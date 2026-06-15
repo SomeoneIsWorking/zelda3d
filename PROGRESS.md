@@ -101,7 +101,58 @@ EGL render of a .3ds model in ~1s (needs SOH3D_3DS_ROM + SOH3D_O2R). Clean rende
 the in-game orientation (SoH3D_DrawModelGL uses live gSoH3dRotX/Y/Z) still needs an
 in-game check (harness ≠ in-game orientation proxy — see earlier).
 
-### Phase 4 NEXT — animation (CSAB skeletal anim). Scoping done:
+### Phase 4 DONE (session 8) — CSAB skeletal animation, VERIFIED through GL
+The Gerudo's idle "wait" animation renders fully textured + correctly skinned
+through the direct-GL path. **`scratch/render/gerudo_idle_f0.png`** = the iconic
+arms-crossed Gerudo idle; `gerudo_idle_f11.png` = the idle sway (torso lean). End
+to end: CSAB parse → per-bone animated TRS → world matrices → skinMatrix =
+animWorld·bindInverse → per-vertex weighted blend → GL.
+
+**Files.** Python oracle: `tools/csab.py` (parser + sampling + `skinned_triangles`),
+`tools/csab_render.py` (software rasterizer for quick pose checks),
+`tools/csab_xcheck.py` (element-wise C++↔Python diff). C++: `soh/src/soh3d/asset/
+csab.{h,cpp}` (mirror of csab.py), `asset/mat4.h` (shared 4x4 helpers, extracted
+from cmb.cpp + general inverse), `asset/cmb` gained `buildDrawGroupsSkinned(skinMats)`
++ `boneMatrices()` (the old `buildDrawGroups()` is the identity case = bind pose,
+unchanged). Wiring: `soh3d_model.cpp` provider + `dlist_harness` honor env
+`SOH3D_ANIM=<csab base>` `SOH3D_FRAME=<float>`.
+
+**Key design (the property that makes it safe):** the animated bone world matrix uses
+the SAME T·Rz·Ry·Rx·S convention as the CMB bind-pose `computeBoneMatrices`, so with
+no anim (rest TRS) animWorld == bindWorld and skinMatrix = animWorld·bindInverse = I —
+the bind-pose render is byte-unchanged. Rigid (bone_dim==1) and smooth (bone_dim>1)
+meshes are UNIFIED: every vertex is first taken to MODEL space exactly as the bind-pose
+path does (rigid: ·bindWorld; smooth: raw), then skinned by the weighted blend of its
+bones' skinMatrix. Rigid = single bound bone weight 1.
+
+**Verified (verify-quantitatively):** Python — rest-pose skin matrices = I (3.9e-13);
+keyframe-exactness = 0 (sampling at a keyframe returns its value → track parse + hermite
+correct); loop continuity pose(0)==pose(duration) = 0 (duration + REPEAT wrap correct);
+csab=None skinned == bind pose. C++↔Python element-wise (`csab_xcheck.py`): ge1_s_wait
+frames 0/11/21 + ge1_matsu (linear) max|Δpos|~1e-3 (float32 vs float64 on coords ≤6500),
+max|Δnrm|~3e-7. Commits: Shipwright fork develop 25a03176b; libultraship fork soh3d
+835f6a1e; parent main e871b7f.
+
+**Format (Ocarina subversion 3), confirmed on ge1_s_wait:** header `csab`@0,
+subver=3@8, anod-base=0x18 (@0x14), duration-1@0x28, anodCount@0x30, boneCount@0x34,
+then int16 boneToAnimTable[boneCount], align(4), u32 anod-offset table (rel to 0x18).
+Each `anod`: boneIndex u16@4, isRotInt16 u16@6, nine u16 track offsets@8 (tX tY tZ rX
+rY rZ sX sY sZ, rel to anod start). Track: type u32@0 (0 const/1 linear/2 hermite),
+nKf@4, tStart@8, tEnd@0xC; linear kf = (u32 time, f32 val) stride 8; hermite kf = (u32
+time, f32 val, f32 tIn, f32 tOut) stride 0x10. Rotations are radians.
+
+**REMAINING (next layer): LIVE in-game animation.** Current wiring bakes ONE frame at
+load (env-driven, for harness verification). For live playback: advance a frame counter
+per game frame, recompute skin matrices, and either (a) re-skin on CPU + re-upload the
+VBO each frame (needs a `SoH3D_GL_InvalidateModel`/re-upload hook — the renderer caches
+the upload), or (b) GPU skinning — add per-vertex boneIndices/weights to the VBO + a
+bone-matrix uniform array, blend in the shader (cleanest; the per-vertex bone data is
+already gathered in `buildDrawGroupsSkinned`). Also: hook the actual En_Ge1 actor's
+current animation (the game picks ge1_s_wait/matsu/hanasi by state) rather than a fixed
+env anim. Harness ≠ in-game orientation (see the upside-down/untextured note below) —
+verify live anim IN-GAME.
+
+### Phase 4 (original scoping) — animation (CSAB skeletal anim):
 zelda_ge1.zar contains CSAB anims: `ge1_s_wait` (idle), `ge1_matsu`, `ge1_hanasi`
 (talk), + `geldwoman_eye.cmab` (eye texture anim). CSAB header (ge1_s_wait): magic
 'csab', version=3 @0x08, ~frame/duration field near 0x14, bone count 15 @0x30 (matches
