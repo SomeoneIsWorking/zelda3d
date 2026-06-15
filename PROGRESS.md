@@ -87,6 +87,39 @@ with "no LUS". Decide: is "no LUS" = don't route our MODELS through the N64
 Fast3D/texture path (satisfied — we draw raw GL), or literally zero libultraship
 edits (then need an existing hook / a different injection)? **Pending user call.**
 
+### Phase 2 DONE (session 7) — direct-GL renderer, VERIFIED correct
+The Gerudo renders fully + correctly textured through the new path, loaded from the
+.3ds at runtime. Committed+pushed: libultraship fork soh3d 7b3b6c9d; Shipwright fork
+develop 31563fa26. Key files: `libultraship/src/fast/soh3d_gl.cpp` (renderer),
+`OTR_G_SOH3D_DRAW` opcode (gbi.h/lus_gbi.h/interpreter.cpp), `soh/src/soh3d/
+soh3d_model.cpp` (bridge), `soh3d.c` SoH3D_DrawModelGL. Bugs fixed via the harness:
+(1) crash — the interpreter assumed mOpenglVbo stays bound; now LoadShader+DrawTriangles
+bind it explicitly. (2) textures wrong — UVs need V-flip (PICA top-origin vs GL
+bottom-origin). Harness: `soh3d_dlist_harness --soh3d [--rotx 180] [--zar <p>]` →
+EGL render of a .3ds model in ~1s (needs SOH3D_3DS_ROM + SOH3D_O2R). Clean render:
+`scratch/render/soh3d_gl_clean.png`. NOTE: rotx 180 makes it upright in the HARNESS;
+the in-game orientation (SoH3D_DrawModelGL uses live gSoH3dRotX/Y/Z) still needs an
+in-game check (harness ≠ in-game orientation proxy — see earlier).
+
+### Phase 4 NEXT — animation (CSAB skeletal anim). Scoping done:
+zelda_ge1.zar contains CSAB anims: `ge1_s_wait` (idle), `ge1_matsu`, `ge1_hanasi`
+(talk), + `geldwoman_eye.cmab` (eye texture anim). CSAB header (ge1_s_wait): magic
+'csab', version=3 @0x08, ~frame/duration field near 0x14, bone count 15 @0x30 (matches
+skeleton), then a per-bone index table, then `anod` chunks each with translation/
+rotation/scale keyframe tracks. **Plan:**
+1. Port a CSAB parser (Python first in tools/csab.py, verify, then C++ asset/csab) —
+   use the noclip OcarinaOfTime3D/csab.ts as the format reference (cmb.py/pica were
+   ports of noclip; do the same — don't reverse-engineer keyframe encoding blind).
+2. Per frame: anim → each bone's local TRS → world matrices; skin = for smooth meshes
+   blend by per-vertex boneIndices+boneWeights using animBoneWorld × bindInverse
+   (identity at bind pose, so bind-pose render still matches). Need to ALSO read the
+   boneIndices/boneWeights attrs (currently buildDrawGroups ignores them for smooth)
+   and the per-bone bind-inverse matrices.
+3. Skinning location: GPU (pass bone-matrix array uniform + per-vertex idx/weights in
+   the VBO; shader does the blend) is cleanest; CPU (recompute verts/frame) is simpler
+   to get correct first. Verify a deformed frame in the harness (--anim ge1_s_wait
+   --frame N) before in-game.
+
 **Renderer pieces to build (`soh/src/soh3d/soh3d_gl.{cpp,h}`):**
 - One-time per model: upload each draw group's verts to a VBO; decode+upload each
   texture (PicaDecode→glTexImage2D, GL_RGBA8); cache by model id.
