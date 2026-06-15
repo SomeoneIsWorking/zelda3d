@@ -4,6 +4,58 @@ Goal: make **Ship of Harkinian** render **OoT3D (3DS)** character models and wor
 geometry instead of the N64 assets. Asset-conversion + renderer-integration task
 (not a renderer merge). Azahar (3DS emulator) is built as the **visual oracle**.
 
+## ⭐ ARCHITECTURE PIVOT (2026-06-15, session 7) — read this FIRST
+The "convert CMB → N64 F3DEX2 dlist (cmb_to_c.py) → bake C arrays into soh.elf →
+draw via libultraship's Fast3D interpreter" approach is being **REPLACED**. User
+directive: *"Mod SoH so it reads 3DS textures and models directly and can replace
+N64 models with them, no LUS, no elf."* Decisions (locked via AskUserQuestion):
+- **Render path:** a NEW **direct-OpenGL renderer inside SoH** that does NOT go
+  through the Fast3D interpreter/dlist path. Own vertex+texture upload, own shader,
+  matrices hooked to the game camera, drawing into the game framebuffer with depth
+  test so 3DS models occlude correctly against the N64 scene.
+- **Assets:** a runtime **C++ parser for raw .cmb/.zar/decrypted-.3ds** (port of the
+  Python tools/ parsers), reading 3DS files directly at load time. NO pre-converted
+  C arrays compiled into the binary.
+- **Replacement:** at the actor-divert point (sModelTable), draw the runtime-loaded
+  3DS model via the new GL path instead of the N64 actor.
+
+**Why the pivot (root cause that triggered it):** baking models as `static const`
+C arrays makes their texture pointers land at ~0x03xxxxxx in the **non-PIE** soh.elf
+(`readelf` Type=EXEC). Those addresses are ≤ 0x0FFFFFFF, which collides with the N64
+**segment-address range** — `gfx_set_timg_handler_rdp`'s `addr <= 0x0FFFFFFF` guard
+rejects them as "unresolved N64 segment", so geldwoman's textures never upload
+(in-game = flat tan skin; the dlist harness only worked because it mmap'd textures
+high). Verified via TEXLOG instrumentation: all 6 geldwoman RGBA32 textures
+"REJECTED by guard: addr=0x31e6b40…". Rather than fight the N64 segment scheme
+(relocate-to-heap / PIE / resource packaging), use SoH as the PC engine it is:
+load assets at runtime (heap = high addrs, no guard) and render them directly in GL.
+
+**What was REVERTED this session:** the TEXLOG/texfix debug hacks in libultraship
+(interpreter.cpp, gfx_sdl2.cpp) — that fork is back to its committed baseline ("no
+LUS" edits). The cmb_to_c.py / generated `soh3d_*_model.{c,h}` path is now legacy
+(kept for reference until the new path renders, then removed).
+
+**Plan / phases** (see also `debug_journal/` if present):
+1. **C++ asset loader** (port tools/ → `soh/src/soh3d/asset/`): `ctr_rom` (NCSD→NCCH
+   →IVFC romfs), `zar`, `cmb` (skeleton, bind-pose matrices, SEPD/PRMS/PRM geometry
+   assembly, smooth-vs-rigid skinning), `pica_texture` (ETC1/ETC1A4 + tiled formats).
+   Verify byte/vertex-exact vs the Python tools (verify-quantitatively).
+2. **GL renderer** (`soh/src/soh3d/soh3d_gl.{cpp,h}`): upload decoded textures + a
+   VBO per model once; per draw, set MVP from the game camera + actor matrix, render
+   into the game FBO with depth. Reuse libultraship's GL *context/FBO* (unavoidable)
+   but NOT its Fast3D interpreter.
+3. **Divert wiring:** SoH3D_TryDrawActor → enqueue (model, matrix); flush via the new
+   renderer. Orientation/scale tuned live over the existing REPL.
+4. Then: animation (bone matrices), more characters, **world/scene geometry**.
+   World geometry is the SAME pipeline — OoT3D scenes/rooms are CMB models inside
+   ZAR archives (e.g. the scene `*_info.zar` / room CMBs). The loader (CtrRom→Zar→
+   Cmb) and the GL renderer are kept GENERAL (not character-specific): a scene model
+   is just a static, skeleton-less CMB placed at world origin. Design must not bake
+   in character-only assumptions — this is an explicit goal, not an afterthought.
+
+ROM path: read the decrypted .3ds at runtime from **env `SOH3D_3DS_ROM`** (see
+`soh3d-rom-paths` memory; NEVER commit the absolute path).
+
 ## Layout
 - `tools/` — 3DS asset toolchain (Python, dependency-free for extraction).
 - `scripts/` — dependency install scripts (Fedora; run with sudo yourself).
