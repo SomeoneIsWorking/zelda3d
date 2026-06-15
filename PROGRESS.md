@@ -361,6 +361,31 @@ Resolved the head-down orientation so characters drop into the in-game pipeline 
   divert, tune `scale geldwoman <f>` via the REPL (same method as the pot). Generated
   character model .c is regenerated with `--rotx 180 --ground` (ROM-derived → gitignored).
 
+### BUG — in-game Gerudo is UPSIDE-DOWN + UNTEXTURED (harness ≠ game) (2026-06-15, session 6)
+First in-game character test (En_Ge1 diverted, spawned in Gerudo Fortress ENTR 0x129=297,
+SOH3D=1) rendered the OoT3D Gerudo **upside-down and untextured (flat grey)** — even though
+the harness `--gl` render of the SAME generated .c is upright + fully textured. Verified the
+running soh.elf has the upright model (geldwoman.c vtx y range 0..6524; elf newer than the .c).
+Two distinct in-game-only bugs the harness did NOT catch:
+1. **Orientation — the harness readback is vertically FLIPPED vs the game.** Both use
+   libultraship's `GfxRenderingAPIOGL`; the only difference is harness-only code: the PPM
+   readback **row-flip** (`WritePpmFlipped`) + identity projection. mGameFb is created with
+   `opengl_invertY=true`, so the harness's extra flip likely double-inverts. Props (pot/gs)
+   are ~vertically symmetric so it went unnoticed; the asymmetric Gerudo exposed it. The game
+   is canonical → **the `--rotx 180` bake was BACKWARDS for the game.** TODO: (a) fix the
+   harness readback to match the game (after fix, `--rotx 180` geldwoman should show
+   head-DOWN in the harness); (b) re-derive the correct orientation bake against the GAME as
+   ground truth (likely NO --rotx 180, just grounding so feet sit at the actor origin).
+2. **Textures fail in-game (renders flat grey = TEXEL0*PRIM with no texel).** The harness
+   mmaps textures to high addresses to pass `gfx_set_timg_handler_rdp`'s `addr<=0x0FFFFFFF`
+   guard; in-game pot/gs/kibako texture fine, so soh.elf static data is normally high — but
+   geldwoman (6 textures, several using the PLAIN G_LOADBLOCK for <=4096-texel textures, vs
+   the props' all-wide loads) shows none. Investigate whether the small/plain-LoadBlock
+   textures bind in-game, or whether some of the 6 G_SETTIMG addrs land below the guard.
+**Lesson: the dlist harness is NOT a faithful proxy for in-game orientation/texture — verify
+characters IN-GAME, not just in the harness.** The --rotx/--ground feature + En_Ge1 divert
+wiring are sound; the orientation VALUE + texture path need in-game debugging.
+
 ### TOOLING — Azahar texture-decode ORACLE (data-driven) (2026-06-15, session 4)
 Built the first piece of the "compare SoH3D vs Azahar" oracle the user asked for,
 as a C++ tool in the Azahar fork that needs NO emulator run / in-game navigation:
