@@ -40,14 +40,69 @@ SOH_FRAMEDUMP=/abs/out.ppm SOH_FRAMEDUMP_FRAME=500 \
   timeout 150 xvfb-run -a -s "-screen 0 1280x720x24" ./soh.elf
 ```
 
+### MILESTONE — OoT3D pot renders in-game (2026-06-15)
+First OoT3D asset rendered through SoH's modern renderer, in a live scene, with
+its full-res 3DS texture at the correct world transform. **Approach A** (CMB →
+F3DEX2 dlist + full-res RGBA32 texture), which turned out to be the right first
+step — see the corrected TMEM finding below.
+
+Pipeline:
+- `tools/cmb_to_c.py <model.cmb> <out_base>` converts a CMB to a self-contained
+  C source: a `Vtx[]`, the texture decoded to RGBA32 (`pica_texture.decode`),
+  and an `Gfx[]` display list with **manual** texture-load commands carrying the
+  *real* pixel width (so LUS uploads it at full res — NOT through 4 KB TMEM).
+  Geometry is batched <=10 tris / gSPVertex load. Generated files contain
+  ROM-derived assets → **gitignored, never committed**; regenerate from the ROM.
+- `soh/src/soh3d/` — `soh3d.{c,h}` (env toggles) + the generated
+  `soh3d_pot_model.{c,h}`. SoH globs `src/*.c` (GLOB_RECURSE) so new files are
+  picked up after a `cmake build-cmake` reconfigure.
+- Hook: `ObjTsubo_Draw` (z_obj_tsubo.c) draws `soh3d_pot_model_dl` via
+  `Gfx_DrawDListOpa` when `SOH3D=1`. The actor world matrix is already loaded, so
+  the mesh lands correctly.
+
+Regenerate the pot model (from the extracted CMB):
+```
+python3 tools/cmb_to_c.py scratch/extract/tubo2_model.cmb \
+  Shipwright/soh/src/soh3d/soh3d_pot_model
+```
+
+### Headless verification path (no input scripting)
+Reaching an in-game scene headlessly is solved with an env-gated auto-warp that
+reuses SoH's debug Select overlay + `Select_LoadGame`:
+- `SOH3D_WARP=1` — boot straight into Select, then auto-warp. Default entrance
+  Kakariko Village (`SOH3D_ENTRANCE=<decimal>` to override).
+- `SOH3D=1` — enable OoT3D-model rendering (the `ObjTsubo_Draw` divert).
+- `SOH3D_DEBUGPOT=1` — debug-draw the pot model at Link's position in ANY scene
+  (verifies the render path without needing a real pot in view). `SOH3D_SCALE=F`
+  scales it (env tunable, no baked magic constant).
+Verified render: `scratch/screenshots/pot3d_s0.2.png` (pot at Link's feet,
+Kakariko). Code: graph.c (boot→Select), z_select.c (auto-warp), z_play.c
+(debug draw at OnPlayDrawEnd).
+
+### CORRECTION — there is NO 4 KB TMEM limit in the LUS modern path
+PROGRESS/handoff previously said approach A hits "TMEM 4 KB: pot's 64x128 tex
+won't fit". **Wrong.** `Interpreter::ImportTextureRgba32` reads the texture
+straight from the source pointer at the tile's full dimensions; the 4 KB assert
+in `GfxDpLoadBlock` is commented out, and the code explicitly supports
+manually-built DLs that set the real pixel width. This is the same path SoH's HD
+texture packs use. So approach A renders full-res textures fine — it is the
+correct first milestone, not just a stepping stone. Approach B (native opcode)
+is only needed later if per-vertex lighting/normals fidelity demands it.
+
 ## Next phase (implementation)
-1. **Azahar oracle instrumentation** (the "tooling baked in"): add a headless
-   frame dump (glReadPixels, mirror of the LUS one) + ideally a draw-call dump of
-   the geometry/material/texture the PICA receives for a target object. Qt+GL
-   frame isn't grabbable via X root (same as SoH) → in-app dump needed.
-2. **LUS native model draw path** (approach B above): render a native CMB mesh at
-   the actor matrix through the modern backend, full-res texture bound directly.
-3. **First in-game result**: pot via the native path, A/B'd vs the Azahar oracle.
+1. **DONE** — First in-game OoT3D pot via approach A (see MILESTONE above).
+2. **Scale calibration** (next): derive the OoT3D→N64 unit scale from the actual
+   N64 pot dimensions (don't bake an eyeballed constant). ~0.2 looks right; the
+   principled value = N64_pot_height / OoT3D_model_height. Bake into the converter
+   (--scale) or the draw, replacing the SOH3D_SCALE debug env.
+3. **Fidelity**: the pot currently draws flat-lit (white vtx color, MODULATERGBA).
+   Add normals + the scene lighting (or per-vertex CMB color) for real 3DS look;
+   verify V-flip / wrap modes against the texture; map materials→textures (the
+   converter currently hardcodes texture index 0; fine for the 1-material pot).
+4. **Azahar oracle instrumentation**: headless frame dump (glReadPixels, mirror
+   of the LUS one) + draw-call dump of geometry/material/texture for A/B compare.
+5. **Generalize**: drive the converter from a per-actor table / GameInteractor
+   `VB_*` hooks instead of editing each actor's Draw; then a second object.
 
 ## In progress / next
 - **Azahar Qt frontend build**: needs Qt6 — run `scripts/install_azahar_deps.sh`,
@@ -72,9 +127,10 @@ GameInteractor `VB_POT_SETUP_DRAW` hooks — a clean place to divert.
 
 Two integration layers:
 - **A. CMB→F3DEX2 conversion** (no LUS changes): convert CMB to an N64 display
-  list + N64-format texture, feed to `Gfx_DrawDListOpa`. Fast, reuses everything,
-  but hits N64 limits (TMEM 4KB: pot's 64x128 tex won't fit in one load; s16
-  verts; limited lighting). Good only as a stepping stone.
+  list + full-res RGBA32 texture, feed to `Gfx_DrawDListOpa`. **This is what's
+  implemented and verified (see MILESTONE).** The old "TMEM 4 KB limit" worry was
+  wrong — LUS uploads textures at full tile size (CORRECTION above). Remaining A
+  limits are s16 vertex precision and N64-style lighting, not texture size.
 - **B. Native model draw path** (chosen end state): new Fast3D opcode / resource
   in libultraship that, at gfx_pc interpret time, takes the current MV+proj matrix
   and renders a native CMB mesh (full-res RGBA texture bound directly, bypassing
