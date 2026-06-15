@@ -197,6 +197,43 @@ add `{ ACTOR_<ID>, <model>_dl, <scale> }` to `sModelTable[]`, add the generated
 but the `Actor_Draw` chokepoint is simpler and id-driven — no per-actor hook
 plumbing.)
 
+### TOOLING — live REPL for a long-lived headless SoH instance (2026-06-15, session 4)
+Replaced the env-flag -> rebuild -> 7-min headless render loop with an interactive
+REPL so experiments cost seconds. Tooling-first (a hard rule — see memory):
+- `tools/soh3d_render.sh` — headless launcher with GUARANTEED Xvfb/soh teardown via
+  a trap (soh.elf exits 139 on teardown, which leaked Xvfb under plain xvfb-run —
+  that was the "instances left behind" bug).
+- `tools/soh3d_repl_launch.sh` — boots ONE long-lived instance with the REPL FIFO
+  enabled (default warp Gerudo Valley 0x117, which loads OBJECT_KIBAKO2).
+- `soh3d.c SoH3D_ReplPoll` (env SOH3D_REPL=<fifo>) — reads commands each frame:
+  `mul/diff/tint` (live scene tint), `scale <name> <f>`, `spawn <name>`, `enable`,
+  `dump <path>` (on-demand frame dump, no exit), `state`. Tint params + per-model
+  world scales are now live globals; the model table carries a name per entry.
+- libultraship `gfx_sdl2.cpp` — on-demand dump trigger (`gSoh3dDumpPending`/Path)
+  so the running instance dumps any frame without exiting.
+- `tools/soh3d_repl.py` — driver: `ready`, `cmd`, `shot [box]`, `zoom`, `region`,
+  `isolate` (diff two shots of the same scene to isolate the one changed object),
+  `probe`. Use these; never hand-run xvfb or inline measurement python again.
+
+### OPEN BUG — 128x128 RGBA32 textures don't upload (gsDPLoadBlock 12-bit lrs)
+The OoT3D crate (Obj_Kibako2, 128x128 ETC1 wood) renders a teal/green blotchy
+texture, NOT its (verified-brown) wood texels. Diagnosed via the REPL:
+- `state` confirms at mul=10 the tint PRIM clamps to (255,255,255), so a full-bright
+  shot is pure texture — and it is green, while every tex0 texel is brown.
+- A solid-MAGENTA texture (cmb_to_c.py new `--solid R,G,B` diag flag) ALSO renders
+  teal, so our texture array is never sampled — the crate shows a stale/other texture.
+- Root-cause candidate: `gsDPLoadBlock` encodes lrs (texels-1) in a 12-bit field
+  (handler reads `C1(12,12)`), so >4096 texels truncate (16383 & 0xFFF = 4095) ->
+  wrong size_bytes -> garbled/partial load. The pot (8192 texels) is ALSO affected
+  (loads ~64x64 not 64x128) but wasn't visually obvious; the GS's verified face is
+  its 128x64 body, not a true 128x128. So 128x128 was never actually proven before.
+- FIX ATTEMPTED: emit `gsDPLoadBlockWide` (full lrs in w1) for >4096 texels
+  (cmb_to_c.py). It did NOT fix the crate — still teal. So either the wide opcode
+  path is also broken in this LUS, or the upload is skipped for another reason
+  (e.g. a size guard / cache). STILL OPEN — next: trace ImportTextureRgba32 /
+  TextureCacheLookup for a 128x128 load (add a logged dump of size_bytes/width/
+  height, or check GetMaxTextureSize / a >N-texel skip). The wide change is kept.
+
 ## Next phase (implementation)
 1. **DONE** — First in-game OoT3D pot via approach A (see MILESTONE above).
 2. **DONE** — Real `ObjTsubo_Draw` path renders the OoT3D pot at calibrated size
