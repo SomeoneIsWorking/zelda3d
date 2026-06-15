@@ -335,8 +335,14 @@ onto every vertex. The key finding (verified by rendering `hintstone` through th
   rest→upright reorientation for in-game placement is unresolved and is an INTEGRATION concern
   (the in-game actor/skeleton matrix), not a geometry/texture bug. Revisit when wiring
   characters into SoH in-game.
-- NEXT: try Link (`zelda_link_child_new.zar` → `child/model/childlink_v2.cmb`); then in-game
-  integration / animation (moving bones) as a later, separate phase.
+- **Child Link too** (`zelda_link_child_new.zar` → `child/model/childlink_v2.cmb`): 25 bones,
+  55 meshes, 27 materials, 11172 verts — renders fully textured (green tunic/hat, face,
+  Kokiri sword + shield, slingshot, Deku shield) via `--model childlink`. See
+  `scratch/render/childlink_upright.png`. (Lower legs/boots look slightly compressed — likely
+  rigid sub-meshes bound to leg bones interacting with the mixed rigid/smooth model; minor,
+  revisit later.)
+- NEXT: in-game integration of OoT3D models (divert table `sModelTable[]` in soh3d.c);
+  animation (moving bones) and world/scene geometry as later phases.
 
 ### TOOLING — Azahar texture-decode ORACLE (data-driven) (2026-06-15, session 4)
 Built the first piece of the "compare SoH3D vs Azahar" oracle the user asked for,
