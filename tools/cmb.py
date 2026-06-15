@@ -11,8 +11,25 @@ Indexing model (verified against noclip.website OcarinaOfTime3D/cmb.ts):
 References: CloudModding 3D:CMB_format, noclip OcarinaOfTime3D/cmb.ts.
 """
 from __future__ import annotations
-import struct
+import struct, math
 from dataclasses import dataclass, field
+
+# ---- tiny 4x4 matrix helpers (column-vector convention, M @ [x,y,z,1]) ----
+def _mat_id(): return [[1.0 if i==j else 0.0 for j in range(4)] for i in range(4)]
+def _mat_mul(A,B):
+    return [[sum(A[i][k]*B[k][j] for k in range(4)) for j in range(4)] for i in range(4)]
+def _mat_T(x,y,z): return [[1,0,0,x],[0,1,0,y],[0,0,1,z],[0,0,0,1]]
+def _mat_S(x,y,z): return [[x,0,0,0],[0,y,0,0],[0,0,z,0],[0,0,0,1]]
+def _mat_Rx(a):
+    c,s=math.cos(a),math.sin(a); return [[1,0,0,0],[0,c,-s,0],[0,s,c,0],[0,0,0,1]]
+def _mat_Ry(a):
+    c,s=math.cos(a),math.sin(a); return [[c,0,s,0],[0,1,0,0],[-s,0,c,0],[0,0,0,1]]
+def _mat_Rz(a):
+    c,s=math.cos(a),math.sin(a); return [[c,-s,0,0],[s,c,0,0],[0,0,1,0],[0,0,0,1]]
+def _mat_apply_pos(M,p):
+    return tuple(sum(M[i][k]*(p[k] if k<3 else 1.0) for k in range(4)) for i in range(3))
+def _mat_apply_dir(M,v):   # rotation+scale only, no translation (for normals)
+    return tuple(sum(M[i][k]*v[k] for k in range(3)) for i in range(3))
 
 def _u8(b,o):  return b[o]
 def _s16(b,o): return struct.unpack_from("<h",b,o)[0]
@@ -56,6 +73,21 @@ class Sepd:
 class Mesh:
     sepd_index:int; material_index:int; mesh_id:int
 
+# GL texture wrap modes (CMB stores the raw GL enum).
+WRAP_CLAMP, WRAP_REPEAT, WRAP_CLAMP_EDGE, WRAP_MIRROR = 0x2900, 0x2901, 0x812F, 0x8370
+
+@dataclass
+class Material:
+    index:int
+    tex0_idx:int          # texture index of binding 0 (-1 if none)
+    wrap_s:int; wrap_t:int # GL wrap enums for binding 0
+    scale_s:float; scale_t:float
+    trans_s:float; trans_t:float
+    rot:float
+    cull:int              # 0=none 1=back 2=front 3=both (raw flags)
+    alpha_test:bool
+    alpha_ref:float
+
 @dataclass
 class Texture:
     name:str; width:int; height:int; fmt:int; data_type:int; etc1:bool; data_offset:int; data_len:int
@@ -89,6 +121,8 @@ class Cmb:
         self.texdata_ptr = _u32(b,0x40)
         self.attrs_def = ATTRS_MM3D if self.version>=7 else ATTRS_OOT3D
         self._parse_skl()
+        self._compute_bone_matrices()
+        self._parse_mats()
         self._parse_vatr()
         self._parse_tex()
         self._parse_sklm()
@@ -105,6 +139,60 @@ class Cmb:
             scale=_vec(b,o+4,3); rot=_vec(b,o+0x10,3); trans=_vec(b,o+0x1C,3)
             self.bones.append(Bone(bid,parent,scale,rot,trans))
             o+=0x28   # id+unk+parent(4) + scale/rot/trans(3x12=36) = 0x28
+
+    # ---- bind-pose bone matrices ----
+    def _compute_bone_matrices(self):
+        """World (bind-pose) matrix per bone, so rigidly-skinned meshes stored in
+        bone-local space land in the right place. Local = T * Rz * Ry * Rx * S
+        (CTR/Grezzo ZYX euler); world = parent_world * local. The single-bone pot
+        never needed this (bone 0 = identity); multi-bone props (chest lid, etc.)
+        do — without it bone-local meshes render scrambled. Verified on tr_box:
+        the lid (bone 2) then sits exactly atop the base."""
+        by_id = {b.id: b for b in self.bones}
+        self.bone_matrix = {}
+        def world(bid):
+            if bid in self.bone_matrix: return self.bone_matrix[bid]
+            b = by_id[bid]
+            L = _mat_mul(_mat_T(*b.trans),
+                         _mat_mul(_mat_mul(_mat_Rz(b.rot[2]), _mat_Ry(b.rot[1])),
+                                  _mat_Rx(b.rot[0])))
+            L = _mat_mul(L, _mat_S(*b.scale))
+            W = L if b.parent < 0 else _mat_mul(world(b.parent), L)
+            self.bone_matrix[bid] = W
+            return W
+        for b in self.bones:
+            world(b.id)
+
+    # ---- MATS ----
+    def _parse_mats(self):
+        """Parse the material table: per-material primary texture binding + UV
+        coordinator + alpha test. Verified against noclip readMatsChunk (Ocarina
+        layout, material stride 0x15C; >Ocarina adds 0x10)."""
+        b=self.data; p=self.mats_ptr
+        self.materials=[]
+        if p==0 or b[p:p+4]!=b"mats": return
+        n=_u32(b,p+8)
+        stride = 0x15C if self.version<=6 else 0x16C
+        o=p+0x0C
+        for i in range(n):
+            cull=_u8(b,o+4)
+            # binding 0 at o+0x10: textureIdx(s16) .. wrapS(u16)@+8 wrapT@+0xA
+            bo=o+0x10
+            tex0=_s16(b,bo); wrap_s=_u16(b,bo+8); wrap_t=_u16(b,bo+0x0A)
+            # coordinator 0 at o+0x58: scaleS/T, transS/T, rot (f32)
+            co=o+0x58
+            sS,sT,tS,tT,rot=struct.unpack_from("<5f",b,co+4)
+            alpha_en=_u8(b,o+0x130); alpha_ref=_u8(b,o+0x131)/255.0
+            self.materials.append(Material(i,tex0,wrap_s,wrap_t,sS,sT,tS,tT,rot,
+                                           cull,bool(alpha_en),alpha_ref))
+            o+=stride
+
+    def material_texture(self, mat_index:int)->int:
+        """Texture index used by a material's primary binding (0 if unknown)."""
+        if 0<=mat_index<len(self.materials):
+            t=self.materials[mat_index].tex0_idx
+            return t if t>=0 else 0
+        return 0
 
     # ---- VATR ----
     def _parse_vatr(self):
@@ -202,6 +290,14 @@ class Cmb:
             sepd=self.sepds[mesh.sepd_index]
             for prms in sepd.prms:
                 prm=prms.prms[0]
+                # Rigid bind-pose transform: the prms is bound to bone_table[0].
+                # (Smooth skinning would blend per-vertex boneIndices/weights;
+                # OoT3D static props are rigid, so use the single bound bone.)
+                if sepd.bone_dimension>1:
+                    print(f"  WARN: sepd bone_dimension={sepd.bone_dimension} "
+                          f"(smooth skinning) — using bone {prms.bone_table[:1]} for all verts")
+                bid = prms.bone_table[0] if prms.bone_table else 0
+                M = self.bone_matrix.get(bid, _mat_id())
                 isz=DT_SIZE[prm.index_type]; ifmt=DT_FMT[prm.index_type]
                 ibase=self.idx_ptr + prm.first*isz
                 idxs=struct.unpack_from("<%d%s"%(prm.count,ifmt), b, ibase)
@@ -211,6 +307,8 @@ class Cmb:
                     nrm=self.read_attr(sepd.attrs["normal"],"normal",idx,3) \
                         if sepd.attrs["normal"].mode==MODE_ARRAY or sepd.attrs["normal"].mode==MODE_CONSTANT else (0,0,1)
                     uv =self.read_attr(sepd.attrs["texCoord0"],"texCoord0",idx,2)
+                    pos=_mat_apply_pos(M,pos)
+                    nrm=_mat_apply_dir(M,nrm)
                     verts.append((idx,pos,nrm,uv))
                 for i in range(0,len(verts)-2,3):
                     yield (mesh.sepd_index, mesh.material_index, verts[i:i+3])
@@ -246,6 +344,12 @@ if __name__=="__main__":
           f"sepds={len(c.sepds)} textures={len(c.textures)} indices={c.index_count}")
     for t in c.textures:
         print(f"  tex {t.name:20} {t.width}x{t.height} fmt=0x{t.fmt:x} etc1={t.etc1} len={t.data_len}")
+    for m in c.materials:
+        print(f"  mat{m.index}: tex0={m.tex0_idx} wrapS=0x{m.wrap_s:x} wrapT=0x{m.wrap_t:x} "
+              f"scale=({m.scale_s:.3f},{m.scale_t:.3f}) trans=({m.trans_s:.3f},{m.trans_t:.3f}) "
+              f"rot={m.rot:.3f} cull={m.cull} alphaTest={m.alpha_test}@{m.alpha_ref:.2f}")
+    for mesh in c.meshes:
+        print(f"  mesh sepd={mesh.sepd_index} mat={mesh.material_index} -> tex{c.material_texture(mesh.material_index)}")
     for i,s in enumerate(c.sepds):
         pa=s.attrs["position"]
         print(f"  sepd{i} prims={s.prim_count} pos(dt=0x{pa.data_type:x} scale={pa.scale} mode={pa.mode} start={pa.start})")
