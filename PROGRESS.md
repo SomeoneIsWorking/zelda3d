@@ -259,22 +259,25 @@ as a C++ tool in the Azahar fork that needs NO emulator run / in-game navigation
   BOTH the oracle and the converter's `pica_texture.decode`, and diffs per channel
   (worst/mean |Δ| + histogram), trying both V orientations.
 
-**FINDING (data-driven, not eyeballed): the converter's ETC1 decode diverges from
-Azahar.** All OoT3D model textures so far are ETC1. Result for the crate/pot/GS
-ETC1 textures: orientation aligns (top-down), but the decode is NOT bit-exact —
-e.g. crate tex0: ~90.7% of channels EXACT, ~9.3% off by 33-128 (worst 66), NONE
->128. ETC1 is deterministic, so a correct decoder must match Azahar exactly
-(mean|Δ|=0). The bimodal 90/10 split + worst=66 (≈2×33, a modifier-table value)
-points to a specific ETC1 sub-case in `tools/pica_texture.py` `_decode_etc1`
-(not pervasive, not orientation). Bit layout, subtile order, texel mapping and the
-modifier sign/subindex mapping were all checked against `etc1.cpp` and MATCH on
-inspection — so the remaining suspect is a value-path detail (differential base
-range handling, or a per-pixel modifier selection in one mode). NEXT: dump the
-oracle vs converter PNGs + a spatial diff mask to localise which subtiles/modes
-the 9% live in, then fix `_decode_etc1` and re-run until mean|Δ|=0.
+**FOUND + FIXED a real ETC1 decode bug, data-driven (the full oracle loop).**
+The oracle showed the converter's ETC1 decode was NOT bit-exact vs Azahar — crate
+tex0: ~90.7% channels exact, ~9.3% off by 33-128 (worst 66). The spatial diff
+(`oracle_compare.py` histogram by `(x%8,y%8)`) localised the errors to EXACTLY
+ETC1 subblock2 (the `c2` half: differ when local x>=2 OR y>=2, exact in the
+lx<2&ly<2 corner). That + worst=66 (= 8 five-bit levels × ~8.25 after 5->8
+expansion) pinned it to the differential DELTA. Root cause: `pica_texture.py`
+`_s3` (3-bit sign-extend) used the C idiom `(n<<29)>>29`, which relies on 32-bit
+overflow into the sign bit — but Python ints are arbitrary precision, so it does
+NOT sign-extend (`(4<<29)>>29 == 4`). Differential deltas with bit 2 set (n=4..7,
+i.e. -4..-1) stayed positive, corrupting every differential-mode block's c2.
+Fix: `_s3(n) = n-8 if (n&4) else n`. After the fix ALL OoT3D ETC1 textures
+(pot, GS tex0/tex1, crate) decode **bit-exact** vs Azahar: worst|Δ|=0, mean|Δ|=0.
 
-NOTE: this also means the earlier in-game texture renders were slightly off in ~9%
-of texels — minor visually, but the oracle is now the bar (fix to exact).
+Impact: every OoT3D texture rendered in-game before this was subtly mis-coloured
+(~9% of texels, up to 66/255). Regenerate the generated models to pick up the fix.
+This is the payoff of the Azahar oracle — a bug invisible to eyeballing, caught and
+fixed to provable exactness. (The separate crate 128x128 LUS UPLOAD bug above is
+unrelated and still open — correct texels still won't upload until that's fixed.)
 
 ## Next phase (implementation)
 1. **DONE** — First in-game OoT3D pot via approach A (see MILESTONE above).
