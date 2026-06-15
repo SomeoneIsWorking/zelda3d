@@ -173,6 +173,30 @@ The frac=0.5 / mul=1.0 DEFAULTS land within tolerance with no per-scene tuning, 
 no magic constants are baked. Residual hue gap (OoT3D stone is gray-green, N64 is
 gray-blue) is the genuine OoT3D texture palette, not a tint error.
 
+### MILESTONE — generalised table-driven divert (2026-06-15, session 4)
+The SoH3D divert was hand-coded into each actor's Draw (`ObjTsubo_Draw`,
+`EnGs_Draw`) with an `if (SoH3D_Enabled()) { SoH3D_DrawModel(...); return; }`
+block. Replaced with ONE central divert + a table, so adding an object is a
+one-row change with no actor-source edits:
+- `soh3d.c`: `sModelTable[]` maps `actorId -> { dlist, worldScale }`, and
+  `SoH3D_TryDrawActor(play, actor)` looks the actor up; on a hit it draws the
+  OoT3D model via `SoH3D_DrawModel` and returns 1.
+- `z_actor.c` `Actor_Draw`: the single `actor->draw(actor, play)` call site (the
+  chokepoint for EVERY actor) becomes
+  `if (!SoH3D_TryDrawActor(play, actor)) actor->draw(actor, play);`.
+- The per-actor edits in `z_obj_tsubo.c` / `z_en_gs.c` are reverted to stock.
+
+`Actor_Draw` only runs once an actor has a non-NULL draw, so load/spawn timing
+(e.g. the pot's VB_POT_SETUP_DRAW gate) is preserved. **Verified**: the Gossip
+Stone rendered through the new central divert is **pixel-identical** (0 differing
+px) to the pre-refactor per-actor render.
+
+To register another object: extract+convert its CMB (see the pot/GS recipes),
+add `{ ACTOR_<ID>, <model>_dl, <scale> }` to `sModelTable[]`, add the generated
+`#include`/`extern` via `soh3d.h`. (GameInteractor `VB_*` hooks were considered
+but the `Actor_Draw` chokepoint is simpler and id-driven — no per-actor hook
+plumbing.)
+
 ## Next phase (implementation)
 1. **DONE** — First in-game OoT3D pot via approach A (see MILESTONE above).
 2. **DONE** — Real `ObjTsubo_Draw` path renders the OoT3D pot at calibrated size
@@ -192,8 +216,8 @@ gray-blue) is the genuine OoT3D texture palette, not a tint error.
    work; the converter no longer hardcodes texture 0.)
 5. **Azahar oracle instrumentation**: headless frame dump (glReadPixels, mirror
    of the LUS one) + draw-call dump of geometry/material/texture for A/B compare.
-6. **Generalize**: drive the converter from a per-actor table / GameInteractor
-   `VB_*` hooks instead of editing each actor's Draw; then a second object.
+6. **DONE (generalised divert)** — A central table-driven divert replaces the
+   per-actor Draw edits. See the MILESTONE below.
 
 ## In progress / next
 - **Azahar Qt frontend build**: needs Qt6 — run `scripts/install_azahar_deps.sh`,
