@@ -58,7 +58,10 @@ class Mesh:
 
 @dataclass
 class Texture:
-    name:str; width:int; height:int; fmt:int; etc1:bool; data_offset:int; data_len:int
+    name:str; width:int; height:int; fmt:int; data_type:int; etc1:bool; data_offset:int; data_len:int
+    @property
+    def gl_format(self):   # (dataType<<16)|formatConstant -> TextureFormatGL key
+        return (self.data_type<<16)|self.fmt
 
 # attribute name -> component count. OoT3D (v6) has NO tangent slot; MM3D (v7) does.
 ATTRS_OOT3D = [("position",3),("normal",3),("color",4),
@@ -124,9 +127,9 @@ class Cmb:
         n=_u32(b,p+8); o=p+0x0C
         for _ in range(n):
             dlen=_u32(b,o); etc1=_u8(b,o+6); w=_u16(b,o+8); h=_u16(b,o+0x0A)
-            fmt=_u16(b,o+0x0C); doff=_u32(b,o+0x10)
+            fmt=_u16(b,o+0x0C); dtype=_u16(b,o+0x0E); doff=_u32(b,o+0x10)
             nm=b[o+0x14:o+0x24].split(b"\x00")[0].decode("ascii","replace")
-            self.textures.append(Texture(nm,w,h,fmt,bool(etc1),doff,dlen))
+            self.textures.append(Texture(nm,w,h,fmt,dtype,bool(etc1),doff,dlen))
             o+=0x24
 
     # ---- SKLM / SHP / SEPD / PRMS / PRM ----
