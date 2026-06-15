@@ -187,7 +187,48 @@ instances share one pose (skin matrices upload per modelId) — independent per-
 poses would need per-actor bone buffers, deferred. Regression-verified: lone geldwoman
 still grounds + idles (figure-band motion ~2-3k px/0.5s, bg settled).
 
-### Phase 5 NEXT — world/scene geometry (research DONE session 9, IMPL pending)
+### Phase 5 DONE — world/scene geometry (session 10) ⭐
+**OoT3D scene ROOM geometry now renders in-game through the direct-GL path**, world-space
+aligned with the N64 scene and depth-correct. Verified A/B in TWO scenes (general, not
+one-off): Gerudo's Fortress (`spot12_0`, entrance 297) and Gerudo Valley (`spot09_0`,
+entrance 279). Quantitative: scene-1 wall-top silhouette median |Δrow|=0 vs the N64 room
+(95.7% central sky/geometry agreement); scene-2 the N64 Link actor anchors to the SAME
+screen pixel (951,549 vs 964,550) in both renders → identical camera, room grounded.
+
+**What was built (all committed):**
+- `tools/zsi.py` (oracle) + `Shipwright/soh/src/soh3d/asset/zsi.{h,cpp}` (C++): parse the
+  ZSI, walk the command list, require a 0x0A Mesh command, extract the single embedded
+  room CMB by its `cmb ` magic. Byte/vertex-EXACT C++↔Python (verified across rooms +
+  scenes via `tools/soh3d_zsi_test.cpp`, wired into `build_asset_test.sh`).
+- **KEY FINDING (don't re-derive):** every one of the game's 390 room files holds EXACTLY
+  ONE embedded CMB — OoT3D rooms are a single multi-material CMB; the opaque/transparent
+  split N64 puts in separate mesh entries lives in the CMB's per-material alpha flags
+  (renderer already honours it). The ZSI mesh-header→entries→opaque/transparent pointer
+  chain (noclip zsi.ts) does NOT resolve at plain file offsets on the USA decrypted ROM
+  (the data-section addresses carry a base/segment not pinned down), and is unnecessary:
+  locating the lone `cmb ` blob (anchored to a 0x0A command, NOT hardcoded — gerudoway is
+  at 96, spot00 at 996) is robust. See `tools/zsi.py` docstring for the full rationale.
+- `tools/gen_scene_names.py` → committed `soh3d_scene_names.inc`: SoH sceneNum (== SceneID
+  enum == scene_table.h row) → OoT3D scene folder name. 101/110 mapped (case-insensitive
+  match + overrides for renamed dungeons/bosses/houses/shops; 9 NULL = test/beta → N64).
+  Names only, no ROM assets.
+- `soh3d_model.cpp`: scene-room models in a separate id range (`kSceneModelBase=1000`),
+  allocated on demand by ZSI path (`SoH3D_RoomModelId`), loaded via ZSI→CMB→`buildFromCmb`
+  (shared with the actor path; no skeleton/anim). 
+- `soh3d.c`: `SoH3D_TryDrawRoom` (gate by SOH3D → scene name → `room->num` → model id →
+  `SoH3D_DrawRoomGL`). Room draws at the WORLD ORIGIN with an **identity model matrix**
+  (scene CMB verts are already world-space) + scene tint; MP = identity·view·proj = the
+  game camera, so no actor-translate. REPL knobs `scenescale`/`sceneoff` (defaults 1.0 / 0
+  — N64 unit scale & origin match directly, confirmed). Hook: `z_room.c` `Room_Draw`
+  diverts on the opaque pass (`flags&1`; Room_Draw is called once/room with flags=3) and
+  skips the N64 mesh on a hit. Multi-room scenes handled because we hook INSIDE Room_Draw
+  (engine calls it per active room with the right `room->num`).
+
+**Polish left for later (not blockers):** the OoT3D room is brighter than the N64 room —
+we apply a flat scene tint, not the N64 per-vertex lighting; lighting parity is a
+follow-up. Detail/LOD differs (OoT3D is higher-poly + higher-res textures, by design).
+
+### Phase 5 (original research — kept for reference)
 The plan-item-4 goal. **The whole asset+GL pipeline is reusable for scenes — a room is
 a static, skeleton-less CMB.** Validated this session against `gerudoway` (Gerudo's
 Fortress, the entrance-297 scene):
