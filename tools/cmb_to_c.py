@@ -187,6 +187,12 @@ def main():
     # this because Deku Tree's fog setup didn't tint.)
     s.append("    gsDPSetRenderMode(G_RM_AA_ZB_OPA_SURF, G_RM_AA_ZB_OPA_SURF2),")
     s.append("    gsSPTexture(0xFFFF, 0xFFFF, 0, G_TX_RENDERTILE, G_ON),")
+    # Unlit colour comes from the PRIMITIVE register, not vertex SHADE, so the
+    # caller can apply a flat per-draw scene tint (G_CC_*_PRIM = TEXEL0 * PRIM).
+    # SoH3D_DrawModel sets gDPSetPrimColor to the live scene light colour before
+    # the dlist runs; we deliberately do NOT emit a prim colour here (it would
+    # override the caller's). --lit keeps SHADE-based N64 per-vertex lighting.
+    cc = "G_CC_MODULATERGBA" if lit else "G_CC_MODULATERGBA_PRIM"
     for plan in mat_plan:
         ti, TW, TH = plan["tex"], plan["TW"], plan["TH"]
         masks = (TW.bit_length() - 1)
@@ -195,10 +201,10 @@ def main():
         s.append(f"    // material {plan['mat']} -> tex{ti} ({TW}x{TH}), {len(plan['batches'])} batch(es)")
         s.append("    gsDPPipeSync(),")
         if plan["alpha"]:
-            s.append("    gsDPSetCombineMode(G_CC_MODULATERGBA, G_CC_MODULATERGBA),")
+            s.append(f"    gsDPSetCombineMode({cc}, {cc}),")
             s.append("    gsDPSetRenderMode(G_RM_AA_ZB_TEX_EDGE, G_RM_AA_ZB_TEX_EDGE2),")
         else:
-            s.append("    gsDPSetCombineMode(G_CC_MODULATERGBA, G_CC_MODULATERGBA),")
+            s.append(f"    gsDPSetCombineMode({cc}, {cc}),")
         s.append(f"    gsDPSetTextureImage(G_IM_FMT_RGBA, G_IM_SIZ_32b, {TW}, {ident}_tex{ti}),")
         s.append("    gsDPSetTile(G_IM_FMT_RGBA, G_IM_SIZ_32b, 0, 0, G_TX_LOADTILE, 0,")
         s.append("                G_TX_WRAP, 0, 0, G_TX_WRAP, 0, 0),")
