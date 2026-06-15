@@ -91,6 +91,30 @@ def main():
                 break
     print(f"  per-channel |Δ| histogram (of {n}): "
           f">128:{buckets[128]} 33-128:{buckets[32]} 9-32:{buckets[8]} 3-8:{buckets[2]} 0-2:{buckets[0]}")
+    # which in-8x8-tile (x%8,y%8) positions differ? (pinpoints the ETC1 sub-case)
+    pos = {}
+    W = tex.width
+    for p in range(n // 3):
+        x, y = p % W, p // W
+        d = max(abs(abytes[3 * p + k] - best[3 * p + k]) for k in range(3))
+        if d > 8:
+            pos[(x % 8, y % 8)] = pos.get((x % 8, y % 8), 0) + 1
+    if pos:
+        print("  differing pixels by (x%8,y%8):")
+        for yy in range(8):
+            print("   " + " ".join(f"{pos.get((xx, yy), 0):4d}" for xx in range(8)))
+    if "--dump" in sys.argv:
+        from PIL import Image
+        sd = os.path.join(REPO, "scratch", "screenshots")
+        os.makedirs(sd, exist_ok=True)
+        best = conv_rgb if mean <= fmean else flipped
+        Image.frombytes("RGB", (tex.width, tex.height), bytes(abytes[:n])).save(os.path.join(sd, "oracle_azahar.png"))
+        Image.frombytes("RGB", (tex.width, tex.height), bytes(best[:n])).save(os.path.join(sd, "oracle_conv.png"))
+        # amplified diff mask (5x) so small deltas are visible
+        dmask = bytes(min(255, abs(abytes[i] - best[i]) * 5) for i in range(n))
+        Image.frombytes("RGB", (tex.width, tex.height), dmask).save(os.path.join(sd, "oracle_diff.png"))
+        print("dumped oracle_{azahar,conv,diff}.png to scratch/screenshots/")
+
     best_mean = min(mean, fmean)
     orient = "top-down" if mean <= fmean else "V-flipped"
     if best_mean < 1.0:

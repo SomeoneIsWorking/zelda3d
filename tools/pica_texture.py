@@ -42,7 +42,7 @@ def _tiled(width,height,decode):
 # ---- ETC1 ----
 _INTENS=[[2,8,-2,-8],[5,17,-5,-17],[9,29,-9,-29],[13,42,-13,-42],
          [18,60,-18,-60],[24,80,-24,-80],[33,106,-33,-106],[47,183,-47,-183]]
-def _s3(n): return (n<<29)>>29  # sign-extend 3-bit
+def _s3(n): return n - 8 if (n & 4) else n  # sign-extend 3-bit (n=4..7 -> -4..-1)
 
 def _etc1_color(dst,w1,w2,dstOffs,stride):
     diff=(w1&0x02)!=0; flip=(w1&0x01)!=0
