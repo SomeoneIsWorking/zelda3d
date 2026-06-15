@@ -215,38 +215,58 @@ REPL so experiments cost seconds. Tooling-first (a hard rule — see memory):
   `isolate` (diff two shots of the same scene to isolate the one changed object),
   `probe`. Use these; never hand-run xvfb or inline measurement python again.
 
-### OPEN BUG — 128x128 RGBA32 textures don't upload (gsDPLoadBlock 12-bit lrs)
-The OoT3D crate (Obj_Kibako2, 128x128 ETC1 wood) renders a teal/green blotchy
-texture, NOT its (verified-brown) wood texels. Diagnosed via the REPL:
-- `state` confirms at mul=10 the tint PRIM clamps to (255,255,255), so a full-bright
-  shot is pure texture — and it is green, while every tex0 texel is brown.
-- A solid-MAGENTA texture (cmb_to_c.py new `--solid R,G,B` diag flag) ALSO renders
-  teal, so our texture array is never sampled — the crate shows a stale/other texture.
-- Root-cause candidate: `gsDPLoadBlock` encodes lrs (texels-1) in a 12-bit field
-  (handler reads `C1(12,12)`), so >4096 texels truncate (16383 & 0xFFF = 4095) ->
-  wrong size_bytes -> garbled/partial load. The pot (8192 texels) is ALSO affected
-  (loads ~64x64 not 64x128) but wasn't visually obvious; the GS's verified face is
-  its 128x64 body, not a true 128x128. So 128x128 was never actually proven before.
-- FIX ATTEMPTED: emit `gsDPLoadBlockWide` (full lrs in w1) for >4096 texels
-  (cmb_to_c.py). Did NOT fix the crate — still teal. Kept (it IS needed).
-- NARROWED with REPL + interpreter.cpp logging (logging since reverted):
-  - `GfxDpLoadBlock` IS called for the crate every frame with `lrs=16383 siz=2`
-    (RGBA32), so the wide opcode dispatches fine and size_bytes=65536 is computed.
-  - BUT `Interpreter::ImportTexture` / `ImportTextureRgba32` is NEVER called for a
-    >=16KB texture, and never for the crate's first texel (213,196,94). The only
-    RGBA32 import seen is a 32x32/4096B UI texture. So the 128x128 load happens but
-    the texture is never IMPORTED/uploaded at draw time -> the crate samples stale
-    TMEM (the teal). The pot (64x128) renders, so smaller raw RGBA32 imports work.
-  - NEXT: trace why ImportTexture is skipped for the render tile of a 65536B load.
-    Suspects: TextureCacheLookup returning a stale hit (key collision on
-    {origAddr,fmt,siz,origSizeBytes}); the render tile's tmem_index not pointing at
-    the slot LoadBlock wrote; `textures_changed[i]` not set; or a size cap in the
-    draw-time texture binding. Put the log back at ImportTexture top filtered on the
-    crate's first texel (213,196,94) and at the TextureCacheLookup call.
-  - NOTE: headless auto-warp boots are FLAKY (often hang in the entrance fade with
-    Play_Draw taking the transition `goto`, which is BEFORE SoH3D_ReplPoll, so the
-    REPL goes unresponsive). Retry the launch; or move ReplPoll earlier in Play_Draw
-    / into Play_Main so it runs during transitions.
+### RESOLVED (NOT A BUG) — 128x128 RGBA32 upload works fine in LUS (2026-06-15, session 5)
+**The previous session's "128x128 RGBA32 textures don't upload" was a MISDIAGNOSIS**,
+built on a misread in-game log. Debunked with a new data-driven SoH-side oracle (the
+**dlist render harness**, below) that runs the crate's exact generated dlist+texture
+through the REAL libultraship Fast3D interpreter with NO game boot, NO window, NO GPU:
+- The harness drives `Interpreter::Run()` over `soh3d_kibako_model_dl` with a recording
+  `GfxRenderingAPI` stub. Result: `gsDPLoadBlockWide(16383)` dispatches correctly
+  (otrHandlers entry `RDP_G_LOADBLOCK_WIDE`=0x47 -> `gfx_load_block_wide_handler_rdp`),
+  `GfxDpLoadBlock` computes the FULL `size=65536` (no 12-bit truncation — the wide
+  opcode carries lrs in w1), and `ImportTextureRgba32` **uploads the full 128x128 with
+  the correct wood texels** (`UploadTexture 128x128, first=213,196,94,255`). The whole
+  RGBA32 upload path is correct end-to-end.
+- Why the previous session was wrong: (a) it read a `siz=2`(16b)/`32768B`/`131,81,123`
+  scene texture as "the crate's 65536B RGBA32 load" — it was an unrelated texture; the
+  crate's load never appeared in the in-game log AT ALL. (b) The crate's load was absent
+  because the spawned `Obj_Kibako2` actor was **frustum-culled / off-screen** (spawned
+  120 units ahead of Link in Gerudo Valley), so `Actor_Draw -> SoH3D_TryDrawActor` never
+  ran its dlist. No dlist => no load => no upload. The "teal" was a stale/other surface,
+  not a failed upload. The `gsDPLoadBlockWide` change (cmb_to_c.py) IS still correct and
+  needed (>4096 texels would truncate under plain `gsDPLoadBlock`); it was a red herring
+  only in that it didn't "fix" a bug that was actually elsewhere.
+- REMAINING (separate, integration-level, NOT an LUS bug): confirm the crate renders
+  in-game when guaranteed on-screen. The debug-draw hooks only *spawn a cullable actor*;
+  to verify deterministically, draw the crate dlist directly each frame in front of the
+  camera (or spawn closer / point the camera at it). The LUS render path itself is proven.
+- FIXED the REPL flakiness this implies: `SoH3D_ReplPoll` moved from `Play_Draw` (after a
+  transition `goto` that skipped it) to `Play_Main` after `Play_Update`, so the REPL stays
+  responsive during entrance fades.
+
+### TOOLING — SoH-side dlist render harness (the LUS oracle) (2026-06-15, session 5)
+The SoH-side counterpart to the Azahar decode oracle: drives libultraship's REAL Fast3D
+interpreter over a generated CMB->F3DEX2 model dlist, headless, with NO game boot / NO
+window / NO GPU. This is the tool to answer "does LUS actually upload/draw this model
+correctly?" deterministically (ms, not a 7-min flaky scene navigation where the actor may
+be culled). It already debunked the bogus "128x128 upload" bug (RESOLVED section above).
+- `Shipwright/libultraship/tools/dlist_harness/` (CMake target `soh3d_dlist_harness`,
+  gated by `-DLUS_BUILD_DLIST_HARNESS=ON`): a recording `GfxRenderingAPI` stub (logs every
+  `UploadTexture` w/h + first pixel, and triangle count) + a no-op `GfxWindowBackend`; a
+  minimal `Ship::Context` (just `InitConsoleVariables`); links the generated model `.c`
+  directly. Injects an ortho projection + modelview via `Run()`'s `mtx_replacements` so
+  triangles aren't all clip-rejected (the upload only fires once a tri survives culling).
+- GOTCHAS baked in: (1) the harness target MUST define `F3DEX_GBI_2` (libultraship sets it
+  PRIVATE, so it doesn't propagate) or the gbi.h opcode macros encode the wrong ucode and
+  the dlist desyncs into garbage opcodes. (2) `gfx_set_timg_handler_rdp` rejects texture
+  pointers `<= 0x0FFFFFFF` (assumed unresolved N64 segment addrs); in a small standalone
+  binary the static texture sits at ~6 MB and is falsely rejected, so the harness mmap's
+  the texture to a HIGH address to mimic the in-game (PIE, high-addr) condition.
+- Build/run: `cmake -S Shipwright -B Shipwright/build-cmake -DLUS_BUILD_DLIST_HARNESS=ON`
+  then `cmake --build ... --target soh3d_dlist_harness`; run the resulting binary.
+- NEXT extension: have the harness drive a REAL GL backend (offscreen FBO) + readback so it
+  dumps actual rendered pixels for an A/B vs the Azahar oracle render (the full both-renderers
+  compare). Currently it records the upload/draw calls, not a framebuffer.
 
 ### TOOLING — Azahar texture-decode ORACLE (data-driven) (2026-06-15, session 4)
 Built the first piece of the "compare SoH3D vs Azahar" oracle the user asked for,
