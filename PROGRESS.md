@@ -187,6 +187,38 @@ instances share one pose (skin matrices upload per modelId) — independent per-
 poses would need per-actor bone buffers, deferred. Regression-verified: lone geldwoman
 still grounds + idles (figure-band motion ~2-3k px/0.5s, bg settled).
 
+### Phase 5 NEXT — world/scene geometry (research DONE session 9, IMPL pending)
+The plan-item-4 goal. **The whole asset+GL pipeline is reusable for scenes — a room is
+a static, skeleton-less CMB.** Validated this session against `gerudoway` (Gerudo's
+Fortress, the entrance-297 scene):
+
+**Where scene geometry lives (don't re-derive):**
+- `/scene/<name>.zar` holds only per-room `.cmab` (material/UV ANIMATION, tiny 128–544 b)
+  + `.ctxb` (the scene NAME-plate textures, per language) — NOT the room mesh.
+- Room geometry is an **embedded CMB inside `/scene/<name>_<R>_info.zsi`** (the per-room
+  "Zelda Scene Info" file; `<name>_info.zsi` with no number = the SCENE header: room list,
+  actor/spawn lists, collision, lighting — N64 scene-header analogue). `.zsi` header magic
+  = `ZSI\x01` then an 8-byte name ("ShUnqueen"); a `cmb ` magic follows (offset 96 in the
+  gerudoway rooms, but PARSE the ZSI mesh-header command to locate it — do NOT hardcode 96).
+- The embedded CMB parses with the EXISTING `Cmb` loader UNCHANGED: gerudoway ROOM0 =
+  2334 tris / 7002 verts, has materials + textures, `bone_count` absent (static mesh).
+- **Scene coords are already WORLD-space**: ROOM0 bbox x[-1570,1630] y[-160,800]
+  z[-3828,-2984] (extent 3200×960×844). So a scene draws at the **world origin with an
+  IDENTITY model matrix** (just camera view·proj), NOT translated to an actor pos like
+  characters. Likely also at the N64 world scale directly (verify the unit match in-game).
+
+**Impl sketch (next session):** (1) C++ ZSI parser in `soh/src/soh3d/asset/` (port from
+noclip OoT3D `zsi.ts`): read the ZSI command list, find the mesh header → embedded CMB
+slice; expose room CMB(s). Verify byte/vertex-exact vs a Python `tools/zsi.py` oracle
+(write that too) per verify-quantitatively. (2) A scene-render entry on the GL path:
+load the scene's room CMBs via `buildDrawGroups` (no skinning — bind pose / identity),
+draw each at world origin with the game camera matrices + depth, replacing/over the N64
+room. Hook at scene/room load (z_scene / room draw), gated by `SOH3D`. (3) Verify
+in-game: SOH3D=1 OoT3D room vs SOH3D=0 N64 room in the SAME scene (entrance 297), aligned
++ depth-correct. Keep it GENERAL (no character assumptions) — explicit roadmap goal.
+**Gotcha to expect:** multiple rooms per scene (gerudoway has 6: ROOM0–5); the active
+room set is driven by the scene/room-load logic — mirror that, don't draw all rooms always.
+
 **(1) Placement.** `SoH3D_DrawModelGL` gained a per-model `groundOffset` (MODEL units,
 applied innermost = pre-scale, so it scales WITH worldScale and re-tuning scale never
 desyncs grounding). `SOH3D_GELDWOMAN_GROUND_OFFSET=-1000` drops her soles onto the
