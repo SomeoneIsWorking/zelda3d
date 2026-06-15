@@ -7,6 +7,7 @@
 #include "../Shipwright/soh/src/soh3d/asset/ctr_rom.h"
 #include "../Shipwright/soh/src/soh3d/asset/zar.h"
 #include "../Shipwright/soh/src/soh3d/asset/cmb.h"
+#include "../Shipwright/soh/src/soh3d/asset/csab.h"
 #include "../Shipwright/soh/src/soh3d/asset/pica_texture.h"
 #include <cstdio>
 #include <cstdlib>
@@ -64,5 +65,54 @@ int main(int argc, char** argv) {
     }
     printf("draw groups=%zu  tris=%zu  verts=%zu\n", groups.size(), totalTris, totalVerts);
     printf("bbox x[%.2f,%.2f] y[%.2f,%.2f] z[%.2f,%.2f]\n", lo[0], hi[0], lo[1], hi[1], lo[2], hi[2]);
+
+    // ---- optional CSAB skinning cross-check (vs the Python oracle tools/csab.py) ----
+    // SOH3D_ANIM=<base name>  SOH3D_FRAME=<float>  [SOH3D_ANIM_DUMP=<path>]
+    // Builds skinned draw groups and (if dump path given) writes all skinned
+    // vertex pos+nrm as float32 in iteration order, for an element-wise diff.
+    const char* animName = getenv("SOH3D_ANIM");
+    if (animName && *animName) {
+        std::string nm = std::string(animName);
+        std::string full = (nm.rfind("Anim/", 0) == 0) ? nm : ("Anim/" + nm + ".csab");
+        const ZarFile* af = nullptr;
+        for (const auto& f : z.files()) if (f.name == full) { af = &f; break; }
+        if (!af) { fprintf(stderr, "anim not found: %s\n", full.c_str()); return 1; }
+        Csab anim(z.read(*af));
+        if (!anim.ok()) { fprintf(stderr, "Csab: %s\n", anim.error().c_str()); return 1; }
+        float frame = getenv("SOH3D_FRAME") ? (float)atof(getenv("SOH3D_FRAME")) : 0.0f;
+        printf("CSAB %s: duration=%d bones=%d anods=%d  frame=%.2f\n",
+               full.c_str(), anim.duration(), anim.boneCount(), anim.animNodeCount(), frame);
+
+        // VERIFY: skinned vs bind-pose for csab applied at rest is not meaningful in
+        // C++ (skinMatrices always applies the anim), so instead diff bind-pose verts
+        // vs python; the cross-check below is the authoritative correctness gate.
+        std::vector<std::array<float, 16>> sm;
+        anim.skinMatrices(c, frame, sm);
+        auto sgroups = c.buildDrawGroupsSkinned(sm.data(), sm.size());
+
+        float slo[3] = { 1e30f, 1e30f, 1e30f }, shi[3] = { -1e30f, -1e30f, -1e30f };
+        size_t sverts = 0;
+        for (const auto& g : sgroups) {
+            sverts += g.verts.size();
+            for (const auto& v : g.verts)
+                for (int k = 0; k < 3; k++) { if (v.pos[k] < slo[k]) slo[k] = v.pos[k]; if (v.pos[k] > shi[k]) shi[k] = v.pos[k]; }
+        }
+        printf("skinned verts=%zu  bbox x[%.2f,%.2f] y[%.2f,%.2f] z[%.2f,%.2f]\n",
+               sverts, slo[0], shi[0], slo[1], shi[1], slo[2], shi[2]);
+
+        const char* dump = getenv("SOH3D_ANIM_DUMP");
+        if (dump && *dump) {
+            FILE* fp = fopen(dump, "wb");
+            if (fp) {
+                for (const auto& g : sgroups)
+                    for (const auto& v : g.verts) {
+                        fwrite(v.pos, sizeof(float), 3, fp);
+                        fwrite(v.nrm, sizeof(float), 3, fp);
+                    }
+                fclose(fp);
+                printf("dumped skinned verts -> %s\n", dump);
+            }
+        }
+    }
     return 0;
 }
