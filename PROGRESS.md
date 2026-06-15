@@ -172,6 +172,36 @@ ACTUAL current animation (the game picks ge1_s_wait/matsu/hanasi by state) inste
 the fixed table anim. (3) Frame RATE: `gSoH3dAnimRate`=1/Actor_Draw is a guess; match
 the OoT3D logic tick. (4) Generalise beyond one global anim frame if >1 GL character.
 
+### Phase 4 polish DONE (session 9) — En_Ge1 grounded + live anim state, VERIFIED in-game
+En_Ge1 now stands **grounded** on the floor playing her **real** animation, fully
+textured + upright (`scratch/render/ge1_placed_anim_a.png` = mid-sway, `..._b.png` =
+arms-crossed idle; A/B against the N64 En_Ge1 in Gerudo Fortress). Closes REMAINING
+(1)(2)(3) above; (4) (multi-GL-char generalisation) is the only item left.
+
+**(1) Placement.** `SoH3D_DrawModelGL` gained a per-model `groundOffset` (MODEL units,
+applied innermost = pre-scale, so it scales WITH worldScale and re-tuning scale never
+desyncs grounding). `SOH3D_GELDWOMAN_GROUND_OFFSET=-1000` drops her soles onto the
+actor's shadow — CALIBRATED live via new REPL `yoff geldwoman <f>` (-600 floats, -1000
+grounds, -1400 sinks to ankles). **Scale 0.011 is CORRECT, not too small:** quantitative
+A/B in the same shot — OoT3D figure 186 px tall (head y399→foot y585) vs N64 En_Ge1
+187 px (head→shadow). The earlier "0.011 too small" was a misread of an occluded shot.
+REPL `spawn` now offsets front-right (~55u) so the figure clears Link for inspection.
+
+**(2)+(3) Live anim selection + rate.** `sModelTable` gained an `SoH3D_AnimResolver`
+fn-ptr; `SoH3D_ResolveAnim_EnGe1` reads the actor's live N64 anim (`EnGe1.animation`,
+an OTR-path string in SoH → identify by `strcmp`) and maps it to the CSAB: Idle
+(`gGerudoWhiteIdleAnim`)→`ge1_s_wait`, Clap/open-gate→`ge1_mon_akeru`, Dismissive/
+post-talk→`ge1_hanasi` (mapping by use site in z_en_ge1.c; `ge1_matsu` unused by this
+actor). The resolver picks WHICH CSAB; the CSAB then **free-runs** at its own authored
+rate (`gSoH3dAnimRate`=1/Actor_Draw), restarting on anim change. **Key finding (don't
+re-derive):** phase-LOCKING the CSAB to the N64 `SkelAnime.curFrame` does NOT work — the
+N64 idle `gGerudoWhiteIdleAnim` is a 2-frame stub (`animLength=2`, `curFrame` stays 0);
+its visible life is *procedural limb fidget*, not keyframes. So there is no frame motion
+to sync to, and the OoT3D CSAB's own 22-frame idle is the faithful motion source. Live
+verify (background drift-free): figure-band changed px 388→707→1570→1570→1465 across
+0.5 s frames, bg patch ~0 → continuous idle sway. REPL: `animlive <0|1>` (1=resolver,
+0=scrub w/ `animframe`), `animdbg <0|1>` (log resolved csab/curFrame each ~20 draws).
+
 ### Phase 4 (original scoping) — animation (CSAB skeletal anim):
 zelda_ge1.zar contains CSAB anims: `ge1_s_wait` (idle), `ge1_matsu`, `ge1_hanasi`
 (talk), + `geldwoman_eye.cmab` (eye texture anim). CSAB header (ge1_s_wait): magic
