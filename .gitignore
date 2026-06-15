@@ -1,0 +1,8 @@
+.venv/
+3ds/
+Shipwright/
+scratch/
+*.otr
+*.o2r
+build/
+__pycache__/

@@ -1,0 +1,259 @@
+#!/usr/bin/env python3
+"""Parser for OoT3D CMB models (geometry + skeleton + material/texture refs).
+
+Indexing model (verified against noclip.website OcarinaOfTime3D/cmb.ts):
+  - VATR holds one raw byte-buffer per attribute (position/normal/color/uv/...).
+  - Each SEPD attribute has: start (byte offset into that attr's VATR buffer),
+    scale (multiplier for fixed-point data), dataType (GL type), mode (array/const).
+  - PRM triangle indices are GLOBAL: for index `idx`, attribute value =
+    VATR[attr][ sepd.attr.start + idx * components * sizeof(dataType) ] * scale.
+
+References: CloudModding 3D:CMB_format, noclip OcarinaOfTime3D/cmb.ts.
+"""
+from __future__ import annotations
+import struct
+from dataclasses import dataclass, field
+
+def _u8(b,o):  return b[o]
+def _s16(b,o): return struct.unpack_from("<h",b,o)[0]
+def _u16(b,o): return struct.unpack_from("<H",b,o)[0]
+def _u32(b,o): return struct.unpack_from("<I",b,o)[0]
+def _f32(b,o): return struct.unpack_from("<f",b,o)[0]
+def _vec(b,o,n): return struct.unpack_from("<%df"%n,b,o)
+
+# GL data types
+DT_BYTE,DT_UBYTE,DT_SHORT,DT_USHORT,DT_INT,DT_UINT,DT_FLOAT = \
+    0x1400,0x1401,0x1402,0x1403,0x1404,0x1405,0x1406
+DT_SIZE = {DT_BYTE:1,DT_UBYTE:1,DT_SHORT:2,DT_USHORT:2,DT_INT:4,DT_UINT:4,DT_FLOAT:4}
+DT_FMT  = {DT_BYTE:"b",DT_UBYTE:"B",DT_SHORT:"h",DT_USHORT:"H",DT_INT:"i",DT_UINT:"I",DT_FLOAT:"f"}
+
+MODE_ARRAY, MODE_CONSTANT = 0, 1   # Sepd attribute mode
+
+@dataclass
+class Bone:
+    id:int; parent:int; scale:tuple; rot:tuple; trans:tuple
+
+@dataclass
+class SepdAttr:
+    start:int; scale:float; data_type:int; mode:int; constant:tuple
+
+@dataclass
+class Prm:
+    index_type:int; count:int; first:int   # first = first index (in elements)
+
+@dataclass
+class Prms:
+    skinning_mode:int; bone_table:list; prms:list  # prms: list[Prm]
+
+@dataclass
+class Sepd:
+    attrs:dict                 # name -> SepdAttr
+    prim_count:int
+    bone_dimension:int
+    prms:list                  # list[Prms]
+
+@dataclass
+class Mesh:
+    sepd_index:int; material_index:int; mesh_id:int
+
+@dataclass
+class Texture:
+    name:str; width:int; height:int; fmt:int; etc1:bool; data_offset:int; data_len:int
+
+# attribute name -> component count. OoT3D (v6) has NO tangent slot; MM3D (v7) does.
+ATTRS_OOT3D = [("position",3),("normal",3),("color",4),
+               ("texCoord0",2),("texCoord1",2),("texCoord2",2),
+               ("boneIndices",0),("boneWeights",0)]
+ATTRS_MM3D  = [("position",3),("normal",3),("tangent",3),("color",4),
+               ("texCoord0",2),("texCoord1",2),("texCoord2",2),
+               ("boneIndices",0),("boneWeights",0)]
+
+
+class Cmb:
+    def __init__(self, data: bytes):
+        self.data = b = data
+        assert b[0:4]==b"cmb ", "not a CMB"
+        self.version = _u32(b,0x08)
+        self.name = b[0x10:0x20].split(b"\x00")[0].decode("ascii","replace")
+        self.index_count = _u32(b,0x20)
+        self.skl_ptr  = _u32(b,0x24)
+        self.mats_ptr = _u32(b,0x28)
+        self.tex_ptr  = _u32(b,0x2C)
+        self.sklm_ptr = _u32(b,0x30)
+        self.luts_ptr = _u32(b,0x34)
+        self.vatr_ptr = _u32(b,0x38)
+        self.idx_ptr  = _u32(b,0x3C)
+        self.texdata_ptr = _u32(b,0x40)
+        self.attrs_def = ATTRS_MM3D if self.version>=7 else ATTRS_OOT3D
+        self._parse_skl()
+        self._parse_vatr()
+        self._parse_tex()
+        self._parse_sklm()
+
+    # ---- SKL ----
+    def _parse_skl(self):
+        b=self.data; p=self.skl_ptr
+        assert b[p:p+4]==b"skl ", "bad skl"
+        n=_u32(b,p+8)
+        self.bones=[]
+        o=p+0x10
+        for _ in range(n):
+            bid=_u8(b,o); parent=_s16(b,o+2)
+            scale=_vec(b,o+4,3); rot=_vec(b,o+0x10,3); trans=_vec(b,o+0x1C,3)
+            self.bones.append(Bone(bid,parent,scale,rot,trans))
+            o+=0x28   # id+unk+parent(4) + scale/rot/trans(3x12=36) = 0x28
+
+    # ---- VATR ----
+    def _parse_vatr(self):
+        b=self.data; p=self.vatr_ptr
+        assert b[p:p+4]==b"vatr", "bad vatr"
+        self.max_index=_u32(b,p+8)
+        self.vatr={}   # name -> (abs_offset, size)
+        o=p+0x0C
+        for name,_ in self.attrs_def:
+            size=_u32(b,o); off=_u32(b,o+4)   # NOTE: size first, then offset
+            self.vatr[name]=(self.vatr_ptr+off, size)
+            o+=8
+
+    # ---- TEX ----
+    def _parse_tex(self):
+        self.textures=[]
+        if self.tex_ptr==0: return
+        b=self.data; p=self.tex_ptr
+        if b[p:p+4]!=b"tex ": return
+        n=_u32(b,p+8); o=p+0x0C
+        for _ in range(n):
+            dlen=_u32(b,o); etc1=_u8(b,o+6); w=_u16(b,o+8); h=_u16(b,o+0x0A)
+            fmt=_u16(b,o+0x0C); doff=_u32(b,o+0x10)
+            nm=b[o+0x14:o+0x24].split(b"\x00")[0].decode("ascii","replace")
+            self.textures.append(Texture(nm,w,h,fmt,bool(etc1),doff,dlen))
+            o+=0x24
+
+    # ---- SKLM / SHP / SEPD / PRMS / PRM ----
+    def _parse_sklm(self):
+        b=self.data; p=self.sklm_ptr
+        assert b[p:p+4]==b"sklm", "bad sklm"
+        mshs_off=p+_u32(b,p+0x08)
+        shp_off =p+_u32(b,p+0x0C)
+        # MSHS: meshes
+        assert b[mshs_off:mshs_off+4]==b"mshs"
+        mesh_count=_u32(b,mshs_off+8)
+        self.meshes=[]
+        mo=mshs_off+0x10
+        for _ in range(mesh_count):
+            sepd_i=_u16(b,mo); mat_i=_u8(b,mo+2); mid=_u8(b,mo+3)
+            self.meshes.append(Mesh(sepd_i,mat_i,mid))
+            mo+=4   # OoT3D mesh stride = 4
+        # SHP: shapes -> SEPDs
+        assert b[shp_off:shp_off+4]==b"shp ", "bad shp"
+        sepd_count=_u32(b,shp_off+8)
+        sepd_ptrs=[_u16(b,shp_off+0x10+2*i) for i in range(sepd_count)]
+        self.sepds=[self._parse_sepd(shp_off+ptr) for ptr in sepd_ptrs]
+
+    def _parse_sepd(self, p):
+        b=self.data
+        assert b[p:p+4]==b"sepd", "bad sepd @0x%x"%p
+        prim_count=_u16(b,p+8)
+        attrs={}
+        o=p+0x24
+        for name,_ in self.attrs_def:
+            start=_u32(b,o); scale=_f32(b,o+4); dt=_u16(b,o+8); mode=_u16(b,o+0x0A)
+            const=_vec(b,o+0x0C,4)
+            attrs[name]=SepdAttr(start,scale,dt,mode,const)
+            o+=0x1C   # VertexList = offset+scale+dt+mode + constant vec4(16) = 0x1C
+        bone_dim=_u16(b,o); o+=4   # bone dimension + autogen flags
+        # PRMS pointers (u16[], relative to sepd) at o
+        prms_ptrs=[_u16(b,o+2*i) for i in range(prim_count)]
+        prms=[self._parse_prms(p+ptr) for ptr in prms_ptrs]
+        return Sepd(attrs,prim_count,bone_dim,prms)
+
+    def _parse_prms(self, p):
+        b=self.data
+        assert b[p:p+4]==b"prms", "bad prms @0x%x"%p
+        skin=_u16(b,p+0x0C); bt_count=_u16(b,p+0x0E)
+        bt_off=p+_u32(b,p+0x10); prm_off=p+_u32(b,p+0x14)
+        bone_table=[_u16(b,bt_off+2*i) for i in range(bt_count)]
+        prm=self._parse_prm(prm_off)
+        return Prms(skin,bone_table,[prm])
+
+    def _parse_prm(self, p):
+        b=self.data
+        assert b[p:p+4]==b"prm ", "bad prm @0x%x"%p
+        idx_type=_u16(b,p+0x10); count=_u16(b,p+0x14); first=_u16(b,p+0x16)
+        return Prm(idx_type,count,first)
+
+    # ---- geometry assembly ----
+    def read_attr(self, attr:SepdAttr, name:str, idx:int, comps:int):
+        if attr.mode==MODE_CONSTANT:
+            return attr.constant[:comps]
+        base,_=self.vatr[name]
+        sz=DT_SIZE[attr.data_type]; fmt="<%d%s"%(comps,DT_FMT[attr.data_type])
+        off=base + attr.start + idx*comps*sz
+        vals=struct.unpack_from(fmt,self.data,off)
+        return tuple(v*attr.scale for v in vals)
+
+    def triangles(self):
+        """Yield (sepd_index, material_index, [ (idx,pos,normal,uv0), x3 ]) per triangle."""
+        b=self.data
+        for mesh in self.meshes:
+            sepd=self.sepds[mesh.sepd_index]
+            for prms in sepd.prms:
+                prm=prms.prms[0]
+                isz=DT_SIZE[prm.index_type]; ifmt=DT_FMT[prm.index_type]
+                ibase=self.idx_ptr + prm.first*isz
+                idxs=struct.unpack_from("<%d%s"%(prm.count,ifmt), b, ibase)
+                verts=[]
+                for idx in idxs:
+                    pos=self.read_attr(sepd.attrs["position"],"position",idx,3)
+                    nrm=self.read_attr(sepd.attrs["normal"],"normal",idx,3) \
+                        if sepd.attrs["normal"].mode==MODE_ARRAY or sepd.attrs["normal"].mode==MODE_CONSTANT else (0,0,1)
+                    uv =self.read_attr(sepd.attrs["texCoord0"],"texCoord0",idx,2)
+                    verts.append((idx,pos,nrm,uv))
+                for i in range(0,len(verts)-2,3):
+                    yield (mesh.sepd_index, mesh.material_index, verts[i:i+3])
+
+
+def to_obj(cmb:Cmb, path:str):
+    vs=[]; vts=[]; vns=[]; faces=[]
+    vmap={}
+    for sepd_i,mat_i,tri in cmb.triangles():
+        fi=[]
+        for idx,pos,nrm,uv in tri:
+            key=(pos,nrm,uv)
+            if key not in vmap:
+                vs.append(pos); vns.append(nrm); vts.append(uv)
+                vmap[key]=len(vs)
+            fi.append(vmap[key])
+        faces.append(fi)
+    with open(path,"w") as f:
+        for p in vs:  f.write("v %.6f %.6f %.6f\n"%p)
+        for t in vts: f.write("vt %.6f %.6f\n"%(t[0],t[1]))
+        for n in vns: f.write("vn %.6f %.6f %.6f\n"%n)
+        for fc in faces:
+            f.write("f %d/%d/%d %d/%d/%d %d/%d/%d\n"%(
+                fc[0],fc[0],fc[0],fc[1],fc[1],fc[1],fc[2],fc[2],fc[2]))
+    return len(vs),len(faces)
+
+
+if __name__=="__main__":
+    import sys
+    path=sys.argv[1] if len(sys.argv)>1 else "scratch/extract/tubo2_model.cmb"
+    c=Cmb(open(path,"rb").read())
+    print(f"CMB {c.name} v{c.version} bones={len(c.bones)} meshes={len(c.meshes)} "
+          f"sepds={len(c.sepds)} textures={len(c.textures)} indices={c.index_count}")
+    for t in c.textures:
+        print(f"  tex {t.name:20} {t.width}x{t.height} fmt=0x{t.fmt:x} etc1={t.etc1} len={t.data_len}")
+    for i,s in enumerate(c.sepds):
+        pa=s.attrs["position"]
+        print(f"  sepd{i} prims={s.prim_count} pos(dt=0x{pa.data_type:x} scale={pa.scale} mode={pa.mode} start={pa.start})")
+    outobj=path.rsplit(".",1)[0]+".obj"
+    nv,nf=to_obj(c,outobj)
+    print(f"wrote {outobj}: {nv} verts, {nf} tris")
+    # bbox sanity
+    import struct as _s
+    xs=[];ys=[];zs=[]
+    for _,_,tri in c.triangles():
+        for _,pos,_,_ in tri:
+            xs.append(pos[0]);ys.append(pos[1]);zs.append(pos[2])
+    if xs:
+        print(f"  bbox x[{min(xs):.2f},{max(xs):.2f}] y[{min(ys):.2f},{max(ys):.2f}] z[{min(zs):.2f},{max(zs):.2f}]")
