@@ -21,8 +21,21 @@ geometry instead of the N64 assets. Asset-conversion + renderer-integration task
   - `tools/cmb.py` CMB models: geometry/skeleton/material+texture refs. OBJ export.
   - `tools/pica_texture.py` PICA textures (ETC1 + 8x8 Morton-tiled formats).
   - pot → 130 verts / 160 tris, ETC1 + RGB565 textures decode correctly.
-- **SoH builds**: `Shipwright/build-cmake/soh/soh.elf` (57 MB). `soh.o2r` generated.
-- Azahar configures & its externals build.
+- **SoH builds & RUNS**: `soh.elf` (57 MB). Game archive `oot.o2r` (33 MB) +
+  `soh.o2r` generated and staged in `build-cmake/soh/`. Boots headlessly to the
+  title screen, **render captured** (scratch/screenshots/soh_vanilla.png).
+- **Azahar builds**: `Azahar/build/bin/Release/azahar` (49 MB), Qt6 frontend.
+- **Headless frame-dump tool** added to libultraship (branch `soh3d` in the
+  submodule): `SOH_FRAMEDUMP=<path.ppm> SOH_FRAMEDUMP_FRAME=N ./soh.elf` under
+  `xvfb-run`. Reusable for A/B vs the oracle. (exit 139 on teardown after dump is
+  harmless — PPM is written before exit.)
+
+### How to run SoH headless + capture
+```
+cd Shipwright/build-cmake/soh
+SOH_FRAMEDUMP=/abs/out.ppm SOH_FRAMEDUMP_FRAME=500 \
+  timeout 150 xvfb-run -a -s "-screen 0 1280x720x24" ./soh.elf
+```
 
 ## In progress / next
 - **Azahar Qt frontend build**: needs Qt6 — run `scripts/install_azahar_deps.sh`,
