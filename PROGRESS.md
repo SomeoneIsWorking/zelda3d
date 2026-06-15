@@ -290,9 +290,18 @@ question with actual pixels, end-to-end through LUS's GL path.
   end, so don't read it.
 - Prologue adds a full-screen 320x240 viewport + scissor + white PRIM (combiner is
   MODULATE x PRIM => PRIM=0 renders black) so the crate actually rasterises on-screen.
-- NEXT extension: wire `tools/render_compare.py` to diff this harness PPM vs the Azahar
-  oracle's render of the same model (numeric pixel A/B), and parameterise model selection
-  (pot/gs) beyond the built-in crate.
+- **`--model {kibako,pot,gs}`** selects which generated model to render (CMake links every
+  `soh3d_*_model.c` that exists, exposes them via HAVE_* defines; default out =
+  `scratch/render/<model>_lus.ppm`). The modelview is **auto-fit** from the model's vertex
+  bbox (scan G_VTX = opcode **0x01** under F3DEX_GBI_2, `n=(w0>>12)&0xFF`, int16 ob[3] at
+  Vtx offset 0; centre + uniform-scale into ~80% NDC) — no per-model magic constants.
+  VERIFIED all three render correctly: crate=wood, pot=clay tubo2, gossip stone=Sheikah-eye
+  with BOTH textures (2-material). PNGs in `scratch/render/`.
+- NEXT extension: wire `tools/render_compare.py` to diff a harness PPM vs the Azahar
+  oracle's render of the same model (numeric pixel A/B). Caveat: the Azahar oracle currently
+  only does *texture decode* (flat texture PPM), not a 3D geometry render — a true
+  both-renderers pixel compare needs either an Azahar geometry render (big: PICA vertex
+  decode + raster) or capturing Azahar's in-emulator framebuffer for the object.
 
 ### TOOLING — Azahar texture-decode ORACLE (data-driven) (2026-06-15, session 4)
 Built the first piece of the "compare SoH3D vs Azahar" oracle the user asked for,
