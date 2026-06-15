@@ -141,16 +141,36 @@ rY rZ sX sY sZ, rel to anod start). Track: type u32@0 (0 const/1 linear/2 hermit
 nKf@4, tStart@8, tEnd@0xC; linear kf = (u32 time, f32 val) stride 8; hermite kf = (u32
 time, f32 val, f32 tIn, f32 tOut) stride 0x10. Rotations are radians.
 
-**REMAINING (next layer): LIVE in-game animation.** Current wiring bakes ONE frame at
-load (env-driven, for harness verification). For live playback: advance a frame counter
-per game frame, recompute skin matrices, and either (a) re-skin on CPU + re-upload the
-VBO each frame (needs a `SoH3D_GL_InvalidateModel`/re-upload hook — the renderer caches
-the upload), or (b) GPU skinning — add per-vertex boneIndices/weights to the VBO + a
-bone-matrix uniform array, blend in the shader (cleanest; the per-vertex bone data is
-already gathered in `buildDrawGroupsSkinned`). Also: hook the actual En_Ge1 actor's
-current animation (the game picks ge1_s_wait/matsu/hanasi by state) rather than a fixed
-env anim. Harness ≠ in-game orientation (see the upside-down/untextured note below) —
-verify live anim IN-GAME.
+### Phase 4 LIVE in-game (session 8) — GPU skinning + live playback, VERIFIED in-game
+The Gerudo (En_Ge1) plays her CSAB idle LIVE in-game, fully textured + upright —
+`scratch/render/ingame_anim_f0.png` (arms-crossed idle, from behind: elbows out + the
+green Gerudo-belt emblem) vs `ingame_anim_f11.png` (idle sway: torso lean/head tilt).
+**This closes the old "in-game Gerudo is UPSIDE-DOWN + UNTEXTURED" bug** (that was the
+legacy N64-dlist path; the direct-GL path textures correctly, and upright in-game
+matches harness `--rotx 180` per the documented harness-readback flip).
+
+**GPU skinning (the chosen design).** `SoH3DGlVtx`/`CmbVertex` gained `boneIds[4]`+
+`weights[4]`; `buildDrawGroups` uploads MODEL-space (bind-pose) verts + bindings ONCE.
+The GL vertex shader blends `pos = Σ weight_i · uBones[boneId_i] · pos` — `uBones`
+defaults to identity (bind pose, so un-animated models are unchanged), uploaded with
+`transpose=GL_TRUE` (row-major M·v → GLSL column-major m·v). `SoH3D_GL_SetBones
+(modelId, mats16, n)` stores per-model matrices (≤`SOH3D_GL_MAX_BONES`=32); attribs 3/4
+save/restored so Fast3D state isn't corrupted. Verified in the harness pixel-equal to
+the CPU oracle (bind + ge1_s_wait f0/f11 ≤2 px, `scratch/render/gpu_*.png`).
+
+**Live driver.** `soh3d_model.cpp` keeps the Zar+Cmb resident + caches parsed CSABs;
+`SoH3D_UpdateAnim(modelId, animName, frame)` recomputes skin matrices per call.
+`soh3d.c` `SoH3D_DrawModelGL` advances a free-running `gSoH3dAnimFrame` per Actor_Draw
+and calls it before the draw opcode; `sModelTable` carries a per-entry CSAB name
+(geldwoman → `ge1_s_wait`). REPL: `animrate` (0=pause) / `animframe` (scrub), in `state`.
+
+**REMAINING (integration polish, NOT animation bugs):** (1) **placement** — En_Ge1
+renders floating ABOVE Link (model origin not grounded at the actor world pos) and
+**world-scale** needs calibration (0.011 too small; 0.02 framed the verification shot).
+Fix the origin/ground offset + calibrate scale vs the N64 En_Ge1. (2) Hook the actor's
+ACTUAL current animation (the game picks ge1_s_wait/matsu/hanasi by state) instead of
+the fixed table anim. (3) Frame RATE: `gSoH3dAnimRate`=1/Actor_Draw is a guess; match
+the OoT3D logic tick. (4) Generalise beyond one global anim frame if >1 GL character.
 
 ### Phase 4 (original scoping) — animation (CSAB skeletal anim):
 zelda_ge1.zar contains CSAB anims: `ge1_s_wait` (idle), `ge1_matsu`, `ge1_hanasi`
