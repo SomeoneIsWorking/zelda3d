@@ -344,6 +344,23 @@ onto every vertex. The key finding (verified by rendering `hintstone` through th
 - NEXT: in-game integration of OoT3D models (divert table `sModelTable[]` in soh3d.c);
   animation (moving bones) and world/scene geometry as later phases.
 
+### Character orientation baking + first character divert wired (2026-06-15, session 6)
+Resolved the head-down orientation so characters drop into the in-game pipeline like props:
+- `cmb_to_c.py` gained **`--rotx/--roty/--rotz <deg>` + `--ground`** — bakes a PROPER
+  rotation (no mirror) into the geometry and drops min-Y to 0 (stand on origin).
+  `--rotx 180 --ground` makes the (head-down, model-space) characters UPRIGHT, grounded,
+  front-facing, NOT mirrored. Harness-verified: `scratch/render/geldwoman_baked.png` and
+  `childlink_baked.png` both upright with NO manual rotate. Baking it (vs a runtime
+  transform) means `SoH3D_DrawModel`'s existing Translate*RotateY*Scale handles characters
+  with zero special-casing — same path as the props.
+- **First character divert wired in-game**: `sModelTable[]` now maps `ACTOR_EN_GE1`
+  (white Gerudo) → the OoT3D Gerudo model (`SOH3D_GELDWOMAN_WORLD_SCALE` 0.011, initial).
+  SoH compiles + links. (REPL `state` now lists the table generically.)
+- **REMAINING (needs a game run):** live in-game verification + world-scale calibration vs
+  the N64 En_Ge1 — warp to a Gerudo scene (Gerudo Fortress/Valley), `SOH3D=1`, A/B the
+  divert, tune `scale geldwoman <f>` via the REPL (same method as the pot). Generated
+  character model .c is regenerated with `--rotx 180 --ground` (ROM-derived → gitignored).
+
 ### TOOLING — Azahar texture-decode ORACLE (data-driven) (2026-06-15, session 4)
 Built the first piece of the "compare SoH3D vs Azahar" oracle the user asked for,
 as a C++ tool in the Azahar fork that needs NO emulator run / in-game navigation:
