@@ -290,12 +290,18 @@ class Cmb:
         placed by its bone's world (bind) matrix:
           - bone_dimension==1 (rigid): the whole prms is bound to bone_table[0];
             transform every vertex by that one matrix (verified on pot / tr_box).
-          - bone_dimension>1 (smooth): vertices are stored in MODEL space, with
+          - bone_dimension>1 (smooth): vertices are stored in MODEL space, with the
             per-vertex bone indices + weights used only for animation (the runtime
-            applies bone_current * bone_bind_inverse per bone). At BIND POSE that
-            product is the identity, so a static bind-pose render uses the raw model-
-            space positions unchanged — no per-bone transform. (Applying the bones'
-            world-bind matrices here instead scrambles the mesh; verified on hintstone.)
+            applies bone_current * bone_bind_inverse, which is IDENTITY at bind pose).
+            So a static bind-pose render uses the RAW model-space positions with NO
+            per-bone transform. (Applying either a single bone's or the root bone's
+            world matrix scrambles / mis-orients the mesh — both tried on hintstone +
+            geldwoman; raw model space is coherent and Y-up for both.)
+
+        NOTE (orientation): character rest meshes (e.g. geldwoman) come out Y-up but
+        HEAD-DOWN in model space — the in-game skeleton root reorients them. The
+        bind-pose render reflects raw model space; final upright placement is an
+        in-game / integration concern, not a conversion bug.
         """
         b=self.data
         for mesh in self.meshes:
@@ -307,7 +313,8 @@ class Cmb:
                 bt=prms.bone_table or [0]
                 smooth = bd>1 and sepd.attrs["boneIndices"].mode==MODE_ARRAY \
                                  and sepd.attrs["boneWeights"].mode==MODE_ARRAY
-                rigidM = self.bone_matrix.get(bt[0], _mat_id())
+                # rigid -> place by the bound bone; smooth -> raw model space (identity).
+                M = _mat_id() if smooth else self.bone_matrix.get(bt[0], _mat_id())
                 isz=DT_SIZE[prm.index_type]; ifmt=DT_FMT[prm.index_type]
                 ibase=self.idx_ptr + prm.first*isz
                 idxs=struct.unpack_from("<%d%s"%(prm.count,ifmt), b, ibase)
@@ -316,9 +323,7 @@ class Cmb:
                     pos=self.read_attr(sepd.attrs["position"],"position",idx,3)
                     nrm=self.read_attr(sepd.attrs["normal"],"normal",idx,3) if has_normal else (0,0,1)
                     uv =self.read_attr(sepd.attrs["texCoord0"],"texCoord0",idx,2)
-                    if not smooth:  # rigid: bone-local verts -> place by the bound bone
-                        pos=_mat_apply_pos(rigidM,pos); nrm=_mat_apply_dir(rigidM,nrm)
-                    # smooth: pos/nrm already in model space (bind pose == identity)
+                    pos=_mat_apply_pos(M,pos); nrm=_mat_apply_dir(M,nrm)
                     verts.append((idx,pos,nrm,uv))
                 for i in range(0,len(verts)-2,3):
                     yield (mesh.sepd_index, mesh.material_index, verts[i:i+3])

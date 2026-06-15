@@ -315,9 +315,28 @@ onto every vertex. The key finding (verified by rendering `hintstone` through th
   types (0x1401 = GL_UNSIGNED_BYTE); boneIndices are LOCAL indices into prms.bone_table;
   boneWeights scaled (e.g. ×0.01) and sum to 1. hintstone: 4 bones stacked vertically
   (world y = 0/2600/5200), bone_dim=3, bone_table=[1,2,3,0].
-- **This unblocks CHARACTER models** — OoT3D characters/NPCs are smooth-skinned; they will now
-  render in bind/T-pose. NEXT: extract a character CMB from the romfs (actor archives via
-  ctr_romfs.py + zar.py) and render it; animation (moving bones) is a later, separate step.
+- **This unblocks CHARACTER models** — OoT3D characters/NPCs are smooth-skinned; they render
+  in bind/T-pose. (Done — see next section.)
+
+### First OoT3D CHARACTER rendered — Gerudo woman (2026-06-15, session 6)
+**A real OoT3D character renders headless through the LUS GL backend** — see
+`scratch/render/geldwoman_upright.png`: a fully-textured Gerudo (geldwoman) in T-pose
+(red hair, yellow eyes, magenta top, white harem pants, gold bracelets, sandals), 15 bones,
+6 meshes, 6 textures (5 ETC1 + 1 RGBA), 952 verts / 1086 tris.
+- Extracted via the existing pipeline: `ctr_romfs.py` (NCSD→RomFS) → read `/actor/zelda_ge1.zar`
+  → `zar.Zar` → `Model/geldwoman.cmb`. Other characters seen in romfs: zelda_link_{child,boy}_new
+  (Link), zelda_ge1 (Gerudo), zelda_dog/cow, zelda_zl* (Zelda), zelda_ganon*, zelda_horse*.
+- Smooth skinning (above) was the key unlock; multi-material (6 distinct opaque textures) and
+  the harness load-block fix (plain G_LOADBLOCK for ≤4096-texel textures) were also needed.
+- **OPEN (orientation):** character rest meshes are Y-up but **HEAD-DOWN** in model space
+  (geldwoman head at y≈0, feet at y≈6524). The bind-pose render is faithful to raw model
+  space; the upright PNG was just `magick -rotate 180`. Applying the skeleton ROOT bone's
+  world matrix does NOT fix it (it rotates the figure to Z-up — tried, wrong). The correct
+  rest→upright reorientation for in-game placement is unresolved and is an INTEGRATION concern
+  (the in-game actor/skeleton matrix), not a geometry/texture bug. Revisit when wiring
+  characters into SoH in-game.
+- NEXT: try Link (`zelda_link_child_new.zar` → `child/model/childlink_v2.cmb`); then in-game
+  integration / animation (moving bones) as a later, separate phase.
 
 ### TOOLING — Azahar texture-decode ORACLE (data-driven) (2026-06-15, session 4)
 Built the first piece of the "compare SoH3D vs Azahar" oracle the user asked for,
