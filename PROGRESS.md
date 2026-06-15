@@ -24,7 +24,10 @@ geometry instead of the N64 assets. Asset-conversion + renderer-integration task
 - **SoH builds & RUNS**: `soh.elf` (57 MB). Game archive `oot.o2r` (33 MB) +
   `soh.o2r` generated and staged in `build-cmake/soh/`. Boots headlessly to the
   title screen, **render captured** (scratch/screenshots/soh_vanilla.png).
-- **Azahar builds**: `Azahar/build/bin/Release/azahar` (49 MB), Qt6 frontend.
+- **Azahar builds & RUNS OoT3D**: `azahar` (49 MB). Boots the ROM (title id
+  0004000000033500), inits DSP/save archive, emulates without crashing. Run with
+  `XDG_CONFIG_HOME`/`XDG_DATA_HOME` pointed at `scratch/azahar_{cfg,data}` to keep
+  it out of the user's real config. Logs to `<data>/azahar-emu/log/azahar_log.txt`.
 - **Headless frame-dump tool** added to libultraship (branch `soh3d` in the
   submodule): `SOH_FRAMEDUMP=<path.ppm> SOH_FRAMEDUMP_FRAME=N ./soh.elf` under
   `xvfb-run`. Reusable for A/B vs the oracle. (exit 139 on teardown after dump is
@@ -36,6 +39,15 @@ cd Shipwright/build-cmake/soh
 SOH_FRAMEDUMP=/abs/out.ppm SOH_FRAMEDUMP_FRAME=500 \
   timeout 150 xvfb-run -a -s "-screen 0 1280x720x24" ./soh.elf
 ```
+
+## Next phase (implementation)
+1. **Azahar oracle instrumentation** (the "tooling baked in"): add a headless
+   frame dump (glReadPixels, mirror of the LUS one) + ideally a draw-call dump of
+   the geometry/material/texture the PICA receives for a target object. Qt+GL
+   frame isn't grabbable via X root (same as SoH) → in-app dump needed.
+2. **LUS native model draw path** (approach B above): render a native CMB mesh at
+   the actor matrix through the modern backend, full-res texture bound directly.
+3. **First in-game result**: pot via the native path, A/B'd vs the Azahar oracle.
 
 ## In progress / next
 - **Azahar Qt frontend build**: needs Qt6 — run `scripts/install_azahar_deps.sh`,
