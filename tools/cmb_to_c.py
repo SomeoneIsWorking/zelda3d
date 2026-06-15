@@ -57,6 +57,8 @@ def main():
                   # colour (keeps dims/dlist). Renders the model flat in that colour
                   # iff the texture-upload path is sound — isolates upload/binding
                   # bugs from texture-decode/data bugs.
+    rot = [0.0, 0.0, 0.0]  # bake a rotation (deg) about model X/Y/Z into the verts
+    ground = False         # after rotation, translate so min-Y == 0 (stand on origin)
     args = sys.argv[3:]
     i = 0
     while i < len(args):
@@ -65,6 +67,10 @@ def main():
         elif a == "--no-flip-v": flip_v = False; i += 1
         elif a == "--lit": lit = True; i += 1
         elif a == "--solid": solid = tuple(int(x) for x in args[i+1].split(",")); i += 2
+        elif a == "--rotx": rot[0] = float(args[i+1]); i += 2
+        elif a == "--roty": rot[1] = float(args[i+1]); i += 2
+        elif a == "--rotz": rot[2] = float(args[i+1]); i += 2
+        elif a == "--ground": ground = True; i += 1
         else: print("unknown arg", a); sys.exit(1)
 
     c = Cmb(open(cmb_path, "rb").read())
@@ -84,6 +90,37 @@ def main():
         for idx, pos, nrm, uv in tri:
             face.append((pos, nrm, uv))
         groups[mat_i].append(face)
+
+    # --- bake an orientation (proper rotation, no mirror) into the geometry ---
+    # OoT3D character rest meshes are Y-up but HEAD-DOWN in model space; the in-game
+    # SoH3D_DrawModel only does Translate*RotateY*Scale, so the model must already be
+    # upright + standing at the origin in actor-local space (like the props). --rotx
+    # 180 flips head-up; --ground drops the feet to y=0. Rotations compose Rz*Ry*Rx.
+    if any(rot) or ground:
+        import math
+        rx, ry, rz = (math.radians(d) for d in rot)
+        def matmul(A, B):
+            return [[sum(A[r][k]*B[k][c] for k in range(3)) for c in range(3)] for r in range(3)]
+        Rx = [[1,0,0],[0,math.cos(rx),-math.sin(rx)],[0,math.sin(rx),math.cos(rx)]]
+        Ry = [[math.cos(ry),0,math.sin(ry)],[0,1,0],[-math.sin(ry),0,math.cos(ry)]]
+        Rz = [[math.cos(rz),-math.sin(rz),0],[math.sin(rz),math.cos(rz),0],[0,0,1]]
+        R = matmul(Rz, matmul(Ry, Rx))
+        def apply(v):
+            return tuple(R[r][0]*v[0] + R[r][1]*v[1] + R[r][2]*v[2] for r in range(3))
+        miny = 1e30
+        for faces in groups.values():
+            for fi, face in enumerate(faces):
+                nf = []
+                for pos, nrm, uv in face:
+                    p = apply(pos); n = apply(nrm)
+                    miny = min(miny, p[1])
+                    nf.append((p, n, uv))
+                faces[fi] = nf
+        if ground and miny < 1e29:
+            for faces in groups.values():
+                for fi, face in enumerate(faces):
+                    faces[fi] = [((p[0], p[1]-miny, p[2]), n, uv) for p, n, uv in face]
+        print(f"  oriented: rot={rot} ground={ground} (min-Y was {miny:.0f})")
 
     # --- decode every texture referenced by a drawn material (deduped) ---
     tex_used = {}      # tex_index -> (TW, TH, rgba bytes)
