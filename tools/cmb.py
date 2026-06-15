@@ -284,31 +284,41 @@ class Cmb:
         return tuple(v*attr.scale for v in vals)
 
     def triangles(self):
-        """Yield (sepd_index, material_index, [ (idx,pos,normal,uv0), x3 ]) per triangle."""
+        """Yield (sepd_index, material_index, [ (idx,pos,normal,uv0), x3 ]) per triangle.
+
+        Bind-pose skinning. CMB vertices are stored in BONE-LOCAL space; each is
+        placed by its bone's world (bind) matrix:
+          - bone_dimension==1 (rigid): the whole prms is bound to bone_table[0];
+            transform every vertex by that one matrix (verified on pot / tr_box).
+          - bone_dimension>1 (smooth): vertices are stored in MODEL space, with
+            per-vertex bone indices + weights used only for animation (the runtime
+            applies bone_current * bone_bind_inverse per bone). At BIND POSE that
+            product is the identity, so a static bind-pose render uses the raw model-
+            space positions unchanged — no per-bone transform. (Applying the bones'
+            world-bind matrices here instead scrambles the mesh; verified on hintstone.)
+        """
         b=self.data
         for mesh in self.meshes:
             sepd=self.sepds[mesh.sepd_index]
+            bd=sepd.bone_dimension
+            has_normal = sepd.attrs["normal"].mode in (MODE_ARRAY, MODE_CONSTANT)
             for prms in sepd.prms:
                 prm=prms.prms[0]
-                # Rigid bind-pose transform: the prms is bound to bone_table[0].
-                # (Smooth skinning would blend per-vertex boneIndices/weights;
-                # OoT3D static props are rigid, so use the single bound bone.)
-                if sepd.bone_dimension>1:
-                    print(f"  WARN: sepd bone_dimension={sepd.bone_dimension} "
-                          f"(smooth skinning) — using bone {prms.bone_table[:1]} for all verts")
-                bid = prms.bone_table[0] if prms.bone_table else 0
-                M = self.bone_matrix.get(bid, _mat_id())
+                bt=prms.bone_table or [0]
+                smooth = bd>1 and sepd.attrs["boneIndices"].mode==MODE_ARRAY \
+                                 and sepd.attrs["boneWeights"].mode==MODE_ARRAY
+                rigidM = self.bone_matrix.get(bt[0], _mat_id())
                 isz=DT_SIZE[prm.index_type]; ifmt=DT_FMT[prm.index_type]
                 ibase=self.idx_ptr + prm.first*isz
                 idxs=struct.unpack_from("<%d%s"%(prm.count,ifmt), b, ibase)
                 verts=[]
                 for idx in idxs:
                     pos=self.read_attr(sepd.attrs["position"],"position",idx,3)
-                    nrm=self.read_attr(sepd.attrs["normal"],"normal",idx,3) \
-                        if sepd.attrs["normal"].mode==MODE_ARRAY or sepd.attrs["normal"].mode==MODE_CONSTANT else (0,0,1)
+                    nrm=self.read_attr(sepd.attrs["normal"],"normal",idx,3) if has_normal else (0,0,1)
                     uv =self.read_attr(sepd.attrs["texCoord0"],"texCoord0",idx,2)
-                    pos=_mat_apply_pos(M,pos)
-                    nrm=_mat_apply_dir(M,nrm)
+                    if not smooth:  # rigid: bone-local verts -> place by the bound bone
+                        pos=_mat_apply_pos(rigidM,pos); nrm=_mat_apply_dir(rigidM,nrm)
+                    # smooth: pos/nrm already in model space (bind pose == identity)
                     verts.append((idx,pos,nrm,uv))
                 for i in range(0,len(verts)-2,3):
                     yield (mesh.sepd_index, mesh.material_index, verts[i:i+3])
