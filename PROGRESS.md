@@ -56,9 +56,21 @@ Pipeline:
 - `soh/src/soh3d/` — `soh3d.{c,h}` (env toggles) + the generated
   `soh3d_pot_model.{c,h}`. SoH globs `src/*.c` (GLOB_RECURSE) so new files are
   picked up after a `cmake build-cmake` reconfigure.
-- Hook: `ObjTsubo_Draw` (z_obj_tsubo.c) draws `soh3d_pot_model_dl` via
-  `Gfx_DrawDListOpa` when `SOH3D=1`. The actor world matrix is already loaded, so
-  the mesh lands correctly.
+- Hook: `ObjTsubo_Draw` (z_obj_tsubo.c) calls `SoH3D_DrawModel(play, dl, actor,
+  SOH3D_POT_WORLD_SCALE)` when `SOH3D=1`.
+
+**Draw path — must build its own matrix (root cause).** Do NOT reuse
+`Gfx_DrawDListOpa` for OoT3D models: it loads the actor's inherited matrix, which
+carries the N64 0.01 actor scale (`Actor_Draw` does `Matrix_Scale(actor->scale)`
+before the actor's Draw). With that inherited fixed-point matrix the OoT3D dlist
+renders **nothing at all** (not just wrong-sized) — verified: the identical dlist
+renders fine through a fresh `MTXMODE_NEW` matrix but is invisible through the
+inherited one. `SoH3D_DrawModel` (soh3d.c) builds its own
+translate+rotateY+scale matrix at the actor's world pos and emits the dlist, so
+SoH3D owns the transform. Calibrated world scale: **0.12** (OoT3D pot ~162 model
+units -> matches the N64 pot's on-screen height; tuned via the SOH3D_SPAWNPOT
+spawn comparison in Deku Tree). Generated model is baked at --scale 1.0; the
+world scale lives in `SOH3D_POT_WORLD_SCALE`.
 
 Regenerate the pot model (from the extracted CMB):
 ```
@@ -72,12 +84,14 @@ reuses SoH's debug Select overlay + `Select_LoadGame`:
 - `SOH3D_WARP=1` — boot straight into Select, then auto-warp. Default entrance
   Kakariko Village (`SOH3D_ENTRANCE=<decimal>` to override).
 - `SOH3D=1` — enable OoT3D-model rendering (the `ObjTsubo_Draw` divert).
-- `SOH3D_DEBUGPOT=1` — debug-draw the pot model at Link's position in ANY scene
-  (verifies the render path without needing a real pot in view). `SOH3D_SCALE=F`
-  scales it (env tunable, no baked magic constant).
-Verified render: `scratch/screenshots/pot3d_s0.2.png` (pot at Link's feet,
-Kakariko). Code: graph.c (boot→Select), z_select.c (auto-warp), z_play.c
-(debug draw at OnPlayDrawEnd).
+- `SOH3D_SPAWNPOT=1` — spawn one real Obj_Tsubo beside Link (the actual
+  ObjTsubo_Draw path). A/B with SOH3D=0 (N64 pot) vs SOH3D=1 (OoT3D pot) in the
+  same scene. params=0 needs the dungeon keep object, so use a dungeon
+  (`SOH3D_ENTRANCE=0` = Deku Tree).
+Verified renders: `scratch/screenshots/final_3ds.png` (OoT3D pot via the real
+ObjTsubo_Draw path, Deku Tree, calibrated size) and `full_n64.png` vs
+`full_s012.png` (N64 vs OoT3D height match). Code: graph.c (boot→Select),
+z_select.c (auto-warp), z_play.c + soh3d.c (spawn helper).
 
 ### CORRECTION — there is NO 4 KB TMEM limit in the LUS modern path
 PROGRESS/handoff previously said approach A hits "TMEM 4 KB: pot's 64x128 tex
@@ -91,11 +105,13 @@ is only needed later if per-vertex lighting/normals fidelity demands it.
 
 ## Next phase (implementation)
 1. **DONE** — First in-game OoT3D pot via approach A (see MILESTONE above).
-2. **Scale calibration** (next): derive the OoT3D→N64 unit scale from the actual
-   N64 pot dimensions (don't bake an eyeballed constant). ~0.2 looks right; the
-   principled value = N64_pot_height / OoT3D_model_height. Bake into the converter
-   (--scale) or the draw, replacing the SOH3D_SCALE debug env.
-3. **Fidelity**: the pot currently draws flat-lit (white vtx color, MODULATERGBA).
+2. **DONE** — Real `ObjTsubo_Draw` path renders the OoT3D pot at calibrated size
+   (0.12), via `SoH3D_DrawModel`'s own matrix. Root cause of the earlier
+   non-render documented above.
+3. **Fidelity**: the pot currently draws flat-lit (white vtx color, MODULATERGBA)
+   and comes out DARK in dim scenes (e.g. Deku Tree) — investigate whether
+   Gfx_SetupDL_25Opa lighting treats the white vertex colors as normals; want the
+   OoT3D texture at full brightness (or proper scene lighting via real normals).
    Add normals + the scene lighting (or per-vertex CMB color) for real 3DS look;
    verify V-flip / wrap modes against the texture; map materials→textures (the
    converter currently hardcodes texture index 0; fine for the 1-material pot).
