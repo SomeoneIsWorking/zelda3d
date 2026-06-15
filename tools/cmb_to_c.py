@@ -17,7 +17,7 @@ slots) so it works regardless of mesh size without vertex-cache bookkeeping.
 Usage: cmb_to_c.py <model.cmb> <out_basename> [--tex N] [--scale F] [--no-flip-v]
 Emits  <out_basename>.c and <out_basename>.h.
 """
-import sys, os, struct
+import sys, os, struct, math
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
 from cmb import Cmb
 import pica_texture
@@ -26,6 +26,15 @@ def clamp_s16(v):
     v = int(round(v))
     return -32768 if v < -32768 else 32767 if v > 32767 else v
 
+def pack_n8(nx, ny, nz):
+    """Normalize a normal and pack each component as an s8 byte (two's complement),
+    the layout F3DEX2 reads from the Vtx color slot under G_LIGHTING."""
+    l = math.sqrt(nx * nx + ny * ny + nz * nz) or 1.0
+    def b(v):
+        i = int(round(max(-1.0, min(1.0, v / l)) * 127.0))
+        return i & 0xFF
+    return b(nx), b(ny), b(nz)
+
 def main():
     if len(sys.argv) < 3:
         print(__doc__); sys.exit(1)
@@ -33,6 +42,9 @@ def main():
     tex_index = 0
     scale = 1.0
     flip_v = True
+    lit = False  # default unlit: full-bright texture (3DS look). --lit uses N64
+                 # per-vertex lighting from CMB normals (bands on low-poly meshes
+                 # in low-ambient scenes; kept for when smoother models warrant it).
     args = sys.argv[3:]
     i = 0
     while i < len(args):
@@ -40,6 +52,7 @@ def main():
         if a == "--tex": tex_index = int(args[i+1]); i += 2
         elif a == "--scale": scale = float(args[i+1]); i += 2
         elif a == "--no-flip-v": flip_v = False; i += 1
+        elif a == "--lit": lit = True; i += 1
         else: print("unknown arg", a); sys.exit(1)
 
     c = Cmb(open(cmb_path, "rb").read())
@@ -66,7 +79,8 @@ def main():
             if flip_v: v = 1.0 - v
             s = clamp_s16(u * TW * 32.0)
             t = clamp_s16(v * TH * 32.0)
-            face.append((x, y, z, s, t))
+            nx, ny, nz = pack_n8(nrm[0], nrm[1], nrm[2])
+            face.append((x, y, z, s, t, nx, ny, nz))
         tris.append(face)
 
     BATCH = 10  # <=10 tris -> <=30 vtx slots (cache holds 32)
@@ -103,13 +117,20 @@ def main():
     s.append(f"static const Vtx {ident}_vtx[] = {{")
     for b in batches:
         for face in b:
-            for (x, y, z, sc, tc) in face:
-                s.append(f"    {{{{ {{{x},{y},{z}}}, 0, {{{sc},{tc}}}, {{255,255,255,255}} }}}},")
+            for (x, y, z, sc, tc, nx, ny, nz) in face:
+                # cn[4]: packed s8 normal for G_LIGHTING (--lit), else white color
+                # (unlit -> shade = white -> texture shown at full brightness).
+                cn = f"{nx},{ny},{nz},255" if lit else "255,255,255,255"
+                s.append(f"    {{{{ {{{x},{y},{z}}}, 0, {{{sc},{tc}}}, {{{cn}}} }}}},")
     s.append("};")
     s.append("")
     # display list
     s.append(f"Gfx {ident}_dl[] = {{")
     s.append("    gsDPPipeSync(),")
+    if not lit:
+        # Unlit: drop scene lighting/fog so the white vertex color is the shade
+        # (full-bright texture) instead of being read as a normal.
+        s.append("    gsSPClearGeometryMode(G_LIGHTING | G_FOG),")
     s.append("    gsDPSetCombineMode(G_CC_MODULATERGBA, G_CC_MODULATERGBA),")
     s.append("    gsSPTexture(0xFFFF, 0xFFFF, 0, G_TX_RENDERTILE, G_ON),")
     s.append(f"    gsDPSetTextureImage(G_IM_FMT_RGBA, G_IM_SIZ_32b, {TW}, {ident}_tex),")
