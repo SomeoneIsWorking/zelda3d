@@ -175,8 +175,17 @@ the OoT3D logic tick. (4) Generalise beyond one global anim frame if >1 GL chara
 ### Phase 4 polish DONE (session 9) — En_Ge1 grounded + live anim state, VERIFIED in-game
 En_Ge1 now stands **grounded** on the floor playing her **real** animation, fully
 textured + upright (`scratch/render/ge1_placed_anim_a.png` = mid-sway, `..._b.png` =
-arms-crossed idle; A/B against the N64 En_Ge1 in Gerudo Fortress). Closes REMAINING
-(1)(2)(3) above; (4) (multi-GL-char generalisation) is the only item left.
+arms-crossed idle; A/B against the N64 En_Ge1 in Gerudo Fortress). **Closes ALL of
+REMAINING (1)(2)(3)(4).**
+
+**(4) Multi-GL-char generalisation.** The free-running playhead is now PER GL MODEL
+(`gSoH3dGlAnim[glModelId]` = {frame, lastCsab}, cap `SOH3D_GL_MODEL_MAX`=16) instead of
+one global `gSoH3dAnimFrame`, so distinct GL characters animate on independent playheads
+(`gSoH3dAnimRate` stays the shared speed knob; the global frame remains the scrub-mode
+playhead for REPL `animframe`/`animrate`). Still per-MODEL not per-instance: two En_Ge1
+instances share one pose (skin matrices upload per modelId) — independent per-instance
+poses would need per-actor bone buffers, deferred. Regression-verified: lone geldwoman
+still grounds + idles (figure-band motion ~2-3k px/0.5s, bg settled).
 
 **(1) Placement.** `SoH3D_DrawModelGL` gained a per-model `groundOffset` (MODEL units,
 applied innermost = pre-scale, so it scales WITH worldScale and re-tuning scale never
