@@ -56,6 +56,46 @@ LUS" edits). The cmb_to_c.py / generated `soh3d_*_model.{c,h}` path is now legac
 ROM path: read the decrypted .3ds at runtime from **env `SOH3D_3DS_ROM`** (see
 `soh3d-rom-paths` memory; NEVER commit the absolute path).
 
+### Phase 1 DONE (session 7) — runtime C++ asset loader, VERIFIED
+`soh/src/soh3d/asset/{ctr_rom,zar,cmb,pica_texture}.{h,cpp}` (pure C++, no SoH/LUS
+deps) load a model straight from the .3ds. Verified byte-identical to the Python
+tools on zelda_ge1→geldwoman: bones=15/meshes=6/materials=6/textures=6, 1086 tris,
+exact bbox, all 6 texture-decode FNV checksums match (Python decode was oracle-exact
+vs Azahar). Standalone verifier: `tools/build_asset_test.sh` →
+`scratch/bin/asset_test [/actor/<x>.zar]`. Committed+pushed (Shipwright fork develop
+993b7ec9e; parent main 3a6715a). `Cmb::buildDrawGroups()` returns per-material
+interleaved {pos,nrm,uv} triangle lists (bind pose); `CmbMaterial`/`CmbTexture`
+carry wrap/alpha/tex metadata; `PicaDecode()` → RGBA8.
+
+### Phase 2 NEXT — direct-GL renderer (design notes, START HERE)
+**Execution model (researched):** SoH renders RETAINED-mode but SYNCHRONOUS on the
+MAIN thread — `graph.c` → `Graph_ProcessGfxCommands` (OTRGlobals.cpp:1800) →
+`RunCommands` → `Fast3dWindow::DrawAndRunGraphicsCommands` → `Interpreter::Run()`.
+GL is current only DURING `Run()`, not during `Actor_Draw` (which only RECORDS the
+POLY_OPA dlist). So we CANNOT `glDraw*` in the divert; we must inject at dlist-EXEC
+time. Note: the dlist is Run() once PER mtx_replacement (frame interpolation), so any
+hook fires multiple times/frame — fine (idempotent redraw), but don't accumulate.
+
+**Clean injection point:** embed a CUSTOM GBI opcode in the POLY_OPA dlist at the
+divert (carrying a model handle); register a handler in the interpreter's opcode
+dispatch table (interpreter.cpp ~4560, same mechanism as `G_REGBLENDEDTEX` 0x3f).
+At execution the handler runs on the main thread with GL current and the interpreter's
+current modelview/projection available → do `glUseProgram`+VBO+texture draw into the
+bound game FBO with depth test, save/restore GL state so Fast3D isn't corrupted.
+⚠️ This is a SMALL libultraship hook (a generic "call native draw" opcode) — tension
+with "no LUS". Decide: is "no LUS" = don't route our MODELS through the N64
+Fast3D/texture path (satisfied — we draw raw GL), or literally zero libultraship
+edits (then need an existing hook / a different injection)? **Pending user call.**
+
+**Renderer pieces to build (`soh/src/soh3d/soh3d_gl.{cpp,h}`):**
+- One-time per model: upload each draw group's verts to a VBO; decode+upload each
+  texture (PicaDecode→glTexImage2D, GL_RGBA8); cache by model id.
+- Shader: textured + a flat tint uniform (reuse the scene-tint idea) + alpha test.
+- Per draw: MVP = game proj * game view * actor(Translate*RotateY*Scale) — get the
+  matrices from the interpreter at hook time (or recompute from play->view).
+- Divert: SoH3D_TryDrawActor records (modelId, matrix); the hook draws it.
+Orientation/scale tuned live via the existing REPL (rotx/roty/rotz still wired).
+
 ## Layout
 - `tools/` — 3DS asset toolchain (Python, dependency-free for extraction).
 - `scripts/` — dependency install scripts (Fedora; run with sudo yourself).
