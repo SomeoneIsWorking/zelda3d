@@ -248,6 +248,34 @@ texture, NOT its (verified-brown) wood texels. Diagnosed via the REPL:
     REPL goes unresponsive). Retry the launch; or move ReplPoll earlier in Play_Draw
     / into Play_Main so it runs during transitions.
 
+### TOOLING — Azahar texture-decode ORACLE (data-driven) (2026-06-15, session 4)
+Built the first piece of the "compare SoH3D vs Azahar" oracle the user asked for,
+as a C++ tool in the Azahar fork that needs NO emulator run / in-game navigation:
+- `Azahar/src/soh3d_oracle/` (new CMake target `soh3d_oracle`): links Azahar's OWN
+  `Pica::Texture::LookupTexture` + `etc1.cpp` + `citra_common` (no GL/Vulkan/core).
+  Decodes a raw PICA texture blob -> PPM = the emulator's ground-truth decode.
+  Build: `cmake --build Azahar/build --target soh3d_oracle`.
+- `tools/oracle_compare.py <cmb> [tex]`: pulls the CMB texture's raw bytes, runs
+  BOTH the oracle and the converter's `pica_texture.decode`, and diffs per channel
+  (worst/mean |Δ| + histogram), trying both V orientations.
+
+**FINDING (data-driven, not eyeballed): the converter's ETC1 decode diverges from
+Azahar.** All OoT3D model textures so far are ETC1. Result for the crate/pot/GS
+ETC1 textures: orientation aligns (top-down), but the decode is NOT bit-exact —
+e.g. crate tex0: ~90.7% of channels EXACT, ~9.3% off by 33-128 (worst 66), NONE
+>128. ETC1 is deterministic, so a correct decoder must match Azahar exactly
+(mean|Δ|=0). The bimodal 90/10 split + worst=66 (≈2×33, a modifier-table value)
+points to a specific ETC1 sub-case in `tools/pica_texture.py` `_decode_etc1`
+(not pervasive, not orientation). Bit layout, subtile order, texel mapping and the
+modifier sign/subindex mapping were all checked against `etc1.cpp` and MATCH on
+inspection — so the remaining suspect is a value-path detail (differential base
+range handling, or a per-pixel modifier selection in one mode). NEXT: dump the
+oracle vs converter PNGs + a spatial diff mask to localise which subtiles/modes
+the 9% live in, then fix `_decode_etc1` and re-run until mean|Δ|=0.
+
+NOTE: this also means the earlier in-game texture renders were slightly off in ~9%
+of texels — minor visually, but the oracle is now the bar (fix to exact).
+
 ## Next phase (implementation)
 1. **DONE** — First in-game OoT3D pot via approach A (see MILESTONE above).
 2. **DONE** — Real `ObjTsubo_Draw` path renders the OoT3D pot at calibrated size
