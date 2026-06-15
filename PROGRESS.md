@@ -264,9 +264,35 @@ be culled). It already debunked the bogus "128x128 upload" bug (RESOLVED section
   the texture to a HIGH address to mimic the in-game (PIE, high-addr) condition.
 - Build/run: `cmake -S Shipwright -B Shipwright/build-cmake -DLUS_BUILD_DLIST_HARNESS=ON`
   then `cmake --build ... --target soh3d_dlist_harness`; run the resulting binary.
-- NEXT extension: have the harness drive a REAL GL backend (offscreen FBO) + readback so it
-  dumps actual rendered pixels for an A/B vs the Azahar oracle render (the full both-renderers
-  compare). Currently it records the upload/draw calls, not a framebuffer.
+
+### TOOLING — dlist harness `--gl` mode: REAL rendered pixels (2026-06-15, session 6)
+The harness now also drives the **real `GfxRenderingAPIOGL`** to emit actual rasterised
+pixels, still fully headless — the both-renderers pixel A/B counterpart to the Azahar
+decode oracle. **VERIFIED**: the 128x128 RGBA32 crate renders as a fully textured wood
+crate (bright wood highlights to 255,242,174, wood-grain interior, centred bbox) — see
+`scratch/render/kibako_lus.png`. Definitively NOT teal/black; closes the "128x128 upload"
+question with actual pixels, end-to-end through LUS's GL path.
+- Run: `soh3d_dlist_harness --gl [--out scratch/render/kibako_lus.ppm] [--size 640x480]
+  [--o2r <path>]` (recording stub stays the default mode). Needs the shader archive
+  (`shaders/opengl/default.shader.glsl` lives in `soh.o2r`) — pass `--o2r`/`SOH3D_O2R` or
+  it probes `Shipwright/build-cmake/soh/soh.o2r` etc.
+- GL context = **EGL surfaceless** (no window, no X server, no Xvfb — directly addresses
+  the leftover-Xvfb complaint). KEY GOTCHAS: (1) `EGL_PLATFORM_SURFACELESS_MESA` advertises
+  ZERO EGLConfigs, so create a **config-less context** via `EGL_KHR_no_config_context`
+  (`EGL_NO_CONFIG_KHR`) + `EGL_KHR_surfaceless_context` (both present on this Mesa). (2)
+  Request a **compatibility** profile — the GLSL the OGL backend emits on desktop Linux is
+  `#version 130` (varying / gl_FragColor / texture2D) and it draws WITHOUT a VAO; both need
+  a non-core context. (3) harness CMake must also define **`ENABLE_OPENGL`** (gates the
+  `GfxRenderingAPIOGL` decl in gfx_opengl.h) and link `OpenGL::OpenGL` + `OpenGL::EGL` (LUS
+  pulls them PRIVATEly). (4) the rendered image lives in `mGameFb` = the interpreter's FIRST
+  `CreateFramebuffer()` (deterministic index 1); read its colour attachment with
+  `glGetTexImage` (MSAA=1 default => it's a plain RGB8 texture). fb 0 is re-cleared at frame
+  end, so don't read it.
+- Prologue adds a full-screen 320x240 viewport + scissor + white PRIM (combiner is
+  MODULATE x PRIM => PRIM=0 renders black) so the crate actually rasterises on-screen.
+- NEXT extension: wire `tools/render_compare.py` to diff this harness PPM vs the Azahar
+  oracle's render of the same model (numeric pixel A/B), and parameterise model selection
+  (pot/gs) beyond the built-in crate.
 
 ### TOOLING — Azahar texture-decode ORACLE (data-driven) (2026-06-15, session 4)
 Built the first piece of the "compare SoH3D vs Azahar" oracle the user asked for,

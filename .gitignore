@@ -5,6 +5,7 @@ scratch/
 *.otr
 *.o2r
 build/
+logs/
 __pycache__/
 scratch/azahar_cfg/
 scratch/azahar_data/
