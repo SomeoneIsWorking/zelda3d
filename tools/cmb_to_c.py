@@ -53,6 +53,10 @@ def main():
     lit = False  # default unlit: full-bright texture (3DS look). --lit uses N64
                  # per-vertex lighting from CMB normals (bands on low-poly meshes
                  # in low-ambient scenes; kept for when smoother models warrant it).
+    solid = None  # diagnostic: (r,g,b) -> replace ALL texture data with this solid
+                  # colour (keeps dims/dlist). Renders the model flat in that colour
+                  # iff the texture-upload path is sound — isolates upload/binding
+                  # bugs from texture-decode/data bugs.
     args = sys.argv[3:]
     i = 0
     while i < len(args):
@@ -60,6 +64,7 @@ def main():
         if a == "--scale": scale = float(args[i+1]); i += 2
         elif a == "--no-flip-v": flip_v = False; i += 1
         elif a == "--lit": lit = True; i += 1
+        elif a == "--solid": solid = tuple(int(x) for x in args[i+1].split(",")); i += 2
         else: print("unknown arg", a); sys.exit(1)
 
     c = Cmb(open(cmb_path, "rb").read())
@@ -91,6 +96,8 @@ def main():
             rgba = pica_texture.decode(tex.gl_format, tex.width, tex.height, tdata)
             assert len(rgba) == tex.width * tex.height * 4, \
                 f"tex{ti} decoded {len(rgba)}, expected {tex.width*tex.height*4}"
+            if solid is not None:
+                rgba = bytearray((solid[0], solid[1], solid[2], 255)) * (tex.width * tex.height)
             tex_used[ti] = (tex.width, tex.height, rgba)
 
     # --- build vertex array + per-material batch plan ---
@@ -208,7 +215,15 @@ def main():
         s.append(f"    gsDPSetTextureImage(G_IM_FMT_RGBA, G_IM_SIZ_32b, {TW}, {ident}_tex{ti}),")
         s.append("    gsDPSetTile(G_IM_FMT_RGBA, G_IM_SIZ_32b, 0, 0, G_TX_LOADTILE, 0,")
         s.append("                G_TX_WRAP, 0, 0, G_TX_WRAP, 0, 0),")
-        s.append(f"    gsDPLoadBlock(G_TX_LOADTILE, 0, 0, {TW*TH-1}, 0),")
+        # gsDPLoadBlock encodes lrs (texel count - 1) in a 12-bit field, so it
+        # SILENTLY TRUNCATES for textures with > 4096 texels (e.g. 128x128) — the
+        # RDP then computes a wrong size_bytes and the texture loads garbled/partial
+        # (verified: 128x128 sampled stale TMEM, not our data). gsDPLoadBlockWide
+        # carries lrs in the full w1 word, so use it past the 12-bit limit.
+        if TW * TH - 1 > 0xFFF:
+            s.append(f"    gsDPLoadBlockWide(G_TX_LOADTILE, 0, 0, {TW*TH-1}, 0),")
+        else:
+            s.append(f"    gsDPLoadBlock(G_TX_LOADTILE, 0, 0, {TW*TH-1}, 0),")
         s.append(f"    gsDPSetTile(G_IM_FMT_RGBA, G_IM_SIZ_32b, {line_words}, 0, G_TX_RENDERTILE, 0,")
         s.append(f"                {plan['wrap_t']}, {maskt}, 0, {plan['wrap_s']}, {masks}, 0),")
         s.append(f"    gsDPSetTileSize(G_TX_RENDERTILE, 0, 0, {(TW-1)<<2}, {(TH-1)<<2}),")
