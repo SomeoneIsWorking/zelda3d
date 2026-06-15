@@ -35,6 +35,35 @@ geometry instead of the N64 assets. Asset-conversion + renderer-integration task
   texture state + framebuffer for a target model), and the SoH-side integration
   (new 3DS-model resource + draw path, hooked where the N64 model is drawn).
 
+## Integration design (SoH render path)
+
+Draw path (pot example): `ObjTsubo_Draw` → `Gfx_DrawDListOpa(play, dlist)`
+(`soh/src/code/z_cheap_proc.c`). That fn does:
+1. `Gfx_SetupDL_25Opa` (state), 2. `gSPMatrix(..., MATRIX_NEWMTX, MODELVIEW|LOAD)`
+— loads the actor's already-built world matrix, 3. `gSPDisplayList(dlist)`.
+So the actor transform is on the RSP matrix stack before the dlist; any
+replacement draws at the correct place for free. SoH already wraps pot draw in
+GameInteractor `VB_POT_SETUP_DRAW` hooks — a clean place to divert.
+
+Two integration layers:
+- **A. CMB→F3DEX2 conversion** (no LUS changes): convert CMB to an N64 display
+  list + N64-format texture, feed to `Gfx_DrawDListOpa`. Fast, reuses everything,
+  but hits N64 limits (TMEM 4KB: pot's 64x128 tex won't fit in one load; s16
+  verts; limited lighting). Good only as a stepping stone.
+- **B. Native model draw path** (chosen end state): new Fast3D opcode / resource
+  in libultraship that, at gfx_pc interpret time, takes the current MV+proj matrix
+  and renders a native CMB mesh (full-res RGBA texture bound directly, bypassing
+  TMEM) through the modern gfx backend. Hook actor draw (GameInteractor `VB_` or a
+  per-object table) to emit it instead of the N64 dlist. Real 3DS quality.
+
+Plan: implement B. First milestone — pot in-game via the native path, A/B'd
+against the Azahar oracle render.
+
+To generate the **game** archive (oot.o2r) headlessly:
+`python3 OTRExporter/extract_assets.py -z build-cmake/ZAPD/ZAPD.out --non-interactive <rom>`
+(run from `Shipwright/soh`-relative as the build does; do after Azahar build to
+avoid CPU contention).
+
 ## Gotchas learned (CMB; wiki is partly wrong / MM3D-mixed)
 - OoT3D cmb version = 6; MM3D = 0x0A. OoT3D has NO tangent attribute.
 - SEPD VertexList stride = 0x1C (includes constant vec4), not 0x14.
