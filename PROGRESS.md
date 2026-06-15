@@ -146,6 +146,33 @@ texture). Calibrated world scale ~0.13 (`SOH3D_GS_WORLD_SCALE`).
   converter renders it wrong. PICA combiner emulation is future work. Pick models
   whose materials each use a distinct mostly-opaque texture (the Gossip Stone does).
 
+### MILESTONE — flat scene-ambient tint (color fidelity) (2026-06-15, session 4)
+Unlit OoT3D models rendered full-bright: they did NOT darken with the room and
+sat ~2.5x too bright vs the N64 model in the same scene. Fixed without
+reintroducing per-vertex lighting banding.
+
+**How.** The unlit dlist now modulates the texture by the **PRIMITIVE** register
+instead of vertex SHADE: `cmb_to_c.py` emits `G_CC_MODULATERGBA_PRIM` (= TEXEL0 *
+PRIM) for both the opaque and alpha-test material paths (still `G_CC_MODULATERGBA`
+under `--lit`). `SoH3D_DrawModel` (soh3d.c) computes ONE flat tint colour from the
+LIVE interpolated scene lights — `play->envCtx.lightSettings`: `ambient + 0.5 *
+(light1Color + light2Color)`, clamped — and emits `gDPSetPrimColor` before the
+dlist. Reading it live means the model tracks time-of-day automatically; one prim
+colour for the whole dlist means it's flat by construction (no banding). The dlist
+deliberately emits no prim colour of its own so the caller's wins. Re-cal knobs:
+`SOH3D_TINT_DIFF` (diffuse fraction, default 0.5), `SOH3D_TINT_MUL` (overall, 1.0).
+
+**Verified QUANTITATIVELY** (`tools/compare_render.py model`, A/B same scene/spawn;
+see [[verify-quantitatively]]). Model-region mean luminance:
+- Gossip Stone / Kakariko: full-bright **150.5** -> tinted **62.7**; N64 **60.2**
+  (tinted within ~4% of N64; full-bright was 2.5x too bright).
+- Pot / Deku Tree (darker scene, single material): tinted **56.6**; N64 **65.4**
+  (~13%) — confirms it generalises across scenes/objects, neither black nor
+  full-bright.
+The frac=0.5 / mul=1.0 DEFAULTS land within tolerance with no per-scene tuning, so
+no magic constants are baked. Residual hue gap (OoT3D stone is gray-green, N64 is
+gray-blue) is the genuine OoT3D texture palette, not a tint error.
+
 ## Next phase (implementation)
 1. **DONE** — First in-game OoT3D pot via approach A (see MILESTONE above).
 2. **DONE** — Real `ObjTsubo_Draw` path renders the OoT3D pot at calibrated size
@@ -159,10 +186,10 @@ texture). Calibrated world scale ~0.13 (`SOH3D_GS_WORLD_SCALE`).
    per-vertex lighting instead, but on this low-poly pot in low ambient that
    bands hard, so unlit is the default. True 3DS-style per-pixel lighting is a
    later, bigger task.
-4. **Fidelity (open)**: unlit means the pot doesn't darken with the room. A flat
-   scene-ambient tint (one color, no per-vertex banding) would integrate better
-   without the low-poly lighting artifacts. Also map materials→textures (converter
-   hardcodes texture 0; fine for the 1-material pot) and verify V-flip/wrap.
+4. **DONE (flat scene tint)** — Unlit models now darken/colour-shift with the room
+   via a flat per-draw PRIMITIVE tint (no per-vertex banding). See the MILESTONE
+   below. (Materials→textures map was already done in session 3's multi-material
+   work; the converter no longer hardcodes texture 0.)
 5. **Azahar oracle instrumentation**: headless frame dump (glReadPixels, mirror
    of the LUS one) + draw-call dump of geometry/material/texture for A/B compare.
 6. **Generalize**: drive the converter from a per-actor table / GameInteractor
