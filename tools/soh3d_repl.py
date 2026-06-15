@@ -46,9 +46,17 @@ def send(cmd, timeout=3.0):
     if not os.path.exists(FIFO):
         sys.exit(f"FIFO {FIFO} not present — is the instance running? (soh3d_repl_launch.sh)")
     pre = _out_size()
-    with open(FIFO, "w") as f:
-        f.write(cmd + "\n")
-        f.flush()
+    # Non-blocking open so a DEAD instance fails fast (ENXIO) instead of blocking
+    # forever on the FIFO write — a blocking open(FIFO,"w") hangs with no reader,
+    # which silently wedges interactive REPL iteration when soh.elf has crashed.
+    try:
+        fd = os.open(FIFO, os.O_WRONLY | os.O_NONBLOCK)
+    except OSError as e:
+        sys.exit(f"FIFO {FIFO} has no reader — instance dead/not ready? ({e.strerror})")
+    try:
+        os.write(fd, (cmd + "\n").encode())
+    finally:
+        os.close(fd)
     t0 = time.time()
     while time.time() - t0 < timeout:
         if _out_size() > pre:
