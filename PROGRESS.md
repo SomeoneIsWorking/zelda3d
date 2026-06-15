@@ -297,11 +297,27 @@ question with actual pixels, end-to-end through LUS's GL path.
   Vtx offset 0; centre + uniform-scale into ~80% NDC) — no per-model magic constants.
   VERIFIED all three render correctly: crate=wood, pot=clay tubo2, gossip stone=Sheikah-eye
   with BOTH textures (2-material). PNGs in `scratch/render/`.
-- NEXT extension: wire `tools/render_compare.py` to diff a harness PPM vs the Azahar
-  oracle's render of the same model (numeric pixel A/B). Caveat: the Azahar oracle currently
-  only does *texture decode* (flat texture PPM), not a 3D geometry render — a true
-  both-renderers pixel compare needs either an Azahar geometry render (big: PICA vertex
-  decode + raster) or capturing Azahar's in-emulator framebuffer for the object.
+- (render_compare vs Azahar was explicitly dropped by the user — "just work on SoH3D".)
+
+### Smooth (per-vertex) skinning in cmb.py — bind-pose = model space (2026-06-15, session 6)
+**FIXED**: cmb.py previously only did RIGID skinning (whole prms bound to one bone) and
+*scrambled* any `bone_dimension>1` (smooth-skinned) mesh by forcing bone_table[0]'s matrix
+onto every vertex. The key finding (verified by rendering `hintstone` through the harness):
+- **Rigid meshes (bone_dimension==1)**: vertices are in BONE-LOCAL space → transform by the
+  single bound bone's world-bind matrix (unchanged; pot/gs/kibako/tr_box output byte-identical).
+- **Smooth meshes (bone_dimension>1)**: vertices are in MODEL space; the per-vertex
+  boneIndices/boneWeights are for animation only (runtime applies bone_current ·
+  bone_bind_inverse, which is IDENTITY at bind pose). So a static bind-pose render uses the
+  RAW positions with NO per-bone transform. Applying the bones' world-bind matrices (whether
+  single-bone or a weighted blend) scrambles it — both tried on hintstone, both exploded; raw
+  model-space gave a coherent stone (`scratch/render/hintstone_lus.png`).
+- Data notes: boneIndices/boneWeights are per-vertex arrays of `bone_dimension` elems, GL data
+  types (0x1401 = GL_UNSIGNED_BYTE); boneIndices are LOCAL indices into prms.bone_table;
+  boneWeights scaled (e.g. ×0.01) and sum to 1. hintstone: 4 bones stacked vertically
+  (world y = 0/2600/5200), bone_dim=3, bone_table=[1,2,3,0].
+- **This unblocks CHARACTER models** — OoT3D characters/NPCs are smooth-skinned; they will now
+  render in bind/T-pose. NEXT: extract a character CMB from the romfs (actor archives via
+  ctr_romfs.py + zar.py) and render it; animation (moving bones) is a later, separate step.
 
 ### TOOLING — Azahar texture-decode ORACLE (data-driven) (2026-06-15, session 4)
 Built the first piece of the "compare SoH3D vs Azahar" oracle the user asked for,
