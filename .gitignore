@@ -6,3 +6,6 @@ scratch/
 *.o2r
 build/
 __pycache__/
+scratch/azahar_cfg/
+scratch/azahar_data/
+Azahar/
