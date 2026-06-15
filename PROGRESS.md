@@ -103,6 +103,49 @@ texture packs use. So approach A renders full-res textures fine — it is the
 correct first milestone, not just a stepping stone. Approach B (native opcode)
 is only needed later if per-vertex lighting/normals fidelity demands it.
 
+### MILESTONE — multi-material model (Gossip Stone) renders in-game (2026-06-15, session 3)
+Generalised the pipeline from the 1-mesh/1-material pot to genuine multi-mesh,
+multi-material, multi-texture models, and proved it on the **OoT3D Gossip Stone**
+(`zelda_gs.zar` -> `gossip_stone2_model.cmb`: 2 meshes, 2 materials, 2 distinct
+fully-opaque 128x128 / 128x64 textures), hooked via `EnGs_Draw` + `SOH3D_SPAWNGS`.
+
+Toolchain changes:
+- `cmb.py` now parses **MATS** (per-material primary texture index + wrap modes +
+  UV coordinator scale/translate + alpha test) and computes **bind-pose bone
+  matrices**; `triangles()` applies each mesh's bound-bone world matrix. Multi-bone
+  props (e.g. the treasure-chest lid, bone 2) are stored in bone-LOCAL space and
+  render scrambled without this — verified on `tr_box` (lid then sits atop the base).
+  The single-bone pot never exposed it (bone 0 = identity).
+- `cmb_to_c.py` groups triangles by material and re-binds texture+combiner per
+  material in one dlist (multiple RGBA32 texture arrays in the C file).
+
+**Root cause of the "model renders solid black" bug (the real one).** Clearing the
+`G_FOG` *geometry-mode* bit stops the RSP computing per-vertex fog, but the RDP
+**blender** configured by the caller's SetupDL can still blend the framebuffer
+toward the scene fog colour. In a foggy scene (Kakariko at night, fog ~ (0,0,30))
+that painted the *entire* model the fog colour regardless of texture/combiner — a
+solid black/blue silhouette. Proven by bisection: a solid-red PRIMITIVE combiner
+*also* rendered black, so it was downstream of the combiner. Fix: the converter
+emits an explicit `gsDPSetRenderMode(G_RM_AA_ZB_OPA_SURF, G_RM_AA_ZB_OPA_SURF2)`.
+The pot only escaped this because Deku Tree's fog setup didn't tint.
+
+**Verified QUANTITATIVELY (do not eyeball — see `tools/compare_render.py` and the
+[[verify-quantitatively]] memory).** Lower-frame pixels matching tex0's gray-green
+palette: **0.2% before the fix (fog-black) -> 33.6% after**; the N64 Gossip Stone
+scores 0.2% (its stone is gray-blue, so the green is unambiguously the OoT3D
+texture). Calibrated world scale ~0.13 (`SOH3D_GS_WORLD_SCALE`).
+
+**Dead ends / corrected notes from this session (don't re-walk):**
+- The `lrs` 12-bit truncation in `gsDPLoadBlock` (>4096 texels truncate) is REAL but
+  IRRELEVANT to our textures: wide vs non-wide `gsDPLoadBlock` produced a
+  pixel-identical pot render, so SoH3D's static textures load fully via the
+  resource/cache path regardless. Kept plain `gsDPLoadBlock` (proven primitive).
+- The treasure chest (`tr_box`) is a POOR multi-material test: both its main textures
+  are ~95-100% transparent decals composited by a PICA multi-texture fragment
+  combiner — no single binding-0 texture is the visible surface, so the single-texture
+  converter renders it wrong. PICA combiner emulation is future work. Pick models
+  whose materials each use a distinct mostly-opaque texture (the Gossip Stone does).
+
 ## Next phase (implementation)
 1. **DONE** — First in-game OoT3D pot via approach A (see MILESTONE above).
 2. **DONE** — Real `ObjTsubo_Draw` path renders the OoT3D pot at calibrated size
