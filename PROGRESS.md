@@ -108,16 +108,21 @@ is only needed later if per-vertex lighting/normals fidelity demands it.
 2. **DONE** — Real `ObjTsubo_Draw` path renders the OoT3D pot at calibrated size
    (0.12), via `SoH3D_DrawModel`'s own matrix. Root cause of the earlier
    non-render documented above.
-3. **Fidelity**: the pot currently draws flat-lit (white vtx color, MODULATERGBA)
-   and comes out DARK in dim scenes (e.g. Deku Tree) — investigate whether
-   Gfx_SetupDL_25Opa lighting treats the white vertex colors as normals; want the
-   OoT3D texture at full brightness (or proper scene lighting via real normals).
-   Add normals + the scene lighting (or per-vertex CMB color) for real 3DS look;
-   verify V-flip / wrap modes against the texture; map materials→textures (the
-   converter currently hardcodes texture index 0; fine for the 1-material pot).
-4. **Azahar oracle instrumentation**: headless frame dump (glReadPixels, mirror
+3. **DONE (lighting)** — Pot renders unlit / full-bright so the OoT3D texture
+   shows at its authored brightness. Root cause of the earlier darkness: SETUPDL_25
+   has `G_LIGHTING` on, so F3DEX2 read the white vertex *color* as a *normal* and
+   shaded by the (dark) scene. The converter now clears `G_LIGHTING | G_FOG` and
+   uses white vertex color (unlit). `--lit` emits real CMB normals for N64
+   per-vertex lighting instead, but on this low-poly pot in low ambient that
+   bands hard, so unlit is the default. True 3DS-style per-pixel lighting is a
+   later, bigger task.
+4. **Fidelity (open)**: unlit means the pot doesn't darken with the room. A flat
+   scene-ambient tint (one color, no per-vertex banding) would integrate better
+   without the low-poly lighting artifacts. Also map materials→textures (converter
+   hardcodes texture 0; fine for the 1-material pot) and verify V-flip/wrap.
+5. **Azahar oracle instrumentation**: headless frame dump (glReadPixels, mirror
    of the LUS one) + draw-call dump of geometry/material/texture for A/B compare.
-5. **Generalize**: drive the converter from a per-actor table / GameInteractor
+6. **Generalize**: drive the converter from a per-actor table / GameInteractor
    `VB_*` hooks instead of editing each actor's Draw; then a second object.
 
 ## In progress / next
