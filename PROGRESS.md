@@ -228,11 +228,25 @@ texture, NOT its (verified-brown) wood texels. Diagnosed via the REPL:
   (loads ~64x64 not 64x128) but wasn't visually obvious; the GS's verified face is
   its 128x64 body, not a true 128x128. So 128x128 was never actually proven before.
 - FIX ATTEMPTED: emit `gsDPLoadBlockWide` (full lrs in w1) for >4096 texels
-  (cmb_to_c.py). It did NOT fix the crate — still teal. So either the wide opcode
-  path is also broken in this LUS, or the upload is skipped for another reason
-  (e.g. a size guard / cache). STILL OPEN — next: trace ImportTextureRgba32 /
-  TextureCacheLookup for a 128x128 load (add a logged dump of size_bytes/width/
-  height, or check GetMaxTextureSize / a >N-texel skip). The wide change is kept.
+  (cmb_to_c.py). Did NOT fix the crate — still teal. Kept (it IS needed).
+- NARROWED with REPL + interpreter.cpp logging (logging since reverted):
+  - `GfxDpLoadBlock` IS called for the crate every frame with `lrs=16383 siz=2`
+    (RGBA32), so the wide opcode dispatches fine and size_bytes=65536 is computed.
+  - BUT `Interpreter::ImportTexture` / `ImportTextureRgba32` is NEVER called for a
+    >=16KB texture, and never for the crate's first texel (213,196,94). The only
+    RGBA32 import seen is a 32x32/4096B UI texture. So the 128x128 load happens but
+    the texture is never IMPORTED/uploaded at draw time -> the crate samples stale
+    TMEM (the teal). The pot (64x128) renders, so smaller raw RGBA32 imports work.
+  - NEXT: trace why ImportTexture is skipped for the render tile of a 65536B load.
+    Suspects: TextureCacheLookup returning a stale hit (key collision on
+    {origAddr,fmt,siz,origSizeBytes}); the render tile's tmem_index not pointing at
+    the slot LoadBlock wrote; `textures_changed[i]` not set; or a size cap in the
+    draw-time texture binding. Put the log back at ImportTexture top filtered on the
+    crate's first texel (213,196,94) and at the TextureCacheLookup call.
+  - NOTE: headless auto-warp boots are FLAKY (often hang in the entrance fade with
+    Play_Draw taking the transition `goto`, which is BEFORE SoH3D_ReplPoll, so the
+    REPL goes unresponsive). Retry the launch; or move ReplPoll earlier in Play_Draw
+    / into Play_Main so it runs during transitions.
 
 ## Next phase (implementation)
 1. **DONE** — First in-game OoT3D pot via approach A (see MILESTONE above).
