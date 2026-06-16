@@ -96,6 +96,31 @@ equivalent of noclip's reverse-Z depth offset — negative unit pulls the decal 
 normal materials). Verified in Gerudo's Fortress (decal flicker gone on camera motion). Ruled
 out the terrain warp as the cause first (warp on/off ground crops were identical).
 
+### ⚠️ TERRAIN WARP breaks in Kokiri — thorough tooling investigation (session 14)
+Tool: `tools/soh3d_warp_audit.py` (per-scene BENEFIT vs HARM from a REPL `floorgrid` CSV +
+the OoT3D room mesh). Kokiri (spot04_0) vs Kakariko (spot01_0, warp known-good):
+- **Sparse data → 90% hole-filled.** Kokiri: only 21% of the grid has an N64 floor, 202 cells
+  have BOTH floors → 6479/7200 grid cells are BFS hole-filled (vs Kakariko 983 valid). The
+  correction field is mostly guessed, so it's unreliable across most of the scene.
+- **Under-correction (the "Link floats above ground / fence in the air" report).** At the fence
+  spot (-892,715): raw OoT3D ground=120, N64=160 (needs +40), but the warp applied only +27.8
+  (→147.8) — 100u grid + bilinear + hole-fill dilutes the correction, so ground lands ~12u low
+  and Link (on N64=160) floats above it. This is "the LACK of [enough] warp," not over-warp.
+- **Reject leaves big divergences floating.** Cells where OoT3D ground is >120u above N64 (the
+  z≈1535 region, +130…+204) are REJECTED as "structure" by `kWarpReject=120` and never lowered
+  → that ground + fences on it float at OoT3D height while Link walks at N64 height below.
+- **Over-displacement (the real warp HARM).** 361 elevated (structure) verts displaced >50u
+  (vs Kakariko 25): a tree/post on a hole-filled cell inherits a neighbor's D (up to ±120) and
+  the whole column lifts/sinks off the real ground → floating posts/trunks.
+- **Why Kakariko works, Kokiri doesn't:** Kakariko has dense valid coverage + a large genuine
+  sink, so benefit dominates (elevated-vert p90 disp 4u, 25 floats). Kokiri is sparse + mixes
+  small ground divergences, big genuine divergences, and many structures → the crude
+  reject/smooth/hole-fill misbehaves (elevated p90 37u, 361 floats).
+- **Fix direction (not a per-scene off switch):** the warp needs (a) DENSER N64 floor input so
+  fewer cells hole-fill, (b) smarter reject that distinguishes "ground that moved a lot" from a
+  wall/building (don't reject genuine ground divergences), and (c) height-aware blending so
+  structures aren't shifted by ground D. NOT yet implemented — design pending.
+
 ### ⚠️ KNOWN RESIDUAL — terrain warp under-corrects at sloped wall-edge cells (Link sinks)
 At Gerudo's Fortress (-560,-2812) the N64 collision floor is y=204.6 but the warped OoT3D
 render ground is y=221.6 (+17u), so Link's lower body is buried in the render terrain. This is
