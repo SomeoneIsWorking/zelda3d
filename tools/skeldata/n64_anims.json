@@ -1,0 +1,5207 @@
+{
+ "/actor/zelda_am.zar": {
+  "object": "object_am",
+  "anims": [
+   {
+    "name": "gArmosRicochetAnim",
+    "otr": "objects/object_am/gArmosRicochetAnim",
+    "offset": "0x33C",
+    "frameCount": 9
+   },
+   {
+    "name": "gArmosHopAnim",
+    "otr": "objects/object_am/gArmosHopAnim",
+    "offset": "0x238",
+    "frameCount": 23
+   },
+   {
+    "name": "gArmosDamagedAnim",
+    "otr": "objects/object_am/gArmosDamagedAnim",
+    "offset": "0x5B3C",
+    "frameCount": 20
+   }
+  ]
+ },
+ "/actor/zelda_ani.zar": {
+  "object": "object_ani",
+  "anims": [
+   {
+    "name": "gRoofManKnockbackAnim",
+    "otr": "objects/object_ani/gRoofManKnockbackAnim",
+    "offset": "0x67B8",
+    "frameCount": 20
+   },
+   {
+    "name": "gRoofManGettingUpAfterKnockbackAnim",
+    "otr": "objects/object_ani/gRoofManGettingUpAfterKnockbackAnim",
+    "offset": "0x70F0",
+    "frameCount": 30
+   },
+   {
+    "name": "gRoofManIdleAnim",
+    "otr": "objects/object_ani/gRoofManIdleAnim",
+    "offset": "0x76EC",
+    "frameCount": 30
+   }
+  ]
+ },
+ "/actor/zelda_bg.zar": {
+  "object": "object_bg",
+  "anims": [
+   {
+    "name": "gChuGirlWakeUpAnim",
+    "otr": "objects/object_bg/gChuGirlWakeUpAnim",
+    "offset": "0x80",
+    "frameCount": 71
+   },
+   {
+    "name": "gChuGirlNoddingOffAnim",
+    "otr": "objects/object_bg/gChuGirlNoddingOffAnim",
+    "offset": "0x710",
+    "frameCount": 49
+   },
+   {
+    "name": "gChuGirlLeanOverCounterAnim",
+    "otr": "objects/object_bg/gChuGirlLeanOverCounterAnim",
+    "offset": "0x72AC",
+    "frameCount": 20
+   }
+  ]
+ },
+ "/actor/zelda_bl.zar": {
+  "object": "object_bl",
+  "anims": [
+   {
+    "name": "gBiriDischargeLightningAnim",
+    "otr": "objects/object_bl/gBiriDischargeLightningAnim",
+    "offset": "0x24",
+    "frameCount": 7
+   },
+   {
+    "name": "gBiriClimbAnim",
+    "otr": "objects/object_bl/gBiriClimbAnim",
+    "offset": "0x64",
+    "frameCount": 41
+   },
+   {
+    "name": "gBiriDefaultAnim",
+    "otr": "objects/object_bl/gBiriDefaultAnim",
+    "offset": "0xA4",
+    "frameCount": 16
+   }
+  ]
+ },
+ "/actor/zelda_box.zar": {
+  "object": "object_box",
+  "anims": [
+   {
+    "name": "gTreasureChestAnim_000128",
+    "otr": "objects/object_box/gTreasureChestAnim_000128",
+    "offset": "0x128",
+    "frameCount": 130
+   },
+   {
+    "name": "gTreasureChestAnim_00024C",
+    "otr": "objects/object_box/gTreasureChestAnim_00024C",
+    "offset": "0x24C",
+    "frameCount": 116
+   },
+   {
+    "name": "gTreasureChestAnim_00043C",
+    "otr": "objects/object_box/gTreasureChestAnim_00043C",
+    "offset": "0x43C",
+    "frameCount": 50
+   }
+  ]
+ },
+ "/actor/zelda_brob.zar": {
+  "object": "object_brob",
+  "anims": [
+   {
+    "name": "object_brob_Anim_000290",
+    "otr": "objects/object_brob/object_brob_Anim_000290",
+    "offset": "0x290",
+    "frameCount": 33
+   },
+   {
+    "name": "object_brob_Anim_001678",
+    "otr": "objects/object_brob/object_brob_Anim_001678",
+    "offset": "0x1678",
+    "frameCount": 4
+   },
+   {
+    "name": "object_brob_Anim_001750",
+    "otr": "objects/object_brob/object_brob_Anim_001750",
+    "offset": "0x1750",
+    "frameCount": 16
+   },
+   {
+    "name": "object_brob_Anim_001958",
+    "otr": "objects/object_brob/object_brob_Anim_001958",
+    "offset": "0x1958",
+    "frameCount": 20
+   }
+  ]
+ },
+ "/actor/zelda_bv.zar": {
+  "object": "object_bv",
+  "anims": [
+   {
+    "name": "gBarinadeBodyAnim",
+    "otr": "objects/object_bv/gBarinadeBodyAnim",
+    "offset": "0x5184",
+    "frameCount": -24930
+   },
+   {
+    "name": "gBarinadeSupportAttachedAnim",
+    "otr": "objects/object_bv/gBarinadeSupportAttachedAnim",
+    "offset": "0x166A8",
+    "frameCount": 1536
+   },
+   {
+    "name": "gBarinadeZapperIdleAnim",
+    "otr": "objects/object_bv/gBarinadeZapperIdleAnim",
+    "offset": "0x18D18",
+    "frameCount": 16784
+   },
+   {
+    "name": "gBarinadeStumpAnim",
+    "otr": "objects/object_bv/gBarinadeStumpAnim",
+    "offset": "0x18150",
+    "frameCount": 1292
+   },
+   {
+    "name": "gBarinadeBariAnim",
+    "otr": "objects/object_bv/gBarinadeBariAnim",
+    "offset": "0x24",
+    "frameCount": 2
+   },
+   {
+    "name": "gBarinadeSupportDamage1Anim",
+    "otr": "objects/object_bv/gBarinadeSupportDamage1Anim",
+    "offset": "0x162AC",
+    "frameCount": 0
+   },
+   {
+    "name": "gBarinadeSupportDamage2Anim",
+    "otr": "objects/object_bv/gBarinadeSupportDamage2Anim",
+    "offset": "0x164B0",
+    "frameCount": 473
+   },
+   {
+    "name": "gBarinadeSupportCutAnim",
+    "otr": "objects/object_bv/gBarinadeSupportCutAnim",
+    "offset": "0x17694",
+    "frameCount": 17226
+   },
+   {
+    "name": "gBarinadeSupportDetachedAnim",
+    "otr": "objects/object_bv/gBarinadeSupportDetachedAnim",
+    "offset": "0x177F4",
+    "frameCount": 14577
+   },
+   {
+    "name": "gBarinadeZapperDamage1Anim",
+    "otr": "objects/object_bv/gBarinadeZapperDamage1Anim",
+    "offset": "0x18A68",
+    "frameCount": 11042
+   },
+   {
+    "name": "gBarinadeZapperDamage2Anim",
+    "otr": "objects/object_bv/gBarinadeZapperDamage2Anim",
+    "offset": "0x18B90",
+    "frameCount": -10606
+   },
+   {
+    "name": "gBarinadeAnim_018A00",
+    "otr": "objects/object_bv/gBarinadeAnim_018A00",
+    "offset": "0x18A00",
+    "frameCount": 3139
+   },
+   {
+    "name": "gBarinadeAnim_015F10",
+    "otr": "objects/object_bv/gBarinadeAnim_015F10",
+    "offset": "0x15F10",
+    "frameCount": -11621
+   },
+   {
+    "name": "gBarinadeAnim_015D10",
+    "otr": "objects/object_bv/gBarinadeAnim_015D10",
+    "offset": "0x15D10",
+    "frameCount": -9187
+   }
+  ]
+ },
+ "/actor/zelda_bw.zar": {
+  "object": "object_bw",
+  "anims": [
+   {
+    "name": "gTorchSlugEyestalkWaveAnim",
+    "otr": "objects/object_bw/gTorchSlugEyestalkWaveAnim",
+    "offset": "0x228",
+    "frameCount": 59
+   },
+   {
+    "name": "gTorchSlugEyestalkRaiseAnim",
+    "otr": "objects/object_bw/gTorchSlugEyestalkRaiseAnim",
+    "offset": "0x21A0",
+    "frameCount": 7
+   },
+   {
+    "name": "gTorchSlugEyestalkFlailAnim",
+    "otr": "objects/object_bw/gTorchSlugEyestalkFlailAnim",
+    "offset": "0x2250",
+    "frameCount": 7
+   }
+  ]
+ },
+ "/actor/zelda_cow.zar": {
+  "object": "object_cow",
+  "anims": [
+   {
+    "name": "gCowBodyChewAnim",
+    "otr": "objects/object_cow/gCowBodyChewAnim",
+    "offset": "0x01CC",
+    "frameCount": 30
+   },
+   {
+    "name": "gCowBodyMoveHeadAnim",
+    "otr": "objects/object_cow/gCowBodyMoveHeadAnim",
+    "offset": "0x4264",
+    "frameCount": 30
+   },
+   {
+    "name": "gCowTailIdleAnim",
+    "otr": "objects/object_cow/gCowTailIdleAnim",
+    "offset": "0x4348",
+    "frameCount": 20
+   },
+   {
+    "name": "gCowTailSwishAnim",
+    "otr": "objects/object_cow/gCowTailSwishAnim",
+    "offset": "0x4E98",
+    "frameCount": 40
+   }
+  ]
+ },
+ "/actor/zelda_crow.zar": {
+  "object": "object_crow",
+  "anims": [
+   {
+    "name": "gGuayFlyAnim",
+    "otr": "objects/object_crow/gGuayFlyAnim",
+    "offset": "0xF0",
+    "frameCount": 8
+   }
+  ]
+ },
+ "/actor/zelda_cs.zar": {
+  "object": "object_cs",
+  "anims": [
+   {
+    "name": "gGraveyardKidWalkAnim",
+    "otr": "objects/object_cs/gGraveyardKidWalkAnim",
+    "offset": "0x0700",
+    "frameCount": 30
+   },
+   {
+    "name": "gGraveyardKidSwingStickUpAnim",
+    "otr": "objects/object_cs/gGraveyardKidSwingStickUpAnim",
+    "offset": "0x0E10",
+    "frameCount": 30
+   },
+   {
+    "name": "gGraveyardKidGrabStickTwoHandsAnim",
+    "otr": "objects/object_cs/gGraveyardKidGrabStickTwoHandsAnim",
+    "offset": "0x1588",
+    "frameCount": 28
+   },
+   {
+    "name": "gGraveyardKidIdleAnim",
+    "otr": "objects/object_cs/gGraveyardKidIdleAnim",
+    "offset": "0x195C",
+    "frameCount": 19
+   }
+  ]
+ },
+ "/actor/zelda_daiku.zar": {
+  "object": "object_daiku",
+  "anims": [
+   {
+    "name": "object_daiku_Anim_000600",
+    "otr": "objects/object_daiku/object_daiku_Anim_000600",
+    "offset": "0x600",
+    "frameCount": 28
+   },
+   {
+    "name": "object_daiku_Anim_000C44",
+    "otr": "objects/object_daiku/object_daiku_Anim_000C44",
+    "offset": "0xC44",
+    "frameCount": 18
+   },
+   {
+    "name": "object_daiku_Anim_001AB0",
+    "otr": "objects/object_daiku/object_daiku_Anim_001AB0",
+    "offset": "0x1AB0",
+    "frameCount": 59
+   },
+   {
+    "name": "object_daiku_Anim_007DE0",
+    "otr": "objects/object_daiku/object_daiku_Anim_007DE0",
+    "offset": "0x7DE0",
+    "frameCount": 20
+   },
+   {
+    "name": "object_daiku_Anim_008164",
+    "otr": "objects/object_daiku/object_daiku_Anim_008164",
+    "offset": "0x8164",
+    "frameCount": 14
+   },
+   {
+    "name": "object_daiku_Anim_00885C",
+    "otr": "objects/object_daiku/object_daiku_Anim_00885C",
+    "offset": "0x885C",
+    "frameCount": 20
+   }
+  ]
+ },
+ "/actor/zelda_dekubaba.zar": {
+  "object": "object_dekubaba",
+  "anims": [
+   {
+    "name": "gDekuBabaPauseChompAnim",
+    "otr": "objects/object_dekubaba/gDekuBabaPauseChompAnim",
+    "offset": "0x208",
+    "frameCount": 116
+   },
+   {
+    "name": "gDekuBabaFastChompAnim",
+    "otr": "objects/object_dekubaba/gDekuBabaFastChompAnim",
+    "offset": "0x2B8",
+    "frameCount": 24
+   }
+  ]
+ },
+ "/actor/zelda_dekunuts.zar": {
+  "object": "object_dekunuts",
+  "anims": [
+   {
+    "name": "gDekuNutsSpitAnim",
+    "otr": "objects/object_dekunuts/gDekuNutsSpitAnim",
+    "offset": "0x1C4",
+    "frameCount": 18
+   },
+   {
+    "name": "gDekuNutsDamageAnim",
+    "otr": "objects/object_dekunuts/gDekuNutsDamageAnim",
+    "offset": "0x368",
+    "frameCount": 14
+   },
+   {
+    "name": "gDekuNutsBurrowAnim",
+    "otr": "objects/object_dekunuts/gDekuNutsBurrowAnim",
+    "offset": "0x4D8",
+    "frameCount": 10
+   },
+   {
+    "name": "gDekuNutsDieAnim",
+    "otr": "objects/object_dekunuts/gDekuNutsDieAnim",
+    "offset": "0x6B0",
+    "frameCount": 11
+   },
+   {
+    "name": "gDekuNutsUnburrowAnim",
+    "otr": "objects/object_dekunuts/gDekuNutsUnburrowAnim",
+    "offset": "0x8C4",
+    "frameCount": 16
+   },
+   {
+    "name": "gDekuNutsLookAroundAnim",
+    "otr": "objects/object_dekunuts/gDekuNutsLookAroundAnim",
+    "offset": "0xAF0",
+    "frameCount": 26
+   },
+   {
+    "name": "gDekuNutsUpAnim",
+    "otr": "objects/object_dekunuts/gDekuNutsUpAnim",
+    "offset": "0xD1C",
+    "frameCount": 21
+   },
+   {
+    "name": "gDekuNutsStandAnim",
+    "otr": "objects/object_dekunuts/gDekuNutsStandAnim",
+    "offset": "0xE6C",
+    "frameCount": 15
+   },
+   {
+    "name": "gDekuNutsGaspAnim",
+    "otr": "objects/object_dekunuts/gDekuNutsGaspAnim",
+    "offset": "0x1024",
+    "frameCount": 9
+   },
+   {
+    "name": "gDekuNutsRunAnim",
+    "otr": "objects/object_dekunuts/gDekuNutsRunAnim",
+    "offset": "0x3650",
+    "frameCount": 18
+   }
+  ]
+ },
+ "/actor/zelda_dh.zar": {
+  "object": "object_dh",
+  "anims": [
+   {
+    "name": "object_dh_Anim_0015B0",
+    "otr": "objects/object_dh/object_dh_Anim_0015B0",
+    "offset": "0x15B0",
+    "frameCount": 30
+   },
+   {
+    "name": "object_dh_Anim_001A3C",
+    "otr": "objects/object_dh/object_dh_Anim_001A3C",
+    "offset": "0x1A3C",
+    "frameCount": 20
+   },
+   {
+    "name": "object_dh_Anim_002148",
+    "otr": "objects/object_dh/object_dh_Anim_002148",
+    "offset": "0x2148",
+    "frameCount": 30
+   },
+   {
+    "name": "object_dh_Anim_0032BC",
+    "otr": "objects/object_dh/object_dh_Anim_0032BC",
+    "offset": "0x32BC",
+    "frameCount": 70
+   },
+   {
+    "name": "object_dh_Anim_00375C",
+    "otr": "objects/object_dh/object_dh_Anim_00375C",
+    "offset": "0x375C",
+    "frameCount": 21
+   },
+   {
+    "name": "object_dh_Anim_003A8C",
+    "otr": "objects/object_dh/object_dh_Anim_003A8C",
+    "offset": "0x3A8C",
+    "frameCount": 20
+   },
+   {
+    "name": "object_dh_Anim_003D6C",
+    "otr": "objects/object_dh/object_dh_Anim_003D6C",
+    "offset": "0x3D6C",
+    "frameCount": 12
+   },
+   {
+    "name": "object_dh_Anim_004658",
+    "otr": "objects/object_dh/object_dh_Anim_004658",
+    "offset": "0x4658",
+    "frameCount": 40
+   },
+   {
+    "name": "object_dh_Anim_005880",
+    "otr": "objects/object_dh/object_dh_Anim_005880",
+    "offset": "0x5880",
+    "frameCount": 40
+   }
+  ]
+ },
+ "/actor/zelda_dnk.zar": {
+  "object": "object_dnk",
+  "anims": [
+   {
+    "name": "gDntStageSpitAnim",
+    "otr": "objects/object_dnk/gDntStageSpitAnim",
+    "offset": "0x31C",
+    "frameCount": 18
+   },
+   {
+    "name": "gDntStageHideAnim",
+    "otr": "objects/object_dnk/gDntStageHideAnim",
+    "offset": "0x430",
+    "frameCount": 10
+   },
+   {
+    "name": "gDntStageDanceAnim",
+    "otr": "objects/object_dnk/gDntStageDanceAnim",
+    "offset": "0x6CC",
+    "frameCount": 16
+   },
+   {
+    "name": "gDntStageUnburrowAnim",
+    "otr": "objects/object_dnk/gDntStageUnburrowAnim",
+    "offset": "0x894",
+    "frameCount": 9
+   },
+   {
+    "name": "gDntStageUpAnim",
+    "otr": "objects/object_dnk/gDntStageUpAnim",
+    "offset": "0xB70",
+    "frameCount": 21
+   },
+   {
+    "name": "gDntStageWalkAnim",
+    "otr": "objects/object_dnk/gDntStageWalkAnim",
+    "offset": "0x2E1C",
+    "frameCount": 8
+   },
+   {
+    "name": "gDntStageWaitAnim",
+    "otr": "objects/object_dnk/gDntStageWaitAnim",
+    "offset": "0x2CB8",
+    "frameCount": 15
+   }
+  ]
+ },
+ "/actor/zelda_dns.zar": {
+  "object": "object_dns",
+  "anims": [
+   {
+    "name": "gDntJijiBurrowAnim",
+    "otr": "objects/object_dns/gDntJijiBurrowAnim",
+    "offset": "0x560",
+    "frameCount": 10
+   },
+   {
+    "name": "gDntJijiCowerAnim",
+    "otr": "objects/object_dns/gDntJijiCowerAnim",
+    "offset": "0x944",
+    "frameCount": 5
+   },
+   {
+    "name": "gDntJijiHideAnim",
+    "otr": "objects/object_dns/gDntJijiHideAnim",
+    "offset": "0xA70",
+    "frameCount": 7
+   },
+   {
+    "name": "gDntJijiTalkAnim",
+    "otr": "objects/object_dns/gDntJijiTalkAnim",
+    "offset": "0xBD0",
+    "frameCount": 10
+   },
+   {
+    "name": "gDntJijiUnburrowAnim",
+    "otr": "objects/object_dns/gDntJijiUnburrowAnim",
+    "offset": "0xDF8",
+    "frameCount": 9
+   },
+   {
+    "name": "gDntJijiUpAnim",
+    "otr": "objects/object_dns/gDntJijiUpAnim",
+    "offset": "0x12B0",
+    "frameCount": 21
+   },
+   {
+    "name": "gDntJijiWalkAnim",
+    "otr": "objects/object_dns/gDntJijiWalkAnim",
+    "offset": "0x37C0",
+    "frameCount": 8
+   },
+   {
+    "name": "gDntJijiSpitAnim",
+    "otr": "objects/object_dns/gDntJijiSpitAnim",
+    "offset": "0x400",
+    "frameCount": 18
+   },
+   {
+    "name": "gDntJijiDanceAnim",
+    "otr": "objects/object_dns/gDntJijiDanceAnim",
+    "offset": "0x82C",
+    "frameCount": 16
+   },
+   {
+    "name": "gDntJijiUnkAnim",
+    "otr": "objects/object_dns/gDntJijiUnkAnim",
+    "offset": "0xF98",
+    "frameCount": 6
+   },
+   {
+    "name": "gDntJijiWaitAnim",
+    "otr": "objects/object_dns/gDntJijiWaitAnim",
+    "offset": "0x364C",
+    "frameCount": 15
+   }
+  ]
+ },
+ "/actor/zelda_dodojr.zar": {
+  "object": "object_dodojr",
+  "anims": [
+   {
+    "name": "object_dodojr_Anim_0004A0",
+    "otr": "objects/object_dodojr/object_dodojr_Anim_0004A0",
+    "offset": "0x4A0",
+    "frameCount": 45
+   },
+   {
+    "name": "object_dodojr_Anim_0005F0",
+    "otr": "objects/object_dodojr/object_dodojr_Anim_0005F0",
+    "offset": "0x5F0",
+    "frameCount": 15
+   },
+   {
+    "name": "object_dodojr_Anim_000724",
+    "otr": "objects/object_dodojr/object_dodojr_Anim_000724",
+    "offset": "0x724",
+    "frameCount": 19
+   },
+   {
+    "name": "object_dodojr_Anim_000860",
+    "otr": "objects/object_dodojr/object_dodojr_Anim_000860",
+    "offset": "0x860",
+    "frameCount": 10
+   },
+   {
+    "name": "object_dodojr_Anim_0009D4",
+    "otr": "objects/object_dodojr/object_dodojr_Anim_0009D4",
+    "offset": "0x9D4",
+    "frameCount": 16
+   }
+  ]
+ },
+ "/actor/zelda_dodongo.zar": {
+  "object": "object_dodongo",
+  "anims": [
+   {
+    "name": "gDodongoDieAnim",
+    "otr": "objects/object_dodongo/gDodongoDieAnim",
+    "offset": "0x13C4",
+    "frameCount": 81
+   },
+   {
+    "name": "gDodongoDamageAnim",
+    "otr": "objects/object_dodongo/gDodongoDamageAnim",
+    "offset": "0x1A44",
+    "frameCount": 19
+   },
+   {
+    "name": "gDodongoBreatheFireAnim",
+    "otr": "objects/object_dodongo/gDodongoBreatheFireAnim",
+    "offset": "0x28F0",
+    "frameCount": 51
+   },
+   {
+    "name": "gDodongoAfterBreatheFireAnim",
+    "otr": "objects/object_dodongo/gDodongoAfterBreatheFireAnim",
+    "offset": "0x3088",
+    "frameCount": 41
+   },
+   {
+    "name": "gDodongoSweepTailRightAnim",
+    "otr": "objects/object_dodongo/gDodongoSweepTailRightAnim",
+    "offset": "0x3B14",
+    "frameCount": 30
+   },
+   {
+    "name": "gDodongoSweepTailLeftAnim",
+    "otr": "objects/object_dodongo/gDodongoSweepTailLeftAnim",
+    "offset": "0x42C4",
+    "frameCount": 30
+   },
+   {
+    "name": "gDodongoWaitAnim",
+    "otr": "objects/object_dodongo/gDodongoWaitAnim",
+    "offset": "0x4C20",
+    "frameCount": 40
+   },
+   {
+    "name": "gDodongoWalkAnim",
+    "otr": "objects/object_dodongo/gDodongoWalkAnim",
+    "offset": "0x8B1C",
+    "frameCount": 40
+   },
+   {
+    "name": "gDodongoTwitchAnim",
+    "otr": "objects/object_dodongo/gDodongoTwitchAnim",
+    "offset": "0x15F4",
+    "frameCount": 20
+   },
+   {
+    "name": "gDodongoGetUpAnim",
+    "otr": "objects/object_dodongo/gDodongoGetUpAnim",
+    "offset": "0x1F44",
+    "frameCount": 21
+   },
+   {
+    "name": "gDodongoLowerTailAnim",
+    "otr": "objects/object_dodongo/gDodongoLowerTailAnim",
+    "offset": "0x3368",
+    "frameCount": 11
+   },
+   {
+    "name": "gDodongoRightStepAnim",
+    "otr": "objects/object_dodongo/gDodongoRightStepAnim",
+    "offset": "0x8DE0",
+    "frameCount": 11
+   },
+   {
+    "name": "gDodongoLeftStepAnim",
+    "otr": "objects/object_dodongo/gDodongoLeftStepAnim",
+    "offset": "0x9088",
+    "frameCount": 10
+   }
+  ]
+ },
+ "/actor/zelda_dog.zar": {
+  "object": "object_dog",
+  "anims": [
+   {
+    "name": "gDogBarkAnim",
+    "otr": "objects/object_dog/gDogBarkAnim",
+    "offset": "0x278",
+    "frameCount": 30
+   },
+   {
+    "name": "gDogBowAnim",
+    "otr": "objects/object_dog/gDogBowAnim",
+    "offset": "0x928",
+    "frameCount": 57
+   },
+   {
+    "name": "gDogBow2Anim",
+    "otr": "objects/object_dog/gDogBow2Anim",
+    "offset": "0xC28",
+    "frameCount": 46
+   },
+   {
+    "name": "gDogRunAnim",
+    "otr": "objects/object_dog/gDogRunAnim",
+    "offset": "0xD78",
+    "frameCount": 8
+   },
+   {
+    "name": "gDogSitAnim",
+    "otr": "objects/object_dog/gDogSitAnim",
+    "offset": "0x1150",
+    "frameCount": 31
+   },
+   {
+    "name": "gDogWalkAnim",
+    "otr": "objects/object_dog/gDogWalkAnim",
+    "offset": "0x1368",
+    "frameCount": 12
+   }
+  ]
+ },
+ "/actor/zelda_ds.zar": {
+  "object": "object_ds",
+  "anims": [
+   {
+    "name": "gPotionShopLadyAnim",
+    "otr": "objects/object_ds/gPotionShopLadyAnim",
+    "offset": "0x39C",
+    "frameCount": 49
+   }
+  ]
+ },
+ "/actor/zelda_ds2.zar": {
+  "object": "object_ds2",
+  "anims": [
+   {
+    "name": "object_ds2_Anim_0002E4",
+    "otr": "objects/object_ds2/object_ds2_Anim_0002E4",
+    "offset": "0x2E4",
+    "frameCount": 22
+   }
+  ]
+ },
+ "/actor/zelda_du.zar": {
+  "object": "object_du",
+  "anims": [
+   {
+    "name": "gDaruniaIdleAnim",
+    "otr": "objects/object_du/gDaruniaIdleAnim",
+    "offset": "0x6EB0",
+    "frameCount": -1468
+   },
+   {
+    "name": "gDaruniaItemGiveAnim",
+    "otr": "objects/object_du/gDaruniaItemGiveAnim",
+    "offset": "0x800",
+    "frameCount": 31
+   },
+   {
+    "name": "gDaruniaItemGiveIdleAnim",
+    "otr": "objects/object_du/gDaruniaItemGiveIdleAnim",
+    "offset": "0xD00",
+    "frameCount": 31
+   },
+   {
+    "name": "gDaruniaHitLinkAnim",
+    "otr": "objects/object_du/gDaruniaHitLinkAnim",
+    "offset": "0x1D70",
+    "frameCount": 55
+   },
+   {
+    "name": "gDaruniaHitBreastAnim",
+    "otr": "objects/object_du/gDaruniaHitBreastAnim",
+    "offset": "0x2374",
+    "frameCount": 20
+   },
+   {
+    "name": "gDaruniaStandUpAfterFallingAnim",
+    "otr": "objects/object_du/gDaruniaStandUpAfterFallingAnim",
+    "offset": "0x288C",
+    "frameCount": 23
+   },
+   {
+    "name": "gDaruniaDancingLoop1Anim",
+    "otr": "objects/object_du/gDaruniaDancingLoop1Anim",
+    "offset": "0x2D94",
+    "frameCount": -9810
+   },
+   {
+    "name": "gDaruniaDancingLoop2Anim",
+    "otr": "objects/object_du/gDaruniaDancingLoop2Anim",
+    "offset": "0x3D48",
+    "frameCount": 3
+   },
+   {
+    "name": "gDaruniaDancingLoop3Anim",
+    "otr": "objects/object_du/gDaruniaDancingLoop3Anim",
+    "offset": "0x4C04",
+    "frameCount": 756
+   },
+   {
+    "name": "gDaruniaDancingLoop4Anim",
+    "otr": "objects/object_du/gDaruniaDancingLoop4Anim",
+    "offset": "0x4ED8",
+    "frameCount": -15029
+   },
+   {
+    "name": "gDaruniaDancingEndAnim",
+    "otr": "objects/object_du/gDaruniaDancingEndAnim",
+    "offset": "0x41F4",
+    "frameCount": 1126
+   },
+   {
+    "name": "gDaruniaWrongSongAnim",
+    "otr": "objects/object_du/gDaruniaWrongSongAnim",
+    "offset": "0x3A30",
+    "frameCount": 2169
+   },
+   {
+    "name": "gDaruniaWrongSongEndAnim",
+    "otr": "objects/object_du/gDaruniaWrongSongEndAnim",
+    "offset": "0x46F4",
+    "frameCount": -18313
+   },
+   {
+    "name": "gDaruniaSageFormationAnim",
+    "otr": "objects/object_du/gDaruniaSageFormationAnim",
+    "offset": "0x12014",
+    "frameCount": 3
+   },
+   {
+    "name": "gDaruniaLookingUpToSariaAnim",
+    "otr": "objects/object_du/gDaruniaLookingUpToSariaAnim",
+    "offset": "0x5458",
+    "frameCount": 1394
+   },
+   {
+    "name": "gDaruniaCreditsHitBreastAnim",
+    "otr": "objects/object_du/gDaruniaCreditsHitBreastAnim",
+    "offset": "0x6104",
+    "frameCount": 21662
+   },
+   {
+    "name": "gDaruniaCreditsIdleAnim",
+    "otr": "objects/object_du/gDaruniaCreditsIdleAnim",
+    "offset": "0x67CC",
+    "frameCount": -1736
+   }
+  ]
+ },
+ "/actor/zelda_dy_obj.zar": {
+  "object": "object_dy_obj",
+  "anims": [
+   {
+    "name": "gGreatFairyAnim_000108",
+    "otr": "objects/object_dy_obj/gGreatFairyAnim_000108",
+    "offset": "0x108",
+    "frameCount": 2
+   },
+   {
+    "name": "gGreatFairySpellFountainSpinShrinkAnim",
+    "otr": "objects/object_dy_obj/gGreatFairySpellFountainSpinShrinkAnim",
+    "offset": "0x92C",
+    "frameCount": 16
+   },
+   {
+    "name": "gGreatFairyLayingSidewaysAnim",
+    "otr": "objects/object_dy_obj/gGreatFairyLayingSidewaysAnim",
+    "offset": "0x1DF0",
+    "frameCount": 50
+   },
+   {
+    "name": "gGreatFairyLayingDownTransitionAnim",
+    "otr": "objects/object_dy_obj/gGreatFairyLayingDownTransitionAnim",
+    "offset": "0x31C0",
+    "frameCount": 40
+   },
+   {
+    "name": "gGreatFairyAfterSpellAnim",
+    "otr": "objects/object_dy_obj/gGreatFairyAfterSpellAnim",
+    "offset": "0x4344",
+    "frameCount": 39
+   },
+   {
+    "name": "gGreatFairyAnim_005810",
+    "otr": "objects/object_dy_obj/gGreatFairyAnim_005810",
+    "offset": "0x5810",
+    "frameCount": 40
+   },
+   {
+    "name": "gGreatFairyJewelFountainSpinShrinkAnim",
+    "otr": "objects/object_dy_obj/gGreatFairyJewelFountainSpinShrinkAnim",
+    "offset": "0x5E60",
+    "frameCount": 10
+   },
+   {
+    "name": "gGreatFairyGivingUpgradeAnim",
+    "otr": "objects/object_dy_obj/gGreatFairyGivingUpgradeAnim",
+    "offset": "0x69E8",
+    "frameCount": 30
+   },
+   {
+    "name": "gGreatFairyAfterUpgradeAnim",
+    "otr": "objects/object_dy_obj/gGreatFairyAfterUpgradeAnim",
+    "offset": "0x7CA8",
+    "frameCount": 50
+   },
+   {
+    "name": "gGreatFairySittingTransitionAnim",
+    "otr": "objects/object_dy_obj/gGreatFairySittingTransitionAnim",
+    "offset": "0x8698",
+    "frameCount": 30
+   },
+   {
+    "name": "gGreatFairySittingAnim",
+    "otr": "objects/object_dy_obj/gGreatFairySittingAnim",
+    "offset": "0x1D514",
+    "frameCount": 50
+   }
+  ]
+ },
+ "/actor/zelda_ec.zar": {
+  "object": "object_ec",
+  "anims": [
+   {
+    "name": "gDemoEcCuccoLadyAnim",
+    "otr": "objects/object_ec/gDemoEcCuccoLadyAnim",
+    "offset": "0xCD8",
+    "frameCount": 48
+   },
+   {
+    "name": "gDemoEcCarpenterAnim",
+    "otr": "objects/object_ec/gDemoEcCarpenterAnim",
+    "offset": "0x164C",
+    "frameCount": 59
+   },
+   {
+    "name": "gDemoEcWindmillManAnim",
+    "otr": "objects/object_ec/gDemoEcWindmillManAnim",
+    "offset": "0x196C",
+    "frameCount": 27
+   },
+   {
+    "name": "gDemoEcGerudoAnim",
+    "otr": "objects/object_ec/gDemoEcGerudoAnim",
+    "offset": "0x2254",
+    "frameCount": 48
+   },
+   {
+    "name": "gDemoEcGoronAnim",
+    "otr": "objects/object_ec/gDemoEcGoronAnim",
+    "offset": "0x2FA0",
+    "frameCount": 37
+   },
+   {
+    "name": "gDemoEcGoron2Anim",
+    "otr": "objects/object_ec/gDemoEcGoron2Anim",
+    "offset": "0x3A98",
+    "frameCount": 37
+   },
+   {
+    "name": "gDemoEcIngoAnim",
+    "otr": "objects/object_ec/gDemoEcIngoAnim",
+    "offset": "0x48F4",
+    "frameCount": 40
+   },
+   {
+    "name": "gDemoEcDancingKokiriAnim",
+    "otr": "objects/object_ec/gDemoEcDancingKokiriAnim",
+    "offset": "0x513C",
+    "frameCount": 30
+   },
+   {
+    "name": "gDemoEcKokiriAnim",
+    "otr": "objects/object_ec/gDemoEcKokiriAnim",
+    "offset": "0x5670",
+    "frameCount": 27
+   },
+   {
+    "name": "gDemoEcOldManAnim",
+    "otr": "objects/object_ec/gDemoEcOldManAnim",
+    "offset": "0x5EA8",
+    "frameCount": 34
+   },
+   {
+    "name": "gDemoEcAnim_006220",
+    "otr": "objects/object_ec/gDemoEcAnim_006220",
+    "offset": "0x6220",
+    "frameCount": 24
+   },
+   {
+    "name": "gDemoEcAnim_006930",
+    "otr": "objects/object_ec/gDemoEcAnim_006930",
+    "offset": "0x6930",
+    "frameCount": 50
+   },
+   {
+    "name": "gDemoEcKingZoraAnim",
+    "otr": "objects/object_ec/gDemoEcKingZoraAnim",
+    "offset": "0x6C40",
+    "frameCount": 24
+   },
+   {
+    "name": "gDemoEcAnim_008D1C",
+    "otr": "objects/object_ec/gDemoEcAnim_008D1C",
+    "offset": "0x8D1C",
+    "frameCount": 109
+   },
+   {
+    "name": "gDemoEcAnim_009234",
+    "otr": "objects/object_ec/gDemoEcAnim_009234",
+    "offset": "0x9234",
+    "frameCount": 25
+   },
+   {
+    "name": "gDemoEcMidoAnim",
+    "otr": "objects/object_ec/gDemoEcMidoAnim",
+    "offset": "0x95DC",
+    "frameCount": 24
+   },
+   {
+    "name": "gDemoEcJumpingCuccoAnim",
+    "otr": "objects/object_ec/gDemoEcJumpingCuccoAnim",
+    "offset": "0x9BB4",
+    "frameCount": 48
+   },
+   {
+    "name": "gDemoEcJumpingCucco2Anim",
+    "otr": "objects/object_ec/gDemoEcJumpingCucco2Anim",
+    "offset": "0xA07C",
+    "frameCount": 48
+   },
+   {
+    "name": "gDemoEcWalkingCuccoAnim",
+    "otr": "objects/object_ec/gDemoEcWalkingCuccoAnim",
+    "offset": "0xA474",
+    "frameCount": 48
+   },
+   {
+    "name": "gDemoEcPotionShopOwnerAnim",
+    "otr": "objects/object_ec/gDemoEcPotionShopOwnerAnim",
+    "offset": "0xAFE0",
+    "frameCount": 59
+   },
+   {
+    "name": "gDemoEcTalonAnim",
+    "otr": "objects/object_ec/gDemoEcTalonAnim",
+    "offset": "0xBD38",
+    "frameCount": 40
+   },
+   {
+    "name": "gDemoEcDancingZoraAnim",
+    "otr": "objects/object_ec/gDemoEcDancingZoraAnim",
+    "offset": "0xC918",
+    "frameCount": 30
+   }
+  ]
+ },
+ "/actor/zelda_ei.zar": {
+  "object": "object_ei",
+  "anims": [
+   {
+    "name": "gStingerPopOutAnim",
+    "otr": "objects/object_ei/gStingerPopOutAnim",
+    "offset": "0x288",
+    "frameCount": 26
+   },
+   {
+    "name": "gStingerDiveAnim",
+    "otr": "objects/object_ei/gStingerDiveAnim",
+    "offset": "0x4C4",
+    "frameCount": 21
+   },
+   {
+    "name": "gStingerBackflipAnim",
+    "otr": "objects/object_ei/gStingerBackflipAnim",
+    "offset": "0x704",
+    "frameCount": 21
+   },
+   {
+    "name": "gStingerHitAnim",
+    "otr": "objects/object_ei/gStingerHitAnim",
+    "offset": "0xFC0",
+    "frameCount": 80
+   },
+   {
+    "name": "gStingerIdleAnim",
+    "otr": "objects/object_ei/gStingerIdleAnim",
+    "offset": "0x12AC",
+    "frameCount": 60
+   }
+  ]
+ },
+ "/actor/zelda_fd.zar": {
+  "object": "object_fd",
+  "anims": [
+   {
+    "name": "gVolvagiaLeftArmEmergeAnim",
+    "otr": "objects/object_fd/gVolvagiaLeftArmEmergeAnim",
+    "offset": "0x11464",
+    "frameCount": null
+   },
+   {
+    "name": "gVolvagiaRightArmEmergeAnim",
+    "otr": "objects/object_fd/gVolvagiaRightArmEmergeAnim",
+    "offset": "0x11524",
+    "frameCount": null
+   },
+   {
+    "name": "gVolvagiaHeadEmergeAnim",
+    "otr": "objects/object_fd/gVolvagiaHeadEmergeAnim",
+    "offset": "0x115E4",
+    "frameCount": null
+   },
+   {
+    "name": "gVolvagiaBodyStaticAnim",
+    "otr": "objects/object_fd/gVolvagiaBodyStaticAnim",
+    "offset": "0x61D8",
+    "frameCount": 100
+   }
+  ]
+ },
+ "/actor/zelda_fr.zar": {
+  "object": "object_fr",
+  "anims": [
+   {
+    "name": "object_fr_Anim_0007BC",
+    "otr": "objects/object_fr/object_fr_Anim_0007BC",
+    "offset": "0x7BC",
+    "frameCount": 19
+   },
+   {
+    "name": "object_fr_Anim_0011C0",
+    "otr": "objects/object_fr/object_fr_Anim_0011C0",
+    "offset": "0x11C0",
+    "frameCount": 27
+   },
+   {
+    "name": "object_fr_Anim_001534",
+    "otr": "objects/object_fr/object_fr_Anim_001534",
+    "offset": "0x1534",
+    "frameCount": 8
+   }
+  ]
+ },
+ "/actor/zelda_fu.zar": {
+  "object": "object_fu",
+  "anims": [
+   {
+    "name": "gWindmillManPlayAndMoveHeadAnim",
+    "otr": "objects/object_fu/gWindmillManPlayAndMoveHeadAnim",
+    "offset": "0x57C",
+    "frameCount": 27
+   },
+   {
+    "name": "gWindmillManPlayStillAnim",
+    "otr": "objects/object_fu/gWindmillManPlayStillAnim",
+    "offset": "0xB04",
+    "frameCount": 27
+   }
+  ]
+ },
+ "/actor/zelda_fw.zar": {
+  "object": "object_fw",
+  "anims": [
+   {
+    "name": "gFlareDancerCastingFireAnim",
+    "otr": "objects/object_fw/gFlareDancerCastingFireAnim",
+    "offset": "0x10B4",
+    "frameCount": 50
+   },
+   {
+    "name": "gFlareDancerBackflipAnim",
+    "otr": "objects/object_fw/gFlareDancerBackflipAnim",
+    "offset": "0x5C64",
+    "frameCount": 13
+   },
+   {
+    "name": "gFlareDancerGettingUpAnim",
+    "otr": "objects/object_fw/gFlareDancerGettingUpAnim",
+    "offset": "0x6044",
+    "frameCount": 13
+   },
+   {
+    "name": "gFlareDancerChasingAnim",
+    "otr": "objects/object_fw/gFlareDancerChasingAnim",
+    "offset": "0x6A18",
+    "frameCount": 41
+   },
+   {
+    "name": "gFlareDancerTwirlAnim",
+    "otr": "objects/object_fw/gFlareDancerTwirlAnim",
+    "offset": "0x6B64",
+    "frameCount": 7
+   },
+   {
+    "name": "gFlareDancerCoreInitRunCycleAnim",
+    "otr": "objects/object_fw/gFlareDancerCoreInitRunCycleAnim",
+    "offset": "0x6CF8",
+    "frameCount": 10
+   },
+   {
+    "name": "gFlareDancerCoreRunCycleAnim",
+    "otr": "objects/object_fw/gFlareDancerCoreRunCycleAnim",
+    "offset": "0x7CD0",
+    "frameCount": 3
+   },
+   {
+    "name": "gFlareDancerCoreEndRunCycleAnim",
+    "otr": "objects/object_fw/gFlareDancerCoreEndRunCycleAnim",
+    "offset": "0x7DC8",
+    "frameCount": 7
+   }
+  ]
+ },
+ "/actor/zelda_ganon2.zar": {
+  "object": "object_ganon2",
+  "anims": [
+   {
+    "name": "gGanonFinalBlowAnim",
+    "otr": "objects/object_ganon2/gGanonFinalBlowAnim",
+    "offset": "0x3B1C",
+    "frameCount": 72
+   },
+   {
+    "name": "gGanonDeadStartAnim",
+    "otr": "objects/object_ganon2/gGanonDeadStartAnim",
+    "offset": "0x7288",
+    "frameCount": 77
+   },
+   {
+    "name": "gGanonDeadLoopAnim",
+    "otr": "objects/object_ganon2/gGanonDeadLoopAnim",
+    "offset": "0x8EB8",
+    "frameCount": 40
+   },
+   {
+    "name": "gGanonGuardToWalk",
+    "otr": "objects/object_ganon2/gGanonGuardToWalk",
+    "offset": "0x9654",
+    "frameCount": 12
+   },
+   {
+    "name": "gGanonLeftSwordSwingAnim",
+    "otr": "objects/object_ganon2/gGanonLeftSwordSwingAnim",
+    "offset": "0xADD0",
+    "frameCount": 35
+   },
+   {
+    "name": "gGanonRightSwordSwingAnim",
+    "otr": "objects/object_ganon2/gGanonRightSwordSwingAnim",
+    "offset": "0xCAF8",
+    "frameCount": 43
+   },
+   {
+    "name": "gGanonDamageAnim",
+    "otr": "objects/object_ganon2/gGanonDamageAnim",
+    "offset": "0xDFF0",
+    "frameCount": 30
+   },
+   {
+    "name": "gGanonGuardWalkAnim",
+    "otr": "objects/object_ganon2/gGanonGuardWalkAnim",
+    "offset": "0xE8EC",
+    "frameCount": 14
+   },
+   {
+    "name": "gGanonGuardSidestepAnim",
+    "otr": "objects/object_ganon2/gGanonGuardSidestepAnim",
+    "offset": "0xF1D0",
+    "frameCount": 14
+   },
+   {
+    "name": "gGanonGuardIdleAnim",
+    "otr": "objects/object_ganon2/gGanonGuardIdleAnim",
+    "offset": "0xFFE4",
+    "frameCount": 24
+   },
+   {
+    "name": "gGanonStunStartAnim",
+    "otr": "objects/object_ganon2/gGanonStunStartAnim",
+    "offset": "0x26510",
+    "frameCount": 6694
+   },
+   {
+    "name": "gGanonStunLoopAnim",
+    "otr": "objects/object_ganon2/gGanonStunLoopAnim",
+    "offset": "0x26AF4",
+    "frameCount": 13866
+   },
+   {
+    "name": "gGanonStunEndAnim",
+    "otr": "objects/object_ganon2/gGanonStunEndAnim",
+    "offset": "0x27824",
+    "frameCount": 1291
+   },
+   {
+    "name": "gGanonDownedStartAnim",
+    "otr": "objects/object_ganon2/gGanonDownedStartAnim",
+    "offset": "0x2A848",
+    "frameCount": -830
+   },
+   {
+    "name": "gGanonStunEndToWalkAnim",
+    "otr": "objects/object_ganon2/gGanonStunEndToWalkAnim",
+    "offset": "0x2B528",
+    "frameCount": 8303
+   },
+   {
+    "name": "gGanonDuplicateStunStartAnim",
+    "otr": "objects/object_ganon2/gGanonDuplicateStunStartAnim",
+    "offset": "0x2C0D0",
+    "frameCount": -13298
+   },
+   {
+    "name": "gGanonDuplicateStunLoopAnim",
+    "otr": "objects/object_ganon2/gGanonDuplicateStunLoopAnim",
+    "offset": "0x2C6B4",
+    "frameCount": 1203
+   },
+   {
+    "name": "gGanonGetUpAnim",
+    "otr": "objects/object_ganon2/gGanonGetUpAnim",
+    "offset": "0x334F8",
+    "frameCount": 3915
+   },
+   {
+    "name": "gGanonDownedLoopAnim",
+    "otr": "objects/object_ganon2/gGanonDownedLoopAnim",
+    "offset": "0x34278",
+    "frameCount": 2370
+   },
+   {
+    "name": "gGanonWalkAnim",
+    "otr": "objects/object_ganon2/gGanonWalkAnim",
+    "offset": "0x353C0",
+    "frameCount": null
+   },
+   {
+    "name": "gGanonWalkToGuardAnim",
+    "otr": "objects/object_ganon2/gGanonWalkToGuardAnim",
+    "offset": "0x35BDC",
+    "frameCount": null
+   }
+  ]
+ },
+ "/actor/zelda_ge1.zar": {
+  "object": "object_ge1",
+  "anims": [
+   {
+    "name": "gGerudoWhiteUnusedFoldingArmsAnim",
+    "otr": "objects/object_ge1/gGerudoWhiteUnusedFoldingArmsAnim",
+    "offset": "0x0168",
+    "frameCount": 7
+   },
+   {
+    "name": "gGerudoWhiteIdleAnim",
+    "otr": "objects/object_ge1/gGerudoWhiteIdleAnim",
+    "offset": "0x0228",
+    "frameCount": 2
+   },
+   {
+    "name": "gGerudoWhiteClapAnim",
+    "otr": "objects/object_ge1/gGerudoWhiteClapAnim",
+    "offset": "0xA048",
+    "frameCount": 25
+   },
+   {
+    "name": "gGerudoWhiteDismissiveAnim",
+    "otr": "objects/object_ge1/gGerudoWhiteDismissiveAnim",
+    "offset": "0xA498",
+    "frameCount": 22
+   }
+  ]
+ },
+ "/actor/zelda_gla.zar": {
+  "object": "object_gla",
+  "anims": [
+   {
+    "name": "gGerudoPurpleUnusedHorizontalSlashAnim",
+    "otr": "objects/object_gla/gGerudoPurpleUnusedHorizontalSlashAnim",
+    "offset": "0x0324",
+    "frameCount": 9
+   },
+   {
+    "name": "gGerudoPurpleUnusedSlashToStandingAnim",
+    "otr": "objects/object_gla/gGerudoPurpleUnusedSlashToStandingAnim",
+    "offset": "0x0780",
+    "frameCount": 11
+   },
+   {
+    "name": "gGerudoPurpleFallingToGroundAnim",
+    "otr": "objects/object_gla/gGerudoPurpleFallingToGroundAnim",
+    "offset": "0x11F4",
+    "frameCount": 30
+   },
+   {
+    "name": "gGerudoPurpleUnusedStandingToCrouchAnim",
+    "otr": "objects/object_gla/gGerudoPurpleUnusedStandingToCrouchAnim",
+    "offset": "0x15D0",
+    "frameCount": 11
+   },
+   {
+    "name": "gGerudoPurpleUnusedCrouchingLookAroundAnim",
+    "otr": "objects/object_gla/gGerudoPurpleUnusedCrouchingLookAroundAnim",
+    "offset": "0x1B3C",
+    "frameCount": 26
+   },
+   {
+    "name": "gGerudoPurpleChargingAnim",
+    "otr": "objects/object_gla/gGerudoPurpleChargingAnim",
+    "offset": "0x8D60",
+    "frameCount": 13
+   },
+   {
+    "name": "gGerudoPurpleLookingAboutAnim",
+    "otr": "objects/object_gla/gGerudoPurpleLookingAboutAnim",
+    "offset": "0x98AC",
+    "frameCount": 59
+   },
+   {
+    "name": "gGerudoPurpleWalkingAnim",
+    "otr": "objects/object_gla/gGerudoPurpleWalkingAnim",
+    "offset": "0x9ED4",
+    "frameCount": 25
+   }
+  ]
+ },
+ "/actor/zelda_gm.zar": {
+  "object": "object_gm",
+  "anims": [
+   {
+    "name": "object_gm_Anim_0002B8",
+    "otr": "objects/object_gm/object_gm_Anim_0002B8",
+    "offset": "0x2B8",
+    "frameCount": 25
+   }
+  ]
+ },
+ "/actor/zelda_gnd.zar": {
+  "object": "object_gnd",
+  "anims": [
+   {
+    "name": "gPhantomGanonRideAnim",
+    "otr": "objects/object_gnd/gPhantomGanonRideAnim",
+    "offset": "0x3CA4",
+    "frameCount": 14
+   },
+   {
+    "name": "gPhantomGanonMaskOnAnim",
+    "otr": "objects/object_gnd/gPhantomGanonMaskOnAnim",
+    "offset": "0x1144",
+    "frameCount": 20
+   },
+   {
+    "name": "gPhantomGanonRidePoseAnim",
+    "otr": "objects/object_gnd/gPhantomGanonRidePoseAnim",
+    "offset": "0x19A4",
+    "frameCount": 2
+   },
+   {
+    "name": "gPhantomGanonHorseRearingAnim",
+    "otr": "objects/object_gnd/gPhantomGanonHorseRearingAnim",
+    "offset": "0x2684",
+    "frameCount": 33
+   },
+   {
+    "name": "gPhantomGanonRideSpearRaiseAnim",
+    "otr": "objects/object_gnd/gPhantomGanonRideSpearRaiseAnim",
+    "offset": "0xD99C",
+    "frameCount": 14
+   },
+   {
+    "name": "gPhantomGanonRideSpearStrikeAnim",
+    "otr": "objects/object_gnd/gPhantomGanonRideSpearStrikeAnim",
+    "offset": "0x3080",
+    "frameCount": 24
+   },
+   {
+    "name": "gPhantomGanonRideSpearResetAnim",
+    "otr": "objects/object_gnd/gPhantomGanonRideSpearResetAnim",
+    "offset": "0xDF80",
+    "frameCount": 16
+   },
+   {
+    "name": "gPhantomGanonNeutralAnim",
+    "otr": "objects/object_gnd/gPhantomGanonNeutralAnim",
+    "offset": "0x10060",
+    "frameCount": 20
+   },
+   {
+    "name": "gPhantomGanonThrowAnim",
+    "otr": "objects/object_gnd/gPhantomGanonThrowAnim",
+    "offset": "0xEC94",
+    "frameCount": 36
+   },
+   {
+    "name": "gPhantomGanonThrowEndAnim",
+    "otr": "objects/object_gnd/gPhantomGanonThrowEndAnim",
+    "offset": "0xF48C",
+    "frameCount": 21
+   },
+   {
+    "name": "gPhantomGanonReturn1Anim",
+    "otr": "objects/object_gnd/gPhantomGanonReturn1Anim",
+    "offset": "0x10FD4",
+    "frameCount": 20
+   },
+   {
+    "name": "gPhantomGanonReturn2Anim",
+    "otr": "objects/object_gnd/gPhantomGanonReturn2Anim",
+    "offset": "0x11800",
+    "frameCount": 22
+   },
+   {
+    "name": "gPhantomGanonBlockAnim",
+    "otr": "objects/object_gnd/gPhantomGanonBlockAnim",
+    "offset": "0x10344",
+    "frameCount": 10
+   },
+   {
+    "name": "gPhantomGanonChargeWindupAnim",
+    "otr": "objects/object_gnd/gPhantomGanonChargeWindupAnim",
+    "offset": "0x129E0",
+    "frameCount": 10
+   },
+   {
+    "name": "gPhantomGanonChargeStartAnim",
+    "otr": "objects/object_gnd/gPhantomGanonChargeStartAnim",
+    "offset": "0x11F44",
+    "frameCount": 9
+   },
+   {
+    "name": "gPhantomGanonChargeAnim",
+    "otr": "objects/object_gnd/gPhantomGanonChargeAnim",
+    "offset": "0x1267C",
+    "frameCount": 10
+   },
+   {
+    "name": "gPhantomGanonAirDamageAnim",
+    "otr": "objects/object_gnd/gPhantomGanonAirDamageAnim",
+    "offset": "0x108D8",
+    "frameCount": 14
+   },
+   {
+    "name": "gPhantomGanonGroundDamageAnim",
+    "otr": "objects/object_gnd/gPhantomGanonGroundDamageAnim",
+    "offset": "0xFAC8",
+    "frameCount": 16
+   },
+   {
+    "name": "gPhantomGanonStunnedAnim",
+    "otr": "objects/object_gnd/gPhantomGanonStunnedAnim",
+    "offset": "0x11BCC",
+    "frameCount": 10
+   },
+   {
+    "name": "gPhantomGanonDeathBlowAnim",
+    "otr": "objects/object_gnd/gPhantomGanonDeathBlowAnim",
+    "offset": "0x90C",
+    "frameCount": 25
+   },
+   {
+    "name": "gPhantomGanonLimpAnim",
+    "otr": "objects/object_gnd/gPhantomGanonLimpAnim",
+    "offset": "0xD84",
+    "frameCount": 14
+   },
+   {
+    "name": "gPhantomGanonScreamAnim",
+    "otr": "objects/object_gnd/gPhantomGanonScreamAnim",
+    "offset": "0x189C",
+    "frameCount": 24
+   },
+   {
+    "name": "gPhantomGanonLastPoseAnim",
+    "otr": "objects/object_gnd/gPhantomGanonLastPoseAnim",
+    "offset": "0x1AB0",
+    "frameCount": 2
+   },
+   {
+    "name": "gPhantomGanonAnim_003854",
+    "otr": "objects/object_gnd/gPhantomGanonAnim_003854",
+    "offset": "0x3854",
+    "frameCount": 20
+   },
+   {
+    "name": "gPhantomGanonAnim_00D398",
+    "otr": "objects/object_gnd/gPhantomGanonAnim_00D398",
+    "offset": "0xD398",
+    "frameCount": 30
+   },
+   {
+    "name": "gPhantomGanonAnim_00CC84",
+    "otr": "objects/object_gnd/gPhantomGanonAnim_00CC84",
+    "offset": "0xCC84",
+    "frameCount": 12
+   },
+   {
+    "name": "gPhantomGanonAnim_012320",
+    "otr": "objects/object_gnd/gPhantomGanonAnim_012320",
+    "offset": "0x12320",
+    "frameCount": 9
+   }
+  ]
+ },
+ "/actor/zelda_gndd.zar": {
+  "object": "object_gndd",
+  "anims": [
+   {
+    "name": "gYoungGanondorfHorsebackRideAnim",
+    "otr": "objects/object_gndd/gYoungGanondorfHorsebackRideAnim",
+    "offset": "0x5B4",
+    "frameCount": 24
+   },
+   {
+    "name": "gYoungGanondorfHorsebackMagicChargeUpStartAnim",
+    "otr": "objects/object_gndd/gYoungGanondorfHorsebackMagicChargeUpStartAnim",
+    "offset": "0x8A0",
+    "frameCount": 15
+   },
+   {
+    "name": "gYoungGanondorfHorsebackMagicChargeUpLoopAnim",
+    "otr": "objects/object_gndd/gYoungGanondorfHorsebackMagicChargeUpLoopAnim",
+    "offset": "0xBC8",
+    "frameCount": 25
+   },
+   {
+    "name": "gYoungGanondorfHorsebackLookSidewaysStartAnim",
+    "otr": "objects/object_gndd/gYoungGanondorfHorsebackLookSidewaysStartAnim",
+    "offset": "0xF54",
+    "frameCount": 15
+   },
+   {
+    "name": "gYoungGanondorfHorsebackLookSidewaysLoopAnim",
+    "otr": "objects/object_gndd/gYoungGanondorfHorsebackLookSidewaysLoopAnim",
+    "offset": "0x14F4",
+    "frameCount": 25
+   },
+   {
+    "name": "gYoungGanondorfHorsebackRearAnim",
+    "otr": "objects/object_gndd/gYoungGanondorfHorsebackRearAnim",
+    "offset": "0x1D28",
+    "frameCount": 33
+   },
+   {
+    "name": "gYoungGanondorfHorsebackIdleAnim",
+    "otr": "objects/object_gndd/gYoungGanondorfHorsebackIdleAnim",
+    "offset": "0x2928",
+    "frameCount": 80
+   },
+   {
+    "name": "gYoungGanondorfKneelStartAnim",
+    "otr": "objects/object_gndd/gYoungGanondorfKneelStartAnim",
+    "offset": "0x3284",
+    "frameCount": 30
+   },
+   {
+    "name": "gYoungGanondorfKneelLookSidewaysAnim",
+    "otr": "objects/object_gndd/gYoungGanondorfKneelLookSidewaysAnim",
+    "offset": "0x3428",
+    "frameCount": 10
+   },
+   {
+    "name": "gYoungGanondorfKneelLoopAnim",
+    "otr": "objects/object_gndd/gYoungGanondorfKneelLoopAnim",
+    "offset": "0x3D84",
+    "frameCount": 30
+   },
+   {
+    "name": "gYoungGanondorfArmsCrossedAnim",
+    "otr": "objects/object_gndd/gYoungGanondorfArmsCrossedAnim",
+    "offset": "0x4260",
+    "frameCount": 30
+   },
+   {
+    "name": "gYoungGanondorfLaughStartAnim",
+    "otr": "objects/object_gndd/gYoungGanondorfLaughStartAnim",
+    "offset": "0x4534",
+    "frameCount": 15
+   },
+   {
+    "name": "gYoungGanondorfLaughLoopAnim",
+    "otr": "objects/object_gndd/gYoungGanondorfLaughLoopAnim",
+    "offset": "0x48B0",
+    "frameCount": 30
+   },
+   {
+    "name": "gYoungGanondorfWalkAnim",
+    "otr": "objects/object_gndd/gYoungGanondorfWalkAnim",
+    "offset": "0x50A8",
+    "frameCount": 30
+   }
+  ]
+ },
+ "/actor/zelda_goma.zar": {
+  "object": "object_goma",
+  "anims": [
+   {
+    "name": "gGohmaStandAnim",
+    "otr": "objects/object_goma/gGohmaStandAnim",
+    "offset": "0xAE8",
+    "frameCount": 20
+   },
+   {
+    "name": "gGohmaHangAnim",
+    "otr": "objects/object_goma/gGohmaHangAnim",
+    "offset": "0x193C",
+    "frameCount": 31
+   },
+   {
+    "name": "gGohmaWalkAnim",
+    "otr": "objects/object_goma/gGohmaWalkAnim",
+    "offset": "0x2360",
+    "frameCount": 20
+   },
+   {
+    "name": "gGohmaPrepareEggsAnim",
+    "otr": "objects/object_goma/gGohmaPrepareEggsAnim",
+    "offset": "0x29F0",
+    "frameCount": 20
+   },
+   {
+    "name": "gGohmaAttackAnim",
+    "otr": "objects/object_goma/gGohmaAttackAnim",
+    "offset": "0x4318",
+    "frameCount": 14
+   },
+   {
+    "name": "gGohmaRestAfterAttackAnim",
+    "otr": "objects/object_goma/gGohmaRestAfterAttackAnim",
+    "offset": "0x4A20",
+    "frameCount": 15
+   },
+   {
+    "name": "gGohmaRecoverAfterAttackAnim",
+    "otr": "objects/object_goma/gGohmaRecoverAfterAttackAnim",
+    "offset": "0x5330",
+    "frameCount": 14
+   },
+   {
+    "name": "gGohmaCrashAnim",
+    "otr": "objects/object_goma/gGohmaCrashAnim",
+    "offset": "0x58C0",
+    "frameCount": 8
+   },
+   {
+    "name": "gGohmaLandAnim",
+    "otr": "objects/object_goma/gGohmaLandAnim",
+    "offset": "0x5F28",
+    "frameCount": 10
+   },
+   {
+    "name": "gGohmaClimbAnim",
+    "otr": "objects/object_goma/gGohmaClimbAnim",
+    "offset": "0x66DC",
+    "frameCount": 13
+   },
+   {
+    "name": "gGohmaDamageAnim",
+    "otr": "objects/object_goma/gGohmaDamageAnim",
+    "offset": "0x6E60",
+    "frameCount": 13
+   },
+   {
+    "name": "gGohmaDeathAnim",
+    "otr": "objects/object_goma/gGohmaDeathAnim",
+    "offset": "0xB2FC",
+    "frameCount": 115
+   },
+   {
+    "name": "gGohmaPrepareAttackAnim",
+    "otr": "objects/object_goma/gGohmaPrepareAttackAnim",
+    "offset": "0xC468",
+    "frameCount": 30
+   },
+   {
+    "name": "gGohmaStunnedAnim",
+    "otr": "objects/object_goma/gGohmaStunnedAnim",
+    "offset": "0xCCD8",
+    "frameCount": 19
+   },
+   {
+    "name": "gGohmaInitialLandingAnim",
+    "otr": "objects/object_goma/gGohmaInitialLandingAnim",
+    "offset": "0xF70C",
+    "frameCount": 80
+   },
+   {
+    "name": "gGohmaEyeRollAnim",
+    "otr": "objects/object_goma/gGohmaEyeRollAnim",
+    "offset": "0x10918",
+    "frameCount": 45
+   },
+   {
+    "name": "gGohmaLayEggsAnim",
+    "otr": "objects/object_goma/gGohmaLayEggsAnim",
+    "offset": "0x113BC",
+    "frameCount": 29
+   },
+   {
+    "name": "gGohmaIdleCrouchedAnim",
+    "otr": "objects/object_goma/gGohmaIdleCrouchedAnim",
+    "offset": "0x12678",
+    "frameCount": 40
+   },
+   {
+    "name": "gGohmaWalkCrouchedAnim",
+    "otr": "objects/object_goma/gGohmaWalkCrouchedAnim",
+    "offset": "0x1EB4C",
+    "frameCount": null
+   },
+   {
+    "name": "gGohmaViolentAttackAnim",
+    "otr": "objects/object_goma/gGohmaViolentAttackAnim",
+    "offset": "0x39D0",
+    "frameCount": 27
+   }
+  ]
+ },
+ "/actor/zelda_gr.zar": {
+  "object": "object_gr",
+  "anims": [
+   {
+    "name": "gNiwGirlRunAnim",
+    "otr": "objects/object_gr/gNiwGirlRunAnim",
+    "offset": "0x0378",
+    "frameCount": 16
+   },
+   {
+    "name": "gNiwGirlJumpAnim",
+    "otr": "objects/object_gr/gNiwGirlJumpAnim",
+    "offset": "0x9C78",
+    "frameCount": 14
+   }
+  ]
+ },
+ "/actor/zelda_hata.zar": {
+  "object": "object_hata",
+  "anims": [
+   {
+    "name": "gFlagpoleFlapAnim",
+    "otr": "objects/object_hata/gFlagpoleFlapAnim",
+    "offset": "0x444",
+    "frameCount": 30
+   }
+  ]
+ },
+ "/actor/zelda_hintnuts.zar": {
+  "object": "object_hintnuts",
+  "anims": [
+   {
+    "name": "gHintNutsSpitAnim",
+    "otr": "objects/object_hintnuts/gHintNutsSpitAnim",
+    "offset": "0x168",
+    "frameCount": 18
+   },
+   {
+    "name": "gHintNutsBurrowAnim",
+    "otr": "objects/object_hintnuts/gHintNutsBurrowAnim",
+    "offset": "0x24CC",
+    "frameCount": 10
+   },
+   {
+    "name": "gHintNutsUnburrowAnim",
+    "otr": "objects/object_hintnuts/gHintNutsUnburrowAnim",
+    "offset": "0x26C4",
+    "frameCount": 16
+   },
+   {
+    "name": "gHintNutsUpAnim",
+    "otr": "objects/object_hintnuts/gHintNutsUpAnim",
+    "offset": "0x2B90",
+    "frameCount": 21
+   },
+   {
+    "name": "gHintNutsLookAroundAnim",
+    "otr": "objects/object_hintnuts/gHintNutsLookAroundAnim",
+    "offset": "0x2894",
+    "frameCount": 26
+   },
+   {
+    "name": "gHintNutsFreezeAnim",
+    "otr": "objects/object_hintnuts/gHintNutsFreezeAnim",
+    "offset": "0x29BC",
+    "frameCount": 16
+   },
+   {
+    "name": "gHintNutsTalkAnim",
+    "otr": "objects/object_hintnuts/gHintNutsTalkAnim",
+    "offset": "0x2E84",
+    "frameCount": 16
+   },
+   {
+    "name": "gHintNutsStandAnim",
+    "otr": "objects/object_hintnuts/gHintNutsStandAnim",
+    "offset": "0x2F7C",
+    "frameCount": 15
+   },
+   {
+    "name": "gHintNutsRunAnim",
+    "otr": "objects/object_hintnuts/gHintNutsRunAnim",
+    "offset": "0x3128",
+    "frameCount": 12
+   }
+  ]
+ },
+ "/actor/zelda_hni.zar": {
+  "object": "object_hni",
+  "anims": [
+   {
+    "name": "gHorseIngoIdleAnim",
+    "otr": "objects/object_hni/gHorseIngoIdleAnim",
+    "offset": "0x9FC4",
+    "frameCount": 80
+   },
+   {
+    "name": "gHorseIngoWhinnyAnim",
+    "otr": "objects/object_hni/gHorseIngoWhinnyAnim",
+    "offset": "0xA6B4",
+    "frameCount": 30
+   },
+   {
+    "name": "gHorseIngoRefuseAnim",
+    "otr": "objects/object_hni/gHorseIngoRefuseAnim",
+    "offset": "0x901C",
+    "frameCount": 36
+   },
+   {
+    "name": "gHorseIngoRearingAnim",
+    "otr": "objects/object_hni/gHorseIngoRearingAnim",
+    "offset": "0x85E0",
+    "frameCount": 33
+   },
+   {
+    "name": "gHorseIngoWalkingAnim",
+    "otr": "objects/object_hni/gHorseIngoWalkingAnim",
+    "offset": "0xAF60",
+    "frameCount": 35
+   },
+   {
+    "name": "gHorseIngoTrottingAnim",
+    "otr": "objects/object_hni/gHorseIngoTrottingAnim",
+    "offset": "0x7B54",
+    "frameCount": 29
+   },
+   {
+    "name": "gHorseIngoGallopingAnim",
+    "otr": "objects/object_hni/gHorseIngoGallopingAnim",
+    "offset": "0x506C",
+    "frameCount": 24
+   },
+   {
+    "name": "gHorseIngoJumpingAnim",
+    "otr": "objects/object_hni/gHorseIngoJumpingAnim",
+    "offset": "0x5684",
+    "frameCount": 23
+   },
+   {
+    "name": "gHorseIngoJumpingHighAnim",
+    "otr": "objects/object_hni/gHorseIngoJumpingHighAnim",
+    "offset": "0x5E20",
+    "frameCount": 30
+   }
+  ]
+ },
+ "/actor/zelda_horse.zar": {
+  "object": "object_horse",
+  "anims": [
+   {
+    "name": "gEponaIdleAnim",
+    "otr": "objects/object_horse/gEponaIdleAnim",
+    "offset": "0x6D50",
+    "frameCount": 120
+   },
+   {
+    "name": "gEponaWhinnyAnim",
+    "otr": "objects/object_horse/gEponaWhinnyAnim",
+    "offset": "0x5584",
+    "frameCount": 30
+   },
+   {
+    "name": "gEponaRefuseAnim",
+    "otr": "objects/object_horse/gEponaRefuseAnim",
+    "offset": "0x4DEC",
+    "frameCount": 65
+   },
+   {
+    "name": "gEponaRearingAnim",
+    "otr": "objects/object_horse/gEponaRearingAnim",
+    "offset": "0x3CEC",
+    "frameCount": 33
+   },
+   {
+    "name": "gEponaWalkingAnim",
+    "otr": "objects/object_horse/gEponaWalkingAnim",
+    "offset": "0x75F0",
+    "frameCount": 35
+   },
+   {
+    "name": "gEponaTrottingAnim",
+    "otr": "objects/object_horse/gEponaTrottingAnim",
+    "offset": "0x32B0",
+    "frameCount": 29
+   },
+   {
+    "name": "gEponaGallopingAnim",
+    "otr": "objects/object_horse/gEponaGallopingAnim",
+    "offset": "0x1E2C",
+    "frameCount": 24
+   },
+   {
+    "name": "gEponaJumpingAnim",
+    "otr": "objects/object_horse/gEponaJumpingAnim",
+    "offset": "0x2470",
+    "frameCount": 23
+   },
+   {
+    "name": "gEponaJumpingHighAnim",
+    "otr": "objects/object_horse/gEponaJumpingHighAnim",
+    "offset": "0x2C38",
+    "frameCount": 30
+   }
+  ]
+ },
+ "/actor/zelda_horse_ganon.zar": {
+  "object": "object_horse_ganon",
+  "anims": [
+   {
+    "name": "gHorseGanonIdleAnim",
+    "otr": "objects/object_horse_ganon/gHorseGanonIdleAnim",
+    "offset": "0x4AA4",
+    "frameCount": 80
+   },
+   {
+    "name": "gHorseGanonWhinnyAnim",
+    "otr": "objects/object_horse_ganon/gHorseGanonWhinnyAnim",
+    "offset": "0x5264",
+    "frameCount": 30
+   },
+   {
+    "name": "gHorseGanonWalkingAnim",
+    "otr": "objects/object_horse_ganon/gHorseGanonWalkingAnim",
+    "offset": "0x5B78",
+    "frameCount": 35
+   },
+   {
+    "name": "gHorseGanonTrottingAnim",
+    "otr": "objects/object_horse_ganon/gHorseGanonTrottingAnim",
+    "offset": "0x2CE4",
+    "frameCount": 29
+   },
+   {
+    "name": "gHorseGanonGallopingAnim",
+    "otr": "objects/object_horse_ganon/gHorseGanonGallopingAnim",
+    "offset": "0x2650",
+    "frameCount": 24
+   },
+   {
+    "name": "gHorseGanonRearingAnim",
+    "otr": "objects/object_horse_ganon/gHorseGanonRearingAnim",
+    "offset": "0x3858",
+    "frameCount": 33
+   }
+  ]
+ },
+ "/actor/zelda_horse_normal.zar": {
+  "object": "object_horse_normal",
+  "anims": [
+   {
+    "name": "gHorseNormalGallopingAnim",
+    "otr": "objects/object_horse_normal/gHorseNormalGallopingAnim",
+    "offset": "0x608",
+    "frameCount": 24
+   },
+   {
+    "name": "gHorseNormalJumpingAnim",
+    "otr": "objects/object_horse_normal/gHorseNormalJumpingAnim",
+    "offset": "0xC20",
+    "frameCount": 23
+   },
+   {
+    "name": "gHorseNormalJumpingHighAnim",
+    "otr": "objects/object_horse_normal/gHorseNormalJumpingHighAnim",
+    "offset": "0x13A8",
+    "frameCount": 30
+   },
+   {
+    "name": "gHorseNormalTrottingAnim",
+    "otr": "objects/object_horse_normal/gHorseNormalTrottingAnim",
+    "offset": "0x1A1C",
+    "frameCount": 29
+   },
+   {
+    "name": "gHorseNormalRearingAnim",
+    "otr": "objects/object_horse_normal/gHorseNormalRearingAnim",
+    "offset": "0x2458",
+    "frameCount": 33
+   },
+   {
+    "name": "gHorseNormalRefuseAnim",
+    "otr": "objects/object_horse_normal/gHorseNormalRefuseAnim",
+    "offset": "0x35D4",
+    "frameCount": 65
+   },
+   {
+    "name": "gHorseNormalIdleAnim",
+    "otr": "objects/object_horse_normal/gHorseNormalIdleAnim",
+    "offset": "0x4580",
+    "frameCount": 80
+   },
+   {
+    "name": "gHorseNormalWhinnyAnim",
+    "otr": "objects/object_horse_normal/gHorseNormalWhinnyAnim",
+    "offset": "0x4C20",
+    "frameCount": 30
+   },
+   {
+    "name": "gHorseNormalWalkingAnim",
+    "otr": "objects/object_horse_normal/gHorseNormalWalkingAnim",
+    "offset": "0x54BC",
+    "frameCount": 35
+   }
+  ]
+ },
+ "/actor/zelda_horse_zelda.zar": {
+  "object": "object_horse_zelda",
+  "anims": [
+   {
+    "name": "gHorseZeldaGallopingAnim",
+    "otr": "objects/object_horse_zelda/gHorseZeldaGallopingAnim",
+    "offset": "0x7148",
+    "frameCount": 24
+   }
+  ]
+ },
+ "/actor/zelda_hs.zar": {
+  "object": "object_hs",
+  "anims": [
+   {
+    "name": "object_hs_Anim_000304",
+    "otr": "objects/object_hs/object_hs_Anim_000304",
+    "offset": "0x304",
+    "frameCount": 16
+   },
+   {
+    "name": "object_hs_Anim_000528",
+    "otr": "objects/object_hs/object_hs_Anim_000528",
+    "offset": "0x528",
+    "frameCount": 10
+   },
+   {
+    "name": "object_hs_Anim_0005C0",
+    "otr": "objects/object_hs/object_hs_Anim_0005C0",
+    "offset": "0x5C0",
+    "frameCount": 2
+   }
+  ]
+ },
+ "/actor/zelda_ik.zar": {
+  "object": "object_ik",
+  "anims": [
+   {
+    "name": "object_ik_Anim_00035C",
+    "otr": "objects/object_ik/object_ik_Anim_00035C",
+    "offset": "0x35C",
+    "frameCount": 70
+   },
+   {
+    "name": "object_ik_Anim_000634",
+    "otr": "objects/object_ik/object_ik_Anim_000634",
+    "offset": "0x634",
+    "frameCount": 55
+   },
+   {
+    "name": "object_ik_Anim_0008DC",
+    "otr": "objects/object_ik/object_ik_Anim_0008DC",
+    "offset": "0x8DC",
+    "frameCount": 60
+   },
+   {
+    "name": "object_ik_Anim_000C6C",
+    "otr": "objects/object_ik/object_ik_Anim_000C6C",
+    "offset": "0xC6C",
+    "frameCount": 70
+   },
+   {
+    "name": "object_ik_Anim_000F0C",
+    "otr": "objects/object_ik/object_ik_Anim_000F0C",
+    "offset": "0xF0C",
+    "frameCount": 60
+   },
+   {
+    "name": "gIronKnuckleVerticalAttackAnim",
+    "otr": "objects/object_ik/gIronKnuckleVerticalAttackAnim",
+    "offset": "0x1C28",
+    "frameCount": 33
+   },
+   {
+    "name": "gIronKnuckleRecoverFromVerticalAttackAnim",
+    "otr": "objects/object_ik/gIronKnuckleRecoverFromVerticalAttackAnim",
+    "offset": "0x2538",
+    "frameCount": 21
+   },
+   {
+    "name": "gIronKnuckleAxeStuckAnim",
+    "otr": "objects/object_ik/gIronKnuckleAxeStuckAnim",
+    "offset": "0x29FC",
+    "frameCount": 12
+   },
+   {
+    "name": "gIronKnuckleHorizontalAttackAnim",
+    "otr": "objects/object_ik/gIronKnuckleHorizontalAttackAnim",
+    "offset": "0x33C4",
+    "frameCount": 22
+   },
+   {
+    "name": "gIronKnuckleRecoverFromHorizontalAttackAnim",
+    "otr": "objects/object_ik/gIronKnuckleRecoverFromHorizontalAttackAnim",
+    "offset": "0x3DBC",
+    "frameCount": 22
+   },
+   {
+    "name": "gIronKnuckleBackHitAnim",
+    "otr": "objects/object_ik/gIronKnuckleBackHitAnim",
+    "offset": "0x45BC",
+    "frameCount": 18
+   },
+   {
+    "name": "gIronKnuckleBlockAnim",
+    "otr": "objects/object_ik/gIronKnuckleBlockAnim",
+    "offset": "0x485C",
+    "frameCount": 5
+   },
+   {
+    "name": "gIronKnuckleDeathAnim",
+    "otr": "objects/object_ik/gIronKnuckleDeathAnim",
+    "offset": "0x5944",
+    "frameCount": 50
+   },
+   {
+    "name": "gIronKnuckleFrontHitAnim",
+    "otr": "objects/object_ik/gIronKnuckleFrontHitAnim",
+    "offset": "0x6194",
+    "frameCount": 18
+   },
+   {
+    "name": "gIronKnuckleRunAnim",
+    "otr": "objects/object_ik/gIronKnuckleRunAnim",
+    "offset": "0x6734",
+    "frameCount": 15
+   },
+   {
+    "name": "gIronKnuckleNabooruSummonAxeAnim",
+    "otr": "objects/object_ik/gIronKnuckleNabooruSummonAxeAnim",
+    "offset": "0xC114",
+    "frameCount": 215
+   },
+   {
+    "name": "gIronKnuckleStandUpAnim",
+    "otr": "objects/object_ik/gIronKnuckleStandUpAnim",
+    "offset": "0xCD70",
+    "frameCount": 32
+   },
+   {
+    "name": "object_ik_Anim_00DD50",
+    "otr": "objects/object_ik/object_ik_Anim_00DD50",
+    "offset": "0xDD50",
+    "frameCount": 48
+   },
+   {
+    "name": "gIronKnuckleWalkAnim",
+    "otr": "objects/object_ik/gIronKnuckleWalkAnim",
+    "offset": "0xED24",
+    "frameCount": 31
+   },
+   {
+    "name": "object_ik_Anim_01EB14",
+    "otr": "objects/object_ik/object_ik_Anim_01EB14",
+    "offset": "0x1EB14",
+    "frameCount": 60
+   },
+   {
+    "name": "object_ik_Anim_01EE34",
+    "otr": "objects/object_ik/object_ik_Anim_01EE34",
+    "offset": "0x1EE34",
+    "frameCount": 60
+   },
+   {
+    "name": "gIronKnuckleNabooruDeathAnim",
+    "otr": "objects/object_ik/gIronKnuckleNabooruDeathAnim",
+    "offset": "0x203D8",
+    "frameCount": 60
+   }
+  ]
+ },
+ "/actor/zelda_im.zar": {
+  "object": "object_im",
+  "anims": [
+   {
+    "name": "gImpaRaiseArmsAnim",
+    "otr": "objects/object_im/gImpaRaiseArmsAnim",
+    "offset": "0x710",
+    "frameCount": 30
+   },
+   {
+    "name": "gImpaPresentShadowMedallionAnim",
+    "otr": "objects/object_im/gImpaPresentShadowMedallionAnim",
+    "offset": "0xAFC",
+    "frameCount": 30
+   },
+   {
+    "name": "gImpaThrowDekuNutAnim",
+    "otr": "objects/object_im/gImpaThrowDekuNutAnim",
+    "offset": "0x14E4",
+    "frameCount": 30
+   },
+   {
+    "name": "gImpaIdleAnim",
+    "otr": "objects/object_im/gImpaIdleAnim",
+    "offset": "0x1868",
+    "frameCount": 30
+   },
+   {
+    "name": "object_im_Anim_00FB10",
+    "otr": "objects/object_im/object_im_Anim_00FB10",
+    "offset": "0xFB10",
+    "frameCount": 30
+   },
+   {
+    "name": "object_im_Anim_0101C8",
+    "otr": "objects/object_im/object_im_Anim_0101C8",
+    "offset": "0x101C8",
+    "frameCount": 39
+   },
+   {
+    "name": "gImpaStartWhistlingAnim",
+    "otr": "objects/object_im/gImpaStartWhistlingAnim",
+    "offset": "0x10EE0",
+    "frameCount": 40
+   },
+   {
+    "name": "gImpaWhistlingAnim",
+    "otr": "objects/object_im/gImpaWhistlingAnim",
+    "offset": "0x1182C",
+    "frameCount": 55
+   },
+   {
+    "name": "gImpaPrepareSealGanonAnim",
+    "otr": "objects/object_im/gImpaPrepareSealGanonAnim",
+    "offset": "0x11C08",
+    "frameCount": 15
+   },
+   {
+    "name": "gImpaSealGanonAnim",
+    "otr": "objects/object_im/gImpaSealGanonAnim",
+    "offset": "0x12218",
+    "frameCount": 25
+   }
+  ]
+ },
+ "/actor/zelda_in.zar": {
+  "object": "object_in",
+  "anims": [
+   {
+    "name": "object_in_Anim_0003B4",
+    "otr": "objects/object_in/object_in_Anim_0003B4",
+    "offset": "0x3B4",
+    "frameCount": 12
+   },
+   {
+    "name": "object_in_Anim_000CB0",
+    "otr": "objects/object_in/object_in_Anim_000CB0",
+    "offset": "0xCB0",
+    "frameCount": 46
+   },
+   {
+    "name": "object_in_Anim_001BE0",
+    "otr": "objects/object_in/object_in_Anim_001BE0",
+    "offset": "0x1BE0",
+    "frameCount": 49
+   },
+   {
+    "name": "object_in_Anim_001CC0",
+    "otr": "objects/object_in/object_in_Anim_001CC0",
+    "offset": "0x1CC0",
+    "frameCount": 2
+   },
+   {
+    "name": "object_in_Anim_013C6C",
+    "otr": "objects/object_in/object_in_Anim_013C6C",
+    "offset": "0x13C6C",
+    "frameCount": 2
+   },
+   {
+    "name": "object_in_Anim_013D60",
+    "otr": "objects/object_in/object_in_Anim_013D60",
+    "offset": "0x13D60",
+    "frameCount": 2
+   },
+   {
+    "name": "object_in_Anim_01431C",
+    "otr": "objects/object_in/object_in_Anim_01431C",
+    "offset": "0x1431C",
+    "frameCount": 24
+   },
+   {
+    "name": "object_in_Anim_014CA8",
+    "otr": "objects/object_in/object_in_Anim_014CA8",
+    "offset": "0x14CA8",
+    "frameCount": 30
+   },
+   {
+    "name": "object_in_Anim_0151C8",
+    "otr": "objects/object_in/object_in_Anim_0151C8",
+    "offset": "0x151C8",
+    "frameCount": 24
+   },
+   {
+    "name": "object_in_Anim_015814",
+    "otr": "objects/object_in/object_in_Anim_015814",
+    "offset": "0x15814",
+    "frameCount": 25
+   },
+   {
+    "name": "object_in_Anim_015DF0",
+    "otr": "objects/object_in/object_in_Anim_015DF0",
+    "offset": "0x15DF0",
+    "frameCount": 29
+   },
+   {
+    "name": "object_in_Anim_01646C",
+    "otr": "objects/object_in/object_in_Anim_01646C",
+    "offset": "0x1646C",
+    "frameCount": 29
+   },
+   {
+    "name": "object_in_Anim_016B3C",
+    "otr": "objects/object_in/object_in_Anim_016B3C",
+    "offset": "0x16B3C",
+    "frameCount": 36
+   },
+   {
+    "name": "object_in_Anim_0175D0",
+    "otr": "objects/object_in/object_in_Anim_0175D0",
+    "offset": "0x175D0",
+    "frameCount": 75
+   },
+   {
+    "name": "object_in_Anim_017B58",
+    "otr": "objects/object_in/object_in_Anim_017B58",
+    "offset": "0x17B58",
+    "frameCount": 30
+   },
+   {
+    "name": "object_in_Anim_018C38",
+    "otr": "objects/object_in/object_in_Anim_018C38",
+    "offset": "0x18C38",
+    "frameCount": 80
+   }
+  ]
+ },
+ "/actor/zelda_jj.zar": {
+  "object": "object_jj",
+  "anims": [
+   {
+    "name": "gJabuJabuAnim",
+    "otr": "objects/object_jj/gJabuJabuAnim",
+    "offset": "0x1F4C",
+    "frameCount": 81
+   }
+  ]
+ },
+ "/actor/zelda_js.zar": {
+  "object": "object_js",
+  "anims": [
+   {
+    "name": "gCarpetMerchantSlappingKneeAnim",
+    "otr": "objects/object_js/gCarpetMerchantSlappingKneeAnim",
+    "offset": "0x45C",
+    "frameCount": 25
+   },
+   {
+    "name": "gCarpetMerchantIdleAnim",
+    "otr": "objects/object_js/gCarpetMerchantIdleAnim",
+    "offset": "0x18C",
+    "frameCount": 10
+   }
+  ]
+ },
+ "/actor/zelda_ka.zar": {
+  "object": "object_ka",
+  "anims": [
+   {
+    "name": "object_ka_Anim_000214",
+    "otr": "objects/object_ka/object_ka_Anim_000214",
+    "offset": "0x214",
+    "frameCount": 20
+   },
+   {
+    "name": "object_ka_Anim_0067AC",
+    "otr": "objects/object_ka/object_ka_Anim_0067AC",
+    "offset": "0x67AC",
+    "frameCount": 20
+   }
+  ]
+ },
+ "/actor/zelda_kz.zar": {
+  "object": "object_kz",
+  "anims": [
+   {
+    "name": "gKzMweepAnim",
+    "otr": "objects/object_kz/gKzMweepAnim",
+    "offset": "0x46C",
+    "frameCount": 25
+   },
+   {
+    "name": "gKzIdleAnim",
+    "otr": "objects/object_kz/gKzIdleAnim",
+    "offset": "0x75C",
+    "frameCount": 25
+   }
+  ]
+ },
+ "/actor/zelda_ma1.zar": {
+  "object": "object_ma1",
+  "anims": [
+   {
+    "name": "gMalonChildRaiseHandsAnim",
+    "otr": "objects/object_ma1/gMalonChildRaiseHandsAnim",
+    "offset": "0x244",
+    "frameCount": 7
+   },
+   {
+    "name": "gMalonChildIdleAnim",
+    "otr": "objects/object_ma1/gMalonChildIdleAnim",
+    "offset": "0x820",
+    "frameCount": 29
+   },
+   {
+    "name": "gMalonChildSingAnim",
+    "otr": "objects/object_ma1/gMalonChildSingAnim",
+    "offset": "0x8D64",
+    "frameCount": 59
+   }
+  ]
+ },
+ "/actor/zelda_ma2.zar": {
+  "object": "object_ma2",
+  "anims": [
+   {
+    "name": "gMalonAdultIdleAnim",
+    "otr": "objects/object_ma2/gMalonAdultIdleAnim",
+    "offset": "0x7D4",
+    "frameCount": 30
+   },
+   {
+    "name": "gMalonAdultSingToIdleAnim",
+    "otr": "objects/object_ma2/gMalonAdultSingToIdleAnim",
+    "offset": "0x92F0",
+    "frameCount": 15
+   },
+   {
+    "name": "gMalonAdultStandStillAnim",
+    "otr": "objects/object_ma2/gMalonAdultStandStillAnim",
+    "offset": "0x93BC",
+    "frameCount": 2
+   },
+   {
+    "name": "gMalonAdultSingAnim",
+    "otr": "objects/object_ma2/gMalonAdultSingAnim",
+    "offset": "0x9EE0",
+    "frameCount": 58
+   }
+  ]
+ },
+ "/actor/zelda_mastergolon.zar": {
+  "object": "object_mastergolon",
+  "anims": [
+   {
+    "name": "gGoronShopkeeperAnim",
+    "otr": "objects/object_mastergolon/gGoronShopkeeperAnim",
+    "offset": "0xFC",
+    "frameCount": 23
+   }
+  ]
+ },
+ "/actor/zelda_masterzoora.zar": {
+  "object": "object_masterzoora",
+  "anims": [
+   {
+    "name": "gZoraShopkeeperAnim",
+    "otr": "objects/object_masterzoora/gZoraShopkeeperAnim",
+    "offset": "0x78C",
+    "frameCount": 29
+   }
+  ]
+ },
+ "/actor/zelda_mb.zar": {
+  "object": "object_mb",
+  "anims": [
+   {
+    "name": "gEnMbSpearFallFaceDownAnim",
+    "otr": "objects/object_mb/gEnMbSpearFallFaceDownAnim",
+    "offset": "0x6A4",
+    "frameCount": 21
+   },
+   {
+    "name": "gEnMbSpearDamagedFromBehindAnim",
+    "otr": "objects/object_mb/gEnMbSpearDamagedFromBehindAnim",
+    "offset": "0x95C",
+    "frameCount": 6
+   },
+   {
+    "name": "gEnMbSpearDamagedUngrabSpearAnim",
+    "otr": "objects/object_mb/gEnMbSpearDamagedUngrabSpearAnim",
+    "offset": "0x1000",
+    "frameCount": 17
+   },
+   {
+    "name": "gEnMbSpearFallOnItsBackAnim",
+    "otr": "objects/object_mb/gEnMbSpearFallOnItsBackAnim",
+    "offset": "0x16B4",
+    "frameCount": 21
+   },
+   {
+    "name": "gEnMbSpearDamagedFromFrontAnim",
+    "otr": "objects/object_mb/gEnMbSpearDamagedFromFrontAnim",
+    "offset": "0x1950",
+    "frameCount": 6
+   },
+   {
+    "name": "gEnMbSpearStandStillAnim",
+    "otr": "objects/object_mb/gEnMbSpearStandStillAnim",
+    "offset": "0x28E0",
+    "frameCount": 61
+   },
+   {
+    "name": "gEnMbSpearPrepareChargeAnim",
+    "otr": "objects/object_mb/gEnMbSpearPrepareChargeAnim",
+    "offset": "0x2C10",
+    "frameCount": 7
+   },
+   {
+    "name": "gEnMbSpearChargeAnim",
+    "otr": "objects/object_mb/gEnMbSpearChargeAnim",
+    "offset": "0x2F10",
+    "frameCount": 8
+   },
+   {
+    "name": "gEnMbSpearLookLeftAndRightAnim",
+    "otr": "objects/object_mb/gEnMbSpearLookLeftAndRightAnim",
+    "offset": "0x41A8",
+    "frameCount": 60
+   },
+   {
+    "name": "gEnMbSpearSlowDownAnim",
+    "otr": "objects/object_mb/gEnMbSpearSlowDownAnim",
+    "offset": "0x9280",
+    "frameCount": 7
+   },
+   {
+    "name": "gEnMbSpearLookLeftAnim",
+    "otr": "objects/object_mb/gEnMbSpearLookLeftAnim",
+    "offset": "0x9450",
+    "frameCount": 3
+   },
+   {
+    "name": "gEnMbSpearWalkAnim",
+    "otr": "objects/object_mb/gEnMbSpearWalkAnim",
+    "offset": "0x9FC0",
+    "frameCount": 40
+   },
+   {
+    "name": "gEnMbSpearUngrabSpearAnim",
+    "otr": "objects/object_mb/gEnMbSpearUngrabSpearAnim",
+    "offset": "0xA410",
+    "frameCount": 11
+   },
+   {
+    "name": "gEnMbSpearGrabSpearAnim",
+    "otr": "objects/object_mb/gEnMbSpearGrabSpearAnim",
+    "offset": "0xA80C",
+    "frameCount": 10
+   },
+   {
+    "name": "gEnMbClubStrikeDownAnim",
+    "otr": "objects/object_mb/gEnMbClubStrikeDownAnim",
+    "offset": "0xABE0",
+    "frameCount": 9
+   },
+   {
+    "name": "gEnMbClubLiftClubAnim",
+    "otr": "objects/object_mb/gEnMbClubLiftClubAnim",
+    "offset": "0xB4BC",
+    "frameCount": 24
+   },
+   {
+    "name": "gEnMbClubFallOnItsBackAnim",
+    "otr": "objects/object_mb/gEnMbClubFallOnItsBackAnim",
+    "offset": "0xBE58",
+    "frameCount": 24
+   },
+   {
+    "name": "gEnMbClubDamagedKneelAnim",
+    "otr": "objects/object_mb/gEnMbClubDamagedKneelAnim",
+    "offset": "0xC44C",
+    "frameCount": 14
+   },
+   {
+    "name": "gEnMbClubStandStillClubUpAnim",
+    "otr": "objects/object_mb/gEnMbClubStandStillClubUpAnim",
+    "offset": "0xCF1C",
+    "frameCount": 60
+   },
+   {
+    "name": "gEnMbClubKneelingAnim",
+    "otr": "objects/object_mb/gEnMbClubKneelingAnim",
+    "offset": "0xD380",
+    "frameCount": 20
+   },
+   {
+    "name": "gEnMbClubBeatenKneelingAnim",
+    "otr": "objects/object_mb/gEnMbClubBeatenKneelingAnim",
+    "offset": "0xD5D4",
+    "frameCount": 6
+   },
+   {
+    "name": "gEnMbClubStandUpAnim",
+    "otr": "objects/object_mb/gEnMbClubStandUpAnim",
+    "offset": "0xE18C",
+    "frameCount": 31
+   },
+   {
+    "name": "gEnMbClubStandStillClubDownAnim",
+    "otr": "objects/object_mb/gEnMbClubStandStillClubDownAnim",
+    "offset": "0xEBE4",
+    "frameCount": 60
+   }
+  ]
+ },
+ "/actor/zelda_md.zar": {
+  "object": "object_md",
+  "anims": [
+   {
+    "name": "gMidoHandsOnHipsIdleAnim",
+    "otr": "objects/object_md/gMidoHandsOnHipsIdleAnim",
+    "offset": "0x02C8",
+    "frameCount": 16
+   },
+   {
+    "name": "gMidoSlamAnim",
+    "otr": "objects/object_md/gMidoSlamAnim",
+    "offset": "0x8510",
+    "frameCount": 17
+   },
+   {
+    "name": "gMidoAngryHeadTurnAnim",
+    "otr": "objects/object_md/gMidoAngryHeadTurnAnim",
+    "offset": "0x8738",
+    "frameCount": 7
+   },
+   {
+    "name": "gMidoAnnoyedPointedHeadIdle1Anim",
+    "otr": "objects/object_md/gMidoAnnoyedPointedHeadIdle1Anim",
+    "offset": "0x8E84",
+    "frameCount": 24
+   },
+   {
+    "name": "gMidoHandsOnHipsTransitionAnim",
+    "otr": "objects/object_md/gMidoHandsOnHipsTransitionAnim",
+    "offset": "0x8FC0",
+    "frameCount": 3
+   },
+   {
+    "name": "gMidoRaiseHand1Anim",
+    "otr": "objects/object_md/gMidoRaiseHand1Anim",
+    "offset": "0x917C",
+    "frameCount": 6
+   },
+   {
+    "name": "gMidoAnim_92B0",
+    "otr": "objects/object_md/gMidoAnim_92B0",
+    "offset": "0x92B0",
+    "frameCount": 4
+   },
+   {
+    "name": "gMidoRaiseHand2Anim",
+    "otr": "objects/object_md/gMidoRaiseHand2Anim",
+    "offset": "0x95BC",
+    "frameCount": 9
+   },
+   {
+    "name": "gMidoAnnoyedPointedHeadIdle2Anim",
+    "otr": "objects/object_md/gMidoAnnoyedPointedHeadIdle2Anim",
+    "offset": "0x97F0",
+    "frameCount": 16
+   },
+   {
+    "name": "gMidoPutHandDownAnim",
+    "otr": "objects/object_md/gMidoPutHandDownAnim",
+    "offset": "0x9B1C",
+    "frameCount": 12
+   },
+   {
+    "name": "gMidoHaltAnim",
+    "otr": "objects/object_md/gMidoHaltAnim",
+    "offset": "0x9E68",
+    "frameCount": 18
+   },
+   {
+    "name": "gMidoWalkingAnim",
+    "otr": "objects/object_md/gMidoWalkingAnim",
+    "offset": "0xA138",
+    "frameCount": 14
+   }
+  ]
+ },
+ "/actor/zelda_mk.zar": {
+  "object": "object_mk",
+  "anims": [
+   {
+    "name": "object_mk_Anim_000368",
+    "otr": "objects/object_mk/object_mk_Anim_000368",
+    "offset": "0x368",
+    "frameCount": 14
+   },
+   {
+    "name": "object_mk_Anim_000724",
+    "otr": "objects/object_mk/object_mk_Anim_000724",
+    "offset": "0x724",
+    "frameCount": 15
+   },
+   {
+    "name": "object_mk_Anim_000AC0",
+    "otr": "objects/object_mk/object_mk_Anim_000AC0",
+    "offset": "0xAC0",
+    "frameCount": 16
+   },
+   {
+    "name": "object_mk_Anim_000D88",
+    "otr": "objects/object_mk/object_mk_Anim_000D88",
+    "offset": "0xD88",
+    "frameCount": 29
+   }
+  ]
+ },
+ "/actor/zelda_mm.zar": {
+  "object": "object_mm",
+  "anims": [
+   {
+    "name": "gRunningManRunAnim",
+    "otr": "objects/object_mm/gRunningManRunAnim",
+    "offset": "0x0718",
+    "frameCount": 9
+   },
+   {
+    "name": "gRunningManSitStandAnim",
+    "otr": "objects/object_mm/gRunningManSitStandAnim",
+    "offset": "0x6940",
+    "frameCount": 35
+   },
+   {
+    "name": "gRunningManSitWaitAnim",
+    "otr": "objects/object_mm/gRunningManSitWaitAnim",
+    "offset": "0x6C50",
+    "frameCount": 24
+   },
+   {
+    "name": "gRunningManSprintAnim",
+    "otr": "objects/object_mm/gRunningManSprintAnim",
+    "offset": "0x0468",
+    "frameCount": 20
+   },
+   {
+    "name": "gRunningManExcitedAnim",
+    "otr": "objects/object_mm/gRunningManExcitedAnim",
+    "offset": "0x73A0",
+    "frameCount": 32
+   },
+   {
+    "name": "gRunningManHappyAnim",
+    "otr": "objects/object_mm/gRunningManHappyAnim",
+    "offset": "0x8060",
+    "frameCount": 46
+   }
+  ]
+ },
+ "/actor/zelda_ms.zar": {
+  "object": "object_ms",
+  "anims": [
+   {
+    "name": "gBeanSalesmanEatingAnim",
+    "otr": "objects/object_ms/gBeanSalesmanEatingAnim",
+    "offset": "0x5EC",
+    "frameCount": 52
+   }
+  ]
+ },
+ "/actor/zelda_mu.zar": {
+  "object": "object_mu",
+  "anims": [
+   {
+    "name": "object_mu_Anim_0003F4",
+    "otr": "objects/object_mu/object_mu_Anim_0003F4",
+    "offset": "0x3F4",
+    "frameCount": 24
+   },
+   {
+    "name": "gDancingCoupleAnim",
+    "otr": "objects/object_mu/gDancingCoupleAnim",
+    "offset": "0x5040",
+    "frameCount": 2
+   }
+  ]
+ },
+ "/actor/zelda_nb.zar": {
+  "object": "object_nb",
+  "anims": [
+   {
+    "name": "gNabooruPuttingHandsTogetherCastingMagicAnim",
+    "otr": "objects/object_nb/gNabooruPuttingHandsTogetherCastingMagicAnim",
+    "offset": "0x00410",
+    "frameCount": 14
+   },
+   {
+    "name": "gNabooruSittingCrossLeggedAnim",
+    "otr": "objects/object_nb/gNabooruSittingCrossLeggedAnim",
+    "offset": "0x00BC0",
+    "frameCount": 24
+   },
+   {
+    "name": "gNabooruTrappedInVortexRaisingArmAnim",
+    "otr": "objects/object_nb/gNabooruTrappedInVortexRaisingArmAnim",
+    "offset": "0x01104",
+    "frameCount": 20
+   },
+   {
+    "name": "gNabooruSuckedByVortexAnim",
+    "otr": "objects/object_nb/gNabooruSuckedByVortexAnim",
+    "offset": "0x01350",
+    "frameCount": 10
+   },
+   {
+    "name": "gNabooruTrappedInVortexPushingGroundAnim",
+    "otr": "objects/object_nb/gNabooruTrappedInVortexPushingGroundAnim",
+    "offset": "0x01E7C",
+    "frameCount": 40
+   },
+   {
+    "name": "gNabooruRaisingArmsGivingMedallionAnim",
+    "otr": "objects/object_nb/gNabooruRaisingArmsGivingMedallionAnim",
+    "offset": "0x0274C",
+    "frameCount": 30
+   },
+   {
+    "name": "gNabooruArmsRaisedGivingMedallionAnim",
+    "otr": "objects/object_nb/gNabooruArmsRaisedGivingMedallionAnim",
+    "offset": "0x02B4C",
+    "frameCount": 30
+   },
+   {
+    "name": "gNabooruOnOneKneeTurningHeadRightToLeftTransitionAnim",
+    "otr": "objects/object_nb/gNabooruOnOneKneeTurningHeadRightToLeftTransitionAnim",
+    "offset": "0x02DBC",
+    "frameCount": 6
+   },
+   {
+    "name": "gNabooruOnOneKneeLookingLeftAnim",
+    "otr": "objects/object_nb/gNabooruOnOneKneeLookingLeftAnim",
+    "offset": "0x035A8",
+    "frameCount": 24
+   },
+   {
+    "name": "gNabooruOnAllFoursToOnOneKneeLookingRightTransitionAnim",
+    "otr": "objects/object_nb/gNabooruOnAllFoursToOnOneKneeLookingRightTransitionAnim",
+    "offset": "0x03954",
+    "frameCount": 10
+   },
+   {
+    "name": "gNabooruOnOneKneeLookingRightAnim",
+    "otr": "objects/object_nb/gNabooruOnOneKneeLookingRightAnim",
+    "offset": "0x04030",
+    "frameCount": 24
+   },
+   {
+    "name": "gNabooruOnAllFoursAnim",
+    "otr": "objects/object_nb/gNabooruOnAllFoursAnim",
+    "offset": "0x046A8",
+    "frameCount": 24
+   },
+   {
+    "name": "gNabooruStandingHandsOnHipsAnim",
+    "otr": "objects/object_nb/gNabooruStandingHandsOnHipsAnim",
+    "offset": "0x04BB4",
+    "frameCount": 23
+   },
+   {
+    "name": "gNabooruStandingToWalkingTransitionAnim",
+    "otr": "objects/object_nb/gNabooruStandingToWalkingTransitionAnim",
+    "offset": "0x04E60",
+    "frameCount": 6
+   },
+   {
+    "name": "gNabooruSittingCrossLeggedLookingUpRightAnim",
+    "otr": "objects/object_nb/gNabooruSittingCrossLeggedLookingUpRightAnim",
+    "offset": "0x05614",
+    "frameCount": 24
+   },
+   {
+    "name": "gNabooruSittingCrossLeggedTurningToLookUpRightTransitionAnim",
+    "otr": "objects/object_nb/gNabooruSittingCrossLeggedTurningToLookUpRightTransitionAnim",
+    "offset": "0x05CA4",
+    "frameCount": 20
+   },
+   {
+    "name": "gNabooruKneeingToRunningToHitAnim",
+    "otr": "objects/object_nb/gNabooruKneeingToRunningToHitAnim",
+    "offset": "0x06320",
+    "frameCount": 16
+   },
+   {
+    "name": "gNabooruUnusedKneelingAtCrawlspaceToStandingTransitionAnim",
+    "otr": "objects/object_nb/gNabooruUnusedKneelingAtCrawlspaceToStandingTransitionAnim",
+    "offset": "0x0676C",
+    "frameCount": 10
+   },
+   {
+    "name": "gNabooruKneeingAtCrawlspaceAnim",
+    "otr": "objects/object_nb/gNabooruKneeingAtCrawlspaceAnim",
+    "offset": "0x06E78",
+    "frameCount": 24
+   },
+   {
+    "name": "gNabooruCollapseFromStandingToKneelingTransitionAnim",
+    "otr": "objects/object_nb/gNabooruCollapseFromStandingToKneelingTransitionAnim",
+    "offset": "0x08BD0",
+    "frameCount": 80
+   },
+   {
+    "name": "gNabooruWalkingAnim",
+    "otr": "objects/object_nb/gNabooruWalkingAnim",
+    "offset": "0x09238",
+    "frameCount": 17
+   },
+   {
+    "name": "gNabooruStandingHandsOnHipsChamberOfSagesAnim",
+    "otr": "objects/object_nb/gNabooruStandingHandsOnHipsChamberOfSagesAnim",
+    "offset": "0x09694",
+    "frameCount": 22
+   }
+  ]
+ },
+ "/actor/zelda_os.zar": {
+  "object": "object_os",
+  "anims": [
+   {
+    "name": "gHappyMaskSalesmanIdleAnim",
+    "otr": "objects/object_os/gHappyMaskSalesmanIdleAnim",
+    "offset": "0x2E4",
+    "frameCount": 24
+   }
+  ]
+ },
+ "/actor/zelda_owl.zar": {
+  "object": "object_owl",
+  "anims": [
+   {
+    "name": "gOwlTakeoffAnim",
+    "otr": "objects/object_owl/gOwlTakeoffAnim",
+    "offset": "0x1168",
+    "frameCount": 60
+   },
+   {
+    "name": "gOwlFlyAnim",
+    "otr": "objects/object_owl/gOwlFlyAnim",
+    "offset": "0x15CC",
+    "frameCount": 15
+   },
+   {
+    "name": "gOwlGlideAnim",
+    "otr": "objects/object_owl/gOwlGlideAnim",
+    "offset": "0xC1C4",
+    "frameCount": 2
+   },
+   {
+    "name": "gOwlUnfoldWingsAnim",
+    "otr": "objects/object_owl/gOwlUnfoldWingsAnim",
+    "offset": "0xC684",
+    "frameCount": 15
+   },
+   {
+    "name": "gOwlPerchAnim",
+    "otr": "objects/object_owl/gOwlPerchAnim",
+    "offset": "0xC8A0",
+    "frameCount": 20
+   }
+  ]
+ },
+ "/actor/zelda_po_composer.zar": {
+  "object": "object_po_composer",
+  "anims": [
+   {
+    "name": "gPoeComposerAttackAnim",
+    "otr": "objects/object_po_composer/gPoeComposerAttackAnim",
+    "offset": "0x020C",
+    "frameCount": 8
+   },
+   {
+    "name": "gPoeComposerDamagedAnim",
+    "otr": "objects/object_po_composer/gPoeComposerDamagedAnim",
+    "offset": "0x0570",
+    "frameCount": 16
+   },
+   {
+    "name": "gPoeComposerFleeAnim",
+    "otr": "objects/object_po_composer/gPoeComposerFleeAnim",
+    "offset": "0x0708",
+    "frameCount": 8
+   },
+   {
+    "name": "gPoeComposerFloatAnim",
+    "otr": "objects/object_po_composer/gPoeComposerFloatAnim",
+    "offset": "0x09DC",
+    "frameCount": 16
+   },
+   {
+    "name": "gPoeComposerAppearAnim",
+    "otr": "objects/object_po_composer/gPoeComposerAppearAnim",
+    "offset": "0x0FE4",
+    "frameCount": 30
+   },
+   {
+    "name": "gPoeComposerDisappearAnim",
+    "otr": "objects/object_po_composer/gPoeComposerDisappearAnim",
+    "offset": "0x1440",
+    "frameCount": 20
+   }
+  ]
+ },
+ "/actor/zelda_po_field.zar": {
+  "object": "object_po_field",
+  "anims": [
+   {
+    "name": "gPoeFieldAttackAnim",
+    "otr": "objects/object_po_field/gPoeFieldAttackAnim",
+    "offset": "0x0158",
+    "frameCount": 8
+   },
+   {
+    "name": "gPoeFieldDamagedAnim",
+    "otr": "objects/object_po_field/gPoeFieldDamagedAnim",
+    "offset": "0x0454",
+    "frameCount": 16
+   },
+   {
+    "name": "gPoeFieldFleeAnim",
+    "otr": "objects/object_po_field/gPoeFieldFleeAnim",
+    "offset": "0x0608",
+    "frameCount": 8
+   },
+   {
+    "name": "gPoeFieldFloatAnim",
+    "otr": "objects/object_po_field/gPoeFieldFloatAnim",
+    "offset": "0x0924",
+    "frameCount": 16
+   },
+   {
+    "name": "gPoeFieldAppearAnim",
+    "otr": "objects/object_po_field/gPoeFieldAppearAnim",
+    "offset": "0x0F9C",
+    "frameCount": 30
+   },
+   {
+    "name": "gPoeFieldDisappearAnim",
+    "otr": "objects/object_po_field/gPoeFieldDisappearAnim",
+    "offset": "0x1360",
+    "frameCount": 20
+   }
+  ]
+ },
+ "/actor/zelda_po_sisters.zar": {
+  "object": "object_po_sisters",
+  "anims": [
+   {
+    "name": "gPoeSistersAttackAnim",
+    "otr": "objects/object_po_sisters/gPoeSistersAttackAnim",
+    "offset": "0x0114",
+    "frameCount": 8
+   },
+   {
+    "name": "gPoeSistersMegCryAnim",
+    "otr": "objects/object_po_sisters/gPoeSistersMegCryAnim",
+    "offset": "0x0680",
+    "frameCount": 32
+   },
+   {
+    "name": "gPoeSistersDamagedAnim",
+    "otr": "objects/object_po_sisters/gPoeSistersDamagedAnim",
+    "offset": "0x08C0",
+    "frameCount": 16
+   },
+   {
+    "name": "gPoeSistersFleeAnim",
+    "otr": "objects/object_po_sisters/gPoeSistersFleeAnim",
+    "offset": "0x0A54",
+    "frameCount": 8
+   },
+   {
+    "name": "gPoeSistersFloatAnim",
+    "otr": "objects/object_po_sisters/gPoeSistersFloatAnim",
+    "offset": "0x0D40",
+    "frameCount": 16
+   },
+   {
+    "name": "gPoeSistersAppearDisappearAnim",
+    "otr": "objects/object_po_sisters/gPoeSistersAppearDisappearAnim",
+    "offset": "0x119C",
+    "frameCount": 30
+   },
+   {
+    "name": "gPoeSistersSwayAnim",
+    "otr": "objects/object_po_sisters/gPoeSistersSwayAnim",
+    "offset": "0x14CC",
+    "frameCount": 20
+   }
+  ]
+ },
+ "/actor/zelda_ps.zar": {
+  "object": "object_ps",
+  "anims": [
+   {
+    "name": "gPoeSellerIdleAnim",
+    "otr": "objects/object_ps/gPoeSellerIdleAnim",
+    "offset": "0x049C",
+    "frameCount": 29
+   },
+   {
+    "name": "gPoeSellerSwingStickAnim",
+    "otr": "objects/object_ps/gPoeSellerSwingStickAnim",
+    "offset": "0xC8EC",
+    "frameCount": 30
+   }
+  ]
+ },
+ "/actor/zelda_rd.zar": {
+  "object": "object_rd",
+  "anims": [
+   {
+    "name": "gGibdoRedeadGrabAttackAnim",
+    "otr": "objects/object_rd/gGibdoRedeadGrabAttackAnim",
+    "offset": "0x4268",
+    "frameCount": 11
+   },
+   {
+    "name": "gGibdoRedeadGrabEndAnim",
+    "otr": "objects/object_rd/gGibdoRedeadGrabEndAnim",
+    "offset": "0x46F8",
+    "frameCount": 11
+   },
+   {
+    "name": "gGibdoRedeadGrabStartAnim",
+    "otr": "objects/object_rd/gGibdoRedeadGrabStartAnim",
+    "offset": "0x4ADC",
+    "frameCount": 9
+   },
+   {
+    "name": "gGibdoRedeadLookBackAnim",
+    "otr": "objects/object_rd/gGibdoRedeadLookBackAnim",
+    "offset": "0x4F94",
+    "frameCount": 14
+   },
+   {
+    "name": "gGibdoRedeadWipingTearsAnim",
+    "otr": "objects/object_rd/gGibdoRedeadWipingTearsAnim",
+    "offset": "0x57AC",
+    "frameCount": 40
+   },
+   {
+    "name": "gGibdoRedeadSobbingAnim",
+    "otr": "objects/object_rd/gGibdoRedeadSobbingAnim",
+    "offset": "0x5D98",
+    "frameCount": 40
+   },
+   {
+    "name": "gGibdoRedeadDeathAnim",
+    "otr": "objects/object_rd/gGibdoRedeadDeathAnim",
+    "offset": "0x6E88",
+    "frameCount": 45
+   },
+   {
+    "name": "gGibdoRedeadDamageAnim",
+    "otr": "objects/object_rd/gGibdoRedeadDamageAnim",
+    "offset": "0x74F0",
+    "frameCount": 19
+   },
+   {
+    "name": "gGibdoRedeadStandUpAnim",
+    "otr": "objects/object_rd/gGibdoRedeadStandUpAnim",
+    "offset": "0x8040",
+    "frameCount": 33
+   },
+   {
+    "name": "gGibdoRedeadIdleAnim",
+    "otr": "objects/object_rd/gGibdoRedeadIdleAnim",
+    "offset": "0x87D0",
+    "frameCount": 28
+   },
+   {
+    "name": "gGibdoRedeadWalkAnim",
+    "otr": "objects/object_rd/gGibdoRedeadWalkAnim",
+    "offset": "0xEFDC",
+    "frameCount": 27
+   }
+  ]
+ },
+ "/actor/zelda_rl.zar": {
+  "object": "object_rl",
+  "anims": [
+   {
+    "name": "object_rl_Anim_00040C",
+    "otr": "objects/object_rl/object_rl_Anim_00040C",
+    "offset": "0x40C",
+    "frameCount": 30
+   },
+   {
+    "name": "object_rl_Anim_000830",
+    "otr": "objects/object_rl/object_rl_Anim_000830",
+    "offset": "0x830",
+    "frameCount": 30
+   },
+   {
+    "name": "object_rl_Anim_000A3C",
+    "otr": "objects/object_rl/object_rl_Anim_000A3C",
+    "offset": "0xA3C",
+    "frameCount": 27
+   }
+  ]
+ },
+ "/actor/zelda_rs.zar": {
+  "object": "object_rs",
+  "anims": [
+   {
+    "name": "gBombchuShopkeeperIdleAnim",
+    "otr": "objects/object_rs/gBombchuShopkeeperIdleAnim",
+    "offset": "0x65C",
+    "frameCount": 39
+   }
+  ]
+ },
+ "/actor/zelda_ru1.zar": {
+  "object": "object_ru1",
+  "anims": [
+   {
+    "name": "gRutoChildWaitHandsBehindBackAnim",
+    "otr": "objects/object_ru1/gRutoChildWaitHandsBehindBackAnim",
+    "offset": "0x690",
+    "frameCount": 31
+   },
+   {
+    "name": "gRutoChildWaitHandsOnHipsAnim",
+    "otr": "objects/object_ru1/gRutoChildWaitHandsOnHipsAnim",
+    "offset": "0xE54",
+    "frameCount": 40
+   },
+   {
+    "name": "gRutoChildTransitionHandsOnHipToCrossArmsAndLegsAnim",
+    "otr": "objects/object_ru1/gRutoChildTransitionHandsOnHipToCrossArmsAndLegsAnim",
+    "offset": "0x1488",
+    "frameCount": 20
+   },
+   {
+    "name": "gRutoChildWaitSittingAnim",
+    "otr": "objects/object_ru1/gRutoChildWaitSittingAnim",
+    "offset": "0x2058",
+    "frameCount": 40
+   },
+   {
+    "name": "gRutoChildWaitInBlueWarpAnim",
+    "otr": "objects/object_ru1/gRutoChildWaitInBlueWarpAnim",
+    "offset": "0x2990",
+    "frameCount": 30
+   },
+   {
+    "name": "gRutoChildBringHandsDownAnim",
+    "otr": "objects/object_ru1/gRutoChildBringHandsDownAnim",
+    "offset": "0x2EC0",
+    "frameCount": 15
+   },
+   {
+    "name": "gRutoChildHoldArmsUpAnim",
+    "otr": "objects/object_ru1/gRutoChildHoldArmsUpAnim",
+    "offset": "0x3608",
+    "frameCount": 24
+   },
+   {
+    "name": "gRutoChildBringArmsUpAnim",
+    "otr": "objects/object_ru1/gRutoChildBringArmsUpAnim",
+    "offset": "0x3784",
+    "frameCount": 4
+   },
+   {
+    "name": "gRutoChildTurnAroundAnim",
+    "otr": "objects/object_ru1/gRutoChildTurnAroundAnim",
+    "offset": "0x4074",
+    "frameCount": 25
+   },
+   {
+    "name": "gRutoChildSquirmAnim",
+    "otr": "objects/object_ru1/gRutoChildSquirmAnim",
+    "offset": "0x4350",
+    "frameCount": 8
+   },
+   {
+    "name": "gRutoChildSeesSapphireAnim",
+    "otr": "objects/object_ru1/gRutoChildSeesSapphireAnim",
+    "offset": "0x4648",
+    "frameCount": 8
+   },
+   {
+    "name": "gRutoChildShutterAnim",
+    "otr": "objects/object_ru1/gRutoChildShutterAnim",
+    "offset": "0x4BF0",
+    "frameCount": 16
+   },
+   {
+    "name": "gRutoChildWalkToAndHoldUpSapphireAnim",
+    "otr": "objects/object_ru1/gRutoChildWalkToAndHoldUpSapphireAnim",
+    "offset": "0x63F4",
+    "frameCount": 70
+   },
+   {
+    "name": "gRutoChildSittingAnim",
+    "otr": "objects/object_ru1/gRutoChildSittingAnim",
+    "offset": "0x6B9C",
+    "frameCount": 30
+   },
+   {
+    "name": "gRutoChildSitAnim",
+    "otr": "objects/object_ru1/gRutoChildSitAnim",
+    "offset": "0x7534",
+    "frameCount": 29
+   },
+   {
+    "name": "gRutoChildWalkAnim",
+    "otr": "objects/object_ru1/gRutoChildWalkAnim",
+    "offset": "0x78E4",
+    "frameCount": 10
+   },
+   {
+    "name": "gRutoChildTransitionFromSwimOnBackAnim",
+    "otr": "objects/object_ru1/gRutoChildTransitionFromSwimOnBackAnim",
+    "offset": "0x8100",
+    "frameCount": 30
+   },
+   {
+    "name": "gRutoChildTransitionToSwimOnBackAnim",
+    "otr": "objects/object_ru1/gRutoChildTransitionToSwimOnBackAnim",
+    "offset": "0x8AA8",
+    "frameCount": 30
+   },
+   {
+    "name": "gRutoChildAnim_009060",
+    "otr": "objects/object_ru1/gRutoChildAnim_009060",
+    "offset": "0x9060",
+    "frameCount": 20
+   },
+   {
+    "name": "gRutoChildWait2Anim",
+    "otr": "objects/object_ru1/gRutoChildWait2Anim",
+    "offset": "0x97B8",
+    "frameCount": 23
+   },
+   {
+    "name": "gRutoChildSwimOnBackAnim",
+    "otr": "objects/object_ru1/gRutoChildSwimOnBackAnim",
+    "offset": "0x12E94",
+    "frameCount": 32
+   },
+   {
+    "name": "gRutoChildTreadWaterAnim",
+    "otr": "objects/object_ru1/gRutoChildTreadWaterAnim",
+    "offset": "0x13A64",
+    "frameCount": 40
+   }
+  ]
+ },
+ "/actor/zelda_ru2.zar": {
+  "object": "object_ru2",
+  "anims": [
+   {
+    "name": "gAdultRutoCrossingArmsAnim",
+    "otr": "objects/object_ru2/gAdultRutoCrossingArmsAnim",
+    "offset": "0x04CC",
+    "frameCount": 14
+   },
+   {
+    "name": "gAdultRutoIdleAnim",
+    "otr": "objects/object_ru2/gAdultRutoIdleAnim",
+    "offset": "0xDE8",
+    "frameCount": 29
+   },
+   {
+    "name": "gAdultRutoRaisingArmsUpAnim",
+    "otr": "objects/object_ru2/gAdultRutoRaisingArmsUpAnim",
+    "offset": "0xD3DC",
+    "frameCount": 30
+   },
+   {
+    "name": "gAdultRutoHeadTurnDownLeftAnim",
+    "otr": "objects/object_ru2/gAdultRutoHeadTurnDownLeftAnim",
+    "offset": "0xDCAC",
+    "frameCount": 20
+   },
+   {
+    "name": "gAdultRutoIdleHandsOnHipsAnim",
+    "otr": "objects/object_ru2/gAdultRutoIdleHandsOnHipsAnim",
+    "offset": "0xE630",
+    "frameCount": 24
+   },
+   {
+    "name": "gAdultRutoLookingDownLeftAnim",
+    "otr": "objects/object_ru2/gAdultRutoLookingDownLeftAnim",
+    "offset": "0xF03C",
+    "frameCount": 24
+   },
+   {
+    "name": "gAdultRutoSwimmingUpAnim",
+    "otr": "objects/object_ru2/gAdultRutoSwimmingUpAnim",
+    "offset": "0xF8B8",
+    "frameCount": 20
+   }
+  ]
+ },
+ "/actor/zelda_sa.zar": {
+  "object": "object_sa",
+  "anims": [
+   {
+    "name": "gSariaSealGanonAnim",
+    "otr": "objects/object_sa/gSariaSealGanonAnim",
+    "offset": "0x1334",
+    "frameCount": 75
+   },
+   {
+    "name": "gSariaOcarinaToMouthAnim",
+    "otr": "objects/object_sa/gSariaOcarinaToMouthAnim",
+    "offset": "0x1D50",
+    "frameCount": 42
+   },
+   {
+    "name": "gSariaWaitArmsToSideAnim",
+    "otr": "objects/object_sa/gSariaWaitArmsToSideAnim",
+    "offset": "0x21D8",
+    "frameCount": 24
+   },
+   {
+    "name": "gSariaPlayingOcarinaAnim",
+    "otr": "objects/object_sa/gSariaPlayingOcarinaAnim",
+    "offset": "0xBAEC",
+    "frameCount": 65
+   },
+   {
+    "name": "gSariaStopPlayingOcarinaAnim",
+    "otr": "objects/object_sa/gSariaStopPlayingOcarinaAnim",
+    "offset": "0xC500",
+    "frameCount": 42
+   },
+   {
+    "name": "gSariaLinkLearnedSariasSongAnim",
+    "otr": "objects/object_sa/gSariaLinkLearnedSariasSongAnim",
+    "offset": "0xCFD8",
+    "frameCount": 40
+   },
+   {
+    "name": "gSariaReturnToOcarinaAnim",
+    "otr": "objects/object_sa/gSariaReturnToOcarinaAnim",
+    "offset": "0xD7E8",
+    "frameCount": 30
+   },
+   {
+    "name": "gSariaGiveForestMedallionAnim",
+    "otr": "objects/object_sa/gSariaGiveForestMedallionAnim",
+    "offset": "0xDF80",
+    "frameCount": 30
+   },
+   {
+    "name": "gSariaGiveForestMedallionStandAnim",
+    "otr": "objects/object_sa/gSariaGiveForestMedallionStandAnim",
+    "offset": "0xE500",
+    "frameCount": 30
+   },
+   {
+    "name": "gSariaLookUpArmExtendedAnim",
+    "otr": "objects/object_sa/gSariaLookUpArmExtendedAnim",
+    "offset": "0xE908",
+    "frameCount": 11
+   },
+   {
+    "name": "gSariaRunAnim",
+    "otr": "objects/object_sa/gSariaRunAnim",
+    "offset": "0xEBB0",
+    "frameCount": 14
+   },
+   {
+    "name": "gSariaWaveAnim",
+    "otr": "objects/object_sa/gSariaWaveAnim",
+    "offset": "0xF1D4",
+    "frameCount": 20
+   },
+   {
+    "name": "gSariaSitting1Anim",
+    "otr": "objects/object_sa/gSariaSitting1Anim",
+    "offset": "0xF580",
+    "frameCount": 19
+   },
+   {
+    "name": "gSariaSitting2Anim",
+    "otr": "objects/object_sa/gSariaSitting2Anim",
+    "offset": "0xFCE0",
+    "frameCount": 43
+   },
+   {
+    "name": "gSariaSitting3Anim",
+    "otr": "objects/object_sa/gSariaSitting3Anim",
+    "offset": "0xFFD4",
+    "frameCount": 24
+   },
+   {
+    "name": "gSariaLookOverShoulderAnim",
+    "otr": "objects/object_sa/gSariaLookOverShoulderAnim",
+    "offset": "0x10C44",
+    "frameCount": 40
+   },
+   {
+    "name": "gSariaWaitOnBridgeAnim",
+    "otr": "objects/object_sa/gSariaWaitOnBridgeAnim",
+    "offset": "0x1113C",
+    "frameCount": 24
+   },
+   {
+    "name": "gSariaTransitionHandsSideToBackAnim",
+    "otr": "objects/object_sa/gSariaTransitionHandsSideToBackAnim",
+    "offset": "0x11580",
+    "frameCount": 14
+   },
+   {
+    "name": "gSariaHandsOutAnim",
+    "otr": "objects/object_sa/gSariaHandsOutAnim",
+    "offset": "0x1186C",
+    "frameCount": 9
+   },
+   {
+    "name": "gSariaTransitionHandsSideToHipsAnim",
+    "otr": "objects/object_sa/gSariaTransitionHandsSideToHipsAnim",
+    "offset": "0x11C38",
+    "frameCount": 11
+   },
+   {
+    "name": "gSariaHandsBehindBackWaitAnim",
+    "otr": "objects/object_sa/gSariaHandsBehindBackWaitAnim",
+    "offset": "0x12100",
+    "frameCount": 24
+   },
+   {
+    "name": "gSariaTransitionHandsSideToChestToSideAnim",
+    "otr": "objects/object_sa/gSariaTransitionHandsSideToChestToSideAnim",
+    "offset": "0x1291C",
+    "frameCount": 27
+   },
+   {
+    "name": "gSariaRightArmExtendedWaitAnim",
+    "otr": "objects/object_sa/gSariaRightArmExtendedWaitAnim",
+    "offset": "0x13008",
+    "frameCount": 24
+   },
+   {
+    "name": "gSariaGiveLinkOcarinaAnim",
+    "otr": "objects/object_sa/gSariaGiveLinkOcarinaAnim",
+    "offset": "0x135EC",
+    "frameCount": 19
+   },
+   {
+    "name": "gSariaHoldOutOcarinaAnim",
+    "otr": "objects/object_sa/gSariaHoldOutOcarinaAnim",
+    "offset": "0x13CD8",
+    "frameCount": 24
+   },
+   {
+    "name": "gSariaHoldOcarinaAnim",
+    "otr": "objects/object_sa/gSariaHoldOcarinaAnim",
+    "offset": "0x140BC",
+    "frameCount": 24
+   },
+   {
+    "name": "gSariaStandHandsOnHipsAnim",
+    "otr": "objects/object_sa/gSariaStandHandsOnHipsAnim",
+    "offset": "0x14470",
+    "frameCount": 24
+   },
+   {
+    "name": "gSariaExtendRightArmAnim",
+    "otr": "objects/object_sa/gSariaExtendRightArmAnim",
+    "offset": "0x14850",
+    "frameCount": 13
+   },
+   {
+    "name": "gSariaHandsOnFaceAnim",
+    "otr": "objects/object_sa/gSariaHandsOnFaceAnim",
+    "offset": "0x15220",
+    "frameCount": 33
+   }
+  ]
+ },
+ "/actor/zelda_sb.zar": {
+  "object": "object_sb",
+  "anims": [
+   {
+    "name": "object_sb_Anim_00004C",
+    "otr": "objects/object_sb/object_sb_Anim_00004C",
+    "offset": "0x4C",
+    "frameCount": 4
+   },
+   {
+    "name": "object_sb_Anim_0000B4",
+    "otr": "objects/object_sb/object_sb_Anim_0000B4",
+    "offset": "0xB4",
+    "frameCount": 6
+   },
+   {
+    "name": "object_sb_Anim_000124",
+    "otr": "objects/object_sb/object_sb_Anim_000124",
+    "offset": "0x124",
+    "frameCount": 6
+   },
+   {
+    "name": "object_sb_Anim_000194",
+    "otr": "objects/object_sb/object_sb_Anim_000194",
+    "offset": "0x194",
+    "frameCount": 6
+   },
+   {
+    "name": "object_sb_Anim_002C8C",
+    "otr": "objects/object_sb/object_sb_Anim_002C8C",
+    "offset": "0x2C8C",
+    "frameCount": 20
+   }
+  ]
+ },
+ "/actor/zelda_sd.zar": {
+  "object": "object_sd",
+  "anims": [
+   {
+    "name": "gEnHeishiSlamSpearAnim",
+    "otr": "objects/object_sd/gEnHeishiSlamSpearAnim",
+    "offset": "0x5500",
+    "frameCount": 22
+   },
+   {
+    "name": "gEnHeishiWalkAnim",
+    "otr": "objects/object_sd/gEnHeishiWalkAnim",
+    "offset": "0x5880",
+    "frameCount": 29
+   },
+   {
+    "name": "gEnHeishiIdleAnim",
+    "otr": "objects/object_sd/gEnHeishiIdleAnim",
+    "offset": "0x5C30",
+    "frameCount": 30
+   },
+   {
+    "name": "gEnHeishiDyingGuardTalkAnim",
+    "otr": "objects/object_sd/gEnHeishiDyingGuardTalkAnim",
+    "offset": "0xC6C8",
+    "frameCount": 19
+   },
+   {
+    "name": "gEnHeishiDyingGuardDieAnim",
+    "otr": "objects/object_sd/gEnHeishiDyingGuardDieAnim",
+    "offset": "0xC374",
+    "frameCount": 40
+   },
+   {
+    "name": "gEnHeishiDyingGuardAnim_00C444",
+    "otr": "objects/object_sd/gEnHeishiDyingGuardAnim_00C444",
+    "offset": "0xC444",
+    "frameCount": 2
+   }
+  ]
+ },
+ "/actor/zelda_shopnuts.zar": {
+  "object": "object_shopnuts",
+  "anims": [
+   {
+    "name": "gBusinessScrubAnim_1EC",
+    "otr": "objects/object_shopnuts/gBusinessScrubAnim_1EC",
+    "offset": "0x1EC",
+    "frameCount": 18
+   },
+   {
+    "name": "gBusinessScrubAnim_39C",
+    "otr": "objects/object_shopnuts/gBusinessScrubAnim_39C",
+    "offset": "0x39C",
+    "frameCount": 10
+   },
+   {
+    "name": "gBusinessScrubRotateAnim",
+    "otr": "objects/object_shopnuts/gBusinessScrubRotateAnim",
+    "offset": "0x764",
+    "frameCount": 16
+   },
+   {
+    "name": "gBusinessScrubNervousTransitionAnim",
+    "otr": "objects/object_shopnuts/gBusinessScrubNervousTransitionAnim",
+    "offset": "0x9A0",
+    "frameCount": 8
+   },
+   {
+    "name": "gBusinessScrubLookAroundAnim",
+    "otr": "objects/object_shopnuts/gBusinessScrubLookAroundAnim",
+    "offset": "0xBA0",
+    "frameCount": 26
+   },
+   {
+    "name": "gBusinessScrubNervousIdleAnim",
+    "otr": "objects/object_shopnuts/gBusinessScrubNervousIdleAnim",
+    "offset": "0x1108",
+    "frameCount": 16
+   },
+   {
+    "name": "gBusinessScrubAnim_139C",
+    "otr": "objects/object_shopnuts/gBusinessScrubAnim_139C",
+    "offset": "0x139C",
+    "frameCount": 21
+   },
+   {
+    "name": "gBusinessScrubLeaveBurrowAnim",
+    "otr": "objects/object_shopnuts/gBusinessScrubLeaveBurrowAnim",
+    "offset": "0x4404",
+    "frameCount": 8
+   },
+   {
+    "name": "gBusinessScrubAnim_4574",
+    "otr": "objects/object_shopnuts/gBusinessScrubAnim_4574",
+    "offset": "0x4574",
+    "frameCount": 15
+   }
+  ]
+ },
+ "/actor/zelda_skb.zar": {
+  "object": "object_skb",
+  "anims": [
+   {
+    "name": "gStalchildUncurlingAnim",
+    "otr": "objects/object_skb/gStalchildUncurlingAnim",
+    "offset": "0x1854",
+    "frameCount": 30
+   },
+   {
+    "name": "gStalchildDyingAnim",
+    "otr": "objects/object_skb/gStalchildDyingAnim",
+    "offset": "0x9DC",
+    "frameCount": 16
+   },
+   {
+    "name": "gStalchildDamagedAnim",
+    "otr": "objects/object_skb/gStalchildDamagedAnim",
+    "offset": "0xD98",
+    "frameCount": 9
+   },
+   {
+    "name": "gStalchildWalkingAnim",
+    "otr": "objects/object_skb/gStalchildWalkingAnim",
+    "offset": "0x47E0",
+    "frameCount": 16
+   },
+   {
+    "name": "gStalchildAttackingAnim",
+    "otr": "objects/object_skb/gStalchildAttackingAnim",
+    "offset": "0x460",
+    "frameCount": 11
+   }
+  ]
+ },
+ "/actor/zelda_skj.zar": {
+  "object": "object_skj",
+  "anims": [
+   {
+    "name": "gSkullKidBackflipAnim",
+    "otr": "objects/object_skj/gSkullKidBackflipAnim",
+    "offset": "0x051C",
+    "frameCount": 14
+   },
+   {
+    "name": "gSkullKidShootNeedleAnim",
+    "otr": "objects/object_skj/gSkullKidShootNeedleAnim",
+    "offset": "0x07A4",
+    "frameCount": 6
+   },
+   {
+    "name": "gSkullKidPlayFluteAnim",
+    "otr": "objects/object_skj/gSkullKidPlayFluteAnim",
+    "offset": "0x0E10",
+    "frameCount": 20
+   },
+   {
+    "name": "gSkullKidDieAnim",
+    "otr": "objects/object_skj/gSkullKidDieAnim",
+    "offset": "0x6A98",
+    "frameCount": 30
+   },
+   {
+    "name": "gSkullKidHitAnim",
+    "otr": "objects/object_skj/gSkullKidHitAnim",
+    "offset": "0x6D84",
+    "frameCount": 8
+   },
+   {
+    "name": "gSkullKidLandAnim",
+    "otr": "objects/object_skj/gSkullKidLandAnim",
+    "offset": "0x7128",
+    "frameCount": 9
+   },
+   {
+    "name": "gSkullKidLookLeftAndRightAnim",
+    "otr": "objects/object_skj/gSkullKidLookLeftAndRightAnim",
+    "offset": "0x8174",
+    "frameCount": 50
+   },
+   {
+    "name": "gSkullKidFightingStanceAnim",
+    "otr": "objects/object_skj/gSkullKidFightingStanceAnim",
+    "offset": "0x8374",
+    "frameCount": 6
+   },
+   {
+    "name": "gSkullKidWaitAnim",
+    "otr": "objects/object_skj/gSkullKidWaitAnim",
+    "offset": "0x8B9C",
+    "frameCount": 38
+   },
+   {
+    "name": "gSkullKidWalkToPlayerAnim",
+    "otr": "objects/object_skj/gSkullKidWalkToPlayerAnim",
+    "offset": "0x8E14",
+    "frameCount": 6
+   }
+  ]
+ },
+ "/actor/zelda_ssh.zar": {
+  "object": "object_ssh",
+  "anims": [
+   {
+    "name": "object_ssh_Anim_000304",
+    "otr": "objects/object_ssh/object_ssh_Anim_000304",
+    "offset": "0x304",
+    "frameCount": 32
+   },
+   {
+    "name": "object_ssh_Anim_0055F8",
+    "otr": "objects/object_ssh/object_ssh_Anim_0055F8",
+    "offset": "0x55F8",
+    "frameCount": 29
+   },
+   {
+    "name": "object_ssh_Anim_005BE8",
+    "otr": "objects/object_ssh/object_ssh_Anim_005BE8",
+    "offset": "0x5BE8",
+    "frameCount": 50
+   }
+  ]
+ },
+ "/actor/zelda_sst.zar": {
+  "object": "object_sst",
+  "anims": [
+   {
+    "name": "gBongoLeftHandIdleAnim",
+    "otr": "objects/object_sst/gBongoLeftHandIdleAnim",
+    "offset": "0x002E8",
+    "frameCount": 10
+   },
+   {
+    "name": "gBongoLeftHandFlatPoseAnim",
+    "otr": "objects/object_sst/gBongoLeftHandFlatPoseAnim",
+    "offset": "0x04EC4",
+    "frameCount": 2
+   },
+   {
+    "name": "gBongoLeftHandOpenPoseAnim",
+    "otr": "objects/object_sst/gBongoLeftHandOpenPoseAnim",
+    "offset": "0x04FB4",
+    "frameCount": 2
+   },
+   {
+    "name": "gBongoLeftHandFistPoseAnim",
+    "otr": "objects/object_sst/gBongoLeftHandFistPoseAnim",
+    "offset": "0x050A8",
+    "frameCount": 2
+   },
+   {
+    "name": "gBongoLeftHandClenchAnim",
+    "otr": "objects/object_sst/gBongoLeftHandClenchAnim",
+    "offset": "0x0529C",
+    "frameCount": 10
+   },
+   {
+    "name": "gBongoLeftHandDamagePoseAnim",
+    "otr": "objects/object_sst/gBongoLeftHandDamagePoseAnim",
+    "offset": "0x0539C",
+    "frameCount": 2
+   },
+   {
+    "name": "gBongoLeftHandPushoffPoseAnim",
+    "otr": "objects/object_sst/gBongoLeftHandPushoffPoseAnim",
+    "offset": "0x0549C",
+    "frameCount": 2
+   },
+   {
+    "name": "gBongoLeftHandHangPoseAnim",
+    "otr": "objects/object_sst/gBongoLeftHandHangPoseAnim",
+    "offset": "0x05588",
+    "frameCount": 2
+   },
+   {
+    "name": "gBongoRightHandIdleAnim",
+    "otr": "objects/object_sst/gBongoRightHandIdleAnim",
+    "offset": "0x05860",
+    "frameCount": 10
+   },
+   {
+    "name": "gBongoRightHandFlatPoseAnim",
+    "otr": "objects/object_sst/gBongoRightHandFlatPoseAnim",
+    "offset": "0x0A434",
+    "frameCount": 2
+   },
+   {
+    "name": "gBongoRightHandOpenPoseAnim",
+    "otr": "objects/object_sst/gBongoRightHandOpenPoseAnim",
+    "offset": "0x0A524",
+    "frameCount": 2
+   },
+   {
+    "name": "gBongoRightHandFistPoseAnim",
+    "otr": "objects/object_sst/gBongoRightHandFistPoseAnim",
+    "offset": "0x0A618",
+    "frameCount": 2
+   },
+   {
+    "name": "gBongoRightHandClenchAnim",
+    "otr": "objects/object_sst/gBongoRightHandClenchAnim",
+    "offset": "0x0A848",
+    "frameCount": 10
+   },
+   {
+    "name": "gBongoRightHandDamagePoseAnim",
+    "otr": "objects/object_sst/gBongoRightHandDamagePoseAnim",
+    "offset": "0x0A948",
+    "frameCount": 2
+   },
+   {
+    "name": "gBongoRightHandPushoffPoseAnim",
+    "otr": "objects/object_sst/gBongoRightHandPushoffPoseAnim",
+    "offset": "0x0AA4C",
+    "frameCount": 2
+   },
+   {
+    "name": "gBongoRightHandHangPoseAnim",
+    "otr": "objects/object_sst/gBongoRightHandHangPoseAnim",
+    "offset": "0x0AB38",
+    "frameCount": 2
+   },
+   {
+    "name": "gBongoHeadStunnedAnim",
+    "otr": "objects/object_sst/gBongoHeadStunnedAnim",
+    "offset": "0x0ACD4",
+    "frameCount": 7
+   },
+   {
+    "name": "gBongoHeadChargeAnim",
+    "otr": "objects/object_sst/gBongoHeadChargeAnim",
+    "offset": "0x0B0D8",
+    "frameCount": 11
+   },
+   {
+    "name": "gBongoHeadKnockoutAnim",
+    "otr": "objects/object_sst/gBongoHeadKnockoutAnim",
+    "offset": "0x0B6FC",
+    "frameCount": 17
+   },
+   {
+    "name": "gBongoHeadEyeCloseAnim",
+    "otr": "objects/object_sst/gBongoHeadEyeCloseAnim",
+    "offset": "0x0C288",
+    "frameCount": 40
+   },
+   {
+    "name": "gBongoHeadDamagedHandAnim",
+    "otr": "objects/object_sst/gBongoHeadDamagedHandAnim",
+    "offset": "0x0C5B0",
+    "frameCount": 10
+   },
+   {
+    "name": "gBongoHeadEyeOpenAnim",
+    "otr": "objects/object_sst/gBongoHeadEyeOpenAnim",
+    "offset": "0x0C9BC",
+    "frameCount": 10
+   },
+   {
+    "name": "gBongoHeadDamageAnim",
+    "otr": "objects/object_sst/gBongoHeadDamageAnim",
+    "offset": "0x0CC6C",
+    "frameCount": 7
+   },
+   {
+    "name": "gBongoHeadRecoverAnim",
+    "otr": "objects/object_sst/gBongoHeadRecoverAnim",
+    "offset": "0x0D458",
+    "frameCount": 26
+   },
+   {
+    "name": "gBongoHeadEyeCloseIdleAnim",
+    "otr": "objects/object_sst/gBongoHeadEyeCloseIdleAnim",
+    "offset": "0x0DC2C",
+    "frameCount": 40
+   },
+   {
+    "name": "gBongoHeadEyeOpenIdleAnim",
+    "otr": "objects/object_sst/gBongoHeadEyeOpenIdleAnim",
+    "offset": "0x0E7B8",
+    "frameCount": 40
+   }
+  ]
+ },
+ "/actor/zelda_st.zar": {
+  "object": "object_st",
+  "anims": [
+   {
+    "name": "object_st_Anim_000304",
+    "otr": "objects/object_st/object_st_Anim_000304",
+    "offset": "0x304",
+    "frameCount": 32
+   },
+   {
+    "name": "object_st_Anim_0055A8",
+    "otr": "objects/object_st/object_st_Anim_0055A8",
+    "offset": "0x55A8",
+    "frameCount": 29
+   },
+   {
+    "name": "object_st_Anim_005B98",
+    "otr": "objects/object_st/object_st_Anim_005B98",
+    "offset": "0x5B98",
+    "frameCount": 50
+   }
+  ]
+ },
+ "/actor/zelda_ta.zar": {
+  "object": "object_ta",
+  "anims": [
+   {
+    "name": "gTalonSitSleepingAnim",
+    "otr": "objects/object_ta/gTalonSitSleepingAnim",
+    "offset": "0x17E8",
+    "frameCount": 100
+   },
+   {
+    "name": "gTalonStandAnim",
+    "otr": "objects/object_ta/gTalonStandAnim",
+    "offset": "0x1C94",
+    "frameCount": 25
+   },
+   {
+    "name": "gTalonSitHandsUpAnim",
+    "otr": "objects/object_ta/gTalonSitHandsUpAnim",
+    "offset": "0xBF38",
+    "frameCount": 40
+   },
+   {
+    "name": "gTalonSitWakeUpAnim",
+    "otr": "objects/object_ta/gTalonSitWakeUpAnim",
+    "offset": "0xC48C",
+    "frameCount": 30
+   },
+   {
+    "name": "gTalonRunAnim",
+    "otr": "objects/object_ta/gTalonRunAnim",
+    "offset": "0xC858",
+    "frameCount": 10
+   },
+   {
+    "name": "gTalonSleepAnim",
+    "otr": "objects/object_ta/gTalonSleepAnim",
+    "offset": "0xCD50",
+    "frameCount": 32
+   },
+   {
+    "name": "gTalonRunTransitionAnim",
+    "otr": "objects/object_ta/gTalonRunTransitionAnim",
+    "offset": "0xCF28",
+    "frameCount": 4
+   },
+   {
+    "name": "gTalonWakeUpAnim",
+    "otr": "objects/object_ta/gTalonWakeUpAnim",
+    "offset": "0xE3D8",
+    "frameCount": 60
+   }
+  ]
+ },
+ "/actor/zelda_tk.zar": {
+  "object": "object_tk",
+  "anims": [
+   {
+    "name": "gDampeDigAnim",
+    "otr": "objects/object_tk/gDampeDigAnim",
+    "offset": "0x1144",
+    "frameCount": 50
+   },
+   {
+    "name": "gDampeWalkAnim",
+    "otr": "objects/object_tk/gDampeWalkAnim",
+    "offset": "0x1FA8",
+    "frameCount": 49
+   },
+   {
+    "name": "gDampeRestAnim",
+    "otr": "objects/object_tk/gDampeRestAnim",
+    "offset": "0x2F84",
+    "frameCount": 49
+   },
+   {
+    "name": "gDampeFloatAnim",
+    "otr": "objects/object_tk/gDampeFloatAnim",
+    "offset": "0x3768",
+    "frameCount": 24
+   }
+  ]
+ },
+ "/actor/zelda_toryo.zar": {
+  "object": "object_toryo",
+  "anims": [
+   {
+    "name": "object_toryo_Anim_000E50",
+    "otr": "objects/object_toryo/object_toryo_Anim_000E50",
+    "offset": "0xE50",
+    "frameCount": 59
+   }
+  ]
+ },
+ "/actor/zelda_tr.zar": {
+  "object": "object_tr",
+  "anims": [
+   {
+    "name": "gKotakeKoumeLookOverRightShoulderAnim",
+    "otr": "objects/object_tr/gKotakeKoumeLookOverRightShoulderAnim",
+    "offset": "0xBFC",
+    "frameCount": 30
+   },
+   {
+    "name": "gKotakeKoumeLookingOverRightShoulderAnim",
+    "otr": "objects/object_tr/gKotakeKoumeLookingOverRightShoulderAnim",
+    "offset": "0x13CC",
+    "frameCount": 24
+   },
+   {
+    "name": "gKotakeKoumeStandingBroomOverLeftShoulderAnim",
+    "otr": "objects/object_tr/gKotakeKoumeStandingBroomOverLeftShoulderAnim",
+    "offset": "0x1CDC",
+    "frameCount": 24
+   },
+   {
+    "name": "gKotakeKoumeLookOverLeftShoulderAnim",
+    "otr": "objects/object_tr/gKotakeKoumeLookOverLeftShoulderAnim",
+    "offset": "0x2BC4",
+    "frameCount": 40
+   },
+   {
+    "name": "gKotakeKoumeLookingOverLeftShoulderAnim",
+    "otr": "objects/object_tr/gKotakeKoumeLookingOverLeftShoulderAnim",
+    "offset": "0x35CC",
+    "frameCount": 24
+   },
+   {
+    "name": "gKotakeKoumeStandingBroomOverRightShoulderAnim",
+    "otr": "objects/object_tr/gKotakeKoumeStandingBroomOverRightShoulderAnim",
+    "offset": "0x3FC8",
+    "frameCount": 24
+   },
+   {
+    "name": "gKotakeKoumeFlyAnim",
+    "otr": "objects/object_tr/gKotakeKoumeFlyAnim",
+    "offset": "0x49C8",
+    "frameCount": 24
+   },
+   {
+    "name": "gKotakeKoumeStandingBroomOverRightShoulderUnusedAnim",
+    "otr": "objects/object_tr/gKotakeKoumeStandingBroomOverRightShoulderUnusedAnim",
+    "offset": "0x5308",
+    "frameCount": 24
+   },
+   {
+    "name": "gKotakeKoumeTPoseAnim",
+    "otr": "objects/object_tr/gKotakeKoumeTPoseAnim",
+    "offset": "0xC60C",
+    "frameCount": 2
+   },
+   {
+    "name": "gKotakeKoumeCastMagicAnim",
+    "otr": "objects/object_tr/gKotakeKoumeCastMagicAnim",
+    "offset": "0x12E1C",
+    "frameCount": 54
+   }
+  ]
+ },
+ "/actor/zelda_ts.zar": {
+  "object": "object_ts",
+  "anims": [
+   {
+    "name": "object_ts_Anim_000498",
+    "otr": "objects/object_ts/object_ts_Anim_000498",
+    "offset": "0x498",
+    "frameCount": 29
+   }
+  ]
+ },
+ "/actor/zelda_tw.zar": {
+  "object": "object_tw",
+  "anims": [
+   {
+    "name": "gTwinrovaKotakeKoumeIdleLoopAnim",
+    "otr": "objects/object_tw/gTwinrovaKotakeKoumeIdleLoopAnim",
+    "offset": "0x4A4",
+    "frameCount": 20
+   },
+   {
+    "name": "gTwinrovaKotakeKoumeIdleEndAnim",
+    "otr": "objects/object_tw/gTwinrovaKotakeKoumeIdleEndAnim",
+    "offset": "0xAAC",
+    "frameCount": 12
+   },
+   {
+    "name": "gTwinrovaKotakeKoumeBickerAnim",
+    "otr": "objects/object_tw/gTwinrovaKotakeKoumeBickerAnim",
+    "offset": "0x12A4",
+    "frameCount": 20
+   },
+   {
+    "name": "gTwinrovaKotakeKoumeFloatLookUpAnim",
+    "otr": "objects/object_tw/gTwinrovaKotakeKoumeFloatLookUpAnim",
+    "offset": "0x17E0",
+    "frameCount": 16
+   },
+   {
+    "name": "gTwinrovaKotakeKoumeFloatLookForwardAnim",
+    "otr": "objects/object_tw/gTwinrovaKotakeKoumeFloatLookForwardAnim",
+    "offset": "0x1D10",
+    "frameCount": 16
+   },
+   {
+    "name": "gTwinrovaKotakeKoumeShakeHandAnim",
+    "otr": "objects/object_tw/gTwinrovaKotakeKoumeShakeHandAnim",
+    "offset": "0x230C",
+    "frameCount": 23
+   },
+   {
+    "name": "gTwinrovaKotakeKoumeAttackStartAnim",
+    "otr": "objects/object_tw/gTwinrovaKotakeKoumeAttackStartAnim",
+    "offset": "0x3614",
+    "frameCount": 30
+   },
+   {
+    "name": "gTwinrovaKotakeKoumeAttackLoopAnim",
+    "otr": "objects/object_tw/gTwinrovaKotakeKoumeAttackLoopAnim",
+    "offset": "0x3E34",
+    "frameCount": 16
+   },
+   {
+    "name": "gTwinrovaKotakeKoumeAttackEndAnim",
+    "otr": "objects/object_tw/gTwinrovaKotakeKoumeAttackEndAnim",
+    "offset": "0x4548",
+    "frameCount": 12
+   },
+   {
+    "name": "gTwinrovaKotakeKoumeDamageStartAnim",
+    "otr": "objects/object_tw/gTwinrovaKotakeKoumeDamageStartAnim",
+    "offset": "0x578C",
+    "frameCount": 32
+   },
+   {
+    "name": "gTwinrovaKotakeKoumeDamageEndAnim",
+    "otr": "objects/object_tw/gTwinrovaKotakeKoumeDamageEndAnim",
+    "offset": "0x6530",
+    "frameCount": 25
+   },
+   {
+    "name": "gTwinrovaKotakeKoumeFlyAnim",
+    "otr": "objects/object_tw/gTwinrovaKotakeKoumeFlyAnim",
+    "offset": "0x6F28",
+    "frameCount": 24
+   },
+   {
+    "name": "gTwinrovaKotakeKoumeChargeUpAttackStartAnim",
+    "otr": "objects/object_tw/gTwinrovaKotakeKoumeChargeUpAttackStartAnim",
+    "offset": "0x7688",
+    "frameCount": 12
+   },
+   {
+    "name": "gTwinrovaKotakeKoumeSpinAnim",
+    "otr": "objects/object_tw/gTwinrovaKotakeKoumeSpinAnim",
+    "offset": "0x7CA8",
+    "frameCount": 12
+   },
+   {
+    "name": "gTwinrovaKotakeKoumeLaughAnim",
+    "otr": "objects/object_tw/gTwinrovaKotakeKoumeLaughAnim",
+    "offset": "0x88C8",
+    "frameCount": 29
+   },
+   {
+    "name": "gTwinrovaKotakeKoumeChargeUpAttackLoopAnim",
+    "otr": "objects/object_tw/gTwinrovaKotakeKoumeChargeUpAttackLoopAnim",
+    "offset": "0x9398",
+    "frameCount": 24
+   },
+   {
+    "name": "gTwinrovaKotakeKoumeTPoseAnim",
+    "otr": "objects/object_tw/gTwinrovaKotakeKoumeTPoseAnim",
+    "offset": "0x947C",
+    "frameCount": 2
+   },
+   {
+    "name": "gTwinrovaDeathAnim",
+    "otr": "objects/object_tw/gTwinrovaDeathAnim",
+    "offset": "0x216DC",
+    "frameCount": 45
+   },
+   {
+    "name": "gTwinrovaIceAttackAnim",
+    "otr": "objects/object_tw/gTwinrovaIceAttackAnim",
+    "offset": "0x22700",
+    "frameCount": 24
+   },
+   {
+    "name": "gTwinrovaFireAttackAnim",
+    "otr": "objects/object_tw/gTwinrovaFireAttackAnim",
+    "offset": "0x23750",
+    "frameCount": 24
+   },
+   {
+    "name": "gTwinrovaDamageAnim",
+    "otr": "objects/object_tw/gTwinrovaDamageAnim",
+    "offset": "0x24374",
+    "frameCount": 17
+   },
+   {
+    "name": "gTwinrovaTPoseAnim",
+    "otr": "objects/object_tw/gTwinrovaTPoseAnim",
+    "offset": "0x244B4",
+    "frameCount": 2
+   },
+   {
+    "name": "gTwinrovaHoverAnim",
+    "otr": "objects/object_tw/gTwinrovaHoverAnim",
+    "offset": "0x32BF8",
+    "frameCount": 2900
+   },
+   {
+    "name": "gTwinrovaChargedAttackHitAnim",
+    "otr": "objects/object_tw/gTwinrovaChargedAttackHitAnim",
+    "offset": "0x338F0",
+    "frameCount": -6958
+   },
+   {
+    "name": "gTwinrovaStunStartAnim",
+    "otr": "objects/object_tw/gTwinrovaStunStartAnim",
+    "offset": "0x343B4",
+    "frameCount": -21049
+   },
+   {
+    "name": "gTwinrovaStunLoopAnim",
+    "otr": "objects/object_tw/gTwinrovaStunLoopAnim",
+    "offset": "0x35030",
+    "frameCount": 3288
+   },
+   {
+    "name": "gTwinrovaStunEndAnim",
+    "otr": "objects/object_tw/gTwinrovaStunEndAnim",
+    "offset": "0x35988",
+    "frameCount": -3342
+   },
+   {
+    "name": "gTwinrovaWindUpAnim",
+    "otr": "objects/object_tw/gTwinrovaWindUpAnim",
+    "offset": "0x36FBC",
+    "frameCount": -7919
+   },
+   {
+    "name": "gTwinrovaIntroAnim",
+    "otr": "objects/object_tw/gTwinrovaIntroAnim",
+    "offset": "0x38E2C",
+    "frameCount": 0
+   },
+   {
+    "name": "gTwinrovaLaughAnim",
+    "otr": "objects/object_tw/gTwinrovaLaughAnim",
+    "offset": "0x3A2D0",
+    "frameCount": null
+   }
+  ]
+ },
+ "/actor/zelda_vali.zar": {
+  "object": "object_vali",
+  "anims": [
+   {
+    "name": "gBariWaitingAnim",
+    "otr": "objects/object_vali/gBariWaitingAnim",
+    "offset": "0x710",
+    "frameCount": 81
+   },
+   {
+    "name": "gBariRetaliatingAnim",
+    "otr": "objects/object_vali/gBariRetaliatingAnim",
+    "offset": "0x854",
+    "frameCount": 6
+   },
+   {
+    "name": "gBariMovingArmsDownAnim",
+    "otr": "objects/object_vali/gBariMovingArmsDownAnim",
+    "offset": "0xB34",
+    "frameCount": 26
+   },
+   {
+    "name": "gBariUnusedAnim_000D9C",
+    "otr": "objects/object_vali/gBariUnusedAnim_000D9C",
+    "offset": "0xD9C",
+    "frameCount": 20
+   },
+   {
+    "name": "gBariLurkingAnim",
+    "otr": "objects/object_vali/gBariLurkingAnim",
+    "offset": "0x14AC",
+    "frameCount": 80
+   }
+  ]
+ },
+ "/actor/zelda_vm.zar": {
+  "object": "object_vm",
+  "anims": [
+   {
+    "name": "gBeamosAnim",
+    "otr": "objects/object_vm/gBeamosAnim",
+    "offset": "0x68",
+    "frameCount": 8
+   }
+  ]
+ },
+ "/actor/zelda_warp1.zar": {
+  "object": "object_warp1",
+  "anims": [
+   {
+    "name": "gWarpCrystalAnim",
+    "otr": "objects/object_warp1/gWarpCrystalAnim",
+    "offset": "0x1374",
+    "frameCount": 3
+   }
+  ]
+ },
+ "/actor/zelda_wf.zar": {
+  "object": "object_wf",
+  "anims": [
+   {
+    "name": "gWolfosSlashingAnim",
+    "otr": "objects/object_wf/gWolfosSlashingAnim",
+    "offset": "0x4638",
+    "frameCount": 30
+   },
+   {
+    "name": "gWolfosBackflippingAnim",
+    "otr": "objects/object_wf/gWolfosBackflippingAnim",
+    "offset": "0x4AD0",
+    "frameCount": 13
+   },
+   {
+    "name": "gWolfosBlockingAnim",
+    "otr": "objects/object_wf/gWolfosBlockingAnim",
+    "offset": "0x4CA4",
+    "frameCount": 4
+   },
+   {
+    "name": "gWolfosRearingUpFallingOverAnim",
+    "otr": "objects/object_wf/gWolfosRearingUpFallingOverAnim",
+    "offset": "0x5430",
+    "frameCount": 25
+   },
+   {
+    "name": "gWolfosRunningAnim",
+    "otr": "objects/object_wf/gWolfosRunningAnim",
+    "offset": "0x57A0",
+    "frameCount": 9
+   },
+   {
+    "name": "gWolfosSidesteppingAnim",
+    "otr": "objects/object_wf/gWolfosSidesteppingAnim",
+    "offset": "0x98C8",
+    "frameCount": 7
+   },
+   {
+    "name": "gWolfosDamagedAnim",
+    "otr": "objects/object_wf/gWolfosDamagedAnim",
+    "offset": "0x9B20",
+    "frameCount": 8
+   },
+   {
+    "name": "gWolfosWaitingAnim",
+    "otr": "objects/object_wf/gWolfosWaitingAnim",
+    "offset": "0xA4AC",
+    "frameCount": 29
+   }
+  ]
+ },
+ "/actor/zelda_xc.zar": {
+  "object": "object_xc",
+  "anims": [
+   {
+    "name": "gSheikPlayingHarpAnim",
+    "otr": "objects/object_xc/gSheikPlayingHarpAnim",
+    "offset": "0xB6C",
+    "frameCount": -2565
+   },
+   {
+    "name": "gSheikShowingTriforceOnHandAnim",
+    "otr": "objects/object_xc/gSheikShowingTriforceOnHandAnim",
+    "offset": "0x1A08",
+    "frameCount": -131
+   },
+   {
+    "name": "gSheikShowingTriforceOnHandIdleAnim",
+    "otr": "objects/object_xc/gSheikShowingTriforceOnHandIdleAnim",
+    "offset": "0x1D14",
+    "frameCount": -1281
+   },
+   {
+    "name": "gSheikPlayingHarp2Anim",
+    "otr": "objects/object_xc/gSheikPlayingHarp2Anim",
+    "offset": "0x289C",
+    "frameCount": -1001
+   },
+   {
+    "name": "gSheikPlayingHarp3Anim",
+    "otr": "objects/object_xc/gSheikPlayingHarp3Anim",
+    "offset": "0x35C8",
+    "frameCount": -17438
+   },
+   {
+    "name": "gSheikPlayingHarp4Anim",
+    "otr": "objects/object_xc/gSheikPlayingHarp4Anim",
+    "offset": "0x4570",
+    "frameCount": 6475
+   },
+   {
+    "name": "gSheikIdleAnim",
+    "otr": "objects/object_xc/gSheikIdleAnim",
+    "offset": "0x4828",
+    "frameCount": -2042
+   },
+   {
+    "name": "gSheikWalkingAnim",
+    "otr": "objects/object_xc/gSheikWalkingAnim",
+    "offset": "0x12FD0",
+    "frameCount": 516
+   },
+   {
+    "name": "gSheikArmsCrossedIdleAnim",
+    "otr": "objects/object_xc/gSheikArmsCrossedIdleAnim",
+    "offset": "0x13AA4",
+    "frameCount": 25
+   },
+   {
+    "name": "gSheikFallingFromContortionsAnim",
+    "otr": "objects/object_xc/gSheikFallingFromContortionsAnim",
+    "offset": "0x149E4",
+    "frameCount": -7432
+   },
+   {
+    "name": "gSheikContortionsAnim",
+    "otr": "objects/object_xc/gSheikContortionsAnim",
+    "offset": "0x169E8",
+    "frameCount": -7785
+   },
+   {
+    "name": "gSheikPlayingHarp5Anim",
+    "otr": "objects/object_xc/gSheikPlayingHarp5Anim",
+    "offset": "0x177F8",
+    "frameCount": -436
+   },
+   {
+    "name": "gSheikInitialHarpAnim",
+    "otr": "objects/object_xc/gSheikInitialHarpAnim",
+    "offset": "0x17C54",
+    "frameCount": 29547
+   },
+   {
+    "name": "gSheikDefenseStanceAnim",
+    "otr": "objects/object_xc/gSheikDefenseStanceAnim",
+    "offset": "0x18B00",
+    "frameCount": 3305
+   },
+   {
+    "name": "gSheikThrowingNutAnim",
+    "otr": "objects/object_xc/gSheikThrowingNutAnim",
+    "offset": "0x19598",
+    "frameCount": -1526
+   },
+   {
+    "name": "gSheikKneelingAnim",
+    "otr": "objects/object_xc/gSheikKneelingAnim",
+    "offset": "0x19C30",
+    "frameCount": 2714
+   },
+   {
+    "name": "gSheikHittingGroundAnim",
+    "otr": "objects/object_xc/gSheikHittingGroundAnim",
+    "offset": "0x19F78",
+    "frameCount": 425
+   },
+   {
+    "name": "gSheikAnim_01A048",
+    "otr": "objects/object_xc/gSheikAnim_01A048",
+    "offset": "0x1A048",
+    "frameCount": 1758
+   },
+   {
+    "name": "gSheikPullingOutHarpAnim",
+    "otr": "objects/object_xc/gSheikPullingOutHarpAnim",
+    "offset": "0x1B19C",
+    "frameCount": -14570
+   },
+   {
+    "name": "gSheikFallingFromSkyAnim",
+    "otr": "objects/object_xc/gSheikFallingFromSkyAnim",
+    "offset": "0x1C0E8",
+    "frameCount": 1435
+   }
+  ]
+ },
+ "/actor/zelda_zf.zar": {
+  "object": "object_zf",
+  "anims": [
+   {
+    "name": "gZfWalkingAnim",
+    "otr": "objects/object_zf/gZfWalkingAnim",
+    "offset": "0x8138",
+    "frameCount": 59
+   },
+   {
+    "name": "gZfLandingAnim",
+    "otr": "objects/object_zf/gZfLandingAnim",
+    "offset": "0x8C6C",
+    "frameCount": 21
+   },
+   {
+    "name": "gZfJumpingAnim",
+    "otr": "objects/object_zf/gZfJumpingAnim",
+    "offset": "0x9530",
+    "frameCount": 20
+   },
+   {
+    "name": "gZfSlashAnim",
+    "otr": "objects/object_zf/gZfSlashAnim",
+    "offset": "0xA3D4",
+    "frameCount": 30
+   },
+   {
+    "name": "gZfCryingAnim",
+    "otr": "objects/object_zf/gZfCryingAnim",
+    "offset": "0xB10C",
+    "frameCount": 29
+   },
+   {
+    "name": "gZfHopCrouchingAnim",
+    "otr": "objects/object_zf/gZfHopCrouchingAnim",
+    "offset": "0x1081C",
+    "frameCount": 7
+   },
+   {
+    "name": "gZfHopLeapingAnim",
+    "otr": "objects/object_zf/gZfHopLeapingAnim",
+    "offset": "0x10CAC",
+    "frameCount": 7
+   },
+   {
+    "name": "gZfHopLandingAnim",
+    "otr": "objects/object_zf/gZfHopLandingAnim",
+    "offset": "0x11070",
+    "frameCount": 7
+   },
+   {
+    "name": "gZfSheathingSwordAnim",
+    "otr": "objects/object_zf/gZfSheathingSwordAnim",
+    "offset": "0x119F4",
+    "frameCount": 17
+   },
+   {
+    "name": "gZfDrawingSwordAnim",
+    "otr": "objects/object_zf/gZfDrawingSwordAnim",
+    "offset": "0x1366C",
+    "frameCount": 56
+   },
+   {
+    "name": "gZfDyingAnim",
+    "otr": "objects/object_zf/gZfDyingAnim",
+    "offset": "0x14E60",
+    "frameCount": 50
+   },
+   {
+    "name": "gZfKnockedBackAnim",
+    "otr": "objects/object_zf/gZfKnockedBackAnim",
+    "offset": "0x157F8",
+    "frameCount": 20
+   },
+   {
+    "name": "gZfSidesteppingAnim",
+    "otr": "objects/object_zf/gZfSidesteppingAnim",
+    "offset": "0x16388",
+    "frameCount": 29
+   }
+  ]
+ },
+ "/actor/zelda_zl1.zar": {
+  "object": "object_zl1",
+  "anims": [
+   {
+    "name": "gChildZelda1Anim_00438",
+    "otr": "objects/object_zl1/gChildZelda1Anim_00438",
+    "offset": "0x00438",
+    "frameCount": 20
+   },
+   {
+    "name": "gChildZelda1Anim_10B38",
+    "otr": "objects/object_zl1/gChildZelda1Anim_10B38",
+    "offset": "0x10B38",
+    "frameCount": 65
+   },
+   {
+    "name": "gChildZelda1Anim_11348",
+    "otr": "objects/object_zl1/gChildZelda1Anim_11348",
+    "offset": "0x11348",
+    "frameCount": 30
+   },
+   {
+    "name": "gChildZelda1Anim_116E4",
+    "otr": "objects/object_zl1/gChildZelda1Anim_116E4",
+    "offset": "0x116E4",
+    "frameCount": 15
+   },
+   {
+    "name": "gChildZelda1Anim_12B88",
+    "otr": "objects/object_zl1/gChildZelda1Anim_12B88",
+    "offset": "0x11B88",
+    "frameCount": 20
+   },
+   {
+    "name": "gChildZelda1Anim_12118",
+    "otr": "objects/object_zl1/gChildZelda1Anim_12118",
+    "offset": "0x12118",
+    "frameCount": 20
+   },
+   {
+    "name": "gChildZelda1Anim_12B04",
+    "otr": "objects/object_zl1/gChildZelda1Anim_12B04",
+    "offset": "0x12B04",
+    "frameCount": 40
+   },
+   {
+    "name": "gChildZelda1Anim_12F80",
+    "otr": "objects/object_zl1/gChildZelda1Anim_12F80",
+    "offset": "0x12F80",
+    "frameCount": 20
+   },
+   {
+    "name": "gChildZelda1Anim_132D8",
+    "otr": "objects/object_zl1/gChildZelda1Anim_132D8",
+    "offset": "0x132D8",
+    "frameCount": 15
+   },
+   {
+    "name": "gChildZelda1Anim_138E0",
+    "otr": "objects/object_zl1/gChildZelda1Anim_138E0",
+    "offset": "0x138E0",
+    "frameCount": 25
+   },
+   {
+    "name": "gChildZelda1Anim_13F10",
+    "otr": "objects/object_zl1/gChildZelda1Anim_13F10",
+    "offset": "0x13F10",
+    "frameCount": 25
+   },
+   {
+    "name": "gChildZelda1Anim_143A8",
+    "otr": "objects/object_zl1/gChildZelda1Anim_143A8",
+    "offset": "0x143A8",
+    "frameCount": 20
+   }
+  ]
+ },
+ "/actor/zelda_zl4.zar": {
+  "object": "object_zl4",
+  "anims": [
+   {
+    "name": "gChildZeldaAnim_000654",
+    "otr": "objects/object_zl4/gChildZeldaAnim_000654",
+    "offset": "0x654",
+    "frameCount": 30
+   },
+   {
+    "name": "gChildZeldaAnim_00E5C8",
+    "otr": "objects/object_zl4/gChildZeldaAnim_00E5C8",
+    "offset": "0xE5C8",
+    "frameCount": 20
+   },
+   {
+    "name": "gChildZeldaAnim_00EBC4",
+    "otr": "objects/object_zl4/gChildZeldaAnim_00EBC4",
+    "offset": "0xEBC4",
+    "frameCount": 30
+   },
+   {
+    "name": "gChildZeldaAnim_010DF8",
+    "otr": "objects/object_zl4/gChildZeldaAnim_010DF8",
+    "offset": "0x10DF8",
+    "frameCount": 65
+   },
+   {
+    "name": "gChildZeldaAnim_011248",
+    "otr": "objects/object_zl4/gChildZeldaAnim_011248",
+    "offset": "0x11248",
+    "frameCount": 20
+   },
+   {
+    "name": "gChildZeldaAnim_011698",
+    "otr": "objects/object_zl4/gChildZeldaAnim_011698",
+    "offset": "0x11698",
+    "frameCount": 20
+   },
+   {
+    "name": "gChildZeldaAnim_011B34",
+    "otr": "objects/object_zl4/gChildZeldaAnim_011B34",
+    "offset": "0x11B34",
+    "frameCount": 20
+   },
+   {
+    "name": "gChildZeldaAnim_0125E4",
+    "otr": "objects/object_zl4/gChildZeldaAnim_0125E4",
+    "offset": "0x125E4",
+    "frameCount": 27
+   },
+   {
+    "name": "gChildZeldaAnim_012E58",
+    "otr": "objects/object_zl4/gChildZeldaAnim_012E58",
+    "offset": "0x12E58",
+    "frameCount": 24
+   },
+   {
+    "name": "gChildZeldaAnim_013280",
+    "otr": "objects/object_zl4/gChildZeldaAnim_013280",
+    "offset": "0x13280",
+    "frameCount": 20
+   },
+   {
+    "name": "gChildZeldaAnim_013628",
+    "otr": "objects/object_zl4/gChildZeldaAnim_013628",
+    "offset": "0x13628",
+    "frameCount": 20
+   },
+   {
+    "name": "gChildZeldaAnim_013A50",
+    "otr": "objects/object_zl4/gChildZeldaAnim_013A50",
+    "offset": "0x13A50",
+    "frameCount": 20
+   },
+   {
+    "name": "gChildZeldaAnim_013EA0",
+    "otr": "objects/object_zl4/gChildZeldaAnim_013EA0",
+    "offset": "0x13EA0",
+    "frameCount": 30
+   },
+   {
+    "name": "gChildZeldaAnim_015F14",
+    "otr": "objects/object_zl4/gChildZeldaAnim_015F14",
+    "offset": "0x15F14",
+    "frameCount": 87
+   },
+   {
+    "name": "gChildZeldaAnim_01726C",
+    "otr": "objects/object_zl4/gChildZeldaAnim_01726C",
+    "offset": "0x1726C",
+    "frameCount": 20
+   },
+   {
+    "name": "gChildZeldaAnim_017818",
+    "otr": "objects/object_zl4/gChildZeldaAnim_017818",
+    "offset": "0x17818",
+    "frameCount": 31
+   },
+   {
+    "name": "gChildZeldaAnim_0169B4",
+    "otr": "objects/object_zl4/gChildZeldaAnim_0169B4",
+    "offset": "0x169B4",
+    "frameCount": 28
+   },
+   {
+    "name": "gChildZeldaAnim_016D08",
+    "otr": "objects/object_zl4/gChildZeldaAnim_016D08",
+    "offset": "0x16D08",
+    "frameCount": 24
+   },
+   {
+    "name": "gChildZeldaAnim_01805C",
+    "otr": "objects/object_zl4/gChildZeldaAnim_01805C",
+    "offset": "0x1805C",
+    "frameCount": 24
+   },
+   {
+    "name": "gChildZeldaAnim_018898",
+    "otr": "objects/object_zl4/gChildZeldaAnim_018898",
+    "offset": "0x18898",
+    "frameCount": 21
+   },
+   {
+    "name": "gChildZeldaAnim_01910C",
+    "otr": "objects/object_zl4/gChildZeldaAnim_01910C",
+    "offset": "0x1910C",
+    "frameCount": 24
+   },
+   {
+    "name": "gChildZeldaAnim_019600",
+    "otr": "objects/object_zl4/gChildZeldaAnim_019600",
+    "offset": "0x19600",
+    "frameCount": 20
+   },
+   {
+    "name": "gChildZeldaAnim_01991C",
+    "otr": "objects/object_zl4/gChildZeldaAnim_01991C",
+    "offset": "0x1991C",
+    "frameCount": 15
+   },
+   {
+    "name": "gChildZeldaAnim_01A2FC",
+    "otr": "objects/object_zl4/gChildZeldaAnim_01A2FC",
+    "offset": "0x1A2FC",
+    "frameCount": 26
+   },
+   {
+    "name": "gChildZeldaAnim_01AAE0",
+    "otr": "objects/object_zl4/gChildZeldaAnim_01AAE0",
+    "offset": "0x1AAE0",
+    "frameCount": 24
+   },
+   {
+    "name": "gChildZeldaAnim_01AE88",
+    "otr": "objects/object_zl4/gChildZeldaAnim_01AE88",
+    "offset": "0x1AE88",
+    "frameCount": 20
+   },
+   {
+    "name": "gChildZeldaAnim_01B874",
+    "otr": "objects/object_zl4/gChildZeldaAnim_01B874",
+    "offset": "0x1B874",
+    "frameCount": 40
+   },
+   {
+    "name": "gChildZeldaAnim_01BCF0",
+    "otr": "objects/object_zl4/gChildZeldaAnim_01BCF0",
+    "offset": "0x1BCF0",
+    "frameCount": 20
+   },
+   {
+    "name": "gChildZeldaAnim_01CE08",
+    "otr": "objects/object_zl4/gChildZeldaAnim_01CE08",
+    "offset": "0x1CE08",
+    "frameCount": 24
+   },
+   {
+    "name": "gChildZeldaAnim_01C494",
+    "otr": "objects/object_zl4/gChildZeldaAnim_01C494",
+    "offset": "0x1C494",
+    "frameCount": 35
+   },
+   {
+    "name": "gChildZeldaAnim_01C7B0",
+    "otr": "objects/object_zl4/gChildZeldaAnim_01C7B0",
+    "offset": "0x1C7B0",
+    "frameCount": 20
+   },
+   {
+    "name": "gChildZeldaAnim_00F0A4",
+    "otr": "objects/object_zl4/gChildZeldaAnim_00F0A4",
+    "offset": "0xF0A4",
+    "frameCount": 12
+   },
+   {
+    "name": "gChildZeldaAnim_00F894",
+    "otr": "objects/object_zl4/gChildZeldaAnim_00F894",
+    "offset": "0xF894",
+    "frameCount": 24
+   }
+  ]
+ },
+ "/actor/zelda_zo.zar": {
+  "object": "object_zo",
+  "anims": [
+   {
+    "name": "gZoraIdleAnim",
+    "otr": "objects/object_zo/gZoraIdleAnim",
+    "offset": "0x2FE8",
+    "frameCount": 2
+   },
+   {
+    "name": "gZoraSurfaceAnim",
+    "otr": "objects/object_zo/gZoraSurfaceAnim",
+    "offset": "0x2F10",
+    "frameCount": 30
+   },
+   {
+    "name": "gZoraThrowRupeesAnim",
+    "otr": "objects/object_zo/gZoraThrowRupeesAnim",
+    "offset": "0x219C",
+    "frameCount": 60
+   },
+   {
+    "name": "gZoraHandsOnHipsTappingFootAnim",
+    "otr": "objects/object_zo/gZoraHandsOnHipsTappingFootAnim",
+    "offset": "0x598",
+    "frameCount": 30
+   },
+   {
+    "name": "gZoraOpenArmsAnim",
+    "otr": "objects/object_zo/gZoraOpenArmsAnim",
+    "offset": "0xD48",
+    "frameCount": 30
+   }
+  ]
+ }
+}
