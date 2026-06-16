@@ -1,5 +1,33 @@
 # SoH3D — progress & state
 
+## ✅ DONE (session 18, 2026-06-17): FIX invisible hook-replaced skinned actors (POLY_OPA rewind)
+**The "auto-skinned chars draw-yet-invisible" bug from the session-17 handoff is FIXED + pushed**
+(Shipwright@develop 0c453a3a6, `soh/src/code/z_skelanime.c` only). En_Sa (Saria, Kokiri Forest)
+now renders her OoT3D 3DS model playing her own CSAB.
+- **Root cause (root-caused, not patched):** the SoH3D SkelAnime hook emits the OoT3D model into
+  POLY_OPA via a nested `OPEN_DISPS`, advancing the GLOBAL `__gfxCtx->polyOpa.p` (POLY_OPA_DISP is
+  literally that field — release OPEN_DISPS keeps no local copy). But the THREE Gfx*-returning
+  choke points — `SkelAnime_Draw`, `SkelAnime_DrawFlex`, `SkelAnime_DrawSkeleton2` — returned the
+  STALE pre-hook `gfx`, and the caller's `POLY_OPA_DISP = SkelAnime_DrawX(...)` wrote that stale
+  pointer back, REWINDING polyOpa.p over the just-emitted `gSPSoH3DDraw` opcode. The interpreter
+  then never executed it (`SoH3D_GL_Submit` was never reached → the model was absent from the
+  render-pass draw list, even though the pass reported "N/N items glerr=0" for the OTHER items).
+  The VOID-returning choke points (`DrawSkeletonOpa`/`DrawOpa`/`DrawFlexOpa`, used by En_Ge1) don't
+  thread the pointer back → unaffected. **That is exactly why En_Ge1 worked via the hook but En_Sa
+  was invisible** — it was never CSAB/pose/scale/material (all verified sane during the hunt:
+  Saria skinned-vert bbox sane, materials opaque/no-alpha-test, scale ~0.0105 → ~47u).
+- **Fix:** in each Gfx*-returning function, capture `Gfx* soh3dOpaEntry = polyOpa.p` at entry; when
+  the hook fires, `return (gfx == soh3dOpaEntry) ? polyOpa.p : gfx` — i.e. for an OPA draw return
+  the ADVANCED pointer (no rewind); for XLU/other-buffer callers the opa emit is independent of gfx
+  so return gfx unchanged. No behavior change when SoH3D is off (hook returns 0).
+- **How it was found:** heartbeat logs proved `auto-emit model=N` fired every frame but
+  `SoH3D_GL_Submit modelId=N` never did → the opcode was emitted but never executed → pointer
+  clobber. (Discriminating steps: skinned-vert bbox = sane → not pose; draw-list ids = model
+  absent → not drawn; Submit heartbeat = never called → emit clobbered.)
+- **NEXT (per handoff):** N64-anim → 3DS-CSAB MAPPING (select CSAB from the actor's live N64 anim,
+  not just the idle default); ensure every replaced obj has a CSAB. Saria currently plays
+  `saria_banzai_wait` (arm-raised idle) — fine, but the right idle/anim selection is the next step.
+
 ## ✅ DONE (session 16, 2026-06-16): OWN THE OoT3D FRAME — dedicated SoH3D render pass
 **The strategic direction (PRIMARY) landed: SoH3D content no longer draws inline inside
 Fast3D's frame fighting its cached GL state. It is now COLLECTED and drawn in ONE
