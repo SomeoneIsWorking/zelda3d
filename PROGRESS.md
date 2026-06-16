@@ -74,10 +74,25 @@ Fast3D isn't corrupted. **Verified:** at night the window shafts GLOW on the dar
 Also added **time-of-day control** (env `SOH3D_TIME` / REPL `time`; pins dayTime+skyboxTime);
 `soh3d_gpu_launch.sh` defaults to noon (0x8000) — set `SOH3D_TIME=0` for night.
 
-**ISSUE 3 — a crate renders as a solid black box.** Not yet identified. Likely a crate
-diverted through the LEGACY F3DEX2 dlist path (`sModelTable` kibako, glModelId=-1) which
-has the known texture-upload failure (renders black) — vs the working direct-GL path.
-Confirm which actor/path; likely fix = move it to the GL path or fix the dlist texture.
+**ISSUE 3 — a crate renders as a solid black box. ✅ FIXED (session 12).** Confirmed cause:
+the large crate (Obj_Kibako2) went through the LEGACY F3DEX2 baked-dlist path
+(`glModelId=-1`) which has the known texture-upload failure → black. Fix: move it to the
+runtime direct-GL path. ALL props are now on the GL path (no more baked dlists):
+- modelId 1 = crate `/actor/zelda_kibako2.zar` (CIkibako_model), 2 = bush `/actor/zelda_kusa.zar`
+  (obj_kusa01_model, En_Kusa, scale 0.5), 3 = pot `/actor/zelda_tsubo.zar` (tubo2_model).
+- Multi-CMB ZARs: added a `cmbName` selector to `ModelSpec`/`loadActorModel` so a ZAR with a
+  main model + a `hahen`/debris variant picks the intact one (kibako/tsubo both have debris CMBs).
+- Verified in-game: crate (Gerudo Valley) wood-plank textured; pots (Kakariko) terracotta;
+  bush (Kakariko) leafy — all correct, not black.
+
+### "Replace more objects" — pattern + remaining candidates
+To add an object: find its `/actor/*.zar` in the romfs, pick the main `.cmb` (avoid `hahen`
+debris), add a `kModels[]` row (zarPath, worldScale, cmbName) + an `sModelTable` row mapping
+the `ACTOR_*` id to that `glModelId`, then calibrate worldScale live via REPL `scale <name>`.
+Still N64 (candidates seen in romfs): gossip stone is on the older `gs` mapping; **sign
+(zelda_kanban) needs multi-CMB assembly** (the sign is split into bottom/center/top + slice
+pieces — the loader currently draws one CMB, so a sign needs combining several); bombable
+rock (zelda_bombiwa), torch (zelda_torch2), treasure chest (zelda_box, animated lid).
 
 ## ⭐ ARCHITECTURE PIVOT (2026-06-15, session 7) — read this FIRST
 The "convert CMB → N64 F3DEX2 dlist (cmb_to_c.py) → bake C arrays into soh.elf →
