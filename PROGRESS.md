@@ -117,7 +117,35 @@ ONE geometry for gameplay+visuals → use OoT3D's collision.
   visual `meshfloor`. Keep it gated for A/B.
 - See memory `soh3d-terrain-warp` (history of the render-side attempts + why they fail).
 
-## 🚧 IN PROGRESS (session 16): "replace ALL characters" — SCALE fixed, POSE next
+## 🚧 IN PROGRESS (session 16): "replace ALL characters" — DATA-DRIVEN maps (user direction)
+**User direction: precompute the per-character bone-correspondence OFFLINE (dump both games ->
+JSON), reference it directly in-game; do NOT match at runtime.** Pipeline built:
+`tools/soh3d_skel_export.py` -> `tools/skeldata/oot3d_skeletons.json` (156 skinned chars, parsed
+offline from each ZAR via cmb.py) + `tools/skeldata/bonemap.json` (per char: scale_ratio +
+bone_to_limb map). N64 skeletons captured in-game via SOH3D_SKELDUMP -> `tools/skeldata/n64/<base>.txt`
+(only zelda_boj so far; scale_ratio 1.0167, map verified == hand map). Matcher in
+`tools/soh3d_skel_match.py` (collapse zero-len bones, pair children by length).
+
+**Two findings this session (IMPORTANT):**
+- **Saria (and most NPCs) are NOT being replaced — they render N64.** The SkelAnime replacement
+  hook is ONLY in `SkelAnime_DrawSkeletonOpa`/`DrawSkeleton2` (z_skelanime.c). En_Sa never calls
+  those, so it's never offered for replacement (verified: 0 retarget logs with Saria framed at
+  dist 107). This is a COVERAGE gap separate from the bone map. To actually SEE OoT3D characters,
+  the hook must cover more paths (esp. `SkelAnime_DrawFlexOpa`, the common humanoid path).
+- The earlier "Saria looks good" was the N64 model. Don't claim a replacement without a DRAW log.
+
+**NEXT (resumable):**
+1. Game-side: generate `soh3d_bonemap.inc` from bonemap.json (keyed by object id), load it, and
+   use `bone_to_limb` + `scale_ratio` in `SoH3D_UpdateAnimN64` instead of the identity map.
+2. Widen the SkelAnime hook (DrawFlexOpa etc.) so En_Sa/Kokiri/etc. are offered for replacement
+   — but only AFTER the map is wired, else more chars render with the wrong identity map.
+3. Collect N64 skeletons for the chars we want (drive scenes w/ SOH3D_SKELDUMP -> n64/*.txt; the
+   hook-coverage widening also makes SKELDUMP capture them). Then re-run soh3d_skel_export.py.
+4. If "replace + correct map" still mis-poses divergent rigs (differing rest rots), switch to the
+   WORLD-orientation retarget (see below). Verify live (skill soh3d-game-control: actors/cam/shot).
+   Boj lives in Market (loads as empty NIGHT — need a non-night route or a different Boj scene).
+
+## (history) "replace ALL characters" — SCALE fixed, POSE analysis
 **SCALE done + verified + pushed (2026-06-16).** Skinned auto-actors no longer use the bbox
 measure (which over-measures articulated actors -> giant). Scale now comes from the REST
 skeletons' bone-length ratio (rotation-invariant; N64 & OoT3D are the same Grezzo-ported char):
