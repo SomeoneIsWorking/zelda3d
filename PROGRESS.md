@@ -32,11 +32,20 @@ relief.** Implemented as a per-XZ vertical warp of the RENDER mesh:
   room draw (one-time stall) — bucket triangles by XZ if Hyrule Field stalls. Generalizes to
   any scene automatically (no per-scene data shipped).
 
-**ISSUE 2 — window "light shaft" renders as an opaque grey trapezoid.** Room-CMB
-translucent/light-volume geometry drawn OPAQUE by the direct-GL renderer, which currently
-ignores per-material blend mode (`soh3d_gl.cpp` always uses GL_SRC_ALPHA/ONE_MINUS_SRC_ALPHA;
-CMB material only carries `alpha_test`/`alpha_ref`, see `cmb.cpp:145`). Fix: read the CMB
-material's blend func / combiner and honor translucent vs additive in the GL group draw.
+**ISSUE 2 — window "light shaft" renders as an opaque grey trapezoid. ✅ FIXED (session 12).**
+Root cause: the direct-GL renderer forced blend on with GL_SRC_ALPHA/GL_ONE_MINUS_SRC_ALPHA
+for every group and ignored the CMB material blend mode, so ADDITIVE materials (dst=GL_ONE)
+drew opaque. The OoT3D scene CMB stores blend state as GL-ES enum values (used verbatim):
+the window-light material is `s01_mado_light` (mat19, src=GL_SRC_ALPHA dst=GL_ONE, depth-write
+off), god-rays are `s01_hikari` (mat4). Fix: `cmb.cpp` parses per-material blend (enable,
+src/dst/eq RGB+A @ 0x138/0x13C.. , const color @ 0x14C, depth-write @ 0x135 — offsets per
+noclip readMatsChunk, verified), passed via `SoH3DGlGroup` to `soh3d_gl.cpp`, which sets
+`glBlendFuncSeparate`/`glBlendEquationSeparate`/`glBlendColor` + per-material depth-write per
+group (opaque mats disable blend). Resets blend eq/color to GL defaults after the draw so
+Fast3D isn't corrupted. **Verified:** at night the window shafts GLOW on the dark wall (beam
+≈165 brightness vs wall ≈35); previously flat grey. Tool: `cmb.py` now dumps blend state.
+Also added **time-of-day control** (env `SOH3D_TIME` / REPL `time`; pins dayTime+skyboxTime);
+`soh3d_gpu_launch.sh` defaults to noon (0x8000) — set `SOH3D_TIME=0` for night.
 
 **ISSUE 3 — a crate renders as a solid black box.** Not yet identified. Likely a crate
 diverted through the LEGACY F3DEX2 dlist path (`sModelTable` kibako, glModelId=-1) which
