@@ -116,10 +116,22 @@ the OoT3D room mesh). Kokiri (spot04_0) vs Kakariko (spot01_0, warp known-good):
   sink, so benefit dominates (elevated-vert p90 disp 4u, 25 floats). Kokiri is sparse + mixes
   small ground divergences, big genuine divergences, and many structures → the crude
   reject/smooth/hole-fill misbehaves (elevated p90 37u, 361 floats).
-- **Fix direction (not a per-scene off switch):** the warp needs (a) DENSER N64 floor input so
-  fewer cells hole-fill, (b) smarter reject that distinguishes "ground that moved a lot" from a
-  wall/building (don't reject genuine ground divergences), and (c) height-aware blending so
-  structures aren't shifted by ground D. NOT yet implemented — design pending.
+- **✅ FIXED (session 14) — height-aware blend.** Prototyped + measured all three candidate
+  changes offline (`tools/soh3d_warp_proto.py`) on Kokiri AND Kakariko before porting:
+  - **Height-blend WINS** (the fix): fade the per-XZ correction to zero with height above the
+    local ground (full <=60u, zero >=400u). Ground re-leveling unchanged; floating STRUCTURE
+    verts (>50u) dropped **168->10 (Kokiri)** and **31->4 (Kakariko)**, max float 119->57. No
+    ground-benefit regression on either scene. Ported to `warpRoomMesh` (`meshFloor` gained a
+    `lowest` mode → per-cell local-ground grid `G`; vertex shift scaled by the height blend).
+  - **Denser grid (50u) REJECTED:** only 44->48% ground <=1u but floating got WORSE (10->42)
+    and 4x perf — not worth it.
+  - **Raising REJECT threshold REJECTED:** catastrophic in Kokiri (floating 10->944 at REJECT
+    200) — its >120u cells are mostly bad samples, not genuine ground; the reject is protecting
+    us. (Kakariko's big divergences ARE real, so it'd help there — but a global raise is wrong.)
+  - **Residuals (not floating, lower priority):** (a) ~12u ground under-correction at some
+    spots (hole-fill/bilinear dilution; Link floats slightly above ground) — needs denser/
+    smarter data, deferred; (b) the z≈1900 raised region (OoT3D ground >120u above N64) stays
+    rejected → that ground sits high (can't fix without flooding bad D, see REJECT result).
 
 ### ⚠️ KNOWN RESIDUAL — terrain warp under-corrects at sloped wall-edge cells (Link sinks)
 At Gerudo's Fortress (-560,-2812) the N64 collision floor is y=204.6 but the warped OoT3D
