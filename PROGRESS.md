@@ -5,8 +5,35 @@ geometry instead of the N64 assets. Asset-conversion + renderer-integration task
 (not a renderer merge). Azahar (3DS emulator) is built as the **visual oracle**.
 
 ## 🔧 OPEN ISSUES — found by the user driving Kakariko (session 11→12, 2026-06-16)
-Three live rendering/behaviour bugs, in priority order. Diagnostic data gathered; fixes
-NOT yet implemented. (Aspect-ratio shear from session 11 is FIXED + pushed — see below.)
+Three live rendering/behaviour bugs, in priority order. (Aspect-ratio shear from session 11
+is FIXED + pushed — see below.) Session 12: ISSUE 1 (terrain sink) and ISSUE 2 (window
+light shaft) FIXED; added OoT3D vertex-color lighting + time-of-day control. ISSUE 3
+(black crate) still open.
+
+### ⚠️ CRITICAL RE FINDING — Fast3D OpenGL backend CACHES GL state (read before any GL hook)
+`GfxRenderingAPIOGL` (`libultraship/src/fast/backends/gfx_opengl.cpp`) only issues GL state
+calls on CHANGE (shadow vars `mLast*`), and some state it sets ONCE at init and assumes
+constant forever — notably **`glBlendFunc(GL_SRC_ALPHA, GL_ONE_MINUS_SRC_ALPHA)` is set once
+and NEVER re-set** (it only toggles `GL_BLEND` enable per draw via `SetUseAlpha`). Depth
+func/mask/zmode are re-set only when their cached state changes. ⇒ **Any GL state our
+`SoH3D_GL_Draw` (soh3d_gl.cpp) changes that gfx_opengl does NOT re-set per draw will LEAK
+into all later Fast3D draws** (the "opaque 2D UI/sprites/bushes/skybox went transparent +
+whitened" regression was our per-material additive blend func leaking). Rule: after our draw,
+reset every non-per-draw GL state we touched to gfx_opengl's exact assumption (blend func →
+SRC_ALPHA/ONE_MINUS_SRC_ALPHA, equation → FUNC_ADD), and restore per-draw-cached state
+(blend enable, depth test/mask, attribs, program, texture, buffers) to the value at entry so
+gfx_opengl's shadow vars stay consistent. Do NOT use glGet→restore for the once-set state
+(if the query returns an unexpected value you restore garbage and break everything worse —
+that happened). Deterministic reset to the known assumption is correct.
+
+### OoT3D vertex-color lighting (session 12)
+Scene-room CMBs carry per-vertex RGBA = OoT3D's BAKED lighting (walls dimmed ~0.5, ground
+AO, additive light-shaft/god-ray alpha falloff). We were dropping it → flat, washed,
+"cubic" windows. Now `cmb.cpp` reads the color attribute, `soh3d_gl` modulates
+`frag = tex.rgb*vColor.rgb*uTint, a = tex.a*vColor.a`. Applied to SCENE ROOMS ONLY
+(`buildFromCmb(out, bakedVertexColor)`): characters/props are lit dynamically and their
+color attr is unused/garbage (geldwoman reads ~0 → would render black), so they force white.
+Night Kakariko now matches the OoT3D reference (dark stone, glowing windows).
 
 **ISSUE 1 — Link sinks into the OoT3D terrain. ✅ FIXED (session 12, render-mesh warp).**
 Collision stays N64; the OoT3D render mesh diverged where OoT3D reshaped ground (Kakariko
