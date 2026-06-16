@@ -1,0 +1,43 @@
+#!/usr/bin/env bash
+# Launch SoH3D on the REAL GPU (the user's desktop X/XWayland display), with the REPL
+# enabled, for radeonsi-vs-llvmpipe debugging. Headless Xvfb uses llvmpipe (software)
+# and HIDES driver-specific bugs (e.g. the ACO skinning miscompile); this runs on the
+# actual GPU so those reproduce. Drive it with tools/soh3d_repl.py (dump/posinfo/tp/...).
+#
+# Use via the agent's background runner (run_in_background) so it survives across calls:
+#   tools/soh3d_gpu_launch.sh [entrance]
+# Auto-detects DISPLAY/XAUTHORITY (KDE Wayland XWayland) and the ROM (env / .env /
+# ./oot3d.3ds). Kills stale soh.elf first; a trap tears everything down on exit so no
+# instance is left on the user's desktop. Log -> scratch/logs/gpu.log (line-buffered).
+set -u
+REPO="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
+SOH="$REPO/Shipwright/build-cmake/soh"
+ENTR="${1:-${SOH3D_ENTRANCE:-219}}" # default Kakariko Village front gate
+
+cleanup() { pkill -9 -f "$SOH/soh.elf" 2>/dev/null; pkill -9 -f "soh.elf" 2>/dev/null; }
+trap cleanup EXIT INT TERM
+cleanup; sleep 1 # clear any stale instance before we start
+
+# ROM provisioning (env -> .env -> drop-in), same as run.sh.
+[ -f "$REPO/.env" ] && . "$REPO/.env"
+[ -z "${SOH3D_3DS_ROM:-}" ] && [ -f "$REPO/oot3d.3ds" ] && SOH3D_3DS_ROM="$REPO/oot3d.3ds"
+: "${SOH3D_3DS_ROM:?set SOH3D_3DS_ROM (or add ./.env or ./oot3d.3ds)}"
+export SOH3D_3DS_ROM
+
+# Real-GPU display: prefer an already-set DISPLAY, else the KDE XWayland :0 + its xauth.
+if [ -z "${DISPLAY:-}" ]; then export DISPLAY=:0; fi
+if [ -z "${XAUTHORITY:-}" ]; then
+    XAUTHORITY="$(ls -t /run/user/"$(id -u)"/xauth_* 2>/dev/null | head -1)"
+    [ -n "$XAUTHORITY" ] && export XAUTHORITY
+fi
+
+mkdir -p "$REPO/scratch/logs"
+export SOH3D=1
+export SOH3D_WARP=1
+export SOH3D_ENTRANCE="$ENTR"
+export SOH3D_REPL="${SOH3D_REPL:-$REPO/scratch/soh3d.ctl}"
+rm -f "$SOH3D_REPL" "$SOH3D_REPL.out"
+echo "soh3d_gpu_launch: DISPLAY=$DISPLAY XAUTHORITY=${XAUTHORITY:-<none>} entrance=$ENTR fifo=$SOH3D_REPL"
+cd "$SOH"
+# stdbuf line-buffers so the log (and any crash dump) survives even on a hard exit.
+exec stdbuf -oL -eL ./soh.elf

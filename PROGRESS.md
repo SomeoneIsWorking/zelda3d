@@ -228,6 +228,43 @@ screen pixel (951,549 vs 964,550) in both renders → identical camera, room gro
 we apply a flat scene tint, not the N64 per-vertex lighting; lighting parity is a
 follow-up. Detail/LOD differs (OoT3D is higher-poly + higher-res textures, by design).
 
+### BUG FIXED — OoT3D content not widescreen-corrected (session 11, 2026-06-16) ⭐
+**Symptom (user):** "some props move differently via the camera, visible in the initial
+Kakariko camera sway" — the OoT3D scene and the N64 actors (trees/doors/Link) sheared
+horizontally relative to each other as the camera panned, growing off-center.
+
+**Root cause (quantitatively confirmed, NOT eyeballed):** Fast3D applies a per-vertex
+widescreen correction to EVERY N64 vertex — `x = AdjXForAspectRatio(x)` in
+`interpreter.cpp` `gfx_sp_vertex`, where `AdjXForAspectRatio(x) = x * (4/3)/(w/h)` for the
+resizable game FB (≈0.699 on a 1920×1006 window), squeezing the 4:3-authored clip-X onto
+the wider screen. The direct-GL path (`SoH3D_GL_Draw`) uploaded the raw `MP_matrix` with
+NO such scale, so the OoT3D scene + diverted props rendered at the un-squeezed 4:3 X while
+N64 actors were squeezed. Near screen center (clip x≈0) negligible; off-center the two
+coordinate frames diverge linearly with the pan → "moves differently." NOT an
+origin/scale mismatch — the spot01 room CMB bbox `x[-6479,3412] z[-9614,2376]` contains
+Link's world pos, so the scene IS world-aligned (matches Phase 5).
+
+**Fix:** mirror Fast3D exactly. `gfx_soh3d_draw_handler_custom` passes
+`gfx->AdjXForAspectRatio(1.0f)` (the factor, or 1.0 for fixed-aspect FBs — so the headless
+harness, which renders to a fixed-size FB, is unaffected) to `SoH3D_GL_Draw`, which scales
+the clip-X output column of MP (row-major indices 0,4,8,12) by it before upload. Files:
+`libultraship/.../soh3d_gl.{h,cpp}`, `interpreter.cpp`.
+
+**Verification (geometry-independent):** same camera, OoT3D scene before vs after the fix;
+Link (N64, unaffected by the fix) is the fixed fiducial. Best-fit horizontal scale that
+maps before→after about screen center = **0.695**, predicted `(4/3)/(1920/1006)=0.699`
+(Δ0.004, within search step); SAD 10.5→7.7. The applied factor matches Fast3D's exactly.
+
+**TOOLING added (the diagnostic that found/measured this):** REPL camera control for
+DETERMINISTIC sweeps, in `soh3d.c` (`cam`/`camorbit`/`camfreeze`) — freeze the world and
+orbit the camera about a fixed look point. A pure-rotation orbit is the textbook way to
+expose a transform mismatch between two render paths that "share" the camera (the OoT3D GL
+draw vs N64 Fast3D both read `mRsp->MP_matrix`, so under orbit they can only drift if their
+effective transforms differ — which the missing aspect scale made true). Override is
+re-applied every frame in `SoH3D_ReplPoll` (runs post-`Play_Update`, pre-`Play_Draw`) by
+writing `play->view.eye/lookAt/up`. `soh3d_zsi_test.cpp` also gained bone-binding stats
+(boneId range / weight-sum) for the GPU skinning shader's `uBones[32]` bound.
+
 ### Phase 5 (original research — kept for reference)
 The plan-item-4 goal. **The whole asset+GL pipeline is reusable for scenes — a room is
 a static, skeleton-less CMB.** Validated this session against `gerudoway` (Gerudo's

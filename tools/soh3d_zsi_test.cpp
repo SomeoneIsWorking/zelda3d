@@ -45,5 +45,22 @@ int main(int argc, char** argv) {
     printf("CMB %s: %zu tris %zu verts, %zu mats, %zu texs, %zu groups\n", c.name().c_str(), tris, verts,
            c.materials().size(), c.textures().size(), groups.size());
     printf("bbox x[%.0f,%.0f] y[%.0f,%.0f] z[%.0f,%.0f]\n", lo[0], hi[0], lo[1], hi[1], lo[2], hi[2]);
+
+    // Bone-binding stats: the GPU shader indexes uBones[int(boneId)] (array size 32).
+    // Any boneId >= 32 is an out-of-bounds uniform read (UB -> garbage on real HW).
+    float bidLo = 1e9f, bidHi = -1e9f, wsumLo = 1e9f, wsumHi = -1e9f;
+    for (const auto& gr : groups)
+        for (const auto& v : gr.verts) {
+            float ws = 0;
+            for (int e = 0; e < 4; e++) {
+                if (v.boneIds[e] < bidLo) bidLo = v.boneIds[e];
+                if (v.boneIds[e] > bidHi) bidHi = v.boneIds[e];
+                ws += v.weights[e];
+            }
+            if (ws < wsumLo) wsumLo = ws;
+            if (ws > wsumHi) wsumHi = ws;
+        }
+    printf("boneId range [%.0f, %.0f]  weight-sum range [%.3f, %.3f]  (uBones size=32)\n", bidLo, bidHi, wsumLo,
+           wsumHi);
     return 0;
 }
