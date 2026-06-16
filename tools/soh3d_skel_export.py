@@ -70,6 +70,17 @@ def main():
             nN = M.build_n64_nodes(limbs)
             nO = {b['id']: dict(id=b['id'], parent=b['parent'], length=b['length']) for b in skels[zar]['bones']}
             bmap = M.match(nN, nO)
+            # QUALITY GATE: only keep a map if (almost) every non-root OoT3D bone got a live N64
+            # limb. A partial map leaves bones at rest while neighbors animate -> the skinned mesh
+            # collapses/distorts (worse than the N64 model). Such chars get NO entry -> the in-game
+            # guard falls them back to N64 until the matcher/data improves.
+            nbones = len(skels[zar]['bones'])
+            # count over ALL OoT3D bones (1..n-1; bone 0 is the root, -1 by design). Bones the
+            # matcher never paired aren't in bmap at all -> treated as unmapped.
+            mapped = sum(1 for b in range(1, nbones) if bmap.get(b, -1) >= 0)
+            quality = mapped / (nbones - 1) if nbones > 1 else 0.0
+            if quality < 0.9:
+                miss.append((obj, 'partial-map %d/%d' % (mapped, nbones - 1))); continue
             n64len = sum(nN[i]['length'] for i in nN if nN[i]['parent'] >= 0)
             oot3dlen = sum(b['length'] for b in skels[zar]['bones'] if b['parent'] >= 0)
             bonemap[zar] = dict(
