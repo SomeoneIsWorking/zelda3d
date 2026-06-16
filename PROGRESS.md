@@ -8,22 +8,29 @@ geometry instead of the N64 assets. Asset-conversion + renderer-integration task
 Three live rendering/behaviour bugs, in priority order. Diagnostic data gathered; fixes
 NOT yet implemented. (Aspect-ratio shear from session 11 is FIXED + pushed — see below.)
 
-**ISSUE 1 — Link sinks into the OoT3D terrain (PRIMARY).** Collision is still the N64
-mesh; the rendered ground is OoT3D. They match EXACTLY on flat ground (measured Δ≈0 at
-3 Kakariko path samples via `tools/soh3d_floor.py`) but diverge where OoT3D reshaped
-terrain → Link's N64-collision feet sit below the visible OoT3D ground. Confirmed sink at
-Kakariko `(-1067,429)`: OoT3D render floor=20 vs N64 floor=10 (Δ+10); user reports MUCH
-worse in Hyrule Field. So it is LOCAL feature mismatch, NOT a global Y offset — a scene
-`sceneoff`/offset fix is ruled out. **Chosen fix (faithful):** OoT3D ships its OWN
-collision in the SCENE-level zsi (`spot01_info.zsi`, NOT the room file — cmd `0x03` at
-data offset `0x787c`; verified present). Parse it → convert to the engine's
-`CollisionHeader` (`z64bgcheck.h`: Vec3s* vtxList / CollisionPoly* polyList(0x10 each) /
-SurfaceType* surfaceTypeList) → inject at scene load so BgCheck uses geometry that matches
-what's drawn. NEXT STEP (do offline first, no rebuild): figure out the OoT3D collision
-format (noclip `oot3d` / RE), parse cmd-0x03, and verify the parsed floor at `(-1067,429)`
-≈ 20 (matches render, not N64's 10) — validates the approach before wiring into the engine.
-Target inject point: scene load / `BgCheck` init, gated by `SoH3D_Enabled()`. Surface-type
-mapping OoT3D→N64 can default-to-ground initially (don't block on exits/SFX parity).
+**ISSUE 1 — Link sinks into the OoT3D terrain. ✅ FIXED (session 12, render-mesh warp).**
+Collision stays N64; the OoT3D render mesh diverged where OoT3D reshaped ground (Kakariko
+`(-1067,429)`: OoT3D=20 vs N64=10). **User directive: do NOT inject OoT3D collision —
+instead recompute the OoT3D terrain to match N64 levels while preserving cliff/mountain
+relief.** Implemented as a per-XZ vertical warp of the RENDER mesh:
+- `D(x,z) = N64_floor - OoT3D_floor` on a 100u grid. N64 floor = `BgCheck_EntityRaycastFloor1`
+  (the surface Link stands on); OoT3D floor = the room mesh. Structure outliers (|D|>120)
+  are rejected + hole-filled (BFS) from nearby ground, so a building/cliff column shifts by
+  its local ground correction (relief preserved, only the ground baseline re-levels). Every
+  room vertex Y += bilinear sample of D.
+- In-engine: `SoH3D_WarpRoomToN64` (soh3d_model.cpp), called once per room model from
+  `SoH3D_TryDrawRoom` (has PlayState/colCtx), cached. Gate: `SoH3D_Enabled()` + env
+  `SOH3D_TERRAIN_WARP` (default ON, =0 for A/B) + REPL `terrainwarp`.
+- Oracle (offline, verified first): `tools/soh3d_warp.py` — ground cells within 1u 60%→92%,
+  sink 19.9→10.7. In-engine verify: warped `meshfloor` vs N64 `floorat` across 14 spread
+  Kakariko points mostly within a few units (sink 20→11.8 vs 10.3; flat 238.1 vs 238.1).
+- New REPL cmds: `floorat x z` / `floorgrid x0 z0 x1 z1 step path` (N64 BgCheck field),
+  `meshfloor x z` (warped render-mesh floor). Tools: `soh3d_terrain_diff.py`, `soh3d_warp.py`.
+- **Residuals (not blocking, revisit if visible):** (a) one Kakariko sample (-579,-1314) still
+  −28 (steep/structure-edge; coarse grid + topmost-floor pick); (b) a few map-edge points have
+  no OoT3D mesh floor (warp MISS); (c) the warp is ~nx·nz·tris ≈ 1e8 triangle tests at first
+  room draw (one-time stall) — bucket triangles by XZ if Hyrule Field stalls. Generalizes to
+  any scene automatically (no per-scene data shipped).
 
 **ISSUE 2 — window "light shaft" renders as an opaque grey trapezoid.** Room-CMB
 translucent/light-volume geometry drawn OPAQUE by the direct-GL renderer, which currently
