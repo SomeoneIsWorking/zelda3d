@@ -4,7 +4,33 @@ Goal: make **Ship of Harkinian** render **OoT3D (3DS)** character models and wor
 geometry instead of the N64 assets. Asset-conversion + renderer-integration task
 (not a renderer merge). Azahar (3DS emulator) is built as the **visual oracle**.
 
-## 🚧 NEXT MAJOR EFFORT (session 14 decision) — USE OoT3D COLLISION
+## 🚧 IN PROGRESS (session 15) — USE OoT3D COLLISION
+**Step 1 DONE (2026-06-16): OoT3D scene-collision format fully reverse-engineered + verified.**
+noclip has the `Collision = 0x03` enum but NEVER parses it, so there was no reference — REd
+from scratch off the USA decrypted ROM. Oracle: `tools/oot3d_collision.py` (verified across
+spot04/spot01/gerudoway/spot00/ydan/ddan: plane identity `n·vA == -dist` holds for ~100% of
+polys, stored normal == geometric face normal for 99.9%). Format (in `<scene>_info.zsi`,
+scene-header cmd-0x03; command addrs are PLAIN file offsets, proven via Rooms cmd):
+- **CollisionHeader** @ cmd-0x03 file offset: `+0x1c u16 nVtx`, `+0x1e u16 nPoly`,
+  `+0x28 u32 vtxList`, `+0x2c u32 polyList`, `+0x30 surfaceTypeList`, `+0x34 camData`,
+  `+0x38 waterBox`. **Internal data pointers are NOT plain offsets**: actual vertex data =
+  `vtxList + 0x10`; the poly array is anchored at `polyList - 2` (the 3 vtx indices of poly 0
+  sit at file offset polyList-2). These two offsets differ (+0x10 vs −2) but are STABLE across
+  all tested scenes — do not "fix" them.
+- **Vertex** = `Vec3s` (s16 x,y,z), stride 6, from `vtxList+0x10`.
+- **CollisionPoly** = 20 bytes, stride 20, from `polyList-2`: `+0 u16 vA`, `+2 u16 vB`,
+  `+4 u16 vC` (each `& 0x1FFF`; top 3 bits = flags), `+6 u16` flags/material, `+8 s16 nx`,
+  `+0xa ny`, `+0xc nz` (normal /32767), `+0xe f32 dist` (plane `n·p == -dist`), `+0x12 u16` pad.
+- Collision floor matches the OoT3D RENDER mesh floor (spot01 median 0.1u; spot04 noisier only
+  because multi-level render geom has non-walkable canopy/rooftops the max-Y probe catches).
+**Step 2 NEXT: inject into SoH gameplay** — extend `zsi.{h,cpp}` to parse collision, convert to
+SoH `CollisionHeader`/`CollisionPoly`/`SurfaceType`, install into `play->colCtx` at scene load
+(or hook `BgCheck_*`). Gate for A/B (env + REPL, like `terrainwarp`). Verify `floorat` (now =
+OoT3D) vs `meshfloor`. STILL TODO: surfaceType list parse (offset `surfaceTypeList+0x10`,
+count?), waterboxes, and the SoH-side conversion + coordinate/scale check (collision verts are
+N64-unit world-space, same as render mesh per [[soh3d-scene-geometry]]).
+
+## (superseded) NEXT MAJOR EFFORT (session 14 decision) — USE OoT3D COLLISION
 **User decision (reverses the earlier "keep N64 collision" rule):** drive gameplay from the
 **OoT3D scene collision mesh** so Link physically walks the OoT3D world. Why: N64 collision
 geometry and OoT3D render geometry genuinely differ in 3D — not just floor height but **walls
