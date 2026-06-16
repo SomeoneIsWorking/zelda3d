@@ -1,0 +1,76 @@
+#!/usr/bin/env python3
+# Data-driven character-replacement maps. Dump skeleton data from BOTH games to text/JSON, then
+# emit a precomputed bone-correspondence map the game references directly (no runtime matching).
+#   OoT3D side: parsed offline from each actor ZAR (cmb.py) -> tools/skeldata/oot3d_skeletons.json
+#   N64 side:   captured in-game via SOH3D_SKELDUMP -> tools/skeldata/n64/<zarbase>.txt
+#   bonemap:    soh3d_skel_match.match() per character (where N64 data exists) -> bonemap.json
+# Run with SOH3D_3DS_ROM set. See SKILL soh3d-game-control + PROGRESS.
+import os, sys, json, math, re
+sys.path.insert(0, 'tools')
+from ctr_romfs import CtrRom
+from zar import Zar
+import cmb as C
+import soh3d_skel_match as M
+
+REPO = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
+SK = os.path.join(REPO, 'tools', 'skeldata')
+
+def oot3d_skeleton(rom, zarname):
+    zf = Zar(rom.read(rom.get(zarname)))
+    cmbs = [f for f in zf.files if f.name.lower().endswith('.cmb')]
+    if not cmbs:
+        return None
+    main = max(cmbs, key=lambda f: f.size)
+    m = C.Cmb(zf.read(main))
+    bones = []
+    for b in m.bones:
+        L = math.sqrt(sum(c*c for c in b.trans))
+        bones.append(dict(id=b.id, parent=b.parent,
+                          trans=[round(x,2) for x in b.trans], length=round(L,2)))
+    return dict(cmb=main.name, bones=bones)
+
+def main():
+    rom = CtrRom(os.environ["SOH3D_3DS_ROM"])
+    inc = open(os.path.join(REPO, 'Shipwright/soh/src/soh3d/soh3d_object_zars.inc')).read()
+    zars = sorted(set(re.findall(r'"(/actor/[a-z0-9_]+\.zar)"', inc)))
+    skels = {}
+    for z in zars:
+        try:
+            sk = oot3d_skeleton(rom, z)
+        except Exception:
+            sk = None
+        if sk and len(sk['bones']) > 1:
+            skels[z] = sk
+    os.makedirs(SK, exist_ok=True)
+    json.dump(skels, open(os.path.join(SK, 'oot3d_skeletons.json'), 'w'), indent=1)
+    print("OoT3D skeletons dumped:", len(skels), "-> tools/skeldata/oot3d_skeletons.json")
+
+    # Build bonemap for every character that ALSO has an N64 dump captured in tools/skeldata/n64/.
+    n64dir = os.path.join(SK, 'n64')
+    bonemap = {}
+    for fn in sorted(os.listdir(n64dir)) if os.path.isdir(n64dir) else []:
+        if not fn.endswith('.txt'):
+            continue
+        base = fn[:-4]                      # zelda_boj
+        zar = '/actor/' + base + '.zar'
+        if zar not in skels:
+            print("  N64 dump", fn, "has no OoT3D skeleton; skip"); continue
+        nN = M.load_n64(os.path.join(n64dir, fn))
+        # rebuild OoT3D node dict in soh3d_skel_match's shape from the JSON we just dumped
+        nO = {b['id']: dict(id=b['id'], parent=b['parent'], length=b['length']) for b in skels[zar]['bones']}
+        bmap = M.match(nN, nO)
+        n64len = sum(nN[i]['length'] for i in nN if nN[i]['parent'] >= 0)
+        oot3dlen = sum(b['length'] for b in skels[zar]['bones'] if b['parent'] >= 0)
+        bonemap[zar] = dict(
+            n64_limb_count=len(nN),
+            oot3d_bone_count=len(skels[zar]['bones']),
+            scale_ratio=round(n64len / oot3dlen, 5) if oot3dlen else 0,  # * actor->scale = world scale
+            bone_to_limb={str(b): bmap[b] for b in sorted(bmap)},
+        )
+        print("  bonemap %-22s bones=%d limbs=%d scale_ratio=%.4f"
+              % (base, len(skels[zar]['bones']), len(nN), bonemap[zar]['scale_ratio']))
+    json.dump(bonemap, open(os.path.join(SK, 'bonemap.json'), 'w'), indent=1)
+    print("bonemap entries:", len(bonemap), "-> tools/skeldata/bonemap.json")
+
+if __name__ == '__main__':
+    main()
