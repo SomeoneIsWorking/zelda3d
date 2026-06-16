@@ -23,12 +23,39 @@ scene-header cmd-0x03; command addrs are PLAIN file offsets, proven via Rooms cm
   `+0xa ny`, `+0xc nz` (normal /32767), `+0xe f32 dist` (plane `n·p == -dist`), `+0x12 u16` pad.
 - Collision floor matches the OoT3D RENDER mesh floor (spot01 median 0.1u; spot04 noisier only
   because multi-level render geom has non-walkable canopy/rooftops the max-Y probe catches).
-**Step 2 NEXT: inject into SoH gameplay** — extend `zsi.{h,cpp}` to parse collision, convert to
-SoH `CollisionHeader`/`CollisionPoly`/`SurfaceType`, install into `play->colCtx` at scene load
-(or hook `BgCheck_*`). Gate for A/B (env + REPL, like `terrainwarp`). Verify `floorat` (now =
-OoT3D) vs `meshfloor`. STILL TODO: surfaceType list parse (offset `surfaceTypeList+0x10`,
-count?), waterboxes, and the SoH-side conversion + coordinate/scale check (collision verts are
-N64-unit world-space, same as render mesh per [[soh3d-scene-geometry]]).
+**Step 2 DONE (2026-06-16): OoT3D collision drives gameplay in-engine.** Link now physically
+walks the OoT3D world. Pipeline:
+- C++ parser `asset/zcol.{h,cpp}` (OoT3DCollision) + C-ABI bridge `soh3d_collision.h` /
+  `SoH3D_LoadSceneCollisionRaw` (soh3d_model.cpp, reuses `rom()`).
+- `SoH3D_BuildSceneCollision(play, n64)` (soh3d.c) converts to a SoH `CollisionHeader`: verts
+  copied 1:1 (N64-unit world-space, no transform), poly normal = raw s16 (matches
+  COLPOLY_SNORMAL), `dist = (s16)oot3dDist` (SoH plane normal·p+dist=0 == OoT3D n·p=-dist),
+  vA/vB/vC → flags_vIA/vIB/vIC, all polys share ONE generic SurfaceType (floor/wall/ceiling
+  comes from the normal, not the type). Arrays malloc'd + kept resident (freed on next build).
+- Hook: `Scene_CommandCollisionHeader` (the ACTIVE one is the OTR path `soh/z_scene_otr.cpp`,
+  NOT `src/code/z_scene.c` — both hooked) installs the OoT3D header via `BgCheck_Allocate`.
+- **Waterboxes + camera regions are COPIED from the N64 header** (not REd yet): actors like
+  `Bg_Spot01_Idomizu` write `colHeader->waterBoxes[0]` and crash on a NULL list. Same world
+  space, so carrying N64 water/cam over is correct enough; floors+walls are OoT3D.
+- **Camera-follow fix:** the floor poly's SurfaceType camDataIndex (`data[0]&0xFF`) selects the
+  scene-follow camera (`cameraDataList[idx].cameraSType`). The single generic SurfaceType made
+  every floor use `camData[0]` — often a FIXED cam → "camera won't follow Link" (user-caught
+  regression). Fix: point the generic floor's camIndex at a `CAM_SET_NORMAL0` (normal follow)
+  entry — reuse one from the N64 camData if present, else append one. Verified: camera tracks
+  Link after a `tp`. (Per-region/fixed cameras need the OoT3D surfaceType list — TODO.)
+- Gate: `SoH3D_CollisionEnabled()` (env `SOH3D_COLLISION`, default ON; REPL `collision <0|1>`,
+  takes effect next scene load/warp). Terrain Y-offset auto-disables when collision is on
+  (mutually exclusive — `SoH3D_TerrainWarpEnabled()` returns 0).
+- **Verified in-engine** (Kokiri spot04, Kakariko spot01): `floorat` (N64 BgCheck, now reading
+  OoT3D collision) == `meshfloor` (OoT3D render floor) across the scene (e.g. the old sink spots
+  Kokiri (-1067,429) and Kakariko (-1067,429): collision==render, sink GONE); Link stands
+  exactly on the floor (y == floorat under him); no crash; BgCheck buffer holds 3858 polys.
+  Residual: steep multi-level spots (Kakariko (-579,-1314)) differ ~130u — collision picks a
+  higher real surface than the render max-Y probe; not a parse error (plane identity was 100%).
+**STILL TODO:** RE the OoT3D surfaceType list (per-poly material: sound, special floors like
+sand/void) + waterbox/camData sub-lists (offsets at `surfaceTypeList`/`camData`/`waterBox`
+header fields, all +0x10 like vtx); test more scenes (dungeons, Hyrule Field poly count/stall);
+verify walls/Link physics interactively with the user.
 
 ## (superseded) NEXT MAJOR EFFORT (session 14 decision) — USE OoT3D COLLISION
 **User decision (reverses the earlier "keep N64 collision" rule):** drive gameplay from the
