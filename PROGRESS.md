@@ -117,7 +117,45 @@ ONE geometry for gameplay+visuals → use OoT3D's collision.
   visual `meshfloor`. Keep it gated for A/B.
 - See memory `soh3d-terrain-warp` (history of the render-side attempts + why they fail).
 
-## 🚧 IN PROGRESS (session 15): "replace ALL characters" (WIP, gated SOH3D_N64ANIM)
+## 🚧 IN PROGRESS (session 16): "replace ALL characters" — SCALE fixed, POSE next
+**SCALE done + verified + pushed (2026-06-16).** Skinned auto-actors no longer use the bbox
+measure (which over-measures articulated actors -> giant). Scale now comes from the REST
+skeletons' bone-length ratio (rotation-invariant; N64 & OoT3D are the same Grezzo-ported char):
+`scale = actor->scale * (Σ N64 |jointPos|) / (Σ OoT3D |trans|)`. Verified Market: Boj 0.01017
+(n64sum 15100.7 / oot3dsum 14853.1), Malon 0.00986 — sums agree ~1.5%. Code: SkelAnime hook
+(soh3d.c) + `SoH3D_AutoModelBoneLenSum` (soh3d_model.cpp) + `SoH3D_WalkN64Skeleton` (OOB-safe
+limb-tree walk — blind 0..limbCount-1 crashed on skeletons with an unreferenced trailing limb,
+e.g. Boj limbCount 16 but only limbs 0..14 reachable).
+
+**POSE still wrong for topology-divergent rigs (NEXT, the hard part).** The retarget still uses
+the identity map (OoT3D bone i <- N64 limb i), which only works when the rigs match index-wise
+(ge1). For Boj it's wrong because:
+- TOPOLOGY DIVERGES: OoT3D has a pure root b0 + zero-length reorient bones (b1=-90,-90; b8) that
+  N64 folds into the waist limb; AND the leg branch attaches at a different node (N64: waist
+  limb0; OoT3D: root b0). So neither identity nor a fixed offset maps them.
+- BIND POSES DIFFER: N64 rest = zero-rotation (splayed); OoT3D rest carries real rotations. So
+  matching by rest POSITION fails, and the "replace" retarget (N64 local rot AS the OoT3D bone
+  local rot — works for ge1 whose rest rots are ~identity) won't pose Boj.
+PLAN (proper fix), step 1 of 2 DONE:
+(1) CORRESPONDENCE — DONE + VERIFIED offline. `tools/soh3d_skel_match.py` produces the OoT3D
+bone -> N64 limb map and reproduces the hand-derived Boj map EXACTLY (all 16 bones; lengths
+align: arms 492~577/1336~1401/1456~1451, head 1815~1855, legs, zero-len hubs b1<->limb0,
+b8<->limb7, OoT3D pure-root b0 -> identity). ALGORITHM: build both limb trees; COLLAPSE
+zero-length reorient bones (|trans|<1) on BOTH sides (OoT3D inserts a pure root + reorient bones
+that N64 folds into one limb); pair each node's effective children by |bone length|; align the
+collapsed zero-len chains (chain bone i <-> chain limb i; extra OoT3D reorient bones map to the
+parent's N64 limb). Boj map (bone->limb): b0->-1,b1->0,b2->1,b3->2,b4->3,b5->4,b6->5,b7->6,
+b8->7,b9->14,b10->8,b11->9,b12->10,b13->11,b14->12,b15->13.
+(2) RETARGET — TODO (the remaining uncertain mile, needs LIVE visual iteration). The "replace"
+retarget (N64 local rot AS OoT3D bone local rot) only works when rest orientations align (ge1).
+For rigs with differing rest rots (Boj b1=-90,-90) the proper fix is WORLD-orientation: FK the
+live N64 jointTable to world rotations, set each OoT3D bone's world orientation from its mapped
+N64 limb, skin = worldAnim * bindInverse. NEXT: port soh3d_skel_match.py to C++ (SkelAnime hook /
+soh3d_model.cpp), feed the map into SoH3D_UpdateAnimN64, switch to world-orientation retarget,
+verify by driving to a stationary Market Boj. Captured data: scratch/skeldump/; OoT3D bones also
+parse offline via tools/cmb.py (no game needed).
+
+## (history) IN PROGRESS (session 15): "replace ALL characters" (WIP, gated SOH3D_N64ANIM)
 Skinned auto-actors now route through the generic N64-anim SkelAnime hook (was skipped). Committed
 but NOT good yet — **two unsolved problems, both solvable PROGRAMMATICALLY from the shared
 skeleton** (N64 and OoT3D are the same character; Grezzo ported the rig):
