@@ -37,12 +37,17 @@ walks the OoT3D world. Pipeline:
 - **Waterboxes + camera regions are COPIED from the N64 header** (not REd yet): actors like
   `Bg_Spot01_Idomizu` write `colHeader->waterBoxes[0]` and crash on a NULL list. Same world
   space, so carrying N64 water/cam over is correct enough; floors+walls are OoT3D.
-- **Camera-follow fix:** the floor poly's SurfaceType camDataIndex (`data[0]&0xFF`) selects the
-  scene-follow camera (`cameraDataList[idx].cameraSType`). The single generic SurfaceType made
-  every floor use `camData[0]` — often a FIXED cam → "camera won't follow Link" (user-caught
-  regression). Fix: point the generic floor's camIndex at a `CAM_SET_NORMAL0` (normal follow)
-  entry — reuse one from the N64 camData if present, else append one. Verified: camera tracks
-  Link after a `tp`. (Per-region/fixed cameras need the OoT3D surfaceType list — TODO.)
+- **Per-poly SurfaceType (exits + cameras + floor types) DONE.** The OoT3D poly's `+0x12` field
+  is the surfaceType INDEX (spot04: 47 types [0,46]; spot01: 28 [0,27]); the surfaceType list is
+  at `surfaceTypeList+0x10`, count at header `+0x20`, 8 bytes/entry, **same bitfield layout as N64**
+  (data0 low byte = camIndex, `(data0>>8)&0x1F` = scene EXIT index, data1 = floor props). Since
+  it's the same game, the cam/exit indices line up with SoH's N64 cameraDataList / exit list, so
+  zcol now parses them and the builder copies `data0/data1` verbatim + sets each poly's `type`.
+  This fixed: **scene exits** (user-caught: "can't leave the village" — every floor had exit 0),
+  per-region cameras (replaces the earlier forced-CAM_SET_NORMAL0 hack), and special floors.
+  REPL `exitat x z` reports the floor poly's exit/cam index. Verified: exit floors report their
+  index in-engine; user confirmed leaving Kakariko works. Camera + waterboxes still copied from
+  the N64 header (CamData/WaterBox OoT3D formats not REd; indices align since same game).
 - Gate: `SoH3D_CollisionEnabled()` (env `SOH3D_COLLISION`, default ON; REPL `collision <0|1>`,
   takes effect next scene load/warp). Terrain Y-offset auto-disables when collision is on
   (mutually exclusive — `SoH3D_TerrainWarpEnabled()` returns 0).
