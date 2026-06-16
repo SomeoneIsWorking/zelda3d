@@ -4,6 +4,38 @@ Goal: make **Ship of Harkinian** render **OoT3D (3DS)** character models and wor
 geometry instead of the N64 assets. Asset-conversion + renderer-integration task
 (not a renderer merge). Azahar (3DS emulator) is built as the **visual oracle**.
 
+## 🔧 OPEN ISSUES — found by the user driving Kakariko (session 11→12, 2026-06-16)
+Three live rendering/behaviour bugs, in priority order. Diagnostic data gathered; fixes
+NOT yet implemented. (Aspect-ratio shear from session 11 is FIXED + pushed — see below.)
+
+**ISSUE 1 — Link sinks into the OoT3D terrain (PRIMARY).** Collision is still the N64
+mesh; the rendered ground is OoT3D. They match EXACTLY on flat ground (measured Δ≈0 at
+3 Kakariko path samples via `tools/soh3d_floor.py`) but diverge where OoT3D reshaped
+terrain → Link's N64-collision feet sit below the visible OoT3D ground. Confirmed sink at
+Kakariko `(-1067,429)`: OoT3D render floor=20 vs N64 floor=10 (Δ+10); user reports MUCH
+worse in Hyrule Field. So it is LOCAL feature mismatch, NOT a global Y offset — a scene
+`sceneoff`/offset fix is ruled out. **Chosen fix (faithful):** OoT3D ships its OWN
+collision in the SCENE-level zsi (`spot01_info.zsi`, NOT the room file — cmd `0x03` at
+data offset `0x787c`; verified present). Parse it → convert to the engine's
+`CollisionHeader` (`z64bgcheck.h`: Vec3s* vtxList / CollisionPoly* polyList(0x10 each) /
+SurfaceType* surfaceTypeList) → inject at scene load so BgCheck uses geometry that matches
+what's drawn. NEXT STEP (do offline first, no rebuild): figure out the OoT3D collision
+format (noclip `oot3d` / RE), parse cmd-0x03, and verify the parsed floor at `(-1067,429)`
+≈ 20 (matches render, not N64's 10) — validates the approach before wiring into the engine.
+Target inject point: scene load / `BgCheck` init, gated by `SoH3D_Enabled()`. Surface-type
+mapping OoT3D→N64 can default-to-ground initially (don't block on exits/SFX parity).
+
+**ISSUE 2 — window "light shaft" renders as an opaque grey trapezoid.** Room-CMB
+translucent/light-volume geometry drawn OPAQUE by the direct-GL renderer, which currently
+ignores per-material blend mode (`soh3d_gl.cpp` always uses GL_SRC_ALPHA/ONE_MINUS_SRC_ALPHA;
+CMB material only carries `alpha_test`/`alpha_ref`, see `cmb.cpp:145`). Fix: read the CMB
+material's blend func / combiner and honor translucent vs additive in the GL group draw.
+
+**ISSUE 3 — a crate renders as a solid black box.** Not yet identified. Likely a crate
+diverted through the LEGACY F3DEX2 dlist path (`sModelTable` kibako, glModelId=-1) which
+has the known texture-upload failure (renders black) — vs the working direct-GL path.
+Confirm which actor/path; likely fix = move it to the GL path or fix the dlist texture.
+
 ## ⭐ ARCHITECTURE PIVOT (2026-06-15, session 7) — read this FIRST
 The "convert CMB → N64 F3DEX2 dlist (cmb_to_c.py) → bake C arrays into soh.elf →
 draw via libultraship's Fast3D interpreter" approach is being **REPLACED**. User
