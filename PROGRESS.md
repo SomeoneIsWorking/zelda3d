@@ -84,7 +84,37 @@ ONE geometry for gameplay+visuals → use OoT3D's collision.
   visual `meshfloor`. Keep it gated for A/B.
 - See memory `soh3d-terrain-warp` (history of the render-side attempts + why they fail).
 
-## ⏸️ ALSO PENDING (not started): "replace ALL characters"
+## 🚧 IN PROGRESS (session 15): "replace ALL characters" (WIP, gated SOH3D_N64ANIM)
+Skinned auto-actors now route through the generic N64-anim SkelAnime hook (was skipped). Committed
+but NOT good yet — **two unsolved problems, both solvable PROGRAMMATICALLY from the shared
+skeleton** (N64 and OoT3D are the same character; Grezzo ported the rig):
+1. **Scale (giant):** the measure-bbox over-measures skinned actors (roofman n64h=1091, soldier
+   n64h=4773 — no NPC is ~1000u tall; Link≈70). Static props measure fine. Robust fix: derive
+   scale from the N64 skeleton REST pose (walk skelAnime->skeleton limb tree, rest jointPos ×
+   actor->scale = N64 world height) vs the OoT3D CMB rest height — no bbox measure.
+2. **Pose (malformed):** the retarget assumes N64 jointTable[i+1] -> OoT3D bone i. Works when the
+   rig matches (ge1 Gerudo woman, hand-calibrated) but breaks when bone COUNT or ORDER differs
+   (roofman 15 OoT3D bones). Stopgap added: a bone-count guard (auto path only) falls back to N64
+   when count != limbCount — prevents giant/malformed but skips those chars. Robust fix: compute
+   the OoT3D-bone <-> N64-limb correspondence by matching the two skeletons' rest poses / tree
+   topology at runtime (both available: skelAnime->skeleton + cmb->bones()).
+**NEXT:** implement rest-pose skeleton matching (scale + correspondence) in the SkelAnime hook /
+soh3d_model.cpp. This is the user's explicit ask: "there MUST be a way to compute the correct
+replacements programmatically" — and there is (shared skeleton).
+
+## 🔁 RECURRING: GL state leak striping the skybox/UI (user-caught again, session 15)
+The "candy-stripe diagonal bands on black sky" is the [[soh3d-gl-state-leak]] regression
+recurring — our direct-GL draw (soh3d_gl.cpp) leaves some GL state Fast3D's OGL backend doesn't
+re-set per draw, leaking into the skybox/2D. The VAO-isolation fix reduced but didn't kill it.
+**User's strategic framing (worth acting on):** SoH is a decomp of OoT's *logic* but RENDERS via
+Fast3D (N64 RDP/RSP display-list -> GL translation); our OoT3D GL injection co-exists with it and
+fights its cached state. "Port more of it" = own the GL frame state around our draws completely
+(save/restore the FULL set Fast3D assumes, or push/pop a complete state block), and longer-term
+own the OoT3D render path rather than injecting alongside Fast3D. NEXT: enumerate every GL state
+our draw touches and harden the restore (deterministic, not glGet) — find the one still leaking
+into the skybox pass specifically.
+
+## ⏸️ ALSO PENDING (superseded by the section above): "replace ALL characters"
 Route SKINNED auto-replaced actors (currently SKIPPED to avoid T-pose, see
 `soh3d-auto-replace`) through the GENERIC N64-anim SkelAnime hook (already built, session 14:
 `SoH3D_SkelAnimeDraw` + sModelTable `n64anim` flag). Plan: in `SoH3D_TryAuto`, stop skipping
