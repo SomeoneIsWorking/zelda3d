@@ -18,13 +18,14 @@ def load_oot3d(zarname):
     nodes = {b.id: dict(id=b.id, parent=b.parent, length=math.sqrt(sum(c*c for c in b.trans))) for b in m.bones}
     return nodes
 
-def load_n64(dumpfile):
+def build_n64_nodes(limbs_in):
+    # limbs_in: list of {id, jp:(x,y,z), child, sibling}. Returns the matcher node dict
+    # {id: {child,sibling,length,parent}} with parents derived from child/sibling (255 = none).
     limbs = {}
-    for ln in open(dumpfile):
-        mo = re.search(r'N64 limb=(\d+) jointPos=\((-?\d+),(-?\d+),(-?\d+)\) child=(\d+) sibling=(\d+)', ln)
-        if mo:
-            i,x,y,z,c,s = map(int, mo.groups())
-            limbs[i] = dict(id=i, child=c, sibling=s, length=math.sqrt(x*x+y*y+z*z), parent=-1)
+    for l in limbs_in:
+        x,y,z = l['jp']
+        limbs[l['id']] = dict(id=l['id'], child=l['child'], sibling=l['sibling'],
+                              length=math.sqrt(x*x+y*y+z*z), parent=-1)
     parent = {0: -1}
     for i,l in limbs.items():
         if l['child'] != 255: parent[l['child']] = i
@@ -36,6 +37,15 @@ def load_n64(dumpfile):
                 parent[l['sibling']] = parent[i]; changed = True
     for i in limbs: limbs[i]['parent'] = parent.get(i, -1)
     return limbs
+
+def load_n64(dumpfile):
+    limbs_in = []
+    for ln in open(dumpfile):
+        mo = re.search(r'N64 limb=(\d+) jointPos=\((-?\d+),(-?\d+),(-?\d+)\) child=(\d+) sibling=(\d+)', ln)
+        if mo:
+            i,x,y,z,c,s = map(int, mo.groups())
+            limbs_in.append(dict(id=i, jp=(x,y,z), child=c, sibling=s))
+    return build_n64_nodes(limbs_in)
 
 def children_of(nodes):
     ch = {n: [] for n in nodes}

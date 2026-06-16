@@ -45,32 +45,46 @@ def main():
     json.dump(skels, open(os.path.join(SK, 'oot3d_skeletons.json'), 'w'), indent=1)
     print("OoT3D skeletons dumped:", len(skels), "-> tools/skeldata/oot3d_skeletons.json")
 
-    # Build bonemap for every character that ALSO has an N64 dump captured in tools/skeldata/n64/.
-    n64dir = os.path.join(SK, 'n64')
+    # Build the bonemap for EVERY skinned character: extract its N64 skeleton offline from the
+    # N64 ROM (zar /actor/zelda_<x>.zar -> N64 object_<x>), match against the OoT3D skeleton.
+    import n64_skel_extract as N
+    n64rom = open(N.ROM, 'rb').read()
+    # zar -> N64 object name (zelda_boj -> object_boj). Override the few that don't fit the pattern.
+    OBJ_OVERRIDE = {}
+    want = {}
+    for z in skels:
+        base = os.path.basename(z)[:-4]            # zelda_boj
+        obj = OBJ_OVERRIDE.get(z) or ('object_' + base[len('zelda_'):] if base.startswith('zelda_') else None)
+        if obj:
+            want[obj] = z
+    objs, dma = N.load_objects(n64rom, set(want))
+    print("N64 ROM dmadata @ 0x%X; objects extracted: %d/%d" % (dma, len(objs), len(want)))
     bonemap = {}
-    for fn in sorted(os.listdir(n64dir)) if os.path.isdir(n64dir) else []:
-        if not fn.endswith('.txt'):
-            continue
-        base = fn[:-4]                      # zelda_boj
-        zar = '/actor/' + base + '.zar'
-        if zar not in skels:
-            print("  N64 dump", fn, "has no OoT3D skeleton; skip"); continue
-        nN = M.load_n64(os.path.join(n64dir, fn))
-        # rebuild OoT3D node dict in soh3d_skel_match's shape from the JSON we just dumped
-        nO = {b['id']: dict(id=b['id'], parent=b['parent'], length=b['length']) for b in skels[zar]['bones']}
-        bmap = M.match(nN, nO)
-        n64len = sum(nN[i]['length'] for i in nN if nN[i]['parent'] >= 0)
-        oot3dlen = sum(b['length'] for b in skels[zar]['bones'] if b['parent'] >= 0)
-        bonemap[zar] = dict(
-            n64_limb_count=len(nN),
-            oot3d_bone_count=len(skels[zar]['bones']),
-            scale_ratio=round(n64len / oot3dlen, 5) if oot3dlen else 0,  # * actor->scale = world scale
-            bone_to_limb={str(b): bmap[b] for b in sorted(bmap)},
-        )
-        print("  bonemap %-22s bones=%d limbs=%d scale_ratio=%.4f"
-              % (base, len(skels[zar]['bones']), len(nN), bonemap[zar]['scale_ratio']))
+    miss = []
+    for obj, zar in sorted(want.items()):
+        try:
+            so = N.skel_offset_from_xml(obj)
+            if so is None or obj not in objs:
+                miss.append((obj, 'no-xml-skel' if so is None else 'no-rom-file')); continue
+            lc, limbs = N.parse_skeleton(objs[obj], so)
+            nN = M.build_n64_nodes(limbs)
+            nO = {b['id']: dict(id=b['id'], parent=b['parent'], length=b['length']) for b in skels[zar]['bones']}
+            bmap = M.match(nN, nO)
+            n64len = sum(nN[i]['length'] for i in nN if nN[i]['parent'] >= 0)
+            oot3dlen = sum(b['length'] for b in skels[zar]['bones'] if b['parent'] >= 0)
+            bonemap[zar] = dict(
+                object=obj,
+                n64_limb_count=len(nN),
+                oot3d_bone_count=len(skels[zar]['bones']),
+                scale_ratio=round(n64len / oot3dlen, 5) if oot3dlen else 0,  # * actor->scale = world scale
+                bone_to_limb={str(b): bmap[b] for b in sorted(bmap)},
+            )
+        except Exception as e:
+            miss.append((obj, str(e)[:40]))
     json.dump(bonemap, open(os.path.join(SK, 'bonemap.json'), 'w'), indent=1)
-    print("bonemap entries:", len(bonemap), "-> tools/skeldata/bonemap.json")
+    print("bonemap entries:", len(bonemap), "-> tools/skeldata/bonemap.json   (missed %d)" % len(miss))
+    if miss:
+        print("  missed:", ', '.join('%s(%s)' % m for m in miss[:25]))
 
     # Emit the game-side include: a flat table the retarget references directly (data-driven,
     # no runtime matching). boneToLimb is indexed by OoT3D bone id (-1 = no live joint -> rest).
