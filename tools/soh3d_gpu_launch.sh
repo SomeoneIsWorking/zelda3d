@@ -36,8 +36,11 @@ export SOH3D=1
 export SOH3D_WARP=1
 export SOH3D_ENTRANCE="$ENTR"
 export SOH3D_REPL="${SOH3D_REPL:-$REPO/scratch/soh3d.ctl}"
+# Pin time-of-day to noon so scenes load in DAYLIGHT (override with SOH3D_TIME, e.g.
+# 0x4000 dawn / 0xC000 dusk / 0 midnight, or -1 to release the game clock). REPL: `time`.
+export SOH3D_TIME="${SOH3D_TIME:-0x8000}"
 rm -f "$SOH3D_REPL" "$SOH3D_REPL.out"
-echo "soh3d_gpu_launch: DISPLAY=$DISPLAY XAUTHORITY=${XAUTHORITY:-<none>} entrance=$ENTR fifo=$SOH3D_REPL"
+echo "soh3d_gpu_launch: DISPLAY=$DISPLAY XAUTHORITY=${XAUTHORITY:-<none>} entrance=$ENTR time=$SOH3D_TIME fifo=$SOH3D_REPL"
 cd "$SOH"
 # stdbuf line-buffers so the log (and any crash dump) survives even on a hard exit.
 exec stdbuf -oL -eL ./soh.elf
