@@ -1,5 +1,43 @@
 # SoH3D — progress & state
 
+## ✅ DONE (session 19, 2026-06-17): N64-anim → OoT3D-CSAB MAPPING (auto skinned actors)
+**Auto-replaced skinned actors now play the OoT3D CSAB that CORRESPONDS to their LIVE N64 animation
+(walk→walk, cut-grass→cut-grass, idle→idle), instead of one fixed idle.** Built the "dump all anims
+from both games and match them" pipeline the user asked for + wired the runtime resolver.
+- **Offline pipeline** `tools/soh3d_anim_export.py` (sibling of soh3d_skel_export.py): dumps every
+  OoT3D CSAB per ZAR (name+duration+boneCount, via csab.py) → `tools/skeldata/oot3d_anims.json`
+  (1026 CSABs/117 ZARs); every N64 AnimationHeader per object (XML `<Animation Name Offset>` +
+  frameCount read from the ROM object bytes, via n64_skel_extract) → `n64_anims.json` (785 anims/99
+  objects); MATCHES per character → `animmap.json` + `soh3d_animmap.seed.inc`. Match signal =
+  **frame count** (Grezzo re-exported the same data; an N64 frameCount usually == one CSAB's
+  duration), with an idle-aware tiebreak: an N64 idle that is itself a 2-frame STUB (ge1
+  gGerudoWhiteIdleAnim fc=2) must pick the LIVELY idle (ge1_s_wait d22), not the stub frame-match
+  (ge1_matsu d2); a real idle LOOP (Saria fc=24) keeps the frame-close idle. Verified the seed
+  reproduces ge1 ground truth (Idle→ge1_s_wait, Clap→ge1_mon_akeru) + Saria idle→saria_matteru_wait.
+- **Hand-maintained map** `Shipwright/soh/src/soh3d/soh3d_animmap.inc` (mirrors the bonemap design:
+  generator writes a `.seed.inc`, the `.inc` is hand-owned). Flat `SOH3D_ANIMMAP(n64otr, csab)` table
+  keyed by the N64 anim's OTR resource path (object-qualified → globally unique). 785 entries
+  bootstrapped from the seed; frame-count guesses are APPROXIMATE — hand-fix as verified in-game
+  (1 so far: ge1 Dismissive→ge1_hanasi, a semantic match frame count can't see).
+- **Runtime** (soh3d.c): `skelAnime->animation` is an OTR path string in SoH (ResourceMgr resolves
+  it) = the stable key. `SoH3D_ResolveAutoCsab` strips `__OTR__` and strcmp-looks it up. Captured
+  per-actor: reset in `SoH3D_TryDrawActor`, set by the SkelAnime-bearing choke points
+  (SoH3D_SkelAnimeDraw + new `SoH3D_SetCurAnim` called from func_80034BA0/CC4, whose inner
+  SkelAnime_DrawFlex/raw hook has only skeleton+jointTable). Auto branch of `SoH3D_DoRetarget` uses
+  the mapped CSAB, falling back to the default idle when unlisted. `SoH3D_UpdateAnimAuto` now
+  restarts the per-model playhead when the selected CSAB changes (one-shots start at frame 0).
+- **VERIFIED in-engine** (Kokiri Forest entrance 238, real GPU, single clean instance): live anim →
+  corresponding CSAB across 3 chars — Saria `gSariaHandsBehindBackWaitAnim`→`saria_matteru_wait`,
+  Kokiri kid `gKokiriCuttingGrassAnim`→`fad_kusu_to_wait` (a real km1 CSAB; semantically apt),
+  Skulltula `object_st_Anim_000304`→`st_matsu`. NOT the old fixed default (`saria_banzai_wait`).
+  Screenshot scratch/screenshots/saria_front.png (OoT3D Saria, hands-behind-back pose).
+- **TOOLING:** new `tools/soh3d_game.sh` (start|restart|stop|status|log) — single-instance game
+  manager. Root-caused a recurring time-sink: the hand-rolled kill loop matched `*soh.elf)` and
+  SILENTLY missed rebuilt binaries that readlink reports as `soh.elf (deleted)`, so MULTIPLE
+  instances piled up fighting over one REPL FIFO (commands reverting, log from a different instance).
+  The manager kills the `(deleted)` form too, guarantees one instance, and self-daemonizes
+  (setsid+nohup) so no orphaned background launches. USE IT instead of hand-launching.
+
 ## ✅ DONE (session 18, 2026-06-17): FIX invisible hook-replaced skinned actors (POLY_OPA rewind)
 **The "auto-skinned chars draw-yet-invisible" bug from the session-17 handoff is FIXED + pushed**
 (Shipwright@develop 0c453a3a6, `soh/src/code/z_skelanime.c` only). En_Sa (Saria, Kokiri Forest)

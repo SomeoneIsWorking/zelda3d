@@ -1,0 +1,6392 @@
+{
+ "/actor/zelda_ahg.zar": [
+  {
+   "name": "Anim/Ahg_matsu.csab",
+   "base": "Ahg_matsu",
+   "duration": 20,
+   "bones": 19
+  },
+  {
+   "name": "Anim/Ahg2_18.csab",
+   "base": "Ahg2_18",
+   "duration": 20,
+   "bones": 19
+  },
+  {
+   "name": "Anim/Ahg2_8.csab",
+   "base": "Ahg2_8",
+   "duration": 20,
+   "bones": 19
+  },
+  {
+   "name": "Anim/sth_oya_matsu.csab",
+   "base": "sth_oya_matsu",
+   "duration": 28,
+   "bones": 19
+  }
+ ],
+ "/actor/zelda_am.zar": [
+  {
+   "name": "Anim/am_jump.csab",
+   "base": "am_jump",
+   "duration": 24,
+   "bones": 5
+  },
+  {
+   "name": "Anim/am_mamori.csab",
+   "base": "am_mamori",
+   "duration": 10,
+   "bones": 5
+  },
+  {
+   "name": "Anim/am_yarare.csab",
+   "base": "am_yarare",
+   "duration": 21,
+   "bones": 5
+  }
+ ],
+ "/actor/zelda_ane.zar": [
+  {
+   "name": "Anim/Ane_hanasu.csab",
+   "base": "Ane_hanasu",
+   "duration": 20,
+   "bones": 15
+  },
+  {
+   "name": "Anim/Ane_matsu.csab",
+   "base": "Ane_matsu",
+   "duration": 24,
+   "bones": 15
+  },
+  {
+   "name": "Anim/onegai_c.csab",
+   "base": "onegai_c",
+   "duration": 15,
+   "bones": 15
+  },
+  {
+   "name": "Anim/oro_oro.csab",
+   "base": "oro_oro",
+   "duration": 21,
+   "bones": 15
+  }
+ ],
+ "/actor/zelda_ani.zar": [
+  {
+   "name": "Anim/ani_bikkuri.csab",
+   "base": "ani_bikkuri",
+   "duration": 31,
+   "bones": 15
+  },
+  {
+   "name": "Anim/ani_nanyarona.csab",
+   "base": "ani_nanyarona",
+   "duration": 30,
+   "bones": 15
+  },
+  {
+   "name": "Anim/ani_suwari_wait.csab",
+   "base": "ani_suwari_wait",
+   "duration": 30,
+   "bones": 15
+  }
+ ],
+ "/actor/zelda_aob.zar": [
+  {
+   "name": "Anim/Aob_mastu.csab",
+   "base": "Aob_mastu",
+   "duration": 20,
+   "bones": 17
+  },
+  {
+   "name": "Anim/Aob_tataku_roop.csab",
+   "base": "Aob_tataku_roop",
+   "duration": 15,
+   "bones": 17
+  },
+  {
+   "name": "Anim/Aob_te_wait.csab",
+   "base": "Aob_te_wait",
+   "duration": 15,
+   "bones": 17
+  },
+  {
+   "name": "Anim/Aob_n_wait.csab",
+   "base": "Aob_n_wait",
+   "duration": 15,
+   "bones": 17
+  }
+ ],
+ "/actor/zelda_bba.zar": [
+  {
+   "name": "Anim/Bba_matsu.csab",
+   "base": "Bba_matsu",
+   "duration": 40,
+   "bones": 16
+  },
+  {
+   "name": "Anim/Bba_n_wait.csab",
+   "base": "Bba_n_wait",
+   "duration": 40,
+   "bones": 16
+  }
+ ],
+ "/actor/zelda_bg.zar": [
+  {
+   "name": "Anim/bg_getup.csab",
+   "base": "bg_getup",
+   "duration": 71,
+   "bones": 10
+  },
+  {
+   "name": "Anim/bg_sleeping.csab",
+   "base": "bg_sleeping",
+   "duration": 49,
+   "bones": 10
+  },
+  {
+   "name": "Anim/bg_wait.csab",
+   "base": "bg_wait",
+   "duration": 40,
+   "bones": 10
+  }
+ ],
+ "/actor/zelda_bji.zar": [
+  {
+   "name": "Anim/Bji_matsu.csab",
+   "base": "Bji_matsu",
+   "duration": 40,
+   "bones": 17
+  },
+  {
+   "name": "Anim/Bji_aruku.csab",
+   "base": "Bji_aruku",
+   "duration": 60,
+   "bones": 17
+  },
+  {
+   "name": "Anim/Bji2_20.csab",
+   "base": "Bji2_20",
+   "duration": 40,
+   "bones": 17
+  }
+ ],
+ "/actor/zelda_bl.zar": [
+  {
+   "name": "Anim/bl_nomral.csab",
+   "base": "bl_nomral",
+   "duration": 17,
+   "bones": 6
+  },
+  {
+   "name": "Anim/bl_jump.csab",
+   "base": "bl_jump",
+   "duration": 42,
+   "bones": 6
+  },
+  {
+   "name": "Anim/bl_elec_a.csab",
+   "base": "bl_elec_a",
+   "duration": 8,
+   "bones": 6
+  },
+  {
+   "name": "Anim/bl_dmg.csab",
+   "base": "bl_dmg",
+   "duration": 20,
+   "bones": 6
+  }
+ ],
+ "/actor/zelda_bob.zar": [
+  {
+   "name": "Anim/Bob_matsu.csab",
+   "base": "Bob_matsu",
+   "duration": 20,
+   "bones": 15
+  }
+ ],
+ "/actor/zelda_boj.zar": [
+  {
+   "name": "Anim/Boj_matsu.csab",
+   "base": "Boj_matsu",
+   "duration": 30,
+   "bones": 16
+  },
+  {
+   "name": "Anim/Boj2_5.csab",
+   "base": "Boj2_5",
+   "duration": 16,
+   "bones": 16
+  },
+  {
+   "name": "Anim/Boj2_9.csab",
+   "base": "Boj2_9",
+   "duration": 11,
+   "bones": 16
+  },
+  {
+   "name": "Anim/Boj2_9_2.csab",
+   "base": "Boj2_9_2",
+   "duration": 16,
+   "bones": 16
+  },
+  {
+   "name": "Anim/Boj2_17.csab",
+   "base": "Boj2_17",
+   "duration": 30,
+   "bones": 16
+  },
+  {
+   "name": "Anim/Boj2_19.csab",
+   "base": "Boj2_19",
+   "duration": 30,
+   "bones": 16
+  },
+  {
+   "name": "Anim/Boj_13.csab",
+   "base": "Boj_13",
+   "duration": 30,
+   "bones": 16
+  },
+  {
+   "name": "Anim/Boj_14.csab",
+   "base": "Boj_14",
+   "duration": 23,
+   "bones": 16
+  },
+  {
+   "name": "Anim/sth_ko_matsu.csab",
+   "base": "sth_ko_matsu",
+   "duration": 38,
+   "bones": 16
+  }
+ ],
+ "/actor/zelda_box.zar": [
+  {
+   "name": "Anim/cdemo_box_boxA.csab",
+   "base": "cdemo_box_boxA",
+   "duration": 131,
+   "bones": 3
+  },
+  {
+   "name": "Anim/demo_box_boxA.csab",
+   "base": "demo_box_boxA",
+   "duration": 117,
+   "bones": 3
+  },
+  {
+   "name": "Anim/demo_box_boxB.csab",
+   "base": "demo_box_boxB",
+   "duration": 51,
+   "bones": 3
+  },
+  {
+   "name": "Anim/demo_tre_lgt_fcurve_data.csab",
+   "base": "demo_tre_lgt_fcurve_data",
+   "duration": 327,
+   "bones": 19
+  },
+  {
+   "name": "Anim/demo_tre_lgt_c_fcurve_data.csab",
+   "base": "demo_tre_lgt_c_fcurve_data",
+   "duration": 357,
+   "bones": 19
+  }
+ ],
+ "/actor/zelda_brob.zar": [
+  {
+   "name": "Anim/br_start.csab",
+   "base": "br_start",
+   "duration": 17,
+   "bones": 6
+  },
+  {
+   "name": "Anim/br_unyo.csab",
+   "base": "br_unyo",
+   "duration": 20,
+   "bones": 6
+  },
+  {
+   "name": "Anim/br_elec.csab",
+   "base": "br_elec",
+   "duration": 5,
+   "bones": 6
+  },
+  {
+   "name": "Anim/br_dmg.csab",
+   "base": "br_dmg",
+   "duration": 34,
+   "bones": 6
+  }
+ ],
+ "/actor/zelda_bv.zar": [
+  {
+   "name": "Anim/bl2.csab",
+   "base": "bl2",
+   "duration": 3,
+   "bones": 4
+  },
+  {
+   "name": "Anim/bv_arm_dmg.csab",
+   "base": "bv_arm_dmg",
+   "duration": 41,
+   "bones": 33
+  },
+  {
+   "name": "Anim/bva_bdmg1.csab",
+   "base": "bva_bdmg1",
+   "duration": 42,
+   "bones": 6
+  },
+  {
+   "name": "Anim/bva_bdmg2.csab",
+   "base": "bva_bdmg2",
+   "duration": 42,
+   "bones": 6
+  },
+  {
+   "name": "Anim/bva_dmg1.csab",
+   "base": "bva_dmg1",
+   "duration": 42,
+   "bones": 6
+  },
+  {
+   "name": "Anim/bva_dmg2.csab",
+   "base": "bva_dmg2",
+   "duration": 42,
+   "bones": 6
+  },
+  {
+   "name": "Anim/bva_wait.csab",
+   "base": "bva_wait",
+   "duration": 41,
+   "bones": 6
+  },
+  {
+   "name": "Anim/bvb_break.csab",
+   "base": "bvb_break",
+   "duration": 42,
+   "bones": 4
+  },
+  {
+   "name": "Anim/bvb_down.csab",
+   "base": "bvb_down",
+   "duration": 42,
+   "bones": 4
+  },
+  {
+   "name": "Anim/bvc_break.csab",
+   "base": "bvc_break",
+   "duration": 52,
+   "bones": 3
+  },
+  {
+   "name": "Anim/bve_bdmg.csab",
+   "base": "bve_bdmg",
+   "duration": 42,
+   "bones": 4
+  },
+  {
+   "name": "Anim/bve_dmg_a.csab",
+   "base": "bve_dmg_a",
+   "duration": 5,
+   "bones": 4
+  },
+  {
+   "name": "Anim/bve_dmg_b.csab",
+   "base": "bve_dmg_b",
+   "duration": 28,
+   "bones": 4
+  },
+  {
+   "name": "Anim/bve_wait.csab",
+   "base": "bve_wait",
+   "duration": 41,
+   "bones": 4
+  }
+ ],
+ "/actor/zelda_bw.zar": [
+  {
+   "name": "Anim/bw_aruku.csab",
+   "base": "bw_aruku",
+   "duration": 60,
+   "bones": 5
+  },
+  {
+   "name": "Anim/bw_hakken.csab",
+   "base": "bw_hakken",
+   "duration": 8,
+   "bones": 5
+  },
+  {
+   "name": "Anim/bw_kogeki.csab",
+   "base": "bw_kogeki",
+   "duration": 8,
+   "bones": 5
+  }
+ ],
+ "/actor/zelda_bxa.zar": [
+  {
+   "name": "Anim/tentacle_motion_test01.csab",
+   "base": "tentacle_motion_test01",
+   "duration": 48,
+   "bones": 14
+  },
+  {
+   "name": "Anim/balinadetrap.csab",
+   "base": "balinadetrap",
+   "duration": 31,
+   "bones": 4
+  },
+  {
+   "name": "Anim/baarm_death.csab",
+   "base": "baarm_death",
+   "duration": 50,
+   "bones": 14
+  }
+ ],
+ "/actor/zelda_cne.zar": [
+  {
+   "name": "Anim/Cne_matsu.csab",
+   "base": "Cne_matsu",
+   "duration": 20,
+   "bones": 17
+  },
+  {
+   "name": "Anim/Cne2_15.csab",
+   "base": "Cne2_15",
+   "duration": 12,
+   "bones": 17
+  },
+  {
+   "name": "Anim/Cne_n_wait.csab",
+   "base": "Cne_n_wait",
+   "duration": 40,
+   "bones": 17
+  }
+ ],
+ "/actor/zelda_cob.zar": [
+  {
+   "name": "Anim/Cob_matsu.csab",
+   "base": "Cob_matsu",
+   "duration": 20,
+   "bones": 13
+  }
+ ],
+ "/actor/zelda_cow.zar": [
+  {
+   "name": "Anim/usi_mogmog.csab",
+   "base": "usi_mogmog",
+   "duration": 31,
+   "bones": 10
+  },
+  {
+   "name": "Anim/usi_mooo.csab",
+   "base": "usi_mooo",
+   "duration": 31,
+   "bones": 10
+  },
+  {
+   "name": "Anim/ust_daran.csab",
+   "base": "ust_daran",
+   "duration": 21,
+   "bones": 10
+  },
+  {
+   "name": "Anim/ust_furifuri.csab",
+   "base": "ust_furifuri",
+   "duration": 41,
+   "bones": 10
+  }
+ ],
+ "/actor/zelda_crow.zar": [
+  {
+   "name": "Anim/df_flygue.csab",
+   "base": "df_flygue",
+   "duration": 8,
+   "bones": 8
+  },
+  {
+   "name": "Anim/df_hover.csab",
+   "base": "df_hover",
+   "duration": 25,
+   "bones": 8
+  }
+ ],
+ "/actor/zelda_cs.zar": [
+  {
+   "name": "Anim/cs_aruku.csab",
+   "base": "cs_aruku",
+   "duration": 30,
+   "bones": 15
+  },
+  {
+   "name": "Anim/cs_matsu.csab",
+   "base": "cs_matsu",
+   "duration": 24,
+   "bones": 15
+  },
+  {
+   "name": "Anim/cs_matsu02.csab",
+   "base": "cs_matsu02",
+   "duration": 28,
+   "bones": 15
+  },
+  {
+   "name": "Anim/cs_matsu03.csab",
+   "base": "cs_matsu03",
+   "duration": 19,
+   "bones": 15
+  }
+ ],
+ "/actor/zelda_daiku.zar": [
+  {
+   "name": "Anim/dk2_hanasi.csab",
+   "base": "dk2_hanasi",
+   "duration": 28,
+   "bones": 20
+  },
+  {
+   "name": "Anim/dk2_hashiru.csab",
+   "base": "dk2_hashiru",
+   "duration": 18,
+   "bones": 20
+  },
+  {
+   "name": "Anim/dk2_matsu.csab",
+   "base": "dk2_matsu",
+   "duration": 59,
+   "bones": 20
+  },
+  {
+   "name": "Anim/dk2_roya.csab",
+   "base": "dk2_roya",
+   "duration": 20,
+   "bones": 20
+  },
+  {
+   "name": "Anim/dk2_suwari.csab",
+   "base": "dk2_suwari",
+   "duration": 14,
+   "bones": 20
+  },
+  {
+   "name": "Anim/dk2_tasuke.csab",
+   "base": "dk2_tasuke",
+   "duration": 20,
+   "bones": 20
+  }
+ ],
+ "/actor/zelda_dekubaba.zar": [
+  {
+   "name": "Anim/db_P_tobidasu.csab",
+   "base": "db_P_tobidasu",
+   "duration": 25,
+   "bones": 3
+  },
+  {
+   "name": "Anim/db_P_kougeki.csab",
+   "base": "db_P_kougeki",
+   "duration": 117,
+   "bones": 3
+  }
+ ],
+ "/actor/zelda_dekunuts.zar": [
+  {
+   "name": "Anim/dn_atack.csab",
+   "base": "dn_atack",
+   "duration": 19,
+   "bones": 10
+  },
+  {
+   "name": "Anim/dn_damage.csab",
+   "base": "dn_damage",
+   "duration": 15,
+   "bones": 10
+  },
+  {
+   "name": "Anim/dn_dig.csab",
+   "base": "dn_dig",
+   "duration": 11,
+   "bones": 10
+  },
+  {
+   "name": "Anim/dn_down.csab",
+   "base": "dn_down",
+   "duration": 12,
+   "bones": 10
+  },
+  {
+   "name": "Anim/dn_jump.csab",
+   "base": "dn_jump",
+   "duration": 16,
+   "bones": 10
+  },
+  {
+   "name": "Anim/dn_lookaround.csab",
+   "base": "dn_lookaround",
+   "duration": 27,
+   "bones": 10
+  },
+  {
+   "name": "Anim/dn_start.csab",
+   "base": "dn_start",
+   "duration": 21,
+   "bones": 10
+  },
+  {
+   "name": "Anim/dn_wait02.csab",
+   "base": "dn_wait02",
+   "duration": 9,
+   "bones": 10
+  },
+  {
+   "name": "Anim/dn_wait.csab",
+   "base": "dn_wait",
+   "duration": 15,
+   "bones": 10
+  },
+  {
+   "name": "Anim/dn_walk.csab",
+   "base": "dn_walk",
+   "duration": 19,
+   "bones": 10
+  }
+ ],
+ "/actor/zelda_dh.zar": [
+  {
+   "name": "Anim/dead_armR_wait_20f.csab",
+   "base": "dead_armR_wait_20f",
+   "duration": 31,
+   "bones": 3
+  },
+  {
+   "name": "Anim/dead_hand_wait_20f.csab",
+   "base": "dead_hand_wait_20f",
+   "duration": 40,
+   "bones": 15
+  },
+  {
+   "name": "Anim/dead_hand_dig_20f.csab",
+   "base": "dead_hand_dig_20f",
+   "duration": 30,
+   "bones": 15
+  },
+  {
+   "name": "Anim/dead_hand_greeting_20f.csab",
+   "base": "dead_hand_greeting_20f",
+   "duration": 20,
+   "bones": 15
+  },
+  {
+   "name": "Anim/dead_hand_hit_20f.csab",
+   "base": "dead_hand_hit_20f",
+   "duration": 12,
+   "bones": 15
+  },
+  {
+   "name": "Anim/dead_hand_meeting_20f.csab",
+   "base": "dead_hand_meeting_20f",
+   "duration": 40,
+   "bones": 15
+  },
+  {
+   "name": "Anim/dead_hand_attack_20f.csab",
+   "base": "dead_hand_attack_20f",
+   "duration": 20,
+   "bones": 15
+  },
+  {
+   "name": "Anim/dead_hand_down_20f.csab",
+   "base": "dead_hand_down_20f",
+   "duration": 70,
+   "bones": 15
+  },
+  {
+   "name": "Anim/dead_hand_down_wait_20f.csab",
+   "base": "dead_hand_down_wait_20f",
+   "duration": 21,
+   "bones": 15
+  }
+ ],
+ "/actor/zelda_dnk.zar": [
+  {
+   "name": "Anim/dnk_atack.csab",
+   "base": "dnk_atack",
+   "duration": 19,
+   "bones": 9
+  },
+  {
+   "name": "Anim/dnk_dig.csab",
+   "base": "dnk_dig",
+   "duration": 11,
+   "bones": 9
+  },
+  {
+   "name": "Anim/dnk_happy.csab",
+   "base": "dnk_happy",
+   "duration": 17,
+   "bones": 9
+  },
+  {
+   "name": "Anim/dnk_jump.csab",
+   "base": "dnk_jump",
+   "duration": 10,
+   "bones": 9
+  },
+  {
+   "name": "Anim/dnk_start.csab",
+   "base": "dnk_start",
+   "duration": 22,
+   "bones": 9
+  },
+  {
+   "name": "Anim/dnk_wait.csab",
+   "base": "dnk_wait",
+   "duration": 16,
+   "bones": 9
+  },
+  {
+   "name": "Anim/dnk_walk.csab",
+   "base": "dnk_walk",
+   "duration": 9,
+   "bones": 9
+  }
+ ],
+ "/actor/zelda_dns.zar": [
+  {
+   "name": "Anim/dns_atack.csab",
+   "base": "dns_atack",
+   "duration": 19,
+   "bones": 11
+  },
+  {
+   "name": "Anim/dns_dig.csab",
+   "base": "dns_dig",
+   "duration": 11,
+   "bones": 11
+  },
+  {
+   "name": "Anim/dns_happy.csab",
+   "base": "dns_happy",
+   "duration": 16,
+   "bones": 11
+  },
+  {
+   "name": "Anim/dns_hintdig01.csab",
+   "base": "dns_hintdig01",
+   "duration": 6,
+   "bones": 11
+  },
+  {
+   "name": "Anim/dns_hintdig02.csab",
+   "base": "dns_hintdig02",
+   "duration": 8,
+   "bones": 11
+  },
+  {
+   "name": "Anim/dns_hintwait.csab",
+   "base": "dns_hintwait",
+   "duration": 11,
+   "bones": 11
+  },
+  {
+   "name": "Anim/dns_jump.csab",
+   "base": "dns_jump",
+   "duration": 10,
+   "bones": 11
+  },
+  {
+   "name": "Anim/dns_start.csab",
+   "base": "dns_start",
+   "duration": 22,
+   "bones": 11
+  },
+  {
+   "name": "Anim/dns_wait.csab",
+   "base": "dns_wait",
+   "duration": 16,
+   "bones": 11
+  },
+  {
+   "name": "Anim/dns_walk.csab",
+   "base": "dns_walk",
+   "duration": 8,
+   "bones": 11
+  }
+ ],
+ "/actor/zelda_dodojr.zar": [
+  {
+   "name": "Anim/dd_wait.csab",
+   "base": "dd_wait",
+   "duration": 16,
+   "bones": 6
+  },
+  {
+   "name": "Anim/dd_move.csab",
+   "base": "dd_move",
+   "duration": 10,
+   "bones": 6
+  },
+  {
+   "name": "Anim/dd_jump.csab",
+   "base": "dd_jump",
+   "duration": 19,
+   "bones": 6
+  },
+  {
+   "name": "Anim/dd_damage.csab",
+   "base": "dd_damage",
+   "duration": 31,
+   "bones": 6
+  },
+  {
+   "name": "Anim/dd_die.csab",
+   "base": "dd_die",
+   "duration": 18,
+   "bones": 6
+  }
+ ],
+ "/actor/zelda_dodongo.zar": [
+  {
+   "name": "Anim/da_wait.csab",
+   "base": "da_wait",
+   "duration": 41,
+   "bones": 18
+  },
+  {
+   "name": "Anim/da_walk_start.csab",
+   "base": "da_walk_start",
+   "duration": 11,
+   "bones": 18
+  },
+  {
+   "name": "Anim/da_walk.csab",
+   "base": "da_walk",
+   "duration": 41,
+   "bones": 18
+  },
+  {
+   "name": "Anim/da_walk_end.csab",
+   "base": "da_walk_end",
+   "duration": 12,
+   "bones": 18
+  },
+  {
+   "name": "Anim/da_fire.csab",
+   "base": "da_fire",
+   "duration": 52,
+   "bones": 18
+  },
+  {
+   "name": "Anim/da_fire_wait.csab",
+   "base": "da_fire_wait",
+   "duration": 42,
+   "bones": 18
+  },
+  {
+   "name": "Anim/da_dmg.csab",
+   "base": "da_dmg",
+   "duration": 19,
+   "bones": 18
+  },
+  {
+   "name": "Anim/da_dmg_wait.csab",
+   "base": "da_dmg_wait",
+   "duration": 22,
+   "bones": 18
+  },
+  {
+   "name": "Anim/da_left.csab",
+   "base": "da_left",
+   "duration": 30,
+   "bones": 18
+  },
+  {
+   "name": "Anim/da_right.csab",
+   "base": "da_right",
+   "duration": 30,
+   "bones": 18
+  },
+  {
+   "name": "Anim/da_die.csab",
+   "base": "da_die",
+   "duration": 81,
+   "bones": 18
+  }
+ ],
+ "/actor/zelda_dog.zar": [
+  {
+   "name": "Anim/dog_bark.csab",
+   "base": "dog_bark",
+   "duration": 31,
+   "bones": 9
+  },
+  {
+   "name": "Anim/dog_fuse.csab",
+   "base": "dog_fuse",
+   "duration": 58,
+   "bones": 9
+  },
+  {
+   "name": "Anim/dog_fusetamama.csab",
+   "base": "dog_fusetamama",
+   "duration": 47,
+   "bones": 9
+  },
+  {
+   "name": "Anim/dog_run.csab",
+   "base": "dog_run",
+   "duration": 8,
+   "bones": 9
+  },
+  {
+   "name": "Anim/dog_sit.csab",
+   "base": "dog_sit",
+   "duration": 31,
+   "bones": 9
+  },
+  {
+   "name": "Anim/dog_walk.csab",
+   "base": "dog_walk",
+   "duration": 13,
+   "bones": 9
+  }
+ ],
+ "/actor/zelda_ds.zar": [
+  {
+   "name": "Anim/ds_matsu.csab",
+   "base": "ds_matsu",
+   "duration": 50,
+   "bones": 5
+  }
+ ],
+ "/actor/zelda_ds2.zar": [
+  {
+   "name": "Anim/ds2_matsu.csab",
+   "base": "ds2_matsu",
+   "duration": 22,
+   "bones": 8
+  }
+ ],
+ "/actor/zelda_du.zar": [
+  {
+   "name": "Anim/dal_banzai.csab",
+   "base": "dal_banzai",
+   "duration": 31,
+   "bones": 35
+  },
+  {
+   "name": "Anim/dal_banzai_wait.csab",
+   "base": "dal_banzai_wait",
+   "duration": 31,
+   "bones": 35
+  },
+  {
+   "name": "Anim/dal_bashi.csab",
+   "base": "dal_bashi",
+   "duration": 60,
+   "bones": 35
+  },
+  {
+   "name": "Anim/dal_kangeki.csab",
+   "base": "dal_kangeki",
+   "duration": 20,
+   "bones": 35
+  },
+  {
+   "name": "Anim/dal_okiru.csab",
+   "base": "dal_okiru",
+   "duration": 23,
+   "bones": 35
+  },
+  {
+   "name": "Anim/dalnia_base_dance.csab",
+   "base": "dalnia_base_dance",
+   "duration": 17,
+   "bones": 35
+  },
+  {
+   "name": "Anim/dalnia_base_to_dai.csab",
+   "base": "dalnia_base_to_dai",
+   "duration": 9,
+   "bones": 35
+  },
+  {
+   "name": "Anim/dalnia_base_to_kihon.csab",
+   "base": "dalnia_base_to_kihon",
+   "duration": 12,
+   "bones": 35
+  },
+  {
+   "name": "Anim/dalnia_chotto_chigau.csab",
+   "base": "dalnia_chotto_chigau",
+   "duration": 20,
+   "bones": 35
+  },
+  {
+   "name": "Anim/dalnia_dai_to_base.csab",
+   "base": "dalnia_dai_to_base",
+   "duration": 9,
+   "bones": 35
+  },
+  {
+   "name": "Anim/dalnia_end_miage.csab",
+   "base": "dalnia_end_miage",
+   "duration": 19,
+   "bones": 35
+  },
+  {
+   "name": "Anim/dalnia_end_modoru.csab",
+   "base": "dalnia_end_modoru",
+   "duration": 43,
+   "bones": 35
+  },
+  {
+   "name": "Anim/dalnia_end_wait.csab",
+   "base": "dalnia_end_wait",
+   "duration": 24,
+   "bones": 35
+  },
+  {
+   "name": "Anim/dalnia_base_to_chotto.csab",
+   "base": "dalnia_base_to_chotto",
+   "duration": 141,
+   "bones": 35
+  },
+  {
+   "name": "Anim/du_matsu.csab",
+   "base": "du_matsu",
+   "duration": 29,
+   "bones": 35
+  },
+  {
+   "name": "Anim/km_daru.csab",
+   "base": "km_daru",
+   "duration": 15,
+   "bones": 35
+  },
+  {
+   "name": "Anim/dalnia_dai_dance.csab",
+   "base": "dalnia_dai_dance",
+   "duration": 18,
+   "bones": 35
+  },
+  {
+   "name": "Anim/dalnia_base_dance_work.csab",
+   "base": "dalnia_base_dance_work",
+   "duration": 102,
+   "bones": 35
+  }
+ ],
+ "/actor/zelda_dy_obj.zar": [
+  {
+   "name": "Anim/DY_kieruu.csab",
+   "base": "DY_kieruu",
+   "duration": 16,
+   "bones": 27
+  },
+  {
+   "name": "Anim/DY_n_wait.csab",
+   "base": "DY_n_wait",
+   "duration": 50,
+   "bones": 27
+  },
+  {
+   "name": "Anim/DY_sanjyou.csab",
+   "base": "DY_sanjyou",
+   "duration": 40,
+   "bones": 27
+  },
+  {
+   "name": "Anim/DY_t_wait.csab",
+   "base": "DY_t_wait",
+   "duration": 40,
+   "bones": 27
+  },
+  {
+   "name": "Anim/DY_tiryou.csab",
+   "base": "DY_tiryou",
+   "duration": 40,
+   "bones": 27
+  },
+  {
+   "name": "Anim/yousei_end.csab",
+   "base": "yousei_end",
+   "duration": 10,
+   "bones": 27
+  },
+  {
+   "name": "Anim/yousei_nagekiss.csab",
+   "base": "yousei_nagekiss",
+   "duration": 30,
+   "bones": 27
+  },
+  {
+   "name": "Anim/yousei_nagekiss_wait.csab",
+   "base": "yousei_nagekiss_wait",
+   "duration": 51,
+   "bones": 27
+  },
+  {
+   "name": "Anim/yousei_start.csab",
+   "base": "yousei_start",
+   "duration": 30,
+   "bones": 27
+  },
+  {
+   "name": "Anim/yousei_start_wait.csab",
+   "base": "yousei_start_wait",
+   "duration": 50,
+   "bones": 27
+  }
+ ],
+ "/actor/zelda_ec.zar": [
+  {
+   "name": "Anim/ane_dance.csab",
+   "base": "ane_dance",
+   "duration": 48,
+   "bones": 15
+  },
+  {
+   "name": "Anim/ge1_dance.csab",
+   "base": "ge1_dance",
+   "duration": 48,
+   "bones": 15
+  },
+  {
+   "name": "Anim/goron_dance.csab",
+   "base": "goron_dance",
+   "duration": 37,
+   "bones": 19
+  },
+  {
+   "name": "Anim/goron_hara_daiko.csab",
+   "base": "goron_hara_daiko",
+   "duration": 37,
+   "bones": 19
+  },
+  {
+   "name": "Anim/km1_motsu.csab",
+   "base": "km1_motsu",
+   "duration": 27,
+   "bones": 19
+  },
+  {
+   "name": "Anim/kyotsu_swing_1.csab",
+   "base": "kyotsu_swing_1",
+   "duration": 34,
+   "bones": 19
+  },
+  {
+   "name": "Anim/kyotsu_swing_2.csab",
+   "base": "kyotsu_swing_2",
+   "duration": 34,
+   "bones": 15
+  },
+  {
+   "name": "Anim/kyotsu_swing_3.csab",
+   "base": "kyotsu_swing_3",
+   "duration": 34,
+   "bones": 17
+  },
+  {
+   "name": "Anim/kyotsu_swing_4.csab",
+   "base": "kyotsu_swing_4",
+   "duration": 34,
+   "bones": 16
+  },
+  {
+   "name": "Anim/kz_miage_wait.csab",
+   "base": "kz_miage_wait",
+   "duration": 41,
+   "bones": 26
+  },
+  {
+   "name": "Anim/kz_miageru.csab",
+   "base": "kz_miageru",
+   "duration": 59,
+   "bones": 26
+  },
+  {
+   "name": "Anim/kz_utsumuki_wait.csab",
+   "base": "kz_utsumuki_wait",
+   "duration": 40,
+   "bones": 26
+  },
+  {
+   "name": "Anim/mido_stand_up.csab",
+   "base": "mido_stand_up",
+   "duration": 109,
+   "bones": 18
+  },
+  {
+   "name": "Anim/mido_stand_wait.csab",
+   "base": "mido_stand_wait",
+   "duration": 20,
+   "bones": 18
+  },
+  {
+   "name": "Anim/mido_utsumuki_wait.csab",
+   "base": "mido_utsumuki_wait",
+   "duration": 31,
+   "bones": 18
+  },
+  {
+   "name": "Anim/km1_dance.csab",
+   "base": "km1_dance",
+   "duration": 20,
+   "bones": 19
+  },
+  {
+   "name": "Anim/daiku_utau_1.csab",
+   "base": "daiku_utau_1",
+   "duration": 60,
+   "bones": 21
+  },
+  {
+   "name": "Anim/daiku_utau_2.csab",
+   "base": "daiku_utau_2",
+   "duration": 60,
+   "bones": 20
+  },
+  {
+   "name": "Anim/fu_mawasare.csab",
+   "base": "fu_mawasare",
+   "duration": 42,
+   "bones": 14
+  },
+  {
+   "name": "Anim/ingo_katakumi.csab",
+   "base": "ingo_katakumi",
+   "duration": 40,
+   "bones": 22
+  },
+  {
+   "name": "Anim/taron_katakumi.csab",
+   "base": "taron_katakumi",
+   "duration": 40,
+   "bones": 19
+  },
+  {
+   "name": "Anim/zola_dance.csab",
+   "base": "zola_dance",
+   "duration": 45,
+   "bones": 21
+  },
+  {
+   "name": "Anim/nw_dance_A.csab",
+   "base": "nw_dance_A",
+   "duration": 140,
+   "bones": 9
+  },
+  {
+   "name": "Anim/nw_dance_B.csab",
+   "base": "nw_dance_B",
+   "duration": 140,
+   "bones": 9
+  },
+  {
+   "name": "Anim/nw_dance_C.csab",
+   "base": "nw_dance_C",
+   "duration": 140,
+   "bones": 9
+  },
+  {
+   "name": "Anim/shop_swing_1.csab",
+   "base": "shop_swing_1",
+   "duration": 60,
+   "bones": 8
+  },
+  {
+   "name": "Anim/shop_swing_2.csab",
+   "base": "shop_swing_2",
+   "duration": 60,
+   "bones": 8
+  },
+  {
+   "name": "Anim/shop_swing_3.csab",
+   "base": "shop_swing_3",
+   "duration": 60,
+   "bones": 8
+  },
+  {
+   "name": "Anim/shop_swing_4.csab",
+   "base": "shop_swing_4",
+   "duration": 60,
+   "bones": 8
+  },
+  {
+   "name": "Anim/km1_out_in_pose.csab",
+   "base": "km1_out_in_pose",
+   "duration": 27,
+   "bones": 19
+  },
+  {
+   "name": "Anim/oF1d_chyu_goron.csab",
+   "base": "oF1d_chyu_goron",
+   "duration": 25,
+   "bones": 19
+  },
+  {
+   "name": "Anim/ma2_utau.csab",
+   "base": "ma2_utau",
+   "duration": 58,
+   "bones": 20
+  }
+ ],
+ "/actor/zelda_efc_tw.zar": [
+  {
+   "name": "Anim/top_fc_mdl.csab",
+   "base": "top_fc_mdl",
+   "duration": 48,
+   "bones": 3
+  }
+ ],
+ "/actor/zelda_ei.zar": [
+  {
+   "name": "Anim/ei_wait.csab",
+   "base": "ei_wait",
+   "duration": 60,
+   "bones": 14
+  },
+  {
+   "name": "Anim/ei_rot.csab",
+   "base": "ei_rot",
+   "duration": 22,
+   "bones": 14
+  },
+  {
+   "name": "Anim/ei_swim.csab",
+   "base": "ei_swim",
+   "duration": 80,
+   "bones": 14
+  },
+  {
+   "name": "Anim/ei_dmg.csab",
+   "base": "ei_dmg",
+   "duration": 21,
+   "bones": 14
+  },
+  {
+   "name": "Anim/ei_die.csab",
+   "base": "ei_die",
+   "duration": 26,
+   "bones": 14
+  },
+  {
+   "name": "Anim/ei_death.csab",
+   "base": "ei_death",
+   "duration": 50,
+   "bones": 14
+  },
+  {
+   "name": "Anim/ei_hover.csab",
+   "base": "ei_hover",
+   "duration": 32,
+   "bones": 14
+  },
+  {
+   "name": "Anim/ei_hover2.csab",
+   "base": "ei_hover2",
+   "duration": 31,
+   "bones": 14
+  }
+ ],
+ "/actor/zelda_fa.zar": [
+  {
+   "name": "Anim/fad_n_wait.csab",
+   "base": "fad_n_wait",
+   "duration": 40,
+   "bones": 19
+  },
+  {
+   "name": "Anim/fad_kusukusu.csab",
+   "base": "fad_kusukusu",
+   "duration": 21,
+   "bones": 19
+  },
+  {
+   "name": "Anim/fad_kusu_to_wait.csab",
+   "base": "fad_kusu_to_wait",
+   "duration": 10,
+   "bones": 19
+  }
+ ],
+ "/actor/zelda_fd.zar": [
+  {
+   "name": "Anim/vb_FWDtest.csab",
+   "base": "vb_FWDtest",
+   "duration": 101,
+   "bones": 37
+  },
+  {
+   "name": "Anim/vb_headONLY.csab",
+   "base": "vb_headONLY",
+   "duration": 3,
+   "bones": 3
+  },
+  {
+   "name": "Anim/vb_LarmONLY.csab",
+   "base": "vb_LarmONLY",
+   "duration": 3,
+   "bones": 6
+  },
+  {
+   "name": "Anim/vb_RarmONLY.csab",
+   "base": "vb_RarmONLY",
+   "duration": 31,
+   "bones": 6
+  },
+  {
+   "name": "Anim/vba_atack.csab",
+   "base": "vba_atack",
+   "duration": 86,
+   "bones": 36
+  },
+  {
+   "name": "Anim/vba_beforedamage.csab",
+   "base": "vba_beforedamage",
+   "duration": 17,
+   "bones": 36
+  },
+  {
+   "name": "Anim/vba_damage.csab",
+   "base": "vba_damage",
+   "duration": 46,
+   "bones": 36
+  },
+  {
+   "name": "Anim/vba_down.csab",
+   "base": "vba_down",
+   "duration": 21,
+   "bones": 36
+  },
+  {
+   "name": "Anim/vba_hit.csab",
+   "base": "vba_hit",
+   "duration": 45,
+   "bones": 36
+  },
+  {
+   "name": "Anim/vba_pikupiku.csab",
+   "base": "vba_pikupiku",
+   "duration": 16,
+   "bones": 36
+  },
+  {
+   "name": "Anim/vba_search.csab",
+   "base": "vba_search",
+   "duration": 17,
+   "bones": 36
+  },
+  {
+   "name": "Anim/vba_tyokkai.csab",
+   "base": "vba_tyokkai",
+   "duration": 24,
+   "bones": 36
+  },
+  {
+   "name": "Anim/vba_up.csab",
+   "base": "vba_up",
+   "duration": 27,
+   "bones": 36
+  },
+  {
+   "name": "Anim/vba_wait02.csab",
+   "base": "vba_wait02",
+   "duration": 21,
+   "bones": 36
+  },
+  {
+   "name": "Anim/vba_wait.csab",
+   "base": "vba_wait",
+   "duration": 21,
+   "bones": 36
+  }
+ ],
+ "/actor/zelda_fr.zar": [
+  {
+   "name": "Anim/Jump.csab",
+   "base": "Jump",
+   "duration": 20,
+   "bones": 20
+  },
+  {
+   "name": "Anim/swing.csab",
+   "base": "swing",
+   "duration": 28,
+   "bones": 20
+  },
+  {
+   "name": "Anim/wait.csab",
+   "base": "wait",
+   "duration": 9,
+   "bones": 20
+  },
+  {
+   "name": "Anim/butterfly_fly.csab",
+   "base": "butterfly_fly",
+   "duration": 10,
+   "bones": 3
+  }
+ ],
+ "/actor/zelda_fu.zar": [
+  {
+   "name": "Anim/are_are.csab",
+   "base": "are_are",
+   "duration": 42,
+   "bones": 14
+  },
+  {
+   "name": "Anim/fu_mawasu.csab",
+   "base": "fu_mawasu",
+   "duration": 42,
+   "bones": 14
+  }
+ ],
+ "/actor/zelda_fw.zar": [
+  {
+   "name": "Anim/fire_dancer_greeting.csab",
+   "base": "fire_dancer_greeting",
+   "duration": 50,
+   "bones": 20
+  },
+  {
+   "name": "Anim/fire_dancer_jump.csab",
+   "base": "fire_dancer_jump",
+   "duration": 16,
+   "bones": 20
+  },
+  {
+   "name": "Anim/fire_dancer_landing.csab",
+   "base": "fire_dancer_landing",
+   "duration": 13,
+   "bones": 20
+  },
+  {
+   "name": "Anim/fire_dancer_turn_20f.csab",
+   "base": "fire_dancer_turn_20f",
+   "duration": 8,
+   "bones": 20
+  },
+  {
+   "name": "Anim/fire_dancer_run.csab",
+   "base": "fire_dancer_run",
+   "duration": 41,
+   "bones": 20
+  },
+  {
+   "name": "Anim/fire_walker_greeting_20f.csab",
+   "base": "fire_walker_greeting_20f",
+   "duration": 11,
+   "bones": 10
+  },
+  {
+   "name": "Anim/fire_walker_run_20f.csab",
+   "base": "fire_walker_run_20f",
+   "duration": 8,
+   "bones": 10
+  },
+  {
+   "name": "Anim/fire_walker_jump_20f.csab",
+   "base": "fire_walker_jump_20f",
+   "duration": 3,
+   "bones": 10
+  }
+ ],
+ "/actor/zelda_ganon2.zar": [
+  {
+   "name": "Anim/GF_aw.csab",
+   "base": "GF_aw",
+   "duration": 30,
+   "bones": 46
+  },
+  {
+   "name": "Anim/GF_f.csab",
+   "base": "GF_f",
+   "duration": 55,
+   "bones": 46
+  },
+  {
+   "name": "Anim/GF_hen_shin.csab",
+   "base": "GF_hen_shin",
+   "duration": 28,
+   "bones": 46
+  },
+  {
+   "name": "Anim/GF_sw.csab",
+   "base": "GF_sw",
+   "duration": 15,
+   "bones": 46
+  },
+  {
+   "name": "Anim/GF_tijimu.csab",
+   "base": "GF_tijimu",
+   "duration": 32,
+   "bones": 46
+  },
+  {
+   "name": "Anim/GF_tijimu_wait.csab",
+   "base": "GF_tijimu_wait",
+   "duration": 40,
+   "bones": 46
+  },
+  {
+   "name": "Anim/GF_tw.csab",
+   "base": "GF_tw",
+   "duration": 20,
+   "bones": 46
+  },
+  {
+   "name": "Anim/gn2_downDEMO.csab",
+   "base": "gn2_downDEMO",
+   "duration": 60,
+   "bones": 46
+  },
+  {
+   "name": "Anim/gn2_hukkiDEMO.csab",
+   "base": "gn2_hukkiDEMO",
+   "duration": 150,
+   "bones": 46
+  },
+  {
+   "name": "Anim/gn2_K_to_walk.csab",
+   "base": "gn2_K_to_walk",
+   "duration": 12,
+   "bones": 46
+  },
+  {
+   "name": "Anim/gn2_Katack01L.csab",
+   "base": "gn2_Katack01L",
+   "duration": 35,
+   "bones": 46
+  },
+  {
+   "name": "Anim/gn2_Katack01R.csab",
+   "base": "gn2_Katack01R",
+   "duration": 43,
+   "bones": 46
+  },
+  {
+   "name": "Anim/gn2_Kdamage.csab",
+   "base": "gn2_Kdamage",
+   "duration": 31,
+   "bones": 46
+  },
+  {
+   "name": "Anim/gn2_Kfrontwalk.csab",
+   "base": "gn2_Kfrontwalk",
+   "duration": 15,
+   "bones": 46
+  },
+  {
+   "name": "Anim/gn2_Ksidewalk.csab",
+   "base": "gn2_Ksidewalk",
+   "duration": 15,
+   "bones": 46
+  },
+  {
+   "name": "Anim/gn2_Kwait.csab",
+   "base": "gn2_Kwait",
+   "duration": 24,
+   "bones": 46
+  },
+  {
+   "name": "Anim/gn2_Lhit.csab",
+   "base": "gn2_Lhit",
+   "duration": 17,
+   "bones": 46
+  },
+  {
+   "name": "Anim/gn2_Lmahi.csab",
+   "base": "gn2_Lmahi",
+   "duration": 24,
+   "bones": 46
+  },
+  {
+   "name": "Anim/gn2_Lmahi_to_K.csab",
+   "base": "gn2_Lmahi_to_K",
+   "duration": 19,
+   "bones": 46
+  },
+  {
+   "name": "Anim/gn2_mahiDEMO.csab",
+   "base": "gn2_mahiDEMO",
+   "duration": 20,
+   "bones": 46
+  },
+  {
+   "name": "Anim/gn2_walk.csab",
+   "base": "gn2_walk",
+   "duration": 45,
+   "bones": 46
+  },
+  {
+   "name": "Anim/gn2_walk_to_K.csab",
+   "base": "gn2_walk_to_K",
+   "duration": 12,
+   "bones": 46
+  },
+  {
+   "name": "Anim/Last_hit_motion1.csab",
+   "base": "Last_hit_motion1",
+   "duration": 82,
+   "bones": 46
+  },
+  {
+   "name": "Anim/Last_hit_motion2.csab",
+   "base": "Last_hit_motion2",
+   "duration": 77,
+   "bones": 46
+  },
+  {
+   "name": "Anim/Last_mogaki.csab",
+   "base": "Last_mogaki",
+   "duration": 41,
+   "bones": 46
+  },
+  {
+   "name": "Anim/LG_DANGO.csab",
+   "base": "LG_DANGO",
+   "duration": 260,
+   "bones": 46
+  },
+  {
+   "name": "Anim/LG_Hoeru.csab",
+   "base": "LG_Hoeru",
+   "duration": 116,
+   "bones": 46
+  }
+ ],
+ "/actor/zelda_ge1.zar": [
+  {
+   "name": "Anim/ge1_mon_akeru.csab",
+   "base": "ge1_mon_akeru",
+   "duration": 25,
+   "bones": 15
+  },
+  {
+   "name": "Anim/ge1_s_wait.csab",
+   "base": "ge1_s_wait",
+   "duration": 22,
+   "bones": 15
+  },
+  {
+   "name": "Anim/ge1_matsu.csab",
+   "base": "ge1_matsu",
+   "duration": 2,
+   "bones": 15
+  },
+  {
+   "name": "Anim/ge1_hanasi.csab",
+   "base": "ge1_hanasi",
+   "duration": 8,
+   "bones": 15
+  }
+ ],
+ "/actor/zelda_gla.zar": [
+  {
+   "name": "Anim/geldA_attack.csab",
+   "base": "geldA_attack",
+   "duration": 10,
+   "bones": 17
+  },
+  {
+   "name": "Anim/geldA_attack_end.csab",
+   "base": "geldA_attack_end",
+   "duration": 12,
+   "bones": 17
+  },
+  {
+   "name": "Anim/geldA_down.csab",
+   "base": "geldA_down",
+   "duration": 30,
+   "bones": 17
+  },
+  {
+   "name": "Anim/geldA_find.csab",
+   "base": "geldA_find",
+   "duration": 11,
+   "bones": 17
+  },
+  {
+   "name": "Anim/geldA_find_wait.csab",
+   "base": "geldA_find_wait",
+   "duration": 26,
+   "bones": 17
+  },
+  {
+   "name": "Anim/geldA_run.csab",
+   "base": "geldA_run",
+   "duration": 13,
+   "bones": 17
+  },
+  {
+   "name": "Anim/geldA_wait.csab",
+   "base": "geldA_wait",
+   "duration": 59,
+   "bones": 17
+  },
+  {
+   "name": "Anim/geldA_walk.csab",
+   "base": "geldA_walk",
+   "duration": 25,
+   "bones": 17
+  }
+ ],
+ "/actor/zelda_gm.zar": [
+  {
+   "name": "Anim/oF1d_chyu_goron.csab",
+   "base": "oF1d_chyu_goron",
+   "duration": 25,
+   "bones": 19
+  }
+ ],
+ "/actor/zelda_gnd.zar": [
+  {
+   "name": "Anim/gnf_atack.csab",
+   "base": "gnf_atack",
+   "duration": 24,
+   "bones": 18
+  },
+  {
+   "name": "Anim/gnf_damage.csab",
+   "base": "gnf_damage",
+   "duration": 21,
+   "bones": 18
+  },
+  {
+   "name": "Anim/gnf_Ddamage.csab",
+   "base": "gnf_Ddamage",
+   "duration": 100,
+   "bones": 18
+  },
+  {
+   "name": "Anim/gnf_Dfurafura.csab",
+   "base": "gnf_Dfurafura",
+   "duration": 30,
+   "bones": 18
+  },
+  {
+   "name": "Anim/gnf_Dhenshin.csab",
+   "base": "gnf_Dhenshin",
+   "duration": 20,
+   "bones": 18
+  },
+  {
+   "name": "Anim/gnf_Dmogaki.csab",
+   "base": "gnf_Dmogaki",
+   "duration": 24,
+   "bones": 18
+  },
+  {
+   "name": "Anim/gnf_Dnormal.csab",
+   "base": "gnf_Dnormal",
+   "duration": 45,
+   "bones": 18
+  },
+  {
+   "name": "Anim/gnf_Dsaigo.csab",
+   "base": "gnf_Dsaigo",
+   "duration": 2,
+   "bones": 18
+  },
+  {
+   "name": "Anim/gnf_Dstand.csab",
+   "base": "gnf_Dstand",
+   "duration": 33,
+   "bones": 18
+  },
+  {
+   "name": "Anim/gnf_fastrun.csab",
+   "base": "gnf_fastrun",
+   "duration": 14,
+   "bones": 18
+  },
+  {
+   "name": "Anim/gnf_jump01.csab",
+   "base": "gnf_jump01",
+   "duration": 14,
+   "bones": 18
+  },
+  {
+   "name": "Anim/gnf_jump02.csab",
+   "base": "gnf_jump02",
+   "duration": 16,
+   "bones": 18
+  },
+  {
+   "name": "Anim/gnf_lonlyATACK02.csab",
+   "base": "gnf_lonlyATACK02",
+   "duration": 22,
+   "bones": 18
+  },
+  {
+   "name": "Anim/gnf_lonlyATACK.csab",
+   "base": "gnf_lonlyATACK",
+   "duration": 36,
+   "bones": 18
+  },
+  {
+   "name": "Anim/gnf_lonlyDAMAGE.csab",
+   "base": "gnf_lonlyDAMAGE",
+   "duration": 17,
+   "bones": 18
+  },
+  {
+   "name": "Anim/gnf_lonlyFLY.csab",
+   "base": "gnf_lonlyFLY",
+   "duration": 20,
+   "bones": 18
+  },
+  {
+   "name": "Anim/gnf_lonlyGUARD.csab",
+   "base": "gnf_lonlyGUARD",
+   "duration": 10,
+   "bones": 18
+  },
+  {
+   "name": "Anim/gnf_lonlyHIT.csab",
+   "base": "gnf_lonlyHIT",
+   "duration": 75,
+   "bones": 18
+  },
+  {
+   "name": "Anim/gnf_lonlyKAESHI02.csab",
+   "base": "gnf_lonlyKAESHI02",
+   "duration": 22,
+   "bones": 18
+  },
+  {
+   "name": "Anim/gnf_lonlyKAESHI.csab",
+   "base": "gnf_lonlyKAESHI",
+   "duration": 20,
+   "bones": 18
+  },
+  {
+   "name": "Anim/gnf_lonlyMAHI.csab",
+   "base": "gnf_lonlyMAHI",
+   "duration": 25,
+   "bones": 18
+  },
+  {
+   "name": "Anim/gnf_lonlyTSUKI02.csab",
+   "base": "gnf_lonlyTSUKI02",
+   "duration": 11,
+   "bones": 18
+  },
+  {
+   "name": "Anim/gnf_lonlyTSUKI.csab",
+   "base": "gnf_lonlyTSUKI",
+   "duration": 9,
+   "bones": 18
+  },
+  {
+   "name": "Anim/gnf_lonlyTSUKIwait.csab",
+   "base": "gnf_lonlyTSUKIwait",
+   "duration": 14,
+   "bones": 18
+  }
+ ],
+ "/actor/zelda_gndd.zar": [
+  {
+   "name": "Anim/gnd_anim_fastrun.csab",
+   "base": "gnd_anim_fastrun",
+   "duration": 24,
+   "bones": 22
+  },
+  {
+   "name": "Anim/gnd_anim_mahou.csab",
+   "base": "gnd_anim_mahou",
+   "duration": 15,
+   "bones": 22
+  },
+  {
+   "name": "Anim/gnd_anim_mahou_wait.csab",
+   "base": "gnd_anim_mahou_wait",
+   "duration": 80,
+   "bones": 22
+  },
+  {
+   "name": "Anim/gnd_anim_nirami.csab",
+   "base": "gnd_anim_nirami",
+   "duration": 15,
+   "bones": 22
+  },
+  {
+   "name": "Anim/gnd_anim_nirami_wait.csab",
+   "base": "gnd_anim_nirami_wait",
+   "duration": 81,
+   "bones": 22
+  },
+  {
+   "name": "Anim/gnd_anim_stand.csab",
+   "base": "gnd_anim_stand",
+   "duration": 33,
+   "bones": 22
+  },
+  {
+   "name": "Anim/gnd_anim_wait.csab",
+   "base": "gnd_anim_wait",
+   "duration": 80,
+   "bones": 22
+  },
+  {
+   "name": "Anim/gnd_demo_ojigi.csab",
+   "base": "gnd_demo_ojigi",
+   "duration": 30,
+   "bones": 22
+  },
+  {
+   "name": "Anim/gnd_demo_ojigi_furimuki.csab",
+   "base": "gnd_demo_ojigi_furimuki",
+   "duration": 40,
+   "bones": 22
+  },
+  {
+   "name": "Anim/gnd_demo_ojigi_wait.csab",
+   "base": "gnd_demo_ojigi_wait",
+   "duration": 30,
+   "bones": 22
+  },
+  {
+   "name": "Anim/gnd_demo_ukabi_wait.csab",
+   "base": "gnd_demo_ukabi_wait",
+   "duration": 30,
+   "bones": 22
+  },
+  {
+   "name": "Anim/gnd_demo_ukabi_warai.csab",
+   "base": "gnd_demo_ukabi_warai",
+   "duration": 15,
+   "bones": 22
+  },
+  {
+   "name": "Anim/gnd_demo_ukabi_warai_wait.csab",
+   "base": "gnd_demo_ukabi_warai_wait",
+   "duration": 30,
+   "bones": 22
+  },
+  {
+   "name": "Anim/gnd_walk.csab",
+   "base": "gnd_walk",
+   "duration": 30,
+   "bones": 22
+  }
+ ],
+ "/actor/zelda_goma.zar": [
+  {
+   "name": "Anim/go_after_umu.csab",
+   "base": "go_after_umu",
+   "duration": 21,
+   "bones": 33
+  },
+  {
+   "name": "Anim/go_atack01.csab",
+   "base": "go_atack01",
+   "duration": 14,
+   "bones": 33
+  },
+  {
+   "name": "Anim/go_atack02.csab",
+   "base": "go_atack02",
+   "duration": 16,
+   "bones": 33
+  },
+  {
+   "name": "Anim/go_atack03.csab",
+   "base": "go_atack03",
+   "duration": 14,
+   "bones": 33
+  },
+  {
+   "name": "Anim/go_Await.csab",
+   "base": "go_Await",
+   "duration": 20,
+   "bones": 33
+  },
+  {
+   "name": "Anim/go_chakuchi02.csab",
+   "base": "go_chakuchi02",
+   "duration": 10,
+   "bones": 33
+  },
+  {
+   "name": "Anim/go_chakuchi.csab",
+   "base": "go_chakuchi",
+   "duration": 8,
+   "bones": 33
+  },
+  {
+   "name": "Anim/go_clim.csab",
+   "base": "go_clim",
+   "duration": 14,
+   "bones": 33
+  },
+  {
+   "name": "Anim/go_damage.csab",
+   "base": "go_damage",
+   "duration": 13,
+   "bones": 33
+  },
+  {
+   "name": "Anim/go_down.csab",
+   "base": "go_down",
+   "duration": 255,
+   "bones": 33
+  },
+  {
+   "name": "Anim/go_pre_atack.csab",
+   "base": "go_pre_atack",
+   "duration": 30,
+   "bones": 33
+  },
+  {
+   "name": "Anim/go_stan.csab",
+   "base": "go_stan",
+   "duration": 19,
+   "bones": 33
+  },
+  {
+   "name": "Anim/go_startdemo02.csab",
+   "base": "go_startdemo02",
+   "duration": 45,
+   "bones": 33
+  },
+  {
+   "name": "Anim/go_startdemo.csab",
+   "base": "go_startdemo",
+   "duration": 80,
+   "bones": 33
+  },
+  {
+   "name": "Anim/go_umu.csab",
+   "base": "go_umu",
+   "duration": 30,
+   "bones": 33
+  },
+  {
+   "name": "Anim/go_Uwait.csab",
+   "base": "go_Uwait",
+   "duration": 31,
+   "bones": 33
+  },
+  {
+   "name": "Anim/go_Uwalk.csab",
+   "base": "go_Uwalk",
+   "duration": 20,
+   "bones": 33
+  },
+  {
+   "name": "Anim/go_wait.csab",
+   "base": "go_wait",
+   "duration": 40,
+   "bones": 33
+  },
+  {
+   "name": "Anim/go_walk.csab",
+   "base": "go_walk",
+   "duration": 30,
+   "bones": 33
+  }
+ ],
+ "/actor/zelda_gr.zar": [
+  {
+   "name": "Anim/gr_run.csab",
+   "base": "gr_run",
+   "duration": 17,
+   "bones": 16
+  },
+  {
+   "name": "Anim/gr_wait.csab",
+   "base": "gr_wait",
+   "duration": 15,
+   "bones": 16
+  }
+ ],
+ "/actor/zelda_haka_door.zar": [
+  {
+   "name": "Anim/clink_demo_doorA_door.csab",
+   "base": "clink_demo_doorA_door",
+   "duration": 89,
+   "bones": 4
+  },
+  {
+   "name": "Anim/clink_demo_doorB_door.csab",
+   "base": "clink_demo_doorB_door",
+   "duration": 86,
+   "bones": 4
+  },
+  {
+   "name": "Anim/link_demo_doorA_door.csab",
+   "base": "link_demo_doorA_door",
+   "duration": 67,
+   "bones": 4
+  },
+  {
+   "name": "Anim/link_demo_doorB_door.csab",
+   "base": "link_demo_doorB_door",
+   "duration": 75,
+   "bones": 4
+  }
+ ],
+ "/actor/zelda_hata.zar": [
+  {
+   "name": "Anim/ht_hata.csab",
+   "base": "ht_hata",
+   "duration": 25,
+   "bones": 20
+  }
+ ],
+ "/actor/zelda_hintnuts.zar": [
+  {
+   "name": "Anim/dnh_start.csab",
+   "base": "dnh_start",
+   "duration": 21,
+   "bones": 9
+  },
+  {
+   "name": "Anim/dnh_dig.csab",
+   "base": "dnh_dig",
+   "duration": 11,
+   "bones": 9
+  },
+  {
+   "name": "Anim/dnh_wait.csab",
+   "base": "dnh_wait",
+   "duration": 15,
+   "bones": 9
+  },
+  {
+   "name": "Anim/dnh_lookaround.csab",
+   "base": "dnh_lookaround",
+   "duration": 27,
+   "bones": 9
+  },
+  {
+   "name": "Anim/dnh_atack.csab",
+   "base": "dnh_atack",
+   "duration": 19,
+   "bones": 9
+  },
+  {
+   "name": "Anim/dnh_jump.csab",
+   "base": "dnh_jump",
+   "duration": 16,
+   "bones": 9
+  },
+  {
+   "name": "Anim/dnh_walk.csab",
+   "base": "dnh_walk",
+   "duration": 13,
+   "bones": 9
+  },
+  {
+   "name": "Anim/dnh_talk.csab",
+   "base": "dnh_talk",
+   "duration": 16,
+   "bones": 9
+  },
+  {
+   "name": "Anim/dnh_mahi.csab",
+   "base": "dnh_mahi",
+   "duration": 16,
+   "bones": 9
+  }
+ ],
+ "/actor/zelda_hni.zar": [
+  {
+   "name": "Anim/hni_jump100.csab",
+   "base": "hni_jump100",
+   "duration": 23,
+   "bones": 25
+  },
+  {
+   "name": "Anim/hni_jump200.csab",
+   "base": "hni_jump200",
+   "duration": 30,
+   "bones": 25
+  },
+  {
+   "name": "Anim/hni_stand.csab",
+   "base": "hni_stand",
+   "duration": 33,
+   "bones": 25
+  },
+  {
+   "name": "Anim/hni_stop.csab",
+   "base": "hni_stop",
+   "duration": 36,
+   "bones": 25
+  },
+  {
+   "name": "Anim/hni_wait.csab",
+   "base": "hni_wait",
+   "duration": 80,
+   "bones": 25
+  },
+  {
+   "name": "Anim/hni_wait02.csab",
+   "base": "hni_wait02",
+   "duration": 30,
+   "bones": 25
+  },
+  {
+   "name": "Anim/hni_walk.csab",
+   "base": "hni_walk",
+   "duration": 35,
+   "bones": 25
+  },
+  {
+   "name": "Anim/hni_walk_30.csab",
+   "base": "hni_walk_30",
+   "duration": 53,
+   "bones": 25
+  },
+  {
+   "name": "Anim/hni_slowrun_30.csab",
+   "base": "hni_slowrun_30",
+   "duration": 44,
+   "bones": 25
+  },
+  {
+   "name": "Anim/hni_fastrun_30.csab",
+   "base": "hni_fastrun_30",
+   "duration": 36,
+   "bones": 25
+  },
+  {
+   "name": "Anim/hni_land.csab",
+   "base": "hni_land",
+   "duration": 6,
+   "bones": 25
+  },
+  {
+   "name": "Anim/hni_land1002.csab",
+   "base": "hni_land1002",
+   "duration": 6,
+   "bones": 25
+  },
+  {
+   "name": "Anim/hni_fastrun_to_slowrun.csab",
+   "base": "hni_fastrun_to_slowrun",
+   "duration": 44,
+   "bones": 25
+  },
+  {
+   "name": "Anim/hni_slowrun_to_fastrun.csab",
+   "base": "hni_slowrun_to_fastrun",
+   "duration": 36,
+   "bones": 25
+  },
+  {
+   "name": "Anim/hni_carrotrun.csab",
+   "base": "hni_carrotrun",
+   "duration": 36,
+   "bones": 25
+  },
+  {
+   "name": "Anim/hni_stop_s.csab",
+   "base": "hni_stop_s",
+   "duration": 36,
+   "bones": 25
+  }
+ ],
+ "/actor/zelda_horse.zar": [
+  {
+   "name": "Anim/hl_anim_wait2.csab",
+   "base": "hl_anim_wait2",
+   "duration": 120,
+   "bones": 25
+  },
+  {
+   "name": "Anim/hl_anim_wait022.csab",
+   "base": "hl_anim_wait022",
+   "duration": 30,
+   "bones": 25
+  },
+  {
+   "name": "Anim/hl_anim_stop2.csab",
+   "base": "hl_anim_stop2",
+   "duration": 65,
+   "bones": 25
+  },
+  {
+   "name": "Anim/hl_anim_jump1002.csab",
+   "base": "hl_anim_jump1002",
+   "duration": 23,
+   "bones": 25
+  },
+  {
+   "name": "Anim/hl_anim_jump2002.csab",
+   "base": "hl_anim_jump2002",
+   "duration": 30,
+   "bones": 25
+  },
+  {
+   "name": "Anim/hl_anim_stand2.csab",
+   "base": "hl_anim_stand2",
+   "duration": 33,
+   "bones": 25
+  },
+  {
+   "name": "Anim/hl_anim_carrotrun.csab",
+   "base": "hl_anim_carrotrun",
+   "duration": 36,
+   "bones": 25
+  },
+  {
+   "name": "Anim/hl_anim_land.csab",
+   "base": "hl_anim_land",
+   "duration": 6,
+   "bones": 25
+  },
+  {
+   "name": "Anim/hl_anim_land1002.csab",
+   "base": "hl_anim_land1002",
+   "duration": 6,
+   "bones": 25
+  },
+  {
+   "name": "Anim/hl_anim_fastrun2_30.csab",
+   "base": "hl_anim_fastrun2_30",
+   "duration": 36,
+   "bones": 25
+  },
+  {
+   "name": "Anim/hl_anim_slowrun2_30.csab",
+   "base": "hl_anim_slowrun2_30",
+   "duration": 44,
+   "bones": 25
+  },
+  {
+   "name": "Anim/hl_anim_walk2_30.csab",
+   "base": "hl_anim_walk2_30",
+   "duration": 53,
+   "bones": 25
+  },
+  {
+   "name": "Anim/hl_anim_fastrun_to_slowrun.csab",
+   "base": "hl_anim_fastrun_to_slowrun",
+   "duration": 44,
+   "bones": 25
+  },
+  {
+   "name": "Anim/hl_anim_slowrun_to_fastrun.csab",
+   "base": "hl_anim_slowrun_to_fastrun",
+   "duration": 36,
+   "bones": 25
+  },
+  {
+   "name": "Anim/hl_anim_stop2_s.csab",
+   "base": "hl_anim_stop2_s",
+   "duration": 65,
+   "bones": 25
+  }
+ ],
+ "/actor/zelda_horse_ganon.zar": [
+  {
+   "name": "Anim/hg_anim_fastrun.csab",
+   "base": "hg_anim_fastrun",
+   "duration": 24,
+   "bones": 25
+  },
+  {
+   "name": "Anim/hg_anim_slowrun.csab",
+   "base": "hg_anim_slowrun",
+   "duration": 29,
+   "bones": 25
+  },
+  {
+   "name": "Anim/hg_anim_stand.csab",
+   "base": "hg_anim_stand",
+   "duration": 33,
+   "bones": 25
+  },
+  {
+   "name": "Anim/hg_anim_wait02.csab",
+   "base": "hg_anim_wait02",
+   "duration": 30,
+   "bones": 25
+  },
+  {
+   "name": "Anim/hg_anim_wait.csab",
+   "base": "hg_anim_wait",
+   "duration": 80,
+   "bones": 25
+  },
+  {
+   "name": "Anim/hg_anim_walk.csab",
+   "base": "hg_anim_walk",
+   "duration": 35,
+   "bones": 25
+  }
+ ],
+ "/actor/zelda_horse_normal.zar": [
+  {
+   "name": "Anim/hn_anim_fastrun.csab",
+   "base": "hn_anim_fastrun",
+   "duration": 24,
+   "bones": 24
+  },
+  {
+   "name": "Anim/hn_anim_jump100.csab",
+   "base": "hn_anim_jump100",
+   "duration": 24,
+   "bones": 24
+  },
+  {
+   "name": "Anim/hn_anim_jump200.csab",
+   "base": "hn_anim_jump200",
+   "duration": 31,
+   "bones": 24
+  },
+  {
+   "name": "Anim/hn_anim_slowrun.csab",
+   "base": "hn_anim_slowrun",
+   "duration": 29,
+   "bones": 24
+  },
+  {
+   "name": "Anim/hn_anim_stand.csab",
+   "base": "hn_anim_stand",
+   "duration": 33,
+   "bones": 24
+  },
+  {
+   "name": "Anim/hn_anim_stop.csab",
+   "base": "hn_anim_stop",
+   "duration": 65,
+   "bones": 24
+  },
+  {
+   "name": "Anim/hn_anim_wait.csab",
+   "base": "hn_anim_wait",
+   "duration": 80,
+   "bones": 24
+  },
+  {
+   "name": "Anim/hn_anim_wait02.csab",
+   "base": "hn_anim_wait02",
+   "duration": 30,
+   "bones": 24
+  },
+  {
+   "name": "Anim/hn_anim_walk.csab",
+   "base": "hn_anim_walk",
+   "duration": 35,
+   "bones": 24
+  }
+ ],
+ "/actor/zelda_horse_zelda.zar": [
+  {
+   "name": "Anim/hz_fastrun_2.csab",
+   "base": "hz_fastrun_2",
+   "duration": 14,
+   "bones": 24
+  }
+ ],
+ "/actor/zelda_hs.zar": [
+  {
+   "name": "Anim/h_purupuru.csab",
+   "base": "h_purupuru",
+   "duration": 24,
+   "bones": 11
+  },
+  {
+   "name": "Anim/h_tanomuu.csab",
+   "base": "h_tanomuu",
+   "duration": 14,
+   "bones": 11
+  },
+  {
+   "name": "Anim/hs_matsu.csab",
+   "base": "hs_matsu",
+   "duration": 30,
+   "bones": 11
+  }
+ ],
+ "/actor/zelda_ik.zar": [
+  {
+   "name": "Anim/ironknack_attackA.csab",
+   "base": "ironknack_attackA",
+   "duration": 38,
+   "bones": 29
+  },
+  {
+   "name": "Anim/ironknack_attackA_end.csab",
+   "base": "ironknack_attackA_end",
+   "duration": 21,
+   "bones": 29
+  },
+  {
+   "name": "Anim/ironknack_attackA_hit.csab",
+   "base": "ironknack_attackA_hit",
+   "duration": 12,
+   "bones": 29
+  },
+  {
+   "name": "Anim/ironknack_attackB.csab",
+   "base": "ironknack_attackB",
+   "duration": 27,
+   "bones": 29
+  },
+  {
+   "name": "Anim/ironknack_attackB_end.csab",
+   "base": "ironknack_attackB_end",
+   "duration": 22,
+   "bones": 29
+  },
+  {
+   "name": "Anim/ironknack_back_hit.csab",
+   "base": "ironknack_back_hit",
+   "duration": 18,
+   "bones": 29
+  },
+  {
+   "name": "Anim/ironknack_defense.csab",
+   "base": "ironknack_defense",
+   "duration": 5,
+   "bones": 29
+  },
+  {
+   "name": "Anim/ironknack_down.csab",
+   "base": "ironknack_down",
+   "duration": 50,
+   "bones": 29
+  },
+  {
+   "name": "Anim/ironknack_front_hit.csab",
+   "base": "ironknack_front_hit",
+   "duration": 18,
+   "bones": 29
+  },
+  {
+   "name": "Anim/ironknack_run.csab",
+   "base": "ironknack_run",
+   "duration": 15,
+   "bones": 29
+  },
+  {
+   "name": "Anim/ironknack_stand_demo.csab",
+   "base": "ironknack_stand_demo",
+   "duration": 215,
+   "bones": 29
+  },
+  {
+   "name": "Anim/ironknack_stand_up.csab",
+   "base": "ironknack_stand_up",
+   "duration": 32,
+   "bones": 29
+  },
+  {
+   "name": "Anim/ironknack_wait.csab",
+   "base": "ironknack_wait",
+   "duration": 48,
+   "bones": 29
+  },
+  {
+   "name": "Anim/ironknack_wait_hit.csab",
+   "base": "ironknack_wait_hit",
+   "duration": 13,
+   "bones": 29
+  },
+  {
+   "name": "Anim/ironknack_walk.csab",
+   "base": "ironknack_walk",
+   "duration": 31,
+   "bones": 29
+  },
+  {
+   "name": "Anim/ironknack_walk_stop.csab",
+   "base": "ironknack_walk_stop",
+   "duration": 18,
+   "bones": 29
+  },
+  {
+   "name": "Anim/naborknack_damage_demo.csab",
+   "base": "naborknack_damage_demo",
+   "duration": 55,
+   "bones": 29
+  },
+  {
+   "name": "Anim/kabutoL_damage_demo.csab",
+   "base": "kabutoL_damage_demo",
+   "duration": 61,
+   "bones": 1
+  },
+  {
+   "name": "Anim/kabutoR_damage_demo.csab",
+   "base": "kabutoR_damage_demo",
+   "duration": 61,
+   "bones": 1
+  },
+  {
+   "name": "Anim/frontarmer_damage_demo.csab",
+   "base": "frontarmer_damage_demo",
+   "duration": 60,
+   "bones": 1
+  },
+  {
+   "name": "Anim/front_armer_drop.csab",
+   "base": "front_armer_drop",
+   "duration": 71,
+   "bones": 1
+  },
+  {
+   "name": "Anim/LshoulderA_drop.csab",
+   "base": "LshoulderA_drop",
+   "duration": 71,
+   "bones": 1
+  },
+  {
+   "name": "Anim/RshoulderB_drop.csab",
+   "base": "RshoulderB_drop",
+   "duration": 56,
+   "bones": 1
+  },
+  {
+   "name": "Anim/backarmer_damage_demo.csab",
+   "base": "backarmer_damage_demo",
+   "duration": 61,
+   "bones": 1
+  }
+ ],
+ "/actor/zelda_im.zar": [
+  {
+   "name": "Anim/impa_banzai.csab",
+   "base": "impa_banzai",
+   "duration": 30,
+   "bones": 19
+  },
+  {
+   "name": "Anim/impa_banzai_wait.csab",
+   "base": "impa_banzai_wait",
+   "duration": 30,
+   "bones": 19
+  },
+  {
+   "name": "Anim/impa_kieru.csab",
+   "base": "impa_kieru",
+   "duration": 30,
+   "bones": 19
+  },
+  {
+   "name": "Anim/impa_matsu.csab",
+   "base": "impa_matsu",
+   "duration": 30,
+   "bones": 19
+  },
+  {
+   "name": "Anim/impa_miage_wait.csab",
+   "base": "impa_miage_wait",
+   "duration": 30,
+   "bones": 19
+  },
+  {
+   "name": "Anim/impa_miageru.csab",
+   "base": "impa_miageru",
+   "duration": 39,
+   "bones": 19
+  },
+  {
+   "name": "Anim/inpa_y_kuti.csab",
+   "base": "inpa_y_kuti",
+   "duration": 40,
+   "bones": 19
+  },
+  {
+   "name": "Anim/inpa_y_roop.csab",
+   "base": "inpa_y_roop",
+   "duration": 55,
+   "bones": 19
+  },
+  {
+   "name": "Anim/km_inp1.csab",
+   "base": "km_inp1",
+   "duration": 15,
+   "bones": 19
+  },
+  {
+   "name": "Anim/km_inp2.csab",
+   "base": "km_inp2",
+   "duration": 25,
+   "bones": 19
+  },
+  {
+   "name": "Anim/impa_anim_fastrun.csab",
+   "base": "impa_anim_fastrun",
+   "duration": 14,
+   "bones": 19
+  },
+  {
+   "name": "Anim/impa_anim_fast_run_okarina.csab",
+   "base": "impa_anim_fast_run_okarina",
+   "duration": 72,
+   "bones": 19
+  }
+ ],
+ "/actor/zelda_in.zar": [
+  {
+   "name": "Anim/in2_fusagu.csab",
+   "base": "in2_fusagu",
+   "duration": 12,
+   "bones": 22
+  },
+  {
+   "name": "Anim/in2_kachi.csab",
+   "base": "in2_kachi",
+   "duration": 46,
+   "bones": 22
+  },
+  {
+   "name": "Anim/in2_kuyasii.csab",
+   "base": "in2_kuyasii",
+   "duration": 49,
+   "bones": 22
+  },
+  {
+   "name": "Anim/in_matsu1.csab",
+   "base": "in_matsu1",
+   "duration": 2,
+   "bones": 22
+  },
+  {
+   "name": "Anim/in_matsu2.csab",
+   "base": "in_matsu2",
+   "duration": 30,
+   "bones": 22
+  },
+  {
+   "name": "Anim/in_neru1.csab",
+   "base": "in_neru1",
+   "duration": 50,
+   "bones": 22
+  },
+  {
+   "name": "Anim/in_pekopeko.csab",
+   "base": "in_pekopeko",
+   "duration": 24,
+   "bones": 22
+  },
+  {
+   "name": "Anim/in_shigoto.csab",
+   "base": "in_shigoto",
+   "duration": 30,
+   "bones": 22
+  },
+  {
+   "name": "Anim/ingo_anim_fastrun.csab",
+   "base": "ingo_anim_fastrun",
+   "duration": 24,
+   "bones": 22
+  },
+  {
+   "name": "Anim/ingo_anim_fastrun_muti.csab",
+   "base": "ingo_anim_fastrun_muti",
+   "duration": 24,
+   "bones": 22
+  },
+  {
+   "name": "Anim/ingo_anim_slowrun.csab",
+   "base": "ingo_anim_slowrun",
+   "duration": 29,
+   "bones": 22
+  },
+  {
+   "name": "Anim/ingo_anim_slowrun_muti.csab",
+   "base": "ingo_anim_slowrun_muti",
+   "duration": 29,
+   "bones": 22
+  },
+  {
+   "name": "Anim/ingo_anim_stop.csab",
+   "base": "ingo_anim_stop",
+   "duration": 36,
+   "bones": 22
+  },
+  {
+   "name": "Anim/ingo_anim_stop_muti.csab",
+   "base": "ingo_anim_stop_muti",
+   "duration": 75,
+   "bones": 22
+  },
+  {
+   "name": "Anim/ingo_anim_wait1.csab",
+   "base": "ingo_anim_wait1",
+   "duration": 30,
+   "bones": 22
+  },
+  {
+   "name": "Anim/ingo_anim_wait2.csab",
+   "base": "ingo_anim_wait2",
+   "duration": 80,
+   "bones": 22
+  }
+ ],
+ "/actor/zelda_jj.zar": [
+  {
+   "name": "Anim/jj_wait.csab",
+   "base": "jj_wait",
+   "duration": 82,
+   "bones": 12
+  }
+ ],
+ "/actor/zelda_js.zar": [
+  {
+   "name": "Anim/js_maido.csab",
+   "base": "js_maido",
+   "duration": 21,
+   "bones": 11
+  },
+  {
+   "name": "Anim/js_matsu.csab",
+   "base": "js_matsu",
+   "duration": 27,
+   "bones": 11
+  }
+ ],
+ "/actor/zelda_ka.zar": [
+  {
+   "name": "Anim/ka_dance.csab",
+   "base": "ka_dance",
+   "duration": 21,
+   "bones": 8
+  }
+ ],
+ "/actor/zelda_km1.zar": [
+  {
+   "name": "Anim/fad_kusukusu.csab",
+   "base": "fad_kusukusu",
+   "duration": 40,
+   "bones": 19
+  },
+  {
+   "name": "Anim/fad_kusu_to_wait.csab",
+   "base": "fad_kusu_to_wait",
+   "duration": 10,
+   "bones": 19
+  },
+  {
+   "name": "Anim/fad_n_wait.csab",
+   "base": "fad_n_wait",
+   "duration": 40,
+   "bones": 19
+  },
+  {
+   "name": "Anim/km1_agura_pose.csab",
+   "base": "km1_agura_pose",
+   "duration": 30,
+   "bones": 19
+  },
+  {
+   "name": "Anim/km1_asekaki_wait.csab",
+   "base": "km1_asekaki_wait",
+   "duration": 20,
+   "bones": 19
+  },
+  {
+   "name": "Anim/km1_backcyu.csab",
+   "base": "km1_backcyu",
+   "duration": 22,
+   "bones": 19
+  },
+  {
+   "name": "Anim/km1_bed_suwari_pose.csab",
+   "base": "km1_bed_suwari_pose",
+   "duration": 24,
+   "bones": 19
+  },
+  {
+   "name": "Anim/km1_doushite_pose.csab",
+   "base": "km1_doushite_pose",
+   "duration": 30,
+   "bones": 19
+  },
+  {
+   "name": "Anim/km1_hiji_suwari_pose.csab",
+   "base": "km1_hiji_suwari_pose",
+   "duration": 24,
+   "bones": 19
+  },
+  {
+   "name": "Anim/km1_ijiiji.csab",
+   "base": "km1_ijiiji",
+   "duration": 20,
+   "bones": 19
+  },
+  {
+   "name": "Anim/km1_ishi_wait.csab",
+   "base": "km1_ishi_wait",
+   "duration": 19,
+   "bones": 19
+  },
+  {
+   "name": "Anim/km1_kusakari.csab",
+   "base": "km1_kusakari",
+   "duration": 19,
+   "bones": 19
+  },
+  {
+   "name": "Anim/km1_kususu_pose.csab",
+   "base": "km1_kususu_pose",
+   "duration": 30,
+   "bones": 19
+  },
+  {
+   "name": "Anim/km1_miage_pose.csab",
+   "base": "km1_miage_pose",
+   "duration": 24,
+   "bones": 19
+  },
+  {
+   "name": "Anim/km1_nani_pose.csab",
+   "base": "km1_nani_pose",
+   "duration": 24,
+   "bones": 19
+  },
+  {
+   "name": "Anim/km1_niterunar_pose.csab",
+   "base": "km1_niterunar_pose",
+   "duration": 24,
+   "bones": 19
+  },
+  {
+   "name": "Anim/km1_nokezori_pose.csab",
+   "base": "km1_nokezori_pose",
+   "duration": 24,
+   "bones": 19
+  },
+  {
+   "name": "Anim/km1_osiete_wait.csab",
+   "base": "km1_osiete_wait",
+   "duration": 20,
+   "bones": 19
+  },
+  {
+   "name": "Anim/km1_setsumei_pose.csab",
+   "base": "km1_setsumei_pose",
+   "duration": 24,
+   "bones": 19
+  },
+  {
+   "name": "Anim/km1_shinpai_pose.csab",
+   "base": "km1_shinpai_pose",
+   "duration": 24,
+   "bones": 19
+  },
+  {
+   "name": "Anim/km1_suwari_pose.csab",
+   "base": "km1_suwari_pose",
+   "duration": 24,
+   "bones": 19
+  },
+  {
+   "name": "Anim/km1_udekumi_pose.csab",
+   "base": "km1_udekumi_pose",
+   "duration": 25,
+   "bones": 19
+  },
+  {
+   "name": "Anim/km1_ukiuki_wait.csab",
+   "base": "km1_ukiuki_wait",
+   "duration": 34,
+   "bones": 19
+  },
+  {
+   "name": "Anim/km1_usirote_pose.csab",
+   "base": "km1_usirote_pose",
+   "duration": 24,
+   "bones": 19
+  },
+  {
+   "name": "Anim/km1_utsumuki_pose.csab",
+   "base": "km1_utsumuki_pose",
+   "duration": 20,
+   "bones": 19
+  },
+  {
+   "name": "Anim/km1_omise.csab",
+   "base": "km1_omise",
+   "duration": 30,
+   "bones": 19
+  },
+  {
+   "name": "Anim/kw1_out_in_pose1.csab",
+   "base": "kw1_out_in_pose1",
+   "duration": 25,
+   "bones": 19
+  },
+  {
+   "name": "Anim/kw1_out_in_pose2.csab",
+   "base": "kw1_out_in_pose2",
+   "duration": 21,
+   "bones": 19
+  },
+  {
+   "name": "Anim/kw1_out_in_pose3.csab",
+   "base": "kw1_out_in_pose3",
+   "duration": 25,
+   "bones": 19
+  },
+  {
+   "name": "Anim/kw1_out_in_pose4.csab",
+   "base": "kw1_out_in_pose4",
+   "duration": 25,
+   "bones": 19
+  },
+  {
+   "name": "Anim/km1_out_in_pose1.csab",
+   "base": "km1_out_in_pose1",
+   "duration": 31,
+   "bones": 19
+  },
+  {
+   "name": "Anim/km1_out_in_pose2.csab",
+   "base": "km1_out_in_pose2",
+   "duration": 25,
+   "bones": 19
+  },
+  {
+   "name": "Anim/km1_out_in_pose3.csab",
+   "base": "km1_out_in_pose3",
+   "duration": 14,
+   "bones": 19
+  },
+  {
+   "name": "Anim/km1_out_in_pose4.csab",
+   "base": "km1_out_in_pose4",
+   "duration": 12,
+   "bones": 19
+  }
+ ],
+ "/actor/zelda_kw1.zar": [
+  {
+   "name": "Anim/fad_kusukusu.csab",
+   "base": "fad_kusukusu",
+   "duration": 40,
+   "bones": 19
+  },
+  {
+   "name": "Anim/fad_kusu_to_wait.csab",
+   "base": "fad_kusu_to_wait",
+   "duration": 10,
+   "bones": 19
+  },
+  {
+   "name": "Anim/fad_n_wait.csab",
+   "base": "fad_n_wait",
+   "duration": 40,
+   "bones": 19
+  },
+  {
+   "name": "Anim/km1_agura_pose.csab",
+   "base": "km1_agura_pose",
+   "duration": 30,
+   "bones": 19
+  },
+  {
+   "name": "Anim/km1_asekaki_wait.csab",
+   "base": "km1_asekaki_wait",
+   "duration": 20,
+   "bones": 19
+  },
+  {
+   "name": "Anim/km1_backcyu.csab",
+   "base": "km1_backcyu",
+   "duration": 19,
+   "bones": 19
+  },
+  {
+   "name": "Anim/km1_bed_suwari_pose.csab",
+   "base": "km1_bed_suwari_pose",
+   "duration": 24,
+   "bones": 19
+  },
+  {
+   "name": "Anim/km1_doushite_pose.csab",
+   "base": "km1_doushite_pose",
+   "duration": 30,
+   "bones": 19
+  },
+  {
+   "name": "Anim/km1_hiji_suwari_pose.csab",
+   "base": "km1_hiji_suwari_pose",
+   "duration": 24,
+   "bones": 19
+  },
+  {
+   "name": "Anim/km1_ijiiji.csab",
+   "base": "km1_ijiiji",
+   "duration": 20,
+   "bones": 19
+  },
+  {
+   "name": "Anim/km1_ishi_wait.csab",
+   "base": "km1_ishi_wait",
+   "duration": 19,
+   "bones": 19
+  },
+  {
+   "name": "Anim/km1_kusakari.csab",
+   "base": "km1_kusakari",
+   "duration": 19,
+   "bones": 19
+  },
+  {
+   "name": "Anim/km1_kususu_pose.csab",
+   "base": "km1_kususu_pose",
+   "duration": 30,
+   "bones": 19
+  },
+  {
+   "name": "Anim/km1_miage_pose.csab",
+   "base": "km1_miage_pose",
+   "duration": 24,
+   "bones": 19
+  },
+  {
+   "name": "Anim/km1_nani_pose.csab",
+   "base": "km1_nani_pose",
+   "duration": 24,
+   "bones": 19
+  },
+  {
+   "name": "Anim/km1_niterunar_pose.csab",
+   "base": "km1_niterunar_pose",
+   "duration": 24,
+   "bones": 19
+  },
+  {
+   "name": "Anim/km1_nokezori_pose.csab",
+   "base": "km1_nokezori_pose",
+   "duration": 24,
+   "bones": 19
+  },
+  {
+   "name": "Anim/km1_osiete_wait.csab",
+   "base": "km1_osiete_wait",
+   "duration": 20,
+   "bones": 19
+  },
+  {
+   "name": "Anim/km1_setsumei_pose.csab",
+   "base": "km1_setsumei_pose",
+   "duration": 24,
+   "bones": 19
+  },
+  {
+   "name": "Anim/km1_shinpai_pose.csab",
+   "base": "km1_shinpai_pose",
+   "duration": 24,
+   "bones": 19
+  },
+  {
+   "name": "Anim/km1_suwari_pose.csab",
+   "base": "km1_suwari_pose",
+   "duration": 24,
+   "bones": 19
+  },
+  {
+   "name": "Anim/km1_udekumi_pose.csab",
+   "base": "km1_udekumi_pose",
+   "duration": 25,
+   "bones": 19
+  },
+  {
+   "name": "Anim/km1_ukiuki_wait.csab",
+   "base": "km1_ukiuki_wait",
+   "duration": 34,
+   "bones": 19
+  },
+  {
+   "name": "Anim/km1_usirote_pose.csab",
+   "base": "km1_usirote_pose",
+   "duration": 24,
+   "bones": 19
+  },
+  {
+   "name": "Anim/km1_utsumuki_pose.csab",
+   "base": "km1_utsumuki_pose",
+   "duration": 20,
+   "bones": 19
+  },
+  {
+   "name": "Anim/km1_omise.csab",
+   "base": "km1_omise",
+   "duration": 30,
+   "bones": 19
+  },
+  {
+   "name": "Anim/kw1_out_in_pose1.csab",
+   "base": "kw1_out_in_pose1",
+   "duration": 25,
+   "bones": 19
+  },
+  {
+   "name": "Anim/kw1_out_in_pose2.csab",
+   "base": "kw1_out_in_pose2",
+   "duration": 21,
+   "bones": 19
+  },
+  {
+   "name": "Anim/kw1_out_in_pose3.csab",
+   "base": "kw1_out_in_pose3",
+   "duration": 25,
+   "bones": 19
+  },
+  {
+   "name": "Anim/kw1_out_in_pose4.csab",
+   "base": "kw1_out_in_pose4",
+   "duration": 25,
+   "bones": 19
+  },
+  {
+   "name": "Anim/km1_out_in_pose1.csab",
+   "base": "km1_out_in_pose1",
+   "duration": 31,
+   "bones": 19
+  },
+  {
+   "name": "Anim/km1_out_in_pose2.csab",
+   "base": "km1_out_in_pose2",
+   "duration": 25,
+   "bones": 19
+  },
+  {
+   "name": "Anim/km1_out_in_pose3.csab",
+   "base": "km1_out_in_pose3",
+   "duration": 14,
+   "bones": 19
+  },
+  {
+   "name": "Anim/km1_out_in_pose4.csab",
+   "base": "km1_out_in_pose4",
+   "duration": 12,
+   "bones": 19
+  }
+ ],
+ "/actor/zelda_kz.zar": [
+  {
+   "name": "Anim/kz_kani.csab",
+   "base": "kz_kani",
+   "duration": 25,
+   "bones": 26
+  },
+  {
+   "name": "Anim/kz_matsu.csab",
+   "base": "kz_matsu",
+   "duration": 25,
+   "bones": 26
+  }
+ ],
+ "/actor/zelda_ma1.zar": [
+  {
+   "name": "Anim/ma1_hanasi.csab",
+   "base": "ma1_hanasi",
+   "duration": 7,
+   "bones": 19
+  },
+  {
+   "name": "Anim/ma1_matsu.csab",
+   "base": "ma1_matsu",
+   "duration": 29,
+   "bones": 19
+  },
+  {
+   "name": "Anim/ma1_utau.csab",
+   "base": "ma1_utau",
+   "duration": 60,
+   "bones": 19
+  }
+ ],
+ "/actor/zelda_ma2.zar": [
+  {
+   "name": "Anim/ma2_matsu.csab",
+   "base": "ma2_matsu",
+   "duration": 30,
+   "bones": 20
+  },
+  {
+   "name": "Anim/ma2_moshikashite.csab",
+   "base": "ma2_moshikashite",
+   "duration": 15,
+   "bones": 20
+  },
+  {
+   "name": "Anim/ma2_shigoto.csab",
+   "base": "ma2_shigoto",
+   "duration": 30,
+   "bones": 20
+  },
+  {
+   "name": "Anim/ma2_utau.csab",
+   "base": "ma2_utau",
+   "duration": 58,
+   "bones": 20
+  }
+ ],
+ "/actor/zelda_mag.zar": [
+  {
+   "name": "Anim/title_test.csab",
+   "base": "title_test",
+   "duration": 120,
+   "bones": 13
+  },
+  {
+   "name": "Anim/title_logo_jpeu.csab",
+   "base": "title_logo_jpeu",
+   "duration": 120,
+   "bones": 12
+  },
+  {
+   "name": "Anim/title_logo_us.csab",
+   "base": "title_logo_us",
+   "duration": 120,
+   "bones": 13
+  }
+ ],
+ "/actor/zelda_mastergolon.zar": [
+  {
+   "name": "Anim/oF1d_omise.csab",
+   "base": "oF1d_omise",
+   "duration": 23,
+   "bones": 19
+  }
+ ],
+ "/actor/zelda_masterzoora.zar": [
+  {
+   "name": "Anim/zo_omise.csab",
+   "base": "zo_omise",
+   "duration": 29,
+   "bones": 21
+  }
+ ],
+ "/actor/zelda_mb.zar": [
+  {
+   "name": "Anim/mbV_n_wait.csab",
+   "base": "mbV_n_wait",
+   "duration": 61,
+   "bones": 16
+  },
+  {
+   "name": "Anim/mbV_s_wait.csab",
+   "base": "mbV_s_wait",
+   "duration": 60,
+   "bones": 16
+  },
+  {
+   "name": "Anim/mbV_walk_start.csab",
+   "base": "mbV_walk_start",
+   "duration": 10,
+   "bones": 16
+  },
+  {
+   "name": "Anim/mbV_walk.csab",
+   "base": "mbV_walk",
+   "duration": 40,
+   "bones": 16
+  },
+  {
+   "name": "Anim/mbV_bjump.csab",
+   "base": "mbV_bjump",
+   "duration": 17,
+   "bones": 16
+  },
+  {
+   "name": "Anim/mbV_pose.csab",
+   "base": "mbV_pose",
+   "duration": 7,
+   "bones": 16
+  },
+  {
+   "name": "Anim/mbV_run.csab",
+   "base": "mbV_run",
+   "duration": 8,
+   "bones": 16
+  },
+  {
+   "name": "Anim/mbV_stop.csab",
+   "base": "mbV_stop",
+   "duration": 7,
+   "bones": 16
+  },
+  {
+   "name": "Anim/mbV_turn.csab",
+   "base": "mbV_turn",
+   "duration": 4,
+   "bones": 16
+  },
+  {
+   "name": "Anim/mbV_f_dmg.csab",
+   "base": "mbV_f_dmg",
+   "duration": 7,
+   "bones": 16
+  },
+  {
+   "name": "Anim/mbV_b_dmg.csab",
+   "base": "mbV_b_dmg",
+   "duration": 7,
+   "bones": 16
+  },
+  {
+   "name": "Anim/mbV_f_die.csab",
+   "base": "mbV_f_die",
+   "duration": 40,
+   "bones": 16
+  },
+  {
+   "name": "Anim/mbV_b_die.csab",
+   "base": "mbV_b_die",
+   "duration": 22,
+   "bones": 16
+  },
+  {
+   "name": "Anim/mbV_walk_end.csab",
+   "base": "mbV_walk_end",
+   "duration": 12,
+   "bones": 16
+  },
+  {
+   "name": "Anim/mn_wait.csab",
+   "base": "mn_wait",
+   "duration": 60,
+   "bones": 16
+  },
+  {
+   "name": "Anim/mn_brandish.csab",
+   "base": "mn_brandish",
+   "duration": 24,
+   "bones": 16
+  },
+  {
+   "name": "Anim/mn_lift.csab",
+   "base": "mn_lift",
+   "duration": 60,
+   "bones": 16
+  },
+  {
+   "name": "Anim/mn_attack.csab",
+   "base": "mn_attack",
+   "duration": 9,
+   "bones": 16
+  },
+  {
+   "name": "Anim/mn_dmg.csab",
+   "base": "mn_dmg",
+   "duration": 9,
+   "bones": 16
+  },
+  {
+   "name": "Anim/mn_sit.csab",
+   "base": "mn_sit",
+   "duration": 20,
+   "bones": 16
+  },
+  {
+   "name": "Anim/mn_standup.csab",
+   "base": "mn_standup",
+   "duration": 31,
+   "bones": 16
+  },
+  {
+   "name": "Anim/mn_sitdmg.csab",
+   "base": "mn_sitdmg",
+   "duration": 7,
+   "bones": 16
+  },
+  {
+   "name": "Anim/mn_die.csab",
+   "base": "mn_die",
+   "duration": 67,
+   "bones": 16
+  },
+  {
+   "name": "Anim/mbV_r_turn.csab",
+   "base": "mbV_r_turn",
+   "duration": 37,
+   "bones": 16
+  },
+  {
+   "name": "Anim/mbV_l_turn.csab",
+   "base": "mbV_l_turn",
+   "duration": 37,
+   "bones": 16
+  },
+  {
+   "name": "Anim/mn_startdemo.csab",
+   "base": "mn_startdemo",
+   "duration": 102,
+   "bones": 16
+  },
+  {
+   "name": "Anim/mbV_l_turn90.csab",
+   "base": "mbV_l_turn90",
+   "duration": 17,
+   "bones": 16
+  },
+  {
+   "name": "Anim/mbV_r_turn90.csab",
+   "base": "mbV_r_turn90",
+   "duration": 17,
+   "bones": 16
+  }
+ ],
+ "/actor/zelda_md.zar": [
+  {
+   "name": "Anim/md_matsu_kani.csab",
+   "base": "md_matsu_kani",
+   "duration": 16,
+   "bones": 18
+  },
+  {
+   "name": "Anim/mido_are_to_okoru_a.csab",
+   "base": "mido_are_to_okoru_a",
+   "duration": 17,
+   "bones": 18
+  },
+  {
+   "name": "Anim/mido_are_to_okoru_b.csab",
+   "base": "mido_are_to_okoru_b",
+   "duration": 7,
+   "bones": 18
+  },
+  {
+   "name": "Anim/mido_are_wait.csab",
+   "base": "mido_are_wait",
+   "duration": 24,
+   "bones": 18
+  },
+  {
+   "name": "Anim/mido_kihon_to_okoru.csab",
+   "base": "mido_kihon_to_okoru",
+   "duration": 4,
+   "bones": 18
+  },
+  {
+   "name": "Anim/mido_kihon_to_stop.csab",
+   "base": "mido_kihon_to_stop",
+   "duration": 6,
+   "bones": 18
+  },
+  {
+   "name": "Anim/mido_kihon_to_walk.csab",
+   "base": "mido_kihon_to_walk",
+   "duration": 4,
+   "bones": 18
+  },
+  {
+   "name": "Anim/mido_okoru_to_stop.csab",
+   "base": "mido_okoru_to_stop",
+   "duration": 9,
+   "bones": 18
+  },
+  {
+   "name": "Anim/mido_okoru_wait.csab",
+   "base": "mido_okoru_wait",
+   "duration": 16,
+   "bones": 18
+  },
+  {
+   "name": "Anim/mido_stop_to_are.csab",
+   "base": "mido_stop_to_are",
+   "duration": 12,
+   "bones": 18
+  },
+  {
+   "name": "Anim/mido_stop_wait.csab",
+   "base": "mido_stop_wait",
+   "duration": 18,
+   "bones": 18
+  },
+  {
+   "name": "Anim/mido_walk_loop.csab",
+   "base": "mido_walk_loop",
+   "duration": 14,
+   "bones": 18
+  }
+ ],
+ "/actor/zelda_mizu_objects.zar": [
+  {
+   "name": "Anim/clink_demo_doorA_door.csab",
+   "base": "clink_demo_doorA_door",
+   "duration": 89,
+   "bones": 4
+  },
+  {
+   "name": "Anim/clink_demo_doorB_door.csab",
+   "base": "clink_demo_doorB_door",
+   "duration": 86,
+   "bones": 4
+  },
+  {
+   "name": "Anim/link_demo_doorA_door.csab",
+   "base": "link_demo_doorA_door",
+   "duration": 67,
+   "bones": 4
+  },
+  {
+   "name": "Anim/link_demo_doorB_door.csab",
+   "base": "link_demo_doorB_door",
+   "duration": 75,
+   "bones": 4
+  }
+ ],
+ "/actor/zelda_mk.zar": [
+  {
+   "name": "Anim/h_odoroku.csab",
+   "base": "h_odoroku",
+   "duration": 14,
+   "bones": 14
+  },
+  {
+   "name": "Anim/h_sagyou.csab",
+   "base": "h_sagyou",
+   "duration": 15,
+   "bones": 14
+  },
+  {
+   "name": "Anim/h_yorokobu.csab",
+   "base": "h_yorokobu",
+   "duration": 16,
+   "bones": 14
+  },
+  {
+   "name": "Anim/mk_matsu.csab",
+   "base": "mk_matsu",
+   "duration": 42,
+   "bones": 14
+  }
+ ],
+ "/actor/zelda_mm.zar": [
+  {
+   "name": "Anim/hasiruu.csab",
+   "base": "hasiruu",
+   "duration": 20,
+   "bones": 15
+  },
+  {
+   "name": "Anim/mm_run01.csab",
+   "base": "mm_run01",
+   "duration": 9,
+   "bones": 15
+  },
+  {
+   "name": "Anim/mm_tatsu.csab",
+   "base": "mm_tatsu",
+   "duration": 35,
+   "bones": 15
+  },
+  {
+   "name": "Anim/mm_yoru.csab",
+   "base": "mm_yoru",
+   "duration": 24,
+   "bones": 15
+  },
+  {
+   "name": "Anim/uttekure.csab",
+   "base": "uttekure",
+   "duration": 32,
+   "bones": 15
+  },
+  {
+   "name": "Anim/yorokobi_long.csab",
+   "base": "yorokobi_long",
+   "duration": 47,
+   "bones": 15
+  }
+ ],
+ "/actor/zelda_ms.zar": [
+  {
+   "name": "Anim/ms_matsu.csab",
+   "base": "ms_matsu",
+   "duration": 78,
+   "bones": 12
+  }
+ ],
+ "/actor/zelda_mu.zar": [
+  {
+   "name": "Anim/mu_matsu.csab",
+   "base": "mu_matsu",
+   "duration": 24,
+   "bones": 8
+  },
+  {
+   "name": "Anim/tg_matsu.csab",
+   "base": "tg_matsu",
+   "duration": 45,
+   "bones": 14
+  }
+ ],
+ "/actor/zelda_nb.zar": [
+  {
+   "name": "Anim/km_nabo.csab",
+   "base": "km_nabo",
+   "duration": 14,
+   "bones": 22
+  },
+  {
+   "name": "Anim/nabor_agura_wait.csab",
+   "base": "nabor_agura_wait",
+   "duration": 24,
+   "bones": 22
+  },
+  {
+   "name": "Anim/nabor_banzai.csab",
+   "base": "nabor_banzai",
+   "duration": 30,
+   "bones": 22
+  },
+  {
+   "name": "Anim/nabor_banzai_wait.csab",
+   "base": "nabor_banzai_wait",
+   "duration": 30,
+   "bones": 22
+  },
+  {
+   "name": "Anim/nabor_furimuki_l.csab",
+   "base": "nabor_furimuki_l",
+   "duration": 6,
+   "bones": 22
+  },
+  {
+   "name": "Anim/nabor_furimuki_l_wait.csab",
+   "base": "nabor_furimuki_l_wait",
+   "duration": 24,
+   "bones": 22
+  },
+  {
+   "name": "Anim/nabor_furimuki_r.csab",
+   "base": "nabor_furimuki_r",
+   "duration": 10,
+   "bones": 22
+  },
+  {
+   "name": "Anim/nabor_furimuki_r_wait.csab",
+   "base": "nabor_furimuki_r_wait",
+   "duration": 24,
+   "bones": 22
+  },
+  {
+   "name": "Anim/nabor_hiza_wait.csab",
+   "base": "nabor_hiza_wait",
+   "duration": 24,
+   "bones": 22
+  },
+  {
+   "name": "Anim/nabor_kihon_talk_wait.csab",
+   "base": "nabor_kihon_talk_wait",
+   "duration": 23,
+   "bones": 22
+  },
+  {
+   "name": "Anim/nabor_kihon_to_walk.csab",
+   "base": "nabor_kihon_to_walk",
+   "duration": 6,
+   "bones": 22
+  },
+  {
+   "name": "Anim/nabor_miage_wait.csab",
+   "base": "nabor_miage_wait",
+   "duration": 24,
+   "bones": 22
+  },
+  {
+   "name": "Anim/nabor_miageru.csab",
+   "base": "nabor_miageru",
+   "duration": 20,
+   "bones": 22
+  },
+  {
+   "name": "Anim/nabor_run_to_hit.csab",
+   "base": "nabor_run_to_hit",
+   "duration": 16,
+   "bones": 22
+  },
+  {
+   "name": "Anim/nabor_shagami_to_kihon.csab",
+   "base": "nabor_shagami_to_kihon",
+   "duration": 10,
+   "bones": 22
+  },
+  {
+   "name": "Anim/nabor_shagami_wait.csab",
+   "base": "nabor_shagami_wait",
+   "duration": 24,
+   "bones": 22
+  },
+  {
+   "name": "Anim/nabor_taoreru.csab",
+   "base": "nabor_taoreru",
+   "duration": 80,
+   "bones": 22
+  },
+  {
+   "name": "Anim/nabor_walk_loop.csab",
+   "base": "nabor_walk_loop",
+   "duration": 17,
+   "bones": 22
+  },
+  {
+   "name": "Anim/nb_matsu.csab",
+   "base": "nb_matsu",
+   "duration": 25,
+   "bones": 22
+  },
+  {
+   "name": "Anim/nabor_suna_otiru_wait.csab",
+   "base": "nabor_suna_otiru_wait",
+   "duration": 10,
+   "bones": 22
+  },
+  {
+   "name": "Anim/nabor_suna_wait.csab",
+   "base": "nabor_suna_wait",
+   "duration": 40,
+   "bones": 22
+  },
+  {
+   "name": "Anim/nabor_suna_otiru.csab",
+   "base": "nabor_suna_otiru",
+   "duration": 20,
+   "bones": 22
+  }
+ ],
+ "/actor/zelda_os.zar": [
+  {
+   "name": "Anim/os_matsu.csab",
+   "base": "os_matsu",
+   "duration": 25,
+   "bones": 8
+  }
+ ],
+ "/actor/zelda_owl.zar": [
+  {
+   "name": "Anim/owl_wait.csab",
+   "base": "owl_wait",
+   "duration": 30,
+   "bones": 11
+  },
+  {
+   "name": "Anim/owl_openwing.csab",
+   "base": "owl_openwing",
+   "duration": 15,
+   "bones": 20
+  },
+  {
+   "name": "Anim/hovering.csab",
+   "base": "hovering",
+   "duration": 60,
+   "bones": 20
+  },
+  {
+   "name": "Anim/owl_fly.csab",
+   "base": "owl_fly",
+   "duration": 15,
+   "bones": 20
+  },
+  {
+   "name": "Anim/owl_kakku.csab",
+   "base": "owl_kakku",
+   "duration": 2,
+   "bones": 20
+  }
+ ],
+ "/actor/zelda_po_composer.zar": [
+  {
+   "name": "Anim/pom_atack.csab",
+   "base": "pom_atack",
+   "duration": 12,
+   "bones": 17
+  },
+  {
+   "name": "Anim/pom_damage.csab",
+   "base": "pom_damage",
+   "duration": 16,
+   "bones": 17
+  },
+  {
+   "name": "Anim/pom_escape.csab",
+   "base": "pom_escape",
+   "duration": 8,
+   "bones": 17
+  },
+  {
+   "name": "Anim/pom_fly.csab",
+   "base": "pom_fly",
+   "duration": 16,
+   "bones": 17
+  },
+  {
+   "name": "Anim/pom_start.csab",
+   "base": "pom_start",
+   "duration": 30,
+   "bones": 17
+  },
+  {
+   "name": "Anim/pom_wait.csab",
+   "base": "pom_wait",
+   "duration": 20,
+   "bones": 17
+  }
+ ],
+ "/actor/zelda_po_field.zar": [
+  {
+   "name": "Anim/pog_wait.csab",
+   "base": "pog_wait",
+   "duration": 20,
+   "bones": 16
+  },
+  {
+   "name": "Anim/pog_start.csab",
+   "base": "pog_start",
+   "duration": 30,
+   "bones": 16
+  },
+  {
+   "name": "Anim/pog_fly.csab",
+   "base": "pog_fly",
+   "duration": 16,
+   "bones": 16
+  },
+  {
+   "name": "Anim/pog_atack.csab",
+   "base": "pog_atack",
+   "duration": 12,
+   "bones": 16
+  },
+  {
+   "name": "Anim/pog_damage.csab",
+   "base": "pog_damage",
+   "duration": 16,
+   "bones": 16
+  },
+  {
+   "name": "Anim/pog_escape.csab",
+   "base": "pog_escape",
+   "duration": 8,
+   "bones": 16
+  }
+ ],
+ "/actor/zelda_po_sisters.zar": [
+  {
+   "name": "Anim/pob_wait.csab",
+   "base": "pob_wait",
+   "duration": 20,
+   "bones": 18
+  },
+  {
+   "name": "Anim/pob_start.csab",
+   "base": "pob_start",
+   "duration": 30,
+   "bones": 18
+  },
+  {
+   "name": "Anim/pob_fly.csab",
+   "base": "pob_fly",
+   "duration": 16,
+   "bones": 18
+  },
+  {
+   "name": "Anim/pob_atack.csab",
+   "base": "pob_atack",
+   "duration": 8,
+   "bones": 18
+  },
+  {
+   "name": "Anim/pob_damage.csab",
+   "base": "pob_damage",
+   "duration": 16,
+   "bones": 18
+  },
+  {
+   "name": "Anim/pob_escape.csab",
+   "base": "pob_escape",
+   "duration": 8,
+   "bones": 18
+  },
+  {
+   "name": "Anim/pob_cry.csab",
+   "base": "pob_cry",
+   "duration": 48,
+   "bones": 18
+  }
+ ],
+ "/actor/zelda_ps.zar": [
+  {
+   "name": "Anim/ps_matsu.csab",
+   "base": "ps_matsu",
+   "duration": 90,
+   "bones": 10
+  },
+  {
+   "name": "Anim/ps_tataku.csab",
+   "base": "ps_tataku",
+   "duration": 30,
+   "bones": 10
+  }
+ ],
+ "/actor/zelda_rd.zar": [
+  {
+   "name": "Anim/re_dead_cry_20f.csab",
+   "base": "re_dead_cry_20f",
+   "duration": 60,
+   "bones": 17
+  },
+  {
+   "name": "Anim/re_dead_cryB_20f.csab",
+   "base": "re_dead_cryB_20f",
+   "duration": 41,
+   "bones": 17
+  },
+  {
+   "name": "Anim/re_dead_standing_20f.csab",
+   "base": "re_dead_standing_20f",
+   "duration": 33,
+   "bones": 17
+  },
+  {
+   "name": "Anim/re_dead_wait_20f.csab",
+   "base": "re_dead_wait_20f",
+   "duration": 28,
+   "bones": 17
+  },
+  {
+   "name": "Anim/re_dead_back_turn_20f.csab",
+   "base": "re_dead_back_turn_20f",
+   "duration": 15,
+   "bones": 17
+  },
+  {
+   "name": "Anim/re_dead_walk_20f.csab",
+   "base": "re_dead_walk_20f",
+   "duration": 27,
+   "bones": 17
+  },
+  {
+   "name": "Anim/re_dead_hit_20f.csab",
+   "base": "re_dead_hit_20f",
+   "duration": 20,
+   "bones": 17
+  },
+  {
+   "name": "Anim/re_dead_down_20f.csab",
+   "base": "re_dead_down_20f",
+   "duration": 45,
+   "bones": 17
+  },
+  {
+   "name": "Anim/re_dead_attack_start_20f.csab",
+   "base": "re_dead_attack_start_20f",
+   "duration": 9,
+   "bones": 17
+  },
+  {
+   "name": "Anim/re_dead_attack_20f.csab",
+   "base": "re_dead_attack_20f",
+   "duration": 12,
+   "bones": 17
+  },
+  {
+   "name": "Anim/re_dead_attack_end_20f.csab",
+   "base": "re_dead_attack_end_20f",
+   "duration": 12,
+   "bones": 17
+  }
+ ],
+ "/actor/zelda_rl.zar": [
+  {
+   "name": "Anim/rl_matsu.csab",
+   "base": "rl_matsu",
+   "duration": 27,
+   "bones": 23
+  },
+  {
+   "name": "Anim/raul_banzai.csab",
+   "base": "raul_banzai",
+   "duration": 30,
+   "bones": 23
+  },
+  {
+   "name": "Anim/raul_banzai_wait.csab",
+   "base": "raul_banzai_wait",
+   "duration": 30,
+   "bones": 23
+  }
+ ],
+ "/actor/zelda_rs.zar": [
+  {
+   "name": "Anim/rs_matsu.csab",
+   "base": "rs_matsu",
+   "duration": 40,
+   "bones": 8
+  }
+ ],
+ "/actor/zelda_ru1.zar": [
+  {
+   "name": "Anim/ru1_matsu.csab",
+   "base": "ru1_matsu",
+   "duration": 23,
+   "bones": 19
+  },
+  {
+   "name": "Anim/cyu_matsu.csab",
+   "base": "cyu_matsu",
+   "duration": 31,
+   "bones": 19
+  },
+  {
+   "name": "Anim/koruto_shagamu.csab",
+   "base": "koruto_shagamu",
+   "duration": 29,
+   "bones": 19
+  },
+  {
+   "name": "Anim/koruto_shagami_wait.csab",
+   "base": "koruto_shagami_wait",
+   "duration": 30,
+   "bones": 19
+  },
+  {
+   "name": "Anim/koruto_jitabata.csab",
+   "base": "koruto_jitabata",
+   "duration": 8,
+   "bones": 19
+  },
+  {
+   "name": "Anim/koruto_mitsuketa.csab",
+   "base": "koruto_mitsuketa",
+   "duration": 8,
+   "bones": 19
+  },
+  {
+   "name": "Anim/koruto_furimuki.csab",
+   "base": "koruto_furimuki",
+   "duration": 25,
+   "bones": 19
+  },
+  {
+   "name": "Anim/koruto_walk_2.csab",
+   "base": "koruto_walk_2",
+   "duration": 10,
+   "bones": 19
+  },
+  {
+   "name": "Anim/koruto_drop_2.csab",
+   "base": "koruto_drop_2",
+   "duration": 4,
+   "bones": 19
+  },
+  {
+   "name": "Anim/koruto_run_banzai.csab",
+   "base": "koruto_run_banzai",
+   "duration": 70,
+   "bones": 19
+  },
+  {
+   "name": "Anim/koruto_banzai_wait.csab",
+   "base": "koruto_banzai_wait",
+   "duration": 24,
+   "bones": 19
+  },
+  {
+   "name": "Anim/koruto_banzai_modoru.csab",
+   "base": "koruto_banzai_modoru",
+   "duration": 15,
+   "bones": 19
+  },
+  {
+   "name": "Anim/koruto_ottotto.csab",
+   "base": "koruto_ottotto",
+   "duration": 21,
+   "bones": 19
+  },
+  {
+   "name": "Anim/tatioyogu.csab",
+   "base": "tatioyogu",
+   "duration": 40,
+   "bones": 19
+  },
+  {
+   "name": "Anim/mog.csab",
+   "base": "mog",
+   "duration": 30,
+   "bones": 19
+  },
+  {
+   "name": "Anim/seoyogi.csab",
+   "base": "seoyogi",
+   "duration": 32,
+   "bones": 19
+  },
+  {
+   "name": "Anim/korutoteisi.csab",
+   "base": "korutoteisi",
+   "duration": 30,
+   "bones": 19
+  },
+  {
+   "name": "Anim/puhaaruto.csab",
+   "base": "puhaaruto",
+   "duration": 20,
+   "bones": 19
+  },
+  {
+   "name": "Anim/demo_okori_wait.csab",
+   "base": "demo_okori_wait",
+   "duration": 40,
+   "bones": 19
+  },
+  {
+   "name": "Anim/demo_suwari.csab",
+   "base": "demo_suwari",
+   "duration": 20,
+   "bones": 19
+  },
+  {
+   "name": "Anim/demo_suwari_wait.csab",
+   "base": "demo_suwari_wait",
+   "duration": 40,
+   "bones": 19
+  },
+  {
+   "name": "Anim/demo_warp.csab",
+   "base": "demo_warp",
+   "duration": 30,
+   "bones": 19
+  }
+ ],
+ "/actor/zelda_ru2.zar": [
+  {
+   "name": "Anim/km_luto.csab",
+   "base": "km_luto",
+   "duration": 14,
+   "bones": 24
+  },
+  {
+   "name": "Anim/ru2_matsu.csab",
+   "base": "ru2_matsu",
+   "duration": 29,
+   "bones": 24
+  },
+  {
+   "name": "Anim/ruto_banzai.csab",
+   "base": "ruto_banzai",
+   "duration": 30,
+   "bones": 24
+  },
+  {
+   "name": "Anim/ruto_end_furimuki.csab",
+   "base": "ruto_end_furimuki",
+   "duration": 20,
+   "bones": 24
+  },
+  {
+   "name": "Anim/ruto_end_wait.csab",
+   "base": "ruto_end_wait",
+   "duration": 24,
+   "bones": 24
+  },
+  {
+   "name": "Anim/ruto_furimuki_wait.csab",
+   "base": "ruto_furimuki_wait",
+   "duration": 24,
+   "bones": 24
+  },
+  {
+   "name": "Anim/ruto_swim_up.csab",
+   "base": "ruto_swim_up",
+   "duration": 20,
+   "bones": 24
+  }
+ ],
+ "/actor/zelda_sa.zar": [
+  {
+   "name": "Anim/saria_banzai.csab",
+   "base": "saria_banzai",
+   "duration": 30,
+   "bones": 19
+  },
+  {
+   "name": "Anim/saria_banzai_wait.csab",
+   "base": "saria_banzai_wait",
+   "duration": 20,
+   "bones": 19
+  },
+  {
+   "name": "Anim/saria_demo_aogimi.csab",
+   "base": "saria_demo_aogimi",
+   "duration": 14,
+   "bones": 19
+  },
+  {
+   "name": "Anim/saria_demo_run.csab",
+   "base": "saria_demo_run",
+   "duration": 20,
+   "bones": 19
+  },
+  {
+   "name": "Anim/saria_demo_yahho.csab",
+   "base": "saria_demo_yahho",
+   "duration": 24,
+   "bones": 19
+  },
+  {
+   "name": "Anim/saria_furikaeru.csab",
+   "base": "saria_furikaeru",
+   "duration": 65,
+   "bones": 19
+  },
+  {
+   "name": "Anim/saria_kihon_to_matteru.csab",
+   "base": "saria_kihon_to_matteru",
+   "duration": 14,
+   "bones": 19
+  },
+  {
+   "name": "Anim/saria_kihon_to_odoroki.csab",
+   "base": "saria_kihon_to_odoroki",
+   "duration": 9,
+   "bones": 19
+  },
+  {
+   "name": "Anim/saria_kihon_to_okoru.csab",
+   "base": "saria_kihon_to_okoru",
+   "duration": 11,
+   "bones": 19
+  },
+  {
+   "name": "Anim/saria_matteru_wait.csab",
+   "base": "saria_matteru_wait",
+   "duration": 24,
+   "bones": 19
+  },
+  {
+   "name": "Anim/saria_odoroki_to_kihon.csab",
+   "base": "saria_odoroki_to_kihon",
+   "duration": 27,
+   "bones": 19
+  },
+  {
+   "name": "Anim/saria_odoroki_wait.csab",
+   "base": "saria_odoroki_wait",
+   "duration": 24,
+   "bones": 19
+  },
+  {
+   "name": "Anim/saria_okoru_wait.csab",
+   "base": "saria_okoru_wait",
+   "duration": 24,
+   "bones": 19
+  },
+  {
+   "name": "Anim/saria_tomodachi.csab",
+   "base": "saria_tomodachi",
+   "duration": 13,
+   "bones": 19
+  },
+  {
+   "name": "Anim/sa_hanasi_modoru.csab",
+   "base": "sa_hanasi_modoru",
+   "duration": 40,
+   "bones": 19
+  },
+  {
+   "name": "Anim/sa_matsu.csab",
+   "base": "sa_matsu",
+   "duration": 24,
+   "bones": 19
+  },
+  {
+   "name": "Anim/sa_okarina.csab",
+   "base": "sa_okarina",
+   "duration": 42,
+   "bones": 19
+  },
+  {
+   "name": "Anim/sa_okarina_hanasi.csab",
+   "base": "sa_okarina_hanasi",
+   "duration": 42,
+   "bones": 19
+  },
+  {
+   "name": "Anim/sa_umai.csab",
+   "base": "sa_umai",
+   "duration": 44,
+   "bones": 19
+  },
+  {
+   "name": "Anim/sa_umai_okarina.csab",
+   "base": "sa_umai_okarina",
+   "duration": 65,
+   "bones": 19
+  },
+  {
+   "name": "Anim/saria_uresi.csab",
+   "base": "saria_uresi",
+   "duration": 33,
+   "bones": 19
+  },
+  {
+   "name": "Anim/saria_ok_motsu_wait.csab",
+   "base": "saria_ok_motsu_wait",
+   "duration": 24,
+   "bones": 19
+  },
+  {
+   "name": "Anim/saria_hasi_wait.csab",
+   "base": "saria_hasi_wait",
+   "duration": 24,
+   "bones": 19
+  },
+  {
+   "name": "Anim/saria_ok_ageru.csab",
+   "base": "saria_ok_ageru",
+   "duration": 19,
+   "bones": 19
+  },
+  {
+   "name": "Anim/saria_ok_ageru_wait.csab",
+   "base": "saria_ok_ageru_wait",
+   "duration": 24,
+   "bones": 19
+  },
+  {
+   "name": "Anim/saria_end_wait.csab",
+   "base": "saria_end_wait",
+   "duration": 24,
+   "bones": 19
+  },
+  {
+   "name": "Anim/km_saria.csab",
+   "base": "km_saria",
+   "duration": 75,
+   "bones": 19
+  },
+  {
+   "name": "Anim/saria_end_miorosi.csab",
+   "base": "saria_end_miorosi",
+   "duration": 19,
+   "bones": 19
+  },
+  {
+   "name": "Anim/saria_end_modoru.csab",
+   "base": "saria_end_modoru",
+   "duration": 43,
+   "bones": 19
+  },
+  {
+   "name": "Anim/sa_umai_wait.csab",
+   "base": "sa_umai_wait",
+   "duration": 20,
+   "bones": 19
+  },
+  {
+   "name": "Anim/sa_okarina_hanasi_wait.csab",
+   "base": "sa_okarina_hanasi_wait",
+   "duration": 21,
+   "bones": 19
+  }
+ ],
+ "/actor/zelda_sb.zar": [
+  {
+   "name": "Anim/sb_wait.csab",
+   "base": "sb_wait",
+   "duration": 21,
+   "bones": 5
+  },
+  {
+   "name": "Anim/sb_open.csab",
+   "base": "sb_open",
+   "duration": 7,
+   "bones": 5
+  },
+  {
+   "name": "Anim/sb_close.csab",
+   "base": "sb_close",
+   "duration": 5,
+   "bones": 5
+  },
+  {
+   "name": "Anim/sb_jump_start.csab",
+   "base": "sb_jump_start",
+   "duration": 7,
+   "bones": 5
+  },
+  {
+   "name": "Anim/sb_jump_end.csab",
+   "base": "sb_jump_end",
+   "duration": 7,
+   "bones": 5
+  }
+ ],
+ "/actor/zelda_sd.zar": [
+  {
+   "name": "Anim/sd_matsu.csab",
+   "base": "sd_matsu",
+   "duration": 30,
+   "bones": 16
+  },
+  {
+   "name": "Anim/sd_aruku.csab",
+   "base": "sd_aruku",
+   "duration": 29,
+   "bones": 16
+  },
+  {
+   "name": "Anim/sd_akeru.csab",
+   "base": "sd_akeru",
+   "duration": 22,
+   "bones": 16
+  },
+  {
+   "name": "Anim/sd_suwari.csab",
+   "base": "sd_suwari",
+   "duration": 60,
+   "bones": 16
+  },
+  {
+   "name": "Anim/sd_suwari_hanasi.csab",
+   "base": "sd_suwari_hanasi",
+   "duration": 19,
+   "bones": 16
+  },
+  {
+   "name": "Anim/sd_shini.csab",
+   "base": "sd_shini",
+   "duration": 40,
+   "bones": 16
+  }
+ ],
+ "/actor/zelda_shopnuts.zar": [
+  {
+   "name": "Anim/dnu_start.csab",
+   "base": "dnu_start",
+   "duration": 22,
+   "bones": 15
+  },
+  {
+   "name": "Anim/dnu_dig.csab",
+   "base": "dnu_dig",
+   "duration": 11,
+   "bones": 15
+  },
+  {
+   "name": "Anim/dnu_wait.csab",
+   "base": "dnu_wait",
+   "duration": 15,
+   "bones": 15
+  },
+  {
+   "name": "Anim/dnu_lookaround.csab",
+   "base": "dnu_lookaround",
+   "duration": 27,
+   "bones": 15
+  },
+  {
+   "name": "Anim/dnu_atack.csab",
+   "base": "dnu_atack",
+   "duration": 19,
+   "bones": 15
+  },
+  {
+   "name": "Anim/dnu_jump.csab",
+   "base": "dnu_jump",
+   "duration": 17,
+   "bones": 15
+  },
+  {
+   "name": "Anim/dnu_jump_to_shop.csab",
+   "base": "dnu_jump_to_shop",
+   "duration": 9,
+   "bones": 15
+  },
+  {
+   "name": "Anim/dnu_shop.csab",
+   "base": "dnu_shop",
+   "duration": 16,
+   "bones": 15
+  },
+  {
+   "name": "Anim/dnu_to_end.csab",
+   "base": "dnu_to_end",
+   "duration": 9,
+   "bones": 15
+  }
+ ],
+ "/actor/zelda_skb.zar": [
+  {
+   "name": "Anim/stal_baby_attack.csab",
+   "base": "stal_baby_attack",
+   "duration": 11,
+   "bones": 29
+  },
+  {
+   "name": "Anim/stal_baby_down.csab",
+   "base": "stal_baby_down",
+   "duration": 16,
+   "bones": 29
+  },
+  {
+   "name": "Anim/stal_baby_hit.csab",
+   "base": "stal_baby_hit",
+   "duration": 9,
+   "bones": 29
+  },
+  {
+   "name": "Anim/stal_baby_start.csab",
+   "base": "stal_baby_start",
+   "duration": 30,
+   "bones": 29
+  },
+  {
+   "name": "Anim/stal_baby_walk.csab",
+   "base": "stal_baby_walk",
+   "duration": 17,
+   "bones": 29
+  }
+ ],
+ "/actor/zelda_skj.zar": [
+  {
+   "name": "Anim/skeltonJR_wait.csab",
+   "base": "skeltonJR_wait",
+   "duration": 38,
+   "bones": 18
+  },
+  {
+   "name": "Anim/skeltonJR_serch_wait.csab",
+   "base": "skeltonJR_serch_wait",
+   "duration": 50,
+   "bones": 18
+  },
+  {
+   "name": "Anim/skeltonJR_walk.csab",
+   "base": "skeltonJR_walk",
+   "duration": 6,
+   "bones": 18
+  },
+  {
+   "name": "Anim/skeltonJR_dance_walk.csab",
+   "base": "skeltonJR_dance_walk",
+   "duration": 20,
+   "bones": 18
+  },
+  {
+   "name": "Anim/skeltonJR_side_walk.csab",
+   "base": "skeltonJR_side_walk",
+   "duration": 7,
+   "bones": 18
+  },
+  {
+   "name": "Anim/skeltonJR_back_jump.csab",
+   "base": "skeltonJR_back_jump",
+   "duration": 15,
+   "bones": 18
+  },
+  {
+   "name": "Anim/skeltonJR_landing.csab",
+   "base": "skeltonJR_landing",
+   "duration": 10,
+   "bones": 18
+  },
+  {
+   "name": "Anim/skeltonJR_hit.csab",
+   "base": "skeltonJR_hit",
+   "duration": 9,
+   "bones": 18
+  },
+  {
+   "name": "Anim/skeltonJR_down.csab",
+   "base": "skeltonJR_down",
+   "duration": 31,
+   "bones": 18
+  },
+  {
+   "name": "Anim/skeltonJR_blowgun_attack.csab",
+   "base": "skeltonJR_blowgun_attack",
+   "duration": 7,
+   "bones": 18
+  }
+ ],
+ "/actor/zelda_ssh.zar": [
+  {
+   "name": "anim/st_matsu.csab",
+   "base": "st_matsu",
+   "duration": 32,
+   "bones": 18
+  },
+  {
+   "name": "anim/st_otchiru.csab",
+   "base": "st_otchiru",
+   "duration": 30,
+   "bones": 18
+  },
+  {
+   "name": "anim/st_yarare.csab",
+   "base": "st_yarare",
+   "duration": 51,
+   "bones": 18
+  }
+ ],
+ "/actor/zelda_sst.zar": [
+  {
+   "name": "Anim/slh_pose_a.csab",
+   "base": "slh_pose_a",
+   "duration": 10,
+   "bones": 15
+  },
+  {
+   "name": "Anim/slh_pose_b.csab",
+   "base": "slh_pose_b",
+   "duration": 3,
+   "bones": 15
+  },
+  {
+   "name": "Anim/slh_pose_c.csab",
+   "base": "slh_pose_c",
+   "duration": 3,
+   "bones": 15
+  },
+  {
+   "name": "Anim/slh_pose_d.csab",
+   "base": "slh_pose_d",
+   "duration": 3,
+   "bones": 15
+  },
+  {
+   "name": "Anim/slh_pose_e.csab",
+   "base": "slh_pose_e",
+   "duration": 10,
+   "bones": 15
+  },
+  {
+   "name": "Anim/slh_pose_f.csab",
+   "base": "slh_pose_f",
+   "duration": 3,
+   "bones": 15
+  },
+  {
+   "name": "Anim/slh_pose_g.csab",
+   "base": "slh_pose_g",
+   "duration": 3,
+   "bones": 15
+  },
+  {
+   "name": "Anim/slh_pose_h.csab",
+   "base": "slh_pose_h",
+   "duration": 3,
+   "bones": 15
+  },
+  {
+   "name": "Anim/srh_pose_a.csab",
+   "base": "srh_pose_a",
+   "duration": 10,
+   "bones": 15
+  },
+  {
+   "name": "Anim/srh_pose_b.csab",
+   "base": "srh_pose_b",
+   "duration": 3,
+   "bones": 15
+  },
+  {
+   "name": "Anim/srh_pose_c.csab",
+   "base": "srh_pose_c",
+   "duration": 3,
+   "bones": 15
+  },
+  {
+   "name": "Anim/srh_pose_d.csab",
+   "base": "srh_pose_d",
+   "duration": 3,
+   "bones": 15
+  },
+  {
+   "name": "Anim/srh_pose_e.csab",
+   "base": "srh_pose_e",
+   "duration": 10,
+   "bones": 15
+  },
+  {
+   "name": "Anim/srh_pose_f.csab",
+   "base": "srh_pose_f",
+   "duration": 3,
+   "bones": 15
+  },
+  {
+   "name": "Anim/srh_pose_g.csab",
+   "base": "srh_pose_g",
+   "duration": 3,
+   "bones": 15
+  },
+  {
+   "name": "Anim/srh_pose_h.csab",
+   "base": "srh_pose_h",
+   "duration": 3,
+   "bones": 15
+  },
+  {
+   "name": "Anim/ss_after.csab",
+   "base": "ss_after",
+   "duration": 7,
+   "bones": 31
+  },
+  {
+   "name": "Anim/ss_attack.csab",
+   "base": "ss_attack",
+   "duration": 11,
+   "bones": 31
+  },
+  {
+   "name": "Anim/ss_bowhit.csab",
+   "base": "ss_bowhit",
+   "duration": 17,
+   "bones": 31
+  },
+  {
+   "name": "Anim/ss_close.csab",
+   "base": "ss_close",
+   "duration": 40,
+   "bones": 31
+  },
+  {
+   "name": "Anim/ss_dmg.csab",
+   "base": "ss_dmg",
+   "duration": 10,
+   "bones": 31
+  },
+  {
+   "name": "Anim/ss_dmg_open.csab",
+   "base": "ss_dmg_open",
+   "duration": 10,
+   "bones": 31
+  },
+  {
+   "name": "Anim/ss_swdhit.csab",
+   "base": "ss_swdhit",
+   "duration": 11,
+   "bones": 31
+  },
+  {
+   "name": "Anim/ss_towait.csab",
+   "base": "ss_towait",
+   "duration": 26,
+   "bones": 31
+  },
+  {
+   "name": "Anim/ss_wait_close.csab",
+   "base": "ss_wait_close",
+   "duration": 40,
+   "bones": 31
+  },
+  {
+   "name": "Anim/ss_wait_open.csab",
+   "base": "ss_wait_open",
+   "duration": 40,
+   "bones": 31
+  },
+  {
+   "name": "Anim/ss_death.csab",
+   "base": "ss_death",
+   "duration": 160,
+   "bones": 31
+  }
+ ],
+ "/actor/zelda_st.zar": [
+  {
+   "name": "Anim/st_matsu.csab",
+   "base": "st_matsu",
+   "duration": 32,
+   "bones": 11
+  },
+  {
+   "name": "Anim/st_yarare.csab",
+   "base": "st_yarare",
+   "duration": 30,
+   "bones": 11
+  },
+  {
+   "name": "Anim/st_yarare2.csab",
+   "base": "st_yarare2",
+   "duration": 30,
+   "bones": 11
+  },
+  {
+   "name": "Anim/st_otchiru.csab",
+   "base": "st_otchiru",
+   "duration": 30,
+   "bones": 11
+  }
+ ],
+ "/actor/zelda_ta.zar": [
+  {
+   "name": "Anim/ta_matsu.csab",
+   "base": "ta_matsu",
+   "duration": 25,
+   "bones": 19
+  },
+  {
+   "name": "Anim/taron_sleep_wait.csab",
+   "base": "taron_sleep_wait",
+   "duration": 32,
+   "bones": 19
+  },
+  {
+   "name": "Anim/taron_wakeup.csab",
+   "base": "taron_wakeup",
+   "duration": 60,
+   "bones": 19
+  },
+  {
+   "name": "Anim/taron_wait_run.csab",
+   "base": "taron_wait_run",
+   "duration": 4,
+   "bones": 19
+  },
+  {
+   "name": "Anim/taron_run.csab",
+   "base": "taron_run",
+   "duration": 10,
+   "bones": 19
+  },
+  {
+   "name": "Anim/ta_inemuri.csab",
+   "base": "ta_inemuri",
+   "duration": 100,
+   "bones": 19
+  },
+  {
+   "name": "Anim/ta_okiru.csab",
+   "base": "ta_okiru",
+   "duration": 30,
+   "bones": 19
+  },
+  {
+   "name": "Anim/ta_nageru.csab",
+   "base": "ta_nageru",
+   "duration": 40,
+   "bones": 19
+  }
+ ],
+ "/actor/zelda_tk.zar": [
+  {
+   "name": "Anim/tk_aruku.csab",
+   "base": "tk_aruku",
+   "duration": 49,
+   "bones": 22
+  },
+  {
+   "name": "Anim/tk_matsu.csab",
+   "base": "tk_matsu",
+   "duration": 49,
+   "bones": 22
+  },
+  {
+   "name": "Anim/tk_yuurei.csab",
+   "base": "tk_yuurei",
+   "duration": 24,
+   "bones": 22
+  },
+  {
+   "name": "Anim/tk_ana_hori.csab",
+   "base": "tk_ana_hori",
+   "duration": 50,
+   "bones": 22
+  }
+ ],
+ "/actor/zelda_toryo.zar": [
+  {
+   "name": "Anim/dk1_matsu.csab",
+   "base": "dk1_matsu",
+   "duration": 89,
+   "bones": 21
+  }
+ ],
+ "/actor/zelda_tr.zar": [
+  {
+   "name": "Anim/kotake_wait.csab",
+   "base": "kotake_wait",
+   "duration": 24,
+   "bones": 26
+  },
+  {
+   "name": "Anim/kotake_furimuki.csab",
+   "base": "kotake_furimuki",
+   "duration": 31,
+   "bones": 26
+  },
+  {
+   "name": "Anim/kotake_furimuki_wait.csab",
+   "base": "kotake_furimuki_wait",
+   "duration": 24,
+   "bones": 26
+  },
+  {
+   "name": "Anim/trT_wait.csab",
+   "base": "trT_wait",
+   "duration": 24,
+   "bones": 26
+  },
+  {
+   "name": "Anim/trT_fly.csab",
+   "base": "trT_fly",
+   "duration": 24,
+   "bones": 26
+  },
+  {
+   "name": "Anim/twin_shoot.csab",
+   "base": "twin_shoot",
+   "duration": 55,
+   "bones": 26
+  },
+  {
+   "name": "Anim/koume_wait.csab",
+   "base": "koume_wait",
+   "duration": 24,
+   "bones": 26
+  },
+  {
+   "name": "Anim/koume_furimuki.csab",
+   "base": "koume_furimuki",
+   "duration": 41,
+   "bones": 26
+  },
+  {
+   "name": "Anim/koume_furimuki_wait.csab",
+   "base": "koume_furimuki_wait",
+   "duration": 24,
+   "bones": 26
+  }
+ ],
+ "/actor/zelda_ts.zar": [
+  {
+   "name": "Anim/ts_matsu.csab",
+   "base": "ts_matsu",
+   "duration": 30,
+   "bones": 9
+  }
+ ],
+ "/actor/zelda_tw.zar": [
+  {
+   "name": "Anim/btT_atack.csab",
+   "base": "btT_atack",
+   "duration": 30,
+   "bones": 26
+  },
+  {
+   "name": "Anim/btT_beeem.csab",
+   "base": "btT_beeem",
+   "duration": 17,
+   "bones": 26
+  },
+  {
+   "name": "Anim/btT_beeem_to_fly.csab",
+   "base": "btT_beeem_to_fly",
+   "duration": 12,
+   "bones": 26
+  },
+  {
+   "name": "Anim/btT_damage01.csab",
+   "base": "btT_damage01",
+   "duration": 52,
+   "bones": 26
+  },
+  {
+   "name": "Anim/btT_damage02.csab",
+   "base": "btT_damage02",
+   "duration": 25,
+   "bones": 26
+  },
+  {
+   "name": "Anim/btT_DEMOwait.csab",
+   "base": "btT_DEMOwait",
+   "duration": 20,
+   "bones": 26
+  },
+  {
+   "name": "Anim/btT_DEMOwait_to_fly.csab",
+   "base": "btT_DEMOwait_to_fly",
+   "duration": 12,
+   "bones": 26
+  },
+  {
+   "name": "Anim/btT_EDikari.csab",
+   "base": "btT_EDikari",
+   "duration": 20,
+   "bones": 26
+  },
+  {
+   "name": "Anim/btT_EDmiage.csab",
+   "base": "btT_EDmiage",
+   "duration": 16,
+   "bones": 26
+  },
+  {
+   "name": "Anim/btT_EDwait.csab",
+   "base": "btT_EDwait",
+   "duration": 16,
+   "bones": 26
+  },
+  {
+   "name": "Anim/btT_EDyaruki.csab",
+   "base": "btT_EDyaruki",
+   "duration": 23,
+   "bones": 26
+  },
+  {
+   "name": "Anim/btT_fly.csab",
+   "base": "btT_fly",
+   "duration": 24,
+   "bones": 26
+  },
+  {
+   "name": "Anim/btT_fly_to_tame.csab",
+   "base": "btT_fly_to_tame",
+   "duration": 12,
+   "bones": 26
+  },
+  {
+   "name": "Anim/btT_guard.csab",
+   "base": "btT_guard",
+   "duration": 12,
+   "bones": 26
+  },
+  {
+   "name": "Anim/btT_hihihi.csab",
+   "base": "btT_hihihi",
+   "duration": 29,
+   "bones": 26
+  },
+  {
+   "name": "Anim/btT_tame.csab",
+   "base": "btT_tame",
+   "duration": 25,
+   "bones": 26
+  },
+  {
+   "name": "Anim/btW_atackL.csab",
+   "base": "btW_atackL",
+   "duration": 24,
+   "bones": 43
+  },
+  {
+   "name": "Anim/btW_atackR.csab",
+   "base": "btW_atackR",
+   "duration": 24,
+   "bones": 43
+  },
+  {
+   "name": "Anim/btW_damage.csab",
+   "base": "btW_damage",
+   "duration": 17,
+   "bones": 43
+  },
+  {
+   "name": "Anim/btW_default.csab",
+   "base": "btW_default",
+   "duration": 3,
+   "bones": 43
+  },
+  {
+   "name": "Anim/btW_EDdamage.csab",
+   "base": "btW_EDdamage",
+   "duration": 45,
+   "bones": 43
+  },
+  {
+   "name": "Anim/btW_fly.csab",
+   "base": "btW_fly",
+   "duration": 24,
+   "bones": 43
+  },
+  {
+   "name": "Anim/btW_hit.csab",
+   "base": "btW_hit",
+   "duration": 18,
+   "bones": 43
+  },
+  {
+   "name": "Anim/btW_hit_to_mahi.csab",
+   "base": "btW_hit_to_mahi",
+   "duration": 16,
+   "bones": 43
+  },
+  {
+   "name": "Anim/btW_mahi.csab",
+   "base": "btW_mahi",
+   "duration": 20,
+   "bones": 43
+  },
+  {
+   "name": "Anim/btW_mahi_to_fly.csab",
+   "base": "btW_mahi_to_fly",
+   "duration": 14,
+   "bones": 43
+  },
+  {
+   "name": "Anim/btW_preatack.csab",
+   "base": "btW_preatack",
+   "duration": 35,
+   "bones": 43
+  },
+  {
+   "name": "Anim/btW_start.csab",
+   "base": "btW_start",
+   "duration": 50,
+   "bones": 43
+  },
+  {
+   "name": "Anim/btW_ufufu.csab",
+   "base": "btW_ufufu",
+   "duration": 32,
+   "bones": 43
+  }
+ ],
+ "/actor/zelda_vali.zar": [
+  {
+   "name": "Anim/vl_normal.csab",
+   "base": "vl_normal",
+   "duration": 80,
+   "bones": 11
+  },
+  {
+   "name": "Anim/vl_attack.csab",
+   "base": "vl_attack",
+   "duration": 81,
+   "bones": 11
+  },
+  {
+   "name": "Anim/vl_dmg.csab",
+   "base": "vl_dmg",
+   "duration": 6,
+   "bones": 11
+  },
+  {
+   "name": "Anim/vl_dmg_normal.csab",
+   "base": "vl_dmg_normal",
+   "duration": 26,
+   "bones": 11
+  },
+  {
+   "name": "Anim/vl_elec_a.csab",
+   "base": "vl_elec_a",
+   "duration": 21,
+   "bones": 11
+  }
+ ],
+ "/actor/zelda_vm.zar": [
+  {
+   "name": "Anim/vm_akesime.csab",
+   "base": "vm_akesime",
+   "duration": 9,
+   "bones": 6
+  }
+ ],
+ "/actor/zelda_warp1.zar": [
+  {
+   "name": "anim/crystal_anim_mdl.csab",
+   "base": "crystal_anim_mdl",
+   "duration": 60,
+   "bones": 28
+  },
+  {
+   "name": "anim/warp_2_modelT_end.csab",
+   "base": "warp_2_modelT_end",
+   "duration": 2,
+   "bones": 3
+  },
+  {
+   "name": "anim/warp_2_modelT_middle1.csab",
+   "base": "warp_2_modelT_middle1",
+   "duration": 150,
+   "bones": 3
+  },
+  {
+   "name": "anim/warp_2_modelT_middle2.csab",
+   "base": "warp_2_modelT_middle2",
+   "duration": 150,
+   "bones": 3
+  },
+  {
+   "name": "anim/warp_2_modelT_open1.csab",
+   "base": "warp_2_modelT_open1",
+   "duration": 150,
+   "bones": 3
+  },
+  {
+   "name": "anim/warp_2_modelT_open2.csab",
+   "base": "warp_2_modelT_open2",
+   "duration": 90,
+   "bones": 3
+  }
+ ],
+ "/actor/zelda_wf.zar": [
+  {
+   "name": "Anim/wolfman_wait.csab",
+   "base": "wolfman_wait",
+   "duration": 29,
+   "bones": 21
+  },
+  {
+   "name": "Anim/wolfman_run.csab",
+   "base": "wolfman_run",
+   "duration": 9,
+   "bones": 21
+  },
+  {
+   "name": "Anim/wolfman_side_walk.csab",
+   "base": "wolfman_side_walk",
+   "duration": 8,
+   "bones": 21
+  },
+  {
+   "name": "Anim/wolfman_back_jump.csab",
+   "base": "wolfman_back_jump",
+   "duration": 13,
+   "bones": 21
+  },
+  {
+   "name": "Anim/wolfman_defense.csab",
+   "base": "wolfman_defense",
+   "duration": 4,
+   "bones": 21
+  },
+  {
+   "name": "Anim/wolfman_tail_hit.csab",
+   "base": "wolfman_tail_hit",
+   "duration": 8,
+   "bones": 21
+  },
+  {
+   "name": "Anim/wolfman_down.csab",
+   "base": "wolfman_down",
+   "duration": 29,
+   "bones": 21
+  },
+  {
+   "name": "Anim/wolfman_attack.csab",
+   "base": "wolfman_attack",
+   "duration": 30,
+   "bones": 21
+  }
+ ],
+ "/actor/zelda_xc.zar": [
+  {
+   "name": "Anim/xc_matsu.csab",
+   "base": "xc_matsu",
+   "duration": 26,
+   "bones": 19
+  },
+  {
+   "name": "Anim/xechu_aruku.csab",
+   "base": "xechu_aruku",
+   "duration": 25,
+   "bones": 19
+  },
+  {
+   "name": "Anim/xechutoujyou.csab",
+   "base": "xechutoujyou",
+   "duration": 65,
+   "bones": 19
+  },
+  {
+   "name": "Anim/xechu_kieru.csab",
+   "base": "xechu_kieru",
+   "duration": 30,
+   "bones": 19
+  },
+  {
+   "name": "Anim/xechu_toridasu.csab",
+   "base": "xechu_toridasu",
+   "duration": 58,
+   "bones": 19
+  },
+  {
+   "name": "Anim/xechu_kamae.csab",
+   "base": "xechu_kamae",
+   "duration": 16,
+   "bones": 19
+  },
+  {
+   "name": "Anim/xechu_hiku.csab",
+   "base": "xechu_hiku",
+   "duration": 66,
+   "bones": 19
+  },
+  {
+   "name": "Anim/mizunoserenaade.csab",
+   "base": "mizunoserenaade",
+   "duration": 96,
+   "bones": 19
+  },
+  {
+   "name": "Anim/kazenomenuetto.csab",
+   "base": "kazenomenuetto",
+   "duration": 96,
+   "bones": 19
+  },
+  {
+   "name": "Anim/honoonobolero.csab",
+   "base": "honoonobolero",
+   "duration": 80,
+   "bones": 19
+  },
+  {
+   "name": "Anim/X_hikari_p.csab",
+   "base": "X_hikari_p",
+   "duration": 80,
+   "bones": 19
+  },
+  {
+   "name": "Anim/demo_hensin.csab",
+   "base": "demo_hensin",
+   "duration": 50,
+   "bones": 19
+  },
+  {
+   "name": "Anim/demo_hensin_wait.csab",
+   "base": "demo_hensin_wait",
+   "duration": 20,
+   "bones": 19
+  },
+  {
+   "name": "Anim/xechu_kamaeru.csab",
+   "base": "xechu_kamaeru",
+   "duration": 44,
+   "bones": 19
+  },
+  {
+   "name": "Anim/xechu_furimawashi.csab",
+   "base": "xechu_furimawashi",
+   "duration": 79,
+   "bones": 19
+  },
+  {
+   "name": "Anim/xechu_drop.csab",
+   "base": "xechu_drop",
+   "duration": 40,
+   "bones": 19
+  },
+  {
+   "name": "Anim/xechu_stop.csab",
+   "base": "xechu_stop",
+   "duration": 11,
+   "bones": 19
+  },
+  {
+   "name": "Anim/xechu_shagami_wait.csab",
+   "base": "xechu_shagami_wait",
+   "duration": 24,
+   "bones": 19
+  },
+  {
+   "name": "Anim/xechu_daiza_wait.csab",
+   "base": "xechu_daiza_wait",
+   "duration": 30,
+   "bones": 19
+  },
+  {
+   "name": "Anim/xechu_tobikomi.csab",
+   "base": "xechu_tobikomi",
+   "duration": 2,
+   "bones": 19
+  }
+ ],
+ "/actor/zelda_zf.zar": [
+  {
+   "name": "Anim/zf_aruku.csab",
+   "base": "zf_aruku",
+   "duration": 59,
+   "bones": 20
+  },
+  {
+   "name": "Anim/zf_chyakuchi.csab",
+   "base": "zf_chyakuchi",
+   "duration": 25,
+   "bones": 20
+  },
+  {
+   "name": "Anim/zf_jump.csab",
+   "base": "zf_jump",
+   "duration": 20,
+   "bones": 20
+  },
+  {
+   "name": "Anim/zf_kiru.csab",
+   "base": "zf_kiru",
+   "duration": 30,
+   "bones": 20
+  },
+  {
+   "name": "Anim/zf_matsu.csab",
+   "base": "zf_matsu",
+   "duration": 30,
+   "bones": 20
+  },
+  {
+   "name": "Anim/zf_nige_jump_a.csab",
+   "base": "zf_nige_jump_a",
+   "duration": 7,
+   "bones": 20
+  },
+  {
+   "name": "Anim/zf_nige_jump_b.csab",
+   "base": "zf_nige_jump_b",
+   "duration": 8,
+   "bones": 20
+  },
+  {
+   "name": "Anim/zf_nige_jump_c.csab",
+   "base": "zf_nige_jump_c",
+   "duration": 4,
+   "bones": 20
+  },
+  {
+   "name": "Anim/zf_nigeru.csab",
+   "base": "zf_nigeru",
+   "duration": 17,
+   "bones": 20
+  },
+  {
+   "name": "Anim/zf_nuku.csab",
+   "base": "zf_nuku",
+   "duration": 56,
+   "bones": 20
+  },
+  {
+   "name": "Anim/zf_shini.csab",
+   "base": "zf_shini",
+   "duration": 50,
+   "bones": 20
+  },
+  {
+   "name": "Anim/zf_yarare.csab",
+   "base": "zf_yarare",
+   "duration": 20,
+   "bones": 20
+  },
+  {
+   "name": "Anim/zf_yokoaruki.csab",
+   "base": "zf_yokoaruki",
+   "duration": 29,
+   "bones": 20
+  }
+ ],
+ "/actor/zelda_zl1.zar": [
+  {
+   "name": "Anim/anim_matsu.csab",
+   "base": "anim_matsu",
+   "duration": 40,
+   "bones": 26
+  },
+  {
+   "name": "Anim/demo_furimuki.csab",
+   "base": "demo_furimuki",
+   "duration": 65,
+   "bones": 26
+  },
+  {
+   "name": "Anim/demo_furimuki_wait.csab",
+   "base": "demo_furimuki_wait",
+   "duration": 30,
+   "bones": 26
+  },
+  {
+   "name": "Anim/demo_kasige.csab",
+   "base": "demo_kasige",
+   "duration": 15,
+   "bones": 26
+  },
+  {
+   "name": "Anim/demo_kasige_wait.csab",
+   "base": "demo_kasige_wait",
+   "duration": 20,
+   "bones": 26
+  },
+  {
+   "name": "Anim/demo_nozoki_wait.csab",
+   "base": "demo_nozoki_wait",
+   "duration": 20,
+   "bones": 26
+  },
+  {
+   "name": "Anim/demo_slide.csab",
+   "base": "demo_slide",
+   "duration": 40,
+   "bones": 26
+  },
+  {
+   "name": "Anim/demo_slide_wait.csab",
+   "base": "demo_slide_wait",
+   "duration": 20,
+   "bones": 26
+  },
+  {
+   "name": "Anim/demo_tesage.csab",
+   "base": "demo_tesage",
+   "duration": 15,
+   "bones": 26
+  },
+  {
+   "name": "Anim/demo_tetataki_1.csab",
+   "base": "demo_tetataki_1",
+   "duration": 25,
+   "bones": 26
+  },
+  {
+   "name": "Anim/demo_tetataki_2.csab",
+   "base": "demo_tetataki_2",
+   "duration": 25,
+   "bones": 26
+  },
+  {
+   "name": "Anim/demo_tetataki_wait.csab",
+   "base": "demo_tetataki_wait",
+   "duration": 21,
+   "bones": 26
+  }
+ ],
+ "/actor/zelda_zl2.zar": [
+  {
+   "name": "Anim/demo_aruki.csab",
+   "base": "demo_aruki",
+   "duration": 60,
+   "bones": 28
+  },
+  {
+   "name": "Anim/demo_banzai.csab",
+   "base": "demo_banzai",
+   "duration": 30,
+   "bones": 28
+  },
+  {
+   "name": "Anim/demo_banzai_wait.csab",
+   "base": "demo_banzai_wait",
+   "duration": 20,
+   "bones": 28
+  },
+  {
+   "name": "Anim/demo_kizetu.csab",
+   "base": "demo_kizetu",
+   "duration": 12,
+   "bones": 28
+  },
+  {
+   "name": "Anim/demo_kizetu_wait.csab",
+   "base": "demo_kizetu_wait",
+   "duration": 30,
+   "bones": 28
+  },
+  {
+   "name": "Anim/demo_modori.csab",
+   "base": "demo_modori",
+   "duration": 10,
+   "bones": 28
+  },
+  {
+   "name": "Anim/demo_modori_wait.csab",
+   "base": "demo_modori_wait",
+   "duration": 20,
+   "bones": 28
+  },
+  {
+   "name": "Anim/demo_sitamuki.csab",
+   "base": "demo_sitamuki",
+   "duration": 30,
+   "bones": 28
+  },
+  {
+   "name": "Anim/demo_sitamuki_wait.csab",
+   "base": "demo_sitamuki_wait",
+   "duration": 30,
+   "bones": 28
+  },
+  {
+   "name": "Anim/demo_tukamaru.csab",
+   "base": "demo_tukamaru",
+   "duration": 54,
+   "bones": 28
+  },
+  {
+   "name": "Anim/demo_tukamaru_wait.csab",
+   "base": "demo_tukamaru_wait",
+   "duration": 46,
+   "bones": 28
+  },
+  {
+   "name": "Anim/demo_uemuki.csab",
+   "base": "demo_uemuki",
+   "duration": 15,
+   "bones": 28
+  },
+  {
+   "name": "Anim/demo_uemuki_wait.csab",
+   "base": "demo_uemuki_wait",
+   "duration": 20,
+   "bones": 28
+  },
+  {
+   "name": "Anim/demo_zelda_byebye.csab",
+   "base": "demo_zelda_byebye",
+   "duration": 95,
+   "bones": 28
+  },
+  {
+   "name": "Anim/demo_zelda_hanasu.csab",
+   "base": "demo_zelda_hanasu",
+   "duration": 90,
+   "bones": 28
+  },
+  {
+   "name": "Anim/demo_zelda_hwait.csab",
+   "base": "demo_zelda_hwait",
+   "duration": 45,
+   "bones": 28
+  },
+  {
+   "name": "Anim/demo_zelda_kure.csab",
+   "base": "demo_zelda_kure",
+   "duration": 90,
+   "bones": 28
+  },
+  {
+   "name": "Anim/demo_zelda_kwait.csab",
+   "base": "demo_zelda_kwait",
+   "duration": 45,
+   "bones": 28
+  },
+  {
+   "name": "Anim/demo_zelda_lovelove.csab",
+   "base": "demo_zelda_lovelove",
+   "duration": 46,
+   "bones": 28
+  },
+  {
+   "name": "Anim/demo_zelda_lwait.csab",
+   "base": "demo_zelda_lwait",
+   "duration": 45,
+   "bones": 28
+  },
+  {
+   "name": "Anim/demo_zelda_nwait.csab",
+   "base": "demo_zelda_nwait",
+   "duration": 45,
+   "bones": 28
+  },
+  {
+   "name": "Anim/demo_zelda_piroro.csab",
+   "base": "demo_zelda_piroro",
+   "duration": 90,
+   "bones": 28
+  },
+  {
+   "name": "Anim/Z_bibibi.csab",
+   "base": "Z_bibibi",
+   "duration": 18,
+   "bones": 28
+  },
+  {
+   "name": "Anim/Z_f_wait.csab",
+   "base": "Z_f_wait",
+   "duration": 20,
+   "bones": 28
+  },
+  {
+   "name": "Anim/Z_fuuu.csab",
+   "base": "Z_fuuu",
+   "duration": 55,
+   "bones": 28
+  },
+  {
+   "name": "Anim/Z_gaku_wait.csab",
+   "base": "Z_gaku_wait",
+   "duration": 20,
+   "bones": 28
+  },
+  {
+   "name": "Anim/Z_gakuu.csab",
+   "base": "Z_gakuu",
+   "duration": 35,
+   "bones": 28
+  },
+  {
+   "name": "Anim/Z_k_wait.csab",
+   "base": "Z_k_wait",
+   "duration": 20,
+   "bones": 28
+  },
+  {
+   "name": "Anim/Z_kenjya.csab",
+   "base": "Z_kenjya",
+   "duration": 10,
+   "bones": 28
+  },
+  {
+   "name": "Anim/Z_syu_wait.csab",
+   "base": "Z_syu_wait",
+   "duration": 15,
+   "bones": 28
+  },
+  {
+   "name": "Anim/Z_syupen.csab",
+   "base": "Z_syupen",
+   "duration": 30,
+   "bones": 28
+  },
+  {
+   "name": "Anim/ze_a_wait.csab",
+   "base": "ze_a_wait",
+   "duration": 40,
+   "bones": 28
+  },
+  {
+   "name": "Anim/ze_awaseru.csab",
+   "base": "ze_awaseru",
+   "duration": 25,
+   "bones": 28
+  },
+  {
+   "name": "Anim/ze_ha_m.csab",
+   "base": "ze_ha_m",
+   "duration": 35,
+   "bones": 28
+  },
+  {
+   "name": "Anim/ze_otituku.csab",
+   "base": "ze_otituku",
+   "duration": 20,
+   "bones": 28
+  },
+  {
+   "name": "Anim/ze_s_wait.csab",
+   "base": "ze_s_wait",
+   "duration": 30,
+   "bones": 28
+  },
+  {
+   "name": "Anim/ze_u_wait.csab",
+   "base": "ze_u_wait",
+   "duration": 40,
+   "bones": 28
+  },
+  {
+   "name": "Anim/ze_ue_miru.csab",
+   "base": "ze_ue_miru",
+   "duration": 20,
+   "bones": 28
+  },
+  {
+   "name": "Anim/zel_b_odoroku.csab",
+   "base": "zel_b_odoroku",
+   "duration": 20,
+   "bones": 28
+  },
+  {
+   "name": "Anim/zel_f_wait.csab",
+   "base": "zel_f_wait",
+   "duration": 20,
+   "bones": 28
+  },
+  {
+   "name": "Anim/zel_kao_kakusu.csab",
+   "base": "zel_kao_kakusu",
+   "duration": 35,
+   "bones": 28
+  },
+  {
+   "name": "Anim/zel_kururi.csab",
+   "base": "zel_kururi",
+   "duration": 15,
+   "bones": 28
+  },
+  {
+   "name": "Anim/zel_mousaigo.csab",
+   "base": "zel_mousaigo",
+   "duration": 20,
+   "bones": 28
+  },
+  {
+   "name": "Anim/zel_odo_wait.csab",
+   "base": "zel_odo_wait",
+   "duration": 15,
+   "bones": 28
+  },
+  {
+   "name": "Anim/zel_t_awasuM.csab",
+   "base": "zel_t_awasuM",
+   "duration": 10,
+   "bones": 28
+  },
+  {
+   "name": "Anim/zel_t_orosu.csab",
+   "base": "zel_t_orosu",
+   "duration": 15,
+   "bones": 28
+  },
+  {
+   "name": "Anim/zl2_demo_furimuki.csab",
+   "base": "zl2_demo_furimuki",
+   "duration": 15,
+   "bones": 28
+  },
+  {
+   "name": "Anim/zl2_demo_furimuki_wait.csab",
+   "base": "zl2_demo_furimuki_wait",
+   "duration": 20,
+   "bones": 28
+  },
+  {
+   "name": "Anim/zl2_demo_look_hand.csab",
+   "base": "zl2_demo_look_hand",
+   "duration": 30,
+   "bones": 28
+  },
+  {
+   "name": "Anim/zl2_g_miru.csab",
+   "base": "zl2_g_miru",
+   "duration": 30,
+   "bones": 28
+  },
+  {
+   "name": "Anim/zl2_g_miru_wait.csab",
+   "base": "zl2_g_miru_wait",
+   "duration": 30,
+   "bones": 28
+  },
+  {
+   "name": "Anim/zl2_game_run.csab",
+   "base": "zl2_game_run",
+   "duration": 12,
+   "bones": 28
+  },
+  {
+   "name": "Anim/zl2_matsu.csab",
+   "base": "zl2_matsu",
+   "duration": 30,
+   "bones": 28
+  },
+  {
+   "name": "Anim/zl2_to_wait.csab",
+   "base": "zl2_to_wait",
+   "duration": 20,
+   "bones": 28
+  },
+  {
+   "name": "Anim/zl2_ue_miru.csab",
+   "base": "zl2_ue_miru",
+   "duration": 30,
+   "bones": 28
+  },
+  {
+   "name": "Anim/zl2_ue_miru_wait.csab",
+   "base": "zl2_ue_miru_wait",
+   "duration": 21,
+   "bones": 28
+  }
+ ],
+ "/actor/zelda_zl4.zar": [
+  {
+   "name": "Anim/demo_aisatu.csab",
+   "base": "demo_aisatu",
+   "duration": 20,
+   "bones": 26
+  },
+  {
+   "name": "Anim/demo_aisatu_wait.csab",
+   "base": "demo_aisatu_wait",
+   "duration": 30,
+   "bones": 26
+  },
+  {
+   "name": "Anim/demo_arigato.csab",
+   "base": "demo_arigato",
+   "duration": 12,
+   "bones": 26
+  },
+  {
+   "name": "Anim/demo_arigato_wait.csab",
+   "base": "demo_arigato_wait",
+   "duration": 24,
+   "bones": 26
+  },
+  {
+   "name": "Anim/demo_gomen.csab",
+   "base": "demo_gomen",
+   "duration": 20,
+   "bones": 26
+  },
+  {
+   "name": "Anim/demo_himitu.csab",
+   "base": "demo_himitu",
+   "duration": 20,
+   "bones": 26
+  },
+  {
+   "name": "Anim/demo_kaku.csab",
+   "base": "demo_kaku",
+   "duration": 27,
+   "bones": 26
+  },
+  {
+   "name": "Anim/demo_kaku_wait.csab",
+   "base": "demo_kaku_wait",
+   "duration": 24,
+   "bones": 26
+  },
+  {
+   "name": "Anim/demo_kirai.csab",
+   "base": "demo_kirai",
+   "duration": 20,
+   "bones": 26
+  },
+  {
+   "name": "Anim/demo_kirai_wait.csab",
+   "base": "demo_kirai_wait",
+   "duration": 30,
+   "bones": 26
+  },
+  {
+   "name": "Anim/demo_modoru.csab",
+   "base": "demo_modoru",
+   "duration": 87,
+   "bones": 26
+  },
+  {
+   "name": "Anim/demo_modoru_to_omegai2.csab",
+   "base": "demo_modoru_to_omegai2",
+   "duration": 28,
+   "bones": 26
+  },
+  {
+   "name": "Anim/demo_modoru_wait.csab",
+   "base": "demo_modoru_wait",
+   "duration": 24,
+   "bones": 26
+  },
+  {
+   "name": "Anim/demo_namae.csab",
+   "base": "demo_namae",
+   "duration": 20,
+   "bones": 26
+  },
+  {
+   "name": "Anim/demo_namae_wait.csab",
+   "base": "demo_namae_wait",
+   "duration": 31,
+   "bones": 26
+  },
+  {
+   "name": "Anim/demo_naname_wait.csab",
+   "base": "demo_naname_wait",
+   "duration": 24,
+   "bones": 26
+  },
+  {
+   "name": "Anim/demo_noridasi.csab",
+   "base": "demo_noridasi",
+   "duration": 21,
+   "bones": 26
+  },
+  {
+   "name": "Anim/demo_noridasi_wait.csab",
+   "base": "demo_noridasi_wait",
+   "duration": 24,
+   "bones": 26
+  },
+  {
+   "name": "Anim/demo_onegai2.csab",
+   "base": "demo_onegai2",
+   "duration": 26,
+   "bones": 26
+  },
+  {
+   "name": "Anim/demo_onegai.csab",
+   "base": "demo_onegai",
+   "duration": 15,
+   "bones": 26
+  },
+  {
+   "name": "Anim/demo_onegai_wait.csab",
+   "base": "demo_onegai_wait",
+   "duration": 20,
+   "bones": 26
+  },
+  {
+   "name": "Anim/demo_usiro_ude_wait.csab",
+   "base": "demo_usiro_ude_wait",
+   "duration": 24,
+   "bones": 26
+  },
+  {
+   "name": "Anim/anim_fast_run.csab",
+   "base": "anim_fast_run",
+   "duration": 14,
+   "bones": 26
+  },
+  {
+   "name": "Anim/anim_fast_run_okarina.csab",
+   "base": "anim_fast_run_okarina",
+   "duration": 99,
+   "bones": 26
+  },
+  {
+   "name": "Anim/kozelda_furimuki.csab",
+   "base": "kozelda_furimuki",
+   "duration": 69,
+   "bones": 26
+  },
+  {
+   "name": "Anim/kozelda_okarina_wait.csab",
+   "base": "kozelda_okarina_wait",
+   "duration": 60,
+   "bones": 26
+  },
+  {
+   "name": "Anim/kozelda_ushiro_wait.csab",
+   "base": "kozelda_ushiro_wait",
+   "duration": 24,
+   "bones": 26
+  },
+  {
+   "name": "Anim/demo_tetataki_wait.csab",
+   "base": "demo_tetataki_wait",
+   "duration": 20,
+   "bones": 26
+  },
+  {
+   "name": "Anim/anim_matsu.csab",
+   "base": "anim_matsu",
+   "duration": 40,
+   "bones": 26
+  },
+  {
+   "name": "Anim/demo_furimuki.csab",
+   "base": "demo_furimuki",
+   "duration": 65,
+   "bones": 26
+  },
+  {
+   "name": "Anim/zl4_demo_furimuki_wait.csab",
+   "base": "zl4_demo_furimuki_wait",
+   "duration": 20,
+   "bones": 26
+  },
+  {
+   "name": "Anim/zl4_demo_kasige.csab",
+   "base": "zl4_demo_kasige",
+   "duration": 20,
+   "bones": 26
+  },
+  {
+   "name": "Anim/demo_kasige_wait.csab",
+   "base": "demo_kasige_wait",
+   "duration": 20,
+   "bones": 26
+  },
+  {
+   "name": "Anim/demo_nozoki_wait.csab",
+   "base": "demo_nozoki_wait",
+   "duration": 20,
+   "bones": 26
+  },
+  {
+   "name": "Anim/demo_slide.csab",
+   "base": "demo_slide",
+   "duration": 40,
+   "bones": 26
+  },
+  {
+   "name": "Anim/demo_slide_wait.csab",
+   "base": "demo_slide_wait",
+   "duration": 20,
+   "bones": 26
+  },
+  {
+   "name": "Anim/demo_tesage.csab",
+   "base": "demo_tesage",
+   "duration": 15,
+   "bones": 26
+  },
+  {
+   "name": "Anim/zl4_demo_tetataki_1.csab",
+   "base": "zl4_demo_tetataki_1",
+   "duration": 35,
+   "bones": 26
+  },
+  {
+   "name": "Anim/demo_tetataki_2.csab",
+   "base": "demo_tetataki_2",
+   "duration": 25,
+   "bones": 26
+  },
+  {
+   "name": "Anim/demo_onegai2_wait.csab",
+   "base": "demo_onegai2_wait",
+   "duration": 24,
+   "bones": 26
+  },
+  {
+   "name": "Anim/demo_furimuki_wait.csab",
+   "base": "demo_furimuki_wait",
+   "duration": 30,
+   "bones": 26
+  },
+  {
+   "name": "Anim/demo_kasige.csab",
+   "base": "demo_kasige",
+   "duration": 15,
+   "bones": 26
+  },
+  {
+   "name": "Anim/demo_slideto_link.csab",
+   "base": "demo_slideto_link",
+   "duration": 100,
+   "bones": 26
+  }
+ ],
+ "/actor/zelda_zo.zar": [
+  {
+   "name": "Anim/zo_riku_matsu.csab",
+   "base": "zo_riku_matsu",
+   "duration": 40,
+   "bones": 21
+  },
+  {
+   "name": "Anim/zo_mizu_talk.csab",
+   "base": "zo_mizu_talk",
+   "duration": 30,
+   "bones": 21
+  },
+  {
+   "name": "Anim/Zola_maku.csab",
+   "base": "Zola_maku",
+   "duration": 60,
+   "bones": 21
+  },
+  {
+   "name": "Anim/ZS_z1.csab",
+   "base": "ZS_z1",
+   "duration": 30,
+   "bones": 21
+  },
+  {
+   "name": "Anim/ZS_z2.csab",
+   "base": "ZS_z2",
+   "duration": 30,
+   "bones": 21
+  },
+  {
+   "name": "Anim/zo_omise.csab",
+   "base": "zo_omise",
+   "duration": 29,
+   "bones": 21
+  },
+  {
+   "name": "Anim/zo_mizu_matsu.csab",
+   "base": "zo_mizu_matsu",
+   "duration": 28,
+   "bones": 21
+  }
+ ]
+}
