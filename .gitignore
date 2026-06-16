@@ -4,6 +4,10 @@ Shipwright/
 scratch/
 *.otr
 *.o2r
+# ROM + local env (never commit copyrighted assets or machine-specific paths)
+.env
+*.3ds
+*.z64
 build/
 logs/
 __pycache__/
