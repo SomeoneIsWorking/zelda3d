@@ -87,6 +87,15 @@ class Material:
     cull:int              # 0=none 1=back 2=front 3=both (raw flags)
     alpha_test:bool
     alpha_ref:float
+    # Blend state. The CMB stores GL-ES enum values directly (0x0302 GL_SRC_ALPHA,
+    # 0x0001 GL_ONE, 0x8006 GL_FUNC_ADD), usable verbatim in desktop GL. blend_enable
+    # off => opaque (alpha-test only). Additive light-shaft mats have dst_rgb=GL_ONE.
+    blend_enable:bool=False
+    blend_src_rgb:int=0x0302; blend_dst_rgb:int=0x0303
+    blend_src_a:int=0x0001;   blend_dst_a:int=0x0000
+    blend_eq_rgb:int=0x8006;  blend_eq_a:int=0x8006
+    blend_color:tuple=(0.0,0.0,0.0,1.0)
+    depth_write:bool=True
 
 @dataclass
 class Texture:
@@ -183,8 +192,15 @@ class Cmb:
             co=o+0x58
             sS,sT,tS,tT,rot=struct.unpack_from("<5f",b,co+4)
             alpha_en=_u8(b,o+0x130); alpha_ref=_u8(b,o+0x131)/255.0
+            # Blend state (GL-ES enums, used verbatim). Offsets per noclip readMatsChunk
+            # (Ocarina v6); verified against real room materials.
+            depth_w=_u8(b,o+0x135); blend_en=_u8(b,o+0x138)
+            bsr=_u16(b,o+0x13C); bdr=_u16(b,o+0x13E); ber=_u16(b,o+0x140)
+            bsa=_u16(b,o+0x144); bda=_u16(b,o+0x146); bea=_u16(b,o+0x148)
+            bc=struct.unpack_from("<4f",b,o+0x14C)
             self.materials.append(Material(i,tex0,wrap_s,wrap_t,sS,sT,tS,tT,rot,
-                                           cull,bool(alpha_en),alpha_ref))
+                                           cull,bool(alpha_en),alpha_ref,
+                                           bool(blend_en),bsr,bdr,bsa,bda,ber,bea,bc,bool(depth_w)))
             o+=stride
 
     def material_texture(self, mat_index:int)->int:
@@ -363,6 +379,11 @@ if __name__=="__main__":
         print(f"  mat{m.index}: tex0={m.tex0_idx} wrapS=0x{m.wrap_s:x} wrapT=0x{m.wrap_t:x} "
               f"scale=({m.scale_s:.3f},{m.scale_t:.3f}) trans=({m.trans_s:.3f},{m.trans_t:.3f}) "
               f"rot={m.rot:.3f} cull={m.cull} alphaTest={m.alpha_test}@{m.alpha_ref:.2f}")
+        if m.blend_enable:
+            print(f"       BLEND src/dst rgb=0x{m.blend_src_rgb:x}/0x{m.blend_dst_rgb:x} "
+                  f"a=0x{m.blend_src_a:x}/0x{m.blend_dst_a:x} eq=0x{m.blend_eq_rgb:x}/0x{m.blend_eq_a:x} "
+                  f"const={tuple(round(v,2) for v in m.blend_color)} depthWrite={m.depth_write} "
+                  f"{'(ADDITIVE)' if m.blend_dst_rgb==1 else ''}")
     for mesh in c.meshes:
         print(f"  mesh sepd={mesh.sepd_index} mat={mesh.material_index} -> tex{c.material_texture(mesh.material_index)}")
     for i,s in enumerate(c.sepds):
