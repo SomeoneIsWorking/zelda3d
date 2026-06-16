@@ -21,6 +21,13 @@ SOH_DIR="$REPO/Shipwright/build-cmake/soh"
 DISP="${SOH3D_DISPLAY:-99}"
 TIMEOUT="${SOH3D_TIMEOUT:-420}"
 
+# Force the X11 (Xvfb) backend. Without this, if the caller's environment has
+# WAYLAND_DISPLAY set (e.g. a KDE/GNOME Wayland session), SDL2 prefers the real
+# Wayland compositor and pops a VISIBLE window on the user's desktop instead of
+# rendering into our private Xvfb — i.e. "headless" stops being headless. Unset it.
+unset WAYLAND_DISPLAY
+export SDL_VIDEODRIVER=x11
+
 cleanup() {
     pkill -9 -f "$SOH_DIR/soh.elf" 2>/dev/null
     pkill -9 -f "soh.elf" 2>/dev/null
