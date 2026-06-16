@@ -1,5 +1,38 @@
 # SoH3D — progress & state
 
+## ✅ DONE (session 16, 2026-06-16): OWN THE OoT3D FRAME — dedicated SoH3D render pass
+**The strategic direction (PRIMARY) landed: SoH3D content no longer draws inline inside
+Fast3D's frame fighting its cached GL state. It is now COLLECTED and drawn in ONE
+GL-state-bracketed pass.** This subsumes the recurring GL-state-leak (striped skybox) bug.
+Pipeline:
+- `OTR_G_SOH3D_DRAW` handler (interpreter.cpp) no longer calls `SoH3D_GL_Draw` inline — it
+  calls `SoH3D_GL_Submit`, capturing {modelId, MP_matrix snapshot, invertY, tint, aspectAdj}
+  into a per-frame draw list (soh3d_gl.cpp `g_drawList`). Capturing MP HERE is essential
+  (it's that item's matrix; the render-pass opcode comes later when MP is something else).
+- New opcode `OTR_G_SOH3D_RENDERPASS` (0x4b) + `gSPSoH3DRenderPass`: `gfx_soh3d_renderpass_handler`
+  flushes Fast3D then calls `SoH3D_GL_RenderPass`, which drains the list — `beginPass` saves
+  Fast3D's GL state + installs ours ONCE (isolated VAO, our program, depth LEQUAL, scissor/cull
+  off), `drawOne` per item (per-group blend/depth from the CMB material), `endPass` restores
+  Fast3D's state + deterministically resets the once-set state (blendFunc/equation/blendColor,
+  depthFunc) ONCE. Old `SoH3D_GL_Draw` kept as a thin single-item bracket (legacy/unused path).
+- Emitted once/frame: `SoH3D_EmitRenderPass(play)` right after the actor draw-all
+  (`func_800315AC`, z_play.c) so OoT3D content composites after Fast3D's opaque 3D, before UI.
+  `SoH3D_FrameBegin()` (at the per-frame REPL-poll point) drops any items left unrendered by a
+  transition early-out so they can't double-draw.
+- Pose note (unchanged, pre-existing): skinning is per-modelId (`SoH3D_GL_SetBones`), set at
+  emit time; multiple actors sharing a model id still share the last pose. Not a regression of
+  this change; fix when char-replacement resumes.
+- **VERIFIED** (Kakariko entrance 219, real GPU :0, SOH_FRAMEDUMP): room geometry (windmill/
+  gate/walls) renders, Link composites depth-correct in front, render pass logs "5/5 items
+  glerr=0x0" every frame, no crash. Skybox CLEAN — quantitative: 34.7k blue-sky px, B-channel
+  std 1.1, horizontal scanline adjacent-pixel delta 2.1 (striping would be tens-to-hundreds).
+  The recurring candy-stripe leak is GONE. Screenshot scratch/screenshots/rp_kak.png.
+- Files: libultraship@soh3d {soh3d_gl.cpp/.h, interpreter.cpp, fast/lus_gbi.h,
+  libultra/gbi.h}; Shipwright@develop {soh3d.c/.h, z_play.c}.
+**NEXT (render path, step 3):** grow coverage — more of the frame under our pass; consider
+per-item pose capture (fix shared-model pose); eventually our own view/proj setup.
+
+
 Goal: make **Ship of Harkinian** render **OoT3D (3DS)** character models and world
 geometry instead of the N64 assets. Asset-conversion + renderer-integration task
 (not a renderer merge). Azahar (3DS emulator) is built as the **visual oracle**.
