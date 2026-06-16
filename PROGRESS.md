@@ -123,11 +123,17 @@ replaced automatically, at a MEASURED scale. Two halves + the framework:
   back to N64. Animating them via the actor's live N64 SkelAnime pose on the OoT3D skeleton
   is a SEPARATE effort (user: "we tried this and it worked" — geldwoman's sModelTable
   N64-anim->CSAB resolver is the hand-built precedent). **TODO (separate task).**
-- **Known auto limitations:** multi-CMB objects assemble only their largest piece (sign
-  `zelda_kanban` -> bottom only); some objects pick an effect/billboard CMB (a tree came out
-  as a 2D cloud); keep-object actors (cuttable grass `En_Kusa` lives in gameplay_keep) have
-  no per-object ZAR so the object-id path can't map them — `sModelTable` (by actor id) still
-  does. Never crashes: a bad/missing ZAR or empty model falls back to N64.
+- **Main-CMB pick (largest-non-debris) refined:** reject FLAT/degenerate CMBs (one bbox
+  dim ~0 => billboard/sprite/decal) and pick the CMB with the MOST VERTICES among non-debris
+  non-flat candidates. Fixed the Kakariko tree rendering as a white flat quad: wood02's
+  `wd_model` is a flat [800,655,0] billboard the old "largest diagonal" pick chose; now it
+  picks `tree05_model` (489-vert 3D tree). Verified in log (no crash, real mesh loaded).
+- **Known auto limitations:** multi-CMB objects assemble only their main piece (sign
+  `zelda_kanban` -> center only; no multi-part assembly); the auto path picks ONE tree
+  variant (tree05) regardless of the actor's tree-type param; keep-object actors (cuttable
+  grass `En_Kusa` lives in gameplay_keep) have no per-object ZAR so the object-id path can't
+  map them — `sModelTable` (by actor id) still does. Never crashes: a bad/missing ZAR or
+  empty/flat-only model falls back to N64.
 
 ## ⭐ ARCHITECTURE PIVOT (2026-06-15, session 7) — read this FIRST
 The "convert CMB → N64 F3DEX2 dlist (cmb_to_c.py) → bake C arrays into soh.elf →
