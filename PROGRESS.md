@@ -135,6 +135,18 @@ replaced automatically, at a MEASURED scale. Two halves + the framework:
   map them — `sModelTable` (by actor id) still does. Never crashes: a bad/missing ZAR or
   empty/flat-only model falls back to N64.
 
+## Animated characters: N64 anim -> OoT3D skeleton (session 13, WIP — gated OFF)
+Port animated characters by driving the OoT3D skeleton from the actor's LIVE N64 SkelAnime
+joint pose (no per-actor CSAB mapping). `SoH3D_UpdateAnimN64` (soh3d_model.cpp) mirrors
+csab.cpp::skinMatrices but driven by N64 joint rotations; wired for En_Ge1
+(`SoH3D_Joints_EnGe1`). Bone correspondence VERIFIED exact for Gerudo (OoT3D bone i <- N64
+jointTable[i+1]; same 15-limb rig). Gate: env `SOH3D_N64ANIM` / REPL `n64anim` (default OFF).
+**Status:** plumbing works (runs, live joints), but the per-limb rotation CONVENTION is still
+wrong — pose comes out upright-but-contorted. Tried `T·R_rest·R_n64·S` (flat) then
+`T·R_n64·R_rest·S` (contorted). **Full continuation brief + next hypotheses (euler order,
+sign, numeric A/B vs CSAB) in `scratch/handoff_n64anim.md`.** Default keeps the working CSAB
+path so nothing is broken. Generalize via a SkelAnime_Draw hook AFTER geldwoman is correct.
+
 ## ⭐ ARCHITECTURE PIVOT (2026-06-15, session 7) — read this FIRST
 The "convert CMB → N64 F3DEX2 dlist (cmb_to_c.py) → bake C arrays into soh.elf →
 draw via libultraship's Fast3D interpreter" approach is being **REPLACED**. User
