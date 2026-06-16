@@ -178,8 +178,25 @@ the bone's rest rotation. Fix: `L = T(rest)·Rz·Ry·Rx(n64)·S(rest)` (no rest-
   ge1_s_wait — but the STRUCTURE is unambiguous.)
 - **Verified:** at Gerudo's Fortress the OoT3D Gerudo stands upright with natural proportions
   (arms at sides), matching the CSAB A/B (`scratch/screenshots/ge1_AB_n64.png` vs `_csab.png`).
-- **NEXT:** generalize via a SkelAnime_Draw hook (per-actor bone-count/order check) so it
-  applies to ALL animated actors, not just geldwoman. Default still keeps CSAB path.
+- **✅ GENERALIZED (session 14) via a SkelAnime_Draw hook.** No more per-actor jointTable
+  accessor: `SoH3D_TryDrawActor` defers an `n64anim`-flagged table actor (returns 0 so its own
+  Draw runs); the `SoH3D_SkelAnimeDraw` hook at the top of `SkelAnime_DrawSkeletonOpa` /
+  `SkelAnime_DrawSkeleton2` (used by ~139 animated actors) grabs the live `SkelAnime*`
+  (jointTable + limbCount), retargets the OoT3D model and draws it, returning 1 to skip the N64
+  limbs. Unhooked actors fall back to the N64 draw. Adding an animated actor = one table row
+  with `n64anim=1` (verify the rig corresponds: bone i <- jointTable[i+1]). `SoH3D_EmitModelDraw`
+  shares the world-transform+draw emit between the table and hook paths. Verified: En_Ge1
+  renders upright via the generic hook, matching the CSAB A/B. Gated by SOH3D_N64ANIM.
+
+### GL state leak (striped UI/skybox/magic-bar corruption) — ✅ FIXED (session 14, own VAO)
+The recurring non-deterministic 2D corruption was our `SoH3D_GL_Draw` mutating **Fast3D's
+VAO**: gfx_opengl creates one VAO at init (`mOpenglVao`) and assumes its attrib config
+persists; we ran with it bound, changed its attrib state, then hand-restored 6 attribs field
+by field — any miss corrupted Fast3D's persistent vertex state, so later draws (incl. the
+skybox/2D UI drawn before our scene draw → next frame) fetched garbage → stripes. Fix: give
+our draw its **own VAO** (`g_vao`), bind it for the draw, restore the previous VAO binding
+after; deletes the fragile per-attrib save/restore. (The old comment "interpreter renders on
+the DEFAULT VAO" was wrong.) Structural fix — the leak mechanism is eliminated, not patched.
 
 ## ⭐ ARCHITECTURE PIVOT (2026-06-15, session 7) — read this FIRST
 The "convert CMB → N64 F3DEX2 dlist (cmb_to_c.py) → bake C arrays into soh.elf →
