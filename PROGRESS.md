@@ -116,22 +116,27 @@ the OoT3D room mesh). Kokiri (spot04_0) vs Kakariko (spot01_0, warp known-good):
   sink, so benefit dominates (elevated-vert p90 disp 4u, 25 floats). Kokiri is sparse + mixes
   small ground divergences, big genuine divergences, and many structures → the crude
   reject/smooth/hole-fill misbehaves (elevated p90 37u, 361 floats).
-- **✅ FIXED (session 14) — height-aware blend.** Prototyped + measured all three candidate
-  changes offline (`tools/soh3d_warp_proto.py`) on Kokiri AND Kakariko before porting:
-  - **Height-blend WINS** (the fix): fade the per-XZ correction to zero with height above the
-    local ground (full <=60u, zero >=400u). Ground re-leveling unchanged; floating STRUCTURE
-    verts (>50u) dropped **168->10 (Kokiri)** and **31->4 (Kakariko)**, max float 119->57. No
-    ground-benefit regression on either scene. Ported to `warpRoomMesh` (`meshFloor` gained a
-    `lowest` mode → per-cell local-ground grid `G`; vertex shift scaled by the height blend).
-  - **Denser grid (50u) REJECTED:** only 44->48% ground <=1u but floating got WORSE (10->42)
-    and 4x perf — not worth it.
-  - **Raising REJECT threshold REJECTED:** catastrophic in Kokiri (floating 10->944 at REJECT
-    200) — its >120u cells are mostly bad samples, not genuine ground; the reject is protecting
-    us. (Kakariko's big divergences ARE real, so it'd help there — but a global raise is wrong.)
-  - **Residuals (not floating, lower priority):** (a) ~12u ground under-correction at some
-    spots (hole-fill/bilinear dilution; Link floats slightly above ground) — needs denser/
-    smarter data, deferred; (b) the z≈1900 raised region (OoT3D ground >120u above N64) stays
-    rejected → that ground sits high (can't fix without flooding bad D, see REJECT result).
+- **✅ RESOLVED (session 14) — INVERTED the approach: offset actors, don't warp the mesh.**
+  The render-mesh warp (any variant, incl. the height-blend that was tried first) has a
+  fundamental limit: it can only apply a SMOOTH per-XZ height field, but N64 collision has
+  SHARP steps (ledges, fenced platforms) that OoT3D ground doesn't mirror — so near every step
+  it smears the correction into adjacent already-correct ground and floats fences/posts.
+  Proven at the Kokiri fence (-867,737): raw OoT3D ground=120 ALREADY = N64=120, yet the warp
+  lifted it to 146 (+26 smeared from a 40u N64 ledge 30u away). The height-blend can't fix this
+  (it's the GROUND being lifted) and worse, stretches attached fences (a flawed offline metric
+  rewarded structures NOT moving, but a fence on lowered ground SHOULD move down with it).
+  - **Fix (user-chosen):** leave the OoT3D render mesh UNTOUCHED (pixel-faithful) and instead
+    offset each actor's RENDER Y by `OoT3D_ground - N64_ground` (= -D) so it stands on the
+    visible ground; physics stays N64. `computeRoomGroundDelta` now just computes+caches the D
+    grid (no mesh edit); `SoH3D_RoomGroundDeltaAt` samples it; `SoH3D_ActorRenderYOffset`
+    returns -D for an actor; Actor_Draw bumps `world.pos.y` by it around the draw then restores.
+  - **Verified in-engine (user, Kokiri):** "very good" — fences/ground no longer float; the
+    render is faithful and Link/actors sit on the visible ground. No smearing (no smooth field
+    applied to the mesh at all).
+  - **Remaining floating things** are NOT terrain — they're incorrect actor/model replacements
+    (auto-scale/position), a separate issue.
+  - Tools kept for reference: `soh3d_warp_audit.py`, `soh3d_warp_proto.py` (proved the warp's
+    limits + that no smooth-warp variant wins).
 
 ### ⚠️ KNOWN RESIDUAL — terrain warp under-corrects at sloped wall-edge cells (Link sinks)
 At Gerudo's Fortress (-560,-2812) the N64 collision floor is y=204.6 but the warped OoT3D
