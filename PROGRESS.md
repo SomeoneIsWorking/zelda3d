@@ -4,6 +4,40 @@ Goal: make **Ship of Harkinian** render **OoT3D (3DS)** character models and wor
 geometry instead of the N64 assets. Asset-conversion + renderer-integration task
 (not a renderer merge). Azahar (3DS emulator) is built as the **visual oracle**.
 
+## 🚧 NEXT MAJOR EFFORT (session 14 decision) — USE OoT3D COLLISION
+**User decision (reverses the earlier "keep N64 collision" rule):** drive gameplay from the
+**OoT3D scene collision mesh** so Link physically walks the OoT3D world. Why: N64 collision
+geometry and OoT3D render geometry genuinely differ in 3D — not just floor height but **walls
+and edges** (proven in Kokiri: Link sinks where OoT3D ground ≠ N64 floor AND can walk *into*
+OoT3D walls because they sit at a different XZ than the N64 collision wall). Every render-side
+fix tried (mesh warp → height-blend → inverse per-actor Y-offset onto the OoT3D floor) is a
+*vertical* band-aid; **no Y-offset can fix horizontal (wall) mismatch.** The only true fix is
+ONE geometry for gameplay+visuals → use OoT3D's collision.
+- **Current state being superseded:** the inverse approach (actors offset to the OoT3D render
+  floor, `SoH3D_ActorRenderYOffset`, render mesh untouched) is committed and is a decent
+  *visual* stopgap for floors, but OoT3D collision replaces the need for it (and fixes walls).
+- **Starting points for the port:** (a) OoT3D scene collision lives in the **scene-level ZSI**
+  (a collision command — the N64 cmd-0x03 analogue; noclip's oot3d parses it: vertices + polys
+  + surface types). Our `zsi.cpp`/`zsi.py` currently parse ONLY the room `cmb ` geometry — add
+  collision parsing. (b) SoH gameplay collision = `play->colCtx` / `BgCheck_*` (see
+  `SoH3D_N64FloorCb` using `BgCheck_EntityRaycastFloor1`). Decide: convert OoT3D collision →
+  SoH's `CollisionHeader`/`CollisionPoly` format and inject into `colCtx` at scene load, OR
+  hook the BgCheck queries. (c) Verify with `floorat` (N64 collision) vs the OoT3D collision +
+  visual `meshfloor`. Keep it gated for A/B.
+- See memory `soh3d-terrain-warp` (history of the render-side attempts + why they fail).
+
+## ⏸️ ALSO PENDING (not started): "replace ALL characters"
+Route SKINNED auto-replaced actors (currently SKIPPED to avoid T-pose, see
+`soh3d-auto-replace`) through the GENERIC N64-anim SkelAnime hook (already built, session 14:
+`SoH3D_SkelAnimeDraw` + sModelTable `n64anim` flag). Plan: in `SoH3D_TryAuto`, stop skipping
+skinned models when `SOH3D_N64ANIM` is on; measure+scale them, compute a groundOffset =
+`-(bind-pose bbox minY)` (ge1's -1000 == -minY, verified), then set the pending N64-anim state
+(`gSoH3dPendingActor/Model/Scale/GroundOff`) + return 0 so the hook drives them from live N64
+joints. RISK: characters whose OoT3D rig doesn't correspond to the N64 skeleton (bone i ↔
+jointTable[i+1]) will pose wrong — add per-character objId skips as they show up. Grezzo mostly
+preserved rigs (verified for ge1), so it should broadly work ("we tried this and it worked").
+
+
 ## 🔧 OPEN ISSUES — found by the user driving Kakariko (session 11→12, 2026-06-16)
 Three live rendering/behaviour bugs, in priority order. (Aspect-ratio shear from session 11
 is FIXED + pushed — see below.) Session 12: ISSUE 1 (terrain sink) and ISSUE 2 (window
