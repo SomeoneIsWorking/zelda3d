@@ -85,6 +85,25 @@ runtime direct-GL path. ALL props are now on the GL path (no more baked dlists):
 - Verified in-game: crate (Gerudo Valley) wood-plank textured; pots (Kakariko) terracotta;
   bush (Kakariko) leafy — all correct, not black.
 
+### Decal z-fighting on ground/walls — ✅ FIXED (session 14, CMB polygon offset)
+OoT3D scene decals (sand/symbol detail coplanar with the base ground/wall) flickered when
+the camera moved: our direct-GL path ignored the CMB material's **polygon offset** (the depth
+bias OoT3D uses to pull decals toward the camera so they win the depth test cleanly). Fix:
+parse `isPolygonOffsetEnabled` (material +0x05) + signed `polygonOffsetUnit` (+0x07), confirmed
+against noclip `readMatsChunk`; `polygon_offset = unit/0xFFFE`. Plumbed through `SoH3DGlGroup`;
+the GL fragment shader applies `gl_FragDepth = gl_FragCoord.z + uDepthOffset` (standard-Z
+equivalent of noclip's reverse-Z depth offset — negative unit pulls the decal forward; 0 for
+normal materials). Verified in Gerudo's Fortress (decal flicker gone on camera motion). Ruled
+out the terrain warp as the cause first (warp on/off ground crops were identical).
+
+### ⚠️ KNOWN RESIDUAL — terrain warp under-corrects at sloped wall-edge cells (Link sinks)
+At Gerudo's Fortress (-560,-2812) the N64 collision floor is y=204.6 but the warped OoT3D
+render ground is y=221.6 (+17u), so Link's lower body is buried in the render terrain. This is
+the terrain-warp residual class already noted (steep / structure-edge cells: the 100u grid +
+bilinear smoothing + topmost-floor pick under-corrects near walls). NOT caused by the decal
+fix (Link is on the N64 draw path). Proper fix = finer warp grid / better N64↔render floor
+correspondence near structures. Measure with REPL `floorat` vs `meshfloor`.
+
 ### "Replace more objects" — pattern + remaining candidates
 To add an object: find its `/actor/*.zar` in the romfs, pick the main `.cmb` (avoid `hahen`
 debris), add a `kModels[]` row (zarPath, worldScale, cmbName) + an `sModelTable` row mapping
