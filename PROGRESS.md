@@ -94,6 +94,41 @@ Still N64 (candidates seen in romfs): gossip stone is on the older `gs` mapping;
 pieces — the loader currently draws one CMB, so a sign needs combining several); bombable
 rock (zelda_bombiwa), torch (zelda_torch2), treasure chest (zelda_box, animated lid).
 
+## SOH3D_AUTO — programmatic actor replacement + auto-scale (session 13, 2026-06-16)
+Stop hand-listing actors: any actor whose loaded object has a matching OoT3D ZAR is
+replaced automatically, at a MEASURED scale. Two halves + the framework:
+- **object id -> ZAR** (`tools/gen_object_zars.py` -> `soh3d_object_zars.inc`): an actor's
+  object dependency id (`play->objectCtx.status[actor->objBankIndex].id`) indexes a
+  generated positional table to `/actor/zelda_<name>.zar` (289/402 object ids map 1:1).
+  Paths only — safe to commit.
+- **AUTO-SCALE by measuring the N64 actor (height, NOT diagonal).** No universal scale
+  exists (OoT3D models are authored at per-object-inconsistent scales). First time an
+  auto-eligible actor is seen, its N64 draw is bracketed by the `OTR_G_SOH3D_MEASURE`
+  opcode (gbi 0x4a); the Fast3D interpreter accumulates the actor's drawn **world-space
+  height** (projects each vertex's eye-space pos onto the world-up axis = top-modelview ·
+  (0,1,0); rigid view => eye-space range == world height) and reports it via
+  `SoH3D_MeasureResult`. Next frame: `worldScale = measured_N64_height / OoT3D_model_local_Yextent`,
+  cached per object id, drawn via the GL path. **Height — not bbox diagonal:** diagonal
+  gave a consistent ~+22% bias (pot 0.147 vs hand 0.12, crate 0.122 vs 0.10) because the
+  manual scales were calibrated by matching visible HEIGHT and the OoT3D remodels have a
+  different aspect ratio than the N64 models; height removes the bias.
+- **Framework:** explicit `sModelTable` entries WIN (calibrated scale + anim resolvers);
+  else SOH3D_AUTO fills in. Auto model ids allocated in a 3rd range (`kAutoModelBase=2000`,
+  keyed by ZAR path) in soh3d_model.cpp; main CMB picked by "largest non-debris" (skip
+  hahen/modelT/broke/...). Gate: env `SOH3D_AUTO` (0=off default, 1=fill non-table, 2=ALL/
+  validation) + REPL `auto`/`autostate`. After-draw hook `SoH3D_AfterActorDraw` (z_actor.c)
+  closes the measure bracket.
+- **Skinned characters are SKIPPED on the auto path** (CMB bones>1 => articulated): with no
+  animation they render in a frozen T-pose (user saw guards T-posing at AUTO=2). They fall
+  back to N64. Animating them via the actor's live N64 SkelAnime pose on the OoT3D skeleton
+  is a SEPARATE effort (user: "we tried this and it worked" — geldwoman's sModelTable
+  N64-anim->CSAB resolver is the hand-built precedent). **TODO (separate task).**
+- **Known auto limitations:** multi-CMB objects assemble only their largest piece (sign
+  `zelda_kanban` -> bottom only); some objects pick an effect/billboard CMB (a tree came out
+  as a 2D cloud); keep-object actors (cuttable grass `En_Kusa` lives in gameplay_keep) have
+  no per-object ZAR so the object-id path can't map them — `sModelTable` (by actor id) still
+  does. Never crashes: a bad/missing ZAR or empty model falls back to N64.
+
 ## ⭐ ARCHITECTURE PIVOT (2026-06-15, session 7) — read this FIRST
 The "convert CMB → N64 F3DEX2 dlist (cmb_to_c.py) → bake C arrays into soh.elf →
 draw via libultraship's Fast3D interpreter" approach is being **REPLACED**. User
