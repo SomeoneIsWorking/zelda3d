@@ -135,17 +135,32 @@ replaced automatically, at a MEASURED scale. Two halves + the framework:
   map them — `sModelTable` (by actor id) still does. Never crashes: a bad/missing ZAR or
   empty/flat-only model falls back to N64.
 
-## Animated characters: N64 anim -> OoT3D skeleton (session 13, WIP — gated OFF)
+## Animated characters: N64 anim -> OoT3D skeleton (session 14, ✅ POSE CORRECT for Gerudo)
 Port animated characters by driving the OoT3D skeleton from the actor's LIVE N64 SkelAnime
 joint pose (no per-actor CSAB mapping). `SoH3D_UpdateAnimN64` (soh3d_model.cpp) mirrors
 csab.cpp::skinMatrices but driven by N64 joint rotations; wired for En_Ge1
 (`SoH3D_Joints_EnGe1`). Bone correspondence VERIFIED exact for Gerudo (OoT3D bone i <- N64
 jointTable[i+1]; same 15-limb rig). Gate: env `SOH3D_N64ANIM` / REPL `n64anim` (default OFF).
-**Status:** plumbing works (runs, live joints), but the per-limb rotation CONVENTION is still
-wrong — pose comes out upright-but-contorted. Tried `T·R_rest·R_n64·S` (flat) then
-`T·R_n64·R_rest·S` (contorted). **Full continuation brief + next hypotheses (euler order,
-sign, numeric A/B vs CSAB) in `scratch/handoff_n64anim.md`.** Default keeps the working CSAB
-path so nothing is broken. Generalize via a SkelAnime_Draw hook AFTER geldwoman is correct.
+
+**✅ FIXED (session 14) — the rotation CONVENTION, derived QUANTITATIVELY (not by guessing).**
+The contortion was a structural compose error: the old formula multiplied the N64 joint
+rotation INTO the CMB rest rotation (`T·R_n64·R_rest·S`). But the N64 jointTable already
+encodes each limb's FULL local orientation (the standing pose's big rotations — e.g. En_Ge1
+limb1 = (-90,0,-90), matching OoT3D bone0's rest), so composing double-applies that
+orientation. The correct rule is the SAME one csab.cpp uses: the animated rotation REPLACES
+the bone's rest rotation. Fix: `L = T(rest)·Rz·Ry·Rx(n64)·S(rest)` (no rest-rot compose).
+- **How it was derived (the quantitative gate the user asked for):** added a REPL `jointdump`
+  cmd (dumps the live En_Ge1 jointTable) + `tools/soh3d_anim_derive.py`, which diffs the CSAB
+  ge1_s_wait skin matrices against the N64-joint-driven ones across all 15 bones × 864
+  candidate conventions (3 compose structures × 6 euler orders × axis perms × sign flips). The
+  top 12 by Frobenius residual were ALL `struct=replace`; winner `replace, ZYX, identity,
+  +++` beat every compose variant decisively. (Residuals nonzero because the N64 idle
+  `gGerudoWhiteIdleAnim` is a 2-frame fidget stub — a slightly different pose than CSAB
+  ge1_s_wait — but the STRUCTURE is unambiguous.)
+- **Verified:** at Gerudo's Fortress the OoT3D Gerudo stands upright with natural proportions
+  (arms at sides), matching the CSAB A/B (`scratch/screenshots/ge1_AB_n64.png` vs `_csab.png`).
+- **NEXT:** generalize via a SkelAnime_Draw hook (per-actor bone-count/order check) so it
+  applies to ALL animated actors, not just geldwoman. Default still keeps CSAB path.
 
 ## ⭐ ARCHITECTURE PIVOT (2026-06-15, session 7) — read this FIRST
 The "convert CMB → N64 F3DEX2 dlist (cmb_to_c.py) → bake C arrays into soh.elf →
