@@ -1,5 +1,26 @@
 # SoH3D — progress & state
 
+## ✅ DONE (session 19, 2026-06-17): CHARACTER LIGHTING (half-Lambert form term)
+**OoT3D characters/props were rendering FLAT** — the GL shader did `frag = tex·vColor·flatTint` and
+the per-vertex normal (`aNrm`, read from the CMB) was uploaded but UNUSED, so models had no form
+while N64 models get per-vertex N·L. Added a directional FORM term:
+- **Shader** (libultraship soh3d_gl.cpp): vertex now skins the NORMAL too and outputs a view-space
+  normal (via new `uMV` = modelview, no projection); fragment adds a half-Lambert wrap term for lit
+  draws: `shade = uTint·(0.55 + 0.45·(dot(N,L)·0.5+0.5))` with a FIXED camera-space key light
+  `L=normalize(0.40,0.55,0.73)` (form follows the camera; scene colour/time still from uTint). 0.55
+  floor → never black.
+- **Scoping:** only characters/props are lit (they have flat vColor); SCENE GEOMETRY keeps its baked
+  vColor AO (would double-shade). The emitter packs a "lit" flag into the draw handle's high bit
+  (`modelId | 0x80000000` in SoH3D_EmitModelDraw; scene rooms leave it clear); the interpreter masks
+  it back out and also captures the modelview-stack top for `uMV`.
+- **Toggle:** REPL `light 0|1` / env `SOH3D_LIGHT` (default on) via cross-module global
+  `gSoH3dLightEnable` (same pattern as gSoh3dDumpPending).
+- **VERIFIED** (Kokiri Forest, Saria, frozen pose): live `light` toggle changes ONLY the model
+  (2220 px in Saria's bbox; N64 Link + scene unchanged → correct scoping). ON shows a clear
+  light→dark gradient across her tunic/hair (was flat). scratch/screenshots/saria_{ON,OFF}_crop.png.
+  Plausible next: drive the key light from the scene's actual light1Dir (needs the view matrix to
+  put world light dirs in view space) so shading tracks time-of-day direction, not just the camera.
+
 ## ✅ DONE (session 19, 2026-06-17): N64-anim → OoT3D-CSAB MAPPING (auto skinned actors)
 **Auto-replaced skinned actors now play the OoT3D CSAB that CORRESPONDS to their LIVE N64 animation
 (walk→walk, cut-grass→cut-grass, idle→idle), instead of one fixed idle.** Built the "dump all anims
