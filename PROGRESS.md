@@ -1,5 +1,33 @@
 # SoH3D — progress & state
 
+## ✅ DONE (session 20, 2026-06-17): SCENE-ACCURATE form lighting (sun direction)
+**The character/prop form light now follows the SCENE'S sun, not a fixed direction.** Session 19's
+half-Lambert term used a hardcoded direction the comments called "camera-space"; this session drives
+it from `play->envCtx.lightSettings.light1Dir` so shading tracks time of day / the world.
+- **Root-caught a wrong assumption first:** the form normal was documented as "view/camera space",
+  implying the light followed the camera. It does NOT. OoT folds the camera/viewing matrix into the
+  **PROJECTION** matrix (`z_view.c` loads `viewing` with `G_MTX_PROJECTION|G_MTX_MUL`;
+  `interpreter.cpp` line 1437 `MatrixMul(P_matrix, viewing, P_matrix)`), so the modelview-stack top is
+  the **model→world** matrix only. Hence `mat3(uMV)*nM` is a **WORLD-space** normal — the old fixed
+  light was world-fixed, not camera-fixed. So the fix needs NO view transform: feed the world-space
+  `light1Dir` straight in. Fixed the misleading comments in `soh3d_gl.cpp`.
+- **Impl:** frag shader's const `kLightDir` → per-frame uniform `uLightDir`; new global
+  `gSoH3dLightDirWorld` + setter `SoH3D_GL_SetLightDir` (mirrors `gSoH3dLightEnable`), uploaded once
+  in `beginPass`. `SoH3D_UpdateLight(play)` (called from `SoH3D_EmitRenderPass`) normalizes
+  `light1Dir` (F3DEX dir-to-light = exactly the half-Lambert L; OoT copies it into
+  `dirLight1.params.dir`) and sets it; degenerate dirs are skipped (hold last). light1 only (the sun);
+  light2/colour fill is a possible follow-on.
+- **TOOLING:** REPL `lightdir x y z` (override world dir, held), `lightdir auto` (back to scene),
+  `lightdir` (print live dir) — lets the plumbing be A/B'd live and the scene's light1Dir be read.
+- **VERIFIED quantitatively** (Kokiri Forest, static `kibako` prop, frozen camera/pose). (1) Live
+  `light1Dir` traces the sun arc: t=8192 (0.70,−0.70,…)→ 20480 (0.92,0.38,…)→ 32768 noon
+  (0.00,0.99,…)→ 43008 (−0.83,0.55,…). (2) Shader consumes it: lightdir toward- vs away-camera =
+  **77-luma swing** on the box's interior front face (static noise 99/3380 px = drifting N64
+  sparkles). (3) Sun-tracking, **tint-isolated** (on/off ratio = 0.55+0.45·hl, divides out scene
+  colour): box front-face ratio **0.761 (morning, sun east/away) → 0.911 (afternoon, sun west/toward)**.
+  scratch/screenshots/lighting_flat_vs_scene.png. NOTE the original "follows the camera" claim below
+  is FALSE (see root-cause above); the form was always world-fixed.
+
 ## ✅ DONE (session 19, 2026-06-17): CHARACTER LIGHTING (half-Lambert form term)
 **OoT3D characters/props were rendering FLAT** — the GL shader did `frag = tex·vColor·flatTint` and
 the per-vertex normal (`aNrm`, read from the CMB) was uploaded but UNUSED, so models had no form
