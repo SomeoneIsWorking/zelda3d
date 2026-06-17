@@ -10,11 +10,11 @@ symbol is NOT here — the tool derives it at runtime by listing the object's re
 Emits an .inc of IndexAnim[]/IndexEntry[] arrays (structs declared in cc_index.h).
 Run:  python3 tools/gen_charcompare_index.py
 """
-import json
 import os
 
+import animmap_source
+
 REPO = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
-ANIMMAP = os.path.join(REPO, "tools/skeldata/animmap.json")
 OUT = os.path.join(REPO, "Shipwright/soh/charcompare/charcompare_index.inc")
 
 # Curated TYPE per N64 object. Anything unlisted -> "other". Editable; regenerate after edits.
@@ -76,14 +76,15 @@ def cident(s):
 
 
 def main():
-    am = json.load(open(ANIMMAP))
+    src, n_ov = animmap_source.load()
     # Stable order: by category then display name.
     entries = []
-    for zar, d in am.items():
+    for d in src:
+        zar = d["zar"]
         obj = d["object"]
         name = zar.replace("/actor/zelda_", "").replace(".zar", "")
         cat = CATEGORY.get(obj, "other")
-        anims = [(r["n64"], r["otr"], int(r["frameCount"] or 0), r.get("best") or "") for r in d["rows"]]
+        anims = [(r["n64"], r["otr"], r["frameCount"], r["csab"]) for r in d["rows"]]
         entries.append((cat, name, zar, obj, anims))
     entries.sort(key=lambda e: (e[0], e[1]))
 
@@ -114,7 +115,7 @@ def main():
     cats = {}
     for cat, *_ in entries:
         cats[cat] = cats.get(cat, 0) + 1
-    print(f"wrote {OUT}: {len(entries)} entries; categories: " +
+    print(f"wrote {OUT}: {len(entries)} entries ({n_ov} csab overrides applied); categories: " +
           ", ".join(f"{k}={v}" for k, v in sorted(cats.items())))
 
 
