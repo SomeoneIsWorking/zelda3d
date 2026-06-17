@@ -32,6 +32,18 @@ User-driven session ("replace ALL characters", smooth anims, sensible defaults).
 - **CORRECTION:** the "shared zelda_ec archive" concern was UNFOUNDED. En_Hy townsfolk use SEPARATE
   per-body objects (OBJECT_AOB/BOJ/AHG/BBA/CNE/BJI/COB/BOB), each already mapped to its own zar; the
   cucco is zelda_nw (not ec). zelda_ec is a redundant consolidated archive nothing routes through.
+- **CREATURE ANIM MAPS (bulk dump -> hand-weave, per user direction).** Made the offline exporters
+  (soh3d_skel_export.py + soh3d_anim_export.py) ALIAS-AWARE (import gen_object_zars.ALIAS, build
+  OBJ_OVERRIDE from its inverse, case-insensitive zar regex) so they dump N64+OoT3D skeletons & anims
+  for the aliased creatures too. Then wove 116 reviewed N64-anim->CSAB entries into soh3d_animmap.inc
+  so the new creatures play proper anims (octorok shoot/die/hide, stalfos full moveset, tektite jump,
+  peahat fly, poe states, gerudo combat, king dodongo, child epona gaits) instead of idle. Hand-fixed
+  the matcher's alphabetical ties (Poe attack->po_atack/damaged->po_damage, Octorok shoot->oc_atack,
+  Wallmaster wait->wm_wait/miss->wm_miss, Anubis standup->av_getup, Gerudo damage->geldB_hit); dropped
+  garbage-frameCount entries; skipped object_fhg (bad reads) + object_door_killer (no skel anims).
+  NOTE the auto path plays each model's OWN CSAB (no joint retarget) so creatures POSE correctly by
+  construction — the anim map only selects WHICH CSAB. Townsfolk os_anime gestures stay idle (shared
+  gesture bank across body types -> one mapping can't fit all; idle is the right fallback).
 - **REMAINING N64 (no clean standalone model / not creatures):** ~96 NULL objects left, but they are
   keeps (gameplay_keep), scene object-sets (oA*/oB*/oE*/oF*), anim-only banks (*_anime, ganon_anime*,
   zl2_anime*), effects (mjin_*), items (medal/b_heart/gi via held path), Link/Epona variants, and a
