@@ -7,7 +7,11 @@ import struct, sys, os, re, glob
 ROM = "<rom-dir>/ROM/N64/Legend of Zelda, The - Ocarina of Time (USA).z64"
 REPO = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 FILELIST = os.path.join(REPO, "Shipwright/soh/assets/extractor/filelists/ntsc_oot.txt")
-XMLDIR = os.path.join(REPO, "Shipwright/soh/assets/xml/GC_NMQ_PAL_F/objects")  # offsets are version-stable
+# XML offsets are NOT version-stable: anim offsets differ between PAL and NTSC for some objects
+# (e.g. object_du gDaruniaIdleAnim = 0x6EB0 PAL vs 0x74B0 NTSC). The ROM above is USA/NTSC, so the
+# XML version MUST be an NTSC one or the frameCount reads land on garbage bytes (was 58/913 wrong
+# with the PAL dir -> bad anim<->CSAB matches like Darunia's). N64_NTSC_10 matches this USA ROM.
+XMLDIR = os.path.join(REPO, "Shipwright/soh/assets/xml/N64_NTSC_10/objects")
 
 def be16(b,o): return struct.unpack_from(">h",b,o)[0]
 def beu16(b,o): return struct.unpack_from(">H",b,o)[0]
