@@ -1,0 +1,1377 @@
+==========================================================================================
+/actor/zelda_am.zar  (object_am)
+  OoT3D CSABs: am_jump(24), am_mamori(10), am_yarare(21)
+  N64 anims:
+    gArmosRicochetAnim                           fc=9
+    gArmosHopAnim                                fc=23
+    gArmosDamagedAnim                            fc=20
+==========================================================================================
+/actor/zelda_ani.zar  (object_ani)
+  OoT3D CSABs: ani_bikkuri(31), ani_nanyarona(30), ani_suwari_wait(30)
+  N64 anims:
+    gRoofManKnockbackAnim                        fc=20
+    gRoofManGettingUpAfterKnockbackAnim          fc=30
+    gRoofManIdleAnim                             fc=30
+==========================================================================================
+/actor/zelda_av.zar  (object_anubice)
+  OoT3D CSABs: av_die(13), av_dmg(22), av_fire(61), av_getup(17), av_jump(12), av_jump_start(17), av_wait(61)
+  N64 anims:
+    gAnubiceFallDownAnim                         fc=21
+    gAnubiceAttackingAnim                        fc=60
+    gAnubiceIdleAnim                             fc=60
+    gAnubiceLaughingAnim                         fc=12
+    gAnubiceStandUpAnim                          fc=16
+    gAnubiceAnim_000A48                          fc=11
+    gAnubiceAnim_000BAC                          fc=16
+==========================================================================================
+/actor/zelda_bb.zar  (object_Bb)
+  OoT3D CSABs: bb_fly(11), bb_atack(11), bb_damage(9)
+  N64 anims:
+    object_Bb_Anim_000184                        fc=10
+    object_Bb_Anim_0002AC                        fc=8
+    object_Bb_Anim_000444                        fc=10
+==========================================================================================
+/actor/zelda_bg.zar  (object_bg)
+  OoT3D CSABs: bg_getup(71), bg_sleeping(49), bg_wait(40)
+  N64 anims:
+    gChuGirlWakeUpAnim                           fc=71
+    gChuGirlNoddingOffAnim                       fc=49
+    gChuGirlLeanOverCounterAnim                  fc=20
+==========================================================================================
+/actor/zelda_bl.zar  (object_bl)
+  OoT3D CSABs: bl_nomral(17), bl_jump(42), bl_elec_a(8), bl_dmg(20)
+  N64 anims:
+    gBiriDischargeLightningAnim                  fc=7
+    gBiriClimbAnim                               fc=41
+    gBiriDefaultAnim                             fc=16
+==========================================================================================
+/actor/zelda_box.zar  (object_box)
+  OoT3D CSABs: cdemo_box_boxA(131), demo_box_boxA(117), demo_box_boxB(51), demo_tre_lgt_fcurve_data(327), demo_tre_lgt_c_fcurve_data(357)
+  N64 anims:
+    gTreasureChestAnim_000128                    fc=130
+    gTreasureChestAnim_00024C                    fc=116
+    gTreasureChestAnim_00043C                    fc=50
+==========================================================================================
+/actor/zelda_brob.zar  (object_brob)
+  OoT3D CSABs: br_start(17), br_unyo(20), br_elec(5), br_dmg(34)
+  N64 anims:
+    object_brob_Anim_000290                      fc=33
+    object_brob_Anim_001678                      fc=4
+    object_brob_Anim_001750                      fc=16
+    object_brob_Anim_001958                      fc=20
+==========================================================================================
+/actor/zelda_bv.zar  (object_bv)
+  OoT3D CSABs: bl2(3), bv_arm_dmg(41), bva_bdmg1(42), bva_bdmg2(42), bva_dmg1(42), bva_dmg2(42), bva_wait(41), bvb_break(42), bvb_down(42), bvc_break(52), bve_bdmg(42), bve_dmg_a(5), bve_dmg_b(28), bve_wait(41)
+  N64 anims:
+    gBarinadeBodyAnim                            fc=-24930
+    gBarinadeSupportAttachedAnim                 fc=1536
+    gBarinadeZapperIdleAnim                      fc=16784
+    gBarinadeStumpAnim                           fc=1292
+    gBarinadeBariAnim                            fc=2
+    gBarinadeSupportDamage1Anim                  fc=0
+    gBarinadeSupportDamage2Anim                  fc=473
+    gBarinadeSupportCutAnim                      fc=17226
+    gBarinadeSupportDetachedAnim                 fc=14577
+    gBarinadeZapperDamage1Anim                   fc=11042
+    gBarinadeZapperDamage2Anim                   fc=-10606
+    gBarinadeAnim_018A00                         fc=3139
+    gBarinadeAnim_015F10                         fc=-11621
+    gBarinadeAnim_015D10                         fc=-9187
+==========================================================================================
+/actor/zelda_bw.zar  (object_bw)
+  OoT3D CSABs: bw_aruku(60), bw_hakken(8), bw_kogeki(8)
+  N64 anims:
+    gTorchSlugEyestalkWaveAnim                   fc=59
+    gTorchSlugEyestalkRaiseAnim                  fc=7
+    gTorchSlugEyestalkFlailAnim                  fc=7
+==========================================================================================
+/actor/zelda_cow.zar  (object_cow)
+  OoT3D CSABs: usi_mogmog(31), usi_mooo(31), ust_daran(21), ust_furifuri(41)
+  N64 anims:
+    gCowBodyChewAnim                             fc=30
+    gCowBodyMoveHeadAnim                         fc=30
+    gCowTailIdleAnim                             fc=20
+    gCowTailSwishAnim                            fc=40
+==========================================================================================
+/actor/zelda_crow.zar  (object_crow)
+  OoT3D CSABs: df_flygue(8), df_hover(25)
+  N64 anims:
+    gGuayFlyAnim                                 fc=8
+==========================================================================================
+/actor/zelda_cs.zar  (object_cs)
+  OoT3D CSABs: cs_aruku(30), cs_matsu(24), cs_matsu02(28), cs_matsu03(19)
+  N64 anims:
+    gGraveyardKidWalkAnim                        fc=30
+    gGraveyardKidSwingStickUpAnim                fc=30
+    gGraveyardKidGrabStickTwoHandsAnim           fc=28
+    gGraveyardKidIdleAnim                        fc=19
+==========================================================================================
+/actor/zelda_daiku.zar  (object_daiku)
+  OoT3D CSABs: dk2_hanasi(28), dk2_hashiru(18), dk2_matsu(59), dk2_roya(20), dk2_suwari(14), dk2_tasuke(20)
+  N64 anims:
+    object_daiku_Anim_000600                     fc=28
+    object_daiku_Anim_000C44                     fc=18
+    object_daiku_Anim_001AB0                     fc=59
+    object_daiku_Anim_007DE0                     fc=20
+    object_daiku_Anim_008164                     fc=14
+    object_daiku_Anim_00885C                     fc=20
+==========================================================================================
+/actor/zelda_dekubaba.zar  (object_dekubaba)
+  OoT3D CSABs: db_P_tobidasu(25), db_P_kougeki(117)
+  N64 anims:
+    gDekuBabaPauseChompAnim                      fc=116
+    gDekuBabaFastChompAnim                       fc=24
+==========================================================================================
+/actor/zelda_dekunuts.zar  (object_dekunuts)
+  OoT3D CSABs: dn_atack(19), dn_damage(15), dn_dig(11), dn_down(12), dn_jump(16), dn_lookaround(27), dn_start(21), dn_wait02(9), dn_wait(15), dn_walk(19)
+  N64 anims:
+    gDekuNutsSpitAnim                            fc=18
+    gDekuNutsDamageAnim                          fc=14
+    gDekuNutsBurrowAnim                          fc=10
+    gDekuNutsDieAnim                             fc=11
+    gDekuNutsUnburrowAnim                        fc=16
+    gDekuNutsLookAroundAnim                      fc=26
+    gDekuNutsUpAnim                              fc=21
+    gDekuNutsStandAnim                           fc=15
+    gDekuNutsGaspAnim                            fc=9
+    gDekuNutsRunAnim                             fc=18
+==========================================================================================
+/actor/zelda_dh.zar  (object_dh)
+  OoT3D CSABs: dead_armR_wait_20f(31), dead_hand_wait_20f(40), dead_hand_dig_20f(30), dead_hand_greeting_20f(20), dead_hand_hit_20f(12), dead_hand_meeting_20f(40), dead_hand_attack_20f(20), dead_hand_down_20f(70), dead_hand_down_wait_20f(21)
+  N64 anims:
+    object_dh_Anim_0015B0                        fc=30
+    object_dh_Anim_001A3C                        fc=20
+    object_dh_Anim_002148                        fc=30
+    object_dh_Anim_0032BC                        fc=70
+    object_dh_Anim_00375C                        fc=21
+    object_dh_Anim_003A8C                        fc=20
+    object_dh_Anim_003D6C                        fc=12
+    object_dh_Anim_004658                        fc=40
+    object_dh_Anim_005880                        fc=40
+==========================================================================================
+/actor/zelda_dnk.zar  (object_dnk)
+  OoT3D CSABs: dnk_atack(19), dnk_dig(11), dnk_happy(17), dnk_jump(10), dnk_start(22), dnk_wait(16), dnk_walk(9)
+  N64 anims:
+    gDntStageSpitAnim                            fc=18
+    gDntStageHideAnim                            fc=10
+    gDntStageDanceAnim                           fc=16
+    gDntStageUnburrowAnim                        fc=9
+    gDntStageUpAnim                              fc=21
+    gDntStageWalkAnim                            fc=8
+    gDntStageWaitAnim                            fc=15
+==========================================================================================
+/actor/zelda_dns.zar  (object_dns)
+  OoT3D CSABs: dns_atack(19), dns_dig(11), dns_happy(16), dns_hintdig01(6), dns_hintdig02(8), dns_hintwait(11), dns_jump(10), dns_start(22), dns_wait(16), dns_walk(8)
+  N64 anims:
+    gDntJijiBurrowAnim                           fc=10
+    gDntJijiCowerAnim                            fc=5
+    gDntJijiHideAnim                             fc=7
+    gDntJijiTalkAnim                             fc=10
+    gDntJijiUnburrowAnim                         fc=9
+    gDntJijiUpAnim                               fc=21
+    gDntJijiWalkAnim                             fc=8
+    gDntJijiSpitAnim                             fc=18
+    gDntJijiDanceAnim                            fc=16
+    gDntJijiUnkAnim                              fc=6
+    gDntJijiWaitAnim                             fc=15
+==========================================================================================
+/actor/zelda_dodojr.zar  (object_dodojr)
+  OoT3D CSABs: dd_wait(16), dd_move(10), dd_jump(19), dd_damage(31), dd_die(18)
+  N64 anims:
+    object_dodojr_Anim_0004A0                    fc=45
+    object_dodojr_Anim_0005F0                    fc=15
+    object_dodojr_Anim_000724                    fc=19
+    object_dodojr_Anim_000860                    fc=10
+    object_dodojr_Anim_0009D4                    fc=16
+==========================================================================================
+/actor/zelda_dodongo.zar  (object_dodongo)
+  OoT3D CSABs: da_wait(41), da_walk_start(11), da_walk(41), da_walk_end(12), da_fire(52), da_fire_wait(42), da_dmg(19), da_dmg_wait(22), da_left(30), da_right(30), da_die(81)
+  N64 anims:
+    gDodongoDieAnim                              fc=81
+    gDodongoDamageAnim                           fc=19
+    gDodongoBreatheFireAnim                      fc=51
+    gDodongoAfterBreatheFireAnim                 fc=41
+    gDodongoSweepTailRightAnim                   fc=30
+    gDodongoSweepTailLeftAnim                    fc=30
+    gDodongoWaitAnim                             fc=40
+    gDodongoWalkAnim                             fc=40
+    gDodongoTwitchAnim                           fc=20
+    gDodongoGetUpAnim                            fc=21
+    gDodongoLowerTailAnim                        fc=11
+    gDodongoRightStepAnim                        fc=11
+    gDodongoLeftStepAnim                         fc=10
+==========================================================================================
+/actor/zelda_dog.zar  (object_dog)
+  OoT3D CSABs: dog_bark(31), dog_fuse(58), dog_fusetamama(47), dog_run(8), dog_sit(31), dog_walk(13)
+  N64 anims:
+    gDogBarkAnim                                 fc=30
+    gDogBowAnim                                  fc=57
+    gDogBow2Anim                                 fc=46
+    gDogRunAnim                                  fc=8
+    gDogSitAnim                                  fc=31
+    gDogWalkAnim                                 fc=12
+==========================================================================================
+/actor/zelda_ds.zar  (object_ds)
+  OoT3D CSABs: ds_matsu(50)
+  N64 anims:
+    gPotionShopLadyAnim                          fc=49
+==========================================================================================
+/actor/zelda_ds2.zar  (object_ds2)
+  OoT3D CSABs: ds2_matsu(22)
+  N64 anims:
+    object_ds2_Anim_0002E4                       fc=22
+==========================================================================================
+/actor/zelda_du.zar  (object_du)
+  OoT3D CSABs: dal_banzai(31), dal_banzai_wait(31), dal_bashi(60), dal_kangeki(20), dal_okiru(23), dalnia_base_dance(17), dalnia_base_to_dai(9), dalnia_base_to_kihon(12), dalnia_chotto_chigau(20), dalnia_dai_to_base(9), dalnia_end_miage(19), dalnia_end_modoru(43), dalnia_end_wait(24), dalnia_base_to_chotto(141), du_matsu(29), km_daru(15), dalnia_dai_dance(18), dalnia_base_dance_work(102)
+  N64 anims:
+    gDaruniaIdleAnim                             fc=-1468
+    gDaruniaItemGiveAnim                         fc=31
+    gDaruniaItemGiveIdleAnim                     fc=31
+    gDaruniaHitLinkAnim                          fc=55
+    gDaruniaHitBreastAnim                        fc=20
+    gDaruniaStandUpAfterFallingAnim              fc=23
+    gDaruniaDancingLoop1Anim                     fc=-9810
+    gDaruniaDancingLoop2Anim                     fc=3
+    gDaruniaDancingLoop3Anim                     fc=756
+    gDaruniaDancingLoop4Anim                     fc=-15029
+    gDaruniaDancingEndAnim                       fc=1126
+    gDaruniaWrongSongAnim                        fc=2169
+    gDaruniaWrongSongEndAnim                     fc=-18313
+    gDaruniaSageFormationAnim                    fc=3
+    gDaruniaLookingUpToSariaAnim                 fc=1394
+    gDaruniaCreditsHitBreastAnim                 fc=21662
+    gDaruniaCreditsIdleAnim                      fc=-1736
+==========================================================================================
+/actor/zelda_dy_obj.zar  (object_dy_obj)
+  OoT3D CSABs: DY_kieruu(16), DY_n_wait(50), DY_sanjyou(40), DY_t_wait(40), DY_tiryou(40), yousei_end(10), yousei_nagekiss(30), yousei_nagekiss_wait(51), yousei_start(30), yousei_start_wait(50)
+  N64 anims:
+    gGreatFairyAnim_000108                       fc=2
+    gGreatFairySpellFountainSpinShrinkAnim       fc=16
+    gGreatFairyLayingSidewaysAnim                fc=50
+    gGreatFairyLayingDownTransitionAnim          fc=40
+    gGreatFairyAfterSpellAnim                    fc=39
+    gGreatFairyAnim_005810                       fc=40
+    gGreatFairyJewelFountainSpinShrinkAnim       fc=10
+    gGreatFairyGivingUpgradeAnim                 fc=30
+    gGreatFairyAfterUpgradeAnim                  fc=50
+    gGreatFairySittingTransitionAnim             fc=30
+    gGreatFairySittingAnim                       fc=50
+==========================================================================================
+/actor/zelda_ec.zar  (object_ec)
+  OoT3D CSABs: ane_dance(48), ge1_dance(48), goron_dance(37), goron_hara_daiko(37), km1_motsu(27), kyotsu_swing_1(34), kyotsu_swing_2(34), kyotsu_swing_3(34), kyotsu_swing_4(34), kz_miage_wait(41), kz_miageru(59), kz_utsumuki_wait(40), mido_stand_up(109), mido_stand_wait(20), mido_utsumuki_wait(31), km1_dance(20), daiku_utau_1(60), daiku_utau_2(60), fu_mawasare(42), ingo_katakumi(40), taron_katakumi(40), zola_dance(45), nw_dance_A(140), nw_dance_B(140), nw_dance_C(140), shop_swing_1(60), shop_swing_2(60), shop_swing_3(60), shop_swing_4(60), km1_out_in_pose(27), oF1d_chyu_goron(25), ma2_utau(58)
+  N64 anims:
+    gDemoEcCuccoLadyAnim                         fc=48
+    gDemoEcCarpenterAnim                         fc=59
+    gDemoEcWindmillManAnim                       fc=27
+    gDemoEcGerudoAnim                            fc=48
+    gDemoEcGoronAnim                             fc=37
+    gDemoEcGoron2Anim                            fc=37
+    gDemoEcIngoAnim                              fc=40
+    gDemoEcDancingKokiriAnim                     fc=30
+    gDemoEcKokiriAnim                            fc=27
+    gDemoEcOldManAnim                            fc=34
+    gDemoEcAnim_006220                           fc=24
+    gDemoEcAnim_006930                           fc=50
+    gDemoEcKingZoraAnim                          fc=24
+    gDemoEcAnim_008D1C                           fc=109
+    gDemoEcAnim_009234                           fc=25
+    gDemoEcMidoAnim                              fc=24
+    gDemoEcJumpingCuccoAnim                      fc=48
+    gDemoEcJumpingCucco2Anim                     fc=48
+    gDemoEcWalkingCuccoAnim                      fc=48
+    gDemoEcPotionShopOwnerAnim                   fc=59
+    gDemoEcTalonAnim                             fc=40
+    gDemoEcDancingZoraAnim                       fc=30
+==========================================================================================
+/actor/zelda_ei.zar  (object_ei)
+  OoT3D CSABs: ei_wait(60), ei_rot(22), ei_swim(80), ei_dmg(21), ei_die(26), ei_death(50), ei_hover(32), ei_hover2(31)
+  N64 anims:
+    gStingerPopOutAnim                           fc=26
+    gStingerDiveAnim                             fc=21
+    gStingerBackflipAnim                         fc=21
+    gStingerHitAnim                              fc=80
+    gStingerIdleAnim                             fc=60
+==========================================================================================
+/actor/zelda_fantomHG.zar  (object_fhg)
+  OoT3D CSABs: hgf_damage(20), hgf_fastrun(14), hgf_fly(15), hgf_jump(30), hgf_jump01(14), hgf_jump02(16), hgf_stand(33), hgf_wait(45)
+  N64 anims:
+    gPhantomHorseRunningAnim                     fc=14916
+    gPhantomHorseAirAnim                         fc=1568
+    gPhantomHorseLeapAnim                        fc=-10080
+    gPhantomHorseLandAnim                        fc=1262
+    gPhantomHorseRearingAnim                     fc=12544
+    gPhantomHorseIdleAnim                        fc=-6400
+    gPhantomHorseUnusedRearingAnim               fc=20
+    gPhantomHorseStillAnim                       fc=2
+    gPhantomHorseFenceJumpAnim                   fc=-2912
+==========================================================================================
+/actor/zelda_fd.zar  (object_fd)
+  OoT3D CSABs: vb_FWDtest(101), vb_headONLY(3), vb_LarmONLY(3), vb_RarmONLY(31), vba_atack(86), vba_beforedamage(17), vba_damage(46), vba_down(21), vba_hit(45), vba_pikupiku(16), vba_search(17), vba_tyokkai(24), vba_up(27), vba_wait02(21), vba_wait(21)
+  N64 anims:
+    gVolvagiaLeftArmEmergeAnim                   fc=None
+    gVolvagiaRightArmEmergeAnim                  fc=None
+    gVolvagiaHeadEmergeAnim                      fc=None
+    gVolvagiaBodyStaticAnim                      fc=100
+==========================================================================================
+/actor/zelda_ff.zar  (object_firefly)
+  OoT3D CSABs: firefly_foot_fly(10), firefly_foot_at(5)
+  N64 anims:
+    gKeeseFlyAnim                                fc=8
+==========================================================================================
+/actor/zelda_fr.zar  (object_fr)
+  OoT3D CSABs: Jump(20), swing(28), wait(9), butterfly_fly(10)
+  N64 anims:
+    object_fr_Anim_0007BC                        fc=19
+    object_fr_Anim_0011C0                        fc=27
+    object_fr_Anim_001534                        fc=8
+==========================================================================================
+/actor/zelda_fu.zar  (object_fu)
+  OoT3D CSABs: are_are(42), fu_mawasu(42)
+  N64 anims:
+    gWindmillManPlayAndMoveHeadAnim              fc=27
+    gWindmillManPlayStillAnim                    fc=27
+==========================================================================================
+/actor/zelda_fw.zar  (object_fw)
+  OoT3D CSABs: fire_dancer_greeting(50), fire_dancer_jump(16), fire_dancer_landing(13), fire_dancer_turn_20f(8), fire_dancer_run(41), fire_walker_greeting_20f(11), fire_walker_run_20f(8), fire_walker_jump_20f(3)
+  N64 anims:
+    gFlareDancerCastingFireAnim                  fc=50
+    gFlareDancerBackflipAnim                     fc=13
+    gFlareDancerGettingUpAnim                    fc=13
+    gFlareDancerChasingAnim                      fc=41
+    gFlareDancerTwirlAnim                        fc=7
+    gFlareDancerCoreInitRunCycleAnim             fc=10
+    gFlareDancerCoreRunCycleAnim                 fc=3
+    gFlareDancerCoreEndRunCycleAnim              fc=7
+==========================================================================================
+/actor/zelda_ganon2.zar  (object_ganon2)
+  OoT3D CSABs: GF_aw(30), GF_f(55), GF_hen_shin(28), GF_sw(15), GF_tijimu(32), GF_tijimu_wait(40), GF_tw(20), gn2_downDEMO(60), gn2_hukkiDEMO(150), gn2_K_to_walk(12), gn2_Katack01L(35), gn2_Katack01R(43), gn2_Kdamage(31), gn2_Kfrontwalk(15), gn2_Ksidewalk(15), gn2_Kwait(24), gn2_Lhit(17), gn2_Lmahi(24), gn2_Lmahi_to_K(19), gn2_mahiDEMO(20), gn2_walk(45), gn2_walk_to_K(12), Last_hit_motion1(82), Last_hit_motion2(77), Last_mogaki(41), LG_DANGO(260), LG_Hoeru(116)
+  N64 anims:
+    gGanonFinalBlowAnim                          fc=72
+    gGanonDeadStartAnim                          fc=77
+    gGanonDeadLoopAnim                           fc=40
+    gGanonGuardToWalk                            fc=12
+    gGanonLeftSwordSwingAnim                     fc=35
+    gGanonRightSwordSwingAnim                    fc=43
+    gGanonDamageAnim                             fc=30
+    gGanonGuardWalkAnim                          fc=14
+    gGanonGuardSidestepAnim                      fc=14
+    gGanonGuardIdleAnim                          fc=24
+    gGanonStunStartAnim                          fc=6694
+    gGanonStunLoopAnim                           fc=13866
+    gGanonStunEndAnim                            fc=1291
+    gGanonDownedStartAnim                        fc=-830
+    gGanonStunEndToWalkAnim                      fc=8303
+    gGanonDuplicateStunStartAnim                 fc=-13298
+    gGanonDuplicateStunLoopAnim                  fc=1203
+    gGanonGetUpAnim                              fc=3915
+    gGanonDownedLoopAnim                         fc=2370
+    gGanonWalkAnim                               fc=None
+    gGanonWalkToGuardAnim                        fc=None
+==========================================================================================
+/actor/zelda_ge1.zar  (object_ge1)
+  OoT3D CSABs: ge1_mon_akeru(25), ge1_s_wait(22), ge1_matsu(2), ge1_hanasi(8)
+  N64 anims:
+    gGerudoWhiteUnusedFoldingArmsAnim            fc=7
+    gGerudoWhiteIdleAnim                         fc=2
+    gGerudoWhiteClapAnim                         fc=25
+    gGerudoWhiteDismissiveAnim                   fc=22
+==========================================================================================
+/actor/zelda_gelb.zar  (object_geldb)
+  OoT3D CSABs: geldB_attackA(10), geldB_attackB(40), geldB_back_ten(11), geldB_defense(5), geldB_down(24), geldB_hit(12), geldB_run(7), geldB_side_walk(10), geldB_start(17), geldB_talk(15), geldB_wait(20)
+  N64 anims:
+    gGerudoRedJumpAnim                           fc=17
+    gGerudoRedNeutralAnim                        fc=19
+    gGerudoRedSidestepAnim                       fc=10
+    gGerudoRedFlipAnim                           fc=11
+    gGerudoRedWalkAnim                           fc=7
+    gGerudoRedSlashAnim                          fc=10
+    gGerudoRedSpinAttackAnim                     fc=34
+    gGerudoRedDamageAnim                         fc=11
+    gGerudoRedDefeatAnim                         fc=23
+    gGerudoRedBlockAnim                          fc=4
+    gGerudoRedStandAnim                          fc=15
+==========================================================================================
+/actor/zelda_gla.zar  (object_gla)
+  OoT3D CSABs: geldA_attack(10), geldA_attack_end(12), geldA_down(30), geldA_find(11), geldA_find_wait(26), geldA_run(13), geldA_wait(59), geldA_walk(25)
+  N64 anims:
+    gGerudoPurpleUnusedHorizontalSlashAnim       fc=9
+    gGerudoPurpleUnusedSlashToStandingAnim       fc=11
+    gGerudoPurpleFallingToGroundAnim             fc=30
+    gGerudoPurpleUnusedStandingToCrouchAnim      fc=11
+    gGerudoPurpleUnusedCrouchingLookAroundAnim   fc=26
+    gGerudoPurpleChargingAnim                    fc=13
+    gGerudoPurpleLookingAboutAnim                fc=59
+    gGerudoPurpleWalkingAnim                     fc=25
+==========================================================================================
+/actor/zelda_gm.zar  (object_gm)
+  OoT3D CSABs: oF1d_chyu_goron(25)
+  N64 anims:
+    object_gm_Anim_0002B8                        fc=25
+==========================================================================================
+/actor/zelda_gnd.zar  (object_gnd)
+  OoT3D CSABs: gnf_atack(24), gnf_damage(21), gnf_Ddamage(100), gnf_Dfurafura(30), gnf_Dhenshin(20), gnf_Dmogaki(24), gnf_Dnormal(45), gnf_Dsaigo(2), gnf_Dstand(33), gnf_fastrun(14), gnf_jump01(14), gnf_jump02(16), gnf_lonlyATACK02(22), gnf_lonlyATACK(36), gnf_lonlyDAMAGE(17), gnf_lonlyFLY(20), gnf_lonlyGUARD(10), gnf_lonlyHIT(75), gnf_lonlyKAESHI02(22), gnf_lonlyKAESHI(20), gnf_lonlyMAHI(25), gnf_lonlyTSUKI02(11), gnf_lonlyTSUKI(9), gnf_lonlyTSUKIwait(14)
+  N64 anims:
+    gPhantomGanonRideAnim                        fc=14
+    gPhantomGanonMaskOnAnim                      fc=20
+    gPhantomGanonRidePoseAnim                    fc=2
+    gPhantomGanonHorseRearingAnim                fc=33
+    gPhantomGanonRideSpearRaiseAnim              fc=14
+    gPhantomGanonRideSpearStrikeAnim             fc=24
+    gPhantomGanonRideSpearResetAnim              fc=16
+    gPhantomGanonNeutralAnim                     fc=20
+    gPhantomGanonThrowAnim                       fc=36
+    gPhantomGanonThrowEndAnim                    fc=21
+    gPhantomGanonReturn1Anim                     fc=20
+    gPhantomGanonReturn2Anim                     fc=22
+    gPhantomGanonBlockAnim                       fc=10
+    gPhantomGanonChargeWindupAnim                fc=10
+    gPhantomGanonChargeStartAnim                 fc=9
+    gPhantomGanonChargeAnim                      fc=10
+    gPhantomGanonAirDamageAnim                   fc=14
+    gPhantomGanonGroundDamageAnim                fc=16
+    gPhantomGanonStunnedAnim                     fc=10
+    gPhantomGanonDeathBlowAnim                   fc=25
+    gPhantomGanonLimpAnim                        fc=14
+    gPhantomGanonScreamAnim                      fc=24
+    gPhantomGanonLastPoseAnim                    fc=2
+    gPhantomGanonAnim_003854                     fc=20
+    gPhantomGanonAnim_00D398                     fc=30
+    gPhantomGanonAnim_00CC84                     fc=12
+    gPhantomGanonAnim_012320                     fc=9
+==========================================================================================
+/actor/zelda_gndd.zar  (object_gndd)
+  OoT3D CSABs: gnd_anim_fastrun(24), gnd_anim_mahou(15), gnd_anim_mahou_wait(80), gnd_anim_nirami(15), gnd_anim_nirami_wait(81), gnd_anim_stand(33), gnd_anim_wait(80), gnd_demo_ojigi(30), gnd_demo_ojigi_furimuki(40), gnd_demo_ojigi_wait(30), gnd_demo_ukabi_wait(30), gnd_demo_ukabi_warai(15), gnd_demo_ukabi_warai_wait(30), gnd_walk(30)
+  N64 anims:
+    gYoungGanondorfHorsebackRideAnim             fc=24
+    gYoungGanondorfHorsebackMagicChargeUpStartAnim fc=15
+    gYoungGanondorfHorsebackMagicChargeUpLoopAnim fc=25
+    gYoungGanondorfHorsebackLookSidewaysStartAnim fc=15
+    gYoungGanondorfHorsebackLookSidewaysLoopAnim fc=25
+    gYoungGanondorfHorsebackRearAnim             fc=33
+    gYoungGanondorfHorsebackIdleAnim             fc=80
+    gYoungGanondorfKneelStartAnim                fc=30
+    gYoungGanondorfKneelLookSidewaysAnim         fc=10
+    gYoungGanondorfKneelLoopAnim                 fc=30
+    gYoungGanondorfArmsCrossedAnim               fc=30
+    gYoungGanondorfLaughStartAnim                fc=15
+    gYoungGanondorfLaughLoopAnim                 fc=30
+    gYoungGanondorfWalkAnim                      fc=30
+==========================================================================================
+/actor/zelda_goma.zar  (object_goma)
+  OoT3D CSABs: go_after_umu(21), go_atack01(14), go_atack02(16), go_atack03(14), go_Await(20), go_chakuchi02(10), go_chakuchi(8), go_clim(14), go_damage(13), go_down(255), go_pre_atack(30), go_stan(19), go_startdemo02(45), go_startdemo(80), go_umu(30), go_Uwait(31), go_Uwalk(20), go_wait(40), go_walk(30)
+  N64 anims:
+    gGohmaStandAnim                              fc=20
+    gGohmaHangAnim                               fc=31
+    gGohmaWalkAnim                               fc=20
+    gGohmaPrepareEggsAnim                        fc=20
+    gGohmaAttackAnim                             fc=14
+    gGohmaRestAfterAttackAnim                    fc=15
+    gGohmaRecoverAfterAttackAnim                 fc=14
+    gGohmaCrashAnim                              fc=8
+    gGohmaLandAnim                               fc=10
+    gGohmaClimbAnim                              fc=13
+    gGohmaDamageAnim                             fc=13
+    gGohmaDeathAnim                              fc=115
+    gGohmaPrepareAttackAnim                      fc=30
+    gGohmaStunnedAnim                            fc=19
+    gGohmaInitialLandingAnim                     fc=80
+    gGohmaEyeRollAnim                            fc=45
+    gGohmaLayEggsAnim                            fc=29
+    gGohmaIdleCrouchedAnim                       fc=40
+    gGohmaWalkCrouchedAnim                       fc=None
+    gGohmaViolentAttackAnim                      fc=27
+==========================================================================================
+/actor/zelda_gr.zar  (object_gr)
+  OoT3D CSABs: gr_run(17), gr_wait(15)
+  N64 anims:
+    gNiwGirlRunAnim                              fc=16
+    gNiwGirlJumpAnim                             fc=14
+==========================================================================================
+/actor/zelda_hata.zar  (object_hata)
+  OoT3D CSABs: ht_hata(25)
+  N64 anims:
+    gFlagpoleFlapAnim                            fc=30
+==========================================================================================
+/actor/zelda_hintnuts.zar  (object_hintnuts)
+  OoT3D CSABs: dnh_start(21), dnh_dig(11), dnh_wait(15), dnh_lookaround(27), dnh_atack(19), dnh_jump(16), dnh_walk(13), dnh_talk(16), dnh_mahi(16)
+  N64 anims:
+    gHintNutsSpitAnim                            fc=18
+    gHintNutsBurrowAnim                          fc=10
+    gHintNutsUnburrowAnim                        fc=16
+    gHintNutsUpAnim                              fc=21
+    gHintNutsLookAroundAnim                      fc=26
+    gHintNutsFreezeAnim                          fc=16
+    gHintNutsTalkAnim                            fc=16
+    gHintNutsStandAnim                           fc=15
+    gHintNutsRunAnim                             fc=12
+==========================================================================================
+/actor/zelda_hlc.zar  (object_horse_link_child)
+  OoT3D CSABs: hlc_anim_fastrun(24), hlc_anim_slowrun(29), hlc_anim_wait(70), hlc_anim_wait02(30), hlc_anim_walk(35)
+  N64 anims:
+    gChildEponaIdleAnim                          fc=70
+    gChildEponaWhinnyAnim                        fc=30
+    gChildEponaWalkingAnim                       fc=35
+    gChildEponaTrottingAnim                      fc=29
+    gChildEponaGallopingAnim                     fc=24
+==========================================================================================
+/actor/zelda_hni.zar  (object_hni)
+  OoT3D CSABs: hni_jump100(23), hni_jump200(30), hni_stand(33), hni_stop(36), hni_wait(80), hni_wait02(30), hni_walk(35), hni_walk_30(53), hni_slowrun_30(44), hni_fastrun_30(36), hni_land(6), hni_land1002(6), hni_fastrun_to_slowrun(44), hni_slowrun_to_fastrun(36), hni_carrotrun(36), hni_stop_s(36)
+  N64 anims:
+    gHorseIngoIdleAnim                           fc=80
+    gHorseIngoWhinnyAnim                         fc=30
+    gHorseIngoRefuseAnim                         fc=36
+    gHorseIngoRearingAnim                        fc=33
+    gHorseIngoWalkingAnim                        fc=35
+    gHorseIngoTrottingAnim                       fc=29
+    gHorseIngoGallopingAnim                      fc=24
+    gHorseIngoJumpingAnim                        fc=23
+    gHorseIngoJumpingHighAnim                    fc=30
+==========================================================================================
+/actor/zelda_horse.zar  (object_horse)
+  OoT3D CSABs: hl_anim_wait2(120), hl_anim_wait022(30), hl_anim_stop2(65), hl_anim_jump1002(23), hl_anim_jump2002(30), hl_anim_stand2(33), hl_anim_carrotrun(36), hl_anim_land(6), hl_anim_land1002(6), hl_anim_fastrun2_30(36), hl_anim_slowrun2_30(44), hl_anim_walk2_30(53), hl_anim_fastrun_to_slowrun(44), hl_anim_slowrun_to_fastrun(36), hl_anim_stop2_s(65)
+  N64 anims:
+    gEponaIdleAnim                               fc=120
+    gEponaWhinnyAnim                             fc=30
+    gEponaRefuseAnim                             fc=65
+    gEponaRearingAnim                            fc=33
+    gEponaWalkingAnim                            fc=35
+    gEponaTrottingAnim                           fc=29
+    gEponaGallopingAnim                          fc=24
+    gEponaJumpingAnim                            fc=23
+    gEponaJumpingHighAnim                        fc=30
+==========================================================================================
+/actor/zelda_horse_ganon.zar  (object_horse_ganon)
+  OoT3D CSABs: hg_anim_fastrun(24), hg_anim_slowrun(29), hg_anim_stand(33), hg_anim_wait02(30), hg_anim_wait(80), hg_anim_walk(35)
+  N64 anims:
+    gHorseGanonIdleAnim                          fc=80
+    gHorseGanonWhinnyAnim                        fc=30
+    gHorseGanonWalkingAnim                       fc=35
+    gHorseGanonTrottingAnim                      fc=29
+    gHorseGanonGallopingAnim                     fc=24
+    gHorseGanonRearingAnim                       fc=33
+==========================================================================================
+/actor/zelda_horse_normal.zar  (object_horse_normal)
+  OoT3D CSABs: hn_anim_fastrun(24), hn_anim_jump100(24), hn_anim_jump200(31), hn_anim_slowrun(29), hn_anim_stand(33), hn_anim_stop(65), hn_anim_wait(80), hn_anim_wait02(30), hn_anim_walk(35)
+  N64 anims:
+    gHorseNormalGallopingAnim                    fc=24
+    gHorseNormalJumpingAnim                      fc=23
+    gHorseNormalJumpingHighAnim                  fc=30
+    gHorseNormalTrottingAnim                     fc=29
+    gHorseNormalRearingAnim                      fc=33
+    gHorseNormalRefuseAnim                       fc=65
+    gHorseNormalIdleAnim                         fc=80
+    gHorseNormalWhinnyAnim                       fc=30
+    gHorseNormalWalkingAnim                      fc=35
+==========================================================================================
+/actor/zelda_horse_zelda.zar  (object_horse_zelda)
+  OoT3D CSABs: hz_fastrun_2(14)
+  N64 anims:
+    gHorseZeldaGallopingAnim                     fc=24
+==========================================================================================
+/actor/zelda_hs.zar  (object_hs)
+  OoT3D CSABs: h_purupuru(24), h_tanomuu(14), hs_matsu(30)
+  N64 anims:
+    object_hs_Anim_000304                        fc=16
+    object_hs_Anim_000528                        fc=10
+    object_hs_Anim_0005C0                        fc=2
+==========================================================================================
+/actor/zelda_ik.zar  (object_ik)
+  OoT3D CSABs: ironknack_attackA(38), ironknack_attackA_end(21), ironknack_attackA_hit(12), ironknack_attackB(27), ironknack_attackB_end(22), ironknack_back_hit(18), ironknack_defense(5), ironknack_down(50), ironknack_front_hit(18), ironknack_run(15), ironknack_stand_demo(215), ironknack_stand_up(32), ironknack_wait(48), ironknack_wait_hit(13), ironknack_walk(31), ironknack_walk_stop(18), naborknack_damage_demo(55), kabutoL_damage_demo(61), kabutoR_damage_demo(61), frontarmer_damage_demo(60), front_armer_drop(71), LshoulderA_drop(71), RshoulderB_drop(56), backarmer_damage_demo(61)
+  N64 anims:
+    object_ik_Anim_00035C                        fc=70
+    object_ik_Anim_000634                        fc=55
+    object_ik_Anim_0008DC                        fc=60
+    object_ik_Anim_000C6C                        fc=70
+    object_ik_Anim_000F0C                        fc=60
+    gIronKnuckleVerticalAttackAnim               fc=33
+    gIronKnuckleRecoverFromVerticalAttackAnim    fc=21
+    gIronKnuckleAxeStuckAnim                     fc=12
+    gIronKnuckleHorizontalAttackAnim             fc=22
+    gIronKnuckleRecoverFromHorizontalAttackAnim  fc=22
+    gIronKnuckleBackHitAnim                      fc=18
+    gIronKnuckleBlockAnim                        fc=5
+    gIronKnuckleDeathAnim                        fc=50
+    gIronKnuckleFrontHitAnim                     fc=18
+    gIronKnuckleRunAnim                          fc=15
+    gIronKnuckleNabooruSummonAxeAnim             fc=215
+    gIronKnuckleStandUpAnim                      fc=32
+    object_ik_Anim_00DD50                        fc=48
+    gIronKnuckleWalkAnim                         fc=31
+    object_ik_Anim_01EB14                        fc=60
+    object_ik_Anim_01EE34                        fc=60
+    gIronKnuckleNabooruDeathAnim                 fc=60
+==========================================================================================
+/actor/zelda_im.zar  (object_im)
+  OoT3D CSABs: impa_banzai(30), impa_banzai_wait(30), impa_kieru(30), impa_matsu(30), impa_miage_wait(30), impa_miageru(39), inpa_y_kuti(40), inpa_y_roop(55), km_inp1(15), km_inp2(25), impa_anim_fastrun(14), impa_anim_fast_run_okarina(72)
+  N64 anims:
+    gImpaRaiseArmsAnim                           fc=30
+    gImpaPresentShadowMedallionAnim              fc=30
+    gImpaThrowDekuNutAnim                        fc=30
+    gImpaIdleAnim                                fc=30
+    object_im_Anim_00FB10                        fc=30
+    object_im_Anim_0101C8                        fc=39
+    gImpaStartWhistlingAnim                      fc=40
+    gImpaWhistlingAnim                           fc=55
+    gImpaPrepareSealGanonAnim                    fc=15
+    gImpaSealGanonAnim                           fc=25
+==========================================================================================
+/actor/zelda_in.zar  (object_in)
+  OoT3D CSABs: in2_fusagu(12), in2_kachi(46), in2_kuyasii(49), in_matsu1(2), in_matsu2(30), in_neru1(50), in_pekopeko(24), in_shigoto(30), ingo_anim_fastrun(24), ingo_anim_fastrun_muti(24), ingo_anim_slowrun(29), ingo_anim_slowrun_muti(29), ingo_anim_stop(36), ingo_anim_stop_muti(75), ingo_anim_wait1(30), ingo_anim_wait2(80)
+  N64 anims:
+    object_in_Anim_0003B4                        fc=12
+    object_in_Anim_000CB0                        fc=46
+    object_in_Anim_001BE0                        fc=49
+    object_in_Anim_001CC0                        fc=2
+    object_in_Anim_013C6C                        fc=2
+    object_in_Anim_013D60                        fc=2
+    object_in_Anim_01431C                        fc=24
+    object_in_Anim_014CA8                        fc=30
+    object_in_Anim_0151C8                        fc=24
+    object_in_Anim_015814                        fc=25
+    object_in_Anim_015DF0                        fc=29
+    object_in_Anim_01646C                        fc=29
+    object_in_Anim_016B3C                        fc=36
+    object_in_Anim_0175D0                        fc=75
+    object_in_Anim_017B58                        fc=30
+    object_in_Anim_018C38                        fc=80
+==========================================================================================
+/actor/zelda_jj.zar  (object_jj)
+  OoT3D CSABs: jj_wait(82)
+  N64 anims:
+    gJabuJabuAnim                                fc=81
+==========================================================================================
+/actor/zelda_js.zar  (object_js)
+  OoT3D CSABs: js_maido(21), js_matsu(27)
+  N64 anims:
+    gCarpetMerchantSlappingKneeAnim              fc=25
+    gCarpetMerchantIdleAnim                      fc=10
+==========================================================================================
+/actor/zelda_ka.zar  (object_ka)
+  OoT3D CSABs: ka_dance(21)
+  N64 anims:
+    object_ka_Anim_000214                        fc=20
+    object_ka_Anim_0067AC                        fc=20
+==========================================================================================
+/actor/zelda_kdodongo.zar  (object_kingdodongo)
+  OoT3D CSABs: kd_bombwait(31), kd_damage(23), kd_die_a(68), kd_die_b(30), kd_down(20), kd_explode(27), kd_fire(51), kd_fire_damage(20), kd_fire_standby(101), kd_getup(36), kd_roll_standby(31), kd_rolling(115), kd_success(30), kd_wait(21), kd_walk(61), kd_walk_end(17), kd_walk_start(15), kd_end(270)
+  N64 anims:
+    object_kingdodongo_Anim_000690               fc=30
+    object_kingdodongo_Anim_001074               fc=23
+    object_kingdodongo_Anim_002D0C               fc=68
+    object_kingdodongo_Anim_003CF8               fc=30
+    object_kingdodongo_Anim_0042A8               fc=20
+    object_kingdodongo_Anim_004E0C               fc=27
+    object_kingdodongo_Anim_0061D4               fc=51
+    object_kingdodongo_Anim_006924               fc=19
+    object_kingdodongo_Anim_008EEC               fc=101
+    object_kingdodongo_Anim_009D10               fc=36
+    object_kingdodongo_Anim_00AA9C               fc=31
+    object_kingdodongo_Anim_00DF38               fc=115
+    object_kingdodongo_Anim_00E848               fc=30
+    object_kingdodongo_Anim_00F0D8               fc=20
+    object_kingdodongo_Anim_01CAE0               fc=-29327
+    object_kingdodongo_Anim_01D218               fc=-7716
+    object_kingdodongo_Anim_01D934               fc=0
+==========================================================================================
+/actor/zelda_kz.zar  (object_kz)
+  OoT3D CSABs: kz_kani(25), kz_matsu(25)
+  N64 anims:
+    gKzMweepAnim                                 fc=25
+    gKzIdleAnim                                  fc=25
+==========================================================================================
+/actor/zelda_ma1.zar  (object_ma1)
+  OoT3D CSABs: ma1_hanasi(7), ma1_matsu(29), ma1_utau(60)
+  N64 anims:
+    gMalonChildRaiseHandsAnim                    fc=7
+    gMalonChildIdleAnim                          fc=29
+    gMalonChildSingAnim                          fc=59
+==========================================================================================
+/actor/zelda_ma2.zar  (object_ma2)
+  OoT3D CSABs: ma2_matsu(30), ma2_moshikashite(15), ma2_shigoto(30), ma2_utau(58)
+  N64 anims:
+    gMalonAdultIdleAnim                          fc=30
+    gMalonAdultSingToIdleAnim                    fc=15
+    gMalonAdultStandStillAnim                    fc=2
+    gMalonAdultSingAnim                          fc=58
+==========================================================================================
+/actor/zelda_mastergolon.zar  (object_mastergolon)
+  OoT3D CSABs: oF1d_omise(23)
+  N64 anims:
+    gGoronShopkeeperAnim                         fc=23
+==========================================================================================
+/actor/zelda_masterzoora.zar  (object_masterzoora)
+  OoT3D CSABs: zo_omise(29)
+  N64 anims:
+    gZoraShopkeeperAnim                          fc=29
+==========================================================================================
+/actor/zelda_mb.zar  (object_mb)
+  OoT3D CSABs: mbV_n_wait(61), mbV_s_wait(60), mbV_walk_start(10), mbV_walk(40), mbV_bjump(17), mbV_pose(7), mbV_run(8), mbV_stop(7), mbV_turn(4), mbV_f_dmg(7), mbV_b_dmg(7), mbV_f_die(40), mbV_b_die(22), mbV_walk_end(12), mn_wait(60), mn_brandish(24), mn_lift(60), mn_attack(9), mn_dmg(9), mn_sit(20), mn_standup(31), mn_sitdmg(7), mn_die(67), mbV_r_turn(37), mbV_l_turn(37), mn_startdemo(102), mbV_l_turn90(17), mbV_r_turn90(17)
+  N64 anims:
+    gEnMbSpearFallFaceDownAnim                   fc=21
+    gEnMbSpearDamagedFromBehindAnim              fc=6
+    gEnMbSpearDamagedUngrabSpearAnim             fc=17
+    gEnMbSpearFallOnItsBackAnim                  fc=21
+    gEnMbSpearDamagedFromFrontAnim               fc=6
+    gEnMbSpearStandStillAnim                     fc=61
+    gEnMbSpearPrepareChargeAnim                  fc=7
+    gEnMbSpearChargeAnim                         fc=8
+    gEnMbSpearLookLeftAndRightAnim               fc=60
+    gEnMbSpearSlowDownAnim                       fc=7
+    gEnMbSpearLookLeftAnim                       fc=3
+    gEnMbSpearWalkAnim                           fc=40
+    gEnMbSpearUngrabSpearAnim                    fc=11
+    gEnMbSpearGrabSpearAnim                      fc=10
+    gEnMbClubStrikeDownAnim                      fc=9
+    gEnMbClubLiftClubAnim                        fc=24
+    gEnMbClubFallOnItsBackAnim                   fc=24
+    gEnMbClubDamagedKneelAnim                    fc=14
+    gEnMbClubStandStillClubUpAnim                fc=60
+    gEnMbClubKneelingAnim                        fc=20
+    gEnMbClubBeatenKneelingAnim                  fc=6
+    gEnMbClubStandUpAnim                         fc=31
+    gEnMbClubStandStillClubDownAnim              fc=60
+==========================================================================================
+/actor/zelda_md.zar  (object_md)
+  OoT3D CSABs: md_matsu_kani(16), mido_are_to_okoru_a(17), mido_are_to_okoru_b(7), mido_are_wait(24), mido_kihon_to_okoru(4), mido_kihon_to_stop(6), mido_kihon_to_walk(4), mido_okoru_to_stop(9), mido_okoru_wait(16), mido_stop_to_are(12), mido_stop_wait(18), mido_walk_loop(14)
+  N64 anims:
+    gMidoHandsOnHipsIdleAnim                     fc=16
+    gMidoSlamAnim                                fc=17
+    gMidoAngryHeadTurnAnim                       fc=7
+    gMidoAnnoyedPointedHeadIdle1Anim             fc=24
+    gMidoHandsOnHipsTransitionAnim               fc=3
+    gMidoRaiseHand1Anim                          fc=6
+    gMidoAnim_92B0                               fc=4
+    gMidoRaiseHand2Anim                          fc=9
+    gMidoAnnoyedPointedHeadIdle2Anim             fc=16
+    gMidoPutHandDownAnim                         fc=12
+    gMidoHaltAnim                                fc=18
+    gMidoWalkingAnim                             fc=14
+==========================================================================================
+/actor/zelda_mk.zar  (object_mk)
+  OoT3D CSABs: h_odoroku(14), h_sagyou(15), h_yorokobu(16), mk_matsu(42)
+  N64 anims:
+    object_mk_Anim_000368                        fc=14
+    object_mk_Anim_000724                        fc=15
+    object_mk_Anim_000AC0                        fc=16
+    object_mk_Anim_000D88                        fc=29
+==========================================================================================
+/actor/zelda_mm.zar  (object_mm)
+  OoT3D CSABs: hasiruu(20), mm_run01(9), mm_tatsu(35), mm_yoru(24), uttekure(32), yorokobi_long(47)
+  N64 anims:
+    gRunningManRunAnim                           fc=9
+    gRunningManSitStandAnim                      fc=35
+    gRunningManSitWaitAnim                       fc=24
+    gRunningManSprintAnim                        fc=20
+    gRunningManExcitedAnim                       fc=32
+    gRunningManHappyAnim                         fc=46
+==========================================================================================
+/actor/zelda_ms.zar  (object_ms)
+  OoT3D CSABs: ms_matsu(78)
+  N64 anims:
+    gBeanSalesmanEatingAnim                      fc=52
+==========================================================================================
+/actor/zelda_mu.zar  (object_mu)
+  OoT3D CSABs: mu_matsu(24), tg_matsu(45)
+  N64 anims:
+    object_mu_Anim_0003F4                        fc=24
+    gDancingCoupleAnim                           fc=2
+==========================================================================================
+/actor/zelda_nb.zar  (object_nb)
+  OoT3D CSABs: km_nabo(14), nabor_agura_wait(24), nabor_banzai(30), nabor_banzai_wait(30), nabor_furimuki_l(6), nabor_furimuki_l_wait(24), nabor_furimuki_r(10), nabor_furimuki_r_wait(24), nabor_hiza_wait(24), nabor_kihon_talk_wait(23), nabor_kihon_to_walk(6), nabor_miage_wait(24), nabor_miageru(20), nabor_run_to_hit(16), nabor_shagami_to_kihon(10), nabor_shagami_wait(24), nabor_taoreru(80), nabor_walk_loop(17), nb_matsu(25), nabor_suna_otiru_wait(10), nabor_suna_wait(40), nabor_suna_otiru(20)
+  N64 anims:
+    gNabooruPuttingHandsTogetherCastingMagicAnim fc=14
+    gNabooruSittingCrossLeggedAnim               fc=24
+    gNabooruTrappedInVortexRaisingArmAnim        fc=20
+    gNabooruSuckedByVortexAnim                   fc=10
+    gNabooruTrappedInVortexPushingGroundAnim     fc=40
+    gNabooruRaisingArmsGivingMedallionAnim       fc=30
+    gNabooruArmsRaisedGivingMedallionAnim        fc=30
+    gNabooruOnOneKneeTurningHeadRightToLeftTransitionAnim fc=6
+    gNabooruOnOneKneeLookingLeftAnim             fc=24
+    gNabooruOnAllFoursToOnOneKneeLookingRightTransitionAnim fc=10
+    gNabooruOnOneKneeLookingRightAnim            fc=24
+    gNabooruOnAllFoursAnim                       fc=24
+    gNabooruStandingHandsOnHipsAnim              fc=23
+    gNabooruStandingToWalkingTransitionAnim      fc=6
+    gNabooruSittingCrossLeggedLookingUpRightAnim fc=24
+    gNabooruSittingCrossLeggedTurningToLookUpRightTransitionAnim fc=20
+    gNabooruKneeingToRunningToHitAnim            fc=16
+    gNabooruUnusedKneelingAtCrawlspaceToStandingTransitionAnim fc=10
+    gNabooruKneeingAtCrawlspaceAnim              fc=24
+    gNabooruCollapseFromStandingToKneelingTransitionAnim fc=80
+    gNabooruWalkingAnim                          fc=17
+    gNabooruStandingHandsOnHipsChamberOfSagesAnim fc=22
+==========================================================================================
+/actor/zelda_nw.zar  (object_niw)
+  OoT3D CSABs: nw_wait(11)
+  N64 anims:
+    gCuccoAnim                                   fc=10
+==========================================================================================
+/actor/zelda_oF1d.zar  (object_oF1d_map)
+  OoT3D CSABs: Goro_een(25), Goro_siku_siku(25), Goron_mukuri(30), Goron_pikupiku(24), Goron_poripori(44), goron_demo_walk(26), oF1d_chyu_goron(25), oF1d_dai_goron_ii(21), oF1d_dai_goron_kaii(50), oF1d_dai_goron_megusuri(15), oF1d_konnnichiwa(41), oF1d_omise(23), oF1d_yokoaruki(20)
+  N64 anims:
+    gGoronAnim_000750                            fc=25
+    gGoronAnim_000D5C                            fc=25
+    gGoronAnim_00161C                            fc=30
+    gGoronAnim_001A00                            fc=23
+    gGoronAnim_0021D0                            fc=31
+    gGoronAnim_0029A8                            fc=26
+    gGoronAnim_002D80                            fc=21
+    gGoronAnim_003768                            fc=50
+    gGoronAnim_0038E4                            fc=15
+    gGoronAnim_004930                            fc=53
+    gGoronAnim_010590                            fc=20
+==========================================================================================
+/actor/zelda_oc2.zar  (object_okuta)
+  OoT3D CSABs: oc_up(21), oc_float(17), oc_down(8), oc_predead(13), oc_dead(26), oc_atack(21)
+  N64 anims:
+    gOctorokShootAnim                            fc=20
+    gOctorokDieAnim                              fc=25
+    gOctorokHideAnim                             fc=7
+    gOctorokFloatAnim                            fc=16
+    gOctorokHitAnim                              fc=12
+    gOctorokAppearAnim                           fc=20
+==========================================================================================
+/actor/zelda_ocd.zar  (object_bigokuta)
+  OoT3D CSABs: ocd_wait(30), ocd_walk(25), ocd_stop(9), ocd_damagejump(14), ocd_dead(21)
+  N64 anims:
+    object_bigokuta_Anim_000444                  fc=13
+    object_bigokuta_Anim_000A74                  fc=17
+    object_bigokuta_Anim_000D1C                  fc=8
+    object_bigokuta_Anim_0014B8                  fc=20
+    object_bigokuta_Anim_001CA4                  fc=24
+==========================================================================================
+/actor/zelda_os.zar  (object_os)
+  OoT3D CSABs: os_matsu(25)
+  N64 anims:
+    gHappyMaskSalesmanIdleAnim                   fc=24
+==========================================================================================
+/actor/zelda_owl.zar  (object_owl)
+  OoT3D CSABs: owl_wait(30), owl_openwing(15), hovering(60), owl_fly(15), owl_kakku(2)
+  N64 anims:
+    gOwlTakeoffAnim                              fc=60
+    gOwlFlyAnim                                  fc=15
+    gOwlGlideAnim                                fc=2
+    gOwlUnfoldWingsAnim                          fc=15
+    gOwlPerchAnim                                fc=20
+==========================================================================================
+/actor/zelda_ph.zar  (object_peehat)
+  OoT3D CSABs: ph_start(17), ph_end(50), ph_fly(33), ph_shock(33)
+  N64 anims:
+    gPeehatLandingAnim                           fc=49
+    gPeehatFlyingAnim                            fc=32
+    gPeehatRecoilAnim                            fc=32
+    gPeehatRisingAnim                            fc=16
+==========================================================================================
+/actor/zelda_po.zar  (object_poh)
+  OoT3D CSABs: po_wait(20), po_start(30), po_fly(16), po_atack(12), po_damage(16), po_escape(8)
+  N64 anims:
+    gPoeAttackAnim                               fc=8
+    gPoeDamagedAnim                              fc=16
+    gPoeFleeAnim                                 fc=8
+    gPoeFloatAnim                                fc=16
+    gPoeAppearAnim                               fc=30
+    gPoeDisappearAnim                            fc=20
+==========================================================================================
+/actor/zelda_po_composer.zar  (object_po_composer)
+  OoT3D CSABs: pom_atack(12), pom_damage(16), pom_escape(8), pom_fly(16), pom_start(30), pom_wait(20)
+  N64 anims:
+    gPoeComposerAttackAnim                       fc=8
+    gPoeComposerDamagedAnim                      fc=16
+    gPoeComposerFleeAnim                         fc=8
+    gPoeComposerFloatAnim                        fc=16
+    gPoeComposerAppearAnim                       fc=30
+    gPoeComposerDisappearAnim                    fc=20
+==========================================================================================
+/actor/zelda_po_field.zar  (object_po_field)
+  OoT3D CSABs: pog_wait(20), pog_start(30), pog_fly(16), pog_atack(12), pog_damage(16), pog_escape(8)
+  N64 anims:
+    gPoeFieldAttackAnim                          fc=8
+    gPoeFieldDamagedAnim                         fc=16
+    gPoeFieldFleeAnim                            fc=8
+    gPoeFieldFloatAnim                           fc=16
+    gPoeFieldAppearAnim                          fc=30
+    gPoeFieldDisappearAnim                       fc=20
+==========================================================================================
+/actor/zelda_po_sisters.zar  (object_po_sisters)
+  OoT3D CSABs: pob_wait(20), pob_start(30), pob_fly(16), pob_atack(8), pob_damage(16), pob_escape(8), pob_cry(48)
+  N64 anims:
+    gPoeSistersAttackAnim                        fc=8
+    gPoeSistersMegCryAnim                        fc=32
+    gPoeSistersDamagedAnim                       fc=16
+    gPoeSistersFleeAnim                          fc=8
+    gPoeSistersFloatAnim                         fc=16
+    gPoeSistersAppearDisappearAnim               fc=30
+    gPoeSistersSwayAnim                          fc=20
+==========================================================================================
+/actor/zelda_ps.zar  (object_ps)
+  OoT3D CSABs: ps_matsu(90), ps_tataku(30)
+  N64 anims:
+    gPoeSellerIdleAnim                           fc=29
+    gPoeSellerSwingStickAnim                     fc=30
+==========================================================================================
+/actor/zelda_rb.zar  (object_reeba)
+  OoT3D CSABs: reeba_rb_move(31), reeba_dmg(27)
+  N64 anims:
+    object_reeba_Anim_0001E4                     fc=30
+==========================================================================================
+/actor/zelda_rd.zar  (object_rd)
+  OoT3D CSABs: re_dead_cry_20f(60), re_dead_cryB_20f(41), re_dead_standing_20f(33), re_dead_wait_20f(28), re_dead_back_turn_20f(15), re_dead_walk_20f(27), re_dead_hit_20f(20), re_dead_down_20f(45), re_dead_attack_start_20f(9), re_dead_attack_20f(12), re_dead_attack_end_20f(12)
+  N64 anims:
+    gGibdoRedeadGrabAttackAnim                   fc=11
+    gGibdoRedeadGrabEndAnim                      fc=11
+    gGibdoRedeadGrabStartAnim                    fc=9
+    gGibdoRedeadLookBackAnim                     fc=14
+    gGibdoRedeadWipingTearsAnim                  fc=40
+    gGibdoRedeadSobbingAnim                      fc=40
+    gGibdoRedeadDeathAnim                        fc=45
+    gGibdoRedeadDamageAnim                       fc=19
+    gGibdoRedeadStandUpAnim                      fc=33
+    gGibdoRedeadIdleAnim                         fc=28
+    gGibdoRedeadWalkAnim                         fc=27
+==========================================================================================
+/actor/zelda_rl.zar  (object_rl)
+  OoT3D CSABs: rl_matsu(27), raul_banzai(30), raul_banzai_wait(30)
+  N64 anims:
+    object_rl_Anim_00040C                        fc=30
+    object_rl_Anim_000830                        fc=30
+    object_rl_Anim_000A3C                        fc=27
+==========================================================================================
+/actor/zelda_rs.zar  (object_rs)
+  OoT3D CSABs: rs_matsu(40)
+  N64 anims:
+    gBombchuShopkeeperIdleAnim                   fc=39
+==========================================================================================
+/actor/zelda_ru1.zar  (object_ru1)
+  OoT3D CSABs: ru1_matsu(23), cyu_matsu(31), koruto_shagamu(29), koruto_shagami_wait(30), koruto_jitabata(8), koruto_mitsuketa(8), koruto_furimuki(25), koruto_walk_2(10), koruto_drop_2(4), koruto_run_banzai(70), koruto_banzai_wait(24), koruto_banzai_modoru(15), koruto_ottotto(21), tatioyogu(40), mog(30), seoyogi(32), korutoteisi(30), puhaaruto(20), demo_okori_wait(40), demo_suwari(20), demo_suwari_wait(40), demo_warp(30)
+  N64 anims:
+    gRutoChildWaitHandsBehindBackAnim            fc=31
+    gRutoChildWaitHandsOnHipsAnim                fc=40
+    gRutoChildTransitionHandsOnHipToCrossArmsAndLegsAnim fc=20
+    gRutoChildWaitSittingAnim                    fc=40
+    gRutoChildWaitInBlueWarpAnim                 fc=30
+    gRutoChildBringHandsDownAnim                 fc=15
+    gRutoChildHoldArmsUpAnim                     fc=24
+    gRutoChildBringArmsUpAnim                    fc=4
+    gRutoChildTurnAroundAnim                     fc=25
+    gRutoChildSquirmAnim                         fc=8
+    gRutoChildSeesSapphireAnim                   fc=8
+    gRutoChildShutterAnim                        fc=16
+    gRutoChildWalkToAndHoldUpSapphireAnim        fc=70
+    gRutoChildSittingAnim                        fc=30
+    gRutoChildSitAnim                            fc=29
+    gRutoChildWalkAnim                           fc=10
+    gRutoChildTransitionFromSwimOnBackAnim       fc=30
+    gRutoChildTransitionToSwimOnBackAnim         fc=30
+    gRutoChildAnim_009060                        fc=20
+    gRutoChildWait2Anim                          fc=23
+    gRutoChildSwimOnBackAnim                     fc=32
+    gRutoChildTreadWaterAnim                     fc=40
+==========================================================================================
+/actor/zelda_ru2.zar  (object_ru2)
+  OoT3D CSABs: km_luto(14), ru2_matsu(29), ruto_banzai(30), ruto_end_furimuki(20), ruto_end_wait(24), ruto_furimuki_wait(24), ruto_swim_up(20)
+  N64 anims:
+    gAdultRutoCrossingArmsAnim                   fc=14
+    gAdultRutoIdleAnim                           fc=29
+    gAdultRutoRaisingArmsUpAnim                  fc=30
+    gAdultRutoHeadTurnDownLeftAnim               fc=20
+    gAdultRutoIdleHandsOnHipsAnim                fc=24
+    gAdultRutoLookingDownLeftAnim                fc=24
+    gAdultRutoSwimmingUpAnim                     fc=20
+==========================================================================================
+/actor/zelda_sa.zar  (object_sa)
+  OoT3D CSABs: saria_banzai(30), saria_banzai_wait(20), saria_demo_aogimi(14), saria_demo_run(20), saria_demo_yahho(24), saria_furikaeru(65), saria_kihon_to_matteru(14), saria_kihon_to_odoroki(9), saria_kihon_to_okoru(11), saria_matteru_wait(24), saria_odoroki_to_kihon(27), saria_odoroki_wait(24), saria_okoru_wait(24), saria_tomodachi(13), sa_hanasi_modoru(40), sa_matsu(24), sa_okarina(42), sa_okarina_hanasi(42), sa_umai(44), sa_umai_okarina(65), saria_uresi(33), saria_ok_motsu_wait(24), saria_hasi_wait(24), saria_ok_ageru(19), saria_ok_ageru_wait(24), saria_end_wait(24), km_saria(75), saria_end_miorosi(19), saria_end_modoru(43), sa_umai_wait(20), sa_okarina_hanasi_wait(21)
+  N64 anims:
+    gSariaSealGanonAnim                          fc=75
+    gSariaOcarinaToMouthAnim                     fc=42
+    gSariaWaitArmsToSideAnim                     fc=24
+    gSariaPlayingOcarinaAnim                     fc=65
+    gSariaStopPlayingOcarinaAnim                 fc=42
+    gSariaLinkLearnedSariasSongAnim              fc=40
+    gSariaReturnToOcarinaAnim                    fc=30
+    gSariaGiveForestMedallionAnim                fc=30
+    gSariaGiveForestMedallionStandAnim           fc=30
+    gSariaLookUpArmExtendedAnim                  fc=11
+    gSariaRunAnim                                fc=14
+    gSariaWaveAnim                               fc=20
+    gSariaSitting1Anim                           fc=19
+    gSariaSitting2Anim                           fc=43
+    gSariaSitting3Anim                           fc=24
+    gSariaLookOverShoulderAnim                   fc=40
+    gSariaWaitOnBridgeAnim                       fc=24
+    gSariaTransitionHandsSideToBackAnim          fc=14
+    gSariaHandsOutAnim                           fc=9
+    gSariaTransitionHandsSideToHipsAnim          fc=11
+    gSariaHandsBehindBackWaitAnim                fc=24
+    gSariaTransitionHandsSideToChestToSideAnim   fc=27
+    gSariaRightArmExtendedWaitAnim               fc=24
+    gSariaGiveLinkOcarinaAnim                    fc=19
+    gSariaHoldOutOcarinaAnim                     fc=24
+    gSariaHoldOcarinaAnim                        fc=24
+    gSariaStandHandsOnHipsAnim                   fc=24
+    gSariaExtendRightArmAnim                     fc=13
+    gSariaHandsOnFaceAnim                        fc=33
+==========================================================================================
+/actor/zelda_sb.zar  (object_sb)
+  OoT3D CSABs: sb_wait(21), sb_open(7), sb_close(5), sb_jump_start(7), sb_jump_end(7)
+  N64 anims:
+    object_sb_Anim_00004C                        fc=4
+    object_sb_Anim_0000B4                        fc=6
+    object_sb_Anim_000124                        fc=6
+    object_sb_Anim_000194                        fc=6
+    object_sb_Anim_002C8C                        fc=20
+==========================================================================================
+/actor/zelda_sd.zar  (object_sd)
+  OoT3D CSABs: sd_matsu(30), sd_aruku(29), sd_akeru(22), sd_suwari(60), sd_suwari_hanasi(19), sd_shini(40)
+  N64 anims:
+    gEnHeishiSlamSpearAnim                       fc=22
+    gEnHeishiWalkAnim                            fc=29
+    gEnHeishiIdleAnim                            fc=30
+    gEnHeishiDyingGuardTalkAnim                  fc=19
+    gEnHeishiDyingGuardDieAnim                   fc=40
+    gEnHeishiDyingGuardAnim_00C444               fc=2
+==========================================================================================
+/actor/zelda_shopnuts.zar  (object_shopnuts)
+  OoT3D CSABs: dnu_start(22), dnu_dig(11), dnu_wait(15), dnu_lookaround(27), dnu_atack(19), dnu_jump(17), dnu_jump_to_shop(9), dnu_shop(16), dnu_to_end(9)
+  N64 anims:
+    gBusinessScrubAnim_1EC                       fc=18
+    gBusinessScrubAnim_39C                       fc=10
+    gBusinessScrubRotateAnim                     fc=16
+    gBusinessScrubNervousTransitionAnim          fc=8
+    gBusinessScrubLookAroundAnim                 fc=26
+    gBusinessScrubNervousIdleAnim                fc=16
+    gBusinessScrubAnim_139C                      fc=21
+    gBusinessScrubLeaveBurrowAnim                fc=8
+    gBusinessScrubAnim_4574                      fc=15
+==========================================================================================
+/actor/zelda_skb.zar  (object_skb)
+  OoT3D CSABs: stal_baby_attack(11), stal_baby_down(16), stal_baby_hit(9), stal_baby_start(30), stal_baby_walk(17)
+  N64 anims:
+    gStalchildUncurlingAnim                      fc=30
+    gStalchildDyingAnim                          fc=16
+    gStalchildDamagedAnim                        fc=9
+    gStalchildWalkingAnim                        fc=16
+    gStalchildAttackingAnim                      fc=11
+==========================================================================================
+/actor/zelda_skelton.zar  (object_sk2)
+  OoT3D CSABs: skelton_fight_wait2wait(11), skelton_fighting_run(10), skelton_fighting_walk(13), skelton_landing(12), skelton_side_walk(15), skelton_back_jump(10), skelton_defend(3), skelton_front_damage(9), skelton_back_damage(8), skelton_back_down(33), skelton_front_down(41), skelton_jump_kiru(8), skelton_jump_kiru_end(12), skelton_kiru(13), skelton_kiru_end(8), skelton_kiru_finsh(19), skelton_laugh(14), skelton_jump(6), skelton_fighting_wait(8)
+  N64 anims:
+    gStalfosFlinchFromHitBehindAnim              fc=8
+    gStalfosFallOverBackwardsAnim                fc=33
+    gStalfosJumpBackwardsAnim                    fc=10
+    gStalfosBlockWithShieldAnim                  fc=3
+    gStalfosStandAttentionAnim                   fc=10
+    gStalfosFastAdvanceAnim                      fc=10
+    gStalfosMiddleGuardAnim                      fc=27
+    gStalfosSlowAdvanceAnim                      fc=13
+    gStalfosFlinchFromHitFrontAnim               fc=9
+    gStalfosFallOverForwardsAnim                 fc=41
+    gStalfosLeapAnim                             fc=6
+    gStalfosJumpAnim                             fc=8
+    gStalfosJumpslashAnim                        fc=12
+    gStalfosDownSlashAnim                        fc=12
+    gStalfosRecoverFromDownSlashAnim             fc=8
+    gStalfosUpSlashAnim                          fc=19
+    gStalfosLandFromLeapAnim                     fc=12
+    gStalfosLaughAnim                            fc=13
+    gStalfosLookAroundAnim                       fc=53
+    gStalfosSidestepAnim                         fc=15
+    gStalfosReleaseAttentionAnim                 fc=10
+==========================================================================================
+/actor/zelda_skj.zar  (object_skj)
+  OoT3D CSABs: skeltonJR_wait(38), skeltonJR_serch_wait(50), skeltonJR_walk(6), skeltonJR_dance_walk(20), skeltonJR_side_walk(7), skeltonJR_back_jump(15), skeltonJR_landing(10), skeltonJR_hit(9), skeltonJR_down(31), skeltonJR_blowgun_attack(7)
+  N64 anims:
+    gSkullKidBackflipAnim                        fc=14
+    gSkullKidShootNeedleAnim                     fc=6
+    gSkullKidPlayFluteAnim                       fc=20
+    gSkullKidDieAnim                             fc=30
+    gSkullKidHitAnim                             fc=8
+    gSkullKidLandAnim                            fc=9
+    gSkullKidLookLeftAndRightAnim                fc=50
+    gSkullKidFightingStanceAnim                  fc=6
+    gSkullKidWaitAnim                            fc=38
+    gSkullKidWalkToPlayerAnim                    fc=6
+==========================================================================================
+/actor/zelda_ssh.zar  (object_ssh)
+  OoT3D CSABs: st_matsu(32), st_otchiru(30), st_yarare(51)
+  N64 anims:
+    object_ssh_Anim_000304                       fc=32
+    object_ssh_Anim_0055F8                       fc=29
+    object_ssh_Anim_005BE8                       fc=50
+==========================================================================================
+/actor/zelda_sst.zar  (object_sst)
+  OoT3D CSABs: slh_pose_a(10), slh_pose_b(3), slh_pose_c(3), slh_pose_d(3), slh_pose_e(10), slh_pose_f(3), slh_pose_g(3), slh_pose_h(3), srh_pose_a(10), srh_pose_b(3), srh_pose_c(3), srh_pose_d(3), srh_pose_e(10), srh_pose_f(3), srh_pose_g(3), srh_pose_h(3), ss_after(7), ss_attack(11), ss_bowhit(17), ss_close(40), ss_dmg(10), ss_dmg_open(10), ss_swdhit(11), ss_towait(26), ss_wait_close(40), ss_wait_open(40), ss_death(160)
+  N64 anims:
+    gBongoLeftHandIdleAnim                       fc=10
+    gBongoLeftHandFlatPoseAnim                   fc=2
+    gBongoLeftHandOpenPoseAnim                   fc=2
+    gBongoLeftHandFistPoseAnim                   fc=2
+    gBongoLeftHandClenchAnim                     fc=10
+    gBongoLeftHandDamagePoseAnim                 fc=2
+    gBongoLeftHandPushoffPoseAnim                fc=2
+    gBongoLeftHandHangPoseAnim                   fc=2
+    gBongoRightHandIdleAnim                      fc=10
+    gBongoRightHandFlatPoseAnim                  fc=2
+    gBongoRightHandOpenPoseAnim                  fc=2
+    gBongoRightHandFistPoseAnim                  fc=2
+    gBongoRightHandClenchAnim                    fc=10
+    gBongoRightHandDamagePoseAnim                fc=2
+    gBongoRightHandPushoffPoseAnim               fc=2
+    gBongoRightHandHangPoseAnim                  fc=2
+    gBongoHeadStunnedAnim                        fc=7
+    gBongoHeadChargeAnim                         fc=11
+    gBongoHeadKnockoutAnim                       fc=17
+    gBongoHeadEyeCloseAnim                       fc=40
+    gBongoHeadDamagedHandAnim                    fc=10
+    gBongoHeadEyeOpenAnim                        fc=10
+    gBongoHeadDamageAnim                         fc=7
+    gBongoHeadRecoverAnim                        fc=26
+    gBongoHeadEyeCloseIdleAnim                   fc=40
+    gBongoHeadEyeOpenIdleAnim                    fc=40
+==========================================================================================
+/actor/zelda_st.zar  (object_st)
+  OoT3D CSABs: st_matsu(32), st_yarare(30), st_yarare2(30), st_otchiru(30)
+  N64 anims:
+    object_st_Anim_000304                        fc=32
+    object_st_Anim_0055A8                        fc=29
+    object_st_Anim_005B98                        fc=50
+==========================================================================================
+/actor/zelda_ta.zar  (object_ta)
+  OoT3D CSABs: ta_matsu(25), taron_sleep_wait(32), taron_wakeup(60), taron_wait_run(4), taron_run(10), ta_inemuri(100), ta_okiru(30), ta_nageru(40)
+  N64 anims:
+    gTalonSitSleepingAnim                        fc=100
+    gTalonStandAnim                              fc=25
+    gTalonSitHandsUpAnim                         fc=40
+    gTalonSitWakeUpAnim                          fc=30
+    gTalonRunAnim                                fc=10
+    gTalonSleepAnim                              fc=32
+    gTalonRunTransitionAnim                      fc=4
+    gTalonWakeUpAnim                             fc=60
+==========================================================================================
+/actor/zelda_tk.zar  (object_tk)
+  OoT3D CSABs: tk_aruku(49), tk_matsu(49), tk_yuurei(24), tk_ana_hori(50)
+  N64 anims:
+    gDampeDigAnim                                fc=50
+    gDampeWalkAnim                               fc=49
+    gDampeRestAnim                               fc=49
+    gDampeFloatAnim                              fc=24
+==========================================================================================
+/actor/zelda_toryo.zar  (object_toryo)
+  OoT3D CSABs: dk1_matsu(89)
+  N64 anims:
+    object_toryo_Anim_000E50                     fc=59
+==========================================================================================
+/actor/zelda_tr.zar  (object_tr)
+  OoT3D CSABs: kotake_wait(24), kotake_furimuki(31), kotake_furimuki_wait(24), trT_wait(24), trT_fly(24), twin_shoot(55), koume_wait(24), koume_furimuki(41), koume_furimuki_wait(24)
+  N64 anims:
+    gKotakeKoumeLookOverRightShoulderAnim        fc=30
+    gKotakeKoumeLookingOverRightShoulderAnim     fc=24
+    gKotakeKoumeStandingBroomOverLeftShoulderAnim fc=24
+    gKotakeKoumeLookOverLeftShoulderAnim         fc=40
+    gKotakeKoumeLookingOverLeftShoulderAnim      fc=24
+    gKotakeKoumeStandingBroomOverRightShoulderAnim fc=24
+    gKotakeKoumeFlyAnim                          fc=24
+    gKotakeKoumeStandingBroomOverRightShoulderUnusedAnim fc=24
+    gKotakeKoumeTPoseAnim                        fc=2
+    gKotakeKoumeCastMagicAnim                    fc=54
+==========================================================================================
+/actor/zelda_ts.zar  (object_ts)
+  OoT3D CSABs: ts_matsu(30)
+  N64 anims:
+    object_ts_Anim_000498                        fc=29
+==========================================================================================
+/actor/zelda_tt.zar  (object_tite)
+  OoT3D CSABs: tt_wait(120), tt_move(8), tt_smalljump(11), tt_dmg(8), tt_jump_start(6), tt_jump_end(6), tt_jump(15)
+  N64 anims:
+    object_tite_Anim_0001D4                      fc=8
+    object_tite_Anim_0004F8                      fc=15
+    object_tite_Anim_00069C                      fc=6
+    object_tite_Anim_00083C                      fc=6
+    object_tite_Anim_000A14                      fc=8
+    object_tite_Anim_000C70                      fc=11
+    object_tite_Anim_000F50                      fc=15
+    object_tite_Anim_0012E4                      fc=20
+==========================================================================================
+/actor/zelda_tw.zar  (object_tw)
+  OoT3D CSABs: btT_atack(30), btT_beeem(17), btT_beeem_to_fly(12), btT_damage01(52), btT_damage02(25), btT_DEMOwait(20), btT_DEMOwait_to_fly(12), btT_EDikari(20), btT_EDmiage(16), btT_EDwait(16), btT_EDyaruki(23), btT_fly(24), btT_fly_to_tame(12), btT_guard(12), btT_hihihi(29), btT_tame(25), btW_atackL(24), btW_atackR(24), btW_damage(17), btW_default(3), btW_EDdamage(45), btW_fly(24), btW_hit(18), btW_hit_to_mahi(16), btW_mahi(20), btW_mahi_to_fly(14), btW_preatack(35), btW_start(50), btW_ufufu(32)
+  N64 anims:
+    gTwinrovaKotakeKoumeIdleLoopAnim             fc=20
+    gTwinrovaKotakeKoumeIdleEndAnim              fc=12
+    gTwinrovaKotakeKoumeBickerAnim               fc=20
+    gTwinrovaKotakeKoumeFloatLookUpAnim          fc=16
+    gTwinrovaKotakeKoumeFloatLookForwardAnim     fc=16
+    gTwinrovaKotakeKoumeShakeHandAnim            fc=23
+    gTwinrovaKotakeKoumeAttackStartAnim          fc=30
+    gTwinrovaKotakeKoumeAttackLoopAnim           fc=16
+    gTwinrovaKotakeKoumeAttackEndAnim            fc=12
+    gTwinrovaKotakeKoumeDamageStartAnim          fc=32
+    gTwinrovaKotakeKoumeDamageEndAnim            fc=25
+    gTwinrovaKotakeKoumeFlyAnim                  fc=24
+    gTwinrovaKotakeKoumeChargeUpAttackStartAnim  fc=12
+    gTwinrovaKotakeKoumeSpinAnim                 fc=12
+    gTwinrovaKotakeKoumeLaughAnim                fc=29
+    gTwinrovaKotakeKoumeChargeUpAttackLoopAnim   fc=24
+    gTwinrovaKotakeKoumeTPoseAnim                fc=2
+    gTwinrovaDeathAnim                           fc=45
+    gTwinrovaIceAttackAnim                       fc=24
+    gTwinrovaFireAttackAnim                      fc=24
+    gTwinrovaDamageAnim                          fc=17
+    gTwinrovaTPoseAnim                           fc=2
+    gTwinrovaHoverAnim                           fc=2900
+    gTwinrovaChargedAttackHitAnim                fc=-6958
+    gTwinrovaStunStartAnim                       fc=-21049
+    gTwinrovaStunLoopAnim                        fc=3288
+    gTwinrovaStunEndAnim                         fc=-3342
+    gTwinrovaWindUpAnim                          fc=-7919
+    gTwinrovaIntroAnim                           fc=0
+    gTwinrovaLaughAnim                           fc=None
+==========================================================================================
+/actor/zelda_vali.zar  (object_vali)
+  OoT3D CSABs: vl_normal(80), vl_attack(81), vl_dmg(6), vl_dmg_normal(26), vl_elec_a(21)
+  N64 anims:
+    gBariWaitingAnim                             fc=81
+    gBariRetaliatingAnim                         fc=6
+    gBariMovingArmsDownAnim                      fc=26
+    gBariUnusedAnim_000D9C                       fc=20
+    gBariLurkingAnim                             fc=80
+==========================================================================================
+/actor/zelda_vm.zar  (object_vm)
+  OoT3D CSABs: vm_akesime(9)
+  N64 anims:
+    gBeamosAnim                                  fc=8
+==========================================================================================
+/actor/zelda_warp1.zar  (object_warp1)
+  OoT3D CSABs: crystal_anim_mdl(60), warp_2_modelT_end(2), warp_2_modelT_middle1(150), warp_2_modelT_middle2(150), warp_2_modelT_open1(150), warp_2_modelT_open2(90)
+  N64 anims:
+    gWarpCrystalAnim                             fc=3
+==========================================================================================
+/actor/zelda_wf.zar  (object_wf)
+  OoT3D CSABs: wolfman_wait(29), wolfman_run(9), wolfman_side_walk(8), wolfman_back_jump(13), wolfman_defense(4), wolfman_tail_hit(8), wolfman_down(29), wolfman_attack(30)
+  N64 anims:
+    gWolfosSlashingAnim                          fc=30
+    gWolfosBackflippingAnim                      fc=13
+    gWolfosBlockingAnim                          fc=4
+    gWolfosRearingUpFallingOverAnim              fc=25
+    gWolfosRunningAnim                           fc=9
+    gWolfosSidesteppingAnim                      fc=7
+    gWolfosDamagedAnim                           fc=8
+    gWolfosWaitingAnim                           fc=29
+==========================================================================================
+/actor/zelda_wm2.zar  (object_wallmaster)
+  OoT3D CSABs: wm_damage(25), wm_damage_wait(40), wm_f_jump(51), wm_l_turn(28), wm_link_hangup(31), wm_miss(28), wm_motionA(40), wm_move(37), wm_move_wait(9), wm_success(10), wm_wait(40), wm_wait_move(9)
+  N64 anims:
+    gWallmasterDamageAnim                        fc=25
+    gWallmasterRecoverFromDamageAnim             fc=41
+    gWallmasterJumpAnim                          fc=51
+    gWallmasterWalkAnim                          fc=37
+    gWallmasterStopWalkAnim                      fc=9
+    gWallmasterHoverAnim                         fc=9
+    gWallmasterWaitAnim                          fc=40
+    gWallmasterStandUpAnim                       fc=9
+    gWallmasterLungeAnim                         fc=30
+    gFloormasterTurnAnim                         fc=28
+    gFloormasterTapFingerAnim                    fc=40
+    gWallmasterMissAnim                          fc=27
+==========================================================================================
+/actor/zelda_xc.zar  (object_xc)
+  OoT3D CSABs: xc_matsu(26), xechu_aruku(25), xechutoujyou(65), xechu_kieru(30), xechu_toridasu(58), xechu_kamae(16), xechu_hiku(66), mizunoserenaade(96), kazenomenuetto(96), honoonobolero(80), X_hikari_p(80), demo_hensin(50), demo_hensin_wait(20), xechu_kamaeru(44), xechu_furimawashi(79), xechu_drop(40), xechu_stop(11), xechu_shagami_wait(24), xechu_daiza_wait(30), xechu_tobikomi(2)
+  N64 anims:
+    gSheikPlayingHarpAnim                        fc=-2565
+    gSheikShowingTriforceOnHandAnim              fc=-131
+    gSheikShowingTriforceOnHandIdleAnim          fc=-1281
+    gSheikPlayingHarp2Anim                       fc=-1001
+    gSheikPlayingHarp3Anim                       fc=-17438
+    gSheikPlayingHarp4Anim                       fc=6475
+    gSheikIdleAnim                               fc=-2042
+    gSheikWalkingAnim                            fc=516
+    gSheikArmsCrossedIdleAnim                    fc=25
+    gSheikFallingFromContortionsAnim             fc=-7432
+    gSheikContortionsAnim                        fc=-7785
+    gSheikPlayingHarp5Anim                       fc=-436
+    gSheikInitialHarpAnim                        fc=29547
+    gSheikDefenseStanceAnim                      fc=3305
+    gSheikThrowingNutAnim                        fc=-1526
+    gSheikKneelingAnim                           fc=2714
+    gSheikHittingGroundAnim                      fc=425
+    gSheikAnim_01A048                            fc=1758
+    gSheikPullingOutHarpAnim                     fc=-14570
+    gSheikFallingFromSkyAnim                     fc=1435
+==========================================================================================
+/actor/zelda_zf.zar  (object_zf)
+  OoT3D CSABs: zf_aruku(59), zf_chyakuchi(25), zf_jump(20), zf_kiru(30), zf_matsu(30), zf_nige_jump_a(7), zf_nige_jump_b(8), zf_nige_jump_c(4), zf_nigeru(17), zf_nuku(56), zf_shini(50), zf_yarare(20), zf_yokoaruki(29)
+  N64 anims:
+    gZfWalkingAnim                               fc=59
+    gZfLandingAnim                               fc=21
+    gZfJumpingAnim                               fc=20
+    gZfSlashAnim                                 fc=30
+    gZfCryingAnim                                fc=29
+    gZfHopCrouchingAnim                          fc=7
+    gZfHopLeapingAnim                            fc=7
+    gZfHopLandingAnim                            fc=7
+    gZfSheathingSwordAnim                        fc=17
+    gZfDrawingSwordAnim                          fc=56
+    gZfDyingAnim                                 fc=50
+    gZfKnockedBackAnim                           fc=20
+    gZfSidesteppingAnim                          fc=29
+==========================================================================================
+/actor/zelda_zl1.zar  (object_zl1)
+  OoT3D CSABs: anim_matsu(40), demo_furimuki(65), demo_furimuki_wait(30), demo_kasige(15), demo_kasige_wait(20), demo_nozoki_wait(20), demo_slide(40), demo_slide_wait(20), demo_tesage(15), demo_tetataki_1(25), demo_tetataki_2(25), demo_tetataki_wait(21)
+  N64 anims:
+    gChildZelda1Anim_00438                       fc=20
+    gChildZelda1Anim_10B38                       fc=65
+    gChildZelda1Anim_11348                       fc=30
+    gChildZelda1Anim_116E4                       fc=15
+    gChildZelda1Anim_12B88                       fc=20
+    gChildZelda1Anim_12118                       fc=20
+    gChildZelda1Anim_12B04                       fc=40
+    gChildZelda1Anim_12F80                       fc=20
+    gChildZelda1Anim_132D8                       fc=15
+    gChildZelda1Anim_138E0                       fc=25
+    gChildZelda1Anim_13F10                       fc=25
+    gChildZelda1Anim_143A8                       fc=20
+==========================================================================================
+/actor/zelda_zl4.zar  (object_zl4)
+  OoT3D CSABs: demo_aisatu(20), demo_aisatu_wait(30), demo_arigato(12), demo_arigato_wait(24), demo_gomen(20), demo_himitu(20), demo_kaku(27), demo_kaku_wait(24), demo_kirai(20), demo_kirai_wait(30), demo_modoru(87), demo_modoru_to_omegai2(28), demo_modoru_wait(24), demo_namae(20), demo_namae_wait(31), demo_naname_wait(24), demo_noridasi(21), demo_noridasi_wait(24), demo_onegai2(26), demo_onegai(15), demo_onegai_wait(20), demo_usiro_ude_wait(24), anim_fast_run(14), anim_fast_run_okarina(99), kozelda_furimuki(69), kozelda_okarina_wait(60), kozelda_ushiro_wait(24), demo_tetataki_wait(20), anim_matsu(40), demo_furimuki(65), zl4_demo_furimuki_wait(20), zl4_demo_kasige(20), demo_kasige_wait(20), demo_nozoki_wait(20), demo_slide(40), demo_slide_wait(20), demo_tesage(15), zl4_demo_tetataki_1(35), demo_tetataki_2(25), demo_onegai2_wait(24), demo_furimuki_wait(30), demo_kasige(15), demo_slideto_link(100)
+  N64 anims:
+    gChildZeldaAnim_000654                       fc=30
+    gChildZeldaAnim_00E5C8                       fc=20
+    gChildZeldaAnim_00EBC4                       fc=30
+    gChildZeldaAnim_010DF8                       fc=65
+    gChildZeldaAnim_011248                       fc=20
+    gChildZeldaAnim_011698                       fc=20
+    gChildZeldaAnim_011B34                       fc=20
+    gChildZeldaAnim_0125E4                       fc=27
+    gChildZeldaAnim_012E58                       fc=24
+    gChildZeldaAnim_013280                       fc=20
+    gChildZeldaAnim_013628                       fc=20
+    gChildZeldaAnim_013A50                       fc=20
+    gChildZeldaAnim_013EA0                       fc=30
+    gChildZeldaAnim_015F14                       fc=87
+    gChildZeldaAnim_01726C                       fc=20
+    gChildZeldaAnim_017818                       fc=31
+    gChildZeldaAnim_0169B4                       fc=28
+    gChildZeldaAnim_016D08                       fc=24
+    gChildZeldaAnim_01805C                       fc=24
+    gChildZeldaAnim_018898                       fc=21
+    gChildZeldaAnim_01910C                       fc=24
+    gChildZeldaAnim_019600                       fc=20
+    gChildZeldaAnim_01991C                       fc=15
+    gChildZeldaAnim_01A2FC                       fc=26
+    gChildZeldaAnim_01AAE0                       fc=24
+    gChildZeldaAnim_01AE88                       fc=20
+    gChildZeldaAnim_01B874                       fc=40
+    gChildZeldaAnim_01BCF0                       fc=20
+    gChildZeldaAnim_01CE08                       fc=24
+    gChildZeldaAnim_01C494                       fc=35
+    gChildZeldaAnim_01C7B0                       fc=20
+    gChildZeldaAnim_00F0A4                       fc=12
+    gChildZeldaAnim_00F894                       fc=24
+==========================================================================================
+/actor/zelda_zo.zar  (object_zo)
+  OoT3D CSABs: zo_riku_matsu(40), zo_mizu_talk(30), Zola_maku(60), ZS_z1(30), ZS_z2(30), zo_omise(29), zo_mizu_matsu(28)
+  N64 anims:
+    gZoraIdleAnim                                fc=2
+    gZoraSurfaceAnim                             fc=30
+    gZoraThrowRupeesAnim                         fc=60
+    gZoraHandsOnHipsTappingFootAnim              fc=30
+    gZoraOpenArmsAnim                            fc=30
