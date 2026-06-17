@@ -68,27 +68,67 @@ def n64_anims(objbytes, objname):
     return out
 
 
-# --- light romaji <-> english token hints (weak signal; frame count dominates) ---
-# Grezzo CSAB bases are romaji (wait/matsu/hanasi/aruki...); decomp N64 names are English.
+# --- romaji/english CSAB-token -> N64-name-token dictionary (NAME is the PRIMARY signal) ---
+# Grezzo CSAB bases mix English (wait/walk/run/jump/damage/dead/fly/attack) and romaji
+# (matsu=wait, aruki=walk, hashiri=run, furimuki=turn, banzai=cheer, suwari=sit, kihon=idle...).
+# Frame count is AMBIGUOUS (a character often has many same-length waits), so a confident name
+# match wins; frame delta only breaks ties / fills anims with no name signal. Keys = tokens that
+# appear in a CSAB base; values = substrings to look for in the (English) N64 anim name.
 NAME_HINTS = {
-    'wait': ['wait', 'idle', 'stand', 'matsu'],
-    'matsu': ['wait', 'idle', 'stand'],
-    'aruki': ['walk'], 'walk': ['walk', 'aruki'], 'run': ['run', 'hasiri', 'dash'],
-    'hanasi': ['talk', 'speak', 'dismissive', 'tell'], 'talk': ['talk', 'hanasi'],
-    'akeru': ['open', 'clap', 'gate'], 'damage': ['damage', 'hit'], 'down': ['down', 'fall'],
-    'jump': ['jump', 'tobi'], 'attack': ['attack', 'kougeki'], 'think': ['think', 'kangae'],
+    # idle / stand
+    'wait': ['wait', 'idle', 'stand', 'stop', 'neutral'], 'matsu': ['wait', 'idle', 'stand'],
+    'matteru': ['wait', 'idle', 'stand'], 'machi': ['wait', 'idle'], 'mati': ['wait', 'idle'],
+    'kihon': ['idle', 'wait', 'neutral', 'stand'], 'tachi': ['stand', 'idle'], 'tati': ['stand', 'idle'],
+    'stand': ['stand', 'idle'], 'stop': ['stop', 'halt', 'idle'], 'idle': ['idle', 'wait', 'stand'],
+    # locomotion
+    'walk': ['walk'], 'aruki': ['walk'], 'aruku': ['walk'], 'ayumi': ['walk'],
+    'run': ['run'], 'hashiri': ['run', 'dash'], 'hasiri': ['run', 'dash'], 'dash': ['dash', 'run'],
+    'fastrun': ['run', 'dash', 'gallop', 'fast', 'charge'], 'slowrun': ['run', 'trot', 'jog', 'walk'],
+    'jump': ['jump', 'leap', 'hop'], 'tobi': ['jump', 'leap', 'hop'], 'leap': ['leap', 'jump'],
+    # combat
+    'damage': ['damage', 'flinch', 'recoil', 'hurt', 'hit'], 'dmg': ['damage', 'flinch', 'recoil', 'hit'],
+    'hit': ['hit', 'damage'], 'yarare': ['damage', 'hit'],
+    'atack': ['attack', 'slash', 'swing', 'shoot', 'lunge', 'slam', 'strike', 'stab', 'spin'],
+    'attack': ['attack', 'slash', 'swing', 'shoot', 'lunge', 'slam', 'strike', 'stab', 'spin'],
+    'swing': ['swing', 'slash', 'attack'], 'kiru': ['slash', 'cut', 'attack', 'swing', 'slice'],
+    'fire': ['fire', 'breath', 'flame', 'shoot', 'spit'], 'shot': ['shoot', 'shot', 'fire'],
+    'defend': ['block', 'guard', 'defend', 'shield'], 'defense': ['block', 'guard', 'defend', 'shield'],
+    'mamori': ['block', 'guard', 'defend'], 'gad': ['block', 'guard'],
+    # death / down
+    'dead': ['die', 'death', 'dead', 'defeat', 'kill'], 'die': ['die', 'death', 'dead', 'defeat'],
+    'down': ['down', 'fall', 'knock', 'collapse'], 'taore': ['fall', 'down', 'collapse'],
+    'daun': ['down', 'fall'], 'predead': ['die', 'death', 'hit'],
+    # flight / float
+    'fly': ['fly', 'float', 'hover', 'air', 'flight'], 'float': ['float', 'fly', 'hover'],
+    # social / gestures
+    'hanasi': ['talk', 'speak', 'tell', 'dismiss'], 'hanashi': ['talk', 'speak', 'tell'],
+    'syaberi': ['talk', 'speak'], 'aisatsu': ['greet', 'hello', 'meet'],
+    'banzai': ['cheer', 'raise', 'celebrate', 'banzai', 'give', 'wave', 'happy'],
+    'dance': ['dance'], 'suwari': ['sit', 'seated'], 'sit': ['sit', 'seated'],
+    'furimuki': ['turn', 'lookover', 'lookaround', 'shoulder', 'overshoulder', 'look'],
+    'hand': ['hand', 'wave', 'arm', 'hold'], 'nod': ['nod'], 'unazuki': ['nod'],
+    'warai': ['laugh'], 'laugh': ['laugh'], 'uresi': ['happy', 'joy', 'glad'],
+    'odoroki': ['surprise', 'shock', 'startle', 'wake'], 'okoru': ['angry', 'anger', 'mad'],
+    # appear / leave / get up
+    'start': ['start', 'appear', 'begin', 'rise', 'spawn'], 'end': ['end', 'disappear', 'finish', 'leave'],
+    'getup': ['getup', 'standup', 'rise', 'recover'], 'mukuri': ['getup', 'rise', 'standup'],
+    'okarina': ['ocarina', 'flute', 'song'], 'ocarina': ['ocarina', 'flute', 'song'],
+    'eat': ['eat', 'eating'], 'sleep': ['sleep', 'nod'], 'open': ['open', 'clap', 'gate'],
 }
 
 
 def name_score(csab_base, n64_name):
-    """Crude token overlap in [0,1]. Strips the per-char prefix from the CSAB base."""
+    """NAME-FIRST signal: count CSAB-base tokens whose dictionary synonyms appear in the (English)
+    N64 anim name. Tokens NOT in the dict (per-character prefixes like 'saria'/'km1', ids) are
+    IGNORED so they can't inflate the score uniformly. Higher = more semantic agreement."""
     nl = n64_name.lower()
-    parts = [p for p in re.split(r'[_]', csab_base.lower()) if p]
     score = 0.0
-    for p in parts:
-        for hint in NAME_HINTS.get(p, [p]):
-            if hint and hint in nl:
-                score = max(score, 1.0 if hint == p or len(hint) > 3 else 0.5)
+    for p in re.split(r'[_]', csab_base.lower()):
+        hints = NAME_HINTS.get(p)
+        if not hints:
+            continue
+        if any(h in nl for h in hints):
+            score += 1.0
     return score
 
 
@@ -117,16 +157,22 @@ def pick_best(n64_name, fc, cands):
     hand fix."""
     if not cands:
         return None
+    # NAME-FIRST: a confident name match beats frame count (which is ambiguous across same-length
+    # CSABs). Among the best-named candidates, break ties by frame delta.
+    best_name = max(c['namescore'] for c in cands)
+    if best_name >= 1.0:
+        named = sorted([c for c in cands if c['namescore'] == best_name], key=lambda c: c['dframe'])
+        return named[0]['base']
+    # No name signal: idle-stub handling (a 2-frame N64 idle stub should pick the lively idle CSAB).
     if _is_idle(n64_name):
         idles = [c for c in cands if _csab_idle(c['base'])]
         if idles:
-            if fc is not None and fc <= 4:                       # N64 idle is a stub: frame is noise
-                idles.sort(key=lambda c: -(c['duration'] or 0))  # -> liveliest (longest) idle
-            else:                                                # real idle loop: frame-close idle
+            if fc is not None and fc <= 4:
+                idles.sort(key=lambda c: -(c['duration'] or 0))
+            else:
                 idles.sort(key=lambda c: (c['dframe'], -(c['duration'] or 0)))
             return idles[0]['base']
-    best = sorted(cands, key=lambda c: (c['dframe'], -c['namescore']))[0]
-    return best['base']
+    return sorted(cands, key=lambda c: (c['dframe'], -c['namescore']))[0]['base']
 
 
 def match_char(n64_list, csab_list):
