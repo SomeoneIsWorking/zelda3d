@@ -5,8 +5,8 @@ graphics replacement. Per-actor object->ZAR coverage + what still needs a path.
 
 ## Per-actor object -> ZAR
 - **377** object_* segments total.
-- **309 mapped** to an OoT3D /actor model (direct name or verified alias).
-- **68 have no OoT3D /actor model** (need a different path or have no equivalent):
+- **310 mapped** to an OoT3D /actor model (direct name or verified alias).
+- **67 have no OoT3D /actor model** (need a different path or have no equivalent):
   - **cutscene** (10): cutscene rig — special anim path
     - demo_tre_lgt, ganon_anime1, ganon_anime2, ganon_anime3, oE_anime, o_anime, opening_demo1, os_anime, zl2_anime1, zl2_anime2
   - **effect** (8): effect/particle — likely no OoT3D model
@@ -19,8 +19,8 @@ graphics replacement. Per-actor object->ZAR coverage + what still needs a path.
     - oA1, oA10, oA11, oA2, oA3, oA4, oA5, oA6, oA7, oA8, oA9, oB1, oB2, oB3, oB4, oE1, oE10, oE11, oE12, oE1s, oE2, oE3, oE4, oE4s, oE5, oE6, oE7, oE8, oE9, shop_dungen, spot04_objects
   - **texture** (1): texture-only object — no mesh
     - mori_tex
-  - **unknown** (13): no OoT3D actor ZAR; replacement path TBD
-    - bird, fd2, gol, human, lightbox, masterkokiri, masterkokirihead, nwc, oF1s, ossan, trap, vase, yabusame_point
+  - **unknown** (12): no OoT3D actor ZAR; replacement path TBD
+    - bird, fd2, gol, human, masterkokiri, masterkokirihead, nwc, oF1s, ossan, trap, vase, yabusame_point
 
 ## Candidate object->ZAR gaps: OoT3D /actor models nothing maps to (31)
 Each is a real OoT3D actor model not yet pointed to by any N64 object. Add a

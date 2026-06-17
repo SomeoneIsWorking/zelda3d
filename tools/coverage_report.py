@@ -17,7 +17,7 @@ import os, re, sys
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
 from ctr_romfs import CtrRom
 from zar import Zar
-from gen_object_zars import ALIAS
+from gen_object_zars import ALIAS, alias_path
 
 REPO = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 OBJ_TABLE = os.path.join(REPO, "Shipwright/soh/include/tables/object_table.h")
@@ -64,10 +64,10 @@ def main():
     mapped, gaps_by_class = [], {}
     for oid, base, enum in objects:
         direct = "/actor/zelda_%s.zar" % base
-        alias = "/actor/zelda_%s.zar" % ALIAS[base] if base in ALIAS else None
+        alias = alias_path(ALIAS[base], zarset) if base in ALIAS else None
         if direct in zarset:
             mapped.append((base, direct)); matched_zars.add(direct)
-        elif alias and alias in zarset:
+        elif alias:
             mapped.append((base, alias)); matched_zars.add(alias)
         else:
             cat, desc = classify_nozar(base)

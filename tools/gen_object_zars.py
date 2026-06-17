@@ -49,7 +49,18 @@ ALIAS = {
     "oF1d_map": "oF1d",         # Goron NPCs (En_Go/En_Go2, Goron City) (oF1d/goronpeople.cmb)
     "fish": "fishing",          # Fishing-pond owner (Fishing actor) (fishing/fishmaster.cmb)
     "bdoor": "boss_door",       # Boss-room door     (boss_door/bossdoor_model.cmb)
+    # Dungeon-prop archives (OoT3D groups them under a "dk_" prefix, no zelda_ prefix). Each
+    # confirmed by the CMB basename matching the N64 object/actor's single drawn model.
+    "lightbox": "dk_lightbox",  # En_Lightbox (Forest Temple light box) (dk_lightbox/lightbox4_model.cmb)
 }
+
+# Alias values are OoT3D zar BASENAMES. Resolve to a real /actor path, trying the common
+# "zelda_<name>.zar" naming first, then a bare "<name>.zar" (the dk_* dungeon-prop archives).
+def alias_path(base, zars):
+    for cand in ("/actor/zelda_%s.zar" % base, "/actor/%s.zar" % base):
+        if cand in zars:
+            return cand
+    return None
 
 
 def main():
@@ -74,8 +85,8 @@ def main():
             cand = "/actor/zelda_" + base + ".zar"
             if cand in zars:
                 zar = cand
-            elif base in ALIAS and ("/actor/zelda_" + ALIAS[base] + ".zar") in zars:
-                zar = "/actor/zelda_" + ALIAS[base] + ".zar"  # renamed-creature alias
+            elif base in ALIAS:
+                zar = alias_path(ALIAS[base], zars)  # renamed-creature / dungeon-prop alias
         rows.append((oid, enum, seg, zar))
 
     table = [None] * (maxid + 1)
