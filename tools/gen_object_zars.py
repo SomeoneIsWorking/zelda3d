@@ -46,6 +46,7 @@ ALIAS = {
     "fhg": "fantomHG",          # Phantom Ganon's horse (fantomHG/ganonhorse.cmb)
     "door_killer": "killer_door",  # Killer Door   (killer_door/idle.cmb)
     "sk2": "skelton",           # Stalfos (En_Test) (skelton/stalfos.cmb)
+    "oF1d_map": "oF1d",         # Goron NPCs (En_Go/En_Go2, Goron City) (oF1d/goronpeople.cmb)
 }
 
 
