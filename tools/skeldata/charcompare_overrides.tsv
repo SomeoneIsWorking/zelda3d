@@ -1,0 +1,12 @@
+# SHARED hand-verified N64-anim -> 3DS-CSAB corrections, read by the charcompare tool
+# (which also WRITES this file via "Save overrides") AND the Python generators
+# (tools/gen_animmap_inc.py for the game table, tools/gen_charcompare_index.py for the
+# tool index). These OVERRIDE animmap.json's auto-picked best for a (zar, n64anim) pair.
+# Columns are tab-separated: zar <TAB> n64anim <TAB> csab. '#' lines and blanks are ignored.
+#
+# The original 4 hand-verified disagreements migrated from the formerly hand-maintained
+# soh3d_animmap.inc (verified in-game; the auto-picker chose differently):
+/actor/zelda_du.zar	gDaruniaSageFormationAnim	dalnia_base_to_dai
+/actor/zelda_wm2.zar	gWallmasterMissAnim	wm_miss
+/actor/zelda_xc.zar	gSheikArmsCrossedIdleAnim	xc_matsu
+/actor/zelda_xc.zar	gSheikHittingGroundAnim	mizunoserenaade
