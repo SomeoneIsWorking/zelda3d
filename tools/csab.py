@@ -71,8 +71,11 @@ def _parse_track(b, o, is_rot_int16):
             frames.append((_u32(b, p), _f32(b, p + 4))); p += 8
     elif typ == HERMITE:
         if is_rot_int16:
+            # Quantized rotation: u16 time + s16 value/in-tangent/out-tangent as fixed-point ANGLES
+            # (full circle = 0x10000 -> radians = s16 * pi/0x8000). Tangents are angle/frame, same scale.
+            ANG = math.pi / 32768.0
             for _ in range(nkf):
-                frames.append((_u16(b, p), _i16(b, p + 2), _i16(b, p + 4), _i16(b, p + 6)))
+                frames.append((_u16(b, p), _i16(b, p + 2) * ANG, _i16(b, p + 4) * ANG, _i16(b, p + 6) * ANG))
                 p += 8
         else:
             for _ in range(nkf):
@@ -88,11 +91,11 @@ def _parse_anod(b, o):
     bone_index = _u16(b, o + 4)
     is_rot_int16 = bool(_u16(b, o + 6))
     offs = [_u16(b, o + 8 + 2 * i) for i in range(9)]
-    assert _u16(b, o + 0x1A) == 0
     tracks = {}
     for name, off in zip(_TRACK_NAMES, offs):
         is_rot = name in ("rX", "rY", "rZ")
-        tracks[name] = _parse_track(b, o + off, is_rot_int16) if off else None
+        # int16 quantization applies only to the rotation slots; translation/scale stay float.
+        tracks[name] = _parse_track(b, o + off, is_rot_int16 and is_rot) if off else None
     return AnimNode(bone_index, is_rot_int16, tracks)
 
 
