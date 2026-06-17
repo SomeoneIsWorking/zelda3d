@@ -11,9 +11,14 @@ from ctr_romfs import CtrRom
 from zar import Zar
 import cmb as C
 import soh3d_skel_match as M
+from gen_object_zars import ALIAS  # N64 object base -> OoT3D zar base, for renamed creatures
 
 REPO = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 SK = os.path.join(REPO, 'tools', 'skeldata')
+
+# zar path -> N64 object name, the INVERSE of the renamed-creature ALIAS (zelda_nw -> object_niw).
+# Lets the offline N64-skeleton match find the right N64 object for an aliased OoT3D zar.
+OBJ_OVERRIDE = {("/actor/zelda_%s.zar" % v): ("object_%s" % k) for k, v in ALIAS.items()}
 
 def oot3d_skeleton(rom, zarname):
     zf = Zar(rom.read(rom.get(zarname)))
@@ -32,7 +37,7 @@ def oot3d_skeleton(rom, zarname):
 def main():
     rom = CtrRom(os.environ["SOH3D_3DS_ROM"])
     inc = open(os.path.join(REPO, 'Shipwright/soh/src/soh3d/soh3d_object_zars.inc')).read()
-    zars = sorted(set(re.findall(r'"(/actor/[a-z0-9_]+\.zar)"', inc)))
+    zars = sorted(set(re.findall(r'"(/actor/[a-zA-Z0-9_]+\.zar)"', inc)))  # case-insensitive: catch oF1d etc.
     skels = {}
     for z in zars:
         try:
@@ -49,8 +54,7 @@ def main():
     # N64 ROM (zar /actor/zelda_<x>.zar -> N64 object_<x>), match against the OoT3D skeleton.
     import n64_skel_extract as N
     n64rom = open(N.ROM, 'rb').read()
-    # zar -> N64 object name (zelda_boj -> object_boj). Override the few that don't fit the pattern.
-    OBJ_OVERRIDE = {}
+    # zar -> N64 object name (zelda_boj -> object_boj); OBJ_OVERRIDE (module-level) handles renamed creatures.
     want = {}
     for z in skels:
         base = os.path.basename(z)[:-4]            # zelda_boj
