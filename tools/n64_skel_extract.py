@@ -4,8 +4,10 @@
 # object XML gives -> walk limb pointer table -> StandardLimb {jointPos, child, sibling}.
 # Validates against the in-game SOH3D_SKELDUMP. Big-endian N64 data.
 import struct, sys, os, re, glob
-ROM = "<rom-dir>/ROM/N64/Legend of Zelda, The - Ocarina of Time (USA).z64"
 REPO = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
+# N64 OoT USA/NTSC v1.0 ROM. Provide it via the SOH3D_N64_ROM env var (see the gitignored .env)
+# or drop the .z64 into the repo root as oot_ntsc_10.z64. Never commit the ROM (copyrighted).
+ROM = os.environ.get("SOH3D_N64_ROM") or os.path.join(REPO, "oot_ntsc_10.z64")
 FILELIST = os.path.join(REPO, "Shipwright/soh/assets/extractor/filelists/ntsc_oot.txt")
 # XML offsets are NOT version-stable: anim offsets differ between PAL and NTSC for some objects
 # (e.g. object_du gDaruniaIdleAnim = 0x6EB0 PAL vs 0x74B0 NTSC). The ROM above is USA/NTSC, so the

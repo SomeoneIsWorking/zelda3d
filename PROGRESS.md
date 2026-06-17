@@ -1094,8 +1094,8 @@ Orientation/scale tuned live via the existing REPL (rotx/roty/rotz still wired).
 - `scratch/` — extraction output, logs, screenshots. gitignored.
 
 ## Done
-- ROMs verified: N64 OoT USA v1.0 (`<rom-dir>/ROM/N64/...z64`, supported hash),
-  OoT3D USA decrypted NCSD (`<rom-dir>/ROM/3DS/...3ds`).
+- ROMs verified: N64 OoT USA v1.0 (`$SOH3D_N64_ROM`, supported hash),
+  OoT3D USA decrypted NCSD (`$SOH3D_3DS_ROM`). Provide both via the gitignored `.env`.
 - 3DS extraction pipeline, **verified on the pot** (`zelda_tsubo`):
   - `tools/ctr_romfs.py` NCSD→NCCH→RomFS (IVFC), no bootrom needed.
   - `tools/zar.py` ZAR archives.

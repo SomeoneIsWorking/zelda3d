@@ -14,7 +14,7 @@ using namespace SoH3D;
 
 int main(int argc, char** argv) {
     const char* rom = getenv("SOH3D_3DS_ROM");
-    if (!rom || !*rom) rom = "<rom-dir>/ROM/3DS/Legend of Zelda, The - Ocarina of Time 3D (USA) (En,Fr,Es).3ds";
+    if (!rom || !*rom) { fprintf(stderr, "set SOH3D_3DS_ROM to the OoT3D .3ds (see .env)\n"); return 1; }
     const char* path = argc > 1 ? argv[1] : "/scene/gerudoway_0_info.zsi";
 
     CtrRom r(rom);
