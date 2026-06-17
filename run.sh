@@ -2,7 +2,9 @@
 # Boot SoH3D into Kakariko Village (OoT3D geometry) on the current desktop.
 #
 # Run from a terminal in your graphical session (DISPLAY/XAUTHORITY are inherited):
-#   ./run.sh
+#   ./run.sh              # the game
+#   ./run.sh tool         # the N64-vs-3DS character compare tool (charcompare)
+#   ./run.sh tool /actor/zelda_zl4.zar   # ...starting on a specific character
 #
 # The decrypted OoT3D .3ds is provided via env SOH3D_3DS_ROM (never hardcoded — repo
 # rule). Either export it, drop a `.env` next to this script setting it, or drop the
@@ -21,6 +23,27 @@ if [ -z "${SOH3D_3DS_ROM:-}" ]; then
     exit 1
 fi
 export SOH3D_3DS_ROM
+
+# If no graphical session is inherited (e.g. launched over SSH/headless terminal),
+# fall back to the primary local display so the window actually appears.
+if [ -z "${DISPLAY:-}" ]; then
+    export DISPLAY=:0
+    [ -z "${XAUTHORITY:-}" ] && for x in /run/user/$(id -u)/xauth_*; do
+        [ -f "$x" ] && export XAUTHORITY="$x" && break
+    done
+fi
+
+# Subcommand: `./run.sh tool [args]` -> the charcompare character-compare tool.
+if [ "${1:-}" = "tool" ]; then
+    shift
+    CC="$SOH/charcompare/charcompare"
+    if [ ! -x "$CC" ]; then
+        echo "error: $CC not built — run: cmake --build Shipwright/build-cmake --target charcompare" >&2
+        exit 1
+    fi
+    cd "$SOH"
+    exec ./charcompare/charcompare "$@"
+fi
 
 if [ ! -x "$SOH/soh.elf" ]; then
     echo "error: $SOH/soh.elf not built — run: cmake --build Shipwright/build-cmake --target soh" >&2
