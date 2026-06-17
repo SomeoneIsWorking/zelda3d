@@ -21,12 +21,14 @@ from ctr_romfs import CtrRom
 from zar import Zar
 from csab import Csab
 import n64_skel_extract as N
+from gen_object_zars import ALIAS  # N64 object base -> OoT3D zar base, for renamed creatures
 
 REPO = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 SK = os.path.join(REPO, 'tools', 'skeldata')
 
-# ZAR -> N64 object name. Default zelda_<x> -> object_<x>; a few don't fit the pattern.
-OBJ_OVERRIDE = {}
+# ZAR -> N64 object name. Default zelda_<x> -> object_<x>; renamed creatures via the ALIAS inverse
+# (zelda_nw -> object_niw) so an aliased OoT3D zar finds its N64 animations.
+OBJ_OVERRIDE = {("/actor/zelda_%s.zar" % v): ("object_%s" % k) for k, v in ALIAS.items()}
 
 
 def zar_to_object(zar):
