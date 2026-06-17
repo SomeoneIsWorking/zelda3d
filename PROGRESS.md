@@ -15,6 +15,15 @@ per_item_pose_two_flags.png.
   live actor of that id with world pos + distance from Link. Ends blind scene-wandering — used it to
   find all 4 En_Hata (id 0x26) and pick the closest pair to frame. Reusable for any multi-instance
   framing/verification.
+- **ANIM-MAP curation spot-check (roadmap #3):** sampled live mappings in Kokiri Forest via
+  `animdbg 1` — Saria `gSariaHandsBehindBackWaitAnim`→`saria_matteru_wait` (matteru=wait ✓),
+  skulltula `object_st_Anim_000304`→`st_matsu` (✓). The IDLE mappings spot-checked are correct.
+  FINDING: meaningful curation needs observing NPCs in VARIED anim states (talk/walk/special),
+  but free-roam mostly shows idle and the En_Ko kids wander out of frame — forcing varied anims
+  on demand is impractical without scripted interaction. So #3's near-term yield is low; the
+  high-value next work is roadmap #4 (broaden coverage / multi-CMB assemblies), which also surfaces
+  more replaced NPCs to curate. #2 (lighting fill/per-light colour) is low-priority and would
+  invalidate the session-20 brightness calibration (needs re-cal) for a modest gain — deferred.
 
 ## 🟡 PARTLY-VERIFIED (session 20, 2026-06-17): per-item POSE capture (multi-instance skinning)
 **Fixes the session-16 known issue: multiple actors sharing a glModelId all rendered with the LAST
