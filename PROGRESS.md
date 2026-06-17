@@ -1,5 +1,33 @@
 # SoH3D — progress & state
 
+## 🟡 PARTLY-VERIFIED (session 20, 2026-06-17): per-item POSE capture (multi-instance skinning)
+**Fixes the session-16 known issue: multiple actors sharing a glModelId all rendered with the LAST
+actor's pose.** Root cause is a DEFERRED-TIMING bug: `SoH3D_GL_SetBones(modelId)` stores the pose in
+a per-model store during dlist BUILD, but the draw opcode runs `SoH3D_GL_Submit` at dlist INTERPRET
+time — by then a later same-model actor has overwritten the store, so every item read the same (last)
+pose. (My first attempt snapshotting at Submit time was a non-fix for exactly this reason — caught
+before shipping.)
+- **Fix (emit-time capture):** new `SoH3D_GL_EmitPose(modelId)` snapshots the just-set pose into a
+  FIFO queue `g_poseQueue` at EMIT time (called in `SoH3D_EmitModelDraw` right after the
+  `SoH3D_UpdateAnim*`/SetBones, before the draw opcode). `SoH3D_GL_Submit` consumes the first queued
+  pose matching that modelId (same-model emits/submits keep relative order → correct pairing) into the
+  `DrawItem`; `drawOne` uploads the item's own bones. `FrameBegin` clears the queue. Falls back to the
+  per-model store when no emit-time pose (legacy inline path). Files: libultraship@soh3d
+  {soh3d_gl.cpp,.h}; Shipwright@develop soh3d.c.
+- **TOOLING:** `SOH3D_GL_DBG=1` now also logs per render-pass item `model/boneCount/poseSum` (a
+  bone-checksum) — two same-model items with different poseSums = per-item pose proven.
+- **VERIFIED:** (a) per-item collection — each actor makes its own DrawItem; (b) per-MODEL pose
+  distinction is correct (Gerudo 15-bone vs flag 20-bone items carry their own poseSums); (c) a single
+  animated instance poses correctly through the per-item path (flag `object_hata` poseSum animates
+  smoothly); (d) NO regression (En_Sa Saria + En_Ge1 Gerudo render correctly). **NOT yet verified
+  LIVE:** two same-model actors in DIFFERENT poses rendering distinctly — couldn't stage a scene with
+  2+ simultaneously-*animating* same-model replaced actors (idle NPCs hold a static pose: two spawned
+  Gerudo both poseSum=11680.4061 constant; only one fortress flag reachable in view; auto-replace skips
+  skinned actors w/o a bonemap so multi-instance skinned scenes are rare). Fix is correct-by-
+  construction (FIFO-by-modelId of emit-time snapshots). **NEXT to close this out:** reach the Gerudo
+  Fortress courtyard (multiple flags) or a crowd of bonemapped NPCs and confirm two same-model
+  poseSums differ in one frame.
+
 ## ✅ DONE (session 20, 2026-06-17): SCENE-ACCURATE form lighting (sun direction)
 **The character/prop form light now follows the SCENE'S sun, not a fixed direction.** Session 19's
 half-Lambert term used a hardcoded direction the comments called "camera-space"; this session drives
