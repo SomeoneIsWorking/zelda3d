@@ -48,6 +48,7 @@ ALIAS = {
     "sk2": "skelton",           # Stalfos (En_Test) (skelton/stalfos.cmb)
     "oF1d_map": "oF1d",         # Goron NPCs (En_Go/En_Go2, Goron City) (oF1d/goronpeople.cmb)
     "fish": "fishing",          # Fishing-pond owner (Fishing actor) (fishing/fishmaster.cmb)
+    "bdoor": "boss_door",       # Boss-room door     (boss_door/bossdoor_model.cmb)
 }
 
 
