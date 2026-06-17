@@ -1,5 +1,21 @@
 # SoH3D — progress & state
 
+## ✅ DONE (session 21, 2026-06-17): per-item POSE capture — LIVE two-actor proof (CLOSED OUT)
+**The session-20 per-item-pose fix is now FULLY verified live.** Staged two `En_Hata` flags
+(model=2001, 20 bones) in one view at Gerudo Fortress (scene 0x5d, entrance 297): `tp -4150 -18
+-3300` next to flags at z=-3246 & z=-3363, frozen cam framing both. With `SOH3D_GL_DBG=1`, a single
+render pass shows **two model=2001 items with DIFFERENT poseSums** (e.g. 3358.61 vs 3786.26). Parsed
+the whole run: across **1458 render passes containing both flags, the two same-model items differed
+in ALL 1458 (0 identical), min nonzero delta 54.04** — zero collapse to a shared pose. This is the
+two-different-poses live demo that was pending. Flags animate via the N64-anim path
+(`SoH3D_UpdateAnimN64` reads each actor's own jointTable → per-actor phases), and `SoH3D_GL_EmitPose`
+snapshots each at emit time. Evidence: scratch/evidence/per_item_pose_proof.txt +
+per_item_pose_two_flags.png.
+- **NEW TOOLING (Shipwright@develop soh3d.c):** REPL `actorscan <id>` (decimal or 0xHEX) lists every
+  live actor of that id with world pos + distance from Link. Ends blind scene-wandering — used it to
+  find all 4 En_Hata (id 0x26) and pick the closest pair to frame. Reusable for any multi-instance
+  framing/verification.
+
 ## 🟡 PARTLY-VERIFIED (session 20, 2026-06-17): per-item POSE capture (multi-instance skinning)
 **Fixes the session-16 known issue: multiple actors sharing a glModelId all rendered with the LAST
 actor's pose.** Root cause is a DEFERRED-TIMING bug: `SoH3D_GL_SetBones(modelId)` stores the pose in
