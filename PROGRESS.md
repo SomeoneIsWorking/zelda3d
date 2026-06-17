@@ -1,5 +1,41 @@
 # SoH3D — progress & state
 
+## ✅ DONE (session 22, 2026-06-17): multi-CMB ASSEMBLY merge mechanism + KANBAN; generic-merge REJECTED
+**Built the reusable multi-CMB merge capability and hand-applied it to the kanban signpost; a
+GENERIC auto multi-CMB merge was investigated and rejected on evidence.**
+- **SURVEY (the decision):** dumped all 289 mapped object ZARs (`tools/` py + ctr_romfs/zar/cmb).
+  112 have >=2 "real" (non-debris, non-flat) CMBs, but they are overwhelmingly COLLECTIONS (one
+  ZAR shared by many actor types, e.g. `zelda_ec` = 23 distinct NPCs; `bdan_objects`/`jya_obj`/
+  `haka_objects` = dozens of objects), ALTERNATE VARIANTS (cow/cow2, koume/kotake, gi_* states),
+  or effect sprites. A blanket "merge all CMBs" would draw them overlapping = massive regression.
+  So a generic assembly loader is the WRONG abstraction — correct CMB selection needs the actor's
+  own draw logic (per-actor). Evidence: `scratch/evidence/multicmb_finding.md` + `multicmb_survey.txt`.
+  Per the user's steer ("do the ones you can manually, ignore hard ones"), implemented a
+  HAND-CURATED table instead.
+- **MECHANISM (libultraship... no — Shipwright@develop soh3d_model.cpp):** new `buildFromCmbs()`
+  merges N CMBs into one model — concatenates draw groups + textures, rebasing each group's
+  material texture index by the running texture count (`makeCgroup(cmb,group,verts,texBase)`;
+  `appendTextures()`). cGroups are built only AFTER `out->groups` is final (stable vert pointers).
+  `kAssemblies[]` table = {zar suffix -> CMB-name-substring list}; each substring merges EVERY
+  matching .cmb. loadAutoModel consults it before the single-pick. Static props only (skinned=false).
+- **KANBAN (first + only verified entry):** the OBJECT_KANBAN skip in `SoH3D_TryAuto` is REMOVED;
+  it now routes through the assembly path. Entry = `{"kanban_bo_","kanban_L_","kanban_R_"}` (11 CMBs:
+  post segments bo_* + the 8 board segments L_*/R_*; the flat eff_modelT slash sprite excluded).
+  **Key geometry correction:** the bo_* CMBs are the POST (each ~411x N x411, stacked Y0-6014), NOT
+  a board; the wide flat BOARD (2000x1155x213) is the L_*/R_* pieces — authored pre-divided into 8
+  cuttable segments whose baked positions (x=+-1000, width 2000) tile a CONTIGUOUS board, i.e. the
+  ASSEMBLED board at rest (the slash anim moves them at runtime), NOT shattered debris. My first cut
+  merged only bo_* and rendered a bare POST (caught in-game); adding the board pieces fixed it.
+- **VERIFIED in-game** (Kokiri Forest scene 0x55, 8 signs via `actorscan 0x141`, frozen cam on the
+  nearest at world (49,-94,967), time 0x8000): OoT3D sign now renders a complete board+post matching
+  the N64 silhouette. Before-fix (bo_* only) vs after-fix at identical camera: the board region went
+  from dark grass mean RGB (51,57,25) to bright wood/parchment (128,114,64) — the board appearing
+  where there was empty space. Evidence: scratch/screenshots/ksign_oot (bare post, bug),
+  ksign_oot2 (full sign, fixed), ksign_n64 (N64 reference).
+- **NOTE:** auto is OFF by default, so this is opt-in (SOH3D_AUTO=1). Other plausible static
+  assemblies (d_lift, spot00 drawbridge, mamenoki) are in hard-to-reach scenes with low payoff;
+  add to kAssemblies only when confirmed in-scene (no unverified entries).
+
 ## ✅ DONE (session 21, 2026-06-17): per-item POSE capture — LIVE two-actor proof (CLOSED OUT)
 **The session-20 per-item-pose fix is now FULLY verified live.** Staged two `En_Hata` flags
 (model=2001, 20 bones) in one view at Gerudo Fortress (scene 0x5d, entrance 297): `tp -4150 -18
