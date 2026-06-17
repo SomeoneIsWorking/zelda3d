@@ -254,26 +254,26 @@
    {
     "name": "gBarinadeBodyAnim",
     "otr": "objects/object_bv/gBarinadeBodyAnim",
-    "offset": "0x5184",
-    "frameCount": -24930
+    "offset": "0x3D84",
+    "frameCount": 40
    },
    {
     "name": "gBarinadeSupportAttachedAnim",
     "otr": "objects/object_bv/gBarinadeSupportAttachedAnim",
-    "offset": "0x166A8",
-    "frameCount": 1536
+    "offset": "0x152A8",
+    "frameCount": 40
    },
    {
     "name": "gBarinadeZapperIdleAnim",
     "otr": "objects/object_bv/gBarinadeZapperIdleAnim",
-    "offset": "0x18D18",
-    "frameCount": 16784
+    "offset": "0x17918",
+    "frameCount": 40
    },
    {
     "name": "gBarinadeStumpAnim",
     "otr": "objects/object_bv/gBarinadeStumpAnim",
-    "offset": "0x18150",
-    "frameCount": 1292
+    "offset": "0x16D50",
+    "frameCount": 51
    },
    {
     "name": "gBarinadeBariAnim",
@@ -284,56 +284,56 @@
    {
     "name": "gBarinadeSupportDamage1Anim",
     "otr": "objects/object_bv/gBarinadeSupportDamage1Anim",
-    "offset": "0x162AC",
-    "frameCount": 0
+    "offset": "0x14EAC",
+    "frameCount": 41
    },
    {
     "name": "gBarinadeSupportDamage2Anim",
     "otr": "objects/object_bv/gBarinadeSupportDamage2Anim",
-    "offset": "0x164B0",
-    "frameCount": 473
+    "offset": "0x150B0",
+    "frameCount": 41
    },
    {
     "name": "gBarinadeSupportCutAnim",
     "otr": "objects/object_bv/gBarinadeSupportCutAnim",
-    "offset": "0x17694",
-    "frameCount": 17226
+    "offset": "0x16294",
+    "frameCount": 41
    },
    {
     "name": "gBarinadeSupportDetachedAnim",
     "otr": "objects/object_bv/gBarinadeSupportDetachedAnim",
-    "offset": "0x177F4",
-    "frameCount": 14577
+    "offset": "0x163F4",
+    "frameCount": 41
    },
    {
     "name": "gBarinadeZapperDamage1Anim",
     "otr": "objects/object_bv/gBarinadeZapperDamage1Anim",
-    "offset": "0x18A68",
-    "frameCount": 11042
+    "offset": "0x17668",
+    "frameCount": 4
    },
    {
     "name": "gBarinadeZapperDamage2Anim",
     "otr": "objects/object_bv/gBarinadeZapperDamage2Anim",
-    "offset": "0x18B90",
-    "frameCount": -10606
+    "offset": "0x17790",
+    "frameCount": 27
    },
    {
     "name": "gBarinadeAnim_018A00",
     "otr": "objects/object_bv/gBarinadeAnim_018A00",
-    "offset": "0x18A00",
-    "frameCount": 3139
+    "offset": "0x17600",
+    "frameCount": 41
    },
    {
     "name": "gBarinadeAnim_015F10",
     "otr": "objects/object_bv/gBarinadeAnim_015F10",
-    "offset": "0x15F10",
-    "frameCount": -11621
+    "offset": "0x14B10",
+    "frameCount": 41
    },
    {
     "name": "gBarinadeAnim_015D10",
     "otr": "objects/object_bv/gBarinadeAnim_015D10",
-    "offset": "0x15D10",
-    "frameCount": -9187
+    "offset": "0x14910",
+    "frameCount": 41
    }
   ]
  },
@@ -916,8 +916,8 @@
    {
     "name": "gDaruniaIdleAnim",
     "otr": "objects/object_du/gDaruniaIdleAnim",
-    "offset": "0x6EB0",
-    "frameCount": -1468
+    "offset": "0x74B0",
+    "frameCount": 29
    },
    {
     "name": "gDaruniaItemGiveAnim",
@@ -952,68 +952,68 @@
    {
     "name": "gDaruniaDancingLoop1Anim",
     "otr": "objects/object_du/gDaruniaDancingLoop1Anim",
-    "offset": "0x2D94",
-    "frameCount": -9810
+    "offset": "0x2E8C",
+    "frameCount": 17
    },
    {
     "name": "gDaruniaDancingLoop2Anim",
     "otr": "objects/object_du/gDaruniaDancingLoop2Anim",
-    "offset": "0x3D48",
-    "frameCount": 3
+    "offset": "0x40FC",
+    "frameCount": 9
    },
    {
     "name": "gDaruniaDancingLoop3Anim",
     "otr": "objects/object_du/gDaruniaDancingLoop3Anim",
-    "offset": "0x4C04",
-    "frameCount": 756
+    "offset": "0x516C",
+    "frameCount": 17
    },
    {
     "name": "gDaruniaDancingLoop4Anim",
     "otr": "objects/object_du/gDaruniaDancingLoop4Anim",
-    "offset": "0x4ED8",
-    "frameCount": -15029
+    "offset": "0x54DC",
+    "frameCount": 9
    },
    {
     "name": "gDaruniaDancingEndAnim",
     "otr": "objects/object_du/gDaruniaDancingEndAnim",
-    "offset": "0x41F4",
-    "frameCount": 1126
+    "offset": "0x45A4",
+    "frameCount": 12
    },
    {
     "name": "gDaruniaWrongSongAnim",
     "otr": "objects/object_du/gDaruniaWrongSongAnim",
-    "offset": "0x3A30",
-    "frameCount": 2169
+    "offset": "0x3D88",
+    "frameCount": 42
    },
    {
     "name": "gDaruniaWrongSongEndAnim",
     "otr": "objects/object_du/gDaruniaWrongSongEndAnim",
-    "offset": "0x46F4",
-    "frameCount": -18313
+    "offset": "0x4B6C",
+    "frameCount": 20
    },
    {
     "name": "gDaruniaSageFormationAnim",
     "otr": "objects/object_du/gDaruniaSageFormationAnim",
-    "offset": "0x12014",
-    "frameCount": 3
+    "offset": "0x12614",
+    "frameCount": 15
    },
    {
     "name": "gDaruniaLookingUpToSariaAnim",
     "otr": "objects/object_du/gDaruniaLookingUpToSariaAnim",
-    "offset": "0x5458",
-    "frameCount": 1394
+    "offset": "0x5A58",
+    "frameCount": 19
    },
    {
     "name": "gDaruniaCreditsHitBreastAnim",
     "otr": "objects/object_du/gDaruniaCreditsHitBreastAnim",
-    "offset": "0x6104",
-    "frameCount": 21662
+    "offset": "0x6704",
+    "frameCount": 43
    },
    {
     "name": "gDaruniaCreditsIdleAnim",
     "otr": "objects/object_du/gDaruniaCreditsIdleAnim",
-    "offset": "0x67CC",
-    "frameCount": -1736
+    "offset": "0x6DCC",
+    "frameCount": 24
    }
   ]
  },
@@ -1266,20 +1266,20 @@
    {
     "name": "gVolvagiaLeftArmEmergeAnim",
     "otr": "objects/object_fd/gVolvagiaLeftArmEmergeAnim",
-    "offset": "0x11464",
-    "frameCount": null
+    "offset": "0x10064",
+    "frameCount": 2
    },
    {
     "name": "gVolvagiaRightArmEmergeAnim",
     "otr": "objects/object_fd/gVolvagiaRightArmEmergeAnim",
-    "offset": "0x11524",
-    "frameCount": null
+    "offset": "0x10124",
+    "frameCount": 30
    },
    {
     "name": "gVolvagiaHeadEmergeAnim",
     "otr": "objects/object_fd/gVolvagiaHeadEmergeAnim",
-    "offset": "0x115E4",
-    "frameCount": null
+    "offset": "0x101E4",
+    "frameCount": 2
    },
    {
     "name": "gVolvagiaBodyStaticAnim",
@@ -1295,38 +1295,38 @@
    {
     "name": "gPhantomHorseRunningAnim",
     "otr": "objects/object_fhg/gPhantomHorseRunningAnim",
-    "offset": "0xB4C8",
-    "frameCount": 14916
+    "offset": "0xA0C8",
+    "frameCount": 14
    },
    {
     "name": "gPhantomHorseAirAnim",
     "otr": "objects/object_fhg/gPhantomHorseAirAnim",
-    "offset": "0xB9D0",
-    "frameCount": 1568
+    "offset": "0xA5D0",
+    "frameCount": 15
    },
    {
     "name": "gPhantomHorseLeapAnim",
     "otr": "objects/object_fhg/gPhantomHorseLeapAnim",
-    "offset": "0xC65C",
-    "frameCount": -10080
+    "offset": "0xB25C",
+    "frameCount": 14
    },
    {
     "name": "gPhantomHorseLandAnim",
     "otr": "objects/object_fhg/gPhantomHorseLandAnim",
-    "offset": "0xCB1C",
-    "frameCount": 1262
+    "offset": "0xB71C",
+    "frameCount": 16
    },
    {
     "name": "gPhantomHorseRearingAnim",
     "otr": "objects/object_fhg/gPhantomHorseRearingAnim",
-    "offset": "0xDDB8",
-    "frameCount": 12544
+    "offset": "0xC9B8",
+    "frameCount": 33
    },
    {
     "name": "gPhantomHorseIdleAnim",
     "otr": "objects/object_fhg/gPhantomHorseIdleAnim",
-    "offset": "0xE8A0",
-    "frameCount": -6400
+    "offset": "0xD4A0",
+    "frameCount": 45
    },
    {
     "name": "gPhantomHorseUnusedRearingAnim",
@@ -1343,8 +1343,8 @@
    {
     "name": "gPhantomHorseFenceJumpAnim",
     "otr": "objects/object_fhg/gPhantomHorseFenceJumpAnim",
-    "offset": "0xC180",
-    "frameCount": -2912
+    "offset": "0xAD80",
+    "frameCount": 30
    }
   ]
  },
@@ -1518,68 +1518,68 @@
    {
     "name": "gGanonStunStartAnim",
     "otr": "objects/object_ganon2/gGanonStunStartAnim",
-    "offset": "0x26510",
-    "frameCount": 6694
+    "offset": "0x25110",
+    "frameCount": 17
    },
    {
     "name": "gGanonStunLoopAnim",
     "otr": "objects/object_ganon2/gGanonStunLoopAnim",
-    "offset": "0x26AF4",
-    "frameCount": 13866
+    "offset": "0x256F4",
+    "frameCount": 14
    },
    {
     "name": "gGanonStunEndAnim",
     "otr": "objects/object_ganon2/gGanonStunEndAnim",
-    "offset": "0x27824",
-    "frameCount": 1291
+    "offset": "0x26424",
+    "frameCount": 19
    },
    {
     "name": "gGanonDownedStartAnim",
     "otr": "objects/object_ganon2/gGanonDownedStartAnim",
-    "offset": "0x2A848",
-    "frameCount": -830
+    "offset": "0x29448",
+    "frameCount": 60
    },
    {
     "name": "gGanonStunEndToWalkAnim",
     "otr": "objects/object_ganon2/gGanonStunEndToWalkAnim",
-    "offset": "0x2B528",
-    "frameCount": 8303
+    "offset": "0x2A128",
+    "frameCount": 19
    },
    {
     "name": "gGanonDuplicateStunStartAnim",
     "otr": "objects/object_ganon2/gGanonDuplicateStunStartAnim",
-    "offset": "0x2C0D0",
-    "frameCount": -13298
+    "offset": "0x2ACD0",
+    "frameCount": 17
    },
    {
     "name": "gGanonDuplicateStunLoopAnim",
     "otr": "objects/object_ganon2/gGanonDuplicateStunLoopAnim",
-    "offset": "0x2C6B4",
-    "frameCount": 1203
+    "offset": "0x2B2B4",
+    "frameCount": 14
    },
    {
     "name": "gGanonGetUpAnim",
     "otr": "objects/object_ganon2/gGanonGetUpAnim",
-    "offset": "0x334F8",
-    "frameCount": 3915
+    "offset": "0x320F8",
+    "frameCount": 150
    },
    {
     "name": "gGanonDownedLoopAnim",
     "otr": "objects/object_ganon2/gGanonDownedLoopAnim",
-    "offset": "0x34278",
-    "frameCount": 2370
+    "offset": "0x32E78",
+    "frameCount": 19
    },
    {
     "name": "gGanonWalkAnim",
     "otr": "objects/object_ganon2/gGanonWalkAnim",
-    "offset": "0x353C0",
-    "frameCount": null
+    "offset": "0x33FC0",
+    "frameCount": 30
    },
    {
     "name": "gGanonWalkToGuardAnim",
     "otr": "objects/object_ganon2/gGanonWalkToGuardAnim",
-    "offset": "0x35BDC",
-    "frameCount": null
+    "offset": "0x347DC",
+    "frameCount": 12
    }
   ]
  },
@@ -2117,8 +2117,8 @@
    {
     "name": "gGohmaWalkCrouchedAnim",
     "otr": "objects/object_goma/gGohmaWalkCrouchedAnim",
-    "offset": "0x1EB4C",
-    "frameCount": null
+    "offset": "0x1D74C",
+    "frameCount": 30
    },
    {
     "name": "gGohmaViolentAttackAnim",
@@ -2940,20 +2940,20 @@
    {
     "name": "object_kingdodongo_Anim_01CAE0",
     "otr": "objects/object_kingdodongo/object_kingdodongo_Anim_01CAE0",
-    "offset": "0x1CAE0",
-    "frameCount": -29327
+    "offset": "0x1B6E0",
+    "frameCount": 60
    },
    {
     "name": "object_kingdodongo_Anim_01D218",
     "otr": "objects/object_kingdodongo/object_kingdodongo_Anim_01D218",
-    "offset": "0x1D218",
-    "frameCount": -7716
+    "offset": "0x1BE18",
+    "frameCount": 16
    },
    {
     "name": "object_kingdodongo_Anim_01D934",
     "otr": "objects/object_kingdodongo/object_kingdodongo_Anim_01D934",
-    "offset": "0x1D934",
-    "frameCount": 0
+    "offset": "0x1C534",
+    "frameCount": 15
    }
   ]
  },
@@ -5300,50 +5300,50 @@
    {
     "name": "gTwinrovaHoverAnim",
     "otr": "objects/object_tw/gTwinrovaHoverAnim",
-    "offset": "0x32BF8",
-    "frameCount": 2900
+    "offset": "0x317F8",
+    "frameCount": 24
    },
    {
     "name": "gTwinrovaChargedAttackHitAnim",
     "otr": "objects/object_tw/gTwinrovaChargedAttackHitAnim",
-    "offset": "0x338F0",
-    "frameCount": -6958
+    "offset": "0x324F0",
+    "frameCount": 18
    },
    {
     "name": "gTwinrovaStunStartAnim",
     "otr": "objects/object_tw/gTwinrovaStunStartAnim",
-    "offset": "0x343B4",
-    "frameCount": -21049
+    "offset": "0x32FB4",
+    "frameCount": 16
    },
    {
     "name": "gTwinrovaStunLoopAnim",
     "otr": "objects/object_tw/gTwinrovaStunLoopAnim",
-    "offset": "0x35030",
-    "frameCount": 3288
+    "offset": "0x33C30",
+    "frameCount": 20
    },
    {
     "name": "gTwinrovaStunEndAnim",
     "otr": "objects/object_tw/gTwinrovaStunEndAnim",
-    "offset": "0x35988",
-    "frameCount": -3342
+    "offset": "0x34588",
+    "frameCount": 14
    },
    {
     "name": "gTwinrovaWindUpAnim",
     "otr": "objects/object_tw/gTwinrovaWindUpAnim",
-    "offset": "0x36FBC",
-    "frameCount": -7919
+    "offset": "0x35BBC",
+    "frameCount": 35
    },
    {
     "name": "gTwinrovaIntroAnim",
     "otr": "objects/object_tw/gTwinrovaIntroAnim",
-    "offset": "0x38E2C",
-    "frameCount": 0
+    "offset": "0x37A2C",
+    "frameCount": 50
    },
    {
     "name": "gTwinrovaLaughAnim",
     "otr": "objects/object_tw/gTwinrovaLaughAnim",
-    "offset": "0x3A2D0",
-    "frameCount": null
+    "offset": "0x38ED0",
+    "frameCount": 32
    }
   ]
  },
@@ -5540,122 +5540,122 @@
    {
     "name": "gSheikPlayingHarpAnim",
     "otr": "objects/object_xc/gSheikPlayingHarpAnim",
-    "offset": "0xB6C",
-    "frameCount": -2565
+    "offset": "0xDB8",
+    "frameCount": 80
    },
    {
     "name": "gSheikShowingTriforceOnHandAnim",
     "otr": "objects/object_xc/gSheikShowingTriforceOnHandAnim",
-    "offset": "0x1A08",
-    "frameCount": -131
+    "offset": "0x1C58",
+    "frameCount": 50
    },
    {
     "name": "gSheikShowingTriforceOnHandIdleAnim",
     "otr": "objects/object_xc/gSheikShowingTriforceOnHandIdleAnim",
-    "offset": "0x1D14",
-    "frameCount": -1281
+    "offset": "0x1F64",
+    "frameCount": 20
    },
    {
     "name": "gSheikPlayingHarp2Anim",
     "otr": "objects/object_xc/gSheikPlayingHarp2Anim",
-    "offset": "0x289C",
-    "frameCount": -1001
+    "offset": "0x2D38",
+    "frameCount": 80
    },
    {
     "name": "gSheikPlayingHarp3Anim",
     "otr": "objects/object_xc/gSheikPlayingHarp3Anim",
-    "offset": "0x35C8",
-    "frameCount": -17438
+    "offset": "0x3CE8",
+    "frameCount": 96
    },
    {
     "name": "gSheikPlayingHarp4Anim",
     "otr": "objects/object_xc/gSheikPlayingHarp4Anim",
-    "offset": "0x4570",
-    "frameCount": 6475
+    "offset": "0x4F90",
+    "frameCount": 96
    },
    {
     "name": "gSheikIdleAnim",
     "otr": "objects/object_xc/gSheikIdleAnim",
-    "offset": "0x4828",
-    "frameCount": -2042
+    "offset": "0x5248",
+    "frameCount": 26
    },
    {
     "name": "gSheikWalkingAnim",
     "otr": "objects/object_xc/gSheikWalkingAnim",
-    "offset": "0x12FD0",
-    "frameCount": 516
+    "offset": "0x139F0",
+    "frameCount": 25
    },
    {
     "name": "gSheikArmsCrossedIdleAnim",
     "otr": "objects/object_xc/gSheikArmsCrossedIdleAnim",
-    "offset": "0x13AA4",
-    "frameCount": 25
+    "offset": "0x144C4",
+    "frameCount": 30
    },
    {
     "name": "gSheikFallingFromContortionsAnim",
     "otr": "objects/object_xc/gSheikFallingFromContortionsAnim",
-    "offset": "0x149E4",
-    "frameCount": -7432
+    "offset": "0x15404",
+    "frameCount": 40
    },
    {
     "name": "gSheikContortionsAnim",
     "otr": "objects/object_xc/gSheikContortionsAnim",
-    "offset": "0x169E8",
-    "frameCount": -7785
+    "offset": "0x17408",
+    "frameCount": 79
    },
    {
     "name": "gSheikPlayingHarp5Anim",
     "otr": "objects/object_xc/gSheikPlayingHarp5Anim",
-    "offset": "0x177F8",
-    "frameCount": -436
+    "offset": "0x18218",
+    "frameCount": 66
    },
    {
     "name": "gSheikInitialHarpAnim",
     "otr": "objects/object_xc/gSheikInitialHarpAnim",
-    "offset": "0x17C54",
-    "frameCount": 29547
+    "offset": "0x18674",
+    "frameCount": 17
    },
    {
     "name": "gSheikDefenseStanceAnim",
     "otr": "objects/object_xc/gSheikDefenseStanceAnim",
-    "offset": "0x18B00",
-    "frameCount": 3305
+    "offset": "0x19520",
+    "frameCount": 43
    },
    {
     "name": "gSheikThrowingNutAnim",
     "otr": "objects/object_xc/gSheikThrowingNutAnim",
-    "offset": "0x19598",
-    "frameCount": -1526
+    "offset": "0x19FB8",
+    "frameCount": 30
    },
    {
     "name": "gSheikKneelingAnim",
     "otr": "objects/object_xc/gSheikKneelingAnim",
-    "offset": "0x19C30",
-    "frameCount": 2714
+    "offset": "0x1A650",
+    "frameCount": 24
    },
    {
     "name": "gSheikHittingGroundAnim",
     "otr": "objects/object_xc/gSheikHittingGroundAnim",
-    "offset": "0x19F78",
-    "frameCount": 425
+    "offset": "0x1A998",
+    "frameCount": 11
    },
    {
     "name": "gSheikAnim_01A048",
     "otr": "objects/object_xc/gSheikAnim_01A048",
-    "offset": "0x1A048",
-    "frameCount": 1758
+    "offset": "0x1AA68",
+    "frameCount": 2
    },
    {
     "name": "gSheikPullingOutHarpAnim",
     "otr": "objects/object_xc/gSheikPullingOutHarpAnim",
-    "offset": "0x1B19C",
-    "frameCount": -14570
+    "offset": "0x1BBBC",
+    "frameCount": 58
    },
    {
     "name": "gSheikFallingFromSkyAnim",
     "otr": "objects/object_xc/gSheikFallingFromSkyAnim",
-    "offset": "0x1C0E8",
-    "frameCount": 1435
+    "offset": "0x1CB08",
+    "frameCount": 65
    }
   ]
  },
