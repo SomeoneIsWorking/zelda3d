@@ -30,6 +30,9 @@ fi
 export SOH3D=1                                  # render OoT3D assets
 export SOH3D_WARP=1                             # auto-warp past title/file-select
 export SOH3D_ENTRANCE="${SOH3D_ENTRANCE:-219}"  # 219 = Kakariko Village front gate
+export SOH3D_TIME="${SOH3D_TIME:-0x8000}"       # 0x8000 = noon (force DAY; Kakariko else loads at night)
+export SOH3D_AUTO="${SOH3D_AUTO:-1}"            # 1 = auto-replace non-table actors with OoT3D models
+export SOH3D_N64ANIM="${SOH3D_N64ANIM:-1}"      # drive OoT3D skeletons from live N64 joints (req. for characters)
 
 cd "$SOH"
 exec ./soh.elf "$@"
