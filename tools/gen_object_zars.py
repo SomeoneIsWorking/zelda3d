@@ -24,6 +24,27 @@ REPO = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 OBJ_TABLE = os.path.join(REPO, "Shipwright/soh/include/tables/object_table.h")
 OUT = os.path.join(REPO, "Shipwright/soh/src/soh3d/soh3d_object_zars.inc")
 
+# N64 object name -> OoT3D /actor/zelda_<basename>.zar, for CREATURES whose OoT3D archive was
+# RENAMED (so the exact object_<name> match misses). Each was confirmed by dumping the zar's main
+# CMB (tools: zar.py + cmb.py): the listed zar's main model is that creature. Only add an entry
+# when the model identity is certain (the cmb name says so) — a wrong guess renders the wrong actor.
+ALIAS = {
+    "niw": "nw",                # Cucco            (nw/chicken.cmb)
+    "okuta": "oc2",             # Octorok          (oc2/octarock.cmb)
+    "bigokuta": "ocd",          # Big Octo         (ocd/daiocta.cmb)
+    "peehat": "ph",             # Peahat           (ph/peehat.cmb)
+    "poh": "po",                # Poe              (po/poh.cmb)
+    "reeba": "rb",              # Leever           (rb/reeba.cmb)
+    "tite": "tt",               # Tektite          (tt/tectite.cmb)
+    "wallmaster": "wm2",        # Floor/Wallmaster (wm2/floormaster.cmb)
+    "kingdodongo": "kdodongo",  # King Dodongo     (kdodongo/kingdodongo.cmb)
+    "firefly": "ff",            # Keese            (ff/keith.cmb)
+    "anubice": "av",            # Anubis           (av/anubis.cmb)
+    "Bb": "bb",                 # Bubble           (bb/bubble.cmb)
+    "geldb": "gelb",            # Gerudo guard     (gelb/geld.cmb)
+    "horse_link_child": "hlc",  # child Epona      (hlc/childepona.cmb)
+}
+
 
 def main():
     rom = CtrRom(os.environ["SOH3D_3DS_ROM"])
@@ -43,9 +64,12 @@ def main():
         seg, enum = d.group(1), d.group(2)
         zar = None
         if seg.startswith("object_"):
-            cand = "/actor/zelda_" + seg[len("object_"):] + ".zar"
+            base = seg[len("object_"):]
+            cand = "/actor/zelda_" + base + ".zar"
             if cand in zars:
                 zar = cand
+            elif base in ALIAS and ("/actor/zelda_" + ALIAS[base] + ".zar") in zars:
+                zar = "/actor/zelda_" + ALIAS[base] + ".zar"  # renamed-creature alias
         rows.append((oid, enum, seg, zar))
 
     table = [None] * (maxid + 1)
