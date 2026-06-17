@@ -45,6 +45,7 @@ ALIAS = {
     "horse_link_child": "hlc",  # child Epona      (hlc/childepona.cmb)
     "fhg": "fantomHG",          # Phantom Ganon's horse (fantomHG/ganonhorse.cmb)
     "door_killer": "killer_door",  # Killer Door   (killer_door/idle.cmb)
+    "sk2": "skelton",           # Stalfos (En_Test) (skelton/stalfos.cmb)
 }
 
 
