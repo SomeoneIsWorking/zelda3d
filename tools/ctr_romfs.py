@@ -169,8 +169,9 @@ class CtrRom:
 
 if __name__ == "__main__":
     import sys
-    rom = sys.argv[1] if len(sys.argv) > 1 else \
-        "<rom-dir>/ROM/3DS/Legend of Zelda, The - Ocarina of Time 3D (USA) (En,Fr,Es).3ds"
+    rom = sys.argv[1] if len(sys.argv) > 1 else os.environ.get("SOH3D_3DS_ROM")
+    if not rom:
+        sys.exit("usage: ctr_romfs.py <oot3d.3ds>  (or set SOH3D_3DS_ROM; see .env)")
     r = CtrRom(rom)
     print(f"product={r.product_code} nocrypto={r.nocrypto} "
           f"romfs@0x{r.romfs_off:x} size=0x{r.romfs_size:x}")
