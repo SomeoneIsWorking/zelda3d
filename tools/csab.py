@@ -147,8 +147,15 @@ def _point_cubic(cf, t):
     return ((cf[0] * t + cf[1]) * t + cf[2]) * t + cf[3]
 
 
-def _hermite_interp(k0, k1, t, length):
+def _hermite_interp(k0, k1, t, length, rotation=False):
     p0, p1 = k0[1], k1[1]
+    if rotation:
+        # int16 rotation values are wrapped to [-pi,pi); the cubic must interpolate the
+        # CONTINUOUS curve, so unwrap p1 to the branch nearest p0 (take the short way).
+        # Without this, a keyframe pair straddling +-pi (e.g. +176deg -> -168deg, a +16deg
+        # move) sweeps the long way (~-344deg) and the bone spins all the way around.
+        # Tangents are slopes (angle/frame), invariant under adding 2*pi, so they stay valid.
+        p1 = p0 + ((p1 - p0 + math.pi) % (2 * math.pi) - math.pi)
     s0 = k0[3] * length   # tangentOut of k0
     s1 = k1[2] * length   # tangentIn  of k1
     return _point_cubic(_get_coeff_hermite(p0, p1, s0, s1), t)
@@ -182,7 +189,7 @@ def _sample_linear(track: Track, frame, rotation):
     return _lerp_angle(k0[1], k1[1], t) if rotation else _lerp(k0[1], k1[1], t)
 
 
-def _sample_hermite(track: Track, frame):
+def _sample_hermite(track: Track, frame, rotation=False):
     f = track.frames
     i1 = _find_idx1(f, frame)
     if i1 <= 0:
@@ -193,7 +200,7 @@ def _sample_hermite(track: Track, frame):
     if length == 0:
         return k0[1]
     t = (frame - k0[0]) / length
-    return _hermite_interp(k0, k1, t, length)
+    return _hermite_interp(k0, k1, t, length, rotation)
 
 
 def sample_track(track: Track, frame, rotation=False):
@@ -202,7 +209,7 @@ def sample_track(track: Track, frame, rotation=False):
     if track.type == LINEAR:
         return _sample_linear(track, frame, rotation)
     if track.type == HERMITE:
-        return _sample_hermite(track, frame)
+        return _sample_hermite(track, frame, rotation)
     raise ValueError("bad track type")
 
 
