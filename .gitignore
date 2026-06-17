@@ -16,6 +16,7 @@ scratch/azahar_data/
 Azahar/
 /textures
 
-# SoH runtime config written into cwd when launching from repo root
+# SoH runtime config + saves written into cwd when launching from repo root
 imgui.ini
 shipofharkinian.json
+Save/
