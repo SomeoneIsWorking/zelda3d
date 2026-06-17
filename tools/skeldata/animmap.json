@@ -165,6 +165,444 @@
    }
   ]
  },
+ "/actor/zelda_av.zar": {
+  "object": "object_anubice",
+  "rows": [
+   {
+    "n64": "gAnubiceFallDownAnim",
+    "otr": "objects/object_anubice/gAnubiceFallDownAnim",
+    "frameCount": 21,
+    "best": "av_dmg",
+    "candidates": [
+     {
+      "base": "av_dmg",
+      "duration": 22,
+      "dframe": 1,
+      "namescore": 0.0
+     },
+     {
+      "base": "av_getup",
+      "duration": 17,
+      "dframe": 4,
+      "namescore": 0.0
+     },
+     {
+      "base": "av_jump_start",
+      "duration": 17,
+      "dframe": 4,
+      "namescore": 0.0
+     },
+     {
+      "base": "av_die",
+      "duration": 13,
+      "dframe": 8,
+      "namescore": 0.0
+     },
+     {
+      "base": "av_jump",
+      "duration": 12,
+      "dframe": 9,
+      "namescore": 0.0
+     },
+     {
+      "base": "av_fire",
+      "duration": 61,
+      "dframe": 40,
+      "namescore": 0.0
+     },
+     {
+      "base": "av_wait",
+      "duration": 61,
+      "dframe": 40,
+      "namescore": 0.0
+     }
+    ]
+   },
+   {
+    "n64": "gAnubiceAttackingAnim",
+    "otr": "objects/object_anubice/gAnubiceAttackingAnim",
+    "frameCount": 60,
+    "best": "av_fire",
+    "candidates": [
+     {
+      "base": "av_fire",
+      "duration": 61,
+      "dframe": 1,
+      "namescore": 0.0
+     },
+     {
+      "base": "av_wait",
+      "duration": 61,
+      "dframe": 1,
+      "namescore": 0.0
+     },
+     {
+      "base": "av_dmg",
+      "duration": 22,
+      "dframe": 38,
+      "namescore": 0.0
+     },
+     {
+      "base": "av_getup",
+      "duration": 17,
+      "dframe": 43,
+      "namescore": 0.0
+     },
+     {
+      "base": "av_jump_start",
+      "duration": 17,
+      "dframe": 43,
+      "namescore": 0.0
+     },
+     {
+      "base": "av_die",
+      "duration": 13,
+      "dframe": 47,
+      "namescore": 0.0
+     },
+     {
+      "base": "av_jump",
+      "duration": 12,
+      "dframe": 48,
+      "namescore": 0.0
+     }
+    ]
+   },
+   {
+    "n64": "gAnubiceIdleAnim",
+    "otr": "objects/object_anubice/gAnubiceIdleAnim",
+    "frameCount": 60,
+    "best": "av_wait",
+    "candidates": [
+     {
+      "base": "av_wait",
+      "duration": 61,
+      "dframe": 1,
+      "namescore": 1.0
+     },
+     {
+      "base": "av_fire",
+      "duration": 61,
+      "dframe": 1,
+      "namescore": 0.0
+     },
+     {
+      "base": "av_dmg",
+      "duration": 22,
+      "dframe": 38,
+      "namescore": 0.0
+     },
+     {
+      "base": "av_getup",
+      "duration": 17,
+      "dframe": 43,
+      "namescore": 0.0
+     },
+     {
+      "base": "av_jump_start",
+      "duration": 17,
+      "dframe": 43,
+      "namescore": 0.0
+     },
+     {
+      "base": "av_die",
+      "duration": 13,
+      "dframe": 47,
+      "namescore": 0.0
+     },
+     {
+      "base": "av_jump",
+      "duration": 12,
+      "dframe": 48,
+      "namescore": 0.0
+     }
+    ]
+   },
+   {
+    "n64": "gAnubiceLaughingAnim",
+    "otr": "objects/object_anubice/gAnubiceLaughingAnim",
+    "frameCount": 12,
+    "best": "av_jump",
+    "candidates": [
+     {
+      "base": "av_jump",
+      "duration": 12,
+      "dframe": 0,
+      "namescore": 0.0
+     },
+     {
+      "base": "av_die",
+      "duration": 13,
+      "dframe": 1,
+      "namescore": 0.0
+     },
+     {
+      "base": "av_getup",
+      "duration": 17,
+      "dframe": 5,
+      "namescore": 0.0
+     },
+     {
+      "base": "av_jump_start",
+      "duration": 17,
+      "dframe": 5,
+      "namescore": 0.0
+     },
+     {
+      "base": "av_dmg",
+      "duration": 22,
+      "dframe": 10,
+      "namescore": 0.0
+     },
+     {
+      "base": "av_fire",
+      "duration": 61,
+      "dframe": 49,
+      "namescore": 0.0
+     },
+     {
+      "base": "av_wait",
+      "duration": 61,
+      "dframe": 49,
+      "namescore": 0.0
+     }
+    ]
+   },
+   {
+    "n64": "gAnubiceStandUpAnim",
+    "otr": "objects/object_anubice/gAnubiceStandUpAnim",
+    "frameCount": 16,
+    "best": "av_wait",
+    "candidates": [
+     {
+      "base": "av_getup",
+      "duration": 17,
+      "dframe": 1,
+      "namescore": 0.0
+     },
+     {
+      "base": "av_jump_start",
+      "duration": 17,
+      "dframe": 1,
+      "namescore": 0.0
+     },
+     {
+      "base": "av_die",
+      "duration": 13,
+      "dframe": 3,
+      "namescore": 0.0
+     },
+     {
+      "base": "av_jump",
+      "duration": 12,
+      "dframe": 4,
+      "namescore": 0.0
+     },
+     {
+      "base": "av_dmg",
+      "duration": 22,
+      "dframe": 6,
+      "namescore": 0.0
+     },
+     {
+      "base": "av_wait",
+      "duration": 61,
+      "dframe": 45,
+      "namescore": 1.0
+     },
+     {
+      "base": "av_fire",
+      "duration": 61,
+      "dframe": 45,
+      "namescore": 0.0
+     }
+    ]
+   },
+   {
+    "n64": "gAnubiceAnim_000A48",
+    "otr": "objects/object_anubice/gAnubiceAnim_000A48",
+    "frameCount": 11,
+    "best": "av_jump",
+    "candidates": [
+     {
+      "base": "av_jump",
+      "duration": 12,
+      "dframe": 1,
+      "namescore": 0.0
+     },
+     {
+      "base": "av_die",
+      "duration": 13,
+      "dframe": 2,
+      "namescore": 0.0
+     },
+     {
+      "base": "av_getup",
+      "duration": 17,
+      "dframe": 6,
+      "namescore": 0.0
+     },
+     {
+      "base": "av_jump_start",
+      "duration": 17,
+      "dframe": 6,
+      "namescore": 0.0
+     },
+     {
+      "base": "av_dmg",
+      "duration": 22,
+      "dframe": 11,
+      "namescore": 0.0
+     },
+     {
+      "base": "av_fire",
+      "duration": 61,
+      "dframe": 50,
+      "namescore": 0.0
+     },
+     {
+      "base": "av_wait",
+      "duration": 61,
+      "dframe": 50,
+      "namescore": 0.0
+     }
+    ]
+   },
+   {
+    "n64": "gAnubiceAnim_000BAC",
+    "otr": "objects/object_anubice/gAnubiceAnim_000BAC",
+    "frameCount": 16,
+    "best": "av_getup",
+    "candidates": [
+     {
+      "base": "av_getup",
+      "duration": 17,
+      "dframe": 1,
+      "namescore": 0.0
+     },
+     {
+      "base": "av_jump_start",
+      "duration": 17,
+      "dframe": 1,
+      "namescore": 0.0
+     },
+     {
+      "base": "av_die",
+      "duration": 13,
+      "dframe": 3,
+      "namescore": 0.0
+     },
+     {
+      "base": "av_jump",
+      "duration": 12,
+      "dframe": 4,
+      "namescore": 0.0
+     },
+     {
+      "base": "av_dmg",
+      "duration": 22,
+      "dframe": 6,
+      "namescore": 0.0
+     },
+     {
+      "base": "av_fire",
+      "duration": 61,
+      "dframe": 45,
+      "namescore": 0.0
+     },
+     {
+      "base": "av_wait",
+      "duration": 61,
+      "dframe": 45,
+      "namescore": 0.0
+     }
+    ]
+   }
+  ]
+ },
+ "/actor/zelda_bb.zar": {
+  "object": "object_Bb",
+  "rows": [
+   {
+    "n64": "object_Bb_Anim_000184",
+    "otr": "objects/object_Bb/object_Bb_Anim_000184",
+    "frameCount": 10,
+    "best": "bb_fly",
+    "candidates": [
+     {
+      "base": "bb_fly",
+      "duration": 11,
+      "dframe": 1,
+      "namescore": 1.0
+     },
+     {
+      "base": "bb_atack",
+      "duration": 11,
+      "dframe": 1,
+      "namescore": 1.0
+     },
+     {
+      "base": "bb_damage",
+      "duration": 9,
+      "dframe": 1,
+      "namescore": 1.0
+     }
+    ]
+   },
+   {
+    "n64": "object_Bb_Anim_0002AC",
+    "otr": "objects/object_Bb/object_Bb_Anim_0002AC",
+    "frameCount": 8,
+    "best": "bb_damage",
+    "candidates": [
+     {
+      "base": "bb_damage",
+      "duration": 9,
+      "dframe": 1,
+      "namescore": 1.0
+     },
+     {
+      "base": "bb_fly",
+      "duration": 11,
+      "dframe": 3,
+      "namescore": 1.0
+     },
+     {
+      "base": "bb_atack",
+      "duration": 11,
+      "dframe": 3,
+      "namescore": 1.0
+     }
+    ]
+   },
+   {
+    "n64": "object_Bb_Anim_000444",
+    "otr": "objects/object_Bb/object_Bb_Anim_000444",
+    "frameCount": 10,
+    "best": "bb_fly",
+    "candidates": [
+     {
+      "base": "bb_fly",
+      "duration": 11,
+      "dframe": 1,
+      "namescore": 1.0
+     },
+     {
+      "base": "bb_atack",
+      "duration": 11,
+      "dframe": 1,
+      "namescore": 1.0
+     },
+     {
+      "base": "bb_damage",
+      "duration": 9,
+      "dframe": 1,
+      "namescore": 1.0
+     }
+    ]
+   }
+  ]
+ },
  "/actor/zelda_bg.zar": {
   "object": "object_bg",
   "rows": [
@@ -13827,6 +14265,515 @@
    }
   ]
  },
+ "/actor/zelda_fantomHG.zar": {
+  "object": "object_fhg",
+  "rows": [
+   {
+    "n64": "gPhantomHorseRunningAnim",
+    "otr": "objects/object_fhg/gPhantomHorseRunningAnim",
+    "frameCount": 14916,
+    "best": "hgf_wait",
+    "candidates": [
+     {
+      "base": "hgf_wait",
+      "duration": 45,
+      "dframe": 14871,
+      "namescore": 0.0
+     },
+     {
+      "base": "hgf_stand",
+      "duration": 33,
+      "dframe": 14883,
+      "namescore": 0.0
+     },
+     {
+      "base": "hgf_jump",
+      "duration": 30,
+      "dframe": 14886,
+      "namescore": 0.0
+     },
+     {
+      "base": "hgf_damage",
+      "duration": 20,
+      "dframe": 14896,
+      "namescore": 0.0
+     },
+     {
+      "base": "hgf_jump02",
+      "duration": 16,
+      "dframe": 14900,
+      "namescore": 0.0
+     },
+     {
+      "base": "hgf_fly",
+      "duration": 15,
+      "dframe": 14901,
+      "namescore": 0.0
+     },
+     {
+      "base": "hgf_fastrun",
+      "duration": 14,
+      "dframe": 14902,
+      "namescore": 0.0
+     },
+     {
+      "base": "hgf_jump01",
+      "duration": 14,
+      "dframe": 14902,
+      "namescore": 0.0
+     }
+    ]
+   },
+   {
+    "n64": "gPhantomHorseAirAnim",
+    "otr": "objects/object_fhg/gPhantomHorseAirAnim",
+    "frameCount": 1568,
+    "best": "hgf_wait",
+    "candidates": [
+     {
+      "base": "hgf_wait",
+      "duration": 45,
+      "dframe": 1523,
+      "namescore": 0.0
+     },
+     {
+      "base": "hgf_stand",
+      "duration": 33,
+      "dframe": 1535,
+      "namescore": 0.0
+     },
+     {
+      "base": "hgf_jump",
+      "duration": 30,
+      "dframe": 1538,
+      "namescore": 0.0
+     },
+     {
+      "base": "hgf_damage",
+      "duration": 20,
+      "dframe": 1548,
+      "namescore": 0.0
+     },
+     {
+      "base": "hgf_jump02",
+      "duration": 16,
+      "dframe": 1552,
+      "namescore": 0.0
+     },
+     {
+      "base": "hgf_fly",
+      "duration": 15,
+      "dframe": 1553,
+      "namescore": 0.0
+     },
+     {
+      "base": "hgf_fastrun",
+      "duration": 14,
+      "dframe": 1554,
+      "namescore": 0.0
+     },
+     {
+      "base": "hgf_jump01",
+      "duration": 14,
+      "dframe": 1554,
+      "namescore": 0.0
+     }
+    ]
+   },
+   {
+    "n64": "gPhantomHorseLeapAnim",
+    "otr": "objects/object_fhg/gPhantomHorseLeapAnim",
+    "frameCount": -10080,
+    "best": "hgf_fastrun",
+    "candidates": [
+     {
+      "base": "hgf_fastrun",
+      "duration": 14,
+      "dframe": 10094,
+      "namescore": 0.0
+     },
+     {
+      "base": "hgf_jump01",
+      "duration": 14,
+      "dframe": 10094,
+      "namescore": 0.0
+     },
+     {
+      "base": "hgf_fly",
+      "duration": 15,
+      "dframe": 10095,
+      "namescore": 0.0
+     },
+     {
+      "base": "hgf_jump02",
+      "duration": 16,
+      "dframe": 10096,
+      "namescore": 0.0
+     },
+     {
+      "base": "hgf_damage",
+      "duration": 20,
+      "dframe": 10100,
+      "namescore": 0.0
+     },
+     {
+      "base": "hgf_jump",
+      "duration": 30,
+      "dframe": 10110,
+      "namescore": 0.0
+     },
+     {
+      "base": "hgf_stand",
+      "duration": 33,
+      "dframe": 10113,
+      "namescore": 0.0
+     },
+     {
+      "base": "hgf_wait",
+      "duration": 45,
+      "dframe": 10125,
+      "namescore": 0.0
+     }
+    ]
+   },
+   {
+    "n64": "gPhantomHorseLandAnim",
+    "otr": "objects/object_fhg/gPhantomHorseLandAnim",
+    "frameCount": 1262,
+    "best": "hgf_wait",
+    "candidates": [
+     {
+      "base": "hgf_wait",
+      "duration": 45,
+      "dframe": 1217,
+      "namescore": 0.0
+     },
+     {
+      "base": "hgf_stand",
+      "duration": 33,
+      "dframe": 1229,
+      "namescore": 0.0
+     },
+     {
+      "base": "hgf_jump",
+      "duration": 30,
+      "dframe": 1232,
+      "namescore": 0.0
+     },
+     {
+      "base": "hgf_damage",
+      "duration": 20,
+      "dframe": 1242,
+      "namescore": 0.0
+     },
+     {
+      "base": "hgf_jump02",
+      "duration": 16,
+      "dframe": 1246,
+      "namescore": 0.0
+     },
+     {
+      "base": "hgf_fly",
+      "duration": 15,
+      "dframe": 1247,
+      "namescore": 0.0
+     },
+     {
+      "base": "hgf_fastrun",
+      "duration": 14,
+      "dframe": 1248,
+      "namescore": 0.0
+     },
+     {
+      "base": "hgf_jump01",
+      "duration": 14,
+      "dframe": 1248,
+      "namescore": 0.0
+     }
+    ]
+   },
+   {
+    "n64": "gPhantomHorseRearingAnim",
+    "otr": "objects/object_fhg/gPhantomHorseRearingAnim",
+    "frameCount": 12544,
+    "best": "hgf_wait",
+    "candidates": [
+     {
+      "base": "hgf_wait",
+      "duration": 45,
+      "dframe": 12499,
+      "namescore": 0.0
+     },
+     {
+      "base": "hgf_stand",
+      "duration": 33,
+      "dframe": 12511,
+      "namescore": 0.0
+     },
+     {
+      "base": "hgf_jump",
+      "duration": 30,
+      "dframe": 12514,
+      "namescore": 0.0
+     },
+     {
+      "base": "hgf_damage",
+      "duration": 20,
+      "dframe": 12524,
+      "namescore": 0.0
+     },
+     {
+      "base": "hgf_jump02",
+      "duration": 16,
+      "dframe": 12528,
+      "namescore": 0.0
+     },
+     {
+      "base": "hgf_fly",
+      "duration": 15,
+      "dframe": 12529,
+      "namescore": 0.0
+     },
+     {
+      "base": "hgf_fastrun",
+      "duration": 14,
+      "dframe": 12530,
+      "namescore": 0.0
+     },
+     {
+      "base": "hgf_jump01",
+      "duration": 14,
+      "dframe": 12530,
+      "namescore": 0.0
+     }
+    ]
+   },
+   {
+    "n64": "gPhantomHorseIdleAnim",
+    "otr": "objects/object_fhg/gPhantomHorseIdleAnim",
+    "frameCount": -6400,
+    "best": "hgf_wait",
+    "candidates": [
+     {
+      "base": "hgf_fastrun",
+      "duration": 14,
+      "dframe": 6414,
+      "namescore": 0.0
+     },
+     {
+      "base": "hgf_jump01",
+      "duration": 14,
+      "dframe": 6414,
+      "namescore": 0.0
+     },
+     {
+      "base": "hgf_fly",
+      "duration": 15,
+      "dframe": 6415,
+      "namescore": 0.0
+     },
+     {
+      "base": "hgf_jump02",
+      "duration": 16,
+      "dframe": 6416,
+      "namescore": 0.0
+     },
+     {
+      "base": "hgf_damage",
+      "duration": 20,
+      "dframe": 6420,
+      "namescore": 0.0
+     },
+     {
+      "base": "hgf_jump",
+      "duration": 30,
+      "dframe": 6430,
+      "namescore": 0.0
+     },
+     {
+      "base": "hgf_stand",
+      "duration": 33,
+      "dframe": 6433,
+      "namescore": 0.0
+     },
+     {
+      "base": "hgf_wait",
+      "duration": 45,
+      "dframe": 6445,
+      "namescore": 1.0
+     }
+    ]
+   },
+   {
+    "n64": "gPhantomHorseUnusedRearingAnim",
+    "otr": "objects/object_fhg/gPhantomHorseUnusedRearingAnim",
+    "frameCount": 20,
+    "best": "hgf_damage",
+    "candidates": [
+     {
+      "base": "hgf_damage",
+      "duration": 20,
+      "dframe": 0,
+      "namescore": 0.0
+     },
+     {
+      "base": "hgf_jump02",
+      "duration": 16,
+      "dframe": 4,
+      "namescore": 0.0
+     },
+     {
+      "base": "hgf_fly",
+      "duration": 15,
+      "dframe": 5,
+      "namescore": 0.0
+     },
+     {
+      "base": "hgf_fastrun",
+      "duration": 14,
+      "dframe": 6,
+      "namescore": 0.0
+     },
+     {
+      "base": "hgf_jump01",
+      "duration": 14,
+      "dframe": 6,
+      "namescore": 0.0
+     },
+     {
+      "base": "hgf_jump",
+      "duration": 30,
+      "dframe": 10,
+      "namescore": 0.0
+     },
+     {
+      "base": "hgf_stand",
+      "duration": 33,
+      "dframe": 13,
+      "namescore": 0.0
+     },
+     {
+      "base": "hgf_wait",
+      "duration": 45,
+      "dframe": 25,
+      "namescore": 0.0
+     }
+    ]
+   },
+   {
+    "n64": "gPhantomHorseStillAnim",
+    "otr": "objects/object_fhg/gPhantomHorseStillAnim",
+    "frameCount": 2,
+    "best": "hgf_fastrun",
+    "candidates": [
+     {
+      "base": "hgf_fastrun",
+      "duration": 14,
+      "dframe": 12,
+      "namescore": 0.0
+     },
+     {
+      "base": "hgf_jump01",
+      "duration": 14,
+      "dframe": 12,
+      "namescore": 0.0
+     },
+     {
+      "base": "hgf_fly",
+      "duration": 15,
+      "dframe": 13,
+      "namescore": 0.0
+     },
+     {
+      "base": "hgf_jump02",
+      "duration": 16,
+      "dframe": 14,
+      "namescore": 0.0
+     },
+     {
+      "base": "hgf_damage",
+      "duration": 20,
+      "dframe": 18,
+      "namescore": 0.0
+     },
+     {
+      "base": "hgf_jump",
+      "duration": 30,
+      "dframe": 28,
+      "namescore": 0.0
+     },
+     {
+      "base": "hgf_stand",
+      "duration": 33,
+      "dframe": 31,
+      "namescore": 0.0
+     },
+     {
+      "base": "hgf_wait",
+      "duration": 45,
+      "dframe": 43,
+      "namescore": 0.0
+     }
+    ]
+   },
+   {
+    "n64": "gPhantomHorseFenceJumpAnim",
+    "otr": "objects/object_fhg/gPhantomHorseFenceJumpAnim",
+    "frameCount": -2912,
+    "best": "hgf_fastrun",
+    "candidates": [
+     {
+      "base": "hgf_fastrun",
+      "duration": 14,
+      "dframe": 2926,
+      "namescore": 0.0
+     },
+     {
+      "base": "hgf_jump01",
+      "duration": 14,
+      "dframe": 2926,
+      "namescore": 0.0
+     },
+     {
+      "base": "hgf_fly",
+      "duration": 15,
+      "dframe": 2927,
+      "namescore": 0.0
+     },
+     {
+      "base": "hgf_jump02",
+      "duration": 16,
+      "dframe": 2928,
+      "namescore": 0.0
+     },
+     {
+      "base": "hgf_damage",
+      "duration": 20,
+      "dframe": 2932,
+      "namescore": 0.0
+     },
+     {
+      "base": "hgf_jump",
+      "duration": 30,
+      "dframe": 2942,
+      "namescore": 1.0
+     },
+     {
+      "base": "hgf_stand",
+      "duration": 33,
+      "dframe": 2945,
+      "namescore": 0.0
+     },
+     {
+      "base": "hgf_wait",
+      "duration": 45,
+      "dframe": 2957,
+      "namescore": 0.0
+     }
+    ]
+   }
+  ]
+ },
  "/actor/zelda_fd.zar": {
   "object": "object_fd",
   "rows": [
@@ -14218,6 +15165,31 @@
       "base": "vb_LarmONLY",
       "duration": 3,
       "dframe": 97,
+      "namescore": 0.0
+     }
+    ]
+   }
+  ]
+ },
+ "/actor/zelda_ff.zar": {
+  "object": "object_firefly",
+  "rows": [
+   {
+    "n64": "gKeeseFlyAnim",
+    "otr": "objects/object_firefly/gKeeseFlyAnim",
+    "frameCount": 8,
+    "best": "firefly_foot_fly",
+    "candidates": [
+     {
+      "base": "firefly_foot_fly",
+      "duration": 10,
+      "dframe": 2,
+      "namescore": 1.0
+     },
+     {
+      "base": "firefly_foot_at",
+      "duration": 5,
+      "dframe": 3,
       "namescore": 0.0
      }
     ]
@@ -18525,6 +19497,825 @@
       "base": "ge1_matsu",
       "duration": 2,
       "dframe": 20,
+      "namescore": 0.0
+     }
+    ]
+   }
+  ]
+ },
+ "/actor/zelda_gelb.zar": {
+  "object": "object_geldb",
+  "rows": [
+   {
+    "n64": "gGerudoRedJumpAnim",
+    "otr": "objects/object_geldb/gGerudoRedJumpAnim",
+    "frameCount": 17,
+    "best": "geldB_start",
+    "candidates": [
+     {
+      "base": "geldB_start",
+      "duration": 17,
+      "dframe": 0,
+      "namescore": 0.0
+     },
+     {
+      "base": "geldB_talk",
+      "duration": 15,
+      "dframe": 2,
+      "namescore": 0.0
+     },
+     {
+      "base": "geldB_wait",
+      "duration": 20,
+      "dframe": 3,
+      "namescore": 0.0
+     },
+     {
+      "base": "geldB_hit",
+      "duration": 12,
+      "dframe": 5,
+      "namescore": 0.0
+     },
+     {
+      "base": "geldB_back_ten",
+      "duration": 11,
+      "dframe": 6,
+      "namescore": 0.0
+     },
+     {
+      "base": "geldB_attackA",
+      "duration": 10,
+      "dframe": 7,
+      "namescore": 0.0
+     },
+     {
+      "base": "geldB_down",
+      "duration": 24,
+      "dframe": 7,
+      "namescore": 0.0
+     },
+     {
+      "base": "geldB_side_walk",
+      "duration": 10,
+      "dframe": 7,
+      "namescore": 0.0
+     },
+     {
+      "base": "geldB_run",
+      "duration": 7,
+      "dframe": 10,
+      "namescore": 0.0
+     },
+     {
+      "base": "geldB_defense",
+      "duration": 5,
+      "dframe": 12,
+      "namescore": 0.0
+     },
+     {
+      "base": "geldB_attackB",
+      "duration": 40,
+      "dframe": 23,
+      "namescore": 0.0
+     }
+    ]
+   },
+   {
+    "n64": "gGerudoRedNeutralAnim",
+    "otr": "objects/object_geldb/gGerudoRedNeutralAnim",
+    "frameCount": 19,
+    "best": "geldB_wait",
+    "candidates": [
+     {
+      "base": "geldB_wait",
+      "duration": 20,
+      "dframe": 1,
+      "namescore": 0.0
+     },
+     {
+      "base": "geldB_start",
+      "duration": 17,
+      "dframe": 2,
+      "namescore": 0.0
+     },
+     {
+      "base": "geldB_talk",
+      "duration": 15,
+      "dframe": 4,
+      "namescore": 0.0
+     },
+     {
+      "base": "geldB_down",
+      "duration": 24,
+      "dframe": 5,
+      "namescore": 0.0
+     },
+     {
+      "base": "geldB_hit",
+      "duration": 12,
+      "dframe": 7,
+      "namescore": 0.0
+     },
+     {
+      "base": "geldB_back_ten",
+      "duration": 11,
+      "dframe": 8,
+      "namescore": 0.0
+     },
+     {
+      "base": "geldB_attackA",
+      "duration": 10,
+      "dframe": 9,
+      "namescore": 0.0
+     },
+     {
+      "base": "geldB_side_walk",
+      "duration": 10,
+      "dframe": 9,
+      "namescore": 0.0
+     },
+     {
+      "base": "geldB_run",
+      "duration": 7,
+      "dframe": 12,
+      "namescore": 0.0
+     },
+     {
+      "base": "geldB_defense",
+      "duration": 5,
+      "dframe": 14,
+      "namescore": 0.0
+     },
+     {
+      "base": "geldB_attackB",
+      "duration": 40,
+      "dframe": 21,
+      "namescore": 0.0
+     }
+    ]
+   },
+   {
+    "n64": "gGerudoRedSidestepAnim",
+    "otr": "objects/object_geldb/gGerudoRedSidestepAnim",
+    "frameCount": 10,
+    "best": "geldB_side_walk",
+    "candidates": [
+     {
+      "base": "geldB_side_walk",
+      "duration": 10,
+      "dframe": 0,
+      "namescore": 1.0
+     },
+     {
+      "base": "geldB_attackA",
+      "duration": 10,
+      "dframe": 0,
+      "namescore": 0.0
+     },
+     {
+      "base": "geldB_back_ten",
+      "duration": 11,
+      "dframe": 1,
+      "namescore": 0.0
+     },
+     {
+      "base": "geldB_hit",
+      "duration": 12,
+      "dframe": 2,
+      "namescore": 0.0
+     },
+     {
+      "base": "geldB_run",
+      "duration": 7,
+      "dframe": 3,
+      "namescore": 0.0
+     },
+     {
+      "base": "geldB_defense",
+      "duration": 5,
+      "dframe": 5,
+      "namescore": 0.0
+     },
+     {
+      "base": "geldB_talk",
+      "duration": 15,
+      "dframe": 5,
+      "namescore": 0.0
+     },
+     {
+      "base": "geldB_start",
+      "duration": 17,
+      "dframe": 7,
+      "namescore": 0.0
+     },
+     {
+      "base": "geldB_wait",
+      "duration": 20,
+      "dframe": 10,
+      "namescore": 0.0
+     },
+     {
+      "base": "geldB_down",
+      "duration": 24,
+      "dframe": 14,
+      "namescore": 0.0
+     },
+     {
+      "base": "geldB_attackB",
+      "duration": 40,
+      "dframe": 30,
+      "namescore": 0.0
+     }
+    ]
+   },
+   {
+    "n64": "gGerudoRedFlipAnim",
+    "otr": "objects/object_geldb/gGerudoRedFlipAnim",
+    "frameCount": 11,
+    "best": "geldB_back_ten",
+    "candidates": [
+     {
+      "base": "geldB_back_ten",
+      "duration": 11,
+      "dframe": 0,
+      "namescore": 0.0
+     },
+     {
+      "base": "geldB_attackA",
+      "duration": 10,
+      "dframe": 1,
+      "namescore": 0.0
+     },
+     {
+      "base": "geldB_hit",
+      "duration": 12,
+      "dframe": 1,
+      "namescore": 0.0
+     },
+     {
+      "base": "geldB_side_walk",
+      "duration": 10,
+      "dframe": 1,
+      "namescore": 0.0
+     },
+     {
+      "base": "geldB_run",
+      "duration": 7,
+      "dframe": 4,
+      "namescore": 0.0
+     },
+     {
+      "base": "geldB_talk",
+      "duration": 15,
+      "dframe": 4,
+      "namescore": 0.0
+     },
+     {
+      "base": "geldB_defense",
+      "duration": 5,
+      "dframe": 6,
+      "namescore": 0.0
+     },
+     {
+      "base": "geldB_start",
+      "duration": 17,
+      "dframe": 6,
+      "namescore": 0.0
+     },
+     {
+      "base": "geldB_wait",
+      "duration": 20,
+      "dframe": 9,
+      "namescore": 0.0
+     },
+     {
+      "base": "geldB_down",
+      "duration": 24,
+      "dframe": 13,
+      "namescore": 0.0
+     },
+     {
+      "base": "geldB_attackB",
+      "duration": 40,
+      "dframe": 29,
+      "namescore": 0.0
+     }
+    ]
+   },
+   {
+    "n64": "gGerudoRedWalkAnim",
+    "otr": "objects/object_geldb/gGerudoRedWalkAnim",
+    "frameCount": 7,
+    "best": "geldB_run",
+    "candidates": [
+     {
+      "base": "geldB_run",
+      "duration": 7,
+      "dframe": 0,
+      "namescore": 0.0
+     },
+     {
+      "base": "geldB_defense",
+      "duration": 5,
+      "dframe": 2,
+      "namescore": 0.0
+     },
+     {
+      "base": "geldB_side_walk",
+      "duration": 10,
+      "dframe": 3,
+      "namescore": 1.0
+     },
+     {
+      "base": "geldB_attackA",
+      "duration": 10,
+      "dframe": 3,
+      "namescore": 0.0
+     },
+     {
+      "base": "geldB_back_ten",
+      "duration": 11,
+      "dframe": 4,
+      "namescore": 0.0
+     },
+     {
+      "base": "geldB_hit",
+      "duration": 12,
+      "dframe": 5,
+      "namescore": 0.0
+     },
+     {
+      "base": "geldB_talk",
+      "duration": 15,
+      "dframe": 8,
+      "namescore": 0.0
+     },
+     {
+      "base": "geldB_start",
+      "duration": 17,
+      "dframe": 10,
+      "namescore": 0.0
+     },
+     {
+      "base": "geldB_wait",
+      "duration": 20,
+      "dframe": 13,
+      "namescore": 0.0
+     },
+     {
+      "base": "geldB_down",
+      "duration": 24,
+      "dframe": 17,
+      "namescore": 0.0
+     },
+     {
+      "base": "geldB_attackB",
+      "duration": 40,
+      "dframe": 33,
+      "namescore": 0.0
+     }
+    ]
+   },
+   {
+    "n64": "gGerudoRedSlashAnim",
+    "otr": "objects/object_geldb/gGerudoRedSlashAnim",
+    "frameCount": 10,
+    "best": "geldB_attackA",
+    "candidates": [
+     {
+      "base": "geldB_attackA",
+      "duration": 10,
+      "dframe": 0,
+      "namescore": 0.0
+     },
+     {
+      "base": "geldB_side_walk",
+      "duration": 10,
+      "dframe": 0,
+      "namescore": 0.0
+     },
+     {
+      "base": "geldB_back_ten",
+      "duration": 11,
+      "dframe": 1,
+      "namescore": 0.0
+     },
+     {
+      "base": "geldB_hit",
+      "duration": 12,
+      "dframe": 2,
+      "namescore": 0.0
+     },
+     {
+      "base": "geldB_run",
+      "duration": 7,
+      "dframe": 3,
+      "namescore": 0.0
+     },
+     {
+      "base": "geldB_defense",
+      "duration": 5,
+      "dframe": 5,
+      "namescore": 0.0
+     },
+     {
+      "base": "geldB_talk",
+      "duration": 15,
+      "dframe": 5,
+      "namescore": 0.0
+     },
+     {
+      "base": "geldB_start",
+      "duration": 17,
+      "dframe": 7,
+      "namescore": 0.0
+     },
+     {
+      "base": "geldB_wait",
+      "duration": 20,
+      "dframe": 10,
+      "namescore": 0.0
+     },
+     {
+      "base": "geldB_down",
+      "duration": 24,
+      "dframe": 14,
+      "namescore": 0.0
+     },
+     {
+      "base": "geldB_attackB",
+      "duration": 40,
+      "dframe": 30,
+      "namescore": 0.0
+     }
+    ]
+   },
+   {
+    "n64": "gGerudoRedSpinAttackAnim",
+    "otr": "objects/object_geldb/gGerudoRedSpinAttackAnim",
+    "frameCount": 34,
+    "best": "geldB_attackB",
+    "candidates": [
+     {
+      "base": "geldB_attackB",
+      "duration": 40,
+      "dframe": 6,
+      "namescore": 0.0
+     },
+     {
+      "base": "geldB_down",
+      "duration": 24,
+      "dframe": 10,
+      "namescore": 0.0
+     },
+     {
+      "base": "geldB_wait",
+      "duration": 20,
+      "dframe": 14,
+      "namescore": 0.0
+     },
+     {
+      "base": "geldB_start",
+      "duration": 17,
+      "dframe": 17,
+      "namescore": 0.0
+     },
+     {
+      "base": "geldB_talk",
+      "duration": 15,
+      "dframe": 19,
+      "namescore": 0.0
+     },
+     {
+      "base": "geldB_hit",
+      "duration": 12,
+      "dframe": 22,
+      "namescore": 0.0
+     },
+     {
+      "base": "geldB_back_ten",
+      "duration": 11,
+      "dframe": 23,
+      "namescore": 0.0
+     },
+     {
+      "base": "geldB_attackA",
+      "duration": 10,
+      "dframe": 24,
+      "namescore": 1.0
+     },
+     {
+      "base": "geldB_side_walk",
+      "duration": 10,
+      "dframe": 24,
+      "namescore": 0.0
+     },
+     {
+      "base": "geldB_run",
+      "duration": 7,
+      "dframe": 27,
+      "namescore": 0.0
+     },
+     {
+      "base": "geldB_defense",
+      "duration": 5,
+      "dframe": 29,
+      "namescore": 0.0
+     }
+    ]
+   },
+   {
+    "n64": "gGerudoRedDamageAnim",
+    "otr": "objects/object_geldb/gGerudoRedDamageAnim",
+    "frameCount": 11,
+    "best": "geldB_back_ten",
+    "candidates": [
+     {
+      "base": "geldB_back_ten",
+      "duration": 11,
+      "dframe": 0,
+      "namescore": 0.0
+     },
+     {
+      "base": "geldB_attackA",
+      "duration": 10,
+      "dframe": 1,
+      "namescore": 0.0
+     },
+     {
+      "base": "geldB_hit",
+      "duration": 12,
+      "dframe": 1,
+      "namescore": 0.0
+     },
+     {
+      "base": "geldB_side_walk",
+      "duration": 10,
+      "dframe": 1,
+      "namescore": 0.0
+     },
+     {
+      "base": "geldB_run",
+      "duration": 7,
+      "dframe": 4,
+      "namescore": 0.0
+     },
+     {
+      "base": "geldB_talk",
+      "duration": 15,
+      "dframe": 4,
+      "namescore": 0.0
+     },
+     {
+      "base": "geldB_defense",
+      "duration": 5,
+      "dframe": 6,
+      "namescore": 0.0
+     },
+     {
+      "base": "geldB_start",
+      "duration": 17,
+      "dframe": 6,
+      "namescore": 0.0
+     },
+     {
+      "base": "geldB_wait",
+      "duration": 20,
+      "dframe": 9,
+      "namescore": 0.0
+     },
+     {
+      "base": "geldB_down",
+      "duration": 24,
+      "dframe": 13,
+      "namescore": 0.0
+     },
+     {
+      "base": "geldB_attackB",
+      "duration": 40,
+      "dframe": 29,
+      "namescore": 0.0
+     }
+    ]
+   },
+   {
+    "n64": "gGerudoRedDefeatAnim",
+    "otr": "objects/object_geldb/gGerudoRedDefeatAnim",
+    "frameCount": 23,
+    "best": "geldB_down",
+    "candidates": [
+     {
+      "base": "geldB_down",
+      "duration": 24,
+      "dframe": 1,
+      "namescore": 0.0
+     },
+     {
+      "base": "geldB_wait",
+      "duration": 20,
+      "dframe": 3,
+      "namescore": 0.0
+     },
+     {
+      "base": "geldB_start",
+      "duration": 17,
+      "dframe": 6,
+      "namescore": 0.0
+     },
+     {
+      "base": "geldB_talk",
+      "duration": 15,
+      "dframe": 8,
+      "namescore": 0.0
+     },
+     {
+      "base": "geldB_hit",
+      "duration": 12,
+      "dframe": 11,
+      "namescore": 0.0
+     },
+     {
+      "base": "geldB_back_ten",
+      "duration": 11,
+      "dframe": 12,
+      "namescore": 0.0
+     },
+     {
+      "base": "geldB_attackA",
+      "duration": 10,
+      "dframe": 13,
+      "namescore": 0.0
+     },
+     {
+      "base": "geldB_side_walk",
+      "duration": 10,
+      "dframe": 13,
+      "namescore": 0.0
+     },
+     {
+      "base": "geldB_run",
+      "duration": 7,
+      "dframe": 16,
+      "namescore": 0.0
+     },
+     {
+      "base": "geldB_attackB",
+      "duration": 40,
+      "dframe": 17,
+      "namescore": 0.0
+     },
+     {
+      "base": "geldB_defense",
+      "duration": 5,
+      "dframe": 18,
+      "namescore": 0.0
+     }
+    ]
+   },
+   {
+    "n64": "gGerudoRedBlockAnim",
+    "otr": "objects/object_geldb/gGerudoRedBlockAnim",
+    "frameCount": 4,
+    "best": "geldB_defense",
+    "candidates": [
+     {
+      "base": "geldB_defense",
+      "duration": 5,
+      "dframe": 1,
+      "namescore": 0.0
+     },
+     {
+      "base": "geldB_run",
+      "duration": 7,
+      "dframe": 3,
+      "namescore": 0.0
+     },
+     {
+      "base": "geldB_attackA",
+      "duration": 10,
+      "dframe": 6,
+      "namescore": 0.0
+     },
+     {
+      "base": "geldB_side_walk",
+      "duration": 10,
+      "dframe": 6,
+      "namescore": 0.0
+     },
+     {
+      "base": "geldB_back_ten",
+      "duration": 11,
+      "dframe": 7,
+      "namescore": 0.0
+     },
+     {
+      "base": "geldB_hit",
+      "duration": 12,
+      "dframe": 8,
+      "namescore": 0.0
+     },
+     {
+      "base": "geldB_talk",
+      "duration": 15,
+      "dframe": 11,
+      "namescore": 0.0
+     },
+     {
+      "base": "geldB_start",
+      "duration": 17,
+      "dframe": 13,
+      "namescore": 0.0
+     },
+     {
+      "base": "geldB_wait",
+      "duration": 20,
+      "dframe": 16,
+      "namescore": 0.0
+     },
+     {
+      "base": "geldB_down",
+      "duration": 24,
+      "dframe": 20,
+      "namescore": 0.0
+     },
+     {
+      "base": "geldB_attackB",
+      "duration": 40,
+      "dframe": 36,
+      "namescore": 0.0
+     }
+    ]
+   },
+   {
+    "n64": "gGerudoRedStandAnim",
+    "otr": "objects/object_geldb/gGerudoRedStandAnim",
+    "frameCount": 15,
+    "best": "geldB_wait",
+    "candidates": [
+     {
+      "base": "geldB_talk",
+      "duration": 15,
+      "dframe": 0,
+      "namescore": 0.0
+     },
+     {
+      "base": "geldB_start",
+      "duration": 17,
+      "dframe": 2,
+      "namescore": 0.0
+     },
+     {
+      "base": "geldB_hit",
+      "duration": 12,
+      "dframe": 3,
+      "namescore": 0.0
+     },
+     {
+      "base": "geldB_back_ten",
+      "duration": 11,
+      "dframe": 4,
+      "namescore": 0.0
+     },
+     {
+      "base": "geldB_wait",
+      "duration": 20,
+      "dframe": 5,
+      "namescore": 1.0
+     },
+     {
+      "base": "geldB_attackA",
+      "duration": 10,
+      "dframe": 5,
+      "namescore": 0.0
+     },
+     {
+      "base": "geldB_side_walk",
+      "duration": 10,
+      "dframe": 5,
+      "namescore": 0.0
+     },
+     {
+      "base": "geldB_run",
+      "duration": 7,
+      "dframe": 8,
+      "namescore": 0.0
+     },
+     {
+      "base": "geldB_down",
+      "duration": 24,
+      "dframe": 9,
+      "namescore": 0.0
+     },
+     {
+      "base": "geldB_defense",
+      "duration": 5,
+      "dframe": 10,
+      "namescore": 0.0
+     },
+     {
+      "base": "geldB_attackB",
+      "duration": 40,
+      "dframe": 25,
       "namescore": 0.0
      }
     ]
@@ -27477,6 +29268,201 @@
    }
   ]
  },
+ "/actor/zelda_hlc.zar": {
+  "object": "object_horse_link_child",
+  "rows": [
+   {
+    "n64": "gChildEponaIdleAnim",
+    "otr": "objects/object_horse_link_child/gChildEponaIdleAnim",
+    "frameCount": 70,
+    "best": "hlc_anim_wait",
+    "candidates": [
+     {
+      "base": "hlc_anim_wait",
+      "duration": 70,
+      "dframe": 0,
+      "namescore": 1.0
+     },
+     {
+      "base": "hlc_anim_walk",
+      "duration": 35,
+      "dframe": 35,
+      "namescore": 1.0
+     },
+     {
+      "base": "hlc_anim_wait02",
+      "duration": 30,
+      "dframe": 40,
+      "namescore": 1.0
+     },
+     {
+      "base": "hlc_anim_slowrun",
+      "duration": 29,
+      "dframe": 41,
+      "namescore": 1.0
+     },
+     {
+      "base": "hlc_anim_fastrun",
+      "duration": 24,
+      "dframe": 46,
+      "namescore": 1.0
+     }
+    ]
+   },
+   {
+    "n64": "gChildEponaWhinnyAnim",
+    "otr": "objects/object_horse_link_child/gChildEponaWhinnyAnim",
+    "frameCount": 30,
+    "best": "hlc_anim_wait02",
+    "candidates": [
+     {
+      "base": "hlc_anim_wait02",
+      "duration": 30,
+      "dframe": 0,
+      "namescore": 1.0
+     },
+     {
+      "base": "hlc_anim_slowrun",
+      "duration": 29,
+      "dframe": 1,
+      "namescore": 1.0
+     },
+     {
+      "base": "hlc_anim_walk",
+      "duration": 35,
+      "dframe": 5,
+      "namescore": 1.0
+     },
+     {
+      "base": "hlc_anim_fastrun",
+      "duration": 24,
+      "dframe": 6,
+      "namescore": 1.0
+     },
+     {
+      "base": "hlc_anim_wait",
+      "duration": 70,
+      "dframe": 40,
+      "namescore": 1.0
+     }
+    ]
+   },
+   {
+    "n64": "gChildEponaWalkingAnim",
+    "otr": "objects/object_horse_link_child/gChildEponaWalkingAnim",
+    "frameCount": 35,
+    "best": "hlc_anim_walk",
+    "candidates": [
+     {
+      "base": "hlc_anim_walk",
+      "duration": 35,
+      "dframe": 0,
+      "namescore": 1.0
+     },
+     {
+      "base": "hlc_anim_wait02",
+      "duration": 30,
+      "dframe": 5,
+      "namescore": 1.0
+     },
+     {
+      "base": "hlc_anim_slowrun",
+      "duration": 29,
+      "dframe": 6,
+      "namescore": 1.0
+     },
+     {
+      "base": "hlc_anim_fastrun",
+      "duration": 24,
+      "dframe": 11,
+      "namescore": 1.0
+     },
+     {
+      "base": "hlc_anim_wait",
+      "duration": 70,
+      "dframe": 35,
+      "namescore": 1.0
+     }
+    ]
+   },
+   {
+    "n64": "gChildEponaTrottingAnim",
+    "otr": "objects/object_horse_link_child/gChildEponaTrottingAnim",
+    "frameCount": 29,
+    "best": "hlc_anim_slowrun",
+    "candidates": [
+     {
+      "base": "hlc_anim_slowrun",
+      "duration": 29,
+      "dframe": 0,
+      "namescore": 1.0
+     },
+     {
+      "base": "hlc_anim_wait02",
+      "duration": 30,
+      "dframe": 1,
+      "namescore": 1.0
+     },
+     {
+      "base": "hlc_anim_fastrun",
+      "duration": 24,
+      "dframe": 5,
+      "namescore": 1.0
+     },
+     {
+      "base": "hlc_anim_walk",
+      "duration": 35,
+      "dframe": 6,
+      "namescore": 1.0
+     },
+     {
+      "base": "hlc_anim_wait",
+      "duration": 70,
+      "dframe": 41,
+      "namescore": 1.0
+     }
+    ]
+   },
+   {
+    "n64": "gChildEponaGallopingAnim",
+    "otr": "objects/object_horse_link_child/gChildEponaGallopingAnim",
+    "frameCount": 24,
+    "best": "hlc_anim_fastrun",
+    "candidates": [
+     {
+      "base": "hlc_anim_fastrun",
+      "duration": 24,
+      "dframe": 0,
+      "namescore": 1.0
+     },
+     {
+      "base": "hlc_anim_slowrun",
+      "duration": 29,
+      "dframe": 5,
+      "namescore": 1.0
+     },
+     {
+      "base": "hlc_anim_wait02",
+      "duration": 30,
+      "dframe": 6,
+      "namescore": 1.0
+     },
+     {
+      "base": "hlc_anim_walk",
+      "duration": 35,
+      "dframe": 11,
+      "namescore": 1.0
+     },
+     {
+      "base": "hlc_anim_wait",
+      "duration": 70,
+      "dframe": 46,
+      "namescore": 1.0
+     }
+    ]
+   }
+  ]
+ },
  "/actor/zelda_hni.zar": {
   "object": "object_hni",
   "rows": [
@@ -36154,6 +38140,1983 @@
       "duration": 21,
       "dframe": 1,
       "namescore": 1.0
+     }
+    ]
+   }
+  ]
+ },
+ "/actor/zelda_kdodongo.zar": {
+  "object": "object_kingdodongo",
+  "rows": [
+   {
+    "n64": "object_kingdodongo_Anim_000690",
+    "otr": "objects/object_kingdodongo/object_kingdodongo_Anim_000690",
+    "frameCount": 30,
+    "best": "kd_die_b",
+    "candidates": [
+     {
+      "base": "kd_die_b",
+      "duration": 30,
+      "dframe": 0,
+      "namescore": 1.0
+     },
+     {
+      "base": "kd_success",
+      "duration": 30,
+      "dframe": 0,
+      "namescore": 0.0
+     },
+     {
+      "base": "kd_bombwait",
+      "duration": 31,
+      "dframe": 1,
+      "namescore": 0.0
+     },
+     {
+      "base": "kd_roll_standby",
+      "duration": 31,
+      "dframe": 1,
+      "namescore": 0.0
+     },
+     {
+      "base": "kd_explode",
+      "duration": 27,
+      "dframe": 3,
+      "namescore": 0.0
+     },
+     {
+      "base": "kd_getup",
+      "duration": 36,
+      "dframe": 6,
+      "namescore": 0.0
+     },
+     {
+      "base": "kd_damage",
+      "duration": 23,
+      "dframe": 7,
+      "namescore": 0.0
+     },
+     {
+      "base": "kd_wait",
+      "duration": 21,
+      "dframe": 9,
+      "namescore": 0.0
+     },
+     {
+      "base": "kd_down",
+      "duration": 20,
+      "dframe": 10,
+      "namescore": 0.0
+     },
+     {
+      "base": "kd_fire_damage",
+      "duration": 20,
+      "dframe": 10,
+      "namescore": 0.0
+     },
+     {
+      "base": "kd_walk_end",
+      "duration": 17,
+      "dframe": 13,
+      "namescore": 0.0
+     },
+     {
+      "base": "kd_walk_start",
+      "duration": 15,
+      "dframe": 15,
+      "namescore": 0.0
+     },
+     {
+      "base": "kd_fire",
+      "duration": 51,
+      "dframe": 21,
+      "namescore": 0.0
+     },
+     {
+      "base": "kd_walk",
+      "duration": 61,
+      "dframe": 31,
+      "namescore": 0.0
+     },
+     {
+      "base": "kd_die_a",
+      "duration": 68,
+      "dframe": 38,
+      "namescore": 1.0
+     },
+     {
+      "base": "kd_fire_standby",
+      "duration": 101,
+      "dframe": 71,
+      "namescore": 0.0
+     },
+     {
+      "base": "kd_rolling",
+      "duration": 115,
+      "dframe": 85,
+      "namescore": 0.0
+     },
+     {
+      "base": "kd_end",
+      "duration": 270,
+      "dframe": 240,
+      "namescore": 0.0
+     }
+    ]
+   },
+   {
+    "n64": "object_kingdodongo_Anim_001074",
+    "otr": "objects/object_kingdodongo/object_kingdodongo_Anim_001074",
+    "frameCount": 23,
+    "best": "kd_damage",
+    "candidates": [
+     {
+      "base": "kd_damage",
+      "duration": 23,
+      "dframe": 0,
+      "namescore": 0.0
+     },
+     {
+      "base": "kd_wait",
+      "duration": 21,
+      "dframe": 2,
+      "namescore": 0.0
+     },
+     {
+      "base": "kd_down",
+      "duration": 20,
+      "dframe": 3,
+      "namescore": 0.0
+     },
+     {
+      "base": "kd_fire_damage",
+      "duration": 20,
+      "dframe": 3,
+      "namescore": 0.0
+     },
+     {
+      "base": "kd_explode",
+      "duration": 27,
+      "dframe": 4,
+      "namescore": 0.0
+     },
+     {
+      "base": "kd_walk_end",
+      "duration": 17,
+      "dframe": 6,
+      "namescore": 0.0
+     },
+     {
+      "base": "kd_die_b",
+      "duration": 30,
+      "dframe": 7,
+      "namescore": 1.0
+     },
+     {
+      "base": "kd_success",
+      "duration": 30,
+      "dframe": 7,
+      "namescore": 0.0
+     },
+     {
+      "base": "kd_bombwait",
+      "duration": 31,
+      "dframe": 8,
+      "namescore": 0.0
+     },
+     {
+      "base": "kd_roll_standby",
+      "duration": 31,
+      "dframe": 8,
+      "namescore": 0.0
+     },
+     {
+      "base": "kd_walk_start",
+      "duration": 15,
+      "dframe": 8,
+      "namescore": 0.0
+     },
+     {
+      "base": "kd_getup",
+      "duration": 36,
+      "dframe": 13,
+      "namescore": 0.0
+     },
+     {
+      "base": "kd_fire",
+      "duration": 51,
+      "dframe": 28,
+      "namescore": 0.0
+     },
+     {
+      "base": "kd_walk",
+      "duration": 61,
+      "dframe": 38,
+      "namescore": 0.0
+     },
+     {
+      "base": "kd_die_a",
+      "duration": 68,
+      "dframe": 45,
+      "namescore": 1.0
+     },
+     {
+      "base": "kd_fire_standby",
+      "duration": 101,
+      "dframe": 78,
+      "namescore": 0.0
+     },
+     {
+      "base": "kd_rolling",
+      "duration": 115,
+      "dframe": 92,
+      "namescore": 0.0
+     },
+     {
+      "base": "kd_end",
+      "duration": 270,
+      "dframe": 247,
+      "namescore": 0.0
+     }
+    ]
+   },
+   {
+    "n64": "object_kingdodongo_Anim_002D0C",
+    "otr": "objects/object_kingdodongo/object_kingdodongo_Anim_002D0C",
+    "frameCount": 68,
+    "best": "kd_die_a",
+    "candidates": [
+     {
+      "base": "kd_die_a",
+      "duration": 68,
+      "dframe": 0,
+      "namescore": 1.0
+     },
+     {
+      "base": "kd_walk",
+      "duration": 61,
+      "dframe": 7,
+      "namescore": 0.0
+     },
+     {
+      "base": "kd_fire",
+      "duration": 51,
+      "dframe": 17,
+      "namescore": 0.0
+     },
+     {
+      "base": "kd_getup",
+      "duration": 36,
+      "dframe": 32,
+      "namescore": 0.0
+     },
+     {
+      "base": "kd_fire_standby",
+      "duration": 101,
+      "dframe": 33,
+      "namescore": 0.0
+     },
+     {
+      "base": "kd_bombwait",
+      "duration": 31,
+      "dframe": 37,
+      "namescore": 0.0
+     },
+     {
+      "base": "kd_roll_standby",
+      "duration": 31,
+      "dframe": 37,
+      "namescore": 0.0
+     },
+     {
+      "base": "kd_die_b",
+      "duration": 30,
+      "dframe": 38,
+      "namescore": 1.0
+     },
+     {
+      "base": "kd_success",
+      "duration": 30,
+      "dframe": 38,
+      "namescore": 0.0
+     },
+     {
+      "base": "kd_explode",
+      "duration": 27,
+      "dframe": 41,
+      "namescore": 0.0
+     },
+     {
+      "base": "kd_damage",
+      "duration": 23,
+      "dframe": 45,
+      "namescore": 0.0
+     },
+     {
+      "base": "kd_rolling",
+      "duration": 115,
+      "dframe": 47,
+      "namescore": 0.0
+     },
+     {
+      "base": "kd_wait",
+      "duration": 21,
+      "dframe": 47,
+      "namescore": 0.0
+     },
+     {
+      "base": "kd_down",
+      "duration": 20,
+      "dframe": 48,
+      "namescore": 0.0
+     },
+     {
+      "base": "kd_fire_damage",
+      "duration": 20,
+      "dframe": 48,
+      "namescore": 0.0
+     },
+     {
+      "base": "kd_walk_end",
+      "duration": 17,
+      "dframe": 51,
+      "namescore": 0.0
+     },
+     {
+      "base": "kd_walk_start",
+      "duration": 15,
+      "dframe": 53,
+      "namescore": 0.0
+     },
+     {
+      "base": "kd_end",
+      "duration": 270,
+      "dframe": 202,
+      "namescore": 0.0
+     }
+    ]
+   },
+   {
+    "n64": "object_kingdodongo_Anim_003CF8",
+    "otr": "objects/object_kingdodongo/object_kingdodongo_Anim_003CF8",
+    "frameCount": 30,
+    "best": "kd_die_b",
+    "candidates": [
+     {
+      "base": "kd_die_b",
+      "duration": 30,
+      "dframe": 0,
+      "namescore": 1.0
+     },
+     {
+      "base": "kd_success",
+      "duration": 30,
+      "dframe": 0,
+      "namescore": 0.0
+     },
+     {
+      "base": "kd_bombwait",
+      "duration": 31,
+      "dframe": 1,
+      "namescore": 0.0
+     },
+     {
+      "base": "kd_roll_standby",
+      "duration": 31,
+      "dframe": 1,
+      "namescore": 0.0
+     },
+     {
+      "base": "kd_explode",
+      "duration": 27,
+      "dframe": 3,
+      "namescore": 0.0
+     },
+     {
+      "base": "kd_getup",
+      "duration": 36,
+      "dframe": 6,
+      "namescore": 0.0
+     },
+     {
+      "base": "kd_damage",
+      "duration": 23,
+      "dframe": 7,
+      "namescore": 0.0
+     },
+     {
+      "base": "kd_wait",
+      "duration": 21,
+      "dframe": 9,
+      "namescore": 0.0
+     },
+     {
+      "base": "kd_down",
+      "duration": 20,
+      "dframe": 10,
+      "namescore": 0.0
+     },
+     {
+      "base": "kd_fire_damage",
+      "duration": 20,
+      "dframe": 10,
+      "namescore": 0.0
+     },
+     {
+      "base": "kd_walk_end",
+      "duration": 17,
+      "dframe": 13,
+      "namescore": 0.0
+     },
+     {
+      "base": "kd_walk_start",
+      "duration": 15,
+      "dframe": 15,
+      "namescore": 0.0
+     },
+     {
+      "base": "kd_fire",
+      "duration": 51,
+      "dframe": 21,
+      "namescore": 0.0
+     },
+     {
+      "base": "kd_walk",
+      "duration": 61,
+      "dframe": 31,
+      "namescore": 0.0
+     },
+     {
+      "base": "kd_die_a",
+      "duration": 68,
+      "dframe": 38,
+      "namescore": 1.0
+     },
+     {
+      "base": "kd_fire_standby",
+      "duration": 101,
+      "dframe": 71,
+      "namescore": 0.0
+     },
+     {
+      "base": "kd_rolling",
+      "duration": 115,
+      "dframe": 85,
+      "namescore": 0.0
+     },
+     {
+      "base": "kd_end",
+      "duration": 270,
+      "dframe": 240,
+      "namescore": 0.0
+     }
+    ]
+   },
+   {
+    "n64": "object_kingdodongo_Anim_0042A8",
+    "otr": "objects/object_kingdodongo/object_kingdodongo_Anim_0042A8",
+    "frameCount": 20,
+    "best": "kd_down",
+    "candidates": [
+     {
+      "base": "kd_down",
+      "duration": 20,
+      "dframe": 0,
+      "namescore": 0.0
+     },
+     {
+      "base": "kd_fire_damage",
+      "duration": 20,
+      "dframe": 0,
+      "namescore": 0.0
+     },
+     {
+      "base": "kd_wait",
+      "duration": 21,
+      "dframe": 1,
+      "namescore": 0.0
+     },
+     {
+      "base": "kd_damage",
+      "duration": 23,
+      "dframe": 3,
+      "namescore": 0.0
+     },
+     {
+      "base": "kd_walk_end",
+      "duration": 17,
+      "dframe": 3,
+      "namescore": 0.0
+     },
+     {
+      "base": "kd_walk_start",
+      "duration": 15,
+      "dframe": 5,
+      "namescore": 0.0
+     },
+     {
+      "base": "kd_explode",
+      "duration": 27,
+      "dframe": 7,
+      "namescore": 0.0
+     },
+     {
+      "base": "kd_die_b",
+      "duration": 30,
+      "dframe": 10,
+      "namescore": 1.0
+     },
+     {
+      "base": "kd_success",
+      "duration": 30,
+      "dframe": 10,
+      "namescore": 0.0
+     },
+     {
+      "base": "kd_bombwait",
+      "duration": 31,
+      "dframe": 11,
+      "namescore": 0.0
+     },
+     {
+      "base": "kd_roll_standby",
+      "duration": 31,
+      "dframe": 11,
+      "namescore": 0.0
+     },
+     {
+      "base": "kd_getup",
+      "duration": 36,
+      "dframe": 16,
+      "namescore": 0.0
+     },
+     {
+      "base": "kd_fire",
+      "duration": 51,
+      "dframe": 31,
+      "namescore": 0.0
+     },
+     {
+      "base": "kd_walk",
+      "duration": 61,
+      "dframe": 41,
+      "namescore": 0.0
+     },
+     {
+      "base": "kd_die_a",
+      "duration": 68,
+      "dframe": 48,
+      "namescore": 1.0
+     },
+     {
+      "base": "kd_fire_standby",
+      "duration": 101,
+      "dframe": 81,
+      "namescore": 0.0
+     },
+     {
+      "base": "kd_rolling",
+      "duration": 115,
+      "dframe": 95,
+      "namescore": 0.0
+     },
+     {
+      "base": "kd_end",
+      "duration": 270,
+      "dframe": 250,
+      "namescore": 0.0
+     }
+    ]
+   },
+   {
+    "n64": "object_kingdodongo_Anim_004E0C",
+    "otr": "objects/object_kingdodongo/object_kingdodongo_Anim_004E0C",
+    "frameCount": 27,
+    "best": "kd_explode",
+    "candidates": [
+     {
+      "base": "kd_explode",
+      "duration": 27,
+      "dframe": 0,
+      "namescore": 0.0
+     },
+     {
+      "base": "kd_die_b",
+      "duration": 30,
+      "dframe": 3,
+      "namescore": 1.0
+     },
+     {
+      "base": "kd_success",
+      "duration": 30,
+      "dframe": 3,
+      "namescore": 0.0
+     },
+     {
+      "base": "kd_bombwait",
+      "duration": 31,
+      "dframe": 4,
+      "namescore": 0.0
+     },
+     {
+      "base": "kd_damage",
+      "duration": 23,
+      "dframe": 4,
+      "namescore": 0.0
+     },
+     {
+      "base": "kd_roll_standby",
+      "duration": 31,
+      "dframe": 4,
+      "namescore": 0.0
+     },
+     {
+      "base": "kd_wait",
+      "duration": 21,
+      "dframe": 6,
+      "namescore": 0.0
+     },
+     {
+      "base": "kd_down",
+      "duration": 20,
+      "dframe": 7,
+      "namescore": 0.0
+     },
+     {
+      "base": "kd_fire_damage",
+      "duration": 20,
+      "dframe": 7,
+      "namescore": 0.0
+     },
+     {
+      "base": "kd_getup",
+      "duration": 36,
+      "dframe": 9,
+      "namescore": 0.0
+     },
+     {
+      "base": "kd_walk_end",
+      "duration": 17,
+      "dframe": 10,
+      "namescore": 0.0
+     },
+     {
+      "base": "kd_walk_start",
+      "duration": 15,
+      "dframe": 12,
+      "namescore": 0.0
+     },
+     {
+      "base": "kd_fire",
+      "duration": 51,
+      "dframe": 24,
+      "namescore": 0.0
+     },
+     {
+      "base": "kd_walk",
+      "duration": 61,
+      "dframe": 34,
+      "namescore": 0.0
+     },
+     {
+      "base": "kd_die_a",
+      "duration": 68,
+      "dframe": 41,
+      "namescore": 1.0
+     },
+     {
+      "base": "kd_fire_standby",
+      "duration": 101,
+      "dframe": 74,
+      "namescore": 0.0
+     },
+     {
+      "base": "kd_rolling",
+      "duration": 115,
+      "dframe": 88,
+      "namescore": 0.0
+     },
+     {
+      "base": "kd_end",
+      "duration": 270,
+      "dframe": 243,
+      "namescore": 0.0
+     }
+    ]
+   },
+   {
+    "n64": "object_kingdodongo_Anim_0061D4",
+    "otr": "objects/object_kingdodongo/object_kingdodongo_Anim_0061D4",
+    "frameCount": 51,
+    "best": "kd_fire",
+    "candidates": [
+     {
+      "base": "kd_fire",
+      "duration": 51,
+      "dframe": 0,
+      "namescore": 0.0
+     },
+     {
+      "base": "kd_walk",
+      "duration": 61,
+      "dframe": 10,
+      "namescore": 0.0
+     },
+     {
+      "base": "kd_getup",
+      "duration": 36,
+      "dframe": 15,
+      "namescore": 0.0
+     },
+     {
+      "base": "kd_die_a",
+      "duration": 68,
+      "dframe": 17,
+      "namescore": 1.0
+     },
+     {
+      "base": "kd_bombwait",
+      "duration": 31,
+      "dframe": 20,
+      "namescore": 0.0
+     },
+     {
+      "base": "kd_roll_standby",
+      "duration": 31,
+      "dframe": 20,
+      "namescore": 0.0
+     },
+     {
+      "base": "kd_die_b",
+      "duration": 30,
+      "dframe": 21,
+      "namescore": 1.0
+     },
+     {
+      "base": "kd_success",
+      "duration": 30,
+      "dframe": 21,
+      "namescore": 0.0
+     },
+     {
+      "base": "kd_explode",
+      "duration": 27,
+      "dframe": 24,
+      "namescore": 0.0
+     },
+     {
+      "base": "kd_damage",
+      "duration": 23,
+      "dframe": 28,
+      "namescore": 0.0
+     },
+     {
+      "base": "kd_wait",
+      "duration": 21,
+      "dframe": 30,
+      "namescore": 0.0
+     },
+     {
+      "base": "kd_down",
+      "duration": 20,
+      "dframe": 31,
+      "namescore": 0.0
+     },
+     {
+      "base": "kd_fire_damage",
+      "duration": 20,
+      "dframe": 31,
+      "namescore": 0.0
+     },
+     {
+      "base": "kd_walk_end",
+      "duration": 17,
+      "dframe": 34,
+      "namescore": 0.0
+     },
+     {
+      "base": "kd_walk_start",
+      "duration": 15,
+      "dframe": 36,
+      "namescore": 0.0
+     },
+     {
+      "base": "kd_fire_standby",
+      "duration": 101,
+      "dframe": 50,
+      "namescore": 0.0
+     },
+     {
+      "base": "kd_rolling",
+      "duration": 115,
+      "dframe": 64,
+      "namescore": 0.0
+     },
+     {
+      "base": "kd_end",
+      "duration": 270,
+      "dframe": 219,
+      "namescore": 0.0
+     }
+    ]
+   },
+   {
+    "n64": "object_kingdodongo_Anim_006924",
+    "otr": "objects/object_kingdodongo/object_kingdodongo_Anim_006924",
+    "frameCount": 19,
+    "best": "kd_down",
+    "candidates": [
+     {
+      "base": "kd_down",
+      "duration": 20,
+      "dframe": 1,
+      "namescore": 0.0
+     },
+     {
+      "base": "kd_fire_damage",
+      "duration": 20,
+      "dframe": 1,
+      "namescore": 0.0
+     },
+     {
+      "base": "kd_wait",
+      "duration": 21,
+      "dframe": 2,
+      "namescore": 0.0
+     },
+     {
+      "base": "kd_walk_end",
+      "duration": 17,
+      "dframe": 2,
+      "namescore": 0.0
+     },
+     {
+      "base": "kd_damage",
+      "duration": 23,
+      "dframe": 4,
+      "namescore": 0.0
+     },
+     {
+      "base": "kd_walk_start",
+      "duration": 15,
+      "dframe": 4,
+      "namescore": 0.0
+     },
+     {
+      "base": "kd_explode",
+      "duration": 27,
+      "dframe": 8,
+      "namescore": 0.0
+     },
+     {
+      "base": "kd_die_b",
+      "duration": 30,
+      "dframe": 11,
+      "namescore": 1.0
+     },
+     {
+      "base": "kd_success",
+      "duration": 30,
+      "dframe": 11,
+      "namescore": 0.0
+     },
+     {
+      "base": "kd_bombwait",
+      "duration": 31,
+      "dframe": 12,
+      "namescore": 0.0
+     },
+     {
+      "base": "kd_roll_standby",
+      "duration": 31,
+      "dframe": 12,
+      "namescore": 0.0
+     },
+     {
+      "base": "kd_getup",
+      "duration": 36,
+      "dframe": 17,
+      "namescore": 0.0
+     },
+     {
+      "base": "kd_fire",
+      "duration": 51,
+      "dframe": 32,
+      "namescore": 0.0
+     },
+     {
+      "base": "kd_walk",
+      "duration": 61,
+      "dframe": 42,
+      "namescore": 0.0
+     },
+     {
+      "base": "kd_die_a",
+      "duration": 68,
+      "dframe": 49,
+      "namescore": 1.0
+     },
+     {
+      "base": "kd_fire_standby",
+      "duration": 101,
+      "dframe": 82,
+      "namescore": 0.0
+     },
+     {
+      "base": "kd_rolling",
+      "duration": 115,
+      "dframe": 96,
+      "namescore": 0.0
+     },
+     {
+      "base": "kd_end",
+      "duration": 270,
+      "dframe": 251,
+      "namescore": 0.0
+     }
+    ]
+   },
+   {
+    "n64": "object_kingdodongo_Anim_008EEC",
+    "otr": "objects/object_kingdodongo/object_kingdodongo_Anim_008EEC",
+    "frameCount": 101,
+    "best": "kd_fire_standby",
+    "candidates": [
+     {
+      "base": "kd_fire_standby",
+      "duration": 101,
+      "dframe": 0,
+      "namescore": 0.0
+     },
+     {
+      "base": "kd_rolling",
+      "duration": 115,
+      "dframe": 14,
+      "namescore": 0.0
+     },
+     {
+      "base": "kd_die_a",
+      "duration": 68,
+      "dframe": 33,
+      "namescore": 1.0
+     },
+     {
+      "base": "kd_walk",
+      "duration": 61,
+      "dframe": 40,
+      "namescore": 0.0
+     },
+     {
+      "base": "kd_fire",
+      "duration": 51,
+      "dframe": 50,
+      "namescore": 0.0
+     },
+     {
+      "base": "kd_getup",
+      "duration": 36,
+      "dframe": 65,
+      "namescore": 0.0
+     },
+     {
+      "base": "kd_bombwait",
+      "duration": 31,
+      "dframe": 70,
+      "namescore": 0.0
+     },
+     {
+      "base": "kd_roll_standby",
+      "duration": 31,
+      "dframe": 70,
+      "namescore": 0.0
+     },
+     {
+      "base": "kd_die_b",
+      "duration": 30,
+      "dframe": 71,
+      "namescore": 1.0
+     },
+     {
+      "base": "kd_success",
+      "duration": 30,
+      "dframe": 71,
+      "namescore": 0.0
+     },
+     {
+      "base": "kd_explode",
+      "duration": 27,
+      "dframe": 74,
+      "namescore": 0.0
+     },
+     {
+      "base": "kd_damage",
+      "duration": 23,
+      "dframe": 78,
+      "namescore": 0.0
+     },
+     {
+      "base": "kd_wait",
+      "duration": 21,
+      "dframe": 80,
+      "namescore": 0.0
+     },
+     {
+      "base": "kd_down",
+      "duration": 20,
+      "dframe": 81,
+      "namescore": 0.0
+     },
+     {
+      "base": "kd_fire_damage",
+      "duration": 20,
+      "dframe": 81,
+      "namescore": 0.0
+     },
+     {
+      "base": "kd_walk_end",
+      "duration": 17,
+      "dframe": 84,
+      "namescore": 0.0
+     },
+     {
+      "base": "kd_walk_start",
+      "duration": 15,
+      "dframe": 86,
+      "namescore": 0.0
+     },
+     {
+      "base": "kd_end",
+      "duration": 270,
+      "dframe": 169,
+      "namescore": 0.0
+     }
+    ]
+   },
+   {
+    "n64": "object_kingdodongo_Anim_009D10",
+    "otr": "objects/object_kingdodongo/object_kingdodongo_Anim_009D10",
+    "frameCount": 36,
+    "best": "kd_getup",
+    "candidates": [
+     {
+      "base": "kd_getup",
+      "duration": 36,
+      "dframe": 0,
+      "namescore": 0.0
+     },
+     {
+      "base": "kd_bombwait",
+      "duration": 31,
+      "dframe": 5,
+      "namescore": 0.0
+     },
+     {
+      "base": "kd_roll_standby",
+      "duration": 31,
+      "dframe": 5,
+      "namescore": 0.0
+     },
+     {
+      "base": "kd_die_b",
+      "duration": 30,
+      "dframe": 6,
+      "namescore": 1.0
+     },
+     {
+      "base": "kd_success",
+      "duration": 30,
+      "dframe": 6,
+      "namescore": 0.0
+     },
+     {
+      "base": "kd_explode",
+      "duration": 27,
+      "dframe": 9,
+      "namescore": 0.0
+     },
+     {
+      "base": "kd_damage",
+      "duration": 23,
+      "dframe": 13,
+      "namescore": 0.0
+     },
+     {
+      "base": "kd_fire",
+      "duration": 51,
+      "dframe": 15,
+      "namescore": 0.0
+     },
+     {
+      "base": "kd_wait",
+      "duration": 21,
+      "dframe": 15,
+      "namescore": 0.0
+     },
+     {
+      "base": "kd_down",
+      "duration": 20,
+      "dframe": 16,
+      "namescore": 0.0
+     },
+     {
+      "base": "kd_fire_damage",
+      "duration": 20,
+      "dframe": 16,
+      "namescore": 0.0
+     },
+     {
+      "base": "kd_walk_end",
+      "duration": 17,
+      "dframe": 19,
+      "namescore": 0.0
+     },
+     {
+      "base": "kd_walk_start",
+      "duration": 15,
+      "dframe": 21,
+      "namescore": 0.0
+     },
+     {
+      "base": "kd_walk",
+      "duration": 61,
+      "dframe": 25,
+      "namescore": 0.0
+     },
+     {
+      "base": "kd_die_a",
+      "duration": 68,
+      "dframe": 32,
+      "namescore": 1.0
+     },
+     {
+      "base": "kd_fire_standby",
+      "duration": 101,
+      "dframe": 65,
+      "namescore": 0.0
+     },
+     {
+      "base": "kd_rolling",
+      "duration": 115,
+      "dframe": 79,
+      "namescore": 0.0
+     },
+     {
+      "base": "kd_end",
+      "duration": 270,
+      "dframe": 234,
+      "namescore": 0.0
+     }
+    ]
+   },
+   {
+    "n64": "object_kingdodongo_Anim_00AA9C",
+    "otr": "objects/object_kingdodongo/object_kingdodongo_Anim_00AA9C",
+    "frameCount": 31,
+    "best": "kd_bombwait",
+    "candidates": [
+     {
+      "base": "kd_bombwait",
+      "duration": 31,
+      "dframe": 0,
+      "namescore": 0.0
+     },
+     {
+      "base": "kd_roll_standby",
+      "duration": 31,
+      "dframe": 0,
+      "namescore": 0.0
+     },
+     {
+      "base": "kd_die_b",
+      "duration": 30,
+      "dframe": 1,
+      "namescore": 1.0
+     },
+     {
+      "base": "kd_success",
+      "duration": 30,
+      "dframe": 1,
+      "namescore": 0.0
+     },
+     {
+      "base": "kd_explode",
+      "duration": 27,
+      "dframe": 4,
+      "namescore": 0.0
+     },
+     {
+      "base": "kd_getup",
+      "duration": 36,
+      "dframe": 5,
+      "namescore": 0.0
+     },
+     {
+      "base": "kd_damage",
+      "duration": 23,
+      "dframe": 8,
+      "namescore": 0.0
+     },
+     {
+      "base": "kd_wait",
+      "duration": 21,
+      "dframe": 10,
+      "namescore": 0.0
+     },
+     {
+      "base": "kd_down",
+      "duration": 20,
+      "dframe": 11,
+      "namescore": 0.0
+     },
+     {
+      "base": "kd_fire_damage",
+      "duration": 20,
+      "dframe": 11,
+      "namescore": 0.0
+     },
+     {
+      "base": "kd_walk_end",
+      "duration": 17,
+      "dframe": 14,
+      "namescore": 0.0
+     },
+     {
+      "base": "kd_walk_start",
+      "duration": 15,
+      "dframe": 16,
+      "namescore": 0.0
+     },
+     {
+      "base": "kd_fire",
+      "duration": 51,
+      "dframe": 20,
+      "namescore": 0.0
+     },
+     {
+      "base": "kd_walk",
+      "duration": 61,
+      "dframe": 30,
+      "namescore": 0.0
+     },
+     {
+      "base": "kd_die_a",
+      "duration": 68,
+      "dframe": 37,
+      "namescore": 1.0
+     },
+     {
+      "base": "kd_fire_standby",
+      "duration": 101,
+      "dframe": 70,
+      "namescore": 0.0
+     },
+     {
+      "base": "kd_rolling",
+      "duration": 115,
+      "dframe": 84,
+      "namescore": 0.0
+     },
+     {
+      "base": "kd_end",
+      "duration": 270,
+      "dframe": 239,
+      "namescore": 0.0
+     }
+    ]
+   },
+   {
+    "n64": "object_kingdodongo_Anim_00DF38",
+    "otr": "objects/object_kingdodongo/object_kingdodongo_Anim_00DF38",
+    "frameCount": 115,
+    "best": "kd_rolling",
+    "candidates": [
+     {
+      "base": "kd_rolling",
+      "duration": 115,
+      "dframe": 0,
+      "namescore": 0.0
+     },
+     {
+      "base": "kd_fire_standby",
+      "duration": 101,
+      "dframe": 14,
+      "namescore": 0.0
+     },
+     {
+      "base": "kd_die_a",
+      "duration": 68,
+      "dframe": 47,
+      "namescore": 1.0
+     },
+     {
+      "base": "kd_walk",
+      "duration": 61,
+      "dframe": 54,
+      "namescore": 0.0
+     },
+     {
+      "base": "kd_fire",
+      "duration": 51,
+      "dframe": 64,
+      "namescore": 0.0
+     },
+     {
+      "base": "kd_getup",
+      "duration": 36,
+      "dframe": 79,
+      "namescore": 0.0
+     },
+     {
+      "base": "kd_bombwait",
+      "duration": 31,
+      "dframe": 84,
+      "namescore": 0.0
+     },
+     {
+      "base": "kd_roll_standby",
+      "duration": 31,
+      "dframe": 84,
+      "namescore": 0.0
+     },
+     {
+      "base": "kd_die_b",
+      "duration": 30,
+      "dframe": 85,
+      "namescore": 1.0
+     },
+     {
+      "base": "kd_success",
+      "duration": 30,
+      "dframe": 85,
+      "namescore": 0.0
+     },
+     {
+      "base": "kd_explode",
+      "duration": 27,
+      "dframe": 88,
+      "namescore": 0.0
+     },
+     {
+      "base": "kd_damage",
+      "duration": 23,
+      "dframe": 92,
+      "namescore": 0.0
+     },
+     {
+      "base": "kd_wait",
+      "duration": 21,
+      "dframe": 94,
+      "namescore": 0.0
+     },
+     {
+      "base": "kd_down",
+      "duration": 20,
+      "dframe": 95,
+      "namescore": 0.0
+     },
+     {
+      "base": "kd_fire_damage",
+      "duration": 20,
+      "dframe": 95,
+      "namescore": 0.0
+     },
+     {
+      "base": "kd_walk_end",
+      "duration": 17,
+      "dframe": 98,
+      "namescore": 0.0
+     },
+     {
+      "base": "kd_walk_start",
+      "duration": 15,
+      "dframe": 100,
+      "namescore": 0.0
+     },
+     {
+      "base": "kd_end",
+      "duration": 270,
+      "dframe": 155,
+      "namescore": 0.0
+     }
+    ]
+   },
+   {
+    "n64": "object_kingdodongo_Anim_00E848",
+    "otr": "objects/object_kingdodongo/object_kingdodongo_Anim_00E848",
+    "frameCount": 30,
+    "best": "kd_die_b",
+    "candidates": [
+     {
+      "base": "kd_die_b",
+      "duration": 30,
+      "dframe": 0,
+      "namescore": 1.0
+     },
+     {
+      "base": "kd_success",
+      "duration": 30,
+      "dframe": 0,
+      "namescore": 0.0
+     },
+     {
+      "base": "kd_bombwait",
+      "duration": 31,
+      "dframe": 1,
+      "namescore": 0.0
+     },
+     {
+      "base": "kd_roll_standby",
+      "duration": 31,
+      "dframe": 1,
+      "namescore": 0.0
+     },
+     {
+      "base": "kd_explode",
+      "duration": 27,
+      "dframe": 3,
+      "namescore": 0.0
+     },
+     {
+      "base": "kd_getup",
+      "duration": 36,
+      "dframe": 6,
+      "namescore": 0.0
+     },
+     {
+      "base": "kd_damage",
+      "duration": 23,
+      "dframe": 7,
+      "namescore": 0.0
+     },
+     {
+      "base": "kd_wait",
+      "duration": 21,
+      "dframe": 9,
+      "namescore": 0.0
+     },
+     {
+      "base": "kd_down",
+      "duration": 20,
+      "dframe": 10,
+      "namescore": 0.0
+     },
+     {
+      "base": "kd_fire_damage",
+      "duration": 20,
+      "dframe": 10,
+      "namescore": 0.0
+     },
+     {
+      "base": "kd_walk_end",
+      "duration": 17,
+      "dframe": 13,
+      "namescore": 0.0
+     },
+     {
+      "base": "kd_walk_start",
+      "duration": 15,
+      "dframe": 15,
+      "namescore": 0.0
+     },
+     {
+      "base": "kd_fire",
+      "duration": 51,
+      "dframe": 21,
+      "namescore": 0.0
+     },
+     {
+      "base": "kd_walk",
+      "duration": 61,
+      "dframe": 31,
+      "namescore": 0.0
+     },
+     {
+      "base": "kd_die_a",
+      "duration": 68,
+      "dframe": 38,
+      "namescore": 1.0
+     },
+     {
+      "base": "kd_fire_standby",
+      "duration": 101,
+      "dframe": 71,
+      "namescore": 0.0
+     },
+     {
+      "base": "kd_rolling",
+      "duration": 115,
+      "dframe": 85,
+      "namescore": 0.0
+     },
+     {
+      "base": "kd_end",
+      "duration": 270,
+      "dframe": 240,
+      "namescore": 0.0
+     }
+    ]
+   },
+   {
+    "n64": "object_kingdodongo_Anim_00F0D8",
+    "otr": "objects/object_kingdodongo/object_kingdodongo_Anim_00F0D8",
+    "frameCount": 20,
+    "best": "kd_down",
+    "candidates": [
+     {
+      "base": "kd_down",
+      "duration": 20,
+      "dframe": 0,
+      "namescore": 0.0
+     },
+     {
+      "base": "kd_fire_damage",
+      "duration": 20,
+      "dframe": 0,
+      "namescore": 0.0
+     },
+     {
+      "base": "kd_wait",
+      "duration": 21,
+      "dframe": 1,
+      "namescore": 0.0
+     },
+     {
+      "base": "kd_damage",
+      "duration": 23,
+      "dframe": 3,
+      "namescore": 0.0
+     },
+     {
+      "base": "kd_walk_end",
+      "duration": 17,
+      "dframe": 3,
+      "namescore": 0.0
+     },
+     {
+      "base": "kd_walk_start",
+      "duration": 15,
+      "dframe": 5,
+      "namescore": 0.0
+     },
+     {
+      "base": "kd_explode",
+      "duration": 27,
+      "dframe": 7,
+      "namescore": 0.0
+     },
+     {
+      "base": "kd_die_b",
+      "duration": 30,
+      "dframe": 10,
+      "namescore": 1.0
+     },
+     {
+      "base": "kd_success",
+      "duration": 30,
+      "dframe": 10,
+      "namescore": 0.0
+     },
+     {
+      "base": "kd_bombwait",
+      "duration": 31,
+      "dframe": 11,
+      "namescore": 0.0
+     },
+     {
+      "base": "kd_roll_standby",
+      "duration": 31,
+      "dframe": 11,
+      "namescore": 0.0
+     },
+     {
+      "base": "kd_getup",
+      "duration": 36,
+      "dframe": 16,
+      "namescore": 0.0
+     },
+     {
+      "base": "kd_fire",
+      "duration": 51,
+      "dframe": 31,
+      "namescore": 0.0
+     },
+     {
+      "base": "kd_walk",
+      "duration": 61,
+      "dframe": 41,
+      "namescore": 0.0
+     },
+     {
+      "base": "kd_die_a",
+      "duration": 68,
+      "dframe": 48,
+      "namescore": 1.0
+     },
+     {
+      "base": "kd_fire_standby",
+      "duration": 101,
+      "dframe": 81,
+      "namescore": 0.0
+     },
+     {
+      "base": "kd_rolling",
+      "duration": 115,
+      "dframe": 95,
+      "namescore": 0.0
+     },
+     {
+      "base": "kd_end",
+      "duration": 270,
+      "dframe": 250,
+      "namescore": 0.0
+     }
+    ]
+   },
+   {
+    "n64": "object_kingdodongo_Anim_01CAE0",
+    "otr": "objects/object_kingdodongo/object_kingdodongo_Anim_01CAE0",
+    "frameCount": -29327,
+    "best": "kd_walk_start",
+    "candidates": [
+     {
+      "base": "kd_walk_start",
+      "duration": 15,
+      "dframe": 29342,
+      "namescore": 0.0
+     },
+     {
+      "base": "kd_walk_end",
+      "duration": 17,
+      "dframe": 29344,
+      "namescore": 0.0
+     },
+     {
+      "base": "kd_down",
+      "duration": 20,
+      "dframe": 29347,
+      "namescore": 0.0
+     },
+     {
+      "base": "kd_fire_damage",
+      "duration": 20,
+      "dframe": 29347,
+      "namescore": 0.0
+     },
+     {
+      "base": "kd_wait",
+      "duration": 21,
+      "dframe": 29348,
+      "namescore": 0.0
+     },
+     {
+      "base": "kd_damage",
+      "duration": 23,
+      "dframe": 29350,
+      "namescore": 0.0
+     },
+     {
+      "base": "kd_explode",
+      "duration": 27,
+      "dframe": 29354,
+      "namescore": 0.0
+     },
+     {
+      "base": "kd_die_b",
+      "duration": 30,
+      "dframe": 29357,
+      "namescore": 1.0
+     },
+     {
+      "base": "kd_success",
+      "duration": 30,
+      "dframe": 29357,
+      "namescore": 0.0
+     },
+     {
+      "base": "kd_bombwait",
+      "duration": 31,
+      "dframe": 29358,
+      "namescore": 0.0
+     },
+     {
+      "base": "kd_roll_standby",
+      "duration": 31,
+      "dframe": 29358,
+      "namescore": 0.0
+     },
+     {
+      "base": "kd_getup",
+      "duration": 36,
+      "dframe": 29363,
+      "namescore": 0.0
+     },
+     {
+      "base": "kd_fire",
+      "duration": 51,
+      "dframe": 29378,
+      "namescore": 0.0
+     },
+     {
+      "base": "kd_walk",
+      "duration": 61,
+      "dframe": 29388,
+      "namescore": 0.0
+     },
+     {
+      "base": "kd_die_a",
+      "duration": 68,
+      "dframe": 29395,
+      "namescore": 1.0
+     },
+     {
+      "base": "kd_fire_standby",
+      "duration": 101,
+      "dframe": 29428,
+      "namescore": 0.0
+     },
+     {
+      "base": "kd_rolling",
+      "duration": 115,
+      "dframe": 29442,
+      "namescore": 0.0
+     },
+     {
+      "base": "kd_end",
+      "duration": 270,
+      "dframe": 29597,
+      "namescore": 0.0
+     }
+    ]
+   },
+   {
+    "n64": "object_kingdodongo_Anim_01D218",
+    "otr": "objects/object_kingdodongo/object_kingdodongo_Anim_01D218",
+    "frameCount": -7716,
+    "best": "kd_walk_start",
+    "candidates": [
+     {
+      "base": "kd_walk_start",
+      "duration": 15,
+      "dframe": 7731,
+      "namescore": 0.0
+     },
+     {
+      "base": "kd_walk_end",
+      "duration": 17,
+      "dframe": 7733,
+      "namescore": 0.0
+     },
+     {
+      "base": "kd_down",
+      "duration": 20,
+      "dframe": 7736,
+      "namescore": 0.0
+     },
+     {
+      "base": "kd_fire_damage",
+      "duration": 20,
+      "dframe": 7736,
+      "namescore": 0.0
+     },
+     {
+      "base": "kd_wait",
+      "duration": 21,
+      "dframe": 7737,
+      "namescore": 0.0
+     },
+     {
+      "base": "kd_damage",
+      "duration": 23,
+      "dframe": 7739,
+      "namescore": 0.0
+     },
+     {
+      "base": "kd_explode",
+      "duration": 27,
+      "dframe": 7743,
+      "namescore": 0.0
+     },
+     {
+      "base": "kd_die_b",
+      "duration": 30,
+      "dframe": 7746,
+      "namescore": 1.0
+     },
+     {
+      "base": "kd_success",
+      "duration": 30,
+      "dframe": 7746,
+      "namescore": 0.0
+     },
+     {
+      "base": "kd_bombwait",
+      "duration": 31,
+      "dframe": 7747,
+      "namescore": 0.0
+     },
+     {
+      "base": "kd_roll_standby",
+      "duration": 31,
+      "dframe": 7747,
+      "namescore": 0.0
+     },
+     {
+      "base": "kd_getup",
+      "duration": 36,
+      "dframe": 7752,
+      "namescore": 0.0
+     },
+     {
+      "base": "kd_fire",
+      "duration": 51,
+      "dframe": 7767,
+      "namescore": 0.0
+     },
+     {
+      "base": "kd_walk",
+      "duration": 61,
+      "dframe": 7777,
+      "namescore": 0.0
+     },
+     {
+      "base": "kd_die_a",
+      "duration": 68,
+      "dframe": 7784,
+      "namescore": 1.0
+     },
+     {
+      "base": "kd_fire_standby",
+      "duration": 101,
+      "dframe": 7817,
+      "namescore": 0.0
+     },
+     {
+      "base": "kd_rolling",
+      "duration": 115,
+      "dframe": 7831,
+      "namescore": 0.0
+     },
+     {
+      "base": "kd_end",
+      "duration": 270,
+      "dframe": 7986,
+      "namescore": 0.0
+     }
+    ]
+   },
+   {
+    "n64": "object_kingdodongo_Anim_01D934",
+    "otr": "objects/object_kingdodongo/object_kingdodongo_Anim_01D934",
+    "frameCount": 0,
+    "best": "kd_walk_start",
+    "candidates": [
+     {
+      "base": "kd_walk_start",
+      "duration": 15,
+      "dframe": 15,
+      "namescore": 0.0
+     },
+     {
+      "base": "kd_walk_end",
+      "duration": 17,
+      "dframe": 17,
+      "namescore": 0.0
+     },
+     {
+      "base": "kd_down",
+      "duration": 20,
+      "dframe": 20,
+      "namescore": 0.0
+     },
+     {
+      "base": "kd_fire_damage",
+      "duration": 20,
+      "dframe": 20,
+      "namescore": 0.0
+     },
+     {
+      "base": "kd_wait",
+      "duration": 21,
+      "dframe": 21,
+      "namescore": 0.0
+     },
+     {
+      "base": "kd_damage",
+      "duration": 23,
+      "dframe": 23,
+      "namescore": 0.0
+     },
+     {
+      "base": "kd_explode",
+      "duration": 27,
+      "dframe": 27,
+      "namescore": 0.0
+     },
+     {
+      "base": "kd_die_b",
+      "duration": 30,
+      "dframe": 30,
+      "namescore": 1.0
+     },
+     {
+      "base": "kd_success",
+      "duration": 30,
+      "dframe": 30,
+      "namescore": 0.0
+     },
+     {
+      "base": "kd_bombwait",
+      "duration": 31,
+      "dframe": 31,
+      "namescore": 0.0
+     },
+     {
+      "base": "kd_roll_standby",
+      "duration": 31,
+      "dframe": 31,
+      "namescore": 0.0
+     },
+     {
+      "base": "kd_getup",
+      "duration": 36,
+      "dframe": 36,
+      "namescore": 0.0
+     },
+     {
+      "base": "kd_fire",
+      "duration": 51,
+      "dframe": 51,
+      "namescore": 0.0
+     },
+     {
+      "base": "kd_walk",
+      "duration": 61,
+      "dframe": 61,
+      "namescore": 0.0
+     },
+     {
+      "base": "kd_die_a",
+      "duration": 68,
+      "dframe": 68,
+      "namescore": 1.0
+     },
+     {
+      "base": "kd_fire_standby",
+      "duration": 101,
+      "dframe": 101,
+      "namescore": 0.0
+     },
+     {
+      "base": "kd_rolling",
+      "duration": 115,
+      "dframe": 115,
+      "namescore": 0.0
+     },
+     {
+      "base": "kd_end",
+      "duration": 270,
+      "dframe": 270,
+      "namescore": 0.0
      }
     ]
    }
@@ -45027,6 +48990,1440 @@
    }
   ]
  },
+ "/actor/zelda_nw.zar": {
+  "object": "object_niw",
+  "rows": [
+   {
+    "n64": "gCuccoAnim",
+    "otr": "objects/object_niw/gCuccoAnim",
+    "frameCount": 10,
+    "best": "nw_wait",
+    "candidates": [
+     {
+      "base": "nw_wait",
+      "duration": 11,
+      "dframe": 1,
+      "namescore": 0.0
+     }
+    ]
+   }
+  ]
+ },
+ "/actor/zelda_oF1d.zar": {
+  "object": "object_oF1d_map",
+  "rows": [
+   {
+    "n64": "gGoronAnim_000750",
+    "otr": "objects/object_oF1d_map/gGoronAnim_000750",
+    "frameCount": 25,
+    "best": "Goro_een",
+    "candidates": [
+     {
+      "base": "Goro_een",
+      "duration": 25,
+      "dframe": 0,
+      "namescore": 1.0
+     },
+     {
+      "base": "Goro_siku_siku",
+      "duration": 25,
+      "dframe": 0,
+      "namescore": 1.0
+     },
+     {
+      "base": "oF1d_chyu_goron",
+      "duration": 25,
+      "dframe": 0,
+      "namescore": 1.0
+     },
+     {
+      "base": "Goron_pikupiku",
+      "duration": 24,
+      "dframe": 1,
+      "namescore": 1.0
+     },
+     {
+      "base": "goron_demo_walk",
+      "duration": 26,
+      "dframe": 1,
+      "namescore": 1.0
+     },
+     {
+      "base": "oF1d_omise",
+      "duration": 23,
+      "dframe": 2,
+      "namescore": 0.0
+     },
+     {
+      "base": "oF1d_dai_goron_ii",
+      "duration": 21,
+      "dframe": 4,
+      "namescore": 1.0
+     },
+     {
+      "base": "Goron_mukuri",
+      "duration": 30,
+      "dframe": 5,
+      "namescore": 1.0
+     },
+     {
+      "base": "oF1d_yokoaruki",
+      "duration": 20,
+      "dframe": 5,
+      "namescore": 0.0
+     },
+     {
+      "base": "oF1d_dai_goron_megusuri",
+      "duration": 15,
+      "dframe": 10,
+      "namescore": 1.0
+     },
+     {
+      "base": "oF1d_konnnichiwa",
+      "duration": 41,
+      "dframe": 16,
+      "namescore": 0.0
+     },
+     {
+      "base": "Goron_poripori",
+      "duration": 44,
+      "dframe": 19,
+      "namescore": 1.0
+     },
+     {
+      "base": "oF1d_dai_goron_kaii",
+      "duration": 50,
+      "dframe": 25,
+      "namescore": 1.0
+     }
+    ]
+   },
+   {
+    "n64": "gGoronAnim_000D5C",
+    "otr": "objects/object_oF1d_map/gGoronAnim_000D5C",
+    "frameCount": 25,
+    "best": "Goro_een",
+    "candidates": [
+     {
+      "base": "Goro_een",
+      "duration": 25,
+      "dframe": 0,
+      "namescore": 1.0
+     },
+     {
+      "base": "Goro_siku_siku",
+      "duration": 25,
+      "dframe": 0,
+      "namescore": 1.0
+     },
+     {
+      "base": "oF1d_chyu_goron",
+      "duration": 25,
+      "dframe": 0,
+      "namescore": 1.0
+     },
+     {
+      "base": "Goron_pikupiku",
+      "duration": 24,
+      "dframe": 1,
+      "namescore": 1.0
+     },
+     {
+      "base": "goron_demo_walk",
+      "duration": 26,
+      "dframe": 1,
+      "namescore": 1.0
+     },
+     {
+      "base": "oF1d_omise",
+      "duration": 23,
+      "dframe": 2,
+      "namescore": 0.0
+     },
+     {
+      "base": "oF1d_dai_goron_ii",
+      "duration": 21,
+      "dframe": 4,
+      "namescore": 1.0
+     },
+     {
+      "base": "Goron_mukuri",
+      "duration": 30,
+      "dframe": 5,
+      "namescore": 1.0
+     },
+     {
+      "base": "oF1d_yokoaruki",
+      "duration": 20,
+      "dframe": 5,
+      "namescore": 0.0
+     },
+     {
+      "base": "oF1d_dai_goron_megusuri",
+      "duration": 15,
+      "dframe": 10,
+      "namescore": 1.0
+     },
+     {
+      "base": "oF1d_konnnichiwa",
+      "duration": 41,
+      "dframe": 16,
+      "namescore": 0.0
+     },
+     {
+      "base": "Goron_poripori",
+      "duration": 44,
+      "dframe": 19,
+      "namescore": 1.0
+     },
+     {
+      "base": "oF1d_dai_goron_kaii",
+      "duration": 50,
+      "dframe": 25,
+      "namescore": 1.0
+     }
+    ]
+   },
+   {
+    "n64": "gGoronAnim_00161C",
+    "otr": "objects/object_oF1d_map/gGoronAnim_00161C",
+    "frameCount": 30,
+    "best": "Goron_mukuri",
+    "candidates": [
+     {
+      "base": "Goron_mukuri",
+      "duration": 30,
+      "dframe": 0,
+      "namescore": 1.0
+     },
+     {
+      "base": "goron_demo_walk",
+      "duration": 26,
+      "dframe": 4,
+      "namescore": 1.0
+     },
+     {
+      "base": "Goro_een",
+      "duration": 25,
+      "dframe": 5,
+      "namescore": 1.0
+     },
+     {
+      "base": "Goro_siku_siku",
+      "duration": 25,
+      "dframe": 5,
+      "namescore": 1.0
+     },
+     {
+      "base": "oF1d_chyu_goron",
+      "duration": 25,
+      "dframe": 5,
+      "namescore": 1.0
+     },
+     {
+      "base": "Goron_pikupiku",
+      "duration": 24,
+      "dframe": 6,
+      "namescore": 1.0
+     },
+     {
+      "base": "oF1d_omise",
+      "duration": 23,
+      "dframe": 7,
+      "namescore": 0.0
+     },
+     {
+      "base": "oF1d_dai_goron_ii",
+      "duration": 21,
+      "dframe": 9,
+      "namescore": 1.0
+     },
+     {
+      "base": "oF1d_yokoaruki",
+      "duration": 20,
+      "dframe": 10,
+      "namescore": 0.0
+     },
+     {
+      "base": "oF1d_konnnichiwa",
+      "duration": 41,
+      "dframe": 11,
+      "namescore": 0.0
+     },
+     {
+      "base": "Goron_poripori",
+      "duration": 44,
+      "dframe": 14,
+      "namescore": 1.0
+     },
+     {
+      "base": "oF1d_dai_goron_megusuri",
+      "duration": 15,
+      "dframe": 15,
+      "namescore": 1.0
+     },
+     {
+      "base": "oF1d_dai_goron_kaii",
+      "duration": 50,
+      "dframe": 20,
+      "namescore": 1.0
+     }
+    ]
+   },
+   {
+    "n64": "gGoronAnim_001A00",
+    "otr": "objects/object_oF1d_map/gGoronAnim_001A00",
+    "frameCount": 23,
+    "best": "oF1d_omise",
+    "candidates": [
+     {
+      "base": "oF1d_omise",
+      "duration": 23,
+      "dframe": 0,
+      "namescore": 0.0
+     },
+     {
+      "base": "Goron_pikupiku",
+      "duration": 24,
+      "dframe": 1,
+      "namescore": 1.0
+     },
+     {
+      "base": "Goro_een",
+      "duration": 25,
+      "dframe": 2,
+      "namescore": 1.0
+     },
+     {
+      "base": "Goro_siku_siku",
+      "duration": 25,
+      "dframe": 2,
+      "namescore": 1.0
+     },
+     {
+      "base": "oF1d_chyu_goron",
+      "duration": 25,
+      "dframe": 2,
+      "namescore": 1.0
+     },
+     {
+      "base": "oF1d_dai_goron_ii",
+      "duration": 21,
+      "dframe": 2,
+      "namescore": 1.0
+     },
+     {
+      "base": "goron_demo_walk",
+      "duration": 26,
+      "dframe": 3,
+      "namescore": 1.0
+     },
+     {
+      "base": "oF1d_yokoaruki",
+      "duration": 20,
+      "dframe": 3,
+      "namescore": 0.0
+     },
+     {
+      "base": "Goron_mukuri",
+      "duration": 30,
+      "dframe": 7,
+      "namescore": 1.0
+     },
+     {
+      "base": "oF1d_dai_goron_megusuri",
+      "duration": 15,
+      "dframe": 8,
+      "namescore": 1.0
+     },
+     {
+      "base": "oF1d_konnnichiwa",
+      "duration": 41,
+      "dframe": 18,
+      "namescore": 0.0
+     },
+     {
+      "base": "Goron_poripori",
+      "duration": 44,
+      "dframe": 21,
+      "namescore": 1.0
+     },
+     {
+      "base": "oF1d_dai_goron_kaii",
+      "duration": 50,
+      "dframe": 27,
+      "namescore": 1.0
+     }
+    ]
+   },
+   {
+    "n64": "gGoronAnim_0021D0",
+    "otr": "objects/object_oF1d_map/gGoronAnim_0021D0",
+    "frameCount": 31,
+    "best": "Goron_mukuri",
+    "candidates": [
+     {
+      "base": "Goron_mukuri",
+      "duration": 30,
+      "dframe": 1,
+      "namescore": 1.0
+     },
+     {
+      "base": "goron_demo_walk",
+      "duration": 26,
+      "dframe": 5,
+      "namescore": 1.0
+     },
+     {
+      "base": "Goro_een",
+      "duration": 25,
+      "dframe": 6,
+      "namescore": 1.0
+     },
+     {
+      "base": "Goro_siku_siku",
+      "duration": 25,
+      "dframe": 6,
+      "namescore": 1.0
+     },
+     {
+      "base": "oF1d_chyu_goron",
+      "duration": 25,
+      "dframe": 6,
+      "namescore": 1.0
+     },
+     {
+      "base": "Goron_pikupiku",
+      "duration": 24,
+      "dframe": 7,
+      "namescore": 1.0
+     },
+     {
+      "base": "oF1d_omise",
+      "duration": 23,
+      "dframe": 8,
+      "namescore": 0.0
+     },
+     {
+      "base": "oF1d_dai_goron_ii",
+      "duration": 21,
+      "dframe": 10,
+      "namescore": 1.0
+     },
+     {
+      "base": "oF1d_konnnichiwa",
+      "duration": 41,
+      "dframe": 10,
+      "namescore": 0.0
+     },
+     {
+      "base": "oF1d_yokoaruki",
+      "duration": 20,
+      "dframe": 11,
+      "namescore": 0.0
+     },
+     {
+      "base": "Goron_poripori",
+      "duration": 44,
+      "dframe": 13,
+      "namescore": 1.0
+     },
+     {
+      "base": "oF1d_dai_goron_megusuri",
+      "duration": 15,
+      "dframe": 16,
+      "namescore": 1.0
+     },
+     {
+      "base": "oF1d_dai_goron_kaii",
+      "duration": 50,
+      "dframe": 19,
+      "namescore": 1.0
+     }
+    ]
+   },
+   {
+    "n64": "gGoronAnim_0029A8",
+    "otr": "objects/object_oF1d_map/gGoronAnim_0029A8",
+    "frameCount": 26,
+    "best": "goron_demo_walk",
+    "candidates": [
+     {
+      "base": "goron_demo_walk",
+      "duration": 26,
+      "dframe": 0,
+      "namescore": 1.0
+     },
+     {
+      "base": "Goro_een",
+      "duration": 25,
+      "dframe": 1,
+      "namescore": 1.0
+     },
+     {
+      "base": "Goro_siku_siku",
+      "duration": 25,
+      "dframe": 1,
+      "namescore": 1.0
+     },
+     {
+      "base": "oF1d_chyu_goron",
+      "duration": 25,
+      "dframe": 1,
+      "namescore": 1.0
+     },
+     {
+      "base": "Goron_pikupiku",
+      "duration": 24,
+      "dframe": 2,
+      "namescore": 1.0
+     },
+     {
+      "base": "oF1d_omise",
+      "duration": 23,
+      "dframe": 3,
+      "namescore": 0.0
+     },
+     {
+      "base": "Goron_mukuri",
+      "duration": 30,
+      "dframe": 4,
+      "namescore": 1.0
+     },
+     {
+      "base": "oF1d_dai_goron_ii",
+      "duration": 21,
+      "dframe": 5,
+      "namescore": 1.0
+     },
+     {
+      "base": "oF1d_yokoaruki",
+      "duration": 20,
+      "dframe": 6,
+      "namescore": 0.0
+     },
+     {
+      "base": "oF1d_dai_goron_megusuri",
+      "duration": 15,
+      "dframe": 11,
+      "namescore": 1.0
+     },
+     {
+      "base": "oF1d_konnnichiwa",
+      "duration": 41,
+      "dframe": 15,
+      "namescore": 0.0
+     },
+     {
+      "base": "Goron_poripori",
+      "duration": 44,
+      "dframe": 18,
+      "namescore": 1.0
+     },
+     {
+      "base": "oF1d_dai_goron_kaii",
+      "duration": 50,
+      "dframe": 24,
+      "namescore": 1.0
+     }
+    ]
+   },
+   {
+    "n64": "gGoronAnim_002D80",
+    "otr": "objects/object_oF1d_map/gGoronAnim_002D80",
+    "frameCount": 21,
+    "best": "oF1d_dai_goron_ii",
+    "candidates": [
+     {
+      "base": "oF1d_dai_goron_ii",
+      "duration": 21,
+      "dframe": 0,
+      "namescore": 1.0
+     },
+     {
+      "base": "oF1d_yokoaruki",
+      "duration": 20,
+      "dframe": 1,
+      "namescore": 0.0
+     },
+     {
+      "base": "oF1d_omise",
+      "duration": 23,
+      "dframe": 2,
+      "namescore": 0.0
+     },
+     {
+      "base": "Goron_pikupiku",
+      "duration": 24,
+      "dframe": 3,
+      "namescore": 1.0
+     },
+     {
+      "base": "Goro_een",
+      "duration": 25,
+      "dframe": 4,
+      "namescore": 1.0
+     },
+     {
+      "base": "Goro_siku_siku",
+      "duration": 25,
+      "dframe": 4,
+      "namescore": 1.0
+     },
+     {
+      "base": "oF1d_chyu_goron",
+      "duration": 25,
+      "dframe": 4,
+      "namescore": 1.0
+     },
+     {
+      "base": "goron_demo_walk",
+      "duration": 26,
+      "dframe": 5,
+      "namescore": 1.0
+     },
+     {
+      "base": "oF1d_dai_goron_megusuri",
+      "duration": 15,
+      "dframe": 6,
+      "namescore": 1.0
+     },
+     {
+      "base": "Goron_mukuri",
+      "duration": 30,
+      "dframe": 9,
+      "namescore": 1.0
+     },
+     {
+      "base": "oF1d_konnnichiwa",
+      "duration": 41,
+      "dframe": 20,
+      "namescore": 0.0
+     },
+     {
+      "base": "Goron_poripori",
+      "duration": 44,
+      "dframe": 23,
+      "namescore": 1.0
+     },
+     {
+      "base": "oF1d_dai_goron_kaii",
+      "duration": 50,
+      "dframe": 29,
+      "namescore": 1.0
+     }
+    ]
+   },
+   {
+    "n64": "gGoronAnim_003768",
+    "otr": "objects/object_oF1d_map/gGoronAnim_003768",
+    "frameCount": 50,
+    "best": "oF1d_dai_goron_kaii",
+    "candidates": [
+     {
+      "base": "oF1d_dai_goron_kaii",
+      "duration": 50,
+      "dframe": 0,
+      "namescore": 1.0
+     },
+     {
+      "base": "Goron_poripori",
+      "duration": 44,
+      "dframe": 6,
+      "namescore": 1.0
+     },
+     {
+      "base": "oF1d_konnnichiwa",
+      "duration": 41,
+      "dframe": 9,
+      "namescore": 0.0
+     },
+     {
+      "base": "Goron_mukuri",
+      "duration": 30,
+      "dframe": 20,
+      "namescore": 1.0
+     },
+     {
+      "base": "goron_demo_walk",
+      "duration": 26,
+      "dframe": 24,
+      "namescore": 1.0
+     },
+     {
+      "base": "Goro_een",
+      "duration": 25,
+      "dframe": 25,
+      "namescore": 1.0
+     },
+     {
+      "base": "Goro_siku_siku",
+      "duration": 25,
+      "dframe": 25,
+      "namescore": 1.0
+     },
+     {
+      "base": "oF1d_chyu_goron",
+      "duration": 25,
+      "dframe": 25,
+      "namescore": 1.0
+     },
+     {
+      "base": "Goron_pikupiku",
+      "duration": 24,
+      "dframe": 26,
+      "namescore": 1.0
+     },
+     {
+      "base": "oF1d_omise",
+      "duration": 23,
+      "dframe": 27,
+      "namescore": 0.0
+     },
+     {
+      "base": "oF1d_dai_goron_ii",
+      "duration": 21,
+      "dframe": 29,
+      "namescore": 1.0
+     },
+     {
+      "base": "oF1d_yokoaruki",
+      "duration": 20,
+      "dframe": 30,
+      "namescore": 0.0
+     },
+     {
+      "base": "oF1d_dai_goron_megusuri",
+      "duration": 15,
+      "dframe": 35,
+      "namescore": 1.0
+     }
+    ]
+   },
+   {
+    "n64": "gGoronAnim_0038E4",
+    "otr": "objects/object_oF1d_map/gGoronAnim_0038E4",
+    "frameCount": 15,
+    "best": "oF1d_dai_goron_megusuri",
+    "candidates": [
+     {
+      "base": "oF1d_dai_goron_megusuri",
+      "duration": 15,
+      "dframe": 0,
+      "namescore": 1.0
+     },
+     {
+      "base": "oF1d_yokoaruki",
+      "duration": 20,
+      "dframe": 5,
+      "namescore": 0.0
+     },
+     {
+      "base": "oF1d_dai_goron_ii",
+      "duration": 21,
+      "dframe": 6,
+      "namescore": 1.0
+     },
+     {
+      "base": "oF1d_omise",
+      "duration": 23,
+      "dframe": 8,
+      "namescore": 0.0
+     },
+     {
+      "base": "Goron_pikupiku",
+      "duration": 24,
+      "dframe": 9,
+      "namescore": 1.0
+     },
+     {
+      "base": "Goro_een",
+      "duration": 25,
+      "dframe": 10,
+      "namescore": 1.0
+     },
+     {
+      "base": "Goro_siku_siku",
+      "duration": 25,
+      "dframe": 10,
+      "namescore": 1.0
+     },
+     {
+      "base": "oF1d_chyu_goron",
+      "duration": 25,
+      "dframe": 10,
+      "namescore": 1.0
+     },
+     {
+      "base": "goron_demo_walk",
+      "duration": 26,
+      "dframe": 11,
+      "namescore": 1.0
+     },
+     {
+      "base": "Goron_mukuri",
+      "duration": 30,
+      "dframe": 15,
+      "namescore": 1.0
+     },
+     {
+      "base": "oF1d_konnnichiwa",
+      "duration": 41,
+      "dframe": 26,
+      "namescore": 0.0
+     },
+     {
+      "base": "Goron_poripori",
+      "duration": 44,
+      "dframe": 29,
+      "namescore": 1.0
+     },
+     {
+      "base": "oF1d_dai_goron_kaii",
+      "duration": 50,
+      "dframe": 35,
+      "namescore": 1.0
+     }
+    ]
+   },
+   {
+    "n64": "gGoronAnim_004930",
+    "otr": "objects/object_oF1d_map/gGoronAnim_004930",
+    "frameCount": 53,
+    "best": "oF1d_dai_goron_kaii",
+    "candidates": [
+     {
+      "base": "oF1d_dai_goron_kaii",
+      "duration": 50,
+      "dframe": 3,
+      "namescore": 1.0
+     },
+     {
+      "base": "Goron_poripori",
+      "duration": 44,
+      "dframe": 9,
+      "namescore": 1.0
+     },
+     {
+      "base": "oF1d_konnnichiwa",
+      "duration": 41,
+      "dframe": 12,
+      "namescore": 0.0
+     },
+     {
+      "base": "Goron_mukuri",
+      "duration": 30,
+      "dframe": 23,
+      "namescore": 1.0
+     },
+     {
+      "base": "goron_demo_walk",
+      "duration": 26,
+      "dframe": 27,
+      "namescore": 1.0
+     },
+     {
+      "base": "Goro_een",
+      "duration": 25,
+      "dframe": 28,
+      "namescore": 1.0
+     },
+     {
+      "base": "Goro_siku_siku",
+      "duration": 25,
+      "dframe": 28,
+      "namescore": 1.0
+     },
+     {
+      "base": "oF1d_chyu_goron",
+      "duration": 25,
+      "dframe": 28,
+      "namescore": 1.0
+     },
+     {
+      "base": "Goron_pikupiku",
+      "duration": 24,
+      "dframe": 29,
+      "namescore": 1.0
+     },
+     {
+      "base": "oF1d_omise",
+      "duration": 23,
+      "dframe": 30,
+      "namescore": 0.0
+     },
+     {
+      "base": "oF1d_dai_goron_ii",
+      "duration": 21,
+      "dframe": 32,
+      "namescore": 1.0
+     },
+     {
+      "base": "oF1d_yokoaruki",
+      "duration": 20,
+      "dframe": 33,
+      "namescore": 0.0
+     },
+     {
+      "base": "oF1d_dai_goron_megusuri",
+      "duration": 15,
+      "dframe": 38,
+      "namescore": 1.0
+     }
+    ]
+   },
+   {
+    "n64": "gGoronAnim_010590",
+    "otr": "objects/object_oF1d_map/gGoronAnim_010590",
+    "frameCount": 20,
+    "best": "oF1d_yokoaruki",
+    "candidates": [
+     {
+      "base": "oF1d_yokoaruki",
+      "duration": 20,
+      "dframe": 0,
+      "namescore": 0.0
+     },
+     {
+      "base": "oF1d_dai_goron_ii",
+      "duration": 21,
+      "dframe": 1,
+      "namescore": 1.0
+     },
+     {
+      "base": "oF1d_omise",
+      "duration": 23,
+      "dframe": 3,
+      "namescore": 0.0
+     },
+     {
+      "base": "Goron_pikupiku",
+      "duration": 24,
+      "dframe": 4,
+      "namescore": 1.0
+     },
+     {
+      "base": "Goro_een",
+      "duration": 25,
+      "dframe": 5,
+      "namescore": 1.0
+     },
+     {
+      "base": "Goro_siku_siku",
+      "duration": 25,
+      "dframe": 5,
+      "namescore": 1.0
+     },
+     {
+      "base": "oF1d_chyu_goron",
+      "duration": 25,
+      "dframe": 5,
+      "namescore": 1.0
+     },
+     {
+      "base": "oF1d_dai_goron_megusuri",
+      "duration": 15,
+      "dframe": 5,
+      "namescore": 1.0
+     },
+     {
+      "base": "goron_demo_walk",
+      "duration": 26,
+      "dframe": 6,
+      "namescore": 1.0
+     },
+     {
+      "base": "Goron_mukuri",
+      "duration": 30,
+      "dframe": 10,
+      "namescore": 1.0
+     },
+     {
+      "base": "oF1d_konnnichiwa",
+      "duration": 41,
+      "dframe": 21,
+      "namescore": 0.0
+     },
+     {
+      "base": "Goron_poripori",
+      "duration": 44,
+      "dframe": 24,
+      "namescore": 1.0
+     },
+     {
+      "base": "oF1d_dai_goron_kaii",
+      "duration": 50,
+      "dframe": 30,
+      "namescore": 1.0
+     }
+    ]
+   }
+  ]
+ },
+ "/actor/zelda_oc2.zar": {
+  "object": "object_okuta",
+  "rows": [
+   {
+    "n64": "gOctorokShootAnim",
+    "otr": "objects/object_okuta/gOctorokShootAnim",
+    "frameCount": 20,
+    "best": "oc_up",
+    "candidates": [
+     {
+      "base": "oc_up",
+      "duration": 21,
+      "dframe": 1,
+      "namescore": 1.0
+     },
+     {
+      "base": "oc_atack",
+      "duration": 21,
+      "dframe": 1,
+      "namescore": 1.0
+     },
+     {
+      "base": "oc_float",
+      "duration": 17,
+      "dframe": 3,
+      "namescore": 1.0
+     },
+     {
+      "base": "oc_dead",
+      "duration": 26,
+      "dframe": 6,
+      "namescore": 1.0
+     },
+     {
+      "base": "oc_predead",
+      "duration": 13,
+      "dframe": 7,
+      "namescore": 1.0
+     },
+     {
+      "base": "oc_down",
+      "duration": 8,
+      "dframe": 12,
+      "namescore": 1.0
+     }
+    ]
+   },
+   {
+    "n64": "gOctorokDieAnim",
+    "otr": "objects/object_okuta/gOctorokDieAnim",
+    "frameCount": 25,
+    "best": "oc_dead",
+    "candidates": [
+     {
+      "base": "oc_dead",
+      "duration": 26,
+      "dframe": 1,
+      "namescore": 1.0
+     },
+     {
+      "base": "oc_up",
+      "duration": 21,
+      "dframe": 4,
+      "namescore": 1.0
+     },
+     {
+      "base": "oc_atack",
+      "duration": 21,
+      "dframe": 4,
+      "namescore": 1.0
+     },
+     {
+      "base": "oc_float",
+      "duration": 17,
+      "dframe": 8,
+      "namescore": 1.0
+     },
+     {
+      "base": "oc_predead",
+      "duration": 13,
+      "dframe": 12,
+      "namescore": 1.0
+     },
+     {
+      "base": "oc_down",
+      "duration": 8,
+      "dframe": 17,
+      "namescore": 1.0
+     }
+    ]
+   },
+   {
+    "n64": "gOctorokHideAnim",
+    "otr": "objects/object_okuta/gOctorokHideAnim",
+    "frameCount": 7,
+    "best": "oc_down",
+    "candidates": [
+     {
+      "base": "oc_down",
+      "duration": 8,
+      "dframe": 1,
+      "namescore": 1.0
+     },
+     {
+      "base": "oc_predead",
+      "duration": 13,
+      "dframe": 6,
+      "namescore": 1.0
+     },
+     {
+      "base": "oc_float",
+      "duration": 17,
+      "dframe": 10,
+      "namescore": 1.0
+     },
+     {
+      "base": "oc_up",
+      "duration": 21,
+      "dframe": 14,
+      "namescore": 1.0
+     },
+     {
+      "base": "oc_atack",
+      "duration": 21,
+      "dframe": 14,
+      "namescore": 1.0
+     },
+     {
+      "base": "oc_dead",
+      "duration": 26,
+      "dframe": 19,
+      "namescore": 1.0
+     }
+    ]
+   },
+   {
+    "n64": "gOctorokFloatAnim",
+    "otr": "objects/object_okuta/gOctorokFloatAnim",
+    "frameCount": 16,
+    "best": "oc_float",
+    "candidates": [
+     {
+      "base": "oc_float",
+      "duration": 17,
+      "dframe": 1,
+      "namescore": 1.0
+     },
+     {
+      "base": "oc_predead",
+      "duration": 13,
+      "dframe": 3,
+      "namescore": 1.0
+     },
+     {
+      "base": "oc_up",
+      "duration": 21,
+      "dframe": 5,
+      "namescore": 1.0
+     },
+     {
+      "base": "oc_atack",
+      "duration": 21,
+      "dframe": 5,
+      "namescore": 1.0
+     },
+     {
+      "base": "oc_down",
+      "duration": 8,
+      "dframe": 8,
+      "namescore": 1.0
+     },
+     {
+      "base": "oc_dead",
+      "duration": 26,
+      "dframe": 10,
+      "namescore": 1.0
+     }
+    ]
+   },
+   {
+    "n64": "gOctorokHitAnim",
+    "otr": "objects/object_okuta/gOctorokHitAnim",
+    "frameCount": 12,
+    "best": "oc_predead",
+    "candidates": [
+     {
+      "base": "oc_predead",
+      "duration": 13,
+      "dframe": 1,
+      "namescore": 1.0
+     },
+     {
+      "base": "oc_down",
+      "duration": 8,
+      "dframe": 4,
+      "namescore": 1.0
+     },
+     {
+      "base": "oc_float",
+      "duration": 17,
+      "dframe": 5,
+      "namescore": 1.0
+     },
+     {
+      "base": "oc_up",
+      "duration": 21,
+      "dframe": 9,
+      "namescore": 1.0
+     },
+     {
+      "base": "oc_atack",
+      "duration": 21,
+      "dframe": 9,
+      "namescore": 1.0
+     },
+     {
+      "base": "oc_dead",
+      "duration": 26,
+      "dframe": 14,
+      "namescore": 1.0
+     }
+    ]
+   },
+   {
+    "n64": "gOctorokAppearAnim",
+    "otr": "objects/object_okuta/gOctorokAppearAnim",
+    "frameCount": 20,
+    "best": "oc_up",
+    "candidates": [
+     {
+      "base": "oc_up",
+      "duration": 21,
+      "dframe": 1,
+      "namescore": 1.0
+     },
+     {
+      "base": "oc_atack",
+      "duration": 21,
+      "dframe": 1,
+      "namescore": 1.0
+     },
+     {
+      "base": "oc_float",
+      "duration": 17,
+      "dframe": 3,
+      "namescore": 1.0
+     },
+     {
+      "base": "oc_dead",
+      "duration": 26,
+      "dframe": 6,
+      "namescore": 1.0
+     },
+     {
+      "base": "oc_predead",
+      "duration": 13,
+      "dframe": 7,
+      "namescore": 1.0
+     },
+     {
+      "base": "oc_down",
+      "duration": 8,
+      "dframe": 12,
+      "namescore": 1.0
+     }
+    ]
+   }
+  ]
+ },
+ "/actor/zelda_ocd.zar": {
+  "object": "object_bigokuta",
+  "rows": [
+   {
+    "n64": "object_bigokuta_Anim_000444",
+    "otr": "objects/object_bigokuta/object_bigokuta_Anim_000444",
+    "frameCount": 13,
+    "best": "ocd_damagejump",
+    "candidates": [
+     {
+      "base": "ocd_damagejump",
+      "duration": 14,
+      "dframe": 1,
+      "namescore": 0.0
+     },
+     {
+      "base": "ocd_stop",
+      "duration": 9,
+      "dframe": 4,
+      "namescore": 0.0
+     },
+     {
+      "base": "ocd_dead",
+      "duration": 21,
+      "dframe": 8,
+      "namescore": 0.0
+     },
+     {
+      "base": "ocd_walk",
+      "duration": 25,
+      "dframe": 12,
+      "namescore": 0.0
+     },
+     {
+      "base": "ocd_wait",
+      "duration": 30,
+      "dframe": 17,
+      "namescore": 0.0
+     }
+    ]
+   },
+   {
+    "n64": "object_bigokuta_Anim_000A74",
+    "otr": "objects/object_bigokuta/object_bigokuta_Anim_000A74",
+    "frameCount": 17,
+    "best": "ocd_damagejump",
+    "candidates": [
+     {
+      "base": "ocd_damagejump",
+      "duration": 14,
+      "dframe": 3,
+      "namescore": 0.0
+     },
+     {
+      "base": "ocd_dead",
+      "duration": 21,
+      "dframe": 4,
+      "namescore": 0.0
+     },
+     {
+      "base": "ocd_walk",
+      "duration": 25,
+      "dframe": 8,
+      "namescore": 0.0
+     },
+     {
+      "base": "ocd_stop",
+      "duration": 9,
+      "dframe": 8,
+      "namescore": 0.0
+     },
+     {
+      "base": "ocd_wait",
+      "duration": 30,
+      "dframe": 13,
+      "namescore": 0.0
+     }
+    ]
+   },
+   {
+    "n64": "object_bigokuta_Anim_000D1C",
+    "otr": "objects/object_bigokuta/object_bigokuta_Anim_000D1C",
+    "frameCount": 8,
+    "best": "ocd_stop",
+    "candidates": [
+     {
+      "base": "ocd_stop",
+      "duration": 9,
+      "dframe": 1,
+      "namescore": 0.0
+     },
+     {
+      "base": "ocd_damagejump",
+      "duration": 14,
+      "dframe": 6,
+      "namescore": 0.0
+     },
+     {
+      "base": "ocd_dead",
+      "duration": 21,
+      "dframe": 13,
+      "namescore": 0.0
+     },
+     {
+      "base": "ocd_walk",
+      "duration": 25,
+      "dframe": 17,
+      "namescore": 0.0
+     },
+     {
+      "base": "ocd_wait",
+      "duration": 30,
+      "dframe": 22,
+      "namescore": 0.0
+     }
+    ]
+   },
+   {
+    "n64": "object_bigokuta_Anim_0014B8",
+    "otr": "objects/object_bigokuta/object_bigokuta_Anim_0014B8",
+    "frameCount": 20,
+    "best": "ocd_dead",
+    "candidates": [
+     {
+      "base": "ocd_dead",
+      "duration": 21,
+      "dframe": 1,
+      "namescore": 0.0
+     },
+     {
+      "base": "ocd_walk",
+      "duration": 25,
+      "dframe": 5,
+      "namescore": 0.0
+     },
+     {
+      "base": "ocd_damagejump",
+      "duration": 14,
+      "dframe": 6,
+      "namescore": 0.0
+     },
+     {
+      "base": "ocd_wait",
+      "duration": 30,
+      "dframe": 10,
+      "namescore": 0.0
+     },
+     {
+      "base": "ocd_stop",
+      "duration": 9,
+      "dframe": 11,
+      "namescore": 0.0
+     }
+    ]
+   },
+   {
+    "n64": "object_bigokuta_Anim_001CA4",
+    "otr": "objects/object_bigokuta/object_bigokuta_Anim_001CA4",
+    "frameCount": 24,
+    "best": "ocd_walk",
+    "candidates": [
+     {
+      "base": "ocd_walk",
+      "duration": 25,
+      "dframe": 1,
+      "namescore": 0.0
+     },
+     {
+      "base": "ocd_dead",
+      "duration": 21,
+      "dframe": 3,
+      "namescore": 0.0
+     },
+     {
+      "base": "ocd_wait",
+      "duration": 30,
+      "dframe": 6,
+      "namescore": 0.0
+     },
+     {
+      "base": "ocd_damagejump",
+      "duration": 14,
+      "dframe": 10,
+      "namescore": 0.0
+     },
+     {
+      "base": "ocd_stop",
+      "duration": 9,
+      "dframe": 15,
+      "namescore": 0.0
+     }
+    ]
+   }
+  ]
+ },
  "/actor/zelda_os.zar": {
   "object": "object_os",
   "rows": [
@@ -45236,6 +50633,408 @@
       "duration": 60,
       "dframe": 40,
       "namescore": 0.0
+     }
+    ]
+   }
+  ]
+ },
+ "/actor/zelda_ph.zar": {
+  "object": "object_peehat",
+  "rows": [
+   {
+    "n64": "gPeehatLandingAnim",
+    "otr": "objects/object_peehat/gPeehatLandingAnim",
+    "frameCount": 49,
+    "best": "ph_end",
+    "candidates": [
+     {
+      "base": "ph_end",
+      "duration": 50,
+      "dframe": 1,
+      "namescore": 0.0
+     },
+     {
+      "base": "ph_fly",
+      "duration": 33,
+      "dframe": 16,
+      "namescore": 0.0
+     },
+     {
+      "base": "ph_shock",
+      "duration": 33,
+      "dframe": 16,
+      "namescore": 0.0
+     },
+     {
+      "base": "ph_start",
+      "duration": 17,
+      "dframe": 32,
+      "namescore": 0.0
+     }
+    ]
+   },
+   {
+    "n64": "gPeehatFlyingAnim",
+    "otr": "objects/object_peehat/gPeehatFlyingAnim",
+    "frameCount": 32,
+    "best": "ph_fly",
+    "candidates": [
+     {
+      "base": "ph_fly",
+      "duration": 33,
+      "dframe": 1,
+      "namescore": 1.0
+     },
+     {
+      "base": "ph_shock",
+      "duration": 33,
+      "dframe": 1,
+      "namescore": 0.0
+     },
+     {
+      "base": "ph_start",
+      "duration": 17,
+      "dframe": 15,
+      "namescore": 0.0
+     },
+     {
+      "base": "ph_end",
+      "duration": 50,
+      "dframe": 18,
+      "namescore": 0.0
+     }
+    ]
+   },
+   {
+    "n64": "gPeehatRecoilAnim",
+    "otr": "objects/object_peehat/gPeehatRecoilAnim",
+    "frameCount": 32,
+    "best": "ph_fly",
+    "candidates": [
+     {
+      "base": "ph_fly",
+      "duration": 33,
+      "dframe": 1,
+      "namescore": 0.0
+     },
+     {
+      "base": "ph_shock",
+      "duration": 33,
+      "dframe": 1,
+      "namescore": 0.0
+     },
+     {
+      "base": "ph_start",
+      "duration": 17,
+      "dframe": 15,
+      "namescore": 0.0
+     },
+     {
+      "base": "ph_end",
+      "duration": 50,
+      "dframe": 18,
+      "namescore": 0.0
+     }
+    ]
+   },
+   {
+    "n64": "gPeehatRisingAnim",
+    "otr": "objects/object_peehat/gPeehatRisingAnim",
+    "frameCount": 16,
+    "best": "ph_start",
+    "candidates": [
+     {
+      "base": "ph_start",
+      "duration": 17,
+      "dframe": 1,
+      "namescore": 0.0
+     },
+     {
+      "base": "ph_fly",
+      "duration": 33,
+      "dframe": 17,
+      "namescore": 0.0
+     },
+     {
+      "base": "ph_shock",
+      "duration": 33,
+      "dframe": 17,
+      "namescore": 0.0
+     },
+     {
+      "base": "ph_end",
+      "duration": 50,
+      "dframe": 34,
+      "namescore": 0.0
+     }
+    ]
+   }
+  ]
+ },
+ "/actor/zelda_po.zar": {
+  "object": "object_poh",
+  "rows": [
+   {
+    "n64": "gPoeAttackAnim",
+    "otr": "objects/object_poh/gPoeAttackAnim",
+    "frameCount": 8,
+    "best": "po_escape",
+    "candidates": [
+     {
+      "base": "po_escape",
+      "duration": 8,
+      "dframe": 0,
+      "namescore": 1.0
+     },
+     {
+      "base": "po_atack",
+      "duration": 12,
+      "dframe": 4,
+      "namescore": 1.0
+     },
+     {
+      "base": "po_fly",
+      "duration": 16,
+      "dframe": 8,
+      "namescore": 1.0
+     },
+     {
+      "base": "po_damage",
+      "duration": 16,
+      "dframe": 8,
+      "namescore": 1.0
+     },
+     {
+      "base": "po_wait",
+      "duration": 20,
+      "dframe": 12,
+      "namescore": 1.0
+     },
+     {
+      "base": "po_start",
+      "duration": 30,
+      "dframe": 22,
+      "namescore": 1.0
+     }
+    ]
+   },
+   {
+    "n64": "gPoeDamagedAnim",
+    "otr": "objects/object_poh/gPoeDamagedAnim",
+    "frameCount": 16,
+    "best": "po_fly",
+    "candidates": [
+     {
+      "base": "po_fly",
+      "duration": 16,
+      "dframe": 0,
+      "namescore": 1.0
+     },
+     {
+      "base": "po_damage",
+      "duration": 16,
+      "dframe": 0,
+      "namescore": 1.0
+     },
+     {
+      "base": "po_wait",
+      "duration": 20,
+      "dframe": 4,
+      "namescore": 1.0
+     },
+     {
+      "base": "po_atack",
+      "duration": 12,
+      "dframe": 4,
+      "namescore": 1.0
+     },
+     {
+      "base": "po_escape",
+      "duration": 8,
+      "dframe": 8,
+      "namescore": 1.0
+     },
+     {
+      "base": "po_start",
+      "duration": 30,
+      "dframe": 14,
+      "namescore": 1.0
+     }
+    ]
+   },
+   {
+    "n64": "gPoeFleeAnim",
+    "otr": "objects/object_poh/gPoeFleeAnim",
+    "frameCount": 8,
+    "best": "po_escape",
+    "candidates": [
+     {
+      "base": "po_escape",
+      "duration": 8,
+      "dframe": 0,
+      "namescore": 1.0
+     },
+     {
+      "base": "po_atack",
+      "duration": 12,
+      "dframe": 4,
+      "namescore": 1.0
+     },
+     {
+      "base": "po_fly",
+      "duration": 16,
+      "dframe": 8,
+      "namescore": 1.0
+     },
+     {
+      "base": "po_damage",
+      "duration": 16,
+      "dframe": 8,
+      "namescore": 1.0
+     },
+     {
+      "base": "po_wait",
+      "duration": 20,
+      "dframe": 12,
+      "namescore": 1.0
+     },
+     {
+      "base": "po_start",
+      "duration": 30,
+      "dframe": 22,
+      "namescore": 1.0
+     }
+    ]
+   },
+   {
+    "n64": "gPoeFloatAnim",
+    "otr": "objects/object_poh/gPoeFloatAnim",
+    "frameCount": 16,
+    "best": "po_fly",
+    "candidates": [
+     {
+      "base": "po_fly",
+      "duration": 16,
+      "dframe": 0,
+      "namescore": 1.0
+     },
+     {
+      "base": "po_damage",
+      "duration": 16,
+      "dframe": 0,
+      "namescore": 1.0
+     },
+     {
+      "base": "po_wait",
+      "duration": 20,
+      "dframe": 4,
+      "namescore": 1.0
+     },
+     {
+      "base": "po_atack",
+      "duration": 12,
+      "dframe": 4,
+      "namescore": 1.0
+     },
+     {
+      "base": "po_escape",
+      "duration": 8,
+      "dframe": 8,
+      "namescore": 1.0
+     },
+     {
+      "base": "po_start",
+      "duration": 30,
+      "dframe": 14,
+      "namescore": 1.0
+     }
+    ]
+   },
+   {
+    "n64": "gPoeAppearAnim",
+    "otr": "objects/object_poh/gPoeAppearAnim",
+    "frameCount": 30,
+    "best": "po_start",
+    "candidates": [
+     {
+      "base": "po_start",
+      "duration": 30,
+      "dframe": 0,
+      "namescore": 1.0
+     },
+     {
+      "base": "po_wait",
+      "duration": 20,
+      "dframe": 10,
+      "namescore": 1.0
+     },
+     {
+      "base": "po_fly",
+      "duration": 16,
+      "dframe": 14,
+      "namescore": 1.0
+     },
+     {
+      "base": "po_damage",
+      "duration": 16,
+      "dframe": 14,
+      "namescore": 1.0
+     },
+     {
+      "base": "po_atack",
+      "duration": 12,
+      "dframe": 18,
+      "namescore": 1.0
+     },
+     {
+      "base": "po_escape",
+      "duration": 8,
+      "dframe": 22,
+      "namescore": 1.0
+     }
+    ]
+   },
+   {
+    "n64": "gPoeDisappearAnim",
+    "otr": "objects/object_poh/gPoeDisappearAnim",
+    "frameCount": 20,
+    "best": "po_wait",
+    "candidates": [
+     {
+      "base": "po_wait",
+      "duration": 20,
+      "dframe": 0,
+      "namescore": 1.0
+     },
+     {
+      "base": "po_fly",
+      "duration": 16,
+      "dframe": 4,
+      "namescore": 1.0
+     },
+     {
+      "base": "po_damage",
+      "duration": 16,
+      "dframe": 4,
+      "namescore": 1.0
+     },
+     {
+      "base": "po_atack",
+      "duration": 12,
+      "dframe": 8,
+      "namescore": 1.0
+     },
+     {
+      "base": "po_start",
+      "duration": 30,
+      "dframe": 10,
+      "namescore": 1.0
+     },
+     {
+      "base": "po_escape",
+      "duration": 8,
+      "dframe": 12,
+      "namescore": 1.0
      }
     ]
    }
@@ -46174,6 +51973,31 @@
       "duration": 90,
       "dframe": 60,
       "namescore": 0.0
+     }
+    ]
+   }
+  ]
+ },
+ "/actor/zelda_rb.zar": {
+  "object": "object_reeba",
+  "rows": [
+   {
+    "n64": "object_reeba_Anim_0001E4",
+    "otr": "objects/object_reeba/object_reeba_Anim_0001E4",
+    "frameCount": 30,
+    "best": "reeba_rb_move",
+    "candidates": [
+     {
+      "base": "reeba_rb_move",
+      "duration": 31,
+      "dframe": 1,
+      "namescore": 1.0
+     },
+     {
+      "base": "reeba_dmg",
+      "duration": 27,
+      "dframe": 3,
+      "namescore": 1.0
      }
     ]
    }
@@ -57393,6 +63217,2573 @@
    }
   ]
  },
+ "/actor/zelda_skelton.zar": {
+  "object": "object_sk2",
+  "rows": [
+   {
+    "n64": "gStalfosFlinchFromHitBehindAnim",
+    "otr": "objects/object_sk2/gStalfosFlinchFromHitBehindAnim",
+    "frameCount": 8,
+    "best": "skelton_back_damage",
+    "candidates": [
+     {
+      "base": "skelton_back_damage",
+      "duration": 8,
+      "dframe": 0,
+      "namescore": 0.5
+     },
+     {
+      "base": "skelton_jump_kiru",
+      "duration": 8,
+      "dframe": 0,
+      "namescore": 0.0
+     },
+     {
+      "base": "skelton_kiru_end",
+      "duration": 8,
+      "dframe": 0,
+      "namescore": 0.0
+     },
+     {
+      "base": "skelton_fighting_wait",
+      "duration": 8,
+      "dframe": 0,
+      "namescore": 0.0
+     },
+     {
+      "base": "skelton_front_damage",
+      "duration": 9,
+      "dframe": 1,
+      "namescore": 0.5
+     },
+     {
+      "base": "skelton_fighting_run",
+      "duration": 10,
+      "dframe": 2,
+      "namescore": 0.0
+     },
+     {
+      "base": "skelton_back_jump",
+      "duration": 10,
+      "dframe": 2,
+      "namescore": 0.0
+     },
+     {
+      "base": "skelton_jump",
+      "duration": 6,
+      "dframe": 2,
+      "namescore": 0.0
+     },
+     {
+      "base": "skelton_fight_wait2wait",
+      "duration": 11,
+      "dframe": 3,
+      "namescore": 0.0
+     },
+     {
+      "base": "skelton_landing",
+      "duration": 12,
+      "dframe": 4,
+      "namescore": 0.0
+     },
+     {
+      "base": "skelton_jump_kiru_end",
+      "duration": 12,
+      "dframe": 4,
+      "namescore": 0.0
+     },
+     {
+      "base": "skelton_fighting_walk",
+      "duration": 13,
+      "dframe": 5,
+      "namescore": 0.0
+     },
+     {
+      "base": "skelton_defend",
+      "duration": 3,
+      "dframe": 5,
+      "namescore": 0.0
+     },
+     {
+      "base": "skelton_kiru",
+      "duration": 13,
+      "dframe": 5,
+      "namescore": 0.0
+     },
+     {
+      "base": "skelton_laugh",
+      "duration": 14,
+      "dframe": 6,
+      "namescore": 0.0
+     },
+     {
+      "base": "skelton_side_walk",
+      "duration": 15,
+      "dframe": 7,
+      "namescore": 0.0
+     },
+     {
+      "base": "skelton_kiru_finsh",
+      "duration": 19,
+      "dframe": 11,
+      "namescore": 0.0
+     },
+     {
+      "base": "skelton_back_down",
+      "duration": 33,
+      "dframe": 25,
+      "namescore": 0.0
+     },
+     {
+      "base": "skelton_front_down",
+      "duration": 41,
+      "dframe": 33,
+      "namescore": 0.0
+     }
+    ]
+   },
+   {
+    "n64": "gStalfosFallOverBackwardsAnim",
+    "otr": "objects/object_sk2/gStalfosFallOverBackwardsAnim",
+    "frameCount": 33,
+    "best": "skelton_back_down",
+    "candidates": [
+     {
+      "base": "skelton_back_down",
+      "duration": 33,
+      "dframe": 0,
+      "namescore": 1.0
+     },
+     {
+      "base": "skelton_front_down",
+      "duration": 41,
+      "dframe": 8,
+      "namescore": 1.0
+     },
+     {
+      "base": "skelton_kiru_finsh",
+      "duration": 19,
+      "dframe": 14,
+      "namescore": 0.0
+     },
+     {
+      "base": "skelton_side_walk",
+      "duration": 15,
+      "dframe": 18,
+      "namescore": 0.0
+     },
+     {
+      "base": "skelton_laugh",
+      "duration": 14,
+      "dframe": 19,
+      "namescore": 0.0
+     },
+     {
+      "base": "skelton_fighting_walk",
+      "duration": 13,
+      "dframe": 20,
+      "namescore": 0.0
+     },
+     {
+      "base": "skelton_kiru",
+      "duration": 13,
+      "dframe": 20,
+      "namescore": 0.0
+     },
+     {
+      "base": "skelton_landing",
+      "duration": 12,
+      "dframe": 21,
+      "namescore": 0.0
+     },
+     {
+      "base": "skelton_jump_kiru_end",
+      "duration": 12,
+      "dframe": 21,
+      "namescore": 0.0
+     },
+     {
+      "base": "skelton_fight_wait2wait",
+      "duration": 11,
+      "dframe": 22,
+      "namescore": 0.0
+     },
+     {
+      "base": "skelton_back_jump",
+      "duration": 10,
+      "dframe": 23,
+      "namescore": 1.0
+     },
+     {
+      "base": "skelton_fighting_run",
+      "duration": 10,
+      "dframe": 23,
+      "namescore": 0.0
+     },
+     {
+      "base": "skelton_front_damage",
+      "duration": 9,
+      "dframe": 24,
+      "namescore": 0.0
+     },
+     {
+      "base": "skelton_back_damage",
+      "duration": 8,
+      "dframe": 25,
+      "namescore": 1.0
+     },
+     {
+      "base": "skelton_jump_kiru",
+      "duration": 8,
+      "dframe": 25,
+      "namescore": 0.0
+     },
+     {
+      "base": "skelton_kiru_end",
+      "duration": 8,
+      "dframe": 25,
+      "namescore": 0.0
+     },
+     {
+      "base": "skelton_fighting_wait",
+      "duration": 8,
+      "dframe": 25,
+      "namescore": 0.0
+     },
+     {
+      "base": "skelton_jump",
+      "duration": 6,
+      "dframe": 27,
+      "namescore": 0.0
+     },
+     {
+      "base": "skelton_defend",
+      "duration": 3,
+      "dframe": 30,
+      "namescore": 0.0
+     }
+    ]
+   },
+   {
+    "n64": "gStalfosJumpBackwardsAnim",
+    "otr": "objects/object_sk2/gStalfosJumpBackwardsAnim",
+    "frameCount": 10,
+    "best": "skelton_back_jump",
+    "candidates": [
+     {
+      "base": "skelton_back_jump",
+      "duration": 10,
+      "dframe": 0,
+      "namescore": 1.0
+     },
+     {
+      "base": "skelton_fighting_run",
+      "duration": 10,
+      "dframe": 0,
+      "namescore": 0.0
+     },
+     {
+      "base": "skelton_fight_wait2wait",
+      "duration": 11,
+      "dframe": 1,
+      "namescore": 0.0
+     },
+     {
+      "base": "skelton_front_damage",
+      "duration": 9,
+      "dframe": 1,
+      "namescore": 0.0
+     },
+     {
+      "base": "skelton_back_damage",
+      "duration": 8,
+      "dframe": 2,
+      "namescore": 1.0
+     },
+     {
+      "base": "skelton_jump_kiru",
+      "duration": 8,
+      "dframe": 2,
+      "namescore": 1.0
+     },
+     {
+      "base": "skelton_jump_kiru_end",
+      "duration": 12,
+      "dframe": 2,
+      "namescore": 1.0
+     },
+     {
+      "base": "skelton_landing",
+      "duration": 12,
+      "dframe": 2,
+      "namescore": 0.0
+     },
+     {
+      "base": "skelton_kiru_end",
+      "duration": 8,
+      "dframe": 2,
+      "namescore": 0.0
+     },
+     {
+      "base": "skelton_fighting_wait",
+      "duration": 8,
+      "dframe": 2,
+      "namescore": 0.0
+     },
+     {
+      "base": "skelton_fighting_walk",
+      "duration": 13,
+      "dframe": 3,
+      "namescore": 0.0
+     },
+     {
+      "base": "skelton_kiru",
+      "duration": 13,
+      "dframe": 3,
+      "namescore": 0.0
+     },
+     {
+      "base": "skelton_jump",
+      "duration": 6,
+      "dframe": 4,
+      "namescore": 1.0
+     },
+     {
+      "base": "skelton_laugh",
+      "duration": 14,
+      "dframe": 4,
+      "namescore": 0.0
+     },
+     {
+      "base": "skelton_side_walk",
+      "duration": 15,
+      "dframe": 5,
+      "namescore": 0.0
+     },
+     {
+      "base": "skelton_defend",
+      "duration": 3,
+      "dframe": 7,
+      "namescore": 0.0
+     },
+     {
+      "base": "skelton_kiru_finsh",
+      "duration": 19,
+      "dframe": 9,
+      "namescore": 0.0
+     },
+     {
+      "base": "skelton_back_down",
+      "duration": 33,
+      "dframe": 23,
+      "namescore": 1.0
+     },
+     {
+      "base": "skelton_front_down",
+      "duration": 41,
+      "dframe": 31,
+      "namescore": 0.0
+     }
+    ]
+   },
+   {
+    "n64": "gStalfosBlockWithShieldAnim",
+    "otr": "objects/object_sk2/gStalfosBlockWithShieldAnim",
+    "frameCount": 3,
+    "best": "skelton_defend",
+    "candidates": [
+     {
+      "base": "skelton_defend",
+      "duration": 3,
+      "dframe": 0,
+      "namescore": 0.0
+     },
+     {
+      "base": "skelton_jump",
+      "duration": 6,
+      "dframe": 3,
+      "namescore": 0.0
+     },
+     {
+      "base": "skelton_back_damage",
+      "duration": 8,
+      "dframe": 5,
+      "namescore": 0.0
+     },
+     {
+      "base": "skelton_jump_kiru",
+      "duration": 8,
+      "dframe": 5,
+      "namescore": 0.0
+     },
+     {
+      "base": "skelton_kiru_end",
+      "duration": 8,
+      "dframe": 5,
+      "namescore": 0.0
+     },
+     {
+      "base": "skelton_fighting_wait",
+      "duration": 8,
+      "dframe": 5,
+      "namescore": 0.0
+     },
+     {
+      "base": "skelton_front_damage",
+      "duration": 9,
+      "dframe": 6,
+      "namescore": 0.0
+     },
+     {
+      "base": "skelton_fighting_run",
+      "duration": 10,
+      "dframe": 7,
+      "namescore": 0.0
+     },
+     {
+      "base": "skelton_back_jump",
+      "duration": 10,
+      "dframe": 7,
+      "namescore": 0.0
+     },
+     {
+      "base": "skelton_fight_wait2wait",
+      "duration": 11,
+      "dframe": 8,
+      "namescore": 0.0
+     },
+     {
+      "base": "skelton_landing",
+      "duration": 12,
+      "dframe": 9,
+      "namescore": 0.0
+     },
+     {
+      "base": "skelton_jump_kiru_end",
+      "duration": 12,
+      "dframe": 9,
+      "namescore": 0.0
+     },
+     {
+      "base": "skelton_fighting_walk",
+      "duration": 13,
+      "dframe": 10,
+      "namescore": 0.0
+     },
+     {
+      "base": "skelton_kiru",
+      "duration": 13,
+      "dframe": 10,
+      "namescore": 0.0
+     },
+     {
+      "base": "skelton_laugh",
+      "duration": 14,
+      "dframe": 11,
+      "namescore": 0.0
+     },
+     {
+      "base": "skelton_side_walk",
+      "duration": 15,
+      "dframe": 12,
+      "namescore": 0.0
+     },
+     {
+      "base": "skelton_kiru_finsh",
+      "duration": 19,
+      "dframe": 16,
+      "namescore": 0.0
+     },
+     {
+      "base": "skelton_back_down",
+      "duration": 33,
+      "dframe": 30,
+      "namescore": 0.0
+     },
+     {
+      "base": "skelton_front_down",
+      "duration": 41,
+      "dframe": 38,
+      "namescore": 0.0
+     }
+    ]
+   },
+   {
+    "n64": "gStalfosStandAttentionAnim",
+    "otr": "objects/object_sk2/gStalfosStandAttentionAnim",
+    "frameCount": 10,
+    "best": "skelton_fight_wait2wait",
+    "candidates": [
+     {
+      "base": "skelton_fighting_run",
+      "duration": 10,
+      "dframe": 0,
+      "namescore": 0.0
+     },
+     {
+      "base": "skelton_back_jump",
+      "duration": 10,
+      "dframe": 0,
+      "namescore": 0.0
+     },
+     {
+      "base": "skelton_fight_wait2wait",
+      "duration": 11,
+      "dframe": 1,
+      "namescore": 0.0
+     },
+     {
+      "base": "skelton_front_damage",
+      "duration": 9,
+      "dframe": 1,
+      "namescore": 0.0
+     },
+     {
+      "base": "skelton_fighting_wait",
+      "duration": 8,
+      "dframe": 2,
+      "namescore": 1.0
+     },
+     {
+      "base": "skelton_landing",
+      "duration": 12,
+      "dframe": 2,
+      "namescore": 0.0
+     },
+     {
+      "base": "skelton_back_damage",
+      "duration": 8,
+      "dframe": 2,
+      "namescore": 0.0
+     },
+     {
+      "base": "skelton_jump_kiru",
+      "duration": 8,
+      "dframe": 2,
+      "namescore": 0.0
+     },
+     {
+      "base": "skelton_jump_kiru_end",
+      "duration": 12,
+      "dframe": 2,
+      "namescore": 0.0
+     },
+     {
+      "base": "skelton_kiru_end",
+      "duration": 8,
+      "dframe": 2,
+      "namescore": 0.0
+     },
+     {
+      "base": "skelton_fighting_walk",
+      "duration": 13,
+      "dframe": 3,
+      "namescore": 0.0
+     },
+     {
+      "base": "skelton_kiru",
+      "duration": 13,
+      "dframe": 3,
+      "namescore": 0.0
+     },
+     {
+      "base": "skelton_laugh",
+      "duration": 14,
+      "dframe": 4,
+      "namescore": 0.0
+     },
+     {
+      "base": "skelton_jump",
+      "duration": 6,
+      "dframe": 4,
+      "namescore": 0.0
+     },
+     {
+      "base": "skelton_side_walk",
+      "duration": 15,
+      "dframe": 5,
+      "namescore": 0.0
+     },
+     {
+      "base": "skelton_defend",
+      "duration": 3,
+      "dframe": 7,
+      "namescore": 0.0
+     },
+     {
+      "base": "skelton_kiru_finsh",
+      "duration": 19,
+      "dframe": 9,
+      "namescore": 0.0
+     },
+     {
+      "base": "skelton_back_down",
+      "duration": 33,
+      "dframe": 23,
+      "namescore": 0.0
+     },
+     {
+      "base": "skelton_front_down",
+      "duration": 41,
+      "dframe": 31,
+      "namescore": 0.0
+     }
+    ]
+   },
+   {
+    "n64": "gStalfosFastAdvanceAnim",
+    "otr": "objects/object_sk2/gStalfosFastAdvanceAnim",
+    "frameCount": 10,
+    "best": "skelton_fighting_run",
+    "candidates": [
+     {
+      "base": "skelton_fighting_run",
+      "duration": 10,
+      "dframe": 0,
+      "namescore": 0.0
+     },
+     {
+      "base": "skelton_back_jump",
+      "duration": 10,
+      "dframe": 0,
+      "namescore": 0.0
+     },
+     {
+      "base": "skelton_fight_wait2wait",
+      "duration": 11,
+      "dframe": 1,
+      "namescore": 0.0
+     },
+     {
+      "base": "skelton_front_damage",
+      "duration": 9,
+      "dframe": 1,
+      "namescore": 0.0
+     },
+     {
+      "base": "skelton_landing",
+      "duration": 12,
+      "dframe": 2,
+      "namescore": 0.0
+     },
+     {
+      "base": "skelton_back_damage",
+      "duration": 8,
+      "dframe": 2,
+      "namescore": 0.0
+     },
+     {
+      "base": "skelton_jump_kiru",
+      "duration": 8,
+      "dframe": 2,
+      "namescore": 0.0
+     },
+     {
+      "base": "skelton_jump_kiru_end",
+      "duration": 12,
+      "dframe": 2,
+      "namescore": 0.0
+     },
+     {
+      "base": "skelton_kiru_end",
+      "duration": 8,
+      "dframe": 2,
+      "namescore": 0.0
+     },
+     {
+      "base": "skelton_fighting_wait",
+      "duration": 8,
+      "dframe": 2,
+      "namescore": 0.0
+     },
+     {
+      "base": "skelton_fighting_walk",
+      "duration": 13,
+      "dframe": 3,
+      "namescore": 0.0
+     },
+     {
+      "base": "skelton_kiru",
+      "duration": 13,
+      "dframe": 3,
+      "namescore": 0.0
+     },
+     {
+      "base": "skelton_laugh",
+      "duration": 14,
+      "dframe": 4,
+      "namescore": 0.0
+     },
+     {
+      "base": "skelton_jump",
+      "duration": 6,
+      "dframe": 4,
+      "namescore": 0.0
+     },
+     {
+      "base": "skelton_side_walk",
+      "duration": 15,
+      "dframe": 5,
+      "namescore": 0.0
+     },
+     {
+      "base": "skelton_defend",
+      "duration": 3,
+      "dframe": 7,
+      "namescore": 0.0
+     },
+     {
+      "base": "skelton_kiru_finsh",
+      "duration": 19,
+      "dframe": 9,
+      "namescore": 0.0
+     },
+     {
+      "base": "skelton_back_down",
+      "duration": 33,
+      "dframe": 23,
+      "namescore": 0.0
+     },
+     {
+      "base": "skelton_front_down",
+      "duration": 41,
+      "dframe": 31,
+      "namescore": 0.0
+     }
+    ]
+   },
+   {
+    "n64": "gStalfosMiddleGuardAnim",
+    "otr": "objects/object_sk2/gStalfosMiddleGuardAnim",
+    "frameCount": 27,
+    "best": "skelton_back_down",
+    "candidates": [
+     {
+      "base": "skelton_back_down",
+      "duration": 33,
+      "dframe": 6,
+      "namescore": 0.0
+     },
+     {
+      "base": "skelton_kiru_finsh",
+      "duration": 19,
+      "dframe": 8,
+      "namescore": 0.0
+     },
+     {
+      "base": "skelton_side_walk",
+      "duration": 15,
+      "dframe": 12,
+      "namescore": 0.0
+     },
+     {
+      "base": "skelton_laugh",
+      "duration": 14,
+      "dframe": 13,
+      "namescore": 0.0
+     },
+     {
+      "base": "skelton_fighting_walk",
+      "duration": 13,
+      "dframe": 14,
+      "namescore": 0.0
+     },
+     {
+      "base": "skelton_front_down",
+      "duration": 41,
+      "dframe": 14,
+      "namescore": 0.0
+     },
+     {
+      "base": "skelton_kiru",
+      "duration": 13,
+      "dframe": 14,
+      "namescore": 0.0
+     },
+     {
+      "base": "skelton_landing",
+      "duration": 12,
+      "dframe": 15,
+      "namescore": 0.0
+     },
+     {
+      "base": "skelton_jump_kiru_end",
+      "duration": 12,
+      "dframe": 15,
+      "namescore": 0.0
+     },
+     {
+      "base": "skelton_fight_wait2wait",
+      "duration": 11,
+      "dframe": 16,
+      "namescore": 0.0
+     },
+     {
+      "base": "skelton_fighting_run",
+      "duration": 10,
+      "dframe": 17,
+      "namescore": 0.0
+     },
+     {
+      "base": "skelton_back_jump",
+      "duration": 10,
+      "dframe": 17,
+      "namescore": 0.0
+     },
+     {
+      "base": "skelton_front_damage",
+      "duration": 9,
+      "dframe": 18,
+      "namescore": 0.0
+     },
+     {
+      "base": "skelton_back_damage",
+      "duration": 8,
+      "dframe": 19,
+      "namescore": 0.0
+     },
+     {
+      "base": "skelton_jump_kiru",
+      "duration": 8,
+      "dframe": 19,
+      "namescore": 0.0
+     },
+     {
+      "base": "skelton_kiru_end",
+      "duration": 8,
+      "dframe": 19,
+      "namescore": 0.0
+     },
+     {
+      "base": "skelton_fighting_wait",
+      "duration": 8,
+      "dframe": 19,
+      "namescore": 0.0
+     },
+     {
+      "base": "skelton_jump",
+      "duration": 6,
+      "dframe": 21,
+      "namescore": 0.0
+     },
+     {
+      "base": "skelton_defend",
+      "duration": 3,
+      "dframe": 24,
+      "namescore": 0.0
+     }
+    ]
+   },
+   {
+    "n64": "gStalfosSlowAdvanceAnim",
+    "otr": "objects/object_sk2/gStalfosSlowAdvanceAnim",
+    "frameCount": 13,
+    "best": "skelton_fighting_walk",
+    "candidates": [
+     {
+      "base": "skelton_fighting_walk",
+      "duration": 13,
+      "dframe": 0,
+      "namescore": 0.0
+     },
+     {
+      "base": "skelton_kiru",
+      "duration": 13,
+      "dframe": 0,
+      "namescore": 0.0
+     },
+     {
+      "base": "skelton_landing",
+      "duration": 12,
+      "dframe": 1,
+      "namescore": 0.0
+     },
+     {
+      "base": "skelton_jump_kiru_end",
+      "duration": 12,
+      "dframe": 1,
+      "namescore": 0.0
+     },
+     {
+      "base": "skelton_laugh",
+      "duration": 14,
+      "dframe": 1,
+      "namescore": 0.0
+     },
+     {
+      "base": "skelton_fight_wait2wait",
+      "duration": 11,
+      "dframe": 2,
+      "namescore": 0.0
+     },
+     {
+      "base": "skelton_side_walk",
+      "duration": 15,
+      "dframe": 2,
+      "namescore": 0.0
+     },
+     {
+      "base": "skelton_fighting_run",
+      "duration": 10,
+      "dframe": 3,
+      "namescore": 0.0
+     },
+     {
+      "base": "skelton_back_jump",
+      "duration": 10,
+      "dframe": 3,
+      "namescore": 0.0
+     },
+     {
+      "base": "skelton_front_damage",
+      "duration": 9,
+      "dframe": 4,
+      "namescore": 0.0
+     },
+     {
+      "base": "skelton_back_damage",
+      "duration": 8,
+      "dframe": 5,
+      "namescore": 0.0
+     },
+     {
+      "base": "skelton_jump_kiru",
+      "duration": 8,
+      "dframe": 5,
+      "namescore": 0.0
+     },
+     {
+      "base": "skelton_kiru_end",
+      "duration": 8,
+      "dframe": 5,
+      "namescore": 0.0
+     },
+     {
+      "base": "skelton_fighting_wait",
+      "duration": 8,
+      "dframe": 5,
+      "namescore": 0.0
+     },
+     {
+      "base": "skelton_kiru_finsh",
+      "duration": 19,
+      "dframe": 6,
+      "namescore": 0.0
+     },
+     {
+      "base": "skelton_jump",
+      "duration": 6,
+      "dframe": 7,
+      "namescore": 0.0
+     },
+     {
+      "base": "skelton_defend",
+      "duration": 3,
+      "dframe": 10,
+      "namescore": 0.0
+     },
+     {
+      "base": "skelton_back_down",
+      "duration": 33,
+      "dframe": 20,
+      "namescore": 0.0
+     },
+     {
+      "base": "skelton_front_down",
+      "duration": 41,
+      "dframe": 28,
+      "namescore": 0.0
+     }
+    ]
+   },
+   {
+    "n64": "gStalfosFlinchFromHitFrontAnim",
+    "otr": "objects/object_sk2/gStalfosFlinchFromHitFrontAnim",
+    "frameCount": 9,
+    "best": "skelton_front_damage",
+    "candidates": [
+     {
+      "base": "skelton_front_damage",
+      "duration": 9,
+      "dframe": 0,
+      "namescore": 1.0
+     },
+     {
+      "base": "skelton_back_damage",
+      "duration": 8,
+      "dframe": 1,
+      "namescore": 0.5
+     },
+     {
+      "base": "skelton_fighting_run",
+      "duration": 10,
+      "dframe": 1,
+      "namescore": 0.0
+     },
+     {
+      "base": "skelton_back_jump",
+      "duration": 10,
+      "dframe": 1,
+      "namescore": 0.0
+     },
+     {
+      "base": "skelton_jump_kiru",
+      "duration": 8,
+      "dframe": 1,
+      "namescore": 0.0
+     },
+     {
+      "base": "skelton_kiru_end",
+      "duration": 8,
+      "dframe": 1,
+      "namescore": 0.0
+     },
+     {
+      "base": "skelton_fighting_wait",
+      "duration": 8,
+      "dframe": 1,
+      "namescore": 0.0
+     },
+     {
+      "base": "skelton_fight_wait2wait",
+      "duration": 11,
+      "dframe": 2,
+      "namescore": 0.0
+     },
+     {
+      "base": "skelton_landing",
+      "duration": 12,
+      "dframe": 3,
+      "namescore": 0.0
+     },
+     {
+      "base": "skelton_jump_kiru_end",
+      "duration": 12,
+      "dframe": 3,
+      "namescore": 0.0
+     },
+     {
+      "base": "skelton_jump",
+      "duration": 6,
+      "dframe": 3,
+      "namescore": 0.0
+     },
+     {
+      "base": "skelton_fighting_walk",
+      "duration": 13,
+      "dframe": 4,
+      "namescore": 0.0
+     },
+     {
+      "base": "skelton_kiru",
+      "duration": 13,
+      "dframe": 4,
+      "namescore": 0.0
+     },
+     {
+      "base": "skelton_laugh",
+      "duration": 14,
+      "dframe": 5,
+      "namescore": 0.0
+     },
+     {
+      "base": "skelton_side_walk",
+      "duration": 15,
+      "dframe": 6,
+      "namescore": 0.0
+     },
+     {
+      "base": "skelton_defend",
+      "duration": 3,
+      "dframe": 6,
+      "namescore": 0.0
+     },
+     {
+      "base": "skelton_kiru_finsh",
+      "duration": 19,
+      "dframe": 10,
+      "namescore": 0.0
+     },
+     {
+      "base": "skelton_back_down",
+      "duration": 33,
+      "dframe": 24,
+      "namescore": 0.0
+     },
+     {
+      "base": "skelton_front_down",
+      "duration": 41,
+      "dframe": 32,
+      "namescore": 1.0
+     }
+    ]
+   },
+   {
+    "n64": "gStalfosFallOverForwardsAnim",
+    "otr": "objects/object_sk2/gStalfosFallOverForwardsAnim",
+    "frameCount": 41,
+    "best": "skelton_front_down",
+    "candidates": [
+     {
+      "base": "skelton_front_down",
+      "duration": 41,
+      "dframe": 0,
+      "namescore": 1.0
+     },
+     {
+      "base": "skelton_back_down",
+      "duration": 33,
+      "dframe": 8,
+      "namescore": 1.0
+     },
+     {
+      "base": "skelton_kiru_finsh",
+      "duration": 19,
+      "dframe": 22,
+      "namescore": 0.0
+     },
+     {
+      "base": "skelton_side_walk",
+      "duration": 15,
+      "dframe": 26,
+      "namescore": 0.0
+     },
+     {
+      "base": "skelton_laugh",
+      "duration": 14,
+      "dframe": 27,
+      "namescore": 0.0
+     },
+     {
+      "base": "skelton_fighting_walk",
+      "duration": 13,
+      "dframe": 28,
+      "namescore": 0.0
+     },
+     {
+      "base": "skelton_kiru",
+      "duration": 13,
+      "dframe": 28,
+      "namescore": 0.0
+     },
+     {
+      "base": "skelton_landing",
+      "duration": 12,
+      "dframe": 29,
+      "namescore": 0.0
+     },
+     {
+      "base": "skelton_jump_kiru_end",
+      "duration": 12,
+      "dframe": 29,
+      "namescore": 0.0
+     },
+     {
+      "base": "skelton_fight_wait2wait",
+      "duration": 11,
+      "dframe": 30,
+      "namescore": 0.0
+     },
+     {
+      "base": "skelton_fighting_run",
+      "duration": 10,
+      "dframe": 31,
+      "namescore": 0.0
+     },
+     {
+      "base": "skelton_back_jump",
+      "duration": 10,
+      "dframe": 31,
+      "namescore": 0.0
+     },
+     {
+      "base": "skelton_front_damage",
+      "duration": 9,
+      "dframe": 32,
+      "namescore": 0.0
+     },
+     {
+      "base": "skelton_back_damage",
+      "duration": 8,
+      "dframe": 33,
+      "namescore": 0.0
+     },
+     {
+      "base": "skelton_jump_kiru",
+      "duration": 8,
+      "dframe": 33,
+      "namescore": 0.0
+     },
+     {
+      "base": "skelton_kiru_end",
+      "duration": 8,
+      "dframe": 33,
+      "namescore": 0.0
+     },
+     {
+      "base": "skelton_fighting_wait",
+      "duration": 8,
+      "dframe": 33,
+      "namescore": 0.0
+     },
+     {
+      "base": "skelton_jump",
+      "duration": 6,
+      "dframe": 35,
+      "namescore": 0.0
+     },
+     {
+      "base": "skelton_defend",
+      "duration": 3,
+      "dframe": 38,
+      "namescore": 0.0
+     }
+    ]
+   },
+   {
+    "n64": "gStalfosLeapAnim",
+    "otr": "objects/object_sk2/gStalfosLeapAnim",
+    "frameCount": 6,
+    "best": "skelton_jump",
+    "candidates": [
+     {
+      "base": "skelton_jump",
+      "duration": 6,
+      "dframe": 0,
+      "namescore": 0.0
+     },
+     {
+      "base": "skelton_back_damage",
+      "duration": 8,
+      "dframe": 2,
+      "namescore": 0.0
+     },
+     {
+      "base": "skelton_jump_kiru",
+      "duration": 8,
+      "dframe": 2,
+      "namescore": 0.0
+     },
+     {
+      "base": "skelton_kiru_end",
+      "duration": 8,
+      "dframe": 2,
+      "namescore": 0.0
+     },
+     {
+      "base": "skelton_fighting_wait",
+      "duration": 8,
+      "dframe": 2,
+      "namescore": 0.0
+     },
+     {
+      "base": "skelton_defend",
+      "duration": 3,
+      "dframe": 3,
+      "namescore": 0.0
+     },
+     {
+      "base": "skelton_front_damage",
+      "duration": 9,
+      "dframe": 3,
+      "namescore": 0.0
+     },
+     {
+      "base": "skelton_fighting_run",
+      "duration": 10,
+      "dframe": 4,
+      "namescore": 0.0
+     },
+     {
+      "base": "skelton_back_jump",
+      "duration": 10,
+      "dframe": 4,
+      "namescore": 0.0
+     },
+     {
+      "base": "skelton_fight_wait2wait",
+      "duration": 11,
+      "dframe": 5,
+      "namescore": 0.0
+     },
+     {
+      "base": "skelton_landing",
+      "duration": 12,
+      "dframe": 6,
+      "namescore": 0.0
+     },
+     {
+      "base": "skelton_jump_kiru_end",
+      "duration": 12,
+      "dframe": 6,
+      "namescore": 0.0
+     },
+     {
+      "base": "skelton_fighting_walk",
+      "duration": 13,
+      "dframe": 7,
+      "namescore": 0.0
+     },
+     {
+      "base": "skelton_kiru",
+      "duration": 13,
+      "dframe": 7,
+      "namescore": 0.0
+     },
+     {
+      "base": "skelton_laugh",
+      "duration": 14,
+      "dframe": 8,
+      "namescore": 0.0
+     },
+     {
+      "base": "skelton_side_walk",
+      "duration": 15,
+      "dframe": 9,
+      "namescore": 0.0
+     },
+     {
+      "base": "skelton_kiru_finsh",
+      "duration": 19,
+      "dframe": 13,
+      "namescore": 0.0
+     },
+     {
+      "base": "skelton_back_down",
+      "duration": 33,
+      "dframe": 27,
+      "namescore": 0.0
+     },
+     {
+      "base": "skelton_front_down",
+      "duration": 41,
+      "dframe": 35,
+      "namescore": 0.0
+     }
+    ]
+   },
+   {
+    "n64": "gStalfosJumpAnim",
+    "otr": "objects/object_sk2/gStalfosJumpAnim",
+    "frameCount": 8,
+    "best": "skelton_jump_kiru",
+    "candidates": [
+     {
+      "base": "skelton_jump_kiru",
+      "duration": 8,
+      "dframe": 0,
+      "namescore": 1.0
+     },
+     {
+      "base": "skelton_back_damage",
+      "duration": 8,
+      "dframe": 0,
+      "namescore": 0.0
+     },
+     {
+      "base": "skelton_kiru_end",
+      "duration": 8,
+      "dframe": 0,
+      "namescore": 0.0
+     },
+     {
+      "base": "skelton_fighting_wait",
+      "duration": 8,
+      "dframe": 0,
+      "namescore": 0.0
+     },
+     {
+      "base": "skelton_front_damage",
+      "duration": 9,
+      "dframe": 1,
+      "namescore": 0.0
+     },
+     {
+      "base": "skelton_back_jump",
+      "duration": 10,
+      "dframe": 2,
+      "namescore": 1.0
+     },
+     {
+      "base": "skelton_jump",
+      "duration": 6,
+      "dframe": 2,
+      "namescore": 1.0
+     },
+     {
+      "base": "skelton_fighting_run",
+      "duration": 10,
+      "dframe": 2,
+      "namescore": 0.0
+     },
+     {
+      "base": "skelton_fight_wait2wait",
+      "duration": 11,
+      "dframe": 3,
+      "namescore": 0.0
+     },
+     {
+      "base": "skelton_jump_kiru_end",
+      "duration": 12,
+      "dframe": 4,
+      "namescore": 1.0
+     },
+     {
+      "base": "skelton_landing",
+      "duration": 12,
+      "dframe": 4,
+      "namescore": 0.0
+     },
+     {
+      "base": "skelton_fighting_walk",
+      "duration": 13,
+      "dframe": 5,
+      "namescore": 0.0
+     },
+     {
+      "base": "skelton_defend",
+      "duration": 3,
+      "dframe": 5,
+      "namescore": 0.0
+     },
+     {
+      "base": "skelton_kiru",
+      "duration": 13,
+      "dframe": 5,
+      "namescore": 0.0
+     },
+     {
+      "base": "skelton_laugh",
+      "duration": 14,
+      "dframe": 6,
+      "namescore": 0.0
+     },
+     {
+      "base": "skelton_side_walk",
+      "duration": 15,
+      "dframe": 7,
+      "namescore": 0.0
+     },
+     {
+      "base": "skelton_kiru_finsh",
+      "duration": 19,
+      "dframe": 11,
+      "namescore": 0.0
+     },
+     {
+      "base": "skelton_back_down",
+      "duration": 33,
+      "dframe": 25,
+      "namescore": 0.0
+     },
+     {
+      "base": "skelton_front_down",
+      "duration": 41,
+      "dframe": 33,
+      "namescore": 0.0
+     }
+    ]
+   },
+   {
+    "n64": "gStalfosJumpslashAnim",
+    "otr": "objects/object_sk2/gStalfosJumpslashAnim",
+    "frameCount": 12,
+    "best": "skelton_jump_kiru_end",
+    "candidates": [
+     {
+      "base": "skelton_jump_kiru_end",
+      "duration": 12,
+      "dframe": 0,
+      "namescore": 1.0
+     },
+     {
+      "base": "skelton_landing",
+      "duration": 12,
+      "dframe": 0,
+      "namescore": 0.0
+     },
+     {
+      "base": "skelton_fight_wait2wait",
+      "duration": 11,
+      "dframe": 1,
+      "namescore": 0.0
+     },
+     {
+      "base": "skelton_fighting_walk",
+      "duration": 13,
+      "dframe": 1,
+      "namescore": 0.0
+     },
+     {
+      "base": "skelton_kiru",
+      "duration": 13,
+      "dframe": 1,
+      "namescore": 0.0
+     },
+     {
+      "base": "skelton_back_jump",
+      "duration": 10,
+      "dframe": 2,
+      "namescore": 1.0
+     },
+     {
+      "base": "skelton_fighting_run",
+      "duration": 10,
+      "dframe": 2,
+      "namescore": 0.0
+     },
+     {
+      "base": "skelton_laugh",
+      "duration": 14,
+      "dframe": 2,
+      "namescore": 0.0
+     },
+     {
+      "base": "skelton_side_walk",
+      "duration": 15,
+      "dframe": 3,
+      "namescore": 0.0
+     },
+     {
+      "base": "skelton_front_damage",
+      "duration": 9,
+      "dframe": 3,
+      "namescore": 0.0
+     },
+     {
+      "base": "skelton_jump_kiru",
+      "duration": 8,
+      "dframe": 4,
+      "namescore": 1.0
+     },
+     {
+      "base": "skelton_back_damage",
+      "duration": 8,
+      "dframe": 4,
+      "namescore": 0.0
+     },
+     {
+      "base": "skelton_kiru_end",
+      "duration": 8,
+      "dframe": 4,
+      "namescore": 0.0
+     },
+     {
+      "base": "skelton_fighting_wait",
+      "duration": 8,
+      "dframe": 4,
+      "namescore": 0.0
+     },
+     {
+      "base": "skelton_jump",
+      "duration": 6,
+      "dframe": 6,
+      "namescore": 1.0
+     },
+     {
+      "base": "skelton_kiru_finsh",
+      "duration": 19,
+      "dframe": 7,
+      "namescore": 0.0
+     },
+     {
+      "base": "skelton_defend",
+      "duration": 3,
+      "dframe": 9,
+      "namescore": 0.0
+     },
+     {
+      "base": "skelton_back_down",
+      "duration": 33,
+      "dframe": 21,
+      "namescore": 0.0
+     },
+     {
+      "base": "skelton_front_down",
+      "duration": 41,
+      "dframe": 29,
+      "namescore": 0.0
+     }
+    ]
+   },
+   {
+    "n64": "gStalfosDownSlashAnim",
+    "otr": "objects/object_sk2/gStalfosDownSlashAnim",
+    "frameCount": 12,
+    "best": "skelton_landing",
+    "candidates": [
+     {
+      "base": "skelton_landing",
+      "duration": 12,
+      "dframe": 0,
+      "namescore": 0.0
+     },
+     {
+      "base": "skelton_jump_kiru_end",
+      "duration": 12,
+      "dframe": 0,
+      "namescore": 0.0
+     },
+     {
+      "base": "skelton_fight_wait2wait",
+      "duration": 11,
+      "dframe": 1,
+      "namescore": 0.0
+     },
+     {
+      "base": "skelton_fighting_walk",
+      "duration": 13,
+      "dframe": 1,
+      "namescore": 0.0
+     },
+     {
+      "base": "skelton_kiru",
+      "duration": 13,
+      "dframe": 1,
+      "namescore": 0.0
+     },
+     {
+      "base": "skelton_fighting_run",
+      "duration": 10,
+      "dframe": 2,
+      "namescore": 0.0
+     },
+     {
+      "base": "skelton_back_jump",
+      "duration": 10,
+      "dframe": 2,
+      "namescore": 0.0
+     },
+     {
+      "base": "skelton_laugh",
+      "duration": 14,
+      "dframe": 2,
+      "namescore": 0.0
+     },
+     {
+      "base": "skelton_side_walk",
+      "duration": 15,
+      "dframe": 3,
+      "namescore": 0.0
+     },
+     {
+      "base": "skelton_front_damage",
+      "duration": 9,
+      "dframe": 3,
+      "namescore": 0.0
+     },
+     {
+      "base": "skelton_back_damage",
+      "duration": 8,
+      "dframe": 4,
+      "namescore": 0.0
+     },
+     {
+      "base": "skelton_jump_kiru",
+      "duration": 8,
+      "dframe": 4,
+      "namescore": 0.0
+     },
+     {
+      "base": "skelton_kiru_end",
+      "duration": 8,
+      "dframe": 4,
+      "namescore": 0.0
+     },
+     {
+      "base": "skelton_fighting_wait",
+      "duration": 8,
+      "dframe": 4,
+      "namescore": 0.0
+     },
+     {
+      "base": "skelton_jump",
+      "duration": 6,
+      "dframe": 6,
+      "namescore": 0.0
+     },
+     {
+      "base": "skelton_kiru_finsh",
+      "duration": 19,
+      "dframe": 7,
+      "namescore": 0.0
+     },
+     {
+      "base": "skelton_defend",
+      "duration": 3,
+      "dframe": 9,
+      "namescore": 0.0
+     },
+     {
+      "base": "skelton_back_down",
+      "duration": 33,
+      "dframe": 21,
+      "namescore": 1.0
+     },
+     {
+      "base": "skelton_front_down",
+      "duration": 41,
+      "dframe": 29,
+      "namescore": 1.0
+     }
+    ]
+   },
+   {
+    "n64": "gStalfosRecoverFromDownSlashAnim",
+    "otr": "objects/object_sk2/gStalfosRecoverFromDownSlashAnim",
+    "frameCount": 8,
+    "best": "skelton_back_damage",
+    "candidates": [
+     {
+      "base": "skelton_back_damage",
+      "duration": 8,
+      "dframe": 0,
+      "namescore": 0.0
+     },
+     {
+      "base": "skelton_jump_kiru",
+      "duration": 8,
+      "dframe": 0,
+      "namescore": 0.0
+     },
+     {
+      "base": "skelton_kiru_end",
+      "duration": 8,
+      "dframe": 0,
+      "namescore": 0.0
+     },
+     {
+      "base": "skelton_fighting_wait",
+      "duration": 8,
+      "dframe": 0,
+      "namescore": 0.0
+     },
+     {
+      "base": "skelton_front_damage",
+      "duration": 9,
+      "dframe": 1,
+      "namescore": 0.0
+     },
+     {
+      "base": "skelton_fighting_run",
+      "duration": 10,
+      "dframe": 2,
+      "namescore": 0.0
+     },
+     {
+      "base": "skelton_back_jump",
+      "duration": 10,
+      "dframe": 2,
+      "namescore": 0.0
+     },
+     {
+      "base": "skelton_jump",
+      "duration": 6,
+      "dframe": 2,
+      "namescore": 0.0
+     },
+     {
+      "base": "skelton_fight_wait2wait",
+      "duration": 11,
+      "dframe": 3,
+      "namescore": 0.0
+     },
+     {
+      "base": "skelton_landing",
+      "duration": 12,
+      "dframe": 4,
+      "namescore": 0.0
+     },
+     {
+      "base": "skelton_jump_kiru_end",
+      "duration": 12,
+      "dframe": 4,
+      "namescore": 0.0
+     },
+     {
+      "base": "skelton_fighting_walk",
+      "duration": 13,
+      "dframe": 5,
+      "namescore": 0.0
+     },
+     {
+      "base": "skelton_defend",
+      "duration": 3,
+      "dframe": 5,
+      "namescore": 0.0
+     },
+     {
+      "base": "skelton_kiru",
+      "duration": 13,
+      "dframe": 5,
+      "namescore": 0.0
+     },
+     {
+      "base": "skelton_laugh",
+      "duration": 14,
+      "dframe": 6,
+      "namescore": 0.0
+     },
+     {
+      "base": "skelton_side_walk",
+      "duration": 15,
+      "dframe": 7,
+      "namescore": 0.0
+     },
+     {
+      "base": "skelton_kiru_finsh",
+      "duration": 19,
+      "dframe": 11,
+      "namescore": 0.0
+     },
+     {
+      "base": "skelton_back_down",
+      "duration": 33,
+      "dframe": 25,
+      "namescore": 1.0
+     },
+     {
+      "base": "skelton_front_down",
+      "duration": 41,
+      "dframe": 33,
+      "namescore": 1.0
+     }
+    ]
+   },
+   {
+    "n64": "gStalfosUpSlashAnim",
+    "otr": "objects/object_sk2/gStalfosUpSlashAnim",
+    "frameCount": 19,
+    "best": "skelton_kiru_finsh",
+    "candidates": [
+     {
+      "base": "skelton_kiru_finsh",
+      "duration": 19,
+      "dframe": 0,
+      "namescore": 0.0
+     },
+     {
+      "base": "skelton_side_walk",
+      "duration": 15,
+      "dframe": 4,
+      "namescore": 0.0
+     },
+     {
+      "base": "skelton_laugh",
+      "duration": 14,
+      "dframe": 5,
+      "namescore": 0.0
+     },
+     {
+      "base": "skelton_fighting_walk",
+      "duration": 13,
+      "dframe": 6,
+      "namescore": 0.0
+     },
+     {
+      "base": "skelton_kiru",
+      "duration": 13,
+      "dframe": 6,
+      "namescore": 0.0
+     },
+     {
+      "base": "skelton_landing",
+      "duration": 12,
+      "dframe": 7,
+      "namescore": 0.0
+     },
+     {
+      "base": "skelton_jump_kiru_end",
+      "duration": 12,
+      "dframe": 7,
+      "namescore": 0.0
+     },
+     {
+      "base": "skelton_fight_wait2wait",
+      "duration": 11,
+      "dframe": 8,
+      "namescore": 0.0
+     },
+     {
+      "base": "skelton_fighting_run",
+      "duration": 10,
+      "dframe": 9,
+      "namescore": 0.0
+     },
+     {
+      "base": "skelton_back_jump",
+      "duration": 10,
+      "dframe": 9,
+      "namescore": 0.0
+     },
+     {
+      "base": "skelton_front_damage",
+      "duration": 9,
+      "dframe": 10,
+      "namescore": 0.0
+     },
+     {
+      "base": "skelton_back_damage",
+      "duration": 8,
+      "dframe": 11,
+      "namescore": 0.0
+     },
+     {
+      "base": "skelton_jump_kiru",
+      "duration": 8,
+      "dframe": 11,
+      "namescore": 0.0
+     },
+     {
+      "base": "skelton_kiru_end",
+      "duration": 8,
+      "dframe": 11,
+      "namescore": 0.0
+     },
+     {
+      "base": "skelton_fighting_wait",
+      "duration": 8,
+      "dframe": 11,
+      "namescore": 0.0
+     },
+     {
+      "base": "skelton_jump",
+      "duration": 6,
+      "dframe": 13,
+      "namescore": 0.0
+     },
+     {
+      "base": "skelton_back_down",
+      "duration": 33,
+      "dframe": 14,
+      "namescore": 0.0
+     },
+     {
+      "base": "skelton_defend",
+      "duration": 3,
+      "dframe": 16,
+      "namescore": 0.0
+     },
+     {
+      "base": "skelton_front_down",
+      "duration": 41,
+      "dframe": 22,
+      "namescore": 0.0
+     }
+    ]
+   },
+   {
+    "n64": "gStalfosLandFromLeapAnim",
+    "otr": "objects/object_sk2/gStalfosLandFromLeapAnim",
+    "frameCount": 12,
+    "best": "skelton_landing",
+    "candidates": [
+     {
+      "base": "skelton_landing",
+      "duration": 12,
+      "dframe": 0,
+      "namescore": 0.0
+     },
+     {
+      "base": "skelton_jump_kiru_end",
+      "duration": 12,
+      "dframe": 0,
+      "namescore": 0.0
+     },
+     {
+      "base": "skelton_fight_wait2wait",
+      "duration": 11,
+      "dframe": 1,
+      "namescore": 0.0
+     },
+     {
+      "base": "skelton_fighting_walk",
+      "duration": 13,
+      "dframe": 1,
+      "namescore": 0.0
+     },
+     {
+      "base": "skelton_kiru",
+      "duration": 13,
+      "dframe": 1,
+      "namescore": 0.0
+     },
+     {
+      "base": "skelton_fighting_run",
+      "duration": 10,
+      "dframe": 2,
+      "namescore": 0.0
+     },
+     {
+      "base": "skelton_back_jump",
+      "duration": 10,
+      "dframe": 2,
+      "namescore": 0.0
+     },
+     {
+      "base": "skelton_laugh",
+      "duration": 14,
+      "dframe": 2,
+      "namescore": 0.0
+     },
+     {
+      "base": "skelton_side_walk",
+      "duration": 15,
+      "dframe": 3,
+      "namescore": 0.0
+     },
+     {
+      "base": "skelton_front_damage",
+      "duration": 9,
+      "dframe": 3,
+      "namescore": 0.0
+     },
+     {
+      "base": "skelton_back_damage",
+      "duration": 8,
+      "dframe": 4,
+      "namescore": 0.0
+     },
+     {
+      "base": "skelton_jump_kiru",
+      "duration": 8,
+      "dframe": 4,
+      "namescore": 0.0
+     },
+     {
+      "base": "skelton_kiru_end",
+      "duration": 8,
+      "dframe": 4,
+      "namescore": 0.0
+     },
+     {
+      "base": "skelton_fighting_wait",
+      "duration": 8,
+      "dframe": 4,
+      "namescore": 0.0
+     },
+     {
+      "base": "skelton_jump",
+      "duration": 6,
+      "dframe": 6,
+      "namescore": 0.0
+     },
+     {
+      "base": "skelton_kiru_finsh",
+      "duration": 19,
+      "dframe": 7,
+      "namescore": 0.0
+     },
+     {
+      "base": "skelton_defend",
+      "duration": 3,
+      "dframe": 9,
+      "namescore": 0.0
+     },
+     {
+      "base": "skelton_back_down",
+      "duration": 33,
+      "dframe": 21,
+      "namescore": 0.0
+     },
+     {
+      "base": "skelton_front_down",
+      "duration": 41,
+      "dframe": 29,
+      "namescore": 0.0
+     }
+    ]
+   },
+   {
+    "n64": "gStalfosLaughAnim",
+    "otr": "objects/object_sk2/gStalfosLaughAnim",
+    "frameCount": 13,
+    "best": "skelton_fighting_walk",
+    "candidates": [
+     {
+      "base": "skelton_fighting_walk",
+      "duration": 13,
+      "dframe": 0,
+      "namescore": 0.0
+     },
+     {
+      "base": "skelton_kiru",
+      "duration": 13,
+      "dframe": 0,
+      "namescore": 0.0
+     },
+     {
+      "base": "skelton_laugh",
+      "duration": 14,
+      "dframe": 1,
+      "namescore": 1.0
+     },
+     {
+      "base": "skelton_landing",
+      "duration": 12,
+      "dframe": 1,
+      "namescore": 0.0
+     },
+     {
+      "base": "skelton_jump_kiru_end",
+      "duration": 12,
+      "dframe": 1,
+      "namescore": 0.0
+     },
+     {
+      "base": "skelton_fight_wait2wait",
+      "duration": 11,
+      "dframe": 2,
+      "namescore": 0.0
+     },
+     {
+      "base": "skelton_side_walk",
+      "duration": 15,
+      "dframe": 2,
+      "namescore": 0.0
+     },
+     {
+      "base": "skelton_fighting_run",
+      "duration": 10,
+      "dframe": 3,
+      "namescore": 0.0
+     },
+     {
+      "base": "skelton_back_jump",
+      "duration": 10,
+      "dframe": 3,
+      "namescore": 0.0
+     },
+     {
+      "base": "skelton_front_damage",
+      "duration": 9,
+      "dframe": 4,
+      "namescore": 0.0
+     },
+     {
+      "base": "skelton_back_damage",
+      "duration": 8,
+      "dframe": 5,
+      "namescore": 0.0
+     },
+     {
+      "base": "skelton_jump_kiru",
+      "duration": 8,
+      "dframe": 5,
+      "namescore": 0.0
+     },
+     {
+      "base": "skelton_kiru_end",
+      "duration": 8,
+      "dframe": 5,
+      "namescore": 0.0
+     },
+     {
+      "base": "skelton_fighting_wait",
+      "duration": 8,
+      "dframe": 5,
+      "namescore": 0.0
+     },
+     {
+      "base": "skelton_kiru_finsh",
+      "duration": 19,
+      "dframe": 6,
+      "namescore": 0.0
+     },
+     {
+      "base": "skelton_jump",
+      "duration": 6,
+      "dframe": 7,
+      "namescore": 0.0
+     },
+     {
+      "base": "skelton_defend",
+      "duration": 3,
+      "dframe": 10,
+      "namescore": 0.0
+     },
+     {
+      "base": "skelton_back_down",
+      "duration": 33,
+      "dframe": 20,
+      "namescore": 0.0
+     },
+     {
+      "base": "skelton_front_down",
+      "duration": 41,
+      "dframe": 28,
+      "namescore": 0.0
+     }
+    ]
+   },
+   {
+    "n64": "gStalfosLookAroundAnim",
+    "otr": "objects/object_sk2/gStalfosLookAroundAnim",
+    "frameCount": 53,
+    "best": "skelton_front_down",
+    "candidates": [
+     {
+      "base": "skelton_front_down",
+      "duration": 41,
+      "dframe": 12,
+      "namescore": 0.0
+     },
+     {
+      "base": "skelton_back_down",
+      "duration": 33,
+      "dframe": 20,
+      "namescore": 0.0
+     },
+     {
+      "base": "skelton_kiru_finsh",
+      "duration": 19,
+      "dframe": 34,
+      "namescore": 0.0
+     },
+     {
+      "base": "skelton_side_walk",
+      "duration": 15,
+      "dframe": 38,
+      "namescore": 0.0
+     },
+     {
+      "base": "skelton_laugh",
+      "duration": 14,
+      "dframe": 39,
+      "namescore": 0.0
+     },
+     {
+      "base": "skelton_fighting_walk",
+      "duration": 13,
+      "dframe": 40,
+      "namescore": 0.0
+     },
+     {
+      "base": "skelton_kiru",
+      "duration": 13,
+      "dframe": 40,
+      "namescore": 0.0
+     },
+     {
+      "base": "skelton_landing",
+      "duration": 12,
+      "dframe": 41,
+      "namescore": 0.0
+     },
+     {
+      "base": "skelton_jump_kiru_end",
+      "duration": 12,
+      "dframe": 41,
+      "namescore": 0.0
+     },
+     {
+      "base": "skelton_fight_wait2wait",
+      "duration": 11,
+      "dframe": 42,
+      "namescore": 0.0
+     },
+     {
+      "base": "skelton_fighting_run",
+      "duration": 10,
+      "dframe": 43,
+      "namescore": 0.0
+     },
+     {
+      "base": "skelton_back_jump",
+      "duration": 10,
+      "dframe": 43,
+      "namescore": 0.0
+     },
+     {
+      "base": "skelton_front_damage",
+      "duration": 9,
+      "dframe": 44,
+      "namescore": 0.0
+     },
+     {
+      "base": "skelton_back_damage",
+      "duration": 8,
+      "dframe": 45,
+      "namescore": 0.0
+     },
+     {
+      "base": "skelton_jump_kiru",
+      "duration": 8,
+      "dframe": 45,
+      "namescore": 0.0
+     },
+     {
+      "base": "skelton_kiru_end",
+      "duration": 8,
+      "dframe": 45,
+      "namescore": 0.0
+     },
+     {
+      "base": "skelton_fighting_wait",
+      "duration": 8,
+      "dframe": 45,
+      "namescore": 0.0
+     },
+     {
+      "base": "skelton_jump",
+      "duration": 6,
+      "dframe": 47,
+      "namescore": 0.0
+     },
+     {
+      "base": "skelton_defend",
+      "duration": 3,
+      "dframe": 50,
+      "namescore": 0.0
+     }
+    ]
+   },
+   {
+    "n64": "gStalfosSidestepAnim",
+    "otr": "objects/object_sk2/gStalfosSidestepAnim",
+    "frameCount": 15,
+    "best": "skelton_side_walk",
+    "candidates": [
+     {
+      "base": "skelton_side_walk",
+      "duration": 15,
+      "dframe": 0,
+      "namescore": 1.0
+     },
+     {
+      "base": "skelton_laugh",
+      "duration": 14,
+      "dframe": 1,
+      "namescore": 0.0
+     },
+     {
+      "base": "skelton_fighting_walk",
+      "duration": 13,
+      "dframe": 2,
+      "namescore": 0.0
+     },
+     {
+      "base": "skelton_kiru",
+      "duration": 13,
+      "dframe": 2,
+      "namescore": 0.0
+     },
+     {
+      "base": "skelton_landing",
+      "duration": 12,
+      "dframe": 3,
+      "namescore": 0.0
+     },
+     {
+      "base": "skelton_jump_kiru_end",
+      "duration": 12,
+      "dframe": 3,
+      "namescore": 0.0
+     },
+     {
+      "base": "skelton_fight_wait2wait",
+      "duration": 11,
+      "dframe": 4,
+      "namescore": 0.0
+     },
+     {
+      "base": "skelton_kiru_finsh",
+      "duration": 19,
+      "dframe": 4,
+      "namescore": 0.0
+     },
+     {
+      "base": "skelton_fighting_run",
+      "duration": 10,
+      "dframe": 5,
+      "namescore": 0.0
+     },
+     {
+      "base": "skelton_back_jump",
+      "duration": 10,
+      "dframe": 5,
+      "namescore": 0.0
+     },
+     {
+      "base": "skelton_front_damage",
+      "duration": 9,
+      "dframe": 6,
+      "namescore": 0.0
+     },
+     {
+      "base": "skelton_back_damage",
+      "duration": 8,
+      "dframe": 7,
+      "namescore": 0.0
+     },
+     {
+      "base": "skelton_jump_kiru",
+      "duration": 8,
+      "dframe": 7,
+      "namescore": 0.0
+     },
+     {
+      "base": "skelton_kiru_end",
+      "duration": 8,
+      "dframe": 7,
+      "namescore": 0.0
+     },
+     {
+      "base": "skelton_fighting_wait",
+      "duration": 8,
+      "dframe": 7,
+      "namescore": 0.0
+     },
+     {
+      "base": "skelton_jump",
+      "duration": 6,
+      "dframe": 9,
+      "namescore": 0.0
+     },
+     {
+      "base": "skelton_defend",
+      "duration": 3,
+      "dframe": 12,
+      "namescore": 0.0
+     },
+     {
+      "base": "skelton_back_down",
+      "duration": 33,
+      "dframe": 18,
+      "namescore": 0.0
+     },
+     {
+      "base": "skelton_front_down",
+      "duration": 41,
+      "dframe": 26,
+      "namescore": 0.0
+     }
+    ]
+   },
+   {
+    "n64": "gStalfosReleaseAttentionAnim",
+    "otr": "objects/object_sk2/gStalfosReleaseAttentionAnim",
+    "frameCount": 10,
+    "best": "skelton_fighting_run",
+    "candidates": [
+     {
+      "base": "skelton_fighting_run",
+      "duration": 10,
+      "dframe": 0,
+      "namescore": 0.0
+     },
+     {
+      "base": "skelton_back_jump",
+      "duration": 10,
+      "dframe": 0,
+      "namescore": 0.0
+     },
+     {
+      "base": "skelton_fight_wait2wait",
+      "duration": 11,
+      "dframe": 1,
+      "namescore": 0.0
+     },
+     {
+      "base": "skelton_front_damage",
+      "duration": 9,
+      "dframe": 1,
+      "namescore": 0.0
+     },
+     {
+      "base": "skelton_landing",
+      "duration": 12,
+      "dframe": 2,
+      "namescore": 0.0
+     },
+     {
+      "base": "skelton_back_damage",
+      "duration": 8,
+      "dframe": 2,
+      "namescore": 0.0
+     },
+     {
+      "base": "skelton_jump_kiru",
+      "duration": 8,
+      "dframe": 2,
+      "namescore": 0.0
+     },
+     {
+      "base": "skelton_jump_kiru_end",
+      "duration": 12,
+      "dframe": 2,
+      "namescore": 0.0
+     },
+     {
+      "base": "skelton_kiru_end",
+      "duration": 8,
+      "dframe": 2,
+      "namescore": 0.0
+     },
+     {
+      "base": "skelton_fighting_wait",
+      "duration": 8,
+      "dframe": 2,
+      "namescore": 0.0
+     },
+     {
+      "base": "skelton_fighting_walk",
+      "duration": 13,
+      "dframe": 3,
+      "namescore": 0.0
+     },
+     {
+      "base": "skelton_kiru",
+      "duration": 13,
+      "dframe": 3,
+      "namescore": 0.0
+     },
+     {
+      "base": "skelton_laugh",
+      "duration": 14,
+      "dframe": 4,
+      "namescore": 0.0
+     },
+     {
+      "base": "skelton_jump",
+      "duration": 6,
+      "dframe": 4,
+      "namescore": 0.0
+     },
+     {
+      "base": "skelton_side_walk",
+      "duration": 15,
+      "dframe": 5,
+      "namescore": 0.0
+     },
+     {
+      "base": "skelton_defend",
+      "duration": 3,
+      "dframe": 7,
+      "namescore": 0.0
+     },
+     {
+      "base": "skelton_kiru_finsh",
+      "duration": 19,
+      "dframe": 9,
+      "namescore": 0.0
+     },
+     {
+      "base": "skelton_back_down",
+      "duration": 33,
+      "dframe": 23,
+      "namescore": 0.0
+     },
+     {
+      "base": "skelton_front_down",
+      "duration": 41,
+      "dframe": 31,
+      "namescore": 0.0
+     }
+    ]
+   }
+  ]
+ },
  "/actor/zelda_skj.zar": {
   "object": "object_skj",
   "rows": [
@@ -63936,6 +72327,411 @@
    }
   ]
  },
+ "/actor/zelda_tt.zar": {
+  "object": "object_tite",
+  "rows": [
+   {
+    "n64": "object_tite_Anim_0001D4",
+    "otr": "objects/object_tite/object_tite_Anim_0001D4",
+    "frameCount": 8,
+    "best": "tt_move",
+    "candidates": [
+     {
+      "base": "tt_move",
+      "duration": 8,
+      "dframe": 0,
+      "namescore": 0.0
+     },
+     {
+      "base": "tt_dmg",
+      "duration": 8,
+      "dframe": 0,
+      "namescore": 0.0
+     },
+     {
+      "base": "tt_jump_start",
+      "duration": 6,
+      "dframe": 2,
+      "namescore": 0.0
+     },
+     {
+      "base": "tt_jump_end",
+      "duration": 6,
+      "dframe": 2,
+      "namescore": 0.0
+     },
+     {
+      "base": "tt_smalljump",
+      "duration": 11,
+      "dframe": 3,
+      "namescore": 0.0
+     },
+     {
+      "base": "tt_jump",
+      "duration": 15,
+      "dframe": 7,
+      "namescore": 0.0
+     },
+     {
+      "base": "tt_wait",
+      "duration": 120,
+      "dframe": 112,
+      "namescore": 0.0
+     }
+    ]
+   },
+   {
+    "n64": "object_tite_Anim_0004F8",
+    "otr": "objects/object_tite/object_tite_Anim_0004F8",
+    "frameCount": 15,
+    "best": "tt_jump",
+    "candidates": [
+     {
+      "base": "tt_jump",
+      "duration": 15,
+      "dframe": 0,
+      "namescore": 0.0
+     },
+     {
+      "base": "tt_smalljump",
+      "duration": 11,
+      "dframe": 4,
+      "namescore": 0.0
+     },
+     {
+      "base": "tt_move",
+      "duration": 8,
+      "dframe": 7,
+      "namescore": 0.0
+     },
+     {
+      "base": "tt_dmg",
+      "duration": 8,
+      "dframe": 7,
+      "namescore": 0.0
+     },
+     {
+      "base": "tt_jump_start",
+      "duration": 6,
+      "dframe": 9,
+      "namescore": 0.0
+     },
+     {
+      "base": "tt_jump_end",
+      "duration": 6,
+      "dframe": 9,
+      "namescore": 0.0
+     },
+     {
+      "base": "tt_wait",
+      "duration": 120,
+      "dframe": 105,
+      "namescore": 0.0
+     }
+    ]
+   },
+   {
+    "n64": "object_tite_Anim_00069C",
+    "otr": "objects/object_tite/object_tite_Anim_00069C",
+    "frameCount": 6,
+    "best": "tt_jump_start",
+    "candidates": [
+     {
+      "base": "tt_jump_start",
+      "duration": 6,
+      "dframe": 0,
+      "namescore": 0.0
+     },
+     {
+      "base": "tt_jump_end",
+      "duration": 6,
+      "dframe": 0,
+      "namescore": 0.0
+     },
+     {
+      "base": "tt_move",
+      "duration": 8,
+      "dframe": 2,
+      "namescore": 0.0
+     },
+     {
+      "base": "tt_dmg",
+      "duration": 8,
+      "dframe": 2,
+      "namescore": 0.0
+     },
+     {
+      "base": "tt_smalljump",
+      "duration": 11,
+      "dframe": 5,
+      "namescore": 0.0
+     },
+     {
+      "base": "tt_jump",
+      "duration": 15,
+      "dframe": 9,
+      "namescore": 0.0
+     },
+     {
+      "base": "tt_wait",
+      "duration": 120,
+      "dframe": 114,
+      "namescore": 0.0
+     }
+    ]
+   },
+   {
+    "n64": "object_tite_Anim_00083C",
+    "otr": "objects/object_tite/object_tite_Anim_00083C",
+    "frameCount": 6,
+    "best": "tt_jump_start",
+    "candidates": [
+     {
+      "base": "tt_jump_start",
+      "duration": 6,
+      "dframe": 0,
+      "namescore": 0.0
+     },
+     {
+      "base": "tt_jump_end",
+      "duration": 6,
+      "dframe": 0,
+      "namescore": 0.0
+     },
+     {
+      "base": "tt_move",
+      "duration": 8,
+      "dframe": 2,
+      "namescore": 0.0
+     },
+     {
+      "base": "tt_dmg",
+      "duration": 8,
+      "dframe": 2,
+      "namescore": 0.0
+     },
+     {
+      "base": "tt_smalljump",
+      "duration": 11,
+      "dframe": 5,
+      "namescore": 0.0
+     },
+     {
+      "base": "tt_jump",
+      "duration": 15,
+      "dframe": 9,
+      "namescore": 0.0
+     },
+     {
+      "base": "tt_wait",
+      "duration": 120,
+      "dframe": 114,
+      "namescore": 0.0
+     }
+    ]
+   },
+   {
+    "n64": "object_tite_Anim_000A14",
+    "otr": "objects/object_tite/object_tite_Anim_000A14",
+    "frameCount": 8,
+    "best": "tt_move",
+    "candidates": [
+     {
+      "base": "tt_move",
+      "duration": 8,
+      "dframe": 0,
+      "namescore": 0.0
+     },
+     {
+      "base": "tt_dmg",
+      "duration": 8,
+      "dframe": 0,
+      "namescore": 0.0
+     },
+     {
+      "base": "tt_jump_start",
+      "duration": 6,
+      "dframe": 2,
+      "namescore": 0.0
+     },
+     {
+      "base": "tt_jump_end",
+      "duration": 6,
+      "dframe": 2,
+      "namescore": 0.0
+     },
+     {
+      "base": "tt_smalljump",
+      "duration": 11,
+      "dframe": 3,
+      "namescore": 0.0
+     },
+     {
+      "base": "tt_jump",
+      "duration": 15,
+      "dframe": 7,
+      "namescore": 0.0
+     },
+     {
+      "base": "tt_wait",
+      "duration": 120,
+      "dframe": 112,
+      "namescore": 0.0
+     }
+    ]
+   },
+   {
+    "n64": "object_tite_Anim_000C70",
+    "otr": "objects/object_tite/object_tite_Anim_000C70",
+    "frameCount": 11,
+    "best": "tt_smalljump",
+    "candidates": [
+     {
+      "base": "tt_smalljump",
+      "duration": 11,
+      "dframe": 0,
+      "namescore": 0.0
+     },
+     {
+      "base": "tt_move",
+      "duration": 8,
+      "dframe": 3,
+      "namescore": 0.0
+     },
+     {
+      "base": "tt_dmg",
+      "duration": 8,
+      "dframe": 3,
+      "namescore": 0.0
+     },
+     {
+      "base": "tt_jump",
+      "duration": 15,
+      "dframe": 4,
+      "namescore": 0.0
+     },
+     {
+      "base": "tt_jump_start",
+      "duration": 6,
+      "dframe": 5,
+      "namescore": 0.0
+     },
+     {
+      "base": "tt_jump_end",
+      "duration": 6,
+      "dframe": 5,
+      "namescore": 0.0
+     },
+     {
+      "base": "tt_wait",
+      "duration": 120,
+      "dframe": 109,
+      "namescore": 0.0
+     }
+    ]
+   },
+   {
+    "n64": "object_tite_Anim_000F50",
+    "otr": "objects/object_tite/object_tite_Anim_000F50",
+    "frameCount": 15,
+    "best": "tt_jump",
+    "candidates": [
+     {
+      "base": "tt_jump",
+      "duration": 15,
+      "dframe": 0,
+      "namescore": 0.0
+     },
+     {
+      "base": "tt_smalljump",
+      "duration": 11,
+      "dframe": 4,
+      "namescore": 0.0
+     },
+     {
+      "base": "tt_move",
+      "duration": 8,
+      "dframe": 7,
+      "namescore": 0.0
+     },
+     {
+      "base": "tt_dmg",
+      "duration": 8,
+      "dframe": 7,
+      "namescore": 0.0
+     },
+     {
+      "base": "tt_jump_start",
+      "duration": 6,
+      "dframe": 9,
+      "namescore": 0.0
+     },
+     {
+      "base": "tt_jump_end",
+      "duration": 6,
+      "dframe": 9,
+      "namescore": 0.0
+     },
+     {
+      "base": "tt_wait",
+      "duration": 120,
+      "dframe": 105,
+      "namescore": 0.0
+     }
+    ]
+   },
+   {
+    "n64": "object_tite_Anim_0012E4",
+    "otr": "objects/object_tite/object_tite_Anim_0012E4",
+    "frameCount": 20,
+    "best": "tt_jump",
+    "candidates": [
+     {
+      "base": "tt_jump",
+      "duration": 15,
+      "dframe": 5,
+      "namescore": 0.0
+     },
+     {
+      "base": "tt_smalljump",
+      "duration": 11,
+      "dframe": 9,
+      "namescore": 0.0
+     },
+     {
+      "base": "tt_move",
+      "duration": 8,
+      "dframe": 12,
+      "namescore": 0.0
+     },
+     {
+      "base": "tt_dmg",
+      "duration": 8,
+      "dframe": 12,
+      "namescore": 0.0
+     },
+     {
+      "base": "tt_jump_start",
+      "duration": 6,
+      "dframe": 14,
+      "namescore": 0.0
+     },
+     {
+      "base": "tt_jump_end",
+      "duration": 6,
+      "dframe": 14,
+      "namescore": 0.0
+     },
+     {
+      "base": "tt_wait",
+      "duration": 120,
+      "dframe": 100,
+      "namescore": 0.0
+     }
+    ]
+   }
+  ]
+ },
  "/actor/zelda_tw.zar": {
   "object": "object_tw",
   "rows": [
@@ -70111,6 +78907,971 @@
       "base": "wolfman_defense",
       "duration": 4,
       "dframe": 25,
+      "namescore": 0.0
+     }
+    ]
+   }
+  ]
+ },
+ "/actor/zelda_wm2.zar": {
+  "object": "object_wallmaster",
+  "rows": [
+   {
+    "n64": "gWallmasterDamageAnim",
+    "otr": "objects/object_wallmaster/gWallmasterDamageAnim",
+    "frameCount": 25,
+    "best": "wm_damage",
+    "candidates": [
+     {
+      "base": "wm_damage",
+      "duration": 25,
+      "dframe": 0,
+      "namescore": 1.0
+     },
+     {
+      "base": "wm_l_turn",
+      "duration": 28,
+      "dframe": 3,
+      "namescore": 1.0
+     },
+     {
+      "base": "wm_miss",
+      "duration": 28,
+      "dframe": 3,
+      "namescore": 0.0
+     },
+     {
+      "base": "wm_link_hangup",
+      "duration": 31,
+      "dframe": 6,
+      "namescore": 0.0
+     },
+     {
+      "base": "wm_move",
+      "duration": 37,
+      "dframe": 12,
+      "namescore": 0.0
+     },
+     {
+      "base": "wm_damage_wait",
+      "duration": 40,
+      "dframe": 15,
+      "namescore": 1.0
+     },
+     {
+      "base": "wm_motionA",
+      "duration": 40,
+      "dframe": 15,
+      "namescore": 0.0
+     },
+     {
+      "base": "wm_success",
+      "duration": 10,
+      "dframe": 15,
+      "namescore": 0.0
+     },
+     {
+      "base": "wm_wait",
+      "duration": 40,
+      "dframe": 15,
+      "namescore": 0.0
+     },
+     {
+      "base": "wm_move_wait",
+      "duration": 9,
+      "dframe": 16,
+      "namescore": 0.0
+     },
+     {
+      "base": "wm_wait_move",
+      "duration": 9,
+      "dframe": 16,
+      "namescore": 0.0
+     },
+     {
+      "base": "wm_f_jump",
+      "duration": 51,
+      "dframe": 26,
+      "namescore": 0.0
+     }
+    ]
+   },
+   {
+    "n64": "gWallmasterRecoverFromDamageAnim",
+    "otr": "objects/object_wallmaster/gWallmasterRecoverFromDamageAnim",
+    "frameCount": 41,
+    "best": "wm_damage_wait",
+    "candidates": [
+     {
+      "base": "wm_damage_wait",
+      "duration": 40,
+      "dframe": 1,
+      "namescore": 1.0
+     },
+     {
+      "base": "wm_motionA",
+      "duration": 40,
+      "dframe": 1,
+      "namescore": 0.0
+     },
+     {
+      "base": "wm_wait",
+      "duration": 40,
+      "dframe": 1,
+      "namescore": 0.0
+     },
+     {
+      "base": "wm_move",
+      "duration": 37,
+      "dframe": 4,
+      "namescore": 0.0
+     },
+     {
+      "base": "wm_f_jump",
+      "duration": 51,
+      "dframe": 10,
+      "namescore": 1.0
+     },
+     {
+      "base": "wm_link_hangup",
+      "duration": 31,
+      "dframe": 10,
+      "namescore": 0.0
+     },
+     {
+      "base": "wm_l_turn",
+      "duration": 28,
+      "dframe": 13,
+      "namescore": 1.0
+     },
+     {
+      "base": "wm_miss",
+      "duration": 28,
+      "dframe": 13,
+      "namescore": 0.0
+     },
+     {
+      "base": "wm_damage",
+      "duration": 25,
+      "dframe": 16,
+      "namescore": 1.0
+     },
+     {
+      "base": "wm_success",
+      "duration": 10,
+      "dframe": 31,
+      "namescore": 0.0
+     },
+     {
+      "base": "wm_move_wait",
+      "duration": 9,
+      "dframe": 32,
+      "namescore": 0.0
+     },
+     {
+      "base": "wm_wait_move",
+      "duration": 9,
+      "dframe": 32,
+      "namescore": 0.0
+     }
+    ]
+   },
+   {
+    "n64": "gWallmasterJumpAnim",
+    "otr": "objects/object_wallmaster/gWallmasterJumpAnim",
+    "frameCount": 51,
+    "best": "wm_f_jump",
+    "candidates": [
+     {
+      "base": "wm_f_jump",
+      "duration": 51,
+      "dframe": 0,
+      "namescore": 1.0
+     },
+     {
+      "base": "wm_damage_wait",
+      "duration": 40,
+      "dframe": 11,
+      "namescore": 0.0
+     },
+     {
+      "base": "wm_motionA",
+      "duration": 40,
+      "dframe": 11,
+      "namescore": 0.0
+     },
+     {
+      "base": "wm_wait",
+      "duration": 40,
+      "dframe": 11,
+      "namescore": 0.0
+     },
+     {
+      "base": "wm_move",
+      "duration": 37,
+      "dframe": 14,
+      "namescore": 0.0
+     },
+     {
+      "base": "wm_link_hangup",
+      "duration": 31,
+      "dframe": 20,
+      "namescore": 0.0
+     },
+     {
+      "base": "wm_l_turn",
+      "duration": 28,
+      "dframe": 23,
+      "namescore": 1.0
+     },
+     {
+      "base": "wm_miss",
+      "duration": 28,
+      "dframe": 23,
+      "namescore": 0.0
+     },
+     {
+      "base": "wm_damage",
+      "duration": 25,
+      "dframe": 26,
+      "namescore": 0.0
+     },
+     {
+      "base": "wm_success",
+      "duration": 10,
+      "dframe": 41,
+      "namescore": 0.0
+     },
+     {
+      "base": "wm_move_wait",
+      "duration": 9,
+      "dframe": 42,
+      "namescore": 0.0
+     },
+     {
+      "base": "wm_wait_move",
+      "duration": 9,
+      "dframe": 42,
+      "namescore": 0.0
+     }
+    ]
+   },
+   {
+    "n64": "gWallmasterWalkAnim",
+    "otr": "objects/object_wallmaster/gWallmasterWalkAnim",
+    "frameCount": 37,
+    "best": "wm_move",
+    "candidates": [
+     {
+      "base": "wm_move",
+      "duration": 37,
+      "dframe": 0,
+      "namescore": 0.0
+     },
+     {
+      "base": "wm_damage_wait",
+      "duration": 40,
+      "dframe": 3,
+      "namescore": 0.0
+     },
+     {
+      "base": "wm_motionA",
+      "duration": 40,
+      "dframe": 3,
+      "namescore": 0.0
+     },
+     {
+      "base": "wm_wait",
+      "duration": 40,
+      "dframe": 3,
+      "namescore": 0.0
+     },
+     {
+      "base": "wm_link_hangup",
+      "duration": 31,
+      "dframe": 6,
+      "namescore": 0.0
+     },
+     {
+      "base": "wm_l_turn",
+      "duration": 28,
+      "dframe": 9,
+      "namescore": 1.0
+     },
+     {
+      "base": "wm_miss",
+      "duration": 28,
+      "dframe": 9,
+      "namescore": 0.0
+     },
+     {
+      "base": "wm_damage",
+      "duration": 25,
+      "dframe": 12,
+      "namescore": 0.0
+     },
+     {
+      "base": "wm_f_jump",
+      "duration": 51,
+      "dframe": 14,
+      "namescore": 0.0
+     },
+     {
+      "base": "wm_success",
+      "duration": 10,
+      "dframe": 27,
+      "namescore": 0.0
+     },
+     {
+      "base": "wm_move_wait",
+      "duration": 9,
+      "dframe": 28,
+      "namescore": 0.0
+     },
+     {
+      "base": "wm_wait_move",
+      "duration": 9,
+      "dframe": 28,
+      "namescore": 0.0
+     }
+    ]
+   },
+   {
+    "n64": "gWallmasterStopWalkAnim",
+    "otr": "objects/object_wallmaster/gWallmasterStopWalkAnim",
+    "frameCount": 9,
+    "best": "wm_move_wait",
+    "candidates": [
+     {
+      "base": "wm_move_wait",
+      "duration": 9,
+      "dframe": 0,
+      "namescore": 0.0
+     },
+     {
+      "base": "wm_wait_move",
+      "duration": 9,
+      "dframe": 0,
+      "namescore": 0.0
+     },
+     {
+      "base": "wm_success",
+      "duration": 10,
+      "dframe": 1,
+      "namescore": 0.0
+     },
+     {
+      "base": "wm_damage",
+      "duration": 25,
+      "dframe": 16,
+      "namescore": 0.0
+     },
+     {
+      "base": "wm_l_turn",
+      "duration": 28,
+      "dframe": 19,
+      "namescore": 1.0
+     },
+     {
+      "base": "wm_miss",
+      "duration": 28,
+      "dframe": 19,
+      "namescore": 0.0
+     },
+     {
+      "base": "wm_link_hangup",
+      "duration": 31,
+      "dframe": 22,
+      "namescore": 0.0
+     },
+     {
+      "base": "wm_move",
+      "duration": 37,
+      "dframe": 28,
+      "namescore": 0.0
+     },
+     {
+      "base": "wm_damage_wait",
+      "duration": 40,
+      "dframe": 31,
+      "namescore": 0.0
+     },
+     {
+      "base": "wm_motionA",
+      "duration": 40,
+      "dframe": 31,
+      "namescore": 0.0
+     },
+     {
+      "base": "wm_wait",
+      "duration": 40,
+      "dframe": 31,
+      "namescore": 0.0
+     },
+     {
+      "base": "wm_f_jump",
+      "duration": 51,
+      "dframe": 42,
+      "namescore": 0.0
+     }
+    ]
+   },
+   {
+    "n64": "gWallmasterHoverAnim",
+    "otr": "objects/object_wallmaster/gWallmasterHoverAnim",
+    "frameCount": 9,
+    "best": "wm_move_wait",
+    "candidates": [
+     {
+      "base": "wm_move_wait",
+      "duration": 9,
+      "dframe": 0,
+      "namescore": 0.0
+     },
+     {
+      "base": "wm_wait_move",
+      "duration": 9,
+      "dframe": 0,
+      "namescore": 0.0
+     },
+     {
+      "base": "wm_success",
+      "duration": 10,
+      "dframe": 1,
+      "namescore": 0.0
+     },
+     {
+      "base": "wm_damage",
+      "duration": 25,
+      "dframe": 16,
+      "namescore": 0.0
+     },
+     {
+      "base": "wm_l_turn",
+      "duration": 28,
+      "dframe": 19,
+      "namescore": 1.0
+     },
+     {
+      "base": "wm_miss",
+      "duration": 28,
+      "dframe": 19,
+      "namescore": 0.0
+     },
+     {
+      "base": "wm_link_hangup",
+      "duration": 31,
+      "dframe": 22,
+      "namescore": 0.0
+     },
+     {
+      "base": "wm_move",
+      "duration": 37,
+      "dframe": 28,
+      "namescore": 0.0
+     },
+     {
+      "base": "wm_damage_wait",
+      "duration": 40,
+      "dframe": 31,
+      "namescore": 0.0
+     },
+     {
+      "base": "wm_motionA",
+      "duration": 40,
+      "dframe": 31,
+      "namescore": 0.0
+     },
+     {
+      "base": "wm_wait",
+      "duration": 40,
+      "dframe": 31,
+      "namescore": 0.0
+     },
+     {
+      "base": "wm_f_jump",
+      "duration": 51,
+      "dframe": 42,
+      "namescore": 0.0
+     }
+    ]
+   },
+   {
+    "n64": "gWallmasterWaitAnim",
+    "otr": "objects/object_wallmaster/gWallmasterWaitAnim",
+    "frameCount": 40,
+    "best": "wm_damage_wait",
+    "candidates": [
+     {
+      "base": "wm_damage_wait",
+      "duration": 40,
+      "dframe": 0,
+      "namescore": 1.0
+     },
+     {
+      "base": "wm_wait",
+      "duration": 40,
+      "dframe": 0,
+      "namescore": 1.0
+     },
+     {
+      "base": "wm_motionA",
+      "duration": 40,
+      "dframe": 0,
+      "namescore": 0.0
+     },
+     {
+      "base": "wm_move",
+      "duration": 37,
+      "dframe": 3,
+      "namescore": 0.0
+     },
+     {
+      "base": "wm_link_hangup",
+      "duration": 31,
+      "dframe": 9,
+      "namescore": 0.0
+     },
+     {
+      "base": "wm_f_jump",
+      "duration": 51,
+      "dframe": 11,
+      "namescore": 0.0
+     },
+     {
+      "base": "wm_l_turn",
+      "duration": 28,
+      "dframe": 12,
+      "namescore": 1.0
+     },
+     {
+      "base": "wm_miss",
+      "duration": 28,
+      "dframe": 12,
+      "namescore": 0.0
+     },
+     {
+      "base": "wm_damage",
+      "duration": 25,
+      "dframe": 15,
+      "namescore": 0.0
+     },
+     {
+      "base": "wm_success",
+      "duration": 10,
+      "dframe": 30,
+      "namescore": 0.0
+     },
+     {
+      "base": "wm_move_wait",
+      "duration": 9,
+      "dframe": 31,
+      "namescore": 1.0
+     },
+     {
+      "base": "wm_wait_move",
+      "duration": 9,
+      "dframe": 31,
+      "namescore": 1.0
+     }
+    ]
+   },
+   {
+    "n64": "gWallmasterStandUpAnim",
+    "otr": "objects/object_wallmaster/gWallmasterStandUpAnim",
+    "frameCount": 9,
+    "best": "wm_move_wait",
+    "candidates": [
+     {
+      "base": "wm_move_wait",
+      "duration": 9,
+      "dframe": 0,
+      "namescore": 1.0
+     },
+     {
+      "base": "wm_wait_move",
+      "duration": 9,
+      "dframe": 0,
+      "namescore": 1.0
+     },
+     {
+      "base": "wm_success",
+      "duration": 10,
+      "dframe": 1,
+      "namescore": 0.0
+     },
+     {
+      "base": "wm_damage",
+      "duration": 25,
+      "dframe": 16,
+      "namescore": 0.0
+     },
+     {
+      "base": "wm_l_turn",
+      "duration": 28,
+      "dframe": 19,
+      "namescore": 1.0
+     },
+     {
+      "base": "wm_miss",
+      "duration": 28,
+      "dframe": 19,
+      "namescore": 0.0
+     },
+     {
+      "base": "wm_link_hangup",
+      "duration": 31,
+      "dframe": 22,
+      "namescore": 0.0
+     },
+     {
+      "base": "wm_move",
+      "duration": 37,
+      "dframe": 28,
+      "namescore": 0.0
+     },
+     {
+      "base": "wm_damage_wait",
+      "duration": 40,
+      "dframe": 31,
+      "namescore": 1.0
+     },
+     {
+      "base": "wm_wait",
+      "duration": 40,
+      "dframe": 31,
+      "namescore": 1.0
+     },
+     {
+      "base": "wm_motionA",
+      "duration": 40,
+      "dframe": 31,
+      "namescore": 0.0
+     },
+     {
+      "base": "wm_f_jump",
+      "duration": 51,
+      "dframe": 42,
+      "namescore": 0.0
+     }
+    ]
+   },
+   {
+    "n64": "gWallmasterLungeAnim",
+    "otr": "objects/object_wallmaster/gWallmasterLungeAnim",
+    "frameCount": 30,
+    "best": "wm_link_hangup",
+    "candidates": [
+     {
+      "base": "wm_link_hangup",
+      "duration": 31,
+      "dframe": 1,
+      "namescore": 0.0
+     },
+     {
+      "base": "wm_l_turn",
+      "duration": 28,
+      "dframe": 2,
+      "namescore": 1.0
+     },
+     {
+      "base": "wm_miss",
+      "duration": 28,
+      "dframe": 2,
+      "namescore": 0.0
+     },
+     {
+      "base": "wm_damage",
+      "duration": 25,
+      "dframe": 5,
+      "namescore": 0.0
+     },
+     {
+      "base": "wm_move",
+      "duration": 37,
+      "dframe": 7,
+      "namescore": 0.0
+     },
+     {
+      "base": "wm_damage_wait",
+      "duration": 40,
+      "dframe": 10,
+      "namescore": 0.0
+     },
+     {
+      "base": "wm_motionA",
+      "duration": 40,
+      "dframe": 10,
+      "namescore": 0.0
+     },
+     {
+      "base": "wm_wait",
+      "duration": 40,
+      "dframe": 10,
+      "namescore": 0.0
+     },
+     {
+      "base": "wm_success",
+      "duration": 10,
+      "dframe": 20,
+      "namescore": 0.0
+     },
+     {
+      "base": "wm_f_jump",
+      "duration": 51,
+      "dframe": 21,
+      "namescore": 0.0
+     },
+     {
+      "base": "wm_move_wait",
+      "duration": 9,
+      "dframe": 21,
+      "namescore": 0.0
+     },
+     {
+      "base": "wm_wait_move",
+      "duration": 9,
+      "dframe": 21,
+      "namescore": 0.0
+     }
+    ]
+   },
+   {
+    "n64": "gFloormasterTurnAnim",
+    "otr": "objects/object_wallmaster/gFloormasterTurnAnim",
+    "frameCount": 28,
+    "best": "wm_l_turn",
+    "candidates": [
+     {
+      "base": "wm_l_turn",
+      "duration": 28,
+      "dframe": 0,
+      "namescore": 1.0
+     },
+     {
+      "base": "wm_miss",
+      "duration": 28,
+      "dframe": 0,
+      "namescore": 0.0
+     },
+     {
+      "base": "wm_damage",
+      "duration": 25,
+      "dframe": 3,
+      "namescore": 0.0
+     },
+     {
+      "base": "wm_link_hangup",
+      "duration": 31,
+      "dframe": 3,
+      "namescore": 0.0
+     },
+     {
+      "base": "wm_move",
+      "duration": 37,
+      "dframe": 9,
+      "namescore": 0.0
+     },
+     {
+      "base": "wm_damage_wait",
+      "duration": 40,
+      "dframe": 12,
+      "namescore": 0.0
+     },
+     {
+      "base": "wm_motionA",
+      "duration": 40,
+      "dframe": 12,
+      "namescore": 0.0
+     },
+     {
+      "base": "wm_wait",
+      "duration": 40,
+      "dframe": 12,
+      "namescore": 0.0
+     },
+     {
+      "base": "wm_success",
+      "duration": 10,
+      "dframe": 18,
+      "namescore": 0.0
+     },
+     {
+      "base": "wm_move_wait",
+      "duration": 9,
+      "dframe": 19,
+      "namescore": 0.0
+     },
+     {
+      "base": "wm_wait_move",
+      "duration": 9,
+      "dframe": 19,
+      "namescore": 0.0
+     },
+     {
+      "base": "wm_f_jump",
+      "duration": 51,
+      "dframe": 23,
+      "namescore": 1.0
+     }
+    ]
+   },
+   {
+    "n64": "gFloormasterTapFingerAnim",
+    "otr": "objects/object_wallmaster/gFloormasterTapFingerAnim",
+    "frameCount": 40,
+    "best": "wm_damage_wait",
+    "candidates": [
+     {
+      "base": "wm_damage_wait",
+      "duration": 40,
+      "dframe": 0,
+      "namescore": 0.0
+     },
+     {
+      "base": "wm_motionA",
+      "duration": 40,
+      "dframe": 0,
+      "namescore": 0.0
+     },
+     {
+      "base": "wm_wait",
+      "duration": 40,
+      "dframe": 0,
+      "namescore": 0.0
+     },
+     {
+      "base": "wm_move",
+      "duration": 37,
+      "dframe": 3,
+      "namescore": 0.0
+     },
+     {
+      "base": "wm_link_hangup",
+      "duration": 31,
+      "dframe": 9,
+      "namescore": 0.0
+     },
+     {
+      "base": "wm_f_jump",
+      "duration": 51,
+      "dframe": 11,
+      "namescore": 1.0
+     },
+     {
+      "base": "wm_l_turn",
+      "duration": 28,
+      "dframe": 12,
+      "namescore": 1.0
+     },
+     {
+      "base": "wm_miss",
+      "duration": 28,
+      "dframe": 12,
+      "namescore": 0.0
+     },
+     {
+      "base": "wm_damage",
+      "duration": 25,
+      "dframe": 15,
+      "namescore": 0.0
+     },
+     {
+      "base": "wm_success",
+      "duration": 10,
+      "dframe": 30,
+      "namescore": 0.0
+     },
+     {
+      "base": "wm_move_wait",
+      "duration": 9,
+      "dframe": 31,
+      "namescore": 0.0
+     },
+     {
+      "base": "wm_wait_move",
+      "duration": 9,
+      "dframe": 31,
+      "namescore": 0.0
+     }
+    ]
+   },
+   {
+    "n64": "gWallmasterMissAnim",
+    "otr": "objects/object_wallmaster/gWallmasterMissAnim",
+    "frameCount": 27,
+    "best": "wm_l_turn",
+    "candidates": [
+     {
+      "base": "wm_l_turn",
+      "duration": 28,
+      "dframe": 1,
+      "namescore": 1.0
+     },
+     {
+      "base": "wm_miss",
+      "duration": 28,
+      "dframe": 1,
+      "namescore": 1.0
+     },
+     {
+      "base": "wm_damage",
+      "duration": 25,
+      "dframe": 2,
+      "namescore": 0.0
+     },
+     {
+      "base": "wm_link_hangup",
+      "duration": 31,
+      "dframe": 4,
+      "namescore": 0.0
+     },
+     {
+      "base": "wm_move",
+      "duration": 37,
+      "dframe": 10,
+      "namescore": 0.0
+     },
+     {
+      "base": "wm_damage_wait",
+      "duration": 40,
+      "dframe": 13,
+      "namescore": 0.0
+     },
+     {
+      "base": "wm_motionA",
+      "duration": 40,
+      "dframe": 13,
+      "namescore": 0.0
+     },
+     {
+      "base": "wm_wait",
+      "duration": 40,
+      "dframe": 13,
+      "namescore": 0.0
+     },
+     {
+      "base": "wm_success",
+      "duration": 10,
+      "dframe": 17,
+      "namescore": 0.0
+     },
+     {
+      "base": "wm_move_wait",
+      "duration": 9,
+      "dframe": 18,
+      "namescore": 0.0
+     },
+     {
+      "base": "wm_wait_move",
+      "duration": 9,
+      "dframe": 18,
+      "namescore": 0.0
+     },
+     {
+      "base": "wm_f_jump",
+      "duration": 51,
+      "dframe": 24,
       "namescore": 0.0
      }
     ]

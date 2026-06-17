@@ -117,6 +117,70 @@
    "bones": 17
   }
  ],
+ "/actor/zelda_av.zar": [
+  {
+   "name": "Anim/av_die.csab",
+   "base": "av_die",
+   "duration": 13,
+   "bones": 10
+  },
+  {
+   "name": "Anim/av_dmg.csab",
+   "base": "av_dmg",
+   "duration": 22,
+   "bones": 10
+  },
+  {
+   "name": "Anim/av_fire.csab",
+   "base": "av_fire",
+   "duration": 61,
+   "bones": 10
+  },
+  {
+   "name": "Anim/av_getup.csab",
+   "base": "av_getup",
+   "duration": 17,
+   "bones": 10
+  },
+  {
+   "name": "Anim/av_jump.csab",
+   "base": "av_jump",
+   "duration": 12,
+   "bones": 10
+  },
+  {
+   "name": "Anim/av_jump_start.csab",
+   "base": "av_jump_start",
+   "duration": 17,
+   "bones": 10
+  },
+  {
+   "name": "Anim/av_wait.csab",
+   "base": "av_wait",
+   "duration": 61,
+   "bones": 10
+  }
+ ],
+ "/actor/zelda_bb.zar": [
+  {
+   "name": "Anim/bb_fly.csab",
+   "base": "bb_fly",
+   "duration": 11,
+   "bones": 7
+  },
+  {
+   "name": "Anim/bb_atack.csab",
+   "base": "bb_atack",
+   "duration": 11,
+   "bones": 7
+  },
+  {
+   "name": "Anim/bb_damage.csab",
+   "base": "bb_damage",
+   "duration": 9,
+   "bones": 7
+  }
+ ],
  "/actor/zelda_bba.zar": [
   {
    "name": "Anim/Bba_matsu.csab",
@@ -1413,6 +1477,56 @@
    "bones": 19
   }
  ],
+ "/actor/zelda_fantomHG.zar": [
+  {
+   "name": "Anim/hgf_damage.csab",
+   "base": "hgf_damage",
+   "duration": 20,
+   "bones": 25
+  },
+  {
+   "name": "Anim/hgf_fastrun.csab",
+   "base": "hgf_fastrun",
+   "duration": 14,
+   "bones": 25
+  },
+  {
+   "name": "Anim/hgf_fly.csab",
+   "base": "hgf_fly",
+   "duration": 15,
+   "bones": 25
+  },
+  {
+   "name": "Anim/hgf_jump.csab",
+   "base": "hgf_jump",
+   "duration": 30,
+   "bones": 25
+  },
+  {
+   "name": "Anim/hgf_jump01.csab",
+   "base": "hgf_jump01",
+   "duration": 14,
+   "bones": 25
+  },
+  {
+   "name": "Anim/hgf_jump02.csab",
+   "base": "hgf_jump02",
+   "duration": 16,
+   "bones": 25
+  },
+  {
+   "name": "Anim/hgf_stand.csab",
+   "base": "hgf_stand",
+   "duration": 33,
+   "bones": 25
+  },
+  {
+   "name": "Anim/hgf_wait.csab",
+   "base": "hgf_wait",
+   "duration": 45,
+   "bones": 25
+  }
+ ],
  "/actor/zelda_fd.zar": [
   {
    "name": "Anim/vb_FWDtest.csab",
@@ -1503,6 +1617,20 @@
    "base": "vba_wait",
    "duration": 21,
    "bones": 36
+  }
+ ],
+ "/actor/zelda_ff.zar": [
+  {
+   "name": "Anim/firefly_foot_fly.csab",
+   "base": "firefly_foot_fly",
+   "duration": 10,
+   "bones": 12
+  },
+  {
+   "name": "Anim/firefly_foot_at.csab",
+   "base": "firefly_foot_at",
+   "duration": 5,
+   "bones": 12
   }
  ],
  "/actor/zelda_fr.zar": [
@@ -1783,6 +1911,74 @@
    "base": "ge1_hanasi",
    "duration": 8,
    "bones": 15
+  }
+ ],
+ "/actor/zelda_gelb.zar": [
+  {
+   "name": "Anim/geldB_attackA.csab",
+   "base": "geldB_attackA",
+   "duration": 10,
+   "bones": 19
+  },
+  {
+   "name": "Anim/geldB_attackB.csab",
+   "base": "geldB_attackB",
+   "duration": 40,
+   "bones": 19
+  },
+  {
+   "name": "Anim/geldB_back_ten.csab",
+   "base": "geldB_back_ten",
+   "duration": 11,
+   "bones": 19
+  },
+  {
+   "name": "Anim/geldB_defense.csab",
+   "base": "geldB_defense",
+   "duration": 5,
+   "bones": 19
+  },
+  {
+   "name": "Anim/geldB_down.csab",
+   "base": "geldB_down",
+   "duration": 24,
+   "bones": 19
+  },
+  {
+   "name": "Anim/geldB_hit.csab",
+   "base": "geldB_hit",
+   "duration": 12,
+   "bones": 19
+  },
+  {
+   "name": "Anim/geldB_run.csab",
+   "base": "geldB_run",
+   "duration": 7,
+   "bones": 19
+  },
+  {
+   "name": "Anim/geldB_side_walk.csab",
+   "base": "geldB_side_walk",
+   "duration": 10,
+   "bones": 19
+  },
+  {
+   "name": "Anim/geldB_start.csab",
+   "base": "geldB_start",
+   "duration": 17,
+   "bones": 19
+  },
+  {
+   "name": "Anim/geldB_talk.csab",
+   "base": "geldB_talk",
+   "duration": 15,
+   "bones": 19
+  },
+  {
+   "name": "Anim/geldB_wait.csab",
+   "base": "geldB_wait",
+   "duration": 20,
+   "bones": 19
   }
  ],
  "/actor/zelda_gla.zar": [
@@ -2293,6 +2489,38 @@
    "base": "dnh_mahi",
    "duration": 16,
    "bones": 9
+  }
+ ],
+ "/actor/zelda_hlc.zar": [
+  {
+   "name": "Anim/hlc_anim_fastrun.csab",
+   "base": "hlc_anim_fastrun",
+   "duration": 24,
+   "bones": 24
+  },
+  {
+   "name": "Anim/hlc_anim_slowrun.csab",
+   "base": "hlc_anim_slowrun",
+   "duration": 29,
+   "bones": 24
+  },
+  {
+   "name": "Anim/hlc_anim_wait.csab",
+   "base": "hlc_anim_wait",
+   "duration": 70,
+   "bones": 24
+  },
+  {
+   "name": "Anim/hlc_anim_wait02.csab",
+   "base": "hlc_anim_wait02",
+   "duration": 30,
+   "bones": 24
+  },
+  {
+   "name": "Anim/hlc_anim_walk.csab",
+   "base": "hlc_anim_walk",
+   "duration": 35,
+   "bones": 24
   }
  ],
  "/actor/zelda_hni.zar": [
@@ -2953,6 +3181,116 @@
    "base": "ka_dance",
    "duration": 21,
    "bones": 8
+  }
+ ],
+ "/actor/zelda_kdodongo.zar": [
+  {
+   "name": "anim/kd_bombwait.csab",
+   "base": "kd_bombwait",
+   "duration": 31,
+   "bones": 21
+  },
+  {
+   "name": "anim/kd_damage.csab",
+   "base": "kd_damage",
+   "duration": 23,
+   "bones": 21
+  },
+  {
+   "name": "anim/kd_die_a.csab",
+   "base": "kd_die_a",
+   "duration": 68,
+   "bones": 21
+  },
+  {
+   "name": "anim/kd_die_b.csab",
+   "base": "kd_die_b",
+   "duration": 30,
+   "bones": 21
+  },
+  {
+   "name": "anim/kd_down.csab",
+   "base": "kd_down",
+   "duration": 20,
+   "bones": 21
+  },
+  {
+   "name": "anim/kd_explode.csab",
+   "base": "kd_explode",
+   "duration": 27,
+   "bones": 21
+  },
+  {
+   "name": "anim/kd_fire.csab",
+   "base": "kd_fire",
+   "duration": 51,
+   "bones": 21
+  },
+  {
+   "name": "anim/kd_fire_damage.csab",
+   "base": "kd_fire_damage",
+   "duration": 20,
+   "bones": 21
+  },
+  {
+   "name": "anim/kd_fire_standby.csab",
+   "base": "kd_fire_standby",
+   "duration": 101,
+   "bones": 21
+  },
+  {
+   "name": "anim/kd_getup.csab",
+   "base": "kd_getup",
+   "duration": 36,
+   "bones": 21
+  },
+  {
+   "name": "anim/kd_roll_standby.csab",
+   "base": "kd_roll_standby",
+   "duration": 31,
+   "bones": 21
+  },
+  {
+   "name": "anim/kd_rolling.csab",
+   "base": "kd_rolling",
+   "duration": 115,
+   "bones": 21
+  },
+  {
+   "name": "anim/kd_success.csab",
+   "base": "kd_success",
+   "duration": 30,
+   "bones": 21
+  },
+  {
+   "name": "anim/kd_wait.csab",
+   "base": "kd_wait",
+   "duration": 21,
+   "bones": 21
+  },
+  {
+   "name": "anim/kd_walk.csab",
+   "base": "kd_walk",
+   "duration": 61,
+   "bones": 21
+  },
+  {
+   "name": "anim/kd_walk_end.csab",
+   "base": "kd_walk_end",
+   "duration": 17,
+   "bones": 21
+  },
+  {
+   "name": "anim/kd_walk_start.csab",
+   "base": "kd_walk_start",
+   "duration": 15,
+   "bones": 21
+  },
+  {
+   "name": "anim/kd_end.csab",
+   "base": "kd_end",
+   "duration": 270,
+   "bones": 21
   }
  ],
  "/actor/zelda_km1.zar": [
@@ -3953,6 +4291,164 @@
    "bones": 22
   }
  ],
+ "/actor/zelda_nw.zar": [
+  {
+   "name": "Anim/nw_wait.csab",
+   "base": "nw_wait",
+   "duration": 11,
+   "bones": 9
+  }
+ ],
+ "/actor/zelda_oF1d.zar": [
+  {
+   "name": "Anim/Goro_een.csab",
+   "base": "Goro_een",
+   "duration": 25,
+   "bones": 19
+  },
+  {
+   "name": "Anim/Goro_siku_siku.csab",
+   "base": "Goro_siku_siku",
+   "duration": 25,
+   "bones": 19
+  },
+  {
+   "name": "Anim/Goron_mukuri.csab",
+   "base": "Goron_mukuri",
+   "duration": 30,
+   "bones": 19
+  },
+  {
+   "name": "Anim/Goron_pikupiku.csab",
+   "base": "Goron_pikupiku",
+   "duration": 24,
+   "bones": 19
+  },
+  {
+   "name": "Anim/Goron_poripori.csab",
+   "base": "Goron_poripori",
+   "duration": 44,
+   "bones": 19
+  },
+  {
+   "name": "Anim/goron_demo_walk.csab",
+   "base": "goron_demo_walk",
+   "duration": 26,
+   "bones": 19
+  },
+  {
+   "name": "Anim/oF1d_chyu_goron.csab",
+   "base": "oF1d_chyu_goron",
+   "duration": 25,
+   "bones": 19
+  },
+  {
+   "name": "Anim/oF1d_dai_goron_ii.csab",
+   "base": "oF1d_dai_goron_ii",
+   "duration": 21,
+   "bones": 19
+  },
+  {
+   "name": "Anim/oF1d_dai_goron_kaii.csab",
+   "base": "oF1d_dai_goron_kaii",
+   "duration": 50,
+   "bones": 19
+  },
+  {
+   "name": "Anim/oF1d_dai_goron_megusuri.csab",
+   "base": "oF1d_dai_goron_megusuri",
+   "duration": 15,
+   "bones": 19
+  },
+  {
+   "name": "Anim/oF1d_konnnichiwa.csab",
+   "base": "oF1d_konnnichiwa",
+   "duration": 41,
+   "bones": 19
+  },
+  {
+   "name": "Anim/oF1d_omise.csab",
+   "base": "oF1d_omise",
+   "duration": 23,
+   "bones": 19
+  },
+  {
+   "name": "Anim/oF1d_yokoaruki.csab",
+   "base": "oF1d_yokoaruki",
+   "duration": 20,
+   "bones": 19
+  }
+ ],
+ "/actor/zelda_oc2.zar": [
+  {
+   "name": "Anim/oc_up.csab",
+   "base": "oc_up",
+   "duration": 21,
+   "bones": 16
+  },
+  {
+   "name": "Anim/oc_float.csab",
+   "base": "oc_float",
+   "duration": 17,
+   "bones": 16
+  },
+  {
+   "name": "Anim/oc_down.csab",
+   "base": "oc_down",
+   "duration": 8,
+   "bones": 16
+  },
+  {
+   "name": "Anim/oc_predead.csab",
+   "base": "oc_predead",
+   "duration": 13,
+   "bones": 16
+  },
+  {
+   "name": "Anim/oc_dead.csab",
+   "base": "oc_dead",
+   "duration": 26,
+   "bones": 16
+  },
+  {
+   "name": "Anim/oc_atack.csab",
+   "base": "oc_atack",
+   "duration": 21,
+   "bones": 16
+  }
+ ],
+ "/actor/zelda_ocd.zar": [
+  {
+   "name": "Anim/ocd_wait.csab",
+   "base": "ocd_wait",
+   "duration": 30,
+   "bones": 19
+  },
+  {
+   "name": "Anim/ocd_walk.csab",
+   "base": "ocd_walk",
+   "duration": 25,
+   "bones": 19
+  },
+  {
+   "name": "Anim/ocd_stop.csab",
+   "base": "ocd_stop",
+   "duration": 9,
+   "bones": 19
+  },
+  {
+   "name": "Anim/ocd_damagejump.csab",
+   "base": "ocd_damagejump",
+   "duration": 14,
+   "bones": 19
+  },
+  {
+   "name": "Anim/ocd_dead.csab",
+   "base": "ocd_dead",
+   "duration": 21,
+   "bones": 19
+  }
+ ],
  "/actor/zelda_os.zar": [
   {
    "name": "Anim/os_matsu.csab",
@@ -3991,6 +4487,70 @@
    "base": "owl_kakku",
    "duration": 2,
    "bones": 20
+  }
+ ],
+ "/actor/zelda_ph.zar": [
+  {
+   "name": "Anim/ph_start.csab",
+   "base": "ph_start",
+   "duration": 17,
+   "bones": 10
+  },
+  {
+   "name": "Anim/ph_end.csab",
+   "base": "ph_end",
+   "duration": 50,
+   "bones": 10
+  },
+  {
+   "name": "Anim/ph_fly.csab",
+   "base": "ph_fly",
+   "duration": 33,
+   "bones": 10
+  },
+  {
+   "name": "Anim/ph_shock.csab",
+   "base": "ph_shock",
+   "duration": 33,
+   "bones": 10
+  }
+ ],
+ "/actor/zelda_po.zar": [
+  {
+   "name": "Anim/po_wait.csab",
+   "base": "po_wait",
+   "duration": 20,
+   "bones": 11
+  },
+  {
+   "name": "Anim/po_start.csab",
+   "base": "po_start",
+   "duration": 30,
+   "bones": 11
+  },
+  {
+   "name": "Anim/po_fly.csab",
+   "base": "po_fly",
+   "duration": 16,
+   "bones": 11
+  },
+  {
+   "name": "Anim/po_atack.csab",
+   "base": "po_atack",
+   "duration": 12,
+   "bones": 11
+  },
+  {
+   "name": "Anim/po_damage.csab",
+   "base": "po_damage",
+   "duration": 16,
+   "bones": 11
+  },
+  {
+   "name": "Anim/po_escape.csab",
+   "base": "po_escape",
+   "duration": 8,
+   "bones": 11
   }
  ],
  "/actor/zelda_po_composer.zar": [
@@ -4125,6 +4685,20 @@
    "base": "ps_tataku",
    "duration": 30,
    "bones": 10
+  }
+ ],
+ "/actor/zelda_rb.zar": [
+  {
+   "name": "Anim/reeba_rb_move.csab",
+   "base": "reeba_rb_move",
+   "duration": 31,
+   "bones": 6
+  },
+  {
+   "name": "Anim/reeba_dmg.csab",
+   "base": "reeba_dmg",
+   "duration": 27,
+   "bones": 6
   }
  ],
  "/actor/zelda_rd.zar": [
@@ -4747,6 +5321,122 @@
    "bones": 29
   }
  ],
+ "/actor/zelda_skelton.zar": [
+  {
+   "name": "Anim/skelton_fight_wait2wait.csab",
+   "base": "skelton_fight_wait2wait",
+   "duration": 11,
+   "bones": 25
+  },
+  {
+   "name": "Anim/skelton_fighting_run.csab",
+   "base": "skelton_fighting_run",
+   "duration": 10,
+   "bones": 25
+  },
+  {
+   "name": "Anim/skelton_fighting_walk.csab",
+   "base": "skelton_fighting_walk",
+   "duration": 13,
+   "bones": 25
+  },
+  {
+   "name": "Anim/skelton_landing.csab",
+   "base": "skelton_landing",
+   "duration": 12,
+   "bones": 25
+  },
+  {
+   "name": "Anim/skelton_side_walk.csab",
+   "base": "skelton_side_walk",
+   "duration": 15,
+   "bones": 25
+  },
+  {
+   "name": "Anim/skelton_back_jump.csab",
+   "base": "skelton_back_jump",
+   "duration": 10,
+   "bones": 25
+  },
+  {
+   "name": "Anim/skelton_defend.csab",
+   "base": "skelton_defend",
+   "duration": 3,
+   "bones": 25
+  },
+  {
+   "name": "Anim/skelton_front_damage.csab",
+   "base": "skelton_front_damage",
+   "duration": 9,
+   "bones": 25
+  },
+  {
+   "name": "Anim/skelton_back_damage.csab",
+   "base": "skelton_back_damage",
+   "duration": 8,
+   "bones": 25
+  },
+  {
+   "name": "Anim/skelton_back_down.csab",
+   "base": "skelton_back_down",
+   "duration": 33,
+   "bones": 25
+  },
+  {
+   "name": "Anim/skelton_front_down.csab",
+   "base": "skelton_front_down",
+   "duration": 41,
+   "bones": 25
+  },
+  {
+   "name": "Anim/skelton_jump_kiru.csab",
+   "base": "skelton_jump_kiru",
+   "duration": 8,
+   "bones": 25
+  },
+  {
+   "name": "Anim/skelton_jump_kiru_end.csab",
+   "base": "skelton_jump_kiru_end",
+   "duration": 12,
+   "bones": 25
+  },
+  {
+   "name": "Anim/skelton_kiru.csab",
+   "base": "skelton_kiru",
+   "duration": 13,
+   "bones": 25
+  },
+  {
+   "name": "Anim/skelton_kiru_end.csab",
+   "base": "skelton_kiru_end",
+   "duration": 8,
+   "bones": 25
+  },
+  {
+   "name": "Anim/skelton_kiru_finsh.csab",
+   "base": "skelton_kiru_finsh",
+   "duration": 19,
+   "bones": 25
+  },
+  {
+   "name": "Anim/skelton_laugh.csab",
+   "base": "skelton_laugh",
+   "duration": 14,
+   "bones": 25
+  },
+  {
+   "name": "Anim/skelton_jump.csab",
+   "base": "skelton_jump",
+   "duration": 6,
+   "bones": 25
+  },
+  {
+   "name": "Anim/skelton_fighting_wait.csab",
+   "base": "skelton_fighting_wait",
+   "duration": 8,
+   "bones": 25
+  }
+ ],
  "/actor/zelda_skj.zar": [
   {
    "name": "Anim/skeltonJR_wait.csab",
@@ -5167,6 +5857,50 @@
    "bones": 9
   }
  ],
+ "/actor/zelda_tt.zar": [
+  {
+   "name": "Anim/tt_wait.csab",
+   "base": "tt_wait",
+   "duration": 120,
+   "bones": 10
+  },
+  {
+   "name": "Anim/tt_move.csab",
+   "base": "tt_move",
+   "duration": 8,
+   "bones": 10
+  },
+  {
+   "name": "Anim/tt_smalljump.csab",
+   "base": "tt_smalljump",
+   "duration": 11,
+   "bones": 10
+  },
+  {
+   "name": "Anim/tt_dmg.csab",
+   "base": "tt_dmg",
+   "duration": 8,
+   "bones": 10
+  },
+  {
+   "name": "Anim/tt_jump_start.csab",
+   "base": "tt_jump_start",
+   "duration": 6,
+   "bones": 10
+  },
+  {
+   "name": "Anim/tt_jump_end.csab",
+   "base": "tt_jump_end",
+   "duration": 6,
+   "bones": 10
+  },
+  {
+   "name": "Anim/tt_jump.csab",
+   "base": "tt_jump",
+   "duration": 15,
+   "bones": 10
+  }
+ ],
  "/actor/zelda_tw.zar": [
   {
    "name": "Anim/btT_atack.csab",
@@ -5469,6 +6203,80 @@
    "base": "wolfman_attack",
    "duration": 30,
    "bones": 21
+  }
+ ],
+ "/actor/zelda_wm2.zar": [
+  {
+   "name": "Anim/wm_damage.csab",
+   "base": "wm_damage",
+   "duration": 25,
+   "bones": 14
+  },
+  {
+   "name": "Anim/wm_damage_wait.csab",
+   "base": "wm_damage_wait",
+   "duration": 40,
+   "bones": 14
+  },
+  {
+   "name": "Anim/wm_f_jump.csab",
+   "base": "wm_f_jump",
+   "duration": 51,
+   "bones": 14
+  },
+  {
+   "name": "Anim/wm_l_turn.csab",
+   "base": "wm_l_turn",
+   "duration": 28,
+   "bones": 14
+  },
+  {
+   "name": "Anim/wm_link_hangup.csab",
+   "base": "wm_link_hangup",
+   "duration": 31,
+   "bones": 14
+  },
+  {
+   "name": "Anim/wm_miss.csab",
+   "base": "wm_miss",
+   "duration": 28,
+   "bones": 14
+  },
+  {
+   "name": "Anim/wm_motionA.csab",
+   "base": "wm_motionA",
+   "duration": 40,
+   "bones": 14
+  },
+  {
+   "name": "Anim/wm_move.csab",
+   "base": "wm_move",
+   "duration": 37,
+   "bones": 14
+  },
+  {
+   "name": "Anim/wm_move_wait.csab",
+   "base": "wm_move_wait",
+   "duration": 9,
+   "bones": 14
+  },
+  {
+   "name": "Anim/wm_success.csab",
+   "base": "wm_success",
+   "duration": 10,
+   "bones": 14
+  },
+  {
+   "name": "Anim/wm_wait.csab",
+   "base": "wm_wait",
+   "duration": 40,
+   "bones": 14
+  },
+  {
+   "name": "Anim/wm_wait_move.csab",
+   "base": "wm_wait_move",
+   "duration": 9,
+   "bones": 14
   }
  ],
  "/actor/zelda_xc.zar": [

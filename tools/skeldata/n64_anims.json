@@ -1,4 +1,27 @@
 {
+ "/actor/zelda_bb.zar": {
+  "object": "object_Bb",
+  "anims": [
+   {
+    "name": "object_Bb_Anim_000184",
+    "otr": "objects/object_Bb/object_Bb_Anim_000184",
+    "offset": "0x184",
+    "frameCount": 10
+   },
+   {
+    "name": "object_Bb_Anim_0002AC",
+    "otr": "objects/object_Bb/object_Bb_Anim_0002AC",
+    "offset": "0x2AC",
+    "frameCount": 8
+   },
+   {
+    "name": "object_Bb_Anim_000444",
+    "otr": "objects/object_Bb/object_Bb_Anim_000444",
+    "offset": "0x444",
+    "frameCount": 10
+   }
+  ]
+ },
  "/actor/zelda_am.zar": {
   "object": "object_am",
   "anims": [
@@ -45,6 +68,53 @@
    }
   ]
  },
+ "/actor/zelda_av.zar": {
+  "object": "object_anubice",
+  "anims": [
+   {
+    "name": "gAnubiceFallDownAnim",
+    "otr": "objects/object_anubice/gAnubiceFallDownAnim",
+    "offset": "0x348",
+    "frameCount": 21
+   },
+   {
+    "name": "gAnubiceAttackingAnim",
+    "otr": "objects/object_anubice/gAnubiceAttackingAnim",
+    "offset": "0x78C",
+    "frameCount": 60
+   },
+   {
+    "name": "gAnubiceIdleAnim",
+    "otr": "objects/object_anubice/gAnubiceIdleAnim",
+    "offset": "0xF74",
+    "frameCount": 60
+   },
+   {
+    "name": "gAnubiceLaughingAnim",
+    "otr": "objects/object_anubice/gAnubiceLaughingAnim",
+    "offset": "0x144",
+    "frameCount": 12
+   },
+   {
+    "name": "gAnubiceStandUpAnim",
+    "otr": "objects/object_anubice/gAnubiceStandUpAnim",
+    "offset": "0x930",
+    "frameCount": 16
+   },
+   {
+    "name": "gAnubiceAnim_000A48",
+    "otr": "objects/object_anubice/gAnubiceAnim_000A48",
+    "offset": "0xA48",
+    "frameCount": 11
+   },
+   {
+    "name": "gAnubiceAnim_000BAC",
+    "otr": "objects/object_anubice/gAnubiceAnim_000BAC",
+    "offset": "0xBAC",
+    "frameCount": 16
+   }
+  ]
+ },
  "/actor/zelda_bg.zar": {
   "object": "object_bg",
   "anims": [
@@ -65,6 +135,41 @@
     "otr": "objects/object_bg/gChuGirlLeanOverCounterAnim",
     "offset": "0x72AC",
     "frameCount": 20
+   }
+  ]
+ },
+ "/actor/zelda_ocd.zar": {
+  "object": "object_bigokuta",
+  "anims": [
+   {
+    "name": "object_bigokuta_Anim_000444",
+    "otr": "objects/object_bigokuta/object_bigokuta_Anim_000444",
+    "offset": "0x444",
+    "frameCount": 13
+   },
+   {
+    "name": "object_bigokuta_Anim_000A74",
+    "otr": "objects/object_bigokuta/object_bigokuta_Anim_000A74",
+    "offset": "0xA74",
+    "frameCount": 17
+   },
+   {
+    "name": "object_bigokuta_Anim_000D1C",
+    "otr": "objects/object_bigokuta/object_bigokuta_Anim_000D1C",
+    "offset": "0xD1C",
+    "frameCount": 8
+   },
+   {
+    "name": "object_bigokuta_Anim_0014B8",
+    "otr": "objects/object_bigokuta/object_bigokuta_Anim_0014B8",
+    "offset": "0x14B8",
+    "frameCount": 20
+   },
+   {
+    "name": "object_bigokuta_Anim_001CA4",
+    "otr": "objects/object_bigokuta/object_bigokuta_Anim_001CA4",
+    "offset": "0x1CA4",
+    "frameCount": 24
    }
   ]
  },
@@ -1184,6 +1289,76 @@
    }
   ]
  },
+ "/actor/zelda_fantomHG.zar": {
+  "object": "object_fhg",
+  "anims": [
+   {
+    "name": "gPhantomHorseRunningAnim",
+    "otr": "objects/object_fhg/gPhantomHorseRunningAnim",
+    "offset": "0xB4C8",
+    "frameCount": 14916
+   },
+   {
+    "name": "gPhantomHorseAirAnim",
+    "otr": "objects/object_fhg/gPhantomHorseAirAnim",
+    "offset": "0xB9D0",
+    "frameCount": 1568
+   },
+   {
+    "name": "gPhantomHorseLeapAnim",
+    "otr": "objects/object_fhg/gPhantomHorseLeapAnim",
+    "offset": "0xC65C",
+    "frameCount": -10080
+   },
+   {
+    "name": "gPhantomHorseLandAnim",
+    "otr": "objects/object_fhg/gPhantomHorseLandAnim",
+    "offset": "0xCB1C",
+    "frameCount": 1262
+   },
+   {
+    "name": "gPhantomHorseRearingAnim",
+    "otr": "objects/object_fhg/gPhantomHorseRearingAnim",
+    "offset": "0xDDB8",
+    "frameCount": 12544
+   },
+   {
+    "name": "gPhantomHorseIdleAnim",
+    "otr": "objects/object_fhg/gPhantomHorseIdleAnim",
+    "offset": "0xE8A0",
+    "frameCount": -6400
+   },
+   {
+    "name": "gPhantomHorseUnusedRearingAnim",
+    "otr": "objects/object_fhg/gPhantomHorseUnusedRearingAnim",
+    "offset": "0x5804",
+    "frameCount": 20
+   },
+   {
+    "name": "gPhantomHorseStillAnim",
+    "otr": "objects/object_fhg/gPhantomHorseStillAnim",
+    "offset": "0x5990",
+    "frameCount": 2
+   },
+   {
+    "name": "gPhantomHorseFenceJumpAnim",
+    "otr": "objects/object_fhg/gPhantomHorseFenceJumpAnim",
+    "offset": "0xC180",
+    "frameCount": -2912
+   }
+  ]
+ },
+ "/actor/zelda_ff.zar": {
+  "object": "object_firefly",
+  "anims": [
+   {
+    "name": "gKeeseFlyAnim",
+    "otr": "objects/object_firefly/gKeeseFlyAnim",
+    "offset": "0x17C",
+    "frameCount": 8
+   }
+  ]
+ },
  "/actor/zelda_fr.zar": {
   "object": "object_fr",
   "anims": [
@@ -1434,6 +1609,77 @@
     "otr": "objects/object_ge1/gGerudoWhiteDismissiveAnim",
     "offset": "0xA498",
     "frameCount": 22
+   }
+  ]
+ },
+ "/actor/zelda_gelb.zar": {
+  "object": "object_geldb",
+  "anims": [
+   {
+    "name": "gGerudoRedJumpAnim",
+    "otr": "objects/object_geldb/gGerudoRedJumpAnim",
+    "offset": "0xADF8",
+    "frameCount": 17
+   },
+   {
+    "name": "gGerudoRedNeutralAnim",
+    "otr": "objects/object_geldb/gGerudoRedNeutralAnim",
+    "offset": "0xB6D4",
+    "frameCount": 19
+   },
+   {
+    "name": "gGerudoRedSidestepAnim",
+    "otr": "objects/object_geldb/gGerudoRedSidestepAnim",
+    "offset": "0xA814",
+    "frameCount": 10
+   },
+   {
+    "name": "gGerudoRedFlipAnim",
+    "otr": "objects/object_geldb/gGerudoRedFlipAnim",
+    "offset": "0x1390",
+    "frameCount": 11
+   },
+   {
+    "name": "gGerudoRedWalkAnim",
+    "otr": "objects/object_geldb/gGerudoRedWalkAnim",
+    "offset": "0x24E8",
+    "frameCount": 7
+   },
+   {
+    "name": "gGerudoRedSlashAnim",
+    "otr": "objects/object_geldb/gGerudoRedSlashAnim",
+    "offset": "0x03CC",
+    "frameCount": 10
+   },
+   {
+    "name": "gGerudoRedSpinAttackAnim",
+    "otr": "objects/object_geldb/gGerudoRedSpinAttackAnim",
+    "offset": "0x0F5C",
+    "frameCount": 34
+   },
+   {
+    "name": "gGerudoRedDamageAnim",
+    "otr": "objects/object_geldb/gGerudoRedDamageAnim",
+    "offset": "0x2280",
+    "frameCount": 11
+   },
+   {
+    "name": "gGerudoRedDefeatAnim",
+    "otr": "objects/object_geldb/gGerudoRedDefeatAnim",
+    "offset": "0x1E10",
+    "frameCount": 23
+   },
+   {
+    "name": "gGerudoRedBlockAnim",
+    "otr": "objects/object_geldb/gGerudoRedBlockAnim",
+    "offset": "0x1578",
+    "frameCount": 4
+   },
+   {
+    "name": "gGerudoRedStandAnim",
+    "otr": "objects/object_geldb/gGerudoRedStandAnim",
+    "offset": "0xB07C",
+    "frameCount": 15
    }
   ]
  },
@@ -2128,6 +2374,41 @@
    }
   ]
  },
+ "/actor/zelda_hlc.zar": {
+  "object": "object_horse_link_child",
+  "anims": [
+   {
+    "name": "gChildEponaIdleAnim",
+    "otr": "objects/object_horse_link_child/gChildEponaIdleAnim",
+    "offset": "0x43E4",
+    "frameCount": 70
+   },
+   {
+    "name": "gChildEponaWhinnyAnim",
+    "otr": "objects/object_horse_link_child/gChildEponaWhinnyAnim",
+    "offset": "0x4B08",
+    "frameCount": 30
+   },
+   {
+    "name": "gChildEponaWalkingAnim",
+    "otr": "objects/object_horse_link_child/gChildEponaWalkingAnim",
+    "offset": "0x53F0",
+    "frameCount": 35
+   },
+   {
+    "name": "gChildEponaTrottingAnim",
+    "otr": "objects/object_horse_link_child/gChildEponaTrottingAnim",
+    "offset": "0x360C",
+    "frameCount": 29
+   },
+   {
+    "name": "gChildEponaGallopingAnim",
+    "otr": "objects/object_horse_link_child/gChildEponaGallopingAnim",
+    "offset": "0x2F98",
+    "frameCount": 24
+   }
+  ]
+ },
  "/actor/zelda_horse_normal.zar": {
   "object": "object_horse_normal",
   "anims": [
@@ -2566,6 +2847,113 @@
     "otr": "objects/object_ka/object_ka_Anim_0067AC",
     "offset": "0x67AC",
     "frameCount": 20
+   }
+  ]
+ },
+ "/actor/zelda_kdodongo.zar": {
+  "object": "object_kingdodongo",
+  "anims": [
+   {
+    "name": "object_kingdodongo_Anim_000690",
+    "otr": "objects/object_kingdodongo/object_kingdodongo_Anim_000690",
+    "offset": "0x690",
+    "frameCount": 30
+   },
+   {
+    "name": "object_kingdodongo_Anim_001074",
+    "otr": "objects/object_kingdodongo/object_kingdodongo_Anim_001074",
+    "offset": "0x1074",
+    "frameCount": 23
+   },
+   {
+    "name": "object_kingdodongo_Anim_002D0C",
+    "otr": "objects/object_kingdodongo/object_kingdodongo_Anim_002D0C",
+    "offset": "0x2D0C",
+    "frameCount": 68
+   },
+   {
+    "name": "object_kingdodongo_Anim_003CF8",
+    "otr": "objects/object_kingdodongo/object_kingdodongo_Anim_003CF8",
+    "offset": "0x3CF8",
+    "frameCount": 30
+   },
+   {
+    "name": "object_kingdodongo_Anim_0042A8",
+    "otr": "objects/object_kingdodongo/object_kingdodongo_Anim_0042A8",
+    "offset": "0x42A8",
+    "frameCount": 20
+   },
+   {
+    "name": "object_kingdodongo_Anim_004E0C",
+    "otr": "objects/object_kingdodongo/object_kingdodongo_Anim_004E0C",
+    "offset": "0x4E0C",
+    "frameCount": 27
+   },
+   {
+    "name": "object_kingdodongo_Anim_0061D4",
+    "otr": "objects/object_kingdodongo/object_kingdodongo_Anim_0061D4",
+    "offset": "0x61D4",
+    "frameCount": 51
+   },
+   {
+    "name": "object_kingdodongo_Anim_006924",
+    "otr": "objects/object_kingdodongo/object_kingdodongo_Anim_006924",
+    "offset": "0x6924",
+    "frameCount": 19
+   },
+   {
+    "name": "object_kingdodongo_Anim_008EEC",
+    "otr": "objects/object_kingdodongo/object_kingdodongo_Anim_008EEC",
+    "offset": "0x8EEC",
+    "frameCount": 101
+   },
+   {
+    "name": "object_kingdodongo_Anim_009D10",
+    "otr": "objects/object_kingdodongo/object_kingdodongo_Anim_009D10",
+    "offset": "0x9D10",
+    "frameCount": 36
+   },
+   {
+    "name": "object_kingdodongo_Anim_00AA9C",
+    "otr": "objects/object_kingdodongo/object_kingdodongo_Anim_00AA9C",
+    "offset": "0xAA9C",
+    "frameCount": 31
+   },
+   {
+    "name": "object_kingdodongo_Anim_00DF38",
+    "otr": "objects/object_kingdodongo/object_kingdodongo_Anim_00DF38",
+    "offset": "0xDF38",
+    "frameCount": 115
+   },
+   {
+    "name": "object_kingdodongo_Anim_00E848",
+    "otr": "objects/object_kingdodongo/object_kingdodongo_Anim_00E848",
+    "offset": "0xE848",
+    "frameCount": 30
+   },
+   {
+    "name": "object_kingdodongo_Anim_00F0D8",
+    "otr": "objects/object_kingdodongo/object_kingdodongo_Anim_00F0D8",
+    "offset": "0xF0D8",
+    "frameCount": 20
+   },
+   {
+    "name": "object_kingdodongo_Anim_01CAE0",
+    "otr": "objects/object_kingdodongo/object_kingdodongo_Anim_01CAE0",
+    "offset": "0x1CAE0",
+    "frameCount": -29327
+   },
+   {
+    "name": "object_kingdodongo_Anim_01D218",
+    "otr": "objects/object_kingdodongo/object_kingdodongo_Anim_01D218",
+    "offset": "0x1D218",
+    "frameCount": -7716
+   },
+   {
+    "name": "object_kingdodongo_Anim_01D934",
+    "otr": "objects/object_kingdodongo/object_kingdodongo_Anim_01D934",
+    "offset": "0x1D934",
+    "frameCount": 0
    }
   ]
  },
@@ -3115,6 +3503,129 @@
    }
   ]
  },
+ "/actor/zelda_nw.zar": {
+  "object": "object_niw",
+  "anims": [
+   {
+    "name": "gCuccoAnim",
+    "otr": "objects/object_niw/gCuccoAnim",
+    "offset": "0xE8",
+    "frameCount": 10
+   }
+  ]
+ },
+ "/actor/zelda_oF1d.zar": {
+  "object": "object_oF1d_map",
+  "anims": [
+   {
+    "name": "gGoronAnim_000750",
+    "otr": "objects/object_oF1d_map/gGoronAnim_000750",
+    "offset": "0x750",
+    "frameCount": 25
+   },
+   {
+    "name": "gGoronAnim_000D5C",
+    "otr": "objects/object_oF1d_map/gGoronAnim_000D5C",
+    "offset": "0xD5C",
+    "frameCount": 25
+   },
+   {
+    "name": "gGoronAnim_00161C",
+    "otr": "objects/object_oF1d_map/gGoronAnim_00161C",
+    "offset": "0x161C",
+    "frameCount": 30
+   },
+   {
+    "name": "gGoronAnim_001A00",
+    "otr": "objects/object_oF1d_map/gGoronAnim_001A00",
+    "offset": "0x1A00",
+    "frameCount": 23
+   },
+   {
+    "name": "gGoronAnim_0021D0",
+    "otr": "objects/object_oF1d_map/gGoronAnim_0021D0",
+    "offset": "0x21D0",
+    "frameCount": 31
+   },
+   {
+    "name": "gGoronAnim_0029A8",
+    "otr": "objects/object_oF1d_map/gGoronAnim_0029A8",
+    "offset": "0x29A8",
+    "frameCount": 26
+   },
+   {
+    "name": "gGoronAnim_002D80",
+    "otr": "objects/object_oF1d_map/gGoronAnim_002D80",
+    "offset": "0x2D80",
+    "frameCount": 21
+   },
+   {
+    "name": "gGoronAnim_003768",
+    "otr": "objects/object_oF1d_map/gGoronAnim_003768",
+    "offset": "0x3768",
+    "frameCount": 50
+   },
+   {
+    "name": "gGoronAnim_0038E4",
+    "otr": "objects/object_oF1d_map/gGoronAnim_0038E4",
+    "offset": "0x38E4",
+    "frameCount": 15
+   },
+   {
+    "name": "gGoronAnim_004930",
+    "otr": "objects/object_oF1d_map/gGoronAnim_004930",
+    "offset": "0x4930",
+    "frameCount": 53
+   },
+   {
+    "name": "gGoronAnim_010590",
+    "otr": "objects/object_oF1d_map/gGoronAnim_010590",
+    "offset": "0x10590",
+    "frameCount": 20
+   }
+  ]
+ },
+ "/actor/zelda_oc2.zar": {
+  "object": "object_okuta",
+  "anims": [
+   {
+    "name": "gOctorokShootAnim",
+    "otr": "objects/object_okuta/gOctorokShootAnim",
+    "offset": "0x344",
+    "frameCount": 20
+   },
+   {
+    "name": "gOctorokDieAnim",
+    "otr": "objects/object_okuta/gOctorokDieAnim",
+    "offset": "0x8FC",
+    "frameCount": 25
+   },
+   {
+    "name": "gOctorokHideAnim",
+    "otr": "objects/object_okuta/gOctorokHideAnim",
+    "offset": "0xAC0",
+    "frameCount": 7
+   },
+   {
+    "name": "gOctorokFloatAnim",
+    "otr": "objects/object_okuta/gOctorokFloatAnim",
+    "offset": "0xDDC",
+    "frameCount": 16
+   },
+   {
+    "name": "gOctorokHitAnim",
+    "otr": "objects/object_okuta/gOctorokHitAnim",
+    "offset": "0x3910",
+    "frameCount": 12
+   },
+   {
+    "name": "gOctorokAppearAnim",
+    "otr": "objects/object_okuta/gOctorokAppearAnim",
+    "offset": "0x3C64",
+    "frameCount": 20
+   }
+  ]
+ },
  "/actor/zelda_os.zar": {
   "object": "object_os",
   "anims": [
@@ -3158,6 +3669,35 @@
     "otr": "objects/object_owl/gOwlPerchAnim",
     "offset": "0xC8A0",
     "frameCount": 20
+   }
+  ]
+ },
+ "/actor/zelda_ph.zar": {
+  "object": "object_peehat",
+  "anims": [
+   {
+    "name": "gPeehatLandingAnim",
+    "otr": "objects/object_peehat/gPeehatLandingAnim",
+    "offset": "0x350",
+    "frameCount": 49
+   },
+   {
+    "name": "gPeehatFlyingAnim",
+    "otr": "objects/object_peehat/gPeehatFlyingAnim",
+    "offset": "0x5C4",
+    "frameCount": 32
+   },
+   {
+    "name": "gPeehatRecoilAnim",
+    "otr": "objects/object_peehat/gPeehatRecoilAnim",
+    "offset": "0x844",
+    "frameCount": 32
+   },
+   {
+    "name": "gPeehatRisingAnim",
+    "otr": "objects/object_peehat/gPeehatRisingAnim",
+    "offset": "0x9C4",
+    "frameCount": 16
    }
   ]
  },
@@ -3290,6 +3830,47 @@
    }
   ]
  },
+ "/actor/zelda_po.zar": {
+  "object": "object_poh",
+  "anims": [
+   {
+    "name": "gPoeAttackAnim",
+    "otr": "objects/object_poh/gPoeAttackAnim",
+    "offset": "0x01A8",
+    "frameCount": 8
+   },
+   {
+    "name": "gPoeDamagedAnim",
+    "otr": "objects/object_poh/gPoeDamagedAnim",
+    "offset": "0x04EC",
+    "frameCount": 16
+   },
+   {
+    "name": "gPoeFleeAnim",
+    "otr": "objects/object_poh/gPoeFleeAnim",
+    "offset": "0x06E0",
+    "frameCount": 8
+   },
+   {
+    "name": "gPoeFloatAnim",
+    "otr": "objects/object_poh/gPoeFloatAnim",
+    "offset": "0x0A60",
+    "frameCount": 16
+   },
+   {
+    "name": "gPoeAppearAnim",
+    "otr": "objects/object_poh/gPoeAppearAnim",
+    "offset": "0x11C4",
+    "frameCount": 30
+   },
+   {
+    "name": "gPoeDisappearAnim",
+    "otr": "objects/object_poh/gPoeDisappearAnim",
+    "offset": "0x15B0",
+    "frameCount": 20
+   }
+  ]
+ },
  "/actor/zelda_ps.zar": {
   "object": "object_ps",
   "anims": [
@@ -3375,6 +3956,17 @@
     "otr": "objects/object_rd/gGibdoRedeadWalkAnim",
     "offset": "0xEFDC",
     "frameCount": 27
+   }
+  ]
+ },
+ "/actor/zelda_rb.zar": {
+  "object": "object_reeba",
+  "anims": [
+   {
+    "name": "object_reeba_Anim_0001E4",
+    "otr": "objects/object_reeba/object_reeba_Anim_0001E4",
+    "offset": "0x1E4",
+    "frameCount": 30
    }
   ]
  },
@@ -3910,6 +4502,137 @@
    }
   ]
  },
+ "/actor/zelda_skelton.zar": {
+  "object": "object_sk2",
+  "anims": [
+   {
+    "name": "gStalfosFlinchFromHitBehindAnim",
+    "otr": "objects/object_sk2/gStalfosFlinchFromHitBehindAnim",
+    "offset": "0x444",
+    "frameCount": 8
+   },
+   {
+    "name": "gStalfosFallOverBackwardsAnim",
+    "otr": "objects/object_sk2/gStalfosFallOverBackwardsAnim",
+    "offset": "0x1420",
+    "frameCount": 33
+   },
+   {
+    "name": "gStalfosJumpBackwardsAnim",
+    "otr": "objects/object_sk2/gStalfosJumpBackwardsAnim",
+    "offset": "0x1978",
+    "frameCount": 10
+   },
+   {
+    "name": "gStalfosBlockWithShieldAnim",
+    "otr": "objects/object_sk2/gStalfosBlockWithShieldAnim",
+    "offset": "0x1C20",
+    "frameCount": 3
+   },
+   {
+    "name": "gStalfosStandAttentionAnim",
+    "otr": "objects/object_sk2/gStalfosStandAttentionAnim",
+    "offset": "0x2188",
+    "frameCount": 10
+   },
+   {
+    "name": "gStalfosFastAdvanceAnim",
+    "otr": "objects/object_sk2/gStalfosFastAdvanceAnim",
+    "offset": "0x26D4",
+    "frameCount": 10
+   },
+   {
+    "name": "gStalfosMiddleGuardAnim",
+    "otr": "objects/object_sk2/gStalfosMiddleGuardAnim",
+    "offset": "0x316C",
+    "frameCount": 27
+   },
+   {
+    "name": "gStalfosSlowAdvanceAnim",
+    "otr": "objects/object_sk2/gStalfosSlowAdvanceAnim",
+    "offset": "0x81B4",
+    "frameCount": 13
+   },
+   {
+    "name": "gStalfosFlinchFromHitFrontAnim",
+    "otr": "objects/object_sk2/gStalfosFlinchFromHitFrontAnim",
+    "offset": "0x8604",
+    "frameCount": 9
+   },
+   {
+    "name": "gStalfosFallOverForwardsAnim",
+    "otr": "objects/object_sk2/gStalfosFallOverForwardsAnim",
+    "offset": "0x9A90",
+    "frameCount": 41
+   },
+   {
+    "name": "gStalfosLeapAnim",
+    "otr": "objects/object_sk2/gStalfosLeapAnim",
+    "offset": "0x9E50",
+    "frameCount": 6
+   },
+   {
+    "name": "gStalfosJumpAnim",
+    "otr": "objects/object_sk2/gStalfosJumpAnim",
+    "offset": "0xA324",
+    "frameCount": 8
+   },
+   {
+    "name": "gStalfosJumpslashAnim",
+    "otr": "objects/object_sk2/gStalfosJumpslashAnim",
+    "offset": "0xA99C",
+    "frameCount": 12
+   },
+   {
+    "name": "gStalfosDownSlashAnim",
+    "otr": "objects/object_sk2/gStalfosDownSlashAnim",
+    "offset": "0xB00C",
+    "frameCount": 12
+   },
+   {
+    "name": "gStalfosRecoverFromDownSlashAnim",
+    "otr": "objects/object_sk2/gStalfosRecoverFromDownSlashAnim",
+    "offset": "0xB4E4",
+    "frameCount": 8
+   },
+   {
+    "name": "gStalfosUpSlashAnim",
+    "otr": "objects/object_sk2/gStalfosUpSlashAnim",
+    "offset": "0xBE4C",
+    "frameCount": 19
+   },
+   {
+    "name": "gStalfosLandFromLeapAnim",
+    "otr": "objects/object_sk2/gStalfosLandFromLeapAnim",
+    "offset": "0xC438",
+    "frameCount": 12
+   },
+   {
+    "name": "gStalfosLaughAnim",
+    "otr": "objects/object_sk2/gStalfosLaughAnim",
+    "offset": "0xC8A0",
+    "frameCount": 13
+   },
+   {
+    "name": "gStalfosLookAroundAnim",
+    "otr": "objects/object_sk2/gStalfosLookAroundAnim",
+    "offset": "0xDCF0",
+    "frameCount": 53
+   },
+   {
+    "name": "gStalfosSidestepAnim",
+    "otr": "objects/object_sk2/gStalfosSidestepAnim",
+    "offset": "0xE2B0",
+    "frameCount": 15
+   },
+   {
+    "name": "gStalfosReleaseAttentionAnim",
+    "otr": "objects/object_sk2/gStalfosReleaseAttentionAnim",
+    "offset": "0xE7E4",
+    "frameCount": 10
+   }
+  ]
+ },
  "/actor/zelda_skb.zar": {
   "object": "object_skb",
   "anims": [
@@ -4270,6 +4993,59 @@
    }
   ]
  },
+ "/actor/zelda_tt.zar": {
+  "object": "object_tite",
+  "anims": [
+   {
+    "name": "object_tite_Anim_0001D4",
+    "otr": "objects/object_tite/object_tite_Anim_0001D4",
+    "offset": "0x1D4",
+    "frameCount": 8
+   },
+   {
+    "name": "object_tite_Anim_0004F8",
+    "otr": "objects/object_tite/object_tite_Anim_0004F8",
+    "offset": "0x4F8",
+    "frameCount": 15
+   },
+   {
+    "name": "object_tite_Anim_00069C",
+    "otr": "objects/object_tite/object_tite_Anim_00069C",
+    "offset": "0x69C",
+    "frameCount": 6
+   },
+   {
+    "name": "object_tite_Anim_00083C",
+    "otr": "objects/object_tite/object_tite_Anim_00083C",
+    "offset": "0x83C",
+    "frameCount": 6
+   },
+   {
+    "name": "object_tite_Anim_000A14",
+    "otr": "objects/object_tite/object_tite_Anim_000A14",
+    "offset": "0xA14",
+    "frameCount": 8
+   },
+   {
+    "name": "object_tite_Anim_000C70",
+    "otr": "objects/object_tite/object_tite_Anim_000C70",
+    "offset": "0xC70",
+    "frameCount": 11
+   },
+   {
+    "name": "object_tite_Anim_000F50",
+    "otr": "objects/object_tite/object_tite_Anim_000F50",
+    "offset": "0xF50",
+    "frameCount": 15
+   },
+   {
+    "name": "object_tite_Anim_0012E4",
+    "otr": "objects/object_tite/object_tite_Anim_0012E4",
+    "offset": "0x12E4",
+    "frameCount": 20
+   }
+  ]
+ },
  "/actor/zelda_tk.zar": {
   "object": "object_tk",
   "anims": [
@@ -4614,6 +5390,83 @@
     "otr": "objects/object_vm/gBeamosAnim",
     "offset": "0x68",
     "frameCount": 8
+   }
+  ]
+ },
+ "/actor/zelda_wm2.zar": {
+  "object": "object_wallmaster",
+  "anims": [
+   {
+    "name": "gWallmasterDamageAnim",
+    "otr": "objects/object_wallmaster/gWallmasterDamageAnim",
+    "offset": "0x590",
+    "frameCount": 25
+   },
+   {
+    "name": "gWallmasterRecoverFromDamageAnim",
+    "otr": "objects/object_wallmaster/gWallmasterRecoverFromDamageAnim",
+    "offset": "0xEA4",
+    "frameCount": 41
+   },
+   {
+    "name": "gWallmasterJumpAnim",
+    "otr": "objects/object_wallmaster/gWallmasterJumpAnim",
+    "offset": "0x19CC",
+    "frameCount": 51
+   },
+   {
+    "name": "gWallmasterWalkAnim",
+    "otr": "objects/object_wallmaster/gWallmasterWalkAnim",
+    "offset": "0x41F4",
+    "frameCount": 37
+   },
+   {
+    "name": "gWallmasterStopWalkAnim",
+    "otr": "objects/object_wallmaster/gWallmasterStopWalkAnim",
+    "offset": "0x9244",
+    "frameCount": 9
+   },
+   {
+    "name": "gWallmasterHoverAnim",
+    "otr": "objects/object_wallmaster/gWallmasterHoverAnim",
+    "offset": "0x9520",
+    "frameCount": 9
+   },
+   {
+    "name": "gWallmasterWaitAnim",
+    "otr": "objects/object_wallmaster/gWallmasterWaitAnim",
+    "offset": "0x9DB0",
+    "frameCount": 40
+   },
+   {
+    "name": "gWallmasterStandUpAnim",
+    "otr": "objects/object_wallmaster/gWallmasterStandUpAnim",
+    "offset": "0xA054",
+    "frameCount": 9
+   },
+   {
+    "name": "gWallmasterLungeAnim",
+    "otr": "objects/object_wallmaster/gWallmasterLungeAnim",
+    "offset": "0x299C",
+    "frameCount": 30
+   },
+   {
+    "name": "gFloormasterTurnAnim",
+    "otr": "objects/object_wallmaster/gFloormasterTurnAnim",
+    "offset": "0x2158",
+    "frameCount": 28
+   },
+   {
+    "name": "gFloormasterTapFingerAnim",
+    "otr": "objects/object_wallmaster/gFloormasterTapFingerAnim",
+    "offset": "0x39B0",
+    "frameCount": 40
+   },
+   {
+    "name": "gWallmasterMissAnim",
+    "otr": "objects/object_wallmaster/gWallmasterMissAnim",
+    "offset": "0x3120",
+    "frameCount": 27
    }
   ]
  },
