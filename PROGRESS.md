@@ -1,5 +1,33 @@
 # SoH3D — progress & state
 
+## ✅ DONE (session 23, 2026-06-17): run.sh Kakariko-DAY + all-NPC replace, anim 60fps, defaults
+User-driven session ("replace ALL characters", smooth anims, sensible defaults). Shipped:
+- **KANBAN restored to N64.** Auto-replacing signs broke the cut behaviour: En_Kanban spawns
+  more En_Kanban for the break pieces, which got re-replaced as whole signs ("slashing spawns
+  signs"). Re-added the OBJECT_KANBAN skip; emptied kAssemblies (merge mechanism kept).
+- **run.sh now actually enables replacement.** It set neither SOH3D_AUTO nor SOH3D_N64ANIM (both
+  default OFF) nor a day time — so the user saw N64 chars at night. Added SOH3D_TIME=0x8000,
+  SOH3D_AUTO=1, SOH3D_N64ANIM=1 (overridable).
+- **Day-clock at scene load.** SoH3D_ApplyForceTime() now runs at the TOP of Play_Init, before
+  the day/night scene setup layer + actor set are chosen. Pinning dayTime only per-frame in
+  ReplPoll was too late: the scene loaded the NIGHT NPC set and just looked recoloured. Now
+  SOH3D_TIME loads the DAY villagers (verified: toryo/daiku/ani/ane/soldier spawn + replace).
+- **Animation jitter FIXED (60fps anim).** Replaced chars' bone pose was a 20fps snapshot held
+  across the N interpolation subframes while the transform interpolated -> limbs snapped. Now
+  the pose system keeps per-modelId emit-ordered cur+prev poses; RenderPass lerps prev->cur by
+  the subframe step (gSoH3dInterpStep, fed from RunCommands), component-wise like the N64 matrix
+  interpolation. Also fixed a latent bug (old queue consumed on subframe 0 -> multi-instance
+  poses wrong on the rest). Files: libultraship soh3d_gl.cpp, Shipwright OTRGlobals.cpp.
+- **Display/range defaults (SOH3D mode, applied once, persisted):** MatchRefreshRate=1 (FPS=refresh),
+  DisableDrawDistance=20 (20x actor draw range), WidescreenActorCulling=1. Aspect already follows
+  the window. In InitOTR (OTRGlobals.cpp).
+- **COVERAGE — partial / remaining long tail.** Mapped-object characters replace (the Kakariko day
+  NPCs do). GAP: objects with no per-name ZAR map (NULL) fall back to N64 — e.g. OBJECT_NIW (cucco)
+  is NULL, so chickens stay N64. ~88 unmapped object_ names; the creatures among them live in
+  renamed or SHARED archives (e.g. cucco model is in zelda_ec, not zelda_niw) and need a hand
+  alias + per-actor CMB-selection table. NOT done. Next: build that mapping for the visible Kakariko
+  creatures first. See tools/gen_object_zars.py + scratch/evidence/multicmb_survey.txt.
+
 ## ✅ DONE (session 22, 2026-06-17): multi-CMB ASSEMBLY merge mechanism + KANBAN; generic-merge REJECTED
 **Built the reusable multi-CMB merge capability and hand-applied it to the kanban signpost; a
 GENERIC auto multi-CMB merge was investigated and rejected on evidence.**
