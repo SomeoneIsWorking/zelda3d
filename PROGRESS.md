@@ -1,5 +1,30 @@
 # SoH3D — progress & state
 
+## ✅ DONE (session 24, 2026-06-17): "sky bug" root-caused + diagnostic; anim phase-lock
+User-driven: the rare sky-corruption bug fired live ("probe it... fully... don't assume; probably
+SoH itself, not you — if it's N64 guest memory we'd need real RE").
+- **"SKY BUG" FULLY ROOT-CAUSED (was "interp suspected" — falsified).** Probed live: a garbled HUD
+  item icon + green/white diagonal sky stripes. It is a guest-side **texture-segment race at scene
+  load**, NOT our GL pass (statecheck = 0 leaks; the corrupt elements are Fast3D-drawn HUD/sky). A
+  `G_SETTIMG` references an N64 segment whose base is still 0 (`mSegmentPointers[seg]==0`) when its
+  display list first runs; `SegAddr` can't resolve it → `gfx_set_timg_handler_rdp` skips the texture
+  → `texture_to_load` null → the downstream null guards (anti-crash band-aids) return without binding
+  → the **stale GL binding** paints garbage on that geometry. Self-heals next frame ⇒ rare/transient
+  (3 clean reboots = 0 warnings). The bottom-right cyan shape is the normal minimap, not corruption.
+- **DIAGNOSTIC ADDED** (libultraship interpreter.cpp, commit 560e68b0): at the skip, logs
+  `SoH3D SKYBUG: unresolved texture segment <N> ... drawn by [<OPEN_DISPS file:line breadcrumb>]`
+  (via g_exec_stack.getDisp(), capped 64) — the next occurrence NAMES the culprit object/draw so the
+  actual cause (object-bank/scene segment not set up at first draw) can be chased. Not fixed (rare,
+  cosmetic, self-healing). See memory soh3d-skybox-corruption.
+- **ANIM PHASE-LOCK (handoff #2 "anims too fast" FIXED).** `SoH3D_UpdateAnimAuto` now drives the auto
+  CSAB at the N64 anim's fractional progress: `csab_frame=(n64CurFrame/n64AnimLength)*csab_duration`
+  (threaded from skelAnime->{curFrame,animLength} captured in SoH3D_SkelAnimeDraw). Stub idles
+  (animLength<=4) + the SkelAnime-less raw path free-run. VERIFIED live: En_Daiku_Kakariko (model 2002)
+  object_daiku_Anim_000C44→dk2_hashiru ("run"), n64frame advances 0..18, OoT3D run locked to the N64
+  cycle, renders intact (no explosion). `animdbg` prints `n64frame=cur/len [PHASE-LOCK]/[free-run]`.
+  Known interaction: procedural-motion actors (cucco gCuccoAnim, curFrame stuck at 0) now pin at CSAB
+  frame 0 — orthogonal; they belong on the retarget path (handoff #1). Commit 6d6ddd900.
+
 ## ✅ DONE (session 23, 2026-06-17): run.sh Kakariko-DAY + all-NPC replace, anim 60fps, defaults
 User-driven session ("replace ALL characters", smooth anims, sensible defaults). Shipped:
 - **KANBAN restored to N64.** Auto-replacing signs broke the cut behaviour: En_Kanban spawns
