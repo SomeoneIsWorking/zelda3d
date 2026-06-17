@@ -99,8 +99,18 @@ def main():
     model = C.Cmb(z.read([f for f in z.files if f.name == args.cmb][0]))
     csab = None
     if args.anim and args.anim != "rest":
-        nm = "Anim/%s.csab" % args.anim if not args.anim.startswith("Anim/") else args.anim
-        csab = A.Csab(z.read([f for f in z.files if f.name == nm][0]))
+        # Accept a bare base ("ge1_s_wait" -> "Anim/ge1_s_wait.csab"), an "Anim/..." path, or any
+        # verbatim zar-relative .csab path (link CSABs live under "boy/anim/"/"child/anim/", not "Anim/").
+        if args.anim.startswith("Anim/") or args.anim.endswith(".csab"):
+            nm = args.anim
+        else:
+            nm = "Anim/%s.csab" % args.anim
+        # Fall back to a basename match if the exact path isn't present (resolves boy/ vs child/ dir).
+        cand = [f for f in z.files if f.name == nm]
+        if not cand:
+            base = (nm.rsplit("/", 1)[-1])
+            cand = [f for f in z.files if f.name.endswith("/" + base) or f.name == base]
+        csab = A.Csab(z.read(cand[0]))
 
     tris = list(A.skinned_triangles(model, csab, args.frame))
     img, filled = render(tris, W, H, args.rotx)
