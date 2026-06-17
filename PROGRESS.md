@@ -21,12 +21,22 @@ User-driven session ("replace ALL characters", smooth anims, sensible defaults).
 - **Display/range defaults (SOH3D mode, applied once, persisted):** MatchRefreshRate=1 (FPS=refresh),
   DisableDrawDistance=20 (20x actor draw range), WidescreenActorCulling=1. Aspect already follows
   the window. In InitOTR (OTRGlobals.cpp).
-- **COVERAGE — partial / remaining long tail.** Mapped-object characters replace (the Kakariko day
-  NPCs do). GAP: objects with no per-name ZAR map (NULL) fall back to N64 — e.g. OBJECT_NIW (cucco)
-  is NULL, so chickens stay N64. ~88 unmapped object_ names; the creatures among them live in
-  renamed or SHARED archives (e.g. cucco model is in zelda_ec, not zelda_niw) and need a hand
-  alias + per-actor CMB-selection table. NOT done. Next: build that mapping for the visible Kakariko
-  creatures first. See tools/gen_object_zars.py + scratch/evidence/multicmb_survey.txt.
+- **COVERAGE — renamed-creature aliases added (gen_object_zars.py ALIAS map, 289->306).** Many
+  creatures fell back to N64 because OoT3D renamed their archive, so object_<name> missed. Added a
+  hand ALIAS map (each identity CONFIRMED by dumping the target zar's main CMB): niw->nw (cucco),
+  okuta->oc2, bigokuta->ocd, peehat->ph, poh->po, reeba->rb, tite->tt, wallmaster->wm2,
+  kingdodongo->kdodongo, firefly->ff (keese), anubice->av, Bb->bb (bubble), geldb->gelb,
+  horse_link_child->hlc (child epona), fhg->fantomHG, door_killer->killer_door, sk2->skelton
+  (Stalfos). Verified live: cucco (Kakariko) + Market crowd (En_Hy townsfolk, Malon, dog, market
+  people, cuccos) all auto-replace as OoT3D.
+- **CORRECTION:** the "shared zelda_ec archive" concern was UNFOUNDED. En_Hy townsfolk use SEPARATE
+  per-body objects (OBJECT_AOB/BOJ/AHG/BBA/CNE/BJI/COB/BOB), each already mapped to its own zar; the
+  cucco is zelda_nw (not ec). zelda_ec is a redundant consolidated archive nothing routes through.
+- **REMAINING N64 (no clean standalone model / not creatures):** ~96 NULL objects left, but they are
+  keeps (gameplay_keep), scene object-sets (oA*/oB*/oE*/oF*), anim-only banks (*_anime, ganon_anime*,
+  zl2_anime*), effects (mjin_*), items (medal/b_heart/gi via held path), Link/Epona variants, and a
+  few uncertain (human/ossan shopkeeper, gol, fish-vs-fishmaster, masterkokiri). Mapping more needs
+  per-CMB selection inside multi-model zars (e.g. object_fish would pick fishmaster, the wrong cmb).
 
 ## ✅ DONE (session 22, 2026-06-17): multi-CMB ASSEMBLY merge mechanism + KANBAN; generic-merge REJECTED
 **Built the reusable multi-CMB merge capability and hand-applied it to the kanban signpost; a
