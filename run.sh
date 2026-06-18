@@ -16,8 +16,7 @@
 # required; run.sh inits the submodules for you). On every run it brings the engine in line with the
 # commit THIS repo pins (the submodule gitlink), reporting what it did or why it skipped — but never
 # clobbering local engine work (commits ahead of the pin, or uncommitted changes). So
-# `git pull && ./run.sh` stays current. Skip the check with SOH3D_NOUPDATE=1; force a hard re-sync
-# to the pinned commit (discarding local engine state) with SOH3D_FORCE_ENGINE=1.
+# `git pull && ./run.sh` stays current. Skip the check entirely with SOH3D_NOUPDATE=1.
 set -eu
 REPO="$(cd "$(dirname "$0")" && pwd)"
 BUILD="$REPO/Shipwright/build-cmake"
@@ -36,53 +35,27 @@ NPROC="$(nproc 2>/dev/null || sysctl -n hw.ncpu 2>/dev/null || echo 4)"
 # URL when checking out (keeps the fork's .gitmodules unchanged for clean upstream merges).
 LIBULTRA_FORK="https://github.com/SomeoneIsWorking/libultraship.git"
 
-# Sync ONE submodule to the commit its parent repo pins (the gitlink at the parent's HEAD), and —
-# crucially — report exactly what it decided, so a stale engine is never silent. Never clobbers
-# local work: a checkout with commits AHEAD of the pin (my dev WIP) or uncommitted changes is left
-# alone with an explanation. SOH3D_FORCE_ENGINE=1 overrides that and hard-resets to the pin.
-# Args: <parent_repo_dir> <submodule_path> <label>.
+# Bring ONE submodule to the commit its parent repo pins (the gitlink at the parent's HEAD).
+# The only thing it won't touch is genuine local engine work — a checkout with commits AHEAD of the
+# pin (auto-detected); everything else just gets synced. git's own checkout refuses to overwrite
+# uncommitted changes, so this can never silently lose work. Args: <parent_dir> <subpath> <label>.
 sync_submodule_to_pin() {
     local parent="$1" subpath="$2" label="$3"
     local sub="$parent/$subpath" want cur
     want="$(git -C "$parent" rev-parse --verify --quiet "HEAD:$subpath" 2>/dev/null || true)"
     cur="$(git -C "$sub" rev-parse --verify --quiet HEAD 2>/dev/null || true)"
-    if [ -z "$want" ] || [ -z "$cur" ]; then
-        echo "  $label: cannot resolve pinned/current commit — skipping update" >&2
-        return 0
-    fi
-    if [ "$cur" = "$want" ]; then
-        echo "  $label: up to date (${want:0:9})" >&2
-        return 0
-    fi
+    [ -z "$want" ] || [ -z "$cur" ] && { echo "  $label: cannot resolve commit — skipping" >&2; return 0; }
+    [ "$cur" = "$want" ] && return 0
     # The parent's `git pull` may have advanced the gitlink to a commit this checkout hasn't fetched.
     git -C "$sub" cat-file -e "${want}^{commit}" 2>/dev/null || git -C "$sub" fetch --quiet --all 2>/dev/null || true
-
-    if [ -n "${SOH3D_FORCE_ENGINE:-}" ]; then
-        echo "  $label: forcing ${cur:0:9} -> pinned ${want:0:9} (SOH3D_FORCE_ENGINE)…" >&2
-        git -C "$sub" reset --hard "$want" >&2 2>/dev/null || true
-        git -C "$parent" submodule update --init --force "$subpath" >&2 || \
-            echo "  $label: ERROR force-updating to ${want:0:9}" >&2
-        return 0
-    fi
-    # Commits BEYOND the pin = work in progress on this machine — never clobber.
+    # Local commits beyond the pin = work in progress on this machine — leave it alone.
     if git -C "$sub" merge-base --is-ancestor "$want" "$cur" 2>/dev/null; then
-        echo "  $label: at ${cur:0:9}, AHEAD of the pinned ${want:0:9} — local commits, left as-is." >&2
-        echo "         (commit+push, then bump the gitlink to publish; the build uses your local copy.)" >&2
+        echo "  $label: ${cur:0:9} has local commits ahead of pinned ${want:0:9}; leaving it." >&2
         return 0
     fi
-    # Uncommitted changes to tracked files = unsaved work — never clobber. THIS is the case that used
-    # to make the update silently skip forever (a build that dirties a tracked file); now it says so.
-    if ! git -C "$sub" diff --quiet --ignore-submodules=all 2>/dev/null \
-       || ! git -C "$sub" diff --cached --quiet --ignore-submodules=all 2>/dev/null; then
-        echo "  $label: at ${cur:0:9} but repo pins ${want:0:9}, and the tree has uncommitted changes —" >&2
-        echo "         NOT auto-updating (would lose work). Re-run with SOH3D_FORCE_ENGINE=1 to discard," >&2
-        echo "         or: git -C $sub reset --hard $want" >&2
-        return 0
-    fi
-    # Clean and behind/diverged → move to the pinned commit.
-    echo "  $label: ${cur:0:9} -> pinned ${want:0:9} (updating)…" >&2
+    echo "  $label: ${cur:0:9} -> ${want:0:9}" >&2
     git -C "$parent" submodule update --init "$subpath" >&2 || \
-        echo "  $label: ERROR updating to ${want:0:9} (offline, or the commit isn't on the remote?)" >&2
+        echo "  $label: couldn't switch to ${want:0:9} (local changes in the way? see git output above)" >&2
 }
 
 # Bring the engine checkout in line with the commits THIS repo pins (Shipwright gitlink, then the
