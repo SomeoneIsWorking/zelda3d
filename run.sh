@@ -11,20 +11,47 @@
 # the ROM file (any name) into the repo dir. The N64 .z64 (for first-run extraction)
 # is picked up the same way. Override the warp target with SOH3D_ENTRANCE=<decimal>.
 #
-# The binary is built automatically if missing (the build dir is configured on first
-# run too). Force a rebuild with SOH3D_BUILD=1 ./run.sh.
+# On a fresh machine this also clones the Shipwright engine fork + its submodules and
+# configures the build dir; the binary is then built automatically if missing. Force a
+# rebuild with SOH3D_BUILD=1 ./run.sh.
 set -eu
 REPO="$(cd "$(dirname "$0")" && pwd)"
 BUILD="$REPO/Shipwright/build-cmake"
 SOH="$BUILD/soh"
 
+# The engine lives in a side-by-side clone of our Shipwright fork (gitignored here, NOT a
+# submodule of this repo), with libultraship as a submodule pointing at OUR fork's commit.
+SHIPWRIGHT_FORK="https://github.com/SomeoneIsWorking/Shipwright.git"
+SHIPWRIGHT_BRANCH="develop"
+LIBULTRA_FORK="https://github.com/SomeoneIsWorking/libultraship.git"
+
+# Clone the Shipwright fork + init its submodules if the engine sources aren't present.
+# A plain submodule init won't do: the recorded libultraship commit only exists in our fork,
+# while Shipwright's .gitmodules still points libultraship at upstream — so override that URL.
+ensure_sources() {
+    if [ -f "$REPO/Shipwright/CMakeLists.txt" ] && [ -f "$REPO/Shipwright/libultraship/CMakeLists.txt" ]; then
+        return 0
+    fi
+    if [ ! -d "$REPO/Shipwright/.git" ]; then
+        echo "cloning Shipwright fork ($SHIPWRIGHT_BRANCH)…" >&2
+        git clone -o fork --branch "$SHIPWRIGHT_BRANCH" "$SHIPWRIGHT_FORK" "$REPO/Shipwright" >&2 || {
+            echo "error: failed to clone Shipwright" >&2; exit 1; }
+    fi
+    echo "initialising engine submodules (libultraship from our fork)…" >&2
+    git -C "$REPO/Shipwright" submodule init >&2 || { echo "error: submodule init failed" >&2; exit 1; }
+    git -C "$REPO/Shipwright" config submodule.libultraship.url "$LIBULTRA_FORK"
+    git -C "$REPO/Shipwright" submodule update --init --recursive >&2 || {
+        echo "error: submodule update failed" >&2; exit 1; }
+}
+
 # Build a CMake target if its output is missing (or SOH3D_BUILD=1 forces a rebuild).
-# Configures the build dir first if it has never been configured. Pass: <target> <output-binary>.
+# Clones the engine + configures the build dir first if needed. Pass: <target> <output-binary>.
 ensure_built() {
     local target="$1" binary="$2"
     if [ -x "$binary" ] && [ -z "${SOH3D_BUILD:-}" ]; then
         return 0
     fi
+    ensure_sources
     if [ ! -f "$BUILD/CMakeCache.txt" ]; then
         echo "configuring build dir (first run)…" >&2
         cmake -S "$REPO/Shipwright" -B "$BUILD" -G Ninja -DCMAKE_BUILD_TYPE=Release >&2 || {
