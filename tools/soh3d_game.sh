@@ -53,8 +53,10 @@ status() {
 start() {
     local entr="${1:-${SOH3D_ENTRANCE:-238}}" time="${2:-${SOH3D_TIME:-0x6000}}"
     stop || { echo "stop failed; aborting start" >&2; return 1; }
-    [ -f "$REPO/.env" ] && . "$REPO/.env"
-    : "${SOH3D_3DS_ROM:?set SOH3D_3DS_ROM (.env)}"; export SOH3D_3DS_ROM
+    # ROM provisioning: env -> gitignored .env -> any *.3ds / *.z64 dropped in the repo dir.
+    . "$REPO/tools/rom_provision.sh"
+    soh3d_provision_roms "$REPO" "$(dirname "$SOH")"
+    : "${SOH3D_3DS_ROM:?no OoT3D .3ds found — set SOH3D_3DS_ROM, add ./.env, or drop a *.3ds in $REPO}"
     local xauth; xauth="${XAUTHORITY:-$(ls -t /run/user/"$(id -u)"/xauth_* 2>/dev/null | head -1)}"
     mkdir -p "$REPO/scratch/logs"
     echo "starting: entrance=$entr time=$time -> $LOG"
