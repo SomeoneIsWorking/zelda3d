@@ -63,10 +63,13 @@ This file is the source of truth across sessions.
     the user — verify the hold-Start dialog skip (just added) works, and consider enabling the
     SkipText enhancement by default so B/Start fast-advance text instantly.
 
-13. **Wrong entrance spawn points (CLUSTER)** — entrances land at the wrong spawn: (a) Kokiri shop
-    door → Link's house; (b) Kakariko graveyard → immediately transitions back out (spawns Link ON
-    the exit/leave trigger zone). Likely one root cause: wrong spawn index / spawn-point lookup for
-    these entrances (or door→entrance routing). Check entrance table + spawn handling. Needs repro.
+13. **Wrong entrance spawn points (CLUSTER, some SEVERE)** — entrances land at the wrong spawn:
+    (a) Kokiri shop door → Link's house; (b) Kakariko graveyard → immediately transitions back out
+    (spawns Link ON the exit/leave trigger); (c) a Kakariko door (screenshot: posted-notices door)
+    → enter → fall into the void → respawn inside → fall again FOREVER (infinite void loop, can only
+    escape by debug-teleport; can never die/land). Likely one root cause: wrong spawn index /
+    spawn-point lookup / door→entrance routing, dropping Link outside the room floor. HIGH priority
+    (the void loop is a hard softlock). Check entrance table + spawn handling.
 
 14. **Link drops off EVERY climbable surface halfway** (collision, SYSTEMIC) — not just one ladder;
     all climbables (ladders/vines/walls) drop Link partway up. Likely a general climb-collision
