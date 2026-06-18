@@ -30,6 +30,18 @@ SK = os.path.join(REPO, 'tools', 'skeldata')
 # (zelda_nw -> object_niw) so an aliased OoT3D zar finds its N64 animations.
 OBJ_OVERRIDE = {("/actor/zelda_%s.zar" % v): ("object_%s" % k) for k, v in ALIAS.items()}
 
+# Some character skeletons keep their animations in a SHARED anim-bank object rather than the
+# skeleton's own object, so zar_to_object() finds no AnimationHeaders and the character drops out
+# of the match entirely (-> every instance falls back to the default idle). En_Ko (Kokiri kids)
+# is the case: the km1/kw1 skeletons animate from object_os_anime (gKokiri*Anim). Map such a zar
+# to the extra bank object(s) whose AnimationHeaders are matched against this zar's CSABs; the
+# runtime OTR key stays "objects/<bank>/<anim>" (skelAnime->animation), shared across every body
+# that plays that anim. km1 and kw1 carry the SAME km1_* CSAB set, so associating the bank with
+# ONE of them (km1) yields one entry per anim that resolves correctly for both bodies.
+SHARED_ANIM_BANKS = {
+    "/actor/zelda_km1.zar": ["object_os_anime"],
+}
+
 
 def zar_to_object(zar):
     base = os.path.basename(zar)[:-4]            # zelda_sa
@@ -218,7 +230,10 @@ def main():
         obj = zar_to_object(z)
         if obj:
             want[obj] = z
-    objs, dma = N.load_objects(n64rom, set(want))
+    bank_objs = set()
+    for banks in SHARED_ANIM_BANKS.values():
+        bank_objs.update(banks)
+    objs, dma = N.load_objects(n64rom, set(want) | bank_objs)
     n64 = {}
     for obj, zar in sorted(want.items()):
         if obj not in objs:
@@ -226,6 +241,19 @@ def main():
         a = n64_anims(objs[obj], obj)
         if a:
             n64[zar] = dict(object=obj, anims=a)
+    # Shared anim banks: append the bank object's AnimationHeaders to each zar that uses it, so a
+    # skeleton whose own object has no anims (km1/kw1) still matches its CSABs against the bank.
+    for zar, banks in sorted(SHARED_ANIM_BANKS.items()):
+        extra = []
+        for bobj in banks:
+            if bobj in objs:
+                extra += n64_anims(objs[bobj], bobj)
+        if not extra:
+            continue
+        if zar in n64:
+            n64[zar]['anims'] += extra
+        else:
+            n64[zar] = dict(object=banks[0], anims=extra)
     json.dump(n64, open(os.path.join(SK, 'n64_anims.json'), 'w'), indent=1)
     totn = sum(len(v['anims']) for v in n64.values())
     print("N64 anims: %d AnimationHeaders across %d objects (dma @ 0x%X) -> tools/skeldata/n64_anims.json"

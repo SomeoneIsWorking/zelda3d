@@ -6056,5 +6056,400 @@
     "frameCount": 30
    }
   ]
+ },
+ "/actor/zelda_km1.zar": {
+  "object": "object_os_anime",
+  "anims": [
+   {
+    "name": "gObjOsAnim_00B4",
+    "otr": "objects/object_os_anime/gObjOsAnim_00B4",
+    "offset": "0x0B4",
+    "frameCount": 2
+   },
+   {
+    "name": "gObjOsAnim_0170",
+    "otr": "objects/object_os_anime/gObjOsAnim_0170",
+    "offset": "0x170",
+    "frameCount": 2
+   },
+   {
+    "name": "gObjOsAnim_0228",
+    "otr": "objects/object_os_anime/gObjOsAnim_0228",
+    "offset": "0x228",
+    "frameCount": 2
+   },
+   {
+    "name": "gObjOsAnim_0718",
+    "otr": "objects/object_os_anime/gObjOsAnim_0718",
+    "offset": "0x718",
+    "frameCount": 20
+   },
+   {
+    "name": "gObjOsAnim_07D0",
+    "otr": "objects/object_os_anime/gObjOsAnim_07D0",
+    "offset": "0x7D0",
+    "frameCount": 2
+   },
+   {
+    "name": "gObjOsAnim_0894",
+    "otr": "objects/object_os_anime/gObjOsAnim_0894",
+    "offset": "0x894",
+    "frameCount": 2
+   },
+   {
+    "name": "gObjOsAnim_092C",
+    "otr": "objects/object_os_anime/gObjOsAnim_092C",
+    "offset": "0x92C",
+    "frameCount": 2
+   },
+   {
+    "name": "gObjOsAnim_0BFC",
+    "otr": "objects/object_os_anime/gObjOsAnim_0BFC",
+    "offset": "0xBFC",
+    "frameCount": 15
+   },
+   {
+    "name": "gObjOsAnim_0FE4",
+    "otr": "objects/object_os_anime/gObjOsAnim_0FE4",
+    "offset": "0xFE4",
+    "frameCount": 15
+   },
+   {
+    "name": "gObjOsAnim_12E8",
+    "otr": "objects/object_os_anime/gObjOsAnim_12E8",
+    "offset": "0x12E8",
+    "frameCount": 15
+   },
+   {
+    "name": "gObjOsAnim_14A0",
+    "otr": "objects/object_os_anime/gObjOsAnim_14A0",
+    "offset": "0x14A0",
+    "frameCount": 20
+   },
+   {
+    "name": "gObjOsAnim_1650",
+    "otr": "objects/object_os_anime/gObjOsAnim_1650",
+    "offset": "0x1650",
+    "frameCount": 20
+   },
+   {
+    "name": "gObjOsAnim_16EC",
+    "otr": "objects/object_os_anime/gObjOsAnim_16EC",
+    "offset": "0x16EC",
+    "frameCount": 2
+   },
+   {
+    "name": "gObjOsAnim_18A0",
+    "otr": "objects/object_os_anime/gObjOsAnim_18A0",
+    "offset": "0x18A0",
+    "frameCount": 20
+   },
+   {
+    "name": "gObjOsAnim_1E7C",
+    "otr": "objects/object_os_anime/gObjOsAnim_1E7C",
+    "offset": "0x1E7C",
+    "frameCount": 40
+   },
+   {
+    "name": "gObjOsAnim_1F18",
+    "otr": "objects/object_os_anime/gObjOsAnim_1F18",
+    "offset": "0x1F18",
+    "frameCount": 2
+   },
+   {
+    "name": "gObjOsAnim_2160",
+    "otr": "objects/object_os_anime/gObjOsAnim_2160",
+    "offset": "0x2160",
+    "frameCount": 20
+   },
+   {
+    "name": "gObjOsAnim_25D0",
+    "otr": "objects/object_os_anime/gObjOsAnim_25D0",
+    "offset": "0x25D0",
+    "frameCount": 50
+   },
+   {
+    "name": "gObjOsAnim_265C",
+    "otr": "objects/object_os_anime/gObjOsAnim_265C",
+    "offset": "0x265C",
+    "frameCount": 2
+   },
+   {
+    "name": "gObjOsAnim_2850",
+    "otr": "objects/object_os_anime/gObjOsAnim_2850",
+    "offset": "0x2850",
+    "frameCount": 20
+   },
+   {
+    "name": "gObjOsAnim_28DC",
+    "otr": "objects/object_os_anime/gObjOsAnim_28DC",
+    "offset": "0x28DC",
+    "frameCount": 2
+   },
+   {
+    "name": "gObjOsAnim_2D0C",
+    "otr": "objects/object_os_anime/gObjOsAnim_2D0C",
+    "offset": "0x2D0C",
+    "frameCount": 20
+   },
+   {
+    "name": "gObjOsAnim_2DC0",
+    "otr": "objects/object_os_anime/gObjOsAnim_2DC0",
+    "offset": "0x2DC0",
+    "frameCount": 2
+   },
+   {
+    "name": "gObjOsAnim_300C",
+    "otr": "objects/object_os_anime/gObjOsAnim_300C",
+    "offset": "0x300C",
+    "frameCount": 16
+   },
+   {
+    "name": "gObjOsAnim_31B0",
+    "otr": "objects/object_os_anime/gObjOsAnim_31B0",
+    "offset": "0x31B0",
+    "frameCount": 7
+   },
+   {
+    "name": "gObjOsAnim_33B4",
+    "otr": "objects/object_os_anime/gObjOsAnim_33B4",
+    "offset": "0x33B4",
+    "frameCount": 12
+   },
+   {
+    "name": "gObjOsAnim_3D84",
+    "otr": "objects/object_os_anime/gObjOsAnim_3D84",
+    "offset": "0x3D84",
+    "frameCount": 29
+   },
+   {
+    "name": "gObjOsAnim_41F8",
+    "otr": "objects/object_os_anime/gObjOsAnim_41F8",
+    "offset": "0x41F8",
+    "frameCount": 14
+   },
+   {
+    "name": "gObjOsAnim_42AC",
+    "otr": "objects/object_os_anime/gObjOsAnim_42AC",
+    "offset": "0x42AC",
+    "frameCount": 2
+   },
+   {
+    "name": "gObjOsAnim_4408",
+    "otr": "objects/object_os_anime/gObjOsAnim_4408",
+    "offset": "0x4408",
+    "frameCount": 12
+   },
+   {
+    "name": "gObjOsAnim_4788",
+    "otr": "objects/object_os_anime/gObjOsAnim_4788",
+    "offset": "0x4788",
+    "frameCount": 20
+   },
+   {
+    "name": "gObjOsAnim_4C4C",
+    "otr": "objects/object_os_anime/gObjOsAnim_4C4C",
+    "offset": "0x4C4C",
+    "frameCount": 30
+   },
+   {
+    "name": "gObjOsAnim_4CF4",
+    "otr": "objects/object_os_anime/gObjOsAnim_4CF4",
+    "offset": "0x4CF4",
+    "frameCount": 2
+   },
+   {
+    "name": "gObjOsAnim_4E90",
+    "otr": "objects/object_os_anime/gObjOsAnim_4E90",
+    "offset": "0x4E90",
+    "frameCount": 20
+   },
+   {
+    "name": "gObjOsAnim_4F28",
+    "otr": "objects/object_os_anime/gObjOsAnim_4F28",
+    "offset": "0x4F28",
+    "frameCount": 2
+   },
+   {
+    "name": "gKokiriLaughingAnim",
+    "otr": "objects/object_os_anime/gKokiriLaughingAnim",
+    "offset": "0x5808",
+    "frameCount": 41
+   },
+   {
+    "name": "gKokiriIdleAnim",
+    "otr": "objects/object_os_anime/gKokiriIdleAnim",
+    "offset": "0x62DC",
+    "frameCount": 40
+   },
+   {
+    "name": "gObjOsAnim_6458",
+    "otr": "objects/object_os_anime/gObjOsAnim_6458",
+    "offset": "0x6458",
+    "frameCount": 7
+   },
+   {
+    "name": "gObjOsAnim_6518",
+    "otr": "objects/object_os_anime/gObjOsAnim_6518",
+    "offset": "0x6518",
+    "frameCount": 2
+   },
+   {
+    "name": "gKokiriRecliningSittingUpAnim",
+    "otr": "objects/object_os_anime/gKokiriRecliningSittingUpAnim",
+    "offset": "0x65E0",
+    "frameCount": 2
+   },
+   {
+    "name": "gKokiriWipingForeheadAnim",
+    "otr": "objects/object_os_anime/gKokiriWipingForeheadAnim",
+    "offset": "0x6A60",
+    "frameCount": 20
+   },
+   {
+    "name": "gKokiriBackflipAnim",
+    "otr": "objects/object_os_anime/gKokiriBackflipAnim",
+    "offset": "0x6EE0",
+    "frameCount": 19
+   },
+   {
+    "name": "gKokiriSittingCrossedArmsLegsAnim",
+    "otr": "objects/object_os_anime/gKokiriSittingCrossedArmsLegsAnim",
+    "offset": "0x6F9C",
+    "frameCount": 2
+   },
+   {
+    "name": "gKokiriStandingApprehensiveAnim",
+    "otr": "objects/object_os_anime/gKokiriStandingApprehensiveAnim",
+    "offset": "0x7064",
+    "frameCount": 2
+   },
+   {
+    "name": "gKokiriLeaningOnArmsAnim",
+    "otr": "objects/object_os_anime/gKokiriLeaningOnArmsAnim",
+    "offset": "0x7120",
+    "frameCount": 2
+   },
+   {
+    "name": "gKokiriSittingDiggingAnim",
+    "otr": "objects/object_os_anime/gKokiriSittingDiggingAnim",
+    "offset": "0x7454",
+    "frameCount": 20
+   },
+   {
+    "name": "gKokiriLiftingRockAnim",
+    "otr": "objects/object_os_anime/gKokiriLiftingRockAnim",
+    "offset": "0x7830",
+    "frameCount": 19
+   },
+   {
+    "name": "gKokiriCuttingGrassAnim",
+    "otr": "objects/object_os_anime/gKokiriCuttingGrassAnim",
+    "offset": "0x7D94",
+    "frameCount": 19
+   },
+   {
+    "name": "gKokiriSittingHeadOnHandAnim",
+    "otr": "objects/object_os_anime/gKokiriSittingHeadOnHandAnim",
+    "offset": "0x7E64",
+    "frameCount": 2
+   },
+   {
+    "name": "gKokiriRecliningLeaningBackAnim",
+    "otr": "objects/object_os_anime/gKokiriRecliningLeaningBackAnim",
+    "offset": "0x7F38",
+    "frameCount": 2
+   },
+   {
+    "name": "gKokiriStandingHandOnChestAnim",
+    "otr": "objects/object_os_anime/gKokiriStandingHandOnChestAnim",
+    "offset": "0x7FFC",
+    "frameCount": 2
+   },
+   {
+    "name": "gKokiriStandingHandsOnHipsAnim",
+    "otr": "objects/object_os_anime/gKokiriStandingHandsOnHipsAnim",
+    "offset": "0x80B4",
+    "frameCount": 2
+   },
+   {
+    "name": "gKokiriRecliningStandingAnim",
+    "otr": "objects/object_os_anime/gKokiriRecliningStandingAnim",
+    "offset": "0x8178",
+    "frameCount": 2
+   },
+   {
+    "name": "gKokiriPunchingAnim",
+    "otr": "objects/object_os_anime/gKokiriPunchingAnim",
+    "offset": "0x879C",
+    "frameCount": 20
+   },
+   {
+    "name": "gKokiriBlockingAnim",
+    "otr": "objects/object_os_anime/gKokiriBlockingAnim",
+    "offset": "0x8F6C",
+    "frameCount": 26
+   },
+   {
+    "name": "gKokiriSittingArmsUpAnim",
+    "otr": "objects/object_os_anime/gKokiriSittingArmsUpAnim",
+    "offset": "0x9028",
+    "frameCount": 2
+   },
+   {
+    "name": "gKokiriStandingRightArmUpAnim",
+    "otr": "objects/object_os_anime/gKokiriStandingRightArmUpAnim",
+    "offset": "0x90EC",
+    "frameCount": 2
+   },
+   {
+    "name": "gKokiriSittingAnim",
+    "otr": "objects/object_os_anime/gKokiriSittingAnim",
+    "offset": "0x91AC",
+    "frameCount": 2
+   },
+   {
+    "name": "gKokiriStandingAnim",
+    "otr": "objects/object_os_anime/gKokiriStandingAnim",
+    "offset": "0x9274",
+    "frameCount": 2
+   },
+   {
+    "name": "gKokiriStandingArmsBehindBackAnim",
+    "otr": "objects/object_os_anime/gKokiriStandingArmsBehindBackAnim",
+    "offset": "0x982C",
+    "frameCount": 34
+   },
+   {
+    "name": "gKokiriLeaningForwardAnim",
+    "otr": "objects/object_os_anime/gKokiriLeaningForwardAnim",
+    "offset": "0x98EC",
+    "frameCount": 2
+   },
+   {
+    "name": "gKokiriSittingCrossedLegsAnim",
+    "otr": "objects/object_os_anime/gKokiriSittingCrossedLegsAnim",
+    "offset": "0x99A4",
+    "frameCount": 2
+   },
+   {
+    "name": "gKokiriStandUpAnim",
+    "otr": "objects/object_os_anime/gKokiriStandUpAnim",
+    "offset": "0x9B64",
+    "frameCount": 4
+   },
+   {
+    "name": "gObjOsAnim_9F94",
+    "otr": "objects/object_os_anime/gObjOsAnim_9F94",
+    "offset": "0x9F94",
+    "frameCount": 15
+   },
+   {
+    "name": "gObjOsAnim_A630",
+    "otr": "objects/object_os_anime/gObjOsAnim_A630",
+    "offset": "0xA630",
+    "frameCount": 21
+   }
+  ]
  }
 }
