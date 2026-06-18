@@ -151,6 +151,9 @@ This file is the source of truth across sessions.
 6. **Epona → OoT3D model** (lower priority) — Epona still renders as the N64 model; actor-
    replacement gap.
 
+27. **More foliage** (LOWEST priority — do last) — add more foliage/vegetation density to the world
+    for a lusher look.
+
 ## Done (recent)
 
 - **RmlUi "Restart → Title Screen"** — Debug-tab row (`restart="1"` → `gSoH3dMenuRestart` →
