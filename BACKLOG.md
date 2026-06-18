@@ -22,18 +22,27 @@ This file is the source of truth across sessions.
 
 ## Open
 
-1. **Vulkan upside-down framebuffer** — the title-screen 3D backdrop, the pause/inventory
-   background, AND the equipment-screen Link model all render upside-down on Vulkan (CONFIRMED
-   Vulkan-only; 2D icons/sprites on the same screens are correct). I.e. every 3D-rendered-to-
-   framebuffer-then-sampled image flips. Cause: framebuffers are drawn back as 2D
-   texture rectangles; Vulkan's NDC is Y-down and this backend compensates by flipping vertex Y
-   (`GetClipParameters` returned `{true,true}`), so FB-sampled images come out flipped while
-   uploaded textures (HUD/sprites) are fine. A per-fb `invertY` tweak was committed but is
-   INEFFECTIVE for this bug (verified). Proper fix: switch the Vulkan backend to a negative-height
-   viewport (Metal-style, `invertY=false`, Metal returns `{true,false}`) so FB textures sample
-   upright; verify normal scene + title + inventory together. Files: `libultraship/src/fast/
-   backends/gfx_vulkan.cpp` (`GetClipParameters`, `SetViewport`, present blit), `interpreter.cpp`
-   (`SetVertices` line ~2184, `AdjustVIewportOrScissor` line ~2376). Reference: `gfx_metal.cpp`.
+1. **3D content renders upside-down on the FIRST frame(s) until the camera updates** (RE-DIAGNOSED
+   2026-06-19 from a user observation — supersedes the old "FB sampling flip" theory). The title-
+   screen 3D backdrop (and pause/inventory bg, equipment Link) appear flipped, BUT the user reports
+   **it self-corrects after a camera change**. A framebuffer-sampling flip would be PERMANENT, so
+   this is NOT an FB-flip — it is a stale/wrong **view-or-projection matrix on the first frame(s)**,
+   fixed once the camera recompute runs. User's framing: "this scene is still using the N64
+   projection, not the 3DS one." DO NOT pursue the negative-height-viewport / GetClipParameters
+   restructure — RULED OUT: BOTH `{true,true}` (old) and `{true,!invertY}` (current) leave the image
+   flipped, so `GetClipParameters.invertY` is not the lever. NEXT: find where the OoT3D/Vulkan pass
+   gets its view+projection each frame and why the first frame uses a stale (flipped) one; make the
+   correct (camera-derived) projection apply from frame 0. Files: trace the gSPMatrix projection the
+   game pushes (Play camera) vs what the Vulkan backend uses on the first post-load frame. Repro: any
+   fresh scene load OR the title demo; freeze the camera at load to hold the flipped state.
+
+1b. **Title-screen flow is broken** (user, 2026-06-19) — (a) the title demo's scene load can CRASH:
+   `Scene_CommandAlternateHeaderList` -> `OTRScene_ExecuteCommands` -> `Play_Init` while loading
+   SCENE_ZORAS_RIVER for the title backdrop (seen via the "Restart -> Title" menu row). (b) Pressing
+   Start/A on the title does NOT reliably go to File Select — sometimes lands in "a weird place". (c)
+   If you DON'T press Start, the demo proceeds and dumps you into a playable/movable state (user
+   ended up in the Sages cutscene area able to move). Title gamestate / demo-scene routing is
+   unstable. Likely related to #1 (first-frame scene setup) and the title demo scene table.
 
 2. **Universal Start-skip for cutscenes** — everything that takes control away from Link must be
    Start-skippable: scripted CS cutscenes, onepoint cameras, actor-driven sequences, item-get
