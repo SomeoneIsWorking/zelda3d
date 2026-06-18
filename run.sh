@@ -106,6 +106,23 @@ ensure_built() {
     [ -x "$binary" ] || { echo "error: '$binary' still missing after build" >&2; exit 1; }
 }
 
+# The engine refuses to start without its runtime asset archive `soh.o2r` (custom fonts, UI
+# textures, GL/Metal shaders) sitting next to the binary — on macOS it pops a blocking
+# "Missing soh.o2r … Exiting" dialog. That archive is GENERATED from the in-tree custom assets
+# (NOT from a game ROM), via the CMake `GenerateSohOtr` target (extract_assets.py --norom), which
+# emits it to $BUILD/soh/soh.o2r — exactly where we cd before launching, so the binary finds it
+# (Context::LocateFileAcrossAppDirs searches cwd / app dir). We always launch with cwd=$SOH, so
+# placing it there satisfies both macOS and Linux. Never commit it: it's a build product.
+# Idempotent: skip if already present (the target itself isn't dependency-tracked for staleness,
+# so don't rebuild it every run — only when the file is actually missing).
+ensure_soh_o2r() {
+    [ -f "$SOH/soh.o2r" ] && return 0
+    echo "soh.o2r missing — generating runtime asset archive (GenerateSohOtr)…" >&2
+    cmake --build "$BUILD" --target GenerateSohOtr -j"$NPROC" >&2 || {
+        echo "error: failed to generate soh.o2r (GenerateSohOtr)" >&2; exit 1; }
+    [ -f "$SOH/soh.o2r" ] || { echo "error: soh.o2r still missing after GenerateSohOtr" >&2; exit 1; }
+}
+
 # ROM provisioning: env -> gitignored .env -> any *.3ds / *.z64 dropped in the repo dir.
 . "$REPO/tools/rom_provision.sh"
 soh3d_provision_roms "$REPO" "$SOH"
@@ -129,11 +146,13 @@ if [ "${1:-}" = "tool" ]; then
     shift
     CC="$SOH/charcompare/charcompare"
     ensure_built charcompare "$CC"
+    ensure_soh_o2r          # tool warns (GUI font / GL shaders) without it
     cd "$SOH"
     exec ./charcompare/charcompare "$@"
 fi
 
 ensure_built soh "$SOH/$SOH_BIN"
+ensure_soh_o2r              # game hard-exits with a "Missing soh.o2r" dialog without it
 
 export SOH3D=1                                  # render OoT3D assets
 export SOH3D_WARP=1                             # auto-warp past title/file-select
