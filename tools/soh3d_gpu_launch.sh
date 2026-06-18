@@ -18,11 +18,10 @@ cleanup() { pkill -9 -f "$SOH/soh.elf" 2>/dev/null; pkill -9 -f "soh.elf" 2>/dev
 trap cleanup EXIT INT TERM
 cleanup; sleep 1 # clear any stale instance before we start
 
-# ROM provisioning (env -> .env -> drop-in), same as run.sh.
-[ -f "$REPO/.env" ] && . "$REPO/.env"
-[ -z "${SOH3D_3DS_ROM:-}" ] && [ -f "$REPO/oot3d.3ds" ] && SOH3D_3DS_ROM="$REPO/oot3d.3ds"
-: "${SOH3D_3DS_ROM:?set SOH3D_3DS_ROM (or add ./.env or ./oot3d.3ds)}"
-export SOH3D_3DS_ROM
+# ROM provisioning: env -> .env -> any *.3ds / *.z64 dropped in the repo dir, same as run.sh.
+. "$REPO/tools/rom_provision.sh"
+soh3d_provision_roms "$REPO" "$SOH"
+: "${SOH3D_3DS_ROM:?no OoT3D .3ds found — set SOH3D_3DS_ROM, add ./.env, or drop a *.3ds in $REPO}"
 
 # Real-GPU display: prefer an already-set DISPLAY, else the KDE XWayland :0 + its xauth.
 if [ -z "${DISPLAY:-}" ]; then export DISPLAY=:0; fi

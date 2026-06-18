@@ -7,22 +7,20 @@
 #   ./run.sh tool /actor/zelda_zl4.zar   # ...starting on a specific character
 #
 # The decrypted OoT3D .3ds is provided via env SOH3D_3DS_ROM (never hardcoded — repo
-# rule). Either export it, drop a `.env` next to this script setting it, or drop the
-# ROM in as ./oot3d.3ds. Override the warp target with SOH3D_ENTRANCE=<decimal>.
+# rule). Either export it, drop a `.env` next to this script setting it, or just drop
+# the ROM file (any name) into the repo dir. The N64 .z64 (for first-run extraction)
+# is picked up the same way. Override the warp target with SOH3D_ENTRANCE=<decimal>.
 set -eu
 REPO="$(cd "$(dirname "$0")" && pwd)"
 SOH="$REPO/Shipwright/build-cmake/soh"
 
-# ROM provisioning: env -> gitignored .env -> drop-in ./oot3d.3ds
-[ -f "$REPO/.env" ] && . "$REPO/.env"
-if [ -z "${SOH3D_3DS_ROM:-}" ] && [ -f "$REPO/oot3d.3ds" ]; then
-    SOH3D_3DS_ROM="$REPO/oot3d.3ds"
-fi
+# ROM provisioning: env -> gitignored .env -> any *.3ds / *.z64 dropped in the repo dir.
+. "$REPO/tools/rom_provision.sh"
+soh3d_provision_roms "$REPO" "$SOH"
 if [ -z "${SOH3D_3DS_ROM:-}" ]; then
-    echo "error: set SOH3D_3DS_ROM to your decrypted OoT3D .3ds (or add ./.env or ./oot3d.3ds)" >&2
+    echo "error: no OoT3D .3ds found — set SOH3D_3DS_ROM, add ./.env, or drop a *.3ds into $REPO" >&2
     exit 1
 fi
-export SOH3D_3DS_ROM
 
 # If no graphical session is inherited (e.g. launched over SSH/headless terminal),
 # fall back to the primary local display so the window actually appears.
