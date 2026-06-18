@@ -74,7 +74,15 @@ This file is the source of truth across sessions.
     actor yoff/anchor. Identify rock actor/model (En_Ishi large / Obj rock), raise to ground.
 
 11. **Kokiri sword chest too big** — renders as the large treasure chest; should be the small chest.
-    Fix En_Box size/variant/scale.
+    INVESTIGATED 2026-06-19: NOT an OoT3D-replacement scale bug. En_Box's OoT3D model `tr_box.cmb`
+    (zelda_box.zar) is SKINNED (3 bones — animated lid), so the auto path SKIPS it and chests render
+    as **N64**. The N64 En_Box already draws small (type SMALL/6/ROOM_CLEAR_SMALL/SWITCH_FALL_SMALL →
+    `Actor_SetScale 0.005`) vs big (0.01) correctly, and CSMC (ChestSizeAndTextureMatchContents) is
+    OFF by default (only read in z_en_box). So if the Kokiri-sword chest looks big, check: (a) is that
+    chest's `type` actually a SMALL type in this build/save? (b) is some CVar (CSMC / size-by-contents
+    / rando) enabled? Repro the SPECIFIC chest (Kokiri Forest training maze) and read its
+    `params>>12 & 0xF`. The proper 3DS path would need a SKINNED chest replacement (animated lid),
+    like the calibrated sModelTable n64anim entries — bigger than a scale tweak.
 
 12. **Skip chest-opening + reliable dialog fast-forward** (part of #2) — opening a chest takes
     control (get-item freeze) and must be Start-skippable. Also dialogs aren't fast-forwarding for
