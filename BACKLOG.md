@@ -129,10 +129,6 @@ This file is the source of truth across sessions.
     play its wing-flap anim. Long-tail anim coverage; see [[soh3d-runsh-and-anim-interp]]
     (cucco-type coverage) and [[soh3d-n64anim-csab-map]].
 
-24. **Windmill fan blades render inside the Kakariko well** (instead of water) — a wrong object/model
-    is drawn in the well shaft (user screenshot: windmill sails in the well). Likely an object-id →
-    ZAR mis-map or a shared-object collision in the OoT3D replacement. Repro: Kakariko well.
-
 25. **NPC walking in mid-air** (Kakariko) — a townsperson (running man?) is animated walking high
     above a building/roof instead of on the ground (user screenshot). Actor Y-placement vs floor;
     same collision/terrain-warp Y cluster as #4/#9/#10/#13/#14/#16.
@@ -165,6 +161,13 @@ This file is the source of truth across sessions.
 
 ## Done (recent)
 
+- **#24 Kakariko well shows 3DS water, not windmill blades** — root cause: `Bg_Spot01_Fusya`
+  (windmill), `_Idohashira` (well pillar) and `_Idomizu` (well water) all share OBJECT_SPOT01_OBJECTS,
+  so the auto "largest CMB" pick gave every one the windmill blades (`c_s01fusya`, 56KB). Added a
+  forced-CMB auto key (`"<zar>|<cmbSubstr>"` in loadAutoModel) and routed each actor to its own CMB
+  (fusya / idohashira / idomizu) in SoH3D_TryDrawActor at the shared object scale (0.01268, REPL
+  `gscale 7|8|9`). VERIFIED: well now renders the teal 3DS water + pillar (no blades); windmill
+  unchanged. Tooling: `tools/` ctr_romfs+zar can list a ZAR's CMBs (used to find the names).
 - **#7 En_Ko (replaced actors) draw past the N64 cull distance** — added a pure predicate
   `SoH3D_ActorHasReplacement(play, actor)` (mirrors the table/auto lookups in SoH3D_TryDrawActor /
   SoH3D_TryAuto without drawing) and called it in `Ship_CalcShouldDrawAndUpdate` (z_actor.c): a
