@@ -6,8 +6,10 @@ Mirrors the live task tracker but this file is the source of truth across sessio
 
 ## Open
 
-1. **Vulkan upside-down framebuffer** — the title-screen 3D backdrop and the pause/inventory
-   background render upside-down on the Vulkan backend. Cause: framebuffers are drawn back as 2D
+1. **Vulkan upside-down framebuffer** — the title-screen 3D backdrop, the pause/inventory
+   background, AND the equipment-screen Link model all render upside-down on Vulkan (CONFIRMED
+   Vulkan-only; 2D icons/sprites on the same screens are correct). I.e. every 3D-rendered-to-
+   framebuffer-then-sampled image flips. Cause: framebuffers are drawn back as 2D
    texture rectangles; Vulkan's NDC is Y-down and this backend compensates by flipping vertex Y
    (`GetClipParameters` returned `{true,true}`), so FB-sampled images come out flipped while
    uploaded textures (HUD/sprites) are fine. A per-fb `invertY` tweak was committed but is
