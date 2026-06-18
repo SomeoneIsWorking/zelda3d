@@ -133,10 +133,11 @@ This file is the source of truth across sessions.
     above a building/roof instead of on the ground (user screenshot). Actor Y-placement vs floor;
     same collision/terrain-warp Y cluster as #4/#9/#10/#13/#14/#16.
 
-26. **Death Mountain gate shows wrong model + no collision** (Kakariko) — the closed gate to the
-    mountain (guarded by the soldier) renders as a different model (a wooden beam/brick structure)
-    and has no collision. Wrong object→ZAR/model mapping for the gate, plus missing collision.
-    Repro: Kakariko, the DM Trail gate.
+26b. **DM gate collision (UNVERIFIED leftover from #26)** — the #26 MODEL is fixed (gate renders
+    correctly now). The user also reported "no collision". The N64 Bg_Gate_Shutter keeps its own
+    collision (we only swap the render), so this may have been a misperception caused by the old
+    wrong model rendering away from the real gate. Re-check in-game whether Link is actually blocked;
+    if genuinely passable, investigate the gate's dynapoly separately. (Lower priority.)
 
 4. **Kakariko ladder render too high** — the OoT3D ladder model renders a bit high, so Link appears
    to float when climbing. Lower it slightly (per-actor yoff / placement). Tune live via REPL
@@ -161,6 +162,13 @@ This file is the source of truth across sessions.
 
 ## Done (recent)
 
+- **#26 Kakariko DM-trail gate renders the correct gate model** — Bg_Gate_Shutter uses
+  OBJECT_SPOT01_MATOYAB (zelda_spot01_matoyab.zar), shared with the windmill mechanism; the auto
+  "largest CMB" pick gave the gate the mechanism CMB (c_matoate_before), so it rendered as a
+  beam/brick structure. Forced it to its own CMB (c_s01tomegate = 留め門). The two CMBs are authored
+  at different unit scales (matoate ~1402 vs gate ~111), so the gate uses its OWN scale, calibrated
+  live to 1.4 (gate fills the archway). VERIFIED headless: barred gate blocks the passage. Collision
+  is the N64 actor's own (left as #26b to re-check).
 - **#24 Kakariko well shows 3DS water, not windmill blades** — root cause: `Bg_Spot01_Fusya`
   (windmill), `_Idohashira` (well pillar) and `_Idomizu` (well water) all share OBJECT_SPOT01_OBJECTS,
   so the auto "largest CMB" pick gave every one the windmill blades (`c_s01fusya`, 56KB). Added a
