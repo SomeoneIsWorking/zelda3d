@@ -13,10 +13,11 @@
 #
 # On a fresh checkout this checks out the Shipwright engine submodule (+ its own submodules) and
 # configures the build dir — so `git clone <soh3d> && ./run.sh` is all you need (no --recursive
-# required; run.sh inits the submodules for you). On every run it fast-forwards the engine to the
-# latest fork commit (only if the checkout is clean with no local commits — never clobbers local
-# work) and rebuilds if anything changed, so `git pull && ./run.sh` stays current. Skip the engine
-# update with SOH3D_NOUPDATE=1.
+# required; run.sh inits the submodules for you). On every run it brings the engine in line with the
+# commit THIS repo pins (the submodule gitlink), reporting what it did or why it skipped — but never
+# clobbering local engine work (commits ahead of the pin, or uncommitted changes). So
+# `git pull && ./run.sh` stays current. Skip the check with SOH3D_NOUPDATE=1; force a hard re-sync
+# to the pinned commit (discarding local engine state) with SOH3D_FORCE_ENGINE=1.
 set -eu
 REPO="$(cd "$(dirname "$0")" && pwd)"
 BUILD="$REPO/Shipwright/build-cmake"
@@ -33,50 +34,90 @@ NPROC="$(nproc 2>/dev/null || sysctl -n hw.ncpu 2>/dev/null || echo 4)"
 # in turn has libultraship as a submodule. libultraship's recorded commit only exists in OUR fork
 # while Shipwright's .gitmodules still points libultraship at upstream, so we override that nested
 # URL when checking out (keeps the fork's .gitmodules unchanged for clean upstream merges).
-SHIPWRIGHT_BRANCH="develop"
 LIBULTRA_FORK="https://github.com/SomeoneIsWorking/libultraship.git"
 
-# Fast-forward the engine clone to the latest fork commit, but ONLY when it's a clean consumer
-# clone — never disturb a machine with local engine work (mine). Skips if: SOH3D_NOUPDATE set,
-# working tree dirty, local commits not on the remote, or offline. When it does fast-forward, it
-# re-syncs the submodules to the new gitlink. Safe-by-default: any doubt -> leave the clone alone.
+# Sync ONE submodule to the commit its parent repo pins (the gitlink at the parent's HEAD), and —
+# crucially — report exactly what it decided, so a stale engine is never silent. Never clobbers
+# local work: a checkout with commits AHEAD of the pin (my dev WIP) or uncommitted changes is left
+# alone with an explanation. SOH3D_FORCE_ENGINE=1 overrides that and hard-resets to the pin.
+# Args: <parent_repo_dir> <submodule_path> <label>.
+sync_submodule_to_pin() {
+    local parent="$1" subpath="$2" label="$3"
+    local sub="$parent/$subpath" want cur
+    want="$(git -C "$parent" rev-parse --verify --quiet "HEAD:$subpath" 2>/dev/null || true)"
+    cur="$(git -C "$sub" rev-parse --verify --quiet HEAD 2>/dev/null || true)"
+    if [ -z "$want" ] || [ -z "$cur" ]; then
+        echo "  $label: cannot resolve pinned/current commit — skipping update" >&2
+        return 0
+    fi
+    if [ "$cur" = "$want" ]; then
+        echo "  $label: up to date (${want:0:9})" >&2
+        return 0
+    fi
+    # The parent's `git pull` may have advanced the gitlink to a commit this checkout hasn't fetched.
+    git -C "$sub" cat-file -e "${want}^{commit}" 2>/dev/null || git -C "$sub" fetch --quiet --all 2>/dev/null || true
+
+    if [ -n "${SOH3D_FORCE_ENGINE:-}" ]; then
+        echo "  $label: forcing ${cur:0:9} -> pinned ${want:0:9} (SOH3D_FORCE_ENGINE)…" >&2
+        git -C "$sub" reset --hard "$want" >&2 2>/dev/null || true
+        git -C "$parent" submodule update --init --force "$subpath" >&2 || \
+            echo "  $label: ERROR force-updating to ${want:0:9}" >&2
+        return 0
+    fi
+    # Commits BEYOND the pin = work in progress on this machine — never clobber.
+    if git -C "$sub" merge-base --is-ancestor "$want" "$cur" 2>/dev/null; then
+        echo "  $label: at ${cur:0:9}, AHEAD of the pinned ${want:0:9} — local commits, left as-is." >&2
+        echo "         (commit+push, then bump the gitlink to publish; the build uses your local copy.)" >&2
+        return 0
+    fi
+    # Uncommitted changes to tracked files = unsaved work — never clobber. THIS is the case that used
+    # to make the update silently skip forever (a build that dirties a tracked file); now it says so.
+    if ! git -C "$sub" diff --quiet --ignore-submodules=all 2>/dev/null \
+       || ! git -C "$sub" diff --cached --quiet --ignore-submodules=all 2>/dev/null; then
+        echo "  $label: at ${cur:0:9} but repo pins ${want:0:9}, and the tree has uncommitted changes —" >&2
+        echo "         NOT auto-updating (would lose work). Re-run with SOH3D_FORCE_ENGINE=1 to discard," >&2
+        echo "         or: git -C $sub reset --hard $want" >&2
+        return 0
+    fi
+    # Clean and behind/diverged → move to the pinned commit.
+    echo "  $label: ${cur:0:9} -> pinned ${want:0:9} (updating)…" >&2
+    git -C "$parent" submodule update --init "$subpath" >&2 || \
+        echo "  $label: ERROR updating to ${want:0:9} (offline, or the commit isn't on the remote?)" >&2
+}
+
+# Bring the engine checkout in line with the commits THIS repo pins (Shipwright gitlink, then the
+# libultraship gitlink it records). Reports each decision; never clobbers local engine work.
 update_engine_if_safe() {
-    local sw="$REPO/Shipwright"
-    [ -n "${SOH3D_NOUPDATE:-}" ] && return 0
-    git -C "$sw" diff --quiet 2>/dev/null && git -C "$sw" diff --cached --quiet 2>/dev/null || return 0
-    local up
-    up="$(git -C "$sw" rev-parse --abbrev-ref --symbolic-full-name '@{upstream}' 2>/dev/null)" || return 0
-    git -C "$sw" fetch --quiet "${up%%/*}" 2>/dev/null || return 0          # offline -> skip
-    [ "$(git -C "$sw" rev-list --count '@{upstream}..HEAD' 2>/dev/null)" = 0 ] || return 0  # ahead -> skip
-    [ "$(git -C "$sw" rev-list --count 'HEAD..@{upstream}' 2>/dev/null)" != 0 ] || return 0 # up to date
-    echo "updating engine to latest fork commit…" >&2
-    git -C "$sw" merge --ff-only '@{upstream}' >&2 || return 0
-    git -C "$sw" config submodule.libultraship.url "$LIBULTRA_FORK"
-    git -C "$sw" submodule update --init --recursive >&2 || { echo "error: submodule update failed" >&2; exit 1; }
+    if [ -n "${SOH3D_NOUPDATE:-}" ]; then
+        echo "engine: update skipped (SOH3D_NOUPDATE set)" >&2
+        return 0
+    fi
+    echo "engine: checking it matches the pinned commits…" >&2
+    sync_submodule_to_pin "$REPO" "Shipwright" "Shipwright"
+    # libultraship's pinned commit only exists in OUR fork; configure that URL before syncing it
+    # (Shipwright's own .gitmodules still points it at upstream).
+    git -C "$REPO/Shipwright" config submodule.libultraship.url "$LIBULTRA_FORK" 2>/dev/null || true
+    sync_submodule_to_pin "$REPO/Shipwright" "libultraship" "libultraship"
 }
 
 # Check out the Shipwright engine submodule (+ libultraship from our fork) if the sources aren't
-# present. Only touches the checkout when it's MISSING — an existing checkout is left to
-# update_engine_if_safe, which never clobbers local engine work (mine).
+# present. Only does the initial checkout here — an existing checkout is handled by
+# update_engine_if_safe, which reports + never clobbers local engine work.
 ensure_sources() {
     if [ -f "$REPO/Shipwright/CMakeLists.txt" ] && [ -f "$REPO/Shipwright/libultraship/CMakeLists.txt" ]; then
         update_engine_if_safe
         return 0
     fi
-    echo "checking out Shipwright engine submodule…" >&2
+    echo "checking out Shipwright engine submodule (pinned commit)…" >&2
     git -C "$REPO" submodule sync Shipwright >&2 2>/dev/null || true
     git -C "$REPO" submodule update --init Shipwright >&2 || {
         echo "error: failed to check out the Shipwright submodule" >&2; exit 1; }
-    # submodule update leaves a detached HEAD at the recorded gitlink; put the engine on the develop
-    # branch so update_engine_if_safe can keep it current on later runs.
-    git -C "$REPO/Shipwright" checkout "$SHIPWRIGHT_BRANCH" >&2 2>/dev/null || true
     # The recorded libultraship commit only exists in our fork; override the nested URL before its
     # recursive checkout (Shipwright's own .gitmodules still points at upstream).
-    echo "initialising engine submodules (libultraship from our fork)…" >&2
     git -C "$REPO/Shipwright" config submodule.libultraship.url "$LIBULTRA_FORK"
+    echo "initialising libultraship (from our fork)…" >&2
     git -C "$REPO/Shipwright" submodule update --init --recursive >&2 || {
         echo "error: submodule update (libultraship) failed" >&2; exit 1; }
-    update_engine_if_safe
 }
 
 # Ensure the engine is cloned, updated, configured, and the target is built+current.
