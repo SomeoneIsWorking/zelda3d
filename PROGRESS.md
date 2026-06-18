@@ -27,7 +27,23 @@ develop 9b40d483c, both pushed to `fork`).
   (scratch/screenshots/diff_shadow2.png) shows a localised directional cast shadow on the OoT3D
   ground with zero global dimming far from Link. Demo: shadow_demo2{,_off}.png.
 - **REPL:** `shadow <0|1>`, `shadow bias|str|rad|dist|all <f>`. Env SOH3D_SHADOW (default ON).
-- **NEXT (same request):** ambient occlusion (SSAO or contact AO). Shadows done; AO pending.
+
+### AMBIENT OCCLUSION (same session, also DONE & PUSHED)
+SSAO added (libultraship soh3d_gl.cpp 5da70722, Shipwright develop 764f0e9f5).
+- **Approach:** render a PRIVATE single-sample camera-view depth texture of the SoH3D content
+  using the SAME per-item transforms (mp/aspectAdj/invertY) as the visible draw → pixel-aligned
+  with the frame. This deliberately AVOIDS blitting Fast3D's depth (a non-samplable MSAA
+  renderbuffer) and avoids any unprojection/invertY reconstruction — the full-screen SSAO pass
+  samples by gl_FragCoord. A separate full-screen program (gl_VertexID big triangle) walks a
+  12-tap golden-angle spiral and darkens fragments whose neighbours sit closer to the camera
+  (creases/contacts), range-checked so silhouette edges don't count. Composited as a MULTIPLY
+  (glBlendFunc ZERO, SRC_COLOR); far/empty texels output 1.0 so N64-only pixels are untouched →
+  AO hits only OoT3D content.
+- **REPL:** `ao <0|1>`, `ao rad|str|bias|maxdiff <f>`. Env SOH3D_AO (default ON). Defaults
+  str 0.7 / rad 22px. VERIFIED: STATECHECK=0 with AO+shadows both on; live A/B shows crease/contact
+  darkening on Link/Saria (ao_strong_crop.png, ao_diff.png), no halos/noise.
+- Both enhancements are leak-free and on by default. Render order in SoH3D_GL_RenderPass:
+  shadow depth → visible draws → AO depth+composite → endPass.
 
 ## ✅ DONE (session 24, 2026-06-17): "sky bug" root-caused + diagnostic; anim phase-lock
 User-driven: the rare sky-corruption bug fired live ("probe it... fully... don't assume; probably
