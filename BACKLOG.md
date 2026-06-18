@@ -47,6 +47,33 @@ Mirrors the live task tracker but this file is the source of truth across sessio
     the user — verify the hold-Start dialog skip (just added) works, and consider enabling the
     SkipText enhancement by default so B/Start fast-advance text instantly.
 
+13. **Kokiri shop door → Link's house** — wrong entrance/door destination. Check Kokiri entrance
+    table / door routing. Needs repro.
+
+14. **Tree ladder can't be climbed — Link drops off halfway** (collision). Cluster with #4 (ladder
+    render too high) and #9 (grass). Terrain-warp / OoT3D-vs-N64 ladder collision.
+
+15. **RmlUi Link model/anim toggle** (user-requested) — a 3-way cycle row:
+    `0 = N64 model + N64 anim` (`gSoH3dLinkOn=0`), `1 = 3DS model + N64-retarget anim`
+    (`gSoH3dLinkOn=1, gSoH3dLinkAnimSrc=1`), `2 = 3DS model + 3DS-own-CSAB anim`
+    (`gSoH3dLinkOn=1, gSoH3dLinkAnimSrc=0`). All three modes already work in code (soh3d.c
+    SoH3D_LinkEnabled/SoH3D_LinkAnimSrc). DESIGN: define `extern "C" int gSoH3dMenuLinkMode = 0;`
+    in SohRmlUi.cpp (must be DEFINED in libultraship — charcompare also links it — and READ in
+    soh3d.c, like gSoH3dMenuWarp). Add a `linkmode="1"` cycle row (Graphics or Debug tab); on
+    activate cycle 0→1→2→0 and update `<value>` text (labels: "N64" / "3DS · N64 anim" /
+    "3DS · 3DS anim"); refresh its text on menu open (extend RefreshToggleRows). soh3d.c
+    SoH3D_ReplPoll: on first frame seed gSoH3dMenuLinkMode from current mode, thereafter apply
+    gSoH3dMenuLinkMode → gSoH3dLinkOn/gSoH3dLinkAnimSrc.
+
+16. **Gohma arena void-out** — walking in the Gohma (Deku Tree boss) arena drops Link through the
+    floor → void. Collision hole. Repro at entrance 1039.
+
+17. **Gohma model hand-weave** — Gohma needs hand-curated multi-CMB assembly (like kAssemblies in
+    [[soh3d-auto-replace]]); generic auto-merge is unsound.
+
+18. **Deku Baba (flower enemy) no combat interaction** — Link and the Deku Baba can't damage each
+    other (no hitbox/collision interaction). Repro in Kokiri Forest.
+
 4. **Kakariko ladder render too high** — the OoT3D ladder model renders a bit high, so Link appears
    to float when climbing. Lower it slightly (per-actor yoff / placement). Tune live via REPL
    `yoff`, then bake.
