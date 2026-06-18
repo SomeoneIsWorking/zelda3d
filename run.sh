@@ -18,6 +18,11 @@ set -eu
 REPO="$(cd "$(dirname "$0")" && pwd)"
 BUILD="$REPO/Shipwright/build-cmake"
 SOH="$BUILD/soh"
+# The soh target's output name is set per-platform in soh/CMakeLists.txt.
+case "$(uname)" in
+    Darwin) SOH_BIN="soh-macos" ;;
+    *)      SOH_BIN="soh.elf" ;;
+esac
 # Parallel job count — nproc is GNU-only (absent on macOS); fall back to sysctl, then 4.
 NPROC="$(nproc 2>/dev/null || sysctl -n hw.ncpu 2>/dev/null || echo 4)"
 
@@ -34,10 +39,19 @@ ensure_sources() {
     if [ -f "$REPO/Shipwright/CMakeLists.txt" ] && [ -f "$REPO/Shipwright/libultraship/CMakeLists.txt" ]; then
         return 0
     fi
+    if [ -e "$REPO/Shipwright" ] && [ ! -d "$REPO/Shipwright/.git" ]; then
+        echo "error: $REPO/Shipwright exists but isn't a git clone — move it aside and retry" >&2
+        exit 1
+    fi
     if [ ! -d "$REPO/Shipwright/.git" ]; then
+        # Clone into a temp dir and move into place, so an interrupted clone never lands a
+        # broken half-checkout at Shipwright/ that later runs would mistake for a real clone.
         echo "cloning Shipwright fork ($SHIPWRIGHT_BRANCH)…" >&2
-        git clone -o fork --branch "$SHIPWRIGHT_BRANCH" "$SHIPWRIGHT_FORK" "$REPO/Shipwright" >&2 || {
-            echo "error: failed to clone Shipwright" >&2; exit 1; }
+        local tmp="$REPO/Shipwright.cloning.$$"
+        rm -rf "$tmp"
+        git clone -o fork --branch "$SHIPWRIGHT_BRANCH" "$SHIPWRIGHT_FORK" "$tmp" >&2 || {
+            rm -rf "$tmp"; echo "error: failed to clone Shipwright" >&2; exit 1; }
+        mv "$tmp" "$REPO/Shipwright"
     fi
     echo "initialising engine submodules (libultraship from our fork)…" >&2
     git -C "$REPO/Shipwright" submodule init >&2 || { echo "error: submodule init failed" >&2; exit 1; }
@@ -81,9 +95,10 @@ if [ -z "${SOH3D_3DS_ROM:-}" ]; then
     exit 1
 fi
 
-# If no graphical session is inherited (e.g. launched over SSH/headless terminal),
-# fall back to the primary local display so the window actually appears.
-if [ -z "${DISPLAY:-}" ]; then
+# If no graphical session is inherited (e.g. launched over SSH/headless terminal), fall back
+# to the primary local X display. Linux/X11 only — on macOS the window backend is Cocoa and
+# forcing DISPLAY=:0 would wrongly push SDL onto an X11 path.
+if [ "$(uname)" = "Linux" ] && [ -z "${DISPLAY:-}" ]; then
     export DISPLAY=:0
     [ -z "${XAUTHORITY:-}" ] && for x in /run/user/$(id -u)/xauth_*; do
         [ -f "$x" ] && export XAUTHORITY="$x" && break
@@ -99,7 +114,7 @@ if [ "${1:-}" = "tool" ]; then
     exec ./charcompare/charcompare "$@"
 fi
 
-ensure_built soh "$SOH/soh.elf"
+ensure_built soh "$SOH/$SOH_BIN"
 
 export SOH3D=1                                  # render OoT3D assets
 export SOH3D_WARP=1                             # auto-warp past title/file-select
@@ -112,4 +127,4 @@ export SOH3D_N64ANIM="${SOH3D_N64ANIM:-1}"      # drive OoT3D skeletons from liv
 export SOH3D_GL_STATECHECK="${SOH3D_GL_STATECHECK:-}"
 
 cd "$SOH"
-exec ./soh.elf "$@"
+exec "./$SOH_BIN" "$@"
