@@ -122,13 +122,6 @@ This file is the source of truth across sessions.
     over → respawn in Deku Tree room 1, so it may be state corruption from the void deaths, not a
     general Deku Baba bug. Low confidence; revisit once #14/#16 (collision void-outs) are fixed.
 
-20. **Market NPCs render totally wrong** — townsfolk by the Market fountain/bridge render with
-    white/untextured bodies and broken zebra-striped clothing (user screenshot, Market day). Wrong
-    material/texture or wrong model on the OoT3D replacement for these NPCs (En_Hy townsperson
-    variants?). Likely a texture/material-index or UV bug per variant. Repro: Market (entrance 177).
-    2nd screenshot: townsfolk in contorted poses with striped white clothing — anim + material both
-    look wrong; a correctly-rendered kid (green/blue apron) stands behind them, so it's per-actor.
-
 21. **Giant boulder overlapping Temple of Time** (Market) — a large rock mesh clips into/overlaps
     the Temple of Time building (user screenshot). Misplaced/wrong-scale scene geometry or actor.
     Repro: Market (177), look toward ToT.
@@ -169,6 +162,26 @@ This file is the source of truth across sessions.
     see [[soh3d-texpack]]. (Foliage #27 is the only "extra/lowest" item — foliage is already 3DS.)
 
 ## Done (recent)
+
+- **#20 Market NPCs render "zebra-striped" / contorted (skin-pose interpolation bug)** — the
+  townsfolk by the Market fountain (En_Hy/En_Mu, e.g. zelda_mu `marketpeople.cmb`, an animated
+  crowd) shattered into white striped spikes. NOT a texture/material/variant bug — the En_Hy body
+  texture and the bind pose render correctly (verified: python CPU skinning is clean across the
+  whole `mu_matsu` anim, in-game bind pose is clean). ROOT CAUSE: the per-subframe FPS interpolation
+  in `soh3d_gl.cpp` blended the two logic-frames' skin matrices COMPONENT-WISE. That is only valid
+  for tiny rotations; for the crowd's large per-frame limb swings the blend of two rotation matrices
+  is no longer a rotation and collapses, exploding the mesh into spikes. FIX (3 parts): (1) a skin
+  matrix = animWorld·invBind, whose translation column bakes in invBind, so even rotation-aware
+  interpolation of the skin matrix drifts — instead RECOVER the animated bone-world (skin·bind,
+  a clean rigid R|T), interpolate THAT (quaternion nlerp + scale/translation lerp via interpRigid),
+  then re-apply invBind. (2) Upload the model's constant bind matrices to the GL layer once
+  (`SoH3D_GL_SetBoneBind`, called from all three skin-matrix producers in soh3d_model.cpp). (3)
+  Detect an animation DISCONTINUITY (non-seamless loop wrap / anim switch: any bone rotating >90deg
+  in one 20fps step, impossible for continuous motion) and snap the whole pose to the current frame
+  rather than morph through a wrong intermediate. Applied at all 4 interp sites (shadow/AO/main/Vk).
+  VERIFIED headless across the full anim cycle (8+ frames): crowd animates smoothly, no shatter;
+  dogs/soldiers/Malon/Gerudo unaffected (small-rotation actors interpolate as before). Files:
+  libultraship soh3d_gl.cpp/.h, soh soh3d_model.cpp.
 
 - **#26 Kakariko DM-trail gate renders the correct gate model** — Bg_Gate_Shutter uses
   OBJECT_SPOT01_MATOYAB (zelda_spot01_matoyab.zar), shared with the windmill mechanism; the auto
