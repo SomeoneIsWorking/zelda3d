@@ -327,8 +327,11 @@ class Cmb:
             for prms in sepd.prms:
                 prm=prms.prms[0]
                 bt=prms.bone_table or [0]
-                smooth = bd>1 and sepd.attrs["boneIndices"].mode==MODE_ARRAY \
-                                 and sepd.attrs["boneWeights"].mode==MODE_ARRAY
+                # bone_dimension>1 => verts are MODEL space (smooth), regardless of whether the
+                # boneIndices/boneWeights are ARRAY (per-vertex) or CONSTANT (one set for all verts,
+                # e.g. a head on a 2-bone neck/head chain). Requiring ARRAY mis-classed those as
+                # rigid and double-applied the bind matrix (the Kokiri "floating head"). Match cmb.cpp.
+                smooth = bd>1
                 # rigid -> place by the bound bone; smooth -> raw model space (identity).
                 M = _mat_id() if smooth else self.bone_matrix.get(bt[0], _mat_id())
                 isz=DT_SIZE[prm.index_type]; ifmt=DT_FMT[prm.index_type]
