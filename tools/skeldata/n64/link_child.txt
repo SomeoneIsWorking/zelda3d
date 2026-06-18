@@ -1,0 +1,21 @@
+# player N64 skeleton; limbCount=22 age=5
+N64 limb=1 jointPos=(-4,-104,0) child=2 sibling=9
+N64 limb=2 jointPos=(607,0,0) child=3 sibling=255
+N64 limb=3 jointPos=(-172,50,-190) child=4 sibling=6
+N64 limb=4 jointPos=(697,0,0) child=5 sibling=255
+N64 limb=5 jointPos=(825,5,11) child=255 sibling=255
+N64 limb=6 jointPos=(-170,57,192) child=7 sibling=255
+N64 limb=7 jointPos=(695,0,0) child=8 sibling=255
+N64 limb=8 jointPos=(817,8,4) child=255 sibling=255
+N64 limb=9 jointPos=(0,-103,-7) child=10 sibling=255
+N64 limb=10 jointPos=(996,-201,-1) child=11 sibling=12
+N64 limb=11 jointPos=(-365,-670,0) child=255 sibling=255
+N64 limb=12 jointPos=(0,0,0) child=255 sibling=13
+N64 limb=13 jointPos=(696,-175,466) child=14 sibling=16
+N64 limb=14 jointPos=(581,0,0) child=15 sibling=255
+N64 limb=15 jointPos=(514,0,0) child=255 sibling=255
+N64 limb=16 jointPos=(696,-175,-466) child=17 sibling=19
+N64 limb=17 jointPos=(577,0,0) child=18 sibling=255
+N64 limb=18 jointPos=(525,0,0) child=255 sibling=255
+N64 limb=19 jointPos=(657,-523,367) child=255 sibling=20
+N64 limb=20 jointPos=(0,0,0) child=255 sibling=255
