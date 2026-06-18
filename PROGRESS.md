@@ -1,5 +1,34 @@
 # SoH3D — progress & state
 
+## ✅ DONE (session 30, 2026-06-18): DYNAMIC SUN SHADOWS (enhancement layer)
+User asked for "better lighting with dynamic shadows and ambient occlusion." Shipped real
+shadow mapping in the SoH3D direct-GL pass (libultraship soh3d_gl.cpp 3de9f584, Shipwright
+develop 9b40d483c, both pushed to `fork`).
+- **How:** a depth-only pass renders the shadow casters from the scene sun direction
+  (envCtx.lightSettings.light1Dir, the same dir the form-light uses) into a 2048² depth
+  texture (own FBO). The main fragment shader projects each surface into light-space via a
+  CPU-built world→light ortho VP and does a 3×3 PCF depth compare; shadowed fragments are
+  dimmed (applied to BOTH lit characters and lit=0 scene geometry, so the shadow lands on the
+  OoT3D ground). Light frustum = ortho box centred on the camera look-at (SoH3D_GL_SetShadowFocus,
+  fed per frame from play->view.lookAt).
+- **Casters default = "lit" draws only** (characters/props); receivers = everything. This gives
+  clean character-on-ground shadows with NO ground self-shadow acne. REPL `shadow all 1` adds
+  scene geometry as a caster (walls cast too, at the cost of self-shadowing).
+- **Matrix convention (important):** uMV/uMP upload GL_FALSE, so in GLSL they are standard
+  column-major (M*v = transform); I build lightVP the same way (mat4LookAt/Ortho/Mul col-major)
+  and the depth-pass MP = lightVP * mv. Depth pass forces invertY=0 so the stored map matches the
+  fragment's sampling (which uses uLightVP*world with no clip-Y flip).
+- **BUG FOUND+FIXED:** the shadow map MUST clear to far depth 1.0 explicitly. Fast3D's inherited
+  glClearDepth is NOT 1.0, so empty texels read "near" → every receiver compared as shadowed →
+  the whole ground went dark uniformly (caught live by A/B: castAll=0 yet entire ground dimmed).
+  Set+restore glClearDepth around the shadow clear.
+- **State hygiene:** save/restore bound FBO + viewport + texture unit 1 (shadow map) so nothing
+  leaks into Fast3D's skybox/UI. VERIFIED: SOH3D_GL_STATECHECK=1 → 0 leaked fields; live A/B diff
+  (scratch/screenshots/diff_shadow2.png) shows a localised directional cast shadow on the OoT3D
+  ground with zero global dimming far from Link. Demo: shadow_demo2{,_off}.png.
+- **REPL:** `shadow <0|1>`, `shadow bias|str|rad|dist|all <f>`. Env SOH3D_SHADOW (default ON).
+- **NEXT (same request):** ambient occlusion (SSAO or contact AO). Shadows done; AO pending.
+
 ## ✅ DONE (session 24, 2026-06-17): "sky bug" root-caused + diagnostic; anim phase-lock
 User-driven: the rare sky-corruption bug fired live ("probe it... fully... don't assume; probably
 SoH itself, not you — if it's N64 guest memory we'd need real RE").
