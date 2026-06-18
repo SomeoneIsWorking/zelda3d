@@ -186,6 +186,7 @@ ensure_soh_o2r              # game hard-exits with a "Missing soh.o2r" dialog wi
 
 export SOH3D=1                                  # render OoT3D assets
 export SOH3D_WARP=1                             # auto-warp past title/file-select
+export SOH3D_COLDBOOT="${SOH3D_COLDBOOT:-1}"     # cold boot: clean NEW game, not the debug save (Kakariko+items)
 export SOH3D_ENTRANCE="${SOH3D_ENTRANCE:-219}"  # 219 = Kakariko Village front gate
 export SOH3D_TIME="${SOH3D_TIME:-0x8000}"       # 0x8000 = noon (force DAY; Kakariko else loads at night)
 export SOH3D_AUTO="${SOH3D_AUTO:-1}"            # 1 = auto-replace non-table actors with OoT3D models
