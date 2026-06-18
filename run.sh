@@ -13,7 +13,8 @@
 #
 # On a fresh machine this also clones the Shipwright engine fork + its submodules and
 # configures the build dir; the binary is then built automatically if missing. Force a
-# rebuild with SOH3D_BUILD=1 ./run.sh.
+# rebuild with SOH3D_BUILD=1 ./run.sh. Pull the latest engine fix with SOH3D_UPDATE=1 ./run.sh
+# (ff-only; safe to combine: SOH3D_UPDATE=1 SOH3D_BUILD=1 ./run.sh).
 set -eu
 REPO="$(cd "$(dirname "$0")" && pwd)"
 BUILD="$REPO/Shipwright/build-cmake"
@@ -37,6 +38,17 @@ LIBULTRA_FORK="https://github.com/SomeoneIsWorking/libultraship.git"
 # while Shipwright's .gitmodules still points libultraship at upstream — so override that URL.
 ensure_sources() {
     if [ -f "$REPO/Shipwright/CMakeLists.txt" ] && [ -f "$REPO/Shipwright/libultraship/CMakeLists.txt" ]; then
+        # Sources present. Opt-in update to the latest fork commit (consumer machines): ff-only
+        # so it never clobbers local work, then re-sync the submodules to the new gitlink.
+        if [ -n "${SOH3D_UPDATE:-}" ]; then
+            echo "updating engine to latest fork commit…" >&2
+            git -C "$REPO/Shipwright" pull --ff-only >&2 || {
+                echo "warn: Shipwright pull was not fast-forward (local commits?) — skipping update" >&2
+                return 0; }
+            git -C "$REPO/Shipwright" config submodule.libultraship.url "$LIBULTRA_FORK"
+            git -C "$REPO/Shipwright" submodule update --init --recursive >&2 || {
+                echo "error: submodule update failed" >&2; exit 1; }
+        fi
         return 0
     fi
     if [ -e "$REPO/Shipwright" ] && [ ! -d "$REPO/Shipwright/.git" ]; then
