@@ -61,8 +61,18 @@ sync_submodule_to_pin() {
         echo "  $label: ${cur:0:9} has local commits ahead of pinned ${want:0:9}; leaving it." >&2
         return 0
     fi
-    # Otherwise hard-reset to the pin, throwing away any local edits to tracked files (untracked
-    # files such as the build dir are left in place).
+    # UNCOMMITTED local edits to tracked files = in-progress engine work — NEVER hard-reset them
+    # away. (This bit us: editing an engine source, then running `./run.sh` before committing,
+    # silently erased the edit.) Leave the checkout exactly as-is and tell the user to commit to
+    # advance it. Untracked files (the build dir) are ignored here on purpose.
+    if [ -n "$(git -C "$sub" status --porcelain --untracked-files=no 2>/dev/null)" ]; then
+        echo "  $label: ${cur:0:9} has UNCOMMITTED local edits (pinned ${want:0:9}); leaving them" \
+             "untouched — commit them to move the pin. (export SOH3D_NOUPDATE=1 to silence.)" >&2
+        return 0
+    fi
+    # Otherwise the working tree is clean but at the wrong commit (a stale checkout) — hard-reset to
+    # the pin. Only clean trees reach here, so no local edits can be lost (untracked files such as
+    # the build dir are left in place).
     echo "  $label: hard-reset ${cur:0:9} -> pinned ${want:0:9}" >&2
     git -C "$sub" reset --hard "$want" >/dev/null 2>&1 || true
     # Cover the not-yet-fetched / not-initialised cases (and re-sync nested gitlinks).
