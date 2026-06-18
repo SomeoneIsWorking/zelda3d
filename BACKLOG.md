@@ -122,9 +122,34 @@ This file is the source of truth across sessions.
     the Temple of Time building (user screenshot). Misplaced/wrong-scale scene geometry or actor.
     Repro: Market (177), look toward ToT.
 
-23. **Cucco wing-flap animation not implemented** — the cucco (chicken) OoT3D replacement doesn't
-    play its wing-flap anim. Long-tail anim coverage; see [[soh3d-runsh-and-anim-interp]]
-    (cucco-type coverage) and [[soh3d-n64anim-csab-map]].
+23. **Cucco wing-flap animation not implemented** — the cucco (chicken, En_Niw 0x19) OoT3D
+    replacement doesn't play its wing-flap. ROOT-CAUSED 2026-06-19 (asset + code, ground truth):
+    - The N64 cucco wing-flap is **PROCEDURAL, not in any animation**: `EnNiw_OverrideLimbDraw`
+      (z_en_niw.c:1112) ADDS per-limb rotations from `unk_2C4..unk_2E0` onto N64 limbs **7 & 11
+      (the two wing-tips), 13 & 15 (head/comb)** during the skeleton draw traversal. Those fields
+      are driven by `func_80AB5BF8(this,play,arg2)`: idle/walk (arg2=1) flaps the wings ~7000 binang
+      (~38°), agitated/thrown up to 25000 (~137°), about the wing's local **Z** axis (unk_2C4 →
+      limb7.z, unk_2D0 → limb11.z). gCuccoAnim/jointTable does NOT contain the flap.
+    - The OoT3D cucco (`/actor/zelda_nw.zar`: chicken.cmb 9 bones + nw_hane_model.cmb wing + ONLY
+      `nw_wait.csab`) plays via the **AUTO path** (gCuccoAnim→nw_wait in soh3d_animmap.inc:676).
+      nw_wait (11 frames) animates bones 2-8 but only a **subtle idle ruffle** (wings = bones 3 & 5,
+      tips 4 & 6; rX swing only ±9°). There is **no big flap** in the asset, so OoT3D needs it
+      injected procedurally too — exactly like N64.
+    - WHY it can't be a simple anim-map: the AUTO path (SoH3D_DoRetarget, gSoH3dPendingAuto) plays a
+      CSAB phase-locked to the N64 playhead and **ignores jointTable per-limb** entirely. The
+      retarget hook (SoH3D_SkelAnimeDraw) also drops the `overrideLimbDraw` callback, so the
+      procedural rotation is invisible to it.
+    - PROPER FIX (multi-layer, the real work — NOT a bandaid): inject a per-bone local rotation
+      DELTA onto the CSAB pose for the cucco's wing bones. (1) thread `overrideLimbDraw`+`arg` from
+      `SkelAnime_DrawSkeletonOpa` into `SoH3D_SkelAnimeDraw`; (2) for limbs the override touches,
+      delta = (override-applied rot) − jointTable rot; (3) map N64 wing limbs 7,11 → OoT3D wing
+      bones 3,5 (derive exact corr via SOH3D_SKELDUMP=1 — N64 dump captured, OoT3D bone dump TODO);
+      (4) pass `{boneIdx,dRotXYZ}` deltas through SoH3D_UpdateAnimAuto→SoH3D_UpdateAnim→Csab::
+      skinMatrices and apply the extra local rotation at those bones in csab.cpp's
+      animated_bone_world before world-composing. VERIFY via REPL `isolate` of the wing region with
+      the flap forced 0 vs high. Deferred (low priority, substantial plumbing). See
+      [[soh3d-n64anim-csab-map]]. **Generalizes**: any actor whose limb motion is procedural via an
+      OverrideLimbDraw (not in its anim) needs this same delta-injection.
 
 25. **NPC walking in mid-air** (Kakariko) — a townsperson (running man?) is animated walking high
     above a building/roof instead of on the ground (user screenshot). Actor Y-placement vs floor;
@@ -158,6 +183,13 @@ This file is the source of truth across sessions.
     see [[soh3d-texpack]]. (Foliage #27 is the only "extra/lowest" item — foliage is already 3DS.)
 
 ## Done (recent)
+
+- **SOH3D_ENTRANCE accepts hex** — `SoH3D_AutoWarpEntrance` used `atoi()` (decimal-only), so
+  `tools/soh3d_game.sh start 0xDB` silently parsed `0xDB`→`0` and loaded the Deku Tree (scene 0x0)
+  instead of Kakariko (0x52). entrance_table.h indices + the BACKLOG/memory notes quote entrances
+  in hex as often as decimal, so this was a real footgun. Switched to `strtol(v,NULL,0)` (base 0:
+  hex OR decimal), matching SOH3D_TIME. VERIFIED: `start 0xDB` now lands in scene=0x52 (== decimal
+  219). soh3d.c only.
 
 - **#8 Kokiri kids (En_Ko) stuck animation** — every auto-replaced kid looped ONE frozen pose
   (and a kid who should SIT stood). ROOT CAUSE: the km1/kw1 Kokiri skeletons animate from the
