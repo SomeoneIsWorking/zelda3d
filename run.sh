@@ -18,6 +18,8 @@ set -eu
 REPO="$(cd "$(dirname "$0")" && pwd)"
 BUILD="$REPO/Shipwright/build-cmake"
 SOH="$BUILD/soh"
+# Parallel job count — nproc is GNU-only (absent on macOS); fall back to sysctl, then 4.
+NPROC="$(nproc 2>/dev/null || sysctl -n hw.ncpu 2>/dev/null || echo 4)"
 
 # The engine lives in a side-by-side clone of our Shipwright fork (gitignored here, NOT a
 # submodule of this repo), with libultraship as a submodule pointing at OUR fork's commit.
@@ -52,13 +54,21 @@ ensure_built() {
         return 0
     fi
     ensure_sources
-    if [ ! -f "$BUILD/CMakeCache.txt" ]; then
-        echo "configuring build dir (first run)…" >&2
+    # Configure if the build dir has no generator file yet. A leftover CMakeCache.txt from a
+    # FAILED earlier configure (e.g. -G Ninja before ninja was installed) counts as not-configured:
+    # wipe the stale cache and configure cleanly, otherwise the build step finds no build.ninja.
+    if [ ! -f "$BUILD/build.ninja" ]; then
+        if [ -f "$BUILD/CMakeCache.txt" ]; then
+            echo "build dir half-configured — wiping stale cache and reconfiguring…" >&2
+            rm -f "$BUILD/CMakeCache.txt"; rm -rf "$BUILD/CMakeFiles"
+        else
+            echo "configuring build dir (first run)…" >&2
+        fi
         cmake -S "$REPO/Shipwright" -B "$BUILD" -G Ninja -DCMAKE_BUILD_TYPE=Release >&2 || {
             echo "error: cmake configure failed" >&2; exit 1; }
     fi
     echo "building '$target' (this can take a while the first time)…" >&2
-    cmake --build "$BUILD" --target "$target" -j"$(nproc)" >&2 || {
+    cmake --build "$BUILD" --target "$target" -j"$NPROC" >&2 || {
         echo "error: build of '$target' failed" >&2; exit 1; }
     [ -x "$binary" ] || { echo "error: '$binary' still missing after build" >&2; exit 1; }
 }
