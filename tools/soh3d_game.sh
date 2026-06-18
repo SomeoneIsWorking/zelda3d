@@ -63,6 +63,7 @@ start() {
     # setsid+nohup fully detaches: survives this shell returning, no background-runner needed.
     setsid env SOH3D=1 SOH3D_WARP=1 SOH3D_AUTO="${SOH3D_AUTO:-1}" SOH3D_N64ANIM="${SOH3D_N64ANIM:-1}" \
         SOH3D_VULKAN="${SOH3D_VULKAN:-}" SOH3D_VK_VALIDATION="${SOH3D_VK_VALIDATION:-}" \
+        SOH3D_RMLUI_OPEN="${SOH3D_RMLUI_OPEN:-}" \
         SOH3D_ENTRANCE="$entr" SOH3D_TIME="$time" SOH3D_REPL="$FIFO" \
         DISPLAY="${DISPLAY:-:0}" XAUTHORITY="$xauth" \
         stdbuf -oL -eL "$SOH" >"$LOG" 2>&1 < /dev/null &
