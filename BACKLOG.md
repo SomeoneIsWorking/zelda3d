@@ -36,8 +36,17 @@ This file is the source of truth across sessions.
    in a normal scene; reverted that SOH3D_PROJDBG probe). FIX DIRECTION: reconcile the scripted
    (N64) camera with the 3DS terrain height — likely the same terrain-warp axis as [[soh3d-terrain-warp]]
    (warp the OoT3D render mesh to the N64 floor so N64 camera coords match), but applied to/through
-   the cutscene & title-demo camera path, not just gameplay. Investigate whether terrain-warp runs in
-   cutscene/title scenes at all, and/or offset the scripted camera eye to the 3DS surface.
+   the cutscene & title-demo camera path, not just gameplay.
+   MECHANISM CONFIRMED (2026-06-19): terrain-warp (re-levels the 3DS render mesh to the N64 floor) is
+   GATED OFF whenever collision is ON — `SoH3D_TerrainWarpEnabled() = gSoH3dTerrainWarp &&
+   !SoH3D_CollisionEnabled()` (soh3d.c:269) — and collision is ON by default (`gSoH3dCollision=1`).
+   So the default path injects OoT3D collision and renders the 3DS terrain at its NATIVE height (Link
+   walks it fine, render==collision), but the N64 cutscene/demo camera (N64-authored eye coords) is
+   never reconciled with the native 3DS terrain → camera under the surface. terrain-warp and
+   collision are deliberately mutually exclusive (soh3d.c:266-268 "Collision wins"). FIX OPTIONS:
+   (a) reconcile the scripted cutscene-camera eye.y to the 3DS surface (probe 3DS mesh height at the
+   eye xz, lift when below) — risks breaking intentional low/indoor shots; (b) make 3DS terrain and
+   N64 heights agree globally so N64 camera data "just works" (the real fix, biggest).
 
 1b. **Title-screen flow is broken** (user, 2026-06-19) — (a) the title demo's scene load can CRASH:
    `Scene_CommandAlternateHeaderList` -> `OTRScene_ExecuteCommands` -> `Play_Init` while loading
