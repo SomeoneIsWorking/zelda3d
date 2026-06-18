@@ -50,8 +50,11 @@ Mirrors the live task tracker but this file is the source of truth across sessio
 13. **Kokiri shop door → Link's house** — wrong entrance/door destination. Check Kokiri entrance
     table / door routing. Needs repro.
 
-14. **Tree ladder can't be climbed — Link drops off halfway** (collision). Cluster with #4 (ladder
-    render too high) and #9 (grass). Terrain-warp / OoT3D-vs-N64 ladder collision.
+14. **Link drops off EVERY climbable surface halfway** (collision, SYSTEMIC) — not just one ladder;
+    all climbables (ladders/vines/walls) drop Link partway up. Likely a general climb-collision
+    regression (terrain-warp / OoT3D-vs-N64 collision height for climb surfaces). High-value: one
+    root cause probably fixes the whole climb cluster. Cluster with #4 (ladder render too high),
+    #9 (grass not walkable).
 
 15. **RmlUi Link model/anim toggle** (user-requested) — a 3-way cycle row:
     `0 = N64 model + N64 anim` (`gSoH3dLinkOn=0`), `1 = 3DS model + N64-retarget anim`
