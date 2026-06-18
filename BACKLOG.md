@@ -2,7 +2,16 @@
 
 Durable, in-repo task list (survives PC switches and fresh agent sessions). Keep this honest:
 when an item lands, move it to **Done** with the commit; when you learn something, note it inline.
-Mirrors the live task tracker but this file is the source of truth across sessions.
+This file is the source of truth across sessions.
+
+> **Fresh-session directive (from the user, 2026-06-18):** WORK AUTONOMOUSLY through this list —
+> do NOT ask the user what to work on, just pick items and fix them, committing each verified fix
+> (3-repo chain: libultraship→fork/soh3d, Shipwright→fork/develop, outer→origin/main). The user is
+> playtesting on Vulkan and will keep reporting bugs; capture new ones here. Suggested early picks:
+> #19 (dungeon warps — trivial, indices listed, unblocks the user's testing) and #14/#16 (systemic
+> climb/void collision — one root cause likely clears several items). #1 (Vulkan FB upside-down) is
+> the big proper-fix (negative-height viewport, Metal-style). Read the [[soh3d-vulkan-runsh-and-flip]]
+> memory and `run.sh` notes first. To run the game: `tools/soh3d_game.sh` (see soh3d-game-control).
 
 ## Open
 
@@ -74,8 +83,28 @@ Mirrors the live task tracker but this file is the source of truth across sessio
 17. **Gohma model hand-weave** — Gohma needs hand-curated multi-CMB assembly (like kAssemblies in
     [[soh3d-auto-replace]]); generic auto-merge is unsound.
 
-18. **Deku Baba (flower enemy) no combat interaction** — Link and the Deku Baba can't damage each
-    other (no hitbox/collision interaction). Repro in Kokiri Forest.
+18. **Deku Baba no combat interaction (UNCERTAIN)** — a Deku Baba inside the Deku Tree couldn't be
+    hurt / couldn't hurt Link. Only seen AFTER teleporting to Gohma, void-dying several times → game
+    over → respawn in Deku Tree room 1, so it may be state corruption from the void deaths, not a
+    general Deku Baba bug. Low confidence; revisit once #14/#16 (collision void-outs) are fixed.
+
+20. **Market NPCs render totally wrong** — townsfolk by the Market fountain/bridge render with
+    white/untextured bodies and broken zebra-striped clothing (user screenshot, Market day). Wrong
+    material/texture or wrong model on the OoT3D replacement for these NPCs (En_Hy townsperson
+    variants?). Likely a texture/material-index or UV bug per variant. Repro: Market (entrance 177).
+    2nd screenshot: townsfolk in contorted poses with striped white clothing — anim + material both
+    look wrong; a correctly-rendered kid (green/blue apron) stands behind them, so it's per-actor.
+
+21. **Giant boulder overlapping Temple of Time** (Market) — a large rock mesh clips into/overlaps
+    the Temple of Time building (user screenshot). Misplaced/wrong-scale scene geometry or actor.
+    Repro: Market (177), look toward ToT.
+
+19. **Add dungeon entrances to Debug-menu level-select** (so dungeons are testable). Add warp rows to
+    `libultraship/assets/rml/soh3d_test.rml` (Debug pane, `warp="<dec>"`) with these first-room
+    indices (from `soh/include/tables/entrance_table.h`): Deku Tree 1, Dodongo's Cavern 5,
+    Jabu-Jabu 41, Forest Temple 362, Fire Temple 358, Water Temple 17, Shadow Temple 56,
+    Spirit Temple 131, Bottom of the Well 153, Ice Cavern 137, Gerudo Training 9,
+    Inside Ganon's Castle 1128. (Boss rooms already present as the "Boss Fight" rows.)
 
 4. **Kakariko ladder render too high** — the OoT3D ladder model renders a bit high, so Link appears
    to float when climbing. Lower it slightly (per-actor yoff / placement). Tune live via REPL
