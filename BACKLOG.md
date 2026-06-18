@@ -17,14 +17,33 @@ Mirrors the live task tracker but this file is the source of truth across sessio
    backends/gfx_vulkan.cpp` (`GetClipParameters`, `SetViewport`, present blit), `interpreter.cpp`
    (`SetVertices` line ~2184, `AdjustVIewportOrScissor` line ~2376). Reference: `gfx_metal.cpp`.
 
-2. **Universal Start-skip for cutscenes + dialogs** — everything that takes control away from Link
-   must be skippable by pressing Start: scripted CS cutscenes, onepoint cameras, actor-driven
-   sequences, item-get freezes, AND text/dialog boxes. No auto-skip, no forced-watch. Today only
-   some scripted CS commands are partly Start-skippable (`z_demo.c` `csSkipButton`, gated by
-   scene/gameMode/frames>20); dialogs key off `CVAR_ENHANCEMENT("SkipText")` in `z_message_PAL.c`.
+2. **Universal Start-skip for cutscenes** — everything that takes control away from Link must be
+   Start-skippable: scripted CS cutscenes, onepoint cameras, actor-driven sequences, item-get
+   freezes. No auto-skip, no forced-watch. Scripted CS terminators already skip on Start
+   (`z_demo.c` `csSkipButton`, frames>20). REMAINING: Player cutscene-mode (`csMode`), onepoint
+   cams, actor-driven. User accepts the iterate-on-softlock approach (they report what softlocks).
+   (DONE: holding Start skips dialogs — `z_message_PAL.c` all 4 text-advance sites.)
 
-3. **RmlUi "Restart → title screen"** — add a menu item that restarts the game back to the title
-   screen (re-init to Title gamestate) without quitting.
+7. **Kokiri kids (En_Ko) unlimited render distance** — replacement only renders within a limited
+   distance; raise/remove the draw-distance cull for replaced En_Ko.
+
+8. **Kokiri kids (En_Ko) stuck animation** — auto-replaced kids loop one pose (hands-to-face),
+   including a Kokiri who should be SITTING but stands. Wrong N64-anim->CSAB / idle selection. Model
+   renders fine. See [[soh3d-n64anim-csab-map]], [[soh3d-shared-variant-models]].
+
+9. **Grass/lilypad area not walkable (collision regression)** — Link can't enter a forest pond-edge
+   lilypad patch that "used to work." Check collision / terrainwarp path; needs in-game repro.
+
+10. **Boulder half-clipped underground** — a large rock's render sits too low (bottom buried). Per-
+    actor yoff/anchor. Identify rock actor/model (En_Ishi large / Obj rock), raise to ground.
+
+11. **Kokiri sword chest too big** — renders as the large treasure chest; should be the small chest.
+    Fix En_Box size/variant/scale.
+
+12. **Skip chest-opening + reliable dialog fast-forward** (part of #2) — opening a chest takes
+    control (get-item freeze) and must be Start-skippable. Also dialogs aren't fast-forwarding for
+    the user — verify the hold-Start dialog skip (just added) works, and consider enabling the
+    SkipText enhancement by default so B/Start fast-advance text instantly.
 
 4. **Kakariko ladder render too high** — the OoT3D ladder model renders a bit high, so Link appears
    to float when climbing. Lower it slightly (per-actor yoff / placement). Tune live via REPL
@@ -41,6 +60,8 @@ Mirrors the live task tracker but this file is the source of truth across sessio
 
 ## Done (recent)
 
+- **RmlUi "Restart → Title Screen"** — Debug-tab row (`restart="1"` → `gSoH3dMenuRestart` →
+  soh3d.c `SoH3D_ReplPoll` → `SET_NEXT_GAMESTATE(Title_Init)` + `NA_BGM_STOP`).
 - **run.sh black screen on Vulkan** — root cause: a stale config (`shipofharkinian.json`, cwd-
   relative; run.sh's `cd "$SOH"` loaded a different one than the game-manager) had
   `AdvancedResolution.Enabled=1`, which makes the game render to an offscreen `mGameFb` whose
