@@ -4,14 +4,21 @@ Durable, in-repo task list (survives PC switches and fresh agent sessions). Keep
 when an item lands, move it to **Done** with the commit; when you learn something, note it inline.
 This file is the source of truth across sessions.
 
-> **Fresh-session directive (from the user, 2026-06-18):** WORK AUTONOMOUSLY through this list —
-> do NOT ask the user what to work on, just pick items and fix them, committing each verified fix
-> (3-repo chain: libultraship→fork/soh3d, Shipwright→fork/develop, outer→origin/main). The user is
-> playtesting on Vulkan and will keep reporting bugs; capture new ones here. Suggested early picks:
-> #19 (dungeon warps — trivial, indices listed, unblocks the user's testing) and #14/#16 (systemic
-> climb/void collision — one root cause likely clears several items). #1 (Vulkan FB upside-down) is
-> the big proper-fix (negative-height viewport, Metal-style). Read the [[soh3d-vulkan-runsh-and-flip]]
-> memory and `run.sh` notes first. To run the game: `tools/soh3d_game.sh` (see soh3d-game-control).
+> **Fresh-session directive (from the user, 2026-06-18) — READ THIS FIRST:**
+> **NEVER ask the user anything. NEVER. Do not even chat or narrate. ONLY WORK.** Pick items from
+> this list and FIX them, committing each verified fix yourself (3-repo chain:
+> libultraship→fork/soh3d, Shipwright→fork/develop, outer→origin/main). No questions, no status
+> messages, no "should I" — just do the work and keep going until the list is done. The user is
+> playtesting on Vulkan and will keep dropping new bug reports/screenshots; silently capture each
+> new one into this file and keep fixing. Do NOT pause to confirm anything.
+>
+> Suggested early picks (but use your judgment, just work): #19 (dungeon warps — trivial, indices
+> listed, unblocks testing), #13 (wrong entrance spawn points), #14/#16 (systemic climb/void
+> collision — one root cause likely clears several), #1 (Vulkan FB upside-down — the big proper fix:
+> negative-height viewport, Metal-style). MANY items share root causes (collision/terrain-warp Y
+> for #4/#9/#10/#13/#14/#16/#25; En_Ko anim/variant for #7/#8; render/material for #11/#20/#24).
+> Read the [[soh3d-vulkan-runsh-and-flip]] memory + `run.sh` first. Run the game via
+> `tools/soh3d_game.sh` (skill: soh3d-game-control). Verify with screenshots; commit each fix.
 
 ## Open
 
@@ -56,8 +63,10 @@ This file is the source of truth across sessions.
     the user — verify the hold-Start dialog skip (just added) works, and consider enabling the
     SkipText enhancement by default so B/Start fast-advance text instantly.
 
-13. **Kokiri shop door → Link's house** — wrong entrance/door destination. Check Kokiri entrance
-    table / door routing. Needs repro.
+13. **Wrong entrance spawn points (CLUSTER)** — entrances land at the wrong spawn: (a) Kokiri shop
+    door → Link's house; (b) Kakariko graveyard → immediately transitions back out (spawns Link ON
+    the exit/leave trigger zone). Likely one root cause: wrong spawn index / spawn-point lookup for
+    these entrances (or door→entrance routing). Check entrance table + spawn handling. Needs repro.
 
 14. **Link drops off EVERY climbable surface halfway** (collision, SYSTEMIC) — not just one ladder;
     all climbables (ladders/vines/walls) drop Link partway up. Likely a general climb-collision
@@ -98,6 +107,29 @@ This file is the source of truth across sessions.
 21. **Giant boulder overlapping Temple of Time** (Market) — a large rock mesh clips into/overlaps
     the Temple of Time building (user screenshot). Misplaced/wrong-scale scene geometry or actor.
     Repro: Market (177), look toward ToT.
+
+22. **Debug-menu warp: day/night (time-of-day) selection** — when warping to a location, let the
+    user pick day or night (e.g. Kakariko differs). DESIGN: add a time selector to the warp flow —
+    set `gSoH3dForceTime` (soh3d.c, the SOH3D_TIME mechanism) alongside `gSoH3dMenuWarp` before the
+    transition. Either a day/night toggle row that seeds the time applied on the next warp, or
+    per-warp-row time attribute.
+
+23. **Cucco wing-flap animation not implemented** — the cucco (chicken) OoT3D replacement doesn't
+    play its wing-flap anim. Long-tail anim coverage; see [[soh3d-runsh-and-anim-interp]]
+    (cucco-type coverage) and [[soh3d-n64anim-csab-map]].
+
+24. **Windmill fan blades render inside the Kakariko well** (instead of water) — a wrong object/model
+    is drawn in the well shaft (user screenshot: windmill sails in the well). Likely an object-id →
+    ZAR mis-map or a shared-object collision in the OoT3D replacement. Repro: Kakariko well.
+
+25. **NPC walking in mid-air** (Kakariko) — a townsperson (running man?) is animated walking high
+    above a building/roof instead of on the ground (user screenshot). Actor Y-placement vs floor;
+    same collision/terrain-warp Y cluster as #4/#9/#10/#13/#14/#16.
+
+26. **Death Mountain gate shows wrong model + no collision** (Kakariko) — the closed gate to the
+    mountain (guarded by the soldier) renders as a different model (a wooden beam/brick structure)
+    and has no collision. Wrong object→ZAR/model mapping for the gate, plus missing collision.
+    Repro: Kakariko, the DM Trail gate.
 
 19. **Add dungeon entrances to Debug-menu level-select** (so dungeons are testable). Add warp rows to
     `libultraship/assets/rml/soh3d_test.rml` (Debug pane, `warp="<dec>"`) with these first-room
