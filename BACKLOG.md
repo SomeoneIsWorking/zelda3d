@@ -22,19 +22,22 @@ This file is the source of truth across sessions.
 
 ## Open
 
-1. **3D content renders upside-down on the FIRST frame(s) until the camera updates** (RE-DIAGNOSED
-   2026-06-19 from a user observation — supersedes the old "FB sampling flip" theory). The title-
-   screen 3D backdrop (and pause/inventory bg, equipment Link) appear flipped, BUT the user reports
-   **it self-corrects after a camera change**. A framebuffer-sampling flip would be PERMANENT, so
-   this is NOT an FB-flip — it is a stale/wrong **view-or-projection matrix on the first frame(s)**,
-   fixed once the camera recompute runs. User's framing: "this scene is still using the N64
-   projection, not the 3DS one." DO NOT pursue the negative-height-viewport / GetClipParameters
-   restructure — RULED OUT: BOTH `{true,true}` (old) and `{true,!invertY}` (current) leave the image
-   flipped, so `GetClipParameters.invertY` is not the lever. NEXT: find where the OoT3D/Vulkan pass
-   gets its view+projection each frame and why the first frame uses a stale (flipped) one; make the
-   correct (camera-derived) projection apply from frame 0. Files: trace the gSPMatrix projection the
-   game pushes (Play camera) vs what the Vulkan backend uses on the first post-load frame. Repro: any
-   fresh scene load OR the title demo; freeze the camera at load to hold the flipped state.
+1. **Cutscene / title / demo camera goes UNDER the 3DS terrain (N64 camera sequence vs 3DS terrain
+   heights)** — FINAL diagnosis from the user (2026-06-19): the title was NOT upside-down; the
+   **camera was below the rendered terrain looking up at its underside** (looks like a flip; sky
+   below, ground above). Root cause, in the user's words: **"it is using 3DS terrain with the N64
+   sequence."** The scene renders the OoT3D (3DS) terrain mesh, but the cutscene/demo CAMERA runs the
+   original N64 sequence (camera eye positions authored for the N64 terrain heights). Because the 3DS
+   terrain surface sits at a different height than the N64 floor those camera coords assume, the
+   scripted camera ends up beneath the 3DS surface. It "self-corrects on a camera change" only
+   because the camera then moves out from under the terrain. Confirmed in scene 0x51 with cam
+   eye=(-4000,-1,5228) (eye Y=-1, under the surface). NOTE the EARLIER theories are RULED OUT: not an
+   FB-sampling flip, and not a projection-matrix flip (instrumented P[1][1]=+1.71 stable from frame 0
+   in a normal scene; reverted that SOH3D_PROJDBG probe). FIX DIRECTION: reconcile the scripted
+   (N64) camera with the 3DS terrain height — likely the same terrain-warp axis as [[soh3d-terrain-warp]]
+   (warp the OoT3D render mesh to the N64 floor so N64 camera coords match), but applied to/through
+   the cutscene & title-demo camera path, not just gameplay. Investigate whether terrain-warp runs in
+   cutscene/title scenes at all, and/or offset the scripted camera eye to the 3DS surface.
 
 1b. **Title-screen flow is broken** (user, 2026-06-19) — (a) the title demo's scene load can CRASH:
    `Scene_CommandAlternateHeaderList` -> `OTRScene_ExecuteCommands` -> `Play_Init` while loading
