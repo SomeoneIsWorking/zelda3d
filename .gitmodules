@@ -1,0 +1,4 @@
+[submodule "Shipwright"]
+	path = Shipwright
+	url = https://github.com/SomeoneIsWorking/Shipwright.git
+	branch = develop

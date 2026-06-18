@@ -11,10 +11,12 @@
 # the ROM file (any name) into the repo dir. The N64 .z64 (for first-run extraction)
 # is picked up the same way. Override the warp target with SOH3D_ENTRANCE=<decimal>.
 #
-# On a fresh machine this clones the Shipwright engine fork + its submodules and configures the
-# build dir. On every run it fast-forwards the engine to the latest fork commit (only if the
-# clone is clean with no local commits — never clobbers local work) and rebuilds if anything
-# changed, so `git pull && ./run.sh` stays current. Skip the engine update with SOH3D_NOUPDATE=1.
+# On a fresh checkout this checks out the Shipwright engine submodule (+ its own submodules) and
+# configures the build dir — so `git clone <soh3d> && ./run.sh` is all you need (no --recursive
+# required; run.sh inits the submodules for you). On every run it fast-forwards the engine to the
+# latest fork commit (only if the checkout is clean with no local commits — never clobbers local
+# work) and rebuilds if anything changed, so `git pull && ./run.sh` stays current. Skip the engine
+# update with SOH3D_NOUPDATE=1.
 set -eu
 REPO="$(cd "$(dirname "$0")" && pwd)"
 BUILD="$REPO/Shipwright/build-cmake"
@@ -27,9 +29,10 @@ esac
 # Parallel job count — nproc is GNU-only (absent on macOS); fall back to sysctl, then 4.
 NPROC="$(nproc 2>/dev/null || sysctl -n hw.ncpu 2>/dev/null || echo 4)"
 
-# The engine lives in a side-by-side clone of our Shipwright fork (gitignored here, NOT a
-# submodule of this repo), with libultraship as a submodule pointing at OUR fork's commit.
-SHIPWRIGHT_FORK="https://github.com/SomeoneIsWorking/Shipwright.git"
+# The engine is the `Shipwright` submodule of this repo (url = our fork, branch = develop), and it
+# in turn has libultraship as a submodule. libultraship's recorded commit only exists in OUR fork
+# while Shipwright's .gitmodules still points libultraship at upstream, so we override that nested
+# URL when checking out (keeps the fork's .gitmodules unchanged for clean upstream merges).
 SHIPWRIGHT_BRANCH="develop"
 LIBULTRA_FORK="https://github.com/SomeoneIsWorking/libultraship.git"
 
@@ -52,33 +55,28 @@ update_engine_if_safe() {
     git -C "$sw" submodule update --init --recursive >&2 || { echo "error: submodule update failed" >&2; exit 1; }
 }
 
-# Clone the Shipwright fork + init its submodules if the engine sources aren't present.
-# A plain submodule init won't do: the recorded libultraship commit only exists in our fork,
-# while Shipwright's .gitmodules still points libultraship at upstream — so override that URL.
+# Check out the Shipwright engine submodule (+ libultraship from our fork) if the sources aren't
+# present. Only touches the checkout when it's MISSING — an existing checkout is left to
+# update_engine_if_safe, which never clobbers local engine work (mine).
 ensure_sources() {
     if [ -f "$REPO/Shipwright/CMakeLists.txt" ] && [ -f "$REPO/Shipwright/libultraship/CMakeLists.txt" ]; then
         update_engine_if_safe
         return 0
     fi
-    if [ -e "$REPO/Shipwright" ] && [ ! -d "$REPO/Shipwright/.git" ]; then
-        echo "error: $REPO/Shipwright exists but isn't a git clone — move it aside and retry" >&2
-        exit 1
-    fi
-    if [ ! -d "$REPO/Shipwright/.git" ]; then
-        # Clone into a temp dir and move into place, so an interrupted clone never lands a
-        # broken half-checkout at Shipwright/ that later runs would mistake for a real clone.
-        echo "cloning Shipwright fork ($SHIPWRIGHT_BRANCH)…" >&2
-        local tmp="$REPO/Shipwright.cloning.$$"
-        rm -rf "$tmp"
-        git clone -o fork --branch "$SHIPWRIGHT_BRANCH" "$SHIPWRIGHT_FORK" "$tmp" >&2 || {
-            rm -rf "$tmp"; echo "error: failed to clone Shipwright" >&2; exit 1; }
-        mv "$tmp" "$REPO/Shipwright"
-    fi
+    echo "checking out Shipwright engine submodule…" >&2
+    git -C "$REPO" submodule sync Shipwright >&2 2>/dev/null || true
+    git -C "$REPO" submodule update --init Shipwright >&2 || {
+        echo "error: failed to check out the Shipwright submodule" >&2; exit 1; }
+    # submodule update leaves a detached HEAD at the recorded gitlink; put the engine on the develop
+    # branch so update_engine_if_safe can keep it current on later runs.
+    git -C "$REPO/Shipwright" checkout "$SHIPWRIGHT_BRANCH" >&2 2>/dev/null || true
+    # The recorded libultraship commit only exists in our fork; override the nested URL before its
+    # recursive checkout (Shipwright's own .gitmodules still points at upstream).
     echo "initialising engine submodules (libultraship from our fork)…" >&2
-    git -C "$REPO/Shipwright" submodule init >&2 || { echo "error: submodule init failed" >&2; exit 1; }
     git -C "$REPO/Shipwright" config submodule.libultraship.url "$LIBULTRA_FORK"
     git -C "$REPO/Shipwright" submodule update --init --recursive >&2 || {
-        echo "error: submodule update failed" >&2; exit 1; }
+        echo "error: submodule update (libultraship) failed" >&2; exit 1; }
+    update_engine_if_safe
 }
 
 # Ensure the engine is cloned, updated, configured, and the target is built+current.
