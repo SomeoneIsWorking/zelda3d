@@ -77,17 +77,13 @@ This file is the source of truth across sessions.
     root cause probably fixes the whole climb cluster. Cluster with #4 (ladder render too high),
     #9 (grass not walkable).
 
-15. **RmlUi Link model/anim toggle** (user-requested) — a 3-way cycle row:
-    `0 = N64 model + N64 anim` (`gSoH3dLinkOn=0`), `1 = 3DS model + N64-retarget anim`
-    (`gSoH3dLinkOn=1, gSoH3dLinkAnimSrc=1`), `2 = 3DS model + 3DS-own-CSAB anim`
-    (`gSoH3dLinkOn=1, gSoH3dLinkAnimSrc=0`). All three modes already work in code (soh3d.c
-    SoH3D_LinkEnabled/SoH3D_LinkAnimSrc). DESIGN: define `extern "C" int gSoH3dMenuLinkMode = 0;`
-    in SohRmlUi.cpp (must be DEFINED in libultraship — charcompare also links it — and READ in
-    soh3d.c, like gSoH3dMenuWarp). Add a `linkmode="1"` cycle row (Graphics or Debug tab); on
-    activate cycle 0→1→2→0 and update `<value>` text (labels: "N64" / "3DS · N64 anim" /
-    "3DS · 3DS anim"); refresh its text on menu open (extend RefreshToggleRows). soh3d.c
-    SoH3D_ReplPoll: on first frame seed gSoH3dMenuLinkMode from current mode, thereafter apply
-    gSoH3dMenuLinkMode → gSoH3dLinkOn/gSoH3dLinkAnimSrc.
+29. **Hand-weave the 3DS Link model (multi-CMB assembly)** — with the new menu toggle (#15), mode 1
+    (3DS model + N64-retarget anim) renders, but the user reports it "looks weird, doesn't look like
+    N64 anim — must be hand-weaved." I.e. the 3DS Link replacement needs a hand-curated multi-CMB
+    assembly (like `kAssemblies` in [[soh3d-auto-replace]], same as Gohma #17) rather than the
+    generic path; the N64-anim retarget alone isn't producing a correct Link. See
+    [[soh3d-link-player-path]]. (The #15 menu toggle itself works — this is the underlying model
+    quality.)
 
 16. **Gohma arena void-out** — walking in the Gohma (Deku Tree boss) arena drops Link through the
     floor → void. Collision hole. Repro at entrance 1039.
@@ -111,12 +107,6 @@ This file is the source of truth across sessions.
     the Temple of Time building (user screenshot). Misplaced/wrong-scale scene geometry or actor.
     Repro: Market (177), look toward ToT.
 
-22. **Debug-menu warp: day/night (time-of-day) selection** — when warping to a location, let the
-    user pick day or night (e.g. Kakariko differs). DESIGN: add a time selector to the warp flow —
-    set `gSoH3dForceTime` (soh3d.c, the SOH3D_TIME mechanism) alongside `gSoH3dMenuWarp` before the
-    transition. Either a day/night toggle row that seeds the time applied on the next warp, or
-    per-warp-row time attribute.
-
 23. **Cucco wing-flap animation not implemented** — the cucco (chicken) OoT3D replacement doesn't
     play its wing-flap anim. Long-tail anim coverage; see [[soh3d-runsh-and-anim-interp]]
     (cucco-type coverage) and [[soh3d-n64anim-csab-map]].
@@ -133,13 +123,6 @@ This file is the source of truth across sessions.
     mountain (guarded by the soldier) renders as a different model (a wooden beam/brick structure)
     and has no collision. Wrong object→ZAR/model mapping for the gate, plus missing collision.
     Repro: Kakariko, the DM Trail gate.
-
-19. **Add dungeon entrances to Debug-menu level-select** (so dungeons are testable). Add warp rows to
-    `libultraship/assets/rml/soh3d_test.rml` (Debug pane, `warp="<dec>"`) with these first-room
-    indices (from `soh/include/tables/entrance_table.h`): Deku Tree 1, Dodongo's Cavern 5,
-    Jabu-Jabu 41, Forest Temple 362, Fire Temple 358, Water Temple 17, Shadow Temple 56,
-    Spirit Temple 131, Bottom of the Well 153, Ice Cavern 137, Gerudo Training 9,
-    Inside Ganon's Castle 1128. (Boss rooms already present as the "Boss Fight" rows.)
 
 4. **Kakariko ladder render too high** — the OoT3D ladder model renders a bit high, so Link appears
    to float when climbing. Lower it slightly (per-actor yoff / placement). Tune live via REPL
@@ -164,6 +147,21 @@ This file is the source of truth across sessions.
 
 ## Done (recent)
 
+- **#19 Dungeon entrances in Debug menu** — added a "Dungeons" section (12 first-room warp rows) to
+  the Debug pane of `soh3d_test.rml`. NOTE: the BACKLOG's listed indices were all off-by-one; the
+  correct literal `entrance_table.h` hex→dec values are Deku Tree 0, Dodongo's 4, Jabu 40, Forest
+  361, Fire 357, Water 16, Shadow 55, Spirit 130, Well 152, Ice 136, Gerudo Training 8, Ganon's
+  Castle 1127 (verified vs the working Kokiri 238=0xEE / Gohma 1039=0x40F rows). VERIFIED: Deku Tree
+  warp loaded scene 0x0 with Link on the floor.
+- **#22 Warp day/night selection** — "Warp Time-of-Day" cycle row (Default/Day/Night) in the Debug
+  pane; soh3d.c sets `gSoH3dForceTime` (Day=0x6000, Night=0x0000, Default=-1) when it consumes
+  `gSoH3dMenuWarp`, so the new scene's `Play_Init` (`SoH3D_ApplyForceTime`) picks the right day/night
+  actor set. Generic `cycle="<id>"` row infra added to SohRmlUi.cpp (CycleSpec, mirrors ToggleSpec).
+- **#15 Link model/anim menu toggle** — "Link Model / Anim" cycle row (N64 / 3DS·N64 anim /
+  3DS·3DS anim) in the Graphics pane → `gSoH3dMenuLinkMode` (defined in SohRmlUi.cpp); soh3d.c seeds
+  it from the live mode once, then applies changes to `gSoH3dLinkOn`/`gSoH3dLinkAnimSrc`. VERIFIED:
+  the row cycles and applies live (Link switched to the 3DS model in-game). Underlying 3DS-Link
+  render quality is now tracked as #29 (hand-weave needed).
 - **RmlUi "Restart → Title Screen"** — Debug-tab row (`restart="1"` → `gSoH3dMenuRestart` →
   soh3d.c `SoH3D_ReplPoll` → `SET_NEXT_GAMESTATE(Title_Init)` + `NA_BGM_STOP`).
 - **run.sh black screen on Vulkan** — root cause: a stale config (`shipofharkinian.json`, cwd-
