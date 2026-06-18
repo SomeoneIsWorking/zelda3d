@@ -50,9 +50,29 @@ status() {
     return 0
 }
 
+# Headless mode (SOH3D_HEADLESS=1): run on a private Xvfb X server so NO window appears on the
+# user's desktop. Required on Wayland — SDL ignores X11 DISPLAY there and would open a visible
+# Wayland window — so we force SDL's X11 backend onto the Xvfb display and drop WAYLAND_DISPLAY.
+# Rendering still uses the real GPU; screenshots (REPL `shot`) read the in-process framebuffer.
+setup_headless() {
+    [ "${SOH3D_HEADLESS:-0}" = "1" ] || return 0
+    local disp="${SOH3D_HEADLESS_DISPLAY:-:99}"
+    if ! DISPLAY="$disp" xdpyinfo >/dev/null 2>&1; then
+        echo "headless: starting Xvfb on $disp" >&2
+        setsid Xvfb "$disp" -screen 0 1920x1080x24 >"$REPO/scratch/logs/xvfb.log" 2>&1 &
+        local up=
+        for _ in $(seq 1 20); do DISPLAY="$disp" xdpyinfo >/dev/null 2>&1 && { up=1; break; }; sleep 0.5; done
+        [ -n "$up" ] || { echo "headless: Xvfb failed on $disp (see scratch/logs/xvfb.log)" >&2; return 1; }
+    fi
+    export DISPLAY="$disp" XAUTHORITY=/dev/null SDL_VIDEODRIVER=x11
+    unset WAYLAND_DISPLAY
+    echo "headless: on $disp (Xvfb, SDL x11)" >&2
+}
+
 start() {
     local entr="${1:-${SOH3D_ENTRANCE:-238}}" time="${2:-${SOH3D_TIME:-0x6000}}"
     stop || { echo "stop failed; aborting start" >&2; return 1; }
+    setup_headless || return 1
     # ROM provisioning: env -> gitignored .env -> any *.3ds / *.z64 dropped in the repo dir.
     . "$REPO/tools/rom_provision.sh"
     soh3d_provision_roms "$REPO" "$(dirname "$SOH")"
