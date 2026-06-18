@@ -11,10 +11,10 @@
 # the ROM file (any name) into the repo dir. The N64 .z64 (for first-run extraction)
 # is picked up the same way. Override the warp target with SOH3D_ENTRANCE=<decimal>.
 #
-# On a fresh machine this also clones the Shipwright engine fork + its submodules and
-# configures the build dir; the binary is then built automatically if missing. Force a
-# rebuild with SOH3D_BUILD=1 ./run.sh. Pull the latest engine fix with SOH3D_UPDATE=1 ./run.sh
-# (ff-only; safe to combine: SOH3D_UPDATE=1 SOH3D_BUILD=1 ./run.sh).
+# On a fresh machine this clones the Shipwright engine fork + its submodules and configures the
+# build dir. On every run it fast-forwards the engine to the latest fork commit (only if the
+# clone is clean with no local commits — never clobbers local work) and rebuilds if anything
+# changed, so `git pull && ./run.sh` stays current. Skip the engine update with SOH3D_NOUPDATE=1.
 set -eu
 REPO="$(cd "$(dirname "$0")" && pwd)"
 BUILD="$REPO/Shipwright/build-cmake"
@@ -33,22 +33,31 @@ SHIPWRIGHT_FORK="https://github.com/SomeoneIsWorking/Shipwright.git"
 SHIPWRIGHT_BRANCH="develop"
 LIBULTRA_FORK="https://github.com/SomeoneIsWorking/libultraship.git"
 
+# Fast-forward the engine clone to the latest fork commit, but ONLY when it's a clean consumer
+# clone — never disturb a machine with local engine work (mine). Skips if: SOH3D_NOUPDATE set,
+# working tree dirty, local commits not on the remote, or offline. When it does fast-forward, it
+# re-syncs the submodules to the new gitlink. Safe-by-default: any doubt -> leave the clone alone.
+update_engine_if_safe() {
+    local sw="$REPO/Shipwright"
+    [ -n "${SOH3D_NOUPDATE:-}" ] && return 0
+    git -C "$sw" diff --quiet 2>/dev/null && git -C "$sw" diff --cached --quiet 2>/dev/null || return 0
+    local up
+    up="$(git -C "$sw" rev-parse --abbrev-ref --symbolic-full-name '@{upstream}' 2>/dev/null)" || return 0
+    git -C "$sw" fetch --quiet "${up%%/*}" 2>/dev/null || return 0          # offline -> skip
+    [ "$(git -C "$sw" rev-list --count '@{upstream}..HEAD' 2>/dev/null)" = 0 ] || return 0  # ahead -> skip
+    [ "$(git -C "$sw" rev-list --count 'HEAD..@{upstream}' 2>/dev/null)" != 0 ] || return 0 # up to date
+    echo "updating engine to latest fork commit…" >&2
+    git -C "$sw" merge --ff-only '@{upstream}' >&2 || return 0
+    git -C "$sw" config submodule.libultraship.url "$LIBULTRA_FORK"
+    git -C "$sw" submodule update --init --recursive >&2 || { echo "error: submodule update failed" >&2; exit 1; }
+}
+
 # Clone the Shipwright fork + init its submodules if the engine sources aren't present.
 # A plain submodule init won't do: the recorded libultraship commit only exists in our fork,
 # while Shipwright's .gitmodules still points libultraship at upstream — so override that URL.
 ensure_sources() {
     if [ -f "$REPO/Shipwright/CMakeLists.txt" ] && [ -f "$REPO/Shipwright/libultraship/CMakeLists.txt" ]; then
-        # Sources present. Opt-in update to the latest fork commit (consumer machines): ff-only
-        # so it never clobbers local work, then re-sync the submodules to the new gitlink.
-        if [ -n "${SOH3D_UPDATE:-}" ]; then
-            echo "updating engine to latest fork commit…" >&2
-            git -C "$REPO/Shipwright" pull --ff-only >&2 || {
-                echo "warn: Shipwright pull was not fast-forward (local commits?) — skipping update" >&2
-                return 0; }
-            git -C "$REPO/Shipwright" config submodule.libultraship.url "$LIBULTRA_FORK"
-            git -C "$REPO/Shipwright" submodule update --init --recursive >&2 || {
-                echo "error: submodule update failed" >&2; exit 1; }
-        fi
+        update_engine_if_safe
         return 0
     fi
     if [ -e "$REPO/Shipwright" ] && [ ! -d "$REPO/Shipwright/.git" ]; then
@@ -72,13 +81,11 @@ ensure_sources() {
         echo "error: submodule update failed" >&2; exit 1; }
 }
 
-# Build a CMake target if its output is missing (or SOH3D_BUILD=1 forces a rebuild).
-# Clones the engine + configures the build dir first if needed. Pass: <target> <output-binary>.
+# Ensure the engine is cloned, updated, configured, and the target is built+current.
+# The build step always runs (ninja is a near-instant no-op when nothing changed), so an engine
+# update is actually compiled. Pass: <target> <output-binary>.
 ensure_built() {
     local target="$1" binary="$2"
-    if [ -x "$binary" ] && [ -z "${SOH3D_BUILD:-}" ]; then
-        return 0
-    fi
     ensure_sources
     # Configure if the build dir has no generator file yet. A leftover CMakeCache.txt from a
     # FAILED earlier configure (e.g. -G Ninja before ninja was installed) counts as not-configured:
