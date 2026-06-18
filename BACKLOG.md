@@ -63,10 +63,6 @@ This file is the source of truth across sessions.
    cams, actor-driven. User accepts the iterate-on-softlock approach (they report what softlocks).
    (DONE: holding Start skips dialogs — `z_message_PAL.c` all 4 text-advance sites.)
 
-8. **Kokiri kids (En_Ko) stuck animation** — auto-replaced kids loop one pose (hands-to-face),
-   including a Kokiri who should be SITTING but stands. Wrong N64-anim->CSAB / idle selection. Model
-   renders fine. See [[soh3d-n64anim-csab-map]], [[soh3d-shared-variant-models]].
-
 9. **Grass/lilypad area not walkable (collision regression)** — Link can't enter a forest pond-edge
    lilypad patch that "used to work." Check collision / terrainwarp path; needs in-game repro.
 
@@ -162,6 +158,26 @@ This file is the source of truth across sessions.
     see [[soh3d-texpack]]. (Foliage #27 is the only "extra/lowest" item — foliage is already 3DS.)
 
 ## Done (recent)
+
+- **#8 Kokiri kids (En_Ko) stuck animation** — every auto-replaced kid looped ONE frozen pose
+  (and a kid who should SIT stood). ROOT CAUSE: the km1/kw1 Kokiri skeletons animate from the
+  SHARED `object_os_anime` bank (`gKokiri*Anim`), but the anim-match pipeline keys N64 anims to a
+  character's OWN object (`zar_to_object`), and `object_km1`/`object_kw1` have NO AnimationHeaders
+  — so km1/kw1 never entered `animmap.json` and EVERY live anim (e.g. `gKokiriCuttingGrassAnim`)
+  fell through `SoH3D_ResolveAutoCsab` to the model default idle (`fad_kusu_to_wait`, a Fado pose).
+  FIX (durable, in the pipeline — no hand-edit of the generated `.inc`): (1) added `SHARED_ANIM_BANKS`
+  to `tools/soh3d_anim_export.py` so a zar can source N64 anims from extra shared-bank objects
+  (`/actor/zelda_km1.zar -> object_os_anime`); the runtime OTR key stays `objects/object_os_anime/
+  gKokiri*Anim`, and since km1 & kw1 carry the SAME `km1_*` CSAB set one km1 key resolves for both
+  bodies (no duplicate entries). (2) The gKokiri anims are mostly 2-frame static-pose holds, so
+  frame-delta auto-matching is meaningless → added 26 SEMANTIC overrides to
+  `tools/skeldata/charcompare_overrides.tsv` (suwari=sit, agura=cross-legged, kusakari=cut-grass,
+  shinpai=worried, usirote=hands-behind, nokezori=lean-back, etc.). Regenerated animmap.json +
+  soh3d_animmap.inc (978 entries, 30 overrides) + charcompare_index.inc; diff is CONTAINED (only
+  new `object_os_anime` rows, zero change to the other 116 characters). VERIFIED headless in Kokiri
+  Forest (238): `animdbg` shows `gKokiriCuttingGrassAnim->km1_kusakari`, `gKokiriIdleAnim->
+  km1_ukiuki_wait` (no more `[default-idle]`); the km1 boy renders a cutting-grass crouch and the
+  kw1 girl a natural standing idle (both correct 3DS poses). See [[soh3d-n64anim-csab-map]].
 
 - **#20 Market NPCs render "zebra-striped" / contorted (skin-pose interpolation bug)** — the
   townsfolk by the Market fountain (En_Hy/En_Mu, e.g. zelda_mu `marketpeople.cmb`, an animated

@@ -10,3 +10,37 @@
 /actor/zelda_wm2.zar	gWallmasterMissAnim	wm_miss
 /actor/zelda_xc.zar	gSheikArmsCrossedIdleAnim	xc_matsu
 /actor/zelda_xc.zar	gSheikHittingGroundAnim	mizunoserenaade
+#
+# En_Ko Kokiri kids (BACKLOG #8): the km1/kw1 skeletons animate from the SHARED object_os_anime
+# bank (gKokiri*Anim), now wired in via soh3d_anim_export SHARED_ANIM_BANKS. The anims are mostly
+# 2-frame static-pose holds, so frame-delta auto-matching is meaningless -> map each by SEMANTICS
+# to the km1_* CSAB (romaji: suwari=sit, agura=cross-legged, hiji=elbow, nokezori=lean-back,
+# usirote=hands-behind, utsumuki=look-down, shinpai=worried, udekumi=arms-folded, kusakari=cut-
+# grass, ishi=stone/lift, kususu=giggle, asekaki=sweat, ukiuki=cheerful-stand). km1 carries the
+# full CSAB set and kw1 shares it, so one /actor/zelda_km1.zar key resolves for both bodies.
+/actor/zelda_km1.zar	gKokiriIdleAnim	km1_ukiuki_wait
+/actor/zelda_km1.zar	gKokiriStandingAnim	km1_ukiuki_wait
+/actor/zelda_km1.zar	gKokiriStandUpAnim	km1_ukiuki_wait
+/actor/zelda_km1.zar	gKokiriStandingApprehensiveAnim	km1_shinpai_pose
+/actor/zelda_km1.zar	gKokiriStandingArmsBehindBackAnim	km1_usirote_pose
+/actor/zelda_km1.zar	gKokiriStandingHandsOnHipsAnim	km1_doushite_pose
+/actor/zelda_km1.zar	gKokiriStandingHandOnChestAnim	km1_udekumi_pose
+/actor/zelda_km1.zar	gKokiriStandingRightArmUpAnim	km1_setsumei_pose
+/actor/zelda_km1.zar	gKokiriLeaningForwardAnim	km1_utsumuki_pose
+/actor/zelda_km1.zar	gKokiriBlockingAnim	km1_udekumi_pose
+/actor/zelda_km1.zar	gKokiriSittingAnim	km1_suwari_pose
+/actor/zelda_km1.zar	gKokiriSittingCrossedLegsAnim	km1_agura_pose
+/actor/zelda_km1.zar	gKokiriSittingCrossedArmsLegsAnim	km1_agura_pose
+/actor/zelda_km1.zar	gKokiriSittingHeadOnHandAnim	km1_hiji_suwari_pose
+/actor/zelda_km1.zar	gKokiriSittingArmsUpAnim	km1_suwari_pose
+/actor/zelda_km1.zar	gKokiriSittingDiggingAnim	km1_suwari_pose
+/actor/zelda_km1.zar	gKokiriRecliningSittingUpAnim	km1_hiji_suwari_pose
+/actor/zelda_km1.zar	gKokiriRecliningStandingAnim	km1_nokezori_pose
+/actor/zelda_km1.zar	gKokiriRecliningLeaningBackAnim	km1_nokezori_pose
+/actor/zelda_km1.zar	gKokiriLeaningOnArmsAnim	km1_hiji_suwari_pose
+/actor/zelda_km1.zar	gKokiriCuttingGrassAnim	km1_kusakari
+/actor/zelda_km1.zar	gKokiriLiftingRockAnim	km1_ishi_wait
+/actor/zelda_km1.zar	gKokiriPunchingAnim	km1_ukiuki_wait
+/actor/zelda_km1.zar	gKokiriBackflipAnim	km1_ukiuki_wait
+/actor/zelda_km1.zar	gKokiriLaughingAnim	km1_kususu_pose
+/actor/zelda_km1.zar	gKokiriWipingForeheadAnim	km1_asekaki_wait
