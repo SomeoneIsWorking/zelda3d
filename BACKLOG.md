@@ -63,9 +63,6 @@ This file is the source of truth across sessions.
    cams, actor-driven. User accepts the iterate-on-softlock approach (they report what softlocks).
    (DONE: holding Start skips dialogs — `z_message_PAL.c` all 4 text-advance sites.)
 
-7. **Kokiri kids (En_Ko) unlimited render distance** — replacement only renders within a limited
-   distance; raise/remove the draw-distance cull for replaced En_Ko.
-
 8. **Kokiri kids (En_Ko) stuck animation** — auto-replaced kids loop one pose (hands-to-face),
    including a Kokiri who should be SITTING but stands. Wrong N64-anim->CSAB / idle selection. Model
    renders fine. See [[soh3d-n64anim-csab-map]], [[soh3d-shared-variant-models]].
@@ -168,6 +165,13 @@ This file is the source of truth across sessions.
 
 ## Done (recent)
 
+- **#7 En_Ko (replaced actors) draw past the N64 cull distance** — added a pure predicate
+  `SoH3D_ActorHasReplacement(play, actor)` (mirrors the table/auto lookups in SoH3D_TryDrawActor /
+  SoH3D_TryAuto without drawing) and called it in `Ship_CalcShouldDrawAndUpdate` (z_actor.c): a
+  replaced actor forces `shouldDraw=shouldUpdate=true`, so it keeps rendering+animating instead of
+  popping out at the vanilla cull distance. Generalizes to ALL replaced actors, not just kids. Also
+  added `drawn=<0|1>` (Actor.isDrawn) to the `actorscan` REPL output. VERIFIED quantitatively: kid at
+  dist 1790 from Link → drawn=1 replaced / drawn=0 not-replaced (`auto` toggle A/B).
 - **#19 Dungeon entrances in Debug menu** — added a "Dungeons" section (12 first-room warp rows) to
   the Debug pane of `soh3d_test.rml`. NOTE: the BACKLOG's listed indices were all off-by-one; the
   correct literal `entrance_table.h` hex→dec values are Deku Tree 0, Dodongo's 4, Jabu 40, Forest
