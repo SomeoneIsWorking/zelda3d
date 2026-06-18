@@ -54,8 +54,15 @@ sync_submodule_to_pin() {
         return 0
     fi
     echo "  $label: ${cur:0:9} -> ${want:0:9}" >&2
-    git -C "$parent" submodule update --init "$subpath" >&2 || \
-        echo "  $label: couldn't switch to ${want:0:9} (local changes in the way? see git output above)" >&2
+    if ! git -C "$parent" submodule update --init "$subpath" >&2; then
+        echo "" >&2
+        echo "error: can't update $label to the pinned ${want:0:9} — local changes are in the way" >&2
+        echo "       (see the git error just above). Building now would compile the WRONG engine," >&2
+        echo "       so stopping here. Discard those changes and re-run:" >&2
+        echo "         git -C $sub checkout -- . && ./run.sh" >&2
+        echo "       or inspect them first: git -C $sub status" >&2
+        exit 1
+    fi
 }
 
 # Bring the engine checkout in line with the commits THIS repo pins (Shipwright gitlink, then the
