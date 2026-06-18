@@ -157,6 +157,11 @@ This file is the source of truth across sessions.
 27. **More foliage** (LOWEST priority — do last) — add more foliage/vegetation density to the world
     for a lusher look.
 
+28. **Sky looks bad (low-res N64 skybox)** (NORMAL priority — not low) — the sky is the N64 skybox
+    (N64 Fast3D path, not OoT3D assets), blurry/low-res. Improve: hi-res sky texture or use the
+    OoT3D sky. Note: the texpack (model textures) doesn't cover the N64 sky/HUD path —
+    see [[soh3d-texpack]]. (Foliage #27 is the only "extra/lowest" item — foliage is already 3DS.)
+
 ## Done (recent)
 
 - **RmlUi "Restart → Title Screen"** — Debug-tab row (`restart="1"` → `gSoH3dMenuRestart` →
