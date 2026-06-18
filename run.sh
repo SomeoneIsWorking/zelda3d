@@ -185,10 +185,15 @@ ensure_built soh "$SOH/$SOH_BIN"
 ensure_soh_o2r              # game hard-exits with a "Missing soh.o2r" dialog without it
 
 export SOH3D=1                                  # render OoT3D assets
-export SOH3D_WARP=1                             # auto-warp past title/file-select
-export SOH3D_COLDBOOT="${SOH3D_COLDBOOT:-1}"     # cold boot: clean NEW game, not the debug save (Kakariko+items)
-export SOH3D_ENTRANCE="${SOH3D_ENTRANCE:-219}"  # 219 = Kakariko Village front gate
-export SOH3D_TIME="${SOH3D_TIME:-0x8000}"       # 0x8000 = noon (force DAY; Kakariko else loads at night)
+# Cold boot to the TITLE SCREEN: a plain `./run.sh` powers on like a real console — title screen,
+# file select, New Game, the real intro, normal save + normal day/night clock. The dev-warp shortcuts
+# (skip title and teleport straight into a scene, with an optional clean save / pinned time) are
+# OPT-IN, off by default — set them on the command line when you want to test a specific scene:
+#   SOH3D_WARP=1 SOH3D_ENTRANCE=177 SOH3D_TIME=0x8000 SOH3D_COLDBOOT=1 ./run.sh   # warp to Market, noon, fresh save
+export SOH3D_WARP="${SOH3D_WARP:-}"              # set 1 to auto-warp past title/file-select (dev)
+export SOH3D_COLDBOOT="${SOH3D_COLDBOOT:-}"      # set 1 (with WARP) to start the warp save as a clean NEW game
+export SOH3D_ENTRANCE="${SOH3D_ENTRANCE:-219}"  # warp target when SOH3D_WARP=1 (219 = Kakariko front gate)
+export SOH3D_TIME="${SOH3D_TIME:-}"             # set e.g. 0x8000 to PIN time-of-day (else the game clock runs)
 export SOH3D_AUTO="${SOH3D_AUTO:-1}"            # 1 = auto-replace non-table actors with OoT3D models
 export SOH3D_N64ANIM="${SOH3D_N64ANIM:-1}"      # drive OoT3D skeletons from live N64 joints (req. for characters)
 export SOH3D_VULKAN="${SOH3D_VULKAN:-1}"         # 1 = single Vulkan Fast3D backend (default); 0 = legacy OpenGL
