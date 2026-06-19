@@ -84,9 +84,22 @@ This file is the source of truth across sessions.
 31. **UI textures (user 2026-06-19)** — higher-res / custom HUD & menu element textures (the SVG
    approach used for the stairs is a candidate: author UI elements as SVG, rasterize, inject).
 
-32. **XBOX controller UI (user 2026-06-19)** — show Xbox button glyphs (A/B/X/Y/LB/RB/LT/RT) in
-   button prompts instead of the N64/default set. Check SoH's existing controller-glyph / button-
-   texture system + CVars before authoring.
+32. **XBOX controller UI (user 2026-06-19) — ITEM-BUTTON CLUSTER DONE (see Done); REMAINING POLISH.**
+   Done: the HUD item-button prompts (B + the 3 C buttons) now render as full-colour Xbox face-button
+   glyphs (B=red, C-Left=X blue, C-Down=Y yellow, C-Right=A green), gated SOH3D_XBOXUI / REPL `xboxui`.
+   REMAINING (lower priority): (a) the **A action button** (Interface_DrawActionButton) — it draws a
+   ROTATING textured QUAD (gSP1Quadrangle) whose per-vertex texcoords are tuned for the 32x32 IA8
+   circle (tc 1024 == 32 texels), so a 64x64 RGBA glyph maps to only its top-left quarter; needs either
+   a 32x32 glyph variant or a tile shift/scale, OR redraw it as a screen-space texture rectangle
+   (losing the flip animation). This is the site where the letter would show cleanest (no item icon
+   over it, just the action label). (b) The **C-Up Navi prompt** (the lone blue disc) is a separate
+   gButtonBackgroundTex draw (naviCalling) left as the N64 circle. (c) Letters on item-occupied
+   buttons are mostly hidden behind the item icon + equipped-item outline — only the colour ring +
+   a peek of the letter show; consider a corner BADGE layout if the user wants the letter prominent.
+   (d) The B/C->A/B/X/Y mapping is a fixed cosmetic choice (C buttons are on the right stick by SoH
+   default, no canonical face button) — retune per user preference. Mechanism is the reusable raw-RGBA
+   HUD-glyph path (SoH3D_DrawXboxBtn in z_parameter.c + SoH3D_XboxGlyphTex), same SVG->PNG-embed
+   pipeline as the stairs texture; reuse it for #31 (UI textures).
 
 9. **Grass/lilypad area not walkable (collision regression)** — Link can't enter a forest pond-edge
    lilypad patch that "used to work." Check collision / terrainwarp path; needs in-game repro.
@@ -309,6 +322,29 @@ This file is the source of truth across sessions.
     toward the sun azimuth. Left as #28e below.
 
 ## Done (recent)
+
+- **#32 Xbox face-button HUD glyphs — item-button cluster (B + 3 C buttons)** — the in-game HUD
+  button prompts now render as full-colour Xbox face-button glyphs instead of the shared N64 circle
+  tinted per button. NEW reusable pieces: (1) 4 authored SVG glyphs `assets/soh3d/xbox_{a,b,x,y}.svg`
+  (colour disc + dark ring + white letter), rasterized+embedded via `tools/soh3d_gen_xbox_glyphs.sh`
+  -> `xbox_glyphs_png.h` (mirrors the stairs SVG pipeline); (2) `SoH3D_XboxGlyphTex(which,&w,&h)`
+  (soh3d_model.cpp) decodes each PNG once to persistent RGBA8888 (== N64 G_IM_FMT_RGBA/32b byte
+  order) and hands the Fast3D HUD a raw RAM texture pointer — the HUD already feeds gfx_pc raw
+  pointers (e.g. the do-action labels), so no resource-manager plumbing needed; (3) the in-game
+  draw helper `SoH3D_DrawXboxBtn` (z_parameter.c) loads the glyph as a 32b RGBA tile with a combine
+  that shows TEXEL0.rgb (the baked colour+letter) faded by PRIMITIVE.a, deriving dsdx/dtdy from the
+  glyph dims so any glyph size maps onto the same screen rect. Wired into `Interface_DrawItemButtons`:
+  the always-drawn B + C-Left/Down/Right backgrounds AND the empty-C-slot redraw both branch on
+  `SoH3D_XboxBtnEnabled()`, restoring the IA8 circle tile + MODULATEIA_PRIM afterward so the
+  Start-button draw (which reuses the loaded tile) is byte-identical to the N64 path. Fixed mapping
+  B->B(red), C-Left->X(blue), C-Down->Y(yellow), C-Right->A(green). Gate env SOH3D_XBOXUI (default on)
+  / REPL `xboxui <0|1>` (live). VERIFIED headless (Kakariko 0xDB): `xboxui 0` = the N64 circles
+  (B green, C-Left blue, C yellow); `xboxui 1` = B turns red, the C items gain blue/yellow/green Xbox
+  rings (slingshot=blue X with the white "X" peeking past the icon, bomb=yellow Y, ocarina=green A),
+  the rest of the HUD (hearts/magic/rupees/minimap) unchanged, no corruption. soh only (z_parameter.c,
+  soh3d.{c,h}, soh3d_model.cpp + new assets/header; tools/ gen script in the outer repo); libultraship
+  UNTOUCHED. Remaining polish (A action button quad, C-Up Navi, letter-vs-item occlusion, mapping)
+  tracked under #32 above. See [[soh3d-hud-glyphs]].
 
 - **#5 stairs polish — custom SVG stone texture + configurable step size** — (1) the generated 3D
   steps no longer wear the stretched low-res kaidan ramp texture (muddy smear); they use a
