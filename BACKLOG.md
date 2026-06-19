@@ -99,6 +99,19 @@ This file is the source of truth across sessions.
 > - **#29c 3DS-LINK CAN'T PICK UP CUCCO (NEW, SESSION 2)** — in `linksrc 3ds` mode, child Link cannot
 >   pick up a cucco at all (the grab/lift action doesn't fire / isn't usable). Part of the broken
 >   3DS-Link weave (#29): the 3DS anim/state path doesn't drive the pickup interaction.
+> - **#29d 3DS-LINK with N64 ANIMS = bad retarget (NEW concrete symptoms, SESSION 2)** —
+>   `scratch/screenshots/playtest_0619_s2/link_n64anim_headdown_arms.png`: in N64-anim mode child Link
+>   (a) ALWAYS looks at the ground (head bone pitched fully down), (b) holds arms in weird splayed/bent
+>   positions, (c) walks weird. So the N64 jointTable→OoT3D-skeleton retarget for the PLAYER skeleton
+>   is wrong on at least the head and shoulder/arm bones — likely a per-bone rotation-axis/order or
+>   rest-rotation-replace mismatch (cf. [[soh3d-n64anim-retarget]]: N64 jointTable REPLACES the CMB
+>   rest rotation, ZYX) that hasn't been calibrated for Link's skeleton (cf. [[soh3d-link-player-path]],
+>   still proof-of-hook). Both #29 Link anim paths are broken: 3DS-anim = static slide (#29 slide),
+>   N64-anim = head-down/arms-wrong retarget (this).
+>   SESSION 2 holding-cucco: `link_n64anim_hold_cucco_nohands.png` — N64-anim Link carrying a cucco
+>   has arms WRANGLED/contorted (retarget badness, as above) AND **no cucco is in his hands** (the held
+>   cucco never appears at the hand — it's drawn at the stale pickup position instead, = #23b). So the
+>   two bugs compound: the held cucco is absent from the hands and Link's carry pose is mangled.
 > - **#24 KAKARIKO WELL — [SUPERSEDED by SESSION 2 above: defect IS actionable — water renders as a
 >   tiny teal diamond, not a surface plane].** ~~re-diagnosed 2026-06-19, NO actionable defect found
 >   in-scene; NEEDS USER SPECIFICS.~~ Framed the well live (water actor Idomizu 0x104 @ (762,52,524), pillar Idohashira 0x103
