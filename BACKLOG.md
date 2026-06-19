@@ -92,10 +92,19 @@ This file is the source of truth across sessions.
 >   `linksrc 3ds` (3DS-anim) mode. Plus a NEW concrete bug: **the right arm renders longer than it
 >   should** (skinning/bone-retarget defect). Child Link only (adult untested). n64-anim mode also
 >   "doesn't look fine" (#29). The whole 3DS-Link weave is still broken.
-> - **T-POSING NPC (NEW, #38)** — Image: a red-haired Kakariko woman (En_Ane zelda_ane id=0x13C, or a
->   sister/Cucco-lady type) renders in a static T-POSE = skinned OoT3D model loaded but NO CSAB anim
->   applied. The auto-skinned anim coverage has a gap for this actor (missing anim-map entry or the
->   actor isn't routed through the N64-anim retarget). Reproducible in Kakariko (0x52).
+> - **T-POSING NPC (#38) — DONE 2026-06-19 (verified Kakariko, see Done).** The red-haired woman is the
+>   Cucco Lady (En_Niw_Lady, id 0x13C, gCuccoLadySkel in object_ane). Root cause: she animates from the
+>   SHARED object_os_anime bank via 4 anims (gObjOsAnim_07D0/9F94/0718/A630), but object_ane has no
+>   AnimationHeaders so she never entered the match; those 4 OTR paths were seeded ONLY under km1
+>   (Kokiri), resolving to km1/fad CSABs that don't exist in chickenlady.cmb -> bind pose = T-pose. The
+>   anim map keyed solely on the OTR path, so a bank anim shared by two skeletons couldn't differ per
+>   model. Fix: (1) allowlist her 4 anims into SHARED_ANIM_BANKS for zelda_ane; (2) the matcher picked
+>   her zelda_ane CSABs (onegai_c/Ane_hanasu/oro_oro by frame; 07D0 idle stub pinned to Ane_matsu in the
+>   overrides TSV); (3) made the runtime resolver MODEL-AWARE — entries whose OTR is shared across ZARs
+>   are emitted ZAR-qualified (SOH3D_ANIMMAP_Z) and SoH3D_ResolveAutoCsab now prefers the entry matching
+>   the live model's ZAR (SoH3D_AutoModelZar), falling back to a generic entry. Verified: model 2016
+>   plays gObjOsAnim_A630 -> oro_oro phase-locked (frames advancing), renders animated (arms down), no
+>   T-pose; only the 4 shared OTRs got ZAR-qualified, all gKokiri* anims stayed generic (no En_Ko regression).
 > - **#5 STAIRS — side faces still triangles (REOPEN/extend)** — "stairs look decent now, but the faces
 >   that connect to them need to be stairs too; the SIDES of the stairs are still triangles." My #5
 >   generated stepped treads/risers on the TOP surface but the staircase SIDE walls (the vertical

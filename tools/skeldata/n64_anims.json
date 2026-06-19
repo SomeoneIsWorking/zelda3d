@@ -6057,6 +6057,35 @@
    }
   ]
  },
+ "/actor/zelda_ane.zar": {
+  "object": "object_os_anime",
+  "anims": [
+   {
+    "name": "gObjOsAnim_0718",
+    "otr": "objects/object_os_anime/gObjOsAnim_0718",
+    "offset": "0x718",
+    "frameCount": 20
+   },
+   {
+    "name": "gObjOsAnim_07D0",
+    "otr": "objects/object_os_anime/gObjOsAnim_07D0",
+    "offset": "0x7D0",
+    "frameCount": 2
+   },
+   {
+    "name": "gObjOsAnim_9F94",
+    "otr": "objects/object_os_anime/gObjOsAnim_9F94",
+    "offset": "0x9F94",
+    "frameCount": 15
+   },
+   {
+    "name": "gObjOsAnim_A630",
+    "otr": "objects/object_os_anime/gObjOsAnim_A630",
+    "offset": "0xA630",
+    "frameCount": 21
+   }
+  ]
+ },
  "/actor/zelda_km1.zar": {
   "object": "object_os_anime",
   "anims": [

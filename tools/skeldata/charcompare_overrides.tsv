@@ -48,3 +48,11 @@
 /actor/zelda_horse.zar	gEponaTrottingAnim	hl_anim_slowrun2_30
 /actor/zelda_horse.zar	gEponaGallopingAnim	hl_anim_fastrun2_30
 /actor/zelda_horse.zar	gEponaJumpingHighAnim	hl_anim_jump2002
+#
+# Cucco Lady (En_Niw_Lady, BACKLOG #38): gCuccoLadySkel (object_ane) animates from the shared
+# object_os_anime bank via 4 anims, wired in through soh3d_anim_export SHARED_ANIM_BANKS (allowlist).
+# 9F94/0718/A630 auto-match their zelda_ane CSAB exactly by frame count (onegai_c/Ane_hanasu/oro_oro);
+# only 07D0 needs a semantic pin: it is the neutral idle/wait but a 2-frame stub, so frame-delta picks
+# the wrong CSAB -> map it to Ane_matsu (matsu = wait/idle). The runtime resolver disambiguates these
+# os_anime OTR paths (also seeded under km1) by the model's ZAR.
+/actor/zelda_ane.zar	gObjOsAnim_07D0	Ane_matsu

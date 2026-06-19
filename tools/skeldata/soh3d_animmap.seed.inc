@@ -6,6 +6,11 @@
     SOH3D_ANIMMAP("objects/object_am/gArmosRicochetAnim", "am_mamori"), // fc=9 | am_mamori(d10,Δ1,n0.0) am_yarare(d21,Δ12,n0.0) am_jump(d24,Δ15,n0.0)
     SOH3D_ANIMMAP("objects/object_am/gArmosHopAnim", "am_jump"), // fc=23 | am_jump(d24,Δ1,n1.0) am_yarare(d21,Δ2,n0.0) am_mamori(d10,Δ13,n0.0)
     SOH3D_ANIMMAP("objects/object_am/gArmosDamagedAnim", "am_yarare"), // fc=20 | am_yarare(d21,Δ1,n1.0) am_jump(d24,Δ4,n0.0) am_mamori(d10,Δ10,n0.0)
+    // ==== /actor/zelda_ane.zar (object_os_anime) ====
+    SOH3D_ANIMMAP("objects/object_os_anime/gObjOsAnim_0718", "Ane_hanasu"), // fc=20 | Ane_hanasu(d20,Δ0,n0.0) oro_oro(d21,Δ1,n0.0) Ane_matsu(d24,Δ4,n0.0) onegai_c(d15,Δ5,n0.0)
+    SOH3D_ANIMMAP("objects/object_os_anime/gObjOsAnim_07D0", "onegai_c"), // fc=2 | onegai_c(d15,Δ13,n0.0) Ane_hanasu(d20,Δ18,n0.0) oro_oro(d21,Δ19,n0.0) Ane_matsu(d24,Δ22,n0.0)
+    SOH3D_ANIMMAP("objects/object_os_anime/gObjOsAnim_9F94", "onegai_c"), // fc=15 | onegai_c(d15,Δ0,n0.0) Ane_hanasu(d20,Δ5,n0.0) oro_oro(d21,Δ6,n0.0) Ane_matsu(d24,Δ9,n0.0)
+    SOH3D_ANIMMAP("objects/object_os_anime/gObjOsAnim_A630", "oro_oro"), // fc=21 | oro_oro(d21,Δ0,n0.0) Ane_hanasu(d20,Δ1,n0.0) Ane_matsu(d24,Δ3,n0.0) onegai_c(d15,Δ6,n0.0)
     // ==== /actor/zelda_ani.zar (object_ani) ====
     SOH3D_ANIMMAP("objects/object_ani/gRoofManKnockbackAnim", "ani_nanyarona"), // fc=20 | ani_nanyarona(d30,Δ10,n0.0) ani_suwari_wait(d30,Δ10,n0.0) ani_bikkuri(d31,Δ11,n0.0)
     SOH3D_ANIMMAP("objects/object_ani/gRoofManGettingUpAfterKnockbackAnim", "ani_nanyarona"), // fc=30 | ani_nanyarona(d30,Δ0,n0.0) ani_suwari_wait(d30,Δ0,n0.0) ani_bikkuri(d31,Δ1,n0.0)
