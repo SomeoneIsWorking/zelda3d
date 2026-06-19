@@ -87,6 +87,18 @@ This file is the source of truth across sessions.
 > - **#23 CUCCO won't flap WHEN HELD** — REOPEN. My #23 did the IDLE procedural flap; the HELD/picked-up
 >   cucco uses the agitated flap path (func_80AB5BF8 higher amplitude / a different state) which my
 >   OverrideLimbDraw replay doesn't cover when the cucco is carried. Incomplete, not done.
+>   SESSION 2: STILL not flapping, confirmed (`scratch/screenshots/playtest_0619_s2/cucco_ghost_at_pickup.png`
+>   shows the cucco at rest with N64 feather effects but a static OoT3D wing).
+> - **#23b CUCCO GHOST-AT-PICKUP (NEW, SESSION 2)** — when Link picks a cucco up (and can throw it),
+>   a cucco still renders AT THE SPOT where it was picked up. So the OoT3D replacement is drawing the
+>   cucco at a STALE/original world position instead of following the carried actor (held-above-head /
+>   thrown trajectory). Likely the replacement uses actor->world.pos captured/wrong while the engine
+>   moves the carried actor via a different transform (Player's carry, or En_Niw's grabbed state). Fix:
+>   draw the replacement at the actor's LIVE carried transform (the same matrix the N64 cucco draws at
+>   when held), not its ground position. Same screenshot.
+> - **#29c 3DS-LINK CAN'T PICK UP CUCCO (NEW, SESSION 2)** — in `linksrc 3ds` mode, child Link cannot
+>   pick up a cucco at all (the grab/lift action doesn't fire / isn't usable). Part of the broken
+>   3DS-Link weave (#29): the 3DS anim/state path doesn't drive the pickup interaction.
 > - **#24 KAKARIKO WELL — [SUPERSEDED by SESSION 2 above: defect IS actionable — water renders as a
 >   tiny teal diamond, not a surface plane].** ~~re-diagnosed 2026-06-19, NO actionable defect found
 >   in-scene; NEEDS USER SPECIFICS.~~ Framed the well live (water actor Idomizu 0x104 @ (762,52,524), pillar Idohashira 0x103
