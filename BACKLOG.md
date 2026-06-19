@@ -184,6 +184,20 @@ This file is the source of truth across sessions.
 6. **Epona → OoT3D model** (lower priority) — Epona still renders as the N64 model; actor-
    replacement gap.
 
+28e. **OoT3D sun/moon discs + sun-glow dome** (finishes #28c) — the night STARS landed (#28c, see
+    Done) but the sun/moon DISCS still render via N64 `Environment_DrawSunAndMoon`. ASSET REALITY
+    (dumped 2026-06-19): the discs have NO CMB — `tex/fine_sun.ctxb`, `tex/fine_moon0..2.ctxb`,
+    `tex/fine_lensflare.ctxb` are standalone ctxb sprites the OoT3D engine billboards itself.
+    `fine_sun.cmb` is a vertex-coloured GLOW dome-cap (not the disc). To finish: (1) add a ctxb
+    reader (ctxb's "tex " chunk @ file offset 0x18 is byte-identical to a CMB tex chunk → reuse the
+    existing PICA decode in pica_texture.cpp); (2) build a synthetic textured billboard QUAD as a
+    LoadedModel (manual cGroups/cTexs, no CMB) and feed it through the model provider; (3) hook
+    `SoH3D_TryDrawSunMoon(play)` at the z_play.c Environment_DrawSunAndMoon call site (return 1 to
+    skip N64), drawing the sun quad at eye+sunPos and moon at eye-sunPos, camera-facing via
+    `play->billboardMtxF`, alpha by sun height exactly like the N64 path. sunPos formula is in
+    z_kankyo.c:1319-1321. Far-plane pin (handle bit 30) + depth-write off like the dome. The
+    sun-glow dome (fine_sun.cmb) can use the SKY: infra but must be oriented toward the sun azimuth.
+
 27. **More foliage** (LOWEST priority — do last) — add more foliage/vegetation density to the world
     for a lusher look.
 
@@ -192,17 +206,41 @@ This file is the source of truth across sessions.
     selected by the game's own time-of-day skybox1Index. REMAINING ENHANCEMENTS (optional, lower
     priority): (a) **[DONE 2026-06-19; see Done]** blend the TWO domes (skybox1Index/skybox2Index
     by skyboxBlend) at dawn/dusk instead of snapping to the dominant one; (b) **[DONE 2026-06-19;
-    see Done]** animate the cloud drift via the kumo .cmab; (c) OoT3D sun/moon/stars (still N64
-    Environment_DrawSunAndMoon); (d)
+    see Done]** animate the cloud drift via the kumo .cmab; (c) OoT3D sun/moon/stars — **STARS
+    [DONE 2026-06-19; see Done]**; sun/moon DISCS still N64 (asset reality below); (d)
     broaden past SKYBOX_NORMAL_SKY (shop/indoor skyboxes still N64). Indoor/enclosed scenes (Kokiri)
     have skyboxDisabled so the dome correctly does not draw there.
-    NOTE (#28c assets ARE in /kankyo/BlueSky.zar): `model/fine_sun.cmb` (1536B), `model/cloud_sun.cmb`,
-    `model/fine_star.cmb` (19328B); textures `tex/fine_sun.ctxb`, `tex/fine_lensflare.ctxb`,
-    `tex/fine_moon0..2.ctxb`. So #28c is a billboard-a-textured-quad-at-the-sun-world-pos task, not an
-    asset hunt. The sun/moon world position + phase comes from the N64 `Environment_DrawSunAndMoon`
-    (z_kankyo.c) path; billboard the CMB facing the camera. tools/cmab.py + ctr_romfs/zar read the zar.
+    **ASSET REALITY for #28c (CORRECTED 2026-06-19 — the old "billboard the sun CMB" note was wrong):**
+    dumped /kankyo/BlueSky.zar with tools/cmb.py — the sun/moon DISCS have NO CMB. `fine_sun.cmb`
+    (tex0_idx=-1, UVs all 0) is an UNtextured VERTEX-COLOURED glow DOME-cap (x/z ±148, y[-82,2]); it
+    is NOT the sun disc. `fine_star.cmb` is an L8 ADDITIVE (src=SRC_ALPHA dst=ONE) textured star
+    DOME-cap (the night star field) — DONE. The actual sun/moon disc textures `tex/fine_sun.ctxb`,
+    `tex/fine_moon0..2.ctxb`, `tex/fine_lensflare.ctxb` are STANDALONE ctxb sprites with no CMB —
+    OoT3D's engine billboards them itself (like the N64 gSun1Tex quad). So finishing #28c (discs)
+    needs NEW infra: a ctxb reader (ctxb = a "tex " chunk identical to CMB's at file offset 0x18 →
+    reuse pica decode) + a synthetic textured billboard quad fed to the renderer as a model, drawn at
+    eye±sunPos (sunPos from Environment_DrawSunAndMoon) with play->billboardMtxF for camera-facing.
+    The sun-glow dome (fine_sun.cmb, vertex-coloured) can use the SKY: infra but needs orienting
+    toward the sun azimuth. Left as #28e below.
 
 ## Done (recent)
+
+- **#28c OoT3D night-sky STARS (fine_star.cmb additive star dome) — the night sky was starless** —
+  our #28 dome replacement draws only the gradient (tenkyu); OoT3D layers a separate star dome
+  (`model/fine_star.cmb` in /kankyo/BlueSky.zar) over the dark night gradient, so the OoT3D night sky
+  had NO stars (N64 baked them into its skybox texture). fine_star.cmb is an L8 (luminance) textured
+  dome-cap with ADDITIVE blend (src=GL_SRC_ALPHA dst=GL_ONE) + per-vertex baked brightness; it adds
+  star points over the dome. Drawn via the EXISTING SKY infra (forced-CMB `SKY:/kankyo/BlueSky.zar|
+  fine_star` key → depth-write off, far-plane pin via handle bit 30) — no new mechanism needed.
+  `SoH3D_TryDrawSky` now layers it between the night gradient dome and the cloud band (clouds are
+  nearer), and ALSO on the idx2 cross-fade layer at alpha=skyboxBlend, so stars fade in/out WITH the
+  night dome (no fabricated star-alpha curve). Gated to night variants only (`SoH3D_SkyIsNight`:
+  skybox1Index 3 fine-night / 7 cloud-night). VERIFIED headless on Vulkan (Hyrule Field, frozen cam
+  looking up): NIGHT same overhead region lum mean 26 / max 189 / std 25.6 (bright additive star
+  spikes); DAY mean 138 / max 169 / std 12.4 (smooth gradient, NO spikes → stars correctly off);
+  DUSK cross-fade (idx1=2 sunset, idx2=3 night, blend 47→238) max 215 / std 27.6 — stars fade in via
+  the star2/blend path, no garbage/crash. soh only (Shipwright/soh/src/soh3d/soh3d.c). The sun/moon
+  DISCS + sun-glow dome remain (#28e — need ctxb-sprite billboard infra; see #28 asset note).
 
 - **#28b OoT3D sky cloud band drifts (kumo .cmab texcoord scroll, no longer static)** — the
   BlueSky.zar `kumo` cloud band rendered STATIC. OoT3D scrolls its texcoords via tiny `.cmab`s in
