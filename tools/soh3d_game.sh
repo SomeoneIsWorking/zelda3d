@@ -84,7 +84,10 @@ start() {
     mkdir -p "$REPO/scratch/logs"
     echo "starting: entrance=$entr time=$time -> $LOG"
     # setsid+nohup fully detaches: survives this shell returning, no background-runner needed.
-    setsid env SOH3D=1 SOH3D_WARP=1 SOH3D_AUTO="${SOH3D_AUTO:-1}" SOH3D_N64ANIM="${SOH3D_N64ANIM:-1}" \
+    # SOH3D_WARP defaults ON (auto-warp to an in-game entrance, skipping the boot title demo).
+    # Set SOH3D_WARP= (empty) to boot the real Opening->title demo instead (needed to repro the
+    # title/cutscene-camera bugs #4/#14, which only exist on that flow). entrance/time are unused then.
+    setsid env SOH3D=1 SOH3D_WARP="${SOH3D_WARP-1}" SOH3D_AUTO="${SOH3D_AUTO:-1}" SOH3D_N64ANIM="${SOH3D_N64ANIM:-1}" \
         SOH3D_VULKAN="${SOH3D_VULKAN:-}" SOH3D_VK_VALIDATION="${SOH3D_VK_VALIDATION:-}" \
         SOH3D_RMLUI_OPEN="${SOH3D_RMLUI_OPEN:-}" \
         SOH3D_ENTRANCE="$entr" SOH3D_TIME="$time" SOH3D_REPL="$FIFO" \
