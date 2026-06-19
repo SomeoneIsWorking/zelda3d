@@ -106,6 +106,29 @@ This file is the source of truth across sessions.
 >   FB-flip / negative-viewport issue (#1 family): the pause-preview render samples the FB with the
 >   wrong Y orientation. Likely shares a root with first-person flashing and title-cam-under-terrain.
 >
+> - **#5 STAIRS REWORK (user 2026-06-19, with image).** My first stepped-side attempt was REVERTED:
+>   it added a stone side wall that OVERLAPPED the existing brick wall (z-fighting moiré), used the
+>   wrong (SVG stone) texture, and the steps sink too far below the surface. User's DESIGN: (1) the
+>   stair side faces should be extra faces using the SAME TEXTURE as the WALL they connect to, NOT a
+>   separate stone; (2) step height should AVERAGE to the flat ramp surface they replace (don't sink —
+>   straddle it, tread at the midpoint of each step's ramp span = yk+dy/2); (3) where steps poke ABOVE
+>   the connected wall, BUMP THE WALL up to those points (user prefers this over gap-filling triangles;
+>   "might hurt the UV a bit, I don't care"). CLARIFIED 2026-06-19: the stairs themselves CANNOT reuse
+>   the original kaidan texture — it is a FAKE-STAIRS PAINTING (designed to make a FLAT surface look
+>   stepped), so it doubles/wrong on real 3D steps (tried affine-UV kaidan -> reverted). So the stair
+>   TREADS/RISERS/SIDES should use the CONNECTED WALL's texture (brick), so the staircase reads as the
+>   same material as the wall. The current SVG-stone (gen_stairs_tex) is the accepted baseline but
+>   CLASHES with the brick wall in the image -> goal is the wall's own texture. Don't draw side caps
+>   that overlap the wall (the wall IS the side; bump it). REQUIRES adjacent-wall identification in
+>   generateRoomStairs: the wall is another draw group in the same room CMB (find the group whose verts
+>   are nearest the ramp's cmin/cmax side edges + roughly vertical; use its material/texture for the
+>   steps, UV by world pos so the brick tiles continuously with the wall; raise its top verts to the
+>   step profile). My two attempts (stepped stone side wall; affine kaidan texture) were both reverted.
+>   This is a careful scene-aware geometry change — do it focused, verify visually, don't rush.
+> - **CHILD LINK/ZELDA too small (NEW, #40)** — "child zelda is too small, I think half size" (so the
+>   replacement is ~2x too big, OR child Zelda specifically renders at ~half the right size). Check the
+>   auto-scale (measured N64 height vs OoT3D model height) for the child Zelda actor.
+>
 > NEXT (this session): capturing done; now reworking. Honest verification rule going forward — only
 > mark DONE when the FULL user-facing path works in a realistic run, not when a narrow mechanism passes.
 
