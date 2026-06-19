@@ -191,12 +191,33 @@ This file is the source of truth across sessions.
     normal-sky skybox with the OoT3D /kankyo/BlueSky.zar dome (tenkyu gradient + kumo clouds),
     selected by the game's own time-of-day skybox1Index. REMAINING ENHANCEMENTS (optional, lower
     priority): (a) **[DONE 2026-06-19; see Done]** blend the TWO domes (skybox1Index/skybox2Index
-    by skyboxBlend) at dawn/dusk instead of snapping to the dominant one; (b) animate the cloud
-    drift via the kumo .cmab; (c) OoT3D sun/moon/stars (still N64 Environment_DrawSunAndMoon); (d)
+    by skyboxBlend) at dawn/dusk instead of snapping to the dominant one; (b) **[DONE 2026-06-19;
+    see Done]** animate the cloud drift via the kumo .cmab; (c) OoT3D sun/moon/stars (still N64
+    Environment_DrawSunAndMoon); (d)
     broaden past SKYBOX_NORMAL_SKY (shop/indoor skyboxes still N64). Indoor/enclosed scenes (Kokiri)
     have skyboxDisabled so the dome correctly does not draw there.
 
 ## Done (recent)
+
+- **#28b OoT3D sky cloud band drifts (kumo .cmab texcoord scroll, no longer static)** — the
+  BlueSky.zar `kumo` cloud band rendered STATIC. OoT3D scrolls its texcoords via tiny `.cmab`s in
+  `/kankyo/BlueSky.zar` (`misc/<group>_kumo_a.cmab`): each a single linear texcoord-U translation
+  looping over a `duration` — i.e. a constant U scroll. PARSED the real rate with a NEW reusable
+  tool `tools/cmab.py` (full CMAB parser: header / mads / mmad / linear+hermite+integer tracks,
+  layout from noclip's cmab.ts; channel-0 base-layer rate, DO NOT fabricate): fine (idx0-3) &
+  cloud (idx4-7, ch0) = dU −1/900 per frame; holy (idx8) = dU −1/600; all U-only (dV 0). Plumbed a
+  per-draw texcoord SCROLL offset through the SoH3D draw path, mirroring the #28a alpha exactly:
+  new `gSPSoH3DDrawUV(pkt,handle,alpha,uvU,uvV,r,g,b)` packs uvU/uvV as 16-bit fixed (offset*65536)
+  into the UPPER 32 bits of the 64-bit w0 (handle/alpha/tint untouched); `gSPSoH3DDrawA` is now a
+  uv=0 wrapper, every existing call site unchanged. interpreter decodes w0[32:48]/[48:64] → float
+  /65536 → `SoH3D_GL_Submit(...,uvOffU,uvOffV)` → `DrawItem` → GL `uUVOffset` vec2 uniform (added to
+  `vUv`) AND Vk `uExtra.yz` (added to `vUv`). `SoH3D_TryDrawSky` drives it: U = wrap(
+  `play->gameplayFrames` * rate) so the band advances at OoT3D's own logic-frame clock; kumo tex is
+  GL_REPEAT so it tiles seamlessly. Dome/world draws pass uv=0 (no-op). VERIFIED headless on
+  **Vulkan** (Hyrule Field, camera FROZEN, ~20s gap): sky-top region changed 27.7% of pixels,
+  near-horizon 0.24%, GROUND control 0.00% (proves it's the clouds drifting, not camera/world
+  motion); zoom crops show the cloud wisps shifted horizontally while the HUD is fixed.
+  libultraship (fork/soh3d), Shipwright/soh (fork/develop), tools/cmab.py + BACKLOG (outer/main).
 
 - **#28a OoT3D sky cross-fades the two domes at dawn/dusk (no snap)** — the game blends two sky
   variants at dawn/dusk (`skybox2Index` over `skybox1Index` at alpha = `envCtx.skyboxBlend`).
