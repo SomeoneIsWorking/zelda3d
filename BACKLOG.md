@@ -119,6 +119,51 @@ This file is the source of truth across sessions.
    HUD-glyph path (SoH3D_DrawXboxBtn in z_parameter.c + SoH3D_XboxGlyphTex), same SVG->PNG-embed
    pipeline as the stairs texture; reuse it for #31 (UI textures).
 
+33. **XBOX CONTROL SCHEME — modern dual-stick mapping, not just the HUD glyphs (user 2026-06-19).**
+   This is the CONTROL MAPPING (physical input -> in-game action), distinct from #32 which only
+   reskins the HUD prompts. The user wants a modern-console layout: **no C-pad** — instead map the
+   four item slots onto **B and Y** (face buttons) plus **R1 (RB/R-shoulder) + A/B/X/Y chords**, and
+   also allow the **D-pad** to hold item slots. I.e. the OoT B + C-Left/Down/Right + (optional)
+   D-pad-equip item set is re-bound onto a face-button/shoulder-chord scheme. NOTE the hard part:
+   SoH's input system (`Controller`/`ControllerButton` mappings, the InputEditor + CVars under
+   `CVAR_..."ControllerButton..."`) maps ONE physical button -> ONE N64 button; **R1+A style CHORDS
+   are not natively supported** — a chord (modifier + button -> a different N64 button) needs new
+   input plumbing (a modifier-aware mapping layer), OR leverage SoH's existing "additional bindings"
+   / DpadEquips (`CVAR_SETTING("DpadEquips")`) features. Investigate: (a) what SoH already supports
+   (dual-stick, DpadEquips, extra controller-button slots) vs (b) what needs new chord logic. The N64
+   side still only has B + 4 C + Start + Z + R + L + dpad, so "more item slots than buttons"
+   inherently needs either the existing Ocarina/40-item radial or a chord modifier expanding the slot
+   count. Pairs with #32 (the HUD glyphs should reflect whatever physical button each item lands on,
+   not a fixed B->B/C->XYA map). Needs the user to confirm the exact desired bindings before coding.
+
+34. **INPUT-DEVICE-ADAPTIVE UI — keyboard vs controller prompts (user 2026-06-19).** When playing on
+   KEYBOARD, the HUD/menus should show **keyboard key prompts**; when on a controller, show the
+   controller (Xbox) glyphs (#32). Switch the prompt set based on the **last input device used**
+   (detect the most-recent non-zero input source — keyboard event vs gamepad event — and flip a
+   global "active device" flag). Builds directly on the #32 raw-RGBA HUD-glyph infra
+   ([[soh3d-hud-glyphs]]): add a keyboard-key glyph set (SVG->PNG-embed, same pipeline) and make
+   `SoH3D_XboxGlyphTex` / the draw sites pick the glyph variant by the active-device flag. SoH/LUS
+   already tracks input sources (SDL gamepad vs keyboard) in the WindowManager/Controller layer —
+   find where the last-used device is known (or add a hook in the input poll) and expose it to the
+   HUD. Lower-effort once #32's pipeline is reused; the new work is (a) authoring key glyphs and
+   (b) the device-detection flag.
+
+35. **KEYBOARD + MOUSE CONTROL SCHEME — modern KBAM layout (user 2026-06-19).** The control-mapping
+   side of #34 for keyboard/mouse (the UI/prompt side is #34). Desired bindings (user's words):
+   **WASD = movement** (analog-stick emulation), **1/2/3/4 = item slots**, **mouse-look = camera**,
+   **left click = attack** (B), **right click = block** (R / shield), **E = interact/talk/check**
+   (A), **Space = roll** (the roll input). Implementation: SoH/LUS already has a keyboard mapping
+   layer (`KeyboardController` / `CVAR_..."Keyboard..."` bindings) and a mouse feature in some builds
+   — map these keys/mouse buttons onto the N64 buttons + synthesize an analog stick from WASD, and
+   feed mouse-delta into the camera/right-stick. Mouse-look needs the free-look camera
+   (`CVAR_SETTING("FreeLook...")`) + relative mouse capture. Items on 1-4 map to the B + C slots (or
+   whatever #33 settles on). Roll = the N64 "A while moving"; Space should inject the roll input
+   contextually. NOTE: 1/2/3/4 -> four item slots dovetails with #33's "no C-pad" goal. NB Space is
+   currently BTN_START (the skip key, #2) — rebinding Space to roll conflicts; resolve the skip key
+   (move skip to a different key, or roll on a different key) when implementing. Verify live with the
+   user (keyboard is their actual play path — they report what feels wrong). Pairs with #33 (Xbox
+   scheme) + #34 (device-adaptive prompts) as the input-rework cluster.
+
 9. **Grass/lilypad area not walkable (collision regression)** — Link can't enter a forest pond-edge
    lilypad patch that "used to work." Check collision / terrainwarp path; needs in-game repro.
 
