@@ -67,12 +67,26 @@ This file is the source of truth across sessions.
    ended up in the Sages cutscene area able to move). Title gamestate / demo-scene routing is
    unstable. Likely related to #1 (first-frame scene setup) and the title demo scene table.
 
-2. **Universal Start-skip for cutscenes** — everything that takes control away from Link must be
-   Start-skippable: scripted CS cutscenes, onepoint cameras, actor-driven sequences, item-get
+2. **Universal skip for everything that takes control (re-prioritized by the user 2026-06-19:
+   "space to skip everything that takes control away from the player")** — Start AND the keyboard
+   SPACEBAR must skip: scripted CS cutscenes, onepoint cameras, actor-driven sequences, item-get
    freezes. No auto-skip, no forced-watch. Scripted CS terminators already skip on Start
-   (`z_demo.c` `csSkipButton`, frames>20). REMAINING: Player cutscene-mode (`csMode`), onepoint
-   cams, actor-driven. User accepts the iterate-on-softlock approach (they report what softlocks).
+   (`z_demo.c` `csSkipButton`, frames>20). REMAINING: add SPACE as a skip trigger everywhere;
+   Player cutscene-mode (`csMode`), onepoint cams, actor-driven. User accepts the
+   iterate-on-softlock approach (they report what softlocks).
    (DONE: holding Start skips dialogs — `z_message_PAL.c` all 4 text-advance sites.)
+
+30. **Hi-res textures (user 2026-06-19)** — world/scene textures at higher resolution. The texpack
+   mechanism exists ([[soh3d-texpack]]: replace CMB textures by Citra legacy hash from a `textures/`
+   pack). Either bundle/enable a hi-res pack or upscale procedurally. Needs the actual hi-res image
+   assets (or an upscaler).
+
+31. **UI textures (user 2026-06-19)** — higher-res / custom HUD & menu element textures (the SVG
+   approach used for the stairs is a candidate: author UI elements as SVG, rasterize, inject).
+
+32. **XBOX controller UI (user 2026-06-19)** — show Xbox button glyphs (A/B/X/Y/LB/RB/LT/RT) in
+   button prompts instead of the N64/default set. Check SoH's existing controller-glyph / button-
+   texture system + CVars before authoring.
 
 9. **Grass/lilypad area not walkable (collision regression)** — Link can't enter a forest pond-edge
    lilypad patch that "used to work." Check collision / terrainwarp path; needs in-game repro.
@@ -295,6 +309,16 @@ This file is the source of truth across sessions.
     toward the sun azimuth. Left as #28e below.
 
 ## Done (recent)
+
+- **#5 stairs polish — custom SVG stone texture + configurable step size** — (1) the generated 3D
+  steps no longer wear the stretched low-res kaidan ramp texture (muddy smear); they use a
+  purpose-authored stone texture: `assets/soh3d/stairs_stone.svg` (one-step tile: lit flagstone
+  tread / nosing highlight / shaded riser), rasterized + embedded (`tools/soh3d_gen_stairs_tex.sh`
+  -> stairs_stone_png.h), loaded at runtime, injected per room with tile-aligned UVs. (2) Step size
+  is now a runtime tunable (default chunkier than the old 7.8) with a RmlUi "Stair Step Size"
+  row (Small/Medium/Large) + REPL `stairsize <rise>`; changing it live-rebuilds the loaded scene
+  rooms via a cross-backend GPU model-cache eviction (SoH3D_GL/Vk_RequestEvictRange — the Vk one
+  behind vkDeviceWaitIdle at BeginPass). Verified headless Vulkan. See [[soh3d-stairs]].
 
 - **#26b DM gate collision — confirmed NOT a bug (no code change)** — re-checked the leftover "no
   collision" report against the source: `Bg_Gate_Shutter` (z_bg_gate_shutter.c:42-44) sets up its
