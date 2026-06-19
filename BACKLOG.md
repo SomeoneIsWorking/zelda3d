@@ -145,6 +145,10 @@ This file is the source of truth across sessions.
 >   SESSION 2 rear-view confirmation: `scratch/screenshots/playtest_0619_s2/link_long_right_arm.png`
 >   (child Link from behind, standing idle — one arm visibly elongated, so it is NOT anim-specific;
 >   it's a static bone-length/retarget error on the arm chain, present even at rest).
+>   SESSION 2 SLIDE repro: `link_3ds_motionless_slide.png` — in `linksrc 3ds` mode child Link holds a
+>   STATIC crouched/bind-like pose and SLIDES across the ground while walking (legs do not cycle). The
+>   3DS walk CSAB is NOT advancing → motionless slide. So #29 has two faces: (a) the 3DS-anim walk
+>   clip isn't being played/advanced (slide), and (b) the arm bone is mis-retargeted (long arm).
 > - **T-POSING NPC (#38) — DONE 2026-06-19 (verified Kakariko, see Done).** The red-haired woman is the
 >   Cucco Lady (En_Niw_Lady, id 0x13C, gCuccoLadySkel in object_ane). Root cause: she animates from the
 >   SHARED object_os_anime bank via 4 anims (gObjOsAnim_07D0/9F94/0718/A630), but object_ane has no
