@@ -22,12 +22,53 @@ This file is the source of truth across sessions.
 
 ## Open
 
-> **USER PLAYTEST 2026-06-19 (GROUND TRUTH — overrides prior "VERIFIED headless / DONE" marks).**
+> **USER PLAYTEST 2026-06-19 SESSION 2 (GROUND TRUTH — newest, overrides everything below).**
+> Live keyboard/Vulkan playtest with screenshots (saved `scratch/screenshots/playtest_0619_s2/`).
+> TWO prior "DONE" marks are FALSIFIED by direct visual evidence. Re-prioritize around these:
+>
+> - **#5 STAIRS — REOPENED, the wall-integration rework is BROKEN (4 distinct defects, all on real
+>   walk-up angles).** Last session marked it "DONE + verified + pushed" (Shipwright 9c28b908e); the
+>   user's 4 screenshots show it is not. The wall-integration PREMISE is itself rejected by the user.
+>   Defects (see the saved shots):
+>   1. `stairs_gaps_ugly_tex.png` — bright **CYAN see-through GAPS** between/around the steps (the
+>      clear/sky color punching through the geometry — culling/winding holes or non-watertight steps),
+>      AND the tread brick texture is **stretched/smeared ("super ugly")**.
+>   2. `stairs_flat_ochre_slab.png` — a whole staircase renders as **ONE FLAT UNTEXTURED OCHRE SLAB**
+>      with a cyan halo: NO steps at all, NO real texture (looks like the SVG-stone fallback sampled at
+>      a single UV / a stairFrame that didn't step). Completely busted.
+>   3. `stairs_overlap_wall.png` — the stair side/riser faces **OVERLAP and COVER the original brick
+>      wall** with a duplicated, mis-tiled brick. **USER DIRECTIVE: "the wall should be preserved
+>      original."** Do NOT steal the wall's texture, do NOT build big inset side-walls that drop to a
+>      base over the real wall. Leave the scene wall geometry untouched.
+>   REVISED DESIGN (supersedes the wall-integration design below): replace the fake-flat kaidan ramp
+>   with REAL watertight steps on the ramp's OWN footprint only; texture them with a clean tiled stone
+>   (SVG baseline is acceptable) mapped so it does NOT stretch; sides are minimal vertical caps at the
+>   ramp's actual cmin/cmax edges (no inset, no dropping to a far base, never over the wall); consistent
+>   winding so backface-cull leaves no cyan gaps. The wall-integration code (findPatchWall + the
+>   wall-textured/inset-sawtooth path in buildStairPatch/generateRoomStairs) is the source of defects
+>   2 & 3 and should be reverted/replaced. CANDIDATE BASELINE to revert toward: the pre-rework
+>   SVG-stone stepped stairs at Shipwright `8fff103d0` ("#5 stairs: custom SVG stone texture") +
+>   `11180de6c` (configurable step size) — those were the "accepted baseline" before wall-integration;
+>   then fix the cyan gaps (winding/watertightness) on THAT, not on the wall-integration code.
+>
+> - **#24 KAKARIKO WELL — REOPENED, concrete defect identified at last.** `well_water_tiny_diamond.png`:
+>   the well "water" renders as a **tiny teal GLOWING DIAMOND floating in mid-shaft** — it looks like a
+>   magic crystal/portal, not water. Correct well water is a **wide flat water SURFACE filling the
+>   well's cross-section near the bottom of the shaft**. Root area: the Idomizu (0x104) replacement
+>   forces CMB `c_s01idomizu` (soh3d.c ~1282) — either that CMB is a small splash/ripple decoration
+>   (not the surface plane), or it's drawn at the wrong scale/Y so it shows as a tiny disc. NEXT: dump
+>   what `c_s01idomizu` actually is; if it isn't a full surface plane, either pick the correct surface
+>   CMB or generate a flat water quad sized to the well bore at the water Y (the N64 Idomizu waterbox
+>   ySurface gives the height). The prior "no actionable defect" note (below) is now SUPERSEDED.
+>
+> ---
+> **USER PLAYTEST 2026-06-19 SESSION 1 (GROUND TRUTH — overrides prior "VERIFIED headless / DONE").**
 > The user playtested on keyboard/Vulkan through real scene flow and reports MANY items still broken,
 > incl. several marked DONE. Hard lesson recorded: prior "VERIFIED headless" tested NARROW mechanisms
 > in artificial conditions (frozen cams, `skiptest` harness, forced states, single frames), NOT the
 > full user-facing behavior — so those DONE marks were premature/partial. Treat the items below as the
-> live state. (Stairs are the one confirmed-good DONE: user says "stairs look decent now".)
+> live state. (Stairs were thought confirmed-good here — "stairs look decent now" — but SESSION 2 above
+> FALSIFIES that: from real walk-up angles they are badly broken. #5 is REOPENED.)
 > - **#2 SKIP still fails** — Start/SPACE does NOT skip "place introduction camera panning" (scene-
 >   intro establishing pans). The onepoint-cam skip I shipped only covered onepoint cams; scene-intro
 >   pans are a different system (Cutscene/Player csMode) — the deferred part of #2 is the part the user
@@ -46,8 +87,9 @@ This file is the source of truth across sessions.
 > - **#23 CUCCO won't flap WHEN HELD** — REOPEN. My #23 did the IDLE procedural flap; the HELD/picked-up
 >   cucco uses the agitated flap path (func_80AB5BF8 higher amplitude / a different state) which my
 >   OverrideLimbDraw replay doesn't cover when the cucco is carried. Incomplete, not done.
-> - **#24 KAKARIKO WELL — re-diagnosed 2026-06-19, NO actionable defect found in-scene; NEEDS USER
->   SPECIFICS.** Framed the well live (water actor Idomizu 0x104 @ (762,52,524), pillar Idohashira 0x103
+> - **#24 KAKARIKO WELL — [SUPERSEDED by SESSION 2 above: defect IS actionable — water renders as a
+>   tiny teal diamond, not a surface plane].** ~~re-diagnosed 2026-06-19, NO actionable defect found
+>   in-scene; NEEDS USER SPECIFICS.~~ Framed the well live (water actor Idomizu 0x104 @ (762,52,524), pillar Idohashira 0x103
 >   @ (799,80,503), both drawn=1). At PLAYER EYE-LEVEL the well reads correctly: a stone octagonal ring
 >   matching the surrounding kabe walls, dark shaft interior, teal 3DS water visible (a small disc deep
 >   down) only when looking straight down. The prior forced-CMB fix (teal water + pillar, no windmill
@@ -100,6 +142,9 @@ This file is the source of truth across sessions.
 >   `linksrc 3ds` (3DS-anim) mode. Plus a NEW concrete bug: **the right arm renders longer than it
 >   should** (skinning/bone-retarget defect). Child Link only (adult untested). n64-anim mode also
 >   "doesn't look fine" (#29). The whole 3DS-Link weave is still broken.
+>   SESSION 2 rear-view confirmation: `scratch/screenshots/playtest_0619_s2/link_long_right_arm.png`
+>   (child Link from behind, standing idle — one arm visibly elongated, so it is NOT anim-specific;
+>   it's a static bone-length/retarget error on the arm chain, present even at rest).
 > - **T-POSING NPC (#38) — DONE 2026-06-19 (verified Kakariko, see Done).** The red-haired woman is the
 >   Cucco Lady (En_Niw_Lady, id 0x13C, gCuccoLadySkel in object_ane). Root cause: she animates from the
 >   SHARED object_os_anime bank via 4 anims (gObjOsAnim_07D0/9F94/0718/A630), but object_ane has no
@@ -113,7 +158,7 @@ This file is the source of truth across sessions.
 >   the live model's ZAR (SoH3D_AutoModelZar), falling back to a generic entry. Verified: model 2016
 >   plays gObjOsAnim_A630 -> oro_oro phase-locked (frames advancing), renders animated (arms down), no
 >   T-pose; only the 4 shared OTRs got ZAR-qualified, all gKokiri* anims stayed generic (no En_Ko regression).
-> - **#5 STAIRS — side faces still triangles — DONE 2026-06-19** (Shipwright 9c28b908e fork/develop).
+> - **#5 STAIRS — side faces still triangles — [DONE-mark FALSIFIED by SESSION 2; REOPENED — see top].** (Shipwright 9c28b908e fork/develop).
 >   The sides are now vertical SAWTOOTH-topped walls (not flat triangle caps) textured like the wall
 >   the staircase abuts. See the #5 STAIRS REWORK entry below — both reopen blocks are addressed by the
 >   same wall-integration change. Verified Kakariko: entrance = canyon rock, village = matching brick.
@@ -122,7 +167,7 @@ This file is the source of truth across sessions.
 >   FB-flip / negative-viewport issue (#1 family): the pause-preview render samples the FB with the
 >   wrong Y orientation. Likely shares a root with first-person flashing and title-cam-under-terrain.
 >
-> - **#5 STAIRS REWORK — DONE 2026-06-19** (Shipwright 9c28b908e fork/develop; libultraship + outer
+> - **#5 STAIRS REWORK — [DONE-mark FALSIFIED by SESSION 2; REOPENED — see top]** (Shipwright 9c28b908e fork/develop; libultraship + outer
 >   untouched besides the submodule bump). Implemented the user's wall-integration design. Each kaidan
 >   group is now replaced by ONE draw group PER PATCH (each staircase), and each patch wears the texture
 >   of the WALL it abuts — found by findPatchWall (scan other room groups for verts along the patch's
@@ -558,7 +603,9 @@ This file is the source of truth across sessions.
    to float when climbing. Lower it slightly (per-actor yoff / placement). Tune live via REPL
    `yoff`, then bake.
 
-5. **[DONE 2026-06-19; see Done — render AND collision] Real polygon stairs for fake flat stairs**
+5. **[REOPENED 2026-06-19 SESSION 2 — render BROKEN; see the SESSION 2 block at the top of Open.
+   Collision step-grounding may still be fine; the RENDER (wall-integration) is the broken part]
+   Real polygon stairs for fake flat stairs**
    — original primary goal. OoT3D (like N64) renders staircases as one FLAT textured ramp whose
    step lines are PAINTED into the texture. Detection is the game's own asset label: the stair
    texture name contains "kaidan" (階段). At scene-room build time every kaidan ramp is replaced
