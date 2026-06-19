@@ -125,6 +125,34 @@ This file is the source of truth across sessions.
     regression (terrain-warp / OoT3D-vs-N64 collision height for climb surfaces). High-value: one
     root cause probably fixes the whole climb cluster. Cluster with #4 (ladder render too high),
     #9 (grass not walkable).
+    **LEADING HYPOTHESIS RULED OUT 2026-06-19 (session 14): the OoT3D collision's climbable WALLS
+    match N64 — this is NOT a climb-flag/height/normal regression.** Built the long-missing wall
+    probe: REPL `wallscan <path>` (soh3d.c) dumps EVERY wall poly of the installed static collision
+    (`play->colCtx.colHeader`) to CSV with its vertical extent (ymin/ymax), wall-property index
+    (`func_80041D94`, data[0] bits 21..25), and wall flags (`func_80041DB8`). The climb mechanic
+    (verified by reading z_player.c): a wall is climbable to START via `func_8083EC18` and CONTINUES
+    climbing in **`func_8083FBC0` (z_player.c:7895)** only while the touched wall flag has bit1(&2),
+    bit2(`func_80041E4C`), or bit3(&8=ladder) — flag bit0 alone (ledge-grab) does NOT keep you
+    climbing. So a "halfway drop" would require the OoT3D climbable wall to be SHORTER than N64's, or
+    to lose those flags partway up. Ran `wallscan` under `collision 1` (OoT3D) vs `collision 0` (N64)
+    in TWO scenes and diffed the climb-continue walls (flags & 14):
+    - Kakariko 0x52: OoT3D 13 climb-continue walls / N64 14 — the well, the two +x vine walls, and
+      the ladder all present with matching flags, **identical yspans** (e.g. the 570u-tall well wall
+      [200,770] in both), and perfectly vertical normals (ny=0) in both.
+    - Kokiri 0x55: OoT3D 5 climb-continue walls / N64 6 — every tall N64 climb wall has a matching
+      OoT3D climb wall within 0–4u XZ and **ymax within 5u** (no truncation); the one N64 "orphan"
+      ladder is the same ladder shifted ~71u (still full-height). (The big flags&9 counts — 148 vs 95
+      — are prop=1 flag-bit0-only ledge walls that don't allow climb-continue anyway.)
+    So across both scenes the OoT3D climbable walls are faithful to N64 in flags/height/normal — same
+    class of result as #13/#16 (OoT3D collision == N64 by construction). **COULD NOT repro the actual
+    climb headless** (the `tp` REPL only sticks within Link's current room; Kakariko's climbables sit
+    in a +x room not loaded at the entrance spawn, and Kokiri's climb input wasn't driven), so the
+    item is NOT formally closed. NEXT: (a) get the USER to confirm #14 differs from vanilla SoH and
+    name a SPECIFIC scene+climbable that drops; (b) if real & SoH3D-specific but not the walls, the
+    remaining systemic suspects are a spurious OoT3D FLOOR poly partway up a climbable (the ledge
+    check at z_player.c:11397 `BgCheck_EntityRaycastFloor1` would see it as a ledge and dismount
+    mid-climb — `floorat`/`floorgrid` UP the face of a known climbable to look for an unexpected
+    floor), or the climb on the 3DS-Link path (#29). Don't fabricate a wall fix — the walls are fine.
 
 29. **Hand-weave the 3DS Link model (multi-CMB assembly)** — with the new menu toggle (#15), mode 1
     (3DS model + N64-retarget anim) renders, but the user reports it "looks weird, doesn't look like
