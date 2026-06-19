@@ -84,7 +84,13 @@ def cmd_ls(a):
 
 
 def cmd_show(a):
-    print(gh(["issue", "view", str(a.issue), "--comments"]))
+    # `gh issue view --comments` prints ONLY the comments (not the body/metadata), so an
+    # issue with 0 comments printed nothing at all. Show the body view first, then comments.
+    print(gh(["issue", "view", str(a.issue)]))
+    comments = gh(["issue", "view", str(a.issue), "--comments"]).strip()
+    if comments:
+        print("\n--- comments ---\n")
+        print(comments)
 
 
 def cmd_add(a):
