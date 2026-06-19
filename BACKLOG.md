@@ -22,8 +22,15 @@ This file is the source of truth across sessions.
 
 ## Open
 
-1. **[VISIBLE ARTIFACT FIXED 2026-06-19 via backface culling; see Done] Cutscene / title / demo
-   camera goes UNDER the 3DS terrain.** ROOT CAUSE of the visible "flip" was NOT terrain height:
+1. **[REOPENED 2026-06-19 — backface cull did NOT fully fix it] Cutscene / title / demo
+   camera goes UNDER the 3DS terrain.** USER 2026-06-19: "title screen camera wasn't corrected
+   well, it is still in the terrain." So the backface-cull change removed the "underside flip" read
+   but the title/demo camera is STILL geometrically below the surface (you see into/through terrain).
+   The real fix is the camera reconciliation, not just culling the underside. Pursue: lift the
+   scripted demo/title camera eye.y when it falls below the 3DS mesh surface at its xz (probe the
+   render-mesh height; this is the title-demo camera path specifically, scene 0x51 cam
+   eye.y=-1). Don't just rely on the cull. Original investigation kept below.
+   ROOT CAUSE of the visible "flip" was NOT terrain height:
    the OoT3D meshes were drawn DOUBLE-SIDED (no backface cull), so when the demo camera dipped under
    the Hyrule Field surface we rendered the terrain UNDERSIDE ("ground above, sky below"). N64
    backface-culls those faces (you'd see through to sky). Fixed by honoring the CMB cull byte in the
@@ -180,6 +187,11 @@ This file is the source of truth across sessions.
    key/mouse events in the Xvfb REPL path; the REPL injects at the N64-button level, downstream of
    the mapping) -> validate with the user live.
 
+36. **[DONE 2026-06-19; see Done] 2D→3D item drops default + always on (user 2026-06-19).** SoH's
+    "3D Item Drops" enhancement (`CVAR_ENHANCEMENT("NewDrops")`, read all over `z_en_item00.c`) now
+    forced ON at soh3d init (once per process, in SoH3D_ReplPoll) so drops render as 3D models, not
+    flat billboards. Opt-out env SOH3D_NO3DDROPS=1 (sets the CVar to 0). VERIFIED headless.
+
 9. **Grass/lilypad area not walkable (collision regression)** — Link can't enter a forest pond-edge
    lilypad patch that "used to work." Check collision / terrainwarp path; needs in-game repro.
 
@@ -267,6 +279,28 @@ This file is the source of truth across sessions.
     generic path; the N64-anim retarget alone isn't producing a correct Link. See
     [[soh3d-link-player-path]]. (The #15 menu toggle itself works — this is the underlying model
     quality.)
+    **USER RE-CONFIRMED 2026-06-19 (both anim modes broken):**
+    - `linksrc n64` (3DS model + N64-retarget anim): "doesn't look fine" (this #29).
+    - `linksrc 3ds` (3DS model + own-CSAB anim): **Link FLOATS above the ground and SLIDES instead
+      of walking** — see new #29b. The slide is the documented WALK/RUN-MISSING root cause
+      ([[soh3d-link-player-path]]): own-CSAB-by-name can't see blended locomotion (jointTable), so
+      Link plays an idle CSAB while the actor translates → slide. The float is a Y-placement/scale
+      issue in the player draw hook. Fix both before this is "fine".
+
+29b. **3DS Link (own-CSAB / `linksrc 3ds` path) FLOATS above ground + SLIDES instead of walking
+    (user 2026-06-19).** Two distinct defects on the default Link path (SOH3D_LINK_SRC=3ds):
+    (1) **SLIDE** = walk/run animation missing. ROOT CAUSE already nailed in
+    [[soh3d-link-player-path]] "WALK/RUN MISSING": OoT Link's sustained walk/run is BLENDED into
+    `skelAnime.jointTable` via LinkAnimation_BlendToJoint WITHOUT updating `skelAnime.animation`, so
+    the own-CSAB-by-name resolver stays stuck on the last idle anim the whole time Link moves → idle
+    pose while translating. FIX OPTIONS (from memory): (A) jointTable RETARGET onto the OoT3D rig
+    (needs a derived player bonemap, sound + complete); (B) speed-based free-run of nml_walk/nml_run
+    when actor.speedXZ>thr (smaller, approximate). (2) **FLOAT** = Link's feet sit above the floor.
+    Y-placement/scale in SoH3D_TryDrawPlayer (the body is drawn at the player world transform ×
+    linkscale 0.011 + linkrot; if the OoT3D rig's root/foot origin differs from N64's, the model
+    hovers). Probe: compare the rendered foot Y to the floor Y at Link's xz; adjust the draw
+    translate (NOT a blind magic offset — measure the rig's foot-to-root distance). Verify headless
+    via `walkhold`/`walkinject` + screenshot (SOH3D_LINK=1).
 
 16. **Gohma arena void-out** — walking in the Gohma (Deku Tree boss) arena drops Link through the
     floor → void. Collision hole. Repro at entrance 1039. INVESTIGATED 2026-06-19: NOT an OoT3D-
@@ -401,6 +435,21 @@ This file is the source of truth across sessions.
     toward the sun azimuth. Left as #28e below.
 
 ## Done (recent)
+
+- **#36 2D→3D item drops default + always on** — SoH already ships a "3D Item Drops" enhancement
+  (`CVAR_ENHANCEMENT("NewDrops")`, read throughout `z_en_item00.c`: rupees/hearts/magic jars/ammo
+  draw a real 3D model instead of the flat spinning billboard sprite) but it defaults OFF. The
+  soh3d project converts ALL graphics to 3D, so it's now forced ON. Implementation: a one-shot
+  `CVarSetInteger(CVAR_ENHANCEMENT("NewDrops"), 1)` in `SoH3D_ReplPoll` (soh3d.c) — runs every
+  frame with a static guard so it fires once per process, regardless of REPL connection, after the
+  config is loaded. Set EXPLICITLY in both directions (the CVar persists to config across runs, so
+  the opt-out env `SOH3D_NO3DDROPS=1` actively writes 0 rather than merely skipping the force). New
+  reusable verification helper `SoH3D_DebugDrawDrop` (env `SOH3D_SPAWNDROP=<ITEM00 id>`, hooked in
+  z_play.c next to the other debug spawns) drops one real En_Item00 collectible beside Link.
+  VERIFIED headless (Temple of Time 0x55, adult Link): with the default, the dropped green rupee is
+  the fat faceted 3D gem (hollow center, multi-face shading, ~38px wide); with SOH3D_NO3DDROPS=1
+  it's the thin flat spinning 2D billboard (~21px wide). Log confirms `NewDrops -> 1` (default) vs
+  `-> 0` (opt-out). soh only (soh3d.{c,h}, z_play.c); libultraship UNTOUCHED.
 
 - **#32 A action button → Xbox 'A' glyph (completes the HUD button cluster)** — the do-action A
   button (Interface_DrawActionButton, z_parameter.c) is the one HUD button drawn as a 3D
