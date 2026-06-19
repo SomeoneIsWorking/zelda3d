@@ -22,6 +22,57 @@ This file is the source of truth across sessions.
 
 ## Open
 
+> **USER PLAYTEST 2026-06-19 (GROUND TRUTH — overrides prior "VERIFIED headless / DONE" marks).**
+> The user playtested on keyboard/Vulkan through real scene flow and reports MANY items still broken,
+> incl. several marked DONE. Hard lesson recorded: prior "VERIFIED headless" tested NARROW mechanisms
+> in artificial conditions (frozen cams, `skiptest` harness, forced states, single frames), NOT the
+> full user-facing behavior — so those DONE marks were premature/partial. Treat the items below as the
+> live state. (Stairs are the one confirmed-good DONE: user says "stairs look decent now".)
+> - **#2 SKIP still fails** — Start/SPACE does NOT skip "place introduction camera panning" (scene-
+>   intro establishing pans). The onepoint-cam skip I shipped only covered onepoint cams; scene-intro
+>   pans are a different system (Cutscene/Player csMode) — the deferred part of #2 is the part the user
+>   actually needs. Note: SPACE clearly registers (it does things on the title), so keyboard→Start works.
+> - **#1b TITLE SPACE → weird places** still broken (lands in wrong gamestate).
+> - **#4 LADDER still floats / needs lowering** (Image: child Link floating just above a wooden plank
+>   platform by a ladder; dark mossy wood area — looks like Deku Tree / Kokiri interior, NOT only
+>   Kakariko). "needs hand weaving."
+> - **#7 KOKIRI KID DRAW DISTANCE still culls** — user wants INFINITE. My #7 fix (force shouldDraw/
+>   Update for replaced actors) verified drawn=1 at d=1790 but the kids still pop out for the user →
+>   likely actor UNLOAD (room/scene despawn) at greater range, not just the draw cull. REOPEN.
+> - **#34/#35 KEYBOARD UI / control scheme — not done** (acknowledged; needs libultraship default-map +
+>   live keyboard verification).
+> - **#9 FLOWERS/LILYPAD not walkable** (Image: child Link at the edge of a Kokiri pond clover/lilypad
+>   patch, blocked). Collision.
+> - **#23 CUCCO won't flap WHEN HELD** — REOPEN. My #23 did the IDLE procedural flap; the HELD/picked-up
+>   cucco uses the agitated flap path (func_80AB5BF8 higher amplitude / a different state) which my
+>   OverrideLimbDraw replay doesn't cover when the cucco is carried. Incomplete, not done.
+> - **#24 KAKARIKO WELL still not fixed** — REOPEN (the forced-CMB render swap didn't fully fix what the
+>   user sees; re-diagnose the actual well visual in-scene, don't trust the prior "teal water" check).
+> - **FIRST-PERSON CAMERA FLASHING (NEW, #37)** — "most places first-person camera is flashing."
+>   Pervasive frame-to-frame instability in first-person (C-up) view. Likely a render-pass/FB or
+>   segment-race issue, possibly a regression from recent sky/HUD work. High annoyance.
+> - **#29 3DS LINK slides + RIGHT ARM TOO LONG** — Image: child Link in a crouched/contorted pose while
+>   moving. FALSIFIES the #29b note that "slide does NOT reproduce" — it DOES slide for the user in
+>   `linksrc 3ds` (3DS-anim) mode. Plus a NEW concrete bug: **the right arm renders longer than it
+>   should** (skinning/bone-retarget defect). Child Link only (adult untested). n64-anim mode also
+>   "doesn't look fine" (#29). The whole 3DS-Link weave is still broken.
+> - **T-POSING NPC (NEW, #38)** — Image: a red-haired Kakariko woman (En_Ane zelda_ane id=0x13C, or a
+>   sister/Cucco-lady type) renders in a static T-POSE = skinned OoT3D model loaded but NO CSAB anim
+>   applied. The auto-skinned anim coverage has a gap for this actor (missing anim-map entry or the
+>   actor isn't routed through the N64-anim retarget). Reproducible in Kakariko (0x52).
+> - **#5 STAIRS — side faces still triangles (REOPEN/extend)** — "stairs look decent now, but the faces
+>   that connect to them need to be stairs too; the SIDES of the stairs are still triangles." My #5
+>   generated stepped treads/risers on the TOP surface but the staircase SIDE walls (the vertical
+>   triangular fill on the left/right edges of the flight) are still the original flat diagonal — they
+>   need a stepped (sawtooth) profile to match. I own this code (generateStairsGroup), tractable.
+> - **OPENING INVENTORY renders background UPSIDE DOWN (NEW, #39 / #1 FB-flip cluster)** — pausing to
+>   the inventory/pause menu draws the frozen game background flipped vertically. This is the Vulkan
+>   FB-flip / negative-viewport issue (#1 family): the pause-preview render samples the FB with the
+>   wrong Y orientation. Likely shares a root with first-person flashing and title-cam-under-terrain.
+>
+> NEXT (this session): capturing done; now reworking. Honest verification rule going forward — only
+> mark DONE when the FULL user-facing path works in a realistic run, not when a narrow mechanism passes.
+
 1. **[REOPENED 2026-06-19 — backface cull did NOT fully fix it] Cutscene / title / demo
    camera goes UNDER the 3DS terrain.** USER 2026-06-19: "title screen camera wasn't corrected
    well, it is still in the terrain." So the backface-cull change removed the "underside flip" read
