@@ -104,12 +104,16 @@ This file is the source of truth across sessions.
    **DIGIT FONT DONE 2026-06-19 (see Done; awaiting user sign-off):** the blocky N64 8x16 I8 counter
    digits (gCounterDigit0..9/Colon) are now a crisp 32x64 font injected at the single Gfx_TextureI8
    choke point, so the rupee / small-key / ammo / race-timer / minigame-score counters all upgrade
-   at once. tools/soh3d_gen_digit_tex.sh is the generator (font via SOH3D_DIGIT_FONT). REMAINING
-   high-visibility HUD elements to give the same treatment (all reuse the raw-RGBA mechanism): the
-   **magic bar** (gMagicMeterEnd/Mid/Fill — simple gradient bars, but only shows once Link has magic
-   AND its border uses tuned mirror/tc constants → do carefully, grant magic to verify), the **item
-   icons / equip outlines**, the **do-action label** font, and the **minimap/dungeon-map** dot/marker
-   sprites. The A/B/C button backgrounds are already badged with Xbox glyphs (#32). Pick by visibility.
+   at once. tools/soh3d_gen_digit_tex.sh is the generator (font via SOH3D_DIGIT_FONT).
+   **BUTTON-BG DISC DONE 2026-06-19 (see Done; awaiting user sign-off):** the blocky N64 32x32 IA8
+   gButtonBackgroundTex (round beveled circle behind the B / C / item / A action buttons) is now a
+   crisp 64x64 SVG-authored disc. tools/soh3d_gen_button_tex.sh is the generator.
+   REMAINING high-visibility HUD elements to give the same treatment (all reuse the raw-RGBA mechanism):
+   the **magic bar** (gMagicMeterEnd/Mid/Fill — investigated 2026-06-19: the bar is mostly horizontal
+   bands that are already sharp; the only blocky parts are the tiny rounded cap corners, so the crisp
+   gain is small — "modest gain" confirmed, deprioritized), the **item icons / equip outlines**, the
+   **do-action label** font, and the **minimap/dungeon-map** dot/marker sprites. The A/B/C button
+   backgrounds are also badged with Xbox glyphs (#32). Pick by visibility.
    INVESTIGATED 2026-06-19: the texpack DOES have a `UI/` dir (`textures/0004000000033500/UI`, 259
    files, Citra-hash-named `tex1_WxH_HASH_fmt_mip0.png`, with GERMAN/ITALIAN/JAPANESE/SPANISH subdirs),
    but inspecting the 256x256 set they are **OoT3D menu/map/pause/GAME-OVER screens + item-grid atlases**
@@ -467,6 +471,34 @@ This file is the source of truth across sessions.
     toward the sun azimuth. Left as #28e below.
 
 ## Done (recent)
+
+- **#31 crisp higher-res HUD button-background disc (B / C / item / A action buttons)** — the N64
+  button background was a blocky 32x32 IA8 disc (gButtonBackgroundTex, the round beveled circle drawn
+  behind EVERY HUD button). Replaced with a crisp 64x64 SVG-authored beveled disc injected via the
+  raw-in-RAM RGBA32 path ([[soh3d-hud-glyphs]]). KEY: the button combine is G_CC_MODULATEIA_PRIM
+  (SETUPDL_39: out.rgb = TEXEL0.rgb*PRIM, out.a = TEXEL0.a*PRIM), so a GRAYSCALE disc (rgb=bevel
+  intensity, a=circle coverage) tints to each button's PRIM colour (B=green, C=yellow, A=green, the
+  blue Navi C-Up, etc.) IDENTICALLY to the original IA8 — all per-button colours/cosmetics preserved
+  free, same insight as the hearts. ROOT-CAUSE GOTCHA found+fixed: gButtonBackgroundTex is loaded
+  ONCE by the B-button Gfx_TextureIA8 call and the C-Left/Down/Right/Up buttons REUSE that resident
+  tile via bare texrects whose dsdx/dtdy are tuned for 32 texels (z_parameter.c comment: "Also loads
+  the Item Button Texture reused by other buttons afterwards"). A first attempt with a 128x128 tile
+  broke that contract → the Navi C-Up disc rendered as 3 stacked scalloped shapes. Fixed two ways:
+  (1) use a 64x64 disc (16KB RGBA32, within the proven HUD-load envelope, vs 128x128=64KB), and
+  (2) SoH3D_ButtonBgTexScale() returns gw/32 and every reused texrect scales its dsdx/dtdy by it
+  (a principled texel-ratio, not a magic constant). Pieces: tools/soh3d_gen_button_tex.sh ->
+  button_tex_png.h; SoH3D_ButtonBgTex (soh3d_model.cpp); a gButtonBackgroundTex intercept in
+  Gfx_TextureIA8 (covers the B / empty-C / item-button full-load sites) + the bare-reuse dsdx scale
+  (C-Left/Down/Right/Up) + the do-action A-button 3D quad (Interface_DrawActionButton: load crisp +
+  rescale the actionVtx baked 32-texel tc by gw/32 — same quad/tc remap #32 already proved). Gated on
+  SoH3D_HudTexEnabled (env SOH3D_HUDTEX / REPL hudtex, default on); off restores the byte-identical
+  N64 IA8 path. VERIFIED headless (Kokiri 0xEE): 4x A/B zoom of the empty blue C disc shows the crisp
+  disc has a defined edge + visible bevel vs the vanilla bilinear blur, and the Navi-disc scallop bug
+  is gone (single clean circle); before/after sent to user. The do-action A-button disc uses the same
+  mechanism + a tc-remap proven in #32, falls back to vanilla cleanly, but could not be visually
+  triggered headless (the REPL has no input injection to raise a do-action prompt) — correct by
+  construction. soh only (z_parameter.c, soh3d.{c,h via header}, soh3d_model.cpp, button_tex_png.h);
+  libultraship UNTOUCHED. See [[soh3d-hud-glyphs]].
 
 - **#31 crisp higher-res HUD counter font (rupee/key/ammo/timer/score digits)** — the N64 counter
   digits were blocky 8x16 I8 glyphs (gCounterDigit0..9/Colon) drawn through Gfx_TextureI8 by EVERY
