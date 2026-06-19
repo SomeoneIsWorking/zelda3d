@@ -34,17 +34,34 @@ def main():
     lines.append("typedef struct {")
     lines.append("    const char* n64otr; // N64 animation OTR resource path (no __OTR__ prefix)")
     lines.append("    const char* csab;   // OoT3D CSAB base name to play")
+    lines.append("    const char* zar;    // model ZAR this entry is specific to, or NULL for any model.")
+    lines.append("                        // Set only for OTR paths shared across skeletons (object_os_anime")
+    lines.append("                        // bank: km1/Kokiri vs ane/Cucco-Lady) so the resolver can pick the")
+    lines.append("                        // right CSAB by the live model's ZAR (SoH3D_AutoModelZar).")
     lines.append("} SoH3DAnimMap;")
     lines.append("")
-    lines.append("#define SOH3D_ANIMMAP(otr_, csab_) { otr_, csab_ }")
+    lines.append("#define SOH3D_ANIMMAP(otr_, csab_) { otr_, csab_, NULL }")
+    lines.append("#define SOH3D_ANIMMAP_Z(otr_, csab_, zar_) { otr_, csab_, zar_ }")
     lines.append("")
+    # An OTR path that appears under more than one ZAR is a SHARED-bank anim (e.g. object_os_anime
+    # used by both the km1 Kokiri skeleton and the ane Cucco-Lady skeleton). Those entries are emitted
+    # ZAR-qualified so the runtime resolver disambiguates them per model; everything else is generic.
+    otr_zars = {}
+    for d in src:
+        for r in d["rows"]:
+            otr_zars.setdefault(r["otr"], set()).add(d["zar"])
+    shared = {otr for otr, zs in otr_zars.items() if len(zs) > 1}
     lines.append("static const SoH3DAnimMap kSoH3dAnimMaps[] = {")
     n_rows = 0
     for d in src:
         lines.append("    // ---- %s (%s) ----" % (d["zar"], d["object"]))
         for r in d["rows"]:
             mark = "  // OVERRIDE (was %s)" % (r["auto"] or "<none>") if r["overridden"] else ""
-            lines.append('    SOH3D_ANIMMAP("%s", "%s"),%s' % (r["otr"], r["csab"], mark))
+            if r["otr"] in shared:
+                lines.append('    SOH3D_ANIMMAP_Z("%s", "%s", "%s"),%s'
+                             % (r["otr"], r["csab"], d["zar"], mark))
+            else:
+                lines.append('    SOH3D_ANIMMAP("%s", "%s"),%s' % (r["otr"], r["csab"], mark))
             n_rows += 1
     lines.append("};")
     lines.append("")
