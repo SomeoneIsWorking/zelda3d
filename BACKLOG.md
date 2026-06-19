@@ -196,6 +196,11 @@ This file is the source of truth across sessions.
     Environment_DrawSunAndMoon); (d)
     broaden past SKYBOX_NORMAL_SKY (shop/indoor skyboxes still N64). Indoor/enclosed scenes (Kokiri)
     have skyboxDisabled so the dome correctly does not draw there.
+    NOTE (#28c assets ARE in /kankyo/BlueSky.zar): `model/fine_sun.cmb` (1536B), `model/cloud_sun.cmb`,
+    `model/fine_star.cmb` (19328B); textures `tex/fine_sun.ctxb`, `tex/fine_lensflare.ctxb`,
+    `tex/fine_moon0..2.ctxb`. So #28c is a billboard-a-textured-quad-at-the-sun-world-pos task, not an
+    asset hunt. The sun/moon world position + phase comes from the N64 `Environment_DrawSunAndMoon`
+    (z_kankyo.c) path; billboard the CMB facing the camera. tools/cmab.py + ctr_romfs/zar read the zar.
 
 ## Done (recent)
 
