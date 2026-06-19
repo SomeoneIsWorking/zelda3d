@@ -222,11 +222,14 @@ This file is the source of truth across sessions.
     above a building/roof instead of on the ground (user screenshot). Actor Y-placement vs floor;
     same collision/terrain-warp Y cluster as #4/#9/#10/#13/#14/#16.
 
-26b. **DM gate collision (UNVERIFIED leftover from #26)** — the #26 MODEL is fixed (gate renders
-    correctly now). The user also reported "no collision". The N64 Bg_Gate_Shutter keeps its own
-    collision (we only swap the render), so this may have been a misperception caused by the old
-    wrong model rendering away from the real gate. Re-check in-game whether Link is actually blocked;
-    if genuinely passable, investigate the gate's dynapoly separately. (Lower priority.)
+26b. **[CLOSED 2026-06-19 — confirmed NOT a bug; see Done]** DM gate collision. Code-confirmed that
+    `Bg_Gate_Shutter` installs its own unmodified N64 dynapoly collision
+    (`z_bg_gate_shutter.c:42-44`: `DynaPolyActor_Init` + `CollisionHeader_GetVirtual(&gKakarikoGuardGateCol)`
+    + `DynaPoly_SetBgActor`), which the #26 render swap never touches — so the gate's physics are
+    vanilla by construction. The #26 verification already observed the barred gate blocking the
+    passage. The "no collision" report was the old wrong (windmill-mechanism) model rendering AWAY
+    from the real gate, so the (correct) collision looked detached from the visible mesh; #26's
+    model fix realigned render with collision. No code change needed.
 
 4. **Kakariko ladder render too high** — the OoT3D ladder model renders a bit high, so Link appears
    to float when climbing. Lower it slightly (per-actor yoff / placement). Tune live via REPL
@@ -292,6 +295,16 @@ This file is the source of truth across sessions.
     toward the sun azimuth. Left as #28e below.
 
 ## Done (recent)
+
+- **#26b DM gate collision — confirmed NOT a bug (no code change)** — re-checked the leftover "no
+  collision" report against the source: `Bg_Gate_Shutter` (z_bg_gate_shutter.c:42-44) sets up its
+  own N64 dynapoly collision via `DynaPolyActor_Init(DPM_UNK)` +
+  `CollisionHeader_GetVirtual(&gKakarikoGuardGateCol)` + `DynaPoly_SetBgActor`. SoH3D's #26 fix only
+  swapped the *render* CMB (windmill-mechanism → c_s01tomegate gate); it never touches the actor's
+  collision init, so the gate's physics are the unmodified vanilla dynapoly. The earlier "passable"
+  perception was the OLD wrong model rendering away from the real gate location, making the (correct)
+  collision look detached from the mesh — #26 realigned them, and #26's headless verify already
+  observed the barred gate blocking the passage. Closed by inspection; no commit needed.
 
 - **#23 Cucco wing-flap (procedural OverrideLimbDraw replay onto OoT3D bones)** — the cucco (En_Niw)
   renders via the auto path playing its only CSAB (nw_wait), which has just a ±9° idle ruffle; the
