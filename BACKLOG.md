@@ -110,7 +110,20 @@ This file is the source of truth across sessions.
    item icons that match N64 items) and remap. Needs the user to say which HUD elements matter most;
    pursue (b) for the highest-visibility elements if proceeding autonomously.
 
-32. **XBOX controller UI (user 2026-06-19) — ITEM-BUTTON CLUSTER DONE (see Done); REMAINING POLISH.**
+32. **[REWORKED 2026-06-19 — clean badge replacement, see Done; awaiting user sign-off] XBOX
+    controller UI.** USER 2026-06-19: "You overlaid XBOX buttons on top of the existing UI, don't
+    do that — XBOX should REPLACE the existing UI, not overlay it." (And: do NOT just disable it —
+    tried that, rejected; they want it ON, done right.) The OLD impl swapped the button BACKGROUND
+    circle for a full Xbox disc, then the N64 item icon + do-action LABEL ("PutAway") drew ON TOP,
+    burying the letter = cluttered overlay. REWORKED (see Done): button backgrounds stay vanilla
+    N64, item icons render normally, and a SMALL Xbox face-button glyph is drawn as a BADGE in each
+    item button's top-right corner (recorded rects + SoH3D_DrawHudBadges, on top of the icons). The
+    do-action button reverted to the vanilla green circle + label. Items + controller letters both
+    readable, nothing stacked. REMAINING (await user): badge size/position/corner tuning; whether
+    the do-action button should also carry an A indicator; possible badge-colour-vs-button-colour
+    harmonization. Original polish notes below.
+
+32b. **[was: XBOX controller UI ITEM-BUTTON CLUSTER — superseded by the #32 reopen above]**
    Done: the HUD item-button prompts (B + the 3 C buttons) now render as full-colour Xbox face-button
    glyphs (B=red, C-Left=X blue, C-Down=Y yellow, C-Right=A green), gated SOH3D_XBOXUI / REPL `xboxui`.
    REMAINING (lower priority): (a) **[DONE 2026-06-19; see Done]** the **A action button**
@@ -435,6 +448,22 @@ This file is the source of truth across sessions.
     toward the sun azimuth. Left as #28e below.
 
 ## Done (recent)
+
+- **#32 Xbox HUD glyphs reworked from overlay → clean corner BADGE** — user reported the original
+  #32 "overlaid XBOX buttons on top of the existing UI" (the full Xbox disc was the button
+  background, then the N64 item icon + do-action "PutAway" label drew on top, burying the A/B/X/Y
+  letter). Reworked to a clean replacement: the button backgrounds stay vanilla N64 and the item
+  icons render normally; each item button's screen rect + glyph (B→B, C-Left→X, C-Down→Y,
+  C-Right→A) is recorded during Interface_DrawItemButtons (new SoH3D_RecordHudBtn / sSoH3dHudBtns),
+  and a SMALL Xbox face-button glyph is drawn as a badge in each button's TOP-RIGHT corner AFTER
+  all the item icons (new SoH3D_DrawHudBadges, called in Interface_Draw just before the A button) so
+  it sits on top without obscuring the item. The do-action 'A' button reverted to the vanilla green
+  circle + action label (the green already reads as A; the Xbox-A-glyph-with-label-on-top was the
+  worst overlay). Reused SoH3D_DrawXboxBtn / SoH3D_XboxGlyphTex; gate unchanged (SOH3D_XBOXUI
+  default on, REPL `xboxui`). VERIFIED headless (Kokiri Forest 238): item icons (sword/slingshot/
+  bombs/ocarina) fully visible, each with a crisp readable corner badge (red B, blue X, yellow Y,
+  green A), no stacking/clutter. soh only (z_parameter.c, soh3d.c comment); libultraship UNTOUCHED.
+  Badge tuning + do-action indicator left for user sign-off. See [[soh3d-hud-glyphs]].
 
 - **#36 2D→3D item drops default + always on** — SoH already ships a "3D Item Drops" enhancement
   (`CVAR_ENHANCEMENT("NewDrops")`, read throughout `z_en_item00.c`: rupees/hearts/magic jars/ammo
