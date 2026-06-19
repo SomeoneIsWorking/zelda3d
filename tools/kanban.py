@@ -89,9 +89,9 @@ def cmd_show(a):
 
 def cmd_add(a):
     labels = []
-    if a.status:
+    if a.status and a.status != "done":
         if a.status not in COLUMNS:
-            sys.exit(f"bad status '{a.status}', pick one of {COLUMNS}")
+            sys.exit(f"bad status '{a.status}', pick one of {COLUMNS + ['done']}")
         labels.append(f"status:{a.status}")
     if a.labels:
         labels += [x.strip() for x in a.labels.split(",") if x.strip()]
@@ -106,6 +106,10 @@ def cmd_add(a):
         args += ["--label", l]
     out = gh(args)
     print(out.strip())
+    if a.status == "done":
+        num = out.strip().rstrip("/").split("/")[-1]
+        gh(["issue", "close", num, "--reason", "completed"])
+        print(f"  (closed #{num} as done)")
 
 
 def cmd_mv(a):
