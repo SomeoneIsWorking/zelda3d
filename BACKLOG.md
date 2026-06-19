@@ -106,12 +106,11 @@ This file is the source of truth across sessions.
 32. **XBOX controller UI (user 2026-06-19) — ITEM-BUTTON CLUSTER DONE (see Done); REMAINING POLISH.**
    Done: the HUD item-button prompts (B + the 3 C buttons) now render as full-colour Xbox face-button
    glyphs (B=red, C-Left=X blue, C-Down=Y yellow, C-Right=A green), gated SOH3D_XBOXUI / REPL `xboxui`.
-   REMAINING (lower priority): (a) the **A action button** (Interface_DrawActionButton) — it draws a
-   ROTATING textured QUAD (gSP1Quadrangle) whose per-vertex texcoords are tuned for the 32x32 IA8
-   circle (tc 1024 == 32 texels), so a 64x64 RGBA glyph maps to only its top-left quarter; needs either
-   a 32x32 glyph variant or a tile shift/scale, OR redraw it as a screen-space texture rectangle
-   (losing the flip animation). This is the site where the letter would show cleanest (no item icon
-   over it, just the action label). (b) The **C-Up Navi prompt** (the lone blue disc) is a separate
+   REMAINING (lower priority): (a) **[DONE 2026-06-19; see Done]** the **A action button**
+   (Interface_DrawActionButton) now renders as the green Xbox 'A' glyph on the SAME flip-animated
+   3D quad — the quad's baked 32-texel texcoords were remapped to the glyph's real size so the
+   FULL glyph maps (not the top-left quarter); the do-action label still overlays. (b) The **C-Up
+   Navi prompt** (the lone blue disc) is a separate
    gButtonBackgroundTex draw (naviCalling) left as the N64 circle. (c) Letters on item-occupied
    buttons are mostly hidden behind the item icon + equipped-item outline — only the colour ring +
    a peek of the letter show; consider a corner BADGE layout if the user wants the letter prominent.
@@ -341,6 +340,22 @@ This file is the source of truth across sessions.
     toward the sun azimuth. Left as #28e below.
 
 ## Done (recent)
+
+- **#32 A action button → Xbox 'A' glyph (completes the HUD button cluster)** — the do-action A
+  button (Interface_DrawActionButton, z_parameter.c) is the one HUD button drawn as a 3D
+  flip-animated QUAD (gSP1Quadrangle, RotateX wobble) rather than a screen-space texrect, so the
+  item-button path's `SoH3D_DrawXboxBtn` (texrect) didn't cover it. Now: when Xbox UI is on, draw
+  the green Xbox 'A' glyph on the SAME quad (position + flip animation preserved). The quad's baked
+  texcoords (origin -16, far 1024-16) assume a 32-texel tile, so a 64x64 RGBA glyph would show only
+  its top-left quarter — remapped the far tc to `(gw<<5)-16`/`(gh<<5)-16` so the FULL glyph maps onto
+  the quad (correct-by-construction, no offset tuning). Combine shows TEXEL0.rgb faded by aAlpha
+  (white prim); tc set explicitly in BOTH the Xbox and the N64-circle branch so toggling `xboxui`
+  off restores the IA8 mapping cleanly. The do-action label still overlays (Xbox-prompt style).
+  Reuses the existing `SoH3D_XboxGlyphTex('A')` — no new asset. VERIFIED headless (Kokiri 0x55,
+  Link at a sign so the "Read" A button shows): `xboxui 1` → the do-action button is a clean green
+  disc with a crisp centered white "A" (full glyph, NOT quartered); `xboxui 0` → reverts to the N64
+  circle (tc restored, no corruption). soh only (z_parameter.c); libultraship UNTOUCHED. Remaining
+  #32 polish: C-Up Navi disc, corner-badge letters. See [[soh3d-hud-glyphs]].
 
 - **#2 press-to-skip — onepoint cutscene cameras (door/attention/treasure pans)** — onepoint
   cutscene cameras (Z-target attention pans, door reveals, treasure/switch framing) grab the camera
