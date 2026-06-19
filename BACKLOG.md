@@ -48,9 +48,45 @@ This file is the source of truth across sessions.
 >   OverrideLimbDraw replay doesn't cover when the cucco is carried. Incomplete, not done.
 > - **#24 KAKARIKO WELL still not fixed** — REOPEN (the forced-CMB render swap didn't fully fix what the
 >   user sees; re-diagnose the actual well visual in-scene, don't trust the prior "teal water" check).
-> - **FIRST-PERSON CAMERA FLASHING (NEW, #37)** — "most places first-person camera is flashing."
->   Pervasive frame-to-frame instability in first-person (C-up) view. Likely a render-pass/FB or
->   segment-race issue, possibly a regression from recent sky/HUD work. High annoyance.
+> - **FIRST-PERSON CAMERA (NEW, #37) — TWO bugs.** (a) **CRASH/flashing**: entering first-person
+>   (C-up, BTN_CUP=0x0008) within ~2-3s of a FRESH scene load DETERMINISTICALLY CRASHES (SIGSEGV,
+>   verified 3/3 trials in Kakariko via REPL `btnhold 0x0008 4`). After the scene settles (~30s) it's
+>   SAFE (survives 60+ frames). Crash sig: `guMtxF2L <- Matrix_ToMtx <- Play_Draw+0xA3D`, RDI=0
+>   (NULL source matrix / NULL Graph_Alloc dest) — a graph-arena/matrix corruption that only fires in
+>   the post-scene-load window. The user hits this window constantly (enter a scene, look around) →
+>   experiences it as "flashing most places".
+>   **INVESTIGATION 2026-06-19 (characterized, NOT yet fixed — do not re-walk):** Reliable repro =
+>   Kakariko fresh load + `btnhold 0x0008 30` (C-up) within ~2s + advance ~10 frames -> SIGSEGV.
+>   - `sky 0` (BOTH SoH3D dome + sun/moon off) -> NEVER crashes (3/3). Default sky-on -> crashes.
+>   - `SOH3D_NOSUNMOON` (dome only) -> crashes 3/3; `SOH3D_NOSKYDOME` (sun/moon only) -> crashes 3/3.
+>     So EITHER sky draw alone is sufficient; you must disable BOTH (=`sky 0`) to avoid it.
+>   - Crash is ALWAYS `guMtxF2L <- Matrix_ToMtx <- Play_Draw+0xA3D`, RDI=0 RSI=0, and a SUSPICIOUSLY
+>     CONSTANT RBP=0x417AFA0 / R15=0x3BDA298 across every crash. The only guMtxF2L site in all of
+>     Play_Draw is the per-frame billboard matrix (z_play.c:1437 `Matrix_MtxFToMtx(&billboardMtxF,
+>     Graph_Alloc(...))`), which runs EARLY (before sky/scene/actor draws).
+>   - Diagnostics RULED OUT the obvious causes: POLY_OPA arena is HEALTHY (163-194k free) every
+>     logged frame; sunId/moonId are valid (loaded) from frame 1; billboardMtxF is sane (not NaN);
+>     play->view.eye NEVER moves to the first-person position (stays third-person) right up to the
+>     crash frame. So it is NOT arena exhaustion, NOT model-not-loaded, NOT a NaN matrix, NOT the
+>     first-person camera position.
+>   - NULL-GUARDING the billboard alloc (and the sky/sun/moon allocs) did NOT fix it (6/6 crash with
+>     the long hold) and NEVER logged an actual NULL — and the crash OFFSET shifted by exactly the
+>     bytes I added (+0xA3D->+0xA6D). A crash that ROAMS with unrelated code edits + constant register
+>     state + no real NULL = MEMORY CORRUPTION (a bad write from elsewhere lands on the matrix/arena),
+>     almost certainly from the SoH3D sky/sun-moon DRAW path (gSPSoH3DDraw + SoH3D render pass) in the
+>     first-person early-load window — the billboard Matrix is just the victim. Likely related to the
+>     scene-load race [[soh3d-skybox-corruption]]. Short C-up taps (`btnhold 0x0008 6`) sometimes
+>     survived (timing-accidental), long holds always crash.
+>   - NEXT (for a fresh session): catch the CORRUPTING WRITE, not the victim. Options: (1) a debug/
+>     ASAN build (note: the corruption may be WITHIN the POLY_OPA arena buffer, which ASAN won't see
+>     as a heap overrun — may need arena-bounds asserts in THGA_AllocEnd / the gfx interpreter);
+>     (2) instrument the SoH3D render path (SoH3D_GL_Submit / EmitRenderPass / the bit-30 far-plane
+>     draw) for an out-of-bounds write when the camera is first-person + scene just loaded; (3) check
+>     whether the SoH3D sun/moon BILLBOARD model (loadBillboard quad) or the dome is submitted with a
+>     bad vertex/index count or transform in the first-person view. All my speculative guard/diag
+>     changes were REVERTED (they did not fix it) — tree is clean at the counter-icon commit.
+>   (b) **POSITION SNAP**: first-person camera also "snaps to a wrong place under conditions I don't
+>   know how to reproduce" (user) — a separate positional bug, repro unknown.
 > - **#29 3DS LINK slides + RIGHT ARM TOO LONG** — Image: child Link in a crouched/contorted pose while
 >   moving. FALSIFIES the #29b note that "slide does NOT reproduce" — it DOES slide for the user in
 >   `linksrc 3ds` (3DS-anim) mode. Plus a NEW concrete bug: **the right arm renders longer than it
