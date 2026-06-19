@@ -184,19 +184,11 @@ This file is the source of truth across sessions.
 6. **Epona → OoT3D model** (lower priority) — Epona still renders as the N64 model; actor-
    replacement gap.
 
-28e. **OoT3D sun/moon discs + sun-glow dome** (finishes #28c) — the night STARS landed (#28c, see
-    Done) but the sun/moon DISCS still render via N64 `Environment_DrawSunAndMoon`. ASSET REALITY
-    (dumped 2026-06-19): the discs have NO CMB — `tex/fine_sun.ctxb`, `tex/fine_moon0..2.ctxb`,
-    `tex/fine_lensflare.ctxb` are standalone ctxb sprites the OoT3D engine billboards itself.
-    `fine_sun.cmb` is a vertex-coloured GLOW dome-cap (not the disc). To finish: (1) add a ctxb
-    reader (ctxb's "tex " chunk @ file offset 0x18 is byte-identical to a CMB tex chunk → reuse the
-    existing PICA decode in pica_texture.cpp); (2) build a synthetic textured billboard QUAD as a
-    LoadedModel (manual cGroups/cTexs, no CMB) and feed it through the model provider; (3) hook
-    `SoH3D_TryDrawSunMoon(play)` at the z_play.c Environment_DrawSunAndMoon call site (return 1 to
-    skip N64), drawing the sun quad at eye+sunPos and moon at eye-sunPos, camera-facing via
-    `play->billboardMtxF`, alpha by sun height exactly like the N64 path. sunPos formula is in
-    z_kankyo.c:1319-1321. Far-plane pin (handle bit 30) + depth-write off like the dome. The
-    sun-glow dome (fine_sun.cmb) can use the SKY: infra but must be oriented toward the sun azimuth.
+28e. **[DONE 2026-06-19; see Done] OoT3D sun/moon discs** (finished #28c). REMAINING OPTIONAL polish
+    (lower priority): the fine_lensflare.ctxb lens-flare (still N64 Environment_DrawSunLensFlare, a
+    separate call site) and the fine_sun.cmb vertex-coloured sun-GLOW dome-cap (would reuse the SKY:
+    infra but must be oriented toward the sun azimuth). The discs themselves — the core of
+    Environment_DrawSunAndMoon — are replaced and verified.
 
 27. **More foliage** (LOWEST priority — do last) — add more foliage/vegetation density to the world
     for a lusher look.
@@ -224,6 +216,28 @@ This file is the source of truth across sessions.
     toward the sun azimuth. Left as #28e below.
 
 ## Done (recent)
+
+- **#28e OoT3D sun/moon DISCS (replace N64 Environment_DrawSunAndMoon billboards)** — the sun/moon
+  were the last N64 sky sprites. OoT3D ships them as standalone CTXB sprites in /kankyo/BlueSky.zar
+  (no CMB): `tex/fine_sun.ctxb` (128x128 ETC1 glow-on-black) + `tex/fine_moon0.ctxb` (128x128
+  RGBA4444 alpha-masked full moon). NEW infra: (1) a **CTXB reader** `asset/ctxb.{h,cpp}` — a CTXB
+  is a 0x18-byte header (texChunkOff@0x10, texDataOff@0x14) wrapping a tex chunk BYTE-IDENTICAL to a
+  CMB's, so each entry decodes via the existing `pica_texture.cpp PicaDecode` (glFormat =
+  data_type<<16|fmt); (2) a synthetic **billboard quad** built as a LoadedModel in
+  `soh3d_model.cpp loadBillboard` (no CMB) via the `BILLBOARD:`/`BILLBOARDADD:<zar>|<ctxb>` auto-key
+  prefix — one quad with the N64 sun-sprite verts (-31..32, weights[0]=1 so identity-skin = no-op),
+  one decoded CTXB tex, blend = additive (sun, glow on black) or alpha (moon); (3) `SoH3D_TryDrawSunMoon`
+  (soh3d.c) hooked at z_play.c:1523 (return 1 to skip N64), drawing the sun at eye+sunPos / moon at
+  eye-sunPos, camera-facing via `play->billboardMtxF`, with N64's EXACT sunPos/scale/alpha formulae
+  (sunPos from gSaveContext.dayTime; sun scale (color*2)+10; moon scale -15*color+25, alpha
+  min(-y/80,1)*255 so it fades in only at night). Far-plane pinned (handle bit 30) + depth-write off
+  like the dome, so terrain occludes them below the horizon. Tint left WHITE (CTXBs carry their own
+  colour, unlike N64's I-format sprites). Gated like the dome (SKYBOX_NORMAL_SKY + OoT3D scene +
+  gSoH3dSky). VERIFIED headless on Vulkan (Hyrule Field 0xCD, frozen cam): morning (0x6000) sun glow
+  disc + halo ring renders at the N64 sun's exact screen position (A/B vs `sky 0`); night (0xE000)
+  full moon with surface detail renders at eye-sunPos over the #28c starfield, disc diameter ~490px
+  matching N64's, center within ~6px; `sky 0` correctly reverts to the N64 sun/moon. soh only
+  (Shipwright/soh: ctxb.{h,cpp}, soh3d_model.cpp, soh3d.{c,h}, z_play.c); libultraship untouched.
 
 - **#28c OoT3D night-sky STARS (fine_star.cmb additive star dome) — the night sky was starless** —
   our #28 dome replacement draws only the gradient (tenkyu); OoT3D layers a separate star dome
