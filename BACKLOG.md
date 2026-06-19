@@ -300,20 +300,25 @@ This file is the source of truth across sessions.
       Link plays an idle CSAB while the actor translates → slide. The float is a Y-placement/scale
       issue in the player draw hook. Fix both before this is "fine".
 
-29b. **3DS Link (own-CSAB / `linksrc 3ds` path) FLOATS above ground + SLIDES instead of walking
-    (user 2026-06-19).** Two distinct defects on the default Link path (SOH3D_LINK_SRC=3ds):
-    (1) **SLIDE** = walk/run animation missing. ROOT CAUSE already nailed in
-    [[soh3d-link-player-path]] "WALK/RUN MISSING": OoT Link's sustained walk/run is BLENDED into
-    `skelAnime.jointTable` via LinkAnimation_BlendToJoint WITHOUT updating `skelAnime.animation`, so
-    the own-CSAB-by-name resolver stays stuck on the last idle anim the whole time Link moves → idle
-    pose while translating. FIX OPTIONS (from memory): (A) jointTable RETARGET onto the OoT3D rig
-    (needs a derived player bonemap, sound + complete); (B) speed-based free-run of nml_walk/nml_run
-    when actor.speedXZ>thr (smaller, approximate). (2) **FLOAT** = Link's feet sit above the floor.
-    Y-placement/scale in SoH3D_TryDrawPlayer (the body is drawn at the player world transform ×
-    linkscale 0.011 + linkrot; if the OoT3D rig's root/foot origin differs from N64's, the model
-    hovers). Probe: compare the rendered foot Y to the floor Y at Link's xz; adjust the draw
-    translate (NOT a blind magic offset — measure the rig's foot-to-root distance). Verify headless
-    via `walkhold`/`walkinject` + screenshot (SOH3D_LINK=1).
+29b. **[DONE 2026-06-19 — FLOAT fixed; SLIDE not reproducing; see Done; awaiting user re-confirm]
+    3DS Link (own-CSAB / `linksrc 3ds` path) FLOATS above ground + SLIDES instead of walking
+    (user 2026-06-19).** (1) **FLOAT — FIXED.** Root cause was NOT a blind Y/scale offset: the OoT3D
+    Link CSABs carry absolute HIP (bone 1) TRANSLATION tracks authored for the taller BOY rig;
+    applied to the shorter CHILD rig (the only own-CSAB source for many anims) they over-lift the hip
+    → the whole skeleton floats ~930 model-local units (~40px). Quantified offline: BOY rig +
+    nml_wait_free grounds at -2.2; CHILD + same CSAB floats +931.7. The working linksrc=n64 path
+    grounds because it applies the rest (bind) translation and only REPLACES rotations. Dropping the
+    translation breaks the boy run (needs the hip bob: drop → +177 float), so the fix MEASURES the
+    posed model's lowest visible vertex (the feet) each frame and offsets the draw so the feet land
+    on actor pos.y (per-frame analogue of the auto path's bind-pose groundOffset). VERIFIED headless:
+    boot-bottom 502 (floating) → 553 == the grounded n64-retarget path. (2) **SLIDE — does NOT
+    reproduce.** During sustained movement player->skelAnime.animation resolves to
+    gPlayerAnim_link_normal_run_free → nml_run_free, so Link plays a real run cycle while translating
+    (verified live, Kakariko + Kokiri: speedXZ 1.49-2.15 → nml_run_free, two-frame captures show legs
+    cycling). The documented jointTable-blend slide didn't occur; a speed-driven locomotion override
+    was prototyped but NEVER fired (natural resolution covers it) so it was dropped, not committed.
+    The "slide" look was likely the FLOAT (a hovering Link translating reads as sliding). Re-confirm
+    with the user now that the float is fixed.
 
 16. **Gohma arena void-out** — walking in the Gohma (Deku Tree boss) arena drops Link through the
     floor → void. Collision hole. Repro at entrance 1039. INVESTIGATED 2026-06-19: NOT an OoT3D-
@@ -448,6 +453,30 @@ This file is the source of truth across sessions.
     toward the sun azimuth. Left as #28e below.
 
 ## Done (recent)
+
+- **#29b child Link FLOAT fixed (posed-feet grounding) + SLIDE confirmed not reproducing** — the
+  linksrc=3ds child Link hovered ~40px above the floor. ROOT CAUSE (measured, not guessed): the
+  OoT3D Link CSABs carry absolute hip (bone 1) TRANSLATION tracks authored for the taller BOY rig;
+  applied to the shorter CHILD rig (the own-CSAB source for many anims, since the idle/locomotion
+  CSABs live under boy/anim/ even in the child zar) they over-position the hip and lift the whole
+  skeleton. Offline proof: BOY rig + nml_wait_free grounds at -2.2 local units; CHILD rig + the same
+  CSAB floats at +931.7 (matches the in-game ~40px). The working linksrc=n64 path grounds precisely
+  because SoH3D_UpdateAnimN64* applies the bind translation and only REPLACES bone rotations — never
+  the hip lift. Naively dropping the CSAB translation tracks instead breaks the boy rig (its run
+  NEEDS the hip bob: drop → +177 float), so the fix is general and pose-driven: SoH3D_SetTrackPosedMinY
+  (per-model gate) caches each frame's skin matrices in every Link update path; SoH3D_PosedGroundOffset
+  recomputes the posed model's lowest VISIBLE vertex (mesh_id-mask-gated so a hidden unposed equipment
+  variant at its bind ~-1325 can't skew it) and returns -minY; SoH3D_TryDrawPlayer builds the world
+  matrix AFTER the pose+mask are known and applies that offset innermost (pre-scale, like the auto
+  path's bind-pose groundOffset). VERIFIED headless (Kokiri 0x55, child): boot-bottom 502 (floating) →
+  553 == the grounded n64-retarget path (552); N64 native 542 (the residual ~10px is model height,
+  identical to what the n64-retarget always showed); steady groundOff ~-900 idle / ~-1371 walk,
+  matching the offline-predicted floats. The SLIDE half does NOT reproduce: sustained movement
+  resolves to gPlayerAnim_link_normal_run_free → nml_run_free, so Link animates while translating
+  (verified two scenes, leg-cycle captures); a speed-driven locomotion override was prototyped but
+  never fired (natural resolution covers it) and was dropped rather than committed as dead code; only
+  a speedXZ readout was kept in the anim debug. soh only (soh3d.c, soh3d_model.cpp); libultraship
+  UNTOUCHED. See [[soh3d-link-player-path]].
 
 - **#32 Xbox HUD glyphs reworked from overlay → clean corner BADGE** — user reported the original
   #32 "overlaid XBOX buttons on top of the existing UI" (the full Xbox disc was the button
