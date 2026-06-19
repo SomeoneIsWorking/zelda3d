@@ -22,8 +22,19 @@ This file is the source of truth across sessions.
 
 ## Open
 
-1. **Cutscene / title / demo camera goes UNDER the 3DS terrain (N64 camera sequence vs 3DS terrain
-   heights)** — FINAL diagnosis from the user (2026-06-19): the title was NOT upside-down; the
+1. **[VISIBLE ARTIFACT FIXED 2026-06-19 via backface culling; see Done] Cutscene / title / demo
+   camera goes UNDER the 3DS terrain.** ROOT CAUSE of the visible "flip" was NOT terrain height:
+   the OoT3D meshes were drawn DOUBLE-SIDED (no backface cull), so when the demo camera dipped under
+   the Hyrule Field surface we rendered the terrain UNDERSIDE ("ground above, sky below"). N64
+   backface-culls those faces (you'd see through to sky). Fixed by honoring the CMB cull byte in the
+   GL+Vk draw path (faceCull). **The old "3DS terrain sits higher than N64 → cam under 3DS surface"
+   hypothesis below is FALSIFIED by measurement:** N64 floor vs OoT3D mesh floor in Hyrule Field
+   AGREE to ~1u (at (-4000,5228): N64 11.18 vs OoT3D 10.30), so terrain-delta camera reconciliation
+   would shift the cam <1u and could not lift it above the ~11u terrain. The camera may still dip
+   under terrain in some demo shots, but the RENDER now matches N64 (culled, see-through) so it no
+   longer reads as a flip. REMAINING (lower priority, only if a demo shot still looks wrong): whether
+   the scripted demo cam eye.y is itself mis-derived. Original (now-falsified) writeup kept below.
+   ~~FINAL diagnosis from the user (2026-06-19): the title was NOT upside-down; the~~
    **camera was below the rendered terrain looking up at its underside** (looks like a flip; sky
    below, ground above). Root cause, in the user's words: **"it is using 3DS terrain with the N64
    sequence."** The scene renders the OoT3D (3DS) terrain mesh, but the cutscene/demo CAMERA runs the
@@ -229,6 +240,28 @@ This file is the source of truth across sessions.
     toward the sun azimuth. Left as #28e below.
 
 ## Done (recent)
+
+- **#1 Backface-cull OoT3D meshes (the "camera under terrain / flip look" artifact)** — the OoT3D
+  mesh draw path (GL + Vulkan) rendered everything DOUBLE-SIDED (GL_CULL_FACE off; Vk
+  rs.cullMode=NONE). So whenever the camera saw a backface — the title/demo camera dipping under the
+  Hyrule Field surface, or any view inside geometry — we drew it, where N64 backface-culls (you'd see
+  through to sky). That is the real cause of "cutscene/title camera under terrain → sky-below /
+  ground-above flip". Honor the CMB material cull byte (game-wide ONLY two values: 1 = single-sided /
+  cull-back, 3 = double-sided / no-cull — confirmed across 37 room CMBs (266×1,50×3) + 60 actor zars
+  (250×1,49×3)). makeCgroup sets `faceCull = (mat->cull==1)`; the color pass enables
+  GL_BACK / VK_CULL_MODE_BACK for those groups. Front-face winding flips with invertY (the vertex
+  shader negates clip.y), so `frontCW = invertY ^ gSoH3dFaceCullFlip`; flip=1 is the verified-correct
+  convention (one global works for both backends because the invertY term already accounts for the
+  GL-vs-Vk screen orientation difference). State-leak guarded: beginPass/endPass save+restore
+  GL_CULL_FACE_MODE + GL_FRONT_FACE; shadow/AO depth passes keep culling off (cullPass=false). Sky
+  dome (inward-facing, cull byte 1) stays visible from inside — same normal-side-is-front convention
+  as the terrain. Gate: env SOH3D_FACECULL (default ON) / REPL `facecull <0|1> [flip]`. VERIFIED
+  headless on Vulkan: camera frozen UNDER the Hyrule Field terrain — upper region went from
+  terrain-underside RGB (89,66,60) to sky-blue (82,132,205) (terrain culled, see-through to the dome,
+  == N64); normal above-ground view, Market (buildings + townsfolk + fountain) and the Deku Tree
+  interior (inward walls visible) all unchanged. The old #1 "3DS terrain higher than N64" hypothesis
+  was FALSIFIED by measurement (the two floors agree to ~1u in Hyrule Field). libultraship d272d6a9
+  (fork/soh3d), Shipwright 8dc225e37 (fork/develop).
 
 - **#28e OoT3D sun/moon DISCS (replace N64 Environment_DrawSunAndMoon billboards)** — the sun/moon
   were the last N64 sky sprites. OoT3D ships them as standalone CTXB sprites in /kankyo/BlueSky.zar
