@@ -96,6 +96,16 @@ This file is the source of truth across sessions.
 
 31. **UI textures (user 2026-06-19)** — higher-res / custom HUD & menu element textures (the SVG
    approach used for the stairs is a candidate: author UI elements as SVG, rasterize, inject).
+   **HEARTS DONE 2026-06-19 (see Done; awaiting user sign-off):** the blocky N64 16x16 IA8 HUD
+   hearts (full/3-4/half/quarter/empty) are now crisp 64x64 SVG-authored textures injected via the
+   raw-RGBA Fast3D path (option (b)), grayscale so the heart combine still tints them red + drives
+   the beating/partial/empty states. Gate env SOH3D_HUDTEX / REPL `hudtex 0|1` (default on).
+   tools/soh3d_gen_hud_tex.sh is the reusable heart-style generator. REMAINING high-visibility HUD
+   elements to give the same treatment (all reuse the SoH3D_HeartTex / raw-RGBA mechanism): the
+   **magic bar** (gMagicMeterEnd/Mid/Fill, simple gradient bars — clean, but only shows once Link
+   has magic), the **rupee/key/ammo digit font** + icons, the **A/B/C button backgrounds**
+   (gButtonBackgroundTex — but #32 already badges these with Xbox glyphs), the **do-action label**
+   font, and the **minimap/dungeon-map** dot/marker sprites. Pick by visibility next.
    INVESTIGATED 2026-06-19: the texpack DOES have a `UI/` dir (`textures/0004000000033500/UI`, 259
    files, Citra-hash-named `tex1_WxH_HASH_fmt_mip0.png`, with GERMAN/ITALIAN/JAPANESE/SPANISH subdirs),
    but inspecting the 256x256 set they are **OoT3D menu/map/pause/GAME-OVER screens + item-grid atlases**
@@ -453,6 +463,28 @@ This file is the source of truth across sessions.
     toward the sun azimuth. Left as #28e below.
 
 ## Done (recent)
+
+- **#31 crisp higher-res HUD hearts (raw-RGBA Fast3D injection)** — the N64 HUD hearts were blocky
+  16x16 IA8 textures (gHeart{Full,ThreeQuarter,Half,Quarter,Empty}Tex, drawn by HealthMeter_Draw in
+  z_lifemeter.c). Replaced with crisp 64x64 SVG-authored hearts injected via the same raw-in-RAM
+  RGBA32 pointer path proven by the #32 Xbox glyphs ([[soh3d-hud-glyphs]]). KEY INSIGHT: the heart
+  combine is (PRIM-ENV)*TEXEL0+ENV for colour, TEXEL0*PRIM for alpha — so TEXEL0.rgb is just the
+  PRIM<->ENV lerp factor. A GRAYSCALE heart (rgb=intensity, a=silhouette) therefore tints EXACTLY
+  like the original IA8 one, so every existing behaviour is preserved for free: heart-colour
+  cosmetic CVars, the beating-heart pulse, and the partial/empty fill states (the fill fraction is
+  baked as a bright-vs-dark intensity step WITHIN a solid heart silhouette, matching N64 IA
+  semantics — verified offline by re-tinting the 5 PNGs ENV->PRIM). Pieces: tools/soh3d_gen_hud_tex.sh
+  (SVG->PNG-embed, mirror of the xbox-glyph/stairs scripts) -> heart_tex_png.h (5 fill states);
+  SoH3D_HeartTex(kind) (soh3d_model.cpp, decode-once persistent RGBA32); z_lifemeter.c maps each
+  gHeart*/gDefenseHeart* symbol to a kind, loads the crisp RGBA32 in its place, and RESCALES the
+  shared heart quad's far texcoords to the real texture size (the baked tc span only 16 texels ==
+  the old 16x16 tile, so a 64x64 tile would show its top-left quarter — same quad-tc fix as the #32
+  A-button). Gate env SOH3D_HUDTEX / REPL `hudtex 0|1` (default on); off restores the byte-identical
+  N64 IA8 path (tc reset to 512). VERIFIED headless (Kokiri Forest 238): 8x zoom shows the crisp
+  heart is smooth/anti-aliased with a defined dark rim vs the N64 stair-stepped 16x16; before/after
+  montage sent to user. soh only (z_lifemeter.c, soh3d.{c,h}, soh3d_model.cpp, heart_tex_png.h);
+  libultraship UNTOUCHED. This is the first #31 element; magic bar / digits / map markers reuse the
+  same mechanism. See [[soh3d-hud-glyphs]].
 
 - **#29b child Link FLOAT fixed (posed-feet grounding) + SLIDE confirmed not reproducing** — the
   linksrc=3ds child Link hovered ~40px above the floor. ROOT CAUSE (measured, not guessed): the
