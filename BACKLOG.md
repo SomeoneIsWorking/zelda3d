@@ -46,8 +46,16 @@ This file is the source of truth across sessions.
 > - **#23 CUCCO won't flap WHEN HELD** — REOPEN. My #23 did the IDLE procedural flap; the HELD/picked-up
 >   cucco uses the agitated flap path (func_80AB5BF8 higher amplitude / a different state) which my
 >   OverrideLimbDraw replay doesn't cover when the cucco is carried. Incomplete, not done.
-> - **#24 KAKARIKO WELL still not fixed** — REOPEN (the forced-CMB render swap didn't fully fix what the
->   user sees; re-diagnose the actual well visual in-scene, don't trust the prior "teal water" check).
+> - **#24 KAKARIKO WELL — re-diagnosed 2026-06-19, NO actionable defect found in-scene; NEEDS USER
+>   SPECIFICS.** Framed the well live (water actor Idomizu 0x104 @ (762,52,524), pillar Idohashira 0x103
+>   @ (799,80,503), both drawn=1). At PLAYER EYE-LEVEL the well reads correctly: a stone octagonal ring
+>   matching the surrounding kabe walls, dark shaft interior, teal 3DS water visible (a small disc deep
+>   down) only when looking straight down. The prior forced-CMB fix (teal water + pillar, no windmill
+>   blades) IS in effect. auto 0 (N64) vs auto 1 (3DS) look identical from top-down. So either the prior
+>   fix is actually fine and the user's "still broken" was stale/about something else (windmill? water
+>   level near rim? the Bottom-of-the-Well *entrance* vs the surface well?), or the defect only shows in
+>   a state/angle I didn't reproduce. Screenshots scratch/screenshots/well_{eyelevel,topdown,n64}.png.
+>   DO NOT make a speculative change — get the user to point at the specific wrong thing first.
 > - **FIRST-PERSON CAMERA (NEW, #37) — TWO bugs.** (a) **CRASH/flashing**: entering first-person
 >   (C-up, BTN_CUP=0x0008) within ~2-3s of a FRESH scene load DETERMINISTICALLY CRASHES (SIGSEGV,
 >   verified 3/3 trials in Kakariko via REPL `btnhold 0x0008 4`). After the scene settles (~30s) it's
