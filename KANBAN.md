@@ -3,11 +3,11 @@
 > **Generated mirror — do not hand-edit.** Source of truth = GitHub Issues on
 > `SomeoneIsWorking/soh3d` (private). Regenerate with `tools/kanban.py render`.
 > Move a card with `tools/kanban.py mv <#> <column>`; add with `tools/kanban.py add`.
-> Columns: todo · in-progress · in-review · needs-confirmation · reopened · blocked · done(=closed).  Updated 2026-06-19 21:13.
+> Columns: todo · in-progress · in-review · needs-confirmation · reopened · blocked · done(=closed).  Updated 2026-06-19 21:26.
 
-**Counts:** todo:19 | in-progress:1 | in-review:0 | needs-confirmation:6 | reopened:5 | blocked:1 | done:37
+**Counts:** todo:18 | in-progress:1 | in-review:0 | needs-confirmation:7 | reopened:5 | blocked:1 | done:37
 
-## 📋 To Do  (19)
+## 📋 To Do  (18)
 - [#6](../../issues/6) Held cucco renders at pickup spot, not in Link's hands _(render,link,cucco)_
 - [#8](../../issues/8) 3DS Link (N64 anims): head pitched down, arms wrangled _(anim,link)_
 - [#9](../../issues/9) 3DS Link can't pick up a cucco in 3DS-anim mode _(anim,link)_
@@ -25,7 +25,6 @@
 - [#25](../../issues/25) Link drops off every climbable surface halfway up (systemic) _(collision)_
 - [#27](../../issues/27) Gohma model needs hand-curated multi-CMB assembly _(render,anim)_
 - [#28](../../issues/28) Deku Baba no combat interaction (uncertain / maybe state corruption) _(scene)_
-- [#30](../../issues/30) NPC walks in mid-air above a Kakariko building _(collision,scene)_
 - [#33](../../issues/33) More foliage / vegetation density (lowest priority) _(scene)_
 
 ## 🔨 In Progress  (1)
@@ -34,13 +33,14 @@
 ## 🔍 In Review (agent verifying)  (0)
 _none_
 
-## 🙋 Needs User Confirmation  (6)
+## 🙋 Needs User Confirmation  (7)
 - [#1](../../issues/1) Stairs: real stepped geometry, wall preserved (render broken) _(render,stairs,scene)_
 - [#2](../../issues/2) Kakariko well: water is a tiny teal diamond, not a surface _(render,well)_
 - [#12](../../issues/12) Inventory/pause background renders upside-down _(render,ui,inventory)_
 - [#18](../../issues/18) Crisp HUD/UI textures (hearts/digits/buttons/icons) _(ui,hud)_
 - [#26](../../issues/26) Gohma arena void-out (matches N64 — confirm differs from vanilla?) _(collision,scene)_
 - [#29](../../issues/29) Giant boulder overlaps the Temple of Time (Market) _(render,scene)_
+- [#30](../../issues/30) NPC walks in mid-air above a Kakariko building _(collision,scene)_
 
 ## ♻️ Reopened (was done, found broken)  (5)
 - [#3](../../issues/3) Kokiri kids pop out at distance (actor unload, want infinite) _(render,scene)_
