@@ -85,13 +85,16 @@ This file is the source of truth across sessions.
     the user — verify the hold-Start dialog skip (just added) works, and consider enabling the
     SkipText enhancement by default so B/Start fast-advance text instantly.
 
-13. **Wrong entrance spawn points (CLUSTER, some SEVERE)** — entrances land at the wrong spawn:
-    (a) Kokiri shop door → Link's house; (b) Kakariko graveyard → immediately transitions back out
-    (spawns Link ON the exit/leave trigger); (c) a Kakariko door (screenshot: posted-notices door)
-    → enter → fall into the void → respawn inside → fall again FOREVER (infinite void loop, can only
-    escape by debug-teleport; can never die/land). Likely one root cause: wrong spawn index /
-    spawn-point lookup / door→entrance routing, dropping Link outside the room floor. HIGH priority
-    (the void loop is a hard softlock). Check entrance table + spawn handling.
+13. **[FIXED root cause 2026-06-19; see Done] Wrong entrance spawn points (CLUSTER, some SEVERE)**
+    — (b) Kakariko graveyard "immediately transitions back out" ROOT-CAUSED + FIXED: SoH spawns
+    Link at N64-authored coords, but the OoT3D scene-collision's scene-EXIT triangles cover
+    different XZ than N64's, so the N64 spawn poly landed on an OoT3D exit poly → instant bounce.
+    Fix: re-source each OoT3D floor poly's exit+cam (surfaceType low 13 bits) from the N64 floor at
+    that location (soh3d.c SoH3D_N64FloorData0 + per-poly surfaceTypes). VERIFIED: graveyard (0xE4)
+    now stays loaded; real exit-1 preserved at N64's (-1600,z); spawn exit=0 == N64. The SAME
+    mechanism (N64-spawn-on-OoT3D-exit-poly) is the likely cause of (a) Kokiri shop door → Link's
+    house and (c) the Kakariko void-loop, but those two were NOT individually re-reproduced —
+    re-test them; if (c) persists it may be a missing-OoT3D-floor hole at the spawn (separate).
 
 14. **Link drops off EVERY climbable surface halfway** (collision, SYSTEMIC) — not just one ladder;
     all climbables (ladders/vines/walls) drop Link partway up. Likely a general climb-collision
@@ -108,7 +111,14 @@ This file is the source of truth across sessions.
     quality.)
 
 16. **Gohma arena void-out** — walking in the Gohma (Deku Tree boss) arena drops Link through the
-    floor → void. Collision hole. Repro at entrance 1039.
+    floor → void. Collision hole. Repro at entrance 1039. INVESTIGATED 2026-06-19: NOT an OoT3D-
+    collision regression. Grid-probed `floorat` across the arena under OoT3D collision (default) vs
+    N64 collision (`collision 0`) — the two are IDENTICAL: both have floor only in a small patch
+    (x∈[150,300], z∈[400,850] @ y=-640) and "NO FLOOR" everywhere else (e.g. (0,700),(450,700)).
+    ydan_boss has just 95 verts/151 polys in BOTH. So the void-out is the same under N64 — either
+    original behavior (small arena, Gohma knocks you off) or a deeper non-3DS issue; fixing it would
+    mean ADDING collision the original lacks (bandaid). Deprioritize / needs the user to confirm it
+    differs from vanilla.
 
 17. **Gohma model hand-weave** — Gohma needs hand-curated multi-CMB assembly (like kAssemblies in
     [[soh3d-auto-replace]]); generic auto-merge is unsound.
@@ -183,6 +193,25 @@ This file is the source of truth across sessions.
     see [[soh3d-texpack]]. (Foliage #27 is the only "extra/lowest" item — foliage is already 3DS.)
 
 ## Done (recent)
+
+- **#13(b) Kakariko graveyard bounces straight back out (OoT3D collision exit-poly mismatch)** —
+  warping to the graveyard (entrance 0xE4) immediately transitioned back to Kakariko. ROOT CAUSE:
+  SoH spawns Link at the N64 spawn point (-1408,0,330), which is authored against the N64 EXIT
+  layout. The OoT3D scene collision (spot02_info.zsi) puts its scene-exit triangles at different XZ
+  extents — the N64 spawn poly landed on OoT3D poly472 (type 22, exit index 1 = "back to Kakariko")
+  → Link triggered the exit on frame 0. PROVEN: under `collision 0` (N64) the same spawn poly has
+  exit=0 and Link stays; under OoT3D collision it had exit=1. The OoT3D cam+exit *indices* also
+  point into OoT3D's own camera/exit lists (we load N64's), a second reason not to trust them. FIX
+  (soh3d.c `SoH3D_BuildSceneCollision`): build one SurfaceType PER POLY and, for each FLOOR poly,
+  re-source the cam+exit bits (surfaceType.data[0] low 13 bits = 0x1FFF) from the N64 floor at that
+  triangle's centroid (`SoH3D_N64FloorData0`, manual point-in-triangle over the N64 header, closest
+  plane-Y for multi-level). Floor type/material/flags (data[1], high bits of data[0]) stay OoT3D;
+  walls untouched; OoT3D-only floors with no N64 floor under them get exit bits zeroed (no stray
+  bounce). VERIFIED headless: graveyard (0xE4) now STAYS (scene 0x53); the real exit-1 is preserved
+  at the N64 location (-1600,z); spawn now reads exit=0 cam=4 == N64; Hyrule Field (3753 polys)
+  still loads in ~2s, Link grounded (the per-poly N64 scan is one-time at scene load). Also fixes
+  per-region cameras to match N64. soh only (Shipwright/soh/src/soh3d/soh3d.c). The same mechanism
+  should clear #13(a)/(c) — re-test.
 
 - **SOH3D_ENTRANCE accepts hex** — `SoH3D_AutoWarpEntrance` used `atoi()` (decimal-only), so
   `tools/soh3d_game.sh start 0xDB` silently parsed `0xDB`→`0` and loaded the Deku Tree (scene 0x0)
