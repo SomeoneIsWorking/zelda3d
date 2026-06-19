@@ -199,11 +199,17 @@ This file is the source of truth across sessions.
    to float when climbing. Lower it slightly (per-actor yoff / placement). Tune live via REPL
    `yoff`, then bake.
 
-5. **Real polygon stairs for fake flat stairs** — original primary goal. Stairs rendered as flat
-   textured planes should become real 3D stepped polygon geometry. NOTE: OoT3D ALSO uses flat
-   fake-textured stairs, so this CANNOT be solved by routing to OoT3D geometry — the stepped
-   meshes must be PROGRAMMED/GENERATED ourselves (synthesize real steps where the game has fake
-   flat stairs).
+5. **[DONE 2026-06-19; see Done] Real polygon stairs for fake flat stairs** — original primary
+   goal. OoT3D (like N64) renders staircases as one FLAT textured ramp whose step lines are
+   PAINTED into the texture. Detection is the game's own asset label: the stair texture name
+   contains "kaidan" (階段). At scene-room build time every kaidan ramp is replaced by GENERATED
+   3D step geometry (horizontal treads + vertical risers) over the same footprint, on the same
+   kaidan material (UV/texture/lighting/cull preserved). Generic — applies to every kaidan patch
+   in every scene. Verified on the Kakariko entrance staircase (flat ramp vs stepped: sawtooth
+   silhouette + tread/riser relief; 103k px isolate). REMAINING (lower priority): collision is
+   still the smooth N64 ramp, so Link's feet can clip a riser / float a tread by up to ~half a
+   step (visual-only steps); step undersides are open (fine against terrain). Gate: env
+   SOH3D_STAIRS (default 1) / REPL `stairs <0|1>` (GL caches per id — env for same-scene A/B).
 
 6. **Epona → OoT3D model** (lower priority) — Epona still renders as the N64 model; actor-
    replacement gap.
@@ -240,6 +246,27 @@ This file is the source of truth across sessions.
     toward the sun azimuth. Left as #28e below.
 
 ## Done (recent)
+
+- **#5 Real stepped-polygon stairs from the fake-flat "kaidan" ramps (ORIGINAL PRIMARY GOAL)** —
+  OoT3D renders staircases as ONE flat textured ramp; the steps are painted into the texture, whose
+  name contains "kaidan" (階段, "staircase" — e.g. spot01's `s01_kaidan_01`). That asset name is the
+  grounded detection signal (not a per-scene magic region). At scene-room build (soh3d_model.cpp
+  `generateRoomStairs`/`generateStairsGroup`, called from `loadSceneRoom`→`buildFromCmb(stairs=true)`)
+  every kaidan draw group's flat triangles are REPLACED by generated 3D step geometry: union-find the
+  group into connected+coplanar ramp patches; per patch build a horizontal ascend/across frame from
+  the plane normal, footprint = (a,c) bbox, fit the ramp's affine UV(a,c); emit N = round(rampRiseY /
+  kStairRiserY) treads (top face) + risers (front face, downhill normal), keeping the same material
+  (texture/UV/cull/baked-color). `kStairRiserY = 7.8` is asset-derived: the kaidan texture paints ~11
+  steps per 128px V-tile (FFT) and the ramp UV maps ~86 world-Y per V-tile → ~7.8u per painted step.
+  Winding matches the CMB CCW-outward convention so the cull=1 kaidan material renders correctly.
+  VERIFIED headless Vulkan (Kakariko 0x52 entrance staircase, frozen cam looking down the flight):
+  SOH3D_STAIRS=0 = flat ramp with straight diagonal silhouette + painted stripes; default ON = sawtooth
+  step silhouette + tread/riser relief; isolate = 103k px changed on the staircase, rest of scene
+  unchanged + no corruption. Generic: applies to every kaidan patch in every scene. KNOWN LIMITS:
+  collision is still the smooth N64 ramp (Link can clip a riser/float a tread by ≤½ step — visual-only
+  steps); step undersides open. Gate env SOH3D_STAIRS / REPL `stairs <0|1>` (GL caches geometry per
+  model id, so the live toggle applies to rooms loaded AFTER it — use the env for same-scene A/B).
+  Shipwright (fork/develop) + outer (main); libultraship untouched. Memory [[soh3d-stairs]].
 
 - **#1 Backface-cull OoT3D meshes (the "camera under terrain / flip look" artifact)** — the OoT3D
   mesh draw path (GL + Vulkan) rendered everything DOUBLE-SIDED (GL_CULL_FACE off; Vk
