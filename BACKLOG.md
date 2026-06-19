@@ -83,6 +83,19 @@ This file is the source of truth across sessions.
 
 31. **UI textures (user 2026-06-19)** — higher-res / custom HUD & menu element textures (the SVG
    approach used for the stairs is a candidate: author UI elements as SVG, rasterize, inject).
+   INVESTIGATED 2026-06-19: the texpack DOES have a `UI/` dir (`textures/0004000000033500/UI`, 259
+   files, Citra-hash-named `tex1_WxH_HASH_fmt_mip0.png`, with GERMAN/ITALIAN/JAPANESE/SPANISH subdirs),
+   but inspecting the 256x256 set they are **OoT3D menu/map/pause/GAME-OVER screens + item-grid atlases**
+   — i.e. OoT3D's OWN UI (touchscreen layout), NOT drop-in replacements for the N64 in-game HUD
+   (gButtonBackgroundTex, the heart/magic/rupee/do-action sprites). There is **no clean 1:1 mapping**
+   from these atlases to N64 HUD elements, and they're keyed by Citra hash for the CMB path, which the
+   N64 HUD doesn't use. So "use the texture pack for UI" can't be a blind hash-swap. Tractable options:
+   (a) the **raw-RGBA Fast3D HUD injection path from #32** ([[soh3d-hud-glyphs]] / `SoH3D_XboxGlyphTex`
+   + `SoH3D_DrawXboxBtn`) is the ready mechanism — feed it upscaled/redrawn HUD textures per draw site;
+   (b) author crisp HUD elements as SVG (hearts, magic bar, button bg) and inject them, same pipeline
+   as the Xbox glyphs / stairs; (c) cherry-pick the few pack UI textures that DO correspond (e.g.
+   item icons that match N64 items) and remap. Needs the user to say which HUD elements matter most;
+   pursue (b) for the highest-visibility elements if proceeding autonomously.
 
 32. **XBOX controller UI (user 2026-06-19) — ITEM-BUTTON CLUSTER DONE (see Done); REMAINING POLISH.**
    Done: the HUD item-button prompts (B + the 3 C buttons) now render as full-colour Xbox face-button
