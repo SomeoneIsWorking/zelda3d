@@ -3,9 +3,9 @@
 > **Generated mirror — do not hand-edit.** Source of truth = GitHub Issues on
 > `SomeoneIsWorking/soh3d` (private). Regenerate with `tools/kanban.py render`.
 > Move a card with `tools/kanban.py mv <#> <column>`; add with `tools/kanban.py add`.
-> Columns: todo · in-progress · in-review · needs-confirmation · reopened · blocked · done(=closed).  Updated 2026-06-19 22:23.
+> Columns: todo · in-progress · in-review · needs-confirmation · reopened · blocked · done(=closed).  Updated 2026-06-19 22:40.
 
-**Counts:** todo:18 | in-progress:1 | in-review:0 | needs-confirmation:9 | reopened:2 | blocked:1 | done:38
+**Counts:** todo:18 | in-progress:2 | in-review:0 | needs-confirmation:9 | reopened:1 | blocked:1 | done:38
 
 ## 📋 To Do  (18)
 - [#6](../../issues/6) Held cucco renders at pickup spot, not in Link's hands _(render,link,cucco)_
@@ -27,7 +27,8 @@
 - [#28](../../issues/28) Deku Baba no combat interaction (uncertain / maybe state corruption) _(scene)_
 - [#33](../../issues/33) More foliage / vegetation density (lowest priority) _(scene)_
 
-## 🔨 In Progress  (1)
+## 🔨 In Progress  (2)
+- [#7](../../issues/7) 3DS Link (3DS anims): motionless slide + long right arm _(anim,link)_
 - [#15](../../issues/15) Universal SPACE skip for cutscenes/onepoint/item-get _(keyboard)_
 
 ## 🔍 In Review (agent verifying)  (0)
@@ -44,8 +45,7 @@ _none_
 - [#26](../../issues/26) Gohma arena void-out (matches N64 — confirm differs from vanilla?) _(collision,scene)_
 - [#29](../../issues/29) Giant boulder overlaps the Temple of Time (Market) _(render,scene)_
 
-## ♻️ Reopened (was done, found broken)  (2)
-- [#7](../../issues/7) 3DS Link (3DS anims): motionless slide + long right arm _(anim,link)_
+## ♻️ Reopened (was done, found broken)  (1)
 - [#31](../../issues/31) Hand-weave the 3DS Link model (multi-CMB assembly + equipment) _(render,anim,link)_
 
 ## ⛔ Blocked (needs live/user input)  (1)
