@@ -163,6 +163,22 @@ This file is the source of truth across sessions.
    (move skip to a different key, or roll on a different key) when implementing. Verify live with the
    user (keyboard is their actual play path — they report what feels wrong). Pairs with #33 (Xbox
    scheme) + #34 (device-adaptive prompts) as the input-rework cluster.
+   **SCOPING (investigated 2026-06-19, infra EXISTS — this is mostly default-binding config, not new
+   plumbing):** LUS already has the full mapping system under
+   `libultraship/src/ship/controller/controldevice/controller/mapping/{keyboard,mouse}/` —
+   KeyboardKeyToButtonMapping, KeyboardKeyToAxisDirectionMapping (WASD->stick), MouseButtonToButton,
+   Mouse->axis (mouse-look), all data-driven. Defaults live in
+   `mapping/ControllerDefaultMappings.cpp`: **WASD->LEFT_STICK is ALREADY a built-in default**
+   (lines ~63-66, KbScancode LUS_KB_{A,D,W,S}). So the work is: (1) customize the default KEYBOARD
+   key->button map (E->A, 1/2/3/4 -> B + C-left/down/right, LMB->B, RMB->R) — SoH passes its defaults
+   into the ControllerDefaultMappings ctor; find that call (ControlDeck setup) and set our scheme;
+   (2) wire mouse-delta -> camera (right-stick / FreeLook, `MouseStateManager`/`FastMouseStateManager`
+   + relative capture); (3) resolve Space: A is CONTEXT-SENSITIVE in OoT (roll-when-moving /
+   interact-when-near), so mapping BOTH E and Space -> A gives interact+roll on both keys (functional
+   but the skip-key #2 conflict remains — pick a different skip key). NB this is libultraship-fork
+   territory (commit to fork/soh3d), unlike #32 which was soh-only. Hard to verify headless (no SDL
+   key/mouse events in the Xvfb REPL path; the REPL injects at the N64-button level, downstream of
+   the mapping) -> validate with the user live.
 
 9. **Grass/lilypad area not walkable (collision regression)** — Link can't enter a forest pond-edge
    lilypad patch that "used to work." Check collision / terrainwarp path; needs in-game repro.
