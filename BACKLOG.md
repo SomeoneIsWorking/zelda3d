@@ -75,6 +75,12 @@ This file is the source of truth across sessions.
    Player cutscene-mode (`csMode`), onepoint cams, actor-driven. User accepts the
    iterate-on-softlock approach (they report what softlocks).
    (DONE: holding Start skips dialogs — `z_message_PAL.c` all 4 text-advance sites.)
+   (DONE 2026-06-19, see Done: **onepoint cutscene cameras** now press-to-skip on Start/Space —
+   `SoH3D_SkipControlTakers` force-ends every active onepoint subcam via the game's own
+   `OnePointCutscene_EndCutscene`. Gate `skip <0|1>` / env SOH3D_SKIP.)
+   REMAINING: Player cutscene-mode (`csMode`) freezes + item-get freezes (chest-open / get-item
+   over-head) — these are actor-driven in z_player.c and riskier (must release control without
+   corrupting the get-item state); do next, carefully.
 
 30. **Hi-res textures (user 2026-06-19)** — world/scene textures at higher resolution. The texpack
    mechanism exists ([[soh3d-texpack]]: replace CMB textures by Citra legacy hash from a `textures/`
@@ -335,6 +341,23 @@ This file is the source of truth across sessions.
     toward the sun azimuth. Left as #28e below.
 
 ## Done (recent)
+
+- **#2 press-to-skip — onepoint cutscene cameras (door/attention/treasure pans)** — onepoint
+  cutscene cameras (Z-target attention pans, door reveals, treasure/switch framing) grab the camera
+  away from the player and run on a timer; they were the un-skippable gap (scripted CS already skip
+  via z_demo.c `csSkipButton`). New `SoH3D_SkipControlTakers(play)` (soh3d.c), hooked in `Play_Update`
+  just before the camera-update loop: on a `BTN_START` press (keyboard SPACE maps to Start) it walks
+  the subcameras and force-ends every active onepoint cam (`cam->csId != 0 && timer > 1`) via the
+  game's OWN `OnePointCutscene_EndCutscene` — the same path the timer expiry uses, so it lands in the
+  proper post-cam state (timer→0, or 5 for attention csId 5010). No auto-skip: it only fires on a
+  press. Title demo (fileNum 0xFEDC) excluded. Gate env SOH3D_SKIP (default on) / REPL `skip <0|1>`;
+  added REPL `cscams` (dump active subcams idx/csId/timer) and `skiptest <csId> <timer>` (start a
+  onepoint cam on Link) for verification. VERIFIED headless (Kakariko 0x52): `skiptest 1020 200` →
+  `cscams` shows active=1 cam1 csId=1020 timer counting; `btnhold 0x1000 2` (Start) → `cscams` shows
+  active=0 (cam ended in one frame). Control: `skip 0` then Start → cam SURVIVES (active=1, timer
+  keeps counting) — proves the gate + that our code is what ends it; re-`skip 1` + Start ends it
+  again. soh only (soh3d.{c,h}, z_play.c); libultraship UNTOUCHED. REMAINING #2: Player csMode +
+  item-get freezes (z_player.c, riskier — see #2 Open).
 
 - **#32 Xbox face-button HUD glyphs — item-button cluster (B + 3 C buttons)** — the in-game HUD
   button prompts now render as full-colour Xbox face-button glyphs instead of the shared N64 circle
