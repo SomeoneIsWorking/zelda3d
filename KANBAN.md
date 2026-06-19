@@ -3,9 +3,9 @@
 > **Generated mirror — do not hand-edit.** Source of truth = GitHub Issues on
 > `SomeoneIsWorking/soh3d` (private). Regenerate with `tools/kanban.py render`.
 > Move a card with `tools/kanban.py mv <#> <column>`; add with `tools/kanban.py add`.
-> Columns: todo · in-progress · in-review · needs-confirmation · reopened · blocked · done(=closed).  Updated 2026-06-19 22:02.
+> Columns: todo · in-progress · in-review · needs-confirmation · reopened · blocked · done(=closed).  Updated 2026-06-19 22:23.
 
-**Counts:** todo:18 | in-progress:1 | in-review:0 | needs-confirmation:8 | reopened:3 | blocked:1 | done:38
+**Counts:** todo:18 | in-progress:1 | in-review:0 | needs-confirmation:9 | reopened:2 | blocked:1 | done:38
 
 ## 📋 To Do  (18)
 - [#6](../../issues/6) Held cucco renders at pickup spot, not in Link's hands _(render,link,cucco)_
@@ -33,18 +33,18 @@
 ## 🔍 In Review (agent verifying)  (0)
 _none_
 
-## 🙋 Needs User Confirmation  (8)
+## 🙋 Needs User Confirmation  (9)
 - [#1](../../issues/1) Stairs: real stepped geometry, wall preserved (render broken) _(render,stairs,scene)_
 - [#2](../../issues/2) Kakariko well: water is a tiny teal diamond, not a surface _(render,well)_
 - [#3](../../issues/3) Kokiri kids pop out at distance (actor unload, want infinite) _(render,scene)_
+- [#4](../../issues/4) Title/cutscene camera goes under 3DS terrain _(render,camera)_
 - [#5](../../issues/5) Cucco wings don't flap (idle + held/agitated) _(anim,cucco)_
 - [#12](../../issues/12) Inventory/pause background renders upside-down _(render,ui,inventory)_
 - [#18](../../issues/18) Crisp HUD/UI textures (hearts/digits/buttons/icons) _(ui,hud)_
 - [#26](../../issues/26) Gohma arena void-out (matches N64 — confirm differs from vanilla?) _(collision,scene)_
 - [#29](../../issues/29) Giant boulder overlaps the Temple of Time (Market) _(render,scene)_
 
-## ♻️ Reopened (was done, found broken)  (3)
-- [#4](../../issues/4) Title/cutscene camera goes under 3DS terrain _(render,camera)_
+## ♻️ Reopened (was done, found broken)  (2)
 - [#7](../../issues/7) 3DS Link (3DS anims): motionless slide + long right arm _(anim,link)_
 - [#31](../../issues/31) Hand-weave the 3DS Link model (multi-CMB assembly + equipment) _(render,anim,link)_
 
