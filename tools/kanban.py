@@ -185,46 +185,44 @@ def _repo_meta():
     return _repo_meta.v
 
 
-def _git(args, check=True):
-    r = subprocess.run(["git"] + args, cwd=REPO_ROOT, capture_output=True, text=True)
-    if check and r.returncode != 0:
-        sys.stderr.write(r.stderr or r.stdout or "")
-        sys.exit(r.returncode)
-    return r.stdout
+EVIDENCE_TAG = "evidence-assets"
+
+
+def _ensure_release():
+    if subprocess.run(["gh", "release", "view", EVIDENCE_TAG], cwd=REPO_ROOT,
+                      capture_output=True, text=True).returncode != 0:
+        gh(["release", "create", EVIDENCE_TAG, "--title", "Evidence assets (kanban screenshots)",
+            "--notes", "Off-tree storage for kanban bug/verification screenshots. Uploaded via "
+            "`gh release upload`, embedded in issues by URL. Not source — safe to prune old assets."])
 
 
 def cmd_evidence(a):
-    """Attach screenshot(s) to an issue: commit them to kanban/evidence/<#>/, push, then
-    embed by raw URL in a comment (default) or appended to the issue body (--to-body).
-    This is how agents post bug evidence AND fix-verification proof — gh can't upload
-    images, so a tracked repo dir + raw blob URL is the reproducible path for a private repo."""
-    owner, branch = _repo_meta()
-    dest_dir = os.path.join(REPO_ROOT, "kanban", "evidence", str(a.issue))
-    os.makedirs(dest_dir, exist_ok=True)
-    rels = []
+    """Attach screenshot(s) to an issue. Uploads each image as a RELEASE ASSET (off the source
+    tree, on GitHub's CDN — gh can't push browser-style user-attachments, but `gh release upload`
+    is supported), then embeds it by URL in a comment (default) or the issue body (--to-body).
+    This is how agents post bug evidence AND fix-verification proof for the user to review."""
+    owner, _ = _repo_meta()
+    _ensure_release()
+    tmp = os.path.join(REPO_ROOT, "scratch", "evidence_upload")
+    os.makedirs(tmp, exist_ok=True)
+    urls = []
     for f in a.files:
         if not os.path.isfile(f):
             sys.exit(f"no such file: {f}")
-        name = os.path.basename(f)
-        dst = os.path.join(dest_dir, name)
-        if os.path.abspath(f) != os.path.abspath(dst):
-            with open(f, "rb") as src, open(dst, "wb") as out:
-                out.write(src.read())
-        rels.append(f"kanban/evidence/{a.issue}/{name}")
-    if not a.no_push:
-        _git(["add"] + [os.path.join(REPO_ROOT, r) for r in rels])
-        cap = a.caption or f"evidence for #{a.issue}"
-        _git(["commit", "-q", "-m", f"evidence #{a.issue}: {cap}"])
-        _git(["push", "origin", "HEAD"])
+        # namespace the asset name by issue so the same basename across issues doesn't collide
+        asset = f"i{a.issue}-{os.path.basename(f)}"
+        staged = os.path.join(tmp, asset)
+        with open(f, "rb") as src, open(staged, "wb") as out:
+            out.write(src.read())
+        gh(["release", "upload", EVIDENCE_TAG, staged, "--clobber"])
+        urls.append((asset, f"https://github.com/{owner}/releases/download/{EVIDENCE_TAG}/{asset}"))
     # build markdown
     lines = []
     if a.caption:
         lines.append(a.caption)
         lines.append("")
-    for r in rels:
-        name = os.path.basename(r)
-        url = f"https://github.com/{owner}/blob/{branch}/{r}?raw=true"
-        lines.append(f"![{name}]({url})")
+    for asset, url in urls:
+        lines.append(f"![{asset}]({url})")
     block = "\n".join(lines)
     if a.to_body:
         cur = gh(["issue", "view", str(a.issue), "--json", "body", "-q", ".body"]).rstrip()
@@ -259,10 +257,10 @@ def main():
     s.set_defaults(fn=cmd_add)
     s = sub.add_parser("mv"); s.add_argument("issue", type=int); s.add_argument("status"); s.set_defaults(fn=cmd_mv)
     s = sub.add_parser("reopen"); s.add_argument("issue", type=int); s.add_argument("status", nargs="?"); s.set_defaults(fn=cmd_reopen)
-    s = sub.add_parser("evidence", help="attach screenshot(s) to an issue (commit+push, embed by raw URL)")
+    s = sub.add_parser("evidence", help="attach screenshot(s) to an issue (upload as release asset, embed by URL)")
     s.add_argument("issue", type=int); s.add_argument("files", nargs="+")
     s.add_argument("--caption"); s.add_argument("--to-body", action="store_true")
-    s.add_argument("--no-push", action="store_true"); s.set_defaults(fn=cmd_evidence)
+    s.set_defaults(fn=cmd_evidence)
     s = sub.add_parser("render"); s.add_argument("--out"); s.set_defaults(fn=cmd_render)
     s = sub.add_parser("stats"); s.set_defaults(fn=cmd_stats)
 
