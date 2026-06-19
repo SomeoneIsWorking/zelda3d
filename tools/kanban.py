@@ -228,10 +228,10 @@ def cmd_evidence(a):
         cur = gh(["issue", "view", str(a.issue), "--json", "body", "-q", ".body"]).rstrip()
         new = cur + "\n\n## Evidence\n\n" + block + "\n"
         gh(["issue", "edit", str(a.issue), "--body", new])
-        print(f"appended {len(rels)} image(s) to #{a.issue} body")
+        print(f"appended {len(urls)} image(s) to #{a.issue} body")
     else:
         gh(["issue", "comment", str(a.issue), "--body", block])
-        print(f"commented {len(rels)} image(s) on #{a.issue}")
+        print(f"commented {len(urls)} image(s) on #{a.issue}")
 
 
 def cmd_stats(a):
