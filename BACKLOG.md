@@ -85,16 +85,29 @@ This file is the source of truth across sessions.
     the user — verify the hold-Start dialog skip (just added) works, and consider enabling the
     SkipText enhancement by default so B/Start fast-advance text instantly.
 
-13. **[FIXED root cause 2026-06-19; see Done] Wrong entrance spawn points (CLUSTER, some SEVERE)**
+13. **[FULLY VERIFIED + CLOSED 2026-06-19; see Done] Wrong entrance spawn points (CLUSTER, some SEVERE)**
     — (b) Kakariko graveyard "immediately transitions back out" ROOT-CAUSED + FIXED: SoH spawns
     Link at N64-authored coords, but the OoT3D scene-collision's scene-EXIT triangles cover
     different XZ than N64's, so the N64 spawn poly landed on an OoT3D exit poly → instant bounce.
     Fix: re-source each OoT3D floor poly's exit+cam (surfaceType low 13 bits) from the N64 floor at
     that location (soh3d.c SoH3D_N64FloorData0 + per-poly surfaceTypes). VERIFIED: graveyard (0xE4)
-    now stays loaded; real exit-1 preserved at N64's (-1600,z); spawn exit=0 == N64. The SAME
-    mechanism (N64-spawn-on-OoT3D-exit-poly) is the likely cause of (a) Kokiri shop door → Link's
-    house and (c) the Kakariko void-loop, but those two were NOT individually re-reproduced —
-    re-test them; if (c) persists it may be a missing-OoT3D-floor hole at the spawn (separate).
+    now stays loaded; real exit-1 preserved at N64's (-1600,z); spawn exit=0 == N64.
+    **(a)/(c) NOW RE-TESTED QUANTITATIVELY (2026-06-19, session 10) → RESOLVED, no residual.** Built a
+    durable `exitgrid` REPL diagnostic (soh3d.c, like floorgrid but dumps per-floor type/exit/cam in
+    ONE FIFO round-trip) and dense-scanned Kokiri Forest (0xEE, scene 0x55) and Kakariko (0xDB, scene
+    0x52) under OoT3D collision (`collision 1`) vs N64 (`collision 0`):
+    - Kokiri Forest step-15 grid: 27178 cells / 24202 floor hits → **0 holes either direction, 0
+      exit-index mismatches**; exit histograms byte-identical (indices 3,6,9,10,11) incl. every narrow
+      building doorway. So the shop doorway resolves to the N64 shop, NOT Link's house — (a) cannot
+      occur via the collision/exit mechanism.
+    - Kakariko step-100 grid: 2695 cells / 1110 floor hits → **0 holes, 0 floor-Y diffs >10, 0
+      exit/cam mismatches**. No missing-OoT3D-floor hole at the spawn → (c) "void-loop" not
+      reproducible at the collision level.
+    The #13 fix re-sources exit/cam from the N64 floor wherever an N64 floor exists, and an N64 floor
+    exists at EVERY OoT3D floor cell in both scenes, so OoT3D collision/exits are correct-by-
+    construction == N64 (now empirically confirmed across 51k+ raycasts). If a wrong-destination is
+    ever seen again it's a door/transition ACTOR (uses unmodified N64 params, vanilla-correct), not
+    this collision path. Verified headless on Vulkan.
 
 14. **Link drops off EVERY climbable surface halfway** (collision, SYSTEMIC) — not just one ladder;
     all climbables (ladders/vines/walls) drop Link partway up. Likely a general climb-collision
