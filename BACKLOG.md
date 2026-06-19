@@ -199,17 +199,17 @@ This file is the source of truth across sessions.
    to float when climbing. Lower it slightly (per-actor yoff / placement). Tune live via REPL
    `yoff`, then bake.
 
-5. **[DONE 2026-06-19; see Done] Real polygon stairs for fake flat stairs** — original primary
-   goal. OoT3D (like N64) renders staircases as one FLAT textured ramp whose step lines are
-   PAINTED into the texture. Detection is the game's own asset label: the stair texture name
-   contains "kaidan" (階段). At scene-room build time every kaidan ramp is replaced by GENERATED
-   3D step geometry (horizontal treads + vertical risers) over the same footprint, on the same
-   kaidan material (UV/texture/lighting/cull preserved). Generic — applies to every kaidan patch
-   in every scene. Verified on the Kakariko entrance staircase (flat ramp vs stepped: sawtooth
-   silhouette + tread/riser relief; 103k px isolate). REMAINING (lower priority): collision is
-   still the smooth N64 ramp, so Link's feet can clip a riser / float a tread by up to ~half a
-   step (visual-only steps); step undersides are open (fine against terrain). Gate: env
-   SOH3D_STAIRS (default 1) / REPL `stairs <0|1>` (GL caches per id — env for same-scene A/B).
+5. **[DONE 2026-06-19; see Done — render AND collision] Real polygon stairs for fake flat stairs**
+   — original primary goal. OoT3D (like N64) renders staircases as one FLAT textured ramp whose
+   step lines are PAINTED into the texture. Detection is the game's own asset label: the stair
+   texture name contains "kaidan" (階段). At scene-room build time every kaidan ramp is replaced
+   by GENERATED 3D step geometry (horizontal treads + vertical risers) over the same footprint, on
+   the same kaidan material (UV/texture/lighting/cull preserved). Generic — applies to every kaidan
+   patch in every scene. **Collision is now stepped too (2026-06-19):** the same kaidan→treads
+   transform feeds the OoT3D scene-collision build, so Link grounds on the visible steps (not the
+   smooth ramp). REMAINING (lower priority): step undersides are open (fine against terrain). Gate:
+   env SOH3D_STAIRS (default 1) / REPL `stairs <0|1>` (render: GL caches per id — env for
+   same-scene A/B; collision: built at scene load — env for A/B).
 
 6. **Epona → OoT3D model** (lower priority) — Epona still renders as the N64 model; actor-
    replacement gap.
@@ -246,6 +246,33 @@ This file is the source of truth across sessions.
     toward the sun azimuth. Left as #28e below.
 
 ## Done (recent)
+
+- **#5 STEPPED COLLISION — Link now grounds on the visible kaidan steps (completes #5)** — the
+  render already drew real treads+risers (below), but gameplay collision was still the smooth OoT3D
+  ramp, so Link's feet clipped a riser / floated a tread by ≤½ step. Now the SAME kaidan→steps
+  transform produces the COLLISION floor. Refactored the render-side patch analysis into shared
+  pure-geometry helpers (`stairTriNormals`/`stairPatches`/`stairFrameOf` in soh3d_model.cpp) so the
+  render geometry and the collision geometry can never diverge. New
+  `SoH3D_CollectSceneStairTreads(sceneName,…)` (soh3d_model.cpp) walks every room of the scene,
+  finds kaidan groups, runs those helpers, and emits each step's horizontal TREAD as a world-space
+  quad (2 tris) — risers omitted ON PURPOSE: the original OoT3D ramp collision stays in place
+  underneath, so the treads (which sit on/above it) just become the higher walking surface BgCheck
+  returns. `SoH3D_BuildSceneCollision` (soh3d.c) appends those treads as +Y floor polys
+  (normal=(0,1,0), dist=-y), re-sourcing each tread's cam+exit from the N64 floor at its centroid
+  EXACTLY like the main floor loop (copying the underlying poly's data0 wholesale was unsafe — the
+  entrance staircase abuts the Hyrule-Field transition, so the nearest base poly under a tread can
+  be an EXIT triangle that would warp Link). 13-bit vertex-index budget guarded (skip stairs
+  collision if base+treads ≥ 8000 verts / 60000 polys). Coordinates are world-space (rooms draw at
+  identity, gSoH3dSceneScale=1/off=0), matching the collision frame. VERIFIED headless on Vulkan
+  (Kakariko 0x52): the collision build logs "spliced 608 stepped tread polys (1216 verts)";
+  `floorgrid` down the entrance staircase (patch 0) AND a village staircase (patch 6) shows a clean
+  STAIRCASE Y-profile (flat treads ny=1.000 + ~8u riser jumps) where the smooth-ramp baseline was a
+  continuous ny=0.894 slope; Link walks the steps smoothly (descent identical to the smooth ramp,
+  Kakariko↔Hyrule gate transition normal). Important dead-end recorded: a tp-drop from 100+ units
+  onto the fine steps SKITTERS Link unpredictably — but this is IDENTICAL on the smooth ramp (it's a
+  teleport-drop artifact, not the steps), so not a regression. Gate env SOH3D_STAIRS (shared with
+  the render). soh only (soh3d_model.cpp, soh3d.c, soh3d_collision.h); libultraship UNTOUCHED.
+  Memory [[soh3d-stairs]].
 
 - **#5 Real stepped-polygon stairs from the fake-flat "kaidan" ramps (ORIGINAL PRIMARY GOAL)** —
   OoT3D renders staircases as ONE flat textured ramp; the steps are painted into the texture, whose
