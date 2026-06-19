@@ -108,6 +108,11 @@ This file is the source of truth across sessions.
    **BUTTON-BG DISC DONE 2026-06-19 (see Done; awaiting user sign-off):** the blocky N64 32x32 IA8
    gButtonBackgroundTex (round beveled circle behind the B / C / item / A action buttons) is now a
    crisp 64x64 SVG-authored disc. tools/soh3d_gen_button_tex.sh is the generator.
+   **COUNTER ICONS DONE 2026-06-19 (see Done; awaiting user sign-off):** the blocky N64 16x16 IA8
+   rupee gem (gRupeeCounterIconTex, always-on bottom-left), small-key (gSmallKeyCounterIconTex,
+   dungeons) and clock (gClockIconTex, timers) are now crisp 64x64 SVG-authored grayscale icons
+   injected by pointer in Gfx_TextureIA8. tools/soh3d_gen_counter_icons.sh is the generator. Rupee
+   live-verified (Kokiri); key/clock are the identical PRIM-tinted intercept path, correct-by-construction.
    REMAINING high-visibility HUD elements to give the same treatment (all reuse the raw-RGBA mechanism):
    the **magic bar** (gMagicMeterEnd/Mid/Fill — investigated 2026-06-19: the bar is mostly horizontal
    bands that are already sharp; the only blocky parts are the tiny rounded cap corners, so the crisp
@@ -471,6 +476,27 @@ This file is the source of truth across sessions.
     toward the sun azimuth. Left as #28e below.
 
 ## Done (recent)
+
+- **#31 crisp higher-res HUD counter icons (rupee gem / small key / clock)** — the N64 counter icons
+  were blocky 16x16 IA8 textures (gRupeeCounterIconTex — always-on bottom-left, gSmallKeyCounterIconTex
+  — dungeons, gClockIconTex — timers). Replaced with crisp 64x64 SVG-authored grayscale icons injected
+  via the raw-in-RAM RGBA32 path ([[soh3d-hud-glyphs]]). The rupee/key draws are MODULATEIA_PRIM
+  (Gfx_SetupDL_39Overlay; PRIM carries the rupee colour / key silver), so a GRAYSCALE icon (rgb=facet
+  bevel intensity, a=coverage) tints to PRIM exactly like the original IA8 — the 3D facet look comes
+  from the intensity. The clock is MODULATERGBA_PRIM with PRIM white, so its grayscale shows directly.
+  All three are FULL-LOAD single draws (no shared-tile reuse gotcha like gButtonBackgroundTex), so the
+  intercept just loads the RGBA32 and rescales dsdx/dtdy to the rect. Art authored to match the
+  originals (extracted+viewed each first): rupee = iconic tilted faceted gem crystal, key = skeleton
+  key (round bow + blade/teeth), clock = pocket-watch face (crown + hands). Pieces:
+  tools/soh3d_gen_counter_icons.sh -> counter_icon_png.h; SoH3D_CounterIconTex(kind) (soh3d_model.cpp,
+  decode-once persistent RGBA32, SOH3D_CICON_* enum); a 3-pointer intercept in Gfx_TextureIA8
+  (z_parameter.c) right after the button-bg one. Gated on SoH3D_HudTexEnabled (env SOH3D_HUDTEX / REPL
+  hudtex, default on); off restores the byte-identical N64 IA8 path. VERIFIED headless (Kokiri 238):
+  the always-on rupee counter renders as a crisp faceted green gem (sharp facets vs the vanilla blurry
+  blob) and tints green correctly; before/after sent. Key/clock are the identical intercept path
+  (PRIM-tinted), correct-by-construction (not visible in Kokiri to live-trigger). soh only
+  (z_parameter.c, soh3d.{c via header,h}, soh3d_model.cpp, counter_icon_png.h); libultraship UNTOUCHED.
+  See [[soh3d-hud-glyphs]].
 
 - **#31 crisp higher-res HUD button-background disc (B / C / item / A action buttons)** — the N64
   button background was a blocky 32x32 IA8 disc (gButtonBackgroundTex, the round beveled circle drawn
