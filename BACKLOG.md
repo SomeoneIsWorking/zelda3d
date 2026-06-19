@@ -184,8 +184,13 @@ This file is the source of truth across sessions.
     the Temple of Time building (user screenshot). Misplaced/wrong-scale scene geometry or actor.
     Repro: Market (177), look toward ToT.
 
-23. **Cucco wing-flap animation not implemented** — the cucco (chicken, En_Niw 0x19) OoT3D
-    replacement doesn't play its wing-flap. ROOT-CAUSED 2026-06-19 (asset + code, ground truth):
+23. **[DONE 2026-06-19; see Done] Cucco wing-flap animation not implemented** — the cucco (chicken,
+    En_Niw 0x19) OoT3D replacement now plays its procedural wing-flap (the N64 flap lives in
+    EnNiw_OverrideLimbDraw, not any anim). Generic OverrideLimbDraw-replay mechanism: capture the
+    override callback at the SkelAnime draw choke points, probe it per limb for the additive
+    rotation delta, map N64 wing limbs 7/11 -> OoT3D wing bones 3/5 (local Z), inject as a per-bone
+    local-rotation delta on the CSAB pose. Original root-cause writeup kept below for reference.
+    ROOT-CAUSED 2026-06-19 (asset + code, ground truth):
     - The N64 cucco wing-flap is **PROCEDURAL, not in any animation**: `EnNiw_OverrideLimbDraw`
       (z_en_niw.c:1112) ADDS per-limb rotations from `unk_2C4..unk_2E0` onto N64 limbs **7 & 11
       (the two wing-tips), 13 & 15 (head/comb)** during the skeleton draw traversal. Those fields
@@ -287,6 +292,30 @@ This file is the source of truth across sessions.
     toward the sun azimuth. Left as #28e below.
 
 ## Done (recent)
+
+- **#23 Cucco wing-flap (procedural OverrideLimbDraw replay onto OoT3D bones)** — the cucco (En_Niw)
+  renders via the auto path playing its only CSAB (nw_wait), which has just a ±9° idle ruffle; the
+  real wing-flap is PROCEDURAL in `EnNiw_OverrideLimbDraw` (z_en_niw.c: `rot->z += this->unk_2C4` on
+  N64 wing-tip limbs 7 & 11, ~38° idle / up to ~137° agitated), never in any animation, and the auto
+  path drops the override callback — so the flap was missing. FIX is a GENERIC mechanism (any actor
+  whose limb motion is procedural via an OverrideLimbDraw gets it): (1) capture the `overrideLimbDraw`
+  + `arg` the actor passed to its SkelAnime_Draw* call (`SoH3D_SetLimbOverride`, wired at all 6
+  z_skelanime.c choke points; `kind` distinguishes the 6-arg Opa vs 7-arg variant); (2) in the auto
+  retarget, PROBE the override per mapped limb — call it with `rot` seeded from the N64 jointTable and
+  take delta = (override-applied rot) − jointTable rot (= the `+=` amount); (3) map the N64 limb ->
+  OoT3D bone + axis via a small per-ZAR table `kSoH3dProcOverride` (cucco: limb7->bone3, limb11->bone5,
+  local Z only — DERIVED: chicken.cmb wing bones 3/5 rest rZ≈-159°, nw_wait swings rZ, N64 flaps local
+  z); (4) feed the delta (binang->radians) to the OoT3D bone's animated LOCAL rotation in
+  `Csab::animatedBoneWorld` via a new optional `boneRotDelta` arg, plumbed through
+  `SoH3D_SetBoneRotDelta`/`SoH3D_ClearBoneRotDeltas` (soh3d_model.cpp, per-model, set/cleared each auto
+  draw). Gate env SOH3D_PROCOVERRIDE (default ON) / REPL `wingflap <0|1>`; `wingflap force <binang>`
+  forces a fixed Z delta for direction/amplitude probing. VERIFIED headless on Vulkan (Kakariko 0xDB,
+  6 cuccos): force A/B (0 vs 25000) shows the wing fan UP/out (folded->raised, correct direction, no
+  shatter/deformation), 6919 px change isolated to the wing region; the LIVE probe (animdbg) logs the
+  cucco's real idle flap = Z binang oscillating 0↔~6944 (≈0–38°, matching N64's 7000), X/Y zero,
+  driven onto bone 3/5 — the genuine N64 procedural flap, not a fabricated curve. soh only
+  (z_skelanime.c, soh3d.{c,h}, soh3d_model.cpp, asset/csab.{h,cpp}); libultraship UNTOUCHED. Memory
+  [[soh3d-n64anim-csab-map]].
 
 - **#5 STEPPED COLLISION — Link now grounds on the visible kaidan steps (completes #5)** — the
   render already drew real treads+risers (below), but gameplay collision was still the smooth OoT3D
