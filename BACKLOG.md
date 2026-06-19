@@ -100,12 +100,16 @@ This file is the source of truth across sessions.
    hearts (full/3-4/half/quarter/empty) are now crisp 64x64 SVG-authored textures injected via the
    raw-RGBA Fast3D path (option (b)), grayscale so the heart combine still tints them red + drives
    the beating/partial/empty states. Gate env SOH3D_HUDTEX / REPL `hudtex 0|1` (default on).
-   tools/soh3d_gen_hud_tex.sh is the reusable heart-style generator. REMAINING high-visibility HUD
-   elements to give the same treatment (all reuse the SoH3D_HeartTex / raw-RGBA mechanism): the
-   **magic bar** (gMagicMeterEnd/Mid/Fill, simple gradient bars — clean, but only shows once Link
-   has magic), the **rupee/key/ammo digit font** + icons, the **A/B/C button backgrounds**
-   (gButtonBackgroundTex — but #32 already badges these with Xbox glyphs), the **do-action label**
-   font, and the **minimap/dungeon-map** dot/marker sprites. Pick by visibility next.
+   tools/soh3d_gen_hud_tex.sh is the reusable heart-style generator.
+   **DIGIT FONT DONE 2026-06-19 (see Done; awaiting user sign-off):** the blocky N64 8x16 I8 counter
+   digits (gCounterDigit0..9/Colon) are now a crisp 32x64 font injected at the single Gfx_TextureI8
+   choke point, so the rupee / small-key / ammo / race-timer / minigame-score counters all upgrade
+   at once. tools/soh3d_gen_digit_tex.sh is the generator (font via SOH3D_DIGIT_FONT). REMAINING
+   high-visibility HUD elements to give the same treatment (all reuse the raw-RGBA mechanism): the
+   **magic bar** (gMagicMeterEnd/Mid/Fill — simple gradient bars, but only shows once Link has magic
+   AND its border uses tuned mirror/tc constants → do carefully, grant magic to verify), the **item
+   icons / equip outlines**, the **do-action label** font, and the **minimap/dungeon-map** dot/marker
+   sprites. The A/B/C button backgrounds are already badged with Xbox glyphs (#32). Pick by visibility.
    INVESTIGATED 2026-06-19: the texpack DOES have a `UI/` dir (`textures/0004000000033500/UI`, 259
    files, Citra-hash-named `tex1_WxH_HASH_fmt_mip0.png`, with GERMAN/ITALIAN/JAPANESE/SPANISH subdirs),
    but inspecting the 256x256 set they are **OoT3D menu/map/pause/GAME-OVER screens + item-grid atlases**
@@ -463,6 +467,19 @@ This file is the source of truth across sessions.
     toward the sun azimuth. Left as #28e below.
 
 ## Done (recent)
+
+- **#31 crisp higher-res HUD counter font (rupee/key/ammo/timer/score digits)** — the N64 counter
+  digits were blocky 8x16 I8 glyphs (gCounterDigit0..9/Colon) drawn through Gfx_TextureI8 by EVERY
+  HUD counter. Replaced with a crisp 32x64 font (Liberation Sans Bold) injected at that single choke
+  point, so the rupee, small-key, ammo, race-timer and minigame-score counters all upgrade at once.
+  The counter combine is colour=PRIMITIVE, alpha=TEXEL0, so a grayscale RGBA32 glyph (a=coverage)
+  reproduces the digit exactly at higher res; dsdx/dtdy rescaled from the glyph dims so the full
+  glyph maps onto the same rect (same quad/tc principle as the hearts + #32 A-button). SoH3D_DigitIndex
+  (z_parameter.c) maps each gCounterDigit*/gCounterColon symbol to a glyph; gated on SoH3D_HudTexEnabled
+  (env SOH3D_HUDTEX / REPL hudtex, default on), falls through to the byte-identical N64 I8 path off.
+  Pieces: tools/soh3d_gen_digit_tex.sh -> digit_tex_png.h; SoH3D_DigitTex (soh3d_model.cpp). VERIFIED
+  headless (Kokiri 238): the always-on rupee counter "150" renders smooth/anti-aliased vs the N64
+  pixelated digits; before/after sent to user. soh only; libultraship UNTOUCHED. See [[soh3d-hud-glyphs]].
 
 - **#31 crisp higher-res HUD hearts (raw-RGBA Fast3D injection)** — the N64 HUD hearts were blocky
   16x16 IA8 textures (gHeart{Full,ThreeQuarter,Half,Quarter,Empty}Tex, drawn by HealthMeter_Draw in
