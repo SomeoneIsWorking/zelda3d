@@ -65,8 +65,11 @@ setup_headless() {
         [ -n "$up" ] || { echo "headless: Xvfb failed on $disp (see scratch/logs/xvfb.log)" >&2; return 1; }
     fi
     export DISPLAY="$disp" XAUTHORITY=/dev/null SDL_VIDEODRIVER=x11
+    # Headless = no audio: route SDL audio to the dummy backend so a background headless
+    # run never plays sound on the user's speakers (headed runs keep real audio).
+    export SDL_AUDIODRIVER=dummy
     unset WAYLAND_DISPLAY
-    echo "headless: on $disp (Xvfb, SDL x11)" >&2
+    echo "headless: on $disp (Xvfb, SDL x11, audio=dummy)" >&2
 }
 
 start() {
