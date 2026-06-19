@@ -82,6 +82,139 @@
    }
   ]
  },
+ "/actor/zelda_ane.zar": {
+  "object": "object_os_anime",
+  "rows": [
+   {
+    "n64": "gObjOsAnim_0718",
+    "otr": "objects/object_os_anime/gObjOsAnim_0718",
+    "frameCount": 20,
+    "best": "Ane_hanasu",
+    "candidates": [
+     {
+      "base": "Ane_hanasu",
+      "duration": 20,
+      "dframe": 0,
+      "namescore": 0.0
+     },
+     {
+      "base": "oro_oro",
+      "duration": 21,
+      "dframe": 1,
+      "namescore": 0.0
+     },
+     {
+      "base": "Ane_matsu",
+      "duration": 24,
+      "dframe": 4,
+      "namescore": 0.0
+     },
+     {
+      "base": "onegai_c",
+      "duration": 15,
+      "dframe": 5,
+      "namescore": 0.0
+     }
+    ]
+   },
+   {
+    "n64": "gObjOsAnim_07D0",
+    "otr": "objects/object_os_anime/gObjOsAnim_07D0",
+    "frameCount": 2,
+    "best": "onegai_c",
+    "candidates": [
+     {
+      "base": "onegai_c",
+      "duration": 15,
+      "dframe": 13,
+      "namescore": 0.0
+     },
+     {
+      "base": "Ane_hanasu",
+      "duration": 20,
+      "dframe": 18,
+      "namescore": 0.0
+     },
+     {
+      "base": "oro_oro",
+      "duration": 21,
+      "dframe": 19,
+      "namescore": 0.0
+     },
+     {
+      "base": "Ane_matsu",
+      "duration": 24,
+      "dframe": 22,
+      "namescore": 0.0
+     }
+    ]
+   },
+   {
+    "n64": "gObjOsAnim_9F94",
+    "otr": "objects/object_os_anime/gObjOsAnim_9F94",
+    "frameCount": 15,
+    "best": "onegai_c",
+    "candidates": [
+     {
+      "base": "onegai_c",
+      "duration": 15,
+      "dframe": 0,
+      "namescore": 0.0
+     },
+     {
+      "base": "Ane_hanasu",
+      "duration": 20,
+      "dframe": 5,
+      "namescore": 0.0
+     },
+     {
+      "base": "oro_oro",
+      "duration": 21,
+      "dframe": 6,
+      "namescore": 0.0
+     },
+     {
+      "base": "Ane_matsu",
+      "duration": 24,
+      "dframe": 9,
+      "namescore": 0.0
+     }
+    ]
+   },
+   {
+    "n64": "gObjOsAnim_A630",
+    "otr": "objects/object_os_anime/gObjOsAnim_A630",
+    "frameCount": 21,
+    "best": "oro_oro",
+    "candidates": [
+     {
+      "base": "oro_oro",
+      "duration": 21,
+      "dframe": 0,
+      "namescore": 0.0
+     },
+     {
+      "base": "Ane_hanasu",
+      "duration": 20,
+      "dframe": 1,
+      "namescore": 0.0
+     },
+     {
+      "base": "Ane_matsu",
+      "duration": 24,
+      "dframe": 3,
+      "namescore": 0.0
+     },
+     {
+      "base": "onegai_c",
+      "duration": 15,
+      "dframe": 6,
+      "namescore": 0.0
+     }
+    ]
+   }
+  ]
+ },
  "/actor/zelda_ani.zar": {
   "object": "object_ani",
   "rows": [
