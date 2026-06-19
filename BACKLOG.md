@@ -190,13 +190,30 @@ This file is the source of truth across sessions.
 28. **[DONE 2026-06-19; see Done] Sky looks bad (low-res N64 skybox)** — replaced the N64
     normal-sky skybox with the OoT3D /kankyo/BlueSky.zar dome (tenkyu gradient + kumo clouds),
     selected by the game's own time-of-day skybox1Index. REMAINING ENHANCEMENTS (optional, lower
-    priority): (a) blend the TWO domes (skybox1Index/skybox2Index by skyboxBlend) at dawn/dusk
-    instead of snapping to the dominant one; (b) animate the cloud drift via the kumo .cmab; (c)
-    OoT3D sun/moon/stars (still N64 Environment_DrawSunAndMoon); (d) broaden past SKYBOX_NORMAL_SKY
-    (shop/indoor skyboxes still N64). Indoor/enclosed scenes (Kokiri) have skyboxDisabled so the
-    dome correctly does not draw there.
+    priority): (a) **[DONE 2026-06-19; see Done]** blend the TWO domes (skybox1Index/skybox2Index
+    by skyboxBlend) at dawn/dusk instead of snapping to the dominant one; (b) animate the cloud
+    drift via the kumo .cmab; (c) OoT3D sun/moon/stars (still N64 Environment_DrawSunAndMoon); (d)
+    broaden past SKYBOX_NORMAL_SKY (shop/indoor skyboxes still N64). Indoor/enclosed scenes (Kokiri)
+    have skyboxDisabled so the dome correctly does not draw there.
 
 ## Done (recent)
+
+- **#28a OoT3D sky cross-fades the two domes at dawn/dusk (no snap)** — the game blends two sky
+  variants at dawn/dusk (`skybox2Index` over `skybox1Index` at alpha = `envCtx.skyboxBlend`).
+  `SoH3D_TryDrawSky` previously drew only `skybox1Index`, so the OoT3D dome snapped to whichever
+  variant was dominant at the blend midpoint (a sudden colour pop). Now it draws the lower variant
+  (dome+clouds) opaque, then the upper variant over it at alpha=skyboxBlend. This needed a per-draw
+  ALPHA on the SoH3D draw path (reusable beyond sky): new `gSPSoH3DDrawA(pkt,handle,alpha,r,g,b)`
+  packs the alpha into the upper 32 bits of the 64-bit w1 (handle untouched); `gSPSoH3DDraw` is now
+  an alpha=255 wrapper. Threaded through interpreter -> SoH3D_GL_Submit -> DrawItem -> drawOne
+  (GL `uAlpha` uniform + force standard SRC_ALPHA blend when an opaque material is drawn
+  translucent) AND the Vulkan path (UBO `uExtra.x` + synthesized alpha-over pipeline). Gated to a
+  real cross-fade (blend>0, idx2 in 0..8 and != idx1) so the single-dome steady state is unchanged.
+  REPL `sky info` now prints skyboxId/idx1/idx2/blend. VERIFIED headless on **Vulkan** (Hyrule
+  Field, forward time sweep): sky region RGB blend 0->127->223->255 reads day (70,154,175) ->
+  (134,131,147, intermediate: dist 74 from day, 108 from sunset) -> (161,80,87) -> sunset
+  (167,64,69) — a smooth cross-fade, not a snap. libultraship d4615973 (fork/soh3d), Shipwright
+  a55786793 (fork/develop).
 
 - **#28 OoT3D sky (BlueSky.zar dome + clouds) replaces the low-res N64 skybox** — the N64
   normal-sky skybox is a blurry 128x64 CI8 image. Now: `SoH3D_TryDrawSky` (soh3d.c, hooked in
