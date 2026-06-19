@@ -3,9 +3,9 @@
 > **Generated mirror — do not hand-edit.** Source of truth = GitHub Issues on
 > `SomeoneIsWorking/soh3d` (private). Regenerate with `tools/kanban.py render`.
 > Move a card with `tools/kanban.py mv <#> <column>`; add with `tools/kanban.py add`.
-> Columns: todo · in-progress · in-review · needs-confirmation · reopened · blocked · done(=closed).  Updated 2026-06-19 21:42.
+> Columns: todo · in-progress · in-review · needs-confirmation · reopened · blocked · done(=closed).  Updated 2026-06-19 22:02.
 
-**Counts:** todo:18 | in-progress:1 | in-review:0 | needs-confirmation:8 | reopened:4 | blocked:1 | done:37
+**Counts:** todo:18 | in-progress:1 | in-review:0 | needs-confirmation:8 | reopened:3 | blocked:1 | done:38
 
 ## 📋 To Do  (18)
 - [#6](../../issues/6) Held cucco renders at pickup spot, not in Link's hands _(render,link,cucco)_
@@ -37,22 +37,22 @@ _none_
 - [#1](../../issues/1) Stairs: real stepped geometry, wall preserved (render broken) _(render,stairs,scene)_
 - [#2](../../issues/2) Kakariko well: water is a tiny teal diamond, not a surface _(render,well)_
 - [#3](../../issues/3) Kokiri kids pop out at distance (actor unload, want infinite) _(render,scene)_
+- [#5](../../issues/5) Cucco wings don't flap (idle + held/agitated) _(anim,cucco)_
 - [#12](../../issues/12) Inventory/pause background renders upside-down _(render,ui,inventory)_
 - [#18](../../issues/18) Crisp HUD/UI textures (hearts/digits/buttons/icons) _(ui,hud)_
 - [#26](../../issues/26) Gohma arena void-out (matches N64 — confirm differs from vanilla?) _(collision,scene)_
 - [#29](../../issues/29) Giant boulder overlaps the Temple of Time (Market) _(render,scene)_
-- [#30](../../issues/30) NPC walks in mid-air above a Kakariko building _(collision,scene)_
 
-## ♻️ Reopened (was done, found broken)  (4)
+## ♻️ Reopened (was done, found broken)  (3)
 - [#4](../../issues/4) Title/cutscene camera goes under 3DS terrain _(render,camera)_
-- [#5](../../issues/5) Cucco wings don't flap (idle + held/agitated) _(anim,cucco)_
 - [#7](../../issues/7) 3DS Link (3DS anims): motionless slide + long right arm _(anim,link)_
 - [#31](../../issues/31) Hand-weave the 3DS Link model (multi-CMB assembly + equipment) _(render,anim,link)_
 
 ## ⛔ Blocked (needs live/user input)  (1)
 - [#32](../../issues/32) Xbox control scheme: modern dual-stick mapping + chords (no C-pad) _(ui,keyboard)_
 
-## ✅ Done (recently closed)  (showing 30 of 37)
+## ✅ Done (recently closed)  (showing 30 of 38)
+- [#30](../../issues/30) NPC walks in mid-air above a Kakariko building
 - [#69](../../issues/69) Child Link float fixed (posed-feet grounding)
 - [#68](../../issues/68) run.sh preserves uncommitted submodule edits
 - [#67](../../issues/67) run.sh cold-boots to the title screen by default
@@ -82,4 +82,3 @@ _none_
 - [#43](../../issues/43) Crisp HUD counter icons (rupee gem / small key / clock)
 - [#42](../../issues/42) Crisp HUD button-background disc (B/C/item/A buttons)
 - [#41](../../issues/41) Crisp HUD counter font (rupee/key/ammo/timer digits)
-- [#40](../../issues/40) Crisp HUD hearts (64x64 SVG, raw-RGBA injection)
