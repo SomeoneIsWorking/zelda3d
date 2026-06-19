@@ -211,8 +211,21 @@ This file is the source of truth across sessions.
    env SOH3D_STAIRS (default 1) / REPL `stairs <0|1>` (render: GL caches per id — env for
    same-scene A/B; collision: built at scene load — env for A/B).
 
-6. **Epona → OoT3D model** (lower priority) — Epona still renders as the N64 model; actor-
-   replacement gap.
+6. **Epona → OoT3D model** (lower priority) — PARTLY STALE (2026-06-19): the ranch horses
+   (En_Horse_Normal 0x3C, object_horse_normal → zelda_horse_normal.zar) ALREADY render+animate as
+   the OoT3D model and look correct (verified in Lon Lon Ranch — 3DS horse, grazing + mid-stride
+   poses). The shared auto-skinned path (SOH3D_N64ANIM=1, default in soh3d_game.sh) drives them.
+   FIXED 2026-06-19: Epona herself (En_Horse 0x14, object_horse → zelda_horse.zar/epona.cmb) had
+   WRONG locomotion anim mappings — gEpona{Walking,Trotting,Galloping}Anim all auto-collided onto
+   `hl_anim_slowrun_to_fastrun` (a transition clip), and JumpingHigh→wait022. Corrected to the
+   exact-name CSABs (walk→hl_anim_walk2_30, trot→slowrun2_30, gallop→fastrun2_30,
+   jumpHigh→jump2002), mirroring the already-correct object_horse_normal + object_hni mappings.
+   REMAINING: En_Horse 0x14 (the named, rideable Epona) is CONDITIONALLY spawned (Epona's Song /
+   riding), so it couldn't be rendered in a static headless scan to verify the fix in-motion — the
+   mapping is correct-by-construction (parallel to the verified sibling horses) but a live ride
+   should be eyeballed when reachable. Also TODO if Epona-mount still looks off: she's a SKIN-type
+   N64 skeleton (gEponaSkel, ~47 limbs) vs OoT3D epona.cmb's 25 bones, so the N64-anim RETARGET
+   path won't apply — she relies on the CSAB-matching path (now fixed).
 
 28e. **[DONE 2026-06-19; see Done] OoT3D sun/moon discs** (finished #28c). REMAINING OPTIONAL polish
     (lower priority): the fine_lensflare.ctxb lens-flare (still N64 Environment_DrawSunLensFlare, a
