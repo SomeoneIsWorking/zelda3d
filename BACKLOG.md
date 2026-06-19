@@ -105,16 +105,31 @@ This file is the source of truth across sessions.
 >   the live model's ZAR (SoH3D_AutoModelZar), falling back to a generic entry. Verified: model 2016
 >   plays gObjOsAnim_A630 -> oro_oro phase-locked (frames advancing), renders animated (arms down), no
 >   T-pose; only the 4 shared OTRs got ZAR-qualified, all gKokiri* anims stayed generic (no En_Ko regression).
-> - **#5 STAIRS — side faces still triangles (REOPEN/extend)** — "stairs look decent now, but the faces
->   that connect to them need to be stairs too; the SIDES of the stairs are still triangles." My #5
->   generated stepped treads/risers on the TOP surface but the staircase SIDE walls (the vertical
->   triangular fill on the left/right edges of the flight) are still the original flat diagonal — they
->   need a stepped (sawtooth) profile to match. I own this code (generateStairsGroup), tractable.
+> - **#5 STAIRS — side faces still triangles — DONE 2026-06-19** (Shipwright 9c28b908e fork/develop).
+>   The sides are now vertical SAWTOOTH-topped walls (not flat triangle caps) textured like the wall
+>   the staircase abuts. See the #5 STAIRS REWORK entry below — both reopen blocks are addressed by the
+>   same wall-integration change. Verified Kakariko: entrance = canyon rock, village = matching brick.
 > - **OPENING INVENTORY renders background UPSIDE DOWN (NEW, #39 / #1 FB-flip cluster)** — pausing to
 >   the inventory/pause menu draws the frozen game background flipped vertically. This is the Vulkan
 >   FB-flip / negative-viewport issue (#1 family): the pause-preview render samples the FB with the
 >   wrong Y orientation. Likely shares a root with first-person flashing and title-cam-under-terrain.
 >
+> - **#5 STAIRS REWORK — DONE 2026-06-19** (Shipwright 9c28b908e fork/develop; libultraship + outer
+>   untouched besides the submodule bump). Implemented the user's wall-integration design. Each kaidan
+>   group is now replaced by ONE draw group PER PATCH (each staircase), and each patch wears the texture
+>   of the WALL it abuts — found by findPatchWall (scan other room groups for verts along the patch's
+>   side edges, pick the material with the most + a non-degenerate uv.v-vs-worldY fit). Per-patch matters:
+>   the Kakariko entrance picks the rock canyon (kabe_03), the village stairs pick brick (kabe_01),
+>   patch0/3 pick kabe_05x. Treads sit at the step midpoint (yk+dy/2 — straddle the ramp, no sink);
+>   the SIDES are vertical sawtooth-topped walls inset 3u, same wall texture, dropping to the flight
+>   base (so they read as the wall, no z-fight, no see-through triangle caps). UVs are world-derived
+>   (risers/sides share the wall's vertical V banding; treads tile isotropically). No-wall patches (open
+>   lower entrance flight) fall back to the embedded SVG stone. DESIGN NOTE: I did NOT mutate the shared
+>   wall geometry ("bump the wall") — that's the highest-regression option and isn't needed at the
+>   verified repros (the entrance/village walls already tower above the steps). The inset sawtooth side
+>   wall, same-texture, achieves the same read without touching the wall. Collision unchanged (smooth
+>   ramp; midpoint treads meet it at each tread centre). Verified headless from side/up-channel/player
+>   angles; screenshots scratch/screenshots/stairs_final_*. ORIGINAL DESIGN/CONTEXT kept below.
 > - **#5 STAIRS REWORK (user 2026-06-19, with image).** My first stepped-side attempt was REVERTED:
 >   it added a stone side wall that OVERLAPPED the existing brick wall (z-fighting moiré), used the
 >   wrong (SVG stone) texture, and the steps sink too far below the surface. User's DESIGN: (1) the
