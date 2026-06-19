@@ -176,6 +176,66 @@ def cmd_render(a):
     print(f"wrote {out} ({len(open_issues)} open, {len(closed)} closed)")
 
 
+def _repo_meta():
+    """(owner/repo, default-branch) from gh, cached."""
+    if not hasattr(_repo_meta, "v"):
+        out = gh(["repo", "view", "--json", "nameWithOwner,defaultBranchRef"])
+        d = json.loads(out)
+        _repo_meta.v = (d["nameWithOwner"], d["defaultBranchRef"]["name"])
+    return _repo_meta.v
+
+
+def _git(args, check=True):
+    r = subprocess.run(["git"] + args, cwd=REPO_ROOT, capture_output=True, text=True)
+    if check and r.returncode != 0:
+        sys.stderr.write(r.stderr or r.stdout or "")
+        sys.exit(r.returncode)
+    return r.stdout
+
+
+def cmd_evidence(a):
+    """Attach screenshot(s) to an issue: commit them to kanban/evidence/<#>/, push, then
+    embed by raw URL in a comment (default) or appended to the issue body (--to-body).
+    This is how agents post bug evidence AND fix-verification proof — gh can't upload
+    images, so a tracked repo dir + raw blob URL is the reproducible path for a private repo."""
+    owner, branch = _repo_meta()
+    dest_dir = os.path.join(REPO_ROOT, "kanban", "evidence", str(a.issue))
+    os.makedirs(dest_dir, exist_ok=True)
+    rels = []
+    for f in a.files:
+        if not os.path.isfile(f):
+            sys.exit(f"no such file: {f}")
+        name = os.path.basename(f)
+        dst = os.path.join(dest_dir, name)
+        if os.path.abspath(f) != os.path.abspath(dst):
+            with open(f, "rb") as src, open(dst, "wb") as out:
+                out.write(src.read())
+        rels.append(f"kanban/evidence/{a.issue}/{name}")
+    if not a.no_push:
+        _git(["add"] + [os.path.join(REPO_ROOT, r) for r in rels])
+        cap = a.caption or f"evidence for #{a.issue}"
+        _git(["commit", "-q", "-m", f"evidence #{a.issue}: {cap}"])
+        _git(["push", "origin", "HEAD"])
+    # build markdown
+    lines = []
+    if a.caption:
+        lines.append(a.caption)
+        lines.append("")
+    for r in rels:
+        name = os.path.basename(r)
+        url = f"https://github.com/{owner}/blob/{branch}/{r}?raw=true"
+        lines.append(f"![{name}]({url})")
+    block = "\n".join(lines)
+    if a.to_body:
+        cur = gh(["issue", "view", str(a.issue), "--json", "body", "-q", ".body"]).rstrip()
+        new = cur + "\n\n## Evidence\n\n" + block + "\n"
+        gh(["issue", "edit", str(a.issue), "--body", new])
+        print(f"appended {len(rels)} image(s) to #{a.issue} body")
+    else:
+        gh(["issue", "comment", str(a.issue), "--body", block])
+        print(f"commented {len(rels)} image(s) on #{a.issue}")
+
+
 def cmd_stats(a):
     open_issues = list_issues("open")
     cols = {c: 0 for c in COLUMNS}
@@ -199,6 +259,10 @@ def main():
     s.set_defaults(fn=cmd_add)
     s = sub.add_parser("mv"); s.add_argument("issue", type=int); s.add_argument("status"); s.set_defaults(fn=cmd_mv)
     s = sub.add_parser("reopen"); s.add_argument("issue", type=int); s.add_argument("status", nargs="?"); s.set_defaults(fn=cmd_reopen)
+    s = sub.add_parser("evidence", help="attach screenshot(s) to an issue (commit+push, embed by raw URL)")
+    s.add_argument("issue", type=int); s.add_argument("files", nargs="+")
+    s.add_argument("--caption"); s.add_argument("--to-body", action="store_true")
+    s.add_argument("--no-push", action="store_true"); s.set_defaults(fn=cmd_evidence)
     s = sub.add_parser("render"); s.add_argument("--out"); s.set_defaults(fn=cmd_render)
     s = sub.add_parser("stats"); s.set_defaults(fn=cmd_stats)
 
