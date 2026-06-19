@@ -44,3 +44,7 @@
 /actor/zelda_km1.zar	gKokiriBackflipAnim	km1_ukiuki_wait
 /actor/zelda_km1.zar	gKokiriLaughingAnim	km1_kususu_pose
 /actor/zelda_km1.zar	gKokiriWipingForeheadAnim	km1_asekaki_wait
+/actor/zelda_horse.zar	gEponaWalkingAnim	hl_anim_walk2_30
+/actor/zelda_horse.zar	gEponaTrottingAnim	hl_anim_slowrun2_30
+/actor/zelda_horse.zar	gEponaGallopingAnim	hl_anim_fastrun2_30
+/actor/zelda_horse.zar	gEponaJumpingHighAnim	hl_anim_jump2002
