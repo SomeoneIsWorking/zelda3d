@@ -187,12 +187,34 @@ This file is the source of truth across sessions.
 27. **More foliage** (LOWEST priority — do last) — add more foliage/vegetation density to the world
     for a lusher look.
 
-28. **Sky looks bad (low-res N64 skybox)** (NORMAL priority — not low) — the sky is the N64 skybox
-    (N64 Fast3D path, not OoT3D assets), blurry/low-res. Improve: hi-res sky texture or use the
-    OoT3D sky. Note: the texpack (model textures) doesn't cover the N64 sky/HUD path —
-    see [[soh3d-texpack]]. (Foliage #27 is the only "extra/lowest" item — foliage is already 3DS.)
+28. **[DONE 2026-06-19; see Done] Sky looks bad (low-res N64 skybox)** — replaced the N64
+    normal-sky skybox with the OoT3D /kankyo/BlueSky.zar dome (tenkyu gradient + kumo clouds),
+    selected by the game's own time-of-day skybox1Index. REMAINING ENHANCEMENTS (optional, lower
+    priority): (a) blend the TWO domes (skybox1Index/skybox2Index by skyboxBlend) at dawn/dusk
+    instead of snapping to the dominant one; (b) animate the cloud drift via the kumo .cmab; (c)
+    OoT3D sun/moon/stars (still N64 Environment_DrawSunAndMoon); (d) broaden past SKYBOX_NORMAL_SKY
+    (shop/indoor skyboxes still N64). Indoor/enclosed scenes (Kokiri) have skyboxDisabled so the
+    dome correctly does not draw there.
 
 ## Done (recent)
+
+- **#28 OoT3D sky (BlueSky.zar dome + clouds) replaces the low-res N64 skybox** — the N64
+  normal-sky skybox is a blurry 128x64 CI8 image. Now: `SoH3D_TryDrawSky` (soh3d.c, hooked in
+  z_play.c ahead of `SkyboxDraw_Draw`) draws the OoT3D `/kankyo/BlueSky.zar` celestial dome
+  (`tenkyu`, a vertex-coloured gradient) + its cloud band (`kumo`, textured alpha) centred on the
+  camera eye, picked by the game's own `envCtx.skybox1Index` (0..8 = fine/cloud/holy × time-of-day).
+  The OoT3D `fine_tenkyu_0..3` baked vertex colours line up 1:1 with the N64 order (0=sunrise
+  yellow-green, 1=day blue, 2=sunset red, 3=night dark-blue — verified by dumping the dome vertex
+  colours). MECHANISM: a per-draw "sky" flag (SoH3D draw handle bit 30) makes the vertex shader pin
+  the dome's clip z to the far plane (z=w) in BOTH the GL and Vulkan backends, so it fills only
+  untouched (far) pixels under LEQUAL — never occludes world geometry, never clips against the far
+  plane, independent of its geometric scale. The "SKY:" model-key prefix (loadAutoModel) loads the
+  CMB with baked vertex colour + depth-write off; sky draws are excluded from shadow casting and AO;
+  untextured groups now bind a 1x1 white texture (GL) so the dome shows pure vertex colour. REPL
+  `sky <0|1>` / `sky scale <f>`. VERIFIED headless on Vulkan (Hyrule Field): day = saturated blue
+  gradient + 3DS clouds (sky-band RGB ~(60,183,255) vs N64 ~(109,133,255)); night dome dark blue
+  (~(25,21,79)); full overhead coverage; world unoccluded. 3-repo: libultraship 89f1c136
+  (fork/soh3d), Shipwright b13a530b3 (fork/develop). Remaining enhancements tracked in #28 above.
 
 - **#13(b) Kakariko graveyard bounces straight back out (OoT3D collision exit-poly mismatch)** —
   warping to the graveyard (entrance 0xE4) immediately transitioned back to Kakariko. ROOT CAUSE:
