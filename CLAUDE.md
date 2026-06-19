@@ -26,12 +26,25 @@ just a pointer; `KANBAN.md` is a generated offline mirror.
 Full workflow: the **soh3d-kanban** skill. Detail on any item: its issue body +
 `kanban/ARCHIVE_BACKLOG_pre_kanban.md` (pre-migration history).
 
+## RULE: every fix MUST post evidence before it leaves `in-progress`
+
+A card does **not** advance to `needs-confirmation` or `done` until you have posted proof to the
+issue. **No evidence = not fixed.** This is mandatory, not optional.
+
+- **User-visible fix** → an AFTER screenshot from the live game:
+  `tools/kanban.py evidence <#> after.png --caption "fixed: <what now works>"`. For a regression
+  the user reported with a picture, frame the SAME view so it's a like-for-like before/after.
+- **Non-visual / tooling fix** → post the proof that applies (REPL/log output, a quantitative
+  measurement, a test result) as an issue comment. Still required.
+- Then `mv <#> needs-confirmation` and let the USER confirm user-visible fixes (don't self-close
+  them). Close outright only for non-user-visible work.
+
 ## Verify the FULL user-facing path, not a narrow mechanism
 
-A card is only `done` when the real user-facing behavior works in a realistic run — not when a
+A card is only fixed when the real user-facing behavior works in a realistic run — not when a
 frozen-cam / forced-state / single-frame harness passes. Prior "VERIFIED headless" marks were
-repeatedly falsified by playtest. Run the live game (skill **soh3d-game-control**), screenshot the
-result, attach it as evidence, and let the user confirm.
+repeatedly falsified by playtest. Run the live game (skill **soh3d-game-control**), exercise the
+actual path, and capture the evidence above.
 
 ## Commit chain (commit each verified fix yourself, reference the issue `#<n>`)
 
