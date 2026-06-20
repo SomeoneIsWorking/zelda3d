@@ -3,9 +3,9 @@
 > **Generated mirror — do not hand-edit.** Source of truth = GitHub Issues on
 > `SomeoneIsWorking/soh3d` (private). Regenerate with `tools/kanban.py render`.
 > Move a card with `tools/kanban.py mv <#> <column>`; add with `tools/kanban.py add`.
-> Columns: todo · in-progress · in-review · needs-confirmation · reopened · blocked · done(=closed).  Updated 2026-06-20 14:05.
+> Columns: todo · in-progress · in-review · needs-confirmation · reopened · blocked · done(=closed).  Updated 2026-06-20 14:30.
 
-**Counts:** todo:10 | in-progress:2 | in-review:0 | needs-confirmation:16 | reopened:1 | blocked:2 | done:38
+**Counts:** todo:10 | in-progress:2 | in-review:0 | needs-confirmation:15 | reopened:1 | blocked:3 | done:38
 
 ## 📋 To Do  (10)
 - [#9](../../issues/9) 3DS Link can't pick up a cucco in 3DS-anim mode _(anim,link)_
@@ -26,13 +26,12 @@
 ## 🔍 In Review (agent verifying)  (0)
 _none_
 
-## 🙋 Needs User Confirmation  (16)
+## 🙋 Needs User Confirmation  (15)
 - [#1](../../issues/1) Stairs: real stepped geometry, wall preserved (render broken) _(render,stairs,scene)_
 - [#2](../../issues/2) Kakariko well: water is a tiny teal diamond, not a surface _(render,well)_
 - [#3](../../issues/3) Kokiri kids pop out at distance (actor unload, want infinite) _(render,scene)_
 - [#4](../../issues/4) Title/cutscene camera goes under 3DS terrain _(render,camera)_
 - [#5](../../issues/5) Cucco wings don't flap (idle + held/agitated) _(anim,cucco)_
-- [#6](../../issues/6) Held cucco renders at pickup spot, not in Link's hands _(render,link,cucco)_
 - [#8](../../issues/8) 3DS Link (N64 anims): head pitched down, arms wrangled _(anim,link)_
 - [#12](../../issues/12) Inventory/pause background renders upside-down _(render,ui,inventory)_
 - [#13](../../issues/13) Child Zelda renders ~half size _(render,scene)_
@@ -47,7 +46,8 @@ _none_
 ## ♻️ Reopened (was done, found broken)  (1)
 - [#31](../../issues/31) Hand-weave the 3DS Link model (multi-CMB assembly + equipment) _(render,anim,link)_
 
-## ⛔ Blocked (needs live/user input)  (2)
+## ⛔ Blocked (needs live/user input)  (3)
+- [#6](../../issues/6) Held cucco renders at pickup spot, not in Link's hands _(render,link,cucco)_
 - [#23](../../issues/23) Kokiri sword chest renders as the large chest, not small _(render,scene)_
 - [#32](../../issues/32) Xbox control scheme: modern dual-stick mapping + chords (no C-pad) _(ui,keyboard)_
 
