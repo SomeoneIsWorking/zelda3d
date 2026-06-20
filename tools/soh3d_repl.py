@@ -38,7 +38,11 @@ Examples:
 import sys, os, time, subprocess
 
 REPO = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
-FIFO = os.environ.get("SOH3D_REPL", os.path.join(REPO, "scratch", "soh3d.ctl"))
+# Target a parallel game instance with SOH3D_INSTANCE=<N> (matches tools/soh3d_game.sh); an
+# explicit SOH3D_REPL still wins. Empty/unset = the default "main" instance (unchanged).
+_inst = os.environ.get("SOH3D_INSTANCE", "")
+FIFO = os.environ.get("SOH3D_REPL") or os.path.join(
+    REPO, "scratch", f"soh3d.{_inst}.ctl" if _inst else "soh3d.ctl")
 OUT = FIFO + ".out"
 SHOTDIR = os.path.join(REPO, "scratch", "screenshots")
 
