@@ -11,10 +11,12 @@ Subcommands:
                         (mul/diff/tint/enable/scale/spawn/dump/state)
   shot <name> [x0 y0 x1 y1]   dump the current frame -> scratch/screenshots/<name>.png
                         (optional crop box: also writes <name>_crop.png, upscaled)
-  record <name> [secs] [fps] [width] [x0 y0 x1 y1]   capture a burst of live frames and
-                        encode scratch/screenshots/<name>.mp4 (for animated issue evidence).
-                        Duration HARD-CAPPED at 3s. Defaults: 3s, 15fps, 960px wide, full frame.
-                        Attach with: tools/kanban.py evidence <#> scratch/screenshots/<name>.mp4
+  record <name> [secs] [fps] [width] [span] [pan_deg] [x0 y0 x1 y1]   capture a burst of live
+                        frames and encode scratch/screenshots/<name>.mp4 (animated issue evidence).
+                        Duration HARD-CAPPED at 3s. Defaults: 3s, 15fps, 960px, auto span, no pan.
+                        `pan_deg` slowly orbits the (held) camera that many degrees over the clip
+                        for a parallax sweep (needs acam/cam/camfreeze first). Use 60fps + a slow
+                        pan for smooth, readable 3D. Attach: kanban.py evidence <#> <...>.mp4
   zoom <name> x0 y0 x1 y1 [scale]   crop+upscale an existing shot for inspection
                         -> scratch/screenshots/<name>_zoom.png (default scale 3)
   region <name> x0 y0 x1 y1   mean RGB of a region of an existing shot
@@ -106,7 +108,7 @@ def shot(name, timeout=10.0):
     return png
 
 
-def record(name, seconds=3.0, fps=15, width=960, span=None, box=None):
+def record(name, seconds=3.0, fps=15, width=960, span=None, box=None, pan=0.0):
     """Capture a burst of game frames and encode an MP4 (<=3s) for issue evidence.
 
     OUTPUT duration is HARD-CAPPED at 3s (GitHub-friendly). Captures seconds*fps frames and
@@ -131,9 +133,15 @@ def record(name, seconds=3.0, fps=15, width=960, span=None, box=None):
     for f in os.listdir(rec_dir):  # clear any prior frames
         os.remove(os.path.join(rec_dir, f))
     period = span / nframes
+    # `pan` = total degrees to orbit the (frozen) camera around its look-at over the whole clip, for
+    # a slow parallax sweep that makes the 3D shape readable. Stepped a little each frame via
+    # `camorbit`. The camera must already be held (acam/cam/camfreeze) so camorbit rotates that eye.
+    pan_step = (float(pan) / nframes) if pan else 0.0
     for i in range(nframes):
         t0 = time.time()
         _dump_frame(os.path.join(rec_dir, f"f{i:04d}.ppm"))
+        if pan_step:
+            send(f"camorbit {pan_step}")
         dt = time.time() - t0
         if dt < period:
             time.sleep(period - dt)
@@ -215,14 +223,15 @@ def main():
             box = tuple(int(x) for x in sys.argv[3:7])
             print(zoom(sys.argv[2], box, suffix="_crop"))
     elif sub == "record":
-        # record <name> [seconds] [fps] [width] [span] [x0 y0 x1 y1]
+        # record <name> [seconds] [fps] [width] [span] [pan_deg] [x0 y0 x1 y1]
         name = sys.argv[2]
         seconds = float(sys.argv[3]) if len(sys.argv) > 3 else 3.0
         fps = int(sys.argv[4]) if len(sys.argv) > 4 else 15
         width = int(sys.argv[5]) if len(sys.argv) > 5 else 960
         span = float(sys.argv[6]) if len(sys.argv) > 6 else None
-        box = tuple(int(x) for x in sys.argv[7:11]) if len(sys.argv) >= 11 else None
-        mp4 = record(name, seconds, fps, width, span, box)
+        pan = float(sys.argv[7]) if len(sys.argv) > 7 else 0.0
+        box = tuple(int(x) for x in sys.argv[8:12]) if len(sys.argv) >= 12 else None
+        mp4 = record(name, seconds, fps, width, span, box, pan)
         print(mp4)
     elif sub == "zoom":
         name = sys.argv[2]
