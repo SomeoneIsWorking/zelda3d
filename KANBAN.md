@@ -3,9 +3,9 @@
 > **Generated mirror — do not hand-edit.** Source of truth = GitHub Issues on
 > `SomeoneIsWorking/soh3d` (private). Regenerate with `tools/kanban.py render`.
 > Move a card with `tools/kanban.py mv <#> <column>`; add with `tools/kanban.py add`.
-> Columns: todo · in-progress · in-review · needs-confirmation · reopened · blocked · done(=closed).  Updated 2026-06-20 15:43.
+> Columns: todo · in-progress · in-review · needs-confirmation · reopened · blocked · done(=closed).  Updated 2026-06-20 15:45.
 
-**Counts:** todo:9 | in-progress:2 | in-review:0 | needs-confirmation:17 | reopened:1 | blocked:2 | done:38
+**Counts:** todo:9 | in-progress:1 | in-review:0 | needs-confirmation:18 | reopened:1 | blocked:2 | done:38
 
 ## 📋 To Do  (9)
 - [#10](../../issues/10) Child Link floats above plank platform by ladder _(collision)_
@@ -18,20 +18,20 @@
 - [#28](../../issues/28) Deku Baba no combat interaction (uncertain / maybe state corruption) _(scene)_
 - [#33](../../issues/33) More foliage / vegetation density (lowest priority) _(scene)_
 
-## 🔨 In Progress  (2)
-- [#7](../../issues/7) 3DS Link (3DS anims): motionless slide + long right arm _(anim,link)_
+## 🔨 In Progress  (1)
 - [#15](../../issues/15) Universal SPACE skip for cutscenes/onepoint/item-get _(keyboard)_
 
 ## 🔍 In Review (agent verifying)  (0)
 _none_
 
-## 🙋 Needs User Confirmation  (17)
+## 🙋 Needs User Confirmation  (18)
 - [#1](../../issues/1) Stairs: real stepped geometry, wall preserved (render broken) _(render,stairs,scene)_
 - [#2](../../issues/2) Kakariko well: water is a tiny teal diamond, not a surface _(render,well)_
 - [#3](../../issues/3) Kokiri kids pop out at distance (actor unload, want infinite) _(render,scene)_
 - [#4](../../issues/4) Title/cutscene camera goes under 3DS terrain _(render,camera)_
 - [#5](../../issues/5) Cucco wings don't flap (idle + held/agitated) _(anim,cucco)_
 - [#6](../../issues/6) Held cucco renders at pickup spot, not in Link's hands _(render,link,cucco)_
+- [#7](../../issues/7) 3DS Link (3DS anims): motionless slide + long right arm _(anim,link)_
 - [#8](../../issues/8) 3DS Link (N64 anims): head pitched down, arms wrangled _(anim,link)_
 - [#9](../../issues/9) 3DS Link can't pick up a cucco in 3DS-anim mode _(anim,link)_
 - [#12](../../issues/12) Inventory/pause background renders upside-down _(render,ui,inventory)_
