@@ -3,9 +3,9 @@
 > **Generated mirror — do not hand-edit.** Source of truth = GitHub Issues on
 > `SomeoneIsWorking/soh3d` (private). Regenerate with `tools/kanban.py render`.
 > Move a card with `tools/kanban.py mv <#> <column>`; add with `tools/kanban.py add`.
-> Columns: todo · in-progress · in-review · needs-confirmation · reopened · blocked · done(=closed).  Updated 2026-06-20 17:28.
+> Columns: todo · in-progress · in-review · needs-confirmation · reopened · blocked · done(=closed).  Updated 2026-06-20 17:58.
 
-**Counts:** todo:5 | in-progress:3 | in-review:0 | needs-confirmation:20 | reopened:1 | blocked:2 | done:38
+**Counts:** todo:5 | in-progress:2 | in-review:0 | needs-confirmation:21 | reopened:1 | blocked:2 | done:38
 
 ## 📋 To Do  (5)
 - [#10](../../issues/10) Child Link floats above plank platform by ladder _(collision)_
@@ -14,15 +14,14 @@
 - [#28](../../issues/28) Deku Baba no combat interaction (uncertain / maybe state corruption) _(scene)_
 - [#33](../../issues/33) More foliage / vegetation density (lowest priority) _(scene)_
 
-## 🔨 In Progress  (3)
-- [#11](../../issues/11) Kokiri clover/lilypad pond patch not walkable _(collision,scene)_
+## 🔨 In Progress  (2)
 - [#15](../../issues/15) Universal SPACE skip for cutscenes/onepoint/item-get _(keyboard)_
 - [#21](../../issues/21) Item/C-button UI icons render as garbled noise (texture corruption) _(render,crash,ui,hud)_
 
 ## 🔍 In Review (agent verifying)  (0)
 _none_
 
-## 🙋 Needs User Confirmation  (20)
+## 🙋 Needs User Confirmation  (21)
 - [#1](../../issues/1) Stairs: real stepped geometry, wall preserved (render broken) _(render,stairs,scene)_
 - [#2](../../issues/2) Kakariko well: water is a tiny teal diamond, not a surface _(render,well)_
 - [#3](../../issues/3) Kokiri kids pop out at distance (actor unload, want infinite) _(render,scene)_
@@ -32,6 +31,7 @@ _none_
 - [#7](../../issues/7) 3DS Link (3DS anims): motionless slide + long right arm _(anim,link)_
 - [#8](../../issues/8) 3DS Link (N64 anims): head pitched down, arms wrangled _(anim,link)_
 - [#9](../../issues/9) 3DS Link can't pick up a cucco in 3DS-anim mode _(anim,link)_
+- [#11](../../issues/11) Kokiri clover/lilypad pond patch not walkable _(collision,scene)_
 - [#12](../../issues/12) Inventory/pause background renders upside-down _(render,ui,inventory)_
 - [#13](../../issues/13) Child Zelda renders ~half size _(render,scene)_
 - [#14](../../issues/14) Title-screen flow unstable (crash / wrong gamestate) _(camera,scene)_
