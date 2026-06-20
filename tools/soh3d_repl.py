@@ -11,6 +11,10 @@ Subcommands:
                         (mul/diff/tint/enable/scale/spawn/dump/state)
   shot <name> [x0 y0 x1 y1]   dump the current frame -> scratch/screenshots/<name>.png
                         (optional crop box: also writes <name>_crop.png, upscaled)
+  record <name> [secs] [fps] [width] [x0 y0 x1 y1]   capture a burst of live frames and
+                        encode scratch/screenshots/<name>.mp4 (for animated issue evidence).
+                        Duration HARD-CAPPED at 3s. Defaults: 3s, 15fps, 960px wide, full frame.
+                        Attach with: tools/kanban.py evidence <#> scratch/screenshots/<name>.mp4
   zoom <name> x0 y0 x1 y1 [scale]   crop+upscale an existing shot for inspection
                         -> scratch/screenshots/<name>_zoom.png (default scale 3)
   region <name> x0 y0 x1 y1   mean RGB of a region of an existing shot
@@ -76,11 +80,8 @@ def wait_ready(timeout=180):
     return False
 
 
-def shot(name, timeout=10.0):
-    """Trigger an on-demand frame dump, wait for it, convert to PNG, return path."""
-    os.makedirs(SHOTDIR, exist_ok=True)
-    ppm = os.path.join(SHOTDIR, name + ".ppm")
-    png = os.path.join(SHOTDIR, name + ".png")
+def _dump_frame(ppm, timeout=10.0):
+    """Send a `dump <ppm>` and block until the PPM is fully written (size stable)."""
     pre = os.path.getmtime(ppm) if os.path.exists(ppm) else 0
     send(f"dump {ppm}")
     t0 = time.time()
@@ -89,13 +90,67 @@ def shot(name, timeout=10.0):
         if os.path.exists(ppm) and os.path.getmtime(ppm) > pre:
             sz = os.path.getsize(ppm)
             if sz > 1000 and sz == last:  # size stable across two polls => fully written
-                break
+                return
             last = sz
         time.sleep(0.05)
-    else:
-        sys.exit("shot: timed out waiting for frame dump")
+    sys.exit("dump: timed out waiting for frame")
+
+
+def shot(name, timeout=10.0):
+    """Trigger an on-demand frame dump, wait for it, convert to PNG, return path."""
+    os.makedirs(SHOTDIR, exist_ok=True)
+    ppm = os.path.join(SHOTDIR, name + ".ppm")
+    png = os.path.join(SHOTDIR, name + ".png")
+    _dump_frame(ppm, timeout)
     subprocess.run(["magick", ppm, png], check=True)
     return png
+
+
+def record(name, seconds=3.0, fps=15, width=960, span=None, box=None):
+    """Capture a burst of game frames and encode an MP4 (<=3s) for issue evidence.
+
+    OUTPUT duration is HARD-CAPPED at 3s (GitHub-friendly). Captures seconds*fps frames and
+    encodes at `fps`, so the clip plays for `seconds`. `width` downscales for a small upload
+    (height auto-even); `box`=(x0,y0,x1,y1) crops before scaling.
+
+    `span` = the WALL-CLOCK seconds to spread the capture over. The headless game advances its
+    logic slowly (a cucco wing-flap cycle takes ~6s of real time), and back-to-back dumps return
+    the SAME frame; so the frames must be spaced out in real time to capture motion. The captured
+    span is then time-compressed into the <=3s clip. Default span auto-picks ~0.22s/frame
+    (enough for the game to render a new frame), i.e. a sped-up clip. Pass span==seconds for a
+    real-time clip (choppy if the game is slow). Returns the .mp4 path."""
+    seconds = min(float(seconds), 3.0)  # hard 3s OUTPUT cap (per issue-evidence policy)
+    fps = int(fps)
+    nframes = max(1, int(round(seconds * fps)))
+    if span is None:
+        span = max(seconds, nframes * 0.22)  # ~0.22s/frame so each dump catches a fresh game frame
+    span = float(span)
+    os.makedirs(SHOTDIR, exist_ok=True)
+    rec_dir = os.path.join(REPO, "scratch", "record", name)
+    os.makedirs(rec_dir, exist_ok=True)
+    for f in os.listdir(rec_dir):  # clear any prior frames
+        os.remove(os.path.join(rec_dir, f))
+    period = span / nframes
+    for i in range(nframes):
+        t0 = time.time()
+        _dump_frame(os.path.join(rec_dir, f"f{i:04d}.ppm"))
+        dt = time.time() - t0
+        if dt < period:
+            time.sleep(period - dt)
+    out = os.path.join(SHOTDIR, name + ".mp4")
+    vf = []
+    if box:
+        x0, y0, x1, y1 = box
+        vf.append(f"crop={x1 - x0}:{y1 - y0}:{x0}:{y0}")
+    if width:
+        vf.append(f"scale={int(width)}:-2:flags=lanczos")
+    vf.append("format=yuv420p")
+    subprocess.run(
+        ["ffmpeg", "-y", "-framerate", str(fps), "-i", os.path.join(rec_dir, "f%04d.ppm"),
+         "-vf", ",".join(vf), "-c:v", "libx264", "-preset", "medium", "-crf", "23",
+         "-movflags", "+faststart", out],
+        check=True, stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
+    return out
 
 
 def zoom(name, box, scale=3, suffix="_zoom"):
@@ -159,6 +214,16 @@ def main():
         if len(sys.argv) >= 7:
             box = tuple(int(x) for x in sys.argv[3:7])
             print(zoom(sys.argv[2], box, suffix="_crop"))
+    elif sub == "record":
+        # record <name> [seconds] [fps] [width] [span] [x0 y0 x1 y1]
+        name = sys.argv[2]
+        seconds = float(sys.argv[3]) if len(sys.argv) > 3 else 3.0
+        fps = int(sys.argv[4]) if len(sys.argv) > 4 else 15
+        width = int(sys.argv[5]) if len(sys.argv) > 5 else 960
+        span = float(sys.argv[6]) if len(sys.argv) > 6 else None
+        box = tuple(int(x) for x in sys.argv[7:11]) if len(sys.argv) >= 11 else None
+        mp4 = record(name, seconds, fps, width, span, box)
+        print(mp4)
     elif sub == "zoom":
         name = sys.argv[2]
         box = tuple(int(x) for x in sys.argv[3:7])
