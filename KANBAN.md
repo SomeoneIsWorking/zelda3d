@@ -3,17 +3,21 @@
 > **Generated mirror — do not hand-edit.** Source of truth = GitHub Issues on
 > `SomeoneIsWorking/soh3d` (private). Regenerate with `tools/kanban.py render`.
 > Move a card with `tools/kanban.py mv <#> <column>`; add with `tools/kanban.py add`.
-> Columns: todo · in-progress · in-review · needs-confirmation · reopened · blocked · done(=closed).  Updated 2026-06-20 19:53.
+> Columns: todo · in-progress · in-review · needs-confirmation · reopened · blocked · done(=closed).  Updated 2026-06-20 20:34.
 
-**Counts:** todo:6 | in-progress:2 | in-review:0 | needs-confirmation:17 | reopened:4 | blocked:2 | done:40
+**Counts:** todo:10 | in-progress:2 | in-review:0 | needs-confirmation:16 | reopened:5 | blocked:2 | done:40
 
-## 📋 To Do  (6)
+## 📋 To Do  (10)
 - [#17](../../issues/17) Hi-res world/scene textures (texpack) _(render)_
 - [#24](../../issues/24) Skip chest-open / get-item freeze + reliable dialog fast-forward _(keyboard)_
 - [#28](../../issues/28) Deku Baba no combat interaction (uncertain / maybe state corruption) _(scene)_
 - [#33](../../issues/33) More foliage / vegetation density (lowest priority) _(scene)_
 - [#70](../../issues/70) Link roll animation broken (3DS Link) _(anim,link)_
 - [#71](../../issues/71) Pause map subscreen: area icons render as garbled white glyphs over sky _(render,ui)_
+- [#72](../../issues/72) Graphics menu toggles (shadows/AO/scene lighting) do nothing _(render,ui)_
+- [#73](../../issues/73) Market/town NPCs (En_Hy adults) render in T-pose / arms splayed _(render,anim)_
+- [#74](../../issues/74) Can't climb vine wall (climb does not initiate) _(collision,scene)_
+- [#75](../../issues/75) Gold Skulltula (En_Sw) renders malformed (legs splayed, distorted body) _(render,anim)_
 
 ## 🔨 In Progress  (2)
 - [#15](../../issues/15) Universal SPACE skip for cutscenes/onepoint/item-get _(keyboard)_
@@ -22,7 +26,7 @@
 ## 🔍 In Review (agent verifying)  (0)
 _none_
 
-## 🙋 Needs User Confirmation  (17)
+## 🙋 Needs User Confirmation  (16)
 - [#1](../../issues/1) Stairs: real stepped geometry, wall preserved (render broken) _(render,stairs,scene)_
 - [#2](../../issues/2) Kakariko well: water is a tiny teal diamond, not a surface _(render,well)_
 - [#3](../../issues/3) Kokiri kids pop out at distance (actor unload, want infinite) _(render,scene)_
@@ -39,12 +43,12 @@ _none_
 - [#22](../../issues/22) Large boulder renders half-buried underground _(render,scene)_
 - [#26](../../issues/26) Gohma arena void-out (matches N64 — confirm differs from vanilla?) _(collision,scene)_
 - [#27](../../issues/27) Gohma model needs hand-curated multi-CMB assembly _(render,anim)_
-- [#29](../../issues/29) Giant boulder overlaps the Temple of Time (Market) _(render,scene)_
 
-## ♻️ Reopened (was done, found broken)  (4)
+## ♻️ Reopened (was done, found broken)  (5)
 - [#7](../../issues/7) 3DS Link (3DS anims): motionless slide + long right arm _(anim,link)_
 - [#8](../../issues/8) 3DS Link (N64 anims): head pitched down, arms wrangled _(anim,link)_
 - [#16](../../issues/16) First-person camera: early-load crash + position snap _(camera,crash)_
+- [#29](../../issues/29) Giant boulder overlaps the Temple of Time (Market) _(render,scene)_
 - [#31](../../issues/31) Hand-weave the 3DS Link model (multi-CMB assembly + equipment) _(render,anim,link)_
 
 ## ⛔ Blocked (needs live/user input)  (2)
