@@ -3,23 +3,23 @@
 > **Generated mirror — do not hand-edit.** Source of truth = GitHub Issues on
 > `SomeoneIsWorking/soh3d` (private). Regenerate with `tools/kanban.py render`.
 > Move a card with `tools/kanban.py mv <#> <column>`; add with `tools/kanban.py add`.
-> Columns: todo · in-progress · in-review · needs-confirmation · reopened · blocked · done(=closed).  Updated 2026-06-20 15:45.
+> Columns: todo · in-progress · in-review · needs-confirmation · reopened · blocked · done(=closed).  Updated 2026-06-20 16:02.
 
-**Counts:** todo:9 | in-progress:1 | in-review:0 | needs-confirmation:18 | reopened:1 | blocked:2 | done:38
+**Counts:** todo:8 | in-progress:2 | in-review:0 | needs-confirmation:18 | reopened:1 | blocked:2 | done:38
 
-## 📋 To Do  (9)
+## 📋 To Do  (8)
 - [#10](../../issues/10) Child Link floats above plank platform by ladder _(collision)_
 - [#11](../../issues/11) Kokiri clover/lilypad pond patch not walkable _(collision,scene)_
 - [#14](../../issues/14) Title-screen flow unstable (crash / wrong gamestate) _(camera,scene)_
 - [#17](../../issues/17) Hi-res world/scene textures (texpack) _(render)_
 - [#20](../../issues/20) Keyboard UI / control scheme + default mapping _(ui,keyboard)_
-- [#21](../../issues/21) Item/C-button UI icons render as garbled noise (texture corruption) _(render,crash,ui,hud)_
 - [#24](../../issues/24) Skip chest-open / get-item freeze + reliable dialog fast-forward _(keyboard)_
 - [#28](../../issues/28) Deku Baba no combat interaction (uncertain / maybe state corruption) _(scene)_
 - [#33](../../issues/33) More foliage / vegetation density (lowest priority) _(scene)_
 
-## 🔨 In Progress  (1)
+## 🔨 In Progress  (2)
 - [#15](../../issues/15) Universal SPACE skip for cutscenes/onepoint/item-get _(keyboard)_
+- [#21](../../issues/21) Item/C-button UI icons render as garbled noise (texture corruption) _(render,crash,ui,hud)_
 
 ## 🔍 In Review (agent verifying)  (0)
 _none_
