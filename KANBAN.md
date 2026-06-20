@@ -3,11 +3,11 @@
 > **Generated mirror — do not hand-edit.** Source of truth = GitHub Issues on
 > `SomeoneIsWorking/soh3d` (private). Regenerate with `tools/kanban.py render`.
 > Move a card with `tools/kanban.py mv <#> <column>`; add with `tools/kanban.py add`.
-> Columns: todo · in-progress · in-review · needs-confirmation · reopened · blocked · done(=closed).  Updated 2026-06-20 20:34.
+> Columns: todo · in-progress · in-review · needs-confirmation · reopened · blocked · done(=closed).  Updated 2026-06-20 21:30.
 
-**Counts:** todo:10 | in-progress:2 | in-review:0 | needs-confirmation:16 | reopened:5 | blocked:2 | done:40
+**Counts:** todo:12 | in-progress:2 | in-review:0 | needs-confirmation:16 | reopened:5 | blocked:2 | done:40
 
-## 📋 To Do  (10)
+## 📋 To Do  (12)
 - [#17](../../issues/17) Hi-res world/scene textures (texpack) _(render)_
 - [#24](../../issues/24) Skip chest-open / get-item freeze + reliable dialog fast-forward _(keyboard)_
 - [#28](../../issues/28) Deku Baba no combat interaction (uncertain / maybe state corruption) _(scene)_
@@ -18,6 +18,8 @@
 - [#73](../../issues/73) Market/town NPCs (En_Hy adults) render in T-pose / arms splayed _(render,anim)_
 - [#74](../../issues/74) Can't climb vine wall (climb does not initiate) _(collision,scene)_
 - [#75](../../issues/75) Gold Skulltula (En_Sw) renders malformed (legs splayed, distorted body) _(render,anim)_
+- [#76](../../issues/76) Auto-replaced NPC animation playback wrong (Kokiri kids: one too fast, one frozen) _(anim)_
+- [#77](../../issues/77) Kakariko well: wooden frame structure floats at water level, should be above the well _(render,well,scene)_
 
 ## 🔨 In Progress  (2)
 - [#15](../../issues/15) Universal SPACE skip for cutscenes/onepoint/item-get _(keyboard)_
@@ -29,10 +31,10 @@ _none_
 ## 🙋 Needs User Confirmation  (16)
 - [#1](../../issues/1) Stairs: real stepped geometry, wall preserved (render broken) _(render,stairs,scene)_
 - [#2](../../issues/2) Kakariko well: water is a tiny teal diamond, not a surface _(render,well)_
-- [#3](../../issues/3) Kokiri kids pop out at distance (actor unload, want infinite) _(render,scene)_
 - [#4](../../issues/4) Title/cutscene camera goes under 3DS terrain _(render,camera)_
 - [#5](../../issues/5) Cucco wings don't flap (idle + held/agitated) _(anim,cucco)_
 - [#6](../../issues/6) Held cucco renders at pickup spot, not in Link's hands _(render,link,cucco)_
+- [#7](../../issues/7) 3DS Link (3DS anims): motionless slide + long right arm _(anim,link)_
 - [#9](../../issues/9) 3DS Link can't pick up a cucco in 3DS-anim mode _(anim,link)_
 - [#11](../../issues/11) Kokiri clover/lilypad pond patch not walkable _(collision,scene)_
 - [#12](../../issues/12) Inventory/pause background renders upside-down _(render,ui,inventory)_
@@ -45,7 +47,7 @@ _none_
 - [#27](../../issues/27) Gohma model needs hand-curated multi-CMB assembly _(render,anim)_
 
 ## ♻️ Reopened (was done, found broken)  (5)
-- [#7](../../issues/7) 3DS Link (3DS anims): motionless slide + long right arm _(anim,link)_
+- [#3](../../issues/3) Kokiri kids pop out at distance (actor unload, want infinite) _(render,scene)_
 - [#8](../../issues/8) 3DS Link (N64 anims): head pitched down, arms wrangled _(anim,link)_
 - [#16](../../issues/16) First-person camera: early-load crash + position snap _(camera,crash)_
 - [#29](../../issues/29) Giant boulder overlaps the Temple of Time (Market) _(render,scene)_
