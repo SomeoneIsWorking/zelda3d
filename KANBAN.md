@@ -3,11 +3,11 @@
 > **Generated mirror — do not hand-edit.** Source of truth = GitHub Issues on
 > `SomeoneIsWorking/soh3d` (private). Regenerate with `tools/kanban.py render`.
 > Move a card with `tools/kanban.py mv <#> <column>`; add with `tools/kanban.py add`.
-> Columns: todo · in-progress · in-review · needs-confirmation · reopened · blocked · done(=closed).  Updated 2026-06-20 07:29.
+> Columns: todo · in-progress · in-review · needs-confirmation · reopened · blocked · done(=closed).  Updated 2026-06-20 10:12.
 
-**Counts:** todo:17 | in-progress:2 | in-review:0 | needs-confirmation:10 | reopened:1 | blocked:1 | done:38
+**Counts:** todo:16 | in-progress:2 | in-review:0 | needs-confirmation:10 | reopened:1 | blocked:2 | done:38
 
-## 📋 To Do  (17)
+## 📋 To Do  (16)
 - [#6](../../issues/6) Held cucco renders at pickup spot, not in Link's hands _(render,link,cucco)_
 - [#8](../../issues/8) 3DS Link (N64 anims): head pitched down, arms wrangled _(anim,link)_
 - [#9](../../issues/9) 3DS Link can't pick up a cucco in 3DS-anim mode _(anim,link)_
@@ -19,7 +19,6 @@
 - [#17](../../issues/17) Hi-res world/scene textures (texpack) _(render)_
 - [#20](../../issues/20) Keyboard UI / control scheme + default mapping _(ui,keyboard)_
 - [#21](../../issues/21) Item/C-button UI icons render as garbled noise (texture corruption) _(render,crash,ui,hud)_
-- [#23](../../issues/23) Kokiri sword chest renders as the large chest, not small _(render,scene)_
 - [#24](../../issues/24) Skip chest-open / get-item freeze + reliable dialog fast-forward _(keyboard)_
 - [#25](../../issues/25) Link drops off every climbable surface halfway up (systemic) _(collision)_
 - [#27](../../issues/27) Gohma model needs hand-curated multi-CMB assembly _(render,anim)_
@@ -48,7 +47,8 @@ _none_
 ## ♻️ Reopened (was done, found broken)  (1)
 - [#31](../../issues/31) Hand-weave the 3DS Link model (multi-CMB assembly + equipment) _(render,anim,link)_
 
-## ⛔ Blocked (needs live/user input)  (1)
+## ⛔ Blocked (needs live/user input)  (2)
+- [#23](../../issues/23) Kokiri sword chest renders as the large chest, not small _(render,scene)_
 - [#32](../../issues/32) Xbox control scheme: modern dual-stick mapping + chords (no C-pad) _(ui,keyboard)_
 
 ## ✅ Done (recently closed)  (showing 30 of 38)
