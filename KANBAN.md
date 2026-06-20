@@ -3,9 +3,9 @@
 > **Generated mirror — do not hand-edit.** Source of truth = GitHub Issues on
 > `SomeoneIsWorking/soh3d` (private). Regenerate with `tools/kanban.py render`.
 > Move a card with `tools/kanban.py mv <#> <column>`; add with `tools/kanban.py add`.
-> Columns: todo · in-progress · in-review · needs-confirmation · reopened · blocked · done(=closed).  Updated 2026-06-20 06:22.
+> Columns: todo · in-progress · in-review · needs-confirmation · reopened · blocked · done(=closed).  Updated 2026-06-20 06:42.
 
-**Counts:** todo:18 | in-progress:3 | in-review:0 | needs-confirmation:8 | reopened:1 | blocked:1 | done:38
+**Counts:** todo:18 | in-progress:2 | in-review:0 | needs-confirmation:8 | reopened:1 | blocked:2 | done:38
 
 ## 📋 To Do  (18)
 - [#6](../../issues/6) Held cucco renders at pickup spot, not in Link's hands _(render,link,cucco)_
@@ -27,8 +27,7 @@
 - [#28](../../issues/28) Deku Baba no combat interaction (uncertain / maybe state corruption) _(scene)_
 - [#33](../../issues/33) More foliage / vegetation density (lowest priority) _(scene)_
 
-## 🔨 In Progress  (3)
-- [#5](../../issues/5) Cucco wings don't flap (idle + held/agitated) _(anim,cucco)_
+## 🔨 In Progress  (2)
 - [#7](../../issues/7) 3DS Link (3DS anims): motionless slide + long right arm _(anim,link)_
 - [#15](../../issues/15) Universal SPACE skip for cutscenes/onepoint/item-get _(keyboard)_
 
@@ -48,7 +47,8 @@ _none_
 ## ♻️ Reopened (was done, found broken)  (1)
 - [#31](../../issues/31) Hand-weave the 3DS Link model (multi-CMB assembly + equipment) _(render,anim,link)_
 
-## ⛔ Blocked (needs live/user input)  (1)
+## ⛔ Blocked (needs live/user input)  (2)
+- [#5](../../issues/5) Cucco wings don't flap (idle + held/agitated) _(anim,cucco)_
 - [#32](../../issues/32) Xbox control scheme: modern dual-stick mapping + chords (no C-pad) _(ui,keyboard)_
 
 ## ✅ Done (recently closed)  (showing 30 of 38)
