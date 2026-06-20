@@ -3,18 +3,17 @@
 > **Generated mirror — do not hand-edit.** Source of truth = GitHub Issues on
 > `SomeoneIsWorking/soh3d` (private). Regenerate with `tools/kanban.py render`.
 > Move a card with `tools/kanban.py mv <#> <column>`; add with `tools/kanban.py add`.
-> Columns: todo · in-progress · in-review · needs-confirmation · reopened · blocked · done(=closed).  Updated 2026-06-20 11:36.
+> Columns: todo · in-progress · in-review · needs-confirmation · reopened · blocked · done(=closed).  Updated 2026-06-20 12:51.
 
-**Counts:** todo:14 | in-progress:2 | in-review:0 | needs-confirmation:12 | reopened:1 | blocked:2 | done:38
+**Counts:** todo:13 | in-progress:2 | in-review:0 | needs-confirmation:13 | reopened:1 | blocked:2 | done:38
 
-## 📋 To Do  (14)
+## 📋 To Do  (13)
 - [#6](../../issues/6) Held cucco renders at pickup spot, not in Link's hands _(render,link,cucco)_
 - [#8](../../issues/8) 3DS Link (N64 anims): head pitched down, arms wrangled _(anim,link)_
 - [#9](../../issues/9) 3DS Link can't pick up a cucco in 3DS-anim mode _(anim,link)_
 - [#10](../../issues/10) Child Link floats above plank platform by ladder _(collision)_
 - [#11](../../issues/11) Kokiri clover/lilypad pond patch not walkable _(collision,scene)_
 - [#14](../../issues/14) Title-screen flow unstable (crash / wrong gamestate) _(camera,scene)_
-- [#16](../../issues/16) First-person camera: early-load crash + position snap _(camera,crash)_
 - [#17](../../issues/17) Hi-res world/scene textures (texpack) _(render)_
 - [#20](../../issues/20) Keyboard UI / control scheme + default mapping _(ui,keyboard)_
 - [#21](../../issues/21) Item/C-button UI icons render as garbled noise (texture corruption) _(render,crash,ui,hud)_
@@ -30,7 +29,7 @@
 ## 🔍 In Review (agent verifying)  (0)
 _none_
 
-## 🙋 Needs User Confirmation  (12)
+## 🙋 Needs User Confirmation  (13)
 - [#1](../../issues/1) Stairs: real stepped geometry, wall preserved (render broken) _(render,stairs,scene)_
 - [#2](../../issues/2) Kakariko well: water is a tiny teal diamond, not a surface _(render,well)_
 - [#3](../../issues/3) Kokiri kids pop out at distance (actor unload, want infinite) _(render,scene)_
@@ -38,6 +37,7 @@ _none_
 - [#5](../../issues/5) Cucco wings don't flap (idle + held/agitated) _(anim,cucco)_
 - [#12](../../issues/12) Inventory/pause background renders upside-down _(render,ui,inventory)_
 - [#13](../../issues/13) Child Zelda renders ~half size _(render,scene)_
+- [#16](../../issues/16) First-person camera: early-load crash + position snap _(camera,crash)_
 - [#18](../../issues/18) Crisp HUD/UI textures (hearts/digits/buttons/icons) _(ui,hud)_
 - [#22](../../issues/22) Large boulder renders half-buried underground _(render,scene)_
 - [#25](../../issues/25) Link drops off every climbable surface halfway up (systemic) _(collision)_
