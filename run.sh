@@ -13,11 +13,12 @@
 #
 # On a fresh checkout this checks out the Shipwright engine submodule (+ its own submodules) and
 # configures the build dir — so `git clone <soh3d> && ./run.sh` is all you need (no --recursive
-# required; run.sh inits the submodules for you). On every run it hard-resets the engine submodules
-# to the commit THIS repo pins (the submodule gitlink) — discarding stray local edits to engine
-# sources so a stale/dirty checkout fixes itself — while keeping local commits (dev WIP) and
-# untracked files (the build dir). So `git pull && ./run.sh` stays current. Skip with
-# SOH3D_NOUPDATE=1.
+# required; run.sh inits the submodules for you). On every run it makes sure each engine submodule
+# is properly registered (re-cloning it from scratch if it is half-present / broken) and otherwise
+# UPDATES it to the commit THIS repo pins (the submodule gitlink). It never hard-resets: a plain
+# `git submodule update` preserves in-progress engine work (uncommitted edits / local commits) by
+# refusing to clobber it rather than discarding it. So `git pull && ./run.sh` stays current. Skip
+# with SOH3D_NOUPDATE=1.
 set -eu
 REPO="$(cd "$(dirname "$0")" && pwd)"
 BUILD="$REPO/Shipwright/build-cmake"
@@ -45,49 +46,41 @@ sync_submodule_to_pin() {
     local parent="$1" subpath="$2" label="$3"
     local sub="$parent/$subpath" want cur
     want="$(git -C "$parent" rev-parse --verify --quiet "HEAD:$subpath" 2>/dev/null || true)"
-    cur="$(git -C "$sub" rev-parse --verify --quiet HEAD 2>/dev/null || true)"
     [ -z "$want" ] && { echo "  $label: cannot resolve pinned commit — skipping" >&2; return 0; }
-    if [ -z "$cur" ]; then
-        # Not checked out yet → initialise it at the pin.
+
+    # Is the submodule PROPERLY REGISTERED? It must (a) have a configured URL in the parent's git
+    # config (i.e. `git submodule init` has run for it) AND (b) be a real git working tree on disk.
+    # If either is missing the checkout is half-present / broken (empty dir, stray clone, deinitialised
+    # gitlink) → delete it and clone it again from scratch. Otherwise just update it.
+    local registered=1
+    git -C "$parent" config --get "submodule.${subpath}.url" >/dev/null 2>&1 || registered=0
+    git -C "$sub" rev-parse --is-inside-work-tree >/dev/null 2>&1 || registered=0
+
+    if [ "$registered" = 0 ]; then
+        echo "  $label: not properly registered as a submodule — deleting and cloning it again" >&2
+        rm -rf "$sub"
         git -C "$parent" submodule update --init "$subpath" >&2 || {
-            echo "error: failed to check out $label" >&2; exit 1; }
+            echo "error: failed to clone $label" >&2; exit 1; }
         return 0
     fi
+
+    cur="$(git -C "$sub" rev-parse --verify --quiet HEAD 2>/dev/null || true)"
     [ "$cur" = "$want" ] && return 0
-    # The parent's `git pull` may have advanced the gitlink to a commit this checkout hasn't fetched.
+
+    # Registered but at the wrong commit → UPDATE it to the pin. NEVER hard-reset: `git submodule
+    # update` checks the pinned commit OUT, which advances a clean tree but ABORTS (rather than
+    # discarding) if local edits/commits would be overwritten — so in-progress engine work is kept.
+    # Fetch the pin first in case the parent's pull advanced the gitlink past what's local here.
     git -C "$sub" cat-file -e "${want}^{commit}" 2>/dev/null || git -C "$sub" fetch --quiet --all 2>/dev/null || true
-    # Local COMMITS beyond the pin = work in progress on this machine — never discard those.
-    if git -C "$sub" merge-base --is-ancestor "$want" "$cur" 2>/dev/null; then
-        echo "  $label: ${cur:0:9} has local commits ahead of pinned ${want:0:9}; leaving it." >&2
-        return 0
-    fi
-    # UNCOMMITTED local edits to tracked files = in-progress engine work — NEVER hard-reset them
-    # away. (This bit us: editing an engine source, then running `./run.sh` before committing,
-    # silently erased the edit.) Leave the checkout exactly as-is and tell the user to commit to
-    # advance it. Untracked files (the build dir) are ignored here on purpose.
-    if [ -n "$(git -C "$sub" status --porcelain --untracked-files=no 2>/dev/null)" ]; then
-        echo "  $label: ${cur:0:9} has UNCOMMITTED local edits (pinned ${want:0:9}); leaving them" \
-             "untouched — commit them to move the pin. (export SOH3D_NOUPDATE=1 to silence.)" >&2
-        return 0
-    fi
-    # Otherwise the working tree is clean but at the wrong commit (a stale checkout) — hard-reset to
-    # the pin. Only clean trees reach here, so no local edits can be lost (untracked files such as
-    # the build dir are left in place).
-    echo "  $label: hard-reset ${cur:0:9} -> pinned ${want:0:9}" >&2
-    git -C "$sub" reset --hard "$want" >/dev/null 2>&1 || true
-    # Cover the not-yet-fetched / not-initialised cases (and re-sync nested gitlinks).
-    if [ "$(git -C "$sub" rev-parse --verify --quiet HEAD 2>/dev/null || true)" != "$want" ]; then
-        git -C "$parent" submodule update --init --force "$subpath" >&2 || true
-    fi
-    if [ "$(git -C "$sub" rev-parse --verify --quiet HEAD 2>/dev/null || true)" != "$want" ]; then
-        echo "error: couldn't reset $label to ${want:0:9} (offline, or commit not on the remote?)" >&2
-        exit 1
-    fi
+    echo "  $label: updating ${cur:0:9} -> pinned ${want:0:9}" >&2
+    git -C "$parent" submodule update "$subpath" >&2 || \
+        echo "  $label: could not advance to ${want:0:9} — local edits/commits in the way; left as-is." \
+             "(commit or stash them to update; SOH3D_NOUPDATE=1 to silence.)" >&2
 }
 
 # Bring the engine checkout in line with the commits THIS repo pins (Shipwright gitlink, then the
-# libultraship gitlink it records), hard-resetting each to its pin. Reports each decision; discards
-# local edits to engine sources but keeps local commits (dev WIP) and untracked files.
+# libultraship gitlink it records): re-clone a broken/unregistered submodule, otherwise update it
+# to its pin. Reports each decision; never hard-resets, so local engine work is preserved.
 update_engine_if_safe() {
     if [ -n "${SOH3D_NOUPDATE:-}" ]; then
         echo "engine: update skipped (SOH3D_NOUPDATE set)" >&2
