@@ -228,7 +228,13 @@ def cmd_evidence(a):
         lines.append(a.caption)
         lines.append("")
     for asset, url in urls:
-        lines.append(f"![{asset}]({url})")
+        if asset.lower().endswith((".mp4", ".mov", ".webm")):
+            # GitHub renders an inline <video> player for a BARE video URL on its own line;
+            # the ![]() image syntax would render a broken image for video.
+            lines.append(url)
+        else:
+            lines.append(f"![{asset}]({url})")
+        lines.append("")
     block = "\n".join(lines)
     if a.to_body:
         cur = gh(["issue", "view", str(a.issue), "--json", "body", "-q", ".body"]).rstrip()
