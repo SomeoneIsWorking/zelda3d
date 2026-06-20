@@ -14,9 +14,17 @@
 set -u
 REPO="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
 SOH="$REPO/Shipwright/build-cmake/soh/soh.elf"
-LOG="$REPO/scratch/logs/run.log"
-FIFO="${SOH3D_REPL:-$REPO/scratch/soh3d.ctl}"
-PIDFILE="$REPO/scratch/soh3d.pid"
+# Parallel instances: SOH3D_INSTANCE=<N> (a positive integer) runs a SECOND (3rd, ...) game
+# concurrently with the default one, on its own Xvfb display (:9(9-N)), control FIFO, pidfile and
+# log, so two agents can drive/screenshot the game at once. Empty (default) = the original single
+# "main" instance with byte-identical paths/behaviour. All instances share the one built binary
+# (assets resolve next to it) — so a default-instance `stop` (kill ALL soh.elf) would also reap a
+# parallel one; stop() therefore SPARES any pid registered in a non-default pidfile (soh3d.<N>.pid).
+INST="${SOH3D_INSTANCE:-}"
+if [ -n "$INST" ]; then SUF=".$INST"; DEFDISP=":$((99 - INST))"; else SUF=""; DEFDISP=":99"; fi
+LOG="$REPO/scratch/logs/run$SUF.log"
+FIFO="${SOH3D_REPL:-$REPO/scratch/soh3d$SUF.ctl}"
+PIDFILE="$REPO/scratch/soh3d$SUF.pid"
 
 # List pids of every running soh.elf — matches the path with OR without a trailing " (deleted)"
 # (a rebuilt-over binary), which is exactly the case the old kill loop missed.
@@ -30,15 +38,38 @@ soh_pids() {
     done
 }
 
+# Pids registered by parallel (non-default) instances — the default `stop` must NOT reap these.
+# (soh3d.<N>.pid; the default pidfile soh3d.pid has no digit after the dot, so it's excluded.)
+parallel_pids() { cat "$REPO"/scratch/soh3d.[0-9]*.pid 2>/dev/null; }
+
 stop() {
-    local pids; pids="$(soh_pids)"
-    if [ -n "$pids" ]; then echo "$pids" | xargs -r kill -9 2>/dev/null; fi
-    pkill -9 zenity 2>/dev/null   # a SoH crash pops a blocking zenity dialog; clear it too
+    local pids pid spare alive
+    pids="$(soh_pids)"
+    if [ -n "$INST" ]; then
+        # Instance stop: kill ONLY this instance's pid (from its pidfile) — leave others alone.
+        pid="$(cat "$PIDFILE" 2>/dev/null)"
+        [ -n "$pid" ] && kill -9 "$pid" 2>/dev/null
+    else
+        # Default stop: kill ALL soh.elf EXCEPT pids a parallel instance registered.
+        spare=" $(parallel_pids | tr '\n' ' ') "
+        for pid in $pids; do
+            case "$spare" in *" $pid "*) continue ;; esac
+            kill -9 "$pid" 2>/dev/null
+        done
+        pkill -9 zenity 2>/dev/null   # a SoH crash pops a blocking zenity dialog; clear it too
+    fi
     rm -f "$FIFO" "$FIFO.out" "$PIDFILE" 2>/dev/null
-    # wait for them to actually die (up to ~3s)
-    for _ in $(seq 1 30); do [ -z "$(soh_pids)" ] && break; sleep 0.1; done
-    local left; left="$(soh_pids)"
-    [ -n "$left" ] && { echo "WARN: still alive: $left" >&2; return 1; }
+    # wait for the targeted instance(s) to actually die (up to ~3s)
+    for _ in $(seq 1 30); do
+        if [ -n "$INST" ]; then
+            kill -0 "$pid" 2>/dev/null || break
+        else
+            spare=" $(parallel_pids | tr '\n' ' ') "; alive=
+            for pid in $(soh_pids); do case "$spare" in *" $pid "*) continue ;; esac; alive=1; done
+            [ -z "$alive" ] && break
+        fi
+        sleep 0.1
+    done
     return 0
 }
 
@@ -56,7 +87,7 @@ status() {
 # Rendering still uses the real GPU; screenshots (REPL `shot`) read the in-process framebuffer.
 setup_headless() {
     [ "${SOH3D_HEADLESS:-0}" = "1" ] || return 0
-    local disp="${SOH3D_HEADLESS_DISPLAY:-:99}"
+    local disp="${SOH3D_HEADLESS_DISPLAY:-$DEFDISP}"
     if ! DISPLAY="$disp" xdpyinfo >/dev/null 2>&1; then
         echo "headless: starting Xvfb on $disp" >&2
         setsid Xvfb "$disp" -screen 0 1920x1080x24 >"$REPO/scratch/logs/xvfb.log" 2>&1 &
@@ -94,13 +125,14 @@ start() {
         DISPLAY="${DISPLAY:-:0}" XAUTHORITY="$xauth" \
         stdbuf -oL -eL "$SOH" >"$LOG" 2>&1 < /dev/null &
     local pid=$!; echo "$pid" > "$PIDFILE"
-    # wait for REPL ready (the .out file appears) — up to ~40s
+    # wait for REPL ready (the .out file appears) — up to ~40s. Liveness is checked on THIS
+    # instance's own pid so a parallel instance's failure isn't masked by the others still running.
     for _ in $(seq 1 80); do
-        [ -e "$FIFO.out" ] && { echo "ready (pid $(soh_pids))"; return 0; }
-        [ -z "$(soh_pids)" ] && { echo "FAILED to boot — see $LOG" >&2; tail -5 "$LOG" >&2; return 1; }
+        [ -e "$FIFO.out" ] && { echo "ready (pid $pid${INST:+ inst $INST on $DISPLAY})"; return 0; }
+        kill -0 "$pid" 2>/dev/null || { echo "FAILED to boot — see $LOG" >&2; tail -5 "$LOG" >&2; return 1; }
         sleep 0.5
     done
-    echo "WARN: booted but REPL not ready after 40s (pid $(soh_pids))" >&2; return 1
+    echo "WARN: booted but REPL not ready after 40s (pid $pid)" >&2; return 1
 }
 
 case "${1:-}" in
