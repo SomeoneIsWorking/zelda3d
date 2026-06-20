@@ -39,6 +39,23 @@ issue. **No evidence = not fixed.** This is mandatory, not optional.
 - Then `mv <#> needs-confirmation` and let the USER confirm user-visible fixes (don't self-close
   them). Close outright only for non-user-visible work.
 
+## RULE: every bugfix STARTS by proving the tooling can investigate it
+
+Before touching a fix, confirm you can **reliably drive the game to the failing situation and observe
+it** — reproduce the state on demand, hold it still, frame it, and read back the relevant engine
+values. If you can't, your first task is to BUILD/extend that tooling, not to guess at a fix. A fix
+attempted on top of flaky control produces "evidence" that's really just luck (e.g. #5: identical
+before/after shots because the cucco was never reliably posed/observed). "If you can't control the
+game reliably, you shouldn't be working on the bug fix." (user directive, 2026-06-20)
+
+- Prefer **GENERIC, reusable** control primitives over one-off per-bug hacks. The generic actor
+  surface in `soh3d.c` REPL is the model: `asel <id|any> [n]` (select nth-nearest live actor),
+  `afreeze <0|1>` (pin its transform — no wander/hop/AI drift), `apos/arot/aparams` (set
+  transform/params), `acam [dist] [axis]` (auto-frame it as a side profile — no coordinate
+  guessing), `ainfo` (dump pos/rot/params/velocity). These work on ANY actor. Build bug-specific
+  controls only for state with no generic form (e.g. the cucco wing state machine: `cuccostate`,
+  `flapinfo`). Driven per-frame from `SoH3D_ActorPostUpdate` in `Actor_UpdateAll`.
+
 ## Verify the FULL user-facing path, not a narrow mechanism
 
 A card is only fixed when the real user-facing behavior works in a realistic run — not when a
