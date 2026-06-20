@@ -3,13 +3,12 @@
 > **Generated mirror — do not hand-edit.** Source of truth = GitHub Issues on
 > `SomeoneIsWorking/soh3d` (private). Regenerate with `tools/kanban.py render`.
 > Move a card with `tools/kanban.py mv <#> <column>`; add with `tools/kanban.py add`.
-> Columns: todo · in-progress · in-review · needs-confirmation · reopened · blocked · done(=closed).  Updated 2026-06-20 13:02.
+> Columns: todo · in-progress · in-review · needs-confirmation · reopened · blocked · done(=closed).  Updated 2026-06-20 13:47.
 
-**Counts:** todo:12 | in-progress:2 | in-review:0 | needs-confirmation:14 | reopened:1 | blocked:2 | done:38
+**Counts:** todo:11 | in-progress:2 | in-review:1 | needs-confirmation:14 | reopened:1 | blocked:2 | done:38
 
-## 📋 To Do  (12)
+## 📋 To Do  (11)
 - [#6](../../issues/6) Held cucco renders at pickup spot, not in Link's hands _(render,link,cucco)_
-- [#8](../../issues/8) 3DS Link (N64 anims): head pitched down, arms wrangled _(anim,link)_
 - [#9](../../issues/9) 3DS Link can't pick up a cucco in 3DS-anim mode _(anim,link)_
 - [#10](../../issues/10) Child Link floats above plank platform by ladder _(collision)_
 - [#11](../../issues/11) Kokiri clover/lilypad pond patch not walkable _(collision,scene)_
@@ -25,8 +24,8 @@
 - [#7](../../issues/7) 3DS Link (3DS anims): motionless slide + long right arm _(anim,link)_
 - [#15](../../issues/15) Universal SPACE skip for cutscenes/onepoint/item-get _(keyboard)_
 
-## 🔍 In Review (agent verifying)  (0)
-_none_
+## 🔍 In Review (agent verifying)  (1)
+- [#8](../../issues/8) 3DS Link (N64 anims): head pitched down, arms wrangled _(anim,link)_
 
 ## 🙋 Needs User Confirmation  (14)
 - [#1](../../issues/1) Stairs: real stepped geometry, wall preserved (render broken) _(render,stairs,scene)_
