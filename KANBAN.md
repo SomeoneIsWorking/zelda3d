@@ -3,11 +3,11 @@
 > **Generated mirror — do not hand-edit.** Source of truth = GitHub Issues on
 > `SomeoneIsWorking/soh3d` (private). Regenerate with `tools/kanban.py render`.
 > Move a card with `tools/kanban.py mv <#> <column>`; add with `tools/kanban.py add`.
-> Columns: todo · in-progress · in-review · needs-confirmation · reopened · blocked · done(=closed).  Updated 2026-06-20 10:25.
+> Columns: todo · in-progress · in-review · needs-confirmation · reopened · blocked · done(=closed).  Updated 2026-06-20 11:09.
 
-**Counts:** todo:15 | in-progress:2 | in-review:0 | needs-confirmation:11 | reopened:1 | blocked:2 | done:38
+**Counts:** todo:14 | in-progress:3 | in-review:0 | needs-confirmation:11 | reopened:1 | blocked:2 | done:38
 
-## 📋 To Do  (15)
+## 📋 To Do  (14)
 - [#6](../../issues/6) Held cucco renders at pickup spot, not in Link's hands _(render,link,cucco)_
 - [#8](../../issues/8) 3DS Link (N64 anims): head pitched down, arms wrangled _(anim,link)_
 - [#9](../../issues/9) 3DS Link can't pick up a cucco in 3DS-anim mode _(anim,link)_
@@ -19,14 +19,14 @@
 - [#20](../../issues/20) Keyboard UI / control scheme + default mapping _(ui,keyboard)_
 - [#21](../../issues/21) Item/C-button UI icons render as garbled noise (texture corruption) _(render,crash,ui,hud)_
 - [#24](../../issues/24) Skip chest-open / get-item freeze + reliable dialog fast-forward _(keyboard)_
-- [#25](../../issues/25) Link drops off every climbable surface halfway up (systemic) _(collision)_
 - [#27](../../issues/27) Gohma model needs hand-curated multi-CMB assembly _(render,anim)_
 - [#28](../../issues/28) Deku Baba no combat interaction (uncertain / maybe state corruption) _(scene)_
 - [#33](../../issues/33) More foliage / vegetation density (lowest priority) _(scene)_
 
-## 🔨 In Progress  (2)
+## 🔨 In Progress  (3)
 - [#7](../../issues/7) 3DS Link (3DS anims): motionless slide + long right arm _(anim,link)_
 - [#15](../../issues/15) Universal SPACE skip for cutscenes/onepoint/item-get _(keyboard)_
+- [#25](../../issues/25) Link drops off every climbable surface halfway up (systemic) _(collision)_
 
 ## 🔍 In Review (agent verifying)  (0)
 _none_
