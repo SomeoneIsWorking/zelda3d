@@ -3,16 +3,17 @@
 > **Generated mirror — do not hand-edit.** Source of truth = GitHub Issues on
 > `SomeoneIsWorking/soh3d` (private). Regenerate with `tools/kanban.py render`.
 > Move a card with `tools/kanban.py mv <#> <column>`; add with `tools/kanban.py add`.
-> Columns: todo · in-progress · in-review · needs-confirmation · reopened · blocked · done(=closed).  Updated 2026-06-20 19:20.
+> Columns: todo · in-progress · in-review · needs-confirmation · reopened · blocked · done(=closed).  Updated 2026-06-20 19:53.
 
-**Counts:** todo:5 | in-progress:2 | in-review:0 | needs-confirmation:21 | reopened:1 | blocked:2 | done:38
+**Counts:** todo:6 | in-progress:2 | in-review:0 | needs-confirmation:17 | reopened:4 | blocked:2 | done:40
 
-## 📋 To Do  (5)
-- [#10](../../issues/10) Child Link floats above plank platform by ladder _(collision)_
+## 📋 To Do  (6)
 - [#17](../../issues/17) Hi-res world/scene textures (texpack) _(render)_
 - [#24](../../issues/24) Skip chest-open / get-item freeze + reliable dialog fast-forward _(keyboard)_
 - [#28](../../issues/28) Deku Baba no combat interaction (uncertain / maybe state corruption) _(scene)_
 - [#33](../../issues/33) More foliage / vegetation density (lowest priority) _(scene)_
+- [#70](../../issues/70) Link roll animation broken (3DS Link) _(anim,link)_
+- [#71](../../issues/71) Pause map subscreen: area icons render as garbled white glyphs over sky _(render,ui)_
 
 ## 🔨 In Progress  (2)
 - [#15](../../issues/15) Universal SPACE skip for cutscenes/onepoint/item-get _(keyboard)_
@@ -21,37 +22,38 @@
 ## 🔍 In Review (agent verifying)  (0)
 _none_
 
-## 🙋 Needs User Confirmation  (21)
+## 🙋 Needs User Confirmation  (17)
 - [#1](../../issues/1) Stairs: real stepped geometry, wall preserved (render broken) _(render,stairs,scene)_
 - [#2](../../issues/2) Kakariko well: water is a tiny teal diamond, not a surface _(render,well)_
 - [#3](../../issues/3) Kokiri kids pop out at distance (actor unload, want infinite) _(render,scene)_
 - [#4](../../issues/4) Title/cutscene camera goes under 3DS terrain _(render,camera)_
 - [#5](../../issues/5) Cucco wings don't flap (idle + held/agitated) _(anim,cucco)_
 - [#6](../../issues/6) Held cucco renders at pickup spot, not in Link's hands _(render,link,cucco)_
-- [#7](../../issues/7) 3DS Link (3DS anims): motionless slide + long right arm _(anim,link)_
-- [#8](../../issues/8) 3DS Link (N64 anims): head pitched down, arms wrangled _(anim,link)_
 - [#9](../../issues/9) 3DS Link can't pick up a cucco in 3DS-anim mode _(anim,link)_
 - [#11](../../issues/11) Kokiri clover/lilypad pond patch not walkable _(collision,scene)_
 - [#12](../../issues/12) Inventory/pause background renders upside-down _(render,ui,inventory)_
 - [#13](../../issues/13) Child Zelda renders ~half size _(render,scene)_
 - [#14](../../issues/14) Title-screen flow unstable (crash / wrong gamestate) _(camera,scene)_
-- [#16](../../issues/16) First-person camera: early-load crash + position snap _(camera,crash)_
 - [#18](../../issues/18) Crisp HUD/UI textures (hearts/digits/buttons/icons) _(ui,hud)_
 - [#20](../../issues/20) Keyboard UI / control scheme + default mapping _(ui,keyboard)_
 - [#22](../../issues/22) Large boulder renders half-buried underground _(render,scene)_
-- [#25](../../issues/25) Link drops off every climbable surface halfway up (systemic) _(collision)_
 - [#26](../../issues/26) Gohma arena void-out (matches N64 — confirm differs from vanilla?) _(collision,scene)_
 - [#27](../../issues/27) Gohma model needs hand-curated multi-CMB assembly _(render,anim)_
 - [#29](../../issues/29) Giant boulder overlaps the Temple of Time (Market) _(render,scene)_
 
-## ♻️ Reopened (was done, found broken)  (1)
+## ♻️ Reopened (was done, found broken)  (4)
+- [#7](../../issues/7) 3DS Link (3DS anims): motionless slide + long right arm _(anim,link)_
+- [#8](../../issues/8) 3DS Link (N64 anims): head pitched down, arms wrangled _(anim,link)_
+- [#16](../../issues/16) First-person camera: early-load crash + position snap _(camera,crash)_
 - [#31](../../issues/31) Hand-weave the 3DS Link model (multi-CMB assembly + equipment) _(render,anim,link)_
 
 ## ⛔ Blocked (needs live/user input)  (2)
 - [#23](../../issues/23) Kokiri sword chest renders as the large chest, not small _(render,scene)_
 - [#32](../../issues/32) Xbox control scheme: modern dual-stick mapping + chords (no C-pad) _(ui,keyboard)_
 
-## ✅ Done (recently closed)  (showing 30 of 38)
+## ✅ Done (recently closed)  (showing 30 of 40)
+- [#10](../../issues/10) Child Link floats above plank platform by ladder
+- [#25](../../issues/25) Link drops off every climbable surface halfway up (systemic)
 - [#30](../../issues/30) NPC walks in mid-air above a Kakariko building
 - [#69](../../issues/69) Child Link float fixed (posed-feet grounding)
 - [#68](../../issues/68) run.sh preserves uncommitted submodule edits
@@ -80,5 +82,3 @@ _none_
 - [#45](../../issues/45) A action button → Xbox 'A' glyph on the 3D quad
 - [#44](../../issues/44) Xbox face-button HUD glyphs (B + 3 C buttons cluster)
 - [#43](../../issues/43) Crisp HUD counter icons (rupee gem / small key / clock)
-- [#42](../../issues/42) Crisp HUD button-background disc (B/C/item/A buttons)
-- [#41](../../issues/41) Crisp HUD counter font (rupee/key/ammo/timer digits)
