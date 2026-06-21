@@ -3,21 +3,21 @@
 > **Generated mirror — do not hand-edit.** Source of truth = GitHub Issues on
 > `SomeoneIsWorking/soh3d` (private). Regenerate with `tools/kanban.py render`.
 > Move a card with `tools/kanban.py mv <#> <column>`; add with `tools/kanban.py add`.
-> Columns: todo · in-progress · in-review · needs-confirmation · reopened · blocked · done(=closed).  Updated 2026-06-21 06:30.
+> Columns: todo · in-progress · in-review · needs-confirmation · reopened · blocked · done(=closed).  Updated 2026-06-21 06:47.
 
-**Counts:** todo:6 | in-progress:5 | in-review:0 | needs-confirmation:23 | reopened:5 | blocked:2 | done:40
+**Counts:** todo:5 | in-progress:6 | in-review:0 | needs-confirmation:23 | reopened:5 | blocked:2 | done:40
 
-## 📋 To Do  (6)
+## 📋 To Do  (5)
 - [#17](../../issues/17) Hi-res world/scene textures (texpack) _(render)_
 - [#24](../../issues/24) Skip chest-open / get-item freeze + reliable dialog fast-forward _(keyboard)_
 - [#28](../../issues/28) Deku Baba no combat interaction (uncertain / maybe state corruption) _(scene)_
 - [#33](../../issues/33) More foliage / vegetation density (lowest priority) _(scene)_
 - [#70](../../issues/70) Link roll animation broken (3DS Link) _(anim,link)_
-- [#71](../../issues/71) Pause map subscreen: area icons render as garbled white glyphs over sky _(render,ui)_
 
-## 🔨 In Progress  (5)
+## 🔨 In Progress  (6)
 - [#15](../../issues/15) Universal SPACE skip for cutscenes/onepoint/item-get _(keyboard)_
 - [#21](../../issues/21) Item/C-button UI icons render as garbled noise (texture corruption) _(render,crash,ui,hud)_
+- [#71](../../issues/71) Pause map subscreen: area icons render as garbled white glyphs over sky _(render,ui)_
 - [#76](../../issues/76) Auto-replaced NPC animation playback wrong (Kokiri kids: one too fast, one frozen) _(anim)_
 - [#77](../../issues/77) Kakariko well: wooden frame structure floats at water level, should be above the well _(render,well,scene)_
 - [#79](../../issues/79) 3d3 Link (3DS model + 3DS anim) teleports upward while climbing _(anim,link)_
