@@ -80,7 +80,18 @@ def do(rpc, line):
         print(f"  holding {args[0]} (use `release`)")
     elif cmd == "release":
         rpc.set_input(0, None)
+        rpc.set_touch(False)
         print("  released")
+    elif cmd == "touch":
+        if args and args[0] == "off":
+            rpc.set_touch(False)
+            print("  touch released")
+        else:
+            rpc.tap_touch(int(args[0]), int(args[1]))
+            print(f"  touched ({args[0]},{args[1]})")
+    elif cmd == "touchhold":
+        rpc.set_touch(True, int(args[0]), int(args[1]))
+        print(f"  touch held ({args[0]},{args[1]})")
     elif cmd == "circle":
         if args and args[0] == "off":
             rpc.set_input(0, None)

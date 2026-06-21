@@ -25,7 +25,7 @@ import socket, struct, sys
 
 HOST, PORT = "127.0.0.1", 45987
 VERSION = 1
-READMEM, WRITEMEM, PROCLIST, SETGETPROC, SCREENSHOT, INPUT = 1, 2, 3, 4, 5, 6
+READMEM, WRITEMEM, PROCLIST, SETGETPROC, SCREENSHOT, INPUT, TOUCH = 1, 2, 3, 4, 5, 6, 7
 
 # 3DS PadState button bits (see Azahar src/core/hle/service/hid/hid.h).
 BTN = {
@@ -118,6 +118,18 @@ class Rpc:
             cy = max(-100, min(100, int(circle[1]))) & 0xFF
             circ = (1 << 24) | (cx << 8) | cy
         self._req(INPUT, buttons, circ)
+
+    def set_touch(self, active, x=0, y=0):
+        """Hold/release a bottom-screen touch (pixels, x 0..319 y 0..239). Requires the Touch mod."""
+        xy = ((int(x) & 0xFFFF) << 16) | (int(y) & 0xFFFF)
+        self._req(TOUCH, 1 if active else 0, xy)
+
+    def tap_touch(self, x, y, hold_s=0.15):
+        import time
+        self.set_touch(True, x, y)
+        time.sleep(hold_s)
+        self.set_touch(False)
+        time.sleep(0.05)
 
     def tap(self, buttons, hold_s=0.12, circle=None):
         """Press buttons (and/or circle), hold briefly, release. A single discrete input."""
