@@ -120,6 +120,12 @@ def do(rpc, line):
         addr = int(args[0], 16)
         v = rpc.read_f32(addr)
         print(f"  {addr:08x}: {v}" if v is not None else "  (failed)")
+    elif cmd == "save":
+        slot = int(args[0]) if args else 1
+        print(f"  savestate slot {slot}: {'OK' if rpc.savestate(slot, True) else 'FAILED'}")
+    elif cmd == "load":
+        slot = int(args[0]) if args else 1
+        print(f"  loadstate slot {slot}: {'OK' if rpc.savestate(slot, False) else 'FAILED'}")
     elif cmd == "sleep":
         time.sleep(float(args[0]))
     else:
