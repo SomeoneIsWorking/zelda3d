@@ -15,10 +15,12 @@
 # configures the build dir — so `git clone <soh3d> && ./run.sh` is all you need (no --recursive
 # required; run.sh inits the submodules for you). On every run it makes sure each engine submodule
 # is properly registered (re-cloning it from scratch if it is half-present / broken) and otherwise
-# UPDATES it to the commit THIS repo pins (the submodule gitlink). It never hard-resets: a plain
-# `git submodule update` preserves in-progress engine work (uncommitted edits / local commits) by
-# refusing to clobber it rather than discarding it. So `git pull && ./run.sh` stays current. Skip
-# with SOH3D_NOUPDATE=1.
+# UPDATES it to the commit THIS repo pins (the submodule gitlink) — but only FORWARD: if the local
+# submodule HEAD already contains the pin (local commits in progress on top of it), it is left
+# alone rather than rewound, so engine work-in-progress survives. (Plain `git submodule update`
+# would silently orphan such detached-HEAD commits — it only aborts on uncommitted file edits, not
+# on local commits — so run.sh guards against that itself.) So `git pull && ./run.sh` stays
+# current. Skip with SOH3D_NOUPDATE=1.
 set -eu
 REPO="$(cd "$(dirname "$0")" && pwd)"
 BUILD="$REPO/Shipwright/build-cmake"
@@ -67,14 +69,29 @@ sync_submodule_to_pin() {
     cur="$(git -C "$sub" rev-parse --verify --quiet HEAD 2>/dev/null || true)"
     [ "$cur" = "$want" ] && return 0
 
-    # Registered but at the wrong commit → UPDATE it to the pin. NEVER hard-reset: `git submodule
-    # update` checks the pinned commit OUT, which advances a clean tree but ABORTS (rather than
-    # discarding) if local edits/commits would be overwritten — so in-progress engine work is kept.
-    # Fetch the pin first in case the parent's pull advanced the gitlink past what's local here.
+    # Make the pinned commit available locally so we can both reason about ancestry and check it
+    # out. (The parent's pull may have advanced the gitlink past what this clone has fetched.)
     git -C "$sub" cat-file -e "${want}^{commit}" 2>/dev/null || git -C "$sub" fetch --quiet --all 2>/dev/null || true
+
+    # CRITICAL: `git submodule update` does a *detached* checkout of the pin. With a clean working
+    # tree it does NOT abort on local COMMITS — it silently moves HEAD to the pin, orphaning any
+    # commits that aren't on a branch (the common case for a submodule). It only aborts on
+    # uncommitted *file* edits. So the only safe guard for in-progress engine work is to detect,
+    # ourselves, when the local HEAD is AHEAD of the pin and refuse to rewind it. If the pin is an
+    # ancestor of the current HEAD, this checkout has local commits on top of the pin → leave it.
+    if git -C "$sub" cat-file -e "${want}^{commit}" 2>/dev/null && \
+       git -C "$sub" merge-base --is-ancestor "$want" "$cur" 2>/dev/null; then
+        echo "  $label: HEAD ${cur:0:9} already contains pin ${want:0:9} (local commits ahead) — left as-is." \
+             "(push the pin bump, or SOH3D_NOUPDATE=1, to silence.)" >&2
+        return 0
+    fi
+
+    # Pin is newer than / diverged from the local HEAD (e.g. a `git pull` advanced the gitlink) and
+    # the local checkout has no commits past it → advance to the pin. `git submodule update` still
+    # aborts here if uncommitted file edits would be overwritten, so those are preserved.
     echo "  $label: updating ${cur:0:9} -> pinned ${want:0:9}" >&2
     git -C "$parent" submodule update "$subpath" >&2 || \
-        echo "  $label: could not advance to ${want:0:9} — local edits/commits in the way; left as-is." \
+        echo "  $label: could not advance to ${want:0:9} — local edits in the way; left as-is." \
              "(commit or stash them to update; SOH3D_NOUPDATE=1 to silence.)" >&2
 }
 
