@@ -3,18 +3,17 @@
 > **Generated mirror — do not hand-edit.** Source of truth = GitHub Issues on
 > `SomeoneIsWorking/soh3d` (private). Regenerate with `tools/kanban.py render`.
 > Move a card with `tools/kanban.py mv <#> <column>`; add with `tools/kanban.py add`.
-> Columns: todo · in-progress · in-review · needs-confirmation · reopened · blocked · done(=closed).  Updated 2026-06-21 06:17.
+> Columns: todo · in-progress · in-review · needs-confirmation · reopened · blocked · done(=closed).  Updated 2026-06-21 06:30.
 
-**Counts:** todo:7 | in-progress:5 | in-review:0 | needs-confirmation:22 | reopened:5 | blocked:2 | done:40
+**Counts:** todo:6 | in-progress:5 | in-review:0 | needs-confirmation:23 | reopened:5 | blocked:2 | done:40
 
-## 📋 To Do  (7)
+## 📋 To Do  (6)
 - [#17](../../issues/17) Hi-res world/scene textures (texpack) _(render)_
 - [#24](../../issues/24) Skip chest-open / get-item freeze + reliable dialog fast-forward _(keyboard)_
 - [#28](../../issues/28) Deku Baba no combat interaction (uncertain / maybe state corruption) _(scene)_
 - [#33](../../issues/33) More foliage / vegetation density (lowest priority) _(scene)_
 - [#70](../../issues/70) Link roll animation broken (3DS Link) _(anim,link)_
 - [#71](../../issues/71) Pause map subscreen: area icons render as garbled white glyphs over sky _(render,ui)_
-- [#81](../../issues/81) Obj_Hana params=1 (field rock-debris) renders as N64 gray rock in Kokiri Forest _(render,scene)_
 
 ## 🔨 In Progress  (5)
 - [#15](../../issues/15) Universal SPACE skip for cutscenes/onepoint/item-get _(keyboard)_
@@ -26,7 +25,7 @@
 ## 🔍 In Review (agent verifying)  (0)
 _none_
 
-## 🙋 Needs User Confirmation  (22)
+## 🙋 Needs User Confirmation  (23)
 - [#1](../../issues/1) Stairs: real stepped geometry, wall preserved (render broken) _(render,stairs,scene)_
 - [#2](../../issues/2) Kakariko well: water is a tiny teal diamond, not a surface _(render,well)_
 - [#4](../../issues/4) Title/cutscene camera goes under 3DS terrain _(render,camera)_
@@ -49,6 +48,7 @@ _none_
 - [#75](../../issues/75) Gold Skulltula (En_Sw) renders malformed (legs splayed, distorted body) _(render,anim)_
 - [#78](../../issues/78) Kokiri Forest big chest renders TOO big (oversized scale) _(render,scene)_
 - [#80](../../issues/80) Rolling boulder slides instead of rolling (no spin) _(anim,scene)_
+- [#81](../../issues/81) Obj_Hana params=1 (field rock-debris) renders as N64 gray rock in Kokiri Forest _(render,scene)_
 
 ## ♻️ Reopened (was done, found broken)  (5)
 - [#3](../../issues/3) Kokiri kids pop out at distance (actor unload, want infinite) _(render,scene)_
