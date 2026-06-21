@@ -3,9 +3,9 @@
 > **Generated mirror — do not hand-edit.** Source of truth = GitHub Issues on
 > `SomeoneIsWorking/soh3d` (private). Regenerate with `tools/kanban.py render`.
 > Move a card with `tools/kanban.py mv <#> <column>`; add with `tools/kanban.py add`.
-> Columns: todo · in-progress · in-review · needs-confirmation · reopened · blocked · done(=closed).  Updated 2026-06-21 12:11.
+> Columns: todo · in-progress · in-review · needs-confirmation · reopened · blocked · done(=closed).  Updated 2026-06-21 12:19.
 
-**Counts:** todo:7 | in-progress:3 | in-review:0 | needs-confirmation:32 | reopened:1 | blocked:3 | done:40
+**Counts:** todo:7 | in-progress:2 | in-review:0 | needs-confirmation:33 | reopened:1 | blocked:3 | done:40
 
 ## 📋 To Do  (7)
 - [#17](../../issues/17) Hi-res world/scene textures (texpack) _(render)_
@@ -16,15 +16,14 @@
 - [#84](../../issues/84) NPC (Kakariko adult) floats slightly above the rooftop/ground (grounding offset) _(render,scene)_
 - [#86](../../issues/86) 3D3 Link: upper torso briefly snaps ~90deg right after stopping a walk; run-off-edge jump looks wrong _(anim,link)_
 
-## 🔨 In Progress  (3)
+## 🔨 In Progress  (2)
 - [#29](../../issues/29) Giant boulder overlaps the Temple of Time (Market) _(render,scene)_
-- [#76](../../issues/76) Auto-replaced NPC animation playback wrong (Kokiri kids: one too fast, one frozen) _(anim)_
 - [#79](../../issues/79) 3d3 Link (3DS model + 3DS anim) teleports upward while climbing _(anim,link)_
 
 ## 🔍 In Review (agent verifying)  (0)
 _none_
 
-## 🙋 Needs User Confirmation  (32)
+## 🙋 Needs User Confirmation  (33)
 - [#1](../../issues/1) Stairs: real stepped geometry, wall preserved (render broken) _(render,stairs,scene)_
 - [#2](../../issues/2) Kakariko well: water is a tiny teal diamond, not a surface _(render,well)_
 - [#3](../../issues/3) Kokiri kids pop out at distance (actor unload, want infinite) _(render,scene)_
@@ -52,6 +51,7 @@ _none_
 - [#73](../../issues/73) Market/town NPCs (En_Hy adults) render in T-pose / arms splayed _(render,anim)_
 - [#74](../../issues/74) Can't climb vine wall (climb does not initiate) _(collision,scene)_
 - [#75](../../issues/75) Gold Skulltula (En_Sw) renders malformed (legs splayed, distorted body) _(render,anim)_
+- [#76](../../issues/76) Auto-replaced NPC animation playback wrong (Kokiri kids: one too fast, one frozen) _(anim)_
 - [#77](../../issues/77) Kakariko well: wooden frame structure floats at water level, should be above the well _(render,well,scene)_
 - [#78](../../issues/78) Kokiri Forest big chest renders TOO big (oversized scale) _(render,scene)_
 - [#80](../../issues/80) Rolling boulder slides instead of rolling (no spin) _(anim,scene)_
