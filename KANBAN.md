@@ -3,11 +3,11 @@
 > **Generated mirror — do not hand-edit.** Source of truth = GitHub Issues on
 > `SomeoneIsWorking/soh3d` (private). Regenerate with `tools/kanban.py render`.
 > Move a card with `tools/kanban.py mv <#> <column>`; add with `tools/kanban.py add`.
-> Columns: todo · in-progress · in-review · needs-confirmation · reopened · blocked · done(=closed).  Updated 2026-06-21 12:41.
+> Columns: todo · in-progress · in-review · needs-confirmation · reopened · blocked · done(=closed).  Updated 2026-06-21 15:58.
 
-**Counts:** todo:7 | in-progress:2 | in-review:0 | needs-confirmation:33 | reopened:1 | blocked:3 | done:40
+**Counts:** todo:8 | in-progress:2 | in-review:0 | needs-confirmation:34 | reopened:2 | blocked:2 | done:40
 
-## 📋 To Do  (7)
+## 📋 To Do  (8)
 - [#17](../../issues/17) Hi-res world/scene textures (texpack) _(render)_
 - [#33](../../issues/33) More foliage / vegetation density (lowest priority) _(scene)_
 - [#70](../../issues/70) Link roll animation broken (3DS Link) _(anim,link)_
@@ -15,6 +15,7 @@
 - [#83](../../issues/83) 3d3 Link arms get wrangled when in dialog (talk state) _(anim,link)_
 - [#84](../../issues/84) NPC (Kakariko adult) floats slightly above the rooftop/ground (grounding offset) _(render,scene)_
 - [#86](../../issues/86) 3D3 Link: upper torso briefly snaps ~90deg right after stopping a walk; run-off-edge jump looks wrong _(anim,link)_
+- [#88](../../issues/88) 3D3 Link: yawning (idle fidget) animation is wrong _(anim,link)_
 
 ## 🔨 In Progress  (2)
 - [#29](../../issues/29) Giant boulder overlaps the Temple of Time (Market) _(render,scene)_
@@ -23,7 +24,7 @@
 ## 🔍 In Review (agent verifying)  (0)
 _none_
 
-## 🙋 Needs User Confirmation  (33)
+## 🙋 Needs User Confirmation  (34)
 - [#1](../../issues/1) Stairs: real stepped geometry, wall preserved (render broken) _(render,stairs,scene)_
 - [#2](../../issues/2) Kakariko well: water is a tiny teal diamond, not a surface _(render,well)_
 - [#3](../../issues/3) Kokiri kids pop out at distance (actor unload, want infinite) _(render,scene)_
@@ -31,7 +32,6 @@ _none_
 - [#5](../../issues/5) Cucco wings don't flap (idle + held/agitated) _(anim,cucco)_
 - [#6](../../issues/6) Held cucco renders at pickup spot, not in Link's hands _(render,link,cucco)_
 - [#7](../../issues/7) 3DS Link (3DS anims): motionless slide + long right arm _(anim,link)_
-- [#8](../../issues/8) 3DS Link (N64 anims): head pitched down, arms wrangled _(anim,link)_
 - [#9](../../issues/9) 3DS Link can't pick up a cucco in 3DS-anim mode _(anim,link)_
 - [#11](../../issues/11) Kokiri clover/lilypad pond patch not walkable _(collision,scene)_
 - [#12](../../issues/12) Inventory/pause background renders upside-down _(render,ui,inventory)_
@@ -46,6 +46,7 @@ _none_
 - [#24](../../issues/24) Skip chest-open / get-item freeze + reliable dialog fast-forward _(keyboard)_
 - [#26](../../issues/26) Gohma arena void-out (matches N64 — confirm differs from vanilla?) _(collision,scene)_
 - [#27](../../issues/27) Gohma model needs hand-curated multi-CMB assembly _(render,anim)_
+- [#32](../../issues/32) Xbox control scheme: modern dual-stick mapping + chords (no C-pad) _(ui,keyboard)_
 - [#71](../../issues/71) Pause map subscreen: area icons render as garbled white glyphs over sky _(render,ui)_
 - [#72](../../issues/72) Graphics menu toggles (shadows/AO/scene lighting) do nothing _(render,ui)_
 - [#73](../../issues/73) Market/town NPCs (En_Hy adults) render in T-pose / arms splayed _(render,anim)_
@@ -57,14 +58,15 @@ _none_
 - [#80](../../issues/80) Rolling boulder slides instead of rolling (no spin) _(anim,scene)_
 - [#81](../../issues/81) Obj_Hana params=1 (field rock-debris) renders as N64 gray rock in Kokiri Forest _(render,scene)_
 - [#85](../../issues/85) 3D3 Link holding cucco: legs don't move while walking + cucco doesn't rotate with him _(anim,link,cucco)_
+- [#87](../../issues/87) Kokiri kids (En_Ko): idle variants all identical + sitting girl plays idle sway (anim/variant selection) _(render,anim)_
 
-## ♻️ Reopened (was done, found broken)  (1)
+## ♻️ Reopened (was done, found broken)  (2)
+- [#8](../../issues/8) 3DS Link (N64 anims): head pitched down, arms wrangled _(anim,link)_
 - [#31](../../issues/31) Hand-weave the 3DS Link model (multi-CMB assembly + equipment) _(render,anim,link)_
 
-## ⛔ Blocked (needs live/user input)  (3)
+## ⛔ Blocked (needs live/user input)  (2)
 - [#23](../../issues/23) Kokiri sword chest renders as the large chest, not small _(render,scene)_
 - [#28](../../issues/28) Deku Baba no combat interaction (uncertain / maybe state corruption) _(scene)_
-- [#32](../../issues/32) Xbox control scheme: modern dual-stick mapping + chords (no C-pad) _(ui,keyboard)_
 
 ## ✅ Done (recently closed)  (showing 30 of 40)
 - [#10](../../issues/10) Child Link floats above plank platform by ladder
