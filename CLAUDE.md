@@ -63,10 +63,18 @@ frozen-cam / forced-state / single-frame harness passes. Prior "VERIFIED headles
 repeatedly falsified by playtest. Run the live game (skill **soh3d-game-control**), exercise the
 actual path, and capture the evidence above.
 
+## Architecture docs (read before re-investigating)
+
+- **`docs/lus_input_architecture.md`** — libultraship's `Ship::` (generic framework, `src/ship/`) vs
+  `LUS::` (concrete N64 impl, `src/libultraship/`) split (NOT duplicate trees — base/derived by design),
+  the per-frame physical→N64-pad input path, where button-mapping classes live, and the chord/modifier
+  design for #32. Read this instead of re-deriving the controller code.
+
 ## Commit chain (commit each verified fix yourself, reference the issue `#<n>`)
 
-- `libultraship/` → `fork/soh3d`  (edit it freely when the fix belongs there: renderer, input
-  mapping, windowing — don't push a fix into the wrong layer to keep LUS "UNTOUCHED")
+- `libultraship/` (submodule at `Shipwright/libultraship/`) → `fork/soh3d`  (edit it freely when the fix
+  belongs there: renderer, input mapping, windowing — don't push a fix into the wrong layer to keep LUS
+  "UNTOUCHED")
 - `Shipwright/` → `fork/develop`
 - outer repo → `origin/main`
 
