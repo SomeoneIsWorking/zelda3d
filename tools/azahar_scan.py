@@ -56,15 +56,17 @@ def find_player_pos(rpc, regions=REGIONS):
         rpc.set_input(0, c); time.sleep(1.3); rpc.set_input(0, None); time.sleep(0.5)
         return snap()
 
-    # Alternate still/move/still/move/still. Position = unchanged across EVERY still interval AND
-    # changed across EVERY move interval. (Camera/anim jitter fails the "unchanged while still" test;
-    # constants fail the "changed while moving" test.) Move in different directions so it really moves.
+    # Alternate still/move/still/move/still/move/still. Position = unchanged across EVERY still interval
+    # AND changed across EVERY move interval. (Camera/anim jitter fails "unchanged while still";
+    # constants fail "changed while moving".) Move different directions so it really moves each time.
     seq = []  # (snapshot, moved_since_prev)
     seq.append((still("0"), None))
     seq.append((move("+Z", (0, 95)), True))
     seq.append((still("1"), False))
     seq.append((move("+X", (95, 0)), True))
     seq.append((still("2"), False))
+    seq.append((move("-Z", (0, -95)), True))
+    seq.append((still("3"), False))
 
     cands = []
     for base, size in regions:
@@ -79,9 +81,12 @@ def find_player_pos(rpc, regions=REGIONS):
                 mask &= np.abs(cur - prev) > 1.0     # must change while walking
             else:
                 mask &= np.abs(cur - prev) < 0.01    # must hold while standing still
-        idx = np.where(mask)[0]
-        for i in idx:
-            cands.append((base + int(i) * 4, [round(float(c[i]), 2) for c in cols]))
+        idx = set(int(i) for i in np.where(mask)[0])
+        for i in sorted(idx):
+            # Vec3f run length: how many of {i, i+1, i+2} are also flagged (a clean world.pos x,y,z
+            # shows as 2-3 consecutive flagged floats; scattered matrix floats show as 1).
+            run = 1 + (1 if (i + 1) in idx else 0) + (1 if (i + 2) in idx else 0)
+            cands.append((base + i * 4, [round(float(c[i]), 2) for c in cols], run))
     return cands
 
 
@@ -92,9 +97,11 @@ def main():
             rpc.select(pid)
     if len(sys.argv) > 1 and sys.argv[1] == "findpos":
         c = find_player_pos(rpc)
-        print(f"[scan] {len(c)} candidates (addr: still0, +Z, still1, +X, still2):")
-        for addr, vals in c[:80]:
-            print(f"  {addr:08x}: {vals}")
+        print(f"[scan] {len(c)} candidates. Vec3f runs (run>=2) first — likely Actor.world.pos:")
+        c.sort(key=lambda t: -t[2])
+        for addr, vals, run in c[:80]:
+            tag = f"  <-- Vec3f run={run}" if run >= 2 else ""
+            print(f"  {addr:08x} (run{run}): {vals}{tag}")
     else:
         print(__doc__)
 
