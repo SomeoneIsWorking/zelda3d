@@ -25,7 +25,28 @@ import socket, struct, sys
 
 HOST, PORT = "127.0.0.1", 45987
 VERSION = 1
-READMEM, WRITEMEM, PROCLIST, SETGETPROC, SCREENSHOT = 1, 2, 3, 4, 5
+READMEM, WRITEMEM, PROCLIST, SETGETPROC, SCREENSHOT, INPUT = 1, 2, 3, 4, 5, 6
+
+# 3DS PadState button bits (see Azahar src/core/hle/service/hid/hid.h).
+BTN = {
+    "a": 1 << 0, "b": 1 << 1, "select": 1 << 2, "start": 1 << 3,
+    "right": 1 << 4, "left": 1 << 5, "up": 1 << 6, "down": 1 << 7,
+    "r": 1 << 8, "l": 1 << 9, "x": 1 << 10, "y": 1 << 11,
+}
+
+
+def buttons_mask(names):
+    """names: iterable or space/plus-separated string of button names -> bitmask."""
+    if isinstance(names, str):
+        names = names.replace("+", " ").split()
+    m = 0
+    for n in names:
+        n = n.strip().lower()
+        if n and n not in BTN:
+            raise ValueError(f"unknown button '{n}' (have {', '.join(BTN)})")
+        if n:
+            m |= BTN[n]
+    return m
 
 
 class Rpc:
@@ -85,6 +106,26 @@ class Rpc:
     def read_f32(self, addr):
         b = self.read(addr, 4)
         return struct.unpack("<f", b)[0] if len(b) >= 4 else None
+
+    def set_input(self, buttons=0, circle=None):
+        """Set the HELD pad state. buttons=bitmask (or name string). circle=(cx%,cy%) in -100..100
+        or None to release the circle pad. Persists until the next set_input. Requires the Input mod."""
+        if isinstance(buttons, str):
+            buttons = buttons_mask(buttons)
+        circ = 0
+        if circle is not None:
+            cx = max(-100, min(100, int(circle[0]))) & 0xFF
+            cy = max(-100, min(100, int(circle[1]))) & 0xFF
+            circ = (1 << 24) | (cx << 8) | cy
+        self._req(INPUT, buttons, circ)
+
+    def tap(self, buttons, hold_s=0.12, circle=None):
+        """Press buttons (and/or circle), hold briefly, release. A single discrete input."""
+        import time
+        self.set_input(buttons, circle)
+        time.sleep(hold_s)
+        self.set_input(0, None)
+        time.sleep(0.05)
 
     def screenshot(self, ppm_path, res_scale=0, timeout=8.0):
         """Capture the next OoT3D frame to ppm_path (Azahar writes it host-side). Returns True on ok.
