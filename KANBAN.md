@@ -3,9 +3,9 @@
 > **Generated mirror — do not hand-edit.** Source of truth = GitHub Issues on
 > `SomeoneIsWorking/soh3d` (private). Regenerate with `tools/kanban.py render`.
 > Move a card with `tools/kanban.py mv <#> <column>`; add with `tools/kanban.py add`.
-> Columns: todo · in-progress · in-review · needs-confirmation · reopened · blocked · done(=closed).  Updated 2026-06-21 06:47.
+> Columns: todo · in-progress · in-review · needs-confirmation · reopened · blocked · done(=closed).  Updated 2026-06-21 08:58.
 
-**Counts:** todo:5 | in-progress:6 | in-review:0 | needs-confirmation:23 | reopened:5 | blocked:2 | done:40
+**Counts:** todo:5 | in-progress:7 | in-review:0 | needs-confirmation:24 | reopened:3 | blocked:2 | done:40
 
 ## 📋 To Do  (5)
 - [#17](../../issues/17) Hi-res world/scene textures (texpack) _(render)_
@@ -14,9 +14,10 @@
 - [#33](../../issues/33) More foliage / vegetation density (lowest priority) _(scene)_
 - [#70](../../issues/70) Link roll animation broken (3DS Link) _(anim,link)_
 
-## 🔨 In Progress  (6)
+## 🔨 In Progress  (7)
 - [#15](../../issues/15) Universal SPACE skip for cutscenes/onepoint/item-get _(keyboard)_
 - [#21](../../issues/21) Item/C-button UI icons render as garbled noise (texture corruption) _(render,crash,ui,hud)_
+- [#29](../../issues/29) Giant boulder overlaps the Temple of Time (Market) _(render,scene)_
 - [#71](../../issues/71) Pause map subscreen: area icons render as garbled white glyphs over sky _(render,ui)_
 - [#76](../../issues/76) Auto-replaced NPC animation playback wrong (Kokiri kids: one too fast, one frozen) _(anim)_
 - [#77](../../issues/77) Kakariko well: wooden frame structure floats at water level, should be above the well _(render,well,scene)_
@@ -25,7 +26,7 @@
 ## 🔍 In Review (agent verifying)  (0)
 _none_
 
-## 🙋 Needs User Confirmation  (23)
+## 🙋 Needs User Confirmation  (24)
 - [#1](../../issues/1) Stairs: real stepped geometry, wall preserved (render broken) _(render,stairs,scene)_
 - [#2](../../issues/2) Kakariko well: water is a tiny teal diamond, not a surface _(render,well)_
 - [#4](../../issues/4) Title/cutscene camera goes under 3DS terrain _(render,camera)_
@@ -37,6 +38,7 @@ _none_
 - [#12](../../issues/12) Inventory/pause background renders upside-down _(render,ui,inventory)_
 - [#13](../../issues/13) Child Zelda renders ~half size _(render,scene)_
 - [#14](../../issues/14) Title-screen flow unstable (crash / wrong gamestate) _(camera,scene)_
+- [#16](../../issues/16) First-person camera: early-load crash + position snap _(camera,crash)_
 - [#18](../../issues/18) Crisp HUD/UI textures (hearts/digits/buttons/icons) _(ui,hud)_
 - [#20](../../issues/20) Keyboard UI / control scheme + default mapping _(ui,keyboard)_
 - [#22](../../issues/22) Large boulder renders half-buried underground _(render,scene)_
@@ -50,11 +52,9 @@ _none_
 - [#80](../../issues/80) Rolling boulder slides instead of rolling (no spin) _(anim,scene)_
 - [#81](../../issues/81) Obj_Hana params=1 (field rock-debris) renders as N64 gray rock in Kokiri Forest _(render,scene)_
 
-## ♻️ Reopened (was done, found broken)  (5)
+## ♻️ Reopened (was done, found broken)  (3)
 - [#3](../../issues/3) Kokiri kids pop out at distance (actor unload, want infinite) _(render,scene)_
 - [#8](../../issues/8) 3DS Link (N64 anims): head pitched down, arms wrangled _(anim,link)_
-- [#16](../../issues/16) First-person camera: early-load crash + position snap _(camera,crash)_
-- [#29](../../issues/29) Giant boulder overlaps the Temple of Time (Market) _(render,scene)_
 - [#31](../../issues/31) Hand-weave the 3DS Link model (multi-CMB assembly + equipment) _(render,anim,link)_
 
 ## ⛔ Blocked (needs live/user input)  (2)
