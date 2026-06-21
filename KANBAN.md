@@ -3,9 +3,9 @@
 > **Generated mirror — do not hand-edit.** Source of truth = GitHub Issues on
 > `SomeoneIsWorking/soh3d` (private). Regenerate with `tools/kanban.py render`.
 > Move a card with `tools/kanban.py mv <#> <column>`; add with `tools/kanban.py add`.
-> Columns: todo · in-progress · in-review · needs-confirmation · reopened · blocked · done(=closed).  Updated 2026-06-21 10:03.
+> Columns: todo · in-progress · in-review · needs-confirmation · reopened · blocked · done(=closed).  Updated 2026-06-21 10:39.
 
-**Counts:** todo:7 | in-progress:6 | in-review:0 | needs-confirmation:25 | reopened:3 | blocked:2 | done:40
+**Counts:** todo:7 | in-progress:6 | in-review:0 | needs-confirmation:26 | reopened:2 | blocked:2 | done:40
 
 ## 📋 To Do  (7)
 - [#17](../../issues/17) Hi-res world/scene textures (texpack) _(render)_
@@ -27,9 +27,10 @@
 ## 🔍 In Review (agent verifying)  (0)
 _none_
 
-## 🙋 Needs User Confirmation  (25)
+## 🙋 Needs User Confirmation  (26)
 - [#1](../../issues/1) Stairs: real stepped geometry, wall preserved (render broken) _(render,stairs,scene)_
 - [#2](../../issues/2) Kakariko well: water is a tiny teal diamond, not a surface _(render,well)_
+- [#3](../../issues/3) Kokiri kids pop out at distance (actor unload, want infinite) _(render,scene)_
 - [#4](../../issues/4) Title/cutscene camera goes under 3DS terrain _(render,camera)_
 - [#5](../../issues/5) Cucco wings don't flap (idle + held/agitated) _(anim,cucco)_
 - [#6](../../issues/6) Held cucco renders at pickup spot, not in Link's hands _(render,link,cucco)_
@@ -54,8 +55,7 @@ _none_
 - [#80](../../issues/80) Rolling boulder slides instead of rolling (no spin) _(anim,scene)_
 - [#81](../../issues/81) Obj_Hana params=1 (field rock-debris) renders as N64 gray rock in Kokiri Forest _(render,scene)_
 
-## ♻️ Reopened (was done, found broken)  (3)
-- [#3](../../issues/3) Kokiri kids pop out at distance (actor unload, want infinite) _(render,scene)_
+## ♻️ Reopened (was done, found broken)  (2)
 - [#8](../../issues/8) 3DS Link (N64 anims): head pitched down, arms wrangled _(anim,link)_
 - [#31](../../issues/31) Hand-weave the 3DS Link model (multi-CMB assembly + equipment) _(render,anim,link)_
 
