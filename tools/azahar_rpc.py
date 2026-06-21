@@ -25,7 +25,7 @@ import socket, struct, sys
 
 HOST, PORT = "127.0.0.1", 45987
 VERSION = 1
-READMEM, WRITEMEM, PROCLIST, SETGETPROC = 1, 2, 3, 4
+READMEM, WRITEMEM, PROCLIST, SETGETPROC, SCREENSHOT = 1, 2, 3, 4, 5
 
 
 class Rpc:
@@ -86,6 +86,18 @@ class Rpc:
         b = self.read(addr, 4)
         return struct.unpack("<f", b)[0] if len(b) >= 4 else None
 
+    def screenshot(self, ppm_path, res_scale=0, timeout=8.0):
+        """Capture the next OoT3D frame to ppm_path (Azahar writes it host-side). Returns True on ok.
+        Requires the SoH3D screenshot RPC mod (PacketType::Screenshot=5)."""
+        old = self.sock.gettimeout()
+        self.sock.settimeout(timeout)
+        try:
+            out = self._req(SCREENSHOT, res_scale, len(ppm_path.encode()),
+                            ppm_path.encode())
+        finally:
+            self.sock.settimeout(old)
+        return len(out) >= 4 and struct.unpack("<I", out[:4])[0] == 1
+
 
 def _hexdump(addr, data):
     for i in range(0, len(data), 16):
@@ -112,6 +124,10 @@ def main():
         addr = int(sys.argv[2], 16)
         v = r.read32(addr)
         print(f"{addr:08x}: {v:08x} ({v})" if v is not None else "(read failed)")
+    elif cmd == "shot":
+        out = sys.argv[2] if len(sys.argv) > 2 else "scratch/screenshots/azahar_shot.ppm"
+        ok = r.screenshot(out)
+        print(f"screenshot {'OK' if ok else 'FAILED'} -> {out}")
     else:
         print(f"unknown cmd {cmd}")
 
