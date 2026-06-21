@@ -3,9 +3,9 @@
 > **Generated mirror — do not hand-edit.** Source of truth = GitHub Issues on
 > `SomeoneIsWorking/soh3d` (private). Regenerate with `tools/kanban.py render`.
 > Move a card with `tools/kanban.py mv <#> <column>`; add with `tools/kanban.py add`.
-> Columns: todo · in-progress · in-review · needs-confirmation · reopened · blocked · done(=closed).  Updated 2026-06-21 16:14.
+> Columns: todo · in-progress · in-review · needs-confirmation · reopened · blocked · done(=closed).  Updated 2026-06-21 21:39.
 
-**Counts:** todo:9 | in-progress:3 | in-review:0 | needs-confirmation:33 | reopened:2 | blocked:2 | done:40
+**Counts:** todo:9 | in-progress:2 | in-review:0 | needs-confirmation:35 | reopened:2 | blocked:2 | done:40
 
 ## 📋 To Do  (9)
 - [#17](../../issues/17) Hi-res world/scene textures (texpack) _(render)_
@@ -18,15 +18,14 @@
 - [#88](../../issues/88) 3D3 Link: yawning (idle fidget) animation is wrong _(anim,link)_
 - [#89](../../issues/89) Tooling: export authoritative per-actor variant+animation from OoT3D (Azahar oracle) — base SoH3D on 3DS not N64
 
-## 🔨 In Progress  (3)
+## 🔨 In Progress  (2)
 - [#29](../../issues/29) Giant boulder overlaps the Temple of Time (Market) _(render,scene)_
 - [#79](../../issues/79) 3d3 Link (3DS model + 3DS anim) teleports upward while climbing _(anim,link)_
-- [#87](../../issues/87) Kokiri kids (En_Ko): idle variants all identical + sitting girl plays idle sway (anim/variant selection) _(render,anim)_
 
 ## 🔍 In Review (agent verifying)  (0)
 _none_
 
-## 🙋 Needs User Confirmation  (33)
+## 🙋 Needs User Confirmation  (35)
 - [#1](../../issues/1) Stairs: real stepped geometry, wall preserved (render broken) _(render,stairs,scene)_
 - [#2](../../issues/2) Kakariko well: water is a tiny teal diamond, not a surface _(render,well)_
 - [#3](../../issues/3) Kokiri kids pop out at distance (actor unload, want infinite) _(render,scene)_
@@ -60,6 +59,8 @@ _none_
 - [#80](../../issues/80) Rolling boulder slides instead of rolling (no spin) _(anim,scene)_
 - [#81](../../issues/81) Obj_Hana params=1 (field rock-debris) renders as N64 gray rock in Kokiri Forest _(render,scene)_
 - [#85](../../issues/85) 3D3 Link holding cucco: legs don't move while walking + cucco doesn't rotate with him _(anim,link,cucco)_
+- [#87](../../issues/87) Kokiri kids (En_Ko): idle variants all identical + sitting girl plays idle sway (anim/variant selection) _(render,anim)_
+- [#90](../../issues/90) ImGui/SDL leaves text input on → IME (GTK) eats keyboard gameplay keys _(ui,keyboard)_
 
 ## ♻️ Reopened (was done, found broken)  (2)
 - [#8](../../issues/8) 3DS Link (N64 anims): head pitched down, arms wrangled _(anim,link)_
