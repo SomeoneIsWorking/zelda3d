@@ -13,7 +13,10 @@
 # background-runner (which orphaned instances the agent then lost track of). One pid -> scratch.
 set -u
 REPO="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
-SOH="$REPO/Shipwright/build-cmake/soh/soh.elf"
+# Binary path: defaults to the main build-cmake elf; override with SOH3D_SOH to run a soh.elf
+# built into a different dir (e.g. a parallel agent's dedicated build dir). Assets resolve next
+# to the elf, so a sibling build dir works standalone.
+SOH="${SOH3D_SOH:-$REPO/Shipwright/build-cmake/soh/soh.elf}"
 # Parallel instances: SOH3D_INSTANCE=<N> (a positive integer) runs a SECOND (3rd, ...) game
 # concurrently with the default one, on its own Xvfb display (:9(9-N)), control FIFO, pidfile and
 # log, so two agents can drive/screenshot the game at once. Empty (default) = the original single
