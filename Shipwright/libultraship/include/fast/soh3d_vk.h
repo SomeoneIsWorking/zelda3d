@@ -31,10 +31,12 @@ void SoH3D_Vk_SetProvider(SoH3DModelProvider fn);
 // records one (already pose-resolved) model; EndPass is a no-op placeholder for symmetry. The
 // caller (SoH3D_GL_RenderPass) does the per-item pose interpolation, exactly as for the GL path.
 void SoH3D_Vk_BeginPass(void);
+// matTex: a const std::unordered_map<int,int>* (material->texIndex facial override), passed as void*
+// to keep the header C-linkage clean; null = no override. Mirrors the GL drawOne matTex channel.
 void SoH3D_Vk_DrawModel(int modelId, const float* mp16, const float* mv16, int lit, int invertY,
                         unsigned char r, unsigned char g, unsigned char b, unsigned char a, float aspectAdj,
                         const float* boneData, int boneCnt, unsigned long long midMask, int sky,
-                        float uvOffU, float uvOffV);
+                        float uvOffU, float uvOffV, const void* matTex);
 void SoH3D_Vk_EndPass(void);
 
 // --- Screen-space ambient occlusion (the Vulkan counterpart of soh3d_gl.cpp's aoPass) ---

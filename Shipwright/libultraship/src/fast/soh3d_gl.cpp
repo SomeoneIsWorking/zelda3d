@@ -48,6 +48,7 @@ struct GlGroup {
     int cull = 0;               // 1 = skip (hidden group, e.g. Link baked equipment)
     int faceCull = 0;           // 1 = cull back face (CMB cull byte 1); 0 = double-sided
     int meshId = -1;            // CMB mesh_id (per-frame visibility-switch key; -1 = always shown)
+    int materialIndex = -1;     // CMB material slot (key for the facial tex-override; -1 = none)
 };
 
 struct GlModel {
@@ -66,6 +67,10 @@ struct GlModel {
     // bit i = mesh_id i visible. Snapshotted per emit into ItemPose so it survives the deferred
     // render (like bones). ~0 = all visible (default; non-Link models never set it). See drawOne.
     uint64_t pendingMidMask = ~0ull;
+    // Per-frame material->texIndex override (facial eye/mouth frame swap), set via
+    // SoH3D_GL_SetMatTexOverride before EmitPose; snapshotted into ItemPose so it survives the
+    // deferred render (like midMask). Empty = no override (materials sample their static binding).
+    std::unordered_map<int, int> pendingMatTex; // materialIndex -> texIndex (-1 entry = cleared)
 };
 
 std::unordered_map<int, GlModel> g_models; // keyed by stable model id
@@ -80,6 +85,7 @@ struct ItemPose {
     std::vector<float> bones;
     int boneCount = 0;
     uint64_t midMask = ~0ull; // mesh_id visibility for this emit (see GlModel::pendingMidMask)
+    std::unordered_map<int, int> matTex; // material->texIndex override for this emit (facial swap)
 };
 std::unordered_map<int, std::vector<ItemPose>> g_curPoses;  // this logic frame, per modelId
 std::unordered_map<int, std::vector<ItemPose>> g_prevPoses; // last logic frame, per modelId
@@ -591,6 +597,19 @@ extern "C" void SoH3D_GL_SetMidMask(int modelId, unsigned long long mask) {
     g_models[modelId].pendingMidMask = mask;
 }
 
+// Facial eye/mouth material-anim frame swap: redirect a material's sampled texture for this model's
+// next emit. texIndex < 0 clears that material's override (back to the static binding). Snapshotted
+// at EmitPose (like midMask) so it pairs with the deferred draw. See SoH3DGlGroup::materialIndex.
+extern "C" void SoH3D_GL_SetMatTexOverride(int modelId, int materialIndex, int texIndex) {
+    auto& pm = g_models[modelId].pendingMatTex;
+    if (texIndex < 0) pm.erase(materialIndex);
+    else pm[materialIndex] = texIndex;
+}
+extern "C" void SoH3D_GL_ClearMatTexOverrides(int modelId) {
+    auto it = g_models.find(modelId);
+    if (it != g_models.end()) it->second.pendingMatTex.clear();
+}
+
 extern "C" void SoH3D_GL_EmitPose(int modelId) {
     // Snapshot this actor's just-set pose at EMIT time (during dlist build, logic-frame rate) so it
     // survives later same-modelId SetBones calls. Appended in emit order; the k-th submit of this
@@ -604,6 +623,7 @@ extern "C" void SoH3D_GL_EmitPose(int modelId) {
             p.boneCount = it->second.boneCount;
         }
         p.midMask = it->second.pendingMidMask;
+        p.matTex = it->second.pendingMatTex;
     }
     g_curPoses[modelId].push_back(std::move(p));
 }
@@ -632,6 +652,7 @@ static bool uploadModel(GlModel& m, const SoH3DGlGroup* groups, int groupCount, 
         g.cull = groups[i].cull;
         g.faceCull = groups[i].faceCull;
         g.meshId = groups[i].meshId;
+        g.materialIndex = groups[i].materialIndex;
         for (int k = 0; k < 4; k++) g.blendColor[k] = groups[i].blendColor[k];
         all.insert(all.end(), groups[i].verts, groups[i].verts + groups[i].vertCount);
         m.groups.push_back(g);
@@ -833,7 +854,7 @@ void endPass(const SavedGl& s) {
 void drawOne(GlModel& m, const float* mp16, const float* mv16, int lit, int invertY, unsigned char r,
              unsigned char g, unsigned char b, unsigned char a, float aspectAdj, const float* boneData, int boneCnt,
              uint64_t midMask = ~0ull, bool sky = false, float uvOffU = 0.0f, float uvOffV = 0.0f,
-             bool cullPass = false) {
+             bool cullPass = false, const std::unordered_map<int, int>* matTex = nullptr) {
     // Mirror Fast3D's per-vertex `x = AdjXForAspectRatio(x)` (interpreter.cpp): scale the
     // clip-space X output of MP by the factor the N64 actors get (MP column 0 = row-major
     // indices 0,4,8,12). Without it the OoT3D content shears vs N64 actors as the camera pans.
@@ -924,8 +945,14 @@ void drawOne(GlModel& m, const float* mp16, const float* mv16, int lit, int inve
         } else {
             glDisable(GL_CULL_FACE);
         }
-        if (grp.texIndex >= 0 && grp.texIndex < (int)m.textures.size()) {
-            glBindTexture(GL_TEXTURE_2D, m.textures[grp.texIndex]);
+        // Facial material-anim: a per-material override (eye/mouth frame) wins over the static tex.
+        int texIndex = grp.texIndex;
+        if (matTex && grp.materialIndex >= 0) {
+            auto ov = matTex->find(grp.materialIndex);
+            if (ov != matTex->end() && ov->second >= 0) texIndex = ov->second;
+        }
+        if (texIndex >= 0 && texIndex < (int)m.textures.size()) {
+            glBindTexture(GL_TEXTURE_2D, m.textures[texIndex]);
             glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_S, grp.wrapS);
             glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_T, grp.wrapT);
         } else {
@@ -951,6 +978,7 @@ struct DrawItem {
     std::vector<float> prevBones; // same item's previous-frame pose (for FPS interpolation); may be empty
     int boneCount = 0;
     uint64_t midMask = ~0ull;     // mesh_id visibility for this draw (see GlModel::pendingMidMask)
+    std::unordered_map<int, int> matTex; // facial material->texIndex override for this draw
 };
 std::vector<DrawItem> g_drawList;
 
@@ -1310,7 +1338,7 @@ extern "C" void SoH3D_GL_Draw(int modelId, const float* mp16, int invertY, unsig
         int bc = (mit != g_models.end()) ? mit->second.boneCount : 0;
         SoH3D_Vk_BeginPass();
         SoH3D_Vk_DrawModel(modelId, mp16, mp16, /*lit=*/0, invertY, r, g, b, 255, aspectAdj, pose, bc, ~0ull, /*sky=*/0,
-                           /*uvOffU=*/0.0f, /*uvOffV=*/0.0f);
+                           /*uvOffU=*/0.0f, /*uvOffV=*/0.0f, /*matTex=*/nullptr);
         SoH3D_Vk_EndPass();
         return;
     }
@@ -1355,7 +1383,10 @@ extern "C" void SoH3D_GL_Submit(int modelId, const float* mp16, const float* mv1
     for (const DrawItem& d : g_drawList)
         if (d.modelId == modelId) k++;
     auto cit = g_curPoses.find(modelId);
-    if (cit != g_curPoses.end() && k < cit->second.size()) it.midMask = cit->second[k].midMask;
+    if (cit != g_curPoses.end() && k < cit->second.size()) {
+        it.midMask = cit->second[k].midMask;
+        it.matTex = cit->second[k].matTex;
+    }
     if (cit != g_curPoses.end() && k < cit->second.size() && !cit->second[k].bones.empty()) {
         it.bones = cit->second[k].bones;
         it.boneCount = cit->second[k].boneCount;
@@ -1453,7 +1484,7 @@ extern "C" void SoH3D_GL_RenderPass(void) {
         SoH3D_Vk_SetShadow(shadowsOn ? 1 : 0, lightVP);
         for (const DrawItem& it : g_drawList) {
             SoH3D_Vk_DrawModel(it.modelId, it.mp, it.mv, it.lit, it.invertY, it.r, it.g, it.b, it.a, it.aspectAdj,
-                               poseOf(it), it.boneCount, it.midMask, it.sky, it.uvOffU, it.uvOffV);
+                               poseOf(it), it.boneCount, it.midMask, it.sky, it.uvOffU, it.uvOffV, &it.matTex);
         }
         SoH3D_Vk_AoComposite();
         SoH3D_Vk_EndPass();
@@ -1514,7 +1545,7 @@ extern "C" void SoH3D_GL_RenderPass(void) {
             pose = lerped.data();
         }
         drawOne(*m, it.mp, it.mv, it.lit, it.invertY, it.r, it.g, it.b, it.a, it.aspectAdj, pose, it.boneCount,
-                it.midMask, it.sky != 0, it.uvOffU, it.uvOffV, /*cullPass=*/true);
+                it.midMask, it.sky != 0, it.uvOffU, it.uvOffV, /*cullPass=*/true, &it.matTex);
         drawn++;
     }
 

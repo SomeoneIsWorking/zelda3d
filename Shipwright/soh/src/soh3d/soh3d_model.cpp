@@ -148,6 +148,11 @@ struct LoadedModel {
     std::vector<float> delta;
     float dMinX = 0, dMinZ = 0, dStep = 100.0f;
     int dNx = 0, dNz = 0;
+    // Facial material-anim (keystone #3): per eye/mouth material slot, the texture indices of its
+    // decoded .cmab frame sprites (appended to texRgba/cTexs at load). materialIndex -> [texIndex
+    // per frame]. The override driver reads the live N64 eye/mouth index and binds frame N's texture
+    // via SoH3D_GL_SetMatTexOverride. Empty for non-facial models.
+    std::unordered_map<int, std::vector<int>> facialFrames;
 };
 
 std::unordered_map<int, std::unique_ptr<LoadedModel>> g_loaded;
@@ -219,6 +224,7 @@ static SoH3DGlGroup makeCgroup(const SoH3D::Cmb& cmb, const SoH3D::CmbDrawGroup&
     // mesh interiors). Only value 1 culls; everything else (3, none) draws both sides.
     cg.faceCull = (mat && mat->cull == 1) ? 1 : 0;
     cg.meshId = g.mesh_id;
+    cg.materialIndex = g.material_index; // key for the facial eye/mouth texture-override channel
     for (int k = 0; k < 4; k++) cg.blendColor[k] = mat ? mat->blend_color[k] : (k == 3 ? 1.0f : 0.0f);
     return cg;
 }
@@ -246,6 +252,93 @@ static int appendTextures(LoadedModel* out, const SoH3D::Cmb& cmb, std::vector<s
         if (dims) dims->push_back({ w, h });
     }
     return base;
+}
+
+// --- Facial material-anim frame textures (keystone #3) -------------------------------------------
+// OoT3D animates an NPC's eye/mouth by swapping which texture a single eye/mouth MATERIAL samples
+// each frame. The alternate frame sprites are NOT in the model CMB (it holds only the base frame) —
+// they live in a sibling `.cmab` material-anim file whose embedded texture-data block is just the
+// frame sprites concatenated, each the SAME size/format as the CMB's base eye/mouth texture. The
+// cmab header points at a `strt` string-table of frame names (count) and the raw frame data.
+//   header+0x18 -> strt offset (u32 count at strt+4); header+0x1c -> texDataOffset.
+// We decode each frame (reusing the base texture's glFormat/dims) and append it to the model's
+// texture array, recording materialIndex -> [texIndex per frame] so the override driver can bind
+// frame N for the live eye/mouth index. Verified layout: tools/cmab.py + tools/face_cmb_dump.py.
+struct FacialCmab { const char* cmabSuffix; int materialIndex; };
+struct FacialAsset { const char* zarSuffix; FacialCmab cmabs[3]; };
+// Material slots + cmab filenames are CONSTANTS per ZAR (resolved by dumping each face CMB/cmab;
+// see docs/material_facial_channel_spec.md "Resolved unknowns"). kw1 bakes TWO eye materials (Fado
+// mat1 / girl mat2) into one shared body — both cmabs are loaded; the driver picks by ENKO_TYPE.
+static const FacialAsset kFacialAssets[] = {
+    { "zelda_sa.zar",  { { "saria_eye.cmab", 2 }, { "saria_mouth.cmab", 3 }, { nullptr, -1 } } },
+    { "zelda_km1.zar", { { "kokirimaster_eye.cmab", 1 }, { nullptr, -1 }, { nullptr, -1 } } },
+    { "zelda_kw1.zar", { { "kokiripeople_a_eye.cmab", 1 }, { "kokiripeople_b_eye.cmab", 2 }, { nullptr, -1 } } },
+};
+
+static bool strEndsWith(const std::string& s, const char* suf) {
+    size_t n = std::strlen(suf);
+    return s.size() >= n && s.compare(s.size() - n, n, suf) == 0;
+}
+
+// Decode a face ZAR's cmab eye/mouth frame textures and append them to the model's texture arrays,
+// filling out->facialFrames. Must run AFTER buildFromCmb (cTexs built) and BEFORE GL upload (first
+// draw). No-op for non-facial ZARs.
+static void appendFacialFrames(LoadedModel* out, const std::string& zarPath) {
+    if (!out->ok || !out->cmb || !out->zar) return;
+    const FacialAsset* fa = nullptr;
+    for (const auto& a : kFacialAssets)
+        if (strEndsWith(zarPath, a.zarSuffix)) { fa = &a; break; }
+    if (!fa) return;
+    const SoH3D::Cmb& cmb = *out->cmb;
+    // Rebuild a dims list parallel to the existing cTexs (w,h) so cTexs can be re-pointed after
+    // texRgba grows (push_back may reallocate, invalidating earlier .data() pointers).
+    std::vector<std::pair<int, int>> dims;
+    dims.reserve(out->cTexs.size());
+    for (const auto& t : out->cTexs) dims.push_back({ t.w, t.h });
+
+    for (const auto& fc : fa->cmabs) {
+        if (!fc.cmabSuffix) break;
+        int mat = fc.materialIndex;
+        if (mat < 0 || mat >= (int)cmb.materials().size()) continue;
+        int baseTexIdx = cmb.materials()[mat].tex0_idx;
+        if (baseTexIdx < 0 || baseTexIdx >= (int)cmb.textures().size()) continue;
+        const SoH3D::CmbTexture& bt = cmb.textures()[baseTexIdx];
+        const SoH3D::ZarFile* cf = nullptr;
+        for (const auto& f : out->zar->files())
+            if (strEndsWith(f.name, fc.cmabSuffix)) { cf = &f; break; }
+        if (!cf) { fprintf(stderr, "[SoH3D] facial %s: cmab '%s' not in zar\n", zarPath.c_str(), fc.cmabSuffix); continue; }
+        std::vector<uint8_t> buf = out->zar->read(*cf);
+        if (buf.size() < 0x20) continue;
+        auto rd32 = [&](size_t o) -> uint32_t {
+            return (uint32_t)buf[o] | ((uint32_t)buf[o + 1] << 8) | ((uint32_t)buf[o + 2] << 16) | ((uint32_t)buf[o + 3] << 24);
+        };
+        uint32_t strtOff = rd32(0x18), texDataOff = rd32(0x1c);
+        if (strtOff + 8 > buf.size()) continue;
+        uint32_t n = rd32(strtOff + 4);
+        uint32_t dataLen = bt.data_len;
+        if (dataLen == 0 || n == 0 || (uint64_t)texDataOff + (uint64_t)n * dataLen > buf.size()) {
+            fprintf(stderr, "[SoH3D] facial %s/%s: bad cmab layout (n=%u dataLen=%u texOff=%u len=%zu)\n",
+                    zarPath.c_str(), fc.cmabSuffix, n, dataLen, texDataOff, buf.size());
+            continue;
+        }
+        std::vector<int> frameTex;
+        frameTex.reserve(n);
+        for (uint32_t f = 0; f < n; f++) {
+            std::vector<uint8_t> raw(buf.begin() + texDataOff + (size_t)f * dataLen,
+                                     buf.begin() + texDataOff + (size_t)(f + 1) * dataLen);
+            std::vector<uint8_t> rgba = SoH3D::PicaDecode(bt.glFormat(), bt.width, bt.height, raw);
+            frameTex.push_back((int)out->texRgba.size());
+            out->texRgba.push_back(std::move(rgba));
+            dims.push_back({ bt.width, bt.height });
+        }
+        out->facialFrames[mat] = std::move(frameTex);
+        fprintf(stderr, "[SoH3D] facial %s: loaded %u frames for mat %d from %s\n",
+                zarPath.c_str(), n, mat, fc.cmabSuffix);
+    }
+    // Re-point cTexs at (possibly reallocated) texRgba storage, including the new facial frames.
+    out->cTexs.resize(out->texRgba.size());
+    for (size_t i = 0; i < out->texRgba.size(); i++)
+        out->cTexs[i] = { out->texRgba[i].data(), dims[i].first, dims[i].second };
 }
 
 // ============================================================================
@@ -763,6 +856,7 @@ static void loadActorModel(int modelId, LoadedModel* out) {
     out->cmb = std::make_unique<SoH3D::Cmb>(out->zar->read(*cmbf));
     if (!out->cmb->ok()) { fprintf(stderr, "[SoH3D] Cmb: %s\n", out->cmb->error().c_str()); return; }
     buildFromCmb(out, /*bakedVertexColor=*/false); // characters/props: dynamic lighting, color attr unused
+    appendFacialFrames(out, kModels[modelId].zarPath); // eye/mouth .cmab frames (keystone #3)
     printf("[SoH3D] loaded model %d (%s): %zu groups, %zu textures\n", modelId, kModels[modelId].zarPath,
            out->cGroups.size(), out->cTexs.size());
 }
@@ -1077,6 +1171,7 @@ static void loadAutoModel(int modelId, LoadedModel* out) {
     // own draw group (buildDrawGroups now splits by mesh_id) and let the player path pick the
     // visible subset per frame via SoH3D_GL_SetMidMask. So NO build-time cull here.
     buildFromCmb(out, /*bakedVertexColor=*/false);
+    appendFacialFrames(out, zarPath); // eye/mouth .cmab frames (keystone #3)
     printf("[SoH3D] auto-loaded model %d (%s): cmb '%s' of %d, height=%.1f, bones=%zu%s, %zu groups, %zu textures\n",
            modelId, zarPath.c_str(), best ? best->name.c_str() : "?", nCmb, bboxHeight(out->groups),
            out->cmb->bones().size(), out->skinned ? " (skinned->skip)" : "", out->cGroups.size(), out->cTexs.size());
@@ -1705,6 +1800,21 @@ int SoH3D_AutoModelBoneCount(int modelId) {
     LoadedModel* lm = loadModel(modelId);
     if (!lm || !lm->ok || !lm->cmb) return 0;
     return (int)lm->cmb->bones().size();
+}
+
+// Facial material-anim (keystone #3): the GL texture index of the eye/mouth material's frame-N
+// sprite (decoded from the sibling .cmab at load; see appendFacialFrames / kFacialAssets). Returns
+// -1 if this model has no facial frames for `materialIndex` or `frame` is out of range. The override
+// driver (soh3d_anim_override.cpp) reads the live N64 eye/mouth index and binds this via
+// SoH3D_GL_SetMatTexOverride. Returns the frame count for this material when frame < 0 (query).
+int SoH3D_FacialFrameTex(int modelId, int materialIndex, int frame) {
+    LoadedModel* lm = loadModel(modelId);
+    if (!lm || !lm->ok) return -1;
+    auto it = lm->facialFrames.find(materialIndex);
+    if (it == lm->facialFrames.end()) return -1;
+    if (frame < 0) return (int)it->second.size();
+    if (frame >= (int)it->second.size()) return -1;
+    return it->second[frame];
 }
 
 // Sum of OoT3D bone lengths (|local translation| of every non-root bone) for a loaded model.

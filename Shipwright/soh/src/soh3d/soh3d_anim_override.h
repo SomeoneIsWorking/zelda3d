@@ -28,6 +28,9 @@ void SoH3D_ApplyActorOverrides(int modelId, void* actor);
 // Feature gate (REPL `track`, env SOH3D_TRACK, default on) — lets the override be A/B'd live.
 extern int gSoH3dTrack;
 
+// Facial eye/mouth material-anim gate (REPL `facial`, env SOH3D_FACIAL, default on). Keystone #3.
+extern int gSoH3dFacial;
+
 #ifdef __cplusplus
 }
 #endif

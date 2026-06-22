@@ -52,6 +52,7 @@ typedef struct SoH3DGlGroup {
     // face opposite the geometric normal (matches N64 G_CULL_BACK); 0 => draw both sides.
     int faceCull;             // 0 = no cull (double-sided), 1 = cull back face
     int meshId;               // CMB mesh_id of this group (visibility-switch key; -1 = none)
+    int materialIndex;        // CMB material slot of this group (key for the facial tex-override; -1 = none)
 } SoH3DGlGroup;
 
 // One decoded texture (RGBA8, w*h*4 bytes, row 0 = top).
@@ -144,6 +145,16 @@ void SoH3D_GL_SetBoneBind(int modelId, const float* mats16, int n);
 // The player path calls this each frame (before its EmitPose) to select Link's live equipment /
 // hand-pose variant subset from the all-variants childlink_v2 mesh. ~0 = show everything (default).
 void SoH3D_GL_SetMidMask(int modelId, unsigned long long mask);
+
+// Per-material texture-index OVERRIDE channel (facial eye/mouth material-anim frame swap, keystone
+// #3). OoT3D animates the eye/mouth by swapping which texture a single eye/mouth material samples
+// each frame; the alternate frame sprites live in sibling .cmab files, decoded + appended to the
+// model's texture array at load (soh3d_model.cpp). Set BEFORE EmitPose, exactly like SetMidMask:
+// the override is snapshotted at emit time so it pairs with the right deferred draw. texIndex < 0
+// clears that material's override; an empty override map = no swap (the material's static binding).
+// drawOne/the Vulkan group draw redirect grp.texIndex -> the override for matching materialIndex.
+void SoH3D_GL_SetMatTexOverride(int modelId, int materialIndex, int texIndex);
+void SoH3D_GL_ClearMatTexOverrides(int modelId);
 
 #ifdef __cplusplus
 }

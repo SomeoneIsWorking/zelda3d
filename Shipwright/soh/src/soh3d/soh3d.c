@@ -2060,9 +2060,23 @@ static void SoH3D_DumpLimbCb(int limbIndex, StandardLimb* lb, void* ud) {
 static unsigned long long gSoH3dEnKoMaskOverride = ~0ull; // REPL `enkomask <hex>` (mid-ident sweep)
 static int gSoH3dEnKoMaskOverrideSet = 0;
 #define ENKO_MID(n) (1ull << (n))
-static unsigned long long SoH3D_EnKoMidMask(int modelId, Actor* actor) {
+static unsigned long long SoH3D_AutoActorMidMask(int modelId, Actor* actor, s32 sceneNum) {
     if (gSoH3dEnKoMaskOverrideSet) {
         return gSoH3dEnKoMaskOverride; // debug identification override
+    }
+    // En_Sa (Saria) ocarina: OoT3D toggles the right-hand mesh by visibility, not a DL swap. In the
+    // Sacred Forest Meadow (scene 0x56) she holds the ocarina (mesh_id 5 = ocarina hand); elsewhere
+    // the empty hand (mesh_id 2). Hide the other so the two hand meshes don't overlap. Keep every
+    // other mesh_id visible. (Ground truth: enko_override_and_ensa_facial.md §En_Sa; mesh_ids dumped
+    // in docs/material_facial_channel_spec.md "Resolved unknowns" §3.)
+    if (actor != NULL && actor->id == ACTOR_EN_SA) {
+        unsigned long long mask = ~0ull;
+        if (sceneNum == SCENE_SACRED_FOREST_MEADOW) {
+            mask &= ~(1ull << 2); // Meadow: show ocarina hand (5), hide empty hand (2)
+        } else {
+            mask &= ~(1ull << 5); // elsewhere: show empty hand (2), hide ocarina hand (5)
+        }
+        return mask;
     }
     if (actor == NULL || actor->id != ACTOR_EN_KO) {
         return ~0ull; // not a Kokiri kid -> draw everything (clears any stale per-model mask)
@@ -2241,7 +2255,8 @@ static int SoH3D_DoRetarget(PlayState* play, void** skeleton, Vec3s* jointTable,
         // Shared multi-variant CMBs (En_Ko Kokiri kids) bake several heads on distinct mesh_ids;
         // select the one this actor's ENKO_TYPE wants. Set BEFORE EmitModelDraw's EmitPose so the
         // mask pairs with this draw item (the GL pass snapshots pendingMidMask at emit time).
-        SoH3D_GL_SetMidMask(gSoH3dPendingModel, SoH3D_EnKoMidMask(gSoH3dPendingModel, gSoH3dPendingActor));
+        SoH3D_GL_SetMidMask(gSoH3dPendingModel,
+                            SoH3D_AutoActorMidMask(gSoH3dPendingModel, gSoH3dPendingActor, play->sceneNum));
         SoH3D_EmitModelDraw(play, gSoH3dPendingModel, gSoH3dPendingActor, gSoH3dPendingScale, gSoH3dPendingGroundOff);
         gSoH3dPendingModel = -1;
         gSoH3dPendingBoneMap = NULL;
@@ -4133,6 +4148,24 @@ static void SoH3D_ReplExec(PlayState* play, char* line, const char* outPath) {
             gSoH3dTrack = (iv != 0);
         }
         SoH3D_ReplReply(outPath, "track=%d", gSoH3dTrack);
+    } else if (strcmp(cmd, "facial") == 0) {
+        // Keystone #3 — OoT3D eye/mouth material-anim port (soh3d_anim_override). `facial <0|1>`
+        // toggles the per-material frame swap (A/B blink/mouth vs frozen base); alone reports state.
+        extern int gSoH3dFacial;
+        int iv;
+        if (sscanf(line, "%*s %d", &iv) == 1) {
+            gSoH3dFacial = (iv != 0);
+        }
+        SoH3D_ReplReply(outPath, "facial=%d", gSoH3dFacial);
+    } else if (strcmp(cmd, "faceframe") == 0) {
+        // Keystone #3 verification: force every facial actor's eye+mouth to a fixed frame index
+        // (bypassing the live N64 index, which the headless throttle stalls). `faceframe -1` = live.
+        extern int gSoH3dFaceForce;
+        int iv;
+        if (sscanf(line, "%*s %d", &iv) == 1) {
+            gSoH3dFaceForce = iv;
+        }
+        SoH3D_ReplReply(outPath, "faceframe=%d", gSoH3dFaceForce);
     } else if (strcmp(cmd, "cuccopose") == 0) {
         // #5 — hold every cucco in its agitated wing-spread pose (EnNiw_Update -> func_80AB5BF8 2)
         // for deterministic A/B of the spread flap (N64 via `enable 0` vs OoT3D replay). `cuccopose
