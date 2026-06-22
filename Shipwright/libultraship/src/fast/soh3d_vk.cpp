@@ -230,6 +230,7 @@ struct VkGroup {
     int cull = 0;
     int faceCull = 0; // 1 = cull back face (CMB cull byte 1); 0 = double-sided
     int meshId = -1;
+    int materialIndex = -1; // CMB material slot (key for the facial tex-override; -1 = none)
 };
 
 struct VkModel {
@@ -866,6 +867,7 @@ VkModel* ensureUploaded(int modelId) {
         g.cull = groups[i].cull;
         g.faceCull = groups[i].faceCull;
         g.meshId = groups[i].meshId;
+        g.materialIndex = groups[i].materialIndex;
         for (int k = 0; k < 4; k++)
             g.blendColor[k] = groups[i].blendColor[k];
         all.insert(all.end(), groups[i].verts, groups[i].verts + groups[i].vertCount);
@@ -1489,7 +1491,9 @@ extern "C" void SoH3D_Vk_BeginPass(void) {
 extern "C" void SoH3D_Vk_DrawModel(int modelId, const float* mp16, const float* mv16, int lit, int invertY,
                                    unsigned char r8, unsigned char g8, unsigned char b8, unsigned char a8,
                                    float aspectAdj, const float* boneData, int boneCnt,
-                                   unsigned long long midMask, int sky, float uvOffU, float uvOffV) {
+                                   unsigned long long midMask, int sky, float uvOffU, float uvOffV,
+                                   const void* matTex) {
+    const std::unordered_map<int, int>* matTexMap = static_cast<const std::unordered_map<int, int>*>(matTex);
     if (!g_ctxValid)
         return;
     VkModel* m = ensureUploaded(modelId);
@@ -1590,10 +1594,16 @@ extern "C" void SoH3D_Vk_DrawModel(int modelId, const float* mp16, const float* 
         bi.offset = uboOff;
         bi.range = sizeof(VkUbo);
 
+        // Facial material-anim: a per-material override (eye/mouth frame) wins over the static tex.
+        int texIndex = grp.texIndex;
+        if (matTexMap && grp.materialIndex >= 0) {
+            auto ov = matTexMap->find(grp.materialIndex);
+            if (ov != matTexMap->end() && ov->second >= 0) texIndex = ov->second;
+        }
         VkImageView view = g_dummyTex.view;
         VkSampler samp = g_dummySampler;
-        if (grp.texIndex >= 0 && grp.texIndex < (int)m->textures.size()) {
-            view = m->textures[grp.texIndex].view;
+        if (texIndex >= 0 && texIndex < (int)m->textures.size()) {
+            view = m->textures[texIndex].view;
             samp = getSampler(grp.wrapS, grp.wrapT);
         }
         VkDescriptorImageInfo ii{};
