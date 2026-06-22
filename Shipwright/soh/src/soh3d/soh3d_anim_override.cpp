@@ -44,10 +44,29 @@ struct TrackActor {
 // are the **N64** struct offsets — SoH3D reads the N64 actor (it runs N64 logic); the OoT3D-native
 // interactInfo offsets differ (En_Ko +0x28c, En_Sa +0x450) and must NOT be used here (validated live:
 // head-track with 0x1E8 matched the reference). oot3d-decomp/docs/enko_override_and_ensa_facial.md.
+// All these actors apply head/torso through the SAME OoT3D shared helper (FUN_0034e01c) trackRot()
+// uses — only {N64 interactInfo offset, head bone, torso bone} differ. interactOff is the N64 struct
+// offset (SoH3D runs N64 logic); bones are OoT3D CMB bone ids. Decomp-derived:
+// oot3d-decomp/docs/enko_override_and_ensa_facial.md (En_Ko/En_Sa live-verified; the rest pending).
+// En_Hy townsfolk swap body skeletons by EnHyType (params&0x7f) — but each archetype is a distinct
+// OoT3D body zar, so the ZAR-keyed table covers them with one row each (constant interactOff 0x1E8,
+// per-archetype head/torso bones).
 constexpr TrackActor kTrackActors[] = {
-    { "/actor/zelda_km1.zar", 0x1E8, 10, 9 },
-    { "/actor/zelda_kw1.zar", 0x1E8, 10, 9 },
-    { "/actor/zelda_sa.zar",  0x1E0, 10, 9 },
+    { "/actor/zelda_km1.zar", 0x1E8, 10, 9 }, // En_Ko Kokiri boy
+    { "/actor/zelda_kw1.zar", 0x1E8, 10, 9 }, // En_Ko Kokiri girl
+    { "/actor/zelda_sa.zar",  0x1E0, 10, 9 }, // En_Sa Saria
+    { "/actor/zelda_md.zar",  0x1E0,  9, 8 }, // En_Md Mido
+    { "/actor/zelda_ma1.zar", 0x1E8,  7, 6 }, // En_Ma1 child Malon
+    { "/actor/zelda_ma2.zar", 0x1E0,  8, 7 }, // En_Ma2/Ma3 adult Malon
+    // En_Hy townsfolk, per body archetype (interactOff 0x1E8 for all):
+    { "/actor/zelda_boj.zar", 0x1E8,  9, 8 },
+    { "/actor/zelda_ahg.zar", 0x1E8, 15, 8 },
+    { "/actor/zelda_bji.zar", 0x1E8, 10, 9 },
+    { "/actor/zelda_cne.zar", 0x1E8, 14, 7 },
+    { "/actor/zelda_aob.zar", 0x1E8, 10, 9 },
+    { "/actor/zelda_cob.zar", 0x1E8, 12, 5 },
+    { "/actor/zelda_bba.zar", 0x1E8,  7, 6 },
+    { "/actor/zelda_bob.zar", 0x1E8, 14, 7 },
 };
 
 constexpr float kBinangToRad = 3.14159265358979f / 32768.0f;
