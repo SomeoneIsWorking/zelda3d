@@ -212,7 +212,7 @@ void EnGSwitch_SilverRupeeTracker(EnGSwitch* this, PlayState* play) {
     static s8 majorScale[] = { 0, 2, 4, 5, 7, 9, 11, 13, 15, 17 };
 
     if (this->noteIndex < sCollectedCount) {
-        if (sCollectedCount < (CVarGetInteger(CVAR_ENHANCEMENT("SilverRupeeJingleExtend"), 0) ? 10 : 5)) {
+        if (sCollectedCount < 10) {
             // "sound?"
             osSyncPrintf(VT_FGCOL(GREEN) "☆☆☆☆☆ 音？ ☆☆☆☆☆ %d\n" VT_RST, this->noteIndex);
             Audio_PlaySoundTransposed(&gSfxDefaultPos, NA_SE_EV_FIVE_COUNT_LUPY, majorScale[this->noteIndex]);

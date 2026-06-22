@@ -15,7 +15,7 @@ static constexpr int32_t CVAR_FIX_TWO_HANDED_IDLE_DEFAULT = 0;
 
 // clang-format off
 static RegisterShipInitFunc initFunc([]() {
-    COND_VB_SHOULD(VB_SET_IDLE_ANIM, CVAR_FIX_TWO_HANDED_IDLE_VALUE, {
+    COND_VB_SHOULD(VB_SET_IDLE_ANIM, true, {
         Player* player = va_arg(args, Player*);
         s32 commonType = va_arg(args, s32);
 

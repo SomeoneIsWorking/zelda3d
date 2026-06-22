@@ -22,7 +22,7 @@ static void OnInitGCDoor(void* refActor) {
 }
 
 void RegisterGoronTunicFix() {
-    COND_ID_HOOK(OnActorInit, ACTOR_BG_SPOT18_SHUTTER, !IS_RANDO && CVAR_GC_DOOR_FIX_VALUE, OnInitGCDoor);
+    COND_ID_HOOK(OnActorInit, ACTOR_BG_SPOT18_SHUTTER, !IS_RANDO, OnInitGCDoor);
 }
 
 static RegisterShipInitFunc initFunc(RegisterGoronTunicFix, { CVAR_GC_DOOR_FIX_NAME, "IS_RANDO" });
