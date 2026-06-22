@@ -8,6 +8,10 @@ scratch/
 *.3ds
 *.z64
 build/
+build-cmake/
+# vendored Shipwright-tree build artifacts (post-submodule-flatten)
+Shipwright/**/build/
+Shipwright/**/cmake-build-*/
 logs/
 __pycache__/
 scratch/azahar_cfg/
