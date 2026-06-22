@@ -239,9 +239,7 @@ void EnPoRelay_Race(EnPoRelay* this, PlayState* play) {
             speed = 3.5f;
         }
 
-        if (CVarGetInteger(CVAR_ENHANCEMENT("FixDampeGoingBackwards"), false)) {
-            speed = ABS(speed);
-        }
+        speed = ABS(speed);
 
         multiplier = 250.0f - this->actor.xzDistToPlayer;
         multiplier = CLAMP_MIN(multiplier, 0.0f);

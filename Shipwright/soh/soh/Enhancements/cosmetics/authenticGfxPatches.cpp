@@ -90,7 +90,7 @@ void PatchArrowTipTexture() {
                              G_TX_MIRROR | G_TX_WRAP, 5, 5, 1, 1),
     };
 
-    bool fixTexturesOOB = CVarGetInteger(CVAR_ENHANCEMENT("FixTexturesOOB"), 0);
+    bool fixTexturesOOB = true;
 
     for (const auto& patchInfo : arrowTipDListPatchInfos) {
         const char* dlist = patchInfo.dlist;
@@ -145,7 +145,7 @@ void PatchDekuStickTextureOverflow() {
     int start = 5;
 
     // Patch using custom overflowed texture
-    if (!CVarGetInteger(CVAR_ENHANCEMENT("FixTexturesOOB"), 0)) {
+    if (false) {
         // Unpatch the other texture fix
         for (size_t i = 0; i < 8; i++) {
             size_t instruction = start + i;
@@ -189,7 +189,7 @@ void PatchFreezardTextureOverflow() {
                              G_TX_NOMIRROR | G_TX_WRAP, 5, 5, G_TX_NOLOD, G_TX_NOLOD),
     };
 
-    bool fixTexturesOOB = CVarGetInteger(CVAR_ENHANCEMENT("FixTexturesOOB"), 0);
+    bool fixTexturesOOB = true;
 
     for (const auto& patchInfo : freezardBodyDListPatchInfos) {
         const char* dlist = patchInfo.dlist;
@@ -241,7 +241,7 @@ void PatchIronKnuckleTextureOverflow() {
                                 G_TX_MIRROR | G_TX_WRAP, 5, 6, G_TX_NOLOD, G_TX_NOLOD),
     };
 
-    bool fixTexturesOOB = CVarGetInteger(CVAR_ENHANCEMENT("FixTexturesOOB"), 0);
+    bool fixTexturesOOB = true;
 
     for (const auto& patchInfo : ironKnuckleDListPatchInfos) {
         const char* dlist = patchInfo.dlist;

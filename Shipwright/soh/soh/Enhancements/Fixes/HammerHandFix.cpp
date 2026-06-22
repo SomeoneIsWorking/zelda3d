@@ -20,19 +20,10 @@ static void FixHammerHand() {
     }
 }
 
-static void ResetHammerHand() {
-    ResourceMgr_UnpatchGfxByName(gLinkAdultLeftHandHoldingHammerNearDL, "hammerHand1");
-    ResourceMgr_UnpatchGfxByName(gLinkAdultLeftHandHoldingHammerNearDL, "hammerHand2");
-}
-
 static void RegisterHammerHandFix() {
-    if (CVAR_HAMMER_HAND_VALUE) {
-        FixHammerHand();
-    } else {
-        ResetHammerHand();
-    }
+    FixHammerHand();
 
-    COND_HOOK(OnSceneInit, CVAR_HAMMER_HAND_VALUE, [](int32_t) { FixHammerHand(); });
+    COND_HOOK(OnSceneInit, true, [](int32_t) { FixHammerHand(); });
 }
 
 static RegisterShipInitFunc initFunc(RegisterHammerHandFix, { CVAR_HAMMER_HAND_NAME });

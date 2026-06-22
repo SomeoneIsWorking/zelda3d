@@ -41,7 +41,7 @@ static void OnReceiveBrokenGiantsKnife(GetItemEntry itemEntry) {
 
 static void RegisterBrokenGiantsKnifeFix() {
     // If enhancement is off, flag should be handled exclusively by vanilla behaviour
-    COND_HOOK(OnItemReceive, CVAR_BGS_FIX_VALUE || IS_RANDO, OnReceiveBrokenGiantsKnife);
+    COND_HOOK(OnItemReceive, true, OnReceiveBrokenGiantsKnife);
 }
 
 static RegisterShipInitFunc initFunc(RegisterBrokenGiantsKnifeFix, { CVAR_BGS_FIX_NAME, "IS_RANDO" });
