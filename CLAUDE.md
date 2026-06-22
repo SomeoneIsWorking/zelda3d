@@ -70,13 +70,16 @@ actual path, and capture the evidence above.
   the per-frame physical→N64-pad input path, where button-mapping classes live, and the chord/modifier
   design for #32. Read this instead of re-deriving the controller code.
 
-## Commit chain (commit each verified fix yourself, reference the issue `#<n>`)
+## Commit chain — ONE repo now (commit each verified fix yourself, reference the issue `#<n>`)
 
-- `libultraship/` (submodule at `Shipwright/libultraship/`) → `fork/soh3d`  (edit it freely when the fix
-  belongs there: renderer, input mapping, windowing — don't push a fix into the wrong layer to keep LUS
-  "UNTOUCHED")
-- `Shipwright/` → `fork/develop`
-- outer repo → `origin/main`
+The former 3-level submodule chain (soh3d → Shipwright → {libultraship, ZAPDTR, OTRExporter}) was
+**flattened into this single repo** (2026-06-22): the engine is vendored as plain directories, there
+are **no submodules**, and everything commits + pushes to **`origin/main`** in one shot. Edit
+`Shipwright/` and `Shipwright/libultraship/` freely in-tree (renderer, input mapping, windowing — put
+the fix in the layer it belongs to). No more `fork/develop` / `fork/soh3d` / per-submodule pushes; the
+old history still lives on those fork remotes if ever needed. `Azahar/` (the oracle) is NOT part of
+this repo — it's gitignored. ROMs (`*.z64`), archives (`*.o2r`/`*.otr`) and `build-cmake/` stay
+gitignored — never commit them.
 
 ## Hard rules
 
