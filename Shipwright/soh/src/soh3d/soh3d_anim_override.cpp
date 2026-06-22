@@ -33,25 +33,31 @@ using SoH3D::Mat4;
 //                (head is the same for all: RotateX(headRot.y) then RotateZ(headRot.x)).
 struct TrackActor {
     const char* zar;
-    int interactOff;
+    int interactOff; // NpcInteractInfo offset in the N64 actor struct (SoH3D runs N64 logic)
     int headBone;
     int torsoBone;
-    int torsoStyle; // 0 = En_Ko (RotateX(-torsoRot.y), RotateZ(torsoRot.x))
-                    // 1 = En_Sa (RotateY(torsoRot.y),  RotateX(torsoRot.x))
 };
 
-// En_Ko Kokiri kids: km1 (boy) / kw1 (girl). interactInfo @ 0x1E8 (z_en_ko.h). OoT3D km1 skeleton
-// (bonestats): bone 10 = head (highest, 1124 face verts), bone 9 = upper torso (parent of head +
-// both arms). En_Sa Saria: zelda_sa, interactInfo @ 0x1E0 (z_en_sa.h); OoT3D limbs head 10 / torso 9
-// (saria_en_sa_compare.md), torso uses RotateY/RotateX. (sa bone ids assume the same layout as km1 —
-// re-confirm against the sa skeleton when first exercised in the Meadow.)
+// En_Ko Kokiri kids: km1 (boy) / kw1 (girl), N64 interactInfo @ 0x1E8 (z_en_ko.h). En_Sa Saria:
+// zelda_sa, N64 interactInfo @ 0x1E0 (z_en_sa.h). OoT3D head = bone 10, torso = bone 9 for both
+// (decomp-confirmed: EnKo_OverrideLimbDraw 0x2335b4 + EnSa, shared helper FUN_0034e01c). NOTE: these
+// are the **N64** struct offsets — SoH3D reads the N64 actor (it runs N64 logic); the OoT3D-native
+// interactInfo offsets differ (En_Ko +0x28c, En_Sa +0x450) and must NOT be used here (validated live:
+// head-track with 0x1E8 matched the reference). oot3d-decomp/docs/enko_override_and_ensa_facial.md.
 constexpr TrackActor kTrackActors[] = {
-    { "/actor/zelda_km1.zar", 0x1E8, 10, 9, 0 },
-    { "/actor/zelda_kw1.zar", 0x1E8, 10, 9, 0 },
-    { "/actor/zelda_sa.zar",  0x1E0, 10, 9, 1 },
+    { "/actor/zelda_km1.zar", 0x1E8, 10, 9 },
+    { "/actor/zelda_kw1.zar", 0x1E8, 10, 9 },
+    { "/actor/zelda_sa.zar",  0x1E0, 10, 9 },
 };
 
 constexpr float kBinangToRad = 3.14159265358979f / 32768.0f;
+
+// OoT3D head/torso track rotation — the shared no-negation helper (FUN_0034e01c) OoT3D applies to
+// BOTH the head and torso limb matrix (MTXMODE_APPLY): RotateX(rot.y) then RotateZ(rot.x). (N64
+// EnKo negates torso.y; OoT3D does not — a genuine Grezzo divergence. We match OoT3D.)
+Mat4 trackRot(const short* rot) {
+    return SoH3D::matMul(SoH3D::matRx(rot[1] * kBinangToRad), SoH3D::matRz(rot[0] * kBinangToRad));
+}
 
 // Push a 4x4's rotation 3x3 block (row-major) as a bone post-rotation.
 void setBonePost(int modelId, int bone, const Mat4& m) {
@@ -85,19 +91,7 @@ extern "C" void SoH3D_ApplyActorOverrides(int modelId, void* actorv) {
     const short* headRot = reinterpret_cast<const short*>(a + row->interactOff + 0x08);  // Vec3s
     const short* torsoRot = reinterpret_cast<const short*>(a + row->interactOff + 0x0E); // Vec3s
 
-    // Head: RotateX(headRot.y) then RotateZ(headRot.x) — MTXMODE_APPLY => post = Rx(hy)·Rz(hx).
-    Mat4 head = SoH3D::matMul(SoH3D::matRx(headRot[1] * kBinangToRad),
-                              SoH3D::matRz(headRot[0] * kBinangToRad));
-    setBonePost(modelId, row->headBone, head);
-
-    // Torso: actor-specific sequence (same MTXMODE_APPLY post-multiply order).
-    Mat4 torso;
-    if (row->torsoStyle == 0) { // En_Ko
-        torso = SoH3D::matMul(SoH3D::matRx(-torsoRot[1] * kBinangToRad),
-                              SoH3D::matRz(torsoRot[0] * kBinangToRad));
-    } else { // En_Sa
-        torso = SoH3D::matMul(SoH3D::matRy(torsoRot[1] * kBinangToRad),
-                              SoH3D::matRx(torsoRot[0] * kBinangToRad));
-    }
-    setBonePost(modelId, row->torsoBone, torso);
+    // Head and torso both use the same OoT3D no-negation helper, post-multiplied onto their bones.
+    setBonePost(modelId, row->headBone, trackRot(headRot));
+    setBonePost(modelId, row->torsoBone, trackRot(torsoRot));
 }
