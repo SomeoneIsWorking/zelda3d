@@ -20,7 +20,7 @@ static void OnInitFloorSwitches(void* refActor) {
 }
 
 static void RegisterFloorSwitchesFix() {
-    COND_ID_HOOK(OnActorInit, ACTOR_OBJ_SWITCH, CVAR_FLOOR_SWITCHES_VALUE, OnInitFloorSwitches);
+    COND_ID_HOOK(OnActorInit, ACTOR_OBJ_SWITCH, true, OnInitFloorSwitches);
 }
 
 static RegisterShipInitFunc initFunc(RegisterFloorSwitchesFix, { CVAR_FLOOR_SWITCHES_NAME });

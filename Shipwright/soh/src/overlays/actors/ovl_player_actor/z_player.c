@@ -11406,7 +11406,7 @@ void Player_ProcessSceneCollision(PlayState* play, Player* this) {
 
         // conflicts arise from these two being enabled at once, and with ClimbEverything on, FixVineFall is redundant
         // anyway
-        if (CVarGetInteger(CVAR_ENHANCEMENT("FixVineFall"), 0) && !CVarGetInteger(CVAR_CHEAT("ClimbEverything"), 0)) {
+        if (!CVarGetInteger(CVAR_CHEAT("ClimbEverything"), 0)) {
             /* This fixes the "started climbing a wall and then immediately fell off" bug.
              * The main idea is if a climbing wall is detected, double-check that it will
              * still be valid once climbing begins by doing a second raycast with a small
@@ -16625,8 +16625,7 @@ void func_80852C50(PlayState* play, Player* this, CsCmdActorCue* cue) {
     sp24 = sCueToCsActionMap[this->cueId];
     func_80852B4C(play, this, linkCsAction, &D_80854E50[ABS(sp24)]);
 
-    if (CVarGetInteger(CVAR_ENHANCEMENT("FixEyesOpenWhileSleeping"), 0) &&
-        (play->csCtx.linkAction->action == 28 || play->csCtx.linkAction->action == 29)) {
+    if (play->csCtx.linkAction->action == 28 || play->csCtx.linkAction->action == 29) {
         this->skelAnime.jointTable[22].x = 8;
     }
 }

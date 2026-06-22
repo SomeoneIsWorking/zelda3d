@@ -990,80 +990,7 @@ void SohMenu::AddMenuEnhancements() {
     path.sidebarName = "Fixes";
     AddSidebarEntry("Enhancements", path.sidebarName, 3);
     path.column = SECTION_COLUMN_1;
-    AddWidget(path, "Gameplay Fixes", WIDGET_SEPARATOR_TEXT);
-    AddWidget(path, "Fix the Gravedigging Tour Glitch", WIDGET_CVAR_CHECKBOX)
-        .CVar(CVAR_ENHANCEMENT("GravediggingTourFix"))
-        .PreFunc([](WidgetInfo& info) {
-            info.options->disabled = IS_RANDO && GameInteractor::IsSaveLoaded(true);
-            info.options->disabledTooltip = "This setting is always enabled in randomized save files.";
-        })
-        .Options(CheckboxOptions().Tooltip(
-            "Fixes a bug where the Gravedigging Tour Heart Piece disappears if the area reloads."));
-    AddWidget(path, "Fix Dampé Going Backwards", WIDGET_CVAR_CHECKBOX)
-        .CVar(CVAR_ENHANCEMENT("FixDampeGoingBackwards"))
-        .Options(CheckboxOptions().Tooltip(
-            "Fixes Dampé going backwards in certain circumstances when the player is going backwards."));
-    AddWidget(path, "Fix Kokiri Forest Quest State", WIDGET_CVAR_CHECKBOX)
-        .CVar(CVAR_ENHANCEMENT("FixKokiriForestQuestState"))
-        .Options(CheckboxOptions().Tooltip("Fixes kokiri animation state to match their text state when getting "
-                                           "Zelda's Letter before Kokiri Emerald."));
-    AddWidget(path, "Fix Raised Floor Switches", WIDGET_CVAR_CHECKBOX)
-        .CVar(CVAR_ENHANCEMENT("FixFloorSwitches"))
-        .Options(CheckboxOptions().Tooltip(
-            "Fixes the two raised floor switches, the one in Forest Temple Basement and the one at the top of Fire "
-            "Temple. This will lower them, making activating them easier."));
-    AddWidget(path, "Fix Zora Hint Dialogue", WIDGET_CVAR_CHECKBOX)
-        .CVar(CVAR_ENHANCEMENT("FixZoraHintDialogue"))
-        .Options(CheckboxOptions().Tooltip(
-            "Fixes one Zora's dialogue giving a hint about bringing Ruto's Letter to King Zora to properly occur "
-            "before moving King Zora rather than after."));
-    AddWidget(path, "Fix Falling from Vine Edges", WIDGET_CVAR_CHECKBOX)
-        .CVar(CVAR_ENHANCEMENT("FixVineFall"))
-        .Options(
-            CheckboxOptions().Tooltip("Prevents immediately falling off climbable surfaces if climbing on the edges."));
-    AddWidget(path, "Fix Bush Item Drops", WIDGET_CVAR_CHECKBOX)
-        .CVar(CVAR_ENHANCEMENT("BushDropFix"))
-        .Options(CheckboxOptions().Tooltip(
-            "Fixes the bushes to drop items correctly rather than spawning undefined items."));
-    AddWidget(path, "Fix Enemies not Spawning Near Water", WIDGET_CVAR_CHECKBOX)
-        .CVar(CVAR_ENHANCEMENT("EnemySpawnsOverWaterboxes"))
-        .Options(CheckboxOptions().Tooltip(
-            "Causes respawning enemies, like Stalchildren, to appear on land near bodies of water. "
-            "Fixes an incorrect calculation that acted like water underneath ground was above it."));
-    AddWidget(path, "Fix Poacher's Saw Softlock", WIDGET_CVAR_CHECKBOX)
-        .CVar(CVAR_ENHANCEMENT("FixSawSoftlock"))
-        .PreFunc([](WidgetInfo& info) {
-            info.options->disabled = CVarGetInteger(CVAR_ENHANCEMENT("SkipText"), 0) == 1;
-            info.options->disabledTooltip = "This option is forced on when Skip Text is enabled.";
-        })
-        .Options(CheckboxOptions().Tooltip(
-            "Prevents the Poacher's Saw softlock from mashing through the text, or with Skip Text enabled."));
-    AddWidget(path, "Fix Anubis Fireballs", WIDGET_CVAR_CHECKBOX)
-        .CVar(CVAR_ENHANCEMENT("AnubisFix"))
-        .Options(CheckboxOptions().Tooltip(
-            "Make Anubis Fireballs do Fire damage when reflected back at them with the Mirror Shield."));
-    AddWidget(path, "Fix Goron City Doors After Fire Temple", WIDGET_CVAR_CHECKBOX)
-        .CVar(CVAR_ENHANCEMENT("GCDoorsAfterFireFix"))
-        .Options(CheckboxOptions().Tooltip(
-            "Forces Goron City doors open if you somehow complete Fire Temple without talking to Goron Link "
-            " and receiving the Goron Tunic."));
-
-    AddWidget(path, "Fix MQ Water 1F Lock", WIDGET_CVAR_CHECKBOX)
-        .CVar(CVAR_ENHANCEMENT("MQWaterLockFix"))
-        .PreFunc([](WidgetInfo& info) {
-            info.options->disabled = IS_RANDO && GameInteractor::IsSaveLoaded(true);
-            info.options->disabledTooltip = "This setting is forcefully enabled when you are playing a Randomizer.";
-        })
-        .Options(CheckboxOptions().Tooltip(
-            "The second small key lock MQ water is removed before the player can reach it by a shared flag with some "
-            "Stalfos on the way to Dark Link.\n"
-            "Enabling this will cause that lock to use a different flag, working as intended."));
-
     AddWidget(path, "Item-related Fixes", WIDGET_SEPARATOR_TEXT);
-    AddWidget(path, "Fix Deku Nut Upgrade", WIDGET_CVAR_CHECKBOX)
-        .CVar(CVAR_ENHANCEMENT("DekuNutUpgradeFix"))
-        .Options(CheckboxOptions().Tooltip("Prevents the Forest Stage Deku Nut upgrade from becoming unobtainable "
-                                           "after receiving the Poacher's Saw."));
     AddWidget(path, "Fix Megaton Hammer Crouch Stab", WIDGET_CVAR_CHECKBOX)
         .CVar(CVAR_ENHANCEMENT("CrouchStabHammerFix"))
         .Callback([](WidgetInfo& info) {
@@ -1078,82 +1005,9 @@ void SohMenu::AddMenuEnhancements() {
         .PreFunc(
             [](WidgetInfo& info) { info.isHidden = CVarGetInteger(CVAR_ENHANCEMENT("CrouchStabHammerFix"), 0) == 0; })
         .Options(CheckboxOptions().Tooltip("Make crouch stabbing always do the same damage as a regular slash."));
-    AddWidget(path, "Fix Broken Giant's Knife Bug", WIDGET_CVAR_CHECKBOX)
-        .CVar(CVAR_ENHANCEMENT("FixBrokenGiantsKnife"))
-        .PreFunc([](WidgetInfo& info) {
-            info.options->disabled = IS_RANDO && GameInteractor::IsSaveLoaded(true);
-            info.options->disabledTooltip = "This setting is forcefully enabled when you are playing a Randomizer.";
-        })
-        .Callback([](WidgetInfo& info) {
-            bool hasGiantsKnife = CHECK_OWNED_EQUIP(EQUIP_TYPE_SWORD, EQUIP_INV_SWORD_BIGGORON);
-            bool hasBrokenKnife = CHECK_OWNED_EQUIP_ALT(EQUIP_TYPE_SWORD, EQUIP_INV_SWORD_BROKENGIANTKNIFE);
-            bool knifeIsBroken = gSaveContext.swordHealth == 0.0f;
-
-            if (hasGiantsKnife && (hasBrokenKnife != knifeIsBroken)) {
-                func_800849EC(gPlayState);
-            }
-        })
-        .Options(
-            CheckboxOptions().Tooltip("Fixes the Broken Giant's Knife flag not being reset when Medigoron fixes it."));
-
-    AddWidget(path, "Camera Fixes", WIDGET_SEPARATOR_TEXT);
-    AddWidget(path, "Fix Camera Drift", WIDGET_CVAR_CHECKBOX)
-        .CVar(CVAR_ENHANCEMENT("FixCameraDrift"))
-        .Options(CheckboxOptions().Tooltip("Fixes camera slightly drifting to the left when standing still due to a "
-                                           "math error. May impact certain glitches."));
-    AddWidget(path, "Fix Camera Swing", WIDGET_CVAR_CHECKBOX)
-        .CVar(CVAR_ENHANCEMENT("FixCameraSwing"))
-        .Options(CheckboxOptions().Tooltip(
-            "Fixes camera getting stuck on collision when standing still. Also fixes slight shift "
-            "back in camera when Link stops moving. May impact certain glitches."));
-    AddWidget(path, "Fix Hanging Ledge Swing Rate", WIDGET_CVAR_CHECKBOX)
-        .CVar(CVAR_ENHANCEMENT("FixHangingLedgeSwingRate"))
-        .Options(CheckboxOptions().Tooltip("Fixes camera swing rate when the player falls off a ledge and the camera "
-                                           "swings around. May impact certain glitches."));
 
     path.column = SECTION_COLUMN_2;
     AddWidget(path, "Graphical Fixes", WIDGET_SEPARATOR_TEXT);
-    AddWidget(path, "Fix L&R Pause Menu", WIDGET_CVAR_CHECKBOX)
-        .CVar(CVAR_ENHANCEMENT("FixMenuLR"))
-        .RaceDisable(false)
-        .Options(CheckboxOptions().Tooltip("Makes the L and R buttons in the pause menu the same color."));
-    AddWidget(path, "Fix Dungeon Entrances", WIDGET_CVAR_CHECKBOX)
-        .CVar(CVAR_ENHANCEMENT("FixDungeonMinimapIcon"))
-        .RaceDisable(false)
-        .Options(CheckboxOptions().Tooltip(
-            "Removes the Dungeon Entrance icon on the top-left corner of the screen when no dungeon is present on the "
-            "current map."));
-    AddWidget(path, "Fix Two-Handed Idle Animations", WIDGET_CVAR_CHECKBOX)
-        .CVar(CVAR_ENHANCEMENT("TwoHandedIdle"))
-        .RaceDisable(false)
-        .Options(CheckboxOptions().Tooltip(
-            "Re-Enables the two-handed idle animation, a seemingly finished animation that was disabled on accident "
-            "in the original game."));
-    AddWidget(path, "Fix Navi Text HUD Position", WIDGET_CVAR_CHECKBOX)
-        .CVar(CVAR_ENHANCEMENT("NaviTextFix"))
-        .RaceDisable(false)
-        .Options(CheckboxOptions().Tooltip("Correctly centers the Navi text prompt on the HUD's C-Up button."));
-    AddWidget(path, "Fix Gerudo Warrior's Clothing Colors", WIDGET_CVAR_CHECKBOX)
-        .CVar(CVAR_ENHANCEMENT("GerudoWarriorClothingFix"))
-        .RaceDisable(false)
-        .Options(CheckboxOptions().Tooltip(
-            "Prevent the Gerudo Warrior's clothes changing color when changing Link's tunic or "
-            "using bombs in front of her."));
-    AddWidget(path, "Fix Out of Bounds Textures", WIDGET_CVAR_CHECKBOX)
-        .CVar(CVAR_ENHANCEMENT("FixTexturesOOB"))
-        .Callback([](WidgetInfo& info) { ApplyAuthenticGfxPatches(); })
-        .Options(CheckboxOptions().Tooltip(
-            "Fixes authentic out of bounds texture reads, instead loading textures with the correct size."));
-    AddWidget(path, "Fix Link's Eyes Open while Sleeping", WIDGET_CVAR_CHECKBOX)
-        .CVar(CVAR_ENHANCEMENT("FixEyesOpenWhileSleeping"))
-        .RaceDisable(false)
-        .Options(CheckboxOptions().Tooltip(
-            "Fixes Link's eyes being open in the opening cutscene when he is supposed to be sleeping."));
-    AddWidget(path, "Fix Hand Holding Hammer", WIDGET_CVAR_CHECKBOX)
-        .CVar(CVAR_ENHANCEMENT("FixHammerHand"))
-        .RaceDisable(false)
-        .Options(CheckboxOptions().Tooltip(
-            "Fixes Adult Link having a backwards Left hand when holding the Megaton Hammer."));
     AddWidget(path, "Fix Vanishing Paths", WIDGET_CVAR_COMBOBOX)
         .CVar(CVAR_ENHANCEMENT("SceneSpecificDirtPathFix"))
         .RaceDisable(false)
@@ -1165,26 +1019,6 @@ void SohMenu::AddMenuEnhancements() {
                          "Consistent: Certain paths vanish the same way in all resolutions.\n"
                          "No Vanish: Paths do not vanish, Link seems to sink in to some paths.\n"
                          "This might affect other decal effects."));
-
-    AddWidget(path, "Audio Fixes", WIDGET_SEPARATOR_TEXT);
-    AddWidget(path, "Fix Missing Jingle after 5 Silver Rupees", WIDGET_CVAR_CHECKBOX)
-        .CVar(CVAR_ENHANCEMENT("SilverRupeeJingleExtend"))
-        .RaceDisable(false)
-        .Options(CheckboxOptions().Tooltip(
-            "Adds 5 higher pitches for the Silver Rupee Jingle for the rooms with more than 5 Silver Rupees. "
-            "Only relevant for playthroughs involving Master Quest Dungeons."));
-
-    AddWidget(path, "Desync Fixes", WIDGET_SEPARATOR_TEXT);
-    AddWidget(path, "Fix Darunia Dancing too Fast", WIDGET_CVAR_CHECKBOX)
-        .CVar(CVAR_ENHANCEMENT("FixDaruniaDanceSpeed"))
-        .RaceDisable(false)
-        .Options(CheckboxOptions().Tooltip(
-            "Fixes Darunia's dancing speed so he dances to the beat of Saria's Song, like in the Original Game."));
-    AddWidget(path, "Fix Credits Timing (PAL)", WIDGET_CVAR_CHECKBOX)
-        .CVar(CVAR_ENHANCEMENT("CreditsFix"))
-        .RaceDisable(false)
-        .Options(CheckboxOptions().Tooltip(
-            "Extend certain credits scenes so the music lines up properly with the visuals. (PAL only)"));
 
     path.column = SECTION_COLUMN_3;
     AddWidget(path, "Graphical Restorations", WIDGET_SEPARATOR_TEXT);

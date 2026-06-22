@@ -746,17 +746,11 @@ void TimeSaverOnVanillaBehaviorHandler(GIVanillaBehavior id, bool* should, va_li
             }
             break;
         case VB_DAMPE_GRAVEDIGGING_GRAND_PRIZE_BE_HEART_PIECE:
-            if (CVarGetInteger(CVAR_ENHANCEMENT("GravediggingTourFix"), 0) || IS_RANDO) {
-                *should = !Flags_GetCollectible(gPlayState, COLLECTFLAG_GRAVEDIGGING_HEART_PIECE);
-            }
+            *should = !Flags_GetCollectible(gPlayState, COLLECTFLAG_GRAVEDIGGING_HEART_PIECE);
             break;
         case VB_FIX_SAW_SOFTLOCK:
             // Animation Count should be no more than 1 to guarantee putaway is complete after giving the saw
-            // As this is vanilla behavior, it only applies with the Fix toggle or Skip Text enabled.
-            *should = (CVarGetInteger(CVAR_ENHANCEMENT("FixSawSoftlock"), 0) != 0 ||
-                       CVarGetInteger(CVAR_ENHANCEMENT("SkipText"), 0) != 0)
-                          ? gPlayState->animationCtx.animationCount > 1
-                          : *should;
+            *should = gPlayState->animationCtx.animationCount > 1;
             break;
         case VB_BIGGORON_CONSIDER_SWORD_FORGED:
             *should = Environment_GetBgsDayCount() >= CVarGetInteger(CVAR_ENHANCEMENT("ForgeTime"), 3);

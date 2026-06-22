@@ -277,13 +277,7 @@ void func_809FE040(EnDu* this) {
         if (this->unk_1E6 >= 8) {
             this->unk_1E6 = 0;
         }
-        // #region SOH[Enhancement]
-        if (CVarGetInteger(CVAR_ENHANCEMENT("FixDaruniaDanceSpeed"), 1)) {
-            Animation_ChangeByInfo(&this->skelAnime, sAnimationInfoFix, animationIndices[this->unk_1E6]);
-            // #endregion
-        } else {
-            Animation_ChangeByInfo(&this->skelAnime, sAnimationInfo, animationIndices[this->unk_1E6]);
-        }
+        Animation_ChangeByInfo(&this->skelAnime, sAnimationInfoFix, animationIndices[this->unk_1E6]);
     }
 }
 
@@ -299,10 +293,8 @@ void func_809FE104(EnDu* this) {
         if (Animation_OnFrame(&this->skelAnime, this->skelAnime.endFrame)) {
             this->unk_1E6++;
             if (this->unk_1E6 < 4) {
-                // #region SOH[Enhancement]
-                if (CVarGetInteger(CVAR_ENHANCEMENT("FixDaruniaDanceSpeed"), 1) && this->unk_1E6 <= 1) {
+                if (this->unk_1E6 <= 1) {
                     Animation_ChangeByInfo(&this->skelAnime, sAnimationInfoFix, animationIndices[this->unk_1E6]);
-                    // #endregion
                 } else {
                     Animation_ChangeByInfo(&this->skelAnime, sAnimationInfo, animationIndices[this->unk_1E6]);
                 }
@@ -497,13 +489,7 @@ void func_809FE890(EnDu* this, PlayState* play) {
             }
             if (csAction->action == 7 || csAction->action == 8) {
                 this->unk_1E6 = 0;
-                // #region SOH[Enhancement]
-                if (CVarGetInteger(CVAR_ENHANCEMENT("FixDaruniaDanceSpeed"), 1)) {
-                    Animation_ChangeByInfo(&this->skelAnime, sAnimationInfoFix, ENDU_ANIM_7);
-                    // #endregion
-                } else {
-                    Animation_ChangeByInfo(&this->skelAnime, sAnimationInfo, ENDU_ANIM_7);
-                }
+                Animation_ChangeByInfo(&this->skelAnime, sAnimationInfoFix, ENDU_ANIM_7);
             }
             this->unk_1EA = csAction->action;
             if (this->unk_1EA == 7) {

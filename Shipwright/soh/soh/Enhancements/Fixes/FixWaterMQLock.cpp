@@ -20,7 +20,7 @@ static void OnInitEnDoor(void* refActor) {
 }
 
 static void RegisterMQWaterLockFix() {
-    COND_ID_HOOK(OnActorInit, ACTOR_EN_DOOR, IS_RANDO || CVAR_MQ_WATER_LOCK_VALUE, OnInitEnDoor);
+    COND_ID_HOOK(OnActorInit, ACTOR_EN_DOOR, true, OnInitEnDoor);
 }
 
 static RegisterShipInitFunc initFunc(RegisterMQWaterLockFix, { CVAR_MQ_WATER_LOCK_FIX_NAME, "IS_RANDO" });

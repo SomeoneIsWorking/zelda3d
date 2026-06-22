@@ -8,7 +8,7 @@ s32 EnKo_GetForestQuestState(EnKo*);
 }
 
 void RegisterFixKokiriForestQuestState() {
-    COND_VB_SHOULD(VB_KOKIRI_GET_FOREST_QUEST_STATE2, CVarGetInteger(CVAR_ENHANCEMENT("FixKokiriForestQuestState"), 0),
+    COND_VB_SHOULD(VB_KOKIRI_GET_FOREST_QUEST_STATE2, true,
                    {
                        EnKo* enKo = va_arg(args, EnKo*);
                        enKo->forestQuestState = EnKo_GetForestQuestState(enKo);

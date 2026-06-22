@@ -2112,30 +2112,18 @@ void KaleidoScope_DrawInfoPanel(PlayState* play) {
 
     gSPDisplayList(POLY_OPA_DISP++, gItemNamePanelDL);
 
-    if (CVarGetInteger(CVAR_ENHANCEMENT("FixMenuLR"), 0) == 0) { // Restore the misplace gDPSetPrimColor
-        gDPSetPrimColor(POLY_OPA_DISP++, 0, 0, 90, 100, 130, 255);
-    }
-
     if ((pauseCtx->cursorSpecialPos == PAUSE_CURSOR_PAGE_LEFT) && (pauseCtx->unk_1E4 == 0)) {
         gDPSetPrimColor(POLY_OPA_DISP++, 0, 0, D_808321A0, D_808321A2, D_808321A4, D_808321A6);
     } else {
-        if (CVarGetInteger(CVAR_ENHANCEMENT("FixMenuLR"), 0) != 0) {
-            gDPSetPrimColor(POLY_OPA_DISP++, 0, 0, 180, 210, 255, 255);
-        }
+        gDPSetPrimColor(POLY_OPA_DISP++, 0, 0, 180, 210, 255, 255);
     }
 
     gSPDisplayList(POLY_OPA_DISP++, gLButtonIconDL);
 
-    if (CVarGetInteger(CVAR_ENHANCEMENT("FixMenuLR"), 0) == 0) { // Restore the misplace gDPSetPrimColor
-        gDPSetPrimColor(POLY_OPA_DISP++, 0, 0, 180, 210, 255, 255);
-    }
-
     if ((pauseCtx->cursorSpecialPos == PAUSE_CURSOR_PAGE_RIGHT) && (pauseCtx->unk_1E4 == 0)) {
         gDPSetPrimColor(POLY_OPA_DISP++, 0, 0, D_808321A0, D_808321A2, D_808321A4, D_808321A6);
     } else {
-        if (CVarGetInteger(CVAR_ENHANCEMENT("FixMenuLR"), 0) != 0) {
-            gDPSetPrimColor(POLY_OPA_DISP++, 0, 0, 180, 210, 255, 255);
-        }
+        gDPSetPrimColor(POLY_OPA_DISP++, 0, 0, 180, 210, 255, 255);
     }
 
     gSPDisplayList(POLY_OPA_DISP++, gRButtonIconDL);

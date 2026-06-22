@@ -1000,9 +1000,7 @@ void Minimap_Draw(PlayState* play) {
                         // dimension or hide them entirely if the fix is applied
                         if (gMapData->owEntranceIconPosY[sEntranceIconMapIndex] == 0) {
                             entranceY = 0;
-                            entranceX = CVarGetInteger(CVAR_ENHANCEMENT("FixDungeonMinimapIcon"), 0)
-                                            ? -9999
-                                            : OTRGetRectDimensionFromLeftEdge(0);
+                            entranceX = -9999;
                         }
 
                         //! @bug UB: sEntranceIconMapIndex can be up to 23 and is accessing owEntranceFlag which is size
