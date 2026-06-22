@@ -572,52 +572,12 @@ void Fast3dGui::DrawGame() {
 
     GetGameOverlay()->Draw();
 
-    ImVec2 mainPos = ImGui::GetWindowPos();
-    ImVec2 size = ImGui::GetContentRegionAvail();
-    ImVec2 pos = ImVec2(0, 0);
-    const auto interpreter = mInterpreter.lock().get();
-
-    if (Ship::Context::GetRawInstance()->GetConsoleVariables()->GetInteger(CVAR_LOW_RES_MODE, 0) ==
-        1) { // N64 Mode takes priority
-        const float sw = size.y * 320.0f / 240.0f;
-        pos = ImVec2(floor(size.x / 2 - sw / 2), 0);
-        size = ImVec2(sw, size.y);
-    } else if (Ship::Context::GetRawInstance()->GetConsoleVariables()->GetInteger(
-                   CVAR_PREFIX_ADVANCED_RESOLUTION ".Enabled", 0)) {
-        if (!Ship::Context::GetRawInstance()->GetConsoleVariables()->GetInteger(
-                CVAR_PREFIX_ADVANCED_RESOLUTION ".PixelPerfectMode", 0)) {
-            if (!Ship::Context::GetRawInstance()->GetConsoleVariables()->GetInteger(
-                    CVAR_PREFIX_ADVANCED_RESOLUTION ".IgnoreAspectCorrection", 0)) {
-                float sWdth = size.y * interpreter->mCurDimensions.width / interpreter->mCurDimensions.height;
-                float sHght = size.x * interpreter->mCurDimensions.height / interpreter->mCurDimensions.width;
-
-                float sPosX = floor(size.x / 2.0f - sWdth / 2.0f);
-                float sPosY = floor(size.y / 2.0f - sHght / 2.0f);
-                if (sPosY < 0.0f) { // pillarbox
-                    sPosY = 0.0f;   // clamp y position
-                    sHght = size.y; // reset height
-                }
-                if (sPosX < 0.0f) { // letterbox
-                    sPosX = 0.0f;   // clamp x position
-                    sWdth = size.x; // reset width
-                }
-                pos = ImVec2(sPosX, sPosY);
-                size = ImVec2(sWdth, sHght);
-            }
-        } else { // in pixel perfect mode it's much easier
-            const int factor = GetIntegerScaleFactor();
-            float sPosX = floor(size.x / 2.0f - (interpreter->mCurDimensions.width * factor) / 2.0f);
-            float sPosY = floor(size.y / 2.0f - (interpreter->mCurDimensions.height * factor) / 2.0f);
-            pos = ImVec2(sPosX, sPosY);
-            size = ImVec2(float(interpreter->mCurDimensions.width) * factor,
-                          float(interpreter->mCurDimensions.height) * factor);
-        }
-    }
-    uintptr_t fb = Ship::Context::GetRawInstance()->GetWindow()->GetGfxFrameBuffer();
-    if (fb) {
-        ImGui::SetCursorPos(pos);
-        ImGui::Image(reinterpret_cast<ImTextureID>(fb), size);
-    }
+    // ONE render path: the game frame is composited onto fb 0 natively by the interpreter
+    // (Interpreter::Run/RunGuiOnly -> CopyFramebuffer(0, mGameFb, ...)) and fb 0 is presented
+    // directly, for EVERY backend. The old ImGui::Image(GetGfxFrameBuffer()) composite (with its
+    // letterbox/aspect math) that drew the game through ImGui on GL/Metal/DX11 has been removed --
+    // the game no longer depends on ImGui to reach the screen. This "Main Game" window now only
+    // hosts the game overlay; ImGui draws overlays/dev-tools on top of the already-present frame.
 
     ImGui::End();
 }
@@ -679,7 +639,8 @@ void Fast3dGui::ApplyResolutionChanges() {
     // apply new dimensions
     interpreter->mCurDimensions.width = newWidth;
     interpreter->mCurDimensions.height = newHeight;
-    // centring the image is done in Fast3dGui::DrawGame().
+    // The game frame is now composited full-window onto fb 0 by the interpreter (one render path);
+    // there is no longer an ImGui::Image letterbox step in DrawGame to centre it.
 }
 
 int16_t Fast3dGui::GetIntegerScaleFactor() {

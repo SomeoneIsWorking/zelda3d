@@ -5369,18 +5369,15 @@ void Interpreter::RunGuiOnly() {
         } else {
             mGfxFrameBuffer = (uintptr_t)mRapi->GetFramebufferTextureId(mGameFb);
         }
-        // The Vulkan backend presents fb 0 directly via a swapchain blit; the ImGui
-        // DrawGame() composite that copies the game image (mGameFb) onto fb 0 is only
-        // wired for the GL/Metal backends. Without it fb 0 stays cleared and the screen
-        // is black except for RmlUi (which renders on its own Vulkan interface). macOS
-        // ALWAYS takes this mRendersToFb path because ViewportMatchesRendererResolution()
-        // is hardcoded false there for retina, so it was always black. Composite the game
-        // image onto fb 0 ourselves (stretch-blit) so the present shows the world.
-        if (Ship::Context::GetRawInstance()->GetWindow()->GetWindowBackend() == FAST3D_SDL_VULKAN &&
-            !(mMsaaLevel > 1 && ViewportMatchesRendererResolution())) {
+        // ONE render path: composite the game image (mGameFb) onto fb 0 ourselves for EVERY
+        // backend, then fb 0 is presented. Previously only Vulkan did this natively while
+        // GL/Metal/DX11 relied on ImGui::Image in Fast3dGui::DrawGame to draw mGameFb -- that
+        // ImGui game-composite has been removed, so this native blit is now the sole path for
+        // the game frame. Per-backend Y is handled inside CopyFramebuffer (GL flips by src/dst
+        // invertY; Vulkan stores mGameFb top-down like fb 0 and blits straight). Skip only the
+        // case the MSAA resolve above already wrote fb 0 directly (MSAA at window resolution).
+        if (!(mMsaaLevel > 1 && ViewportMatchesRendererResolution())) {
             int srcFb = (mMsaaLevel > 1) ? mGameFbMsaaResolved : mGameFb;
-            // Straight blit: mGameFb is now stored top-down like fb 0 (openglInvertY=false above),
-            // and fb 0 is presented without a flip, so no Y compensation is needed here.
             mRapi->CopyFramebuffer(0, srcFb, 0, 0, mCurDimensions.width, mCurDimensions.height, 0, 0,
                                    mGfxCurrentWindowDimensions.width, mGfxCurrentWindowDimensions.height);
         }
@@ -5484,18 +5481,15 @@ void Interpreter::Run(Gfx* commands, const std::unordered_map<Mtx*, MtxF>& mtx_r
         } else {
             mGfxFrameBuffer = (uintptr_t)mRapi->GetFramebufferTextureId(mGameFb);
         }
-        // The Vulkan backend presents fb 0 directly via a swapchain blit; the ImGui
-        // DrawGame() composite that copies the game image (mGameFb) onto fb 0 is only
-        // wired for the GL/Metal backends. Without it fb 0 stays cleared and the screen
-        // is black except for RmlUi (which renders on its own Vulkan interface). macOS
-        // ALWAYS takes this mRendersToFb path because ViewportMatchesRendererResolution()
-        // is hardcoded false there for retina, so it was always black. Composite the game
-        // image onto fb 0 ourselves (stretch-blit) so the present shows the world.
-        if (Ship::Context::GetRawInstance()->GetWindow()->GetWindowBackend() == FAST3D_SDL_VULKAN &&
-            !(mMsaaLevel > 1 && ViewportMatchesRendererResolution())) {
+        // ONE render path: composite the game image (mGameFb) onto fb 0 ourselves for EVERY
+        // backend, then fb 0 is presented. Previously only Vulkan did this natively while
+        // GL/Metal/DX11 relied on ImGui::Image in Fast3dGui::DrawGame to draw mGameFb -- that
+        // ImGui game-composite has been removed, so this native blit is now the sole path for
+        // the game frame. Per-backend Y is handled inside CopyFramebuffer (GL flips by src/dst
+        // invertY; Vulkan stores mGameFb top-down like fb 0 and blits straight). Skip only the
+        // case the MSAA resolve above already wrote fb 0 directly (MSAA at window resolution).
+        if (!(mMsaaLevel > 1 && ViewportMatchesRendererResolution())) {
             int srcFb = (mMsaaLevel > 1) ? mGameFbMsaaResolved : mGameFb;
-            // Straight blit: mGameFb is now stored top-down like fb 0 (openglInvertY=false above),
-            // and fb 0 is presented without a flip, so no Y compensation is needed here.
             mRapi->CopyFramebuffer(0, srcFb, 0, 0, mCurDimensions.width, mCurDimensions.height, 0, 0,
                                    mGfxCurrentWindowDimensions.width, mGfxCurrentWindowDimensions.height);
         }
