@@ -1,5 +1,23 @@
 # Implementation spec: per-limb material/facial + mesh-show/hide override channel (keystone #3 / P0)
 
+> ## ✅ IMPLEMENTED (commit eaf2075, kanban #94, 2026-06-22)
+> The facial eye/mouth material-anim channel and the Saria ocarina mesh-toggle are BUILT and the
+> eye swap is **live-verified** (En_Ko girl, Kokiri Forest: forcing the frame swaps the on-screen eye
+> texture open↔closed — `scratch/screenshots/facial_eye_ab.png`). Key realities vs this spec:
+> - The cmab does NOT have a `tex `/`strt`-pair the way Part A2 imagined: it has header+0x18 → `strt`
+>   (frame-name table, count at strt+4) and header+0x1c → `texDataOffset` (frames concatenated raw,
+>   each = the CMB base eye/mouth texture's size+format). No per-frame headers — slice evenly by the
+>   base `data_len`. Implemented in `soh3d_model.cpp appendFacialFrames()` (NOT `SoH3D_FindFaceTexFrame`
+>   over CMB textures, which can't work — frames aren't in the CMB).
+> - Channel = `SoH3D_GL_SetMatTexOverride` (GL + Vulkan), driven by `soh3d_anim_override.cpp`
+>   FacialActor table reading the N64 eye/mouth index. REPL `facial 0|1`, `faceframe <n>`.
+> - Ocarina = `SoH3D_AutoActorMidMask` (En_Sa, scene 0x56). Material slots/offsets per the resolved
+>   unknowns below were all correct.
+> - **Still TODO:** live-confirm mouth + ocarina (needs Saria in the Meadow); facial tables for
+>   Mido/Malon/En_Hy (dump pass needed); En_Sa blink-overlay mesh (optional). See kanban #94.
+
+
+
 READ-ONLY research spec, 2026-06-22. Closes the last gap in the CSAB auto-draw framework
 (`docs/skeletal_parity_backlog.md` P0): **frozen faces** (no eye-blink / mouth) on every NPC, and
 **missing held items** (Saria's ocarina). Ground truth: `oot3d-decomp/docs/enko_override_and_ensa_facial.md`.
