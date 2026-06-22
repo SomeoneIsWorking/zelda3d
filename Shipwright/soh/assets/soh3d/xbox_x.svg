@@ -1,0 +1,15 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!-- Xbox face-button glyph: X (blue). See xbox_a.svg. -->
+<svg xmlns="http://www.w3.org/2000/svg" width="64" height="64" viewBox="0 0 64 64">
+  <defs>
+    <radialGradient id="g" cx="38%" cy="32%" r="75%">
+      <stop offset="0%"  stop-color="#5AA0FF"/>
+      <stop offset="60%" stop-color="#1E6FE0"/>
+      <stop offset="100%" stop-color="#103F8C"/>
+    </radialGradient>
+  </defs>
+  <circle cx="32" cy="32" r="29" fill="url(#g)" stroke="#0A2654" stroke-width="3"/>
+  <text x="32" y="33" text-anchor="middle" dominant-baseline="central"
+        font-family="DejaVu Sans, Arial, sans-serif" font-weight="bold" font-size="40"
+        fill="#FFFFFF" stroke="#0A2654" stroke-width="1.2">X</text>
+</svg>
