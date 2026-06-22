@@ -56,6 +56,16 @@ Fast3dWindow::Fast3dWindow() : Fast3dWindow(std::vector<std::shared_ptr<Ship::Gu
 
 Fast3dWindow::~Fast3dWindow() {
     SPDLOG_DEBUG("destruct fast3dwindow");
+    // Tear down the GUI (ImGui + RmlUi) BEFORE the rendering API: the RmlUi Vulkan render interface
+    // owns device-allocated resources (buffers/images/pipeline) and frees them in its destructor.
+    // C++ destroys this derived subobject before the base Window, whose ~Window would otherwise run
+    // ShutDownImGui only AFTER `delete mRenderingApi` has already destroyed the VkDevice -> Rml's
+    // vkDeviceWaitIdle/vkDestroy* would hit a dead device (validation errors + SIGSEGV). Doing it
+    // here keeps the device alive for the GUI teardown; ShutDownImGui is idempotent so the base
+    // Window::~Window second call is a no-op. (Also correct for GL: the context is still current.)
+    if (auto gui = GetGui()) {
+        gui->ShutDownImGui(this);
+    }
     mInterpreter->Destroy();
     delete mRenderingApi;
     delete mWindowManagerApi;

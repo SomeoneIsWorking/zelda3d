@@ -109,6 +109,13 @@ void Gui::ImGuiWMInit() {
 }
 
 void Gui::ShutDownImGui(Ship::Window* window) {
+    // Idempotent: Fast3dWindow::~Fast3dWindow calls this BEFORE deleting the rendering API so the
+    // RmlUi/ImGui backend resources are freed while the (Vulkan) device is still alive; the base
+    // Window::~Window then calls it a second time. Guard so the second call is a no-op.
+    if (mShutDown) {
+        return;
+    }
+    mShutDown = true;
     ImGuiWMShutdown();
     ImGuiBackendShutdown();
     ImGui::DestroyContext();
