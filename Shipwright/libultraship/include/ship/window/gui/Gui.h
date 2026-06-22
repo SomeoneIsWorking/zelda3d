@@ -232,6 +232,7 @@ class Gui {
     std::map<std::string, std::shared_ptr<GuiWindow>> mGuiWindows; ///< Registered window map (name → window).
 
   private:
+    bool mShutDown = false; ///< Guards ShutDownImGui against being run twice (see ShutDownImGui).
     bool mNeedsConsoleVariableSave;
     std::string mImGuiIniPath;
     std::string mImGuiLogPath;

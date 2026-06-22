@@ -519,6 +519,14 @@ static void RunFrame() {
     osSyncPrintf("グラフィックスレッド実行終了\n"); // "End of graphic thread execution"
 
     // Graph_Update(gfxCtxTest, gameStateTest);
+    // This exit(0) (reached when the game's overlay state machine fully ends) terminates the
+    // process directly, bypassing main()'s post-Main() DeinitOTR(). Run the clean shutdown
+    // explicitly first: OTRAudio_Exit() stops+joins the audio thread BEFORE exit()'s static
+    // destructors tear down the Context, otherwise the still-running audio thread dereferences the
+    // freed AudioPlayer (SIGSEGV). It also tears down the GUI/window/rendering API in order.
+    // (The window-close path instead returns through Graph_ThreadEntry -> Main() -> main()'s
+    // DeinitOTR(); the audio-thread teardown race on THAT path is tracked separately.)
+    DeinitOTR();
     exit(0);
 }
 
