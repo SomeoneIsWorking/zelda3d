@@ -3249,6 +3249,19 @@ static void SoH3D_ReplExec(PlayState* play, char* line, const char* outPath) {
         play->transitionTrigger = TRANS_TRIGGER_START;
         play->transitionType = TRANS_TYPE_FADE_BLACK;
         SoH3D_ReplReply(outPath, "warp -> entrance 0x%x (%d)", iv, iv);
+    } else if (strcmp(cmd, "eventflag") == 0 &&
+               (iv2 = 1, sscanf(line, "%*s %i %i", &iv, &iv2) >= 1)) {
+        // Generic save-flag primitive: set/clear an EVENTCHKINF flag (the (index<<4)|shift
+        // encoded value, decimal or 0x-hex), then read it back. Many actors gate their very
+        // spawn on a flag in Init (e.g. En_Sa is Actor_Kill'd in the Sacred Forest Meadow
+        // unless EVENTCHKINF_OBTAINED_ZELDAS_LETTER=0x40 is set), so combine with a `warp`
+        // to that scene to make the actor appear. Default (one arg) = set; second arg 0=clear.
+        if (iv2 == 0) {
+            Flags_UnsetEventChkInf(iv);
+        } else {
+            Flags_SetEventChkInf(iv);
+        }
+        SoH3D_ReplReply(outPath, "eventflag 0x%x -> %d", iv, Flags_GetEventChkInf(iv) ? 1 : 0);
     } else if (strcmp(cmd, "age") == 0 && sscanf(line, "%*s %i", &iv) == 1) {
         // Toggle Link's age (0=adult, 1=child) so we can test the boy/adult equipment path.
         // Player_InitImpl copies play->linkAgeOnLoad -> gSaveContext.linkAge on (re)load

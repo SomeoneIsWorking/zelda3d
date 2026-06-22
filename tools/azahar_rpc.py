@@ -99,6 +99,20 @@ class Rpc:
                 break
         return buf
 
+    def write(self, addr, data):
+        """Write raw bytes to a 3DS vaddr (chunked at 1024B/req). WriteMemory: arg1=vaddr,arg2=size."""
+        off = 0
+        while off < len(data):
+            chunk = data[off:off + 1024]
+            self._req(WRITEMEM, addr + off, len(chunk), chunk)
+            off += len(chunk)
+
+    def write_f32(self, addr, value):
+        self.write(addr, struct.pack("<f", float(value)))
+
+    def write32(self, addr, value):
+        self.write(addr, struct.pack("<I", value & 0xFFFFFFFF))
+
     def read32(self, addr):
         b = self.read(addr, 4)
         return struct.unpack("<I", b)[0] if len(b) >= 4 else None
