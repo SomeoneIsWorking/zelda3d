@@ -3,11 +3,11 @@
 > **Generated mirror — do not hand-edit.** Source of truth = GitHub Issues on
 > `SomeoneIsWorking/soh3d` (private). Regenerate with `tools/kanban.py render`.
 > Move a card with `tools/kanban.py mv <#> <column>`; add with `tools/kanban.py add`.
-> Columns: todo · in-progress · in-review · needs-confirmation · reopened · blocked · done(=closed).  Updated 2026-06-22 10:23.
+> Columns: todo · in-progress · in-review · needs-confirmation · reopened · blocked · done(=closed).  Updated 2026-06-22 11:25.
 
-**Counts:** todo:11 | in-progress:2 | in-review:0 | needs-confirmation:34 | reopened:2 | blocked:2 | done:41
+**Counts:** todo:12 | in-progress:2 | in-review:0 | needs-confirmation:34 | reopened:2 | blocked:2 | done:41
 
-## 📋 To Do  (11)
+## 📋 To Do  (12)
 - [#17](../../issues/17) Hi-res world/scene textures (texpack) _(render)_
 - [#33](../../issues/33) More foliage / vegetation density (lowest priority) _(scene)_
 - [#70](../../issues/70) Link roll animation broken (3DS Link) _(anim,link)_
@@ -19,6 +19,7 @@
 - [#89](../../issues/89) Tooling: export authoritative per-actor variant+animation from OoT3D (Azahar oracle) — base SoH3D on 3DS not N64
 - [#91](../../issues/91) Vulkan/Wayland swapchain teardown double-free on window close _(render,crash)_
 - [#92](../../issues/92) Replicate OoT3D title screen scene (visually indistinguishable) _(render,camera,scene)_
+- [#93](../../issues/93) Kokiri (En_Ko) don't head-track the player (CSAB path drops limb overrides) _(anim,link)_
 
 ## 🔨 In Progress  (2)
 - [#29](../../issues/29) Giant boulder overlaps the Temple of Time (Market) _(render,scene)_
