@@ -273,6 +273,16 @@ static const FacialAsset kFacialAssets[] = {
     { "zelda_sa.zar",  { { "saria_eye.cmab", 2 }, { "saria_mouth.cmab", 3 }, { nullptr, -1 } } },
     { "zelda_km1.zar", { { "kokirimaster_eye.cmab", 1 }, { nullptr, -1 }, { nullptr, -1 } } },
     { "zelda_kw1.zar", { { "kokiripeople_a_eye.cmab", 1 }, { "kokiripeople_b_eye.cmab", 2 }, { nullptr, -1 } } },
+    // Mido / Malon / En_Hy townsfolk (keystone #3 extension). Material slots + cmab names dumped per
+    // ZAR (tools/face_cmb_dump.py + cmab strt names); cross-checked vs OoT3D draw decomp for the slot.
+    { "zelda_md.zar",  { { "mido_eye.cmab", 1 }, { nullptr, -1 }, { nullptr, -1 } } },
+    { "zelda_ma1.zar", { { "childmalon_eye.cmab", 3 }, { "childmalon_mouth.cmab", 4 }, { nullptr, -1 } } },
+    { "zelda_ma2.zar", { { "malon_eye.cmab", 4 }, { "malon_mouth.cmab", 5 }, { nullptr, -1 } } },
+    { "zelda_boj.zar", { { "hyliaman1_eye.cmab", 3 }, { nullptr, -1 }, { nullptr, -1 } } },
+    { "zelda_ahg.zar", { { "hyliaman2_eye.cmab", 3 }, { nullptr, -1 }, { nullptr, -1 } } },
+    { "zelda_bji.zar", { { "hyliaoldman_eye.cmab", 3 }, { nullptr, -1 }, { nullptr, -1 } } },
+    { "zelda_aob.zar", { { "hyliawoman1_eye.cmab", 1 }, { nullptr, -1 }, { nullptr, -1 } } },
+    { "zelda_bob.zar", { { "hyliawoman3_eye.cmab", 1 }, { nullptr, -1 }, { nullptr, -1 } } },
 };
 
 static bool strEndsWith(const std::string& s, const char* suf) {

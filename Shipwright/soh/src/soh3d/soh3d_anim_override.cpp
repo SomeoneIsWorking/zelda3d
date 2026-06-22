@@ -132,6 +132,26 @@ constexpr FacialActor kFacialActors[] = {
     { "/actor/zelda_sa.zar",  0x212, 0x216, 2, 3, kEnSaMouthRemap, (int)(sizeof(kEnSaMouthRemap)) },
     { "/actor/zelda_km1.zar", 0x216, -1, 1, -1, nullptr, 0 },
     { "/actor/zelda_kw1.zar", 0x216, -1, -2, -1, nullptr, 0 },
+    // En_Md Mido (eye only, no mouth): N64 eyeIdx @ 0x20E (z_en_md.h). CMB eye mat 1 (md_eye01_CI01).
+    // OoT3D EnMd_Draw 0x1b72b4 sets matAnim slot 0 = eyeIdx DIRECT (no remap; the +0x480 block is the
+    // optional blink overlay).
+    { "/actor/zelda_md.zar",  0x20E, -1, 1, -1, nullptr, 0 },
+    // En_Ma1 child Malon: N64 eyeIndex @ 0x1E4, mouthIndex @ 0x1E6 (z_en_ma1.h). CMB eye mat 3 / mouth
+    // mat 4. OoT3D EnMa1_Draw 0x1d9d50 sets slot 0=eye, slot 1=mouth BOTH DIRECT (no remap — unlike
+    // En_Sa). N64 sEye/sMouthTextures {Open,Half,Closed}/{Neutral,Smiling,Talking} == cmab order.
+    { "/actor/zelda_ma1.zar", 0x1E4, 0x1E6, 3, 4, nullptr, 0 },
+    // En_Ma2/Ma3 adult Malon: N64 eyeIndex @ 0x20E, mouthIndex @ 0x210 (z_en_ma2.h). CMB eye mat 4 /
+    // mouth mat 5. OoT3D EnMa2_Draw 0x1da000 slot 0=eye, slot 1=mouth DIRECT.
+    { "/actor/zelda_ma2.zar", 0x20E, 0x210, 4, 5, nullptr, 0 },
+    // En_Hy townsfolk (eye only, no mouth): N64 curEyeIndex @ 0x218 (z_en_hy.h); each indexes its
+    // per-archetype sEyeTextures {Open,Half,Closed} DIRECTLY. Per OoT3D body zar: CMB eye material is
+    // 3 for the men (boj/ahg/bji) and 1 for the women (aob/bob). cne/cob/bba have no eye-anim (no N64
+    // eye array, no eye cmab) — omitted.
+    { "/actor/zelda_boj.zar", 0x218, -1, 3, -1, nullptr, 0 },
+    { "/actor/zelda_ahg.zar", 0x218, -1, 3, -1, nullptr, 0 },
+    { "/actor/zelda_bji.zar", 0x218, -1, 3, -1, nullptr, 0 },
+    { "/actor/zelda_aob.zar", 0x218, -1, 1, -1, nullptr, 0 },
+    { "/actor/zelda_bob.zar", 0x218, -1, 1, -1, nullptr, 0 },
 };
 
 // ENKO_TYPE_CHILD_FADO = 12 (z_en_ko.h KokiriChildren enum). Actor.params is an s16 @ N64 offset
