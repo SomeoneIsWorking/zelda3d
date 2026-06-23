@@ -796,7 +796,7 @@ static const SoH3DAnimMap kSoH3dAnimMaps[] = {
     SOH3D_ANIMMAP("objects/object_ru1/gRutoChildSquirmAnim", "koruto_jitabata"),
     SOH3D_ANIMMAP("objects/object_ru1/gRutoChildSeesSapphireAnim", "koruto_jitabata"),
     SOH3D_ANIMMAP("objects/object_ru1/gRutoChildShutterAnim", "koruto_banzai_modoru"),
-    SOH3D_ANIMMAP("objects/object_ru1/gRutoChildWalkToAndHoldUpSapphireAnim", "koruto_walk_2"),
+    SOH3D_ANIMMAP("objects/object_ru1/gRutoChildWalkToAndHoldUpSapphireAnim", "koruto_run_banzai"),
     SOH3D_ANIMMAP("objects/object_ru1/gRutoChildSittingAnim", "demo_suwari"),
     SOH3D_ANIMMAP("objects/object_ru1/gRutoChildSitAnim", "demo_suwari"),
     SOH3D_ANIMMAP("objects/object_ru1/gRutoChildWalkAnim", "koruto_walk_2"),
