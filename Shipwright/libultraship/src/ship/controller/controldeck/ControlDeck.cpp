@@ -26,7 +26,9 @@ ControlDeck::~ControlDeck() {
 // mapping table changes (LUS::ControllerDefaultMappings::SetDefaultKeyboardKeyToButtonMappings).
 // On startup, if the stored scheme version in the config doesn't match, existing keyboard
 // bindings are wiped and the new defaults are written — a one-time migration per user.
-static constexpr int kSoH3dInputSchemeVersion = 1;
+// v2: BTN_START moved off Escape onto Enter, so Escape only opens the RmlUi menu (was opening the
+//     N64 pause/inventory AND the menu). Bumping re-migrates existing configs to the new defaults.
+static constexpr int kSoH3dInputSchemeVersion = 2;
 static constexpr const char* kSoH3dInputSchemeVersionCvar = "gSoH3dInputSchemeVersion";
 
 void ControlDeck::Init(uint8_t* controllerBits) {
