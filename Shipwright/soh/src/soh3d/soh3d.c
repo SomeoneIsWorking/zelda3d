@@ -578,6 +578,194 @@ void SoH3D_HotbarSync(PlayState* play) {
     }
 }
 
+// ---- PC HUD (native Vulkan, soh3d_hud_vk.cpp) -----------------------------------------------
+// The in-game HUD rendered directly through the Vulkan backend (user directive 2026-06-23): a
+// modern PC layout drawing the real HD textures, replacing both the N64 Fast3D HUD and RmlUi.
+// soh3d.c owns the LAYOUT (sized from the gSoH3dHudState snapshot); the C-ABI below (implemented
+// in libultraship/src/fast/soh3d_hud_vk.cpp) owns the Vulkan textured-quad drawing.
+extern int  SoH3D_Hud_Available(void);
+extern int  SoH3D_Hud_Begin(int* outW, int* outH);
+extern int  SoH3D_Hud_Tex(const void* key, const void* rgba, int w, int h);
+extern void SoH3D_Hud_Draw(int tex, float x, float y, float w, float h, float u0, float v0, float u1,
+                           float v1, unsigned int tintRGBA);
+extern void SoH3D_Hud_End(void);
+
+int gSoH3dPcHud = -1; // -1=uninit, 0=off, 1=on
+int SoH3D_PcHudEnabled(void) {
+    if (gSoH3dPcHud < 0) {
+        const char* v = getenv("SOH3D_PCHUD");
+        gSoH3dPcHud = (v != NULL && v[0] == '0') ? 0 : 1;
+    }
+    // Only active when the Vulkan HUD layer is live; a GL build keeps the native HUD as fallback.
+    return gSoH3dPcHud && SoH3D_Hud_Available();
+}
+
+SoH3dHudState gSoH3dHudState = { 0 };
+
+void SoH3D_HudUpdateFrame(PlayState* play) {
+    (void)play;
+    if (!SoH3D_PcHudEnabled()) {
+        return;
+    }
+    gSoH3dHudState.health         = gSaveContext.health;
+    gSoH3dHudState.healthCapacity = gSaveContext.healthCapacity;
+    gSoH3dHudState.magic          = (int)(u8)gSaveContext.magic;
+    gSoH3dHudState.magicCapacity  = gSaveContext.magicCapacity;
+    gSoH3dHudState.magicLevel     = gSaveContext.magicLevel;
+    gSoH3dHudState.rupees         = gSaveContext.rupees;
+    for (int i = 0; i < 6; i++) {
+        gSoH3dHudState.hotbarItems[i] = gSoH3dHotbarItems[i];
+    }
+    gSoH3dHudState.hotbarActive = gSoH3dHotbarActive;
+    gSoH3dHudState.inputDevice  = SoH3D_InputDevice();
+    gSoH3dHudState.valid        = 1;
+}
+
+// Draw a texture obtained from one of the SoH3D_*Tex accessors (or gItemIcons). `buf` is the RGBA32
+// pointer (also used as the upload cache key); (tw,th) its dimensions; the quad is (x,y,w,h) px.
+static void SoH3D_HudBlit(const void* buf, int tw, int th, float x, float y, float w, float h,
+                          unsigned int tint) {
+    if (buf == NULL || tw <= 0 || th <= 0) {
+        return;
+    }
+    int id = SoH3D_Hud_Tex(buf, buf, tw, th);
+    if (id == 0) {
+        return;
+    }
+    SoH3D_Hud_Draw(id, x, y, w, h, 0.0f, 0.0f, 1.0f, 1.0f, tint);
+}
+
+// Solid (untextured) tinted rectangle — panels, magic bar, highlights.
+static void SoH3D_HudRect(float x, float y, float w, float h, unsigned int tint) {
+    SoH3D_Hud_Draw(0, x, y, w, h, 0.0f, 0.0f, 1.0f, 1.0f, tint);
+}
+
+void SoH3D_HudFrame(void) {
+    if (!SoH3D_PcHudEnabled()) {
+        return;
+    }
+    const SoH3dHudState* s = &gSoH3dHudState;
+    if (!s->valid) {
+        return;
+    }
+    int W = 0, H = 0;
+    if (!SoH3D_Hud_Begin(&W, &H)) {
+        return;
+    }
+    // Layout authored in 720p units, scaled by framebuffer height for resolution independence.
+    const float sc = (H > 0 ? (float)H : 720.0f) / 720.0f;
+    const float margin = 18.0f * sc;
+
+    // ---- Hearts (top-left) -------------------------------------------------------------------
+    const float heart = 30.0f * sc;
+    const float hgap = 2.0f * sc;
+    const int FULL = 16; // quarter-hearts per container (FULL_HEART_HEALTH)
+    int containers = s->healthCapacity / FULL;
+    if (containers < 1) {
+        containers = 1;
+    }
+    const int perRow = 10;
+    for (int i = 0; i < containers; i++) {
+        int rem = s->health - i * FULL;
+        int kind;
+        if (rem >= FULL)      kind = SOH3D_HEART_FULL;
+        else if (rem >= 12)   kind = SOH3D_HEART_THREEQUARTER;
+        else if (rem >= 8)    kind = SOH3D_HEART_HALF;
+        else if (rem >= 1)    kind = SOH3D_HEART_QUARTER;
+        else                  kind = SOH3D_HEART_EMPTY;
+        int tw = 0, th = 0;
+        const void* tex = SoH3D_HudHeartRGBA(kind, &tw, &th);
+        float hx = margin + (i % perRow) * (heart + hgap);
+        float hy = margin + (i / perRow) * (heart + hgap);
+        SoH3D_HudBlit(tex, tw, th, hx, hy, heart, heart, 0xFFFFFFFFu);
+    }
+    int heartRows = (containers + perRow - 1) / perRow;
+    float belowHearts = margin + heartRows * (heart + hgap) + 6.0f * sc;
+
+    // ---- Magic bar (below hearts; only when the player has magic) ----------------------------
+    if (s->magicLevel > 0 && s->magicCapacity > 0) {
+        const float mbw = 124.0f * sc;
+        const float mbh = 9.0f * sc;
+        float mx = margin, my = belowHearts;
+        SoH3D_HudRect(mx - 1.0f * sc, my - 1.0f * sc, mbw + 2.0f * sc, mbh + 2.0f * sc, 0x101820D0u); // frame
+        int fillPx = (int)(mbw * s->magic / s->magicCapacity);
+        if (fillPx < 0) fillPx = 0;
+        if (fillPx > (int)mbw) fillPx = (int)mbw;
+        SoH3D_HudRect(mx, my, mbw, mbh, 0x00000080u);          // empty track
+        SoH3D_HudRect(mx, my, (float)fillPx, mbh, 0x32D232FFu); // green fill
+    }
+
+    // ---- Rupees (bottom-left): green gem + digit glyphs --------------------------------------
+    {
+        const float gem = 26.0f * sc;
+        float rx = margin;
+        float ry = (float)H - margin - gem;
+        int gw = 0, gh = 0;
+        const void* gemTex = SoH3D_CounterIconTex(SOH3D_CICON_RUPEE, &gw, &gh);
+        SoH3D_HudBlit(gemTex, gw, gh, rx, ry, gem, gem, 0xC8FF64FFu); // wallet-green gem
+        float dx = rx + gem + 4.0f * sc;
+        const float dh = gem;
+        char buf[8];
+        int rup = s->rupees;
+        if (rup < 0) rup = 0;
+        if (rup > 999) rup = 999;
+        snprintf(buf, sizeof(buf), "%d", rup);
+        for (const char* p = buf; *p; p++) {
+            int dw = 0, dhh = 0;
+            const void* dtex = SoH3D_DigitTex(*p - '0', &dw, &dhh);
+            if (dtex && dw > 0 && dhh > 0) {
+                float dwpx = dh * (float)dw / (float)dhh; // keep glyph aspect
+                SoH3D_HudBlit(dtex, dw, dhh, dx, ry, dwpx, dh, 0xFFFFFFFFu);
+                dx += dwpx + 1.0f * sc;
+            }
+        }
+    }
+
+    // ---- Hotbar (bottom-centre): 6 slots with item icons + slot glyphs -----------------------
+    {
+        extern const void* SoH3D_NumGlyphTex(char which, int* w, int* h);
+        extern const void* SoH3D_XboxGlyphTex(char which, int* w, int* h);
+        const int NSLOTS = 6;
+        const float slot = 54.0f * sc;
+        const float sgap = 6.0f * sc;
+        const float totalW = NSLOTS * slot + (NSLOTS - 1) * sgap;
+        float bx = ((float)W - totalW) * 0.5f;
+        float by = (float)H - margin - slot;
+        int kbd = (s->inputDevice == 1);
+        static const char kPadGlyph[6] = { 'B', 'Y', 'A', 'B', 'X', 'Y' };
+        for (int i = 0; i < NSLOTS; i++) {
+            float sx = bx + i * (slot + sgap);
+            int active = (i == s->hotbarActive);
+            if (active) {
+                float b = 3.0f * sc; // gold border behind the slot
+                SoH3D_HudRect(sx - b, by - b, slot + 2 * b, slot + 2 * b, 0xFFD24FFFu);
+            }
+            SoH3D_HudRect(sx, by, slot, slot, active ? 0x282420E0u : 0x14141EC0u); // slot panel
+            int itemId = s->hotbarItems[i];
+            if (itemId != 0xFF && itemId >= 0 && itemId < 158 && gItemIcons[itemId] != NULL) {
+                float pad = 5.0f * sc;
+                SoH3D_HudBlit(gItemIcons[itemId], 32, 32, sx + pad, by + pad, slot - 2 * pad,
+                              slot - 2 * pad, 0xFFFFFFFFu);
+            }
+            // Slot glyph badge, top-right corner.
+            int gw = 0, gh = 0;
+            const void* glyph = NULL;
+            if (kbd) {
+                glyph = SoH3D_NumGlyphTex((char)('1' + i), &gw, &gh);
+            } else {
+                glyph = SoH3D_XboxGlyphTex(kPadGlyph[i], &gw, &gh);
+            }
+            if (glyph && gw > 0 && gh > 0) {
+                float bsz = 20.0f * sc;
+                SoH3D_HudBlit(glyph, gw, gh, sx + slot - bsz - 1.0f * sc, by + 1.0f * sc, bsz, bsz,
+                              0xFFFFFFFFu);
+            }
+        }
+    }
+
+    SoH3D_Hud_End();
+}
+
 // #31 — substitute crisp higher-res HUD textures (hearts) for the blocky 16x16 N64 ones.
 // -1 = uninit (read SOH3D_HUDTEX env, default on). z_lifemeter.c reads this and swaps the heart
 // texture/load size/texcoords; see SoH3D_HeartTex.
@@ -2290,14 +2478,26 @@ static const char* SoH3D_EnKoCsabOverride(int modelId, Actor* actor) {
 //
 // Oracle ground truth (Market Day, scene 32; tools/oracle_export.py animLength column):
 //   type 3  (BOJ_3,  ENHY_ANIM_15): oracle 16f → Boj2_9_2 (16f, only remaining 16f BOJ CSAB)
+//   type 4  (AHG_4,  ENHY_ANIM_11): oracle 20f → Ahg2_8   (20f); auto picks Ahg_matsu (wrong)
 //   type 5  (BOJ_5,  ENHY_ANIM_16): oracle 11f → Boj2_9   (11f, UNIQUE)
+//   type 6  (BBA,    ENHY_ANIM_10): oracle 40f → Bba_n_wait(40f); auto picks Bba_matsu (wrong)
 //   type 8  (CNE_8,  ENHY_ANIM_9 ): oracle 40f → Cne_n_wait (40f, UNIQUE); matsu=20f wrong
 //   type 9  (BOJ_9,  ENHY_ANIM_13): oracle 30f → Boj_13   (30f); suffix=anim_idx naming
 //   type 10 (BOJ_10, ENHY_ANIM_14): oracle 23f → Boj_14   (23f, UNIQUE)
 //   type 11 (CNE_11, ENHY_ANIM_20): oracle 12f → Cne2_15  (12f, UNIQUE)
-//   type 14 (BOJ_14, ENHY_ANIM_19): oracle n/a  → Boj2_19 (30f); suffix=anim_idx, Boj_matsu=30f same dur
-//   type 16 (BOJ_16, ENHY_ANIM_5 ): oracle n/a  → Boj2_5  (16f); suffix=anim_idx
-// zelda_boj.zar catalog: Boj_13(30), Boj_14(23), Boj_matsu(30), Boj2_5(16), Boj2_9(11),
+//   type 12 (BOJ_12, ENHY_ANIM_18): oracle 30f → Boj2_17  (30f); auto picks Boj_matsu (wrong)
+//   type 13 (AHG_13, ENHY_ANIM_12): static 20f → Ahg2_18  (20f); auto picks Ahg_matsu (wrong)
+//   type 14 (BOJ_14, ENHY_ANIM_19): static 30f → Boj2_19 (30f); Boj_matsu=30f same dur wrong
+//   type 15 (BJI_15, ENHY_ANIM_21): static 40f → Bji2_20  (40f); auto picks Bji_matsu (wrong)
+//   type 16 (BOJ_16, ENHY_ANIM_5 ): static 30f → Boj_matsu(30f) — auto picks Boj_matsu, CORRECT
+//   type 17 (AHG_17, ENHY_ANIM_11): static 20f → Ahg2_8   (20f, same as type 4)
+//   type 19 (BJI_19, ENHY_ANIM_21): static 40f → Bji2_20  (40f, same as type 15)
+//   type 20 (AHG_20, ENHY_ANIM_12): static 20f → Ahg2_18  (20f, same as type 13)
+// zelda_aob.zar: Aob_mastu(20), Aob_tataku_roop(15), Aob_te_wait(15), Aob_n_wait(15).
+// zelda_ahg.zar: Ahg_matsu(20), Ahg2_18(20), Ahg2_8(20), sth_oya_matsu(28).
+// zelda_bba.zar: Bba_matsu(40), Bba_n_wait(40).
+// zelda_bji.zar: Bji_matsu(40), Bji_aruku(60), Bji2_20(40).
+// zelda_boj.zar: Boj_13(30), Boj_14(23), Boj_matsu(30), Boj2_5(16), Boj2_9(11),
 //   Boj2_9_2(16), Boj2_17(30), Boj2_19(30). zelda_cne.zar: Cne_matsu(20), Cne_n_wait(40), Cne2_15(12).
 static const char* SoH3D_EnHyCsabOverride(int modelId, Actor* actor) {
     (void)modelId;
@@ -2305,21 +2505,41 @@ static const char* SoH3D_EnHyCsabOverride(int modelId, Actor* actor) {
         return NULL;
     }
     switch (actor->params & 0x7F) { // ENHY_TYPE
+        // AHG body skeleton (zelda_ahg.zar) — auto picks Ahg_matsu first; oracle/static says otherwise:
+        case 4:   // ENHY_TYPE_AHG_4: ENHY_ANIM_11 → oracle 20f → Ahg2_8 (pool 11, csab_idx 2)
+        case 17:  // ENHY_TYPE_AHG_17: same pool as type 4 → Ahg2_8 (20f)
+            return "Ahg2_8";
+        case 13:  // ENHY_TYPE_AHG_13: ENHY_ANIM_12 → Ahg2_18 (pool 12, csab_idx 1, 20f)
+        case 20:  // ENHY_TYPE_AHG_20: same pool as type 13 → Ahg2_18 (20f)
+            return "Ahg2_18";
+        // BBA body skeleton (zelda_bba.zar) — auto picks Bba_matsu first; oracle says Bba_n_wait:
+        case 6:   // ENHY_TYPE_BBA: ENHY_ANIM_10 → oracle 40f → Bba_n_wait (pool 10, csab_idx 1)
+                  // Both are 40f; Bba_matsu is the wrong one (auto picks by first "matsu" hit).
+            return "Bba_n_wait";
+        // BJI body skeleton (zelda_bji.zar) — auto picks Bji_matsu; static says Bji2_20 for types 15/19:
+        case 15:  // ENHY_TYPE_BJI_15: ENHY_ANIM_21 → Bji2_20 (pool 21, csab_idx 2, 40f)
+        case 19:  // ENHY_TYPE_BJI_19: same pool as type 15 → Bji2_20 (40f)
+            return "Bji2_20";
         // BOJ body skeleton (zelda_boj.zar) — types where OoT3D idle ≠ Boj_matsu:
-        case 3:   // ENHY_TYPE_BOJ_3: ENHY_ANIM_15 → oracle 16f → Boj2_9_2 (16f)
-                  // Boj2_5 is taken by type 16 (ANIM_5); Boj2_9_2 is the only other 16f BOJ CSAB.
-            return "Boj2_9_2";
+        case 3:   // ENHY_TYPE_BOJ_3: ENHY_ANIM_15 → oracle 16f → Boj2_5 (pool 15, csab_idx=1)
+                  // csab_zar_idx=1 in zelda_boj.zar is Boj2_5 (16f); prior code returned Boj2_9_2
+                  // by mistake (assumed Boj2_5 was "taken by type16", but type16 uses Boj_matsu idx0).
+            return "Boj2_5";
         case 5:   // ENHY_TYPE_BOJ_5: ENHY_ANIM_16 → oracle 11f → Boj2_9 (11f, UNIQUE in BOJ ZAR)
             return "Boj2_9";
         case 9:   // ENHY_TYPE_BOJ_9: ENHY_ANIM_13 → oracle 30f → Boj_13 (30f, naming suffix=13)
             return "Boj_13";
         case 10:  // ENHY_TYPE_BOJ_10: ENHY_ANIM_14 → oracle 23f → Boj_14 (23f, UNIQUE in BOJ ZAR)
             return "Boj_14";
+        case 12:  // ENHY_TYPE_BOJ_12: ENHY_ANIM_18 → oracle 30f → Boj2_17 (pool 18, csab_idx 4)
+                  // Auto picks Boj_matsu (30f, also "matsu" first); oracle confirms Boj2_17 is correct.
+            return "Boj2_17";
         case 14:  // ENHY_TYPE_BOJ_14: ENHY_ANIM_19 → Boj2_19 (30f, naming suffix=19)
                   // Same duration as Boj_matsu but explicit to avoid drift if default changes.
             return "Boj2_19";
-        case 16:  // ENHY_TYPE_BOJ_16: ENHY_ANIM_5  → Boj2_5 (16f, naming suffix=5)
-            return "Boj2_5";
+        case 16:  // ENHY_TYPE_BOJ_16: ENHY_ANIM_5  → Boj_matsu (30f) — auto already correct; explicit
+                  // for documentation (Boj_matsu IS the right CSAB here, index 0 via pool 5).
+            return NULL;
         // CNE body skeleton (zelda_cne.zar):
         case 8:   // ENHY_TYPE_CNE_8: ENHY_ANIM_9  → oracle 40f → Cne_n_wait (40f, UNIQUE)
                   // SoH3D_AutoModelDefaultAnim picks Cne_matsu (20f) via "matsu" keyword first;
@@ -4600,6 +4820,11 @@ static void SoH3D_ReplExec(PlayState* play, char* line, const char* outPath) {
         // gSoH3dHudTex every frame. 1 = crisp 64x64 hearts, 0 = the blocky N64 16x16 hearts.
         gSoH3dHudTex = (f1 != 0.0f) ? 1 : 0;
         SoH3D_ReplReply(outPath, "hudtex=%d", gSoH3dHudTex);
+    } else if (strcmp(cmd, "pchud") == 0 && sscanf(line, "%*s %f", &f1) == 1) {
+        // Toggle the native Vulkan PC HUD (default on). 1 = PC HUD (Interface_Draw/HealthMeter_Draw
+        // gated off, soh3d_hud_vk draws); 0 = the original N64 Fast3D HUD + hotbar.
+        gSoH3dPcHud = (f1 != 0.0f) ? 1 : 0;
+        SoH3D_ReplReply(outPath, "pchud=%d (vkAvail=%d)", gSoH3dPcHud, SoH3D_Hud_Available());
     } else if (strcmp(cmd, "hotbaron") == 0 && sscanf(line, "%*s %f", &f1) == 1) {
         // `hotbaron <0|1>` — toggle the PC hotbar as the sole item UI.
         // 1 (default) = suppress N64 C-button/D-pad item cluster; 0 = show both.
@@ -5085,6 +5310,10 @@ void SoH3D_ReplPoll(PlayState* play) {
     // Hotbar sync: keep the active hotbar slot's item on B button each frame so the SoH use-item
     // engine fires the right item when B is pressed.
     SoH3D_HotbarSync(play);
+
+    // PC HUD snapshot: copy gSaveContext HUD state into gSoH3dHudState so the native Vulkan HUD
+    // (drawn on the render thread from Gui::EndFrame, where there is no PlayState) can read it.
+    SoH3D_HudUpdateFrame(play);
 
     // Force time-of-day (e.g. day instead of night). Applied every frame, before the
     // FIFO handling, so it holds regardless of whether the REPL is connected.
