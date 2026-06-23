@@ -273,6 +273,13 @@ static SoH3DGlGroup makeCgroup(const SoH3D::Cmb& cmb, const SoH3D::CmbDrawGroup&
     cg.meshId = g.mesh_id;
     cg.materialIndex = g.material_index; // key for the facial eye/mouth texture-override channel
     for (int k = 0; k < 4; k++) cg.blendColor[k] = mat ? mat->blend_color[k] : (k == 3 ? 1.0f : 0.0f);
+    // OoT3D world lighting/combiner port (docs/oot3d_world_lighting_re.md).
+    cg.vertexLighting = (mat && mat->vertex_lighting) ? 1 : 0;
+    cg.combScaleRGB = mat ? mat->comb_scale_rgb : 1.0f;
+    for (int k = 0; k < 3; k++) {
+        cg.matAmbient[k] = mat ? mat->mat_ambient[k] : 1.0f;
+        cg.matDiffuse[k] = mat ? mat->mat_diffuse[k] : 1.0f;
+    }
     return cg;
 }
 

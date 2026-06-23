@@ -49,6 +49,11 @@ struct GlGroup {
     int faceCull = 0;           // 1 = cull back face (CMB cull byte 1); 0 = double-sided
     int meshId = -1;            // CMB mesh_id (per-frame visibility-switch key; -1 = always shown)
     int materialIndex = -1;     // CMB material slot (key for the facial tex-override; -1 = none)
+    // OoT3D world lighting/combiner port (docs/oot3d_world_lighting_re.md).
+    int vertexLighting = 0;     // 1 = PICA vertex-lit scene geometry (compute real lit vColor)
+    float matAmbient[3] = { 1, 1, 1 };
+    float matDiffuse[3] = { 1, 1, 1 };
+    float combScaleRGB = 1.0f;  // stage-0 TEV RGB scale (1/2/4); the brightness factor
 };
 
 struct GlModel {
@@ -260,6 +265,7 @@ GLint g_uSky = -1;
 GLuint g_whiteTex = 0; // 1x1 white, bound for untextured groups (e.g. the vertex-coloured sky dome)
 GLint g_uDepthOffset = -1, g_uMV = -1, g_uLit = -1, g_uLightDir = -1;
 GLint g_uAmbient = -1, g_uLight1Color = -1, g_uLight2Dir = -1, g_uLight2Color = -1;
+GLint g_uVtxLit = -1, g_uMatAmbient = -1, g_uMatDiffuse = -1, g_uCombScale = -1; // OoT3D world combiner port
 GLint g_uLightVP = -1, g_uShadowMap = -1, g_uShadowOn = -1, g_uShadowBias = -1, g_uShadowStrength = -1,
       g_uShadowTexel = -1;
 bool g_progFailed = false;
@@ -345,6 +351,11 @@ const char* kFrag =
     // uAmbient = ambientColor/255, uLight1Color = light1Color/255, uLight2Dir/uLight2Color = second dir light.
     // Used to compute the real N64 lighting equation for lit (character/prop) draws.
     "uniform vec3 uAmbient; uniform vec3 uLight1Color; uniform vec3 uLight2Dir; uniform vec3 uLight2Color;\n"
+    // OoT3D world (scene) lighting/combiner port (docs/oot3d_world_lighting_re.md). uVtxLit>0.5
+    // selects the PICA vertex-lit combiner for scene geometry: the per-vertex lit colour
+    // v = saturate(uAmbient*uMatAmbient + uMatDiffuse*(L0*ndl0 + L1*ndl1)) * bakedVColor, then
+    // the stage-0 TEV output saturate(tex*v) scaled by uCombScale (Kokiri grass = x2).
+    "uniform float uVtxLit; uniform vec3 uMatAmbient; uniform vec3 uMatDiffuse; uniform float uCombScale;\n"
     // Dynamic sun-shadow: uLightVP maps WORLD -> the sun's light-space clip (built CPU-side from
     // the scene sun dir + a focus box around the camera target); uShadowMap is the depth render
     // from the light. uShadowOn gates it (0 = no shadows / shadow-map build pass). uShadowBias
@@ -384,28 +395,41 @@ const char* kFrag =
     //                                                             + light2 * max(0,N·L2)
     // All color terms are scene-live (envCtx.lightSettings) so time-of-day, weather, and indoor
     // scenes all get correct magnitudes. Scene geometry (uLit==0) keeps its baked vColor untouched.
-    "  vec3 shade = uTint;\n"
+    // rgb = the combined surface colour BEFORE the shared shadow multiply. Three paths:
+    //  (1) uLit (characters/props): texture * bakedVColor * realTwoLightShade.
+    //  (2) uVtxLit (OoT3D scene geometry): the ported PICA vertex-lit TEV combiner.
+    //  (3) legacy world fallback: texture * bakedVColor * uTint.
+    "  vec3 rgb;\n"
     "  if (uLit > 0.5) {\n"
     "    vec3 N = normalize(vNrmView);\n"
     "    float d1 = max(0.0, dot(N, normalize(uLightDir)));\n"       // N·L1: primary (sun/moon)
     "    float d2 = max(0.0, dot(N, normalize(uLight2Dir)));\n"      // N·L2: secondary fill
     // Real lighting equation: ambient + diffuse1 + diffuse2 (matches N64 shade computation).
-    // uAmbient, uLight1Color, uLight2Color are in [0,1] (ambientColor/255 etc. set CPU-side).
-    // Clamp to [0,1] so over-bright scenes don't blow out.
     "    vec3 lit = clamp(uAmbient + uLight1Color * d1 + uLight2Color * d2, 0.0, 1.0);\n"
-    // uTint carries the scene RGB tint for scene geometry (unlit draws). For lit draws we
-    // ignore uTint's flat-ambient approximation and use the real per-channel light term instead.
-    // Shadow + AO still multiply on top of this.
-    "    shade = lit;\n"
+    "    rgb = t.rgb * vColor.rgb * lit;\n"
+    "  } else if (uVtxLit > 0.5) {\n"
+    // OoT3D vertex lighting (docs/oot3d_world_lighting_re.md): the PICA200 per-vertex lit
+    // colour, fed to the stage-0 TEV combiner as PRIMARY_COLOR. matDiffuse is the material's
+    // diffuse colour (BLACK for Kokiri scene -> the directional term drops out, leaving the
+    // ambient daylight); matAmbient is its ambient colour (WHITE for Kokiri). bakedVColor is
+    // the per-vertex AO/shade. uCombScale is the stage-0 RGB scale (x2 for grass).
+    "    vec3 N = normalize(vNrmView);\n"
+    "    float ndl0 = max(0.0, dot(N, normalize(uLightDir)));\n"
+    "    float ndl1 = max(0.0, dot(N, normalize(uLight2Dir)));\n"
+    "    vec3 vlit = clamp(uAmbient * uMatAmbient + uMatDiffuse * (uLight1Color * ndl0 + uLight2Color * ndl1), 0.0, 1.0);\n"
+    "    vec3 ve = clamp(vlit * vColor.rgb, 0.0, 1.0);\n"            // PRIMARY_COLOR (v_Color)
+    "    rgb = clamp(t.rgb * ve, 0.0, 1.0) * uCombScale;\n"         // MODULATE(v_Color, TEX0) * scaleRGB
+    "  } else {\n"
+    "    rgb = t.rgb * vColor.rgb * uTint;\n"
     "  }\n"
-    // Dynamic shadow: darken by the shadowed fraction. Applied to BOTH lit (characters) and
-    // unlit (scene ground/walls) draws, so a character's shadow lands on the OoT3D ground.
+    // Dynamic shadow: darken by the shadowed fraction. Applied to ALL paths so a character's
+    // shadow lands on the OoT3D ground.
     "  if (uShadowOn > 0.5) {\n"
-    "    shade *= (1.0 - uShadowStrength * (1.0 - shadowLit()));\n"
+    "    rgb *= (1.0 - uShadowStrength * (1.0 - shadowLit()));\n"
     "  }\n"
     // uAlpha is a per-draw opacity (1 = opaque). Used to cross-fade the two skybox domes at
     // dawn/dusk (dome2 drawn over dome1 with alpha = skyboxBlend); 1.0 for every other draw.
-    "  frag = vec4(t.rgb * vColor.rgb * shade, t.a * vColor.a * uAlpha);\n"
+    "  frag = vec4(rgb, t.a * vColor.a * uAlpha);\n"
     "}\n";
 
 GLuint compile(GLenum type, const char* src) {
@@ -473,6 +497,10 @@ bool ensureProgram() {
     g_uLight1Color = glGetUniformLocation(p, "uLight1Color");
     g_uLight2Dir = glGetUniformLocation(p, "uLight2Dir");
     g_uLight2Color = glGetUniformLocation(p, "uLight2Color");
+    g_uVtxLit = glGetUniformLocation(p, "uVtxLit");
+    g_uMatAmbient = glGetUniformLocation(p, "uMatAmbient");
+    g_uMatDiffuse = glGetUniformLocation(p, "uMatDiffuse");
+    g_uCombScale = glGetUniformLocation(p, "uCombScale");
     g_uLightVP = glGetUniformLocation(p, "uLightVP");
     g_uShadowMap = glGetUniformLocation(p, "uShadowMap");
     g_uShadowOn = glGetUniformLocation(p, "uShadowOn");
@@ -513,6 +541,10 @@ GLint mapWrap(unsigned glWrap) {
 // Character/prop lighting gate, toggled by soh3d.c's REPL (`light 0|1`) and seeded from env
 // SOH3D_LIGHT. -1 = uninit (read env on first draw), 0 = off (flat tint), 1 = on (half-Lambert form).
 extern "C" int gSoH3dLightEnable = -1;
+// OoT3D world (scene) vertex-lit combiner port (docs/oot3d_world_lighting_re.md). 1 = on
+// (real PICA vertex lighting + per-material TEV scale for scene geometry), 0 = legacy
+// texture*vColor*uTint path. Toggle live via REPL `worldlit 0|1` for A/B vs the oracle.
+extern "C" int gSoH3dWorldLit = 1;
 
 // World-space key-light (sun) direction TO the light, set once per frame by soh3d.c
 // (SoH3D_UpdateLight, from envCtx.lightSettings.light1Dir) and read by the render pass into
@@ -695,6 +727,9 @@ static bool uploadModel(GlModel& m, const SoH3DGlGroup* groups, int groupCount, 
         g.meshId = groups[i].meshId;
         g.materialIndex = groups[i].materialIndex;
         for (int k = 0; k < 4; k++) g.blendColor[k] = groups[i].blendColor[k];
+        g.vertexLighting = groups[i].vertexLighting;
+        g.combScaleRGB = groups[i].combScaleRGB;
+        for (int k = 0; k < 3; k++) { g.matAmbient[k] = groups[i].matAmbient[k]; g.matDiffuse[k] = groups[i].matDiffuse[k]; }
         all.insert(all.end(), groups[i].verts, groups[i].verts + groups[i].vertCount);
         m.groups.push_back(g);
     }
@@ -962,6 +997,13 @@ void drawOne(GlModel& m, const float* mp16, const float* mv16, int lit, int inve
         if (grp.meshId >= 0 && grp.meshId < 64 && !((midMask >> grp.meshId) & 1ull)) continue;
         glUniform1f(g_uAlphaRef, grp.alphaTest ? grp.alphaRef : 0.0f);
         glUniform1f(g_uDepthOffset, grp.polygonOffset);
+        // OoT3D world lighting/combiner port (docs/oot3d_world_lighting_re.md). Per-group:
+        // the vertex-lit scene path is gated by uVtxLit (only when the draw isn't already a
+        // lit character). Disabled globally via REPL `worldlit 0` for A/B against the oracle.
+        glUniform1f(g_uVtxLit, (grp.vertexLighting && gSoH3dWorldLit) ? 1.0f : 0.0f);
+        glUniform3f(g_uMatAmbient, grp.matAmbient[0], grp.matAmbient[1], grp.matAmbient[2]);
+        glUniform3f(g_uMatDiffuse, grp.matDiffuse[0], grp.matDiffuse[1], grp.matDiffuse[2]);
+        glUniform1f(g_uCombScale, grp.combScaleRGB);
         if (grp.blendEnable) {
             glEnable(GL_BLEND);
             glBlendFuncSeparate(grp.blendSrcRGB, grp.blendDstRGB, grp.blendSrcA, grp.blendDstA);
