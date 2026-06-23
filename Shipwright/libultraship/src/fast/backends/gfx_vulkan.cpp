@@ -1036,7 +1036,9 @@ void GfxRenderingAPIVulkan::CreateDepthResources() {
     vi.image = mDepthImage;
     vi.viewType = VK_IMAGE_VIEW_TYPE_2D;
     vi.format = mDepthFormat;
-    vi.subresourceRange = { VK_IMAGE_ASPECT_DEPTH_BIT, 0, 1, 0, 1 };
+    // Combined depth+stencil view so the framebuffer attachment covers the stencil aspect
+    // (required for D32_SFLOAT_S8_UINT; game draws only use depth, stencil stays zeroed).
+    vi.subresourceRange = { VK_IMAGE_ASPECT_DEPTH_BIT | VK_IMAGE_ASPECT_STENCIL_BIT, 0, 1, 0, 1 };
     VK_CHECK(vkCreateImageView(mDevice, &vi, nullptr, &mDepthView));
 }
 
@@ -2500,7 +2502,9 @@ void GfxRenderingAPIVulkan::CreateFbResources(FramebufferVulkan& fb, uint32_t wi
         vi.image = fb.depthImage;
         vi.viewType = VK_IMAGE_VIEW_TYPE_2D;
         vi.format = mDepthFormat;
-        vi.subresourceRange = { VK_IMAGE_ASPECT_DEPTH_BIT, 0, 1, 0, 1 };
+        // Combined view: stencil aspect must be included so the framebuffer attachment is valid
+        // for D32_SFLOAT_S8_UINT.
+        vi.subresourceRange = { VK_IMAGE_ASPECT_DEPTH_BIT | VK_IMAGE_ASPECT_STENCIL_BIT, 0, 1, 0, 1 };
         VK_CHECK(vkCreateImageView(mDevice, &vi, nullptr, &fb.depthView));
         fb.depthLayout = VK_IMAGE_LAYOUT_UNDEFINED;
     }
@@ -2640,8 +2644,8 @@ void GfxRenderingAPIVulkan::BeginPassIfNeeded() {
     TransitionImageLayout(cmd, fb.colorImage, VK_IMAGE_ASPECT_COLOR_BIT, fb.colorLayout,
                           VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL);
     if (fb.depthImage != VK_NULL_HANDLE)
-        TransitionImageLayout(cmd, fb.depthImage, VK_IMAGE_ASPECT_DEPTH_BIT, fb.depthLayout,
-                              VK_IMAGE_LAYOUT_DEPTH_STENCIL_ATTACHMENT_OPTIMAL);
+        TransitionImageLayout(cmd, fb.depthImage, VK_IMAGE_ASPECT_DEPTH_BIT | VK_IMAGE_ASPECT_STENCIL_BIT,
+                              fb.depthLayout, VK_IMAGE_LAYOUT_DEPTH_STENCIL_ATTACHMENT_OPTIMAL);
 
     VkRenderPassBeginInfo rp{};
     rp.sType = VK_STRUCTURE_TYPE_RENDER_PASS_BEGIN_INFO;
@@ -2924,12 +2928,13 @@ GfxRenderingAPIVulkan::GetPixelDepth(int fbId, const std::set<std::pair<float, f
     cbi.sType = VK_STRUCTURE_TYPE_COMMAND_BUFFER_BEGIN_INFO;
     cbi.flags = VK_COMMAND_BUFFER_USAGE_ONE_TIME_SUBMIT_BIT;
     VK_CHECK(vkBeginCommandBuffer(cmd, &cbi));
-    TransitionImageLayout(cmd, fb.depthImage, VK_IMAGE_ASPECT_DEPTH_BIT, fb.depthLayout,
-                          VK_IMAGE_LAYOUT_TRANSFER_SRC_OPTIMAL);
+    // Transition both aspects (depth+stencil) to TRANSFER_SRC; we only copy the depth aspect.
+    TransitionImageLayout(cmd, fb.depthImage, VK_IMAGE_ASPECT_DEPTH_BIT | VK_IMAGE_ASPECT_STENCIL_BIT,
+                          fb.depthLayout, VK_IMAGE_LAYOUT_TRANSFER_SRC_OPTIMAL);
     vkCmdCopyImageToBuffer(cmd, fb.depthImage, VK_IMAGE_LAYOUT_TRANSFER_SRC_OPTIMAL, buffer, (uint32_t)regions.size(),
                            regions.data());
-    TransitionImageLayout(cmd, fb.depthImage, VK_IMAGE_ASPECT_DEPTH_BIT, fb.depthLayout,
-                          VK_IMAGE_LAYOUT_DEPTH_STENCIL_ATTACHMENT_OPTIMAL);
+    TransitionImageLayout(cmd, fb.depthImage, VK_IMAGE_ASPECT_DEPTH_BIT | VK_IMAGE_ASPECT_STENCIL_BIT,
+                          fb.depthLayout, VK_IMAGE_LAYOUT_DEPTH_STENCIL_ATTACHMENT_OPTIMAL);
     VK_CHECK(vkEndCommandBuffer(cmd));
     VkSubmitInfo submit{};
     submit.sType = VK_STRUCTURE_TYPE_SUBMIT_INFO;
