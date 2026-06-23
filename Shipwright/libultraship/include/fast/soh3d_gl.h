@@ -53,6 +53,15 @@ typedef struct SoH3DGlGroup {
     int faceCull;             // 0 = no cull (double-sided), 1 = cull back face
     int meshId;               // CMB mesh_id of this group (visibility-switch key; -1 = none)
     int materialIndex;        // CMB material slot of this group (key for the facial tex-override; -1 = none)
+    // OoT3D world (scene) lighting/combiner port (docs/oot3d_world_lighting_re.md). For
+    // VERTEX-lit scene geometry the renderer computes the real OoT3D per-vertex lit colour
+    //   v = saturate(sceneAmb*matAmbient + sceneDif*matDiffuse*max(0,N.L)) * bakedColor
+    // and the TEV combiner output v*tex scaled by combScaleRGB (Kokiri grass = x2). When
+    // vertexLighting is 0 the old behaviour is kept.
+    int vertexLighting;       // 0/1: material uses PICA vertex lighting (scene geometry)
+    float matAmbient[3];      // material ambient colour (RGB, [0,1])
+    float matDiffuse[3];      // material diffuse colour (RGB, [0,1])
+    float combScaleRGB;       // stage-0 TEV RGB scale (1/2/4); the brightness factor
 } SoH3DGlGroup;
 
 // One decoded texture (RGBA8, w*h*4 bytes, row 0 = top).

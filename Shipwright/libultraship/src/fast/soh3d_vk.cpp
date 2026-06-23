@@ -192,7 +192,14 @@ void main() {
     }
     if (ubo.uShadow.x > 0.5) // dynamic sun-shadow: darken by the shadowed fraction (lit + unlit draws)
         shade *= (1.0 - ubo.uShadow.z * (1.0 - shadowLit()));
-    frag = vec4(t.rgb * vColor.rgb * shade, t.a * vColor.a * ubo.uExtra.x); // uExtra.x = per-draw alpha
+    // OoT3D stage-0 TEV combiner RGB scale (uExtra.w; 1 for non-scene draws -> no-op, x2 for
+    // Kokiri grass). saturate before scaling matches the PICA combiner (clamp then *scale).
+    // Scoped to SCENE geometry (uParams.y == 0): characters/props use our half-Lambert form
+    // term, a different lighting model than OoT3D's combiner, so don't double them here.
+    vec3 rgb = t.rgb * vColor.rgb * shade;
+    if (ubo.uParams.y < 0.5)
+        rgb = clamp(rgb, 0.0, 1.0) * ubo.uExtra.w;
+    frag = vec4(rgb, t.a * vColor.a * ubo.uExtra.x); // uExtra.x = per-draw alpha
 }
 )";
 
@@ -231,6 +238,11 @@ struct VkGroup {
     int faceCull = 0; // 1 = cull back face (CMB cull byte 1); 0 = double-sided
     int meshId = -1;
     int materialIndex = -1; // CMB material slot (key for the facial tex-override; -1 = none)
+    // OoT3D world (scene) combiner port (docs/oot3d_world_lighting_re.md): the per-material
+    // stage-0 TEV RGB scale (Kokiri grass = x2), the brightness factor the texture*vColor*tint
+    // path dropped. Applied only to vertex-lit scene geometry, gated by REPL `worldlit`.
+    int vertexLighting = 0;
+    float combScaleRGB = 1.0f;
 };
 
 struct VkModel {
@@ -868,6 +880,8 @@ VkModel* ensureUploaded(int modelId) {
         g.faceCull = groups[i].faceCull;
         g.meshId = groups[i].meshId;
         g.materialIndex = groups[i].materialIndex;
+        g.vertexLighting = groups[i].vertexLighting;
+        g.combScaleRGB = groups[i].combScaleRGB;
         for (int k = 0; k < 4; k++)
             g.blendColor[k] = groups[i].blendColor[k];
         all.insert(all.end(), groups[i].verts, groups[i].verts + groups[i].vertCount);
@@ -1576,6 +1590,12 @@ extern "C" void SoH3D_Vk_DrawModel(int modelId, const float* mp16, const float* 
         if (roomHl && gIdx == gSoH3dHlGroup) { ubo.uTintSkin[0] = 1.0f; ubo.uTintSkin[1] = 0.0f; ubo.uTintSkin[2] = 0.0f; }
         ubo.uParams[2] = grp.alphaTest ? grp.alphaRef : 0.0f;
         ubo.uParams[3] = grp.polygonOffset;
+        // OoT3D world (scene) combiner port (docs/oot3d_world_lighting_re.md): apply the
+        // per-material stage-0 TEV RGB scale (Kokiri grass = x2) to vertex-lit scene geometry.
+        // uExtra.w stays 1.0 for everything else, so the shader's saturate(...)*scale is a no-op
+        // for the unchanged paths. Gated by REPL `worldlit` for A/B against the oracle.
+        extern int gSoH3dWorldLit;
+        ubo.uExtra[3] = (grp.vertexLighting && gSoH3dWorldLit) ? grp.combScaleRGB : 1.0f;
         const VkDeviceSize uboOff = ring.offset;
         memcpy((uint8_t*)ring.mapped + uboOff, &ubo, sizeof(ubo));
         ring.offset += g_uboStride;

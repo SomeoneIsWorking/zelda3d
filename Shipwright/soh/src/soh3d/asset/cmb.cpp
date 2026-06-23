@@ -127,6 +127,9 @@ bool Cmb::parseMats() {
     uint32_t n = u32(b, p + 8);
     uint32_t stride = (mVersion <= 6) ? 0x15C : 0x16C;
     uint32_t o = p + 0x0C;
+    // The per-material combiner index tables point into a shared settings table that begins
+    // right after all material structs (noclip readMatsChunk). Entry stride 0x28.
+    uint32_t combTableBase = p + 0x0C + n * stride;
     mMaterials.resize(n);
     for (uint32_t i = 0; i < n; i++) {
         CmbMaterial& m = mMaterials[i];
@@ -159,6 +162,30 @@ bool Cmb::parseMats() {
         m.blend_dst_a = u16(b, o + 0x146);
         m.blend_eq_a = u16(b, o + 0x148);
         for (int k = 0; k < 4; k++) m.blend_color[k] = f32(b, o + 0x14C + 4 * k);
+
+        // --- OoT3D fragment pipeline (lighting flags + material colours + TEV combiner). ---
+        // See docs/oot3d_world_lighting_re.md. Material colours are RGBA8 BIG-endian.
+        m.fragment_lighting = u8(b, o + 0x00) != 0;
+        m.vertex_lighting = u8(b, o + 0x01) != 0;
+        auto rgb_be = [&](uint32_t off, float* dst) {
+            dst[0] = b[off + 0] / 255.0f; // big-endian: byte0 = R
+            dst[1] = b[off + 1] / 255.0f;
+            dst[2] = b[off + 2] / 255.0f;
+        };
+        rgb_be(o + 0xA4, m.mat_ambient);
+        rgb_be(o + 0xA8, m.mat_diffuse);
+        // Stage-0 combiner: op (+0x00), RGB scale (+0x04: 1/2/4), RGB sources (+0x0C/0E/10).
+        m.comb_stage_count = (int)u32(b, o + 0x120);
+        if (m.comb_stage_count > 0) {
+            uint32_t cidx = u16(b, o + 0x124);          // first stage's settings index
+            uint32_t co = combTableBase + cidx * 0x28;
+            m.comb_combine_rgb = u16(b, co + 0x00);
+            uint16_t scale = u16(b, co + 0x04);
+            m.comb_scale_rgb = (scale == 2 || scale == 4) ? (float)scale : 1.0f;
+            m.comb_src_rgb[0] = u16(b, co + 0x0C);
+            m.comb_src_rgb[1] = u16(b, co + 0x0E);
+            m.comb_src_rgb[2] = u16(b, co + 0x10);
+        }
         o += stride;
     }
     return true;
