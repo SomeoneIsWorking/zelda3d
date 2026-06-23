@@ -942,7 +942,11 @@ static const SoH3DAnimMap kSoH3dAnimMaps[] = {
     SOH3D_ANIMMAP("objects/object_st/object_st_Anim_0055A8", "st_yarare"),
     SOH3D_ANIMMAP("objects/object_st/object_st_Anim_005B98", "st_matsu"),
     // ---- /actor/zelda_ta.zar (object_ta) ----
-    SOH3D_ANIMMAP("objects/object_ta/gTalonSitSleepingAnim", "taron_sleep_wait"),
+    // ta_inemuri (100f, "dozing off sitting") is the correct CSAB for the sit-sleep pose.
+    // taron_sleep_wait (32f) is the lying-down sleep loop used by gTalonSleepAnim.
+    // Oracle (scene 95, En_Ta id=132): gTalonSleepAnim confirmed animLength=32 -> taron_sleep_wait OK.
+    // Proposal high_dframe_proposals.tsv: gTalonSitSleepingAnim dframe=68 (100-32) -> ta_inemuri.
+    SOH3D_ANIMMAP("objects/object_ta/gTalonSitSleepingAnim", "ta_inemuri"),
     SOH3D_ANIMMAP("objects/object_ta/gTalonStandAnim", "ta_matsu"),
     SOH3D_ANIMMAP("objects/object_ta/gTalonSitHandsUpAnim", "ta_nageru"),
     SOH3D_ANIMMAP("objects/object_ta/gTalonSitWakeUpAnim", "ta_okiru"),
