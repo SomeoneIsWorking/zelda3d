@@ -227,7 +227,8 @@ bool RmlRenderInterfaceVk::EnsureResources() {
         mTextures.erase(wh); // keep it out of the public handle table; we own it directly
     }
 
-    // Graphics pipeline (single config: premultiplied-alpha blend, no depth, dynamic viewport/scissor).
+    // Two pipeline variants sharing all fixed state except depth-stencil + color-write mask.
+    // Built here via a lambda to avoid repeating the large descriptor chain.
     VkPipelineShaderStageCreateInfo stages[2]{};
     stages[0].sType = VK_STRUCTURE_TYPE_PIPELINE_SHADER_STAGE_CREATE_INFO;
     stages[0].stage = VK_SHADER_STAGE_VERTEX_BIT;
@@ -273,11 +274,39 @@ bool RmlRenderInterfaceVk::EnsureResources() {
     ms.sType = VK_STRUCTURE_TYPE_PIPELINE_MULTISAMPLE_STATE_CREATE_INFO;
     ms.rasterizationSamples = VK_SAMPLE_COUNT_1_BIT;
 
-    VkPipelineDepthStencilStateCreateInfo ds{};
-    ds.sType = VK_STRUCTURE_TYPE_PIPELINE_DEPTH_STENCIL_STATE_CREATE_INFO;
-    ds.depthTestEnable = VK_FALSE;  // menu always on top
-    ds.depthWriteEnable = VK_FALSE;
-    ds.depthCompareOp = VK_COMPARE_OP_ALWAYS;
+    VkDynamicState dyn[] = { VK_DYNAMIC_STATE_VIEWPORT, VK_DYNAMIC_STATE_SCISSOR,
+                             VK_DYNAMIC_STATE_STENCIL_REFERENCE };
+    VkPipelineDynamicStateCreateInfo dynS{};
+    dynS.sType = VK_STRUCTURE_TYPE_PIPELINE_DYNAMIC_STATE_CREATE_INFO;
+    dynS.dynamicStateCount = 3;
+    dynS.pDynamicStates = dyn;
+
+    // Stencil op state shared by both pipelines (the reference is set dynamically).
+    // Normal draw: stencil test = EQUAL (passes when ref==mask; ref driven by RenderToClipMask).
+    //              Stencil write = KEEP (no modification).
+    // Mask-write:  stencil test = ALWAYS (always passes; we are writing the mask, not testing it).
+    //              Stencil write = REPLACE (write ref into stencil buffer).
+    auto makeStencilOp = [](VkCompareOp cmp, VkStencilOp pass) {
+        VkStencilOpState s{};
+        s.failOp = VK_STENCIL_OP_KEEP;
+        s.passOp = pass;
+        s.depthFailOp = VK_STENCIL_OP_KEEP;
+        s.compareOp = cmp;
+        s.compareMask = 0xFF;
+        s.writeMask = 0xFF;
+        s.reference = 0; // set dynamically via vkCmdSetStencilReference
+        return s;
+    };
+
+    // --- Pipeline 1: normal draw (stencil test, color writes on) ---
+    VkPipelineDepthStencilStateCreateInfo dsNormal{};
+    dsNormal.sType = VK_STRUCTURE_TYPE_PIPELINE_DEPTH_STENCIL_STATE_CREATE_INFO;
+    dsNormal.depthTestEnable = VK_FALSE;  // menu always on top
+    dsNormal.depthWriteEnable = VK_FALSE;
+    dsNormal.depthCompareOp = VK_COMPARE_OP_ALWAYS;
+    dsNormal.stencilTestEnable = VK_TRUE; // test against mask (ref set dynamically; passes when disabled = ref 0, mask=0→always)
+    dsNormal.front = makeStencilOp(VK_COMPARE_OP_EQUAL, VK_STENCIL_OP_KEEP);
+    dsNormal.back = dsNormal.front;
 
     VkPipelineColorBlendAttachmentState cba{};
     cba.colorWriteMask =
@@ -289,16 +318,10 @@ bool RmlRenderInterfaceVk::EnsureResources() {
     cba.srcAlphaBlendFactor = VK_BLEND_FACTOR_ONE;
     cba.dstAlphaBlendFactor = VK_BLEND_FACTOR_ONE_MINUS_SRC_ALPHA;
     cba.alphaBlendOp = VK_BLEND_OP_ADD;
-    VkPipelineColorBlendStateCreateInfo cb{};
-    cb.sType = VK_STRUCTURE_TYPE_PIPELINE_COLOR_BLEND_STATE_CREATE_INFO;
-    cb.attachmentCount = 1;
-    cb.pAttachments = &cba;
-
-    VkDynamicState dyn[] = { VK_DYNAMIC_STATE_VIEWPORT, VK_DYNAMIC_STATE_SCISSOR };
-    VkPipelineDynamicStateCreateInfo dynS{};
-    dynS.sType = VK_STRUCTURE_TYPE_PIPELINE_DYNAMIC_STATE_CREATE_INFO;
-    dynS.dynamicStateCount = 2;
-    dynS.pDynamicStates = dyn;
+    VkPipelineColorBlendStateCreateInfo cbNormal{};
+    cbNormal.sType = VK_STRUCTURE_TYPE_PIPELINE_COLOR_BLEND_STATE_CREATE_INFO;
+    cbNormal.attachmentCount = 1;
+    cbNormal.pAttachments = &cba;
 
     VkGraphicsPipelineCreateInfo pci{};
     pci.sType = VK_STRUCTURE_TYPE_GRAPHICS_PIPELINE_CREATE_INFO;
@@ -309,14 +332,39 @@ bool RmlRenderInterfaceVk::EnsureResources() {
     pci.pViewportState = &vp;
     pci.pRasterizationState = &rs;
     pci.pMultisampleState = &ms;
-    pci.pDepthStencilState = &ds;
-    pci.pColorBlendState = &cb;
+    pci.pDepthStencilState = &dsNormal;
+    pci.pColorBlendState = &cbNormal;
     pci.pDynamicState = &dynS;
     pci.layout = mPipeLayout;
     pci.renderPass = mRenderPass;
     pci.subpass = 0;
     if (vkCreateGraphicsPipelines(mDevice, VK_NULL_HANDLE, 1, &pci, nullptr, &mPipeline) != VK_SUCCESS) {
-        SPDLOG_ERROR("[RmlVk] pipeline creation failed");
+        SPDLOG_ERROR("[RmlVk] normal pipeline creation failed");
+        return false;
+    }
+
+    // --- Pipeline 2: mask-write (color writes off, stencil write via REPLACE) ---
+    VkPipelineDepthStencilStateCreateInfo dsMask{};
+    dsMask.sType = VK_STRUCTURE_TYPE_PIPELINE_DEPTH_STENCIL_STATE_CREATE_INFO;
+    dsMask.depthTestEnable = VK_FALSE;
+    dsMask.depthWriteEnable = VK_FALSE;
+    dsMask.depthCompareOp = VK_COMPARE_OP_ALWAYS;
+    dsMask.stencilTestEnable = VK_TRUE;
+    dsMask.front = makeStencilOp(VK_COMPARE_OP_ALWAYS, VK_STENCIL_OP_REPLACE);
+    dsMask.back = dsMask.front;
+
+    VkPipelineColorBlendAttachmentState cbaMask{};
+    cbaMask.colorWriteMask = 0; // no color writes during mask write
+    cbaMask.blendEnable = VK_FALSE;
+    VkPipelineColorBlendStateCreateInfo cbMask{};
+    cbMask.sType = VK_STRUCTURE_TYPE_PIPELINE_COLOR_BLEND_STATE_CREATE_INFO;
+    cbMask.attachmentCount = 1;
+    cbMask.pAttachments = &cbaMask;
+
+    pci.pDepthStencilState = &dsMask;
+    pci.pColorBlendState = &cbMask;
+    if (vkCreateGraphicsPipelines(mDevice, VK_NULL_HANDLE, 1, &pci, nullptr, &mPipelineMaskWrite) != VK_SUCCESS) {
+        SPDLOG_ERROR("[RmlVk] mask-write pipeline creation failed");
         return false;
     }
 
@@ -350,10 +398,26 @@ bool RmlRenderInterfaceVk::BeginFrame() {
     Ring& r = mRings[mFrameIndex];
     r.offset = 0;
     vkResetDescriptorPool(mDevice, r.pool, 0);
-    // Default scissor = full viewport until RmlUi sets one.
+    // Default scissor = full viewport; stencil ref 0 = all pixels pass EQUAL test (mask disabled).
     mScissorEnabled = false;
     mScissor = mFullScissor;
+    mClipMaskEnabled = false;
+    mStencilRef = 0;
     mActive = true;
+
+    // Clear the stencil buffer to 0 at the start of each menu frame so the EQUAL test with
+    // ref=0 passes everywhere when no clip mask has been written. ClearFramebuffer only clears
+    // depth (not stencil) and mFbRenderPass uses DONT_CARE for stencil load, so we must do this
+    // explicitly.
+    VkClearAttachment stencilClear{};
+    stencilClear.aspectMask = VK_IMAGE_ASPECT_STENCIL_BIT;
+    stencilClear.clearValue.depthStencil = { 0.0f, 0 };
+    VkClearRect clearRect{};
+    clearRect.rect = mFullScissor;
+    clearRect.baseArrayLayer = 0;
+    clearRect.layerCount = 1;
+    vkCmdClearAttachments(mCmd, 1, &stencilClear, 1, &clearRect);
+
     return true;
 }
 
@@ -477,6 +541,9 @@ void RmlRenderInterfaceVk::RenderGeometry(Rml::CompiledGeometryHandle geometry, 
     vkUpdateDescriptorSets(mDevice, 2, w, 0, nullptr);
 
     vkCmdBindPipeline(cmd, VK_PIPELINE_BIND_POINT_GRAPHICS, mPipeline);
+    // Set stencil reference: when clip mask is active the ref is the expected mask value; when
+    // disabled ref=0 and stencil buffer is all-zeros → EQUAL passes everywhere.
+    vkCmdSetStencilReference(cmd, VK_STENCIL_FACE_FRONT_AND_BACK, mStencilRef);
     vkCmdSetViewport(cmd, 0, 1, &mViewport);
     VkRect2D sc = mScissorEnabled ? mScissor : mFullScissor;
     vkCmdSetScissor(cmd, 0, 1, &sc);
@@ -610,6 +677,125 @@ void RmlRenderInterfaceVk::SetScissorRegion(Rml::Rectanglei region) {
     mScissor.extent.height = (uint32_t)(region.Height() < 0 ? 0 : region.Height());
 }
 
+void RmlRenderInterfaceVk::EnableClipMask(bool enable) {
+    // Stencil test is always active in mPipeline (EQUAL). When the mask is disabled,
+    // mStencilRef=0 and the stencil buffer is 0 everywhere → test passes everywhere.
+    // When enabled, mStencilRef was set by the last RenderToClipMask call.
+    mClipMaskEnabled = enable;
+    if (!enable)
+        mStencilRef = 0;
+}
+
+void RmlRenderInterfaceVk::RenderToClipMask(Rml::ClipMaskOperation operation, Rml::CompiledGeometryHandle geometry,
+                                             Rml::Vector2f translation) {
+    if (!mActive || !mPipelineMaskWrite)
+        return;
+
+    VkCommandBuffer cmd = mCmd;
+
+    // Matching the GL3 reference implementation:
+    //   Set:        clear stencil to 0, paint geometry pixels with 1. Normal draw ref=1 → passes inside.
+    //   SetInverse: clear stencil to 1, paint geometry pixels with 0. Normal draw ref=1 → passes outside.
+    //   Intersect:  paint geometry pixels with (mStencilRef+1) using ALWAYS. Normal draw ref bumped.
+    uint8_t clearValue = 0;
+    uint8_t writeRef = 1;
+    bool doClear = false;
+
+    switch (operation) {
+    case Rml::ClipMaskOperation::Set:
+        clearValue = 0;
+        writeRef = 1;
+        doClear = true;
+        mStencilRef = 1;
+        break;
+    case Rml::ClipMaskOperation::SetInverse:
+        clearValue = 1;
+        writeRef = 0;
+        doClear = true;
+        mStencilRef = 1; // pixels outside the geometry have stencil=1 → ref=1 → EQUAL passes them
+        break;
+    case Rml::ClipMaskOperation::Intersect:
+        doClear = false;
+        writeRef = static_cast<uint8_t>(mStencilRef + 1);
+        mStencilRef = writeRef;
+        break;
+    }
+
+    if (doClear) {
+        VkClearAttachment clr{};
+        clr.aspectMask = VK_IMAGE_ASPECT_STENCIL_BIT;
+        clr.clearValue.depthStencil = { 0.0f, clearValue };
+        VkClearRect cr{};
+        cr.rect = mFullScissor;
+        cr.baseArrayLayer = 0;
+        cr.layerCount = 1;
+        vkCmdClearAttachments(cmd, 1, &clr, 1, &cr);
+    }
+
+    auto it = mGeometries.find(geometry);
+    if (it == mGeometries.end())
+        return;
+    const Geometry& g = it->second;
+    if (g.indexCount == 0)
+        return;
+
+    Ring& ring = mRings[mFrameIndex];
+    if (ring.offset + mUboStride > ring.capacity)
+        return;
+
+    VkUbo ubo{};
+    ubo.uTranslate[0] = translation.x;
+    ubo.uTranslate[1] = translation.y;
+    ubo.uViewport[0] = (float)mViewport.width;
+    ubo.uViewport[1] = (float)mViewport.height;
+    const VkDeviceSize uboOff = ring.offset;
+    memcpy((uint8_t*)ring.mapped + uboOff, &ubo, sizeof(ubo));
+    ring.offset += mUboStride;
+
+    VkDescriptorSetAllocateInfo dai{};
+    dai.sType = VK_STRUCTURE_TYPE_DESCRIPTOR_SET_ALLOCATE_INFO;
+    dai.descriptorPool = ring.pool;
+    dai.descriptorSetCount = 1;
+    dai.pSetLayouts = &mSetLayout;
+    VkDescriptorSet set;
+    if (vkAllocateDescriptorSets(mDevice, &dai, &set) != VK_SUCCESS)
+        return;
+
+    VkDescriptorBufferInfo bi{};
+    bi.buffer = ring.ubo;
+    bi.offset = uboOff;
+    bi.range = sizeof(VkUbo);
+    VkDescriptorImageInfo ii{};
+    ii.sampler = mSampler;
+    ii.imageView = mWhiteTex.view;
+    ii.imageLayout = VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL;
+    VkWriteDescriptorSet w[2]{};
+    w[0].sType = VK_STRUCTURE_TYPE_WRITE_DESCRIPTOR_SET;
+    w[0].dstSet = set;
+    w[0].dstBinding = 0;
+    w[0].descriptorType = VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER;
+    w[0].descriptorCount = 1;
+    w[0].pBufferInfo = &bi;
+    w[1].sType = VK_STRUCTURE_TYPE_WRITE_DESCRIPTOR_SET;
+    w[1].dstSet = set;
+    w[1].dstBinding = 1;
+    w[1].descriptorType = VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER;
+    w[1].descriptorCount = 1;
+    w[1].pImageInfo = &ii;
+    vkUpdateDescriptorSets(mDevice, 2, w, 0, nullptr);
+
+    vkCmdBindPipeline(cmd, VK_PIPELINE_BIND_POINT_GRAPHICS, mPipelineMaskWrite);
+    vkCmdSetStencilReference(cmd, VK_STENCIL_FACE_FRONT_AND_BACK, writeRef);
+    vkCmdSetViewport(cmd, 0, 1, &mViewport);
+    VkRect2D sc = mScissorEnabled ? mScissor : mFullScissor;
+    vkCmdSetScissor(cmd, 0, 1, &sc);
+    VkDeviceSize zero = 0;
+    vkCmdBindVertexBuffers(cmd, 0, 1, &g.vbo, &zero);
+    vkCmdBindIndexBuffer(cmd, g.ibo, 0, VK_INDEX_TYPE_UINT32);
+    vkCmdBindDescriptorSets(cmd, VK_PIPELINE_BIND_POINT_GRAPHICS, mPipeLayout, 0, 1, &set, 0, nullptr);
+    vkCmdDrawIndexed(cmd, g.indexCount, 1, 0, 0, 0);
+}
+
 void RmlRenderInterfaceVk::DestroyGeometry(Geometry& g) {
     if (g.vbo)
         vkDestroyBuffer(mDevice, g.vbo, nullptr);
@@ -673,6 +859,8 @@ void RmlRenderInterfaceVk::Shutdown() {
         vkDestroySampler(mDevice, mSampler, nullptr);
     if (mPipeline)
         vkDestroyPipeline(mDevice, mPipeline, nullptr);
+    if (mPipelineMaskWrite)
+        vkDestroyPipeline(mDevice, mPipelineMaskWrite, nullptr);
     if (mVs)
         vkDestroyShaderModule(mDevice, mVs, nullptr);
     if (mFs)
@@ -683,6 +871,7 @@ void RmlRenderInterfaceVk::Shutdown() {
         vkDestroyDescriptorSetLayout(mDevice, mSetLayout, nullptr);
     mSampler = VK_NULL_HANDLE;
     mPipeline = VK_NULL_HANDLE;
+    mPipelineMaskWrite = VK_NULL_HANDLE;
     mVs = mFs = VK_NULL_HANDLE;
     mPipeLayout = VK_NULL_HANDLE;
     mSetLayout = VK_NULL_HANDLE;

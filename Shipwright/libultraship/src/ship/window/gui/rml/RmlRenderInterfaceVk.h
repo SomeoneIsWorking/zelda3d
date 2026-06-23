@@ -3,9 +3,12 @@
 // RmlUi render interface for the Fast3D Vulkan backend. Records the menu's 2D geometry into the
 // backend's current command buffer + render pass (obtained via GfxRenderingAPIVulkan::BeginSoH3DPass,
 // the same hook soh3d_vk uses), so the RmlUi menu draws on top of the game under Vulkan — the GL3
-// render interface's counterpart. Minimal feature set: compiled geometry (VBO+IBO), generated
-// textures (font atlas), scissor. Clip-mask/transform/layer/filter effects use the base no-op
-// defaults (the current menu does not need them).
+// render interface's counterpart. Feature set: compiled geometry (VBO+IBO), generated textures
+// (font atlas), scissor, and stencil clip-mask (EnableClipMask/RenderToClipMask — required for
+// overflow:hidden with border-radius). Layer/transform/filter effects are still no-op stubs.
+//
+// Clip-mask requires the depth-stencil attachment to include a stencil aspect, which is why
+// gfx_vulkan.cpp uses VK_FORMAT_D32_SFLOAT_S8_UINT (see mDepthFormat).
 //
 // NOTE: the small Vulkan helpers (memory-type pick, buffer/image upload, one-shot transfer) are
 // duplicated from soh3d_vk.cpp for now; a shared libultraship Vulkan-util TU is a TODO.
@@ -46,6 +49,10 @@ class RmlRenderInterfaceVk : public Rml::RenderInterface {
 
     void EnableScissorRegion(bool enable) override;
     void SetScissorRegion(Rml::Rectanglei region) override;
+
+    void EnableClipMask(bool enable) override;
+    void RenderToClipMask(Rml::ClipMaskOperation operation, Rml::CompiledGeometryHandle geometry,
+                          Rml::Vector2f translation) override;
 
   private:
     struct Geometry {
@@ -104,7 +111,8 @@ class RmlRenderInterfaceVk : public Rml::RenderInterface {
     VkDescriptorSetLayout mSetLayout = VK_NULL_HANDLE;
     VkPipelineLayout mPipeLayout = VK_NULL_HANDLE;
     VkShaderModule mVs = VK_NULL_HANDLE, mFs = VK_NULL_HANDLE;
-    VkPipeline mPipeline = VK_NULL_HANDLE;
+    VkPipeline mPipeline = VK_NULL_HANDLE;          // normal draw (stencil test; color writes on)
+    VkPipeline mPipelineMaskWrite = VK_NULL_HANDLE; // clip-mask write (color writes off; stencil write on)
     VkSampler mSampler = VK_NULL_HANDLE;
     Texture mWhiteTex{};
     VkDeviceSize mUboStride = 0;
@@ -112,6 +120,10 @@ class RmlRenderInterfaceVk : public Rml::RenderInterface {
 
     bool mScissorEnabled = false;
     VkRect2D mScissor{};
+
+    // Clip-mask (stencil) state.
+    bool mClipMaskEnabled = false;
+    uint8_t mStencilRef = 0; // current stencil reference value for the test pipeline
 
     std::unordered_map<Rml::CompiledGeometryHandle, Geometry> mGeometries;
     std::unordered_map<Rml::TextureHandle, Texture> mTextures;
