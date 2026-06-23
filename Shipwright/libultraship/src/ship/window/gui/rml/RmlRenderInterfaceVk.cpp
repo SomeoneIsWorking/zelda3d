@@ -3,6 +3,8 @@
 #ifdef ENABLE_VULKAN
 
 #include <RmlUi/Core/Vertex.h>
+#include <RmlUi/Core/Dictionary.h>
+#include <RmlUi/Core/RenderInterface.h>
 
 #include "fast/backends/gfx_vulkan.h"
 
@@ -368,6 +370,131 @@ bool RmlRenderInterfaceVk::EnsureResources() {
         return false;
     }
 
+    // --- Layer render passes (RGBA8, no depth/stencil) ---
+    // mLayerRenderPass:     LOAD_OP_CLEAR,  initialLayout=UNDEFINED                — first entry (PushLayer).
+    // mLayerRenderPassLoad: LOAD_OP_LOAD,   initialLayout=SHADER_READ_ONLY_OPTIMAL — resume / composite dst.
+    // Both are compatible (same format/samples) so the same VkFramebuffers work with either.
+    {
+        auto CreateLayerRenderPass = [&](VkAttachmentLoadOp loadOp, VkImageLayout initLayout,
+                                         VkRenderPass& rp) -> bool {
+            VkAttachmentDescription colorAtt{};
+            colorAtt.format = VK_FORMAT_R8G8B8A8_UNORM;
+            colorAtt.samples = VK_SAMPLE_COUNT_1_BIT;
+            colorAtt.loadOp = loadOp;
+            colorAtt.storeOp = VK_ATTACHMENT_STORE_OP_STORE;
+            colorAtt.stencilLoadOp = VK_ATTACHMENT_LOAD_OP_DONT_CARE;
+            colorAtt.stencilStoreOp = VK_ATTACHMENT_STORE_OP_DONT_CARE;
+            colorAtt.initialLayout = initLayout;
+            colorAtt.finalLayout = VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL;
+
+            VkAttachmentReference colorRef{};
+            colorRef.attachment = 0;
+            colorRef.layout = VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL;
+
+            VkSubpassDescription subpass{};
+            subpass.pipelineBindPoint = VK_PIPELINE_BIND_POINT_GRAPHICS;
+            subpass.colorAttachmentCount = 1;
+            subpass.pColorAttachments = &colorRef;
+
+            // Ensure fragment shader reads complete after the render pass finishes.
+            VkSubpassDependency dep{};
+            dep.srcSubpass = 0;
+            dep.dstSubpass = VK_SUBPASS_EXTERNAL;
+            dep.srcStageMask = VK_PIPELINE_STAGE_COLOR_ATTACHMENT_OUTPUT_BIT;
+            dep.dstStageMask = VK_PIPELINE_STAGE_FRAGMENT_SHADER_BIT;
+            dep.srcAccessMask = VK_ACCESS_COLOR_ATTACHMENT_WRITE_BIT;
+            dep.dstAccessMask = VK_ACCESS_SHADER_READ_BIT;
+            dep.dependencyFlags = 0;
+
+            VkRenderPassCreateInfo rpci{};
+            rpci.sType = VK_STRUCTURE_TYPE_RENDER_PASS_CREATE_INFO;
+            rpci.attachmentCount = 1;
+            rpci.pAttachments = &colorAtt;
+            rpci.subpassCount = 1;
+            rpci.pSubpasses = &subpass;
+            rpci.dependencyCount = 1;
+            rpci.pDependencies = &dep;
+            return vkCreateRenderPass(mDevice, &rpci, nullptr, &rp) == VK_SUCCESS;
+        };
+
+        if (!CreateLayerRenderPass(VK_ATTACHMENT_LOAD_OP_CLEAR, VK_IMAGE_LAYOUT_UNDEFINED, mLayerRenderPass)) {
+            SPDLOG_ERROR("[RmlVk] layer render pass (clear) creation failed");
+            return false;
+        }
+        if (!CreateLayerRenderPass(VK_ATTACHMENT_LOAD_OP_LOAD, VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL,
+                                   mLayerRenderPassLoad)) {
+            SPDLOG_ERROR("[RmlVk] layer render pass (load) creation failed");
+            return false;
+        }
+    }
+
+    // --- Layer composite pipelines (for mLayerRenderPass; no depth/stencil) ---
+    // These draw a fullscreen quad sampling a layer texture onto the destination layer (or main FB).
+    // We reuse the same shaders + vertex layout, but use mLayerRenderPass and no stencil.
+    {
+        VkPipelineDepthStencilStateCreateInfo dsLayer{};
+        dsLayer.sType = VK_STRUCTURE_TYPE_PIPELINE_DEPTH_STENCIL_STATE_CREATE_INFO;
+        dsLayer.depthTestEnable = VK_FALSE;
+        dsLayer.depthWriteEnable = VK_FALSE;
+        dsLayer.depthCompareOp = VK_COMPARE_OP_ALWAYS;
+        dsLayer.stencilTestEnable = VK_FALSE;
+
+        // BlendMode::Blend — premultiplied alpha over.
+        VkPipelineColorBlendAttachmentState cbaBlend{};
+        cbaBlend.colorWriteMask = VK_COLOR_COMPONENT_R_BIT | VK_COLOR_COMPONENT_G_BIT |
+                                   VK_COLOR_COMPONENT_B_BIT | VK_COLOR_COMPONENT_A_BIT;
+        cbaBlend.blendEnable = VK_TRUE;
+        cbaBlend.srcColorBlendFactor = VK_BLEND_FACTOR_ONE;
+        cbaBlend.dstColorBlendFactor = VK_BLEND_FACTOR_ONE_MINUS_SRC_ALPHA;
+        cbaBlend.colorBlendOp = VK_BLEND_OP_ADD;
+        cbaBlend.srcAlphaBlendFactor = VK_BLEND_FACTOR_ONE;
+        cbaBlend.dstAlphaBlendFactor = VK_BLEND_FACTOR_ONE_MINUS_SRC_ALPHA;
+        cbaBlend.alphaBlendOp = VK_BLEND_OP_ADD;
+        VkPipelineColorBlendStateCreateInfo cbBlend{};
+        cbBlend.sType = VK_STRUCTURE_TYPE_PIPELINE_COLOR_BLEND_STATE_CREATE_INFO;
+        cbBlend.attachmentCount = 1;
+        cbBlend.pAttachments = &cbaBlend;
+
+        // Reuse existing dynamic state (without stencil ref — no stencil test here).
+        VkDynamicState dynLayer[] = { VK_DYNAMIC_STATE_VIEWPORT, VK_DYNAMIC_STATE_SCISSOR };
+        VkPipelineDynamicStateCreateInfo dynSLayer{};
+        dynSLayer.sType = VK_STRUCTURE_TYPE_PIPELINE_DYNAMIC_STATE_CREATE_INFO;
+        dynSLayer.dynamicStateCount = 2;
+        dynSLayer.pDynamicStates = dynLayer;
+
+        VkGraphicsPipelineCreateInfo lpci = pci;
+        lpci.pDepthStencilState = &dsLayer;
+        lpci.pColorBlendState = &cbBlend;
+        lpci.pDynamicState = &dynSLayer;
+        lpci.renderPass = mLayerRenderPass;
+        if (vkCreateGraphicsPipelines(mDevice, VK_NULL_HANDLE, 1, &lpci, nullptr, &mLayerPipelineBlend) != VK_SUCCESS) {
+            SPDLOG_ERROR("[RmlVk] layer blend pipeline creation failed");
+            return false;
+        }
+
+        // BlendMode::Replace — overwrite dst with src (no blending).
+        VkPipelineColorBlendAttachmentState cbaReplace{};
+        cbaReplace.colorWriteMask = VK_COLOR_COMPONENT_R_BIT | VK_COLOR_COMPONENT_G_BIT |
+                                     VK_COLOR_COMPONENT_B_BIT | VK_COLOR_COMPONENT_A_BIT;
+        cbaReplace.blendEnable = VK_FALSE;
+        VkPipelineColorBlendStateCreateInfo cbReplace{};
+        cbReplace.sType = VK_STRUCTURE_TYPE_PIPELINE_COLOR_BLEND_STATE_CREATE_INFO;
+        cbReplace.attachmentCount = 1;
+        cbReplace.pAttachments = &cbaReplace;
+
+        lpci.pColorBlendState = &cbReplace;
+        if (vkCreateGraphicsPipelines(mDevice, VK_NULL_HANDLE, 1, &lpci, nullptr, &mLayerPipelineReplace) != VK_SUCCESS) {
+            SPDLOG_ERROR("[RmlVk] layer replace pipeline creation failed");
+            return false;
+        }
+    }
+
+    // Push the base layer sentinel onto the stack (poolIdx==-1 = main FB).
+    mLayerStack.clear();
+    mLayerStack.push_back({ 0, -1 });
+    mInMainPass = true;
+    mActivePassPoolIdx = -1;
+
     mReady = true;
     SPDLOG_INFO("[RmlVk] resources ready (ubo stride {})", (unsigned long long)mUboStride);
     return true;
@@ -403,6 +530,14 @@ bool RmlRenderInterfaceVk::BeginFrame() {
     mScissor = mFullScissor;
     mClipMaskEnabled = false;
     mStencilRef = 0;
+    // Reset layer stack: base sentinel only, and we are in the main FB render pass.
+    mLayerStack.clear();
+    mLayerStack.push_back({ 0, -1 });
+    mInMainPass = true;
+    mActivePassPoolIdx = -1;
+    // Mark all layer pool slots as not in use.
+    for (auto& l : mLayerPool)
+        l.inUse = false;
     mActive = true;
 
     // Clear the stencil buffer to 0 at the start of each menu frame so the EQUAL test with
@@ -540,10 +675,17 @@ void RmlRenderInterfaceVk::RenderGeometry(Rml::CompiledGeometryHandle geometry, 
     w[1].pImageInfo = &ii;
     vkUpdateDescriptorSets(mDevice, 2, w, 0, nullptr);
 
-    vkCmdBindPipeline(cmd, VK_PIPELINE_BIND_POINT_GRAPHICS, mPipeline);
-    // Set stencil reference: when clip mask is active the ref is the expected mask value; when
-    // disabled ref=0 and stencil buffer is all-zeros → EQUAL passes everywhere.
-    vkCmdSetStencilReference(cmd, VK_STENCIL_FACE_FRONT_AND_BACK, mStencilRef);
+    // Pipeline selection: main FB uses mPipeline (compatible with main FB renderPass, has stencil).
+    // Layer passes use mLayerPipelineBlend (compatible with mLayerRenderPass, no stencil). The
+    // dynamic stencil reference is only needed for the main FB pipeline.
+    if (mInMainPass) {
+        vkCmdBindPipeline(cmd, VK_PIPELINE_BIND_POINT_GRAPHICS, mPipeline);
+        // Set stencil reference: when clip mask is active the ref is the expected mask value; when
+        // disabled ref=0 and stencil buffer is all-zeros → EQUAL passes everywhere.
+        vkCmdSetStencilReference(cmd, VK_STENCIL_FACE_FRONT_AND_BACK, mStencilRef);
+    } else {
+        vkCmdBindPipeline(cmd, VK_PIPELINE_BIND_POINT_GRAPHICS, mLayerPipelineBlend);
+    }
     vkCmdSetViewport(cmd, 0, 1, &mViewport);
     VkRect2D sc = mScissorEnabled ? mScissor : mFullScissor;
     vkCmdSetScissor(cmd, 0, 1, &sc);
@@ -784,6 +926,9 @@ void RmlRenderInterfaceVk::RenderToClipMask(Rml::ClipMaskOperation operation, Rm
     w[1].pImageInfo = &ii;
     vkUpdateDescriptorSets(mDevice, 2, w, 0, nullptr);
 
+    // Stencil clip-mask is only supported in the main FB pass (which has a stencil attachment).
+    // In layer passes we don't have stencil, so skip the mask-write (layer clip-mask is a no-op).
+    if (!mInMainPass) return;
     vkCmdBindPipeline(cmd, VK_PIPELINE_BIND_POINT_GRAPHICS, mPipelineMaskWrite);
     vkCmdSetStencilReference(cmd, VK_STENCIL_FACE_FRONT_AND_BACK, writeRef);
     vkCmdSetViewport(cmd, 0, 1, &mViewport);
@@ -794,6 +939,397 @@ void RmlRenderInterfaceVk::RenderToClipMask(Rml::ClipMaskOperation operation, Rm
     vkCmdBindIndexBuffer(cmd, g.ibo, 0, VK_INDEX_TYPE_UINT32);
     vkCmdBindDescriptorSets(cmd, VK_PIPELINE_BIND_POINT_GRAPHICS, mPipeLayout, 0, 1, &set, 0, nullptr);
     vkCmdDrawIndexed(cmd, g.indexCount, 1, 0, 0, 0);
+}
+
+// ============================================================
+// Layer stack (PushLayer / PopLayer / CompositeLayers)
+// ============================================================
+
+int RmlRenderInterfaceVk::AcquireLayerImage() {
+    const uint32_t w = (uint32_t)mViewport.width;
+    const uint32_t h = (uint32_t)mViewport.height;
+
+    // Try to reuse an existing pool slot that is not in use and matches the current dimensions.
+    for (int i = 0; i < (int)mLayerPool.size(); i++) {
+        LayerImage& l = mLayerPool[i];
+        if (!l.inUse && l.w == w && l.h == h) {
+            l.inUse = true;
+            return i;
+        }
+    }
+
+    // Allocate a new slot.
+    LayerImage l{};
+    l.w = w;
+    l.h = h;
+
+    VkImageCreateInfo ici{};
+    ici.sType = VK_STRUCTURE_TYPE_IMAGE_CREATE_INFO;
+    ici.imageType = VK_IMAGE_TYPE_2D;
+    ici.format = VK_FORMAT_R8G8B8A8_UNORM;
+    ici.extent = { w, h, 1 };
+    ici.mipLevels = 1;
+    ici.arrayLayers = 1;
+    ici.samples = VK_SAMPLE_COUNT_1_BIT;
+    ici.tiling = VK_IMAGE_TILING_OPTIMAL;
+    ici.usage = VK_IMAGE_USAGE_COLOR_ATTACHMENT_BIT | VK_IMAGE_USAGE_SAMPLED_BIT;
+    ici.sharingMode = VK_SHARING_MODE_EXCLUSIVE;
+    ici.initialLayout = VK_IMAGE_LAYOUT_UNDEFINED;
+    vkCreateImage(mDevice, &ici, nullptr, &l.image);
+
+    VkMemoryRequirements req{};
+    vkGetImageMemoryRequirements(mDevice, l.image, &req);
+    VkMemoryAllocateInfo ai{};
+    ai.sType = VK_STRUCTURE_TYPE_MEMORY_ALLOCATE_INFO;
+    ai.allocationSize = req.size;
+    ai.memoryTypeIndex = FindMemType(req.memoryTypeBits, VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT);
+    vkAllocateMemory(mDevice, &ai, nullptr, &l.mem);
+    vkBindImageMemory(mDevice, l.image, l.mem, 0);
+
+    VkImageViewCreateInfo vi{};
+    vi.sType = VK_STRUCTURE_TYPE_IMAGE_VIEW_CREATE_INFO;
+    vi.image = l.image;
+    vi.viewType = VK_IMAGE_VIEW_TYPE_2D;
+    vi.format = VK_FORMAT_R8G8B8A8_UNORM;
+    vi.subresourceRange = { VK_IMAGE_ASPECT_COLOR_BIT, 0, 1, 0, 1 };
+    vkCreateImageView(mDevice, &vi, nullptr, &l.view);
+
+    VkFramebufferCreateInfo fci{};
+    fci.sType = VK_STRUCTURE_TYPE_FRAMEBUFFER_CREATE_INFO;
+    fci.renderPass = mLayerRenderPass;
+    fci.attachmentCount = 1;
+    fci.pAttachments = &l.view;
+    fci.width = w;
+    fci.height = h;
+    fci.layers = 1;
+    vkCreateFramebuffer(mDevice, &fci, nullptr, &l.fb);
+
+    l.inUse = true;
+    mLayerPool.push_back(l);
+    return (int)mLayerPool.size() - 1;
+}
+
+void RmlRenderInterfaceVk::BeginLayerRenderPass(int poolIdx) {
+    // Initial entry: CLEAR pass. Image must be in UNDEFINED (first use) or SHADER_READ_ONLY_OPTIMAL
+    // (reused pool slot) — Vulkan allows UNDEFINED initialLayout to discard any prior layout.
+    LayerImage& l = mLayerPool[poolIdx];
+    VkRenderPassBeginInfo rpbi{};
+    rpbi.sType = VK_STRUCTURE_TYPE_RENDER_PASS_BEGIN_INFO;
+    rpbi.renderPass = mLayerRenderPass;
+    rpbi.framebuffer = l.fb;
+    rpbi.renderArea.offset = { 0, 0 };
+    rpbi.renderArea.extent = { l.w, l.h };
+    VkClearValue clearVal{};
+    clearVal.color = { { 0.0f, 0.0f, 0.0f, 0.0f } };
+    rpbi.clearValueCount = 1;
+    rpbi.pClearValues = &clearVal;
+    vkCmdBeginRenderPass(mCmd, &rpbi, VK_SUBPASS_CONTENTS_INLINE);
+    mActivePassPoolIdx = poolIdx;
+    mInMainPass = false;
+}
+
+void RmlRenderInterfaceVk::ResumeLayerRenderPass(int poolIdx) {
+    // Resume: LOAD pass. Image must be in SHADER_READ_ONLY_OPTIMAL (final layout of any prior pass).
+    // Used when re-entering a layer that already has content: CompositeLayers dst, PopLayer parent.
+    LayerImage& l = mLayerPool[poolIdx];
+    VkRenderPassBeginInfo rpbi{};
+    rpbi.sType = VK_STRUCTURE_TYPE_RENDER_PASS_BEGIN_INFO;
+    rpbi.renderPass = mLayerRenderPassLoad;
+    rpbi.framebuffer = l.fb;
+    rpbi.renderArea.offset = { 0, 0 };
+    rpbi.renderArea.extent = { l.w, l.h };
+    rpbi.clearValueCount = 0;  // LOAD_OP_LOAD doesn't use the clear value
+    rpbi.pClearValues = nullptr;
+    vkCmdBeginRenderPass(mCmd, &rpbi, VK_SUBPASS_CONTENTS_INLINE);
+    mActivePassPoolIdx = poolIdx;
+    mInMainPass = false;
+}
+
+void RmlRenderInterfaceVk::DrawLayerComposite(VkImageView srcView, Rml::BlendMode blendMode, float blendFactor) {
+    // Build a fullscreen-quad geometry covering the current viewport (pixels), with UV (0,0)→(1,1).
+    // Recreate if viewport size changed.
+    const uint32_t vpW = (uint32_t)mViewport.width;
+    const uint32_t vpH = (uint32_t)mViewport.height;
+    if (mFullscreenQuad == 0 || mFullscreenQuadW != vpW || mFullscreenQuadH != vpH) {
+        if (mFullscreenQuad != 0) {
+            ReleaseGeometry(mFullscreenQuad);
+            mFullscreenQuad = 0;
+        }
+        // Two triangles: (0,0)→(W,H). UV y is 0 at top (matches Vulkan image layout).
+        float fw = (float)vpW, fh = (float)vpH;
+        Rml::Vertex verts[4]{};
+        verts[0].position = { 0.f, 0.f };  verts[0].tex_coord = { 0.f, 0.f }; verts[0].colour = { 255,255,255,255 };
+        verts[1].position = { fw,  0.f };  verts[1].tex_coord = { 1.f, 0.f }; verts[1].colour = { 255,255,255,255 };
+        verts[2].position = { fw,  fh  };  verts[2].tex_coord = { 1.f, 1.f }; verts[2].colour = { 255,255,255,255 };
+        verts[3].position = { 0.f, fh  };  verts[3].tex_coord = { 0.f, 1.f }; verts[3].colour = { 255,255,255,255 };
+        int idx[6] = { 0,1,2, 0,2,3 };
+        mFullscreenQuad = CompileGeometry(Rml::Span<const Rml::Vertex>(verts, 4), Rml::Span<const int>(idx, 6));
+        mFullscreenQuadW = vpW;
+        mFullscreenQuadH = vpH;
+    }
+    if (mFullscreenQuad == 0)
+        return;
+
+    auto it = mGeometries.find(mFullscreenQuad);
+    if (it == mGeometries.end())
+        return;
+    const Geometry& g = it->second;
+
+    Ring& ring = mRings[mFrameIndex];
+    if (ring.offset + mUboStride > ring.capacity)
+        return;
+
+    VkUbo ubo{};
+    ubo.uTranslate[0] = 0.0f;
+    ubo.uTranslate[1] = 0.0f;
+    ubo.uViewport[0] = (float)vpW;
+    ubo.uViewport[1] = (float)vpH;
+    const VkDeviceSize uboOff = ring.offset;
+    memcpy((uint8_t*)ring.mapped + uboOff, &ubo, sizeof(ubo));
+    ring.offset += mUboStride;
+
+    VkDescriptorSetAllocateInfo dai{};
+    dai.sType = VK_STRUCTURE_TYPE_DESCRIPTOR_SET_ALLOCATE_INFO;
+    dai.descriptorPool = ring.pool;
+    dai.descriptorSetCount = 1;
+    dai.pSetLayouts = &mSetLayout;
+    VkDescriptorSet set;
+    if (vkAllocateDescriptorSets(mDevice, &dai, &set) != VK_SUCCESS)
+        return;
+
+    VkDescriptorBufferInfo bi{};
+    bi.buffer = ring.ubo;
+    bi.offset = uboOff;
+    bi.range = sizeof(VkUbo);
+
+    // The opacity filter is applied by pre-multiplying vertex colour.  For blendFactor<1 we encode
+    // the factor in the vertex colour (premult: R=G=B=A=blendFactor*255). Since the shader does
+    // texture * vCol, this scales all channels uniformly. Note: we can't easily patch the already-
+    // compiled fullscreen quad vertices, so we handle opacity by adjusting the blend constant instead.
+    // (The pipeline uses VK_BLEND_FACTOR_ONE for src, so we leave vertex colour white and scale via
+    // the UBO alpha if needed.  For now opacity just falls through as BlendMode::Blend with the
+    // quad vertex colour set to white = full opacity — which is correct for the texture-based path
+    // because the source layer already has the pre-rendered premult alpha content.)
+    // Actual opacity scaling is left for a future push-constant extension; the current handling
+    // ensures no ghost double-draw (the real bug #4 fix), which is the primary goal.
+    (void)blendFactor;
+
+    VkDescriptorImageInfo ii{};
+    ii.sampler = mSampler;
+    ii.imageView = srcView;
+    ii.imageLayout = VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL;
+
+    VkWriteDescriptorSet w[2]{};
+    w[0].sType = VK_STRUCTURE_TYPE_WRITE_DESCRIPTOR_SET;
+    w[0].dstSet = set; w[0].dstBinding = 0;
+    w[0].descriptorType = VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER;
+    w[0].descriptorCount = 1; w[0].pBufferInfo = &bi;
+    w[1].sType = VK_STRUCTURE_TYPE_WRITE_DESCRIPTOR_SET;
+    w[1].dstSet = set; w[1].dstBinding = 1;
+    w[1].descriptorType = VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER;
+    w[1].descriptorCount = 1; w[1].pImageInfo = &ii;
+    vkUpdateDescriptorSets(mDevice, 2, w, 0, nullptr);
+
+    // Pipeline selection: when compositing onto the main FB (mInMainPass), use mPipeline which is
+    // compatible with the main FB render pass (BGRA + depth/stencil). For layer-to-layer compositing,
+    // use the layer pipelines (built for mLayerRenderPass, RGBA, no depth/stencil).
+    VkPipeline pipe;
+    if (mInMainPass) {
+        // Main FB: use the normal draw pipeline (stencil ref=0 = passes everywhere when mask disabled).
+        pipe = mPipeline;
+        vkCmdSetStencilReference(mCmd, VK_STENCIL_FACE_FRONT_AND_BACK, 0);
+    } else {
+        pipe = (blendMode == Rml::BlendMode::Replace) ? mLayerPipelineReplace : mLayerPipelineBlend;
+    }
+    vkCmdBindPipeline(mCmd, VK_PIPELINE_BIND_POINT_GRAPHICS, pipe);
+    vkCmdSetViewport(mCmd, 0, 1, &mViewport);
+    vkCmdSetScissor(mCmd, 0, 1, &mFullScissor);
+    VkDeviceSize zero = 0;
+    vkCmdBindVertexBuffers(mCmd, 0, 1, &g.vbo, &zero);
+    vkCmdBindIndexBuffer(mCmd, g.ibo, 0, VK_INDEX_TYPE_UINT32);
+    vkCmdBindDescriptorSets(mCmd, VK_PIPELINE_BIND_POINT_GRAPHICS, mPipeLayout, 0, 1, &set, 0, nullptr);
+    vkCmdDrawIndexed(mCmd, g.indexCount, 1, 0, 0, 0);
+}
+
+Rml::LayerHandle RmlRenderInterfaceVk::PushLayer() {
+    if (!mActive || !mReady)
+        return 0;
+
+    // End whichever render pass is currently open.
+    // If in the main FB pass, use BeginSoH3DOffscreen to close it through the backend.
+    // If in a layer pass, end it ourselves.
+    if (mInMainPass) {
+        // Close the main FB pass via the backend so it can be properly reopened later.
+        Fast::SoH3DVkContext ctx{};
+        if (!Fast::g_activeVulkanApi->BeginSoH3DOffscreen(ctx)) {
+            SPDLOG_WARN("[RmlVk] PushLayer: BeginSoH3DOffscreen failed");
+            return 0;
+        }
+        // mCmd is still valid (same command buffer, just pass ended).
+        mInMainPass = false;
+        mActivePassPoolIdx = -1;
+    } else {
+        // End the current layer render pass so we can begin a new one.
+        vkCmdEndRenderPass(mCmd);
+        mActivePassPoolIdx = -1;
+    }
+
+    int poolIdx = AcquireLayerImage();
+    BeginLayerRenderPass(poolIdx);  // sets mActivePassPoolIdx = poolIdx, mInMainPass = false
+
+    Rml::LayerHandle handle = mNextLayer++;
+    mLayerStack.push_back({ handle, poolIdx });
+    SPDLOG_INFO("[RmlVk] PushLayer -> handle {} pool {}", (size_t)handle, poolIdx);
+    return handle;
+}
+
+void RmlRenderInterfaceVk::CompositeLayers(Rml::LayerHandle source, Rml::LayerHandle destination,
+                                            Rml::BlendMode blendMode,
+                                            Rml::Span<const Rml::CompiledFilterHandle> filters) {
+    if (!mActive || !mReady)
+        return;
+    SPDLOG_INFO("[RmlVk] CompositeLayers src={} dst={} blend={} filters={}", (size_t)source,
+                (size_t)destination, (int)blendMode, filters.size());
+
+    // Collect opacity from filters (first opacity filter wins; others are no-ops here).
+    float blendFactor = 1.0f;
+    for (const Rml::CompiledFilterHandle fh : filters) {
+        if (fh == 0) continue;
+        const CompiledFilter* cf = reinterpret_cast<const CompiledFilter*>(fh);
+        blendFactor = cf->blendFactor;
+        break; // only first filter used
+    }
+
+    // Find source and destination pool indices.
+    int srcPool = -1;
+    for (auto& lf : mLayerStack) {
+        if (lf.handle == source) { srcPool = lf.poolIdx; break; }
+    }
+    int dstPool = -1;
+    for (auto& lf : mLayerStack) {
+        if (lf.handle == destination) { dstPool = lf.poolIdx; break; }
+    }
+
+    VkImageView srcView = (srcPool >= 0) ? mLayerPool[srcPool].view : mWhiteTex.view;
+
+    // Close the source's render pass if it is currently open (mActivePassPoolIdx == srcPool).
+    // After this, the source image is in SHADER_READ_ONLY_OPTIMAL (finalLayout of any layer pass).
+    if (mInMainPass) {
+        // Source should never be the main FB in practice, but handle it safely.
+        SPDLOG_WARN("[RmlVk] CompositeLayers: source is main FB? unexpected");
+    } else if (mActivePassPoolIdx == srcPool) {
+        vkCmdEndRenderPass(mCmd);
+        mActivePassPoolIdx = -1;
+    }
+    // else: source was already ended (e.g. by a prior PopLayer / CompositeLayers iteration)
+
+    // Begin the destination render pass.
+    if (dstPool >= 0) {
+        // Destination is an offscreen layer.
+        // Always use LOAD (mLayerRenderPassLoad) to PRESERVE existing destination content —
+        // this is critical when destination already has geometry rendered to it (e.g. window
+        // content rendered to L1 before the box-shadow sub-layer was pushed and composited back).
+        ResumeLayerRenderPass(dstPool);  // sets mActivePassPoolIdx = dstPool, mInMainPass = false
+        DrawLayerComposite(srcView, blendMode, blendFactor);
+        // Leave the render pass open — further RmlUi draws (or another CompositeLayers) will follow.
+    } else {
+        // Destination is the main FB (base layer, handle 0 / null).
+        // Re-open the main FB render pass via BeginSoH3DPass.
+        Fast::SoH3DVkContext ctx{};
+        if (!Fast::g_activeVulkanApi->BeginSoH3DPass(ctx)) {
+            SPDLOG_WARN("[RmlVk] CompositeLayers: BeginSoH3DPass failed");
+            return;
+        }
+        mCmd = ctx.cmd;
+        mViewport = ctx.viewport;
+        mFullScissor = ctx.scissor;
+        mInMainPass = true;
+        mActivePassPoolIdx = -1;
+        DrawLayerComposite(srcView, blendMode, blendFactor);
+    }
+}
+
+void RmlRenderInterfaceVk::PopLayer() {
+    if (!mActive || !mReady)
+        return;
+    if (mLayerStack.size() <= 1) {
+        SPDLOG_WARN("[RmlVk] PopLayer with empty layer stack");
+        return;
+    }
+
+    // End the top layer's render pass only if it is currently the ACTIVE one.
+    // CompositeLayers may have already ended it (ended src, opened dst), so mActivePassPoolIdx
+    // tracks which pool slot's pass is truly open right now.
+    LayerFrame top = mLayerStack.back();
+    mLayerStack.pop_back();
+
+    if (!mInMainPass && mActivePassPoolIdx == top.poolIdx && top.poolIdx >= 0) {
+        // Top's render pass is still open — end it. Image transitions to SHADER_READ_ONLY_OPTIMAL.
+        vkCmdEndRenderPass(mCmd);
+        mActivePassPoolIdx = -1;
+    }
+    // else: top's pass was already ended by CompositeLayers (active pass is dst, not top)
+    // — nothing to end here for top; whatever is open will be handled below.
+
+    // Release the pool slot.
+    if (top.poolIdx >= 0)
+        mLayerPool[top.poolIdx].inUse = false;
+
+    // Restore the parent render pass.
+    const LayerFrame& parent = mLayerStack.back();
+    if (parent.poolIdx == -1) {
+        // Parent is the main FB — restore it via BeginSoH3DPass (idempotent if already open).
+        if (!mInMainPass) {
+            Fast::SoH3DVkContext ctx{};
+            if (Fast::g_activeVulkanApi->BeginSoH3DPass(ctx)) {
+                mCmd = ctx.cmd;
+                mViewport = ctx.viewport;
+                mFullScissor = ctx.scissor;
+                mInMainPass = true;
+                mActivePassPoolIdx = -1;
+            } else {
+                SPDLOG_WARN("[RmlVk] PopLayer: BeginSoH3DPass failed");
+            }
+        }
+        // if mInMainPass is already true (CompositeLayers opened it), no-op — already correct.
+    } else {
+        // Parent is an offscreen layer.
+        if (mActivePassPoolIdx != parent.poolIdx) {
+            // Parent's pass is not currently open. Re-enter it with LOAD to preserve its content.
+            // The parent image is in SHADER_READ_ONLY_OPTIMAL (finalLayout of any layer pass that
+            // ended on it). ResumeLayerRenderPass uses LOAD_OP_LOAD + initialLayout = SHADER_READ_ONLY.
+            ResumeLayerRenderPass(parent.poolIdx);  // sets mActivePassPoolIdx = parent.poolIdx
+        }
+        // else: parent's pass is already the active one (mActivePassPoolIdx == parent.poolIdx),
+        // nothing to do — CompositeLayers opened it to dst which is this parent.
+    }
+
+    SPDLOG_INFO("[RmlVk] PopLayer done; stack depth {}", mLayerStack.size());
+}
+
+// ============================================================
+// Filters
+// ============================================================
+
+Rml::CompiledFilterHandle RmlRenderInterfaceVk::CompileFilter(const Rml::String& name,
+                                                               const Rml::Dictionary& parameters) {
+    float blendFactor = 1.0f;
+    if (name == "opacity") {
+        blendFactor = Rml::Get(parameters, "value", 1.0f);
+        auto* cf = new CompiledFilter();
+        cf->blendFactor = blendFactor;
+        return reinterpret_cast<Rml::CompiledFilterHandle>(cf);
+    }
+    // Other filters (blur, drop-shadow, etc.) are not yet implemented — return a passthrough filter
+    // so the layer composite still runs (just without the effect). This prevents the no-op stub
+    // from causing ghost double-renders.
+    auto* cf = new CompiledFilter();
+    cf->blendFactor = 1.0f;
+    return reinterpret_cast<Rml::CompiledFilterHandle>(cf);
+}
+
+void RmlRenderInterfaceVk::ReleaseFilter(Rml::CompiledFilterHandle filter) {
+    delete reinterpret_cast<CompiledFilter*>(filter);
 }
 
 void RmlRenderInterfaceVk::DestroyGeometry(Geometry& g) {
@@ -816,6 +1352,18 @@ void RmlRenderInterfaceVk::DestroyTexture(Texture& t) {
     if (t.mem)
         vkFreeMemory(mDevice, t.mem, nullptr);
     t = {};
+}
+
+void RmlRenderInterfaceVk::DestroyLayerImage(LayerImage& l) {
+    if (l.fb)
+        vkDestroyFramebuffer(mDevice, l.fb, nullptr);
+    if (l.view)
+        vkDestroyImageView(mDevice, l.view, nullptr);
+    if (l.image)
+        vkDestroyImage(mDevice, l.image, nullptr);
+    if (l.mem)
+        vkFreeMemory(mDevice, l.mem, nullptr);
+    l = {};
 }
 
 void RmlRenderInterfaceVk::ProcessPendingFrees() {
@@ -846,6 +1394,20 @@ void RmlRenderInterfaceVk::Shutdown() {
     }
     mPendingFrees.clear();
     DestroyTexture(mWhiteTex);
+    // Release fullscreen quad before destroying geometry maps.
+    if (mFullscreenQuad != 0) {
+        auto it = mGeometries.find(mFullscreenQuad);
+        if (it != mGeometries.end()) {
+            DestroyGeometry(it->second);
+            mGeometries.erase(it);
+        }
+        mFullscreenQuad = 0;
+    }
+    // Destroy layer pool.
+    for (auto& l : mLayerPool)
+        DestroyLayerImage(l);
+    mLayerPool.clear();
+    mLayerStack.clear();
     for (Ring& r : mRings) {
         if (r.pool)
             vkDestroyDescriptorPool(mDevice, r.pool, nullptr);
@@ -861,6 +1423,14 @@ void RmlRenderInterfaceVk::Shutdown() {
         vkDestroyPipeline(mDevice, mPipeline, nullptr);
     if (mPipelineMaskWrite)
         vkDestroyPipeline(mDevice, mPipelineMaskWrite, nullptr);
+    if (mLayerPipelineBlend)
+        vkDestroyPipeline(mDevice, mLayerPipelineBlend, nullptr);
+    if (mLayerPipelineReplace)
+        vkDestroyPipeline(mDevice, mLayerPipelineReplace, nullptr);
+    if (mLayerRenderPass)
+        vkDestroyRenderPass(mDevice, mLayerRenderPass, nullptr);
+    if (mLayerRenderPassLoad)
+        vkDestroyRenderPass(mDevice, mLayerRenderPassLoad, nullptr);
     if (mVs)
         vkDestroyShaderModule(mDevice, mVs, nullptr);
     if (mFs)
@@ -872,6 +1442,10 @@ void RmlRenderInterfaceVk::Shutdown() {
     mSampler = VK_NULL_HANDLE;
     mPipeline = VK_NULL_HANDLE;
     mPipelineMaskWrite = VK_NULL_HANDLE;
+    mLayerPipelineBlend = VK_NULL_HANDLE;
+    mLayerPipelineReplace = VK_NULL_HANDLE;
+    mLayerRenderPass = VK_NULL_HANDLE;
+    mLayerRenderPassLoad = VK_NULL_HANDLE;
     mVs = mFs = VK_NULL_HANDLE;
     mPipeLayout = VK_NULL_HANDLE;
     mSetLayout = VK_NULL_HANDLE;

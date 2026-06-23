@@ -5465,6 +5465,16 @@ const char* digitTextures[] = { gCounterDigit0Tex, gCounterDigit1Tex, gCounterDi
                                 gCounterDigit6Tex, gCounterDigit7Tex, gCounterDigit8Tex };
 
 void Interface_Draw(PlayState* play) {
+    // SoH3D PC HUD: when the native Vulkan PC HUD is active, suppress the entire N64 Fast3D HUD
+    // (hearts/magic/rupees/buttons AND the SoH3D 6-slot hotbar drawn at the tail of this function)
+    // so the two don't stack. The PC HUD (soh3d_hud_vk.cpp, driven by SoH3D_HudFrame) draws them
+    // natively via Vulkan with the real HD textures. Env SOH3D_PCHUD=0 / REPL `pchud 0` reverts.
+    {
+        extern int SoH3D_PcHudEnabled(void);
+        if (SoH3D_PcHudEnabled()) {
+            return;
+        }
+    }
     static s16 magicArrowEffectsR[] = { 255, 100, 255 };
     static s16 magicArrowEffectsG[] = { 0, 100, 255 };
     static s16 magicArrowEffectsB[] = { 0, 255, 100 };

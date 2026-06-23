@@ -16,6 +16,10 @@
 #include "ship/window/gui/resource/GuiTextureFactory.h"
 #include "ship/window/gui/resource/GuiTexture.h"
 
+// SoH3D native PC HUD render entry (defined in soh/src/soh3d/soh3d.c). C linkage; called from
+// Gui::EndFrame before the RmlUi menu so the HUD draws under an open ESC menu. No-op when disabled.
+extern "C" void SoH3D_HudFrame(void);
+
 namespace Ship {
 #define TOGGLE_BTN ImGuiKey_F1
 #define TOGGLE_PAD_BTN ImGuiKey_GamepadBack
@@ -279,6 +283,10 @@ void Gui::EndFrame() {
     // game image paints over it. (Layering the menu under the ImGui dev-tool windows is a
     // Phase 2 concern — they share a single ImGui draw pass here.)
     ImGuiRenderDrawData(ImGui::GetDrawData());
+    // SoH3D native PC HUD: drawn directly through the Vulkan backend (soh3d_hud_vk.cpp), BEFORE the
+    // RmlUi menu so an open ESC menu composites on top of the HUD. No-op when the PC HUD is disabled,
+    // on non-Vulkan backends, or before a valid game frame exists. Defined in soh/src/soh3d/soh3d.c.
+    SoH3D_HudFrame();
     RenderRmlMenu();
     ImGui::EndFrame();
 }
