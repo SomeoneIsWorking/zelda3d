@@ -2284,6 +2284,54 @@ static const char* SoH3D_EnKoCsabOverride(int modelId, Actor* actor) {
     }
 }
 
+// En_Hy adult townsfolk: per-ENHY_TYPE idle CSAB override, grounded in OoT3D oracle animLength.
+// Only types whose idle CSAB differs from the body's SoH3D_AutoModelDefaultAnim selection are
+// listed.  Others fall through to *_matsu (or the first idle-matching CSAB) which is correct.
+//
+// Oracle ground truth (Market Day, scene 32; tools/oracle_export.py animLength column):
+//   type 3  (BOJ_3,  ENHY_ANIM_15): oracle 16f → Boj2_9_2 (16f, only remaining 16f BOJ CSAB)
+//   type 5  (BOJ_5,  ENHY_ANIM_16): oracle 11f → Boj2_9   (11f, UNIQUE)
+//   type 8  (CNE_8,  ENHY_ANIM_9 ): oracle 40f → Cne_n_wait (40f, UNIQUE); matsu=20f wrong
+//   type 9  (BOJ_9,  ENHY_ANIM_13): oracle 30f → Boj_13   (30f); suffix=anim_idx naming
+//   type 10 (BOJ_10, ENHY_ANIM_14): oracle 23f → Boj_14   (23f, UNIQUE)
+//   type 11 (CNE_11, ENHY_ANIM_20): oracle 12f → Cne2_15  (12f, UNIQUE)
+//   type 14 (BOJ_14, ENHY_ANIM_19): oracle n/a  → Boj2_19 (30f); suffix=anim_idx, Boj_matsu=30f same dur
+//   type 16 (BOJ_16, ENHY_ANIM_5 ): oracle n/a  → Boj2_5  (16f); suffix=anim_idx
+// zelda_boj.zar catalog: Boj_13(30), Boj_14(23), Boj_matsu(30), Boj2_5(16), Boj2_9(11),
+//   Boj2_9_2(16), Boj2_17(30), Boj2_19(30). zelda_cne.zar: Cne_matsu(20), Cne_n_wait(40), Cne2_15(12).
+static const char* SoH3D_EnHyCsabOverride(int modelId, Actor* actor) {
+    (void)modelId;
+    if (actor == NULL || actor->id != ACTOR_EN_HY) {
+        return NULL;
+    }
+    switch (actor->params & 0x7F) { // ENHY_TYPE
+        // BOJ body skeleton (zelda_boj.zar) — types where OoT3D idle ≠ Boj_matsu:
+        case 3:   // ENHY_TYPE_BOJ_3: ENHY_ANIM_15 → oracle 16f → Boj2_9_2 (16f)
+                  // Boj2_5 is taken by type 16 (ANIM_5); Boj2_9_2 is the only other 16f BOJ CSAB.
+            return "Boj2_9_2";
+        case 5:   // ENHY_TYPE_BOJ_5: ENHY_ANIM_16 → oracle 11f → Boj2_9 (11f, UNIQUE in BOJ ZAR)
+            return "Boj2_9";
+        case 9:   // ENHY_TYPE_BOJ_9: ENHY_ANIM_13 → oracle 30f → Boj_13 (30f, naming suffix=13)
+            return "Boj_13";
+        case 10:  // ENHY_TYPE_BOJ_10: ENHY_ANIM_14 → oracle 23f → Boj_14 (23f, UNIQUE in BOJ ZAR)
+            return "Boj_14";
+        case 14:  // ENHY_TYPE_BOJ_14: ENHY_ANIM_19 → Boj2_19 (30f, naming suffix=19)
+                  // Same duration as Boj_matsu but explicit to avoid drift if default changes.
+            return "Boj2_19";
+        case 16:  // ENHY_TYPE_BOJ_16: ENHY_ANIM_5  → Boj2_5 (16f, naming suffix=5)
+            return "Boj2_5";
+        // CNE body skeleton (zelda_cne.zar):
+        case 8:   // ENHY_TYPE_CNE_8: ENHY_ANIM_9  → oracle 40f → Cne_n_wait (40f, UNIQUE)
+                  // SoH3D_AutoModelDefaultAnim picks Cne_matsu (20f) via "matsu" keyword first;
+                  // oracle says 40f → must override to Cne_n_wait.
+            return "Cne_n_wait";
+        case 11:  // ENHY_TYPE_CNE_11: ENHY_ANIM_20 → oracle 12f → Cne2_15 (12f, UNIQUE)
+            return "Cne2_15";
+        default:
+            return NULL;
+    }
+}
+
 static int SoH3D_DoRetarget(PlayState* play, void** skeleton, Vec3s* jointTable, int limbCount) {
     // ORACLE DUMP (SOH3D_SKELDUMP=1): print the live N64 skeleton + the OoT3D skeleton once per
     // model, for offline analysis. Tree walk is OOB-safe.
@@ -2379,6 +2427,11 @@ static int SoH3D_DoRetarget(PlayState* play, void** skeleton, Vec3s* jointTable,
         const char* enkoOv = SoH3D_EnKoCsabOverride(gSoH3dPendingModel, gSoH3dPendingActor);
         if (enkoOv != NULL && SoH3D_AutoModelHasCsab(gSoH3dPendingModel, enkoOv)) {
             csab = enkoOv;
+        }
+        // #73: En_Hy per-ENHY_TYPE idle CSAB override (same guard: only if CSAB lives in this model's ZAR).
+        const char* enhyOv = SoH3D_EnHyCsabOverride(gSoH3dPendingModel, gSoH3dPendingActor);
+        if (enhyOv != NULL && SoH3D_AutoModelHasCsab(gSoH3dPendingModel, enhyOv)) {
+            csab = enhyOv;
         }
         // LIVE anim-compare tooling: REPL `animforce <base>` pins a chosen CSAB on every replaced
         // actor so its motion can be eyeballed against the N64 anim (toggle `auto 0/1`). Empty = auto.
