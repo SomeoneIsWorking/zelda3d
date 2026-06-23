@@ -1,0 +1,103 @@
+# OoT3D world (scene) lighting & combiner — reverse-engineered port spec
+
+Goal: SoH3D world geometry must render **pixel-identical** to OoT3D (the user's definitive-edition
+north star). This documents OoT3D's real per-material PICA200 fragment pipeline so it can be ported
+into `soh3d_gl.cpp` (and the Vulkan backend), replacing the current ad-hoc `texture * vColor * uTint`.
+
+Authoritative reference: **noclip.website `src/OcarinaOfTime3D/{cmb,render,zsi}.ts`** (the DMP/PICA200
+shader generator). All offsets below are validated live against the 3DS ROM for the Kokiri room CMB
+`/scene/spot04_0_info.zsi`. Probe: `scratch/lightport/mat_probe.py`.
+
+## The pipeline OoT3D actually runs (per material)
+
+OoT3D builds a per-material fragment program. For **scene/world geometry** the relevant config is:
+
+1. **Vertex lighting** (`isVertexLightingEnabled`, material +0x01) — Kokiri: **all 21 mats = 1**.
+   Fragment lighting (+0x00) = 0 for world geometry. So lighting is computed **per vertex**, fed
+   into the combiner as `PRIMARY_COLOR` (= `v_Color`):
+
+   ```
+   for i in 0..1:                                  # only 2 lights in the vtx shader
+     diffuse_i = sceneLight[i].diffuse * matDiffuse
+     ambient_i = sceneLight[i].ambient * matAmbient
+     NdotL     = max(0, dot(-sceneLight[i].direction, normal))
+     acc      += diffuse_i * NdotL + ambient_i
+   v_Color = saturate(acc) * a_Color               # a_Color = baked per-vertex color (VATR)
+   ```
+
+   **Kokiri material colors (validated raw bytes):** matAmbient = (255,255,255) WHITE
+   (+0xA4), matDiffuse = (0,0,0) BLACK (+0xA8). Because matDiffuse is black, the **directional
+   N·L term contributes nothing** — world lit color collapses to:
+
+   ```
+   v_Color = saturate( sceneLight0.ambient + sceneLight1.ambient ) * a_Color
+   ```
+   (sceneLight1.ambient is forced 0 in the ZSI parse, so effectively `saturate(sceneAmbient)*a_Color`).
+
+2. **TEV texture combiner** (per-material, material +0x120 count / +0x124 index table → settings
+   table after all materials, stride 0x28). The grass/ground material (mat0) is **one stage**:
+
+   ```
+   combineRGB = MODULATE(src0=PRIMARY_COLOR(v_Color), src1=TEXTURE0)   # = v_Color * tex
+   scaleRGB   = x2                                                     # <-- KEY brightness factor
+   out        = saturate(v_Color * tex) * 2.0
+   ```
+
+   `scaleRGB` is **per-material** (mat10/mat12 = x1, mat0 = x2). This is exactly why a single global
+   brightness multiply is wrong and the real combiner must be ported. Combiner source/op/combine/scale
+   enums: see `cmb.ts` (CombineSourceDMP / CombineOpDMP / CombineResultOpDMP / CombineScaleDMP) and
+   `render.ts generateTexCombiner*`.
+
+## What SoH3D does today (the bug)
+
+`soh3d_gl.cpp` frag (uLit==0 world path): `frag = texture * vColor * uTint`, where `vColor` is the
+RAW baked `a_Color` and `uTint ≈ 0.95`. It **ignores the TEV combiner entirely** (cmb.cpp parses no
+combiner — confirmed), so it misses:
+  - the per-material combiner **scale** (×2 for grass) — the prime brightness loss,
+  - the **vertex-lighting ambient multiply** `saturate(sceneAmbient)` that OoT3D folds into v_Color,
+  - any non-MODULATE combiner / multi-stage materials (e.g. mat10 stage1 MULT_ADD of TEX1).
+
+Result measured (Kokiri noon): SoH3D grass (26,25,13) lum 21 G/R 0.95 vs oracle (75,98,26) lum 66
+G/R 1.31 — ~3× dark + hue lost.
+
+## Material byte layout (ver<=6, stride 0x15C; relative to material start)
+- +0x00 isFragmentLightingEnabled (u8) ; +0x01 isVertexLightingEnabled (u8)
+- +0xA0 emission / +0xA4 ambient / +0xA8 diffuse / +0xAC spec0 / +0xB0 spec1 — all RGBA8 **big-endian**
+- +0xB4..+0xC8 constantColors[0..5] (RGBA8 BE) ; +0xCC..+0xD8 combinerBufferColor (4×f32 LE)
+- +0xE4 lightingConfig (u32) ; +0x120 textureCombinerTableCount (u32) ; +0x124 index table (u16 each)
+- combiner settings table base = matsChunk + 0x0C + count*0x15C ; entry stride 0x28:
+  +0x00 combineRGB +0x02 combineAlpha +0x04 scaleRGB +0x06 scaleAlpha +0x08/0x0A bufferInput
+  +0x0C/0x0E/0x10 source0/1/2 RGB +0x12/0x14/0x16 op0/1/2 RGB +0x18.. alpha +0x24 constantIndex (u32)
+  Note: material data region starts at matsChunk **+0x0C** (not +0x10).
+
+## ZSI environment settings (the scene light source) — scene header `<scene>_info.zsi`, cmd 0x0F
+Per-setting stride 0x1C (non-Majora): +0x0A ambient RGB, +0x0D light0 dir (s8/0x7F), +0x10 light0 col,
++0x13 light1 dir, +0x16 light1 col, +0x19 fog col. Kokiri has **12 settings** (time-of-day variants).
+light1.ambient forced 0. light0.col const (0,128,59) (irrelevant — matDiffuse black). The active
+setting/blend is time-driven (OoT3D z_kankyo analogue).
+
+## OPEN / next (do live, not offline)
+Offline numeric reconstruction does NOT cleanly match the oracle yet — too many offline unknowns
+(runtime ETC1 texture decode vs python, which of the 12 env settings is active + time blend, exact
+per-vertex a_Color, gamma). Per project rule "verify the FULL path live vs oracle": implement the
+port in-engine, gate A/B, and measure live grass/wall G-R + luminance vs the Azahar oracle. Do NOT
+tune offline constants to match.
+
+### Port plan
+1. **cmb.cpp**: parse the TEV combiner (≥stage0: combineRGB, src0/1/2, op, scaleRGB, constantIndex)
+   + isVertexLighting/isFragmentLighting + matAmbient/matDiffuse per material. Store on CmbMaterial.
+2. **soh3d_gl.cpp world path**: replace `texture*vColor*uTint` with the real combiner eval. Minimum
+   viable for scenes: `out = saturate(tex * v_Color) * scaleRGB`, with
+   `v_Color = saturate(sceneAmbient*matAmbient + sceneDiffuse*matDiffuse*NdotL) * a_Color`.
+   Feed sceneAmbient/diffuse/dir from the scene env (see "source of truth" below). Gate behind an
+   env var + REPL toggle for A/B against the current path.
+3. Generalize to multi-stage / non-MODULATE combiners (MULT_ADD, ADD, constants, buffer color) so
+   layered materials (e.g. mat10) match too.
+4. **Source of truth for scene lights**: decide N64 envCtx vs OoT3D ZSI env settings. For pixel parity
+   prefer OoT3D's own ZSI env (cmd 0x0F) selected/blended by time-of-day; confirm which index the live
+   game uses by reading the oracle.
+5. Mirror in the Vulkan backend (single source of truth).
+6. Verify live across scenes (Kokiri, Market, Kakariko, a dungeon; day+night) vs oracle. Pixel-diff.
+
+Tools: `scratch/lightport/mat_probe.py` (material+combiner dump), `tools/cmb.py`/`zsi.py`/`ctr_romfs.py`
+(ROM decode), Azahar oracle (`tools/oracle_boot.sh`), live SoH3D (skill soh3d-game-control).
