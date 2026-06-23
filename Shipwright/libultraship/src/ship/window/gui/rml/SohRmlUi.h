@@ -111,6 +111,10 @@ class SohRmlUi {
     // (called on open / tab switch), and flip+persist the focused row's CVar (called on activate).
     void RefreshToggleRows();
     bool ToggleFocusedRow();
+    // Curated CVar knob rows: step the focused row's value by direction (+1 or -1) if it has a
+    // `knob` attribute. Returns true if the focused row was a knob (Left/Right consumed), false if
+    // the caller should fall through to tab switching.
+    bool StepFocusedKnob(int direction);
     // Rewrite the Diag pane's #diagtext element from the gSoH3dDiagText buffer (filled per-frame by
     // soh3d.c). Called every frame from UpdateAndRender so the on-screen coords stay live.
     void RefreshDiag();

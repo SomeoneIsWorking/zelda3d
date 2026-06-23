@@ -104,6 +104,57 @@ static void SetToggleValueText(Rml::Element* row, bool on) {
     }
 }
 
+// Curated knob rows: an RML row carrying `knob="<id>"` adjusts a CVar integer in a [min,max] range
+// with a given step. Enter/Right increments, Left/Shift-Enter decrements. The displayed <value> is
+// "N%" (percentage of max). These wire the Audio tab's volume sliders to SoH's live CVars — the
+// audioMgr reads gSettings.Volume.* every retrace, so the change is audible on the next audio tick.
+struct KnobSpec {
+    const char* id;
+    const char* cvar;
+    int defaultVal; // initial CVar value if not yet persisted
+    int minVal;
+    int maxVal;
+    int step;
+};
+static const KnobSpec kKnobs[] = {
+    { "vol-master",     "gSettings.Volume.Master",    40,   0, 100, 10 },
+    { "vol-music",      "gSettings.Volume.MainMusic", 100,  0, 100, 10 },
+    { "vol-sfx",        "gSettings.Volume.SFX",       100,  0, 100, 10 },
+};
+static const KnobSpec* FindKnob(const Rml::String& id) {
+    for (const auto& k : kKnobs) {
+        if (id == k.id) {
+            return &k;
+        }
+    }
+    return nullptr;
+}
+static int KnobValue(const KnobSpec& k) {
+    int v = CVarGetInteger(k.cvar, k.defaultVal);
+    return std::max(k.minVal, std::min(k.maxVal, v));
+}
+static void SetKnobValueText(Rml::Element* row, const KnobSpec& k) {
+    if (Rml::Element* val = row->QuerySelector("value")) {
+        char buf[16];
+        snprintf(buf, sizeof(buf), "%d%%", KnobValue(k));
+        val->SetInnerRML(buf);
+    }
+}
+// Step the knob by one step in the given direction (+1 or -1). Returns true if the value changed
+// (not already at the limit in that direction), false if the knob was already at its end — so the
+// caller can fall through to tab switching when the user keeps pressing Left/Right past the end.
+static bool StepKnob(const KnobSpec& k, int direction) {
+    int cur = KnobValue(k);
+    int next = cur + direction * k.step;
+    next = std::max(k.minVal, std::min(k.maxVal, next));
+    if (next == cur) {
+        return false; // already at limit
+    }
+    CVarSetInteger(k.cvar, next);
+    CVarSave();
+    return true;
+}
+
 // Curated cycle rows: an RML row carrying `cycle="<id>"` steps through a fixed list of labels and
 // writes the selected index into a live menu global (consumed by soh3d.c's SoH3D_ReplPoll). Unlike
 // the on/off toggles these have N states. The displayed `<value>` is the current label.
@@ -356,6 +407,19 @@ void SohRmlUi::ActivateFocused() {
             return;
         }
     }
+    // Curated CVar knob rows (e.g. volume): Enter/Activate increments by one step. Wraps at max.
+    {
+        const Rml::String kid = focus->GetAttribute<Rml::String>("knob", "");
+        if (const KnobSpec* k = kid.empty() ? nullptr : FindKnob(kid)) {
+            // At max: wrap around to min (so Enter keeps cycling the whole range).
+            if (!StepKnob(*k, +1)) {
+                CVarSetInteger(k->cvar, k->minVal);
+                CVarSave();
+            }
+            SetKnobValueText(focus, *k);
+            return;
+        }
+    }
     // Curated CVar toggle rows take priority: flip the feature in place rather than "clicking" a row.
     if (ToggleFocusedRow()) {
         return;
@@ -381,6 +445,10 @@ void SohRmlUi::RefreshToggleRows() {
         const Rml::String cid = row->GetAttribute<Rml::String>("cycle", "");
         if (const CycleSpec* c = cid.empty() ? nullptr : FindCycle(cid)) {
             SetCycleValueText(row, *c);
+        }
+        const Rml::String kid = row->GetAttribute<Rml::String>("knob", "");
+        if (const KnobSpec* k = kid.empty() ? nullptr : FindKnob(kid)) {
+            SetKnobValueText(row, *k);
         }
     }
 }
@@ -426,6 +494,27 @@ bool SohRmlUi::ToggleFocusedRow() {
     CVarSetInteger(t->cvar, next ? 1 : 0); // persist the choice
     CVarSave();
     SetToggleValueText(focus, next);
+    return true;
+}
+
+bool SohRmlUi::StepFocusedKnob(int direction) {
+    if (!mContext) {
+        return false;
+    }
+    Rml::Element* focus = mContext->GetFocusElement();
+    if (!focus) {
+        return false;
+    }
+    const Rml::String kid = focus->GetAttribute<Rml::String>("knob", "");
+    const KnobSpec* k = kid.empty() ? nullptr : FindKnob(kid);
+    if (!k) {
+        return false;
+    }
+    // Returns false if already at the limit — caller falls through to tab switching.
+    if (!StepKnob(*k, direction)) {
+        return false;
+    }
+    SetKnobValueText(focus, *k);
     return true;
 }
 
@@ -533,9 +622,17 @@ bool SohRmlUi::ProcessSdlEvent(void* sdlEvent) {
                     FocusPrev();
                     return true;
                 case SDLK_RIGHT:
+                    // If the focused row is a knob, Right increments it; otherwise switch tabs.
+                    if (StepFocusedKnob(+1)) {
+                        return true;
+                    }
                     NextTab();
                     return true;
                 case SDLK_LEFT:
+                    // If the focused row is a knob, Left decrements it; otherwise switch tabs.
+                    if (StepFocusedKnob(-1)) {
+                        return true;
+                    }
                     PrevTab();
                     return true;
                 case SDLK_RETURN:
@@ -556,9 +653,15 @@ bool SohRmlUi::ProcessSdlEvent(void* sdlEvent) {
                     FocusPrev();
                     return true;
                 case SDL_CONTROLLER_BUTTON_DPAD_RIGHT:
+                    if (StepFocusedKnob(+1)) {
+                        return true;
+                    }
                     NextTab();
                     return true;
                 case SDL_CONTROLLER_BUTTON_DPAD_LEFT:
+                    if (StepFocusedKnob(-1)) {
+                        return true;
+                    }
                     PrevTab();
                     return true;
                 case SDL_CONTROLLER_BUTTON_A:
