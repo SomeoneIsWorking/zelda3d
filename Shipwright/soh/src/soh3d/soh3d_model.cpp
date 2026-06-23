@@ -1531,6 +1531,59 @@ const void* SoH3D_XboxGlyphTex(char which, int* w, int* h) {
     return g[idx].rgba.data();
 }
 
+// #32 hotswap — keyboard-key HUD glyphs. One glyph per HUD slot (B, C-Left, C-Down, C-Right).
+// Gray disc + white key label, matching the default keyboard bindings (C / ← / ↓ / →).
+// Same 64x64 RGBA layout as SoH3D_XboxGlyphTex — the draw path is identical, only the texture
+// changes. Decoded lazily once. See also gSoH3dInputDevice / SoH3D_InputDevice().
+#include "kbd_glyphs_png.h"
+
+const void* SoH3D_KbdGlyphTex(char which, int* w, int* h) {
+    // Slots: 0=B, 1=C-Left, 2=C-Down, 3=C-Right (mirrors SoH3D_RecordHudBtn glyph chars)
+    struct Glyph { std::vector<uint8_t> rgba; int w = 0, hh = 0; };
+    static Glyph g[4];
+    static bool tried = false;
+    if (!tried) {
+        tried = true;
+        struct { const unsigned char* png; unsigned int len; } src[4] = {
+            { kKbdGlyph_BPng,      kKbdGlyph_BPngLen      },
+            { kKbdGlyph_CleftPng,  kKbdGlyph_CleftPngLen  },
+            { kKbdGlyph_CdownPng,  kKbdGlyph_CdownPngLen  },
+            { kKbdGlyph_CrightPng, kKbdGlyph_CrightPngLen },
+        };
+        for (int i = 0; i < 4; i++) {
+            int sw = 0, sh = 0, n = 0;
+            stbi_uc* px = stbi_load_from_memory(src[i].png, (int)src[i].len, &sw, &sh, &n, 4);
+            if (px) {
+                g[i].rgba.assign(px, px + (size_t)sw * sh * 4);
+                g[i].w = sw; g[i].hh = sh;
+                stbi_image_free(px);
+            } else {
+                fprintf(stderr, "[SoH3D] kbd glyph %d: PNG decode failed\n", i);
+            }
+        }
+    }
+    // 'B'=B slot, 'X'=C-Left, 'Y'=C-Down, 'A'=C-Right — matches the SoH3D_RecordHudBtn calls
+    int idx;
+    switch (which) {
+        case 'B': case 'b': idx = 0; break;
+        case 'X': case 'x': idx = 1; break;
+        case 'Y': case 'y': idx = 2; break;
+        case 'A': case 'a': idx = 3; break;
+        default: if (w) *w = 0; if (h) *h = 0; return nullptr;
+    }
+    if (g[idx].rgba.empty()) { if (w) *w = 0; if (h) *h = 0; return nullptr; }
+    static bool reg = false;
+    if (!reg) {
+        reg = true;
+        for (int k = 0; k < 4; k++) {
+            if (!g[k].rgba.empty()) SoH3D_HudTexClaim(g[k].rgba.data());
+        }
+    }
+    if (w) *w = g[idx].w;
+    if (h) *h = g[idx].hh;
+    return g[idx].rgba.data();
+}
+
 // #18 — derive the FULL / EMPTY HUD heart from the OoT3D item atlas (user approved 2026-06-20).
 // The clean red heart icon lives in the pack item atlas (hash CF461E58E637A97A, 4096x4096) at
 // x=2018..2338, y=3020..3352 (a red heart with a light rim). The lifemeter combine is

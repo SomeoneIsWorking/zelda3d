@@ -1528,6 +1528,26 @@ static Gfx* SoH3D_DrawXboxBtn(Gfx* dl, char which, s16 left, s16 top, s16 w, s16
     return dl;
 }
 
+// #32 hotswap — keyboard-key glyph badge, parallel to SoH3D_DrawXboxBtn but sourcing
+// SoH3D_KbdGlyphTex. Same Fast3D combine + dsdx/dtdy logic; only the texture pointer differs.
+static Gfx* SoH3D_DrawKbdBtn(Gfx* dl, char which, s16 left, s16 top, s16 w, s16 h, u8 alpha) {
+    int gw = 0, gh = 0;
+    const void* tex = SoH3D_KbdGlyphTex(which, &gw, &gh);
+    if (tex == NULL || gw <= 0 || gh <= 0 || w <= 0 || h <= 0) {
+        return dl;
+    }
+    gDPPipeSync(dl++);
+    gDPSetCombineLERP(dl++, 0, 0, 0, TEXEL0, TEXEL0, 0, PRIMITIVE, 0, 0, 0, 0, TEXEL0, TEXEL0, 0, PRIMITIVE, 0);
+    gDPSetPrimColor(dl++, 0, 0, 255, 255, 255, alpha);
+    gDPLoadTextureBlock(dl++, tex, G_IM_FMT_RGBA, G_IM_SIZ_32b, gw, gh, 0, G_TX_NOMIRROR | G_TX_WRAP,
+                        G_TX_NOMIRROR | G_TX_WRAP, G_TX_NOMASK, G_TX_NOMASK, G_TX_NOLOD, G_TX_NOLOD);
+    u16 dsdx = (u16)(((u32)gw << 10) / (u32)w);
+    u16 dtdy = (u16)(((u32)gh << 10) / (u32)h);
+    gSPWideTextureRectangle(dl++, left << 2, top << 2, (left + w) << 2, (top + h) << 2, G_TX_RENDERTILE, 0, 0, dsdx,
+                            dtdy);
+    return dl;
+}
+
 // #32 (clean replace, not overlay — user 2026-06-19): instead of swapping each HUD button
 // BACKGROUND for a full Xbox disc (which the N64 item icon / do-action label then stacked on top
 // of, burying the letter), the button backgrounds stay vanilla and the item icons render normally;
@@ -1554,21 +1574,28 @@ static void SoH3D_RecordHudBtn(int i, s16 x, s16 y, s16 w, u8 alpha, char glyph)
     sSoH3dHudBtns[i].active = 1;
 }
 static Gfx* SoH3D_DrawHudBadges(Gfx* dl) {
+    // #32 hotswap: pick glyph set from last-used input device (SoH3D_InputDevice(): 0=gamepad,
+    // 1=keyboard). Both draw helpers (SoH3D_DrawXboxBtn / SoH3D_DrawKbdBtn) are structurally
+    // identical — same Fast3D combine + dsdx/dtdy math — so the layout is device-invariant.
+    int useKbd = SoH3D_XboxBtnEnabled() && (SoH3D_InputDevice() == 1);
     int i;
     for (i = 0; i < 4; i++) {
         if (!sSoH3dHudBtns[i].active) {
             continue;
         }
         sSoH3dHudBtns[i].active = 0; // consume; re-recorded each frame
-        if (!SoH3D_XboxBtnEnabled() || SoH3D_XboxGlyphTex(sSoH3dHudBtns[i].glyph, NULL, NULL) == NULL) {
+        if (!SoH3D_XboxBtnEnabled()) {
             continue;
         }
-        // Badge ~9/16 of the button, tucked into the TOP-RIGHT corner (the ammo count sits along the
-        // bottom, the equipped-item outline along the edges — top-right is the clearest quadrant).
+        // Badge ~9/16 of the button, tucked into the TOP-RIGHT corner.
         s16 bw = (s16)(sSoH3dHudBtns[i].w * 9 / 16);
         s16 bx = (s16)(sSoH3dHudBtns[i].x + sSoH3dHudBtns[i].w - bw);
         s16 by = sSoH3dHudBtns[i].y;
-        dl = SoH3D_DrawXboxBtn(dl, sSoH3dHudBtns[i].glyph, bx, by, bw, bw, sSoH3dHudBtns[i].alpha);
+        if (useKbd) {
+            dl = SoH3D_DrawKbdBtn(dl, sSoH3dHudBtns[i].glyph, bx, by, bw, bw, sSoH3dHudBtns[i].alpha);
+        } else {
+            dl = SoH3D_DrawXboxBtn(dl, sSoH3dHudBtns[i].glyph, bx, by, bw, bw, sSoH3dHudBtns[i].alpha);
+        }
     }
     return dl;
 }

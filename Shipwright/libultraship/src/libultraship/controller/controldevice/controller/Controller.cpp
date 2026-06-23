@@ -19,6 +19,9 @@
 #define M_TAU 6.2831853071795864769252867665590057 // 2 * pi
 #define MINIMUM_RADIUS_TO_MAP_NOTCH 0.9
 
+// #32 hotswap — last-used input device signal, defined in soh3d.c (C).
+extern "C" { extern int gSoH3dInputDevice; }
+
 namespace LUS {
 
 // ---- #32 button chords (modifier + face -> N64 item slots, no C-pad) ------------------------------
@@ -122,6 +125,36 @@ void Controller::ReadToOSContPad(OSContPad* pad) {
             padToBuffer.button |= after;
         } else if (phys != 0) {
             padToBuffer.button = ApplyButtonChords(padToBuffer.button, phys);
+        }
+    }
+
+    // #32 hotswap: if any SDL gamepad has a button pressed on port 0 this frame, record it
+    // as "gamepad last used" so the HUD swaps to Xbox glyphs. Only scan port 0 to avoid
+    // spurious device flips from unmapped/background controllers.
+    if (mPortIndex == 0) {
+        bool anyGamepadBtn = false;
+        for (const auto& [instanceId, gamepad] :
+             Ship::Context::GetRawInstance()
+                 ->GetControlDeck()
+                 ->GetConnectedPhysicalDeviceManager()
+                 ->GetConnectedSDLGamepadsForPort(mPortIndex)) {
+            for (int btn = 0; btn < SDL_CONTROLLER_BUTTON_MAX; btn++) {
+                if (SDL_GameControllerGetButton(gamepad, (SDL_GameControllerButton)btn)) {
+                    anyGamepadBtn = true;
+                    break;
+                }
+            }
+            if (!anyGamepadBtn) {
+                // Also check for non-trivial axis deflection (>= 8192 = ~1/4 throw).
+                for (int ax = 0; ax < SDL_CONTROLLER_AXIS_MAX; ax++) {
+                    Sint16 v = SDL_GameControllerGetAxis(gamepad, (SDL_GameControllerAxis)ax);
+                    if (v > 8192 || v < -8192) { anyGamepadBtn = true; break; }
+                }
+            }
+            if (anyGamepadBtn) break;
+        }
+        if (anyGamepadBtn) {
+            gSoH3dInputDevice = 0; // gamepad
         }
     }
 
