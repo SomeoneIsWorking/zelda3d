@@ -59,13 +59,6 @@ class SohRmlUi {
     /** @brief Updates and renders the RmlUi context (only when visible), wrapped in GL save/restore. */
     void UpdateAndRender();
 
-    /**
-     * @brief Update the always-on PC HUD elements from gSoH3dHudState.
-     * Called every frame from UpdateAndRender regardless of menu visibility.
-     * No-op until gSoH3dHudState.valid is set by soh3d.c.
-     */
-    void UpdateHud();
-
     /** @brief Updates the context + render-interface viewport after a window resize. */
     void Resize(int width, int height);
 
@@ -135,16 +128,10 @@ class SohRmlUi {
     std::unique_ptr<RmlRenderInterfaceVk> mVkRenderInterface;    // Vulkan backend
     std::unique_ptr<SystemInterface_SDL> mSystemInterface;
     Rml::Context* mContext = nullptr;          // owned by RmlUi, freed by Rml::Shutdown()
-    Rml::ElementDocument* mDocument = nullptr;  // menu doc — owned by the context
-    Rml::ElementDocument* mHudDocument = nullptr; // PC HUD doc — always-on, owned by the context
+    Rml::ElementDocument* mDocument = nullptr;  // ESC menu doc — owned by the context
+    Rml::ElementDocument* mHudDocument = nullptr; // unused — kept to avoid any lingering refs
     // Per-<tab> click listeners (own their lifetime; must outlive the document's elements).
     std::vector<std::unique_ptr<Rml::EventListener>> mTabClickListeners;
-    // Cached HUD element pointers (refreshed if null — survives a Reload). Avoid per-frame lookup.
-    Rml::Element* mHudHeartsRow = nullptr;
-    Rml::Element* mHudMagicFill = nullptr;
-    Rml::Element* mHudMagicBlock = nullptr;
-    Rml::Element* mHudRupeeCount = nullptr;
-    Rml::Element* mHudSlotB = nullptr;
 };
 
 } // namespace Ship

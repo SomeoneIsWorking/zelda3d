@@ -537,36 +537,30 @@ int SoH3D_InputDevice(void) {
     return gSoH3dInputDevice;
 }
 
-// ---- PC HUD gate (RmlUi replaces the N64 Fast3D HUD) ----------------------------------------
-// -1 = uninit; 0 = off (N64 HUD shows); 1 = on (Interface_Draw gated off, RmlUi HUD shows).
-// Default ON.  env SOH3D_PCHUD=0 opts out.  REPL `pchud <0|1>` toggles at runtime.
-int gSoH3dPcHud = -1;
-int SoH3D_PcHudEnabled(void) {
-    if (gSoH3dPcHud < 0) {
-        const char* v = getenv("SOH3D_PCHUD");
-        gSoH3dPcHud = (v != NULL && v[0] == '0') ? 0 : 1;
-    }
-    return gSoH3dPcHud;
+// ---- Hotbar: 6-slot item hotbar drawn natively via Fast3D HUD injection ----------------------
+// gSoH3dHotbarItems[6]: item id (0xFF=ITEM_NONE) in each slot.
+// gSoH3dHotbarActive: currently selected slot (0-5).
+// Slots are set by REPL `hotbar <0-5>` (headless) and by SDL key press (keys 1-6, live).
+// When a slot is "selected" by pressing 1-6, the item in that slot is routed to B button
+// (buttonItems[0]) so the existing SoH use-item engine handles it without duplication.
+u8 gSoH3dHotbarItems[6] = { 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF };
+int gSoH3dHotbarActive  = 0;   // 0-5
+
+int SoH3D_HotbarSlot(void) {
+    return gSoH3dHotbarActive;
 }
 
-// Snapshot filled once per frame and consumed by SohRmlUi::UpdateHud().
-SoH3dHudState gSoH3dHudState = { 0 };
-
-void SoH3D_HudUpdateFrame(PlayState* play) {
-    if (!SoH3D_PcHudEnabled()) {
-        return;
+// Called from SoH3D_ReplPoll each frame: sync hotbar slot[active] <-> buttonItems[0] so pressing
+// the existing B-button use path fires the hotbar item. Also copies all 6 slot items from the
+// hotbar array (slots 0-3 mirror the existing C-button assignments via save-context after mapping).
+void SoH3D_HotbarSync(PlayState* play) {
+    (void)play;
+    // Slot active's item must be on B (buttonItems[0]) for the SoH engine to use it.
+    // We write the hotbar item into B; if the user hasn't assigned slots, B is already ITEM_NONE.
+    u8 activeItem = gSoH3dHotbarItems[gSoH3dHotbarActive];
+    if (activeItem != (u8)gSaveContext.equips.buttonItems[0]) {
+        gSaveContext.equips.buttonItems[0] = activeItem;
     }
-    gSoH3dHudState.health         = gSaveContext.health;
-    gSoH3dHudState.healthCapacity = gSaveContext.healthCapacity;
-    gSoH3dHudState.magic          = (int)(u8)gSaveContext.magic;
-    gSoH3dHudState.magicCapacity  = gSaveContext.magicCapacity;
-    gSoH3dHudState.magicLevel     = gSaveContext.magicLevel;
-    gSoH3dHudState.rupees         = gSaveContext.rupees;
-    for (int i = 0; i < 4; i++) {
-        gSoH3dHudState.buttonItems[i] = gSaveContext.equips.buttonItems[i];
-    }
-    gSoH3dHudState.inputDevice    = SoH3D_InputDevice();
-    gSoH3dHudState.valid          = 1;
 }
 
 // #31 — substitute crisp higher-res HUD textures (hearts) for the blocky 16x16 N64 ones.
@@ -1310,6 +1304,58 @@ static float SoH3D_ReconcileCutsceneCam(PlayState* play) {
     play->view.lookAt.y += deficit; // rigid vertical shift: preserve the authored look direction
     gSoH3dCamLiftLast = deficit;
     return deficit;
+}
+
+// --- #92 title-screen camera: match OoT3D's title framing ---------------------------------
+// The N64 title demo (SOH3D_WARP= empty, scene=spot00/Hyrule Field, csCtx active) sweeps
+// the camera over many Hyrule Field shots. OoT3D's title shows a specific static frame
+// (the Market/Castle upper-left, field, moon in the distance). When running in title-demo
+// mode, override the camera EVERY frame to the OoT3D-matching fixed eye/lookAt.
+// Gate: SoH3D_Enabled() + env SOH3D_TITLECAM (default ON) + gSoH3dTitleCam toggle.
+// The diagnostic REPL `cam` override (gSoH3dCamOverride) always takes precedence so A/B
+// testing still works.
+int gSoH3dTitleCam = 1;
+// OoT3D title-screen framing: Castle/Market upper-left, moon at horizon, field below.
+static const float kSoH3dTitleEye[3] = { 1000.0f,  90.0f, 3000.0f };
+static const float kSoH3dTitleAt[3]  = { -200.0f, 180.0f, 1500.0f };
+
+static int SoH3D_TitleCamEnabled(void) {
+    static int cached = -1;
+    if (cached < 0) {
+        const char* v = getenv("SOH3D_TITLECAM");
+        cached = (v != NULL && v[0] == '0') ? 0 : 1; // default ON
+    }
+    return SoH3D_Enabled() && cached && gSoH3dTitleCam;
+}
+
+// Returns 1 if we are currently in title-demo mode and applied the override. Called from
+// SoH3D_ReplPoll AFTER the engine's per-frame view update, and only when gSoH3dCamOverride
+// is NOT set (so the REPL `cam` override takes full precedence for A/B).
+static int SoH3D_ApplyTitleCam(PlayState* play) {
+    if (play == NULL || !SoH3D_TitleCamEnabled()) {
+        return 0;
+    }
+    // Title-demo conditions: no SOH3D_WARP warp target (empty string env), Hyrule Field
+    // scene (spot00, 0x51), and the cutscene context is active (the N64 title intro cs).
+    if (SoH3D_AutoWarpEnabled()) {
+        return 0; // user has a warp target → not the title screen
+    }
+    if (play->sceneNum != SCENE_HYRULE_FIELD) {
+        return 0;
+    }
+    if (play->csCtx.state == CS_STATE_IDLE) {
+        return 0; // cutscene not running — gameplay, not title demo
+    }
+    play->view.eye.x    = kSoH3dTitleEye[0];
+    play->view.eye.y    = kSoH3dTitleEye[1];
+    play->view.eye.z    = kSoH3dTitleEye[2];
+    play->view.lookAt.x = kSoH3dTitleAt[0];
+    play->view.lookAt.y = kSoH3dTitleAt[1];
+    play->view.lookAt.z = kSoH3dTitleAt[2];
+    play->view.up.x = 0.0f;
+    play->view.up.y = 1.0f;
+    play->view.up.z = 0.0f;
+    return 1;
 }
 
 // Resolve the actor's CURRENT animation to a CSAB base name, by reading the actor's
@@ -4484,11 +4530,33 @@ static void SoH3D_ReplExec(PlayState* play, char* line, const char* outPath) {
         // gSoH3dHudTex every frame. 1 = crisp 64x64 hearts, 0 = the blocky N64 16x16 hearts.
         gSoH3dHudTex = (f1 != 0.0f) ? 1 : 0;
         SoH3D_ReplReply(outPath, "hudtex=%d", gSoH3dHudTex);
-    } else if (strcmp(cmd, "pchud") == 0 && sscanf(line, "%*s %f", &f1) == 1) {
-        // Toggle the PC RmlUi HUD (default on). 1 = RmlUi HUD, 0 = original N64 Fast3D HUD.
-        // The RmlUi HUD gates Interface_Draw and HealthMeter_Draw off when active.
-        gSoH3dPcHud = (f1 != 0.0f) ? 1 : 0;
-        SoH3D_ReplReply(outPath, "pchud=%d", gSoH3dPcHud);
+    } else if (strcmp(cmd, "hotbar") == 0 && sscanf(line, "%*s %f", &f1) == 1) {
+        // Hotbar slot selection (headless test hook). `hotbar <0-5>` selects the active slot;
+        // in live play keys 1-6 select slots 0-5 via SDL input. The active slot's item is
+        // synced to buttonItems[0] (B) so the SoH use-item engine fires it normally.
+        int slot = (int)f1;
+        if (slot >= 0 && slot <= 5) {
+            gSoH3dHotbarActive = slot;
+            SoH3D_ReplReply(outPath, "hotbar=%d item=0x%02X", slot, (unsigned)gSoH3dHotbarItems[slot]);
+        } else {
+            SoH3D_ReplReply(outPath, "hotbar=err (need 0-5)");
+        }
+    } else if (strcmp(cmd, "hotbarset") == 0) {
+        // `hotbarset <slot> <itemid>` — assign an item to a slot for testing.
+        // E.g. `hotbarset 0 0x12` puts item 0x12 in slot 0.
+        float f2 = 0;
+        if (sscanf(line, "%*s %f %f", &f1, &f2) == 2) {
+            int slot = (int)f1;
+            int item = (int)f2;
+            if (slot >= 0 && slot <= 5 && item >= 0 && item <= 0xFF) {
+                gSoH3dHotbarItems[slot] = (u8)item;
+                SoH3D_ReplReply(outPath, "hotbarset slot=%d item=0x%02X", slot, (unsigned)gSoH3dHotbarItems[slot]);
+            } else {
+                SoH3D_ReplReply(outPath, "hotbarset=err");
+            }
+        } else {
+            SoH3D_ReplReply(outPath, "hotbarset=err (need slot item)");
+        }
     } else if (strcmp(cmd, "key") == 0) {
         // #20 — inject a raw keyboard scancode through the real SDL->ControlDeck path so the
         // DEFAULT keyboard->N64-button mapping can be verified headless. `key <scancode> <0|1>`
@@ -4767,6 +4835,19 @@ static void SoH3D_ReplExec(PlayState* play, char* line, const char* outPath) {
                         "| world: bottom=Y%+.1f top=Y%+.1f (actorY=%.1f) -> drawnBottom=%.1f drawnTop=%.1f",
                         mid, miny, h, ex, ez, ws, miny * ws, (miny + h) * ws, ay,
                         ay + miny * ws, ay + (miny + h) * ws);
+    } else if (strcmp(cmd, "titlecam") == 0) {
+        // #92 toggle/inspect the title-screen camera override. `titlecam 0|1` sets it; `titlecam`
+        // alone reports current state + the live view eye so you can verify framing.
+        // Set `titlecam 0` then `cam x y z x y z` for A/B against OoT3D reference.
+        if (sscanf(line, "%*s %i", &iv) == 1) {
+            gSoH3dTitleCam = iv ? 1 : 0;
+        }
+        SoH3D_ReplReply(outPath,
+            "titlecam=%d scene=%d csState=%d autoWarp=%d "
+            "view.eye=(%.0f,%.0f,%.0f) target.eye=(%.0f,%.0f,%.0f)",
+            gSoH3dTitleCam, play->sceneNum, play->csCtx.state, SoH3D_AutoWarpEnabled(),
+            play->view.eye.x, play->view.eye.y, play->view.eye.z,
+            kSoH3dTitleEye[0], kSoH3dTitleEye[1], kSoH3dTitleEye[2]);
     } else if (strcmp(cmd, "camlift") == 0) {
         // #4 toggle/inspect the cutscene/title camera-lift. `camlift 0|1` sets it; `camlift` alone
         // reports state + the live view eye and the lift applied THIS frame (post-reconcile).
@@ -4926,10 +5007,9 @@ void SoH3D_ReplPoll(PlayState* play) {
     char* nl;
     ssize_t n;
 
-    // PC HUD snapshot: fill gSoH3dHudState from gSaveContext so SohRmlUi can read it without
-    // needing PlayState (libultraship doesn't have it).  Runs unconditionally each frame while
-    // a PlayState is live; SoH3D_HudUpdateFrame gates itself on SoH3D_PcHudEnabled().
-    SoH3D_HudUpdateFrame(play);
+    // Hotbar sync: keep the active hotbar slot's item on B button each frame so the SoH use-item
+    // engine fires the right item when B is pressed.
+    SoH3D_HotbarSync(play);
 
     // Force time-of-day (e.g. day instead of night). Applied every frame, before the
     // FIFO handling, so it holds regardless of whether the REPL is connected.
@@ -5179,8 +5259,13 @@ void SoH3D_ReplPoll(PlayState* play) {
         play->view.up.y = 1.0f;
         play->view.up.z = 0.0f;
     } else {
-        // #4: lift a buried cinematic camera out of the OoT3D terrain (skipped while the diagnostic
-        // `cam` override holds the view, so A/B tests see the raw authored camera).
-        SoH3D_ReconcileCutsceneCam(play);
+        // #92: title-screen camera override — match OoT3D's fixed title framing when in
+        // title-demo mode (spot00, csCtx active, no warp target). Falls through to camlift
+        // when not in title-demo mode.
+        if (!SoH3D_ApplyTitleCam(play)) {
+            // #4: lift a buried cinematic camera out of the OoT3D terrain (skipped while
+            // the diagnostic `cam` override holds the view, so A/B tests see the raw cam).
+            SoH3D_ReconcileCutsceneCam(play);
+        }
     }
 }

@@ -16,7 +16,11 @@
 #define MINIMUM_RADIUS_TO_MAP_NOTCH 0.9
 
 // #32 hotswap — last-used input device signal, defined in soh3d.c (C).
-extern "C" { extern int gSoH3dInputDevice; }
+extern "C" {
+    extern int gSoH3dInputDevice;
+    // Hotbar slot selection: set by keys 1-6 (SDL scancodes 30-35).
+    extern int gSoH3dHotbarActive;
+}
 
 namespace Ship {
 
@@ -137,6 +141,16 @@ bool Controller::ProcessKeyboardEvent(KbEventType eventType, KbScancode scancode
     if (eventType == KbEventType::LUS_KB_EVENT_KEY_DOWN && GetPortIndex() == 0 && result) {
         gSoH3dInputDevice = 1; // keyboard
     }
+
+    // Hotbar slot selection: keys 1-6 (SDL scancodes 30-35) select the active hotbar slot.
+    // These are checked even if `result` is false (they're not mapped as game-pad buttons).
+    if (eventType == KbEventType::LUS_KB_EVENT_KEY_DOWN && GetPortIndex() == 0) {
+        if (scancode >= 30 && scancode <= 35) {
+            gSoH3dHotbarActive = (int)(scancode - 30); // scancode 30 -> slot 0 (key 1), etc.
+            gSoH3dInputDevice = 1; // hotbar keys = keyboard input
+        }
+    }
+
     return result;
 }
 
