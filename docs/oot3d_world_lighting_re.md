@@ -76,6 +76,28 @@ Per-setting stride 0x1C (non-Majora): +0x0A ambient RGB, +0x0D light0 dir (s8/0x
 light1.ambient forced 0. light0.col const (0,128,59) (irrelevant — matDiffuse black). The active
 setting/blend is time-driven (OoT3D z_kankyo analogue).
 
+## STATUS — increment 1 DONE (per-material combiner scale), live-verified on Vulkan
+
+Ported the parse + plumbing + the per-material **combiner RGB scale** (the x2 grass factor):
+- `cmb.cpp` now parses `vertex_lighting`/`fragment_lighting`, `mat_ambient`/`mat_diffuse`, and the
+  stage-0 combiner (op, scaleRGB, sources) onto `CmbMaterial`.
+- Threaded through `SoH3DGlGroup` → `GlGroup`/`VkGroup` (`makeCgroup`, both uploads).
+- **Vulkan (the live backend)**: scene draws now do `saturate(tex*vColor*shade) * combScale`,
+  scoped to non-lit scene geometry, gated by REPL `worldlit 0|1`. Measured Kokiri noon, frozen cam:
+  grass lum 31→52 (oracle 66), G/R 1.12→1.19 (oracle 1.31); walls ~doubled; characters unchanged.
+  Real move toward parity, visually correct (not blown out).
+- **OpenGL**: has the FULLER reference impl (the real vertex-lighting equation with matAmbient/
+  matDiffuse + uAmbient, then MODULATE*scale). NOTE: GL is currently a regressed/secondary path —
+  it does not even draw the OoT3D room replacement (N64 shows through), so it can't be verified
+  live; treat the GL shader as the reference for increment 2, not as a working renderer.
+
+REMAINING GAP (still ~1.3x dark + slightly under-green): the lighting input. VK increment 1 reuses
+the existing scene shade (N64 envCtx `uTintSkin`, ~0.31 gray ambient) instead of OoT3D's real ZSI
+env ambient (Kokiri daytime ambient is brighter + tinted). Increment 2 = feed the real
+`saturate(sceneAmbient*matAmbient + sceneDiffuse*matDiffuse*NdotL)` as the vertex-lit colour (the GL
+shader already does this) and decide the scene-light SOURCE (N64 envCtx vs OoT3D ZSI env cmd 0x0F by
+time-of-day). That unifies GL and VK on the same model.
+
 ## OPEN / next (do live, not offline)
 Offline numeric reconstruction does NOT cleanly match the oracle yet — too many offline unknowns
 (runtime ETC1 texture decode vs python, which of the 12 env settings is active + time blend, exact

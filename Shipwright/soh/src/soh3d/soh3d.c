@@ -4620,6 +4620,13 @@ static void SoH3D_ReplExec(PlayState* play, char* line, const char* outPath) {
         }
         SoH3D_ReplReply(outPath, "ao=%d rad=%.1f str=%.2f bias=%.5f maxdiff=%.5f", gSoH3dAoEnable,
                         gSoH3dAoRadius, gSoH3dAoStrength, gSoH3dAoBias, gSoH3dAoMaxDiff);
+    } else if (strcmp(cmd, "worldlit") == 0) {
+        // OoT3D world (scene) vertex-lit combiner port (docs/oot3d_world_lighting_re.md).
+        // `worldlit 0` = legacy texture*vColor*uTint; `worldlit 1` = real PICA vertex lighting
+        // + per-material TEV scale. A/B against the Azahar oracle.
+        extern int gSoH3dWorldLit;
+        if (sscanf(line, "%*s %i", &iv) == 1) gSoH3dWorldLit = iv;
+        SoH3D_ReplReply(outPath, "worldlit=%d", gSoH3dWorldLit);
     } else if (strcmp(cmd, "facecull") == 0) {
         // Backface culling of OoT3D meshes (honor the CMB cull byte; matches N64 G_CULL_BACK so the
         // camera never sees terrain undersides / mesh interiors). `facecull <0|1> [flip]`: arg1 = on/off,

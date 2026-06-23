@@ -44,6 +44,29 @@ struct CmbMaterial {
     // depth offset (polygonOffsetUnit / 0xFFFE, per noclip); 0 = no bias. Applied in the
     // GL fragment shader as gl_FragDepth = gl_FragCoord.z + polygon_offset.
     float polygon_offset = 0.0f;
+
+    // --- OoT3D fragment pipeline (PICA200), ported for pixel-parity world lighting. ---
+    // See docs/oot3d_world_lighting_re.md. Scene geometry is VERTEX-lit: the per-vertex lit
+    // colour fed to the TEV combiner is
+    //   v_Color = saturate( sceneAmb*mat_ambient + sceneDif*mat_diffuse*max(0,N.L) ) * a_Color
+    // where a_Color is the baked CmbVertex.color. Flags at +0x00/+0x01; mat ambient/diffuse
+    // at +0xA4/+0xA8 (RGBA8 big-endian). The old renderer ignored all of this and did
+    // texture*a_Color*uTint, dropping both the lighting and the combiner scale below.
+    bool vertex_lighting = false;
+    bool fragment_lighting = false;
+    float mat_ambient[3] = { 1, 1, 1 };
+    float mat_diffuse[3] = { 1, 1, 1 };
+    // Stage-0 TEV combiner. Scene materials are overwhelmingly a single
+    // MODULATE(PRIMARY_COLOR=v_Color, TEXTURE0) stage, but the combine op and especially the
+    // RGB SCALE (x1/x2/x4) are per-material — Kokiri grass MODULATEs at scaleRGB=x2, the
+    // brightness factor the old path dropped. Captured verbatim; the renderer applies the
+    // real op+scale. comb_combine_rgb uses CombineResultOpDMP enums (0x2100 MODULATE,
+    // 0x0104 ADD, 0x6401 MULT_ADD, 0x1E01 REPLACE...). Multi-stage / non-MODULATE materials
+    // are a documented follow-up (docs/oot3d_world_lighting_re.md).
+    int comb_stage_count = 0;
+    uint16_t comb_combine_rgb = 0x2100;                    // MODULATE
+    float comb_scale_rgb = 1.0f;                           // 1 / 2 / 4
+    uint16_t comb_src_rgb[3] = { 0x8577, 0x84C0, 0x8576 }; // PRIMARY_COLOR, TEXTURE0, CONSTANT
 };
 
 struct CmbTexture {
