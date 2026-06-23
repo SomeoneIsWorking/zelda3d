@@ -1584,6 +1584,49 @@ const void* SoH3D_KbdGlyphTex(char which, int* w, int* h) {
     return g[idx].rgba.data();
 }
 
+// Hotbar number-key glyphs 1-6 (keycap style, matching the approved keycap aesthetic).
+// Loaded lazily from num_glyphs_png.h; returns RGBA32 pointer + dims.
+// `which` = '1'..'6'. Returns nullptr on failure.
+#include "num_glyphs_png.h"
+
+const void* SoH3D_NumGlyphTex(char which, int* w, int* h) {
+    struct Glyph { std::vector<uint8_t> rgba; int w = 0, hh = 0; };
+    static Glyph g[6];
+    static bool tried = false;
+    if (!tried) {
+        tried = true;
+        struct { const unsigned char* png; unsigned int len; } src[6] = {
+            { kNumGlyph_1Png, kNumGlyph_1PngLen },
+            { kNumGlyph_2Png, kNumGlyph_2PngLen },
+            { kNumGlyph_3Png, kNumGlyph_3PngLen },
+            { kNumGlyph_4Png, kNumGlyph_4PngLen },
+            { kNumGlyph_5Png, kNumGlyph_5PngLen },
+            { kNumGlyph_6Png, kNumGlyph_6PngLen },
+        };
+        for (int i = 0; i < 6; i++) {
+            int sw = 0, sh = 0, n = 0;
+            stbi_uc* px = stbi_load_from_memory(src[i].png, (int)src[i].len, &sw, &sh, &n, 4);
+            if (px) {
+                g[i].rgba.assign(px, px + (size_t)sw * sh * 4);
+                g[i].w = sw; g[i].hh = sh;
+                stbi_image_free(px);
+            } else {
+                fprintf(stderr, "[SoH3D] num glyph %d: PNG decode failed\n", i + 1);
+            }
+        }
+        // Register with HudTexClaim so the GC doesn't free them.
+        for (int k = 0; k < 6; k++) {
+            if (!g[k].rgba.empty()) SoH3D_HudTexClaim(g[k].rgba.data());
+        }
+    }
+    int idx = (int)(which - '1');
+    if (idx < 0 || idx > 5) { if (w) *w = 0; if (h) *h = 0; return nullptr; }
+    if (g[idx].rgba.empty()) { if (w) *w = 0; if (h) *h = 0; return nullptr; }
+    if (w) *w = g[idx].w;
+    if (h) *h = g[idx].hh;
+    return g[idx].rgba.data();
+}
+
 // #18 — derive the FULL / EMPTY HUD heart from the OoT3D item atlas (user approved 2026-06-20).
 // The clean red heart icon lives in the pack item atlas (hash CF461E58E637A97A, 4096x4096) at
 // x=2018..2338, y=3020..3352 (a red heart with a light rim). The lifemeter combine is
