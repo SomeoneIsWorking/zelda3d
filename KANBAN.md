@@ -3,9 +3,9 @@
 > **Generated mirror — do not hand-edit.** Source of truth = GitHub Issues on
 > `SomeoneIsWorking/soh3d` (private). Regenerate with `tools/kanban.py render`.
 > Move a card with `tools/kanban.py mv <#> <column>`; add with `tools/kanban.py add`.
-> Columns: todo · in-progress · in-review · needs-confirmation · reopened · blocked · done(=closed).  Updated 2026-06-23 15:36.
+> Columns: todo · in-progress · in-review · needs-confirmation · reopened · blocked · done(=closed).  Updated 2026-06-23 15:57.
 
-**Counts:** todo:3 | in-progress:2 | in-review:0 | needs-confirmation:33 | reopened:1 | blocked:1 | done:42
+**Counts:** todo:3 | in-progress:2 | in-review:0 | needs-confirmation:34 | reopened:1 | blocked:1 | done:42
 
 ## 📋 To Do  (3)
 - [#17](../../issues/17) Hi-res world/scene textures (texpack) _(render)_
@@ -19,7 +19,7 @@
 ## 🔍 In Review (agent verifying)  (0)
 _none_
 
-## 🙋 Needs User Confirmation  (33)
+## 🙋 Needs User Confirmation  (34)
 - [#1](../../issues/1) Stairs: real stepped geometry, wall preserved (render broken) _(render,stairs,scene)_
 - [#2](../../issues/2) Kakariko well: water is a tiny teal diamond, not a surface _(render,well)_
 - [#4](../../issues/4) Title/cutscene camera goes under 3DS terrain _(render,camera)_
@@ -53,6 +53,7 @@ _none_
 - [#95](../../issues/95) Audio thread use-after-free on clean window-close teardown _(crash)_
 - [#96](../../issues/96) PC-native default keyboard + controller mapping (input layer)
 - [#97](../../issues/97) PC-native HUD: replace N64 Fast3D HUD with RmlUi overlay _(ui,hud)_
+- [#98](../../issues/98) RmlUi menu Audio tab: Master/Music/SFX volume knobs (Phase 3 CVar binding) _(ui)_
 
 ## ♻️ Reopened (was done, found broken)  (1)
 - [#8](../../issues/8) 3DS Link (N64 anims): head pitched down, arms wrangled _(anim,link)_
