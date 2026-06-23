@@ -3,7 +3,7 @@
 > **Generated mirror — do not hand-edit.** Source of truth = GitHub Issues on
 > `SomeoneIsWorking/soh3d` (private). Regenerate with `tools/kanban.py render`.
 > Move a card with `tools/kanban.py mv <#> <column>`; add with `tools/kanban.py add`.
-> Columns: todo · in-progress · in-review · needs-confirmation · reopened · blocked · done(=closed).  Updated 2026-06-23 13:39.
+> Columns: todo · in-progress · in-review · needs-confirmation · reopened · blocked · done(=closed).  Updated 2026-06-23 13:44.
 
 **Counts:** todo:6 | in-progress:3 | in-review:0 | needs-confirmation:27 | reopened:1 | blocked:1 | done:42
 
@@ -59,8 +59,8 @@ _none_
 - [#23](../../issues/23) Kokiri sword chest renders as the large chest, not small _(render,scene)_
 
 ## ✅ Done (recently closed)  (showing 30 of 42)
-- [#74](../../issues/74) Can't climb vine wall (climb does not initiate)
 - [#87](../../issues/87) Kokiri kids (En_Ko): idle variants all identical + sitting girl plays idle sway (anim/variant selection)
+- [#74](../../issues/74) Can't climb vine wall (climb does not initiate)
 - [#10](../../issues/10) Child Link floats above plank platform by ladder
 - [#25](../../issues/25) Link drops off every climbable surface halfway up (systemic)
 - [#30](../../issues/30) NPC walks in mid-air above a Kakariko building
