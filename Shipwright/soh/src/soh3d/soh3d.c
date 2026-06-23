@@ -1315,9 +1315,11 @@ static float SoH3D_ReconcileCutsceneCam(PlayState* play) {
 // The diagnostic REPL `cam` override (gSoH3dCamOverride) always takes precedence so A/B
 // testing still works.
 int gSoH3dTitleCam = 1;
-// OoT3D title-screen framing: Castle/Market upper-left, moon at horizon, field below.
-static const float kSoH3dTitleEye[3] = { 1000.0f,  90.0f, 3000.0f };
-static const float kSoH3dTitleAt[3]  = { -200.0f, 180.0f, 1500.0f };
+// OoT3D title-screen framing: Castle/Market walls on the right, sky + moon upper-left,
+// field in the lower half. Eye is in Hyrule Field looking diagonally toward the Market/
+// Castle entrance so the castle walls occupy the right frame quadrant.
+static const float kSoH3dTitleEye[3] = {  800.0f,  80.0f, 3000.0f };
+static const float kSoH3dTitleAt[3]  = { -500.0f, 400.0f,  500.0f };
 
 static int SoH3D_TitleCamEnabled(void) {
     static int cached = -1;
