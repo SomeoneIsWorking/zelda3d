@@ -20,6 +20,19 @@
 
 namespace SoH3D {
 
+// One OoT3D scene environment-lighting setting (header command 0x0F). A scene holds a list of
+// these (time-of-day variants); OoT3D selects/blends among them by dayTime. Used to drive SoH3D's
+// world lighting from OoT3D's OWN data for graphical parity (docs/oot3d_world_lighting_re.md).
+// Non-Majora (OoT3D) per-setting stride 0x1C; colours are u8 [0,255], dirs are s8/0x7F in [-1,1].
+struct ZsiEnvSetting {
+    uint8_t ambient[3] = { 0, 0, 0 };       // scene ambient (shared by both lights as light[i].ambient)
+    float light0Dir[3] = { 0, 0, 0 };       // primary directional light (normalized-ish, [-1,1])
+    uint8_t light0Col[3] = { 0, 0, 0 };     // primary diffuse colour
+    float light1Dir[3] = { 0, 0, 0 };       // secondary directional light
+    uint8_t light1Col[3] = { 0, 0, 0 };     // secondary diffuse colour
+    uint8_t fogColor[3] = { 0, 0, 0 };
+};
+
 class Zsi {
   public:
     // Takes ownership of the file bytes.
@@ -41,6 +54,11 @@ class Zsi {
     int cmbOffset() const { return mCmbOff; }
     uint32_t cmbSize() const { return mCmbSize; }
 
+    // OoT3D scene environment-lighting settings (header command 0x0F), in file order. Empty for
+    // room files / scenes without the command. These are the time-of-day variants OoT3D selects
+    // among to light the world; SoH3D drives its world lighting from them for graphical parity.
+    const std::vector<ZsiEnvSetting>& envSettings() const { return mEnvSettings; }
+
   private:
     bool mOk = false;
     std::string mErr;
@@ -49,6 +67,7 @@ class Zsi {
     bool mHasMesh = false;
     int mCmbOff = -1;
     uint32_t mCmbSize = 0;
+    std::vector<ZsiEnvSetting> mEnvSettings;
 };
 
 } // namespace SoH3D
