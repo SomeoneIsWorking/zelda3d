@@ -286,7 +286,10 @@ class GfxRenderingAPIVulkan : public GfxRenderingAPI {
     VkImage mDepthImage = VK_NULL_HANDLE;
     VkDeviceMemory mDepthMemory = VK_NULL_HANDLE;
     VkImageView mDepthView = VK_NULL_HANDLE;
-    VkFormat mDepthFormat = VK_FORMAT_D32_SFLOAT;
+    // D32_SFLOAT_S8_UINT: combined depth+stencil; stencil aspect used by RmlRenderInterfaceVk
+    // for clip-mask operations (overflow:hidden with border-radius). Game draws leave stencil
+    // untouched (stencilTestEnable=false in all game pipelines).
+    VkFormat mDepthFormat = VK_FORMAT_D32_SFLOAT_S8_UINT;
 
     // Combiner-shader records keyed by (id0,id1).
     std::map<std::pair<uint64_t, uint64_t>, ShaderProgramVulkan> mShaderProgramPool;
