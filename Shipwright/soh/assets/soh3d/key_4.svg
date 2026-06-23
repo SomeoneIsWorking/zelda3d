@@ -1,0 +1,21 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!-- Keyboard-key glyph for hotbar slot 3 (key: 4). Keycap style. -->
+<svg xmlns="http://www.w3.org/2000/svg" width="64" height="64" viewBox="0 0 64 64">
+  <defs>
+    <linearGradient id="cap" x1="0" y1="0" x2="0" y2="1">
+      <stop offset="0%"   stop-color="#F4F4F5"/>
+      <stop offset="100%" stop-color="#D8D8DA"/>
+    </linearGradient>
+    <filter id="shadow" x="-15%" y="-10%" width="140%" height="140%">
+      <feDropShadow dx="1.5" dy="2" stdDeviation="1.5" flood-color="#00000055"/>
+    </filter>
+  </defs>
+  <rect x="5" y="4" width="54" height="52" rx="9" ry="9"
+        fill="url(#cap)" stroke="#555559" stroke-width="1.5"
+        filter="url(#shadow)"/>
+  <rect x="7" y="6" width="50" height="6" rx="6" ry="6"
+        fill="#FFFFFF" fill-opacity="0.55"/>
+  <text x="32" y="34" text-anchor="middle" dominant-baseline="central"
+        font-family="DejaVu Sans, Arial, sans-serif" font-weight="bold" font-size="30"
+        fill="#222222">4</text>
+</svg>

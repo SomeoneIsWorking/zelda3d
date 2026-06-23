@@ -176,6 +176,10 @@ int SoH3D_XboxBtnEnabled(void); // lazily resolves the env on first call; HUD dr
 // Same 64x64 dims as SoH3D_XboxGlyphTex. The draw path is identical; only the texture changes.
 const void* SoH3D_KbdGlyphTex(char which, int* w, int* h);
 
+// Hotbar number keycap glyphs. `which` = '1'..'6'. 64x64 RGBA32, same keycap style as above.
+// Used to label each hotbar slot's number key (keyboard mode) or omitted (gamepad mode).
+const void* SoH3D_NumGlyphTex(char which, int* w, int* h);
+
 // #32 hotswap — last-used input device. 0 = gamepad (Xbox glyphs), 1 = keyboard (key-label glyphs).
 // Updated from the C++ LUS input layer (Ship::Controller::ProcessKeyboardEvent for keyboard events,
 // LUS::Controller::ReadToOSContPad for gamepad events). The HUD reads this each frame to pick the
@@ -443,35 +447,15 @@ extern int gSoH3dLinkAnimSrc;
 int SoH3D_LinkEnabled(void);
 int SoH3D_LinkAnimSrc(void);
 
-// ---- PC HUD (RmlUi replacement for the N64 Fast3D HUD) ------------------------------------
-// Gate: 1 = PC HUD active (default ON); env SOH3D_PCHUD=0 disables it (falls back to N64 HUD).
-// When enabled, Interface_Draw and HealthMeter_Draw are skipped and SoH3D_HudUpdateFrame fills
-// gSoH3dHudState each frame for SohRmlUi to render.
-extern int gSoH3dPcHud;            // -1=uninit, 0=off, 1=on
-int SoH3D_PcHudEnabled(void);      // lazily resolves env, then returns gSoH3dPcHud
-
-// Snapshot of game HUD state for the RmlUi pass. Filled by SoH3D_HudUpdateFrame() once per
-// frame (soh3d.c), consumed by SohRmlUi::UpdateHud() (libultraship). The struct is pure POD
-// so it crosses the C/C++ boundary without issues.
-// buttonItems[0]=B, [1]=C-Left, [2]=C-Down, [3]=C-Right (index into gItemIcons names, = item id).
-// ITEM_NONE (0xFF) = empty slot.
-typedef struct {
-    int     health;           // current health in quarter-hearts (gSaveContext.health)
-    int     healthCapacity;   // max health in quarter-hearts (gSaveContext.healthCapacity)
-    int     magic;            // current magic 0..magicCapacity (gSaveContext.magic)
-    int     magicCapacity;    // max magic (gSaveContext.magicCapacity; 0 if no magic)
-    int     magicLevel;       // 0=none, 1=normal, 2=double (gSaveContext.magicLevel)
-    int     rupees;           // current rupee count (gSaveContext.rupees)
-    int     buttonItems[4];   // item ids for B/C-L/C-D/C-R (0xFF=empty)
-    int     inputDevice;      // 0=gamepad, 1=keyboard (gSoH3dInputDevice)
-    int     valid;            // 1 when this struct has been filled at least once
-} SoH3dHudState;
-
-extern SoH3dHudState gSoH3dHudState;
-
-// Called once per frame from SoH3D_ReplPoll (has PlayState) to snapshot game state into
-// gSoH3dHudState. SohRmlUi reads the snapshot and updates the RML document elements.
-void SoH3D_HudUpdateFrame(PlayState* play);
+// ---- Hotbar: 6-slot native Fast3D item hotbar (native SoH HUD, NOT RmlUi) -----------------
+// Drawn via z_parameter.c's Fast3D overlay pass (same path as existing button icons).
+// Keys 1-6 select slot 0-5 via SDL input; the active slot item is mirrored onto buttonItems[0]
+// (B button) so the existing SoH use-item engine fires it without reimplementing item logic.
+// REPL `hotbar <0-5>` selects the active slot headless; `hotbarset <slot> <item>` assigns an item.
+extern u8  gSoH3dHotbarItems[6];  // item id per slot (0xFF=ITEM_NONE=empty)
+extern int gSoH3dHotbarActive;    // currently selected slot 0-5
+int  SoH3D_HotbarSlot(void);      // returns gSoH3dHotbarActive
+void SoH3D_HotbarSync(PlayState* play); // called each frame from SoH3D_ReplPoll
 
 #ifdef __cplusplus
 }
