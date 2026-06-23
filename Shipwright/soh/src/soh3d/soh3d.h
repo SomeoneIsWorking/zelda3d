@@ -447,6 +447,12 @@ extern int gSoH3dLinkAnimSrc;
 int SoH3D_LinkEnabled(void);
 int SoH3D_LinkAnimSrc(void);
 
+// gSoH3dHotbarOn: 1 = the PC hotbar is the SOLE item UI — suppress the N64 top-right C-button
+// item cluster (C-Left/C-Down/C-Right icon + background discs + D-pad item indicators) from
+// Interface_DrawItemButtons and Interface_Draw. Hearts, magic, rupees, minimap, and the A-button
+// do-action prompt are NOT suppressed. Default on (set in SoH3D_ReplPoll). REPL `hotbaron <0|1>`.
+extern int gSoH3dHotbarOn;
+
 // ---- Hotbar: 6-slot native Fast3D item hotbar (native SoH HUD, NOT RmlUi) -----------------
 // Drawn via z_parameter.c's Fast3D overlay pass (same path as existing button icons).
 // Keys 1-6 select slot 0-5 via SDL input; the active slot item is mirrored onto buttonItems[0]
@@ -454,6 +460,9 @@ int SoH3D_LinkAnimSrc(void);
 // REPL `hotbar <0-5>` selects the active slot headless; `hotbarset <slot> <item>` assigns an item.
 extern u8  gSoH3dHotbarItems[6];  // item id per slot (0xFF=ITEM_NONE=empty)
 extern int gSoH3dHotbarActive;    // currently selected slot 0-5
+// gSoH3dHotbarFireB: set to 1 by the gamepad chord path (LUS Controller) when it wants to fire
+// the newly-selected slot this frame (i.e. inject a B press). Consumed by SoH3D_HotbarSync.
+extern int gSoH3dHotbarFireB;
 int  SoH3D_HotbarSlot(void);      // returns gSoH3dHotbarActive
 void SoH3D_HotbarSync(PlayState* play); // called each frame from SoH3D_ReplPoll
 

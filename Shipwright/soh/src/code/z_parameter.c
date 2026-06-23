@@ -1618,6 +1618,7 @@ static Gfx* SoH3D_DrawHotbar(PlayState* play, Gfx* dl) {
     extern int SoH3D_InputDevice(void);
     extern int SoH3D_XboxBtnEnabled(void);
     extern const void* SoH3D_NumGlyphTex(char which, int* w, int* h);
+    extern const void* SoH3D_XboxGlyphTex(char which, int* w, int* h);
 
     // Slot geometry — same visual weight as the C-buttons (~24 px in 240p).
     const s16 SLOT_SIZE = 24;      // on-screen square size per slot (pixels)
@@ -1680,27 +1681,63 @@ static Gfx* SoH3D_DrawHotbar(PlayState* play, Gfx* dl) {
             }
         }
 
-        // Number keycap badge (keyboard mode only) — top-right corner of the slot.
-        if (SoH3D_XboxBtnEnabled() && SoH3D_InputDevice() == 1) {
-            char numch = (char)('1' + i);
-            int gw = 0, gh = 0;
-            const void* numtex = SoH3D_NumGlyphTex(numch, &gw, &gh);
-            if (numtex != NULL && gw > 0 && gh > 0) {
-                // Badge: ~9px, tucked into top-right corner.
-                s16 bw = 9;
-                s16 bx = (s16)(sx + SLOT_SIZE - bw);
-                s16 by = sy;
-                gDPPipeSync(dl++);
-                gDPSetCombineLERP(dl++, 0,0,0,TEXEL0, TEXEL0,0,PRIMITIVE,0,
-                                       0,0,0,TEXEL0, TEXEL0,0,PRIMITIVE,0);
-                gDPSetPrimColor(dl++, 0, 0, 255, 255, 255, 255);
-                gDPLoadTextureBlock(dl++, numtex, G_IM_FMT_RGBA, G_IM_SIZ_32b, gw, gh, 0,
-                                    G_TX_NOMIRROR|G_TX_WRAP, G_TX_NOMIRROR|G_TX_WRAP,
-                                    G_TX_NOMASK, G_TX_NOMASK, G_TX_NOLOD, G_TX_NOLOD);
-                u16 dsdx = (u16)(((u32)gw << 10) / (u32)bw);
-                u16 dtdy = (u16)(((u32)gh << 10) / (u32)bw);
-                gSPWideTextureRectangle(dl++, bx<<2, by<<2, (bx+bw)<<2, (by+bw)<<2,
-                                        G_TX_RENDERTILE, 0, 0, dsdx, dtdy);
+        // Slot-label badge — keyboard or gamepad mode.
+        if (SoH3D_XboxBtnEnabled()) {
+            int devIsKeyboard = (SoH3D_InputDevice() == 1);
+            if (devIsKeyboard) {
+                // Keyboard: number keycap 1-6 in top-right corner.
+                char numch = (char)('1' + i);
+                int gw = 0, gh = 0;
+                const void* numtex = SoH3D_NumGlyphTex(numch, &gw, &gh);
+                if (numtex != NULL && gw > 0 && gh > 0) {
+                    s16 bw = 9;
+                    s16 bx = (s16)(sx + SLOT_SIZE - bw);
+                    s16 by = sy;
+                    gDPPipeSync(dl++);
+                    gDPSetCombineLERP(dl++, 0,0,0,TEXEL0, TEXEL0,0,PRIMITIVE,0,
+                                           0,0,0,TEXEL0, TEXEL0,0,PRIMITIVE,0);
+                    gDPSetPrimColor(dl++, 0, 0, 255, 255, 255, 255);
+                    gDPLoadTextureBlock(dl++, numtex, G_IM_FMT_RGBA, G_IM_SIZ_32b, gw, gh, 0,
+                                        G_TX_NOMIRROR|G_TX_WRAP, G_TX_NOMIRROR|G_TX_WRAP,
+                                        G_TX_NOMASK, G_TX_NOMASK, G_TX_NOLOD, G_TX_NOLOD);
+                    u16 dsdx = (u16)(((u32)gw << 10) / (u32)bw);
+                    u16 dtdy = (u16)(((u32)gh << 10) / (u32)bw);
+                    gSPWideTextureRectangle(dl++, bx<<2, by<<2, (bx+bw)<<2, (by+bw)<<2,
+                                            G_TX_RENDERTILE, 0, 0, dsdx, dtdy);
+                }
+            } else {
+                // Gamepad: Xbox face-button glyph.
+                // Slot 0=B, Slot 1=Y, Slot 2=chord+A, Slot 3=chord+B, Slot 4=chord+X, Slot 5=chord+Y
+                static const char kGamepadGlyphs[6] = { 'B', 'Y', 'A', 'B', 'X', 'Y' };
+                char glyphCh = kGamepadGlyphs[i];
+                int isChordSlot = (i >= 2); // slots 3-6 require RB chord
+                int gw = 0, gh = 0;
+                const void* gtex = SoH3D_XboxGlyphTex(glyphCh, &gw, &gh);
+                if (gtex != NULL && gw > 0 && gh > 0) {
+                    // For chord slots, draw a small cyan stripe above the icon as chord indicator.
+                    if (isChordSlot) {
+                        gDPPipeSync(dl++);
+                        gDPSetCombineMode(dl++, G_CC_PRIMITIVE, G_CC_PRIMITIVE);
+                        gDPSetPrimColor(dl++, 0, 0, 80, 200, 255, 160); // cyan stripe
+                        gDPFillRectangle(dl++, sx, sy, sx + SLOT_SIZE, sy + 2);
+                        gDPPipeSync(dl++);
+                    }
+                    // Badge: 10px glyph in top-right (or top-left for chord slots to leave room).
+                    s16 bw = 10;
+                    s16 bx = isChordSlot ? (s16)(sx + 1) : (s16)(sx + SLOT_SIZE - bw);
+                    s16 by = (s16)(sy + (isChordSlot ? 3 : 0));
+                    gDPPipeSync(dl++);
+                    gDPSetCombineLERP(dl++, 0,0,0,TEXEL0, TEXEL0,0,PRIMITIVE,0,
+                                           0,0,0,TEXEL0, TEXEL0,0,PRIMITIVE,0);
+                    gDPSetPrimColor(dl++, 0, 0, 255, 255, 255, 255);
+                    gDPLoadTextureBlock(dl++, gtex, G_IM_FMT_RGBA, G_IM_SIZ_32b, gw, gh, 0,
+                                        G_TX_NOMIRROR|G_TX_WRAP, G_TX_NOMIRROR|G_TX_WRAP,
+                                        G_TX_NOMASK, G_TX_NOMASK, G_TX_NOLOD, G_TX_NOLOD);
+                    u16 dsdx = (u16)(((u32)gw << 10) / (u32)bw);
+                    u16 dtdy = (u16)(((u32)gh << 10) / (u32)bw);
+                    gSPWideTextureRectangle(dl++, bx<<2, by<<2, (bx+bw)<<2, (by+bw)<<2,
+                                            G_TX_RENDERTILE, 0, 0, dsdx, dtdy);
+                }
             }
         }
     }
@@ -4450,34 +4487,39 @@ void Interface_DrawItemButtons(PlayState* play) {
                                       BBtnScaled, BBtnScaled, BBtn_factor, BBtn_factor);
         SoH3D_RecordHudBtn(0, PosX_BtnB, PosY_BtnB, BBtnScaled, interfaceCtx->bAlpha, 'B');
 
-        // C-Left Button Color & Texture
-        gDPPipeSync(OVERLAY_DISP++);
-        gDPSetPrimColor(OVERLAY_DISP++, 0, 0, cLeftButtonColor.r, cLeftButtonColor.g, cLeftButtonColor.b,
-                        interfaceCtx->cLeftAlpha);
-        gSPWideTextureRectangle(OVERLAY_DISP++, C_Left_BTN_Pos[0] << 2, C_Left_BTN_Pos[1] << 2,
-                                (C_Left_BTN_Pos[0] + R_ITEM_BTN_WIDTH(1)) << 2,
-                                (C_Left_BTN_Pos[1] + R_ITEM_BTN_WIDTH(1)) << 2, G_TX_RENDERTILE, 0, 0,
-                                (R_ITEM_BTN_DD(1) << 1) * bgScale, (R_ITEM_BTN_DD(1) << 1) * bgScale);
-        SoH3D_RecordHudBtn(1, C_Left_BTN_Pos[0], C_Left_BTN_Pos[1], R_ITEM_BTN_WIDTH(1), interfaceCtx->cLeftAlpha, 'X');
+        // C-Left / C-Down / C-Right button background discs — suppressed when the PC hotbar is
+        // the sole item UI (gSoH3dHotbarOn). B-button disc above is always drawn (it's the
+        // roll/action button, not an item slot and is retained in the PC HUD).
+        if (!gSoH3dHotbarOn) {
+            // C-Left Button Color & Texture
+            gDPPipeSync(OVERLAY_DISP++);
+            gDPSetPrimColor(OVERLAY_DISP++, 0, 0, cLeftButtonColor.r, cLeftButtonColor.g, cLeftButtonColor.b,
+                            interfaceCtx->cLeftAlpha);
+            gSPWideTextureRectangle(OVERLAY_DISP++, C_Left_BTN_Pos[0] << 2, C_Left_BTN_Pos[1] << 2,
+                                    (C_Left_BTN_Pos[0] + R_ITEM_BTN_WIDTH(1)) << 2,
+                                    (C_Left_BTN_Pos[1] + R_ITEM_BTN_WIDTH(1)) << 2, G_TX_RENDERTILE, 0, 0,
+                                    (R_ITEM_BTN_DD(1) << 1) * bgScale, (R_ITEM_BTN_DD(1) << 1) * bgScale);
+            SoH3D_RecordHudBtn(1, C_Left_BTN_Pos[0], C_Left_BTN_Pos[1], R_ITEM_BTN_WIDTH(1), interfaceCtx->cLeftAlpha, 'X');
 
-        // C-Down Button Color & Texture
-        gDPSetPrimColor(OVERLAY_DISP++, 0, 0, cDownButtonColor.r, cDownButtonColor.g, cDownButtonColor.b,
-                        interfaceCtx->cDownAlpha);
-        gSPWideTextureRectangle(OVERLAY_DISP++, C_Down_BTN_Pos[0] << 2, C_Down_BTN_Pos[1] << 2,
-                                (C_Down_BTN_Pos[0] + R_ITEM_BTN_WIDTH(2)) << 2,
-                                (C_Down_BTN_Pos[1] + R_ITEM_BTN_WIDTH(2)) << 2, G_TX_RENDERTILE, 0, 0,
-                                (R_ITEM_BTN_DD(2) << 1) * bgScale, (R_ITEM_BTN_DD(2) << 1) * bgScale);
-        SoH3D_RecordHudBtn(2, C_Down_BTN_Pos[0], C_Down_BTN_Pos[1], R_ITEM_BTN_WIDTH(2), interfaceCtx->cDownAlpha, 'Y');
+            // C-Down Button Color & Texture
+            gDPSetPrimColor(OVERLAY_DISP++, 0, 0, cDownButtonColor.r, cDownButtonColor.g, cDownButtonColor.b,
+                            interfaceCtx->cDownAlpha);
+            gSPWideTextureRectangle(OVERLAY_DISP++, C_Down_BTN_Pos[0] << 2, C_Down_BTN_Pos[1] << 2,
+                                    (C_Down_BTN_Pos[0] + R_ITEM_BTN_WIDTH(2)) << 2,
+                                    (C_Down_BTN_Pos[1] + R_ITEM_BTN_WIDTH(2)) << 2, G_TX_RENDERTILE, 0, 0,
+                                    (R_ITEM_BTN_DD(2) << 1) * bgScale, (R_ITEM_BTN_DD(2) << 1) * bgScale);
+            SoH3D_RecordHudBtn(2, C_Down_BTN_Pos[0], C_Down_BTN_Pos[1], R_ITEM_BTN_WIDTH(2), interfaceCtx->cDownAlpha, 'Y');
 
-        // C-Right Button Color & Texture
-        gDPSetPrimColor(OVERLAY_DISP++, 0, 0, cRightButtonColor.r, cRightButtonColor.g, cRightButtonColor.b,
-                        interfaceCtx->cRightAlpha);
-        gSPWideTextureRectangle(OVERLAY_DISP++, C_Right_BTN_Pos[0] << 2, C_Right_BTN_Pos[1] << 2,
-                                (C_Right_BTN_Pos[0] + R_ITEM_BTN_WIDTH(3)) << 2,
-                                (C_Right_BTN_Pos[1] + R_ITEM_BTN_WIDTH(3)) << 2, G_TX_RENDERTILE, 0, 0,
-                                (R_ITEM_BTN_DD(3) << 1) * bgScale, (R_ITEM_BTN_DD(3) << 1) * bgScale);
-        SoH3D_RecordHudBtn(3, C_Right_BTN_Pos[0], C_Right_BTN_Pos[1], R_ITEM_BTN_WIDTH(3), interfaceCtx->cRightAlpha,
-                           'A');
+            // C-Right Button Color & Texture
+            gDPSetPrimColor(OVERLAY_DISP++, 0, 0, cRightButtonColor.r, cRightButtonColor.g, cRightButtonColor.b,
+                            interfaceCtx->cRightAlpha);
+            gSPWideTextureRectangle(OVERLAY_DISP++, C_Right_BTN_Pos[0] << 2, C_Right_BTN_Pos[1] << 2,
+                                    (C_Right_BTN_Pos[0] + R_ITEM_BTN_WIDTH(3)) << 2,
+                                    (C_Right_BTN_Pos[1] + R_ITEM_BTN_WIDTH(3)) << 2, G_TX_RENDERTILE, 0, 0,
+                                    (R_ITEM_BTN_DD(3) << 1) * bgScale, (R_ITEM_BTN_DD(3) << 1) * bgScale);
+            SoH3D_RecordHudBtn(3, C_Right_BTN_Pos[0], C_Right_BTN_Pos[1], R_ITEM_BTN_WIDTH(3), interfaceCtx->cRightAlpha,
+                               'A');
+        }
     }
 
     if ((pauseCtx->state < 8) || (pauseCtx->state >= 18)) {
@@ -5866,44 +5908,51 @@ void Interface_Draw(PlayState* play) {
 
         gDPPipeSync(OVERLAY_DISP++);
 
-        // C-Left Button Icon & Ammo Count
-        if (gSaveContext.equips.buttonItems[1] < 0xF0) {
-            gDPSetPrimColor(OVERLAY_DISP++, 0, 0, 255, 255, 255, interfaceCtx->cLeftAlpha);
-            gDPSetCombineMode(OVERLAY_DISP++, G_CC_MODULATERGBA_PRIM, G_CC_MODULATERGBA_PRIM);
-            Interface_DrawItemIconTexture(play, gItemIcons[gSaveContext.equips.buttonItems[1]], 1);
+        // C-Left / C-Down / C-Right icon + ammo: suppressed when the PC hotbar is the sole item UI.
+        // The hotbar replaces the N64 top-right item cluster entirely; the C-button item-slot engine
+        // still runs (so items stay equippable via the pause menu) but these on-screen icons are
+        // hidden. Re-enable with REPL `hotbaron 0` for debugging.
+        if (!gSoH3dHotbarOn) {
+            // C-Left Button Icon & Ammo Count
+            if (gSaveContext.equips.buttonItems[1] < 0xF0) {
+                gDPSetPrimColor(OVERLAY_DISP++, 0, 0, 255, 255, 255, interfaceCtx->cLeftAlpha);
+                gDPSetCombineMode(OVERLAY_DISP++, G_CC_MODULATERGBA_PRIM, G_CC_MODULATERGBA_PRIM);
+                Interface_DrawItemIconTexture(play, gItemIcons[gSaveContext.equips.buttonItems[1]], 1);
+                gDPPipeSync(OVERLAY_DISP++);
+                gDPSetCombineLERP(OVERLAY_DISP++, PRIMITIVE, ENVIRONMENT, TEXEL0, ENVIRONMENT, TEXEL0, 0, PRIMITIVE, 0,
+                                  PRIMITIVE, ENVIRONMENT, TEXEL0, ENVIRONMENT, TEXEL0, 0, PRIMITIVE, 0);
+                Interface_DrawAmmoCount(play, 1, interfaceCtx->cLeftAlpha);
+            }
+
             gDPPipeSync(OVERLAY_DISP++);
-            gDPSetCombineLERP(OVERLAY_DISP++, PRIMITIVE, ENVIRONMENT, TEXEL0, ENVIRONMENT, TEXEL0, 0, PRIMITIVE, 0,
-                              PRIMITIVE, ENVIRONMENT, TEXEL0, ENVIRONMENT, TEXEL0, 0, PRIMITIVE, 0);
-            Interface_DrawAmmoCount(play, 1, interfaceCtx->cLeftAlpha);
-        }
 
-        gDPPipeSync(OVERLAY_DISP++);
+            // C-Down Button Icon & Ammo Count
+            if (gSaveContext.equips.buttonItems[2] < 0xF0) {
+                gDPSetPrimColor(OVERLAY_DISP++, 0, 0, 255, 255, 255, interfaceCtx->cDownAlpha);
+                gDPSetCombineMode(OVERLAY_DISP++, G_CC_MODULATERGBA_PRIM, G_CC_MODULATERGBA_PRIM);
+                Interface_DrawItemIconTexture(play, gItemIcons[gSaveContext.equips.buttonItems[2]], 2);
+                gDPPipeSync(OVERLAY_DISP++);
+                gDPSetCombineLERP(OVERLAY_DISP++, PRIMITIVE, ENVIRONMENT, TEXEL0, ENVIRONMENT, TEXEL0, 0, PRIMITIVE, 0,
+                                  PRIMITIVE, ENVIRONMENT, TEXEL0, ENVIRONMENT, TEXEL0, 0, PRIMITIVE, 0);
+                Interface_DrawAmmoCount(play, 2, interfaceCtx->cDownAlpha);
+            }
 
-        // C-Down Button Icon & Ammo Count
-        if (gSaveContext.equips.buttonItems[2] < 0xF0) {
-            gDPSetPrimColor(OVERLAY_DISP++, 0, 0, 255, 255, 255, interfaceCtx->cDownAlpha);
-            gDPSetCombineMode(OVERLAY_DISP++, G_CC_MODULATERGBA_PRIM, G_CC_MODULATERGBA_PRIM);
-            Interface_DrawItemIconTexture(play, gItemIcons[gSaveContext.equips.buttonItems[2]], 2);
             gDPPipeSync(OVERLAY_DISP++);
-            gDPSetCombineLERP(OVERLAY_DISP++, PRIMITIVE, ENVIRONMENT, TEXEL0, ENVIRONMENT, TEXEL0, 0, PRIMITIVE, 0,
-                              PRIMITIVE, ENVIRONMENT, TEXEL0, ENVIRONMENT, TEXEL0, 0, PRIMITIVE, 0);
-            Interface_DrawAmmoCount(play, 2, interfaceCtx->cDownAlpha);
-        }
 
-        gDPPipeSync(OVERLAY_DISP++);
+            // C-Right Button Icon & Ammo Count
+            if (gSaveContext.equips.buttonItems[3] < 0xF0) {
+                gDPSetPrimColor(OVERLAY_DISP++, 0, 0, 255, 255, 255, interfaceCtx->cRightAlpha);
+                gDPSetCombineMode(OVERLAY_DISP++, G_CC_MODULATERGBA_PRIM, G_CC_MODULATERGBA_PRIM);
+                Interface_DrawItemIconTexture(play, gItemIcons[gSaveContext.equips.buttonItems[3]], 3);
+                gDPPipeSync(OVERLAY_DISP++);
+                gDPSetCombineLERP(OVERLAY_DISP++, PRIMITIVE, ENVIRONMENT, TEXEL0, ENVIRONMENT, TEXEL0, 0, PRIMITIVE, 0,
+                                  PRIMITIVE, ENVIRONMENT, TEXEL0, ENVIRONMENT, TEXEL0, 0, PRIMITIVE, 0);
+                Interface_DrawAmmoCount(play, 3, interfaceCtx->cRightAlpha);
+            }
+        } // end !gSoH3dHotbarOn
 
-        // C-Right Button Icon & Ammo Count
-        if (gSaveContext.equips.buttonItems[3] < 0xF0) {
-            gDPSetPrimColor(OVERLAY_DISP++, 0, 0, 255, 255, 255, interfaceCtx->cRightAlpha);
-            gDPSetCombineMode(OVERLAY_DISP++, G_CC_MODULATERGBA_PRIM, G_CC_MODULATERGBA_PRIM);
-            Interface_DrawItemIconTexture(play, gItemIcons[gSaveContext.equips.buttonItems[3]], 3);
-            gDPPipeSync(OVERLAY_DISP++);
-            gDPSetCombineLERP(OVERLAY_DISP++, PRIMITIVE, ENVIRONMENT, TEXEL0, ENVIRONMENT, TEXEL0, 0, PRIMITIVE, 0,
-                              PRIMITIVE, ENVIRONMENT, TEXEL0, ENVIRONMENT, TEXEL0, 0, PRIMITIVE, 0);
-            Interface_DrawAmmoCount(play, 3, interfaceCtx->cRightAlpha);
-        }
-
-        if (CVarGetInteger(CVAR_ENHANCEMENT("DpadEquips"), 0) != 0) {
+        // D-pad item equip icons: suppressed when the PC hotbar is the sole item UI.
+        if (CVarGetInteger(CVAR_ENHANCEMENT("DpadEquips"), 0) != 0 && !gSoH3dHotbarOn) {
             // DPad is only greyed-out when all 4 DPad directions are too
             uint16_t dpadAlpha =
                 MAX(MAX(MAX(interfaceCtx->dpadUpAlpha, interfaceCtx->dpadDownAlpha), interfaceCtx->dpadLeftAlpha),

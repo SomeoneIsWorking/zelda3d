@@ -20,7 +20,12 @@
 #define MINIMUM_RADIUS_TO_MAP_NOTCH 0.9
 
 // #32 hotswap — last-used input device signal, defined in soh3d.c (C).
-extern "C" { extern int gSoH3dInputDevice; }
+extern "C" {
+    extern int gSoH3dInputDevice;
+    // Gamepad hotbar: active slot selection + B-fire injection, defined in soh3d.c.
+    extern int gSoH3dHotbarActive;
+    extern int gSoH3dHotbarFireB;
+}
 
 namespace LUS {
 
@@ -92,11 +97,25 @@ void Controller::ReadToOSContPad(OSContPad* pad) {
         button->UpdatePad(padToBuffer.button);
     }
 
-    // #32 button chords: after the pad is assembled, fold in modifier+face -> C-button item slots.
-    // Gated by CVar gControllerChords (default on). Physical state is real SDL, OR a headless injection
-    // via gChordPhysInject (>=0 -> use that bitfield directly; -1 -> read SDL). See ApplyButtonChords.
+    // #32 button chords + hotbar gamepad routing:
+    //
+    // C-button chord (unchanged): RB + A/B/X/Y -> N64 C-Right/C-Left/C-Up/C-Down item slots.
+    // This wires RB as the "second layer" modifier for the engine's C-button equip slots (DpadEquips
+    // maps 4 more), giving full no-C-pad coverage. Gated by CVar gControllerChords (default on).
+    //
+    // Hotbar gamepad routing (new — #97):
+    //   Without chord: B = hotbar slot 1 (slot 0), Y = hotbar slot 2 (slot 1).
+    //     B is already N64 B, so the item fires via the existing SoH use-item path.
+    //     Y has no default N64 mapping — we set the active slot AND inject gSoH3dHotbarFireB=1 so
+    //     SoH3D_HotbarSync injects a virtual B press this frame.
+    //   With RB chord: A/B/X/Y -> hotbar slots 3/4/5/6 (select + fire B).
+    //     The chord also fires C-button bits (from kDefaultChords above); those are now redundant
+    //     for the hotbar path and harmless (engine will try to use the C-slot item, but
+    //     gSoH3dHotbarFireB fires the hotbar item via B which takes priority in the item-use path).
+    //
+    // Physical state is real SDL for live play, OR the gChordPhysInject CVar for headless testing.
     auto cvars = Ship::Context::GetRawInstance()->GetConsoleVariables();
-    if (cvars->GetInteger("gControllerChords", 1)) {
+    if (mPortIndex == 0) {
         int32_t inject = cvars->GetInteger("gChordPhysInject", -1);
         uint16_t phys = 0;
         if (inject >= 0) {
@@ -115,16 +134,62 @@ void Controller::ReadToOSContPad(OSContPad* pad) {
                 if (SDL_GameControllerGetButton(gamepad, SDL_CONTROLLER_BUTTON_Y)) phys |= CHORD_PHYS_Y;
             }
         }
+
         if (inject >= 0) {
-            // Headless self-test: fold gChordTestButtons (pre-existing N64 bits) through the pure chord
-            // logic so OUTPUT and SUPPRESSION are both observable without a controller, then OR into pad.
+            // Headless self-test: fold gChordTestButtons through the pure chord logic.
             CONTROLLERBUTTONS_T before = (CONTROLLERBUTTONS_T)cvars->GetInteger("gChordTestButtons", 0);
             CONTROLLERBUTTONS_T after = ApplyButtonChords(before, phys);
             printf("[CHORD] phys=0x%02x buttons 0x%04x -> 0x%04x\n", phys, before, after);
             fflush(stdout);
             padToBuffer.button |= after;
-        } else if (phys != 0) {
-            padToBuffer.button = ApplyButtonChords(padToBuffer.button, phys);
+        } else if (cvars->GetInteger("gControllerChords", 1)) {
+            // Live: C-button chord.
+            if (phys != 0) {
+                padToBuffer.button = ApplyButtonChords(padToBuffer.button, phys);
+            }
+        }
+
+        // Hotbar gamepad routing (port 0 only).
+        // Without chord modifier: B selects slot 0, Y selects slot 1.
+        // With RB chord modifier: A->slot2, B->slot3, X->slot4, Y->slot5 (+ fire B).
+        // Log whenever we change the active slot (once per press, visible in run.log).
+        if (phys & CHORD_PHYS_MOD) {
+            // Chord path: map A/B/X/Y -> hotbar slots 3-6.
+            bool chordSlot = false;
+            int newSlot = -1;
+            if (phys & CHORD_PHYS_A) { newSlot = 2; chordSlot = true; }
+            else if (phys & CHORD_PHYS_B) { newSlot = 3; chordSlot = true; }
+            else if (phys & CHORD_PHYS_X) { newSlot = 4; chordSlot = true; }
+            else if (phys & CHORD_PHYS_Y) { newSlot = 5; chordSlot = true; }
+            if (chordSlot && newSlot != gSoH3dHotbarActive) {
+                printf("[HOTBAR] chord RB+phys=0x%02x -> slot %d (fire B)\n", phys, newSlot);
+                fflush(stdout);
+                gSoH3dHotbarActive = newSlot;
+                gSoH3dHotbarFireB = 1; // request B-fire from SoH3D_HotbarSync this frame
+                gSoH3dInputDevice = 0; // gamepad active
+            } else if (chordSlot) {
+                // Same slot already selected, still fire B.
+                gSoH3dHotbarFireB = 1;
+                gSoH3dInputDevice = 0;
+            }
+        } else {
+            // No chord: B = slot 0 (B is already N64 B -> fires via existing path).
+            // Y = slot 1 (inject B fire since Y has no default N64 mapping).
+            if ((phys & CHORD_PHYS_B) && gSoH3dHotbarActive != 0) {
+                printf("[HOTBAR] B -> slot 0\n"); fflush(stdout);
+                gSoH3dHotbarActive = 0;
+                gSoH3dInputDevice = 0;
+                // N64 B is already set by the button mapping, no extra fire needed.
+            } else if (phys & CHORD_PHYS_B) {
+                gSoH3dInputDevice = 0; // B held, slot already 0
+            } else if (phys & CHORD_PHYS_Y) {
+                if (gSoH3dHotbarActive != 1) {
+                    printf("[HOTBAR] Y -> slot 1 (fire B)\n"); fflush(stdout);
+                    gSoH3dHotbarActive = 1;
+                }
+                gSoH3dHotbarFireB = 1; // Y has no default N64 mapping, inject B press
+                gSoH3dInputDevice = 0;
+            }
         }
     }
 

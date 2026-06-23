@@ -543,23 +543,38 @@ int SoH3D_InputDevice(void) {
 // Slots are set by REPL `hotbar <0-5>` (headless) and by SDL key press (keys 1-6, live).
 // When a slot is "selected" by pressing 1-6, the item in that slot is routed to B button
 // (buttonItems[0]) so the existing SoH use-item engine handles it without duplication.
+// gSoH3dHotbarOn: 1 = hotbar is the sole item UI; N64 C-button/D-pad cluster is suppressed.
+// Default on. REPL `hotbaron <0|1>`.
+int gSoH3dHotbarOn = 1;
+
 u8 gSoH3dHotbarItems[6] = { 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF };
 int gSoH3dHotbarActive  = 0;   // 0-5
+// Set to 1 by the gamepad chord path (LUS Controller) when it wants to fire the newly-selected
+// slot this frame (i.e. inject a virtual B press). Consumed by SoH3D_HotbarSync.
+int gSoH3dHotbarFireB   = 0;
 
 int SoH3D_HotbarSlot(void) {
     return gSoH3dHotbarActive;
 }
 
 // Called from SoH3D_ReplPoll each frame: sync hotbar slot[active] <-> buttonItems[0] so pressing
-// the existing B-button use path fires the hotbar item. Also copies all 6 slot items from the
-// hotbar array (slots 0-3 mirror the existing C-button assignments via save-context after mapping).
+// the existing B-button use path fires the hotbar item.
+// For gamepad: when gSoH3dHotbarFireB is set (gamepad Y press or chord+ABXY), we also inject a
+// virtual B press via the engine's input so the item fires immediately.
 void SoH3D_HotbarSync(PlayState* play) {
-    (void)play;
     // Slot active's item must be on B (buttonItems[0]) for the SoH engine to use it.
     // We write the hotbar item into B; if the user hasn't assigned slots, B is already ITEM_NONE.
     u8 activeItem = gSoH3dHotbarItems[gSoH3dHotbarActive];
     if (activeItem != (u8)gSaveContext.equips.buttonItems[0]) {
         gSaveContext.equips.buttonItems[0] = activeItem;
+    }
+    // Gamepad chord path: fire the active slot's item this frame by injecting a B-button press.
+    // gSoH3dHotbarFireB is set by ReadToOSContPad (gamepad Y or chord+ABXY) and consumed here.
+    if (gSoH3dHotbarFireB && play != NULL) {
+        // Inject a press into the engine's input pad so B-button press handling runs this frame.
+        play->state.input[0].press.button  |= BTN_B;
+        play->state.input[0].cur.button    |= BTN_B;
+        gSoH3dHotbarFireB = 0;
     }
 }
 
@@ -4532,6 +4547,11 @@ static void SoH3D_ReplExec(PlayState* play, char* line, const char* outPath) {
         // gSoH3dHudTex every frame. 1 = crisp 64x64 hearts, 0 = the blocky N64 16x16 hearts.
         gSoH3dHudTex = (f1 != 0.0f) ? 1 : 0;
         SoH3D_ReplReply(outPath, "hudtex=%d", gSoH3dHudTex);
+    } else if (strcmp(cmd, "hotbaron") == 0 && sscanf(line, "%*s %f", &f1) == 1) {
+        // `hotbaron <0|1>` — toggle the PC hotbar as the sole item UI.
+        // 1 (default) = suppress N64 C-button/D-pad item cluster; 0 = show both.
+        gSoH3dHotbarOn = (f1 != 0.0f) ? 1 : 0;
+        SoH3D_ReplReply(outPath, "hotbaron=%d", gSoH3dHotbarOn);
     } else if (strcmp(cmd, "hotbar") == 0 && sscanf(line, "%*s %f", &f1) == 1) {
         // Hotbar slot selection (headless test hook). `hotbar <0-5>` selects the active slot;
         // in live play keys 1-6 select slots 0-5 via SDL input. The active slot's item is
