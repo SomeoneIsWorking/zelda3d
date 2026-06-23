@@ -147,6 +147,28 @@ static void ErrorHandler(int sig, siginfo_t* sigInfo, void* data) {
     }
     sHandling = 1;
 
+    // soh3d (#91): a crash that originates INSIDE malloc/free — e.g. a double-free during
+    // window-close teardown — leaves glibc's malloc arena lock HELD. Everything below
+    // (backtrace_symbols, demangling, std::string, the crash dialog) then mallocs and DEADLOCKS on
+    // that lock, so the process hangs forever instead of dying. That deadlock is the window-close
+    // hang. Guards:
+    //   1) Dump an async-signal-safe backtrace (backtrace_symbols_fd — no malloc) to stderr NOW, so
+    //      the trace is always captured even if the rich handler below wedges. stderr -> run.log.
+    //   2) Arm a watchdog so a held malloc lock can never hang the process; and for SIGABRT (glibc's
+    //      heap-corruption signal — arena lock is held) bail out immediately after the safe dump.
+    {
+        void* asBt[256];
+        int asN = backtrace(asBt, 256);
+        static const char hdr[] = "\n[soh3d] FATAL signal — async-signal-safe backtrace:\n";
+        (void)!write(STDERR_FILENO, hdr, sizeof(hdr) - 1);
+        backtrace_symbols_fd(asBt, asN, STDERR_FILENO);
+    }
+    signal(SIGALRM, [](int s) { _exit(128 + s); });
+    alarm(3); // hard cap: the malloc-using handler below can never hang the process more than 3s
+    if (sig == SIGABRT) {
+        _exit(128 + sig);
+    }
+
     std::shared_ptr<CrashHandler> crashHandler = Context::GetRawInstance()->GetCrashHandler();
     char intToCharBuffer[16];
 
