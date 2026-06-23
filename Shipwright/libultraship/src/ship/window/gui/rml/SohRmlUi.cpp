@@ -18,6 +18,29 @@
 #include "libultraship/bridge/consolevariablebridge.h"
 #include <spdlog/spdlog.h>
 #include <algorithm>
+#include <cstdio>
+
+// PC HUD state snapshot filled by soh3d.c SoH3D_HudUpdateFrame (has PlayState).
+// Defined as extern "C" so C and C++ link to the same symbol.
+extern "C" {
+typedef struct {
+    int  health;
+    int  healthCapacity;
+    int  magic;
+    int  magicCapacity;
+    int  magicLevel;
+    int  rupees;
+    int  buttonItems[4];
+    int  inputDevice;
+    int  valid;
+} SoH3dHudState;
+extern SoH3dHudState gSoH3dHudState;
+
+// PC HUD enable gate (-1=uninit,0=off,1=on). Defined in soh/soh3d.c; linked into the same
+// binary, so libultraship can extern it at link time.  We read it in UpdateHud() to hide the
+// HUD document when the user toggles it off at runtime via `pchud 0`.
+extern int gSoH3dPcHud;
+}
 
 // SoH3D render toggles live as extern "C" ints in libultraship's soh3d_gl.cpp (the live state the
 // GL pass reads each frame). The RML rows flip these directly for an immediate, visible effect and
@@ -245,11 +268,26 @@ bool SohRmlUi::Init(void* sdlWindow, void* glContext, int width, int height, boo
         Shutdown();
         return false;
     }
-    // Start hidden; the menu is shown on demand via ToggleVisible() (Phase 2). The document stays
-    // loaded either way — we gate update/render + input on mVisible.
-    mDocument->Show();
+    // Start hidden; the menu is shown on demand via ToggleVisible().
+    // Now that UpdateAndRender always renders (for the HUD), we must actually hide the document
+    // rather than relying on the old !mVisible early-return guard.
+    mDocument->Show(); // must be shown once so RmlUi builds its layout; then immediately hide it.
+    mDocument->Hide();
     // Mouse parity: clicking a <tab> switches to it (keyboard/D-pad Left/Right already do).
     AttachTabClickHandlers();
+
+    // Load the always-on PC HUD document.  It starts hidden until gSoH3dHudState.valid==1 on the
+    // first real gameplay frame (soh3d.c calls SoH3D_HudUpdateFrame from SoH3D_ReplPoll).
+    const std::string hudPath = Context::GetPathRelativeToAppBundle("assets/rml/soh3d_hud.rml");
+    mHudDocument = mContext->LoadDocument(hudPath);
+    if (!mHudDocument) {
+        SPDLOG_WARN("[SohRmlUi] Failed to load HUD document: {} — PC HUD will be absent", hudPath);
+        // Non-fatal: the menu still works; the PC HUD is just missing.
+    } else {
+        // Keep hidden until UpdateHud() receives the first valid state snapshot.
+        // Do NOT call mHudDocument->Show() here; UpdateHud() calls it on the first valid frame.
+        SPDLOG_INFO("[SohRmlUi] PC HUD document loaded: {}", hudPath);
+    }
 
     SPDLOG_INFO("[SohRmlUi] RmlUi initialised ({}x{}) — {} ({})", mWidth, mHeight, docPath, gl_message);
     mInitialised = true;
@@ -273,6 +311,14 @@ void SohRmlUi::SetVisible(bool visible) {
             ctx->GetControlDeck()->BlockGameInput(SOH3D_RML_MENU_BLOCK_ID);
         } else {
             ctx->GetControlDeck()->UnblockGameInput(SOH3D_RML_MENU_BLOCK_ID);
+        }
+    }
+    // Show/hide the ESC menu document.  The HUD document is unaffected (always shown).
+    if (mDocument) {
+        if (mVisible) {
+            mDocument->Show();
+        } else {
+            mDocument->Hide();
         }
     }
     if (mVisible && mContext) {
@@ -590,8 +636,155 @@ void SohRmlUi::Resize(int width, int height) {
     }
 }
 
+void SohRmlUi::UpdateHud() {
+    if (!mHudDocument) {
+        return;
+    }
+
+    const SoH3dHudState& s = gSoH3dHudState;
+
+    // Sync document visibility with the live PC HUD gate.
+    // gSoH3dPcHud: -1=uninit (not yet resolved), 0=off, 1=on.
+    // Show only when enabled AND game state is valid (a PlayState is live).
+    static bool sHudShown = false;
+    const bool wantShow = (gSoH3dPcHud != 0) && (s.valid != 0);
+    if (wantShow != sHudShown) {
+        if (wantShow) {
+            mHudDocument->Show();
+        } else {
+            mHudDocument->Hide();
+        }
+        sHudShown = wantShow;
+    }
+
+    if (!wantShow) {
+        return;
+    }
+
+    // ---- Hearts ----------------------------------------------------------------
+    if (!mHudHeartsRow) {
+        mHudHeartsRow = mHudDocument->GetElementById("hearts-row");
+    }
+    if (mHudHeartsRow) {
+        // Each heart container is FULL_HEART_HEALTH=16 quarter-hearts wide.
+        // Build the <hrt> inner RML fresh each frame (cheap string; max ~20 hearts).
+        const int FULL = 16; // quarter-hearts per heart = FULL_HEART_HEALTH
+        int containers = s.healthCapacity / FULL;
+        if (containers < 1) {
+            containers = 1;
+        }
+        int hp = s.health; // quarter-hearts remaining
+        Rml::String inner;
+        inner.reserve(containers * 32);
+        for (int i = 0; i < containers; i++) {
+            const char* cls;
+            if (hp >= FULL) {
+                cls = "full";
+            } else if (hp >= 12) {
+                cls = "threequarter";
+            } else if (hp >= 8) {
+                cls = "half";
+            } else if (hp > 0) {
+                cls = "quarter";
+            } else {
+                cls = "empty";
+            }
+            inner += "<hrt class=\"";
+            inner += cls;
+            inner += "\"/>";
+            hp -= FULL;
+            if (hp < 0) {
+                hp = 0;
+            }
+        }
+        if (inner != mHudHeartsRow->GetInnerRML()) {
+            mHudHeartsRow->SetInnerRML(inner);
+        }
+    }
+
+    // ---- Magic bar -------------------------------------------------------------
+    if (!mHudMagicBlock) {
+        mHudMagicBlock = mHudDocument->GetElementById("hud-magic");
+    }
+    if (!mHudMagicFill) {
+        mHudMagicFill = mHudDocument->GetElementById("magic-bar-fill");
+    }
+    if (mHudMagicBlock) {
+        bool hasMagic = (s.magicLevel > 0);
+        mHudMagicBlock->SetClass("hidden", !hasMagic);
+    }
+    if (mHudMagicFill && s.magicCapacity > 0) {
+        int pct = (s.magic * 100) / s.magicCapacity;
+        if (pct < 0) { pct = 0; }
+        if (pct > 100) { pct = 100; }
+        char buf[32];
+        std::snprintf(buf, sizeof(buf), "width: %d%%;", pct);
+        mHudMagicFill->SetAttribute("style", Rml::String(buf));
+    }
+
+    // ---- Rupees ----------------------------------------------------------------
+    if (!mHudRupeeCount) {
+        mHudRupeeCount = mHudDocument->GetElementById("rupee-count");
+    }
+    if (mHudRupeeCount) {
+        char buf[16];
+        std::snprintf(buf, sizeof(buf), "%d", s.rupees);
+        Rml::String str(buf);
+        if (str != mHudRupeeCount->GetInnerRML()) {
+            mHudRupeeCount->SetInnerRML(str);
+        }
+    }
+
+    // ---- Item buttons (B + C-L + C-D + C-R) -----------------------------------
+    // Item names are derived from the item id (0xFF = ITEM_NONE = empty).
+    // For this first pass we show the item id as a number; icon art is a future enhancement.
+    static const struct { const char* slot; const char* icon; const char* lbl; } kSlots[4] = {
+        { "slot-b",      "icon-b",     "label-b"     },
+        { "slot-cleft",  "icon-cleft", "label-cleft" },
+        { "slot-cdown",  "icon-cdown", "label-cdown" },
+        { "slot-cright", "icon-cright","label-cright" },
+    };
+    // Keyboard-mode labels for B/C (keyboard binding names; brief so they fit the slot).
+    static const char* kKbdLabels[4] = { "Z", "Q", "E", "R" }; // B=Z, C-L=Q, C-D=E, C-R=R
+    // Gamepad labels.
+    static const char* kPadLabels[4] = { "B", "C\xe2\x97\x84", "C\xe2\x96\xbc", "C\xe2\x96\xba" }; // UTF-8 triangles
+
+    for (int i = 0; i < 4; i++) {
+        int itemId = s.buttonItems[i];
+        bool empty = (itemId == 0xFF || itemId < 0);
+
+        Rml::Element* iconEl  = mHudDocument->GetElementById(kSlots[i].icon);
+        Rml::Element* lblEl   = mHudDocument->GetElementById(kSlots[i].lbl);
+        Rml::Element* slotEl  = mHudDocument->GetElementById(kSlots[i].slot);
+        if (slotEl) {
+            slotEl->SetClass("empty", empty);
+        }
+        if (iconEl) {
+            if (empty) {
+                iconEl->SetInnerRML("");
+            } else {
+                // Show the item id (hex) until icon textures are wired up.
+                char buf[12];
+                std::snprintf(buf, sizeof(buf), "0x%02X", (unsigned)itemId);
+                Rml::String str(buf);
+                if (str != iconEl->GetInnerRML()) {
+                    iconEl->SetInnerRML(str);
+                }
+            }
+        }
+        if (lblEl) {
+            const char* lbl = (s.inputDevice == 1) ? kKbdLabels[i] : kPadLabels[i];
+            Rml::String str(lbl);
+            if (str != lblEl->GetInnerRML()) {
+                lblEl->SetInnerRML(str);
+            }
+            lblEl->SetClass("kbd", s.inputDevice == 1);
+        }
+    }
+}
+
 void SohRmlUi::UpdateAndRender() {
-    if (!mInitialised || !mContext || !mVisible) {
+    if (!mInitialised || !mContext) {
         return;
     }
 
@@ -602,9 +795,18 @@ void SohRmlUi::UpdateAndRender() {
         Resize(dw, dh);
     }
 
-    RefreshDiag();
+    // PC HUD: always updated, regardless of whether the ESC menu is open.
+    UpdateHud();
+
+    // Always update the context (both HUD doc and menu doc live in the same context).
+    // RefreshDiag is only needed when the menu is open.
+    if (mVisible) {
+        RefreshDiag();
+    }
     mContext->Update();
 
+    // Render: always render the context so the HUD shows even when the menu is closed.
+    // (The menu document is hidden by RmlUi when mVisible==false; the HUD doc is always shown.)
 #ifdef ENABLE_VULKAN
     if (mVulkan) {
         // Record the menu into the Fast3D Vulkan backend's current pass (no GL state to guard).
@@ -654,6 +856,14 @@ void SohRmlUi::Shutdown() {
         Rml::RemoveContext(mContext->GetName());
         mContext = nullptr;
         mDocument = nullptr;
+        mHudDocument = nullptr;
+        // Cached HUD element pointers are owned by the context; null them so UpdateHud()
+        // doesn't dereference stale pointers if Shutdown is called mid-frame.
+        mHudHeartsRow   = nullptr;
+        mHudMagicFill   = nullptr;
+        mHudMagicBlock  = nullptr;
+        mHudRupeeCount  = nullptr;
+        mHudSlotB       = nullptr;
     }
     if (sRmlLibraryInitialised) {
         Rml::Shutdown(); // releases textures/geometry through the render interface; keep it alive here
