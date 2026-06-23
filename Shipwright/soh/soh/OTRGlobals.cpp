@@ -422,8 +422,92 @@ namespace SohGui {
 extern std::shared_ptr<SohGui::SohMenu> mSohMenu;
 }
 
+// soh3d: fully automated, prompt-free vanilla extraction. SoH's stock RunExtract drives an
+// interactive popup state machine (locate ROM / confirm / re-extract) and pumps the frame loop
+// waiting for clicks — which silently hangs in a headless/auto run (the popup may not even render).
+// Instead: find an OoT N64 ROM (.z64/.n64/.v64) near the binary or repo root, run it through ZAPD,
+// and write oot.o2r next to the binary where the engine looks. No questions asked. True on success.
+static bool SoH3D_AutoExtractVanilla() {
+    namespace fs = std::filesystem;
+    std::error_code ec;
+
+    const std::string installPath = Ship::Context::GetAppBundlePath(); // holds assets/ that ZAPD needs
+    const std::string exportDir = installPath;                         // oot.o2r lands next to soh.o2r
+
+    // Candidate dirs: cwd, the binary dir, and a few parents (covers a ROM dropped in the repo root,
+    // which sits a few levels above <repo>/Shipwright/build-cmake/soh).
+    std::vector<fs::path> dirs;
+    dirs.push_back(fs::current_path(ec));
+    for (fs::path p(installPath); !p.empty() && p != p.root_path() && dirs.size() < 8; p = p.parent_path()) {
+        dirs.push_back(p);
+    }
+
+    // Collect candidate ROM paths (absolute), de-duplicated.
+    std::vector<std::string> roms;
+    for (const auto& d : dirs) {
+        if (d.empty() || !fs::is_directory(d, ec)) {
+            continue;
+        }
+        for (const auto& entry : fs::directory_iterator(d, ec)) {
+            if (!entry.is_regular_file(ec)) {
+                continue;
+            }
+            const std::string ext = entry.path().extension().string();
+            if (ext == ".z64" || ext == ".n64" || ext == ".v64") {
+                const std::string full = fs::absolute(entry.path(), ec).string();
+                if (std::find(roms.begin(), roms.end(), full) == roms.end()) {
+                    roms.push_back(full);
+                }
+            }
+        }
+    }
+
+    SOH3D_BOOT("AutoExtract: scanned {} dir(s), found {} candidate ROM(s)", dirs.size(), roms.size());
+    if (roms.empty()) {
+        return false;
+    }
+
+    for (const auto& rom : roms) {
+        Extractor extract;
+        SOH3D_BOOT("AutoExtract: validating ROM '{}'", rom);
+        if (!extract.RunFileStandalone(rom)) {
+            SOH3D_BOOT("AutoExtract: '{}' is not a supported OoT N64 ROM, skipping", rom);
+            continue;
+        }
+        std::atomic<size_t> count = 0, total = 0;
+        SOH3D_BOOT("AutoExtract: extracting '{}' via ZAPD -> '{}' (this can take a bit)", rom, exportDir);
+        extract.CallZapd(installPath, exportDir, &count, &total); // always returns false; verify by file
+        const bool ok =
+            fs::exists(Ship::Context::LocateFileAcrossAppDirs("oot.o2r", appShortName)) ||
+            fs::exists(Ship::Context::LocateFileAcrossAppDirs("oot-mq.o2r", appShortName));
+        SOH3D_BOOT("AutoExtract: ZAPD finished (isMQ={}), oot.o2r present={}", extract.IsMasterQuest(), ok);
+        if (ok) {
+            return true;
+        }
+    }
+    return false;
+}
+
 void OTRGlobals::RunExtract(int argc, char* argv[]) {
     SOH3D_BOOT("RunExtract: enter");
+
+    // soh3d: no interactive extraction. If the vanilla archive is missing, auto-extract it from a
+    // ROM with no prompts; if there's no usable ROM, fail fast with a clear message rather than
+    // hanging forever on an invisible popup.
+    if (!std::filesystem::exists(Ship::Context::LocateFileAcrossAppDirs("oot.o2r", appShortName)) &&
+        !std::filesystem::exists(Ship::Context::LocateFileAcrossAppDirs("oot-mq.o2r", appShortName))) {
+        SOH3D_BOOT("RunExtract: oot.o2r missing — auto-extracting from ROM (no prompts)");
+        if (!SoH3D_AutoExtractVanilla()) {
+            SPDLOG_ERROR("[soh3d] No oot.o2r and no usable OoT N64 ROM (.z64/.n64/.v64) found near the binary "
+                         "or repo root to extract from. Drop a valid OoT ROM there and relaunch.");
+            if (auto _lg = spdlog::default_logger()) {
+                _lg->flush();
+            }
+            exit(1);
+        }
+        SOH3D_BOOT("RunExtract: auto-extract complete; continuing");
+    }
+
     bool extractDone = false;
     ExtractSteps extractStep = ES_PORT_ARCHIVE;
     WindowsSteps windowsStep = WS_TEMP;
