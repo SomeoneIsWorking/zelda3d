@@ -66,14 +66,14 @@ list(APPEND ADDITIONAL_LIB_INCLUDES ${rmlui_SOURCE_DIR}/Include)
 
 # ========= StormLib =============
 if(INCLUDE_MPQ_SUPPORT)
-    set(stormlib_patch_file ${CMAKE_CURRENT_SOURCE_DIR}/cmake/dependencies/patches/stormlib-optimizations.patch)
-    set(stormlib_apply_patch_command ${CMAKE_COMMAND} -Dpatch_file=${stormlib_patch_file} -Dwith_reset=TRUE -P ${CMAKE_CURRENT_SOURCE_DIR}/cmake/dependencies/git-patch.cmake)
-
+    # StormLib is vendored in-tree (extern/StormLib) at upstream v9.25 with the
+    # "bring back optimizations" change already applied to the source (a free-space
+    # write cursor: lastFreeSpaceEntry). This replaces the former fetch-and-patch
+    # via cmake/dependencies/patches/stormlib-optimizations.patch -- no download,
+    # no fragile build-time git apply.
     FetchContent_Declare(
         StormLib
-        GIT_REPOSITORY https://github.com/ladislav-zezula/StormLib.git
-        GIT_TAG v9.25
-        PATCH_COMMAND ${stormlib_apply_patch_command}
+        SOURCE_DIR ${CMAKE_CURRENT_SOURCE_DIR}/extern/StormLib
     )
     FetchContent_MakeAvailable(StormLib)
     list(APPEND ADDITIONAL_LIB_INCLUDES ${stormlib_SOURCE_DIR}/src)
