@@ -24,7 +24,7 @@
 				<select-button tabindex="auto"><key>Controller Navigation</key><value>On</value></select-button>
 				<select-button tabindex="auto"><key>Cursor Always Visible</key><value>Off</value></select-button>
 				<select-button tabindex="auto"><key>Language</key><value>English</value></select-button>
-				<p class="hint">&#8596; switch tab &middot; &#8597; move &middot; Enter / A select &middot; Esc / B close</p>
+				<p class="hint">&#8596; switch tab &#183; &#8597; move &#183; Enter / A select &#183; Esc / B close</p>
 			</pane>
 			<pane>
 				<div class="section-heading">Graphics</div>
@@ -37,7 +37,7 @@
 				<select-button tabindex="auto" cycle="linkmode"><key>Link Model / Anim</key><value>N64</value></select-button>
 				<!-- Generated stair step size: Small / Medium / Large (applies live to loaded scenes). -->
 				<select-button tabindex="auto" cycle="stairsize"><key>Stair Step Size</key><value>Medium</value></select-button>
-				<p class="hint">&#8596; switch tab &middot; &#8597; move &middot; Enter / A toggle &middot; Esc / B close</p>
+				<p class="hint">&#8596; switch tab &#183; &#8597; move &#183; Enter / A toggle &#183; Esc / B close</p>
 			</pane>
 			<pane>
 				<!-- Audio volumes: each row's `knob` id maps to a live gSettings.Volume.* CVar.
@@ -47,7 +47,7 @@
 				<select-button tabindex="auto" knob="vol-master"><key>Master Volume</key><value>40%</value></select-button>
 				<select-button tabindex="auto" knob="vol-music"><key>Main Music Volume</key><value>100%</value></select-button>
 				<select-button tabindex="auto" knob="vol-sfx"><key>Sound Effects Volume</key><value>100%</value></select-button>
-				<p class="hint">&#8596; adjust &middot; &#8597; move &middot; Esc / B close</p>
+				<p class="hint">&#8596; adjust &#183; &#8597; move &#183; Esc / B close</p>
 			</pane>
 			<pane>
 				<!-- Debug warps: a row's `warp` is an entrance index; activating it requests a
@@ -101,7 +101,7 @@
 				     Read-only (no focusable rows) — screenshot it to read coords off-REPL. -->
 				<div class="section-heading">Diagnostics</div>
 				<p id="diagtext">(waiting for game state...)</p>
-				<p class="hint">&#8596; switch tab &middot; Esc / B close &middot; screenshot this for coords</p>
+				<p class="hint">&#8596; switch tab &#183; Esc / B close &#183; screenshot this for coords</p>
 			</pane>
 			<pane>
 				<div class="section-heading">About</div>
