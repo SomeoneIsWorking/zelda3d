@@ -81,6 +81,7 @@ class OTRGlobals {
 #ifndef __cplusplus
 void InitOTR(int argc, char* argv[]);
 void DeinitOTR(void);
+void OTRAudio_Exit(void); // idempotent — safe to call before DeinitOTR
 void OTRMessage_Init();
 void Graph_StartFrame();
 void Graph_ProcessGfxCommands(Gfx* commands);
