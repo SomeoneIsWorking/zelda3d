@@ -233,7 +233,7 @@ static const SoH3DAnimMap kSoH3dAnimMaps[] = {
     SOH3D_ANIMMAP("objects/object_ei/gStingerPopOutAnim", "ei_die"),
     SOH3D_ANIMMAP("objects/object_ei/gStingerDiveAnim", "ei_dmg"),
     SOH3D_ANIMMAP("objects/object_ei/gStingerBackflipAnim", "ei_dmg"),
-    SOH3D_ANIMMAP("objects/object_ei/gStingerHitAnim", "ei_dmg"),
+    SOH3D_ANIMMAP("objects/object_ei/gStingerHitAnim", "ei_swim"),  // N64=80f; ei_swim=80f (exact); ei_dmg=21f was WRONG
     SOH3D_ANIMMAP("objects/object_ei/gStingerIdleAnim", "ei_wait"),
     // ---- /actor/zelda_fantomHG.zar (object_fhg) ----
     SOH3D_ANIMMAP("objects/object_fhg/gPhantomHorseRunningAnim", "hgf_fastrun"),
