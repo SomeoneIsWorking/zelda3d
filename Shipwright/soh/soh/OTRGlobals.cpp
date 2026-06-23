@@ -1268,9 +1268,7 @@ extern "C" void OTRAudio_Exit() {
     audio.cv_to_thread.notify_all();
 
     // Wait until the audio thread quit
-    SOH3D_BOOT("teardown: OTRAudio_Exit joining audio thread (hangs here if the audio thread is stuck)");
     audio.thread.join();
-    SOH3D_BOOT("teardown: OTRAudio_Exit audio thread joined");
 #if 0
     for (size_t i = 0; i < sequenceMapSize; i++) {
         free(sequenceMap[i]);
@@ -1751,12 +1749,21 @@ extern "C" void SaveManager_ThreadPoolWait() {
     SaveManager::Instance->ThreadPoolWait();
 }
 
+// Application shutdown. Runs ONCE on the main thread after the game loop (Main) returns because the
+// window was closed. Three clear steps: STOP threads, PERSIST what must survive, then EXIT.
+//
+// We deliberately do NOT run the engine's GUI/renderer/window destructors here, nor let them run at
+// exit() via the static `unique_ptr<Context>`. On a dying process that teardown is pure liability:
+//   - The driver's Vulkan swapchain/WSI destroy crashes on multiple machines (RADV/Wayland
+//     `wsi_wl_swapchain_destroy` double-free; lavapipe/X11 `xcb_present` buffer-overflow), and
+//     RmlUi's static StyleSheetFactory double-frees — all inside library/driver code we don't own.
+//   - The OS reclaims the GPU, the window and the heap on exit regardless. Object-graph teardown
+//     only matters for swapchain RECREATE (resize), never for shutdown.
+// So we persist the only two side-effecting things ~Context would (window layout + config) and exit.
 extern "C" void DeinitOTR() {
-    SOH3D_BOOT("teardown: DeinitOTR enter (window closing)");
-    SaveManager_ThreadPoolWait();
-    SOH3D_BOOT("teardown: SaveManager thread pool drained");
-    OTRAudio_Exit();
-    SOH3D_BOOT("teardown: OTRAudio_Exit returned");
+    // 1. Stop every background thread, so nothing touches the engine, files or network as we exit.
+    OTRAudio_Exit();              // stop + join the audio thread (idempotent; main.c stops it first)
+    SaveManager_ThreadPoolWait(); // let any in-flight save finish writing to disk
     if (CVarGetInteger(CVAR_REMOTE_CROWD_CONTROL("Enabled"), 0)) {
         CrowdControl::Instance->Disable();
     }
@@ -1768,16 +1775,21 @@ extern "C" void DeinitOTR() {
     }
     SDLNet_Quit();
 
-    // Destroying gui here because we have shared ptrs to LUS objects which output to SPDLOG which is destroyed before
-    // these shared ptrs.
-    SOH3D_BOOT("teardown: SohGui::Destroy");
-    SohGui::Destroy();
-    SOH3D_BOOT("teardown: destroying Fast3dWindow (Vulkan device/swapchain teardown — #91 hang suspect)");
-    sohFast3dWindow = nullptr;
-    SOH3D_BOOT("teardown: Fast3dWindow destroyed");
+    // 2. Persist the only state ~Context would have written: window layout and the config file.
+    if (Ship::Context* ctx = OTRGlobals::Instance->context) {
+        if (auto window = ctx->GetWindow()) {
+            window->SaveWindowToConfig();
+        }
+        if (auto config = ctx->GetConfig()) {
+            config->Save();
+        }
+    }
 
-    OTRGlobals::Instance->context = nullptr;
-    SOH3D_BOOT("teardown: context destroyed — DeinitOTR complete");
+    // 3. Flush the log and exit, skipping the fragile GUI/GPU/window teardown (see header comment).
+    if (auto logger = spdlog::default_logger()) {
+        logger->flush();
+    }
+    _exit(0);
 }
 
 #ifdef _WIN32
