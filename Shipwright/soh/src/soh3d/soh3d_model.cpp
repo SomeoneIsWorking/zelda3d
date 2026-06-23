@@ -185,6 +185,53 @@ SoH3D::CtrRom* rom() {
     return g_rom.get();
 }
 
+// PC HUD — decode an OoT3D standalone romfs .ctxb atlas (e.g. /menu/01_US_ENGLISH/hud_all00.ctxb,
+// icon_item_menu00.ctxb) to RGBA8 once, cached by romfs path. These are the real 3DS HUD textures
+// the native Vulkan HUD (soh3d_hud_vk.cpp) draws sub-rects of, in place of the N64/SVG icons.
+// Returns the RGBA buffer (top row first) + dims, or NULL. Texel index `texIdx` selects the entry
+// (these menu files each carry a single atlas at index 0).
+struct OoT3dAtlas {
+    std::vector<uint8_t> rgba;
+    int w = 0, h = 0;
+};
+extern "C" const void* SoH3D_OoT3dAtlas(const char* romfsPath, int texIdx, int* w, int* h) {
+    static std::unordered_map<std::string, OoT3dAtlas> cache;
+    if (romfsPath == nullptr) {
+        if (w) *w = 0; if (h) *h = 0; return nullptr;
+    }
+    std::string key = std::string(romfsPath) + "#" + std::to_string(texIdx);
+    auto it = cache.find(key);
+    if (it == cache.end()) {
+        OoT3dAtlas a;
+        SoH3D::CtrRom* r = rom();
+        if (r) {
+            std::vector<uint8_t> bytes = r->read(romfsPath);
+            if (!bytes.empty()) {
+                SoH3D::Ctxb ctxb(std::move(bytes));
+                if (ctxb.ok() && texIdx >= 0 && texIdx < (int)ctxb.textures().size()) {
+                    int tw = 0, th = 0;
+                    a.rgba = ctxb.decodeRGBA((size_t)texIdx, &tw, &th);
+                    a.w = tw; a.h = th;
+                } else {
+                    fprintf(stderr, "[SoH3D] OoT3dAtlas %s: ctxb %s\n", romfsPath,
+                            ctxb.ok() ? "texIdx OOR" : ctxb.error().c_str());
+                }
+            } else {
+                fprintf(stderr, "[SoH3D] OoT3dAtlas: romfs file not found: %s\n", romfsPath);
+            }
+        }
+        // No SoH3D_HudTexClaim here: this atlas feeds only the native Vulkan HUD (SoH3D_Hud_Tex),
+        // never the Fast3D pointer-keyed texture cache, so it needs no eviction guard.
+        it = cache.emplace(std::move(key), std::move(a)).first;
+    }
+    if (it->second.rgba.empty()) {
+        if (w) *w = 0; if (h) *h = 0; return nullptr;
+    }
+    if (w) *w = it->second.w;
+    if (h) *h = it->second.h;
+    return it->second.rgba.data();
+}
+
 // Decode an already-parsed CMB (out->cmb) into the renderer's CPU views: bind-pose
 // draw groups (model-space verts + bone bindings; GPU skinning applies the pose, or
 // identity = bind pose for skeleton-less scene rooms), decoded RGBA8 textures, and the
@@ -1698,6 +1745,48 @@ const void* SoH3D_HeartTex(int kind, int* w, int* h) {
         for (int k = 0; k < 5; k++) {
             if (!t[k].rgba.empty()) SoH3D_HudTexClaim(t[k].rgba.data());
         }
+    }
+    if (w) *w = t[kind].w;
+    if (h) *h = t[kind].hh;
+    return t[kind].rgba.data();
+}
+
+// SoH3D PC HUD — colour-baked heart texture for the native Vulkan HUD path (soh3d_hud_vk.cpp).
+// SoH3D_HeartTex returns a GRAYSCALE intensity map (rgb = the PRIM<->ENV lerp factor, a = the heart
+// silhouette) meant to be tinted by the N64 Fast3D combiner. The PC HUD draws straight RGBA with no
+// combiner, so we bake the same lerp here: out.rgb = ENV + (PRIM-ENV) * intensity, out.a = silhouette.
+// Colours are OoT's life-meter PRIM/ENV (z64interface.h: HEARTS_PRIM = {255,70,50}, HEARTS_ENV =
+// {50,40,60}), kept in sync with z_lifemeter.c's normal (non-DD) heart draw. Cached per kind.
+const void* SoH3D_HudHeartRGBA(int kind, int* w, int* h) {
+    struct Tex { std::vector<uint8_t> rgba; int w = 0, hh = 0; };
+    static Tex t[5];
+    static int tried = 0;
+    // OoT life-meter normal-heart colours (z64interface.h HEARTS_PRIM_* / HEARTS_ENV_*).
+    const int PRIM[3] = { 255, 70, 50 };
+    const int ENV[3] = { 50, 40, 60 };
+    if (!tried) {
+        tried = 1;
+        for (int k = 0; k < 5; k++) {
+            int gw = 0, gh = 0;
+            const uint8_t* gray = (const uint8_t*)SoH3D_HeartTex(k, &gw, &gh);
+            if (!gray || gw <= 0 || gh <= 0) {
+                continue;
+            }
+            t[k].rgba.resize((size_t)gw * gh * 4);
+            for (size_t i = 0; i < (size_t)gw * gh; i++) {
+                int inten = gray[i * 4]; // rgb are equal (intensity); take r
+                int a = gray[i * 4 + 3]; // silhouette
+                for (int c = 0; c < 3; c++) {
+                    t[k].rgba[i * 4 + c] = (uint8_t)(ENV[c] + (PRIM[c] - ENV[c]) * inten / 255);
+                }
+                t[k].rgba[i * 4 + 3] = (uint8_t)a;
+            }
+            t[k].w = gw;
+            t[k].hh = gh;
+        }
+    }
+    if (kind < 0 || kind >= 5 || t[kind].rgba.empty()) {
+        if (w) *w = 0; if (h) *h = 0; return nullptr;
     }
     if (w) *w = t[kind].w;
     if (h) *h = t[kind].hh;
