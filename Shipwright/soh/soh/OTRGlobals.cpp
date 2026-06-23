@@ -423,16 +423,21 @@ extern std::shared_ptr<SohGui::SohMenu> mSohMenu;
 }
 
 void OTRGlobals::RunExtract(int argc, char* argv[]) {
+    SOH3D_BOOT("RunExtract: enter");
     bool extractDone = false;
     ExtractSteps extractStep = ES_PORT_ARCHIVE;
     WindowsSteps windowsStep = WS_TEMP;
     auto wnd = std::dynamic_pointer_cast<Fast::Fast3dWindow>(OTRGlobals::Instance->context->GetWindow());
     auto gui = wnd->GetGui();
 
+    SOH3D_BOOT("RunExtract: DetectOTRVersion(oot.o2r)");
     OTRVersion vanillaVersion = DetectOTRVersion("oot.o2r", false);
+    SOH3D_BOOT("RunExtract: DetectOTRVersion(oot-mq.o2r)");
     OTRVersion mqVersion = DetectOTRVersion("oot-mq.o2r", true);
 
     bool shouldRegen = VerifyArchiveVersion(vanillaVersion) || VerifyArchiveVersion(mqVersion);
+    SOH3D_BOOT("RunExtract: versions vanilla.major={} mq.major={} buildMajor={} shouldRegen={} sohArchiveVersionMatch={}",
+               vanillaVersion.major, mqVersion.major, gBuildVersionMajor, shouldRegen, sohArchiveVersionMatch);
 
     std::filesystem::path ownPath;
     std::vector<std::string> args;
@@ -465,12 +470,16 @@ void OTRGlobals::RunExtract(int argc, char* argv[]) {
     OSFatal();
 #endif
 
+    SOH3D_BOOT("RunExtract: installPath='{}' assetsExist={} dataPath='{}'", installPath,
+               std::filesystem::exists(installPath + "/assets"), dataPath);
     if (!std::filesystem::exists(installPath + "/assets")) {
+        SOH3D_BOOT("RunExtract: REGISTERING POPUP 'Extractor assets not found' (installPath/assets missing) — will block");
         SohGui::RegisterPopup("Extractor assets not found",
                               "No O2R files found. Missing 'assets/' folder needed to generate OTR file.\nPlease "
                               "re-extract them from the download or.\n\nExiting...",
                               "OK", "", [&]() { exit(1); });
     } else if (shouldRegen) {
+        SOH3D_BOOT("RunExtract: REGISTERING POPUP 'Outdated ROM Archives' (shouldRegen) — will block");
         SohGui::RegisterPopup("Outdated ROM Archives",
                               "Your oot.o2r or oot-mq.o2r were created with incompatible versions of SoH.\nYou will "
                               "now be redirected to re-extract them.");
@@ -485,8 +494,15 @@ void OTRGlobals::RunExtract(int argc, char* argv[]) {
     CheckAndCreateModFolder();
 #endif
 
+    bool loggedRenderWait = false;
     while (!extractDone) {
         if (SohGui::PopupsQueued() > 0 || extractionTask.has_value()) {
+            if (!loggedRenderWait) {
+                SOH3D_BOOT("RunExtract: STUCK in render/wait loop — popupsQueued={} extractionTask={} extractStep={} "
+                           "(blocked until a popup is dismissed; if the popup isn't visible/clickable this hangs)",
+                           SohGui::PopupsQueued(), extractionTask.has_value(), (int)extractStep);
+                loggedRenderWait = true;
+            }
             goto render;
         }
         switch (extractStep) {
