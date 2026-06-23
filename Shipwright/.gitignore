@@ -83,6 +83,14 @@ graphs/
 # Build results
 [Dd]ebug/
 [Dd]ebugPublic/
+
+# ...but these are real libultraship SOURCE dirs, not MSVC [Dd]ebug/ build output.
+# Without these negations the broad [Dd]ebug/ rule above silently swallows them
+# (Console/CrashHandler/GfxDebugger never get committed -> fresh clones fail to build).
+!/libultraship/src/fast/debug/
+!/libultraship/src/ship/debug/
+!/libultraship/include/fast/debug/
+!/libultraship/include/ship/debug/
 [Rr]elease/
 [Rr]eleases/
 x64/
