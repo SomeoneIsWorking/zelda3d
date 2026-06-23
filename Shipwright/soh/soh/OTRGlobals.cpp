@@ -1268,7 +1268,9 @@ extern "C" void OTRAudio_Exit() {
     audio.cv_to_thread.notify_all();
 
     // Wait until the audio thread quit
+    SOH3D_BOOT("teardown: OTRAudio_Exit joining audio thread (hangs here if the audio thread is stuck)");
     audio.thread.join();
+    SOH3D_BOOT("teardown: OTRAudio_Exit audio thread joined");
 #if 0
     for (size_t i = 0; i < sequenceMapSize; i++) {
         free(sequenceMap[i]);
@@ -1750,8 +1752,11 @@ extern "C" void SaveManager_ThreadPoolWait() {
 }
 
 extern "C" void DeinitOTR() {
+    SOH3D_BOOT("teardown: DeinitOTR enter (window closing)");
     SaveManager_ThreadPoolWait();
+    SOH3D_BOOT("teardown: SaveManager thread pool drained");
     OTRAudio_Exit();
+    SOH3D_BOOT("teardown: OTRAudio_Exit returned");
     if (CVarGetInteger(CVAR_REMOTE_CROWD_CONTROL("Enabled"), 0)) {
         CrowdControl::Instance->Disable();
     }
@@ -1765,10 +1770,14 @@ extern "C" void DeinitOTR() {
 
     // Destroying gui here because we have shared ptrs to LUS objects which output to SPDLOG which is destroyed before
     // these shared ptrs.
+    SOH3D_BOOT("teardown: SohGui::Destroy");
     SohGui::Destroy();
+    SOH3D_BOOT("teardown: destroying Fast3dWindow (Vulkan device/swapchain teardown — #91 hang suspect)");
     sohFast3dWindow = nullptr;
+    SOH3D_BOOT("teardown: Fast3dWindow destroyed");
 
     OTRGlobals::Instance->context = nullptr;
+    SOH3D_BOOT("teardown: context destroyed — DeinitOTR complete");
 }
 
 #ifdef _WIN32
