@@ -537,6 +537,38 @@ int SoH3D_InputDevice(void) {
     return gSoH3dInputDevice;
 }
 
+// ---- PC HUD gate (RmlUi replaces the N64 Fast3D HUD) ----------------------------------------
+// -1 = uninit; 0 = off (N64 HUD shows); 1 = on (Interface_Draw gated off, RmlUi HUD shows).
+// Default ON.  env SOH3D_PCHUD=0 opts out.  REPL `pchud <0|1>` toggles at runtime.
+int gSoH3dPcHud = -1;
+int SoH3D_PcHudEnabled(void) {
+    if (gSoH3dPcHud < 0) {
+        const char* v = getenv("SOH3D_PCHUD");
+        gSoH3dPcHud = (v != NULL && v[0] == '0') ? 0 : 1;
+    }
+    return gSoH3dPcHud;
+}
+
+// Snapshot filled once per frame and consumed by SohRmlUi::UpdateHud().
+SoH3dHudState gSoH3dHudState = { 0 };
+
+void SoH3D_HudUpdateFrame(PlayState* play) {
+    if (!SoH3D_PcHudEnabled()) {
+        return;
+    }
+    gSoH3dHudState.health         = gSaveContext.health;
+    gSoH3dHudState.healthCapacity = gSaveContext.healthCapacity;
+    gSoH3dHudState.magic          = (int)(u8)gSaveContext.magic;
+    gSoH3dHudState.magicCapacity  = gSaveContext.magicCapacity;
+    gSoH3dHudState.magicLevel     = gSaveContext.magicLevel;
+    gSoH3dHudState.rupees         = gSaveContext.rupees;
+    for (int i = 0; i < 4; i++) {
+        gSoH3dHudState.buttonItems[i] = gSaveContext.equips.buttonItems[i];
+    }
+    gSoH3dHudState.inputDevice    = SoH3D_InputDevice();
+    gSoH3dHudState.valid          = 1;
+}
+
 // #31 — substitute crisp higher-res HUD textures (hearts) for the blocky 16x16 N64 ones.
 // -1 = uninit (read SOH3D_HUDTEX env, default on). z_lifemeter.c reads this and swaps the heart
 // texture/load size/texcoords; see SoH3D_HeartTex.
@@ -4452,6 +4484,11 @@ static void SoH3D_ReplExec(PlayState* play, char* line, const char* outPath) {
         // gSoH3dHudTex every frame. 1 = crisp 64x64 hearts, 0 = the blocky N64 16x16 hearts.
         gSoH3dHudTex = (f1 != 0.0f) ? 1 : 0;
         SoH3D_ReplReply(outPath, "hudtex=%d", gSoH3dHudTex);
+    } else if (strcmp(cmd, "pchud") == 0 && sscanf(line, "%*s %f", &f1) == 1) {
+        // Toggle the PC RmlUi HUD (default on). 1 = RmlUi HUD, 0 = original N64 Fast3D HUD.
+        // The RmlUi HUD gates Interface_Draw and HealthMeter_Draw off when active.
+        gSoH3dPcHud = (f1 != 0.0f) ? 1 : 0;
+        SoH3D_ReplReply(outPath, "pchud=%d", gSoH3dPcHud);
     } else if (strcmp(cmd, "key") == 0) {
         // #20 — inject a raw keyboard scancode through the real SDL->ControlDeck path so the
         // DEFAULT keyboard->N64-button mapping can be verified headless. `key <scancode> <0|1>`
@@ -4888,6 +4925,11 @@ void SoH3D_ReplPoll(PlayState* play) {
     char* start;
     char* nl;
     ssize_t n;
+
+    // PC HUD snapshot: fill gSoH3dHudState from gSaveContext so SohRmlUi can read it without
+    // needing PlayState (libultraship doesn't have it).  Runs unconditionally each frame while
+    // a PlayState is live; SoH3D_HudUpdateFrame gates itself on SoH3D_PcHudEnabled().
+    SoH3D_HudUpdateFrame(play);
 
     // Force time-of-day (e.g. day instead of night). Applied every frame, before the
     // FIFO handling, so it holds regardless of whether the REPL is connected.

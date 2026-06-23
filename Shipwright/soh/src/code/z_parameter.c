@@ -5384,6 +5384,16 @@ void Interface_Draw(PlayState* play) {
         return;
     }
 
+    // SoH3D PC HUD: when the RmlUi PC HUD is active the N64 Fast3D HUD is suppressed so the
+    // two don't stack.  The RmlUi HUD (soh3d_hud.rml) renders health/magic/rupees/items in a
+    // clean PC layout.  Env SOH3D_PCHUD=0 / REPL `pchud 0` reverts to the N64 HUD.
+    {
+        extern int SoH3D_PcHudEnabled(void);
+        if (SoH3D_PcHudEnabled()) {
+            return;
+        }
+    }
+
     OPEN_DISPS(play->state.gfxCtx);
 
     gSPSegment(OVERLAY_DISP++, 0x02, interfaceCtx->parameterSegment);
