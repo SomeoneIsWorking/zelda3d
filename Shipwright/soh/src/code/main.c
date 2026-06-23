@@ -140,6 +140,11 @@ void Main(void* arg) {
     osSetThreadPri(0, Z_PRIORITY_SCHED);
 
     Graph_ThreadEntry(0);
+    // Window closed: stop the audio thread immediately so it can't call
+    // Context::GetRawInstance() while DeinitOTR() tears down the Context.
+    // OTRAudio_Exit() is idempotent — the DeinitOTR() call below is a no-op
+    // for the audio thread but still handles GUI/window/rendering teardown.
+    OTRAudio_Exit();
 
     while (true) {
         msg = NULL;

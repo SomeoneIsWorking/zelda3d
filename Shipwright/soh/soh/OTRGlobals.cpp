@@ -1136,7 +1136,12 @@ extern "C" char** fontMap;
 extern "C" size_t fontMapSize;
 
 extern "C" void OTRAudio_Exit() {
-    // Tell the audio thread to stop
+    // Tell the audio thread to stop. Guard with joinable() so this is idempotent
+    // — called early (right after Graph_ThreadEntry returns on window-close) AND
+    // again from DeinitOTR; the second call is a no-op.
+    if (!audio.thread.joinable()) {
+        return;
+    }
     {
         std::unique_lock<std::mutex> Lock(audio.mutex);
         audio.running = false;
