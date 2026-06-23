@@ -3,9 +3,9 @@
 > **Generated mirror — do not hand-edit.** Source of truth = GitHub Issues on
 > `SomeoneIsWorking/soh3d` (private). Regenerate with `tools/kanban.py render`.
 > Move a card with `tools/kanban.py mv <#> <column>`; add with `tools/kanban.py add`.
-> Columns: todo · in-progress · in-review · needs-confirmation · reopened · blocked · done(=closed).  Updated 2026-06-23 15:57.
+> Columns: todo · in-progress · in-review · needs-confirmation · reopened · blocked · done(=closed).  Updated 2026-06-23 16:20.
 
-**Counts:** todo:3 | in-progress:2 | in-review:0 | needs-confirmation:34 | reopened:1 | blocked:1 | done:42
+**Counts:** todo:3 | in-progress:2 | in-review:0 | needs-confirmation:34 | reopened:1 | blocked:1 | done:43
 
 ## 📋 To Do  (3)
 - [#17](../../issues/17) Hi-res world/scene textures (texpack) _(render)_
@@ -61,7 +61,8 @@ _none_
 ## ⛔ Blocked (needs live/user input)  (1)
 - [#23](../../issues/23) Kokiri sword chest renders as the large chest, not small _(render,scene)_
 
-## ✅ Done (recently closed)  (showing 30 of 42)
+## ✅ Done (recently closed)  (showing 30 of 43)
+- [#99](../../issues/99) RmlUi VK: clip-mask path (overflow:hidden + border-radius) causes ghost/corrupt render
 - [#87](../../issues/87) Kokiri kids (En_Ko): idle variants all identical + sitting girl plays idle sway (anim/variant selection)
 - [#74](../../issues/74) Can't climb vine wall (climb does not initiate)
 - [#10](../../issues/10) Child Link floats above plank platform by ladder
@@ -91,4 +92,3 @@ _none_
 - [#48](../../issues/48) 2D->3D item drops forced on by default
 - [#47](../../issues/47) Press-to-skip onepoint cutscene cameras (Start/SPACE)
 - [#46](../../issues/46) Xbox HUD glyphs reworked from overlay to corner badge
-- [#45](../../issues/45) A action button → Xbox 'A' glyph on the 3D quad
