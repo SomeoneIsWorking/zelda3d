@@ -15,6 +15,9 @@
 #define M_TAU 6.2831853071795864769252867665590057 // 2 * pi
 #define MINIMUM_RADIUS_TO_MAP_NOTCH 0.9
 
+// #32 hotswap — last-used input device signal, defined in soh3d.c (C).
+extern "C" { extern int gSoH3dInputDevice; }
+
 namespace Ship {
 
 Controller::Controller(uint8_t portIndex, std::vector<CONTROLLERBUTTONS_T> bitmasks) : ControlDevice(portIndex) {
@@ -129,6 +132,11 @@ bool Controller::ProcessKeyboardEvent(KbEventType eventType, KbScancode scancode
     }
     result = GetLeftStick()->ProcessKeyboardEvent(eventType, scancode) || result;
     result = GetRightStick()->ProcessKeyboardEvent(eventType, scancode) || result;
+    // #32 hotswap: a key-down event on port 0 means the player last used the keyboard.
+    // Update the C-side last-input-device signal so the HUD picks keyboard glyphs next frame.
+    if (eventType == KbEventType::LUS_KB_EVENT_KEY_DOWN && GetPortIndex() == 0 && result) {
+        gSoH3dInputDevice = 1; // keyboard
+    }
     return result;
 }
 

@@ -517,6 +517,22 @@ int SoH3D_XboxBtnEnabled(void) {
     return gSoH3dXboxBtn;
 }
 
+// #32 hotswap — last-used input device. 0 = gamepad (show Xbox glyphs), 1 = keyboard (show key
+// labels). Updated by the C++ LUS input layer (Controller.cpp) on every key/gamepad event.
+// The HUD glyph draw (SoH3D_DrawHudBadges) reads this each frame and picks the glyph set.
+// -1 = default (read SOH3D_INPUTDEV env; if absent, default to 0=gamepad).
+// REPL `inputdev <0|1>` overrides for testing.
+int gSoH3dInputDevice = -1;
+int SoH3D_InputDevice(void) {
+    if (gSoH3dInputDevice < 0) {
+        const char* v = getenv("SOH3D_INPUTDEV");
+        // Default to keyboard (1) when no env set so the headless game shows keyboard glyphs
+        // without requiring a connected gamepad. (A real gamepad event flips it to 0 instantly.)
+        gSoH3dInputDevice = (v != NULL && v[0] == '0') ? 0 : 1;
+    }
+    return gSoH3dInputDevice;
+}
+
 // #31 — substitute crisp higher-res HUD textures (hearts) for the blocky 16x16 N64 ones.
 // -1 = uninit (read SOH3D_HUDTEX env, default on). z_lifemeter.c reads this and swaps the heart
 // texture/load size/texcoords; see SoH3D_HeartTex.
@@ -4341,6 +4357,13 @@ static void SoH3D_ReplExec(PlayState* play, char* line, const char* outPath) {
         // rebuild at the new size on the next render pass.
         SoH3D_SetStairRiserY(f1);
         SoH3D_ReplReply(outPath, "stairsize riser=%.1f (live)", SoH3D_GetStairRiserY());
+    } else if (strcmp(cmd, "inputdev") == 0 && sscanf(line, "%*s %f", &f1) == 1) {
+        // #32 hotswap — force the "last-used input device" signal (0=gamepad glyphs, 1=keyboard
+        // glyphs). Normally set automatically by the LUS input path on each key/gamepad event;
+        // this REPL command overrides it for testing when no physical device is connected.
+        gSoH3dInputDevice = (f1 != 0.0f) ? 1 : 0;
+        SoH3D_ReplReply(outPath, "inputdev=%d (%s glyphs)", gSoH3dInputDevice,
+                        gSoH3dInputDevice ? "keyboard" : "gamepad");
     } else if (strcmp(cmd, "xboxui") == 0 && sscanf(line, "%*s %f", &f1) == 1) {
         // #32 — toggle Xbox face-button glyphs in the HUD button prompts (live; the HUD reads
         // gSoH3dXboxBtn every frame). 1 = Xbox A/B/X/Y glyphs, 0 = the N64 colored circles.

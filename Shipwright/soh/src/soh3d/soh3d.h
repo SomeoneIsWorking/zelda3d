@@ -171,6 +171,19 @@ const void* SoH3D_XboxGlyphTex(char which, int* w, int* h);
 extern int gSoH3dXboxBtn;       // env SOH3D_XBOXUI / REPL `xboxui` gate (-1=uninit, 0/1)
 int SoH3D_XboxBtnEnabled(void); // lazily resolves the env on first call; HUD draws gate on this
 
+// #32 hotswap — keyboard-key HUD glyphs. Returns a persistent RGBA8888 buffer for the key glyph
+// for the given HUD slot: 'B'=B-button (C key), 'X'=C-Left (←), 'Y'=C-Down (↓), 'A'=C-Right (→).
+// Same 64x64 dims as SoH3D_XboxGlyphTex. The draw path is identical; only the texture changes.
+const void* SoH3D_KbdGlyphTex(char which, int* w, int* h);
+
+// #32 hotswap — last-used input device. 0 = gamepad (Xbox glyphs), 1 = keyboard (key-label glyphs).
+// Updated from the C++ LUS input layer (Ship::Controller::ProcessKeyboardEvent for keyboard events,
+// LUS::Controller::ReadToOSContPad for gamepad events). The HUD reads this each frame to pick the
+// glyph set. -1 = uninitialized (lazily resolved from SOH3D_INPUTDEV env on first call).
+// REPL `inputdev <0|1>` overrides for testing. SoH3D_InputDevice() is the lazily-initialized getter.
+extern int gSoH3dInputDevice;
+int SoH3D_InputDevice(void);
+
 // #31 — crisp higher-res HUD textures (hearts first). Returns a persistent RGBA8888
 // (G_IM_FMT_RGBA/32b) buffer for a heart kind + its dims, or NULL on failure. The buffer is
 // grayscale (rgb=intensity, a=silhouette) so the N64 heart combine ((PRIM-ENV)*TEXEL0+ENV) tints

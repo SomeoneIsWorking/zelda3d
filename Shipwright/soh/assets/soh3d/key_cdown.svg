@@ -1,0 +1,15 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!-- Keyboard-key glyph for N64 C-Down button (default key: Arrow Down). -->
+<svg xmlns="http://www.w3.org/2000/svg" width="64" height="64" viewBox="0 0 64 64">
+  <defs>
+    <radialGradient id="g" cx="40%" cy="35%" r="70%">
+      <stop offset="0%"  stop-color="#C8C8CC"/>
+      <stop offset="60%" stop-color="#888890"/>
+      <stop offset="100%" stop-color="#505058"/>
+    </radialGradient>
+  </defs>
+  <circle cx="32" cy="32" r="29" fill="url(#g)" stroke="#303038" stroke-width="3"/>
+  <text x="32" y="33" text-anchor="middle" dominant-baseline="central"
+        font-family="DejaVu Sans, Arial, sans-serif" font-weight="bold" font-size="34"
+        fill="#FFFFFF" stroke="#303038" stroke-width="1.0">&#x2193;</text>
+</svg>
