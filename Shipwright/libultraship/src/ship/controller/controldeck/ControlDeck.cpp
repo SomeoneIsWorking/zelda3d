@@ -22,6 +22,13 @@ ControlDeck::~ControlDeck() {
     SPDLOG_TRACE("destruct control deck");
 }
 
+// SoH3D PC-native input scheme version. Bump this integer whenever the keyboard default
+// mapping table changes (LUS::ControllerDefaultMappings::SetDefaultKeyboardKeyToButtonMappings).
+// On startup, if the stored scheme version in the config doesn't match, existing keyboard
+// bindings are wiped and the new defaults are written — a one-time migration per user.
+static constexpr int kSoH3dInputSchemeVersion = 1;
+static constexpr const char* kSoH3dInputSchemeVersionCvar = "gSoH3dInputSchemeVersion";
+
 void ControlDeck::Init(uint8_t* controllerBits) {
     mControllerBits = controllerBits;
     *mControllerBits |= 1 << 0;
@@ -37,6 +44,20 @@ void ControlDeck::Init(uint8_t* controllerBits) {
         mPorts[0]->GetConnectedController()->AddDefaultMappings(PhysicalDeviceType::Keyboard);
         mPorts[0]->GetConnectedController()->AddDefaultMappings(PhysicalDeviceType::Mouse);
         mPorts[0]->GetConnectedController()->AddDefaultMappings(PhysicalDeviceType::SDLGamepad);
+    } else {
+        // Migration: if the stored scheme version is stale, replace keyboard bindings with
+        // the current PC-native defaults. Gamepad and mouse bindings are left untouched.
+        int storedVersion = Context::GetRawInstance()->GetConsoleVariables()->GetInteger(
+            kSoH3dInputSchemeVersionCvar, 0);
+        if (storedVersion < kSoH3dInputSchemeVersion) {
+            SPDLOG_INFO("[SoH3D] Input scheme migrated: v{} -> v{} (resetting keyboard defaults)",
+                        storedVersion, kSoH3dInputSchemeVersion);
+            mPorts[0]->GetConnectedController()->ClearAllMappingsForDeviceType(PhysicalDeviceType::Keyboard);
+            mPorts[0]->GetConnectedController()->AddDefaultMappings(PhysicalDeviceType::Keyboard);
+            Context::GetRawInstance()->GetConsoleVariables()->SetInteger(
+                kSoH3dInputSchemeVersionCvar, kSoH3dInputSchemeVersion);
+            Context::GetRawInstance()->GetConsoleVariables()->Save();
+        }
     }
 }
 

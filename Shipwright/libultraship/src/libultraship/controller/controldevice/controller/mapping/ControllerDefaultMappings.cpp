@@ -45,21 +45,43 @@ void ControllerDefaultMappings::SetDefaultKeyboardKeyToButtonMappings(
         return;
     }
 
+    // PC-native default keyboard layout (SoH3D project vision: PC-native controls).
+    // Move (W/A/S/D) is handled by the axis-direction defaults in Ship::ControllerDefaultMappings.
+    //
+    // Action          N64 btn    Key            Rationale
+    // --------------- -------    ---            ---------
+    // Interact/A      BTN_A      Space          Primary action — universal PC convention
+    // Attack/B        BTN_B      F              Attack key left of WASD; LMB deferred (mouse-look pass)
+    // Z-target        BTN_Z      Q              Lock-on left of WASD, reachable by pinky/ring finger
+    // Shield/R        BTN_R      Left Ctrl      Modifier-style key for shield/roll
+    // L-button        BTN_L      Left Shift     Walk-modifier / L in OoT
+    // Pause/menu      BTN_START  Escape         Standard PC pause/menu
+    // Camera up       BTN_CUP    Arrow Up       Arrow keys = camera fallback (mouse-look deferred)
+    // Camera down     BTN_CDOWN  Arrow Down
+    // Camera left     BTN_CLEFT  Arrow Left
+    // Camera right    BTN_CRIGHT Arrow Right
+    // D-pad up        BTN_DUP    I              Item slot up (reserved — item hotbar separate pass)
+    // D-pad down      BTN_DDOWN  K              Item slot down
+    // D-pad left      BTN_DLEFT  J              Item slot left
+    // D-pad right     BTN_DRIGHT L              Item slot right
+    //
+    // Keys 1-8 are reserved for the item hotbar (separate pass — do NOT wire here).
+    // Mouse LMB→BTN_B and mouse-look→camera are deferred to the mouse-look pass.
     Ship::ControllerDefaultMappings::SetDefaultKeyboardKeyToButtonMappings({
-        { BTN_A, { Ship::KbScancode::LUS_KB_X } },
-        { BTN_B, { Ship::KbScancode::LUS_KB_C } },
-        { BTN_L, { Ship::KbScancode::LUS_KB_E } },
-        { BTN_R, { Ship::KbScancode::LUS_KB_R } },
-        { BTN_Z, { Ship::KbScancode::LUS_KB_Z } },
-        { BTN_START, { Ship::KbScancode::LUS_KB_SPACE } },
+        { BTN_A, { Ship::KbScancode::LUS_KB_SPACE } },
+        { BTN_B, { Ship::KbScancode::LUS_KB_F } },
+        { BTN_Z, { Ship::KbScancode::LUS_KB_Q } },
+        { BTN_R, { Ship::KbScancode::LUS_KB_CONTROL } },
+        { BTN_L, { Ship::KbScancode::LUS_KB_SHIFT } },
+        { BTN_START, { Ship::KbScancode::LUS_KB_ESCAPE } },
         { BTN_CUP, { Ship::KbScancode::LUS_KB_ARROWKEY_UP } },
         { BTN_CDOWN, { Ship::KbScancode::LUS_KB_ARROWKEY_DOWN } },
         { BTN_CLEFT, { Ship::KbScancode::LUS_KB_ARROWKEY_LEFT } },
         { BTN_CRIGHT, { Ship::KbScancode::LUS_KB_ARROWKEY_RIGHT } },
-        { BTN_DUP, { Ship::KbScancode::LUS_KB_T } },
-        { BTN_DDOWN, { Ship::KbScancode::LUS_KB_G } },
-        { BTN_DLEFT, { Ship::KbScancode::LUS_KB_F } },
-        { BTN_DRIGHT, { Ship::KbScancode::LUS_KB_H } },
+        { BTN_DUP, { Ship::KbScancode::LUS_KB_I } },
+        { BTN_DDOWN, { Ship::KbScancode::LUS_KB_K } },
+        { BTN_DLEFT, { Ship::KbScancode::LUS_KB_J } },
+        { BTN_DRIGHT, { Ship::KbScancode::LUS_KB_L } },
     });
 }
 
@@ -71,6 +93,19 @@ void ControllerDefaultMappings::SetDefaultSDLButtonToButtonMappings(
         return;
     }
 
+    // Modern dual-stick gamepad defaults (Xbox-style layout).
+    // Right stick → C-buttons (camera) is handled via SDL axis defaults.
+    // Left stick → move is handled via SDL axis defaults.
+    //
+    // N64 btn   Gamepad button         Rationale
+    // -------   --------------         ---------
+    // BTN_A     A (face south)         Confirm/interact — cross-platform standard
+    // BTN_B     B (face east)          Back/attack
+    // BTN_Z     Left trigger (axis)    Z-targeting (see axis→button defaults)
+    // BTN_R     Right trigger (axis)   Shield/R (see axis→button defaults)
+    // BTN_L     Left shoulder          L-button
+    // BTN_START Start                  Pause/menu
+    // D-pad     D-pad                  Item slots (item hotbar separate pass)
     Ship::ControllerDefaultMappings::SetDefaultSDLButtonToButtonMappings({
         { BTN_A, { SDL_CONTROLLER_BUTTON_A } },
         { BTN_B, { SDL_CONTROLLER_BUTTON_B } },
