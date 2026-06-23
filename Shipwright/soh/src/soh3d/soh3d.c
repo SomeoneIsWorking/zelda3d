@@ -71,6 +71,10 @@ static struct {
 void SoH3D_EnsureModelProvider(void);
 void SoH3D_GL_FrameBegin(void); // drop any SoH3D draws left unrendered from a prior frame
 void SoH3D_GL_SetLightDir(const float dirWorld[3]); // scene sun dir (world space) for the form term
+// Push all four scene light parameters (ambient, key-light color, fill-light dir+color) from
+// envCtx.lightSettings so the shader runs the real N64 two-light diffuse equation.
+void SoH3D_GL_SetLightParams(const float ambient[3], const float light1Col[3],
+                              const float light2Dir[3], const float light2Col[3]);
 void SoH3D_GL_SetShadowFocus(float x, float y, float z); // per-frame world focus for the sun-shadow box
 void SoH3D_GL_EmitPose(int modelId); // snapshot this actor's pose at emit time (per-item skinning)
 void SoH3D_GL_SetMidMask(int modelId, unsigned long long mask); // per-frame mesh_id visibility (Link equipment)
@@ -2123,23 +2127,63 @@ static unsigned long long SoH3D_AutoActorMidMask(int modelId, Actor* actor, s32 
 // to force for this actor's ENKO_TYPE, or NULL to leave the normal N64-anim mapping in place. The
 // resolver only applies it if the CSAB actually exists in this kid's zar.
 //
-// Two failure modes this fixes (both are "kids look wrong vs OoT3D"):
-//   - DIVERGENCE: a type whose N64 anim says one thing but OoT3D plays another. CHILD_5 (the shop-
-//     awning girl) has sOsAnimeLookup[CHILD_5]=STANDUP_2 (STANDING) for EVERY forest quest state,
-//     yet OoT3D shows her SITTING (verified live: oracle oot3d-decomp/tools/enko_anim.py read a
-//     looping 21-frame anim, and animforce km1_suwari_pose reproduces the sit). N64-anim mapping can
-//     never sit her; only a type override can.
-//   - COLLAPSE: several types share gKokiriStandUpAnim (a frozen N64 standing rest) so the N64-anim
-//     map can't distinguish them; OoT3D plays distinct poses per type.
-// Add an entry ONLY after verifying the pose against OoT3D (enko_anim.py readout + a framed shot).
+// ALL 8 Kokiri Forest types are overridden here, keyed to the oracle animLength discriminator:
+//   oracle = python3 oot3d-decomp/tools/enko_anim.py  (Kokiri Forest, scene 85)
+//
+// Two failure modes this addresses:
+//   - COLLAPSE: types 1, 5, 6 all play gKokiriStandUpAnim in N64 (a 4-frame stub) -> animmap
+//     collapses all to km1_ukiuki_wait (34f). OoT3D plays distinct 25f, 21f, 25f poses.
+//   - DIVERGENCE: the N64-mapped CSAB duration simply does not match what OoT3D plays. E.g.
+//     type 3 (blocking): N64 full gKokiriBlockingAnim->km1_udekumi_pose (25f), OoT3D animLen=14.
+//     type 2 (punch): N64 gKokiriPunchingAnim->km1_ukiuki_wait (34f), OoT3D animLen=20.
+//     type 12 (Fado): N64 gKokiriIdleAnim->km1_ukiuki_wait (34f), OoT3D animLen=40.
+//
+// CSAB pick methodology: animLength is the stable discriminator (oracle_export.py --json).
+//   When multiple CSABs share the same duration, name semantics + model (km1=boy, kw1=girl) disambiguate.
+//   Each entry below is annotated with [oracle animLen] and the reasoning.
+//   Types 0 and 4 ARE correct via the N64 mapping alone, but are overridden here for explicitness.
+//
+// Verification: run oot3d-decomp/tools/enko_anim.py to re-read oracle; compare CSAB durations.
 static const char* SoH3D_EnKoCsabOverride(int modelId, Actor* actor) {
     (void)modelId;
     if (actor == NULL || actor->id != ACTOR_EN_KO) {
         return NULL;
     }
     switch (actor->params & 0xFF) {
+        // BOY types (km1 skeleton):
+        case ENKO_TYPE_CHILD_0:
+            // oracle animLen=19; km1_ishi_wait(19) = "stone/lift-wait", matches N64 LIFTING_ROCK.
+            return "km1_ishi_wait";
+        case ENKO_TYPE_CHILD_2:
+            // oracle animLen=20; km1_ijiiji(20) = fidget/impatient, fits energetic punching-type boy.
+            // Other 20f: asekaki_wait(wipe forehead), osiete_wait(explain), utsumuki_pose(look down).
+            return "km1_ijiiji";
+        case ENKO_TYPE_CHILD_3:
+            // oracle animLen=14; km1_out_in_pose3(14) is the ONLY 14f CSAB -> unique match.
+            return "km1_out_in_pose3";
+        case ENKO_TYPE_CHILD_4:
+            // oracle animLen=19; km1_kusakari(19) = "grass cutting", matches N64 CUTTING_GRASS.
+            // Also 19f in kw1: km1_ishi_wait -- but km1_kusakari is semantically correct.
+            return "km1_kusakari";
+        // GIRL types (kw1 skeleton):
+        case ENKO_TYPE_CHILD_1:
+            // oracle animLen=25; kw1 25f CSABs: kw1_out_in_pose1, kw1_out_in_pose3, kw1_out_in_pose4,
+            // km1_udekumi_pose, km1_out_in_pose2. N64: STANDUP_1/STANDING_HAND_ON_CHEST.
+            // kw1_out_in_pose1 = first girl-specific standby pose (named kw1 = girl body).
+            return "kw1_out_in_pose1";
         case ENKO_TYPE_CHILD_5:
-            return "km1_suwari_pose"; // OoT3D: shop-awning girl SITS (verified); N64 says she stands
+            // oracle animLen=21; kw1_out_in_pose2(21) is the ONLY 21f CSAB -> unique match.
+            // (Prior override km1_suwari_pose=24f was WRONG -- duration mismatch vs oracle=21.)
+            return "kw1_out_in_pose2";
+        case ENKO_TYPE_CHILD_6:
+            // oracle animLen=25; same 25f pool as type 1. N64: STANDUP_3/STANDING_RIGHT_ARM_UP.
+            // kw1_out_in_pose3 = third girl standby, distinct from pose1 (used for type 1).
+            return "kw1_out_in_pose3";
+        // FADO (kw1 skeleton):
+        case ENKO_TYPE_CHILD_FADO:
+            // oracle animLen=40; fad_n_wait(40) = "Fado normal wait" = idle standby.
+            // Also 40f: fad_kusukusu(laugh) -- IDLE_NOMORPH -> wait, not laugh.
+            return "fad_n_wait";
         default:
             return NULL;
     }
@@ -2665,8 +2709,30 @@ static void SoH3D_UpdateLight(PlayState* play) {
     // Center the sun-shadow frustum on the camera's look-at point (covers whatever the player is
     // looking at, even when Link is off to the side). Set every frame so the shadow box follows.
     SoH3D_GL_SetShadowFocus(play->view.lookAt.x, play->view.lookAt.y, play->view.lookAt.z);
+
+    // Always push the real scene light colors + ambient so the shader lighting equation matches
+    // OoT3D regardless of the lightdir override. All values live-interpolated by z_kankyo.c.
+    {
+        float ambient[3], l1col[3], l2dir[3], l2col[3];
+        float l2len;
+        s32 i;
+        for (i = 0; i < 3; i++) {
+            ambient[i] = (float)(ls->ambientColor[i]) / 255.0f;
+            l1col[i]   = (float)(ls->light1Color[i])  / 255.0f;
+            l2dir[i]   = (float)(ls->light2Dir[i]);
+            l2col[i]   = (float)(ls->light2Color[i])  / 255.0f;
+        }
+        l2len = sqrtf(l2dir[0]*l2dir[0] + l2dir[1]*l2dir[1] + l2dir[2]*l2dir[2]);
+        if (l2len > 0.5f) {
+            l2dir[0] /= l2len;
+            l2dir[1] /= l2len;
+            l2dir[2] /= l2len;
+        }
+        SoH3D_GL_SetLightParams(ambient, l1col, l2dir, l2col);
+    }
+
     if (gSoH3dLightDirOverride) {
-        return; // held by REPL `lightdir x y z`
+        return; // light1Dir held by REPL `lightdir x y z`; colors + ambient updated above
     }
     d[0] = (float)ls->light1Dir[0];
     d[1] = (float)ls->light1Dir[1];
@@ -4098,6 +4164,18 @@ static void SoH3D_ReplExec(PlayState* play, char* line, const char* outPath) {
             SoH3D_ReplReply(outPath, "lightdir=(%.3f,%.3f,%.3f) %s", gSoH3dLightDirLast[0], gSoH3dLightDirLast[1],
                             gSoH3dLightDirLast[2], gSoH3dLightDirOverride ? "(override)" : "(auto/live light1Dir)");
         }
+    } else if (strcmp(cmd, "lightparams") == 0) {
+        // Print the current scene light parameters being pushed to the shader (from envCtx.lightSettings,
+        // updated every frame in SoH3D_UpdateLight). Useful to verify the real values reach the GPU.
+        extern float gSoH3dAmbient[3], gSoH3dLight1Col[3], gSoH3dLight2Dir[3], gSoH3dLight2Col[3];
+        SoH3D_ReplReply(outPath,
+            "lightparams: ambient=(%.3f,%.3f,%.3f) light1col=(%.3f,%.3f,%.3f) "
+            "light1dir=(%.3f,%.3f,%.3f) light2dir=(%.3f,%.3f,%.3f) light2col=(%.3f,%.3f,%.3f)",
+            gSoH3dAmbient[0], gSoH3dAmbient[1], gSoH3dAmbient[2],
+            gSoH3dLight1Col[0], gSoH3dLight1Col[1], gSoH3dLight1Col[2],
+            gSoH3dLightDirLast[0], gSoH3dLightDirLast[1], gSoH3dLightDirLast[2],
+            gSoH3dLight2Dir[0], gSoH3dLight2Dir[1], gSoH3dLight2Dir[2],
+            gSoH3dLight2Col[0], gSoH3dLight2Col[1], gSoH3dLight2Col[2]);
     } else if (strcmp(cmd, "shadow") == 0) {
         // Dynamic sun-shadow controls (libultraship soh3d_gl.cpp). `shadow <0|1>` toggles; the
         // tunables let me fit the light frustum / cure acne live without a rebuild. `shadow` alone prints.
