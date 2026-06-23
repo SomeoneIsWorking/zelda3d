@@ -40,10 +40,14 @@
 				<p class="hint">&#8596; switch tab &middot; &#8597; move &middot; Enter / A toggle &middot; Esc / B close</p>
 			</pane>
 			<pane>
+				<!-- Audio volumes: each row's `knob` id maps to a live gSettings.Volume.* CVar.
+				     Left/Right arrows or D-pad Left/Right step the value by 10%; Enter also increments.
+				     SoH's audioMgr reads these CVars every audio retrace, so changes are immediate. -->
 				<div class="section-heading">Audio</div>
-				<select-button tabindex="auto"><key>Master Volume</key><value>100%</value></select-button>
-				<select-button tabindex="auto"><key>Main Music Volume</key><value>75%</value></select-button>
-				<select-button tabindex="auto"><key>Sound Effects Volume</key><value>100%</value></select-button>
+				<select-button tabindex="auto" knob="vol-master"><key>Master Volume</key><value>40%</value></select-button>
+				<select-button tabindex="auto" knob="vol-music"><key>Main Music Volume</key><value>100%</value></select-button>
+				<select-button tabindex="auto" knob="vol-sfx"><key>Sound Effects Volume</key><value>100%</value></select-button>
+				<p class="hint">&#8596; adjust &middot; &#8597; move &middot; Esc / B close</p>
 			</pane>
 			<pane>
 				<!-- Debug warps: a row's `warp` is an entrance index; activating it requests a
