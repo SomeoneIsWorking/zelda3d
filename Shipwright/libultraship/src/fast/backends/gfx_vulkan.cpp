@@ -566,6 +566,22 @@ GfxRenderingAPIVulkan::~GfxRenderingAPIVulkan() {
     if (g_activeVulkanApi == this)
         g_activeVulkanApi = nullptr;
     if (mDevice != VK_NULL_HANDLE) {
+        // If the game loop exited mid-frame (window closed between StartFrame and EndFrame/FinishRender),
+        // mFrameAcquired is true but the acquired swapchain image was never presented. Destroying the
+        // swapchain while an image is in the ACQUIRED state without a corresponding present leaves RADV's
+        // Wayland WSI with a dangling wl_surface frame-callback, causing "double free or corruption (out)"
+        // in wsi_wl_swapchain_destroy → wl_proxy_marshal_flags on compositor-initiated close (#91).
+        //
+        // Fix: drain the dangling frame by ending + presenting it before teardown. EndFrame closes any
+        // open render pass, blits the main FB to the swapchain image (or just transitions it to PRESENT
+        // if the FB is gone), and records the command buffer. FinishRender submits + presents, returning
+        // the image to the WSI so RADV can retire its Wayland frame callbacks cleanly.
+        if (mFrameAcquired) {
+            SPDLOG_INFO("[Vulkan] ~GfxRenderingAPIVulkan: mid-frame teardown (mFrameAcquired=true); "
+                        "draining acquired swapchain image before destroy (#91)");
+            EndFrame();
+            FinishRender();
+        }
         vkDeviceWaitIdle(mDevice);
         for (auto& fb : mFramebuffers)
             DestroyFbResources(fb);
