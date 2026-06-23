@@ -3,14 +3,19 @@
 //
 // ORACLE-VERIFIED BONE MAP: ../../../../oot3d-decomp/docs/link_bone_map.md (read this).
 // The full N64-limb<->OoT3D-bone correspondence was verified against the LIVE OoT3D game (Azahar
-// oracle, link_skel_live.py) + static CMB mesh->bone bindings. KEY UNRESOLVED FINDING: the SPINE
-// here is shifted one bone too low. OoT3D inserts an extra chest bone (b10) between the upper-body
-// root (b9) and the head/arms; eyes+mouth bind to b11 (=HEAD), cap to b12 (=HAT). So the correct
-// drive is b9<-UPPER (ok), b10<-REST (extra), b11<-HEAD, b12<-HAT — but this table drives b10<-HEAD
-// and b11<-HAT (HEAD/HAT applied to chest/head instead of head/hat). Idle hides it (HEAD rot~=0);
-// head-look/dialog animations tilt the chest -> #8/#83. FIX = re-derive with HEAD->b11, HAT->b12,
-// b10->rest; gate on tools/soh3d_anim_qa.py before/after. (Not applied yet — shipped idle is
-// confirmed fine and the change touches the live retarget path.)
+// oracle, link_skel_live.py) + static CMB mesh->bone bindings. OoT3D inserts an extra chest bone
+// (b10) between the upper-body root (b9=UPPER) and the head/arms; eyes+mouth bind to b11 (=HEAD),
+// cap to b12 (=HAT). So the correct drive is b9<-UPPER, b10<-REST (extra), b11<-HEAD, b12<-rest
+// (the cap rigidly tracks b11; its N64-HAT replace residual 0.868 means the rest frames diverge,
+// so replace would discard the cap orientation — rest is faithful).
+//
+// SPINE-SHIFT FIX APPLIED 2026-06-23: the table previously drove b10<-HEAD and b11<-HAT (HEAD/HAT
+// one bone too low), so N64 HEAD pitch tilted the CHEST instead of the head -> #8 head-down /
+// #83 dialog arms. Idle hid it (HEAD rot~=0). Now b10=rest, b11<-HEAD(n64Limb 10). The b9 UPPER
+// correction is unchanged (its per-bone idle-fit is independent of the b10/b11 mapping; re-deriving
+// reproduces the same -8.8deg left-C). b11<-HEAD pure-replace residual is 0.306, on par with the
+// known-good legs (0.33-0.57) — verified by tools/soh3d_link_retarget_derive.py with the corrected
+// BONEMAP. Gated on tools/soh3d_anim_qa.py before/after.
 //
 // #8 ROOT-CAUSE FIX (2026-06-21): the previous table's head bone b10 carried a hand-woven
 // correction that TWISTED the whole upper body ~126° and pitched the head/chest forward (b10 is
@@ -44,8 +49,8 @@ static const SoH3dBoneCorr kLinkChildBoneCorr[25] = {
     {   4, 1, { 1.000000f,0.000000f,0.000000f,0.000000f,1.000000f,0.000000f,0.000000f,0.000000f,1.000000f }, { 1.000000f,0.000000f,0.000000f,0.000000f,1.000000f,0.000000f,0.000000f,0.000000f,1.000000f } }, // b7
     {   5, 1, { 1.000000f,0.000000f,0.000000f,0.000000f,1.000000f,0.000000f,0.000000f,0.000000f,1.000000f }, { 1.000000f,0.000000f,0.000000f,0.000000f,1.000000f,0.000000f,0.000000f,0.000000f,1.000000f } }, // b8
     {   9, 2, { 0.999926f,-0.001493f,-0.012109f,0.003337f,0.988111f,0.153705f,0.011736f,-0.153734f,0.988043f }, { 1.000000f,0.000000f,0.000000f,0.000000f,1.000000f,0.000000f,0.000000f,0.000000f,1.000000f } }, // b9
-    {  10, 3, { 0.078560f,0.995780f,0.047441f,-0.996902f,0.078655f,-0.000136f,-0.003867f,-0.047283f,0.998874f }, { 1.000000f,0.000000f,0.000000f,0.000000f,1.000000f,0.000000f,0.000000f,0.000000f,1.000000f } }, // b10
-    {  11, 1, { 1.000000f,0.000000f,0.000000f,0.000000f,1.000000f,0.000000f,0.000000f,0.000000f,1.000000f }, { 1.000000f,0.000000f,0.000000f,0.000000f,1.000000f,0.000000f,0.000000f,0.000000f,1.000000f } }, // b11
+    {  -1, 0, { 1.000000f,0.000000f,0.000000f,0.000000f,1.000000f,0.000000f,0.000000f,0.000000f,1.000000f }, { 1.000000f,0.000000f,0.000000f,0.000000f,1.000000f,0.000000f,0.000000f,0.000000f,1.000000f } }, // b10 chest = REST (extra OoT3D bone, no N64 limb; oracle-verified spine fix 2026-06-23)
+    {  10, 1, { 1.000000f,0.000000f,0.000000f,0.000000f,1.000000f,0.000000f,0.000000f,0.000000f,1.000000f }, { 1.000000f,0.000000f,0.000000f,0.000000f,1.000000f,0.000000f,0.000000f,0.000000f,1.000000f } }, // b11 head <- N64 HEAD (limb 10); replace residual 0.306 ~= legs
     {  -1, 0, { 1.000000f,0.000000f,0.000000f,0.000000f,1.000000f,0.000000f,0.000000f,0.000000f,1.000000f }, { 1.000000f,0.000000f,0.000000f,0.000000f,1.000000f,0.000000f,0.000000f,0.000000f,1.000000f } }, // b12
     {  -1, 0, { 1.000000f,0.000000f,0.000000f,0.000000f,1.000000f,0.000000f,0.000000f,0.000000f,1.000000f }, { 1.000000f,0.000000f,0.000000f,0.000000f,1.000000f,0.000000f,0.000000f,0.000000f,1.000000f } }, // b13
     {  13, 4, { -0.021007f,-0.937732f,0.346723f,0.204548f,-0.343495f,-0.916609f,0.978631f,0.051666f,0.199027f }, { 0.437235f,-0.113691f,-0.892132f,-0.002496f,0.991820f,-0.127619f,0.899344f,0.058026f,0.433375f } }, // b14 CARRY-FIT (idle+carryB_wait)
