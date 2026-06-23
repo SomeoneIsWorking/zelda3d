@@ -39,6 +39,15 @@ Camera / free-cam primitives (analogous to SoH3D acam):
                             screenshot. Defaults: dist=200, yaw=0 (north), pitch=20 (slightly above).
                             yaw=0 → +Z side, yaw=90 → +X side. Analogous to SoH3D `acam`.
                             Use `cam_orbit link` to orbit current Link position automatically.
+  cam_orbit_actor <hexaddr> [dist [yawDeg [pitchDeg]]]
+                            read actor's world.pos from RAM (hexaddr + A_POS offset) and orbit it.
+                            Same angle/dist args as cam_orbit. Lets you frame any live actor by address
+                            in one command without computing coordinates by hand.
+  orbit_sweep <target> [n [dist [pitch]]]
+                            shoot N evenly-spaced yaw angles (360°/N apart) around <target>, saving a
+                            numbered PNG per angle. target = hex actor addr OR "link". Defaults:
+                            n=8, dist=200, pitch=20. Files → scratch/screenshots/sweep_ADDR_NNN.png.
+                            Uses cam_freeze between shots. Prints all saved paths when done.
 
   quit / exit
 Button names: a b x y start select up down left right l r  (combine with + e.g. `tap l+r`)
@@ -373,6 +382,100 @@ def do(rpc, line):  # noqa: C901
         out = save_png(rpc, shot_path)
         print(f"  cam_orbit shot -> {out}" if out else "  cam_orbit shot FAILED")
         print("  (cam_freeze now running; use cam_unfreeze to release)")
+    elif cmd == "cam_orbit_actor":
+        import math
+        # cam_orbit_actor <hexaddr> [dist [yawDeg [pitchDeg]]]
+        # Reads Actor.world.pos (A_POS=+0x08) directly from RAM, then orbits it.
+        actor_addr = int(args[0], 0)
+        raw = rpc.read(actor_addr + A_POS, 12)
+        if raw is None or len(raw) < 12:
+            print(f"  cam_orbit_actor: cannot read pos from {actor_addr:#010x}")
+        else:
+            tx, ty, tz = struct.unpack("<3f", raw)
+            print(f"  actor @ {actor_addr:#010x}: world.pos=({tx:.2f},{ty:.2f},{tz:.2f})")
+            dist      = float(args[1]) if len(args) > 1 else 200.0
+            yaw_deg   = float(args[2]) if len(args) > 2 else 0.0
+            pitch_deg = float(args[3]) if len(args) > 3 else 20.0
+            yaw   = math.radians(yaw_deg)
+            pitch = math.radians(pitch_deg)
+            ex = tx + dist * math.sin(yaw) * math.cos(pitch)
+            ey = ty + dist * math.sin(pitch)
+            ez = tz + dist * math.cos(yaw) * math.cos(pitch)
+            ps = _cam_read_ps(rpc)
+            _cam_write_eye(rpc, ps, ex, ey, ez)
+            _cam_write_at(rpc, ps, tx, ty, tz)
+            print(f"  cam_orbit_actor dist={dist:.0f} yaw={yaw_deg:.0f}° pitch={pitch_deg:.0f}°")
+            print(f"                  eye=({ex:.1f},{ey:.1f},{ez:.1f})")
+            # Replace any existing freeze
+            if not _cam_freeze_stop.is_set():
+                _cam_freeze_stop.set()
+                if _cam_freeze_thread:
+                    _cam_freeze_thread.join(timeout=0.3)
+            _cam_freeze_stop = threading.Event()
+            _cam_freeze_thread = threading.Thread(
+                target=_cam_freeze_bg, args=((ex, ey, ez), (tx, ty, tz), _cam_freeze_stop),
+                daemon=True)
+            _cam_freeze_thread.start()
+            time.sleep(0.3)
+            shot_name = f"orbit_actor_{actor_addr:#010x}_{yaw_deg:.0f}yaw.png"
+            shot_path = os.path.join(SHOTDIR, shot_name)
+            out = save_png(rpc, shot_path)
+            print(f"  cam_orbit_actor shot -> {out}" if out else "  shot FAILED")
+            print("  (cam_freeze running; use cam_unfreeze to release)")
+    elif cmd == "orbit_sweep":
+        import math
+        # orbit_sweep <target> [n [dist [pitch]]]
+        # target = hex actor addr OR "link"
+        target_arg = args[0]
+        n         = int(args[1])   if len(args) > 1 else 8
+        dist      = float(args[2]) if len(args) > 2 else 200.0
+        pitch_deg = float(args[3]) if len(args) > 3 else 20.0
+        ps = _cam_read_ps(rpc)
+        if target_arg.lower() == "link":
+            h = _link_head(rpc, ps)
+            tx, ty, tz = _link_pos(rpc, h)
+            label = "link"
+        else:
+            actor_addr = int(target_arg, 0)
+            raw = rpc.read(actor_addr + A_POS, 12)
+            if raw is None or len(raw) < 12:
+                print(f"  orbit_sweep: cannot read pos from {actor_addr:#010x}")
+                return True
+            tx, ty, tz = struct.unpack("<3f", raw)
+            label = f"{actor_addr:#010x}"
+        print(f"  orbit_sweep target=({tx:.2f},{ty:.2f},{tz:.2f}) n={n} dist={dist:.0f} pitch={pitch_deg:.0f}°")
+        pitch = math.radians(pitch_deg)
+        saved = []
+        for i in range(n):
+            yaw_deg = 360.0 * i / n
+            yaw = math.radians(yaw_deg)
+            ex = tx + dist * math.sin(yaw) * math.cos(pitch)
+            ey = ty + dist * math.sin(pitch)
+            ez = tz + dist * math.cos(yaw) * math.cos(pitch)
+            # Stop old freeze, start new one for this angle
+            if not _cam_freeze_stop.is_set():
+                _cam_freeze_stop.set()
+                if _cam_freeze_thread:
+                    _cam_freeze_thread.join(timeout=0.3)
+            _cam_freeze_stop = threading.Event()
+            _cam_freeze_thread = threading.Thread(
+                target=_cam_freeze_bg, args=((ex, ey, ez), (tx, ty, tz), _cam_freeze_stop),
+                daemon=True)
+            _cam_freeze_thread.start()
+            time.sleep(0.25)  # let freeze settle before shot
+            safe_label = label.replace("0x", "").replace("#", "")
+            shot_name  = f"sweep_{safe_label}_{i:03d}_{yaw_deg:.0f}yaw.png"
+            shot_path  = os.path.join(SHOTDIR, shot_name)
+            out = save_png(rpc, shot_path)
+            if out:
+                saved.append(out)
+                print(f"  [{i+1}/{n}] yaw={yaw_deg:.0f}° -> {out}")
+            else:
+                print(f"  [{i+1}/{n}] yaw={yaw_deg:.0f}° -> shot FAILED")
+        # Leave cam frozen at last angle
+        print(f"  orbit_sweep done: {len(saved)}/{n} shots saved")
+        for p in saved:
+            print(f"    {p}")
     else:
         print(f"  unknown command '{cmd}' (try: help/quit, see --help)")
     return True
