@@ -443,6 +443,36 @@ extern int gSoH3dLinkAnimSrc;
 int SoH3D_LinkEnabled(void);
 int SoH3D_LinkAnimSrc(void);
 
+// ---- PC HUD (RmlUi replacement for the N64 Fast3D HUD) ------------------------------------
+// Gate: 1 = PC HUD active (default ON); env SOH3D_PCHUD=0 disables it (falls back to N64 HUD).
+// When enabled, Interface_Draw and HealthMeter_Draw are skipped and SoH3D_HudUpdateFrame fills
+// gSoH3dHudState each frame for SohRmlUi to render.
+extern int gSoH3dPcHud;            // -1=uninit, 0=off, 1=on
+int SoH3D_PcHudEnabled(void);      // lazily resolves env, then returns gSoH3dPcHud
+
+// Snapshot of game HUD state for the RmlUi pass. Filled by SoH3D_HudUpdateFrame() once per
+// frame (soh3d.c), consumed by SohRmlUi::UpdateHud() (libultraship). The struct is pure POD
+// so it crosses the C/C++ boundary without issues.
+// buttonItems[0]=B, [1]=C-Left, [2]=C-Down, [3]=C-Right (index into gItemIcons names, = item id).
+// ITEM_NONE (0xFF) = empty slot.
+typedef struct {
+    int     health;           // current health in quarter-hearts (gSaveContext.health)
+    int     healthCapacity;   // max health in quarter-hearts (gSaveContext.healthCapacity)
+    int     magic;            // current magic 0..magicCapacity (gSaveContext.magic)
+    int     magicCapacity;    // max magic (gSaveContext.magicCapacity; 0 if no magic)
+    int     magicLevel;       // 0=none, 1=normal, 2=double (gSaveContext.magicLevel)
+    int     rupees;           // current rupee count (gSaveContext.rupees)
+    int     buttonItems[4];   // item ids for B/C-L/C-D/C-R (0xFF=empty)
+    int     inputDevice;      // 0=gamepad, 1=keyboard (gSoH3dInputDevice)
+    int     valid;            // 1 when this struct has been filled at least once
+} SoH3dHudState;
+
+extern SoH3dHudState gSoH3dHudState;
+
+// Called once per frame from SoH3D_ReplPoll (has PlayState) to snapshot game state into
+// gSoH3dHudState. SohRmlUi reads the snapshot and updates the RML document elements.
+void SoH3D_HudUpdateFrame(PlayState* play);
+
 #ifdef __cplusplus
 }
 #endif
