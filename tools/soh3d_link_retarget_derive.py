@@ -45,7 +45,12 @@ BONEMAP = {
     0: -1, 1: -1, 2: -1,           # root, pelvis(translation), leg reorient
     3: 6, 4: 7, 5: 8,              # L leg <- N64 limb 6,7,8
     6: 3, 7: 4, 8: 5,              # R leg <- N64 limb 3,4,5
-    9: 9, 10: 10, 11: 11, 12: -1,  # spine<-9, chest<-10, neck/head<-11, head-sub
+    # ORACLE-VERIFIED spine (../../../../oot3d-decomp/docs/link_bone_map.md): OoT3D inserts an
+    # EXTRA chest bone (b10) between the upper-pivot (b9=N64 UPPER) and the head/arms. Eyes+mouth
+    # bind to b11 (=N64 HEAD), the cap tip to b12 (=N64 HAT). The chest b10 has NO N64 limb -> rest.
+    # (The pre-2026-06-23 map shifted HEAD/HAT one bone too low — drove HEAD pitch onto the chest;
+    #  that was the #8 head-down / #83 dialog-arms root cause.)
+    9: 9, 10: -1, 11: 10, 12: 11,  # upper-pivot<-9(UPPER), chest(rest), head<-10(HEAD), hat<-11(HAT)
     13: -1, 14: 13, 15: 14, 16: 15,  # L clav(rest), upper<-13, fore<-14, hand<-15
     17: -1, 18: 16, 19: 17, 20: 18,  # R clav(rest), upper<-16, fore<-17, hand<-18
     21: -1, 22: -1, 23: -1, 24: -1,
@@ -178,8 +183,8 @@ def main():
     # DIVERGENT upper-body bones (spine b9/b10, arms b14-16/b18-20), choosing left (C·R) or right
     # (R·C) by whichever has the lower residual (both 3-DOF; two-sided is skipped to avoid overfit
     # to the low-motion idle data). modes: 0=rest(no live joint) 1=replace 2=left 3=right.
-    REPLACE_SET = {3,4,5,6,7,8,11}
-    CORRECT_SET = {9,10,14,15,16,18,19,20}
+    REPLACE_SET = {3,4,5,6,7,8,11,12}  # legs + head(b11) + hat(b12): rest frames coincide w/ N64
+    CORRECT_SET = {9,14,15,16,18,19,20}  # divergent spine-pivot(b9) + arms; chest b10 is now rest
     TWOSIDED_MARGIN = 0.10  # only use the 6-DOF two-sided fit if it beats the best 3-DOF by this
     out_inc = os.environ.get("SOH3D_LINK_BONECORR_INC",
                              "Shipwright/soh/src/soh3d/soh3d_link_bonecorr.inc")

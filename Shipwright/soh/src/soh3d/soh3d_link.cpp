@@ -551,11 +551,13 @@ extern "C" int SoH3D_TryDrawPlayer(PlayState* play, Actor* actor) {
     // and the first-person (C-up) camera, which reads Actor_GetFocus()->pos, snaps to where the
     // head USED to be (#16 reopen: "3DS Link first-person camera moves to the wrong place"). Same
     // mechanism/pattern as the #6 held-actor hand anchor above: take the posed head bone origin
-    // (childlink_v2 OoT3D bone 10) in model-local space and lift it to world via the matrix stack
-    // top (player world transform just loaded). Faithful: position only, every frame.
+    // (childlink_v2 OoT3D bone 11 — the HEAD; eyes/mouth bind there, Y~=3226. b10 is the extra
+    // CHEST bone at Y~=2665, NOT the head — see soh3d_link_bonecorr.inc spine-shift fix) in
+    // model-local space and lift it to world via the matrix stack top (player world transform
+    // just loaded). Faithful: position only, every frame.
     {
         float hd[3];
-        if (gSoH3dFocusFix && SoH3D_PosedBoneWorldPos(modelId, 10, hd)) {
+        if (gSoH3dFocusFix && SoH3D_PosedBoneWorldPos(modelId, 11, hd)) {
             Vec3f hdLocal = { hd[0], hd[1], hd[2] };
             Vec3f hdWorld;
             Matrix_MultVec3f(&hdLocal, &hdWorld);
