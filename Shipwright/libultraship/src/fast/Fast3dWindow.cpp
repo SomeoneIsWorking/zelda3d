@@ -54,17 +54,7 @@ Fast3dWindow::Fast3dWindow(std::vector<std::shared_ptr<Ship::GuiWindow>> guiWind
 Fast3dWindow::Fast3dWindow() : Fast3dWindow(std::vector<std::shared_ptr<Ship::GuiWindow>>()) {
 }
 
-// soh3d: teardown breadcrumbs (log + immediate flush) so a window-close hang (#91) shows the exact
-// stuck step instead of stalling silently. Grep the run log for "[soh3d teardown]".
-#define SOH3D_TEARDOWN(msg)                                                                        \
-    do {                                                                                           \
-        SPDLOG_INFO("[soh3d teardown] " msg);                                                      \
-        if (auto _lg = spdlog::default_logger())                                                   \
-            _lg->flush();                                                                          \
-    } while (0)
-
 Fast3dWindow::~Fast3dWindow() {
-    SOH3D_TEARDOWN("~Fast3dWindow enter");
     SPDLOG_DEBUG("destruct fast3dwindow");
     // Tear down the GUI (ImGui + RmlUi) BEFORE the rendering API: the RmlUi Vulkan render interface
     // owns device-allocated resources (buffers/images/pipeline) and frees them in its destructor.
@@ -74,16 +64,11 @@ Fast3dWindow::~Fast3dWindow() {
     // here keeps the device alive for the GUI teardown; ShutDownImGui is idempotent so the base
     // Window::~Window second call is a no-op. (Also correct for GL: the context is still current.)
     if (auto gui = GetGui()) {
-        SOH3D_TEARDOWN("ShutDownImGui (RmlUi/ImGui VK resources)");
         gui->ShutDownImGui(this);
     }
-    SOH3D_TEARDOWN("mInterpreter->Destroy");
     mInterpreter->Destroy();
-    SOH3D_TEARDOWN("delete mRenderingApi (Vulkan device/swapchain destroy — vkDeviceWaitIdle/WSI)");
     delete mRenderingApi;
-    SOH3D_TEARDOWN("delete mWindowManagerApi (SDL/Wayland window)");
     delete mWindowManagerApi;
-    SOH3D_TEARDOWN("~Fast3dWindow done");
 }
 
 void Fast3dWindow::Init() {
