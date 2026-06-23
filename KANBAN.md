@@ -3,9 +3,9 @@
 > **Generated mirror — do not hand-edit.** Source of truth = GitHub Issues on
 > `SomeoneIsWorking/soh3d` (private). Regenerate with `tools/kanban.py render`.
 > Move a card with `tools/kanban.py mv <#> <column>`; add with `tools/kanban.py add`.
-> Columns: todo · in-progress · in-review · needs-confirmation · reopened · blocked · done(=closed).  Updated 2026-06-23 14:07.
+> Columns: todo · in-progress · in-review · needs-confirmation · reopened · blocked · done(=closed).  Updated 2026-06-23 14:42.
 
-**Counts:** todo:5 | in-progress:3 | in-review:0 | needs-confirmation:30 | reopened:1 | blocked:1 | done:42
+**Counts:** todo:5 | in-progress:2 | in-review:0 | needs-confirmation:31 | reopened:1 | blocked:1 | done:42
 
 ## 📋 To Do  (5)
 - [#17](../../issues/17) Hi-res world/scene textures (texpack) _(render)_
@@ -14,15 +14,14 @@
 - [#91](../../issues/91) Vulkan/Wayland swapchain teardown double-free on window close _(render,crash)_
 - [#95](../../issues/95) Audio thread use-after-free on clean window-close teardown _(crash)_
 
-## 🔨 In Progress  (3)
+## 🔨 In Progress  (2)
 - [#29](../../issues/29) Giant boulder overlaps the Temple of Time (Market) _(render,scene)_
 - [#89](../../issues/89) Tooling: export authoritative per-actor variant+animation from OoT3D (Azahar oracle) — base SoH3D on 3DS not N64
-- [#92](../../issues/92) Replicate OoT3D title screen scene (visually indistinguishable) _(render,camera,scene)_
 
 ## 🔍 In Review (agent verifying)  (0)
 _none_
 
-## 🙋 Needs User Confirmation  (30)
+## 🙋 Needs User Confirmation  (31)
 - [#1](../../issues/1) Stairs: real stepped geometry, wall preserved (render broken) _(render,stairs,scene)_
 - [#2](../../issues/2) Kakariko well: water is a tiny teal diamond, not a surface _(render,well)_
 - [#4](../../issues/4) Title/cutscene camera goes under 3DS terrain _(render,camera)_
@@ -50,6 +49,7 @@ _none_
 - [#78](../../issues/78) Kokiri Forest big chest renders TOO big (oversized scale) _(render,scene)_
 - [#80](../../issues/80) Rolling boulder slides instead of rolling (no spin) _(anim,scene)_
 - [#86](../../issues/86) 3D3 Link: upper torso briefly snaps ~90deg right after stopping a walk; run-off-edge jump looks wrong _(anim,link)_
+- [#92](../../issues/92) Replicate OoT3D title screen scene (visually indistinguishable) _(render,camera,scene)_
 - [#94](../../issues/94) Per-limb material/facial channel + Saria ocarina (keystone #3) _(render,anim)_
 - [#96](../../issues/96) PC-native default keyboard + controller mapping (input layer)
 - [#97](../../issues/97) PC-native HUD: replace N64 Fast3D HUD with RmlUi overlay _(ui,hud)_
