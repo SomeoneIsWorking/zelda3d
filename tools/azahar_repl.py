@@ -34,6 +34,11 @@ Camera / free-cam primitives (analogous to SoH3D acam):
                             auto-released on next cam_freeze 0 or `cam_unfreeze`; secs>0 → blocks
   cam_unfreeze              stop any running cam_freeze background thread
   cam_frame <hexaddr> [secs]  teleport Link next to actor, freeze him, hold cam, screenshot
+  cam_orbit <tx> <ty> <tz> [dist [yawDeg [pitchDeg]]]
+                            place camera at polar angle around target (tx,ty,tz), freeze it, and
+                            screenshot. Defaults: dist=200, yaw=0 (north), pitch=20 (slightly above).
+                            yaw=0 → +Z side, yaw=90 → +X side. Analogous to SoH3D `acam`.
+                            Use `cam_orbit link` to orbit current Link position automatically.
 
   quit / exit
 Button names: a b x y start select up down left right l r  (combine with + e.g. `tap l+r`)
@@ -322,6 +327,52 @@ def do(rpc, line):  # noqa: C901
                 print(f"  cam_frame (PPM) -> {ppm}")
         else:
             print("  cam_frame shot FAILED")
+    elif cmd == "cam_orbit":
+        import math
+        # cam_orbit <tx|link> <ty> <tz> [dist [yawDeg [pitchDeg]]]
+        # If first arg is "link", read Link's current position as target.
+        if args and args[0].lower() == "link":
+            ps = _cam_read_ps(rpc)
+            h  = _link_head(rpc, ps)
+            tx, ty, tz = _link_pos(rpc, h)
+            rest = args[1:]
+        else:
+            tx, ty, tz = float(args[0]), float(args[1]), float(args[2])
+            rest = args[3:]
+        dist     = float(rest[0]) if len(rest) > 0 else 200.0
+        yaw_deg  = float(rest[1]) if len(rest) > 1 else 0.0
+        pitch_deg = float(rest[2]) if len(rest) > 2 else 20.0
+        # Convert polar to Cartesian eye position.
+        # yaw=0 → eye on +Z side of target; yaw=90 → eye on +X side.
+        # pitch>0 → eye above target plane.
+        yaw   = math.radians(yaw_deg)
+        pitch = math.radians(pitch_deg)
+        ex = tx + dist * math.sin(yaw) * math.cos(pitch)
+        ey = ty + dist * math.sin(pitch)
+        ez = tz + dist * math.cos(yaw) * math.cos(pitch)
+        ps = _cam_read_ps(rpc)
+        _cam_write_eye(rpc, ps, ex, ey, ez)
+        _cam_write_at(rpc, ps, tx, ty, tz)
+        print(f"  cam_orbit target=({tx:.1f},{ty:.1f},{tz:.1f}) "
+              f"dist={dist:.0f} yaw={yaw_deg:.0f}° pitch={pitch_deg:.0f}°")
+        print(f"           eye=({ex:.1f},{ey:.1f},{ez:.1f})")
+        # Freeze in background (replaces any existing freeze)
+        if not _cam_freeze_stop.is_set():
+            _cam_freeze_stop.set()
+            if _cam_freeze_thread:
+                _cam_freeze_thread.join(timeout=0.3)
+        _cam_freeze_stop = threading.Event()
+        _cam_freeze_thread = threading.Thread(
+            target=_cam_freeze_bg, args=((ex, ey, ez), (tx, ty, tz), _cam_freeze_stop),
+            daemon=True)
+        _cam_freeze_thread.start()
+        time.sleep(0.3)  # let the freeze take hold before returning
+        # Take a screenshot automatically
+        shot_name = f"orbit_{yaw_deg:.0f}yaw_{pitch_deg:.0f}pitch.png"
+        shot_path = os.path.join(SHOTDIR, shot_name)
+        out = save_png(rpc, shot_path)
+        print(f"  cam_orbit shot -> {out}" if out else "  cam_orbit shot FAILED")
+        print("  (cam_freeze now running; use cam_unfreeze to release)")
     else:
         print(f"  unknown command '{cmd}' (try: help/quit, see --help)")
     return True
