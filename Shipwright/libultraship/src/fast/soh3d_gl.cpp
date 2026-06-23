@@ -259,6 +259,7 @@ GLint g_uUVOffset = -1;
 GLint g_uSky = -1;
 GLuint g_whiteTex = 0; // 1x1 white, bound for untextured groups (e.g. the vertex-coloured sky dome)
 GLint g_uDepthOffset = -1, g_uMV = -1, g_uLit = -1, g_uLightDir = -1;
+GLint g_uAmbient = -1, g_uLight1Color = -1, g_uLight2Dir = -1, g_uLight2Color = -1;
 GLint g_uLightVP = -1, g_uShadowMap = -1, g_uShadowOn = -1, g_uShadowBias = -1, g_uShadowStrength = -1,
       g_uShadowTexel = -1;
 bool g_progFailed = false;
@@ -340,6 +341,10 @@ const char* kFrag =
     "in vec2 vUv; in vec4 vColor; in vec3 vNrmView; in vec3 vWorld;\n"
     "uniform sampler2D uTex; uniform vec3 uTint; uniform float uAlphaRef; uniform float uAlpha;\n"
     "uniform float uDepthOffset; uniform float uLit; uniform vec3 uLightDir;\n"
+    // Per-scene light parameters (from envCtx.lightSettings, updated every frame by SoH3D_UpdateLight):
+    // uAmbient = ambientColor/255, uLight1Color = light1Color/255, uLight2Dir/uLight2Color = second dir light.
+    // Used to compute the real N64 lighting equation for lit (character/prop) draws.
+    "uniform vec3 uAmbient; uniform vec3 uLight1Color; uniform vec3 uLight2Dir; uniform vec3 uLight2Color;\n"
     // Dynamic sun-shadow: uLightVP maps WORLD -> the sun's light-space clip (built CPU-side from
     // the scene sun dir + a focus box around the camera target); uShadowMap is the depth render
     // from the light. uShadowOn gates it (0 = no shadows / shadow-map build pass). uShadowBias
@@ -374,13 +379,24 @@ const char* kFrag =
     "  gl_FragDepth = gl_FragCoord.z + uDepthOffset;\n"
     // OoT3D modulates the texture by the per-vertex color (baked scene lighting: dimmed
     // walls, ground AO) and the vertex alpha, then by the scene-ambient tint. Character/prop
-    // models carry NO baked lighting (flat vColor) -> they looked flat; add a half-Lambert
-    // diffuse FORM term (uLit) using the model normal so they read as 3D. Scene geometry
-    // (uLit==0) keeps its baked vColor untouched.
+    // models carry NO baked lighting (flat vColor) -> they looked flat; add the REAL N64/OoT3D
+    // two-light diffuse equation for lit draws: shade = ambient + light1 * max(0,N·L1)
+    //                                                             + light2 * max(0,N·L2)
+    // All color terms are scene-live (envCtx.lightSettings) so time-of-day, weather, and indoor
+    // scenes all get correct magnitudes. Scene geometry (uLit==0) keeps its baked vColor untouched.
     "  vec3 shade = uTint;\n"
     "  if (uLit > 0.5) {\n"
-    "    float hl = dot(normalize(vNrmView), normalize(uLightDir)) * 0.5 + 0.5;\n" // half-Lambert wrap [0,1]
-    "    shade = uTint * (0.55 + 0.45 * hl);\n"                          // 0.55 ambient floor -> never black
+    "    vec3 N = normalize(vNrmView);\n"
+    "    float d1 = max(0.0, dot(N, normalize(uLightDir)));\n"       // N·L1: primary (sun/moon)
+    "    float d2 = max(0.0, dot(N, normalize(uLight2Dir)));\n"      // N·L2: secondary fill
+    // Real lighting equation: ambient + diffuse1 + diffuse2 (matches N64 shade computation).
+    // uAmbient, uLight1Color, uLight2Color are in [0,1] (ambientColor/255 etc. set CPU-side).
+    // Clamp to [0,1] so over-bright scenes don't blow out.
+    "    vec3 lit = clamp(uAmbient + uLight1Color * d1 + uLight2Color * d2, 0.0, 1.0);\n"
+    // uTint carries the scene RGB tint for scene geometry (unlit draws). For lit draws we
+    // ignore uTint's flat-ambient approximation and use the real per-channel light term instead.
+    // Shadow + AO still multiply on top of this.
+    "    shade = lit;\n"
     "  }\n"
     // Dynamic shadow: darken by the shadowed fraction. Applied to BOTH lit (characters) and
     // unlit (scene ground/walls) draws, so a character's shadow lands on the OoT3D ground.
@@ -453,6 +469,10 @@ bool ensureProgram() {
     g_uMV = glGetUniformLocation(p, "uMV");
     g_uLit = glGetUniformLocation(p, "uLit");
     g_uLightDir = glGetUniformLocation(p, "uLightDir");
+    g_uAmbient = glGetUniformLocation(p, "uAmbient");
+    g_uLight1Color = glGetUniformLocation(p, "uLight1Color");
+    g_uLight2Dir = glGetUniformLocation(p, "uLight2Dir");
+    g_uLight2Color = glGetUniformLocation(p, "uLight2Color");
     g_uLightVP = glGetUniformLocation(p, "uLightVP");
     g_uShadowMap = glGetUniformLocation(p, "uShadowMap");
     g_uShadowOn = glGetUniformLocation(p, "uShadowOn");
@@ -503,6 +523,27 @@ extern "C" void SoH3D_GL_SetLightDir(const float dirWorld[3]) {
     gSoH3dLightDirWorld[0] = dirWorld[0];
     gSoH3dLightDirWorld[1] = dirWorld[1];
     gSoH3dLightDirWorld[2] = dirWorld[2];
+}
+
+// Scene light parameters (updated once per frame from envCtx.lightSettings by soh3d.c):
+//   ambient   = ambientColor[3] / 255.0 (RGB)
+//   light1Col = light1Color[3]  / 255.0 (key light / sun)
+//   light2Dir = light2Dir[3]    / 127.0 (second directional, signed s8)
+//   light2Col = light2Color[3]  / 255.0 (fill / moon)
+// These drive the real N64 two-light diffuse equation in the fragment shader for lit draws.
+extern "C" float gSoH3dAmbient[3]    = { 0.10f, 0.10f, 0.12f }; // defaults: dim night sky
+extern "C" float gSoH3dLight1Col[3]  = { 0.80f, 0.75f, 0.65f }; // warm sun
+extern "C" float gSoH3dLight2Dir[3]  = {-0.40f,-0.55f,-0.73f }; // opposite sun (fill)
+extern "C" float gSoH3dLight2Col[3]  = { 0.05f, 0.08f, 0.15f }; // cool sky fill
+
+extern "C" void SoH3D_GL_SetLightParams(const float ambient[3], const float light1Col[3],
+                                         const float light2Dir[3], const float light2Col[3]) {
+    for (int i = 0; i < 3; i++) {
+        gSoH3dAmbient[i]   = ambient[i];
+        gSoH3dLight1Col[i] = light1Col[i];
+        gSoH3dLight2Dir[i] = light2Dir[i];
+        gSoH3dLight2Col[i] = light2Col[i];
+    }
 }
 
 // --- Dynamic shadow tunables (REPL `shadow*` in soh3d.c; env SOH3D_SHADOW for the master gate) ---
@@ -815,7 +856,11 @@ void beginPass(SavedGl& s) {
     glBindVertexArray(g_vao); // our isolated VAO; attrib changes stay here, off Fast3D's VAO
     glUseProgram(g_program);
     glUniform1i(g_uTex, 0);
-    glUniform3fv(g_uLightDir, 1, gSoH3dLightDirWorld); // scene sun dir (world space), per frame
+    glUniform3fv(g_uLightDir,    1, gSoH3dLightDirWorld); // primary light dir (world space), per frame
+    glUniform3fv(g_uAmbient,     1, gSoH3dAmbient);      // scene ambient RGB [0,1]
+    glUniform3fv(g_uLight1Color, 1, gSoH3dLight1Col);    // primary light RGB [0,1]
+    glUniform3fv(g_uLight2Dir,   1, gSoH3dLight2Dir);    // secondary light dir (world space)
+    glUniform3fv(g_uLight2Color, 1, gSoH3dLight2Col);    // secondary light RGB [0,1]
     glEnable(GL_DEPTH_TEST);
     glDepthFunc(GL_LEQUAL);
     glDisable(GL_SCISSOR_TEST);
