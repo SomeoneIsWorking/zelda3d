@@ -635,16 +635,20 @@ static const SoH3DAnimMap kSoH3dAnimMaps[] = {
     SOH3D_ANIMMAP("objects/object_mb/gEnMbClubStandUpAnim", "mbV_s_wait"),
     SOH3D_ANIMMAP("objects/object_mb/gEnMbClubStandStillClubDownAnim", "mbV_s_wait"),
     // ---- /actor/zelda_md.zar (object_md) ----
-    SOH3D_ANIMMAP("objects/object_md/gMidoHandsOnHipsIdleAnim", "mido_stop_wait"),
+    // md_matsu_kani (16f): oracle animLen=16 for Kokiri gating Mido playing gMidoHandsOnHipsIdleAnim (N64 16f)
+    SOH3D_ANIMMAP("objects/object_md/gMidoHandsOnHipsIdleAnim", "md_matsu_kani"),
     SOH3D_ANIMMAP("objects/object_md/gMidoSlamAnim", "mido_are_to_okoru_a"),
     SOH3D_ANIMMAP("objects/object_md/gMidoAngryHeadTurnAnim", "mido_are_to_okoru_b"),
-    SOH3D_ANIMMAP("objects/object_md/gMidoAnnoyedPointedHeadIdle1Anim", "mido_stop_wait"),
+    // mido_are_wait (24f): N64 AnnoyedPointedHead1 is 24f, oracle mido_are_wait=24f exact match
+    SOH3D_ANIMMAP("objects/object_md/gMidoAnnoyedPointedHeadIdle1Anim", "mido_are_wait"),
     SOH3D_ANIMMAP("objects/object_md/gMidoHandsOnHipsTransitionAnim", "mido_kihon_to_okoru"),
     SOH3D_ANIMMAP("objects/object_md/gMidoRaiseHand1Anim", "mido_kihon_to_stop"),
     SOH3D_ANIMMAP("objects/object_md/gMidoAnim_92B0", "mido_kihon_to_okoru"),
     SOH3D_ANIMMAP("objects/object_md/gMidoRaiseHand2Anim", "mido_okoru_to_stop"),
-    SOH3D_ANIMMAP("objects/object_md/gMidoAnnoyedPointedHeadIdle2Anim", "mido_stop_wait"),
+    // mido_okoru_wait (16f): AnnoyedPointedHead2 is N64 16f; okoru=angry, semantic match for annoyed idle
+    SOH3D_ANIMMAP("objects/object_md/gMidoAnnoyedPointedHeadIdle2Anim", "mido_okoru_wait"),
     SOH3D_ANIMMAP("objects/object_md/gMidoPutHandDownAnim", "mido_stop_to_are"),
+    // mido_stop_wait (18f): HaltAnim is N64 18f, exact frame-count match
     SOH3D_ANIMMAP("objects/object_md/gMidoHaltAnim", "mido_stop_wait"),
     SOH3D_ANIMMAP("objects/object_md/gMidoWalkingAnim", "mido_walk_loop"),
     // ---- /actor/zelda_mk.zar (object_mk) ----
