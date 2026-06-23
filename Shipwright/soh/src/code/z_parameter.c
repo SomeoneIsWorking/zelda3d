@@ -1614,7 +1614,6 @@ static Gfx* SoH3D_DrawHudBadges(Gfx* dl) {
 static Gfx* SoH3D_DrawHotbar(PlayState* play, Gfx* dl) {
     InterfaceContext* interfaceCtx = &play->interfaceCtx;
     extern u8  gSoH3dHotbarItems[6];
-    extern int gSoH3dHotbarActive;
     extern int SoH3D_InputDevice(void);
     extern int SoH3D_XboxBtnEnabled(void);
     extern const void* SoH3D_NumGlyphTex(char which, int* w, int* h);
@@ -1642,16 +1641,13 @@ static Gfx* SoH3D_DrawHotbar(PlayState* play, Gfx* dl) {
         s16 sx = (s16)(BAR_X + i * (SLOT_SIZE + SLOT_GAP));
         s16 sy = SLOT_Y;
         u8 itemId = gSoH3dHotbarItems[i];
-        int isActive = (i == gSoH3dHotbarActive);
 
-        // Draw slot background: slightly lighter than the panel, highlighted if active.
+        // Draw slot background. soh3d: no active-slot cursor — every slot renders the same dark bg
+        // (user: "there should be no hotbar cursor"). The old gold highlight tracked
+        // gSoH3dHotbarActive, which the (buggy, now-removed) keyboard handler moved via WASD.
         gDPPipeSync(dl++);
         gDPSetCombineMode(dl++, G_CC_PRIMITIVE, G_CC_PRIMITIVE);
-        if (isActive) {
-            gDPSetPrimColor(dl++, 0, 0, 255, 215, 80, 200); // gold highlight
-        } else {
-            gDPSetPrimColor(dl++, 0, 0, 40, 40, 40, 160);   // dark slot bg
-        }
+        gDPSetPrimColor(dl++, 0, 0, 40, 40, 40, 160); // dark slot bg (uniform, no highlight)
         gDPFillRectangle(dl++, sx, sy, sx + SLOT_SIZE, sy + SLOT_SIZE);
         gDPPipeSync(dl++);
 

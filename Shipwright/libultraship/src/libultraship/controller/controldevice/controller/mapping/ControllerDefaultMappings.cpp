@@ -55,7 +55,8 @@ void ControllerDefaultMappings::SetDefaultKeyboardKeyToButtonMappings(
     // Z-target        BTN_Z      Q              Lock-on left of WASD, reachable by pinky/ring finger
     // Shield/R        BTN_R      Left Ctrl      Modifier-style key for shield/roll
     // L-button        BTN_L      Left Shift     Walk-modifier / L in OoT
-    // Pause/menu      BTN_START  Escape         Standard PC pause/menu
+    // Pause/skip      BTN_START  Enter          Escape is reserved for the RmlUi menu (SohRmlUi
+    //                                           toggles on ESC); Start on Enter keeps cutscene/dialog skip (#15)
     // Camera up       BTN_CUP    Arrow Up       Arrow keys = camera fallback (mouse-look deferred)
     // Camera down     BTN_CDOWN  Arrow Down
     // Camera left     BTN_CLEFT  Arrow Left
@@ -73,7 +74,7 @@ void ControllerDefaultMappings::SetDefaultKeyboardKeyToButtonMappings(
         { BTN_Z, { Ship::KbScancode::LUS_KB_Q } },
         { BTN_R, { Ship::KbScancode::LUS_KB_CONTROL } },
         { BTN_L, { Ship::KbScancode::LUS_KB_SHIFT } },
-        { BTN_START, { Ship::KbScancode::LUS_KB_ESCAPE } },
+        { BTN_START, { Ship::KbScancode::LUS_KB_ENTER } },
         { BTN_CUP, { Ship::KbScancode::LUS_KB_ARROWKEY_UP } },
         { BTN_CDOWN, { Ship::KbScancode::LUS_KB_ARROWKEY_DOWN } },
         { BTN_CLEFT, { Ship::KbScancode::LUS_KB_ARROWKEY_LEFT } },
