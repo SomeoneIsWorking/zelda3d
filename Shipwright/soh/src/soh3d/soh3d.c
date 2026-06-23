@@ -635,6 +635,30 @@ static void SoH3D_HudBlit(const void* buf, int tw, int th, float x, float y, flo
     SoH3D_Hud_Draw(id, x, y, w, h, 0.0f, 0.0f, 1.0f, 1.0f, tint);
 }
 
+// Blit a sub-rect (sx,sy,sw,sh in atlas pixels) of an atlas texture (aw x ah) into the quad
+// (x,y,w,h). Used for the real OoT3D 3DS HUD atlases (rupee from hud_all, items from icon_item_menu).
+static void SoH3D_HudBlitAtlas(const void* atlas, int aw, int ah, int sx, int sy, int sw, int sh,
+                               float x, float y, float w, float h, unsigned int tint) {
+    if (atlas == NULL || aw <= 0 || ah <= 0) {
+        return;
+    }
+    int id = SoH3D_Hud_Tex(atlas, atlas, aw, ah);
+    if (id == 0) {
+        return;
+    }
+    SoH3D_Hud_Draw(id, x, y, w, h, (float)sx / aw, (float)sy / ah, (float)(sx + sw) / aw,
+                   (float)(sy + sh) / ah, tint);
+}
+
+// OoT3D 3DS HUD atlas romfs paths + sub-rect geometry (measured from the decoded atlases).
+#define SOH3D_HUD_ALL_CTXB   "/menu/01_US_ENGLISH/hud_all00.ctxb"
+#define SOH3D_ICON_ITEM_CTXB "/menu/01_US_ENGLISH/icon_item_menu00.ctxb"
+// icon_item_menu00 is a 12-column grid (pitch 42px, origin (1,1), ~40px icons); cell index == item id.
+#define SOH3D_ITEM_COLS 12
+#define SOH3D_ITEM_PITCH 42
+#define SOH3D_ITEM_ORIGIN 1
+#define SOH3D_ITEM_CELL 40
+
 // Solid (untextured) tinted rectangle — panels, magic bar, highlights.
 static void SoH3D_HudRect(float x, float y, float w, float h, unsigned int tint) {
     SoH3D_Hud_Draw(0, x, y, w, h, 0.0f, 0.0f, 1.0f, 1.0f, tint);
@@ -695,15 +719,19 @@ void SoH3D_HudFrame(void) {
         SoH3D_HudRect(mx, my, (float)fillPx, mbh, 0x32D232FFu); // green fill
     }
 
-    // ---- Rupees (bottom-left): green gem + digit glyphs --------------------------------------
+    // ---- Rupees (bottom-left): real OoT3D 3DS rupee gem (hud_all atlas) + digit glyphs --------
     {
-        const float gem = 26.0f * sc;
+        const float gem = 30.0f * sc;
         float rx = margin;
         float ry = (float)H - margin - gem;
-        int gw = 0, gh = 0;
-        const void* gemTex = SoH3D_CounterIconTex(SOH3D_CICON_RUPEE, &gw, &gh);
-        SoH3D_HudBlit(gemTex, gw, gh, rx, ry, gem, gem, 0xC8FF64FFu); // wallet-green gem
-        float dx = rx + gem + 4.0f * sc;
+        // Rupee sub-rect in the 256x256 hud_all atlas (the teal/gold gem), measured from the decode
+        // (gem body x[131,171]; excludes the C-button at x<124 and the d-pad red arrow at x>=180).
+        const int RX = 131, RY = 8, RW = 41, RH = 46;
+        int aw = 0, ah = 0;
+        const void* hudAtlas = SoH3D_OoT3dAtlas(SOH3D_HUD_ALL_CTXB, 0, &aw, &ah);
+        float gemW = gem * (float)RW / (float)RH; // preserve the gem's aspect
+        SoH3D_HudBlitAtlas(hudAtlas, aw, ah, RX, RY, RW, RH, rx, ry, gemW, gem, 0xFFFFFFFFu);
+        float dx = rx + gemW + 4.0f * sc;
         const float dh = gem;
         char buf[8];
         int rup = s->rupees;
@@ -721,7 +749,7 @@ void SoH3D_HudFrame(void) {
         }
     }
 
-    // ---- Hotbar (bottom-centre): 6 slots with item icons + slot glyphs -----------------------
+    // ---- Hotbar (top-right corner, user-requested): 6 slots with item icons + slot glyphs -----
     {
         extern const void* SoH3D_NumGlyphTex(char which, int* w, int* h);
         extern const void* SoH3D_XboxGlyphTex(char which, int* w, int* h);
@@ -729,8 +757,8 @@ void SoH3D_HudFrame(void) {
         const float slot = 54.0f * sc;
         const float sgap = 6.0f * sc;
         const float totalW = NSLOTS * slot + (NSLOTS - 1) * sgap;
-        float bx = ((float)W - totalW) * 0.5f;
-        float by = (float)H - margin - slot;
+        float bx = (float)W - margin - totalW; // right-aligned
+        float by = margin;                      // top
         int kbd = (s->inputDevice == 1);
         static const char kPadGlyph[6] = { 'B', 'Y', 'A', 'B', 'X', 'Y' };
         for (int i = 0; i < NSLOTS; i++) {
@@ -742,10 +770,22 @@ void SoH3D_HudFrame(void) {
             }
             SoH3D_HudRect(sx, by, slot, slot, active ? 0x282420E0u : 0x14141EC0u); // slot panel
             int itemId = s->hotbarItems[i];
-            if (itemId != 0xFF && itemId >= 0 && itemId < 158 && gItemIcons[itemId] != NULL) {
+            if (itemId != 0xFF && itemId >= 0) {
                 float pad = 5.0f * sc;
-                SoH3D_HudBlit(gItemIcons[itemId], 32, 32, sx + pad, by + pad, slot - 2 * pad,
-                              slot - 2 * pad, 0xFFFFFFFFu);
+                // Prefer the real OoT3D 3DS item icon (icon_item_menu atlas; cell index == item id).
+                int row = itemId / SOH3D_ITEM_COLS, col = itemId % SOH3D_ITEM_COLS;
+                int iw = 0, ih = 0;
+                const void* itemAtlas = SoH3D_OoT3dAtlas(SOH3D_ICON_ITEM_CTXB, 0, &iw, &ih);
+                int cellY = SOH3D_ITEM_ORIGIN + row * SOH3D_ITEM_PITCH;
+                if (itemAtlas != NULL && iw > 0 && ih > 0 && cellY + SOH3D_ITEM_CELL <= ih) {
+                    int cellX = SOH3D_ITEM_ORIGIN + col * SOH3D_ITEM_PITCH;
+                    SoH3D_HudBlitAtlas(itemAtlas, iw, ih, cellX, cellY, SOH3D_ITEM_CELL, SOH3D_ITEM_CELL,
+                                       sx + pad, by + pad, slot - 2 * pad, slot - 2 * pad, 0xFFFFFFFFu);
+                } else if (itemId < 158 && gItemIcons[itemId] != NULL) {
+                    // Fallback for item ids beyond the 3DS atlas grid (quest/equipment icons).
+                    SoH3D_HudBlit(gItemIcons[itemId], 32, 32, sx + pad, by + pad, slot - 2 * pad,
+                                  slot - 2 * pad, 0xFFFFFFFFu);
+                }
             }
             // Slot glyph badge, top-right corner.
             int gw = 0, gh = 0;
@@ -4820,6 +4860,25 @@ static void SoH3D_ReplExec(PlayState* play, char* line, const char* outPath) {
         // gSoH3dHudTex every frame. 1 = crisp 64x64 hearts, 0 = the blocky N64 16x16 hearts.
         gSoH3dHudTex = (f1 != 0.0f) ? 1 : 0;
         SoH3D_ReplReply(outPath, "hudtex=%d", gSoH3dHudTex);
+    } else if (strcmp(cmd, "atlasdump") == 0) {
+        // TEMP tooling: decode an OoT3D romfs .ctxb atlas and dump raw RGBA to scratch for offline
+        // inspection (find the rupee / item-icon sub-rects). `atlasdump <romfsPath> [texIdx]`.
+        char path[256] = { 0 };
+        int idx = 0;
+        if (sscanf(line, "%*s %255s %d", path, &idx) >= 1) {
+            int aw = 0, ah = 0;
+            const void* rgba = SoH3D_OoT3dAtlas(path, idx, &aw, &ah);
+            if (rgba && aw > 0 && ah > 0) {
+                FILE* f = fopen("scratch/raw/atlas.rgba", "wb");
+                if (f) {
+                    fwrite(rgba, 1, (size_t)aw * ah * 4, f);
+                    fclose(f);
+                }
+                SoH3D_ReplReply(outPath, "atlas %s idx=%d -> %dx%d (scratch/raw/atlas.rgba)", path, idx, aw, ah);
+            } else {
+                SoH3D_ReplReply(outPath, "atlas %s idx=%d: decode failed", path, idx);
+            }
+        }
     } else if (strcmp(cmd, "pchud") == 0 && sscanf(line, "%*s %f", &f1) == 1) {
         // Toggle the native Vulkan PC HUD (default on). 1 = PC HUD (Interface_Draw/HealthMeter_Draw
         // gated off, soh3d_hud_vk draws); 0 = the original N64 Fast3D HUD + hotbar.

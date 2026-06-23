@@ -201,6 +201,14 @@ enum {
     SOH3D_HEART_EMPTY,
 };
 const void* SoH3D_HeartTex(int kind, int* w, int* h);
+// PC HUD (soh3d_hud_vk.cpp) variant: the same heart but colour-BAKED into straight RGBA (the OoT
+// life-meter PRIM/ENV lerp applied), since the native Vulkan HUD draws without the N64 combiner that
+// would otherwise tint the grayscale SoH3D_HeartTex. `kind` is SOH3D_HEART_*. Cached; NULL on failure.
+const void* SoH3D_HudHeartRGBA(int kind, int* w, int* h);
+// PC HUD — decode an OoT3D standalone romfs .ctxb atlas (the real 3DS HUD textures: hud_all00,
+// icon_item_menu00, num_all00) to RGBA8, cached by path. texIdx selects the texture entry (these
+// menu files carry one atlas at index 0). NULL on failure. The native HUD draws sub-rects of these.
+const void* SoH3D_OoT3dAtlas(const char* romfsPath, int texIdx, int* w, int* h);
 extern int gSoH3dHudTex;       // env SOH3D_HUDTEX / REPL `hudtex` gate (-1=uninit, 0/1)
 int SoH3D_HudTexEnabled(void); // lazily resolves the env on first call; HUD draws gate on this
 
@@ -465,6 +473,38 @@ extern int gSoH3dHotbarActive;    // currently selected slot 0-5
 extern int gSoH3dHotbarFireB;
 int  SoH3D_HotbarSlot(void);      // returns gSoH3dHotbarActive
 void SoH3D_HotbarSync(PlayState* play); // called each frame from SoH3D_ReplPoll
+
+// ---- PC HUD (native Vulkan, replaces the N64 Fast3D HUD) -----------------------------------
+// User directive 2026-06-23: the in-game HUD is a MODERN PC HUD rendered DIRECTLY via Vulkan
+// (soh3d_hud_vk.cpp), NOT the N64 Interface_Draw path and NOT RmlUi. When enabled, Interface_Draw
+// and HealthMeter_Draw are gated off; SoH3D_HudFrame() draws hearts/magic/rupees/hotbar with the
+// real HD textures. Gate: 1 = PC HUD on (default); env SOH3D_PCHUD=0 / REPL `pchud 0` reverts to
+// the N64 HUD. The gate ALSO requires the Vulkan backend (SoH3D_Hud_Available) — a GL build keeps
+// the native HUD as fallback.
+extern int gSoH3dPcHud;       // -1=uninit, 0=off, 1=on
+int SoH3D_PcHudEnabled(void); // resolves env lazily; 1 only when on AND the VK HUD layer is live
+
+// Snapshot of game HUD state, filled once per frame by SoH3D_HudUpdateFrame() (game thread, has
+// PlayState) and read by SoH3D_HudFrame() (render thread, no PlayState). Pure POD.
+typedef struct {
+    int health;          // current health in quarter-hearts (gSaveContext.health)
+    int healthCapacity;  // max health in quarter-hearts
+    int magic;           // current magic 0..magicCapacity
+    int magicCapacity;   // max magic (0 if no magic)
+    int magicLevel;      // 0=none, 1=normal, 2=double
+    int rupees;          // current rupee count
+    int hotbarItems[6];  // item id per hotbar slot (0xFF=empty)
+    int hotbarActive;    // selected hotbar slot 0-5
+    int inputDevice;     // 0=gamepad, 1=keyboard
+    int valid;           // 1 once filled at least once
+} SoH3dHudState;
+extern SoH3dHudState gSoH3dHudState;
+
+// Snapshot game state into gSoH3dHudState (called from SoH3D_ReplPoll). No-op when PC HUD off.
+void SoH3D_HudUpdateFrame(PlayState* play);
+// Render the PC HUD this frame via the Vulkan HUD layer. Called from libultraship's Gui::EndFrame
+// (render thread). No-op when the PC HUD is disabled or no valid snapshot exists yet.
+void SoH3D_HudFrame(void);
 
 #ifdef __cplusplus
 }

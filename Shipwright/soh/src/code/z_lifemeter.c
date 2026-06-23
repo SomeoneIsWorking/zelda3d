@@ -396,6 +396,13 @@ s16 getHealthMeterYOffset() {
 }
 
 void HealthMeter_Draw(PlayState* play) {
+    // SoH3D PC HUD replaces the N64 heart draw — suppress it when the native Vulkan PC HUD is active.
+    {
+        extern int SoH3D_PcHudEnabled(void);
+        if (SoH3D_PcHudEnabled()) {
+            return;
+        }
+    }
     s32 pad[5];
     void* heartBgImg;
     u32 curColorSet;
