@@ -283,6 +283,16 @@ static bool VerifyArchiveVersion(OTRVersion version);
 std::string portArchivePath = "";
 static bool sohArchiveVersionMatch = false;
 
+// soh3d: boot breadcrumbs. Each logs AND flushes immediately, so if a startup step hangs
+// (e.g. an ImGui font-atlas build or a Vulkan wait on MoltenVK) the log shows the exact last
+// step reached instead of stalling silently. Grep the run log for "[soh3d boot]".
+#define SOH3D_BOOT(...)                                                                            \
+    do {                                                                                           \
+        SPDLOG_INFO("[soh3d boot] " __VA_ARGS__);                                                  \
+        if (auto _lg = spdlog::default_logger())                                                   \
+            _lg->flush();                                                                          \
+    } while (0)
+
 OTRGlobals::OTRGlobals() {
     context = Ship::Context::CreateUninitializedInstance("Ship of Harkinian", appShortName, "shipofharkinian.json");
 
@@ -318,28 +328,37 @@ OTRGlobals::OTRGlobals() {
     context->InitWindow(sohFast3dWindow);
 
     SohGui::SetupMenu();
+    SOH3D_BOOT("ctor: SetupMenu done; sohArchiveVersionMatch={}", sohArchiveVersionMatch);
 
     if (sohArchiveVersionMatch) {
 
         auto overlay = context->GetRawInstance()->GetWindow()->GetGui()->GetGameOverlay();
+        SOH3D_BOOT("ctor: overlay->LoadFont PressStart2P");
         overlay->LoadFont("Press Start 2P", 12.0f, "fonts/PressStart2P-Regular.ttf");
+        SOH3D_BOOT("ctor: overlay->LoadFont Fipps");
         overlay->LoadFont("Fipps", 32.0f, "fonts/Fipps-Regular.otf");
         overlay->SetCurrentFont(CVarGetString(CVAR_GAME_OVERLAY_FONT, "Press Start 2P"));
 
+        SOH3D_BOOT("ctor: CreateFontWithSize Inconsolata x4");
         fontMonoSmall = CreateFontWithSize(14.0f, "fonts/Inconsolata-Regular.ttf");
         fontMono = CreateFontWithSize(16.0f, "fonts/Inconsolata-Regular.ttf");
         fontMonoLarger = CreateFontWithSize(20.0f, "fonts/Inconsolata-Regular.ttf");
         fontMonoLargest = CreateFontWithSize(24.0f, "fonts/Inconsolata-Regular.ttf");
+        SOH3D_BOOT("ctor: CreateFontWithSize Montserrat x3");
         fontStandard = CreateFontWithSize(16.0f, "fonts/Montserrat-Regular.ttf");
         fontStandardLarger = CreateFontWithSize(20.0f, "fonts/Montserrat-Regular.ttf");
         fontStandardLargest = CreateFontWithSize(24.0f, "fonts/Montserrat-Regular.ttf");
+        SOH3D_BOOT("ctor: CreateFontWithSize NotoSansJP (full CJK atlas)");
         fontJapanese = CreateFontWithSize(24.0f, "fonts/NotoSansJP-Regular.ttf", true);
+        SOH3D_BOOT("ctor: fonts loaded");
         ImGui::GetIO().FontDefault = fontStandardLarger;
     }
 
     previousImGuiScaleIndex = -1;
     previousImGuiScale = defaultImGuiScale;
+    SOH3D_BOOT("ctor: ScaleImGui");
     ScaleImGui();
+    SOH3D_BOOT("ctor: OTRGlobals constructor complete");
 }
 
 typedef enum ExtractSteps {
@@ -1531,10 +1550,14 @@ bool VerifyArchiveVersion(OTRVersion version) {
 }
 
 extern "C" void InitOTR(int argc, char* argv[]) {
+    SOH3D_BOOT("InitOTR: new OTRGlobals()");
     OTRGlobals::Instance = new OTRGlobals();
+    SOH3D_BOOT("InitOTR: RunExtract()");
     OTRGlobals::Instance->RunExtract(argc, argv);
 
+    SOH3D_BOOT("InitOTR: Initialize() (loads oot.o2r)");
     OTRGlobals::Instance->Initialize();
+    SOH3D_BOOT("InitOTR: Initialize() done; managers/audio next");
     CustomMessageManager::Instance = new CustomMessageManager();
     ItemTableManager::Instance = new ItemTableManager();
     GameInteractor::Instance = new GameInteractor();
