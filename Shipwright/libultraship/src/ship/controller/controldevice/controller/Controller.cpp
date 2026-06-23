@@ -18,8 +18,6 @@
 // #32 hotswap — last-used input device signal, defined in soh3d.c (C).
 extern "C" {
     extern int gSoH3dInputDevice;
-    // Hotbar slot selection: set by keys 1-6 (SDL scancodes 30-35).
-    extern int gSoH3dHotbarActive;
 }
 
 namespace Ship {
@@ -142,14 +140,10 @@ bool Controller::ProcessKeyboardEvent(KbEventType eventType, KbScancode scancode
         gSoH3dInputDevice = 1; // keyboard
     }
 
-    // Hotbar slot selection: keys 1-6 (SDL scancodes 30-35) select the active hotbar slot.
-    // These are checked even if `result` is false (they're not mapped as game-pad buttons).
-    if (eventType == KbEventType::LUS_KB_EVENT_KEY_DOWN && GetPortIndex() == 0) {
-        if (scancode >= 30 && scancode <= 35) {
-            gSoH3dHotbarActive = (int)(scancode - 30); // scancode 30 -> slot 0 (key 1), etc.
-            gSoH3dInputDevice = 1; // hotbar keys = keyboard input
-        }
-    }
+    // soh3d: removed the keyboard hotbar slot-selection handler. It tested `scancode >= 30 && <= 35`
+    // assuming SDL scancodes (keys 1-6), but `scancode` here is a LUS/DIK scancode where 30-35 are
+    // A, S, D, F, G, H — so the WASD movement keys silently moved the hotbar slot. There is no
+    // hotbar selection cursor (the gold highlight in z_parameter.c is removed), so nothing to select.
 
     return result;
 }
