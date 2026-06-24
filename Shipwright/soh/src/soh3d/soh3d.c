@@ -313,10 +313,13 @@ void SoH3D_ActorPostUpdate(PlayState* play, Actor* actor) {
     // Motion sampler: stream the selected actor's live state once per frame (BEFORE the freeze pin,
     // so a frozen actor logs zeroed motion correctly and a free actor logs its real trajectory).
     if (sSoH3dMotionFile != NULL && actor == sSoH3dMotionActor && sSoH3dMotionRemaining > 0) {
-        fprintf(sSoH3dMotionFile, "%d,0x%X,%.3f,%.3f,%.3f,%d,%d,%d,%.4f,%.4f,%.4f,%.4f\n",
-                sSoH3dMotionFrame, actor->id, actor->world.pos.x, actor->world.pos.y,
-                actor->world.pos.z, actor->world.rot.x, actor->world.rot.y, actor->world.rot.z,
-                actor->velocity.x, actor->velocity.y, actor->velocity.z, actor->speedXZ);
+        // gframe = play->gameplayFrames (logic-frame counter, ++1/logic frame) so the consumer can
+        // tell whether rows are one-logic-frame apart (delta==speedXZ) or the sampler undersampled.
+        fprintf(sSoH3dMotionFile, "%d,%u,0x%X,%.3f,%.3f,%.3f,%d,%d,%d,%.4f,%.4f,%.4f,%.4f\n",
+                sSoH3dMotionFrame, play->gameplayFrames, actor->id, actor->world.pos.x,
+                actor->world.pos.y, actor->world.pos.z, actor->world.rot.x, actor->world.rot.y,
+                actor->world.rot.z, actor->velocity.x, actor->velocity.y, actor->velocity.z,
+                actor->speedXZ);
         fflush(sSoH3dMotionFile); // per-row flush so a capture can be read live (small N)
         sSoH3dMotionFrame++;
         if (--sSoH3dMotionRemaining <= 0) {
@@ -5396,7 +5399,7 @@ static void SoH3D_ReplExec(PlayState* play, char* line, const char* outPath) {
                 SoH3D_ReplReply(outPath, "asample: cannot open '%s' (mkdir scratch/motion?)", path);
             } else {
                 fprintf(sSoH3dMotionFile,
-                        "frame,id,posx,posy,posz,rotx,roty,rotz,velx,vely,velz,speedXZ\n");
+                        "frame,gframe,id,posx,posy,posz,rotx,roty,rotz,velx,vely,velz,speedXZ\n");
                 fflush(sSoH3dMotionFile);
                 sSoH3dMotionActor = gSoH3dSelActor;
                 sSoH3dMotionRemaining = n;
