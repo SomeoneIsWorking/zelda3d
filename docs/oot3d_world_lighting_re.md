@@ -280,3 +280,63 @@ bright). That is the MULTIPLICATIVE night-darkening gap and needs the real OoT3D
 equation (`saturate(diffuse·NdotL + ambient·matAmbient)`), the bigger lighting port — out of scope
 for the #110 additive-floor fix. TODO: also source `u_SceneAmbient` PER-SCENE (the 0.06 blue is
 Kokiri-derived; other scenes may differ).
+
+## #111 VERTEX-LIGHTING PORT — corrected ZSI layout, slot/schedule mapping, model (2026-06-24n→o)
+
+This is the source-of-truth section for the #111 port. **A prior session used the WRONG ZSI env
+layout** (noclip's `zsi.ts` offsets — ambient at +0x0A). That layout is for *N64 ZSI embedded inside
+the 3DS build*, NOT native 3DS romfs ZSI. The CORRECT native-3DS env-setting layout (28-byte stride,
+from `oot3d-decomp/docs/scene_lighting.md`, re-validated here against `/scene/spot04_info.zsi`):
+
+```
++0x00 u8[3]  ambientColor       +0x03 s8[3] light0Dir   +0x06 u8[3] light0Color
++0x09 s8[3]  light1Dir          +0x0c u8[3] light1Color  +0x0f u8 pad
++0x10 f32 fogEnd (=12000 Kokiri) +0x14 f32 drawDist (=2400) +0x18 u16 blendFog
+```
+Validated: with this layout `fogEnd=12000.0`, `drawDist=2400.0` come out as clean round numbers and
+`light0Color` is the constant per-scene sun colour — the +0x0A layout produced garbage. **Entry 0 is a
+metadata blob (different layout) — skip it; entries 1..N-1 are the per-time-of-day settings.** The
+parsed Kokiri (`spot04`) palette matches `oot3d-decomp/data/scene_lighting.json["spot04"]` exactly.
+Probe: `scratch/lightport/env_probe.py` (uses the CORRECT layout).
+
+### Slot↔slot + time schedule are SOLVED (no more guessing which setting is active)
+- **OoT3D scene slot `i` ↔ N64 scene slot `i`** (slot-by-slot; per `oot3d-decomp/tools/lighting_parity.py`).
+- **The N64 z_kankyo time schedule (`D_8011FB48` row 0) picks the slot by time** and SoH3D already
+  runs it: noon `0x8000` → slot **1**, deep night `0x0000` → slot **3** (verified LIVE: SoH3D N64
+  `lightparams` reads ambient `(80,80,80)`=N64 spot04 slot1 at noon, `(60,80,110)`=N64 slot3 at night,
+  matching `D_8011FB48[0]` = `{day=1, night=3}`). So the active OoT3D slot per time is KNOWN for free
+  by reusing the N64 schedule — **do NOT reverse-engineer OoT3D's own kankyo**.
+- OoT3D `spot04` ambient palette (corrected): slot1(noon)=(61,72,72), slot3(night)=(40,72,72),
+  slot2/4=(160,72,72) bright. Note **G,B are constant 72** across the day slots (1-8).
+
+### The model is NOT pure `saturate(2·ambient)` — there IS a directional term (offline can't close it)
+Derived the oracle's effective WORLD SHADE from rendered grass (pixel/texture), per channel:
+| | shade_R | shade_G |
+|---|---|---|
+| noon  | ~0.87 | ~0.70 |
+| night | ~0.29 | ~0.39 |
+| night/noon | **0.34** | **0.55** |
+
+noclip's room path (`render.ts:1518`, *explicitly labelled "Temporary hack until I get kankyo
+implemented"*) forces both world lights' diffuse=BLACK and `light[1].ambient=light[0].ambient`, giving
+world shade = `saturate(2·ambient·matAmb)`. That predicts night/noon R=0.66, **G=1.0** (G ambient is
+constant 72 → no G darkening) — but the oracle G DOES drop to 0.55, and noon shade_R 0.87 ≫ 2·ambient
+(0.478). The noon "extra" over 2·ambient is R≈0.389 ≈ **light0Color_R (99/255=0.388)** → OoT3D world
+geometry DOES receive a directional/diffuse contribution from light0/light1 (brighter sun at noon than
+moon at night). So the faithful model is `saturate(2·ambient·matAmb + Σ lightCol·something·NdotL)`,
+NdotL depending on per-vertex normals — **only resolvable LIVE** (matches the doc's standing rule).
+
+### Port plan (build + verify LIVE, A/B; do NOT tune offline)
+1. **Data**: `tools/gen_oot3d_scene_lighting.py` → generated `.inc` table keyed by OoT3D scene name,
+   one row per slot: {ambient[3], l0dir[3], l0col[3], l1dir[3], l1col[3]} (corrected 28-byte layout,
+   skip entry 0). Runtime maps SoH sceneNum→OoT3D name via existing `SoH3D_SceneName`/`kSoH3dSceneNames`.
+2. **Blend**: reuse the N64 z_kankyo schedule — the active slot index(es) + weight are already computed
+   for the N64 palette; compute a PARALLEL OoT3D-palette blend with the same indices/weights into
+   globals `gSoH3dWorld{Ambient,Light0Col,Light0Dir,Light1Col,Light1Dir}[3]` (hook next to the
+   `envCtx->lightSettings.ambientColor` write in `z_kankyo.c`, outdoor + indoor paths).
+3. **Shader (world path, `soh3d_vk.cpp`)**: replace the flat-tint `shade` for scene geom (uParams.y<0.5)
+   with the OoT3D vertex-light eqn using per-vertex view-normal: start
+   `shade = saturate(2·ambient·matAmb)`, then ADD the directional term and tune which light/coeff LIVE
+   against the oracle until noon stays at parity AND night R/G hit 0.34/0.55. Keep the #110 additive
+   blue floor. Gate behind REPL `worldlit`/env var for A/B.
+4. Verify Kokiri noon+night+dusk vs oracle, then ≥1 more scene (Market/Kakariko + a dungeon).
