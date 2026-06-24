@@ -8,6 +8,7 @@
 #include "soh/ResourceManagerHelpers.h"
 #include "soh/Enhancements/game-interactor/GameInteractor.h"
 #include "soh/Enhancements/game-interactor/GameInteractor_Hooks.h"
+#include "soh3d/soh3d.h" // #111: SoH3D_WorldShadeBlend (OoT3D-palette world shade)
 
 typedef enum {
     /* 0 */ LENS_FLARE_CIRCLE0,
@@ -1005,6 +1006,12 @@ void Environment_Update(PlayState* play, EnvironmentContext* envCtx, LightContex
                                              lightSettingsList[TIME_ENTRY_20.unk_05].ambientColor[j], sp8C);
                             *(envCtx->lightSettings.ambientColor + j) = LERP(blend8[0], blend8[1], sp88);
                         }
+
+                        // #111: compute the OoT3D-palette world shade with the SAME slot indices +
+                        // weights used for the N64 ambient above (no schedule duplication). No-op
+                        // unless this outdoor scene has an OoT3D env palette + REPL `worldshade 1`.
+                        SoH3D_WorldShadeBlend(TIME_ENTRY_1F.unk_04, TIME_ENTRY_1F.unk_05,
+                                              TIME_ENTRY_20.unk_04, TIME_ENTRY_20.unk_05, sp8C, sp88);
 
                         // set light1 direction for the sun
                         envCtx->lightSettings.light1Dir[0] =
