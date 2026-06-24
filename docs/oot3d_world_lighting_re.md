@@ -340,3 +340,37 @@ NdotL depending on per-vertex normals — **only resolvable LIVE** (matches the 
    against the oracle until noon stays at parity AND night R/G hit 0.34/0.55. Keep the #110 additive
    blue floor. Gate behind REPL `worldlit`/env var for A/B.
 4. Verify Kokiri noon+night+dusk vs oracle, then ≥1 more scene (Market/Kakariko + a dungeon).
+
+### RESOLVED via the live oracle (2026-06-24o) — ground truth from Azahar RAM
+A RAM investigation of the live OoT3D oracle (now in oot3d-decomp/docs/ram_map.md "ENVIRONMENT
+LIGHTING") resolved the two offline-unresolvable unknowns:
+1. **CORRECTED romfs ZSI light-color offsets.** Validated against the runtime EnvLightSettings:
+   `+0x00 ambient · +0x04 light0Color · +0x07 light0Dir(s8) · +0x0a light1Color · +0x0d light1Dir(s8)`.
+   The earlier doc/generator had light0Color @ +0x06 — WRONG (a near-constant field). Confirmed for
+   spot04 noon/night/dusk: l0col = (255,255,219)/(63,63,99)/(239,140,61). gen_oot3d_scene_lighting.py
+   fixed + table regenerated.
+2. **Slot alignment = +1.** The runtime DROPS ZSI metadata entry 0, so runtime slot i = ZSI entry
+   (i+1). N64 z_kankyo schedule: noon→slot1, night→slot3 → OoT3D entry2/entry4. `gSoH3dWorldShadeSlotBias
+   = 1`. Verified live: SoH3D's `SoH3D_WorldShadeBlend` now reports the IDENTICAL blended env values as
+   the oracle (noon amb=(160,72,72) l0col=(255,255,219); night amb=(160,72,72) l0col=(63,63,99)).
+3. **The day/night darkening is in light0Color (the sun), NOT ambient** (ambient ~constant 160 noon &
+   night). So the world shade tracks light0Color. light1Color is the cool moonlight FILL
+   (night (99,170,219)) that keeps night G/B up.
+
+### Model shipped (opt-in, REPL `worldshade`): saturate(ka·ambient + kd·light0Color + ke·light1Color)
+Per-channel, computed on CPU as the room's single shade tint (matches the existing one-tint room
+architecture). Defaults ka=0.16, kd=0.77, ke=0.12 (REPL-tunable, no rebuild). LIVE A/B (Kokiri,
+consistent framing within a run, grass night/noon ratio vs oracle):
+| ratio | flat tint (shipped) | worldshade model | oracle |
+|---|---|---|---|
+| night/noon R | 0.58 | **0.36** | 0.34 |
+| night/noon G | 0.73 | 0.32 (ke=0) → ~0.45 (ke=0.12) | 0.55 |
+
+Night R is fixed (the primary #111 complaint) and noon moved closer to oracle. RESIDUALS (next session):
+(a) night **G** is still a bit dark and **B** short — B's night blue comes from the #110 ADDITIVE floor
+(coef 0.02, too small), not the multiply, so it's a #110 follow-up, not this model; (b) a single global
+per-light coef can't perfectly fit R and G simultaneously (R penalty from light1Color's R=99) — the
+faithful fix is the per-vertex shader model (real NdotL per light, soh3d_vk.cpp world frag) which can
+separate the lights by direction; (c) CONSISTENT-FRAMING multi-time + multi-scene verification (use a
+fixed cam/grass target) before flipping `worldshade` default ON; (d) tune/verify ≥1 more scene
+(per-scene palette already generated for 101 scenes). Tooling: scratch/lightport/{env_probe,measure_grass}.py.
