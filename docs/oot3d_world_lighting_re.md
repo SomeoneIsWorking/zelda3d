@@ -244,3 +244,29 @@ time's value).
 3. Verify ≥1 more scene + dusk (0xC000) and dawn. Repro: warp oracle to Kokiri via
    `play+0x5c32=0xEE, play+0x5c2d=0x14` (PlayState @ gPlayState=0x0050AF34); pin oracle dayTime by
    spam-writing u16 @ gSaveContext(0x00587958)+0x0C; SoH3D `time <u16>` + `camfreeze 1`.
+
+### IMPLEMENTED (2026-06-24, VK world path) — additive scene-ambient blue floor
+Added an **additive** env-ambient floor to the VK world frag (`soh3d_vk.cpp`: `uAmbient` UBO slot;
+`rgb += uAmbient.xyz * uAmbient.w` for vertex-lit scene geom, scoped exactly like the combiner
+scale). Globals `gSoH3dWorldAmbColor`/`gSoH3dWorldAmb`/`gSoH3dWorldAmbOverride` (`soh3d_gl.cpp`),
+fed/overridable from `soh3d.c`; REPL `worldamb <coef> [r g b]`.
+
+**Derivation (live vs oracle, Kokiri grass box (420,640,560,800)):** the env time-blended ambient
+is the WRONG source — it's GRAY at noon (0.314,0.314,0.314), so scaling it overshoots R/G (at
+coef 0.20 noon R 51.7→67.7 vs oracle 49). The oracle floor is a CONSTANT blue ≈22.9 at ALL times
+(noon=night=dusk=dawn) with R/G≈0 — i.e. OoT3D's per-scene **constant** `u_SceneAmbient`
+(render.ts:355 `t_FragPriColor += u_SceneAmbient`), not the per-light ambient. So the floor is
+pinned to pure blue `(0,0,1)` × coef `0.06` (= +15.3/255): SoH3D grass blue 7.6 + 15.3 = **22.9**,
+matching the oracle at every time of day while leaving noon R/G untouched (noon stays near-parity).
+
+**Measured after (default-on):** grass blue → 22.9 (noon), 22.9 (night), 21.0 (dusk), 22.0 (dawn);
+B/R 0.15→0.44 noon, 0.25→0.77 night. Verified no breakage on an indoor scene (chicken house wood
+stays warm) and Kakariko night (grass cools, dark rock unaffected).
+
+**RESIDUAL (separate card, NOT this fix):** night R/G are still too BRIGHT — oracle night grass R is
+34% of its noon R, SoH3D's is 58%, so B/R reaches 0.77 not the oracle's 1.37. Cause: the flat tint
+`SoH3D_SceneTint = (ambient + 0.5·(light1+light2))·1.0` under-darkens at night (light2col stays
+bright). That is the MULTIPLICATIVE night-darkening gap and needs the real OoT3D vertex-lighting
+equation (`saturate(diffuse·NdotL + ambient·matAmbient)`), the bigger lighting port — out of scope
+for the #110 additive-floor fix. TODO: also source `u_SceneAmbient` PER-SCENE (the 0.06 blue is
+Kokiri-derived; other scenes may differ).

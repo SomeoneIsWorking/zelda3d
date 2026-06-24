@@ -125,6 +125,7 @@ layout(binding=0, std140) uniform UBO {
     vec4 uShadow;    // x=shadowOn y=bias z=strength w=texel (1/shadowRes)
     vec4 uFog;       // xyz=env fog colour, w=fog enable
     vec4 uFog2;      // x=fog near (view w), y=fog far
+    vec4 uAmbient;   // xyz=env ambient colour, w=additive-floor coef (0 = off / non-scene) (#110)
 } ubo;
 void main() {
     vColor = aColor;
@@ -178,6 +179,7 @@ layout(binding=0, std140) uniform UBO {
     vec4 uShadow;  // x=on y=bias z=strength w=texel
     vec4 uFog;     // xyz=env fog colour, w=fog enable
     vec4 uFog2;    // x=F3DEX fog mul, y=F3DEX fog offset
+    vec4 uAmbient; // xyz=env ambient colour, w=additive-floor coef (0 = off / non-scene) (#110)
 } ubo;
 layout(binding=1) uniform sampler2D uTex;
 layout(binding=2) uniform sampler2D uShadowMap;
@@ -215,6 +217,13 @@ void main() {
     vec3 rgb = t.rgb * vColor.rgb * shade;
     if (ubo.uParams.y < 0.5)
         rgb = clamp(rgb, 0.0, 1.0) * ubo.uExtra.w;
+    // OoT3D additive env-AMBIENT floor (#110, docs/oot3d_world_lighting_re.md). The world frag above
+    // is purely multiplicative, so a blue night ambient can't enter a green-dominant grass texture.
+    // OoT3D applies the scene ambient additively (render.ts:355 t_FragPriColor += u_SceneAmbient).
+    // uAmbient.w is the live-derived coef, set to 0 for non-vertex-lit / non-scene draws so this is a
+    // no-op everywhere else. Clamp after, before fog.
+    if (ubo.uAmbient.w > 0.0)
+        rgb = clamp(rgb + ubo.uAmbient.xyz * ubo.uAmbient.w, 0.0, 1.0);
     // N64/OoT3D F3DEX fog (interpreter.cpp:1850): fog_z = ndcZ*fogMul + fogOffset, clamped to
     // [0,255], used as the blend factor toward the scene fog colour. vFogDist carries the GL-NDC z.
     // Skip the skybox dome (uLightDir.w>0.5 -> it IS the far background). The fogMul/fogOffset come
@@ -241,6 +250,7 @@ struct VkUbo {
     float uShadow[4];   // x=on y=bias z=strength w=texel
     float uFog[4];      // xyz = OoT3D env fog colour, w = fog enable (0/1)
     float uFog2[4];     // x = fog near (view-space w), y = fog far; z,w unused
+    float uAmbient[4];  // xyz = OoT3D env ambient colour, w = additive-floor coef (#110)
 };
 
 struct VkTex {
@@ -1605,6 +1615,13 @@ extern "C" void SoH3D_Vk_DrawModel(int modelId, const float* mp16, const float* 
     base.uFog2[1] = gSoH3dFogOffset;
     base.uFog2[2] = 0.0f;
     base.uFog2[3] = 0.0f;
+    // #110 additive env-ambient floor colour (live, time-blended from envCtx.lightSettings.ambient
+    // via soh3d.c). The per-group coef (uAmbient[3]) is set below, scoped to vertex-lit scene geom.
+    extern float gSoH3dWorldAmbColor[3];
+    base.uAmbient[0] = gSoH3dWorldAmbColor[0];
+    base.uAmbient[1] = gSoH3dWorldAmbColor[1];
+    base.uAmbient[2] = gSoH3dWorldAmbColor[2];
+    base.uAmbient[3] = 0.0f;
     bool forceBlend = (a8 < 255);          // translucent draw -> alpha-over even if the material is opaque
 
     bool vboBound = false;
@@ -1633,6 +1650,10 @@ extern "C" void SoH3D_Vk_DrawModel(int modelId, const float* mp16, const float* 
         // for the unchanged paths. Gated by REPL `worldlit` for A/B against the oracle.
         extern int gSoH3dWorldLit;
         ubo.uExtra[3] = (grp.vertexLighting && gSoH3dWorldLit) ? grp.combScaleRGB : 1.0f;
+        // #110: additive env-ambient floor coef, scoped exactly like combScale (vertex-lit scene
+        // geom only; 0 elsewhere -> shader no-op). gSoH3dWorldAmb is the live-derived coefficient.
+        extern float gSoH3dWorldAmb;
+        ubo.uAmbient[3] = (grp.vertexLighting && gSoH3dWorldLit) ? gSoH3dWorldAmb : 0.0f;
         const VkDeviceSize uboOff = ring.offset;
         memcpy((uint8_t*)ring.mapped + uboOff, &ubo, sizeof(ubo));
         ring.offset += g_uboStride;
