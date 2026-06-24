@@ -2094,6 +2094,23 @@ void func_80068C3C(PlayState* play, CutsceneContext* csCtx) {
         } else {
             Cutscene_ProcessCommands(play, csCtx, play->csCtx.segment);
         }
+
+        // SoH3D (#112): universal player START-skip for an ACTIVE scripted (csCtx) cutscene whose
+        // script has NO terminator command (CS_CMD_TERMINATOR). The vanilla / SoH START-skip lives in
+        // Cutscene_Command_Terminator, only dispatched when the script CONTAINS a terminator, so a
+        // terminator-less scripted cutscene couldn't be skipped. This processor runs every frame for
+        // every active csCtx cutscene; if a terminator already handled the skip this frame the state
+        // is no longer SKIPPABLE_EXEC, so this only fires for the terminator-less case. End via the
+        // standard teardown state (CS_STATE_UNSKIPPABLE_INIT -> func_80068DC0: clears link/npc
+        // actions, cutsceneIndex=0, gameMode=NORMAL, restores camera). Gated like csSkipButton.
+        // (NOTE: the new-game Navi intro is NOT a csCtx cutscene — csCtx.state stays IDLE there — so
+        // it is handled separately by the Player-side skip in z_player.c Player_UpdateCommon.)
+        if ((csCtx->state == CS_STATE_SKIPPABLE_EXEC) &&
+            CHECK_BTN_ALL(play->state.input[0].press.button, BTN_START) &&
+            (gSaveContext.gameMode != GAMEMODE_TITLE_SCREEN) && (gSaveContext.fileNum != 0xFEDC) &&
+            (csCtx->frames > 20) && (play->transitionTrigger == TRANS_TRIGGER_OFF)) {
+            csCtx->state = CS_STATE_UNSKIPPABLE_INIT;
+        }
     }
 }
 
