@@ -53,12 +53,12 @@ extern "C" float gSoH3dAoMaxDiff;  // depth delta beyond which a neighbour is a 
 // world->light-clip matrix (computeLightVP) is computed by the GL dispatcher and handed to us.
 extern "C" int gSoH3dShadowEnable;   // -1 uninit (resolved by the GL dispatcher), 0 off, 1 on
 extern "C" int gSoH3dShadowHasFocus; // 0 until soh3d.c sets the focus point (no shadows pre-scene)
-// OoT3D env distance fog (ported from envCtx.lightSettings). Owned by the GL dispatcher
-// (soh3d_gl.cpp), set each frame by soh3d.c SoH3D_UpdateLight. Mirror under Vulkan.
+// N64/OoT3D F3DEX fog (ported from envCtx.lightSettings + z_play.c gSPFogPosition). Owned by the GL
+// dispatcher (soh3d_gl.cpp), set each frame by soh3d.c SoH3D_UpdateLight. Mirror under Vulkan.
 extern "C" int gSoH3dFogEnable;       // 0 off, 1 on (default on)
 extern "C" float gSoH3dFogColor[3];   // env fog colour (0..1)
-extern "C" float gSoH3dFogNear;       // fog start (view-space w / world units)
-extern "C" float gSoH3dFogFar;        // fog full-density distance
+extern "C" float gSoH3dFogMul;        // F3DEX fog multiplier (s16): fog_z = ndcZ*mul + offset
+extern "C" float gSoH3dFogOffset;     // F3DEX fog offset    (s16)
 extern "C" float gSoH3dShadowBias;
 extern "C" float gSoH3dShadowStrength;
 static int vkFaceCullOn() {
@@ -138,6 +138,10 @@ void main() {
         sp = acc.xyz;
     } else { sp = aPos; nM = aNrm; }
     vec4 c = ubo.uMP * vec4(sp, 1.0);
+    // F3DEX fog input = the GL-convention NDC z (clipZ/w in [-1,1]) — the EXACT value the RSP fog
+    // stage uses (interpreter.cpp: fog_z = z*winv*mul + offset). Capture it BEFORE the Vulkan z
+    // remap below, so the fog curve is identical on both backends regardless of the depth range.
+    vFogDist = c.z / c.w;
     // uParams.x carries the backend's clip invertY (interpreter passes GetClipParameters().invertY:
     // -1 on Vulkan, +1 on GL). That single negate IS the Vulkan Y-down flip and matches exactly what
     // the interpreter applies to N64 vertices (interpreter.cpp: y = -y). Do NOT negate again.
@@ -145,7 +149,6 @@ void main() {
     c.z = (c.z + c.w) * 0.5;  // GL clip z [-1,1] -> Vulkan [0,1]
     if (ubo.uLightDir.w > 0.5) c.z = c.w; // skybox: pin to far plane (Vulkan far = z/w = 1)
     gl_Position = c;
-    vFogDist = c.w; // view-space depth (perspective w) -> distance fog input
     vNrmView = mat3(ubo.uMV) * nM; // world-space normal (uMV is model->world; see soh3d_gl.cpp)
     vWorld = (ubo.uMV * vec4(sp, 1.0)).xyz; // world-space position for the shadow projection
     // CMB/PICA UVs are top-origin. Texture SAMPLING maps v=0 -> data row 0 identically in GL and
@@ -174,7 +177,7 @@ layout(binding=0, std140) uniform UBO {
     mat4 uLightVP;
     vec4 uShadow;  // x=on y=bias z=strength w=texel
     vec4 uFog;     // xyz=env fog colour, w=fog enable
-    vec4 uFog2;    // x=fog near (view w), y=fog far
+    vec4 uFog2;    // x=F3DEX fog mul, y=F3DEX fog offset
 } ubo;
 layout(binding=1) uniform sampler2D uTex;
 layout(binding=2) uniform sampler2D uShadowMap;
@@ -212,11 +215,13 @@ void main() {
     vec3 rgb = t.rgb * vColor.rgb * shade;
     if (ubo.uParams.y < 0.5)
         rgb = clamp(rgb, 0.0, 1.0) * ubo.uExtra.w;
-    // OoT3D env distance fog (ported from envCtx.lightSettings fogColor/fogNear/zFar): blend toward
-    // the scene fog colour by view-space depth. Skip the skybox dome (uLightDir.w>0.5 -> it IS the
-    // far background). This is the Kokiri green-yellow atmosphere haze.
+    // N64/OoT3D F3DEX fog (interpreter.cpp:1850): fog_z = ndcZ*fogMul + fogOffset, clamped to
+    // [0,255], used as the blend factor toward the scene fog colour. vFogDist carries the GL-NDC z.
+    // Skip the skybox dome (uLightDir.w>0.5 -> it IS the far background). The fogMul/fogOffset come
+    // from the live per-scene gSPFogPosition(fogNear,1000), so the curve matches the game exactly
+    // (Kokiri fogNear~994 -> near fog-free until the far clip, not the old over-dense world ramp).
     if (ubo.uFog.w > 0.5 && ubo.uLightDir.w < 0.5) {
-        float f = clamp((vFogDist - ubo.uFog2.x) / max(ubo.uFog2.y - ubo.uFog2.x, 1.0), 0.0, 1.0);
+        float f = clamp(vFogDist * ubo.uFog2.x + ubo.uFog2.y, 0.0, 255.0) * (1.0 / 255.0);
         rgb = mix(rgb, ubo.uFog.xyz, f);
     }
     frag = vec4(rgb, t.a * vColor.a * ubo.uExtra.x); // uExtra.x = per-draw alpha
@@ -1590,13 +1595,14 @@ extern "C" void SoH3D_Vk_DrawModel(int modelId, const float* mp16, const float* 
     base.uShadow[1] = gSoH3dShadowBias;
     base.uShadow[2] = gSoH3dShadowStrength;
     base.uShadow[3] = g_shadowDim ? 1.0f / (float)g_shadowDim : 0.0f;
-    // OoT3D env distance fog (Kokiri green-yellow haze etc.), from envCtx.lightSettings via soh3d.c.
+    // N64/OoT3D F3DEX fog, from envCtx.lightSettings + gSPFogPosition via soh3d.c. uFog2 = the F3DEX
+    // (mul, offset) the world shader applies to the NDC z, exactly like the RSP fog stage.
     base.uFog[0] = gSoH3dFogColor[0];
     base.uFog[1] = gSoH3dFogColor[1];
     base.uFog[2] = gSoH3dFogColor[2];
     base.uFog[3] = gSoH3dFogEnable ? 1.0f : 0.0f;
-    base.uFog2[0] = gSoH3dFogNear;
-    base.uFog2[1] = gSoH3dFogFar;
+    base.uFog2[0] = gSoH3dFogMul;
+    base.uFog2[1] = gSoH3dFogOffset;
     base.uFog2[2] = 0.0f;
     base.uFog2[3] = 0.0f;
     bool forceBlend = (a8 < 255);          // translucent draw -> alpha-over even if the material is opaque

@@ -3110,6 +3110,20 @@ int SoH3D_TryDrawSunMoon(PlayState* play) {
 int gSoH3dLightDirOverride = 0;
 float gSoH3dLightDirLast[3] = { 0.40f, 0.55f, 0.73f };
 
+// Convert an F3DEX fog position pair (min,max in the 0..1000 projected-depth scale, exactly what
+// z_play.c passes to gSPFogPosition) into the (fogMul, fogOffset) the RSP fog stage uses. Mirrors
+// the gbi.h gSPFogPosition macro and the s16 truncation the interpreter reads back, so the world
+// shaders reproduce the N64/OoT3D fog curve bit-for-bit. Stored into the shared fog globals.
+static void SoH3D_FogSetPosition(float fmin, float fmax) {
+    extern float gSoH3dFogMul, gSoH3dFogOffset;
+    float span = fmax - fmin;
+    if (span < 1.0f) span = 1.0f; // avoid div-by-zero / inverted positions
+    // gSPFogPosition: fm = 128000/(max-min), fo = (500-min)*256/(max-min). The macro casts to s32
+    // and the word is read back as int16_t (interpreter.cpp G_RDPSETOTHERMODE_H/G_MOVEWORD fog).
+    gSoH3dFogMul    = (float)(int16_t)(int)(128000.0f / span);
+    gSoH3dFogOffset = (float)(int16_t)(int)((500.0f - fmin) * 256.0f / span);
+}
+
 static void SoH3D_UpdateLight(PlayState* play) {
     EnvLightSettings* ls = &play->envCtx.lightSettings;
     float d[3];
@@ -3139,30 +3153,28 @@ static void SoH3D_UpdateLight(PlayState* play) {
         SoH3D_GL_SetLightParams(ambient, l1col, l2dir, l2col);
     }
 
-    // OoT3D env distance fog: feed the live (time-blended) scene fog colour + near/far so the
-    // SoH3D world geometry hazes toward it exactly like OoT3D (e.g. Kokiri's green-yellow
-    // atmosphere). N64 fogNear/fogFar are in the F3DEX 0..1000 projected-depth scale; the shader
-    // fogs on view-space w, so convert that scale to a world distance via the camera frustum.
-    // REPL `fog` can override for live A/B verification against the oracle.
+    // OoT3D / N64 F3DEX fog: feed the live (time-blended) scene fog colour + the EXACT F3DEX fog
+    // factor so the SoH3D world geometry hazes toward it identically to the N64/OoT3D game. The N64
+    // sets fog per-frame in z_play.c via gSPFogPosition(lightCtx.fogNear, 1000); the RSP then
+    // computes fog_z = (clipZ/w)*fogMul + fogOffset clamped to [0,255] (interpreter.cpp:1850). We
+    // recompute the SAME fogMul/fogOffset from the live per-scene fogNear and hand them to the world
+    // shaders, which apply the identical formula on the projected depth. This replaces an earlier
+    // hand-tuned world-distance ramp (zFar*0.045..0.31) that made Kokiri far too hazy — the real
+    // curve is near fog-free until the far clip (fogNear ~994/1000), matching the oracle. REPL `fog`.
     {
         extern int gSoH3dFogEnable, gSoH3dFogOverride;
-        extern float gSoH3dFogColor[3], gSoH3dFogNear, gSoH3dFogFar;
+        extern float gSoH3dFogColor[3], gSoH3dFogMul, gSoH3dFogOffset;
         EnvLightSettings* ls2 = &play->envCtx.lightSettings;
         if (!gSoH3dFogOverride) {
-            // Fog COLOUR comes straight from the live (time-blended) scene env — N64's Kokiri
-            // fogColor (200,200,150) matches the OoT3D oracle's atmosphere exactly.
+            // Fog COLOUR comes straight from the live (time-blended) scene env (N64 OTR scene data).
             gSoH3dFogColor[0] = (float)ls2->fogColor[0] / 255.0f;
             gSoH3dFogColor[1] = (float)ls2->fogColor[1] / 255.0f;
             gSoH3dFogColor[2] = (float)ls2->fogColor[2] / 255.0f;
-            // Fog DISTANCE: OoT3D renders a denser atmosphere than the raw N64 F3DEX fog position
-            // (fogNear ~994 -> only ~1296+ world units) reproduces — the 3DS forest haze fills the
-            // mid-field. We drive density off the scene's far-clip (fogFar = zFar, world units) with
-            // a fixed OoT3D-atmosphere ramp (near ~5%, full ~31% of zFar), verified against the
-            // oracle at the Kokiri Deku ledge. REPL `fog near a b` overrides for A/B.
-            // TODO: extract OoT3D's exact per-scene fog from its ZSI env / runtime for full fidelity.
-            float zfar = (float)ls2->fogFar > 1.0f ? (float)ls2->fogFar : 5800.0f;
-            gSoH3dFogNear = zfar * 0.045f;
-            gSoH3dFogFar  = zfar * 0.31f;
+            // F3DEX gSPFogPosition(fogNear, 1000) -> (fogMul, fogOffset). Matches the gbi.h macro
+            // (fogMul = 128000/(max-min), fogOffset = (500-min)*256/(max-min)) and the s16 storage
+            // the RSP interpreter reads back. fogNear is the live per-scene value (Kokiri ~994).
+            SoH3D_FogSetPosition((float)ls2->fogNear, 1000.0f);
+            (void)gSoH3dFogMul; (void)gSoH3dFogOffset;
         }
         (void)gSoH3dFogEnable;
     }
@@ -4864,16 +4876,19 @@ static void SoH3D_ReplExec(PlayState* play, char* line, const char* outPath) {
                         gSoH3dSkyScale, play->skyboxId, play->envCtx.skybox1Index, play->envCtx.skybox2Index,
                         play->envCtx.skyboxBlend);
     } else if (strcmp(cmd, "fog") == 0) {
-        // OoT3D env fog port. `fog <0|1>` toggles; `fog near far` overrides distances (world view-w),
+        // N64/OoT3D F3DEX fog port. `fog <0|1>` toggles; `fog pos <near> [max]` overrides the F3DEX
+        // fog position (0..1000 scale, exactly z_play.c's gSPFogPosition args; max defaults 1000);
         // `fog color r g b` overrides colour (0..255); `fog auto` returns to env-driven; `fog info`
-        // prints the live env values. Verify the haze against the oracle, don't tune blind.
+        // prints the live values. Verify the haze against the oracle, don't tune blind.
         extern int gSoH3dFogEnable, gSoH3dFogOverride;
-        extern float gSoH3dFogColor[3], gSoH3dFogNear, gSoH3dFogFar;
+        extern float gSoH3dFogColor[3], gSoH3dFogMul, gSoH3dFogOffset;
         EnvLightSettings* lsf = &play->envCtx.lightSettings;
         char sub[32];
         float a, b, c;
-        if (sscanf(line, "%*s near %f %f", &a, &b) == 2 || sscanf(line, "%*s dist %f %f", &a, &b) == 2) {
-            gSoH3dFogOverride = 1; gSoH3dFogNear = a; gSoH3dFogFar = b;
+        if (sscanf(line, "%*s pos %f %f", &a, &b) == 2) {
+            gSoH3dFogOverride = 1; SoH3D_FogSetPosition(a, b);
+        } else if (sscanf(line, "%*s pos %f", &a) == 1) {
+            gSoH3dFogOverride = 1; SoH3D_FogSetPosition(a, 1000.0f);
         } else if (sscanf(line, "%*s color %f %f %f", &a, &b, &c) == 3) {
             gSoH3dFogOverride = 1; gSoH3dFogColor[0] = a/255.f; gSoH3dFogColor[1] = b/255.f; gSoH3dFogColor[2] = c/255.f;
         } else if (sscanf(line, "%*s %31s", sub) == 1 && strcmp(sub, "info") != 0) {
@@ -4881,9 +4896,9 @@ static void SoH3D_ReplExec(PlayState* play, char* line, const char* outPath) {
             else gSoH3dFogEnable = (atoi(sub) != 0);
         }
         SoH3D_ReplReply(outPath,
-            "fog=%d override=%d color=(%.0f,%.0f,%.0f) near=%.0f far=%.0f | env: fogColor=(%d,%d,%d) fogNear=%d fogFar=%d",
+            "fog=%d override=%d color=(%.0f,%.0f,%.0f) mul=%.0f offset=%.0f | env: fogColor=(%d,%d,%d) fogNear=%d fogFar=%d",
             gSoH3dFogEnable, gSoH3dFogOverride, gSoH3dFogColor[0]*255, gSoH3dFogColor[1]*255, gSoH3dFogColor[2]*255,
-            gSoH3dFogNear, gSoH3dFogFar, lsf->fogColor[0], lsf->fogColor[1], lsf->fogColor[2], lsf->fogNear, lsf->fogFar);
+            gSoH3dFogMul, gSoH3dFogOffset, lsf->fogColor[0], lsf->fogColor[1], lsf->fogColor[2], lsf->fogNear, lsf->fogFar);
     } else if (strcmp(cmd, "stairs") == 0 && sscanf(line, "%*s %f", &f1) == 1) {
         // #5 — toggle real stepped-polygon stairs (kaidan ramps -> treads+risers). Evicts the
         // cached CPU scene-room models, but the GL backend caches the uploaded geometry per
