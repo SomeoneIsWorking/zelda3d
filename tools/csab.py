@@ -288,10 +288,16 @@ def skin_matrices(model: "_cmb.Cmb", csab: "Csab | None", frame: float):
     return out
 
 
-def _vertex_bones(model, sepd, prms, idx, bd, smooth):
+def _vertex_bones(model, sepd, prms, idx, bd, smooth, rigid_pv=False):
     """Per-vertex [(bone_id, weight)] in MODEL-space terms (see skinned_triangles).
-    rigid -> single bound bone, weight 1; smooth -> boneIndices(local)+boneWeights."""
+    rigid -> single bound bone, weight 1; smooth -> boneIndices(local)+boneWeights.
+    rigid_pv (RIGID_SKINNING) -> the vertex's own bone index (1 per vertex), weight 1."""
     bt = prms.bone_table or [0]
+    if rigid_pv:
+        bi_attr = sepd.attrs["boneIndices"]; base, _ = model.vatr["boneIndices"]
+        sz = _cmb.DT_SIZE[bi_attr.data_type]; fmt = _cmb.DT_FMT[bi_attr.data_type]
+        li = struct.unpack_from("<" + fmt, model.data, base + bi_attr.start + idx * bd * sz)[0]
+        return [(bt[int(li)] if 0 <= int(li) < len(bt) else bt[0], 1.0)]
     if not smooth:
         return [(bt[0], 1.0)]
     bi_attr = sepd.attrs["boneIndices"]; bw_attr = sepd.attrs["boneWeights"]
@@ -325,20 +331,31 @@ def skinned_triangles(model: "_cmb.Cmb", csab: "Csab | None", frame: float):
             bt = prms.bone_table or [0]
             smooth = bd > 1 and sepd.attrs["boneIndices"].mode == _cmb.MODE_ARRAY \
                             and sepd.attrs["boneWeights"].mode == _cmb.MODE_ARRAY
+            # RIGID_SKINNING (skinning_mode==1): per-vertex single bone index into bone_table; the
+            # vertex lives in that bone's local space. Binding all verts to bt[0] scatters the rig
+            # (stalchild #109) -> resolve the bone + bind matrix per vertex below.
+            bi = sepd.attrs["boneIndices"]
+            rigid_pv = (not smooth) and prms.skinning_mode == 1 and bi.mode == _cmb.MODE_ARRAY and len(bt) > 1
             # rigid: bake to model space with the bound bone's bind matrix (as cmb.triangles)
             Mmodel = _cmb._mat_id() if smooth else model.bone_matrix.get(bt[0], _cmb._mat_id())
             isz = _cmb.DT_SIZE[prm.index_type]; ifmt = _cmb.DT_FMT[prm.index_type]
             ibase = model.idx_ptr + prm.first * isz
             idxs = struct.unpack_from("<%d%s" % (prm.count, ifmt), b, ibase)
+            bibase, _ = model.vatr["boneIndices"]; bisz = _cmb.DT_SIZE[bi.data_type]; bifmt = _cmb.DT_FMT[bi.data_type]
             verts = []
             for idx in idxs:
                 pos = model.read_attr(sepd.attrs["position"], "position", idx, 3)
                 nrm = model.read_attr(sepd.attrs["normal"], "normal", idx, 3) if has_normal else (0, 0, 1)
                 uv = model.read_attr(sepd.attrs["texCoord0"], "texCoord0", idx, 2)
-                pos = _cmb._mat_apply_pos(Mmodel, pos)
-                nrm = _cmb._mat_apply_dir(Mmodel, nrm)
+                Mvert = Mmodel
+                if rigid_pv:
+                    li = struct.unpack_from("<" + bifmt, b, bibase + bi.start + idx * bd * bisz)[0]
+                    gb = bt[int(li)] if 0 <= int(li) < len(bt) else bt[0]
+                    Mvert = model.bone_matrix.get(gb, _cmb._mat_id())
+                pos = _cmb._mat_apply_pos(Mvert, pos)
+                nrm = _cmb._mat_apply_dir(Mvert, nrm)
                 # weighted skin blend
-                bones = _vertex_bones(model, sepd, prms, idx, bd, smooth)
+                bones = _vertex_bones(model, sepd, prms, idx, bd, smooth, rigid_pv)
                 px = py = pz = nx = ny = nz = 0.0
                 for bid, w in bones:
                     S = sm.get(bid, _cmb._mat_id())

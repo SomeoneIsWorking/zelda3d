@@ -3,15 +3,14 @@
 > **Generated mirror — do not hand-edit.** Source of truth = GitHub Issues on
 > `SomeoneIsWorking/soh3d` (private). Regenerate with `tools/kanban.py render`.
 > Move a card with `tools/kanban.py mv <#> <column>`; add with `tools/kanban.py add`.
-> Columns: todo · in-progress · in-review · needs-confirmation · reopened · blocked · done(=closed).  Updated 2026-06-24 14:00.
+> Columns: todo · in-progress · in-review · needs-confirmation · reopened · blocked · done(=closed).  Updated 2026-06-24 14:17.
 
-**Counts:** todo:4 | in-progress:0 | in-review:0 | needs-confirmation:13 | reopened:0 | blocked:0 | done:77
+**Counts:** todo:3 | in-progress:0 | in-review:0 | needs-confirmation:14 | reopened:0 | blocked:0 | done:77
 
-## 📋 To Do  (4)
+## 📋 To Do  (3)
 - [#17](../../issues/17) Hi-res world/scene textures (texpack) _(render)_
 - [#33](../../issues/33) More foliage / vegetation density (lowest priority) _(scene)_
 - [#106](../../issues/106) Gerudo Valley deep gorge shows skybox through backface-culled far wall (not water) _(render,scene)_
-- [#109](../../issues/109) Stalchild (En_Skb) OoT3D model renders disassembled — bones scattered (visual half of #107) _(render,anim)_
 
 ## 🔨 In Progress  (0)
 _none_
@@ -19,7 +18,7 @@ _none_
 ## 🔍 In Review (agent verifying)  (0)
 _none_
 
-## 🙋 Needs User Confirmation  (13)
+## 🙋 Needs User Confirmation  (14)
 - [#12](../../issues/12) Inventory/pause background renders upside-down _(render,ui,inventory)_
 - [#16](../../issues/16) First-person camera: early-load crash + position snap _(camera,crash)_
 - [#18](../../issues/18) Crisp HUD/UI textures (hearts/digits/buttons/icons) _(ui,hud)_
@@ -33,6 +32,7 @@ _none_
 - [#103](../../issues/103) OoT3D water surfaces render as flat opaque cyan (no texture/transparency/animation) _(render,scene)_
 - [#107](../../issues/107) Stalchildren (En_Skb) zip away after spawning — broken behavior + visuals _(render,behavior)_
 - [#108](../../issues/108) Extend #107 collision-sphere fix to the other SkelAnime draw choke points (DrawFlexOpa etc.) _(render,behavior)_
+- [#109](../../issues/109) Stalchild (En_Skb) OoT3D model renders disassembled — bones scattered (visual half of #107) _(render,anim)_
 
 ## ♻️ Reopened (was done, found broken)  (0)
 _none_
