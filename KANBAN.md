@@ -3,21 +3,22 @@
 > **Generated mirror — do not hand-edit.** Source of truth = GitHub Issues on
 > `SomeoneIsWorking/soh3d` (private). Regenerate with `tools/kanban.py render`.
 > Move a card with `tools/kanban.py mv <#> <column>`; add with `tools/kanban.py add`.
-> Columns: todo · in-progress · in-review · needs-confirmation · reopened · blocked · done(=closed).  Updated 2026-06-24 16:12.
+> Columns: todo · in-progress · in-review · needs-confirmation · reopened · blocked · done(=closed).  Updated 2026-06-24 16:32.
 
-**Counts:** todo:2 | in-progress:1 | in-review:0 | needs-confirmation:15 | reopened:0 | blocked:0 | done:77
+**Counts:** todo:3 | in-progress:0 | in-review:0 | needs-confirmation:16 | reopened:0 | blocked:0 | done:77
 
-## 📋 To Do  (2)
+## 📋 To Do  (3)
 - [#17](../../issues/17) Hi-res world/scene textures (texpack) _(render)_
 - [#33](../../issues/33) More foliage / vegetation density (lowest priority) _(scene)_
+- [#111](../../issues/111) World night R/G too bright — flat tint under-darkens at night (needs vertex-lighting port) _(render)_
 
-## 🔨 In Progress  (1)
-- [#110](../../issues/110) World night/dusk lighting hue wrong — stays warm-green, not OoT3D cool-blue (multiplicative shade can't add ambient) _(render)_
+## 🔨 In Progress  (0)
+_none_
 
 ## 🔍 In Review (agent verifying)  (0)
 _none_
 
-## 🙋 Needs User Confirmation  (15)
+## 🙋 Needs User Confirmation  (16)
 - [#12](../../issues/12) Inventory/pause background renders upside-down _(render,ui,inventory)_
 - [#16](../../issues/16) First-person camera: early-load crash + position snap _(camera,crash)_
 - [#18](../../issues/18) Crisp HUD/UI textures (hearts/digits/buttons/icons) _(ui,hud)_
@@ -33,6 +34,7 @@ _none_
 - [#107](../../issues/107) Stalchildren (En_Skb) zip away after spawning — broken behavior + visuals _(render,behavior)_
 - [#108](../../issues/108) Extend #107 collision-sphere fix to the other SkelAnime draw choke points (DrawFlexOpa etc.) _(render,behavior)_
 - [#109](../../issues/109) Stalchild (En_Skb) OoT3D model renders disassembled — bones scattered (visual half of #107) _(render,anim)_
+- [#110](../../issues/110) World night/dusk lighting hue wrong — stays warm-green, not OoT3D cool-blue (multiplicative shade can't add ambient) _(render)_
 
 ## ♻️ Reopened (was done, found broken)  (0)
 _none_
