@@ -55,7 +55,7 @@ extern "C" int gSoH3dShadowEnable;   // -1 uninit (resolved by the GL dispatcher
 extern "C" int gSoH3dShadowHasFocus; // 0 until soh3d.c sets the focus point (no shadows pre-scene)
 // N64/OoT3D F3DEX fog (ported from envCtx.lightSettings + z_play.c gSPFogPosition). Owned by the GL
 // dispatcher (soh3d_gl.cpp), set each frame by soh3d.c SoH3D_UpdateLight. Mirror under Vulkan.
-extern "C" int gSoH3dFogEnable;       // 0 off, 1 on (default on)
+extern "C" int gSoH3dFogEnable;       // 0 off, 1 on (DEFAULT OFF, #113 — see soh3d_gl.cpp definition)
 extern "C" float gSoH3dFogColor[3];   // env fog colour (0..1)
 extern "C" float gSoH3dFogMul;        // F3DEX fog multiplier (s16): fog_z = ndcZ*mul + offset
 extern "C" float gSoH3dFogOffset;     // F3DEX fog offset    (s16)
