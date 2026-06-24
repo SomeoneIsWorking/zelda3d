@@ -113,6 +113,13 @@ def main():
           f"  ({'speedXZ col' if s_spd else 'pos-delta'} vs {'speedXZ col' if o_spd else 'pos-delta'})")
     if o_auth:
         print(f"  ratio SoH/ora = {s_auth / o_auth:.3f}")
+    # Note the framerate-compensation gap: SoH3D advances pos ~1.5x its velocity counter per logic
+    # frame (20fps logic moving 30fps-equivalent distance) — its positional median speed reads ~1.5x
+    # speedXZ while the oracle's positional speed == its velocity. Same wall-clock speed; the speedXZ
+    # vs pos-delta comparison above is the apples-to-apples one.
+    if s_spd and ms["median_speed"] > 1.3 * s_auth:
+        print(f"  [SoH3D pos-delta {ms['median_speed']:.2f}/frame = {ms['median_speed']/s_auth:.2f}x its "
+              f"speedXZ — the 20->30fps position compensation, not a divergence]")
 
     print("\n--- divergence ---")
     sc = corr(ms["steps"], mo["steps"])
