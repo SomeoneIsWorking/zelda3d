@@ -2241,6 +2241,25 @@ int SoH3D_TryDrawActor(PlayState* play, Actor* actor) {
                               SOH3D_GSCALE(10, SOH3D_MATOYAB_WORLD_SCALE), NULL, 0.0f, NULL, NULL);
             return 1;
         }
+        // Lake Hylia water surface (Bg_Spot06_Objects, params == LHO_WATER_PLANE == 2). The OoT3D
+        // water body c_s06beforewater (translucent blue + additive caustics) is a 2-bone mesh, so
+        // the auto path skips it as "skinned" and only the room's additive s06_uvwater caustic
+        // renders -> flat fluorescent cyan (kanban #103). Force-draw the body at its rest/bind pose
+        // (no anim -> identity bones -> the static water surface). Its blend is material-driven:
+        // mat0/1 = SRC_COLOR x CONSTANT_ALPHA(0.65) translucent body, mat2/3 = additive shimmer;
+        // the renderer honours dst=GL_CONSTANT_ALPHA via the per-draw blend constants. The mesh is
+        // authored at N64 unit scale in the actor's local frame, so worldScale = 1.0 anchored at the
+        // actor world pos (which tracks the rising/lowering lake level). The other LHO_* params
+        // (gate/lock/ice) keep their auto/N64 draw. REPL `gscale 11` and `autoyoff` tune live.
+        if (actor->id == ACTOR_BG_SPOT06_OBJECTS && actor->params == 2 /* LHO_WATER_PLANE */) {
+            int mid = SoH3D_AutoModelId(ZSPOT06 "|c_s06beforewater");
+            if (mid >= 0) {
+                SoH3D_DrawModelGL(play, mid, actor, SOH3D_GSCALE(11, SOH3D_SPOT06_WATER_WORLD_SCALE),
+                                  NULL, 0.0f, NULL, NULL);
+                return 1;
+            }
+            return 0; // no OoT3D water CMB -> let the N64 water plane draw
+        }
     }
     // Explicit table wins (calibrated scale + anim resolvers), unless validation mode (=2)
     // routes everything through the auto path to check the derived scale.
