@@ -280,6 +280,31 @@ def do(rpc, line):  # noqa: C901
                 target=_cam_freeze_bg, args=(eye, at, _cam_freeze_stop), daemon=True)
             _cam_freeze_thread.start()
             print("  cam_freeze running in background — use cam_unfreeze to stop")
+    elif cmd == "cam_holdshot":
+        # cam_holdshot <ex> <ey> <ez> <ax> <ay> <az> <outname> [settle_secs]
+        # Spam-write an EXPLICIT eye+at (overriding the live camera that snaps back to
+        # Link) in a background thread, let it settle, screenshot, then release. This is
+        # the oracle-matched free-cam primitive: hold any SoH3D repro camera and capture
+        # exactly what OoT3D draws from there (cam_eye/cam_at alone are reverted before
+        # the frame is captured; cam_freeze re-reads the LIVE camera, not your override).
+        ex, ey, ez = float(args[0]), float(args[1]), float(args[2])
+        ax, ay, az = float(args[3]), float(args[4]), float(args[5])
+        out = args[6]
+        settle = float(args[7]) if len(args) > 7 else 0.6
+        if not _cam_freeze_stop.is_set():
+            _cam_freeze_stop.set()
+            if _cam_freeze_thread:
+                _cam_freeze_thread.join(timeout=0.3)
+        _cam_freeze_stop = threading.Event()
+        _cam_freeze_thread = threading.Thread(
+            target=_cam_freeze_bg, args=((ex, ey, ez), (ax, ay, az), _cam_freeze_stop),
+            daemon=True)
+        _cam_freeze_thread.start()
+        time.sleep(settle)
+        path = save_png(rpc, out)
+        _cam_freeze_stop.set()
+        _cam_freeze_thread.join(timeout=0.3)
+        print(f"  cam_holdshot -> {path}" if path else "  cam_holdshot FAILED")
     elif cmd == "cam_unfreeze":
         if not _cam_freeze_stop.is_set():
             _cam_freeze_stop.set()
