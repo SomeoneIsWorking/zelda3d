@@ -280,6 +280,11 @@ static SoH3DGlGroup makeCgroup(const SoH3D::Cmb& cmb, const SoH3D::CmbDrawGroup&
         cg.matAmbient[k] = mat ? mat->mat_ambient[k] : 1.0f;
         cg.matDiffuse[k] = mat ? mat->mat_diffuse[k] : 1.0f;
     }
+    if (getenv("SOH3D_DBG_MAT")) {
+        fprintf(stderr, "[MAT] mi=%d vlit=%d comb=%.1f amb=(%.2f,%.2f,%.2f) dif=(%.2f,%.2f,%.2f)\n",
+                g.material_index, cg.vertexLighting, cg.combScaleRGB, cg.matAmbient[0], cg.matAmbient[1],
+                cg.matAmbient[2], cg.matDiffuse[0], cg.matDiffuse[1], cg.matDiffuse[2]);
+    }
     return cg;
 }
 
