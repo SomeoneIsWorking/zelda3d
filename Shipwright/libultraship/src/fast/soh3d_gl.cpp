@@ -610,6 +610,22 @@ extern "C" float gSoH3dFogColor[3] = { 0.0f, 0.0f, 0.0f };
 extern "C" float gSoH3dFogMul = 0.0f;    // F3DEX fog multiplier (s16 range), = 128000/(1000-fogNear)
 extern "C" float gSoH3dFogOffset = 0.0f; // F3DEX fog offset    (s16 range), = (500-fogNear)*256/(1000-fogNear)
 
+// #110: additive env-AMBIENT floor for the VK world path. The world frag is purely multiplicative,
+// so OoT3D's blue night ambient can't enter a green grass texture; OoT3D adds the scene ambient
+// additively. gSoH3dWorldAmbColor = live env ambient (fed from envCtx.lightSettings.ambient by
+// soh3d.c); gSoH3dWorldAmb = the additive coefficient (REPL `worldamb`, derived live vs the oracle).
+// Default = OoT3D's per-scene constant additive ambient (u_SceneAmbient, render.ts:355), reproduced
+// for Kokiri. DERIVED live vs the Azahar oracle (#110): SoH3D grass blue was a time-invariant 7.6
+// (oracle box 6.6) while the oracle's is a time-invariant 22.9 — a constant additive BLUE floor the
+// purely-multiplicative SoH3D world frag lacked. coef 0.06 * 255 = +15.3 blue -> 7.6+15.3 = 22.9,
+// matching the oracle at BOTH noon and night (R/G unchanged -> noon near-parity preserved). The env
+// time-blended ambient is the WRONG source (gray at noon -> overshoots R/G); this is the scene
+// CONSTANT ambient, so colour is pinned (override=1) not env-fed. Other scenes may need their own
+// u_SceneAmbient (TODO: source per-scene). REPL `worldamb <coef> [r g b]` to re-derive live.
+extern "C" float gSoH3dWorldAmbColor[3] = { 0.0f, 0.0f, 1.0f };
+extern "C" float gSoH3dWorldAmb = 0.06f;
+extern "C" int   gSoH3dWorldAmbOverride = 1; // colour is the scene constant, not the env feed
+
 extern "C" void SoH3D_GL_SetShadowFocus(float x, float y, float z) {
     gSoH3dShadowFocus[0] = x;
     gSoH3dShadowFocus[1] = y;
