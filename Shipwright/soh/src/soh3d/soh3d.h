@@ -285,6 +285,16 @@ void SoH3D_SkipControlTakers(PlayState* play);
 #define ZMATOYAB "/actor/zelda_spot01_matoyab.zar"
 #define SOH3D_MATOYAB_WORLD_SCALE 1.4f
 
+// Lake Hylia water body (Bg_Spot06_Objects, LHO_WATER_PLANE). The OoT3D water surface is the
+// actor model c_s06beforewater (translucent blue body + additive caustics) in
+// zelda_spot06_objects.zar — NOT the room's additive-only s06_uvwater overlay (which alone reads as
+// flat fluorescent cyan; kanban #103). It has 2 bones (the Water-Temple raise/lower pose) so the
+// auto path skips it as "skinned"; route it here at its rest/bind pose like a scene-aligned prop.
+// The mesh is authored in the actor's local space at N64 unit scale, so worldScale = 1.0; REPL
+// `gscale 11 <f>` overrides for re-cal.
+#define ZSPOT06 "/actor/zelda_spot06_objects.zar"
+#define SOH3D_SPOT06_WATER_WORLD_SCALE 1.0f
+
 // World scale for the OoT3D Gerudo (En_Ge1). FIRST CHARACTER divert: the OoT3D
 // model is smooth-skinned and baked UPRIGHT + grounded (cmb_to_c --rotx 180
 // --ground), so it drops into the same Translate*RotateY*Scale path as the props
