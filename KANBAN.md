@@ -3,14 +3,14 @@
 > **Generated mirror — do not hand-edit.** Source of truth = GitHub Issues on
 > `SomeoneIsWorking/soh3d` (private). Regenerate with `tools/kanban.py render`.
 > Move a card with `tools/kanban.py mv <#> <column>`; add with `tools/kanban.py add`.
-> Columns: todo · in-progress · in-review · needs-confirmation · reopened · blocked · done(=closed).  Updated 2026-06-24 12:02.
+> Columns: todo · in-progress · in-review · needs-confirmation · reopened · blocked · done(=closed).  Updated 2026-06-24 12:59.
 
-**Counts:** todo:3 | in-progress:0 | in-review:0 | needs-confirmation:11 | reopened:0 | blocked:0 | done:76
+**Counts:** todo:3 | in-progress:0 | in-review:0 | needs-confirmation:11 | reopened:0 | blocked:0 | done:77
 
 ## 📋 To Do  (3)
 - [#17](../../issues/17) Hi-res world/scene textures (texpack) _(render)_
 - [#33](../../issues/33) More foliage / vegetation density (lowest priority) _(scene)_
-- [#105](../../issues/105) Port OoT3D water rendering to remaining scenes (Zora's/Kokiri/Gerudo river) — follow-up to #103 Lake Hylia _(render,scene)_
+- [#106](../../issues/106) Gerudo Valley deep gorge shows skybox through backface-culled far wall (not water) _(render,scene)_
 
 ## 🔨 In Progress  (0)
 _none_
@@ -37,7 +37,8 @@ _none_
 ## ⛔ Blocked (needs live/user input)  (0)
 _none_
 
-## ✅ Done (recently closed)  (showing 30 of 76)
+## ✅ Done (recently closed)  (showing 30 of 77)
+- [#105](../../issues/105) Port OoT3D water rendering to remaining scenes (Zora's/Kokiri/Gerudo river) — follow-up to #103 Lake Hylia
 - [#104](../../issues/104) Lake Hylia: black void blob on grass terrain (baked shadow/AO decal renders solid dark)
 - [#24](../../issues/24) Skip chest-open / get-item freeze + reliable dialog fast-forward
 - [#15](../../issues/15) Universal SPACE skip for cutscenes/onepoint/item-get
@@ -67,4 +68,3 @@ _none_
 - [#4](../../issues/4) Title/cutscene camera goes under 3DS terrain
 - [#2](../../issues/2) Kakariko well: water is a tiny teal diamond, not a surface
 - [#89](../../issues/89) Tooling: export authoritative per-actor variant+animation from OoT3D (Azahar oracle) — base SoH3D on 3DS not N64
-- [#29](../../issues/29) Giant boulder overlaps the Temple of Time (Market)
