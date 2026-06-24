@@ -3182,6 +3182,19 @@ static void SoH3D_UpdateLight(PlayState* play) {
             l2dir[2] /= l2len;
         }
         SoH3D_GL_SetLightParams(ambient, l1col, l2dir, l2col);
+        // #110: feed the live (time-blended) env ambient colour to the VK world path's additive
+        // ambient floor. The coefficient (gSoH3dWorldAmb, REPL `worldamb`) gates/scales it. When the
+        // REPL has pinned a colour (gSoH3dWorldAmbOverride, for deriving OoT3D's scene-constant
+        // u_SceneAmbient live), stop overwriting it from the env feed.
+        {
+            extern float gSoH3dWorldAmbColor[3];
+            extern int gSoH3dWorldAmbOverride;
+            if (!gSoH3dWorldAmbOverride) {
+                gSoH3dWorldAmbColor[0] = ambient[0];
+                gSoH3dWorldAmbColor[1] = ambient[1];
+                gSoH3dWorldAmbColor[2] = ambient[2];
+            }
+        }
     }
 
     // OoT3D / N64 F3DEX fog: feed the live (time-blended) scene fog colour + the EXACT F3DEX fog
@@ -4698,6 +4711,26 @@ static void SoH3D_ReplExec(PlayState* play, char* line, const char* outPath) {
         extern int gSoH3dWorldLit;
         if (sscanf(line, "%*s %i", &iv) == 1) gSoH3dWorldLit = iv;
         SoH3D_ReplReply(outPath, "worldlit=%d", gSoH3dWorldLit);
+    } else if (strcmp(cmd, "worldamb") == 0) {
+        // #110: additive env-AMBIENT floor coefficient for the VK world path. `worldamb <coef>`
+        // (0 = off). The world frag adds gSoH3dWorldAmb * envAmbient to vertex-lit scene geom, so a
+        // blue night ambient lifts grass blue the way OoT3D does (multiplicative tint can't). Derive
+        // the coef live vs the Azahar oracle (night+noon grass B), then lock it.
+        extern float gSoH3dWorldAmb, gSoH3dWorldAmbColor[3];
+        extern int gSoH3dWorldAmbOverride;
+        float fv, cr, cg, cb;
+        if (sscanf(line, "%*s %f %f %f %f", &fv, &cr, &cg, &cb) == 4) {
+            // `worldamb <coef> <r> <g> <b>`: pin both the coef and the scene-ambient colour (derive
+            // OoT3D's constant u_SceneAmbient live; gray env ambient is the wrong source — overshoots
+            // R/G at noon, see #110 notes). Override stops the per-frame env feed.
+            gSoH3dWorldAmb = fv; gSoH3dWorldAmbColor[0] = cr; gSoH3dWorldAmbColor[1] = cg;
+            gSoH3dWorldAmbColor[2] = cb; gSoH3dWorldAmbOverride = 1;
+        } else if (sscanf(line, "%*s %f", &fv) == 1) {
+            gSoH3dWorldAmb = fv;
+        }
+        SoH3D_ReplReply(outPath, "worldamb=%.3f ambColor=(%.3f,%.3f,%.3f) override=%d", gSoH3dWorldAmb,
+                        gSoH3dWorldAmbColor[0], gSoH3dWorldAmbColor[1], gSoH3dWorldAmbColor[2],
+                        gSoH3dWorldAmbOverride);
     } else if (strcmp(cmd, "facecull") == 0) {
         // Backface culling of OoT3D meshes (honor the CMB cull byte; matches N64 G_CULL_BACK so the
         // camera never sees terrain undersides / mesh interiors). `facecull <0|1> [flip]`: arg1 = on/off,
