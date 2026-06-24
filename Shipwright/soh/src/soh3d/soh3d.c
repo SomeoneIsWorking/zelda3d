@@ -50,11 +50,18 @@ int gSoH3dWorldShadeSlotBias = 1;
 // #111 world-shade model coefficients (REPL `worldshade ka/kd/ke <f>`). The day/night darkening is
 // carried by light0Color (the sun: noon ~255, night ~63), NOT the ~constant ambient; light1Color is
 // the cool moonlight FILL (night ~(99,170,219) green+blue) that keeps night G/B up. World shade =
-// saturate(ka*ambient + kd*light0Color + ke*light1Color) per channel. Defaults fit the Kokiri
-// oracle (night/noon R 0.34, G 0.55): kd dominant (sun), ke lifts night G/B. Tune live vs oracle.
-float gSoH3dWorldShadeKa = 0.16f;
-float gSoH3dWorldShadeKd = 0.77f;
-float gSoH3dWorldShadeKe = 0.0f;
+// saturate(ka*ambient + kd*light0Color + ke*light1Color) per channel.
+// ka=0 (STRUCTURAL FIX, measured 2026-06-24p): the Kokiri ambient is red-dominant (160,72,72; G,B
+// pinned ~72), so a non-zero ka folds that red into a MULTIPLICATIVE tint and DE-GREENS noon grass
+// (live A/B at a pinned grass frame: ka=0.16 dropped noon G/R 1.19->1.12 AND dimmed it 63->54). The
+// reddish ambient belongs in the ADDITIVE #110 floor, not the multiply, so ka=0 here. kd~0.9 keeps
+// the sun (l0col ~white at noon) at ~oracle brightness; night l0col~(63,63,99) still darkens R
+// (night/noon R 0.28, oracle 0.34) = the #111 fix. ke lifts night G/B via the moon fill. The
+// residual (night G ratio 0.32 vs oracle 0.55) is irreducible with a single global tint and is a
+// #110-floor follow-up, NOT more coefficient grinding ([[soh3d-stop-microtuning-lighting]]).
+float gSoH3dWorldShadeKa = 0.0f;
+float gSoH3dWorldShadeKd = 0.9f;
+float gSoH3dWorldShadeKe = 0.12f;
 
 // Live debug orientation (degrees) applied in the direct-GL draw (SoH3D_EmitModelDraw)
 // BEFORE the model, so a correct in-game rest->upright orientation can be found over the
