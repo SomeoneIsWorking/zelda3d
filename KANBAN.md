@@ -3,9 +3,9 @@
 > **Generated mirror — do not hand-edit.** Source of truth = GitHub Issues on
 > `SomeoneIsWorking/soh3d` (private). Regenerate with `tools/kanban.py render`.
 > Move a card with `tools/kanban.py mv <#> <column>`; add with `tools/kanban.py add`.
-> Columns: todo · in-progress · in-review · needs-confirmation · reopened · blocked · done(=closed).  Updated 2026-06-23 17:51.
+> Columns: todo · in-progress · in-review · needs-confirmation · reopened · blocked · done(=closed).  Updated 2026-06-24 11:16.
 
-**Counts:** todo:2 | in-progress:0 | in-review:0 | needs-confirmation:9 | reopened:0 | blocked:0 | done:75
+**Counts:** todo:2 | in-progress:0 | in-review:0 | needs-confirmation:10 | reopened:0 | blocked:0 | done:75
 
 ## 📋 To Do  (2)
 - [#17](../../issues/17) Hi-res world/scene textures (texpack) _(render)_
@@ -17,7 +17,7 @@ _none_
 ## 🔍 In Review (agent verifying)  (0)
 _none_
 
-## 🙋 Needs User Confirmation  (9)
+## 🙋 Needs User Confirmation  (10)
 - [#12](../../issues/12) Inventory/pause background renders upside-down _(render,ui,inventory)_
 - [#16](../../issues/16) First-person camera: early-load crash + position snap _(camera,crash)_
 - [#18](../../issues/18) Crisp HUD/UI textures (hearts/digits/buttons/icons) _(ui,hud)_
@@ -27,6 +27,7 @@ _none_
 - [#96](../../issues/96) Input (keyboard + controller): PC-native mapping (done) + universal Start/SPACE skip (needs work)
 - [#97](../../issues/97) PC-native HUD: replace N64 Fast3D HUD with RmlUi overlay _(ui,hud)_
 - [#98](../../issues/98) RmlUi menu Audio tab: Master/Music/SFX volume knobs (Phase 3 CVar binding) _(ui)_
+- [#102](../../issues/102) Port real OoT3D/N64 F3DEX fog curve (Kokiri over-dense haze) _(render)_
 
 ## ♻️ Reopened (was done, found broken)  (0)
 _none_
