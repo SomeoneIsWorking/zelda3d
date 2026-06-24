@@ -280,6 +280,8 @@ struct VkGroup {
     // path dropped. Applied only to vertex-lit scene geometry, gated by REPL `worldlit`.
     int vertexLighting = 0;
     float combScaleRGB = 1.0f;
+    float matAmbient[3] = { 1.0f, 1.0f, 1.0f }; // material ambient response (#110: modulates the floor)
+    float matDiffuse[3] = { 1.0f, 1.0f, 1.0f }; // material diffuse response (#110: gates the floor)
 };
 
 struct VkModel {
@@ -919,6 +921,10 @@ VkModel* ensureUploaded(int modelId) {
         g.materialIndex = groups[i].materialIndex;
         g.vertexLighting = groups[i].vertexLighting;
         g.combScaleRGB = groups[i].combScaleRGB;
+        for (int k = 0; k < 3; k++) {
+            g.matAmbient[k] = groups[i].matAmbient[k];
+            g.matDiffuse[k] = groups[i].matDiffuse[k];
+        }
         for (int k = 0; k < 4; k++)
             g.blendColor[k] = groups[i].blendColor[k];
         all.insert(all.end(), groups[i].verts, groups[i].verts + groups[i].vertCount);
@@ -1652,8 +1658,22 @@ extern "C" void SoH3D_Vk_DrawModel(int modelId, const float* mp16, const float* 
         ubo.uExtra[3] = (grp.vertexLighting && gSoH3dWorldLit) ? grp.combScaleRGB : 1.0f;
         // #110: additive env-ambient floor coef, scoped exactly like combScale (vertex-lit scene
         // geom only; 0 elsewhere -> shader no-op). gSoH3dWorldAmb is the live-derived coefficient.
+        // MODULATED per-material by matAmbient (OoT3D's `ambient * matAmbient`, render.ts:651): the
+        // Kokiri grass has matAmbient=WHITE so it takes the full blue floor, while the warm dirt path
+        // has a lower/warmer matAmbient so it keeps its warm tan instead of washing out to grey (#110
+        // ground regression). The scene-constant colour (base.uAmbient.xyz) is scaled by matAmbient.
+        // Per-material modulation by matAmbient (OoT3D's `ambient * matAmbient`, render.ts:651): a
+        // material with a lower/warmer matAmbient takes less of the blue floor. (In Kokiri the grass
+        // AND the dirt path share dif=0/amb=white, so the floor can't separate them by material — the
+        // grass-vs-path blue difference lives in the baked vertex colour/texture and only the full
+        // vertex-lighting port (#111) reproduces it. The coef is kept low (0.02) so a uniform floor
+        // is a subtle cool ambient that does NOT wash the warm path out to grey — see #110 notes.)
         extern float gSoH3dWorldAmb;
-        ubo.uAmbient[3] = (grp.vertexLighting && gSoH3dWorldLit) ? gSoH3dWorldAmb : 0.0f;
+        bool ambGroup = (grp.vertexLighting && gSoH3dWorldLit);
+        ubo.uAmbient[0] = base.uAmbient[0] * grp.matAmbient[0];
+        ubo.uAmbient[1] = base.uAmbient[1] * grp.matAmbient[1];
+        ubo.uAmbient[2] = base.uAmbient[2] * grp.matAmbient[2];
+        ubo.uAmbient[3] = ambGroup ? gSoH3dWorldAmb : 0.0f;
         const VkDeviceSize uboOff = ring.offset;
         memcpy((uint8_t*)ring.mapped + uboOff, &ubo, sizeof(ubo));
         ring.offset += g_uboStride;
