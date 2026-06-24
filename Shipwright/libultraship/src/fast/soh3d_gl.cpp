@@ -604,7 +604,12 @@ extern "C" float gSoH3dShadowStrength = 0.55f;  // how dark the shadowed area ge
 // gSPFogPosition(fogNear, 1000) macro applied to the live per-scene fogNear — NOT a hand-tuned
 // world-distance ramp (which made Kokiri far too hazy; the real curve is near fog-free until the
 // far clip, matching the oracle). REPL `fog`.
-extern "C" int gSoH3dFogEnable = 1;
+// DEFAULT OFF (#113 / user directive 2026-06-25): the ported F3DEX world fog slams distant OoT3D
+// ground (seen at a grazing angle) to a flat pale fog-colour wedge that pops as the camera moves —
+// an effect the user never wanted ("I just wanted lighting that looks nice"). Live A/B confirmed
+// fog OFF removes the pale-tan triangle and leaves clean grass. So the OoT3D world renders fog-free
+// by default; REPL `fog 1` can still re-enable it for debugging.
+extern "C" int gSoH3dFogEnable = 0;
 extern "C" int gSoH3dFogOverride = 0; // REPL `fog` set mul/offset/color manually (stop env auto-feed)
 extern "C" float gSoH3dFogColor[3] = { 0.0f, 0.0f, 0.0f };
 extern "C" float gSoH3dFogMul = 0.0f;    // F3DEX fog multiplier (s16 range), = 128000/(1000-fogNear)
