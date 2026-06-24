@@ -8,6 +8,8 @@
 // interactInfo values come from the running (faithful) actor logic; only the application is ported.
 #include "soh3d_anim_override.h"
 #include "asset/mat4.h"
+#include "z64.h"                     // Actor (for the structured per-actor behavior dispatch)
+#include "behaviors/actor_behavior.h" // game-like per-actor behavior modules (registry by actor->id)
 
 #include <cstring>
 #include <cmath>
@@ -62,8 +64,8 @@ struct TrackActor {
 // OoT3D body zar, so the ZAR-keyed table covers them with one row each (constant interactOff 0x1E8,
 // per-archetype head/torso bones).
 constexpr TrackActor kTrackActors[] = {
-    { "/actor/zelda_km1.zar", 0x1E8, 10, 9 }, // En_Ko Kokiri boy
-    { "/actor/zelda_kw1.zar", 0x1E8, 10, 9 }, // En_Ko Kokiri girl
+    // En_Ko Kokiri kids (km1/kw1) migrated to behaviors/actor/kokiri_kid.cpp (typed C-struct read;
+    // fixes #116 — the legacy raw-offset read here got misread memory in the 64-bit build).
     { "/actor/zelda_sa.zar",  0x1E0, 10, 9 }, // En_Sa Saria
     { "/actor/zelda_md.zar",  0x1E0,  9, 8 }, // En_Md Mido
     { "/actor/zelda_ma1.zar", 0x1E8,  7, 6 }, // En_Ma1 child Malon
@@ -130,8 +132,7 @@ constexpr signed char kEnSaMouthRemap[] = { 0, 3, 4, 1, 2 };
 // materials (Fado mat1 / girl mat2) into one shared body — eyeMat = -2 selects by ENKO_TYPE.
 constexpr FacialActor kFacialActors[] = {
     { "/actor/zelda_sa.zar",  0x212, 0x216, 2, 3, kEnSaMouthRemap, (int)(sizeof(kEnSaMouthRemap)) },
-    { "/actor/zelda_km1.zar", 0x216, -1, 1, -1, nullptr, 0 },
-    { "/actor/zelda_kw1.zar", 0x216, -1, -2, -1, nullptr, 0 },
+    // En_Ko km1/kw1 eye material-anim migrated to behaviors/actor/kokiri_kid.cpp.
     // En_Md Mido (eye only, no mouth): N64 eyeIdx @ 0x20E (z_en_md.h). CMB eye mat 1 (md_eye01_CI01).
     // OoT3D EnMd_Draw 0x1b72b4 sets matAnim slot 0 = eyeIdx DIRECT (no remap; the +0x480 block is the
     // optional blink overlay).
@@ -201,6 +202,16 @@ extern "C" void SoH3D_ApplyActorOverrides(int modelId, void* actorv) {
     if (actorv == nullptr) {
         return;
     }
+
+    // Structured per-actor behavior modules (behaviors/actor/<actor>.cpp), dispatched by actor->id.
+    // A registered behavior FULLY owns its actor's draw-overrides (read via the C struct — correct in
+    // the 64-bit build); fall through to the legacy zar-table path below for actors not yet migrated.
+    Actor* actor = static_cast<Actor*>(actorv);
+    if (SoH3D::ActorBehavior* behavior = SoH3D::findActorBehavior(actor->id)) {
+        behavior->applyDrawOverrides(modelId, actor, gSoH3dTrack != 0, gSoH3dFacial != 0);
+        return;
+    }
+
     const char* zar = SoH3D_AutoModelZar(modelId);
     const unsigned char* a = static_cast<const unsigned char*>(actorv);
 
