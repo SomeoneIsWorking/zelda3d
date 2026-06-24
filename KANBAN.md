@@ -3,14 +3,13 @@
 > **Generated mirror — do not hand-edit.** Source of truth = GitHub Issues on
 > `SomeoneIsWorking/soh3d` (private). Regenerate with `tools/kanban.py render`.
 > Move a card with `tools/kanban.py mv <#> <column>`; add with `tools/kanban.py add`.
-> Columns: todo · in-progress · in-review · needs-confirmation · reopened · blocked · done(=closed).  Updated 2026-06-24 11:52.
+> Columns: todo · in-progress · in-review · needs-confirmation · reopened · blocked · done(=closed).  Updated 2026-06-24 12:00.
 
-**Counts:** todo:3 | in-progress:0 | in-review:0 | needs-confirmation:11 | reopened:0 | blocked:0 | done:75
+**Counts:** todo:2 | in-progress:0 | in-review:0 | needs-confirmation:11 | reopened:0 | blocked:0 | done:76
 
-## 📋 To Do  (3)
+## 📋 To Do  (2)
 - [#17](../../issues/17) Hi-res world/scene textures (texpack) _(render)_
 - [#33](../../issues/33) More foliage / vegetation density (lowest priority) _(scene)_
-- [#104](../../issues/104) Lake Hylia: black void blob on grass terrain (baked shadow/AO decal renders solid dark) _(render,scene)_
 
 ## 🔨 In Progress  (0)
 _none_
@@ -37,7 +36,8 @@ _none_
 ## ⛔ Blocked (needs live/user input)  (0)
 _none_
 
-## ✅ Done (recently closed)  (showing 30 of 75)
+## ✅ Done (recently closed)  (showing 30 of 76)
+- [#104](../../issues/104) Lake Hylia: black void blob on grass terrain (baked shadow/AO decal renders solid dark)
 - [#24](../../issues/24) Skip chest-open / get-item freeze + reliable dialog fast-forward
 - [#15](../../issues/15) Universal SPACE skip for cutscenes/onepoint/item-get
 - [#95](../../issues/95) Audio thread use-after-free on clean window-close teardown
@@ -67,4 +67,3 @@ _none_
 - [#2](../../issues/2) Kakariko well: water is a tiny teal diamond, not a surface
 - [#89](../../issues/89) Tooling: export authoritative per-actor variant+animation from OoT3D (Azahar oracle) — base SoH3D on 3DS not N64
 - [#29](../../issues/29) Giant boulder overlaps the Temple of Time (Market)
-- [#82](../../issues/82) NPC drop-shadow circle renders on her head, not at her feet
