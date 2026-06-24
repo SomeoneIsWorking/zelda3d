@@ -177,3 +177,30 @@ untouched (separate pass; they only darken genuinely shadowed pixels). Verified 
 AO ON: Kokiri Deku grass median 36→46, p90 57→73, G/R 1.22 (oracle 54/87/1.26) — hue matched,
 ~1.17x residual remaining (the spurious N64 `uTint`≈0.95 + minor a_Color/texture; a smaller
 follow-up). Do NOT add a global brightness constant for that residual.
+
+## FOG — FALSIFIED prior assumption + real F3DEX port (2026-06-24, #102, commit 1784454)
+
+**Falsified:** the prior session asserted "OoT3D renders a DENSER atmosphere than the raw N64 F3DEX
+fog reproduces — the 3DS forest haze fills the mid-field" and hand-tuned a world-distance ramp
+(`fogNear=zFar*0.045`, `fogFar=zFar*0.31`). The oracle REFUTES this: at the Kokiri Deku ledge the
+OoT3D background is **clear dark forest, almost no fog**. The ramp washed SoH3D's whole mid/far field
+to a bright yellow-grey haze (the opposite of the oracle). The "verified at Deku ledge" claim behind
+the ramp did not hold up to a location-matched comparison.
+
+**Real model:** N64/OoT3D fog is the F3DEX screen-Z curve, NOT linear world distance. `z_play.c:235`
+issues `gSPFogPosition(play->lightCtx.fogNear, 1000)`; the RSP (Fast3D `interpreter.cpp:1850`)
+computes `fog_z = (clipZ/w)*fogMul + fogOffset`, clamped `[0,255]`, as the blend factor toward the
+fog colour. `fogMul/fogOffset` come from the gbi.h macro: `fogMul = 128000/(max-min)`,
+`fogOffset = (500-min)*256/(max-min)`, truncated to s16. Kokiri `fogNear=994` ⇒ mul=21333,
+offset=-21077 ⇒ fog only over NDC z `[0.988, 1.0]` (near fog-free until the far clip). Hyrule
+`fogNear=996, zFar=12800` ⇒ mul=32000, offset=-31744 ⇒ faint bluish horizon haze only.
+
+**Port (live = Vulkan):** `soh3d.c SoH3D_FogSetPosition()` derives mul/offset from the live per-scene
+`envCtx.lightSettings.fogNear`; the VK world vert passes the GL-NDC z (`clipZ/w`, captured *before*
+the Vulkan z remap) and the frag applies the exact RSP formula. Globals renamed
+`gSoH3dFogNear/Far → gSoH3dFogMul/Offset`. REPL: `fog pos <near> [max]`, `fog info` (shows mul/offset).
+Per-scene faithful — no global constant. Verified: Kokiri Deku-ledge background haze band lum 167→85
+(meanRGB 172,173,126 ≈ fog colour → 88,90,54 = real geometry).
+
+**GL backend still has no fog consumer** (it doesn't render the OoT3D world; secondary path) — wiring
+GL frag fog with the same mul/offset is an open follow-up, unverifiable until GL renders the world.
