@@ -3,14 +3,15 @@
 > **Generated mirror — do not hand-edit.** Source of truth = GitHub Issues on
 > `SomeoneIsWorking/soh3d` (private). Regenerate with `tools/kanban.py render`.
 > Move a card with `tools/kanban.py mv <#> <column>`; add with `tools/kanban.py add`.
-> Columns: todo · in-progress · in-review · needs-confirmation · reopened · blocked · done(=closed).  Updated 2026-06-24 13:56.
+> Columns: todo · in-progress · in-review · needs-confirmation · reopened · blocked · done(=closed).  Updated 2026-06-24 14:00.
 
-**Counts:** todo:3 | in-progress:0 | in-review:0 | needs-confirmation:13 | reopened:0 | blocked:0 | done:77
+**Counts:** todo:4 | in-progress:0 | in-review:0 | needs-confirmation:13 | reopened:0 | blocked:0 | done:77
 
-## 📋 To Do  (3)
+## 📋 To Do  (4)
 - [#17](../../issues/17) Hi-res world/scene textures (texpack) _(render)_
 - [#33](../../issues/33) More foliage / vegetation density (lowest priority) _(scene)_
 - [#106](../../issues/106) Gerudo Valley deep gorge shows skybox through backface-culled far wall (not water) _(render,scene)_
+- [#109](../../issues/109) Stalchild (En_Skb) OoT3D model renders disassembled — bones scattered (visual half of #107) _(render,anim)_
 
 ## 🔨 In Progress  (0)
 _none_
