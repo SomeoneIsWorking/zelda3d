@@ -3831,6 +3831,16 @@ static void SoH3D_ReplExec(PlayState* play, char* line, const char* outPath) {
         play->transitionTrigger = TRANS_TRIGGER_START;
         play->transitionType = TRANS_TYPE_FADE_BLACK;
         SoH3D_ReplReply(outPath, "warp -> entrance 0x%x (%d)", iv, iv);
+    } else if (strcmp(cmd, "introcs") == 0) {
+        // #112 repro: replay the new-game intro (Navi wakes Link) on demand. z_sram new-game sets
+        // entrance=Link's house child spawn + cutsceneIndex=0xFFF1; z_play.c:509 derives scene setup
+        // 4+(0xFFF1&0xF)=5, which spawns Navi (En_Elf gate setup 4/5) + the wakeup cutscene. Set
+        // nextCutsceneIndex (copied to cutsceneIndex on scene load, z_play.c:480) then warp.
+        gSaveContext.nextCutsceneIndex = 0xFFF1;
+        play->nextEntranceIndex = 0xBB; // ENTR_LINKS_HOUSE_CHILD_SPAWN
+        play->transitionTrigger = TRANS_TRIGGER_START;
+        play->transitionType = TRANS_TYPE_FADE_BLACK;
+        SoH3D_ReplReply(outPath, "introcs -> Link's house setup5 (nextCutsceneIndex=0xFFF1)");
     } else if (strcmp(cmd, "eventflag") == 0 &&
                (iv2 = 1, sscanf(line, "%*s %i %i", &iv, &iv2) >= 1)) {
         // Generic save-flag primitive: set/clear an EVENTCHKINF flag (the (index<<4)|shift
