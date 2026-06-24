@@ -53,6 +53,12 @@ extern "C" float gSoH3dAoMaxDiff;  // depth delta beyond which a neighbour is a 
 // world->light-clip matrix (computeLightVP) is computed by the GL dispatcher and handed to us.
 extern "C" int gSoH3dShadowEnable;   // -1 uninit (resolved by the GL dispatcher), 0 off, 1 on
 extern "C" int gSoH3dShadowHasFocus; // 0 until soh3d.c sets the focus point (no shadows pre-scene)
+// OoT3D env distance fog (ported from envCtx.lightSettings). Owned by the GL dispatcher
+// (soh3d_gl.cpp), set each frame by soh3d.c SoH3D_UpdateLight. Mirror under Vulkan.
+extern "C" int gSoH3dFogEnable;       // 0 off, 1 on (default on)
+extern "C" float gSoH3dFogColor[3];   // env fog colour (0..1)
+extern "C" float gSoH3dFogNear;       // fog start (view-space w / world units)
+extern "C" float gSoH3dFogFar;        // fog full-density distance
 extern "C" float gSoH3dShadowBias;
 extern "C" float gSoH3dShadowStrength;
 static int vkFaceCullOn() {
@@ -106,6 +112,7 @@ layout(location=0) out vec2 vUv;
 layout(location=1) out vec4 vColor;
 layout(location=2) out vec3 vNrmView;
 layout(location=3) out vec3 vWorld;
+layout(location=4) out float vFogDist;
 layout(binding=0, std140) uniform UBO {
     mat4 uMP;
     mat4 uMV;
@@ -116,6 +123,8 @@ layout(binding=0, std140) uniform UBO {
     vec4 uExtra;     // x=per-draw alpha (1=opaque) y=texcoord scroll U z=scroll V (cloud drift, #28b)
     mat4 uLightVP;   // WORLD -> sun light-clip (dynamic shadow); unused when uShadow.x==0
     vec4 uShadow;    // x=shadowOn y=bias z=strength w=texel (1/shadowRes)
+    vec4 uFog;       // xyz=env fog colour, w=fog enable
+    vec4 uFog2;      // x=fog near (view w), y=fog far
 } ubo;
 void main() {
     vColor = aColor;
@@ -136,6 +145,7 @@ void main() {
     c.z = (c.z + c.w) * 0.5;  // GL clip z [-1,1] -> Vulkan [0,1]
     if (ubo.uLightDir.w > 0.5) c.z = c.w; // skybox: pin to far plane (Vulkan far = z/w = 1)
     gl_Position = c;
+    vFogDist = c.w; // view-space depth (perspective w) -> distance fog input
     vNrmView = mat3(ubo.uMV) * nM; // world-space normal (uMV is model->world; see soh3d_gl.cpp)
     vWorld = (ubo.uMV * vec4(sp, 1.0)).xyz; // world-space position for the shadow projection
     // CMB/PICA UVs are top-origin. Texture SAMPLING maps v=0 -> data row 0 identically in GL and
@@ -151,6 +161,7 @@ layout(location=0) in vec2 vUv;
 layout(location=1) in vec4 vColor;
 layout(location=2) in vec3 vNrmView;
 layout(location=3) in vec3 vWorld;
+layout(location=4) in float vFogDist;
 layout(location=0) out vec4 frag;
 layout(binding=0, std140) uniform UBO {
     mat4 uMP;
@@ -162,6 +173,8 @@ layout(binding=0, std140) uniform UBO {
     vec4 uExtra;
     mat4 uLightVP;
     vec4 uShadow;  // x=on y=bias z=strength w=texel
+    vec4 uFog;     // xyz=env fog colour, w=fog enable
+    vec4 uFog2;    // x=fog near (view w), y=fog far
 } ubo;
 layout(binding=1) uniform sampler2D uTex;
 layout(binding=2) uniform sampler2D uShadowMap;
@@ -199,6 +212,13 @@ void main() {
     vec3 rgb = t.rgb * vColor.rgb * shade;
     if (ubo.uParams.y < 0.5)
         rgb = clamp(rgb, 0.0, 1.0) * ubo.uExtra.w;
+    // OoT3D env distance fog (ported from envCtx.lightSettings fogColor/fogNear/zFar): blend toward
+    // the scene fog colour by view-space depth. Skip the skybox dome (uLightDir.w>0.5 -> it IS the
+    // far background). This is the Kokiri green-yellow atmosphere haze.
+    if (ubo.uFog.w > 0.5 && ubo.uLightDir.w < 0.5) {
+        float f = clamp((vFogDist - ubo.uFog2.x) / max(ubo.uFog2.y - ubo.uFog2.x, 1.0), 0.0, 1.0);
+        rgb = mix(rgb, ubo.uFog.xyz, f);
+    }
     frag = vec4(rgb, t.a * vColor.a * ubo.uExtra.x); // uExtra.x = per-draw alpha
 }
 )";
@@ -214,6 +234,8 @@ struct VkUbo {
     float uExtra[4];   // x = per-draw alpha (1 = opaque); y/z = texcoord scroll U/V (cloud drift, #28b)
     float uLightVP[16]; // WORLD -> sun light-clip (dynamic shadow); identity when shadows off
     float uShadow[4];   // x=on y=bias z=strength w=texel
+    float uFog[4];      // xyz = OoT3D env fog colour, w = fog enable (0/1)
+    float uFog2[4];     // x = fog near (view-space w), y = fog far; z,w unused
 };
 
 struct VkTex {
@@ -1568,6 +1590,15 @@ extern "C" void SoH3D_Vk_DrawModel(int modelId, const float* mp16, const float* 
     base.uShadow[1] = gSoH3dShadowBias;
     base.uShadow[2] = gSoH3dShadowStrength;
     base.uShadow[3] = g_shadowDim ? 1.0f / (float)g_shadowDim : 0.0f;
+    // OoT3D env distance fog (Kokiri green-yellow haze etc.), from envCtx.lightSettings via soh3d.c.
+    base.uFog[0] = gSoH3dFogColor[0];
+    base.uFog[1] = gSoH3dFogColor[1];
+    base.uFog[2] = gSoH3dFogColor[2];
+    base.uFog[3] = gSoH3dFogEnable ? 1.0f : 0.0f;
+    base.uFog2[0] = gSoH3dFogNear;
+    base.uFog2[1] = gSoH3dFogFar;
+    base.uFog2[2] = 0.0f;
+    base.uFog2[3] = 0.0f;
     bool forceBlend = (a8 < 255);          // translucent draw -> alpha-over even if the material is opaque
 
     bool vboBound = false;

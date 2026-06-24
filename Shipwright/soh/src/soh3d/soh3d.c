@@ -3139,6 +3139,34 @@ static void SoH3D_UpdateLight(PlayState* play) {
         SoH3D_GL_SetLightParams(ambient, l1col, l2dir, l2col);
     }
 
+    // OoT3D env distance fog: feed the live (time-blended) scene fog colour + near/far so the
+    // SoH3D world geometry hazes toward it exactly like OoT3D (e.g. Kokiri's green-yellow
+    // atmosphere). N64 fogNear/fogFar are in the F3DEX 0..1000 projected-depth scale; the shader
+    // fogs on view-space w, so convert that scale to a world distance via the camera frustum.
+    // REPL `fog` can override for live A/B verification against the oracle.
+    {
+        extern int gSoH3dFogEnable, gSoH3dFogOverride;
+        extern float gSoH3dFogColor[3], gSoH3dFogNear, gSoH3dFogFar;
+        EnvLightSettings* ls2 = &play->envCtx.lightSettings;
+        if (!gSoH3dFogOverride) {
+            // Fog COLOUR comes straight from the live (time-blended) scene env — N64's Kokiri
+            // fogColor (200,200,150) matches the OoT3D oracle's atmosphere exactly.
+            gSoH3dFogColor[0] = (float)ls2->fogColor[0] / 255.0f;
+            gSoH3dFogColor[1] = (float)ls2->fogColor[1] / 255.0f;
+            gSoH3dFogColor[2] = (float)ls2->fogColor[2] / 255.0f;
+            // Fog DISTANCE: OoT3D renders a denser atmosphere than the raw N64 F3DEX fog position
+            // (fogNear ~994 -> only ~1296+ world units) reproduces — the 3DS forest haze fills the
+            // mid-field. We drive density off the scene's far-clip (fogFar = zFar, world units) with
+            // a fixed OoT3D-atmosphere ramp (near ~5%, full ~31% of zFar), verified against the
+            // oracle at the Kokiri Deku ledge. REPL `fog near a b` overrides for A/B.
+            // TODO: extract OoT3D's exact per-scene fog from its ZSI env / runtime for full fidelity.
+            float zfar = (float)ls2->fogFar > 1.0f ? (float)ls2->fogFar : 5800.0f;
+            gSoH3dFogNear = zfar * 0.045f;
+            gSoH3dFogFar  = zfar * 0.31f;
+        }
+        (void)gSoH3dFogEnable;
+    }
+
     if (gSoH3dLightDirOverride) {
         return; // light1Dir held by REPL `lightdir x y z`; colors + ambient updated above
     }
@@ -4835,6 +4863,27 @@ static void SoH3D_ReplExec(PlayState* play, char* line, const char* outPath) {
         SoH3D_ReplReply(outPath, "sky=%d scale=%.2f skyboxId=%d idx1=%d idx2=%d blend=%d", gSoH3dSky,
                         gSoH3dSkyScale, play->skyboxId, play->envCtx.skybox1Index, play->envCtx.skybox2Index,
                         play->envCtx.skyboxBlend);
+    } else if (strcmp(cmd, "fog") == 0) {
+        // OoT3D env fog port. `fog <0|1>` toggles; `fog near far` overrides distances (world view-w),
+        // `fog color r g b` overrides colour (0..255); `fog auto` returns to env-driven; `fog info`
+        // prints the live env values. Verify the haze against the oracle, don't tune blind.
+        extern int gSoH3dFogEnable, gSoH3dFogOverride;
+        extern float gSoH3dFogColor[3], gSoH3dFogNear, gSoH3dFogFar;
+        EnvLightSettings* lsf = &play->envCtx.lightSettings;
+        char sub[32];
+        float a, b, c;
+        if (sscanf(line, "%*s near %f %f", &a, &b) == 2 || sscanf(line, "%*s dist %f %f", &a, &b) == 2) {
+            gSoH3dFogOverride = 1; gSoH3dFogNear = a; gSoH3dFogFar = b;
+        } else if (sscanf(line, "%*s color %f %f %f", &a, &b, &c) == 3) {
+            gSoH3dFogOverride = 1; gSoH3dFogColor[0] = a/255.f; gSoH3dFogColor[1] = b/255.f; gSoH3dFogColor[2] = c/255.f;
+        } else if (sscanf(line, "%*s %31s", sub) == 1 && strcmp(sub, "info") != 0) {
+            if (strcmp(sub, "auto") == 0) gSoH3dFogOverride = 0;
+            else gSoH3dFogEnable = (atoi(sub) != 0);
+        }
+        SoH3D_ReplReply(outPath,
+            "fog=%d override=%d color=(%.0f,%.0f,%.0f) near=%.0f far=%.0f | env: fogColor=(%d,%d,%d) fogNear=%d fogFar=%d",
+            gSoH3dFogEnable, gSoH3dFogOverride, gSoH3dFogColor[0]*255, gSoH3dFogColor[1]*255, gSoH3dFogColor[2]*255,
+            gSoH3dFogNear, gSoH3dFogFar, lsf->fogColor[0], lsf->fogColor[1], lsf->fogColor[2], lsf->fogNear, lsf->fogFar);
     } else if (strcmp(cmd, "stairs") == 0 && sscanf(line, "%*s %f", &f1) == 1) {
         // #5 — toggle real stepped-polygon stairs (kaidan ramps -> treads+risers). Evicts the
         // cached CPU scene-room models, but the GL backend caches the uploaded geometry per

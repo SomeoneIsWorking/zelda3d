@@ -597,6 +597,14 @@ extern "C" float gSoH3dShadowDist = 1600.0f;    // light "camera" pullback along
 extern "C" float gSoH3dShadowBias = 0.0030f;    // depth-compare bias (acne vs peter-panning)
 extern "C" float gSoH3dShadowStrength = 0.55f;  // how dark the shadowed area gets (0..1)
 
+// OoT3D env distance fog (ported from envCtx.lightSettings), set each frame by soh3d.c
+// SoH3D_UpdateLight; read by both the GL and Vulkan world draws. Default on. REPL `fog`.
+extern "C" int gSoH3dFogEnable = 1;
+extern "C" int gSoH3dFogOverride = 0; // REPL `fog` set near/far/color manually (stop env auto-feed)
+extern "C" float gSoH3dFogColor[3] = { 0.0f, 0.0f, 0.0f };
+extern "C" float gSoH3dFogNear = 0.0f;
+extern "C" float gSoH3dFogFar = 0.0f;
+
 extern "C" void SoH3D_GL_SetShadowFocus(float x, float y, float z) {
     gSoH3dShadowFocus[0] = x;
     gSoH3dShadowFocus[1] = y;
