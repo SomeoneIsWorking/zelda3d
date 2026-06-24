@@ -623,7 +623,7 @@ extern "C" float gSoH3dFogOffset = 0.0f; // F3DEX fog offset    (s16 range), = (
 // CONSTANT ambient, so colour is pinned (override=1) not env-fed. Other scenes may need their own
 // u_SceneAmbient (TODO: source per-scene). REPL `worldamb <coef> [r g b]` to re-derive live.
 extern "C" float gSoH3dWorldAmbColor[3] = { 0.0f, 0.0f, 1.0f };
-extern "C" float gSoH3dWorldAmb = 0.06f;
+extern "C" float gSoH3dWorldAmb = 0.02f;
 extern "C" int   gSoH3dWorldAmbOverride = 1; // colour is the scene constant, not the env feed
 
 extern "C" void SoH3D_GL_SetShadowFocus(float x, float y, float z) {

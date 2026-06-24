@@ -263,6 +263,16 @@ matching the oracle at every time of day while leaving noon R/G untouched (noon 
 B/R 0.15→0.44 noon, 0.25→0.77 night. Verified no breakage on an indoor scene (chicken house wood
 stays warm) and Kakariko night (grass cools, dark rock unaffected).
 
+**REVISED 2026-06-24 — coef 0.06 → 0.02 (ground wash-out).** At coef 0.06 the dirt PATH washed out
+to flat grey: a fresh consistent-framing oracle capture shows grass B/R 0.32 but path B/R 0.23 (path
+is warmer, R>G, less blue), while a uniform flat floor pushed BOTH to ~0.50 — the path went bluest
+because it's darker (flat add raises a darker surface's B/R more). The grass and path are
+INDISTINGUISHABLE by material (both dif=0, amb=white, comb=2 — dumped via SOH3D_DBG_MAT); the
+grass-vs-path blue difference lives in the baked vertex colour/texture, so a post-combiner additive
+floor cannot separate them. Reproducing it exactly needs the full vertex-lighting port (#111). As a
+non-breaking compromise the coef is lowered to 0.02 (a subtle cool ambient: grass B/R 0.15→0.26,
+path 0.15→0.27, both near the oracle) and modulated per-material by matAmbient (render.ts:651).
+
 **RESIDUAL (separate card, NOT this fix):** night R/G are still too BRIGHT — oracle night grass R is
 34% of its noon R, SoH3D's is 58%, so B/R reaches 0.77 not the oracle's 1.37. Cause: the flat tint
 `SoH3D_SceneTint = (ambient + 0.5·(light1+light2))·1.0` under-darkens at night (light2col stays
