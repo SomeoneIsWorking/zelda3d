@@ -597,13 +597,18 @@ extern "C" float gSoH3dShadowDist = 1600.0f;    // light "camera" pullback along
 extern "C" float gSoH3dShadowBias = 0.0030f;    // depth-compare bias (acne vs peter-panning)
 extern "C" float gSoH3dShadowStrength = 0.55f;  // how dark the shadowed area gets (0..1)
 
-// OoT3D env distance fog (ported from envCtx.lightSettings), set each frame by soh3d.c
-// SoH3D_UpdateLight; read by both the GL and Vulkan world draws. Default on. REPL `fog`.
+// OoT3D / N64 F3DEX fog (ported from envCtx.lightSettings + z_play.c gSPFogPosition), set each
+// frame by soh3d.c SoH3D_UpdateLight; read by both the GL and Vulkan world draws. Default on.
+// This is the EXACT N64 fog math (interpreter.cpp): fog_z = (clipZ/w)*fogMul + fogOffset, clamped
+// to [0,255], used as the blend factor toward fogColor. fogMul/fogOffset come from the F3DEX
+// gSPFogPosition(fogNear, 1000) macro applied to the live per-scene fogNear — NOT a hand-tuned
+// world-distance ramp (which made Kokiri far too hazy; the real curve is near fog-free until the
+// far clip, matching the oracle). REPL `fog`.
 extern "C" int gSoH3dFogEnable = 1;
-extern "C" int gSoH3dFogOverride = 0; // REPL `fog` set near/far/color manually (stop env auto-feed)
+extern "C" int gSoH3dFogOverride = 0; // REPL `fog` set mul/offset/color manually (stop env auto-feed)
 extern "C" float gSoH3dFogColor[3] = { 0.0f, 0.0f, 0.0f };
-extern "C" float gSoH3dFogNear = 0.0f;
-extern "C" float gSoH3dFogFar = 0.0f;
+extern "C" float gSoH3dFogMul = 0.0f;    // F3DEX fog multiplier (s16 range), = 128000/(1000-fogNear)
+extern "C" float gSoH3dFogOffset = 0.0f; // F3DEX fog offset    (s16 range), = (500-fogNear)*256/(1000-fogNear)
 
 extern "C" void SoH3D_GL_SetShadowFocus(float x, float y, float z) {
     gSoH3dShadowFocus[0] = x;
