@@ -3831,6 +3831,19 @@ static void SoH3D_ReplExec(PlayState* play, char* line, const char* outPath) {
         play->transitionTrigger = TRANS_TRIGGER_START;
         play->transitionType = TRANS_TYPE_FADE_BLACK;
         SoH3D_ReplReply(outPath, "warp -> entrance 0x%x (%d)", iv, iv);
+    } else if (strcmp(cmd, "cswarp") == 0 && sscanf(line, "%*s %i %i", &iv, &iv2) == 2) {
+        // Warp to an entrance WITH a chosen cutscene-setup index (both decimal or 0x-hex). Needed
+        // for CUTSCENE-ONLY scenes (e.g. Chamber of the Sages 0x6B): a plain `warp` lands there with
+        // cutsceneIndex=0, so z_play.c:506 picks the day/night setup layer — but those scenes have NO
+        // player in their non-cutscene setup, so Actor_SpawnEntry never spawns Link and func_800304DC
+        // null-derefs the empty PLAYER actor list (SIGSEGV). z_play.c:509 derives the setup layer as
+        // SCENE_LAYER_CUTSCENE_FIRST + (cutsceneIndex & 0xF) once cutsceneIndex >= 0xFFF0, so pass a
+        // 0xFFFn value to select the scene's nth cutscene setup (the one that DOES spawn Link).
+        gSaveContext.nextCutsceneIndex = iv2;
+        play->nextEntranceIndex = iv;
+        play->transitionTrigger = TRANS_TRIGGER_START;
+        play->transitionType = TRANS_TYPE_FADE_BLACK;
+        SoH3D_ReplReply(outPath, "cswarp -> entrance 0x%x csIndex 0x%x", iv, iv2);
     } else if (strcmp(cmd, "introcs") == 0) {
         // #112 repro: replay the new-game intro (Navi wakes Link) on demand. z_sram new-game sets
         // entrance=Link's house child spawn + cutsceneIndex=0xFFF1; z_play.c:509 derives scene setup
