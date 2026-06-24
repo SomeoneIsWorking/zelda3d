@@ -42,10 +42,19 @@ signed char gSoH3dWorldShadeL1Dir[3] = { 0, -127, 0 };
 // Current scene's OoT3D env palette pointer is defined just after soh3d_scene_lighting.inc (where the
 // SoH3dLightSlot type becomes visible). Slot count + tunables live here (no struct dependency).
 int gSoH3dScenePaletteN = 0;
-// UNRESOLVED OFFLINE (docs #111): OoT3D entry 0 is a metadata-looking blob, so the N64-schedule slot
-// index may need +1 to land on the matching OoT3D entry. Tunable live (REPL `worldshade bias <n>`)
-// while A/B-ing vs the oracle. Default 0 (entry-i <-> N64-slot-i).
-int gSoH3dWorldShadeSlotBias = 0;
+// OoT3D entry 0 is a metadata blob that the RUNTIME drops, so runtime slot i = ZSI entry (i+1).
+// Confirmed vs the live Azahar oracle (oot3d-decomp ram_map.md): noon N64-slot1 -> OoT3D entry2.
+// So bias = +1 aligns the N64 z_kankyo schedule index with the matching OoT3D entry. Tunable live
+// (REPL `worldshade bias <n>`).
+int gSoH3dWorldShadeSlotBias = 1;
+// #111 world-shade model coefficients (REPL `worldshade ka/kd/ke <f>`). The day/night darkening is
+// carried by light0Color (the sun: noon ~255, night ~63), NOT the ~constant ambient; light1Color is
+// the cool moonlight FILL (night ~(99,170,219) green+blue) that keeps night G/B up. World shade =
+// saturate(ka*ambient + kd*light0Color + ke*light1Color) per channel. Defaults fit the Kokiri
+// oracle (night/noon R 0.34, G 0.55): kd dominant (sun), ke lifts night G/B. Tune live vs oracle.
+float gSoH3dWorldShadeKa = 0.16f;
+float gSoH3dWorldShadeKd = 0.77f;
+float gSoH3dWorldShadeKe = 0.0f;
 
 // Live debug orientation (degrees) applied in the direct-GL draw (SoH3D_EmitModelDraw)
 // BEFORE the model, so a correct in-game rest->upright orientation can be found over the
@@ -2916,15 +2925,18 @@ static void SoH3D_DrawRoomGL(PlayState* play, int modelId) {
     Matrix_Scale(gSoH3dSceneScale, gSoH3dSceneScale, gSoH3dSceneScale, MTXMODE_APPLY);
     gSPMatrix(POLY_OPA_DISP++, MATRIX_NEWMTX(play->state.gfxCtx), G_MTX_MODELVIEW | G_MTX_LOAD);
     if (gSoH3dWorldShade && gSoH3dScenePalette != 0) {
-        // #111: OoT3D world shade = saturate(2 * sceneAmbient) per channel (the OoT3D vertex-light
-        // ambient term: both world lights carry light0.ambient, matDiffuse is black so no directional
-        // in THIS first cut — the directional term is a follow-up in the shader once confirmed live).
-        // Sourced from OoT3D's own time-blended env palette, so night R/G darken the way the oracle
-        // does (the N64 flat tint over-brightens night — #111). A/B via REPL `worldshade`.
+        // #111: OoT3D world shade = saturate(ka*ambient + kd*light0Color) per channel, from OoT3D's
+        // own time-blended env palette. The day/night darkening lives in light0Color (the sun: noon
+        // ~255, dim ~63 at night) — ambient is ~constant (verified vs the Azahar oracle), so the N64
+        // flat tint (ambient + 0.5*lights) over-brightens night. This tracks the sun, fixing #111.
+        // ka/kd tunable live via REPL `worldshade ka/kd`. The room gets one shade (matches the
+        // existing single-tint architecture; per-vertex NdotL is a possible future refinement).
         s32 i;
         for (i = 0; i < 3; i++) {
-            int v = 2 * (int)gSoH3dWorldShadeAmb[i];
-            tint[i] = (u8)(v > 255 ? 255 : v);
+            float v = gSoH3dWorldShadeKa * (float)gSoH3dWorldShadeAmb[i] +
+                      gSoH3dWorldShadeKd * (float)gSoH3dWorldShadeL0Col[i] +
+                      gSoH3dWorldShadeKe * (float)gSoH3dWorldShadeL1Col[i];
+            tint[i] = (u8)(v <= 0.0f ? 0 : v >= 255.0f ? 255 : (int)(v + 0.5f));
         }
     } else {
         SoH3D_SceneTint(play, tint);
@@ -4876,16 +4888,25 @@ static void SoH3D_ReplExec(PlayState* play, char* line, const char* outPath) {
         extern int gSoH3dWorldShade, gSoH3dWorldShadeSlotBias;
         extern unsigned char gSoH3dWorldShadeAmb[3], gSoH3dWorldShadeL0Col[3], gSoH3dWorldShadeL1Col[3];
         extern int gSoH3dScenePaletteN;
-        // `worldshade bias <n>` tunes the slot alignment (entry-0-metadata off-by-one); `worldshade <0|1>`
-        // toggles the OoT3D env shade vs the N64 flat tint.
+        extern float gSoH3dWorldShadeKa, gSoH3dWorldShadeKd, gSoH3dWorldShadeKe;
+        float fv;
+        // `worldshade bias <n>` tunes slot alignment; `worldshade ka/kd/ke <f>` tune the
+        // ambient/light0Color/light1Color coefficients; `worldshade <0|1>` toggles the OoT3D shade.
         if (sscanf(line, "%*s bias %i", &iv) == 1) {
             gSoH3dWorldShadeSlotBias = iv;
+        } else if (sscanf(line, "%*s ka %f", &fv) == 1) {
+            gSoH3dWorldShadeKa = fv;
+        } else if (sscanf(line, "%*s kd %f", &fv) == 1) {
+            gSoH3dWorldShadeKd = fv;
+        } else if (sscanf(line, "%*s ke %f", &fv) == 1) {
+            gSoH3dWorldShadeKe = fv;
         } else if (sscanf(line, "%*s %i", &iv) == 1) {
             gSoH3dWorldShade = iv;
         }
         SoH3D_ReplReply(outPath,
-            "worldshade=%d bias=%d paletteSlots=%d amb=(%d,%d,%d) l0col=(%d,%d,%d) l1col=(%d,%d,%d)",
-            gSoH3dWorldShade, gSoH3dWorldShadeSlotBias, gSoH3dScenePaletteN,
+            "worldshade=%d bias=%d ka=%.2f kd=%.2f ke=%.2f slots=%d amb=(%d,%d,%d) l0col=(%d,%d,%d) l1col=(%d,%d,%d)",
+            gSoH3dWorldShade, gSoH3dWorldShadeSlotBias, gSoH3dWorldShadeKa, gSoH3dWorldShadeKd,
+            gSoH3dWorldShadeKe, gSoH3dScenePaletteN,
             gSoH3dWorldShadeAmb[0], gSoH3dWorldShadeAmb[1], gSoH3dWorldShadeAmb[2],
             gSoH3dWorldShadeL0Col[0], gSoH3dWorldShadeL0Col[1], gSoH3dWorldShadeL0Col[2],
             gSoH3dWorldShadeL1Col[0], gSoH3dWorldShadeL1Col[1], gSoH3dWorldShadeL1Col[2]);

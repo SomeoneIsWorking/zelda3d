@@ -3,15 +3,21 @@
 vertex-lighting port.
 
 Parses each OoT3D scene-header ZSI (`/scene/<name>_info.zsi`) env-settings command
-(0x0F) using the CORRECT native-3DS 28-byte layout (oot3d-decomp/docs/scene_lighting.md;
-see docs/oot3d_world_lighting_re.md "#111" section — NOT noclip's +0x0A layout):
+(0x0F) using the native-3DS 28-byte layout. The byte offsets below were re-derived 2026-06-24
+by matching the parsed bytes against the LIVE Azahar oracle runtime EnvLightSettings
+(oot3d-decomp/docs/ram_map.md "ENVIRONMENT LIGHTING"); the offsets in scene_lighting.md
+were WRONG for the light colors (had l0col @ +0x06 = a constant field). VALIDATED layout:
 
-    +0x00 u8[3] ambient  +0x03 s8[3] l0dir  +0x06 u8[3] l0col
-    +0x09 s8[3] l1dir    +0x0c u8[3] l1col  +0x0f u8 pad  +0x10 f32 fogEnd ...
+    +0x00 u8[3] ambient   +0x04 u8[3] light0Color   +0x07 s8[3] light0Dir
+    +0x0a u8[3] light1Color  +0x0d s8[3] light1Dir   +0x10 f32 fogEnd  +0x14 f32 drawDist
 
-Entry 0 is a metadata blob (different layout) and is SKIPPED; entries 1..N-1 are the
-per-time-of-day settings, slot-by-slot aligned with the N64 light-settings list (so the
-N64 z_kankyo time schedule selects the matching OoT3D slot for free).
+(ambient @ +0x00, l0col @ +0x04, l1col @ +0x0a confirmed against runtime noon/night/dusk
+slots for spot04: noon l0col=(255,255,219), night=(63,63,99), dusk=(239,140,61).) The
+day/night brightness is carried by **light0Color** (the sun), NOT ambient (~constant).
+
+Entry 0 is a metadata blob; the RUNTIME drops it, so runtime slot i = ZSI entry (i+1).
+We emit ALL entries (entry 0 included) so the runtime can apply slot bias +1 to align the
+N64 z_kankyo schedule index with the matching OoT3D entry.
 
 Output: a positional array `kSoH3dSceneLighting[]` indexed by SoH sceneNum (same order as
 kSoH3dSceneNames / scene_table.h), each row = the scene's slot palette. Values only (tiny
@@ -61,8 +67,8 @@ def parse_env(d):
         def s(off, n):  # signed bytes
             return [b - 256 if b >= 128 else b for b in d[o + off:o + off + n]]
         slots.append({
-            "amb": u(0x00, 3), "l0dir": s(0x03, 3), "l0col": u(0x06, 3),
-            "l1dir": s(0x09, 3), "l1col": u(0x0c, 3),
+            "amb": u(0x00, 3), "l0col": u(0x04, 3), "l0dir": s(0x07, 3),
+            "l1col": u(0x0a, 3), "l1dir": s(0x0d, 3),
         })
     return slots
 
