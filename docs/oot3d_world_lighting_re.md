@@ -123,3 +123,43 @@ tune offline constants to match.
 
 Tools: `scratch/lightport/mat_probe.py` (material+combiner dump), `tools/cmb.py`/`zsi.py`/`ctr_romfs.py`
 (ROM decode), Azahar oracle (`tools/oracle_boot.sh`), live SoH3D (skill soh3d-game-control).
+
+---
+
+## Session 2026-06-24 — parity re-measure + PLAN CORRECTION (read before doing "Increment 2")
+
+Measured live SoH3D-VK vs Azahar oracle, **both at the Kokiri Deku-ledge spawn, ~midday**, sampling
+green-grass pixels (constant-region, percentile stats). Findings, all data-backed:
+
+- **Real position-matched gap = ~1.5x brightness, hue MATCHED.** Oracle grass median lum 54 / p90 87,
+  G/R 1.26; SoH3D 36 / 57, G/R 1.21. (An earlier "2.4x" was a Saria sunlit-closeup framing artifact.)
+  The ratio is ~constant across p25/p50/p90 ⇒ **linear** scale, **not** gamma.
+- **Live VK world frag confirmed** (`soh3d_vk.cpp`): `rgb = tex * a_Color * uTint(~0.95) * combScale(2)`.
+  SoH3D grass 36 == this exactly ⇒ SoH3D nets **~0.65× texture**.
+- **The floor texture `s04_yuka_01r` decodes to lum 50** (same logic as runtime). The oracle renders
+  the floor at **54 ≈ 1.08× the texture** — i.e. OoT3D shows the texture **~as-decoded; net world
+  multiplier ≈ 1.0**. So the gap is the **world lighting multiplier: oracle ~1.0 vs SoH3D ~0.65.**
+- **a_Color is genuinely dark & real** (not a decode bug): per-vertex u8 ×1/255; ground sepds mean
+  ~0.34 (sepd0) … 0.56 (sepd13); sepd9/17 are CONSTANT-mode 0.4/0.5 gray.
+- **Combiner scale is LITERAL (×1/×2), not the PICA 0/1/2→×1/×2/×4 enum.** Across all settings the
+  raw scaleRGB values are only {1,2} and **scaleAlpha is always 1** — under the enum that would mean
+  ×2 alpha on every material (absurd). So the live ×2 for grass is correct; **the missing 1.5× is NOT
+  a ×4 scale.** (Also: `mat_probe.py` previously MISPRINTED amb/dif via an endian bug — read u32 LE
+  then shifted BE; fixed to `>I`. The numbers in this doc's body — matAmbient=WHITE, matDiffuse=BLACK,
+  grass scale ×2 — are the CORRECT raw bytes and match the live C++ `rgb_be` parse.)
+
+### ⚠️ Consequence: the "Increment 2 = `saturate(sceneAmbient)·a_Color`" step CANNOT close the gap
+Kokiri **matAmbient = WHITE** and `saturate(sceneAmbient) ≤ 1`, so that term is **at most `a_Color`** —
+identical to (or darker than) SoH3D's current `a_Color·uTint·×2` path. It is a **noon no-op** (only
+changes dawn/dusk/night). OoT3D renders the world **~1.5× brighter than its own documented
+vertex-light × combiner model** (`a_Color·tex·scale = 0.68·tex`) predicts — the model is incomplete.
+
+### Next experiments (do NOT add a global brightness constant — banned)
+1. **Read OoT3D's LIVE env ambient from Azahar RAM** at noon, confirm it saturates ~1. (Warp on this
+   Azahar build: write `play+0x5c2d = 0x14` (TRANS_TRIGGER_START) and `play+0x5c32 = 0xEE`
+   (nextEntrance, Kokiri); PlayState was @ 0x0871e840 this session. Need the envCtx offset in OoT3D
+   PlayState.)
+2. **Live A/B in SoH3D-VK:** drop the spurious N64-envCtx `uTint` from the world path (OoT3D never
+   applies the N64 tint) and read the actual FLOOR sepd's per-vertex `a_Color` in-engine; check if the
+   net → ~1.0 and grass → ~54. Suspects, in order: (a) uTint double-dim (~1.05× alone), (b) floor
+   a_Color ~0.5 with SoH3D's extra uTint pulling it to 0.65, (c) texture-decode/gamma residual.
