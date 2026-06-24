@@ -1376,6 +1376,9 @@ static void aoPass(GLint gameFbo, const GLint vp[4], float step) {
     glUniform1f(g_uShadowOn, 0.0f); // depth only: no shadow sampling
     std::vector<float> lerped;
     for (const DrawItem& it : g_drawList) {
+        // World/scene geometry (lit==0) has baked per-vertex AO; exclude it so SSAO doesn't
+        // double-darken it. Only dynamic actors/props (lit==1) contribute to / receive SSAO.
+        if (!it.lit) continue;
         GlModel* m = ensureUploaded(it.modelId);
         if (!m) continue;
         const float* pose = it.bones.empty() ? nullptr : it.bones.data();
@@ -1559,6 +1562,11 @@ extern "C" void SoH3D_GL_RenderPass(void) {
         if (SoH3D_Vk_BeginDepthPrepass()) {
             for (const DrawItem& it : g_drawList) {
                 if (it.sky) continue;
+                // OoT3D world/scene geometry (lit==0) already carries baked per-vertex AO in its
+                // a_Color; recording it here would let SSAO double-darken it (~1.3x too dark vs the
+                // oracle — see docs/oot3d_world_lighting_re.md). Only dynamic actors/props (lit==1,
+                // ~white vColor, no baked AO) get screen-space AO.
+                if (!it.lit) continue;
                 SoH3D_Vk_DepthPrepassDraw(it.modelId, it.mp, it.mv, it.invertY, it.aspectAdj, poseOf(it),
                                           it.boneCount, it.midMask, it.sky);
             }
