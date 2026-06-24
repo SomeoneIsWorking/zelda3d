@@ -3217,7 +3217,15 @@ static void SoH3D_UpdateLight(PlayState* play) {
             // F3DEX gSPFogPosition(fogNear, 1000) -> (fogMul, fogOffset). Matches the gbi.h macro
             // (fogMul = 128000/(max-min), fogOffset = (500-min)*256/(max-min)) and the s16 storage
             // the RSP interpreter reads back. fogNear is the live per-scene value (Kokiri ~994).
-            SoH3D_FogSetPosition((float)ls2->fogNear, 1000.0f);
+            // Use the scene's REAL fogFar, not the N64-standard 1000. The N64 path
+            // (z_play.c gSPFogPosition(fogNear, 1000)) computes fog from the RSP's own z scale, but
+            // the SoH3D world shader applies the F3DEX ramp to the GL NDC z of the OoT3D MESH, whose
+            // ground extends to the scene's actual zFar (Kokiri fogFar ~5800). With the hardcoded
+            // 1000 the span collapses to ~6 -> a near-step ramp that slams distant OoT3D ground (seen
+            // at a grazing angle, filling the lower screen) to a flat pale fog-colour triangle at
+            // Link's feet. Spanning the real fogFar makes that geometry haze gradually like OoT3D.
+            float fogFar = (ls2->fogFar > ls2->fogNear + 1) ? (float)ls2->fogFar : 1000.0f;
+            SoH3D_FogSetPosition((float)ls2->fogNear, fogFar);
             (void)gSoH3dFogMul; (void)gSoH3dFogOffset;
         }
         (void)gSoH3dFogEnable;
