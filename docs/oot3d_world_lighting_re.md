@@ -204,3 +204,43 @@ Per-scene faithful — no global constant. Verified: Kokiri Deku-ledge backgroun
 
 **GL backend still has no fog consumer** (it doesn't render the OoT3D world; secondary path) — wiring
 GL frag fog with the same mul/offset is an open follow-up, unverifiable until GL renders the world.
+
+## NIGHT/DUSK HUE — new parity gap (2026-06-24, issue #110, data-backed)
+
+Noon is now near-parity (~1.2-1.3x dark, hue ~ok). The bigger remaining gap is **time-of-day HUE**:
+at NIGHT the OoT3D world goes cool moonlit-blue but SoH3D stays warm yellow-green.
+
+**Measured (Kokiri, clean near-grass at Link's feet, fog≈0, frozen framing, SoH3D-VK vs oracle):**
+| | R | G | B | B/R |
+|---|---|---|---|---|
+| oracle grass NOON  | 49.4 | 61.2 | **22.9** | 0.46 |
+| oracle grass NIGHT | 16.7 | 33.5 | **22.9** | 1.37 |
+| SoH3D grass NOON   | 47.9 | 54.6 | 6.6 | 0.14 |
+| SoH3D grass NIGHT  | 27.7 | 39.4 | 6.6 | 0.24 |
+
+**Signature → root cause:** the oracle's grass BLUE is *identical* noon vs night (22.9) while R/G
+collapse. That is an **additive blue ambient/atmosphere FLOOR**, NOT a multiply (would scale blue
+down) and NOT depth-fog (`render.ts:438` fog = depth `smoothstep mix` → ≈0 on near grass; fog colour
+also varies with time, this floor doesn't). SoH3D's grass blue is likewise time-invariant but ~3.5×
+lower (6.6) → **SoH3D lacks the blue ambient floor OoT3D applies.** The current SoH3D world frag is
+purely multiplicative (`tex·a_Color·uTint·combScale`); a multiplicative blue tint can't introduce
+blue onto a green-dominant texture (night `shade` B/R≈1.8 × grass tex R/B≈6 ⇒ predicted B/R≈0.3,
+oracle is 1.37). The faithful OoT3D vertex model (`saturate(sceneAmbient·a_Color)·tex·scale`) is ALSO
+multiplicative and can't reach B=22.9 on grass either ⇒ the 22.9 enters via an additive term TBD.
+
+**The N64 envCtx DOES carry the blue night data** (SoH3D REPL `lightparams` @ time 0x0000:
+ambient=(0.235,0.314,**0.431**), light1col dim-blue; @ 0x8000 ambient gray (0.314)³). So the source
+colour exists; it's just annihilated by the multiplicative model. NOTE env lerps over several frames
+after a `time` change — settle ≥1s before reading `lightparams` (an immediate read shows the prior
+time's value).
+
+**Fix plan (implement in-engine + verify LIVE — offline won't converge, per the doc rule above):**
+1. Feed real OoT3D/env sceneAmbient into the world v_Color path (port the vertex-lighting eqn:
+   `v_Color = saturate(sceneAmbient·matAmbient + ...)·a_Color`), replacing the flat N64 uTint
+   multiply. A/B in VK (REPL toggle), measure grass B at noon AND night vs oracle.
+2. If blue still short of 22.9 (likely — multiplicative can't reach it), add the **additive** ambient/
+   atmosphere floor OoT3D applies, sourced from the env ambient colour (NOT a magic constant — derive
+   the coefficient; the floor is ~the env ambient added post-combiner, clamp to [0,1]).
+3. Verify ≥1 more scene + dusk (0xC000) and dawn. Repro: warp oracle to Kokiri via
+   `play+0x5c32=0xEE, play+0x5c2d=0x14` (PlayState @ gPlayState=0x0050AF34); pin oracle dayTime by
+   spam-writing u16 @ gSaveContext(0x00587958)+0x0C; SoH3D `time <u16>` + `camfreeze 1`.
