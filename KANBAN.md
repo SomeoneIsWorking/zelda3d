@@ -3,13 +3,14 @@
 > **Generated mirror — do not hand-edit.** Source of truth = GitHub Issues on
 > `SomeoneIsWorking/soh3d` (private). Regenerate with `tools/kanban.py render`.
 > Move a card with `tools/kanban.py mv <#> <column>`; add with `tools/kanban.py add`.
-> Columns: todo · in-progress · in-review · needs-confirmation · reopened · blocked · done(=closed).  Updated 2026-06-24 11:51.
+> Columns: todo · in-progress · in-review · needs-confirmation · reopened · blocked · done(=closed).  Updated 2026-06-24 11:52.
 
-**Counts:** todo:2 | in-progress:0 | in-review:0 | needs-confirmation:11 | reopened:0 | blocked:0 | done:75
+**Counts:** todo:3 | in-progress:0 | in-review:0 | needs-confirmation:11 | reopened:0 | blocked:0 | done:75
 
-## 📋 To Do  (2)
+## 📋 To Do  (3)
 - [#17](../../issues/17) Hi-res world/scene textures (texpack) _(render)_
 - [#33](../../issues/33) More foliage / vegetation density (lowest priority) _(scene)_
+- [#104](../../issues/104) Lake Hylia: black void blob on grass terrain (baked shadow/AO decal renders solid dark) _(render,scene)_
 
 ## 🔨 In Progress  (0)
 _none_
