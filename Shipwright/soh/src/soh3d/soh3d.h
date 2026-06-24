@@ -106,6 +106,12 @@ void SoH3D_SetCurAnim(void* animation, float curFrame, float animLength, float m
 // skips the N64 room mesh; returns 0 otherwise (caller draws the N64 room as normal).
 int SoH3D_TryDrawRoom(PlayState* play, Room* room);
 
+// #111: compute the OoT3D-palette world shade in parallel with z_kankyo's N64 envCtx ambient blend.
+// Called from the OUTDOOR time-of-day blend with the SAME slot indices + weights z_kankyo uses, so
+// no schedule logic is duplicated. No-op if the current scene has no OoT3D palette. Result feeds the
+// scene/room shade when REPL `worldshade 1` is set (vs the N64 flat tint). See docs #111.
+void SoH3D_WorldShadeBlend(int a1, int b1, int a2, int b2, float w1, float w2);
+
 // Draw the OoT3D sky (BlueSky.zar tenkyu gradient dome) in place of the N64 normal-sky skybox.
 // Called from Play_Draw at the skybox point; returns 1 if it drew the OoT3D sky (caller skips the
 // N64 SkyboxDraw_Draw), 0 otherwise (caller draws the N64 skybox as normal). #28.
