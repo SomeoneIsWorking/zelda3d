@@ -39,6 +39,28 @@ issue. **No evidence = not fixed.** This is mandatory, not optional.
 - Then `mv <#> needs-confirmation` and let the USER confirm user-visible fixes (don't self-close
   them). Close outright only for non-user-visible work.
 
+## RULE: structure SoH3D like a real PC game — per-behavior modules, OOP, NOT one giant soh3d.c
+
+Treat SoH3D as a brand-new PC game that needs proper structure. Do **NOT** keep cramming logic into
+`soh3d.c` (it is already a multi-thousand-line dumping ground). When we RE/decomp an OoT3D behavior and
+port it, it goes into a **dedicated, well-named module** under a game-like tree, e.g.:
+
+```
+soh/src/soh3d/behaviors/actor/kokiri_kid.cpp   // En_Ko head/torso track + facial, ported from OoT3D
+soh/src/soh3d/behaviors/actor/<actor>.cpp      // one module per actor behavior
+soh/src/soh3d/behaviors/actor_behavior.h       // base interface + registry (dispatch by actor id)
+```
+
+- **Use OOP** where it fits: a base `ActorBehavior` (virtuals like `applyDrawOverrides`), concrete
+  subclasses per actor, a registry that dispatches by `actor->id`. Prefer C++ classes over C-struct
+  vtables when the headers cooperate.
+- **The port carries the structure.** When a divergence needs RE, the deliverable is: (1) decomp it,
+  (2) document the ground truth in `oot3d-decomp/docs/`, (3) port it into a properly-structured SoH3D
+  module — not a patch bolted onto `soh3d.c`.
+- **Restructuring existing code into this shape is welcome**, incrementally: each time you touch a
+  behavior, migrate it out of `soh3d.c` / monolithic files into its module. Don't regress working
+  behavior; fall through to legacy for not-yet-migrated actors. (user directive, 2026-06-25, hard rule)
+
 ## RULE: ground truth for any behavioral divergence is the OoT3D DECOMP — extend it, don't memory-poke
 
 OoT3D decomp (the private `oot3d-decomp` repo, fed by the **decomp-port** skill / Ghidra pipeline) is a
