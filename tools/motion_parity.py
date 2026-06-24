@@ -113,10 +113,15 @@ def main():
           f"  ({'speedXZ col' if s_spd else 'pos-delta'} vs {'speedXZ col' if o_spd else 'pos-delta'})")
     if o_auth:
         print(f"  ratio SoH/ora = {s_auth / o_auth:.3f}")
-    # Note the framerate-compensation gap: SoH3D advances pos ~1.5x its velocity counter per logic
-    # frame (20fps logic moving 30fps-equivalent distance) — its positional median speed reads ~1.5x
-    # speedXZ while the oracle's positional speed == its velocity. Same wall-clock speed; the speedXZ
-    # vs pos-delta comparison above is the apples-to-apples one.
+    # Framerate-compensation gap — ROOT-CAUSED (session 2026-06-24m), not a divergence:
+    # z_actor.c Actor_UpdatePos does `pos += velocity * (R_UPDATE_RATE * 0.5)`, and normal play sets
+    # R_UPDATE_RATE = 3 (game.c:437 / z_play.c) -> speedRate = 1.5. So EVERY actor in SoH/N64 advances
+    # its position 1.5x its velocity counter per logic frame, on all axes (verified live: Link run AND
+    # free-fall both show pos-delta == 1.5*velocity, gframe incrementing by exactly 1 = no undersample).
+    # This is authentic vanilla-OoT 20fps behavior. OoT3D (oracle, 30fps) integrates with a different
+    # update rate so its per-frame pos-delta == its velocity (~1.0x); per-SECOND ground speed matches
+    # (20fps*1.5 == 30fps*1.0). => the velocity field (speedXZ) is the frame-rate-INDEPENDENT parity
+    # metric; ALWAYS verdict on speedXZ, never on per-frame positional deltas (they differ by design).
     if s_spd and ms["median_speed"] > 1.3 * s_auth:
         print(f"  [SoH3D pos-delta {ms['median_speed']:.2f}/frame = {ms['median_speed']/s_auth:.2f}x its "
               f"speedXZ — the 20->30fps position compensation, not a divergence]")
