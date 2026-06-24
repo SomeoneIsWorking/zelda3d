@@ -83,12 +83,14 @@ def main():
     time_arg = "0x6000"
     name = hexs
     cam = None
+    orbit = None
     settle = 5.0
     i = 1
     while i < len(args):
         if args[i] == "--time": time_arg = args[i + 1]; i += 2
         elif args[i] == "--name": name = args[i + 1]; i += 2
         elif args[i] == "--cam": cam = args[i + 1]; i += 2          # "ex ey ez ax ay az"
+        elif args[i] == "--orbit": orbit = args[i + 1]; i += 2      # "dist yaw pitch" (deg)
         elif args[i] == "--settle": settle = float(args[i + 1]); i += 2
         else: i += 1
 
@@ -106,6 +108,25 @@ def main():
     print("  " + (w.stdout.strip().splitlines()[-1] if w.stdout.strip() else "warp: no output"))
 
     time.sleep(settle)
+
+    # --orbit: read the (matched) spawn pos from SoH3D and frame Link from the same WORLD angle in
+    # both engines -> identical framing with no per-scene coordinate guessing.
+    if orbit and not cam:
+        import math, re
+        info = repl("posinfo")
+        m = re.search(r"link=\(([-\d]+),([-\d]+),([-\d]+)\)", info)
+        if m:
+            sx, sy, sz = (float(m.group(1)), float(m.group(2)), float(m.group(3)))
+            dist, yaw, pitch = (float(x) for x in orbit.split())
+            ax, ay, az = sx, sy + 30.0, sz
+            ry, rp = math.radians(yaw), math.radians(pitch)
+            ex = ax + dist * math.cos(rp) * math.sin(ry)
+            ey = ay + dist * math.sin(rp)
+            ez = az + dist * math.cos(rp) * math.cos(ry)
+            cam = f"{ex:.0f} {ey:.0f} {ez:.0f} {ax:.0f} {ay:.0f} {az:.0f}"
+            print(f"[parity_ab] orbit cam (spawn {sx:.0f},{sy:.0f},{sz:.0f}) -> {cam}")
+        else:
+            print(f"[parity_ab] orbit: couldn't parse spawn from posinfo: {info!r}")
 
     soh_png = os.path.join(SHOTDIR, f"ab_{name}_soh.png")
     if cam:
