@@ -5523,6 +5523,32 @@ static void SoH3D_ReplExec(PlayState* play, char* line, const char* outPath) {
                             a->colChkInfo.displacement.z, a->bgCheckFlags, a->floorHeight,
                             gSoH3dActorFreeze);
         }
+    } else if (strcmp(cmd, "apeek") == 0) {
+        // GENERIC actor-memory peek: dump <count> s16s at byte offset <off> from the selected
+        // actor, PLUS the actor's facing (shape.rot.y) and the yaw it would need to face Link
+        // (the head-track expectation). For En_Ko Kokiri kids headRot Vec3s is at +0x1F0
+        // (interactOff 0x1E8 + 0x08): `asel 0x163` then `apeek 0x1F0` reads (pitch,yaw,roll);
+        // headRot.y should track `rel` (yawToLink - actorYaw) within the head-turn clamp as Link
+        // moves. Used to debug #115b weird Kokiri-kid head orientation by VALUES, not pixels.
+        int off = 0, cnt = 3;
+        (void)sscanf(line, "%*s %i %i", &off, &cnt);
+        if (gSoH3dSelActor == NULL) {
+            SoH3D_ReplReply(outPath, "apeek: no selection (asel first)");
+        } else if (cnt < 1 || cnt > 16 || off < 0 || off > 0x2000) {
+            SoH3D_ReplReply(outPath, "apeek <byteoff> [count<=16] (off in [0,0x2000])");
+        } else {
+            Actor* a = gSoH3dSelActor;
+            Player* pl = GET_PLAYER(play);
+            s16* p = (s16*)((u8*)a + off);
+            char buf[256];
+            int k = 0;
+            k += snprintf(buf + k, sizeof(buf) - k, "apeek +0x%X:", off);
+            for (int i = 0; i < cnt && k < (int)sizeof(buf) - 8; i++)
+                k += snprintf(buf + k, sizeof(buf) - k, " %d", p[i]);
+            s16 yawToLink = Math_Vec3f_Yaw(&a->world.pos, &pl->actor.world.pos);
+            SoH3D_ReplReply(outPath, "%s | actorYaw=%d yawToLink=%d rel=%d", buf,
+                            a->shape.rot.y, yawToLink, (s16)(yawToLink - a->shape.rot.y));
+        }
     } else if (strcmp(cmd, "asample") == 0) {
         // BEHAVIORAL motion-parity sampler: `asample <n> [path]` streams the selected actor's
         // pos/rot/vel for the next n game frames to a CSV (default scratch/motion/soh3d.csv), then

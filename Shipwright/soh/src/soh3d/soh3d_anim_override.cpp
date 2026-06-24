@@ -209,9 +209,26 @@ extern "C" void SoH3D_ApplyActorOverrides(int modelId, void* actorv) {
     if (row != nullptr) {
         const short* headRot = reinterpret_cast<const short*>(a + row->interactOff + 0x08);  // Vec3s
         const short* torsoRot = reinterpret_cast<const short*>(a + row->interactOff + 0x0E); // Vec3s
+        // STALE-DATA GUARD (#116 "Kokiri kids' heads face weird directions"): on N64, Npc_TrackPoint
+        // (re)computes a CLAMPED headRot/torsoRot every Update — the head/torso clamp is ~0x2AAA (60deg)
+        // and is driven back toward 0 when not tracking. But OoT-style UPDATE CULLING means an NPC
+        // outside its culling volume NEVER runs Update, so its headRot stays frozen at a STALE value.
+        // N64 also draw-culls such an actor, but SoH3D still DRAWS the replaced model and its
+        // OverrideLimbDraw applies that stale headRot -> the head is twisted into a broken pose (verified
+        // live: a culled Kokiri kid had headRot.x = 0x5B90 = 129deg -> RotateZ(129deg); track ON folded
+        // the head down, track OFF = upright). A real head/torso turn never exceeds ~90deg, so a
+        // component beyond kMaxTrackBinang is non-physical stale data: skip that bone (leave it at its
+        // neutral anim pose) rather than apply garbage. Valid live tracking (small, clamped values) is
+        // unaffected. Per-bone so a sane head still tracks even if the torso datum is stale and vice versa.
+        constexpr short kMaxTrackBinang = 0x4000; // 90deg; above this the interactInfo datum is stale
+        auto sane = [](const short* r) {
+            return std::abs((int)r[0]) <= kMaxTrackBinang && std::abs((int)r[1]) <= kMaxTrackBinang;
+        };
         // Head and torso both use the same OoT3D no-negation helper, post-multiplied onto their bones.
-        setBonePost(modelId, row->headBone, trackRot(headRot));
-        setBonePost(modelId, row->torsoBone, trackRot(torsoRot));
+        if (sane(headRot))
+            setBonePost(modelId, row->headBone, trackRot(headRot));
+        if (sane(torsoRot))
+            setBonePost(modelId, row->torsoBone, trackRot(torsoRot));
     }
 
     // Facial eye/mouth material-anim (keystone #3).
