@@ -39,6 +39,23 @@ issue. **No evidence = not fixed.** This is mandatory, not optional.
 - Then `mv <#> needs-confirmation` and let the USER confirm user-visible fixes (don't self-close
   them). Close outright only for non-user-visible work.
 
+## RULE: ground truth for any behavioral divergence is the OoT3D DECOMP — extend it, don't memory-poke
+
+OoT3D decomp (the private `oot3d-decomp` repo, fed by the **decomp-port** skill / Ghidra pipeline) is a
+**primary project goal and a prerequisite for full parity** — not a side quest. So when you find a
+behavioral difference (an actor moving/posing/animating wrong vs OoT3D), the correct response is to
+**extend the OoT3D decomp until it covers that behavior**, derive the ground truth from the 3DS binary,
+and port THAT faithfully. (user directive, 2026-06-25, hard instruction)
+
+- **Do NOT reverse-engineer the behavior by poking SoH's N64-struct memory by raw byte offset.** SoH is
+  a 64-bit build; the N64 struct-offset *comments* (`z_*.h`) do NOT match the real runtime layout (8-byte
+  pointers shift everything past the first pointer), so `apeek <n64off>`-style raw reads return GARBAGE
+  past ~0x74 and any "fix" built on them is luck, not engineering. Read fields through the C struct, and
+  establish what the behavior SHOULD be from the OoT3D decomp — never from guessed SoH offsets.
+- The decomp is the source of truth; SoH observation only confirms the *port matches it*. If the decomp
+  doesn't yet cover the function you need, decompiling it IS the task (it advances the primary goal too).
+- Record each newly-decompiled behavior in `oot3d-decomp/docs/` (addresses + derived C), then port.
+
 ## RULE: every bugfix STARTS by proving the tooling can investigate it
 
 Before touching a fix, confirm you can **reliably drive the game to the failing situation and observe
