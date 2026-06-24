@@ -413,8 +413,18 @@ std::vector<CmbDrawGroup> Cmb::buildDrawGroupsSkinned(const std::array<float, 16
             // the bind matrix and flings the mesh away (the Kokiri "floating head": kokirimaster/
             // kokiripeople face & hat are bd=2 with constant boneIndices). So smooth == bd > 1.
             bool smooth = bd > 1 && slotBi >= 0 && slotBw >= 0;
+            // RIGID_SKINNING (skinning_mode == 1): the mesh is bd == 1 (one bone per vertex,
+            // weight 1) BUT each vertex carries its OWN bone index (boneIndices, a local index
+            // into bone_table), and is stored in THAT bone's local space. Binding every vertex
+            // to bone_table[0] (the plain single-bone rigid path) collapses the whole mesh onto
+            // one bone and scatters the rest of the rig — the stalchild rendered as a pile of
+            // detached skull/ribcage/limb pieces (#109). Resolve the bone (and its bind matrix)
+            // per vertex below. SINGLE_BONE (mode 0) keeps the one-bone path; SMOOTH is bd > 1.
+            bool rigidPV = !smooth && prms.skinning_mode == 1 && slotBi >= 0 &&
+                           sepd.attrs[slotBi].present && prms.bone_table.size() > 1;
             // model-space bake: rigid verts come in bone-local space -> bound bone's
-            // bind world; smooth verts are already model space (identity).
+            // bind world; smooth verts are already model space (identity). rigidPV resolves
+            // its matrix per vertex inside the loop, so leave M at the bone_table[0] default.
             Mat4 M = smooth ? matId()
                             : (boneId < (int)mBoneMatrix.size() ? mBoneMatrix[boneId] : matId());
             int isz = dtSize(prm.index_type);
@@ -431,14 +441,25 @@ std::vector<CmbDrawGroup> Cmb::buildDrawGroupsSkinned(const std::array<float, 16
                 readAttr(sepd.attrs[slotPos], slotPos, idx, 3, pos);
                 if (hasNormal) readAttr(sepd.attrs[slotNrm], slotNrm, idx, 3, nrm);
                 if (slotUv0 >= 0 && sepd.attrs[slotUv0].present) readAttr(sepd.attrs[slotUv0], slotUv0, idx, 2, uv);
+                // RIGID_SKINNING: resolve this vertex's own bone + bind matrix (see rigidPV above).
+                int vBone = boneId;
+                Mat4 Mv = M;
+                if (rigidPV) {
+                    const SepdAttr& bia = sepd.attrs[slotBi];
+                    int li = (bia.mode == 1)
+                                 ? (int)bia.constant[0]
+                                 : (int)dtRead(b, biBase + bia.start + idx * (uint32_t)bd * biSz, bia.data_type);
+                    vBone = (li >= 0 && li < (int)prms.bone_table.size()) ? prms.bone_table[li] : boneId;
+                    Mv = (vBone >= 0 && vBone < (int)mBoneMatrix.size()) ? mBoneMatrix[vBone] : matId();
+                }
                 // to model space (rigid bake / smooth identity)
                 float mp[3], mn[3];
-                matApplyPos(M, pos, mp);
-                matApplyDir(M, nrm, mn);
+                matApplyPos(Mv, pos, mp);
+                matApplyDir(Mv, nrm, mn);
                 // gather (boneId, weight)
                 int ids[8]; float wts[8]; int nb = 0;
                 if (!smooth) {
-                    ids[0] = boneId; wts[0] = 1.0f; nb = 1;
+                    ids[0] = vBone; wts[0] = 1.0f; nb = 1;
                 } else {
                     const SepdAttr& bia = sepd.attrs[slotBi];
                     float wbuf[8] = {};

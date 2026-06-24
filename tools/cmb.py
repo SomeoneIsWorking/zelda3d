@@ -332,17 +332,28 @@ class Cmb:
                 # e.g. a head on a 2-bone neck/head chain). Requiring ARRAY mis-classed those as
                 # rigid and double-applied the bind matrix (the Kokiri "floating head"). Match cmb.cpp.
                 smooth = bd>1
+                # RIGID_SKINNING (skinning_mode==1): bd==1 but each vertex has its OWN bone index
+                # (boneIndices, local into bone_table) and is in THAT bone's local space. Binding
+                # all verts to bt[0] scatters the rig (stalchild #109) -> resolve per vertex below.
+                bi=sepd.attrs["boneIndices"]
+                rigid_pv = (not smooth) and prms.skinning_mode==1 and bi.mode==MODE_ARRAY and len(bt)>1
                 # rigid -> place by the bound bone; smooth -> raw model space (identity).
                 M = _mat_id() if smooth else self.bone_matrix.get(bt[0], _mat_id())
                 isz=DT_SIZE[prm.index_type]; ifmt=DT_FMT[prm.index_type]
                 ibase=self.idx_ptr + prm.first*isz
                 idxs=struct.unpack_from("<%d%s"%(prm.count,ifmt), b, ibase)
+                bibase,_=self.vatr["boneIndices"]; bisz=DT_SIZE[bi.data_type]; bifmt=DT_FMT[bi.data_type]
                 verts=[]
                 for idx in idxs:
                     pos=self.read_attr(sepd.attrs["position"],"position",idx,3)
                     nrm=self.read_attr(sepd.attrs["normal"],"normal",idx,3) if has_normal else (0,0,1)
                     uv =self.read_attr(sepd.attrs["texCoord0"],"texCoord0",idx,2)
-                    pos=_mat_apply_pos(M,pos); nrm=_mat_apply_dir(M,nrm)
+                    Mv=M
+                    if rigid_pv:
+                        li=struct.unpack_from("<"+bifmt,b,bibase+bi.start+idx*bd*bisz)[0]
+                        gb=bt[int(li)] if 0<=int(li)<len(bt) else bt[0]
+                        Mv=self.bone_matrix.get(gb,_mat_id())
+                    pos=_mat_apply_pos(Mv,pos); nrm=_mat_apply_dir(Mv,nrm)
                     verts.append((idx,pos,nrm,uv))
                 for i in range(0,len(verts)-2,3):
                     yield (mesh.sepd_index, mesh.material_index, verts[i:i+3])
