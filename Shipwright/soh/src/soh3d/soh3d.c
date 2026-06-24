@@ -291,6 +291,17 @@ s32 gSoH3dActorFreeze = 0;
 static Vec3f sSoH3dActorPinPos;
 static Vec3s sSoH3dActorPinRot;
 
+// BEHAVIORAL motion-parity sampler (REPL `asample <n> <path>`): stream the selected actor's
+// per-frame pos/rot/vel to a CSV for N frames, then close. The selected actor is post-updated
+// exactly once per game frame, so each match = one frame regardless of headless being uncapped
+// (frame-indexed, not wallclock — the oracle side samples the same actor's RAM, tools/
+// oracle_motion_sample.py, and tools/motion_parity.py diffs the two trajectories). Sampling does
+// NOT require afreeze — the point is to observe the actor's natural motion.
+static FILE* sSoH3dMotionFile = NULL;
+static Actor* sSoH3dMotionActor = NULL; // pinned at asample time so reselecting doesn't hijack it
+static s32 sSoH3dMotionRemaining = 0;
+static s32 sSoH3dMotionFrame = 0;
+
 // The PLAYER-transform pin (linkpin) state + application now live in soh3d_link.cpp; the call site
 // stays here (SoH3D_LinkApplyPin, applied before the generic actor pin below).
 
@@ -299,6 +310,21 @@ static Vec3s sSoH3dActorPinRot;
 // killed selection simply stops matching (no dangling deref).
 void SoH3D_ActorPostUpdate(PlayState* play, Actor* actor) {
     SoH3D_LinkApplyPin(play, actor); // #8 linkpin (pins the player transform; defined in soh3d_link.cpp)
+    // Motion sampler: stream the selected actor's live state once per frame (BEFORE the freeze pin,
+    // so a frozen actor logs zeroed motion correctly and a free actor logs its real trajectory).
+    if (sSoH3dMotionFile != NULL && actor == sSoH3dMotionActor && sSoH3dMotionRemaining > 0) {
+        fprintf(sSoH3dMotionFile, "%d,0x%X,%.3f,%.3f,%.3f,%d,%d,%d,%.4f,%.4f,%.4f,%.4f\n",
+                sSoH3dMotionFrame, actor->id, actor->world.pos.x, actor->world.pos.y,
+                actor->world.pos.z, actor->world.rot.x, actor->world.rot.y, actor->world.rot.z,
+                actor->velocity.x, actor->velocity.y, actor->velocity.z, actor->speedXZ);
+        fflush(sSoH3dMotionFile); // per-row flush so a capture can be read live (small N)
+        sSoH3dMotionFrame++;
+        if (--sSoH3dMotionRemaining <= 0) {
+            fclose(sSoH3dMotionFile);
+            sSoH3dMotionFile = NULL;
+            sSoH3dMotionActor = NULL;
+        }
+    }
     if (actor == NULL || actor != gSoH3dSelActor || !gSoH3dActorFreeze) {
         return;
     }
@@ -5347,6 +5373,37 @@ static void SoH3D_ReplExec(PlayState* play, char* line, const char* outPath) {
                             a->colChkInfo.displacement.x, a->colChkInfo.displacement.y,
                             a->colChkInfo.displacement.z, a->bgCheckFlags, a->floorHeight,
                             gSoH3dActorFreeze);
+        }
+    } else if (strcmp(cmd, "asample") == 0) {
+        // BEHAVIORAL motion-parity sampler: `asample <n> [path]` streams the selected actor's
+        // pos/rot/vel for the next n game frames to a CSV (default scratch/motion/soh3d.csv), then
+        // closes. Pair with the oracle side (tools/oracle_motion_sample.py) + tools/motion_parity.py.
+        // Do NOT afreeze the actor if you want to observe its real motion.
+        int n = 0;
+        char path[256] = "scratch/motion/soh3d.csv";
+        int got = sscanf(line, "%*s %d %255s", &n, path);
+        if (gSoH3dSelActor == NULL) {
+            SoH3D_ReplReply(outPath, "asample: no selection (asel first)");
+        } else if (got < 1 || n <= 0) {
+            SoH3D_ReplReply(outPath, "asample needs <n> [path] (n frames to log)");
+        } else {
+            if (sSoH3dMotionFile != NULL) {
+                fclose(sSoH3dMotionFile);
+                sSoH3dMotionFile = NULL;
+            }
+            sSoH3dMotionFile = fopen(path, "w");
+            if (sSoH3dMotionFile == NULL) {
+                SoH3D_ReplReply(outPath, "asample: cannot open '%s' (mkdir scratch/motion?)", path);
+            } else {
+                fprintf(sSoH3dMotionFile,
+                        "frame,id,posx,posy,posz,rotx,roty,rotz,velx,vely,velz,speedXZ\n");
+                fflush(sSoH3dMotionFile);
+                sSoH3dMotionActor = gSoH3dSelActor;
+                sSoH3dMotionRemaining = n;
+                sSoH3dMotionFrame = 0;
+                SoH3D_ReplReply(outPath, "asample: logging id=0x%X for %d frames -> %s",
+                                gSoH3dSelActor->id, n, path);
+            }
         }
     } else if (strcmp(cmd, "archinfo") == 0) {
         // #77 diagnostic: dump the well-arch (Idohashira) CMB geometry anchoring vs the actor.
