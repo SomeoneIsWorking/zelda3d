@@ -353,7 +353,28 @@ Gfx* SkelAnime_DrawSkeleton2(PlayState* play, SkelAnime* skelAnime, OverrideLimb
     SoH3D_SetLimbOverride((void*)overrideLimbDraw, arg, 0); // #23 procedural-override replay
     if (SoH3D_SkelAnimeDraw(play, skelAnime)) {
         Gfx* ret = (gfx == soh3dOpaEntry) ? play->state.gfxCtx->polyOpa.p : gfx;
-        SoH3D_UpdateSkelColliders(play, skelAnime, overrideLimbDraw, postLimbDraw, arg); // #108
+        // #108 collider re-walk — MUST use the 6-arg SkelAnime_Draw/DrawFlex, NOT SkelAnime_DrawOpa.
+        // DrawSkeleton2 callers provide a 6-arg PostLimbDraw whose body dereferences the Gfx** gfx
+        // param (e.g. EnBox_PostLimbDraw emits the chest body/lid dlists into *gfx). The generic
+        // SoH3D_UpdateSkelColliders re-walks via SkelAnime_DrawOpa, which invokes postLimbDraw with
+        // the 5-arg PostLimbDrawOpa ABI (no gfx) — so the callback read a garbage register and
+        // (*gfx)++ SIGSEGV'd (Deku Tree treasure-chest crash on load). Re-walking through the same
+        // 6-arg path the actor expects passes a valid gfx; gSoH3dColliderPass suppresses the OoT3D
+        // replacement so the real N64 limb walk runs for its collider side-effects, and we rewind
+        // the gfx buffers afterward so none of the N64 geometry renders.
+        Gfx* dOpa = play->state.gfxCtx->polyOpa.p;
+        Gfx* dXlu = play->state.gfxCtx->polyXlu.p;
+        gSoH3dColliderPass = 1;
+        if (skelAnime->skeletonHeader->skeletonType == SKELANIME_TYPE_NORMAL) {
+            SkelAnime_Draw(play, skelAnime->skeleton, skelAnime->jointTable, overrideLimbDraw, postLimbDraw, arg, ret);
+        } else if (skelAnime->skeletonHeader->skeletonType == SKELANIME_TYPE_FLEX) {
+            FlexSkeletonHeader* flexHeader = (FlexSkeletonHeader*)skelAnime->skeletonHeader;
+            SkelAnime_DrawFlex(play, skelAnime->skeleton, skelAnime->jointTable, flexHeader->dListCount,
+                               overrideLimbDraw, postLimbDraw, arg, ret);
+        }
+        gSoH3dColliderPass = 0;
+        play->state.gfxCtx->polyOpa.p = dOpa;
+        play->state.gfxCtx->polyXlu.p = dXlu;
         return ret;
     }
     if (skelAnime->skeletonHeader->skeletonType == SKELANIME_TYPE_NORMAL) {
