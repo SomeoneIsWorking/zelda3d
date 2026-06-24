@@ -163,3 +163,17 @@ vertex-light × combiner model** (`a_Color·tex·scale = 0.68·tex`) predicts �
    applies the N64 tint) and read the actual FLOOR sepd's per-vertex `a_Color` in-engine; check if the
    net → ~1.0 and grass → ~54. Suspects, in order: (a) uTint double-dim (~1.05× alone), (b) floor
    a_Color ~0.5 with SoH3D's extra uTint pulling it to 0.65, (c) texture-decode/gamma residual.
+
+### FIX LANDED (2026-06-24): exclude OoT3D world geometry from SSAO
+**Root cause of the ~1.5x:** SoH3D's screen-space AO was darkening the OoT3D world on top of its
+ALREADY-baked per-vertex AO (the dark a_Color *is* the baked occlusion) — a ~1.3x double-darkening.
+Live A/B (Deku ledge): grass median lum AO+shadow=36, AO-off=47; shadow alone has ZERO effect on
+open grass. So AO was the whole gap.
+
+**Fix:** both AO depth-prepass loops in `soh3d_gl.cpp` (the VK dispatch ~L1560 and the GL `aoPass`
+~L1378) now `if (!it.lit) continue;` — `DrawItem.lit==0` is world/scene geometry (baked AO), so it's
+excluded from SSAO; `lit==1` dynamic actors/props (≈white vColor, no baked AO) still get it. Shadows
+untouched (separate pass; they only darken genuinely shadowed pixels). Verified live on Vulkan with
+AO ON: Kokiri Deku grass median 36→46, p90 57→73, G/R 1.22 (oracle 54/87/1.26) — hue matched,
+~1.17x residual remaining (the spurious N64 `uTint`≈0.95 + minor a_Color/texture; a smaller
+follow-up). Do NOT add a global brightness constant for that residual.
