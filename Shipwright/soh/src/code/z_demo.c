@@ -1327,6 +1327,19 @@ void Cutscene_Command_Terminator(PlayState* play, CutsceneContext* csCtx, CsCmdB
                 play->transitionType = TRANS_TYPE_FADE_WHITE;
                 break;
         }
+
+        // SoH3D (#15): make a player START-skip actually skip a cutscene whose terminator ENDS IN
+        // PLACE (cmd->base == 0, or any base that triggers no scene transition). For those, the
+        // vanilla skip above only sets CS_STATE_UNSKIPPABLE_EXEC, which keeps playing the remaining
+        // frames one-by-one until the natural end frame — so the segment isn't actually shortened.
+        // The most visible victim is the FINAL segment of the new-game intro (Navi flying into
+        // Link's house and waking him, cutsceneIndex 0xFFF1): START skips every earlier segment
+        // (their terminators transition to the next scene) but stalls on this last in-place one.
+        // When the skip was player-initiated and no transition got armed, jump straight to the
+        // teardown state (CS_STATE_UNSKIPPABLE_INIT) so the cutscene ends immediately and cleanly.
+        if (csSkipButton && (play->transitionTrigger == TRANS_TRIGGER_OFF)) {
+            csCtx->state = CS_STATE_UNSKIPPABLE_INIT;
+        }
     }
 }
 
