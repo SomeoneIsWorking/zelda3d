@@ -11937,6 +11937,33 @@ void Player_UpdateCommon(Player* this, PlayState* play, Input* input) {
 
     sControlInput = input;
 
+    // SoH3D (#112): START-skip the new-game intro (Navi flies in / wakes Link). That intro is the
+    // ONE cutscene in Link's house: it spawns with cutsceneIndex 0xFFF1 and locks the player via
+    // PLAYER_STATE1_IN_CUTSCENE, but it is driven directly (start-mode/actor), NOT the csCtx script
+    // system (csCtx.state stays IDLE the whole time) and has no terminator command — so neither the
+    // scripted-cutscene START-skip (Cutscene_Command_Terminator) nor the manual-cutscene processor
+    // ever fires for it, and START did nothing. Link is never legitimately IN_CUTSCENE in his own
+    // house otherwise, so gating on (Link's house + IN_CUTSCENE) targets exactly the intro. Skip it
+    // by reloading the scene with no cutscene (nextCutsceneIndex 0 -> day setup layer), which drops
+    // the player into normal control in Link's house — the genuine post-intro state.
+    if ((play->sceneNum == SCENE_LINKS_HOUSE) &&
+        ((this->stateFlags1 & PLAYER_STATE1_IN_CUTSCENE) || (this->csAction != 0) ||
+         (play->csCtx.state != CS_STATE_IDLE)) &&
+        (gSaveContext.gameMode != GAMEMODE_TITLE_SCREEN) && (play->transitionTrigger == TRANS_TRIGGER_OFF) &&
+        (gSaveContext.fileNum != 0xFEDC) && CHECK_BTN_ALL(input->press.button, BTN_START)) {
+        Audio_PlaySoundGeneral(NA_SE_SY_PIECE_OF_HEART, &gSfxDefaultPos, 4, &gSfxDefaultFreqAndVolScale,
+                               &gSfxDefaultFreqAndVolScale, &gSfxDefaultReverb);
+        gSaveContext.cutsceneIndex = 0;
+        gSaveContext.nextCutsceneIndex = 0;
+        gSaveContext.seqId = (u8)NA_BGM_DISABLED;
+        gSaveContext.natureAmbienceId = 0xFF;
+        this->stateFlags1 &= ~PLAYER_STATE1_IN_CUTSCENE;
+        this->csAction = 0;
+        play->nextEntranceIndex = ENTR_LINKS_HOUSE_CHILD_SPAWN;
+        play->transitionTrigger = TRANS_TRIGGER_START;
+        play->transitionType = TRANS_TYPE_FADE_BLACK_FAST;
+    }
+
     if (this->unk_A86 < 0) {
         this->unk_A86++;
         if (this->unk_A86 == 0) {
