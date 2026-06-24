@@ -352,7 +352,9 @@ Gfx* SkelAnime_DrawSkeleton2(PlayState* play, SkelAnime* skelAnime, OverrideLimb
     Gfx* soh3dOpaEntry = play->state.gfxCtx->polyOpa.p;
     SoH3D_SetLimbOverride((void*)overrideLimbDraw, arg, 0); // #23 procedural-override replay
     if (SoH3D_SkelAnimeDraw(play, skelAnime)) {
-        return (gfx == soh3dOpaEntry) ? play->state.gfxCtx->polyOpa.p : gfx;
+        Gfx* ret = (gfx == soh3dOpaEntry) ? play->state.gfxCtx->polyOpa.p : gfx;
+        SoH3D_UpdateSkelColliders(play, skelAnime, overrideLimbDraw, postLimbDraw, arg); // #108
+        return ret;
     }
     if (skelAnime->skeletonHeader->skeletonType == SKELANIME_TYPE_NORMAL) {
         return SkelAnime_Draw(play, skelAnime->skeleton, skelAnime->jointTable, overrideLimbDraw, postLimbDraw, arg,
@@ -674,7 +676,17 @@ Gfx* SkelAnime_Draw(PlayState* play, void** skeleton, Vec3s* jointTable, Overrid
     Gfx* soh3dOpaEntry = play->state.gfxCtx->polyOpa.p;
     SoH3D_SetLimbOverride((void*)overrideLimbDraw, arg, 1); // #23 (7-arg OverrideLimbDraw)
     if (SoH3D_SkelAnimeDrawRaw(play, skeleton, jointTable)) {
-        return (gfx == soh3dOpaEntry) ? play->state.gfxCtx->polyOpa.p : gfx;
+        Gfx* ret = (gfx == soh3dOpaEntry) ? play->state.gfxCtx->polyOpa.p : gfx;
+        // #108: re-run the N64 limb walk for postLimbDraw collider side-effects, then discard the N64
+        // geometry (see SkelAnime_DrawFlex / #107).
+        Gfx* dOpa = play->state.gfxCtx->polyOpa.p;
+        Gfx* dXlu = play->state.gfxCtx->polyXlu.p;
+        gSoH3dColliderPass = 1;
+        SkelAnime_Draw(play, skeleton, jointTable, overrideLimbDraw, postLimbDraw, arg, ret);
+        gSoH3dColliderPass = 0;
+        play->state.gfxCtx->polyOpa.p = dOpa;
+        play->state.gfxCtx->polyXlu.p = dXlu;
+        return ret;
     }
 
     if (skeleton == NULL) {
@@ -794,7 +806,18 @@ Gfx* SkelAnime_DrawFlex(PlayState* play, void** skeleton, Vec3s* jointTable, s32
     Gfx* soh3dOpaEntry = play->state.gfxCtx->polyOpa.p;
     SoH3D_SetLimbOverride((void*)overrideLimbDraw, arg, 1); // #23 (7-arg OverrideLimbDraw)
     if (SoH3D_SkelAnimeDrawRaw(play, skeleton, jointTable)) {
-        return (gfx == soh3dOpaEntry) ? play->state.gfxCtx->polyOpa.p : gfx;
+        Gfx* ret = (gfx == soh3dOpaEntry) ? play->state.gfxCtx->polyOpa.p : gfx;
+        // #108: re-run the N64 limb walk for its postLimbDraw collider side-effects (gSoH3dColliderPass
+        // suppresses the replacement so the real walk runs), then rewind the buffers to discard the N64
+        // geometry. Without this, replaced skinned actors' collision spheres stay at the origin (#107).
+        Gfx* dOpa = play->state.gfxCtx->polyOpa.p;
+        Gfx* dXlu = play->state.gfxCtx->polyXlu.p;
+        gSoH3dColliderPass = 1;
+        SkelAnime_DrawFlex(play, skeleton, jointTable, dListCount, overrideLimbDraw, postLimbDraw, arg, ret);
+        gSoH3dColliderPass = 0;
+        play->state.gfxCtx->polyOpa.p = dOpa;
+        play->state.gfxCtx->polyXlu.p = dXlu;
+        return ret;
     }
 
     mtx = Graph_Alloc(play->state.gfxCtx, dListCount * sizeof(*mtx));
