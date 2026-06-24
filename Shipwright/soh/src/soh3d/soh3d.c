@@ -5549,6 +5549,82 @@ static void SoH3D_ReplExec(PlayState* play, char* line, const char* outPath) {
             SoH3D_ReplReply(outPath, "%s | actorYaw=%d yawToLink=%d rel=%d", buf,
                             a->shape.rot.y, yawToLink, (s16)(yawToLink - a->shape.rot.y));
         }
+    } else if (strcmp(cmd, "bscan") == 0) {
+        // BEHAVIORAL anomaly scan (whole-game sweep primitive): dump every live actor's pos +
+        // speedXZ + velocity.y, and FLAG the signatures of the known actor-bug families so an
+        // automated sweep can surface them without per-actor inspection:
+        //   ORIGIN  pos within 1u of (0,0,0) and not the player -> collider/transform stuck at origin
+        //           (the #107 stalchild root: collision sphere pinned at origin -> phantom collision).
+        //   NAN     pos/vel is NaN -> blown-up transform.
+        //   ZIP     speedXZ > <thr> (default 60) -> flung/zipping (the #107 visible symptom).
+        //   FALL    velocity.y < -50 sustained -> falling through the world.
+        // Prints one line per FLAGGED actor + a summary count; `bscan all` lists every actor.
+        float thr = 60.0f;
+        char sub[16] = "";
+        int listAll = (sscanf(line, "%*s %15s", sub) == 1 && strcmp(sub, "all") == 0);
+        if (!listAll) (void)sscanf(line, "%*s %f", &thr);
+        Player* pl = GET_PLAYER(play);
+        s32 cat, n = 0, nflag = 0;
+        SoH3D_ReplReply(outPath, "bscan thr=%.0f (ORIGIN/NAN/ZIP/FALL):", thr);
+        for (cat = 0; cat < ACTORCAT_MAX; cat++) {
+            Actor* a = play->actorCtx.actorLists[cat].head;
+            for (; a != NULL && n < 120; a = a->next, n++) {
+                float x = a->world.pos.x, y = a->world.pos.y, z = a->world.pos.z;
+                int isPlayer = (cat == ACTORCAT_PLAYER);
+                int nan = (x != x) || (y != y) || (z != z) || (a->speedXZ != a->speedXZ);
+                int origin = !isPlayer && (x > -1.0f && x < 1.0f) && (z > -1.0f && z < 1.0f) &&
+                             (y > -1.0f && y < 1.0f);
+                int zip = (a->speedXZ > thr) || (a->speedXZ < -thr);
+                int fall = (a->velocity.y < -50.0f);
+                const char* flag = nan ? "NAN" : origin ? "ORIGIN" : zip ? "ZIP" : fall ? "FALL" : NULL;
+                if (flag != NULL) nflag++;
+                if (flag != NULL || listAll)
+                    SoH3D_ReplReply(outPath, "  %sid=0x%-4X cat=%d p=0x%04X pos=(%.0f,%.0f,%.0f) "
+                                    "speedXZ=%.1f vy=%.1f", flag ? flag : "  ", a->id, cat,
+                                    (u16)a->params, x, y, z, a->speedXZ, a->velocity.y);
+            }
+        }
+        (void)pl;
+        SoH3D_ReplReply(outPath, "bscan: %d actors, %d flagged", n, nflag);
+    } else if (strcmp(cmd, "geomscan") == 0) {
+        // GEOMETRY-VALUE sweep: read every SoH3D model draw's WORLD-space AABB straight out of the
+        // renderer (soh3d_vk capture) — NOT pixels — and flag MISRENDERED objects by VALUE: a world
+        // extent far larger than any real OoT3D model (default > 1500u) or NaN = a mis-scaled/blown-up
+        // draw (e.g. a push block rendering as a giant dark blob). This is what a parity sweep needs to
+        // catch render glitches automatically. `geomscan all` lists every draw; `geomscan <thr>` sets
+        // the extent threshold. Maps each draw's modelId -> its OoT3D ZAR so the offender is named.
+        extern int SoH3D_GeomScanDump(int*, float*, float*, int);
+        extern const char* SoH3D_AutoModelZar(int);
+        static int ids[2048];
+        static float mins[2048 * 3], maxs[2048 * 3];
+        float thr = 1500.0f;
+        char sub[16] = "";
+        int listAll = (sscanf(line, "%*s %15s", sub) == 1 && strcmp(sub, "all") == 0);
+        if (!listAll) {
+            (void)sscanf(line, "%*s %f", &thr);
+        }
+        int gn = SoH3D_GeomScanDump(ids, mins, maxs, 2048);
+        int gflag = 0;
+        SoH3D_ReplReply(outPath, "geomscan thr=%.0f (%d SoH3D draws this frame):", thr, gn);
+        for (int i = 0; i < gn; i++) {
+            float ex = maxs[i * 3 + 0] - mins[i * 3 + 0];
+            float ey = maxs[i * 3 + 1] - mins[i * 3 + 1];
+            float ez = maxs[i * 3 + 2] - mins[i * 3 + 2];
+            float mx = ex > ey ? (ex > ez ? ex : ez) : (ey > ez ? ey : ez);
+            int isnan = (mx != mx);
+            int huge = (mx > thr);
+            const char* zar = SoH3D_AutoModelZar(ids[i]);
+            if (isnan || huge) {
+                gflag++;
+            }
+            if (isnan || huge || listAll) {
+                SoH3D_ReplReply(outPath,
+                                "  %smodel=%d ext=(%.0f,%.0f,%.0f) maxext=%.0f wmin=(%.0f,%.0f,%.0f) %s",
+                                isnan ? "NAN " : huge ? "HUGE " : "  ", ids[i], ex, ey, ez, mx,
+                                mins[i * 3 + 0], mins[i * 3 + 1], mins[i * 3 + 2], zar ? zar : "?");
+            }
+        }
+        SoH3D_ReplReply(outPath, "geomscan: %d draws, %d flagged (huge/nan)", gn, gflag);
     } else if (strcmp(cmd, "asample") == 0) {
         // BEHAVIORAL motion-parity sampler: `asample <n> [path]` streams the selected actor's
         // pos/rot/vel for the next n game frames to a CSV (default scratch/motion/soh3d.csv), then

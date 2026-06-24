@@ -290,7 +290,21 @@ struct VkModel {
     VkDeviceMemory vboMem = VK_NULL_HANDLE;
     std::vector<VkGroup> groups;
     std::vector<VkTex> textures;
+    // Local-space vertex AABB (geometry-value sweep: a model whose WORLD AABB, this*matrix, is
+    // implausibly large/degenerate is a misrendered object — caught from renderer VALUES, not pixels).
+    float localMin[3] = { 0, 0, 0 }, localMax[3] = { 0, 0, 0 };
+    bool hasBounds = false;
 };
+
+// Per-frame geometry capture for `geomscan`: every SoH3D model draw records its world-space AABB
+// (local AABB transformed by the model->world matrix). The sweep reads these VALUES to flag
+// misrendered geometry (huge/NaN/degenerate extent) directly from the renderer. Double-buffered:
+// draws fill g_geomCur; startFrameOnce swaps it to g_geomLast so geomscan reads a complete frame.
+struct GeomRec {
+    int modelId;
+    float wmin[3], wmax[3];
+};
+std::vector<GeomRec> g_geomCur, g_geomLast;
 
 struct Ring {
     VkBuffer ubo = VK_NULL_HANDLE;
@@ -931,6 +945,17 @@ VkModel* ensureUploaded(int modelId) {
         m.groups.push_back(g);
     }
 
+    // Local-space vertex AABB for the geometry-value sweep (geomscan).
+    if (!all.empty()) {
+        for (int k = 0; k < 3; k++) m.localMin[k] = m.localMax[k] = all[0].pos[k];
+        for (const SoH3DGlVtx& v : all)
+            for (int k = 0; k < 3; k++) {
+                if (v.pos[k] < m.localMin[k]) m.localMin[k] = v.pos[k];
+                if (v.pos[k] > m.localMax[k]) m.localMax[k] = v.pos[k];
+            }
+        m.hasBounds = true;
+    }
+
     // Device-local vertex buffer via a staging copy.
     const VkDeviceSize vbBytes = all.size() * sizeof(SoH3DGlVtx);
     VkBuffer staging;
@@ -1481,6 +1506,8 @@ void recordDepthDraw(int modelId, const float* mp16, const float* mv16, int inve
 void startFrameOnce() {
     if (g_frameStarted)
         return;
+    g_geomLast.swap(g_geomCur); // publish last frame's geometry capture; start a fresh one
+    g_geomCur.clear();
     applyPendingEvict(); // drop any models flagged for reload before any draw records this frame
     Ring& r = g_rings[g_ctx.frameIndex];
     r.offset = 0;
@@ -1496,6 +1523,21 @@ extern "C" int SoH3D_Vk_Active(void) {
 
 extern "C" void SoH3D_Vk_SetProvider(SoH3DModelProvider fn) {
     g_provider = fn;
+}
+
+// geomscan bridge: copy the last completed frame's per-draw world AABBs out to the REPL (soh3d.c).
+// Returns the count written; modelIds[i], mins[i*3..], maxs[i*3..] describe draw i.
+extern "C" int SoH3D_GeomScanDump(int* modelIds, float* mins, float* maxs, int maxN) {
+    int n = (int)g_geomLast.size();
+    if (n > maxN) n = maxN;
+    for (int i = 0; i < n; i++) {
+        modelIds[i] = g_geomLast[i].modelId;
+        for (int k = 0; k < 3; k++) {
+            mins[i * 3 + k] = g_geomLast[i].wmin[k];
+            maxs[i * 3 + k] = g_geomLast[i].wmax[k];
+        }
+    }
+    return n;
 }
 
 // Deferred model-cache eviction (mirror of the GL path). A request from another thread (the
@@ -1556,6 +1598,32 @@ extern "C" void SoH3D_Vk_DrawModel(int modelId, const float* mp16, const float* 
     VkModel* m = ensureUploaded(modelId);
     if (!m)
         return;
+
+    // Geometry-value capture (geomscan): world AABB = local AABB transformed by mv16 (model->world,
+    // column-major to match the shader's ubo.uMV * pos). One record per draw; the sweep reads these
+    // to flag misrendered geometry by VALUE (huge/degenerate world extent) with no screenshot/diff.
+    if (m->hasBounds && mv16 != nullptr && g_geomCur.size() < 4096) {
+        GeomRec rec;
+        rec.modelId = modelId;
+        bool first = true;
+        for (int c = 0; c < 8; c++) {
+            float lx = (c & 1) ? m->localMax[0] : m->localMin[0];
+            float ly = (c & 2) ? m->localMax[1] : m->localMin[1];
+            float lz = (c & 4) ? m->localMax[2] : m->localMin[2];
+            float wx = mv16[0] * lx + mv16[4] * ly + mv16[8] * lz + mv16[12];
+            float wy = mv16[1] * lx + mv16[5] * ly + mv16[9] * lz + mv16[13];
+            float wz = mv16[2] * lx + mv16[6] * ly + mv16[10] * lz + mv16[14];
+            if (first) {
+                rec.wmin[0] = rec.wmax[0] = wx; rec.wmin[1] = rec.wmax[1] = wy;
+                rec.wmin[2] = rec.wmax[2] = wz; first = false;
+            } else {
+                if (wx < rec.wmin[0]) rec.wmin[0] = wx; if (wx > rec.wmax[0]) rec.wmax[0] = wx;
+                if (wy < rec.wmin[1]) rec.wmin[1] = wy; if (wy > rec.wmax[1]) rec.wmax[1] = wy;
+                if (wz < rec.wmin[2]) rec.wmin[2] = wz; if (wz > rec.wmax[2]) rec.wmax[2] = wz;
+            }
+        }
+        g_geomCur.push_back(rec);
+    }
 
     Ring& ring = g_rings[g_ctx.frameIndex];
     VkCommandBuffer cmd = g_ctx.cmd;
