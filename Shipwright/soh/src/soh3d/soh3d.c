@@ -2767,7 +2767,16 @@ static int SoH3D_DoRetarget(PlayState* play, void** skeleton, Vec3s* jointTable,
 // points are covered: this one takes a SkelAnime* (SkelAnime_DrawSkeletonOpa/DrawSkeleton2 and
 // func_80034BA0/CC4), and SoH3D_SkelAnimeDrawRaw takes the raw skeleton+jointTable
 // (SkelAnime_DrawFlexOpa/DrawOpa, which many actors call directly without a SkelAnime*).
+// #107: when set, the SoH3D draw-replacement is suppressed so the vanilla N64 limb walk runs. Used
+// to re-run that walk purely for its postLimbDraw side effects (Collider_UpdateSpheres) AFTER an
+// OoT3D model was already drawn, so replaced skinned actors keep correct collision-sphere positions
+// (otherwise their spheres stay at the origin -> phantom collisions -> enemies fly off, #107).
+int gSoH3dColliderPass = 0;
+
 int SoH3D_SkelAnimeDraw(PlayState* play, SkelAnime* skelAnime) {
+    if (gSoH3dColliderPass) {
+        return 0; // collider-update re-walk: never replace, let the N64 limb walk run
+    }
     if (gSoH3dPendingModel < 0 || gSoH3dPendingActor == NULL) {
         return 0; // no pending replacement for the current actor
     }
@@ -2785,6 +2794,9 @@ int SoH3D_SkelAnimeDraw(PlayState* play, SkelAnime* skelAnime) {
 }
 
 int SoH3D_SkelAnimeDrawRaw(PlayState* play, void** skeleton, Vec3s* jointTable) {
+    if (gSoH3dColliderPass) {
+        return 0; // collider-update re-walk: never replace, let the N64 limb walk run (#107)
+    }
     if (gSoH3dPendingModel < 0 || gSoH3dPendingActor == NULL) {
         return 0; // no pending replacement -> cheap early out (this fires for every limbed draw)
     }
@@ -5263,10 +5275,14 @@ static void SoH3D_ReplExec(PlayState* play, char* line, const char* outPath) {
             Actor* a = gSoH3dSelActor;
             SoH3D_ReplReply(outPath,
                             "ainfo id=0x%X params=%d pos=(%.0f,%.0f,%.0f) rot=(%d,%d,%d) "
-                            "vel=(%.1f,%.1f,%.1f) speedXZ=%.1f freeze=%d",
+                            "vel=(%.1f,%.1f,%.1f) speedXZ=%.1f disp=(%.1f,%.1f,%.1f) "
+                            "bgFlags=0x%X floorY=%.0f freeze=%d",
                             a->id, a->params, a->world.pos.x, a->world.pos.y, a->world.pos.z,
                             a->world.rot.x, a->world.rot.y, a->world.rot.z, a->velocity.x,
-                            a->velocity.y, a->velocity.z, a->speedXZ, gSoH3dActorFreeze);
+                            a->velocity.y, a->velocity.z, a->speedXZ,
+                            a->colChkInfo.displacement.x, a->colChkInfo.displacement.y,
+                            a->colChkInfo.displacement.z, a->bgCheckFlags, a->floorHeight,
+                            gSoH3dActorFreeze);
         }
     } else if (strcmp(cmd, "archinfo") == 0) {
         // #77 diagnostic: dump the well-arch (Idohashira) CMB geometry anchoring vs the actor.

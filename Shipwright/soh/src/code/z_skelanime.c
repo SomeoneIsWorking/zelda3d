@@ -300,6 +300,31 @@ void SkelAnime_DrawLimbOpa(PlayState* play, s32 limbIndex, void** skeleton, Vec3
 
 // Checks the skeleton header to draw the appropriate skeleton type instead of harcoding the type in the actor's draw
 // function...
+// SoH3D #107: when an OoT3D model replaces a skinned actor's N64 skeleton draw, the N64 limb walk is
+// skipped — and with it the per-limb postLimbDraw callback that repositions the actor's collision
+// spheres (Collider_UpdateSpheres). Left un-run, every replaced actor's OC/AC/AT spheres stay at the
+// world origin, so the collision check sees them overlapping there and shoves them apart with the
+// degenerate fixed pushback (enemies "zip away"; stalchildren are the vivid case, #107). Re-run the
+// N64 limb matrix walk purely for those side effects (gSoH3dColliderPass suppresses the OoT3D
+// replacement so the real walk runs), then rewind the gfx buffers so none of the N64 geometry renders.
+extern int gSoH3dColliderPass;
+static void SoH3D_UpdateSkelColliders(PlayState* play, SkelAnime* skelAnime,
+                                      OverrideLimbDrawOpa overrideLimbDraw, PostLimbDrawOpa postLimbDraw, void* arg) {
+    Gfx* opaP = play->state.gfxCtx->polyOpa.p;
+    Gfx* xluP = play->state.gfxCtx->polyXlu.p;
+    gSoH3dColliderPass = 1;
+    if (skelAnime->skeletonHeader->skeletonType == SKELANIME_TYPE_NORMAL) {
+        SkelAnime_DrawOpa(play, skelAnime->skeleton, skelAnime->jointTable, overrideLimbDraw, postLimbDraw, arg);
+    } else if (skelAnime->skeletonHeader->skeletonType == SKELANIME_TYPE_FLEX) {
+        FlexSkeletonHeader* flexHeader = (FlexSkeletonHeader*)skelAnime->skeletonHeader;
+        SkelAnime_DrawFlexOpa(play, skelAnime->skeleton, skelAnime->jointTable, flexHeader->dListCount,
+                              overrideLimbDraw, postLimbDraw, arg);
+    }
+    gSoH3dColliderPass = 0;
+    play->state.gfxCtx->polyOpa.p = opaP; // discard the N64 geometry; keep the OoT3D model + collider updates
+    play->state.gfxCtx->polyXlu.p = xluP;
+}
+
 void SkelAnime_DrawSkeletonOpa(PlayState* play, SkelAnime* skelAnime, OverrideLimbDrawOpa overrideLimbDraw,
                                PostLimbDrawOpa postLimbDraw, void* arg) {
     // SoH3D: if this actor is registered for N64-anim replacement, draw the OoT3D model
@@ -307,6 +332,7 @@ void SkelAnime_DrawSkeletonOpa(PlayState* play, SkelAnime* skelAnime, OverrideLi
     // auto path can replay any procedural per-limb rotation it adds (e.g. cucco wing-flap, #23).
     SoH3D_SetLimbOverride((void*)overrideLimbDraw, arg, 0);
     if (SoH3D_SkelAnimeDraw(play, skelAnime)) {
+        SoH3D_UpdateSkelColliders(play, skelAnime, overrideLimbDraw, postLimbDraw, arg); // #107
         return;
     }
     if (skelAnime->skeletonHeader->skeletonType == SKELANIME_TYPE_NORMAL) {
