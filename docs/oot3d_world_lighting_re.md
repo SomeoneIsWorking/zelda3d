@@ -366,11 +366,31 @@ consistent framing within a run, grass night/noon ratio vs oracle):
 | night/noon R | 0.58 | **0.36** | 0.34 |
 | night/noon G | 0.73 | 0.32 (ke=0) → ~0.45 (ke=0.12) | 0.55 |
 
-Night R is fixed (the primary #111 complaint) and noon moved closer to oracle. RESIDUALS (next session):
-(a) night **G** is still a bit dark and **B** short — B's night blue comes from the #110 ADDITIVE floor
-(coef 0.02, too small), not the multiply, so it's a #110 follow-up, not this model; (b) a single global
-per-light coef can't perfectly fit R and G simultaneously (R penalty from light1Color's R=99) — the
-faithful fix is the per-vertex shader model (real NdotL per light, soh3d_vk.cpp world frag) which can
-separate the lights by direction; (c) CONSISTENT-FRAMING multi-time + multi-scene verification (use a
-fixed cam/grass target) before flipping `worldshade` default ON; (d) tune/verify ≥1 more scene
-(per-scene palette already generated for 101 scenes). Tooling: scratch/lightport/{env_probe,measure_grass}.py.
+Night R is fixed (the primary #111 complaint) and noon moved closer to oracle.
+
+### CORRECTION (2026-06-24p): ka=0 — ambient out of the multiplicative term (measured regression fix)
+A pinned-frame A/B (Kokiri grass, fixed cam `cam -66 5 1075 -66 -55 945`, Link tp'd out of frame,
+`measure_grass.py` box) found the shipped **ka=0.16 DE-GREENS noon**: the Kokiri ambient is
+red-dominant `(160,72,72)` (G,B pinned ~72), so ka folds that red into a multiplicative tint:
+
+| model (noon, pinned frame) | R | G | B | G/R |
+|---|---|---|---|---|
+| worldshade OFF (flat tint) | 63.4 | 75.7 | 19.5 | 1.19 |
+| shipped ka.16/kd.77/ke.12  | 61.3 | 68.5 | 15.9 | **1.12** (de-greened + dimmed) |
+| **ka0/kd.9/ke.12 (new default)** | 63.1 | 74.7 | 16.8 | **1.18** (matches OFF) |
+| oracle target | — | — | — | ~1.26 |
+
+Night/noon ratios with the new default: **R 0.28** (oracle 0.34 — the #111 darkening, retained),
+G 0.32, B 0.69. So `ka=0` is a strict improvement: removes the noon de-green/dim regression while
+keeping the night fix. The reddish ambient belongs in the ADDITIVE #110 floor, not the multiply.
+**New defaults: ka=0.0, kd=0.9, ke=0.12.**
+
+RESIDUALS (NOT to be closed by more coefficient grinding — [[soh3d-stop-microtuning-lighting]]):
+(a) night **G** ratio 0.32 vs oracle 0.55 and **B** short — both come from the #110 ADDITIVE floor
+being too small (coef 0.02), a #110 follow-up, NOT this multiplicative model; (b) a single global
+per-light coef cannot fit R AND G simultaneously — this is IRREDUCIBLE for a single-tint model.
+KEY: the oracle's world shade matched as a SINGLE per-room tint (no per-vertex normal dependence;
+Kokiri matDiffuse=BLACK → no real NdotL), so the per-vertex NdotL port would NOT help here and is
+not the answer — the lights act as global colour terms, not directional diffuse. (c) Verifying ≥1
+more scene + the default-ON decision are user-gated (any default visual change needs user approval).
+Tooling: scratch/lightport/{env_probe,measure_grass}.py.
