@@ -145,7 +145,13 @@ def save_png(rpc, path):
         return None
     try:
         from PIL import Image
-        Image.open(ppm).save(path)
+        im = Image.open(ppm)
+        im.save(path)
+        # Azahar saves the 3DS dual-screen stacked 400x480 (top=game 400x240, bottom=touch).
+        # Also emit a TOP-SCREEN crop = the game view, for clean SoH3D-vs-oracle A/B compares.
+        if im.size == (400, 480):
+            top = path[:-4] + "_top.png"
+            im.crop((0, 0, 400, 240)).save(top)
         return path
     except Exception:
         return ppm  # PIL missing: leave the PPM
