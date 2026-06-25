@@ -1559,6 +1559,15 @@ extern "C" void SoH3D_GL_RenderPass(void) {
     if (SoH3D_Sg_Active()) {
         std::vector<float> lerped;
         float step = gSoH3dInterpStep;
+        // Resolve the AO + shadow master toggles the same way the GL/Vulkan paths do (env, CVar).
+        if (gSoH3dAoEnable < 0) {
+            const char* e = getenv("SOH3D_AO");
+            gSoH3dAoEnable = CVarGetInteger("gSoH3d.AO", (e && e[0] == '0') ? 0 : 1);
+        }
+        if (gSoH3dShadowEnable < 0) {
+            const char* e = getenv("SOH3D_SHADOW");
+            gSoH3dShadowEnable = CVarGetInteger("gSoH3d.Shadows", (e && e[0] == '0') ? 0 : 1);
+        }
         auto poseOf = [&](const DrawItem& it) -> const float* {
             const float* pose = it.bones.empty() ? nullptr : it.bones.data();
             if (pose && step < 0.999f && !it.prevBones.empty() && it.prevBones.size() == it.bones.size()) {
@@ -1572,11 +1581,43 @@ extern "C" void SoH3D_GL_RenderPass(void) {
             }
             return pose;
         };
+
+        // (0) Dynamic sun-shadow map (own offscreen pass, light's POV). Only lit casters by default.
+        bool shadowsOn = false;
+        float lightVP[16];
+        if (SoH3D_Sg_BeginShadowPass()) {
+            computeLightVP(lightVP);
+            for (const DrawItem& it : g_drawList) {
+                if (it.sky) continue;
+                if (!gSoH3dShadowCastAll && !it.lit) continue;
+                float depthMP[16];
+                mat4Mul(depthMP, lightVP, it.mv); // model -> light-clip = lightVP * (model -> world)
+                SoH3D_Sg_ShadowCasterDraw(it.modelId, depthMP, it.mv, poseOf(it), it.boneCount, it.midMask);
+            }
+            SoH3D_Sg_ShadowCasterTris(g_n64ShadowCasters, g_n64ShadowCasterTris, lightVP);
+            SoH3D_Sg_EndShadowPass();
+            shadowsOn = true;
+        }
+
+        // (1) AO depth pre-pass (own offscreen pass): dynamic actors/props only (lit==1). World
+        // geometry already carries baked per-vertex AO, so SSAO must not double-darken it.
+        if (SoH3D_Sg_BeginDepthPrepass()) {
+            for (const DrawItem& it : g_drawList) {
+                if (it.sky || !it.lit) continue;
+                SoH3D_Sg_DepthPrepassDraw(it.modelId, it.mp, it.mv, it.invertY, it.aspectAdj, poseOf(it),
+                                          it.boneCount, it.midMask, it.sky);
+            }
+            SoH3D_Sg_EndDepthPrepass();
+        }
+
+        // (2) visible model draws (sampling the shadow map per SetShadow), then (3) SSAO composite.
         SoH3D_Sg_BeginPass();
+        SoH3D_Sg_SetShadow(shadowsOn ? 1 : 0, lightVP);
         for (const DrawItem& it : g_drawList) {
             SoH3D_Sg_DrawModel(it.modelId, it.mp, it.mv, it.lit, it.invertY, it.r, it.g, it.b, it.a, it.aspectAdj,
                                poseOf(it), it.boneCount, it.midMask, it.sky, it.uvOffU, it.uvOffV, &it.matTex);
         }
+        SoH3D_Sg_AoComposite();
         SoH3D_Sg_EndPass();
         g_drawList.clear();
         return;
