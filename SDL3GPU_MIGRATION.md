@@ -226,3 +226,52 @@ SDL surface (~40 files) — project is on **SDL2 2.32**, system has **SDL3 3.4.1
     removal.
   - **P4 (separate phase) — delete GL/DX11/Metal/Vulkan backends + `soh3d_gl.cpp` + `soh3d_hud_vk.cpp`'s
     Vulkan body + `RmlRenderInterfaceVk` + shader templates; collapse `WindowBackend`; drop SDL2.
+- **P4 DONE — SDL3 GPU is the project's ONLY renderer; everything else removed.** Builds clean; boots
+  headless with SDL3 GPU as the **default** (no `SOH3D_SDL3GPU=1`) and renders the full unified scene.
+  Commits `9208590` (removal + untangle) + `db5fa51` (ENABLE_* ifdef purge). ~**22.7k lines / 26 files**
+  deleted.
+  - **Deleted (files):** the GfxRenderingAPI backends `gfx_opengl.*`, `gfx_direct3d11.*`,
+    `gfx_direct3d_common.*`, `gfx_dxgi.*`, `gfx_metal.*`, `gfx_metal_shader.*`, `gfx_vulkan.*`; the SoH3D
+    Vulkan draw/HUD twins `soh3d_vk.*` + `soh3d_hud_vk.*`; the RmlUi Vulkan + GL3 interfaces
+    `RmlRenderInterfaceVk.*`, `RmlUi_Renderer_GL3.*`, `RmlUi_Include_GL3.h`; the `{opengl,directx,metal}`
+    shader templates. (`gfx_sdl3gpu.*` + `soh3d_sdl3gpu.*` + `soh3d_hud_sdl3gpu.*` +
+    `RmlRenderInterfaceSdl3Gpu.*` are the live replacements.)
+  - **Backend selection:** `Fast3dWindow` registers + selects ONLY `FAST3D_SDL_GPU` and no longer reads
+    `SOH3D_VULKAN`/`SOH3D_SDL3GPU` (gating removed). The `WindowBackend` enum **values** are kept (the
+    dead labels are referenced by leftover case-labels / `interpreter.cpp` / `SohMenu.cpp`, harmless),
+    but only the SDL3 GPU one is registered/default/in `windowBackendsMap`. `Fast3dGui`/`SohRmlUi` route
+    exclusively to the SDL3 GPU RmlUi interface; their GL/Vulkan/DX/Metal switch arms are gone.
+  - **`soh3d_gl.cpp` — KEPT, not deleted (had to stay).** It is NOT a removable backend: it owns the
+    `SoH3D_GL_*` model/pose/collection **host API** that the whole soh3d tree links against (anim, model,
+    interpreter). The `SoH3D_Sg_*` SDL3 GPU module only replaced the *backend draw*, not this host. So the
+    file was **stripped of its direct-OpenGL render body** (shaders, program, `drawOne`, GL shadow/AO FBOs,
+    GL state save/restore, the GL `RenderPass` fallback — ~1040 lines) and de-gated from `#ifdef
+    ENABLE_OPENGL`; it is now the backend-agnostic SoH3D draw host + the SDL3 GPU dispatch. The historical
+    `_GL_` symbol prefix is retained to avoid churning ~30 call sites (it no longer implies OpenGL).
+  - **Ported off the removed Vulkan backend onto SDL3 GPU:** the `SoH3D_Hud_*` C-ABI (now in
+    `soh3d_hud_sdl3gpu.cpp`, delegating to `Fast::SgHud_*`) and the geomscan AABB bridge
+    `SoH3D_GeomScanDump` (now in `soh3d_sdl3gpu.cpp` — per-model local AABB at upload + per-draw world
+    AABB capture published at `BeginPass`, for the #115/#120 audit). Re-added the `gSoH3dStateCheck`
+    symbol (was in the deleted GL body, still written by soh3d.c).
+  - **Had to STAY (+ why):** **glslang** (the SDL3 GPU backend compiles the per-combiner GLSL → SPIR-V at
+    runtime — it is a hard dep); the **ImGui OpenGL3 backend** (`imgui_impl_opengl3`, vendored by ImGui's
+    own cmake) is still compiled but never called, so `libGLdispatch` is still pulled in transitively
+    (harmless, not our code). The **Vulkan loader / MoltenVK** deps were dropped (no `find_package(Vulkan)`,
+    no `Vulkan::Vulkan` link); `soh.elf` links **no `libvulkan`**. Apple/Metal `#ifdef __APPLE__` case
+    stubs in `Fast3dGui`/`gfx_sdl2` were left in place but now reference removed types — **Apple is
+    unsupported after P4** (not built/tested here); a future Apple bring-up rides on SDL3 GPU + MoltenVK.
+  - **CMake:** dropped `ENABLE_OPENGL` / `ENABLE_VULKAN` / `ENABLE_DX11` defines + `find_package(Vulkan)` +
+    the `Vulkan::Vulkan` link; `ENABLE_SDL3GPU` now requires only glslang (FATAL_ERROR if missing); removed
+    the stale backend-source FILTER lists. **GATE:** `grep -rE
+    'ENABLE_OPENGL|ENABLE_VULKAN|ENABLE_METAL|ENABLE_DX11|gfx_opengl|gfx_vulkan' libultraship/src` →
+    only **2 historical comments** in `gfx_sdl3gpu.cpp` (naming the `gfx_vulkan.cpp` template it was ported
+    from). Clean.
+  - **Render proof (default backend, no `SOH3D_SDL3GPU`):** Kokiri Forest e238 t0x6000 — log
+    `gfx_sdl3gpu.cpp: SDL3 GPU backend: device driver = vulkan` + `... backend initialized`, **0** GL
+    backend. 640×480, 97.2% non-black, mean RGB (155,155,112): OoT3D Link + Saria + grass/fences/buildings
+    + the PC HUD (hearts/magic/hotbar/rupees) + Link's contact shadow render;
+    `scratch/screenshots/p4_sdl3gpu_only.png`. `shadow 1`/`ao 1` toggle on (`p4_sdl3gpu_shadow_ao.png`).
+    `SOH3D_RMLUI_OPEN=1` → the styled RmlUi ESC menu (tabs, toggle rows, rounded clip-masked panel) over
+    HUD + scene; `p4_sdl3gpu_rmlui.png`. All in ONE unified SDL3 GPU pass.
+  - **NOT done here (left for the orchestrator):** P5 fast-forward to `main`. The documented GL-vs-SDL3GPU
+    brightness/gamma one-liner residual is untouched, as instructed.
