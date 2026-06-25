@@ -4192,8 +4192,27 @@ static void SoH3D_ReplExec(PlayState* play, char* line, const char* outPath) {
         } else if (strcmp(arg, "idle") == 0) {
             SoH3D_PlayerForceIdle(p, play);
             SoH3D_ReplReply(outPath, "linkstate idle -> reset (st1=0x%x)", p->stateFlags1);
+        } else if (strcmp(arg, "jump") == 0) {
+            SoH3D_PlayerForceJump(p, play);
+            SoH3D_ReplReply(outPath, "linkstate jump -> airborne (st1=0x%x)", p->stateFlags1);
+        } else if (strcmp(arg, "swim") == 0) {
+            SoH3D_PlayerForceSwim(p, play);
+            SoH3D_ReplReply(outPath, "linkstate swim -> swim-wait (st1=0x%x)", p->stateFlags1);
+        } else if (strcmp(arg, "damage") == 0) {
+            SoH3D_PlayerForceDamage(p, play);
+            SoH3D_ReplReply(outPath, "linkstate damage -> recoil (st1=0x%x)", p->stateFlags1);
+        } else if (strcmp(arg, "shield") == 0) {
+            SoH3D_PlayerForceShield(p, play);
+            SoH3D_ReplReply(outPath, "linkstate shield -> defend (st1=0x%x)", p->stateFlags1);
+        } else if (strcmp(arg, "attack") == 0) {
+            SoH3D_PlayerForceAttack(p, play);
+            SoH3D_ReplReply(outPath, "linkstate attack -> slash (st1=0x%x)", p->stateFlags1);
+        } else if (strcmp(arg, "climb") == 0) {
+            SoH3D_PlayerForceHang(p, play);
+            SoH3D_ReplReply(outPath, "linkstate climb -> jump_climb/hang anim (st1=0x%x)", p->stateFlags1);
         } else {
-            SoH3D_ReplReply(outPath, "usage: linkstate <roll|talk|idle>");
+            SoH3D_ReplReply(outPath,
+                            "usage: linkstate <roll|talk|idle|jump|swim|damage|shield|attack|climb>");
         }
     } else if (strcmp(cmd, "freeze") == 0 && sscanf(line, "%*s %i", &iv) == 1) {
         // Frame-step harness: `freeze 1` holds the game logic still (Play_Update skipped) so a brief

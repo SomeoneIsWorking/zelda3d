@@ -412,6 +412,18 @@ s32 SoH3D_PlayerForceTalk(Player* player, PlayState* play, f32 range);
 // Safe reset out of forced talk/roll (avoids the talkActor-null CLOSING crash). REPL `linkstate idle`.
 s32 SoH3D_PlayerForceIdle(Player* player, PlayState* play);
 
+// Discrete-state force helpers for the per-state Link parity sweep (tools/parity_state_sweep.py): each
+// installs the real OoT3D action func + the canonical anim for the state, bypassing only the natural
+// entry gate (equipment/water/ledge/hit) headless can't satisfy. REPL `linkstate jump|swim|damage|
+// shield|attack`. Live in z_player.c (need the static action funcs + anim-group table).
+s32 SoH3D_PlayerForceJump(Player* player, PlayState* play);
+s32 SoH3D_PlayerForceSwim(Player* player, PlayState* play);
+s32 SoH3D_PlayerForceDamage(Player* player, PlayState* play);
+s32 SoH3D_PlayerForceShield(Player* player, PlayState* play);
+s32 SoH3D_PlayerForceAttack(Player* player, PlayState* play);
+// Wall-hang (jump_climb) SELECTION force (no wallPoly needed) — exercises the jump_climb->hang map.
+s32 SoH3D_PlayerForceHang(Player* player, PlayState* play);
+
 // Per-frame pose-scan LOGGER (anim QA). Active=on records each drawn player frame's max bone-rotation
 // jump + bone + resolved csab + frame into a log the REPL reads back (`posescan on|off|dump`). Sampled
 // in the DRAW path (where the pose updates), so it works at normal speed, not under frame-step.

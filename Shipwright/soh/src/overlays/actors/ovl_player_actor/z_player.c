@@ -7709,6 +7709,64 @@ s32 SoH3D_PlayerForceIdle(Player* this, PlayState* play) {
     return 1;
 }
 
+// SoH3D discrete-state force helpers for the per-state Link parity sweep (tools/parity_state_sweep.py).
+// Each installs the real OoT3D action func + plays the canonical anim that state's action func plays,
+// bypassing ONLY the natural ENTRY gate (sword/shield equipped, deep water, an enemy hit, a ledge) that
+// headless control can't satisfy. The action func + anim are exactly what OoT3D runs in the state, so
+// SoH3D's live CSAB-selection path (kPlayerAnimMap + the #117 walk/run gate + age cl_ fallback) is
+// exercised faithfully. The sweep reads the SELECTED CSAB under `freeze` right after the force, so a
+// state that would immediately transition out headlessly (swim with no water, damage recover) is still
+// captured at its representative anim. modelAnimType-driven groups auto-pick the age-correct anim.
+// Generic & reusable. REPL `linkstate <jump|swim|damage|shield|attack>`. See respawn_brief task #3.
+
+// Free-fall / jump: the airborne action (Player_Action_8084411C) + the normal_jump anim — exactly what
+// func_80838940 installs when Link leaves a ledge. arg2=0 (no launch velocity; the sweep reads frozen).
+s32 SoH3D_PlayerForceJump(Player* this, PlayState* play) {
+    func_808389E8(this, &gPlayerAnim_link_normal_jump, 0.0f, play);
+    return 1;
+}
+
+// Swim-wait: the treading action (Player_Action_8084D610) + swimer_swim_wait, what func_80838F18
+// installs on water entry. Set IN_WATER so the action's assumptions hold for the representative frame.
+s32 SoH3D_PlayerForceSwim(Player* this, PlayState* play) {
+    this->stateFlags1 |= PLAYER_STATE1_IN_WATER;
+    func_80838F18(play, this);
+    return 1;
+}
+
+// Grounded recoil ("took a hit"): the stable in-place damage action (Player_Action_8084370C) + the
+// front_hit recoil anim — the common grounded branch of func_80837C0C (D_808544B0[4]). The knockback
+// branch flings Link; this one holds in place, the cleaner representative for a selection read.
+s32 SoH3D_PlayerForceDamage(Player* this, PlayState* play) {
+    Player_SetupAction(play, this, Player_Action_8084370C, 0);
+    Player_AnimPlayOnce(play, this, &gPlayerAnim_link_normal_front_hit);
+    return 1;
+}
+
+// Shield/defend: the defend action (Player_Action_80843188) + the defense anim group (the R-held pose).
+s32 SoH3D_PlayerForceShield(Player* this, PlayState* play) {
+    Player_SetupAction(play, this, Player_Action_80843188, 0);
+    Player_AnimPlayOnce(play, this, GET_PLAYER_ANIM(PLAYER_ANIMGROUP_defense, this->modelAnimType));
+    return 1;
+}
+
+// Melee attack: the sword-attack action (Player_Action_808502D0) + the forward-slash anim (the first
+// entry func_80837948 plays for PLAYER_MWA_FORWARD_SLASH_1H). Bypasses the sword-equipped gate.
+s32 SoH3D_PlayerForceAttack(Player* this, PlayState* play) {
+    Player_SetupAction(play, this, Player_Action_808502D0, 0);
+    Player_AnimPlayOnce(play, this, D_80854190[PLAYER_MWA_FORWARD_SLASH_1H].unk_00);
+    return 1;
+}
+
+// Wall-hang (jump_climb) SELECTION force: the live grab needs a wallPoly (forceclimb), unreachable on
+// open ground. For the per-state sweep we only need skelAnime.animation set to the jump_climb family so
+// the live CSAB resolver exercises the task-#2 jump_climb->hang OVERRIDE map (nml_hang_*). Read under
+// freeze; `linkstate idle` resets afterwards (the climb action never runs). REPL `linkstate climb`.
+s32 SoH3D_PlayerForceHang(Player* this, PlayState* play) {
+    Player_AnimPlayLoop(play, this, &gPlayerAnim_link_normal_jump_climb_wait_free);
+    return 1;
+}
+
 void func_8083F070(Player* this, LinkAnimationHeader* anim, PlayState* play) {
     Player_SetupActionPreserveAnimMovement(play, this, Player_Action_8084C5F8, 0);
     LinkAnimation_PlayOnceSetSpeed(play, &this->skelAnime, anim, (4.0f / 3.0f));
