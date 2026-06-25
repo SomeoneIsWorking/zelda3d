@@ -83,6 +83,9 @@ def main():
     ap.add_argument("--hold-circle", default=None, metavar="CX,CY",
                     help="hold circle pad at CX,CY (-100..100, e.g. 0,100 = full forward)")
     ap.add_argument("--hold-buttons", default="", help="buttons to hold (e.g. 'a b')")
+    ap.add_argument("--release-after", type=float, default=None, metavar="SECS",
+                    help="hold the circle for SECS into the capture, then RELEASE to neutral and keep "
+                         "capturing — for the walk/run -> stop transition (does the oracle pop or blend?)")
     ap.add_argument("--eps", type=float, default=3.0,
                     help="min summed per-bone rotation change (deg) to count a new distinct frame")
     ap.add_argument("--out", default="scratch/parity/oracle.csv")
@@ -141,7 +144,11 @@ def main():
             last = rots
             last_change = now
         if circle is not None:
-            rpc.set_input(btn_mask, circle)
+            # release-after: drop to neutral once we pass the threshold (capture spans the stop transition)
+            if args.release_after is not None and (now - t0) >= args.release_after:
+                rpc.set_input(0, (0, 0))
+            else:
+                rpc.set_input(btn_mask, circle)
         time.sleep(period)
 
     if circle is not None:
