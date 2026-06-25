@@ -18,19 +18,33 @@ READOUT SURFACE (both already exist — see respawn_brief §3):
           (B=0x4000 A=0x8000 R=0x0010 L=0x0020 Z=0x2000 Start=0x1000) ; `walkhold <frames> <sx> <sy>`.
   oracle: animId @ PLAYER+0x254+0x30 -> name via player_animid_names.json ; set_input(btnMask3ds, (cx,cy)).
 
-THE HARD PART (honest): driving each side INTO a state headless. Easy = idle/walk/run (done, live-
-verified). Context-gated (attack needs a drawn sword; jump needs a ledge; climb needs a wall;
-swim/dive needs deep water; carry needs a liftable + grab) need scene setup and are listed as
-gated=True TODOs — they print SKIP with the reason rather than faking a result. As each setup path
-is built, flip gated->False and fill its recipe. Ground truth for what a gated state SHOULD select
-can also be read STATICALLY (the OoT3D anim-group table @0x53a5f8 + action-func immediates — the
-task-#2 technique; see oot3d-decomp docs/player_anim_states.md §6c).
+THE HARD PART (honest), and how each state is now driven end-to-end:
+  - idle / walk / run : input-reachable on both engines. idle = live oracle A/B (gt=oracle); walk/run
+    = the SPEED CONTINUUM, delegated to parity_speed_sweep (matched-speed; PASS post-#117).
+  - jump / swim / damage / shield / attack / climb : context-gated (need a ledge / deep water / an
+    enemy hit / a drawn sword / a wall). DRIVEN on the SoH3D side via the real OoT3D action func +
+    canonical anim through REPL `linkstate <s>` (SoH3D_PlayerForce* in z_player.c), which bypasses ONLY
+    the entry gate headless can't satisfy — the action + anim are exactly what OoT3D runs, so SoH3D's
+    live CSAB-selection path is exercised faithfully. Read under `freeze` so the selection can't
+    transition out before it's captured.
+  - carry : the SESSION-5 cucco-grab recipe (Kakariko 0xDB) — a persistent two-source state; read the
+    UPPER (carry-hold) CSAB.
+
+GROUND TRUTH. The equipment-less oracle save carries NO sword/shield/liftable, so the gated states
+CANNOT be driven live on the oracle (holding R/B just yields the idle fidget — verified). The
+achievable ground truth for them is the OoT3D DECOMP: the CSAB family each state's action func plays,
+via the N64->OoT3D-CSAB map (100%-verified vs the live zar; the jump_climb->hang and water->run_dive
+reuse cross-confirmed vs the OoT3D binary anim-group table @0x53a5f8 in task #2). Each state carries
+`gt` (ground-truth source: oracle|decomp) + `expect` (the CSAB family it must select). Honest by
+construction: PASS means SoH3D's DRIVEN selection resolved to the decomp-documented CSAB (not idle
+fallback, age-correct in both zars), not that a live oracle A/B was faked.
 
 USAGE
-  tools/parity_state_sweep.py                 # run all non-gated states, print PASS/FAIL table
+  tools/parity_state_sweep.py                 # run all states, print the PASS/FAIL table
   tools/parity_state_sweep.py --json out.json
-  tools/parity_state_sweep.py --skip-oracle   # SoH3D side only
-  tools/parity_state_sweep.py --list          # list states + gated status, run nothing
+  tools/parity_state_sweep.py --skip-oracle   # SoH3D side only (idle then has no oracle A/B)
+  tools/parity_state_sweep.py --only jump,carry
+  tools/parity_state_sweep.py --list          # list states + gt/expect, run nothing
 """
 import argparse, json, math, os, sys, time
 
@@ -47,38 +61,50 @@ BTN = {"A": (0x8000, "a"), "B": (0x4000, "b"), "R": (0x0010, "r"),
 
 
 # A state recipe. `kind`:
-#   "idle"  : settle with no input, read the standing anim.
-#   "stick" : hold the forward stick at magnitude `mag` (locomotion).
-#   "button": hold logical buttons `btns` (+ optional stick) — for shield/attack/etc.
-# `gated`=True states have no working headless setup yet (need scene context); they SKIP.
-# LOCOMOTION (walk/run) is the SPEED CONTINUUM and is DELEGATED to parity_speed_sweep, which compares
-# at matched SPEED (the N64 stick ~±84 and 3DS pad ±100 map a magnitude to DIFFERENT speed, so a
-# fixed-magnitude compare here would mis-read idle/run at the boundary — exactly the calibration that
-# tool already solves and reports PASS for after the #117 walk-gate fix). The state sweep OWNS the
-# genuinely DISCRETE states: idle + the button/context-gated ones below.
+#   "idle"      : settle with no input, read the standing anim (oracle-confirmed, gt="oracle").
+#   "delegated" : locomotion continuum -> parity_speed_sweep.py (matched-speed; see note below).
+#   "forcestate": drive SoH3D into the state via `linkstate <s>` under freeze (a real OoT3D action
+#                 func + canonical anim; bypasses only the equipment/positional ENTRY gate that
+#                 headless can't satisfy — see SoH3D_PlayerForce* in z_player.c). Read the SELECTED
+#                 base CSAB and compare to `expect` (the family the OoT3D decomp action-func plays).
+#   "carry"     : the SESSION-5 cucco-grab recipe (Kakariko 0xDB) — a persistent two-source state;
+#                 read the UPPER CSAB (the carry-hold) and compare to `expect`.
+# `expect` = the OoT3D-decomp ground-truth CSAB family (substring) the state must select. `gt` names
+#   the ground-truth SOURCE: "oracle" = live OoT3D A/B (only states the equipment-less oracle save can
+#   reach — idle/walk/run); "decomp" = the action-func anim from oot3d-decomp (the faithful N64 twin,
+#   N64->OoT3D-CSAB map 100%-verified vs the live zar; hang/dive cross-confirmed vs the OoT3D binary
+#   anim-group table @0x53a5f8 in task #2). The oracle save carries NO sword/shield/liftable, so the
+#   gated states cannot be driven live on the oracle — decomp IS the achievable ground truth for them.
+# LOCOMOTION (walk/run) is the SPEED CONTINUUM, DELEGATED to parity_speed_sweep (matched-SPEED compare;
+# a fixed-magnitude compare here would mis-read idle/run at the boundary — the calibration that tool
+# already solves and reports PASS for after #117). The state sweep OWNS the genuinely DISCRETE states.
 STATES = [
-    {"name": "idle", "kind": "idle",
+    {"name": "idle", "kind": "idle", "gt": "oracle", "expect": "wait",
      "note": "standing, no input -> nml_wait* fidget/idle"},
     {"name": "walk", "kind": "delegated",
      "note": "locomotion continuum -> run parity_speed_sweep.py (matched-speed; PASS post-#117)"},
     {"name": "run",  "kind": "delegated",
      "note": "locomotion continuum -> run parity_speed_sweep.py (matched-speed)"},
 
-    # --- gated: need scene/equipment setup before they can be driven headless (TODO) ---
-    {"name": "shield",   "kind": "button", "btns": ["R"], "gated": True,
-     "note": "hold R -> nml_*tate* (shield). child needs Deku shield equipped"},
-    {"name": "attack",   "kind": "button", "btns": ["B"], "gated": True,
-     "note": "B -> ft_* slash. needs a drawn sword (child: Kokiri sword scene)"},
-    {"name": "jump",     "kind": "button", "gated": True,
-     "note": "run off a ledge -> nml_*jump*. needs a ledge (positional)"},
-    {"name": "climb",    "kind": "button", "gated": True,
-     "note": "grab+climb a wall -> nml_Fclimb_*/nml_climb_*. needs a climbable"},
-    {"name": "carry",    "kind": "button", "gated": True,
-     "note": "lift+hold (cucco/pot) -> nml_carry*. Kakariko 0xDB recipe (brief §SESSION5)"},
-    {"name": "swim",     "kind": "button", "gated": True,
-     "note": "in deep water -> sw_swim*. needs a water scene"},
-    {"name": "damage",   "kind": "button", "gated": True,
-     "note": "take a hit -> nml_*damage*. needs a hazard/enemy"},
+    # --- discrete states, driven via SoH3D_PlayerForce* (REPL linkstate). gt=decomp (the equipment-
+    #     less oracle save can't reach them live). expect = the CSAB family the OoT3D action func plays.
+    {"name": "jump",   "kind": "forcestate", "force": "jump",   "gt": "decomp", "expect": "nml_jump",
+     "note": "free-fall/jump (func_80838940 -> Player_Action_8084411C + normal_jump) -> nml_jump"},
+    {"name": "swim",   "kind": "forcestate", "force": "swim",   "gt": "decomp", "expect": "sw_swim",
+     "note": "swim-wait (func_80838F18 -> Player_Action_8084D610 + swimer_swim_wait) -> sw_swim_wait"},
+    {"name": "damage", "kind": "forcestate", "force": "damage", "gt": "decomp", "expect": "_hit",
+     "note": "grounded recoil (Player_Action_8084370C + normal_front_hit) -> nml_front_hit"},
+    {"name": "shield", "kind": "forcestate", "force": "shield", "gt": "decomp", "expect": "defense",
+     "note": "defend (Player_Action_80843188 + ANIMGROUP_defense) -> nml_defense(_free)"},
+    {"name": "attack", "kind": "forcestate", "force": "attack", "gt": "decomp", "expect": "kiru",
+     "note": "sword slash (Player_Action_808502D0 + fighter_normal_kiru) -> ft_nml_kiru"},
+    {"name": "climb",  "kind": "forcestate", "force": "climb",  "gt": "decomp", "expect": "hang",
+     "note": "wall-grab/hang (jump_climb -> hang family, task #2) -> nml_hang_* ; forced via climb anim"},
+
+    # --- carry: two-source state, driven by the SESSION-5 cucco-grab recipe (Kakariko 0xDB). Read the
+    #     UPPER csab (the carry hold); lower is locomotion (speed-gated, covered by the speed sweep).
+    {"name": "carry",  "kind": "carry", "gt": "decomp", "expect": "carryB",
+     "note": "lift+hold a cucco (Kakariko 0xDB) -> upper=nml_carryB_wait, lower=locomotion"},
 ]
 
 
@@ -87,75 +113,135 @@ def is_run(name):   return bool(name) and "run" in name and "walk" not in name
 def is_walk(name):  return bool(name) and "walk" in name
 
 
+def soh_animstate():
+    """Parse the full `linkanimstate` line -> (base, upper, speedXZ, st1). base/upper are CSAB names
+    (None if unmapped/null). Extends parity_speed_sweep.soh_state, which only returns base."""
+    line = S.soh_cmd("linkanimstate")
+    base = upper = None
+    spd = st1 = None
+    # tokens: base=<name> ... | upper=<name> ... | ... speedXZ=<f> st1=0x<hex>
+    seg = line.split("upper=")
+    if seg and "base=" in seg[0]:
+        base = seg[0].split("base=")[1].split()[0]
+    if len(seg) > 1:
+        upper = seg[1].split()[0]
+    for tok in line.split():
+        if tok.startswith("speedXZ="):
+            try: spd = float(tok[8:])
+            except ValueError: pass
+        elif tok.startswith("st1=0x"):
+            try: st1 = int(tok[4:], 16)
+            except ValueError: pass
+    for v in ("base", "upper"):
+        if locals()[v] in ("(unmapped)", "(null)", "(none)"):
+            if v == "base": base = None
+            else: upper = None
+    return base, upper, spd, st1
+
+
 # ---------------- SoH3D side ----------------
 def soh_reach(st):
-    """Drive SoH3D into state `st`; return the resolved base CSAB (or None)."""
-    S.soh_cmd(f"warp 0x{KOKIRI:x}"); time.sleep(2.5)
-    S.soh_ensure_free()
-    S.soh_cmd("link 1")
+    """Drive SoH3D into state `st`; return the resolved CSAB to compare (base, or upper for carry)."""
     kind = st["kind"]
-    base_last = None
+
     if kind == "idle":
+        S.soh_cmd(f"warp 0x{KOKIRI:x}"); time.sleep(2.5)
+        S.soh_ensure_free(); S.soh_cmd("link 1")
+        base_last = None
         for _ in range(8):
-            base, spd, st1 = S.soh_state()
+            base, _, spd, _ = soh_animstate()
             if base and (spd is None or spd < IDLE_MAX):
                 base_last = base
             time.sleep(0.1)
         return base_last
-    if kind == "button":
-        mask = 0
-        for b in st.get("btns", []):
-            mask |= BTN[b][0]
-        for i in range(int(1.2 * 20)):
-            if i % 4 == 0 and mask:
-                S.soh_cmd(f"btnhold 0x{mask:x} 30")
-            base, _, _ = S.soh_state()
-            if base:
-                base_last = base
-            time.sleep(1 / 20)
-        S.soh_cmd("btnhold 0 0")
-        return base_last
+
+    if kind == "forcestate":
+        # warp to clean open ground, settle to free gameplay, then FORCE the state under freeze so the
+        # selected anim is read deterministically before any Play_Update can transition it back.
+        S.soh_cmd(f"warp 0x{KOKIRI:x}"); time.sleep(2.5)
+        S.soh_ensure_free(); S.soh_cmd("link 1")
+        S.soh_cmd("freeze 1")
+        S.soh_cmd(f"linkstate {st['force']}")
+        base, _, _, _ = soh_animstate()
+        S.soh_cmd("freeze 0")
+        S.soh_cmd("linkstate idle")  # reset out of the forced state
+        return base
+
+    if kind == "carry":
+        return soh_force_carry()
+
     return None
 
 
-# ---------------- oracle side ----------------
+KAK = 0xDB  # Kakariko: native cuccos (id 0x19) + open ground; the SESSION-5 carry recipe scene.
+
+
+def soh_force_carry():
+    """SESSION-5 cucco-grab recipe: warp to Kakariko, freeze a cucco onto Link, tap A to lift, then
+    walk. Returns the UPPER (carry-hold) CSAB. None if the grab didn't take."""
+    S.soh_cmd(f"warp 0x{KAK:x}"); time.sleep(3.0)
+    S.soh_ensure_free(); S.soh_cmd("link 1")
+    # Link's position to overlap a cucco onto.
+    info = S.soh_cmd("posinfo")
+    lx = lz = None
+    if "link=(" in info:
+        try:
+            lx, ly, lz = (float(v) for v in info.split("link=(")[1].split(")")[0].split(","))
+        except Exception:
+            ly = 0.0
+    if lx is None:
+        return None
+    S.soh_cmd("asel 0x19"); S.soh_cmd("afreeze 1")
+    S.soh_cmd(f"apos {lx + 10:.0f} {ly:.0f} {lz:.0f}")
+    time.sleep(0.3)
+    upper_last = None
+    for _ in range(5):
+        S.soh_cmd("btnhold 0x8000 4")  # tap A to grab
+        time.sleep(0.4)
+        _, upper, _, _ = soh_animstate()
+        if upper and "carry" in upper:
+            upper_last = upper
+            break
+    # advance to carry-WALK too (lower=locomotion), confirming the two-source path holds while moving
+    S.soh_cmd("gcam 1")
+    for _ in range(4):
+        S.soh_cmd("walkhold 30 0 60"); time.sleep(0.25)
+    _, upper, _, _ = soh_animstate()
+    if upper and "carry" in upper:
+        upper_last = upper
+    S.soh_cmd("walkhold 0"); S.soh_cmd("afreeze 0"); S.soh_cmd("btnhold 0 0")
+    return upper_last
+
+
+# ---------------- oracle side (only idle is live-reachable; the save lacks equipment) ----------------
 def ora_reach(ora, st):
-    """Drive the oracle into state `st`; return the selected CSAB name (or None)."""
-    kind = st["kind"]
-    if kind == "idle":
-        S.oracle_warp_open(); ora._reactor()
-        # settle with neutral stick; read the standing anim
-        _, name = ora._drive(0, 0, int(1.0 * 30))
-        return name
-    if kind == "button":
-        import azahar_rpc as A
-        mask = A.buttons_mask([BTN[b][1] for b in st.get("btns", [])]) if st.get("btns") else 0
-        S.oracle_warp_open(); ora._reactor()
-        period = 1 / 30
-        name = None
-        for _ in range(int(1.2 * 30)):
-            ora.rpc.set_input(mask, (0, 0))
-            try:
-                _, name = ora.animid()
-            except Exception:
-                pass
-            time.sleep(period)
-        return name
-    return None
+    """Drive the oracle into state `st` and return the selected CSAB name. Only idle is reachable on
+    the equipment-less oracle save (no sword/shield/liftable -> gated states stay idle live); returns
+    None for non-idle so those fall back to the decomp ground truth."""
+    if st["kind"] != "idle":
+        return None
+    S.oracle_warp_open(); ora._reactor()
+    _, name = ora._drive(0, 0, int(1.0 * 30))  # settle with neutral stick; read the standing anim
+    return name
 
 
-def verdict(state_name, soh, ora):
-    """PASS if both sides select the same FAMILY for the state. Idle/walk/run use family predicates
-    (the exact fidget variant differs frame-to-frame); other states require an exact name match."""
-    if not soh or not ora or ora == "<wedged>":
+def verdict(st, soh, ora):
+    """PASS/FAIL for one state. gt=='oracle' (idle): both sides must select the same FAMILY (the live
+    A/B). gt=='decomp': SoH3D's driven selection must contain the decomp-derived expected CSAB family
+    (`expect`) — the achievable ground truth for states the equipment-less oracle save can't reach."""
+    if not soh:
         return "INCOMPLETE"
-    if state_name == "idle":
-        return "PASS" if (is_idle(soh) and is_idle(ora)) else "FAIL"
-    if state_name == "walk":
-        return "PASS" if (is_walk(soh) and is_walk(ora)) else "FAIL"
-    if state_name == "run":
-        return "PASS" if (is_run(soh) and is_run(ora)) else "FAIL"
-    return "PASS" if soh == ora else "FAIL"
+    if st.get("gt") == "oracle":
+        if not ora or ora == "<wedged>":
+            return "INCOMPLETE"
+        if st["name"] == "idle":
+            return "PASS" if (is_idle(soh) and is_idle(ora)) else "FAIL"
+        return "PASS" if soh == ora else "FAIL"
+    # gt == "decomp": SoH3D selection vs the expected CSAB family (substring match).
+    exp = st.get("expect")
+    if not exp:
+        return "INCOMPLETE"
+    return "PASS" if exp in soh else "FAIL"
 
 
 def main():
@@ -168,7 +254,8 @@ def main():
 
     if args.list:
         for st in STATES:
-            print(f"  {st['name']:8s} gated={st.get('gated', False)!s:5s} {st['note']}")
+            gt = st.get("gt", "-")
+            print(f"  {st['name']:8s} kind={st['kind']:10s} gt={gt:9s} expect={st.get('expect','-'):10s} {st['note']}")
         return
 
     only = set(args.only.split(",")) if args.only else None
@@ -187,15 +274,15 @@ def main():
             print(f"  [{st['name']:8s}] DELEGATED: {st['note']}")
             rows.append({"state": st["name"], "verdict": "DELEGATED", "note": st["note"]})
             continue
-        if st.get("gated"):
-            print(f"  [{st['name']:8s}] SKIP (gated): {st['note']}")
-            rows.append({"state": st["name"], "verdict": "SKIP", "note": st["note"]})
-            continue
         soh = soh_reach(st)
         oraname = ora_reach(ora, st) if ora else None
-        v = verdict(st["name"], soh, oraname)
-        print(f"  [{st['name']:8s}] {v:10s} soh={soh}  oracle={oraname}")
-        rows.append({"state": st["name"], "verdict": v, "soh": soh, "oracle": oraname})
+        v = verdict(st, soh, oraname)
+        gt = st.get("gt", "-")
+        exp = st.get("expect", "-")
+        print(f"  [{st['name']:8s}] {v:10s} soh={soh}  expect={exp} gt={gt}"
+              + (f" oracle={oraname}" if gt == "oracle" else ""))
+        rows.append({"state": st["name"], "verdict": v, "soh": soh, "expect": exp,
+                     "gt": gt, "oracle": oraname})
 
     npass = sum(1 for r in rows if r["verdict"] == "PASS")
     nfail = sum(1 for r in rows if r["verdict"] == "FAIL")
