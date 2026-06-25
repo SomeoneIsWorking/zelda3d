@@ -3,22 +3,22 @@
 > **Generated mirror — do not hand-edit.** Source of truth = GitHub Issues on
 > `SomeoneIsWorking/soh3d` (private). Regenerate with `tools/kanban.py render`.
 > Move a card with `tools/kanban.py mv <#> <column>`; add with `tools/kanban.py add`.
-> Columns: todo · in-progress · in-review · needs-confirmation · reopened · blocked · done(=closed).  Updated 2026-06-24 17:02.
+> Columns: todo · in-progress · in-review · needs-confirmation · reopened · blocked · done(=closed).  Updated 2026-06-25 08:56.
 
-**Counts:** todo:3 | in-progress:0 | in-review:1 | needs-confirmation:17 | reopened:0 | blocked:0 | done:77
+**Counts:** todo:2 | in-progress:2 | in-review:1 | needs-confirmation:19 | reopened:0 | blocked:0 | done:77
 
-## 📋 To Do  (3)
+## 📋 To Do  (2)
 - [#17](../../issues/17) Hi-res world/scene textures (texpack) _(render)_
 - [#33](../../issues/33) More foliage / vegetation density (lowest priority) _(scene)_
-- [#111](../../issues/111) World night R/G too bright — flat tint under-darkens at night (needs vertex-lighting port) _(render)_
 
-## 🔨 In Progress  (0)
-_none_
+## 🔨 In Progress  (2)
+- [#111](../../issues/111) World night R/G too bright — flat tint under-darkens at night (needs vertex-lighting port) _(render)_
+- [#115](../../issues/115) Character/object render-parity gaps: doors, shop props/NPCs, switches still render as N64 (whole-game audit) _(render,scene)_
 
 ## 🔍 In Review (agent verifying)  (1)
 - [#112](../../issues/112) START can't skip the final intro segment (Navi flies in / wakes Link) _(render,keyboard)_
 
-## 🙋 Needs User Confirmation  (17)
+## 🙋 Needs User Confirmation  (19)
 - [#12](../../issues/12) Inventory/pause background renders upside-down _(render,ui,inventory)_
 - [#16](../../issues/16) First-person camera: early-load crash + position snap _(camera,crash)_
 - [#18](../../issues/18) Crisp HUD/UI textures (hearts/digits/buttons/icons) _(ui,hud)_
@@ -36,6 +36,8 @@ _none_
 - [#109](../../issues/109) Stalchild (En_Skb) OoT3D model renders disassembled — bones scattered (visual half of #107) _(render,anim)_
 - [#110](../../issues/110) World night/dusk lighting hue wrong — stays warm-green, not OoT3D cool-blue (multiplicative shade can't add ambient) _(render)_
 - [#113](../../issues/113) Flat pale-tan triangle on Kokiri ground (distant plane slammed to full fog by steep ramp) _(render)_
+- [#114](../../issues/114) Deku Tree crashes on load (SIGSEGV) — En_Box chest collider re-walk uses wrong postLimbDraw ABI _(render,crash)_
+- [#116](../../issues/116) Kokiri kids (En_Ko) heads twisted into weird orientations (head-track applies non-physical headRot) _(render,anim)_
 
 ## ♻️ Reopened (was done, found broken)  (0)
 _none_
