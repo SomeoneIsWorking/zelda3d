@@ -3,22 +3,24 @@
 > **Generated mirror — do not hand-edit.** Source of truth = GitHub Issues on
 > `SomeoneIsWorking/soh3d` (private). Regenerate with `tools/kanban.py render`.
 > Move a card with `tools/kanban.py mv <#> <column>`; add with `tools/kanban.py add`.
-> Columns: todo · in-progress · in-review · needs-confirmation · reopened · blocked · done(=closed).  Updated 2026-06-25 08:56.
+> Columns: todo · in-progress · in-review · needs-confirmation · reopened · blocked · done(=closed).  Updated 2026-06-25 14:19.
 
-**Counts:** todo:2 | in-progress:2 | in-review:1 | needs-confirmation:19 | reopened:0 | blocked:0 | done:77
+**Counts:** todo:3 | in-progress:3 | in-review:1 | needs-confirmation:20 | reopened:0 | blocked:0 | done:77
 
-## 📋 To Do  (2)
+## 📋 To Do  (3)
 - [#17](../../issues/17) Hi-res world/scene textures (texpack) _(render)_
 - [#33](../../issues/33) More foliage / vegetation density (lowest priority) _(scene)_
+- [#118](../../issues/118) Market (SCENE_MARKET_DAY) parity: crowd NPCs (En_Hy/En_Mu) mis-rendered, door still N64 _(render,scene,behavior)_
 
-## 🔨 In Progress  (2)
+## 🔨 In Progress  (3)
 - [#111](../../issues/111) World night R/G too bright — flat tint under-darkens at night (needs vertex-lighting port) _(render)_
 - [#115](../../issues/115) Character/object render-parity gaps: doors, shop props/NPCs, switches still render as N64 (whole-game audit) _(render,scene)_
+- [#117](../../issues/117) Link (OoT3D) animation parity: walk, walk-stop, pickup (rock/cucco), carry-walk diverge from OoT3D _(anim,behavior)_
 
 ## 🔍 In Review (agent verifying)  (1)
 - [#112](../../issues/112) START can't skip the final intro segment (Navi flies in / wakes Link) _(render,keyboard)_
 
-## 🙋 Needs User Confirmation  (19)
+## 🙋 Needs User Confirmation  (20)
 - [#12](../../issues/12) Inventory/pause background renders upside-down _(render,ui,inventory)_
 - [#16](../../issues/16) First-person camera: early-load crash + position snap _(camera,crash)_
 - [#18](../../issues/18) Crisp HUD/UI textures (hearts/digits/buttons/icons) _(ui,hud)_
@@ -38,6 +40,7 @@
 - [#113](../../issues/113) Flat pale-tan triangle on Kokiri ground (distant plane slammed to full fog by steep ramp) _(render)_
 - [#114](../../issues/114) Deku Tree crashes on load (SIGSEGV) — En_Box chest collider re-walk uses wrong postLimbDraw ABI _(render,crash)_
 - [#116](../../issues/116) Kokiri kids (En_Ko) heads twisted into weird orientations (head-track applies non-physical headRot) _(render,anim)_
+- [#119](../../issues/119) Spirit Temple child Nabooru (En_Nb) lower body collapses into a white blob (skinned retarget mis-poses crossed legs) _(render,anim)_
 
 ## ♻️ Reopened (was done, found broken)  (0)
 _none_
