@@ -2663,6 +2663,39 @@ static void uploadSkin(int modelId, LoadedModel* lm, std::vector<std::array<floa
     SoH3D_GL_SetBones(modelId, sm.empty() ? nullptr : sm.front().data(), (int)sm.size());
 }
 
+// --- Resolved-pose geometry capture (anim-parity harness, #117) ---------------------------------
+// Dumps the ACTUAL resolved per-bone skin matrices (the geometry the renderer draws) for one tracked
+// model, per draw, tagged with the resolved CSAB name + the REAL playhead frame (the free-run
+// accumulator, not the dead skelAnime.curFrame). This is the SoH3D side of the direct-vs-oracle
+// per-frame diff: it answers "does the pose actually cycle / what pose is on screen this frame".
+// Generic (any auto-model). Arm via the REPL `skindump` (resolves Link's modelId). Each row is one
+// bone's animated bone-world rotation column (m4,m5,m6 = up-axis basis), enough to detect a frozen
+// pose (identical rows across caps) and to align against the oracle jointTable.
+static FILE* gSkinDumpFile = nullptr;
+static int gSkinDumpModel = -1;
+static int gSkinDumpRemaining = 0;
+static int gSkinDumpCap = 0;
+extern "C" void SoH3D_SkinDumpArm(int modelId, const char* path, int frames) {
+    if (gSkinDumpFile) { fclose(gSkinDumpFile); gSkinDumpFile = nullptr; }
+    gSkinDumpFile = fopen(path, "w");
+    if (!gSkinDumpFile) return;
+    fprintf(gSkinDumpFile, "# resolved CSAB pose capture (skin matrices, row-major 4x4 per bone)\n");
+    fprintf(gSkinDumpFile, "cap,anim,frame,bone,m0,m1,m2,m3,m4,m5,m6,m7,m8,m9,m10,m11\n");
+    gSkinDumpModel = modelId; gSkinDumpRemaining = frames; gSkinDumpCap = 0;
+}
+static void skinDumpWrite(int modelId, const char* animName, float frame,
+                          const std::vector<std::array<float, 16>>& sm) {
+    if (!gSkinDumpFile || modelId != gSkinDumpModel || gSkinDumpRemaining <= 0) return;
+    for (int b = 0; b < (int)sm.size(); b++) {
+        const float* M = sm[b].data();
+        fprintf(gSkinDumpFile, "%d,%s,%.3f,%d,%.4f,%.4f,%.4f,%.2f,%.4f,%.4f,%.4f,%.2f,%.4f,%.4f,%.4f,%.2f\n",
+                gSkinDumpCap, animName ? animName : "(null)", frame, b,
+                M[0], M[1], M[2], M[3], M[4], M[5], M[6], M[7], M[8], M[9], M[10], M[11]);
+    }
+    gSkinDumpCap++;
+    if (--gSkinDumpRemaining == 0) { fclose(gSkinDumpFile); gSkinDumpFile = nullptr; gSkinDumpModel = -1; }
+}
+
 void SoH3D_UpdateAnim(int modelId, const char* animName, float frame) {
     if (!animName || !*animName) { SoH3D_GL_SetBones(modelId, nullptr, 0); return; }
     LoadedModel* lm = loadModel(modelId);
@@ -2677,6 +2710,7 @@ void SoH3D_UpdateAnim(int modelId, const char* animName, float frame) {
     getBoneRotDeltas(modelId, &drot, &dcount);
     getBonePostRots(modelId, &post, &pcount);
     anim->skinMatrices(*lm->cmb, frame, sm, drot, dcount, post, pcount);
+    skinDumpWrite(modelId, animName, frame, sm);
     uploadSkin(modelId, lm, sm);
 }
 
@@ -2702,6 +2736,7 @@ static void SoH3D_UpdateAnimMorph(int modelId, const char* inName, float fIn, co
     } else {
         in->skinMatrices(*lm->cmb, fIn, sm, drot, dcount, post, pcount); // outgoing unresolved -> no blend
     }
+    skinDumpWrite(modelId, inName, fIn, sm);
     uploadSkin(modelId, lm, sm);
 }
 
