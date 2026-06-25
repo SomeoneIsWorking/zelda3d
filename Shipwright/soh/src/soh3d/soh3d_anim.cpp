@@ -532,6 +532,22 @@ static void skinDumpWrite(int modelId, const char* animName, float frame,
     if (--gSkinDumpRemaining == 0) { fclose(gSkinDumpFile); gSkinDumpFile = nullptr; gSkinDumpModel = -1; }
 }
 
+// Bind-pose (no CSAB) skinning with the procedural per-bone channels (boneRotDelta / bonePostRot)
+// applied. For statically-modelled actors whose only motion is an OverrideLimbDraw-style rotation —
+// En_Door's panel swing: the door has no CSAB, so the swing is a local-euler delta on the panel bone
+// (set via SoH3D_SetBoneRotDelta), exactly like N64 EnDoor rotating panel limb 4 by the open angle.
+extern "C" void SoH3D_UpdateBindPose(int modelId) {
+    LoadedModel* lm = loadModel(modelId);
+    if (!lm || !lm->ok || !lm->cmb) { return; }
+    const float* drot = nullptr; int dcount = 0;
+    const float* post = nullptr; int pcount = 0;
+    getBoneRotDeltas(modelId, &drot, &dcount);
+    getBonePostRots(modelId, &post, &pcount);
+    std::vector<std::array<float, 16>> sm;
+    SoH3D::restPoseSkinMatrices(*lm->cmb, sm, drot, dcount, post, pcount);
+    uploadSkin(modelId, lm, sm);
+}
+
 void SoH3D_UpdateAnim(int modelId, const char* animName, float frame) {
     if (!animName || !*animName) { SoH3D_GL_SetBones(modelId, nullptr, 0); return; }
     LoadedModel* lm = loadModel(modelId);
