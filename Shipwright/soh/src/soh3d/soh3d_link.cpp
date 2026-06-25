@@ -443,18 +443,24 @@ extern "C" int SoH3D_PlayerDrawImpl(PlayState* play, Actor* actor) {
         csab = SoH3D_ResolvePlayerCsab((const char*)player->skelAnime.animation);
         // #117 walk/run SELECTION parity (see SoH3D_LinkWalkRunGate / SOH3D_LINK_WALKRUN_SPEED).
         csab = SoH3D_LinkWalkRunGate(csab, player->actor.speedXZ);
-        // #6/#85: while carrying, OoT layers a held-item animation (e.g. carryB_wait, arms raised
-        // overhead) on the UPPER body via player->upperSkelAnime, leaving the base skelAnime on
-        // wait/locomotion. Resolve that upper carry CSAB. carry-IDLE (standing) = whole rig plays it
-        // (N64 SetCopyAll). carry-WALK = TWO-SOURCE per-limb blend below (lower loco + upper carry),
-        // the faithful sUpperBodyLimbCopyMap result — NOT the whole-rig carry CSAB (which has static
-        // legs => the #85a slide). `csab` stays the LOWER locomotion CSAB so the two-source path drives
-        // the legs from it; carry-idle overrides it to the carry CSAB.
+        // #6/#85/#117 carry: OoT3D (oracle, GROUND TRUTH — tools/oracle_carry_id.py 2026-06-25) does
+        // NOT layer carry onto locomotion via the N64 sUpperBodyLimbCopyMap. It plays a SINGLE unified
+        // whole-body clip per carry state:
+        //   carry-WALK  -> nml_carryB_free  (legs 3-8 AND arms 9-21 both match it at the SAME frame,
+        //                  mean 0.9°/1.1° across 50 captured frames — a complete walk-while-carrying
+        //                  loop, 17f). The old TWO-SOURCE blend (lower nml_walk_free + upper carryB_wait
+        //                  masked b9..21) was a reconstruction of the N64 copy-map, but OoT3D simply
+        //                  authored a dedicated clip. Play carryB_free whole-rig, free-run by ground
+        //                  speed exactly like the walk/run loco cycle.
+        //   carry-IDLE  -> the upper carry CSAB resolved from player->upperSkelAnime (carryB_wait),
+        //                  whole rig (N64 SetCopyAll while standing).
         const char* upperCarryCsab = NULL;
         if (player->heldActor != NULL && player->upperSkelAnime.animation != NULL) {
             upperCarryCsab = SoH3D_ResolvePlayerCsab((const char*)player->upperSkelAnime.animation);
         }
-        if (upperCarryCsab != NULL && !carryWalk) {
+        if (carryWalk && gSoH3dLinkForceCsab[0] == '\0') {
+            csab = "nml_carryB_free"; // carry-WALK: unified whole-body carry-locomotion clip
+        } else if (upperCarryCsab != NULL && !carryWalk) {
             csab = upperCarryCsab; // carry-IDLE: SetCopyAll -> whole rig plays the carry pose
         }
         if (csab == NULL) {
@@ -473,21 +479,18 @@ extern "C" int SoH3D_PlayerDrawImpl(PlayState* play, Actor* actor) {
                 fflush(stdout);
             }
         }
-        int isLoco = (strstr(csab, "run") != NULL) || (strstr(csab, "walk") != NULL);
-        int twoSource = (carryWalk && upperCarryCsab != NULL && gSoH3dLinkForceCsab[0] == '\0');
+        // carry-WALK rides the same speed-driven loco free-run as walk/run (nml_carryB_free has no
+        // "run"/"walk" substring so it is gated in explicitly here).
+        int isLoco = (strstr(csab, "run") != NULL) || (strstr(csab, "walk") != NULL) ||
+                     (carryWalk && gSoH3dLinkForceCsab[0] == '\0');
         if (gSoH3dLinkForceTwoLower[0] != '\0' && gSoH3dLinkForceTwoUpper[0] != '\0') {
             // REPL `linktwo`: forced two-source capture (no live grab needed). Lower legs cycle at
             // animrate; upper held as a free-run carry pose. csab tracked as the lower for poseScan.
+            // Retained as a DEBUG path only — OoT3D's real carry-walk is the unified carryB_free clip
+            // selected above (oracle-verified); the live carry path no longer uses two-source.
             csab = gSoH3dLinkForceTwoLower;
             SoH3D_UpdateAnimTwoSource(modelId, gSoH3dLinkForceTwoLower, gSoH3dAnimRate,
                                       gSoH3dLinkForceTwoUpper, 0.0f, 0.0f, kLinkUpperBodyMask, 25);
-        } else if (twoSource) {
-            // #85 carry-WALK: lower body = loco CSAB (csab, walk/run-gated) free-run by ground speed
-            // (same as the loco branch — the run cycle's curFrame is dead); upper body = carry CSAB.
-            // kLinkUpperBodyMask = the OoT3D sUpperBodyLimbCopyMap analogue (bones 9..21).
-            SoH3D_UpdateAnimTwoSource(modelId, csab, player->actor.speedXZ * gSoH3dLinkLocoGain,
-                                      upperCarryCsab, player->upperSkelAnime.curFrame,
-                                      player->upperSkelAnime.animLength, kLinkUpperBodyMask, 25);
         } else if (strcmp(csab, "rest") == 0) {
             SoH3D_UpdateAnim(modelId, NULL, 0); // diagnostic: force bind pose (linkanim rest)
         } else if (isLoco && gSoH3dLinkForceCsab[0] == '\0' && player->actor.speedXZ > 0.5f) {
