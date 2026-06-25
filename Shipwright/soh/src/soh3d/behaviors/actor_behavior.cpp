@@ -6,6 +6,7 @@
 #include "actor/mido.h"
 #include "actor/malon.h"
 #include "actor/townsfolk.h"
+#include "actor/door.h"
 #include "../asset/mat4.h"
 
 extern "C" {
@@ -55,7 +56,10 @@ ActorBehavior* findActorBehavior(s16 actorId) {
     static ChildMalonBehavior sChildMalon;
     static AdultMalonBehavior sAdultMalon;
     static TownsfolkBehavior sTownsfolk;
+    static EnDoorBehavior sEnDoor;
     switch (actorId) {
+        case ACTOR_EN_DOOR:
+            return &sEnDoor;
         case ACTOR_EN_KO:
             return &sKokiriKid;
         case ACTOR_EN_SA:
@@ -75,3 +79,15 @@ ActorBehavior* findActorBehavior(s16 actorId) {
 }
 
 } // namespace SoH3D
+
+// C bridge for soh3d.c (compiled as C): dispatch an actor to its model-REPLACEMENT behavior, if any.
+// Returns 1 if the behavior fully drew the OoT3D replacement (N64 draw should be suppressed), else 0.
+// Called once per actor from SoH3D_TryDrawActor, before the auto/table forced-CMB path.
+extern "C" int SoH3D_TryActorModelDraw(PlayState* play, Actor* actor) {
+    if (SoH3D::ActorBehavior* b = SoH3D::findActorBehavior(actor->id)) {
+        if (b->tryDrawModel(play, actor)) {
+            return 1;
+        }
+    }
+    return 0;
+}

@@ -301,21 +301,6 @@ void SoH3D_SkipControlTakers(PlayState* play);
 #define ZSPOT06 "/actor/zelda_spot06_objects.zar"
 #define SOH3D_SPOT06_WATER_WORLD_SCALE 1.0f
 
-// Standard hinged door (En_Door, #115 item C). OoT3D keeps the generic door CMB in the KEEP zar
-// (zelda_keep.zar), under door/model/ — see oot3d-decomp/docs/en_door.md. N64 standard doors all
-// resolve to the FIELD door (gFieldDoorLeftDL, dListIndex 4) due to the Object_GetIndex quirk in
-// z_en_door.c, so the faithful OoT3D match is m_Fnormaldoor_omote_model.cmb. The CMB rest pose is
-// a closed upright door, Y-up, base at Y=0, panel centered at local X (width ±3000, height 10000,
-// faces ±Z) — so it drops straight into the actor's world.pos + shape.rot.y transform with no
-// offset, exactly like the N64 door it replaces.
-//   Scale is calibrated to the DOORWAY (the same fit method used for the DM-trail gate/windmill):
-//   10000-unit CMB × 0.009 = ~90 world units tall, which fills the OoT3D doorway floor-to-lintel
-//   (verified in Market Day, 2026-06-25). The auto-measure path is NOT used here — it under-reports
-//   the skeletal En_Door draw by ~10× (n64h 9.7 for a >60-unit-tall door). REPL `gscale 12` retunes.
-#define ZKEEP "/actor/zelda_keep.zar"
-#define SOH3D_DOOR_CMB "door/model/m_Fnormaldoor_omote_model.cmb"
-#define SOH3D_DOOR_WORLD_SCALE 0.009f
-
 // World scale for the OoT3D Gerudo (En_Ge1). FIRST CHARACTER divert: the OoT3D
 // model is smooth-skinned and baked UPRIGHT + grounded (cmb_to_c --rotx 180
 // --ground), so it drops into the same Translate*RotateY*Scale path as the props
@@ -459,6 +444,10 @@ void SoH3D_SceneTint(PlayState* play, u8 out[3]);                       // flat 
 const char* SoH3D_ResolvePlayerCsab(const char* otr);                  // player anim OTR -> link CSAB base
 void SoH3D_EnsureModelProvider(void);                                   // lazy GL model provider init
 int SoH3D_AutoModelId(const char* zarPath);                            // get-or-alloc a GL model id
+// Bridges for the structured model-REPLACEMENT behaviors (behaviors/actor/<actor>.cpp):
+int SoH3D_TryActorModelDraw(PlayState* play, Actor* actor);            // dispatch actor->behavior->tryDrawModel
+int SoH3D_DrawActorModel(PlayState* play, int modelId, Actor* actor, float worldScale); // draw OoT3D CMB at actor xform
+float SoH3D_GScale(int slot, float def);                              // live REPL `gscale <slot>` or def
 // Low-level retarget primitives (DEFINED in soh3d_model.cpp); forwarded here so link.cpp sees them.
 void SoH3D_SetTrackPosedMinY(int modelId, int enable);                  // per-frame posed-feet grounding
 float SoH3D_PosedGroundOffset(int modelId, unsigned long long midMask); // model-local Y to ground feet
