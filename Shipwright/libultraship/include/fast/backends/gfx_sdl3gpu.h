@@ -13,6 +13,7 @@
 #include <unordered_map>
 #include <string>
 #include <cstdint>
+#include <functional>
 
 namespace Fast {
 
@@ -118,6 +119,36 @@ class GfxRenderingAPISdl3Gpu : public GfxRenderingAPI {
     bool BeginSoH3DPass(SoH3DGpuContext& out);
     bool BeginSoH3DOffscreen(SoH3DGpuContext& out);
 
+    // ---- Unified op model (P3): the SoH3D OoT3D content (CMB models, HUD, RmlUi) appends its draws
+    // as ops into the SAME deferred op-list as the N64 Fast3D triangles, replayed in ONE render pass
+    // in FinishRender. There is NO separate-pass / live-command-buffer handshake — the legacy
+    // BeginSoH3DPass model is gone. soh3d_sdl3gpu.cpp owns its own GPU resources (created via the
+    // device handle below) and records draws via these two appenders.
+    SDL_GPUDevice* GpuDevice() {
+        return mDevice;
+    }
+    SDL_GPUTextureFormat GpuColorFormat() {
+        return mColorFormat;
+    }
+    SDL_GPUTextureFormat GpuDepthFormat() {
+        return mDepthFormat;
+    }
+    int CurrentFb() {
+        return mCurrentFb;
+    }
+    // The current viewport/scissor (as set by the interpreter for the N64 geometry) converted to the
+    // SDL3 GPU top-left convention for the current framebuffer — the SAME conversion DrawTriangles
+    // applies — so SoH3D model draws land pixel-aligned with the N64 geometry they interleave with.
+    void GetSoH3DViewportScissor(SDL_GPUViewport& vp, SDL_Rect& sc);
+    // Append an external draw recorded INSIDE the current framebuffer's render pass (interleaves
+    // depth-correctly with N64 geometry — same color+depth target). The callback gets the open
+    // command buffer + render pass at replay time.
+    void AppendSoH3DInPass(std::function<void(SDL_GPUCommandBuffer*, SDL_GPURenderPass*)> fn);
+    // Append an external op that runs its OWN render pass (offscreen shadow/AO depth targets). The
+    // main framebuffer pass is ended first (SDL3 GPU passes can't nest); the callback owns
+    // SDL_BeginGPURenderPass/SDL_EndGPURenderPass on the supplied command buffer.
+    void AppendSoH3DOwnPass(std::function<void(SDL_GPUCommandBuffer*)> fn);
+
     const char* GetName() override;
     int GetMaxTextureSize() override;
     GfxClipParameters GetClipParameters() override;
@@ -169,10 +200,12 @@ class GfxRenderingAPISdl3Gpu : public GfxRenderingAPI {
     // backend records draws/clears/blits into an op list during the frame (with vertex data staged
     // into a CPU buffer), then at EndFrame uploads the whole vertex buffer in ONE copy pass and
     // replays the ops — switching render passes only when the target framebuffer changes.
-    enum OpKind { OP_DRAW, OP_CLEAR, OP_COPY };
+    // OP_EXT_IN_PASS / OP_EXT_OWN_PASS are the unified-renderer hooks (P3): the SoH3D OoT3D content
+    // records its draws as callback ops in the SAME stream as the N64 triangles.
+    enum OpKind { OP_DRAW, OP_CLEAR, OP_COPY, OP_EXT_IN_PASS, OP_EXT_OWN_PASS };
     struct Op {
         OpKind kind;
-        int fb;     // target fb (DRAW/CLEAR) or destination fb (COPY)
+        int fb;     // target fb (DRAW/CLEAR/EXT_IN_PASS) or destination fb (COPY)
         int srcFb;  // COPY source fb
         bool clearColor, clearDepth;
         SDL_Rect srcRect, dstRect; // COPY
@@ -186,6 +219,9 @@ class GfxRenderingAPISdl3Gpu : public GfxRenderingAPI {
         SDL_GPUViewport viewport;
         SDL_Rect scissor;
         uint8_t ubo[64]; // std140 fragment UBO payload (SgUboData)
+        // EXT_IN_PASS: invoked inside fb's render pass. EXT_OWN_PASS: invoked with the main pass ended.
+        std::function<void(SDL_GPUCommandBuffer*, SDL_GPURenderPass*)> extIn;
+        std::function<void(SDL_GPUCommandBuffer*)> extOwn;
     };
 
     void CreateDeviceAndClaim();

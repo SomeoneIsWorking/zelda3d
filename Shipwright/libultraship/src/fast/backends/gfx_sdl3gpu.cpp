@@ -819,6 +819,28 @@ void GfxRenderingAPISdl3Gpu::ReplayOps(SDL_GPUTexture* presentTex, uint32_t pres
                 SDL_DrawGPUPrimitives(pass, op.numVerts, 1, 0, 0);
                 break;
             }
+            case OP_EXT_IN_PASS: {
+                // Unified SoH3D draw recorded into the target fb's render pass (interleaves with N64
+                // geometry, sharing color + depth). Ensure that fb's pass is open, then hand it over.
+                FramebufferSDL3& f = mFramebuffers[op.fb];
+                if (!f.color || !f.depth)
+                    break;
+                if (!(pass && curFb == op.fb)) {
+                    endPass();
+                    beginPass(op.fb);
+                }
+                if (op.extIn)
+                    op.extIn(mCmd, pass);
+                break;
+            }
+            case OP_EXT_OWN_PASS: {
+                // Offscreen SoH3D pass (shadow / AO depth). The callback owns its own render pass, so
+                // the main fb pass must be closed first (SDL3 GPU render passes do not nest).
+                endPass();
+                if (op.extOwn)
+                    op.extOwn(mCmd);
+                break;
+            }
         }
     }
     endPass();
@@ -1891,20 +1913,65 @@ void GfxRenderingAPISdl3Gpu::SetCurrentPrimDepth(float depth) {
 }
 
 // ---------------------------------------------------------------------------
-// SoH3D pass hooks (P3 stubs)
+// SoH3D unified-op hooks (P3): the OoT3D model / HUD / RmlUi content appends its draws as ops into
+// the SAME deferred op-list as the N64 triangles, replayed in ONE render pass in FinishRender. The
+// legacy BeginSoH3DPass live-command-buffer handshake is gone (the methods below are the only path).
 // ---------------------------------------------------------------------------
 
+void GfxRenderingAPISdl3Gpu::GetSoH3DViewportScissor(SDL_GPUViewport& vp, SDL_Rect& sc) {
+    int fbId = (mCurrentFb >= 0 && mCurrentFb < (int)mFramebuffers.size()) ? mCurrentFb : 0;
+    FramebufferSDL3& f = mFramebuffers[fbId];
+    // Same GL-bottom-left -> SDL3-GPU-top-left conversion DrawTriangles applies.
+    vp = mCurrentViewport;
+    vp.y = (float)f.height - vp.y - vp.h;
+    sc = mCurrentScissor;
+    sc.y = (int)f.height - sc.y - sc.h;
+    if (sc.x < 0) {
+        sc.w += sc.x;
+        sc.x = 0;
+    }
+    if (sc.y < 0) {
+        sc.h += sc.y;
+        sc.y = 0;
+    }
+    if (sc.x > (int)f.width)
+        sc.x = (int)f.width;
+    if (sc.y > (int)f.height)
+        sc.y = (int)f.height;
+    if (sc.x + sc.w > (int)f.width)
+        sc.w = std::max(0, (int)f.width - sc.x);
+    if (sc.y + sc.h > (int)f.height)
+        sc.h = std::max(0, (int)f.height - sc.y);
+    if (sc.w < 0)
+        sc.w = 0;
+    if (sc.h < 0)
+        sc.h = 0;
+}
+
+void GfxRenderingAPISdl3Gpu::AppendSoH3DInPass(std::function<void(SDL_GPUCommandBuffer*, SDL_GPURenderPass*)> fn) {
+    Op op{};
+    op.kind = OP_EXT_IN_PASS;
+    op.fb = mCurrentFb;
+    op.extIn = std::move(fn);
+    mOps.push_back(std::move(op));
+}
+
+void GfxRenderingAPISdl3Gpu::AppendSoH3DOwnPass(std::function<void(SDL_GPUCommandBuffer*)> fn) {
+    Op op{};
+    op.kind = OP_EXT_OWN_PASS;
+    op.fb = mCurrentFb;
+    op.extOwn = std::move(fn);
+    mOps.push_back(std::move(op));
+}
+
 bool GfxRenderingAPISdl3Gpu::BeginSoH3DPass(SoH3DGpuContext& out) {
-    // P3 will hand the SoH3D OoT3D-model path the open render pass + dynamic state. The deferred
-    // recording model means a live render pass only exists during FinishRender's replay, so this is
-    // a no-op stub in P2 (the SoH3D model draws are not yet ported to SDL3 GPU).
     (void)out;
-    return false;
+    return false; // legacy handshake removed; use AppendSoH3DInPass.
 }
 
 bool GfxRenderingAPISdl3Gpu::BeginSoH3DOffscreen(SoH3DGpuContext& out) {
     (void)out;
-    return false;
+    return false; // legacy handshake removed; use AppendSoH3DOwnPass.
 }
 
 } // namespace Fast

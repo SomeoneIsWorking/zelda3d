@@ -5,6 +5,9 @@
 #ifdef ENABLE_VULKAN
 #include "fast/soh3d_vk.h" // dispatch the GPU pass to Vulkan when that backend is live
 #endif
+#ifdef ENABLE_SDL3GPU
+#include "fast/soh3d_sdl3gpu.h" // dispatch the GPU pass to SDL3 GPU when that backend is live
+#endif
 #include "libultraship/bridge/consolevariablebridge.h" // CVar-backed shadow/AO/lighting toggles
 
 // Match the GL headers the OpenGL backend uses (see gfx_opengl.h).
@@ -673,6 +676,9 @@ extern "C" void SoH3D_GL_SetModelProvider(SoH3DModelProvider fn) {
 #ifdef ENABLE_VULKAN
     SoH3D_Vk_SetProvider(fn); // the Vulkan model store uses the same provider
 #endif
+#ifdef ENABLE_SDL3GPU
+    SoH3D_Sg_SetProvider(fn); // the SDL3 GPU model store uses the same provider
+#endif
 }
 
 extern "C" void SoH3D_GL_SetBones(int modelId, const float* mats16, int n) {
@@ -812,7 +818,12 @@ static int g_evictLo = 0, g_evictHi = 0;
 static bool g_evictPending = false;
 extern "C" void SoH3D_GL_RequestEvictRange(int lo, int hi) {
     g_evictLo = lo; g_evictHi = hi; g_evictPending = true;
+#ifdef ENABLE_VULKAN
     SoH3D_Vk_RequestEvictRange(lo, hi); // mirror to the Vulkan model store (whichever backend is live)
+#endif
+#ifdef ENABLE_SDL3GPU
+    SoH3D_Sg_RequestEvictRange(lo, hi); // mirror to the SDL3 GPU model store
+#endif
 }
 static void applyPendingEvict() {
     if (!g_evictPending) return;
@@ -1539,6 +1550,38 @@ extern "C" void SoH3D_GL_FrameBegin(void) {
 extern "C" void SoH3D_GL_RenderPass(void) {
     applyPendingEvict(); // render thread, GL current: safe to delete evicted models' GPU objects
     if (g_drawList.empty()) return;
+
+#ifdef ENABLE_SDL3GPU
+    // SDL3 GPU backend active: append the OoT3D model draws as OPS into the unified op-list (replayed
+    // in ONE render pass alongside the N64 geometry — no separate-pass handshake). Per-item pose
+    // interpolation matches the GL/Vulkan paths. Shadows + AO are M4 (the Sg shadow/AO entry points
+    // are no-ops for now), so this is the model + HUD content path.
+    if (SoH3D_Sg_Active()) {
+        std::vector<float> lerped;
+        float step = gSoH3dInterpStep;
+        auto poseOf = [&](const DrawItem& it) -> const float* {
+            const float* pose = it.bones.empty() ? nullptr : it.bones.data();
+            if (pose && step < 0.999f && !it.prevBones.empty() && it.prevBones.size() == it.bones.size()) {
+                auto mit = g_models.find(it.modelId);
+                const float* bd =
+                    (mit != g_models.end() && !mit->second.bind.empty()) ? mit->second.bind.data() : nullptr;
+                const float* bi =
+                    (mit != g_models.end() && !mit->second.binv.empty()) ? mit->second.binv.data() : nullptr;
+                interpSkinPose(it.prevBones.data(), it.bones.data(), bd, bi, step, it.bones.size(), lerped);
+                pose = lerped.data();
+            }
+            return pose;
+        };
+        SoH3D_Sg_BeginPass();
+        for (const DrawItem& it : g_drawList) {
+            SoH3D_Sg_DrawModel(it.modelId, it.mp, it.mv, it.lit, it.invertY, it.r, it.g, it.b, it.a, it.aspectAdj,
+                               poseOf(it), it.boneCount, it.midMask, it.sky, it.uvOffU, it.uvOffV, &it.matTex);
+        }
+        SoH3D_Sg_EndPass();
+        g_drawList.clear();
+        return;
+    }
+#endif
 
 #ifdef ENABLE_VULKAN
     // Vulkan backend active: dispatch the GPU submission to soh3d_vk.cpp. The per-item pose
