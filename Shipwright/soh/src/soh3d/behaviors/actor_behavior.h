@@ -39,6 +39,20 @@ public:
     // draws from the KEEP zar rather than as a standalone actor object. Called from
     // SoH3D_TryDrawActor (via the SoH3D_TryActorModelDraw C bridge) before the auto/table path.
     virtual bool tryDrawModel(PlayState* play, Actor* actor) { return false; }
+
+    // Faithful draw-space transform offset for an actor whose own Draw applies translate(s) the
+    // generic world.pos anchor path omits. OoT3D Actor_Draw lifts the model matrix by
+    // shape.yOffset*scale.y in WORLD Y; some actors' Draw then post-multiplies a LOCAL
+    // Matrix_Translate (in the rotated, actor-scale frame) — e.g. BossGoma_Draw's
+    // Matrix_Translate(0,-4000,0). When the actor rotates (Gohma tilting onto a climbing pillar) the
+    // world lift and the local translate stop cancelling, so the model is displaced off its world.pos
+    // anchor; the generic anchor path (a vertical groundOffset) cannot reproduce this. Fill
+    // *worldLiftY (added to world.pos.y, world frame, like shape.yOffset*scale.y) and *localOffset
+    // (applied AFTER shape.rot but BEFORE the model's worldScale, i.e. in the rotated WORLD-UNIT frame,
+    // like the actor Draw's Matrix_Translate scaled by actor->scale). Return true to REPLACE the
+    // generic groundOffset with this faithful placement (false = keep the generic anchor). Read
+    // scale/yOffset from the live actor C struct (64-bit-safe) — never raw N64 byte offsets.
+    virtual bool drawSpaceTransform(Actor* actor, float* worldLiftY, Vec3f* localOffset) { return false; }
 };
 
 // Look up the behavior that owns `actorId`, or nullptr if none is registered (caller falls through to
