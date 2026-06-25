@@ -15,9 +15,9 @@
 // see EnExRuppy_Draw rupeeTexturesNew), and the CMB follows that 3D ordering.
 //
 // So to render one colored rupee we draw the CMB but mask it to the single mesh_id == colorIdx via the
-// existing per-frame mesh_id visibility channel (SoH3D_GL_SetMidMask — the same machinery the player
-// path uses to pick Link's equipment variant). Without the mask all five colors would draw stacked at
-// the same origin.
+// per-frame mesh_id visibility channel — the shared SoH3D::drawRupeeColorMesh helper
+// (actor_behavior.cpp), which En_Item00 reuses for its dropped rupees. Without the mask all five
+// colors would draw stacked at the same origin.
 //
 // Honors `invisible`: while the actor is invisible (mid-drop, blown up) the N64 draw early-returns, so
 // we draw nothing but still claim the draw to keep the N64 rupee suppressed.
@@ -25,25 +25,16 @@
 #include "ruppy.h"
 #include "overlays/actors/ovl_En_Ex_Ruppy/z_en_ex_ruppy.h"
 
-// Get-item rupee zar + CMB. Self-contained to this module.
-#define SOH3D_RUPPY_ZAR "/actor/zelda_gi_rupy.zar"
-#define SOH3D_RUPPY_CMB "Model/zelda_gi_rupy.cmb"
-
 // World scale: the N64 draws gRupeeDL at (actor.scale * mtxScale), with mtxScale 25.0 (17.5 for the
 // big gold/purple). The OoT3D CMB bakes the bigger geometry into the gold mesh directly, so we use a
 // single multiplier on the actor's own live scale (which the N64 logic sets per type: 0.01 diving,
 // 0.02 courtyard/giant, 0.1 "wow coin"). Driving off actor->scale preserves those relative sizes the
 // same way the N64 actor-scale path does. The multiplier is calibrated live to the N64 rupee footprint
-// and retunable via REPL `gscale 17`.
+// and retunable via REPL `gscale 17` (shared with En_Item00 — same CMB).
 static constexpr float kRuppyScaleMul = 25.0f;
 static constexpr int kRuppyGScaleSlot = 17;
 
-extern "C" {
-int SoH3D_AutoModelId(const char* zarPath);
-int SoH3D_DrawActorModel(PlayState* play, int modelId, Actor* actor, float worldScale);
-float SoH3D_GScale(int slot, float def);
-void SoH3D_GL_SetMidMask(int modelId, unsigned long long mask);
-}
+extern "C" float SoH3D_GScale(int slot, float def);
 
 namespace SoH3D {
 
@@ -52,30 +43,14 @@ s16 EnExRuppyBehavior::actorId() const {
 }
 
 bool EnExRuppyBehavior::tryDrawModel(PlayState* play, Actor* actor) {
-    static int sModelId = 0; // 0 = unresolved, <0 = no CMB (fall through to N64)
-    if (sModelId == 0) {
-        sModelId = SoH3D_AutoModelId(SOH3D_RUPPY_ZAR "|" SOH3D_RUPPY_CMB);
-    }
-    if (sModelId < 0) {
-        return false; // no OoT3D rupee CMB -> let the N64 rupee draw
-    }
-
     EnExRuppy* ruppy = (EnExRuppy*)actor;
     if (ruppy->invisible) {
         return true; // invisible: draw nothing, but keep the N64 rupee suppressed (matches N64 Draw)
     }
-
-    // Select the single color mesh. mesh_id == colorIdx (0..4). Out-of-range -> green so something
-    // sane draws rather than the whole stack.
-    int colorIdx = ruppy->colorIdx;
-    if (colorIdx < 0 || colorIdx > 4) {
-        colorIdx = 0;
-    }
-    SoH3D_GL_SetMidMask(sModelId, 1ull << colorIdx);
-
     float worldScale = actor->scale.x * SoH3D_GScale(kRuppyGScaleSlot, kRuppyScaleMul);
-    SoH3D_DrawActorModel(play, sModelId, actor, worldScale);
-    return true;
+    // mesh_id == colorIdx; the shared helper masks to that single color (and falls through to N64 if
+    // the CMB is unavailable, returning false).
+    return drawRupeeColorMesh(play, actor, ruppy->colorIdx, worldScale);
 }
 
 } // namespace SoH3D

@@ -12,6 +12,7 @@
 #include "actor/hamishi.h"
 #include "actor/bombwall.h"
 #include "actor/ruppy.h"
+#include "actor/en_item00.h"
 #include "../asset/mat4.h"
 
 extern "C" {
@@ -20,6 +21,10 @@ void SoH3D_SetBonePostRot(int modelId, int boneId, const float* mat9);
 // Facial material-anim channel: bind material `mat`'s frame texture (tex<0 clears -> base sprite).
 void SoH3D_GL_SetMatTexOverride(int modelId, int materialIndex, int texIndex);
 int SoH3D_FacialFrameTex(int modelId, int materialIndex, int frame); // -1 = none/out-of-range
+// Model-draw bridges (shared rupee draw): resolve a CMB, mask to a mesh_id subset, draw at an actor.
+int SoH3D_AutoModelId(const char* zarPath);
+int SoH3D_DrawActorModel(PlayState* play, int modelId, Actor* actor, float worldScale);
+void SoH3D_GL_SetMidMask(int modelId, unsigned long long mask);
 }
 
 // REPL `faceframe <n>` verification override (>= 0 forces the eye/mouth frame). Owned by
@@ -52,6 +57,27 @@ void applyFacialFrame(int modelId, int material, int liveIdx) {
     SoH3D_GL_SetMatTexOverride(modelId, material, tex); // tex<0 (out-of-range) clears -> base sprite
 }
 
+// Shared colored-rupee draw: the OoT3D get-item rupee CMB (zelda_gi_rupy.cmb) bakes all five rupee
+// colors as distinct mesh_ids 0..4 (green/blue/red/gold/purple, OoT3D GID order) stacked at one
+// origin. We mask the per-frame mesh_id visibility to the single colorIdx so only that color draws.
+// See oot3d-decomp/docs/en_ex_ruppy.md. Used by En_Ex_Ruppy and En_Item00 (both draw the N64 gRupeeDL
+// with a per-color texture swap).
+bool drawRupeeColorMesh(PlayState* play, Actor* actor, int colorIdx, float worldScale) {
+    static int sModelId = 0; // 0 = unresolved, <0 = no CMB
+    if (sModelId == 0) {
+        sModelId = SoH3D_AutoModelId("/actor/zelda_gi_rupy.zar|Model/zelda_gi_rupy.cmb");
+    }
+    if (sModelId < 0) {
+        return false; // no OoT3D rupee CMB -> caller falls through to the N64 rupee
+    }
+    if (colorIdx < 0 || colorIdx > 4) {
+        colorIdx = 0;
+    }
+    SoH3D_GL_SetMidMask(sModelId, 1ull << colorIdx);
+    SoH3D_DrawActorModel(play, sModelId, actor, worldScale);
+    return true;
+}
+
 // Explicit registry: one static singleton per ported behavior, dispatched by actor id. Add a case
 // here as each actor is migrated out of the legacy soh3d_anim_override.cpp tables.
 ActorBehavior* findActorBehavior(s16 actorId) {
@@ -67,6 +93,7 @@ ActorBehavior* findActorBehavior(s16 actorId) {
     static ObjHamishiBehavior sObjHamishi;
     static BgBombwallBehavior sBgBombwall;
     static EnExRuppyBehavior sEnExRuppy;
+    static EnItem00Behavior sEnItem00;
     switch (actorId) {
         case ACTOR_EN_DOOR:
             return &sEnDoor;
@@ -80,6 +107,8 @@ ActorBehavior* findActorBehavior(s16 actorId) {
             return &sBgBombwall;
         case ACTOR_EN_EX_RUPPY:
             return &sEnExRuppy;
+        case ACTOR_EN_ITEM00:
+            return &sEnItem00;
         case ACTOR_EN_KO:
             return &sKokiriKid;
         case ACTOR_EN_SA:

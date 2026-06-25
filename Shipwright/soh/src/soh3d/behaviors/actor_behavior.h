@@ -67,6 +67,14 @@ void applyHeadTorsoTrack(int modelId, int headBone, int torsoBone, const NpcInte
 // swap, not an N64 segment swap.
 void applyFacialFrame(int modelId, int material, int liveIdx);
 
+// Draw the shared OoT3D rupee CMB (zelda_gi_rupy.cmb) masked to the single color mesh whose
+// mesh_id == colorIdx (0=green,1=blue,2=red,3=gold,4=purple — OoT3D GID order) at `worldScale`. The
+// CMB packs all five colors as distinct mesh_ids at the same origin, so the mesh_id mask is what
+// keeps only one color visible. Shared by every actor that renders a colored rupee (En_Ex_Ruppy,
+// En_Item00, ...). Returns false (drawing nothing) when the rupee CMB is unavailable so the caller
+// can fall through to the N64 rupee; colorIdx is clamped to [0,4].
+bool drawRupeeColorMesh(PlayState* play, Actor* actor, int colorIdx, float worldScale);
+
 } // namespace SoH3D
 
 #endif // SOH3D_BEHAVIORS_ACTOR_BEHAVIOR_H
