@@ -299,7 +299,7 @@ GLint g_uAoDepth = -1, g_uAoTexel = -1, g_uAoRadius = -1, g_uAoStrength = -1, g_
 const char* kVert =
     "#version 130\n"
     "in vec3 aPos; in vec3 aNrm; in vec2 aUv; in vec4 aBoneId; in vec4 aBoneW; in vec4 aColor;\n"
-    "uniform mat4 uMP; uniform mat4 uMV; uniform float uInvertY; uniform mat4 uBones[32]; uniform float uSkin;\n"
+    "uniform mat4 uMP; uniform mat4 uMV; uniform float uInvertY; uniform mat4 uBones[64]; uniform float uSkin;\n" // [64] must match SOH3D_GL_MAX_BONES (Gohma needs 33, #120)
     "uniform float uSky;\n" // 1 = skybox dome: force clip z to the far plane (z=w) so it sits behind everything
     "uniform vec2 uUVOffset;\n" // per-draw texcoord scroll (cloud-band drift, #28b); 0 = none
 
