@@ -7,6 +7,16 @@
 // into a per-frame host-visible vertex buffer and drawn directly).
 #include "fast/soh3d_hud_vk.h"
 
+// SDL3 GPU HUD path (unified op model): when the SDL3 GPU backend is live, the SoH3D_Hud_* C-ABI
+// delegates to the Fast::SgHud_* implementation (soh3d_hud_sdl3gpu.cpp) instead of the Vulkan one.
+#ifdef ENABLE_SDL3GPU
+#include "fast/soh3d_hud_sdl3gpu.h"
+#include "fast/backends/gfx_sdl3gpu.h"
+#define SOH3D_HUD_SG_ACTIVE (Fast::g_activeSdl3GpuApi != nullptr)
+#else
+#define SOH3D_HUD_SG_ACTIVE 0
+#endif
+
 #ifdef ENABLE_VULKAN
 
 #include "fast/backends/gfx_vulkan.h"
@@ -449,10 +459,14 @@ bool EnsureResources() {
 extern "C" {
 
 int SoH3D_Hud_Available(void) {
+    if (SOH3D_HUD_SG_ACTIVE)
+        return Fast::SgHud_Available();
     return (Fast::g_activeVulkanApi != nullptr) ? 1 : 0;
 }
 
 int SoH3D_Hud_Begin(int* outW, int* outH) {
+    if (SOH3D_HUD_SG_ACTIVE)
+        return Fast::SgHud_Begin(outW, outH);
     g.active = false;
     if (!Fast::g_activeVulkanApi)
         return 0;
@@ -486,6 +500,8 @@ int SoH3D_Hud_Begin(int* outW, int* outH) {
 }
 
 int SoH3D_Hud_Tex(const void* key, const void* rgba, int w, int h) {
+    if (SOH3D_HUD_SG_ACTIVE)
+        return Fast::SgHud_Tex(key, rgba, w, h);
     if (!g.active || !key)
         return 0;
     auto it = g.keyToId.find(key);
@@ -500,6 +516,10 @@ int SoH3D_Hud_Tex(const void* key, const void* rgba, int w, int h) {
 
 void SoH3D_Hud_Draw(int tex, float x, float y, float w, float h, float u0, float v0, float u1, float v1,
                     unsigned int tintRGBA) {
+    if (SOH3D_HUD_SG_ACTIVE) {
+        Fast::SgHud_Draw(tex, x, y, w, h, u0, v0, u1, v1, tintRGBA);
+        return;
+    }
     if (!g.active)
         return;
     Ring& r = g.rings[g.frameIndex];
@@ -568,6 +588,10 @@ void SoH3D_Hud_Draw(int tex, float x, float y, float w, float h, float u0, float
 }
 
 void SoH3D_Hud_End(void) {
+    if (SOH3D_HUD_SG_ACTIVE) {
+        Fast::SgHud_End();
+        return;
+    }
     g.active = false;
 }
 
