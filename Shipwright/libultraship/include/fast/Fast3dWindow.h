@@ -24,6 +24,7 @@ enum WindowBackend {
     FAST3D_SDL_OPENGL = 2,
     FAST3D_SDL_METAL = 3,
     FAST3D_SDL_VULKAN = 4,
+    FAST3D_SDL_GPU = 5, // SDL3 GPU API backend (soh3d single-renderer migration)
 };
 
 class Fast3dWindow : public Ship::Window {

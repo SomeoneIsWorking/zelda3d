@@ -1,8 +1,8 @@
 # SDL3 GPU unified-renderer migration (branch `sdl3gpu`)
 
 **Directive (user, 2026-06-25):** make the **SDL3 GPU API** the project's *only* renderer and
-**remove everything else** — OpenGL, DirectX11, Metal, the custom Vulkan backend, AND the raylib
-window backend. raylib was "a bad call"; SDL3 GPU is the foundation. (Memory: soh3d-renderer-sdl3gpu.)
+**remove everything else** — OpenGL, DirectX11, Metal, and the custom Vulkan backend. SDL3 GPU is
+the foundation. (Memory: soh3d-renderer-sdl3gpu.)
 
 This branch is an isolated worktree (`../soh3d-sdl3gpu`) off `main`, so it cannot collide with the
 parallel Gohma port (#120) building on `main`. Build dir here: `Shipwright/build-cmake` (its own).
@@ -56,7 +56,7 @@ SDL surface (~40 files) — project is on **SDL2 2.32**, system has **SDL3 3.4.1
   Fold `soh3d_gl.cpp`'s logic in, then drop it. GATE: OoT3D models + HUD + shadows/AO render.
 - **P4 — REMOVE everything else.** Delete gfx_opengl/dx11/metal/dxgi + headers + shader templates +
   soh3d_gl.cpp; strip `ENABLE_OPENGL/DX11/VULKAN`, the `WindowBackend` enum down to one, `SOH3D_VULKAN`.
-  Remove the raylib branch/worktree (`git worktree remove ../soh3d-raylib`; delete branch). Drop SDL2.
+  Drop SDL2.
 - **P5 — Verify full path** headless, capture evidence, commit + push `sdl3gpu`, then fast-forward `main`.
 
 ## Status log
