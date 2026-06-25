@@ -10,6 +10,7 @@
 #include "actor/pot.h"
 #include "actor/comb.h"
 #include "actor/hamishi.h"
+#include "actor/bombwall.h"
 #include "../asset/mat4.h"
 
 extern "C" {
@@ -63,6 +64,7 @@ ActorBehavior* findActorBehavior(s16 actorId) {
     static EnTuboTrapBehavior sEnTuboTrap;
     static ObjCombBehavior sObjComb;
     static ObjHamishiBehavior sObjHamishi;
+    static BgBombwallBehavior sBgBombwall;
     switch (actorId) {
         case ACTOR_EN_DOOR:
             return &sEnDoor;
@@ -72,6 +74,8 @@ ActorBehavior* findActorBehavior(s16 actorId) {
             return &sObjComb;
         case ACTOR_OBJ_HAMISHI:
             return &sObjHamishi;
+        case ACTOR_BG_BOMBWALL:
+            return &sBgBombwall;
         case ACTOR_EN_KO:
             return &sKokiriKid;
         case ACTOR_EN_SA:
