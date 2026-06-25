@@ -5,6 +5,7 @@
 #include "soh3d_anim_override.h" // skeletal-actor draw-override port (head/torso track, facial, DLs)
 #include "overlays/actors/ovl_En_Ge1/z_en_ge1.h" // EnGe1 (read live SkelAnime state)
 #include "overlays/actors/ovl_En_Ko/z_en_ko.h"   // EnKo ENKO_TYPE_* (shared-CMB head-variant select)
+#include "overlays/actors/ovl_En_Ex_Ruppy/z_en_ex_ruppy.h" // EnExRuppy colorIdx (ainfo rupee debug)
 #include "objects/object_ge1/object_ge1.h"       // dgGerudoWhite*Anim OTR-path strings
 #include <stdlib.h>
 #include <stdio.h>
@@ -5541,6 +5542,14 @@ static void SoH3D_ReplExec(PlayState* play, char* line, const char* outPath) {
                             a->colChkInfo.displacement.x, a->colChkInfo.displacement.y,
                             a->colChkInfo.displacement.z, a->bgCheckFlags, a->floorHeight,
                             gSoH3dActorFreeze);
+            // Colored-rupee debug aid: surface En_Ex_Ruppy's live colorIdx so the OoT3D
+            // mesh-select port (behaviors/actor/ruppy.cpp: mesh_id == colorIdx) can be verified
+            // against the on-screen color. Read through the C struct, not a raw offset.
+            if (a->id == ACTOR_EN_EX_RUPPY) {
+                EnExRuppy* r = (EnExRuppy*)a;
+                SoH3D_ReplReply(outPath, "ainfo ruppy colorIdx=%d type=%d invisible=%d scale=%.3f",
+                                r->colorIdx, r->type, r->invisible, a->scale.x);
+            }
         }
     } else if (strcmp(cmd, "apeek") == 0) {
         // GENERIC actor-memory peek: dump <count> s16s at byte offset <off> from the selected
