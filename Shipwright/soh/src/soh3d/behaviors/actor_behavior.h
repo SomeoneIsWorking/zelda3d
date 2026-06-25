@@ -29,7 +29,16 @@ public:
     // stale bone post-rotations and material-texture overrides for `modelId`, so the behavior only
     // SETS what it needs. `track`/`facial` are the live A/B feature gates (REPL `track` / `facial`).
     // `actor` is the live, faithfully-updated N64 actor — read its state through the C struct.
-    virtual void applyDrawOverrides(int modelId, Actor* actor, bool track, bool facial) = 0;
+    // Default no-op: a model-REPLACEMENT behavior (tryDrawModel) need not layer per-draw overrides.
+    virtual void applyDrawOverrides(int modelId, Actor* actor, bool track, bool facial) {}
+
+    // Model-REPLACEMENT path: fully DRAW this actor's OoT3D replacement model (choosing the CMB,
+    // scale and transform itself) and return true to SUPPRESS the N64 draw. Default false = this
+    // behavior does not replace the model (it only layers overrides via applyDrawOverrides above).
+    // Used for actors whose OoT3D asset is a distinct CMB chosen here — e.g. En_Door, which OoT3D
+    // draws from the KEEP zar rather than as a standalone actor object. Called from
+    // SoH3D_TryDrawActor (via the SoH3D_TryActorModelDraw C bridge) before the auto/table path.
+    virtual bool tryDrawModel(PlayState* play, Actor* actor) { return false; }
 };
 
 // Look up the behavior that owns `actorId`, or nullptr if none is registered (caller falls through to
