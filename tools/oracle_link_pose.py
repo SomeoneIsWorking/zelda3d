@@ -1,36 +1,39 @@
 #!/usr/bin/env python3
-"""oracle_link_pose.py — capture OoT3D Link's LIVE per-bone world matrices per frame from Azahar.
+"""oracle_link_pose.py — capture OoT3D Link's LIVE per-bone LOCAL rotations per frame from Azahar.
 
-The ORACLE half of the geometry-level Link animation parity sweep (SoH3D half = REPL `skindump`,
-which dumps the resolved CSAB bone-world matrices aw=skin*bind; diff = tools/parity_pose_diff.py).
+The ORACLE half of the geometry-level Link animation parity sweep (SoH3D half = REPL `skindump`;
+diff = tools/parity_pose_diff.py).
 
-Reads Link's 25-bone childlink_v2 skeleton each frame via the live bone-matrix chain
-(oot3d-decomp tools/link_skel_live.py):
-    PLAYER actor + 0x25c -> skeleton obj ; +0x20 -> anim player ; +0xd4 -> bone array + 0xc
-Each bone matrix is column-major 4x3 (0x30 bytes); bone WORLD POSITION = (m[6], m[10], m[2]).
+Reads Link's pose from the live **jointTable** at `PLAYER+0x254+0x78` (the SkelAnime controller; see
+oot3d-decomp docs/player_anim_states.md). OoT3D stores per-bone LOCAL 3x4 float transforms, stride 13
+floats/bone, in skeleton order: rotation 3x3 = floats {0,1,2 / 4,5,6 / 8,9,10}, translation = {3,7,11}.
 
-Azahar runs ~60fps; we oversample and keep only rows where the pose changed (recovering the per-frame
-sequence without a frame counter), exactly like oracle_motion_sample.py. Optionally hold the circle pad
-+ buttons for the whole capture to drive a state (locomotion, etc.) — the oracle analog of SoH3D's
-`walkhold` / `btnhold`.
+CRITICAL: this jointTable updates every LOGIC frame regardless of rendering. The render-side bone-WORLD
+matrix array (actor+0x25c chain, tools/link_skel_live.py) is a GPU-skinning product that stays FROZEN
+under headless Azahar — do NOT use it for per-frame pose. We capture the local ROTATION per bone (the
+pure anim output, parent-relative, directly comparable across rigs).
+
+Azahar runs ~60fps; we oversample and keep only rows where the pose changed. Optionally hold the circle
+pad + buttons for the whole capture to drive a state (locomotion, etc.) — the oracle analog of SoH3D's
+`walkhold` / `btnhold`. Combine with `oot3d-decomp tools/link_ctl.py warp <entrance>` to reach open
+ground (e.g. Kokiri Forest 0xEE) where Link can sustain a run.
 
 Usage:
   tools/oracle_link_pose.py --frames 60 --out scratch/parity/oracle_run.csv --hold-circle 0,100
   tools/oracle_link_pose.py --frames 40 --out scratch/parity/oracle_idle.csv     # standing idle
 Options: --hold-circle CX,CY (-100..100), --hold-buttons 'a b', --hz, --settle, --timeout, --stall.
 """
-import argparse, os, struct, sys, time
+import argparse, math, os, struct, sys, time
 
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
 import azahar_rpc as A
 
 OOT3D_TID = 0x0004000000033500
 GPLAYSTATE = 0x0050AF34
-SKEL_OFF = 0x25C        # actor -> embedded skeleton object
-ANIMPLAYER_OFF = 0x20   # skelobj -> anim player
-MATPTR_OFF = 0xD4       # animplayer -> bone array + 0xc
-NBONE = 25
-STRIDE = 0x30
+SKELANIME_OFF = 0x254   # PLAYER -> embedded SkelAnime controller
+JOINTTABLE_OFF = 0x78   # SkelAnime -> live local-transform array
+BONE_STRIDE = 13 * 4    # 13 floats per bone (3x4 matrix + 1 pad)
+NBONE = 25              # child/adult Link childlink_v2 rig
 
 
 def select_oot3d(rpc):
@@ -49,16 +52,25 @@ def link_actor(rpc):
     return rpc.read32(ps + 0x208C + 0x0C + 2 * 8 + 4)
 
 
-def bone_world_positions(rpc, actor):
-    """Return [(x,y,z)]*NBONE — each bone's live world position (m[6],m[10],m[2])."""
-    animplayer = rpc.read32(actor + SKEL_OFF + ANIMPLAYER_OFF)
-    arr = rpc.read32(animplayer + MATPTR_OFF) - 0xC
-    d = rpc.read(arr, NBONE * STRIDE)
+def bone_local_rots(rpc, actor):
+    """Return [r0..r8]*NBONE — each bone's live LOCAL 3x3 rotation (row-major) from the jointTable."""
+    jt = rpc.read32(actor + SKELANIME_OFF + JOINTTABLE_OFF)
+    d = rpc.read(jt, NBONE * BONE_STRIDE)
     out = []
     for i in range(NBONE):
-        m = struct.unpack_from("<12f", d, i * STRIDE)
-        out.append((m[6], m[10], m[2]))
+        m = struct.unpack_from("<12f", d, i * BONE_STRIDE)  # 3x4 row-major
+        out.append((m[0], m[1], m[2], m[4], m[5], m[6], m[8], m[9], m[10]))  # 3x3 rotation
     return out
+
+
+def _pose_delta(a, b):
+    """Total per-bone rotation change (deg) between two captures — for distinct-frame detection."""
+    tot = 0.0
+    for ra, rb in zip(a, b):
+        tr = sum(ra[i] * rb[i] for i in range(9))
+        c = max(-1.0, min(1.0, (tr - 1.0) / 2.0))
+        tot += math.degrees(math.acos(c))
+    return tot
 
 
 def main():
@@ -71,7 +83,8 @@ def main():
     ap.add_argument("--hold-circle", default=None, metavar="CX,CY",
                     help="hold circle pad at CX,CY (-100..100, e.g. 0,100 = full forward)")
     ap.add_argument("--hold-buttons", default="", help="buttons to hold (e.g. 'a b')")
-    ap.add_argument("--eps", type=float, default=1.0, help="min summed pos change to count a new frame")
+    ap.add_argument("--eps", type=float, default=3.0,
+                    help="min summed per-bone rotation change (deg) to count a new distinct frame")
     ap.add_argument("--out", default="scratch/parity/oracle.csv")
     args = ap.parse_args()
 
@@ -100,7 +113,7 @@ def main():
     os.makedirs(os.path.dirname(os.path.abspath(args.out)), exist_ok=True)
     period = 1.0 / args.hz
     t0 = time.time()
-    rows = []      # (cap, t_ms, [(x,y,z)]*NBONE)
+    rows = []      # (cap, t_ms, [r0..r8]*NBONE)
     last = None
     last_change = t0
     misses = 0
@@ -113,7 +126,7 @@ def main():
             print(f"oracle_link_pose: pose static for {args.stall}s — stopping")
             break
         try:
-            pos = bone_world_positions(rpc, actor)
+            rots = bone_local_rots(rpc, actor)
         except Exception:
             misses += 1
             if misses > 200:
@@ -121,15 +134,11 @@ def main():
                 break
             time.sleep(period)
             continue
-        # distinct-frame key: total movement of all bones vs last kept frame
-        if last is not None:
-            d = sum(abs(pos[i][k] - last[i][k]) for i in range(NBONE) for k in range(3))
-            changed = d > args.eps
-        else:
-            changed = True
+        # distinct-frame key: total per-bone local-rotation change (deg) vs last kept frame
+        changed = (last is None) or (_pose_delta(rots, last) > args.eps)
         if changed:
-            rows.append((len(rows), round((now - t0) * 1000, 1), pos))
-            last = pos
+            rows.append((len(rows), round((now - t0) * 1000, 1), rots))
+            last = rots
             last_change = now
         if circle is not None:
             rpc.set_input(btn_mask, circle)
@@ -139,10 +148,10 @@ def main():
         rpc.set_input(0, None)
 
     with open(args.out, "w") as f:
-        f.write("cap,t_ms,bone,x,y,z\n")
-        for cap, tms, pos in rows:
-            for b, (x, y, z) in enumerate(pos):
-                f.write(f"{cap},{tms},{b},{x:.3f},{y:.3f},{z:.3f}\n")
+        f.write("cap,t_ms,bone,r0,r1,r2,r3,r4,r5,r6,r7,r8\n")
+        for cap, tms, rots in rows:
+            for b, r in enumerate(rots):
+                f.write(f"{cap},{tms},{b}," + ",".join(f"{v:.5f}" for v in r) + "\n")
     span = rows[-1][1] - rows[0][1] if len(rows) > 1 else 0.0
     print(f"oracle_link_pose: wrote {len(rows)} distinct frames over {span:.0f}ms -> {args.out}")
 
