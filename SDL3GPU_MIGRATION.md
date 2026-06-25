@@ -143,3 +143,73 @@ SDL surface (~40 files) — project is on **SDL2 2.32**, system has **SDL3 3.4.1
     `soh3d_gl.cpp`'s logic folded in then dropped. The backend's `BeginSoH3DPass`/`BeginSoH3DOffscreen`
     hooks + a live (or appended-op) recording model are the prerequisite. RmlUi-on-SDL3GPU (above)
     rides on the same infrastructure.
+- **P3 IN PROGRESS — UNIFY N64 + 3DS into ONE pass. The unified op model is built and proven for
+  3 of 4 milestones. NO separate-pass handshake: `BeginSoH3DPass`/`BeginSoH3DOffscreen` now return
+  false (legacy handshake deleted, not ported).**
+  - **The unified op model (how `BeginSoH3DPass` is truly gone).** The SDL3 GPU backend's deferred
+    op-list (`mOps`, replayed once in `FinishRender`) gained two external-op kinds + appenders
+    (`gfx_sdl3gpu.{h,cpp}`): `AppendSoH3DInPass(fn)` / `AppendSoH3DInPassFb(fb, fn)` record a callback
+    INSIDE a framebuffer's render pass (interleaves depth-correctly with N64 geometry, same
+    color+depth target); `AppendSoH3DOwnPass(fn)` records a callback that runs its OWN render pass
+    (offscreen targets), with the main fb pass ended first (SDL3 GPU passes don't nest). `ReplayOps`
+    handles both: for `OP_EXT_IN_PASS` it ensures the target fb's pass is open then invokes the
+    callback with `(cmd, pass)`; for `OP_EXT_OWN_PASS` it ends any open pass then invokes `(cmd)`.
+    The SoH3D modules own their own GPU resources (created via `GpuDevice()`), resolve
+    pipelines/textures/UBOs at record time, and capture them into the callback. There is no live
+    command buffer handed out mid-frame — everything is an op in the one stream, replayed in one pass.
+    Frame ordering (proven from `Fast3dWindow::DrawAndRunGraphicsCommands`): `Interpreter::Run`
+    records N64 + OoT3D-model-renderpass ops, then `gui->EndDraw()` → `Gui::EndFrame` records HUD +
+    RmlUi ops, then `Interpreter::EndFrame` → `FinishRender` replays them all into fb 0 (whose color
+    is blitted to the swapchain / read back headless). On SDL3 GPU the present is ONLY a blit of fb 0,
+    so HUD + menu must be ops into fb 0 (they are) — there is no separate swapchain ImGui composite.
+  - **M1 ✅ OoT3D CMB models render in the unified pass.** New `soh3d_sdl3gpu.cpp` (`SoH3D_Sg_*`):
+    model provider, per-model SDL_GPUBuffer, pipeline cache, per-draw UBO pushed via
+    `SDL_Push{Vertex,Fragment}UniformData`. One in-pass op per model, replayed in fb 0's pass
+    alongside the N64 triangles. Model shaders = `soh3d_vk.cpp`'s verbatim, retargeted to SDL3 GPU's
+    SPIR-V set model (vertex UBO set 1, fragment samplers set 2, fragment UBO set 3). `soh3d_gl.cpp`
+    dispatches to `SoH3D_Sg_*` when the SDL3 GPU backend is live. Verified Kokiri Forest e238 t0x6000:
+    Link/Saria/grass/fences/buildings render; 98.3% non-black. `scratch/screenshots/p3_m1_kokiri.png`.
+    Commit `5e422da`.
+  - **M2 ✅ OoT3D PC HUD renders in the unified pass.** New `soh3d_hud_sdl3gpu.cpp` (`Fast::SgHud_*`):
+    collects the frame's HUD quads (Begin..Draw..End), uploads to a ring vertex buffer, appends ONE
+    op into fb 0. `soh3d_hud_vk.cpp`'s `SoH3D_Hud_*` C-ABI delegates to `SgHud_*` when SDL3 GPU is
+    live; `SoH3D_Hud_Available()` true activates the PC HUD (N64 HUD draws gate off). New backend
+    accessors `AppendSoH3DInPassFb` / `MainFbSize` / `FrameRecording`. Verified: hearts, item hotbar,
+    rupee counter render over the scene. `scratch/screenshots/p3_m2_hud.png`. Commit `752fac8`.
+  - **M3 ✅ RmlUi ESC menu renders in the unified pass.** New `RmlRenderInterfaceSdl3Gpu.{h,cpp}`:
+    collects menu geometry during `Rml::Context::Render()` and appends ONE op into fb 0. `SohRmlUi`
+    gains an sdl3gpu mode; `Fast3dGui` gains a `FAST3D_SDL_GPU` case in `ImGuiBackendInit` (creates
+    `mRml`) and `RenderRmlMenu` (calls `UpdateAndRender`). Verified `SOH3D_RMLUI_OPEN=1`: styled menu
+    (tabs, toggle rows, help text, rounded panel, radial glow) over HUD + scene.
+    `scratch/screenshots/p3_m3_rmlui.png`. Commit `8a96953`. **Feature gap:** stencil clip-mask
+    (`EnableClipMask`/`RenderToClipMask` are no-ops) + the layer stack/opacity filters
+    (`PushLayer`/`CompositeLayers` render straight to fb 0) are NOT ported — see remaining-M3 below.
+  - **REMAINING P3 (precise):**
+    - **M4 — shadows + AO (REPL `shadow`/`ao`).** NOT ported; the `SoH3D_Sg_BeginShadowPass` /
+      `BeginDepthPrepass` / `ShadowCasterDraw` / `DepthPrepassDraw` / `AoComposite` / `SetShadow`
+      entry points in `soh3d_sdl3gpu.cpp` are no-ops (return 0). Port plan, all from `soh3d_vk.cpp`:
+      (1) A depth-only model pipeline (reuse the model vertex shader + an alpha-test-discard frag),
+      and offscreen depth `SDL_GPUTexture`s with `DEPTH_STENCIL_TARGET | SAMPLER` usage (D32_FLOAT) —
+      a 2048² shadow map (`ensureShadowMap`) and a viewport-sized AO depth (`ensureAoDepth`).
+      (2) Shadow pass: an `AppendSoH3DOwnPass` op that `SDL_BeginGPURenderPass` on the shadow depth
+      target (clear to 1.0), draws every lit caster's depth (model->lightclip MVP) + the N64 caster
+      tri-soup, ends the pass. Append it BEFORE the model in-pass ops. Then in `SoH3D_Sg_DrawModel`,
+      when shadows on, set `uShadow.x=1` + `uLightVP` + bind the shadow depth texture (instead of the
+      dummy) to fragment sampler slot 1 (the model frag already PCF-samples it). (3) AO: an
+      `AppendSoH3DOwnPass` op for the AO depth prepass (lit actors only), then an `AppendSoH3DInPassFb(0,…)`
+      op AFTER the model ops for the SSAO composite full-screen triangle (multiply blend
+      `dst*src`, sampling the AO depth — shader `kAoCompFrag` in `soh3d_vk.cpp`). (4) Expand the
+      `SoH3D_Sg_Active()` branch in `soh3d_gl.cpp:SoH3D_GL_RenderPass` to mirror the Vulkan branch's
+      shadow→prepass→model→composite sequence (it currently does only BeginPass→DrawModel→EndPass).
+      `computeLightVP` is already shared (in `soh3d_gl.cpp`). Gotcha: confirm SDL3 GPU can sample a
+      D32_FLOAT texture as `sampler2D` (read `.r`); if not, render shadow/AO depth into an R32_FLOAT
+      color target writing `gl_FragCoord.z` instead.
+    - **M3 follow-up — RmlUi clip-mask + layers.** Stencil clip-mask needs the SDL3 GPU backend's
+      depth target to carry a stencil aspect (currently `D32_FLOAT`; change `mDepthFormat` to
+      `D32_FLOAT_S8_UINT` or `D24_UNORM_S8_UINT` and add stencil state to the affected pipelines), then
+      port `EnableClipMask`/`RenderToClipMask` (two pipeline variants: stencil-write + stencil-test).
+      The layer stack/opacity filters need an offscreen RGBA8 layer-image pool + composite pipeline
+      (port `PushLayer`/`CompositeLayers`/`CompileFilter("opacity")` from `RmlRenderInterfaceVk`).
+      Symptom of the gap: inactive tab panes' text is not clipped (minor overlap at the menu's top).
+  - **P4 (separate phase) — delete GL/DX11/Metal/Vulkan backends + `soh3d_gl.cpp` + `soh3d_hud_vk.cpp`'s
+    Vulkan body + `RmlRenderInterfaceVk` + shader templates; collapse `WindowBackend`; drop SDL2.
