@@ -1,4 +1,4 @@
-#if defined(ENABLE_OPENGL) || defined(__APPLE__)
+#if defined(ENABLE_OPENGL) || defined(ENABLE_SDL3GPU) || defined(__APPLE__)
 
 #include <stdio.h>
 

@@ -6,13 +6,7 @@
 #include "ship/config/ConsoleVariable.h"
 #include "fast/interpreter.h"
 #include "fast/backends/gfx_sdl.h"
-#include "fast/backends/gfx_dxgi.h"
-#include "fast/backends/gfx_opengl.h"
-#include "fast/backends/gfx_metal.h"
-#include "fast/backends/gfx_vulkan.h"
 #include "fast/backends/gfx_sdl3gpu.h"
-#include "fast/backends/gfx_direct3d_common.h"
-#include "fast/backends/gfx_direct3d11.h"
 #include "fast/backends/gfx_window_manager_api.h"
 
 #include "fast/Fast3dGui.h"
@@ -30,21 +24,9 @@ Fast3dWindow::Fast3dWindow(std::shared_ptr<Ship::Gui> gui, std::shared_ptr<FastM
     mInterpreter = std::make_shared<Interpreter>();
     GfxSetInstance(mInterpreter);
 
-#ifdef _WIN32
-    AddAvailableWindowBackend(WindowBackend::FAST3D_DXGI_DX11);
-#endif
-#ifdef __APPLE__
-    if (Metal_IsSupported()) {
-        AddAvailableWindowBackend(WindowBackend::FAST3D_SDL_METAL);
-    }
-#endif
-    AddAvailableWindowBackend(WindowBackend::FAST3D_SDL_OPENGL);
-#ifdef ENABLE_VULKAN
-    AddAvailableWindowBackend(WindowBackend::FAST3D_SDL_VULKAN);
-#endif
-#ifdef ENABLE_SDL3GPU
+    // SDL3 GPU is the project's only renderer (soh3d single-renderer migration, P4). All other
+    // backends (OpenGL/DX11/Metal/Vulkan) were removed; SDL3 GPU is the sole registered backend.
     AddAvailableWindowBackend(WindowBackend::FAST3D_SDL_GPU);
-#endif
 }
 
 Fast3dWindow::Fast3dWindow(std::shared_ptr<Ship::Gui> gui)
@@ -152,70 +134,13 @@ uint16_t Fast3dWindow::GetPixelDepth(float x, float y) {
 }
 
 void Fast3dWindow::InitWindowManager() {
-    SetWindowBackend(GetSavedWindowBackend());
+    // SDL3 GPU is the only backend (soh3d single-renderer migration, P4). Force it regardless of any
+    // saved/legacy config value, and ignore the old SOH3D_VULKAN / SOH3D_SDL3GPU env gates (the other
+    // backends no longer exist).
+    SetWindowBackend(WindowBackend::FAST3D_SDL_GPU);
 
-#ifdef ENABLE_VULKAN
-    // Runtime backend override while Vulkan is being brought up. Authoritative in BOTH directions so
-    // an A/B harness can pin each instance regardless of the persisted backend (a Vulkan run SAVES
-    // "Vulkan" to config, so SOH3D_VULKAN=0 must explicitly force GL back — not just decline to
-    // override, or the sticky saved value keeps it on Vulkan). '1' -> Vulkan, '0' -> OpenGL.
-    if (const char* v = std::getenv("SOH3D_VULKAN"); v != nullptr) {
-        if (v[0] == '1') {
-            SetWindowBackend(WindowBackend::FAST3D_SDL_VULKAN);
-        } else if (v[0] == '0') {
-            SetWindowBackend(WindowBackend::FAST3D_SDL_OPENGL);
-        }
-    }
-#endif
-
-#ifdef ENABLE_SDL3GPU
-    // Runtime override for the SDL3 GPU backend while it is brought up. Authoritative in BOTH
-    // directions so an A/B harness can pin each instance regardless of the persisted backend
-    // (an SDL3-GPU run SAVES "SDL3GPU" to config, so SOH3D_SDL3GPU=0 must force GL back).
-    if (const char* v = std::getenv("SOH3D_SDL3GPU"); v != nullptr) {
-        if (v[0] == '1') {
-            SetWindowBackend(WindowBackend::FAST3D_SDL_GPU);
-        } else if (v[0] == '0') {
-            SetWindowBackend(WindowBackend::FAST3D_SDL_OPENGL);
-        }
-    }
-#endif
-
-    switch (GetWindowBackend()) {
-#ifdef ENABLE_DX11
-        case WindowBackend::FAST3D_DXGI_DX11:
-            mWindowManagerApi = new GfxWindowBackendDXGI();
-            mRenderingApi = new GfxRenderingAPIDX11(static_cast<GfxWindowBackendDXGI*>(mWindowManagerApi));
-            break;
-#endif
-#ifdef ENABLE_OPENGL
-        case WindowBackend::FAST3D_SDL_OPENGL:
-            mRenderingApi = new GfxRenderingAPIOGL();
-            mWindowManagerApi = new GfxWindowBackendSDL2();
-            break;
-#endif
-#ifdef ENABLE_VULKAN
-        case WindowBackend::FAST3D_SDL_VULKAN:
-            mWindowManagerApi = new GfxWindowBackendSDL2();
-            mRenderingApi = new GfxRenderingAPIVulkan(static_cast<GfxWindowBackendSDL2*>(mWindowManagerApi));
-            break;
-#endif
-#ifdef ENABLE_SDL3GPU
-        case WindowBackend::FAST3D_SDL_GPU:
-            mWindowManagerApi = new GfxWindowBackendSDL2();
-            mRenderingApi = new GfxRenderingAPISdl3Gpu(static_cast<GfxWindowBackendSDL2*>(mWindowManagerApi));
-            break;
-#endif
-#ifdef __APPLE__
-        case WindowBackend::FAST3D_SDL_METAL:
-            mRenderingApi = new GfxRenderingAPIMetal();
-            mWindowManagerApi = new GfxWindowBackendSDL2();
-            break;
-#endif
-        default:
-            SPDLOG_ERROR("Could not load the correct rendering backend");
-            break;
-    }
+    mWindowManagerApi = new GfxWindowBackendSDL2();
+    mRenderingApi = new GfxRenderingAPISdl3Gpu(static_cast<GfxWindowBackendSDL2*>(mWindowManagerApi));
 }
 
 void Fast3dWindow::SetTextureFilter(FilteringMode filteringMode) {
