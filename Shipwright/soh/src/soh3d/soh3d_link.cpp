@@ -83,6 +83,7 @@ int gSoH3dFocusFix = 1;            // #16(b) keep actor.focus.pos at 3DS Link's 
 // CSAB (it froze at frame 0 -> the motionless slide). A footstep cadence is a function of movement
 // speed, so we free-run the CSAB at speedXZ * this gain. Calibrated live vs N64 (REPL `linkloco`).
 float gSoH3dLinkLocoGain = 0.30f;
+extern int gSoH3dLogicFrame; // soh3d_anim.cpp: logic-frame clock for the walk-stop synthetic morph
 // Player animation SOURCE (REPL `linksrc`, env SOH3D_LINK_SRC). Two independent, both-working modes:
 //   0 = 3DS own-CSAB: play the OoT3D link rig's own CSAB matching the named player anim (kPlayerAnimMap).
 //       Faithful for discrete states (idle fidgets, jumps, item use) but BLIND to walk/run — OoT blends
@@ -351,6 +352,7 @@ extern "C" int SoH3D_PlayerDrawImpl(PlayState* play, Actor* actor) {
     P().modelId = modelId; // expose to the REPL pose-discontinuity scanner (SoH3D_LinkModelId)
     // Player is Actor-first so the cast is valid (see z64player.h).
     player = (Player*)actor;
+    gSoH3dLogicFrame = (int)play->gameplayFrames; // logic-frame clock for the walk-stop synthetic morph
     // #16c: in FIRST-PERSON (C-up) the camera eye sits AT Link's head bone, so drawing the 3DS body
     // renders the head mesh around/in front of the camera — "you see inside his head". Vanilla OoT
     // hides the head/torso here via Player_OverrideLimbDrawGameplayFirstPerson (z_player.c ~12576),
