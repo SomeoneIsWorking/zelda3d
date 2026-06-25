@@ -656,6 +656,14 @@ void SoH3D_UpdateAnimAuto(int modelId, const char* animName, float rate, float n
     lastCsab[modelId] = animName;
     lastFrame[modelId] = f;
 
+    if (gSoH3dAnimDebug && modelId == SoH3D_LinkModelId() && (csabChanged || morphWeight > 0.0f)) {
+        printf("SOH3D ANIM XTRANS: %s f=%.2f morphW=%.3f morphOut=%s outFrame=%.2f%s\n",
+               animName, f, morphWeight,
+               (morphOut.count(modelId) ? morphOut[modelId].c_str() : "(none)"),
+               (morphOut.count(modelId) ? morphOutFrame[modelId] : -1.0f),
+               csabChanged ? " [CHANGE]" : "");
+        fflush(stdout);
+    }
     auto moIt = morphOut.find(modelId);
     if (moIt != morphOut.end() && morphWeight > 0.0f) {
         SoH3D_UpdateAnimMorph(modelId, animName, f, moIt->second.c_str(), morphOutFrame[modelId],
