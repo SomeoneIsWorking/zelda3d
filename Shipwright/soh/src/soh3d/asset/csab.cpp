@@ -360,6 +360,62 @@ void Csab::animatedBoneWorldMorph(const Cmb& model, float frameIn, const Csab& o
     for (const auto& bn : bones) world(bn.id);
 }
 
+void Csab::animatedBoneWorldTwoSource(const Cmb& model, float frameLower, const Csab& upper,
+                                      float frameUpper, const unsigned char* upperMask, int maskCount,
+                                      std::vector<std::array<float, 16>>& out,
+                                      const float* boneRotDelta, int deltaCount,
+                                      const float* bonePostRot, int postCount) const {
+    const auto& bones = model.bones();
+    const auto& bind = model.boneMatrices();
+    out.assign(bind.size(), matId());
+    std::vector<char> done(bind.size(), 0);
+    std::vector<const CmbBone*> byId(bind.size(), nullptr);
+    for (const auto& bn : bones) if (bn.id >= 0 && (size_t)bn.id < byId.size()) byId[bn.id] = &bn;
+    float frLo = animFrame(frameLower);
+    float frUp = upper.animFrame(frameUpper);
+
+    // resolve a bone's animated world matrix; its LOCAL TRS is sampled from whichever clip the
+    // upper-body mask selects, then composed through its (already-resolved) parent. Mixing happens
+    // purely at the local-transform level, so the hierarchy stays consistent (an upper-body arm
+    // still hangs off the lower clip's posed torso/pelvis — the N64 copy-map result).
+    std::function<Mat4(int)> world = [&](int id) -> Mat4 {
+        if (id < 0 || (size_t)id >= out.size() || !byId[id]) return matId();
+        if (done[id]) return out[id];
+        const CmbBone* bn = byId[id];
+        bool useUpper = (upperMask && id < maskCount && upperMask[id]);
+        float s[3], r[3], t[3];
+        if (useUpper)
+            upper.sampleLocalTRS(id, bn->parent >= 0, bn->trans, bn->rot, bn->scale, frUp, t, r, s);
+        else
+            sampleLocalTRS(id, bn->parent >= 0, bn->trans, bn->rot, bn->scale, frLo, t, r, s);
+        if (boneRotDelta && id >= 0 && id < deltaCount) {
+            r[0] += boneRotDelta[id * 3 + 0];
+            r[1] += boneRotDelta[id * 3 + 1];
+            r[2] += boneRotDelta[id * 3 + 2];
+        }
+        Mat4 R = applyPostRot(eulerMat(r), bonePostRot, postCount, id);
+        Mat4 L = matMul(matT(t[0], t[1], t[2]), matMul(R, matS(s[0], s[1], s[2])));
+        Mat4 W = (bn->parent < 0) ? L : matMul(world(bn->parent), L);
+        out[id] = W;
+        done[id] = 1;
+        return W;
+    };
+    for (const auto& bn : bones) world(bn.id);
+}
+
+void Csab::skinMatricesTwoSource(const Cmb& model, float frameLower, const Csab& upper,
+                                 float frameUpper, const unsigned char* upperMask, int maskCount,
+                                 std::vector<std::array<float, 16>>& out, const float* boneRotDelta,
+                                 int deltaCount, const float* bonePostRot, int postCount) const {
+    std::vector<std::array<float, 16>> aw;
+    animatedBoneWorldTwoSource(model, frameLower, upper, frameUpper, upperMask, maskCount, aw,
+                               boneRotDelta, deltaCount, bonePostRot, postCount);
+    const auto& bind = model.boneMatrices();
+    out.assign(bind.size(), matId());
+    for (size_t id = 0; id < bind.size(); id++)
+        out[id] = matMul(aw[id], matInverse(bind[id]));
+}
+
 void Csab::skinMatricesMorph(const Cmb& model, float frameIn, const Csab& outgoing, float frameOut,
                              float weight, std::vector<std::array<float, 16>>& out,
                              const float* boneRotDelta, int deltaCount, const float* bonePostRot,

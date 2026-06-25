@@ -457,6 +457,10 @@ void SoH3D_UpdateAnim(int modelId, const char* animName, float frame);
 void SoH3D_SkinDumpArm(int modelId, const char* path, int frames); // #117 resolved-pose capture
 void SoH3D_UpdateAnimAuto(int modelId, const char* animName, float rate, float n64CurFrame,
                           float n64AnimLength, float morphWeight);
+// #85 carry-WALK two-source per-limb blend (lower=loco clip free-run by speed, upper=carry pose).
+void SoH3D_UpdateAnimTwoSource(int modelId, const char* lowerAnim, float lowerRate,
+                               const char* upperAnim, float upperCurFrame, float upperAnimLength,
+                               const unsigned char* upperMask, int maskCount);
 void SoH3D_GL_SetMidMask(int modelId, unsigned long long mask);
 void SoH3D_GL_EmitPose(int modelId);
 // Walk a live N64 skeleton tree, cb per non-root limb (shared with the linkskeldump REPL).

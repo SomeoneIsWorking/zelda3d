@@ -58,6 +58,25 @@ class Csab {
                                 const float* boneRotDelta, int deltaCount,
                                 const float* bonePostRot, int postCount) const;
 
+    // TWO-SOURCE per-limb blend (the N64 sUpperBodyLimbCopyMap model, z_player.c:397 — used for
+    // carry-WALK: lower body plays the locomotion clip, upper body plays the carry pose). `this` is
+    // the LOWER clip (driving root/waist/legs), `upper` the UPPER clip (driving chest/head/arms);
+    // for each bone id, upperMask[id] != 0 selects `upper`, else `this`. Both clips drive the SAME
+    // rig (same Cmb). Each bone's LOCAL TRS comes from its selected source, then the normal
+    // parent-multiply composes the hierarchy — so an upper bone hangs off the lower body's posed
+    // pelvis exactly as the N64 copy-map result does. Frames are sampled independently (frameLower
+    // on this, frameUpper on upper). boneRotDelta/bonePostRot apply to all bones as in skinMatrices.
+    void skinMatricesTwoSource(const Cmb& model, float frameLower, const Csab& upper, float frameUpper,
+                               const unsigned char* upperMask, int maskCount,
+                               std::vector<std::array<float, 16>>& out,
+                               const float* boneRotDelta = nullptr, int deltaCount = 0,
+                               const float* bonePostRot = nullptr, int postCount = 0) const;
+    void animatedBoneWorldTwoSource(const Cmb& model, float frameLower, const Csab& upper,
+                                    float frameUpper, const unsigned char* upperMask, int maskCount,
+                                    std::vector<std::array<float, 16>>& out,
+                                    const float* boneRotDelta = nullptr, int deltaCount = 0,
+                                    const float* bonePostRot = nullptr, int postCount = 0) const;
+
   private:
     // Sample a bone's animated LOCAL transform (TRS) at `fr` from this clip's tracks, falling back
     // to the rest TRS where a track is absent (or is a static non-root translation bake — see the

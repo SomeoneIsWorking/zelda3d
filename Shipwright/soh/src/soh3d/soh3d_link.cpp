@@ -64,6 +64,12 @@ float gSoH3dLinkRotY = 0.0f;
 float gSoH3dLinkRotZ = 0.0f;
 char gSoH3dLinkForceCsab[64] = ""; // REPL `linkanim <csab>` pins a CSAB on Link (verify idle/walk/run
                                    // deterministically without real movement input); empty = live-resolve
+// REPL `linktwo <lower> <upper>`: force the #85 two-source per-limb blend (lower loco + upper carry)
+// with explicit CSAB bases, so the carry-walk pose can be captured/verified WITHOUT a live grab
+// (skindump + the bone partition). Lower free-runs at gSoH3dAnimRate (legs cycle); upper free-runs
+// (carry hold). Empty = off. Also reusable for the future per-state Link parity sweep.
+char gSoH3dLinkForceTwoLower[64] = "";
+char gSoH3dLinkForceTwoUpper[64] = "";
 int gSoH3dClimbGroundFix = 0; // #79: freeze feet-grounding during climb poses (REPL `climbgroundfix`).
                               // DEFAULT OFF: root cause confirmed (grounding swings wildly on climb
                               // poses) but the freeze DIRECTION is not yet live-verified on a real
@@ -139,6 +145,20 @@ extern "C" const char* SoH3D_LinkWalkRunGate(const char* csab, float speedXZ) {
     }
     return csab;
 }
+
+// #85 carry-WALK upper-body bone mask for the two-source per-limb blend (SoH3D_UpdateAnimTwoSource).
+// The OoT3D analogue of N64 sUpperBodyLimbCopyMap (z_player.c:397): the N64 marks limbs UPPER..TORSO
+// (PLAYER_LIMB 10-21) as upper-body. Mapping those to the shared 25-bone link rig via the verified
+// bone<->limb correspondence (soh3d_link_bonecorr.inc / oot3d-decomp/docs/link_bone_map.md): N64
+// UPPER->b9, the extra OoT3D chest/collar bones b10/b13/b17 (TORSO/COLLAR region, no own N64 limb),
+// HEAD->b11, HAT->b12, L arm->b14/15/16, R arm->b18/19/20, SHEATH->b21. So bones 9..21 are upper;
+// 0..8 (root/waist/lower-pivot/legs) and 22..24 (aux root2) stay on the lower locomotion clip. Same
+// partition for child (childlink_v2) and adult (link_v2) — they share the rig.
+static const unsigned char kLinkUpperBodyMask[25] = {
+    0, 0, 0, 0, 0, 0, 0, 0, 0, // b0..b8  lower: root, waist, lower-pivot, R/L legs
+    1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, // b9..b21 upper: spine, chest, head, hat, both arms, sheath
+    0, 0, 0 // b22..b24 aux root2 -> lower
+};
 
 // Compute which childlink_v2 mesh_ids are visible this frame from Link's live state. The CMB bakes
 // EVERY hand-pose + held-equipment variant on its own mesh_id; the game (N64 and OoT3D) shows a
@@ -374,18 +394,17 @@ extern "C" int SoH3D_PlayerDrawImpl(PlayState* play, Actor* actor) {
     // #85 carry-walk: in N64, walking-while-carrying merges TWO anims per-limb — the BASE skelAnime's
     // locomotion anim drives the LOWER body (legs cycle) while the upper carry anim (carryB_wait, arms
     // raised) is copied onto only the upper-body limbs (z_player.c ~3611, SetCopyTrue +
-    // sUpperBodyLimbCopyMap; "moving" = linearVelocity != 0). The 3ds own-CSAB path plays ONE CSAB on
-    // the whole rig and, when carrying, picks the upper carry CSAB (below) — which has STATIC legs, so
-    // Link slides with frozen legs (#85a). There is no per-limb two-CSAB blend in the model layer. The
-    // N64-retarget path, however, reads the ALREADY-MERGED jointTable, so it gets the correct
-    // legs+arms carry-walk pose for free. So for carry-WALK only, route the body pose through the
-    // retarget path even in 3ds mode (it is the faithful N64 pose). Carry-IDLE (linearVelocity == 0)
-    // still uses the 3ds carry CSAB below — N64 copies the carry anim onto ALL limbs there
-    // (SetCopyAll), so the standing carry pose is a single whole-rig anim with no leg cycle anyway.
+    // sUpperBodyLimbCopyMap; "moving" = linearVelocity != 0). The 3ds own-CSAB path now reproduces
+    // this directly with a TWO-SOURCE per-limb blend (SoH3D_UpdateAnimTwoSource + kLinkUpperBodyMask):
+    // lower body plays the loco CSAB, upper body the carry CSAB — see the 3ds branch below. This drops
+    // the former carry-walk detour through the N64 retarget path (the last retarget dependency in the
+    // 3ds Link path). Carry-IDLE (linearVelocity == 0) plays the carry CSAB on the WHOLE rig (N64
+    // SetCopyAll there — a single whole-rig pose, no leg cycle). The N64-retarget path (linksrc n64)
+    // still handles carry-walk for free via the already-merged jointTable.
     int carryWalk = (player->heldActor != NULL && player->linearVelocity != 0.0f &&
                      player->skelAnime.jointTable != NULL && player->skelAnime.limbCount > 0);
     // Two user-selectable animation sources (REPL `linksrc`), both kept working:
-    if ((SoH3D_LinkAnimSrc() == 1 || carryWalk) && gSoH3dLinkForceCsab[0] == '\0' &&
+    if (SoH3D_LinkAnimSrc() == 1 && gSoH3dLinkForceCsab[0] == '\0' &&
         player->skelAnime.jointTable != NULL && player->skelAnime.limbCount > 0) {
         // N64 RETARGET: drive the OoT3D rig from Link's LIVE blended jointTable (captures walk/run and
         // every blended state, which the named-CSAB path is blind to). jointTable[0] = root translation,
@@ -422,16 +441,19 @@ extern "C" int SoH3D_PlayerDrawImpl(PlayState* play, Actor* actor) {
         csab = SoH3D_ResolvePlayerCsab((const char*)player->skelAnime.animation);
         // #117 walk/run SELECTION parity (see SoH3D_LinkWalkRunGate / SOH3D_LINK_WALKRUN_SPEED).
         csab = SoH3D_LinkWalkRunGate(csab, player->actor.speedXZ);
-        // #6/#9: while carrying, OoT layers a held-item animation (e.g. carryB_wait, arms raised
+        // #6/#85: while carrying, OoT layers a held-item animation (e.g. carryB_wait, arms raised
         // overhead) on the UPPER body via player->upperSkelAnime, leaving the base skelAnime on
-        // wait/locomotion. The N64-retarget path reads the already-merged jointTable so it gets the
-        // carry pose for free; the named-CSAB path here sees only the base name (wait_free -> arms
-        // DOWN), dropping the carry. When carrying, resolve the CSAB from the upper-body anim instead
-        // so the 3DS rig faithfully plays OoT3D's own carry CSAB. (Standing carry is exact; a true
-        // per-limb upper/lower BLEND for walking-while-carrying is future locomotion work, #9.)
+        // wait/locomotion. Resolve that upper carry CSAB. carry-IDLE (standing) = whole rig plays it
+        // (N64 SetCopyAll). carry-WALK = TWO-SOURCE per-limb blend below (lower loco + upper carry),
+        // the faithful sUpperBodyLimbCopyMap result — NOT the whole-rig carry CSAB (which has static
+        // legs => the #85a slide). `csab` stays the LOWER locomotion CSAB so the two-source path drives
+        // the legs from it; carry-idle overrides it to the carry CSAB.
+        const char* upperCarryCsab = NULL;
         if (player->heldActor != NULL && player->upperSkelAnime.animation != NULL) {
-            const char* upperCsab = SoH3D_ResolvePlayerCsab((const char*)player->upperSkelAnime.animation);
-            if (upperCsab != NULL) csab = upperCsab;
+            upperCarryCsab = SoH3D_ResolvePlayerCsab((const char*)player->upperSkelAnime.animation);
+        }
+        if (upperCarryCsab != NULL && !carryWalk) {
+            csab = upperCarryCsab; // carry-IDLE: SetCopyAll -> whole rig plays the carry pose
         }
         if (csab == NULL) {
             csab = SOH3D_LINK_IDLE_CSAB;
@@ -450,7 +472,21 @@ extern "C" int SoH3D_PlayerDrawImpl(PlayState* play, Actor* actor) {
             }
         }
         int isLoco = (strstr(csab, "run") != NULL) || (strstr(csab, "walk") != NULL);
-        if (strcmp(csab, "rest") == 0) {
+        int twoSource = (carryWalk && upperCarryCsab != NULL && gSoH3dLinkForceCsab[0] == '\0');
+        if (gSoH3dLinkForceTwoLower[0] != '\0' && gSoH3dLinkForceTwoUpper[0] != '\0') {
+            // REPL `linktwo`: forced two-source capture (no live grab needed). Lower legs cycle at
+            // animrate; upper held as a free-run carry pose. csab tracked as the lower for poseScan.
+            csab = gSoH3dLinkForceTwoLower;
+            SoH3D_UpdateAnimTwoSource(modelId, gSoH3dLinkForceTwoLower, gSoH3dAnimRate,
+                                      gSoH3dLinkForceTwoUpper, 0.0f, 0.0f, kLinkUpperBodyMask, 25);
+        } else if (twoSource) {
+            // #85 carry-WALK: lower body = loco CSAB (csab, walk/run-gated) free-run by ground speed
+            // (same as the loco branch — the run cycle's curFrame is dead); upper body = carry CSAB.
+            // kLinkUpperBodyMask = the OoT3D sUpperBodyLimbCopyMap analogue (bones 9..21).
+            SoH3D_UpdateAnimTwoSource(modelId, csab, player->actor.speedXZ * gSoH3dLinkLocoGain,
+                                      upperCarryCsab, player->upperSkelAnime.curFrame,
+                                      player->upperSkelAnime.animLength, kLinkUpperBodyMask, 25);
+        } else if (strcmp(csab, "rest") == 0) {
             SoH3D_UpdateAnim(modelId, NULL, 0); // diagnostic: force bind pose (linkanim rest)
         } else if (isLoco && gSoH3dLinkForceCsab[0] == '\0' && player->actor.speedXZ > 0.5f) {
             // #117 / #7 SLIDE FIX: Link's run/walk advances its pose via a player-internal accumulator
@@ -846,6 +882,23 @@ int SoH3D::PlayerBehavior::repl(PlayState* play, const char* cmd, const char* li
         } else {
             gSoH3dLinkForceCsab[0] = '\0';
             SoH3D_ReplReply(outPath, "linkanim OFF (live anim resolution restored)");
+        }
+    } else if (strcmp(cmd, "linktwo") == 0) {
+        // `linktwo <lowerCsab> <upperCsab>` — force the #85 carry-WALK two-source per-limb blend with
+        // explicit CSABs (lower drives legs, upper drives arms via kLinkUpperBodyMask), so the blend
+        // can be skindumped/verified without a live grab. `linktwo off` releases.
+        char lo[64] = "", up[64] = "";
+        int got = sscanf(line, "%*s %63s %63s", lo, up);
+        if (got >= 1 && strcmp(lo, "off") == 0) {
+            gSoH3dLinkForceTwoLower[0] = '\0'; gSoH3dLinkForceTwoUpper[0] = '\0';
+            SoH3D_ReplReply(outPath, "linktwo OFF");
+        } else if (got == 2) {
+            strncpy(gSoH3dLinkForceTwoLower, lo, sizeof(gSoH3dLinkForceTwoLower) - 1);
+            strncpy(gSoH3dLinkForceTwoUpper, up, sizeof(gSoH3dLinkForceTwoUpper) - 1);
+            SoH3D_ReplReply(outPath, "linktwo lower='%s' upper='%s' (forced two-source; `linktwo off`)",
+                            gSoH3dLinkForceTwoLower, gSoH3dLinkForceTwoUpper);
+        } else {
+            SoH3D_ReplReply(outPath, "usage: linktwo <lowerCsab> <upperCsab> | off");
         }
     } else if (strcmp(cmd, "climbgroundfix") == 0) {
         // #79 A/B toggle: freeze feet-grounding during climb poses (default ON). `climbgroundfix 0`
