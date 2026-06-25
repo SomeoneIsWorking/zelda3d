@@ -460,6 +460,11 @@ int SoH3D_AutoModelId(const char* zarPath);                            // get-or
 // Bridges for the structured model-REPLACEMENT behaviors (behaviors/actor/<actor>.cpp):
 int SoH3D_TryActorModelDraw(PlayState* play, Actor* actor);            // dispatch actor->behavior->tryDrawModel
 int SoH3D_ActorDrawSpaceTransform(void* actor, float* outLiftY, float* outLocalOff); // faithful draw-space offset
+// Boss_Goma climb-state tooling (REPL `gohmaclimb`, #123): drive Gohma into her REAL wall-climb so the
+// draw-space-offset fix can be judged in genuine (not forced) play. Defined in behaviors/actor/boss_goma.cpp.
+int SoH3D_BossGomaForceClimb(Actor* actor, float climbY, int hold); // enter the climb (1=applied)
+void SoH3D_BossGomaClimbTick(Actor* actor);                         // per-frame hold (self-gated)
+int SoH3D_BossGomaClimbHeld(void);                                  // 1 if the hold is active
 int SoH3D_DrawActorModel(PlayState* play, int modelId, Actor* actor, float worldScale); // draw OoT3D CMB at actor xform
 float SoH3D_GScale(int slot, float def);                              // live REPL `gscale <slot>` or def
 // Low-level retarget primitives (DEFINED in soh3d_model.cpp); forwarded here so link.cpp sees them.
