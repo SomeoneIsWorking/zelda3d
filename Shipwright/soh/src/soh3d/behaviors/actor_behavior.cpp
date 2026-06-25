@@ -13,6 +13,7 @@
 #include "actor/bombwall.h"
 #include "actor/ruppy.h"
 #include "actor/en_item00.h"
+#include "actor/kibako.h"
 #include "../asset/mat4.h"
 
 extern "C" {
@@ -94,6 +95,7 @@ ActorBehavior* findActorBehavior(s16 actorId) {
     static BgBombwallBehavior sBgBombwall;
     static EnExRuppyBehavior sEnExRuppy;
     static EnItem00Behavior sEnItem00;
+    static ObjKibakoBehavior sObjKibako;
     switch (actorId) {
         case ACTOR_EN_DOOR:
             return &sEnDoor;
@@ -109,6 +111,8 @@ ActorBehavior* findActorBehavior(s16 actorId) {
             return &sEnExRuppy;
         case ACTOR_EN_ITEM00:
             return &sEnItem00;
+        case ACTOR_OBJ_KIBAKO:
+            return &sObjKibako;
         case ACTOR_EN_KO:
             return &sKokiriKid;
         case ACTOR_EN_SA:
