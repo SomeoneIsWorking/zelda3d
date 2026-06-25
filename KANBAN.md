@@ -3,18 +3,19 @@
 > **Generated mirror — do not hand-edit.** Source of truth = GitHub Issues on
 > `SomeoneIsWorking/soh3d` (private). Regenerate with `tools/kanban.py render`.
 > Move a card with `tools/kanban.py mv <#> <column>`; add with `tools/kanban.py add`.
-> Columns: todo · in-progress · in-review · needs-confirmation · reopened · blocked · done(=closed).  Updated 2026-06-25 19:41.
+> Columns: todo · in-progress · in-review · needs-confirmation · reopened · blocked · done(=closed).  Updated 2026-06-25 22:01.
 
-**Counts:** todo:3 | in-progress:2 | in-review:1 | needs-confirmation:21 | reopened:0 | blocked:0 | done:77
+**Counts:** todo:3 | in-progress:3 | in-review:1 | needs-confirmation:21 | reopened:0 | blocked:0 | done:78
 
 ## 📋 To Do  (3)
 - [#17](../../issues/17) Hi-res world/scene textures (texpack) _(render)_
 - [#33](../../issues/33) More foliage / vegetation density (lowest priority) _(scene)_
 - [#118](../../issues/118) Market (SCENE_MARKET_DAY) parity: crowd NPCs (En_Hy/En_Mu) mis-rendered, door still N64 _(render,scene,behavior)_
 
-## 🔨 In Progress  (2)
+## 🔨 In Progress  (3)
 - [#111](../../issues/111) World night R/G too bright — flat tint under-darkens at night (needs vertex-lighting port) _(render)_
 - [#115](../../issues/115) Character/object render-parity gaps: doors, shop props/NPCs, switches still render as N64 (whole-game audit) _(render,scene)_
+- [#120](../../issues/120) Queen Gohma OoT3D model: smooth-skinning geometry defect (stretched limb) _(render,behavior)_
 
 ## 🔍 In Review (agent verifying)  (1)
 - [#112](../../issues/112) START can't skip the final intro segment (Navi flies in / wakes Link) _(render,keyboard)_
@@ -48,7 +49,8 @@ _none_
 ## ⛔ Blocked (needs live/user input)  (0)
 _none_
 
-## ✅ Done (recently closed)  (showing 30 of 77)
+## ✅ Done (recently closed)  (showing 30 of 78)
+- [#121](../../issues/121) Queen Gohma OoT3D model: smooth-skinning geometry defect (stretched limb)
 - [#105](../../issues/105) Port OoT3D water rendering to remaining scenes (Zora's/Kokiri/Gerudo river) — follow-up to #103 Lake Hylia
 - [#104](../../issues/104) Lake Hylia: black void blob on grass terrain (baked shadow/AO decal renders solid dark)
 - [#24](../../issues/24) Skip chest-open / get-item freeze + reliable dialog fast-forward
@@ -78,4 +80,3 @@ _none_
 - [#5](../../issues/5) Cucco wings don't flap (idle + held/agitated)
 - [#4](../../issues/4) Title/cutscene camera goes under 3DS terrain
 - [#2](../../issues/2) Kakariko well: water is a tiny teal diamond, not a surface
-- [#89](../../issues/89) Tooling: export authoritative per-actor variant+animation from OoT3D (Azahar oracle) — base SoH3D on 3DS not N64
