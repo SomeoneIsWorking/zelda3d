@@ -170,7 +170,6 @@ if (CMAKE_SYSTEM_NAME STREQUAL "Windows")
         WIN32
         _CONSOLE
         _CRT_SECURE_NO_WARNINGS
-        ENABLE_DX11
         NOMINMAX
     )
 endif()

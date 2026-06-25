@@ -23,21 +23,10 @@ target_sources(libultraship PRIVATE ${Source_Files__Resource} ${Source_Files__Re
 
 #=================== Graphic ===================
 
+# SDL3 GPU is the only renderer (P4): the only backends left are the SDL3 window backend
+# (gfx_sdl2.cpp) and the SDL3 GPU rendering API (gfx_sdl3gpu.cpp). The GL/DX11/Metal/Vulkan backend
+# sources were deleted, so no per-platform filtering is needed.
 file(GLOB Source_Files__Graphic RELATIVE ${CMAKE_CURRENT_SOURCE_DIR} CONFIGURE_DEPENDS "backends/*.cpp")
-
-if (NOT CMAKE_SYSTEM_NAME STREQUAL "Windows")
-    list(FILTER Source_Files__Graphic EXCLUDE REGEX "graphic/Fast3D/backends/gfx_dxgi*")
-    list(FILTER Source_Files__Graphic EXCLUDE REGEX "graphic/Fast3D/backends/gfx_direct3d*")
-    list(FILTER Source_Files__Graphic EXCLUDE REGEX "graphic/Fast3D/backends/dxsdk/*")
-endif()
-
-if (NOT CMAKE_SYSTEM_NAME STREQUAL "Darwin" AND NOT CMAKE_SYSTEM_NAME STREQUAL "iOS")
-    list(FILTER Source_Files__Graphic EXCLUDE REGEX "graphic/Fast3D/backends/gfx_metal*")
-endif()
-
-if (CMAKE_SYSTEM_NAME STREQUAL "iOS")
-    list(FILTER Source_Files__Graphic EXCLUDE REGEX "graphic/Fast3D/backends/gfx_opengl*")
-endif()
 
 source_group("graphic" FILES ${Source_Files__Graphic})
 target_sources(libultraship PRIVATE ${Source_Files__Graphic})

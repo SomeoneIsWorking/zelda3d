@@ -19,16 +19,8 @@
 #include "ship/port/mobile/MobileImpl.h"
 #endif
 
-// The ImGui SDL3 platform backend drives every windowing path now (SDL3 GPU is the only backend).
+// The ImGui SDL3 platform backend drives the windowing path; SDL3 GPU is the only backend (P4).
 #include <imgui_impl_sdl3.h>
-
-#if defined(ENABLE_DX11) || defined(ENABLE_DX12)
-#include <imgui_impl_dx11.h>
-#include <imgui_impl_win32.h>
-
-// NOLINTNEXTLINE
-IMGUI_IMPL_API LRESULT ImGui_ImplWin32_WndProcHandler(HWND hWnd, UINT msg, WPARAM wParam, LPARAM lParam);
-#endif
 
 namespace Fast {
 
@@ -61,299 +53,67 @@ bool Fast3dGui::SupportsViewports() {
 }
 
 void Fast3dGui::HandleWindowEvents(Fast::WindowEvent event) {
-    switch (mImpl.Backend) {
-        case WindowBackend::FAST3D_SDL_OPENGL:
-        case WindowBackend::FAST3D_SDL_METAL:
-#ifdef ENABLE_VULKAN
-        case WindowBackend::FAST3D_SDL_VULKAN:
-#endif
-#ifdef ENABLE_SDL3GPU
-        case WindowBackend::FAST3D_SDL_GPU:
-#endif
-            // Offer the event to the RmlUi menu first (Phase 2). It always handles its toggle
-            // binding, and consumes input while open so the ImGui menu / game do not also react.
-            if (mRml && mRml->ProcessSdlEvent(const_cast<SDL_Event*>(static_cast<const SDL_Event*>(event.Sdl.Event)))) {
-                break;
-            }
-            ImGui_ImplSDL3_ProcessEvent(static_cast<const SDL_Event*>(event.Sdl.Event));
-#if defined(__ANDROID__) || defined(__IOS__)
-            Ship::Mobile::ImGuiProcessEvent(ImGui::GetIO().WantTextInput);
-#endif
-            break;
-#ifdef ENABLE_DX11
-        case WindowBackend::FAST3D_DXGI_DX11:
-            ImGui_ImplWin32_WndProcHandler(static_cast<HWND>(event.Win32.Handle), event.Win32.Msg, event.Win32.Param1,
-                                           event.Win32.Param2);
-            break;
-#endif
-        default:
-            break;
+    // Offer the event to the RmlUi menu first. It always handles its toggle binding, and consumes
+    // input while open so the ImGui menu / game do not also react.
+    if (mRml && mRml->ProcessSdlEvent(const_cast<SDL_Event*>(static_cast<const SDL_Event*>(event.Sdl.Event)))) {
+        return;
     }
+    ImGui_ImplSDL3_ProcessEvent(static_cast<const SDL_Event*>(event.Sdl.Event));
+#if defined(__ANDROID__) || defined(__IOS__)
+    Ship::Mobile::ImGuiProcessEvent(ImGui::GetIO().WantTextInput);
+#endif
 }
 
 void Fast3dGui::ImGuiWMInit() {
-    switch (mImpl.Backend) {
-        case WindowBackend::FAST3D_SDL_OPENGL:
-            SDL_SetHint(SDL_HINT_TOUCH_MOUSE_EVENTS, "1");
-            if (Ship::Context::GetRawInstance()->GetConsoleVariables()->GetInteger(CVAR_ALLOW_BACKGROUND_INPUTS, 1)) {
-                SDL_SetHint(SDL_HINT_JOYSTICK_ALLOW_BACKGROUND_EVENTS, "1");
-            }
-            ImGui_ImplSDL3_InitForOpenGL(static_cast<SDL_Window*>(mImpl.Opengl.Window), mImpl.Opengl.Context);
-            break;
-#ifdef ENABLE_VULKAN
-        case WindowBackend::FAST3D_SDL_VULKAN:
-            SDL_SetHint(SDL_HINT_TOUCH_MOUSE_EVENTS, "1");
-            if (Ship::Context::GetRawInstance()->GetConsoleVariables()->GetInteger(CVAR_ALLOW_BACKGROUND_INPUTS, 1)) {
-                SDL_SetHint(SDL_HINT_JOYSTICK_ALLOW_BACKGROUND_EVENTS, "1");
-            }
-            // Platform backend only in M1; the ImGui Vulkan *renderer* backend is M4,
-            // so ImGui draw data is produced but not yet rendered for Vulkan.
-            ImGui_ImplSDL3_InitForVulkan(static_cast<SDL_Window*>(mImpl.Vulkan.Window));
-            break;
-#endif
-#ifdef ENABLE_SDL3GPU
-        case WindowBackend::FAST3D_SDL_GPU:
-            SDL_SetHint(SDL_HINT_TOUCH_MOUSE_EVENTS, "1");
-            if (Ship::Context::GetRawInstance()->GetConsoleVariables()->GetInteger(CVAR_ALLOW_BACKGROUND_INPUTS, 1)) {
-                SDL_SetHint(SDL_HINT_JOYSTICK_ALLOW_BACKGROUND_EVENTS, "1");
-            }
-            // Platform backend only (the ImGui SDL3-GPU *renderer* backend is a later phase, like
-            // Vulkan's M4). The dev-overlay draw data is produced but not yet rendered.
-            ImGui_ImplSDL3_InitForSDLGPU(static_cast<SDL_Window*>(mImpl.Vulkan.Window));
-            break;
-#endif
-#if __APPLE__
-        case WindowBackend::FAST3D_SDL_METAL:
-            SDL_SetHint(SDL_HINT_TOUCH_MOUSE_EVENTS, "1");
-            if (Ship::Context::GetRawInstance()->GetConsoleVariables()->GetInteger(CVAR_ALLOW_BACKGROUND_INPUTS, 1)) {
-                SDL_SetHint(SDL_HINT_JOYSTICK_ALLOW_BACKGROUND_EVENTS, "1");
-            }
-            ImGui_ImplSDL3_InitForMetal(static_cast<SDL_Window*>(mImpl.Metal.Window));
-            break;
-#endif
-#if defined(ENABLE_DX11) || defined(ENABLE_DX12)
-        case WindowBackend::FAST3D_DXGI_DX11:
-            ImGui_ImplWin32_Init(mImpl.Dx11.Window);
-            break;
-#endif
-        default:
-            break;
+    SDL_SetHint(SDL_HINT_TOUCH_MOUSE_EVENTS, "1");
+    if (Ship::Context::GetRawInstance()->GetConsoleVariables()->GetInteger(CVAR_ALLOW_BACKGROUND_INPUTS, 1)) {
+        SDL_SetHint(SDL_HINT_JOYSTICK_ALLOW_BACKGROUND_EVENTS, "1");
     }
+    // SDL3 GPU is the only backend. The ImGui SDL3-GPU *renderer* backend is not stood up (the
+    // dev-overlay draw data is produced but not rendered); only the SDL3 platform backend is needed.
+    // The SDL_Window is carried in the (legacy-named) Vulkan window-impl member; see gfx_sdl2.cpp.
+    ImGui_ImplSDL3_InitForSDLGPU(static_cast<SDL_Window*>(mImpl.Vulkan.Window));
 }
 
 void Fast3dGui::ImGuiWMShutdown() {
-    switch (mImpl.Backend) {
-#ifdef ENABLE_OPENGL
-        case WindowBackend::FAST3D_SDL_OPENGL:
-            ImGui_ImplSDL3_Shutdown();
-            break;
-#endif
-#ifdef ENABLE_VULKAN
-        case WindowBackend::FAST3D_SDL_VULKAN:
-            ImGui_ImplSDL3_Shutdown();
-            break;
-#endif
-#ifdef ENABLE_SDL3GPU
-        case WindowBackend::FAST3D_SDL_GPU:
-            ImGui_ImplSDL3_Shutdown();
-            break;
-#endif
-#if __APPLE__
-        case WindowBackend::FAST3D_SDL_METAL:
-            ImGui_ImplSDL3_Shutdown();
-            break;
-#endif
-#if defined(ENABLE_DX11) || defined(ENABLE_DX12)
-        case WindowBackend::FAST3D_DXGI_DX11:
-            ImGui_ImplWin32_Shutdown();
-            break;
-#endif
-        default:
-            break;
-    }
+    ImGui_ImplSDL3_Shutdown();
 }
 
 void Fast3dGui::ImGuiBackendInit() {
     auto window = Ship::Context::GetRawInstance()->GetWindow();
     mInterpreter = std::dynamic_pointer_cast<Fast3dWindow>(window)->GetInterpreterWeak();
-    switch (mImpl.Backend) {
-#ifdef ENABLE_OPENGL
-        case WindowBackend::FAST3D_SDL_OPENGL:
-#ifdef __APPLE__
-            ImGui_ImplOpenGL3_Init("#version 410 core");
-#elif USE_OPENGLES
-            ImGui_ImplOpenGL3_Init("#version 300 es");
-#else
-            ImGui_ImplOpenGL3_Init("#version 120");
-#endif
-            {
-                // Stand up the RmlUi menu runtime alongside ImGui on the same SDL/GL context.
-                auto wnd = Ship::Context::GetRawInstance()->GetWindow();
-                mRml = std::make_unique<Ship::SohRmlUi>();
-                if (!mRml->Init(mImpl.Opengl.Window, mImpl.Opengl.Context, (int)wnd->GetWidth(),
-                                (int)wnd->GetHeight(), /*vulkan=*/false)) {
-                    SPDLOG_ERROR("Fast3dGui: RmlUi init failed; menu disabled");
-                    mRml.reset();
-                }
-            }
-            break;
-#endif
-
-#ifdef __APPLE__
-        case WindowBackend::FAST3D_SDL_METAL: {
-            GfxRenderingAPIMetal* api = (GfxRenderingAPIMetal*)mInterpreter.lock()->GetCurrentRenderingAPI();
-            api->MetalInit(mImpl.Metal.Renderer);
-            break;
-        }
-#endif
-
-#ifdef ENABLE_VULKAN
-        case WindowBackend::FAST3D_SDL_VULKAN:
-            // No ImGui Vulkan *renderer* backend yet (that is M4); the ImGui font atlas is built
-            // lazily on first NewFrame. The RmlUi menu, however, has its own Vulkan render interface
-            // (records into the Fast3D Vulkan pass), so stand it up here.
-            {
-                auto wnd = Ship::Context::GetRawInstance()->GetWindow();
-                mRml = std::make_unique<Ship::SohRmlUi>();
-                if (!mRml->Init(mImpl.Vulkan.Window, nullptr, (int)wnd->GetWidth(), (int)wnd->GetHeight(),
-                                /*vulkan=*/true)) {
-                    SPDLOG_ERROR("Fast3dGui: RmlUi (Vulkan) init failed; menu disabled");
-                    mRml.reset();
-                }
-            }
-            break;
-#endif
-#ifdef ENABLE_SDL3GPU
-        case WindowBackend::FAST3D_SDL_GPU:
-            // No ImGui SDL3-GPU renderer backend; the RmlUi menu has its own SDL3 GPU render
-            // interface (appends ops into the Fast3D SDL3 GPU unified op-list), so stand it up here.
-            {
-                auto wnd = Ship::Context::GetRawInstance()->GetWindow();
-                mRml = std::make_unique<Ship::SohRmlUi>();
-                if (!mRml->Init(mImpl.Vulkan.Window, nullptr, (int)wnd->GetWidth(), (int)wnd->GetHeight(),
-                                /*vulkan=*/false, /*sdl3gpu=*/true)) {
-                    SPDLOG_ERROR("Fast3dGui: RmlUi (SDL3 GPU) init failed; menu disabled");
-                    mRml.reset();
-                }
-            }
-            break;
-#endif
-#ifdef ENABLE_DX11
-        case WindowBackend::FAST3D_DXGI_DX11:
-            ImGui_ImplDX11_Init(static_cast<ID3D11Device*>(mImpl.Dx11.Device),
-                                static_cast<ID3D11DeviceContext*>(mImpl.Dx11.DeviceContext));
-            break;
-#endif
-        default:
-            break;
+    // No ImGui SDL3-GPU renderer backend; the RmlUi menu has its own SDL3 GPU render interface
+    // (appends ops into the Fast3D SDL3 GPU unified op-list), so stand it up here.
+    auto wnd = Ship::Context::GetRawInstance()->GetWindow();
+    mRml = std::make_unique<Ship::SohRmlUi>();
+    if (!mRml->Init(mImpl.Vulkan.Window, nullptr, (int)wnd->GetWidth(), (int)wnd->GetHeight(),
+                    /*vulkan=*/false, /*sdl3gpu=*/true)) {
+        SPDLOG_ERROR("Fast3dGui: RmlUi (SDL3 GPU) init failed; menu disabled");
+        mRml.reset();
     }
 }
 
 void Fast3dGui::ImGuiBackendShutdown() {
-    switch (mImpl.Backend) {
-#ifdef ENABLE_OPENGL
-        case WindowBackend::FAST3D_SDL_OPENGL:
-            mRml.reset();
-            ImGui_ImplOpenGL3_Shutdown();
-            break;
-#endif
-#if __APPLE__
-        case WindowBackend::FAST3D_SDL_METAL:
-            ImGui_ImplMetal_Shutdown();
-            break;
-#endif
-#ifdef ENABLE_VULKAN
-        case WindowBackend::FAST3D_SDL_VULKAN:
-            mRml.reset();
-            break;
-#endif
-#if defined(ENABLE_DX11) || defined(ENABLE_DX12)
-        case WindowBackend::FAST3D_DXGI_DX11:
-            ImGui_ImplDX11_Shutdown();
-            break;
-#endif
-        default:
-            break;
-    }
+    // SDL3 GPU backend: the RmlUi menu owns the only renderer-side resources. (No ImGui SDL3-GPU
+    // renderer backend was stood up, so there is nothing else to shut down here.)
+    mRml.reset();
 }
 
 void Fast3dGui::ImGuiBackendNewFrame() {
-    switch (mImpl.Backend) {
-#ifdef ENABLE_OPENGL
-        case WindowBackend::FAST3D_SDL_OPENGL:
-            ImGui_ImplOpenGL3_NewFrame();
-            break;
-#endif
-#ifdef ENABLE_VULKAN
-        case WindowBackend::FAST3D_SDL_VULKAN: {
-            // M1: stand in for the (M4) ImGui Vulkan renderer's first-frame work.
-            // The renderer backends normally build/upload the font atlas on their first
-            // NewFrame; without one, ImGui::NewFrame would SetCurrentFont(null) and crash.
-            // Build it CPU-side once SoH's fonts are registered (a default font if none).
-            ImGuiIO& io = ImGui::GetIO();
-            if (!io.Fonts->IsBuilt()) {
-                if (io.Fonts->Fonts.empty()) {
-                    io.Fonts->AddFontDefault();
-                }
-                io.Fonts->Build();
-            }
-            break;
+    // No ImGui SDL3-GPU *renderer* backend is stood up; build the font atlas CPU-side so
+    // ImGui::NewFrame doesn't SetCurrentFont(null) and crash.
+    ImGuiIO& io = ImGui::GetIO();
+    if (!io.Fonts->IsBuilt()) {
+        if (io.Fonts->Fonts.empty()) {
+            io.Fonts->AddFontDefault();
         }
-#endif
-#ifdef ENABLE_SDL3GPU
-        case WindowBackend::FAST3D_SDL_GPU: {
-            // No ImGui SDL3-GPU *renderer* backend yet (later phase); build the font atlas CPU-side
-            // so ImGui::NewFrame doesn't SetCurrentFont(null) and crash. Mirrors the Vulkan case.
-            ImGuiIO& io = ImGui::GetIO();
-            if (!io.Fonts->IsBuilt()) {
-                if (io.Fonts->Fonts.empty()) {
-                    io.Fonts->AddFontDefault();
-                }
-                io.Fonts->Build();
-            }
-            break;
-        }
-#endif
-
-#ifdef ENABLE_DX11
-        case WindowBackend::FAST3D_DXGI_DX11:
-            ImGui_ImplDX11_NewFrame();
-            break;
-#endif
-
-#ifdef __APPLE__
-        case WindowBackend::FAST3D_SDL_METAL: {
-            GfxRenderingAPIMetal* api = (GfxRenderingAPIMetal*)mInterpreter.lock()->GetCurrentRenderingAPI();
-            api->NewFrame();
-            break;
-        }
-#endif
-        default:
-            break;
+        io.Fonts->Build();
     }
 }
 
 void Fast3dGui::ImGuiWMNewFrame() {
-    switch (mImpl.Backend) {
-        case WindowBackend::FAST3D_SDL_OPENGL:
-        case WindowBackend::FAST3D_SDL_METAL:
-#ifdef ENABLE_VULKAN
-        case WindowBackend::FAST3D_SDL_VULKAN:
-#endif
-#ifdef ENABLE_SDL3GPU
-        case WindowBackend::FAST3D_SDL_GPU:
-#endif
-            ImGui_ImplSDL3_NewFrame();
-            UpdateSdlTextInput();
-            break;
-#ifdef ENABLE_DX11
-        case WindowBackend::FAST3D_DXGI_DX11:
-            ImGui_ImplWin32_NewFrame();
-            break;
-#endif
-        default:
-            break;
-    }
+    ImGui_ImplSDL3_NewFrame();
+    UpdateSdlTextInput();
 }
 
 void Fast3dGui::UpdateSdlTextInput() {
@@ -383,48 +143,17 @@ void Fast3dGui::UpdateSdlTextInput() {
 }
 
 void Fast3dGui::ImGuiRenderDrawData(ImDrawData* data) {
-    switch (mImpl.Backend) {
-#ifdef ENABLE_OPENGL
-        case WindowBackend::FAST3D_SDL_OPENGL:
-            ImGui_ImplOpenGL3_RenderDrawData(data);
-            break;
-#endif
-
-#ifdef __APPLE__
-        case WindowBackend::FAST3D_SDL_METAL: {
-            GfxRenderingAPIMetal* api = (GfxRenderingAPIMetal*)mInterpreter.lock()->GetCurrentRenderingAPI();
-            api->RenderDrawData(data);
-            break;
-        }
-#endif
-
-#ifdef ENABLE_DX11
-        case WindowBackend::FAST3D_DXGI_DX11:
-            ImGui_ImplDX11_RenderDrawData(data);
-            break;
-#endif
-        default:
-            break;
-    }
+    // No ImGui SDL3-GPU *renderer* backend is stood up (P4): the ImGui dev-overlay draw data is
+    // produced but not rendered. The in-game UI (HUD + ESC menu) renders via the SoH3D HUD and the
+    // RmlUi SDL3 GPU interface instead.
+    (void)data;
 }
 
 void Fast3dGui::RenderRmlMenu() {
     if (!mRml) {
         return;
     }
-    switch (mImpl.Backend) {
-        case WindowBackend::FAST3D_SDL_OPENGL:
-#ifdef ENABLE_VULKAN
-        case WindowBackend::FAST3D_SDL_VULKAN:
-#endif
-#ifdef ENABLE_SDL3GPU
-        case WindowBackend::FAST3D_SDL_GPU:
-#endif
-            mRml->UpdateAndRender();
-            break;
-        default:
-            break;
-    }
+    mRml->UpdateAndRender();
 }
 
 void Fast3dGui::RmlMenuInjectKey(int sdlKeycode) {
