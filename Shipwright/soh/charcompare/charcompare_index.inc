@@ -166,7 +166,7 @@ static const IndexAnim ccAnims_nb[] = {
     { "gNabooruSittingCrossLeggedTurningToLookUpRightTransitionAnim", "objects/object_nb/gNabooruSittingCrossLeggedTurningToLookUpRightTransitionAnim", 20, "nabor_furimuki_l_wait" },
     { "gNabooruKneeingToRunningToHitAnim", "objects/object_nb/gNabooruKneeingToRunningToHitAnim", 16, "nabor_run_to_hit" },
     { "gNabooruUnusedKneelingAtCrawlspaceToStandingTransitionAnim", "objects/object_nb/gNabooruUnusedKneelingAtCrawlspaceToStandingTransitionAnim", 10, "nabor_kihon_talk_wait" },
-    { "gNabooruKneeingAtCrawlspaceAnim", "objects/object_nb/gNabooruKneeingAtCrawlspaceAnim", 24, "nabor_agura_wait" },
+    { "gNabooruKneeingAtCrawlspaceAnim", "objects/object_nb/gNabooruKneeingAtCrawlspaceAnim", 24, "nabor_hiza_wait" },
     { "gNabooruCollapseFromStandingToKneelingTransitionAnim", "objects/object_nb/gNabooruCollapseFromStandingToKneelingTransitionAnim", 80, "nabor_kihon_talk_wait" },
     { "gNabooruWalkingAnim", "objects/object_nb/gNabooruWalkingAnim", 17, "nabor_walk_loop" },
     { "gNabooruStandingHandsOnHipsChamberOfSagesAnim", "objects/object_nb/gNabooruStandingHandsOnHipsChamberOfSagesAnim", 22, "nabor_kihon_talk_wait" },
