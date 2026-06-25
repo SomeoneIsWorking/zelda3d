@@ -175,6 +175,13 @@ bool RmlRenderInterfaceSdl3Gpu::EnsureResources() {
     const unsigned char white[4] = { 255, 255, 255, 255 };
     mWhiteTex = UploadTexture(white, 1, 1);
 
+    // Pick a supported depth-stencil format for the menu's private clip-mask target.
+    if (SDL_GPUTextureSupportsFormat(mDevice, SDL_GPU_TEXTUREFORMAT_D24_UNORM_S8_UINT, SDL_GPU_TEXTURETYPE_2D,
+                                     SDL_GPU_TEXTUREUSAGE_DEPTH_STENCIL_TARGET))
+        mStencilFormat = SDL_GPU_TEXTUREFORMAT_D24_UNORM_S8_UINT;
+    else
+        mStencilFormat = SDL_GPU_TEXTUREFORMAT_D32_FLOAT_S8_UINT;
+
     SDL_GPUVertexAttribute attrs[3]{};
     attrs[0] = { 0, 0, SDL_GPU_VERTEXELEMENTFORMAT_FLOAT2, (uint32_t)offsetof(Rml::Vertex, position) };
     attrs[1] = { 1, 0, SDL_GPU_VERTEXELEMENTFORMAT_UBYTE4_NORM, (uint32_t)offsetof(Rml::Vertex, colour) };
@@ -184,35 +191,57 @@ bool RmlRenderInterfaceSdl3Gpu::EnsureResources() {
     vb.pitch = sizeof(Rml::Vertex);
     vb.input_rate = SDL_GPU_VERTEXINPUTRATE_VERTEX;
 
-    SDL_GPUGraphicsPipelineCreateInfo pci{};
-    pci.vertex_shader = mVs;
-    pci.fragment_shader = mFs;
-    pci.vertex_input_state.vertex_buffer_descriptions = &vb;
-    pci.vertex_input_state.num_vertex_buffers = 1;
-    pci.vertex_input_state.vertex_attributes = attrs;
-    pci.vertex_input_state.num_vertex_attributes = 3;
-    pci.primitive_type = SDL_GPU_PRIMITIVETYPE_TRIANGLELIST;
-    pci.rasterizer_state.fill_mode = SDL_GPU_FILLMODE_FILL;
-    pci.rasterizer_state.cull_mode = SDL_GPU_CULLMODE_NONE;
-    pci.rasterizer_state.front_face = SDL_GPU_FRONTFACE_COUNTER_CLOCKWISE;
-    pci.multisample_state.sample_count = SDL_GPU_SAMPLECOUNT_1;
-    pci.depth_stencil_state.enable_depth_test = false; // menu always on top
-    pci.depth_stencil_state.enable_depth_write = false;
-    SDL_GPUColorTargetDescription ct{};
-    ct.format = api->GpuColorFormat();
-    ct.blend_state.enable_blend = true;
-    ct.blend_state.src_color_blendfactor = SDL_GPU_BLENDFACTOR_ONE; // premultiplied alpha
-    ct.blend_state.dst_color_blendfactor = SDL_GPU_BLENDFACTOR_ONE_MINUS_SRC_ALPHA;
-    ct.blend_state.color_blend_op = SDL_GPU_BLENDOP_ADD;
-    ct.blend_state.src_alpha_blendfactor = SDL_GPU_BLENDFACTOR_ONE;
-    ct.blend_state.dst_alpha_blendfactor = SDL_GPU_BLENDFACTOR_ONE_MINUS_SRC_ALPHA;
-    ct.blend_state.alpha_blend_op = SDL_GPU_BLENDOP_ADD;
-    pci.target_info.color_target_descriptions = &ct;
-    pci.target_info.num_color_targets = 1;
-    pci.target_info.has_depth_stencil_target = true; // fb 0's pass binds a depth target
-    pci.target_info.depth_stencil_format = api->GpuDepthFormat();
-    mPipeline = SDL_CreateGPUGraphicsPipeline(mDevice, &pci);
-    if (!mPipeline) {
+    // Build one pipeline variant. maskWrite=false: normal draw (premult-alpha blend, colour on,
+    // stencil test EQUAL, no stencil write). maskWrite=true: paint the clip mask (no colour, stencil
+    // ALWAYS+REPLACE). Both run in the menu's own pass against the private D24S8/D32S8 target.
+    auto makePipe = [&](bool maskWrite) -> SDL_GPUGraphicsPipeline* {
+        SDL_GPUGraphicsPipelineCreateInfo pci{};
+        pci.vertex_shader = mVs;
+        pci.fragment_shader = mFs;
+        pci.vertex_input_state.vertex_buffer_descriptions = &vb;
+        pci.vertex_input_state.num_vertex_buffers = 1;
+        pci.vertex_input_state.vertex_attributes = attrs;
+        pci.vertex_input_state.num_vertex_attributes = 3;
+        pci.primitive_type = SDL_GPU_PRIMITIVETYPE_TRIANGLELIST;
+        pci.rasterizer_state.fill_mode = SDL_GPU_FILLMODE_FILL;
+        pci.rasterizer_state.cull_mode = SDL_GPU_CULLMODE_NONE;
+        pci.rasterizer_state.front_face = SDL_GPU_FRONTFACE_COUNTER_CLOCKWISE;
+        pci.multisample_state.sample_count = SDL_GPU_SAMPLECOUNT_1;
+        pci.depth_stencil_state.enable_depth_test = false; // menu always on top
+        pci.depth_stencil_state.enable_depth_write = false;
+        pci.depth_stencil_state.enable_stencil_test = true;
+        pci.depth_stencil_state.compare_mask = 0xFF;
+        pci.depth_stencil_state.write_mask = maskWrite ? 0xFF : 0x00;
+        SDL_GPUStencilOpState so{};
+        so.fail_op = SDL_GPU_STENCILOP_KEEP;
+        so.depth_fail_op = SDL_GPU_STENCILOP_KEEP;
+        so.pass_op = maskWrite ? SDL_GPU_STENCILOP_REPLACE : SDL_GPU_STENCILOP_KEEP;
+        so.compare_op = maskWrite ? SDL_GPU_COMPAREOP_ALWAYS : SDL_GPU_COMPAREOP_EQUAL;
+        pci.depth_stencil_state.front_stencil_state = so;
+        pci.depth_stencil_state.back_stencil_state = so;
+        SDL_GPUColorTargetDescription ct{};
+        ct.format = api->GpuColorFormat();
+        if (maskWrite) {
+            ct.blend_state.enable_color_write_mask = true;
+            ct.blend_state.color_write_mask = 0; // mask write: no colour
+        } else {
+            ct.blend_state.enable_blend = true;
+            ct.blend_state.src_color_blendfactor = SDL_GPU_BLENDFACTOR_ONE; // premultiplied alpha
+            ct.blend_state.dst_color_blendfactor = SDL_GPU_BLENDFACTOR_ONE_MINUS_SRC_ALPHA;
+            ct.blend_state.color_blend_op = SDL_GPU_BLENDOP_ADD;
+            ct.blend_state.src_alpha_blendfactor = SDL_GPU_BLENDFACTOR_ONE;
+            ct.blend_state.dst_alpha_blendfactor = SDL_GPU_BLENDFACTOR_ONE_MINUS_SRC_ALPHA;
+            ct.blend_state.alpha_blend_op = SDL_GPU_BLENDOP_ADD;
+        }
+        pci.target_info.color_target_descriptions = &ct;
+        pci.target_info.num_color_targets = 1;
+        pci.target_info.has_depth_stencil_target = true;
+        pci.target_info.depth_stencil_format = mStencilFormat;
+        return SDL_CreateGPUGraphicsPipeline(mDevice, &pci);
+    };
+    mPipeline = makePipe(false);
+    mPipelineMask = makePipe(true);
+    if (!mPipeline || !mPipelineMask) {
         SPDLOG_ERROR("[RmlSg] pipeline create failed: {}", SDL_GetError());
         return false;
     }
@@ -249,7 +278,41 @@ bool RmlRenderInterfaceSdl3Gpu::BeginFrame() {
     ProcessPendingFrees();
     mCmds.clear();
     mScissorEnabled = false;
+    mClipMaskEnabled = false;
+    mStencilRef = 0;
+    mStencilCounter = 0;
     mActive = true;
+    return true;
+}
+
+// (Re)create the menu's private depth-stencil target (depth aspect unused; stencil holds the mask).
+bool RmlRenderInterfaceSdl3Gpu::EnsureStencilTarget(int w, int h) {
+    if (w <= 0)
+        w = 1;
+    if (h <= 0)
+        h = 1;
+    if (mStencilTarget && mStencilW == w && mStencilH == h)
+        return true;
+    if (mStencilTarget) {
+        SDL_WaitForGPUIdle(mDevice);
+        SDL_ReleaseGPUTexture(mDevice, mStencilTarget);
+        mStencilTarget = nullptr;
+    }
+    SDL_GPUTextureCreateInfo ci{};
+    ci.type = SDL_GPU_TEXTURETYPE_2D;
+    ci.format = mStencilFormat;
+    ci.usage = SDL_GPU_TEXTUREUSAGE_DEPTH_STENCIL_TARGET;
+    ci.width = (uint32_t)w;
+    ci.height = (uint32_t)h;
+    ci.layer_count_or_depth = 1;
+    ci.num_levels = 1;
+    mStencilTarget = SDL_CreateGPUTexture(mDevice, &ci);
+    if (!mStencilTarget) {
+        SPDLOG_ERROR("[RmlSg] stencil target create failed: {}", SDL_GetError());
+        return false;
+    }
+    mStencilW = w;
+    mStencilH = h;
     return true;
 }
 
@@ -258,19 +321,37 @@ void RmlRenderInterfaceSdl3Gpu::EndFrame() {
     mActive = false;
     if (!api || mCmds.empty())
         return;
+    SDL_GPUTexture* fbColor = api->MainFbColorTexture();
+    if (!fbColor || !EnsureStencilTarget(mViewportW, mViewportH))
+        return;
 
-    RmlUbo dummy{};
-    (void)dummy;
     int W = mViewportW, H = mViewportH;
     SDL_GPUGraphicsPipeline* pipe = mPipeline;
+    SDL_GPUGraphicsPipeline* pipeMask = mPipelineMask;
     SDL_GPUSampler* samp = mSampler;
+    SDL_GPUTexture* stencilTarget = mStencilTarget;
     std::vector<Cmd> cmds = std::move(mCmds);
 
-    // ONE op into fb 0: the menu replays on top of the game in the unified render pass.
-    api->AppendSoH3DInPassFb(0, [pipe, samp, W, H, cmds = std::move(cmds)](SDL_GPUCommandBuffer* cmd,
-                                                                           SDL_GPURenderPass* pass) {
+    // The menu draws in its OWN pass that LOADs fb 0's colour and binds a private depth-stencil
+    // target cleared to 0 (so the EQUAL test with ref 0 passes everywhere when no clip is active,
+    // and Set/Intersect can paint incrementing refs without a mid-pass clear). fb 0's own D32_FLOAT
+    // depth is untouched (GetPixelDepth still reads it as raw float).
+    api->AppendSoH3DOwnPass([pipe, pipeMask, samp, stencilTarget, fbColor, W, H,
+                             cmds = std::move(cmds)](SDL_GPUCommandBuffer* cmd) {
+        SDL_GPUColorTargetInfo ct{};
+        ct.texture = fbColor;
+        ct.load_op = SDL_GPU_LOADOP_LOAD; // composite over the game
+        ct.store_op = SDL_GPU_STOREOP_STORE;
+        SDL_GPUDepthStencilTargetInfo dt{};
+        dt.texture = stencilTarget;
+        dt.clear_depth = 1.0f;
+        dt.clear_stencil = 0;
+        dt.load_op = SDL_GPU_LOADOP_DONT_CARE; // depth unused (test off)
+        dt.store_op = SDL_GPU_STOREOP_DONT_CARE;
+        dt.stencil_load_op = SDL_GPU_LOADOP_CLEAR; // stencil mask starts at 0
+        dt.stencil_store_op = SDL_GPU_STOREOP_STORE;
+        SDL_GPURenderPass* pass = SDL_BeginGPURenderPass(cmd, &ct, 1, &dt);
         SDL_GPUViewport vp{ 0.0f, 0.0f, (float)W, (float)H, 0.0f, 1.0f };
-        SDL_BindGPUGraphicsPipeline(pass, pipe);
         SDL_SetGPUViewport(pass, &vp);
         for (const Cmd& c : cmds) {
             SDL_Rect sc = c.scissorOn ? c.scissor : SDL_Rect{ 0, 0, W, H };
@@ -296,6 +377,8 @@ void RmlRenderInterfaceSdl3Gpu::EndFrame() {
             if (sc.h < 0)
                 sc.h = 0;
             SDL_SetGPUScissor(pass, &sc);
+            SDL_BindGPUGraphicsPipeline(pass, c.maskWrite ? pipeMask : pipe);
+            SDL_SetGPUStencilReference(pass, c.stencilRef);
             RmlUbo ubo{};
             ubo.uTranslate[0] = c.translate[0];
             ubo.uTranslate[1] = c.translate[1];
@@ -314,6 +397,7 @@ void RmlRenderInterfaceSdl3Gpu::EndFrame() {
             SDL_BindGPUFragmentSamplers(pass, 0, &sb, 1);
             SDL_DrawGPUIndexedPrimitives(pass, c.indexCount, 1, 0, 0, 0);
         }
+        SDL_EndGPURenderPass(pass);
     });
 }
 
@@ -383,6 +467,52 @@ void RmlRenderInterfaceSdl3Gpu::RenderGeometry(Rml::CompiledGeometryHandle geome
     c.translate[1] = translation.y;
     c.scissorOn = mScissorEnabled;
     c.scissor = mScissor;
+    c.maskWrite = false;
+    c.stencilRef = mClipMaskEnabled ? mStencilRef : 0; // EQUAL vs ref; 0 + zero-stencil = passes all
+    mCmds.push_back(c);
+}
+
+void RmlRenderInterfaceSdl3Gpu::EnableClipMask(bool enable) {
+    // The normal pipeline always tests stencil EQUAL. Disabled -> ref 0 + zeroed stencil passes
+    // everywhere; enabled -> ref is the value the last RenderToClipMask painted.
+    mClipMaskEnabled = enable;
+    if (!enable)
+        mStencilRef = 0;
+}
+
+void RmlRenderInterfaceSdl3Gpu::RenderToClipMask(Rml::ClipMaskOperation operation,
+                                                 Rml::CompiledGeometryHandle geometry, Rml::Vector2f translation) {
+    if (!mActive)
+        return;
+    auto git = mGeometries.find(geometry);
+    if (git == mGeometries.end() || git->second.indexCount == 0)
+        return;
+
+    // SDL3 GPU can't clear the stencil mid-pass, so instead of Vulkan's clear-then-paint we paint
+    // each region with a fresh, monotonically-incrementing ref via ALWAYS+REPLACE. Normal draws then
+    // test EQUAL against that ref, so only this region's pixels pass — old regions hold older refs
+    // that no longer match. (Set/Intersect collapse to the same scheme, matching the Vulkan path's
+    // approximate intersect. SetInverse — rare — has no no-clear equivalent, so it leaves no mask.)
+    if (operation == Rml::ClipMaskOperation::SetInverse) {
+        mStencilRef = 0; // unsupported without a stencil clear: treat as no clip
+        return;
+    }
+    uint8_t writeRef = ++mStencilCounter;
+    if (writeRef == 0) // wrapped past 255 (only on an implausibly clip-heavy frame)
+        writeRef = mStencilCounter = 1;
+    mStencilRef = writeRef;
+
+    Cmd c{};
+    c.vbo = git->second.vbo;
+    c.ibo = git->second.ibo;
+    c.indexCount = git->second.indexCount;
+    c.tex = mWhiteTex;
+    c.translate[0] = translation.x;
+    c.translate[1] = translation.y;
+    c.scissorOn = mScissorEnabled;
+    c.scissor = mScissor;
+    c.maskWrite = true;
+    c.stencilRef = writeRef;
     mCmds.push_back(c);
 }
 
@@ -468,19 +598,26 @@ void RmlRenderInterfaceSdl3Gpu::Shutdown() {
             SDL_ReleaseGPUTexture(mDevice, pf.tex);
     }
     mPendingFrees.clear();
+    if (mStencilTarget)
+        SDL_ReleaseGPUTexture(mDevice, mStencilTarget);
     if (mWhiteTex)
         SDL_ReleaseGPUTexture(mDevice, mWhiteTex);
     if (mSampler)
         SDL_ReleaseGPUSampler(mDevice, mSampler);
     if (mPipeline)
         SDL_ReleaseGPUGraphicsPipeline(mDevice, mPipeline);
+    if (mPipelineMask)
+        SDL_ReleaseGPUGraphicsPipeline(mDevice, mPipelineMask);
     if (mVs)
         SDL_ReleaseGPUShader(mDevice, mVs);
     if (mFs)
         SDL_ReleaseGPUShader(mDevice, mFs);
+    mStencilTarget = nullptr;
+    mStencilW = mStencilH = 0;
     mWhiteTex = nullptr;
     mSampler = nullptr;
     mPipeline = nullptr;
+    mPipelineMask = nullptr;
     mVs = mFs = nullptr;
     mReady = false;
     mDevice = nullptr;
