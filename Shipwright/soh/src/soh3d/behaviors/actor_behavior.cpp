@@ -7,6 +7,7 @@
 #include "actor/malon.h"
 #include "actor/townsfolk.h"
 #include "actor/door.h"
+#include "actor/door_ana.h"
 #include "actor/pot.h"
 #include "actor/comb.h"
 #include "actor/hamishi.h"
@@ -92,6 +93,7 @@ ActorBehavior* findActorBehavior(s16 actorId) {
     static AdultMalonBehavior sAdultMalon;
     static TownsfolkBehavior sTownsfolk;
     static EnDoorBehavior sEnDoor;
+    static DoorAnaBehavior sDoorAna;
     static EnTuboTrapBehavior sEnTuboTrap;
     static ObjCombBehavior sObjComb;
     static ObjHamishiBehavior sObjHamishi;
@@ -105,6 +107,8 @@ ActorBehavior* findActorBehavior(s16 actorId) {
     switch (actorId) {
         case ACTOR_EN_DOOR:
             return &sEnDoor;
+        case ACTOR_DOOR_ANA:
+            return &sDoorAna;
         case ACTOR_EN_TUBO_TRAP:
             return &sEnTuboTrap;
         case ACTOR_OBJ_COMB:

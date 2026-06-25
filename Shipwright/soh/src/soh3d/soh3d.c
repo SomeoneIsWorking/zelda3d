@@ -86,8 +86,11 @@ int gSoH3dDoorHold = (-2147483647 - 1); // INT32_MIN = off (use live swing); els
 // Live world-scale override per glModelId for the param-keyed field-keep props (rock/flower/
 // bush). 0 = use the per-call SOH3D_*_WORLD_SCALE default. REPL `gscale <id> <f>` pokes it so
 // new props can be size-calibrated against the N64 actor without a rebuild per guess.
-float gSoH3dGScale[16] = { 0 };
-#define SOH3D_GSCALE(id, def) (((id) >= 0 && (id) < 16 && gSoH3dGScale[id] > 0.0f) ? gSoH3dGScale[id] : (def))
+// 32 slots: behaviors/actor modules claim slots well past the original 16 (door=12 ... grotto=22),
+// and a too-small array silently made `gscale <id>` a no-op for those (the macro fell back to def for
+// id>=16, so e.g. kibako slot 18 could never be live-tuned). Sized to cover every assigned slot.
+float gSoH3dGScale[32] = { 0 };
+#define SOH3D_GSCALE(id, def) (((id) >= 0 && (id) < 32 && gSoH3dGScale[id] > 0.0f) ? gSoH3dGScale[id] : (def))
 
 // Live CSAB animation playback (GPU skinning). gSoH3dAnimRate = anim-frames advanced
 // per draw (the OoT3D logic tick is ~20 fps; tune live over the REPL). The frame is
@@ -4846,11 +4849,11 @@ static void SoH3D_ReplExec(PlayState* play, char* line, const char* outPath) {
     } else if (strcmp(cmd, "gscale") == 0 && sscanf(line, "%*s %i %f", &iv, &f1) == 2) {
         // `gscale <glModelId> <f>` — live world-scale override for a param-keyed field-keep prop
         // (4=rock_s, 5=rock_l, 6=flower, 2=bush). 0 releases back to the compiled default.
-        if (iv >= 0 && iv < 16) {
+        if (iv >= 0 && iv < 32) {
             gSoH3dGScale[iv] = f1;
             SoH3D_ReplReply(outPath, "gscale[%d]=%.4f%s", iv, f1, f1 <= 0.0f ? " (default)" : "");
         } else {
-            SoH3D_ReplReply(outPath, "gscale: id out of range (0..15)");
+            SoH3D_ReplReply(outPath, "gscale: id out of range (0..31)");
         }
     } else if (strcmp(cmd, "light") == 0 && sscanf(line, "%*s %f", &f1) == 1) {
         extern int gSoH3dLightEnable; // libultraship soh3d_gl.cpp: character/prop form lighting
