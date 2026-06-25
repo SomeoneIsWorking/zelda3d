@@ -3,6 +3,9 @@
 #include "RmlUi_Renderer_GL3.h"
 #include "RmlUi_Platform_SDL.h"
 #include "RmlRenderInterfaceVk.h"
+#ifdef ENABLE_SDL3GPU
+#include "RmlRenderInterfaceSdl3Gpu.h"
+#endif
 // Pull in the bundled glad GL loader (declarations only; the implementation lives in
 // RmlUi_Renderer_GL3.cpp's translation unit). Gives us glGet*/glBind* for the state guard.
 #include "RmlUi_Include_GL3.h"
@@ -213,19 +216,29 @@ SohRmlUi::~SohRmlUi() {
     Shutdown();
 }
 
-bool SohRmlUi::Init(void* sdlWindow, void* glContext, int width, int height, bool vulkan) {
+bool SohRmlUi::Init(void* sdlWindow, void* glContext, int width, int height, bool vulkan, bool sdl3gpu) {
     if (mInitialised) {
         return true;
     }
 
     mSdlWindow = sdlWindow;
     mVulkan = vulkan;
+    mSg = sdl3gpu;
     mWidth = width > 0 ? width : 1;
     mHeight = height > 0 ? height : 1;
 
     Rml::String gl_message = "Vulkan";
     Rml::RenderInterface* renderInterface = nullptr;
-    if (mVulkan) {
+    if (mSg) {
+#ifdef ENABLE_SDL3GPU
+        mSgRenderInterface = std::make_unique<RmlRenderInterfaceSdl3Gpu>();
+        mSgRenderInterface->SetViewport(mWidth, mHeight);
+        renderInterface = mSgRenderInterface.get();
+#else
+        SPDLOG_ERROR("[SohRmlUi] SDL3 GPU requested but ENABLE_SDL3GPU is off");
+        return false;
+#endif
+    } else if (mVulkan) {
 #ifdef ENABLE_VULKAN
         mVkRenderInterface = std::make_unique<RmlRenderInterfaceVk>();
         renderInterface = mVkRenderInterface.get();
@@ -281,7 +294,7 @@ bool SohRmlUi::Init(void* sdlWindow, void* glContext, int width, int height, boo
         SPDLOG_ERROR("[SohRmlUi] Failed to load font face: {}", fontPath);
     }
 
-    if (!mVulkan) {
+    if (!mVulkan && !mSg) {
         mRenderInterface->SetViewport(mWidth, mHeight);
     }
     mContext = Rml::CreateContext("soh3d", Rml::Vector2i(mWidth, mHeight));
@@ -723,6 +736,19 @@ void SohRmlUi::UpdateAndRender() {
     mContext->Update();
 
     // Render the ESC menu context.
+#ifdef ENABLE_SDL3GPU
+    if (mSg) {
+        // Append the menu geometry as ops into the SDL3 GPU backend's unified op-list (fb 0).
+        if (mSgRenderInterface) {
+            mSgRenderInterface->SetViewport(mWidth, mHeight);
+            if (mSgRenderInterface->BeginFrame()) {
+                mContext->Render();
+                mSgRenderInterface->EndFrame();
+            }
+        }
+        return;
+    }
+#endif
 #ifdef ENABLE_VULKAN
     if (mVulkan) {
         // Record the menu into the Fast3D Vulkan backend's current pass (no GL state to guard).
@@ -780,6 +806,12 @@ void SohRmlUi::Shutdown() {
     }
     mRenderInterface.reset();
     mVkRenderInterface.reset();
+#ifdef ENABLE_SDL3GPU
+    if (mSgRenderInterface) {
+        mSgRenderInterface->Shutdown();
+        mSgRenderInterface.reset();
+    }
+#endif
     mSystemInterface.reset();
     mInitialised = false;
 }
