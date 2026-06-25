@@ -10,6 +10,7 @@
 #include "fast/backends/gfx_opengl.h"
 #include "fast/backends/gfx_metal.h"
 #include "fast/backends/gfx_vulkan.h"
+#include "fast/backends/gfx_sdl3gpu.h"
 #include "fast/backends/gfx_direct3d_common.h"
 #include "fast/backends/gfx_direct3d11.h"
 #include "fast/backends/gfx_window_manager_api.h"
@@ -40,6 +41,9 @@ Fast3dWindow::Fast3dWindow(std::shared_ptr<Ship::Gui> gui, std::shared_ptr<FastM
     AddAvailableWindowBackend(WindowBackend::FAST3D_SDL_OPENGL);
 #ifdef ENABLE_VULKAN
     AddAvailableWindowBackend(WindowBackend::FAST3D_SDL_VULKAN);
+#endif
+#ifdef ENABLE_SDL3GPU
+    AddAvailableWindowBackend(WindowBackend::FAST3D_SDL_GPU);
 #endif
 }
 
@@ -164,6 +168,19 @@ void Fast3dWindow::InitWindowManager() {
     }
 #endif
 
+#ifdef ENABLE_SDL3GPU
+    // Runtime override for the SDL3 GPU backend while it is brought up. Authoritative in BOTH
+    // directions so an A/B harness can pin each instance regardless of the persisted backend
+    // (an SDL3-GPU run SAVES "SDL3GPU" to config, so SOH3D_SDL3GPU=0 must force GL back).
+    if (const char* v = std::getenv("SOH3D_SDL3GPU"); v != nullptr) {
+        if (v[0] == '1') {
+            SetWindowBackend(WindowBackend::FAST3D_SDL_GPU);
+        } else if (v[0] == '0') {
+            SetWindowBackend(WindowBackend::FAST3D_SDL_OPENGL);
+        }
+    }
+#endif
+
     switch (GetWindowBackend()) {
 #ifdef ENABLE_DX11
         case WindowBackend::FAST3D_DXGI_DX11:
@@ -181,6 +198,12 @@ void Fast3dWindow::InitWindowManager() {
         case WindowBackend::FAST3D_SDL_VULKAN:
             mWindowManagerApi = new GfxWindowBackendSDL2();
             mRenderingApi = new GfxRenderingAPIVulkan(static_cast<GfxWindowBackendSDL2*>(mWindowManagerApi));
+            break;
+#endif
+#ifdef ENABLE_SDL3GPU
+        case WindowBackend::FAST3D_SDL_GPU:
+            mWindowManagerApi = new GfxWindowBackendSDL2();
+            mRenderingApi = new GfxRenderingAPISdl3Gpu(static_cast<GfxWindowBackendSDL2*>(mWindowManagerApi));
             break;
 #endif
 #ifdef __APPLE__
@@ -442,6 +465,8 @@ std::string Fast3dWindow::GetWindowBackendName() {
             return "OpenGL";
         case WindowBackend::FAST3D_SDL_METAL:
             return "Metal";
+        case WindowBackend::FAST3D_SDL_GPU:
+            return "SDL3GPU";
         default:
             return "";
     }

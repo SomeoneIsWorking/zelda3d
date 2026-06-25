@@ -347,11 +347,14 @@ void GfxWindowBackendSDL2::Init(const char* gameName, const char* gfxApiName, bo
 #ifdef ENABLE_VULKAN
     mUseVulkan = strcmp(gfxApiName, "Vulkan") == 0;
 #endif
+#ifdef ENABLE_SDL3GPU
+    mUseSdl3Gpu = strcmp(gfxApiName, "SDL3GPU") == 0;
+#endif
 
 #if defined(__APPLE__)
-    bool use_opengl = !mUseVulkan && strcmp(gfxApiName, "OpenGL") == 0;
+    bool use_opengl = !mUseVulkan && !mUseSdl3Gpu && strcmp(gfxApiName, "OpenGL") == 0;
 #else
-    bool use_opengl = !mUseVulkan;
+    bool use_opengl = !mUseVulkan && !mUseSdl3Gpu;
 #endif
 
     if (use_opengl) {
@@ -414,6 +417,12 @@ void GfxWindowBackendSDL2::Init(const char* gameName, const char* gfxApiName, bo
         flags = flags | SDL_WINDOW_VULKAN;
     } else
 #endif
+#ifdef ENABLE_SDL3GPU
+        if (mUseSdl3Gpu) {
+        // Plain window: SDL_ClaimWindowForGPUDevice (in the SDL3-GPU rendering API's Init) attaches
+        // the GPU swapchain. No GL/Vulkan/Metal surface flag needed.
+    } else
+#endif
         if (use_opengl) {
         flags = flags | SDL_WINDOW_OPENGL;
     } else {
@@ -455,6 +464,18 @@ void GfxWindowBackendSDL2::Init(const char* gameName, const char* gfxApiName, bo
         }
         window_impl.Vulkan = { mWnd };
         window_impl.Backend = WindowBackend::FAST3D_SDL_VULKAN;
+    } else
+#endif
+#ifdef ENABLE_SDL3GPU
+        if (mUseSdl3Gpu) {
+        // The SDL3-GPU rendering API claims mWnd for its GPU device in its Init(). No GL context.
+        SDL_GetWindowSizeInPixels(mWnd, &mWindowWidth, &mWindowHeight);
+        if (startFullScreen) {
+            SetFullscreenImpl(true, false);
+        }
+        // Reuse the Vulkan window-impl member (a bare SDL_Window*); the Backend tag selects the path.
+        window_impl.Vulkan = { mWnd };
+        window_impl.Backend = WindowBackend::FAST3D_SDL_GPU;
     } else
 #endif
         if (use_opengl) {
@@ -842,6 +863,14 @@ void GfxWindowBackendSDL2::SwapBuffersBegin() {
         // Vulkan: the rendering API owns submit/present and the frame dump (it must
         // read the rendered swapchain image, not the GL back buffer). Here we only
         // pace the frame; everything GL-specific below is skipped.
+        SyncFramerateWithTime();
+        return;
+    }
+#endif
+#ifdef ENABLE_SDL3GPU
+    if (mUseSdl3Gpu) {
+        // SDL3 GPU: like Vulkan, the rendering API owns submit/present + the frame dump (reads its
+        // own fb 0). Only pace the frame here.
         SyncFramerateWithTime();
         return;
     }

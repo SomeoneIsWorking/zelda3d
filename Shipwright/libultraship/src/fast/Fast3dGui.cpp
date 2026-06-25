@@ -78,6 +78,9 @@ void Fast3dGui::HandleWindowEvents(Fast::WindowEvent event) {
 #ifdef ENABLE_VULKAN
         case WindowBackend::FAST3D_SDL_VULKAN:
 #endif
+#ifdef ENABLE_SDL3GPU
+        case WindowBackend::FAST3D_SDL_GPU:
+#endif
             // Offer the event to the RmlUi menu first (Phase 2). It always handles its toggle
             // binding, and consumes input while open so the ImGui menu / game do not also react.
             if (mRml && mRml->ProcessSdlEvent(const_cast<SDL_Event*>(static_cast<const SDL_Event*>(event.Sdl.Event)))) {
@@ -119,6 +122,17 @@ void Fast3dGui::ImGuiWMInit() {
             ImGui_ImplSDL3_InitForVulkan(static_cast<SDL_Window*>(mImpl.Vulkan.Window));
             break;
 #endif
+#ifdef ENABLE_SDL3GPU
+        case WindowBackend::FAST3D_SDL_GPU:
+            SDL_SetHint(SDL_HINT_TOUCH_MOUSE_EVENTS, "1");
+            if (Ship::Context::GetRawInstance()->GetConsoleVariables()->GetInteger(CVAR_ALLOW_BACKGROUND_INPUTS, 1)) {
+                SDL_SetHint(SDL_HINT_JOYSTICK_ALLOW_BACKGROUND_EVENTS, "1");
+            }
+            // Platform backend only (the ImGui SDL3-GPU *renderer* backend is a later phase, like
+            // Vulkan's M4). The dev-overlay draw data is produced but not yet rendered.
+            ImGui_ImplSDL3_InitForSDLGPU(static_cast<SDL_Window*>(mImpl.Vulkan.Window));
+            break;
+#endif
 #if __APPLE__
         case WindowBackend::FAST3D_SDL_METAL:
             SDL_SetHint(SDL_HINT_TOUCH_MOUSE_EVENTS, "1");
@@ -147,6 +161,11 @@ void Fast3dGui::ImGuiWMShutdown() {
 #endif
 #ifdef ENABLE_VULKAN
         case WindowBackend::FAST3D_SDL_VULKAN:
+            ImGui_ImplSDL3_Shutdown();
+            break;
+#endif
+#ifdef ENABLE_SDL3GPU
+        case WindowBackend::FAST3D_SDL_GPU:
             ImGui_ImplSDL3_Shutdown();
             break;
 #endif
@@ -277,6 +296,20 @@ void Fast3dGui::ImGuiBackendNewFrame() {
             break;
         }
 #endif
+#ifdef ENABLE_SDL3GPU
+        case WindowBackend::FAST3D_SDL_GPU: {
+            // No ImGui SDL3-GPU *renderer* backend yet (later phase); build the font atlas CPU-side
+            // so ImGui::NewFrame doesn't SetCurrentFont(null) and crash. Mirrors the Vulkan case.
+            ImGuiIO& io = ImGui::GetIO();
+            if (!io.Fonts->IsBuilt()) {
+                if (io.Fonts->Fonts.empty()) {
+                    io.Fonts->AddFontDefault();
+                }
+                io.Fonts->Build();
+            }
+            break;
+        }
+#endif
 
 #ifdef ENABLE_DX11
         case WindowBackend::FAST3D_DXGI_DX11:
@@ -302,6 +335,9 @@ void Fast3dGui::ImGuiWMNewFrame() {
         case WindowBackend::FAST3D_SDL_METAL:
 #ifdef ENABLE_VULKAN
         case WindowBackend::FAST3D_SDL_VULKAN:
+#endif
+#ifdef ENABLE_SDL3GPU
+        case WindowBackend::FAST3D_SDL_GPU:
 #endif
             ImGui_ImplSDL3_NewFrame();
             UpdateSdlTextInput();

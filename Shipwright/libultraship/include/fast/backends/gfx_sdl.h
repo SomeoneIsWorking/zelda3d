@@ -76,5 +76,9 @@ class GfxWindowBackendSDL2 final : public GfxWindowBackend {
     // The Vulkan rendering API owns submit+present, so the SDL2 window backend
     // skips GL context creation, SDL_GL_SwapWindow, and the glReadPixels dump.
     bool mUseVulkan = false;
+    // True when the window was created for the SDL3 GPU backend. Like Vulkan, the SDL3-GPU
+    // rendering API owns submit+present and the frame dump (reads its own framebuffer), so the
+    // window backend creates a plain (claimable) window and only paces the framerate.
+    bool mUseSdl3Gpu = false;
 };
 } // namespace Fast

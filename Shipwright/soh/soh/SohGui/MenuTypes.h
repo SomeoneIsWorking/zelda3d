@@ -277,6 +277,7 @@ static const std::map<Fast::WindowBackend, const char*> windowBackendsMap = {
     { Fast::WindowBackend::FAST3D_SDL_OPENGL, "OpenGL" },
     { Fast::WindowBackend::FAST3D_SDL_METAL, "Metal" },
     { Fast::WindowBackend::FAST3D_SDL_VULKAN, "Vulkan" },
+    { Fast::WindowBackend::FAST3D_SDL_GPU, "SDL3 GPU" },
 };
 
 struct MenuInit {

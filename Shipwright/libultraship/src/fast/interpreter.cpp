@@ -5312,8 +5312,12 @@ void Interpreter::StartFrame() {
     // itself. With the old bottom-up mGameFb the captured background came out upside down behind
     // the (correct) inventory on macOS. GL/Metal sample mGameFb via ImGui with the opposite
     // convention, so they keep openglInvertY=true.
-    const bool gameFbInvertY =
-        Ship::Context::GetRawInstance()->GetWindow()->GetWindowBackend() != FAST3D_SDL_VULKAN;
+    // Vulkan AND SDL3 GPU composite mGameFb onto fb 0 with a straight (un-flipped) image blit and
+    // present fb 0 without a flip, so both store mGameFb top-down like fb 0 (openglInvertY=false).
+    // GL/Metal sample mGameFb via ImGui with the opposite convention, so they keep openglInvertY=true.
+    const WindowBackend gameFbBackend =
+        (WindowBackend)Ship::Context::GetRawInstance()->GetWindow()->GetWindowBackend();
+    const bool gameFbInvertY = gameFbBackend != FAST3D_SDL_VULKAN && gameFbBackend != FAST3D_SDL_GPU;
     if (!ViewportMatchesRendererResolution() || mMsaaLevel > 1) {
         mRendersToFb = true;
         if (!ViewportMatchesRendererResolution()) {
