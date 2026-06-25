@@ -15,6 +15,7 @@
 #include "actor/en_item00.h"
 #include "actor/kibako.h"
 #include "actor/kibako2.h"
+#include "actor/push_block.h"
 #include "../asset/mat4.h"
 
 extern "C" {
@@ -98,6 +99,7 @@ ActorBehavior* findActorBehavior(s16 actorId) {
     static EnItem00Behavior sEnItem00;
     static ObjKibakoBehavior sObjKibako;
     static ObjKibako2Behavior sObjKibako2;
+    static ObjOshihikiBehavior sObjOshihiki;
     switch (actorId) {
         case ACTOR_EN_DOOR:
             return &sEnDoor;
@@ -117,6 +119,8 @@ ActorBehavior* findActorBehavior(s16 actorId) {
             return &sObjKibako;
         case ACTOR_OBJ_KIBAKO2:
             return &sObjKibako2;
+        case ACTOR_OBJ_OSHIHIKI:
+            return &sObjOshihiki;
         case ACTOR_EN_KO:
             return &sKokiriKid;
         case ACTOR_EN_SA:
