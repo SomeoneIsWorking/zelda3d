@@ -12,20 +12,55 @@
 // The door BEHAVIOR (open/close swing state machine, timing) is shared SoH/N64 code that runs
 // unchanged — only the DRAW differs, which is all this module overrides.
 //
-// Increment 1: static CLOSED door for all non-temple scenes. Temple door variants
-// (Fire/Water/Shadow/Well/Forest) draw from per-dungeon objects and keep their N64 draw for now.
-// Increment 2 (here): open/close SWING — replay the live N64 panel angle (jointTable[3].z + the
+// Increment 1: static CLOSED door for standard (field-keep) scenes.
+// Increment 2: open/close SWING — replay the live N64 panel angle (jointTable[3].z + the
 // DOOR_AJAR world.rot.y) as a procedural per-bone delta on the panel bone, pivoting at its hinge-edge
 // origin. See oot3d-decomp/docs/en_door.md "Increment 2" for the traced swing range + calibration.
-// Follow-up (increment 3): temple variants + shutter (DOOR_SHUTTER) + DOOR_ANA holes.
+// Increment 3 (here): TEMPLE door variants. N64 z_en_door.c sDoorInfo maps temple scenes to a
+// per-dungeon object + dListIndex (Fire->hidan, Water->mizu, Shadow/Well->haka_door, Forest->the
+// generic KEEP door) — only the NON-temple fallthrough hits the "Object_GetIndex always returns 0"
+// field-keep quirk, so temple doors genuinely use distinct CMBs. All five OoT3D door CMBs share the
+// IDENTICAL 4-bone layout (bone1 panel @ -2700 X, -90deg-X rest), so the increment-2 swing applies
+// unchanged to every variant — only the CMB asset key differs per scene (see kDoorVariantKey below).
+// Follow-up: shutter (DOOR_SHUTTER, vertical slide) + DOOR_ANA grotto holes.
 #include "z64.h"
 #include "door.h"
 #include "overlays/actors/ovl_En_Door/z_en_door.h" // EnDoor (read swing state through the C struct)
 #include <math.h>
 
-// KEEP zar + the standard (field) door CMB. Self-contained to this module.
-#define SOH3D_DOOR_ZAR "/actor/zelda_keep.zar"
-#define SOH3D_DOOR_CMB "door/model/m_Fnormaldoor_omote_model.cmb"
+// Per-scene door asset keys ("<zar>|<cmb>"), mirroring N64 z_en_door.c sDoorInfo dListIndex
+// selection. All five CMBs share the identical 4-bone layout (verified: bone1 panel @ -2700 X,
+// -90deg-X rest), so ONE swing serves them all — only the asset differs by scene.
+namespace {
+enum DoorVariant { DV_FIELD, DV_FOREST, DV_HAKA, DV_HIDAN, DV_MIZU, DV_COUNT };
+static const char* const kDoorVariantKey[DV_COUNT] = {
+    // standard houses/buildings (dListIndex 4, gFieldDoorDL) — the Object_GetIndex field-keep quirk
+    "/actor/zelda_keep.zar|door/model/m_Fnormaldoor_omote_model.cmb",
+    // Forest Temple (dListIndex 0, gDoorDL = generic KEEP door)
+    "/actor/zelda_keep.zar|door/model/door_model.cmb",
+    // Shadow Temple + Bottom of the Well (dListIndex 3, OBJECT_HAKA_DOOR -> gShadowDoorDL)
+    "/actor/zelda_haka_door.zar|Model/m_Hnormaldoor_omote_model.cmb",
+    // Fire Temple (dListIndex 1, OBJECT_HIDAN_OBJECTS -> gFireTempleDoorWithHandleDL)
+    "/actor/zelda_hidan_objects.zar|Model/m_Fnormaldoor_omote_model.cmb",
+    // Water Temple (dListIndex 2, OBJECT_MIZU_OBJECTS -> gWaterTempleDoorDL)
+    "/actor/zelda_mizu_objects.zar|Model/m_Wnormaldoor_omote_model.cmb",
+};
+static int doorVariantForScene(int sceneNum) {
+    switch (sceneNum) {
+        case SCENE_FIRE_TEMPLE:
+            return DV_HIDAN;
+        case SCENE_WATER_TEMPLE:
+            return DV_MIZU;
+        case SCENE_SHADOW_TEMPLE:
+        case SCENE_BOTTOM_OF_THE_WELL:
+            return DV_HAKA;
+        case SCENE_FOREST_TEMPLE:
+            return DV_FOREST;
+        default:
+            return DV_FIELD; // standard handle door
+    }
+}
+} // namespace
 
 // World scale, calibrated to the DOORWAY fit (the same method used for the DM-trail gate / windmill):
 // the 10000-unit CMB x 0.009 = ~90 world units tall, which fills the OoT3D doorway floor-to-lintel
@@ -63,25 +98,16 @@ s16 EnDoorBehavior::actorId() const {
 }
 
 bool EnDoorBehavior::tryDrawModel(PlayState* play, Actor* actor) {
-    // Temple-specific door variants use per-dungeon objects, not the KEEP door — leave them on N64
-    // until ported (increment 3).
-    switch (play->sceneNum) {
-        case SCENE_FIRE_TEMPLE:
-        case SCENE_WATER_TEMPLE:
-        case SCENE_SHADOW_TEMPLE:
-        case SCENE_BOTTOM_OF_THE_WELL:
-        case SCENE_FOREST_TEMPLE:
-            return false;
-        default:
-            break;
+    // Pick the per-scene door CMB (standard field door, or the dungeon-specific temple variant).
+    int variant = doorVariantForScene(play->sceneNum);
+    static int sModelId[DV_COUNT] = { 0 }; // per-variant: 0 = unresolved, <0 = no CMB (fall to N64)
+    if (sModelId[variant] == 0) {
+        sModelId[variant] = SoH3D_AutoModelId(kDoorVariantKey[variant]);
     }
-    static int sModelId = 0; // 0 = unresolved, <0 = no CMB (fall through to N64)
-    if (sModelId == 0) {
-        sModelId = SoH3D_AutoModelId(SOH3D_DOOR_ZAR "|" SOH3D_DOOR_CMB);
-    }
-    if (sModelId < 0) {
+    if (sModelId[variant] < 0) {
         return false; // no OoT3D door CMB -> let the N64 door draw
     }
+    int modelId = sModelId[variant];
     // SWING (increment 2): the door has no CSAB — OoT3D, like N64, swings the panel procedurally.
     // N64 EnDoor_OverrideLimbDraw rotates the panel limb by jointTable[3].z (the open SkelAnime,
     // gDoorOpening{Left,Right}, peaks ~-10728 binang ≈ -59deg) PLUS actor.world.rot.y (the DOOR_AJAR
@@ -97,9 +123,9 @@ bool EnDoorBehavior::tryDrawModel(PlayState* play, Actor* actor) {
     if (gSoH3dDoorAxis == 0) rx = swingRad;
     else if (gSoH3dDoorAxis == 1) ry = swingRad;
     else rz = swingRad;
-    SoH3D_SetBoneRotDelta(sModelId, gSoH3dDoorBone, rx, ry, rz);
-    SoH3D_UpdateBindPose(sModelId); // pose the panel before the draw captures it
-    SoH3D_DrawActorModel(play, sModelId, actor, SoH3D_GScale(kDoorGScaleSlot, kDoorWorldScale));
+    SoH3D_SetBoneRotDelta(modelId, gSoH3dDoorBone, rx, ry, rz);
+    SoH3D_UpdateBindPose(modelId); // pose the panel before the draw captures it
+    SoH3D_DrawActorModel(play, modelId, actor, SoH3D_GScale(kDoorGScaleSlot, kDoorWorldScale));
     return true;
 }
 
