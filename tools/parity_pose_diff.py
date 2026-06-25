@@ -66,6 +66,8 @@ def load_soh_local(path, bones):
         for row in csv.reader(f):
             if not row or row[0].startswith("#") or row[0] == "cap":
                 continue
+            if len(row) < 16:  # truncated row (partial write on a frame boundary) — skip
+                continue
             cap = int(row[0]); bone = int(row[3])
             m = [float(x) for x in row[4:16]]  # m0..m11 (row-major top 3 rows)
             R = ortho(np.array([[m[0], m[1], m[2]], [m[4], m[5], m[6]], [m[8], m[9], m[10]]]))
