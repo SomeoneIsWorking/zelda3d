@@ -352,6 +352,18 @@ s32 gSoH3dActorFreeze = 0;
 static Vec3f sSoH3dActorPinPos;
 static Vec3s sSoH3dActorPinRot;
 
+// Draw-position-aware framing (REPL `aaim`/`aorbit`): SoH3D_EmitModelDraw records the SELECTED
+// actor's last OoT3D-model draw here (model id + the scale/ground-offset used), so the REPL can
+// recover where the model ACTUALLY draws — its posed world-space center — instead of the actor's
+// world.pos anchor. Essential for posed/offset actors (Queen Gohma hangs on the ceiling far above
+// her floor anchor, flying creatures, held items). -1 model = the selection hasn't drawn yet.
+int SoH3D_PosedModelLocalAABB(int modelId, unsigned long long midMask, float* outMin, float* outMax);
+static s32 sSoH3dSelDrawModel = -1;
+static float sSoH3dSelDrawScale = 1.0f;
+static float sSoH3dSelDrawGroundOff = 0.0f;
+static float gSoH3dAimCenter[3] = { 0, 0, 0 }; // last computed posed-model world center (for aorbit)
+static float gSoH3dAimRadius = 50.0f;          // its world-space radius (for auto framing distance)
+
 // BEHAVIORAL motion-parity sampler (REPL `asample <n> <path>`): stream the selected actor's
 // per-frame pos/rot/vel to a CSV for N frames, then close. The selected actor is post-updated
 // exactly once per game frame, so each match = one frame regardless of headless being uncapped
@@ -1769,6 +1781,15 @@ void SoH3D_SceneTint(PlayState* play, u8 out[3]) {
 static void SoH3D_EmitModelDraw(PlayState* play, int modelId, Actor* actor, float worldScale,
                                 float groundOffset) {
     u8 tint[3];
+    // Record the SELECTED actor's draw so REPL `aaim`/`aorbit` can frame the model's posed world
+    // center (not the world.pos anchor). Enable posed-skin caching for this model so the posed AABB
+    // is available next frame (the cache is populated by the anim path, which runs before this emit).
+    if (actor != NULL && actor == gSoH3dSelActor) {
+        sSoH3dSelDrawModel = modelId;
+        sSoH3dSelDrawScale = worldScale;
+        sSoH3dSelDrawGroundOff = groundOffset;
+        SoH3D_SetTrackPosedMinY(modelId, 1);
+    }
     OPEN_DISPS(play->state.gfxCtx);
     Gfx_SetupDL_25Opa(play->state.gfxCtx);
     Matrix_Translate(actor->world.pos.x, actor->world.pos.y, actor->world.pos.z, MTXMODE_NEW);
@@ -5485,6 +5506,7 @@ static void SoH3D_ReplExec(PlayState* play, char* line, const char* outPath) {
         } else {
             gSoH3dSelActor = sel;
             gSoH3dSelId = sel->id;
+            sSoH3dSelDrawModel = -1; // invalidate the recorded draw until the new selection draws
             sSoH3dActorPinPos = sel->world.pos;
             sSoH3dActorPinRot = sel->world.rot;
             SoH3D_ReplReply(outPath, "asel id=0x%X pos=(%.0f,%.0f,%.0f) rotY=%d params=%d (of %d)",
@@ -5561,6 +5583,73 @@ static void SoH3D_ReplExec(PlayState* play, char* line, const char* outPath) {
             gSoH3dCamOverride = 1;
             SoH3D_ReplReply(outPath, "acam at=(%.0f,%.0f,%.0f) dist=%.0f axis=%d eye=(%.0f,%.0f,%.0f)",
                             cx, cy, cz, dist, axis, gSoH3dCamEye[0], gSoH3dCamEye[1], gSoH3dCamEye[2]);
+        }
+    } else if (strcmp(cmd, "aaim") == 0 || strcmp(cmd, "aorbit") == 0) {
+        // GENERIC draw-position-aware framing: aim at where the selected actor's OoT3D MODEL actually
+        // draws — its posed world-space center — not its world.pos anchor. Essential for posed/offset
+        // actors (Queen Gohma hangs on the ceiling far above her floor anchor, flying creatures, held
+        // items) where `acam` (anchor-based) points at empty space.
+        //   `aaim [dist] [axis]`   — side profile like acam; dist default = auto (3x model radius).
+        //   `aorbit <dist> <yaw> <pitch>` — orbit the same center at spherical (deg) angles.
+        // Needs the selection to have DRAWN once (SoH3D_EmitModelDraw records its model + transform and
+        // enables posed-skin caching); call after asel and a frame or two of running.
+        int isOrbit = (cmd[1] == 'o');
+        if (gSoH3dSelActor == NULL || sSoH3dSelDrawModel < 0) {
+            SoH3D_ReplReply(outPath, "%s: no DRAWN selection (asel + let the actor draw a frame)", cmd);
+        } else {
+            float mn[3], mx[3];
+            if (!SoH3D_PosedModelLocalAABB(sSoH3dSelDrawModel, ~0ull, mn, mx)) {
+                SoH3D_ReplReply(outPath, "%s: no posed AABB yet (let a frame pass after asel)", cmd);
+            } else {
+                Actor* a = gSoH3dSelActor;
+                float s = sSoH3dSelDrawScale;
+                // model-local center (+ground offset, applied innermost like EmitModelDraw), then scale.
+                float lx = (mn[0] + mx[0]) * 0.5f, ly = (mn[1] + mx[1]) * 0.5f + sSoH3dSelDrawGroundOff,
+                      lz = (mn[2] + mx[2]) * 0.5f;
+                float vx = lx * s, vy = ly * s, vz = lz * s;
+                // rotate by the actor's YXZ shape.rot (EmitModelDraw order: Ry*Rx*Rz applied to scale*L).
+                const float B2R = 3.14159265358979f / 32768.0f;
+                float rx = a->shape.rot.x * B2R, ry = a->shape.rot.y * B2R, rz = a->shape.rot.z * B2R;
+                float cz_ = cosf(rz), sz_ = sinf(rz); // Rz
+                float x1 = cz_ * vx - sz_ * vy, y1 = sz_ * vx + cz_ * vy, z1 = vz;
+                float cx_ = cosf(rx), sx_ = sinf(rx); // Rx
+                float x2 = x1, y2 = cx_ * y1 - sx_ * z1, z2 = sx_ * y1 + cx_ * z1;
+                float cy_ = cosf(ry), sy_ = sinf(ry); // Ry
+                float x3 = cy_ * x2 + sy_ * z2, y3 = y2, z3 = -sy_ * x2 + cy_ * z2;
+                gSoH3dAimCenter[0] = a->world.pos.x + x3;
+                gSoH3dAimCenter[1] = a->world.pos.y + y3;
+                gSoH3dAimCenter[2] = a->world.pos.z + z3;
+                float dx = (mx[0] - mn[0]) * s, dy = (mx[1] - mn[1]) * s, dz = (mx[2] - mn[2]) * s;
+                gSoH3dAimRadius = 0.5f * sqrtf(dx * dx + dy * dy + dz * dz);
+                if (gSoH3dAimRadius < 1.0f) gSoH3dAimRadius = 1.0f;
+                float cx = gSoH3dAimCenter[0], cy = gSoH3dAimCenter[1], cz = gSoH3dAimCenter[2];
+                gSoH3dCamAt[0] = cx; gSoH3dCamAt[1] = cy; gSoH3dCamAt[2] = cz;
+                if (isOrbit) {
+                    float dist = 0.0f, yawD = 0.0f, pitchD = 15.0f;
+                    (void)sscanf(line, "%*s %f %f %f", &dist, &yawD, &pitchD);
+                    if (dist <= 0.0f) dist = gSoH3dAimRadius * 3.0f;
+                    float yaw = yawD * (3.14159265f / 180.0f), pit = pitchD * (3.14159265f / 180.0f);
+                    gSoH3dCamEye[0] = cx + dist * cosf(pit) * sinf(yaw);
+                    gSoH3dCamEye[1] = cy + dist * sinf(pit);
+                    gSoH3dCamEye[2] = cz + dist * cosf(pit) * cosf(yaw);
+                    gSoH3dCamOverride = 1;
+                    SoH3D_ReplReply(outPath,
+                                    "aorbit center=(%.0f,%.0f,%.0f) r=%.0f dist=%.0f yaw=%.0f pitch=%.0f",
+                                    cx, cy, cz, gSoH3dAimRadius, dist, yawD, pitchD);
+                } else {
+                    float dist = 0.0f;
+                    int axis = 0;
+                    (void)sscanf(line, "%*s %f %d", &dist, &axis);
+                    if (dist <= 0.0f) dist = gSoH3dAimRadius * 3.0f;
+                    gSoH3dCamEye[0] = cx + (axis == 0 ? dist : 0.0f);
+                    gSoH3dCamEye[1] = cy + gSoH3dAimRadius * 0.4f;
+                    gSoH3dCamEye[2] = cz + (axis == 0 ? 0.0f : dist);
+                    gSoH3dCamOverride = 1;
+                    SoH3D_ReplReply(outPath,
+                                    "aaim center=(%.0f,%.0f,%.0f) r=%.0f dist=%.0f axis=%d (model %d)",
+                                    cx, cy, cz, gSoH3dAimRadius, dist, axis, sSoH3dSelDrawModel);
+                }
+            }
         }
     } else if (strcmp(cmd, "ainfo") == 0) {
         // GENERIC: dump the selected actor's live state.
