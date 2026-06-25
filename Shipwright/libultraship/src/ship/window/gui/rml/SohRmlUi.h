@@ -20,6 +20,7 @@ class EventListener;
 namespace Ship {
 
 class RmlRenderInterfaceVk;
+class RmlRenderInterfaceSdl3Gpu;
 class TabClickListener; // per-tab mouse-click handler (defined in the .cpp), needs SetActiveTab
 
 /**
@@ -54,7 +55,7 @@ class SohRmlUi {
      *                   backend's pass); false = the GL3 render interface on the SDL/GL context.
      * @return true if RmlUi initialised and the test document loaded.
      */
-    bool Init(void* sdlWindow, void* glContext, int width, int height, bool vulkan);
+    bool Init(void* sdlWindow, void* glContext, int width, int height, bool vulkan, bool sdl3gpu = false);
 
     /** @brief Updates and renders the RmlUi context (only when visible), wrapped in GL save/restore. */
     void UpdateAndRender();
@@ -124,12 +125,14 @@ class SohRmlUi {
     bool mInitialised = false;
     bool mVisible = false;
     bool mVulkan = false;
+    bool mSg = false; // SDL3 GPU render interface
     int mWidth = 0;
     int mHeight = 0;
     void* mSdlWindow = nullptr;
 
     std::unique_ptr<RenderInterface_GL3> mRenderInterface;       // GL backend
     std::unique_ptr<RmlRenderInterfaceVk> mVkRenderInterface;    // Vulkan backend
+    std::unique_ptr<RmlRenderInterfaceSdl3Gpu> mSgRenderInterface; // SDL3 GPU backend
     std::unique_ptr<SystemInterface_SDL> mSystemInterface;
     Rml::Context* mContext = nullptr;          // owned by RmlUi, freed by Rml::Shutdown()
     Rml::ElementDocument* mDocument = nullptr;  // ESC menu doc — owned by the context
