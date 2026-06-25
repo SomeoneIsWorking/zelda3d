@@ -2669,8 +2669,11 @@ static void uploadSkin(int modelId, LoadedModel* lm, std::vector<std::array<floa
 // accumulator, not the dead skelAnime.curFrame). This is the SoH3D side of the direct-vs-oracle
 // per-frame diff: it answers "does the pose actually cycle / what pose is on screen this frame".
 // Generic (any auto-model). Arm via the REPL `skindump` (resolves Link's modelId). Each row is one
-// bone's animated bone-world rotation column (m4,m5,m6 = up-axis basis), enough to detect a frozen
-// pose (identical rows across caps) and to align against the oracle jointTable.
+// bone's animated bone-WORLD matrix aw = skin·bind (row-major top 3 rows m0..m11): the rotation 3x3
+// is (m0..m2 / m4..m6 / m8..m10) and the bone WORLD POSITION is (m3,m7,m11). Bone world positions are
+// the quantity the parity sweep Procrustes-aligns against the oracle's live bone matrices
+// (oot3d-decomp link_skel_live), so a divergent state (e.g. static legs sliding) shows as per-bone
+// residual. A frozen pose still shows as identical rows across caps.
 static FILE* gSkinDumpFile = nullptr;
 static int gSkinDumpModel = -1;
 static int gSkinDumpRemaining = 0;
@@ -2679,15 +2682,19 @@ extern "C" void SoH3D_SkinDumpArm(int modelId, const char* path, int frames) {
     if (gSkinDumpFile) { fclose(gSkinDumpFile); gSkinDumpFile = nullptr; }
     gSkinDumpFile = fopen(path, "w");
     if (!gSkinDumpFile) return;
-    fprintf(gSkinDumpFile, "# resolved CSAB pose capture (skin matrices, row-major 4x4 per bone)\n");
+    fprintf(gSkinDumpFile, "# resolved CSAB pose capture: animated bone-WORLD matrix aw=skin*bind,\n");
+    fprintf(gSkinDumpFile, "# row-major top 3 rows; bone world pos=(m3,m7,m11). Parity vs oracle link_skel_live.\n");
     fprintf(gSkinDumpFile, "cap,anim,frame,bone,m0,m1,m2,m3,m4,m5,m6,m7,m8,m9,m10,m11\n");
     gSkinDumpModel = modelId; gSkinDumpRemaining = frames; gSkinDumpCap = 0;
 }
+// `aw` is the animated bone-WORLD matrix straight from Csab::animatedBoneWorld (recursive parent
+// multiply) — NOT reconstructed via skin*bind, which is lossy when bind carries scale (matInverse
+// is approximate there). Bone world position = (m3,m7,m11).
 static void skinDumpWrite(int modelId, const char* animName, float frame,
-                          const std::vector<std::array<float, 16>>& sm) {
+                          const std::vector<std::array<float, 16>>& aw) {
     if (!gSkinDumpFile || modelId != gSkinDumpModel || gSkinDumpRemaining <= 0) return;
-    for (int b = 0; b < (int)sm.size(); b++) {
-        const float* M = sm[b].data();
+    for (int b = 0; b < (int)aw.size(); b++) {
+        const float* M = aw[b].data();
         fprintf(gSkinDumpFile, "%d,%s,%.3f,%d,%.4f,%.4f,%.4f,%.2f,%.4f,%.4f,%.4f,%.2f,%.4f,%.4f,%.4f,%.2f\n",
                 gSkinDumpCap, animName ? animName : "(null)", frame, b,
                 M[0], M[1], M[2], M[3], M[4], M[5], M[6], M[7], M[8], M[9], M[10], M[11]);
@@ -2710,7 +2717,11 @@ void SoH3D_UpdateAnim(int modelId, const char* animName, float frame) {
     getBoneRotDeltas(modelId, &drot, &dcount);
     getBonePostRots(modelId, &post, &pcount);
     anim->skinMatrices(*lm->cmb, frame, sm, drot, dcount, post, pcount);
-    skinDumpWrite(modelId, animName, frame, sm);
+    if (gSkinDumpFile && modelId == gSkinDumpModel) {
+        std::vector<std::array<float, 16>> aw;
+        anim->animatedBoneWorld(*lm->cmb, frame, aw, drot, dcount, post, pcount);
+        skinDumpWrite(modelId, animName, frame, aw);
+    }
     uploadSkin(modelId, lm, sm);
 }
 
@@ -2736,7 +2747,12 @@ static void SoH3D_UpdateAnimMorph(int modelId, const char* inName, float fIn, co
     } else {
         in->skinMatrices(*lm->cmb, fIn, sm, drot, dcount, post, pcount); // outgoing unresolved -> no blend
     }
-    skinDumpWrite(modelId, inName, fIn, sm);
+    if (gSkinDumpFile && modelId == gSkinDumpModel) {
+        std::vector<std::array<float, 16>> aw;
+        if (out) in->animatedBoneWorldMorph(*lm->cmb, fIn, *out, fOut, weight, aw, drot, dcount, post, pcount);
+        else in->animatedBoneWorld(*lm->cmb, fIn, aw, drot, dcount, post, pcount);
+        skinDumpWrite(modelId, inName, fIn, aw);
+    }
     uploadSkin(modelId, lm, sm);
 }
 
