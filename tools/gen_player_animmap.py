@@ -74,6 +74,27 @@ SUBS = [
 OVERRIDES = {
     # Grezzo kept the verbatim N64 name for this transition CSAB (no nml_ rename); exists both ages.
     "gPlayerAnim_link_normal_free2freeB": "link_normal_free2freeB",
+
+    # --- jump_climb family: OoT3D has NO jump_climb CSAB and REUSES the hang family. ---
+    # Ground truth = OoT3D player anim-group table @ fp=0x53a5f8 (oot3d-decomp): the jump_climb_*
+    # groups (hold @+0x468, wait @+0x480, up @+0x498) resolve to animIds 143-148 = nml_hang_*,
+    # with the modelAnimType free/non-free split matching N64 sPlayerAnimGroups exactly. The
+    # jump_climb_up_free=145 element cross-validates against the immediate in func_8083AA10's
+    # wall-vault branch (0x4be634, animId 0x91). See docs/player_anim_states.md.
+    "gPlayerAnim_link_normal_jump_climb_hold":      "nml_hang_hold",       # animId 148
+    "gPlayerAnim_link_normal_jump_climb_hold_free": "nml_hang_hold_free",  # animId 147
+    "gPlayerAnim_link_normal_jump_climb_wait":      "nml_hang_wait",       # animId 144
+    "gPlayerAnim_link_normal_jump_climb_wait_free": "nml_hang_wait_free",  # animId 143
+    "gPlayerAnim_link_normal_jump_climb_up":        "nml_hang_up",         # animId 146
+    "gPlayerAnim_link_normal_jump_climb_up_free":   "nml_hang_up_free",    # animId 145
+
+    # --- run-jump-into-water family: OoT3D reuses the run_dive family. ---
+    # Ground truth = decomp immediates: func_8083AA10 water-dive branch (0x1cfd74) passes animId
+    # 0x69=105 (nml_run_dive) to func_808389E8 with 6.0f morph after the WaterBox+50.0f check;
+    # Player_Action_80844A44 (0x21e4e8) loops animId 0x68=104 (nml_run_dive_wait). Matches N64
+    # z_player.c:5809 / :9975 exactly. See docs/player_anim_states.md.
+    "gPlayerAnim_link_normal_run_jump_water_fall":      "nml_run_dive",       # animId 105
+    "gPlayerAnim_link_normal_run_jump_water_fall_wait": "nml_run_dive_wait",  # animId 104
 }
 
 
