@@ -222,11 +222,26 @@ float Csab::sampleTrack(const Track& t, float frame, bool rotation) {
     }
     // HERMITE
     const Keyframe* k0; const Keyframe* k1;
-    if (i1 <= 0) { k0 = &f.back(); k1 = &f.front(); }
-    else { k0 = &f[i1 - 1]; k1 = &f[i1]; }
-    float length = fmodf(k1->time - k0->time, (float)t.timeEnd);
-    if (length == 0) return k0->value;
-    float tt = (frame - k0->time) / length;
+    float length, tt;
+    if (i1 <= 0) {
+        // WRAP segment: the query frame is past the last keyframe (or before the first), so the
+        // active segment spans last_keyframe -> first_keyframe ACROSS the loop seam. The forward
+        // distance must wrap by timeEnd. The old `fmodf(k1->time - k0->time, timeEnd)` produced a
+        // NEGATIVE length here (k1=first < k0=last => fmodf(-16,17) = -16), making the cubic
+        // EXTRAPOLATE garbage — seen live as nml_carryB_free bone 20 (R_HAND) snapping ~160deg once
+        // per loop (the clip's own bone-20 range is only 56deg, so the pop was pure extrapolation).
+        k0 = &f.back(); k1 = &f.front();
+        length = (k1->time - k0->time) + (float)t.timeEnd;       // forward distance across the seam
+        if (length == 0) return k0->value;
+        float num = frame - k0->time;
+        if (num < 0) num += (float)t.timeEnd;                    // frame sits in the [0, first_kf) tail
+        tt = num / length;
+    } else {
+        k0 = &f[i1 - 1]; k1 = &f[i1];
+        length = k1->time - k0->time;
+        if (length == 0) return k0->value;
+        tt = (frame - k0->time) / length;
+    }
     float p0 = k0->value, p1 = k1->value;
     if (rotation) {
         // int16 rotation values are wrapped to [-pi,pi); the cubic must interpolate the
