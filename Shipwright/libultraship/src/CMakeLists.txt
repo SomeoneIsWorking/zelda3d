@@ -134,35 +134,23 @@ if (USE_OPENGLES)
     endif()
 endif()
 
-# ----- Vulkan backend (soh3d single-renderer port) -----
-# Adds a new selectable Fast3D backend (FAST3D_SDL_VULKAN) so the engine can render
-# through Vulkan (and via MoltenVK on macOS). OpenGL remains the default until the
-# Vulkan path reaches parity. Desktop Linux / macOS only (not GLES/iOS/Android).
+# ----- SDL3 GPU backend (soh3d single-renderer migration, P4: the ONLY renderer) -----
+# The Fast3D backend renders through SDL3's GPU API (FAST3D_SDL_GPU). OpenGL/DX11/Metal and the
+# custom Vulkan backend were all removed (P4). The per-combiner shaders are still generated as GLSL
+# at runtime and compiled to SPIR-V with glslang (SDL3 GPU consumes SPIR-V on its Vulkan/Metal/D3D12
+# driver) — so glslang stays a hard dependency; the Vulkan loader / MoltenVK are NOT needed. Desktop
+# Linux / macOS only (not GLES/iOS/Android).
 if (NOT USE_OPENGLES AND NOT CMAKE_SYSTEM_NAME STREQUAL "iOS" AND NOT CMAKE_SYSTEM_NAME STREQUAL "Android")
-    find_package(Vulkan)
-    # Runtime GLSL->SPIR-V compilation of the per-combiner shaders uses glslang
-    # (shaderc has no dev headers on this box). find_package(glslang) exposes the
-    # imported targets glslang::glslang / glslang::SPIRV / the default resource limits.
+    # find_package(glslang) exposes the imported targets glslang::glslang / glslang::SPIRV /
+    # the default resource limits used by the runtime GLSL->SPIR-V compile.
     find_package(glslang QUIET)
-    # SDL3-MIGRATION (Phase 1): the Vulkan backend stays compiled (other modules — soh3d_gl.cpp,
-    # SohRmlUi.cpp — reference Vk symbols unconditionally), but GL remains the active runtime
-    # renderer. Only gfx_vulkan's handful of SDL_Vulkan_* surface calls were migrated to SDL3;
-    # Phase 2 ports the backend itself to SDL3's GPU API.
-    if (Vulkan_FOUND AND glslang_FOUND)
-        target_link_libraries(libultraship PRIVATE Vulkan::Vulkan
+    if (glslang_FOUND)
+        target_link_libraries(libultraship PRIVATE
             glslang::glslang glslang::SPIRV glslang::glslang-default-resource-limits)
-        target_compile_definitions(libultraship PRIVATE ENABLE_VULKAN)
-        message(STATUS "soh3d: Vulkan backend ENABLED (${Vulkan_LIBRARIES}) + glslang")
-        # SDL3 GPU backend (soh3d single-renderer migration, Phase 2): a new selectable Fast3D
-        # backend (FAST3D_SDL_GPU) on SDL3's GPU API. Reuses the same glslang runtime GLSL->SPIR-V
-        # compilation as the Vulkan backend (no extra deps; SDL3 itself is already linked). GL
-        # remains the default until SDL3 GPU reaches parity.
         target_compile_definitions(libultraship PRIVATE ENABLE_SDL3GPU)
         message(STATUS "soh3d: SDL3 GPU backend ENABLED (glslang SPIR-V + SDL3 GPU API)")
-    elseif (Vulkan_FOUND)
-        message(STATUS "soh3d: Vulkan found but glslang missing; Vulkan backend disabled")
     else()
-        message(STATUS "soh3d: Vulkan not found; Vulkan backend disabled")
+        message(FATAL_ERROR "soh3d: glslang not found; the SDL3 GPU backend (the only renderer) cannot build")
     endif()
 endif()
 
@@ -237,7 +225,6 @@ if (CMAKE_SYSTEM_NAME STREQUAL "iOS")
     endif()
 else()
     target_compile_definitions(libultraship PRIVATE
-        ENABLE_OPENGL
         $<$<CONFIG:Debug>:_DEBUG>
         $<$<NOT:$<CONFIG:Debug>>:NDEBUG>
         SPDLOG_ACTIVE_LEVEL=${SPDLOG_MIN_CUTOFF}

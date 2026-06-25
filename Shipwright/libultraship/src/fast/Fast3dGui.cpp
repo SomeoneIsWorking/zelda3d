@@ -3,7 +3,6 @@
 #include "fast/Fast3dWindow.h"
 #include "ship/Context.h"
 #include "ship/config/ConsoleVariable.h"
-#include "fast/backends/gfx_metal.h"
 #include "fast/interpreter.h"
 #include "fast/backends/gfx_rendering_api.h"
 #include "fast/resource/type/Texture.h"
@@ -11,27 +10,17 @@
 #include "ship/resource/File.h"
 #include "ship/window/gui/rml/SohRmlUi.h"
 
-// SDL3-MIGRATION: SDL2 -> SDL3 includes; imgui_impl_sdl2 -> imgui_impl_sdl3.
-#ifdef __APPLE__
+// SDL3 GPU is the only renderer (P4); the GL/Vulkan/Metal/DX ImGui backends are gone.
 #include <SDL3/SDL_hints.h>
 #include <SDL3/SDL_keyboard.h>
 #include <SDL3/SDL_video.h>
-#include <imgui_impl_metal.h>
-#include <imgui_impl_sdl3.h>
-#else
-#include <SDL3/SDL_hints.h>
-#include <SDL3/SDL_keyboard.h>
-#include <SDL3/SDL_video.h>
-#endif
 
 #if defined(__ANDROID__) || defined(__IOS__)
 #include "ship/port/mobile/MobileImpl.h"
 #endif
 
-#ifdef ENABLE_OPENGL
-#include <imgui_impl_opengl3.h>
+// The ImGui SDL3 platform backend drives every windowing path now (SDL3 GPU is the only backend).
 #include <imgui_impl_sdl3.h>
-#endif
 
 #if defined(ENABLE_DX11) || defined(ENABLE_DX12)
 #include <imgui_impl_dx11.h>

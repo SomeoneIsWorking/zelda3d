@@ -235,11 +235,24 @@ struct SgModel {
     SDL_GPUBuffer* vbo = nullptr;
     std::vector<SgGroup> groups;
     std::vector<SDL_GPUTexture*> textures;
+    // Model-local AABB over all group vertices, computed once at upload. Used by the geomscan
+    // bridge (SoH3D_GeomScanDump) to flag misrendered geometry by VALUE for the #115/#120 audit.
+    bool hasBounds = false;
+    float localMin[3] = { 0, 0, 0 }, localMax[3] = { 0, 0, 0 };
 };
 
 // ---- module state ----
 SoH3DModelProvider g_provider = nullptr;
 std::unordered_map<int, SgModel> g_models;
+
+// geomscan capture: each visible model draw appends a world-space AABB record to g_geomCur;
+// SoH3D_Sg_BeginPass publishes the previous frame's into g_geomLast so the REPL reads a complete
+// frame. (Ported from the removed Vulkan backend's g_geomLast path.)
+struct GeomRec {
+    int modelId;
+    float wmin[3], wmax[3];
+};
+std::vector<GeomRec> g_geomCur, g_geomLast;
 
 SDL_GPUDevice* g_device = nullptr;
 bool g_resReady = false;
@@ -522,6 +535,18 @@ SgModel* ensureUploaded(int modelId) {
         }
         all.insert(all.end(), groups[i].verts, groups[i].verts + groups[i].vertCount);
         m.groups.push_back(g);
+    }
+
+    // Model-local AABB over all vertices (geomscan; see SoH3D_GeomScanDump).
+    if (!all.empty()) {
+        for (int k = 0; k < 3; k++) m.localMin[k] = m.localMax[k] = all[0].pos[k];
+        for (const SoH3DGlVtx& v : all) {
+            for (int k = 0; k < 3; k++) {
+                if (v.pos[k] < m.localMin[k]) m.localMin[k] = v.pos[k];
+                if (v.pos[k] > m.localMax[k]) m.localMax[k] = v.pos[k];
+            }
+        }
+        m.hasBounds = true;
     }
 
     // Device vertex buffer via a transfer-buffer copy.
@@ -991,6 +1016,22 @@ extern "C" void SoH3D_Sg_SetProvider(SoH3DModelProvider fn) {
     g_provider = fn;
 }
 
+// geomscan bridge: copy the last completed frame's per-draw world AABBs out to the REPL (soh3d.c
+// `geomscan`, #115/#120). Returns the count written; modelIds[i], mins[i*3..], maxs[i*3..] = draw i.
+// (Ported from the removed Vulkan backend; this is the SDL3 GPU definition of SoH3D_GeomScanDump.)
+extern "C" int SoH3D_GeomScanDump(int* modelIds, float* mins, float* maxs, int maxN) {
+    int n = (int)g_geomLast.size();
+    if (n > maxN) n = maxN;
+    for (int i = 0; i < n; i++) {
+        modelIds[i] = g_geomLast[i].modelId;
+        for (int k = 0; k < 3; k++) {
+            mins[i * 3 + k] = g_geomLast[i].wmin[k];
+            maxs[i * 3 + k] = g_geomLast[i].wmax[k];
+        }
+    }
+    return n;
+}
+
 extern "C" void SoH3D_Sg_RequestEvictRange(int lo, int hi) {
     g_evictLo = lo;
     g_evictHi = hi;
@@ -999,6 +1040,9 @@ extern "C" void SoH3D_Sg_RequestEvictRange(int lo, int hi) {
 
 extern "C" void SoH3D_Sg_BeginPass(void) {
     g_ctxValid = false;
+    // Publish the previous frame's geometry capture; start a fresh one for this frame's draws.
+    g_geomLast.swap(g_geomCur);
+    g_geomCur.clear();
     if (!g_activeSdl3GpuApi)
         return;
     if (!ensureResources())
@@ -1017,6 +1061,33 @@ extern "C" void SoH3D_Sg_DrawModel(int modelId, const float* mp16, const float* 
     SgModel* m = ensureUploaded(modelId);
     if (!m || !m->vbo)
         return;
+
+    // Geometry-value capture (geomscan): world AABB = local AABB transformed by mv16 (model->world,
+    // column-major to match the shader's ubo.uMV * pos). One record per visible draw; the #115/#120
+    // sweep reads these to flag misrendered geometry by VALUE (huge/degenerate extent), no diff.
+    if (m->hasBounds && mv16 != nullptr && g_geomCur.size() < 4096) {
+        GeomRec rec;
+        rec.modelId = modelId;
+        bool first = true;
+        for (int c = 0; c < 8; c++) {
+            float lx = (c & 1) ? m->localMax[0] : m->localMin[0];
+            float ly = (c & 2) ? m->localMax[1] : m->localMin[1];
+            float lz = (c & 4) ? m->localMax[2] : m->localMin[2];
+            float wx = mv16[0] * lx + mv16[4] * ly + mv16[8] * lz + mv16[12];
+            float wy = mv16[1] * lx + mv16[5] * ly + mv16[9] * lz + mv16[13];
+            float wz = mv16[2] * lx + mv16[6] * ly + mv16[10] * lz + mv16[14];
+            if (first) {
+                rec.wmin[0] = rec.wmax[0] = wx; rec.wmin[1] = rec.wmax[1] = wy;
+                rec.wmin[2] = rec.wmax[2] = wz; first = false;
+            } else {
+                if (wx < rec.wmin[0]) rec.wmin[0] = wx; if (wx > rec.wmax[0]) rec.wmax[0] = wx;
+                if (wy < rec.wmin[1]) rec.wmin[1] = wy; if (wy > rec.wmax[1]) rec.wmax[1] = wy;
+                if (wz < rec.wmin[2]) rec.wmin[2] = wz; if (wz > rec.wmax[2]) rec.wmax[2] = wz;
+            }
+        }
+        g_geomCur.push_back(rec);
+    }
+
     GfxRenderingAPISdl3Gpu* api = g_activeSdl3GpuApi;
 
     // Base UBO shared by all groups (per-group alphaRef/depthOffset/etc. patched below).

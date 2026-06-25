@@ -1,14 +1,9 @@
 #include "SohRmlUi.h"
 
-#include "RmlUi_Renderer_GL3.h"
 #include "RmlUi_Platform_SDL.h"
-#include "RmlRenderInterfaceVk.h"
 #ifdef ENABLE_SDL3GPU
 #include "RmlRenderInterfaceSdl3Gpu.h"
 #endif
-// Pull in the bundled glad GL loader (declarations only; the implementation lives in
-// RmlUi_Renderer_GL3.cpp's translation unit). Gives us glGet*/glBind* for the state guard.
-#include "RmlUi_Include_GL3.h"
 
 #include <RmlUi/Core.h>
 #include <RmlUi/Core/Input.h>
@@ -227,39 +222,18 @@ bool SohRmlUi::Init(void* sdlWindow, void* glContext, int width, int height, boo
     mWidth = width > 0 ? width : 1;
     mHeight = height > 0 ? height : 1;
 
-    Rml::String gl_message = "Vulkan";
+    // SDL3 GPU is the only renderer (P4); the menu always records through the SDL3 GPU interface,
+    // appending its geometry as ops into the backend's unified op-list. (mVulkan/GL3 paths removed.)
     Rml::RenderInterface* renderInterface = nullptr;
-    if (mSg) {
 #ifdef ENABLE_SDL3GPU
-        mSgRenderInterface = std::make_unique<RmlRenderInterfaceSdl3Gpu>();
-        mSgRenderInterface->SetViewport(mWidth, mHeight);
-        renderInterface = mSgRenderInterface.get();
+    mSgRenderInterface = std::make_unique<RmlRenderInterfaceSdl3Gpu>();
+    mSgRenderInterface->SetViewport(mWidth, mHeight);
+    renderInterface = mSgRenderInterface.get();
 #else
-        SPDLOG_ERROR("[SohRmlUi] SDL3 GPU requested but ENABLE_SDL3GPU is off");
-        return false;
+    SPDLOG_ERROR("[SohRmlUi] ENABLE_SDL3GPU is off; the RmlUi menu has no render interface");
+    return false;
 #endif
-    } else if (mVulkan) {
-#ifdef ENABLE_VULKAN
-        mVkRenderInterface = std::make_unique<RmlRenderInterfaceVk>();
-        renderInterface = mVkRenderInterface.get();
-#else
-        SPDLOG_ERROR("[SohRmlUi] Vulkan requested but ENABLE_VULKAN is off");
-        return false;
-#endif
-    } else {
-        // Load the bundled glad GL functions against the already-current Fast3D GL context.
-        if (!RmlGL3::Initialize(&gl_message)) {
-            SPDLOG_ERROR("[SohRmlUi] RmlGL3::Initialize failed: {}", gl_message);
-            return false;
-        }
-        mRenderInterface = std::make_unique<RenderInterface_GL3>();
-        if (!*mRenderInterface) {
-            SPDLOG_ERROR("[SohRmlUi] Failed to construct the GL3 render interface");
-            mRenderInterface.reset();
-            return false;
-        }
-        renderInterface = mRenderInterface.get();
-    }
+    mSg = true;
 
     mSystemInterface = std::make_unique<SystemInterface_SDL>();
     mSystemInterface->SetWindow(static_cast<SDL_Window*>(sdlWindow));
@@ -280,7 +254,6 @@ bool SohRmlUi::Init(void* sdlWindow, void* glContext, int width, int height, boo
     if (!sRmlLibraryInitialised) {
         if (!Rml::Initialise()) {
             SPDLOG_ERROR("[SohRmlUi] Rml::Initialise failed");
-            mRenderInterface.reset();
             mSystemInterface.reset();
             return false;
         }
@@ -294,9 +267,6 @@ bool SohRmlUi::Init(void* sdlWindow, void* glContext, int width, int height, boo
         SPDLOG_ERROR("[SohRmlUi] Failed to load font face: {}", fontPath);
     }
 
-    if (!mVulkan && !mSg) {
-        mRenderInterface->SetViewport(mWidth, mHeight);
-    }
     mContext = Rml::CreateContext("soh3d", Rml::Vector2i(mWidth, mHeight));
     if (!mContext) {
         SPDLOG_ERROR("[SohRmlUi] Rml::CreateContext failed");
@@ -320,7 +290,7 @@ bool SohRmlUi::Init(void* sdlWindow, void* glContext, int width, int height, boo
     // HealthMeter_Draw).  RmlUi is for the ESC menu only.  The soh3d_hud.rml file is kept on
     // disk as a reference but is never loaded here.
 
-    SPDLOG_INFO("[SohRmlUi] RmlUi initialised ({}x{}) — {} ({})", mWidth, mHeight, docPath, gl_message);
+    SPDLOG_INFO("[SohRmlUi] RmlUi initialised ({}x{}) — {} (SDL3 GPU)", mWidth, mHeight, docPath);
     mInitialised = true;
     // Debug: open the menu at startup (deterministic verification via the screenshot harness, no
     // input injection needed). Normal use opens it with ESC / the Start button.
@@ -735,62 +705,17 @@ void SohRmlUi::UpdateAndRender() {
     RefreshDiag();
     mContext->Update();
 
-    // Render the ESC menu context.
+    // Render the ESC menu context — append the geometry as ops into the SDL3 GPU backend's unified
+    // op-list (fb 0). SDL3 GPU is the only renderer (P4); the GL3 and Vulkan render paths were removed.
 #ifdef ENABLE_SDL3GPU
-    if (mSg) {
-        // Append the menu geometry as ops into the SDL3 GPU backend's unified op-list (fb 0).
-        if (mSgRenderInterface) {
-            mSgRenderInterface->SetViewport(mWidth, mHeight);
-            if (mSgRenderInterface->BeginFrame()) {
-                mContext->Render();
-                mSgRenderInterface->EndFrame();
-            }
-        }
-        return;
-    }
-#endif
-#ifdef ENABLE_VULKAN
-    if (mVulkan) {
-        // Record the menu into the Fast3D Vulkan backend's current pass (no GL state to guard).
-        if (mVkRenderInterface && mVkRenderInterface->BeginFrame()) {
+    if (mSgRenderInterface) {
+        mSgRenderInterface->SetViewport(mWidth, mHeight);
+        if (mSgRenderInterface->BeginFrame()) {
             mContext->Render();
-            mVkRenderInterface->EndFrame();
+            mSgRenderInterface->EndFrame();
         }
-        return;
     }
 #endif
-
-    // --- GL state guard (see soh3d_gl.cpp for the same discipline) ---------------------------
-    // RmlUi's BeginFrame/EndFrame already save+restore the render state it touches (blend,
-    // scissor, stencil, depth, cull, viewport, colour mask, active texture). It does NOT restore
-    // the bound VAO / program / array buffer / framebuffer / texture, which Fast3D caches across
-    // draws — so snapshot and hand those back, then deterministically reset the blend func to
-    // gfx_opengl's permanent init assumption so its implicit cache stays consistent with GL.
-    GLint prevFbo = 0, prevVao = 0, prevProg = 0, prevArrBuf = 0, prevActiveTex = 0, prevTex0 = 0;
-    glGetIntegerv(GL_DRAW_FRAMEBUFFER_BINDING, &prevFbo);
-    glGetIntegerv(GL_VERTEX_ARRAY_BINDING, &prevVao);
-    glGetIntegerv(GL_CURRENT_PROGRAM, &prevProg);
-    glGetIntegerv(GL_ARRAY_BUFFER_BINDING, &prevArrBuf);
-    glGetIntegerv(GL_ACTIVE_TEXTURE, &prevActiveTex);
-    glActiveTexture(GL_TEXTURE0);
-    glGetIntegerv(GL_TEXTURE_BINDING_2D, &prevTex0);
-
-    mRenderInterface->SetViewport(mWidth, mHeight);
-    mRenderInterface->BeginFrame();
-    mContext->Render();
-    mRenderInterface->EndFrame();
-
-    glBindFramebuffer(GL_FRAMEBUFFER, (GLuint)prevFbo);
-    glBindVertexArray((GLuint)prevVao);
-    glUseProgram((GLuint)prevProg);
-    glBindBuffer(GL_ARRAY_BUFFER, (GLuint)prevArrBuf);
-    glActiveTexture(GL_TEXTURE0);
-    glBindTexture(GL_TEXTURE_2D, (GLuint)prevTex0);
-    glActiveTexture((GLenum)prevActiveTex);
-    // gfx_opengl sets blend func/equation ONCE at init and relies on it persisting; RmlUi changed
-    // it during its pass, so restore that permanent assumption deterministically.
-    glBlendFunc(GL_SRC_ALPHA, GL_ONE_MINUS_SRC_ALPHA);
-    glBlendEquation(GL_FUNC_ADD);
 }
 
 void SohRmlUi::Shutdown() {
@@ -804,8 +729,6 @@ void SohRmlUi::Shutdown() {
         Rml::Shutdown(); // releases textures/geometry through the render interface; keep it alive here
         sRmlLibraryInitialised = false;
     }
-    mRenderInterface.reset();
-    mVkRenderInterface.reset();
 #ifdef ENABLE_SDL3GPU
     if (mSgRenderInterface) {
         mSgRenderInterface->Shutdown();

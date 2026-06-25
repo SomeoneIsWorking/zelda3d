@@ -413,4 +413,75 @@ void SgHud_End() {
 
 } // namespace Fast
 
+// ---- Public C-ABI (SoH3D_Hud_*) ----------------------------------------------------------------
+// Previously lived in soh3d_hud_vk.cpp and dispatched between the Vulkan HUD and this SDL3 GPU one.
+// The Vulkan backend was removed (P4): SDL3 GPU is the only renderer, so these now delegate straight
+// to the Fast::SgHud_* op-emitting collector. Called from soh/src/soh3d/soh3d.c (SoH3D_HudFrame) and
+// libultraship Gui.cpp.
+extern "C" {
+
+int SoH3D_Hud_Available(void) {
+    return Fast::SgHud_Available();
+}
+
+int SoH3D_Hud_Begin(int* outW, int* outH) {
+    return Fast::SgHud_Begin(outW, outH);
+}
+
+int SoH3D_Hud_Tex(const void* key, const void* rgba, int w, int h) {
+    return Fast::SgHud_Tex(key, rgba, w, h);
+}
+
+void SoH3D_Hud_Draw(int tex, float x, float y, float w, float h, float u0, float v0, float u1, float v1,
+                    unsigned int tintRGBA) {
+    Fast::SgHud_Draw(tex, x, y, w, h, u0, v0, u1, v1, tintRGBA);
+}
+
+void SoH3D_Hud_End(void) {
+    Fast::SgHud_End();
+}
+
+void SoH3D_Hud_Shutdown(void) {
+    // SDL3 GPU HUD resources are owned by the backend device and torn down with it; nothing to do.
+}
+
+} // extern "C"
+
+#else // !ENABLE_SDL3GPU — stubs so the soh-side HUD links if the backend is somehow disabled.
+
+extern "C" {
+int SoH3D_Hud_Available(void) {
+    return 0;
+}
+int SoH3D_Hud_Begin(int* outW, int* outH) {
+    (void)outW;
+    (void)outH;
+    return 0;
+}
+int SoH3D_Hud_Tex(const void* key, const void* rgba, int w, int h) {
+    (void)key;
+    (void)rgba;
+    (void)w;
+    (void)h;
+    return 0;
+}
+void SoH3D_Hud_Draw(int tex, float x, float y, float w, float h, float u0, float v0, float u1, float v1,
+                    unsigned int tintRGBA) {
+    (void)tex;
+    (void)x;
+    (void)y;
+    (void)w;
+    (void)h;
+    (void)u0;
+    (void)v0;
+    (void)u1;
+    (void)v1;
+    (void)tintRGBA;
+}
+void SoH3D_Hud_End(void) {
+}
+void SoH3D_Hud_Shutdown(void) {
+}
+}
+
 #endif // ENABLE_SDL3GPU
