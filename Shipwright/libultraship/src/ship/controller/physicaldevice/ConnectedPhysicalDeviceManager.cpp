@@ -8,9 +8,9 @@ ConnectedPhysicalDeviceManager::ConnectedPhysicalDeviceManager() {
 ConnectedPhysicalDeviceManager::~ConnectedPhysicalDeviceManager() {
 }
 
-std::unordered_map<int32_t, SDL_GameController*>
+std::unordered_map<int32_t, SDL_Gamepad*>
 ConnectedPhysicalDeviceManager::GetConnectedSDLGamepadsForPort(uint8_t portIndex) {
-    std::unordered_map<int32_t, SDL_GameController*> result;
+    std::unordered_map<int32_t, SDL_Gamepad*> result;
 
     for (const auto& [instanceId, gamepad] : mConnectedSDLGamepads) {
         if (!PortIsIgnoringInstanceId(portIndex, instanceId)) {
@@ -52,23 +52,32 @@ void ConnectedPhysicalDeviceManager::HandlePhysicalDeviceDisconnect(int32_t sdlJ
 void ConnectedPhysicalDeviceManager::RefreshConnectedSDLGamepads() {
     mConnectedSDLGamepads.clear();
     mConnectedSDLGamepadNames.clear();
-    static SDL_JoystickGUID sZeroGuid;
+    static SDL_GUID sZeroGuid;
 
-    for (int32_t i = 0; i < SDL_NumJoysticks(); i++) {
+    // SDL3-MIGRATION: SDL_NumJoysticks()/index-based enumeration is gone. SDL_GetJoysticks() returns a
+    // heap array of SDL_JoystickID instance ids (must SDL_free); we open/query by instance id, not index.
+    int numJoysticks = 0;
+    SDL_JoystickID* joystickIds = SDL_GetJoysticks(&numJoysticks);
+    if (joystickIds == nullptr) {
+        return;
+    }
 
-        SDL_JoystickGUID deviceGUID = SDL_JoystickGetDeviceGUID(i);
+    for (int i = 0; i < numJoysticks; i++) {
+        SDL_JoystickID instanceId = joystickIds[i];
+
+        SDL_GUID deviceGUID = SDL_GetJoystickGUIDForID(instanceId);
         if (SDL_memcmp(&deviceGUID, &sZeroGuid, sizeof(deviceGUID)) == 0) {
             SPDLOG_WARN(
-                "Calling SDL JoystickGetDeviceGUID with index ({:d}) returned zero GUID. This is likely due to an "
-                "invalid index. Refer to https://wiki.libsdl.org/SDL2/SDL_JoystickGetDeviceGUID for more information.",
-                i);
+                "Calling SDL_GetJoystickGUIDForID with instance id ({:d}) returned zero GUID. This is likely due to "
+                "an invalid id. Refer to https://wiki.libsdl.org/SDL3/SDL_GetJoystickGUIDForID for more information.",
+                instanceId);
             continue;
         }
 
         char deviceGuidCStr[33] = "";
-        SDL_JoystickGetGUIDString(deviceGUID, deviceGuidCStr, sizeof(deviceGuidCStr));
+        SDL_GUIDToString(deviceGUID, deviceGuidCStr, sizeof(deviceGuidCStr));
 
-        if (!SDL_IsGameController(i)) {
+        if (!SDL_IsGamepad(instanceId)) {
             SPDLOG_WARN("SDL Joystick (GUID: {}) not recognized as gamepad."
                         "This is likely due to a missing mapping string in gamecontrollerdb.txt."
                         "Refer to https://github.com/mdqinc/SDL_GameControllerDB for more information.",
@@ -76,23 +85,17 @@ void ConnectedPhysicalDeviceManager::RefreshConnectedSDLGamepads() {
             continue;
         }
 
-        auto gamepad = SDL_GameControllerOpen(i);
+        auto gamepad = SDL_OpenGamepad(instanceId);
         if (gamepad == nullptr) {
-            SPDLOG_ERROR("SDL GameControllerOpen error (GUID: {}): {}", deviceGuidCStr, SDL_GetError());
-            continue;
-        }
-
-        auto instanceId = SDL_JoystickInstanceID(SDL_GameControllerGetJoystick(gamepad));
-        if (instanceId < 0) {
-            SPDLOG_ERROR("SDL JoystickInstanceID error (GUID: {}): {}", deviceGuidCStr, SDL_GetError());
+            SPDLOG_ERROR("SDL_OpenGamepad error (GUID: {}): {}", deviceGuidCStr, SDL_GetError());
             continue;
         }
 
         std::string gamepadName;
-        auto name = SDL_GameControllerName(gamepad);
+        auto name = SDL_GetGamepadName(gamepad);
         if (name == nullptr) {
             gamepadName = deviceGuidCStr;
-            SPDLOG_WARN("SDL_GameControllerName returned null. Setting name to GUID \"{}\" instead.", gamepadName);
+            SPDLOG_WARN("SDL_GetGamepadName returned null. Setting name to GUID \"{}\" instead.", gamepadName);
         } else {
             gamepadName = name;
         }
@@ -104,5 +107,7 @@ void ConnectedPhysicalDeviceManager::RefreshConnectedSDLGamepads() {
             mIgnoredInstanceIds[port].insert(instanceId);
         }
     }
+
+    SDL_free(joystickIds);
 }
 } // namespace Ship

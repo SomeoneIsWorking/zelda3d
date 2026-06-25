@@ -300,16 +300,13 @@ FetchContent_Declare(
 )
 FetchContent_MakeAvailable(dr_libs)
 
-find_package(SDL2)
-set(SDL2-INCLUDE ${SDL2_INCLUDE_DIRS})
+# SDL3-MIGRATION: project migrated SDL2 -> SDL3 (system SDL3 3.4.10).
+find_package(SDL3 REQUIRED)
+set(SDL2-INCLUDE ${SDL3_INCLUDE_DIRS})
 
-find_package(SDL2_net)
-
-if(NOT SDL2_net_FOUND)
-    message(STATUS "SDL2_net not found (it's possible the version installed is too old).")
-else()
-    set(SDL2-NET-INCLUDE ${SDL_NET_INCLUDE_DIRS})
-endif()
+# SDL3-MIGRATION: SDL3_net is not available on this system and the codebase has
+# no SDL_net (SDLNet_*) call sites, so the net dependency is dropped entirely.
+set(SDL2-NET-INCLUDE "")
 
 if (ESPEAK)
     add_compile_definitions(ESPEAK=1)
@@ -695,7 +692,7 @@ elseif(CMAKE_SYSTEM_NAME STREQUAL "CafeOS")
         ${DEVKITPRO}/portlibs/wiiu/include/
     )
 else()
-    find_package(SDL2)
+    find_package(SDL3 REQUIRED) # SDL3-MIGRATION
     set(THREADS_PREFER_PTHREAD_FLAG ON)
     find_package(Threads REQUIRED)
     find_package(Ogg REQUIRED)
@@ -706,14 +703,14 @@ else()
     "libultraship;"
         "ZAPDLib;"
         "stb;"
-        SDL2::SDL2
+        SDL3::SDL3
         "Ogg::ogg"
         "Vorbis::vorbis"
         "Vorbis::vorbisenc"
         "Vorbis::vorbisfile"
         "Opus::opus"
         "Opusfile::Opusfile"
-        "SDL2_net::SDL2_net"
+        # SDL3-MIGRATION: SDL2_net dropped (no SDL3_net, no SDLNet_* usage in source).
         ${CMAKE_DL_LIBS}
         Threads::Threads
     )

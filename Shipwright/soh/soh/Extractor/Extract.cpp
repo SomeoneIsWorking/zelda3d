@@ -41,7 +41,7 @@
 
 #include <stdlib.h>
 
-#include <SDL2/SDL_messagebox.h>
+#include <SDL3/SDL_messagebox.h> // SDL3-MIGRATION
 
 #include <array>
 #include <fstream>
@@ -141,13 +141,13 @@ int Extractor::ShowRomPickBox(uint32_t verCrc) const {
     SDL_MessageBoxButtonData buttons[3] = { { 0 } };
     int ret;
 
-    buttons[0].buttonid = 0;
+    buttons[0].buttonID = 0;
     buttons[0].text = "Yes";
     buttons[0].flags = SDL_MESSAGEBOX_BUTTON_RETURNKEY_DEFAULT;
-    buttons[1].buttonid = 1;
+    buttons[1].buttonID = 1;
     buttons[1].text = "No";
     buttons[1].flags = SDL_MESSAGEBOX_BUTTON_ESCAPEKEY_DEFAULT;
-    buttons[2].buttonid = 2;
+    buttons[2].buttonID = 2;
     buttons[2].text = "Find ROM";
     boxData.numbuttons = 3;
     boxData.flags = SDL_MESSAGEBOX_INFORMATION;
@@ -172,10 +172,10 @@ int Extractor::ShowYesNoBox(const char* title, const char* box) {
     SDL_MessageBoxData boxData = { 0 };
     SDL_MessageBoxButtonData buttons[2] = { { 0 } };
 
-    buttons[0].buttonid = IDYES;
+    buttons[0].buttonID = IDYES;
     buttons[0].text = "Yes";
     buttons[0].flags = SDL_MESSAGEBOX_BUTTON_RETURNKEY_DEFAULT;
-    buttons[1].buttonid = IDNO;
+    buttons[1].buttonID = IDNO;
     buttons[1].text = "No";
     buttons[1].flags = SDL_MESSAGEBOX_BUTTON_ESCAPEKEY_DEFAULT;
     boxData.numbuttons = 2;

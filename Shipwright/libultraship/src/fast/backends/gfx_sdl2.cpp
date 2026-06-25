@@ -36,13 +36,13 @@
 #include "fast/backends/gfx_metal.h"
 #include "ship/utils/macUtils.h"
 #else
-#include <SDL2/SDL.h>
+#include <SDL3/SDL.h>
 #define GL_GLEXT_PROTOTYPES 1
-#include <SDL2/SDL_opengles2.h>
+#include <SDL3/SDL_opengles2.h>
 #endif
 
 #ifdef ENABLE_VULKAN
-#include <SDL2/SDL_vulkan.h>
+#include <SDL3/SDL_vulkan.h>
 #endif
 
 #include "ship/window/gui/Gui.h"
@@ -228,20 +228,11 @@ void GfxWindowBackendSDL2::SetFullscreenImpl(bool on, bool call_callback) {
         return;
     }
 
-    int display_in_use = SDL_GetWindowDisplayIndex(mWnd);
-    if (display_in_use < 0) {
+    // SDL3-MIGRATION: SDL_GetWindowDisplayIndex -> SDL_GetDisplayForWindow (SDL_DisplayID; 0 = error).
+    SDL_DisplayID display_in_use = SDL_GetDisplayForWindow(mWnd);
+    if (display_in_use == 0) {
         SPDLOG_WARN("Can't detect on which monitor we are. Probably out of display area?");
         SPDLOG_WARN(SDL_GetError());
-    }
-
-    if (on) {
-        // OTRTODO: Get mode from config.
-        SDL_DisplayMode mode;
-        if (SDL_GetDesktopDisplayMode(display_in_use, &mode) >= 0) {
-            SDL_SetWindowDisplayMode(mWnd, &mode);
-        } else {
-            SPDLOG_ERROR(SDL_GetError());
-        }
     }
 
 #if defined(__APPLE__)
@@ -251,11 +242,21 @@ void GfxWindowBackendSDL2::SetFullscreenImpl(bool on, bool call_callback) {
     }
     mFullScreen = on;
 #else
-    if (SDL_SetWindowFullscreen(mWnd, on ? (Ship::Context::GetRawInstance()->GetConsoleVariables()->GetInteger(
-                                                CVAR_SDL_WINDOWED_FULLSCREEN, 0)
-                                                ? SDL_WINDOW_FULLSCREEN_DESKTOP
-                                                : SDL_WINDOW_FULLSCREEN)
-                                         : 0) >= 0) {
+    // SDL3-MIGRATION: fullscreen style is now expressed via the window's fullscreen mode.
+    // NULL mode = borderless desktop ("windowed fullscreen"); a concrete mode = exclusive.
+    if (on) {
+        if (Ship::Context::GetRawInstance()->GetConsoleVariables()->GetInteger(CVAR_SDL_WINDOWED_FULLSCREEN, 0)) {
+            SDL_SetWindowFullscreenMode(mWnd, NULL);
+        } else {
+            const SDL_DisplayMode* mode = SDL_GetDesktopDisplayMode(display_in_use);
+            if (mode != NULL) {
+                SDL_SetWindowFullscreenMode(mWnd, mode);
+            } else {
+                SPDLOG_ERROR(SDL_GetError());
+            }
+        }
+    }
+    if (SDL_SetWindowFullscreen(mWnd, on)) {
         mFullScreen = on;
     } else {
         SPDLOG_ERROR("Failed to switch from or to fullscreen mode.");
@@ -269,7 +270,7 @@ void GfxWindowBackendSDL2::SetFullscreenImpl(bool on, bool call_callback) {
         mWindowHeight = conf->GetInt("Window.Height", 480);
         int32_t posX = conf->GetInt("Window.PositionX", 100);
         int32_t posY = conf->GetInt("Window.PositionY", 100);
-        if (display_in_use < 0) { // Fallback to default if out of bounds
+        if (display_in_use == 0) { // Fallback to default if out of bounds
             posX = 100;
             posY = 100;
         }
@@ -283,11 +284,11 @@ void GfxWindowBackendSDL2::SetFullscreenImpl(bool on, bool call_callback) {
 }
 
 void GfxWindowBackendSDL2::GetActiveWindowRefreshRate(uint32_t* refresh_rate) {
-    int display_in_use = SDL_GetWindowDisplayIndex(mWnd);
-
-    SDL_DisplayMode mode;
-    SDL_GetCurrentDisplayMode(display_in_use, &mode);
-    *refresh_rate = mode.refresh_rate != 0 ? mode.refresh_rate : 60;
+    // SDL3-MIGRATION: display index -> SDL_DisplayID; SDL_GetCurrentDisplayMode returns a pointer;
+    // SDL_DisplayMode::refresh_rate is now a float.
+    SDL_DisplayID display_in_use = SDL_GetDisplayForWindow(mWnd);
+    const SDL_DisplayMode* mode = SDL_GetCurrentDisplayMode(display_in_use);
+    *refresh_rate = (mode != NULL && mode->refresh_rate != 0.0f) ? (uint32_t)mode->refresh_rate : 60;
 }
 
 static uint64_t previous_time;
@@ -331,14 +332,17 @@ void GfxWindowBackendSDL2::Init(const char* gameName, const char* gfxApiName, bo
     mWindowWidth = width;
     mWindowHeight = height;
 
-#if SDL_VERSION_ATLEAST(2, 24, 0)
+#if defined(_WIN32) && SDL_VERSION_ATLEAST(2, 24, 0)
     /* fix DPI scaling issues on Windows */
+    // SDL3-MIGRATION: SDL_HINT_WINDOWS_DPI_AWARENESS is Windows-only and gone from SDL3 headers
+    // on other platforms; guard it under _WIN32.
     SDL_SetHint(SDL_HINT_WINDOWS_DPI_AWARENESS, "permonitorv2");
 #endif
 
     SDL_Init(SDL_INIT_VIDEO);
 
-    SDL_EventState(SDL_DROPFILE, SDL_ENABLE);
+    // SDL3-MIGRATION: SDL_EventState(type, SDL_ENABLE) -> SDL_SetEventEnabled(type, true).
+    SDL_SetEventEnabled(SDL_EVENT_DROP_FILE, true);
 
 #ifdef ENABLE_VULKAN
     mUseVulkan = strcmp(gfxApiName, "Vulkan") == 0;
@@ -386,10 +390,12 @@ void GfxWindowBackendSDL2::Init(const char* gameName, const char* gfxApiName, bo
     char title[512];
     int len = snprintf(title, sizeof(title), "%s (%s)", gameName, gfxApiName);
 
+    // SDL3-MIGRATION: SDL_WINDOW_SHOWN no longer exists (windows are shown by default);
+    // SDL_WINDOW_ALLOW_HIGHDPI -> SDL_WINDOW_HIGH_PIXEL_DENSITY. Window flags are now Uint64.
 #ifdef __IOS__
-    Uint32 flags = SDL_WINDOW_BORDERLESS | SDL_WINDOW_SHOWN;
+    SDL_WindowFlags flags = SDL_WINDOW_BORDERLESS;
 #else
-    Uint32 flags = SDL_WINDOW_SHOWN | SDL_WINDOW_RESIZABLE | SDL_WINDOW_ALLOW_HIGHDPI;
+    SDL_WindowFlags flags = SDL_WINDOW_RESIZABLE | SDL_WINDOW_HIGH_PIXEL_DENSITY;
 #endif
 
     // Headless mode (env SOH_HEADLESS=1): create the window HIDDEN so nothing appears on
@@ -399,7 +405,8 @@ void GfxWindowBackendSDL2::Init(const char* gameName, const char* gfxApiName, bo
     const char* headlessEnv = getenv("SOH_HEADLESS");
     bool headless = headlessEnv != nullptr && headlessEnv[0] == '1';
     if (headless) {
-        flags = (flags & ~(Uint32)SDL_WINDOW_SHOWN) | SDL_WINDOW_HIDDEN;
+        // SDL3-MIGRATION: windows are shown by default; hide via SDL_WINDOW_HIDDEN.
+        flags = flags | SDL_WINDOW_HIDDEN;
     }
 
 #ifdef ENABLE_VULKAN
@@ -413,7 +420,11 @@ void GfxWindowBackendSDL2::Init(const char* gameName, const char* gfxApiName, bo
         flags = flags | SDL_WINDOW_METAL;
     }
 
-    mWnd = SDL_CreateWindow(title, posX, posY, mWindowWidth, mWindowHeight, flags);
+    // SDL3-MIGRATION: SDL_CreateWindow no longer takes x/y; set position separately afterward.
+    mWnd = SDL_CreateWindow(title, mWindowWidth, mWindowHeight, flags);
+    if (mWnd != nullptr) {
+        SDL_SetWindowPosition(mWnd, posX, posY);
+    }
 #ifdef _WIN32
     // Get Windows window handle and use it to subclass the window procedure.
     // Needed to circumvent SDLs DPI scaling problems under windows (original does only scale *sometimes*).
@@ -426,8 +437,9 @@ void GfxWindowBackendSDL2::Init(const char* gameName, const char* gfxApiName, bo
 #endif
     Fast::GuiWindowInitData window_impl;
 
-    int display_in_use = SDL_GetWindowDisplayIndex(mWnd);
-    if (display_in_use < 0) { // Fallback to default if out of bounds
+    // SDL3-MIGRATION: SDL_GetWindowDisplayIndex -> SDL_GetDisplayForWindow (0 = error).
+    SDL_DisplayID display_in_use = SDL_GetDisplayForWindow(mWnd);
+    if (display_in_use == 0) { // Fallback to default if out of bounds
         posX = 100;
         posY = 100;
     }
@@ -436,7 +448,8 @@ void GfxWindowBackendSDL2::Init(const char* gameName, const char* gfxApiName, bo
     if (mUseVulkan) {
         // The window is SDL_WINDOW_VULKAN; the Vulkan rendering API creates the
         // instance/surface/swapchain from mWnd in its Init(). No GL context here.
-        SDL_Vulkan_GetDrawableSize(mWnd, &mWindowWidth, &mWindowHeight);
+        // SDL3-MIGRATION: SDL_Vulkan_GetDrawableSize -> SDL_GetWindowSizeInPixels.
+        SDL_GetWindowSizeInPixels(mWnd, &mWindowWidth, &mWindowHeight);
         if (startFullScreen) {
             SetFullscreenImpl(true, false);
         }
@@ -445,7 +458,8 @@ void GfxWindowBackendSDL2::Init(const char* gameName, const char* gfxApiName, bo
     } else
 #endif
         if (use_opengl) {
-        SDL_GL_GetDrawableSize(mWnd, &mWindowWidth, &mWindowHeight);
+        // SDL3-MIGRATION: SDL_GL_GetDrawableSize -> SDL_GetWindowSizeInPixels.
+        SDL_GetWindowSizeInPixels(mWnd, &mWindowWidth, &mWindowHeight);
 
         if (startFullScreen) {
             SetFullscreenImpl(true, false);
@@ -459,21 +473,21 @@ void GfxWindowBackendSDL2::Init(const char* gameName, const char* gfxApiName, bo
         window_impl.Opengl = { mWnd, mCtx };
         window_impl.Backend = WindowBackend::FAST3D_SDL_OPENGL;
     } else {
-        uint32_t flags = SDL_RENDERER_ACCELERATED;
-        if (mVsyncEnabled) {
-            flags |= SDL_RENDERER_PRESENTVSYNC;
-        }
-        mRenderer = SDL_CreateRenderer(mWnd, -1, flags);
+        // SDL3-MIGRATION: SDL_CreateRenderer(win, -1, flags) -> SDL_CreateRenderer(win, name);
+        // vsync is configured separately with SDL_SetRenderVSync.
+        mRenderer = SDL_CreateRenderer(mWnd, NULL);
         if (mRenderer == nullptr) {
             SPDLOG_ERROR("Error creating renderer: {}", SDL_GetError());
             return;
         }
+        SDL_SetRenderVSync(mRenderer, mVsyncEnabled ? 1 : 0);
 
         if (startFullScreen) {
             SetFullscreenImpl(true, false);
         }
 
-        SDL_GetRendererOutputSize(mRenderer, &mWindowWidth, &mWindowHeight);
+        // SDL3-MIGRATION: SDL_GetRendererOutputSize -> SDL_GetCurrentRenderOutputSize.
+        SDL_GetCurrentRenderOutputSize(mRenderer, &mWindowWidth, &mWindowHeight);
         window_impl.Metal = { mWnd, mRenderer };
         window_impl.Backend = WindowBackend::FAST3D_SDL_METAL;
     }
@@ -504,23 +518,32 @@ void GfxWindowBackendSDL2::SetFullscreen(bool enable) {
 }
 
 void GfxWindowBackendSDL2::SetCursorVisibility(bool visible) {
+    // SDL3-MIGRATION: SDL_ShowCursor(SDL_ENABLE/SDL_DISABLE) -> SDL_ShowCursor()/SDL_HideCursor().
     if (visible) {
-        SDL_ShowCursor(SDL_ENABLE);
+        SDL_ShowCursor();
     } else {
-        SDL_ShowCursor(SDL_DISABLE);
+        SDL_HideCursor();
     }
 }
 
 void GfxWindowBackendSDL2::SetMousePos(int32_t x, int32_t y) {
-    SDL_WarpMouseInWindow(mWnd, x, y);
+    SDL_WarpMouseInWindow(mWnd, (float)x, (float)y);
 }
 
 void GfxWindowBackendSDL2::GetMousePos(int32_t* x, int32_t* y) {
-    SDL_GetMouseState(x, y);
+    // SDL3-MIGRATION: SDL_GetMouseState now returns float positions.
+    float fx = 0.0f, fy = 0.0f;
+    SDL_GetMouseState(&fx, &fy);
+    *x = (int32_t)fx;
+    *y = (int32_t)fy;
 }
 
 void GfxWindowBackendSDL2::GetMouseDelta(int32_t* x, int32_t* y) {
-    SDL_GetRelativeMouseState(x, y);
+    // SDL3-MIGRATION: SDL_GetRelativeMouseState now returns float deltas.
+    float fx = 0.0f, fy = 0.0f;
+    SDL_GetRelativeMouseState(&fx, &fy);
+    *x = (int32_t)fx;
+    *y = (int32_t)fy;
 }
 
 void GfxWindowBackendSDL2::GetMouseWheel(float* x, float* y) {
@@ -535,10 +558,10 @@ bool GfxWindowBackendSDL2::GetMouseState(uint32_t btn) {
 }
 
 void GfxWindowBackendSDL2::SetMouseCapture(bool capture) {
-    SDL_SetRelativeMouseMode(static_cast<SDL_bool>(capture));
+    // SDL3-MIGRATION: relative mouse mode is now per-window.
+    SDL_SetWindowRelativeMouseMode(mWnd, capture);
     // TODO: Manually setting a clipping rect here because
     // https://wiki.libsdl.org/SDL2/SDL_HINT_MOUSE_RELATIVE_MODE_CENTER isn't working as epxected.
-    // Revisit on SDL3
     auto mouse = SDL_GetWindowMouseRect(mWnd);
     if (capture) {
         int w, h;
@@ -549,7 +572,8 @@ void GfxWindowBackendSDL2::SetMouseCapture(bool capture) {
 }
 
 bool GfxWindowBackendSDL2::IsMouseCaptured() {
-    return (SDL_GetRelativeMouseMode() == SDL_TRUE);
+    // SDL3-MIGRATION: relative mouse mode is per-window now.
+    return SDL_GetWindowRelativeMouseMode(mWnd);
 }
 
 void GfxWindowBackendSDL2::SetKeyboardCallbacks(bool (*onKeyDown)(int scancode), bool (*onKeyUp)(int scancode),
@@ -567,14 +591,16 @@ void GfxWindowBackendSDL2::SetMouseCallbacks(bool (*onMouseButtonDown)(int btn),
 void GfxWindowBackendSDL2::GetDimensions(uint32_t* width, uint32_t* height, int32_t* posX, int32_t* posY) {
 #ifdef ENABLE_VULKAN
     if (mUseVulkan) {
-        SDL_Vulkan_GetDrawableSize(mWnd, static_cast<int*>((void*)width), static_cast<int*>((void*)height));
+        // SDL3-MIGRATION: SDL_Vulkan_GetDrawableSize -> SDL_GetWindowSizeInPixels.
+        SDL_GetWindowSizeInPixels(mWnd, static_cast<int*>((void*)width), static_cast<int*>((void*)height));
     } else
 #endif
     {
 #ifdef __APPLE__
         SDL_GetWindowSize(mWnd, static_cast<int*>((void*)width), static_cast<int*>((void*)height));
 #else
-        SDL_GL_GetDrawableSize(mWnd, static_cast<int*>((void*)width), static_cast<int*>((void*)height));
+        // SDL3-MIGRATION: SDL_GL_GetDrawableSize -> SDL_GetWindowSizeInPixels.
+        SDL_GetWindowSizeInPixels(mWnd, static_cast<int*>((void*)width), static_cast<int*>((void*)height));
 #endif
     }
     SDL_GetWindowPosition(mWnd, static_cast<int*>(posX), static_cast<int*>(posY));
@@ -590,14 +616,15 @@ void GfxWindowBackendSDL2::SetDimensions(uint32_t width, uint32_t height, int32_
 }
 
 Ship::WindowRect GfxWindowBackendSDL2::GetPrimaryMonitorRect() {
-    SDL_DisplayMode mode;
-    int display_in_use = mWnd ? SDL_GetWindowDisplayIndex(mWnd) : 0;
-    if (display_in_use < 0) {
+    // SDL3-MIGRATION: display index -> SDL_DisplayID; SDL_GetDesktopDisplayMode returns a pointer.
+    SDL_DisplayID display_in_use = mWnd ? SDL_GetDisplayForWindow(mWnd) : SDL_GetPrimaryDisplay();
+    if (display_in_use == 0) {
         SPDLOG_WARN("Can't detect on which monitor we are. Probably out of display area? ({})", SDL_GetError());
-        display_in_use = 0;
+        display_in_use = SDL_GetPrimaryDisplay();
     }
-    if (SDL_GetDesktopDisplayMode(display_in_use, &mode) >= 0) {
-        return { 0, 0, mode.w, mode.h };
+    const SDL_DisplayMode* mode = SDL_GetDesktopDisplayMode(display_in_use);
+    if (mode != NULL) {
+        return { 0, 0, mode->w, mode->h };
     }
     SPDLOG_ERROR("Failed to get SDL Desktop Display Mode: ({})", SDL_GetError());
     return { 0, 0, 0, 0 };
@@ -663,53 +690,47 @@ void GfxWindowBackendSDL2::HandleSingleEvent(SDL_Event& event) {
             sWarnedOnce = true;
         }
     }
+    // SDL3-MIGRATION: event-type enum renames (SDL_KEYDOWN -> SDL_EVENT_KEY_DOWN etc.); the
+    // SDL_WINDOWEVENT umbrella is gone (each window event is its own top-level type); keysym
+    // fields flattened (event.key.keysym.scancode -> event.key.scancode); drop file is event.drop.data.
     switch (event.type) {
 #ifndef TARGET_WEB
         // Scancodes are broken in Emscripten SDL2: https://bugzilla.libsdl.org/show_bug.cgi?id=3259
-        case SDL_KEYDOWN:
-            OnKeydown(event.key.keysym.scancode);
+        case SDL_EVENT_KEY_DOWN:
+            OnKeydown(event.key.scancode);
             break;
-        case SDL_KEYUP:
-            OnKeyup(event.key.keysym.scancode);
+        case SDL_EVENT_KEY_UP:
+            OnKeyup(event.key.scancode);
             break;
-        case SDL_MOUSEBUTTONDOWN:
+        case SDL_EVENT_MOUSE_BUTTON_DOWN:
             OnMouseButtonDown(event.button.button - 1);
             break;
-        case SDL_MOUSEBUTTONUP:
+        case SDL_EVENT_MOUSE_BUTTON_UP:
             OnMouseButtonUp(event.button.button - 1);
             break;
-        case SDL_MOUSEWHEEL:
+        case SDL_EVENT_MOUSE_WHEEL:
             mMouseWheelX = event.wheel.x;
             mMouseWheelY = event.wheel.y;
             break;
 #endif
-        case SDL_WINDOWEVENT:
-            switch (event.window.event) {
-                case SDL_WINDOWEVENT_SIZE_CHANGED:
-#ifdef ENABLE_VULKAN
-                    if (mUseVulkan) {
-                        SDL_Vulkan_GetDrawableSize(mWnd, &mWindowWidth, &mWindowHeight);
-                    } else
-#endif
+        case SDL_EVENT_WINDOW_PIXEL_SIZE_CHANGED:
 #ifdef __APPLE__
-                        SDL_GetWindowSize(mWnd, &mWindowWidth, &mWindowHeight);
+            SDL_GetWindowSize(mWnd, &mWindowWidth, &mWindowHeight);
 #else
-                        SDL_GL_GetDrawableSize(mWnd, &mWindowWidth, &mWindowHeight);
+            SDL_GetWindowSizeInPixels(mWnd, &mWindowWidth, &mWindowHeight);
 #endif
-                    break;
-                case SDL_WINDOWEVENT_CLOSE:
-                    if (event.window.windowID == SDL_GetWindowID(mWnd)) {
-                        // We listen specifically for main window close because closing main window
-                        // on macOS does not trigger SDL_Quit.
-                        Close();
-                    }
-                    break;
+            break;
+        case SDL_EVENT_WINDOW_CLOSE_REQUESTED:
+            if (event.window.windowID == SDL_GetWindowID(mWnd)) {
+                // We listen specifically for main window close because closing main window
+                // on macOS does not trigger SDL_Quit.
+                Close();
             }
             break;
-        case SDL_DROPFILE:
-            Ship::Context::GetRawInstance()->GetFileDropMgr()->SetDroppedFile(event.drop.file);
+        case SDL_EVENT_DROP_FILE:
+            Ship::Context::GetRawInstance()->GetFileDropMgr()->SetDroppedFile(event.drop.data);
             break;
-        case SDL_QUIT:
+        case SDL_EVENT_QUIT:
             Close();
             break;
     }
@@ -718,10 +739,13 @@ void GfxWindowBackendSDL2::HandleSingleEvent(SDL_Event& event) {
 void GfxWindowBackendSDL2::HandleEvents() {
     SDL_Event event;
     SDL_PumpEvents();
-    while (SDL_PeepEvents(&event, 1, SDL_GETEVENT, SDL_FIRSTEVENT, SDL_CONTROLLERDEVICEADDED - 1) > 0) {
+    // SDL3-MIGRATION: process every event EXCEPT the gamepad add/remove pair (consumed by
+    // SDLAddRemoveDeviceEventHandler). SDL_EVENT_GAMEPAD_ADDED / _REMOVED are contiguous, so the
+    // two ranges below straddle exactly those two values (same semantics as the SDL2 controller pair).
+    while (SDL_PeepEvents(&event, 1, SDL_GETEVENT, SDL_EVENT_FIRST, SDL_EVENT_GAMEPAD_ADDED - 1) > 0) {
         HandleSingleEvent(event);
     }
-    while (SDL_PeepEvents(&event, 1, SDL_GETEVENT, SDL_CONTROLLERDEVICEREMOVED + 1, SDL_LASTEVENT) > 0) {
+    while (SDL_PeepEvents(&event, 1, SDL_GETEVENT, SDL_EVENT_GAMEPAD_REMOVED + 1, SDL_EVENT_LAST) > 0) {
         HandleSingleEvent(event);
     }
 
@@ -799,7 +823,7 @@ volatile int gSoh3dDumpPending = 0;
 // Write the current GL window framebuffer to a binary PPM (P6), flipped to top-down.
 static void Soh3dWritePpm(SDL_Window* wnd, const char* path) {
     int w = 0, h = 0;
-    SDL_GL_GetDrawableSize(wnd, &w, &h);
+    SDL_GetWindowSizeInPixels(wnd, &w, &h); // SDL3-MIGRATION: SDL_GL_GetDrawableSize -> SDL_GetWindowSizeInPixels
     std::vector<uint8_t> px((size_t)w * h * 4);
     glReadPixels(0, 0, w, h, GL_RGBA, GL_UNSIGNED_BYTE, px.data());
     FILE* f = fopen(path, "wb");
@@ -828,7 +852,11 @@ void GfxWindowBackendSDL2::SwapBuffersBegin() {
     if (mVsyncEnabled != nextVsyncEnabled) {
         mVsyncEnabled = nextVsyncEnabled;
         SDL_GL_SetSwapInterval(mVsyncEnabled ? 1 : 0);
-        SDL_RenderSetVSync(mRenderer, mVsyncEnabled ? 1 : 0);
+        // SDL3-MIGRATION: SDL_RenderSetVSync -> SDL_SetRenderVSync. mRenderer is only valid on the
+        // (non-Linux) Metal/renderer path; guard it so the GL path doesn't touch a null renderer.
+        if (mRenderer != nullptr) {
+            SDL_SetRenderVSync(mRenderer, mVsyncEnabled ? 1 : 0);
+        }
     }
 
     SyncFramerateWithTime();
@@ -914,9 +942,14 @@ bool GfxWindowBackendSDL2::IsRunning() {
 
 void GfxWindowBackendSDL2::Destroy() {
     // TODO: destroy _any_ resources used by SDL
-    SDL_GL_DeleteContext(mCtx);
+    // SDL3-MIGRATION: SDL_GL_DeleteContext -> SDL_GL_DestroyContext.
+    if (mCtx != nullptr) {
+        SDL_GL_DestroyContext(mCtx);
+    }
+    if (mRenderer != nullptr) {
+        SDL_DestroyRenderer(mRenderer);
+    }
     SDL_DestroyWindow(mWnd);
-    SDL_DestroyRenderer(mRenderer);
     SDL_Quit();
 }
 

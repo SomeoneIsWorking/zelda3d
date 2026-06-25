@@ -169,8 +169,8 @@ AxisDirectionMappingFactory::CreateAxisDirectionMappingFromSDLInput(uint8_t port
                                           ->GetControlDeck()
                                           ->GetConnectedPhysicalDeviceManager()
                                           ->GetConnectedSDLGamepadsForPort(portIndex)) {
-        for (int32_t button = SDL_CONTROLLER_BUTTON_A; button < SDL_CONTROLLER_BUTTON_MAX; button++) {
-            if (SDL_GameControllerGetButton(gamepad, static_cast<SDL_GameControllerButton>(button))) {
+        for (int32_t button = SDL_GAMEPAD_BUTTON_SOUTH; button < SDL_GAMEPAD_BUTTON_COUNT; button++) {
+            if (SDL_GetGamepadButton(gamepad, static_cast<SDL_GamepadButton>(button))) {
                 mapping = std::make_shared<SDLButtonToAxisDirectionMapping>(portIndex, stickIndex, direction, button);
                 break;
             }
@@ -180,9 +180,9 @@ AxisDirectionMappingFactory::CreateAxisDirectionMappingFromSDLInput(uint8_t port
             break;
         }
 
-        for (int32_t i = SDL_CONTROLLER_AXIS_LEFTX; i < SDL_CONTROLLER_AXIS_MAX; i++) {
-            const auto axis = static_cast<SDL_GameControllerAxis>(i);
-            const auto axisValue = SDL_GameControllerGetAxis(gamepad, axis) / 32767.0f;
+        for (int32_t i = SDL_GAMEPAD_AXIS_LEFTX; i < SDL_GAMEPAD_AXIS_COUNT; i++) {
+            const auto axis = static_cast<SDL_GamepadAxis>(i);
+            const auto axisValue = SDL_GetGamepadAxis(gamepad, axis) / 32767.0f;
             int32_t axisDirection = 0;
             if (axisValue < -0.7f) {
                 axisDirection = NEGATIVE;

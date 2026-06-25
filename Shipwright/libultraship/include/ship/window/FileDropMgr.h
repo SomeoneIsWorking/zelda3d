@@ -28,7 +28,8 @@ class FileDropMgr {
      * @brief Records a file path as the currently dropped file.
      * @param path Null-terminated path to the dropped file.
      */
-    void SetDroppedFile(char* path);
+    // SDL3-MIGRATION: SDL3's SDL_DropEvent::data is const char* (SDL-owned); this copies via strdup.
+    void SetDroppedFile(const char* path);
 
     /** @brief Clears the currently stored dropped file path and resets the drop state. */
     void ClearDroppedFile();

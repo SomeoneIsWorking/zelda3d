@@ -10,8 +10,9 @@
 #include <RmlUi/Core.h>
 #include <RmlUi/Core/Input.h>
 #include <RmlUi/Core/EventListener.h>
-#include <SDL2/SDL_video.h>
-#include <SDL2/SDL_events.h>
+// SDL3-MIGRATION: SDL2 -> SDL3 includes.
+#include <SDL3/SDL_video.h>
+#include <SDL3/SDL_events.h>
 
 #include "ship/Context.h"
 #include "ship/controller/controldeck/ControlDeck.h"
@@ -596,11 +597,15 @@ bool SohRmlUi::ProcessSdlEvent(void* sdlEvent) {
 
     // Toggle bindings are always live (so the menu can be opened/closed): ESC on the keyboard, or
     // the Start button on a game controller. (F1 is SoH's existing ImGui menu, left alone.)
-    if (ev.type == SDL_KEYDOWN && ev.key.keysym.sym == SDLK_ESCAPE && ev.key.repeat == 0) {
+    // SDL3-MIGRATION: SDL_KEYDOWN -> SDL_EVENT_KEY_DOWN; ev.key.keysym.sym -> ev.key.key;
+    // ev.key.repeat is now bool (== 0 still reads as "not a repeat").
+    if (ev.type == SDL_EVENT_KEY_DOWN && ev.key.key == SDLK_ESCAPE && !ev.key.repeat) {
         ToggleVisible();
         return true;
     }
-    if (ev.type == SDL_CONTROLLERBUTTONDOWN && ev.cbutton.button == SDL_CONTROLLER_BUTTON_START) {
+    // SDL3-MIGRATION: SDL_CONTROLLERBUTTONDOWN -> SDL_EVENT_GAMEPAD_BUTTON_DOWN; ev.cbutton -> ev.gbutton;
+    // SDL_CONTROLLER_BUTTON_START -> SDL_GAMEPAD_BUTTON_START.
+    if (ev.type == SDL_EVENT_GAMEPAD_BUTTON_DOWN && ev.gbutton.button == SDL_GAMEPAD_BUTTON_START) {
         ToggleVisible();
         return true;
     }
@@ -612,9 +617,12 @@ bool SohRmlUi::ProcessSdlEvent(void* sdlEvent) {
     // Menu is open: map directional input to focus nav, A/Enter to activate, B/Esc to close; pass
     // everything else (mouse, text, other keys) through the SDL platform shim. Consume it all so the
     // game does not also act on input while the menu is up.
+    // SDL3-MIGRATION: event type enums renamed (SDL_KEYDOWN -> SDL_EVENT_KEY_DOWN etc.);
+    // ev.key.keysym.sym -> ev.key.key; gamepad: SDL_CONTROLLERBUTTONDOWN -> SDL_EVENT_GAMEPAD_BUTTON_DOWN,
+    // ev.cbutton -> ev.gbutton, SDL_CONTROLLER_BUTTON_* -> SDL_GAMEPAD_BUTTON_* (A->SOUTH, B->EAST).
     switch (ev.type) {
-        case SDL_KEYDOWN:
-            switch (ev.key.keysym.sym) {
+        case SDL_EVENT_KEY_DOWN:
+            switch (ev.key.key) {
                 case SDLK_DOWN:
                     FocusNext();
                     return true;
@@ -644,41 +652,41 @@ bool SohRmlUi::ProcessSdlEvent(void* sdlEvent) {
                     RmlSDL::InputEventHandler(mContext, static_cast<SDL_Window*>(mSdlWindow), ev);
                     return true;
             }
-        case SDL_CONTROLLERBUTTONDOWN:
-            switch (ev.cbutton.button) {
-                case SDL_CONTROLLER_BUTTON_DPAD_DOWN:
+        case SDL_EVENT_GAMEPAD_BUTTON_DOWN:
+            switch (ev.gbutton.button) {
+                case SDL_GAMEPAD_BUTTON_DPAD_DOWN:
                     FocusNext();
                     return true;
-                case SDL_CONTROLLER_BUTTON_DPAD_UP:
+                case SDL_GAMEPAD_BUTTON_DPAD_UP:
                     FocusPrev();
                     return true;
-                case SDL_CONTROLLER_BUTTON_DPAD_RIGHT:
+                case SDL_GAMEPAD_BUTTON_DPAD_RIGHT:
                     if (StepFocusedKnob(+1)) {
                         return true;
                     }
                     NextTab();
                     return true;
-                case SDL_CONTROLLER_BUTTON_DPAD_LEFT:
+                case SDL_GAMEPAD_BUTTON_DPAD_LEFT:
                     if (StepFocusedKnob(-1)) {
                         return true;
                     }
                     PrevTab();
                     return true;
-                case SDL_CONTROLLER_BUTTON_A:
+                case SDL_GAMEPAD_BUTTON_SOUTH: // A
                     ActivateFocused();
                     return true;
-                case SDL_CONTROLLER_BUTTON_B:
+                case SDL_GAMEPAD_BUTTON_EAST: // B
                     SetVisible(false);
                     return true;
                 default:
                     return true;
             }
-        case SDL_MOUSEMOTION:
-        case SDL_MOUSEBUTTONDOWN:
-        case SDL_MOUSEBUTTONUP:
-        case SDL_MOUSEWHEEL:
-        case SDL_TEXTINPUT:
-        case SDL_KEYUP:
+        case SDL_EVENT_MOUSE_MOTION:
+        case SDL_EVENT_MOUSE_BUTTON_DOWN:
+        case SDL_EVENT_MOUSE_BUTTON_UP:
+        case SDL_EVENT_MOUSE_WHEEL:
+        case SDL_EVENT_TEXT_INPUT:
+        case SDL_EVENT_KEY_UP:
             RmlSDL::InputEventHandler(mContext, static_cast<SDL_Window*>(mSdlWindow), ev);
             return true;
         default:
@@ -706,7 +714,8 @@ void SohRmlUi::UpdateAndRender() {
     // Track the live drawable size so the context + render target follow window resizes.
     if (mSdlWindow) {
         int dw = 0, dh = 0;
-        SDL_GL_GetDrawableSize(static_cast<SDL_Window*>(mSdlWindow), &dw, &dh);
+        // SDL3-MIGRATION: SDL_GL_GetDrawableSize -> SDL_GetWindowSizeInPixels (drawable/pixel size).
+        SDL_GetWindowSizeInPixels(static_cast<SDL_Window*>(mSdlWindow), &dw, &dh);
         Resize(dw, dh);
     }
 

@@ -144,6 +144,10 @@ if (NOT USE_OPENGLES AND NOT CMAKE_SYSTEM_NAME STREQUAL "iOS" AND NOT CMAKE_SYST
     # (shaderc has no dev headers on this box). find_package(glslang) exposes the
     # imported targets glslang::glslang / glslang::SPIRV / the default resource limits.
     find_package(glslang QUIET)
+    # SDL3-MIGRATION (Phase 1): the Vulkan backend stays compiled (other modules — soh3d_gl.cpp,
+    # SohRmlUi.cpp — reference Vk symbols unconditionally), but GL remains the active runtime
+    # renderer. Only gfx_vulkan's handful of SDL_Vulkan_* surface calls were migrated to SDL3;
+    # Phase 2 ports the backend itself to SDL3's GPU API.
     if (Vulkan_FOUND AND glslang_FOUND)
         target_link_libraries(libultraship PRIVATE Vulkan::Vulkan
             glslang::glslang glslang::SPIRV glslang::glslang-default-resource-limits)

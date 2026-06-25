@@ -1,5 +1,6 @@
 #pragma once
-#include <SDL2/SDL.h>
+// SDL3-MIGRATION: SDL2 -> SDL3 single-header include.
+#include <SDL3/SDL.h>
 
 #include "Fast3dWindow.h"
 #include "ship/window/gui/Gui.h"

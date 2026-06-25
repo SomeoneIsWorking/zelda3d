@@ -66,7 +66,8 @@ file(GLOB Source_Files__Window__Gui__Rml RELATIVE ${CMAKE_CURRENT_SOURCE_DIR} CO
 source_group("window/gui/rml" FILES ${Source_Files__Window__Gui__Rml})
 target_sources(libultraship PRIVATE ${Source_Files__Window__Gui__Rml})
 # Applied target-wide: the macro is only referenced by the RmlUi SDL backend files.
-target_compile_definitions(libultraship PRIVATE RMLUI_SDL_VERSION_MAJOR=2)
+# SDL3-MIGRATION: select the SDL3 code path in RmlUi_Platform_SDL.{h,cpp} (was 2).
+target_compile_definitions(libultraship PRIVATE RMLUI_SDL_VERSION_MAJOR=3)
 
 #=================== Utils ===================
 

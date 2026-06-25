@@ -11,16 +11,17 @@
 #include "ship/resource/File.h"
 #include "ship/window/gui/rml/SohRmlUi.h"
 
+// SDL3-MIGRATION: SDL2 -> SDL3 includes; imgui_impl_sdl2 -> imgui_impl_sdl3.
 #ifdef __APPLE__
-#include <SDL_hints.h>
-#include <SDL_keyboard.h>
-#include <SDL_video.h>
+#include <SDL3/SDL_hints.h>
+#include <SDL3/SDL_keyboard.h>
+#include <SDL3/SDL_video.h>
 #include <imgui_impl_metal.h>
-#include <imgui_impl_sdl2.h>
+#include <imgui_impl_sdl3.h>
 #else
-#include <SDL2/SDL_hints.h>
-#include <SDL2/SDL_keyboard.h>
-#include <SDL2/SDL_video.h>
+#include <SDL3/SDL_hints.h>
+#include <SDL3/SDL_keyboard.h>
+#include <SDL3/SDL_video.h>
 #endif
 
 #if defined(__ANDROID__) || defined(__IOS__)
@@ -29,7 +30,7 @@
 
 #ifdef ENABLE_OPENGL
 #include <imgui_impl_opengl3.h>
-#include <imgui_impl_sdl2.h>
+#include <imgui_impl_sdl3.h>
 #endif
 
 #if defined(ENABLE_DX11) || defined(ENABLE_DX12)
@@ -82,7 +83,7 @@ void Fast3dGui::HandleWindowEvents(Fast::WindowEvent event) {
             if (mRml && mRml->ProcessSdlEvent(const_cast<SDL_Event*>(static_cast<const SDL_Event*>(event.Sdl.Event)))) {
                 break;
             }
-            ImGui_ImplSDL2_ProcessEvent(static_cast<const SDL_Event*>(event.Sdl.Event));
+            ImGui_ImplSDL3_ProcessEvent(static_cast<const SDL_Event*>(event.Sdl.Event));
 #if defined(__ANDROID__) || defined(__IOS__)
             Ship::Mobile::ImGuiProcessEvent(ImGui::GetIO().WantTextInput);
 #endif
@@ -105,7 +106,7 @@ void Fast3dGui::ImGuiWMInit() {
             if (Ship::Context::GetRawInstance()->GetConsoleVariables()->GetInteger(CVAR_ALLOW_BACKGROUND_INPUTS, 1)) {
                 SDL_SetHint(SDL_HINT_JOYSTICK_ALLOW_BACKGROUND_EVENTS, "1");
             }
-            ImGui_ImplSDL2_InitForOpenGL(static_cast<SDL_Window*>(mImpl.Opengl.Window), mImpl.Opengl.Context);
+            ImGui_ImplSDL3_InitForOpenGL(static_cast<SDL_Window*>(mImpl.Opengl.Window), mImpl.Opengl.Context);
             break;
 #ifdef ENABLE_VULKAN
         case WindowBackend::FAST3D_SDL_VULKAN:
@@ -115,7 +116,7 @@ void Fast3dGui::ImGuiWMInit() {
             }
             // Platform backend only in M1; the ImGui Vulkan *renderer* backend is M4,
             // so ImGui draw data is produced but not yet rendered for Vulkan.
-            ImGui_ImplSDL2_InitForVulkan(static_cast<SDL_Window*>(mImpl.Vulkan.Window));
+            ImGui_ImplSDL3_InitForVulkan(static_cast<SDL_Window*>(mImpl.Vulkan.Window));
             break;
 #endif
 #if __APPLE__
@@ -124,7 +125,7 @@ void Fast3dGui::ImGuiWMInit() {
             if (Ship::Context::GetRawInstance()->GetConsoleVariables()->GetInteger(CVAR_ALLOW_BACKGROUND_INPUTS, 1)) {
                 SDL_SetHint(SDL_HINT_JOYSTICK_ALLOW_BACKGROUND_EVENTS, "1");
             }
-            ImGui_ImplSDL2_InitForMetal(static_cast<SDL_Window*>(mImpl.Metal.Window));
+            ImGui_ImplSDL3_InitForMetal(static_cast<SDL_Window*>(mImpl.Metal.Window));
             break;
 #endif
 #if defined(ENABLE_DX11) || defined(ENABLE_DX12)
@@ -141,17 +142,17 @@ void Fast3dGui::ImGuiWMShutdown() {
     switch (mImpl.Backend) {
 #ifdef ENABLE_OPENGL
         case WindowBackend::FAST3D_SDL_OPENGL:
-            ImGui_ImplSDL2_Shutdown();
+            ImGui_ImplSDL3_Shutdown();
             break;
 #endif
 #ifdef ENABLE_VULKAN
         case WindowBackend::FAST3D_SDL_VULKAN:
-            ImGui_ImplSDL2_Shutdown();
+            ImGui_ImplSDL3_Shutdown();
             break;
 #endif
 #if __APPLE__
         case WindowBackend::FAST3D_SDL_METAL:
-            ImGui_ImplSDL2_Shutdown();
+            ImGui_ImplSDL3_Shutdown();
             break;
 #endif
 #if defined(ENABLE_DX11) || defined(ENABLE_DX12)
@@ -302,7 +303,7 @@ void Fast3dGui::ImGuiWMNewFrame() {
 #ifdef ENABLE_VULKAN
         case WindowBackend::FAST3D_SDL_VULKAN:
 #endif
-            ImGui_ImplSDL2_NewFrame();
+            ImGui_ImplSDL3_NewFrame();
             UpdateSdlTextInput();
             break;
 #ifdef ENABLE_DX11
@@ -329,10 +330,14 @@ void Fast3dGui::UpdateSdlTextInput() {
     if (want == mTextInputActive) {
         return;
     }
+    // SDL3-MIGRATION: SDL_StartTextInput/SDL_StopTextInput are now per-window. This runs only
+    // on the SDL backends (called from ImGuiWMNewFrame), and all SDL union members share the
+    // same first `void* Window` member, so Opengl.Window is the active SDL_Window for any of them.
+    auto* sdlWindow = static_cast<SDL_Window*>(mImpl.Opengl.Window);
     if (want) {
-        SDL_StartTextInput();
+        SDL_StartTextInput(sdlWindow);
     } else {
-        SDL_StopTextInput();
+        SDL_StopTextInput(sdlWindow);
     }
     mTextInputActive = want;
 }
@@ -385,15 +390,18 @@ void Fast3dGui::RmlMenuInjectKey(int sdlKeycode) {
     }
     // Drive the menu through the same path as a real keypress: a KEYDOWN, then a KEYUP. The scancode
     // is left zero (the menu's handler keys off the keysym/sym only), and modifiers are empty.
+    // SDL3-MIGRATION: SDL_KEYDOWN/UP -> SDL_EVENT_KEY_DOWN/UP; the keysym struct is gone — sym/mod
+    // are now flattened onto event.key directly (event.key.key / event.key.mod); .down replaces
+    // the .state==SDL_PRESSED flag; KMOD_NONE -> SDL_KMOD_NONE.
     SDL_Event ev{};
-    ev.type = SDL_KEYDOWN;
-    ev.key.state = SDL_PRESSED;
-    ev.key.repeat = 0;
-    ev.key.keysym.sym = (SDL_Keycode)sdlKeycode;
-    ev.key.keysym.mod = KMOD_NONE;
+    ev.type = SDL_EVENT_KEY_DOWN;
+    ev.key.down = true;
+    ev.key.repeat = false;
+    ev.key.key = (SDL_Keycode)sdlKeycode;
+    ev.key.mod = SDL_KMOD_NONE;
     mRml->ProcessSdlEvent(&ev);
-    ev.type = SDL_KEYUP;
-    ev.key.state = SDL_RELEASED;
+    ev.type = SDL_EVENT_KEY_UP;
+    ev.key.down = false;
     mRml->ProcessSdlEvent(&ev);
 }
 
@@ -403,21 +411,23 @@ void Fast3dGui::RmlMenuInjectClick(int x, int y) {
     }
     // Position the cursor first (RmlUi resolves the hovered element from the last mouse move), then
     // a left button down + up so the click dispatches to whatever element is under (x, y).
+    // SDL3-MIGRATION: event type enums renamed (SDL_MOUSEMOTION -> SDL_EVENT_MOUSE_MOTION, etc.);
+    // mouse x/y are now floats; .down replaces .state==SDL_PRESSED on the button event.
     SDL_Event ev{};
-    ev.type = SDL_MOUSEMOTION;
-    ev.motion.x = x;
-    ev.motion.y = y;
+    ev.type = SDL_EVENT_MOUSE_MOTION;
+    ev.motion.x = (float)x;
+    ev.motion.y = (float)y;
     mRml->ProcessSdlEvent(&ev);
     ev = SDL_Event{};
-    ev.type = SDL_MOUSEBUTTONDOWN;
+    ev.type = SDL_EVENT_MOUSE_BUTTON_DOWN;
     ev.button.button = SDL_BUTTON_LEFT;
-    ev.button.state = SDL_PRESSED;
+    ev.button.down = true;
     ev.button.clicks = 1;
-    ev.button.x = x;
-    ev.button.y = y;
+    ev.button.x = (float)x;
+    ev.button.y = (float)y;
     mRml->ProcessSdlEvent(&ev);
-    ev.type = SDL_MOUSEBUTTONUP;
-    ev.button.state = SDL_RELEASED;
+    ev.type = SDL_EVENT_MOUSE_BUTTON_UP;
+    ev.button.down = false;
     mRml->ProcessSdlEvent(&ev);
 }
 

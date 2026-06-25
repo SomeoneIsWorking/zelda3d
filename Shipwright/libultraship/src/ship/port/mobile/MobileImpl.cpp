@@ -1,6 +1,6 @@
 #if defined(__ANDROID__) || defined(__IOS__)
 #include "ship/port/mobile/MobileImpl.h"
-#include <SDL2/SDL.h>
+#include <SDL3/SDL.h>
 
 #include <imgui_internal.h>
 
@@ -14,12 +14,13 @@ void Ship::Mobile::ImGuiProcessEvent(bool wantsTextInput) {
             state->ClearText();
 
             isShowingVirtualKeyboard = true;
-            SDL_StartTextInput();
+            // SDL3-MIGRATION: SDL_StartTextInput/SDL_StopTextInput now take an SDL_Window*; target the focused window.
+            SDL_StartTextInput(SDL_GetKeyboardFocus());
         }
     } else {
         if (isShowingVirtualKeyboard) {
             isShowingVirtualKeyboard = false;
-            SDL_StopTextInput();
+            SDL_StopTextInput(SDL_GetKeyboardFocus());
         }
     }
 }

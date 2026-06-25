@@ -459,7 +459,8 @@ std::string Context::GetShortName() const {
 
 std::string Context::GetAppBundlePath() {
 #if defined(__ANDROID__)
-    const char* externaldir = SDL_AndroidGetExternalStoragePath();
+    // SDL3-MIGRATION: SDL_AndroidGetExternalStoragePath -> SDL_GetAndroidExternalStoragePath (Android-only; not built on Linux)
+    const char* externaldir = SDL_GetAndroidExternalStoragePath();
     if (externaldir != NULL) {
         return externaldir;
     }
@@ -522,7 +523,8 @@ std::string Context::GetAppBundlePath() {
 
 std::string Context::GetAppDirectoryPath(const std::string& appName) {
 #if defined(__ANDROID__)
-    const char* externaldir = SDL_AndroidGetExternalStoragePath();
+    // SDL3-MIGRATION: SDL_AndroidGetExternalStoragePath -> SDL_GetAndroidExternalStoragePath (Android-only; not built on Linux)
+    const char* externaldir = SDL_GetAndroidExternalStoragePath();
     if (externaldir != NULL) {
         return externaldir;
     }

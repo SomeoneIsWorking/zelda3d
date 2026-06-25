@@ -4,7 +4,7 @@
 #include "gfx_rendering_api.h"
 #include "../interpreter.h"
 
-#include <SDL2/SDL.h>
+#include <SDL3/SDL.h>
 #include <vulkan/vulkan.h>
 
 #include <vector>

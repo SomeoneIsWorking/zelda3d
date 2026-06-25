@@ -9,18 +9,18 @@
 
 // Match the GL headers the OpenGL backend uses (see gfx_opengl.h).
 #ifdef _MSC_VER
-#include <SDL2/SDL.h>
+#include <SDL3/SDL.h>
 #include <GL/glew.h>
 #elif defined(__APPLE__)
-#include <SDL2/SDL.h>
+#include <SDL3/SDL.h>
 #include <GL/glew.h>
 #elif defined(USE_OPENGLES)
-#include <SDL2/SDL.h>
+#include <SDL3/SDL.h>
 #include <GLES3/gl3.h>
 #else
-#include <SDL2/SDL.h>
+#include <SDL3/SDL.h>
 #define GL_GLEXT_PROTOTYPES 1
-#include <SDL2/SDL_opengl.h>
+#include <SDL3/SDL_opengl.h>
 #endif
 
 #include <vector>

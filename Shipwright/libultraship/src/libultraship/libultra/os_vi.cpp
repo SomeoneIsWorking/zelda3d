@@ -2,7 +2,9 @@
 
 extern "C" {
 
-Uint32 __lusViCallback(Uint32 interval, void* param) {
+// SDL3-MIGRATION: SDL_TimerCallback signature changed from (Uint32 interval, void* param)
+// to (void* userdata, SDL_TimerID timerID, Uint32 interval). Returning the interval keeps it repeating.
+Uint32 __lusViCallback(void* param, SDL_TimerID timerID, Uint32 interval) {
     __OSEventState* es = &__osEventStateTab[OS_EVENT_VI];
 
     if (es && es->queue) {

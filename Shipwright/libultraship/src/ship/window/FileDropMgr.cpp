@@ -23,7 +23,7 @@ FileDropMgr::~FileDropMgr() {
     }
 }
 
-void FileDropMgr::SetDroppedFile(char* path) {
+void FileDropMgr::SetDroppedFile(const char* path) {
     if (mPath != nullptr) {
         SPDLOG_WARN("Overwriting dropped file: {} with {}", mPath, path);
         free(mPath);
