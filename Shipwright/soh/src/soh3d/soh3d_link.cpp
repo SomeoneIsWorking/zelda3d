@@ -101,15 +101,17 @@ extern "C" int SoH3D_LinkEnabled(void) {
     return gSoH3dLinkOn;
 }
 
-// Player animation source: 1 = N64 jointTable retarget (default), 0 = 3DS own-CSAB. env SOH3D_LINK_SRC
-// ("n64"/"3ds" or 1/0); REPL `linksrc`.
+// Player animation source: 0 = 3DS own-CSAB (DEFAULT), 1 = N64 jointTable retarget. env SOH3D_LINK_SRC
+// ("3ds"/0 or "n64"/1); REPL `linksrc`.
 extern "C" int SoH3D_LinkAnimSrc(void) {
     if (gSoH3dLinkAnimSrc < 0) {
         const char* v = getenv("SOH3D_LINK_SRC");
-        // default N64 retarget (the complete path: legs/head + the divergent spine/upper-arm bones
-        // via kLinkChildBoneCorr, AND captures walk/run from the live blended jointTable, which the
-        // named-CSAB path is blind to). env "3"/"0" -> 3DS own-CSAB. REPL `linksrc` overrides live.
-        gSoH3dLinkAnimSrc = (v != NULL && (v[0] == '3' || v[0] == '0')) ? 0 : 1;
+        // DEFAULT = 3DS own-CSAB: SoH3D is a graphical port of OoT3D, so Link plays the OoT3D rig's
+        // OWN CSABs (1-1 parity). The former blocker — the named-CSAB path being "blind to walk/run" —
+        // is fixed (#117 SoH3D_LinkWalkRunGate selects nml_walk_free/nml_run_free by speedXZ). The N64
+        // jointTable-retarget path is retained as a fallback/debug mode only (env "n64"/"1", REPL
+        // `linksrc n64`). env "n64"/"1" -> N64 retarget; anything else -> 3DS own-CSAB.
+        gSoH3dLinkAnimSrc = (v != NULL && (v[0] == 'n' || v[0] == '1')) ? 1 : 0;
     }
     return gSoH3dLinkAnimSrc;
 }
