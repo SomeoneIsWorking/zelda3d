@@ -97,3 +97,42 @@ SDL surface (~40 files) — project is on **SDL2 2.32**, system has **SDL3 3.4.1
       The full Vulkan→SDL3-GPU port is Phase 2.
     - **Mobile/Mac (`MobileImpl.cpp`, `macUtils.mm`):** migrated for cleanliness but not compiled on
       Linux, so not compile-verified here. Windows-only `<SDL_syswm.h>` (gone in SDL3) left under `#ifdef`.
+- **P2 done (`gfx_sdl3gpu` GfxRenderingAPI backend — N64 Fast3D world at GL geometry parity).**
+  Builds clean; boots headless under `SOH3D_SDL3GPU=1` on the SDL3 GPU backend.
+  - **(a) Device + init OK.** Log: `gfx_sdl3gpu.cpp: SDL3 GPU backend: device driver = vulkan` +
+    `SDL3 GPU backend initialized (P2: N64 Fast3D world)`. Headless box has no DRI3
+    (`MESA: vulkan: No DRI3 support detected — required for presentation`), so there is no swapchain
+    present; frames come from the **offscreen FB-0 readback** path, not present.
+  - **(b) Scene geometry renders — GL parity (ignoring brightness).** Kokiri Forest (entrance 238,
+    time 0x6000): Link (upright, shield, tunic), Navi, signposts, minimap, HUD item slots, hearts,
+    rupee count, "Kokiri Forest" title all render with correct shapes/positions/textures, matching the
+    GL backend. Quantitative: 640×480, **99.7% non-black**, mean RGB ~(187,187,140). Evidence:
+    `scratch/screenshots/p2_sdl3gpu_kokiri.png` (SDL3 GPU) vs `p2_gl_match.png` (GL) — same scene,
+    same geometry. The readback path (`ReadFramebufferToCPU`/`GetPixelDepth`/`WriteFbPpm`) is wired
+    like gfx_vulkan: copy FB-0 color → `SDL_GPUTransferBuffer` via a copy pass
+    (`SDL_DownloadFromGPUTexture`), fence-wait, map, write RGBA. Both the scripted `SOH_FRAMEDUMP`
+    dump and the REPL `shot` on-demand dump produce frames.
+  - **(c) RmlUi — NOT rendered on SDL3 GPU; graceful absence, no crash (deferred to P3).** With
+    `SOH3D_RMLUI_OPEN=1 SOH3D_SDL3GPU=1` the scene renders normally but the menu never appears (no
+    RmlUi log lines, no crash). Evidence: `scratch/screenshots/p2_rmlui.png` (plain scene). Root
+    cause: `Fast3dGui::ImGuiBackendInit()` has no `FAST3D_SDL_GPU` case, so `mRml` is never created
+    (only `FAST3D_SDL_OPENGL` → GL3 interface and `FAST3D_SDL_VULKAN` → `RmlRenderInterfaceVk` exist).
+    Making it work is **P3-scale, not a small fix**, because: (1) it needs a new
+    `RmlRenderInterfaceSdl3Gpu` (full port of the 1458-line `RmlRenderInterfaceVk` — compiled
+    geometry, generated/font textures, scissor, stencil clip-mask, layer stack, opacity filter); and
+    (2) the Vk interface records into a *live* command-buffer/render-pass obtained via
+    `BeginSoH3DPass`, but the SDL3 GPU backend uses **deferred op-list recording** (`mOps` replayed
+    only inside `FinishRender`), so `BeginSoH3DPass`/`BeginSoH3DOffscreen` are P2 stubs returning
+    `false` — there IS no live pass mid-frame to record into. An SDL3 GPU RmlUi interface must either
+    append menu geometry as ops to `mOps`, or the backend must add a post-replay overlay pass. This
+    shares the SoH3D-pass infrastructure that P3 builds (alongside the `soh3d_vk` port), so it lands
+    with P3.
+  - **(d) KNOWN RESIDUAL (not addressed — user does not care):** the SDL3 GPU render is slightly
+    dimmer/different gamma vs GL. Best hypothesis: sRGB/gamma handling — the color-target texture
+    format (linear `R8G8B8A8_UNORM` vs an `_SRGB` target) and/or `SetSrgbMode` write-encoding differ
+    from the GL path. One-line residual; do not iterate on it.
+  - **(e) Stubbed for P3:** the SoH3D custom OoT3D draw paths — `soh3d_vk.cpp` (per-model GPU buffers,
+    bone/uniform ring, AO depth-prepass, sun-shadow pass, AO composite) + `soh3d_hud_vk.cpp`, with
+    `soh3d_gl.cpp`'s logic folded in then dropped. The backend's `BeginSoH3DPass`/`BeginSoH3DOffscreen`
+    hooks + a live (or appended-op) recording model are the prerequisite. RmlUi-on-SDL3GPU (above)
+    rides on the same infrastructure.
