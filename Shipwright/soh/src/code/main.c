@@ -45,6 +45,10 @@ void Main_LogSystemHeap(void) {
 }
 
 #ifdef _WIN32
+// SDL3-MIGRATION: SDL2main (which provided the WinMain shim that calls SDL_main) was removed in SDL3.
+// On Linux (the #else branch below) a plain int main(...) is the real entry point and needs no SDL.
+// For the Windows build, SDL3's header-only SDL_main.h must be included in exactly one TU to map
+// the real entry point onto this SDL_main; keep the SDL_main name here for that path.
 int SDL_main(int argc, char* argv[]) {
     AllocConsole();
     (void)freopen("CONIN$", "r", stdin);

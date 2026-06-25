@@ -58,10 +58,10 @@ class GfxWindowBackendSDL2 final : public GfxWindowBackend {
     void OnMouseButtonUp(int btn) const;
     void SyncFramerateWithTime() const;
 
-    SDL_Window* mWnd;
+    SDL_Window* mWnd = nullptr;
     SDL_Rect mCursorClip;
-    SDL_GLContext mCtx;
-    SDL_Renderer* mRenderer;
+    SDL_GLContext mCtx = nullptr;
+    SDL_Renderer* mRenderer = nullptr;
     int mSdlToLusTable[512];
     float mMouseWheelX = 0.0f;
     float mMouseWheelY = 0.0f;

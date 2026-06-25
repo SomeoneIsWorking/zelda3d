@@ -3,7 +3,9 @@
 #ifdef __cplusplus
 
 #include <thread>
-#include <SDL2/SDL_net.h>
+// SDL3-MIGRATION: SDL2_net is ABI-incompatible with SDL3 (shared SDL_h_ guard); use the no-op
+// shim so the networking code compiles/links with the feature disabled at runtime. See SDLNetShim.h.
+#include "soh/Network/SDLNetShim.h"
 #include <nlohmann/json.hpp>
 
 class Network {

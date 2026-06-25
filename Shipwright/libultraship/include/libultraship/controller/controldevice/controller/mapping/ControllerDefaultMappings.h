@@ -32,14 +32,14 @@ class ControllerDefaultMappings : public Ship::ControllerDefaultMappings {
             defaultKeyboardKeyToButtonMappings,
         std::unordered_map<Ship::StickIndex, std::vector<std::pair<Ship::Direction, Ship::KbScancode>>>
             defaultKeyboardKeyToAxisDirectionMappings,
-        std::unordered_map<CONTROLLERBUTTONS_T, std::unordered_set<SDL_GameControllerButton>>
+        std::unordered_map<CONTROLLERBUTTONS_T, std::unordered_set<SDL_GamepadButton>>
             defaultSDLButtonToButtonMappings,
-        std::unordered_map<Ship::StickIndex, std::vector<std::pair<Ship::Direction, SDL_GameControllerButton>>>
+        std::unordered_map<Ship::StickIndex, std::vector<std::pair<Ship::Direction, SDL_GamepadButton>>>
             defaultSDLButtonToAxisDirectionMappings,
-        std::unordered_map<CONTROLLERBUTTONS_T, std::vector<std::pair<SDL_GameControllerAxis, int32_t>>>
+        std::unordered_map<CONTROLLERBUTTONS_T, std::vector<std::pair<SDL_GamepadAxis, int32_t>>>
             defaultSDLAxisDirectionToButtonMappings,
         std::unordered_map<Ship::StickIndex,
-                           std::vector<std::pair<Ship::Direction, std::pair<SDL_GameControllerAxis, int32_t>>>>
+                           std::vector<std::pair<Ship::Direction, std::pair<SDL_GamepadAxis, int32_t>>>>
             defaultSDLAxisDirectionToAxisDirectionMappings);
 
     /**
@@ -64,7 +64,7 @@ class ControllerDefaultMappings : public Ship::ControllerDefaultMappings {
      * @param defaultSDLButtonToButtonMappings Map from button bitmask to SDL gamepad buttons.
      */
     void SetDefaultSDLButtonToButtonMappings(
-        std::unordered_map<CONTROLLERBUTTONS_T, std::unordered_set<SDL_GameControllerButton>>
+        std::unordered_map<CONTROLLERBUTTONS_T, std::unordered_set<SDL_GamepadButton>>
             defaultSDLButtonToButtonMappings) override;
 
     /**
@@ -72,7 +72,7 @@ class ControllerDefaultMappings : public Ship::ControllerDefaultMappings {
      * @param defaultSDLAxisDirectionToButtonMappings Map from button bitmask to (SDL axis, direction) pairs.
      */
     void SetDefaultSDLAxisDirectionToButtonMappings(
-        std::unordered_map<CONTROLLERBUTTONS_T, std::vector<std::pair<SDL_GameControllerAxis, int32_t>>>
+        std::unordered_map<CONTROLLERBUTTONS_T, std::vector<std::pair<SDL_GamepadAxis, int32_t>>>
             defaultSDLAxisDirectionToButtonMappings) override;
 };
 } // namespace LUS

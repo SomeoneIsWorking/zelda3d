@@ -23,11 +23,12 @@ void SDLLEDMapping::SetLEDColor(Color_RGB8 color) {
                                                  ->GetControlDeck()
                                                  ->GetConnectedPhysicalDeviceManager()
                                                  ->GetConnectedSDLGamepadsForPort(mPortIndex)) {
-        if (!SDL_GameControllerHasLED(gamepad)) {
+        // SDL3-MIGRATION: SDL_GameControllerHasLED() removed; query the gamepad capability property instead.
+        if (!SDL_GetBooleanProperty(SDL_GetGamepadProperties(gamepad), SDL_PROP_GAMEPAD_CAP_RGB_LED_BOOLEAN, false)) {
             continue;
         }
 
-        SDL_JoystickSetLED(SDL_GameControllerGetJoystick(gamepad), color.r, color.g, color.b);
+        SDL_SetJoystickLED(SDL_GetGamepadJoystick(gamepad), color.r, color.g, color.b);
     }
 }
 

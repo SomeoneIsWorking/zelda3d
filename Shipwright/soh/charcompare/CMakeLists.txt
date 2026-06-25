@@ -48,7 +48,7 @@ target_include_directories(charcompare PRIVATE
 # transitively gives us <imgui.h> and the SDL/GL headers/libs we need.
 target_link_libraries(charcompare PRIVATE
     libultraship
-    SDL2::SDL2
+    SDL3::SDL3 # SDL3-MIGRATION
     Threads::Threads
     ${CMAKE_DL_LIBS}
 )

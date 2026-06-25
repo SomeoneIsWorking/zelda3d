@@ -28,7 +28,7 @@
 #include "ship/config/ConsoleVariable.h"
 #include <prism/processor.h>
 
-#include <SDL2/SDL_vulkan.h>
+#include <SDL3/SDL_vulkan.h>
 
 #include <glslang/Public/ShaderLang.h>
 #include <glslang/Public/ResourceLimits.h>
@@ -659,16 +659,16 @@ void GfxRenderingAPIVulkan::CreateInstance() {
     }
 #endif
     // SDL needs the window to report the instance extensions it requires.
-    unsigned int extCount = 0;
-    if (!SDL_Vulkan_GetInstanceExtensions(mWindow, &extCount, nullptr)) {
-        SPDLOG_ERROR("SDL_Vulkan_GetInstanceExtensions(count) failed: {}", SDL_GetError());
+    // SDL3-MIGRATION: SDL_Vulkan_GetInstanceExtensions no longer takes a window or a caller buffer;
+    // it returns an SDL-owned array directly: const char* const* (count out-param). Copy into our
+    // mutable vector so the portability/debug extensions can still be appended below.
+    Uint32 extCount = 0;
+    const char* const* sdlExts = SDL_Vulkan_GetInstanceExtensions(&extCount);
+    if (sdlExts == nullptr) {
+        SPDLOG_ERROR("SDL_Vulkan_GetInstanceExtensions failed: {}", SDL_GetError());
         abort();
     }
-    std::vector<const char*> extensions(extCount);
-    if (!SDL_Vulkan_GetInstanceExtensions(mWindow, &extCount, extensions.data())) {
-        SPDLOG_ERROR("SDL_Vulkan_GetInstanceExtensions(list) failed: {}", SDL_GetError());
-        abort();
-    }
+    std::vector<const char*> extensions(sdlExts, sdlExts + extCount);
 #if defined(__APPLE__)
     // MoltenVK is a "portability" (non-conformant) Vulkan implementation. Without enabling this
     // instance extension AND the matching create flag, vkEnumeratePhysicalDevices returns zero
@@ -726,7 +726,8 @@ void GfxRenderingAPIVulkan::CreateInstance() {
 }
 
 void GfxRenderingAPIVulkan::CreateSurface() {
-    if (!SDL_Vulkan_CreateSurface(mWindow, mInstance, &mSurface)) {
+    // SDL3-MIGRATION: SDL_Vulkan_CreateSurface gained an allocator-callbacks arg (NULL = default).
+    if (!SDL_Vulkan_CreateSurface(mWindow, mInstance, nullptr, &mSurface)) {
         SPDLOG_ERROR("SDL_Vulkan_CreateSurface failed: {}", SDL_GetError());
         abort();
     }
@@ -871,7 +872,7 @@ void GfxRenderingAPIVulkan::CreateSwapchain() {
         extent = caps.currentExtent;
     } else {
         int w = 0, h = 0;
-        SDL_Vulkan_GetDrawableSize(mWindow, &w, &h);
+        SDL_GetWindowSizeInPixels(mWindow, &w, &h); // SDL3-MIGRATION: SDL_Vulkan_GetDrawableSize removed
         extent.width = std::clamp((uint32_t)w, caps.minImageExtent.width, caps.maxImageExtent.width);
         extent.height = std::clamp((uint32_t)h, caps.minImageExtent.height, caps.maxImageExtent.height);
     }

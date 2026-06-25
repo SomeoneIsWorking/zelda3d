@@ -4,7 +4,7 @@
 #include <unordered_set>
 #include <vector>
 #include <string>
-#include <SDL2/SDL.h>
+#include <SDL3/SDL.h>
 
 namespace Ship {
 
@@ -28,9 +28,9 @@ class ConnectedPhysicalDeviceManager {
      * Gamepads on the port's ignore list are excluded from the result.
      *
      * @param portIndex Zero-based controller port index.
-     * @return Map of SDL joystick instance ID to SDL_GameController pointer.
+     * @return Map of SDL joystick instance ID to SDL_Gamepad pointer.
      */
-    std::unordered_map<int32_t, SDL_GameController*> GetConnectedSDLGamepadsForPort(uint8_t portIndex);
+    std::unordered_map<int32_t, SDL_Gamepad*> GetConnectedSDLGamepadsForPort(uint8_t portIndex);
 
     /**
      * @brief Returns the display names of all connected SDL gamepads.
@@ -83,7 +83,7 @@ class ConnectedPhysicalDeviceManager {
     void RefreshConnectedSDLGamepads();
 
   private:
-    std::unordered_map<int32_t, SDL_GameController*> mConnectedSDLGamepads;
+    std::unordered_map<int32_t, SDL_Gamepad*> mConnectedSDLGamepads;
     std::unordered_map<int32_t, std::string> mConnectedSDLGamepadNames;
     std::unordered_map<uint8_t, std::unordered_set<int32_t>> mIgnoredInstanceIds;
 };

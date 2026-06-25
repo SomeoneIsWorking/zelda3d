@@ -36,7 +36,7 @@ void SDLAxisDirectionToButtonMapping::UpdatePad(CONTROLLERBUTTONS_T& padButtons)
                                                  ->GetControlDeck()
                                                  ->GetConnectedPhysicalDeviceManager()
                                                  ->GetConnectedSDLGamepadsForPort(mPortIndex)) {
-        const auto axisValue = SDL_GameControllerGetAxis(gamepad, mControllerAxis);
+        const auto axisValue = SDL_GetGamepadAxis(gamepad, mControllerAxis);
 
         auto axisMinValue = SDL_JOYSTICK_AXIS_MAX * (axisThresholdPercentage / 100.0f);
         if ((mAxisDirection == POSITIVE && axisValue > axisMinValue) ||
