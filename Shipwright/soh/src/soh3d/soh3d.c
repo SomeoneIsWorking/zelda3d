@@ -1790,9 +1790,17 @@ static void SoH3D_EmitModelDraw(PlayState* play, int modelId, Actor* actor, floa
         sSoH3dSelDrawGroundOff = groundOffset;
         SoH3D_SetTrackPosedMinY(modelId, 1);
     }
+    // Faithful draw-space transform offset: some actors' OoT3D Draw applies extra translate(s) the
+    // generic world.pos anchor omits (BossGoma_Draw's Matrix_Translate(0,-4000,0) + Actor_Draw's
+    // shape.yOffset*scale.y lift — #123 Gohma floats off the climbing pillar). The behavior module
+    // supplies the world-Y lift + a local (rotated, world-unit) translate; when present it REPLACES
+    // the generic groundOffset. Read live from the actor C struct in behaviors/actor/boss_goma.cpp.
+    float dsLiftY = 0.0f;
+    float dsLocal[3] = { 0.0f, 0.0f, 0.0f };
+    int dsHave = SoH3D_ActorDrawSpaceTransform(actor, &dsLiftY, dsLocal);
     OPEN_DISPS(play->state.gfxCtx);
     Gfx_SetupDL_25Opa(play->state.gfxCtx);
-    Matrix_Translate(actor->world.pos.x, actor->world.pos.y, actor->world.pos.z, MTXMODE_NEW);
+    Matrix_Translate(actor->world.pos.x, actor->world.pos.y + dsLiftY, actor->world.pos.z, MTXMODE_NEW);
     // Replicate the engine's standard actor transform (Matrix_SetTranslateRotateYXZ, z_actor.c):
     // the FULL YXZ shape.rot, not just yaw. Upright props/characters carry shape.rot.x=z=0 so this
     // is a no-op for them, but actors that bake an orientation into shape.rot need all three — e.g.
@@ -1815,13 +1823,19 @@ static void SoH3D_EmitModelDraw(PlayState* play, int modelId, Actor* actor, floa
             Matrix_Translate(0.0f, 0.0f, 200.0f * actor->scale.z, MTXMODE_APPLY);
         }
     }
+    // Faithful actor-Draw local translate (BossGoma_Draw's Matrix_Translate(0,-4000,0)): applied
+    // AFTER shape.rot but BEFORE worldScale, so it stays in the rotated WORLD-UNIT frame (matching the
+    // N64 op which sits between Matrix_Scale(actor->scale) and the skeleton — uniform actor scale
+    // commutes, so the behavior already folds *scale.y into the values it returns).
+    if (dsHave) Matrix_Translate(dsLocal[0], dsLocal[1], dsLocal[2], MTXMODE_APPLY);
     Matrix_Scale(worldScale, worldScale, worldScale, MTXMODE_APPLY);
     if (gSoH3dRotX != 0.0f) Matrix_RotateX(gSoH3dRotX * (3.14159265f / 180.0f), MTXMODE_APPLY);
     if (gSoH3dRotY != 0.0f) Matrix_RotateY(gSoH3dRotY * (3.14159265f / 180.0f), MTXMODE_APPLY);
     if (gSoH3dRotZ != 0.0f) Matrix_RotateZ(gSoH3dRotZ * (3.14159265f / 180.0f), MTXMODE_APPLY);
     // Ground offset: applied innermost (model space, pre-scale) so it scales with
-    // worldScale and brings the model's feet onto the actor's ground pos.
-    if (groundOffset != 0.0f) Matrix_Translate(0.0f, groundOffset, 0.0f, MTXMODE_APPLY);
+    // worldScale and brings the model's feet onto the actor's ground pos. A faithful draw-space
+    // transform (dsHave) REPLACES this generic anchor — the OoT3D draw places the model itself.
+    if (!dsHave && groundOffset != 0.0f) Matrix_Translate(0.0f, groundOffset, 0.0f, MTXMODE_APPLY);
     gSPMatrix(POLY_OPA_DISP++, MATRIX_NEWMTX(play->state.gfxCtx), G_MTX_MODELVIEW | G_MTX_LOAD);
     SoH3D_SceneTint(play, tint);
     // Snapshot this actor's pose NOW (its SkelAnime/CSAB pose was just set via SoH3D_UpdateAnim*),
