@@ -25,8 +25,13 @@ typedef struct SoH3DGlVtx {
     float color[4]; // per-vertex RGBA (OoT3D baked lighting / additive falloff)
 } SoH3DGlVtx;
 
-// Max bones in the skinning uniform array (covers OoT3D characters; childlink=25).
-#define SOH3D_GL_MAX_BONES 32
+// Max bones in the skinning uniform array. Must match the `uBones[N]` array size in the GL/VK
+// vertex shaders (soh3d_gl.cpp kVert, soh3d_vk.cpp). 32 was too small: Queen Gohma's goma.cmb rig
+// has 33 bones (ids 0..32), so bone 32 (the tail tip) was never uploaded (n clamped to 32) and the
+// shader's uBones[32] read out of a 32-entry array -> garbage transform -> the verts weighted to
+// bone 32 stretched into a "tube" off the body (#120). 64 covers Gohma + headroom and stays within
+// the GL guaranteed vertex-uniform budget (64 mat4 = 1024 floats, plus uMP/uMV).
+#define SOH3D_GL_MAX_BONES 64
 
 // One per-material draw batch (triangle list).
 typedef struct SoH3DGlGroup {

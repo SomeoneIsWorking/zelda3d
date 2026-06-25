@@ -116,7 +116,7 @@ layout(location=4) out float vFogDist;
 layout(binding=0, std140) uniform UBO {
     mat4 uMP;
     mat4 uMV;
-    mat4 uBones[32];
+    mat4 uBones[64];
     vec4 uLightDir;  // xyz: world-space sun dir; w: 1 = skybox dome (pin to far plane)
     vec4 uParams;    // x=invertY(+1/-1) y=lit z=alphaRef w=depthOffset
     vec4 uTintSkin;  // xyz=tint w=skin(0/1)
@@ -170,7 +170,7 @@ layout(location=0) out vec4 frag;
 layout(binding=0, std140) uniform UBO {
     mat4 uMP;
     mat4 uMV;
-    mat4 uBones[32];
+    mat4 uBones[64];
     vec4 uLightDir;
     vec4 uParams;
     vec4 uTintSkin;
@@ -241,7 +241,7 @@ void main() {
 struct VkUbo {
     float uMP[16];
     float uMV[16];
-    float uBones[32 * 16];
+    float uBones[64 * 16]; // 64 must match SOH3D_GL_MAX_BONES / shader uBones[64] (Gohma=33 bones, #120)
     float uLightDir[4];
     float uParams[4];
     float uTintSkin[4];
@@ -402,7 +402,7 @@ std::vector<N64CasterBuf> g_n64CasterBufs; // per frame-in-flight
 const char* kAoDepthFrag = R"(#version 450
 layout(location=0) in vec2 vUv;
 layout(binding=0, std140) uniform UBO {
-    mat4 uMP; mat4 uMV; mat4 uBones[32];
+    mat4 uMP; mat4 uMV; mat4 uBones[64];
     vec4 uLightDir; vec4 uParams; vec4 uTintSkin; vec4 uExtra;
 } ubo;
 layout(binding=1) uniform sampler2D uTex;
@@ -1420,11 +1420,11 @@ void recordDepthDraw(int modelId, const float* mp16, const float* mv16, int inve
     base.uMP[8] *= aspectAdj;
     base.uMP[12] *= aspectAdj;
     memcpy(base.uMV, mv16 ? mv16 : mp16, sizeof(base.uMV));
-    for (int k = 0; k < 32; k++)
+    for (int k = 0; k < 64; k++)
         for (int e = 0; e < 16; e++)
             base.uBones[k * 16 + e] = (e % 5 == 0) ? 1.0f : 0.0f;
     if (boneData && boneCnt > 0) {
-        int nb = boneCnt < 32 ? boneCnt : 32;
+        int nb = boneCnt < 64 ? boneCnt : 64;
         for (int k = 0; k < nb; k++) {
             const float* s = boneData + k * 16;
             float* d = base.uBones + k * 16;
@@ -1636,7 +1636,7 @@ extern "C" void SoH3D_Vk_DrawModel(int modelId, const float* mp16, const float* 
     base.uMP[8] *= aspectAdj;
     base.uMP[12] *= aspectAdj;
     memcpy(base.uMV, mv16, sizeof(base.uMV));
-    for (int k = 0; k < 32; k++)
+    for (int k = 0; k < 64; k++)
         for (int e = 0; e < 16; e++)
             base.uBones[k * 16 + e] = (e % 5 == 0) ? 1.0f : 0.0f; // identity
     if (boneData && boneCnt > 0) {
@@ -1644,7 +1644,7 @@ extern "C" void SoH3D_Vk_DrawModel(int modelId, const float* mp16, const float* 
         // transposes on upload, so GLSL stores M itself. Vulkan std140 mat4 is column-major with no
         // transpose-on-upload, and a raw memcpy of row-major data stores M^T -> wrong skinning. So
         // transpose each bone matrix CPU-side to match GL exactly.
-        int nb = boneCnt < 32 ? boneCnt : 32;
+        int nb = boneCnt < 64 ? boneCnt : 64;
         for (int k = 0; k < nb; k++) {
             const float* s = boneData + k * 16;
             float* d = base.uBones + k * 16;
@@ -2010,7 +2010,7 @@ extern "C" void SoH3D_Vk_ShadowCasterTris(const float* worldXYZ, size_t triCount
     memcpy(ubo.uMP, lightVP16, sizeof(ubo.uMP)); // positions are world-space -> clip = lightVP*world
     float identity[16] = { 1, 0, 0, 0, 0, 1, 0, 0, 0, 0, 1, 0, 0, 0, 0, 1 };
     memcpy(ubo.uMV, identity, sizeof(ubo.uMV));
-    for (int k = 0; k < 32; k++)
+    for (int k = 0; k < 64; k++)
         for (int e = 0; e < 16; e++)
             ubo.uBones[k * 16 + e] = (e % 5 == 0) ? 1.0f : 0.0f;
     ubo.uParams[0] = 1.0f;       // invertY off
