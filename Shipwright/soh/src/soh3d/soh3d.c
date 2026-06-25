@@ -2335,6 +2335,35 @@ int SoH3D_TryDrawActor(PlayState* play, Actor* actor) {
             }
             return 0; // no OoT3D water CMB -> let the N64 water plane draw
         }
+        // Standard hinged door (En_Door, #115 item C). OoT3D draws the generic door CMB from the
+        // KEEP zar (zelda_keep.zar door/model/m_Fnormaldoor) — see oot3d-decomp/docs/en_door.md.
+        // The behavior (open/close swing state machine) is shared SoH/N64 code; only the draw
+        // differs, so replace the N64 door mesh with the OoT3D door CMB at the actor's
+        // world.pos + shape.rot.y, self-calibrating the scale from the N64 door's own height.
+        // Increment 1: static CLOSED door (rest pose). Temple-specific door variants (Fire/Water/
+        // Shadow/Well/Forest) keep their N64 draw for now (return 0); they use per-dungeon objects.
+        if (actor->id == ACTOR_EN_DOOR) {
+            switch (play->sceneNum) {
+                case SCENE_FIRE_TEMPLE:
+                case SCENE_WATER_TEMPLE:
+                case SCENE_SHADOW_TEMPLE:
+                case SCENE_BOTTOM_OF_THE_WELL:
+                case SCENE_FOREST_TEMPLE:
+                    return 0; // temple door variants not yet ported -> N64
+                default:
+                    break;
+            }
+            static int sDoorModelId = 0; // 0 = unresolved, <0 = no CMB (fall through to N64)
+            if (sDoorModelId == 0) {
+                sDoorModelId = SoH3D_AutoModelId(ZKEEP "|" SOH3D_DOOR_CMB);
+            }
+            if (sDoorModelId < 0) {
+                return 0; // no OoT3D door CMB -> let the N64 door draw
+            }
+            SoH3D_DrawModelGL(play, sDoorModelId, actor, SOH3D_GSCALE(12, SOH3D_DOOR_WORLD_SCALE),
+                              NULL, 0.0f, NULL, NULL);
+            return 1;
+        }
     }
     // Explicit table wins (calibrated scale + anim resolvers), unless validation mode (=2)
     // routes everything through the auto path to check the derived scale.
