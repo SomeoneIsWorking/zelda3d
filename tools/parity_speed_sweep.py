@@ -25,11 +25,15 @@ USAGE
   tools/parity_speed_sweep.py --json scratch/parity/speed_sweep.json
   tools/parity_speed_sweep.py --skip-oracle        # SoH3D curve only
 
-KNOWN RESULT (2026-06-25): SoH3D selects nml_run_free at EVERY nonzero speed (incl. speedXZ~1.0),
-while the oracle selects nml_walk_free at walk speed and nml_run_free only at run speed. SoH3D reads
-the live N64 player anim (which uses one run anim with speed-scaled playback) and maps it straight to
-nml_run_free; OoT3D/Grezzo instead SELECTS distinct walk/run CSABs by speed. That Grezzo divergence
-is the residual #117 "walk" gap — this sweep surfaces it as a real per-speed FAIL.
+HISTORY (2026-06-25): this sweep first surfaced the #117 walk divergence — SoH3D selected nml_run_free
+at EVERY nonzero speed while the oracle selects nml_walk_free at walk speed. Root cause: SoH3D read the
+live N64 player anim (one run anim, speed-scaled playback) and mapped it straight to nml_run_free;
+OoT3D/Grezzo instead SELECTS distinct walk/run CSABs by speed (RE'd: FUN_002be660 picker in the
+FUN_004ba378 run action family). FIXED by SoH3D_LinkWalkRunGate (soh3d_link.cpp): below the measured
+walk→run threshold (~3.6, in the oracle gap walk_max 3.2 / run_min 3.8) play nml_walk_free. After the
+fix this sweep reports PASS (idle/walk/run selections match + walk→run transition windows overlap).
+NOTE: the gate renders in `linksrc 3ds` mode (the architecture-directive keeper); in the default N64
+retarget mode the pose is the N64 jointTable (one run cycle), so the walk cycle only shows in 3ds mode.
 """
 import argparse, json, os, struct, subprocess, sys, time
 
@@ -45,15 +49,27 @@ ANIMID_OFF = 0x30
 PLAYER_STATE1_IN_CUTSCENE = 0x20000000
 KOKIRI_ENTRANCE = 0xEE
 
-# speed bins (speedXZ) used to align the two curves; chosen around OoT3D's idle/walk/run regimes.
-SPEED_BINS = [(0.0, 0.25, "idle"), (0.25, 2.0, "walk"), (2.0, 4.0, "jog"), (4.0, 99.0, "run")]
+IDLE_MAX = 0.5  # speedXZ below this = not moving (idle)
 
 
-def speed_bin(spd):
-    for lo, hi, name in SPEED_BINS:
-        if lo <= spd < hi:
-            return name
-    return "?"
+def classify(curve):
+    """From a speed->csab curve, derive each regime's selection + the walk->run transition window.
+    Returns dict: idle_csab, walk_csab, run_csab, walk_max (highest speed still selecting walk),
+    run_min (lowest speed selecting a run cycle). The transition window [walk_max, run_min] is the
+    speed band where the side flips walk->run; two sides AGREE if their windows overlap (same
+    threshold) — that is the parity metric, independent of either engine's exact speed-vs-stick map."""
+    moving = [p for p in curve if p["speedXZ"] >= IDLE_MAX and p["csab"]]
+    idle = [p for p in curve if p["speedXZ"] < IDLE_MAX and p["csab"]]
+    def is_run(c): return c and "run" in c and "walk" not in c
+    walks = [p for p in moving if not is_run(p["csab"])]
+    runs = [p for p in moving if is_run(p["csab"])]
+    return {
+        "idle_csab": (idle[-1]["csab"] if idle else None),
+        "walk_csab": (walks[0]["csab"] if walks else None),
+        "run_csab": (runs[0]["csab"] if runs else None),
+        "walk_max": (max(p["speedXZ"] for p in walks) if walks else None),
+        "run_min": (min(p["speedXZ"] for p in runs) if runs else None),
+    }
 
 
 # ---------------- SoH3D side (REPL) ----------------
@@ -120,8 +136,8 @@ def soh_curve(mags):
     out = []
     for m in mags:
         spd, csab = soh_sample_at(m)
-        out.append({"mag": m, "speedXZ": round(spd, 3), "csab": csab, "bin": speed_bin(spd)})
-        print(f"  [soh] mag={m:4d} speedXZ={spd:5.2f} ({speed_bin(spd):4s}) -> {csab}")
+        out.append({"mag": m, "speedXZ": round(spd, 3), "csab": csab})
+        print(f"  [soh] mag={m:4d} speedXZ={spd:5.2f} -> {csab}")
     return out
 
 
@@ -204,20 +220,20 @@ class Oracle:
             oracle_warp_open(); self._reactor()
             cx = int(m * math.sin(ang)); cy = int(m * math.cos(ang))
             spd, name = self._drive(cx, cy, int(1.2 * 30))
-            out.append({"mag": m, "speedXZ": round(spd, 3), "csab": name, "bin": speed_bin(spd)})
-            print(f"  [ora] mag={m:4d} (dir {math.degrees(ang):.0f}deg) speedXZ={spd:5.2f} "
-                  f"({speed_bin(spd):4s}) -> {name}")
+            out.append({"mag": m, "speedXZ": round(spd, 3), "csab": name})
+            print(f"  [ora] mag={m:4d} (dir {math.degrees(ang):.0f}deg) speedXZ={spd:5.2f} -> {name}")
         return out
 
 
 # ---------------- compare ----------------
-def dominant_by_bin(curve):
-    """bin -> most-common csab in that bin (across the magnitude grid)."""
-    byb = {}
-    for pt in curve:
-        byb.setdefault(pt["bin"], {})
-        byb[pt["bin"]][pt["csab"]] = byb[pt["bin"]].get(pt["csab"], 0) + 1
-    return {b: max(c, key=c.get) for b, c in byb.items()}
+def windows_overlap(a, b):
+    """Do two [walk_max, run_min] transition windows agree? They agree if the bands overlap, i.e. one
+    side's walk_max is not clearly above the other's run_min (and vice-versa) — a consistent threshold."""
+    if None in (a["walk_max"], a["run_min"], b["walk_max"], b["run_min"]):
+        return None  # incomplete data (a side never sampled both walk and run)
+    # the windows are [walk_max, run_min] per side; they are consistent if max(walk_max) <= min(run_min)
+    # (a single threshold can satisfy both), allowing a small tolerance for oracle/engine speed noise.
+    return max(a["walk_max"], b["walk_max"]) <= min(a["run_min"], b["run_min"]) + 0.6
 
 
 def main():
@@ -241,31 +257,44 @@ def main():
         print("== Oracle speed->selection curve ==")
         ora = Oracle().curve(ora_mags)
 
-    soh_b = dominant_by_bin(soh)
-    ora_b = dominant_by_bin(ora) if ora else {}
+    sc = classify(soh)
+    oc = classify(ora) if ora else None
 
-    print(f"\n{'speed bin':<10} {'SoH3D selects':<24} {'OoT3D selects':<24} verdict")
-    print("-" * 72)
-    diverged = []
-    for _, _, name in SPEED_BINS:
-        s = soh_b.get(name); o = ora_b.get(name)
-        if s is None and o is None:
-            continue
+    def fmt_win(c):
+        wm = f"{c['walk_max']:.2f}" if c['walk_max'] is not None else "-"
+        rm = f"{c['run_min']:.2f}" if c['run_min'] is not None else "-"
+        return f"walk≤{wm} run≥{rm}"
+
+    print(f"\n{'regime':<14} {'SoH3D':<20} {'OoT3D oracle':<20} verdict")
+    print("-" * 66)
+    fails = []
+    rows = [("idle select", "idle_csab"), ("walk select", "walk_csab"), ("run select", "run_csab")]
+    for label, key in rows:
+        s = sc.get(key); o = (oc.get(key) if oc else None)
         if args.skip_oracle or o is None:
-            verdict = "—"
+            v = "—"
         elif s == o:
-            verdict = "OK"
+            v = "OK"
         else:
-            verdict = "DIVERGE"; diverged.append(name)
-        print(f"{name:<10} {(s or '-'):<24} {(o or '(skipped)'):<24} {verdict}")
-    print(f"\n{len(diverged)} divergent speed bin(s): {', '.join(diverged) or 'none'}")
+            v = "FAIL"; fails.append(label)
+        print(f"{label:<14} {(s or '-'):<20} {(o or '(skipped)'):<20} {v}")
+    # walk->run transition window agreement (the real threshold-parity metric)
+    if oc:
+        ov = windows_overlap(sc, oc)
+        vv = "OK" if ov else ("—" if ov is None else "FAIL")
+        if ov is False:
+            fails.append("walk/run threshold")
+        print(f"{'walk→run xs':<14} {fmt_win(sc):<20} {fmt_win(oc):<20} {vv}")
+
+    print(f"\n{'PASS' if not fails else 'FAIL'}: {len(fails)} mismatch(es)"
+          + (f": {', '.join(fails)}" if fails else ""))
 
     if args.json:
         os.makedirs(os.path.dirname(os.path.abspath(args.json)), exist_ok=True)
-        json.dump({"soh": soh, "oracle": ora, "soh_by_bin": soh_b, "oracle_by_bin": ora_b,
-                   "diverged": diverged}, open(args.json, "w"), indent=2)
+        json.dump({"soh": soh, "oracle": ora, "soh_class": sc, "oracle_class": oc,
+                   "fails": fails}, open(args.json, "w"), indent=2)
         print(f"# wrote {args.json}")
-    return 1 if diverged else 0
+    return 1 if fails else 0
 
 
 if __name__ == "__main__":

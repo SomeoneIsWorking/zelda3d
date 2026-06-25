@@ -442,6 +442,7 @@ float SoH3D_LinkGroundDiag(PlayState* play, const char** outCsab);
 void SoH3D_ReplReply(const char* outPath, const char* fmt, ...);        // REPL reply line (stdout + .out)
 void SoH3D_SceneTint(PlayState* play, u8 out[3]);                       // flat per-scene tint colour
 const char* SoH3D_ResolvePlayerCsab(const char* otr);                  // player anim OTR -> link CSAB base
+const char* SoH3D_LinkWalkRunGate(const char* csab, float speedXZ);    // #117 walk/run selection gate
 void SoH3D_EnsureModelProvider(void);                                   // lazy GL model provider init
 int SoH3D_AutoModelId(const char* zarPath);                            // get-or-alloc a GL model id
 // Bridges for the structured model-REPLACEMENT behaviors (behaviors/actor/<actor>.cpp):

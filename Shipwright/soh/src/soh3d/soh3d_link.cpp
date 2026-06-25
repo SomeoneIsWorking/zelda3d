@@ -117,6 +117,27 @@ extern "C" int SoH3D_LinkAnimSrc(void) {
 // childlink_v2 mesh_id idle fallback. See SoH3D_TryDrawPlayer.
 #define SOH3D_LINK_IDLE_CSAB "nml_wait_typeA_20f"
 
+// #117 walk/run SELECTION threshold (speedXZ). N64 OoT uses ONE run anim
+// (gPlayerAnim_link_normal_run_free) with speed-scaled playback for ALL ground movement, so SoH3D's
+// N64-anim->CSAB map always yields nml_run_free. OoT3D/Grezzo instead SELECTS distinct walk/run CSABs
+// by speed (RE'd: FUN_002be660 walk/run picker, in the FUN_004ba378 run action family; oot3d-decomp
+// player_port.md). Measured live off the oracle (tools/parity_speed_sweep.py): nml_walk_free sustains
+// to speedXZ ~3.17, nml_run_free starts at ~4.04. 3.6 sits in that gap and also separates SoH3D's own
+// speed curve (walk 0.98/1.49, run 5.50) cleanly. Below this -> play the walk cycle, not a slow run.
+#define SOH3D_LINK_WALKRUN_SPEED 3.6f
+
+// Apply the #117 walk/run SELECTION gate to a resolved player locomotion CSAB. The N64 anim is the
+// single run cycle (-> nml_run_free at every ground speed); OoT3D plays nml_walk_free in the walk band.
+// Shared by the draw path AND the `linkanimstate` reporter (so the parity sweep reads what is actually
+// drawn, not the raw N64-anim mapping). Plain run only (damage_run/heavy_run/side_walk are own states).
+extern "C" const char* SoH3D_LinkWalkRunGate(const char* csab, float speedXZ) {
+    if (csab != NULL && strcmp(csab, "nml_run_free") == 0 &&
+        speedXZ > 0.5f && speedXZ <= SOH3D_LINK_WALKRUN_SPEED) {
+        return "nml_walk_free";
+    }
+    return csab;
+}
+
 // Compute which childlink_v2 mesh_ids are visible this frame from Link's live state. The CMB bakes
 // EVERY hand-pose + held-equipment variant on its own mesh_id; the game (N64 and OoT3D) shows a
 // state-dependent subset. N64 already resolves the selection per limb each frame into
@@ -397,6 +418,8 @@ extern "C" int SoH3D_PlayerDrawImpl(PlayState* play, Actor* actor) {
         // gPlayerAnim_link_normal_run_free, so this maps to nml_run_free and Link animates while moving
         // (verified live, Kakariko + Kokiri). speedXZ shown in the debug for future locomotion work.
         csab = SoH3D_ResolvePlayerCsab((const char*)player->skelAnime.animation);
+        // #117 walk/run SELECTION parity (see SoH3D_LinkWalkRunGate / SOH3D_LINK_WALKRUN_SPEED).
+        csab = SoH3D_LinkWalkRunGate(csab, player->actor.speedXZ);
         // #6/#9: while carrying, OoT layers a held-item animation (e.g. carryB_wait, arms raised
         // overhead) on the UPPER body via player->upperSkelAnime, leaving the base skelAnime on
         // wait/locomotion. The N64-retarget path reads the already-merged jointTable so it gets the
@@ -596,6 +619,7 @@ float SoH3D::PlayerBehavior::groundDiag(PlayState* play, const char** outCsab) {
             *outCsab = gSoH3dLinkForceCsab;
         } else {
             const char* c = SoH3D_ResolvePlayerCsab((const char*)player->skelAnime.animation);
+            c = SoH3D_LinkWalkRunGate(c, player->actor.speedXZ);  // report the gated (drawn) CSAB
             *outCsab = c ? c : SOH3D_LINK_IDLE_CSAB " (fallback)";
         }
     }
