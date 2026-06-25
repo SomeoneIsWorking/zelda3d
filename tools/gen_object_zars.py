@@ -52,6 +52,7 @@ ALIAS = {
     # Dungeon-prop archives (OoT3D groups them under a "dk_" prefix, no zelda_ prefix). Each
     # confirmed by the CMB basename matching the N64 object/actor's single drawn model.
     "lightbox": "dk_lightbox",  # En_Lightbox (Forest Temple light box) (dk_lightbox/lightbox4_model.cmb)
+    "shop_dungen": "shop_tana",  # En_Tana shop shelves (shop_tana01/02/03_model.cmb) — #115
 }
 
 # Alias values are OoT3D zar BASENAMES. Resolve to a real /actor path, trying the common
