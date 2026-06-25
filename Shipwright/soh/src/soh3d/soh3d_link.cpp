@@ -21,18 +21,17 @@
 // path actually passes, so each upper-body bone's correction can be adjusted LIVE over the REPL
 // (`linkcorr`) and seen in-game against the 3ds ground truth, instead of rebuild-per-guess. The
 // final hand-tuned values get baked back into soh3d_link_bonecorr.inc (`linkcorr bake <path>`).
-static SoH3dBoneCorr gLinkBoneCorr[25];
-static int gLinkBoneCorrInit = 0;
-// Pose-freeze for hand-weaving: latch the live player jointTable so the idle pose holds still and the
-// only variable while tuning `linkcorr` is the correction itself (REPL `linkfreeze 1|0`).
-static Vec3s gLinkFrozenJoints[40];
-static int gLinkFrozenCount = 0; // >0 = pose frozen at this limbCount
-static int gLinkFreezeReq = 0;   // 1 = latch the live pose on the next player draw
-static void SoH3D_LinkBoneCorrEnsure(void) {
-    if (gLinkBoneCorrInit) return;
-    memcpy(gLinkBoneCorr, kLinkChildBoneCorr, sizeof(gLinkBoneCorr));
-    gLinkBoneCorrInit = 1;
+// Shorthand for the single PlayerBehavior instance (its composed subsystems hold the former
+// file-static Link state). Used by the extern "C" draw body + the per-frame hooks below.
+static inline SoH3D::PlayerBehavior& P() { return SoH3D::PlayerBehavior::instance(); }
+
+// LinkRetarget: lazy-init the runtime correction table from the baked child table (kLinkChildBoneCorr).
+void SoH3D::LinkRetarget::ensure() {
+    if (inited) return;
+    memcpy(table, kLinkChildBoneCorr, sizeof(table));
+    inited = true;
 }
+
 // Build a row-major 3x3 rotation C = Rz(cz)·Ry(cy)·Rx(cx) (the live/csab ZYX convention) from
 // Euler degrees, written into out[9]. Identity when all zero.
 static void SoH3D_EulerToMat3(float cxDeg, float cyDeg, float czDeg, float* out) {
@@ -89,36 +88,10 @@ int gSoH3dLinkAnimSrc = -1;
 
 // Per-frame mesh_id visibility mask for Link's body CMB. childlink_v2 bakes every hand-pose and
 // held-equipment variant onto distinct mesh_ids; the game shows a state-dependent subset. We pick
-// the visible set each frame (SoH3D_LinkComputeMidMask) and push it via SoH3D_GL_SetMidMask.
-// gSoH3dLinkMidOverride: REPL `linkmid` debug override (identification sweep). ~0 sentinel = no
-// override (use the computed policy); any other value forces that exact mask.
-static unsigned long long gSoH3dLinkMidOverride = ~0ull; // ~0 = "no override" sentinel
-static int gSoH3dLinkMidOverrideSet = 0;
-
-// `linkjointdump` capture state: dump the live player jointTable over N consecutive frames to a CSV,
-// for the QUANTITATIVE per-bone retarget-correction derivation (tools/soh3d_link_retarget_derive.py).
-// Each row: cap,curFrame,animLength,anim,limb,x,y,z — cap=frame index, curFrame/animLength=skelAnime
-// phase, anim=base name, limb=jointTable rotation index (1..limbCount; bonemap value m drives
-// jointTable[1+m]), x/y/z=binang.
-static FILE* gLinkJointDumpFile = NULL;
-static int gLinkJointDumpRemaining = 0;
-static int gLinkJointDumpCap = 0;
-
-// `linkgrab` REPL: deterministically drive a REAL cucco pickup headless (for #6/#9). A plain A tap
-// can't reliably grab — the cucco wanders out of range and the A rising edge has to coincide with
-// the frame Link's interactRangeActor detection is true. This driver (run in SoH3D_WalkInject, just
-// before Play_Update) holds the asel-selected actor pinned directly in front of Link's facing every
-// frame AND re-issues a fresh A rising edge every few frames, so detection and edge always line up;
-// it stops the instant player->heldActor is set (the engine's real grab action then takes over).
-static int gSoH3dLinkGrabFrames = 0;
-
-// Pin the PLAYER's world transform (pos + facing yaw) while hand-weaving the Link retarget, so the
-// view is byte-deterministic across `linkcorr` tweaks. linkfreeze pins the LIMB pose; this pins the
-// actor transform the limbs hang off (Link otherwise idle-turns toward the camera/Navi and desyncs
-// the side-profile comparison). REPL `linkpin <0|1>`. asel excludes the player, so this is separate.
-int gSoH3dLinkPin = 0;
-static Vec3f sSoH3dLinkPinPos;
-static s16 sSoH3dLinkPinYaw;
+// the visible set each frame (PlayerBehavior::midmask.compute) and push it via SoH3D_GL_SetMidMask.
+// The mesh-id override (REPL `linkmid`), jointTable-dump capture (`linkjointdump`), cucco-grab driver
+// (`linkgrab`), and transform pin (`linkpin`) state moved into PlayerBehavior's composed subsystems
+// (midmask / jointDump / grab / pin) — see player.h.
 
 extern "C" int SoH3D_LinkEnabled(void) {
     if (gSoH3dLinkOn < 0) {
@@ -158,7 +131,7 @@ extern "C" int SoH3D_LinkAnimSrc(void) {
 // back/sheath=21, waist=23/24) but a DIFFERENT mesh_id layout — identified the same way as child
 // (texture dump + posed-geometry + in-game `linkmid only <n>` render sweep, see link_mesh_id_map.md
 // "## ADULT"). Boy's shield set is Hylian (default) / Mirror, vs child's Deku / Hylian.
-static unsigned long long SoH3D_LinkBoyMidMask(Player* player) {
+unsigned long long SoH3D::LinkMidMask::boyMidMask(Player* player) const {
     unsigned long long m = LINK_MID(45) | LINK_MID(46); // full body + head/face always
     int hylian = (player->currentShield == PLAYER_SHIELD_HYLIAN);
     int mirror = (player->currentShield == PLAYER_SHIELD_MIRROR);
@@ -208,14 +181,14 @@ static unsigned long long SoH3D_LinkBoyMidMask(Player* player) {
     return m;
 }
 
-static unsigned long long SoH3D_LinkComputeMidMask(Player* player) {
+unsigned long long SoH3D::LinkMidMask::compute(Player* player) const {
     unsigned long long m;
     int deku, hylian;
-    if (gSoH3dLinkMidOverrideSet) {
-        return gSoH3dLinkMidOverride; // REPL `linkmid` debug override (identification sweep)
+    if (overrideSet) {
+        return overrideMask; // REPL `linkmid` debug override (identification sweep)
     }
     if (LINK_AGE_IN_YEARS != YEARS_CHILD) {
-        return SoH3D_LinkBoyMidMask(player); // adult uses link_v2.cmb's own mesh_id layout
+        return boyMidMask(player); // adult uses link_v2.cmb's own mesh_id layout
     }
     m = LINK_MID(24) | LINK_MID(26); // body + head/face always (25 = far-LOD, never)
     deku = (player->currentShield == PLAYER_SHIELD_DEKU);
@@ -268,42 +241,43 @@ static unsigned long long SoH3D_LinkComputeMidMask(Player* player) {
 }
 #undef LINK_MID
 
-static int sLinkModelId = -1; // last modelId the player body drew with (for the REPL pose scanner)
-extern "C" int SoH3D_LinkModelId(void) { return sLinkModelId; }
+// sLinkModelId moved to PlayerBehavior::modelId (the player's current draw model id).
+extern "C" int SoH3D_LinkModelId(void) { return P().modelId; }
 
-// Pose-scan LOGGER. The pose (lastSkin) is recomputed in the DRAW path (here), not in Play_Update, so
-// the per-frame discontinuity must be sampled here — once per rendered frame — to be meaningful (the
+// LinkPoseScan LOGGER. The pose (lastSkin) is recomputed in the DRAW path, not in Play_Update, so the
+// per-frame discontinuity must be sampled there — once per rendered frame — to be meaningful (the
 // frame-step `step` advances logic without drawing). When active, each drawn player frame records the
 // max per-bone rotation jump + the bone + the resolved csab + its frame. The REPL reads the log back.
-struct PoseScanRec { float deg; int bone; float frame; char csab[28]; };
-static PoseScanRec sPoseLog[512];
-static int sPoseLogN = 0;
-static int sPoseScanActive = 0;
-extern "C" void SoH3D_PoseScanSetActive(int on) {
-    sPoseScanActive = on ? 1 : 0;
+void SoH3D::LinkPoseScan::setActive(int on) {
+    mActive = on ? 1 : 0;
     if (on) {
-        sPoseLogN = 0; // clear the log only when STARTING a scan; `off` keeps it for `dump`
-        if (sLinkModelId >= 0) SoH3D_PoseScanReset(sLinkModelId); // baseline = next frame
+        mCount = 0; // clear the log only when STARTING a scan; `off` keeps it for `dump`
+        int mid = SoH3D::PlayerBehavior::instance().modelId;
+        if (mid >= 0) SoH3D_PoseScanReset(mid); // baseline = next frame
     }
 }
-extern "C" int SoH3D_PoseScanCount(void) { return sPoseLogN; }
-extern "C" float SoH3D_PoseScanGet(int i, int* bone, float* frame, const char** csab) {
-    if (i < 0 || i >= sPoseLogN) { if (bone) *bone = -1; if (frame) *frame = 0; if (csab) *csab = ""; return 0; }
-    if (bone) *bone = sPoseLog[i].bone;
-    if (frame) *frame = sPoseLog[i].frame;
-    if (csab) *csab = sPoseLog[i].csab;
-    return sPoseLog[i].deg;
+float SoH3D::LinkPoseScan::get(int i, int* bone, float* frame, const char** csab) {
+    if (i < 0 || i >= mCount) { if (bone) *bone = -1; if (frame) *frame = 0; if (csab) *csab = ""; return 0; }
+    if (bone) *bone = mLog[i].bone;
+    if (frame) *frame = mLog[i].frame;
+    if (csab) *csab = mLog[i].csab;
+    return mLog[i].deg;
 }
 // Called from the draw path right after the pose is set, when the scan is active.
-static void poseScanRecord(int modelId, const char* csab, float frame) {
-    if (!sPoseScanActive || sPoseLogN >= (int)(sizeof(sPoseLog) / sizeof(sPoseLog[0]))) return;
+void SoH3D::LinkPoseScan::record(int modelId, const char* csab, float frame) {
+    if (!mActive || mCount >= (int)(sizeof(mLog) / sizeof(mLog[0]))) return;
     int bone = -1;
     float deg = SoH3D_PoseDiscontinuity(modelId, &bone);
-    PoseScanRec& r = sPoseLog[sPoseLogN++];
+    Rec& r = mLog[mCount++];
     r.deg = deg; r.bone = bone; r.frame = frame;
     const char* c = csab ? csab : "(n64-retarget)";
     int k = 0; for (; c[k] && k < 27; k++) r.csab[k] = c[k];
     r.csab[k] = '\0';
+}
+extern "C" void SoH3D_PoseScanSetActive(int on) { P().poseScan.setActive(on); }
+extern "C" int SoH3D_PoseScanCount(void) { return P().poseScan.count(); }
+extern "C" float SoH3D_PoseScanGet(int i, int* bone, float* frame, const char** csab) {
+    return P().poseScan.get(i, bone, frame, csab);
 }
 
 // Draw body kept as an extern "C" GLOBAL function (not a SoH3D-namespace method) because
@@ -331,7 +305,7 @@ extern "C" int SoH3D_PlayerDrawImpl(PlayState* play, Actor* actor) {
     if (modelId < 0) {
         return 0; // model unavailable -> fall back to the N64 body
     }
-    sLinkModelId = modelId; // expose to the REPL pose-discontinuity scanner (SoH3D_LinkModelId)
+    P().modelId = modelId; // expose to the REPL pose-discontinuity scanner (SoH3D_LinkModelId)
     // Player is Actor-first so the cast is valid (see z64player.h).
     player = (Player*)actor;
     // #16c: in FIRST-PERSON (C-up) the camera eye sits AT Link's head bone, so drawing the 3DS body
@@ -357,7 +331,7 @@ extern "C" int SoH3D_PlayerDrawImpl(PlayState* play, Actor* actor) {
     // pose + visible-mesh mask are known (below), so the ground offset can use the live pose.
     SoH3D_SetTrackPosedMinY(modelId, 1);
     // linkjointdump capture: append this frame's live jointTable + phase, for offline retarget fitting.
-    if (gLinkJointDumpFile != NULL && gLinkJointDumpRemaining > 0 &&
+    if (P().jointDump.file != NULL && P().jointDump.remaining > 0 &&
         player->skelAnime.jointTable != NULL && player->skelAnime.limbCount > 0) {
         const char* an = (const char*)player->skelAnime.animation;
         const char* base = an ? strrchr(an, '/') : NULL;
@@ -365,13 +339,13 @@ extern "C" int SoH3D_PlayerDrawImpl(PlayState* play, Actor* actor) {
         int li;
         for (li = 1; li <= player->skelAnime.limbCount; li++) {
             Vec3s* j = &player->skelAnime.jointTable[li];
-            fprintf(gLinkJointDumpFile, "%d,%.3f,%.1f,%s,%d,%d,%d,%d\n", gLinkJointDumpCap,
+            fprintf(P().jointDump.file, "%d,%.3f,%.1f,%s,%d,%d,%d,%d\n", P().jointDump.cap,
                     player->skelAnime.curFrame, player->skelAnime.animLength, base, li, j->x, j->y, j->z);
         }
-        gLinkJointDumpCap++;
-        if (--gLinkJointDumpRemaining == 0) {
-            fclose(gLinkJointDumpFile);
-            gLinkJointDumpFile = NULL;
+        P().jointDump.cap++;
+        if (--P().jointDump.remaining == 0) {
+            fclose(P().jointDump.file);
+            P().jointDump.file = NULL;
         }
     }
     // #85 carry-walk: in N64, walking-while-carrying merges TWO anims per-limb — the BASE skelAnime's
@@ -403,18 +377,18 @@ extern "C" int SoH3D_PlayerDrawImpl(PlayState* play, Actor* actor) {
                 fflush(stdout);
             }
         }
-        SoH3D_LinkBoneCorrEnsure();
+        P().retarget.ensure();
         // Hand-weave pose-freeze: latch the live idle jointTable on request, then feed the frozen copy
         // so tuning `linkcorr` is the only variable (the idle fidget otherwise moves the pose).
         const s16* jrots = (const s16*)&player->skelAnime.jointTable[1];
         int jcount = player->skelAnime.limbCount;
-        if (gLinkFreezeReq && jcount > 0 && jcount < 39) {
-            for (int i = 0; i <= jcount; i++) gLinkFrozenJoints[i] = player->skelAnime.jointTable[i];
-            gLinkFrozenCount = jcount;
-            gLinkFreezeReq = 0;
+        if (P().retarget.freezeReq && jcount > 0 && jcount < 39) {
+            for (int i = 0; i <= jcount; i++) P().retarget.frozenJoints[i] = player->skelAnime.jointTable[i];
+            P().retarget.frozenCount = jcount;
+            P().retarget.freezeReq = 0;
         }
-        if (gLinkFrozenCount > 0) { jrots = (const s16*)&gLinkFrozenJoints[1]; jcount = gLinkFrozenCount; }
-        SoH3D_UpdateAnimN64Corr(modelId, jrots, jcount, gLinkBoneCorr, (int)ARRAY_COUNT(gLinkBoneCorr));
+        if (P().retarget.frozenCount > 0) { jrots = (const s16*)&P().retarget.frozenJoints[1]; jcount = P().retarget.frozenCount; }
+        SoH3D_UpdateAnimN64Corr(modelId, jrots, jcount, P().retarget.table, (int)ARRAY_COUNT(P().retarget.table));
     } else {
         // 3DS OWN-CSAB: pick the link CSAB matching Link's named anim, phase-locked to curFrame/animLength.
         // Unmapped -> idle so it never freezes in bind pose. NOTE (#29b): the documented "slide" (idle
@@ -467,10 +441,10 @@ extern "C" int SoH3D_PlayerDrawImpl(PlayState* play, Actor* actor) {
         }
     }
     // Pose-scan QA: sample the per-frame discontinuity now that lastSkin is set (once per drawn frame).
-    poseScanRecord(modelId, csab, player->skelAnime.curFrame);
+    P().poseScan.record(modelId, csab, player->skelAnime.curFrame);
     // Select Link's live equipment / hand-pose variant subset (the childlink_v2 mesh bakes them
     // all on distinct mesh_ids). Must be set BEFORE EmitPose so it pairs with this draw item.
-    unsigned long long midMask = SoH3D_LinkComputeMidMask(player);
+    unsigned long long midMask = P().midmask.compute(player);
     if (gSoH3dAnimDebug) {
         static int dbg = 0;
         if ((dbg++ % 30) == 0) {
@@ -615,29 +589,29 @@ float SoH3D::PlayerBehavior::groundDiag(PlayState* play, const char** outCsab) {
             *outCsab = c ? c : SOH3D_LINK_IDLE_CSAB " (fallback)";
         }
     }
-    return SoH3D_PosedGroundOffset(modelId, SoH3D_LinkComputeMidMask(player));
+    return SoH3D_PosedGroundOffset(modelId, P().midmask.compute(player));
 }
 
 // #8 hand-weave: pin Link's world pos + facing yaw each frame, so the side-profile view is identical
 // across `linkcorr` tweaks. Extracted from SoH3D_ActorPostUpdate; called from that same call site.
-void SoH3D::PlayerBehavior::applyPin(PlayState* play, Actor* actor) {
-    if (actor != NULL && gSoH3dLinkPin && play != NULL && actor == &GET_PLAYER(play)->actor) {
+void SoH3D::LinkPin::apply(PlayState* play, Actor* actor) {
+    if (actor != NULL && on && play != NULL && actor == &GET_PLAYER(play)->actor) {
         actor->velocity.x = actor->velocity.y = actor->velocity.z = 0.0f;
         actor->speedXZ = 0.0f;
-        actor->world.pos = sSoH3dLinkPinPos;
-        actor->shape.rot.y = actor->world.rot.y = sSoH3dLinkPinYaw;
+        actor->world.pos = pos;
+        actor->shape.rot.y = actor->world.rot.y = yaw;
     }
 }
 
 // #6/#9 linkgrab: hold the selected actor in front of Link + inject fresh A edges until grabbed.
 // Extracted from SoH3D_WalkInject; called from that same call site.
-void SoH3D::PlayerBehavior::walkInject(PlayState* play) {
-    if (gSoH3dLinkGrabFrames > 0) {
+void SoH3D::LinkGrabDriver::walkInject(PlayState* play) {
+    if (frames > 0) {
         Player* pl = GET_PLAYER(play);
         if (pl == NULL || gSoH3dSelActor == NULL) {
-            gSoH3dLinkGrabFrames = 0;
+            frames = 0;
         } else if (pl->heldActor != NULL) {
-            gSoH3dLinkGrabFrames = 0; // grabbed — let the real carry action take over
+            frames = 0; // grabbed — let the real carry action take over
         } else {
             float yawRad = pl->actor.shape.rot.y * (3.14159265f / 32768.0f);
             float fx = sinf(yawRad), fz = cosf(yawRad);
@@ -649,8 +623,8 @@ void SoH3D::PlayerBehavior::walkInject(PlayState* play) {
             gSoH3dSelActor->velocity.y = 0.0f;
             // fresh A rising edge every 4th frame so an edge always lands once detection is true.
             play->state.input[0].cur.button |= BTN_A;
-            if ((gSoH3dLinkGrabFrames & 3) == 0) play->state.input[0].press.button |= BTN_A;
-            gSoH3dLinkGrabFrames--;
+            if ((frames & 3) == 0) play->state.input[0].press.button |= BTN_A;
+            frames--;
         }
     }
 }
@@ -677,7 +651,7 @@ int SoH3D::PlayerBehavior::repl(PlayState* play, const char* cmd, const char* li
             SoH3D_ReplReply(outPath, "linkgrab: no actor selected (asel 0x19 first)");
         } else {
             gSoH3dActorFreeze = 0; // the driver positions it every frame; freeze would fight that
-            gSoH3dLinkGrabFrames = frames;
+            P().grab.frames = frames;
             SoH3D_ReplReply(outPath, "linkgrab: driving pickup of id=0x%X for %d frames",
                             gSoH3dSelActor->id, frames);
         }
@@ -721,25 +695,25 @@ int SoH3D::PlayerBehavior::repl(PlayState* play, const char* cmd, const char* li
     } else if (strcmp(cmd, "linkfreeze") == 0) {
         // #7 hand-weave: freeze Link's live idle pose so `linkcorr` tweaks are the only variable.
         if (sscanf(line, "%*s %i", &iv) == 1) {
-            if (iv) { gLinkFreezeReq = 1; gLinkFrozenCount = 0; }
-            else { gLinkFrozenCount = 0; gLinkFreezeReq = 0; }
+            if (iv) { P().retarget.freezeReq = 1; P().retarget.frozenCount = 0; }
+            else { P().retarget.frozenCount = 0; P().retarget.freezeReq = 0; }
         }
         SoH3D_ReplReply(outPath, "linkfreeze=%d (frozenLimbs=%d, req=%d)",
-                        gLinkFrozenCount > 0 ? 1 : 0, gLinkFrozenCount, gLinkFreezeReq);
+                        P().retarget.frozenCount > 0 ? 1 : 0, P().retarget.frozenCount, P().retarget.freezeReq);
     } else if (strcmp(cmd, "linkpin") == 0) {
         // #8 hand-weave: pin Link's world pos + facing yaw so the side-profile view is identical
         // across `linkcorr` tweaks (linkfreeze alone leaves the actor free to idle-turn -> desync).
         if (sscanf(line, "%*s %i", &iv) == 1) {
             Player* pl = GET_PLAYER(play);
             if (iv) {
-                sSoH3dLinkPinPos = pl->actor.world.pos;
-                sSoH3dLinkPinYaw = pl->actor.shape.rot.y;
-                gSoH3dLinkPin = 1;
+                P().pin.pos = pl->actor.world.pos;
+                P().pin.yaw = pl->actor.shape.rot.y;
+                P().pin.on = 1;
             } else {
-                gSoH3dLinkPin = 0;
+                P().pin.on = 0;
             }
         }
-        SoH3D_ReplReply(outPath, "linkpin=%d (pins player world pos+yaw each frame)", gSoH3dLinkPin);
+        SoH3D_ReplReply(outPath, "linkpin=%d (pins player world pos+yaw each frame)", P().pin.on);
     } else if (strcmp(cmd, "linkcorr") == 0) {
         // #7 HAND-WEAVE the per-bone arm/upper-body retarget correction LIVE (linksrc n64).
         //   linkcorr                         -> show upper-body bones (b9..b20): mode + C euler (zyx deg)
@@ -748,21 +722,21 @@ int SoH3D::PlayerBehavior::repl(PlayState* play, const char* cmd, const char* li
         //   linkcorr reset                   -> restore the generated table
         //   linkcorr bake <path>             -> write the live table as a 25-row .inc for committing
         char sub[64] = "";
-        SoH3D_LinkBoneCorrEnsure();
+        P().retarget.ensure();
         int n = sscanf(line, "%*s %63s", sub);
         if (n == 1 && strcmp(sub, "reset") == 0) {
-            memcpy(gLinkBoneCorr, kLinkChildBoneCorr, sizeof(gLinkBoneCorr));
+            memcpy(P().retarget.table, kLinkChildBoneCorr, sizeof(P().retarget.table));
             SoH3D_ReplReply(outPath, "linkcorr reset to generated table");
         } else if (n == 1 && strcmp(sub, "set") == 0) {
             int bid = -1, mode = 0; float c[3] = { 0, 0, 0 }, c2[3] = { 0, 0, 0 };
             int got = sscanf(line, "%*s %*s %i %i %f %f %f %f %f %f", &bid, &mode, &c[0], &c[1], &c[2],
                              &c2[0], &c2[1], &c2[2]);
             if (got >= 5 && bid >= 0 && bid < 25) {
-                gLinkBoneCorr[bid].mode = (unsigned char)mode;
-                SoH3D_EulerToMat3(c[0], c[1], c[2], gLinkBoneCorr[bid].C);
-                SoH3D_EulerToMat3(c2[0], c2[1], c2[2], gLinkBoneCorr[bid].C2);
+                P().retarget.table[bid].mode = (unsigned char)mode;
+                SoH3D_EulerToMat3(c[0], c[1], c[2], P().retarget.table[bid].C);
+                SoH3D_EulerToMat3(c2[0], c2[1], c2[2], P().retarget.table[bid].C2);
                 SoH3D_ReplReply(outPath, "linkcorr b%d limb=%d mode=%d C=(%.1f,%.1f,%.1f) C2=(%.1f,%.1f,%.1f)",
-                                bid, gLinkBoneCorr[bid].limb, mode, c[0], c[1], c[2], c2[0], c2[1], c2[2]);
+                                bid, P().retarget.table[bid].limb, mode, c[0], c[1], c[2], c2[0], c2[1], c2[2]);
             } else {
                 SoH3D_ReplReply(outPath, "usage: linkcorr set <bid> <mode> <cx> <cy> <cz> [c2x c2y c2z]");
             }
@@ -773,9 +747,9 @@ int SoH3D::PlayerBehavior::repl(PlayState* play, const char* cmd, const char* li
             // limb 9) without a rebuild-per-guess. -1 = rest (no live limb).
             int bid = -1, limb = -2;
             if (sscanf(line, "%*s %*s %i %i", &bid, &limb) == 2 && bid >= 0 && bid < 25) {
-                gLinkBoneCorr[bid].limb = (signed char)limb;
-                SoH3D_ReplReply(outPath, "linkcorr b%d limb=%d mode=%d", bid, gLinkBoneCorr[bid].limb,
-                                gLinkBoneCorr[bid].mode);
+                P().retarget.table[bid].limb = (signed char)limb;
+                SoH3D_ReplReply(outPath, "linkcorr b%d limb=%d mode=%d", bid, P().retarget.table[bid].limb,
+                                P().retarget.table[bid].mode);
             } else {
                 SoH3D_ReplReply(outPath, "usage: linkcorr limb <bid> <n64limb|-1>");
             }
@@ -791,7 +765,7 @@ int SoH3D::PlayerBehavior::repl(PlayState* play, const char* cmd, const char* li
                     fprintf(f, "// 1=replace, 2=left C·R, 3=right R·C, 4=two-sided C·R·C2.\n");
                     fprintf(f, "static const SoH3dBoneCorr kLinkChildBoneCorr[25] = {\n");
                     for (int b = 0; b < 25; b++) {
-                        const SoH3dBoneCorr* bc = &gLinkBoneCorr[b];
+                        const SoH3dBoneCorr* bc = &P().retarget.table[b];
                         fprintf(f, "    { %3d, %d, {", bc->limb, bc->mode);
                         for (int k = 0; k < 9; k++) fprintf(f, "%s%.6ff", k ? "," : "", bc->C[k]);
                         fprintf(f, " }, {");
@@ -811,11 +785,11 @@ int SoH3D::PlayerBehavior::repl(PlayState* play, const char* cmd, const char* li
             off += snprintf(buf + off, sizeof(buf) - off, "linkcorr (upper body):");
             for (int b = 9; b <= 20 && off < (int)sizeof(buf) - 80; b++) {
                 float e[3], e2[3];
-                SoH3D_Mat3ToEuler(gLinkBoneCorr[b].C, e);
-                SoH3D_Mat3ToEuler(gLinkBoneCorr[b].C2, e2);
+                SoH3D_Mat3ToEuler(P().retarget.table[b].C, e);
+                SoH3D_Mat3ToEuler(P().retarget.table[b].C2, e2);
                 off += snprintf(buf + off, sizeof(buf) - off, " b%d:l%d m%d C(%.0f,%.0f,%.0f)", b,
-                                gLinkBoneCorr[b].limb, gLinkBoneCorr[b].mode, e[0], e[1], e[2]);
-                if (gLinkBoneCorr[b].mode == 4)
+                                P().retarget.table[b].limb, P().retarget.table[b].mode, e[0], e[1], e[2]);
+                if (P().retarget.table[b].mode == 4)
                     off += snprintf(buf + off, sizeof(buf) - off, "/C2(%.0f,%.0f,%.0f)", e2[0], e2[1], e2[2]);
             }
             SoH3D_ReplReply(outPath, "%s", buf);
@@ -860,16 +834,16 @@ int SoH3D::PlayerBehavior::repl(PlayState* play, const char* cmd, const char* li
         // whatever named anim Link's SkelAnime is actually playing — keep him idle/standing for nml_wait).
         int n = 60;
         if (sscanf(line, "%*s %1023s %d", path, &n) >= 1) {
-            if (gLinkJointDumpFile != NULL) { fclose(gLinkJointDumpFile); gLinkJointDumpFile = NULL; }
-            gLinkJointDumpFile = fopen(path, "w");
-            if (gLinkJointDumpFile == NULL) {
+            if (P().jointDump.file != NULL) { fclose(P().jointDump.file); P().jointDump.file = NULL; }
+            P().jointDump.file = fopen(path, "w");
+            if (P().jointDump.file == NULL) {
                 SoH3D_ReplReply(outPath, "linkjointdump: cannot open %s", path);
             } else {
                 if (n < 1) n = 1;
-                fprintf(gLinkJointDumpFile, "# player jointTable capture; bonemap value m -> limb (m+1)\n");
-                fprintf(gLinkJointDumpFile, "cap,curFrame,animLength,anim,limb,x,y,z\n");
-                gLinkJointDumpRemaining = n;
-                gLinkJointDumpCap = 0;
+                fprintf(P().jointDump.file, "# player jointTable capture; bonemap value m -> limb (m+1)\n");
+                fprintf(P().jointDump.file, "cap,curFrame,animLength,anim,limb,x,y,z\n");
+                P().jointDump.remaining = n;
+                P().jointDump.cap = 0;
                 SoH3D_ReplReply(outPath, "linkjointdump -> %s (%d frames)", path, n);
             }
         } else {
@@ -884,12 +858,12 @@ int SoH3D::PlayerBehavior::repl(PlayState* play, const char* cmd, const char* li
         // jointTable) this is the OUTPUT geometry after CSAB resolution.
         int n = 60;
         if (sscanf(line, "%*s %1023s %d", path, &n) >= 1) {
-            if (sLinkModelId < 0) {
+            if (P().modelId < 0) {
                 SoH3D_ReplReply(outPath, "skindump: Link model not drawn yet (run `link 1` and let it draw)");
             } else {
                 if (n < 1) n = 1;
-                SoH3D_SkinDumpArm(sLinkModelId, path, n);
-                SoH3D_ReplReply(outPath, "skindump -> %s (%d draws, model %d)", path, n, sLinkModelId);
+                SoH3D_SkinDumpArm(P().modelId, path, n);
+                SoH3D_ReplReply(outPath, "skindump -> %s (%d draws, model %d)", path, n, P().modelId);
             }
         } else {
             SoH3D_ReplReply(outPath, "usage: skindump <path> [nframes]");
@@ -903,21 +877,21 @@ int SoH3D::PlayerBehavior::repl(PlayState* play, const char* cmd, const char* li
         int n = 0;
         if (sscanf(line, "%*s %31s", arg) == 1) {
             if (strcmp(arg, "auto") == 0) {
-                gSoH3dLinkMidOverrideSet = 0;
+                P().midmask.overrideSet = 0;
             } else if (strcmp(arg, "all") == 0) {
-                gSoH3dLinkMidOverride = ~0ull; gSoH3dLinkMidOverrideSet = 1;
+                P().midmask.overrideMask = ~0ull; P().midmask.overrideSet = 1;
             } else if (strcmp(arg, "only") == 0 && sscanf(line, "%*s %*s %d", &n) == 1) {
-                gSoH3dLinkMidOverride = (n >= 0 && n < 64) ? (1ull << n) : 0ull; gSoH3dLinkMidOverrideSet = 1;
+                P().midmask.overrideMask = (n >= 0 && n < 64) ? (1ull << n) : 0ull; P().midmask.overrideSet = 1;
             } else if (strcmp(arg, "add") == 0 && sscanf(line, "%*s %*s %d", &n) == 1) {
-                if (n >= 0 && n < 64) gSoH3dLinkMidOverride |= (1ull << n); gSoH3dLinkMidOverrideSet = 1;
+                if (n >= 0 && n < 64) P().midmask.overrideMask |= (1ull << n); P().midmask.overrideSet = 1;
             } else if (strcmp(arg, "del") == 0 && sscanf(line, "%*s %*s %d", &n) == 1) {
-                if (n >= 0 && n < 64) gSoH3dLinkMidOverride &= ~(1ull << n); gSoH3dLinkMidOverrideSet = 1;
+                if (n >= 0 && n < 64) P().midmask.overrideMask &= ~(1ull << n); P().midmask.overrideSet = 1;
             } else {
-                gSoH3dLinkMidOverride = strtoull(arg, NULL, 0); gSoH3dLinkMidOverrideSet = 1;
+                P().midmask.overrideMask = strtoull(arg, NULL, 0); P().midmask.overrideSet = 1;
             }
         }
         SoH3D_ReplReply(outPath, "linkmid override=%s mask=0x%llx",
-                        gSoH3dLinkMidOverrideSet ? "ON" : "OFF(auto)", gSoH3dLinkMidOverride);
+                        P().midmask.overrideSet ? "ON" : "OFF(auto)", P().midmask.overrideMask);
     } else if (strcmp(cmd, "linkgear") == 0) {
         // `linkgear <sword 0-3> <shield 0-3>` — equip a sword (0=none,1=kokiri,2=master,3=biggoron)
         // + shield (0=none,1=deku,2=hylian,3=mirror) on Link so the boy/adult equipment mids can be
