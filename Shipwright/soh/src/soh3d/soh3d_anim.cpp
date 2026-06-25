@@ -665,4 +665,74 @@ void SoH3D_UpdateAnimAuto(int modelId, const char* animName, float rate, float n
     }
 }
 
+// TWO-SOURCE per-limb blend (#85 carry-WALK): drive the LOWER body from `lowerAnim` (the locomotion
+// CSAB, free-run by `lowerRate` frames/draw exactly like the loco branch of SoH3D_UpdateAnimAuto —
+// the run/walk cycle's curFrame is dead during steady movement, so we advance by ground speed) and
+// the UPPER body from `upperAnim` (the carry pose CSAB). For each bone, `upperMask[id] != 0` selects
+// the upper clip (mask = the OoT3D analogue of sUpperBodyLimbCopyMap; see soh3d_link.cpp). The upper
+// clip is phase-locked to its N64 progress when meaningful (upperAnimLength > 4), else free-run, so a
+// real carry hold (carryB_wait, near-static) plays faithfully without a leg cycle bleeding into it.
+// This replaces the carry-walk N64-retarget detour in the 3DS-CSAB Link path (the last retarget dep).
+void SoH3D_UpdateAnimTwoSource(int modelId, const char* lowerAnim, float lowerRate,
+                               const char* upperAnim, float upperCurFrame, float upperAnimLength,
+                               const unsigned char* upperMask, int maskCount) {
+    static std::unordered_map<int, float> lowerFrames;     // per-model loco free-run playhead
+    static std::unordered_map<int, std::string> lastLower; // last lower CSAB (restart on change)
+    static std::unordered_map<int, float> upperFrames;     // per-model upper free-run playhead (fallback)
+    static std::unordered_map<int, std::string> lastUpper;
+    if (!lowerAnim || !*lowerAnim || !upperAnim || !*upperAnim) {
+        lowerFrames.erase(modelId); lastLower.erase(modelId);
+        upperFrames.erase(modelId); lastUpper.erase(modelId);
+        SoH3D_UpdateAnim(modelId, nullptr, 0); return;
+    }
+    LoadedModel* lm = loadModel(modelId);
+    if (!lm || !lm->ok || !lm->cmb || !lm->zar) return;
+    SoH3D::Csab* lower = getCsab(lm, lowerAnim);
+    SoH3D::Csab* upper = getCsab(lm, upperAnim);
+    if (!lower || !upper) { SoH3D_GL_SetBones(modelId, nullptr, 0); return; }
+
+    // LOWER: free-run by ground speed (legs cycle), restart on a CSAB change so a fresh clip plays
+    // from frame 0 rather than resuming the previous one's phase.
+    {
+        auto llIt = lastLower.find(modelId);
+        if (llIt == lastLower.end() || llIt->second != lowerAnim) lowerFrames[modelId] = 0.0f;
+        lastLower[modelId] = lowerAnim;
+    }
+    float fLower = lowerFrames[modelId];
+    lowerFrames[modelId] += lowerRate;
+
+    // UPPER: phase-lock to the N64 carry anim's progress when it carries real progress, else free-run
+    // (matching SoH3D_UpdateAnimAuto's lock/free choice).
+    float fUpper;
+    float upDur = (float)upper->duration();
+    if (upperAnimLength > 4.0f && upperCurFrame >= 0.0f && upDur > 0.0f) {
+        float phase = upperCurFrame / upperAnimLength;
+        phase -= std::floor(phase);
+        fUpper = phase * upDur;
+        upperFrames[modelId] = fUpper;
+        lastUpper[modelId] = upperAnim;
+    } else {
+        auto luIt = lastUpper.find(modelId);
+        if (luIt == lastUpper.end() || luIt->second != upperAnim) upperFrames[modelId] = 0.0f;
+        lastUpper[modelId] = upperAnim;
+        fUpper = upperFrames[modelId];
+        upperFrames[modelId] += gSoH3dAnimRate;
+    }
+
+    const float* drot = nullptr; int dcount = 0;
+    const float* post = nullptr; int pcount = 0;
+    getBoneRotDeltas(modelId, &drot, &dcount);
+    getBonePostRots(modelId, &post, &pcount);
+    std::vector<std::array<float, 16>> sm;
+    lower->skinMatricesTwoSource(*lm->cmb, fLower, *upper, fUpper, upperMask, maskCount, sm, drot,
+                                 dcount, post, pcount);
+    if (gSkinDumpFile && modelId == gSkinDumpModel) {
+        std::vector<std::array<float, 16>> aw;
+        lower->animatedBoneWorldTwoSource(*lm->cmb, fLower, *upper, fUpper, upperMask, maskCount, aw,
+                                          drot, dcount, post, pcount);
+        skinDumpWrite(modelId, lowerAnim, fLower, aw);
+    }
+    uploadSkin(modelId, lm, sm);
+}
+
 } // extern "C"
