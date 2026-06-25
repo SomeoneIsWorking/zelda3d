@@ -49,12 +49,18 @@ static SoH3D::Csab* getCsab(LoadedModel* lm, const char* animName) {
         const SoH3D::ZarFile* af = nullptr;
         for (const auto& f : lm->zar->files()) if (f.name == full) { af = &f; break; }
         if (!af && !verbatim) { // basename fallback: "<base>.csab" anywhere in the zar (link boy/child/anim)
-            std::string suffix = "/" + nm + ".csab";
-            for (const auto& f : lm->zar->files()) {
-                if (f.name.size() >= suffix.size() && f.name.compare(f.name.size() - suffix.size(), suffix.size(), suffix) == 0) {
-                    af = &f; full = f.name; // cache under the real path so a re-resolve hits directly
-                    break;
+            // Try the verbatim base first, then the child "cl_" prefix: Grezzo prefixes some child-age
+            // link anims with cl_ (e.g. boy dm_Tbox_open <-> child cl_dm_Tbox_open), so a single
+            // basename map entry resolves for either age. (See tools/gen_player_animmap.py resolves_in.)
+            const std::string suffixes[2] = { "/" + nm + ".csab", "/cl_" + nm + ".csab" };
+            for (const std::string& suffix : suffixes) {
+                for (const auto& f : lm->zar->files()) {
+                    if (f.name.size() >= suffix.size() && f.name.compare(f.name.size() - suffix.size(), suffix.size(), suffix) == 0) {
+                        af = &f; full = f.name; // cache under the real path so a re-resolve hits directly
+                        break;
+                    }
                 }
+                if (af) break;
             }
             auto it2 = lm->anims.find(full); // the resolved path may already be cached
             if (it2 != lm->anims.end()) return it2->second.get();

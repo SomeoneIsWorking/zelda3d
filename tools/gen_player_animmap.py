@@ -62,7 +62,19 @@ SUBS = [
     ("doorA_link", "doorA_lk"),     # demo_doorA_link -> dm_doorA_lk
     ("doorB_link", "doorB_lk"),
     ("kakeyori", "runup"),          # demo_kakeyori_* -> dm_runup_*
+    ("nml2fighter_free", "nml2ft_free"),  # normal_normal2fighter_free -> nml_nml2ft_free
+    ("child_tunnel", "cl_nml_tunnel"),    # child_tunnel_start/end -> cl_nml_tunnel_* (child crawl)
+    ("_demo", "_dm"),               # SUFFIX demos: hatto/okiru/shagamu_demo -> *_dm (demo_ prefix
+                                    # is handled by CATEGORY above; this only hits the trailing form)
 ]
+
+# Exact n64base -> CSAB overrides, applied BEFORE the rule pipeline. For ground-truth-verified cases
+# the rewrite rules can't express (e.g. Grezzo kept the full original name for one CSAB). Same
+# philosophy as the En_Ko/En_Hy CSAB overrides — verified, not guessed.
+OVERRIDES = {
+    # Grezzo kept the verbatim N64 name for this transition CSAB (no nml_ rename); exists both ages.
+    "gPlayerAnim_link_normal_free2freeB": "link_normal_free2freeB",
+}
 
 
 def csab_basenames(rom, zarpath):
@@ -71,6 +83,8 @@ def csab_basenames(rom, zarpath):
 
 
 def resolve(n64name):
+    if n64name in OVERRIDES:
+        return OVERRIDES[n64name]
     s = n64name[len(PREFIX):]
     for k, v in CATEGORY:
         if s.startswith(k):
@@ -79,6 +93,12 @@ def resolve(n64name):
     for a, b in SUBS:
         s = s.replace(a, b)
     return s
+
+
+def resolves_in(ageset, base):
+    """A CSAB base resolves in an age zar if the file exists verbatim OR under the child 'cl_' prefix
+    (Grezzo prefixes some child-age anims with cl_; the runtime getCsab has the matching fallback)."""
+    return base in ageset or ("cl_" + base) in ageset
 
 
 def main():
@@ -98,7 +118,10 @@ def main():
         if not re.fullmatch(r"gPlayerAnim_link_[A-Za-z0-9_]+", n):
             continue
         c = resolve(n)
-        if c in shared:
+        # Emit if the CSAB resolves in BOTH ages (verbatim or via the child cl_ prefix that the
+        # runtime getCsab fallback handles) — so age-specific names like dm_Tbox_open/cl_dm_Tbox_open
+        # are covered by a single basename entry.
+        if resolves_in(boy, c) and resolves_in(child, c):
             rows.append((n, c))
         else:
             dropped.append((n, c))
@@ -122,6 +145,17 @@ def main():
 
     print("wrote %s: %d entries (%d N64 anims, %d unmapped -> idle fallback)"
           % (os.path.relpath(OUT, REPO), len(rows), len(names), len(dropped)))
+
+    # Coverage audit: dump the UNMAPPED anims (fall back to idle) + the CSAB the rewrite rules tried
+    # but that isn't present in both age zars, so the 3DS-Link port gaps are visible at a glance.
+    cov = os.path.join(REPO, "scratch", "link_anim_coverage.txt")
+    os.makedirs(os.path.dirname(cov), exist_ok=True)
+    with open(cov, "w") as f:
+        f.write("# UNMAPPED player anims (fall back to idle in the 3DS-Link path)\n")
+        f.write("# n64base\t-> attempted CSAB (not present in both age zars)\n")
+        for n, c in sorted(dropped):
+            f.write("%s\t-> %s\n" % (n, c))
+    print("coverage gaps -> %s" % os.path.relpath(cov, REPO))
 
 
 if __name__ == "__main__":
