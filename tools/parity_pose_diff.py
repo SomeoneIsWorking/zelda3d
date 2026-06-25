@@ -1,32 +1,32 @@
 #!/usr/bin/env python3
 """parity_pose_diff.py — geometry-level Link pose parity: SoH3D resolved pose vs the OoT3D oracle.
 
-Compares two per-frame bone-world-position captures of the SAME 25-bone childlink_v2 rig:
-  SoH3D : REPL `skindump` CSV (cap,anim,frame,bone,m0..m11) — bone world pos = (m3,m7,m11) of aw=skin*bind
-  oracle: tools/oracle_link_pose.py CSV (cap,t_ms,bone,x,y,z) — live bone world positions from Azahar
+Compares per-bone LOCAL rotations (the pure, parent-relative anim output) of the SAME 25-bone
+childlink_v2 rig between:
+  SoH3D : REPL `skindump` CSV (cap,anim,frame,bone,m0..m11) — aw = animated bone-WORLD matrix.
+          We orthonormalize each bone's 3x3 and derive its LOCAL rotation R_local = R_parentᵀ·R_bone
+          using the rig parent map, so it is comparable to the oracle's local rotation.
+  oracle: tools/oracle_link_pose.py CSV (cap,t_ms,bone,r0..r8) — the live jointTable LOCAL rotation.
 
-Because the two live in different coordinate frames (Link faces a different way, different unit scale,
-different root placement), we PROCRUSTES-align each candidate frame pair — best-fit similarity transform
-(scale + rotation + translation, Kabsch) over the bone point cloud — then the residual RMSD is the
-pose mismatch, invariant to placement. Per-bone residual after alignment localizes WHICH bones diverge
+Both rigs share the same childlink_v2 bind frame, so local rotations are directly comparable (no
+alignment needed). For each oracle frame we find the SoH3D frame with the lowest mean per-bone geodesic
+angle (best phase match — the two playheads are not frame-locked), then report the per-bone divergence
+and an overall verdict (median best mean-angle, degrees). High per-bone angle = that joint diverges
 (e.g. static legs vs cycling legs = the #117 slide).
 
-Matching: for each oracle frame, find the SoH3D frame with the LOWEST aligned RMSD (the best phase
-match), since the two playheads are not frame-locked. Reports the per-oracle-frame best RMSD + the
-worst per-bone residuals, and an overall verdict (median best-RMSD) for the state.
-
 Usage:
-  tools/parity_pose_diff.py --soh scratch/parity/soh_idle.csv --oracle scratch/parity/oracle_idle.csv
-  tools/parity_pose_diff.py --soh ... --oracle ... --bones 1-21   # restrict to meaningful bones
+  tools/parity_pose_diff.py --soh scratch/parity/soh_run.csv --oracle scratch/parity/oracle_run.csv
+  tools/parity_pose_diff.py --soh ... --oracle ... --bones 1-21 --state run
 """
-import argparse, csv, sys
+import argparse, csv, math, sys
 
 try:
     import numpy as np
 except ImportError:
     sys.exit("parity_pose_diff: needs numpy (pip install numpy)")
 
-# childlink_v2 body-part labels (from oot3d-decomp link_skel_live.py)
+# childlink_v2 parent map + labels (from the CMB skeleton; see oot3d-decomp link_skel_live.py)
+PARENT = [-1, 0, 1, 2, 3, 4, 2, 6, 7, 1, 9, 10, 11, 10, 13, 14, 15, 10, 17, 18, 19, 10, 0, 22, 22]
 LABEL = {0: "root", 1: "waist", 2: "lower-pivot", 3: "thigh+X", 4: "shin+X", 5: "foot+X",
          6: "thigh-X", 7: "shin-X", 8: "foot-X", 9: "upper-pivot", 10: "chest", 11: "head",
          12: "hat", 13: "clav+X", 14: "shldr+X", 15: "elbow+X", 16: "hand+X", 17: "clav-X",
@@ -38,31 +38,52 @@ def parse_bones(spec):
     out = set()
     for part in spec.split(","):
         if "-" in part:
-            a, b = part.split("-")
-            out.update(range(int(a), int(b) + 1))
+            a, b = part.split("-"); out.update(range(int(a), int(b) + 1))
         else:
             out.add(int(part))
     return sorted(out)
 
 
-def load_soh(path, bones):
-    """-> {cap: {bone: (x,y,z)}} from skindump (bone world pos = m3,m7,m11)."""
-    frames = {}
+def ortho(R):
+    """Nearest rotation matrix to a possibly-scaled 3x3 (polar via SVD)."""
+    U, _, Vt = np.linalg.svd(R)
+    M = U @ Vt
+    if np.linalg.det(M) < 0:
+        U[:, -1] *= -1; M = U @ Vt
+    return M
+
+
+def geo_angle(Ra, Rb):
+    """Geodesic angle (deg) between two rotation matrices."""
+    c = (np.trace(Ra.T @ Rb) - 1.0) * 0.5
+    return math.degrees(math.acos(max(-1.0, min(1.0, c))))
+
+
+def load_soh_local(path, bones):
+    """skindump aw -> {cap: {bone: R_local(3x3)}}. R_local = R_parentᵀ · R_bone (orthonormalized)."""
+    world = {}  # cap -> bone -> R_world(3x3)
     with open(path) as f:
         for row in csv.reader(f):
             if not row or row[0].startswith("#") or row[0] == "cap":
                 continue
             cap = int(row[0]); bone = int(row[3])
-            if bone not in bones:
+            m = [float(x) for x in row[4:16]]  # m0..m11 (row-major top 3 rows)
+            R = ortho(np.array([[m[0], m[1], m[2]], [m[4], m[5], m[6]], [m[8], m[9], m[10]]]))
+            world.setdefault(cap, {})[bone] = R
+    out = {}
+    for cap, bw in world.items():
+        for b in bones:
+            if b not in bw:
                 continue
-            m3, m7, m11 = float(row[7]), float(row[11]), float(row[15])
-            frames.setdefault(cap, {})[bone] = (m3, m7, m11)
-    return frames
+            p = PARENT[b] if b < len(PARENT) else -1
+            Rl = bw[b] if (p < 0 or p not in bw) else bw[p].T @ bw[b]
+            out.setdefault(cap, {})[b] = Rl
+    return out
 
 
-def load_oracle(path, bones):
-    """-> {cap: {bone: (x,y,z)}} from oracle_link_pose."""
-    frames = {}
+def load_oracle_local(path, bones):
+    """oracle_link_pose -> {cap: {bone: R_local(3x3)}} (already local)."""
+    out = {}
     with open(path) as f:
         for row in csv.reader(f):
             if not row or row[0] == "cap":
@@ -70,32 +91,9 @@ def load_oracle(path, bones):
             cap = int(row[0]); bone = int(row[2])
             if bone not in bones:
                 continue
-            frames.setdefault(cap, {})[bone] = (float(row[3]), float(row[4]), float(row[5]))
-    return frames
-
-
-def procrustes(P, Q):
-    """Best-fit similarity (scale s, rotation R, translation t) mapping P->Q (Umeyama).
-    Returns (rmsd, per_point_residual[n])."""
-    Pc = P - P.mean(0); Qc = Q - Q.mean(0)
-    H = Pc.T @ Qc
-    U, S, Vt = np.linalg.svd(H)
-    d = np.sign(np.linalg.det(Vt.T @ U.T))
-    D = np.diag([1, 1, d])
-    R = Vt.T @ D @ U.T
-    varP = (Pc ** 2).sum()
-    s = (S * np.array([1, 1, d])).sum() / varP if varP > 1e-9 else 1.0
-    Pa = (s * (R @ Pc.T)).T  # aligned, centered
-    resid = np.linalg.norm(Pa - Qc, axis=1)
-    rmsd = float(np.sqrt((resid ** 2).mean()))
-    return rmsd, resid
-
-
-def common_matrix(frame_a, frame_b, bones):
-    common = [b for b in bones if b in frame_a and b in frame_b]
-    A = np.array([frame_a[b] for b in common])
-    B = np.array([frame_b[b] for b in common])
-    return common, A, B
+            r = [float(x) for x in row[3:12]]
+            out.setdefault(cap, {})[bone] = np.array([r[0:3], r[3:6], r[6:9]])
+    return out
 
 
 def main():
@@ -107,43 +105,40 @@ def main():
     args = ap.parse_args()
     bones = parse_bones(args.bones)
 
-    soh = load_soh(args.soh, set(bones))
-    ora = load_oracle(args.oracle, set(bones))
+    soh = load_soh_local(args.soh, set(bones))
+    ora = load_oracle_local(args.oracle, set(bones))
     if not soh or not ora:
         sys.exit(f"parity_pose_diff: empty capture (soh={len(soh)} oracle={len(ora)} frames)")
 
-    print(f"== parity [{args.state}]  soh:{len(soh)}f  oracle:{len(ora)}f  bones:{args.bones} ==")
-    best_rmsds = []
-    worst_bone_acc = {}
-    # scale normalization: normalize each cloud by its own RMS radius so RMSD is in % of skeleton size
+    print(f"== parity [{args.state}]  soh:{len(soh)}f  oracle:{len(ora)}f  bones:{args.bones} "
+          f"(per-bone LOCAL rotation, deg) ==")
+    best_means = []
+    worst_bone = {}
     for ocap in sorted(ora):
         of = ora[ocap]
-        best = None
+        best = None  # (mean_deg, scap, {bone: deg})
         for scap in sorted(soh):
-            common, A, B = common_matrix(soh[scap], of, bones)
+            sf = soh[scap]
+            common = [b for b in bones if b in of and b in sf]
             if len(common) < 4:
                 continue
-            rmsd, resid = procrustes(A, B)
-            # normalize by oracle skeleton radius (scale-free %)
-            rad = np.linalg.norm(B - B.mean(0), axis=1).mean()
-            pct = 100.0 * rmsd / rad if rad > 1e-6 else rmsd
-            if best is None or pct < best[0]:
-                best = (pct, scap, common, resid, rad)
+            per = {b: geo_angle(of[b], sf[b]) for b in common}
+            mean = sum(per.values()) / len(per)
+            if best is None or mean < best[0]:
+                best = (mean, scap, per)
         if best is None:
             continue
-        pct, scap, common, resid, rad = best
-        best_rmsds.append(pct)
-        # accumulate worst per-bone residual (normalized)
-        for b, r in zip(common, resid):
-            worst_bone_acc[b] = max(worst_bone_acc.get(b, 0.0), 100.0 * r / rad)
-        print(f"  oracle f{ocap:2d} -> soh f{scap:<3d}  bestRMSD={pct:6.2f}% of skeleton radius")
+        mean, scap, per = best
+        best_means.append(mean)
+        for b, d in per.items():
+            worst_bone[b] = max(worst_bone.get(b, 0.0), d)
 
-    med = float(np.median(best_rmsds)) if best_rmsds else float("nan")
-    print(f"\n  MEDIAN best-RMSD = {med:.2f}%   "
-          f"({'MATCH' if med < 6 else 'DIVERGENT' if med > 12 else 'marginal'})")
-    print("  worst per-bone residual (normalized %):")
-    for b in sorted(worst_bone_acc, key=lambda b: -worst_bone_acc[b])[:8]:
-        print(f"    bone {b:2d} {LABEL.get(b,'?'):10s} {worst_bone_acc[b]:6.2f}%")
+    med = float(np.median(best_means)) if best_means else float("nan")
+    verdict = "MATCH" if med < 8 else "DIVERGENT" if med > 20 else "marginal"
+    print(f"  MEDIAN best mean-angle = {med:.1f} deg   ({verdict})")
+    print("  worst per-bone divergence (deg, across frames):")
+    for b in sorted(worst_bone, key=lambda b: -worst_bone[b])[:10]:
+        print(f"    bone {b:2d} {LABEL.get(b,'?'):10s} {worst_bone[b]:6.1f}")
 
 
 if __name__ == "__main__":
