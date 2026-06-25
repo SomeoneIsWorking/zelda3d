@@ -233,7 +233,7 @@ static const SoH3DAnimMap kSoH3dAnimMaps[] = {
     SOH3D_ANIMMAP("objects/object_ei/gStingerPopOutAnim", "ei_die"),
     SOH3D_ANIMMAP("objects/object_ei/gStingerDiveAnim", "ei_dmg"),
     SOH3D_ANIMMAP("objects/object_ei/gStingerBackflipAnim", "ei_dmg"),
-    SOH3D_ANIMMAP("objects/object_ei/gStingerHitAnim", "ei_swim"),  // N64=80f; ei_swim=80f (exact); ei_dmg=21f was WRONG
+    SOH3D_ANIMMAP("objects/object_ei/gStingerHitAnim", "ei_dmg"),
     SOH3D_ANIMMAP("objects/object_ei/gStingerIdleAnim", "ei_wait"),
     // ---- /actor/zelda_fantomHG.zar (object_fhg) ----
     SOH3D_ANIMMAP("objects/object_fhg/gPhantomHorseRunningAnim", "hgf_fastrun"),
@@ -586,11 +586,6 @@ static const SoH3DAnimMap kSoH3dAnimMaps[] = {
     SOH3D_ANIMMAP("objects/object_os_anime/gKokiriStandingArmsBehindBackAnim", "km1_usirote_pose"),  // OVERRIDE (was km1_ukiuki_wait)
     SOH3D_ANIMMAP("objects/object_os_anime/gKokiriLeaningForwardAnim", "km1_utsumuki_pose"),  // OVERRIDE (was fad_kusu_to_wait)
     SOH3D_ANIMMAP("objects/object_os_anime/gKokiriSittingCrossedLegsAnim", "km1_agura_pose"),  // OVERRIDE (was km1_bed_suwari_pose)
-    // #87: gKokiriStandUpAnim is held FROZEN per-kid at frames 0/1/2 (STANDUP_1/2/3) as static rest
-    // poses — some standing, the shop-awning girl (frame 1) SEATED. A single anim->CSAB entry can't
-    // serve all (mapping all to km1_suwari_pose made EVERY girl sit — regression). The correct fix
-    // needs the OoT3D actor's own per-kid variant/anim choice as ground truth (3DS oracle tooling,
-    // tracked on the board); until then keep the standing idle so only the awning girl is wrong.
     SOH3D_ANIMMAP("objects/object_os_anime/gKokiriStandUpAnim", "km1_ukiuki_wait"),  // OVERRIDE (was fad_kusu_to_wait)
     SOH3D_ANIMMAP_Z("objects/object_os_anime/gObjOsAnim_9F94", "km1_out_in_pose3", "/actor/zelda_km1.zar"),
     SOH3D_ANIMMAP_Z("objects/object_os_anime/gObjOsAnim_A630", "kw1_out_in_pose2", "/actor/zelda_km1.zar"),
@@ -635,20 +630,16 @@ static const SoH3DAnimMap kSoH3dAnimMaps[] = {
     SOH3D_ANIMMAP("objects/object_mb/gEnMbClubStandUpAnim", "mbV_s_wait"),
     SOH3D_ANIMMAP("objects/object_mb/gEnMbClubStandStillClubDownAnim", "mbV_s_wait"),
     // ---- /actor/zelda_md.zar (object_md) ----
-    // md_matsu_kani (16f): oracle animLen=16 for Kokiri gating Mido playing gMidoHandsOnHipsIdleAnim (N64 16f)
-    SOH3D_ANIMMAP("objects/object_md/gMidoHandsOnHipsIdleAnim", "md_matsu_kani"),
+    SOH3D_ANIMMAP("objects/object_md/gMidoHandsOnHipsIdleAnim", "mido_stop_wait"),
     SOH3D_ANIMMAP("objects/object_md/gMidoSlamAnim", "mido_are_to_okoru_a"),
     SOH3D_ANIMMAP("objects/object_md/gMidoAngryHeadTurnAnim", "mido_are_to_okoru_b"),
-    // mido_are_wait (24f): N64 AnnoyedPointedHead1 is 24f, oracle mido_are_wait=24f exact match
-    SOH3D_ANIMMAP("objects/object_md/gMidoAnnoyedPointedHeadIdle1Anim", "mido_are_wait"),
+    SOH3D_ANIMMAP("objects/object_md/gMidoAnnoyedPointedHeadIdle1Anim", "mido_stop_wait"),
     SOH3D_ANIMMAP("objects/object_md/gMidoHandsOnHipsTransitionAnim", "mido_kihon_to_okoru"),
     SOH3D_ANIMMAP("objects/object_md/gMidoRaiseHand1Anim", "mido_kihon_to_stop"),
     SOH3D_ANIMMAP("objects/object_md/gMidoAnim_92B0", "mido_kihon_to_okoru"),
     SOH3D_ANIMMAP("objects/object_md/gMidoRaiseHand2Anim", "mido_okoru_to_stop"),
-    // mido_okoru_wait (16f): AnnoyedPointedHead2 is N64 16f; okoru=angry, semantic match for annoyed idle
-    SOH3D_ANIMMAP("objects/object_md/gMidoAnnoyedPointedHeadIdle2Anim", "mido_okoru_wait"),
+    SOH3D_ANIMMAP("objects/object_md/gMidoAnnoyedPointedHeadIdle2Anim", "mido_stop_wait"),
     SOH3D_ANIMMAP("objects/object_md/gMidoPutHandDownAnim", "mido_stop_to_are"),
-    // mido_stop_wait (18f): HaltAnim is N64 18f, exact frame-count match
     SOH3D_ANIMMAP("objects/object_md/gMidoHaltAnim", "mido_stop_wait"),
     SOH3D_ANIMMAP("objects/object_md/gMidoWalkingAnim", "mido_walk_loop"),
     // ---- /actor/zelda_mk.zar (object_mk) ----
@@ -687,7 +678,7 @@ static const SoH3DAnimMap kSoH3dAnimMaps[] = {
     SOH3D_ANIMMAP("objects/object_nb/gNabooruSittingCrossLeggedTurningToLookUpRightTransitionAnim", "nabor_furimuki_l_wait"),
     SOH3D_ANIMMAP("objects/object_nb/gNabooruKneeingToRunningToHitAnim", "nabor_run_to_hit"),
     SOH3D_ANIMMAP("objects/object_nb/gNabooruUnusedKneelingAtCrawlspaceToStandingTransitionAnim", "nabor_kihon_talk_wait"),
-    SOH3D_ANIMMAP("objects/object_nb/gNabooruKneeingAtCrawlspaceAnim", "nabor_agura_wait"),
+    SOH3D_ANIMMAP("objects/object_nb/gNabooruKneeingAtCrawlspaceAnim", "nabor_hiza_wait"),  // OVERRIDE (was nabor_agura_wait)
     SOH3D_ANIMMAP("objects/object_nb/gNabooruCollapseFromStandingToKneelingTransitionAnim", "nabor_kihon_talk_wait"),
     SOH3D_ANIMMAP("objects/object_nb/gNabooruWalkingAnim", "nabor_walk_loop"),
     SOH3D_ANIMMAP("objects/object_nb/gNabooruStandingHandsOnHipsChamberOfSagesAnim", "nabor_kihon_talk_wait"),
@@ -796,7 +787,7 @@ static const SoH3DAnimMap kSoH3dAnimMaps[] = {
     SOH3D_ANIMMAP("objects/object_ru1/gRutoChildSquirmAnim", "koruto_jitabata"),
     SOH3D_ANIMMAP("objects/object_ru1/gRutoChildSeesSapphireAnim", "koruto_jitabata"),
     SOH3D_ANIMMAP("objects/object_ru1/gRutoChildShutterAnim", "koruto_banzai_modoru"),
-    SOH3D_ANIMMAP("objects/object_ru1/gRutoChildWalkToAndHoldUpSapphireAnim", "koruto_run_banzai"),
+    SOH3D_ANIMMAP("objects/object_ru1/gRutoChildWalkToAndHoldUpSapphireAnim", "koruto_walk_2"),
     SOH3D_ANIMMAP("objects/object_ru1/gRutoChildSittingAnim", "demo_suwari"),
     SOH3D_ANIMMAP("objects/object_ru1/gRutoChildSitAnim", "demo_suwari"),
     SOH3D_ANIMMAP("objects/object_ru1/gRutoChildWalkAnim", "koruto_walk_2"),
@@ -942,11 +933,7 @@ static const SoH3DAnimMap kSoH3dAnimMaps[] = {
     SOH3D_ANIMMAP("objects/object_st/object_st_Anim_0055A8", "st_yarare"),
     SOH3D_ANIMMAP("objects/object_st/object_st_Anim_005B98", "st_matsu"),
     // ---- /actor/zelda_ta.zar (object_ta) ----
-    // ta_inemuri (100f, "dozing off sitting") is the correct CSAB for the sit-sleep pose.
-    // taron_sleep_wait (32f) is the lying-down sleep loop used by gTalonSleepAnim.
-    // Oracle (scene 95, En_Ta id=132): gTalonSleepAnim confirmed animLength=32 -> taron_sleep_wait OK.
-    // Proposal high_dframe_proposals.tsv: gTalonSitSleepingAnim dframe=68 (100-32) -> ta_inemuri.
-    SOH3D_ANIMMAP("objects/object_ta/gTalonSitSleepingAnim", "ta_inemuri"),
+    SOH3D_ANIMMAP("objects/object_ta/gTalonSitSleepingAnim", "taron_sleep_wait"),
     SOH3D_ANIMMAP("objects/object_ta/gTalonStandAnim", "ta_matsu"),
     SOH3D_ANIMMAP("objects/object_ta/gTalonSitHandsUpAnim", "ta_nageru"),
     SOH3D_ANIMMAP("objects/object_ta/gTalonSitWakeUpAnim", "ta_okiru"),
