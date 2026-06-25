@@ -35,13 +35,14 @@ PLAYER_STATE1_IN_CUTSCENE = 0x20000000
 KOKIRI_ENTRANCE = 0xEE
 
 # state name -> (stick_x, stick_y, buttons). Forward = +y.
-# CALIBRATION CAVEAT: the SoH3D side feeds the N64 control stick (effective range ~+-84) while the
-# oracle feeds the 3DS circle pad (range +-100). The same raw magnitude is therefore a DIFFERENT
-# fraction-of-max on each side, so INTERMEDIATE-speed states (walk) are not directly comparable and
-# will read as false DIVERGE (e.g. stick 40 = run on N64, sub-walk idle on the circle pad). Only the
-# UNAMBIGUOUS endpoints are reliable selection checks: idle (0 = no motion) and run (full deflection =
-# top speed on both). To make `walk` trustworthy, calibrate the two magnitudes to equal SPEED (drive
-# until speedXZ matches) — TODO. For now treat `walk` as advisory, idle/run/back-full as authoritative.
+# NOTE: this raw-stick sweep cannot compare INTERMEDIATE-speed states because the N64 stick (~±84) and
+# the 3DS circle pad (±100) map a magnitude to different speeds. The fix is the SPEED-CALIBRATED sweep
+# tools/parity_speed_sweep.py, which compares selection at matched speedXZ. That sweep CONFIRMED a REAL
+# divergence at walk speed (NOT the "calibration artifact" earlier sessions assumed): at speedXZ~1.0 the
+# oracle selects nml_walk_free while SoH3D selects nml_run_free — SoH3D reads the live N64 player anim
+# (one run anim, speed-scaled playback) and maps it straight to nml_run_free, whereas OoT3D/Grezzo
+# SELECTS distinct walk/run CSABs by speed. Use parity_speed_sweep.py for walk; this tool stays valid
+# for the unambiguous endpoints idle (no motion) and run (full deflection = top speed on both sides).
 STATES = {
     "idle":     (0,   0,   ""),
     "walk":     (0,   40,  ""),  # advisory only (calibration caveat above)
