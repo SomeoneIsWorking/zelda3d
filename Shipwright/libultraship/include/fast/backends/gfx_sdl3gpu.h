@@ -154,6 +154,13 @@ class GfxRenderingAPISdl3Gpu : public GfxRenderingAPI {
     void AppendSoH3DOwnPass(std::function<void(SDL_GPUCommandBuffer*)> fn);
     // Pixel dimensions of the main framebuffer (fb 0) — the HUD / menu pixel-space coordinate basis.
     void MainFbSize(int& w, int& h);
+    // The fb 0 color SDL_GPUTexture — for the RmlUi menu's own offscreen composite pass (it loads
+    // this colour, draws the stencil-clipped menu over it, stores it back) without disturbing fb 0's
+    // D32_FLOAT depth (which the GetPixelDepth readback reads as raw float, so it must NOT carry a
+    // stencil aspect). null if fb 0 has no colour yet.
+    SDL_GPUTexture* MainFbColorTexture() {
+        return (!mFramebuffers.empty()) ? mFramebuffers[0].color : nullptr;
+    }
     // True while a frame is recording (StartFrame ran, FinishRender has not) — HUD/menu ops appended
     // now will replay this frame.
     bool FrameRecording() {

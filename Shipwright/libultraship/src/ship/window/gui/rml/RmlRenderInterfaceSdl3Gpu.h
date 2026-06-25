@@ -6,12 +6,17 @@
 // replays on top of the game (N64 + OoT3D models + HUD) in the same single render pass. There is no
 // live-command-buffer handshake (the Vulkan interface's model is gone).
 //
-// Feature set (M3): compiled geometry (VBO+IBO), generated/loaded textures, scissor rect.
-// LIMITATIONS vs the Vulkan interface (deferred): stencil clip-mask (EnableClipMask/RenderToClipMask
-// are no-ops — overflow:hidden + border-radius will not clip) and the layer stack / opacity filters
-// (PushLayer/PopLayer/CompositeLayers render straight to fb 0, so filter:opacity()/box-shadow are
-// no-ops). The SDL3 GPU backend's depth target is D32_FLOAT (no stencil), so a stencil clip-mask
-// needs a backend depth-format change first.
+// Feature set (M3 + M3 polish): compiled geometry (VBO+IBO), generated/loaded textures, scissor
+// rect, and the STENCIL CLIP-MASK (EnableClipMask / RenderToClipMask — overflow:hidden +
+// border-radius now clip correctly). The menu's draw op runs as its OWN offscreen pass that loads
+// fb 0's colour and binds a PRIVATE D24S8/D32S8 depth-stencil target (cleared to 0 at pass begin),
+// so fb 0's D32_FLOAT depth is untouched (GetPixelDepth still reads it as raw float). Because SDL3
+// GPU cannot clear stencil mid-pass (no vkCmdClearAttachments), each Set/Intersect uses a
+// monotonically-INCREMENTING stencil ref instead of a per-region clear (normal draws test EQUAL
+// against the live ref) — equivalent to the Vulkan path minus the clear.
+// LIMITATIONS still deferred: the layer stack / opacity filters (PushLayer/PopLayer/CompositeLayers
+// render straight to the menu pass, so filter:opacity()/box-shadow are no-ops) and SetInverse
+// clip-mask (rare; treated as no clip).
 
 #ifdef ENABLE_SDL3GPU
 
@@ -51,11 +56,11 @@ class RmlRenderInterfaceSdl3Gpu : public Rml::RenderInterface {
     void EnableScissorRegion(bool enable) override;
     void SetScissorRegion(Rml::Rectanglei region) override;
 
-    // Clip-mask + layers: deferred (see header note). No-op so content still renders to fb 0.
-    void EnableClipMask(bool) override {
-    }
-    void RenderToClipMask(Rml::ClipMaskOperation, Rml::CompiledGeometryHandle, Rml::Vector2f) override {
-    }
+    // Stencil clip-mask (overflow:hidden + border-radius). See header note for the deferred model.
+    void EnableClipMask(bool enable) override;
+    void RenderToClipMask(Rml::ClipMaskOperation operation, Rml::CompiledGeometryHandle geometry,
+                          Rml::Vector2f translation) override;
+    // Layers / opacity filters: still deferred (see header note). No-op so content renders straight.
     Rml::LayerHandle PushLayer() override;
     void CompositeLayers(Rml::LayerHandle, Rml::LayerHandle, Rml::BlendMode,
                          Rml::Span<const Rml::CompiledFilterHandle>) override {
@@ -82,6 +87,8 @@ class RmlRenderInterfaceSdl3Gpu : public Rml::RenderInterface {
         float translate[2];
         bool scissorOn;
         SDL_Rect scissor;
+        bool maskWrite;     // true = write the stencil clip-mask (no colour); false = normal draw
+        uint8_t stencilRef; // mask-write: value painted; normal draw: value tested (EQUAL)
     };
     struct PendingFree {
         uint64_t freeAtFrame;
@@ -90,6 +97,7 @@ class RmlRenderInterfaceSdl3Gpu : public Rml::RenderInterface {
     };
 
     bool EnsureResources();
+    bool EnsureStencilTarget(int w, int h);
     SDL_GPUTexture* UploadTexture(const void* rgba, int w, int h);
     void ProcessPendingFrees();
 
@@ -101,12 +109,24 @@ class RmlRenderInterfaceSdl3Gpu : public Rml::RenderInterface {
 
     SDL_GPUShader* mVs = nullptr;
     SDL_GPUShader* mFs = nullptr;
-    SDL_GPUGraphicsPipeline* mPipeline = nullptr;
+    SDL_GPUGraphicsPipeline* mPipeline = nullptr;     // normal draw: stencil test EQUAL, no stencil write
+    SDL_GPUGraphicsPipeline* mPipelineMask = nullptr; // mask write: stencil ALWAYS+REPLACE, no colour
     SDL_GPUSampler* mSampler = nullptr;
     SDL_GPUTexture* mWhiteTex = nullptr;
 
+    // Private depth-stencil target for the menu's own composite pass (D24S8/D32S8; depth unused).
+    SDL_GPUTexture* mStencilTarget = nullptr;
+    SDL_GPUTextureFormat mStencilFormat = SDL_GPU_TEXTUREFORMAT_D24_UNORM_S8_UINT;
+    int mStencilW = 0, mStencilH = 0;
+
     bool mScissorEnabled = false;
     SDL_Rect mScissor{};
+
+    // Stencil clip-mask state (per Render() frame). mStencilCounter increments per Set/Intersect so
+    // no mid-pass stencil clear is needed; mStencilRef is the value normal draws test EQUAL against.
+    bool mClipMaskEnabled = false;
+    uint8_t mStencilRef = 0;
+    uint8_t mStencilCounter = 0;
 
     std::unordered_map<Rml::CompiledGeometryHandle, Geometry> mGeometries;
     std::unordered_map<Rml::TextureHandle, SDL_GPUTexture*> mTextures;
