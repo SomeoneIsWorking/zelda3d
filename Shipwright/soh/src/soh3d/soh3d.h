@@ -459,6 +459,7 @@ void SoH3D_EnsureModelProvider(void);                                   // lazy 
 int SoH3D_AutoModelId(const char* zarPath);                            // get-or-alloc a GL model id
 // Bridges for the structured model-REPLACEMENT behaviors (behaviors/actor/<actor>.cpp):
 int SoH3D_TryActorModelDraw(PlayState* play, Actor* actor);            // dispatch actor->behavior->tryDrawModel
+int SoH3D_ActorDrawSpaceTransform(void* actor, float* outLiftY, float* outLocalOff); // faithful draw-space offset
 int SoH3D_DrawActorModel(PlayState* play, int modelId, Actor* actor, float worldScale); // draw OoT3D CMB at actor xform
 float SoH3D_GScale(int slot, float def);                              // live REPL `gscale <slot>` or def
 // Low-level retarget primitives (DEFINED in soh3d_model.cpp); forwarded here so link.cpp sees them.
