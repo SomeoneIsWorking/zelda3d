@@ -5550,6 +5550,15 @@ static void SoH3D_ReplExec(PlayState* play, char* line, const char* outPath) {
                 SoH3D_ReplReply(outPath, "ainfo ruppy colorIdx=%d type=%d invisible=%d scale=%.3f",
                                 r->colorIdx, r->type, r->invisible, a->scale.x);
             }
+            if (a->id == ACTOR_EN_ITEM00) {
+                EnItem00* it = (EnItem00*)a;
+                SoH3D_ReplReply(outPath,
+                                "ainfo item00 params=%d scale=%.4f shapeRot=(%d,%d,%d) "
+                                "unk_156=0x%X unk_158=0x%X blinkHidden=%d",
+                                a->params, a->scale.x, a->shape.rot.x, a->shape.rot.y, a->shape.rot.z,
+                                (u16)it->unk_156, (u16)it->unk_158,
+                                (it->unk_156 & it->unk_158) ? 1 : 0);
+            }
         }
     } else if (strcmp(cmd, "apeek") == 0) {
         // GENERIC actor-memory peek: dump <count> s16s at byte offset <off> from the selected
