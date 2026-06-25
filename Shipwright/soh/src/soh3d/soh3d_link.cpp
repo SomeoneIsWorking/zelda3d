@@ -64,6 +64,8 @@ float gSoH3dLinkRotY = 0.0f;
 float gSoH3dLinkRotZ = 0.0f;
 char gSoH3dLinkForceCsab[64] = ""; // REPL `linkanim <csab>` pins a CSAB on Link (verify idle/walk/run
                                    // deterministically without real movement input); empty = live-resolve
+int gSoH3dLinkTrace = 0; // REPL `linktrace 1`: per-draw log of heldActor/carryWalk/lower+upper anim/csab
+                         // to stdout (scratch/logs/run.log) — diagnoses the #117 pickup (carryB) path.
 // REPL `linktwo <lower> <upper>`: force the #85 two-source per-limb blend (lower loco + upper carry)
 // with explicit CSAB bases, so the carry-walk pose can be captured/verified WITHOUT a live grab
 // (skindump + the bone partition). Lower free-runs at gSoH3dAnimRate (legs cycle); upper free-runs
@@ -454,8 +456,18 @@ extern "C" int SoH3D_PlayerDrawImpl(PlayState* play, Actor* actor) {
         //                  speed exactly like the walk/run loco cycle.
         //   carry-IDLE  -> the upper carry CSAB resolved from player->upperSkelAnime (carryB_wait),
         //                  whole rig (N64 SetCopyAll while standing).
+        //   PICKUP/LIFT -> the LOWER skelAnime itself plays the lift clip whole-body (N64
+        //                  LinkAnimation_PlayOnce(&skelAnime, carryB...) at z_player.c:5578 — the upper
+        //                  copy is NOT yet engaged). So the upper override below must ONLY fire when the
+        //                  upper body is GENUINELY holding the carry pose (carryB_wait). Gating on
+        //                  upperSkelAnime being a *carry* anim is exactly N64's SetCopy condition
+        //                  (it copies the upper carry pose, meaningful only when the upper IS carry).
+        //                  #117 BUG (fixed): without this gate, the instant heldActor is set mid-lift
+        //                  the upper (still wait_free) clobbered the lower's lift clip -> instant snap
+        //                  to carry-hold instead of OoT3D's ~0.5s raise. Live-traced 2026-06-25.
         const char* upperCarryCsab = NULL;
-        if (player->heldActor != NULL && player->upperSkelAnime.animation != NULL) {
+        if (player->heldActor != NULL && player->upperSkelAnime.animation != NULL &&
+            strstr((const char*)player->upperSkelAnime.animation, "carry") != NULL) {
             upperCarryCsab = SoH3D_ResolvePlayerCsab((const char*)player->upperSkelAnime.animation);
         }
         if (carryWalk && gSoH3dLinkForceCsab[0] == '\0') {
@@ -468,6 +480,18 @@ extern "C" int SoH3D_PlayerDrawImpl(PlayState* play, Actor* actor) {
         }
         if (gSoH3dLinkForceCsab[0] != '\0') {
             csab = gSoH3dLinkForceCsab; // REPL `linkanim` override (verification)
+        }
+        if (gSoH3dLinkTrace) {
+            // #117 pickup diagnosis: trace the exact fields that decide the carry/lift CSAB per draw.
+            const char* lo = (const char*)player->skelAnime.animation;
+            const char* lob = lo ? strrchr(lo, '/') : NULL; lob = lob ? lob + 1 : (lo ? lo : "(null)");
+            const char* up = (const char*)player->upperSkelAnime.animation;
+            const char* upb = up ? strrchr(up, '/') : NULL; upb = upb ? upb + 1 : (up ? up : "(null)");
+            printf("LINKTRACE held=%d carryWalk=%d lin=%.2f spd=%.2f lower=%s(cf=%.1f/%.1f) upper=%s(cf=%.1f) -> csab=%s\n",
+                   player->heldActor != NULL, carryWalk, player->linearVelocity, player->actor.speedXZ,
+                   lob, player->skelAnime.curFrame, player->skelAnime.animLength,
+                   upb, player->upperSkelAnime.curFrame, csab);
+            fflush(stdout);
         }
         if (gSoH3dAnimDebug) {
             static int dbg = 0;
@@ -753,6 +777,10 @@ int SoH3D::PlayerBehavior::repl(PlayState* play, const char* cmd, const char* li
                                 pl->skelAnime.limbCount, LINK_AGE_IN_YEARS);
             }
         }
+    } else if (strcmp(cmd, "linktrace") == 0 && sscanf(line, "%*s %i", &iv) == 1) {
+        gSoH3dLinkTrace = iv ? 1 : 0;
+        SoH3D_ReplReply(outPath, "linktrace=%d (per-draw held/carryWalk/lower+upper anim/csab -> run.log)",
+                        gSoH3dLinkTrace);
     } else if (strcmp(cmd, "link") == 0 && sscanf(line, "%*s %i", &iv) == 1) {
         gSoH3dLinkOn = iv ? 1 : 0;
         SoH3D_ReplReply(outPath, "link=%d (OoT3D player body replacement, proof-of-hook bind pose)",
