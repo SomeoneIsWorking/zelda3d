@@ -1956,6 +1956,24 @@ void GfxRenderingAPISdl3Gpu::AppendSoH3DInPass(std::function<void(SDL_GPUCommand
     mOps.push_back(std::move(op));
 }
 
+void GfxRenderingAPISdl3Gpu::AppendSoH3DInPassFb(int fb,
+                                                 std::function<void(SDL_GPUCommandBuffer*, SDL_GPURenderPass*)> fn) {
+    Op op{};
+    op.kind = OP_EXT_IN_PASS;
+    op.fb = fb;
+    op.extIn = std::move(fn);
+    mOps.push_back(std::move(op));
+}
+
+void GfxRenderingAPISdl3Gpu::MainFbSize(int& w, int& h) {
+    if (!mFramebuffers.empty() && mFramebuffers[0].width > 0) {
+        w = (int)mFramebuffers[0].width;
+        h = (int)mFramebuffers[0].height;
+    } else {
+        w = h = 0;
+    }
+}
+
 void GfxRenderingAPISdl3Gpu::AppendSoH3DOwnPass(std::function<void(SDL_GPUCommandBuffer*)> fn) {
     Op op{};
     op.kind = OP_EXT_OWN_PASS;
