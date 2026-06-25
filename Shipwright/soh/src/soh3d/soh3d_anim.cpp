@@ -388,6 +388,55 @@ extern "C" float SoH3D_PosedGroundOffset(int modelId, unsigned long long midMask
     return (mn < 1e29f) ? -mn : 0.0f;
 }
 
+// Headless-observation tooling: the POSED model-local AABB (min/max over the visible, skinned
+// vertices) of `modelId` this frame. Lets the REPL frame the camera on where an actor's model
+// ACTUALLY draws — not its world.pos anchor — which for posed/offset actors (Queen Gohma on the
+// ceiling, flying creatures, held items) can be far from the anchor. Same skin transform + midMask
+// convention as SoH3D_PosedGroundOffset. Falls back to the BIND/static vertex AABB when no posed
+// pose is cached (un-skinned props, or before tracking warms up), so it always yields a usable box.
+// Returns 1 on success (outMin/outMax = 3 floats, model-local space), 0 if the model isn't loaded.
+extern "C" int SoH3D_PosedModelLocalAABB(int modelId, unsigned long long midMask, float* outMin,
+                                         float* outMax) {
+    LoadedModel* lm = loadModel(modelId);
+    if (!lm || !lm->ok || !outMin || !outMax) return 0;
+    auto it = lastSkin().find(modelId);
+    const std::vector<std::array<float, 16>>* sm =
+        (it != lastSkin().end() && !it->second.empty()) ? &it->second : nullptr;
+    const int n = sm ? (int)sm->size() : 0;
+    float mn[3] = { 1e30f, 1e30f, 1e30f }, mx[3] = { -1e30f, -1e30f, -1e30f };
+    bool any = false;
+    for (const auto& g : lm->groups) {
+        if (g.mesh_id >= 0 && g.mesh_id < 64 && !((midMask >> g.mesh_id) & 1ull)) continue;
+        for (const auto& v : g.verts) {
+            float p[3];
+            if (sm) {
+                // skinned: weighted sum of bone transforms (rows 0/1/2 of each 4x4, row-major).
+                float acc[3] = { 0, 0, 0 }, wsum = 0.0f;
+                for (int k = 0; k < 4; k++) {
+                    float w = v.weights[k];
+                    if (w <= 0.0f) continue;
+                    int b = (int)(v.boneIds[k] + 0.5f);
+                    if (b < 0 || b >= n) continue;
+                    const float* M = (*sm)[b].data();
+                    acc[0] += w * (M[0] * v.pos[0] + M[1] * v.pos[1] + M[2] * v.pos[2] + M[3]);
+                    acc[1] += w * (M[4] * v.pos[0] + M[5] * v.pos[1] + M[6] * v.pos[2] + M[7]);
+                    acc[2] += w * (M[8] * v.pos[0] + M[9] * v.pos[1] + M[10] * v.pos[2] + M[11]);
+                    wsum += w;
+                }
+                if (wsum <= 0.0f) { p[0] = v.pos[0]; p[1] = v.pos[1]; p[2] = v.pos[2]; }
+                else { p[0] = acc[0] / wsum; p[1] = acc[1] / wsum; p[2] = acc[2] / wsum; }
+            } else {
+                p[0] = v.pos[0]; p[1] = v.pos[1]; p[2] = v.pos[2]; // bind/static fallback
+            }
+            for (int a = 0; a < 3; a++) { if (p[a] < mn[a]) mn[a] = p[a]; if (p[a] > mx[a]) mx[a] = p[a]; }
+            any = true;
+        }
+    }
+    if (!any) return 0;
+    for (int a = 0; a < 3; a++) { outMin[a] = mn[a]; outMax[a] = mx[a]; }
+    return 1;
+}
+
 // Model-local position of a posed bone's ORIGIN this frame, recovered from the cached skin matrices
 // (#6 held-actor attach). The animated bone-world matrix is aw[b] = skin[b]*bind[b], so the bone
 // origin in model space is skin[b] applied to the bind-pose origin (bind[b]'s translation column).
