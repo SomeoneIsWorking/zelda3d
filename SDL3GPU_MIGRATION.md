@@ -51,9 +51,16 @@ SDL surface (~40 files) — project is on **SDL2 2.32**, system has **SDL3 3.4.1
   `SDL_GPURenderPass`, `SDL_GPUTexture`, `SDL_GPUBuffer`, `SDL_CreateGPUShader` from the **existing
   glslang SPIR-V** (reuse `BuildVkShaderSource`). New SDL3 GPU swapchain in the window backend. GATE:
   N64 Fast3D world renders at GL parity (A/B a known scene headless).
-- **P3 — Port SoH3D OoT3D model paths.** `soh3d_vk.cpp` (model provider, per-model VkBuffer→GPU buffer,
-  bone/uniform ring, AO depth-prepass, sun-shadow pass, AO composite) + `soh3d_hud_vk.cpp` → SDL3 GPU.
-  Fold `soh3d_gl.cpp`'s logic in, then drop it. GATE: OoT3D models + HUD + shadows/AO render.
+- **P3 — UNIFY N64 + 3DS into ONE pass through the single SoH3D renderer** (user directive 2026-06-26,
+  memory soh3d-unified-renderer-one-pass). There must be NO N64-vs-3DS rendering split and NO separate
+  SoH3D pass. The SDL3 GPU backend already records a DEFERRED op-list replayed once in `FinishRender`;
+  make OoT3D CMB model draws, HUD, and RmlUi append as ops into that SAME stream, replayed in ONE render
+  pass alongside N64 triangles. DELETE the `BeginSoH3DPass`/`BeginSoH3DOffscreen` interleaving handshake
+  (don't port it). Port the content of `soh3d_vk.cpp` (model provider, per-model GPU buffer, bone/uniform
+  ring, AO depth-prepass, sun-shadow pass, AO composite) + `soh3d_hud_vk.cpp` into op-emitting draws on
+  the unified renderer; fold `soh3d_gl.cpp`'s logic in, then drop it. Add `RmlRenderInterfaceSdl3Gpu` +
+  a `FAST3D_SDL_GPU` case in `Fast3dGui` so the menu draws as ops too. GATE: OoT3D models + HUD + RmlUi +
+  shadows/AO all render in one pass, no separate-pass handshake.
 - **P4 — REMOVE everything else.** Delete gfx_opengl/dx11/metal/dxgi + headers + shader templates +
   soh3d_gl.cpp; strip `ENABLE_OPENGL/DX11/VULKAN`, the `WindowBackend` enum down to one, `SOH3D_VULKAN`.
   Drop SDL2.
