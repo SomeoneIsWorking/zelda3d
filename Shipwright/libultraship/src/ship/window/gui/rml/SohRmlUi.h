@@ -8,7 +8,6 @@
 // Forward declarations keep the heavy RmlUi / SDL / GL headers out of this header so it
 // can be included from Fast3dGui (and elsewhere) without dragging in the bundled glad
 // loader or RmlUi's public surface.
-class RenderInterface_GL3;
 class SystemInterface_SDL;
 namespace Rml {
 class Context;
@@ -19,7 +18,6 @@ class EventListener;
 
 namespace Ship {
 
-class RmlRenderInterfaceVk;
 class RmlRenderInterfaceSdl3Gpu;
 class TabClickListener; // per-tab mouse-click handler (defined in the .cpp), needs SetActiveTab
 
@@ -124,15 +122,13 @@ class SohRmlUi {
     int mActiveTab = 0;
     bool mInitialised = false;
     bool mVisible = false;
-    bool mVulkan = false;
-    bool mSg = false; // SDL3 GPU render interface
+    bool mVulkan = false; // legacy ctor flag, retained for ABI of Init(); always false now
+    bool mSg = true;      // SDL3 GPU render interface — the only path (P4)
     int mWidth = 0;
     int mHeight = 0;
     void* mSdlWindow = nullptr;
 
-    std::unique_ptr<RenderInterface_GL3> mRenderInterface;       // GL backend
-    std::unique_ptr<RmlRenderInterfaceVk> mVkRenderInterface;    // Vulkan backend
-    std::unique_ptr<RmlRenderInterfaceSdl3Gpu> mSgRenderInterface; // SDL3 GPU backend
+    std::unique_ptr<RmlRenderInterfaceSdl3Gpu> mSgRenderInterface; // SDL3 GPU backend (the only one)
     std::unique_ptr<SystemInterface_SDL> mSystemInterface;
     Rml::Context* mContext = nullptr;          // owned by RmlUi, freed by Rml::Shutdown()
     Rml::ElementDocument* mDocument = nullptr;  // ESC menu doc — owned by the context
