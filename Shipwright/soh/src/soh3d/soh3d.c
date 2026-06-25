@@ -1844,6 +1844,18 @@ draw:
     SoH3D_EmitModelDraw(play, modelId, actor, worldScale, groundOffset);
 }
 
+// --- C bridges for the structured behavior modules (behaviors/actor/<actor>.cpp) -----------------
+// Thin extern-C wrappers so a model-REPLACEMENT behavior can draw an OoT3D CMB and read live REPL
+// knobs without reaching into soh3d.c's statics. Declared in soh3d.h.
+int SoH3D_DrawActorModel(PlayState* play, int modelId, Actor* actor, float worldScale) {
+    SoH3D_DrawModelGL(play, modelId, actor, worldScale, NULL, 0.0f, NULL, NULL);
+    return 1;
+}
+
+float SoH3D_GScale(int slot, float def) {
+    return SOH3D_GSCALE(slot, def);
+}
+
 // Per-actor OoT3D model table. Maps an N64 actor id to the OoT3D model dlist that
 // replaces its N64 draw, plus that model's world scale. This is the generalised
 // divert: instead of editing each actor's Draw with an `if (SoH3D_Enabled())`
@@ -2335,33 +2347,11 @@ int SoH3D_TryDrawActor(PlayState* play, Actor* actor) {
             }
             return 0; // no OoT3D water CMB -> let the N64 water plane draw
         }
-        // Standard hinged door (En_Door, #115 item C). OoT3D draws the generic door CMB from the
-        // KEEP zar (zelda_keep.zar door/model/m_Fnormaldoor) — see oot3d-decomp/docs/en_door.md.
-        // The behavior (open/close swing state machine) is shared SoH/N64 code; only the draw
-        // differs, so replace the N64 door mesh with the OoT3D door CMB at the actor's
-        // world.pos + shape.rot.y, self-calibrating the scale from the N64 door's own height.
-        // Increment 1: static CLOSED door (rest pose). Temple-specific door variants (Fire/Water/
-        // Shadow/Well/Forest) keep their N64 draw for now (return 0); they use per-dungeon objects.
-        if (actor->id == ACTOR_EN_DOOR) {
-            switch (play->sceneNum) {
-                case SCENE_FIRE_TEMPLE:
-                case SCENE_WATER_TEMPLE:
-                case SCENE_SHADOW_TEMPLE:
-                case SCENE_BOTTOM_OF_THE_WELL:
-                case SCENE_FOREST_TEMPLE:
-                    return 0; // temple door variants not yet ported -> N64
-                default:
-                    break;
-            }
-            static int sDoorModelId = 0; // 0 = unresolved, <0 = no CMB (fall through to N64)
-            if (sDoorModelId == 0) {
-                sDoorModelId = SoH3D_AutoModelId(ZKEEP "|" SOH3D_DOOR_CMB);
-            }
-            if (sDoorModelId < 0) {
-                return 0; // no OoT3D door CMB -> let the N64 door draw
-            }
-            SoH3D_DrawModelGL(play, sDoorModelId, actor, SOH3D_GSCALE(12, SOH3D_DOOR_WORLD_SCALE),
-                              NULL, 0.0f, NULL, NULL);
+        // Structured model-REPLACEMENT behaviors (behaviors/actor/<actor>.cpp, dispatched by
+        // actor->id): an actor whose OoT3D asset is a distinct CMB chosen in its own module — e.g.
+        // En_Door, which OoT3D draws from the KEEP zar — fully draws itself there. Keep porting the
+        // inline forced-CMB branches above into modules; this is the structured home for new ones.
+        if (SoH3D_TryActorModelDraw(play, actor)) {
             return 1;
         }
     }
