@@ -453,6 +453,7 @@ void SoH3D_SetTrackPosedMinY(int modelId, int enable);                  // per-f
 float SoH3D_PosedGroundOffset(int modelId, unsigned long long midMask); // model-local Y to ground feet
 int SoH3D_PosedBoneWorldPos(int modelId, int boneId, float* outModelPos); // posed bone origin (model-local), #6 held-actor attach
 void SoH3D_UpdateAnim(int modelId, const char* animName, float frame);
+void SoH3D_SkinDumpArm(int modelId, const char* path, int frames); // #117 resolved-pose capture
 void SoH3D_UpdateAnimAuto(int modelId, const char* animName, float rate, float n64CurFrame,
                           float n64AnimLength, float morphWeight);
 void SoH3D_GL_SetMidMask(int modelId, unsigned long long mask);

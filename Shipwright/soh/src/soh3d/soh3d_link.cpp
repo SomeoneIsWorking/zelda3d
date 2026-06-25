@@ -5,6 +5,7 @@
 // (SoH3D_UpdateAnimN64*, SoH3D_PosedGroundOffset, ...); this file CALLS them.
 #include "soh3d.h"
 #include "soh3d_link.h"
+#include "behaviors/actor/player.h" // PlayerBehavior — Link as a structured ActorBehavior class
 #include <stdlib.h>
 #include <stdio.h>
 #include <string.h>
@@ -305,7 +306,11 @@ static void poseScanRecord(int modelId, const char* csab, float frame) {
     r.csab[k] = '\0';
 }
 
-extern "C" int SoH3D_TryDrawPlayer(PlayState* play, Actor* actor) {
+// Draw body kept as an extern "C" GLOBAL function (not a SoH3D-namespace method) because
+// OPEN_DISPS/CLOSE_DISPS inject an unqualified FrameInterpolation_RecordOpenChild declaration that
+// must bind to the C-linkage symbol (a namespaced/C++-mangled binding is undefined at link). The
+// PlayerBehavior::tryDrawModel method below delegates here. Returns 1 if it drew.
+extern "C" int SoH3D_PlayerDrawImpl(PlayState* play, Actor* actor) {
     const char* zar;
     const char* csab = NULL; // set only in the own-CSAB (linksrc 3ds) branch; NULL in N64-retarget
     Player* player;
@@ -593,7 +598,7 @@ extern "C" int SoH3D_TryDrawPlayer(PlayState* play, Actor* actor) {
 // is NOT the feet (knees/tucked foot), groundOff differs from idle and the WHOLE body is shoved
 // up/down for the same actor.y — the suspected "teleports upward while climbing" mechanism. Uses the
 // real per-frame mid-mask so it matches the live draw. Returns groundOff; writes the CSAB to outCsab.
-extern "C" float SoH3D_LinkGroundDiag(PlayState* play, const char** outCsab) {
+float SoH3D::PlayerBehavior::groundDiag(PlayState* play, const char** outCsab) {
     Player* player = GET_PLAYER(play);
     const char* zar = (LINK_AGE_IN_YEARS == YEARS_CHILD) ? "/actor/zelda_link_child_new.zar"
                                                          : "/actor/zelda_link_boy_new.zar";
@@ -615,7 +620,7 @@ extern "C" float SoH3D_LinkGroundDiag(PlayState* play, const char** outCsab) {
 
 // #8 hand-weave: pin Link's world pos + facing yaw each frame, so the side-profile view is identical
 // across `linkcorr` tweaks. Extracted from SoH3D_ActorPostUpdate; called from that same call site.
-extern "C" void SoH3D_LinkApplyPin(PlayState* play, Actor* actor) {
+void SoH3D::PlayerBehavior::applyPin(PlayState* play, Actor* actor) {
     if (actor != NULL && gSoH3dLinkPin && play != NULL && actor == &GET_PLAYER(play)->actor) {
         actor->velocity.x = actor->velocity.y = actor->velocity.z = 0.0f;
         actor->speedXZ = 0.0f;
@@ -626,7 +631,7 @@ extern "C" void SoH3D_LinkApplyPin(PlayState* play, Actor* actor) {
 
 // #6/#9 linkgrab: hold the selected actor in front of Link + inject fresh A edges until grabbed.
 // Extracted from SoH3D_WalkInject; called from that same call site.
-extern "C" void SoH3D_LinkWalkInject(PlayState* play) {
+void SoH3D::PlayerBehavior::walkInject(PlayState* play) {
     if (gSoH3dLinkGrabFrames > 0) {
         Player* pl = GET_PLAYER(play);
         if (pl == NULL || gSoH3dSelActor == NULL) {
@@ -658,7 +663,7 @@ static void SoH3D_DumpLimbFileCb(int limbIndex, StandardLimb* lb, void* ud) {
 }
 
 // Handle a `link*` REPL command. Returns 1 if handled (cmd was a link command), 0 otherwise.
-extern "C" int SoH3D_LinkRepl(PlayState* play, const char* cmd, const char* line, const char* outPath) {
+int SoH3D::PlayerBehavior::repl(PlayState* play, const char* cmd, const char* line, const char* outPath) {
     char path[1024];
     float f1, f2, f3;
     int iv;
@@ -870,6 +875,25 @@ extern "C" int SoH3D_LinkRepl(PlayState* play, const char* cmd, const char* line
         } else {
             SoH3D_ReplReply(outPath, "usage: linkjointdump <path> [nframes]");
         }
+    } else if (strcmp(cmd, "skindump") == 0) {
+        // `skindump <path> [nframes]` — capture the ACTUAL resolved per-bone CSAB pose (skin matrices)
+        // the renderer draws for Link, over nframes (default 60) consecutive DRAWS, tagged with the
+        // resolved CSAB name + the REAL playhead frame (free-run accumulator). This is the SoH3D side of
+        // the #117 direct-vs-oracle per-frame diff: it proves whether the pose actually cycles (slide
+        // bug) and exposes the geometry for the bone-rotation diff. Unlike linkjointdump (the N64 input
+        // jointTable) this is the OUTPUT geometry after CSAB resolution.
+        int n = 60;
+        if (sscanf(line, "%*s %1023s %d", path, &n) >= 1) {
+            if (sLinkModelId < 0) {
+                SoH3D_ReplReply(outPath, "skindump: Link model not drawn yet (run `link 1` and let it draw)");
+            } else {
+                if (n < 1) n = 1;
+                SoH3D_SkinDumpArm(sLinkModelId, path, n);
+                SoH3D_ReplReply(outPath, "skindump -> %s (%d draws, model %d)", path, n, sLinkModelId);
+            }
+        } else {
+            SoH3D_ReplReply(outPath, "usage: skindump <path> [nframes]");
+        }
     } else if (strcmp(cmd, "linkmid") == 0) {
         // `linkmid <arg>` — debug override of Link's mesh_id visibility mask (childlink_v2 bakes all
         // hand/equipment variants on distinct mesh_ids). Used to identify each mesh_id by rendering it
@@ -931,4 +955,36 @@ extern "C" int SoH3D_LinkRepl(PlayState* play, const char* cmd, const char* line
         return 0; // not a link command
     }
     return 1;
+}
+
+// --- PlayerBehavior class boilerplate + C-ABI shims --------------------------------------------
+// Link's behavior is reached through the DEDICATED player hooks (z_player.c's SoH3D_TryDrawPlayer and
+// soh3d.c's per-frame inject/pin/repl call sites), NOT the generic findActorBehavior registry — the
+// player draw path is special. These shims keep the existing C entry points stable while routing them
+// to the single PlayerBehavior instance, so the rest of the engine is unchanged.
+SoH3D::PlayerBehavior& SoH3D::PlayerBehavior::instance() {
+    static SoH3D::PlayerBehavior sPlayer;
+    return sPlayer;
+}
+s16 SoH3D::PlayerBehavior::actorId() const {
+    return ACTOR_PLAYER;
+}
+bool SoH3D::PlayerBehavior::tryDrawModel(PlayState* play, Actor* actor) {
+    return SoH3D_PlayerDrawImpl(play, actor) != 0;
+}
+
+extern "C" int SoH3D_TryDrawPlayer(PlayState* play, Actor* actor) {
+    return SoH3D::PlayerBehavior::instance().tryDrawModel(play, actor) ? 1 : 0;
+}
+extern "C" float SoH3D_LinkGroundDiag(PlayState* play, const char** outCsab) {
+    return SoH3D::PlayerBehavior::instance().groundDiag(play, outCsab);
+}
+extern "C" void SoH3D_LinkApplyPin(PlayState* play, Actor* actor) {
+    SoH3D::PlayerBehavior::instance().applyPin(play, actor);
+}
+extern "C" void SoH3D_LinkWalkInject(PlayState* play) {
+    SoH3D::PlayerBehavior::instance().walkInject(play);
+}
+extern "C" int SoH3D_LinkRepl(PlayState* play, const char* cmd, const char* line, const char* outPath) {
+    return SoH3D::PlayerBehavior::instance().repl(play, cmd, line, outPath);
 }
