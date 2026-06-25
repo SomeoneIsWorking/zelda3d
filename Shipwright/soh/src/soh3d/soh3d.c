@@ -3904,7 +3904,9 @@ static Actor* SoH3D_SpawnInFront(PlayState* play, s16 actorId, float dist) {
 }
 
 void SoH3D_ReplReply(const char* outPath, const char* fmt, ...) {
-    char msg[512];
+    // 16 KB: multi-line dump replies (e.g. `posescan dump` builds an 8 KB CSV) were silently cut to
+    // ~18 lines by the old 512-byte buffer — a latent truncation that defeated the dump commands.
+    char msg[16384];
     va_list ap;
     FILE* f;
     va_start(ap, fmt);

@@ -70,6 +70,16 @@ def send(cmd, timeout=3.0):
     t0 = time.time()
     while time.time() - t0 < timeout:
         if _out_size() > pre:
+            # New content has begun; the C side may still be flushing a large reply (e.g. a multi-KB
+            # `posescan dump`). Wait for the size to STOP growing before reading, else we return a
+            # truncated chunk (cut mid-line). Poll until two consecutive reads match.
+            last = -1
+            while time.time() - t0 < timeout:
+                cur = _out_size()
+                if cur == last:
+                    break
+                last = cur
+                time.sleep(0.04)
             with open(OUT) as f:
                 f.seek(pre)
                 return f.read().strip()

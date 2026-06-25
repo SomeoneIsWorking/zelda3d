@@ -599,6 +599,9 @@ static void SoH3D_UpdateAnimMorph(int modelId, const char* inName, float fIn, co
 // "THE MORPH"). Without this the auto/CSAB path hard-cuts every transition (1-frame arm/limb pops).
 // gSoH3dMorph (REPL `morph 0|1`, env SOH3D_MORPH default on) gates it for A/B verification.
 int gSoH3dMorph = -1;
+// Logic-frame clock (= play->gameplayFrames), set by the Link draw path each frame. The walk-stop
+// synthetic morph must advance ONCE per LOGIC frame, not per draw (headless renders many draws/tick).
+int gSoH3dLogicFrame = 0;
 void SoH3D_UpdateAnimAuto(int modelId, const char* animName, float rate, float n64CurFrame,
                           float n64AnimLength, float morphWeight) {
     static std::unordered_map<int, float> frames;
@@ -606,9 +609,17 @@ void SoH3D_UpdateAnimAuto(int modelId, const char* animName, float rate, float n
     static std::unordered_map<int, float> lastFrame;      // last incoming frame rendered (freeze src)
     static std::unordered_map<int, std::string> morphOut; // frozen outgoing CSAB during a morph
     static std::unordered_map<int, float> morphOutFrame;  // frozen outgoing frame
+    // OoT3D walk-STOP synthetic morph state (port of FUN_002be4c4 — see §6e + the block below).
+    static std::unordered_map<int, float> locoStopW;        // synthetic morph weight (1->0)
+    static std::unordered_map<int, float> locoStopRate;     // per-LOGIC-frame decrement = 1/morphFrames
+    static std::unordered_map<int, std::string> locoStopEnd;// phase-chosen end CSAB (R/L)
+    static std::unordered_map<int, int> locoStopLF;         // last logic frame we advanced on
+    static std::unordered_map<int, float> locoStopFrame;    // walk_end playhead (0, advances after morph)
     if (!animName || !*animName) {
         frames.erase(modelId); lastCsab.erase(modelId); lastFrame.erase(modelId);
         morphOut.erase(modelId); morphOutFrame.erase(modelId);
+        locoStopW.erase(modelId); locoStopRate.erase(modelId);
+        locoStopEnd.erase(modelId); locoStopLF.erase(modelId); locoStopFrame.erase(modelId);
         SoH3D_UpdateAnim(modelId, nullptr, 0); return;
     }
     if (gSoH3dMorph < 0) {
@@ -627,6 +638,81 @@ void SoH3D_UpdateAnimAuto(int modelId, const char* animName, float rate, float n
     bool locked = (n64AnimLength > 4.0f && n64CurFrame >= 0.0f && dur > 0.0f);
     auto lcIt = lastCsab.find(modelId);
     bool csabChanged = (lcIt == lastCsab.end()) || (lcIt->second != animName);
+
+    // --- OoT3D walk-STOP (port of FUN_002be4c4; oot3d-decomp player_anim_states.md §6e) ----------
+    // The loco->walk_end transition cross-fades from the frozen leg pose into walk_end with a
+    // PHASE-PROPORTIONAL morph length, choosing endR/endL by the leg-cycle phase. OoT3D arg order
+    // (verified in FUN_00360190's body): playSpeed=1.0, startFrame=0.0 -> walk_end plays from frame 0
+    // and advances; the morph (case 3) holds curFrame pinned then it advances after the morph ends.
+    // morphFrames = rem*fv8*4 (PHASE-dependent, 0..4). nml_walk_free is exactly 29 frames == OoT3D's
+    // phase range [0,29), so our free-run playhead is player+0x2254 1:1. The old N64 path used a
+    // constant ~3-frame morph regardless of phase -> ~55deg pop when the (decoupled) free-run phase
+    // landed far from where walk_end@0 continues; the phase-proportional length tracks the gap.
+    bool incomingWalkEnd = (strstr(animName, "walk_end") != nullptr);
+    if (incomingWalkEnd && csabChanged &&
+        lcIt != lastCsab.end() && strstr(lcIt->second.c_str(), "walk_free") != nullptr) {
+        float phi = lastFrame.count(modelId) ? lastFrame[modelId] : 0.0f; // outgoing walk_free phase
+        phi = std::fmod(phi, 29.0f); if (phi < 0.0f) phi += 29.0f;
+        float p = phi - 3.0f; if (p < 0.0f) p += 29.0f;                   // OoT3D DAT_002be620/628
+        bool wantR = ((int)p < 14);                                       // DAT_002be62c = 14
+        float rem, fv8;
+        if (wantR) { rem = 11.0f - p; if (rem < 0.0f) rem *= -1.375f; fv8 = 1.0f / 11.0f; }
+        else       { rem = 26.0f - p; if (rem < 0.0f) rem *= -2.0f;   fv8 = 1.0f / 12.0f; }
+        float morphFrames = rem * fv8 * 4.0f;                            // DAT_002be658 = 4
+        // Choose endR/endL by OUR free-run phase (override the N64 R/L pick — N64's leg cycle phase
+        // differs, so its choice may select the far end pose for our actual rendered pose). Preserve
+        // the incoming name's prefix/suffix (cl_ / _free) by only flipping the R/L letter.
+        std::string en = animName;
+        size_t rp = en.find("endR"), lp = en.find("endL");
+        if (wantR && lp != std::string::npos) en[lp + 3] = 'R';
+        else if (!wantR && rp != std::string::npos) en[rp + 3] = 'L';
+        locoStopEnd[modelId] = en;
+        locoStopW[modelId] = (morphFrames > 0.01f) ? 1.0f : 0.0f;        // 0 => instant (sweet spot)
+        locoStopRate[modelId] = (morphFrames > 0.01f) ? (1.0f / morphFrames) : 1.0f;
+        locoStopLF[modelId] = gSoH3dLogicFrame;
+        locoStopFrame[modelId] = 0.0f;                                   // OoT3D startFrame = 0
+        morphOut[modelId] = lcIt->second;                                // frozen walk pose source
+        morphOutFrame[modelId] = phi;
+    }
+    if (!incomingWalkEnd) { // left walk_end (e.g. -> idle): drop the synthetic morph
+        locoStopW.erase(modelId); locoStopRate.erase(modelId);
+        locoStopEnd.erase(modelId); locoStopLF.erase(modelId); locoStopFrame.erase(modelId);
+    } else if (locoStopW.count(modelId)) {
+        // Render walk_end @ its playhead, cross-faded from the frozen walk pose by the synthetic
+        // weight. Per the N64 trace + OoT3D case-3: curFrame is pinned during the morph, then plays
+        // forward (playSpeed 1.0) once the morph completes. Advance ONCE per logic frame.
+        const std::string& en = locoStopEnd[modelId];
+        float w = locoStopW[modelId];
+        float ef = locoStopFrame[modelId];
+        if (w > 0.0f && morphOut.count(modelId)) {
+            SoH3D_UpdateAnimMorph(modelId, en.c_str(), ef, morphOut[modelId].c_str(),
+                                  morphOutFrame[modelId], w);
+        } else {
+            SoH3D_UpdateAnim(modelId, en.c_str(), ef);
+            morphOut.erase(modelId); morphOutFrame.erase(modelId);
+        }
+        if (gSoH3dAnimDebug && modelId == SoH3D_LinkModelId()) {
+            printf("SOH3D WALKSTOP: end=%s f=%.1f synthW=%.3f rate=%.3f morphOut=%s@%.1f\n",
+                   en.c_str(), ef, w, locoStopRate[modelId],
+                   morphOut.count(modelId) ? morphOut[modelId].c_str() : "(none)",
+                   morphOut.count(modelId) ? morphOutFrame[modelId] : -1.0f);
+            fflush(stdout);
+        }
+        if (gSoH3dLogicFrame != locoStopLF[modelId]) {
+            locoStopLF[modelId] = gSoH3dLogicFrame;
+            float nw = w - locoStopRate[modelId];
+            locoStopW[modelId] = (nw > 0.0f) ? nw : 0.0f;
+            if (nw <= 0.0f) locoStopFrame[modelId] = ef + 1.0f;          // advance after morph done
+        }
+        // Track the RENDERED end name (we may have flipped R/L vs the N64 anim) + its playhead so the
+        // following walk_end->idle transition freezes the pose we actually drew (else the idle morph
+        // blends from the wrong endR/L pose = an ~88deg hand pop). "walk_endR_free" does NOT contain
+        // "walk_free", so the entry guard above won't re-trigger on subsequent walk_end frames.
+        lastCsab[modelId] = en;
+        lastFrame[modelId] = ef;
+        return;
+    }
+
     float f;
     if (locked) {
         float phase = n64CurFrame / n64AnimLength;
