@@ -455,4 +455,46 @@ void Csab::skinMatrices(const Cmb& model, float frame, std::vector<std::array<fl
         out[id] = matMul(aw[id], matInverse(bind[id]));
 }
 
+// Rest-pose skinning (no CSAB) — mirrors animatedBoneWorld but samples each bone's REST TRS directly
+// (bn->trans/rot/scale) instead of animation tracks, then converts world->skin. The procedural
+// channels (boneRotDelta local-euler add, bonePostRot MTXMODE_APPLY) apply identically, so an actor
+// whose only motion is an OverrideLimbDraw rotation (En_Door panel swing) drives the OoT3D rig with
+// no clip. Keeps the recursive parent multiply so a rotated parent carries its children.
+void restPoseSkinMatrices(const Cmb& model, std::vector<std::array<float, 16>>& out,
+                          const float* boneRotDelta, int deltaCount, const float* bonePostRot,
+                          int postCount) {
+    const auto& bones = model.bones();
+    const auto& bind = model.boneMatrices();
+    std::vector<std::array<float, 16>> aw(bind.size(), matId());
+    std::vector<char> done(bind.size(), 0);
+    std::vector<const CmbBone*> byId(bind.size(), nullptr);
+    for (const auto& bn : bones)
+        if (bn.id >= 0 && (size_t)bn.id < byId.size()) byId[bn.id] = &bn;
+
+    std::function<Mat4(int)> world = [&](int id) -> Mat4 {
+        if (id < 0 || (size_t)id >= aw.size() || !byId[id]) return matId();
+        if (done[id]) return aw[id];
+        const CmbBone* bn = byId[id];
+        float t[3] = { bn->trans[0], bn->trans[1], bn->trans[2] };
+        float r[3] = { bn->rot[0], bn->rot[1], bn->rot[2] };
+        float s[3] = { bn->scale[0], bn->scale[1], bn->scale[2] };
+        if (boneRotDelta && id >= 0 && id < deltaCount) {
+            r[0] += boneRotDelta[id * 3 + 0];
+            r[1] += boneRotDelta[id * 3 + 1];
+            r[2] += boneRotDelta[id * 3 + 2];
+        }
+        Mat4 R = applyPostRot(eulerMat(r), bonePostRot, postCount, id);
+        Mat4 L = matMul(matT(t[0], t[1], t[2]), matMul(R, matS(s[0], s[1], s[2])));
+        Mat4 W = (bn->parent < 0) ? L : matMul(world(bn->parent), L);
+        aw[id] = W;
+        done[id] = 1;
+        return W;
+    };
+    for (const auto& bn : bones) world(bn.id);
+
+    out.assign(bind.size(), matId());
+    for (size_t id = 0; id < bind.size(); id++)
+        out[id] = matMul(aw[id], matInverse(bind[id]));
+}
+
 } // namespace SoH3D

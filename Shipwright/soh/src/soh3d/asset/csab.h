@@ -116,4 +116,13 @@ class Csab {
     float animFrame(float frame) const;
 };
 
+// Rest-pose skin matrices with procedural per-bone overrides — NO CSAB clip. Composes each bone's
+// world from its CMB REST TRS (no animation tracks) and converts to skinMatrix = animWorld·inverse(bind),
+// applying the SAME boneRotDelta (local-euler add, radians) and bonePostRot (MTXMODE_APPLY 3x3) channels
+// as Csab::skinMatrices. For procedurally-posed static models that have no CSAB (e.g. En_Door's panel
+// swing, ported from N64 EnDoor_OverrideLimbDraw which rotates the panel limb by the live open angle).
+void restPoseSkinMatrices(const Cmb& model, std::vector<std::array<float, 16>>& out,
+                          const float* boneRotDelta = nullptr, int deltaCount = 0,
+                          const float* bonePostRot = nullptr, int postCount = 0);
+
 } // namespace SoH3D

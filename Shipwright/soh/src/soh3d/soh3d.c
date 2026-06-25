@@ -6,6 +6,7 @@
 #include "overlays/actors/ovl_En_Ge1/z_en_ge1.h" // EnGe1 (read live SkelAnime state)
 #include "overlays/actors/ovl_En_Ko/z_en_ko.h"   // EnKo ENKO_TYPE_* (shared-CMB head-variant select)
 #include "overlays/actors/ovl_En_Ex_Ruppy/z_en_ex_ruppy.h" // EnExRuppy colorIdx (ainfo rupee debug)
+#include "overlays/actors/ovl_En_Door/z_en_door.h" // EnDoor swing state (ainfo door trace, #115)
 #include "objects/object_ge1/object_ge1.h"       // dgGerudoWhite*Anim OTR-path strings
 #include <stdlib.h>
 #include <stdio.h>
@@ -71,6 +72,16 @@ float gSoH3dRotX = 0.0f;
 float gSoH3dRotY = 0.0f;
 float gSoH3dRotZ = 0.0f;
 int gSoH3dSwTilt = 1; // #75: replicate En_Sw wall/tree draw tilt in the auto emit (REPL `swtilt`, A/B)
+
+// #115 En_Door panel-swing live tuning (behaviors/actor/door.cpp). Calibrated LIVE (2026-06-25):
+// panel = CMB bone 1 (decomp en_door.md: bone1 is the swinging panel pivot), swing about the bone's
+// local Y axis (= the vertical hinge after bone1's -90deg-X rest; axis 0/2 tilt the panel flat
+// instead, confirmed on-screen), gain +1 replays the live N64 binang faithfully and opens the door in
+// the correct direction. Retune live via REPL doorbone/dooraxis/doorgain.
+int gSoH3dDoorBone = 1;
+int gSoH3dDoorAxis = 1;
+float gSoH3dDoorGain = 1.0f;
+int gSoH3dDoorHold = (-2147483647 - 1); // INT32_MIN = off (use live swing); else pin to this binang
 
 // Live world-scale override per glModelId for the param-keyed field-keep props (rock/flower/
 // bush). 0 = use the per-call SOH3D_*_WORLD_SCALE default. REPL `gscale <id> <f>` pokes it so
@@ -5572,6 +5583,24 @@ static void SoH3D_ReplExec(PlayState* play, char* line, const char* outPath) {
                 SoH3D_ReplReply(outPath, "ainfo ruppy colorIdx=%d type=%d invisible=%d scale=%.3f",
                                 r->colorIdx, r->type, r->invisible, a->scale.x);
             }
+            if (a->id == ACTOR_EN_DOOR) {
+                // #115 door-swing trace: read the live swing state through the EnDoor C struct (never
+                // a raw offset — 64-bit build). N64 EnDoor_OverrideLimbDraw swings panel limb 4 by
+                // rot->z += world.rot.y (steps 0 -> -0x1800 on open) on TOP of the open SkelAnime
+                // (gDoorOpeningLeft/Right). jointTable holds the per-limb animated rotations.
+                EnDoor* d = (EnDoor*)a;
+                SoH3D_ReplReply(outPath,
+                                "ainfo door worldRotY=%d shapeRotY=%d animStyle=%d opening=%d "
+                                "animFrame=%.1f playSpeed=%.2f dList=%d",
+                                d->actor.world.rot.y, d->actor.shape.rot.y, d->animStyle,
+                                d->playerIsOpening, d->skelAnime.curFrame, d->skelAnime.playSpeed,
+                                d->dListIndex);
+                SoH3D_ReplReply(outPath,
+                                "ainfo door joint[0..4].z = %d %d %d %d %d  joint[4]=(%d,%d,%d)",
+                                d->jointTable[0].z, d->jointTable[1].z, d->jointTable[2].z,
+                                d->jointTable[3].z, d->jointTable[4].z, d->jointTable[4].x,
+                                d->jointTable[4].y, d->jointTable[4].z);
+            }
             if (a->id == ACTOR_EN_ITEM00) {
                 EnItem00* it = (EnItem00*)a;
                 SoH3D_ReplReply(outPath,
@@ -5582,6 +5611,31 @@ static void SoH3D_ReplExec(PlayState* play, char* line, const char* outPath) {
                                 (it->unk_156 & it->unk_158) ? 1 : 0);
             }
         }
+    } else if (strcmp(cmd, "doorforce") == 0) {
+        // #115 swing-observation tooling: force the selected EnDoor into its real open animation by
+        // setting playerIsOpening=1 (the same flag the Player sets when Link opens a handle door).
+        // EnDoor_Idle then transitions to EnDoor_Open and plays gDoorOpening{Left,Right} faithfully,
+        // so `ainfo` can capture the genuine jointTable swing without the finicky player approach.
+        if (gSoH3dSelActor == NULL || gSoH3dSelActor->id != ACTOR_EN_DOOR) {
+            SoH3D_ReplReply(outPath, "doorforce: select an EnDoor first (asel 0x9)");
+        } else {
+            EnDoor* d = (EnDoor*)gSoH3dSelActor;
+            d->playerIsOpening = 1;
+            SoH3D_ReplReply(outPath, "doorforce: playerIsOpening=1 (animStyle=%d)", d->animStyle);
+        }
+    } else if (strcmp(cmd, "doorbone") == 0 && sscanf(line, "%*s %i", &iv) == 1) {
+        gSoH3dDoorBone = iv;
+        SoH3D_ReplReply(outPath, "doorbone=%d (panel CMB bone to swing)", gSoH3dDoorBone);
+    } else if (strcmp(cmd, "dooraxis") == 0 && sscanf(line, "%*s %i", &iv) == 1) {
+        gSoH3dDoorAxis = iv;
+        SoH3D_ReplReply(outPath, "dooraxis=%d (0=x 1=y 2=z local-euler)", gSoH3dDoorAxis);
+    } else if (strcmp(cmd, "doorgain") == 0 && sscanf(line, "%*s %f", &f1) == 1) {
+        gSoH3dDoorGain = f1;
+        SoH3D_ReplReply(outPath, "doorgain=%.3f (swing multiplier; negative flips)", gSoH3dDoorGain);
+    } else if (strcmp(cmd, "doorhold") == 0 && sscanf(line, "%*s %i", &iv) == 1) {
+        gSoH3dDoorHold = iv;
+        SoH3D_ReplReply(outPath, "doorhold=%d binang (pin swing for tuning; -2147483648=off)",
+                        gSoH3dDoorHold);
     } else if (strcmp(cmd, "apeek") == 0) {
         // GENERIC actor-memory peek: dump <count> s16s at byte offset <off> from the selected
         // actor, PLUS the actor's facing (shape.rot.y) and the yaw it would need to face Link
