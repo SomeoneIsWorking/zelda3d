@@ -63,6 +63,9 @@ def main():
     ap.add_argument("--eps", type=float, default=2.5)
     ap.add_argument("--out", default="scratch/parity/oracle_carrywalk.csv")
     ap.add_argument("--no-walk", action="store_true", help="capture carry-IDLE only (no forward hold)")
+    ap.add_argument("--lift", action="store_true",
+                    help="capture the LIFT transition: stand at the rock, then record from BEFORE the "
+                         "A-press through the grab/lift (no walk), to ID the pickup CSAB sequence")
     args = ap.parse_args()
 
     parts = [float(v) for v in args.rock.split(",")]
@@ -84,6 +87,40 @@ def main():
     rpc.write(actor + 0x10, struct.pack("<f", lz))
     rpc.write(actor + 0x14, struct.pack("<3h", 0, args.face, 0))   # shape.rot
     time.sleep(0.4)
+
+    if args.lift:
+        # LIFT capture: record from BEFORE the A-press through the grab so the lift CSAB sequence
+        # (carryB) is captured, not just the settled carry pose. A single A-tap fires the lift.
+        period = 1.0 / args.hz
+        rows = []
+        last = None
+        pressed = False
+        t0 = time.time()
+        while len(rows) < args.frames and time.time() - t0 < 6.0:
+            el = time.time() - t0
+            # press A once at ~0.3s in, hold ~0.15s, then release (the genuine lift action)
+            if 0.3 <= el < 0.45:
+                rpc.set_input(A.BTN["a"], (0, 0)); pressed = True
+            else:
+                rpc.set_input(0, (0, 0))
+            try:
+                rots = bone_local_rots(rpc, actor)
+            except Exception:
+                time.sleep(period); continue
+            if last is None or pose_delta(rots, last) > args.eps:
+                rows.append((len(rows), round((time.time() - t0) * 1000, 1), rots))
+                last = rots
+            time.sleep(period)
+        rpc.set_input(0, None)
+        print(f"lift capture: heldActor=0x{held(rpc, actor):08x}")
+        os.makedirs(os.path.dirname(os.path.abspath(args.out)), exist_ok=True)
+        with open(args.out, "w") as f:
+            f.write("cap,t_ms,bone,r0,r1,r2,r3,r4,r5,r6,r7,r8\n")
+            for cap, tms, rots in rows:
+                for b, r in enumerate(rots):
+                    f.write(f"{cap},{tms},{b}," + ",".join(f"{v:.5f}" for v in r) + "\n")
+        print(f"wrote {len(rows)} frames -> {args.out}")
+        return
 
     # tap A repeatedly until heldActor set (give the lift action a few presses)
     grabbed = False
