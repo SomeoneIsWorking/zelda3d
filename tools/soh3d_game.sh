@@ -123,6 +123,7 @@ start() {
     # title/cutscene-camera bugs #4/#14, which only exist on that flow). entrance/time are unused then.
     setsid env SOH3D=1 SOH3D_WARP="${SOH3D_WARP-1}" SOH3D_AUTO="${SOH3D_AUTO:-1}" SOH3D_N64ANIM="${SOH3D_N64ANIM:-1}" \
         SOH3D_VULKAN="${SOH3D_VULKAN:-}" SOH3D_VK_VALIDATION="${SOH3D_VK_VALIDATION:-}" \
+        SOH3D_SDL3GPU="${SOH3D_SDL3GPU:-}" SOH3D_SDL3GPU_DEBUG="${SOH3D_SDL3GPU_DEBUG:-}" \
         SOH3D_RMLUI_OPEN="${SOH3D_RMLUI_OPEN:-}" \
         SOH3D_ENTRANCE="$entr" SOH3D_TIME="$time" SOH3D_REPL="$FIFO" \
         DISPLAY="${DISPLAY:-:0}" XAUTHORITY="$xauth" \

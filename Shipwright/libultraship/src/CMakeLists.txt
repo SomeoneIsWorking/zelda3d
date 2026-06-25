@@ -153,6 +153,12 @@ if (NOT USE_OPENGLES AND NOT CMAKE_SYSTEM_NAME STREQUAL "iOS" AND NOT CMAKE_SYST
             glslang::glslang glslang::SPIRV glslang::glslang-default-resource-limits)
         target_compile_definitions(libultraship PRIVATE ENABLE_VULKAN)
         message(STATUS "soh3d: Vulkan backend ENABLED (${Vulkan_LIBRARIES}) + glslang")
+        # SDL3 GPU backend (soh3d single-renderer migration, Phase 2): a new selectable Fast3D
+        # backend (FAST3D_SDL_GPU) on SDL3's GPU API. Reuses the same glslang runtime GLSL->SPIR-V
+        # compilation as the Vulkan backend (no extra deps; SDL3 itself is already linked). GL
+        # remains the default until SDL3 GPU reaches parity.
+        target_compile_definitions(libultraship PRIVATE ENABLE_SDL3GPU)
+        message(STATUS "soh3d: SDL3 GPU backend ENABLED (glslang SPIR-V + SDL3 GPU API)")
     elseif (Vulkan_FOUND)
         message(STATUS "soh3d: Vulkan found but glslang missing; Vulkan backend disabled")
     else()
