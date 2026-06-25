@@ -4222,6 +4222,7 @@ static void SoH3D_ReplExec(PlayState* play, char* line, const char* outPath) {
         Player* p = GET_PLAYER(play);
         const char* baseOtr = (const char*)p->skelAnime.animation;
         const char* baseCsab = baseOtr ? SoH3D_ResolvePlayerCsab(baseOtr) : "(null)";
+        baseCsab = SoH3D_LinkWalkRunGate(baseCsab, p->actor.speedXZ);  // #117 report the gated (drawn) CSAB
         const char* upOtr = (const char*)p->upperSkelAnime.animation;
         const char* upCsab = upOtr ? SoH3D_ResolvePlayerCsab(upOtr) : "(none)";
         SoH3D_ReplReply(outPath,
