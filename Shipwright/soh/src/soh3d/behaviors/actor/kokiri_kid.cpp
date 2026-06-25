@@ -23,13 +23,7 @@
 
 extern "C" {
 const char* SoH3D_AutoModelZar(int modelId);
-void SoH3D_GL_SetMatTexOverride(int modelId, int materialIndex, int texIndex);
-int SoH3D_FacialFrameTex(int modelId, int materialIndex, int frame); // -1 = none/out-of-range
 }
-
-// Verification override (REPL `faceframe <n>`): when >= 0, force the eye frame, bypassing the live
-// index, so the facial channel can be driven deterministically. Defined in soh3d_anim_override.cpp.
-extern int gSoH3dFaceForce;
 
 namespace SoH3D {
 
@@ -48,8 +42,7 @@ void KokiriKidBehavior::applyDrawOverrides(int modelId, Actor* actor, bool track
     if (track) {
         // interactInfo is live: SoH3D forces replaced actors to keep updating regardless of culling
         // (z_actor.c Actor_UpdateAll), so headRot/torsoRot are the current, clamped track values.
-        applyTrackRot(modelId, kHeadBone, ko->interactInfo.headRot);
-        applyTrackRot(modelId, kTorsoBone, ko->interactInfo.torsoRot);
+        applyHeadTorsoTrack(modelId, kHeadBone, kTorsoBone, ko->interactInfo);
     }
 
     // --- Eye material-anim -----------------------------------------------------------------------
@@ -61,9 +54,7 @@ void KokiriKidBehavior::applyDrawOverrides(int modelId, Actor* actor, bool track
         if (zar != nullptr && std::strstr(zar, "zelda_kw1") != nullptr) {
             eyeMat = ((ko->actor.params & 0xFF) == ENKO_TYPE_CHILD_FADO) ? 1 : 2;
         }
-        int idx = (gSoH3dFaceForce >= 0) ? gSoH3dFaceForce : ko->eyeTextureIndex;
-        int tex = SoH3D_FacialFrameTex(modelId, eyeMat, idx);
-        SoH3D_GL_SetMatTexOverride(modelId, eyeMat, tex); // tex<0 clears -> base sprite
+        applyFacialFrame(modelId, eyeMat, ko->eyeTextureIndex);
     }
 }
 
