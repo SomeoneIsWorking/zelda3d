@@ -7,6 +7,7 @@
 #include "actor/malon.h"
 #include "actor/townsfolk.h"
 #include "actor/door.h"
+#include "actor/pot.h"
 #include "../asset/mat4.h"
 
 extern "C" {
@@ -57,9 +58,12 @@ ActorBehavior* findActorBehavior(s16 actorId) {
     static AdultMalonBehavior sAdultMalon;
     static TownsfolkBehavior sTownsfolk;
     static EnDoorBehavior sEnDoor;
+    static EnTuboTrapBehavior sEnTuboTrap;
     switch (actorId) {
         case ACTOR_EN_DOOR:
             return &sEnDoor;
+        case ACTOR_EN_TUBO_TRAP:
+            return &sEnTuboTrap;
         case ACTOR_EN_KO:
             return &sKokiriKid;
         case ACTOR_EN_SA:
