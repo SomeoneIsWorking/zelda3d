@@ -47,6 +47,17 @@ ActorBehavior* findActorBehavior(s16 actorId);
 // plausibility guard is needed when the value is read from the correct (C-struct) field.
 void applyTrackRot(int modelId, int bone, const Vec3s& rot);
 
+// Apply both head and torso track from a live NpcInteractInfo (the common NPC case): post-multiply the
+// shared rotate helper onto the head bone (from headRot) and the torso bone (from torsoRot). Read `ii`
+// through the actor's C struct, never a raw N64 byte offset (64-bit build — see kokiri_kid.cpp).
+void applyHeadTorsoTrack(int modelId, int headBone, int torsoBone, const NpcInteractInfo& ii);
+
+// Bind material `material`'s eye/mouth frame texture to `liveIdx` (the index the running N64 logic
+// computed), honoring the REPL `faceframe` verification override. An out-of-range index clears the
+// override (falls back to the base sprite). This is the OoT3D facial mechanism: a material-anim frame
+// swap, not an N64 segment swap.
+void applyFacialFrame(int modelId, int material, int liveIdx);
+
 } // namespace SoH3D
 
 #endif // SOH3D_BEHAVIORS_ACTOR_BEHAVIOR_H

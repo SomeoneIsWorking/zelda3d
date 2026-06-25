@@ -2,12 +2,23 @@
 #include "z64.h"
 #include "actor_behavior.h"
 #include "actor/kokiri_kid.h"
+#include "actor/saria.h"
+#include "actor/mido.h"
+#include "actor/malon.h"
+#include "actor/townsfolk.h"
 #include "../asset/mat4.h"
 
 extern "C" {
 // CSAB skinner channel: post-multiply a 3x3 rotation onto a bone's local transform (MTXMODE_APPLY).
 void SoH3D_SetBonePostRot(int modelId, int boneId, const float* mat9);
+// Facial material-anim channel: bind material `mat`'s frame texture (tex<0 clears -> base sprite).
+void SoH3D_GL_SetMatTexOverride(int modelId, int materialIndex, int texIndex);
+int SoH3D_FacialFrameTex(int modelId, int materialIndex, int frame); // -1 = none/out-of-range
 }
+
+// REPL `faceframe <n>` verification override (>= 0 forces the eye/mouth frame). Owned by
+// soh3d_anim_override.cpp; honored by every facial path so the channel can be driven deterministically.
+extern int gSoH3dFaceForce;
 
 namespace SoH3D {
 
@@ -21,13 +32,43 @@ void applyTrackRot(int modelId, int bone, const Vec3s& rot) {
     SoH3D_SetBonePostRot(modelId, bone, m9);
 }
 
+void applyHeadTorsoTrack(int modelId, int headBone, int torsoBone, const NpcInteractInfo& ii) {
+    applyTrackRot(modelId, headBone, ii.headRot);
+    applyTrackRot(modelId, torsoBone, ii.torsoRot);
+}
+
+void applyFacialFrame(int modelId, int material, int liveIdx) {
+    if (material < 0) {
+        return;
+    }
+    int idx = (gSoH3dFaceForce >= 0) ? gSoH3dFaceForce : liveIdx;
+    int tex = SoH3D_FacialFrameTex(modelId, material, idx);
+    SoH3D_GL_SetMatTexOverride(modelId, material, tex); // tex<0 (out-of-range) clears -> base sprite
+}
+
 // Explicit registry: one static singleton per ported behavior, dispatched by actor id. Add a case
 // here as each actor is migrated out of the legacy soh3d_anim_override.cpp tables.
 ActorBehavior* findActorBehavior(s16 actorId) {
     static KokiriKidBehavior sKokiriKid;
+    static SariaBehavior sSaria;
+    static MidoBehavior sMido;
+    static ChildMalonBehavior sChildMalon;
+    static AdultMalonBehavior sAdultMalon;
+    static TownsfolkBehavior sTownsfolk;
     switch (actorId) {
         case ACTOR_EN_KO:
             return &sKokiriKid;
+        case ACTOR_EN_SA:
+            return &sSaria;
+        case ACTOR_EN_MD:
+            return &sMido;
+        case ACTOR_EN_MA1:
+            return &sChildMalon;
+        case ACTOR_EN_MA2:
+        case ACTOR_EN_MA3:
+            return &sAdultMalon;
+        case ACTOR_EN_HY:
+            return &sTownsfolk;
         default:
             return nullptr;
     }
