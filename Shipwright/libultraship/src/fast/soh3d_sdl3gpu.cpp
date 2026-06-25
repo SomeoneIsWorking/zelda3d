@@ -42,6 +42,19 @@ extern "C" float gSoH3dWorldAmbColor[3];
 extern "C" float gSoH3dWorldAmb;
 extern "C" int gSoH3dWorldLit;
 extern "C" int gSoH3dHlGroup;
+// Dynamic sun-shadow + screen-space AO tunables (M4), owned by soh3d_gl.cpp; driven by the REPL
+// `shadow`/`ao` + RmlUi Graphics menu. The dispatcher (soh3d_gl.cpp) resolves the master enables
+// (gSoH3dShadowEnable / gSoH3dAoEnable) and gates the Begin*/Draw* calls; we mirror the per-effect
+// strength/bias the same way the Vulkan path does.
+extern "C" int gSoH3dShadowEnable;
+extern "C" int gSoH3dShadowHasFocus;
+extern "C" float gSoH3dShadowBias;
+extern "C" float gSoH3dShadowStrength;
+extern "C" int gSoH3dAoEnable;
+extern "C" float gSoH3dAoRadius;
+extern "C" float gSoH3dAoStrength;
+extern "C" float gSoH3dAoBias;
+extern "C" float gSoH3dAoMaxDiff;
 
 static int sgFaceCullOn() {
     if (gSoH3dFaceCull < 0) {
@@ -579,6 +592,395 @@ struct DrawGroup {
     std::array<uint8_t, sizeof(SgUbo)> ubo;
 };
 
+// ====================================================================================================
+// M4 — dynamic sun-shadows + screen-space AO (ported from soh3d_vk.cpp onto the unified op model).
+//
+// The two offscreen depth renders (shadow map from the sun's POV; AO depth from the camera) run as
+// AppendSoH3DOwnPass ops — each owns its own SDL3 GPU render pass into private offscreen targets,
+// appended BEFORE the visible model in-pass ops. The model fragment shader PCF-samples the shadow
+// map; the SSAO composite samples the AO depth as a full-screen in-pass op (multiply-blended) AFTER
+// the model draws. Per the P3 plan's gotcha, depth is rendered into an R32_FLOAT *color* target
+// (writing gl_FragCoord.z) and sampled as a plain sampler2D `.r`, rather than sampling a D32 depth
+// texture — avoiding SDL3 GPU depth-as-sampler pitfalls. A transient D32_FLOAT depth target backs
+// each pass's z-test so the nearest fragment wins.
+// ----------------------------------------------------------------------------------------------------
+
+constexpr uint32_t kShadowRes = 2048; // square sun-shadow map (P3 plan)
+constexpr SDL_GPUTextureFormat kDepthColorFormat = SDL_GPU_TEXTUREFORMAT_R32_FLOAT; // sampled depth
+constexpr SDL_GPUTextureFormat kDepthZFormat = SDL_GPU_TEXTUREFORMAT_D32_FLOAT;     // transient z-test
+
+// Depth-only fragment shader: alpha-test discard, then write gl_FragCoord.z into the R32F color.
+// The vertex shader (kVert, reused) computes gl_Position identically to the visible draw, so the
+// stored depth indexes the shadow PCF / SSAO sample the same as the GL/Vulkan paths.
+const char* kDepthFrag =
+    "#version 450\n"
+    "layout(location=0) in vec2 vUv;\n"
+    "layout(location=0) out vec4 outColor;\n"
+    "layout(set=3, binding=0, std140) uniform UBO {\n" SG_UBO_BODY "} ubo;\n"
+    "layout(set=2, binding=0) uniform sampler2D uTex;\n"
+    "void main() {\n"
+    "    if (texture(uTex, vUv).a < ubo.uParams.z) discard;\n"
+    "    outColor = vec4(gl_FragCoord.z, 0.0, 0.0, 1.0);\n"
+    "}\n";
+
+// Full-screen triangle (no vertex input) for the SSAO composite.
+const char* kAoCompVert =
+    "#version 450\n"
+    "void main() {\n"
+    "    vec2 p = vec2((gl_VertexIndex == 2) ? 3.0 : -1.0, (gl_VertexIndex == 1) ? 3.0 : -1.0);\n"
+    "    gl_Position = vec4(p, 0.0, 1.0);\n"
+    "}\n";
+
+// SSAO composite: golden-angle spiral over the AO depth, multiply-darken creases (range check
+// rejects silhouette edges). Identical math to soh3d_vk.cpp kAoCompFrag; params via a small UBO.
+const char* kAoCompFrag =
+    "#version 450\n"
+    "layout(location=0) out vec4 frag;\n"
+    "layout(set=2, binding=0) uniform sampler2D uAoDepth;\n"
+    "layout(set=3, binding=0, std140) uniform PC {\n"
+    "    vec4 p0;\n" // xy=texel, z=radius, w=strength
+    "    vec4 p1;\n" // x=bias, y=maxDiff
+    "} pc;\n"
+    "void main() {\n"
+    "    vec2 texel = pc.p0.xy; float radius = pc.p0.z; float strength = pc.p0.w;\n"
+    "    float bias = pc.p1.x; float maxDiff = pc.p1.y;\n"
+    "    vec2 uv = gl_FragCoord.xy * texel;\n"
+    "    float d0 = texture(uAoDepth, uv).r;\n"
+    "    if (d0 >= 0.99999) { frag = vec4(1.0); return; }\n"
+    "    float occ = 0.0;\n"
+    "    for (int i = 0; i < 12; i++) {\n"
+    "        float a = float(i) * 2.3998277;\n"
+    "        float r = radius * (float(i) + 0.5) / 12.0;\n"
+    "        vec2 off = vec2(cos(a), sin(a)) * r * texel;\n"
+    "        float di = texture(uAoDepth, uv + off).r;\n"
+    "        float diff = d0 - di;\n"
+    "        if (diff > bias) occ += clamp(1.0 - (diff - bias) / maxDiff, 0.0, 1.0);\n"
+    "    }\n"
+    "    float ao = 1.0 - strength * (occ / 12.0);\n"
+    "    frag = vec4(vec3(ao), 1.0);\n"
+    "}\n";
+
+struct AoPush {
+    float p0[4]; // xy=texel, z=radius, w=strength
+    float p1[4]; // x=bias, y=maxDiff
+};
+
+// One captured depth draw (shadow caster / AO occluder), replayed inside an own offscreen pass.
+struct DepthDraw {
+    SDL_GPUGraphicsPipeline* pipeline;
+    SDL_GPUTexture* tex; // for the alpha-test discard
+    SDL_GPUSampler* samp;
+    SDL_GPUBuffer* vbo;
+    uint32_t first, count;
+    std::array<uint8_t, sizeof(SgUbo)> ubo;
+};
+
+// ---- M4 module state ----
+bool g_sgAoResReady = false;
+SDL_GPUShader* g_depthFrag = nullptr;
+SDL_GPUShader* g_aoCompVert = nullptr;
+SDL_GPUShader* g_aoCompFrag = nullptr;
+SDL_GPUGraphicsPipeline* g_aoCompPipe = nullptr;
+std::map<uint32_t, SDL_GPUGraphicsPipeline*> g_depthPipes; // key (doCull<<1)|frontCW
+SDL_GPUSampler* g_shadowSampler = nullptr;                 // nearest + clamp (PCF samples explicit offsets)
+
+SDL_GPUTexture* g_shadowColor = nullptr; // R32F sun-shadow depth (sampled by the model frag)
+SDL_GPUTexture* g_shadowZ = nullptr;     // transient D32F z-test
+uint32_t g_shadowDim = 0;
+
+SDL_GPUTexture* g_aoColor = nullptr; // R32F camera depth (sampled by the SSAO composite)
+SDL_GPUTexture* g_aoZ = nullptr;     // transient D32F z-test
+uint32_t g_aoW = 0, g_aoH = 0;
+
+SDL_GPUBuffer* g_n64CasterBuf = nullptr; // per-frame N64 opaque caster triangle soup (shadow)
+uint32_t g_n64CasterCap = 0;
+
+// Per-RenderPass shadow state (set by SoH3D_Sg_SetShadow, consumed by SoH3D_Sg_DrawModel).
+bool g_sgShadowOn = false;
+float g_sgLightVP[16] = { 1, 0, 0, 0, 0, 1, 0, 0, 0, 0, 1, 0, 0, 0, 0, 1 };
+
+// Per-pass phase flags + accumulators.
+bool g_sgShadowPassActive = false;
+bool g_sgAoPassActive = false;
+bool g_sgAoReady = false; // an AO depth pass produced occluders this frame -> composite is valid
+std::vector<DepthDraw> g_shadowDraws;
+std::vector<DepthDraw> g_aoDraws;
+SDL_GPUViewport g_aoVp{};
+SDL_Rect g_aoSc{};
+
+SDL_GPUShader* makeShader(const char* glsl, EShLanguage stage, uint32_t numSamplers, uint32_t numUbo) {
+    std::vector<uint32_t> spv;
+    if (!CompileGlsl(stage, glsl, spv))
+        return nullptr;
+    SDL_GPUShaderCreateInfo ci{};
+    ci.code_size = spv.size() * sizeof(uint32_t);
+    ci.code = (const Uint8*)spv.data();
+    ci.entrypoint = "main";
+    ci.format = SDL_GPU_SHADERFORMAT_SPIRV;
+    ci.stage = (stage == EShLangVertex) ? SDL_GPU_SHADERSTAGE_VERTEX : SDL_GPU_SHADERSTAGE_FRAGMENT;
+    ci.num_samplers = numSamplers;
+    ci.num_uniform_buffers = numUbo;
+    return SDL_CreateGPUShader(g_device, &ci);
+}
+
+// Depth-only pipeline (R32F color + D32F z-test), reusing the model vertex shader. Keyed on cull.
+SDL_GPUGraphicsPipeline* getDepthPipeline(bool doCull, int frontCW) {
+    uint32_t key = (doCull ? 2u : 0u) | (doCull && frontCW ? 1u : 0u);
+    auto it = g_depthPipes.find(key);
+    if (it != g_depthPipes.end())
+        return it->second;
+
+    SDL_GPUVertexAttribute attrs[6]{};
+    attrs[0] = { 0, 0, SDL_GPU_VERTEXELEMENTFORMAT_FLOAT3, (uint32_t)offsetof(SoH3DGlVtx, pos) };
+    attrs[1] = { 1, 0, SDL_GPU_VERTEXELEMENTFORMAT_FLOAT3, (uint32_t)offsetof(SoH3DGlVtx, nrm) };
+    attrs[2] = { 2, 0, SDL_GPU_VERTEXELEMENTFORMAT_FLOAT2, (uint32_t)offsetof(SoH3DGlVtx, uv) };
+    attrs[3] = { 3, 0, SDL_GPU_VERTEXELEMENTFORMAT_FLOAT4, (uint32_t)offsetof(SoH3DGlVtx, boneIds) };
+    attrs[4] = { 4, 0, SDL_GPU_VERTEXELEMENTFORMAT_FLOAT4, (uint32_t)offsetof(SoH3DGlVtx, weights) };
+    attrs[5] = { 5, 0, SDL_GPU_VERTEXELEMENTFORMAT_FLOAT4, (uint32_t)offsetof(SoH3DGlVtx, color) };
+    SDL_GPUVertexBufferDescription vb{};
+    vb.slot = 0;
+    vb.pitch = sizeof(SoH3DGlVtx);
+    vb.input_rate = SDL_GPU_VERTEXINPUTRATE_VERTEX;
+
+    SDL_GPUGraphicsPipelineCreateInfo pci{};
+    pci.vertex_shader = g_vert;
+    pci.fragment_shader = g_depthFrag;
+    pci.vertex_input_state.vertex_buffer_descriptions = &vb;
+    pci.vertex_input_state.num_vertex_buffers = 1;
+    pci.vertex_input_state.vertex_attributes = attrs;
+    pci.vertex_input_state.num_vertex_attributes = 6;
+    pci.primitive_type = SDL_GPU_PRIMITIVETYPE_TRIANGLELIST;
+    pci.rasterizer_state.fill_mode = SDL_GPU_FILLMODE_FILL;
+    pci.rasterizer_state.cull_mode = doCull ? SDL_GPU_CULLMODE_BACK : SDL_GPU_CULLMODE_NONE;
+    pci.rasterizer_state.front_face =
+        frontCW ? SDL_GPU_FRONTFACE_CLOCKWISE : SDL_GPU_FRONTFACE_COUNTER_CLOCKWISE;
+    pci.rasterizer_state.enable_depth_clip = false;
+    pci.multisample_state.sample_count = SDL_GPU_SAMPLECOUNT_1;
+    pci.depth_stencil_state.enable_depth_test = true;
+    pci.depth_stencil_state.enable_depth_write = true;
+    pci.depth_stencil_state.compare_op = SDL_GPU_COMPAREOP_LESS_OR_EQUAL;
+    pci.depth_stencil_state.enable_stencil_test = false;
+
+    SDL_GPUColorTargetDescription ct{};
+    ct.format = kDepthColorFormat;
+    ct.blend_state.enable_blend = false;
+    pci.target_info.color_target_descriptions = &ct;
+    pci.target_info.num_color_targets = 1;
+    pci.target_info.has_depth_stencil_target = true;
+    pci.target_info.depth_stencil_format = kDepthZFormat;
+
+    SDL_GPUGraphicsPipeline* pipe = SDL_CreateGPUGraphicsPipeline(g_device, &pci);
+    if (!pipe)
+        fprintf(stderr, "[SoH3D_SG] depth pipeline create failed: %s\n", SDL_GetError());
+    g_depthPipes[key] = pipe;
+    return pipe;
+}
+
+// One-time M4 resources (shaders, SSAO composite pipeline, shadow sampler). Size-independent; the
+// offscreen targets are (re)built by ensureShadowTargets / ensureAoTargets.
+bool ensureShadowAoResources() {
+    if (g_sgAoResReady)
+        return true;
+    if (!ensureResources())
+        return false;
+
+    g_depthFrag = makeShader(kDepthFrag, EShLangFragment, /*samplers=*/1, /*ubo=*/1);
+    g_aoCompVert = makeShader(kAoCompVert, EShLangVertex, 0, 0);
+    g_aoCompFrag = makeShader(kAoCompFrag, EShLangFragment, /*samplers=*/1, /*ubo=*/1);
+    if (!g_depthFrag || !g_aoCompVert || !g_aoCompFrag) {
+        fprintf(stderr, "[SoH3D_SG] M4 shader create failed: %s\n", SDL_GetError());
+        return false;
+    }
+
+    // SSAO composite pipeline: full-screen triangle, multiply blend (dst *= src) into the fb colour.
+    SDL_GPUGraphicsPipelineCreateInfo pci{};
+    pci.vertex_shader = g_aoCompVert;
+    pci.fragment_shader = g_aoCompFrag;
+    pci.primitive_type = SDL_GPU_PRIMITIVETYPE_TRIANGLELIST;
+    pci.rasterizer_state.fill_mode = SDL_GPU_FILLMODE_FILL;
+    pci.rasterizer_state.cull_mode = SDL_GPU_CULLMODE_NONE;
+    pci.multisample_state.sample_count = SDL_GPU_SAMPLECOUNT_1;
+    pci.depth_stencil_state.enable_depth_test = false;
+    pci.depth_stencil_state.enable_depth_write = false;
+    SDL_GPUColorTargetDescription ct{};
+    ct.format = g_activeSdl3GpuApi->GpuColorFormat();
+    ct.blend_state.enable_blend = true;
+    ct.blend_state.src_color_blendfactor = SDL_GPU_BLENDFACTOR_ZERO;
+    ct.blend_state.dst_color_blendfactor = SDL_GPU_BLENDFACTOR_SRC_COLOR; // dst' = dst * src
+    ct.blend_state.color_blend_op = SDL_GPU_BLENDOP_ADD;
+    ct.blend_state.src_alpha_blendfactor = SDL_GPU_BLENDFACTOR_ZERO;
+    ct.blend_state.dst_alpha_blendfactor = SDL_GPU_BLENDFACTOR_ONE;
+    ct.blend_state.alpha_blend_op = SDL_GPU_BLENDOP_ADD;
+    pci.target_info.color_target_descriptions = &ct;
+    pci.target_info.num_color_targets = 1;
+    pci.target_info.has_depth_stencil_target = true; // fb 0's pass has a depth attachment bound
+    pci.target_info.depth_stencil_format = g_activeSdl3GpuApi->GpuDepthFormat();
+    g_aoCompPipe = SDL_CreateGPUGraphicsPipeline(g_device, &pci);
+    if (!g_aoCompPipe) {
+        fprintf(stderr, "[SoH3D_SG] AO composite pipeline create failed: %s\n", SDL_GetError());
+        return false;
+    }
+
+    SDL_GPUSamplerCreateInfo si{};
+    si.min_filter = SDL_GPU_FILTER_NEAREST;
+    si.mag_filter = SDL_GPU_FILTER_NEAREST;
+    si.mipmap_mode = SDL_GPU_SAMPLERMIPMAPMODE_NEAREST;
+    si.address_mode_u = SDL_GPU_SAMPLERADDRESSMODE_CLAMP_TO_EDGE;
+    si.address_mode_v = SDL_GPU_SAMPLERADDRESSMODE_CLAMP_TO_EDGE;
+    si.address_mode_w = SDL_GPU_SAMPLERADDRESSMODE_CLAMP_TO_EDGE;
+    g_shadowSampler = SDL_CreateGPUSampler(g_device, &si);
+
+    g_sgAoResReady = true;
+    fprintf(stderr, "[SoH3D_SG] M4 shadow+AO resources ready\n");
+    return true;
+}
+
+SDL_GPUTexture* makeDepthTarget(uint32_t w, uint32_t h, SDL_GPUTextureFormat fmt, SDL_GPUTextureUsageFlags usage) {
+    SDL_GPUTextureCreateInfo ci{};
+    ci.type = SDL_GPU_TEXTURETYPE_2D;
+    ci.format = fmt;
+    ci.usage = usage;
+    ci.width = w;
+    ci.height = h;
+    ci.layer_count_or_depth = 1;
+    ci.num_levels = 1;
+    return SDL_CreateGPUTexture(g_device, &ci);
+}
+
+bool ensureShadowTargets(uint32_t dim) {
+    if (g_shadowColor && g_shadowDim == dim)
+        return true;
+    if (g_shadowColor) {
+        SDL_WaitForGPUIdle(g_device);
+        SDL_ReleaseGPUTexture(g_device, g_shadowColor);
+        SDL_ReleaseGPUTexture(g_device, g_shadowZ);
+        g_shadowColor = g_shadowZ = nullptr;
+    }
+    g_shadowColor =
+        makeDepthTarget(dim, dim, kDepthColorFormat, SDL_GPU_TEXTUREUSAGE_COLOR_TARGET | SDL_GPU_TEXTUREUSAGE_SAMPLER);
+    g_shadowZ = makeDepthTarget(dim, dim, kDepthZFormat, SDL_GPU_TEXTUREUSAGE_DEPTH_STENCIL_TARGET);
+    if (!g_shadowColor || !g_shadowZ)
+        return false;
+    g_shadowDim = dim;
+    fprintf(stderr, "[SoH3D_SG] shadow map %ux%u ready\n", dim, dim);
+    return true;
+}
+
+bool ensureAoTargets(uint32_t w, uint32_t h) {
+    if (g_aoColor && g_aoW == w && g_aoH == h)
+        return true;
+    if (g_aoColor) {
+        SDL_WaitForGPUIdle(g_device);
+        SDL_ReleaseGPUTexture(g_device, g_aoColor);
+        SDL_ReleaseGPUTexture(g_device, g_aoZ);
+        g_aoColor = g_aoZ = nullptr;
+    }
+    g_aoColor =
+        makeDepthTarget(w, h, kDepthColorFormat, SDL_GPU_TEXTUREUSAGE_COLOR_TARGET | SDL_GPU_TEXTUREUSAGE_SAMPLER);
+    g_aoZ = makeDepthTarget(w, h, kDepthZFormat, SDL_GPU_TEXTUREUSAGE_DEPTH_STENCIL_TARGET);
+    if (!g_aoColor || !g_aoZ)
+        return false;
+    g_aoW = w;
+    g_aoH = h;
+    fprintf(stderr, "[SoH3D_SG] AO depth %ux%u ready\n", w, h);
+    return true;
+}
+
+// Build the per-group depth draws for one model (camera clip for AO, light clip for shadow) and
+// append them to `out`. Mirrors soh3d_vk.cpp recordDepthDraw; the whole model is recorded (the
+// hlroom tint only affects the colour pass).
+void recordDepthGroups(std::vector<DepthDraw>& out, int modelId, const float* mp16, const float* mv16, int invertY,
+                       float aspectAdj, const float* boneData, int boneCnt, unsigned long long midMask) {
+    SgModel* m = ensureUploaded(modelId);
+    if (!m || !m->vbo)
+        return;
+    SgUbo base{};
+    memcpy(base.uMP, mp16, sizeof(base.uMP));
+    base.uMP[0] *= aspectAdj;
+    base.uMP[4] *= aspectAdj;
+    base.uMP[8] *= aspectAdj;
+    base.uMP[12] *= aspectAdj;
+    memcpy(base.uMV, mv16 ? mv16 : mp16, sizeof(base.uMV));
+    for (int k = 0; k < 32; k++)
+        for (int e = 0; e < 16; e++)
+            base.uBones[k * 16 + e] = (e % 5 == 0) ? 1.0f : 0.0f;
+    if (boneData && boneCnt > 0) {
+        int nb = boneCnt < 32 ? boneCnt : 32;
+        for (int k = 0; k < nb; k++) {
+            const float* s = boneData + k * 16;
+            float* d = base.uBones + k * 16;
+            for (int rr = 0; rr < 4; rr++)
+                for (int col = 0; col < 4; col++)
+                    d[col * 4 + rr] = s[rr * 4 + col];
+        }
+    }
+    base.uParams[0] = invertY ? -1.0f : 1.0f;
+    base.uTintSkin[3] = (boneData && boneCnt > 0) ? 1.0f : 0.0f;
+    int frontCW = (invertY != 0) ^ (gSoH3dFaceCullFlip != 0);
+    for (const SgGroup& grp : m->groups) {
+        if (grp.cull)
+            continue;
+        if (grp.meshId >= 0 && grp.meshId < 64 && !((midMask >> grp.meshId) & 1ull))
+            continue;
+        SgUbo ubo = base;
+        ubo.uParams[2] = grp.alphaTest ? grp.alphaRef : 0.0f;
+        SDL_GPUTexture* tex = g_dummyTex;
+        SDL_GPUSampler* samp = g_dummySampler;
+        if (grp.texIndex >= 0 && grp.texIndex < (int)m->textures.size() && m->textures[grp.texIndex]) {
+            tex = m->textures[grp.texIndex];
+            samp = getSampler(grp.wrapS, grp.wrapT);
+        }
+        bool doCull = grp.faceCull && sgFaceCullOn();
+        DepthDraw d;
+        d.pipeline = getDepthPipeline(doCull, frontCW);
+        d.tex = tex;
+        d.samp = samp;
+        d.vbo = m->vbo;
+        d.first = grp.first;
+        d.count = grp.count;
+        memcpy(d.ubo.data(), &ubo, sizeof(ubo));
+        if (d.pipeline)
+            out.push_back(std::move(d));
+    }
+}
+
+// Replay an accumulated depth-draw list into an own offscreen pass (clear colour to 1.0 = far / lit).
+void replayDepthPass(SDL_GPUCommandBuffer* cmd, SDL_GPUTexture* color, SDL_GPUTexture* z,
+                     const SDL_GPUViewport& vp, const SDL_Rect& sc, const std::vector<DepthDraw>& draws) {
+    SDL_GPUColorTargetInfo ct{};
+    ct.texture = color;
+    ct.load_op = SDL_GPU_LOADOP_CLEAR;
+    ct.store_op = SDL_GPU_STOREOP_STORE;
+    ct.clear_color = SDL_FColor{ 1.0f, 1.0f, 1.0f, 1.0f }; // empty texels read far (1.0): not in shadow / no AO
+    SDL_GPUDepthStencilTargetInfo dt{};
+    dt.texture = z;
+    dt.load_op = SDL_GPU_LOADOP_CLEAR;
+    dt.clear_depth = 1.0f;
+    dt.store_op = SDL_GPU_STOREOP_DONT_CARE;
+    dt.stencil_load_op = SDL_GPU_LOADOP_DONT_CARE;
+    dt.stencil_store_op = SDL_GPU_STOREOP_DONT_CARE;
+    SDL_GPURenderPass* pass = SDL_BeginGPURenderPass(cmd, &ct, 1, &dt);
+    SDL_SetGPUViewport(pass, &vp);
+    SDL_SetGPUScissor(pass, &sc);
+    for (const DepthDraw& d : draws) {
+        if (!d.pipeline || !d.vbo)
+            continue;
+        SDL_BindGPUGraphicsPipeline(pass, d.pipeline);
+        SDL_PushGPUVertexUniformData(cmd, 0, d.ubo.data(), (uint32_t)d.ubo.size());
+        SDL_PushGPUFragmentUniformData(cmd, 0, d.ubo.data(), (uint32_t)d.ubo.size());
+        SDL_GPUBufferBinding vb{};
+        vb.buffer = d.vbo;
+        vb.offset = 0;
+        SDL_BindGPUVertexBuffers(pass, 0, &vb, 1);
+        SDL_GPUTextureSamplerBinding sb{};
+        sb.texture = d.tex;
+        sb.sampler = d.samp;
+        SDL_BindGPUFragmentSamplers(pass, 0, &sb, 1);
+        SDL_DrawGPUPrimitives(pass, d.count, 1, d.first, 0);
+    }
+    SDL_EndGPURenderPass(pass);
+}
+
 } // namespace
 
 extern "C" int SoH3D_Sg_Active(void) {
@@ -653,8 +1055,16 @@ extern "C" void SoH3D_Sg_DrawModel(int modelId, const float* mp16, const float* 
     base.uExtra[0] = a8 / 255.0f;
     base.uExtra[1] = uvOffU;
     base.uExtra[2] = uvOffV;
-    // Shadows are M4; off for now (uShadow.x = 0, shadow sampler bound to the dummy texture).
-    base.uShadow[0] = 0.0f;
+    // Dynamic sun-shadow (M4): when on, the model frag PCF-samples the R32F shadow map (bound below).
+    if (g_sgShadowOn) {
+        base.uShadow[0] = 1.0f;
+        base.uShadow[1] = gSoH3dShadowBias;
+        base.uShadow[2] = gSoH3dShadowStrength;
+        base.uShadow[3] = g_shadowDim ? 1.0f / (float)g_shadowDim : 0.0f;
+        memcpy(base.uLightVP, g_sgLightVP, sizeof(base.uLightVP));
+    } else {
+        base.uShadow[0] = 0.0f;
+    }
     base.uFog[0] = gSoH3dFogColor[0];
     base.uFog[1] = gSoH3dFogColor[1];
     base.uFog[2] = gSoH3dFogColor[2];
@@ -738,8 +1148,8 @@ extern "C" void SoH3D_Sg_DrawModel(int modelId, const float* mp16, const float* 
     SDL_Rect sc{};
     api->GetSoH3DViewportScissor(vp, sc);
     SDL_GPUBuffer* vbo = m->vbo;
-    SDL_GPUTexture* shadowTex = g_dummyTex;
-    SDL_GPUSampler* shadowSamp = g_dummySampler;
+    SDL_GPUTexture* shadowTex = (g_sgShadowOn && g_shadowColor) ? g_shadowColor : g_dummyTex;
+    SDL_GPUSampler* shadowSamp = (g_sgShadowOn && g_shadowColor) ? g_shadowSampler : g_dummySampler;
 
     // Append ONE op for this model: replayed inside the unified fb pass (interleaves with N64 geom).
     api->AppendSoH3DInPass([vbo, dgs = std::move(dgs), vp, sc, shadowTex,
@@ -767,29 +1177,204 @@ extern "C" void SoH3D_Sg_DrawModel(int modelId, const float* mp16, const float* 
 
 extern "C" void SoH3D_Sg_EndPass(void) {
     g_ctxValid = false;
+    g_sgShadowOn = false; // each RenderPass cycle re-establishes the shadow term via SetShadow
+    g_sgAoReady = false;
 }
 
-// --- Shadows + AO (M4): not yet ported; no-op so the shared dispatcher skips them cleanly. ---
+// --- Dynamic sun-shadows + screen-space AO (M4) --------------------------------------------------
+//
+// The depth renders are appended as AppendSoH3DOwnPass ops (own offscreen render pass into R32F
+// depth targets), BEFORE the visible model in-pass ops. The model frag samples the shadow map; the
+// SSAO composite samples the AO depth as a full-screen in-pass op AFTER the model draws. All three
+// replay in the SAME command buffer as the N64 + model ops (SDL3 GPU inserts the write->sample
+// barriers automatically), so there is no separate-pass handshake.
+
 extern "C" int SoH3D_Sg_BeginShadowPass(void) {
-    return 0;
+    g_shadowDraws.clear();
+    g_sgShadowPassActive = false;
+    if (!gSoH3dShadowEnable || !gSoH3dShadowHasFocus || !g_activeSdl3GpuApi)
+        return 0;
+    if (!ensureResources() || !ensureShadowAoResources() || !ensureShadowTargets(kShadowRes))
+        return 0;
+    g_sgShadowPassActive = true;
+    return 1;
 }
-extern "C" void SoH3D_Sg_ShadowCasterDraw(int, const float*, const float*, const float*, int, unsigned long long) {
+
+extern "C" void SoH3D_Sg_ShadowCasterDraw(int modelId, const float* mp16, const float* mv16, const float* boneData,
+                                          int boneCnt, unsigned long long midMask) {
+    if (!g_sgShadowPassActive)
+        return;
+    // mp16 = lightVP * (model->world); invertY forced 0 (the model frag samples uLightVP*world directly).
+    recordDepthGroups(g_shadowDraws, modelId, mp16, mv16, /*invertY=*/0, /*aspectAdj=*/1.0f, boneData, boneCnt,
+                      midMask);
 }
-extern "C" void SoH3D_Sg_ShadowCasterTris(const float*, size_t, const float*) {
+
+extern "C" void SoH3D_Sg_ShadowCasterTris(const float* worldXYZ, size_t triCount, const float* lightVP16) {
+    if (!g_sgShadowPassActive || !worldXYZ || triCount == 0)
+        return;
+    const uint32_t vtxCount = (uint32_t)(triCount * 3);
+    const uint32_t bytes = vtxCount * (uint32_t)sizeof(SoH3DGlVtx);
+
+    // Grow the per-frame caster buffer on demand. Steady-state uploads use cycle=true so a write
+    // can't race the previous frame's GPU read of the same buffer.
+    if (g_n64CasterCap < bytes) {
+        if (g_n64CasterBuf) {
+            SDL_WaitForGPUIdle(g_device);
+            SDL_ReleaseGPUBuffer(g_device, g_n64CasterBuf);
+            g_n64CasterBuf = nullptr;
+        }
+        uint32_t cap = bytes + bytes / 2 + 4096;
+        SDL_GPUBufferCreateInfo bci{};
+        bci.usage = SDL_GPU_BUFFERUSAGE_VERTEX;
+        bci.size = cap;
+        g_n64CasterBuf = SDL_CreateGPUBuffer(g_device, &bci);
+        g_n64CasterCap = cap;
+    }
+    if (!g_n64CasterBuf)
+        return;
+
+    SDL_GPUTransferBufferCreateInfo tci{};
+    tci.usage = SDL_GPU_TRANSFERBUFFERUSAGE_UPLOAD;
+    tci.size = bytes;
+    SDL_GPUTransferBuffer* tb = SDL_CreateGPUTransferBuffer(g_device, &tci);
+    SoH3DGlVtx* dst = (SoH3DGlVtx*)SDL_MapGPUTransferBuffer(g_device, tb, false);
+    for (uint32_t i = 0; i < vtxCount; i++) {
+        SoH3DGlVtx v{};
+        v.pos[0] = worldXYZ[i * 3 + 0];
+        v.pos[1] = worldXYZ[i * 3 + 1];
+        v.pos[2] = worldXYZ[i * 3 + 2];
+        dst[i] = v;
+    }
+    SDL_UnmapGPUTransferBuffer(g_device, tb);
+    SDL_GPUCommandBuffer* c = SDL_AcquireGPUCommandBuffer(g_device);
+    SDL_GPUCopyPass* cp = SDL_BeginGPUCopyPass(c);
+    SDL_GPUTransferBufferLocation src{};
+    src.transfer_buffer = tb;
+    SDL_GPUBufferRegion reg{};
+    reg.buffer = g_n64CasterBuf;
+    reg.size = bytes;
+    SDL_UploadToGPUBuffer(cp, &src, &reg, /*cycle=*/true);
+    SDL_EndGPUCopyPass(cp);
+    SDL_SubmitGPUCommandBuffer(c);
+    SDL_ReleaseGPUTransferBuffer(g_device, tb);
+
+    // Positions are world-space -> clip = lightVP * world; identity model, no skin, no cull.
+    SgUbo ubo{};
+    memcpy(ubo.uMP, lightVP16, sizeof(ubo.uMP));
+    static const float kIdentity[16] = { 1, 0, 0, 0, 0, 1, 0, 0, 0, 0, 1, 0, 0, 0, 0, 1 };
+    memcpy(ubo.uMV, kIdentity, sizeof(ubo.uMV));
+    for (int k = 0; k < 32; k++)
+        for (int e = 0; e < 16; e++)
+            ubo.uBones[k * 16 + e] = (e % 5 == 0) ? 1.0f : 0.0f;
+    ubo.uParams[0] = 1.0f;   // invertY off
+    ubo.uTintSkin[3] = 0.0f; // no skinning
+    DepthDraw d;
+    d.pipeline = getDepthPipeline(/*doCull=*/false, /*frontCW=*/0);
+    d.tex = g_dummyTex;
+    d.samp = g_dummySampler;
+    d.vbo = g_n64CasterBuf;
+    d.first = 0;
+    d.count = vtxCount;
+    memcpy(d.ubo.data(), &ubo, sizeof(ubo));
+    if (d.pipeline)
+        g_shadowDraws.push_back(std::move(d));
 }
+
 extern "C" void SoH3D_Sg_EndShadowPass(void) {
+    if (!g_sgShadowPassActive)
+        return;
+    g_sgShadowPassActive = false;
+    if (g_shadowDraws.empty() || !g_activeSdl3GpuApi)
+        return;
+    uint32_t dim = g_shadowDim;
+    SDL_GPUTexture* color = g_shadowColor;
+    SDL_GPUTexture* z = g_shadowZ;
+    g_activeSdl3GpuApi->AppendSoH3DOwnPass(
+        [draws = std::move(g_shadowDraws), color, z, dim](SDL_GPUCommandBuffer* cmd) {
+            SDL_GPUViewport vp{ 0.0f, 0.0f, (float)dim, (float)dim, 0.0f, 1.0f };
+            SDL_Rect sc{ 0, 0, (int)dim, (int)dim };
+            replayDepthPass(cmd, color, z, vp, sc, draws);
+        });
+    g_shadowDraws.clear();
 }
-extern "C" void SoH3D_Sg_SetShadow(int, const float*) {
+
+extern "C" void SoH3D_Sg_SetShadow(int on, const float* lightVP16) {
+    g_sgShadowOn = (on != 0);
+    if (g_sgShadowOn && lightVP16)
+        memcpy(g_sgLightVP, lightVP16, sizeof(g_sgLightVP));
 }
+
 extern "C" int SoH3D_Sg_BeginDepthPrepass(void) {
-    return 0;
+    g_aoDraws.clear();
+    g_sgAoPassActive = false;
+    if (!gSoH3dAoEnable || !g_activeSdl3GpuApi)
+        return 0;
+    if (!ensureResources() || !ensureShadowAoResources())
+        return 0;
+    int w = 0, h = 0;
+    g_activeSdl3GpuApi->MainFbSize(w, h);
+    if (w <= 0 || h <= 0 || !ensureAoTargets((uint32_t)w, (uint32_t)h))
+        return 0;
+    // Capture the model viewport/scissor so the AO depth is pixel-aligned with the visible draws.
+    g_activeSdl3GpuApi->GetSoH3DViewportScissor(g_aoVp, g_aoSc);
+    g_sgAoPassActive = true;
+    return 1;
 }
-extern "C" void SoH3D_Sg_DepthPrepassDraw(int, const float*, const float*, int, float, const float*, int,
-                                          unsigned long long, int) {
+
+extern "C" void SoH3D_Sg_DepthPrepassDraw(int modelId, const float* mp16, const float* mv16, int invertY,
+                                          float aspectAdj, const float* boneData, int boneCnt,
+                                          unsigned long long midMask, int sky) {
+    if (!g_sgAoPassActive || sky)
+        return;
+    recordDepthGroups(g_aoDraws, modelId, mp16, mv16, invertY, aspectAdj, boneData, boneCnt, midMask);
 }
+
 extern "C" void SoH3D_Sg_EndDepthPrepass(void) {
+    if (!g_sgAoPassActive)
+        return;
+    g_sgAoPassActive = false;
+    if (g_aoDraws.empty() || !g_activeSdl3GpuApi)
+        return;
+    SDL_GPUTexture* color = g_aoColor;
+    SDL_GPUTexture* z = g_aoZ;
+    SDL_GPUViewport vp = g_aoVp;
+    SDL_Rect sc = g_aoSc;
+    g_activeSdl3GpuApi->AppendSoH3DOwnPass(
+        [draws = std::move(g_aoDraws), color, z, vp, sc](SDL_GPUCommandBuffer* cmd) {
+            replayDepthPass(cmd, color, z, vp, sc, draws);
+        });
+    g_aoDraws.clear();
+    g_sgAoReady = true;
 }
+
 extern "C" void SoH3D_Sg_AoComposite(void) {
+    if (!g_sgAoReady || !gSoH3dAoEnable || !g_activeSdl3GpuApi || !g_aoColor || g_aoW == 0)
+        return;
+    SDL_GPUViewport vp{};
+    SDL_Rect sc{};
+    g_activeSdl3GpuApi->GetSoH3DViewportScissor(vp, sc);
+    AoPush push{};
+    push.p0[0] = 1.0f / (float)g_aoW;
+    push.p0[1] = 1.0f / (float)g_aoH;
+    push.p0[2] = gSoH3dAoRadius;
+    push.p0[3] = gSoH3dAoStrength;
+    push.p1[0] = gSoH3dAoBias;
+    push.p1[1] = gSoH3dAoMaxDiff;
+    SDL_GPUGraphicsPipeline* pipe = g_aoCompPipe;
+    SDL_GPUTexture* color = g_aoColor;
+    SDL_GPUSampler* samp = g_shadowSampler;
+    g_activeSdl3GpuApi->AppendSoH3DInPass(
+        [pipe, color, samp, vp, sc, push](SDL_GPUCommandBuffer* cmd, SDL_GPURenderPass* pass) {
+            SDL_SetGPUViewport(pass, &vp);
+            SDL_SetGPUScissor(pass, &sc);
+            SDL_BindGPUGraphicsPipeline(pass, pipe);
+            SDL_PushGPUFragmentUniformData(cmd, 0, &push, sizeof(push));
+            SDL_GPUTextureSamplerBinding sb{};
+            sb.texture = color;
+            sb.sampler = samp;
+            SDL_BindGPUFragmentSamplers(pass, 0, &sb, 1);
+            SDL_DrawGPUPrimitives(pass, 3, 1, 0, 0);
+        });
 }
 
 #endif // ENABLE_SDL3GPU
