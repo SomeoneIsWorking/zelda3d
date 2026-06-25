@@ -4,7 +4,7 @@
 #include <unordered_map>
 #include <unordered_set>
 #include <vector>
-#include <SDL2/SDL.h>
+#include <SDL3/SDL.h>
 #include "ControllerAxisDirectionMapping.h"
 
 #ifndef CONTROLLERBUTTONS_T
@@ -37,13 +37,13 @@ class ControllerDefaultMappings {
         std::unordered_map<CONTROLLERBUTTONS_T, std::unordered_set<KbScancode>> defaultKeyboardKeyToButtonMappings,
         std::unordered_map<StickIndex, std::vector<std::pair<Direction, KbScancode>>>
             defaultKeyboardKeyToAxisDirectionMappings,
-        std::unordered_map<CONTROLLERBUTTONS_T, std::unordered_set<SDL_GameControllerButton>>
+        std::unordered_map<CONTROLLERBUTTONS_T, std::unordered_set<SDL_GamepadButton>>
             defaultSDLButtonToButtonMappings,
-        std::unordered_map<StickIndex, std::vector<std::pair<Direction, SDL_GameControllerButton>>>
+        std::unordered_map<StickIndex, std::vector<std::pair<Direction, SDL_GamepadButton>>>
             defaultSDLButtonToAxisDirectionMappings,
-        std::unordered_map<CONTROLLERBUTTONS_T, std::vector<std::pair<SDL_GameControllerAxis, int32_t>>>
+        std::unordered_map<CONTROLLERBUTTONS_T, std::vector<std::pair<SDL_GamepadAxis, int32_t>>>
             defaultSDLAxisDirectionToButtonMappings,
-        std::unordered_map<StickIndex, std::vector<std::pair<Direction, std::pair<SDL_GameControllerAxis, int32_t>>>>
+        std::unordered_map<StickIndex, std::vector<std::pair<Direction, std::pair<SDL_GamepadAxis, int32_t>>>>
             defaultSDLAxisDirectionToAxisDirectionMappings);
 
     /** @brief Constructs a ControllerDefaultMappings with empty default tables. */
@@ -67,28 +67,28 @@ class ControllerDefaultMappings {
      * @brief Returns the default SDL-button-to-button mappings.
      * @return Map of button bitmask to set of SDL gamepad buttons.
      */
-    std::unordered_map<CONTROLLERBUTTONS_T, std::unordered_set<SDL_GameControllerButton>>
+    std::unordered_map<CONTROLLERBUTTONS_T, std::unordered_set<SDL_GamepadButton>>
     GetDefaultSDLButtonToButtonMappings();
 
     /**
      * @brief Returns the default SDL-button-to-axis-direction mappings.
      * @return Map of stick index to direction/SDL-button pairs.
      */
-    std::unordered_map<StickIndex, std::vector<std::pair<Direction, SDL_GameControllerButton>>>
+    std::unordered_map<StickIndex, std::vector<std::pair<Direction, SDL_GamepadButton>>>
     GetDefaultSDLButtonToAxisDirectionMappings();
 
     /**
      * @brief Returns the default SDL-axis-direction-to-button mappings.
      * @return Map of button bitmask to axis/threshold pairs.
      */
-    std::unordered_map<CONTROLLERBUTTONS_T, std::vector<std::pair<SDL_GameControllerAxis, int32_t>>>
+    std::unordered_map<CONTROLLERBUTTONS_T, std::vector<std::pair<SDL_GamepadAxis, int32_t>>>
     GetDefaultSDLAxisDirectionToButtonMappings();
 
     /**
      * @brief Returns the default SDL-axis-direction-to-axis-direction mappings.
      * @return Map of stick index to direction/(axis, threshold) pairs.
      */
-    std::unordered_map<StickIndex, std::vector<std::pair<Direction, std::pair<SDL_GameControllerAxis, int32_t>>>>
+    std::unordered_map<StickIndex, std::vector<std::pair<Direction, std::pair<SDL_GamepadAxis, int32_t>>>>
     GetDefaultSDLAxisDirectionToAxisDirectionMappings();
 
   protected:
@@ -112,7 +112,7 @@ class ControllerDefaultMappings {
      * @param defaultSDLButtonToButtonMappings The new mappings.
      */
     virtual void SetDefaultSDLButtonToButtonMappings(
-        std::unordered_map<CONTROLLERBUTTONS_T, std::unordered_set<SDL_GameControllerButton>>
+        std::unordered_map<CONTROLLERBUTTONS_T, std::unordered_set<SDL_GamepadButton>>
             defaultSDLButtonToButtonMappings);
 
     /**
@@ -120,7 +120,7 @@ class ControllerDefaultMappings {
      * @param defaultSDLButtonToAxisDirectionMappings The new mappings.
      */
     virtual void SetDefaultSDLButtonToAxisDirectionMappings(
-        std::unordered_map<StickIndex, std::vector<std::pair<Direction, SDL_GameControllerButton>>>
+        std::unordered_map<StickIndex, std::vector<std::pair<Direction, SDL_GamepadButton>>>
             defaultSDLButtonToAxisDirectionMappings);
 
     /**
@@ -128,7 +128,7 @@ class ControllerDefaultMappings {
      * @param defaultSDLAxisDirectionToButtonMappings The new mappings.
      */
     virtual void SetDefaultSDLAxisDirectionToButtonMappings(
-        std::unordered_map<CONTROLLERBUTTONS_T, std::vector<std::pair<SDL_GameControllerAxis, int32_t>>>
+        std::unordered_map<CONTROLLERBUTTONS_T, std::vector<std::pair<SDL_GamepadAxis, int32_t>>>
             defaultSDLAxisDirectionToButtonMappings);
 
     /**
@@ -136,20 +136,20 @@ class ControllerDefaultMappings {
      * @param defaultSDLAxisDirectionToAxisDirectionMappings The new mappings.
      */
     virtual void SetDefaultSDLAxisDirectionToAxisDirectionMappings(
-        std::unordered_map<StickIndex, std::vector<std::pair<Direction, std::pair<SDL_GameControllerAxis, int32_t>>>>
+        std::unordered_map<StickIndex, std::vector<std::pair<Direction, std::pair<SDL_GamepadAxis, int32_t>>>>
             defaultSDLAxisDirectionToAxisDirectionMappings);
 
   private:
     std::unordered_map<CONTROLLERBUTTONS_T, std::unordered_set<KbScancode>> mDefaultKeyboardKeyToButtonMappings;
     std::unordered_map<StickIndex, std::vector<std::pair<Direction, KbScancode>>>
         mDefaultKeyboardKeyToAxisDirectionMappings;
-    std::unordered_map<CONTROLLERBUTTONS_T, std::unordered_set<SDL_GameControllerButton>>
+    std::unordered_map<CONTROLLERBUTTONS_T, std::unordered_set<SDL_GamepadButton>>
         mDefaultSDLButtonToButtonMappings;
-    std::unordered_map<StickIndex, std::vector<std::pair<Direction, SDL_GameControllerButton>>>
+    std::unordered_map<StickIndex, std::vector<std::pair<Direction, SDL_GamepadButton>>>
         mDefaultSDLButtonToAxisDirectionMappings;
-    std::unordered_map<CONTROLLERBUTTONS_T, std::vector<std::pair<SDL_GameControllerAxis, int32_t>>>
+    std::unordered_map<CONTROLLERBUTTONS_T, std::vector<std::pair<SDL_GamepadAxis, int32_t>>>
         mDefaultSDLAxisDirectionToButtonMappings;
-    std::unordered_map<StickIndex, std::vector<std::pair<Direction, std::pair<SDL_GameControllerAxis, int32_t>>>>
+    std::unordered_map<StickIndex, std::vector<std::pair<Direction, std::pair<SDL_GamepadAxis, int32_t>>>>
         mDefaultSDLAxisDirectionToAxisDirectionMappings;
 };
 } // namespace Ship

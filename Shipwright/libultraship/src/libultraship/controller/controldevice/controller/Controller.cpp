@@ -6,11 +6,11 @@
 #include "ship/controller/controldeck/ControlDeck.h"
 #include "ship/controller/physicaldevice/ConnectedPhysicalDeviceManager.h"
 #if __APPLE__
-#include <SDL_events.h>
-#include <SDL_gamecontroller.h>
+#include <SDL3/SDL_events.h>
+#include <SDL3/SDL_gamepad.h>
 #else
-#include <SDL2/SDL_events.h>
-#include <SDL2/SDL_gamecontroller.h>
+#include <SDL3/SDL_events.h>
+#include <SDL3/SDL_gamepad.h>
 #endif
 #include <spdlog/spdlog.h>
 #include <cstdio>
@@ -126,12 +126,12 @@ void Controller::ReadToOSContPad(OSContPad* pad) {
                      ->GetControlDeck()
                      ->GetConnectedPhysicalDeviceManager()
                      ->GetConnectedSDLGamepadsForPort(mPortIndex)) {
-                if (SDL_GameControllerGetButton(gamepad, SDL_CONTROLLER_BUTTON_RIGHTSHOULDER))
+                if (SDL_GetGamepadButton(gamepad, SDL_GAMEPAD_BUTTON_RIGHT_SHOULDER))
                     phys |= CHORD_PHYS_MOD;
-                if (SDL_GameControllerGetButton(gamepad, SDL_CONTROLLER_BUTTON_A)) phys |= CHORD_PHYS_A;
-                if (SDL_GameControllerGetButton(gamepad, SDL_CONTROLLER_BUTTON_B)) phys |= CHORD_PHYS_B;
-                if (SDL_GameControllerGetButton(gamepad, SDL_CONTROLLER_BUTTON_X)) phys |= CHORD_PHYS_X;
-                if (SDL_GameControllerGetButton(gamepad, SDL_CONTROLLER_BUTTON_Y)) phys |= CHORD_PHYS_Y;
+                if (SDL_GetGamepadButton(gamepad, SDL_GAMEPAD_BUTTON_SOUTH)) phys |= CHORD_PHYS_A;
+                if (SDL_GetGamepadButton(gamepad, SDL_GAMEPAD_BUTTON_EAST)) phys |= CHORD_PHYS_B;
+                if (SDL_GetGamepadButton(gamepad, SDL_GAMEPAD_BUTTON_WEST)) phys |= CHORD_PHYS_X;
+                if (SDL_GetGamepadButton(gamepad, SDL_GAMEPAD_BUTTON_NORTH)) phys |= CHORD_PHYS_Y;
             }
         }
 
@@ -203,16 +203,16 @@ void Controller::ReadToOSContPad(OSContPad* pad) {
                  ->GetControlDeck()
                  ->GetConnectedPhysicalDeviceManager()
                  ->GetConnectedSDLGamepadsForPort(mPortIndex)) {
-            for (int btn = 0; btn < SDL_CONTROLLER_BUTTON_MAX; btn++) {
-                if (SDL_GameControllerGetButton(gamepad, (SDL_GameControllerButton)btn)) {
+            for (int btn = 0; btn < SDL_GAMEPAD_BUTTON_COUNT; btn++) {
+                if (SDL_GetGamepadButton(gamepad, (SDL_GamepadButton)btn)) {
                     anyGamepadBtn = true;
                     break;
                 }
             }
             if (!anyGamepadBtn) {
                 // Also check for non-trivial axis deflection (>= 8192 = ~1/4 throw).
-                for (int ax = 0; ax < SDL_CONTROLLER_AXIS_MAX; ax++) {
-                    Sint16 v = SDL_GameControllerGetAxis(gamepad, (SDL_GameControllerAxis)ax);
+                for (int ax = 0; ax < SDL_GAMEPAD_AXIS_COUNT; ax++) {
+                    Sint16 v = SDL_GetGamepadAxis(gamepad, (SDL_GamepadAxis)ax);
                     if (v > 8192 || v < -8192) { anyGamepadBtn = true; break; }
                 }
             }

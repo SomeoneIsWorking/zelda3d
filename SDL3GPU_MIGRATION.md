@@ -61,3 +61,39 @@ SDL surface (~40 files) — project is on **SDL2 2.32**, system has **SDL3 3.4.1
 
 ## Status log
 - P0 done.
+- **P1 done (SDL2 → SDL3 whole-project migration).** Tree builds clean and boots headless under SDL3
+  on the GL backend; `soh.elf` links `libSDL3.so.0` only (no `libSDL2`). GATE PASSED: headless boot +
+  REPL responds (`cmd "ainfo"` → valid reply) + GL renderer renders the Kokiri scene (Link+Saria, HUD;
+  mean RGB ~140/140/104, 87% non-black). Evidence: `scratch/screenshots/p1_sdl3_boot.png`.
+  - **CMake:** `find_package(SDL2)`→`SDL3 REQUIRED`, `SDL2::SDL2`→`SDL3::SDL3` in `soh/CMakeLists.txt`,
+    `soh/charcompare/CMakeLists.txt`, `libultraship/cmake/dependencies/{common,linux}.cmake`
+    (imgui backend `imgui_impl_sdl2`→`imgui_impl_sdl3`, `ImGui PUBLIC SDL3::SDL3`).
+  - **Window/GL:** `gfx_sdl2.cpp` + `gfx_sdl.h` fully migrated (CreateWindow no x/y; `SDL_GetDisplayForWindow`/
+    `SDL_DisplayID`; `SDL_GetDesktopDisplayMode`/`SDL_GetCurrentDisplayMode` return pointers + float
+    `refresh_rate`; fullscreen via `SDL_SetWindowFullscreenMode`; `SDL_GetWindowSizeInPixels`; float mouse
+    state; per-window relative-mouse; event enum/field renames; `SDL_GL_DestroyContext`). `Fast3dWindow.cpp`
+    needed no SDL calls migrated (enums only). `gfx_opengl.h`/`soh3d_gl.cpp` includes → SDL3.
+  - **imgui / RmlUi / audio:** `Fast3dGui.cpp` → `ImGui_ImplSDL3_*`; RmlUi shim driven down its SDL3 branch
+    (`RMLUI_SDL_VERSION_MAJOR=3`); `SDLAudioPlayer.cpp` rewritten to SDL3 audio streams
+    (`SDL_OpenAudioDeviceStream`/`SDL_PutAudioStreamData`/`SDL_ResumeAudioStreamDevice`).
+  - **Input subsystem:** both controller trees (`ship/` + legacy `libultraship/`) migrated
+    `SDL_GameController*`→`SDL_Gamepad*`, enum/event/field renames, `SDL_GetJoysticks` enumeration,
+    property-based HasLED/HasRumble. Numeric button/axis enum values are stable so saved bindings still
+    resolve. Not live-key-tested headless (no physical device), but the SDL3 event pump runs every frame
+    without issue and keyboard-glyph input device is active.
+  - **Misc:** CrashHandler/os/os_vi/Context/main.c/Extract.cpp (messagebox `buttonid`→`buttonID`) migrated;
+    `FileDropMgr::SetDroppedFile` now takes `const char*` (SDL3 `SDL_DropEvent::data` is const).
+  - **Deferred / stubbed (documented):**
+    - **SDL_net / networking (Anchor co-op, CrowdControl, Sail):** there is no SDL3_net, and SDL2_net
+      cannot link into an SDL3 binary (SDL2 & SDL3 share the `SDL_h_` master include guard, so pulling
+      `<SDL2/SDL_net.h>` silently neutralized every later `<SDL3/SDL.h>` and broke the whole soh tree's
+      view of `SDL_Gamepad`). Replaced the `<SDL2/SDL_net.h>` dependency with a self-contained no-op shim
+      (`soh/Network/SDLNetShim.{h,cpp}`): networking compiles + links but is DISABLED at runtime. The
+      SDL2_net CMake link was dropped. **TODO:** native/SDL3 networking transport to restore the feature.
+    - **Vulkan backend:** kept compiled (ENABLE_VULKAN on) because other modules (`soh3d_gl.cpp`,
+      `SohRmlUi.cpp`) reference Vk symbols unconditionally; only its 3 SDL surface calls were migrated
+      (`SDL_Vulkan_GetInstanceExtensions` new signature, `SDL_Vulkan_CreateSurface` +allocator arg,
+      `SDL_Vulkan_GetDrawableSize`→`SDL_GetWindowSizeInPixels`). GL remains the active runtime renderer.
+      The full Vulkan→SDL3-GPU port is Phase 2.
+    - **Mobile/Mac (`MobileImpl.cpp`, `macUtils.mm`):** migrated for cleanliness but not compiled on
+      Linux, so not compile-verified here. Windows-only `<SDL_syswm.h>` (gone in SDL3) left under `#ifdef`.
