@@ -56,3 +56,7 @@
 # the wrong CSAB -> map it to Ane_matsu (matsu = wait/idle). The runtime resolver disambiguates these
 # os_anime OTR paths (also seeded under km1) by the model's ZAR.
 /actor/zelda_ane.zar	gObjOsAnim_07D0	Ane_matsu
+# #119: child Nabooru at Spirit Temple crawlspace was mapped to nabor_agura_wait (agura=cross-legged
+# sitting) -> baggy pants folded into a blob. Correct = nabor_hiza_wait (hiza=knee, kneeling, 24f,
+# matches the 24f N64 KneeingAtCrawlspace anim). Verified live: kneels at the crawlspace, legs intact.
+/actor/zelda_nb.zar	gNabooruKneeingAtCrawlspaceAnim	nabor_hiza_wait
