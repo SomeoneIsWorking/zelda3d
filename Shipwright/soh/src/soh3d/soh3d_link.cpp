@@ -428,12 +428,22 @@ extern "C" int SoH3D_PlayerDrawImpl(PlayState* play, Actor* actor) {
         if (strcmp(csab, "rest") == 0) {
             SoH3D_UpdateAnim(modelId, NULL, 0); // diagnostic: force bind pose (linkanim rest)
         } else if (isLoco && gSoH3dLinkForceCsab[0] == '\0' && player->actor.speedXZ > 0.5f) {
-            // #7 SLIDE FIX: Link's run/walk advances its pose via a player-internal accumulator, not
-            // skelAnime.curFrame (verified pinned at 0 across an entire run). Phase-locking to that
-            // dead clock froze the run CSAB at frame 0 -> static pose sliding over the ground. Drive
-            // the leg cycle by ground speed instead (free-run; the CSAB wraps the frame internally).
+            // #117 / #7 SLIDE FIX: Link's run/walk advances its pose via a player-internal accumulator
+            // (unk_868) + LinkAnimation_BlendToJoint writing jointTable directly, NOT skelAnime.curFrame
+            // (RE'd: z_player.c func_80841860/func_80841EE4; oot3d-decomp player_anim_states.md). So
+            // curFrame is pinned 0 the whole run AND morphWeight is pinned 1.0 — both are STALE design
+            // artifacts of the one-time run-entry morph (func_8083C858 -> Player_AnimChangeLoopMorph,
+            // morphFrames=-6), never updated during the steady cycle because the cycle bypasses the
+            // curFrame/morph machinery. Phase-locking to that dead curFrame froze the CSAB at frame 0;
+            // so we free-run the leg cycle by ground speed (the CSAB wraps internally). CRUCIALLY we
+            // pass morphWeight=0 here, NOT the live (stale 1.0) value: feeding 1.0 makes the morph
+            // blend render 100% the frozen OUTGOING idle pose every frame (csab.cpp weight=1 -> full
+            // outgoing), which froze the legs while the root slid — the actual #117 slide. Verified
+            // A/B (posescan over a run): morphWeight live=1.0 -> mean per-frame leg jump 0.6 deg
+            // (frozen/slide); morphWeight=0 -> 38.9 deg (legs cycle). The loco free-run is a continuous
+            // speed-driven cycle, not a cross-fade, so a morph blend is semantically wrong here.
             SoH3D_UpdateAnimAuto(modelId, csab, player->actor.speedXZ * gSoH3dLinkLocoGain, 0.0f, 0.0f,
-                                 player->skelAnime.morphWeight);
+                                 0.0f);
         } else {
             // Idle / one-shot anims: curFrame is valid here, so keep the N64-progress phase-lock.
             SoH3D_UpdateAnimAuto(modelId, csab, gSoH3dAnimRate, player->skelAnime.curFrame,
