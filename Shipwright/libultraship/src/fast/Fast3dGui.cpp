@@ -234,6 +234,21 @@ void Fast3dGui::ImGuiBackendInit() {
             }
             break;
 #endif
+#ifdef ENABLE_SDL3GPU
+        case WindowBackend::FAST3D_SDL_GPU:
+            // No ImGui SDL3-GPU renderer backend; the RmlUi menu has its own SDL3 GPU render
+            // interface (appends ops into the Fast3D SDL3 GPU unified op-list), so stand it up here.
+            {
+                auto wnd = Ship::Context::GetRawInstance()->GetWindow();
+                mRml = std::make_unique<Ship::SohRmlUi>();
+                if (!mRml->Init(mImpl.Vulkan.Window, nullptr, (int)wnd->GetWidth(), (int)wnd->GetHeight(),
+                                /*vulkan=*/false, /*sdl3gpu=*/true)) {
+                    SPDLOG_ERROR("Fast3dGui: RmlUi (SDL3 GPU) init failed; menu disabled");
+                    mRml.reset();
+                }
+            }
+            break;
+#endif
 #ifdef ENABLE_DX11
         case WindowBackend::FAST3D_DXGI_DX11:
             ImGui_ImplDX11_Init(static_cast<ID3D11Device*>(mImpl.Dx11.Device),
@@ -412,6 +427,9 @@ void Fast3dGui::RenderRmlMenu() {
         case WindowBackend::FAST3D_SDL_OPENGL:
 #ifdef ENABLE_VULKAN
         case WindowBackend::FAST3D_SDL_VULKAN:
+#endif
+#ifdef ENABLE_SDL3GPU
+        case WindowBackend::FAST3D_SDL_GPU:
 #endif
             mRml->UpdateAndRender();
             break;
