@@ -144,10 +144,21 @@ class GfxRenderingAPISdl3Gpu : public GfxRenderingAPI {
     // depth-correctly with N64 geometry — same color+depth target). The callback gets the open
     // command buffer + render pass at replay time.
     void AppendSoH3DInPass(std::function<void(SDL_GPUCommandBuffer*, SDL_GPURenderPass*)> fn);
+    // As AppendSoH3DInPass but targeting an explicit framebuffer (the HUD / menu draw into fb 0, the
+    // composited frame the headless readback reads + the present blit samples, regardless of which
+    // fb the interpreter last drew to).
+    void AppendSoH3DInPassFb(int fb, std::function<void(SDL_GPUCommandBuffer*, SDL_GPURenderPass*)> fn);
     // Append an external op that runs its OWN render pass (offscreen shadow/AO depth targets). The
     // main framebuffer pass is ended first (SDL3 GPU passes can't nest); the callback owns
     // SDL_BeginGPURenderPass/SDL_EndGPURenderPass on the supplied command buffer.
     void AppendSoH3DOwnPass(std::function<void(SDL_GPUCommandBuffer*)> fn);
+    // Pixel dimensions of the main framebuffer (fb 0) — the HUD / menu pixel-space coordinate basis.
+    void MainFbSize(int& w, int& h);
+    // True while a frame is recording (StartFrame ran, FinishRender has not) — HUD/menu ops appended
+    // now will replay this frame.
+    bool FrameRecording() {
+        return mFrameAcquired;
+    }
 
     const char* GetName() override;
     int GetMaxTextureSize() override;
