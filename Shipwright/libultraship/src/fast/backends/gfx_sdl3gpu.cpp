@@ -813,6 +813,22 @@ void GfxRenderingAPISdl3Gpu::ReplayOps(SDL_GPUTexture* presentTex, uint32_t pres
                     endPass();
                     beginPass(op.fb);
                 }
+                // Diagnostic (SOH3D_DBG_OPDRAW=1): dump every replayed draw's recorded state —
+                // pipeline, vertex range, and each fragment-sampler binding. With a synchronous GPU
+                // (LP_NUM_THREADS=0 on lavapipe, or any single-threaded driver) the last line printed
+                // before a fault pins the exact culprit op; combined with SOH3D_SDL3GPU_DEBUG=1
+                // validation it's how the "bones"-descriptor / pipeline-layout crash was found. Pure
+                // logging, no behaviour change.
+                static const bool kDbgOpDraw = getenv("SOH3D_DBG_OPDRAW") != nullptr;
+                if (kDbgOpDraw) {
+                    fprintf(stderr, "[DBG_OPDRAW] fb=%d pipe=%p nVerts=%u vboOff=%u nSamp=%u",
+                            op.fb, (void*)op.pipeline, op.numVerts, op.vboOffset, op.numSamplers);
+                    for (uint32_t si = 0; si < op.numSamplers; si++)
+                        fprintf(stderr, " [%u tex=%p samp=%p]", si, (void*)op.samplers[si].texture,
+                                (void*)op.samplers[si].sampler);
+                    fprintf(stderr, "\n");
+                    fflush(stderr);
+                }
                 SDL_BindGPUGraphicsPipeline(pass, op.pipeline);
                 SDL_SetGPUViewport(pass, &op.viewport);
                 SDL_SetGPUScissor(pass, &op.scissor);
@@ -1453,6 +1469,20 @@ void GfxRenderingAPISdl3Gpu::UploadTexture(const uint8_t* rgba32Buf, uint32_t wi
     TextureSDL3& t = mTextures[id];
     if (t.tex == nullptr || t.width != width || t.height != height) {
         if (t.tex && !t.isFbAlias) {
+            // Diagnostic (SOH3D_DBG_OPDRAW=1): a texture re-uploaded at a new size is released here.
+            // If its handle is still referenced by an op already recorded THIS frame, releasing it now
+            // is a use-after-free at replay/exec time — report which op so that class of bug is caught
+            // by value rather than by a driver fault. (refByOp == -1 means no live reference: safe.)
+            static const bool kDbgOpDraw = getenv("SOH3D_DBG_OPDRAW") != nullptr;
+            if (kDbgOpDraw) {
+                int refOp = -1;
+                for (size_t oi = 0; oi < mOps.size(); oi++)
+                    for (uint32_t si = 0; si < mOps[oi].numSamplers; si++)
+                        if (mOps[oi].samplers[si].texture == t.tex) refOp = (int)oi;
+                fprintf(stderr, "[DBG_TEXREL] release tex id=%u ptr=%p (resize %ux%u->%ux%u) refByOp=%d ops=%zu\n",
+                        id, (void*)t.tex, t.width, t.height, width, height, refOp, mOps.size());
+                fflush(stderr);
+            }
             SDL_ReleaseGPUTexture(mDevice, t.tex);
         }
         SDL_GPUTextureCreateInfo ci{};

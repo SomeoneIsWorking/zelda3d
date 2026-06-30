@@ -440,7 +440,14 @@ bool ensureResources() {
     vci.entrypoint = "main";
     vci.format = SDL_GPU_SHADERFORMAT_SPIRV;
     vci.stage = SDL_GPU_SHADERSTAGE_VERTEX;
-    vci.num_uniform_buffers = 1;
+    // kVert declares TWO vertex uniform buffers: set=1 binding=0 UBO (common) + set=1 binding=1
+    // UBOBones (bone matrices for GPU skinning). This count is the pipeline-layout's vertex uniform
+    // descriptor count and MUST match the shader, or binding 1 (bones) has no descriptor slot: the
+    // Vulkan validation layer flags it (VUID-VkGraphicsPipelineCreateInfo-layout-07988 +
+    // "Set 1, Binding 1, bones is invalid") and the bones descriptor is dereferenced unbacked at draw
+    // time — a stale/garbage read that lavapipe-serial tolerates but MoltenVK and multi-threaded
+    // lavapipe fault on (the headless SKYBUG crash / the macOS BindFragmentSamplers crash).
+    vci.num_uniform_buffers = 2;
     g_vert = SDL_CreateGPUShader(g_device, &vci);
 
     SDL_GPUShaderCreateInfo fci{};
