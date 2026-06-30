@@ -25,8 +25,12 @@ typedef struct SoH3DGlVtx {
     float color[4]; // per-vertex RGBA (OoT3D baked lighting / additive falloff)
 } SoH3DGlVtx;
 
-// Max bones in the skinning uniform array (covers OoT3D characters; childlink=25).
-#define SOH3D_GL_MAX_BONES 32
+// Max bones in the skinning uniform array. This is the SINGLE source of truth for that capacity:
+// the SDL3 GPU backend stringifies it into the `uBones[N]` shader array, the SgUbo struct, and the
+// per-draw upload loops/clamp (soh3d_sdl3gpu.cpp). It must be >= the bone count of the largest
+// OoT3D rig we draw (currently 33). 64 leaves headroom and stays within the guaranteed
+// vertex-uniform budget (64 mat4 = 1024 floats, plus uMP/uMV).
+#define SOH3D_GL_MAX_BONES 64
 
 // One per-material draw batch (triangle list).
 typedef struct SoH3DGlGroup {
