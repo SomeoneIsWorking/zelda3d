@@ -121,7 +121,10 @@ start() {
     # SOH3D_WARP defaults ON (auto-warp to an in-game entrance, skipping the boot title demo).
     # Set SOH3D_WARP= (empty) to boot the real Opening->title demo instead (needed to repro the
     # title/cutscene-camera bugs #4/#14, which only exist on that flow). entrance/time are unused then.
-    setsid env SOH3D=1 SOH3D_WARP="${SOH3D_WARP-1}" SOH3D_AUTO="${SOH3D_AUTO:-1}" SOH3D_N64ANIM="${SOH3D_N64ANIM:-1}" \
+    # SOH3D / SOH3D_AUTO / SOH3D_N64ANIM are ON BY DEFAULT in the binary now (the unified renderer is
+    # the default, no flags) — only pass them through when explicitly overridden (e.g. SOH3D=0 for an
+    # N64 A/B reference). SOH3D_WARP stays a launcher convenience for the entrance-warp test harness.
+    setsid env ${SOH3D:+SOH3D="$SOH3D"} SOH3D_WARP="${SOH3D_WARP-1}" ${SOH3D_AUTO:+SOH3D_AUTO="$SOH3D_AUTO"} ${SOH3D_N64ANIM:+SOH3D_N64ANIM="$SOH3D_N64ANIM"} \
         SOH3D_VULKAN="${SOH3D_VULKAN:-}" SOH3D_VK_VALIDATION="${SOH3D_VK_VALIDATION:-}" \
         SOH3D_SDL3GPU="${SOH3D_SDL3GPU:-}" SOH3D_SDL3GPU_DEBUG="${SOH3D_SDL3GPU_DEBUG:-}" \
         SOH3D_RMLUI_OPEN="${SOH3D_RMLUI_OPEN:-}" \
