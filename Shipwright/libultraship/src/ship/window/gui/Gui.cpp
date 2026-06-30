@@ -55,58 +55,25 @@ Gui::~Gui() {
 }
 
 void Gui::Init() {
-    ImGuiContext* ctx = ImGui::CreateContext();
-    ImGui::SetCurrentContext(ctx);
+    // ImGui has been removed from the build (replaced by a no-op header shim; the ImGui dev-tool /
+    // menu code is kept only as inert scaffolding to migrate to RmlUi). So the framework no longer
+    // creates an ImGui context, builds a font atlas, or ticks/draws ImGui windows — the live UI is
+    // RmlUi (stood up in ImGuiBackendInit) plus the native SoH3D HUD. mImGuiIo points at the shim's
+    // zeroed IO purely so the legacy GamepadNavigation accessors that read mImGuiIo->ConfigFlags stay
+    // valid (they no-op against the zeroed flags).
     mImGuiIo = &ImGui::GetIO();
-    mImGuiIo->ConfigFlags |= ImGuiConfigFlags_DockingEnable | ImGuiConfigFlags_NoMouseCursorChange;
 
-    // Add Font Awesome and merge it into the default font.
-    mImGuiIo->Fonts->AddFontDefault();
-    // This must match the default font size, which is 13.0f.
-    float baseFontSize = 13.0f;
-    // FontAwesome fonts need to have their sizes reduced by 2.0f/3.0f in order to align correctly
-    float iconFontSize = baseFontSize * 2.0f / 3.0f;
-    static const ImWchar sIconsRanges[] = { ICON_MIN_FA, ICON_MAX_16_FA, 0 };
-    ImFontConfig iconsConfig;
-    iconsConfig.MergeMode = true;
-    iconsConfig.PixelSnapH = true;
-    iconsConfig.GlyphMinAdvanceX = iconFontSize;
-    mImGuiIo->Fonts->AddFontFromMemoryCompressedBase85TTF(fontawesome_compressed_data_base85, iconFontSize,
-                                                          &iconsConfig, sIconsRanges);
-
-#if defined(__ANDROID__)
-    // Scale everything by 2 for Android
-    ImGui::GetStyle().ScaleAllSizes(2.0f);
-    mImGuiIo->FontGlobalScale = 2.0f;
-#endif
-
-    mImGuiIniPath = Context::GetPathRelativeToAppDirectory("imgui.ini");
-    mImGuiLogPath = Context::GetPathRelativeToAppDirectory("imgui_log.txt");
-    mImGuiIo->IniFilename = mImGuiIniPath.c_str();
-    mImGuiIo->LogFilename = mImGuiLogPath.c_str();
-
-    if (SupportsViewports() &&
-        Ship::Context::GetRawInstance()->GetConsoleVariables()->GetInteger(CVAR_ENABLE_MULTI_VIEWPORTS, 1)) {
-        mImGuiIo->ConfigFlags |= ImGuiConfigFlags_ViewportsEnable;
-    }
-
-    if (Ship::Context::GetRawInstance()->GetConsoleVariables()->GetInteger(CVAR_IMGUI_CONTROLLER_NAV, 0) &&
-        GetMenuOrMenubarVisible()) {
-        mImGuiIo->ConfigFlags |= ImGuiConfigFlags_NavEnableGamepad;
-    } else {
-        mImGuiIo->ConfigFlags &= ~ImGuiConfigFlags_NavEnableGamepad;
-    }
-
-    GetGuiWindow("Stats")->Init();
-    GetGuiWindow("Console")->Init();
-    GetGameOverlay()->Init();
-
+    // The GUI textures resource factory is still needed (RmlUi/native paths load textures through it).
     Context::GetRawInstance()->GetResourceManager()->GetResourceLoader()->RegisterResourceFactory(
         std::make_shared<ResourceFactoryBinaryGuiTextureV0>(), RESOURCE_FORMAT_BINARY, "GuiTexture",
         static_cast<uint32_t>(RESOURCE_TYPE_GUI_TEXTURE), 0);
 
+    // GameOverlay::Init only registers the FONT resource factory (no ImGui) — the native HUD and
+    // OTRGlobals font creation depend on it, so it must still run.
+    GetGameOverlay()->Init();
+
     ImGuiWMInit();
-    ImGuiBackendInit();
+    ImGuiBackendInit(); // Fast3dGui override stands up the RmlUi menu here.
 }
 
 void Gui::ImGuiWMInit() {
@@ -173,86 +140,9 @@ void Gui::ImGuiWMNewFrame() {
 }
 
 void Gui::DrawMenu() {
-    const std::shared_ptr<Window> wnd = Context::GetRawInstance()->GetWindow();
-    const std::shared_ptr<Config> conf = Context::GetRawInstance()->GetConfig();
-
-    ImGuiWindowFlags windowFlags = ImGuiWindowFlags_NoDocking | ImGuiWindowFlags_NoBackground |
-                                   ImGuiWindowFlags_NoTitleBar | ImGuiWindowFlags_NoCollapse | ImGuiWindowFlags_NoMove |
-                                   ImGuiWindowFlags_NoBringToFrontOnFocus | ImGuiWindowFlags_NoNavFocus |
-                                   ImGuiWindowFlags_NoResize;
-
-    if (GetMenuBar() && GetMenuBar()->IsVisible()) {
-        windowFlags |= ImGuiWindowFlags_MenuBar;
-    }
-
-    const ImGuiViewport* viewport = ImGui::GetMainViewport();
-    ImGui::SetNextWindowPos(viewport->WorkPos);
-    ImGui::SetNextWindowSize(ImVec2((int)wnd->GetWidth(), (int)wnd->GetHeight()));
-    ImGui::SetNextWindowViewport(viewport->ID);
-    ImGui::PushStyleVar(ImGuiStyleVar_WindowPadding, ImVec2(0.0f, 0.0f));
-    ImGui::PushStyleVar(ImGuiStyleVar_WindowBorderSize, 0.0f);
-    ImGui::PushStyleVar(ImGuiStyleVar_ChildBorderSize, 0.0f);
-    ImGui::Begin("Main - Deck", nullptr, windowFlags);
-    ImGui::PopStyleVar(3);
-
-    mTemporaryWindowPos = ImGui::GetWindowPos();
-
-    const ImGuiID dockId = ImGui::GetID("main_dock");
-
-    if (!ImGui::DockBuilderGetNode(dockId)) {
-        ImGui::DockBuilderRemoveNode(dockId);
-        ImGui::DockBuilderAddNode(dockId, ImGuiDockNodeFlags_NoTabBar);
-        ImGui::DockBuilderSetNodeSize(dockId, ImVec2(viewport->Size.x, viewport->Size.y));
-
-        ImGui::DockBuilderDockWindow("Main Game", dockId);
-
-        ImGui::DockBuilderFinish(dockId);
-    }
-
-    ImGui::DockSpace(dockId, ImVec2(0.0f, 0.0f), ImGuiDockNodeFlags_None | ImGuiDockNodeFlags_NoDockingInCentralNode);
-
-    if (ImGui::IsKeyPressed(TOGGLE_BTN, false) || ImGui::IsKeyPressed(ImGuiKey_Escape, false) ||
-        (ImGui::IsKeyPressed(TOGGLE_PAD_BTN, false) &&
-         Ship::Context::GetRawInstance()->GetConsoleVariables()->GetInteger(CVAR_IMGUI_CONTROLLER_NAV, 0))) {
-        // soh3d: the in-game menu is the RmlUi menu (toggled on Esc/Start in Fast3dGui), which
-        // replaces SoH's ImGui menu — so Esc/pad must NOT toggle GetMenu() here, or both would open.
-        if ((ImGui::IsKeyPressed(TOGGLE_BTN, false) || ImGui::IsKeyPressed(TOGGLE_PAD_BTN, false)) &&
-            GetMenuBar()) {
-            GetMenuBar()->ToggleVisibility();
-        }
-        Ship::Context::GetRawInstance()->GetWindow()->GetMouseStateManager()->UpdateMouseCapture();
-        if (Ship::Context::GetRawInstance()->GetConsoleVariables()->GetInteger(CVAR_IMGUI_CONTROLLER_NAV, 0) &&
-            GetMenuOrMenubarVisible()) {
-            mImGuiIo->ConfigFlags |= ImGuiConfigFlags_NavEnableGamepad;
-        } else {
-            mImGuiIo->ConfigFlags &= ~ImGuiConfigFlags_NavEnableGamepad;
-        }
-    }
-
-    // Mac interprets this as cmd+r when io.ConfigMacOSXBehavior is on (on by default)
-    if ((ImGui::IsKeyDown(ImGuiKey_LeftCtrl) || ImGui::IsKeyDown(ImGuiKey_RightCtrl)) &&
-        ImGui::IsKeyPressed(ImGuiKey_R, false)) {
-        std::reinterpret_pointer_cast<ConsoleWindow>(
-            Context::GetRawInstance()->GetWindow()->GetGui()->GetGuiWindow("Console"))
-            ->Dispatch("reset");
-    }
-
-    if (GetMenuBar()) {
-        GetMenuBar()->Update();
-        GetMenuBar()->Draw();
-    }
-
-    if (GetMenu()) {
-        GetMenu()->Update();
-        GetMenu()->Draw();
-    }
-
-    for (auto& windowIter : mGuiWindows) {
-        windowIter.second->Update();
-        windowIter.second->Draw();
-    }
-
-    ImGui::End();
+    // ImGui removed: the old ImGui dock ("Main - Deck"), the dev-tool/menu window tick loop, and the
+    // ImGui menu/reset hotkeys are gone. The live menu is RmlUi (driven from Fast3dGui), and the
+    // registered GuiWindows are inert scaffolding (see AddGuiWindow). Nothing to do here.
 }
 
 void Gui::HandleMouseCapture() {
@@ -270,25 +160,15 @@ void Gui::HandleMouseCapture() {
 }
 
 void Gui::StartFrame() {
-    HandleMouseCapture();
-    ImGuiBackendNewFrame();
-    ImGuiWMNewFrame();
-    ImGui::NewFrame();
+    // ImGui removed: no NewFrame / backend new-frame. Frame compositing is the interpreter's native
+    // path; the menu is RmlUi (rendered in EndFrame).
 }
 
 void Gui::EndFrame() {
-    ImGui::Render();
-    // The game frame is composited THROUGH ImGui (DrawGame -> ImGui::Image of the game
-    // framebuffer), so the RmlUi menu has to render AFTER the ImGui draw data or the opaque
-    // game image paints over it. (Layering the menu under the ImGui dev-tool windows is a
-    // Phase 2 concern — they share a single ImGui draw pass here.)
-    ImGuiRenderDrawData(ImGui::GetDrawData());
-    // SoH3D native PC HUD: drawn directly through the Vulkan backend (soh3d_hud_vk.cpp), BEFORE the
-    // RmlUi menu so an open ESC menu composites on top of the HUD. No-op when the PC HUD is disabled,
-    // on non-Vulkan backends, or before a valid game frame exists. Defined in soh/src/soh3d/soh3d.c.
+    // ImGui removed: no Render / draw-data path. The game frame is composited natively by the
+    // interpreter onto fb 0; here we draw the native SoH3D HUD then the RmlUi menu on top.
     SoH3D_HudFrame();
     RenderRmlMenu();
-    ImGui::EndFrame();
 }
 
 void Gui::CalculateGameViewport() {
@@ -344,7 +224,9 @@ void Gui::AddGuiWindow(std::shared_ptr<GuiWindow> guiWindow) {
     }
 
     mGuiWindows[guiWindow->GetName()] = guiWindow;
-    guiWindow->Init();
+    // NOTE: ImGui removed — windows are kept registered (so GetGuiWindow lookups still resolve) but
+    // are NOT Init()'d or ticked; their InitElement/DrawElement are ImGui scaffolding that no longer
+    // runs. Do not call guiWindow->Init() here.
 }
 
 void Gui::RemoveGuiWindow(std::shared_ptr<GuiWindow> guiWindow) {
@@ -373,18 +255,12 @@ std::shared_ptr<GameOverlay> Gui::GetGameOverlay() {
 
 void Gui::SetMenuBar(std::shared_ptr<GuiMenuBar> menuBar) {
     mMenuBar = menuBar;
-
-    if (GetMenuBar()) {
-        GetMenuBar()->Init();
-    }
+    // ImGui removed: menu bar is inert scaffolding; do not Init() (would run ImGui InitElement).
 }
 
 void Gui::SetMenu(std::shared_ptr<GuiWindow> menu) {
     mMenu = menu;
-
-    if (GetMenu()) {
-        GetMenu()->Init();
-    }
+    // ImGui removed: menu is inert scaffolding; do not Init() (would run ImGui InitElement).
 }
 
 std::shared_ptr<GuiMenuBar> Gui::GetMenuBar() {

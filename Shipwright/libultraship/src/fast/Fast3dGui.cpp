@@ -100,15 +100,8 @@ void Fast3dGui::ImGuiBackendShutdown() {
 }
 
 void Fast3dGui::ImGuiBackendNewFrame() {
-    // No ImGui SDL3-GPU *renderer* backend is stood up; build the font atlas CPU-side so
-    // ImGui::NewFrame doesn't SetCurrentFont(null) and crash.
-    ImGuiIO& io = ImGui::GetIO();
-    if (!io.Fonts->IsBuilt()) {
-        if (io.Fonts->Fonts.empty()) {
-            io.Fonts->AddFontDefault();
-        }
-        io.Fonts->Build();
-    }
+    // ImGui removed: no font atlas / new-frame work (this is no longer called; the frame path is
+    // native + RmlUi).
 }
 
 void Fast3dGui::ImGuiWMNewFrame() {
@@ -279,21 +272,11 @@ void Fast3dGui::DrawFloatingWindows() {
 }
 
 void Fast3dGui::CalculateGameViewport() {
-    ImGui::PushStyleVar(ImGuiStyleVar_WindowPadding, ImVec2(0, 0));
-    ImGui::PushStyleVar(ImGuiStyleVar_WindowBorderSize, 0.0f);
-    ImGui::PushStyleVar(ImGuiStyleVar_ChildBorderSize, 0.0f);
-    ImGui::PushStyleColor(ImGuiCol_ChildBg, ImVec4(0.0f, 0.0f, 0.0f, 0.0f));
-    ImGuiWindowFlags flags = ImGuiWindowFlags_NoTitleBar | ImGuiWindowFlags_NoCollapse | ImGuiWindowFlags_NoResize |
-                             ImGuiWindowFlags_NoMove | ImGuiWindowFlags_NoBackground;
-
-    ImGui::Begin("Main Game", nullptr, flags);
-    ImGui::PopStyleVar(3);
-    ImGui::PopStyleColor();
-
-    ImVec2 mainPos = ImGui::GetWindowPos();
-    mainPos.x -= mTemporaryWindowPos.x;
-    mainPos.y -= mTemporaryWindowPos.y;
-    ImVec2 size = ImGui::GetContentRegionAvail();
+    // ImGui removed: the game dock filled the whole window, so the viewport is simply the full window.
+    // (Previously this read ImGui::Begin("Main Game") + GetContentRegionAvail()/GetWindowPos().)
+    auto window = Ship::Context::GetRawInstance()->GetWindow();
+    ImVec2 mainPos = ImVec2(0.0f, 0.0f);
+    ImVec2 size = ImVec2((float)window->GetWidth(), (float)window->GetHeight());
     const auto interpreter = mInterpreter.lock().get();
     interpreter->mCurDimensions.width = (uint32_t)(size.x * mInterpreter.lock()->mCurDimensions.internal_mul);
     interpreter->mCurDimensions.height = (uint32_t)(size.y * mInterpreter.lock()->mCurDimensions.internal_mul);
@@ -330,36 +313,24 @@ void Fast3dGui::CalculateGameViewport() {
             break;
         }
     }
-
-    ImGui::End();
 }
 
 void Fast3dGui::DrawGame() {
-    ImGui::PushStyleVar(ImGuiStyleVar_WindowPadding, ImVec2(0, 0));
-    ImGui::PushStyleVar(ImGuiStyleVar_WindowBorderSize, 0.0f);
-    ImGui::PushStyleVar(ImGuiStyleVar_ChildBorderSize, 0.0f);
-    ImGui::PushStyleColor(ImGuiCol_ChildBg, ImVec4(0.0f, 0.0f, 0.0f, 0.0f));
-    ImGuiWindowFlags flags = ImGuiWindowFlags_NoTitleBar | ImGuiWindowFlags_NoCollapse | ImGuiWindowFlags_NoResize |
-                             ImGuiWindowFlags_NoMove | ImGuiWindowFlags_NoBackground;
-
-    ImGui::Begin("Main Game", nullptr, flags);
-    ImGui::PopStyleVar(3);
-    ImGui::PopStyleColor();
-
+    // ImGui removed: no "Main Game" ImGui host window. The game frame is composited natively onto
+    // fb 0 by the interpreter; the overlay (notifications/etc.) is the kept GameOverlay scaffold.
     GetGameOverlay()->Draw();
 
     // ONE render path: the game frame is composited onto fb 0 natively by the interpreter
     // (Interpreter::Run/RunGuiOnly -> CopyFramebuffer(0, mGameFb, ...)) and fb 0 is presented
     // directly, for EVERY backend. The old ImGui::Image(GetGfxFrameBuffer()) composite (with its
     // letterbox/aspect math) that drew the game through ImGui on GL/Metal/DX11 has been removed --
-    // the game no longer depends on ImGui to reach the screen. This "Main Game" window now only
-    // hosts the game overlay; ImGui draws overlays/dev-tools on top of the already-present frame.
-
-    ImGui::End();
+    // the game no longer depends on ImGui to reach the screen.
 }
 
 void Fast3dGui::ApplyResolutionChanges() {
-    ImVec2 size = ImGui::GetContentRegionAvail();
+    // ImGui removed: viewport is the full window (see CalculateGameViewport).
+    auto window = Ship::Context::GetRawInstance()->GetWindow();
+    ImVec2 size = ImVec2((float)window->GetWidth(), (float)window->GetHeight());
 
     const float aspectRatioX = Ship::Context::GetRawInstance()->GetConsoleVariables()->GetFloat(
         CVAR_PREFIX_ADVANCED_RESOLUTION ".AspectRatioX", 16.0f);
