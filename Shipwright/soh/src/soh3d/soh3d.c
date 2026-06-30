@@ -5879,6 +5879,13 @@ static void SoH3D_ReplExec(PlayState* play, char* line, const char* outPath) {
         }
         (void)pl;
         SoH3D_ReplReply(outPath, "bscan: %d actors, %d flagged", n, nflag);
+    } else if (strcmp(cmd, "sgdump") == 0 && sscanf(line, "%*s %i", &iv) == 1) {
+        // RenderDoc-style draw inspection: arm a one-shot dump of every material group's render state
+        // for model <iv> on its next draw (-> stderr/run log, grep "SG_DUMP"). Diagnoses a missing or
+        // invisible group by VALUE (which state kills it), not by eyeballing the frame.
+        extern int g_sgDumpModel;
+        g_sgDumpModel = iv;
+        SoH3D_ReplReply(outPath, "sgdump armed for model %d (see run log: grep SG_DUMP)", iv);
     } else if (strcmp(cmd, "geomscan") == 0) {
         // GEOMETRY-VALUE sweep: read every SoH3D model draw's WORLD-space AABB straight out of the
         // renderer (soh3d_vk capture) — NOT pixels — and flag MISRENDERED objects by VALUE: a world
