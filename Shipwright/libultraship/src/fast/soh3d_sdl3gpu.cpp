@@ -10,6 +10,7 @@
 
 #include "fast/soh3d_sdl3gpu.h"
 #include "fast/backends/gfx_sdl3gpu.h"
+#include "fast/backends/soh3d_sdl3gpu.h" // Fast::SoH3DRenderer (this module's state, folded into the backend)
 
 #include <glslang/Public/ShaderLang.h>
 #include <glslang/Public/ResourceLimits.h>
@@ -30,6 +31,14 @@
 
 using Fast::GfxRenderingAPISdl3Gpu;
 using Fast::g_activeSdl3GpuApi;
+// The renderer's record types + class (defined in fast/backends/soh3d_sdl3gpu.h) — brought into this
+// scope so the out-of-class method definitions below can name them unqualified in their signatures.
+using Fast::DepthDraw;
+using Fast::GeomRec;
+using Fast::PipeKey;
+using Fast::SgGroup;
+using Fast::SgModel;
+using Fast::SoH3DRenderer;
 using SoH3DSg::SgUbo;
 constexpr uint32_t kSgCommonBytes = SoH3DSg::kCommonBytes;
 constexpr uint32_t kSgBonesBytes = SoH3DSg::kBonesBytes;
@@ -221,71 +230,13 @@ const char* kFrag =
 // SgUbo, kSgCommonBytes, kSgBonesBytes and the <=4096-byte push-block invariants live in
 // fast/soh3d_sg_ubo.h (single source of truth; unit-tested in tests/soh3d_render_tests.cpp).
 
-struct SgGroup {
-    uint32_t first = 0, count = 0;
-    int texIndex = -1;
-    int alphaTest = 0;
-    float alphaRef = 0.0f;
-    unsigned wrapS = 0x2901, wrapT = 0x2901;
-    int blendEnable = 0;
-    unsigned bSrcRGB = 0x0302, bDstRGB = 0x0303, bEqRGB = 0x8006;
-    unsigned bSrcA = 1, bDstA = 0, bEqA = 0x8006;
-    int depthWrite = 1;
-    float polygonOffset = 0.0f;
-    int cull = 0;
-    int faceCull = 0;
-    int meshId = -1;
-    int materialIndex = -1;
-    int vertexLighting = 0;
-    float combScaleRGB = 1.0f;
-    float matAmbient[3] = { 1.0f, 1.0f, 1.0f };
-    float matDiffuse[3] = { 1.0f, 1.0f, 1.0f };
-    float dbgColor0[4] = { -1, -1, -1, -1 }; // sample of vertex[first].color (sgdump diagnostics)
-    float dbgUv0[2] = { 0, 0 }, dbgUv1[2] = { 0, 0 }, dbgUv2[2] = { 0, 0 }; // sample uvs (sgdump)
-};
-
-struct SgModel {
-    bool uploaded = false, failed = false;
-    SDL_GPUBuffer* vbo = nullptr;
-    std::vector<SgGroup> groups;
-    std::vector<SDL_GPUTexture*> textures;
-    // Model-local AABB over all group vertices, computed once at upload. Used by the geomscan
-    // bridge (SoH3D_GeomScanDump) to flag misrendered geometry by VALUE for the #115/#120 audit.
-    bool hasBounds = false;
-    float localMin[3] = { 0, 0, 0 }, localMax[3] = { 0, 0, 0 };
-};
-
-// ---- module state ----
+// The renderer's record types (SgGroup / SgModel / GeomRec / PipeKey / DepthDraw) and ALL the former
+// file-scope `g_*` module state now live as members of Fast::SoH3DRenderer (fast/backends/
+// soh3d_sdl3gpu.h); the helper/API function bodies below are unchanged member-function definitions
+// (member access is the implicit `this->`). g_provider stays a file-scope global because it is set
+// (SoH3D_Sg_SetProvider) independently of the backend/device lifecycle, so it must not be tied to the
+// instance's lifetime.
 SoH3DModelProvider g_provider = nullptr;
-std::unordered_map<int, SgModel> g_models;
-
-// geomscan capture: each visible model draw appends a world-space AABB record to g_geomCur;
-// SoH3D_Sg_BeginPass publishes the previous frame's into g_geomLast so the REPL reads a complete
-// frame. (Ported from the removed Vulkan backend's g_geomLast path.)
-struct GeomRec {
-    int modelId;
-    float wmin[3], wmax[3];
-};
-std::vector<GeomRec> g_geomCur, g_geomLast;
-
-SDL_GPUDevice* g_device = nullptr;
-bool g_resReady = false;
-SDL_GPUShader* g_vert = nullptr;
-SDL_GPUShader* g_frag = nullptr;
-SDL_GPUTexture* g_dummyTex = nullptr; // 1x1 white (untextured groups + shadow slot when off)
-std::map<uint32_t, SDL_GPUSampler*> g_samplers; // key (wrapS<<16)|wrapT
-SDL_GPUSampler* g_dummySampler = nullptr;
-
-// Pipeline cache: key = blend/depth/cull flags + 6 blend params + frontCW.
-struct PipeKey {
-    std::array<uint32_t, 8> v;
-    bool operator<(const PipeKey& o) const {
-        return v < o.v;
-    }
-};
-std::map<PipeKey, SDL_GPUGraphicsPipeline*> g_pipelines;
-
-bool g_ctxValid = false;
 
 // ---- helpers ----
 SDL_GPUSamplerAddressMode wrapMode(unsigned glWrap) {
@@ -300,7 +251,9 @@ SDL_GPUSamplerAddressMode wrapMode(unsigned glWrap) {
     }
 }
 
-SDL_GPUSampler* getSampler(unsigned wrapS, unsigned wrapT) {
+} // namespace
+
+SDL_GPUSampler* Fast::SoH3DRenderer::getSampler(unsigned wrapS, unsigned wrapT) {
     uint32_t key = (wrapS << 16) | (wrapT & 0xFFFF);
     auto it = g_samplers.find(key);
     if (it != g_samplers.end())
@@ -321,6 +274,8 @@ SDL_GPUSampler* getSampler(unsigned wrapS, unsigned wrapT) {
     g_samplers[key] = s;
     return s;
 }
+
+namespace {
 
 // GL blend enum -> SDL3 GPU blend factor.
 SDL_GPUBlendFactor mapFactor(unsigned f) {
@@ -350,8 +305,10 @@ SDL_GPUBlendOp mapEq(unsigned e) {
     }
 }
 
+} // namespace
+
 // Upload an RGBA8 texture (one-shot copy pass on a private command buffer).
-SDL_GPUTexture* uploadTexture(int w, int h, const unsigned char* rgba) {
+SDL_GPUTexture* Fast::SoH3DRenderer::uploadTexture(int w, int h, const unsigned char* rgba) {
     if (w <= 0 || h <= 0)
         w = h = 1;
     SDL_GPUTextureCreateInfo ci{};
@@ -399,7 +356,7 @@ SDL_GPUTexture* uploadTexture(int w, int h, const unsigned char* rgba) {
     return tex;
 }
 
-bool ensureResources() {
+bool Fast::SoH3DRenderer::ensureResources() {
     if (g_resReady)
         return true;
     GfxRenderingAPISdl3Gpu* api = g_activeSdl3GpuApi;
@@ -472,7 +429,7 @@ bool ensureResources() {
     return true;
 }
 
-SDL_GPUGraphicsPipeline* getPipeline(const SgGroup& g, int frontCW) {
+SDL_GPUGraphicsPipeline* Fast::SoH3DRenderer::getPipeline(const SgGroup& g, int frontCW) {
     bool doCull = g.faceCull && sgFaceCullOn();
     PipeKey key;
     key.v = { (uint32_t)((g.blendEnable ? 1u : 0u) | (g.depthWrite ? 2u : 0u) | (doCull ? 4u : 0u) |
@@ -544,7 +501,7 @@ SDL_GPUGraphicsPipeline* getPipeline(const SgGroup& g, int frontCW) {
     return pipe;
 }
 
-SgModel* ensureUploaded(int modelId) {
+SgModel* Fast::SoH3DRenderer::ensureUploaded(int modelId) {
     SgModel& m = g_models[modelId];
     if (m.uploaded)
         return &m;
@@ -694,10 +651,8 @@ SgModel* ensureUploaded(int modelId) {
     return &m;
 }
 
-// Deferred model eviction (mirror of the GL/VK path).
-int g_evictLo = 0, g_evictHi = 0;
-bool g_evictPending = false;
-void applyPendingEvict() {
+// Deferred model eviction (mirror of the GL/VK path). g_evictLo/g_evictHi/g_evictPending are members.
+void Fast::SoH3DRenderer::applyPendingEvict() {
     if (!g_evictPending || !g_device)
         return;
     g_evictPending = false;
@@ -716,6 +671,8 @@ void applyPendingEvict() {
         }
     }
 }
+
+namespace {
 
 // One captured per-group draw, replayed inside the unified render pass.
 struct DrawGroup {
@@ -799,50 +756,15 @@ struct AoPush {
     float p1[4]; // x=bias, y=maxDiff
 };
 
-// One captured depth draw (shadow caster / AO occluder), replayed inside an own offscreen pass.
-struct DepthDraw {
-    SDL_GPUGraphicsPipeline* pipeline;
-    SDL_GPUTexture* tex; // for the alpha-test discard
-    SDL_GPUSampler* samp;
-    SDL_GPUBuffer* vbo;
-    uint32_t first, count;
-    std::array<uint8_t, sizeof(SgUbo)> ubo;
-};
+// The DepthDraw record and all M4 module state (g_sgAoResReady, g_depthFrag, g_aoCompVert/Frag,
+// g_aoCompPipe, g_depthPipes, g_shadowSampler, g_shadow*/g_ao* targets, g_n64Caster*, g_sgShadowOn,
+// g_sgLightVP, the per-pass phase flags + g_shadowDraws/g_aoDraws/g_aoVp/g_aoSc) are now members of
+// Fast::SoH3DRenderer (see fast/backends/soh3d_sdl3gpu.h).
 
-// ---- M4 module state ----
-bool g_sgAoResReady = false;
-SDL_GPUShader* g_depthFrag = nullptr;
-SDL_GPUShader* g_aoCompVert = nullptr;
-SDL_GPUShader* g_aoCompFrag = nullptr;
-SDL_GPUGraphicsPipeline* g_aoCompPipe = nullptr;
-std::map<uint32_t, SDL_GPUGraphicsPipeline*> g_depthPipes; // key (doCull<<1)|frontCW
-SDL_GPUSampler* g_shadowSampler = nullptr;                 // nearest + clamp (PCF samples explicit offsets)
+} // namespace
 
-SDL_GPUTexture* g_shadowColor = nullptr; // R32F sun-shadow depth (sampled by the model frag)
-SDL_GPUTexture* g_shadowZ = nullptr;     // transient D32F z-test
-uint32_t g_shadowDim = 0;
-
-SDL_GPUTexture* g_aoColor = nullptr; // R32F camera depth (sampled by the SSAO composite)
-SDL_GPUTexture* g_aoZ = nullptr;     // transient D32F z-test
-uint32_t g_aoW = 0, g_aoH = 0;
-
-SDL_GPUBuffer* g_n64CasterBuf = nullptr; // per-frame N64 opaque caster triangle soup (shadow)
-uint32_t g_n64CasterCap = 0;
-
-// Per-RenderPass shadow state (set by SoH3D_Sg_SetShadow, consumed by SoH3D_Sg_DrawModel).
-bool g_sgShadowOn = false;
-float g_sgLightVP[16] = { 1, 0, 0, 0, 0, 1, 0, 0, 0, 0, 1, 0, 0, 0, 0, 1 };
-
-// Per-pass phase flags + accumulators.
-bool g_sgShadowPassActive = false;
-bool g_sgAoPassActive = false;
-bool g_sgAoReady = false; // an AO depth pass produced occluders this frame -> composite is valid
-std::vector<DepthDraw> g_shadowDraws;
-std::vector<DepthDraw> g_aoDraws;
-SDL_GPUViewport g_aoVp{};
-SDL_Rect g_aoSc{};
-
-SDL_GPUShader* makeShader(const char* glsl, EShLanguage stage, uint32_t numSamplers, uint32_t numUbo) {
+SDL_GPUShader* Fast::SoH3DRenderer::makeShader(const char* glsl, EShLanguage stage, uint32_t numSamplers,
+                                               uint32_t numUbo) {
     std::vector<uint32_t> spv;
     if (!CompileGlsl(stage, glsl, spv))
         return nullptr;
@@ -858,7 +780,7 @@ SDL_GPUShader* makeShader(const char* glsl, EShLanguage stage, uint32_t numSampl
 }
 
 // Depth-only pipeline (R32F color + D32F z-test), reusing the model vertex shader. Keyed on cull.
-SDL_GPUGraphicsPipeline* getDepthPipeline(bool doCull, int frontCW) {
+SDL_GPUGraphicsPipeline* Fast::SoH3DRenderer::getDepthPipeline(bool doCull, int frontCW) {
     uint32_t key = (doCull ? 2u : 0u) | (doCull && frontCW ? 1u : 0u);
     auto it = g_depthPipes.find(key);
     if (it != g_depthPipes.end())
@@ -912,7 +834,7 @@ SDL_GPUGraphicsPipeline* getDepthPipeline(bool doCull, int frontCW) {
 
 // One-time M4 resources (shaders, SSAO composite pipeline, shadow sampler). Size-independent; the
 // offscreen targets are (re)built by ensureShadowTargets / ensureAoTargets.
-bool ensureShadowAoResources() {
+bool Fast::SoH3DRenderer::ensureShadowAoResources() {
     if (g_sgAoResReady)
         return true;
     if (!ensureResources())
@@ -969,7 +891,8 @@ bool ensureShadowAoResources() {
     return true;
 }
 
-SDL_GPUTexture* makeDepthTarget(uint32_t w, uint32_t h, SDL_GPUTextureFormat fmt, SDL_GPUTextureUsageFlags usage) {
+SDL_GPUTexture* Fast::SoH3DRenderer::makeDepthTarget(uint32_t w, uint32_t h, SDL_GPUTextureFormat fmt,
+                                                     SDL_GPUTextureUsageFlags usage) {
     SDL_GPUTextureCreateInfo ci{};
     ci.type = SDL_GPU_TEXTURETYPE_2D;
     ci.format = fmt;
@@ -981,7 +904,7 @@ SDL_GPUTexture* makeDepthTarget(uint32_t w, uint32_t h, SDL_GPUTextureFormat fmt
     return SDL_CreateGPUTexture(g_device, &ci);
 }
 
-bool ensureShadowTargets(uint32_t dim) {
+bool Fast::SoH3DRenderer::ensureShadowTargets(uint32_t dim) {
     if (g_shadowColor && g_shadowDim == dim)
         return true;
     if (g_shadowColor) {
@@ -1000,7 +923,7 @@ bool ensureShadowTargets(uint32_t dim) {
     return true;
 }
 
-bool ensureAoTargets(uint32_t w, uint32_t h) {
+bool Fast::SoH3DRenderer::ensureAoTargets(uint32_t w, uint32_t h) {
     if (g_aoColor && g_aoW == w && g_aoH == h)
         return true;
     if (g_aoColor) {
@@ -1023,8 +946,9 @@ bool ensureAoTargets(uint32_t w, uint32_t h) {
 // Build the per-group depth draws for one model (camera clip for AO, light clip for shadow) and
 // append them to `out`. Mirrors soh3d_vk.cpp recordDepthDraw; the whole model is recorded (the
 // hlroom tint only affects the colour pass).
-void recordDepthGroups(std::vector<DepthDraw>& out, int modelId, const float* mp16, const float* mv16, int invertY,
-                       float aspectAdj, const float* boneData, int boneCnt, unsigned long long midMask) {
+void Fast::SoH3DRenderer::recordDepthGroups(std::vector<DepthDraw>& out, int modelId, const float* mp16,
+                                            const float* mv16, int invertY, float aspectAdj, const float* boneData,
+                                            int boneCnt, unsigned long long midMask) {
     SgModel* m = ensureUploaded(modelId);
     if (!m || !m->vbo)
         return;
@@ -1080,7 +1004,11 @@ void recordDepthGroups(std::vector<DepthDraw>& out, int modelId, const float* mp
     }
 }
 
+namespace {
+
 // Replay an accumulated depth-draw list into an own offscreen pass (clear colour to 1.0 = far / lit).
+// Stateless (takes everything by argument), so it stays a free helper; the EndShadowPass /
+// EndDepthPrepass lambdas call it without capturing `this`.
 void replayDepthPass(SDL_GPUCommandBuffer* cmd, SDL_GPUTexture* color, SDL_GPUTexture* z,
                      const SDL_GPUViewport& vp, const SDL_Rect& sc, const std::vector<DepthDraw>& draws) {
     SDL_GPUColorTargetInfo ct{};
@@ -1122,6 +1050,19 @@ void replayDepthPass(SDL_GPUCommandBuffer* cmd, SDL_GPUTexture* color, SDL_GPUTe
 
 } // namespace
 
+// ====================================================================================================
+// Public C-ABI (SoH3D_Sg_* / SoH3D_GeomScanDump). These keep their exact names + signatures (called
+// from soh3d_gl.cpp + soh3d.c) and are now THIN SHIMS forwarding to the SoH3DRenderer member
+// subsystem on the live backend. When no SDL3 GPU backend is active the renderer is null and the
+// shim no-ops (int-returning shims return 0), matching the former null-guard early returns. The
+// function BODIES are the SoH3DRenderer methods defined further below (bodies unchanged).
+// ----------------------------------------------------------------------------------------------------
+namespace {
+inline Fast::SoH3DRenderer* sgRenderer() {
+    return Fast::g_activeSdl3GpuApi ? Fast::g_activeSdl3GpuApi->Soh3d() : nullptr;
+}
+} // namespace
+
 extern "C" int SoH3D_Sg_Active(void) {
     return Fast::g_activeSdl3GpuApi != nullptr ? 1 : 0;
 }
@@ -1130,10 +1071,77 @@ extern "C" void SoH3D_Sg_SetProvider(SoH3DModelProvider fn) {
     g_provider = fn;
 }
 
+extern "C" int SoH3D_GeomScanDump(int* modelIds, float* mins, float* maxs, int maxN) {
+    if (auto* r = sgRenderer())
+        return r->GeomScanDump(modelIds, mins, maxs, maxN);
+    return 0;
+}
+extern "C" void SoH3D_Sg_RequestEvictRange(int lo, int hi) {
+    if (auto* r = sgRenderer())
+        r->RequestEvictRange(lo, hi);
+}
+extern "C" void SoH3D_Sg_BeginPass(void) {
+    if (auto* r = sgRenderer())
+        r->BeginPass();
+}
+extern "C" void SoH3D_Sg_DrawModel(int modelId, const float* mp16, const float* mv16, int lit, int invertY,
+                                   unsigned char r8, unsigned char g8, unsigned char b8, unsigned char a8,
+                                   float aspectAdj, const float* boneData, int boneCnt, unsigned long long midMask,
+                                   int sky, float uvOffU, float uvOffV, const void* matTex) {
+    if (auto* r = sgRenderer())
+        r->DrawModel(modelId, mp16, mv16, lit, invertY, r8, g8, b8, a8, aspectAdj, boneData, boneCnt, midMask, sky,
+                     uvOffU, uvOffV, matTex);
+}
+extern "C" void SoH3D_Sg_EndPass(void) {
+    if (auto* r = sgRenderer())
+        r->EndPass();
+}
+extern "C" int SoH3D_Sg_BeginShadowPass(void) {
+    if (auto* r = sgRenderer())
+        return r->BeginShadowPass();
+    return 0;
+}
+extern "C" void SoH3D_Sg_ShadowCasterDraw(int modelId, const float* mp16, const float* mv16, const float* boneData,
+                                          int boneCnt, unsigned long long midMask) {
+    if (auto* r = sgRenderer())
+        r->ShadowCasterDraw(modelId, mp16, mv16, boneData, boneCnt, midMask);
+}
+extern "C" void SoH3D_Sg_ShadowCasterTris(const float* worldXYZ, size_t triCount, const float* lightVP16) {
+    if (auto* r = sgRenderer())
+        r->ShadowCasterTris(worldXYZ, triCount, lightVP16);
+}
+extern "C" void SoH3D_Sg_EndShadowPass(void) {
+    if (auto* r = sgRenderer())
+        r->EndShadowPass();
+}
+extern "C" void SoH3D_Sg_SetShadow(int on, const float* lightVP16) {
+    if (auto* r = sgRenderer())
+        r->SetShadow(on, lightVP16);
+}
+extern "C" int SoH3D_Sg_BeginDepthPrepass(void) {
+    if (auto* r = sgRenderer())
+        return r->BeginDepthPrepass();
+    return 0;
+}
+extern "C" void SoH3D_Sg_DepthPrepassDraw(int modelId, const float* mp16, const float* mv16, int invertY,
+                                          float aspectAdj, const float* boneData, int boneCnt,
+                                          unsigned long long midMask, int sky) {
+    if (auto* r = sgRenderer())
+        r->DepthPrepassDraw(modelId, mp16, mv16, invertY, aspectAdj, boneData, boneCnt, midMask, sky);
+}
+extern "C" void SoH3D_Sg_EndDepthPrepass(void) {
+    if (auto* r = sgRenderer())
+        r->EndDepthPrepass();
+}
+extern "C" void SoH3D_Sg_AoComposite(void) {
+    if (auto* r = sgRenderer())
+        r->AoComposite();
+}
+
 // geomscan bridge: copy the last completed frame's per-draw world AABBs out to the REPL (soh3d.c
 // `geomscan`, #115/#120). Returns the count written; modelIds[i], mins[i*3..], maxs[i*3..] = draw i.
 // (Ported from the removed Vulkan backend; this is the SDL3 GPU definition of SoH3D_GeomScanDump.)
-extern "C" int SoH3D_GeomScanDump(int* modelIds, float* mins, float* maxs, int maxN) {
+int Fast::SoH3DRenderer::GeomScanDump(int* modelIds, float* mins, float* maxs, int maxN) {
     int n = (int)g_geomLast.size();
     if (n > maxN) n = maxN;
     for (int i = 0; i < n; i++) {
@@ -1146,13 +1154,13 @@ extern "C" int SoH3D_GeomScanDump(int* modelIds, float* mins, float* maxs, int m
     return n;
 }
 
-extern "C" void SoH3D_Sg_RequestEvictRange(int lo, int hi) {
+void Fast::SoH3DRenderer::RequestEvictRange(int lo, int hi) {
     g_evictLo = lo;
     g_evictHi = hi;
     g_evictPending = true;
 }
 
-extern "C" void SoH3D_Sg_BeginPass(void) {
+void Fast::SoH3DRenderer::BeginPass() {
     g_ctxValid = false;
     // Publish the previous frame's geometry capture; start a fresh one for this frame's draws.
     g_geomLast.swap(g_geomCur);
@@ -1165,10 +1173,10 @@ extern "C" void SoH3D_Sg_BeginPass(void) {
     g_ctxValid = true;
 }
 
-extern "C" void SoH3D_Sg_DrawModel(int modelId, const float* mp16, const float* mv16, int lit, int invertY,
-                                   unsigned char r8, unsigned char g8, unsigned char b8, unsigned char a8,
-                                   float aspectAdj, const float* boneData, int boneCnt, unsigned long long midMask,
-                                   int sky, float uvOffU, float uvOffV, const void* matTex) {
+void Fast::SoH3DRenderer::DrawModel(int modelId, const float* mp16, const float* mv16, int lit, int invertY,
+                                    unsigned char r8, unsigned char g8, unsigned char b8, unsigned char a8,
+                                    float aspectAdj, const float* boneData, int boneCnt, unsigned long long midMask,
+                                    int sky, float uvOffU, float uvOffV, const void* matTex) {
     const std::unordered_map<int, int>* matTexMap = static_cast<const std::unordered_map<int, int>*>(matTex);
     if (!g_ctxValid)
         return;
@@ -1396,7 +1404,7 @@ extern "C" void SoH3D_Sg_DrawModel(int modelId, const float* mp16, const float* 
     });
 }
 
-extern "C" void SoH3D_Sg_EndPass(void) {
+void Fast::SoH3DRenderer::EndPass() {
     g_ctxValid = false;
     g_sgShadowOn = false; // each RenderPass cycle re-establishes the shadow term via SetShadow
     g_sgAoReady = false;
@@ -1410,7 +1418,7 @@ extern "C" void SoH3D_Sg_EndPass(void) {
 // replay in the SAME command buffer as the N64 + model ops (SDL3 GPU inserts the write->sample
 // barriers automatically), so there is no separate-pass handshake.
 
-extern "C" int SoH3D_Sg_BeginShadowPass(void) {
+int Fast::SoH3DRenderer::BeginShadowPass() {
     g_shadowDraws.clear();
     g_sgShadowPassActive = false;
     if (!gSoH3dShadowEnable || !gSoH3dShadowHasFocus || !g_activeSdl3GpuApi)
@@ -1421,8 +1429,8 @@ extern "C" int SoH3D_Sg_BeginShadowPass(void) {
     return 1;
 }
 
-extern "C" void SoH3D_Sg_ShadowCasterDraw(int modelId, const float* mp16, const float* mv16, const float* boneData,
-                                          int boneCnt, unsigned long long midMask) {
+void Fast::SoH3DRenderer::ShadowCasterDraw(int modelId, const float* mp16, const float* mv16, const float* boneData,
+                                           int boneCnt, unsigned long long midMask) {
     if (!g_sgShadowPassActive)
         return;
     // mp16 = lightVP * (model->world); invertY forced 0 (the model frag samples uLightVP*world directly).
@@ -1430,7 +1438,7 @@ extern "C" void SoH3D_Sg_ShadowCasterDraw(int modelId, const float* mp16, const 
                       midMask);
 }
 
-extern "C" void SoH3D_Sg_ShadowCasterTris(const float* worldXYZ, size_t triCount, const float* lightVP16) {
+void Fast::SoH3DRenderer::ShadowCasterTris(const float* worldXYZ, size_t triCount, const float* lightVP16) {
     if (!g_sgShadowPassActive || !worldXYZ || triCount == 0)
         return;
     const uint32_t vtxCount = (uint32_t)(triCount * 3);
@@ -1501,7 +1509,7 @@ extern "C" void SoH3D_Sg_ShadowCasterTris(const float* worldXYZ, size_t triCount
         g_shadowDraws.push_back(std::move(d));
 }
 
-extern "C" void SoH3D_Sg_EndShadowPass(void) {
+void Fast::SoH3DRenderer::EndShadowPass() {
     if (!g_sgShadowPassActive)
         return;
     g_sgShadowPassActive = false;
@@ -1519,13 +1527,13 @@ extern "C" void SoH3D_Sg_EndShadowPass(void) {
     g_shadowDraws.clear();
 }
 
-extern "C" void SoH3D_Sg_SetShadow(int on, const float* lightVP16) {
+void Fast::SoH3DRenderer::SetShadow(int on, const float* lightVP16) {
     g_sgShadowOn = (on != 0);
     if (g_sgShadowOn && lightVP16)
         memcpy(g_sgLightVP, lightVP16, sizeof(g_sgLightVP));
 }
 
-extern "C" int SoH3D_Sg_BeginDepthPrepass(void) {
+int Fast::SoH3DRenderer::BeginDepthPrepass() {
     g_aoDraws.clear();
     g_sgAoPassActive = false;
     if (!gSoH3dAoEnable || !g_activeSdl3GpuApi)
@@ -1542,15 +1550,15 @@ extern "C" int SoH3D_Sg_BeginDepthPrepass(void) {
     return 1;
 }
 
-extern "C" void SoH3D_Sg_DepthPrepassDraw(int modelId, const float* mp16, const float* mv16, int invertY,
-                                          float aspectAdj, const float* boneData, int boneCnt,
-                                          unsigned long long midMask, int sky) {
+void Fast::SoH3DRenderer::DepthPrepassDraw(int modelId, const float* mp16, const float* mv16, int invertY,
+                                           float aspectAdj, const float* boneData, int boneCnt,
+                                           unsigned long long midMask, int sky) {
     if (!g_sgAoPassActive || sky)
         return;
     recordDepthGroups(g_aoDraws, modelId, mp16, mv16, invertY, aspectAdj, boneData, boneCnt, midMask);
 }
 
-extern "C" void SoH3D_Sg_EndDepthPrepass(void) {
+void Fast::SoH3DRenderer::EndDepthPrepass() {
     if (!g_sgAoPassActive)
         return;
     g_sgAoPassActive = false;
@@ -1568,7 +1576,7 @@ extern "C" void SoH3D_Sg_EndDepthPrepass(void) {
     g_sgAoReady = true;
 }
 
-extern "C" void SoH3D_Sg_AoComposite(void) {
+void Fast::SoH3DRenderer::AoComposite() {
     if (!g_sgAoReady || !gSoH3dAoEnable || !g_activeSdl3GpuApi || !g_aoColor || g_aoW == 0)
         return;
     SDL_GPUViewport vp{};

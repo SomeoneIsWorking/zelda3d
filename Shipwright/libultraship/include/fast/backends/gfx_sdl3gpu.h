@@ -14,8 +14,15 @@
 #include <string>
 #include <cstdint>
 #include <functional>
+#include <memory>
 
 namespace Fast {
+
+// The OoT3D model renderer + PC HUD, folded into this backend as member subsystems (see
+// fast/backends/soh3d_sdl3gpu.h). Forward-declared here so only gfx_sdl3gpu.cpp + the two soh3d
+// .cpp files need the full definitions.
+class SoH3DRenderer;
+class SoH3DHudRenderer;
 
 // Forward declaration of the SDL window backend so the SDL3-GPU rendering API can pull the
 // SDL_Window out of it (to claim it for the GPU device). gfx_sdl2.cpp is the shared window
@@ -167,6 +174,16 @@ class GfxRenderingAPISdl3Gpu : public GfxRenderingAPI {
         return mFrameAcquired;
     }
 
+    // The folded-in OoT3D model renderer + PC HUD member subsystems (created in Init, reset in the
+    // destructor before the device is destroyed). The SoH3D_Sg_* / SoH3D_Hud_* C-ABI shims forward
+    // here via Fast::g_activeSdl3GpuApi.
+    SoH3DRenderer* Soh3d() {
+        return mSoh3d.get();
+    }
+    SoH3DHudRenderer* Hud() {
+        return mHud.get();
+    }
+
     const char* GetName() override;
     int GetMaxTextureSize() override;
     GfxClipParameters GetClipParameters() override;
@@ -308,6 +325,10 @@ class GfxRenderingAPISdl3Gpu : public GfxRenderingAPI {
     FilteringMode mCurrentFilterMode = FILTER_THREE_POINT;
     uint32_t mNextTextureId = 1;
     int mMaxTextureSize = 8192;
+
+    // Folded-in renderer subsystems (unique_ptr so the header only needs forward declarations).
+    std::unique_ptr<SoH3DRenderer> mSoh3d;
+    std::unique_ptr<SoH3DHudRenderer> mHud;
 };
 
 // Set to the live SDL3-GPU backend in Init() (cleared in the destructor); null when another backend
