@@ -1558,21 +1558,9 @@ void Fast::SoH3DRenderer::AoComposite() {
     push.p0[3] = gSoH3dAoStrength;
     push.p1[0] = gSoH3dAoBias;
     push.p1[1] = gSoH3dAoMaxDiff;
-    SDL_GPUGraphicsPipeline* pipe = g_aoCompPipe;
-    SDL_GPUTexture* color = g_aoColor;
-    SDL_GPUSampler* samp = g_shadowSampler;
-    g_activeSdl3GpuApi->AppendSoH3DInPass(
-        [pipe, color, samp, vp, sc, push](SDL_GPUCommandBuffer* cmd, SDL_GPURenderPass* pass) {
-            SDL_SetGPUViewport(pass, &vp);
-            SDL_SetGPUScissor(pass, &sc);
-            SDL_BindGPUGraphicsPipeline(pass, pipe);
-            SDL_PushGPUFragmentUniformData(cmd, 0, &push, sizeof(push));
-            SDL_GPUTextureSamplerBinding sb{};
-            sb.texture = color;
-            sb.sampler = samp;
-            SDL_BindGPUFragmentSamplers(pass, 0, &sb, 1);
-            SDL_DrawGPUPrimitives(pass, 3, 1, 0, 0);
-        });
+    // Append as a first-class fullscreen OP_DRAW into the fb pass (over the scene), through the
+    // backend's single bind path — same as the model + HUD draws, no callback indirection.
+    g_activeSdl3GpuApi->AppendSoH3DFullscreen(g_aoCompPipe, &push, sizeof(push), g_aoColor, g_shadowSampler, vp, sc);
 }
 
 #endif // ENABLE_SDL3GPU
