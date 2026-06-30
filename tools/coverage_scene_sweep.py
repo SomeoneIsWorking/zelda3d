@@ -65,6 +65,19 @@ def parse_actors(text):
     return out
 
 
+# Actor ids that are INTENTIONALLY invisible/effect/trigger/spawner/manager actors — they correctly
+# have no OoT3D model, so a "--N64--" classification for them is NOT a render-parity gap (triaged on
+# kanban #115). Keyed by id -> name. Keep in sync with actor_table.h. Reported separately so the real
+# remaining-gap list stays clean.
+NON_GAP = {
+    0x02: "En_Test(internal)", 0x08: "En_Light(glow)", 0x18: "En_Elf(Navi)",
+    0x23: "En_Holl(loading-plane)", 0x3B: "En_River_Sound", 0x94: "Obj_Mure(spawner)",
+    0x97: "Object_Kankyo(env-fx)", 0xA7: "En_Encount1(spawner)", 0x112: "En_Wonder_Item(trigger)",
+    0x11B: "Elf_Msg(trigger)", 0x12E: "En_Okarina_Tag(trigger)", 0x147: "En_Wonder_Talk(trigger)",
+    0x151: "Obj_Mure2(spawner)", 0x165: "En_Weather_Tag", 0x173: "Elf_Msg2", 0x185: "En_Wonder_Talk2",
+}
+
+
 def classify(cov):
     if cov.startswith("--N64--"):
         return "n64"
@@ -74,6 +87,8 @@ def classify(cov):
         return "auto"
     if cov == "TABLE":
         return "table"
+    if cov.startswith("MODULE"):
+        return "module"  # behaviors/actor/<x>.cpp model-replacement (door, fish, ...) = OoT3D, not a gap
     return "prop3ds"  # HANA/ISHI etc.
 
 
@@ -118,7 +133,7 @@ def main():
         time.sleep(4)  # let the entrance room's actors finish spawning (headless runs slowly)
         txt = repl("actorsnear 30000")
         actors = parse_actors(txt)
-        counts = {"table": 0, "auto": 0, "auto_skin": 0, "prop3ds": 0, "n64": 0}
+        counts = {"table": 0, "auto": 0, "auto_skin": 0, "prop3ds": 0, "module": 0, "n64": 0}
         n64_ids = {}
         for aid, params, cat, cov in actors:
             if cat == 2:  # ACTORCAT_PLAYER: drawn via the dedicated SoH3D_TryDrawPlayer path, not N64
@@ -135,7 +150,7 @@ def main():
         results[key] = rec
         json.dump(results, open(RESULTS, "w"), indent=1)
         print(f"{key} {scene:42s} actors={len(actors):2d} "
-              f"3DS={counts['table']+counts['auto']+counts['auto_skin']+counts['prop3ds']:2d} "
+              f"3DS={counts['table']+counts['auto']+counts['auto_skin']+counts['prop3ds']+counts['module']:2d} "
               f"N64={counts['n64']:2d} lum={lum} "
               f"{'N64:'+','.join(n64_ids) if n64_ids else ''}", flush=True)
 
@@ -148,14 +163,21 @@ def main():
         for aid, cat in (v.get("n64_ids") or {}).items():
             glob.setdefault(aid, {"cat": cat, "scenes": []})
             glob[aid]["scenes"].append(v["scene"])
+    # Split the global N64 set into REAL render-parity gaps vs the intentionally-modelless
+    # effect/trigger/spawner actors (NON_GAP) so the actionable list is clean.
+    gaps = {a: i for a, i in glob.items() if int(a, 16) not in NON_GAP}
+    nongaps = {a: i for a, i in glob.items() if int(a, 16) in NON_GAP}
     print(f"scanned={len(results)} ok={len(ok)} crash/fail={len(crashed)} "
-          f"global-N64-actor-ids={len(glob)}")
+          f"REAL-gap-actor-ids={len(gaps)} (+{len(nongaps)} intentional-no-model)")
     for k, v in crashed:
         print(f"  CRASH/FAIL {k} {v['scene']} {v.get('crash','')}")
-    print("GLOBAL N64-RENDERING ACTOR IDS (no OoT3D model -> parity gap):")
-    for aid, info in sorted(glob.items(), key=lambda kv: -len(kv[1]["scenes"])):
+    print("REAL RENDER-PARITY GAPS (no OoT3D model + no behavior module — still renders as N64):")
+    for aid, info in sorted(gaps.items(), key=lambda kv: -len(kv[1]["scenes"])):
         print(f"  {aid} cat={info['cat']} in {len(info['scenes'])} scene(s): "
               f"{', '.join(info['scenes'][:6])}{' ...' if len(info['scenes'])>6 else ''}")
+    print("INTENTIONAL no-model actors (NOT gaps — invisible/effect/trigger/spawner):")
+    for aid, info in sorted(nongaps.items(), key=lambda kv: -len(kv[1]["scenes"])):
+        print(f"  {aid} {NON_GAP[int(aid,16)]:24s} in {len(info['scenes'])} scene(s)")
 
 
 if __name__ == "__main__":

@@ -173,6 +173,15 @@ extern "C" int SoH3D_TryActorModelDraw(PlayState* play, Actor* actor) {
     return 0;
 }
 
+// Coverage-audit bridge (REPL `actorsnear`): does this actor id have a ported behavior module?
+// Used only at the audit's --N64-- fallthrough — i.e. after the object->ZAR table/auto checks have
+// already failed — so a registered behavior there is necessarily a model-REPLACEMENT (door, fish,
+// ...). Override-only behaviors (NPCs like En_Ko/En_Sa) enhance an auto/table model and so are
+// classified AUTO/TABLE before this point, never reaching it.
+extern "C" int SoH3D_ActorHasBehaviorModule(s16 actorId) {
+    return SoH3D::findActorBehavior(actorId) != nullptr ? 1 : 0;
+}
+
 // C bridge: query an actor's faithful draw-space transform offset (see ActorBehavior::drawSpaceTransform).
 // Returns 1 and fills *outLiftY (world-Y lift) + outLocalOff[3] (rotated, world-unit local translate) if
 // the actor's behavior supplies one — the caller (SoH3D_EmitModelDraw) then applies them and SKIPS the
