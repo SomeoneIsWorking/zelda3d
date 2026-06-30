@@ -1364,31 +1364,13 @@ void Fast::SoH3DRenderer::DrawModel(int modelId, const float* mp16, const float*
     SDL_GPUSampler* shadowSamp =
         (g_sgShadowOn && g_shadowColor) ? g_shadowSampler : Fast::g_activeSdl3GpuApi->DummySampler();
 
-    // Append ONE op for this model: replayed inside the unified fb pass (interleaves with N64 geom).
-    api->AppendSoH3DInPass([vbo, dgs = std::move(dgs), vp, sc, shadowTex,
-                            shadowSamp](SDL_GPUCommandBuffer* cmd, SDL_GPURenderPass* pass) {
-        SDL_SetGPUViewport(pass, &vp);
-        SDL_SetGPUScissor(pass, &sc);
-        SDL_GPUBufferBinding vb{};
-        vb.buffer = vbo;
-        vb.offset = 0;
-        SDL_BindGPUVertexBuffers(pass, 0, &vb, 1);
-        for (const DrawGroup& g : dgs) {
-            SDL_BindGPUGraphicsPipeline(pass, g.pipeline);
-            // Two-block push (see the SG_UBO_COMMON_BODY comment): common state at binding 0 (both stages), bone
-            // matrices at vertex binding 1 — neither block may exceed SDL3 GPU's 4096-byte cap.
-            SDL_PushGPUVertexUniformData(cmd, 0, g.ubo.data(), kSgCommonBytes);
-            SDL_PushGPUFragmentUniformData(cmd, 0, g.ubo.data(), kSgCommonBytes);
-            SDL_PushGPUVertexUniformData(cmd, 1, g.ubo.data() + kSgCommonBytes, kSgBonesBytes);
-            SDL_GPUTextureSamplerBinding sb[2]{};
-            sb[0].texture = g.tex;
-            sb[0].sampler = g.samp;
-            sb[1].texture = shadowTex;
-            sb[1].sampler = shadowSamp;
-            SDL_BindGPUFragmentSamplers(pass, 0, sb, 2);
-            SDL_DrawGPUPrimitives(pass, g.count, 1, g.first, 0);
-        }
-    });
+    // Append each group as a FIRST-CLASS OP_DRAW in the unified op-list (no callback indirection):
+    // each interleaves with the N64 geometry in this fb's render pass and replays through the backend's
+    // single fragment-sampler bind path, exactly like an N64 triangle draw. Group order is preserved by
+    // sequential append (matters for translucency).
+    for (const DrawGroup& g : dgs)
+        api->AppendSoH3DModelDraw(g.pipeline, vbo, g.first, g.count, g.ubo.data(), g.tex, g.samp, shadowTex, shadowSamp,
+                                  vp, sc);
 }
 
 void Fast::SoH3DRenderer::EndPass() {
