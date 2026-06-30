@@ -27,13 +27,16 @@
 #include "SDL.h"
 #define GL_GLEXT_PROTOTYPES 1
 #include "SDL_opengl.h"
-#elif __APPLE__
-#include <SDL.h>
+#else
+// SDL3-MIGRATION: mac used SDL2's <SDL.h> here; the project links SDL3 now, so use <SDL3/SDL.h> like
+// Linux (keeping the mac-only macUtils). The GLES2 include is only for the removed GL path on Linux.
+#include <SDL3/SDL.h>
+#ifdef __APPLE__
 #include "ship/utils/macUtils.h"
 #else
-#include <SDL3/SDL.h>
 #define GL_GLEXT_PROTOTYPES 1
 #include <SDL3/SDL_opengles2.h>
+#endif
 #endif
 
 #include "ship/window/gui/Gui.h"
