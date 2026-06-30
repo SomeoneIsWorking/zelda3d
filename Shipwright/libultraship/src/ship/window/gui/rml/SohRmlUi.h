@@ -61,6 +61,11 @@ class SohRmlUi {
     /** @brief Updates the context + render-interface viewport after a window resize. */
     void Resize(int width, int height);
 
+    // Sync RmlUi's density-independent-pixel ratio to the window's display content scale so the
+    // dp-authored sheet renders at the right physical size on HiDPI displays. Cheap; no-op if
+    // the scale is unchanged. Call after context creation and whenever the drawable size is polled.
+    void ApplyDensityRatio();
+
     /** @brief Tears down the document, context and RmlUi runtime. */
     void Shutdown();
 
@@ -126,6 +131,7 @@ class SohRmlUi {
     bool mSg = true;      // SDL3 GPU render interface — the only path (P4)
     int mWidth = 0;
     int mHeight = 0;
+    float mDpRatio = 0.0f; // density-independent-pixel ratio (display content scale); 0 = not yet set
     void* mSdlWindow = nullptr;
 
     std::unique_ptr<RmlRenderInterfaceSdl3Gpu> mSgRenderInterface; // SDL3 GPU backend (the only one)
