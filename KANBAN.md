@@ -3,15 +3,16 @@
 > **Generated mirror — do not hand-edit.** Source of truth = GitHub Issues on
 > `SomeoneIsWorking/soh3d` (private). Regenerate with `tools/kanban.py render`.
 > Move a card with `tools/kanban.py mv <#> <column>`; add with `tools/kanban.py add`.
-> Columns: todo · in-progress · in-review · needs-confirmation · reopened · blocked · done(=closed).  Updated 2026-06-25 23:43.
+> Columns: todo · in-progress · in-review · needs-confirmation · reopened · blocked · done(=closed).  Updated 2026-06-30 13:50.
 
-**Counts:** todo:4 | in-progress:2 | in-review:1 | needs-confirmation:23 | reopened:0 | blocked:0 | done:78
+**Counts:** todo:5 | in-progress:2 | in-review:1 | needs-confirmation:23 | reopened:0 | blocked:0 | done:78
 
-## 📋 To Do  (4)
+## 📋 To Do  (5)
 - [#17](../../issues/17) Hi-res world/scene textures (texpack) _(render)_
 - [#33](../../issues/33) More foliage / vegetation density (lowest priority) _(scene)_
 - [#118](../../issues/118) Market (SCENE_MARKET_DAY) parity: crowd NPCs (En_Hy/En_Mu) mis-rendered, door still N64 _(render,scene,behavior)_
 - [#122](../../issues/122) Faithful Boss_Goma per-limb scale overrides (eye-iris open/close + tail extend) in combat states _(render,behavior)_
+- [#124](../../issues/124) Spirit Temple doors (jya_door/boss_door) render ~13x oversized (auto-scale measures N64 door height wrong) _(render,scene)_
 
 ## 🔨 In Progress  (2)
 - [#111](../../issues/111) World night R/G too bright — flat tint under-darkens at night (needs vertex-lighting port) _(render)_
