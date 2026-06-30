@@ -55,12 +55,8 @@ void main() {
 )";
 
 // HudVert, DrawRun, HudSg and the kMaxQuadsPerFrame/kVertsPerQuad/kRingFrames constants now live in
-// fast/backends/soh3d_sdl3gpu.h (so they can be members of Fast::SoH3DHudRenderer). HudUbo stays here
-// (it is only a local in End()).
-struct HudUbo {
-    float viewport[2];
-    float pad[2];
-};
+// fast/backends/soh3d_sdl3gpu.h (so they can be members of Fast::SoH3DHudRenderer). The vertex shader's
+// viewport UBO ({ vec2 uViewport; vec2 pad; }) is now built by the backend (AppendSoH3DHudDraw).
 
 std::once_flag g_glslOnce;
 bool CompileGlsl(EShLanguage stage, const char* src, std::vector<uint32_t>& spv) {
@@ -341,35 +337,12 @@ void SoH3DHudRenderer::End() {
     SDL_EndGPUCopyPass(cp);
     SDL_SubmitGPUCommandBuffer(c);
 
-    HudUbo ubo{};
-    ubo.viewport[0] = (float)g.w;
-    ubo.viewport[1] = (float)g.h;
-    SDL_GPUBuffer* vbo = ring.vbo;
-    SDL_GPUGraphicsPipeline* pipe = g.pipeline;
-    SDL_GPUSampler* samp = g.sampler;
-    int W = g.w, H = g.h;
-    std::vector<DrawRun> runs = std::move(g.runs);
-
-    // ONE op into fb 0: replayed on top of the N64 + OoT3D model content in the unified pass.
-    api->AppendSoH3DInPassFb(0, [vbo, pipe, samp, ubo, W, H, runs = std::move(runs)](
-                                    SDL_GPUCommandBuffer* cmd, SDL_GPURenderPass* pass) {
-        SDL_GPUViewport vp{ 0.0f, 0.0f, (float)W, (float)H, 0.0f, 1.0f };
-        SDL_Rect sc{ 0, 0, W, H };
-        SDL_BindGPUGraphicsPipeline(pass, pipe);
-        SDL_SetGPUViewport(pass, &vp);
-        SDL_SetGPUScissor(pass, &sc);
-        SDL_PushGPUVertexUniformData(cmd, 0, &ubo, sizeof(ubo));
-        SDL_GPUBufferBinding vbnd{};
-        vbnd.buffer = vbo;
-        SDL_BindGPUVertexBuffers(pass, 0, &vbnd, 1);
-        for (const DrawRun& r : runs) {
-            SDL_GPUTextureSamplerBinding sb{};
-            sb.texture = r.tex;
-            sb.sampler = samp;
-            SDL_BindGPUFragmentSamplers(pass, 0, &sb, 1);
-            SDL_DrawGPUPrimitives(pass, r.vertCount, 1, r.firstVert, 0);
-        }
-    });
+    // Append each coalesced quad-run as a first-class OP_DRAW into fb 0 — replayed on top of the N64 +
+    // OoT3D model content in the unified pass, through the backend's single fragment-sampler bind path.
+    // Run order is preserved by sequential append.
+    for (const DrawRun& r : g.runs)
+        api->AppendSoH3DHudDraw(g.pipeline, ring.vbo, r.firstVert, r.vertCount, r.tex, g.sampler, (float)g.w,
+                                (float)g.h);
 }
 
 } // namespace Fast

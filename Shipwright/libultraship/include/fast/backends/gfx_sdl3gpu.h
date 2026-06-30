@@ -163,6 +163,11 @@ class GfxRenderingAPISdl3Gpu : public GfxRenderingAPI {
     void AppendSoH3DModelDraw(SDL_GPUGraphicsPipeline* pipeline, SDL_GPUBuffer* vbo, uint32_t first, uint32_t count,
                               const void* ubo, SDL_GPUTexture* tex, SDL_GPUSampler* samp, SDL_GPUTexture* shadowTex,
                               SDL_GPUSampler* shadowSamp, const SDL_GPUViewport& vp, const SDL_Rect& sc);
+    // Append one coalesced HUD quad-run as a first-class OP_DRAW into fb 0 (on top of the N64 + model
+    // content, in the same pass), through the same single fragment-sampler bind path. `vbo` is the HUD
+    // ring vertex buffer; the vertex shader's viewport UBO is built from w/h.
+    void AppendSoH3DHudDraw(SDL_GPUGraphicsPipeline* pipeline, SDL_GPUBuffer* vbo, uint32_t first, uint32_t count,
+                            SDL_GPUTexture* tex, SDL_GPUSampler* samp, float w, float h);
     // Append an external op that runs its OWN render pass (offscreen shadow/AO depth targets). The
     // main framebuffer pass is ended first (SDL3 GPU passes can't nest); the callback owns
     // SDL_BeginGPURenderPass/SDL_EndGPURenderPass on the supplied command buffer.
@@ -272,24 +277,23 @@ class GfxRenderingAPISdl3Gpu : public GfxRenderingAPI {
         SDL_GPUTextureSamplerBinding samplers[6];
         SDL_GPUViewport viewport;
         SDL_Rect scissor;
-        uint8_t ubo[64]; // std140 fragment UBO payload (SgUboData) — N64 draws only
-        // >= 0 marks this OP_DRAW as a SoH3D skinned model draw: the large per-draw uniform payload,
-        // the per-model vertex buffer and the first/count live in mSoh3dDraws[soh3dDrawIdx] (the
-        // skinned vertex layout + 3-block uniform push differ from N64, but the pipeline, fragment
-        // samplers, viewport/scissor and the single bind path are shared with N64 OP_DRAW). -1 = N64.
-        int soh3dDrawIdx = -1;
+        uint8_t ubo[64];        // std140 uniform payload: N64 = fragment SgUboData; HUD = vertex viewport UBO
+        // Vertex source. altVbo != null binds that buffer (SoH3D model's per-model vbo, or the HUD ring
+        // vbo) at offset 0; null falls back to the shared frame mVbo at vboOffset (N64). numVerts +
+        // firstVertex are the draw range for all three.
+        SDL_GPUBuffer* altVbo;
+        uint32_t firstVertex;
+        // Which uniform-push + sampler shape this OP_DRAW uses. The pipeline, fragment-sampler bind
+        // path, viewport/scissor and the draw are shared across all three; only the uniform push and
+        // the vertex layout (baked into the pipeline) differ.
+        //   DRAW_N64   : one fragment UBO (op.ubo) from mVbo.
+        //   DRAW_MODEL : skinned — the 3-block common+bones push from mSoh3dModelUbos[soh3dDrawIdx].
+        //   DRAW_HUD   : one vertex UBO (op.ubo, the viewport) from altVbo.
+        enum DrawClass : uint8_t { DRAW_N64, DRAW_MODEL, DRAW_HUD } drawClass;
+        int soh3dDrawIdx; // DRAW_MODEL: index into mSoh3dModelUbos for the oversized skinned payload
         // EXT_IN_PASS: invoked inside fb's render pass. EXT_OWN_PASS: invoked with the main pass ended.
         std::function<void(SDL_GPUCommandBuffer*, SDL_GPURenderPass*)> extIn;
         std::function<void(SDL_GPUCommandBuffer*)> extOwn;
-    };
-
-    // Side data for a SoH3D skinned model draw (OP_DRAW with soh3dDrawIdx >= 0). Kept out of Op so the
-    // ~4.4 KB uniform payload doesn't bloat the thousands of N64 ops that don't need it. Index space is
-    // cleared together with mOps each frame, so an op's soh3dDrawIdx always indexes the live vector.
-    struct Soh3dDrawData {
-        SDL_GPUBuffer* vbo;     // per-model vertex buffer (not the shared frame mVbo)
-        uint32_t first, count;  // skinned draws use a nonzero first vertex
-        std::array<uint8_t, sizeof(SoH3DSg::SgUbo)> ubo; // common + bones, pushed as the 3 blocks at replay
     };
 
     void CreateDeviceAndClaim();
@@ -338,9 +342,10 @@ class GfxRenderingAPISdl3Gpu : public GfxRenderingAPI {
     uint32_t mVtxUsed = 0;
 
     std::vector<Op> mOps;
-    // Side payloads for the SoH3D skinned model OP_DRAWs in mOps (see Soh3dDrawData). Cleared in
-    // lockstep with mOps so an op's soh3dDrawIdx always points at the live entry.
-    std::vector<Soh3dDrawData> mSoh3dDraws;
+    // Oversized skinned-model uniform payloads (common + bones, ~4.4 KB) for the DRAW_MODEL OP_DRAWs in
+    // mOps — kept out of Op so they don't bloat the thousands of N64 ops. Cleared in lockstep with mOps
+    // so an op's soh3dDrawIdx always indexes the live vector.
+    std::vector<std::array<uint8_t, sizeof(SoH3DSg::SgUbo)>> mSoh3dModelUbos;
 
     // GPU textures whose release was deferred because the in-flight op-list may still bind them;
     // released in FlushPendingTexReleases once the frame's command buffer is submitted.
