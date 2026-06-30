@@ -24,6 +24,8 @@ add_executable(lus_tests
     path_diskfile_tests.cpp
     resource_type_tests.cpp
     archive_self_tests.cpp
+    soh3d_render_tests.cpp
+    soh3d_test_stubs.cpp
 )
 
 if(ENABLE_SCRIPTING)
