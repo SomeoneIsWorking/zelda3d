@@ -2126,6 +2126,17 @@ static int SoH3D_TryAuto(PlayState* play, Actor* actor) {
     if (objId == OBJECT_KANBAN) {
         return 0;
     }
+    // ACTORCAT_DOOR actors (Door_Shutter, En_Door, ...) are articulated and draw animated sub-meshes
+    // (the sliding panel + the closing bars/tetugousi grate at a per-frame Matrix_Scale). The
+    // auto-replace bbox MEASURE — which assumes one static mesh — captures that transient extent, so
+    // for a Spirit Temple shutter it measured n64H~2113 and scaled the small 160u panel CMB 13.2x,
+    // drawing a door taller than the whole room (room mesh Y-extent ~863). The bbox measure cannot
+    // size articulated doors (same reason skinned actors are excluded below), and there is no reliable
+    // static N64 height to derive a scale from here. Render the faithful N64 door instead of a
+    // blown-up OoT3D one; a proper OoT3D door port needs the door actor's real scale from the decomp.
+    if (actor->category == ACTORCAT_DOOR) {
+        return 0;
+    }
     e = &sAuto[objId];
     if (e->state == 3) {
         return 0; // known-unreplaceable -> N64
