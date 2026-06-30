@@ -13,7 +13,6 @@ ImGuiStyle& GetStyle() { return ZeroRef<ImGuiStyle>(); }
 ImGuiViewport* GetMainViewport() { return ZeroPtr<ImGuiViewport>(); }
 ImGuiViewport* GetWindowViewport() { return ZeroPtr<ImGuiViewport>(); }
 ImGuiWindow* FindWindowByName(char const*) { return ZeroPtr<ImGuiWindow>(); }
-ImGuiWindow* GetTopMostPopupModal() { return ZeroPtr<ImGuiWindow>(); }
 ImU32 ColorConvertFloat4ToU32(ImVec4 const&) { return {}; }
 ImU32 GetColorU32(ImVec4 const&) { return {}; }
 ImU32 GetColorU32(int, float) { return {}; }
