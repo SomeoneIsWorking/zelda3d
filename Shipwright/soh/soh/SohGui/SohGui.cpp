@@ -12,10 +12,6 @@
 #include <imgui_internal.h>
 #include <libultraship/libultraship.h>
 
-#ifdef __APPLE__
-#include <fast/backends/gfx_metal.h>
-#endif
-
 #ifdef __SWITCH__
 #include <port/switch/SwitchImpl.h>
 #endif
