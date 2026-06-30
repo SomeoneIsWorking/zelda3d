@@ -845,10 +845,11 @@ void GfxRenderingAPISdl3Gpu::ReplayOps(SDL_GPUTexture* presentTex, uint32_t pres
                 SDL_BindGPUGraphicsPipeline(pass, op.pipeline);
                 SDL_SetGPUViewport(pass, &op.viewport);
                 SDL_SetGPUScissor(pass, &op.scissor);
-                // Only the uniform push differs across the three draw classes (the vertex layout is
-                // baked into op.pipeline). The vertex-buffer bind, the single fragment-sampler bind
-                // path below, and the draw are shared. altVbo != null selects the SoH3D model / HUD
-                // buffer (offset 0); null falls back to the shared frame mVbo at vboOffset (N64).
+                // Only the uniform push + vertex source differ across the draw classes (the vertex
+                // layout is baked into op.pipeline). The single fragment-sampler bind path below and the
+                // draw are shared. altVbo != null selects the SoH3D model / HUD buffer (offset 0); null
+                // falls back to the shared frame mVbo at vboOffset (N64). DRAW_FULLSCREEN binds no vbo.
+                bool bindVbo = true;
                 switch (op.drawClass) {
                     case Op::DRAW_MODEL: {
                         // Two-block push: common state at binding 0 (both stages), bone matrices at
@@ -862,15 +863,21 @@ void GfxRenderingAPISdl3Gpu::ReplayOps(SDL_GPUTexture* presentTex, uint32_t pres
                     case Op::DRAW_HUD:
                         SDL_PushGPUVertexUniformData(mCmd, 0, op.ubo, 16); // { vec2 viewport; vec2 pad; }
                         break;
+                    case Op::DRAW_FULLSCREEN:
+                        SDL_PushGPUFragmentUniformData(mCmd, 0, op.ubo, op.uboLen);
+                        bindVbo = false; // fullscreen triangle is generated from gl_VertexIndex
+                        break;
                     case Op::DRAW_N64:
                     default:
                         SDL_PushGPUFragmentUniformData(mCmd, 0, op.ubo, sizeof(SgUboData));
                         break;
                 }
-                SDL_GPUBufferBinding vb{};
-                vb.buffer = op.altVbo ? op.altVbo : mVbo;
-                vb.offset = op.altVbo ? 0 : op.vboOffset;
-                SDL_BindGPUVertexBuffers(pass, 0, &vb, 1);
+                if (bindVbo) {
+                    SDL_GPUBufferBinding vb{};
+                    vb.buffer = op.altVbo ? op.altVbo : mVbo;
+                    vb.offset = op.altVbo ? 0 : op.vboOffset;
+                    SDL_BindGPUVertexBuffers(pass, 0, &vb, 1);
+                }
                 if (op.numSamplers > 0) {
 #if defined(__APPLE__)
                     // macOS/MoltenVK only: SDL_BindGPUFragmentSamplers dereferences each binding and
@@ -904,20 +911,6 @@ void GfxRenderingAPISdl3Gpu::ReplayOps(SDL_GPUTexture* presentTex, uint32_t pres
                     SDL_BindGPUFragmentSamplers(pass, 0, op.samplers, op.numSamplers);
                 }
                 SDL_DrawGPUPrimitives(pass, op.numVerts, 1, op.firstVertex, 0);
-                break;
-            }
-            case OP_EXT_IN_PASS: {
-                // Unified SoH3D draw recorded into the target fb's render pass (interleaves with N64
-                // geometry, sharing color + depth). Ensure that fb's pass is open, then hand it over.
-                FramebufferSDL3& f = mFramebuffers[op.fb];
-                if (!f.color || !f.depth)
-                    break;
-                if (!(pass && curFb == op.fb)) {
-                    endPass();
-                    beginPass(op.fb);
-                }
-                if (op.extIn)
-                    op.extIn(mCmd, pass);
                 break;
             }
             case OP_EXT_OWN_PASS: {
@@ -2109,23 +2102,6 @@ void GfxRenderingAPISdl3Gpu::GetSoH3DViewportScissor(SDL_GPUViewport& vp, SDL_Re
         sc.h = 0;
 }
 
-void GfxRenderingAPISdl3Gpu::AppendSoH3DInPass(std::function<void(SDL_GPUCommandBuffer*, SDL_GPURenderPass*)> fn) {
-    Op op{};
-    op.kind = OP_EXT_IN_PASS;
-    op.fb = mCurrentFb;
-    op.extIn = std::move(fn);
-    mOps.push_back(std::move(op));
-}
-
-void GfxRenderingAPISdl3Gpu::AppendSoH3DInPassFb(int fb,
-                                                 std::function<void(SDL_GPUCommandBuffer*, SDL_GPURenderPass*)> fn) {
-    Op op{};
-    op.kind = OP_EXT_IN_PASS;
-    op.fb = fb;
-    op.extIn = std::move(fn);
-    mOps.push_back(std::move(op));
-}
-
 void GfxRenderingAPISdl3Gpu::AppendSoH3DModelDraw(SDL_GPUGraphicsPipeline* pipeline, SDL_GPUBuffer* vbo, uint32_t first,
                                                   uint32_t count, const void* ubo, SDL_GPUTexture* tex,
                                                   SDL_GPUSampler* samp, SDL_GPUTexture* shadowTex,
@@ -2176,6 +2152,27 @@ void GfxRenderingAPISdl3Gpu::AppendSoH3DHudDraw(SDL_GPUGraphicsPipeline* pipelin
     mOps.push_back(std::move(op));
 }
 
+void GfxRenderingAPISdl3Gpu::AppendSoH3DFullscreen(SDL_GPUGraphicsPipeline* pipeline, const void* ubo, uint32_t uboLen,
+                                                   SDL_GPUTexture* tex, SDL_GPUSampler* samp, const SDL_GPUViewport& vp,
+                                                   const SDL_Rect& sc) {
+    Op op{};
+    op.kind = OP_DRAW;
+    op.drawClass = Op::DRAW_FULLSCREEN;
+    op.fb = mCurrentFb;
+    op.pipeline = pipeline;
+    op.numVerts = 3; // fullscreen triangle from gl_VertexIndex; no vertex buffer
+    op.viewport = vp;
+    op.scissor = sc;
+    op.numSamplers = 1;
+    op.samplers[0].texture = tex;
+    op.samplers[0].sampler = samp;
+    if (uboLen > sizeof(op.ubo))
+        uboLen = sizeof(op.ubo);
+    op.uboLen = (uint16_t)uboLen;
+    memcpy(op.ubo, ubo, uboLen);
+    mOps.push_back(std::move(op));
+}
+
 void GfxRenderingAPISdl3Gpu::MainFbSize(int& w, int& h) {
     if (!mFramebuffers.empty() && mFramebuffers[0].width > 0) {
         w = (int)mFramebuffers[0].width;
@@ -2191,16 +2188,6 @@ void GfxRenderingAPISdl3Gpu::AppendSoH3DOwnPass(std::function<void(SDL_GPUComman
     op.fb = mCurrentFb;
     op.extOwn = std::move(fn);
     mOps.push_back(std::move(op));
-}
-
-bool GfxRenderingAPISdl3Gpu::BeginSoH3DPass(SoH3DGpuContext& out) {
-    (void)out;
-    return false; // legacy handshake removed; use AppendSoH3DInPass.
-}
-
-bool GfxRenderingAPISdl3Gpu::BeginSoH3DOffscreen(SoH3DGpuContext& out) {
-    (void)out;
-    return false; // legacy handshake removed; use AppendSoH3DOwnPass.
 }
 
 } // namespace Fast

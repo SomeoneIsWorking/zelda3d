@@ -1,11 +1,11 @@
 // SoH3D SDL3 GPU render path — the SDL3-GPU counterpart of soh3d_vk.cpp's GPU work, built on the
 // UNIFIED op model (user directive 2026-06-26, memory soh3d-unified-renderer-one-pass).
 //
-// Unlike the Vulkan path (which borrowed the backend's live command buffer mid-frame via
-// BeginSoH3DPass), this module records every OoT3D model draw as an OP appended into the SAME
-// deferred op-list the SDL3 GPU backend replays in ONE render pass in FinishRender. So the 3DS
+// Unlike the Vulkan path (which borrowed the backend's live command buffer mid-frame), this module
+// records every OoT3D model draw as a first-class OP_DRAW appended into the SAME deferred op-list the
+// SDL3 GPU backend replays in ONE render pass in FinishRender (AppendSoH3DModelDraw). So the 3DS
 // content interleaves depth-correctly with the N64 triangles with no separate-pass handshake —
-// one renderer, one pass, no N64-vs-3DS distinction in how draws are submitted.
+// one renderer, one pass, one bind path, no N64-vs-3DS distinction in how draws are submitted.
 //
 // The backend-agnostic bookkeeping (draw list, per-emit pose capture, light/shadow/AO tunables, the
 // SoH3D_GL_* C-ABI) stays in soh3d_gl.cpp; when the live Fast3D backend is the SDL3 GPU one those

@@ -1,11 +1,11 @@
 // SoH3D PC HUD — SDL3 GPU immediate-mode 2D textured-quad renderer, on the UNIFIED op model.
 //
-// The Vulkan twin (soh3d_hud_vk.cpp) recorded its quads into a live command buffer obtained via
-// BeginSoH3DPass. Here the quads are COLLECTED during the SoH3D_Hud_Begin..End bracket and appended
-// as ONE op into the SDL3 GPU backend's deferred op-list, targeting framebuffer 0 (the composited
-// frame the present blit / headless readback uses), so the HUD replays on top of the N64 + OoT3D
-// model content in the same single render pass. soh3d_hud_vk.cpp's extern "C" SoH3D_Hud_* entry
-// points delegate here when the SDL3 GPU backend is the live one.
+// The Vulkan twin (soh3d_hud_vk.cpp) recorded its quads into a live command buffer. Here the quads
+// are COLLECTED during the SoH3D_Hud_Begin..End bracket and each coalesced run is appended as a
+// first-class OP_DRAW into the SDL3 GPU backend's deferred op-list (AppendSoH3DHudDraw), targeting
+// framebuffer 0 (the composited frame the present blit / headless readback uses), so the HUD replays
+// on top of the N64 + OoT3D model content in the same single render pass through the same bind path.
+// soh3d_hud_vk.cpp's extern "C" SoH3D_Hud_* entry points delegate here when SDL3 GPU is the live one.
 #ifdef ENABLE_SDL3GPU
 
 #include "fast/soh3d_hud_sdl3gpu.h"
