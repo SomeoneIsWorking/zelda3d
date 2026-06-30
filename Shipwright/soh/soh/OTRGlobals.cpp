@@ -57,11 +57,7 @@
 
 #include <fast/interpreter.h>
 
-#ifdef __APPLE__
-#include <SDL_scancode.h>
-#else
 #include <SDL3/SDL_scancode.h>
-#endif
 
 #ifdef __SWITCH__
 #include <port/switch/SwitchImpl.h>

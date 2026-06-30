@@ -554,7 +554,7 @@ namespace Fast {
 
 GfxRenderingAPISdl3Gpu* g_activeSdl3GpuApi = nullptr;
 
-GfxRenderingAPISdl3Gpu::GfxRenderingAPISdl3Gpu(GfxWindowBackendSDL2* windowBackend) : mWindowBackend(windowBackend) {
+GfxRenderingAPISdl3Gpu::GfxRenderingAPISdl3Gpu(GfxWindowBackendSDL3* windowBackend) : mWindowBackend(windowBackend) {
 }
 
 GfxRenderingAPISdl3Gpu::~GfxRenderingAPISdl3Gpu() {

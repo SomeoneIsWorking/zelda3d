@@ -20,7 +20,7 @@ namespace Fast {
 // Forward declaration of the SDL window backend so the SDL3-GPU rendering API can pull the
 // SDL_Window out of it (to claim it for the GPU device). gfx_sdl2.cpp is the shared window
 // manager for GL / Metal / Vulkan / SDL3-GPU on SDL.
-class GfxWindowBackendSDL2;
+class GfxWindowBackendSDL3;
 
 // Per-combiner shader record. Holds the compiled SPIR-V shader objects and the vertex-input
 // layout derived from the color-combiner features, mirroring ShaderProgramVulkan. Pipelines are
@@ -111,7 +111,7 @@ struct SoH3DGpuContext {
 
 class GfxRenderingAPISdl3Gpu : public GfxRenderingAPI {
   public:
-    explicit GfxRenderingAPISdl3Gpu(GfxWindowBackendSDL2* windowBackend);
+    explicit GfxRenderingAPISdl3Gpu(GfxWindowBackendSDL3* windowBackend);
     ~GfxRenderingAPISdl3Gpu() override;
 
     // P3 hooks (stubbed in P2): hand the SoH3D pass the device/command-buffer/pass handles it needs
@@ -262,7 +262,7 @@ class GfxRenderingAPISdl3Gpu : public GfxRenderingAPI {
     void WriteFbPpm(int fbId, const char* path);
     void MaybeDumpFrame();
 
-    GfxWindowBackendSDL2* mWindowBackend = nullptr;
+    GfxWindowBackendSDL3* mWindowBackend = nullptr;
     SDL_Window* mWindow = nullptr;
     SDL_GPUDevice* mDevice = nullptr;
     SDL_GPUTextureFormat mColorFormat = SDL_GPU_TEXTUREFORMAT_R8G8B8A8_UNORM;
