@@ -254,25 +254,13 @@ SDL_GPUSamplerAddressMode wrapMode(unsigned glWrap) {
 } // namespace
 
 SDL_GPUSampler* Fast::SoH3DRenderer::getSampler(unsigned wrapS, unsigned wrapT) {
-    uint32_t key = (wrapS << 16) | (wrapT & 0xFFFF);
-    auto it = g_samplers.find(key);
-    if (it != g_samplers.end())
-        return it->second;
-    SDL_GPUSamplerCreateInfo si{};
-    si.min_filter = SDL_GPU_FILTER_LINEAR;
-    si.mag_filter = SDL_GPU_FILTER_LINEAR;
-    si.mipmap_mode = SDL_GPU_SAMPLERMIPMAPMODE_NEAREST;
-    // max_lod must cover the texture's LOD range. Left at its zero-init default, a LINEAR-minified
-    // large texture (e.g. the 2048² Kokiri ground) computes an LOD > 0 that clamps against max_lod=0
-    // and samples nothing -> the surface renders BLACK. Only large/minified textures hit it (small
-    // ones stay at LOD 0), which is why the terrain vanished but props/sky did not.
-    si.max_lod = 1000.0f;
-    si.address_mode_u = wrapMode(wrapS);
-    si.address_mode_v = wrapMode(wrapT);
-    si.address_mode_w = SDL_GPU_SAMPLERADDRESSMODE_REPEAT;
-    SDL_GPUSampler* s = SDL_CreateGPUSampler(g_device, &si);
-    g_samplers[key] = s;
-    return s;
+    // Use the backend's single sampler cache. The model path needs LINEAR + max_lod=1000: left at the
+    // zero default, a LINEAR-minified large texture (e.g. the 2048² Kokiri ground) computes an LOD > 0
+    // that clamps against max_lod=0 and samples nothing -> the surface renders BLACK. Only large/
+    // minified textures hit it (small ones stay at LOD 0), which is why the terrain vanished but
+    // props/sky did not. max_lod=1000 lands in a distinct cache slot from the N64 samplers (max_lod=0).
+    return Fast::g_activeSdl3GpuApi->GetOrCreateSamplerEx(SDL_GPU_FILTER_LINEAR, wrapMode(wrapS), wrapMode(wrapT),
+                                                          1000.0f);
 }
 
 namespace {
@@ -422,8 +410,6 @@ bool Fast::SoH3DRenderer::ensureResources() {
         return false;
     }
 
-    g_dummyTex = uploadTexture(1, 1, nullptr);
-    g_dummySampler = getSampler(0x2901, 0x2901);
     g_resReady = true;
     fprintf(stderr, "[SoH3D_SG] resources ready (unified op model)\n");
     return true;
@@ -984,8 +970,8 @@ void Fast::SoH3DRenderer::recordDepthGroups(std::vector<DepthDraw>& out, int mod
             continue;
         SgUbo ubo = base;
         ubo.uParams[2] = grp.alphaTest ? grp.alphaRef : 0.0f;
-        SDL_GPUTexture* tex = g_dummyTex;
-        SDL_GPUSampler* samp = g_dummySampler;
+        SDL_GPUTexture* tex = Fast::g_activeSdl3GpuApi->DummyTexture();
+        SDL_GPUSampler* samp = Fast::g_activeSdl3GpuApi->DummySampler();
         if (grp.texIndex >= 0 && grp.texIndex < (int)m->textures.size() && m->textures[grp.texIndex]) {
             tex = m->textures[grp.texIndex];
             samp = getSampler(grp.wrapS, grp.wrapT);
@@ -1338,8 +1324,8 @@ void Fast::SoH3DRenderer::DrawModel(int modelId, const float* mp16, const float*
             if (ov != matTexMap->end() && ov->second >= 0)
                 texIndex = ov->second;
         }
-        SDL_GPUTexture* tex = g_dummyTex;
-        SDL_GPUSampler* samp = g_dummySampler;
+        SDL_GPUTexture* tex = Fast::g_activeSdl3GpuApi->DummyTexture();
+        SDL_GPUSampler* samp = Fast::g_activeSdl3GpuApi->DummySampler();
         if (texIndex >= 0 && texIndex < (int)m->textures.size() && m->textures[texIndex]) {
             tex = m->textures[texIndex];
             samp = getSampler(grp.wrapS, grp.wrapT);
@@ -1374,8 +1360,9 @@ void Fast::SoH3DRenderer::DrawModel(int modelId, const float* mp16, const float*
     SDL_Rect sc{};
     api->GetSoH3DViewportScissor(vp, sc);
     SDL_GPUBuffer* vbo = m->vbo;
-    SDL_GPUTexture* shadowTex = (g_sgShadowOn && g_shadowColor) ? g_shadowColor : g_dummyTex;
-    SDL_GPUSampler* shadowSamp = (g_sgShadowOn && g_shadowColor) ? g_shadowSampler : g_dummySampler;
+    SDL_GPUTexture* shadowTex = (g_sgShadowOn && g_shadowColor) ? g_shadowColor : Fast::g_activeSdl3GpuApi->DummyTexture();
+    SDL_GPUSampler* shadowSamp =
+        (g_sgShadowOn && g_shadowColor) ? g_shadowSampler : Fast::g_activeSdl3GpuApi->DummySampler();
 
     // Append ONE op for this model: replayed inside the unified fb pass (interleaves with N64 geom).
     api->AppendSoH3DInPass([vbo, dgs = std::move(dgs), vp, sc, shadowTex,
@@ -1499,8 +1486,8 @@ void Fast::SoH3DRenderer::ShadowCasterTris(const float* worldXYZ, size_t triCoun
     ubo.uTintSkin[3] = 0.0f; // no skinning
     DepthDraw d;
     d.pipeline = getDepthPipeline(/*doCull=*/false, /*frontCW=*/0);
-    d.tex = g_dummyTex;
-    d.samp = g_dummySampler;
+    d.tex = Fast::g_activeSdl3GpuApi->DummyTexture();
+    d.samp = Fast::g_activeSdl3GpuApi->DummySampler();
     d.vbo = g_n64CasterBuf;
     d.first = 0;
     d.count = vtxCount;

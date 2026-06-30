@@ -1069,10 +1069,6 @@ void GfxRenderingAPISdl3Gpu::MaybeDumpFrame() {
 // ---------------------------------------------------------------------------
 
 SDL_GPUSampler* GfxRenderingAPISdl3Gpu::GetOrCreateSampler(bool linear, uint32_t cms, uint32_t cmt) {
-    uint32_t key = (linear ? 1u : 0u) | (cms << 1) | (cmt << 4);
-    auto it = mSamplerCache.find(key);
-    if (it != mSamplerCache.end())
-        return it->second;
     auto wrap = [](uint32_t cm) -> SDL_GPUSamplerAddressMode {
         switch (cm) {
             case G_TX_NOMIRROR | G_TX_CLAMP:
@@ -1087,18 +1083,35 @@ SDL_GPUSampler* GfxRenderingAPISdl3Gpu::GetOrCreateSampler(bool linear, uint32_t
                 return SDL_GPU_SAMPLERADDRESSMODE_REPEAT;
         }
     };
+    SDL_GPUFilter f = linear ? SDL_GPU_FILTER_LINEAR : SDL_GPU_FILTER_NEAREST;
+    return GetOrCreateSamplerEx(f, wrap(cms), wrap(cmt), 0.0f);
+}
+
+// The one sampler factory + cache for the whole backend, keyed on the fully-resolved SDL params so
+// the N64 wrapper above and the SoH3D model path (LINEAR + max_lod=1000) share it without colliding
+// (the differing max_lod lands in a distinct cache slot). max_lod is bucketed to {0, nonzero}: the
+// only two values in use are 0 (N64) and 1000 (SoH3D), and a non-mipmapped texture is unaffected by
+// any positive max_lod, so one "uncapped" bucket suffices.
+SDL_GPUSampler* GfxRenderingAPISdl3Gpu::GetOrCreateSamplerEx(SDL_GPUFilter filter, SDL_GPUSamplerAddressMode u,
+                                                             SDL_GPUSamplerAddressMode v, float maxLod) {
+    uint32_t key = (uint32_t)filter | ((uint32_t)u << 4) | ((uint32_t)v << 8) | ((maxLod > 0.0f ? 1u : 0u) << 12);
+    auto it = mSamplerCache.find(key);
+    if (it != mSamplerCache.end())
+        return it->second;
     SDL_GPUSamplerCreateInfo si{};
-    si.min_filter = linear ? SDL_GPU_FILTER_LINEAR : SDL_GPU_FILTER_NEAREST;
-    si.mag_filter = linear ? SDL_GPU_FILTER_LINEAR : SDL_GPU_FILTER_NEAREST;
+    si.min_filter = filter;
+    si.mag_filter = filter;
     si.mipmap_mode = SDL_GPU_SAMPLERMIPMAPMODE_NEAREST;
-    si.address_mode_u = wrap(cms);
-    si.address_mode_v = wrap(cmt);
+    si.address_mode_u = u;
+    si.address_mode_v = v;
     si.address_mode_w = SDL_GPU_SAMPLERADDRESSMODE_REPEAT;
+    si.max_lod = maxLod;
     SDL_GPUSampler* sampler = SDL_CreateGPUSampler(mDevice, &si);
     if (sampler == nullptr) {
         // Don't cache a null — binding a null sampler faults inside the GPU driver
         // (BindFragmentSamplers dereferences it, notably on macOS/MoltenVK). Surface it instead.
-        SPDLOG_ERROR("SDL_CreateGPUSampler failed (linear={}, cms={}, cmt={}): {}", linear, cms, cmt, SDL_GetError());
+        SPDLOG_ERROR("SDL_CreateGPUSampler failed (filter={}, u={}, v={}, maxLod={}): {}", (int)filter, (int)u, (int)v,
+                     maxLod, SDL_GetError());
         return nullptr;
     }
     mSamplerCache[key] = sampler;
