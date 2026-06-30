@@ -13,6 +13,7 @@
 #include <SDL3/SDL_events.h>
 
 #include "ship/Context.h"
+#include "ship/window/Window.h"
 #include "ship/controller/controldeck/ControlDeck.h"
 #include "libultraship/bridge/consolevariablebridge.h"
 #include <spdlog/spdlog.h>
@@ -721,12 +722,20 @@ void SohRmlUi::UpdateAndRender() {
         return;
     }
 
-    // Track the live drawable size so the context + render target follow window resizes.
-    if (mSdlWindow) {
-        int dw = 0, dh = 0;
-        // SDL3-MIGRATION: SDL_GL_GetDrawableSize -> SDL_GetWindowSizeInPixels (drawable/pixel size).
-        SDL_GetWindowSizeInPixels(static_cast<SDL_Window*>(mSdlWindow), &dw, &dh);
-        Resize(dw, dh);
+    // Track the live window size so the context + render target follow window resizes. The RmlUi
+    // geometry is appended into the SAME unified op-list / framebuffer (fb 0) the game renders into,
+    // so RmlUi's coordinate space MUST match that framebuffer's size — otherwise the menu/HUD is laid
+    // out and rasterized at a different scale than the game and slides out of view.
+    //
+    // Use the engine Window as the single source of truth for that size (Window::GetWidth/GetHeight)
+    // — the exact same call the interpreter uses to size fb 0 — instead of re-querying SDL here. That
+    // guarantees RmlUi and the framebuffer agree by construction on EVERY platform, with no per-OS
+    // branch to drift. (Window::GetDimensions already encapsulates the points-vs-pixels choice that a
+    // HiDPI display forces — e.g. retina, where the pixel size is 2x the point size — so duplicating
+    // an #ifdef here would just risk the two sizings diverging.) HiDPI physical element sizing is
+    // handled separately by ApplyDensityRatio's dp ratio.
+    if (auto ctx = Ship::Context::GetRawInstance(); ctx && ctx->GetWindow()) {
+        Resize((int)ctx->GetWindow()->GetWidth(), (int)ctx->GetWindow()->GetHeight());
         ApplyDensityRatio();
     }
 

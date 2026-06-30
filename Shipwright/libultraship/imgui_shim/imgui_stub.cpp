@@ -58,6 +58,16 @@ bool InputTextMultiline(const char*, std::string*, const ImVec2&, ImGuiInputText
 bool InputTextWithHint(const char*, const char*, std::string*, ImGuiInputTextFlags, ImGuiInputTextCallback, void*) {
     return false;
 }
+
+// HAND-DEFINED (NOT auto-generated): existence-checked by LIVE engine code, so the default
+// "pointer-returning stubs return non-null zeroed storage" policy is WRONG here. ControlDeck::
+// KeyboardGameInputBlocked() calls this every frame as `GetTopMostPopupModal() != NULL` to decide
+// whether a modal popup is eating keystrokes. A non-null return = "a popup is open" = ALL keyboard
+// game input blocked (Enter/Start dead). ImGui is dead, so the correct answer is nullptr ("no
+// popup"). Kept here (not in imgui_stub_generated.inc) so a stub regeneration can't revert it.
+ImGuiWindow* GetTopMostPopupModal() {
+    return nullptr;
+}
 } // namespace ImGui
 
 // ============================================================================================
