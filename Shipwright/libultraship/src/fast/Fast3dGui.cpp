@@ -271,14 +271,8 @@ void Fast3dGui::DrawFloatingWindows() {
         // Restore GL context for next frame
         SDL_GL_MakeCurrent(backupCurrentWindow, backupCurrentContext);
     } else {
-#ifdef __APPLE__
-        // Metal requires additional frame setup to get ImGui ready for drawing floating windows
-        if (mImpl.Backend == WindowBackend::FAST3D_SDL_METAL) {
-            GfxRenderingAPIMetal* api = (GfxRenderingAPIMetal*)mInterpreter.lock()->GetCurrentRenderingAPI();
-            api->SetupFloatingFrame();
-        }
-#endif
-
+        // SDL3 GPU (the sole renderer) needs no per-backend floating-window setup; the removed Metal
+        // backend's SetupFloatingFrame()/GfxRenderingAPIMetal are gone with it.
         ImGui::UpdatePlatformWindows();
         ImGui::RenderPlatformWindowsDefault();
     }
