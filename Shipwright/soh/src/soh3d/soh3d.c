@@ -361,6 +361,12 @@ int SoH3D_PosedModelLocalAABB(int modelId, unsigned long long midMask, float* ou
 static s32 sSoH3dSelDrawModel = -1;
 static float sSoH3dSelDrawScale = 1.0f;
 static float sSoH3dSelDrawGroundOff = 0.0f;
+// Faithful draw-space transform (e.g. Boss_Goma) used at the selected actor's last draw, so `aaim`
+// can frame the model where it ACTUALLY draws (the -4000 local translate moves Gohma's model far off
+// her world.pos when she tilts — without this aaim would aim at the un-offset anchor). 0 = none.
+static s32 sSoH3dSelDrawDsHave = 0;
+static float sSoH3dSelDrawDsLiftY = 0.0f;
+static float sSoH3dSelDrawDsLocal[3] = { 0.0f, 0.0f, 0.0f };
 static float gSoH3dAimCenter[3] = { 0, 0, 0 }; // last computed posed-model world center (for aorbit)
 static float gSoH3dAimRadius = 50.0f;          // its world-space radius (for auto framing distance)
 
@@ -401,6 +407,11 @@ void SoH3D_ActorPostUpdate(PlayState* play, Actor* actor) {
             sSoH3dMotionActor = NULL;
         }
     }
+    // #123 Boss_Goma climb hold: keep Gohma in her REAL wall-climb state (self-gated on id + the
+    // `gohmaclimb` hold flag) so the genuine mid-climb pose is observable. Runs for the Gohma actor
+    // regardless of selection/freeze, BEFORE the generic transform pin below (the pin would otherwise
+    // freeze her shape.rot and stop the climb tilt evolving).
+    SoH3D_BossGomaClimbTick(actor);
     if (actor == NULL || actor != gSoH3dSelActor || !gSoH3dActorFreeze) {
         return;
     }
@@ -1790,9 +1801,24 @@ static void SoH3D_EmitModelDraw(PlayState* play, int modelId, Actor* actor, floa
         sSoH3dSelDrawGroundOff = groundOffset;
         SoH3D_SetTrackPosedMinY(modelId, 1);
     }
+    // Faithful draw-space transform offset: some actors' OoT3D Draw applies extra translate(s) the
+    // generic world.pos anchor omits (BossGoma_Draw's Matrix_Translate(0,-4000,0) + Actor_Draw's
+    // shape.yOffset*scale.y lift — #123 Gohma floats off the climbing pillar). The behavior module
+    // supplies the world-Y lift + a local (rotated, world-unit) translate; when present it REPLACES
+    // the generic groundOffset. Read live from the actor C struct in behaviors/actor/boss_goma.cpp.
+    float dsLiftY = 0.0f;
+    float dsLocal[3] = { 0.0f, 0.0f, 0.0f };
+    int dsHave = SoH3D_ActorDrawSpaceTransform(actor, &dsLiftY, dsLocal);
+    if (actor != NULL && actor == gSoH3dSelActor) {
+        sSoH3dSelDrawDsHave = dsHave;
+        sSoH3dSelDrawDsLiftY = dsHave ? dsLiftY : 0.0f;
+        sSoH3dSelDrawDsLocal[0] = dsHave ? dsLocal[0] : 0.0f;
+        sSoH3dSelDrawDsLocal[1] = dsHave ? dsLocal[1] : 0.0f;
+        sSoH3dSelDrawDsLocal[2] = dsHave ? dsLocal[2] : 0.0f;
+    }
     OPEN_DISPS(play->state.gfxCtx);
     Gfx_SetupDL_25Opa(play->state.gfxCtx);
-    Matrix_Translate(actor->world.pos.x, actor->world.pos.y, actor->world.pos.z, MTXMODE_NEW);
+    Matrix_Translate(actor->world.pos.x, actor->world.pos.y + dsLiftY, actor->world.pos.z, MTXMODE_NEW);
     // Replicate the engine's standard actor transform (Matrix_SetTranslateRotateYXZ, z_actor.c):
     // the FULL YXZ shape.rot, not just yaw. Upright props/characters carry shape.rot.x=z=0 so this
     // is a no-op for them, but actors that bake an orientation into shape.rot need all three — e.g.
@@ -1815,13 +1841,19 @@ static void SoH3D_EmitModelDraw(PlayState* play, int modelId, Actor* actor, floa
             Matrix_Translate(0.0f, 0.0f, 200.0f * actor->scale.z, MTXMODE_APPLY);
         }
     }
+    // Faithful actor-Draw local translate (BossGoma_Draw's Matrix_Translate(0,-4000,0)): applied
+    // AFTER shape.rot but BEFORE worldScale, so it stays in the rotated WORLD-UNIT frame (matching the
+    // N64 op which sits between Matrix_Scale(actor->scale) and the skeleton — uniform actor scale
+    // commutes, so the behavior already folds *scale.y into the values it returns).
+    if (dsHave) Matrix_Translate(dsLocal[0], dsLocal[1], dsLocal[2], MTXMODE_APPLY);
     Matrix_Scale(worldScale, worldScale, worldScale, MTXMODE_APPLY);
     if (gSoH3dRotX != 0.0f) Matrix_RotateX(gSoH3dRotX * (3.14159265f / 180.0f), MTXMODE_APPLY);
     if (gSoH3dRotY != 0.0f) Matrix_RotateY(gSoH3dRotY * (3.14159265f / 180.0f), MTXMODE_APPLY);
     if (gSoH3dRotZ != 0.0f) Matrix_RotateZ(gSoH3dRotZ * (3.14159265f / 180.0f), MTXMODE_APPLY);
     // Ground offset: applied innermost (model space, pre-scale) so it scales with
-    // worldScale and brings the model's feet onto the actor's ground pos.
-    if (groundOffset != 0.0f) Matrix_Translate(0.0f, groundOffset, 0.0f, MTXMODE_APPLY);
+    // worldScale and brings the model's feet onto the actor's ground pos. A faithful draw-space
+    // transform (dsHave) REPLACES this generic anchor — the OoT3D draw places the model itself.
+    if (!dsHave && groundOffset != 0.0f) Matrix_Translate(0.0f, groundOffset, 0.0f, MTXMODE_APPLY);
     gSPMatrix(POLY_OPA_DISP++, MATRIX_NEWMTX(play->state.gfxCtx), G_MTX_MODELVIEW | G_MTX_LOAD);
     SoH3D_SceneTint(play, tint);
     // Snapshot this actor's pose NOW (its SkelAnime/CSAB pose was just set via SoH3D_UpdateAnim*),
@@ -5603,10 +5635,16 @@ static void SoH3D_ReplExec(PlayState* play, char* line, const char* outPath) {
             } else {
                 Actor* a = gSoH3dSelActor;
                 float s = sSoH3dSelDrawScale;
-                // model-local center (+ground offset, applied innermost like EmitModelDraw), then scale.
-                float lx = (mn[0] + mx[0]) * 0.5f, ly = (mn[1] + mx[1]) * 0.5f + sSoH3dSelDrawGroundOff,
+                // model-local center; the generic ground offset is applied innermost (pre-scale) ONLY
+                // when there is no faithful draw-space transform (which REPLACES it — see EmitModelDraw).
+                float go = sSoH3dSelDrawDsHave ? 0.0f : sSoH3dSelDrawGroundOff;
+                float lx = (mn[0] + mx[0]) * 0.5f, ly = (mn[1] + mx[1]) * 0.5f + go,
                       lz = (mn[2] + mx[2]) * 0.5f;
-                float vx = lx * s, vy = ly * s, vz = lz * s;
+                // Faithful draw-space LOCAL translate (e.g. Gohma's -4000) is applied after shape.rot
+                // but before worldScale, i.e. added in the rotated, world-unit frame: fold it in here
+                // (pre-rotate) alongside scale*localCenter so the rotation below carries both.
+                float vx = lx * s + sSoH3dSelDrawDsLocal[0], vy = ly * s + sSoH3dSelDrawDsLocal[1],
+                      vz = lz * s + sSoH3dSelDrawDsLocal[2];
                 // rotate by the actor's YXZ shape.rot (EmitModelDraw order: Ry*Rx*Rz applied to scale*L).
                 const float B2R = 3.14159265358979f / 32768.0f;
                 float rx = a->shape.rot.x * B2R, ry = a->shape.rot.y * B2R, rz = a->shape.rot.z * B2R;
@@ -5616,8 +5654,9 @@ static void SoH3D_ReplExec(PlayState* play, char* line, const char* outPath) {
                 float x2 = x1, y2 = cx_ * y1 - sx_ * z1, z2 = sx_ * y1 + cx_ * z1;
                 float cy_ = cosf(ry), sy_ = sinf(ry); // Ry
                 float x3 = cy_ * x2 + sy_ * z2, y3 = y2, z3 = -sy_ * x2 + cy_ * z2;
+                // world.pos + (0, dsLiftY, 0) [world frame] + Rot*(scale*localCenter + dsLocal).
                 gSoH3dAimCenter[0] = a->world.pos.x + x3;
-                gSoH3dAimCenter[1] = a->world.pos.y + y3;
+                gSoH3dAimCenter[1] = a->world.pos.y + sSoH3dSelDrawDsLiftY + y3;
                 gSoH3dAimCenter[2] = a->world.pos.z + z3;
                 float dx = (mx[0] - mn[0]) * s, dy = (mx[1] - mn[1]) * s, dz = (mx[2] - mn[2]) * s;
                 gSoH3dAimRadius = 0.5f * sqrtf(dx * dx + dy * dy + dz * dz);
@@ -5714,6 +5753,39 @@ static void SoH3D_ReplExec(PlayState* play, char* line, const char* outPath) {
             EnDoor* d = (EnDoor*)gSoH3dSelActor;
             d->playerIsOpening = 1;
             SoH3D_ReplReply(outPath, "doorforce: playerIsOpening=1 (animStyle=%d)", d->animStyle);
+        }
+    } else if (strcmp(cmd, "gohmaclimb") == 0) {
+        // #123 climb-state tooling: drive the selected Queen Gohma into her REAL wall-climb state via
+        // her own BossGoma_SetupWallClimb, then (default) HOLD her there so the genuine mid-climb pose
+        // (shape.rot.x -> -0x4000, climb anim, world.rot.y -> wallYaw+0x8000 — all her own code's
+        // output, NOT a forced shape.rot) is observable for the draw-space-offset A/B. Per-actor logic
+        // lives in behaviors/actor/boss_goma.cpp (the cucco-style bug-specific helper pattern).
+        //   gohmaclimb [climbY] [hold]   — enter climb; climbY default -560 (below the -320 ceiling
+        //                                  threshold so the climb has room), hold default 1.
+        //   gohmaclimb off               — release the hold (she resumes her normal state machine).
+        // Select her first (`asel 0x28`). Pair with `aaim`/`ainfo` to read world.pos vs the drawn
+        // model center, and `acam`/`cam` to frame her for the auto0/auto1 diff.
+        char sub[16] = { 0 };
+        float climbY = -560.0f;
+        int hold = 1;
+        if (sscanf(line, "%*s %15s", sub) == 1 && strcmp(sub, "off") == 0) {
+            SoH3D_BossGomaForceClimb(NULL, 0.0f, 0); // release the hold; her state machine resumes
+            SoH3D_ReplReply(outPath, "gohmaclimb off (hold released, held=%d)", SoH3D_BossGomaClimbHeld());
+        } else {
+            (void)sscanf(line, "%*s %f %d", &climbY, &hold);
+            if (gSoH3dSelActor == NULL) {
+                SoH3D_ReplReply(outPath, "gohmaclimb: no selection (asel 0x28 first)");
+            } else if (!SoH3D_BossGomaForceClimb(gSoH3dSelActor, climbY, hold)) {
+                SoH3D_ReplReply(outPath, "gohmaclimb: selection is not Boss_Goma (asel 0x28)");
+            } else {
+                Actor* a = gSoH3dSelActor;
+                sSoH3dActorPinPos = a->world.pos; // keep the freeze pin coherent with her new pos
+                SoH3D_ReplReply(outPath,
+                                "gohmaclimb: climbing pos=(%.0f,%.0f,%.0f) hold=%d held=%d "
+                                "(shape.rot.x will approach -16384; let frames pass then aaim/ainfo)",
+                                a->world.pos.x, a->world.pos.y, a->world.pos.z, hold,
+                                SoH3D_BossGomaClimbHeld());
+            }
         }
     } else if (strcmp(cmd, "doorbone") == 0 && sscanf(line, "%*s %i", &iv) == 1) {
         gSoH3dDoorBone = iv;

@@ -20,6 +20,7 @@
 #include "actor/kibako2.h"
 #include "actor/push_block.h"
 #include "actor/en_tana.h"
+#include "actor/boss_goma.h"
 #include "../asset/mat4.h"
 
 extern "C" {
@@ -108,7 +109,10 @@ ActorBehavior* findActorBehavior(s16 actorId) {
     static ObjKibako2Behavior sObjKibako2;
     static ObjOshihikiBehavior sObjOshihiki;
     static EnTanaBehavior sEnTana;
+    static BossGomaBehavior sBossGoma;
     switch (actorId) {
+        case ACTOR_BOSS_GOMA:
+            return &sBossGoma;
         case ACTOR_EN_DOOR:
             return &sEnDoor;
         case ACTOR_DOOR_ANA:
@@ -163,6 +167,29 @@ ActorBehavior* findActorBehavior(s16 actorId) {
 extern "C" int SoH3D_TryActorModelDraw(PlayState* play, Actor* actor) {
     if (SoH3D::ActorBehavior* b = SoH3D::findActorBehavior(actor->id)) {
         if (b->tryDrawModel(play, actor)) {
+            return 1;
+        }
+    }
+    return 0;
+}
+
+// C bridge: query an actor's faithful draw-space transform offset (see ActorBehavior::drawSpaceTransform).
+// Returns 1 and fills *outLiftY (world-Y lift) + outLocalOff[3] (rotated, world-unit local translate) if
+// the actor's behavior supplies one — the caller (SoH3D_EmitModelDraw) then applies them and SKIPS the
+// generic groundOffset. Returns 0 = no override (keep the generic anchor). Called once per replaced draw.
+extern "C" int SoH3D_ActorDrawSpaceTransform(void* actorv, float* outLiftY, float* outLocalOff) {
+    Actor* actor = (Actor*)actorv;
+    if (actor == nullptr) {
+        return 0;
+    }
+    if (SoH3D::ActorBehavior* b = SoH3D::findActorBehavior(actor->id)) {
+        float lift = 0.0f;
+        Vec3f local = { 0.0f, 0.0f, 0.0f };
+        if (b->drawSpaceTransform(actor, &lift, &local)) {
+            *outLiftY = lift;
+            outLocalOff[0] = local.x;
+            outLocalOff[1] = local.y;
+            outLocalOff[2] = local.z;
             return 1;
         }
     }

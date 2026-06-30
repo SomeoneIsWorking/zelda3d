@@ -96,10 +96,14 @@ bool CompileGlsl(EShLanguage stage, const char* src, std::vector<uint32_t>& spv)
 // buffers in descriptor set 1 and fragment uniform buffers in set 3, with fragment samplers in set
 // 2. The body below is byte-identical to soh3d_vk.cpp's kVert/kFrag; only the set= decorations
 // differ (Vulkan put everything in set 0).
+// Stringify SOH3D_GL_MAX_BONES so the GLSL `uBones[N]` array size has a SINGLE source of truth
+// (the macro in soh3d_gl.h) shared by the shader, the C++ SgUbo struct, and the upload loops below.
+#define SG_STR2(x) #x
+#define SG_STR(x) SG_STR2(x)
 #define SG_UBO_BODY \
     "    mat4 uMP;\n" \
     "    mat4 uMV;\n" \
-    "    mat4 uBones[32];\n" \
+    "    mat4 uBones[" SG_STR(SOH3D_GL_MAX_BONES) "];\n" \
     "    vec4 uLightDir;\n" \
     "    vec4 uParams;\n" \
     "    vec4 uTintSkin;\n" \
@@ -197,7 +201,7 @@ const char* kFrag =
 struct SgUbo {
     float uMP[16];
     float uMV[16];
-    float uBones[32 * 16];
+    float uBones[SOH3D_GL_MAX_BONES * 16];
     float uLightDir[4];
     float uParams[4];
     float uTintSkin[4];
@@ -926,11 +930,11 @@ void recordDepthGroups(std::vector<DepthDraw>& out, int modelId, const float* mp
     base.uMP[8] *= aspectAdj;
     base.uMP[12] *= aspectAdj;
     memcpy(base.uMV, mv16 ? mv16 : mp16, sizeof(base.uMV));
-    for (int k = 0; k < 32; k++)
+    for (int k = 0; k < SOH3D_GL_MAX_BONES; k++)
         for (int e = 0; e < 16; e++)
             base.uBones[k * 16 + e] = (e % 5 == 0) ? 1.0f : 0.0f;
     if (boneData && boneCnt > 0) {
-        int nb = boneCnt < 32 ? boneCnt : 32;
+        int nb = boneCnt < SOH3D_GL_MAX_BONES ? boneCnt : SOH3D_GL_MAX_BONES;
         for (int k = 0; k < nb; k++) {
             const float* s = boneData + k * 16;
             float* d = base.uBones + k * 16;
@@ -1098,13 +1102,13 @@ extern "C" void SoH3D_Sg_DrawModel(int modelId, const float* mp16, const float* 
     base.uMP[8] *= aspectAdj;
     base.uMP[12] *= aspectAdj;
     memcpy(base.uMV, mv16, sizeof(base.uMV));
-    for (int k = 0; k < 32; k++)
+    for (int k = 0; k < SOH3D_GL_MAX_BONES; k++)
         for (int e = 0; e < 16; e++)
             base.uBones[k * 16 + e] = (e % 5 == 0) ? 1.0f : 0.0f;
     if (boneData && boneCnt > 0) {
         // boneData is row-major (M*v). std140 mat4 is column-major with no transpose-on-upload, so
         // transpose CPU-side to match the GL path (which uploads with GL_TRUE transpose).
-        int nb = boneCnt < 32 ? boneCnt : 32;
+        int nb = boneCnt < SOH3D_GL_MAX_BONES ? boneCnt : SOH3D_GL_MAX_BONES;
         for (int k = 0; k < nb; k++) {
             const float* s = boneData + k * 16;
             float* d = base.uBones + k * 16;
@@ -1334,7 +1338,7 @@ extern "C" void SoH3D_Sg_ShadowCasterTris(const float* worldXYZ, size_t triCount
     memcpy(ubo.uMP, lightVP16, sizeof(ubo.uMP));
     static const float kIdentity[16] = { 1, 0, 0, 0, 0, 1, 0, 0, 0, 0, 1, 0, 0, 0, 0, 1 };
     memcpy(ubo.uMV, kIdentity, sizeof(ubo.uMV));
-    for (int k = 0; k < 32; k++)
+    for (int k = 0; k < SOH3D_GL_MAX_BONES; k++)
         for (int e = 0; e < 16; e++)
             ubo.uBones[k * 16 + e] = (e % 5 == 0) ? 1.0f : 0.0f;
     ubo.uParams[0] = 1.0f;   // invertY off
