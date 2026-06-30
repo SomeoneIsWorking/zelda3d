@@ -3,24 +3,24 @@
 > **Generated mirror — do not hand-edit.** Source of truth = GitHub Issues on
 > `SomeoneIsWorking/soh3d` (private). Regenerate with `tools/kanban.py render`.
 > Move a card with `tools/kanban.py mv <#> <column>`; add with `tools/kanban.py add`.
-> Columns: todo · in-progress · in-review · needs-confirmation · reopened · blocked · done(=closed).  Updated 2026-06-25 22:01.
+> Columns: todo · in-progress · in-review · needs-confirmation · reopened · blocked · done(=closed).  Updated 2026-06-25 23:43.
 
-**Counts:** todo:3 | in-progress:3 | in-review:1 | needs-confirmation:21 | reopened:0 | blocked:0 | done:78
+**Counts:** todo:4 | in-progress:2 | in-review:1 | needs-confirmation:23 | reopened:0 | blocked:0 | done:78
 
-## 📋 To Do  (3)
+## 📋 To Do  (4)
 - [#17](../../issues/17) Hi-res world/scene textures (texpack) _(render)_
 - [#33](../../issues/33) More foliage / vegetation density (lowest priority) _(scene)_
 - [#118](../../issues/118) Market (SCENE_MARKET_DAY) parity: crowd NPCs (En_Hy/En_Mu) mis-rendered, door still N64 _(render,scene,behavior)_
+- [#122](../../issues/122) Faithful Boss_Goma per-limb scale overrides (eye-iris open/close + tail extend) in combat states _(render,behavior)_
 
-## 🔨 In Progress  (3)
+## 🔨 In Progress  (2)
 - [#111](../../issues/111) World night R/G too bright — flat tint under-darkens at night (needs vertex-lighting port) _(render)_
 - [#115](../../issues/115) Character/object render-parity gaps: doors, shop props/NPCs, switches still render as N64 (whole-game audit) _(render,scene)_
-- [#120](../../issues/120) Queen Gohma OoT3D model: smooth-skinning geometry defect (stretched limb) _(render,behavior)_
 
 ## 🔍 In Review (agent verifying)  (1)
 - [#112](../../issues/112) START can't skip the final intro segment (Navi flies in / wakes Link) _(render,keyboard)_
 
-## 🙋 Needs User Confirmation  (21)
+## 🙋 Needs User Confirmation  (23)
 - [#12](../../issues/12) Inventory/pause background renders upside-down _(render,ui,inventory)_
 - [#16](../../issues/16) First-person camera: early-load crash + position snap _(camera,crash)_
 - [#18](../../issues/18) Crisp HUD/UI textures (hearts/digits/buttons/icons) _(ui,hud)_
@@ -42,6 +42,8 @@
 - [#116](../../issues/116) Kokiri kids (En_Ko) heads twisted into weird orientations (head-track applies non-physical headRot) _(render,anim)_
 - [#117](../../issues/117) Link (OoT3D) animation parity: walk, walk-stop, pickup (rock/cucco), carry-walk diverge from OoT3D _(anim,behavior)_
 - [#119](../../issues/119) Spirit Temple child Nabooru (En_Nb) lower body collapses into a white blob (skinned retarget mis-poses crossed legs) _(render,anim)_
+- [#120](../../issues/120) Faithfully port OoT3D Boss_Goma (Queen Gohma) from the 3DS decomp _(render,behavior)_
+- [#123](../../issues/123) Queen Gohma floats off the pillars (gap) while climbing _(render,behavior)_
 
 ## ♻️ Reopened (was done, found broken)  (0)
 _none_
