@@ -8,13 +8,14 @@ running engine already computes:
     height) + the measured N64 height + its zar.
   * `geomscan all` — each draw's actual world-space AABB.
 It then cross-checks each replaced object's RENDERED world extent against the object's TRUE extent
-parsed offline from its .zar CMB, and flags anomalies AUTOMATICALLY by two scene-relative signals
+parsed offline from its .zar CMB, and flags anomalies AUTOMATICALLY by room-relative signals
 (so it adapts to any scene instead of a hand-picked absolute threshold):
-  * SCALE OUTLIER — log10(derived scale) is a robust-MAD outlier vs the scene's other replaced
-    objects (a door scaled 13x while everything else scales <1x stands out on its own).
-  * ROOM-SIZED    — the object's rendered extent is a large fraction of the room mesh extent
-    (a prop as big as the room it sits in).
+  * ROOM-SIZED — the object's rendered extent is a large fraction of the room mesh extent
+    (a prop as big as the room it sits in — the Spirit Temple door-burst case).
   * NAN / non-finite render.
+(Detecting UNDER-sized / wrong-but-small objects needs oracle ground truth — a future signal. A
+scale-distribution outlier was tried and removed: the population is dominated by deferred scale=0
+skinned actors, so the statistic is meaningless and flagged correctly-sized props.)
 
 Output is a ranked anomaly report. Exit code 1 if any anomaly is flagged (usable in CI/parity gates).
 
@@ -87,18 +88,6 @@ def parse_geomscan(text, by_model, by_zar):
                 d["rmaxext"] = max(d["rmaxext"], mx)
 
 
-def robust_outliers(vals):
-    """Return per-index modified z-score (MAD based) for a list of values."""
-    n = len(vals)
-    if n < 3:
-        return [0.0] * n
-    s = sorted(vals); med = s[n // 2]
-    devs = sorted(abs(v - med) for v in vals); mad = devs[n // 2]
-    if mad == 0:
-        return [0.0] * n
-    return [0.6745 * (v - med) / mad for v in vals]
-
-
 def main():
     args = sys.argv[1:]
     if not args:
@@ -147,27 +136,22 @@ def main():
         nan = gm.get("nan", False) or gz.get("nan", False)
         rows.append({**a, "offline_ext": off, "rendered_ext": rend, "nan": nan})
 
-    scales = [math.log10(r["scale"]) for r in rows if r["scale"] > 0]
-    zmap = {}
-    if scales:
-        zs = robust_outliers(scales)
-        for r, z in zip([r for r in rows if r["scale"] > 0], zs):
-            zmap[r["model"]] = z
-
+    # Anomaly signals must be ABSOLUTE / room-relative — a scale-distribution outlier is unreliable
+    # here because the population is dominated by deferred scale=0 skinned actors, so a robust-MAD on
+    # the few real scales is meaningless (it flagged correctly-sized torches). The trustworthy signals:
+    #   ROOM-SIZED — a replaced object rendered nearly as large as the room mesh (the door-burst case)
+    #   NAN        — non-finite render
+    # Detecting UNDER-sized / wrong-but-small objects needs oracle ground truth (a future signal).
     for r in rows:
-        z = zmap.get(r["model"], 0.0)
         flags = []
         if r["nan"]:
             flags.append("NAN")
-        if abs(z) > 3.5:
-            flags.append(f"SCALE-OUTLIER(z={z:+.1f})")
         if room_ref and r["rendered_ext"] > 0.6 * room_ref:
             flags.append(f"ROOM-SIZED({r['rendered_ext']:.0f} vs room {room_ref:.0f})")
         r["flags"] = flags
-        r["z"] = z
 
     flagged = [r for r in rows if r["flags"]]
-    flagged.sort(key=lambda r: (-len(r["flags"]), -abs(r["z"]), -r["rendered_ext"]))
+    flagged.sort(key=lambda r: (-len(r["flags"]), -r["rendered_ext"]))
 
     print(f"\n=== geom anomaly sweep: entrance {entrance} ({len(rows)} replaced objects, room ref ext {room_ref:.0f}) ===")
     if not flagged:
