@@ -4768,6 +4768,11 @@ static void SoH3D_ReplExec(PlayState* play, char* line, const char* outPath) {
                         int skin = SoH3D_AutoModelSkinned(SoH3D_AutoModelId(zar));
                         snprintf(buf, sizeof(buf), "AUTO:%s%s", zar, skin ? " (skin)" : "");
                         cov = buf;
+                    } else if (SoH3D_ActorHasBehaviorModule(a->id)) {
+                        // No object->ZAR mapping, but a behaviors/actor/<x>.cpp module REPLACES the
+                        // model (draws a distinct OoT3D CMB, suppressing the N64 draw) — e.g. En_Door,
+                        // En_Fish. NOT an N64 gap; the legacy table/auto path just doesn't see it.
+                        cov = "MODULE(3DS)";
                     } else {
                         nN64++;
                     }
