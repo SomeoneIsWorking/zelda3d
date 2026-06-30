@@ -275,3 +275,19 @@ SDL surface (~40 files) — project is on **SDL2 2.32**, system has **SDL3 3.4.1
     HUD + scene; `p4_sdl3gpu_rmlui.png`. All in ONE unified SDL3 GPU pass.
   - **NOT done here (left for the orchestrator):** P5 fast-forward to `main`. The documented GL-vs-SDL3GPU
     brightness/gamma one-liner residual is untouched, as instructed.
+
+- **P5 DONE (2026-06-30) — merged to `main`; SDL3 GPU is the project's sole renderer.** `main` had advanced
+  with the parallel Gohma work (#120 bone-cap, #123 draw-offset, boss_goma module), so the branches had
+  diverged — a plain fast-forward was impossible. Resolution: merged `main` into `sdl3gpu` (commit
+  `04fe82a`), then fast-forwarded `main` onto it. Conflicts: `soh3d_vk.cpp` (deleted here / modified on
+  main) → kept deleted; `soh3d_gl.cpp` → kept the stripped host. **The #120 bone-cap fix's renderer half
+  lived in the now-deleted `soh3d_vk.cpp`; re-applied in the sole renderer by making the SDL3 GPU shader's
+  `uBones[N]`, the `SgUbo` struct, and the upload loops/clamp all derive from `SOH3D_GL_MAX_BONES` (=64) —
+  a SINGLE source of truth, NO hardcoded 32/64, NO Gohma-specific code in the GPU layer (user directive).**
+  Verified: builds clean in both worktrees, boots headless on SDL3 GPU as default, Kokiri renders, Gohma
+  arena geomscan shows the skinned actor AABB tight (ext 227) — the #120 tube stays fixed.
+- **RmlUi follow-up DONE (2026-06-30, `cdfbadf`) — full-window modal + HiDPI on the SDL3 GPU renderer.**
+  Menu was px-authored, panel capped at 1088x768, density ratio never set → small island + no DPI scaling.
+  Fixed: `ApplyDensityRatio()` syncs the context density ratio to `SDL_GetWindowDisplayScale`; sheet
+  re-authored in `dp`; window max-size caps removed so the panel fills the body content box at any size.
+  Verified headless (ratio 1 vs 2): the dp body inset scales 64→128px and the panel keeps filling.
