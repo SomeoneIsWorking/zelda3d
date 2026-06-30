@@ -141,6 +141,13 @@ constexpr int8_t OTR_G_SOH3D_RENDERPASS = OPCODE(0x4b);
 #endif
 
 /* macros for command parsing: */
+// lus_gbi.h intentionally overrides gbi.h's command-parsing macros: the LUS GIMMCMD expands to
+// `= OPCODE(...)` so it can assign values in the LUS opcode enum, unlike gbi.h's plain expression
+// form. Undef first so this deliberate redefinition doesn't warn (-Wmacro-redefined) when both
+// headers are in scope.
+#undef GDMACMD
+#undef GIMMCMD
+#undef GRDPCMD
 #define GDMACMD(x) (x)
 #define GIMMCMD(x) = OPCODE(G_IMMFIRST - (x))
 #define GRDPCMD(x) (0xff - (x))
