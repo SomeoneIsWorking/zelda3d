@@ -2,39 +2,18 @@ include(FetchContent)
 
 find_package(OpenGL QUIET)
 
-#=================== ImGui ===================
-set(imgui_fixes_and_config_patch_file ${CMAKE_CURRENT_SOURCE_DIR}/cmake/dependencies/patches/imgui-fixes-and-config.patch)
-set(imgui_apply_patch_command ${CMAKE_COMMAND} -Dpatch_file=${imgui_fixes_and_config_patch_file} -Dwith_reset=TRUE -P ${CMAKE_CURRENT_SOURCE_DIR}/cmake/dependencies/git-patch.cmake)
-
-FetchContent_Declare(
-    ImGui
-    GIT_REPOSITORY https://github.com/ocornut/imgui.git
-    GIT_TAG v1.91.9b-docking
-    PATCH_COMMAND ${imgui_apply_patch_command}
+#=================== ImGui (no-op shim) ===================
+# The real Dear ImGui library has been removed from the build. The SoH ImGui dev-tool / menu code is
+# kept in-tree as inert scaffolding to migrate to RmlUi later, so it must still COMPILE and LINK — it
+# is just never rendered (the RmlUi menu is the live UI). To that end we vendor only the ImGui *headers*
+# (imgui_shim/, the patched v1.91.9b headers) and link a no-op stub (imgui_stub.cpp, added to the
+# libultraship target in src/CMakeLists.txt) that provides every referenced ImGui symbol as a no-op.
+# Nothing from upstream imgui (imgui.cpp/draw/tables/widgets/demo or the impl_* backends) is compiled.
+list(APPEND ADDITIONAL_LIB_INCLUDES
+    ${CMAKE_CURRENT_SOURCE_DIR}/imgui_shim
+    ${CMAKE_CURRENT_SOURCE_DIR}/imgui_shim/backends
+    ${CMAKE_CURRENT_SOURCE_DIR}/imgui_shim/misc/cpp
 )
-FetchContent_MakeAvailable(ImGui)
-list(APPEND ADDITIONAL_LIB_INCLUDES ${imgui_SOURCE_DIR} ${imgui_SOURCE_DIR}/backends)
-
-add_library(ImGui STATIC)
-set_property(TARGET ImGui PROPERTY CXX_STANDARD 20)
-
-target_sources(ImGui
-    PRIVATE
-    ${imgui_SOURCE_DIR}/imgui_demo.cpp
-    ${imgui_SOURCE_DIR}/imgui_draw.cpp
-    ${imgui_SOURCE_DIR}/imgui_tables.cpp
-    ${imgui_SOURCE_DIR}/imgui_widgets.cpp
-    ${imgui_SOURCE_DIR}/imgui.cpp
-)
-
-# SDL3-MIGRATION: use the SDL3 imgui backend (imgui v1.91.9b ships imgui_impl_sdl3).
-target_sources(ImGui
-    PRIVATE
-    ${imgui_SOURCE_DIR}/backends/imgui_impl_opengl3.cpp
-    ${imgui_SOURCE_DIR}/backends/imgui_impl_sdl3.cpp
-)
-
-target_include_directories(ImGui PUBLIC ${imgui_SOURCE_DIR} ${imgui_SOURCE_DIR}/backends PRIVATE ${SDL3_INCLUDE_DIRS})
 
 #=================== RmlUi ===================
 # RmlUi provides the HTML/CSS-driven menu (Dusklight-style port). It needs a font
