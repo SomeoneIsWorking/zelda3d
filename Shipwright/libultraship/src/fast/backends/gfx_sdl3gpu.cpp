@@ -32,6 +32,7 @@
 // ============================================================================
 
 #include "fast/backends/gfx_sdl3gpu.h"
+#include "fast/backends/soh3d_sdl3gpu.h" // SoH3DRenderer / SoH3DHudRenderer member subsystems
 #include "fast/backends/gfx_sdl.h"
 #include "fast/interpreter.h"
 #include "ship/Context.h"
@@ -560,6 +561,10 @@ GfxRenderingAPISdl3Gpu::GfxRenderingAPISdl3Gpu(GfxWindowBackendSDL3* windowBacke
 GfxRenderingAPISdl3Gpu::~GfxRenderingAPISdl3Gpu() {
     if (g_activeSdl3GpuApi == this)
         g_activeSdl3GpuApi = nullptr;
+    // Release the folded-in renderer subsystems while the device is still alive (their GPU resources
+    // are owned by the device and freed at SDL_DestroyGPUDevice below — same as before the fold).
+    mSoh3d.reset();
+    mHud.reset();
     if (mDevice == nullptr)
         return;
     if (mVtxMapped) {
@@ -660,6 +665,10 @@ void GfxRenderingAPISdl3Gpu::Init() {
     mFramebuffers.resize(1);
     mFramebuffers[0].renderTarget = true;
     g_activeSdl3GpuApi = this;
+    // Create the folded-in renderer subsystems now that the device is ready and g_activeSdl3GpuApi is
+    // set (their lazy ensureResources() pulls the device through g_activeSdl3GpuApi on first use).
+    mSoh3d = std::make_unique<SoH3DRenderer>();
+    mHud = std::make_unique<SoH3DHudRenderer>();
     SPDLOG_INFO("SDL3 GPU backend initialized (P2: N64 Fast3D world)");
 }
 

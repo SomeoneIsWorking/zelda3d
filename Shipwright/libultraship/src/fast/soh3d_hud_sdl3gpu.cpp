@@ -10,6 +10,7 @@
 
 #include "fast/soh3d_hud_sdl3gpu.h"
 #include "fast/backends/gfx_sdl3gpu.h"
+#include "fast/backends/soh3d_sdl3gpu.h" // Fast::SoH3DHudRenderer (this module's state, folded into the backend)
 
 #include <glslang/Public/ShaderLang.h>
 #include <glslang/Public/ResourceLimits.h>
@@ -53,19 +54,13 @@ void main() {
 }
 )";
 
-struct HudVert {
-    float x, y;
-    uint8_t r, g, b, a;
-    float u, v;
-};
+// HudVert, DrawRun, HudSg and the kMaxQuadsPerFrame/kVertsPerQuad/kRingFrames constants now live in
+// fast/backends/soh3d_sdl3gpu.h (so they can be members of Fast::SoH3DHudRenderer). HudUbo stays here
+// (it is only a local in End()).
 struct HudUbo {
     float viewport[2];
     float pad[2];
 };
-
-constexpr uint32_t kMaxQuadsPerFrame = 2048;
-constexpr uint32_t kVertsPerQuad = 6;
-constexpr uint32_t kRingFrames = 3;
 
 std::once_flag g_glslOnce;
 bool CompileGlsl(EShLanguage stage, const char* src, std::vector<uint32_t>& spv) {
@@ -92,40 +87,13 @@ bool CompileGlsl(EShLanguage stage, const char* src, std::vector<uint32_t>& spv)
     return !spv.empty();
 }
 
-// One contiguous run of quads sharing a texture (a single SDL_DrawGPUPrimitives).
-struct DrawRun {
-    SDL_GPUTexture* tex;
-    uint32_t firstVert, vertCount;
-};
+} // namespace
 
-struct HudSg {
-    SDL_GPUDevice* device = nullptr;
-    bool ready = false;
-    SDL_GPUShader* vs = nullptr;
-    SDL_GPUShader* fs = nullptr;
-    SDL_GPUGraphicsPipeline* pipeline = nullptr;
-    SDL_GPUSampler* sampler = nullptr;
-    SDL_GPUTexture* whiteTex = nullptr;
+// uploadTex / ensureResources and the SgHud_* collector below are now methods of
+// Fast::SoH3DHudRenderer (the former file-global `HudSg g` + `g_idToTex` + `g_nextId` are members).
+namespace Fast {
 
-    // Per-frame vertex ring (host transfer + device vertex buffer).
-    struct Ring {
-        SDL_GPUTransferBuffer* transfer = nullptr;
-        SDL_GPUBuffer* vbo = nullptr;
-    } rings[kRingFrames];
-    uint32_t ringIdx = 0;
-
-    std::unordered_map<const void*, SDL_GPUTexture*> texCache;
-
-    // Collected this frame.
-    bool active = false;
-    int w = 0, h = 0;
-    std::vector<HudVert> verts;
-    std::vector<DrawRun> runs;
-};
-
-HudSg g;
-
-SDL_GPUTexture* uploadTex(const void* rgba, int w, int h) {
+SDL_GPUTexture* SoH3DHudRenderer::uploadTex(const void* rgba, int w, int h) {
     if (w <= 0)
         w = 1;
     if (h <= 0)
@@ -167,7 +135,7 @@ SDL_GPUTexture* uploadTex(const void* rgba, int w, int h) {
     return tex;
 }
 
-bool ensureResources() {
+bool SoH3DHudRenderer::ensureResources() {
     if (g.ready)
         return true;
     GfxRenderingAPISdl3Gpu* api = g_activeSdl3GpuApi;
@@ -266,15 +234,11 @@ bool ensureResources() {
     return true;
 }
 
-} // namespace
-
-namespace Fast {
-
-int SgHud_Available() {
+int SoH3DHudRenderer::Available() {
     return g_activeSdl3GpuApi != nullptr ? 1 : 0;
 }
 
-int SgHud_Begin(int* outW, int* outH) {
+int SoH3DHudRenderer::Begin(int* outW, int* outH) {
     g.active = false;
     GfxRenderingAPISdl3Gpu* api = g_activeSdl3GpuApi;
     if (!api || !api->FrameRecording())
@@ -294,12 +258,9 @@ int SgHud_Begin(int* outW, int* outH) {
     return 1;
 }
 
-// The Draw ABI takes an int id; resolve the texture at Draw time from a per-frame id->tex table.
-// The persistent texCache (keyed by the stable source-RGBA pointer) avoids re-uploading each frame.
-std::unordered_map<int, SDL_GPUTexture*> g_idToTex;
-int g_nextId = 1;
-
-int SgHud_Tex(const void* key, const void* rgba, int w, int h) {
+// g_idToTex (per-frame id->tex table) + g_nextId are members of SoH3DHudRenderer. The persistent
+// texCache (keyed by the stable source-RGBA pointer) avoids re-uploading each frame.
+int SoH3DHudRenderer::Tex(const void* key, const void* rgba, int w, int h) {
     if (!g.active || !key)
         return 0;
     auto it = g.texCache.find(key);
@@ -315,8 +276,8 @@ int SgHud_Tex(const void* key, const void* rgba, int w, int h) {
     return id;
 }
 
-void SgHud_Draw(int tex, float x, float y, float w, float h, float u0, float v0, float u1, float v1,
-                unsigned int tintRGBA) {
+void SoH3DHudRenderer::Draw(int tex, float x, float y, float w, float h, float u0, float v0, float u1, float v1,
+                            unsigned int tintRGBA) {
     if (!g.active)
         return;
     if (g.verts.size() + kVertsPerQuad > kMaxQuadsPerFrame * kVertsPerQuad)
@@ -348,7 +309,7 @@ void SgHud_Draw(int tex, float x, float y, float w, float h, float u0, float v0,
     }
 }
 
-void SgHud_End() {
+void SoH3DHudRenderer::End() {
     GfxRenderingAPISdl3Gpu* api = g_activeSdl3GpuApi;
     if (!g.active || !api) {
         g.active = false;
@@ -420,25 +381,36 @@ void SgHud_End() {
 // libultraship Gui.cpp.
 extern "C" {
 
+// Thin shims forwarding to the SoH3DHudRenderer member subsystem on the live backend (null -> no-op /
+// 0, matching the former FrameRecording/api null guards).
+static inline Fast::SoH3DHudRenderer* hudR() {
+    return Fast::g_activeSdl3GpuApi ? Fast::g_activeSdl3GpuApi->Hud() : nullptr;
+}
+
 int SoH3D_Hud_Available(void) {
-    return Fast::SgHud_Available();
+    auto* r = hudR();
+    return r ? r->Available() : 0;
 }
 
 int SoH3D_Hud_Begin(int* outW, int* outH) {
-    return Fast::SgHud_Begin(outW, outH);
+    auto* r = hudR();
+    return r ? r->Begin(outW, outH) : 0;
 }
 
 int SoH3D_Hud_Tex(const void* key, const void* rgba, int w, int h) {
-    return Fast::SgHud_Tex(key, rgba, w, h);
+    auto* r = hudR();
+    return r ? r->Tex(key, rgba, w, h) : 0;
 }
 
 void SoH3D_Hud_Draw(int tex, float x, float y, float w, float h, float u0, float v0, float u1, float v1,
                     unsigned int tintRGBA) {
-    Fast::SgHud_Draw(tex, x, y, w, h, u0, v0, u1, v1, tintRGBA);
+    if (auto* r = hudR())
+        r->Draw(tex, x, y, w, h, u0, v0, u1, v1, tintRGBA);
 }
 
 void SoH3D_Hud_End(void) {
-    Fast::SgHud_End();
+    if (auto* r = hudR())
+        r->End();
 }
 
 void SoH3D_Hud_Shutdown(void) {
