@@ -26,8 +26,13 @@
 #include <cmath>
 #include <mutex>
 
+#include "fast/soh3d_sg_ubo.h" // SgUbo layout + push-block size invariants (single source of truth)
+
 using Fast::GfxRenderingAPISdl3Gpu;
 using Fast::g_activeSdl3GpuApi;
+using SoH3DSg::SgUbo;
+constexpr uint32_t kSgCommonBytes = SoH3DSg::kCommonBytes;
+constexpr uint32_t kSgBonesBytes = SoH3DSg::kBonesBytes;
 
 // ---- Shared scene/light/effect globals (owned by soh3d_gl.cpp, set per frame by soh3d.c) ----
 extern "C" float gSoH3dLightDirWorld[3];
@@ -41,6 +46,14 @@ extern "C" float gSoH3dFogOffset;
 extern "C" float gSoH3dWorldAmbColor[3];
 extern "C" float gSoH3dWorldAmb;
 extern "C" int gSoH3dWorldLit;
+// REPL `sgdump <modelId>`: arm a one-shot per-group render-state dump for the next draw of that model.
+extern "C" int g_sgDumpModel = -1;
+// SOH3D_SG_DUMPTEX=<modelId>: at that model's upload, log each source texture's mean RGBA (catches a
+// black/failed texture decode, which uploads happen at scene-load before the REPL can arm sgdump).
+static int g_sgDumpTexModel = []() {
+    const char* v = getenv("SOH3D_SG_DUMPTEX");
+    return v ? atoi(v) : -1;
+}();
 extern "C" int gSoH3dHlGroup;
 // Dynamic sun-shadow + screen-space AO tunables (M4), owned by soh3d_gl.cpp; driven by the REPL
 // `shadow`/`ao` + RmlUi Graphics menu. The dispatcher (soh3d_gl.cpp) resolves the master enables
@@ -100,10 +113,15 @@ bool CompileGlsl(EShLanguage stage, const char* src, std::vector<uint32_t>& spv)
 // (the macro in soh3d_gl.h) shared by the shader, the C++ SgUbo struct, and the upload loops below.
 #define SG_STR2(x) #x
 #define SG_STR(x) SG_STR2(x)
-#define SG_UBO_BODY \
+// The UBO is pushed in TWO blocks because SDL3 GPU's Vulkan backend binds each pushed uniform block
+// with a descriptor range capped at MAX_UBO_SECTION_SIZE = 4096 bytes (SDL_gpu_vulkan.c): any field
+// past offset 4096 reads OUTSIDE the bound range -> 0. The 64-bone array alone is 4096 bytes, so a
+// single combined block (4416 B) silently zeroed uLightDir/uParams/uTintSkin/... -> black scene +
+// T-posed (skin-enable lives in uTintSkin.w). SG_UBO_COMMON_BODY (the small per-draw state, ~320 B)
+// is bound at binding 0 for both stages; the bone matrices go in their own block at vertex binding 1.
+#define SG_UBO_COMMON_BODY \
     "    mat4 uMP;\n" \
     "    mat4 uMV;\n" \
-    "    mat4 uBones[" SG_STR(SOH3D_GL_MAX_BONES) "];\n" \
     "    vec4 uLightDir;\n" \
     "    vec4 uParams;\n" \
     "    vec4 uTintSkin;\n" \
@@ -113,6 +131,8 @@ bool CompileGlsl(EShLanguage stage, const char* src, std::vector<uint32_t>& spv)
     "    vec4 uFog;\n" \
     "    vec4 uFog2;\n" \
     "    vec4 uAmbient;\n"
+#define SG_UBO_BONES_BODY \
+    "    mat4 uBones[" SG_STR(SOH3D_GL_MAX_BONES) "];\n"
 
 const char* kVert =
     "#version 450\n"
@@ -127,15 +147,16 @@ const char* kVert =
     "layout(location=2) out vec3 vNrmView;\n"
     "layout(location=3) out vec3 vWorld;\n"
     "layout(location=4) out float vFogDist;\n"
-    "layout(set=1, binding=0, std140) uniform UBO {\n" SG_UBO_BODY "} ubo;\n"
+    "layout(set=1, binding=0, std140) uniform UBO {\n" SG_UBO_COMMON_BODY "} ubo;\n"
+    "layout(set=1, binding=1, std140) uniform UBOBones {\n" SG_UBO_BONES_BODY "} bones;\n"
     "void main() {\n"
     "    vColor = aColor;\n"
     "    vec3 sp, nM;\n"
     "    if (ubo.uTintSkin.w > 0.5) {\n"
     "        vec4 acc = vec4(0.0); nM = vec3(0.0);\n"
     "        for (int i = 0; i < 4; i++) {\n"
-    "            acc += aBoneW[i] * (ubo.uBones[int(aBoneId[i])] * vec4(aPos, 1.0));\n"
-    "            nM  += aBoneW[i] * (mat3(ubo.uBones[int(aBoneId[i])]) * aNrm);\n"
+    "            acc += aBoneW[i] * (bones.uBones[int(aBoneId[i])] * vec4(aPos, 1.0));\n"
+    "            nM  += aBoneW[i] * (mat3(bones.uBones[int(aBoneId[i])]) * aNrm);\n"
     "        }\n"
     "        sp = acc.xyz;\n"
     "    } else { sp = aPos; nM = aNrm; }\n"
@@ -158,7 +179,7 @@ const char* kFrag =
     "layout(location=3) in vec3 vWorld;\n"
     "layout(location=4) in float vFogDist;\n"
     "layout(location=0) out vec4 frag;\n"
-    "layout(set=3, binding=0, std140) uniform UBO {\n" SG_UBO_BODY "} ubo;\n"
+    "layout(set=3, binding=0, std140) uniform UBO {\n" SG_UBO_COMMON_BODY "} ubo;\n"
     "layout(set=2, binding=0) uniform sampler2D uTex;\n"
     "layout(set=2, binding=1) uniform sampler2D uShadowMap;\n"
     "float shadowLit() {\n"
@@ -197,21 +218,8 @@ const char* kFrag =
     "    frag = vec4(rgb, t.a * vColor.a * ubo.uExtra.x);\n"
     "}\n";
 
-// std140 UBO layout matching the shader block (identical to soh3d_vk.cpp VkUbo).
-struct SgUbo {
-    float uMP[16];
-    float uMV[16];
-    float uBones[SOH3D_GL_MAX_BONES * 16];
-    float uLightDir[4];
-    float uParams[4];
-    float uTintSkin[4];
-    float uExtra[4];
-    float uLightVP[16];
-    float uShadow[4];
-    float uFog[4];
-    float uFog2[4];
-    float uAmbient[4];
-};
+// SgUbo, kSgCommonBytes, kSgBonesBytes and the <=4096-byte push-block invariants live in
+// fast/soh3d_sg_ubo.h (single source of truth; unit-tested in tests/soh3d_render_tests.cpp).
 
 struct SgGroup {
     uint32_t first = 0, count = 0;
@@ -232,6 +240,8 @@ struct SgGroup {
     float combScaleRGB = 1.0f;
     float matAmbient[3] = { 1.0f, 1.0f, 1.0f };
     float matDiffuse[3] = { 1.0f, 1.0f, 1.0f };
+    float dbgColor0[4] = { -1, -1, -1, -1 }; // sample of vertex[first].color (sgdump diagnostics)
+    float dbgUv0[2] = { 0, 0 }, dbgUv1[2] = { 0, 0 }, dbgUv2[2] = { 0, 0 }; // sample uvs (sgdump)
 };
 
 struct SgModel {
@@ -299,6 +309,11 @@ SDL_GPUSampler* getSampler(unsigned wrapS, unsigned wrapT) {
     si.min_filter = SDL_GPU_FILTER_LINEAR;
     si.mag_filter = SDL_GPU_FILTER_LINEAR;
     si.mipmap_mode = SDL_GPU_SAMPLERMIPMAPMODE_NEAREST;
+    // max_lod must cover the texture's LOD range. Left at its zero-init default, a LINEAR-minified
+    // large texture (e.g. the 2048² Kokiri ground) computes an LOD > 0 that clamps against max_lod=0
+    // and samples nothing -> the surface renders BLACK. Only large/minified textures hit it (small
+    // ones stay at LOD 0), which is why the terrain vanished but props/sky did not.
+    si.max_lod = 1000.0f;
     si.address_mode_u = wrapMode(wrapS);
     si.address_mode_v = wrapMode(wrapT);
     si.address_mode_w = SDL_GPU_SAMPLERADDRESSMODE_REPEAT;
@@ -348,6 +363,8 @@ SDL_GPUTexture* uploadTexture(int w, int h, const unsigned char* rgba) {
     ci.layer_count_or_depth = 1;
     ci.num_levels = 1;
     SDL_GPUTexture* tex = SDL_CreateGPUTexture(g_device, &ci);
+    if (!tex)
+        fprintf(stderr, "[SoH3D_SG] CreateGPUTexture %dx%d FAILED: %s\n", w, h, SDL_GetError());
 
     const uint32_t size = (uint32_t)w * h * 4;
     static const unsigned char white[4] = { 255, 255, 255, 255 };
@@ -355,7 +372,13 @@ SDL_GPUTexture* uploadTexture(int w, int h, const unsigned char* rgba) {
     tci.usage = SDL_GPU_TRANSFERBUFFERUSAGE_UPLOAD;
     tci.size = rgba ? size : 4;
     SDL_GPUTransferBuffer* tb = SDL_CreateGPUTransferBuffer(g_device, &tci);
+    if (!tb)
+        fprintf(stderr, "[SoH3D_SG] CreateTransferBuffer %u bytes (%dx%d) FAILED: %s\n", tci.size, w, h,
+                SDL_GetError());
     void* mapped = SDL_MapGPUTransferBuffer(g_device, tb, false);
+    if (!mapped)
+        fprintf(stderr, "[SoH3D_SG] MapTransferBuffer %u bytes (%dx%d) FAILED: %s\n", tci.size, w, h,
+                SDL_GetError());
     memcpy(mapped, rgba ? rgba : white, rgba ? size : 4);
     SDL_UnmapGPUTransferBuffer(g_device, tb);
     SDL_GPUCommandBuffer* c = SDL_AcquireGPUCommandBuffer(g_device);
@@ -386,8 +409,29 @@ bool ensureResources() {
     if (!g_device)
         return false;
 
+    // SOH3D_SG_FRAGDBG=<1..4>: replace the combiner with an isolated stage so a black/missing draw is
+    // diagnosed by VALUE — 1=texture only, 2=vertex colour only, 3=solid white, 4=shade(lighting) only.
+    // Applied to EVERY SoH3D draw unconditionally (unlike a per-draw uniform gate), so the readback is
+    // trustworthy. Measure the result with the REPL `region` tool, not by eye.
+    std::string fragSrc = kFrag;
+    if (const char* dbg = getenv("SOH3D_SG_FRAGDBG")) {
+        const std::string anchor = "vec3 rgb = t.rgb * vColor.rgb * shade;\n";
+        const int mode = atoi(dbg);
+        // Return IMMEDIATELY so the override bypasses the later combiner/ambient/FOG stages — otherwise
+        // the fog mix (fog colour ~= the scene tan) repaints the probe and hides what we're isolating.
+        const char* inject = mode == 1 ? "frag = vec4(t.rgb, 1.0); return;\n"
+                             : mode == 2 ? "frag = vec4(vColor.rgb, 1.0); return;\n"
+                             : mode == 3 ? "frag = vec4(1.0); return;\n"
+                             : mode == 4 ? "frag = vec4(shade, 1.0); return;\n"
+                                         : "";
+        size_t p = fragSrc.find(anchor);
+        if (p != std::string::npos)
+            fragSrc.insert(p + anchor.size(), inject);
+        fprintf(stderr, "[SoH3D_SG] FRAGDBG mode=%d active\n", mode);
+    }
+
     std::vector<uint32_t> vsSpv, fsSpv;
-    if (!CompileGlsl(EShLangVertex, kVert, vsSpv) || !CompileGlsl(EShLangFragment, kFrag, fsSpv))
+    if (!CompileGlsl(EShLangVertex, kVert, vsSpv) || !CompileGlsl(EShLangFragment, fragSrc.c_str(), fsSpv))
         return false;
 
     SDL_GPUShaderCreateInfo vci{};
@@ -537,6 +581,16 @@ SgModel* ensureUploaded(int modelId) {
             g.matAmbient[k] = groups[i].matAmbient[k];
             g.matDiffuse[k] = groups[i].matDiffuse[k];
         }
+        if (groups[i].vertCount > 0) {
+            for (int k = 0; k < 4; k++)
+                g.dbgColor0[k] = groups[i].verts[0].color[k];
+            uint32_t vc = groups[i].vertCount;
+            for (int k = 0; k < 2; k++) {
+                g.dbgUv0[k] = groups[i].verts[0].uv[k];
+                g.dbgUv1[k] = groups[i].verts[vc / 2].uv[k];
+                g.dbgUv2[k] = groups[i].verts[vc - 1].uv[k];
+            }
+        }
         all.insert(all.end(), groups[i].verts, groups[i].verts + groups[i].vertCount);
         m.groups.push_back(g);
     }
@@ -580,8 +634,52 @@ SgModel* ensureUploaded(int modelId) {
         SDL_ReleaseGPUTransferBuffer(g_device, tb);
     }
 
-    for (int i = 0; i < texCount; i++)
+    for (int i = 0; i < texCount; i++) {
         m.textures.push_back(uploadTexture(texs[i].w, texs[i].h, texs[i].rgba));
+        if (modelId == g_sgDumpModel || g_sgDumpTexModel == modelId) {
+            // Mean RGBA of the source texels (sgdump diagnostics: is the texture itself black?).
+            const unsigned char* px = texs[i].rgba;
+            long n = (long)texs[i].w * texs[i].h, sr = 0, sg = 0, sb = 0, sa = 0;
+            if (px && n > 0)
+                for (long p = 0; p < n; p++) {
+                    sr += px[p * 4 + 0]; sg += px[p * 4 + 1]; sb += px[p * 4 + 2]; sa += px[p * 4 + 3];
+                }
+            // GPU readback of the just-uploaded texture: copy it to a download transfer buffer, wait,
+            // map, and mean it. If this differs from srcMean, the UPLOAD is broken (not the sample).
+            long gr = -1, gg = -1, gb = -1, ga = -1;
+            SDL_GPUTexture* gtex = m.textures.back();
+            if (gtex && n > 0) {
+                SDL_GPUTransferBufferCreateInfo dci{};
+                dci.usage = SDL_GPU_TRANSFERBUFFERUSAGE_DOWNLOAD;
+                dci.size = (uint32_t)(n * 4);
+                SDL_GPUTransferBuffer* dl = SDL_CreateGPUTransferBuffer(g_device, &dci);
+                SDL_GPUCommandBuffer* dc = SDL_AcquireGPUCommandBuffer(g_device);
+                SDL_GPUCopyPass* dcp = SDL_BeginGPUCopyPass(dc);
+                SDL_GPUTextureRegion dreg{};
+                dreg.texture = gtex; dreg.w = texs[i].w; dreg.h = texs[i].h; dreg.d = 1;
+                SDL_GPUTextureTransferInfo dti{};
+                dti.transfer_buffer = dl; dti.pixels_per_row = texs[i].w; dti.rows_per_layer = texs[i].h;
+                SDL_DownloadFromGPUTexture(dcp, &dreg, &dti);
+                SDL_EndGPUCopyPass(dcp);
+                SDL_GPUFence* f = SDL_SubmitGPUCommandBufferAndAcquireFence(dc);
+                if (f) { SDL_WaitForGPUFences(g_device, true, &f, 1); SDL_ReleaseGPUFence(g_device, f); }
+                const unsigned char* gp = (const unsigned char*)SDL_MapGPUTransferBuffer(g_device, dl, false);
+                if (gp) {
+                    long r2 = 0, g2 = 0, b2 = 0, a2 = 0;
+                    for (long p = 0; p < n; p++) {
+                        r2 += gp[p * 4 + 0]; g2 += gp[p * 4 + 1]; b2 += gp[p * 4 + 2]; a2 += gp[p * 4 + 3];
+                    }
+                    gr = r2 / n; gg = g2 / n; gb = b2 / n; ga = a2 / n;
+                    SDL_UnmapGPUTransferBuffer(g_device, dl);
+                }
+                SDL_ReleaseGPUTransferBuffer(g_device, dl);
+            }
+            fprintf(stderr,
+                    "[SG_DUMP] tex%-2d %dx%d srcMeanRGBA=(%ld,%ld,%ld,%ld) gpuMeanRGBA=(%ld,%ld,%ld,%ld) %s\n",
+                    i, texs[i].w, texs[i].h, n ? sr / n : -1, n ? sg / n : -1, n ? sb / n : -1,
+                    n ? sa / n : -1, gr, gg, gb, ga, px ? "" : "(null rgba!)");
+        }
+    }
 
     m.uploaded = true;
     fprintf(stderr, "[SoH3D_SG] uploaded model %d: %d groups, %d textures, %zu verts\n", modelId, groupCount,
@@ -645,7 +743,7 @@ const char* kDepthFrag =
     "#version 450\n"
     "layout(location=0) in vec2 vUv;\n"
     "layout(location=0) out vec4 outColor;\n"
-    "layout(set=3, binding=0, std140) uniform UBO {\n" SG_UBO_BODY "} ubo;\n"
+    "layout(set=3, binding=0, std140) uniform UBO {\n" SG_UBO_COMMON_BODY "} ubo;\n"
     "layout(set=2, binding=0) uniform sampler2D uTex;\n"
     "void main() {\n"
     "    if (texture(uTex, vUv).a < ubo.uParams.z) discard;\n"
@@ -945,7 +1043,9 @@ void recordDepthGroups(std::vector<DepthDraw>& out, int modelId, const float* mp
     }
     base.uParams[0] = invertY ? -1.0f : 1.0f;
     base.uTintSkin[3] = (boneData && boneCnt > 0) ? 1.0f : 0.0f;
-    int frontCW = (invertY != 0) ^ (gSoH3dFaceCullFlip != 0);
+    // OoT3D winds its front faces CCW; SDL3 GPU never inverts clip-Y (invertY is always 0 here), so
+    // the old `invertY ^ flip` term is dead. Front-face = CCW unless gSoH3dFaceCullFlip is set.
+    int frontCW = SoH3DSg::FrontFaceIsCW(gSoH3dFaceCullFlip) ? 1 : 0;
     for (const SgGroup& grp : m->groups) {
         if (grp.cull)
             continue;
@@ -995,8 +1095,11 @@ void replayDepthPass(SDL_GPUCommandBuffer* cmd, SDL_GPUTexture* color, SDL_GPUTe
         if (!d.pipeline || !d.vbo)
             continue;
         SDL_BindGPUGraphicsPipeline(pass, d.pipeline);
-        SDL_PushGPUVertexUniformData(cmd, 0, d.ubo.data(), (uint32_t)d.ubo.size());
-        SDL_PushGPUFragmentUniformData(cmd, 0, d.ubo.data(), (uint32_t)d.ubo.size());
+        // Two-block push (see the SG_UBO_COMMON_BODY comment): common state at binding 0 (both stages), bones at vertex
+        // binding 1. The depth vertex shader is kVert, so it needs the bone block too.
+        SDL_PushGPUVertexUniformData(cmd, 0, d.ubo.data(), kSgCommonBytes);
+        SDL_PushGPUFragmentUniformData(cmd, 0, d.ubo.data(), kSgCommonBytes);
+        SDL_PushGPUVertexUniformData(cmd, 1, d.ubo.data() + kSgCommonBytes, kSgBonesBytes);
         SDL_GPUBufferBinding vb{};
         vb.buffer = d.vbo;
         vb.offset = 0;
@@ -1094,6 +1197,37 @@ extern "C" void SoH3D_Sg_DrawModel(int modelId, const float* mp16, const float* 
 
     GfxRenderingAPISdl3Gpu* api = g_activeSdl3GpuApi;
 
+    // RenderDoc-style per-draw inspection (REPL `sgdump <modelId>`): one-shot dump of every material
+    // group's render state for one model, so a missing/invisible group is diagnosed by VALUE (which
+    // state — alpha test, blend, cull, texture binding — kills it) instead of eyeballing the frame.
+    if (modelId == g_sgDumpModel) {
+        g_sgDumpModel = -1; // one-shot
+        fprintf(stderr,
+                "[SG_DUMP] model=%d groups=%zu lit=%d invertY=%d tint=(%u,%u,%u) a=%u aspectAdj=%.4f "
+                "sky=%d worldLit=%d worldAmb=%.3f ambColor=(%.2f,%.2f,%.2f) fogOn=%d\n",
+                modelId, m->groups.size(), lit, invertY, r8, g8, b8, a8, aspectAdj, sky, gSoH3dWorldLit,
+                gSoH3dWorldAmb, gSoH3dWorldAmbColor[0], gSoH3dWorldAmbColor[1], gSoH3dWorldAmbColor[2],
+                gSoH3dFogEnable);
+        int gi = -1;
+        for (const SgGroup& grp : m->groups) {
+            gi++;
+            const bool hasTex =
+                grp.texIndex >= 0 && grp.texIndex < (int)m->textures.size() && m->textures[grp.texIndex];
+            fprintf(stderr,
+                    "[SG_DUMP]  g%-2d cull=%d faceCull=%d meshId=%d tex=%d%s mat=%d vtxLit=%d combScale=%.3f "
+                    "blend=%d(src=%#06x dst=%#06x) aTest=%d aRef=%.3f depthW=%d polyOff=%.4f first=%u count=%u "
+                    "vColor0=(%.3f,%.3f,%.3f,%.3f) matAmb=(%.2f,%.2f,%.2f) matDif=(%.2f,%.2f,%.2f) "
+                    "uv=[(%.2f,%.2f)(%.2f,%.2f)(%.2f,%.2f)] wrap=(%#06x,%#06x)\n",
+                    gi, grp.cull, grp.faceCull, grp.meshId, grp.texIndex, hasTex ? "" : "(MISSING->dummy)",
+                    grp.materialIndex, grp.vertexLighting, grp.combScaleRGB, grp.blendEnable, grp.bSrcRGB,
+                    grp.bDstRGB, grp.alphaTest, grp.alphaRef, grp.depthWrite, grp.polygonOffset, grp.first,
+                    grp.count, grp.dbgColor0[0], grp.dbgColor0[1], grp.dbgColor0[2], grp.dbgColor0[3],
+                    grp.matAmbient[0], grp.matAmbient[1], grp.matAmbient[2], grp.matDiffuse[0],
+                    grp.matDiffuse[1], grp.matDiffuse[2], grp.dbgUv0[0], grp.dbgUv0[1], grp.dbgUv1[0],
+                    grp.dbgUv1[1], grp.dbgUv2[0], grp.dbgUv2[1], grp.wrapS, grp.wrapT);
+        }
+    }
+
     // Base UBO shared by all groups (per-group alphaRef/depthOffset/etc. patched below).
     SgUbo base{};
     memcpy(base.uMP, mp16, sizeof(base.uMP));
@@ -1153,7 +1287,9 @@ extern "C" void SoH3D_Sg_DrawModel(int modelId, const float* mp16, const float* 
     bool forceBlend = (a8 < 255);
 
     bool roomHl = (gSoH3dHlGroup >= 0 && m->groups.size() > 20);
-    int frontCW = (invertY != 0) ^ (gSoH3dFaceCullFlip != 0);
+    // OoT3D winds its front faces CCW; SDL3 GPU never inverts clip-Y (invertY is always 0 here), so
+    // the old `invertY ^ flip` term is dead. Front-face = CCW unless gSoH3dFaceCullFlip is set.
+    int frontCW = SoH3DSg::FrontFaceIsCW(gSoH3dFaceCullFlip) ? 1 : 0;
 
     std::vector<DrawGroup> dgs;
     dgs.reserve(m->groups.size());
@@ -1237,8 +1373,11 @@ extern "C" void SoH3D_Sg_DrawModel(int modelId, const float* mp16, const float* 
         SDL_BindGPUVertexBuffers(pass, 0, &vb, 1);
         for (const DrawGroup& g : dgs) {
             SDL_BindGPUGraphicsPipeline(pass, g.pipeline);
-            SDL_PushGPUVertexUniformData(cmd, 0, g.ubo.data(), (uint32_t)g.ubo.size());
-            SDL_PushGPUFragmentUniformData(cmd, 0, g.ubo.data(), (uint32_t)g.ubo.size());
+            // Two-block push (see the SG_UBO_COMMON_BODY comment): common state at binding 0 (both stages), bone
+            // matrices at vertex binding 1 — neither block may exceed SDL3 GPU's 4096-byte cap.
+            SDL_PushGPUVertexUniformData(cmd, 0, g.ubo.data(), kSgCommonBytes);
+            SDL_PushGPUFragmentUniformData(cmd, 0, g.ubo.data(), kSgCommonBytes);
+            SDL_PushGPUVertexUniformData(cmd, 1, g.ubo.data() + kSgCommonBytes, kSgBonesBytes);
             SDL_GPUTextureSamplerBinding sb[2]{};
             sb[0].texture = g.tex;
             sb[0].sampler = g.samp;

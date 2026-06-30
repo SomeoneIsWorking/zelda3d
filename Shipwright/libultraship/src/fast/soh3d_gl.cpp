@@ -339,13 +339,12 @@ extern "C" float gSoH3dAoMaxDiff = 0.0090f;  // depth delta beyond which a neigh
 // backend's clip-Y handling; exposed so the correct convention is found empirically without
 // a rebuild — see REPL `facecull`). Shared with the Vulkan backend (soh3d_vk.cpp).
 extern "C" int gSoH3dFaceCull = -1;
-// Front-face winding: the asset winds front faces CCW from the geometric normal, but the
-// renders go through the clip.y negation (invertY) so the window-space winding the rasterizer
-// sees is flipped. frontCW = invertY ^ flip; flip=1 is the VERIFIED-correct convention on
-// Vulkan (the headless + user backend): camera under Hyrule Field terrain culls the underside
-// (matches N64), normal view keeps terrain + sky dome. Both backends share the invertY term, so
-// this default holds for GL too (its screen invertY differs, which the XOR accounts for).
-extern "C" int gSoH3dFaceCullFlip = 1;
+// Front-face winding: the asset winds front faces CCW from the geometric normal. The sole backend
+// (SDL3 GPU) renders fb0 WITHOUT a clip-Y negation (invertY==0), so the window-space winding is the
+// asset's CCW directly: front-face = CCW, i.e. flip=0. (The old default flip=1 was correct only on
+// the removed Vulkan backend, whose invertY==1 XOR'd it back to CCW.) Exposed via REPL `facecull`
+// so the convention can still be flipped empirically without a rebuild.
+extern "C" int gSoH3dFaceCullFlip = 0;
 extern "C" int gSoH3dHlGroup; // #29 room-group highlight (defined in soh3d.c; REPL `hlroom`)
 static int faceCullOn() {
     if (gSoH3dFaceCull < 0) {
