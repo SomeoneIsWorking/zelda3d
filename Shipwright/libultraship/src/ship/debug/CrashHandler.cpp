@@ -72,7 +72,8 @@ void CrashHandler::PrintCommon() {
     SPDLOG_CRITICAL(mOutBuffer.get());
 }
 
-#if defined(__linux__) && !defined(__ANDROID__)
+#if (defined(__linux__) && !defined(__ANDROID__)) || defined(__APPLE__)
+#if defined(__linux__)
 void CrashHandler::PrintRegisters(ucontext_t* ctx) {
     char regbuffer[30];
     AppendLine("Registers:");
@@ -136,6 +137,7 @@ void CrashHandler::PrintRegisters(ucontext_t* ctx) {
     AppendLine(regbuffer);
 #endif
 }
+#endif // __linux__ (PrintRegisters: glibc register dump; macOS uses backtrace only)
 
 static void ErrorHandler(int sig, siginfo_t* sigInfo, void* data) {
     // Guard against re-entry: this handler itself allocates (backtrace_symbols, demangle, strings),
@@ -173,7 +175,6 @@ static void ErrorHandler(int sig, siginfo_t* sigInfo, void* data) {
     char intToCharBuffer[16];
 
     std::array<void*, 4096> arr;
-    ucontext_t* ctx = static_cast<ucontext_t*>(data);
     constexpr size_t nMaxFrames = arr.size();
     size_t size = backtrace(arr.data(), nMaxFrames);
     char** symbols = backtrace_symbols(arr.data(), nMaxFrames);
@@ -196,7 +197,13 @@ static void ErrorHandler(int sig, siginfo_t* sigInfo, void* data) {
             break;
     }
 
-    crashHandler->PrintRegisters(ctx);
+    // macOS deprecates ucontext and its signal-handler register state is unreliable, so we skip the
+    // register dump there; the symbolized backtrace below is the actionable part. Linux dumps registers.
+#if defined(__linux__)
+    crashHandler->PrintRegisters(static_cast<ucontext_t*>(data));
+#else
+    (void)data;
+#endif
 
     crashHandler->AppendLine("Traceback:");
     for (size_t i = 1; i < size; i++) {
@@ -205,7 +212,6 @@ static void ErrorHandler(int sig, siginfo_t* sigInfo, void* data) {
         std::string functionName(symbols[i]);
 
         if (gotAddress != 0 && info.dli_sname != nullptr) {
-            FILE* pipe;
             int32_t status;
             char* demangled = abi::__cxa_demangle(info.dli_sname, nullptr, nullptr, &status);
             const char* nameFound = info.dli_sname;
@@ -458,7 +464,7 @@ extern "C" LONG WINAPI seh_filter(PEXCEPTION_POINTERS ex) {
 #endif
 
 CrashHandler::CrashHandler() : mOutBuffer(std::make_unique<char[]>(gMaxBufferSize)) {
-#if defined(__linux__) && !defined(__ANDROID__)
+#if (defined(__linux__) && !defined(__ANDROID__)) || defined(__APPLE__)
     struct sigaction action = { 0 };
     struct sigaction shutdownAction = { 0 };
 

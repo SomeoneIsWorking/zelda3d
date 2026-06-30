@@ -3,7 +3,7 @@
 #include <cstddef>
 #include <memory>
 
-#if (__linux__)
+#if defined(__linux__) || defined(__APPLE__)
 #include <csignal>
 #include <cstdio>
 #include <cxxabi.h> // for __cxa_demangle
