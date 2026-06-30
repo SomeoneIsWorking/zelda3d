@@ -693,7 +693,7 @@ void GfxRenderingAPISdl3Gpu::StartFrame() {
 
     mFrameCount++;
     mOps.clear();
-    mSoh3dDraws.clear();
+    mSoh3dModelUbos.clear();
     mVtxUsed = 0;
     mVtxMapped = (uint8_t*)SDL_MapGPUTransferBuffer(mDevice, mVtxTransfer, true /*cycle*/);
 
@@ -832,13 +832,10 @@ void GfxRenderingAPISdl3Gpu::ReplayOps(SDL_GPUTexture* presentTex, uint32_t pres
                 // logging, no behaviour change.
                 static const bool kDbgOpDraw = getenv("SOH3D_DBG_OPDRAW") != nullptr;
                 if (kDbgOpDraw) {
-                    if (op.soh3dDrawIdx >= 0) {
-                        const Soh3dDrawData& d = mSoh3dDraws[op.soh3dDrawIdx];
-                        fprintf(stderr, "[DBG_OPDRAW] fb=%d pipe=%p soh3d#%d vbo=%p first=%u count=%u nSamp=%u", op.fb,
-                                (void*)op.pipeline, op.soh3dDrawIdx, (void*)d.vbo, d.first, d.count, op.numSamplers);
-                    } else
-                        fprintf(stderr, "[DBG_OPDRAW] fb=%d pipe=%p nVerts=%u vboOff=%u nSamp=%u", op.fb,
-                                (void*)op.pipeline, op.numVerts, op.vboOffset, op.numSamplers);
+                    static const char* kClass[] = { "n64", "model", "hud" };
+                    fprintf(stderr, "[DBG_OPDRAW] fb=%d cls=%s pipe=%p nVerts=%u first=%u vbo=%p nSamp=%u", op.fb,
+                            kClass[op.drawClass], (void*)op.pipeline, op.numVerts, op.firstVertex,
+                            (void*)(op.altVbo ? op.altVbo : mVbo), op.numSamplers);
                     for (uint32_t si = 0; si < op.numSamplers; si++)
                         fprintf(stderr, " [%u tex=%p samp=%p]", si, (void*)op.samplers[si].texture,
                                 (void*)op.samplers[si].sampler);
@@ -848,32 +845,31 @@ void GfxRenderingAPISdl3Gpu::ReplayOps(SDL_GPUTexture* presentTex, uint32_t pres
                 SDL_BindGPUGraphicsPipeline(pass, op.pipeline);
                 SDL_SetGPUViewport(pass, &op.viewport);
                 SDL_SetGPUScissor(pass, &op.scissor);
-                // The uniform-push pattern + vertex source differ between N64 and SoH3D skinned draws;
-                // everything below (vertex-buffer bind, the single fragment-sampler bind path, the
-                // draw) is shared. firstVtx/vtxCount/vbuf/voff are resolved here per draw kind.
-                SDL_GPUBuffer* vbuf;
-                uint32_t voff, firstVtx, vtxCount;
-                if (op.soh3dDrawIdx >= 0) {
-                    const Soh3dDrawData& d = mSoh3dDraws[op.soh3dDrawIdx];
-                    // Two-block push: common state at binding 0 (both stages), bone matrices at vertex
-                    // binding 1 — neither block may exceed SDL3 GPU's 4096-byte cap (see soh3d_sg_ubo.h).
-                    SDL_PushGPUVertexUniformData(mCmd, 0, d.ubo.data(), SoH3DSg::kCommonBytes);
-                    SDL_PushGPUFragmentUniformData(mCmd, 0, d.ubo.data(), SoH3DSg::kCommonBytes);
-                    SDL_PushGPUVertexUniformData(mCmd, 1, d.ubo.data() + SoH3DSg::kCommonBytes, SoH3DSg::kBonesBytes);
-                    vbuf = d.vbo;
-                    voff = 0;
-                    firstVtx = d.first;
-                    vtxCount = d.count;
-                } else {
-                    SDL_PushGPUFragmentUniformData(mCmd, 0, op.ubo, sizeof(SgUboData));
-                    vbuf = mVbo;
-                    voff = op.vboOffset;
-                    firstVtx = 0;
-                    vtxCount = op.numVerts;
+                // Only the uniform push differs across the three draw classes (the vertex layout is
+                // baked into op.pipeline). The vertex-buffer bind, the single fragment-sampler bind
+                // path below, and the draw are shared. altVbo != null selects the SoH3D model / HUD
+                // buffer (offset 0); null falls back to the shared frame mVbo at vboOffset (N64).
+                switch (op.drawClass) {
+                    case Op::DRAW_MODEL: {
+                        // Two-block push: common state at binding 0 (both stages), bone matrices at
+                        // vertex binding 1 — neither may exceed SDL3 GPU's 4096-byte cap (soh3d_sg_ubo.h).
+                        const uint8_t* u = mSoh3dModelUbos[op.soh3dDrawIdx].data();
+                        SDL_PushGPUVertexUniformData(mCmd, 0, u, SoH3DSg::kCommonBytes);
+                        SDL_PushGPUFragmentUniformData(mCmd, 0, u, SoH3DSg::kCommonBytes);
+                        SDL_PushGPUVertexUniformData(mCmd, 1, u + SoH3DSg::kCommonBytes, SoH3DSg::kBonesBytes);
+                        break;
+                    }
+                    case Op::DRAW_HUD:
+                        SDL_PushGPUVertexUniformData(mCmd, 0, op.ubo, 16); // { vec2 viewport; vec2 pad; }
+                        break;
+                    case Op::DRAW_N64:
+                    default:
+                        SDL_PushGPUFragmentUniformData(mCmd, 0, op.ubo, sizeof(SgUboData));
+                        break;
                 }
                 SDL_GPUBufferBinding vb{};
-                vb.buffer = vbuf;
-                vb.offset = voff;
+                vb.buffer = op.altVbo ? op.altVbo : mVbo;
+                vb.offset = op.altVbo ? 0 : op.vboOffset;
                 SDL_BindGPUVertexBuffers(pass, 0, &vb, 1);
                 if (op.numSamplers > 0) {
 #if defined(__APPLE__)
@@ -907,7 +903,7 @@ void GfxRenderingAPISdl3Gpu::ReplayOps(SDL_GPUTexture* presentTex, uint32_t pres
 #endif
                     SDL_BindGPUFragmentSamplers(pass, 0, op.samplers, op.numSamplers);
                 }
-                SDL_DrawGPUPrimitives(pass, vtxCount, 1, firstVtx, 0);
+                SDL_DrawGPUPrimitives(pass, op.numVerts, 1, op.firstVertex, 0);
                 break;
             }
             case OP_EXT_IN_PASS: {
@@ -1007,7 +1003,7 @@ void GfxRenderingAPISdl3Gpu::FinishRender() {
     FlushPendingTexReleases();
     mFrameAcquired = false;
     mOps.clear();
-    mSoh3dDraws.clear();
+    mSoh3dModelUbos.clear();
 }
 
 void GfxRenderingAPISdl3Gpu::FlushAndWait() {
@@ -1027,7 +1023,7 @@ void GfxRenderingAPISdl3Gpu::FlushAndWait() {
     // Resume the frame: fresh op list + remapped (cycled) vertex staging. The framebuffers are
     // persistent textures, so already-rendered content is retained and subsequent draws layer on.
     mOps.clear();
-    mSoh3dDraws.clear();
+    mSoh3dModelUbos.clear();
     mVtxUsed = 0;
     mVtxMapped = (uint8_t*)SDL_MapGPUTransferBuffer(mDevice, mVtxTransfer, true /*cycle*/);
 }
@@ -2135,18 +2131,18 @@ void GfxRenderingAPISdl3Gpu::AppendSoH3DModelDraw(SDL_GPUGraphicsPipeline* pipel
                                                   SDL_GPUSampler* samp, SDL_GPUTexture* shadowTex,
                                                   SDL_GPUSampler* shadowSamp, const SDL_GPUViewport& vp,
                                                   const SDL_Rect& sc) {
-    Soh3dDrawData d{};
-    d.vbo = vbo;
-    d.first = first;
-    d.count = count;
-    memcpy(d.ubo.data(), ubo, sizeof(SoH3DSg::SgUbo));
-    int idx = (int)mSoh3dDraws.size();
-    mSoh3dDraws.push_back(d);
+    int idx = (int)mSoh3dModelUbos.size();
+    mSoh3dModelUbos.emplace_back();
+    memcpy(mSoh3dModelUbos.back().data(), ubo, sizeof(SoH3DSg::SgUbo));
 
     Op op{};
     op.kind = OP_DRAW;
+    op.drawClass = Op::DRAW_MODEL;
     op.fb = mCurrentFb;
     op.pipeline = pipeline;
+    op.altVbo = vbo;
+    op.firstVertex = first;
+    op.numVerts = count;
     op.viewport = vp;
     op.scissor = sc;
     op.numSamplers = 2; // slot 0 = model texture, slot 1 = sun-shadow map
@@ -2155,6 +2151,28 @@ void GfxRenderingAPISdl3Gpu::AppendSoH3DModelDraw(SDL_GPUGraphicsPipeline* pipel
     op.samplers[1].texture = shadowTex;
     op.samplers[1].sampler = shadowSamp;
     op.soh3dDrawIdx = idx;
+    mOps.push_back(std::move(op));
+}
+
+void GfxRenderingAPISdl3Gpu::AppendSoH3DHudDraw(SDL_GPUGraphicsPipeline* pipeline, SDL_GPUBuffer* vbo, uint32_t first,
+                                                uint32_t count, SDL_GPUTexture* tex, SDL_GPUSampler* samp, float w,
+                                                float h) {
+    Op op{};
+    op.kind = OP_DRAW;
+    op.drawClass = Op::DRAW_HUD;
+    op.fb = 0; // HUD composites into fb 0 (the present blit / headless readback target)
+    op.pipeline = pipeline;
+    op.altVbo = vbo;
+    op.firstVertex = first;
+    op.numVerts = count;
+    op.viewport = SDL_GPUViewport{ 0.0f, 0.0f, w, h, 0.0f, 1.0f };
+    op.scissor = SDL_Rect{ 0, 0, (int)w, (int)h };
+    op.numSamplers = 1;
+    op.samplers[0].texture = tex;
+    op.samplers[0].sampler = samp;
+    // The vertex shader's UBO is { vec2 uViewport; vec2 pad; } — build it into op.ubo (vertex slot 0).
+    float vubo[4] = { w, h, 0.0f, 0.0f };
+    memcpy(op.ubo, vubo, sizeof(vubo));
     mOps.push_back(std::move(op));
 }
 
