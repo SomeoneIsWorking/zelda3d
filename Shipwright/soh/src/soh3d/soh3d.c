@@ -1738,10 +1738,10 @@ static void SoH3D_DrawModelGL(PlayState* play, int modelId, Actor* actor, float 
 static int SoH3D_N64AnimEnabled(void) {
     if (gSoH3dN64Anim < 0) {
         const char* v = getenv("SOH3D_N64ANIM");
-        // Default OFF: the N64-joint retarget math is WIP (pose still contorted — the per-limb
-        // rotation convention needs work), so calibrated characters keep the working CSAB path
-        // until it's correct. Opt in with SOH3D_N64ANIM=1 / REPL `n64anim 1`.
-        gSoH3dN64Anim = (v != NULL && v[0] == '1') ? 1 : 0;
+        // Default ON: skinned actors render as their OoT3D model driven by the live N64 jointTable.
+        // Without it skinned characters fall back to the N64 model, which re-splits the frame into
+        // N64 + OoT3D — the opposite of the unified default. SOH3D_N64ANIM=0 keeps the N64 path for A/B.
+        gSoH3dN64Anim = (v != NULL && v[0] == '0') ? 0 : 1;
     }
     return gSoH3dN64Anim;
 }
@@ -2023,8 +2023,10 @@ int gSoH3dAuto = -1; // -1 = uninit (read env), 0=off, 1=fill, 2=all (validation
 
 static int SoH3D_AutoMode(void) {
     if (gSoH3dAuto < 0) {
+        // Default ON (mode 1: replace non-table actors with their OoT3D object models). Part of the
+        // no-flags unified default; SOH3D_AUTO=0 still disables, =2 routes ALL actors through auto.
         const char* v = getenv("SOH3D_AUTO");
-        gSoH3dAuto = (v != NULL && v[0] != '\0') ? atoi(v) : 0;
+        gSoH3dAuto = (v != NULL && v[0] != '\0') ? atoi(v) : 1;
     }
     return gSoH3dAuto;
 }
@@ -2999,8 +3001,11 @@ void SoH3D_AfterActorDraw(PlayState* play, Actor* actor) {
 
 int SoH3D_Enabled(void) {
     if (gSoH3dEnabled < 0) {
+        // SoH3D is the renderer — OoT3D rendering is ON by default (no flag needed). Only an
+        // explicit SOH3D=0 disables it (for an N64 A/B reference). This is the unified default:
+        // the game renders OoT3D world+models in one flow, not gated behind an env var.
         const char* v = getenv("SOH3D");
-        gSoH3dEnabled = (v != NULL && v[0] == '1') ? 1 : 0;
+        gSoH3dEnabled = (v != NULL && v[0] == '0') ? 0 : 1;
     }
     return gSoH3dEnabled;
 }
