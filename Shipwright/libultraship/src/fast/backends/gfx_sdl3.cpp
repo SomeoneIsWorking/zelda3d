@@ -214,10 +214,10 @@ const SDL_Scancode scancode_rmapping_nonextended[][2] = { { SDL_SCANCODE_KP_7, S
                                                           { SDL_SCANCODE_KP_PERIOD, SDL_SCANCODE_DELETE },
                                                           { SDL_SCANCODE_KP_MULTIPLY, SDL_SCANCODE_PRINTSCREEN } };
 
-GfxWindowBackendSDL2::~GfxWindowBackendSDL2() {
+GfxWindowBackendSDL3::~GfxWindowBackendSDL3() {
 }
 
-void GfxWindowBackendSDL2::SetFullscreenImpl(bool on, bool call_callback) {
+void GfxWindowBackendSDL3::SetFullscreenImpl(bool on, bool call_callback) {
     if (mFullScreen == on) {
         return;
     }
@@ -277,7 +277,7 @@ void GfxWindowBackendSDL2::SetFullscreenImpl(bool on, bool call_callback) {
     }
 }
 
-void GfxWindowBackendSDL2::GetActiveWindowRefreshRate(uint32_t* refresh_rate) {
+void GfxWindowBackendSDL3::GetActiveWindowRefreshRate(uint32_t* refresh_rate) {
     // SDL3-MIGRATION: display index -> SDL_DisplayID; SDL_GetCurrentDisplayMode returns a pointer;
     // SDL_DisplayMode::refresh_rate is now a float.
     SDL_DisplayID display_in_use = SDL_GetDisplayForWindow(mWnd);
@@ -293,7 +293,7 @@ static HANDLE mTimer;
 #define FRAME_INTERVAL_US_NUMERATOR 1000000
 #define FRAME_INTERVAL_US_DENOMINATOR (mTargetFps)
 
-void GfxWindowBackendSDL2::Close() {
+void GfxWindowBackendSDL3::Close() {
     mIsRunning = false;
 }
 
@@ -305,8 +305,8 @@ static LRESULT CALLBACK gfx_sdl_wnd_proc(HWND h_wnd, UINT message, WPARAM w_para
             // system window procedure instead.
             return DefWindowProc(h_wnd, message, w_param, l_param);
         case WM_ENDSESSION: {
-            GfxWindowBackendSDL2* self =
-                reinterpret_cast<GfxWindowBackendSDL2*>(GetWindowLongPtr(h_wnd, GWLP_USERDATA));
+            GfxWindowBackendSDL3* self =
+                reinterpret_cast<GfxWindowBackendSDL3*>(GetWindowLongPtr(h_wnd, GWLP_USERDATA));
             // Apparently SDL2 does not handle this
             if (w_param == TRUE) {
                 self->Close();
@@ -321,7 +321,7 @@ static LRESULT CALLBACK gfx_sdl_wnd_proc(HWND h_wnd, UINT message, WPARAM w_para
 };
 #endif
 
-void GfxWindowBackendSDL2::Init(const char* gameName, const char* gfxApiName, bool startFullScreen, uint32_t width,
+void GfxWindowBackendSDL3::Init(const char* gameName, const char* gfxApiName, bool startFullScreen, uint32_t width,
                                 uint32_t height, int32_t posX, int32_t posY) {
     mWindowWidth = width;
     mWindowHeight = height;
@@ -503,15 +503,15 @@ void GfxWindowBackendSDL2::Init(const char* gameName, const char* gfxApiName, bo
     }
 }
 
-void GfxWindowBackendSDL2::SetFullscreenChangedCallback(void (*onFullscreenChanged)(bool is_now_fullscreen)) {
+void GfxWindowBackendSDL3::SetFullscreenChangedCallback(void (*onFullscreenChanged)(bool is_now_fullscreen)) {
     mOnFullscreenChanged = onFullscreenChanged;
 }
 
-void GfxWindowBackendSDL2::SetFullscreen(bool enable) {
+void GfxWindowBackendSDL3::SetFullscreen(bool enable) {
     SetFullscreenImpl(enable, true);
 }
 
-void GfxWindowBackendSDL2::SetCursorVisibility(bool visible) {
+void GfxWindowBackendSDL3::SetCursorVisibility(bool visible) {
     // SDL3-MIGRATION: SDL_ShowCursor(SDL_ENABLE/SDL_DISABLE) -> SDL_ShowCursor()/SDL_HideCursor().
     if (visible) {
         SDL_ShowCursor();
@@ -520,11 +520,11 @@ void GfxWindowBackendSDL2::SetCursorVisibility(bool visible) {
     }
 }
 
-void GfxWindowBackendSDL2::SetMousePos(int32_t x, int32_t y) {
+void GfxWindowBackendSDL3::SetMousePos(int32_t x, int32_t y) {
     SDL_WarpMouseInWindow(mWnd, (float)x, (float)y);
 }
 
-void GfxWindowBackendSDL2::GetMousePos(int32_t* x, int32_t* y) {
+void GfxWindowBackendSDL3::GetMousePos(int32_t* x, int32_t* y) {
     // SDL3-MIGRATION: SDL_GetMouseState now returns float positions.
     float fx = 0.0f, fy = 0.0f;
     SDL_GetMouseState(&fx, &fy);
@@ -532,7 +532,7 @@ void GfxWindowBackendSDL2::GetMousePos(int32_t* x, int32_t* y) {
     *y = (int32_t)fy;
 }
 
-void GfxWindowBackendSDL2::GetMouseDelta(int32_t* x, int32_t* y) {
+void GfxWindowBackendSDL3::GetMouseDelta(int32_t* x, int32_t* y) {
     // SDL3-MIGRATION: SDL_GetRelativeMouseState now returns float deltas.
     float fx = 0.0f, fy = 0.0f;
     SDL_GetRelativeMouseState(&fx, &fy);
@@ -540,18 +540,18 @@ void GfxWindowBackendSDL2::GetMouseDelta(int32_t* x, int32_t* y) {
     *y = (int32_t)fy;
 }
 
-void GfxWindowBackendSDL2::GetMouseWheel(float* x, float* y) {
+void GfxWindowBackendSDL3::GetMouseWheel(float* x, float* y) {
     *x = mMouseWheelX;
     *y = mMouseWheelY;
     mMouseWheelX = 0.0f;
     mMouseWheelY = 0.0f;
 }
 
-bool GfxWindowBackendSDL2::GetMouseState(uint32_t btn) {
+bool GfxWindowBackendSDL3::GetMouseState(uint32_t btn) {
     return SDL_GetMouseState(nullptr, nullptr) & (1 << btn);
 }
 
-void GfxWindowBackendSDL2::SetMouseCapture(bool capture) {
+void GfxWindowBackendSDL3::SetMouseCapture(bool capture) {
     // SDL3-MIGRATION: relative mouse mode is now per-window.
     SDL_SetWindowRelativeMouseMode(mWnd, capture);
     // TODO: Manually setting a clipping rect here because
@@ -565,24 +565,24 @@ void GfxWindowBackendSDL2::SetMouseCapture(bool capture) {
     SDL_SetWindowMouseRect(mWnd, capture ? &mCursorClip : NULL);
 }
 
-bool GfxWindowBackendSDL2::IsMouseCaptured() {
+bool GfxWindowBackendSDL3::IsMouseCaptured() {
     // SDL3-MIGRATION: relative mouse mode is per-window now.
     return SDL_GetWindowRelativeMouseMode(mWnd);
 }
 
-void GfxWindowBackendSDL2::SetKeyboardCallbacks(bool (*onKeyDown)(int scancode), bool (*onKeyUp)(int scancode),
+void GfxWindowBackendSDL3::SetKeyboardCallbacks(bool (*onKeyDown)(int scancode), bool (*onKeyUp)(int scancode),
                                                 void (*onAllKeysUp)()) {
     mOnKeyDown = onKeyDown;
     mOnKeyUp = onKeyUp;
     mOnAllKeysUp = onAllKeysUp;
 }
 
-void GfxWindowBackendSDL2::SetMouseCallbacks(bool (*onMouseButtonDown)(int btn), bool (*onMouseButtonUp)(int btn)) {
+void GfxWindowBackendSDL3::SetMouseCallbacks(bool (*onMouseButtonDown)(int btn), bool (*onMouseButtonUp)(int btn)) {
     mOnMouseButtonDown = onMouseButtonDown;
     mOnMouseButtonUp = onMouseButtonUp;
 }
 
-void GfxWindowBackendSDL2::GetDimensions(uint32_t* width, uint32_t* height, int32_t* posX, int32_t* posY) {
+void GfxWindowBackendSDL3::GetDimensions(uint32_t* width, uint32_t* height, int32_t* posX, int32_t* posY) {
     {
 #ifdef __APPLE__
         SDL_GetWindowSize(mWnd, static_cast<int*>((void*)width), static_cast<int*>((void*)height));
@@ -594,7 +594,7 @@ void GfxWindowBackendSDL2::GetDimensions(uint32_t* width, uint32_t* height, int3
     SDL_GetWindowPosition(mWnd, static_cast<int*>(posX), static_cast<int*>(posY));
 }
 
-void GfxWindowBackendSDL2::SetDimensions(uint32_t width, uint32_t height, int32_t posX, int32_t posY) {
+void GfxWindowBackendSDL3::SetDimensions(uint32_t width, uint32_t height, int32_t posX, int32_t posY) {
     mWindowWidth = width;
     mWindowHeight = height;
     if (mWnd) {
@@ -603,7 +603,7 @@ void GfxWindowBackendSDL2::SetDimensions(uint32_t width, uint32_t height, int32_
     }
 }
 
-Ship::WindowRect GfxWindowBackendSDL2::GetPrimaryMonitorRect() {
+Ship::WindowRect GfxWindowBackendSDL3::GetPrimaryMonitorRect() {
     // SDL3-MIGRATION: display index -> SDL_DisplayID; SDL_GetDesktopDisplayMode returns a pointer.
     SDL_DisplayID display_in_use = mWnd ? SDL_GetDisplayForWindow(mWnd) : SDL_GetPrimaryDisplay();
     if (display_in_use == 0) {
@@ -618,14 +618,14 @@ Ship::WindowRect GfxWindowBackendSDL2::GetPrimaryMonitorRect() {
     return { 0, 0, 0, 0 };
 }
 
-int GfxWindowBackendSDL2::TranslateScancode(int scancode) const {
+int GfxWindowBackendSDL3::TranslateScancode(int scancode) const {
     if (scancode < 512) {
         return mSdlToLusTable[scancode];
     }
     return 0;
 }
 
-int GfxWindowBackendSDL2::UntranslateScancode(int translatedScancode) const {
+int GfxWindowBackendSDL3::UntranslateScancode(int translatedScancode) const {
     for (int i = 0; i < 512; i++) {
         if (mSdlToLusTable[i] == translatedScancode) {
             return i;
@@ -635,21 +635,21 @@ int GfxWindowBackendSDL2::UntranslateScancode(int translatedScancode) const {
     return 0;
 }
 
-void GfxWindowBackendSDL2::OnKeydown(int scancode) const {
+void GfxWindowBackendSDL3::OnKeydown(int scancode) const {
     int key = TranslateScancode(scancode);
     if (mOnKeyDown != nullptr) {
         mOnKeyDown(key);
     }
 }
 
-void GfxWindowBackendSDL2::OnKeyup(int scancode) const {
+void GfxWindowBackendSDL3::OnKeyup(int scancode) const {
     int key = TranslateScancode(scancode);
     if (mOnKeyUp != nullptr) {
         mOnKeyUp(key);
     }
 }
 
-void GfxWindowBackendSDL2::OnMouseButtonDown(int btn) const {
+void GfxWindowBackendSDL3::OnMouseButtonDown(int btn) const {
     if (!(btn >= 0 && btn < 5)) {
         return;
     }
@@ -658,13 +658,13 @@ void GfxWindowBackendSDL2::OnMouseButtonDown(int btn) const {
     }
 }
 
-void GfxWindowBackendSDL2::OnMouseButtonUp(int btn) const {
+void GfxWindowBackendSDL3::OnMouseButtonUp(int btn) const {
     if (mOnMouseButtonUp != nullptr) {
         mOnMouseButtonUp(btn);
     }
 }
 
-void GfxWindowBackendSDL2::HandleSingleEvent(SDL_Event& event) {
+void GfxWindowBackendSDL3::HandleSingleEvent(SDL_Event& event) {
     Fast::WindowEvent event_impl;
     event_impl.Sdl = { &event };
     auto gui = Ship::Context::GetRawInstance()->GetWindow()->GetGui();
@@ -724,7 +724,7 @@ void GfxWindowBackendSDL2::HandleSingleEvent(SDL_Event& event) {
     }
 }
 
-void GfxWindowBackendSDL2::HandleEvents() {
+void GfxWindowBackendSDL3::HandleEvents() {
     SDL_Event event;
     SDL_PumpEvents();
     // SDL3-MIGRATION: process every event EXCEPT the gamepad add/remove pair (consumed by
@@ -749,7 +749,7 @@ void GfxWindowBackendSDL2::HandleEvents() {
 #endif
 }
 
-bool GfxWindowBackendSDL2::IsFrameReady() {
+bool GfxWindowBackendSDL3::IsFrameReady() {
     return true;
 }
 
@@ -758,7 +758,7 @@ static uint64_t qpc_to_100ns(uint64_t qpc) {
     return qpc / qpc_freq * _100NANOSECONDS_IN_SECOND + qpc % qpc_freq * _100NANOSECONDS_IN_SECOND / qpc_freq;
 }
 
-void GfxWindowBackendSDL2::SyncFramerateWithTime() const {
+void GfxWindowBackendSDL3::SyncFramerateWithTime() const {
     uint64_t t = qpc_to_100ns(SDL_GetPerformanceCounter());
 
     const int64_t next = previous_time + 10 * FRAME_INTERVAL_US_NUMERATOR / FRAME_INTERVAL_US_DENOMINATOR;
@@ -824,7 +824,7 @@ static void Soh3dWritePpm(SDL_Window* wnd, const char* path) {
     }
 }
 
-void GfxWindowBackendSDL2::SwapBuffersBegin() {
+void GfxWindowBackendSDL3::SwapBuffersBegin() {
 #ifdef ENABLE_SDL3GPU
     if (mUseSdl3Gpu) {
         // SDL3 GPU: like Vulkan, the rendering API owns submit/present + the frame dump (reads its
@@ -896,38 +896,38 @@ void GfxWindowBackendSDL2::SwapBuffersBegin() {
     SDL_GL_SwapWindow(mWnd);
 }
 
-void GfxWindowBackendSDL2::SwapBuffersEnd() {
+void GfxWindowBackendSDL3::SwapBuffersEnd() {
 }
 
-double GfxWindowBackendSDL2::GetTime() {
+double GfxWindowBackendSDL3::GetTime() {
     return 0.0;
 }
 
-int GfxWindowBackendSDL2::GetTargetFps() {
+int GfxWindowBackendSDL3::GetTargetFps() {
     return mTargetFps;
 }
 
-void GfxWindowBackendSDL2::SetTargetFps(int fps) {
+void GfxWindowBackendSDL3::SetTargetFps(int fps) {
     mTargetFps = fps;
 }
 
-void GfxWindowBackendSDL2::SetMaxFrameLatency(int latency) {
+void GfxWindowBackendSDL3::SetMaxFrameLatency(int latency) {
     // Not supported by SDL :(
 }
 
-const char* GfxWindowBackendSDL2::GetKeyName(int scancode) {
+const char* GfxWindowBackendSDL3::GetKeyName(int scancode) {
     return SDL_GetScancodeName((SDL_Scancode)UntranslateScancode(scancode));
 }
 
-bool GfxWindowBackendSDL2::CanDisableVsync() {
+bool GfxWindowBackendSDL3::CanDisableVsync() {
     return true;
 }
 
-bool GfxWindowBackendSDL2::IsRunning() {
+bool GfxWindowBackendSDL3::IsRunning() {
     return mIsRunning;
 }
 
-void GfxWindowBackendSDL2::Destroy() {
+void GfxWindowBackendSDL3::Destroy() {
     // TODO: destroy _any_ resources used by SDL
     // SDL3-MIGRATION: SDL_GL_DeleteContext -> SDL_GL_DestroyContext.
     if (mCtx != nullptr) {
@@ -940,7 +940,7 @@ void GfxWindowBackendSDL2::Destroy() {
     SDL_Quit();
 }
 
-bool GfxWindowBackendSDL2::IsFullscreen() {
+bool GfxWindowBackendSDL3::IsFullscreen() {
     return mFullScreen;
 }
 } // namespace Fast

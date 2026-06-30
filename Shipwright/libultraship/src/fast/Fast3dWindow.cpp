@@ -139,8 +139,8 @@ void Fast3dWindow::InitWindowManager() {
     // backends no longer exist).
     SetWindowBackend(WindowBackend::FAST3D_SDL_GPU);
 
-    mWindowManagerApi = new GfxWindowBackendSDL2();
-    mRenderingApi = new GfxRenderingAPISdl3Gpu(static_cast<GfxWindowBackendSDL2*>(mWindowManagerApi));
+    mWindowManagerApi = new GfxWindowBackendSDL3();
+    mRenderingApi = new GfxRenderingAPISdl3Gpu(static_cast<GfxWindowBackendSDL3*>(mWindowManagerApi));
 }
 
 void Fast3dWindow::SetTextureFilter(FilteringMode filteringMode) {
