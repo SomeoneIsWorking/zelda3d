@@ -23,24 +23,10 @@ FetchContent_Declare(
 FetchContent_MakeAvailable(metalcpp)
 list(APPEND ADDITIONAL_LIB_INCLUDES ${metalcpp_SOURCE_DIR})
 
-#=================== ImGui ===================
-target_sources(ImGui
-    PRIVATE
-    ${imgui_SOURCE_DIR}/backends/imgui_impl_metal.mm
-)
-
-target_include_directories(ImGui PRIVATE ${metalcpp_SOURCE_DIR})
-target_compile_definitions(ImGui PUBLIC IMGUI_IMPL_METAL_CPP)
-
-# SDL3-MIGRATION: the rest of the project (soh, linux.cmake) links SDL3. Linking SDL2 here pulled a
-# second SDL into soh's link graph; SDL's CMake config declares SDL_VERSION as a
-# COMPATIBLE_INTERFACE_STRING, so the SDL2 (2.x) vs SDL3 (3.x) versions disagree and configuration
-# fails ("INTERFACE_SDL_VERSION ... does not agree with the value of SDL_VERSION already determined").
+#=================== SDL3 ===================
+# ImGui is now a header-only no-op shim (see common.cmake); the Metal ImGui backend and its GLEW
+# dependency are gone with it. SDL3 was formerly carried transitively by the ImGui target; find it
+# here so src/CMakeLists.txt can link it directly onto libultraship. (Linking SDL2 here previously
+# pulled a second SDL into soh's link graph and broke configuration via SDL_VERSION mismatch — using
+# SDL3 here finishes the SDL2 eradication on macOS.)
 find_package(SDL3 REQUIRED)
-target_link_libraries(ImGui PUBLIC SDL3::SDL3)
-
-find_package(GLEW REQUIRED)
-target_link_libraries(ImGui PUBLIC ${OPENGL_opengl_LIBRARY} GLEW::GLEW)
-set_target_properties(ImGui PROPERTIES
-    XCODE_ATTRIBUTE_CLANG_ENABLE_OBJC_ARC YES
-)

@@ -758,6 +758,13 @@ void GfxRenderingAPISdl3Gpu::ReplayOps(SDL_GPUTexture* presentTex, uint32_t pres
         curFb = fb;
     };
 
+#if defined(__APPLE__)
+    // Pre-create the dummy texture/sampler now, while no render pass is active, so the OP_DRAW
+    // null-binding guard below (macOS/MoltenVK) never has to create GPU resources mid-pass.
+    DummyTexture();
+    DummySampler();
+#endif
+
     for (Op& op : mOps) {
         if (op.fb < 0 || (size_t)op.fb >= nfb)
             continue;
@@ -814,8 +821,38 @@ void GfxRenderingAPISdl3Gpu::ReplayOps(SDL_GPUTexture* presentTex, uint32_t pres
                 vb.buffer = mVbo;
                 vb.offset = op.vboOffset;
                 SDL_BindGPUVertexBuffers(pass, 0, &vb, 1);
-                if (op.numSamplers > 0)
+                if (op.numSamplers > 0) {
+#if defined(__APPLE__)
+                    // macOS/MoltenVK only: SDL_BindGPUFragmentSamplers dereferences each binding and
+                    // segfaults on a null texture/sampler. Patch nulls with the (pre-warmed) dummies;
+                    // if a dummy is itself null, skip the draw rather than fault. Must NOT create GPU
+                    // resources here (we're inside an active render pass) — the dummies are pre-created
+                    // before the op loop, so DummyTexture()/DummySampler() only return cached handles.
+                    bool bindable = true;
+                    for (uint32_t si = 0; si < op.numSamplers; si++) {
+                        if (op.samplers[si].texture == nullptr) {
+                            op.samplers[si].texture = DummyTexture();
+                        }
+                        if (op.samplers[si].sampler == nullptr) {
+                            op.samplers[si].sampler = DummySampler();
+                        }
+                        if (op.samplers[si].texture == nullptr || op.samplers[si].sampler == nullptr) {
+                            static bool warned = false;
+                            if (!warned) {
+                                warned = true;
+                                SPDLOG_ERROR("OP_DRAW: null fragment-sampler binding (slot {} of {}); "
+                                             "skipping draw to avoid a GPU-driver fault",
+                                             si, op.numSamplers);
+                            }
+                            bindable = false;
+                        }
+                    }
+                    if (!bindable) {
+                        break;
+                    }
+#endif
                     SDL_BindGPUFragmentSamplers(pass, 0, op.samplers, op.numSamplers);
+                }
                 SDL_DrawGPUPrimitives(pass, op.numVerts, 1, 0, 0);
                 break;
             }
@@ -1025,6 +1062,12 @@ SDL_GPUSampler* GfxRenderingAPISdl3Gpu::GetOrCreateSampler(bool linear, uint32_t
     si.address_mode_v = wrap(cmt);
     si.address_mode_w = SDL_GPU_SAMPLERADDRESSMODE_REPEAT;
     SDL_GPUSampler* sampler = SDL_CreateGPUSampler(mDevice, &si);
+    if (sampler == nullptr) {
+        // Don't cache a null — binding a null sampler faults inside the GPU driver
+        // (BindFragmentSamplers dereferences it, notably on macOS/MoltenVK). Surface it instead.
+        SPDLOG_ERROR("SDL_CreateGPUSampler failed (linear={}, cms={}, cmt={}): {}", linear, cms, cmt, SDL_GetError());
+        return nullptr;
+    }
     mSamplerCache[key] = sampler;
     return sampler;
 }
@@ -1041,6 +1084,12 @@ SDL_GPUTexture* GfxRenderingAPISdl3Gpu::DummyTexture() {
     ci.layer_count_or_depth = 1;
     ci.num_levels = 1;
     mDummyTex = SDL_CreateGPUTexture(mDevice, &ci);
+    if (mDummyTex == nullptr) {
+        // The dummy backs every unbound/missing texture slot; a null here would propagate into a
+        // fragment-sampler binding and fault inside the GPU driver. Surface the failure.
+        SPDLOG_ERROR("SDL_CreateGPUTexture (dummy) failed: {}", SDL_GetError());
+        return nullptr;
+    }
 
     const uint8_t white[4] = { 255, 255, 255, 255 };
     SDL_GPUTransferBufferCreateInfo tci{};

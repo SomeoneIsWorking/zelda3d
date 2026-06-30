@@ -79,9 +79,24 @@ if(INCLUDE_MPQ_SUPPORT)
     endif()
 endif()
 
+# Dear ImGui is now a header-only no-op shim (see cmake/dependencies/common.cmake): the SoH ImGui
+# UI code is kept in-tree as inert scaffolding and must still link, so we compile a stub that
+# provides every referenced ImGui symbol as a no-op. SDL3 was formerly carried transitively by the
+# (removed) ImGui target; link it directly now.
+target_sources(libultraship PRIVATE ${CMAKE_CURRENT_SOURCE_DIR}/../imgui_shim/imgui_stub.cpp)
+
 target_link_libraries(libultraship
-    PUBLIC ImGui
+    PUBLIC SDL3::SDL3
 )
+
+# OpenGL was formerly linked transitively via the (removed) ImGui target; a couple of renderer
+# paths (e.g. gfx_sdl3.cpp frame-dump glReadPixels) still need it. find_package(OpenGL) is in
+# common.cmake.
+if(OPENGL_opengl_LIBRARY)
+    target_link_libraries(libultraship PUBLIC ${OPENGL_opengl_LIBRARY})
+elseif(OPENGL_gl_LIBRARY)
+    target_link_libraries(libultraship PUBLIC ${OPENGL_gl_LIBRARY})
+endif()
 
 target_link_libraries(libultraship PUBLIC RmlUi::RmlUi)
 

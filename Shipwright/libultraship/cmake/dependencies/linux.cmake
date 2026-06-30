@@ -1,11 +1,5 @@
-#=================== ImGui ===================
-# SDL3-MIGRATION
+#=================== SDL3 ===================
+# SDL3 was formerly pulled into libultraship transitively via the ImGui target. ImGui is now a
+# header-only no-op shim (see common.cmake), so find SDL3 here and link it directly onto the
+# libultraship target (done in src/CMakeLists.txt).
 find_package(SDL3 REQUIRED)
-target_link_libraries(ImGui PUBLIC SDL3::SDL3)
-
-if (USE_OPENGLES)
-    target_link_libraries(ImGui PUBLIC ${OPENGL_GLESv2_LIBRARY})
-    add_compile_definitions(IMGUI_IMPL_OPENGL_ES3)
-else()
-    target_link_libraries(ImGui PUBLIC ${OPENGL_opengl_LIBRARY})
-endif()
