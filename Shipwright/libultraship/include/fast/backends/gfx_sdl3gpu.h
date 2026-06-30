@@ -184,6 +184,17 @@ class GfxRenderingAPISdl3Gpu : public GfxRenderingAPI {
         return mHud.get();
     }
 
+    // Shared GPU resources the folded-in SoH3D subsystems draw with, so there is ONE sampler cache
+    // and ONE set of dummy (1x1 white tex + sampler) resources across the whole backend rather than
+    // the model renderer keeping its own duplicates. GetOrCreateSamplerEx is the general primitive
+    // (fully-resolved SDL params + max_lod); the N64 GetOrCreateSampler(linear,cms,cmt) is a thin
+    // wrapper over it. The SoH3D model path needs LINEAR + max_lod=1000 (a minified num_levels=1
+    // texture sampled black at max_lod=0), which the N64 wrapper can't express — hence the Ex form.
+    SDL_GPUSampler* GetOrCreateSamplerEx(SDL_GPUFilter filter, SDL_GPUSamplerAddressMode u,
+                                         SDL_GPUSamplerAddressMode v, float maxLod);
+    SDL_GPUTexture* DummyTexture();
+    SDL_GPUSampler* DummySampler();
+
     const char* GetName() override;
     int GetMaxTextureSize() override;
     GfxClipParameters GetClipParameters() override;
@@ -266,8 +277,6 @@ class GfxRenderingAPISdl3Gpu : public GfxRenderingAPI {
     // still bind the handle), flush deferred releases once that frame's command buffer is submitted.
     void DeferReleaseTexture(SDL_GPUTexture* tex);
     void FlushPendingTexReleases();
-    SDL_GPUTexture* DummyTexture();
-    SDL_GPUSampler* DummySampler();
     void CreateFbResources(FramebufferSDL3& fb, uint32_t width, uint32_t height, bool hasDepth);
     void DestroyFbResources(FramebufferSDL3& fb);
     std::string BuildShaderSource(const struct CCFeatures& cc, bool vertex, ShaderProgramSDL3* prg);

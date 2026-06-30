@@ -136,9 +136,9 @@ class SoH3DRenderer {
     bool g_resReady = false;
     SDL_GPUShader* g_vert = nullptr;
     SDL_GPUShader* g_frag = nullptr;
-    SDL_GPUTexture* g_dummyTex = nullptr; // 1x1 white (untextured groups + shadow slot when off)
-    std::map<uint32_t, SDL_GPUSampler*> g_samplers; // key (wrapS<<16)|wrapT
-    SDL_GPUSampler* g_dummySampler = nullptr;
+    // The 1x1 white dummy texture/sampler (untextured groups + shadow slot when off) and per-wrap
+    // samplers now come from the backend's single shared caches (GfxRenderingAPISdl3Gpu::DummyTexture/
+    // DummySampler/GetOrCreateSamplerEx), so the model renderer keeps no duplicates of its own.
     std::map<PipeKey, SDL_GPUGraphicsPipeline*> g_pipelines;
     bool g_ctxValid = false;
 
