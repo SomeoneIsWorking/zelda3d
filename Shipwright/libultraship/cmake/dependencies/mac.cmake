@@ -32,8 +32,12 @@ target_sources(ImGui
 target_include_directories(ImGui PRIVATE ${metalcpp_SOURCE_DIR})
 target_compile_definitions(ImGui PUBLIC IMGUI_IMPL_METAL_CPP)
 
-find_package(SDL2 REQUIRED)
-target_link_libraries(ImGui PUBLIC SDL2::SDL2)
+# SDL3-MIGRATION: the rest of the project (soh, linux.cmake) links SDL3. Linking SDL2 here pulled a
+# second SDL into soh's link graph; SDL's CMake config declares SDL_VERSION as a
+# COMPATIBLE_INTERFACE_STRING, so the SDL2 (2.x) vs SDL3 (3.x) versions disagree and configuration
+# fails ("INTERFACE_SDL_VERSION ... does not agree with the value of SDL_VERSION already determined").
+find_package(SDL3 REQUIRED)
+target_link_libraries(ImGui PUBLIC SDL3::SDL3)
 
 find_package(GLEW REQUIRED)
 target_link_libraries(ImGui PUBLIC ${OPENGL_opengl_LIBRARY} GLEW::GLEW)
