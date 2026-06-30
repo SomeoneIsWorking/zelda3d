@@ -576,6 +576,7 @@ GfxRenderingAPISdl3Gpu::~GfxRenderingAPISdl3Gpu() {
         mCmd = nullptr;
     }
     SDL_WaitForGPUIdle(mDevice);
+    FlushPendingTexReleases(); // GPU idle: release any textures deferred from the last frame
     for (auto& fb : mFramebuffers)
         DestroyFbResources(fb);
     mFramebuffers.clear();
@@ -972,6 +973,10 @@ void GfxRenderingAPISdl3Gpu::FinishRender() {
         mCmd = nullptr;
     }
 
+    // The frame's ops are submitted: any texture whose release we deferred this frame is no longer
+    // referenced by un-submitted recording, and SDL keeps the GPU memory alive until the submitted
+    // work completes. Safe to release now.
+    FlushPendingTexReleases();
     mFrameAcquired = false;
     mOps.clear();
 }
@@ -987,6 +992,9 @@ void GfxRenderingAPISdl3Gpu::FlushAndWait() {
         SDL_WaitForGPUFences(mDevice, true, &fence, 1);
         SDL_ReleaseGPUFence(mDevice, fence);
     }
+    // GPU is idle (fence waited): the submitted ops that referenced any deferred-release texture are
+    // done, so release them before the frame resumes recording new ops.
+    FlushPendingTexReleases();
     // Resume the frame: fresh op list + remapped (cycled) vertex staging. The framebuffers are
     // persistent textures, so already-rendered content is retained and subsequent draws layer on.
     mOps.clear();
@@ -1478,21 +1486,22 @@ void GfxRenderingAPISdl3Gpu::UploadTexture(const uint8_t* rgba32Buf, uint32_t wi
     TextureSDL3& t = mTextures[id];
     if (t.tex == nullptr || t.width != width || t.height != height) {
         if (t.tex && !t.isFbAlias) {
-            // Diagnostic (SOH3D_DBG_OPDRAW=1): a texture re-uploaded at a new size is released here.
-            // If its handle is still referenced by an op already recorded THIS frame, releasing it now
-            // is a use-after-free at replay/exec time — report which op so that class of bug is caught
-            // by value rather than by a driver fault. (refByOp == -1 means no live reference: safe.)
+            // A texture re-uploaded at a new size (the engine reused this id for different texels this
+            // frame) must keep its OLD GPU handle alive until the frame's command buffer is submitted:
+            // ops ALREADY recorded this frame captured the old pointer and will bind it at replay time,
+            // so releasing it now is a use-after-free. Proven on macOS/MoltenVK (BindFragmentSamplers
+            // faults on the freed handle; refByOp>=0 below). DeferReleaseTexture handles the lifetime.
             static const bool kDbgOpDraw = getenv("SOH3D_DBG_OPDRAW") != nullptr;
             if (kDbgOpDraw) {
                 int refOp = -1;
                 for (size_t oi = 0; oi < mOps.size(); oi++)
                     for (uint32_t si = 0; si < mOps[oi].numSamplers; si++)
                         if (mOps[oi].samplers[si].texture == t.tex) refOp = (int)oi;
-                fprintf(stderr, "[DBG_TEXREL] release tex id=%u ptr=%p (resize %ux%u->%ux%u) refByOp=%d ops=%zu\n",
+                fprintf(stderr, "[DBG_TEXREL] defer-release tex id=%u ptr=%p (resize %ux%u->%ux%u) refByOp=%d ops=%zu\n",
                         id, (void*)t.tex, t.width, t.height, width, height, refOp, mOps.size());
                 fflush(stderr);
             }
-            SDL_ReleaseGPUTexture(mDevice, t.tex);
+            DeferReleaseTexture(t.tex);
         }
         SDL_GPUTextureCreateInfo ci{};
         ci.type = SDL_GPU_TEXTURETYPE_2D;
@@ -1556,8 +1565,33 @@ void GfxRenderingAPISdl3Gpu::DeleteTexture(uint32_t texId) {
     TextureSDL3& t = mTextures[texId];
     if (t.isFbAlias || t.tex == nullptr)
         return;
-    SDL_ReleaseGPUTexture(mDevice, t.tex);
+    // Same lifetime hazard as the UploadTexture resize path: a delete mid-frame can free a handle a
+    // recorded op still binds. Defer until the frame is submitted.
+    DeferReleaseTexture(t.tex);
     t = TextureSDL3{};
+}
+
+// Release a GPU texture safely w.r.t. the deferred op-list. While a frame is recording, the op-list
+// may hold this handle (an op captured it at DrawTriangles time and binds it at ReplayOps time), so
+// the release MUST wait until that command buffer is submitted — otherwise the bind dereferences a
+// freed texture (the macOS/MoltenVK BindFragmentSamplers crash). Outside frame recording there are no
+// pending ops that reference it (any are already submitted, where SDL's own deferred-free is safe),
+// so release immediately.
+void GfxRenderingAPISdl3Gpu::DeferReleaseTexture(SDL_GPUTexture* tex) {
+    if (tex == nullptr)
+        return;
+    if (mFrameAcquired)
+        mPendingTexRelease.push_back(tex);
+    else
+        SDL_ReleaseGPUTexture(mDevice, tex);
+}
+
+// Release every texture whose destruction was deferred during the just-submitted (or just-waited)
+// frame. Called only at points where the ops that referenced them have been submitted to the GPU.
+void GfxRenderingAPISdl3Gpu::FlushPendingTexReleases() {
+    for (SDL_GPUTexture* tex : mPendingTexRelease)
+        SDL_ReleaseGPUTexture(mDevice, tex);
+    mPendingTexRelease.clear();
 }
 
 // ---------------------------------------------------------------------------
