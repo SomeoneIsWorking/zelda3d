@@ -5,8 +5,10 @@
    soh3d-rmlui-menu memory):
    - Font: Dusklight uses "Fira Sans" / "Fira Sans Condensed" + "Material Symbols Rounded".
      Only LatoLatin is vendored here, so every family maps to LatoLatin and icons are dropped.
-   - Units: Dusklight authors in `dp`; at the default density ratio (1) dp == px, so this sheet
-     uses px directly.
+   - Units: authored in `dp` (density-independent pixels), like Dusklight. SohRmlUi sets the context's
+     density-independent-pixel ratio to the window's display content scale (SDL_GetWindowDisplayScale),
+     so every dp here scales 1:1 on a 96-dpi monitor and grows on HiDPI / fractional-scaled displays.
+     Relative units (%) are unaffected and keep the panel filling the window at any scale.
    - No `box-shadow`, no `backdrop-filter: blur`, no `filter: opacity()`, no element `opacity`.
      RmlUi renders those via its layer / render-to-texture / composite path, which the SoH3D
      Vulkan render interface does not implement (it inherits the base no-op layer methods). Using
@@ -23,52 +25,51 @@ body {
 	display: flex;
 	width: 100%;
 	height: 100%;
-	padding: 64px;
+	padding: 64dp;
 	/* Dim the whole window so the menu reads as a modal cover over the game (Dusklight uses a
 	   backdrop blur here, which the Vulkan render interface can't do yet — a scrim is the stand-in). */
 	background-color: rgba(0, 0, 0, 82%);
 	font-family: LatoLatin;
 	font-weight: normal;
 	font-style: normal;
-	font-size: 15px;
+	font-size: 15dp;
 	color: #E0DBC8;
 }
 
-/* The window: centered, dark translucent, gold border, rounded. Dusklight scales/fades it in on
-   open via a transform+filter transition; we render it in its open state directly (no filter). */
+/* The window: a full-window modal panel. It fills the body's content box (the whole window minus the
+   body's dp padding) at every resolution — no fixed max size, so it never shrinks to a small island on
+   a large or HiDPI display. Dusklight scales/fades it in on open via a transform+filter transition; we
+   render it in its open state directly (no filter). */
 window {
 	display: flex;
 	flex-flow: column;
 	position: relative;
 	height: 100%;
 	width: 100%;
-	max-width: 1088px;
-	max-height: 768px;
-	margin: auto;
-	border-radius: 14px;
+	border-radius: 14dp;
 	overflow: hidden;
-	border: 2px #92875B;
+	border: 2dp #92875B;
 	background-color: rgba(21, 22, 16, 90%);
 }
 
 /* --- Tab bar ------------------------------------------------------------------------------ */
 tab-bar {
 	display: block;
-	flex: 0 0 64px;
-	height: 64px;
+	flex: 0 0 64dp;
+	height: 64dp;
 	background-color: rgba(217, 217, 217, 10%);
-	border-bottom: 2px #92875B;
+	border-bottom: 2dp #92875B;
 	text-transform: uppercase;
 }
 
 tab {
 	display: inline-block;
-	height: 64px;
-	padding: 0 24px;
-	line-height: 64px;
+	height: 64dp;
+	padding: 0 24dp;
+	line-height: 64dp;
 	vertical-align: top;
 	font-weight: bold;
-	font-size: 18px;
+	font-size: 18dp;
 	white-space: nowrap;
 	color: rgba(224, 219, 200, 25%);
 	cursor: pointer;
@@ -82,8 +83,8 @@ tab:focus {
 
 tab.selected {
 	color: #E0DBC8;
-	border-bottom: 4px #C2A42D;
-	font-effect: glow(0px 4px 0px 4px black);
+	border-bottom: 4dp #C2A42D;
+	font-effect: glow(0dp 4dp 0dp 4dp black);
 }
 
 /* --- Content / panes --------------------------------------------------------------------- */
@@ -99,8 +100,8 @@ pane {
 	display: none;
 	flex: 1 1 0;
 	min-height: 0;
-	padding: 24px;
-	font-size: 20px;
+	padding: 24dp;
+	font-size: 20dp;
 	overflow-y: auto;
 }
 
@@ -112,13 +113,13 @@ pane.active {
 	display: block;
 	font-weight: bold;
 	text-transform: uppercase;
-	font-size: 22px;
+	font-size: 22dp;
 	color: rgba(224, 219, 200, 35%);
-	margin-bottom: 8px;
+	margin-bottom: 8dp;
 }
 
 .section-heading.spaced {
-	margin-top: 16px;
+	margin-top: 16dp;
 }
 
 /* A settings row: label on the left, value right-aligned. The whole row takes focus so a
@@ -126,10 +127,10 @@ pane.active {
 select-button {
 	display: block;
 	background-color: rgba(17, 16, 10, 20%);
-	padding: 8px 16px;
-	margin-bottom: 8px;
-	border-radius: 14px;
-	border: 1px rgba(146, 135, 91, 25%);
+	padding: 8dp 16dp;
+	margin-bottom: 8dp;
+	border-radius: 14dp;
+	border: 1dp rgba(146, 135, 91, 25%);
 	cursor: pointer;
 	/* Put each row in the keyboard/controller Tab order. RmlUi keys focus navigation off the
 	   `tab-index` RCSS property (default `none`), NOT the HTML `tabindex` attribute, so this — not
@@ -141,14 +142,14 @@ select-button {
 select-button:hover,
 select-button:focus {
 	background-color: rgba(204, 184, 119, 20%);
-	border: 1px #C2A42D;
+	border: 1dp #C2A42D;
 }
 
 select-button key {
 	display: inline-block;
 	width: 70%;
 	font-weight: bold;
-	font-size: 18px;
+	font-size: 18dp;
 	text-transform: uppercase;
 	vertical-align: middle;
 }
@@ -157,7 +158,7 @@ select-button value {
 	display: inline-block;
 	width: 28%;
 	text-align: right;
-	font-size: 20px;
+	font-size: 20dp;
 	color: #E0DBC8;
 	vertical-align: middle;
 }
@@ -169,20 +170,20 @@ select-button:focus value {
 
 /* --- Scrollbar (matches Dusklight's slim gold-on-cream bar) ------------------------------- */
 scrollbarvertical {
-	width: 8px;
-	margin: 4px 4px 4px 0;
+	width: 8dp;
+	margin: 4dp 4dp 4dp 0;
 }
 
 scrollbarvertical slidertrack {
 	background-color: rgba(255, 255, 255, 5%);
-	border-radius: 2px;
+	border-radius: 2dp;
 }
 
 scrollbarvertical sliderbar {
-	width: 8px;
-	min-height: 24px;
+	width: 8dp;
+	min-height: 24dp;
 	background-color: rgba(224, 219, 200, 45%);
-	border-radius: 2px;
+	border-radius: 2dp;
 }
 
 scrollbarvertical sliderbar:hover,
@@ -198,7 +199,7 @@ scrollbarvertical sliderarrowinc {
 /* Footer hint line at the bottom of a pane. */
 .hint {
 	display: block;
-	margin-top: 12px;
-	font-size: 15px;
+	margin-top: 12dp;
+	font-size: 15dp;
 	color: rgba(224, 219, 200, 45%);
 }

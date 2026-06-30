@@ -18,6 +18,7 @@
 #include <spdlog/spdlog.h>
 #include <algorithm>
 #include <cstdio>
+#include <cstdlib>
 
 // SoH3D render toggles live as extern "C" ints in libultraship's soh3d_gl.cpp (the live state the
 // GL pass reads each frame). The RML rows flip these directly for an immediate, visible effect and
@@ -284,6 +285,8 @@ bool SohRmlUi::Init(void* sdlWindow, void* glContext, int width, int height, boo
     // Start hidden; the menu is shown on demand via ToggleVisible() (Phase 2). The document stays
     // loaded either way — we gate update/render + input on mVisible.
     mDocument->Show();
+    // Scale the dp-authored sheet to this display's content scale (HiDPI).
+    ApplyDensityRatio();
     // Mouse parity: clicking a <tab> switches to it (keyboard/D-pad Left/Right already do).
     AttachTabClickHandlers();
     // mHudDocument: NOT loaded — the in-game HUD is native SoH Fast3D (Interface_Draw /
@@ -677,6 +680,30 @@ bool SohRmlUi::ProcessSdlEvent(void* sdlEvent) {
     }
 }
 
+void SohRmlUi::ApplyDensityRatio() {
+    if (!mContext || !mSdlWindow) {
+        return;
+    }
+    // SDL3 reports the display content scale (1.0 on a 96-dpi monitor, 1.5/2.0 on HiDPI / fractional
+    // scaling). RmlUi multiplies every `dp` unit by this ratio, so the sheet — authored in dp — renders
+    // at a consistent physical size across displays. A debug override lets the headless harness verify
+    // the scaling math (the Xvfb display always reports 1.0).
+    float scale = SDL_GetWindowDisplayScale(static_cast<SDL_Window*>(mSdlWindow));
+    if (const char* e = std::getenv("SOH3D_RML_DPI")) {
+        float v = (float)atof(e);
+        if (v > 0.0f) {
+            scale = v;
+        }
+    }
+    if (!(scale > 0.0f)) {
+        scale = 1.0f;
+    }
+    if (scale != mDpRatio) {
+        mDpRatio = scale;
+        mContext->SetDensityIndependentPixelRatio(scale);
+    }
+}
+
 void SohRmlUi::Resize(int width, int height) {
     if (width <= 0 || height <= 0 || (width == mWidth && height == mHeight)) {
         return;
@@ -700,6 +727,7 @@ void SohRmlUi::UpdateAndRender() {
         // SDL3-MIGRATION: SDL_GL_GetDrawableSize -> SDL_GetWindowSizeInPixels (drawable/pixel size).
         SDL_GetWindowSizeInPixels(static_cast<SDL_Window*>(mSdlWindow), &dw, &dh);
         Resize(dw, dh);
+        ApplyDensityRatio();
     }
 
     RefreshDiag();
