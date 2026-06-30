@@ -3,6 +3,7 @@
 
 #include "gfx_rendering_api.h"
 #include "../interpreter.h"
+#include "fast/soh3d_sg_ubo.h" // SoH3DSg::SgUbo — the skinned model-draw uniform payload carried by OP_DRAW
 
 #include <SDL3/SDL.h>
 #include <SDL3/SDL_gpu.h>
@@ -155,6 +156,13 @@ class GfxRenderingAPISdl3Gpu : public GfxRenderingAPI {
     // composited frame the headless readback reads + the present blit samples, regardless of which
     // fb the interpreter last drew to).
     void AppendSoH3DInPassFb(int fb, std::function<void(SDL_GPUCommandBuffer*, SDL_GPURenderPass*)> fn);
+    // Append a SoH3D skinned model draw as a FIRST-CLASS OP_DRAW in the unified op-list (no callback
+    // indirection): it interleaves with N64 geometry in the same fb pass and replays through the same
+    // single fragment-sampler bind path. `ubo` points at a full SoH3DSg::SgUbo (common + bones). Slot
+    // 0 = the model texture, slot 1 = the sun-shadow map (or the dummies when shadow is off).
+    void AppendSoH3DModelDraw(SDL_GPUGraphicsPipeline* pipeline, SDL_GPUBuffer* vbo, uint32_t first, uint32_t count,
+                              const void* ubo, SDL_GPUTexture* tex, SDL_GPUSampler* samp, SDL_GPUTexture* shadowTex,
+                              SDL_GPUSampler* shadowSamp, const SDL_GPUViewport& vp, const SDL_Rect& sc);
     // Append an external op that runs its OWN render pass (offscreen shadow/AO depth targets). The
     // main framebuffer pass is ended first (SDL3 GPU passes can't nest); the callback owns
     // SDL_BeginGPURenderPass/SDL_EndGPURenderPass on the supplied command buffer.
@@ -264,10 +272,24 @@ class GfxRenderingAPISdl3Gpu : public GfxRenderingAPI {
         SDL_GPUTextureSamplerBinding samplers[6];
         SDL_GPUViewport viewport;
         SDL_Rect scissor;
-        uint8_t ubo[64]; // std140 fragment UBO payload (SgUboData)
+        uint8_t ubo[64]; // std140 fragment UBO payload (SgUboData) — N64 draws only
+        // >= 0 marks this OP_DRAW as a SoH3D skinned model draw: the large per-draw uniform payload,
+        // the per-model vertex buffer and the first/count live in mSoh3dDraws[soh3dDrawIdx] (the
+        // skinned vertex layout + 3-block uniform push differ from N64, but the pipeline, fragment
+        // samplers, viewport/scissor and the single bind path are shared with N64 OP_DRAW). -1 = N64.
+        int soh3dDrawIdx = -1;
         // EXT_IN_PASS: invoked inside fb's render pass. EXT_OWN_PASS: invoked with the main pass ended.
         std::function<void(SDL_GPUCommandBuffer*, SDL_GPURenderPass*)> extIn;
         std::function<void(SDL_GPUCommandBuffer*)> extOwn;
+    };
+
+    // Side data for a SoH3D skinned model draw (OP_DRAW with soh3dDrawIdx >= 0). Kept out of Op so the
+    // ~4.4 KB uniform payload doesn't bloat the thousands of N64 ops that don't need it. Index space is
+    // cleared together with mOps each frame, so an op's soh3dDrawIdx always indexes the live vector.
+    struct Soh3dDrawData {
+        SDL_GPUBuffer* vbo;     // per-model vertex buffer (not the shared frame mVbo)
+        uint32_t first, count;  // skinned draws use a nonzero first vertex
+        std::array<uint8_t, sizeof(SoH3DSg::SgUbo)> ubo; // common + bones, pushed as the 3 blocks at replay
     };
 
     void CreateDeviceAndClaim();
@@ -316,6 +338,9 @@ class GfxRenderingAPISdl3Gpu : public GfxRenderingAPI {
     uint32_t mVtxUsed = 0;
 
     std::vector<Op> mOps;
+    // Side payloads for the SoH3D skinned model OP_DRAWs in mOps (see Soh3dDrawData). Cleared in
+    // lockstep with mOps so an op's soh3dDrawIdx always points at the live entry.
+    std::vector<Soh3dDrawData> mSoh3dDraws;
 
     // GPU textures whose release was deferred because the in-flight op-list may still bind them;
     // released in FlushPendingTexReleases once the frame's command buffer is submitted.

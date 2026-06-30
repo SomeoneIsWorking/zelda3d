@@ -693,6 +693,7 @@ void GfxRenderingAPISdl3Gpu::StartFrame() {
 
     mFrameCount++;
     mOps.clear();
+    mSoh3dDraws.clear();
     mVtxUsed = 0;
     mVtxMapped = (uint8_t*)SDL_MapGPUTransferBuffer(mDevice, mVtxTransfer, true /*cycle*/);
 
@@ -831,8 +832,13 @@ void GfxRenderingAPISdl3Gpu::ReplayOps(SDL_GPUTexture* presentTex, uint32_t pres
                 // logging, no behaviour change.
                 static const bool kDbgOpDraw = getenv("SOH3D_DBG_OPDRAW") != nullptr;
                 if (kDbgOpDraw) {
-                    fprintf(stderr, "[DBG_OPDRAW] fb=%d pipe=%p nVerts=%u vboOff=%u nSamp=%u",
-                            op.fb, (void*)op.pipeline, op.numVerts, op.vboOffset, op.numSamplers);
+                    if (op.soh3dDrawIdx >= 0) {
+                        const Soh3dDrawData& d = mSoh3dDraws[op.soh3dDrawIdx];
+                        fprintf(stderr, "[DBG_OPDRAW] fb=%d pipe=%p soh3d#%d vbo=%p first=%u count=%u nSamp=%u", op.fb,
+                                (void*)op.pipeline, op.soh3dDrawIdx, (void*)d.vbo, d.first, d.count, op.numSamplers);
+                    } else
+                        fprintf(stderr, "[DBG_OPDRAW] fb=%d pipe=%p nVerts=%u vboOff=%u nSamp=%u", op.fb,
+                                (void*)op.pipeline, op.numVerts, op.vboOffset, op.numSamplers);
                     for (uint32_t si = 0; si < op.numSamplers; si++)
                         fprintf(stderr, " [%u tex=%p samp=%p]", si, (void*)op.samplers[si].texture,
                                 (void*)op.samplers[si].sampler);
@@ -842,10 +848,32 @@ void GfxRenderingAPISdl3Gpu::ReplayOps(SDL_GPUTexture* presentTex, uint32_t pres
                 SDL_BindGPUGraphicsPipeline(pass, op.pipeline);
                 SDL_SetGPUViewport(pass, &op.viewport);
                 SDL_SetGPUScissor(pass, &op.scissor);
-                SDL_PushGPUFragmentUniformData(mCmd, 0, op.ubo, sizeof(SgUboData));
+                // The uniform-push pattern + vertex source differ between N64 and SoH3D skinned draws;
+                // everything below (vertex-buffer bind, the single fragment-sampler bind path, the
+                // draw) is shared. firstVtx/vtxCount/vbuf/voff are resolved here per draw kind.
+                SDL_GPUBuffer* vbuf;
+                uint32_t voff, firstVtx, vtxCount;
+                if (op.soh3dDrawIdx >= 0) {
+                    const Soh3dDrawData& d = mSoh3dDraws[op.soh3dDrawIdx];
+                    // Two-block push: common state at binding 0 (both stages), bone matrices at vertex
+                    // binding 1 — neither block may exceed SDL3 GPU's 4096-byte cap (see soh3d_sg_ubo.h).
+                    SDL_PushGPUVertexUniformData(mCmd, 0, d.ubo.data(), SoH3DSg::kCommonBytes);
+                    SDL_PushGPUFragmentUniformData(mCmd, 0, d.ubo.data(), SoH3DSg::kCommonBytes);
+                    SDL_PushGPUVertexUniformData(mCmd, 1, d.ubo.data() + SoH3DSg::kCommonBytes, SoH3DSg::kBonesBytes);
+                    vbuf = d.vbo;
+                    voff = 0;
+                    firstVtx = d.first;
+                    vtxCount = d.count;
+                } else {
+                    SDL_PushGPUFragmentUniformData(mCmd, 0, op.ubo, sizeof(SgUboData));
+                    vbuf = mVbo;
+                    voff = op.vboOffset;
+                    firstVtx = 0;
+                    vtxCount = op.numVerts;
+                }
                 SDL_GPUBufferBinding vb{};
-                vb.buffer = mVbo;
-                vb.offset = op.vboOffset;
+                vb.buffer = vbuf;
+                vb.offset = voff;
                 SDL_BindGPUVertexBuffers(pass, 0, &vb, 1);
                 if (op.numSamplers > 0) {
 #if defined(__APPLE__)
@@ -879,7 +907,7 @@ void GfxRenderingAPISdl3Gpu::ReplayOps(SDL_GPUTexture* presentTex, uint32_t pres
 #endif
                     SDL_BindGPUFragmentSamplers(pass, 0, op.samplers, op.numSamplers);
                 }
-                SDL_DrawGPUPrimitives(pass, op.numVerts, 1, 0, 0);
+                SDL_DrawGPUPrimitives(pass, vtxCount, 1, firstVtx, 0);
                 break;
             }
             case OP_EXT_IN_PASS: {
@@ -979,6 +1007,7 @@ void GfxRenderingAPISdl3Gpu::FinishRender() {
     FlushPendingTexReleases();
     mFrameAcquired = false;
     mOps.clear();
+    mSoh3dDraws.clear();
 }
 
 void GfxRenderingAPISdl3Gpu::FlushAndWait() {
@@ -998,6 +1027,7 @@ void GfxRenderingAPISdl3Gpu::FlushAndWait() {
     // Resume the frame: fresh op list + remapped (cycled) vertex staging. The framebuffers are
     // persistent textures, so already-rendered content is retained and subsequent draws layer on.
     mOps.clear();
+    mSoh3dDraws.clear();
     mVtxUsed = 0;
     mVtxMapped = (uint8_t*)SDL_MapGPUTransferBuffer(mDevice, mVtxTransfer, true /*cycle*/);
 }
@@ -2097,6 +2127,34 @@ void GfxRenderingAPISdl3Gpu::AppendSoH3DInPassFb(int fb,
     op.kind = OP_EXT_IN_PASS;
     op.fb = fb;
     op.extIn = std::move(fn);
+    mOps.push_back(std::move(op));
+}
+
+void GfxRenderingAPISdl3Gpu::AppendSoH3DModelDraw(SDL_GPUGraphicsPipeline* pipeline, SDL_GPUBuffer* vbo, uint32_t first,
+                                                  uint32_t count, const void* ubo, SDL_GPUTexture* tex,
+                                                  SDL_GPUSampler* samp, SDL_GPUTexture* shadowTex,
+                                                  SDL_GPUSampler* shadowSamp, const SDL_GPUViewport& vp,
+                                                  const SDL_Rect& sc) {
+    Soh3dDrawData d{};
+    d.vbo = vbo;
+    d.first = first;
+    d.count = count;
+    memcpy(d.ubo.data(), ubo, sizeof(SoH3DSg::SgUbo));
+    int idx = (int)mSoh3dDraws.size();
+    mSoh3dDraws.push_back(d);
+
+    Op op{};
+    op.kind = OP_DRAW;
+    op.fb = mCurrentFb;
+    op.pipeline = pipeline;
+    op.viewport = vp;
+    op.scissor = sc;
+    op.numSamplers = 2; // slot 0 = model texture, slot 1 = sun-shadow map
+    op.samplers[0].texture = tex;
+    op.samplers[0].sampler = samp;
+    op.samplers[1].texture = shadowTex;
+    op.samplers[1].sampler = shadowSamp;
+    op.soh3dDrawIdx = idx;
     mOps.push_back(std::move(op));
 }
 
