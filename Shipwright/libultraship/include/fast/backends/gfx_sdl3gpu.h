@@ -262,6 +262,10 @@ class GfxRenderingAPISdl3Gpu : public GfxRenderingAPI {
     void CreateDeviceAndClaim();
     SDL_GPUGraphicsPipeline* GetOrCreatePipeline(ShaderProgramSDL3* prg, uint32_t stateBits);
     SDL_GPUSampler* GetOrCreateSampler(bool linear, uint32_t cms, uint32_t cmt);
+    // Texture-release lifetime helpers: defer a release while a frame is recording (the op-list may
+    // still bind the handle), flush deferred releases once that frame's command buffer is submitted.
+    void DeferReleaseTexture(SDL_GPUTexture* tex);
+    void FlushPendingTexReleases();
     SDL_GPUTexture* DummyTexture();
     SDL_GPUSampler* DummySampler();
     void CreateFbResources(FramebufferSDL3& fb, uint32_t width, uint32_t height, bool hasDepth);
@@ -303,6 +307,10 @@ class GfxRenderingAPISdl3Gpu : public GfxRenderingAPI {
     uint32_t mVtxUsed = 0;
 
     std::vector<Op> mOps;
+
+    // GPU textures whose release was deferred because the in-flight op-list may still bind them;
+    // released in FlushPendingTexReleases once the frame's command buffer is submitted.
+    std::vector<SDL_GPUTexture*> mPendingTexRelease;
 
     SDL_GPUTexture* mDummyTex = nullptr;
     SDL_GPUSampler* mDummySampler = nullptr;
