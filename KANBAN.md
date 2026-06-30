@@ -3,16 +3,16 @@
 > **Generated mirror — do not hand-edit.** Source of truth = GitHub Issues on
 > `SomeoneIsWorking/soh3d` (private). Regenerate with `tools/kanban.py render`.
 > Move a card with `tools/kanban.py mv <#> <column>`; add with `tools/kanban.py add`.
-> Columns: todo · in-progress · in-review · needs-confirmation · reopened · blocked · done(=closed).  Updated 2026-06-30 13:50.
+> Columns: todo · in-progress · in-review · needs-confirmation · reopened · blocked · done(=closed).  Updated 2026-06-30 22:02.
 
-**Counts:** todo:5 | in-progress:2 | in-review:1 | needs-confirmation:23 | reopened:0 | blocked:0 | done:78
+**Counts:** todo:5 | in-progress:2 | in-review:1 | needs-confirmation:26 | reopened:0 | blocked:0 | done:80
 
 ## 📋 To Do  (5)
 - [#17](../../issues/17) Hi-res world/scene textures (texpack) _(render)_
 - [#33](../../issues/33) More foliage / vegetation density (lowest priority) _(scene)_
 - [#118](../../issues/118) Market (SCENE_MARKET_DAY) parity: crowd NPCs (En_Hy/En_Mu) mis-rendered, door still N64 _(render,scene,behavior)_
 - [#122](../../issues/122) Faithful Boss_Goma per-limb scale overrides (eye-iris open/close + tail extend) in combat states _(render,behavior)_
-- [#124](../../issues/124) Spirit Temple doors (jya_door/boss_door) render ~13x oversized (auto-scale measures N64 door height wrong) _(render,scene)_
+- [#128](../../issues/128) SKYBUG: unresolved texture segment 8 paints stale/garbage texels (scene-load race) _(render)_
 
 ## 🔨 In Progress  (2)
 - [#111](../../issues/111) World night R/G too bright — flat tint under-darkens at night (needs vertex-lighting port) _(render)_
@@ -21,7 +21,7 @@
 ## 🔍 In Review (agent verifying)  (1)
 - [#112](../../issues/112) START can't skip the final intro segment (Navi flies in / wakes Link) _(render,keyboard)_
 
-## 🙋 Needs User Confirmation  (23)
+## 🙋 Needs User Confirmation  (26)
 - [#12](../../issues/12) Inventory/pause background renders upside-down _(render,ui,inventory)_
 - [#16](../../issues/16) First-person camera: early-load crash + position snap _(camera,crash)_
 - [#18](../../issues/18) Crisp HUD/UI textures (hearts/digits/buttons/icons) _(ui,hud)_
@@ -45,6 +45,9 @@
 - [#119](../../issues/119) Spirit Temple child Nabooru (En_Nb) lower body collapses into a white blob (skinned retarget mis-poses crossed legs) _(render,anim)_
 - [#120](../../issues/120) Faithfully port OoT3D Boss_Goma (Queen Gohma) from the 3DS decomp _(render,behavior)_
 - [#123](../../issues/123) Queen Gohma floats off the pillars (gap) while climbing _(render,behavior)_
+- [#125](../../issues/125) Headless lavapipe SIGSEGV ~1s after first OoT3D frame (SKYBUG async vertex crash) _(render)_
+- [#126](../../issues/126) Keyboard/Start input dead after ImGui removal — stub GetTopMostPopupModal returns non-null _(keyboard)_
+- [#127](../../issues/127) RmlUi UI scales out of view on retina/HiDPI Mac (points-vs-pixels framebuffer mismatch) _(ui)_
 
 ## ♻️ Reopened (was done, found broken)  (0)
 _none_
@@ -52,7 +55,9 @@ _none_
 ## ⛔ Blocked (needs live/user input)  (0)
 _none_
 
-## ✅ Done (recently closed)  (showing 30 of 78)
+## ✅ Done (recently closed)  (showing 30 of 80)
+- [#129](../../issues/129) Unify SoH3D into the ONE SDL3 GPU backend — single op-list + single sampler-bind path
+- [#124](../../issues/124) Spirit Temple doors (jya_door/boss_door) render ~13x oversized (auto-scale measures N64 door height wrong)
 - [#121](../../issues/121) Queen Gohma OoT3D model: smooth-skinning geometry defect (stretched limb)
 - [#105](../../issues/105) Port OoT3D water rendering to remaining scenes (Zora's/Kokiri/Gerudo river) — follow-up to #103 Lake Hylia
 - [#104](../../issues/104) Lake Hylia: black void blob on grass terrain (baked shadow/AO decal renders solid dark)
@@ -81,5 +86,3 @@ _none_
 - [#7](../../issues/7) 3DS Link (3DS anims): motionless slide + long right arm
 - [#6](../../issues/6) Held cucco renders at pickup spot, not in Link's hands
 - [#5](../../issues/5) Cucco wings don't flap (idle + held/agitated)
-- [#4](../../issues/4) Title/cutscene camera goes under 3DS terrain
-- [#2](../../issues/2) Kakariko well: water is a tiny teal diamond, not a surface
