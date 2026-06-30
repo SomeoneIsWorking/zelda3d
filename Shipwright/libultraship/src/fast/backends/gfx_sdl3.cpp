@@ -809,6 +809,13 @@ volatile int gSoh3dDumpPending = 0;
 }
 
 // Write the current GL window framebuffer to a binary PPM (P6), flipped to top-down.
+// This is the OpenGL frame-dump path; it is only ever reached when mUseSdl3Gpu is false
+// (see SwapBuffersBegin, which returns early on the SDL3 GPU path — the GPU rendering API
+// owns its own frame dump). On Apple no GL header is included (see the top-of-file include
+// block: __APPLE__ pulls macUtils, not GL), and Apple desktop always builds the SDL3 GPU
+// renderer, so the GL dump is unreachable there — compile it out rather than reference
+// undeclared GL symbols.
+#ifndef __APPLE__
 static void Soh3dWritePpm(SDL_Window* wnd, const char* path) {
     int w = 0, h = 0;
     SDL_GetWindowSizeInPixels(wnd, &w, &h); // SDL3-MIGRATION: SDL_GL_GetDrawableSize -> SDL_GetWindowSizeInPixels
@@ -823,6 +830,12 @@ static void Soh3dWritePpm(SDL_Window* wnd, const char* path) {
         fclose(f);
     }
 }
+#else
+static void Soh3dWritePpm(SDL_Window* /*wnd*/, const char* /*path*/) {
+    // Apple desktop builds the SDL3 GPU renderer (the GPU rendering API owns the frame dump);
+    // this OpenGL path is never reached, and no GL header is available here.
+}
+#endif
 
 void GfxWindowBackendSDL3::SwapBuffersBegin() {
 #ifdef ENABLE_SDL3GPU
