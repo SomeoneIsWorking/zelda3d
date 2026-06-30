@@ -105,33 +105,16 @@ struct FramebufferSDL3 {
 
 // Handles the SoH3D 3DS render pass (P3) needs to record its own draws into the SAME command
 // buffer + render pass the Fast3D SDL3-GPU backend has open for the current framebuffer, so the
-// OoT3D content interleaves depth-correctly with the N64 geometry. Mirrors SoH3DVkContext. Filled
-// by GfxRenderingAPISdl3Gpu::BeginSoH3DPass. (P2: handed out as stubs; the SoH3D model port is P3.)
-struct SoH3DGpuContext {
-    SDL_GPUDevice* device;
-    SDL_GPUCommandBuffer* cmd;
-    SDL_GPURenderPass* pass;
-    SDL_GPUViewport viewport;
-    SDL_Rect scissor;
-    uint32_t frameIndex;
-    uint32_t framesInFlight;
-};
-
 class GfxRenderingAPISdl3Gpu : public GfxRenderingAPI {
   public:
     explicit GfxRenderingAPISdl3Gpu(GfxWindowBackendSDL3* windowBackend);
     ~GfxRenderingAPISdl3Gpu() override;
 
-    // P3 hooks (stubbed in P2): hand the SoH3D pass the device/command-buffer/pass handles it needs
-    // to record interleaved OoT3D model draws. Return false in P2 (no open pass handed out yet).
-    bool BeginSoH3DPass(SoH3DGpuContext& out);
-    bool BeginSoH3DOffscreen(SoH3DGpuContext& out);
-
-    // ---- Unified op model (P3): the SoH3D OoT3D content (CMB models, HUD, RmlUi) appends its draws
-    // as ops into the SAME deferred op-list as the N64 Fast3D triangles, replayed in ONE render pass
-    // in FinishRender. There is NO separate-pass / live-command-buffer handshake — the legacy
-    // BeginSoH3DPass model is gone. soh3d_sdl3gpu.cpp owns its own GPU resources (created via the
-    // device handle below) and records draws via these two appenders.
+    // ---- Unified op model: the SoH3D OoT3D content (CMB models, HUD, AO composite, RmlUi menu) records
+    // its draws into the SAME deferred op-list as the N64 Fast3D triangles, replayed in ONE render pass
+    // in FinishRender. Every in-pass draw is a first-class OP_DRAW (AppendSoH3DModelDraw / HudDraw /
+    // Fullscreen); only genuine offscreen passes use AppendSoH3DOwnPass. soh3d_sdl3gpu.cpp owns its own
+    // GPU resources (created via the device handle below).
     SDL_GPUDevice* GpuDevice() {
         return mDevice;
     }
@@ -148,14 +131,6 @@ class GfxRenderingAPISdl3Gpu : public GfxRenderingAPI {
     // SDL3 GPU top-left convention for the current framebuffer — the SAME conversion DrawTriangles
     // applies — so SoH3D model draws land pixel-aligned with the N64 geometry they interleave with.
     void GetSoH3DViewportScissor(SDL_GPUViewport& vp, SDL_Rect& sc);
-    // Append an external draw recorded INSIDE the current framebuffer's render pass (interleaves
-    // depth-correctly with N64 geometry — same color+depth target). The callback gets the open
-    // command buffer + render pass at replay time.
-    void AppendSoH3DInPass(std::function<void(SDL_GPUCommandBuffer*, SDL_GPURenderPass*)> fn);
-    // As AppendSoH3DInPass but targeting an explicit framebuffer (the HUD / menu draw into fb 0, the
-    // composited frame the headless readback reads + the present blit samples, regardless of which
-    // fb the interpreter last drew to).
-    void AppendSoH3DInPassFb(int fb, std::function<void(SDL_GPUCommandBuffer*, SDL_GPURenderPass*)> fn);
     // Append a SoH3D skinned model draw as a FIRST-CLASS OP_DRAW in the unified op-list (no callback
     // indirection): it interleaves with N64 geometry in the same fb pass and replays through the same
     // single fragment-sampler bind path. `ubo` points at a full SoH3DSg::SgUbo (common + bones). Slot
@@ -168,6 +143,12 @@ class GfxRenderingAPISdl3Gpu : public GfxRenderingAPI {
     // ring vertex buffer; the vertex shader's viewport UBO is built from w/h.
     void AppendSoH3DHudDraw(SDL_GPUGraphicsPipeline* pipeline, SDL_GPUBuffer* vbo, uint32_t first, uint32_t count,
                             SDL_GPUTexture* tex, SDL_GPUSampler* samp, float w, float h);
+    // Append a fullscreen-triangle post-process draw (the SSAO composite) as a first-class OP_DRAW into
+    // the current fb pass, over the scene, through the same single bind path. No vertex buffer (the
+    // vertex shader generates the triangle from gl_VertexIndex); `ubo`/`uboLen` is its fragment UBO and
+    // `tex`/`samp` its single sampler. The pipeline carries the multiply blend.
+    void AppendSoH3DFullscreen(SDL_GPUGraphicsPipeline* pipeline, const void* ubo, uint32_t uboLen, SDL_GPUTexture* tex,
+                               SDL_GPUSampler* samp, const SDL_GPUViewport& vp, const SDL_Rect& sc);
     // Append an external op that runs its OWN render pass (offscreen shadow/AO depth targets). The
     // main framebuffer pass is ended first (SDL3 GPU passes can't nest); the callback owns
     // SDL_BeginGPURenderPass/SDL_EndGPURenderPass on the supplied command buffer.
@@ -259,9 +240,11 @@ class GfxRenderingAPISdl3Gpu : public GfxRenderingAPI {
     // backend records draws/clears/blits into an op list during the frame (with vertex data staged
     // into a CPU buffer), then at EndFrame uploads the whole vertex buffer in ONE copy pass and
     // replays the ops — switching render passes only when the target framebuffer changes.
-    // OP_EXT_IN_PASS / OP_EXT_OWN_PASS are the unified-renderer hooks (P3): the SoH3D OoT3D content
-    // records its draws as callback ops in the SAME stream as the N64 triangles.
-    enum OpKind { OP_DRAW, OP_CLEAR, OP_COPY, OP_EXT_IN_PASS, OP_EXT_OWN_PASS };
+    // Every in-pass draw — N64 Fast3D, SoH3D OoT3D skinned models, the PC HUD, and the fullscreen AO
+    // composite — is an OP_DRAW (see Op::DrawClass), so the whole frame replays through one render pass
+    // and one fragment-sampler bind path. OP_EXT_OWN_PASS remains the hook for genuine OFFSCREEN passes
+    // (the shadow / AO depth renders and the RmlUi menu stencil pass) that own their own render pass.
+    enum OpKind { OP_DRAW, OP_CLEAR, OP_COPY, OP_EXT_OWN_PASS };
     struct Op {
         OpKind kind;
         int fb;     // target fb (DRAW/CLEAR/EXT_IN_PASS) or destination fb (COPY)
@@ -286,14 +269,15 @@ class GfxRenderingAPISdl3Gpu : public GfxRenderingAPI {
         // Which uniform-push + sampler shape this OP_DRAW uses. The pipeline, fragment-sampler bind
         // path, viewport/scissor and the draw are shared across all three; only the uniform push and
         // the vertex layout (baked into the pipeline) differ.
-        //   DRAW_N64   : one fragment UBO (op.ubo) from mVbo.
-        //   DRAW_MODEL : skinned — the 3-block common+bones push from mSoh3dModelUbos[soh3dDrawIdx].
-        //   DRAW_HUD   : one vertex UBO (op.ubo, the viewport) from altVbo.
-        enum DrawClass : uint8_t { DRAW_N64, DRAW_MODEL, DRAW_HUD } drawClass;
+        //   DRAW_N64        : one fragment UBO (op.ubo) from mVbo.
+        //   DRAW_MODEL      : skinned — the 3-block common+bones push from mSoh3dModelUbos[soh3dDrawIdx].
+        //   DRAW_HUD        : one vertex UBO (op.ubo, the viewport) from altVbo.
+        //   DRAW_FULLSCREEN : one fragment UBO (op.ubo, uboLen bytes), NO vertex buffer (the AO composite
+        //                     generates a fullscreen triangle from gl_VertexIndex).
+        enum DrawClass : uint8_t { DRAW_N64, DRAW_MODEL, DRAW_HUD, DRAW_FULLSCREEN } drawClass;
+        uint16_t uboLen; // fragment-UBO byte length for DRAW_FULLSCREEN (0 = use the class default)
         int soh3dDrawIdx; // DRAW_MODEL: index into mSoh3dModelUbos for the oversized skinned payload
-        // EXT_IN_PASS: invoked inside fb's render pass. EXT_OWN_PASS: invoked with the main pass ended.
-        std::function<void(SDL_GPUCommandBuffer*, SDL_GPURenderPass*)> extIn;
-        std::function<void(SDL_GPUCommandBuffer*)> extOwn;
+        std::function<void(SDL_GPUCommandBuffer*)> extOwn; // OP_EXT_OWN_PASS: runs with the main pass ended
     };
 
     void CreateDeviceAndClaim();

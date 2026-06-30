@@ -88,8 +88,8 @@ struct DepthDraw {
 
 // The OoT3D skinned-model + dynamic sun-shadow + SSAO renderer. Holds every former file-scope `g_*`
 // of soh3d_sdl3gpu.cpp as a data member with the same name. Methods borrow the backend (device,
-// AppendSoH3DInPass, GpuColorFormat, ...) via the global Fast::g_activeSdl3GpuApi, exactly as the
-// former free functions did.
+// AppendSoH3DModelDraw / AppendSoH3DFullscreen / AppendSoH3DOwnPass, GpuColorFormat, ...) via the
+// global Fast::g_activeSdl3GpuApi, exactly as the former free functions did.
 class SoH3DRenderer {
   public:
     // ---- API (former extern "C" SoH3D_Sg_* bodies; shims forward here) ----
