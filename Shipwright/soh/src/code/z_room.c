@@ -633,12 +633,17 @@ s32 func_800973FC(PlayState* play, RoomContext* roomCtx) {
 void Room_Draw(PlayState* play, Room* room, u32 flags) {
     if (room->segment != NULL) {
         gSegments[3] = VIRTUAL_TO_PHYSICAL(room->segment);
-        // SoH3D: if this scene has an OoT3D room model, draw it (world-origin GL path)
-        // in place of the N64 room mesh. One central divert — see soh3d.c. The opaque
-        // pass (flags bit 0) carries the geometry; mirror the N64 single-draw so the
-        // room isn't emitted twice across the opa/xlu passes.
-        if ((flags & 1) && SoH3D_TryDrawRoom(play, room)) {
-            return;
+        // SoH3D: if this scene has an OoT3D room model, draw it (world-origin GL path). If SoH3D is
+        // on but the scene isn't mapped yet, still refuse to fall back to the N64 room mesh — the
+        // 3DS product has no N64 renderer, and the honest render for an unmapped scene is empty
+        // (skybox + actors, no walls/floor), not a mixed-renderer hybrid. #134.
+        if (flags & 1) {
+            if (SoH3D_TryDrawRoom(play, room)) {
+                return;
+            }
+            if (SoH3D_Enabled()) {
+                return; // unmapped scene under SoH3D → empty room, no N64 mesh
+            }
         }
         assert(room->meshHeader->base.type < ARRAY_COUNTU(sRoomDrawHandlers));
         sRoomDrawHandlers[room->meshHeader->base.type](play, room, flags);
