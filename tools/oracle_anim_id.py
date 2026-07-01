@@ -28,7 +28,7 @@ def main():
     args = ap.parse_args()
     bones = parse_bones(args.bones)
 
-    rom = CtrRom(os.environ["ZELDA3D_3DS_ROM"])
+    rom = CtrRom(os.environ["ZELDA3D_OOT3D_ROM"])
     z = Zar(rom.read(rom.get(ZAR)))
 
     def load(name):

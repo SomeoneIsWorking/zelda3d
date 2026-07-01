@@ -3,7 +3,7 @@
 // -> 3DS asset + world scale), lazily parses+decodes a model from the decrypted
 // .3ds the first time it's drawn (on the render thread, GL current), and serves the
 // renderer's provider callback with the CPU data to upload. No baked-in C arrays;
-// the .3ds path comes from env ZELDA3D_3DS_ROM (never hardcoded — repo rule).
+// the .3ds path comes from env ZELDA3D_OOT3D_ROM (never hardcoded — repo rule).
 #include "asset/ctr_rom.h"
 #include "asset/zar.h"
 #include "asset/zsi.h"
@@ -125,9 +125,9 @@ std::vector<std::string> g_autoModelPaths; // index = modelId - kAutoModelBase
 
 Zelda3D::CtrRom* rom() {
     if (!g_rom) {
-        const char* path = getenv("ZELDA3D_3DS_ROM");
+        const char* path = getenv("ZELDA3D_OOT3D_ROM");
         if (!path || !*path) {
-            fprintf(stderr, "[Zelda3D] ZELDA3D_3DS_ROM not set — cannot load OoT3D assets\n");
+            fprintf(stderr, "[Zelda3D] ZELDA3D_OOT3D_ROM not set — cannot load OoT3D assets\n");
             return nullptr;
         }
         g_rom = std::make_unique<Zelda3D::CtrRom>(path);

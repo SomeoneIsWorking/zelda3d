@@ -5,9 +5,9 @@
 # Validates against the in-game ZELDA3D_SKELDUMP. Big-endian N64 data.
 import struct, sys, os, re, glob
 REPO = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
-# N64 OoT USA/NTSC v1.0 ROM. Provide it via the ZELDA3D_N64_ROM env var (see the gitignored .env)
+# N64 OoT USA/NTSC v1.0 ROM. Provide it via the ZELDA3D_OOT_ROM env var (see the gitignored .env)
 # or drop the .z64 into the repo root as oot_ntsc_10.z64. Never commit the ROM (copyrighted).
-ROM = os.environ.get("ZELDA3D_N64_ROM") or os.path.join(REPO, "oot_ntsc_10.z64")
+ROM = os.environ.get("ZELDA3D_OOT_ROM") or os.path.join(REPO, "oot_ntsc_10.z64")
 FILELIST = os.path.join(REPO, "Shipwright/soh/assets/extractor/filelists/ntsc_oot.txt")
 # XML offsets are NOT version-stable: anim offsets differ between PAL and NTSC for some objects
 # (e.g. object_du gDaruniaIdleAnim = 0x6EB0 PAL vs 0x74B0 NTSC). The ROM above is USA/NTSC, so the

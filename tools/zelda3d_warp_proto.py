@@ -13,7 +13,7 @@ Knobs (env):
   H0/H1   blend full below H0, zero above H1 above local ground (default 60/400)
 
 The current engine algorithm == STEP=100 REJECT=120 HOLEFILL=1 BLEND=0.
-Usage: ZELDA3D_3DS_ROM=<rom> python3 tools/zelda3d_warp_proto.py <scene.zsi> <n64.csv>
+Usage: ZELDA3D_OOT3D_ROM=<rom> python3 tools/zelda3d_warp_proto.py <scene.zsi> <n64.csv>
 """
 import os, sys, math, csv
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
@@ -29,7 +29,7 @@ H1 = float(os.environ.get("H1", "400"))
 
 
 def load(path):
-    rom = CtrRom(os.environ["ZELDA3D_3DS_ROM"])
+    rom = CtrRom(os.environ["ZELDA3D_OOT3D_ROM"])
     z = zsimod.Zsi(rom.read(rom.get(path)))
     m = cmbmod.Cmb(z.cmb_bytes())
     floor_tris, all_verts = [], []

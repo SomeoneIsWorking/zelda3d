@@ -3,7 +3,7 @@
 // against the Python tools (cmb.py / pica_texture.py). No SoH/GL build needed.
 //
 // Build: see tools/build_asset_test.sh
-// Run:   ZELDA3D_3DS_ROM=<path.3ds> scratch/bin/asset_test [/actor/zelda_ge1.zar]
+// Run:   ZELDA3D_OOT3D_ROM=<path.3ds> scratch/bin/asset_test [/actor/zelda_ge1.zar]
 #include "../Shipwright/soh/src/zelda3d/asset/ctr_rom.h"
 #include "../Shipwright/soh/src/zelda3d/asset/zar.h"
 #include "../Shipwright/soh/src/zelda3d/asset/cmb.h"
@@ -23,8 +23,8 @@ static uint32_t fnv1a(const std::vector<uint8_t>& v) {
 }
 
 int main(int argc, char** argv) {
-    const char* rom = getenv("ZELDA3D_3DS_ROM");
-    if (!rom || !*rom) { fprintf(stderr, "set ZELDA3D_3DS_ROM to the OoT3D .3ds (see .env)\n"); return 1; }
+    const char* rom = getenv("ZELDA3D_OOT3D_ROM");
+    if (!rom || !*rom) { fprintf(stderr, "set ZELDA3D_OOT3D_ROM to the OoT3D .3ds (see .env)\n"); return 1; }
     const char* zarPath = argc > 1 ? argv[1] : "/actor/zelda_ge1.zar";
 
     CtrRom r(rom);

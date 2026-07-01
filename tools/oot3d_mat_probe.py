@@ -65,7 +65,7 @@ def parse_mats(b, base):
 
 if __name__=="__main__":
     path=sys.argv[1] if len(sys.argv)>1 else "/scene/spot04_0_info.zsi"
-    rom=CtrRom(os.environ["ZELDA3D_3DS_ROM"])
+    rom=CtrRom(os.environ["ZELDA3D_OOT3D_ROM"])
     z=zsimod.Zsi(rom.read(rom.get(path)))
     # room zsi embeds the CMB; find raw 'mats'
     blob=z.data if hasattr(z,"data") else rom.read(rom.get(path))

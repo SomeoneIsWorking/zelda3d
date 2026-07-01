@@ -12,7 +12,7 @@ degenerate boss-arena CMBs (~1792 bytes, 12-tri placeholders) — the C++ Cmb pa
 fine and the runtime never crashes on them. Treat a handful of cmb.py parse-throws on
 those as oracle-only, cross-checked with scratch/bin/zsi_test.
 
-Run: ZELDA3D_3DS_ROM=<path.3ds> python3 tools/scene_sweep.py
+Run: ZELDA3D_OOT3D_ROM=<path.3ds> python3 tools/scene_sweep.py
 """
 import os, sys, re
 sys.path.insert(0, os.path.dirname(__file__))
@@ -21,7 +21,7 @@ import zsi as zsimod, cmb as cmbmod, pica_texture as pt
 
 
 def main():
-    rom = CtrRom(os.environ["ZELDA3D_3DS_ROM"])
+    rom = CtrRom(os.environ["ZELDA3D_OOT3D_ROM"])
     rooms = sorted({p for f in rom.iter_files()
                     for p in [f if isinstance(f, str) else getattr(f, "path", str(f))]
                     if re.match(r"/scene/[a-zA-Z0-9_]+_\d+_info\.zsi$", p)})

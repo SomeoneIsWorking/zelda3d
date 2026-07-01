@@ -169,9 +169,9 @@ class CtrRom:
 
 if __name__ == "__main__":
     import sys
-    rom = sys.argv[1] if len(sys.argv) > 1 else os.environ.get("ZELDA3D_3DS_ROM")
+    rom = sys.argv[1] if len(sys.argv) > 1 else os.environ.get("ZELDA3D_OOT3D_ROM")
     if not rom:
-        sys.exit("usage: ctr_romfs.py <oot3d.3ds>  (or set ZELDA3D_3DS_ROM; see .env)")
+        sys.exit("usage: ctr_romfs.py <oot3d.3ds>  (or set ZELDA3D_OOT3D_ROM; see .env)")
     r = CtrRom(rom)
     print(f"product={r.product_code} nocrypto={r.nocrypto} "
           f"romfs@0x{r.romfs_off:x} size=0x{r.romfs_size:x}")

@@ -4,7 +4,7 @@
 #   OoT3D side: parsed offline from each actor ZAR (cmb.py) -> tools/skeldata/oot3d_skeletons.json
 #   N64 side:   captured in-game via ZELDA3D_SKELDUMP -> tools/skeldata/n64/<zarbase>.txt
 #   bonemap:    zelda3d_skel_match.match() per character (where N64 data exists) -> bonemap.json
-# Run with ZELDA3D_3DS_ROM set. See SKILL zelda3d-game-control + PROGRESS.
+# Run with ZELDA3D_OOT3D_ROM set. See SKILL zelda3d-game-control + PROGRESS.
 import os, sys, json, math, re
 sys.path.insert(0, 'tools')
 from ctr_romfs import CtrRom
@@ -35,7 +35,7 @@ def oot3d_skeleton(rom, zarname):
     return dict(cmb=main.name, bones=bones)
 
 def main():
-    rom = CtrRom(os.environ["ZELDA3D_3DS_ROM"])
+    rom = CtrRom(os.environ["ZELDA3D_OOT3D_ROM"])
     inc = open(os.path.join(REPO, 'Shipwright/soh/src/zelda3d/zelda3d_object_zars.inc')).read()
     zars = sorted(set(re.findall(r'"(/actor/[a-zA-Z0-9_]+\.zar)"', inc)))  # case-insensitive: catch oF1d etc.
     skels = {}

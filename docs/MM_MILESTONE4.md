@@ -85,7 +85,7 @@ NOTE audio.cpp in ultramodern uses SDL (1 ref) — check whether SDL2 or SDL3 th
 Game id `mm.n64.us.1.0`, rom_hash `0xEF18B4A9E2386169`. The runtime expects a hash-validated
 decompressed copy in the config dir as `mm.n64.us.1.0.z64` (written once by `recomp::select_rom`).
 Bypass the UI: call `recomp::select_rom(path, "mm.n64.us.1.0")` once, then
-`recomp::start_game(u8"mm.n64.us.1.0")`. Our `.env` has `$ZELDA3D_MM_N64_ROM`.
+`recomp::start_game(u8"mm.n64.us.1.0")`. Our `.env` has `$ZELDA3D_MM_ROM`.
 
 ## Sub-step ladder (each independently verifiable)
 
@@ -164,7 +164,7 @@ Landed under `src/mm_host/` and wired into `src/mm_host/CMakeLists.txt`:
   register_data_api_exports → register_overlays/patches → init_extended_actor_data → load_config),
   builds the callback set (our `mm_host::create_render_context`, no-op audio/input, stderr
   message_box), passes a **non-null sentinel WindowHandle** (`(SDL_Window*)1`) so `recomp::start`
-  skips create_window, and kicks `select_rom($ZELDA3D_MM_N64_ROM, u8"mm.n64.us.1.0")` +
+  skips create_window, and kicks `select_rom($ZELDA3D_MM_ROM, u8"mm.n64.us.1.0")` +
   `start_game` from a detached thread before `recomp::start` blocks the main thread.
 - **`shim/recomp_ui.h`** — narrow host replacement for the upstream RmlUi/SDL2 `recomp_ui.h`. Sits
   FIRST on the game-glue include path so `#include "recomp_ui.h"` resolves to ours. Declares only

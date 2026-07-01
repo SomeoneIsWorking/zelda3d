@@ -26,9 +26,9 @@ static std::unordered_map<std::string, Model3ds> g_cache;
 
 bool InitRom(std::string& err) {
     if (g_rom && g_rom->ok()) return true;
-    const char* path = getenv("ZELDA3D_3DS_ROM");
+    const char* path = getenv("ZELDA3D_OOT3D_ROM");
     if (!path || !*path) {
-        err = "ZELDA3D_3DS_ROM not set — point it at the decrypted OoT3D .3ds";
+        err = "ZELDA3D_OOT3D_ROM not set — point it at the decrypted OoT3D .3ds";
         return false;
     }
     g_rom = std::make_unique<Zelda3D::CtrRom>(path);

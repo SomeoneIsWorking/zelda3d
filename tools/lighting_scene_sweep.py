@@ -17,7 +17,7 @@ those are reported but not flagged. Review the flagged scenes' PNGs.
 Shots: scratch/screenshots/lightsweep/<key>_<offday|onday|onnight>.png
 Results: scratch/lightsweep_results.json  (incremental; --resume to continue)
 
-Usage: ZELDA3D_3DS_ROM unused here; just `python3 tools/lighting_scene_sweep.py [--resume]`
+Usage: ZELDA3D_OOT3D_ROM unused here; just `python3 tools/lighting_scene_sweep.py [--resume]`
 """
 import json, os, re, subprocess, sys, shutil
 

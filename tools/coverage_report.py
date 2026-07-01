@@ -10,7 +10,7 @@ know they need a DIFFERENT path (scene geometry, item models, player) — not th
 Also lists the OoT3D /actor ZARs that NO N64 object points to yet, with each ZAR's main CMB
 identity — that list is the candidate pool for new verified ALIASes (the real object->ZAR gap).
 
-Writes COVERAGE.md (committed, the living coverage dashboard). Needs ZELDA3D_3DS_ROM.
+Writes COVERAGE.md (committed, the living coverage dashboard). Needs ZELDA3D_OOT3D_ROM.
 Run: . ./.env && python3 tools/coverage_report.py
 """
 import os, re, sys
@@ -45,7 +45,7 @@ def classify_nozar(base):
 
 
 def main():
-    rom = CtrRom(os.environ["ZELDA3D_3DS_ROM"])
+    rom = CtrRom(os.environ["ZELDA3D_OOT3D_ROM"])
     zarset = {f.path for f in rom.iter_files() if f.path.endswith(".zar")}
     actor_zars = sorted(z for z in zarset if z.startswith("/actor/zelda_"))
 

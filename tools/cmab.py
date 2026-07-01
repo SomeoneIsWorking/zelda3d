@@ -206,7 +206,7 @@ if __name__ == "__main__":
     sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
     from ctr_romfs import CtrRom
     from zar import Zar
-    rom = CtrRom(os.environ["ZELDA3D_3DS_ROM"])
+    rom = CtrRom(os.environ["ZELDA3D_OOT3D_ROM"])
     if len(sys.argv) >= 3:
         z = Zar(rom.read(rom.get(sys.argv[1])))
         f = [x for x in z.files if x.name == sys.argv[2]][0]

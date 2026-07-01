@@ -591,8 +591,8 @@ static Vtx g_canary[3];
 static bool BuildZelda3DDlist(BuiltDlist& b, const std::string& zarPath, int modelId, float rx, float ry, float rz) {
     // Load the CMB (same loader the game uses) to get the model bbox for an
     // auto-fit modelview, and to confirm the asset path is good.
-    const char* rom = getenv("ZELDA3D_3DS_ROM");
-    if (!rom || !*rom) { fprintf(stderr, "[HARNESS] ZELDA3D_3DS_ROM not set\n"); return false; }
+    const char* rom = getenv("ZELDA3D_OOT3D_ROM");
+    if (!rom || !*rom) { fprintf(stderr, "[HARNESS] ZELDA3D_OOT3D_ROM not set\n"); return false; }
     Zelda3D::CtrRom r(rom);
     if (!r.ok()) { fprintf(stderr, "[HARNESS] CtrRom: %s\n", r.error().c_str()); return false; }
     auto zb = r.read(zarPath);

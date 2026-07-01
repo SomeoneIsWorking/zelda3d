@@ -111,7 +111,7 @@ def fit_two_sided(As, Rs, iters=50):
 
 def main():
     csv = sys.argv[1] if len(sys.argv)>1 else "scratch/bin/link_joints.csv"
-    rom = CtrRom(os.environ["ZELDA3D_3DS_ROM"])
+    rom = CtrRom(os.environ["ZELDA3D_OOT3D_ROM"])
     z = Zar(rom.read(rom.get(ZAR)))
     model = C.Cmb(z.read([f for f in z.files if f.name == CMB][0]))
     byname = {f.name: f for f in z.files}

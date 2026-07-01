@@ -100,7 +100,7 @@ def apply_corr(mode, Cm, Cm2, R):
     return R
 
 def main():
-    rom = CtrRom(os.environ["ZELDA3D_3DS_ROM"])
+    rom = CtrRom(os.environ["ZELDA3D_OOT3D_ROM"])
     z = Zar(rom.read(rom.get(ZAR)))
     model = C.Cmb(z.read([f for f in z.files if f.name == CMB][0]))
     bones = {b.id: b for b in model.bones}

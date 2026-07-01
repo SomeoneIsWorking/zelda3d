@@ -1,5 +1,5 @@
 // mm3d_model — MM's per-game model-substitution provider (the MM analog of OoT's
-// zelda3d_model.cpp). Owns the MM3D asset ROM (CtrRom over ZELDA3D_MM_3DS_ROM), the
+// zelda3d_model.cpp). Owns the MM3D asset ROM (CtrRom over ZELDA3D_MM3D_ROM), the
 // actor/object -> CMB tables, and the renderer model provider registered through the
 // SHARED libultraship seam Zelda3D_GL_SetModelProvider. Geometry conversion reuses the
 // shared cmb3d converter (Zelda3D::MakeGlGroup / AppendCmbTextures) — no duplication.

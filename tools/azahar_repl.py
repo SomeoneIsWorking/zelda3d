@@ -7,7 +7,7 @@ the screen, and read emulated 3DS RAM. See issue #89, memory zelda3d-azahar-orac
 
 Launch OoT3D first (headless):
   source ./.env
-  DISPLAY=:95 QT_QPA_PLATFORM=xcb setsid Azahar/build/bin/Release/azahar "$ZELDA3D_3DS_ROM" &
+  DISPLAY=:95 QT_QPA_PLATFORM=xcb setsid Azahar/build/bin/Release/azahar "$ZELDA3D_OOT3D_ROM" &
 Then: tools/azahar_repl.py           # interactive
   or: tools/azahar_repl.py -c "start; sleep 1; shot t.png; read 8000000 32"   # batch (;-separated)
 

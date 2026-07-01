@@ -20,7 +20,7 @@ skinned actors, so the statistic is meaningless and flagged correctly-sized prop
 Output is a ranked anomaly report. Exit code 1 if any anomaly is flagged (usable in CI/parity gates).
 
 Usage:
-  ZELDA3D_3DS_ROM=<rom> tools/geom_anomaly_sweep.py <entrance> [--prefix jyasinzou] [--keep]
+  ZELDA3D_OOT3D_ROM=<rom> tools/geom_anomaly_sweep.py <entrance> [--prefix jyasinzou] [--keep]
   e.g. tools/geom_anomaly_sweep.py 130            # Spirit Temple
 """
 import os, sys, re, math, json, subprocess, time
@@ -41,7 +41,7 @@ def offline_cmb_maxext(zar_path, _cache={}):
     import zar as zarmod, cmb as cmbmod
     from ctr_romfs import CtrRom
     if "_rom" not in _cache:
-        _cache["_rom"] = CtrRom(os.environ["ZELDA3D_3DS_ROM"])
+        _cache["_rom"] = CtrRom(os.environ["ZELDA3D_OOT3D_ROM"])
     rom = _cache["_rom"]
     val = None
     try:

@@ -21,7 +21,7 @@ cleanup; sleep 1 # clear any stale instance before we start
 # ROM provisioning: env -> .env -> any *.3ds / *.z64 dropped in the repo dir, same as run.sh.
 . "$REPO/tools/rom_provision.sh"
 zelda3d_provision_roms "$REPO" "$SOH"
-: "${ZELDA3D_3DS_ROM:?no OoT3D .3ds found — set ZELDA3D_3DS_ROM, add ./.env, or drop a *.3ds in $REPO}"
+: "${ZELDA3D_OOT3D_ROM:?no OoT3D .3ds found — set ZELDA3D_OOT3D_ROM, add ./.env, or drop a *.3ds in $REPO}"
 
 # Real-GPU display: prefer an already-set DISPLAY, else the KDE XWayland :0 + its xauth.
 if [ -z "${DISPLAY:-}" ]; then export DISPLAY=:0; fi

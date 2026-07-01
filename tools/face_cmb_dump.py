@@ -19,7 +19,7 @@ import cmb as cmblib
 def main():
     zar_path = sys.argv[1]
     want = sys.argv[2] if len(sys.argv) > 2 else None
-    rom = CtrRom(os.environ["ZELDA3D_3DS_ROM"])
+    rom = CtrRom(os.environ["ZELDA3D_OOT3D_ROM"])
     z = Zar(rom.read(rom.get(zar_path)))
     cmbs = [f for f in z.files if f.name.lower().endswith(".cmb")]
     if want:

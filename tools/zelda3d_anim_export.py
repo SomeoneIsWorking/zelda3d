@@ -14,7 +14,7 @@
 #      the human picks in the HAND-MAINTAINED Shipwright/.../zelda3d_animmap.inc. This tool only writes
 #      a *.seed.inc reference (mirrors the bonemap design — generator seeds, human owns the .inc).
 #                            -> tools/skeldata/animmap.json + tools/skeldata/zelda3d_animmap.seed.inc
-# Run with ZELDA3D_3DS_ROM set (3DS) + the N64 ROM at n64_skel_extract.ROM. See PROGRESS / handoff.
+# Run with ZELDA3D_OOT3D_ROM set (3DS) + the N64 ROM at n64_skel_extract.ROM. See PROGRESS / handoff.
 import os, sys, json, re
 sys.path.insert(0, 'tools')
 from ctr_romfs import CtrRom
@@ -215,7 +215,7 @@ def match_char(n64_list, csab_list):
 
 
 def main():
-    rom = CtrRom(os.environ["ZELDA3D_3DS_ROM"])
+    rom = CtrRom(os.environ["ZELDA3D_OOT3D_ROM"])
     sk = json.load(open(os.path.join(SK, 'oot3d_skeletons.json')))
     zars = sorted(sk.keys())
 

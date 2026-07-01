@@ -113,7 +113,7 @@ start() {
     # ROM provisioning: env -> gitignored .env -> any *.3ds / *.z64 dropped in the repo dir.
     . "$REPO/tools/rom_provision.sh"
     zelda3d_provision_roms "$REPO" "$(dirname "$SOH")"
-    : "${ZELDA3D_3DS_ROM:?no OoT3D .3ds found — set ZELDA3D_3DS_ROM, add ./.env, or drop a *.3ds in $REPO}"
+    : "${ZELDA3D_OOT3D_ROM:?no OoT3D .3ds found — set ZELDA3D_OOT3D_ROM, add ./.env, or drop a *.3ds in $REPO}"
     local xauth; xauth="${XAUTHORITY:-$(ls -t /run/user/"$(id -u)"/xauth_* 2>/dev/null | head -1)}"
     mkdir -p "$REPO/scratch/logs"
     echo "starting: entrance=$entr time=$time -> $LOG"

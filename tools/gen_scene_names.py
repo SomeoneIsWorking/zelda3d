@@ -10,7 +10,7 @@ renamed (dungeon bosses, houses, shops, market entrances); those get explicit ov
 below. Scenes with no OoT3D equivalent (test/beta) map to NULL -> the engine falls back
 to the N64 room. Output is names only (no ROM assets) -> safe to commit.
 
-Run: ZELDA3D_3DS_ROM=<path.3ds> python3 tools/gen_scene_names.py
+Run: ZELDA3D_OOT3D_ROM=<path.3ds> python3 tools/gen_scene_names.py
 """
 import os, re, sys
 sys.path.insert(0, os.path.dirname(__file__))
@@ -50,7 +50,7 @@ OVERRIDES = {
 
 
 def main():
-    rom = CtrRom(os.environ["ZELDA3D_3DS_ROM"])
+    rom = CtrRom(os.environ["ZELDA3D_OOT3D_ROM"])
     folders = set()
     for f in rom.iter_files():
         p = f if isinstance(f, str) else getattr(f, "path", str(f))
