@@ -314,8 +314,32 @@ Hylian shield + full HUD: hearts, magic, C-item ring, 50 rupees), standing under
 South Clock Town, day-1 "1st" clock **advancing** between the two shots (live, not frozen). This is
 real free-roam gameplay, the N3.4 goal.
 
-**Phase 2 (next) — input injection, UNIFIED at libultraship (design settled 2026-07-01, user).**
-To walk Link / open menus headlessly. The naive path is to poke `play->state.input[0]` per-frame
+**Phase 2 — input injection, UNIFIED at libultraship — DONE (2026-07-01, commit `c7da61b`).**
+The shared seam is built and verified: `libultraship/{include,src}/ship/controller/scripted/
+ScriptedInput.{h,cpp}` holds a thread-safe synthetic N64 pad (held buttons + analog stick), off by
+default, exposed as an extern-C API callable from both C game code and C++. It is OR-mixed into the
+real per-frame `OSContPad` at `LUS::ControlDeck::WriteToOSContPad` (the genuine path BOTH games
+consume) — buttons OR in, stick merges per-axis (larger magnitude wins). Disabled → `MixInto()` is a
+no-op, so live OoT input is untouched (A/B safe). MM per-game glue: `mm/2s2h/Z3DInputDemo.{c,h}`
+ticked from `GameState_GetInput` (gated `ZELDA3D_MM_INPUTDEMO`) runs a fixed walk→stop→START
+timeline and logs Link's world pos. VERIFIED in South Clock Town: Link walked (-278,0,-801)→
+(-377,0,-415) ~398u on the synthetic stick, then synthetic START opened the pause/SELECT-ITEM
+subscreen — zero physical input (`scratch/screenshots/mm_n34_demo_30s.png`, driver
+`scratch/logs/mm_n2/warp_input_demo.sh`). NEXT (phase 2b): replace the fixed demo with the
+game-agnostic FIFO poller in libultraship calling the same `ScriptedInput` API for interactive
+control, + a minimal MM per-game REPL for `PlayState` queries (posinfo/warp/actor scan).
+
+**Build self-sufficiency fix (2026-07-01, commit `931c8e8`) — READ IF MM WON'T COMPILE.** MM failed
+to build (`z64actor.h → code/actor/actor.h: No such file`) because `mm/assets/.gitignore` ignores
+`*.h`/`*.c` (right for ZAPD-GENERATED headers) and the ~960 AUTHORED asset headers (ALIGN_ASSET/OTR
+reference stubs under `assets/{code,interface,misc,archives}`) were only untracked-on-disk — never
+force-added when the MM tree was vendored. A tree wipe / fresh clone loses them. FIX: force-added all
+960 (958 .h + 2 .c) to git, mirroring upstream 2S2H (and OoT/`soh`, which was already done correctly:
+its 1084 authored headers are force-added). They are authored source — extraction does NOT regenerate
+them. If you add a new authored asset header, `git add -f` it (the `*.h` ignore will otherwise swallow
+it). See memory `soh3d-gitignore-swallows-source`.
+
+*Original phase-2 design notes (kept for reference):* To walk Link / open menus headlessly. The naive path is to poke `play->state.input[0]` per-frame
 per game (OoT's `soh3d.c` `walkhold`/`btnhold`). But OoT and MM link the **exact same** libultraship
 (`Shipwright/libultraship`, one dir, verified) and share the controller layer — so the *right* seam
 is UNIFIED, not duplicated:
