@@ -89,6 +89,11 @@ bool Cmb::parseSkl() {
     if (memcmp(b + p, "skl ", 4) != 0) { mErr = "bad skl"; return false; }
     uint32_t n = u32(b, p + 8);
     uint32_t o = p + 0x10;
+    // Bone stride: OoT3D (v<=6) is 0x28; MM3D (v>=7) inserts an extra u32 at the end of
+    // each bone (unknown — perhaps a name-hash / ref-count), making stride 0x2C. Without
+    // this bump the parser reads bone[1..] as noise (parent ids in the tens of thousands)
+    // and computeBoneMatrices does OOB indexing → segfault. Verified vs zelda2_mm.gar.
+    const uint32_t boneStride = (mVersion >= 7) ? 0x2C : 0x28;
     mBones.resize(n);
     for (uint32_t i = 0; i < n; i++) {
         CmbBone& bn = mBones[i];
@@ -97,7 +102,7 @@ bool Cmb::parseSkl() {
         for (int k = 0; k < 3; k++) bn.scale[k] = f32(b, o + 4 + 4 * k);
         for (int k = 0; k < 3; k++) bn.rot[k] = f32(b, o + 0x10 + 4 * k);
         for (int k = 0; k < 3; k++) bn.trans[k] = f32(b, o + 0x1C + 4 * k);
-        o += 0x28;
+        o += boneStride;
     }
     return true;
 }
