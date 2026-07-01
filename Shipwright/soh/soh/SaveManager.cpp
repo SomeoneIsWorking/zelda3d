@@ -482,6 +482,7 @@ void SaveManager::StartupCheckAndInitMeta(int fileNum) {
     input >> metaSaveBlock;
     input.close();
     saveMtx.unlock();
+    try {
     if (!metaSaveBlock.contains("version")) {
         SPDLOG_ERROR("Save at " + fileName.string() + " contains no version");
         assert(false);
@@ -593,6 +594,22 @@ void SaveManager::StartupCheckAndInitMeta(int fileNum) {
     SohUtils::CopyStringToCharArray(fileMetaInfo[fileNum].buildVersion,
                                     metaSaveBlock["sections"]["sohStats"]["data"]["buildVersion"],
                                     ARRAY_COUNT(fileMetaInfo[fileNum].buildVersion));
+    } catch ([[maybe_unused]] const std::exception& e) {
+        fileMetaInfo[fileNum].valid = false;
+        std::string newFileName =
+            Ship::Context::GetPathRelativeToAppDirectory("Save") +
+            ("/file" + std::to_string(fileNum + 1) + "-" + std::to_string(GetUnixTimestamp()) + ".bak");
+#if defined(__SWITCH__) || defined(__WIIU__)
+        copy_file(fileName.c_str(), newFileName.c_str());
+        std::filesystem::remove(fileName);
+#else
+        std::filesystem::rename(fileName, newFileName);
+#endif
+        SohGui::RegisterPopup("Error loading save file", "A problem occurred loading the save in slot " +
+                                                             std::to_string(fileNum + 1) +
+                                                             ".\nSave file corruption is suspected.\n" +
+                                                             "The file has been renamed to prevent further issues.");
+    }
 }
 
 void SaveManager::InitMeta(int fileNum) {
