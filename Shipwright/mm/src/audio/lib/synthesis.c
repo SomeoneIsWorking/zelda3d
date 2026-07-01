@@ -1050,6 +1050,21 @@ Acmd* AudioSynth_ProcessSample(s32 noteIndex, NoteSampleState* sampleState, Note
                 numFirstFrameSamplesToIgnore = synthState->samplePosInt & 0xF;
                 numSamplesUntilEnd = sampleEndPos - synthState->samplePosInt;
 
+                // 2S2H/SoH3D [Port] Guard a stranded sample position. If a note's tunedSample is
+                // swapped to a shorter sample without needsInit, synthState->samplePosInt (valid for
+                // the previous, longer sample) carries over past the new sample's loop/end, making
+                // numSamplesUntilEnd negative. The N64 RSP contains the resulting out-of-range DMEM
+                // address (DMEM is 4KB addressed with 12 bits, so it wraps within SRAM), but the HLE
+                // mixer's BUF_* macros have no such bound and would write ~tens of KB past rspa.buf,
+                // clobbering adjacent audio globals (e.g. gSfxChannelLayout) and crashing later in the
+                // SFX path. A position at/past the end has zero samples remaining: clamp to 0 so the
+                // "end reached" branch below loops-to-point or finishes cleanly instead of underflowing
+                // numSamplesToDecode / numSamplesInFirstFrame into a huge decode. Repros identically in
+                // upstream 2S2H entering Z2_CLOCKTOWER; see docs/MM_NATIVE.md N3.3.
+                if (numSamplesUntilEnd < 0) {
+                    numSamplesUntilEnd = 0;
+                }
+
                 // Calculate number of samples to process this loop
                 numSamplesToProcess = numSamplesToLoadAdj - numSamplesProcessed;
 
