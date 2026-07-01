@@ -1,4 +1,5 @@
 #include "SohModals.h"
+#include <cstdlib> // getenv (unattended-run popup auto-resolve)
 #include <imgui.h>
 #include <vector>
 #include <string>
@@ -74,8 +75,33 @@ void SohModalWindow::DrawElement() {
     }
 }
 
+// An unattended run (headless/Xvfb, cron, CI, the FIFO-driven game manager) has no
+// human to click a modal, so a queued popup blocks the boot state machine forever
+// (the "Missing soh.o2r hang"). Auto-take the popup's DEFAULT (button1) action and
+// log it, so boot proceeds exactly as if the default were clicked (continue, or a
+// clean logged exit for a genuinely-missing asset) instead of hanging on an
+// invisible dialog. Unattended markers, any of:
+//   - SOH3D_REPL set   -> launched by the automated FIFO driver (tools/soh3d_game.sh);
+//                         a real user's headed session never sets this.
+//   - SOH3D_HEADLESS=1  -> the project's Xvfb headless marker.
+//   - SOH_HEADLESS=1    -> libultraship's headless marker.
+static bool sohRunIsUnattended() {
+    const char* repl = getenv("SOH3D_REPL");
+    const char* a = getenv("SOH3D_HEADLESS");
+    const char* b = getenv("SOH_HEADLESS");
+    return (repl && repl[0] != '\0') || (a && a[0] == '1') || (b && b[0] == '1');
+}
+
 void SohModalWindow::RegisterPopup(std::string title, std::string message, std::string button1, std::string button2,
                                    std::function<void()> button1callback, std::function<void()> button2callback) {
+    if (sohRunIsUnattended()) {
+        SPDLOG_WARN("[soh3d headless] auto-resolving popup \"{}\": {} -> [{}]", title, message,
+                    button1.empty() ? "(dismiss)" : button1);
+        if (button1callback != nullptr) {
+            button1callback();
+        }
+        return; // do not queue: nobody is here to click it
+    }
     modals.push_back({ title, message, button1, button2, button1callback, button2callback });
 }
 
