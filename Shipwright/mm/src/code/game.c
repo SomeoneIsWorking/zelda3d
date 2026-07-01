@@ -14,6 +14,7 @@
 
 #include "2s2h/GameInteractor/GameInteractor.h"
 #include "2s2h/Z3DInputDemo.h"
+#include "2s2h/Z3DRepl.h"
 
 #pragma increment_block_number "n64-us:128"
 
@@ -162,6 +163,10 @@ void GameState_Update(GameState* gameState) {
     gameState->main(gameState);
 
     GameInteractor_ExecuteOnGameStateMainFinish();
+
+    // Zelda3D headless: service the per-game REPL after the game state has updated, so PlayState
+    // queries (posinfo/actors) read this frame's values. No-op unless ZELDA3D_MM_REPL is set.
+    Z3D_Repl_Tick();
 
     if (R_PAUSE_BG_PRERENDER_STATE != PAUSE_BG_PRERENDER_PROCESS) {
         GameState_Draw(gameState, gfxCtx);

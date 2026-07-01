@@ -7,6 +7,7 @@
 #include "ship/install_config.h"
 #include "ship/config/ConsoleVariable.h"
 #include "ship/controller/controldeck/ControlDeck.h"
+#include "ship/controller/scripted/ScriptedInputFifo.h"
 #include "ship/debug/CrashHandler.h"
 #include "ship/window/FileDropMgr.h"
 #include "ship/events/EventSystem.h"
@@ -41,6 +42,8 @@ void Context::DestroyInstance() {
 
 Context::~Context() {
     SPDLOG_TRACE("destruct context");
+    // Stop the scripted-input FIFO poller (no-op if it was never started) before tearing down.
+    Ship_ScriptedInputFifo_Stop();
     GetWindow()->SaveWindowToConfig();
     // Explicitly destructing everything so that logging is done last.
     mAudio = nullptr;
@@ -269,6 +272,12 @@ bool Context::InitControlDeck(std::shared_ptr<ControlDeck> controlDeck) {
         SPDLOG_ERROR("Failed to initialize control deck");
         return false;
     }
+
+    // Start the game-agnostic scripted-input FIFO poller once the control deck is up. Hooked here
+    // (not in Context::Init) because MM/2s2h boots via the individual Init* methods rather than the
+    // aggregate Init(); InitControlDeck is the one input-init both OoT (soh3d) and MM share. No-op
+    // unless SHIP_SCRIPTED_FIFO is set, so live OoT and normal MM runs are untouched.
+    Ship_ScriptedInputFifo_StartFromEnv();
 
     return true;
 }
