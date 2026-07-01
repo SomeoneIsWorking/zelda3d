@@ -17,8 +17,14 @@ UnifiedMaterial Fast_PackCCFeaturesToUnifiedMaterial(const CCFeatures& cc) {
     m.blendColor[3] = 1.0f;
     m.fogColor[0] = m.fogColor[1] = m.fogColor[2] = m.fogColor[3] = 0.0f;
 
-    m.alphaTest = cc.opt_alpha_threshold;
-    m.alphaRef = 0.5f; // N64's alpha-threshold compare value; the old shader hardcodes the same
+    // Both are FIXED thresholds in the old shader (gfx_sdl3gpu.cpp's kSgShaderTemplate), not a
+    // real per-material alphaRef: opt_alpha_threshold discards a<8/256; opt_texture_edge instead
+    // snaps a=1 above 0.19 or discards below it (a different rule, not just a different constant).
+    // Encoded via alphaRef's sign — the unified fragment shader's alphaTest branch treats a
+    // negative value as "texture-edge mode" (see unified_shader.cpp). CMB materials use this same
+    // field for a REAL per-material alpha_ref (cmb.h), always >= 0, so the sentinel is unambiguous.
+    m.alphaTest = cc.opt_alpha_threshold || cc.opt_texture_edge;
+    m.alphaRef = cc.opt_texture_edge ? -1.0f : (8.0f / 256.0f);
 
     // Fixed-function state (blend/depth/cull) is NOT derivable from CCFeatures alone today — the
     // old N64 path bakes it into the GL/Vulkan pipeline from separate other_mode_l/h decode

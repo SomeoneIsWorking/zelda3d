@@ -280,7 +280,14 @@ const char* kUnifiedShaderTemplate = R"PRISM(@prism(type='fragment', name='Unifi
             { float g = dot(texel.rgb, vec3(0.299, 0.587, 0.114)); texel.rgb = vec3(g); }
         @end
         @if(o_alphaTest)
-            if (texel.a < ubo.uParams0.x) discard;
+            // uParams0.x < 0 is the "texture-edge" sentinel (N64 opt_texture_edge: snap to opaque
+            // above the fixed 0.19 threshold, discard below — a different rule from a real alpha
+            // ref compare, not just a different constant). See unified_n64_pack.cpp.
+            if (ubo.uParams0.x < 0.0) {
+                if (texel.a > 0.19) texel.a = 1.0; else discard;
+            } else {
+                if (texel.a < ubo.uParams0.x) discard;
+            }
         @end
         @if(o_fog)
             texel.rgb = mix(texel.rgb, ubo.uFogColor.rgb, clamp(vFog.x, 0.0, 1.0));
