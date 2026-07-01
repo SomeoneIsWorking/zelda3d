@@ -69,7 +69,7 @@ This question does NOT block N1/N2 — faithful-first means "get native MM booti
   the "one app both games" decision above gets implemented.
 - **N4 — MM3D substitution (cmb3d).** Wire the 3DS model layer at the N64-gfx/actor-draw
   interception point, mirroring how soh3d swaps OoT3D models for OoT. This is our custom layer;
-  2S2H contributes nothing here.
+  2S2H contributes nothing here. **Scouted 2026-07-01 — see "N4 scouting" below.**
 - **N5+ — Enhancements, intuitive controls, MM3D parity.** Per the project vision.
 
 ## Environment / provisioning
@@ -368,6 +368,75 @@ one-off scratch drivers were promoted to tracked tools mirroring OoT's `soh3d_ga
   — the two-FIFO client (input → shared `$SHIP_SCRIPTED_FIFO`, queries → `$ZELDA3D_MM_REPL`).
 Verified live: `walk 3` moved Link ~485u, `press 0x1000` opened the SELECT-ITEM subscreen
 (`scratch/screenshots/mm_control_tool_menu.png`), `actors`/`pos` return live state.
+
+## N4 scouting (2026-07-01 — how OoT's cmb3d substitution works; verified file:line — don't re-derive)
+
+Goal: render MM actors/world with 3DS MM3D CMB models instead of N64, mirroring soh3d for OoT.
+Prerequisites MET: `ZELDA3D_MM_3DS_ROM` provisioned in `.env`; the `cmb3d` layer exists at
+`Shipwright/soh/src/soh3d/asset/`. The mechanism splits cleanly across a **shared libultraship spine
+(reuse as-is)** and a **per-game soh layer (MM must re-implement)**, joined by exactly two seams:
+a custom GBI opcode and a model-provider callback.
+
+### Reusable spine — already in shared libultraship, MM changes NOTHING here (verified)
+- **Custom GBI opcode** `G_SOH3D_DRAW 0x41` + `G_SOH3D_MEASURE 0x4a` and the `gSPSoH3DDraw`/
+  `gSPSoH3DMeasure` emit macros: `libultraship/include/libultraship/libultra/gbi.h:180-181, 2786,
+  2802` (+ `include/fast/lus_gbi.h`). The game layer emits these into the OPA display list.
+- **Interpreter handlers** consume them: `libultraship/src/fast/interpreter.cpp` —
+  `gfx_soh3d_draw_handler_custom` (~:4377, registered ~:4958), reads the RSP matrix and calls
+  `SoH3D_GL_Submit`. Measure handler reports the N64 bbox diagonal back for auto-scaling.
+- **GPU renderer** (VBO upload, pipelines, shading, HUD): `libultraship/src/fast/soh3d_sdl3gpu.cpp`,
+  `soh3d_gl.cpp`, `soh3d_hud_sdl3gpu.cpp`. Knows only an integer `modelId` + matrices — NOT actors.
+- **Provider indirection**: `SoH3DModelProvider` fn-ptr typedef + `SoH3D_GL_SetModelProvider(fn)` at
+  `libultraship/include/fast/soh3d_gl.h:82-84`. libultraship calls back through it to fetch geometry
+  for a `modelId`. This is the contract MM implements.
+
+### Per-game — soh has it in `soh/src/soh3d/`; MM needs an `mm`-side equivalent
+- **The draw divert (actor):** OoT wraps `Actor_Draw` (`soh/src/code/z_actor.c:2819`):
+  `if (!SoH3D_TryDrawActor(play, actor)) { actor->draw(...); SoH3D_AfterActorDraw(...); }`.
+  `SoH3D_TryDrawActor` (`soh3d.c:2233`) checks the tables; hit → emits the model draw + returns 1
+  (skips N64 draw), miss → returns 0 (vanilla draw). **MM attach point EXISTS and is even cleaner:**
+  `mm/src/code/z_actor.c:2986` already guards `actor->draw` with `GameInteractor_ShouldActorDraw` /
+  `GameInteractor_ExecuteOnActorDraw` — slot an `MM3D_TryDrawActor` there.
+- **Skinned/animated actors** need posing from live N64 joints, so a second seam sits in SkelAnime:
+  `SoH3D_TryDrawActor` only *arms* a pending replacement; the retarget fires at the SkelAnime choke
+  points `SkelAnime_DrawOpa`/`DrawFlexOpa` (OoT `z_skelanime.c:395/513` → `SoH3D_SkelAnimeDrawRaw` →
+  `SoH3D_DoRetarget` `soh3d.c:2789`); return 1 skips the N64 limb walk. **MM has the SAME functions
+  with identical signatures:** `mm/src/code/z_skelanime.c:313 SkelAnime_DrawOpa(play, void** skeleton,
+  Vec3s* jointTable, …)` and `:421 SkelAnime_DrawFlexOpa(…)`. Same `OverrideLimbDraw`/`PostLimbDraw`
+  ABI, same jointTable layout ([0]=root translation, [i+1]=per-limb rots) → retarget carries over.
+  (MM lacks OoT's extra `DrawSkeletonOpa`/`DrawSkeleton2` convenience wrappers; the raw DrawOpa/
+  DrawFlexOpa are the load-bearing ones and exist.)
+- **Emit + provider registration:** OoT builds the opcode in `SoH3D_EmitModelDraw` (`soh3d.c:1792`,
+  `gSPSoH3DDraw` at :1866) and registers its provider in `soh3d_model.cpp:1025` via
+  `SoH3D_GL_SetModelProvider`. MM needs clones of both.
+- **Asset parsers are game-AGNOSTIC** (`soh/src/soh3d/asset/`: `cmb.cpp csab.cpp zar.cpp zsi.cpp
+  ctr_rom.cpp ctxb.cpp pica_texture.cpp cityhash.cpp`) — MM3D uses the same OoT3D-engine formats, so
+  LIFT them wholesale (ideally move to a shared dir rather than duplicate). ROM path via
+  `getenv("SOH3D_3DS_ROM")` (`soh3d_model.cpp:127`) → `CtrRom` parses decrypted NCSD→NCCH→RomFS;
+  lookups by virtual path e.g. `read("/actor/zelda_oc2.zar")`. For MM: point an MM-named env var at
+  the decrypted MM3D `.3ds` and reuse `CtrRom`/`Zar`/`Cmb`/`Csab`/`Zsi` unchanged.
+- **Which CMB replaces which actor — 3-tier, all in the soh layer, MM re-tables:**
+  (1) explicit `sModelTable[]` (`soh3d.c:1995`, hand-tuned `{actorId,name,scale,glModelId,anim,…}`);
+  (2) `kModels[]` (`soh3d_model.cpp:63`, `glModelId → {zarPath,cmbName,scale}`, the id the opcode
+  carries); (3) `SOH3D_AUTO` (env, default 1): actor's loaded N64 **object id** →
+  `kSoH3dObjectZars[objectId]` (`soh3d_object_zars.inc`, generated), pick largest non-debris CMB,
+  and **auto-measure** world scale via `G_SOH3D_MEASURE` (`scale = n64_diag / cmb_local_diag`).
+  MM analog: MM actorId→modelId table + MM `kModels` + MM `ObjectID→/actor/zelda_*.zar` map (MM3D
+  archive names), reusing the shared auto-measure opcode.
+
+### N4 execution order (next session)
+1. **Lift the `asset/` parsers to a shared location** both games compile (or add them to MM's build
+   as-is first, refactor to shared later). They have no OoT dependency.
+2. **New `mm/2s2h/soh3d/` (or `mm/src/soh3d/`) per-game layer**, structured as clean per-behavior
+   modules per the project CLAUDE.md (NOT one giant file): `MM3D_TryDrawActor`, an
+   `MM3D_EmitModelDraw` clone (emits `gSPSoH3DDraw`), a provider registered via
+   `SoH3D_GL_SetModelProvider`, and the MM actor/object→ZAR/CMB tables.
+3. **Hook** `mm z_actor.c:2986` (actor) and `mm z_skelanime.c` DrawOpa/DrawFlexOpa (skinned).
+4. **Provision + open** the MM3D ROM via an MM env var + reused `CtrRom`.
+5. **Verify** with `tools/mm_game.sh` + `mm_control.py`: warp to a scene, screenshot N64-vs-MM3D;
+   use the Azahar 3DS oracle (memory `soh3d-azahar-oracle`) for coordinate-matched A/B ground truth.
+Start faithful-first: get ONE static prop or the pot/actor replaced and measured correctly before
+scaling to the auto table.
 
 **Build self-sufficiency fix (2026-07-01, commit `931c8e8`) — READ IF MM WON'T COMPILE.** MM failed
 to build (`z64actor.h → code/actor/actor.h: No such file`) because `mm/assets/.gitignore` ignores
