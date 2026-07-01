@@ -183,8 +183,24 @@ static const char* objectShortName(int objectId) {
 // entries here as each MM object is verified against the Azahar oracle. First-guess scale
 // 0.1 (matches OoT's initial actor scale); calibrated live via REPL `mscale`.
 static const int kStaticObjects[] = {
-    0x1A4, // OBJECT_TOKEI_STEP    — clock-tower door/wall
-    0x197, // OBJECT_TOKEI_TOBIRA  — clock-tower swinging doors
+    // Clock-tower / Clock Town props — verified in South Clock Town.
+    0x1A4, // OBJECT_TOKEI_STEP     — clock-tower door/wall
+    0x197, // OBJECT_TOKEI_TOBIRA   — clock-tower swinging doors
+    0x18C, // OBJECT_OBJ_TOKEIDAI   — clock-tower body
+
+    // Broad-appearance rigid props (crates, pots, blocks, milk bin, boulder, tree).
+    // Each has a corresponding /actors/zelda2_<name>.gar.lzs archive; scale is a
+    // first-guess 0.1 and needs live calibration against the Azahar oracle before
+    // any is considered "done". Verified only that they load + draw without crashing.
+    0x00C, // OBJECT_BOX
+    0x133, // OBJECT_KIBAKO2         — crate variant
+    0x16F, // OBJECT_KIBAKO
+    0x19C, // OBJECT_RACETSUBO
+    0x1A8, // OBJECT_VISIBLOCK
+    0x1B3, // OBJECT_LIGHTBLOCK
+    0x261, // OBJECT_OBJ_MILK_BIN
+    0x20D, // OBJECT_TREE
+    0x0EF, // OBJECT_GOROIWA
 };
 
 // Resolve an objectId -> renderer modelId, probing the MM3D ROM once per allow-listed object.
@@ -202,7 +218,16 @@ static int resolveModelForObject(int objectId) {
     if (name == nullptr || r == nullptr) { g_objectToModel[objectId] = -1; return -1; }
 
     std::string path = std::string("/actors/zelda2_") + name + ".gar.lzs";
-    if (r->read(path).empty()) { g_objectToModel[objectId] = -1; return -1; }
+    std::vector<uint8_t> bytes = r->read(path);
+    if (bytes.empty()) { g_objectToModel[objectId] = -1; return -1; }
+    // Reject archives we can't handle YET: some MM3D actor .gar.lzs files really are
+    // LzS-compressed (magic "LzS\1"). A separate LzS decompressor lands later; for now
+    // treat them as unmapped so the caller falls back to the N64 draw instead of drawing
+    // an invisible actor.
+    if (bytes.size() < 4 || memcmp(bytes.data(), "GAR\x02", 4) != 0) {
+        g_objectToModel[objectId] = -1;
+        return -1;
+    }
 
     int newId = (int)g_models.size();
     g_models.push_back({ path, 0.1f });
