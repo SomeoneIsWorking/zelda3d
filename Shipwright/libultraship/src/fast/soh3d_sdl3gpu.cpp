@@ -1510,7 +1510,7 @@ void Fast::SoH3DRenderer::DrawModel(int modelId, const float* mp16, const float*
     base.uAmbient[3] = 0.0f;
     bool forceBlend = (a8 < 255);
 
-    bool roomHl = (gSoH3dHlGroup >= 0 && m->groups.size() > 20);
+    bool roomHl = (gSoH3dHlGroup >= 0 && gSoH3dHlGroup < (int)m->groups.size());
     // OoT3D winds its front faces CCW; SDL3 GPU never inverts clip-Y (invertY is always 0 here), so
     // the old `invertY ^ flip` term is dead. Front-face = CCW unless gSoH3dFaceCullFlip is set.
     int frontCW = SoH3DSg::FrontFaceIsCW(gSoH3dFaceCullFlip) ? 1 : 0;
