@@ -17,7 +17,13 @@
 // are explicitly NOT unified (N64 stays CPU limb-walk writing identity bone data; 3DS stays GPU
 // 4-bone blend) — see the plan's "Explicit non-goal".
 struct UnifiedVtx {
-    float pos[3];        // object-space (N64) or model-space (3DS) position
+    // xyz = model-space (3DS) or ALREADY-CLIP-SPACE (N64 — GfxSpVertex CPU-transforms via the
+    // emulated RSP pipeline, guard-band clipping included; there is no clean model-space for N64
+    // content to re-derive). w = 1.0 (3DS) or the real perspective w (N64) — needed for correct
+    // perspective interpolation, so pos must carry all 4 components, not assume w=1.
+    // UnifiedMaterial.alreadyTransformed picks which: true (N64) -> gl_Position = pos verbatim;
+    // false (3DS) -> gl_Position = uMvp * vec4(pos.xyz, 1.0).
+    float pos[4];
     float nrm[3];         // vertex normal; N64 content that has no real normal writes {0,0,1}
     float uv0[2];         // primary texture coordinate (texel0 for N64; the CMB's single UV set)
     float uv1[2];          // secondary texture coordinate (texel1 for N64 2-cycle combiners; unused by 3DS)
@@ -36,4 +42,4 @@ struct UnifiedVtx {
     uint8_t boneW[4];      // 3DS: per-bone blend weights (unorm8, sum to 255). N64: {255,0,0,0}.
 };
 
-static_assert(sizeof(UnifiedVtx) == 88, "UnifiedVtx layout changed — update the emitters in lockstep");
+static_assert(sizeof(UnifiedVtx) == 92, "UnifiedVtx layout changed — update the emitters in lockstep");

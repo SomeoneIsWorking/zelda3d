@@ -651,7 +651,9 @@ namespace {
 
 UnifiedVtx PackUnifiedVtx(const SoH3DGlVtx& v, float combScaleRGB) {
     UnifiedVtx u{};
-    u.pos[0] = v.pos[0]; u.pos[1] = v.pos[1]; u.pos[2] = v.pos[2];
+    // w=1.0: CMB is model-space, GPU-transformed via uMvp (alreadyTransformed=false) — see
+    // unified_vtx.h's pos field doc.
+    u.pos[0] = v.pos[0]; u.pos[1] = v.pos[1]; u.pos[2] = v.pos[2]; u.pos[3] = 1.0f;
     u.nrm[0] = v.nrm[0]; u.nrm[1] = v.nrm[1]; u.nrm[2] = v.nrm[2];
     u.uv0[0] = v.uv[0]; u.uv0[1] = v.uv[1];
     u.uv1[0] = 0.0f; u.uv1[1] = 0.0f;
@@ -768,10 +770,10 @@ SDL_GPUGraphicsPipeline* Fast::SoH3DRenderer::getUnifiedPipeline(const SgGroup& 
     if (!g_uniVert[variant] || !g_uniFrag[variant])
         return nullptr;
 
-    // Vertex input: UnifiedVtx (pos3, nrm3, uv0_2, uv1_2, texClamp4, color0..3 x ubyte4norm, fog2,
+    // Vertex input: UnifiedVtx (pos4, nrm3, uv0_2, uv1_2, texClamp4, color0..3 x ubyte4norm, fog2,
     // boneIds ubyte4, boneW ubyte4norm) — see unified_vtx.h.
     SDL_GPUVertexAttribute attrs[12]{};
-    attrs[0] = { 0, 0, SDL_GPU_VERTEXELEMENTFORMAT_FLOAT3, (uint32_t)offsetof(UnifiedVtx, pos) };
+    attrs[0] = { 0, 0, SDL_GPU_VERTEXELEMENTFORMAT_FLOAT4, (uint32_t)offsetof(UnifiedVtx, pos) };
     attrs[1] = { 1, 0, SDL_GPU_VERTEXELEMENTFORMAT_FLOAT3, (uint32_t)offsetof(UnifiedVtx, nrm) };
     attrs[2] = { 2, 0, SDL_GPU_VERTEXELEMENTFORMAT_FLOAT2, (uint32_t)offsetof(UnifiedVtx, uv0) };
     attrs[3] = { 3, 0, SDL_GPU_VERTEXELEMENTFORMAT_FLOAT2, (uint32_t)offsetof(UnifiedVtx, uv1) };
