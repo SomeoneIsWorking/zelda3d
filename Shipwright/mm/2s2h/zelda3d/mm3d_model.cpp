@@ -21,6 +21,7 @@
 #include "asset/cmb_glgroups.h" // shared Zelda3D::MakeGlGroup / AppendCmbTextures
 #include "asset/ctr_rom.h"
 #include "asset/gar.h" // MM3D actor archives are Grezzo GAR2, not OoT3D ZAR
+#include "asset/lzs.h" // ~40% of MM3D actor .gar.lzs archives are LzS-wrapped GAR2
 
 namespace {
 
@@ -96,6 +97,15 @@ Loaded* loadModel(int modelId) {
     if (garBytes.empty()) {
         fprintf(stderr, "[MM3D] gar not found: %s\n", spec.garPath.c_str());
         return out;
+    }
+    if (Zelda3D::LzsIsCompressed(garBytes)) {
+        std::string lzsErr;
+        std::vector<uint8_t> inflated = Zelda3D::LzsDecompress(garBytes, &lzsErr);
+        if (inflated.empty()) {
+            fprintf(stderr, "[MM3D] LzS inflate %s: %s\n", spec.garPath.c_str(), lzsErr.c_str());
+            return out;
+        }
+        garBytes = std::move(inflated);
     }
     Zelda3D::Gar gar(std::move(garBytes));
     if (!gar.ok()) {
@@ -220,10 +230,20 @@ static int resolveModelForObject(int objectId) {
     std::string path = std::string("/actors/zelda2_") + name + ".gar.lzs";
     std::vector<uint8_t> bytes = r->read(path);
     if (bytes.empty()) { g_objectToModel[objectId] = -1; return -1; }
-    // Reject archives we can't handle YET: some MM3D actor .gar.lzs files really are
-    // LzS-compressed (magic "LzS\1"). A separate LzS decompressor lands later; for now
-    // treat them as unmapped so the caller falls back to the N64 draw instead of drawing
-    // an invisible actor.
+    // MM3D actor archives that carry the .gar.lzs extension come in two flavours:
+    // raw GAR2, or a GAR2 payload wrapped in Grezzo's LzS ("LzS\1") LZSS format.
+    // Auto-detect and inflate the LzS ones in place; then the downstream GAR2 parse
+    // handles both uniformly.
+    if (Zelda3D::LzsIsCompressed(bytes)) {
+        std::string lzsErr;
+        std::vector<uint8_t> inflated = Zelda3D::LzsDecompress(bytes, &lzsErr);
+        if (inflated.empty()) {
+            fprintf(stderr, "[MM3D] LzS inflate failed for %s: %s\n", path.c_str(), lzsErr.c_str());
+            g_objectToModel[objectId] = -1;
+            return -1;
+        }
+        bytes = std::move(inflated);
+    }
     if (bytes.size() < 4 || memcmp(bytes.data(), "GAR\x02", 4) != 0) {
         g_objectToModel[objectId] = -1;
         return -1;
