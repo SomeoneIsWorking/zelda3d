@@ -19,6 +19,11 @@ add_library(cmb3d STATIC ${cmb3d_sources})
 
 target_include_directories(cmb3d PUBLIC ${CMAKE_CURRENT_SOURCE_DIR})
 
+# cmb_glgroups.cpp translates a CMB into the renderer's POD contract
+# (<fast/soh3d_gl.h>), so cmb3d needs libultraship's public headers. Header-only:
+# the structs are PODs, no libultraship link dependency is introduced.
+target_include_directories(cmb3d PRIVATE ${CMAKE_CURRENT_SOURCE_DIR}/../libultraship/include)
+
 # texpack.cpp decodes PNGs via stb_image; `stb` (defined in libultraship) carries the
 # header on its PUBLIC include interface.
 target_link_libraries(cmb3d PRIVATE stb)
