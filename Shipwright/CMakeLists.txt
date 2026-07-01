@@ -252,9 +252,11 @@ add_custom_target(
     GenerateSohOtr
     COMMAND ${CMAKE_COMMAND} -E rm -f soh.o2r
 
-    # copy LUS default shaders into assets/custom
-    COMMAND ${CMAKE_COMMAND} -E rm -r -f ${CMAKE_CURRENT_SOURCE_DIR}/soh/assets/custom/shaders/
-    COMMAND ${CMAKE_COMMAND} -E copy_directory ${CMAKE_CURRENT_SOURCE_DIR}/libultraship/src/fast/shaders/ ${CMAKE_CURRENT_SOURCE_DIR}/soh/assets/custom/shaders/
+    # NOTE: the old renderer shipped GL shader source in assets/custom/shaders/ and
+    # copied it in here. The SDL3GPU backend GENERATES its shaders at runtime (GLSL ->
+    # SPIR-V via glslang, gfx_sdl3gpu.cpp) and loads nothing from the archive, so that
+    # dir no longer exists and the copy is gone. soh.o2r now carries only the real port
+    # assets (fonts/objects/scenes/textures/lang/presets/...).
 
     COMMAND ${Python3_EXECUTABLE} ${CMAKE_CURRENT_SOURCE_DIR}/OTRExporter/extract_assets.py -z "$<TARGET_FILE:ZAPD>" --norom --custom-otr-file soh.o2r "--custom-assets-path" ${CMAKE_CURRENT_SOURCE_DIR}/soh/assets/custom --port-ver "${CMAKE_PROJECT_VERSION}"
     COMMAND ${CMAKE_COMMAND} -DSYSTEM_NAME=${CMAKE_SYSTEM_NAME} -DTARGET_DIR="$<TARGET_FILE_DIR:ZAPD>" -DSOURCE_DIR=${CMAKE_CURRENT_SOURCE_DIR} -DBINARY_DIR=${CMAKE_BINARY_DIR} -DONLYSOHOTR=On -P ${CMAKE_CURRENT_SOURCE_DIR}/copy-existing-otrs.cmake
