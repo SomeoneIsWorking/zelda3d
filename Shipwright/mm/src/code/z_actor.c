@@ -26,6 +26,7 @@
 #include <string.h>
 #include "2s2h/Enhancements/FrameInterpolation/FrameInterpolation.h"
 #include "2s2h/GameInteractor/GameInteractor.h"
+#include "2s2h/soh3d/mm3d_draw.h" // MM3D actor draw-divert (3DS CMB substitution)
 #include "2s2h/BenPort.h"
 #include "2s2h/ShipUtils.h"
 #include "2s2h/ObjectExtension/ObjectExtension.h"
@@ -2984,7 +2985,11 @@ void Actor_Draw(PlayState* play, Actor* actor) {
     }
 
     if (GameInteractor_ShouldActorDraw(actor)) {
-        actor->draw(actor, play);
+        // MM3D: draw the registered 3DS CMB instead of the N64 model when one exists;
+        // fall through to the vanilla N64 draw otherwise. Central table-driven divert.
+        if (!MM3D_TryDrawActor(play, actor)) {
+            actor->draw(actor, play);
+        }
         GameInteractor_ExecuteOnActorDraw(actor);
     }
 
