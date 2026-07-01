@@ -52,11 +52,17 @@ stop() {
 start() {
     local entr="${1:-}"
     stop >/dev/null 2>&1
+    # ROM provisioning: mirrors zelda3d_game.sh so ZELDA3D_MM_ROM / ZELDA3D_MM3D_ROM
+    # (needed by the mm3d asset provider) come from .env when the caller shell hasn't
+    # already exported them.
+    [ -f "$REPO/.env" ] && . "$REPO/.env"
     Xvfb "$DISP" -screen 0 1280x960x24 >"$LOGDIR/xvfb_mm.log" 2>&1 &
     sleep 2
     ( cd "$GAMEDIR" && setsid nohup env -u WAYLAND_DISPLAY DISPLAY="$DISP" \
         SDL_VIDEODRIVER=x11 SDL_AUDIODRIVER=dummy LIBGL_ALWAYS_SOFTWARE=1 GALLIUM_DRIVER=llvmpipe \
         ZELDA3D_MM_WARP=1 ${entr:+ZELDA3D_MM_ENTRANCE="$entr"} \
+        ${ZELDA3D_MM_ROM:+ZELDA3D_MM_ROM="$ZELDA3D_MM_ROM"} \
+        ${ZELDA3D_MM3D_ROM:+ZELDA3D_MM3D_ROM="$ZELDA3D_MM3D_ROM"} \
         SHIP_SCRIPTED_FIFO="$SHIP_SCRIPTED_FIFO" ZELDA3D_MM_REPL="$ZELDA3D_MM_REPL" \
         ./mm.elf >"$LOG" 2>&1 & echo $! >"$PIDFILE" )
     echo "mm pid=$(cat "$PIDFILE") disp=$DISP entrance=${entr:-default}"
