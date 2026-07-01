@@ -6,6 +6,7 @@
 #include "ship/utils/StringHelper.h"
 #include <imgui.h>
 #include "ship/controller/controldevice/controller/mapping/mouse/WheelHandler.h"
+#include "ship/controller/scripted/ScriptedInput.h"
 
 namespace LUS {
 ControlDeck::ControlDeck(std::vector<CONTROLLERBUTTONS_T> additionalBitmasks,
@@ -70,5 +71,11 @@ void ControlDeck::WriteToOSContPad(OSContPad* pad) {
             controller->ReadToPad(&pad[i]);
         }
     }
+
+    // Shared scripted-input seam: OR-mix any synthetic pad state (headless FIFO poller /
+    // per-game REPL / test) into port 0's real N64 pad. No-op unless explicitly enabled, so
+    // physical input is untouched by default. This is the game-agnostic input path used by
+    // both OoT (soh3d) and MM (2s2h). See ship/controller/scripted/ScriptedInput.h.
+    Ship_ScriptedInput_MixInto(&pad[0]);
 }
 } // namespace LUS

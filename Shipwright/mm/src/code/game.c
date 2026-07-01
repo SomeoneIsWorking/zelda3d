@@ -13,6 +13,7 @@
 #include "debug.h"
 
 #include "2s2h/GameInteractor/GameInteractor.h"
+#include "2s2h/Z3DInputDemo.h"
 
 #pragma increment_block_number "n64-us:128"
 
@@ -145,6 +146,9 @@ void GameState_DrawEnd(GraphicsContext* gfxCtx) {
 }
 
 void GameState_GetInput(GameState* gameState) {
+    // Zelda3D headless: advance the scripted-input demo BEFORE reading the pad, so any synthetic
+    // button/stick state is mixed into this frame's OSContPad (no-op unless ZELDA3D_MM_INPUTDEMO).
+    Z3D_InputDemo_Tick();
     PadMgr_GetInput(gameState->input, true);
 }
 
