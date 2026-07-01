@@ -2,6 +2,8 @@
 
 #include <fstream>
 #include <string>
+#include <vector>
+#include <algorithm>
 #include <filesystem>
 #include <unordered_map>
 #include <any>
@@ -212,8 +214,37 @@ void Config::Reload() {
 }
 
 void Config::Save() {
+    // mFlattenedJson holds JSON-pointer keys ("/A/B") -> primitive leaves. unflatten() rebuilds the
+    // nested form for the on-disk file, but throws type_error.313 if two keys collide such that one is
+    // a scalar leaf AND a prefix path of another (e.g. "/Foo" and "/Foo/Bar") — i.e. a CVar written
+    // both as a scalar and as the parent of a nested key. Such a pair is impossible to represent in
+    // the nested on-disk form. Build the nested form into a LOCAL first and only open (truncate) the
+    // file once it succeeds — otherwise a bad key both wipes the config and aborts the process.
+    nlohmann::json nested;
+    try {
+        nested = mFlattenedJson.unflatten();
+    } catch (const nlohmann::json::exception&) {
+        // Identify and drop the colliding scalar prefixes so the config still saves. Sort keys: a key
+        // that is a strict "/"-delimited path-prefix of the next is the un-nestable scalar.
+        std::vector<std::string> keys;
+        for (auto it = mFlattenedJson.begin(); it != mFlattenedJson.end(); ++it) {
+            keys.push_back(it.key());
+        }
+        std::sort(keys.begin(), keys.end());
+        for (size_t i = 0; i + 1 < keys.size(); ++i) {
+            const std::string& a = keys[i];
+            const std::string& b = keys[i + 1];
+            if (b.size() > a.size() && b.compare(0, a.size(), a) == 0 && b[a.size()] == '/') {
+                SPDLOG_ERROR("Config::Save: dropping mis-registered scalar CVar '{}' — it is also the "
+                             "parent of '{}', which cannot be represented in the nested config",
+                             a, b);
+                mFlattenedJson.erase(a);
+            }
+        }
+        nested = mFlattenedJson.unflatten();
+    }
     std::ofstream file(mPath);
-    mNestedJson = mFlattenedJson.unflatten();
+    mNestedJson = nested;
     file << mNestedJson.dump(4);
 }
 
