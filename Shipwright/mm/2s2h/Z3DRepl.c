@@ -5,7 +5,7 @@
 #include "Z3DRepl.h"
 
 #include "global.h" // gPlayState, GET_PLAYER, PlayState, Player, Actor, ACTORCAT_MAX
-#include "2s2h/zelda3d/mm3d_model.h" // MM3D_SetScaleOverride (live prop-scale calibration)
+#include "2s2h/zelda3d/mm3d_model.h" // Zelda3D_SetScaleOverride (live prop-scale calibration)
 
 #include <fcntl.h>
 #include <math.h>
@@ -171,7 +171,7 @@ static void Z3D_Repl_Exec(PlayState* play, char* line) {
         Z3D_Repl_Actors(play, line + 6);
     } else if (strncmp(line, "mscale", 6) == 0) {
         float s = (float)strtod(line + 6, NULL);
-        MM3D_SetScaleOverride(s);
+        Zelda3D_SetScaleOverride(s);
         char out[64];
         snprintf(out, sizeof(out), "mscale = %.4f", s);
         Z3D_Repl_Reply(out);

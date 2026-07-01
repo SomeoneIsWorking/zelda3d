@@ -1,6 +1,7 @@
 #include "global.h"
 #include "PR/gs2dex.h"
 #include "debug.h"
+#include "2s2h/zelda3d/mm3d_draw.h" // Zelda3D_TryDrawRoom
 
 #include <libultraship/bridge/gfxbridge.h>
 
@@ -653,6 +654,14 @@ RoomDrawHandler sRoomDrawHandlers[] = {
 void Room_Draw(PlayState* play, Room* room, u32 flags) {
     if (room->segment != NULL) {
         gSegments[3] = OS_K0_TO_PHYSICAL(room->segment);
+        // Zelda3D room divert (MM analog of OoT's #134 fix). If MM3D covers this room, draw
+        // the OoT3D CMB instead of the N64 mesh. The full "no N64 renderer under Zelda3D"
+        // invariant OoT enforces (empty room for unmapped scenes) will land here once MM3D
+        // grows scene coverage; for now MM has none and dropping the N64 fallback would
+        // make the entire world invisible — so we still fall through.
+        if ((flags & 1) && Zelda3D_TryDrawRoom(play, room)) {
+            return;
+        }
         sRoomDrawHandlers[room->roomShape->base.type](play, room, flags);
     }
     return;

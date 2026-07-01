@@ -2987,7 +2987,7 @@ void Actor_Draw(PlayState* play, Actor* actor) {
     if (GameInteractor_ShouldActorDraw(actor)) {
         // MM3D: draw the registered 3DS CMB instead of the N64 model when one exists;
         // fall through to the vanilla N64 draw otherwise. Central table-driven divert.
-        if (!MM3D_TryDrawActor(play, actor)) {
+        if (!Zelda3D_TryDrawActor(play, actor)) {
             actor->draw(actor, play);
         }
         GameInteractor_ExecuteOnActorDraw(actor);

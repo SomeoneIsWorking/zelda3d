@@ -42,6 +42,7 @@ u8 sMotionBlurStatus;
 #include "debug.h"
 #include "BenPort.h"
 #include <fast/zelda3d_gl.h> // shared unified renderer: Zelda3D_GL_FrameBegin (one renderer, both games)
+#include "2s2h/zelda3d/mm3d_draw.h" // Zelda3D_ShouldSuppressBgImageSkybox (bg-image guard, MM analog of OoT #134)
 #include "2s2h/GameInteractor/GameInteractor.h"
 #include "2s2h/Enhancements/FrameInterpolation/FrameInterpolation.h"
 #include "2s2h/Enhancements/Graphics/Graphics.h"
@@ -1417,14 +1418,17 @@ void Play_DrawMain(PlayState* this) {
                     }
                 }
 
-                if (this->skyboxCtx.shouldDraw) {
+                if (this->skyboxCtx.shouldDraw && !Zelda3D_ShouldSuppressBgImageSkybox(this)) {
                     Vec3f quakeOffset;
 
-                    if (1) {
-                        quakeOffset = Camera_GetQuakeOffset(GET_ACTIVE_CAM(this));
-                        Skybox_Draw(&this->skyboxCtx, gfxCtx, this->skyboxId, 0, this->view.eye.x + quakeOffset.x,
-                                    this->view.eye.y + quakeOffset.y, this->view.eye.z + quakeOffset.z);
-                    }
+                    // MM analog of OoT's #134 fix: pre-rendered background image draws through
+                    // this Skybox_Draw path in bg-image scenes (e.g. clock town interiors) — when
+                    // MM3D covers the scene, suppress it so the CMB shows. Currently a no-op
+                    // (no MM3D scene coverage yet); becomes live the moment the first mapping
+                    // lands, no z_play.c edit needed.
+                    quakeOffset = Camera_GetQuakeOffset(GET_ACTIVE_CAM(this));
+                    Skybox_Draw(&this->skyboxCtx, gfxCtx, this->skyboxId, 0, this->view.eye.x + quakeOffset.x,
+                                this->view.eye.y + quakeOffset.y, this->view.eye.z + quakeOffset.z);
                 }
 
                 if (this->envCtx.precipitation[PRECIP_RAIN_CUR] != 0) {
