@@ -106,6 +106,14 @@ void SoH3D_SetCurAnim(void* animation, float curFrame, float animLength, float m
 // skips the N64 room mesh; returns 0 otherwise (caller draws the N64 room as normal).
 int SoH3D_TryDrawRoom(PlayState* play, Room* room);
 
+// True when SoH3D is going to draw the OoT3D room for the current scene — used to suppress the N64
+// pre-rendered background (e.g. Link's House interior). That bg image is drawn from TWO paths: the
+// Room_Draw handler (already guarded by SoH3D_TryDrawRoom) and the SkyboxDraw_Draw call in Play_Draw
+// for bg-image skyboxes (unk_140 != 0). Without a guard on the second path the 2D bg image draws
+// over our CMB whenever the camera setting isn't CAM_SET_PREREND_FIXED (which triggered the second
+// path). #134.
+int SoH3D_ShouldSuppressBgImageSkybox(PlayState* play);
+
 // #111: compute the OoT3D-palette world shade in parallel with z_kankyo's N64 envCtx ambient blend.
 // Called from the OUTDOOR time-of-day blend with the SAME slot indices + weights z_kankyo uses, so
 // no schedule logic is duplicated. No-op if the current scene has no OoT3D palette. Result feeds the

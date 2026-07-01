@@ -1609,7 +1609,13 @@ void Play_Draw(PlayState* play) {
         }
 
         if ((HREG(80) != 10) || (HREG(83) != 0)) {
-            if ((play->skyboxCtx.unk_140 != 0) && (GET_ACTIVE_CAM(play)->setting != CAM_SET_PREREND_FIXED)) {
+            // SoH3D #134: this is the SECOND N64 "pre-rendered background image" path — a full-screen
+            // 2D bg skybox drawn whenever the camera isn't PREREND_FIXED (typically PREREND_PIVOT).
+            // Room_Draw's opa handler is the first path; we already skip it via SoH3D_TryDrawRoom.
+            // Without this guard the bg image draws over our OoT3D room CMB in Link's House normal
+            // 3rd-person view (only C-up / first-person avoided it by dropping the cam-set entirely).
+            if ((play->skyboxCtx.unk_140 != 0) && (GET_ACTIVE_CAM(play)->setting != CAM_SET_PREREND_FIXED) &&
+                !SoH3D_ShouldSuppressBgImageSkybox(play)) {
                 Vec3f quakeOffset;
 
                 Camera_GetSkyboxOffset(&quakeOffset, GET_ACTIVE_CAM(play));
