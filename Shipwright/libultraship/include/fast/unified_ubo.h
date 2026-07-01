@@ -20,7 +20,7 @@ struct CommonUbo {
     float uEnvColor[4];
     float uFogColor[4];
     float uParams0[4]; // x=alphaRef, y=lightingMode, z=cycleCount, w=frame_count
-    float uParams1[4]; // x=noise_scale, y=polygonOffset, z=hasSkin, w unused
+    float uParams1[4]; // x=noise_scale, y=polygonOffset, z=hasSkin, w=alreadyTransformed (N64)
     float uMatAmbient[4];
     float uMatDiffuse[4];
 };

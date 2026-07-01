@@ -91,13 +91,13 @@ const char* kCommonUboBody =
     "    vec4 uEnvColor;\n"     // 16
     "    vec4 uFogColor;\n"     // 16
     "    vec4 uParams0;\n"      // 16 — x=alphaRef, y=lightingMode, z=cycleCount, w=frame_count
-    "    vec4 uParams1;\n"      // 16 — x=noise_scale, y=polygonOffset, z=hasSkin, w unused
+    "    vec4 uParams1;\n"      // 16 — x=noise_scale, y=polygonOffset, z=hasSkin, w=alreadyTransformed
     "    vec4 uMatAmbient;\n"   // 16
     "    vec4 uMatDiffuse;\n"; // 16  = 320 total
 
 std::string VertexAttribs() {
     return
-        "layout(location=0) in vec3 aPos;\n"
+        "layout(location=0) in vec4 aPos;\n"
         "layout(location=1) in vec3 aNrm;\n"
         "layout(location=2) in vec2 aUv0;\n"
         "layout(location=3) in vec2 aUv1;\n"
@@ -152,7 +152,7 @@ std::string BuildVertexSource(Variant v) {
          std::to_string(SOH3D_GL_MAX_BONES) + "]; } bones;\n";
     s +=
         "void main() {\n"
-        "    vec3 sp = aPos;\n"
+        "    vec3 sp = aPos.xyz;\n"
         "    vec3 nM = aNrm;\n"
         // 3DS GPU 4-bone blend (the plan's non-goal: this mechanism itself stays as-is, only the
         // vertex format/shader it feeds is unified). N64 content sets uParams1.z=0 and writes
@@ -160,13 +160,16 @@ std::string BuildVertexSource(Variant v) {
         "    if (ubo.uParams1.z > 0.5) {\n"
         "        vec4 acc = vec4(0.0); vec3 nAcc = vec3(0.0);\n"
         "        for (int i = 0; i < 4; i++) {\n"
-        "            acc += aBoneW[i] * (bones.uBones[int(aBoneId[i])] * vec4(aPos, 1.0));\n"
+        "            acc += aBoneW[i] * (bones.uBones[int(aBoneId[i])] * vec4(aPos.xyz, 1.0));\n"
         "            nAcc += aBoneW[i] * (mat3(bones.uBones[int(aBoneId[i])]) * aNrm);\n"
         "        }\n"
         "        sp = acc.xyz;\n"
         "        nM = nAcc;\n"
         "    }\n"
-        "    gl_Position = ubo.uMvp * vec4(sp, 1.0);\n"
+        // alreadyTransformed (N64): pos is already clip-space with a real perspective w — pass
+        // through verbatim, do NOT multiply by uMvp (which would double-transform and also
+        // clobber w=1). Otherwise (3DS): GPU-transform model-space pos via uMvp as before.
+        "    gl_Position = (ubo.uParams1.w > 0.5) ? aPos : (ubo.uMvp * vec4(sp, 1.0));\n"
         "    vNrmView = mat3(ubo.uMv) * nM;\n"
         "    vUv0 = aUv0;\n"
         "    vUv1 = aUv1;\n"
