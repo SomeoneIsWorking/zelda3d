@@ -649,7 +649,7 @@ SgModel* Fast::SoH3DRenderer::ensureUploaded(int modelId) {
 // ---------------------------------------------------------------------------
 namespace {
 
-UnifiedVtx PackUnifiedVtx(const SoH3DGlVtx& v) {
+UnifiedVtx PackUnifiedVtx(const SoH3DGlVtx& v, float combScaleRGB) {
     UnifiedVtx u{};
     u.pos[0] = v.pos[0]; u.pos[1] = v.pos[1]; u.pos[2] = v.pos[2];
     u.nrm[0] = v.nrm[0]; u.nrm[1] = v.nrm[1]; u.nrm[2] = v.nrm[2];
@@ -658,10 +658,13 @@ UnifiedVtx PackUnifiedVtx(const SoH3DGlVtx& v) {
     // No per-vertex clamp data on the CMB side (unlike N64) — a large no-op upper bound so the
     // unified fragment shader's clamp(uv, 0.5/texSize, texClamp) never actually clamps.
     u.texClamp[0] = 1e6f; u.texClamp[1] = 1e6f; u.texClamp[2] = 1e6f; u.texClamp[3] = 1e6f;
-    for (int k = 0; k < 4; k++) {
-        u.color0[k] = (uint8_t)std::lround(std::clamp(v.color[k], 0.0f, 1.0f) * 255.0f);
+    // Stage-0 TEV RGB scale (comb_scale_rgb, cmb.h) folded in here since the combiner mux only has
+    // room for a two-operand multiply (texel0 * vColor0) — Kokiri grass etc. MODULATE at x2/x4.
+    for (int k = 0; k < 3; k++)
+        u.color0[k] = (uint8_t)std::lround(std::clamp(v.color[k] * combScaleRGB, 0.0f, 1.0f) * 255.0f);
+    u.color0[3] = (uint8_t)std::lround(std::clamp(v.color[3], 0.0f, 1.0f) * 255.0f);
+    for (int k = 0; k < 4; k++)
         u.color1[k] = u.color2[k] = u.color3[k] = 0;
-    }
     u.fog[0] = 0.0f; u.fog[1] = 0.0f;
     for (int k = 0; k < 4; k++) {
         u.boneIds[k] = (uint8_t)std::clamp((int)std::lround(v.boneIds[k]), 0, 255);
@@ -700,8 +703,12 @@ Fast::SgModel* Fast::SoH3DRenderer::ensureUnifiedUploaded(int modelId) {
 
     std::vector<UnifiedVtx> all;
     for (int i = 0; i < groupCount; i++) {
+        // gSoH3dWorldLit gates the TEV scale exactly like the old path's uExtra[3] (ubo.uExtra[3] in
+        // DrawModel) — legacy-off leaves it at 1.0 (no scale) to match the old texture*vColor*uTint
+        // behavior when the port is toggled off.
+        float scale = (groups[i].vertexLighting && gSoH3dWorldLit) ? groups[i].combScaleRGB : 1.0f;
         for (uint32_t k = 0; k < groups[i].vertCount; k++)
-            all.push_back(PackUnifiedVtx(groups[i].verts[k]));
+            all.push_back(PackUnifiedVtx(groups[i].verts[k], scale));
     }
 
     const uint32_t vbBytes = (uint32_t)(all.size() * sizeof(UnifiedVtx));
