@@ -40,6 +40,14 @@ class GfxWindowBackendSDL3;
 // gfx_metal's ShaderProgramMetal / gfx_vulkan's ShaderProgramVulkan.
 struct ShaderProgramSDL3 {
     uint64_t id0 = 0, id1 = 0;
+    // Render-unification effort (kanban #131), Phase 3 groundwork: the full combiner decode this
+    // program was built from. Not used by the existing per-permutation shader-gen path (which
+    // already consumed it once at CreateAndLoadNewShader time and only needs numInputs/usedTextures/
+    // clamp/opt_fog/opt_grayscale/opt_alpha below) — kept so a future N64->UnifiedVtx converter can
+    // know the semantic meaning of each packed-float `attribs` slot without re-decoding the shader
+    // id, and so a future N64 unified-pipeline path can build UnifiedMaterial via
+    // Fast_PackCCFeaturesToUnifiedMaterial (unified_n64_pack.h) from the SAME decode already done.
+    CCFeatures cc{};
     uint8_t numInputs = 0;
     bool usedTextures[2] = { false, false };
     uint8_t numFloats = 0; // vertex stride in floats
