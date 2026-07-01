@@ -18,7 +18,7 @@ REPL `floorgrid` CSV) and the OoT3D room mesh, builds D, applies it, and reports
 while the mesh stays sane, the algorithm is validated.
 
 Usage:
-  ZELDA3D_3DS_ROM=<rom> tools/zelda3d_warp.py /scene/spot01_0_info.zsi scratch/floor/n64_spot01.csv
+  ZELDA3D_OOT3D_ROM=<rom> tools/zelda3d_warp.py /scene/spot01_0_info.zsi scratch/floor/n64_spot01.csv
 """
 import os, sys, math
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
@@ -30,7 +30,7 @@ REJECT = float(os.environ.get("ZELDA3D_WARP_REJECT", "120"))  # |D| above this =
 
 
 def load_mesh(path):
-    rom = CtrRom(os.environ["ZELDA3D_3DS_ROM"])
+    rom = CtrRom(os.environ["ZELDA3D_OOT3D_ROM"])
     z = zsimod.Zsi(rom.read(rom.get(path)))
     m = cmbmod.Cmb(z.cmb_bytes())
     tris = []  # (p0,p1,p2, minx,maxx,minz,maxz, ny)

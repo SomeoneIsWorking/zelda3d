@@ -3,7 +3,7 @@
 // CMB and prints stats to cross-check against the Python oracle tools/zsi.py.
 //
 // Build: see tools/build_asset_test.sh
-// Run:   ZELDA3D_3DS_ROM=<path.3ds> scratch/bin/zsi_test [/scene/gerudoway_0_info.zsi]
+// Run:   ZELDA3D_OOT3D_ROM=<path.3ds> scratch/bin/zsi_test [/scene/gerudoway_0_info.zsi]
 #include "../Shipwright/soh/src/zelda3d/asset/ctr_rom.h"
 #include "../Shipwright/soh/src/zelda3d/asset/zsi.h"
 #include "../Shipwright/soh/src/zelda3d/asset/cmb.h"
@@ -13,8 +13,8 @@
 using namespace Zelda3D;
 
 int main(int argc, char** argv) {
-    const char* rom = getenv("ZELDA3D_3DS_ROM");
-    if (!rom || !*rom) { fprintf(stderr, "set ZELDA3D_3DS_ROM to the OoT3D .3ds (see .env)\n"); return 1; }
+    const char* rom = getenv("ZELDA3D_OOT3D_ROM");
+    if (!rom || !*rom) { fprintf(stderr, "set ZELDA3D_OOT3D_ROM to the OoT3D .3ds (see .env)\n"); return 1; }
     const char* path = argc > 1 ? argv[1] : "/scene/gerudoway_0_info.zsi";
 
     CtrRom r(rom);

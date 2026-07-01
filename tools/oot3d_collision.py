@@ -112,7 +112,7 @@ if __name__ == "__main__":
     sys.path.insert(0, os.path.dirname(__file__))
     from ctr_romfs import CtrRom
 
-    rom = CtrRom(os.environ["ZELDA3D_3DS_ROM"])
+    rom = CtrRom(os.environ["ZELDA3D_OOT3D_ROM"])
     scenes = sys.argv[1:] or ["spot04", "spot01", "gerudoway", "spot00", "ydan", "ddan"]
 
     def cross(a, b):

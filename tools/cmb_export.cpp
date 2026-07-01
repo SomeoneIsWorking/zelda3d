@@ -11,7 +11,7 @@
 //
 // Usage:
 //   cmb_export <zarPath> [--cmb <substr>] [--list] [--csab <name|path>] [--frame <f>] [--out <json>]
-//   ROM via env ZELDA3D_3DS_ROM. zarPath e.g. /actor/zelda_link_child_new.zar
+//   ROM via env ZELDA3D_OOT3D_ROM. zarPath e.g. /actor/zelda_link_child_new.zar
 #include "asset/ctr_rom.h"
 #include "asset/zar.h"
 #include "asset/cmb.h"
@@ -65,8 +65,8 @@ int main(int argc, char** argv) {
         else if (a == "--out" && i + 1 < argc) outPath = argv[++i];
     }
 
-    const char* romPath = getenv("ZELDA3D_3DS_ROM");
-    if (!romPath || !*romPath) { fprintf(stderr, "ZELDA3D_3DS_ROM not set\n"); return 1; }
+    const char* romPath = getenv("ZELDA3D_OOT3D_ROM");
+    if (!romPath || !*romPath) { fprintf(stderr, "ZELDA3D_OOT3D_ROM not set\n"); return 1; }
     CtrRom rom(romPath);
     if (!rom.ok()) { fprintf(stderr, "CtrRom: %s\n", rom.error().c_str()); return 1; }
 

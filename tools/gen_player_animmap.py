@@ -17,7 +17,7 @@ extend coverage, add a rule below and rerun. Validation against the live zar mea
 can only ever drop an entry, never emit a bad one.
 
 Run:  . ./.env && python3 tools/gen_player_animmap.py
-Needs ZELDA3D_3DS_ROM (the decrypted OoT3D ROM) for the link zars.
+Needs ZELDA3D_OOT3D_ROM (the decrypted OoT3D ROM) for the link zars.
 """
 import os
 import re
@@ -123,7 +123,7 @@ def resolves_in(ageset, base):
 
 
 def main():
-    rom = CtrRom(os.environ["ZELDA3D_3DS_ROM"])
+    rom = CtrRom(os.environ["ZELDA3D_OOT3D_ROM"])
     boy = csab_basenames(rom, "/actor/zelda_link_boy_new.zar")
     child = csab_basenames(rom, "/actor/zelda_link_child_new.zar")
     shared = boy & child  # one basename table must resolve for either age

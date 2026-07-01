@@ -31,7 +31,7 @@ BONES = list(range(1, 22))   # all body bones (incl. bone9 spine twist — decis
 
 
 def main():
-    rom = CtrRom(os.environ["ZELDA3D_3DS_ROM"])
+    rom = CtrRom(os.environ["ZELDA3D_OOT3D_ROM"])
     z = Zar(rom.read(rom.get(ZAR)))
 
     def load(n):

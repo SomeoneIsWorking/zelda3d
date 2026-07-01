@@ -57,15 +57,15 @@ struct Loaded {
 };
 std::unordered_map<int, std::unique_ptr<Loaded>> g_loaded;
 
-// The decrypted MM3D ROM (NCSD->NCCH->RomFS), opened once from ZELDA3D_MM_3DS_ROM.
+// The decrypted MM3D ROM (NCSD->NCCH->RomFS), opened once from ZELDA3D_MM3D_ROM.
 std::unique_ptr<Zelda3D::CtrRom> g_rom;
 bool g_romTried = false;
 Zelda3D::CtrRom* rom() {
     if (!g_romTried) {
         g_romTried = true;
-        const char* path = getenv("ZELDA3D_MM_3DS_ROM");
+        const char* path = getenv("ZELDA3D_MM3D_ROM");
         if (!path) {
-            fprintf(stderr, "[MM3D] ZELDA3D_MM_3DS_ROM not set — cannot load MM3D assets\n");
+            fprintf(stderr, "[MM3D] ZELDA3D_MM3D_ROM not set — cannot load MM3D assets\n");
             return nullptr;
         }
         g_rom = std::make_unique<Zelda3D::CtrRom>(path);

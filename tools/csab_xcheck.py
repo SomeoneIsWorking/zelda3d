@@ -7,8 +7,8 @@ order). This reproduces that exact ordering from skinned_triangles(), then diffs
 position+normal against the C++ float32 dump.
 
 Usage:
-  ZELDA3D_3DS_ROM=... scratch/bin/asset_test  # with ZELDA3D_ANIM/FRAME/ANIM_DUMP set
-  ZELDA3D_3DS_ROM=... python3 tools/csab_xcheck.py <cpp_dump.bin> [anim] [frame]
+  ZELDA3D_OOT3D_ROM=... scratch/bin/asset_test  # with ZELDA3D_ANIM/FRAME/ANIM_DUMP set
+  ZELDA3D_OOT3D_ROM=... python3 tools/csab_xcheck.py <cpp_dump.bin> [anim] [frame]
 """
 import sys, os, struct
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
@@ -25,7 +25,7 @@ def main():
     zar_path = os.environ.get("ZELDA3D_XCHECK_ZAR", "/actor/zelda_ge1.zar")
     cmb_name = os.environ.get("ZELDA3D_XCHECK_CMB", "Model/geldwoman.cmb")
 
-    rom = CtrRom(os.environ["ZELDA3D_3DS_ROM"])
+    rom = CtrRom(os.environ["ZELDA3D_OOT3D_ROM"])
     z = Zar(rom.read(rom.get(zar_path)))
     model = C.Cmb(z.read([f for f in z.files if f.name == cmb_name][0]))
     nm = "Anim/%s.csab" % anim if not anim.startswith("Anim/") else anim

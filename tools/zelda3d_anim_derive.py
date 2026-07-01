@@ -20,7 +20,7 @@ convention drives the residual to ~0.
 
 Usage:
   python3 tools/zelda3d_anim_derive.py scratch/bin/ge1_joints.csv [csab_frame]
-  (ZELDA3D_3DS_ROM must be set; reads /actor/zelda_ge1.zar : Model/geldwoman.cmb + ge1_s_wait)
+  (ZELDA3D_OOT3D_ROM must be set; reads /actor/zelda_ge1.zar : Model/geldwoman.cmb + ge1_s_wait)
 """
 import sys, os, math, itertools
 import numpy as np
@@ -63,7 +63,7 @@ def main():
     zar_path = os.environ.get("ZELDA3D_XCHECK_ZAR", "/actor/zelda_ge1.zar")
     cmb_name = os.environ.get("ZELDA3D_XCHECK_CMB", "Model/geldwoman.cmb")
 
-    rom = CtrRom(os.environ["ZELDA3D_3DS_ROM"])
+    rom = CtrRom(os.environ["ZELDA3D_OOT3D_ROM"])
     z = Zar(rom.read(rom.get(zar_path)))
     model = C.Cmb(z.read([f for f in z.files if f.name == cmb_name][0]))
     csab = A.Csab(z.read([f for f in z.files if f.name == "Anim/ge1_s_wait.csab"][0]))

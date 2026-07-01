@@ -12,9 +12,9 @@ object_* entries (tsubo, kibako2, ge1, kusa, box, bombiwa, ...). We map an id ON
 its segment is `object_*` AND that exact ZAR exists in the romfs; everything else (the
 keep objects, renamed/absent ZARs, UNSET/NULL slots) maps to NULL so the runtime falls
 back to the N64 actor. Output is ZAR PATHS only (no ROM-derived asset bytes) -> safe to
-commit. Needs ZELDA3D_3DS_ROM to check ZAR existence.
+commit. Needs ZELDA3D_OOT3D_ROM to check ZAR existence.
 
-Run: ZELDA3D_3DS_ROM=<path.3ds> python3 tools/gen_object_zars.py
+Run: ZELDA3D_OOT3D_ROM=<path.3ds> python3 tools/gen_object_zars.py
 """
 import os, re, sys
 sys.path.insert(0, os.path.dirname(__file__))
@@ -65,7 +65,7 @@ def alias_path(base, zars):
 
 
 def main():
-    rom = CtrRom(os.environ["ZELDA3D_3DS_ROM"])
+    rom = CtrRom(os.environ["ZELDA3D_OOT3D_ROM"])
     zars = {f.path for f in rom.iter_files() if f.path.endswith(".zar")}
 
     rows = []  # (id, enum, segment_or_None, zar_path_or_None)

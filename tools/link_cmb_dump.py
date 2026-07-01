@@ -66,7 +66,7 @@ def mesh_posed_bbox(c: cmblib.Cmb, mesh_idx):
 
 def main():
     zar_path = sys.argv[1] if len(sys.argv) > 1 else "/actor/zelda_link_boy_new.zar"
-    rom = CtrRom(os.environ["ZELDA3D_3DS_ROM"])
+    rom = CtrRom(os.environ["ZELDA3D_OOT3D_ROM"])
     fe = rom.get(zar_path)
     z = Zar(rom.read(fe))
     body, allcmbs = pick_body_cmb(z)

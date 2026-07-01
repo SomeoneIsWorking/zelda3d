@@ -52,7 +52,7 @@ BONEMAP={0:-1,1:-1,2:-1,3:6,4:7,5:8,6:3,7:4,8:5,9:9,10:10,11:11,12:-1,
          13:-1,14:13,15:14,16:15,17:-1,18:16,19:17,20:18,21:-1,22:-1,23:-1,24:-1}
 
 def main():
-    rom=CtrRom(os.environ["ZELDA3D_3DS_ROM"])
+    rom=CtrRom(os.environ["ZELDA3D_OOT3D_ROM"])
     z=Zar(rom.read(rom.get("/actor/zelda_link_child_new.zar")))
     m=C.Cmb(z.read([f for f in z.files if f.name=="child/model/childlink_v2.cmb"][0]))
     bones={b.id:b for b in m.bones}

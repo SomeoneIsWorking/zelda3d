@@ -18,7 +18,7 @@ This tool reports, for a scene + REPL floorgrid CSV:
 Gives a per-scene "net positive?" read so the warp can be applied only where it helps.
 
 Usage:
-  ZELDA3D_3DS_ROM=<rom> python3 tools/zelda3d_warp_audit.py /scene/spot04_0_info.zsi scratch/floor/n64_kokiri.csv
+  ZELDA3D_OOT3D_ROM=<rom> python3 tools/zelda3d_warp_audit.py /scene/spot04_0_info.zsi scratch/floor/n64_kokiri.csv
 """
 import os, sys, math, csv
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
@@ -31,7 +31,7 @@ REJECT = float(os.environ.get("ZELDA3D_WARP_REJECT", "120"))
 
 
 def load_tris(path):
-    rom = CtrRom(os.environ["ZELDA3D_3DS_ROM"])
+    rom = CtrRom(os.environ["ZELDA3D_OOT3D_ROM"])
     z = zsimod.Zsi(rom.read(rom.get(path)))
     m = cmbmod.Cmb(z.cmb_bytes())
     tris = []
