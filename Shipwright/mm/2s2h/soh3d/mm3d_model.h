@@ -24,6 +24,10 @@ int MM3D_LookupModel(int actorId, int objectId, int* modelId, float* worldScale,
 // World scale for a resolved model id (1.0 if unknown). Kept parallel to the OoT API.
 float MM3D_ModelScaleById(int modelId);
 
+// Live world-scale override for the prop under calibration (REPL `mscale <f>`; <=0 clears
+// back to the table value). Debug knob for dialing in the first props against the oracle.
+void MM3D_SetScaleOverride(float scale);
+
 #ifdef __cplusplus
 }
 #endif

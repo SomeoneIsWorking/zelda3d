@@ -216,13 +216,6 @@ static void interpSkinPose(const float* prev, const float* cur, const float* bin
     }
 }
 
-// #72: N64 opaque world-space caster triangles for this frame, set by the interpreter
-// (SoH3D_GL_SetN64ShadowCasters) right before the render pass. 9 floats (3 xyz verts) per triangle.
-// Forwarded to the SDL3 GPU shadow pass (SoH3D_Sg_ShadowCasterTris) so N64 geometry (N64 Link,
-// unreplaced actors, scene) also casts a sun shadow.
-const float* g_n64ShadowCasters = nullptr;
-size_t g_n64ShadowCasterTris = 0;
-
 } // namespace
 
 // Character/prop lighting gate, toggled by soh3d.c's REPL (`light 0|1`) and seeded from env
@@ -449,7 +442,7 @@ static void applyPendingEvict() {
 }
 
 namespace {
-// One collected draw (captured at OTR_G_SOH3D_DRAW time; rendered later in the pass).
+// One model draw, built on the stack in SoH3D_GL_Submit and appended inline at OTR_G_SOH3D_DRAW time.
 struct DrawItem {
     int modelId;
     float mp[16];
@@ -467,84 +460,12 @@ struct DrawItem {
     uint64_t midMask = ~0ull;     // mesh_id visibility for this draw (see GlModel::pendingMidMask)
     std::unordered_map<int, int> matTex; // facial material->texIndex override for this draw
 };
-std::vector<DrawItem> g_drawList;
-
-// --- Light-space matrix math (column-major, the SAME convention uMP/uMV are uploaded with:
-// glUniformMatrix4fv(..., GL_FALSE, ...) so GLSL `M * v` is the standard transform). All inputs
-// and outputs are float[16] column-major (element [col*4 + row]). ---
-static void vmNormalize(float v[3]) {
-    float l = sqrtf(v[0] * v[0] + v[1] * v[1] + v[2] * v[2]);
-    if (l > 1e-6f) { v[0] /= l; v[1] /= l; v[2] /= l; }
-}
-static void vmCross(const float a[3], const float b[3], float o[3]) {
-    o[0] = a[1] * b[2] - a[2] * b[1];
-    o[1] = a[2] * b[0] - a[0] * b[2];
-    o[2] = a[0] * b[1] - a[1] * b[0];
-}
-static float vmDot(const float a[3], const float b[3]) { return a[0] * b[0] + a[1] * b[1] + a[2] * b[2]; }
-
-// out = A * B (both column-major GLSL matrices). out[c*4+r] = sum_k A[k*4+r] * B[c*4+k].
-static void mat4Mul(float out[16], const float A[16], const float B[16]) {
-    float t[16];
-    for (int c = 0; c < 4; c++)
-        for (int r = 0; r < 4; r++) {
-            float s = 0.0f;
-            for (int k = 0; k < 4; k++) s += A[k * 4 + r] * B[c * 4 + k];
-            t[c * 4 + r] = s;
-        }
-    memcpy(out, t, sizeof(t));
-}
-
-static void mat4LookAt(float m[16], const float eye[3], const float center[3], const float up[3]) {
-    float f[3] = { center[0] - eye[0], center[1] - eye[1], center[2] - eye[2] };
-    vmNormalize(f);
-    float s[3];
-    vmCross(f, up, s);
-    vmNormalize(s);
-    float u[3];
-    vmCross(s, f, u);
-    m[0] = s[0]; m[1] = u[0]; m[2] = -f[0]; m[3] = 0.0f;
-    m[4] = s[1]; m[5] = u[1]; m[6] = -f[1]; m[7] = 0.0f;
-    m[8] = s[2]; m[9] = u[2]; m[10] = -f[2]; m[11] = 0.0f;
-    m[12] = -vmDot(s, eye); m[13] = -vmDot(u, eye); m[14] = vmDot(f, eye); m[15] = 1.0f;
-}
-
-static void mat4Ortho(float m[16], float l, float r, float b, float t, float n, float fr) {
-    memset(m, 0, 16 * sizeof(float));
-    m[0] = 2.0f / (r - l);
-    m[5] = 2.0f / (t - b);
-    m[10] = -2.0f / (fr - n);
-    m[12] = -(r + l) / (r - l);
-    m[13] = -(t + b) / (t - b);
-    m[14] = -(fr + n) / (fr - n);
-    m[15] = 1.0f;
-}
-
-// Build WORLD -> sun-light-clip from the scene sun dir + the focus box (REPL-tunable size/pullback).
-static void computeLightVP(float outVP[16]) {
-    float L[3] = { gSoH3dLightDirWorld[0], gSoH3dLightDirWorld[1], gSoH3dLightDirWorld[2] };
-    vmNormalize(L); // direction TO the light (F3DEX convention)
-    float F[3] = { gSoH3dShadowFocus[0], gSoH3dShadowFocus[1], gSoH3dShadowFocus[2] };
-    float D = gSoH3dShadowDist, R = gSoH3dShadowRadius;
-    float eye[3] = { F[0] + L[0] * D, F[1] + L[1] * D, F[2] + L[2] * D };
-    float up[3] = { 0.0f, 1.0f, 0.0f };
-    if (fabsf(L[1]) > 0.95f) { up[0] = 0.0f; up[1] = 0.0f; up[2] = 1.0f; } // near-vertical sun -> stable up
-    float view[16], proj[16];
-    mat4LookAt(view, eye, F, up);
-    float n = D - R * 4.0f;
-    if (n < 1.0f) n = 1.0f;
-    float fr = D + R * 4.0f;
-    mat4Ortho(proj, -R, R, -R, R, n, fr);
-    mat4Mul(outVP, proj, view);
-}
-
-
-// #72: store this frame's N64 opaque world-space caster triangles (set by the interpreter just
-// before the render pass). Positions are WORLD-space; the shadow loop draws them with mp = lightVP.
-extern "C" void SoH3D_GL_SetN64ShadowCasters(const float* worldXYZ, size_t triCount) {
-    g_n64ShadowCasters = worldXYZ;
-    g_n64ShadowCasterTris = (worldXYZ && triCount) ? triCount : 0;
-}
+// Inline unified-render path: each OTR_G_SOH3D_DRAW appends its model op straight into the SDL3
+// GPU op-list at that point in the N64 dlist (depth-correct interleave, ONE pass for N64 + 3DS —
+// no separate render-pass drain). g_drawIdx counts the k-th draw of each modelId THIS render frame
+// so the k-th draw pairs with the k-th EmitPose (skin-pose pairing). Reset every render frame in
+// SoH3D_GL_RenderFrameBegin. DrawItem is a per-call scratch built in SoH3D_GL_Submit.
+std::unordered_map<int, int> g_drawIdx;
 
 
 } // namespace
@@ -583,12 +504,10 @@ extern "C" void SoH3D_GL_Submit(int modelId, const float* mp16, const float* mv1
     it.aspectAdj = aspectAdj;
     // Per-item pose pairing. Submit runs at dlist INTERPRET time (and re-runs once per interpolation
     // subframe), by which point g_models[modelId].bones holds only the LAST actor's pose. So pair by
-    // EMIT ORDER: this is the k-th submit of `modelId` in the current subframe (k = how many items of
-    // this modelId are already collected), which corresponds to the k-th EmitPose this logic frame.
-    // Carry both that pose (cur) and the same slot's previous-frame pose (prev) for FPS interpolation.
-    size_t k = 0;
-    for (const DrawItem& d : g_drawList)
-        if (d.modelId == modelId) k++;
+    // EMIT ORDER: this is the k-th draw of `modelId` this render frame, which corresponds to the k-th
+    // EmitPose this logic frame. Carry both that pose (cur) and the same slot's previous-frame pose
+    // (prev) for FPS interpolation.
+    size_t k = (size_t)g_drawIdx[modelId]++;
     auto cit = g_curPoses.find(modelId);
     if (cit != g_curPoses.end() && k < cit->second.size()) {
         it.midMask = cit->second[k].midMask;
@@ -608,94 +527,52 @@ extern "C" void SoH3D_GL_Submit(int modelId, const float* mp16, const float* mv1
             it.boneCount = mit->second.boneCount;
         }
     }
-    g_drawList.push_back(std::move(it));
+
+#ifdef ENABLE_SDL3GPU
+    // Unified inline draw: append THIS model op into the op-list right here, interleaved with the
+    // surrounding N64 geometry (same single render pass). SoH3D_Sg_DrawModel no-ops if the SoH3D
+    // frame context isn't open (SoH3D_GL_RenderFrameBegin). Shadows/AO (which needed the whole
+    // draw list up front) are not run on this path.
+    if (SoH3D_Sg_Active()) {
+        const float* pose = it.bones.empty() ? nullptr : it.bones.data();
+        std::vector<float> lerped;
+        if (pose && gSoH3dInterpStep < 0.999f && !it.prevBones.empty() && it.prevBones.size() == it.bones.size()) {
+            auto mit = g_models.find(modelId);
+            const float* bd = (mit != g_models.end() && !mit->second.bind.empty()) ? mit->second.bind.data() : nullptr;
+            const float* bi = (mit != g_models.end() && !mit->second.binv.empty()) ? mit->second.binv.data() : nullptr;
+            interpSkinPose(it.prevBones.data(), it.bones.data(), bd, bi, gSoH3dInterpStep, it.bones.size(), lerped);
+            pose = lerped.data();
+        }
+        SoH3D_Sg_DrawModel(it.modelId, it.mp, it.mv, it.lit, it.invertY, it.r, it.g, it.b, it.a, it.aspectAdj, pose,
+                           it.boneCount, it.midMask, it.sky, it.uvOffU, it.uvOffV, &it.matTex);
+    }
+#else
+    (void)it; // no SDL3 GPU backend: SoH3D rendering has no other path
+#endif
+}
+
+// Open/close the per-render-frame SoH3D context on the render thread, bracketing the N64 dlist
+// interpret (see Interpreter::Run). BeginFrame opens the SDL3 GPU model pass + resets the per-model
+// draw-index counters so pose pairing restarts; EndFrame closes it. The 3DS model ops emitted by
+// SoH3D_GL_Submit in between land in the SAME op-list / pass as the N64 geometry.
+extern "C" void SoH3D_GL_RenderFrameBegin(void) {
+    applyPendingEvict();
+    g_drawIdx.clear();
+#ifdef ENABLE_SDL3GPU
+    if (SoH3D_Sg_Active()) SoH3D_Sg_BeginPass();
+#endif
+}
+
+extern "C" void SoH3D_GL_RenderFrameEnd(void) {
+#ifdef ENABLE_SDL3GPU
+    if (SoH3D_Sg_Active()) SoH3D_Sg_EndPass();
+#endif
 }
 
 extern "C" void SoH3D_GL_FrameBegin(void) {
-    g_drawList.clear();
     // Rotate this logic frame's emit-ordered poses into "previous" so the next frame can interpolate
     // each item from where it was. (Called once per logic frame, before the actors emit their poses.)
     g_prevPoses = std::move(g_curPoses);
     g_curPoses.clear();
-}
-
-extern "C" void SoH3D_GL_RenderPass(void) {
-    applyPendingEvict(); // render thread, GL current: safe to delete evicted models' GPU objects
-    if (g_drawList.empty()) return;
-
-#ifdef ENABLE_SDL3GPU
-    // SDL3 GPU backend active: append the OoT3D model draws as OPS into the unified op-list (replayed
-    // in ONE render pass alongside the N64 geometry — no separate-pass handshake). Per-item pose
-    // interpolation matches the GL/Vulkan paths. Shadows + AO are M4 (the Sg shadow/AO entry points
-    // are no-ops for now), so this is the model + HUD content path.
-    if (SoH3D_Sg_Active()) {
-        std::vector<float> lerped;
-        float step = gSoH3dInterpStep;
-        // Resolve the AO + shadow master toggles the same way the GL/Vulkan paths do (env, CVar).
-        if (gSoH3dAoEnable < 0) {
-            const char* e = getenv("SOH3D_AO");
-            gSoH3dAoEnable = CVarGetInteger("gSoH3d.AO", (e && e[0] == '0') ? 0 : 1);
-        }
-        if (gSoH3dShadowEnable < 0) {
-            const char* e = getenv("SOH3D_SHADOW");
-            gSoH3dShadowEnable = CVarGetInteger("gSoH3d.Shadows", (e && e[0] == '0') ? 0 : 1);
-        }
-        auto poseOf = [&](const DrawItem& it) -> const float* {
-            const float* pose = it.bones.empty() ? nullptr : it.bones.data();
-            if (pose && step < 0.999f && !it.prevBones.empty() && it.prevBones.size() == it.bones.size()) {
-                auto mit = g_models.find(it.modelId);
-                const float* bd =
-                    (mit != g_models.end() && !mit->second.bind.empty()) ? mit->second.bind.data() : nullptr;
-                const float* bi =
-                    (mit != g_models.end() && !mit->second.binv.empty()) ? mit->second.binv.data() : nullptr;
-                interpSkinPose(it.prevBones.data(), it.bones.data(), bd, bi, step, it.bones.size(), lerped);
-                pose = lerped.data();
-            }
-            return pose;
-        };
-
-        // (0) Dynamic sun-shadow map (own offscreen pass, light's POV). Only lit casters by default.
-        bool shadowsOn = false;
-        float lightVP[16];
-        if (SoH3D_Sg_BeginShadowPass()) {
-            computeLightVP(lightVP);
-            for (const DrawItem& it : g_drawList) {
-                if (it.sky) continue;
-                if (!gSoH3dShadowCastAll && !it.lit) continue;
-                float depthMP[16];
-                mat4Mul(depthMP, lightVP, it.mv); // model -> light-clip = lightVP * (model -> world)
-                SoH3D_Sg_ShadowCasterDraw(it.modelId, depthMP, it.mv, poseOf(it), it.boneCount, it.midMask);
-            }
-            SoH3D_Sg_ShadowCasterTris(g_n64ShadowCasters, g_n64ShadowCasterTris, lightVP);
-            SoH3D_Sg_EndShadowPass();
-            shadowsOn = true;
-        }
-
-        // (1) AO depth pre-pass (own offscreen pass): dynamic actors/props only (lit==1). World
-        // geometry already carries baked per-vertex AO, so SSAO must not double-darken it.
-        if (SoH3D_Sg_BeginDepthPrepass()) {
-            for (const DrawItem& it : g_drawList) {
-                if (it.sky || !it.lit) continue;
-                SoH3D_Sg_DepthPrepassDraw(it.modelId, it.mp, it.mv, it.invertY, it.aspectAdj, poseOf(it),
-                                          it.boneCount, it.midMask, it.sky);
-            }
-            SoH3D_Sg_EndDepthPrepass();
-        }
-
-        // (2) visible model draws (sampling the shadow map per SetShadow), then (3) SSAO composite.
-        SoH3D_Sg_BeginPass();
-        SoH3D_Sg_SetShadow(shadowsOn ? 1 : 0, lightVP);
-        for (const DrawItem& it : g_drawList) {
-            SoH3D_Sg_DrawModel(it.modelId, it.mp, it.mv, it.lit, it.invertY, it.r, it.g, it.b, it.a, it.aspectAdj,
-                               poseOf(it), it.boneCount, it.midMask, it.sky, it.uvOffU, it.uvOffV, &it.matTex);
-        }
-        SoH3D_Sg_AoComposite();
-        SoH3D_Sg_EndPass();
-        g_drawList.clear();
-        return;
-    }
-#endif
-
-    g_drawList.clear();
 }
 

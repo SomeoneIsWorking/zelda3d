@@ -13,6 +13,10 @@ extern "C" {
 #endif
 
 // 1 = drew the MM3D replacement (skip N64 draw); 0 = no replacement (draw vanilla N64).
+// This is the only MM-specific renderer surface: the per-actor divert (MM has its own
+// actor/object tables). The model op it emits (G_SOH3D_DRAW) is appended INLINE into the one
+// unified render pass alongside the N64 geometry — the same shared renderer OoT uses. There is
+// ONE renderer and ONE pass; no per-game copy and no separate SoH3D render-pass drain.
 int MM3D_TryDrawActor(struct PlayState* play, struct Actor* actor);
 
 #ifdef __cplusplus

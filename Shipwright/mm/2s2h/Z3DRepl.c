@@ -5,6 +5,7 @@
 #include "Z3DRepl.h"
 
 #include "global.h" // gPlayState, GET_PLAYER, PlayState, Player, Actor, ACTORCAT_MAX
+#include "2s2h/soh3d/mm3d_model.h" // MM3D_SetScaleOverride (live prop-scale calibration)
 
 #include <fcntl.h>
 #include <math.h>
@@ -145,9 +146,11 @@ static void Z3D_Repl_Actors(PlayState* play, const char* arg) {
         dists[min] = dists[rank];
         dists[rank] = td;
 
-        char line[160];
-        snprintf(line, sizeof(line), "  #%d id=0x%03X cat=%d params=0x%04X dist=%.1f pos=(%.1f, %.1f, %.1f)",
-                 rank, ta->id, ta->category, (u16)ta->params, td, ta->world.pos.x, ta->world.pos.y,
+        s32 objId = (ta->objectSlot >= 0) ? play->objectCtx.slots[ta->objectSlot].id : -1;
+        char line[192];
+        snprintf(line, sizeof(line),
+                 "  #%d id=0x%03X obj=0x%03X cat=%d params=0x%04X dist=%.1f pos=(%.1f, %.1f, %.1f)",
+                 rank, ta->id, objId, ta->category, (u16)ta->params, td, ta->world.pos.x, ta->world.pos.y,
                  ta->world.pos.z);
         Z3D_Repl_Reply(line);
     }
@@ -166,6 +169,12 @@ static void Z3D_Repl_Exec(PlayState* play, char* line) {
         Z3D_Repl_Warp(play, line + 4);
     } else if (strncmp(line, "actors", 6) == 0) {
         Z3D_Repl_Actors(play, line + 6);
+    } else if (strncmp(line, "mscale", 6) == 0) {
+        float s = (float)strtod(line + 6, NULL);
+        MM3D_SetScaleOverride(s);
+        char out[64];
+        snprintf(out, sizeof(out), "mscale = %.4f", s);
+        Z3D_Repl_Reply(out);
     } else if (strncmp(line, "ping", 4) == 0) {
         Z3D_Repl_Reply("pong");
     } else {

@@ -79,9 +79,6 @@ constexpr int8_t RDP_G_TRI1_WIDE = OPCODE(0x49);
 // "measuring" the interpreter accumulates the eye-space bbox of every vertex it loads,
 // so the N64 actor's drawn world size can be measured to derive the OoT3D model scale.
 constexpr int8_t OTR_G_SOH3D_MEASURE = OPCODE(0x4a);
-// SoH3D render pass: drain the collected SoH3D draw list in one GL-state-bracketed pass.
-// No operands; emitted once per frame after the actor draw-all.
-constexpr int8_t OTR_G_SOH3D_RENDERPASS = OPCODE(0x4b);
 
 /*
  * The following commands are the "generated" RDP commands; the user

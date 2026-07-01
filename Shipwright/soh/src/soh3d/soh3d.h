@@ -128,9 +128,10 @@ int SoH3D_SkyActive(PlayState* play);
 // if it drew the OoT3D sun/moon (caller skips the N64 path), 0 otherwise (caller draws N64). #28e.
 int SoH3D_TryDrawSunMoon(PlayState* play);
 
-// Emit the once-per-frame SoH3D render-pass marker (drains all SoH3D draws collected this frame
-// in one GL-state-bracketed pass). Call from Play_Draw right after the actor draw-all.
-void SoH3D_EmitRenderPass(PlayState* play);
+// Once-per-frame SoH3D bookkeeping after the actor draw-all: advance the hand-flap frame counter
+// and update the scene light direction. (The 3DS model draws are appended INLINE during the actor
+// draws — G_SOH3D_DRAW — into the one unified render pass; there is no render-pass marker to emit.)
+void SoH3D_FrameEndUpdate(PlayState* play);
 // Per-frame, before the display list is built: drop any SoH3D draws left unrendered from a prior
 // frame. Call once per frame ahead of Play_Draw (e.g. alongside the REPL poll).
 void SoH3D_FrameBegin(void);

@@ -57,12 +57,17 @@ Cmb::Cmb(std::vector<uint8_t> data) : mData(std::move(data)) {
     { size_t e = 0x10; while (e < 0x20 && b[e]) e++; mName.assign((const char*)b + 0x10, e - 0x10); }
     mIndexCount = u32(b, 0x20);
     mSklPtr = u32(b, 0x24);
-    mMatsPtr = u32(b, 0x28);
-    mTexPtr = u32(b, 0x2C);
-    mSklmPtr = u32(b, 0x30);
-    mVatrPtr = u32(b, 0x38);
-    mIdxPtr = u32(b, 0x3C);
-    mTexdataPtr = u32(b, 0x40);
+    // MM3D (version >= 7 / Majora, EverOasis) inserts a "qtrs" chunk pointer at 0x28
+    // right after the skeleton, shifting every subsequent chunk pointer by +4 vs the
+    // OoT3D (version <= 6) header (noclip cmb.ts: the `qtrs` chunk exists past Ocarina).
+    uint32_t d = (mVersion >= 7) ? 4 : 0; // header-pointer shift after skl
+    mMatsPtr = u32(b, 0x28 + d);
+    mTexPtr = u32(b, 0x2C + d);
+    mSklmPtr = u32(b, 0x30 + d);
+    // 0x34+d = "luts" chunk (skipped)
+    mVatrPtr = u32(b, 0x38 + d);
+    mIdxPtr = u32(b, 0x3C + d);
+    mTexdataPtr = u32(b, 0x40 + d);
     if (!parseSkl()) return;
     computeBoneMatrices();
     if (!parseMats()) return;
