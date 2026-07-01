@@ -8,8 +8,6 @@
 # Build:  cmake --build Shipwright/build-cmake --target charcompare
 # (New files need a reconfigure: cmake Shipwright/build-cmake)
 
-set(SOH3D_ASSET_DIR ${CMAKE_CURRENT_SOURCE_DIR}/../src/soh3d/asset)
-
 set(SOH_DIR ${CMAKE_CURRENT_SOURCE_DIR}/..)
 
 add_executable(charcompare
@@ -26,19 +24,13 @@ add_executable(charcompare
     ${SOH_DIR}/soh/resource/type/Animation.cpp
     ${SOH_DIR}/soh/resource/type/Array.cpp
     ${CMAKE_CURRENT_SOURCE_DIR}/../src/soh3d/soh3d_model.cpp
-    ${SOH3D_ASSET_DIR}/ctr_rom.cpp
-    ${SOH3D_ASSET_DIR}/zar.cpp
-    ${SOH3D_ASSET_DIR}/cmb.cpp
-    ${SOH3D_ASSET_DIR}/csab.cpp
-    ${SOH3D_ASSET_DIR}/zsi.cpp
-    ${SOH3D_ASSET_DIR}/zcol.cpp
-    ${SOH3D_ASSET_DIR}/pica_texture.cpp
+    # asset/ parsers now come from the shared cmb3d static lib (linked below).
 )
 
 target_include_directories(charcompare PRIVATE
     ${CMAKE_CURRENT_SOURCE_DIR}
     ${CMAKE_CURRENT_SOURCE_DIR}/../src
-    ${CMAKE_CURRENT_SOURCE_DIR}/../src/soh3d   # so "asset/..." resolves like in soh3d_model.cpp
+    ${CMAKE_CURRENT_SOURCE_DIR}/../src/soh3d   # so soh3d_model.cpp's local headers resolve
     ${CMAKE_CURRENT_SOURCE_DIR}/..             # so "soh/resource/..." resolves in the SOH factories
     ${CMAKE_CURRENT_SOURCE_DIR}/../include     # z64animation.h / z64math.h / libc
     ${CMAKE_CURRENT_SOURCE_DIR}/../../libultraship/include
@@ -48,6 +40,7 @@ target_include_directories(charcompare PRIVATE
 # transitively gives us <imgui.h> and the SDL/GL headers/libs we need.
 target_link_libraries(charcompare PRIVATE
     libultraship
+    cmb3d                  # shared 3DS asset parsers (CMB/CSAB/ZAR/ZSI/CTR-ROM/…)
     SDL3::SDL3 # SDL3-MIGRATION
     Threads::Threads
     ${CMAKE_DL_LIBS}
