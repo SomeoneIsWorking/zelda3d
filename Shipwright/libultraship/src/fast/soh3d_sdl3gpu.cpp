@@ -304,14 +304,22 @@ SDL_GPUBlendOp mapEq(unsigned e) {
 SDL_GPUTexture* Fast::SoH3DRenderer::uploadTexture(int w, int h, const unsigned char* rgba) {
     if (w <= 0 || h <= 0)
         w = h = 1;
+    // Full mip chain: without it, a repeating/detailed texture viewed at a grazing angle (e.g. a
+    // room wall) aliases badly under plain bilinear sampling — the sampler already samples up to
+    // max_lod=1000 (see getSampler), but with only 1 level present that has nothing to select.
+    // COLOR_TARGET usage is needed alongside SAMPLER because SDL_GenerateMipmapsForGPUTexture
+    // downsamples via blit passes, which write each level as a render target.
+    int mipLevels = 1;
+    for (int m = (w > h ? w : h); m > 1; m >>= 1)
+        mipLevels++;
     SDL_GPUTextureCreateInfo ci{};
     ci.type = SDL_GPU_TEXTURETYPE_2D;
     ci.format = SDL_GPU_TEXTUREFORMAT_R8G8B8A8_UNORM;
-    ci.usage = SDL_GPU_TEXTUREUSAGE_SAMPLER;
+    ci.usage = SDL_GPU_TEXTUREUSAGE_SAMPLER | SDL_GPU_TEXTUREUSAGE_COLOR_TARGET;
     ci.width = (uint32_t)w;
     ci.height = (uint32_t)h;
     ci.layer_count_or_depth = 1;
-    ci.num_levels = 1;
+    ci.num_levels = (uint32_t)mipLevels;
     SDL_GPUTexture* tex = SDL_CreateGPUTexture(g_device, &ci);
     if (!tex)
         fprintf(stderr, "[SoH3D_SG] CreateGPUTexture %dx%d FAILED: %s\n", w, h, SDL_GetError());
@@ -344,6 +352,8 @@ SDL_GPUTexture* Fast::SoH3DRenderer::uploadTexture(int w, int h, const unsigned 
     reg.d = 1;
     SDL_UploadToGPUTexture(cp, &ti, &reg, false);
     SDL_EndGPUCopyPass(cp);
+    if (mipLevels > 1)
+        SDL_GenerateMipmapsForGPUTexture(c, tex);
     SDL_SubmitGPUCommandBuffer(c);
     SDL_ReleaseGPUTransferBuffer(g_device, tb);
     return tex;
@@ -592,6 +602,19 @@ SgModel* Fast::SoH3DRenderer::ensureUploaded(int modelId) {
     for (int i = 0; i < texCount; i++) {
         m.textures.push_back(uploadTexture(texs[i].w, texs[i].h, texs[i].rgba));
         if (modelId == g_sgDumpModel || g_sgDumpTexModel == modelId) {
+            if (g_sgDumpTexModel == modelId && texs[i].rgba) {
+                // One-off raw-pixel dump (PPM, no library needed) so the SOURCE texel data can be
+                // eyeballed directly, bypassing the whole render/sampler pipeline.
+                char path[256];
+                snprintf(path, sizeof(path), "scratch/sgtex_%d_%d.ppm", modelId, i);
+                FILE* pf = fopen(path, "wb");
+                if (pf) {
+                    fprintf(pf, "P6\n%d %d\n255\n", texs[i].w, texs[i].h);
+                    for (long p = 0; p < (long)texs[i].w * texs[i].h; p++)
+                        fwrite(&texs[i].rgba[p * 4], 1, 3, pf);
+                    fclose(pf);
+                }
+            }
             // Mean RGBA of the source texels (sgdump diagnostics: is the texture itself black?).
             const unsigned char* px = texs[i].rgba;
             long n = (long)texs[i].w * texs[i].h, sr = 0, sg = 0, sb = 0, sa = 0;
