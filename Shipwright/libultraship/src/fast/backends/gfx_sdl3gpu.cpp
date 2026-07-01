@@ -34,6 +34,7 @@
 #include "fast/backends/gfx_sdl3gpu.h"
 #include "fast/backends/soh3d_sdl3gpu.h" // SoH3DRenderer / SoH3DHudRenderer member subsystems
 #include "fast/backends/gfx_sdl.h"
+#include "fast/backends/unified_shader.h" // render-unification Phase 1 dormant shader selftest
 #include "fast/interpreter.h"
 #include "ship/Context.h"
 #include <prism/processor.h>
@@ -671,6 +672,20 @@ void GfxRenderingAPISdl3Gpu::Init() {
     mSoh3d = std::make_unique<SoH3DRenderer>();
     mHud = std::make_unique<SoH3DHudRenderer>();
     SPDLOG_INFO("SDL3 GPU backend initialized (P2: N64 Fast3D world)");
+
+    // Render-unification effort (kanban #131), Phase 1: the unified shader (unified_shader.h) is
+    // still dormant/unreferenced by any draw path. SOH3D_UNIFIED_SHADER_SELFTEST=1 compiles its six
+    // variants to SPIR-V here (once, at backend init) purely to catch a GLSL authoring mistake —
+    // zero cost/behavior change when unset.
+    if (getenv("SOH3D_UNIFIED_SHADER_SELFTEST") != nullptr) {
+        std::string log;
+        bool ok = Fast::Unified::SelfTestUnifiedShaderVariants(log);
+        if (ok) {
+            SPDLOG_INFO("[unified_shader] selftest: all variants compiled OK");
+        } else {
+            SPDLOG_ERROR("[unified_shader] selftest FAILED:\n{}", log);
+        }
+    }
 }
 
 void GfxRenderingAPISdl3Gpu::OnResize() {
