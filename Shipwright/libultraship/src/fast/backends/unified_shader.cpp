@@ -276,6 +276,17 @@ std::string BuildFragmentSource(Variant v) {
     s += "    vec4 texel = evalCycle(0, vec4(0.0));\n";
     s += "    if (mat_.uParams0.z > 1.5) texel = evalCycle(1, texel);\n"; // cycleCount==2
 
+    // lightingMode 1 (3DS character half-Lambert): applied HERE, not baked into vColor0 like mode
+    // 2, because the combiner's SHADER_INPUT_1 must stay the raw per-vertex tint (matching what the
+    // old fixed CMB shader's `t.rgb * vColor.rgb * shade` does — shade multiplies the combiner
+    // OUTPUT, it isn't itself a combiner input). lightingMode 0 (N64 passthrough) and 2 (already
+    // baked per-vertex) need no fragment-side action.
+    s +=
+        "    if (mat_.uParams0.y > 0.5 && mat_.uParams0.y < 1.5) {\n"
+        "        float hl = dot(normalize(vNrmView), normalize(xf.uLightDir.xyz)) * 0.5 + 0.5;\n"
+        "        texel.rgb *= (0.55 + 0.45 * hl);\n"
+        "    }\n";
+
     if (f.grayscale)
         s += "    { float g = dot(texel.rgb, vec3(0.299, 0.587, 0.114)); texel.rgb = vec3(g); }\n";
     if (f.alphaTest)
