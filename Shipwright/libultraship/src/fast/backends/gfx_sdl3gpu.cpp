@@ -35,6 +35,7 @@
 #include "fast/backends/soh3d_sdl3gpu.h" // SoH3DRenderer / SoH3DHudRenderer member subsystems
 #include "fast/backends/gfx_sdl.h"
 #include "fast/backends/unified_shader.h" // render-unification Phase 1 dormant shader selftest
+#include "fast/backends/unified_n64_pack.h" // render-unification Phase 3 groundwork (dormant)
 #include "fast/interpreter.h"
 #include "ship/Context.h"
 #include <prism/processor.h>
@@ -684,6 +685,17 @@ void GfxRenderingAPISdl3Gpu::Init() {
             SPDLOG_INFO("[unified_shader] selftest: all variants compiled OK");
         } else {
             SPDLOG_ERROR("[unified_shader] selftest FAILED:\n{}", log);
+        }
+        // Phase 3 groundwork (dormant, unwired): sanity-run the CCFeatures -> UnifiedMaterial
+        // packer on a couple of real combiner keys so a struct-layout mistake surfaces here
+        // instead of silently sitting unexercised until Phase 3 wiring.
+        for (uint64_t shaderId : { (uint64_t)0, (uint64_t)0x01010100 }) {
+            CCFeatures cc{};
+            gfx_cc_get_features(shaderId, shaderId, &cc);
+            UnifiedMaterial um = Fast_PackCCFeaturesToUnifiedMaterial(cc);
+            SPDLOG_INFO("[unified_n64_pack] shaderId={:#x} -> combMux[0][0]=({},{},{},{}) cycleCount={}",
+                        shaderId, um.combMux[0][0][0], um.combMux[0][0][1], um.combMux[0][0][2],
+                        um.combMux[0][0][3], um.cycleCount);
         }
     }
 }
