@@ -9,6 +9,7 @@
 #include "z64view.h"
 #include "libc/alloca.h"
 #include "overlays/gamestates/ovl_title/z_title.h"
+#include "Z3DBoot.h"
 #include <libultraship/bridge/consolevariablebridge.h>
 #include "2s2h/DeveloperTools/BetterMapSelect.h"
 #include "2s2h/GameInteractor/GameInteractor.h"
@@ -1083,6 +1084,20 @@ void MapSelect_Draw(MapSelectState* this) {
 
 void MapSelect_Main(GameState* thisx) {
     MapSelectState* this = (MapSelectState*)thisx;
+
+    // Zelda3D: headless debug-warp — on the first MapSelect frame, load a gameplay entrance straight
+    // away so a no-input headless boot reaches real gameplay instead of the title attract-demo loop.
+    // Mirrors soh3d's Select_Main auto-warp (soh/src/overlays/gamestates/ovl_select/z_select.c).
+    // fileNum 0xFF makes MapSelect_LoadGame seed a fresh debug save; spawn 0 matches the menu path.
+    if (Z3D_AutoWarpEnabled()) {
+        s32 entrance = Z3D_AutoWarpEntrance();
+        if (entrance < 0) {
+            entrance = ENTRANCE(SOUTH_CLOCK_TOWN, 0); // default: South Clock Town, day-1 gameplay
+        }
+        gSaveContext.fileNum = 0xFF;
+        MapSelect_LoadGame(this, (u32)entrance, 0);
+        return;
+    }
 
     MapSelect_UpdateMenu(this);
     BetterMapSelect_Update(this);
