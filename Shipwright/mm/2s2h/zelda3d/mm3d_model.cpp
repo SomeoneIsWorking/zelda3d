@@ -172,7 +172,7 @@ bool g_registered = false;
 
 extern "C" {
 
-void MM3D_EnsureModelProvider(void) {
+void Zelda3D_EnsureModelProvider(void) {
     if (!g_registered) {
         Zelda3D_GL_SetModelProvider(provider);
         g_registered = true;
@@ -183,7 +183,7 @@ void MM3D_EnsureModelProvider(void) {
 // -1 = use the table value. A single knob is enough while one prop is being dialed in.
 float g_scaleOverride = -1.0f;
 
-int MM3D_LookupModel(int actorId, int objectId, int* modelId, float* worldScale, float* groundOffset) {
+int Zelda3D_LookupModel(int actorId, int objectId, int* modelId, float* worldScale, float* groundOffset) {
     // Map an actor's loaded N64 object id (preferred: it names the asset) to a model slot.
     // Faithful-first: exactly one entry until the first prop is verified.
     (void)actorId;
@@ -205,14 +205,14 @@ int MM3D_LookupModel(int actorId, int objectId, int* modelId, float* worldScale,
     return 1;
 }
 
-float MM3D_ModelScaleById(int modelId) {
+float Zelda3D_ModelScaleById(int modelId) {
     if (modelId < 0 || modelId >= kModelCount) {
         return 1.0f;
     }
     return kModels[modelId].worldScale;
 }
 
-void MM3D_SetScaleOverride(float scale) {
+void Zelda3D_SetScaleOverride(float scale) {
     g_scaleOverride = scale;
 }
 
