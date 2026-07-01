@@ -1321,6 +1321,7 @@ ShaderProgram* GfxRenderingAPISdl3Gpu::CreateAndLoadNewShader(uint64_t shaderId0
     ShaderProgramSDL3& prg = mShaderProgramPool[std::make_pair(shaderId0, shaderId1)];
     prg.id0 = shaderId0;
     prg.id1 = shaderId1;
+    prg.cc = cc; // render-unification Phase 3 groundwork (kanban #131) — see the field's doc comment
     prg.numInputs = cc.numInputs;
     prg.usedTextures[0] = cc.usedTextures[0];
     prg.usedTextures[1] = cc.usedTextures[1];
