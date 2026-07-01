@@ -3524,6 +3524,26 @@ void SoH3D_FrameBegin(void) {
     SoH3D_GL_FrameBegin();
 }
 
+// Would SoH3D_TryDrawRoom draw the OoT3D room right now? Same short-circuits as the draw form, but
+// no side effects — used to gate other N64 draws (the bg-image skybox in Play_Draw) that share the
+// "N64 room mesh" visual and must be suppressed when we're covering the scene ourselves. The bg
+// image ships from TWO paths: the Room_Draw handler (already guarded by SoH3D_TryDrawRoom) and the
+// SkyboxDraw_Draw call for bg-image skyboxes (unk_140 != 0) in Play_Draw, which fires whenever the
+// camera setting isn't CAM_SET_PREREND_FIXED — e.g. Link's House interior in the normal 3rd-person
+// side view, where the camera is CAM_SET_PREREND_PIVOT. Without this guard the 2D bg image draws
+// over our CMB and only C-up first-person (which drops both cam-set paths) reveals the OoT3D geo. #134.
+int SoH3D_ShouldSuppressBgImageSkybox(PlayState* play) {
+    const char* sceneName;
+    if (play == NULL || !SoH3D_Enabled()) {
+        return 0;
+    }
+    sceneName = SoH3D_SceneName(play);
+    if (sceneName == NULL) {
+        return 0;
+    }
+    return SoH3D_RoomModelId(sceneName, play->roomCtx.curRoom.num) >= 0 ? 1 : 0;
+}
+
 int SoH3D_TryDrawRoom(PlayState* play, Room* room) {
     const char* sceneName;
     int modelId;
