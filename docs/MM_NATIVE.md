@@ -325,9 +325,38 @@ ticked from `GameState_GetInput` (gated `ZELDA3D_MM_INPUTDEMO`) runs a fixed wal
 timeline and logs Link's world pos. VERIFIED in South Clock Town: Link walked (-278,0,-801)→
 (-377,0,-415) ~398u on the synthetic stick, then synthetic START opened the pause/SELECT-ITEM
 subscreen — zero physical input (`scratch/screenshots/mm_n34_demo_30s.png`, driver
-`scratch/logs/mm_n2/warp_input_demo.sh`). NEXT (phase 2b): replace the fixed demo with the
-game-agnostic FIFO poller in libultraship calling the same `ScriptedInput` API for interactive
-control, + a minimal MM per-game REPL for `PlayState` queries (posinfo/warp/actor scan).
+`scratch/logs/mm_n2/warp_input_demo.sh`).
+
+**Phase 2b — interactive FIFO poller + MM per-game REPL — DONE (2026-07-01).** The fixed demo is now
+superseded by INTERACTIVE headless control over two FIFOs (the demo hook stays, still gated
+`ZELDA3D_MM_INPUTDEMO`, for a no-driver smoke test):
+- **Shared, game-agnostic input poller in libultraship** — `ship/controller/scripted/
+  ScriptedInputFifo.{h,cpp}`. A background thread (`poll()`-blocked, 200 ms tick so Stop is
+  responsive) reads newline commands from `$SHIP_SCRIPTED_FIFO` and drives the existing
+  `Ship_ScriptedInput_*` API: `enable <0|1>`, `btn <hexmask>` (strtol base 0), `stick <x> <y>`
+  (clamped ±128), `reset`, `ping`; replies to `<fifo>.out`. **OFF by default** (env unset → no-op;
+  the ScriptedInput seam itself also stays disabled until `enable 1`), so live OoT is untouched.
+  **Hooked at `Context::InitControlDeck`, NOT `Context::Init`** — the root-cause finding this phase:
+  MM/2s2h boots via the individual `Init*` methods (`BenPort.cpp` calls `InitConfiguration/
+  InitControlDeck/InitResourceManager/…` directly) and NEVER calls the aggregate `Context::Init()`,
+  so an `Init()` hook fired for OoT but not MM. `InitControlDeck` is the one input-init BOTH games
+  share. Stopped+joined in `~Context`.
+- **Minimal MM per-game REPL** — `mm/2s2h/Z3DRepl.{c,h}`, ticked from `GameState_Update` (gated
+  `$ZELDA3D_MM_REPL`, its own FIFO). PlayState-only queries: `posinfo` (sceneId/room/Link pos+yaw
+  via `gPlayState`+`GET_PLAYER`), `warp <entrance>` (live scene transition = `nextEntrance` +
+  `TRANS_TRIGGER_START` + `TRANS_TYPE_FADE_BLACK`, mirroring z_play.c `func_80169EFC`),
+  `actors [n]` (per-category live counts + the n nearest actors to Link, bounded collect +
+  partial-selection-sort, over-cap actors reported not silently dropped), `ping`. Input stays on the
+  shared path — this per-game surface is tiny by design.
+- **VERIFIED interactively (real data), South Clock Town.** Driver `scratch/logs/mm_n2/
+  interactive_drive.{sh,py}` opens both FIFOs, waits for gameplay via REPL `posinfo`, then issues
+  `enable 1`+`stick 0 72` for 3 wall-clock seconds, `stick 0 0`, `actors 5`, `btn 0x1000` (START).
+  Link walked **(-278, 0, -752) → (-415, 0, -281)** (~490u) with yaw turning 0 → -2946 to face
+  travel — ON COMMAND, not a baked timeline — and synthetic START opened the SELECT-ITEM subscreen
+  (`scratch/screenshots/mm_n34b_interactive.png`). Every FIFO command was acknowledged in
+  `<fifo>.out`. OoT `soh` target rebuilt clean against the changed shared libultraship (A/B safe).
+This completes the "one libultraship, both games" input unification (memory `mm-renderer-topology`):
+input is a single shared seam, per-game REPLs carry only decomp-typed state.
 
 **Build self-sufficiency fix (2026-07-01, commit `931c8e8`) — READ IF MM WON'T COMPILE.** MM failed
 to build (`z64actor.h → code/actor/actor.h: No such file`) because `mm/assets/.gitignore` ignores
