@@ -275,7 +275,7 @@ bool Context::InitControlDeck(std::shared_ptr<ControlDeck> controlDeck) {
 
     // Start the game-agnostic scripted-input FIFO poller once the control deck is up. Hooked here
     // (not in Context::Init) because MM/2s2h boots via the individual Init* methods rather than the
-    // aggregate Init(); InitControlDeck is the one input-init both OoT (soh3d) and MM share. No-op
+    // aggregate Init(); InitControlDeck is the one input-init both OoT (zelda3d) and MM share. No-op
     // unless SHIP_SCRIPTED_FIFO is set, so live OoT and normal MM runs are untouched.
     Ship_ScriptedInputFifo_StartFromEnv();
 

@@ -1,7 +1,7 @@
 #include "zcol.h"
 #include <cstring>
 
-namespace SoH3D {
+namespace Zelda3D {
 
 static uint16_t u16le(const uint8_t* b, size_t o) {
     return (uint16_t)(b[o] | (b[o + 1] << 8));
@@ -90,4 +90,4 @@ OoT3DCollision::OoT3DCollision(const std::vector<uint8_t>& data) {
     mOk = true;
 }
 
-} // namespace SoH3D
+} // namespace Zelda3D

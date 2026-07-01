@@ -1,14 +1,14 @@
 #!/usr/bin/env python3
 """walk_stop_sweet.py — derive the CSAB-space walk-STOP sweet spots offline.
 
-The walk-stop port (soh3d_anim.cpp, oot3d-decomp player_anim_states.md §6e) cross-fades the frozen
+The walk-stop port (zelda3d_anim.cpp, oot3d-decomp player_anim_states.md §6e) cross-fades the frozen
 `nml_walk_free` leg pose (at free-run frame φ) into `nml_walk_end{R,L}_free` @ frame 0. OoT3D's
-FUN_002be4c4 picks endR/endL + a morph length from the *leg-phase* (player+0x2254), but SoH3D's φ is
+FUN_002be4c4 picks endR/endL + a morph length from the *leg-phase* (player+0x2254), but Zelda3D's φ is
 a free-run CSAB frame that differs from the leg-phase by a CONSTANT OFFSET K (§6d/§6e STATUS). So the
 port's sweet-spot math (computed from φ as if K=0) does NOT land where walk_free@φ == walk_end@0 → the
 residual pop.
 
-This tool measures the sweet spots DIRECTLY in CSAB-frame units, from SoH3D's OWN rig geometry (no
+This tool measures the sweet spots DIRECTLY in CSAB-frame units, from Zelda3D's OWN rig geometry (no
 oracle): for each end anim it finds φ* = the nml_walk_free frame whose per-bone LOCAL pose best matches
 nml_walk_end{R,L}_free @ frame 0. That φ* is the frame at which morphFrames should be 0 (instant). The
 walk-stop block then chooses endR/endL by which φ* is nearer the live φ (mod 29) and scales morphFrames
@@ -27,8 +27,8 @@ from ctr_romfs import CtrRom
 from zar import Zar
 from parity_pose_diff import PARENT, LABEL, parse_bones
 
-ZAR = os.environ.get("SOH3D_LINK_ZAR", "/actor/zelda_link_child_new.zar")
-CMB = os.environ.get("SOH3D_LINK_CMB", "child/model/childlink_v2.cmb")
+ZAR = os.environ.get("ZELDA3D_LINK_ZAR", "/actor/zelda_link_child_new.zar")
+CMB = os.environ.get("ZELDA3D_LINK_CMB", "child/model/childlink_v2.cmb")
 WALK = "child/anim/nml_walk_free.csab"
 ENDR = "boy/anim/nml_walk_endR_free.csab"
 ENDL = "boy/anim/nml_walk_endL_free.csab"
@@ -99,7 +99,7 @@ def main():
     args = ap.parse_args()
     bones = parse_bones("3-8") if args.legs else parse_bones(args.bones)
 
-    rom = CtrRom(os.environ["SOH3D_3DS_ROM"])
+    rom = CtrRom(os.environ["ZELDA3D_3DS_ROM"])
     z = Zar(rom.read(rom.get(ZAR)))
 
     def load(name):

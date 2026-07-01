@@ -10,7 +10,7 @@
 #include <string>
 #include <vector>
 
-namespace SoH3D {
+namespace Zelda3D {
 
 struct CtxbTexture {
     std::string name;
@@ -41,4 +41,4 @@ class Ctxb {
     std::vector<CtxbTexture> mTextures;
 };
 
-} // namespace SoH3D
+} // namespace Zelda3D

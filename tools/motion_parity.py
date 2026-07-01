@@ -1,12 +1,12 @@
 #!/usr/bin/env python3
-"""motion_parity.py — diff a SoH3D actor trajectory against the OoT3D oracle trajectory.
+"""motion_parity.py — diff a Zelda3D actor trajectory against the OoT3D oracle trajectory.
 
 The synthesis half of the BEHAVIORAL motion-parity harness:
-  SoH3D side : in-game REPL `asample <n> scratch/motion/soh3d.csv`   (per-frame, exact)
+  Zelda3D side : in-game REPL `asample <n> scratch/motion/zelda3d.csv`   (per-frame, exact)
   oracle side: tools/oracle_motion_sample.py --id ... --out scratch/motion/oracle.csv
-  this tool  : motion_parity.py scratch/motion/soh3d.csv scratch/motion/oracle.csv
+  this tool  : motion_parity.py scratch/motion/zelda3d.csv scratch/motion/oracle.csv
 
-SoH3D and OoT3D share world coordinates + entrance spawn coords ([[soh3d-oracle-entrance-match]]),
+Zelda3D and OoT3D share world coordinates + entrance spawn coords ([[zelda3d-oracle-entrance-match]]),
 so positions are directly comparable in world units when both are driven to the same scene/actor.
 Rotations are s16 binang in both. The two captures need NOT have the same length or frame phase —
 we compare frame-rate/offset-tolerant SHAPE metrics (path length, net displacement, per-frame speed
@@ -19,7 +19,7 @@ import argparse, csv, math, sys
 
 def load(path):
     rows = []
-    speeds = []  # engine-authoritative speedXZ when the capture has that column (SoH3D side)
+    speeds = []  # engine-authoritative speedXZ when the capture has that column (Zelda3D side)
     with open(path) as f:
         for r in csv.DictReader(f):
             rows.append((
@@ -78,11 +78,11 @@ def corr(a, b):
 
 def main():
     ap = argparse.ArgumentParser()
-    ap.add_argument("soh3d")
+    ap.add_argument("zelda3d")
     ap.add_argument("oracle")
     args = ap.parse_args()
 
-    s, s_spd = load(args.soh3d)
+    s, s_spd = load(args.zelda3d)
     o, o_spd = load(args.oracle)
     ms = path_metrics(s)
     mo = path_metrics(o)
@@ -92,7 +92,7 @@ def main():
     def fmt(v):
         return f"({v[0]:.1f},{v[1]:.1f},{v[2]:.1f})"
 
-    print(f"{'metric':<22}{'SoH3D':>16}{'oracle':>16}")
+    print(f"{'metric':<22}{'Zelda3D':>16}{'oracle':>16}")
     print(f"{'frames':<22}{ms['n']:>16}{mo['n']:>16}")
     print(f"{'start pos':<22}{fmt(ms['start']):>16}{fmt(mo['start']):>16}")
     print(f"{'end pos':<22}{fmt(ms['end']):>16}{fmt(mo['end']):>16}")
@@ -109,7 +109,7 @@ def main():
     # frame, so its positional median IS its per-frame speed.
     s_auth = median(s_spd) if s_spd else ms["median_speed"]
     o_auth = median(o_spd) if o_spd else mo["median_speed"]
-    print(f"\nsteady per-frame speed (authoritative): SoH3D={s_auth:.3f}  oracle={o_auth:.3f}"
+    print(f"\nsteady per-frame speed (authoritative): Zelda3D={s_auth:.3f}  oracle={o_auth:.3f}"
           f"  ({'speedXZ col' if s_spd else 'pos-delta'} vs {'speedXZ col' if o_spd else 'pos-delta'})")
     if o_auth:
         print(f"  ratio SoH/ora = {s_auth / o_auth:.3f}")
@@ -123,7 +123,7 @@ def main():
     # (20fps*1.5 == 30fps*1.0). => the velocity field (speedXZ) is the frame-rate-INDEPENDENT parity
     # metric; ALWAYS verdict on speedXZ, never on per-frame positional deltas (they differ by design).
     if s_spd and ms["median_speed"] > 1.3 * s_auth:
-        print(f"  [SoH3D pos-delta {ms['median_speed']:.2f}/frame = {ms['median_speed']/s_auth:.2f}x its "
+        print(f"  [Zelda3D pos-delta {ms['median_speed']:.2f}/frame = {ms['median_speed']/s_auth:.2f}x its "
               f"speedXZ — the 20->30fps position compensation, not a divergence]")
 
     print("\n--- divergence ---")

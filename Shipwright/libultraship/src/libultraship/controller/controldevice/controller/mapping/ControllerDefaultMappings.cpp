@@ -45,7 +45,7 @@ void ControllerDefaultMappings::SetDefaultKeyboardKeyToButtonMappings(
         return;
     }
 
-    // PC-native default keyboard layout (SoH3D project vision: PC-native controls).
+    // PC-native default keyboard layout (Zelda3D project vision: PC-native controls).
     // Move (W/A/S/D) is handled by the axis-direction defaults in Ship::ControllerDefaultMappings.
     //
     // Action          N64 btn    Key            Rationale

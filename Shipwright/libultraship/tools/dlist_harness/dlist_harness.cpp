@@ -1,4 +1,4 @@
-// SoH3D dlist render harness — the SoH-side counterpart to the Azahar decode
+// Zelda3D dlist render harness — the SoH-side counterpart to the Azahar decode
 // oracle. It drives libultraship's Fast3D interpreter (the REAL render path)
 // over a generated CMB->F3DEX2 display list, WITHOUT booting the game or opening
 // a window.
@@ -14,15 +14,15 @@
 //                          pixel A/B counterpart to the Azahar oracle render.
 //
 // Build:  cmake -S Shipwright -B <build> -DLUS_BUILD_DLIST_HARNESS=ON
-//         cmake --build <build> --target soh3d_dlist_harness
-// Run:    soh3d_dlist_harness                 (recording mode)
-//         soh3d_dlist_harness --gl [--out scratch/render/kibako_lus.ppm] [--size 640x480]
+//         cmake --build <build> --target zelda3d_dlist_harness
+// Run:    zelda3d_dlist_harness                 (recording mode)
+//         zelda3d_dlist_harness --gl [--out scratch/render/kibako_lus.ppm] [--size 640x480]
 //
 // GL mode needs the shader archive (shaders/opengl/default.shader.glsl lives in
-// soh.o2r) mounted via the ResourceManager — pass --o2r <path> or set SOH3D_O2R;
+// soh.o2r) mounted via the ResourceManager — pass --o2r <path> or set ZELDA3D_O2R;
 // it otherwise probes a few standard build locations.
 //
-// It links the generated soh3d_kibako_model.c directly (raw Vtx[]/Gfx[]/tex
+// It links the generated zelda3d_kibako_model.c directly (raw Vtx[]/Gfx[]/tex
 // arrays, no ResourceManager needed for the geometry itself).
 
 #include <algorithm>
@@ -44,9 +44,9 @@
 #include <fast/backends/gfx_window_manager_api.h>
 #include <fast/backends/gfx_opengl.h> // GfxRenderingAPIOGL + GL prototypes (SDL_opengl.h on Linux)
 #include <libultraship/libultra/gbi.h>
-#include <fast/soh3d_gl.h> // SoH3D direct-GL renderer (the --soh3d path under test)
+#include <fast/zelda3d_gl.h> // Zelda3D direct-GL renderer (the --zelda3d path under test)
 
-// SoH3D runtime asset loader (pure C++; reads a model straight from the .3ds).
+// Zelda3D runtime asset loader (pure C++; reads a model straight from the .3ds).
 #include "asset/ctr_rom.h"
 #include "asset/zar.h"
 #include "asset/cmb.h"
@@ -55,31 +55,31 @@
 #include <EGL/egl.h>
 #include <EGL/eglext.h>
 
-// Provider + scale exposed by soh3d_model.cpp (compiled into the harness).
-extern "C" void SoH3D_EnsureModelProvider(void);
-extern "C" void SoH3D_UpdateAnim(int modelId, const char* animName, float frame);
+// Provider + scale exposed by zelda3d_model.cpp (compiled into the harness).
+extern "C" void Zelda3D_EnsureModelProvider(void);
+extern "C" void Zelda3D_UpdateAnim(int modelId, const char* animName, float frame);
 
 // The generated models under test (raw C arrays). Declared extern; linked in.
 // Each is gated by a HAVE_* define from CMake (only the .c files that exist are
 // compiled into the harness, since they are ROM-derived / gitignored).
 extern "C" {
 #ifdef HAVE_KIBAKO
-extern Gfx soh3d_kibako_model_dl[];
+extern Gfx zelda3d_kibako_model_dl[];
 #endif
 #ifdef HAVE_POT
-extern Gfx soh3d_pot_model_dl[];
+extern Gfx zelda3d_pot_model_dl[];
 #endif
 #ifdef HAVE_GS
-extern Gfx soh3d_gs_model_dl[];
+extern Gfx zelda3d_gs_model_dl[];
 #endif
 #ifdef HAVE_HINTSTONE
-extern Gfx soh3d_hintstone_model_dl[];
+extern Gfx zelda3d_hintstone_model_dl[];
 #endif
 #ifdef HAVE_GELDWOMAN
-extern Gfx soh3d_geldwoman_model_dl[];
+extern Gfx zelda3d_geldwoman_model_dl[];
 #endif
 #ifdef HAVE_CHILDLINK
-extern Gfx soh3d_childlink_model_dl[];
+extern Gfx zelda3d_childlink_model_dl[];
 #endif
 }
 
@@ -87,27 +87,27 @@ extern Gfx soh3d_childlink_model_dl[];
 static Gfx* SelectModel(const std::string& name) {
 #ifdef HAVE_KIBAKO
     if (name == "kibako")
-        return soh3d_kibako_model_dl;
+        return zelda3d_kibako_model_dl;
 #endif
 #ifdef HAVE_POT
     if (name == "pot")
-        return soh3d_pot_model_dl;
+        return zelda3d_pot_model_dl;
 #endif
 #ifdef HAVE_GS
     if (name == "gs")
-        return soh3d_gs_model_dl;
+        return zelda3d_gs_model_dl;
 #endif
 #ifdef HAVE_HINTSTONE
     if (name == "hintstone")
-        return soh3d_hintstone_model_dl;
+        return zelda3d_hintstone_model_dl;
 #endif
 #ifdef HAVE_GELDWOMAN
     if (name == "geldwoman")
-        return soh3d_geldwoman_model_dl;
+        return zelda3d_geldwoman_model_dl;
 #endif
 #ifdef HAVE_CHILDLINK
     if (name == "childlink")
-        return soh3d_childlink_model_dl;
+        return zelda3d_childlink_model_dl;
 #endif
     return nullptr;
 }
@@ -419,7 +419,7 @@ static bool WritePpmFlipped(const std::string& path, const uint8_t* rgb, uint32_
 static std::string FindO2r(const char* explicitPath) {
     if (explicitPath && *explicitPath && std::filesystem::exists(explicitPath))
         return explicitPath;
-    if (const char* env = getenv("SOH3D_O2R"); env && *env && std::filesystem::exists(env))
+    if (const char* env = getenv("ZELDA3D_O2R"); env && *env && std::filesystem::exists(env))
         return env;
     const char* candidates[] = {
         "Shipwright/build-cmake/soh/soh.o2r", "build-cmake/soh/soh.o2r", "../../soh/soh.o2r", "soh.o2r",
@@ -581,39 +581,39 @@ static void BuildDlist(BuiltDlist& b, Gfx* modelDl) {
     b.dl.push_back(cEnd);
 }
 
-// --- SoH3D direct-GL path harness ---------------------------------------------
-// Reproduces the IN-GAME path headlessly: emit the OTR_G_SOH3D_DRAW opcode (which
-// runs SoH3D_GL_Draw) into a dlist, followed by a normal Fast3D triangle. If our GL
+// --- Zelda3D direct-GL path harness ---------------------------------------------
+// Reproduces the IN-GAME path headlessly: emit the OTR_G_ZELDA3D_DRAW opcode (which
+// runs Zelda3D_GL_Draw) into a dlist, followed by a normal Fast3D triangle. If our GL
 // draw corrupts the interpreter's GL state, that trailing triangle's DrawTriangles
 // crashes here — the exact in-game symptom, but in ~1s with no game boot.
 static Vtx g_canary[3];
 
-static bool BuildSoH3DDlist(BuiltDlist& b, const std::string& zarPath, int modelId, float rx, float ry, float rz) {
+static bool BuildZelda3DDlist(BuiltDlist& b, const std::string& zarPath, int modelId, float rx, float ry, float rz) {
     // Load the CMB (same loader the game uses) to get the model bbox for an
     // auto-fit modelview, and to confirm the asset path is good.
-    const char* rom = getenv("SOH3D_3DS_ROM");
-    if (!rom || !*rom) { fprintf(stderr, "[HARNESS] SOH3D_3DS_ROM not set\n"); return false; }
-    SoH3D::CtrRom r(rom);
+    const char* rom = getenv("ZELDA3D_3DS_ROM");
+    if (!rom || !*rom) { fprintf(stderr, "[HARNESS] ZELDA3D_3DS_ROM not set\n"); return false; }
+    Zelda3D::CtrRom r(rom);
     if (!r.ok()) { fprintf(stderr, "[HARNESS] CtrRom: %s\n", r.error().c_str()); return false; }
     auto zb = r.read(zarPath);
     if (zb.empty()) { fprintf(stderr, "[HARNESS] zar not found: %s\n", zarPath.c_str()); return false; }
-    SoH3D::Zar zar(std::move(zb));
-    const SoH3D::ZarFile* cf = zar.ok() ? zar.firstWithSuffix(".cmb") : nullptr;
+    Zelda3D::Zar zar(std::move(zb));
+    const Zelda3D::ZarFile* cf = zar.ok() ? zar.firstWithSuffix(".cmb") : nullptr;
     if (!cf) { fprintf(stderr, "[HARNESS] no .cmb in %s\n", zarPath.c_str()); return false; }
-    SoH3D::Cmb cmb(zar.read(*cf));
+    Zelda3D::Cmb cmb(zar.read(*cf));
     if (!cmb.ok()) { fprintf(stderr, "[HARNESS] Cmb: %s\n", cmb.error().c_str()); return false; }
     // Auto-fit bbox from the SKINNED groups when an anim is requested (same env the
     // provider reads), so a deformed pose isn't clipped by a bind-pose-sized fit.
-    std::vector<SoH3D::CmbDrawGroup> bboxGroups;
-    const char* animEnv = getenv("SOH3D_ANIM");
+    std::vector<Zelda3D::CmbDrawGroup> bboxGroups;
+    const char* animEnv = getenv("ZELDA3D_ANIM");
     if (animEnv && *animEnv) {
         std::string an(animEnv);
         std::string full = (an.rfind("Anim/", 0) == 0) ? an : ("Anim/" + an + ".csab");
-        const SoH3D::ZarFile* af = nullptr;
+        const Zelda3D::ZarFile* af = nullptr;
         for (const auto& f : zar.files()) if (f.name == full) { af = &f; break; }
         if (af) {
-            SoH3D::Csab anim(zar.read(*af));
-            float frame = getenv("SOH3D_FRAME") ? (float)atof(getenv("SOH3D_FRAME")) : 0.0f;
+            Zelda3D::Csab anim(zar.read(*af));
+            float frame = getenv("ZELDA3D_FRAME") ? (float)atof(getenv("ZELDA3D_FRAME")) : 0.0f;
             if (anim.ok()) {
                 std::vector<std::array<float, 16>> sm;
                 anim.skinMatrices(cmb, frame, sm);
@@ -628,7 +628,7 @@ static bool BuildSoH3DDlist(BuiltDlist& b, const std::string& zarPath, int model
             for (int k = 0; k < 3; k++) { lo[k] = std::min(lo[k], v.pos[k]); hi[k] = std::max(hi[k], v.pos[k]); }
     float ctr[3], ext[3];
     for (int k = 0; k < 3; k++) { ctr[k] = (lo[k] + hi[k]) * 0.5f; ext[k] = std::max((hi[k] - lo[k]) * 0.5f, 1.0f); }
-    printf("[HARNESS] soh3d bbox x[%.0f,%.0f] y[%.0f,%.0f] z[%.0f,%.0f]\n", lo[0], hi[0], lo[1], hi[1], lo[2], hi[2]);
+    printf("[HARNESS] zelda3d bbox x[%.0f,%.0f] y[%.0f,%.0f] z[%.0f,%.0f]\n", lo[0], hi[0], lo[1], hi[1], lo[2], hi[2]);
 
     // Identity projection; modelview = Scale(fit) * R(rx,ry,rz) about the model
     // centre, into ~80% NDC. Convention clip_j = sum_k pos_k*MV[k][j] + MV[3][j], so
@@ -681,13 +681,13 @@ static bool BuildSoH3DDlist(BuiltDlist& b, const std::string& zarPath, int model
     for (int i = 0; i < 3; i++) { mk[i].v.cn[0] = 255; mk[i].v.cn[1] = 0; mk[i].v.cn[2] = 0; mk[i].v.cn[3] = 255; }
     memcpy(g_canary, mk, sizeof(mk));
 
-    SoH3D_EnsureModelProvider();
+    Zelda3D_EnsureModelProvider();
     // GPU skinning: set the model's animated pose (uBones) for this frame. The VBO
     // itself is model-space (bind pose); the shader applies these matrices. Same
     // frame as the bbox fit above, so the rendered pose matches the auto-fit.
     if (animEnv && *animEnv) {
-        float frame = getenv("SOH3D_FRAME") ? (float)atof(getenv("SOH3D_FRAME")) : 0.0f;
-        SoH3D_UpdateAnim(modelId, animEnv, frame);
+        float frame = getenv("ZELDA3D_FRAME") ? (float)atof(getenv("ZELDA3D_FRAME")) : 0.0f;
+        Zelda3D_UpdateAnim(modelId, animEnv, frame);
     }
 
     Gfx cViewport = gsSPViewport(&b.vp);
@@ -701,12 +701,12 @@ static bool BuildSoH3DDlist(BuiltDlist& b, const std::string& zarPath, int model
     b.dl.push_back(cMv);
     // PRE-canary: a Fast3D draw to make the interpreter apply its framebuffer +
     // viewport + scissor + shader to GL (it does so lazily on first draw), faithfully
-    // mimicking in-game where the scene renders before the actor's SoH3D draw.
+    // mimicking in-game where the scene renders before the actor's Zelda3D draw.
     { Gfx g = gsDPSetCombineMode(G_CC_SHADE, G_CC_SHADE); b.dl.push_back(g); }
     { Gfx g = gsSPVertex(g_canary, 3, 0); b.dl.push_back(g); }
     { Gfx g = gsSP1Triangle(0, 1, 2, 0); b.dl.push_back(g); }
-    // The SoH3D direct-GL model draw under test.
-    { Gfx g; gSPSoH3DDraw(&g, modelId, 255, 255, 255); b.dl.push_back(g); }
+    // The Zelda3D direct-GL model draw under test.
+    { Gfx g; gSPZelda3DDraw(&g, modelId, 255, 255, 255); b.dl.push_back(g); }
     // POST-canary: another Fast3D triangle, to catch GL-state corruption from our draw.
     { Gfx g = gsSPVertex(g_canary, 3, 0); b.dl.push_back(g); }
     { Gfx g = gsSP1Triangle(0, 1, 2, 0); b.dl.push_back(g); }
@@ -720,17 +720,17 @@ int main(int argc, char** argv) {
     std::string o2rArg;
     std::string modelName = "kibako";
     std::string viewPlane = "xy";
-    bool soh3dMode = false;
+    bool zelda3dMode = false;
     std::string zarPath = "/actor/zelda_ge1.zar";
-    float rx = 0, ry = 0, rz = 0; // --soh3d model orientation (degrees)
+    float rx = 0, ry = 0, rz = 0; // --zelda3d model orientation (degrees)
     uint32_t W = 640, H = 480;
     for (int i = 1; i < argc; i++) {
         std::string a = argv[i];
         if (a == "--gl")
             glMode = true;
-        else if (a == "--soh3d") {
-            soh3dMode = true;
-            glMode = true; // the SoH3D direct-GL path requires the real GL backend
+        else if (a == "--zelda3d") {
+            zelda3dMode = true;
+            glMode = true; // the Zelda3D direct-GL path requires the real GL backend
         } else if (a == "--zar" && i + 1 < argc)
             zarPath = argv[++i];
         else if (a == "--rotx" && i + 1 < argc)
@@ -756,10 +756,10 @@ int main(int argc, char** argv) {
         }
     }
     if (outPath.empty())
-        outPath = soh3dMode ? "scratch/render/soh3d_gl.ppm" : "scratch/render/" + modelName + "_lus.ppm";
+        outPath = zelda3dMode ? "scratch/render/zelda3d_gl.ppm" : "scratch/render/" + modelName + "_lus.ppm";
 
     Gfx* modelDl = nullptr;
-    if (!soh3dMode) {
+    if (!zelda3dMode) {
         modelDl = SelectModel(modelName);
         if (!modelDl) {
             fprintf(stderr, "[HARNESS] unknown/unbuilt model '%s' (have: kibako/pot/gs if their .c was generated)\n",
@@ -768,7 +768,7 @@ int main(int argc, char** argv) {
         }
     }
 
-    auto* ctx = Ship::Context::CreateUninitializedInstance("soh3d_harness", "soh3d_harness", "");
+    auto* ctx = Ship::Context::CreateUninitializedInstance("zelda3d_harness", "zelda3d_harness", "");
     ctx->InitLogging();
     ctx->InitConfiguration();
     ctx->InitConsoleVariables();
@@ -778,7 +778,7 @@ int main(int argc, char** argv) {
         o2r = FindO2r(o2rArg.c_str());
         if (o2r.empty()) {
             fprintf(stderr, "[HARNESS] GL mode needs the shader archive (soh.o2r). "
-                            "Pass --o2r <path> or set SOH3D_O2R.\n");
+                            "Pass --o2r <path> or set ZELDA3D_O2R.\n");
             return 2;
         }
         // ResourceManager mounts soh.o2r so the OGL backend can load
@@ -800,19 +800,19 @@ int main(int argc, char** argv) {
     auto gfx = std::make_shared<Interpreter>();
     GfxSetInstance(gfx);
     gfx->SetGfxDebugger(std::make_shared<GfxDebugger>());
-    gfx->Init(wapi.get(), rapi, "soh3d_harness", false, W, H, 0, 0);
+    gfx->Init(wapi.get(), rapi, "zelda3d_harness", false, W, H, 0, 0);
 
     BuiltDlist b;
     b.view = viewPlane;
-    if (soh3dMode) {
-        if (!BuildSoH3DDlist(b, zarPath, 0, rx, ry, rz))
+    if (zelda3dMode) {
+        if (!BuildZelda3DDlist(b, zarPath, 0, rx, ry, rz))
             return 2;
     } else {
         BuildDlist(b, modelDl);
     }
 
     printf("[HARNESS] running '%s' dlist through LUS interpreter (%s, %ux%u)...\n",
-           soh3dMode ? zarPath.c_str() : modelName.c_str(), glMode ? "GL" : "recording", W, H);
+           zelda3dMode ? zarPath.c_str() : modelName.c_str(), glMode ? "GL" : "recording", W, H);
     fflush(stdout);
     gfx->StartFrame();
     gfx->Run(b.dl.data(), b.mtxReplacements);

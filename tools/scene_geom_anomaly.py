@@ -14,7 +14,7 @@ then reports, for the requested scene prefix, each room's meshes ranked by exten
   BAD     NaN / inf vertex
 
 Usage:
-  SOH3D_3DS_ROM=<rom> python3 tools/scene_geom_anomaly.py [scene_prefix=jyasinzou]
+  ZELDA3D_3DS_ROM=<rom> python3 tools/scene_geom_anomaly.py [scene_prefix=jyasinzou]
 """
 import os, sys, re, math
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
@@ -58,7 +58,7 @@ def extent(a):
 
 def main():
     prefix = sys.argv[1] if len(sys.argv) > 1 else "jyasinzou"
-    rom = CtrRom(os.environ["SOH3D_3DS_ROM"])
+    rom = CtrRom(os.environ["ZELDA3D_3DS_ROM"])
     rooms = room_files(rom)
 
     # Pass 1: global baseline of per-mesh extents.

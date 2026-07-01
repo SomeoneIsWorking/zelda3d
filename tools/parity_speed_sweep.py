@@ -1,12 +1,12 @@
 #!/usr/bin/env python3
-"""parity_speed_sweep.py — SPEED-CALIBRATED Link anim-SELECTION parity sweep (SoH3D vs OoT3D oracle).
+"""parity_speed_sweep.py — SPEED-CALIBRATED Link anim-SELECTION parity sweep (Zelda3D vs OoT3D oracle).
 
 Supersedes the raw-stick comparison in parity_selection_sweep.py for INTERMEDIATE states. That tool
 drove both sides at the same raw analog magnitude and dismissed `walk` as a "calibration artifact"
 because the N64 control stick (~±84) and the 3DS circle pad (±100) map a given magnitude to a
 DIFFERENT speed. That excuse hid a REAL divergence. The fix is to compare at matched SPEED, not
 matched stick: speedXZ is the physical quantity both engines animate from, and BOTH expose it
-  - SoH3D : REPL `linkanimstate` field speedXZ
+  - Zelda3D : REPL `linkanimstate` field speedXZ
   - oracle: PLAYER + 0x221c (linearVelocity, = N64 speedXZ; oot3d-decomp player_port.md)
 
 METHOD (no fragile closed-loop): for each side, sweep the forward analog magnitude over a grid; at
@@ -15,7 +15,7 @@ speed ramp to steady state, then read (steadyspeedXZ, selectedCSAB). That yields
 CURVE per side. We then bin both curves by speedXZ and report, per bin, the CSAB each side selects.
 A bin where the two sides select different CSABs at the SAME speed is a TRUE divergence.
 
-Both sides resolve into the same OoT3D CSAB namespace (SoH3D plays the OoT3D rig's CSABs), so the
+Both sides resolve into the same OoT3D CSAB namespace (Zelda3D plays the OoT3D rig's CSABs), so the
 selected names compare directly: idle `nml_waitF_typeA_20f`, walk `nml_walk_free` (animId 0x47),
 run `nml_run_free` (0x6c).
 
@@ -23,13 +23,13 @@ USAGE
   tools/parity_speed_sweep.py                       # full sweep, print the curve + divergence table
   tools/parity_speed_sweep.py --soh-mags 0,20,40,60,80,127 --ora-mags 0,30,50,70,100
   tools/parity_speed_sweep.py --json scratch/parity/speed_sweep.json
-  tools/parity_speed_sweep.py --skip-oracle        # SoH3D curve only
+  tools/parity_speed_sweep.py --skip-oracle        # Zelda3D curve only
 
-HISTORY (2026-06-25): this sweep first surfaced the #117 walk divergence — SoH3D selected nml_run_free
-at EVERY nonzero speed while the oracle selects nml_walk_free at walk speed. Root cause: SoH3D read the
+HISTORY (2026-06-25): this sweep first surfaced the #117 walk divergence — Zelda3D selected nml_run_free
+at EVERY nonzero speed while the oracle selects nml_walk_free at walk speed. Root cause: Zelda3D read the
 live N64 player anim (one run anim, speed-scaled playback) and mapped it straight to nml_run_free;
 OoT3D/Grezzo instead SELECTS distinct walk/run CSABs by speed (RE'd: FUN_002be660 picker in the
-FUN_004ba378 run action family). FIXED by SoH3D_LinkWalkRunGate (soh3d_link.cpp): below the measured
+FUN_004ba378 run action family). FIXED by Zelda3D_LinkWalkRunGate (zelda3d_link.cpp): below the measured
 walk→run threshold (~3.6, in the oracle gap walk_max 3.2 / run_min 3.8) play nml_walk_free. After the
 fix this sweep reports PASS (idle/walk/run selections match + walk→run transition windows overlap).
 NOTE: the gate renders in `linksrc 3ds` mode (the architecture-directive keeper); in the default N64
@@ -72,9 +72,9 @@ def classify(curve):
     }
 
 
-# ---------------- SoH3D side (REPL) ----------------
+# ---------------- Zelda3D side (REPL) ----------------
 def soh_cmd(text):
-    p = subprocess.run([os.path.join(HERE, "soh3d_repl.py"), "cmd", text],
+    p = subprocess.run([os.path.join(HERE, "zelda3d_repl.py"), "cmd", text],
                        capture_output=True, text=True, timeout=15)
     out = (p.stdout or "").strip().splitlines()
     return out[0] if out else ""
@@ -247,9 +247,9 @@ def main():
     soh_mags = [int(x) for x in args.soh_mags.split(",")]
     ora_mags = [int(x) for x in args.ora_mags.split(",")]
 
-    print("== SoH3D speed->selection curve ==")
+    print("== Zelda3D speed->selection curve ==")
     if not soh_ensure_free():
-        print("WARN: SoH3D stuck in cutscene", file=sys.stderr)
+        print("WARN: Zelda3D stuck in cutscene", file=sys.stderr)
     soh = soh_curve(soh_mags)
 
     ora = []
@@ -265,7 +265,7 @@ def main():
         rm = f"{c['run_min']:.2f}" if c['run_min'] is not None else "-"
         return f"walk≤{wm} run≥{rm}"
 
-    print(f"\n{'regime':<14} {'SoH3D':<20} {'OoT3D oracle':<20} verdict")
+    print(f"\n{'regime':<14} {'Zelda3D':<20} {'OoT3D oracle':<20} verdict")
     print("-" * 66)
     fails = []
     rows = [("idle select", "idle_csab"), ("walk select", "walk_csab"), ("run select", "run_csab")]

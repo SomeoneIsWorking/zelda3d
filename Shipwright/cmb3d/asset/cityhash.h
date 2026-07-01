@@ -5,6 +5,6 @@
 #include <cstddef>
 #include <cstdint>
 
-namespace SoH3D {
+namespace Zelda3D {
 uint64_t CityHash64(const char* buf, size_t len);
 }

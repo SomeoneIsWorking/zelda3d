@@ -10,7 +10,7 @@
 #include <vector>
 #include <array>
 
-namespace SoH3D {
+namespace Zelda3D {
 
 struct CmbBone {
     int id = 0;
@@ -80,7 +80,7 @@ struct CmbTexture {
 
 // Interleaved render vertex: position (model space), normal, uv0, and skinning
 // bindings (up to 4 bone ids + weights). MUST stay byte-compatible with
-// SoH3DGlVtx (soh3d_gl.h) — the bridge reinterpret_casts between them.
+// Zelda3DGlVtx (zelda3d_gl.h) — the bridge reinterpret_casts between them.
 struct CmbVertex {
     float pos[3];
     float nrm[3];
@@ -200,4 +200,4 @@ class Cmb {
     void readAttr(const SepdAttr& attr, int attrSlot, uint32_t idx, int comps, float* out) const;
 };
 
-} // namespace SoH3D
+} // namespace Zelda3D

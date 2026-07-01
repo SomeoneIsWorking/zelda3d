@@ -37,7 +37,7 @@ def main():
     ap.add_argument("--upper", default="9-21")
     args = ap.parse_args()
 
-    rom = CtrRom(os.environ["SOH3D_3DS_ROM"])
+    rom = CtrRom(os.environ["ZELDA3D_3DS_ROM"])
     z = Zar(rom.read(rom.get(ZAR)))
 
     def load(name):

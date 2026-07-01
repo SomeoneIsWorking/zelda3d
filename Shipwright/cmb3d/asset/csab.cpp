@@ -5,7 +5,7 @@
 #include <cmath>
 #include <functional>
 
-namespace SoH3D {
+namespace Zelda3D {
 
 static uint16_t u16(const uint8_t* b, size_t o) { uint16_t v; memcpy(&v, b + o, 2); return v; }
 static int16_t  s16(const uint8_t* b, size_t o) { int16_t v; memcpy(&v, b + o, 2); return v; }
@@ -497,4 +497,4 @@ void restPoseSkinMatrices(const Cmb& model, std::vector<std::array<float, 16>>& 
         out[id] = matMul(aw[id], matInverse(bind[id]));
 }
 
-} // namespace SoH3D
+} // namespace Zelda3D

@@ -16,9 +16,9 @@
 #include "ship/window/gui/resource/GuiTextureFactory.h"
 #include "ship/window/gui/resource/GuiTexture.h"
 
-// SoH3D native PC HUD render entry (defined in soh/src/soh3d/soh3d.c). C linkage; called from
+// Zelda3D native PC HUD render entry (defined in soh/src/zelda3d/zelda3d.c). C linkage; called from
 // Gui::EndFrame before the RmlUi menu so the HUD draws under an open ESC menu. No-op when disabled.
-extern "C" void SoH3D_HudFrame(void);
+extern "C" void Zelda3D_HudFrame(void);
 
 namespace Ship {
 #define TOGGLE_BTN ImGuiKey_F1
@@ -58,7 +58,7 @@ void Gui::Init() {
     // ImGui has been removed from the build (replaced by a no-op header shim; the ImGui dev-tool /
     // menu code is kept only as inert scaffolding to migrate to RmlUi). So the framework no longer
     // creates an ImGui context, builds a font atlas, or ticks/draws ImGui windows — the live UI is
-    // RmlUi (stood up in ImGuiBackendInit) plus the native SoH3D HUD. mImGuiIo points at the shim's
+    // RmlUi (stood up in ImGuiBackendInit) plus the native Zelda3D HUD. mImGuiIo points at the shim's
     // zeroed IO purely so the legacy GamepadNavigation accessors that read mImGuiIo->ConfigFlags stay
     // valid (they no-op against the zeroed flags).
     mImGuiIo = &ImGui::GetIO();
@@ -166,8 +166,8 @@ void Gui::StartFrame() {
 
 void Gui::EndFrame() {
     // ImGui removed: no Render / draw-data path. The game frame is composited natively by the
-    // interpreter onto fb 0; here we draw the native SoH3D HUD then the RmlUi menu on top.
-    SoH3D_HudFrame();
+    // interpreter onto fb 0; here we draw the native Zelda3D HUD then the RmlUi menu on top.
+    Zelda3D_HudFrame();
     RenderRmlMenu();
 }
 

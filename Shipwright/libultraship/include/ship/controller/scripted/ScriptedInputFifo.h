@@ -2,7 +2,7 @@
 #define SHIP_SCRIPTED_INPUT_FIFO_H
 
 // Game-agnostic scripted-input FIFO poller — a shared libultraship seam (serves BOTH the OoT
-// (soh3d) and MM (2s2h) games, which link the exact same library). A background thread reads
+// (zelda3d) and MM (2s2h) games, which link the exact same library). A background thread reads
 // newline-delimited commands from a named pipe and drives the synthetic pad via the
 // Ship_ScriptedInput_* C API (see ScriptedInput.h). This turns the fixed input demos into
 // interactive headless control without either game having to grow its own input transport.

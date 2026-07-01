@@ -5,7 +5,7 @@
 #include <algorithm>
 #include <functional>
 
-namespace SoH3D {
+namespace Zelda3D {
 
 static uint8_t  u8(const uint8_t* b, size_t o) { return b[o]; }
 static int16_t  s16(const uint8_t* b, size_t o) { int16_t v; memcpy(&v, b + o, 2); return v; }
@@ -519,4 +519,4 @@ std::vector<CmbDrawGroup> Cmb::buildDrawGroupsSkinned(const std::array<float, 16
     return groups;
 }
 
-} // namespace SoH3D
+} // namespace Zelda3D

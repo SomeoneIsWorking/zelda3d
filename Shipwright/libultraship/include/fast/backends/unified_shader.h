@@ -5,12 +5,12 @@
 
 // Render-unification effort (kanban #131), Phase 1: the unified shader that will eventually
 // replace both the N64 per-combiner-permutation shader generator (gfx_sdl3gpu.cpp's
-// kSgShaderTemplate) and the fixed 3DS CMB shader (soh3d_sdl3gpu.cpp's kVert/kFrag), per
+// kSgShaderTemplate) and the fixed 3DS CMB shader (zelda3d_sdl3gpu.cpp's kVert/kFrag), per
 // UnifiedVtx (unified_vtx.h) / UnifiedMaterial (unified_material.h).
 //
 // Phase 1 status: DORMANT. This module is unreferenced by any live draw path — nothing calls
 // GetOrCreateUnifiedPipeline yet. SelfTestUnifiedShaderVariants() is the only thing exercising it,
-// gated behind SOH3D_UNIFIED_SHADER_SELFTEST=1, purely to catch a GLSL authoring mistake at
+// gated behind ZELDA3D_UNIFIED_SHADER_SELFTEST=1, purely to catch a GLSL authoring mistake at
 // compile-shader time rather than letting bad source sit unvalidated until Phase 2 wires it in.
 namespace Fast::Unified {
 

@@ -137,7 +137,7 @@ void Fast3dGui::UpdateSdlTextInput() {
 
 void Fast3dGui::ImGuiRenderDrawData(ImDrawData* data) {
     // No ImGui SDL3-GPU *renderer* backend is stood up (P4): the ImGui dev-overlay draw data is
-    // produced but not rendered. The in-game UI (HUD + ESC menu) renders via the SoH3D HUD and the
+    // produced but not rendered. The in-game UI (HUD + ESC menu) renders via the Zelda3D HUD and the
     // RmlUi SDL3 GPU interface instead.
     (void)data;
 }
@@ -196,12 +196,12 @@ void Fast3dGui::RmlMenuInjectClick(int x, int y) {
     mRml->ProcessSdlEvent(&ev);
 }
 
-// C bridge for the SoH3D REPL (`menu <action>`): resolve the active Fast3dGui and inject the key
+// C bridge for the Zelda3D REPL (`menu <action>`): resolve the active Fast3dGui and inject the key
 // that drives the requested navigation. The action codes (kept SDL-free for the C caller in
-// soh3d.c) match SoH3D_RmlMenuAction in tools/soh3d_repl.py:
+// zelda3d.c) match Zelda3D_RmlMenuAction in tools/zelda3d_repl.py:
 //   0 next-row (Down)  1 prev-row (Up)  2 activate (Enter)  3 close (Esc)
 //   4 next-tab (Right)  5 prev-tab (Left)
-extern "C" void SoH3D_RmlMenuKey(int action) {
+extern "C" void Zelda3D_RmlMenuKey(int action) {
     auto ctx = Ship::Context::GetRawInstance();
     if (!ctx || !ctx->GetWindow()) {
         return;
@@ -234,9 +234,9 @@ extern "C" void SoH3D_RmlMenuKey(int action) {
     gui->RmlMenuInjectKey(keycode);
 }
 
-// C bridge for the SoH3D REPL (`menuclick <x> <y>`): synthesize a left click at window pixel
+// C bridge for the Zelda3D REPL (`menuclick <x> <y>`): synthesize a left click at window pixel
 // (x, y) through the menu's real input path (used to verify mouse interactions headlessly).
-extern "C" void SoH3D_RmlMenuClick(int x, int y) {
+extern "C" void Zelda3D_RmlMenuClick(int x, int y) {
     auto ctx = Ship::Context::GetRawInstance();
     if (!ctx || !ctx->GetWindow()) {
         return;

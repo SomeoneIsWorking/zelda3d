@@ -6,7 +6,7 @@ Orthographic front view (project X→col, Y→row), z-buffered, flat-shaded by t
 triangle's view-space normal.z (no textures). Purpose: confirm the skinned POSE
 is sane and measure it (filled-pixel count, centroid, bbox) — NOT final quality.
 
-Usage: SOH3D_3DS_ROM=... python3 tools/csab_render.py [--anim ge1_s_wait] \
+Usage: ZELDA3D_3DS_ROM=... python3 tools/csab_render.py [--anim ge1_s_wait] \
          [--frame N] [--out scratch/render/x.ppm] [--size 256x384] [--rotx 180]
 """
 from __future__ import annotations
@@ -94,7 +94,7 @@ def main():
     args = ap.parse_args()
     W, H = (int(x) for x in args.size.split("x"))
 
-    rom = CtrRom(os.environ["SOH3D_3DS_ROM"])
+    rom = CtrRom(os.environ["ZELDA3D_3DS_ROM"])
     z = Zar(rom.read(rom.get(args.zar)))
     model = C.Cmb(z.read([f for f in z.files if f.name == args.cmb][0]))
     csab = None

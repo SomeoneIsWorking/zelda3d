@@ -4,7 +4,7 @@
 #include <cstring>
 #include <utility>
 
-namespace SoH3D {
+namespace Zelda3D {
 namespace {
 
 static uint64_t Fetch64(const char* p) {
@@ -147,4 +147,4 @@ uint64_t CityHash64(const char* s, size_t len) {
                      HashLen16(v.second, w.second) + x);
 }
 
-} // namespace SoH3D
+} // namespace Zelda3D

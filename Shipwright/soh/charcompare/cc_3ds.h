@@ -1,9 +1,9 @@
 // charcompare — 3DS (OoT3D) viewport.
 //
-// Loads an OoT3D character from the decrypted .3ds (SOH3D_3DS_ROM) via the
-// self-contained soh3d asset/ parsers, registers it with the existing soh3d
-// model bridge (soh3d_model.cpp) + direct-GL renderer (SoH3D_GL_*), and emits a
-// Fast3D display list that draws it through the engine's OTR_G_SOH3D_DRAW /
+// Loads an OoT3D character from the decrypted .3ds (ZELDA3D_3DS_ROM) via the
+// self-contained zelda3d asset/ parsers, registers it with the existing zelda3d
+// model bridge (zelda3d_model.cpp) + direct-GL renderer (Zelda3D_GL_*), and emits a
+// Fast3D display list that draws it through the engine's OTR_G_ZELDA3D_DRAW /
 // _RENDERPASS opcodes — exactly the in-game path, so the pixels match the game.
 #pragma once
 
@@ -18,7 +18,7 @@
 
 namespace cc {
 
-// One loaded 3DS character: its model id (in the soh3d bridge), bind-pose bbox
+// One loaded 3DS character: its model id (in the zelda3d bridge), bind-pose bbox
 // (for auto-fit framing), and the list of animation base names found in its ZAR.
 struct Model3ds {
     bool ok = false;
@@ -35,12 +35,12 @@ struct Model3ds {
 // frame slider / wrap playback to the animation's true length.
 int AnimLength(const Model3ds& m, const std::string& csabBase);
 
-// Open the ROM once (SOH3D_3DS_ROM). Returns false (and sets a message in `err`)
+// Open the ROM once (ZELDA3D_3DS_ROM). Returns false (and sets a message in `err`)
 // if the env var is unset or the image can't be parsed. Safe to call repeatedly.
 bool InitRom(std::string& err);
 
 // Load a character by ZAR path (e.g. "/actor/zelda_ge1.zar"). Computes the bind-pose
-// bbox and enumerates animations, and registers the model with the soh3d bridge so the
+// bbox and enumerates animations, and registers the model with the zelda3d bridge so the
 // renderer can draw it. Re-loading the same path returns the cached entry.
 Model3ds Load(const std::string& zarPath);
 

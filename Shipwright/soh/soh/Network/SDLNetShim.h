@@ -1,5 +1,5 @@
-#ifndef SOH3D_SDLNET_SHIM_H
-#define SOH3D_SDLNET_SHIM_H
+#ifndef ZELDA3D_SDLNET_SHIM_H
+#define ZELDA3D_SDLNET_SHIM_H
 
 // SDL3-MIGRATION (Phase 1): SoH's networking (Anchor co-op / CrowdControl / Sail) was built on
 // SDL2_net. There is no SDL3_net on this system, and SDL2_net cannot be linked into an SDL3 binary
@@ -24,8 +24,8 @@ typedef struct {
     uint16_t port; // 16-bit protocol port (network byte order in real SDL_net)
 } IPaddress;
 
-typedef struct SoH3dNetTCPsocket* TCPsocket;
-typedef struct SoH3dNetSocketSet* SDLNet_SocketSet;
+typedef struct Zelda3dNetTCPsocket* TCPsocket;
+typedef struct Zelda3dNetSocketSet* SDLNet_SocketSet;
 
 int SDLNet_Init(void);
 void SDLNet_Quit(void);
@@ -45,4 +45,4 @@ int SDLNet_CheckSockets(SDLNet_SocketSet set, uint32_t timeout);
 
 } // extern "C"
 
-#endif // SOH3D_SDLNET_SHIM_H
+#endif // ZELDA3D_SDLNET_SHIM_H

@@ -10,7 +10,7 @@
 
 #include "soh/Enhancements/enhancementTypes.h"
 #include "soh/Enhancements/game-interactor/GameInteractor_Hooks.h"
-#include "soh3d/soh3d.h"
+#include "zelda3d/zelda3d.h"
 #include "soh/Enhancements/randomizer/randomizer_entrance.h"
 #include "soh/Enhancements/randomizer/randomizer_grotto.h"
 #include "soh/OTRGlobals.h"
@@ -18,7 +18,7 @@
 
 void Select_SwitchBetterWarpMode(SelectContext* this, u8 isBetterWarpMode);
 void Sram_InitDebugSave(void);
-void Sram_InitNewSave(void); // SoH3D cold boot: clean new game instead of the debug save
+void Sram_InitNewSave(void); // Zelda3D cold boot: clean new game instead of the debug save
 
 void Select_LoadTitle(SelectContext* this) {
     this->state.running = false;
@@ -30,10 +30,10 @@ void Select_LoadGame(SelectContext* this, s32 entranceIndex) {
     osSyncPrintf("\n\n\nＦＩＬＥ＿ＮＯ＝%x\n\n\n", gSaveContext.fileNum);
     osSyncPrintf(VT_RST);
     if (gSaveContext.fileNum == 0xFF) {
-        // SoH3D cold boot: a clean NEW game rather than the vanilla debug save (which spawns Link
+        // Zelda3D cold boot: a clean NEW game rather than the vanilla debug save (which spawns Link
         // in Kakariko with a debug inventory + flags). fileNum 0xFF normally always forces the debug
         // save here, bypassing the DebugSaveFileMode CVar — this is the dev "start fresh" path.
-        if (SoH3D_ColdBoot()) {
+        if (Zelda3D_ColdBoot()) {
             Sram_InitNewSave();
         } else {
             Sram_InitDebugSave();
@@ -1802,11 +1802,11 @@ void Select_Draw(SelectContext* this) {
 void Select_Main(GameState* thisx) {
     SelectContext* this = (SelectContext*)thisx;
 
-    // SoH3D: headless auto-warp into a scene so pots are reachable without
+    // Zelda3D: headless auto-warp into a scene so pots are reachable without
     // scripting title/file-select input. Runs once on the first Select frame.
-    if (SoH3D_AutoWarpEnabled()) {
+    if (Zelda3D_AutoWarpEnabled()) {
         gSaveContext.fileNum = 0xFF;
-        Select_LoadGame(this, SoH3D_AutoWarpEntrance());
+        Select_LoadGame(this, Zelda3D_AutoWarpEntrance());
         return;
     }
 

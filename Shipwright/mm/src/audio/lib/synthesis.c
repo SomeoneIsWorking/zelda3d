@@ -1050,7 +1050,7 @@ Acmd* AudioSynth_ProcessSample(s32 noteIndex, NoteSampleState* sampleState, Note
                 numFirstFrameSamplesToIgnore = synthState->samplePosInt & 0xF;
                 numSamplesUntilEnd = sampleEndPos - synthState->samplePosInt;
 
-                // 2S2H/SoH3D [Port] Guard a stranded sample position. If a note's tunedSample is
+                // 2S2H/Zelda3D [Port] Guard a stranded sample position. If a note's tunedSample is
                 // swapped to a shorter sample without needsInit, synthState->samplePosInt (valid for
                 // the previous, longer sample) carries over past the new sample's loop/end, making
                 // numSamplesUntilEnd negative. The N64 RSP contains the resulting out-of-range DMEM

@@ -1328,7 +1328,7 @@ void Cutscene_Command_Terminator(PlayState* play, CutsceneContext* csCtx, CsCmdB
                 break;
         }
 
-        // SoH3D (#15): make a player START-skip actually skip a cutscene whose terminator ENDS IN
+        // Zelda3D (#15): make a player START-skip actually skip a cutscene whose terminator ENDS IN
         // PLACE (cmd->base == 0, or any base that triggers no scene transition). For those, the
         // vanilla skip above only sets CS_STATE_UNSKIPPABLE_EXEC, which keeps playing the remaining
         // frames one-by-one until the natural end frame — so the segment isn't actually shortened.
@@ -2095,7 +2095,7 @@ void func_80068C3C(PlayState* play, CutsceneContext* csCtx) {
             Cutscene_ProcessCommands(play, csCtx, play->csCtx.segment);
         }
 
-        // SoH3D (#112): universal player START-skip for an ACTIVE scripted (csCtx) cutscene whose
+        // Zelda3D (#112): universal player START-skip for an ACTIVE scripted (csCtx) cutscene whose
         // script has NO terminator command (CS_CMD_TERMINATOR). The vanilla / SoH START-skip lives in
         // Cutscene_Command_Terminator, only dispatched when the script CONTAINS a terminator, so a
         // terminator-less scripted cutscene couldn't be skipped. This processor runs every frame for

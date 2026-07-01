@@ -71,20 +71,20 @@ bool Scene_CommandUnused2(PlayState* play, SOH::ISceneCommand* cmd) {
     return false;
 }
 
-// SoH3D: build a SoH CollisionHeader from the OoT3D scene-collision mesh (soh3d.c). NULL when
-// disabled/unavailable -> fall through to the N64 collision. soh3d.h is C, so declare here with
+// Zelda3D: build a SoH CollisionHeader from the OoT3D scene-collision mesh (zelda3d.c). NULL when
+// disabled/unavailable -> fall through to the N64 collision. zelda3d.h is C, so declare here with
 // C linkage rather than including it into this C++ TU.
-extern "C" CollisionHeader* SoH3D_BuildSceneCollision(PlayState* play, CollisionHeader* n64);
+extern "C" CollisionHeader* Zelda3D_BuildSceneCollision(PlayState* play, CollisionHeader* n64);
 
 bool Scene_CommandCollisionHeader(PlayState* play, SOH::ISceneCommand* cmd) {
     // SOH::SetCollisionHeader* cmdCol = std::static_pointer_cast<SOH::SetCollisionHeader>(cmd);
     SOH::SetCollisionHeader* cmdCol = (SOH::SetCollisionHeader*)cmd;
     CollisionHeader* n64 = (CollisionHeader*)cmdCol->GetRawPointer();
 
-    // SoH3D: drive gameplay collision from the OoT3D scene mesh (one geometry for visuals +
+    // Zelda3D: drive gameplay collision from the OoT3D scene mesh (one geometry for visuals +
     // gameplay) when enabled — every BgCheck query then runs on OoT3D geometry. The N64 header
     // is passed so waterboxes/camera regions (not REd yet) are carried over.
-    CollisionHeader* oot3d = SoH3D_BuildSceneCollision(play, n64);
+    CollisionHeader* oot3d = Zelda3D_BuildSceneCollision(play, n64);
     if (oot3d != NULL) {
         BgCheck_Allocate(&play->colCtx, play, oot3d);
         return false;

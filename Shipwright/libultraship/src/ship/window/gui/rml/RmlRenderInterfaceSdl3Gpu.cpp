@@ -336,7 +336,7 @@ void RmlRenderInterfaceSdl3Gpu::EndFrame() {
     // target cleared to 0 (so the EQUAL test with ref 0 passes everywhere when no clip is active,
     // and Set/Intersect can paint incrementing refs without a mid-pass clear). fb 0's own D32_FLOAT
     // depth is untouched (GetPixelDepth still reads it as raw float).
-    api->AppendSoH3DOwnPass([pipe, pipeMask, samp, stencilTarget, fbColor, W, H,
+    api->AppendZelda3DOwnPass([pipe, pipeMask, samp, stencilTarget, fbColor, W, H,
                              cmds = std::move(cmds)](SDL_GPUCommandBuffer* cmd) {
         SDL_GPUColorTargetInfo ct{};
         ct.texture = fbColor;

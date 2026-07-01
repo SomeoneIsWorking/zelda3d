@@ -22,14 +22,14 @@ ControlDeck::~ControlDeck() {
     SPDLOG_TRACE("destruct control deck");
 }
 
-// SoH3D PC-native input scheme version. Bump this integer whenever the keyboard default
+// Zelda3D PC-native input scheme version. Bump this integer whenever the keyboard default
 // mapping table changes (LUS::ControllerDefaultMappings::SetDefaultKeyboardKeyToButtonMappings).
 // On startup, if the stored scheme version in the config doesn't match, existing keyboard
 // bindings are wiped and the new defaults are written — a one-time migration per user.
 // v2: BTN_START moved off Escape onto Enter, so Escape only opens the RmlUi menu (was opening the
 //     N64 pause/inventory AND the menu). Bumping re-migrates existing configs to the new defaults.
-static constexpr int kSoH3dInputSchemeVersion = 2;
-static constexpr const char* kSoH3dInputSchemeVersionCvar = "gSoH3dInputSchemeVersion";
+static constexpr int kZelda3dInputSchemeVersion = 2;
+static constexpr const char* kZelda3dInputSchemeVersionCvar = "gZelda3dInputSchemeVersion";
 
 void ControlDeck::Init(uint8_t* controllerBits) {
     mControllerBits = controllerBits;
@@ -50,14 +50,14 @@ void ControlDeck::Init(uint8_t* controllerBits) {
         // Migration: if the stored scheme version is stale, replace keyboard bindings with
         // the current PC-native defaults. Gamepad and mouse bindings are left untouched.
         int storedVersion = Context::GetRawInstance()->GetConsoleVariables()->GetInteger(
-            kSoH3dInputSchemeVersionCvar, 0);
-        if (storedVersion < kSoH3dInputSchemeVersion) {
-            SPDLOG_INFO("[SoH3D] Input scheme migrated: v{} -> v{} (resetting keyboard defaults)",
-                        storedVersion, kSoH3dInputSchemeVersion);
+            kZelda3dInputSchemeVersionCvar, 0);
+        if (storedVersion < kZelda3dInputSchemeVersion) {
+            SPDLOG_INFO("[Zelda3D] Input scheme migrated: v{} -> v{} (resetting keyboard defaults)",
+                        storedVersion, kZelda3dInputSchemeVersion);
             mPorts[0]->GetConnectedController()->ClearAllMappingsForDeviceType(PhysicalDeviceType::Keyboard);
             mPorts[0]->GetConnectedController()->AddDefaultMappings(PhysicalDeviceType::Keyboard);
             Context::GetRawInstance()->GetConsoleVariables()->SetInteger(
-                kSoH3dInputSchemeVersionCvar, kSoH3dInputSchemeVersion);
+                kZelda3dInputSchemeVersionCvar, kZelda3dInputSchemeVersion);
             Context::GetRawInstance()->GetConsoleVariables()->Save();
         }
     }

@@ -373,12 +373,12 @@ if __name__ == "__main__":
     from ctr_romfs import CtrRom
     from zar import Zar
 
-    rom_path = os.environ.get("SOH3D_3DS_ROM")
+    rom_path = os.environ.get("ZELDA3D_3DS_ROM")
     zar_path = sys.argv[1] if len(sys.argv) > 1 else "/actor/zelda_ge1.zar"
     cmb_name = sys.argv[2] if len(sys.argv) > 2 else "Model/geldwoman.cmb"
     anim_name = sys.argv[3] if len(sys.argv) > 3 else "Anim/ge1_s_wait.csab"
     if not rom_path:
-        print("set SOH3D_3DS_ROM"); sys.exit(1)
+        print("set ZELDA3D_3DS_ROM"); sys.exit(1)
     rom = CtrRom(rom_path)
     z = Zar(rom.read(rom.get(zar_path)))
     model = _cmb.Cmb(z.read([f for f in z.files if f.name == cmb_name][0]))

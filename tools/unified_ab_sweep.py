@@ -14,7 +14,7 @@ each other). Two modes:
 
   --mode ab --env-b VAR=VAL[,VAR2=VAL2]
     Real differential gate for later phases: launches each scene twice (env A = baseline, env B =
-    baseline + the given overrides, e.g. SOH3D_UNIFIED=1 once Phase 2 lands that toggle) and
+    baseline + the given overrides, e.g. ZELDA3D_UNIFIED=1 once Phase 2 lands that toggle) and
     diffs the two fresh screenshots against each other.
 
 Pass bar (per the render-unification plan): mean per-pixel channel delta and the fraction of
@@ -66,12 +66,12 @@ def parse_env_overrides(s):
 
 def boot_and_shoot(idx, name, env_overrides):
     env = dict(os.environ)
-    env["SOH3D_HEADLESS"] = "1"
-    env["SOH3D_FREEZE_NOISE_FRAME"] = FREEZE_NOISE_FRAME
-    env["SOH3D_FREEZE_INTERP"] = "1"
-    env["SOH3D_FREEZE_RAND_SEED"] = FREEZE_RAND_SEED
+    env["ZELDA3D_HEADLESS"] = "1"
+    env["ZELDA3D_FREEZE_NOISE_FRAME"] = FREEZE_NOISE_FRAME
+    env["ZELDA3D_FREEZE_INTERP"] = "1"
+    env["ZELDA3D_FREEZE_RAND_SEED"] = FREEZE_RAND_SEED
     env.update(env_overrides)
-    r = subprocess.run(f"tools/soh3d_game.sh start {idx} 0x8000",
+    r = subprocess.run(f"tools/zelda3d_game.sh start {idx} 0x8000",
                        shell=True, cwd=REPO, env=env, capture_output=True, text=True, timeout=150)
     ready = "ready (pid" in (r.stdout + r.stderr)
     crash = ""
@@ -85,15 +85,15 @@ def boot_and_shoot(idx, name, env_overrides):
     # Freeze+step to a FIXED tick count (not a wall-clock sleep) so this capture lands on the exact
     # same logic state as the golden/other-side capture — see render_unify_corpus_sweep.py's
     # repl_shot for the full rationale (sim-timing jitter otherwise swamps the diff).
-    subprocess.run(["tools/soh3d_repl.py", "cmd", "freeze 1"], cwd=REPO,
+    subprocess.run(["tools/zelda3d_repl.py", "cmd", "freeze 1"], cwd=REPO,
                    capture_output=True, text=True, timeout=15)
     remaining = FREEZE_STEP_TICKS
     while remaining > 0:
         n = min(600, remaining)
-        subprocess.run(["tools/soh3d_repl.py", "cmd", f"step {n}"], cwd=REPO,
+        subprocess.run(["tools/zelda3d_repl.py", "cmd", f"step {n}"], cwd=REPO,
                        capture_output=True, text=True, timeout=30)
         remaining -= n
-    subprocess.run(["tools/soh3d_repl.py", "shot", name], cwd=REPO,
+    subprocess.run(["tools/zelda3d_repl.py", "shot", name], cwd=REPO,
                    capture_output=True, text=True, timeout=30)
     src = os.path.join(REPO, "scratch/screenshots", name + ".png")
     return (src if os.path.exists(src) else None), "OK", ""
@@ -188,7 +188,7 @@ def main():
         print(f"{key} {scene:42s} {tag} mean={stats['mean_delta']:.3f} "
               f"max={stats['max_delta']} frac_over={stats['frac_pixels_over_tol']:.4f}", flush=True)
 
-    subprocess.run("tools/soh3d_game.sh stop", shell=True, cwd=REPO, capture_output=True)
+    subprocess.run("tools/zelda3d_game.sh stop", shell=True, cwd=REPO, capture_output=True)
     n = len(results)
     passed = sum(1 for r in results.values() if r.get("status") == "OK" and r.get("pass"))
     print(f"\ndone: {passed}/{n} scenes within tolerance ({mode} mode). Results -> {RESULTS}")

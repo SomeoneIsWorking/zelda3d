@@ -2,10 +2,10 @@
 """azahar_rpc.py — read/write the emulated 3DS RAM of a running Azahar via its UDP RPC server.
 
 Azahar's built-in RPC server (core/rpc, enable_rpc_server=true, UDP :45987) exposes ReadMemory,
-WriteMemory, ProcessList and SetGetProcess over a tiny packet protocol. This is the SoH3D 3DS
+WriteMemory, ProcessList and SetGetProcess over a tiny packet protocol. This is the Zelda3D 3DS
 ORACLE backbone: with OoT3D running headless in Azahar we can read its actual actor/animation
-state from emulated RAM (3DS *virtual* addresses) — ground truth for matching SoH3D to the 3DS
-game (see issue #89, memory soh3d-azahar-oracle).
+state from emulated RAM (3DS *virtual* addresses) — ground truth for matching Zelda3D to the 3DS
+game (see issue #89, memory zelda3d-azahar-oracle).
 
 Wire format (all little-endian):
   request header (16B): version(u32=1) id(u32) type(u32) packet_size(u32=len(data))
@@ -160,7 +160,7 @@ class Rpc:
 
     def screenshot(self, ppm_path, res_scale=0, timeout=8.0):
         """Capture the next OoT3D frame to ppm_path (Azahar writes it host-side). Returns True on ok.
-        Requires the SoH3D screenshot RPC mod (PacketType::Screenshot=5)."""
+        Requires the Zelda3D screenshot RPC mod (PacketType::Screenshot=5)."""
         old = self.sock.gettimeout()
         self.sock.settimeout(timeout)
         try:

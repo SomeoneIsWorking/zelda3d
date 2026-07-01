@@ -1,7 +1,7 @@
 #include "global.h"
 #include "vt.h"
 #include "regs.h"
-#include "soh3d/soh3d.h"
+#include "zelda3d/zelda3d.h"
 
 #include <string.h>
 #include <stdio.h>
@@ -449,9 +449,9 @@ static void RunFrame() {
 
     runFrameContext.nextOvl = &gGameStateOverlayTable[0];
 
-    // SoH3D: boot straight into the debug Select overlay so the auto-warp can
-    // reach an in-game scene headlessly (see SoH3D_AutoWarp* in soh3d).
-    if (SoH3D_AutoWarpEnabled()) {
+    // Zelda3D: boot straight into the debug Select overlay so the auto-warp can
+    // reach an in-game scene headlessly (see Zelda3D_AutoWarp* in zelda3d).
+    if (Zelda3D_AutoWarpEnabled()) {
         runFrameContext.nextOvl = &gGameStateOverlayTable[1]; // Select_Init
     }
 

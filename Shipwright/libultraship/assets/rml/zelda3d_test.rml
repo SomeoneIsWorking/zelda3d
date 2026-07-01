@@ -1,0 +1,114 @@
+<rml>
+<head>
+	<title>Ship of Harkinian</title>
+	<link type="text/rcss" href="rml.rcss"/>
+	<link type="text/rcss" href="zelda3d_test.rcss"/>
+</head>
+<body>
+	<window id="window">
+		<tab-bar id="tab-bar">
+			<tab class="selected">Settings</tab>
+			<tab>Graphics</tab>
+			<tab>Audio</tab>
+			<tab>Debug</tab>
+			<tab>Diag</tab>
+			<tab>About</tab>
+		</tab-bar>
+		<content id="content">
+			<!-- One <pane> per tab; SohRmlUi shows only the active tab's pane and moves the
+			     `selected`/`active` classes. Each focusable row is a <select-button> with a <key>
+			     (label) + <value>; both `tab-index: auto` (RCSS, drives Tab nav) and the
+			     `tabindex="auto"` attribute (SetVisible's default-focus marker) are required. -->
+			<pane class="active">
+				<div class="section-heading">General</div>
+				<select-button tabindex="auto"><key>Controller Navigation</key><value>On</value></select-button>
+				<select-button tabindex="auto"><key>Cursor Always Visible</key><value>Off</value></select-button>
+				<select-button tabindex="auto"><key>Language</key><value>English</value></select-button>
+				<p class="hint">&#8596; switch tab &#183; &#8597; move &#183; Enter / A select &#183; Esc / B close</p>
+			</pane>
+			<pane>
+				<div class="section-heading">Graphics</div>
+				<!-- Curated, live toggles: SohRmlUi reads each `toggle` id's CVar/feature state on
+				     open and flips it (immediate + persisted) on Enter/A. -->
+				<select-button tabindex="auto" toggle="shadows"><key>Dynamic Shadows</key><value>On</value></select-button>
+				<select-button tabindex="auto" toggle="ao"><key>Ambient Occlusion</key><value>On</value></select-button>
+				<select-button tabindex="auto" toggle="lighting"><key>Scene Lighting</key><value>On</value></select-button>
+				<!-- Cycle row: 0 N64 model+anim / 1 3DS model + N64-retarget anim / 2 3DS model + 3DS anim. -->
+				<select-button tabindex="auto" cycle="linkmode"><key>Link Model / Anim</key><value>N64</value></select-button>
+				<!-- Generated stair step size: Small / Medium / Large (applies live to loaded scenes). -->
+				<select-button tabindex="auto" cycle="stairsize"><key>Stair Step Size</key><value>Medium</value></select-button>
+				<p class="hint">&#8596; switch tab &#183; &#8597; move &#183; Enter / A toggle &#183; Esc / B close</p>
+			</pane>
+			<pane>
+				<!-- Audio volumes: each row's `knob` id maps to a live gSettings.Volume.* CVar.
+				     Left/Right arrows or D-pad Left/Right step the value by 10%; Enter also increments.
+				     SoH's audioMgr reads these CVars every audio retrace, so changes are immediate. -->
+				<div class="section-heading">Audio</div>
+				<select-button tabindex="auto" knob="vol-master"><key>Master Volume</key><value>40%</value></select-button>
+				<select-button tabindex="auto" knob="vol-music"><key>Main Music Volume</key><value>100%</value></select-button>
+				<select-button tabindex="auto" knob="vol-sfx"><key>Sound Effects Volume</key><value>100%</value></select-button>
+				<p class="hint">&#8596; adjust &#183; &#8597; move &#183; Esc / B close</p>
+			</pane>
+			<pane>
+				<!-- Debug warps: a row's `warp` is an entrance index; activating it requests a
+				     scene transition (SohRmlUi -> gZelda3dMenuWarp -> zelda3d.c Zelda3D_ReplPoll). -->
+				<div class="section-heading">Game</div>
+				<select-button tabindex="auto" restart="1"><key>Restart &#8594; Title Screen</key><value>&#8635;</value></select-button>
+				<!-- Time-of-day applied to the NEXT warp below: Default (clock runs) / Day / Night. -->
+				<select-button tabindex="auto" cycle="warptime"><key>Warp Time-of-Day</key><value>Default</value></select-button>
+				<!-- Past/future variant of the warp target: sets linkAge so Play_Init loads the
+				     child (past) or adult (future) scene-setup layer. -->
+				<select-button tabindex="auto" cycle="warpage"><key>Warp Era</key><value>Default</value></select-button>
+				<div class="section-heading">Level Select</div>
+				<select-button tabindex="auto" warp="238"><key>Kokiri Forest</key><value>&#8594;</value></select-button>
+				<select-button tabindex="auto" warp="177"><key>Market</key><value>&#8594;</value></select-button>
+				<select-button tabindex="auto" warp="219"><key>Kakariko Village</key><value>&#8594;</value></select-button>
+				<select-button tabindex="auto" warp="205"><key>Hyrule Field</key><value>&#8594;</value></select-button>
+				<select-button tabindex="auto" warp="343"><key>Lon Lon Ranch</key><value>&#8594;</value></select-button>
+				<select-button tabindex="auto" warp="264"><key>Zora's Domain</key><value>&#8594;</value></select-button>
+				<select-button tabindex="auto" warp="333"><key>Goron City</key><value>&#8594;</value></select-button>
+				<select-button tabindex="auto" warp="83"><key>Temple of Time</key><value>&#8594;</value></select-button>
+				<select-button tabindex="auto" warp="312"><key>Hyrule Castle Grounds</key><value>&#8594;</value></select-button>
+				<select-button tabindex="auto" warp="1024"><key>Castle Courtyard (Zelda)</key><value>&#8594;</value></select-button>
+				<div class="section-heading">Boss Fight</div>
+				<select-button tabindex="auto" warp="1039"><key>Gohma (Deku Tree)</key><value>&#9876;</value></select-button>
+				<select-button tabindex="auto" warp="1035"><key>King Dodongo</key><value>&#9876;</value></select-button>
+				<select-button tabindex="auto" warp="769"><key>Barinade (Jabu-Jabu)</key><value>&#9876;</value></select-button>
+				<select-button tabindex="auto" warp="12"><key>Phantom Ganon (Forest)</key><value>&#9876;</value></select-button>
+				<select-button tabindex="auto" warp="773"><key>Volvagia (Fire)</key><value>&#9876;</value></select-button>
+				<select-button tabindex="auto" warp="1047"><key>Morpha (Water)</key><value>&#9876;</value></select-button>
+				<select-button tabindex="auto" warp="1043"><key>Bongo Bongo (Shadow)</key><value>&#9876;</value></select-button>
+				<select-button tabindex="auto" warp="141"><key>Twinrova (Spirit)</key><value>&#9876;</value></select-button>
+				<!-- Dungeons (first-room entrances; indices are the literal entrance_table.h hex->dec,
+				     same convention as the Level Select / Boss rows above). -->
+				<div class="section-heading">Dungeons</div>
+				<select-button tabindex="auto" warp="0"><key>Deku Tree</key><value>&#9760;</value></select-button>
+				<select-button tabindex="auto" warp="4"><key>Dodongo's Cavern</key><value>&#9760;</value></select-button>
+				<select-button tabindex="auto" warp="40"><key>Jabu-Jabu</key><value>&#9760;</value></select-button>
+				<select-button tabindex="auto" warp="361"><key>Forest Temple</key><value>&#9760;</value></select-button>
+				<select-button tabindex="auto" warp="357"><key>Fire Temple</key><value>&#9760;</value></select-button>
+				<select-button tabindex="auto" warp="16"><key>Water Temple</key><value>&#9760;</value></select-button>
+				<select-button tabindex="auto" warp="55"><key>Shadow Temple</key><value>&#9760;</value></select-button>
+				<select-button tabindex="auto" warp="130"><key>Spirit Temple</key><value>&#9760;</value></select-button>
+				<select-button tabindex="auto" warp="152"><key>Bottom of the Well</key><value>&#9760;</value></select-button>
+				<select-button tabindex="auto" warp="136"><key>Ice Cavern</key><value>&#9760;</value></select-button>
+				<select-button tabindex="auto" warp="8"><key>Gerudo Training</key><value>&#9760;</value></select-button>
+				<select-button tabindex="auto" warp="1127"><key>Inside Ganon's Castle</key><value>&#9760;</value></select-button>
+			</pane>
+			<pane>
+				<!-- Live diagnostics: SohRmlUi rewrites #diagtext every frame from the gZelda3dDiagText
+				     buffer that zelda3d.c fills in Zelda3D_ReplPoll (Link coords, scene/room, yaw, floor).
+				     Read-only (no focusable rows) — screenshot it to read coords off-REPL. -->
+				<div class="section-heading">Diagnostics</div>
+				<p id="diagtext">(waiting for game state...)</p>
+				<p class="hint">&#8596; switch tab &#183; Esc / B close &#183; screenshot this for coords</p>
+			</pane>
+			<pane>
+				<div class="section-heading">About</div>
+				<p>Ship of Harkinian &mdash; rendering Ocarina of Time 3D assets.</p>
+				<p class="hint">RmlUi menu over the Vulkan renderer.</p>
+			</pane>
+		</content>
+	</window>
+</body>
+</rml>

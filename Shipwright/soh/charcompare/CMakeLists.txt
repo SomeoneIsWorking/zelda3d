@@ -1,7 +1,7 @@
 # charcompare — standalone N64-vs-3DS character comparison tool.
 #
 # Embeds libultraship (Fast3D) for the N64 side and compiles the self-contained
-# soh3d asset/ parsers (no engine deps) for the 3DS side. Added via
+# zelda3d asset/ parsers (no engine deps) for the 3DS side. Added via
 # add_subdirectory(charcompare) at the END of soh/CMakeLists.txt, so the SDL2 /
 # Threads imported targets that soh's find_package() created are already visible.
 #
@@ -23,14 +23,14 @@ add_executable(charcompare
     ${SOH_DIR}/soh/resource/type/SkeletonLimb.cpp
     ${SOH_DIR}/soh/resource/type/Animation.cpp
     ${SOH_DIR}/soh/resource/type/Array.cpp
-    ${CMAKE_CURRENT_SOURCE_DIR}/../src/soh3d/soh3d_model.cpp
+    ${CMAKE_CURRENT_SOURCE_DIR}/../src/zelda3d/zelda3d_model.cpp
     # asset/ parsers now come from the shared cmb3d static lib (linked below).
 )
 
 target_include_directories(charcompare PRIVATE
     ${CMAKE_CURRENT_SOURCE_DIR}
     ${CMAKE_CURRENT_SOURCE_DIR}/../src
-    ${CMAKE_CURRENT_SOURCE_DIR}/../src/soh3d   # so soh3d_model.cpp's local headers resolve
+    ${CMAKE_CURRENT_SOURCE_DIR}/../src/zelda3d   # so zelda3d_model.cpp's local headers resolve
     ${CMAKE_CURRENT_SOURCE_DIR}/..             # so "soh/resource/..." resolves in the SOH factories
     ${CMAKE_CURRENT_SOURCE_DIR}/../include     # z64animation.h / z64math.h / libc
     ${CMAKE_CURRENT_SOURCE_DIR}/../../libultraship/include

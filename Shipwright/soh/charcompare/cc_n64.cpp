@@ -542,7 +542,7 @@ void EmitDlistN64(ModelN64& m, float frame, std::vector<Gfx>& dl, std::unordered
         zScale = 0.45f / zhalf;
     }
     // X is NEGATED so F has a NEGATIVE determinant, matching a real N64 perspective projection.
-    // Root cause of the old mirror bug (proven via the SOH3D_GFXDUMP draw dump, charcompare vs the
+    // Root cause of the old mirror bug (proven via the ZELDA3D_GFXDUMP draw dump, charcompare vs the
     // live game): the Fast3D path renders MP = FK·F and the OGL backend then applies its invertY.
     // The real game's projection (guPerspective) carries a handedness flip so that, AFTER the
     // backend invertY, on-screen winding is correct — its MP determinant is NEGATIVE (measured:
@@ -551,7 +551,7 @@ void EmitDlistN64(ModelN64& m, float frame, std::vector<Gfx>& dl, std::unordered
     // — e.g. the torso — reading wrong). Negating one output axis restores the game's handedness;
     // X is the screen-horizontal flip (matches the observed left/right mirror and is NOT Y, which
     // would render upside-down). After this, charcompare's N64 MP det is negative like the game's,
-    // and the N64 half faces the same way as the (in-game-verified) soh3d 3DS half.
+    // and the N64 half faces the same way as the (in-game-verified) zelda3d 3DS half.
     const float S[3] = { -fit * xComp, fit, zScale };
     // F maps point p: clip_j = S_j * sum_k R[j][k]*(p_k - ctr_k) + bias_j. In column-major MtxF
     // (mf[col][row], clip_row = sum_col mf[col][row]*p_col + mf[3][row]):

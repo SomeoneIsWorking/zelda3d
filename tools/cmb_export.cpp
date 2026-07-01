@@ -1,4 +1,4 @@
-// Standalone CMB -> JSON exporter for SoH3D rig analysis (issue #7/#8/#70/#16).
+// Standalone CMB -> JSON exporter for Zelda3D rig analysis (issue #7/#8/#70/#16).
 // Reuses the engine's pure-C++ parsers (ctr_rom + zar + cmb + csab) to dump a Link
 // (or any actor) model's skeleton (bind-pose world matrices + hierarchy) and skinned
 // mesh, optionally at a CSAB frame, to a custom JSON we own both ends of. A Blender
@@ -6,12 +6,12 @@
 // is VISIBLE and MEASURABLE (ending the eyeball-only retarget disagreement).
 //
 // Build (no CMake target; iterate fast):
-//   g++ -std=c++17 -O2 -I Shipwright/soh/src/soh3d tools/cmb_export.cpp \
-//       Shipwright/soh/src/soh3d/asset/{ctr_rom,zar,cmb,csab}.cpp -o scratch/bin/cmb_export
+//   g++ -std=c++17 -O2 -I Shipwright/soh/src/zelda3d tools/cmb_export.cpp \
+//       Shipwright/soh/src/zelda3d/asset/{ctr_rom,zar,cmb,csab}.cpp -o scratch/bin/cmb_export
 //
 // Usage:
 //   cmb_export <zarPath> [--cmb <substr>] [--list] [--csab <name|path>] [--frame <f>] [--out <json>]
-//   ROM via env SOH3D_3DS_ROM. zarPath e.g. /actor/zelda_link_child_new.zar
+//   ROM via env ZELDA3D_3DS_ROM. zarPath e.g. /actor/zelda_link_child_new.zar
 #include "asset/ctr_rom.h"
 #include "asset/zar.h"
 #include "asset/cmb.h"
@@ -23,7 +23,7 @@
 #include <vector>
 #include <array>
 
-using namespace SoH3D;
+using namespace Zelda3D;
 
 static size_t vertCount(const std::vector<CmbDrawGroup>& gs) {
     size_t n = 0;
@@ -65,8 +65,8 @@ int main(int argc, char** argv) {
         else if (a == "--out" && i + 1 < argc) outPath = argv[++i];
     }
 
-    const char* romPath = getenv("SOH3D_3DS_ROM");
-    if (!romPath || !*romPath) { fprintf(stderr, "SOH3D_3DS_ROM not set\n"); return 1; }
+    const char* romPath = getenv("ZELDA3D_3DS_ROM");
+    if (!romPath || !*romPath) { fprintf(stderr, "ZELDA3D_3DS_ROM not set\n"); return 1; }
     CtrRom rom(romPath);
     if (!rom.ok()) { fprintf(stderr, "CtrRom: %s\n", rom.error().c_str()); return 1; }
 

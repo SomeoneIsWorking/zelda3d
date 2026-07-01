@@ -14,7 +14,7 @@ The actors.json + scene.png from batch_capture.py are NOT re-captured; this tool
 the multi-angle visual coverage layer on top of an existing (or new) capture run.
 
 ## Usage
-  # From soh3d repo root, while holding the oracle lock:
+  # From zelda3d repo root, while holding the oracle lock:
   flock scratch/.oraclelock python3 tools/batch_orbit_capture.py
   flock scratch/.oraclelock python3 tools/batch_orbit_capture.py --scenes kokiri_forest links_house
   flock scratch/.oraclelock python3 tools/batch_orbit_capture.py --force    # re-sweep all
@@ -227,7 +227,7 @@ def main():
     ap.add_argument("--dry-run", action="store_true",
                     help="Print what would be swept without driving the oracle")
     ap.add_argument("--out", metavar="DIR", default=None,
-                    help="Output root dir (default: <soh3d>/scratch/oracle_batch/)")
+                    help="Output root dir (default: <zelda3d>/scratch/oracle_batch/)")
     ap.add_argument("--n",     type=int,   default=8,   metavar="N",
                     help="Orbit angles per scene (default: 8)")
     ap.add_argument("--dist",  type=float, default=350, metavar="DIST",

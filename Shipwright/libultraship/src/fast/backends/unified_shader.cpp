@@ -2,7 +2,7 @@
 #include "fast/unified_vtx.h"      // UnifiedVtx — not yet referenced by any draw path (Phase 2/3)
 #include "fast/unified_material.h" // UnifiedMaterial — ditto
 #include "fast/unified_ubo.h"      // CommonUbo/UnifiedDrawUbo — static_assert-checked against kCommonUboBody here
-#include "fast/soh3d_gl.h" // SOH3D_GL_MAX_BONES
+#include "fast/zelda3d_gl.h" // ZELDA3D_GL_MAX_BONES
 
 #include <prism/processor.h>
 
@@ -92,9 +92,9 @@ std::optional<std::string> IncludeNoop(const std::string&) {
 // (@if(VERTEX_SHADER)/@else split). The combined per-draw UBO ("UnifiedCommon") is the SAME block
 // shared by both stages (matching the existing DRAW_MODEL op's push convention: identical bytes go
 // to vertex binding 0 AND fragment binding 0; bones are a separate block at vertex binding 1) —
-// BYTE-IDENTICAL to unified_ubo.h's UnifiedCommonUbo, sized to fit SoH3DSg::kCommonBytes (320
-// bytes) exactly so the existing DRAW_MODEL Op/AppendSoH3DModelDraw/mSoh3dModelUbos plumbing needs
-// ZERO changes for a unified draw — see soh3d_sdl3gpu.cpp/gfx_sdl3gpu.cpp's DrawModel/DrawTriangles
+// BYTE-IDENTICAL to unified_ubo.h's UnifiedCommonUbo, sized to fit Zelda3DSg::kCommonBytes (320
+// bytes) exactly so the existing DRAW_MODEL Op/AppendZelda3DModelDraw/mSoh3dModelUbos plumbing needs
+// ZERO changes for a unified draw — see zelda3d_sdl3gpu.cpp/gfx_sdl3gpu.cpp's DrawModel/DrawTriangles
 // wiring.
 const char* kUnifiedShaderTemplate = R"PRISM(@prism(type='fragment', name='Unified Shader', version='1.0.0')
 #version 450
@@ -137,7 +137,7 @@ const char* kUnifiedShaderTemplate = R"PRISM(@prism(type='fragment', name='Unifi
     layout(location=8) out vec3 vNrmView;
 
     layout(set=1, binding=0, std140) uniform UnifiedCommon { UNIFIED_COMMON_UBO_BODY } ubo;
-    layout(set=1, binding=1, std140) uniform UnifiedBones { mat4 uBones[@{SOH3D_GL_MAX_BONES}]; } bones;
+    layout(set=1, binding=1, std140) uniform UnifiedBones { mat4 uBones[@{ZELDA3D_GL_MAX_BONES}]; } bones;
 
     void main() {
         vec3 sp = aPos.xyz;
@@ -309,7 +309,7 @@ std::string BuildSource(Variant v, bool vertex) {
         { "o_alphaTest", f.alphaTest },
         { "o_fog", f.fog },
         { "o_grayscale", f.grayscale },
-        { "SOH3D_GL_MAX_BONES", SOH3D_GL_MAX_BONES },
+        { "ZELDA3D_GL_MAX_BONES", ZELDA3D_GL_MAX_BONES },
     };
     processor.populate(ctx);
     processor.load(kUnifiedShaderTemplate);

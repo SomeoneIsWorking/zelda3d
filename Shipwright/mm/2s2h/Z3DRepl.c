@@ -1,11 +1,11 @@
 // Z3DRepl.c — see Z3DRepl.h. The minimal per-game REPL for native MM: PlayState-only queries over
 // a private FIFO. Input is NOT handled here (that is the shared libultraship ScriptedInput seam);
-// this exists purely for state that needs MM's decomp types. Modeled on OoT soh3d's SoH3D_ReplPoll
+// this exists purely for state that needs MM's decomp types. Modeled on OoT zelda3d's Zelda3D_ReplPoll
 // FIFO transport (per-frame non-blocking read, reply to "<fifo>.out"), kept deliberately small.
 #include "Z3DRepl.h"
 
 #include "global.h" // gPlayState, GET_PLAYER, PlayState, Player, Actor, ACTORCAT_MAX
-#include "2s2h/soh3d/mm3d_model.h" // MM3D_SetScaleOverride (live prop-scale calibration)
+#include "2s2h/zelda3d/mm3d_model.h" // MM3D_SetScaleOverride (live prop-scale calibration)
 
 #include <fcntl.h>
 #include <math.h>

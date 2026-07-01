@@ -2,7 +2,7 @@
 #include "pica_texture.h"
 #include <cstring>
 
-namespace SoH3D {
+namespace Zelda3D {
 
 static uint16_t u16(const uint8_t* b, size_t o) { uint16_t v; memcpy(&v, b + o, 2); return v; }
 static uint32_t u32(const uint8_t* b, size_t o) { uint32_t v; memcpy(&v, b + o, 4); return v; }
@@ -55,4 +55,4 @@ std::vector<uint8_t> Ctxb::decodeRGBA(size_t i, int* w, int* h) const {
     return PicaDecode(t.glFormat(), t.width, t.height, textureRaw(t));
 }
 
-} // namespace SoH3D
+} // namespace Zelda3D

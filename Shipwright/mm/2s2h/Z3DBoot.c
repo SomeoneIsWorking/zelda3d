@@ -1,6 +1,6 @@
 // Z3DBoot.c — see Z3DBoot.h. Pure env readers; no MM state is touched here, so the two decomp
 // call sites (title_setup.c routes Setup -> MapSelect; z_select.c auto-loads the entrance) stay
-// the only places that know the game types. strtol(base 0) matches soh3d's SOH3D_ENTRANCE parsing
+// the only places that know the game types. strtol(base 0) matches zelda3d's ZELDA3D_ENTRANCE parsing
 // so a hex entrance ("0x6800") and a decimal one both work.
 #include "Z3DBoot.h"
 

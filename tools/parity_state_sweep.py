@@ -1,20 +1,20 @@
 #!/usr/bin/env python3
-"""parity_state_sweep.py — DISCRETE-STATE Link anim-SELECTION parity sweep (SoH3D vs OoT3D oracle).
+"""parity_state_sweep.py — DISCRETE-STATE Link anim-SELECTION parity sweep (Zelda3D vs OoT3D oracle).
 
 The discrete-state analog of parity_speed_sweep.py (which covers the locomotion CONTINUUM by
 speed). This tool drives both engines INTO a named discrete state (idle, walk, run, and — as their
 setup paths get built — shield/attack/jump/climb/swim/carry/...) and compares the SELECTED CSAB
-name each side resolves. Both sides live in the SAME OoT3D CSAB namespace (SoH3D plays the OoT3D
+name each side resolves. Both sides live in the SAME OoT3D CSAB namespace (Zelda3D plays the OoT3D
 rig's CSABs), so the names compare directly. This is the "mature the SWEEP" / per-state PASS-FAIL
 parity report (respawn_brief task #3).
 
 WHY a separate tool from the speed sweep: locomotion is a continuum the speed sweep already bins by
 speedXZ. Discrete states are reached by a BUTTON/CONTEXT recipe, not a stick magnitude, and the two
-engines use DIFFERENT button-bit namespaces (SoH3D `btnhold` = N64 controller.h bits; oracle
+engines use DIFFERENT button-bit namespaces (Zelda3D `btnhold` = N64 controller.h bits; oracle
 set_input = 3DS PadState bits). So each state carries a per-SIDE input recipe, not a shared mask.
 
 READOUT SURFACE (both already exist — see respawn_brief §3):
-  SoH3D : REPL `linkanimstate` -> resolved base CSAB + speedXZ + st1 ; `btnhold <n64hexmask> <frames>`
+  Zelda3D : REPL `linkanimstate` -> resolved base CSAB + speedXZ + st1 ; `btnhold <n64hexmask> <frames>`
           (B=0x4000 A=0x8000 R=0x0010 L=0x0020 Z=0x2000 Start=0x1000) ; `walkhold <frames> <sx> <sy>`.
   oracle: animId @ PLAYER+0x254+0x30 -> name via player_animid_names.json ; set_input(btnMask3ds, (cx,cy)).
 
@@ -22,9 +22,9 @@ THE HARD PART (honest), and how each state is now driven end-to-end:
   - idle / walk / run : input-reachable on both engines. idle = live oracle A/B (gt=oracle); walk/run
     = the SPEED CONTINUUM, delegated to parity_speed_sweep (matched-speed; PASS post-#117).
   - jump / swim / damage / shield / attack / climb : context-gated (need a ledge / deep water / an
-    enemy hit / a drawn sword / a wall). DRIVEN on the SoH3D side via the real OoT3D action func +
-    canonical anim through REPL `linkstate <s>` (SoH3D_PlayerForce* in z_player.c), which bypasses ONLY
-    the entry gate headless can't satisfy — the action + anim are exactly what OoT3D runs, so SoH3D's
+    enemy hit / a drawn sword / a wall). DRIVEN on the Zelda3D side via the real OoT3D action func +
+    canonical anim through REPL `linkstate <s>` (Zelda3D_PlayerForce* in z_player.c), which bypasses ONLY
+    the entry gate headless can't satisfy — the action + anim are exactly what OoT3D runs, so Zelda3D's
     live CSAB-selection path is exercised faithfully. Read under `freeze` so the selection can't
     transition out before it's captured.
   - carry : the SESSION-5 cucco-grab recipe (Kakariko 0xDB) — a persistent two-source state; read the
@@ -36,13 +36,13 @@ achievable ground truth for them is the OoT3D DECOMP: the CSAB family each state
 via the N64->OoT3D-CSAB map (100%-verified vs the live zar; the jump_climb->hang and water->run_dive
 reuse cross-confirmed vs the OoT3D binary anim-group table @0x53a5f8 in task #2). Each state carries
 `gt` (ground-truth source: oracle|decomp) + `expect` (the CSAB family it must select). Honest by
-construction: PASS means SoH3D's DRIVEN selection resolved to the decomp-documented CSAB (not idle
+construction: PASS means Zelda3D's DRIVEN selection resolved to the decomp-documented CSAB (not idle
 fallback, age-correct in both zars), not that a live oracle A/B was faked.
 
 USAGE
   tools/parity_state_sweep.py                 # run all states, print the PASS/FAIL table
   tools/parity_state_sweep.py --json out.json
-  tools/parity_state_sweep.py --skip-oracle   # SoH3D side only (idle then has no oracle A/B)
+  tools/parity_state_sweep.py --skip-oracle   # Zelda3D side only (idle then has no oracle A/B)
   tools/parity_state_sweep.py --only jump,carry
   tools/parity_state_sweep.py --list          # list states + gt/expect, run nothing
 """
@@ -55,7 +55,7 @@ import parity_speed_sweep as S  # reuse soh_cmd/soh_state/soh_ensure_free/Oracle
 KOKIRI = 0xEE
 IDLE_MAX = 0.5   # speedXZ below this = standing
 
-# Logical button -> (N64 bit for SoH3D btnhold, 3DS button name for oracle buttons_mask).
+# Logical button -> (N64 bit for Zelda3D btnhold, 3DS button name for oracle buttons_mask).
 BTN = {"A": (0x8000, "a"), "B": (0x4000, "b"), "R": (0x0010, "r"),
        "L": (0x0020, "l"), "Start": (0x1000, "start")}
 
@@ -63,9 +63,9 @@ BTN = {"A": (0x8000, "a"), "B": (0x4000, "b"), "R": (0x0010, "r"),
 # A state recipe. `kind`:
 #   "idle"      : settle with no input, read the standing anim (oracle-confirmed, gt="oracle").
 #   "delegated" : locomotion continuum -> parity_speed_sweep.py (matched-speed; see note below).
-#   "forcestate": drive SoH3D into the state via `linkstate <s>` under freeze (a real OoT3D action
+#   "forcestate": drive Zelda3D into the state via `linkstate <s>` under freeze (a real OoT3D action
 #                 func + canonical anim; bypasses only the equipment/positional ENTRY gate that
-#                 headless can't satisfy — see SoH3D_PlayerForce* in z_player.c). Read the SELECTED
+#                 headless can't satisfy — see Zelda3D_PlayerForce* in z_player.c). Read the SELECTED
 #                 base CSAB and compare to `expect` (the family the OoT3D decomp action-func plays).
 #   "carry"     : the SESSION-5 cucco-grab recipe (Kakariko 0xDB) — a persistent two-source state;
 #                 read the UPPER CSAB (the carry-hold) and compare to `expect`.
@@ -86,7 +86,7 @@ STATES = [
     {"name": "run",  "kind": "delegated",
      "note": "locomotion continuum -> run parity_speed_sweep.py (matched-speed)"},
 
-    # --- discrete states, driven via SoH3D_PlayerForce* (REPL linkstate). gt=decomp (the equipment-
+    # --- discrete states, driven via Zelda3D_PlayerForce* (REPL linkstate). gt=decomp (the equipment-
     #     less oracle save can't reach them live). expect = the CSAB family the OoT3D action func plays.
     {"name": "jump",   "kind": "forcestate", "force": "jump",   "gt": "decomp", "expect": "nml_jump",
      "note": "free-fall/jump (func_80838940 -> Player_Action_8084411C + normal_jump) -> nml_jump"},
@@ -139,9 +139,9 @@ def soh_animstate():
     return base, upper, spd, st1
 
 
-# ---------------- SoH3D side ----------------
+# ---------------- Zelda3D side ----------------
 def soh_reach(st):
-    """Drive SoH3D into state `st`; return the resolved CSAB to compare (base, or upper for carry)."""
+    """Drive Zelda3D into state `st`; return the resolved CSAB to compare (base, or upper for carry)."""
     kind = st["kind"]
 
     if kind == "idle":
@@ -227,7 +227,7 @@ def ora_reach(ora, st):
 
 def verdict(st, soh, ora):
     """PASS/FAIL for one state. gt=='oracle' (idle): both sides must select the same FAMILY (the live
-    A/B). gt=='decomp': SoH3D's driven selection must contain the decomp-derived expected CSAB family
+    A/B). gt=='decomp': Zelda3D's driven selection must contain the decomp-derived expected CSAB family
     (`expect`) — the achievable ground truth for states the equipment-less oracle save can't reach."""
     if not soh:
         return "INCOMPLETE"
@@ -237,7 +237,7 @@ def verdict(st, soh, ora):
         if st["name"] == "idle":
             return "PASS" if (is_idle(soh) and is_idle(ora)) else "FAIL"
         return "PASS" if soh == ora else "FAIL"
-    # gt == "decomp": SoH3D selection vs the expected CSAB family (substring match).
+    # gt == "decomp": Zelda3D selection vs the expected CSAB family (substring match).
     exp = st.get("expect")
     if not exp:
         return "INCOMPLETE"
@@ -264,7 +264,7 @@ def main():
         try:
             ora = S.Oracle()
         except Exception as e:
-            print(f"oracle unavailable ({e}); SoH3D-only", file=sys.stderr)
+            print(f"oracle unavailable ({e}); Zelda3D-only", file=sys.stderr)
 
     rows = []
     for st in STATES:

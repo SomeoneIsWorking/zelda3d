@@ -2,7 +2,7 @@
 #include <cstdio>
 #include <cstring>
 
-namespace SoH3D {
+namespace Zelda3D {
 
 static const uint64_t MEDIA = 0x200; // media unit size
 
@@ -156,4 +156,4 @@ std::vector<uint8_t> CtrRom::read(const std::string& path) const {
     return fe ? read(*fe) : std::vector<uint8_t>{};
 }
 
-} // namespace SoH3D
+} // namespace Zelda3D

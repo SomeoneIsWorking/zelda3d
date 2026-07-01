@@ -149,7 +149,7 @@ static void ErrorHandler(int sig, siginfo_t* sigInfo, void* data) {
     }
     sHandling = 1;
 
-    // soh3d (#91): a crash that originates INSIDE malloc/free — e.g. a double-free during
+    // zelda3d (#91): a crash that originates INSIDE malloc/free — e.g. a double-free during
     // window-close teardown — leaves glibc's malloc arena lock HELD. Everything below
     // (backtrace_symbols, demangling, std::string, the crash dialog) then mallocs and DEADLOCKS on
     // that lock, so the process hangs forever instead of dying. That deadlock is the window-close
@@ -161,7 +161,7 @@ static void ErrorHandler(int sig, siginfo_t* sigInfo, void* data) {
     {
         void* asBt[256];
         int asN = backtrace(asBt, 256);
-        static const char hdr[] = "\n[soh3d] FATAL signal — async-signal-safe backtrace:\n";
+        static const char hdr[] = "\n[zelda3d] FATAL signal — async-signal-safe backtrace:\n";
         (void)!write(STDERR_FILENO, hdr, sizeof(hdr) - 1);
         backtrace_symbols_fd(asBt, asN, STDERR_FILENO);
     }

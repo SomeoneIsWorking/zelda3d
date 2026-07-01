@@ -42,7 +42,7 @@ class Menu : public GuiWindow {
     ImGuiTextFilter menuSearch;
     uint8_t searchSidebarIndex;
     UIWidgets::Colors defaultThemeIndex;
-    // soh3d's Window API represents backends as int32_t (not the Fast::WindowBackend enum).
+    // zelda3d's Window API represents backends as int32_t (not the Fast::WindowBackend enum).
     std::shared_ptr<std::vector<int32_t>> availableWindowBackends;
     std::unordered_map<int32_t, const char*> availableWindowBackendsMap;
     int32_t configWindowBackend;

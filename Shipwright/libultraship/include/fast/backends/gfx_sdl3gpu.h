@@ -3,7 +3,7 @@
 
 #include "gfx_rendering_api.h"
 #include "../interpreter.h"
-#include "fast/soh3d_sg_ubo.h" // SoH3DSg::SgUbo — the skinned model-draw uniform payload carried by OP_DRAW
+#include "fast/zelda3d_sg_ubo.h" // Zelda3DSg::SgUbo — the skinned model-draw uniform payload carried by OP_DRAW
 
 #include <SDL3/SDL.h>
 #include <SDL3/SDL_gpu.h>
@@ -20,10 +20,10 @@
 namespace Fast {
 
 // The OoT3D model renderer + PC HUD, folded into this backend as member subsystems (see
-// fast/backends/soh3d_sdl3gpu.h). Forward-declared here so only gfx_sdl3gpu.cpp + the two soh3d
+// fast/backends/zelda3d_sdl3gpu.h). Forward-declared here so only gfx_sdl3gpu.cpp + the two zelda3d
 // .cpp files need the full definitions.
-class SoH3DRenderer;
-class SoH3DHudRenderer;
+class Zelda3DRenderer;
+class Zelda3DHudRenderer;
 
 // Forward declaration of the SDL window backend so the SDL3-GPU rendering API can pull the
 // SDL_Window out of it (to claim it for the GPU device). gfx_sdl2.cpp is the shared window
@@ -111,17 +111,17 @@ struct FramebufferSDL3 {
     uint32_t colorTexId = 0; // mTextures alias index, for SelectTextureFb / GetFramebufferTextureId
 };
 
-// Handles the SoH3D 3DS render pass (P3) needs to record its own draws into the SAME command
+// Handles the Zelda3D 3DS render pass (P3) needs to record its own draws into the SAME command
 // buffer + render pass the Fast3D SDL3-GPU backend has open for the current framebuffer, so the
 class GfxRenderingAPISdl3Gpu : public GfxRenderingAPI {
   public:
     explicit GfxRenderingAPISdl3Gpu(GfxWindowBackendSDL3* windowBackend);
     ~GfxRenderingAPISdl3Gpu() override;
 
-    // ---- Unified op model: the SoH3D OoT3D content (CMB models, HUD, AO composite, RmlUi menu) records
+    // ---- Unified op model: the Zelda3D OoT3D content (CMB models, HUD, AO composite, RmlUi menu) records
     // its draws into the SAME deferred op-list as the N64 Fast3D triangles, replayed in ONE render pass
-    // in FinishRender. Every in-pass draw is a first-class OP_DRAW (AppendSoH3DModelDraw / HudDraw /
-    // Fullscreen); only genuine offscreen passes use AppendSoH3DOwnPass. soh3d_sdl3gpu.cpp owns its own
+    // in FinishRender. Every in-pass draw is a first-class OP_DRAW (AppendZelda3DModelDraw / HudDraw /
+    // Fullscreen); only genuine offscreen passes use AppendZelda3DOwnPass. zelda3d_sdl3gpu.cpp owns its own
     // GPU resources (created via the device handle below).
     SDL_GPUDevice* GpuDevice() {
         return mDevice;
@@ -137,30 +137,30 @@ class GfxRenderingAPISdl3Gpu : public GfxRenderingAPI {
     }
     // The current viewport/scissor (as set by the interpreter for the N64 geometry) converted to the
     // SDL3 GPU top-left convention for the current framebuffer — the SAME conversion DrawTriangles
-    // applies — so SoH3D model draws land pixel-aligned with the N64 geometry they interleave with.
-    void GetSoH3DViewportScissor(SDL_GPUViewport& vp, SDL_Rect& sc);
-    // Append a SoH3D skinned model draw as a FIRST-CLASS OP_DRAW in the unified op-list (no callback
+    // applies — so Zelda3D model draws land pixel-aligned with the N64 geometry they interleave with.
+    void GetZelda3DViewportScissor(SDL_GPUViewport& vp, SDL_Rect& sc);
+    // Append a Zelda3D skinned model draw as a FIRST-CLASS OP_DRAW in the unified op-list (no callback
     // indirection): it interleaves with N64 geometry in the same fb pass and replays through the same
-    // single fragment-sampler bind path. `ubo` points at a full SoH3DSg::SgUbo (common + bones). Slot
+    // single fragment-sampler bind path. `ubo` points at a full Zelda3DSg::SgUbo (common + bones). Slot
     // 0 = the model texture, slot 1 = the sun-shadow map (or the dummies when shadow is off).
-    void AppendSoH3DModelDraw(SDL_GPUGraphicsPipeline* pipeline, SDL_GPUBuffer* vbo, uint32_t first, uint32_t count,
+    void AppendZelda3DModelDraw(SDL_GPUGraphicsPipeline* pipeline, SDL_GPUBuffer* vbo, uint32_t first, uint32_t count,
                               const void* ubo, SDL_GPUTexture* tex, SDL_GPUSampler* samp, SDL_GPUTexture* shadowTex,
                               SDL_GPUSampler* shadowSamp, const SDL_GPUViewport& vp, const SDL_Rect& sc);
     // Append one coalesced HUD quad-run as a first-class OP_DRAW into fb 0 (on top of the N64 + model
     // content, in the same pass), through the same single fragment-sampler bind path. `vbo` is the HUD
     // ring vertex buffer; the vertex shader's viewport UBO is built from w/h.
-    void AppendSoH3DHudDraw(SDL_GPUGraphicsPipeline* pipeline, SDL_GPUBuffer* vbo, uint32_t first, uint32_t count,
+    void AppendZelda3DHudDraw(SDL_GPUGraphicsPipeline* pipeline, SDL_GPUBuffer* vbo, uint32_t first, uint32_t count,
                             SDL_GPUTexture* tex, SDL_GPUSampler* samp, float w, float h);
     // Append a fullscreen-triangle post-process draw (the SSAO composite) as a first-class OP_DRAW into
     // the current fb pass, over the scene, through the same single bind path. No vertex buffer (the
     // vertex shader generates the triangle from gl_VertexIndex); `ubo`/`uboLen` is its fragment UBO and
     // `tex`/`samp` its single sampler. The pipeline carries the multiply blend.
-    void AppendSoH3DFullscreen(SDL_GPUGraphicsPipeline* pipeline, const void* ubo, uint32_t uboLen, SDL_GPUTexture* tex,
+    void AppendZelda3DFullscreen(SDL_GPUGraphicsPipeline* pipeline, const void* ubo, uint32_t uboLen, SDL_GPUTexture* tex,
                                SDL_GPUSampler* samp, const SDL_GPUViewport& vp, const SDL_Rect& sc);
     // Append an external op that runs its OWN render pass (offscreen shadow/AO depth targets). The
     // main framebuffer pass is ended first (SDL3 GPU passes can't nest); the callback owns
     // SDL_BeginGPURenderPass/SDL_EndGPURenderPass on the supplied command buffer.
-    void AppendSoH3DOwnPass(std::function<void(SDL_GPUCommandBuffer*)> fn);
+    void AppendZelda3DOwnPass(std::function<void(SDL_GPUCommandBuffer*)> fn);
     // Pixel dimensions of the main framebuffer (fb 0) — the HUD / menu pixel-space coordinate basis.
     void MainFbSize(int& w, int& h);
     // The fb 0 color SDL_GPUTexture — for the RmlUi menu's own offscreen composite pass (it loads
@@ -177,20 +177,20 @@ class GfxRenderingAPISdl3Gpu : public GfxRenderingAPI {
     }
 
     // The folded-in OoT3D model renderer + PC HUD member subsystems (created in Init, reset in the
-    // destructor before the device is destroyed). The SoH3D_Sg_* / SoH3D_Hud_* C-ABI shims forward
+    // destructor before the device is destroyed). The Zelda3D_Sg_* / Zelda3D_Hud_* C-ABI shims forward
     // here via Fast::g_activeSdl3GpuApi.
-    SoH3DRenderer* Soh3d() {
+    Zelda3DRenderer* Soh3d() {
         return mSoh3d.get();
     }
-    SoH3DHudRenderer* Hud() {
+    Zelda3DHudRenderer* Hud() {
         return mHud.get();
     }
 
-    // Shared GPU resources the folded-in SoH3D subsystems draw with, so there is ONE sampler cache
+    // Shared GPU resources the folded-in Zelda3D subsystems draw with, so there is ONE sampler cache
     // and ONE set of dummy (1x1 white tex + sampler) resources across the whole backend rather than
     // the model renderer keeping its own duplicates. GetOrCreateSamplerEx is the general primitive
     // (fully-resolved SDL params + max_lod); the N64 GetOrCreateSampler(linear,cms,cmt) is a thin
-    // wrapper over it. The SoH3D model path needs LINEAR + max_lod=1000 (a minified num_levels=1
+    // wrapper over it. The Zelda3D model path needs LINEAR + max_lod=1000 (a minified num_levels=1
     // texture sampled black at max_lod=0), which the N64 wrapper can't express — hence the Ex form.
     SDL_GPUSampler* GetOrCreateSamplerEx(SDL_GPUFilter filter, SDL_GPUSamplerAddressMode u,
                                          SDL_GPUSamplerAddressMode v, float maxLod);
@@ -248,7 +248,7 @@ class GfxRenderingAPISdl3Gpu : public GfxRenderingAPI {
     // backend records draws/clears/blits into an op list during the frame (with vertex data staged
     // into a CPU buffer), then at EndFrame uploads the whole vertex buffer in ONE copy pass and
     // replays the ops — switching render passes only when the target framebuffer changes.
-    // Every in-pass draw — N64 Fast3D, SoH3D OoT3D skinned models, the PC HUD, and the fullscreen AO
+    // Every in-pass draw — N64 Fast3D, Zelda3D OoT3D skinned models, the PC HUD, and the fullscreen AO
     // composite — is an OP_DRAW (see Op::DrawClass), so the whole frame replays through one render pass
     // and one fragment-sampler bind path. OP_EXT_OWN_PASS remains the hook for genuine OFFSCREEN passes
     // (the shadow / AO depth renders and the RmlUi menu stencil pass) that own their own render pass.
@@ -269,7 +269,7 @@ class GfxRenderingAPISdl3Gpu : public GfxRenderingAPI {
         SDL_GPUViewport viewport;
         SDL_Rect scissor;
         uint8_t ubo[64];        // std140 uniform payload: N64 = fragment SgUboData; HUD = vertex viewport UBO
-        // Vertex source. altVbo != null binds that buffer (SoH3D model's per-model vbo, or the HUD ring
+        // Vertex source. altVbo != null binds that buffer (Zelda3D model's per-model vbo, or the HUD ring
         // vbo) at offset 0; null falls back to the shared frame mVbo at vboOffset (N64). numVerts +
         // firstVertex are the draw range for all three.
         SDL_GPUBuffer* altVbo;
@@ -278,13 +278,13 @@ class GfxRenderingAPISdl3Gpu : public GfxRenderingAPI {
         // path, viewport/scissor and the draw are shared across all three; only the uniform push and
         // the vertex layout (baked into the pipeline) differ.
         //   DRAW_N64        : one fragment UBO (op.ubo) from mVbo.
-        //   DRAW_MODEL      : skinned — the 3-block common+bones push from mSoh3dModelUbos[soh3dDrawIdx].
+        //   DRAW_MODEL      : skinned — the 3-block common+bones push from mSoh3dModelUbos[zelda3dDrawIdx].
         //   DRAW_HUD        : one vertex UBO (op.ubo, the viewport) from altVbo.
         //   DRAW_FULLSCREEN : one fragment UBO (op.ubo, uboLen bytes), NO vertex buffer (the AO composite
         //                     generates a fullscreen triangle from gl_VertexIndex).
         enum DrawClass : uint8_t { DRAW_N64, DRAW_MODEL, DRAW_HUD, DRAW_FULLSCREEN } drawClass;
         uint16_t uboLen; // fragment-UBO byte length for DRAW_FULLSCREEN (0 = use the class default)
-        int soh3dDrawIdx; // DRAW_MODEL: index into mSoh3dModelUbos for the oversized skinned payload
+        int zelda3dDrawIdx; // DRAW_MODEL: index into mSoh3dModelUbos for the oversized skinned payload
         std::function<void(SDL_GPUCommandBuffer*)> extOwn; // OP_EXT_OWN_PASS: runs with the main pass ended
     };
 
@@ -347,8 +347,8 @@ class GfxRenderingAPISdl3Gpu : public GfxRenderingAPI {
     std::vector<Op> mOps;
     // Oversized skinned-model uniform payloads (common + bones, ~4.4 KB) for the DRAW_MODEL OP_DRAWs in
     // mOps — kept out of Op so they don't bloat the thousands of N64 ops. Cleared in lockstep with mOps
-    // so an op's soh3dDrawIdx always indexes the live vector.
-    std::vector<std::array<uint8_t, sizeof(SoH3DSg::SgUbo)>> mSoh3dModelUbos;
+    // so an op's zelda3dDrawIdx always indexes the live vector.
+    std::vector<std::array<uint8_t, sizeof(Zelda3DSg::SgUbo)>> mSoh3dModelUbos;
 
     // GPU textures whose release was deferred because the in-flight op-list may still bind them;
     // released in FlushPendingTexReleases once the frame's command buffer is submitted.
@@ -377,12 +377,12 @@ class GfxRenderingAPISdl3Gpu : public GfxRenderingAPI {
     int mMaxTextureSize = 8192;
 
     // Folded-in renderer subsystems (unique_ptr so the header only needs forward declarations).
-    std::unique_ptr<SoH3DRenderer> mSoh3d;
-    std::unique_ptr<SoH3DHudRenderer> mHud;
+    std::unique_ptr<Zelda3DRenderer> mSoh3d;
+    std::unique_ptr<Zelda3DHudRenderer> mHud;
 };
 
 // Set to the live SDL3-GPU backend in Init() (cleared in the destructor); null when another backend
-// is active. The SoH3D SDL3-GPU pass (P3) will use this to find the backend it must record into.
+// is active. The Zelda3D SDL3-GPU pass (P3) will use this to find the backend it must record into.
 extern GfxRenderingAPISdl3Gpu* g_activeSdl3GpuApi;
 } // namespace Fast
 

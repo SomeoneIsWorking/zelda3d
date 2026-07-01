@@ -21,56 +21,56 @@
 #include <cstdio>
 #include <cstdlib>
 
-// SoH3D render toggles live as extern "C" ints in libultraship's soh3d_gl.cpp (the live state the
+// Zelda3D render toggles live as extern "C" ints in libultraship's zelda3d_gl.cpp (the live state the
 // GL pass reads each frame). The RML rows flip these directly for an immediate, visible effect and
 // persist the choice to a CVar (which the GL pass also reads to seed the global at first use).
 extern "C" {
-extern int gSoH3dShadowEnable;
-extern int gSoH3dAoEnable;
-extern int gSoH3dLightEnable;
+extern int gZelda3dShadowEnable;
+extern int gZelda3dAoEnable;
+extern int gZelda3dLightEnable;
 }
 
 // Debug-menu warp request: a row with `warp="<entrance>"` sets this to the target entrance index;
-// soh3d.c's per-frame SoH3D_ReplPoll consumes it (it has the PlayState) and triggers the scene
+// zelda3d.c's per-frame Zelda3D_ReplPoll consumes it (it has the PlayState) and triggers the scene
 // transition. -1 = nothing pending. Defined here (libultraship) so soh can extern-reference it.
-extern "C" int gSoH3dMenuWarp = -1;
+extern "C" int gZelda3dMenuWarp = -1;
 
-// Debug-menu restart request: a row with `restart="1"` sets this to 1; soh3d.c's per-frame
-// SoH3D_ReplPoll consumes it (it has the PlayState) and returns to the title screen.
-extern "C" int gSoH3dMenuRestart = 0;
+// Debug-menu restart request: a row with `restart="1"` sets this to 1; zelda3d.c's per-frame
+// Zelda3D_ReplPoll consumes it (it has the PlayState) and returns to the title screen.
+extern "C" int gZelda3dMenuRestart = 0;
 
 // Link render/anim mode, cycled by the `linkmode` row: 0 = N64 model + N64 anim, 1 = 3DS model +
-// N64-retarget anim, 2 = 3DS model + 3DS-own CSAB anim. soh3d.c's SoH3D_ReplPoll applies it to
-// gSoH3dLinkOn/gSoH3dLinkAnimSrc (and seeds it from the current mode on the first frame). DEFINED
+// N64-retarget anim, 2 = 3DS model + 3DS-own CSAB anim. zelda3d.c's Zelda3D_ReplPoll applies it to
+// gZelda3dLinkOn/gZelda3dLinkAnimSrc (and seeds it from the current mode on the first frame). DEFINED
 // here in libultraship because charcompare also links against it.
-extern "C" int gSoH3dMenuLinkMode = 0;
+extern "C" int gZelda3dMenuLinkMode = 0;
 
 // Time-of-day applied on the NEXT Debug-menu warp, cycled by the `warptime` row: 0 = scene default
-// (clock runs), 1 = Day, 2 = Night. soh3d.c reads this when it consumes gSoH3dMenuWarp and sets
-// gSoH3dForceTime before the transition (so the new scene's Play_Init picks the right day/night set).
-extern "C" int gSoH3dMenuWarpTime = 0;
+// (clock runs), 1 = Day, 2 = Night. zelda3d.c reads this when it consumes gZelda3dMenuWarp and sets
+// gZelda3dForceTime before the transition (so the new scene's Play_Init picks the right day/night set).
+extern "C" int gZelda3dMenuWarpTime = 0;
 
 // Generated stair step size, cycled by the `stairsize` row: 0 = Small, 1 = Medium, 2 = Large.
-// soh3d.c's SoH3D_ReplPoll maps it to a step rise (SoH3D_SetStairRiserY) and seeds it from the
+// zelda3d.c's Zelda3D_ReplPoll maps it to a step rise (Zelda3D_SetStairRiserY) and seeds it from the
 // current rise on the first frame.
-extern "C" int gSoH3dMenuStairSize = 1;
+extern "C" int gZelda3dMenuStairSize = 1;
 
 // Debug-warp era applied to the NEXT Level-Select / Boss / Dungeon warp: 0 = Default (keep the
-// current age), 1 = Child (past), 2 = Adult (future). soh3d.c sets gSaveContext.linkAge from this
+// current age), 1 = Child (past), 2 = Adult (future). zelda3d.c sets gSaveContext.linkAge from this
 // before the warp, so Play_Init picks the child vs adult scene-setup layer (the past/future variant
-// of the destination). Composes with gSoH3dMenuWarpTime (day/night).
-extern "C" int gSoH3dMenuWarpAge = 0;
+// of the destination). Composes with gZelda3dMenuWarpTime (day/night).
+extern "C" int gZelda3dMenuWarpAge = 0;
 
 // Live on-screen diagnostics text (Link coords / scene / yaw / floor). Owned here (libultraship,
-// no PlayState) and rewritten every frame by soh3d.c's SoH3D_ReplPoll, which DOES have the
+// no PlayState) and rewritten every frame by zelda3d.c's Zelda3D_ReplPoll, which DOES have the
 // PlayState. The "Diag" RML pane's #diagtext element is refreshed from this buffer each frame
 // (SohRmlUi::RefreshDiag), so a screenshot of that tab reports coords without the REPL FIFO.
-extern "C" char gSoH3dDiagText[512] = "(waiting for game state...)";
+extern "C" char gZelda3dDiagText[512] = "(waiting for game state...)";
 
 // Unique id for blocking game input while the RML menu is open (sequence continues the existing
 // *_BLOCK_ID constants in gfx_dxgi.cpp / InputEditorWindow.cpp). Without this, SoH polls the
 // controller/keyboard directly and the game keeps responding under the open menu.
-#define SOH3D_RML_MENU_BLOCK_ID 95237931
+#define ZELDA3D_RML_MENU_BLOCK_ID 95237931
 
 namespace Ship {
 
@@ -82,9 +82,9 @@ struct ToggleSpec {
     int* live;
 };
 static const ToggleSpec kToggles[] = {
-    { "shadows", "gSoH3d.Shadows", &gSoH3dShadowEnable },
-    { "ao", "gSoH3d.AO", &gSoH3dAoEnable },
-    { "lighting", "gSoH3d.Lighting", &gSoH3dLightEnable },
+    { "shadows", "gZelda3d.Shadows", &gZelda3dShadowEnable },
+    { "ao", "gZelda3d.AO", &gZelda3dAoEnable },
+    { "lighting", "gZelda3d.Lighting", &gZelda3dLightEnable },
 };
 static const ToggleSpec* FindToggle(const Rml::String& id) {
     for (const auto& t : kToggles) {
@@ -157,7 +157,7 @@ static bool StepKnob(const KnobSpec& k, int direction) {
 }
 
 // Curated cycle rows: an RML row carrying `cycle="<id>"` steps through a fixed list of labels and
-// writes the selected index into a live menu global (consumed by soh3d.c's SoH3D_ReplPoll). Unlike
+// writes the selected index into a live menu global (consumed by zelda3d.c's Zelda3D_ReplPoll). Unlike
 // the on/off toggles these have N states. The displayed `<value>` is the current label.
 struct CycleSpec {
     const char* id;
@@ -166,10 +166,10 @@ struct CycleSpec {
     int count;
 };
 static const CycleSpec kCycles[] = {
-    { "linkmode", &gSoH3dMenuLinkMode, { "N64", "3DS \xC2\xB7 N64 anim", "3DS \xC2\xB7 3DS anim", nullptr }, 3 },
-    { "warptime", &gSoH3dMenuWarpTime, { "Default", "Day", "Night", nullptr }, 3 },
-    { "warpage", &gSoH3dMenuWarpAge, { "Default", "Child \xC2\xB7 past", "Adult \xC2\xB7 future", nullptr }, 3 },
-    { "stairsize", &gSoH3dMenuStairSize, { "Small", "Medium", "Large", nullptr }, 3 },
+    { "linkmode", &gZelda3dMenuLinkMode, { "N64", "3DS \xC2\xB7 N64 anim", "3DS \xC2\xB7 3DS anim", nullptr }, 3 },
+    { "warptime", &gZelda3dMenuWarpTime, { "Default", "Day", "Night", nullptr }, 3 },
+    { "warpage", &gZelda3dMenuWarpAge, { "Default", "Child \xC2\xB7 past", "Adult \xC2\xB7 future", nullptr }, 3 },
+    { "stairsize", &gZelda3dMenuStairSize, { "Small", "Medium", "Large", nullptr }, 3 },
 };
 static const CycleSpec* FindCycle(const Rml::String& id) {
     for (const auto& c : kCycles) {
@@ -269,14 +269,14 @@ bool SohRmlUi::Init(void* sdlWindow, void* glContext, int width, int height, boo
         SPDLOG_ERROR("[SohRmlUi] Failed to load font face: {}", fontPath);
     }
 
-    mContext = Rml::CreateContext("soh3d", Rml::Vector2i(mWidth, mHeight));
+    mContext = Rml::CreateContext("zelda3d", Rml::Vector2i(mWidth, mHeight));
     if (!mContext) {
         SPDLOG_ERROR("[SohRmlUi] Rml::CreateContext failed");
         Shutdown();
         return false;
     }
 
-    const std::string docPath = Context::GetPathRelativeToAppBundle("assets/rml/soh3d_test.rml");
+    const std::string docPath = Context::GetPathRelativeToAppBundle("assets/rml/zelda3d_test.rml");
     mDocument = mContext->LoadDocument(docPath);
     if (!mDocument) {
         SPDLOG_ERROR("[SohRmlUi] Failed to load document: {}", docPath);
@@ -291,14 +291,14 @@ bool SohRmlUi::Init(void* sdlWindow, void* glContext, int width, int height, boo
     // Mouse parity: clicking a <tab> switches to it (keyboard/D-pad Left/Right already do).
     AttachTabClickHandlers();
     // mHudDocument: NOT loaded — the in-game HUD is native SoH Fast3D (Interface_Draw /
-    // HealthMeter_Draw).  RmlUi is for the ESC menu only.  The soh3d_hud.rml file is kept on
+    // HealthMeter_Draw).  RmlUi is for the ESC menu only.  The zelda3d_hud.rml file is kept on
     // disk as a reference but is never loaded here.
 
     SPDLOG_INFO("[SohRmlUi] RmlUi initialised ({}x{}) — {} (SDL3 GPU)", mWidth, mHeight, docPath);
     mInitialised = true;
     // Debug: open the menu at startup (deterministic verification via the screenshot harness, no
     // input injection needed). Normal use opens it with ESC / the Start button.
-    if (const char* e = std::getenv("SOH3D_RMLUI_OPEN"); e && e[0] == '1') {
+    if (const char* e = std::getenv("ZELDA3D_RMLUI_OPEN"); e && e[0] == '1') {
         SetVisible(true);
     }
     return true;
@@ -313,9 +313,9 @@ void SohRmlUi::SetVisible(bool visible) {
     // (SoH reads the controller by polling, so consuming SDL events alone isn't enough).
     if (auto ctx = Ship::Context::GetRawInstance(); ctx && ctx->GetControlDeck()) {
         if (mVisible) {
-            ctx->GetControlDeck()->BlockGameInput(SOH3D_RML_MENU_BLOCK_ID);
+            ctx->GetControlDeck()->BlockGameInput(ZELDA3D_RML_MENU_BLOCK_ID);
         } else {
-            ctx->GetControlDeck()->UnblockGameInput(SOH3D_RML_MENU_BLOCK_ID);
+            ctx->GetControlDeck()->UnblockGameInput(ZELDA3D_RML_MENU_BLOCK_ID);
         }
     }
     if (mVisible && mContext) {
@@ -370,14 +370,14 @@ void SohRmlUi::ActivateFocused() {
     // Debug warp rows: `warp="<entrance>"` requests a scene transition (level select / boss fight).
     const Rml::String warp = focus->GetAttribute<Rml::String>("warp", "");
     if (!warp.empty()) {
-        gSoH3dMenuWarp = std::atoi(warp.c_str());
+        gZelda3dMenuWarp = std::atoi(warp.c_str());
         SetVisible(false); // close the menu so the transition is visible
         return;
     }
-    // Restart row: `restart="1"` returns to the title screen (consumed in soh3d.c, which has the
+    // Restart row: `restart="1"` returns to the title screen (consumed in zelda3d.c, which has the
     // PlayState — same indirection as the warp rows above).
     if (!focus->GetAttribute<Rml::String>("restart", "").empty()) {
-        gSoH3dMenuRestart = 1;
+        gZelda3dMenuRestart = 1;
         SetVisible(false);
         return;
     }
@@ -449,10 +449,10 @@ void SohRmlUi::RefreshDiag() {
     if (el == nullptr) {
         return;
     }
-    // gSoH3dDiagText is a plain C string filled by soh3d.c each frame; '\n' separates fields. RML
+    // gZelda3dDiagText is a plain C string filled by zelda3d.c each frame; '\n' separates fields. RML
     // ignores raw newlines, so translate them to <br/> for the on-screen multi-line readout.
     Rml::String text;
-    for (const char* p = ::gSoH3dDiagText; *p != '\0'; ++p) {
+    for (const char* p = ::gZelda3dDiagText; *p != '\0'; ++p) {
         if (*p == '\n') {
             text += "<br/>";
         } else {
@@ -690,7 +690,7 @@ void SohRmlUi::ApplyDensityRatio() {
     // at a consistent physical size across displays. A debug override lets the headless harness verify
     // the scaling math (the Xvfb display always reports 1.0).
     float scale = SDL_GetWindowDisplayScale(static_cast<SDL_Window*>(mSdlWindow));
-    if (const char* e = std::getenv("SOH3D_RML_DPI")) {
+    if (const char* e = std::getenv("ZELDA3D_RML_DPI")) {
         float v = (float)atof(e);
         if (v > 0.0f) {
             scale = v;

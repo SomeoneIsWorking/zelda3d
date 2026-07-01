@@ -3,8 +3,8 @@
 
 Decodes a CMB texture two ways from the SAME raw ROM bytes and diffs them:
   1. Azahar's own PICA decoder (the emulator ground truth), via the C++ tool
-     Azahar/build/bin/Release/soh3d_oracle (Pica::Texture::LookupTexture).
-  2. The SoH3D converter's decoder (tools/pica_texture.py).
+     Azahar/build/bin/Release/zelda3d_oracle (Pica::Texture::LookupTexture).
+  2. The Zelda3D converter's decoder (tools/pica_texture.py).
 A divergence means the converter mis-decodes that format (channel order, tiling,
 ETC1, etc.) — caught numerically, not by eyeball. No emulator run needed.
 
@@ -16,9 +16,9 @@ from cmb import Cmb
 import pica_texture
 
 REPO = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
-ORACLE = os.path.join(REPO, "Azahar", "build", "bin", "Release", "soh3d_oracle")
+ORACLE = os.path.join(REPO, "Azahar", "build", "bin", "Release", "zelda3d_oracle")
 
-# CMB glFormat -> Pica::TexturingRegs::TextureFormat int (see soh3d_oracle main.cpp)
+# CMB glFormat -> Pica::TexturingRegs::TextureFormat int (see zelda3d_oracle main.cpp)
 GLFMT_TO_PICA = {
     0x0000675A: 12, 0x0000675B: 13,            # ETC1, ETC1A4
     0x14016752: 0, 0x14016754: 1,              # RGBA8, RGB8
@@ -41,7 +41,7 @@ def main():
         print(__doc__)
         sys.exit(1)
     if not os.path.exists(ORACLE):
-        sys.exit(f"oracle binary missing: {ORACLE}\n  build it: cmake --build Azahar/build --target soh3d_oracle")
+        sys.exit(f"oracle binary missing: {ORACLE}\n  build it: cmake --build Azahar/build --target zelda3d_oracle")
     cmb_path = sys.argv[1]
     ti = int(sys.argv[2]) if len(sys.argv) > 2 else 0
     c = Cmb(open(cmb_path, "rb").read())

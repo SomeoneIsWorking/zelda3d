@@ -1,15 +1,15 @@
 #!/usr/bin/env python3
-"""parity_pose_diff.py — geometry-level Link pose parity: SoH3D resolved pose vs the OoT3D oracle.
+"""parity_pose_diff.py — geometry-level Link pose parity: Zelda3D resolved pose vs the OoT3D oracle.
 
 Compares per-bone LOCAL rotations (the pure, parent-relative anim output) of the SAME 25-bone
 childlink_v2 rig between:
-  SoH3D : REPL `skindump` CSV (cap,anim,frame,bone,m0..m11) — aw = animated bone-WORLD matrix.
+  Zelda3D : REPL `skindump` CSV (cap,anim,frame,bone,m0..m11) — aw = animated bone-WORLD matrix.
           We orthonormalize each bone's 3x3 and derive its LOCAL rotation R_local = R_parentᵀ·R_bone
           using the rig parent map, so it is comparable to the oracle's local rotation.
   oracle: tools/oracle_link_pose.py CSV (cap,t_ms,bone,r0..r8) — the live jointTable LOCAL rotation.
 
 Both rigs share the same childlink_v2 bind frame, so local rotations are directly comparable (no
-alignment needed). For each oracle frame we find the SoH3D frame with the lowest mean per-bone geodesic
+alignment needed). For each oracle frame we find the Zelda3D frame with the lowest mean per-bone geodesic
 angle (best phase match — the two playheads are not frame-locked), then report the per-bone divergence
 and an overall verdict (median best mean-angle, degrees). High per-bone angle = that joint diverges
 (e.g. static legs vs cycling legs = the #117 slide).

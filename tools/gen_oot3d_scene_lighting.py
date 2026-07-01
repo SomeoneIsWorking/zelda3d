@@ -19,11 +19,11 @@ Entry 0 is a metadata blob; the RUNTIME drops it, so runtime slot i = ZSI entry 
 We emit ALL entries (entry 0 included) so the runtime can apply slot bias +1 to align the
 N64 z_kankyo schedule index with the matching OoT3D entry.
 
-Output: a positional array `kSoH3dSceneLighting[]` indexed by SoH sceneNum (same order as
-kSoH3dSceneNames / scene_table.h), each row = the scene's slot palette. Values only (tiny
-tuning ints) — safe to commit, like soh3d_scene_names.inc and n64_scene_lighting.json.
+Output: a positional array `kZelda3dSceneLighting[]` indexed by SoH sceneNum (same order as
+kZelda3dSceneNames / scene_table.h), each row = the scene's slot palette. Values only (tiny
+tuning ints) — safe to commit, like zelda3d_scene_names.inc and n64_scene_lighting.json.
 
-Run: SOH3D_3DS_ROM=<path.3ds> python3 tools/gen_oot3d_scene_lighting.py
+Run: ZELDA3D_3DS_ROM=<path.3ds> python3 tools/gen_oot3d_scene_lighting.py
 """
 import os, re, sys, struct
 sys.path.insert(0, os.path.dirname(__file__))
@@ -31,7 +31,7 @@ from ctr_romfs import CtrRom
 import gen_scene_names as gsn  # reuse OVERRIDES + SCENE_TABLE row derivation
 
 REPO = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
-OUT = os.path.join(REPO, "Shipwright/soh/src/soh3d/soh3d_scene_lighting.inc")
+OUT = os.path.join(REPO, "Shipwright/soh/src/zelda3d/zelda3d_scene_lighting.inc")
 STRIDE = 0x1C
 
 
@@ -74,7 +74,7 @@ def parse_env(d):
 
 
 def main():
-    rom = CtrRom(os.environ["SOH3D_3DS_ROM"])
+    rom = CtrRom(os.environ["ZELDA3D_3DS_ROM"])
     # name -> file path, case-insensitive
     name_path = {}
     for f in rom.iter_files():
@@ -117,8 +117,8 @@ def main():
         o.write("typedef struct {\n")
         o.write("    unsigned char amb[3]; signed char l0dir[3]; unsigned char l0col[3];\n")
         o.write("    signed char l1dir[3]; unsigned char l1col[3];\n")
-        o.write("} SoH3dLightSlot;\n")
-        o.write("typedef struct { unsigned char numSlots; const SoH3dLightSlot* slots; } SoH3dSceneLight;\n\n")
+        o.write("} Zelda3dLightSlot;\n")
+        o.write("typedef struct { unsigned char numSlots; const Zelda3dLightSlot* slots; } Zelda3dSceneLight;\n\n")
 
         emitted = {}
         for name in sorted(parsed):
@@ -127,12 +127,12 @@ def main():
                 continue
             sym = "kSlots_" + re.sub(r"[^A-Za-z0-9_]", "_", name)
             emitted[name] = sym
-            o.write(f"static const SoH3dLightSlot {sym}[] = {{ // {name}\n")
+            o.write(f"static const Zelda3dLightSlot {sym}[] = {{ // {name}\n")
             for s in slots:
                 o.write("    {{%3d,%3d,%3d},{%4d,%4d,%4d},{%3d,%3d,%3d},{%4d,%4d,%4d},{%3d,%3d,%3d}},\n" % (
                     *s["amb"], *s["l0dir"], *s["l0col"], *s["l1dir"], *s["l1col"]))
             o.write("};\n")
-        o.write("\nstatic const SoH3dSceneLight kSoH3dSceneLighting[] = {\n")
+        o.write("\nstatic const Zelda3dSceneLight kZelda3dSceneLighting[] = {\n")
         for i, (soh, enum, name) in enumerate(rows):
             if name and parsed.get(name):
                 o.write(f"    /* 0x{i:02X} {enum:<36} */ {{ {len(parsed[name])}, {emitted[name]} }},\n")

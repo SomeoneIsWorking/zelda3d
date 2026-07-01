@@ -1,12 +1,12 @@
 #!/usr/bin/env python3
-"""Generate the GAME's N64-anim -> OoT3D-CSAB table: soh3d_animmap.inc.
+"""Generate the GAME's N64-anim -> OoT3D-CSAB table: zelda3d_animmap.inc.
 
 Source of truth: tools/animmap_source.py (animmap.json overlaid with the shared
 charcompare_overrides.tsv). This file USED to be hand-maintained; it is now GENERATED so it
 stays in lockstep with the charcompare tool's index (same source, same overrides). Hand-verified
 corrections go in tools/skeldata/charcompare_overrides.tsv, NOT here.
 
-Emits SOH3D_ANIMMAP("<n64 anim OTR path>", "<CSAB base>") entries consumed by soh3d.c.
+Emits ZELDA3D_ANIMMAP("<n64 anim OTR path>", "<CSAB base>") entries consumed by zelda3d.c.
 Run:  python3 tools/gen_animmap_inc.py
 """
 import os
@@ -14,7 +14,7 @@ import os
 import animmap_source
 
 REPO = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
-OUT = os.path.join(REPO, "Shipwright/soh/src/soh3d/soh3d_animmap.inc")
+OUT = os.path.join(REPO, "Shipwright/soh/src/zelda3d/zelda3d_animmap.inc")
 
 
 def main():
@@ -25,7 +25,7 @@ def main():
     lines.append("// N64-animation -> OoT3D-CSAB map for AUTO skinned actors. Key = the actor's live")
     lines.append("// N64 animation OTR path (skelAnime->animation, minus the __OTR__ prefix); value =")
     lines.append("// the CSAB base name played on the replacement OoT3D model. An unlisted anim falls")
-    lines.append("// back to the model's default idle (SoH3D_AutoModelDefaultAnim).")
+    lines.append("// back to the model's default idle (Zelda3D_AutoModelDefaultAnim).")
     lines.append("//")
     lines.append("// Source of truth = tools/skeldata/animmap.json (auto-matched) overlaid with")
     lines.append("// tools/skeldata/charcompare_overrides.tsv (hand-verified). The charcompare tool's")
@@ -37,11 +37,11 @@ def main():
     lines.append("    const char* zar;    // model ZAR this entry is specific to, or NULL for any model.")
     lines.append("                        // Set only for OTR paths shared across skeletons (object_os_anime")
     lines.append("                        // bank: km1/Kokiri vs ane/Cucco-Lady) so the resolver can pick the")
-    lines.append("                        // right CSAB by the live model's ZAR (SoH3D_AutoModelZar).")
-    lines.append("} SoH3DAnimMap;")
+    lines.append("                        // right CSAB by the live model's ZAR (Zelda3D_AutoModelZar).")
+    lines.append("} Zelda3DAnimMap;")
     lines.append("")
-    lines.append("#define SOH3D_ANIMMAP(otr_, csab_) { otr_, csab_, NULL }")
-    lines.append("#define SOH3D_ANIMMAP_Z(otr_, csab_, zar_) { otr_, csab_, zar_ }")
+    lines.append("#define ZELDA3D_ANIMMAP(otr_, csab_) { otr_, csab_, NULL }")
+    lines.append("#define ZELDA3D_ANIMMAP_Z(otr_, csab_, zar_) { otr_, csab_, zar_ }")
     lines.append("")
     # An OTR path that appears under more than one ZAR is a SHARED-bank anim (e.g. object_os_anime
     # used by both the km1 Kokiri skeleton and the ane Cucco-Lady skeleton). Those entries are emitted
@@ -51,17 +51,17 @@ def main():
         for r in d["rows"]:
             otr_zars.setdefault(r["otr"], set()).add(d["zar"])
     shared = {otr for otr, zs in otr_zars.items() if len(zs) > 1}
-    lines.append("static const SoH3DAnimMap kSoH3dAnimMaps[] = {")
+    lines.append("static const Zelda3DAnimMap kZelda3dAnimMaps[] = {")
     n_rows = 0
     for d in src:
         lines.append("    // ---- %s (%s) ----" % (d["zar"], d["object"]))
         for r in d["rows"]:
             mark = "  // OVERRIDE (was %s)" % (r["auto"] or "<none>") if r["overridden"] else ""
             if r["otr"] in shared:
-                lines.append('    SOH3D_ANIMMAP_Z("%s", "%s", "%s"),%s'
+                lines.append('    ZELDA3D_ANIMMAP_Z("%s", "%s", "%s"),%s'
                              % (r["otr"], r["csab"], d["zar"], mark))
             else:
-                lines.append('    SOH3D_ANIMMAP("%s", "%s"),%s' % (r["otr"], r["csab"], mark))
+                lines.append('    ZELDA3D_ANIMMAP("%s", "%s"),%s' % (r["otr"], r["csab"], mark))
             n_rows += 1
     lines.append("};")
     lines.append("")

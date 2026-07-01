@@ -87,8 +87,8 @@ if(LUS_BUILD_TESTS)
     add_subdirectory("tests")
 endif()
 
-# =========== SoH3D dlist render harness =============
-option(LUS_BUILD_DLIST_HARNESS "Build the SoH3D headless dlist render harness" OFF)
+# =========== Zelda3D dlist render harness =============
+option(LUS_BUILD_DLIST_HARNESS "Build the Zelda3D headless dlist render harness" OFF)
 if(LUS_BUILD_DLIST_HARNESS)
     add_subdirectory("tools/dlist_harness")
 endif()

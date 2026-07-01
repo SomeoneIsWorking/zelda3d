@@ -1,0 +1,16 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!-- Xbox face-button glyph: A (green). Authored for the Zelda3D HUD button prompts (#32).
+     Full RGBA: the disc colour + letter are baked in, drawn decal over the N64 HUD quad. -->
+<svg xmlns="http://www.w3.org/2000/svg" width="64" height="64" viewBox="0 0 64 64">
+  <defs>
+    <radialGradient id="g" cx="38%" cy="32%" r="75%">
+      <stop offset="0%"  stop-color="#7ED957"/>
+      <stop offset="60%" stop-color="#3FA516"/>
+      <stop offset="100%" stop-color="#2C7A0E"/>
+    </radialGradient>
+  </defs>
+  <circle cx="32" cy="32" r="29" fill="url(#g)" stroke="#1B4A08" stroke-width="3"/>
+  <text x="32" y="33" text-anchor="middle" dominant-baseline="central"
+        font-family="DejaVu Sans, Arial, sans-serif" font-weight="bold" font-size="40"
+        fill="#FFFFFF" stroke="#16400A" stroke-width="1.2">A</text>
+</svg>

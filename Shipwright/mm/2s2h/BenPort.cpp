@@ -631,7 +631,7 @@ void OTRGlobals::Initialize() {
     context->InitLogging(logLevel, logLevel);
     Ship::Context::GetRawInstance()->GetLogger()->set_pattern("[%H:%M:%S.%e] [%s:%#] [%l] %v");
 
-    // soh3d's libultraship removed Context::InitGfxDebugger (no ImGui gfx debugger).
+    // zelda3d's libultraship removed Context::InitGfxDebugger (no ImGui gfx debugger).
     context->InitFileDropMgr();
 
     // tell LUS to reserve 3 2S2H specific threads (Game, Audio, Save)

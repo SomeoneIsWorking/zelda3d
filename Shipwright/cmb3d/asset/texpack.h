@@ -6,11 +6,11 @@
 #include <cstdint>
 #include <vector>
 
-namespace SoH3D {
+namespace Zelda3D {
 
 // On a hit, fills `rgba` with W*H*4 top-down RGBA8 of the replacement and sets w/h, then
 // returns true. The pack is indexed lazily on first call. Returns false (no replacement)
 // when no pack is found or the hash is absent.
 bool TexPackLookup(uint64_t hash, int& w, int& h, std::vector<uint8_t>& rgba);
 
-} // namespace SoH3D
+} // namespace Zelda3D

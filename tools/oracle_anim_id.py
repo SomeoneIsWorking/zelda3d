@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""oracle_anim_id.py — identify, per oracle frame, which SoH3D CSAB pose best matches it.
+"""oracle_anim_id.py — identify, per oracle frame, which Zelda3D CSAB pose best matches it.
 
 Loads an oracle jointTable capture (oracle_link_pose.py CSV: per-bone LOCAL rotations) and, for each
 captured frame, finds the (anim, frame) among a set of offline-sampled CSABs (nml_walk_free,
@@ -28,7 +28,7 @@ def main():
     args = ap.parse_args()
     bones = parse_bones(args.bones)
 
-    rom = CtrRom(os.environ["SOH3D_3DS_ROM"])
+    rom = CtrRom(os.environ["ZELDA3D_3DS_ROM"])
     z = Zar(rom.read(rom.get(ZAR)))
 
     def load(name):

@@ -1,7 +1,7 @@
 // cmb_glgroups — the game-agnostic CMB -> renderer bridge.
 //
-// Turns a parsed SoH3D::Cmb (3DS model) into the libultraship renderer's POD
-// contract (SoH3DGlGroup / SoH3DGlTex, from <fast/soh3d_gl.h>): per-material draw
+// Turns a parsed Zelda3D::Cmb (3DS model) into the libultraship renderer's POD
+// contract (Zelda3DGlGroup / Zelda3DGlTex, from <fast/zelda3d_gl.h>): per-material draw
 // batches + decoded RGBA textures (with hi-res-pack substitution). This is pure
 // geometry/material translation with NO decomp coupling, so BOTH games (OoT via
 // soh, MM via mm) share the one converter instead of each re-implementing it.
@@ -15,19 +15,19 @@
 #include <utility>
 #include <vector>
 
-#include <fast/soh3d_gl.h> // SoH3DGlGroup / SoH3DGlVtx / SoH3DGlTex (renderer POD contract)
+#include <fast/zelda3d_gl.h> // Zelda3DGlGroup / Zelda3DGlVtx / Zelda3DGlTex (renderer POD contract)
 
 #include "cmb.h"
 
-namespace SoH3D {
+namespace Zelda3D {
 
 // Build one renderer group view from a CMB draw group + its material. `srcVerts`
 // must outlive the returned view (the renderer copies on upload). `texBase` is
 // added to the material's texture index so several CMBs' textures can share one
 // concatenated array (multi-CMB merge / shared atlas). `cg.verts` aliases
-// `srcVerts` via reinterpret_cast — CmbVertex and SoH3DGlVtx share layout by
+// `srcVerts` via reinterpret_cast — CmbVertex and Zelda3DGlVtx share layout by
 // contract (static-asserted in the .cpp).
-SoH3DGlGroup MakeGlGroup(const Cmb& cmb, const CmbDrawGroup& g, const CmbVertex* srcVerts, int texBase);
+Zelda3DGlGroup MakeGlGroup(const Cmb& cmb, const CmbDrawGroup& g, const CmbVertex* srcVerts, int texBase);
 
 // Decode every texture in `cmb` (applying the hi-res texture pack by Citra legacy
 // hash) and APPEND to `texRgba`; the parallel `dims` gets each decoded texture's
@@ -36,4 +36,4 @@ SoH3DGlGroup MakeGlGroup(const Cmb& cmb, const CmbDrawGroup& g, const CmbVertex*
 int AppendCmbTextures(const Cmb& cmb, std::vector<std::vector<uint8_t>>& texRgba,
                       std::vector<std::pair<int, int>>& dims);
 
-} // namespace SoH3D
+} // namespace Zelda3D

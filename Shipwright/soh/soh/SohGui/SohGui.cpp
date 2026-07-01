@@ -96,7 +96,7 @@ std::shared_ptr<SohMenu> GetSohMenu() {
     return mSohMenu;
 }
 
-// soh3d: SoH's genuine bug-fix enhancements — the "* Fixes" sub-groups of the Enhancements >
+// zelda3d: SoH's genuine bug-fix enhancements — the "* Fixes" sub-groups of the Enhancements >
 // Fixes tab (SohMenuEnhancements.cpp). Each corrects an original-game bug. DELIBERATELY EXCLUDES
 // the "Graphical/Glitch/Misc Restorations" groups, which re-introduce glitches or old behavior
 // (HoverFishing, BombchusOOB, N64WeirdFrames, RedGanonBlood, GraveHoles, ...) rather than fix bugs.
@@ -126,24 +126,24 @@ static const char* const kSoh3dForcedFixes[] = {
     CVAR_ENHANCEMENT("FixDaruniaDanceSpeed"), CVAR_ENHANCEMENT("CreditsFix"),
 };
 
-// soh3d: force the genuine bug-fixes ON every boot. Set in memory only (not CVarSave'd), so the
+// zelda3d: force the genuine bug-fixes ON every boot. Set in memory only (not CVarSave'd), so the
 // game reads them as enabled but the user's config file is left untouched. They aren't surfaced in
 // the RML menu, so this makes them effectively always-on and not user-toggleable.
 static void ForceBugFixesOn() {
     for (const char* cvar : kSoh3dForcedFixes) {
         CVarSetInteger(cvar, 1);
     }
-    SPDLOG_INFO("[soh3d] forced {} bug-fix enhancements on", std::size(kSoh3dForcedFixes));
+    SPDLOG_INFO("[zelda3d] forced {} bug-fix enhancements on", std::size(kSoh3dForcedFixes));
 }
 
 void SetupMenu() {
     auto gui = Ship::Context::GetRawInstance()->GetWindow()->GetGui();
     mSohMenu = std::make_shared<SohMenu>(CVAR_WINDOW("Menu"), "Port Menu");
     gui->SetMenu(mSohMenu);
-    // soh3d: the RmlUi menu replaces SoH's ImGui menu. Keep mSohMenu registered (theme/getters
+    // zelda3d: the RmlUi menu replaces SoH's ImGui menu. Keep mSohMenu registered (theme/getters
     // still reference it) but force it hidden at boot so the ImGui menu never appears.
     mSohMenu->Hide();
-    // soh3d: force SoH's genuine bug-fixes on at boot (always-on, not in the RML menu).
+    // zelda3d: force SoH's genuine bug-fixes on at boot (always-on, not in the RML menu).
     ForceBugFixesOn();
 
     mModalWindow = std::make_shared<SohModalWindow>(CVAR_WINDOW("ModalWindow"), "Modal Window");
@@ -298,6 +298,6 @@ void ShowRandomizerSettingsMenu() {
 }
 
 void ShowEscMenu() {
-    // soh3d: the RmlUi menu is the in-game menu now; don't open SoH's ImGui menu.
+    // zelda3d: the RmlUi menu is the in-game menu now; don't open SoH's ImGui menu.
 }
 } // namespace SohGui

@@ -5,7 +5,7 @@
  */
 
 #include "z_obj_tsubo.h"
-#include "soh3d/soh3d.h"
+#include "zelda3d/zelda3d.h"
 #include "overlays/effects/ovl_Effect_Ss_Kakera/z_eff_ss_kakera.h"
 #include "objects/gameplay_dangeon_keep/gameplay_dangeon_keep.h"
 #include "objects/object_tsubo/object_tsubo.h"
@@ -341,7 +341,7 @@ void ObjTsubo_Update(Actor* thisx, PlayState* play) {
 }
 
 void ObjTsubo_Draw(Actor* thisx, PlayState* play) {
-    // SoH3D divert (OoT3D pot) is handled centrally in Actor_Draw via the model
-    // table in soh3d.c — no per-actor edit needed here.
+    // Zelda3D divert (OoT3D pot) is handled centrally in Actor_Draw via the model
+    // table in zelda3d.c — no per-actor edit needed here.
     Gfx_DrawDListOpa(play, D_80BA1B84[(thisx->params >> 8) & 1]);
 }

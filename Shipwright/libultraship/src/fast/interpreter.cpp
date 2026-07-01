@@ -26,7 +26,7 @@
 
 #include "fast/interpreter.h"
 #include "fast/lus_gbi.h"
-#include "fast/soh3d_gl.h"
+#include "fast/zelda3d_gl.h"
 #include "fast/backends/gfx_window_manager_api.h"
 #include "fast/Fast3dWindow.h" // Fast::WindowBackend (FAST3D_SDL_VULKAN) for the present-path composite guard
 #include "fast/backends/gfx_rendering_api.h"
@@ -47,7 +47,7 @@
 
 std::stack<std::string> currentDir;
 
-// --- SoH3D auto-scale measure state (see OTR_G_SOH3D_MEASURE / gfx_soh3d_measure_*) ---
+// --- Zelda3D auto-scale measure state (see OTR_G_ZELDA3D_MEASURE / gfx_zelda3d_measure_*) ---
 // While measuring, GfxSpVertex accumulates the actor's drawn WORLD-SPACE HEIGHT. The top
 // modelview = model.view (pre-projection), with the view a rigid camera transform. The
 // actor's model-space up (0,1,0) maps through its RotateY-only matrix to world up, so the
@@ -55,11 +55,11 @@ std::stack<std::string> currentDir;
 // eye position onto it and taking the range gives the world-space height. Height (not the
 // bbox diagonal) is what the manual scales were calibrated against, so it matches the OoT3D
 // model's local Y extent without the aspect-ratio bias a diagonal introduces. Reported to
-// soh3d.c on the end bracket to derive the OoT3D model's scale.
-static bool s_soh3dMeasuring = false;
-static int s_soh3dMeasureKey = 0;
-static float s_soh3dMeasHMin, s_soh3dMeasHMax;
-extern "C" void SoH3D_MeasureResult(int key, float height); // implemented in soh/src/soh3d/soh3d.c
+// zelda3d.c on the end bracket to derive the OoT3D model's scale.
+static bool s_zelda3dMeasuring = false;
+static int s_zelda3dMeasureKey = 0;
+static float s_zelda3dMeasHMin, s_zelda3dMeasHMax;
+extern "C" void Zelda3D_MeasureResult(int key, float height); // implemented in soh/src/zelda3d/zelda3d.c
 
 // charcompare: measure the MODEL-SPACE (modelview-transformed) vertex bbox over a frame, so the tool
 // can frame the model — especially the DEPTH axis — by its true geometry extent. The modelview is the
@@ -80,15 +80,15 @@ extern "C" void Cc_BboxMeasureEnd(float* mn, float* mx) {
     }
 }
 
-// --- SoH3D "RenderDoc-lite" draw dump (env SOH3D_GFXDUMP=<path>) -------------------------------
+// --- Zelda3D "RenderDoc-lite" draw dump (env ZELDA3D_GFXDUMP=<path>) -------------------------------
 // Captures, per draw BATCH (a run of triangles under one modelview-stack top), the modelview / MP
 // matrices + their 3x3 determinant SIGN (handedness), the object-space vertex bbox + count, sample
 // transformed clip positions, and triangle winding stats (front/back by the SAME screen-space cross
 // the culler uses) plus how many the active cull mode drops. Batches are keyed by their object-space
 // vertex bbox, so the SAME geometry drawn in charcompare and in the live game can be matched and
 // their matrices / winding compared — the tool for "is a limb's geometry inverted vs the game?".
-// One frame only: SOH3D_GFXDUMP=<path> [SOH3D_GFXDUMP_FRAME=<n, default 0>]
-//                 [SOH3D_GFXDUMP_FILTER=<substr the current DL OTR path must contain>].
+// One frame only: ZELDA3D_GFXDUMP=<path> [ZELDA3D_GFXDUMP_FRAME=<n, default 0>]
+//                 [ZELDA3D_GFXDUMP_FILTER=<substr the current DL OTR path must contain>].
 namespace {
 struct GfxDumpBatch {
     bool open = false;
@@ -540,12 +540,12 @@ void Interpreter::GenerateCC(ColorCombiner* comb, const ColorCombinerKey& key) {
 // color-combiner permutation the first time it's seen (the pool insertion below already
 // deduplicates repeats for free), so a scripted sweep of real content yields the authoritative
 // corpus manifest the unified-shader differential harness (tools/unified_ab_sweep.py) needs.
-// Opt-in via SOH3D_CC_DUMP=<path> — zero cost/behavior change when unset (the default).
-static void SoH3D_LogNewCombinerKey(const ColorCombinerKey& key) {
+// Opt-in via ZELDA3D_CC_DUMP=<path> — zero cost/behavior change when unset (the default).
+static void Zelda3D_LogNewCombinerKey(const ColorCombinerKey& key) {
     static int state = -1; // -1 unread, 0 disabled, 1 enabled
     static FILE* f = nullptr;
     if (state < 0) {
-        const char* path = getenv("SOH3D_CC_DUMP");
+        const char* path = getenv("ZELDA3D_CC_DUMP");
         state = (path && path[0]) ? 1 : 0;
         if (state) {
             f = fopen(path, "a");
@@ -568,7 +568,7 @@ ColorCombiner* Interpreter::LookupOrCreateColorCombiner(const ColorCombinerKey& 
     }
     Flush();
     mPrevCombiner = mColorCombinerPool.insert(std::make_pair(key, ColorCombiner())).first;
-    SoH3D_LogNewCombinerKey(key);
+    Zelda3D_LogNewCombinerKey(key);
     GenerateCC(&mPrevCombiner->second, key);
     return &mPrevCombiner->second;
 }
@@ -1677,7 +1677,7 @@ void Interpreter::GfxSpVertex(size_t n_vertices, size_t dest_index, const F3DVtx
             world_pos[2] = v->ob[0] * mtx[0][2] + v->ob[1] * mtx[1][2] + v->ob[2] * mtx[2][2] + mtx[3][2];
         }
 
-        if (s_soh3dMeasuring) {
+        if (s_zelda3dMeasuring) {
             // World-up axis in eye space = (top modelview) applied to direction (0,1,0).
             float(*mv)[4] = mRsp->modelview_matrix_stack[mRsp->modelview_matrix_stack_size - 1];
             float ux = mv[1][0], uy = mv[1][1], uz = mv[1][2];
@@ -1688,8 +1688,8 @@ void Interpreter::GfxSpVertex(size_t n_vertices, size_t dest_index, const F3DVtx
                 float ey = v->ob[0] * mv[0][1] + v->ob[1] * mv[1][1] + v->ob[2] * mv[2][1] + mv[3][1];
                 float ez = v->ob[0] * mv[0][2] + v->ob[1] * mv[1][2] + v->ob[2] * mv[2][2] + mv[3][2];
                 float h = ex * ux + ey * uy + ez * uz; // signed height along world up (eye space)
-                if (h < s_soh3dMeasHMin) s_soh3dMeasHMin = h;
-                if (h > s_soh3dMeasHMax) s_soh3dMeasHMax = h;
+                if (h < s_zelda3dMeasHMin) s_zelda3dMeasHMin = h;
+                if (h > s_zelda3dMeasHMax) s_zelda3dMeasHMax = h;
             }
         }
 
@@ -4141,7 +4141,7 @@ bool gfx_set_timg_handler_rdp(F3DGfx** cmd0) {
     }
 #else
     if (!loadedOtrTex && i <= 0x0FFFFFFF) {
-        // DIAGNOSTIC (SoH3D): the "sky bug" — a non-deterministic scene-load race where a texture's
+        // DIAGNOSTIC (Zelda3D): the "sky bug" — a non-deterministic scene-load race where a texture's
         // N64 segment base is still 0 when its display list first runs, so SegAddr can't resolve it.
         // The texture is skipped here, leaving a stale GL binding that paints garbage (a HUD icon, a
         // sky stripe). The downstream null guards (GfxDpLoadTlut/ImportTexture) only prevent the
@@ -4160,7 +4160,7 @@ bool gfx_set_timg_handler_rdp(F3DGfx** cmd0) {
                 crumb += ":" + std::to_string(disp[k].line);
                 if (k) crumb += " <- ";
             }
-            SPDLOG_WARN("SoH3D SKYBUG: unresolved texture segment {} (w1=0x{:08X}, resolved=0x{:016X}) "
+            SPDLOG_WARN("Zelda3D SKYBUG: unresolved texture segment {} (w1=0x{:08X}, resolved=0x{:016X}) "
                         "skipped; drawn by [{}]",
                         segNum, (uint32_t)w1, (uint64_t)i, crumb.empty() ? "(no OPEN_DISPS context)" : crumb);
         }
@@ -4342,13 +4342,13 @@ bool gfx_read_fb_handler_custom(F3DGfx** cmd0) {
     return false;
 }
 
-// SoH3D model draw opcode. Rather than drawing inline (interleaved with Fast3D, fighting its
+// Zelda3D model draw opcode. Rather than drawing inline (interleaved with Fast3D, fighting its
 // cached GL state), CAPTURE this draw — its model id, the interpreter's current MP_matrix
-// snapshot, tint and clip params — into the SoH3D draw list. The whole list is rendered later
-// in one bracketed pass (OTR_G_SOH3D_RENDERPASS). Capturing MP here is essential: it's this
+// snapshot, tint and clip params — into the Zelda3D draw list. The whole list is rendered later
+// in one bracketed pass (OTR_G_ZELDA3D_RENDERPASS). Capturing MP here is essential: it's this
 // item's matrix (set by the preceding gSPMatrix); the render-pass opcode comes later when
 // MP_matrix is something else.
-bool gfx_soh3d_draw_handler_custom(F3DGfx** cmd0) {
+bool gfx_zelda3d_draw_handler_custom(F3DGfx** cmd0) {
     Interpreter* gfx = mInstance.lock().get();
     F3DGfx* cmd = *cmd0;
     uint64_t w1 = (uint64_t)cmd->words.w1;
@@ -4377,31 +4377,31 @@ bool gfx_soh3d_draw_handler_custom(F3DGfx** cmd0) {
     // Flush Fast3D's pending (not-yet-appended) N64 triangle batch BEFORE appending this op, so the
     // two content streams interleave in true emission order in the unified op-list. Fast3D buffers
     // triangles in mBufVbo and only appends them as an op at a Flush() boundary (state changes /
-    // frame end); without this, a G_SOH3D_DRAW firing mid-batch would jump ahead of (or behind)
+    // frame end); without this, a G_ZELDA3D_DRAW firing mid-batch would jump ahead of (or behind)
     // still-buffered N64 geometry it was actually emitted after (or before) in the game's dlist.
     gfx->Flush();
-    SoH3D_GL_Submit(modelId, &gfx->mRsp->MP_matrix[0][0], mv, lit, invertY ? 1 : 0, r, g, b, a, aspectAdj, sky,
+    Zelda3D_GL_Submit(modelId, &gfx->mRsp->MP_matrix[0][0], mv, lit, invertY ? 1 : 0, r, g, b, a, aspectAdj, sky,
                     uvOffU, uvOffV);
     return false;
 }
 
 
-// SoH3D auto-scale measure bracket. Begin (w0 bit0 = 1): start accumulating the
+// Zelda3D auto-scale measure bracket. Begin (w0 bit0 = 1): start accumulating the
 // eye-space bbox in GfxSpVertex. End (bit0 = 0): finalize the bbox diagonal and report
-// it to soh3d.c keyed by w1, so it can derive the OoT3D model's world scale next frame.
-bool gfx_soh3d_measure_handler_custom(F3DGfx** cmd0) {
+// it to zelda3d.c keyed by w1, so it can derive the OoT3D model's world scale next frame.
+bool gfx_zelda3d_measure_handler_custom(F3DGfx** cmd0) {
     F3DGfx* cmd = *cmd0;
     int key = (int)(intptr_t)cmd->words.w1;
     bool begin = (cmd->words.w0 & 0x1) != 0;
     if (begin) {
-        s_soh3dMeasuring = true;
-        s_soh3dMeasureKey = key;
-        s_soh3dMeasHMin = 1e30f;
-        s_soh3dMeasHMax = -1e30f;
-    } else if (s_soh3dMeasuring) {
-        s_soh3dMeasuring = false;
-        float height = (s_soh3dMeasHMin <= s_soh3dMeasHMax) ? (s_soh3dMeasHMax - s_soh3dMeasHMin) : 0.0f;
-        SoH3D_MeasureResult(key, height);
+        s_zelda3dMeasuring = true;
+        s_zelda3dMeasureKey = key;
+        s_zelda3dMeasHMin = 1e30f;
+        s_zelda3dMeasHMax = -1e30f;
+    } else if (s_zelda3dMeasuring) {
+        s_zelda3dMeasuring = false;
+        float height = (s_zelda3dMeasHMin <= s_zelda3dMeasHMax) ? (s_zelda3dMeasHMax - s_zelda3dMeasHMin) : 0.0f;
+        Zelda3D_MeasureResult(key, height);
     }
     return false;
 }
@@ -4908,8 +4908,8 @@ static constexpr UcodeHandler otrHandlers = {
     { OTR_G_REGBLENDEDTEX,
       { "G_REGBLENDEDTEX", gfx_register_blended_texture_handler_custom } },         // G_REGBLENDEDTEX (0x3f)
     { OTR_G_SETINTENSITY, { "G_SETINTENSITY", gfx_set_intensity_handler_custom } }, // G_SETINTENSITY (0x40)
-    { OTR_G_SOH3D_DRAW, { "G_SOH3D_DRAW", gfx_soh3d_draw_handler_custom } },         // G_SOH3D_DRAW (0x41)
-    { OTR_G_SOH3D_MEASURE, { "G_SOH3D_MEASURE", gfx_soh3d_measure_handler_custom } }, // G_SOH3D_MEASURE (0x4a)
+    { OTR_G_ZELDA3D_DRAW, { "G_ZELDA3D_DRAW", gfx_zelda3d_draw_handler_custom } },         // G_ZELDA3D_DRAW (0x41)
+    { OTR_G_ZELDA3D_MEASURE, { "G_ZELDA3D_MEASURE", gfx_zelda3d_measure_handler_custom } }, // G_ZELDA3D_MEASURE (0x4a)
     { OTR_G_MOVEMEM_HASH, { "OTR_G_MOVEMEM_HASH", gfx_movemem_handler_otr } },      // OTR_G_MOVEMEM_HASH
     { OTR_G_PUSH_SHADER, { "G_PUSH_SHADER", gfx_push_shader } },
     { OTR_G_POP_SHADER, { "G_POP_SHADER", gfx_pop_shader } },
@@ -5350,21 +5350,21 @@ void Interpreter::Run(Gfx* commands, const std::unordered_map<Mtx*, MtxF>& mtx_r
 
     // Arm the RenderDoc-lite draw dump for exactly the target frame (see GfxDumpBatch comment).
     if (s_gfxDumpState == 0) {
-        const char* path = getenv("SOH3D_GFXDUMP");
+        const char* path = getenv("ZELDA3D_GFXDUMP");
         if (!path) {
             s_gfxDumpState = 2; // disabled for this process
         } else {
-            const char* fr = getenv("SOH3D_GFXDUMP_FRAME");
+            const char* fr = getenv("ZELDA3D_GFXDUMP_FRAME");
             s_gfxDumpTargetFrame = fr ? atoi(fr) : 0;
-            const char* fl = getenv("SOH3D_GFXDUMP_FILTER");
+            const char* fl = getenv("ZELDA3D_GFXDUMP_FILTER");
             s_gfxDumpFilter = fl ? fl : "";
             s_gfxDumpState = 1;
         }
     }
     if (s_gfxDumpState == 1 && s_gfxDumpFrameCtr == s_gfxDumpTargetFrame) {
-        s_gfxDump = fopen(getenv("SOH3D_GFXDUMP"), "w");
+        s_gfxDump = fopen(getenv("ZELDA3D_GFXDUMP"), "w");
         if (s_gfxDump) {
-            fprintf(s_gfxDump, "# SoH3D gfx dump — frame %d  filter='%s'\n", s_gfxDumpFrameCtr,
+            fprintf(s_gfxDump, "# Zelda3D gfx dump — frame %d  filter='%s'\n", s_gfxDumpFrameCtr,
                     s_gfxDumpFilter.c_str());
             s_gfxBatch = GfxDumpBatch();
             s_gfxBatchIdx = 0;
@@ -5386,9 +5386,9 @@ void Interpreter::Run(Gfx* commands, const std::unordered_map<Mtx*, MtxF>& mtx_r
     mRenderingState.viewport = {};
     mRenderingState.scissor = {};
 
-    // Open the SoH3D unified-render context: 3DS model ops emitted by G_SOH3D_DRAW while
+    // Open the Zelda3D unified-render context: 3DS model ops emitted by G_ZELDA3D_DRAW while
     // interpreting this dlist append inline into the SAME op-list / render pass as the N64 geometry.
-    SoH3D_GL_RenderFrameBegin();
+    Zelda3D_GL_RenderFrameBegin();
 
     auto dbg = mGfxDebugger;
     g_exec_stack.start((F3DGfx*)commands);
@@ -5412,7 +5412,7 @@ void Interpreter::Run(Gfx* commands, const std::unordered_map<Mtx*, MtxF>& mtx_r
         gfx_step();
     }
 
-    SoH3D_GL_RenderFrameEnd(); // close the SoH3D context (all 3DS model ops for this frame appended)
+    Zelda3D_GL_RenderFrameEnd(); // close the Zelda3D context (all 3DS model ops for this frame appended)
 
     Flush();
 

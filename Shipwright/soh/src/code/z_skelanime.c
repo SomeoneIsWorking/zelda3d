@@ -5,7 +5,7 @@
 #include <assert.h>
 #include "soh/ResourceManagerHelpers.h"
 #include "soh/Enhancements/game-interactor/GameInteractor_Hooks.h"
-#include "soh3d/soh3d.h"
+#include "zelda3d/zelda3d.h"
 
 #define ANIM_INTERP 1
 
@@ -300,19 +300,19 @@ void SkelAnime_DrawLimbOpa(PlayState* play, s32 limbIndex, void** skeleton, Vec3
 
 // Checks the skeleton header to draw the appropriate skeleton type instead of harcoding the type in the actor's draw
 // function...
-// SoH3D #107: when an OoT3D model replaces a skinned actor's N64 skeleton draw, the N64 limb walk is
+// Zelda3D #107: when an OoT3D model replaces a skinned actor's N64 skeleton draw, the N64 limb walk is
 // skipped — and with it the per-limb postLimbDraw callback that repositions the actor's collision
 // spheres (Collider_UpdateSpheres). Left un-run, every replaced actor's OC/AC/AT spheres stay at the
 // world origin, so the collision check sees them overlapping there and shoves them apart with the
 // degenerate fixed pushback (enemies "zip away"; stalchildren are the vivid case, #107). Re-run the
-// N64 limb matrix walk purely for those side effects (gSoH3dColliderPass suppresses the OoT3D
+// N64 limb matrix walk purely for those side effects (gZelda3dColliderPass suppresses the OoT3D
 // replacement so the real walk runs), then rewind the gfx buffers so none of the N64 geometry renders.
-extern int gSoH3dColliderPass;
-static void SoH3D_UpdateSkelColliders(PlayState* play, SkelAnime* skelAnime,
+extern int gZelda3dColliderPass;
+static void Zelda3D_UpdateSkelColliders(PlayState* play, SkelAnime* skelAnime,
                                       OverrideLimbDrawOpa overrideLimbDraw, PostLimbDrawOpa postLimbDraw, void* arg) {
     Gfx* opaP = play->state.gfxCtx->polyOpa.p;
     Gfx* xluP = play->state.gfxCtx->polyXlu.p;
-    gSoH3dColliderPass = 1;
+    gZelda3dColliderPass = 1;
     if (skelAnime->skeletonHeader->skeletonType == SKELANIME_TYPE_NORMAL) {
         SkelAnime_DrawOpa(play, skelAnime->skeleton, skelAnime->jointTable, overrideLimbDraw, postLimbDraw, arg);
     } else if (skelAnime->skeletonHeader->skeletonType == SKELANIME_TYPE_FLEX) {
@@ -320,19 +320,19 @@ static void SoH3D_UpdateSkelColliders(PlayState* play, SkelAnime* skelAnime,
         SkelAnime_DrawFlexOpa(play, skelAnime->skeleton, skelAnime->jointTable, flexHeader->dListCount,
                               overrideLimbDraw, postLimbDraw, arg);
     }
-    gSoH3dColliderPass = 0;
+    gZelda3dColliderPass = 0;
     play->state.gfxCtx->polyOpa.p = opaP; // discard the N64 geometry; keep the OoT3D model + collider updates
     play->state.gfxCtx->polyXlu.p = xluP;
 }
 
 void SkelAnime_DrawSkeletonOpa(PlayState* play, SkelAnime* skelAnime, OverrideLimbDrawOpa overrideLimbDraw,
                                PostLimbDrawOpa postLimbDraw, void* arg) {
-    // SoH3D: if this actor is registered for N64-anim replacement, draw the OoT3D model
+    // Zelda3D: if this actor is registered for N64-anim replacement, draw the OoT3D model
     // driven by these live N64 joints and skip the N64 limb draw. Pass the override callback so the
     // auto path can replay any procedural per-limb rotation it adds (e.g. cucco wing-flap, #23).
-    SoH3D_SetLimbOverride((void*)overrideLimbDraw, arg, 0);
-    if (SoH3D_SkelAnimeDraw(play, skelAnime)) {
-        SoH3D_UpdateSkelColliders(play, skelAnime, overrideLimbDraw, postLimbDraw, arg); // #107
+    Zelda3D_SetLimbOverride((void*)overrideLimbDraw, arg, 0);
+    if (Zelda3D_SkelAnimeDraw(play, skelAnime)) {
+        Zelda3D_UpdateSkelColliders(play, skelAnime, overrideLimbDraw, postLimbDraw, arg); // #107
         return;
     }
     if (skelAnime->skeletonHeader->skeletonType == SKELANIME_TYPE_NORMAL) {
@@ -346,25 +346,25 @@ void SkelAnime_DrawSkeletonOpa(PlayState* play, SkelAnime* skelAnime, OverrideLi
 
 Gfx* SkelAnime_DrawSkeleton2(PlayState* play, SkelAnime* skelAnime, OverrideLimbDrawOpa overrideLimbDraw,
                              PostLimbDrawOpa postLimbDraw, void* arg, Gfx* gfx) {
-    // SoH3D: N64-anim replacement (see SkelAnime_DrawSkeletonOpa). Skip the N64 limb draw if the
+    // Zelda3D: N64-anim replacement (see SkelAnime_DrawSkeletonOpa). Skip the N64 limb draw if the
     // OoT3D model was drawn for this actor. Return the ADVANCED polyOpa.p (not the stale gfx) when
     // this is an OPA draw, so the caller doesn't rewind over the emit. (See SkelAnime_Draw.)
-    Gfx* soh3dOpaEntry = play->state.gfxCtx->polyOpa.p;
-    SoH3D_SetLimbOverride((void*)overrideLimbDraw, arg, 0); // #23 procedural-override replay
-    if (SoH3D_SkelAnimeDraw(play, skelAnime)) {
-        Gfx* ret = (gfx == soh3dOpaEntry) ? play->state.gfxCtx->polyOpa.p : gfx;
+    Gfx* zelda3dOpaEntry = play->state.gfxCtx->polyOpa.p;
+    Zelda3D_SetLimbOverride((void*)overrideLimbDraw, arg, 0); // #23 procedural-override replay
+    if (Zelda3D_SkelAnimeDraw(play, skelAnime)) {
+        Gfx* ret = (gfx == zelda3dOpaEntry) ? play->state.gfxCtx->polyOpa.p : gfx;
         // #108 collider re-walk — MUST use the 6-arg SkelAnime_Draw/DrawFlex, NOT SkelAnime_DrawOpa.
         // DrawSkeleton2 callers provide a 6-arg PostLimbDraw whose body dereferences the Gfx** gfx
         // param (e.g. EnBox_PostLimbDraw emits the chest body/lid dlists into *gfx). The generic
-        // SoH3D_UpdateSkelColliders re-walks via SkelAnime_DrawOpa, which invokes postLimbDraw with
+        // Zelda3D_UpdateSkelColliders re-walks via SkelAnime_DrawOpa, which invokes postLimbDraw with
         // the 5-arg PostLimbDrawOpa ABI (no gfx) — so the callback read a garbage register and
         // (*gfx)++ SIGSEGV'd (Deku Tree treasure-chest crash on load). Re-walking through the same
-        // 6-arg path the actor expects passes a valid gfx; gSoH3dColliderPass suppresses the OoT3D
+        // 6-arg path the actor expects passes a valid gfx; gZelda3dColliderPass suppresses the OoT3D
         // replacement so the real N64 limb walk runs for its collider side-effects, and we rewind
         // the gfx buffers afterward so none of the N64 geometry renders.
         Gfx* dOpa = play->state.gfxCtx->polyOpa.p;
         Gfx* dXlu = play->state.gfxCtx->polyXlu.p;
-        gSoH3dColliderPass = 1;
+        gZelda3dColliderPass = 1;
         if (skelAnime->skeletonHeader->skeletonType == SKELANIME_TYPE_NORMAL) {
             SkelAnime_Draw(play, skelAnime->skeleton, skelAnime->jointTable, overrideLimbDraw, postLimbDraw, arg, ret);
         } else if (skelAnime->skeletonHeader->skeletonType == SKELANIME_TYPE_FLEX) {
@@ -372,7 +372,7 @@ Gfx* SkelAnime_DrawSkeleton2(PlayState* play, SkelAnime* skelAnime, OverrideLimb
             SkelAnime_DrawFlex(play, skelAnime->skeleton, skelAnime->jointTable, flexHeader->dListCount,
                                overrideLimbDraw, postLimbDraw, arg, ret);
         }
-        gSoH3dColliderPass = 0;
+        gZelda3dColliderPass = 0;
         play->state.gfxCtx->polyOpa.p = dOpa;
         play->state.gfxCtx->polyXlu.p = dXlu;
         return ret;
@@ -400,9 +400,9 @@ void SkelAnime_DrawOpa(PlayState* play, void** skeleton, Vec3s* jointTable, Over
     Vec3f pos;
     Vec3s rot;
 
-    // SoH3D: retarget at this choke point too (actors that call DrawOpa directly).
-    SoH3D_SetLimbOverride((void*)overrideLimbDraw, arg, 0); // #23 procedural-override replay
-    if (SoH3D_SkelAnimeDrawRaw(play, skeleton, jointTable)) {
+    // Zelda3D: retarget at this choke point too (actors that call DrawOpa directly).
+    Zelda3D_SetLimbOverride((void*)overrideLimbDraw, arg, 0); // #23 procedural-override replay
+    if (Zelda3D_SkelAnimeDrawRaw(play, skeleton, jointTable)) {
         return;
     }
 
@@ -520,10 +520,10 @@ void SkelAnime_DrawFlexOpa(PlayState* play, void** skeleton, Vec3s* jointTable, 
     Vec3s rot;
     Mtx* mtx;
 
-    // SoH3D: many actors call this directly (no SkelAnime* at the DrawSkeletonOpa choke point);
+    // Zelda3D: many actors call this directly (no SkelAnime* at the DrawSkeletonOpa choke point);
     // retarget here too so they get OoT3D replacement. No-op when nothing is pending.
-    SoH3D_SetLimbOverride((void*)overrideLimbDraw, arg, 0); // #23 procedural-override replay
-    if (SoH3D_SkelAnimeDrawRaw(play, skeleton, jointTable)) {
+    Zelda3D_SetLimbOverride((void*)overrideLimbDraw, arg, 0); // #23 procedural-override replay
+    if (Zelda3D_SkelAnimeDrawRaw(play, skeleton, jointTable)) {
         return;
     }
 
@@ -688,23 +688,23 @@ Gfx* SkelAnime_Draw(PlayState* play, void** skeleton, Vec3s* jointTable, Overrid
     Vec3f pos;
     Vec3s rot;
 
-    // SoH3D: retarget at this choke point too (non-flex gfx-returning draw). The hook emits the
+    // Zelda3D: retarget at this choke point too (non-flex gfx-returning draw). The hook emits the
     // OoT3D model into POLY_OPA, advancing polyOpa.p. If THIS draw writes into POLY_OPA (gfx ==
     // the opa pointer), return the ADVANCED pointer so the caller's
     // `POLY_OPA_DISP = SkelAnime_Draw(...)` doesn't rewind over (clobber) the just-emitted
     // commands — that rewind is what made hook-replaced actors render invisible. For an XLU /
     // other-buffer caller the opa emit is independent of gfx, so return gfx unchanged.
-    Gfx* soh3dOpaEntry = play->state.gfxCtx->polyOpa.p;
-    SoH3D_SetLimbOverride((void*)overrideLimbDraw, arg, 1); // #23 (7-arg OverrideLimbDraw)
-    if (SoH3D_SkelAnimeDrawRaw(play, skeleton, jointTable)) {
-        Gfx* ret = (gfx == soh3dOpaEntry) ? play->state.gfxCtx->polyOpa.p : gfx;
+    Gfx* zelda3dOpaEntry = play->state.gfxCtx->polyOpa.p;
+    Zelda3D_SetLimbOverride((void*)overrideLimbDraw, arg, 1); // #23 (7-arg OverrideLimbDraw)
+    if (Zelda3D_SkelAnimeDrawRaw(play, skeleton, jointTable)) {
+        Gfx* ret = (gfx == zelda3dOpaEntry) ? play->state.gfxCtx->polyOpa.p : gfx;
         // #108: re-run the N64 limb walk for postLimbDraw collider side-effects, then discard the N64
         // geometry (see SkelAnime_DrawFlex / #107).
         Gfx* dOpa = play->state.gfxCtx->polyOpa.p;
         Gfx* dXlu = play->state.gfxCtx->polyXlu.p;
-        gSoH3dColliderPass = 1;
+        gZelda3dColliderPass = 1;
         SkelAnime_Draw(play, skeleton, jointTable, overrideLimbDraw, postLimbDraw, arg, ret);
-        gSoH3dColliderPass = 0;
+        gZelda3dColliderPass = 0;
         play->state.gfxCtx->polyOpa.p = dOpa;
         play->state.gfxCtx->polyXlu.p = dXlu;
         return ret;
@@ -819,23 +819,23 @@ Gfx* SkelAnime_DrawFlex(PlayState* play, void** skeleton, Vec3s* jointTable, s32
     Vec3s rot;
     Mtx* mtx;
 
-    // SoH3D: retarget here too (func_80034BA0/CC4 and DrawSkeleton2 route through this). The hook
+    // Zelda3D: retarget here too (func_80034BA0/CC4 and DrawSkeleton2 route through this). The hook
     // emits the OoT3D draw into POLY_OPA, advancing polyOpa.p. If this draw writes POLY_OPA (gfx ==
     // the opa pointer) return the ADVANCED pointer so the caller's `POLY_OPA_DISP = SkelAnime_DrawFlex(...)`
     // doesn't rewind over (clobber) it — the invisible-replacement bug. XLU caller: opa emit is
     // independent of gfx, return gfx unchanged. (See SkelAnime_Draw for the full rationale.)
-    Gfx* soh3dOpaEntry = play->state.gfxCtx->polyOpa.p;
-    SoH3D_SetLimbOverride((void*)overrideLimbDraw, arg, 1); // #23 (7-arg OverrideLimbDraw)
-    if (SoH3D_SkelAnimeDrawRaw(play, skeleton, jointTable)) {
-        Gfx* ret = (gfx == soh3dOpaEntry) ? play->state.gfxCtx->polyOpa.p : gfx;
-        // #108: re-run the N64 limb walk for its postLimbDraw collider side-effects (gSoH3dColliderPass
+    Gfx* zelda3dOpaEntry = play->state.gfxCtx->polyOpa.p;
+    Zelda3D_SetLimbOverride((void*)overrideLimbDraw, arg, 1); // #23 (7-arg OverrideLimbDraw)
+    if (Zelda3D_SkelAnimeDrawRaw(play, skeleton, jointTable)) {
+        Gfx* ret = (gfx == zelda3dOpaEntry) ? play->state.gfxCtx->polyOpa.p : gfx;
+        // #108: re-run the N64 limb walk for its postLimbDraw collider side-effects (gZelda3dColliderPass
         // suppresses the replacement so the real walk runs), then rewind the buffers to discard the N64
         // geometry. Without this, replaced skinned actors' collision spheres stay at the origin (#107).
         Gfx* dOpa = play->state.gfxCtx->polyOpa.p;
         Gfx* dXlu = play->state.gfxCtx->polyXlu.p;
-        gSoH3dColliderPass = 1;
+        gZelda3dColliderPass = 1;
         SkelAnime_DrawFlex(play, skeleton, jointTable, dListCount, overrideLimbDraw, postLimbDraw, arg, ret);
-        gSoH3dColliderPass = 0;
+        gZelda3dColliderPass = 0;
         play->state.gfxCtx->polyOpa.p = dOpa;
         play->state.gfxCtx->polyXlu.p = dXlu;
         return ret;

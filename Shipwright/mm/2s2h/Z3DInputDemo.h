@@ -5,7 +5,7 @@
 // Link forward, stops, then presses START to open the pause/subscreen menu — no physical
 // controller. It is per-game glue only because it reads gPlayState for quantitative walk-proof
 // (Link's world position); the INPUT itself flows through the game-agnostic ScriptedInput API,
-// exactly as OoT (soh3d) will. Off unless ZELDA3D_MM_INPUTDEMO is set (non-empty).
+// exactly as OoT (zelda3d) will. Off unless ZELDA3D_MM_INPUTDEMO is set (non-empty).
 //
 // Ticked once per frame from GameState_GetInput() BEFORE PadMgr reads the pad, so the synthetic
 // state applies the same frame.

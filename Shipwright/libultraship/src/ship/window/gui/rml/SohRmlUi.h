@@ -27,7 +27,7 @@ class TabClickListener; // per-tab mouse-click handler (defined in the .cpp), ne
  * Phase 1 integration spike: stands up the GL3 RenderInterface, the SDL SystemInterface and a
  * window-sized Rml::Context, loads a single styled test document and renders it over the game
  * each frame. Rendering is wrapped in GL state save/restore so it does not leak into the
- * Fast3D / ImGui passes (see the soh3d_gl pass for the same discipline).
+ * Fast3D / ImGui passes (see the zelda3d_gl pass for the same discipline).
  *
  * Input feeding and controller navigation are deliberately out of scope here (Phase 2).
  */
@@ -119,8 +119,8 @@ class SohRmlUi {
     // `knob` attribute. Returns true if the focused row was a knob (Left/Right consumed), false if
     // the caller should fall through to tab switching.
     bool StepFocusedKnob(int direction);
-    // Rewrite the Diag pane's #diagtext element from the gSoH3dDiagText buffer (filled per-frame by
-    // soh3d.c). Called every frame from UpdateAndRender so the on-screen coords stay live.
+    // Rewrite the Diag pane's #diagtext element from the gZelda3dDiagText buffer (filled per-frame by
+    // zelda3d.c). Called every frame from UpdateAndRender so the on-screen coords stay live.
     void RefreshDiag();
 
   private:
