@@ -1,6 +1,7 @@
 #include "fast/backends/unified_shader.h"
 #include "fast/unified_vtx.h"      // UnifiedVtx — not yet referenced by any draw path (Phase 2/3)
 #include "fast/unified_material.h" // UnifiedMaterial — ditto
+#include "fast/unified_ubo.h"      // CommonUbo/UnifiedDrawUbo — static_assert-checked against kCommonUboBody here
 #include "fast/soh3d_gl.h" // SOH3D_GL_MAX_BONES
 
 #include <glslang/Public/ShaderLang.h>
@@ -74,25 +75,25 @@ VariantFeatures FeaturesFor(Variant v) {
     }
 }
 
-// The material UBO layout shared by both stages (std140; field order matches UnifiedMaterial.h's
-// documented layout, packed for GLSL rather than reinterpret-cast — Phase 2/3 write the CPU-side
-// packer when this is actually wired to a live draw).
-const char* kMaterialUboBody =
-    "    ivec4 uCombA[4];\n"    // combMux[2][2][4] flattened, 16 ints
-    "    vec4 uPrimColor;\n"
-    "    vec4 uEnvColor;\n"
-    "    vec4 uBlendColor;\n"
-    "    vec4 uFogColor;\n"
-    "    vec4 uParams0;\n"       // x=alphaRef, y=lightingMode, z=cycleCount, w=frame_count
-    "    vec4 uParams1;\n"       // x=noise_scale, y=polygonOffset, z=hasSkin, w unused
-    "    vec4 uMatAmbient;\n"    // xyz = matAmbient
-    "    vec4 uMatDiffuse;\n";  // xyz = matDiffuse
-
-const char* kXformUboBody =
-    "    mat4 uMvp;\n"
-    "    mat4 uMv;\n"
-    "    vec4 uLightDir;\n"
-    "    vec4 uVpParams;\n";
+// The combined per-draw UBO — ONE block shared by both stages (matching the existing DRAW_MODEL
+// op's push convention: the same bytes go to vertex binding 0 AND fragment binding 0; bones are a
+// SEPARATE block at vertex binding 1). This layout is BYTE-IDENTICAL to unified_ubo.h's
+// UnifiedCommonUbo — deliberately sized to fit SoH3DSg::kCommonBytes (320 bytes) exactly, so the
+// existing DRAW_MODEL Op/AppendSoH3DModelDraw/mSoh3dModelUbos plumbing (gfx_sdl3gpu.h/.cpp) needs
+// ZERO changes: a unified draw is still just a DRAW_MODEL op with a different pipeline/vbo/ubo
+// content, not a new draw class.
+const char* kCommonUboBody =
+    "    mat4 uMvp;\n"          // 64
+    "    mat4 uMv;\n"           // 64
+    "    vec4 uLightDir;\n"     // 16
+    "    ivec4 uCombA[4];\n"    // 64 — combMux[2][2][4] flattened
+    "    vec4 uPrimColor;\n"    // 16
+    "    vec4 uEnvColor;\n"     // 16
+    "    vec4 uFogColor;\n"     // 16
+    "    vec4 uParams0;\n"      // 16 — x=alphaRef, y=lightingMode, z=cycleCount, w=frame_count
+    "    vec4 uParams1;\n"      // 16 — x=noise_scale, y=polygonOffset, z=hasSkin, w unused
+    "    vec4 uMatAmbient;\n"   // 16
+    "    vec4 uMatDiffuse;\n"; // 16  = 320 total
 
 std::string VertexAttribs() {
     return
@@ -146,11 +147,9 @@ std::string BuildVertexSource(Variant v) {
     std::string s = "#version 450\n";
     s += VertexAttribs();
     s += Varyings("out");
-    s += "layout(set=1, binding=0, std140) uniform UnifiedXform {\n" + std::string(kXformUboBody) + "} xf;\n";
+    s += "layout(set=1, binding=0, std140) uniform UnifiedCommon {\n" + std::string(kCommonUboBody) + "} ubo;\n";
     s += "layout(set=1, binding=1, std140) uniform UnifiedBones { mat4 uBones[" +
          std::to_string(SOH3D_GL_MAX_BONES) + "]; } bones;\n";
-    s += "layout(set=3, binding=0, std140) uniform UnifiedMaterialUBO {\n" + std::string(kMaterialUboBody) +
-         "} mat_;\n";
     s +=
         "void main() {\n"
         "    vec3 sp = aPos;\n"
@@ -158,7 +157,7 @@ std::string BuildVertexSource(Variant v) {
         // 3DS GPU 4-bone blend (the plan's non-goal: this mechanism itself stays as-is, only the
         // vertex format/shader it feeds is unified). N64 content sets uParams1.z=0 and writes
         // identity bone data, so this branch is simply skipped.
-        "    if (mat_.uParams1.z > 0.5) {\n"
+        "    if (ubo.uParams1.z > 0.5) {\n"
         "        vec4 acc = vec4(0.0); vec3 nAcc = vec3(0.0);\n"
         "        for (int i = 0; i < 4; i++) {\n"
         "            acc += aBoneW[i] * (bones.uBones[int(aBoneId[i])] * vec4(aPos, 1.0));\n"
@@ -167,8 +166,8 @@ std::string BuildVertexSource(Variant v) {
         "        sp = acc.xyz;\n"
         "        nM = nAcc;\n"
         "    }\n"
-        "    gl_Position = xf.uMvp * vec4(sp, 1.0);\n"
-        "    vNrmView = mat3(xf.uMv) * nM;\n"
+        "    gl_Position = ubo.uMvp * vec4(sp, 1.0);\n"
+        "    vNrmView = mat3(ubo.uMv) * nM;\n"
         "    vUv0 = aUv0;\n"
         "    vUv1 = aUv1;\n"
         "    vTexClamp = aTexClamp;\n"
@@ -179,9 +178,9 @@ std::string BuildVertexSource(Variant v) {
         "    vFog = aFog;\n"
         // lightingMode 2 (3DS scene vertex-lit): baked here per-vertex, matching the existing
         // per-vertex NdotL approach (docs/oot3d_world_lighting_re.md), not in the fragment stage.
-        "    if (mat_.uParams0.y > 1.5) {\n"
-        "        float ndotl = max(dot(normalize(nM), normalize(xf.uLightDir.xyz)), 0.0);\n"
-        "        vec3 lit = mat_.uMatAmbient.xyz + mat_.uMatDiffuse.xyz * ndotl;\n"
+        "    if (ubo.uParams0.y > 1.5) {\n"
+        "        float ndotl = max(dot(normalize(nM), normalize(ubo.uLightDir.xyz)), 0.0);\n"
+        "        vec3 lit = ubo.uMatAmbient.xyz + ubo.uMatDiffuse.xyz * ndotl;\n"
         "        vColor0 = vec4(clamp(vColor0.rgb * lit, 0.0, 1.0), vColor0.a);\n"
         "    }\n"
         "}\n";
@@ -198,9 +197,7 @@ std::string BuildFragmentSource(Variant v) {
         s += "layout(set=2, binding=" + std::to_string(samplerBind++) + ") uniform sampler2D uTex0;\n";
     if (f.hasTex1)
         s += "layout(set=2, binding=" + std::to_string(samplerBind++) + ") uniform sampler2D uTex1;\n";
-    s += "layout(set=1, binding=0, std140) uniform UnifiedXform {\n" + std::string(kXformUboBody) + "} xf;\n";
-    s += "layout(set=3, binding=0, std140) uniform UnifiedMaterialUBO {\n" + std::string(kMaterialUboBody) +
-         "} mat_;\n";
+    s += "layout(set=3, binding=0, std140) uniform UnifiedCommon {\n" + std::string(kCommonUboBody) + "} ubo;\n";
 
     // SHADER_* operand codes (interpreter.h) — kept in sync manually; combMux is populated with
     // these exact values so N64's CCFeatures.c[2][2][4] can be copied in verbatim in Phase 3.
@@ -252,21 +249,21 @@ std::string BuildFragmentSource(Variant v) {
         "    if (code == SHADER_TEXEL1A) return vec4(texel1().a);\n"
         "    if (code == SHADER_COMBINED) return combined;\n"
         "    if (code == SHADER_NOISE) {\n"
-        "        float n = (random(vec3(floor(gl_FragCoord.xy * mat_.uParams1.x), mat_.uParams0.w)) + 1.0) / "
+        "        float n = (random(vec3(floor(gl_FragCoord.xy * ubo.uParams1.x), ubo.uParams0.w)) + 1.0) / "
         "2.0;\n"
         "        return vec4(n);\n"
         "    }\n"
         "    return vec4(0.0);\n"
         "}\n"
         "vec4 evalCycle(int cycle, vec4 combined) {\n"
-        "    vec4 a = evalInput(mat_.uCombA[cycle * 2 + 0][0], combined);\n"
-        "    vec4 b = evalInput(mat_.uCombA[cycle * 2 + 0][1], combined);\n"
-        "    vec4 c = evalInput(mat_.uCombA[cycle * 2 + 0][2], combined);\n"
-        "    vec4 d = evalInput(mat_.uCombA[cycle * 2 + 0][3], combined);\n"
-        "    vec4 aA = evalInput(mat_.uCombA[cycle * 2 + 1][0], combined);\n"
-        "    vec4 bA = evalInput(mat_.uCombA[cycle * 2 + 1][1], combined);\n"
-        "    vec4 cA = evalInput(mat_.uCombA[cycle * 2 + 1][2], combined);\n"
-        "    vec4 dA = evalInput(mat_.uCombA[cycle * 2 + 1][3], combined);\n"
+        "    vec4 a = evalInput(ubo.uCombA[cycle * 2 + 0][0], combined);\n"
+        "    vec4 b = evalInput(ubo.uCombA[cycle * 2 + 0][1], combined);\n"
+        "    vec4 c = evalInput(ubo.uCombA[cycle * 2 + 0][2], combined);\n"
+        "    vec4 d = evalInput(ubo.uCombA[cycle * 2 + 0][3], combined);\n"
+        "    vec4 aA = evalInput(ubo.uCombA[cycle * 2 + 1][0], combined);\n"
+        "    vec4 bA = evalInput(ubo.uCombA[cycle * 2 + 1][1], combined);\n"
+        "    vec4 cA = evalInput(ubo.uCombA[cycle * 2 + 1][2], combined);\n"
+        "    vec4 dA = evalInput(ubo.uCombA[cycle * 2 + 1][3], combined);\n"
         "    vec3 rgb = (a.rgb - b.rgb) * c.rgb + d.rgb;\n"
         "    float alpha = (aA.a - bA.a) * cA.a + dA.a;\n"
         "    return vec4(rgb, alpha);\n"
@@ -274,7 +271,7 @@ std::string BuildFragmentSource(Variant v) {
 
     s += "void main() {\n";
     s += "    vec4 texel = evalCycle(0, vec4(0.0));\n";
-    s += "    if (mat_.uParams0.z > 1.5) texel = evalCycle(1, texel);\n"; // cycleCount==2
+    s += "    if (ubo.uParams0.z > 1.5) texel = evalCycle(1, texel);\n"; // cycleCount==2
 
     // lightingMode 1 (3DS character half-Lambert): applied HERE, not baked into vColor0 like mode
     // 2, because the combiner's SHADER_INPUT_1 must stay the raw per-vertex tint (matching what the
@@ -282,17 +279,17 @@ std::string BuildFragmentSource(Variant v) {
     // OUTPUT, it isn't itself a combiner input). lightingMode 0 (N64 passthrough) and 2 (already
     // baked per-vertex) need no fragment-side action.
     s +=
-        "    if (mat_.uParams0.y > 0.5 && mat_.uParams0.y < 1.5) {\n"
-        "        float hl = dot(normalize(vNrmView), normalize(xf.uLightDir.xyz)) * 0.5 + 0.5;\n"
+        "    if (ubo.uParams0.y > 0.5 && ubo.uParams0.y < 1.5) {\n"
+        "        float hl = dot(normalize(vNrmView), normalize(ubo.uLightDir.xyz)) * 0.5 + 0.5;\n"
         "        texel.rgb *= (0.55 + 0.45 * hl);\n"
         "    }\n";
 
     if (f.grayscale)
         s += "    { float g = dot(texel.rgb, vec3(0.299, 0.587, 0.114)); texel.rgb = vec3(g); }\n";
     if (f.alphaTest)
-        s += "    if (texel.a < mat_.uParams0.x) discard;\n";
+        s += "    if (texel.a < ubo.uParams0.x) discard;\n";
     if (f.fog)
-        s += "    texel.rgb = mix(texel.rgb, mat_.uFogColor.rgb, clamp(vFog.x, 0.0, 1.0));\n";
+        s += "    texel.rgb = mix(texel.rgb, ubo.uFogColor.rgb, clamp(vFog.x, 0.0, 1.0));\n";
 
     s += "    texel = clamp(texel, 0.0, 1.0);\n";
     s += "    fragColor = texel;\n";

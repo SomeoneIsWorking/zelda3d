@@ -25,9 +25,13 @@
 #include <cstring>
 #include <cstddef>
 #include <cmath>
+#include <algorithm>
 #include <mutex>
 
 #include "fast/soh3d_sg_ubo.h" // SgUbo layout + push-block size invariants (single source of truth)
+#include "fast/unified_vtx.h"      // render-unification (kanban #131), Phase 2
+#include "fast/unified_material.h"
+#include "fast/unified_ubo.h"
 
 using Fast::GfxRenderingAPISdl3Gpu;
 using Fast::g_activeSdl3GpuApi;
@@ -55,6 +59,7 @@ extern "C" float gSoH3dFogOffset;
 extern "C" float gSoH3dWorldAmbColor[3];
 extern "C" float gSoH3dWorldAmb;
 extern "C" int gSoH3dWorldLit;
+extern "C" int gUnifiedRenderer; // render-unification effort (kanban #131): bit 0 = CMB unified
 // REPL `sgdump <modelId>`: arm a one-shot per-group render-state dump for the next draw of that model.
 extern "C" int g_sgDumpModel = -1;
 // SOH3D_SG_DUMPTEX=<modelId>: at that model's upload, log each source texture's mean RGBA (catches a
@@ -635,6 +640,192 @@ SgModel* Fast::SoH3DRenderer::ensureUploaded(int modelId) {
     fprintf(stderr, "[SoH3D_SG] uploaded model %d: %d groups, %d textures, %zu verts\n", modelId, groupCount,
             texCount, all.size());
     return &m;
+}
+
+// ---------------------------------------------------------------------------
+// Render-unification effort (kanban #131), Phase 2: CMB -> UnifiedVtx/UnifiedMaterial packers +
+// the unified vertex buffer / pipeline builders. Only reached when gUnifiedRenderer & 1 (default
+// off) — the old ensureUploaded/getPipeline path above is completely untouched.
+// ---------------------------------------------------------------------------
+namespace {
+
+UnifiedVtx PackUnifiedVtx(const SoH3DGlVtx& v) {
+    UnifiedVtx u{};
+    u.pos[0] = v.pos[0]; u.pos[1] = v.pos[1]; u.pos[2] = v.pos[2];
+    u.nrm[0] = v.nrm[0]; u.nrm[1] = v.nrm[1]; u.nrm[2] = v.nrm[2];
+    u.uv0[0] = v.uv[0]; u.uv0[1] = v.uv[1];
+    u.uv1[0] = 0.0f; u.uv1[1] = 0.0f;
+    // No per-vertex clamp data on the CMB side (unlike N64) — a large no-op upper bound so the
+    // unified fragment shader's clamp(uv, 0.5/texSize, texClamp) never actually clamps.
+    u.texClamp[0] = 1e6f; u.texClamp[1] = 1e6f; u.texClamp[2] = 1e6f; u.texClamp[3] = 1e6f;
+    for (int k = 0; k < 4; k++) {
+        u.color0[k] = (uint8_t)std::lround(std::clamp(v.color[k], 0.0f, 1.0f) * 255.0f);
+        u.color1[k] = u.color2[k] = u.color3[k] = 0;
+    }
+    u.fog[0] = 0.0f; u.fog[1] = 0.0f;
+    for (int k = 0; k < 4; k++) {
+        u.boneIds[k] = (uint8_t)std::clamp((int)std::lround(v.boneIds[k]), 0, 255);
+        u.boneW[k] = (uint8_t)std::lround(std::clamp(v.weights[k], 0.0f, 1.0f) * 255.0f);
+    }
+    return u;
+}
+
+// CMB materials never exercise N64's 2-cycle/fog/grayscale combiner shapes — one texture, optional
+// alpha test, is the whole structural space this content needs (see unified_shader.h's Variant).
+Fast::Unified::Variant VariantForGroup(const SgGroup& g, bool hasTex) {
+    if (!hasTex)
+        return Fast::Unified::Variant::kUntextured;
+    return g.alphaTest ? Fast::Unified::Variant::kSingleTexAlphaTest : Fast::Unified::Variant::kSingleTex;
+}
+
+} // namespace
+
+Fast::SgModel* Fast::SoH3DRenderer::ensureUnifiedUploaded(int modelId) {
+    SgModel* base = ensureUploaded(modelId); // populates m.groups/textures if not already
+    if (!base)
+        return nullptr;
+    SgModel& m = *base;
+    if (m.unifiedUploaded)
+        return &m;
+    if (m.unifiedFailed)
+        return nullptr;
+
+    const SoH3DGlGroup* groups = nullptr;
+    const SoH3DGlTex* texs = nullptr;
+    int groupCount = 0, texCount = 0;
+    if (!g_provider || !g_provider(modelId, &groups, &groupCount, &texs, &texCount) || groupCount <= 0) {
+        m.unifiedFailed = true;
+        return nullptr;
+    }
+
+    std::vector<UnifiedVtx> all;
+    for (int i = 0; i < groupCount; i++) {
+        for (uint32_t k = 0; k < groups[i].vertCount; k++)
+            all.push_back(PackUnifiedVtx(groups[i].verts[k]));
+    }
+
+    const uint32_t vbBytes = (uint32_t)(all.size() * sizeof(UnifiedVtx));
+    if (vbBytes > 0) {
+        SDL_GPUBufferCreateInfo bci{};
+        bci.usage = SDL_GPU_BUFFERUSAGE_VERTEX;
+        bci.size = vbBytes;
+        m.unifiedVbo = SDL_CreateGPUBuffer(g_device, &bci);
+        SDL_GPUTransferBufferCreateInfo tci{};
+        tci.usage = SDL_GPU_TRANSFERBUFFERUSAGE_UPLOAD;
+        tci.size = vbBytes;
+        SDL_GPUTransferBuffer* tb = SDL_CreateGPUTransferBuffer(g_device, &tci);
+        void* mapped = SDL_MapGPUTransferBuffer(g_device, tb, false);
+        memcpy(mapped, all.data(), vbBytes);
+        SDL_UnmapGPUTransferBuffer(g_device, tb);
+        SDL_GPUCommandBuffer* c = SDL_AcquireGPUCommandBuffer(g_device);
+        SDL_GPUCopyPass* cp = SDL_BeginGPUCopyPass(c);
+        SDL_GPUTransferBufferLocation src{};
+        src.transfer_buffer = tb;
+        SDL_GPUBufferRegion dst{};
+        dst.buffer = m.unifiedVbo;
+        dst.size = vbBytes;
+        SDL_UploadToGPUBuffer(cp, &src, &dst, false);
+        SDL_EndGPUCopyPass(cp);
+        SDL_SubmitGPUCommandBuffer(c);
+        SDL_ReleaseGPUTransferBuffer(g_device, tb);
+    }
+    m.unifiedUploaded = true;
+    fprintf(stderr, "[SoH3D_SG] unified-uploaded model %d: %zu verts\n", modelId, all.size());
+    return &m;
+}
+
+SDL_GPUGraphicsPipeline* Fast::SoH3DRenderer::getUnifiedPipeline(const SgGroup& g, int frontCW, int variant) {
+    bool doCull = g.faceCull && sgFaceCullOn();
+    PipeKey key;
+    key.v = { (uint32_t)((g.blendEnable ? 1u : 0u) | (g.depthWrite ? 2u : 0u) | (doCull ? 4u : 0u) |
+                         (doCull && frontCW ? 8u : 0u)),
+              g.bSrcRGB, g.bDstRGB, g.bEqRGB, g.bSrcA, g.bDstA, g.bEqA, (uint32_t)variant };
+    auto it = g_uniPipelines.find(key);
+    if (it != g_uniPipelines.end())
+        return it->second;
+
+    GfxRenderingAPISdl3Gpu* api = g_activeSdl3GpuApi;
+
+    if (g_uniVert[variant] == nullptr) {
+        std::string vsrc = Fast::Unified::BuildVertexSource((Fast::Unified::Variant)variant);
+        std::string fsrc = Fast::Unified::BuildFragmentSource((Fast::Unified::Variant)variant);
+        // 1 UBO (UnifiedCommon) + 1 UBO (bones) for vertex; 1 sampler (untextured variant needs 0)
+        // + 1 UBO (UnifiedCommon) for fragment — mirrors makeShader's existing (numSamplers, numUbo)
+        // convention for the old fixed CMB shader.
+        uint32_t numSamplers = (variant == (int)Fast::Unified::Variant::kUntextured) ? 0 : 1;
+        g_uniVert[variant] = makeShader(vsrc.c_str(), EShLangVertex, 0, 2);
+        g_uniFrag[variant] = makeShader(fsrc.c_str(), EShLangFragment, numSamplers, 1);
+        if (!g_uniVert[variant] || !g_uniFrag[variant])
+            fprintf(stderr, "[SoH3D_SG] unified shader variant %d compile FAILED\n", variant);
+    }
+    if (!g_uniVert[variant] || !g_uniFrag[variant])
+        return nullptr;
+
+    // Vertex input: UnifiedVtx (pos3, nrm3, uv0_2, uv1_2, texClamp4, color0..3 x ubyte4norm, fog2,
+    // boneIds ubyte4, boneW ubyte4norm) — see unified_vtx.h.
+    SDL_GPUVertexAttribute attrs[12]{};
+    attrs[0] = { 0, 0, SDL_GPU_VERTEXELEMENTFORMAT_FLOAT3, (uint32_t)offsetof(UnifiedVtx, pos) };
+    attrs[1] = { 1, 0, SDL_GPU_VERTEXELEMENTFORMAT_FLOAT3, (uint32_t)offsetof(UnifiedVtx, nrm) };
+    attrs[2] = { 2, 0, SDL_GPU_VERTEXELEMENTFORMAT_FLOAT2, (uint32_t)offsetof(UnifiedVtx, uv0) };
+    attrs[3] = { 3, 0, SDL_GPU_VERTEXELEMENTFORMAT_FLOAT2, (uint32_t)offsetof(UnifiedVtx, uv1) };
+    attrs[4] = { 4, 0, SDL_GPU_VERTEXELEMENTFORMAT_FLOAT4, (uint32_t)offsetof(UnifiedVtx, texClamp) };
+    attrs[5] = { 5, 0, SDL_GPU_VERTEXELEMENTFORMAT_UBYTE4_NORM, (uint32_t)offsetof(UnifiedVtx, color0) };
+    attrs[6] = { 6, 0, SDL_GPU_VERTEXELEMENTFORMAT_UBYTE4_NORM, (uint32_t)offsetof(UnifiedVtx, color1) };
+    attrs[7] = { 7, 0, SDL_GPU_VERTEXELEMENTFORMAT_UBYTE4_NORM, (uint32_t)offsetof(UnifiedVtx, color2) };
+    attrs[8] = { 8, 0, SDL_GPU_VERTEXELEMENTFORMAT_UBYTE4_NORM, (uint32_t)offsetof(UnifiedVtx, color3) };
+    attrs[9] = { 9, 0, SDL_GPU_VERTEXELEMENTFORMAT_FLOAT2, (uint32_t)offsetof(UnifiedVtx, fog) };
+    attrs[10] = { 10, 0, SDL_GPU_VERTEXELEMENTFORMAT_UBYTE4, (uint32_t)offsetof(UnifiedVtx, boneIds) };
+    attrs[11] = { 11, 0, SDL_GPU_VERTEXELEMENTFORMAT_UBYTE4_NORM, (uint32_t)offsetof(UnifiedVtx, boneW) };
+    SDL_GPUVertexBufferDescription vb{};
+    vb.slot = 0;
+    vb.pitch = sizeof(UnifiedVtx);
+    vb.input_rate = SDL_GPU_VERTEXINPUTRATE_VERTEX;
+
+    SDL_GPUGraphicsPipelineCreateInfo pci{};
+    pci.vertex_shader = g_uniVert[variant];
+    pci.fragment_shader = g_uniFrag[variant];
+    pci.vertex_input_state.vertex_buffer_descriptions = &vb;
+    pci.vertex_input_state.num_vertex_buffers = 1;
+    pci.vertex_input_state.vertex_attributes = attrs;
+    pci.vertex_input_state.num_vertex_attributes = 12;
+    pci.primitive_type = SDL_GPU_PRIMITIVETYPE_TRIANGLELIST;
+
+    pci.rasterizer_state.fill_mode = SDL_GPU_FILLMODE_FILL;
+    pci.rasterizer_state.cull_mode = doCull ? SDL_GPU_CULLMODE_BACK : SDL_GPU_CULLMODE_NONE;
+    pci.rasterizer_state.front_face =
+        frontCW ? SDL_GPU_FRONTFACE_CLOCKWISE : SDL_GPU_FRONTFACE_COUNTER_CLOCKWISE;
+    pci.rasterizer_state.enable_depth_clip = false;
+
+    pci.multisample_state.sample_count = SDL_GPU_SAMPLECOUNT_1;
+
+    pci.depth_stencil_state.enable_depth_test = true;
+    pci.depth_stencil_state.enable_depth_write = g.depthWrite != 0;
+    pci.depth_stencil_state.compare_op = SDL_GPU_COMPAREOP_LESS_OR_EQUAL;
+    pci.depth_stencil_state.enable_stencil_test = false;
+
+    SDL_GPUColorTargetDescription ct{};
+    ct.format = api->GpuColorFormat();
+    if (g.blendEnable) {
+        ct.blend_state.enable_blend = true;
+        ct.blend_state.src_color_blendfactor = mapFactor(g.bSrcRGB);
+        ct.blend_state.dst_color_blendfactor = mapFactor(g.bDstRGB);
+        ct.blend_state.color_blend_op = mapEq(g.bEqRGB);
+        ct.blend_state.src_alpha_blendfactor = mapFactor(g.bSrcA);
+        ct.blend_state.dst_alpha_blendfactor = mapFactor(g.bDstA);
+        ct.blend_state.alpha_blend_op = mapEq(g.bEqA);
+    } else {
+        ct.blend_state.enable_blend = false;
+    }
+    pci.target_info.color_target_descriptions = &ct;
+    pci.target_info.num_color_targets = 1;
+    pci.target_info.has_depth_stencil_target = true;
+    pci.target_info.depth_stencil_format = api->GpuDepthFormat();
+
+    SDL_GPUGraphicsPipeline* pipe = SDL_CreateGPUGraphicsPipeline(g_device, &pci);
+    if (!pipe)
+        fprintf(stderr, "[SoH3D_SG] unified pipeline create failed: %s\n", SDL_GetError());
+    g_uniPipelines[key] = pipe;
+    return pipe;
 }
 
 // Deferred model eviction (mirror of the GL/VK path). g_evictLo/g_evictHi/g_evictPending are members.
@@ -1292,6 +1483,14 @@ void Fast::SoH3DRenderer::DrawModel(int modelId, const float* mp16, const float*
     // the old `invertY ^ flip` term is dead. Front-face = CCW unless gSoH3dFaceCullFlip is set.
     int frontCW = SoH3DSg::FrontFaceIsCW(gSoH3dFaceCullFlip) ? 1 : 0;
 
+    // Render-unification effort (kanban #131), Phase 2: route through the unified shader/vertex
+    // format instead of the fixed CMB shader above when the bit is set. Falls back to the old path
+    // if the unified upload fails (never silently drops the draw).
+    bool unified = (gUnifiedRenderer & 1) != 0;
+    SgModel* um = unified ? ensureUnifiedUploaded(modelId) : nullptr;
+    if (unified && (!um || !um->unifiedVbo))
+        unified = false;
+
     std::vector<DrawGroup> dgs;
     dgs.reserve(m->groups.size());
     int gIdx = -1;
@@ -1344,12 +1543,52 @@ void Fast::SoH3DRenderer::DrawModel(int modelId, const float* mp16, const float*
         }
 
         DrawGroup dg;
-        dg.pipeline = getPipeline(gb, frontCW);
         dg.tex = tex;
         dg.samp = samp;
         dg.first = grp.first;
         dg.count = grp.count;
-        memcpy(dg.ubo.data(), &ubo, sizeof(ubo));
+        if (unified) {
+            bool hasTex = tex != Fast::g_activeSdl3GpuApi->DummyTexture();
+            auto variant = VariantForGroup(gb, hasTex);
+            dg.pipeline = getUnifiedPipeline(gb, frontCW, (int)variant);
+
+            SoH3DUnified::UnifiedDrawUbo uu{};
+            memcpy(uu.common.uMvp, base.uMP, sizeof(uu.common.uMvp));
+            memcpy(uu.common.uMv, base.uMV, sizeof(uu.common.uMv));
+            memcpy(uu.common.uLightDir, base.uLightDir, sizeof(uu.common.uLightDir));
+            // Cycle 0 = texel0 * vColor0 (matches the old fixed shader's `t.rgb * vColor.rgb`); no
+            // real per-material TEV data exists on the CMB side yet to derive a richer mux from.
+            static const int32_t kCombA[16] = {
+                /* cyc0 rgb */ 8 /*TEXEL0*/, 0 /*0*/, 1 /*INPUT_1*/, 0,
+                /* cyc0 a   */ 8, 0, 1, 0,
+                /* cyc1 rgb */ 0, 0, 0, 0,
+                /* cyc1 a   */ 0, 0, 0, 0,
+            };
+            memcpy(uu.common.uCombA, kCombA, sizeof(uu.common.uCombA));
+            uu.common.uPrimColor[0] = uu.common.uPrimColor[1] = uu.common.uPrimColor[2] = uu.common.uPrimColor[3] = 1.0f;
+            uu.common.uEnvColor[0] = uu.common.uEnvColor[1] = uu.common.uEnvColor[2] = uu.common.uEnvColor[3] = 0.0f;
+            uu.common.uFogColor[0] = base.uFog[0]; uu.common.uFogColor[1] = base.uFog[1]; uu.common.uFogColor[2] = base.uFog[2];
+            uu.common.uFogColor[3] = 0.0f;
+            uu.common.uParams0[0] = grp.alphaTest ? grp.alphaRef : 0.0f;
+            int lightingMode = (grp.vertexLighting && gSoH3dWorldLit) ? 2 : ((lit && gSoH3dLightEnable != 0) ? 1 : 0);
+            uu.common.uParams0[1] = (float)lightingMode;
+            uu.common.uParams0[2] = 1.0f; // cycleCount — CMB never needs the N64 2-cycle shape
+            uu.common.uParams0[3] = 0.0f; // frame_count — CMB draws don't use SHADER_NOISE
+            uu.common.uParams1[0] = 0.0f; // noise_scale — unused (no SHADER_NOISE on CMB content)
+            uu.common.uParams1[1] = grp.polygonOffset;
+            uu.common.uParams1[2] = (boneData && boneCnt > 0) ? 1.0f : 0.0f;
+            uu.common.uParams1[3] = 0.0f;
+            uu.common.uMatAmbient[0] = grp.matAmbient[0]; uu.common.uMatAmbient[1] = grp.matAmbient[1];
+            uu.common.uMatAmbient[2] = grp.matAmbient[2]; uu.common.uMatAmbient[3] = 0.0f;
+            uu.common.uMatDiffuse[0] = grp.matDiffuse[0]; uu.common.uMatDiffuse[1] = grp.matDiffuse[1];
+            uu.common.uMatDiffuse[2] = grp.matDiffuse[2]; uu.common.uMatDiffuse[3] = 0.0f;
+            memcpy(uu.bones, base.uBones, sizeof(uu.bones));
+            static_assert(sizeof(uu) == sizeof(SgUbo), "UnifiedDrawUbo must match DrawGroup::ubo's byte size");
+            memcpy(dg.ubo.data(), &uu, sizeof(uu));
+        } else {
+            dg.pipeline = getPipeline(gb, frontCW);
+            memcpy(dg.ubo.data(), &ubo, sizeof(ubo));
+        }
         if (dg.pipeline)
             dgs.push_back(std::move(dg));
     }
@@ -1359,7 +1598,7 @@ void Fast::SoH3DRenderer::DrawModel(int modelId, const float* mp16, const float*
     SDL_GPUViewport vp{};
     SDL_Rect sc{};
     api->GetSoH3DViewportScissor(vp, sc);
-    SDL_GPUBuffer* vbo = m->vbo;
+    SDL_GPUBuffer* vbo = unified ? um->unifiedVbo : m->vbo;
     SDL_GPUTexture* shadowTex = (g_sgShadowOn && g_shadowColor) ? g_shadowColor : Fast::g_activeSdl3GpuApi->DummyTexture();
     SDL_GPUSampler* shadowSamp =
         (g_sgShadowOn && g_shadowColor) ? g_shadowSampler : Fast::g_activeSdl3GpuApi->DummySampler();

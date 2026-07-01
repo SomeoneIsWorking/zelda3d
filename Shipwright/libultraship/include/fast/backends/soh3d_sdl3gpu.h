@@ -23,6 +23,7 @@
 #include <glslang/Public/ShaderLang.h> // EShLanguage (makeShader parameter)
 
 #include "fast/soh3d_sg_ubo.h" // SoH3DSg::SgUbo (per-draw uniform payload size)
+#include "fast/backends/unified_shader.h" // Fast::Unified::Variant (render-unification, kanban #131)
 
 namespace Fast {
 
@@ -60,6 +61,13 @@ struct SgModel {
     // bridge (SoH3D_GeomScanDump) to flag misrendered geometry by VALUE for the #115/#120 audit.
     bool hasBounds = false;
     float localMin[3] = { 0, 0, 0 }, localMax[3] = { 0, 0, 0 };
+
+    // Render-unification effort (kanban #131), Phase 2: lazily-built UnifiedVtx buffer, same
+    // group first/count indices as `vbo` (same source verts, different per-vertex layout — see
+    // unified_vtx.h). Built only the first time gUnifiedRenderer routes a draw through it, so the
+    // default (unified off) path never pays this cost.
+    SDL_GPUBuffer* unifiedVbo = nullptr;
+    bool unifiedUploaded = false, unifiedFailed = false;
 };
 
 // geomscan capture: each visible model draw appends a world-space AABB record.
@@ -118,6 +126,9 @@ class SoH3DRenderer {
     bool ensureResources();
     SDL_GPUGraphicsPipeline* getPipeline(const SgGroup& g, int frontCW);
     SgModel* ensureUploaded(int modelId);
+    // Render-unification effort (kanban #131), Phase 2.
+    SgModel* ensureUnifiedUploaded(int modelId);
+    SDL_GPUGraphicsPipeline* getUnifiedPipeline(const SgGroup& g, int frontCW, int variant);
     void applyPendingEvict();
     SDL_GPUShader* makeShader(const char* glsl, EShLanguage stage, uint32_t numSamplers, uint32_t numUbo);
     SDL_GPUGraphicsPipeline* getDepthPipeline(bool doCull, int frontCW);
@@ -141,6 +152,14 @@ class SoH3DRenderer {
     // DummySampler/GetOrCreateSamplerEx), so the model renderer keeps no duplicates of its own.
     std::map<PipeKey, SDL_GPUGraphicsPipeline*> g_pipelines;
     bool g_ctxValid = false;
+
+    // Render-unification effort (kanban #131), Phase 2: unified-shader variant shaders (lazily
+    // compiled, one vertex+fragment pair per Fast::Unified::Variant) and the pipeline cache built
+    // from them — kept separate from g_vert/g_frag/g_pipelines (the old fixed-shader path) so
+    // gUnifiedRenderer==0 never even touches this state.
+    SDL_GPUShader* g_uniVert[6] = {};
+    SDL_GPUShader* g_uniFrag[6] = {};
+    std::map<PipeKey, SDL_GPUGraphicsPipeline*> g_uniPipelines;
 
     // Deferred model eviction (mirror of the GL/VK path).
     int g_evictLo = 0, g_evictHi = 0;
