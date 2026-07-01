@@ -61,18 +61,6 @@ static int s_soh3dMeasureKey = 0;
 static float s_soh3dMeasHMin, s_soh3dMeasHMax;
 extern "C" void SoH3D_MeasureResult(int key, float height); // implemented in soh/src/soh3d/soh3d.c
 
-// --- #72: N64 opaque geometry as dynamic-shadow casters -------------------------------------------
-// The SoH3D sun-shadow map only captured the SoH3D model path (g_drawList). N64-drawn geometry
-// (N64 Link, unreplaced actors, the scene mesh) cast no shadow. Here the triangle path appends each
-// opaque, depth-writing, perspective world-space caster triangle (3 verts * xyz) into a frame-scoped
-// soup, which gfx_soh3d_renderpass_handler_custom hands to the shadow pass (GL + Vk) each frame.
-extern "C" int gSoH3dShadowEnable;                       // shadow master toggle (defined in soh3d_gl.cpp)
-extern "C" void SoH3D_GL_SetN64ShadowCasters(const float* worldXYZ, size_t triCount); // soh3d_gl.cpp
-static std::vector<float> s_n64ShadowCasters;            // accumulated this frame: 9 floats per triangle
-// World-space position per loaded vertex slot, written alongside the clip-space transform in
-// GfxSpVertex (the triangle path only has the LoadedVertex indices, not the source object verts).
-static float s_n64CasterWorldPos[MAX_VERTICES + 4][3];
-
 // charcompare: measure the MODEL-SPACE (modelview-transformed) vertex bbox over a frame, so the tool
 // can frame the model — especially the DEPTH axis — by its true geometry extent. The modelview is the
 // per-limb FK (no view/framing rotation), so this bbox is view-independent. Used to scale the depth
@@ -548,6 +536,28 @@ void Interpreter::GenerateCC(ColorCombiner* comb, const ColorCombinerKey& key) {
     memcpy(comb->shader_input_mapping, shaderInputMapping, sizeof(shaderInputMapping));
 }
 
+// Render-unification Phase 0 (kanban #131): logs every DISTINCT (combine_mode, options) N64
+// color-combiner permutation the first time it's seen (the pool insertion below already
+// deduplicates repeats for free), so a scripted sweep of real content yields the authoritative
+// corpus manifest the unified-shader differential harness (tools/unified_ab_sweep.py) needs.
+// Opt-in via SOH3D_CC_DUMP=<path> — zero cost/behavior change when unset (the default).
+static void SoH3D_LogNewCombinerKey(const ColorCombinerKey& key) {
+    static int state = -1; // -1 unread, 0 disabled, 1 enabled
+    static FILE* f = nullptr;
+    if (state < 0) {
+        const char* path = getenv("SOH3D_CC_DUMP");
+        state = (path && path[0]) ? 1 : 0;
+        if (state) {
+            f = fopen(path, "a");
+        }
+    }
+    if (state && f) {
+        fprintf(f, "combine_mode=0x%016llx options=0x%016llx\n", (unsigned long long)key.combine_mode,
+                (unsigned long long)key.options);
+        fflush(f);
+    }
+}
+
 ColorCombiner* Interpreter::LookupOrCreateColorCombiner(const ColorCombinerKey& key) {
     if (mPrevCombiner != mColorCombinerPool.end() && mPrevCombiner->first == key) {
         return &mPrevCombiner->second;
@@ -558,6 +568,7 @@ ColorCombiner* Interpreter::LookupOrCreateColorCombiner(const ColorCombinerKey& 
     }
     Flush();
     mPrevCombiner = mColorCombinerPool.insert(std::make_pair(key, ColorCombiner())).first;
+    SoH3D_LogNewCombinerKey(key);
     GenerateCC(&mPrevCombiner->second, key);
     return &mPrevCombiner->second;
 }
@@ -1666,19 +1677,6 @@ void Interpreter::GfxSpVertex(size_t n_vertices, size_t dest_index, const F3DVtx
             world_pos[2] = v->ob[0] * mtx[0][2] + v->ob[1] * mtx[1][2] + v->ob[2] * mtx[2][2] + mtx[3][2];
         }
 
-        // #72: cache this vertex's WORLD-space position (object * top modelview = model->world, the
-        // same space the OoT3D shadow map is built in) so GfxSpTri1 can emit shadow-caster triangles
-        // by loaded-vertex index. Only when shadows are on, to avoid per-vertex work otherwise.
-        if (gSoH3dShadowEnable > 0 && dest_index < (size_t)(MAX_VERTICES + 4)) {
-            float(*mtx)[4] = mRsp->modelview_matrix_stack[mRsp->modelview_matrix_stack_size - 1];
-            s_n64CasterWorldPos[dest_index][0] =
-                v->ob[0] * mtx[0][0] + v->ob[1] * mtx[1][0] + v->ob[2] * mtx[2][0] + mtx[3][0];
-            s_n64CasterWorldPos[dest_index][1] =
-                v->ob[0] * mtx[0][1] + v->ob[1] * mtx[1][1] + v->ob[2] * mtx[2][1] + mtx[3][1];
-            s_n64CasterWorldPos[dest_index][2] =
-                v->ob[0] * mtx[0][2] + v->ob[1] * mtx[1][2] + v->ob[2] * mtx[2][2] + mtx[3][2];
-        }
-
         if (s_soh3dMeasuring) {
             // World-up axis in eye space = (top modelview) applied to direction (0,1,0).
             float(*mv)[4] = mRsp->modelview_matrix_stack[mRsp->modelview_matrix_stack_size - 1];
@@ -2034,30 +2032,6 @@ void Interpreter::GfxSpTri1(uint8_t vtx1_idx, uint8_t vtx2_idx, uint8_t vtx3_idx
     }
     if (use_prim_depth) {
         cc_options |= SHADER_OPT(PRIM_DEPTH);
-    }
-
-    // #72: capture this triangle as an N64 shadow caster. Be conservative — a missing caster is far
-    // better than UI bleeding into the shadow map. Gate strictly on:
-    //   * shadows master toggle on;
-    //   * OPAQUE, depth-WRITING geometry only (Z_UPD + real z-buffer; NOT prim-depth-only ortho);
-    //   * EXCLUDE decals (zmode_decal), alpha/blended/XLU (use_alpha, blend/fog colour), invisible;
-    //   * PERSPECTIVE projection only — N64 2D/UI/HUD/overlay draws use an orthographic MP_matrix
-    //     (col 3 of rows 2 & 3 are 0/1), so requiring a projective w (MP[2][3] != 0) rejects them.
-    // The sky/skybox is drawn through the SoH3D path (sky dome) and via N64 with z-write off, so the
-    // depth-write gate already excludes it.
-    if (gSoH3dShadowEnable > 0 && zbuffer_enabled && depth_mask && !zmode_decal && !use_alpha &&
-        !use_blend_color && !use_fog && !invisible && !use_prim_depth) {
-        // Perspective test: an orthographic projection leaves w independent of z.
-        bool perspective = mRsp->MP_matrix[2][3] != 0.0f || mRsp->MP_matrix[3][3] != 1.0f;
-        if (perspective) {
-            for (int i = 0; i < 3; i++) {
-                const float* wp =
-                    s_n64CasterWorldPos[v_arr[i] - &mRsp->loaded_vertices[0]];
-                s_n64ShadowCasters.push_back(wp[0]);
-                s_n64ShadowCasters.push_back(wp[1]);
-                s_n64ShadowCasters.push_back(wp[2]);
-            }
-        }
     }
 
     if (!mShaderStack.empty()) {
@@ -4400,38 +4374,17 @@ bool gfx_soh3d_draw_handler_custom(F3DGfx** cmd0) {
     // Modelview (no projection) for the view-space normal: top of the current modelview stack, the
     // same matrix MP_matrix was built from (gSPMatrix LOAD set it just before this opcode).
     const float* mv = &gfx->mRsp->modelview_matrix_stack[gfx->mRsp->modelview_matrix_stack_size - 1][0][0];
+    // Flush Fast3D's pending (not-yet-appended) N64 triangle batch BEFORE appending this op, so the
+    // two content streams interleave in true emission order in the unified op-list. Fast3D buffers
+    // triangles in mBufVbo and only appends them as an op at a Flush() boundary (state changes /
+    // frame end); without this, a G_SOH3D_DRAW firing mid-batch would jump ahead of (or behind)
+    // still-buffered N64 geometry it was actually emitted after (or before) in the game's dlist.
+    gfx->Flush();
     SoH3D_GL_Submit(modelId, &gfx->mRsp->MP_matrix[0][0], mv, lit, invertY ? 1 : 0, r, g, b, a, aspectAdj, sky,
                     uvOffU, uvOffV);
     return false;
 }
 
-// SoH3D render-pass opcode (emitted once per frame after the actor draw-all). Flush Fast3D's
-// pending geometry so its opaque 3D is committed first, then render all collected SoH3D draws
-// in one GL-state-bracketed pass (own the OoT3D frame instead of injecting inline).
-bool gfx_soh3d_renderpass_handler_custom(F3DGfx** cmd0) {
-    Interpreter* gfx = mInstance.lock().get();
-    gfx->Flush();
-    // The SoH3D GL pass uses the CURRENT GL viewport (it sets none of its own). Fast3D only
-    // pushes the GL viewport when it rasterizes a triangle, so a gsSPViewport with no following
-    // Fast3D draw (the charcompare side-by-side split: the 3DS half is drawn purely by SoH3D,
-    // after the N64 half's triangles left the GL viewport on the LEFT) never reaches the GPU.
-    // Apply the current N64 viewport here so the SoH3D models land in their intended rect.
-    // In-game this equals the full-screen viewport the last triangle already set (a no-op), then
-    // we force a reapply so subsequent Fast3D geometry re-establishes its own viewport/scissor.
-    gfx->mRapi->SetViewport(gfx->mRdp->viewport.x, gfx->mRdp->viewport.y, gfx->mRdp->viewport.width,
-                            gfx->mRdp->viewport.height);
-    // #72: hand this frame's accumulated N64 opaque world-space caster triangles to the shadow pass
-    // (consumed by the GL + Vk shadow loops inside SoH3D_GL_RenderPass), then clear for next frame.
-    // This opcode is emitted once per frame after all N64 3D geometry has drawn, so the soup is
-    // complete here. setN64 is a no-op when shadows are off / the soup is empty.
-    SoH3D_GL_SetN64ShadowCasters(s_n64ShadowCasters.empty() ? nullptr : s_n64ShadowCasters.data(),
-                                 s_n64ShadowCasters.size() / 9);
-    SoH3D_GL_RenderPass();
-    s_n64ShadowCasters.clear();
-    gfx->mRenderingState.viewport = {};
-    gfx->mRdp->viewport_or_scissor_changed = true;
-    return false;
-}
 
 // SoH3D auto-scale measure bracket. Begin (w0 bit0 = 1): start accumulating the
 // eye-space bbox in GfxSpVertex. End (bit0 = 0): finalize the bbox diagonal and report
@@ -4957,8 +4910,6 @@ static constexpr UcodeHandler otrHandlers = {
     { OTR_G_SETINTENSITY, { "G_SETINTENSITY", gfx_set_intensity_handler_custom } }, // G_SETINTENSITY (0x40)
     { OTR_G_SOH3D_DRAW, { "G_SOH3D_DRAW", gfx_soh3d_draw_handler_custom } },         // G_SOH3D_DRAW (0x41)
     { OTR_G_SOH3D_MEASURE, { "G_SOH3D_MEASURE", gfx_soh3d_measure_handler_custom } }, // G_SOH3D_MEASURE (0x4a)
-    { OTR_G_SOH3D_RENDERPASS,
-      { "G_SOH3D_RENDERPASS", gfx_soh3d_renderpass_handler_custom } }, // G_SOH3D_RENDERPASS (0x4b)
     { OTR_G_MOVEMEM_HASH, { "OTR_G_MOVEMEM_HASH", gfx_movemem_handler_otr } },      // OTR_G_MOVEMEM_HASH
     { OTR_G_PUSH_SHADER, { "G_PUSH_SHADER", gfx_push_shader } },
     { OTR_G_POP_SHADER, { "G_POP_SHADER", gfx_pop_shader } },
@@ -5435,6 +5386,10 @@ void Interpreter::Run(Gfx* commands, const std::unordered_map<Mtx*, MtxF>& mtx_r
     mRenderingState.viewport = {};
     mRenderingState.scissor = {};
 
+    // Open the SoH3D unified-render context: 3DS model ops emitted by G_SOH3D_DRAW while
+    // interpreting this dlist append inline into the SAME op-list / render pass as the N64 geometry.
+    SoH3D_GL_RenderFrameBegin();
+
     auto dbg = mGfxDebugger;
     g_exec_stack.start((F3DGfx*)commands);
     while (!g_exec_stack.cmd_stack.empty()) {
@@ -5456,6 +5411,8 @@ void Interpreter::Run(Gfx* commands, const std::unordered_map<Mtx*, MtxF>& mtx_r
         }
         gfx_step();
     }
+
+    SoH3D_GL_RenderFrameEnd(); // close the SoH3D context (all 3DS model ops for this frame appended)
 
     Flush();
 

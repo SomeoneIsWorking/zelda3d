@@ -3498,16 +3498,18 @@ static void SoH3D_UpdateLight(PlayState* play) {
     SoH3D_GL_SetLightDir(d);
 }
 
-void SoH3D_EmitRenderPass(PlayState* play) {
+// Per-frame update after the actor draw-all. The 3DS model draws are appended INLINE during the
+// actor draws (G_SOH3D_DRAW -> SoH3D_GL_Submit), interleaved with the N64 geometry in the ONE
+// render pass — there is no separate SoH3D render-pass drain to emit anymore. This still runs the
+// once-per-frame bookkeeping that used to ride along with that opcode: the hand-flap frame counter
+// and the scene light-direction update.
+void SoH3D_FrameEndUpdate(PlayState* play) {
     if (!SoH3D_Enabled()) {
         return;
     }
     extern int gSoH3dFrameCtr;
     gSoH3dFrameCtr++; // once per rendered frame (independent of actor count) — drives the hand flap
     SoH3D_UpdateLight(play);
-    OPEN_DISPS(play->state.gfxCtx);
-    gSPSoH3DRenderPass(POLY_OPA_DISP++);
-    CLOSE_DISPS(play->state.gfxCtx);
 }
 
 // Per-frame, before the display list is built: drop any SoH3D draws left unrendered from a prior

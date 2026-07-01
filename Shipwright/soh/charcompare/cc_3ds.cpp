@@ -192,9 +192,10 @@ void EmitDlist(const Model3ds& m, std::vector<Gfx>& dl, std::unordered_map<Mtx*,
     { Gfx g = gsDPSetScissor(G_SC_NON_INTERLACE, vp.x0, vp.y0, vp.x0 + vp.w, vp.y0 + vp.h); dl.push_back(g); }
     { Gfx g = gsSPMatrix(projKey, G_MTX_NOPUSH | G_MTX_LOAD | G_MTX_PROJECTION); dl.push_back(g); }
     { Gfx g = gsSPMatrix(mvKey, G_MTX_NOPUSH | G_MTX_LOAD | G_MTX_MODELVIEW); dl.push_back(g); }
-    // High bit of the handle = "lit" (character half-Lambert form term).
+    // High bit of the handle = "lit" (character half-Lambert form term). The model op is appended
+    // inline into the unified op-list when the interpreter runs this dlist (bracketed by the render
+    // frame's SoH3D_GL_RenderFrameBegin/End) — no separate render-pass drain to emit.
     { Gfx g; gSPSoH3DDraw(&g, m.modelId | (int)0x80000000, 255, 255, 255); dl.push_back(g); }
-    { Gfx g; gSPSoH3DRenderPass(&g); dl.push_back(g); }
 }
 
 } // namespace cc

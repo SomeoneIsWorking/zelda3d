@@ -179,7 +179,6 @@
 #define G_REGBLENDEDTEX 0x3f
 #define G_SOH3D_DRAW 0x41
 #define G_SOH3D_MEASURE 0x4a
-#define G_SOH3D_RENDERPASS 0x4b
 #define G_MOVEMEM_OTR 0x42
 #define G_LOADBLOCK_WIDE 0x47
 #define G_VTX_WIDE 0x48
@@ -2802,14 +2801,6 @@ typedef union Gfx {
         _g->words.w0 = _SHIFTL(G_SOH3D_MEASURE, 24, 8) |  \
                        _SHIFTL((begin) & 0x1, 0, 24);     \
         _g->words.w1 = (uintptr_t)(key);                  \
-    }
-
-// SoH3D render pass: drain the collected SoH3D draw list in one bracketed GL pass. No operands.
-#define gSPSoH3DRenderPass(pkt)                            \
-    {                                                      \
-        Gfx* _g = (Gfx*)(pkt);                             \
-        _g->words.w0 = _SHIFTL(G_SOH3D_RENDERPASS, 24, 8); \
-        _g->words.w1 = 0;                                  \
     }
 
 #define gsSPSetFB(pkt, fb)                      \

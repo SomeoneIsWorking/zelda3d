@@ -41,6 +41,7 @@ u8 sMotionBlurStatus;
 #include "overlays/gamestates/ovl_file_choose/z_file_select.h"
 #include "debug.h"
 #include "BenPort.h"
+#include <fast/soh3d_gl.h> // shared unified renderer: SoH3D_GL_FrameBegin (one renderer, both games)
 #include "2s2h/GameInteractor/GameInteractor.h"
 #include "2s2h/Enhancements/FrameInterpolation/FrameInterpolation.h"
 #include "2s2h/Enhancements/Graphics/Graphics.h"
@@ -1188,6 +1189,10 @@ void Play_DrawMain(PlayState* this) {
     u8 sp25B = false;
     f32 zFar;
 
+    // Unified renderer (shared with OoT): reset this frame's collected 3DS-model draws
+    // before the actors emit theirs. Same SoH3D_GL_* renderer serves soh/mm.
+    SoH3D_GL_FrameBegin();
+
     // #region 2S2H [Port] Frame buffer effects for pause menu
     // Track render size when paused and that a copy was performed
     static u32 lastPauseWidth;
@@ -1434,6 +1439,9 @@ void Play_DrawMain(PlayState* this) {
             if (1) {
                 Actor_DrawAll(this, &this->actorCtx);
             }
+            // Unified renderer: the replaced actors' 3DS-model draws were appended inline during
+            // Actor_DrawAll (G_SOH3D_DRAW -> SoH3D_GL_Submit), interleaved with the N64 geometry in
+            // the ONE render pass. No separate SoH3D render-pass drain — same as OoT.
 
             if (1) {
                 if (!this->envCtx.sunDisabled) {
