@@ -484,6 +484,49 @@ EMPTY so MM renders vanilla N64 with zero regression (VERIFIED South Clock Town,
   5. Skinned actors come AFTER static props: hook `mm z_skelanime.c:313/421` (DrawOpa/DrawFlexOpa) to
      pose from live N64 joints (OoT does `SoH3D_DoRetarget`), an `SoH3D_GL_EmitPose` equivalent.
 
+### N4.2b BLOCKER FOUND (2026-07-01) — MM3D assets are GAR2, not ZAR. Need a GAR parser first.
+
+Inventoried the MM3D RomFS with `tools/ctr_romfs.py "$ZELDA3D_MM_3DS_ROM"` (the shared `CtrRom`
+Python twin). **MM3D does NOT use the OoT3D `.zar`/`.cmb` layout the shared `Zar` parser expects.**
+Findings (product `CTR-P-AJRE`, romfs 0x27191000):
+- Actor models live at **`/actors/zelda2_<name>.gar.lzs`** (460 of them). Top dirs: `scenes` (645),
+  `actors` (460), `layout` (306), `hint`, `sound`, `menu`. NO `.zar`, NO top-level `.cmb`.
+- **The `.gar.lzs` files are NOT compressed** despite the extension — they begin with `47 41 52 02`
+  = **"GAR\2"** (Grezzo ARchive **version 2**), header u32 size matches file size. So NO LZS
+  decompressor is needed for actors — just a **GAR2 parser**. (Other `.lzs` may truly be compressed;
+  actors aren't.)
+- The CMB/CSAB/CTXB INSIDE the GAR are the same 3DS-engine formats → the shared cmb3d `Cmb`/`Csab`
+  parsers should apply (verify version; MM3D CMB may bump a field).
+
+**GAR2 layout decoded from `/actors/zelda2_bh.gar.lzs` (a 2-file archive: one cmb, one csab):**
+```
+Header (0x20 bytes):
+  0x00 char[4]  "GAR\2"
+  0x04 u32      fileSize
+  0x08 u16      nTypes            (e.g. 3)
+  0x0A u16      nFiles            (e.g. 2)
+  0x0C u32      typesOff          (=0x20)
+  0x10 u32      filesOff          (file-entry table)
+  0x14 u32      dataHdrOff        (data headers)
+  0x18 char[8]  codec  "jenkins"  (hash name; ZAR lacks this -> ZAR hdr is 0x18, GAR2 is 0x20)
+Types table @typesOff, 0x10/entry: { u32 count, u32 idxOff(-1=none), u32 nameOff, u32 -1 }
+  idxOff -> array of u32 file indices of that type. bh: type"cmb"{cnt1,idx->file0}, "csab"{cnt1,idx->file1}.
+Files/data: each file has a full-path name ("model/skylark.cmb") + short name ("skylark") stored
+  inline as C-strings, plus a data {size, offset} — the exact file-entry vs data-header split still
+  needs pinning (raw hex captured in this session's scratch; finish vs the community GAR2 spec).
+```
+
+**N4.2b next-session plan (revised):**
+1. **Add a `Gar` parser to shared cmb3d** (`cmb3d/asset/gar.{h,cpp}`, modeled on `zar.cpp`): parse the
+   GAR2 header/types/files above, expose `firstWithSuffix(".cmb")` / `read(file)` like `Zar`. Finish
+   the file-entry/data-header RE from the captured hex or the community GAR2 spec; unit-check by
+   extracting `skylark.cmb` from `zelda2_bh` and confirming it parses with the shared `Cmb`.
+2. **Point mm3d_model.cpp at GAR**: `rom()->read("/actors/zelda2_<x>.gar.lzs")` -> `Gar` -> `.cmb` ->
+   shared converter. (kModels zarPath becomes the `.gar.lzs` path.)
+3. Pick a first static prop, add its `kModels[]` entry + `MM3D_LookupModel` mapping, live A/B.
+The mechanism (N4.2) is done and inert; ONLY the asset-access format differs from OoT. Do NOT try to
+reuse `Zar` for MM — it will reject "GAR\2".
+
 **Build self-sufficiency fix (2026-07-01, commit `931c8e8`) — READ IF MM WON'T COMPILE.** MM failed
 to build (`z64actor.h → code/actor/actor.h: No such file`) because `mm/assets/.gitignore` ignores
 `*.h`/`*.c` (right for ZAPD-GENERATED headers) and the ~960 AUTHORED asset headers (ALIGN_ASSET/OTR
