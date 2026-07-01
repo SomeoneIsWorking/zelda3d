@@ -5,8 +5,10 @@
 // the vanilla N64 draw. Returns 0 to draw vanilla.
 #pragma once
 
-struct PlayState;
-struct Actor;
+// NB: MM's Room is a typedef of an anonymous struct (z64scene.h), so we can't forward-declare
+// it as `struct Room`. Callers of this header (z_room.c / z_play.c / mm3d_draw.c) all include
+// global.h first, which pulls in the real PlayState/Actor/Room typedefs — so we just use those
+// names here directly. Do NOT forward-declare `struct Room` — it would create a distinct type.
 
 #ifdef __cplusplus
 extern "C" {
@@ -17,7 +19,21 @@ extern "C" {
 // actor/object tables). The model op it emits (G_ZELDA3D_DRAW) is appended INLINE into the one
 // unified render pass alongside the N64 geometry — the same shared renderer OoT uses. There is
 // ONE renderer and ONE pass; no per-game copy and no separate Zelda3D render-pass drain.
-int MM3D_TryDrawActor(struct PlayState* play, struct Actor* actor);
+int Zelda3D_TryDrawActor(PlayState* play, Actor* actor);
+
+// Per-room scene divert (MM analog of the OoT implementation). Returns 1 when the
+// current MM scene has an MM3D room CMB registered and this call drew it — caller
+// then skips the N64 room mesh. Currently returns 0 unconditionally (no MM3D scene
+// coverage table yet); the guard is wired now so no z_room.c edit is needed the
+// day the first mapping lands. #134-style.
+int Zelda3D_TryDrawRoom(PlayState* play, Room* room);
+
+// Predicate mirror of Zelda3D_TryDrawRoom used to suppress the N64 pre-rendered
+// background image (skybox path in Play_Draw): returns 1 when MM3D is going to
+// cover this scene — the same rule OoT applies. Under the game-wide "no N64
+// renderer under Zelda3D" invariant this returns 1 whenever Zelda3D is on, so
+// an unmapped MM scene renders as an empty room instead of a 2D bg image.
+int Zelda3D_ShouldSuppressBgImageSkybox(PlayState* play);
 
 #ifdef __cplusplus
 }

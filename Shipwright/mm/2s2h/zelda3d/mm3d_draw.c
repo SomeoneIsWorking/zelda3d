@@ -10,7 +10,7 @@
 
 #include "global.h" // Actor, PlayState, POLY_OPA_DISP, Matrix_*, Gfx_SetupDL25_Opa, gSPZelda3DDraw
 
-static void MM3D_EmitModelDraw(PlayState* play, Actor* actor, int modelId, float worldScale,
+static void Zelda3D_EmitModelDraw(PlayState* play, Actor* actor, int modelId, float worldScale,
                                float groundOffset) {
     OPEN_DISPS(play->state.gfxCtx);
 
@@ -38,12 +38,12 @@ static void MM3D_EmitModelDraw(PlayState* play, Actor* actor, int modelId, float
     CLOSE_DISPS(play->state.gfxCtx);
 }
 
-int MM3D_TryDrawActor(PlayState* play, Actor* actor) {
+int Zelda3D_TryDrawActor(PlayState* play, Actor* actor) {
     int modelId = -1;
     float worldScale = 1.0f;
     float groundOffset = 0.0f;
 
-    MM3D_EnsureModelProvider();
+    Zelda3D_EnsureModelProvider();
 
     if (actor == NULL || actor->draw == NULL) {
         return 0;
@@ -55,9 +55,27 @@ int MM3D_TryDrawActor(PlayState* play, Actor* actor) {
     if (actor->objectSlot >= 0) {
         objectId = play->objectCtx.slots[actor->objectSlot].id;
     }
-    if (!MM3D_LookupModel(actor->id, objectId, &modelId, &worldScale, &groundOffset)) {
+    if (!Zelda3D_LookupModel(actor->id, objectId, &modelId, &worldScale, &groundOffset)) {
         return 0; // no MM3D model registered -> vanilla N64 draw
     }
-    MM3D_EmitModelDraw(play, actor, modelId, worldScale, groundOffset);
+    Zelda3D_EmitModelDraw(play, actor, modelId, worldScale, groundOffset);
     return 1;
+}
+
+// MM room-divert stub. No MM3D scene coverage table yet, so this always returns 0
+// (fall through to N64 room draw). Present now so z_room.c can call it once and stay
+// clean when MM3D scene mappings land — same shape as Zelda3D_TryDrawRoom in OoT.
+int Zelda3D_TryDrawRoom(PlayState* play, Room* room) {
+    (void)play;
+    (void)room;
+    return 0;
+}
+
+// Predicate used to suppress the N64 pre-rendered bg-image skybox (Play_Draw path in
+// OoT's #134). MM has no MM3D scene coverage yet, so we still WANT the vanilla N64
+// bg image to draw (else nothing appears). Returns 0 for now; flips to 1 the day the
+// first MM3D room CMB is registered (same rule OoT already uses).
+int Zelda3D_ShouldSuppressBgImageSkybox(PlayState* play) {
+    (void)play;
+    return 0;
 }
