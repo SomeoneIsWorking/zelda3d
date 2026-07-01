@@ -40,4 +40,10 @@ struct UnifiedMaterial {
     uint8_t lightingMode;  // 0 = N64 prebaked-Gouraud passthrough (UnifiedVtx.color0 is final shade)
                              // 1 = 3DS character half-Lambert (hl = N·L*0.5+0.5)
                              // 2 = 3DS scene vertex-lit (ambient*matAmbient + diffuse*matDiffuse*N·L)
+
+    // true (N64): UnifiedVtx.pos is already clip-space (CPU-transformed by the emulated RSP
+    // pipeline, guard-band clipping included) — gl_Position = pos verbatim, no MVP multiply.
+    // false (3DS): UnifiedVtx.pos is model-space — gl_Position = uMvp * vec4(pos.xyz, 1.0), the
+    // GPU does the transform. See unified_vtx.h's pos field doc for why this split is necessary.
+    bool alreadyTransformed;
 };
