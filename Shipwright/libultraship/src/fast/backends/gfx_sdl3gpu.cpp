@@ -1150,7 +1150,12 @@ SDL_GPUSampler* GfxRenderingAPISdl3Gpu::GetOrCreateSamplerEx(SDL_GPUFilter filte
     SDL_GPUSamplerCreateInfo si{};
     si.min_filter = filter;
     si.mag_filter = filter;
-    si.mipmap_mode = SDL_GPU_SAMPLERMIPMAPMODE_NEAREST;
+    // Trilinear across the mip chain only when the caller actually uploaded one (max_lod>0 is
+    // the CMB path — see SoH3DRenderer::getSampler / uploadTexture). N64 textures ship with a
+    // single level (max_lod=0), and jumping between mips there would just cost us the crisp
+    // point-sampled look Fast3D expects. Nearest-mip on the CMB path produced hard mip
+    // boundaries → radial moiré on room walls at grazing angles (#134).
+    si.mipmap_mode = (maxLod > 0.0f) ? SDL_GPU_SAMPLERMIPMAPMODE_LINEAR : SDL_GPU_SAMPLERMIPMAPMODE_NEAREST;
     si.address_mode_u = u;
     si.address_mode_v = v;
     si.address_mode_w = SDL_GPU_SAMPLERADDRESSMODE_REPEAT;
