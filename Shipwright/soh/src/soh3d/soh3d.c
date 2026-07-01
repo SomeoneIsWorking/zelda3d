@@ -5019,6 +5019,12 @@ static void SoH3D_ReplExec(PlayState* play, char* line, const char* outPath) {
         extern int gSoH3dWorldLit;
         if (sscanf(line, "%*s %i", &iv) == 1) gSoH3dWorldLit = iv;
         SoH3D_ReplReply(outPath, "worldlit=%d", gSoH3dWorldLit);
+    } else if (strcmp(cmd, "unified") == 0) {
+        // Render-unification effort (kanban #131): 0=off (default) 1=CMB unified 2=N64 unified
+        // 3=both. See gUnifiedRenderer (soh3d_gl.cpp) for the full rationale.
+        extern int gUnifiedRenderer;
+        if (sscanf(line, "%*s %i", &iv) == 1) gUnifiedRenderer = iv;
+        SoH3D_ReplReply(outPath, "unified=%d", gUnifiedRenderer);
     } else if (strcmp(cmd, "worldshade") == 0) {
         // #111: drive the world (scene/room) SHADE from OoT3D's own time-blended env palette
         // (gSoH3dWorldShade*) instead of the N64 flat tint (SoH3D_SceneTint), which over-brightens at

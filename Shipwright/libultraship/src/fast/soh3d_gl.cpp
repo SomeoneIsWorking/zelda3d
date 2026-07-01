@@ -226,6 +226,14 @@ extern "C" int gSoH3dLightEnable = -1;
 // texture*vColor*uTint path. Toggle live via REPL `worldlit 0|1` for A/B vs the oracle.
 extern "C" int gSoH3dWorldLit = 1;
 
+// Render-unification effort (kanban #131). Sub-values route CMB (3DS model) and N64 Fast3D draws
+// through the new UnifiedVtx/UnifiedMaterial/unified-shader path (unified_shader.h) instead of the
+// old fixed CMB shader / per-combiner-permutation N64 shader generator: 0 = off (both old paths,
+// the default — behavior-neutral), 1 = CMB half unified, 2 = N64 half unified, 3 = both. Toggle
+// live via REPL `unified <0-3>`. Per the plan, both old and new systems stay compiled/reachable
+// throughout the rollout — this is the instant-rollback switch, not a revert.
+extern "C" int gUnifiedRenderer = 0;
+
 // World-space key-light (sun) direction TO the light, set once per frame by soh3d.c
 // (SoH3D_UpdateLight, from envCtx.lightSettings.light1Dir) and read by the render pass into
 // uLightDir. Default = the old fixed direction so legacy/uninit draws look as before.
