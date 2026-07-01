@@ -177,8 +177,8 @@
 #define G_TEXRECT_WIDE 0x37
 #define G_FILLWIDERECT 0x38
 #define G_REGBLENDEDTEX 0x3f
-#define G_SOH3D_DRAW 0x41
-#define G_SOH3D_MEASURE 0x4a
+#define G_ZELDA3D_DRAW 0x41
+#define G_ZELDA3D_MEASURE 0x4a
 #define G_MOVEMEM_OTR 0x42
 #define G_LOADBLOCK_WIDE 0x47
 #define G_VTX_WIDE 0x48
@@ -2772,33 +2772,33 @@ typedef union Gfx {
         _g1->words.w1 = (uintptr_t)replc;                \
     }
 
-// SoH3D direct-GL model draw: handle in w1[0:32], flat tint RGB packed in w0[0:24], a per-draw
+// Zelda3D direct-GL model draw: handle in w1[0:32], flat tint RGB packed in w0[0:24], a per-draw
 // alpha in w1[32:40] (255 = opaque), and a per-draw texcoord SCROLL offset in w0[32:48]=U,
 // w0[48:64]=V (16-bit fixed: value/65536 = fractional UV, 0 = none). The alpha rides the upper 32
 // bits of the 64-bit w1 and the UV offset the upper 32 bits of w0, so neither disturbs the 32-bit
 // handle (model id + lit bit31 + sky bit30) nor the 24-bit tint the interpreter already decodes.
 // (64-bit native port: uintptr_t is 64-bit; the alpha/UV bytes are only meaningful there.) The UV
 // offset animates the OoT3D sky cloud band (kumo) per its BlueSky.zar .cmab scroll rate — #28b.
-#define gSPSoH3DDrawUV(pkt, handle, alpha, uvU, uvV, tintR, tintG, tintB)                         \
+#define gSPZelda3DDrawUV(pkt, handle, alpha, uvU, uvV, tintR, tintG, tintB)                         \
     {                                                                                             \
         Gfx* _g = (Gfx*)(pkt);                                                                    \
-        _g->words.w0 = (uintptr_t)((uint64_t)(_SHIFTL(G_SOH3D_DRAW, 24, 8) |                      \
+        _g->words.w0 = (uintptr_t)((uint64_t)(_SHIFTL(G_ZELDA3D_DRAW, 24, 8) |                      \
                        _SHIFTL(((tintR) & 0xFF) << 16 | ((tintG) & 0xFF) << 8 | ((tintB) & 0xFF), 0, 24)) | \
                        ((uint64_t)((uvU) & 0xFFFF) << 32) | ((uint64_t)((uvV) & 0xFFFF) << 48));  \
         _g->words.w1 = (uintptr_t)(((uint64_t)(uint32_t)(uintptr_t)(handle)) |                    \
                                    ((uint64_t)((alpha) & 0xFF) << 32));                           \
     }
 // Alpha wrapper (no UV scroll); and opaque wrapper (alpha = 255) — both preserve existing call sites.
-#define gSPSoH3DDrawA(pkt, handle, alpha, tintR, tintG, tintB)                                    \
-    gSPSoH3DDrawUV(pkt, handle, alpha, 0, 0, tintR, tintG, tintB)
-#define gSPSoH3DDraw(pkt, handle, tintR, tintG, tintB) gSPSoH3DDrawA(pkt, handle, 255, tintR, tintG, tintB)
+#define gSPZelda3DDrawA(pkt, handle, alpha, tintR, tintG, tintB)                                    \
+    gSPZelda3DDrawUV(pkt, handle, alpha, 0, 0, tintR, tintG, tintB)
+#define gSPZelda3DDraw(pkt, handle, tintR, tintG, tintB) gSPZelda3DDrawA(pkt, handle, 255, tintR, tintG, tintB)
 
-// SoH3D auto-scale measure bracket: key in w1, phase in w0[0] (1=begin, 0=end).
+// Zelda3D auto-scale measure bracket: key in w1, phase in w0[0] (1=begin, 0=end).
 // Emitted around an actor's N64 draw so the interpreter can measure its world size.
-#define gSPSoH3DMeasure(pkt, key, begin)                  \
+#define gSPZelda3DMeasure(pkt, key, begin)                  \
     {                                                     \
         Gfx* _g = (Gfx*)(pkt);                            \
-        _g->words.w0 = _SHIFTL(G_SOH3D_MEASURE, 24, 8) |  \
+        _g->words.w0 = _SHIFTL(G_ZELDA3D_MEASURE, 24, 8) |  \
                        _SHIFTL((begin) & 0x1, 0, 24);     \
         _g->words.w1 = (uintptr_t)(key);                  \
     }

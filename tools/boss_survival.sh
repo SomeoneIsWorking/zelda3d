@@ -7,14 +7,14 @@
 # actor itself spawned, not just an empty arena.
 #
 # KEY FACTS (verified 2026-06-24, all 10 ALIVE + boss spawns, no crash):
-#  * Boss arenas MUST be entered via PLAIN dev-warp (cutsceneIndex=0) — `soh3d_game.sh restart
+#  * Boss arenas MUST be entered via PLAIN dev-warp (cutsceneIndex=0) — `zelda3d_game.sh restart
 #    <ent>`. That spawns BOTH Link and the boss (boss = ACTORCAT_BOSS = `cat=9` in REPL `actors`;
 #    do NOT misread cat=9 as a Bg prop). e.g. Boss_Dodongo id=0x27 cat=9 at King Dodongo 0x40B.
 #  * Do NOT use `cswarp <boss> 0xfff0` for boss rooms: boss rooms are NOT cutscene-only scenes
 #    (the intro is triggered in-scene AFTER a normal entry). Forcing cutsceneIndex 0xfff0+ selects
 #    a setup layer whose start-position list has no ACTOR_PLAYER -> func_800304DC null-derefs the
 #    empty PLAYER list -> SIGSEGV. This is the SAME degenerate-setup FALSE POSITIVE as Chamber of
-#    Sages (handoff session k); NOT a SoH3D bug. Don't file, don't bandaid.
+#    Sages (handoff session k); NOT a Zelda3D bug. Don't file, don't bandaid.
 #  * Bosses spawn IDLE (speedXZ=0) and arenas are dim; observing boss model/AI parity needs an
 #    AI trigger + brighter framing (future tooling), not just a warp.
 #
@@ -33,9 +33,9 @@ declare -A BOSS=(
 )
 for ent in 0x40F 0x40B 0x301 0x00C 0x305 0x417 0x08D 0x413 0x41F 0x517; do
   name=${BOSS[$ent]}
-  SOH3D_HEADLESS=1 tools/soh3d_game.sh restart "$ent" 0x6000 >/dev/null 2>&1
+  ZELDA3D_HEADLESS=1 tools/zelda3d_game.sh restart "$ent" 0x6000 >/dev/null 2>&1
   sleep "$DWELL"
-  out=$(python3 tools/soh3d_repl.py cmd "actors" 2>&1)
+  out=$(python3 tools/zelda3d_repl.py cmd "actors" 2>&1)
   boss=$(echo "$out" | grep -c "cat=9")
   crash=$(grep -anE "FATAL signal|Signal: 11|terminate called|Assertion" "$LOG" 2>/dev/null | tail -2)
   if [ -n "$crash" ]; then

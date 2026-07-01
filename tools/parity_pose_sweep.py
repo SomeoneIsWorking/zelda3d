@@ -6,7 +6,7 @@ For each locomotion regime it drives BOTH engines into a sustained, matched-spee
 per-bone pose on each side, and runs tools/parity_pose_diff.py to get a median per-bone divergence and
 PASS/FAIL verdict:
 
-  SoH3D : REPL `walkhold` (re-armed each tick so the hold survives headless's uncapped frame rate) until
+  Zelda3D : REPL `walkhold` (re-armed each tick so the hold survives headless's uncapped frame rate) until
           linkanimstate reports the target CSAB at steady speed, then `skindump` a short burst.
   oracle: oot3d-decomp link_ctl.py warp 0xEE -> tools/oracle_link_pose.py with --hold-circle.
 
@@ -38,7 +38,7 @@ STATES = {
 
 
 def soh(text, timeout=15):
-    return subprocess.run([os.path.join(HERE, "soh3d_repl.py"), "cmd", text],
+    return subprocess.run([os.path.join(HERE, "zelda3d_repl.py"), "cmd", text],
                           capture_output=True, text=True, timeout=timeout).stdout.strip()
 
 

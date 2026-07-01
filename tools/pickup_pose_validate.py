@@ -1,11 +1,11 @@
 #!/usr/bin/env python3
 """pickup_pose_validate.py — geometric A/B for the #117 PICKUP (lift) fix.
 
-For each captured live SoH3D pose (a `skindump` row-group, tagged with the resolved CSAB name + the
+For each captured live Zelda3D pose (a `skindump` row-group, tagged with the resolved CSAB name + the
 real playhead frame), evaluate the SAME OoT3D clip OFFLINE at the SAME frame (deterministic csab.py
 sampler) and report the per-bone geodesic angle between the rendered pose and the clip's geometry.
 
-If the rendered lift pose == the clip (≈0°), the SoH3D pickup faithfully plays nml_carryB_free across
+If the rendered lift pose == the clip (≈0°), the Zelda3D pickup faithfully plays nml_carryB_free across
 its frames (the lift raise) and settles into nml_carryB_wait — proving the lift is no longer clobbered
 to nml_wait_free by the carry-IDLE override (the #117 pickup bug). No screenshots; pure geometry.
 
@@ -58,7 +58,7 @@ def main():
     args = ap.parse_args()
     bones = parse_bones(args.bones)
 
-    rom = CtrRom(os.environ["SOH3D_3DS_ROM"])
+    rom = CtrRom(os.environ["ZELDA3D_3DS_ROM"])
     z = Zar(rom.read(rom.get(ZAR)))
     model = C.Cmb(z.read([f for f in z.files if f.name == CMB][0]))
 

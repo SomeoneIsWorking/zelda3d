@@ -2,7 +2,7 @@
 """geom_anomaly_sweep.py — AUTOMATICALLY surface mis-rendered geometry in a scene (no eyeball, no
 manual roomwarp/grep).
 
-For a scene it cold-boots SoH3D headless, walks EVERY room (roomwarp), and collects two things the
+For a scene it cold-boots Zelda3D headless, walks EVERY room (roomwarp), and collects two things the
 running engine already computes:
   * `autostate` — every auto-replaced object's derived world scale (= N64 actor height / OoT3D-CMB
     height) + the measured N64 height + its zar.
@@ -20,7 +20,7 @@ skinned actors, so the statistic is meaningless and flagged correctly-sized prop
 Output is a ranked anomaly report. Exit code 1 if any anomaly is flagged (usable in CI/parity gates).
 
 Usage:
-  SOH3D_3DS_ROM=<rom> tools/geom_anomaly_sweep.py <entrance> [--prefix jyasinzou] [--keep]
+  ZELDA3D_3DS_ROM=<rom> tools/geom_anomaly_sweep.py <entrance> [--prefix jyasinzou] [--keep]
   e.g. tools/geom_anomaly_sweep.py 130            # Spirit Temple
 """
 import os, sys, re, math, json, subprocess, time
@@ -30,7 +30,7 @@ sys.path.insert(0, os.path.join(REPO, "tools"))
 
 
 def repl(cmd):
-    r = subprocess.run([os.path.join(REPO, "tools", "soh3d_repl.py"), "cmd", cmd],
+    r = subprocess.run([os.path.join(REPO, "tools", "zelda3d_repl.py"), "cmd", cmd],
                        cwd=REPO, capture_output=True, text=True)
     return r.stdout
 
@@ -41,7 +41,7 @@ def offline_cmb_maxext(zar_path, _cache={}):
     import zar as zarmod, cmb as cmbmod
     from ctr_romfs import CtrRom
     if "_rom" not in _cache:
-        _cache["_rom"] = CtrRom(os.environ["SOH3D_3DS_ROM"])
+        _cache["_rom"] = CtrRom(os.environ["ZELDA3D_3DS_ROM"])
     rom = _cache["_rom"]
     val = None
     try:
@@ -98,10 +98,10 @@ def main():
     if "--prefix" in args:
         prefix = args[args.index("--prefix") + 1]
 
-    env = dict(os.environ, SOH3D_HEADLESS="1")
-    subprocess.run([os.path.join(REPO, "tools", "soh3d_game.sh"), "start", str(entrance), "0x6000"],
+    env = dict(os.environ, ZELDA3D_HEADLESS="1")
+    subprocess.run([os.path.join(REPO, "tools", "zelda3d_game.sh"), "start", str(entrance), "0x6000"],
                    cwd=REPO, env=env, capture_output=True, text=True)
-    subprocess.run([os.path.join(REPO, "tools", "soh3d_repl.py"), "ready"], cwd=REPO, capture_output=True)
+    subprocess.run([os.path.join(REPO, "tools", "zelda3d_repl.py"), "ready"], cwd=REPO, capture_output=True)
     time.sleep(2)
     try:
         rinfo = repl("roominfo")
@@ -121,7 +121,7 @@ def main():
                 roomext.append(float(m.group(2)))
     finally:
         if not keep:
-            subprocess.run([os.path.join(REPO, "tools", "soh3d_game.sh"), "stop"],
+            subprocess.run([os.path.join(REPO, "tools", "zelda3d_game.sh"), "stop"],
                            cwd=REPO, env=env, capture_output=True)
 
     room_ref = max(roomext) if roomext else 0.0

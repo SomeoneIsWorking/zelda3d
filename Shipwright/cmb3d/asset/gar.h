@@ -11,7 +11,7 @@
 #include <string>
 #include <vector>
 
-namespace SoH3D {
+namespace Zelda3D {
 
 struct GarFile {
     std::string name;     // short name, e.g. "skylark"
@@ -42,4 +42,4 @@ class Gar {
     std::vector<GarFile> mFiles;
 };
 
-} // namespace SoH3D
+} // namespace Zelda3D

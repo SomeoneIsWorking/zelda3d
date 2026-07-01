@@ -1,7 +1,7 @@
 #include "pica_texture.h"
 #include <cstring>
 
-namespace SoH3D {
+namespace Zelda3D {
 
 static inline uint8_t e4(uint8_t n) { return (n << 4) | n; }
 static inline uint8_t e5(uint8_t n) { return (n << 3) | (n >> 2); }
@@ -215,4 +215,4 @@ std::vector<uint8_t> PicaLegacyHashBytes(uint32_t glFormat, int width, int heigh
     return out;
 }
 
-} // namespace SoH3D
+} // namespace Zelda3D

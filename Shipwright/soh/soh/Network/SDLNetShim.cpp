@@ -8,7 +8,7 @@
 
 extern "C" {
 
-static const char* kSohNetDisabled = "networking disabled in SoH3D SDL3 build (no SDL3_net)";
+static const char* kSohNetDisabled = "networking disabled in Zelda3D SDL3 build (no SDL3_net)";
 
 int SDLNet_Init(void) {
     return 0; // 0 = "success" so SDLNet_Init() at startup is a harmless no-op

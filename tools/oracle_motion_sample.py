@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
 """oracle_motion_sample.py — sample a live OoT3D actor's per-frame pos/rot from the Azahar oracle.
 
-The 3DS-side half of the BEHAVIORAL motion-parity harness (SoH3D side = REPL `asample`, diff =
+The 3DS-side half of the BEHAVIORAL motion-parity harness (Zelda3D side = REPL `asample`, diff =
 tools/motion_parity.py). Walks the durable static actor chain (see oot3d-decomp docs/actor_layout.md):
 
     gPlayState (0x0050af34, .data)  -> PlayState
@@ -143,7 +143,7 @@ def main():
                          "(e.g. free-fall parity test); pos.y is at actor+0x0C")
     ap.add_argument("--hold-circle", default=None, metavar="CX,CY",
                     help="hold the circle pad at CX,CY (-100..100, e.g. 0,100 = full forward) "
-                         "for the whole capture — drive Link's locomotion (parity vs SoH3D walkhold)")
+                         "for the whole capture — drive Link's locomotion (parity vs Zelda3D walkhold)")
     ap.add_argument("--hold-buttons", default="", help="buttons to hold with --hold-circle (e.g. 'a')")
     ap.add_argument("--out", default="scratch/motion/oracle.csv")
     args = ap.parse_args()

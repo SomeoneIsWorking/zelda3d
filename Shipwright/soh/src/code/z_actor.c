@@ -9,7 +9,7 @@
 #include "objects/object_bdoor/object_bdoor.h"
 #include "soh/ObjectExtension/ObjectExtension.h"
 #include "soh/ObjectExtension/ActorListIndex.h"
-#include "soh3d/soh3d.h"
+#include "zelda3d/zelda3d.h"
 #include "soh/frame_interpolation.h"
 #include "soh/Enhancements/cosmetics/cosmeticsTypes.h"
 #include "soh/Enhancements/game-interactor/GameInteractor.h"
@@ -2673,18 +2673,18 @@ void Actor_UpdateAll(PlayState* play, ActorContext* actorCtx) {
                 actor->yawTowardsPlayer = Actor_WorldYawTowardActor(actor, &player->actor);
                 actor->flags &= ~ACTOR_FLAG_SFX_FOR_PLAYER_BODY_HIT;
 
-                // SoH3D #3: actors with an OoT3D replacement (e.g. En_Ko Kokiri kids / Saria) must keep
+                // Zelda3D #3: actors with an OoT3D replacement (e.g. En_Ko Kokiri kids / Saria) must keep
                 // updating regardless of distance/frustum, or the replaced NPC freezes and its OoT3D model
                 // + dynamic shadow pop out once out of the N64 cull range (only reappearing when the player
                 // re-enters the vanilla activation range). The INSIDE_CULLING_VOLUME flag this gate normally
                 // reads is set in the SEPARATE draw loop (func_800315AC), which runs AFTER Actor_UpdateAll
                 // and can be skipped on some frames — relying on it is fragile. Consult the replacement
                 // override directly here so replaced actors update unconditionally. Vanilla (unreplaced)
-                // actors are unaffected: SoH3D_ActorHasReplacement is a pure id/object lookup that returns
+                // actors are unaffected: Zelda3D_ActorHasReplacement is a pure id/object lookup that returns
                 // false for them, so they keep their normal distance/frustum culling.
                 if ((DECR(actor->freezeTimer) == 0) &&
                     ((actor->flags & (ACTOR_FLAG_UPDATE_CULLING_DISABLED | ACTOR_FLAG_INSIDE_CULLING_VOLUME)) ||
-                     SoH3D_ActorHasReplacement(play, actor))) {
+                     Zelda3D_ActorHasReplacement(play, actor))) {
                     if (actor == player->focusActor) {
                         actor->isTargeted = true;
                     } else {
@@ -2702,7 +2702,7 @@ void Actor_UpdateAll(PlayState* play, ActorContext* actorCtx) {
                     if (GameInteractor_ShouldActorUpdate(actor)) {
                         actor->update(actor, play);
                         GameInteractor_ExecuteOnActorUpdate(actor);
-                        SoH3D_ActorPostUpdate(play, actor); // generic actor-control debug override
+                        Zelda3D_ActorPostUpdate(play, actor); // generic actor-control debug override
                     }
                     func_8003F8EC(play, &play->colCtx.dyna, actor);
                 }
@@ -2809,18 +2809,18 @@ void Actor_Draw(PlayState* play, Actor* actor) {
         }
     }
 
-    // SoH3D: if this actor has an OoT3D model registered, draw it instead of the
-    // N64 model. One central table-driven divert for all actors — see soh3d.c.
-    // SoH3D: lift the actor's RENDER position onto the visible OoT3D ground (render mesh is
+    // Zelda3D: if this actor has an OoT3D model registered, draw it instead of the
+    // N64 model. One central table-driven divert for all actors — see zelda3d.c.
+    // Zelda3D: lift the actor's RENDER position onto the visible OoT3D ground (render mesh is
     // left untouched; inverse of the old terrain warp). Offset world.pos.y for the draw only,
-    // then restore so physics stays on N64 collision. 0 when SoH3D/scene not applicable.
-    f32 soh3dYOff = SoH3D_ActorRenderYOffset(play, actor);
-    actor->world.pos.y += soh3dYOff;
-    if (!SoH3D_TryDrawActor(play, actor)) {
+    // then restore so physics stays on N64 collision. 0 when Zelda3D/scene not applicable.
+    f32 zelda3dYOff = Zelda3D_ActorRenderYOffset(play, actor);
+    actor->world.pos.y += zelda3dYOff;
+    if (!Zelda3D_TryDrawActor(play, actor)) {
         actor->draw(actor, play);
-        SoH3D_AfterActorDraw(play, actor); // close any auto-scale measure bracket
+        Zelda3D_AfterActorDraw(play, actor); // close any auto-scale measure bracket
     }
-    actor->world.pos.y -= soh3dYOff;
+    actor->world.pos.y -= zelda3dYOff;
 
     if (actor->colorFilterTimer != 0) {
         if (actor->colorFilterParams & 0x2000) {
@@ -3006,9 +3006,9 @@ s32 Ship_CalcShouldDrawAndUpdate(PlayState* play, Actor* actor, Vec3f* projected
         return false;
     }
 
-    // SoH3D: actors with an OoT3D replacement (e.g. Kokiri kids) must keep drawing + updating past
+    // Zelda3D: actors with an OoT3D replacement (e.g. Kokiri kids) must keep drawing + updating past
     // the N64 cull distance, or the replacement pops out while the N64 actor is gone. (BACKLOG #7)
-    if (SoH3D_ActorHasReplacement(play, actor)) {
+    if (Zelda3D_ActorHasReplacement(play, actor)) {
         *shouldDraw = true;
         *shouldUpdate = true;
         return true;
@@ -3120,13 +3120,13 @@ void func_800315AC(PlayState* play, ActorContext* actorCtx) {
                         actor->flags &= ~ACTOR_FLAG_INSIDE_CULLING_VOLUME;
                     }
                 } else {
-                    // SoH3D #3: with the extended-culling CVars at default, the SoH3D replacement
+                    // Zelda3D #3: with the extended-culling CVars at default, the Zelda3D replacement
                     // override in Ship_CalcShouldDrawAndUpdate is NOT consulted here — vanilla
                     // func_800314B0 culling clears INSIDE_CULLING_VOLUME at distance, which stops the
                     // actor's update() (z_actor.c update gate) so the replaced NPC FREEZES and pops
                     // out (Mido + all replaced humanoid NPCs). Force the flag for replaced actors so
                     // they keep updating + drawing at any range, independent of the CVars.
-                    if (func_800314B0(play, actor) || SoH3D_ActorHasReplacement(play, actor)) {
+                    if (func_800314B0(play, actor) || Zelda3D_ActorHasReplacement(play, actor)) {
                         actor->flags |= ACTOR_FLAG_INSIDE_CULLING_VOLUME;
                     } else {
                         actor->flags &= ~ACTOR_FLAG_INSIDE_CULLING_VOLUME;
@@ -3137,14 +3137,14 @@ void func_800315AC(PlayState* play, ActorContext* actorCtx) {
             actor->isDrawn = false;
 
             if ((HREG(64) != 1) || ((HREG(65) != -1) && (HREG(65) != HREG(66))) || (HREG(71) == 0)) {
-                // SoH3D #3: draw replaced actors unconditionally (see the update gate in Actor_UpdateAll).
+                // Zelda3D #3: draw replaced actors unconditionally (see the update gate in Actor_UpdateAll).
                 // The flag-forcing block above already sets INSIDE_CULLING_VOLUME for replaced actors, but
                 // OR the override in here too so draw can't be culled by distance/frustum regardless of which
                 // culling-CVar branch ran. Pure id/object lookup -> false for vanilla actors, so they keep
                 // their normal culling.
                 if ((actor->init == NULL) && (actor->draw != NULL) &&
                     ((actor->flags & (ACTOR_FLAG_DRAW_CULLING_DISABLED | ACTOR_FLAG_INSIDE_CULLING_VOLUME)) ||
-                     shipShouldDraw || SoH3D_ActorHasReplacement(play, actor))) {
+                     shipShouldDraw || Zelda3D_ActorHasReplacement(play, actor))) {
                     // #endregion
                     if ((actor->flags & ACTOR_FLAG_REACT_TO_LENS) &&
                         ((play->roomCtx.curRoom.lensMode == LENS_MODE_HIDE_ACTORS) || play->actorCtx.lensActive ||
@@ -4621,7 +4621,7 @@ Gfx* func_80034B54(GraphicsContext* gfxCtx) {
 
 void func_80034BA0(PlayState* play, SkelAnime* skelAnime, OverrideLimbDraw overrideLimbDraw, PostLimbDraw postLimbDraw,
                    Actor* actor, s16 alpha) {
-    SoH3D_SetCurAnim(skelAnime->animation, skelAnime->curFrame, skelAnime->animLength,
+    Zelda3D_SetCurAnim(skelAnime->animation, skelAnime->curFrame, skelAnime->animLength,
                      skelAnime->morphWeight); // capture live anim + playhead + morph for the auto CSAB
                                               // map + phase-lock/cross-fade (inner SkelAnime_DrawFlex/
                                               // raw hook has no SkelAnime)
@@ -4642,7 +4642,7 @@ void func_80034BA0(PlayState* play, SkelAnime* skelAnime, OverrideLimbDraw overr
 
 void func_80034CC4(PlayState* play, SkelAnime* skelAnime, OverrideLimbDraw overrideLimbDraw, PostLimbDraw postLimbDraw,
                    Actor* actor, s16 alpha) {
-    SoH3D_SetCurAnim(skelAnime->animation, skelAnime->curFrame, skelAnime->animLength,
+    Zelda3D_SetCurAnim(skelAnime->animation, skelAnime->curFrame, skelAnime->animLength,
                      skelAnime->morphWeight); // capture live anim + playhead + morph (see above)
     OPEN_DISPS(play->state.gfxCtx);
 

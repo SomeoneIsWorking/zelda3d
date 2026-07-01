@@ -1,6 +1,6 @@
 // Z3DBoot.h — Zelda3D headless debug-warp boot for native MM.
 //
-// Mirrors soh3d's SoH3D_AutoWarp* seam for OoT (soh/src/soh3d/soh3d.c): when the env gate is set,
+// Mirrors zelda3d's Zelda3D_AutoWarp* seam for OoT (soh/src/zelda3d/zelda3d.c): when the env gate is set,
 // MM boots straight into the MapSelect debug overlay and warps into a gameplay scene, skipping the
 // title screen + attract-demo cutscene loop (SPOT00 -> Z2_CLOCKTOWER -> ... -> Z2_TOWN) that a
 // no-input headless boot otherwise cycles forever. This is the deterministic path to real gameplay.

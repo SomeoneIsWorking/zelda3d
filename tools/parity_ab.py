@@ -1,21 +1,21 @@
 #!/usr/bin/env python3
-"""parity_ab.py — one-command coordinate-matched SoH3D-vs-OoT3D-oracle A/B for a scene.
+"""parity_ab.py — one-command coordinate-matched Zelda3D-vs-OoT3D-oracle A/B for a scene.
 
-OoT3D shares N64/SoH entrance INDICES and spawn COORDS ([[soh3d-oracle-entrance-match]]), so we can
+OoT3D shares N64/SoH entrance INDICES and spawn COORDS ([[zelda3d-oracle-entrance-match]]), so we can
 drive BOTH engines to the same scene+coords and frame them identically. This wraps the fragile manual
-steps (launch SoH3D, warp oracle, keep Link alive, match camera, crop the 3DS top screen, composite):
+steps (launch Zelda3D, warp oracle, keep Link alive, match camera, crop the 3DS top screen, composite):
 
   python3 tools/parity_ab.py 0xEE --time 0x6000 --name kokiri
   python3 tools/parity_ab.py 206  --time 0xC000 --name hf --cam "160 120 1850 160 30 1415"
 
-Entrance arg = SoH/OoT3D entrance index (hex 0x.. or decimal). It launches SoH3D there, warps the
+Entrance arg = SoH/OoT3D entrance index (hex 0x.. or decimal). It launches Zelda3D there, warps the
 oracle to the same index, ENSURES the immortal-Link keeper (tools/oracle_keeper.py) is running so the
 oracle survives deadly spawns, screenshots both, and writes a side-by-side composite to
 scratch/screenshots/ab_<name>_cmp.png (plus the raw _soh.png / _oracle_top.png).
 
-NOTE on what to compare: lighting brightness/hue is OFF-LIMITS ([[soh3d-stop-microtuning-lighting]],
+NOTE on what to compare: lighting brightness/hue is OFF-LIMITS ([[zelda3d-stop-microtuning-lighting]],
 #110/#111). Compare STRUCTURE / actor presence / poses / effects. The 3DS top screen is 5:3 (400x240);
-SoH3D is widescreen — the composite scales both to a common height, so judge content, not exact aspect.
+Zelda3D is widescreen — the composite scales both to a common height, so judge content, not exact aspect.
 """
 import os, sys, time, subprocess, struct
 
@@ -47,7 +47,7 @@ def ensure_keeper():
 
 
 def repl(cmd, timeout=25):
-    return subprocess.run(["python3", os.path.join(TOOLS, "soh3d_repl.py"), "cmd", cmd],
+    return subprocess.run(["python3", os.path.join(TOOLS, "zelda3d_repl.py"), "cmd", cmd],
                           cwd=REPO, capture_output=True, text=True, timeout=timeout).stdout.strip()
 
 
@@ -67,7 +67,7 @@ def compose(soh_png, oracle_top_png, out_png):
     cmp = Image.new("RGB", (a.width + gap + b.width, H + 28), (20, 20, 20))
     cmp.paste(a, (0, 28)); cmp.paste(b, (a.width + gap, 28))
     d = ImageDraw.Draw(cmp)
-    d.text((6, 8), "SoH3D", fill=(120, 220, 120))
+    d.text((6, 8), "Zelda3D", fill=(120, 220, 120))
     d.text((a.width + gap + 6, 8), "OoT3D oracle (3DS top screen)", fill=(220, 200, 120))
     cmp.save(out_png)
     return out_png
@@ -97,8 +97,8 @@ def main():
     print(f"[parity_ab] entrance dec={dec} hex={hexs} time={time_arg} name={name}")
     print(f"[parity_ab] keeper: {ensure_keeper()}")
 
-    print("[parity_ab] restarting SoH3D…")
-    r = subprocess.run(f"SOH3D_HEADLESS=1 tools/soh3d_game.sh restart {dec} {time_arg}",
+    print("[parity_ab] restarting Zelda3D…")
+    r = subprocess.run(f"ZELDA3D_HEADLESS=1 tools/zelda3d_game.sh restart {dec} {time_arg}",
                        shell=True, cwd=REPO, capture_output=True, text=True)
     print("  " + (r.stdout.strip().splitlines()[-1] if r.stdout.strip() else r.stderr.strip()[-200:]))
 
@@ -109,7 +109,7 @@ def main():
 
     time.sleep(settle)
 
-    # --orbit: read the (matched) spawn pos from SoH3D and frame Link from the same WORLD angle in
+    # --orbit: read the (matched) spawn pos from Zelda3D and frame Link from the same WORLD angle in
     # both engines -> identical framing with no per-scene coordinate guessing.
     if orbit and not cam:
         import math, re
@@ -131,7 +131,7 @@ def main():
     soh_png = os.path.join(SHOTDIR, f"ab_{name}_soh.png")
     if cam:
         repl(f"cam {cam}")
-    subprocess.run(["python3", os.path.join(TOOLS, "soh3d_repl.py"), "shot", f"ab_{name}_soh"],
+    subprocess.run(["python3", os.path.join(TOOLS, "zelda3d_repl.py"), "shot", f"ab_{name}_soh"],
                    cwd=REPO, capture_output=True, text=True, timeout=30)
 
     if cam:

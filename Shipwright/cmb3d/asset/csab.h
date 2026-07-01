@@ -11,7 +11,7 @@
 #include <array>
 #include <string>
 
-namespace SoH3D {
+namespace Zelda3D {
 
 class Cmb;
 
@@ -125,4 +125,4 @@ void restPoseSkinMatrices(const Cmb& model, std::vector<std::array<float, 16>>& 
                           const float* boneRotDelta = nullptr, int deltaCount = 0,
                           const float* bonePostRot = nullptr, int postCount = 0);
 
-} // namespace SoH3D
+} // namespace Zelda3D

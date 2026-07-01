@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
 """oracle_link_pose.py — capture OoT3D Link's LIVE per-bone LOCAL rotations per frame from Azahar.
 
-The ORACLE half of the geometry-level Link animation parity sweep (SoH3D half = REPL `skindump`;
+The ORACLE half of the geometry-level Link animation parity sweep (Zelda3D half = REPL `skindump`;
 diff = tools/parity_pose_diff.py).
 
 Reads Link's pose from the live **jointTable** at `PLAYER+0x254+0x78` (the SkelAnime controller; see
@@ -14,7 +14,7 @@ under headless Azahar — do NOT use it for per-frame pose. We capture the local
 pure anim output, parent-relative, directly comparable across rigs).
 
 Azahar runs ~60fps; we oversample and keep only rows where the pose changed. Optionally hold the circle
-pad + buttons for the whole capture to drive a state (locomotion, etc.) — the oracle analog of SoH3D's
+pad + buttons for the whole capture to drive a state (locomotion, etc.) — the oracle analog of Zelda3D's
 `walkhold` / `btnhold`. Combine with `oot3d-decomp tools/link_ctl.py warp <entrance>` to reach open
 ground (e.g. Kokiri Forest 0xEE) where Link can sustain a run.
 

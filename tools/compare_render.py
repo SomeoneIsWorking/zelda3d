@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""compare_render.py — quantitative checks on SoH3D render dumps. NEVER eyeball.
+"""compare_render.py — quantitative checks on Zelda3D render dumps. NEVER eyeball.
 
 Isolates the model's pixels by diffing an OoT3D render (SOH3D=1) against the N64
 render (SOH3D=0) of the same scene/spawn, then reports the model-region mean colour

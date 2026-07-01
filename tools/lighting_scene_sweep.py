@@ -2,7 +2,7 @@
 """lighting_scene_sweep.py — whole-game #111 world-lighting parity sweep.
 
 For EVERY real scene (first entrance from entrance_table.h, reusing scene_crashscan's
-skip-lists) it cold-boots SoH3D headless and captures three frames with quantitative
+skip-lists) it cold-boots Zelda3D headless and captures three frames with quantitative
 floor-region measurements:
   - OFF-day  (worldshade 0, time 0x8000)  -> regression baseline
   - ON-day   (worldshade 1, time 0x8000)  -> must not regress vs OFF-day
@@ -17,7 +17,7 @@ those are reported but not flagged. Review the flagged scenes' PNGs.
 Shots: scratch/screenshots/lightsweep/<key>_<offday|onday|onnight>.png
 Results: scratch/lightsweep_results.json  (incremental; --resume to continue)
 
-Usage: SOH3D_3DS_ROM unused here; just `python3 tools/lighting_scene_sweep.py [--resume]`
+Usage: ZELDA3D_3DS_ROM unused here; just `python3 tools/lighting_scene_sweep.py [--resume]`
 """
 import json, os, re, subprocess, sys, shutil
 
@@ -36,13 +36,13 @@ from PIL import Image
 
 
 def repl(cmd):
-    subprocess.run(["tools/soh3d_repl.py", "cmd", cmd], cwd=REPO,
+    subprocess.run(["tools/zelda3d_repl.py", "cmd", cmd], cwd=REPO,
                    capture_output=True, text=True, timeout=20)
 
 
 def shot(name):
     """Take a shot (flat name) and move it into OUTDIR; return its final path or None."""
-    r = subprocess.run(["tools/soh3d_repl.py", "shot", name], cwd=REPO,
+    r = subprocess.run(["tools/zelda3d_repl.py", "shot", name], cwd=REPO,
                        capture_output=True, text=True, timeout=30)
     src = os.path.join(SHOTDIR, name + ".png")
     if not os.path.exists(src):
@@ -80,7 +80,7 @@ def main():
         key = f"0x{idx:03X}"
         if resume and key in results:
             continue
-        r = subprocess.run(f"SOH3D_HEADLESS=1 tools/soh3d_game.sh start {idx} 0x8000",
+        r = subprocess.run(f"ZELDA3D_HEADLESS=1 tools/zelda3d_game.sh start {idx} 0x8000",
                            shell=True, cwd=REPO, capture_output=True, text=True, timeout=150)
         ready = "ready (pid" in (r.stdout + r.stderr)
         crash = ""

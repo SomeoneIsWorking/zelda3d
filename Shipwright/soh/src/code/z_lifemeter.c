@@ -4,21 +4,21 @@
 #include "soh/OTRGlobals.h"
 #include "soh/Enhancements/cosmetics/cosmeticsTypes.h"
 #include "soh/Enhancements/game-interactor/GameInteractor_Hooks.h"
-#include "soh3d/soh3d.h" // #31 — crisp higher-res HUD heart textures (SoH3D_HudTexEnabled / SoH3D_HeartTex)
+#include "zelda3d/zelda3d.h" // #31 — crisp higher-res HUD heart textures (Zelda3D_HudTexEnabled / Zelda3D_HeartTex)
 
-// #31 — map an N64 heart texture symbol to a SOH3D_HEART_* kind, or -1 if it isn't a heart we
+// #31 — map an N64 heart texture symbol to a ZELDA3D_HEART_* kind, or -1 if it isn't a heart we
 // replace. The DD (double-defense) variants reuse the same crisp shapes (tint differs via PRIM/ENV).
-static int SoH3D_HeartKind(void* tex) {
+static int Zelda3D_HeartKind(void* tex) {
     if (tex == (void*)gHeartFullTex || tex == (void*)gDefenseHeartFullTex)
-        return SOH3D_HEART_FULL;
+        return ZELDA3D_HEART_FULL;
     if (tex == (void*)gHeartThreeQuarterTex || tex == (void*)gDefenseHeartThreeQuarterTex)
-        return SOH3D_HEART_THREEQUARTER;
+        return ZELDA3D_HEART_THREEQUARTER;
     if (tex == (void*)gHeartHalfTex || tex == (void*)gDefenseHeartHalfTex)
-        return SOH3D_HEART_HALF;
+        return ZELDA3D_HEART_HALF;
     if (tex == (void*)gHeartQuarterTex || tex == (void*)gDefenseHeartQuarterTex)
-        return SOH3D_HEART_QUARTER;
+        return ZELDA3D_HEART_QUARTER;
     if (tex == (void*)gHeartEmptyTex || tex == (void*)gDefenseHeartEmptyTex)
-        return SOH3D_HEART_EMPTY;
+        return ZELDA3D_HEART_EMPTY;
     return -1;
 }
 
@@ -396,10 +396,10 @@ s16 getHealthMeterYOffset() {
 }
 
 void HealthMeter_Draw(PlayState* play) {
-    // SoH3D PC HUD replaces the N64 heart draw — suppress it when the native Vulkan PC HUD is active.
+    // Zelda3D PC HUD replaces the N64 heart draw — suppress it when the native Vulkan PC HUD is active.
     {
-        extern int SoH3D_PcHudEnabled(void);
-        if (SoH3D_PcHudEnabled()) {
+        extern int Zelda3D_PcHudEnabled(void);
+        if (Zelda3D_PcHudEnabled()) {
             return;
         }
     }
@@ -444,7 +444,7 @@ void HealthMeter_Draw(PlayState* play) {
     // FULL texture maps onto the quad (same fix as the #32 A-button quad). Probe the FULL heart once;
     // if it decodes we use the crisp set, else fall back to the byte-identical N64 path.
     int s3HeartW = 0, s3HeartH = 0;
-    const void* s3HeartProbe = SoH3D_HudTexEnabled() ? SoH3D_HeartTex(SOH3D_HEART_FULL, &s3HeartW, &s3HeartH) : NULL;
+    const void* s3HeartProbe = Zelda3D_HudTexEnabled() ? Zelda3D_HeartTex(ZELDA3D_HEART_FULL, &s3HeartW, &s3HeartH) : NULL;
     s32 useSoh3dHearts = (s3HeartProbe != NULL);
     {
         s16 farTcX = useSoh3dHearts ? (s16)(s3HeartW << 5) : 512;
@@ -588,9 +588,9 @@ void HealthMeter_Draw(PlayState* play) {
             int s3w = 0, s3h = 0;
             const void* s3 = NULL;
             if (useSoh3dHearts) {
-                int kind = SoH3D_HeartKind(heartBgImg);
+                int kind = Zelda3D_HeartKind(heartBgImg);
                 if (kind >= 0) {
-                    s3 = SoH3D_HeartTex(kind, &s3w, &s3h);
+                    s3 = Zelda3D_HeartTex(kind, &s3w, &s3h);
                 }
             }
             if (s3 != NULL) {

@@ -26,7 +26,7 @@
 #   tap a     → File 1 highlighted
 #   tap a     → loads the save → spawns in Kokiri Forest (scene 85)
 #
-# Requires: source .env first (SOH3D_3DS_ROM); PIL (Pillow) for screenshots.
+# Requires: source .env first (ZELDA3D_3DS_ROM); PIL (Pillow) for screenshots.
 set -euo pipefail
 
 REPO="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
@@ -161,12 +161,12 @@ do_boot() {
     fi
 
     # ROM check.
-    if [[ -z "${SOH3D_3DS_ROM:-}" ]]; then
-        echo "[oracle_boot] ERROR: SOH3D_3DS_ROM not set. Run: source .env" >&2
+    if [[ -z "${ZELDA3D_3DS_ROM:-}" ]]; then
+        echo "[oracle_boot] ERROR: ZELDA3D_3DS_ROM not set. Run: source .env" >&2
         exit 1
     fi
-    if [[ ! -f "$SOH3D_3DS_ROM" ]]; then
-        echo "[oracle_boot] ERROR: ROM not found: $SOH3D_3DS_ROM" >&2
+    if [[ ! -f "$ZELDA3D_3DS_ROM" ]]; then
+        echo "[oracle_boot] ERROR: ROM not found: $ZELDA3D_3DS_ROM" >&2
         exit 1
     fi
 
@@ -174,7 +174,7 @@ do_boot() {
 
     echo "[oracle_boot] Launching Azahar headless on $XVFB_DISPLAY..."
     DISPLAY="$XVFB_DISPLAY" QT_QPA_PLATFORM=xcb setsid nohup \
-        "$AZAHAR" "$SOH3D_3DS_ROM" \
+        "$AZAHAR" "$ZELDA3D_3DS_ROM" \
         >"$SCRATCH/logs/oracle.log" 2>&1 &
     local new_pid=$!
     save_pid "$new_pid" "$XVFB_DISPLAY"

@@ -2,7 +2,7 @@
 """coverage_scene_sweep.py — whole-game CHARACTER / OBJECT / GEOMETRY render-parity audit.
 
 For EVERY real scene (first entrance from entrance_table.h, reusing scene_crashscan's
-skip-lists) it cold-boots SoH3D headless, enumerates the loaded actors via the REPL
+skip-lists) it cold-boots Zelda3D headless, enumerates the loaded actors via the REPL
 `actorsnear` coverage audit, and screenshots the scene. Per actor `actorsnear` reports:
   TABLE / AUTO:<zar>[ (skin)]  -> renders as the OoT3D model (parity OK)
   HANA-*/ISHI-* (3DS)          -> OoT3D prop
@@ -14,7 +14,7 @@ world geometry render?" — the deliverable is:
   - a screenshot per scene (scratch/screenshots/coverage/<key>.png) for geometry review
   - aggregate: the GLOBAL set of actor ids that render as N64 anywhere (the coverage gap)
 
-NOTE: SoH3D loads only the current room's actors at an entrance, so this samples each scene's
+NOTE: Zelda3D loads only the current room's actors at an entrance, so this samples each scene's
 entrance room (multi-room scenes need roomwarp for full coverage — a follow-up). The N64-actor
 list still aggregates the gaps seen across all entrance rooms. Geometry/visual correctness needs
 the PNGs eyeballed; this tool flags only the quantitative signals (empty/black frame).
@@ -36,13 +36,13 @@ from PIL import Image
 
 
 def repl(cmd, timeout=20):
-    r = subprocess.run(["tools/soh3d_repl.py", "cmd", cmd], cwd=REPO,
+    r = subprocess.run(["tools/zelda3d_repl.py", "cmd", cmd], cwd=REPO,
                        capture_output=True, text=True, timeout=timeout)
     return r.stdout + r.stderr
 
 
 def shot(name):
-    subprocess.run(["tools/soh3d_repl.py", "shot", name], cwd=REPO,
+    subprocess.run(["tools/zelda3d_repl.py", "shot", name], cwd=REPO,
                    capture_output=True, text=True, timeout=30)
     src = os.path.join(SHOTDIR, name + ".png")
     if not os.path.exists(src):
@@ -112,7 +112,7 @@ def main():
         key = f"0x{idx:03X}"
         if resume and key in results:
             continue
-        r = subprocess.run(f"SOH3D_HEADLESS=1 tools/soh3d_game.sh start {idx} 0x8000",
+        r = subprocess.run(f"ZELDA3D_HEADLESS=1 tools/zelda3d_game.sh start {idx} 0x8000",
                            shell=True, cwd=REPO, capture_output=True, text=True, timeout=150)
         ready = "ready (pid" in (r.stdout + r.stderr)
         crash = ""
@@ -136,7 +136,7 @@ def main():
         counts = {"table": 0, "auto": 0, "auto_skin": 0, "prop3ds": 0, "module": 0, "n64": 0}
         n64_ids = {}
         for aid, params, cat, cov in actors:
-            if cat == 2:  # ACTORCAT_PLAYER: drawn via the dedicated SoH3D_TryDrawPlayer path, not N64
+            if cat == 2:  # ACTORCAT_PLAYER: drawn via the dedicated Zelda3D_TryDrawPlayer path, not N64
                 continue
             k = classify(cov)
             counts[k] += 1

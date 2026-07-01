@@ -11,7 +11,7 @@
 #include <libultraship/bridge/gfxbridge.h>
 #include "soh/OTRGlobals.h"
 #include "soh/ResourceManagerHelpers.h"
-#include "soh3d/soh3d.h"
+#include "zelda3d/zelda3d.h"
 
 void func_80095AB4(PlayState* play, Room* room, u32 flags);
 void func_80095D04(PlayState* play, Room* room, u32 flags);
@@ -633,16 +633,16 @@ s32 func_800973FC(PlayState* play, RoomContext* roomCtx) {
 void Room_Draw(PlayState* play, Room* room, u32 flags) {
     if (room->segment != NULL) {
         gSegments[3] = VIRTUAL_TO_PHYSICAL(room->segment);
-        // SoH3D: if this scene has an OoT3D room model, draw it (world-origin GL path). If SoH3D is
+        // Zelda3D: if this scene has an OoT3D room model, draw it (world-origin GL path). If Zelda3D is
         // on but the scene isn't mapped yet, still refuse to fall back to the N64 room mesh — the
         // 3DS product has no N64 renderer, and the honest render for an unmapped scene is empty
         // (skybox + actors, no walls/floor), not a mixed-renderer hybrid. #134.
         if (flags & 1) {
-            if (SoH3D_TryDrawRoom(play, room)) {
+            if (Zelda3D_TryDrawRoom(play, room)) {
                 return;
             }
-            if (SoH3D_Enabled()) {
-                return; // unmapped scene under SoH3D → empty room, no N64 mesh
+            if (Zelda3D_Enabled()) {
+                return; // unmapped scene under Zelda3D → empty room, no N64 mesh
             }
         }
         assert(room->meshHeader->base.type < ARRAY_COUNTU(sRoomDrawHandlers));

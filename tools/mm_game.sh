@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# Single-instance native-MM (2s2h) headless game manager — the MM counterpart to soh3d_game.sh.
+# Single-instance native-MM (2s2h) headless game manager — the MM counterpart to zelda3d_game.sh.
 # Boots mm.elf under a private Xvfb with the debug-warp gate AND both control FIFOs wired:
 #   - shared scripted-input FIFO ($SHIP_SCRIPTED_FIFO, libultraship ScriptedInputFifo) for input
 #   - MM per-game REPL FIFO      ($ZELDA3D_MM_REPL, mm/2s2h/Z3DRepl.c) for PlayState queries

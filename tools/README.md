@@ -1,4 +1,4 @@
-# SoH3D extraction tooling
+# Zelda3D extraction tooling
 
 Dependency-free readers for OoT3D (decrypted .3ds) assets. No emulator/bootrom
 needed for extraction (the dump is decrypted).

@@ -2,7 +2,7 @@
 #ifdef ENABLE_SDL3GPU
 
 // ============================================================================
-// SDL3 GPU rendering backend for Fast3D (soh3d).
+// SDL3 GPU rendering backend for Fast3D (zelda3d).
 //
 // Ported from gfx_vulkan.cpp (the structural template). SDL3 GPU is a thinner
 // version of the same explicit model — one SDL_GPUDevice instead of
@@ -32,7 +32,7 @@
 // ============================================================================
 
 #include "fast/backends/gfx_sdl3gpu.h"
-#include "fast/backends/soh3d_sdl3gpu.h" // SoH3DRenderer / SoH3DHudRenderer member subsystems
+#include "fast/backends/zelda3d_sdl3gpu.h" // Zelda3DRenderer / Zelda3DHudRenderer member subsystems
 #include "fast/backends/gfx_sdl.h"
 #include "fast/backends/unified_shader.h" // render-unification Phase 1 dormant shader selftest
 #include "fast/backends/unified_n64_pack.h" // render-unification Phase 3: CCFeatures -> UnifiedMaterial
@@ -56,7 +56,7 @@
 #include <vector>
 #include <spdlog/spdlog.h>
 
-// SoH3D frame-dump globals (defined in gfx_sdl2.cpp). The REPL sets these to capture the current
+// Zelda3D frame-dump globals (defined in gfx_sdl2.cpp). The REPL sets these to capture the current
 // frame on demand; we honor them from the present path (reading fb 0, which works headless).
 extern "C" {
 extern char gSoh3dDumpPath[1024];
@@ -626,7 +626,7 @@ const char* GfxRenderingAPISdl3Gpu::GetName() {
 // ---------------------------------------------------------------------------
 
 void GfxRenderingAPISdl3Gpu::CreateDeviceAndClaim() {
-    const char* dbg = getenv("SOH3D_SDL3GPU_DEBUG");
+    const char* dbg = getenv("ZELDA3D_SDL3GPU_DEBUG");
     bool debug = dbg != nullptr && dbg[0] == '1';
     mDevice = SDL_CreateGPUDevice(SDL_GPU_SHADERFORMAT_SPIRV, debug, nullptr);
     if (mDevice == nullptr) {
@@ -673,15 +673,15 @@ void GfxRenderingAPISdl3Gpu::Init() {
     g_activeSdl3GpuApi = this;
     // Create the folded-in renderer subsystems now that the device is ready and g_activeSdl3GpuApi is
     // set (their lazy ensureResources() pulls the device through g_activeSdl3GpuApi on first use).
-    mSoh3d = std::make_unique<SoH3DRenderer>();
-    mHud = std::make_unique<SoH3DHudRenderer>();
+    mSoh3d = std::make_unique<Zelda3DRenderer>();
+    mHud = std::make_unique<Zelda3DHudRenderer>();
     SPDLOG_INFO("SDL3 GPU backend initialized (P2: N64 Fast3D world)");
 
     // Render-unification effort (kanban #131), Phase 1: the unified shader (unified_shader.h) is
-    // still dormant/unreferenced by any draw path. SOH3D_UNIFIED_SHADER_SELFTEST=1 compiles its six
+    // still dormant/unreferenced by any draw path. ZELDA3D_UNIFIED_SHADER_SELFTEST=1 compiles its six
     // variants to SPIR-V here (once, at backend init) purely to catch a GLSL authoring mistake —
     // zero cost/behavior change when unset.
-    if (getenv("SOH3D_UNIFIED_SHADER_SELFTEST") != nullptr) {
+    if (getenv("ZELDA3D_UNIFIED_SHADER_SELFTEST") != nullptr) {
         std::string log;
         bool ok = Fast::Unified::SelfTestUnifiedShaderVariants(log);
         if (ok) {
@@ -854,13 +854,13 @@ void GfxRenderingAPISdl3Gpu::ReplayOps(SDL_GPUTexture* presentTex, uint32_t pres
                     endPass();
                     beginPass(op.fb);
                 }
-                // Diagnostic (SOH3D_DBG_OPDRAW=1): dump every replayed draw's recorded state —
+                // Diagnostic (ZELDA3D_DBG_OPDRAW=1): dump every replayed draw's recorded state —
                 // pipeline, vertex range, and each fragment-sampler binding. With a synchronous GPU
                 // (LP_NUM_THREADS=0 on lavapipe, or any single-threaded driver) the last line printed
-                // before a fault pins the exact culprit op; combined with SOH3D_SDL3GPU_DEBUG=1
+                // before a fault pins the exact culprit op; combined with ZELDA3D_SDL3GPU_DEBUG=1
                 // validation it's how the "bones"-descriptor / pipeline-layout crash was found. Pure
                 // logging, no behaviour change.
-                static const bool kDbgOpDraw = getenv("SOH3D_DBG_OPDRAW") != nullptr;
+                static const bool kDbgOpDraw = getenv("ZELDA3D_DBG_OPDRAW") != nullptr;
                 if (kDbgOpDraw) {
                     static const char* kClass[] = { "n64", "model", "hud" };
                     fprintf(stderr, "[DBG_OPDRAW] fb=%d cls=%s pipe=%p nVerts=%u first=%u vbo=%p nSamp=%u", op.fb,
@@ -877,17 +877,17 @@ void GfxRenderingAPISdl3Gpu::ReplayOps(SDL_GPUTexture* presentTex, uint32_t pres
                 SDL_SetGPUScissor(pass, &op.scissor);
                 // Only the uniform push + vertex source differ across the draw classes (the vertex
                 // layout is baked into op.pipeline). The single fragment-sampler bind path below and the
-                // draw are shared. altVbo != null selects the SoH3D model / HUD buffer (offset 0); null
+                // draw are shared. altVbo != null selects the Zelda3D model / HUD buffer (offset 0); null
                 // falls back to the shared frame mVbo at vboOffset (N64). DRAW_FULLSCREEN binds no vbo.
                 bool bindVbo = true;
                 switch (op.drawClass) {
                     case Op::DRAW_MODEL: {
                         // Two-block push: common state at binding 0 (both stages), bone matrices at
-                        // vertex binding 1 — neither may exceed SDL3 GPU's 4096-byte cap (soh3d_sg_ubo.h).
-                        const uint8_t* u = mSoh3dModelUbos[op.soh3dDrawIdx].data();
-                        SDL_PushGPUVertexUniformData(mCmd, 0, u, SoH3DSg::kCommonBytes);
-                        SDL_PushGPUFragmentUniformData(mCmd, 0, u, SoH3DSg::kCommonBytes);
-                        SDL_PushGPUVertexUniformData(mCmd, 1, u + SoH3DSg::kCommonBytes, SoH3DSg::kBonesBytes);
+                        // vertex binding 1 — neither may exceed SDL3 GPU's 4096-byte cap (zelda3d_sg_ubo.h).
+                        const uint8_t* u = mSoh3dModelUbos[op.zelda3dDrawIdx].data();
+                        SDL_PushGPUVertexUniformData(mCmd, 0, u, Zelda3DSg::kCommonBytes);
+                        SDL_PushGPUFragmentUniformData(mCmd, 0, u, Zelda3DSg::kCommonBytes);
+                        SDL_PushGPUVertexUniformData(mCmd, 1, u + Zelda3DSg::kCommonBytes, Zelda3DSg::kBonesBytes);
                         break;
                     }
                     case Op::DRAW_HUD:
@@ -944,7 +944,7 @@ void GfxRenderingAPISdl3Gpu::ReplayOps(SDL_GPUTexture* presentTex, uint32_t pres
                 break;
             }
             case OP_EXT_OWN_PASS: {
-                // Offscreen SoH3D pass (shadow / AO depth). The callback owns its own render pass, so
+                // Offscreen Zelda3D pass (shadow / AO depth). The callback owns its own render pass, so
                 // the main fb pass must be closed first (SDL3 GPU render passes do not nest).
                 endPass();
                 if (op.extOwn)
@@ -1137,9 +1137,9 @@ SDL_GPUSampler* GfxRenderingAPISdl3Gpu::GetOrCreateSampler(bool linear, uint32_t
 }
 
 // The one sampler factory + cache for the whole backend, keyed on the fully-resolved SDL params so
-// the N64 wrapper above and the SoH3D model path (LINEAR + max_lod=1000) share it without colliding
+// the N64 wrapper above and the Zelda3D model path (LINEAR + max_lod=1000) share it without colliding
 // (the differing max_lod lands in a distinct cache slot). max_lod is bucketed to {0, nonzero}: the
-// only two values in use are 0 (N64) and 1000 (SoH3D), and a non-mipmapped texture is unaffected by
+// only two values in use are 0 (N64) and 1000 (Zelda3D), and a non-mipmapped texture is unaffected by
 // any positive max_lod, so one "uncapped" bucket suffices.
 SDL_GPUSampler* GfxRenderingAPISdl3Gpu::GetOrCreateSamplerEx(SDL_GPUFilter filter, SDL_GPUSamplerAddressMode u,
                                                              SDL_GPUSamplerAddressMode v, float maxLod) {
@@ -1151,7 +1151,7 @@ SDL_GPUSampler* GfxRenderingAPISdl3Gpu::GetOrCreateSamplerEx(SDL_GPUFilter filte
     si.min_filter = filter;
     si.mag_filter = filter;
     // Trilinear across the mip chain only when the caller actually uploaded one (max_lod>0 is
-    // the CMB path — see SoH3DRenderer::getSampler / uploadTexture). N64 textures ship with a
+    // the CMB path — see Zelda3DRenderer::getSampler / uploadTexture). N64 textures ship with a
     // single level (max_lod=0), and jumping between mips there would just cost us the crisp
     // point-sampled look Fast3D expects. Nearest-mip on the CMB path produced hard mip
     // boundaries → radial moiré on room walls at grazing angles (#134).
@@ -1678,7 +1678,7 @@ void GfxRenderingAPISdl3Gpu::UploadTexture(const uint8_t* rgba32Buf, uint32_t wi
             // ops ALREADY recorded this frame captured the old pointer and will bind it at replay time,
             // so releasing it now is a use-after-free. Proven on macOS/MoltenVK (BindFragmentSamplers
             // faults on the freed handle; refByOp>=0 below). DeferReleaseTexture handles the lifetime.
-            static const bool kDbgOpDraw = getenv("SOH3D_DBG_OPDRAW") != nullptr;
+            static const bool kDbgOpDraw = getenv("ZELDA3D_DBG_OPDRAW") != nullptr;
             if (kDbgOpDraw) {
                 int refOp = -1;
                 for (size_t oi = 0; oi < mOps.size(); oi++)
@@ -1944,7 +1944,7 @@ void GfxRenderingAPISdl3Gpu::DrawTriangles(float bufVbo[], size_t bufVboLen, siz
             unified = false; // shader/pipeline create failed — fall back rather than drop the draw
         else {
             UnifiedMaterial um = Fast_PackCCFeaturesToUnifiedMaterial(cc);
-            SoH3DUnified::UnifiedDrawUbo uu{};
+            Zelda3DUnified::UnifiedDrawUbo uu{};
             // uMvp/uMv unused when alreadyTransformed (N64 always is here) except uMv for vNrmView,
             // which N64 content never lights from (lightingMode 0) — identity is fine either way.
             uu.common.uMvp[0] = uu.common.uMvp[5] = uu.common.uMvp[10] = uu.common.uMvp[15] = 1.0f;
@@ -1955,7 +1955,7 @@ void GfxRenderingAPISdl3Gpu::DrawTriangles(float bufVbo[], size_t bufVboLen, siz
             uu.common.uParams0[0] = um.alphaRef;
             uu.common.uParams0[1] = 0.0f; // lightingMode 0 — N64 color0 is already the final shade
             uu.common.uParams0[2] = (float)um.cycleCount;
-            static const char* freezeStrN64 = getenv("SOH3D_FREEZE_NOISE_FRAME");
+            static const char* freezeStrN64 = getenv("ZELDA3D_FREEZE_NOISE_FRAME");
             uu.common.uParams0[3] =
                 freezeStrN64 != nullptr ? (float)atoi(freezeStrN64) : (float)mFrameCount;
             uu.common.uParams1[0] = mCurrentNoiseScale;
@@ -1964,7 +1964,7 @@ void GfxRenderingAPISdl3Gpu::DrawTriangles(float bufVbo[], size_t bufVboLen, siz
             uu.common.uParams1[3] = 1.0f; // alreadyTransformed
             mSoh3dModelUbos.push_back({});
             memcpy(mSoh3dModelUbos.back().data(), &uu, sizeof(uu));
-            op.soh3dDrawIdx = (int)mSoh3dModelUbos.size() - 1;
+            op.zelda3dDrawIdx = (int)mSoh3dModelUbos.size() - 1;
             op.drawClass = Op::DRAW_MODEL; // reuses the existing common+bones push path unchanged
             op.altVbo = nullptr;           // fall back to the shared mVbo at vboOffset, like N64 today
         }
@@ -2023,7 +2023,7 @@ void GfxRenderingAPISdl3Gpu::DrawTriangles(float bufVbo[], size_t bufVboLen, siz
     // Test harnesses (tools/render_unify_corpus_sweep.py, tools/unified_ab_sweep.py) pin this so
     // the frame_count-seeded alpha-dither noise (RAND_NOISE above) is bit-identical between two
     // captures being pixel-diffed; without it, dither alone fails any raw LSB comparison.
-    static const char* freezeStr = getenv("SOH3D_FREEZE_NOISE_FRAME");
+    static const char* freezeStr = getenv("ZELDA3D_FREEZE_NOISE_FRAME");
     ubo.frame_count = freezeStr != nullptr ? atoi(freezeStr) : (int32_t)mFrameCount;
     ubo.noise_scale = mCurrentNoiseScale;
     ubo.prim_depth = mCurrentPrimDepth;
@@ -2374,12 +2374,12 @@ void GfxRenderingAPISdl3Gpu::SetCurrentPrimDepth(float depth) {
 }
 
 // ---------------------------------------------------------------------------
-// SoH3D unified-op hooks (P3): the OoT3D model / HUD / RmlUi content appends its draws as ops into
+// Zelda3D unified-op hooks (P3): the OoT3D model / HUD / RmlUi content appends its draws as ops into
 // the SAME deferred op-list as the N64 triangles, replayed in ONE render pass in FinishRender. The
-// legacy BeginSoH3DPass live-command-buffer handshake is gone (the methods below are the only path).
+// legacy BeginZelda3DPass live-command-buffer handshake is gone (the methods below are the only path).
 // ---------------------------------------------------------------------------
 
-void GfxRenderingAPISdl3Gpu::GetSoH3DViewportScissor(SDL_GPUViewport& vp, SDL_Rect& sc) {
+void GfxRenderingAPISdl3Gpu::GetZelda3DViewportScissor(SDL_GPUViewport& vp, SDL_Rect& sc) {
     int fbId = (mCurrentFb >= 0 && mCurrentFb < (int)mFramebuffers.size()) ? mCurrentFb : 0;
     FramebufferSDL3& f = mFramebuffers[fbId];
     // Same GL-bottom-left -> SDL3-GPU-top-left conversion DrawTriangles applies.
@@ -2409,14 +2409,14 @@ void GfxRenderingAPISdl3Gpu::GetSoH3DViewportScissor(SDL_GPUViewport& vp, SDL_Re
         sc.h = 0;
 }
 
-void GfxRenderingAPISdl3Gpu::AppendSoH3DModelDraw(SDL_GPUGraphicsPipeline* pipeline, SDL_GPUBuffer* vbo, uint32_t first,
+void GfxRenderingAPISdl3Gpu::AppendZelda3DModelDraw(SDL_GPUGraphicsPipeline* pipeline, SDL_GPUBuffer* vbo, uint32_t first,
                                                   uint32_t count, const void* ubo, SDL_GPUTexture* tex,
                                                   SDL_GPUSampler* samp, SDL_GPUTexture* shadowTex,
                                                   SDL_GPUSampler* shadowSamp, const SDL_GPUViewport& vp,
                                                   const SDL_Rect& sc) {
     int idx = (int)mSoh3dModelUbos.size();
     mSoh3dModelUbos.emplace_back();
-    memcpy(mSoh3dModelUbos.back().data(), ubo, sizeof(SoH3DSg::SgUbo));
+    memcpy(mSoh3dModelUbos.back().data(), ubo, sizeof(Zelda3DSg::SgUbo));
 
     Op op{};
     op.kind = OP_DRAW;
@@ -2433,11 +2433,11 @@ void GfxRenderingAPISdl3Gpu::AppendSoH3DModelDraw(SDL_GPUGraphicsPipeline* pipel
     op.samplers[0].sampler = samp;
     op.samplers[1].texture = shadowTex;
     op.samplers[1].sampler = shadowSamp;
-    op.soh3dDrawIdx = idx;
+    op.zelda3dDrawIdx = idx;
     mOps.push_back(std::move(op));
 }
 
-void GfxRenderingAPISdl3Gpu::AppendSoH3DHudDraw(SDL_GPUGraphicsPipeline* pipeline, SDL_GPUBuffer* vbo, uint32_t first,
+void GfxRenderingAPISdl3Gpu::AppendZelda3DHudDraw(SDL_GPUGraphicsPipeline* pipeline, SDL_GPUBuffer* vbo, uint32_t first,
                                                 uint32_t count, SDL_GPUTexture* tex, SDL_GPUSampler* samp, float w,
                                                 float h) {
     Op op{};
@@ -2459,7 +2459,7 @@ void GfxRenderingAPISdl3Gpu::AppendSoH3DHudDraw(SDL_GPUGraphicsPipeline* pipelin
     mOps.push_back(std::move(op));
 }
 
-void GfxRenderingAPISdl3Gpu::AppendSoH3DFullscreen(SDL_GPUGraphicsPipeline* pipeline, const void* ubo, uint32_t uboLen,
+void GfxRenderingAPISdl3Gpu::AppendZelda3DFullscreen(SDL_GPUGraphicsPipeline* pipeline, const void* ubo, uint32_t uboLen,
                                                    SDL_GPUTexture* tex, SDL_GPUSampler* samp, const SDL_GPUViewport& vp,
                                                    const SDL_Rect& sc) {
     Op op{};
@@ -2489,7 +2489,7 @@ void GfxRenderingAPISdl3Gpu::MainFbSize(int& w, int& h) {
     }
 }
 
-void GfxRenderingAPISdl3Gpu::AppendSoH3DOwnPass(std::function<void(SDL_GPUCommandBuffer*)> fn) {
+void GfxRenderingAPISdl3Gpu::AppendZelda3DOwnPass(std::function<void(SDL_GPUCommandBuffer*)> fn) {
     Op op{};
     op.kind = OP_EXT_OWN_PASS;
     op.fb = mCurrentFb;

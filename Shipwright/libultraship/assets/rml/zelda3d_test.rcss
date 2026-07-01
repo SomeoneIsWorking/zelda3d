@@ -1,0 +1,205 @@
+/* Zelda3D RmlUi menu — Dusklight-style layout, adapted to Ship of Harkinian.
+   Ported from Dusklight's res/rml/window.rcss + tabbing.rcss (TP PC port, CC0).
+
+   Deliberate deviations from Dusklight (see scratch/handoff_rmlui_dusklight.md and the
+   zelda3d-rmlui-menu memory):
+   - Font: Dusklight uses "Fira Sans" / "Fira Sans Condensed" + "Material Symbols Rounded".
+     Only LatoLatin is vendored here, so every family maps to LatoLatin and icons are dropped.
+   - Units: authored in `dp` (density-independent pixels), like Dusklight. SohRmlUi sets the context's
+     density-independent-pixel ratio to the window's display content scale (SDL_GetWindowDisplayScale),
+     so every dp here scales 1:1 on a 96-dpi monitor and grows on HiDPI / fractional-scaled displays.
+     Relative units (%) are unaffected and keep the panel filling the window at any scale.
+   - No `box-shadow`, no `backdrop-filter: blur`, no `filter: opacity()`, no element `opacity`.
+     RmlUi renders those via its layer / render-to-texture / composite path, which the Zelda3D
+     Vulkan render interface does not implement (it inherits the base no-op layer methods). Using
+     them corrupts the frame (white panel background + a faint ghost copy — the box-shadow's
+     shadow layer drawn straight to the target). Dimming is done with rgba colors instead, which
+     blend correctly. border-radius (plain geometry), gradients (decorators), font-effect glow
+     (baked into the font texture) and rectangular scissor clipping all work and are used freely. */
+
+* {
+	box-sizing: border-box;
+}
+
+body {
+	display: flex;
+	width: 100%;
+	height: 100%;
+	padding: 64dp;
+	/* Dim the whole window so the menu reads as a modal cover over the game (Dusklight uses a
+	   backdrop blur here, which the Vulkan render interface can't do yet — a scrim is the stand-in). */
+	background-color: rgba(0, 0, 0, 82%);
+	font-family: LatoLatin;
+	font-weight: normal;
+	font-style: normal;
+	font-size: 15dp;
+	color: #E0DBC8;
+}
+
+/* The window: a full-window modal panel. It fills the body's content box (the whole window minus the
+   body's dp padding) at every resolution — no fixed max size, so it never shrinks to a small island on
+   a large or HiDPI display. Dusklight scales/fades it in on open via a transform+filter transition; we
+   render it in its open state directly (no filter). */
+window {
+	display: flex;
+	flex-flow: column;
+	position: relative;
+	height: 100%;
+	width: 100%;
+	border-radius: 14dp;
+	overflow: hidden;
+	border: 2dp #92875B;
+	background-color: rgba(21, 22, 16, 90%);
+}
+
+/* --- Tab bar ------------------------------------------------------------------------------ */
+tab-bar {
+	display: block;
+	flex: 0 0 64dp;
+	height: 64dp;
+	background-color: rgba(217, 217, 217, 10%);
+	border-bottom: 2dp #92875B;
+	text-transform: uppercase;
+}
+
+tab {
+	display: inline-block;
+	height: 64dp;
+	padding: 0 24dp;
+	line-height: 64dp;
+	vertical-align: top;
+	font-weight: bold;
+	font-size: 18dp;
+	white-space: nowrap;
+	color: rgba(224, 219, 200, 25%);
+	cursor: pointer;
+}
+
+tab:hover,
+tab:focus {
+	color: #E0DBC8;
+	decorator: vertical-gradient(#c2a42d00 #c2a42d26);
+}
+
+tab.selected {
+	color: #E0DBC8;
+	border-bottom: 4dp #C2A42D;
+	font-effect: glow(0dp 4dp 0dp 4dp black);
+}
+
+/* --- Content / panes --------------------------------------------------------------------- */
+content {
+	display: flex;
+	flex: 1 1 auto;
+	min-height: 0;
+	overflow: hidden;
+}
+
+/* One pane per tab; only the active tab's pane is shown (SohRmlUi toggles the `active` class). */
+pane {
+	display: none;
+	flex: 1 1 0;
+	min-height: 0;
+	padding: 24dp;
+	font-size: 20dp;
+	overflow-y: auto;
+}
+
+pane.active {
+	display: block;
+}
+
+.section-heading {
+	display: block;
+	font-weight: bold;
+	text-transform: uppercase;
+	font-size: 22dp;
+	color: rgba(224, 219, 200, 35%);
+	margin-bottom: 8dp;
+}
+
+.section-heading.spaced {
+	margin-top: 16dp;
+}
+
+/* A settings row: label on the left, value right-aligned. The whole row takes focus so a
+   controller/keyboard has a clear, readable highlight. */
+select-button {
+	display: block;
+	background-color: rgba(17, 16, 10, 20%);
+	padding: 8dp 16dp;
+	margin-bottom: 8dp;
+	border-radius: 14dp;
+	border: 1dp rgba(146, 135, 91, 25%);
+	cursor: pointer;
+	/* Put each row in the keyboard/controller Tab order. RmlUi keys focus navigation off the
+	   `tab-index` RCSS property (default `none`), NOT the HTML `tabindex` attribute, so this — not
+	   a markup attribute — is what makes Down/Up step between rows. */
+	tab-index: auto;
+	focus: auto;
+}
+
+select-button:hover,
+select-button:focus {
+	background-color: rgba(204, 184, 119, 20%);
+	border: 1dp #C2A42D;
+}
+
+select-button key {
+	display: inline-block;
+	width: 70%;
+	font-weight: bold;
+	font-size: 18dp;
+	text-transform: uppercase;
+	vertical-align: middle;
+}
+
+select-button value {
+	display: inline-block;
+	width: 28%;
+	text-align: right;
+	font-size: 20dp;
+	color: #E0DBC8;
+	vertical-align: middle;
+}
+
+select-button:hover value,
+select-button:focus value {
+	color: #C2A42D;
+}
+
+/* --- Scrollbar (matches Dusklight's slim gold-on-cream bar) ------------------------------- */
+scrollbarvertical {
+	width: 8dp;
+	margin: 4dp 4dp 4dp 0;
+}
+
+scrollbarvertical slidertrack {
+	background-color: rgba(255, 255, 255, 5%);
+	border-radius: 2dp;
+}
+
+scrollbarvertical sliderbar {
+	width: 8dp;
+	min-height: 24dp;
+	background-color: rgba(224, 219, 200, 45%);
+	border-radius: 2dp;
+}
+
+scrollbarvertical sliderbar:hover,
+scrollbarvertical sliderbar:active {
+	background-color: rgba(194, 164, 45, 80%);
+}
+
+scrollbarvertical sliderarrowdec,
+scrollbarvertical sliderarrowinc {
+	height: 0;
+}
+
+/* Footer hint line at the bottom of a pane. */
+.hint {
+	display: block;
+	margin-top: 12dp;
+	font-size: 15dp;
+	color: rgba(224, 219, 200, 45%);
+}

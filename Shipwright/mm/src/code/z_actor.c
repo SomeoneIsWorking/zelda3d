@@ -26,7 +26,7 @@
 #include <string.h>
 #include "2s2h/Enhancements/FrameInterpolation/FrameInterpolation.h"
 #include "2s2h/GameInteractor/GameInteractor.h"
-#include "2s2h/soh3d/mm3d_draw.h" // MM3D actor draw-divert (3DS CMB substitution)
+#include "2s2h/zelda3d/mm3d_draw.h" // MM3D actor draw-divert (3DS CMB substitution)
 #include "2s2h/BenPort.h"
 #include "2s2h/ShipUtils.h"
 #include "2s2h/ObjectExtension/ObjectExtension.h"

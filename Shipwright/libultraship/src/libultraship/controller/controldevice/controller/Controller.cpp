@@ -19,12 +19,12 @@
 #define M_TAU 6.2831853071795864769252867665590057 // 2 * pi
 #define MINIMUM_RADIUS_TO_MAP_NOTCH 0.9
 
-// #32 hotswap — last-used input device signal, defined in soh3d.c (C).
+// #32 hotswap — last-used input device signal, defined in zelda3d.c (C).
 extern "C" {
-    extern int gSoH3dInputDevice;
-    // Gamepad hotbar: active slot selection + B-fire injection, defined in soh3d.c.
-    extern int gSoH3dHotbarActive;
-    extern int gSoH3dHotbarFireB;
+    extern int gZelda3dInputDevice;
+    // Gamepad hotbar: active slot selection + B-fire injection, defined in zelda3d.c.
+    extern int gZelda3dHotbarActive;
+    extern int gZelda3dHotbarFireB;
 }
 
 namespace LUS {
@@ -34,8 +34,8 @@ namespace LUS {
 // RB+A -> C-up) needs PHYSICAL input (X/Y have no N64 equivalent) AND suppression of the modifier's own
 // action — and suppression cannot live in a single button mapping (it can only OR bits, and mapping
 // order is unspecified). So chords are applied HERE, at the single pad-assembly chokepoint, after every
-// button mapping has run. See docs/lus_input_architecture.md. The physical read is real SDL; a SoH3D
-// injection seam (SoH3D_ChordPhysicalState) lets the pure logic be exercised headless (the physical SDL
+// button mapping has run. See docs/lus_input_architecture.md. The physical read is real SDL; a Zelda3D
+// injection seam (Zelda3D_ChordPhysicalState) lets the pure logic be exercised headless (the physical SDL
 // path itself needs an on-controller test — the headless harness only injects at the N64-pad level).
 
 // Physical chord-input bits (device-agnostic; mapped from SDL below). Modifier + the four face buttons.
@@ -106,12 +106,12 @@ void Controller::ReadToOSContPad(OSContPad* pad) {
     // Hotbar gamepad routing (new — #97):
     //   Without chord: B = hotbar slot 1 (slot 0), Y = hotbar slot 2 (slot 1).
     //     B is already N64 B, so the item fires via the existing SoH use-item path.
-    //     Y has no default N64 mapping — we set the active slot AND inject gSoH3dHotbarFireB=1 so
-    //     SoH3D_HotbarSync injects a virtual B press this frame.
+    //     Y has no default N64 mapping — we set the active slot AND inject gZelda3dHotbarFireB=1 so
+    //     Zelda3D_HotbarSync injects a virtual B press this frame.
     //   With RB chord: A/B/X/Y -> hotbar slots 3/4/5/6 (select + fire B).
     //     The chord also fires C-button bits (from kDefaultChords above); those are now redundant
     //     for the hotbar path and harmless (engine will try to use the C-slot item, but
-    //     gSoH3dHotbarFireB fires the hotbar item via B which takes priority in the item-use path).
+    //     gZelda3dHotbarFireB fires the hotbar item via B which takes priority in the item-use path).
     //
     // Physical state is real SDL for live play, OR the gChordPhysInject CVar for headless testing.
     auto cvars = Ship::Context::GetRawInstance()->GetConsoleVariables();
@@ -161,34 +161,34 @@ void Controller::ReadToOSContPad(OSContPad* pad) {
             else if (phys & CHORD_PHYS_B) { newSlot = 3; chordSlot = true; }
             else if (phys & CHORD_PHYS_X) { newSlot = 4; chordSlot = true; }
             else if (phys & CHORD_PHYS_Y) { newSlot = 5; chordSlot = true; }
-            if (chordSlot && newSlot != gSoH3dHotbarActive) {
+            if (chordSlot && newSlot != gZelda3dHotbarActive) {
                 printf("[HOTBAR] chord RB+phys=0x%02x -> slot %d (fire B)\n", phys, newSlot);
                 fflush(stdout);
-                gSoH3dHotbarActive = newSlot;
-                gSoH3dHotbarFireB = 1; // request B-fire from SoH3D_HotbarSync this frame
-                gSoH3dInputDevice = 0; // gamepad active
+                gZelda3dHotbarActive = newSlot;
+                gZelda3dHotbarFireB = 1; // request B-fire from Zelda3D_HotbarSync this frame
+                gZelda3dInputDevice = 0; // gamepad active
             } else if (chordSlot) {
                 // Same slot already selected, still fire B.
-                gSoH3dHotbarFireB = 1;
-                gSoH3dInputDevice = 0;
+                gZelda3dHotbarFireB = 1;
+                gZelda3dInputDevice = 0;
             }
         } else {
             // No chord: B = slot 0 (B is already N64 B -> fires via existing path).
             // Y = slot 1 (inject B fire since Y has no default N64 mapping).
-            if ((phys & CHORD_PHYS_B) && gSoH3dHotbarActive != 0) {
+            if ((phys & CHORD_PHYS_B) && gZelda3dHotbarActive != 0) {
                 printf("[HOTBAR] B -> slot 0\n"); fflush(stdout);
-                gSoH3dHotbarActive = 0;
-                gSoH3dInputDevice = 0;
+                gZelda3dHotbarActive = 0;
+                gZelda3dInputDevice = 0;
                 // N64 B is already set by the button mapping, no extra fire needed.
             } else if (phys & CHORD_PHYS_B) {
-                gSoH3dInputDevice = 0; // B held, slot already 0
+                gZelda3dInputDevice = 0; // B held, slot already 0
             } else if (phys & CHORD_PHYS_Y) {
-                if (gSoH3dHotbarActive != 1) {
+                if (gZelda3dHotbarActive != 1) {
                     printf("[HOTBAR] Y -> slot 1 (fire B)\n"); fflush(stdout);
-                    gSoH3dHotbarActive = 1;
+                    gZelda3dHotbarActive = 1;
                 }
-                gSoH3dHotbarFireB = 1; // Y has no default N64 mapping, inject B press
-                gSoH3dInputDevice = 0;
+                gZelda3dHotbarFireB = 1; // Y has no default N64 mapping, inject B press
+                gZelda3dInputDevice = 0;
             }
         }
     }
@@ -219,7 +219,7 @@ void Controller::ReadToOSContPad(OSContPad* pad) {
             if (anyGamepadBtn) break;
         }
         if (anyGamepadBtn) {
-            gSoH3dInputDevice = 0; // gamepad
+            gZelda3dInputDevice = 0; // gamepad
         }
     }
 

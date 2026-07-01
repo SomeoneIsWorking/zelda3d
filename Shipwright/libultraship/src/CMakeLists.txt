@@ -149,7 +149,7 @@ if (USE_OPENGLES)
     endif()
 endif()
 
-# ----- SDL3 GPU backend (soh3d single-renderer migration, P4: the ONLY renderer) -----
+# ----- SDL3 GPU backend (zelda3d single-renderer migration, P4: the ONLY renderer) -----
 # The Fast3D backend renders through SDL3's GPU API (FAST3D_SDL_GPU). OpenGL/DX11/Metal and the
 # custom Vulkan backend were all removed (P4). The per-combiner shaders are still generated as GLSL
 # at runtime and compiled to SPIR-V with glslang (SDL3 GPU consumes SPIR-V on its Vulkan/Metal/D3D12
@@ -163,9 +163,9 @@ if (NOT USE_OPENGLES AND NOT CMAKE_SYSTEM_NAME STREQUAL "iOS" AND NOT CMAKE_SYST
         target_link_libraries(libultraship PRIVATE
             glslang::glslang glslang::SPIRV glslang::glslang-default-resource-limits)
         target_compile_definitions(libultraship PRIVATE ENABLE_SDL3GPU)
-        message(STATUS "soh3d: SDL3 GPU backend ENABLED (glslang SPIR-V + SDL3 GPU API)")
+        message(STATUS "zelda3d: SDL3 GPU backend ENABLED (glslang SPIR-V + SDL3 GPU API)")
     else()
-        message(FATAL_ERROR "soh3d: glslang not found; the SDL3 GPU backend (the only renderer) cannot build")
+        message(FATAL_ERROR "zelda3d: glslang not found; the SDL3 GPU backend (the only renderer) cannot build")
     endif()
 endif()
 

@@ -10,7 +10,7 @@
 #include "vt.h"
 #include "soh/frame_interpolation.h"
 #include "soh/ResourceManagerHelpers.h"
-#include "soh3d/soh3d.h" // #5 cucco-flap diagnostic (gSoH3dForceCuccoAgitate)
+#include "zelda3d/zelda3d.h" // #5 cucco-flap diagnostic (gZelda3dForceCuccoAgitate)
 
 #define FLAGS (ACTOR_FLAG_UPDATE_CULLING_DISABLED | ACTOR_FLAG_THROW_ONLY)
 
@@ -978,7 +978,7 @@ void EnNiw_Update(Actor* thisx, PlayState* play) {
     // runs the wing flap. Reproduce it WITHOUT needing Link to actually grab the cucco (#9/#6 pickup
     // is broken). Forced before actionFunc so the real held code runs this frame. Pair with a
     // position-only freeze (`afreeze 2`) so the body can still jitter while the cucco stays framed.
-    if (gSoH3dCuccoHeld) {
+    if (gZelda3dCuccoHeld) {
         this->actionFunc = func_80AB6BF8;
     }
     this->actionFunc(this, play);
@@ -988,11 +988,11 @@ void EnNiw_Update(Actor* thisx, PlayState* play) {
     // legacy alias for state 2. Run AFTER actionFunc so it overrides whatever the live action set.
     // Holding the cucco STILL (no wander/hop) and FRAMING it are done with the GENERIC actor
     // controls (`asel 0x19` + `afreeze 1` + `acam`), not a cucco-specific freeze.
-    if (gSoH3dForceCuccoAgitate && gSoH3dCuccoState < 0) {
-        gSoH3dCuccoState = 2;
+    if (gZelda3dForceCuccoAgitate && gZelda3dCuccoState < 0) {
+        gZelda3dCuccoState = 2;
     }
-    if (gSoH3dCuccoState >= 0) {
-        func_80AB5BF8(this, play, (s16)gSoH3dCuccoState);
+    if (gZelda3dCuccoState >= 0) {
+        func_80AB5BF8(this, play, (s16)gZelda3dCuccoState);
     }
     Actor_SetFocus(&this->actor, this->unk_304);
     Actor_MoveXZGravity(&this->actor);
@@ -1146,18 +1146,18 @@ s32 EnNiw_OverrideLimbDraw(PlayState* play, s32 limbIndex, Gfx** dList, Vec3f* p
         rot->z += (s16)this->unk_2D0;
         // #5 diagnostic read-back: record the wing binang actually applied + the flap phase so the
         // REPL `flapinfo` can tell which of the two flap phases a captured frame shows.
-        gSoH3dCuccoDbgPhase = this->unk_29C;
-        gSoH3dCuccoDbgWing[3] = (s16)this->unk_2D8;
-        gSoH3dCuccoDbgWing[4] = (s16)this->unk_2D4;
-        gSoH3dCuccoDbgWing[5] = (s16)this->unk_2D0;
+        gZelda3dCuccoDbgPhase = this->unk_29C;
+        gZelda3dCuccoDbgWing[3] = (s16)this->unk_2D8;
+        gZelda3dCuccoDbgWing[4] = (s16)this->unk_2D4;
+        gZelda3dCuccoDbgWing[5] = (s16)this->unk_2D0;
     }
     if (limbIndex == 7) {
         rot->x += (s16)this->unk_2CC;
         rot->y += (s16)this->unk_2C8;
         rot->z += (s16)this->unk_2C4;
-        gSoH3dCuccoDbgWing[0] = (s16)this->unk_2CC;
-        gSoH3dCuccoDbgWing[1] = (s16)this->unk_2C8;
-        gSoH3dCuccoDbgWing[2] = (s16)this->unk_2C4;
+        gZelda3dCuccoDbgWing[0] = (s16)this->unk_2CC;
+        gZelda3dCuccoDbgWing[1] = (s16)this->unk_2C8;
+        gZelda3dCuccoDbgWing[2] = (s16)this->unk_2C4;
     }
 
     return false;

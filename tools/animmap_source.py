@@ -3,7 +3,7 @@
 
 Both generators read from here so the game table and the charcompare tool index can never
 diverge:
-  - tools/gen_animmap_inc.py      -> Shipwright/soh/src/soh3d/soh3d_animmap.inc   (game)
+  - tools/gen_animmap_inc.py      -> Shipwright/soh/src/zelda3d/zelda3d_animmap.inc   (game)
   - tools/gen_charcompare_index.py -> Shipwright/soh/charcompare/charcompare_index.inc (tool)
 
 Inputs:

@@ -1,7 +1,7 @@
 #include "zar.h"
 #include <cstring>
 
-namespace SoH3D {
+namespace Zelda3D {
 
 static uint16_t u16(const uint8_t* b, size_t o) { uint16_t v; memcpy(&v, b + o, 2); return v; }
 static uint32_t u32(const uint8_t* b, size_t o) { uint32_t v; memcpy(&v, b + o, 4); return v; }
@@ -64,4 +64,4 @@ std::vector<uint8_t> Zar::read(const ZarFile& f) const {
     return std::vector<uint8_t>(mData.begin() + f.offset, mData.begin() + f.offset + f.size);
 }
 
-} // namespace SoH3D
+} // namespace Zelda3D

@@ -5,7 +5,7 @@
 #include <string>
 #include <vector>
 
-namespace SoH3D {
+namespace Zelda3D {
 
 struct ZarFile {
     std::string name;
@@ -35,4 +35,4 @@ class Zar {
     std::vector<ZarFile> mFiles;
 };
 
-} // namespace SoH3D
+} // namespace Zelda3D

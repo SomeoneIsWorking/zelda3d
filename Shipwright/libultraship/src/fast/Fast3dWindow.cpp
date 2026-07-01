@@ -24,7 +24,7 @@ Fast3dWindow::Fast3dWindow(std::shared_ptr<Ship::Gui> gui, std::shared_ptr<FastM
     mInterpreter = std::make_shared<Interpreter>();
     GfxSetInstance(mInterpreter);
 
-    // SDL3 GPU is the project's only renderer (soh3d single-renderer migration, P4). All other
+    // SDL3 GPU is the project's only renderer (zelda3d single-renderer migration, P4). All other
     // backends (OpenGL/DX11/Metal/Vulkan) were removed; SDL3 GPU is the sole registered backend.
     AddAvailableWindowBackend(WindowBackend::FAST3D_SDL_GPU);
 }
@@ -134,8 +134,8 @@ uint16_t Fast3dWindow::GetPixelDepth(float x, float y) {
 }
 
 void Fast3dWindow::InitWindowManager() {
-    // SDL3 GPU is the only backend (soh3d single-renderer migration, P4). Force it regardless of any
-    // saved/legacy config value, and ignore the old SOH3D_VULKAN / SOH3D_SDL3GPU env gates (the other
+    // SDL3 GPU is the only backend (zelda3d single-renderer migration, P4). Force it regardless of any
+    // saved/legacy config value, and ignore the old ZELDA3D_VULKAN / ZELDA3D_SDL3GPU env gates (the other
     // backends no longer exist).
     SetWindowBackend(WindowBackend::FAST3D_SDL_GPU);
 

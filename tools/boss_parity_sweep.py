@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""boss_parity_sweep.py — render-parity audit of the 10 boss arenas (SoH3D #115 family).
+"""boss_parity_sweep.py — render-parity audit of the 10 boss arenas (Zelda3D #115 family).
 
 For each boss arena it: plain-warps in (the ONLY correct entry — see boss_survival.sh), waits for
 the boss intro to spawn the boss, enables the OoT3D Link body, brightens the (dim) arena, locates
@@ -39,7 +39,7 @@ ARENAS = [
 
 def repl(cmd, timeout=25):
     try:
-        r = subprocess.run(["tools/soh3d_repl.py", "cmd", cmd], cwd=REPO,
+        r = subprocess.run(["tools/zelda3d_repl.py", "cmd", cmd], cwd=REPO,
                            capture_output=True, text=True, timeout=timeout)
         return (r.stdout or "") + (r.stderr or "")
     except Exception as e:
@@ -47,7 +47,7 @@ def repl(cmd, timeout=25):
 
 
 def shot(name, timeout=25):
-    subprocess.run(["tools/soh3d_repl.py", "shot", name], cwd=REPO,
+    subprocess.run(["tools/zelda3d_repl.py", "shot", name], cwd=REPO,
                    capture_output=True, text=True, timeout=timeout)
 
 
@@ -70,8 +70,8 @@ def main():
     results = []
     for ent, name, zar_hint in ARENAS:
         print(f"\n=== {name} ({ent}) ===", flush=True)
-        subprocess.run(["tools/soh3d_game.sh", "restart", ent, "0x6000"], cwd=REPO,
-                       capture_output=True, text=True, env={**os.environ, "SOH3D_HEADLESS": "1"})
+        subprocess.run(["tools/zelda3d_game.sh", "restart", ent, "0x6000"], cwd=REPO,
+                       capture_output=True, text=True, env={**os.environ, "ZELDA3D_HEADLESS": "1"})
         time.sleep(13)  # boss intro + spawn
         repl("link 1")
         repl("worldamb 0.45")

@@ -165,7 +165,7 @@ u8 Message_ShouldAdvance(PlayState* play) {
 
     bool isB_Held = (CVarGetInteger(CVAR_ENHANCEMENT("SkipText"), 0) != 0 ? CHECK_BTN_ALL(input->cur.button, BTN_B)
                                                                           : CHECK_BTN_ALL(input->press.button, BTN_B))
-                    || CHECK_BTN_ALL(input->cur.button, BTN_START); // SoH3D: holding Start skips dialogs
+                    || CHECK_BTN_ALL(input->cur.button, BTN_START); // Zelda3D: holding Start skips dialogs
 
     if (CHECK_BTN_ALL(input->press.button, BTN_A) || isB_Held || CHECK_BTN_ALL(input->press.button, BTN_CUP)) {
         Audio_PlaySoundGeneral(NA_SE_SY_MESSAGE_PASS, &gSfxDefaultPos, 4, &gSfxDefaultFreqAndVolScale,
@@ -179,7 +179,7 @@ u8 Message_ShouldAdvanceSilent(PlayState* play) {
 
     bool isB_Held = (CVarGetInteger(CVAR_ENHANCEMENT("SkipText"), 0) != 0 ? CHECK_BTN_ALL(input->cur.button, BTN_B)
                                                                           : CHECK_BTN_ALL(input->press.button, BTN_B))
-                    || CHECK_BTN_ALL(input->cur.button, BTN_START); // SoH3D: holding Start skips dialogs
+                    || CHECK_BTN_ALL(input->cur.button, BTN_START); // Zelda3D: holding Start skips dialogs
 
     return CHECK_BTN_ALL(input->press.button, BTN_A) || isB_Held || CHECK_BTN_ALL(input->press.button, BTN_CUP);
 }
@@ -3364,7 +3364,7 @@ void Message_DrawMain(PlayState* play, Gfx** p) {
         bool isB_Held = (CVarGetInteger(CVAR_ENHANCEMENT("SkipText"), 0) != 0
                              ? CHECK_BTN_ALL(play->state.input[0].cur.button, BTN_B)
                              : CHECK_BTN_ALL(play->state.input[0].press.button, BTN_B))
-                        || CHECK_BTN_ALL(play->state.input[0].cur.button, BTN_START); // SoH3D: Start skips dialogs
+                        || CHECK_BTN_ALL(play->state.input[0].cur.button, BTN_START); // Zelda3D: Start skips dialogs
 
         switch (msgCtx->msgMode) {
             case MSGMODE_TEXT_START:
@@ -4470,7 +4470,7 @@ void Message_Update(PlayState* play) {
     bool isB_Held = (CVarGetInteger(CVAR_ENHANCEMENT("SkipText"), 0) != 0
                          ? CHECK_BTN_ALL(input->cur.button, BTN_B) && !sTextboxSkipped
                          : CHECK_BTN_ALL(input->press.button, BTN_B))
-                    || CHECK_BTN_ALL(input->cur.button, BTN_START); // SoH3D: holding Start skips dialogs
+                    || CHECK_BTN_ALL(input->cur.button, BTN_START); // Zelda3D: holding Start skips dialogs
 
     switch (msgCtx->msgMode) {
         case MSGMODE_TEXT_START:

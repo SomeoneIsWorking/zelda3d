@@ -4,7 +4,7 @@
 #include <stdint.h>
 
 // Scripted / synthetic controller input — a GAME-AGNOSTIC seam living in the shared
-// libultraship (serves both the OoT (soh3d) and MM (2s2h) games, which link the exact
+// libultraship (serves both the OoT (zelda3d) and MM (2s2h) games, which link the exact
 // same library). It holds a synthetic N64 pad state (held buttons + analog stick) that is
 // OR-mixed into the real per-frame OSContPad at LUS::ControlDeck::WriteToOSContPad — the
 // game's genuine input path, so scripted input is indistinguishable from a physical pad.

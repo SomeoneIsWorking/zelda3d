@@ -2,7 +2,7 @@
 """Render smoke test (TDD oracle for the "3DS invisible / 0 draws" bug).
 
 Launches the game headless (direct run on Xvfb :99, the launch path that does not lose the
-pre-existing SKYBUG scene-load race), waits for the REPL, asks `geomscan`, and asserts the SoH3D
+pre-existing SKYBUG scene-load race), waits for the REPL, asks `geomscan`, and asserts the Zelda3D
 3DS-model draw count is at least MIN_DRAWS. The Kokiri Forest entrance (238) populated with
 auto-replaced OoT3D models historically submitted ~47 draws; the regression under test reports 0.
 
@@ -14,8 +14,8 @@ import os, re, subprocess, sys, time, signal, pathlib
 
 REPO = pathlib.Path(__file__).resolve().parent.parent
 SOH = REPO / "Shipwright/build-cmake/soh/soh.elf"
-FIFO = REPO / "scratch/soh3d.ctl"
-REPL = REPO / "tools/soh3d_repl.py"
+FIFO = REPO / "scratch/zelda3d.ctl"
+REPL = REPO / "tools/zelda3d_repl.py"
 
 entrance = sys.argv[1] if len(sys.argv) > 1 else "238"
 daytime = sys.argv[2] if len(sys.argv) > 2 else "0x8000"
@@ -31,20 +31,20 @@ def ensure_xvfb():
 
 
 def provision_roms():
-    """Resolve SOH3D_3DS_ROM / SOH3D_N64_ROM exactly like tools/soh3d_game.sh does (env -> .env
+    """Resolve ZELDA3D_3DS_ROM / ZELDA3D_N64_ROM exactly like tools/zelda3d_game.sh does (env -> .env
     -> drop-in ROM), via the shared rom_provision.sh. Without the 3DS ROM the model provider has
     no OoT3D assets to hand the renderer, so EVERY model fails to load and geomscan reports 0
     draws — i.e. the harness would manufacture the very failure it is meant to detect."""
     sohdir = str(SOH.parent)
     script = (f'. "{REPO}/tools/rom_provision.sh"; '
-              f'soh3d_provision_roms "{REPO}" "{sohdir}"; '
-              f'printf "%s\\n%s\\n" "${{SOH3D_3DS_ROM:-}}" "${{SOH3D_N64_ROM:-}}"')
+              f'zelda3d_provision_roms "{REPO}" "{sohdir}"; '
+              f'printf "%s\\n%s\\n" "${{ZELDA3D_3DS_ROM:-}}" "${{ZELDA3D_N64_ROM:-}}"')
     out = subprocess.run(["bash", "-c", script], capture_output=True, text=True).stdout.splitlines()
     roms = {}
     if len(out) >= 1 and out[0].strip():
-        roms["SOH3D_3DS_ROM"] = out[0].strip()
+        roms["ZELDA3D_3DS_ROM"] = out[0].strip()
     if len(out) >= 2 and out[1].strip():
-        roms["SOH3D_N64_ROM"] = out[1].strip()
+        roms["ZELDA3D_N64_ROM"] = out[1].strip()
     return roms
 
 
@@ -53,14 +53,14 @@ def main():
     for f in (FIFO, pathlib.Path(str(FIFO) + ".out")):
         f.unlink(missing_ok=True)
     roms = provision_roms()
-    if "SOH3D_3DS_ROM" not in roms:
-        print("FAIL: no OoT3D .3ds found — set SOH3D_3DS_ROM, add ./.env, or drop a *.3ds in the repo "
+    if "ZELDA3D_3DS_ROM" not in roms:
+        print("FAIL: no OoT3D .3ds found — set ZELDA3D_3DS_ROM, add ./.env, or drop a *.3ds in the repo "
               "(the renderer cannot load any OoT3D model without it)", file=sys.stderr)
         return 2
     env = {**os.environ, "DISPLAY": ":99", "XAUTHORITY": "/dev/null", "SDL_VIDEODRIVER": "x11",
-           "SDL_AUDIODRIVER": "dummy", "SOH3D": "1", "SOH3D_WARP": "1", "SOH3D_AUTO": "1",
-           "SOH3D_N64ANIM": "1", "SOH3D_ENTRANCE": entrance, "SOH3D_TIME": daytime,
-           "SOH3D_REPL": str(FIFO), **roms}
+           "SDL_AUDIODRIVER": "dummy", "SOH3D": "1", "ZELDA3D_WARP": "1", "ZELDA3D_AUTO": "1",
+           "ZELDA3D_N64ANIM": "1", "ZELDA3D_ENTRANCE": entrance, "ZELDA3D_TIME": daytime,
+           "ZELDA3D_REPL": str(FIFO), **roms}
     env.pop("WAYLAND_DISPLAY", None)
     log = open(REPO / "scratch/logs/render_smoke.log", "w")
     proc = subprocess.Popen([str(SOH)], env=env, stdout=log, stderr=log, start_new_session=True)
@@ -89,7 +89,7 @@ def main():
                 break
             out = subprocess.run([sys.executable, str(REPL), "cmd", "geomscan"],
                                  capture_output=True, text=True, cwd=str(REPO), timeout=3).stdout
-            m = re.search(r"\((\d+) SoH3D draws this frame\)", out)
+            m = re.search(r"\((\d+) Zelda3D draws this frame\)", out)
             if m:
                 draws = int(m.group(1))
                 break
@@ -99,7 +99,7 @@ def main():
                   file=sys.stderr)
             return 2
         ok = draws >= min_draws
-        print(f"{'PASS' if ok else 'FAIL'}: geomscan SoH3D draws = {draws} (need >= {min_draws}) "
+        print(f"{'PASS' if ok else 'FAIL'}: geomscan Zelda3D draws = {draws} (need >= {min_draws}) "
               f"[entrance={entrance} time={daytime}]")
         return 0 if ok else 1
     finally:

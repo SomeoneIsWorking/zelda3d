@@ -1,7 +1,7 @@
 // charcompare — N64-vs-3DS character comparison tool.
 //
 // One window, two viewports (left = N64 via libultraship Fast3D, right = OoT3D/3DS
-// via the soh3d asset parsers + the engine's direct-GL skinned renderer), showing the
+// via the zelda3d asset parsers + the engine's direct-GL skinned renderer), showing the
 // SAME character + (mapped) animation, to drive the N64<->3DS anim-map curation.
 //
 // Phase 4: cascading selectors (TYPE -> character -> ANIMATION) driven by the generated
@@ -63,11 +63,11 @@ static void renderFaultHandler(int sig) {
     raise(sig);
 }
 
-// The Fast3D interpreter's OTR_G_SOH3D_MEASURE opcode handler calls back into this
-// game-provided symbol (soh3d.c) to report an actor's measured world height for the
+// The Fast3D interpreter's OTR_G_ZELDA3D_MEASURE opcode handler calls back into this
+// game-provided symbol (zelda3d.c) to report an actor's measured world height for the
 // auto-scale path. The comparison tool never emits that opcode, but the reference
 // must resolve at link time — provide a no-op stub.
-extern "C" void SoH3D_MeasureResult(int /*key*/, float /*height*/) {}
+extern "C" void Zelda3D_MeasureResult(int /*key*/, float /*height*/) {}
 
 // Interpreter model-space bbox measure (libultraship): the N64 viewport frames its DEPTH axis by the
 // model's true geometry extent (not the joint bbox). We measure once per loaded N64 model — wrap the
@@ -428,7 +428,7 @@ int main(int argc, char** argv) {
         if (animLen > 0 && st.frame >= (float)animLen) st.frame = fmodf(st.frame, (float)animLen);
         applyAnim(st);
 
-        // Build this frame's display list: N64 (Fast3D) left, 3DS (SoH3D) right, in one Run.
+        // Build this frame's display list: N64 (Fast3D) left, 3DS (Zelda3D) right, in one Run.
         std::vector<Gfx> dl;
         std::unordered_map<Mtx*, MtxF> mtx;
         cc::DlistKeys keys;

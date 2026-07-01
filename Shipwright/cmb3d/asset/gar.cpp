@@ -19,7 +19,7 @@
 //   Files table @filesOff, 0x0C/entry: { u32 size, u32 shortNameOff, u32 fullPathOff }
 //   Data-offset table @dataHdrOff, 4/entry: { u32 dataOffset } — where file i's bytes live.
 //   (Names are inline NUL-terminated C-strings referenced by the *Off fields.)
-namespace SoH3D {
+namespace Zelda3D {
 
 static uint16_t u16(const uint8_t* b, size_t o) { uint16_t v; memcpy(&v, b + o, 2); return v; }
 static uint32_t u32(const uint8_t* b, size_t o) { uint32_t v; memcpy(&v, b + o, 4); return v; }
@@ -90,4 +90,4 @@ std::vector<uint8_t> Gar::read(const GarFile& f) const {
     return std::vector<uint8_t>(mData.begin() + f.offset, mData.begin() + f.offset + f.size);
 }
 
-} // namespace SoH3D
+} // namespace Zelda3D

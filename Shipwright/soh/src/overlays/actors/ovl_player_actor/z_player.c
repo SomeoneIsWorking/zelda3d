@@ -20,7 +20,7 @@
 #include "overlays/misc/ovl_kaleido_scope/z_kaleido_scope.h"
 #include "objects/gameplay_keep/gameplay_keep.h"
 #include "objects/object_link_child/object_link_child.h"
-#include "soh3d/soh3d.h" // SoH3D Link (player) body replacement (SoH3D_TryDrawPlayer)
+#include "zelda3d/zelda3d.h" // Zelda3D Link (player) body replacement (Zelda3D_TryDrawPlayer)
 #include <soh/Enhancements/custom-message/CustomMessageTypes.h>
 #include "soh/Enhancements/item-tables/ItemTableTypes.h"
 #include "soh/Enhancements/game-interactor/GameInteractor.h"
@@ -7601,14 +7601,14 @@ s32 func_8083EC18(Player* this, PlayState* play, u32 wallFlags) {
     return false;
 }
 
-// SoH3D climb-repro hook (#79/#74): force Link to grab-climb the wall he is currently flush against,
+// Zelda3D climb-repro hook (#79/#74): force Link to grab-climb the wall he is currently flush against,
 // bypassing the natural action-handler approach gate (linearVelocity>0, narrow yaw window, vine-only
 // check) that makes climb initiation flaky to drive headlessly. We OR in the ladder bit (0x08) so
 // func_8083EC18 takes its sp8C!=0 branch: that skips the per-poly lateral-centering test (phi_f12),
 // so the grab succeeds as long as Link actually has a wallPoly and the wall is tall enough
 // (yDistToLedge >= 79). Returns 1 if the climb was entered, 0 if func_8083EC18 declined, -1 if Link
 // isn't touching a wall. Generic, reusable: any climbable wall Link can be walked flush against.
-s32 SoH3D_PlayerForceClimb(Player* this, PlayState* play) {
+s32 Zelda3D_PlayerForceClimb(Player* this, PlayState* play) {
     if (this->actor.wallPoly == NULL) {
         return -1;
     }
@@ -7617,13 +7617,13 @@ s32 SoH3D_PlayerForceClimb(Player* this, PlayState* play) {
     return func_8083EC18(this, play, sTouchedWallFlags | 0x08) ? 1 : 0;
 }
 
-// SoH3D reliable-teleport (#79 repro): plain `tp` only writes world.pos, leaving Link's prior
+// Zelda3D reliable-teleport (#79 repro): plain `tp` only writes world.pos, leaving Link's prior
 // velocity/speed and action intact — so on a slope or with leftover momentum he immediately slides
 // away (observed: a tp lands 200+ units off) or void-falls. This snaps Link to the raycast floor at
 // (x,z), zeroes ALL velocity, and forces the standing-idle action (func_80839E88) so the next
 // Play_Update can't re-accelerate him. Optional yaw aims him (e.g. into a climbable). Returns the
 // floor Y used (or the prior Y if no floor was found). Generic, reusable for any deterministic pose.
-f32 SoH3D_PlayerForceTeleport(Player* this, PlayState* play, f32 x, f32 z, s16 yaw, s32 setYaw) {
+f32 Zelda3D_PlayerForceTeleport(Player* this, PlayState* play, f32 x, f32 z, s16 yaw, s32 setYaw) {
     Vec3f probe = { x, 10000.0f, z };
     CollisionPoly* poly = NULL;
     f32 y = BgCheck_EntityRaycastFloor1(&play->colCtx, &poly, &probe);
@@ -7645,7 +7645,7 @@ f32 SoH3D_PlayerForceTeleport(Player* this, PlayState* play, f32 x, f32 z, s16 y
     return y;
 }
 
-// SoH3D action-state injection (#70 roll / #83 talk repro): drive Link's player action-state DIRECTLY
+// Zelda3D action-state injection (#70 roll / #83 talk repro): drive Link's player action-state DIRECTLY
 // so the LIVE pose/blend can be reproduced + framed headlessly. The natural triggers are context-gated
 // (roll needs a moving stick + non-water floor; talk needs an NPC's talk-offer accepted via an A edge),
 // which `btnhold`/`walkhold` can't reliably hit headless. These call the real setup functions, so the
@@ -7653,7 +7653,7 @@ f32 SoH3D_PlayerForceTeleport(Player* this, PlayState* play, f32 x, f32 z, s16 y
 // in that live blend. Generic & reusable for any future player-state repro. REPL `linkstate roll|talk`.
 
 // Force a forward dodge-roll (sets Player_Action_Roll + plays the landing_roll clip). Returns 1.
-s32 SoH3D_PlayerForceRoll(Player* this, PlayState* play) {
+s32 Zelda3D_PlayerForceRoll(Player* this, PlayState* play) {
     Player_SetupRoll(this, play);
     return 1;
 }
@@ -7663,7 +7663,7 @@ s32 SoH3D_PlayerForceRoll(Player* this, PlayState* play) {
 // advances the textbox). Picks the nearest live NPC (ACTORCAT_NPC) within `range` units; if it has no
 // textId of its own, falls back to a generic one so Message_StartTextbox still opens. Returns the NPC's
 // actor id, 0 if no NPC was found (talk not entered).
-s32 SoH3D_PlayerForceTalk(Player* this, PlayState* play, f32 range) {
+s32 Zelda3D_PlayerForceTalk(Player* this, PlayState* play, f32 range) {
     Actor* best = NULL;
     f32 bestDistSq = range * range;
     Actor* it = play->actorCtx.actorLists[ACTORCAT_NPC].head;
@@ -7697,7 +7697,7 @@ s32 SoH3D_PlayerForceTalk(Player* this, PlayState* play, f32 range) {
 // because the NPC side never did the talk handshake). Clears the talk/cutscene flags + talkActor/
 // focusActor, force-closes any open textbox, and forces the standing-idle action directly (NOT by
 // advancing the textbox with A, which routes through the crashy Player_Action_Talk CLOSING branch).
-s32 SoH3D_PlayerForceIdle(Player* this, PlayState* play) {
+s32 Zelda3D_PlayerForceIdle(Player* this, PlayState* play) {
     this->stateFlags1 &= ~(PLAYER_STATE1_TALKING | PLAYER_STATE1_IN_CUTSCENE);
     this->talkActor = NULL;
     this->focusActor = NULL;
@@ -7709,11 +7709,11 @@ s32 SoH3D_PlayerForceIdle(Player* this, PlayState* play) {
     return 1;
 }
 
-// SoH3D discrete-state force helpers for the per-state Link parity sweep (tools/parity_state_sweep.py).
+// Zelda3D discrete-state force helpers for the per-state Link parity sweep (tools/parity_state_sweep.py).
 // Each installs the real OoT3D action func + plays the canonical anim that state's action func plays,
 // bypassing ONLY the natural ENTRY gate (sword/shield equipped, deep water, an enemy hit, a ledge) that
 // headless control can't satisfy. The action func + anim are exactly what OoT3D runs in the state, so
-// SoH3D's live CSAB-selection path (kPlayerAnimMap + the #117 walk/run gate + age cl_ fallback) is
+// Zelda3D's live CSAB-selection path (kPlayerAnimMap + the #117 walk/run gate + age cl_ fallback) is
 // exercised faithfully. The sweep reads the SELECTED CSAB under `freeze` right after the force, so a
 // state that would immediately transition out headlessly (swim with no water, damage recover) is still
 // captured at its representative anim. modelAnimType-driven groups auto-pick the age-correct anim.
@@ -7721,14 +7721,14 @@ s32 SoH3D_PlayerForceIdle(Player* this, PlayState* play) {
 
 // Free-fall / jump: the airborne action (Player_Action_8084411C) + the normal_jump anim — exactly what
 // func_80838940 installs when Link leaves a ledge. arg2=0 (no launch velocity; the sweep reads frozen).
-s32 SoH3D_PlayerForceJump(Player* this, PlayState* play) {
+s32 Zelda3D_PlayerForceJump(Player* this, PlayState* play) {
     func_808389E8(this, &gPlayerAnim_link_normal_jump, 0.0f, play);
     return 1;
 }
 
 // Swim-wait: the treading action (Player_Action_8084D610) + swimer_swim_wait, what func_80838F18
 // installs on water entry. Set IN_WATER so the action's assumptions hold for the representative frame.
-s32 SoH3D_PlayerForceSwim(Player* this, PlayState* play) {
+s32 Zelda3D_PlayerForceSwim(Player* this, PlayState* play) {
     this->stateFlags1 |= PLAYER_STATE1_IN_WATER;
     func_80838F18(play, this);
     return 1;
@@ -7737,14 +7737,14 @@ s32 SoH3D_PlayerForceSwim(Player* this, PlayState* play) {
 // Grounded recoil ("took a hit"): the stable in-place damage action (Player_Action_8084370C) + the
 // front_hit recoil anim — the common grounded branch of func_80837C0C (D_808544B0[4]). The knockback
 // branch flings Link; this one holds in place, the cleaner representative for a selection read.
-s32 SoH3D_PlayerForceDamage(Player* this, PlayState* play) {
+s32 Zelda3D_PlayerForceDamage(Player* this, PlayState* play) {
     Player_SetupAction(play, this, Player_Action_8084370C, 0);
     Player_AnimPlayOnce(play, this, &gPlayerAnim_link_normal_front_hit);
     return 1;
 }
 
 // Shield/defend: the defend action (Player_Action_80843188) + the defense anim group (the R-held pose).
-s32 SoH3D_PlayerForceShield(Player* this, PlayState* play) {
+s32 Zelda3D_PlayerForceShield(Player* this, PlayState* play) {
     Player_SetupAction(play, this, Player_Action_80843188, 0);
     Player_AnimPlayOnce(play, this, GET_PLAYER_ANIM(PLAYER_ANIMGROUP_defense, this->modelAnimType));
     return 1;
@@ -7752,7 +7752,7 @@ s32 SoH3D_PlayerForceShield(Player* this, PlayState* play) {
 
 // Melee attack: the sword-attack action (Player_Action_808502D0) + the forward-slash anim (the first
 // entry func_80837948 plays for PLAYER_MWA_FORWARD_SLASH_1H). Bypasses the sword-equipped gate.
-s32 SoH3D_PlayerForceAttack(Player* this, PlayState* play) {
+s32 Zelda3D_PlayerForceAttack(Player* this, PlayState* play) {
     Player_SetupAction(play, this, Player_Action_808502D0, 0);
     Player_AnimPlayOnce(play, this, D_80854190[PLAYER_MWA_FORWARD_SLASH_1H].unk_00);
     return 1;
@@ -7762,7 +7762,7 @@ s32 SoH3D_PlayerForceAttack(Player* this, PlayState* play) {
 // open ground. For the per-state sweep we only need skelAnime.animation set to the jump_climb family so
 // the live CSAB resolver exercises the task-#2 jump_climb->hang OVERRIDE map (nml_hang_*). Read under
 // freeze; `linkstate idle` resets afterwards (the climb action never runs). REPL `linkstate climb`.
-s32 SoH3D_PlayerForceHang(Player* this, PlayState* play) {
+s32 Zelda3D_PlayerForceHang(Player* this, PlayState* play) {
     Player_AnimPlayLoop(play, this, &gPlayerAnim_link_normal_jump_climb_wait_free);
     return 1;
 }
@@ -11995,7 +11995,7 @@ void Player_UpdateCommon(Player* this, PlayState* play, Input* input) {
 
     sControlInput = input;
 
-    // SoH3D (#112): START-skip the new-game intro (Navi flies in / wakes Link). That intro is the
+    // Zelda3D (#112): START-skip the new-game intro (Navi flies in / wakes Link). That intro is the
     // ONE cutscene in Link's house: it spawns with cutsceneIndex 0xFFF1 and locks the player via
     // PLAYER_STATE1_IN_CUTSCENE, but it is driven directly (start-mode/actor), NOT the csCtx script
     // system (csCtx.state stays IDLE the whole time) and has no terminator command — so neither the
@@ -12760,8 +12760,8 @@ void Player_Draw(Actor* thisx, PlayState* play2) {
         gSPClearGeometryMode(POLY_OPA_DISP++, G_CULL_BOTH);
         gSPClearGeometryMode(POLY_XLU_DISP++, G_CULL_BOTH);
 
-        // SoH3D: draw the OoT3D Link body instead of the N64 one (gated SOH3D_LINK, default off).
-        if (!SoH3D_TryDrawPlayer(play, &this->actor)) {
+        // Zelda3D: draw the OoT3D Link body instead of the N64 one (gated ZELDA3D_LINK, default off).
+        if (!Zelda3D_TryDrawPlayer(play, &this->actor)) {
             Player_DrawGameplay(play, this, lod, gCullBackDList, overrideLimbDraw);
         }
 
