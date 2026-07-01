@@ -112,12 +112,14 @@ void SoH3D_GL_Draw(int modelId, const float* mp16, int invertY, unsigned char r,
 void SoH3D_GL_Submit(int modelId, const float* mp16, const float* mv16, int lit, int invertY, unsigned char r,
                      unsigned char g, unsigned char b, unsigned char a, float aspectAdj, int sky,
                      float uvOffU, float uvOffV);
-// RenderPass: draw every submitted item in one bracketed pass, then clear the list. Called
-// from the OTR_G_SOH3D_RENDERPASS opcode, emitted once per frame after the actor draw-all
-// (so our content composites after Fast3D's opaque 3D, before the 2D/UI pass).
-void SoH3D_GL_RenderPass(void);
-// FrameBegin: drop any items left unrendered (a frame that emitted draws but no render pass,
-// e.g. a scene transition early-out) so they can't leak into the next frame.
+// RenderFrameBegin / RenderFrameEnd: open/close the per-render-frame SoH3D context on the RENDER
+// thread, bracketing the N64 dlist interpret (Interpreter::Run). SoH3D_GL_Submit appends each 3DS
+// model op inline between them, into the SAME op-list / single render pass as the N64 geometry —
+// there is no separate SoH3D render-pass drain. RenderFrameBegin also resets per-model draw indices.
+void SoH3D_GL_RenderFrameBegin(void);
+void SoH3D_GL_RenderFrameEnd(void);
+// FrameBegin: rotate this logic frame's emit-ordered poses into "previous" for FPS interpolation.
+// Called once per LOGIC frame (game thread) before the actors emit their poses.
 void SoH3D_GL_FrameBegin(void);
 
 // Request that cached uploaded models with id in [lo,hi) be evicted (GPU objects deleted, entry

@@ -20,22 +20,29 @@
 #include "asset/cmb.h"
 #include "asset/cmb_glgroups.h" // shared SoH3D::MakeGlGroup / AppendCmbTextures
 #include "asset/ctr_rom.h"
-#include "asset/zar.h"
+#include "asset/gar.h" // MM3D actor archives are Grezzo GAR2, not OoT3D ZAR
 
 namespace {
 
 // Which MM3D archive/CMB replaces a given renderer model id, and its world scale.
-// EMPTY for now (single reserved slot so sizeof()/indexing stay valid): until the MM3D
-// RomFS archive names are inventoried (N4 step 2b), MM3D_LookupModel matches nothing and
-// the whole path is inert — MM renders vanilla N64. Faithful-first: one verified prop
-// entry lands here before any auto table.
+// MM3D actor models live in Grezzo GAR2 archives at /actors/zelda2_<name>.gar.lzs
+// (uncompressed despite the .lzs extension; LzS-compressed archives come later). The
+// preferred .cmb inside the archive is selected by name, else the first .cmb.
 struct ModelSpec {
-    const char* zarPath;  // RomFS virtual path, e.g. "/actor/zelda_xxx.zar"
-    const char* cmbName;  // preferred .cmb inside the ZAR (nullptr = first .cmb)
+    const char* garPath;  // RomFS virtual path, e.g. "/actors/zelda2_xxx.gar.lzs"
+    const char* cmbName;  // preferred .cmb inside the GAR (nullptr = first .cmb)
     float worldScale;     // N64 world units per CMB unit
 };
 const ModelSpec kModels[] = {
-    { nullptr, nullptr, 1.0f }, // slot 0: reserved / no model
+    // slot 0: Obj_Tokei_Step (Clock Tower door/wall) — OBJECT_TOKEI_STEP (0x1A4). Up high
+    // on the tower; may not draw from the ground. N64 actor->scale 0.1.
+    { "/actors/zelda2_tokei_step.gar.lzs", nullptr, 0.1f },
+    // slot 1: Obj_Tokei_Tobira (Clock Tower Swinging Doors) — OBJECT_TOKEI_TOBIRA (0x197).
+    // Ground-level, in view at the South Clock Town start (the first reliably-drawn target).
+    // N64 actor draws its DL at actor->scale 0.1; MM3D CMB (z2_tobira_h, ~1400 local) draws
+    // directly in world units, so first-guess world scale = 0.1. Calibrated live via `mscale`
+    // against the Azahar 3DS oracle; auto-measure (OoT's G_SOH3D_MEASURE path) comes later.
+    { "/actors/zelda2_tokei_tobira.gar.lzs", nullptr, 0.1f },
 };
 constexpr int kModelCount = (int)(sizeof(kModels) / sizeof(kModels[0]));
 
@@ -84,22 +91,26 @@ Loaded* loadModel(int modelId) {
         return out;
     }
     const ModelSpec& spec = kModels[modelId];
-    if (spec.zarPath == nullptr) {
+    if (spec.garPath == nullptr) {
         return out;
     }
     SoH3D::CtrRom* r = rom();
     if (r == nullptr) {
         return out;
     }
-    std::vector<uint8_t> zarBytes = r->read(spec.zarPath);
-    if (zarBytes.empty()) {
-        fprintf(stderr, "[MM3D] zar not found: %s\n", spec.zarPath);
+    std::vector<uint8_t> garBytes = r->read(spec.garPath);
+    if (garBytes.empty()) {
+        fprintf(stderr, "[MM3D] gar not found: %s\n", spec.garPath);
         return out;
     }
-    SoH3D::Zar zar(std::move(zarBytes));
-    const SoH3D::ZarFile* cmbFile = nullptr;
+    SoH3D::Gar gar(std::move(garBytes));
+    if (!gar.ok()) {
+        fprintf(stderr, "[MM3D] gar parse %s: %s\n", spec.garPath, gar.error().c_str());
+        return out;
+    }
+    const SoH3D::GarFile* cmbFile = nullptr;
     if (spec.cmbName != nullptr) {
-        for (const auto& f : zar.files()) {
+        for (const auto& f : gar.files()) {
             if (f.name == spec.cmbName) {
                 cmbFile = &f;
                 break;
@@ -107,15 +118,15 @@ Loaded* loadModel(int modelId) {
         }
     }
     if (cmbFile == nullptr) {
-        cmbFile = zar.firstWithSuffix(".cmb");
+        cmbFile = gar.firstWithSuffix(".cmb");
     }
     if (cmbFile == nullptr) {
-        fprintf(stderr, "[MM3D] no .cmb in %s\n", spec.zarPath);
+        fprintf(stderr, "[MM3D] no .cmb in %s\n", spec.garPath);
         return out;
     }
-    out->cmb = std::make_unique<SoH3D::Cmb>(zar.read(*cmbFile));
+    out->cmb = std::make_unique<SoH3D::Cmb>(gar.read(*cmbFile));
     if (!out->cmb->ok()) {
-        fprintf(stderr, "[MM3D] cmb parse %s: %s\n", spec.zarPath, out->cmb->error().c_str());
+        fprintf(stderr, "[MM3D] cmb parse %s: %s\n", spec.garPath, out->cmb->error().c_str());
         return out;
     }
     out->groups = out->cmb->buildDrawGroups();
@@ -137,7 +148,7 @@ Loaded* loadModel(int modelId) {
         out->cGroups.push_back(SoH3D::MakeGlGroup(*out->cmb, g, g.verts.data(), 0));
     }
     out->ok = true;
-    fprintf(stderr, "[MM3D] loaded model %d (%s): %zu groups, %zu textures\n", modelId, spec.zarPath,
+    fprintf(stderr, "[MM3D] loaded model %d (%s): %zu groups, %zu textures\n", modelId, spec.garPath,
             out->cGroups.size(), out->cTexs.size());
     return out;
 }
@@ -168,15 +179,30 @@ void MM3D_EnsureModelProvider(void) {
     }
 }
 
+// Live scale override for the model under calibration (set via the `mscale` REPL command).
+// -1 = use the table value. A single knob is enough while one prop is being dialed in.
+float g_scaleOverride = -1.0f;
+
 int MM3D_LookupModel(int actorId, int objectId, int* modelId, float* worldScale, float* groundOffset) {
-    // Table is empty (kModels has no real entries yet), so nothing matches and MM draws
-    // vanilla N64. Populated in N4 step 2b once MM3D archive names are inventoried.
+    // Map an actor's loaded N64 object id (preferred: it names the asset) to a model slot.
+    // Faithful-first: exactly one entry until the first prop is verified.
     (void)actorId;
-    (void)objectId;
-    (void)modelId;
-    (void)worldScale;
-    (void)groundOffset;
-    return 0;
+    int id = -1;
+    switch (objectId) {
+        case 0x1A4: id = 0; break; // OBJECT_TOKEI_STEP   -> slot 0
+        case 0x197: id = 1; break; // OBJECT_TOKEI_TOBIRA -> slot 1
+        default: return 0;
+    }
+    if (modelId != nullptr) {
+        *modelId = id;
+    }
+    if (worldScale != nullptr) {
+        *worldScale = (g_scaleOverride > 0.0f) ? g_scaleOverride : kModels[id].worldScale;
+    }
+    if (groundOffset != nullptr) {
+        *groundOffset = 0.0f;
+    }
+    return 1;
 }
 
 float MM3D_ModelScaleById(int modelId) {
@@ -184,6 +210,10 @@ float MM3D_ModelScaleById(int modelId) {
         return 1.0f;
     }
     return kModels[modelId].worldScale;
+}
+
+void MM3D_SetScaleOverride(float scale) {
+    g_scaleOverride = scale;
 }
 
 } // extern "C"

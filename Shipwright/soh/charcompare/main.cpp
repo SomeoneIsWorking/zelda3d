@@ -389,17 +389,18 @@ int main(int argc, char** argv) {
 
     // Scale the ImGui UI for HiDPI / readability. ImGui does NOT respect display scaling, so on a
     // HiDPI/scaled desktop (e.g. KDE Plasma @ 2x) the font + widgets render tiny. Detect the system
-    // scale from the display DPI (SDL_GetDisplayDPI; on X11/XWayland this reflects the KDE/Xft.dpi
-    // setting — 192 dpi = 2x) and scale the font + all style metrics by it. CC_UISCALE overrides.
-    // ScaleAllSizes is one-shot (it multiplies the current style), so call it exactly once here.
+    // scale via SDL_GetDisplayContentScale (SDL3; the DPI-based SDL_GetDisplayDPI this replaced was
+    // removed going from SDL2->SDL3) and scale the font + all style metrics by it. CC_UISCALE
+    // overrides. ScaleAllSizes is one-shot (it multiplies the current style), call it exactly once.
     float uiScale = 1.0f;
     if (const char* e = getenv("CC_UISCALE")) {
         uiScale = (float)atof(e);
     } else {
-        float ddpi = 0, hdpi = 0, vdpi = 0;
-        if (SDL_GetDisplayDPI(0, &ddpi, &hdpi, &vdpi) == 0 && hdpi > 1.0f)
-            uiScale = hdpi / 96.0f; // 96 dpi = 1.0 (unscaled); KDE 2x sets 192
-        printf("[charcompare] display DPI %.0f -> UI scale %.2f\n", hdpi, uiScale);
+        float scale = SDL_GetDisplayContentScale(SDL_GetPrimaryDisplay());
+        if (scale > 1.0f) {
+            uiScale = scale;
+        }
+        printf("[charcompare] display content scale %.2f -> UI scale %.2f\n", scale, uiScale);
     }
     if (uiScale < 1.0f) uiScale = 1.0f;
     if (ImGui::GetCurrentContext() && uiScale > 0.0f) {
