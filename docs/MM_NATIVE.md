@@ -358,6 +358,17 @@ superseded by INTERACTIVE headless control over two FIFOs (the demo hook stays, 
 This completes the "one libultraship, both games" input unification (memory `mm-renderer-topology`):
 input is a single shared seam, per-game REPLs carry only decomp-typed state.
 
+**Durable MM game-control tooling (committed, reusable — don't re-derive the FIFO recipe).** The
+one-off scratch drivers were promoted to tracked tools mirroring OoT's `soh3d_game.sh`/`soh3d_repl.py`:
+- `tools/mm_game.sh {start [entrance]|restart|stop|status|shot <name>|log}` — single-instance MM
+  manager: boots `mm.elf` headless (private Xvfb :94, both FIFOs wired, `ZELDA3D_MM_WARP=1`),
+  detached via setsid so it survives across tool calls; `start` blocks until gameplay is confirmed
+  via the REPL; `stop` reaps ALL `mm.elf` (incl. "(deleted)") + this Xvfb + FIFOs.
+- `tools/mm_control.py {pos|walk <s> [x y]|press <hex> [ms]|actors [n]|warp <ent>|query <c>|input <c>}`
+  — the two-FIFO client (input → shared `$SHIP_SCRIPTED_FIFO`, queries → `$ZELDA3D_MM_REPL`).
+Verified live: `walk 3` moved Link ~485u, `press 0x1000` opened the SELECT-ITEM subscreen
+(`scratch/screenshots/mm_control_tool_menu.png`), `actors`/`pos` return live state.
+
 **Build self-sufficiency fix (2026-07-01, commit `931c8e8`) — READ IF MM WON'T COMPILE.** MM failed
 to build (`z64actor.h → code/actor/actor.h: No such file`) because `mm/assets/.gitignore` ignores
 `*.h`/`*.c` (right for ZAPD-GENERATED headers) and the ~960 AUTHORED asset headers (ALIGN_ASSET/OTR
