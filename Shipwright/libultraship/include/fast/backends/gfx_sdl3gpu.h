@@ -323,6 +323,17 @@ class GfxRenderingAPISdl3Gpu : public GfxRenderingAPI {
     // Per-combiner shader records keyed by (id0,id1); pipelines cached by (id0,id1,stateBits).
     std::map<std::pair<uint64_t, uint64_t>, ShaderProgramSDL3> mShaderProgramPool;
     std::unordered_map<Sdl3PipelineKey, SDL_GPUGraphicsPipeline*, Sdl3PipelineKeyHash> mPipelineCache;
+
+    // Render-unification effort (kanban #131), Phase 3: N64 draws routed through the unified
+    // shader when gUnifiedRenderer & 2. Separate shader/pipeline caches from the old per-permutation
+    // ones above so gUnifiedRenderer==0 never touches this state. The pipeline SHAPE only depends on
+    // the structural variant (texture count/alpha-test/fog/grayscale) + stateBits (depth/blend) —
+    // unlike the old path, the combiner mux itself lives in the per-draw UBO now, not the shader
+    // text, so no per-(id0,id1) pipeline explosion. Key = variant*16 + stateBits.
+    SDL_GPUShader* mUniN64Vert[6] = {};
+    SDL_GPUShader* mUniN64Frag[6] = {};
+    std::unordered_map<uint32_t, SDL_GPUGraphicsPipeline*> mUniN64PipelineCache;
+    SDL_GPUGraphicsPipeline* GetOrCreateUnifiedN64Pipeline(int variant, uint32_t stateBits);
     std::map<uint32_t, SDL_GPUSampler*> mSamplerCache;
 
     // Per-frame vertex staging: a host transfer buffer (mapped during the frame) + a device vertex
