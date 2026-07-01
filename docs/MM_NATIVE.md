@@ -438,6 +438,52 @@ a custom GBI opcode and a model-provider callback.
 Start faithful-first: get ONE static prop or the pot/actor replaced and measured correctly before
 scaling to the auto table.
 
+### N4 execution log (2026-07-01 — DONE through step 2 mechanism; measured, don't re-derive)
+
+**N4.1 — shared `cmb3d` asset lib (commit `9185bd91`).** The 3DS format parsers moved from
+`soh/src/soh3d/asset/` → new top-level `Shipwright/cmb3d/asset/`, built as STATIC lib `cmb3d`
+(`cmb3d/CMakeLists.txt`), PUBLIC-exposing its parent so every `#include "asset/<fmt>.h"` still
+resolves with ZERO caller churn. `add_subdirectory(cmb3d)` in root CMakeLists; linked by soh + mm +
+charcompare. ONE copy of each parser, both games compile it. (soh relinked clean, mm links clean.)
+
+**N4.1.5 — shared CMB→GlGroup converter (commit `b2b6ff9d`).** Extracted the game-agnostic
+`makeCgroup`/`appendTextures` out of soh's `soh3d_model.cpp` into `cmb3d/asset/cmb_glgroups.{h,cpp}`
+as `SoH3D::MakeGlGroup` / `SoH3D::AppendCmbTextures` (guarded by static_asserts that `CmbVertex` ==
+renderer `SoH3DGlVtx` layout). cmb3d gains `libultraship/include` (PRIVATE) for `<fast/soh3d_gl.h>`
+(header-only POD, no link dep). soh's two fns became thin wrappers; MM reuses these verbatim. OoT
+render VERIFIED unchanged (Kokiri Forest, `scratch/screenshots/cmb3d_refactor_verify.png`).
+  - Also in that commit: **o2r boot friction fixed** (see [[soh3d-o2r-direction]] memory). `GenerateSohOtr`
+    copied a deleted `libultraship/src/fast/shaders/` (SDL3GPU generates shaders at runtime) → broke
+    `soh.o2r` regen → headless boot hung on "Missing soh.o2r" popup. Dropped the dead copy. Then commit
+    `157d57a8`: `SohModalWindow::RegisterPopup` auto-takes a popup's default action + logs it when the
+    run is unattended (`SOH3D_REPL` set OR `SOH3D_HEADLESS=1` OR `SOH_HEADLESS=1`) → boot never hangs.
+
+**N4.2 — MM3D substitution seam wired + INERT (commit `dd715cc2`).** MM's per-game layer under
+`mm/2s2h/soh3d/` (globbed by the existing `2s2h/*.c|*.cpp`), mechanism complete but the model table is
+EMPTY so MM renders vanilla N64 with zero regression (VERIFIED South Clock Town,
+`scratch/screenshots/mm_n42_inert_hook.png`):
+  - `mm3d_model.{h,cpp}` (C++): provider registered via `SoH3D_GL_SetModelProvider`; `CtrRom` over
+    `ZELDA3D_MM_3DS_ROM`; `kModels[]` (modelId→{zarPath,cmbName,scale}); lazy `Loaded` cache; reuses the
+    shared converter. C-API: `MM3D_EnsureModelProvider` / `MM3D_LookupModel` / `MM3D_ModelScaleById`.
+  - `mm3d_draw.{h,c}` (C): `MM3D_TryDrawActor(play, actor)` — resolves object id via
+    `play->objectCtx.slots[actor->objectSlot].id`, looks up, on hit emits `Gfx_SetupDL25_Opa` +
+    `Matrix_Translate`/`RotateYF,XF,ZF`(`BINANG_TO_RAD(shape.rot)`)/`Scale` + `MATRIX_FINALIZE_AND_LOAD`
+    + `gSPSoH3DDraw(handle|0x80000000, 255,255,255)`, returns 1 (skip N64 draw). No OoT-specific hacks.
+  - Hook: `mm z_actor.c:2986`, inside the `GameInteractor_ShouldActorDraw` guard.
+
+**N4 step 2b (NEXT — the first real 3DS model):** the mechanism is proven; it now needs DATA.
+  1. Inventory the MM3D RomFS archive names: open the ROM with `CtrRom` (`ZELDA3D_MM_3DS_ROM` in
+     `.env`) and list `/actor/*.zar` (mirror how OoT's `SOH3D_3DS_ROM` is walked). A tiny throwaway
+     C++ using the shared `cmb3d` (or extend `charcompare`) can dump the archive list + each ZAR's CMBs.
+  2. Pick ONE early, static, single-CMB prop that appears in South/Clock-Town (a pot/sign/crate) and
+     find its MM actorId + N64 objectId + the MM3D `/actor/zelda_*.zar` name.
+  3. Add ONE `kModels[]` entry + make `MM3D_LookupModel` map that (actorId|objectId)→modelId 0.
+     Auto-measure scale later; hardcode a first guess or reuse the `G_SOH3D_MEASURE` opcode.
+  4. `tools/mm_game.sh start`; screenshot; compare vs N64 + the Azahar 3DS oracle (coord-matched A/B).
+     Faithful-first: get ONE prop replaced + correctly scaled before any actorId/objectId auto table.
+  5. Skinned actors come AFTER static props: hook `mm z_skelanime.c:313/421` (DrawOpa/DrawFlexOpa) to
+     pose from live N64 joints (OoT does `SoH3D_DoRetarget`), an `SoH3D_GL_EmitPose` equivalent.
+
 **Build self-sufficiency fix (2026-07-01, commit `931c8e8`) — READ IF MM WON'T COMPILE.** MM failed
 to build (`z64actor.h → code/actor/actor.h: No such file`) because `mm/assets/.gitignore` ignores
 `*.h`/`*.c` (right for ZAPD-GENERATED headers) and the ~960 AUTHORED asset headers (ALIGN_ASSET/OTR
