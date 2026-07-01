@@ -3,11 +3,11 @@
 > **Generated mirror — do not hand-edit.** Source of truth = GitHub Issues on
 > `SomeoneIsWorking/soh3d` (private). Regenerate with `tools/kanban.py render`.
 > Move a card with `tools/kanban.py mv <#> <column>`; add with `tools/kanban.py add`.
-> Columns: todo · in-progress · in-review · needs-confirmation · reopened · blocked · done(=closed).  Updated 2026-07-01 20:07.
+> Columns: todo · in-progress · in-review · needs-confirmation · reopened · blocked · done(=closed).  Updated 2026-07-01 20:55.
 
-**Counts:** todo:7 | in-progress:2 | in-review:1 | needs-confirmation:27 | reopened:0 | blocked:0 | done:80
+**Counts:** todo:9 | in-progress:2 | in-review:1 | needs-confirmation:27 | reopened:0 | blocked:0 | done:80
 
-## 📋 To Do  (7)
+## 📋 To Do  (9)
 - [#17](../../issues/17) Hi-res world/scene textures (texpack) _(render)_
 - [#33](../../issues/33) More foliage / vegetation density (lowest priority) _(scene)_
 - [#118](../../issues/118) Market (SCENE_MARKET_DAY) parity: crowd NPCs (En_Hy/En_Mu) mis-rendered, door still N64 _(render,scene,behavior)_
@@ -15,6 +15,8 @@
 - [#128](../../issues/128) SKYBUG: unresolved texture segment 8 paints stale/garbage texels (scene-load race) _(render)_
 - [#130](../../issues/130) Make repo public — audit + clean git history first (no outside-repo paths, no copyrighted assets) _(infra)_
 - [#131](../../issues/131) Unified N64/3DS render pipeline: one vertex/material/shader/lighting system _(render)_
+- [#133](../../issues/133) Add HTTP/remote layer to the REPL control channel (beyond FIFO)
+- [#134](../../issues/134) Link's House interior wall looks N64-rough vs overview 3DS-smooth (unresolved)
 
 ## 🔨 In Progress  (2)
 - [#111](../../issues/111) World night R/G too bright — flat tint under-darkens at night (needs vertex-lighting port) _(render)_
