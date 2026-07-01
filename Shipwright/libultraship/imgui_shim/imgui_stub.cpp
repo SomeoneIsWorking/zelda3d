@@ -114,6 +114,10 @@ void ImDrawList::AddRect(const ImVec2&, const ImVec2&, ImU32, float, int, float)
 }
 void ImDrawList::AddText(ImFont*, float, const ImVec2&, ImU32, const char*, const char*, float, const ImVec4*) {
 }
+void ImDrawList::AddText(const ImVec2&, ImU32, const char*, const char*) {
+}
+void ImDrawList::AddImage(ImTextureID, const ImVec2&, const ImVec2&, const ImVec2&, const ImVec2&, ImU32) {
+}
 int ImDrawList::_CalcCircleAutoSegmentCount(float) const {
     return 0;
 }

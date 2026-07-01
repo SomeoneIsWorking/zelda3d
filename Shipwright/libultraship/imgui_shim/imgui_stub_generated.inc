@@ -196,3 +196,21 @@ void TreePop() {  }
 void Unindent(float) {  }
 void UpdatePlatformWindows() {  }
 void* MemAlloc(unsigned long) { return ZeroPtr<void>(); }
+// ---- referenced by the MM (2S2H) menu/dev-tool code (BenGui) but not by soh's; hand-added.
+bool BeginMenuBar() { return false; }
+void EndMenuBar() {  }
+void EndMenu() {  }
+bool ColorButton(char const*, ImVec4 const&, int, ImVec2 const&) { return false; }
+void Columns(int, char const*, bool) {  }
+void NextColumn() {  }
+float GetColumnWidth(int) { return {}; }
+void SetColumnWidth(int, float) {  }
+ImVec2 GetContentRegionMax() { return {}; }
+ImVec2 GetItemRectSize() { return {}; }
+ImVec2 GetMousePos() { return {}; }
+float GetTextLineHeight() { return {}; }
+bool InvisibleButton(char const*, ImVec2 const&, int) { return false; }
+bool IsItemClicked(int) { return false; }
+bool IsWindowAppearing() { return false; }
+bool IsWindowDocked() { return false; }
+void TextDisabled(char const*, ...) {  }
