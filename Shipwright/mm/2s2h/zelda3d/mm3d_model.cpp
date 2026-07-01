@@ -24,27 +24,21 @@
 
 namespace {
 
-// Which MM3D archive/CMB replaces a given renderer model id, and its world scale.
-// MM3D actor models live in Grezzo GAR2 archives at /actors/zelda2_<name>.gar.lzs
-// (uncompressed despite the .lzs extension; LzS-compressed archives come later). The
-// preferred .cmb inside the archive is selected by name, else the first .cmb.
+// Auto-map: MM3D actor archives live at /actors/zelda2_<short-name>.gar.lzs, where the
+// short-name matches the object_table.h `object_<short>` symbol. So for every objectId with
+// an archive we can dynamically discover the mapping — no per-object hand-list. The generated
+// kObjectNames inc gives us objectId -> short-name; we probe the archive once and cache the
+// (objectId -> renderer modelId) resolution.
+#include "mm3d_object_names.inc"
+
+// One live model slot. Dynamically allocated as objects resolve for the first time.
 struct ModelSpec {
-    const char* garPath;  // RomFS virtual path, e.g. "/actors/zelda2_xxx.gar.lzs"
-    const char* cmbName;  // preferred .cmb inside the GAR (nullptr = first .cmb)
-    float worldScale;     // N64 world units per CMB unit
+    std::string garPath;  // "/actors/zelda2_<name>.gar.lzs"
+    float worldScale;     // N64 world units per CMB unit; first-guess 0.1 until calibrated.
 };
-const ModelSpec kModels[] = {
-    // slot 0: Obj_Tokei_Step (Clock Tower door/wall) — OBJECT_TOKEI_STEP (0x1A4). Up high
-    // on the tower; may not draw from the ground. N64 actor->scale 0.1.
-    { "/actors/zelda2_tokei_step.gar.lzs", nullptr, 0.1f },
-    // slot 1: Obj_Tokei_Tobira (Clock Tower Swinging Doors) — OBJECT_TOKEI_TOBIRA (0x197).
-    // Ground-level, in view at the South Clock Town start (the first reliably-drawn target).
-    // N64 actor draws its DL at actor->scale 0.1; MM3D CMB (z2_tobira_h, ~1400 local) draws
-    // directly in world units, so first-guess world scale = 0.1. Calibrated live via `mscale`
-    // against the Azahar 3DS oracle; auto-measure (OoT's G_ZELDA3D_MEASURE path) comes later.
-    { "/actors/zelda2_tokei_tobira.gar.lzs", nullptr, 0.1f },
-};
-constexpr int kModelCount = (int)(sizeof(kModels) / sizeof(kModels[0]));
+std::vector<ModelSpec> g_models;
+// objectId -> renderer modelId (or -1 if resolution attempted and failed — cache miss).
+std::unordered_map<int, int> g_objectToModel;
 
 // Lazily-loaded geometry; owns the CPU arrays the renderer reads during upload.
 struct Loaded {
@@ -87,11 +81,11 @@ Loaded* loadModel(int modelId) {
     Loaded* out = owned.get();
     g_loaded[modelId] = std::move(owned);
 
-    if (modelId < 0 || modelId >= kModelCount) {
+    if (modelId < 0 || modelId >= (int)g_models.size()) {
         return out;
     }
-    const ModelSpec& spec = kModels[modelId];
-    if (spec.garPath == nullptr) {
+    const ModelSpec& spec = g_models[modelId];
+    if (spec.garPath.empty()) {
         return out;
     }
     Zelda3D::CtrRom* r = rom();
@@ -100,33 +94,22 @@ Loaded* loadModel(int modelId) {
     }
     std::vector<uint8_t> garBytes = r->read(spec.garPath);
     if (garBytes.empty()) {
-        fprintf(stderr, "[MM3D] gar not found: %s\n", spec.garPath);
+        fprintf(stderr, "[MM3D] gar not found: %s\n", spec.garPath.c_str());
         return out;
     }
     Zelda3D::Gar gar(std::move(garBytes));
     if (!gar.ok()) {
-        fprintf(stderr, "[MM3D] gar parse %s: %s\n", spec.garPath, gar.error().c_str());
+        fprintf(stderr, "[MM3D] gar parse %s: %s\n", spec.garPath.c_str(), gar.error().c_str());
         return out;
     }
-    const Zelda3D::GarFile* cmbFile = nullptr;
-    if (spec.cmbName != nullptr) {
-        for (const auto& f : gar.files()) {
-            if (f.name == spec.cmbName) {
-                cmbFile = &f;
-                break;
-            }
-        }
-    }
+    const Zelda3D::GarFile* cmbFile = gar.firstWithSuffix(".cmb");
     if (cmbFile == nullptr) {
-        cmbFile = gar.firstWithSuffix(".cmb");
-    }
-    if (cmbFile == nullptr) {
-        fprintf(stderr, "[MM3D] no .cmb in %s\n", spec.garPath);
+        fprintf(stderr, "[MM3D] no .cmb in %s\n", spec.garPath.c_str());
         return out;
     }
     out->cmb = std::make_unique<Zelda3D::Cmb>(gar.read(*cmbFile));
     if (!out->cmb->ok()) {
-        fprintf(stderr, "[MM3D] cmb parse %s: %s\n", spec.garPath, out->cmb->error().c_str());
+        fprintf(stderr, "[MM3D] cmb parse %s: %s\n", spec.garPath.c_str(), out->cmb->error().c_str());
         return out;
     }
     out->groups = out->cmb->buildDrawGroups();
@@ -148,7 +131,7 @@ Loaded* loadModel(int modelId) {
         out->cGroups.push_back(Zelda3D::MakeGlGroup(*out->cmb, g, g.verts.data(), 0));
     }
     out->ok = true;
-    fprintf(stderr, "[MM3D] loaded model %d (%s): %zu groups, %zu textures\n", modelId, spec.garPath,
+    fprintf(stderr, "[MM3D] loaded model %d (%s): %zu groups, %zu textures\n", modelId, spec.garPath.c_str(),
             out->cGroups.size(), out->cTexs.size());
     return out;
 }
@@ -183,33 +166,64 @@ void Zelda3D_EnsureModelProvider(void) {
 // -1 = use the table value. A single knob is enough while one prop is being dialed in.
 float g_scaleOverride = -1.0f;
 
+// Look up the object short-name from the generated kObjectNames table (objectId ordered).
+static const char* objectShortName(int objectId) {
+    int lo = 0, hi = (int)(sizeof(kObjectNames) / sizeof(kObjectNames[0])) - 1;
+    while (lo <= hi) {
+        int mid = (lo + hi) / 2;
+        if (kObjectNames[mid].id == objectId) return kObjectNames[mid].name;
+        if (kObjectNames[mid].id < objectId) lo = mid + 1; else hi = mid - 1;
+    }
+    return nullptr;
+}
+
+// Allow-list of MM object ids the STATIC-prop draw path (Zelda3D_EmitModelDraw) can handle
+// safely — rigid actors only. Skinned/rigged characters need the SkelAnime replacement path
+// OoT grew, which isn't wired for MM yet; auto-probing them crashes on the first draw. Add
+// entries here as each MM object is verified against the Azahar oracle. First-guess scale
+// 0.1 (matches OoT's initial actor scale); calibrated live via REPL `mscale`.
+static const int kStaticObjects[] = {
+    0x1A4, // OBJECT_TOKEI_STEP    — clock-tower door/wall
+    0x197, // OBJECT_TOKEI_TOBIRA  — clock-tower swinging doors
+};
+
+// Resolve an objectId -> renderer modelId, probing the MM3D ROM once per allow-listed object.
+// Returns -1 for anything not on the allow-list (fall through to vanilla N64 draw).
+static int resolveModelForObject(int objectId) {
+    auto it = g_objectToModel.find(objectId);
+    if (it != g_objectToModel.end()) return it->second;
+
+    bool allowed = false;
+    for (int oid : kStaticObjects) if (oid == objectId) { allowed = true; break; }
+    if (!allowed) { g_objectToModel[objectId] = -1; return -1; }
+
+    const char* name = objectShortName(objectId);
+    Zelda3D::CtrRom* r = rom();
+    if (name == nullptr || r == nullptr) { g_objectToModel[objectId] = -1; return -1; }
+
+    std::string path = std::string("/actors/zelda2_") + name + ".gar.lzs";
+    if (r->read(path).empty()) { g_objectToModel[objectId] = -1; return -1; }
+
+    int newId = (int)g_models.size();
+    g_models.push_back({ path, 0.1f });
+    g_objectToModel[objectId] = newId;
+    fprintf(stderr, "[MM3D] mapped obj=0x%03X (%s) -> modelId=%d\n", objectId, name, newId);
+    return newId;
+}
+
 int Zelda3D_LookupModel(int actorId, int objectId, int* modelId, float* worldScale, float* groundOffset) {
-    // Map an actor's loaded N64 object id (preferred: it names the asset) to a model slot.
-    // Faithful-first: exactly one entry until the first prop is verified.
     (void)actorId;
-    int id = -1;
-    switch (objectId) {
-        case 0x1A4: id = 0; break; // OBJECT_TOKEI_STEP   -> slot 0
-        case 0x197: id = 1; break; // OBJECT_TOKEI_TOBIRA -> slot 1
-        default: return 0;
-    }
-    if (modelId != nullptr) {
-        *modelId = id;
-    }
-    if (worldScale != nullptr) {
-        *worldScale = (g_scaleOverride > 0.0f) ? g_scaleOverride : kModels[id].worldScale;
-    }
-    if (groundOffset != nullptr) {
-        *groundOffset = 0.0f;
-    }
+    int id = resolveModelForObject(objectId);
+    if (id < 0) return 0;
+    if (modelId != nullptr) *modelId = id;
+    if (worldScale != nullptr) *worldScale = (g_scaleOverride > 0.0f) ? g_scaleOverride : g_models[id].worldScale;
+    if (groundOffset != nullptr) *groundOffset = 0.0f;
     return 1;
 }
 
 float Zelda3D_ModelScaleById(int modelId) {
-    if (modelId < 0 || modelId >= kModelCount) {
-        return 1.0f;
-    }
-    return kModels[modelId].worldScale;
+    if (modelId < 0 || modelId >= (int)g_models.size()) return 1.0f;
+    return g_models[modelId].worldScale;
 }
 
 void Zelda3D_SetScaleOverride(float scale) {
