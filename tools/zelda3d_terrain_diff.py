@@ -12,7 +12,7 @@ of delta will snap the drawn ground to the N64 floor while preserving cliff/moun
 relief. If delta is wild noise, the approach is wrong.
 
 Usage:
-  ZELDA3D_3DS_ROM=<rom> tools/zelda3d_terrain_diff.py /scene/spot01_0_info.zsi scratch/floor/n64_spot01.csv
+  ZELDA3D_OOT3D_ROM=<rom> tools/zelda3d_terrain_diff.py /scene/spot01_0_info.zsi scratch/floor/n64_spot01.csv
 """
 import os, sys, math
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
@@ -22,7 +22,7 @@ from ctr_romfs import CtrRom
 
 
 def load_tris(path):
-    rom = CtrRom(os.environ["ZELDA3D_3DS_ROM"])
+    rom = CtrRom(os.environ["ZELDA3D_OOT3D_ROM"])
     z = zsimod.Zsi(rom.read(rom.get(path)))
     m = cmbmod.Cmb(z.cmb_bytes())
     tris = []

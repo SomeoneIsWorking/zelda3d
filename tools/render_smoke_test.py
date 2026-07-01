@@ -31,20 +31,20 @@ def ensure_xvfb():
 
 
 def provision_roms():
-    """Resolve ZELDA3D_3DS_ROM / ZELDA3D_N64_ROM exactly like tools/zelda3d_game.sh does (env -> .env
+    """Resolve ZELDA3D_OOT3D_ROM / ZELDA3D_OOT_ROM exactly like tools/zelda3d_game.sh does (env -> .env
     -> drop-in ROM), via the shared rom_provision.sh. Without the 3DS ROM the model provider has
     no OoT3D assets to hand the renderer, so EVERY model fails to load and geomscan reports 0
     draws — i.e. the harness would manufacture the very failure it is meant to detect."""
     sohdir = str(SOH.parent)
     script = (f'. "{REPO}/tools/rom_provision.sh"; '
               f'zelda3d_provision_roms "{REPO}" "{sohdir}"; '
-              f'printf "%s\\n%s\\n" "${{ZELDA3D_3DS_ROM:-}}" "${{ZELDA3D_N64_ROM:-}}"')
+              f'printf "%s\\n%s\\n" "${{ZELDA3D_OOT3D_ROM:-}}" "${{ZELDA3D_OOT_ROM:-}}"')
     out = subprocess.run(["bash", "-c", script], capture_output=True, text=True).stdout.splitlines()
     roms = {}
     if len(out) >= 1 and out[0].strip():
-        roms["ZELDA3D_3DS_ROM"] = out[0].strip()
+        roms["ZELDA3D_OOT3D_ROM"] = out[0].strip()
     if len(out) >= 2 and out[1].strip():
-        roms["ZELDA3D_N64_ROM"] = out[1].strip()
+        roms["ZELDA3D_OOT_ROM"] = out[1].strip()
     return roms
 
 
@@ -53,8 +53,8 @@ def main():
     for f in (FIFO, pathlib.Path(str(FIFO) + ".out")):
         f.unlink(missing_ok=True)
     roms = provision_roms()
-    if "ZELDA3D_3DS_ROM" not in roms:
-        print("FAIL: no OoT3D .3ds found — set ZELDA3D_3DS_ROM, add ./.env, or drop a *.3ds in the repo "
+    if "ZELDA3D_OOT3D_ROM" not in roms:
+        print("FAIL: no OoT3D .3ds found — set ZELDA3D_OOT3D_ROM, add ./.env, or drop a *.3ds in the repo "
               "(the renderer cannot load any OoT3D model without it)", file=sys.stderr)
         return 2
     env = {**os.environ, "DISPLAY": ":99", "XAUTHORITY": "/dev/null", "SDL_VIDEODRIVER": "x11",

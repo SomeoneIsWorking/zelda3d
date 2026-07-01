@@ -12,7 +12,7 @@ import cmb as C
 EPS = 1.0
 
 def load_oot3d(zarname):
-    rom = CtrRom(os.environ["ZELDA3D_3DS_ROM"]); z = Zar(rom.read(rom.get(zarname)))
+    rom = CtrRom(os.environ["ZELDA3D_OOT3D_ROM"]); z = Zar(rom.read(rom.get(zarname)))
     cmbs = [f for f in z.files if f.name.lower().endswith('.cmb')]
     m = C.Cmb(z.read(max(cmbs, key=lambda f: f.size)))
     nodes = {b.id: dict(id=b.id, parent=b.parent, length=math.sqrt(sum(c*c for c in b.trans))) for b in m.bones}

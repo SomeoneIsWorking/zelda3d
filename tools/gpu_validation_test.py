@@ -62,18 +62,18 @@ def ensure_xvfb():
 
 
 def provision_roms():
-    """Resolve ZELDA3D_3DS_ROM / ZELDA3D_N64_ROM via the shared rom_provision.sh (env -> .env -> drop-in),
+    """Resolve ZELDA3D_OOT3D_ROM / ZELDA3D_OOT_ROM via the shared rom_provision.sh (env -> .env -> drop-in),
     exactly like tools/zelda3d_game.sh. Without the 3DS ROM no OoT3D model loads -> no skinned draw."""
     sohdir = str(SOH.parent)
     script = (f'. "{REPO}/tools/rom_provision.sh"; '
               f'zelda3d_provision_roms "{REPO}" "{sohdir}"; '
-              f'printf "%s\\n%s\\n" "${{ZELDA3D_3DS_ROM:-}}" "${{ZELDA3D_N64_ROM:-}}"')
+              f'printf "%s\\n%s\\n" "${{ZELDA3D_OOT3D_ROM:-}}" "${{ZELDA3D_OOT_ROM:-}}"')
     out = subprocess.run(["bash", "-c", script], capture_output=True, text=True).stdout.splitlines()
     roms = {}
     if len(out) >= 1 and out[0].strip():
-        roms["ZELDA3D_3DS_ROM"] = out[0].strip()
+        roms["ZELDA3D_OOT3D_ROM"] = out[0].strip()
     if len(out) >= 2 and out[1].strip():
-        roms["ZELDA3D_N64_ROM"] = out[1].strip()
+        roms["ZELDA3D_OOT_ROM"] = out[1].strip()
     return roms
 
 
@@ -195,8 +195,8 @@ def phase2_validation(roms):
 def main():
     ensure_xvfb()
     roms = provision_roms()
-    if "ZELDA3D_3DS_ROM" not in roms:
-        print("FAIL: no OoT3D .3ds found — set ZELDA3D_3DS_ROM, add ./.env, or drop a *.3ds in the repo",
+    if "ZELDA3D_OOT3D_ROM" not in roms:
+        print("FAIL: no OoT3D .3ds found — set ZELDA3D_OOT3D_ROM, add ./.env, or drop a *.3ds in the repo",
               file=sys.stderr)
         return 2
 

@@ -84,7 +84,7 @@ fs::path findPackRoot() {
         if (hasTextures(p)) return p;
     }
     if (hasTextures("textures")) return "textures";
-    if (const char* romp = std::getenv("ZELDA3D_3DS_ROM"); romp && *romp) {
+    if (const char* romp = std::getenv("ZELDA3D_OOT3D_ROM"); romp && *romp) {
         fs::path cand = fs::path(romp).parent_path() / "textures";
         if (hasTextures(cand)) return cand;
     }

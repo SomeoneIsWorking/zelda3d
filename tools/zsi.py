@@ -93,7 +93,7 @@ if __name__ == "__main__":
     from ctr_romfs import CtrRom
     import cmb as cmbmod
 
-    rom = CtrRom(os.environ["ZELDA3D_3DS_ROM"])
+    rom = CtrRom(os.environ["ZELDA3D_OOT3D_ROM"])
     path = sys.argv[1] if len(sys.argv) > 1 else "/scene/gerudoway_0_info.zsi"
     z = Zsi(rom.read(rom.get(path)))
     print(f"{path}: ok={z.ok} name={z.name!r} has_mesh={z.has_mesh} "

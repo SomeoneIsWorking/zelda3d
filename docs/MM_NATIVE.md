@@ -74,7 +74,7 @@ This question does NOT block N1/N2 — faithful-first means "get native MM booti
 
 ## Environment / provisioning
 
-- N64 MM ROM: `$ZELDA3D_MM_N64_ROM` from gitignored `.env` (asset extraction input). Never commit.
+- N64 MM ROM: `$ZELDA3D_MM_ROM` from gitignored `.env` (asset extraction input). Never commit.
 - 3DS MM3D assets: cmb3d layer input (separate; needed at N4, not before).
 - Toolchain: GCC + CMake (soh3d's toolchain). ZAPDTR/OTRExporter for O2R extraction (2S2H submods).
 - Wayland: GPU runs under `env -u WAYLAND_DISPLAY xvfb-run -a -s "-screen 0 1280x960x24" <bin>`.
@@ -99,7 +99,7 @@ machine.
   1. `cmake -H. -Bbuild-cmake -GNinja -DCMAKE_BUILD_TYPE=Release -DPython3_EXECUTABLE=$(which python3)`
   2. `cmake --build build-cmake -j16`  → binary at `build-cmake/mm/2s2h.elf`, ZAPD at
      `build-cmake/ZAPD/ZAPD.out`.
-  3. Symlink the ROM where the extractor's `rom_chooser.py` looks: `ln -sf "$ZELDA3D_MM_N64_ROM"
+  3. Symlink the ROM where the extractor's `rom_chooser.py` looks: `ln -sf "$ZELDA3D_MM_ROM"
      OTRExporter/mm.z64` (it globs `../OTRExporter/*.z64` from workdir `mm/`).
   4. `cmake --build build-cmake --target ExtractAssets`  → ZAPD auto-detects **N64_US**, writes
      **`mm.o2r` (~36 MB, extracted N64 assets)** + **`2ship.o2r` (~1 MB, custom port assets)** next to
@@ -267,7 +267,7 @@ anim, etc.), NOT by soh/mm/top-level. So the clean path is a SEPARATE build dir:
 pulls libultraship as a dep — the trailing custom step exits 2 but `ZAPD.out` is built and valid). Run
 extraction from `Shipwright/mm/` mirroring 2ship's `ExtractAssets`:
 `python3 ../OTRExporter/extract_assets.py -z <ZAPD.out> --non-interactive --xml-root ../mm/assets/xml
---custom-otr-file 2ship.o2r --custom-assets-path $PWD/assets/custom --port-ver 9.2.3 "$ZELDA3D_MM_N64_ROM"`
+--custom-otr-file 2ship.o2r --custom-assets-path $PWD/assets/custom --port-ver 9.2.3 "$ZELDA3D_MM_ROM"`
 → produces `mm.o2r` (36 MB, ROM assets, 660 xmls) + `2ship.o2r` (1 MB, custom). Copy both to
 `build-cmake/mm/`. (`--port-ver 9.2.3` = the Ship project version; port-ver is stored in the o2r.)
 NEVER commit `.o2r`/ROM.
@@ -372,7 +372,7 @@ Verified live: `walk 3` moved Link ~485u, `press 0x1000` opened the SELECT-ITEM 
 ## N4 scouting (2026-07-01 — how OoT's cmb3d substitution works; verified file:line — don't re-derive)
 
 Goal: render MM actors/world with 3DS MM3D CMB models instead of N64, mirroring soh3d for OoT.
-Prerequisites MET: `ZELDA3D_MM_3DS_ROM` provisioned in `.env`; the `cmb3d` layer exists at
+Prerequisites MET: `ZELDA3D_MM3D_ROM` provisioned in `.env`; the `cmb3d` layer exists at
 `Shipwright/soh/src/soh3d/asset/`. The mechanism splits cleanly across a **shared libultraship spine
 (reuse as-is)** and a **per-game soh layer (MM must re-implement)**, joined by exactly two seams:
 a custom GBI opcode and a model-provider callback.
@@ -463,7 +463,7 @@ render VERIFIED unchanged (Kokiri Forest, `scratch/screenshots/cmb3d_refactor_ve
 EMPTY so MM renders vanilla N64 with zero regression (VERIFIED South Clock Town,
 `scratch/screenshots/mm_n42_inert_hook.png`):
   - `mm3d_model.{h,cpp}` (C++): provider registered via `SoH3D_GL_SetModelProvider`; `CtrRom` over
-    `ZELDA3D_MM_3DS_ROM`; `kModels[]` (modelId→{zarPath,cmbName,scale}); lazy `Loaded` cache; reuses the
+    `ZELDA3D_MM3D_ROM`; `kModels[]` (modelId→{zarPath,cmbName,scale}); lazy `Loaded` cache; reuses the
     shared converter. C-API: `MM3D_EnsureModelProvider` / `MM3D_LookupModel` / `MM3D_ModelScaleById`.
   - `mm3d_draw.{h,c}` (C): `MM3D_TryDrawActor(play, actor)` — resolves object id via
     `play->objectCtx.slots[actor->objectSlot].id`, looks up, on hit emits `Gfx_SetupDL25_Opa` +
@@ -472,7 +472,7 @@ EMPTY so MM renders vanilla N64 with zero regression (VERIFIED South Clock Town,
   - Hook: `mm z_actor.c:2986`, inside the `GameInteractor_ShouldActorDraw` guard.
 
 **N4 step 2b (NEXT — the first real 3DS model):** the mechanism is proven; it now needs DATA.
-  1. Inventory the MM3D RomFS archive names: open the ROM with `CtrRom` (`ZELDA3D_MM_3DS_ROM` in
+  1. Inventory the MM3D RomFS archive names: open the ROM with `CtrRom` (`ZELDA3D_MM3D_ROM` in
      `.env`) and list `/actor/*.zar` (mirror how OoT's `SOH3D_3DS_ROM` is walked). A tiny throwaway
      C++ using the shared `cmb3d` (or extend `charcompare`) can dump the archive list + each ZAR's CMBs.
   2. Pick ONE early, static, single-CMB prop that appears in South/Clock-Town (a pot/sign/crate) and
@@ -486,7 +486,7 @@ EMPTY so MM renders vanilla N64 with zero regression (VERIFIED South Clock Town,
 
 ### N4.2b BLOCKER FOUND (2026-07-01) — MM3D assets are GAR2, not ZAR. Need a GAR parser first.
 
-Inventoried the MM3D RomFS with `tools/ctr_romfs.py "$ZELDA3D_MM_3DS_ROM"` (the shared `CtrRom`
+Inventoried the MM3D RomFS with `tools/ctr_romfs.py "$ZELDA3D_MM3D_ROM"` (the shared `CtrRom`
 Python twin). **MM3D does NOT use the OoT3D `.zar`/`.cmb` layout the shared `Zar` parser expects.**
 Findings (product `CTR-P-AJRE`, romfs 0x27191000):
 - Actor models live at **`/actors/zelda2_<name>.gar.lzs`** (460 of them). Top dirs: `scenes` (645),

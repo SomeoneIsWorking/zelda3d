@@ -21,7 +21,7 @@ def pick_body_cmb(zar):
 
 def main():
     zar_path = sys.argv[1] if len(sys.argv) > 1 else "/actor/zelda_link_child_new.zar"
-    rom = CtrRom(os.environ["ZELDA3D_3DS_ROM"])
+    rom = CtrRom(os.environ["ZELDA3D_OOT3D_ROM"])
     z = Zar(rom.read(rom.get(zar_path)))
     body = pick_body_cmb(z)
     c = cmblib.Cmb(z.read(body))

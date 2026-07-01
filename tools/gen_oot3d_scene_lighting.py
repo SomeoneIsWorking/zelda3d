@@ -23,7 +23,7 @@ Output: a positional array `kZelda3dSceneLighting[]` indexed by SoH sceneNum (sa
 kZelda3dSceneNames / scene_table.h), each row = the scene's slot palette. Values only (tiny
 tuning ints) — safe to commit, like zelda3d_scene_names.inc and n64_scene_lighting.json.
 
-Run: ZELDA3D_3DS_ROM=<path.3ds> python3 tools/gen_oot3d_scene_lighting.py
+Run: ZELDA3D_OOT3D_ROM=<path.3ds> python3 tools/gen_oot3d_scene_lighting.py
 """
 import os, re, sys, struct
 sys.path.insert(0, os.path.dirname(__file__))
@@ -74,7 +74,7 @@ def parse_env(d):
 
 
 def main():
-    rom = CtrRom(os.environ["ZELDA3D_3DS_ROM"])
+    rom = CtrRom(os.environ["ZELDA3D_OOT3D_ROM"])
     # name -> file path, case-insensitive
     name_path = {}
     for f in rom.iter_files():

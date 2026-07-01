@@ -1,6 +1,6 @@
 // charcompare — 3DS (OoT3D) viewport.
 //
-// Loads an OoT3D character from the decrypted .3ds (ZELDA3D_3DS_ROM) via the
+// Loads an OoT3D character from the decrypted .3ds (ZELDA3D_OOT3D_ROM) via the
 // self-contained zelda3d asset/ parsers, registers it with the existing zelda3d
 // model bridge (zelda3d_model.cpp) + direct-GL renderer (Zelda3D_GL_*), and emits a
 // Fast3D display list that draws it through the engine's OTR_G_ZELDA3D_DRAW /
@@ -35,7 +35,7 @@ struct Model3ds {
 // frame slider / wrap playback to the animation's true length.
 int AnimLength(const Model3ds& m, const std::string& csabBase);
 
-// Open the ROM once (ZELDA3D_3DS_ROM). Returns false (and sets a message in `err`)
+// Open the ROM once (ZELDA3D_OOT3D_ROM). Returns false (and sets a message in `err`)
 // if the env var is unset or the image can't be parsed. Safe to call repeatedly.
 bool InitRom(std::string& err);
 

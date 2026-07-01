@@ -9,9 +9,9 @@ hit Ys. Use to compare the OoT3D rendered ground against the N64 collision floor
 mismatch is a constant Y offset (cheap scene-offset fix) or local (collision work).
 
 Usage:
-  ZELDA3D_3DS_ROM=<rom> tools/zelda3d_floor.py /scene/spot01_0_info.zsi x z [x z ...]
+  ZELDA3D_OOT3D_ROM=<rom> tools/zelda3d_floor.py /scene/spot01_0_info.zsi x z [x z ...]
   # or pairs "x,z[,n64floor]" to also print the delta vs a known N64 floor:
-  ZELDA3D_3DS_ROM=<rom> tools/zelda3d_floor.py /scene/spot01_0_info.zsi -2451,1062,138
+  ZELDA3D_OOT3D_ROM=<rom> tools/zelda3d_floor.py /scene/spot01_0_info.zsi -2451,1062,138
 """
 import os, sys
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
@@ -49,7 +49,7 @@ def tri_floor_y(x, z, tri):
 
 
 def main():
-    rom = CtrRom(os.environ["ZELDA3D_3DS_ROM"])
+    rom = CtrRom(os.environ["ZELDA3D_OOT3D_ROM"])
     path = sys.argv[1]
     z = zsimod.Zsi(rom.read(rom.get(path)))
     m = cmbmod.Cmb(z.cmb_bytes())
