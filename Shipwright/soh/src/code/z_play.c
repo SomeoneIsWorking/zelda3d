@@ -19,6 +19,7 @@
 
 #include <time.h>
 #include <assert.h>
+#include <stdlib.h>
 
 TransitionUnk sTrnsnUnk;
 s32 gTrnsnUnkState;
@@ -579,7 +580,15 @@ void Play_Init(GameState* thisx) {
     gTrnsnUnkState = 0;
     play->transitionMode = TRANS_MODE_OFF;
     FrameAdvance_Init(&play->frameAdvCtx);
-    Rand_Seed((u32)osGetTime());
+    // Render-unification differential gate (kanban #131): osGetTime() reseeds the RNG from
+    // wall-clock time on every scene load, so idle sway/blink and other RNG-driven animation
+    // diverge between two otherwise-identical test boots (found via unified_ab_sweep.py selfcheck
+    // — world geometry was already bit-exact once frame_count/interp were pinned; only Link's own
+    // RNG-driven pose still differed). Pin the seed for test captures the same way.
+    {
+        const char* freezeRand = getenv("SOH3D_FREEZE_RAND_SEED");
+        Rand_Seed(freezeRand != NULL ? (u32)strtoul(freezeRand, NULL, 0) : (u32)osGetTime());
+    }
     Matrix_Init(&play->state);
     play->state.main = Play_Main;
     play->state.destroy = Play_Destroy;
