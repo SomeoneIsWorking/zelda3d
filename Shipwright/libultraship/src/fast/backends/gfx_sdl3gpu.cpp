@@ -35,7 +35,9 @@
 #include "fast/backends/soh3d_sdl3gpu.h" // SoH3DRenderer / SoH3DHudRenderer member subsystems
 #include "fast/backends/gfx_sdl.h"
 #include "fast/backends/unified_shader.h" // render-unification Phase 1 dormant shader selftest
-#include "fast/backends/unified_n64_pack.h" // render-unification Phase 3 groundwork (dormant)
+#include "fast/backends/unified_n64_pack.h" // render-unification Phase 3: CCFeatures -> UnifiedMaterial
+#include "fast/unified_vtx.h"
+#include "fast/unified_ubo.h"
 #include "fast/interpreter.h"
 #include "ship/Context.h"
 #include <prism/processor.h>
@@ -59,6 +61,7 @@
 extern "C" {
 extern char gSoh3dDumpPath[1024];
 extern volatile int gSoh3dDumpPending;
+extern int gUnifiedRenderer; // render-unification effort (kanban #131): bit 1 = N64 unified
 }
 
 namespace {
@@ -1505,6 +1508,125 @@ SDL_GPUGraphicsPipeline* GfxRenderingAPISdl3Gpu::GetOrCreatePipeline(ShaderProgr
 }
 
 // ---------------------------------------------------------------------------
+// Render-unification effort (kanban #131), Phase 3: N64 draws through the unified shader
+// (gUnifiedRenderer & 2). Mirrors GetOrCreatePipeline's depth/blend/cull mapping exactly (N64
+// always culls on the CPU, front-face fixed CCW, blend is fixed standard alpha-over when
+// useAlpha) — only the vertex layout (UnifiedVtx, 12 attribs) and shader (unified_shader.h's
+// per-variant pair) differ.
+// ---------------------------------------------------------------------------
+SDL_GPUGraphicsPipeline* GfxRenderingAPISdl3Gpu::GetOrCreateUnifiedN64Pipeline(int variant, uint32_t stateBits) {
+    uint32_t key = (uint32_t)variant * 16u + stateBits;
+    auto it = mUniN64PipelineCache.find(key);
+    if (it != mUniN64PipelineCache.end())
+        return it->second;
+
+    if (mUniN64Vert[variant] == nullptr) {
+        std::string vsrc = Fast::Unified::BuildVertexSource((Fast::Unified::Variant)variant);
+        std::string fsrc = Fast::Unified::BuildFragmentSource((Fast::Unified::Variant)variant);
+        std::vector<uint32_t> vspv, fspv;
+        std::string log;
+        bool ok = CompileGlslToSpirv(EShLangVertex, vsrc, vspv, log);
+        if (ok)
+            ok = CompileGlslToSpirv(EShLangFragment, fsrc, fspv, log);
+        if (!ok) {
+            SPDLOG_ERROR("[unified N64] shader variant {} compile FAILED: {}", variant, log);
+            return nullptr;
+        }
+        // 2 UBOs: UnifiedCommon (binding 0) + UnifiedBones (binding 1) — the vertex shader declares
+        // both even though N64 never uses the bones one (unlike the CMB path's getUnifiedPipeline,
+        // which passes the same 2 here).
+        mUniN64Vert[variant] = CreateShader(vspv, true, 0, 2);
+        uint32_t numSamplers = (variant == (int)Fast::Unified::Variant::kDualTex ||
+                                 variant == (int)Fast::Unified::Variant::kDualTexFog)
+                                    ? 2
+                                    : (variant == (int)Fast::Unified::Variant::kUntextured ? 0 : 1);
+        mUniN64Frag[variant] = CreateShader(fspv, false, numSamplers, 1);
+    }
+    if (!mUniN64Vert[variant] || !mUniN64Frag[variant])
+        return nullptr;
+
+    const bool depthTest = (stateBits & 1) != 0;
+    const bool depthMask = (stateBits & 2) != 0;
+    const bool zmodeDecal = (stateBits & 4) != 0;
+    const bool useAlpha = (stateBits & 8) != 0;
+
+    SDL_GPUVertexAttribute attrs[12]{};
+    attrs[0] = { 0, 0, SDL_GPU_VERTEXELEMENTFORMAT_FLOAT4, (uint32_t)offsetof(UnifiedVtx, pos) };
+    attrs[1] = { 1, 0, SDL_GPU_VERTEXELEMENTFORMAT_FLOAT3, (uint32_t)offsetof(UnifiedVtx, nrm) };
+    attrs[2] = { 2, 0, SDL_GPU_VERTEXELEMENTFORMAT_FLOAT2, (uint32_t)offsetof(UnifiedVtx, uv0) };
+    attrs[3] = { 3, 0, SDL_GPU_VERTEXELEMENTFORMAT_FLOAT2, (uint32_t)offsetof(UnifiedVtx, uv1) };
+    attrs[4] = { 4, 0, SDL_GPU_VERTEXELEMENTFORMAT_FLOAT4, (uint32_t)offsetof(UnifiedVtx, texClamp) };
+    attrs[5] = { 5, 0, SDL_GPU_VERTEXELEMENTFORMAT_UBYTE4_NORM, (uint32_t)offsetof(UnifiedVtx, color0) };
+    attrs[6] = { 6, 0, SDL_GPU_VERTEXELEMENTFORMAT_UBYTE4_NORM, (uint32_t)offsetof(UnifiedVtx, color1) };
+    attrs[7] = { 7, 0, SDL_GPU_VERTEXELEMENTFORMAT_UBYTE4_NORM, (uint32_t)offsetof(UnifiedVtx, color2) };
+    attrs[8] = { 8, 0, SDL_GPU_VERTEXELEMENTFORMAT_UBYTE4_NORM, (uint32_t)offsetof(UnifiedVtx, color3) };
+    attrs[9] = { 9, 0, SDL_GPU_VERTEXELEMENTFORMAT_FLOAT2, (uint32_t)offsetof(UnifiedVtx, fog) };
+    attrs[10] = { 10, 0, SDL_GPU_VERTEXELEMENTFORMAT_UBYTE4, (uint32_t)offsetof(UnifiedVtx, boneIds) };
+    attrs[11] = { 11, 0, SDL_GPU_VERTEXELEMENTFORMAT_UBYTE4_NORM, (uint32_t)offsetof(UnifiedVtx, boneW) };
+    SDL_GPUVertexBufferDescription vbDesc{};
+    vbDesc.slot = 0;
+    vbDesc.pitch = sizeof(UnifiedVtx);
+    vbDesc.input_rate = SDL_GPU_VERTEXINPUTRATE_VERTEX;
+
+    SDL_GPUGraphicsPipelineCreateInfo pci{};
+    pci.vertex_shader = mUniN64Vert[variant];
+    pci.fragment_shader = mUniN64Frag[variant];
+    pci.vertex_input_state.vertex_buffer_descriptions = &vbDesc;
+    pci.vertex_input_state.num_vertex_buffers = 1;
+    pci.vertex_input_state.vertex_attributes = attrs;
+    pci.vertex_input_state.num_vertex_attributes = 12;
+    pci.primitive_type = SDL_GPU_PRIMITIVETYPE_TRIANGLELIST;
+
+    pci.rasterizer_state.fill_mode = SDL_GPU_FILLMODE_FILL;
+    pci.rasterizer_state.cull_mode = SDL_GPU_CULLMODE_NONE; // Fast3D culls on the CPU
+    pci.rasterizer_state.front_face = SDL_GPU_FRONTFACE_COUNTER_CLOCKWISE;
+    pci.rasterizer_state.enable_depth_clip = false;
+    pci.rasterizer_state.enable_depth_bias = zmodeDecal;
+    pci.rasterizer_state.depth_bias_constant_factor = zmodeDecal ? -2.0f : 0.0f;
+    pci.rasterizer_state.depth_bias_clamp = 0.0f;
+    pci.rasterizer_state.depth_bias_slope_factor = zmodeDecal ? -2.0f : 0.0f;
+
+    pci.multisample_state.sample_count = SDL_GPU_SAMPLECOUNT_1;
+
+    if (depthTest || depthMask) {
+        pci.depth_stencil_state.enable_depth_test = true;
+        pci.depth_stencil_state.enable_depth_write = depthMask;
+        pci.depth_stencil_state.compare_op =
+            depthTest ? (zmodeDecal ? SDL_GPU_COMPAREOP_LESS_OR_EQUAL : SDL_GPU_COMPAREOP_LESS)
+                      : SDL_GPU_COMPAREOP_ALWAYS;
+    } else {
+        pci.depth_stencil_state.enable_depth_test = false;
+        pci.depth_stencil_state.enable_depth_write = false;
+        pci.depth_stencil_state.compare_op = SDL_GPU_COMPAREOP_ALWAYS;
+    }
+    pci.depth_stencil_state.enable_stencil_test = false;
+
+    SDL_GPUColorTargetDescription colorDesc{};
+    colorDesc.format = mColorFormat;
+    if (useAlpha) {
+        colorDesc.blend_state.enable_blend = true;
+        colorDesc.blend_state.src_color_blendfactor = SDL_GPU_BLENDFACTOR_SRC_ALPHA;
+        colorDesc.blend_state.dst_color_blendfactor = SDL_GPU_BLENDFACTOR_ONE_MINUS_SRC_ALPHA;
+        colorDesc.blend_state.color_blend_op = SDL_GPU_BLENDOP_ADD;
+        colorDesc.blend_state.src_alpha_blendfactor = SDL_GPU_BLENDFACTOR_SRC_ALPHA;
+        colorDesc.blend_state.dst_alpha_blendfactor = SDL_GPU_BLENDFACTOR_ONE_MINUS_SRC_ALPHA;
+        colorDesc.blend_state.alpha_blend_op = SDL_GPU_BLENDOP_ADD;
+    } else {
+        colorDesc.blend_state.enable_blend = false;
+    }
+    pci.target_info.color_target_descriptions = &colorDesc;
+    pci.target_info.num_color_targets = 1;
+    pci.target_info.has_depth_stencil_target = true;
+    pci.target_info.depth_stencil_format = mDepthFormat;
+
+    SDL_GPUGraphicsPipeline* pipeline = SDL_CreateGPUGraphicsPipeline(mDevice, &pci);
+    if (!pipeline)
+        SPDLOG_ERROR("[unified N64] pipeline create failed: {}", SDL_GetError());
+    mUniN64PipelineCache[key] = pipeline;
+    return pipeline;
+}
+
+// ---------------------------------------------------------------------------
 // Textures
 // ---------------------------------------------------------------------------
 
@@ -1683,6 +1805,93 @@ void GfxRenderingAPISdl3Gpu::SetUseAlpha(bool useAlpha) {
     mCurrentUseAlpha = useAlpha;
 }
 
+// ---------------------------------------------------------------------------
+// Render-unification effort (kanban #131), Phase 3: convert the OLD path's already-correctly-
+// packed per-vertex floats (bufVbo, laid out per ShaderProgramSDL3::attribs) into UnifiedVtx,
+// using the CCFeatures this program was built from (prg->cc, stored since the Phase 3 groundwork
+// commit) to know each float's meaning. Deliberately does NOT touch interpreter.cpp's tri-emit
+// packing (the hot path for every N64 triangle) — this reuses values the old path already computed
+// correctly (PRIM/ENV/LOD-fraction colors are pre-resolved into concrete RGB(A) floats by the time
+// they reach bufVbo, so no RDP-register access is needed here).
+namespace {
+
+Fast::Unified::Variant N64VariantFor(const CCFeatures& cc) {
+    if (cc.opt_grayscale)
+        return Fast::Unified::Variant::kGrayscale;
+    bool tex0 = cc.usedTextures[0], tex1 = cc.usedTextures[1];
+    if (tex0 && tex1)
+        return cc.opt_fog ? Fast::Unified::Variant::kDualTexFog : Fast::Unified::Variant::kDualTex;
+    if (!tex0 && !tex1)
+        return Fast::Unified::Variant::kUntextured;
+    return cc.opt_alpha_threshold ? Fast::Unified::Variant::kSingleTexAlphaTest : Fast::Unified::Variant::kSingleTex;
+}
+
+// Reads one vertex's floats (already resolved concrete color values, not combiner codes — see the
+// header comment above) starting at `vf`, in the SAME order CreateAndLoadNewShader's `add()` calls
+// declared them (interpreter.cpp's tri-emit loop packs in this identical order).
+UnifiedVtx PackN64VertexToUnified(const float* vf, const CCFeatures& cc, float outFogColor[3]) {
+    UnifiedVtx u{};
+    int idx = 0;
+    u.pos[0] = vf[idx++]; u.pos[1] = vf[idx++]; u.pos[2] = vf[idx++]; u.pos[3] = vf[idx++];
+    u.nrm[0] = 0.0f; u.nrm[1] = 0.0f; u.nrm[2] = 1.0f; // N64 has no real per-vertex normal
+    float uv[2][2] = { { 0, 0 }, { 0, 0 } };
+    float clampS[2] = { 1e6f, 1e6f }, clampT[2] = { 1e6f, 1e6f };
+    for (int t = 0; t < 2; t++) {
+        if (cc.usedTextures[t]) {
+            uv[t][0] = vf[idx++];
+            uv[t][1] = vf[idx++];
+            if (cc.clamp[t][0])
+                clampS[t] = vf[idx++];
+            if (cc.clamp[t][1])
+                clampT[t] = vf[idx++];
+        }
+    }
+    u.uv0[0] = uv[0][0]; u.uv0[1] = uv[0][1];
+    u.uv1[0] = uv[1][0]; u.uv1[1] = uv[1][1];
+    u.texClamp[0] = clampS[0]; u.texClamp[1] = clampT[0]; u.texClamp[2] = clampS[1]; u.texClamp[3] = clampT[1];
+
+    // Fog: interpreter.cpp packs {r,g,b,factor} per vertex, but r/g/b come from the RDP's fog_color
+    // register — constant across the whole draw, not really per-vertex. Read once (any vertex) into
+    // outFogColor (caller puts it in the per-draw UBO); only the 4th float (factor) is genuinely
+    // per-vertex and lives in UnifiedVtx.fog[0].
+    float fogFactor = 0.0f;
+    if (cc.opt_fog) {
+        outFogColor[0] = vf[idx++];
+        outFogColor[1] = vf[idx++];
+        outFogColor[2] = vf[idx++];
+        fogFactor = vf[idx++];
+    }
+    u.fog[0] = fogFactor;
+    u.fog[1] = 0.0f;
+
+    // Grayscale: same per-draw-constant-register shape as fog (mRdp->grayscale_color.rgba, all 4
+    // components from the SAME register). The unified shader's grayscale variant currently uses a
+    // generic luma approximation (documented residual, not a real port of this blend-toward-color
+    // mechanism) — skip the 4 floats here to keep numInputs parsing aligned, don't use the values.
+    if (cc.opt_grayscale)
+        idx += 4;
+
+    for (int j = 0; j < cc.numInputs && j < 4; j++) {
+        uint8_t* slot = (j == 0) ? u.color0 : (j == 1) ? u.color1 : (j == 2) ? u.color2 : u.color3;
+        for (int k = 0; k < 3; k++)
+            slot[k] = (uint8_t)std::lround(std::clamp(vf[idx + k], 0.0f, 1.0f) * 255.0f);
+        idx += 3;
+        if (cc.opt_alpha) {
+            slot[3] = (uint8_t)std::lround(std::clamp(vf[idx], 0.0f, 1.0f) * 255.0f);
+            idx += 1;
+        } else {
+            slot[3] = 255;
+        }
+    }
+    // Bone data: N64 has no GPU skinning — identity (100% bone 0, which the unified vertex shader
+    // never reads for N64 anyway since UnifiedMaterial.alreadyTransformed skips the whole branch).
+    u.boneIds[0] = u.boneIds[1] = u.boneIds[2] = u.boneIds[3] = 0;
+    u.boneW[0] = 255; u.boneW[1] = u.boneW[2] = u.boneW[3] = 0;
+    return u;
+}
+
+} // namespace
+
 void GfxRenderingAPISdl3Gpu::DrawTriangles(float bufVbo[], size_t bufVboLen, size_t bufVboNumTris) {
     if (!mFrameAcquired || mCurrentShaderProgram == nullptr || mCurrentShaderProgram->frag == nullptr)
         return;
@@ -1693,21 +1902,76 @@ void GfxRenderingAPISdl3Gpu::DrawTriangles(float bufVbo[], size_t bufVboLen, siz
         return; // current FB is not a drawable render target
 
     ShaderProgramSDL3* prg = mCurrentShaderProgram;
+    const CCFeatures& cc = prg->cc;
+    const uint32_t stateBits = (mCurrentDepthTest ? 1u : 0u) | (mCurrentDepthMask ? 2u : 0u) |
+                                (mCurrentZmodeDecal ? 4u : 0u) | (mCurrentUseAlpha ? 8u : 0u);
+    const uint32_t numVerts = 3u * (uint32_t)bufVboNumTris;
 
-    const uint32_t vboBytes = (uint32_t)(bufVboLen * sizeof(float));
-    const uint32_t aligned = (mVtxUsed + 0xF) & ~0xFu;
-    if (mVtxMapped == nullptr || aligned + vboBytes > mVtxCapacity)
-        return; // ring exhausted this frame: drop rather than corrupt
-    memcpy(mVtxMapped + aligned, bufVbo, vboBytes);
-    mVtxUsed = aligned + vboBytes;
+    // Render-unification effort (kanban #131), Phase 3: route through the unified shader/vertex
+    // format when the bit is set. Bounded to the common case for this first cut — mask/blend
+    // texture combiner modes (rare) still fall back to the old per-permutation path, same
+    // never-silently-drop-a-draw discipline as Phase 2's CMB wiring.
+    bool unified = (gUnifiedRenderer & 2) != 0 && cc.numInputs <= 4 && !cc.used_masks[0] &&
+                   !cc.used_masks[1] && !cc.used_blend[0] && !cc.used_blend[1];
 
+    uint32_t vboBytes, aligned;
     Op op{};
+    if (unified) {
+        vboBytes = numVerts * (uint32_t)sizeof(UnifiedVtx);
+        aligned = (mVtxUsed + 0xF) & ~0xFu;
+        if (mVtxMapped == nullptr || aligned + vboBytes > mVtxCapacity)
+            return;
+        float fogColor[3] = { 0, 0, 0 };
+        UnifiedVtx* dst = reinterpret_cast<UnifiedVtx*>(mVtxMapped + aligned);
+        for (uint32_t i = 0; i < numVerts; i++)
+            dst[i] = PackN64VertexToUnified(bufVbo + (size_t)i * prg->numFloats, cc, fogColor);
+        mVtxUsed = aligned + vboBytes;
+
+        Fast::Unified::Variant variant = N64VariantFor(cc);
+        op.pipeline = GetOrCreateUnifiedN64Pipeline((int)variant, stateBits);
+        if (!op.pipeline)
+            unified = false; // shader/pipeline create failed — fall back rather than drop the draw
+        else {
+            UnifiedMaterial um = Fast_PackCCFeaturesToUnifiedMaterial(cc);
+            SoH3DUnified::UnifiedDrawUbo uu{};
+            // uMvp/uMv unused when alreadyTransformed (N64 always is here) except uMv for vNrmView,
+            // which N64 content never lights from (lightingMode 0) — identity is fine either way.
+            uu.common.uMvp[0] = uu.common.uMvp[5] = uu.common.uMvp[10] = uu.common.uMvp[15] = 1.0f;
+            uu.common.uMv[0] = uu.common.uMv[5] = uu.common.uMv[10] = uu.common.uMv[15] = 1.0f;
+            memcpy(uu.common.uCombA, um.combMux, sizeof(uu.common.uCombA));
+            uu.common.uFogColor[0] = fogColor[0]; uu.common.uFogColor[1] = fogColor[1];
+            uu.common.uFogColor[2] = fogColor[2]; uu.common.uFogColor[3] = 0.0f;
+            uu.common.uParams0[0] = um.alphaRef;
+            uu.common.uParams0[1] = 0.0f; // lightingMode 0 — N64 color0 is already the final shade
+            uu.common.uParams0[2] = (float)um.cycleCount;
+            static const char* freezeStrN64 = getenv("SOH3D_FREEZE_NOISE_FRAME");
+            uu.common.uParams0[3] =
+                freezeStrN64 != nullptr ? (float)atoi(freezeStrN64) : (float)mFrameCount;
+            uu.common.uParams1[0] = mCurrentNoiseScale;
+            uu.common.uParams1[1] = 0.0f; // polygonOffset — N64 decal bias is baked into the pipeline
+            uu.common.uParams1[2] = 0.0f; // hasSkin — N64 never GPU-skins
+            uu.common.uParams1[3] = 1.0f; // alreadyTransformed
+            mSoh3dModelUbos.push_back({});
+            memcpy(mSoh3dModelUbos.back().data(), &uu, sizeof(uu));
+            op.soh3dDrawIdx = (int)mSoh3dModelUbos.size() - 1;
+            op.drawClass = Op::DRAW_MODEL; // reuses the existing common+bones push path unchanged
+            op.altVbo = nullptr;           // fall back to the shared mVbo at vboOffset, like N64 today
+        }
+    }
+    if (!unified) {
+        vboBytes = (uint32_t)(bufVboLen * sizeof(float));
+        aligned = (mVtxUsed + 0xF) & ~0xFu;
+        if (mVtxMapped == nullptr || aligned + vboBytes > mVtxCapacity)
+            return; // ring exhausted this frame: drop rather than corrupt
+        memcpy(mVtxMapped + aligned, bufVbo, vboBytes);
+        mVtxUsed = aligned + vboBytes;
+        op.pipeline = GetOrCreatePipeline(prg, stateBits);
+    }
+
     op.kind = OP_DRAW;
     op.fb = mCurrentFb;
-    op.pipeline = GetOrCreatePipeline(prg, (mCurrentDepthTest ? 1u : 0u) | (mCurrentDepthMask ? 2u : 0u) |
-                                              (mCurrentZmodeDecal ? 4u : 0u) | (mCurrentUseAlpha ? 8u : 0u));
     op.vboOffset = aligned;
-    op.numVerts = 3u * (uint32_t)bufVboNumTris;
+    op.numVerts = numVerts;
 
     // SDL3 GPU has a hybrid convention: NDC is Y-up (GL-like, so vertices aren't negated — see
     // GetClipParameters), but the viewport/scissor origin is TOP-left (Vulkan/D3D-like). The
