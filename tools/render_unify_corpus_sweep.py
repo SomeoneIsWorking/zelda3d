@@ -2,12 +2,12 @@
 """render_unify_corpus_sweep.py — Phase 0 of the render-unification effort (kanban #131).
 
 Cold-boots every distinct scene (first entrance per scene_crashscan's table, skipping its
-test/cutscene-only lists) with SOH3D_CC_DUMP set, so the SoH3D_LogNewCombinerKey instrumentation
+test/cutscene-only lists) with ZELDA3D_CC_DUMP set, so the Zelda3D_LogNewCombinerKey instrumentation
 (interpreter.cpp) appends every distinct N64 color-combiner permutation actually exercised into
 one shared manifest. Also captures a golden screenshot per scene for later old-vs-new diffing by
 tools/unified_ab_sweep.py (not built yet).
 
-This does NOT change rendering behavior (SOH3D_CC_DUMP is a pure logging opt-in) — it just walks
+This does NOT change rendering behavior (ZELDA3D_CC_DUMP is a pure logging opt-in) — it just walks
 content. Output:
   scratch/render_unify/cc_corpus.log          combine_mode/options lines, one append run per scene
                                                (dedupe downstream: sort -u by the two hex fields)
@@ -40,15 +40,15 @@ def repl_shot(name):
     # which swamps any real rendering diff with sim-timing noise indistinguishable from a
     # regression. Freeze+step makes two independent boots of the same scene land on the exact same
     # logic state, so a later capture (unified_ab_sweep.py) compares like-for-like.
-    subprocess.run(["tools/soh3d_repl.py", "cmd", "freeze 1"], cwd=REPO,
+    subprocess.run(["tools/zelda3d_repl.py", "cmd", "freeze 1"], cwd=REPO,
                    capture_output=True, text=True, timeout=15)
     remaining = FREEZE_STEP_TICKS
     while remaining > 0:  # `step` caps a single call at 600 ticks
         n = min(600, remaining)
-        subprocess.run(["tools/soh3d_repl.py", "cmd", f"step {n}"], cwd=REPO,
+        subprocess.run(["tools/zelda3d_repl.py", "cmd", f"step {n}"], cwd=REPO,
                        capture_output=True, text=True, timeout=30)
         remaining -= n
-    subprocess.run(["tools/soh3d_repl.py", "shot", name], cwd=REPO,
+    subprocess.run(["tools/zelda3d_repl.py", "shot", name], cwd=REPO,
                    capture_output=True, text=True, timeout=30)
     src = os.path.join(REPO, "scratch/screenshots", name + ".png")
     return src if os.path.exists(src) else None
@@ -74,14 +74,14 @@ def main():
         if resume and key in results:
             continue
         env = dict(os.environ)
-        env["SOH3D_HEADLESS"] = "1"
-        env["SOH3D_CC_DUMP"] = CC_LOG
+        env["ZELDA3D_HEADLESS"] = "1"
+        env["ZELDA3D_CC_DUMP"] = CC_LOG
         # Pin the alpha-dither noise seed so this golden set is bit-reproducible against a later
         # unified_ab_sweep.py capture using the same value (see docs/render_unify plan, kanban #131).
-        env["SOH3D_FREEZE_NOISE_FRAME"] = FREEZE_NOISE_FRAME
-        env["SOH3D_FREEZE_INTERP"] = "1"
-        env["SOH3D_FREEZE_RAND_SEED"] = FREEZE_RAND_SEED
-        r = subprocess.run(f"tools/soh3d_game.sh start {idx} 0x8000",
+        env["ZELDA3D_FREEZE_NOISE_FRAME"] = FREEZE_NOISE_FRAME
+        env["ZELDA3D_FREEZE_INTERP"] = "1"
+        env["ZELDA3D_FREEZE_RAND_SEED"] = FREEZE_RAND_SEED
+        r = subprocess.run(f"tools/zelda3d_game.sh start {idx} 0x8000",
                            shell=True, cwd=REPO, env=env, capture_output=True, text=True, timeout=150)
         ready = "ready (pid" in (r.stdout + r.stderr)
         crash = ""
@@ -112,7 +112,7 @@ def main():
         json.dump(results, open(RESULTS, "w"), indent=1)
         print(f"{key} {scene:42s} {rec['status']}", flush=True)
 
-    subprocess.run("tools/soh3d_game.sh stop", shell=True, cwd=REPO, capture_output=True)
+    subprocess.run("tools/zelda3d_game.sh stop", shell=True, cwd=REPO, capture_output=True)
     ok = sum(1 for r in results.values() if r.get("status") == "OK")
     print(f"\ndone: {ok}/{len(results)} scenes OK; cc corpus log -> {CC_LOG}")
     if os.path.exists(CC_LOG):

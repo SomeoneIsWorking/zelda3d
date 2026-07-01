@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""gen_walk_stop_sweet.py — bake the walk-STOP morph table for soh3d_anim.cpp.
+"""gen_walk_stop_sweet.py — bake the walk-STOP morph table for zelda3d_anim.cpp.
 
 For each integer free-run phase φ of nml_walk_free (duration 29), emit the MAX per-bone local-rotation
 gap (deg) between walk_free@φ and each end anim's frame 0 (nml_walk_endR_free@0 / nml_walk_endL_free@0).
@@ -7,7 +7,7 @@ The §6e walk-stop cross-fade blends the frozen walk pose → end@0, so this gap
 morph must cover. Driving morphFrames = gap / OOT3D_BUDGET (the oracle's measured ~18°/frame walk-stop
 ceiling) bounds the per-frame velocity to oracle parity, and picking the end with the smaller gap chooses
 the nearer continuation — replacing the decomp's leg-phase sweet-spot math, which assumes a CSAB↔leg-phase
-offset K=0 that does NOT hold for SoH3D's single-CSAB (non-blend) walk, so it let morphFrames collapse to
+offset K=0 that does NOT hold for Zelda3D's single-CSAB (non-blend) walk, so it let morphFrames collapse to
 ~0 at the wrong φ → the 119° arm snap (measured, tools/walk_stop_phase_sweep.py).
 
 bone9 (upper-pivot/spine twist) is INCLUDED and is decisive for the R/L choice: endR@0 and endL@0
@@ -15,7 +15,7 @@ differ ~90° on bone9 because they continue OPPOSITE-foot strides (the torso cou
 spine matches exactly ONE of them, so the min-gap pick selects the stride-correct end; choosing the
 other swings the spine 90° and that propagates to every arm bone (the measured 38° shoulder pop).
 
-Output: Shipwright/soh/src/soh3d/soh3d_walk_stop_sweet.inc  (two 29-float arrays gapR[]/gapL[]).
+Output: Shipwright/soh/src/zelda3d/zelda3d_walk_stop_sweet.inc  (two 29-float arrays gapR[]/gapL[]).
 """
 from __future__ import annotations
 import sys, os
@@ -26,12 +26,12 @@ from zar import Zar
 from walk_stop_sweet import local_rotations, _geo_angle, ZAR, CMB, WALK, ENDR, ENDL
 
 OUT = os.path.join(os.path.dirname(os.path.abspath(__file__)),
-                   "..", "Shipwright", "soh", "src", "soh3d", "soh3d_walk_stop_sweet.inc")
+                   "..", "Shipwright", "soh", "src", "zelda3d", "zelda3d_walk_stop_sweet.inc")
 BONES = list(range(1, 22))   # all body bones (incl. bone9 spine twist — decisive for R/L, see above)
 
 
 def main():
-    rom = CtrRom(os.environ["SOH3D_3DS_ROM"])
+    rom = CtrRom(os.environ["ZELDA3D_3DS_ROM"])
     z = Zar(rom.read(rom.get(ZAR)))
 
     def load(n):

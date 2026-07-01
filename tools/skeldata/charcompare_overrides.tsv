@@ -5,14 +5,14 @@
 # Columns are tab-separated: zar <TAB> n64anim <TAB> csab. '#' lines and blanks are ignored.
 #
 # The original 4 hand-verified disagreements migrated from the formerly hand-maintained
-# soh3d_animmap.inc (verified in-game; the auto-picker chose differently):
+# zelda3d_animmap.inc (verified in-game; the auto-picker chose differently):
 /actor/zelda_du.zar	gDaruniaSageFormationAnim	dalnia_base_to_dai
 /actor/zelda_wm2.zar	gWallmasterMissAnim	wm_miss
 /actor/zelda_xc.zar	gSheikArmsCrossedIdleAnim	xc_matsu
 /actor/zelda_xc.zar	gSheikHittingGroundAnim	mizunoserenaade
 #
 # En_Ko Kokiri kids (BACKLOG #8): the km1/kw1 skeletons animate from the SHARED object_os_anime
-# bank (gKokiri*Anim), now wired in via soh3d_anim_export SHARED_ANIM_BANKS. The anims are mostly
+# bank (gKokiri*Anim), now wired in via zelda3d_anim_export SHARED_ANIM_BANKS. The anims are mostly
 # 2-frame static-pose holds, so frame-delta auto-matching is meaningless -> map each by SEMANTICS
 # to the km1_* CSAB (romaji: suwari=sit, agura=cross-legged, hiji=elbow, nokezori=lean-back,
 # usirote=hands-behind, utsumuki=look-down, shinpai=worried, udekumi=arms-folded, kusakari=cut-
@@ -50,7 +50,7 @@
 /actor/zelda_horse.zar	gEponaJumpingHighAnim	hl_anim_jump2002
 #
 # Cucco Lady (En_Niw_Lady, BACKLOG #38): gCuccoLadySkel (object_ane) animates from the shared
-# object_os_anime bank via 4 anims, wired in through soh3d_anim_export SHARED_ANIM_BANKS (allowlist).
+# object_os_anime bank via 4 anims, wired in through zelda3d_anim_export SHARED_ANIM_BANKS (allowlist).
 # 9F94/0718/A630 auto-match their zelda_ane CSAB exactly by frame count (onegai_c/Ane_hanasu/oro_oro);
 # only 07D0 needs a semantic pin: it is the neutral idle/wait but a 2-frame stub, so frame-delta picks
 # the wrong CSAB -> map it to Ane_matsu (matsu = wait/idle). The runtime resolver disambiguates these

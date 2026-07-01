@@ -9,7 +9,7 @@
 #include "overlays/actors/ovl_En_Elf/z_en_elf.h"
 #include "objects/gameplay_keep/gameplay_keep.h"
 #include "soh/Enhancements/game-interactor/GameInteractor_Hooks.h"
-#include "soh3d/soh3d.h"
+#include "zelda3d/zelda3d.h"
 
 #define FLAGS (ACTOR_FLAG_ATTENTION_ENABLED | ACTOR_FLAG_FRIENDLY | ACTOR_FLAG_UPDATE_DURING_OCARINA)
 
@@ -569,8 +569,8 @@ void EnGs_Draw(Actor* thisx, PlayState* play) {
     s32 tmp;
     u32 frames;
 
-    // SoH3D divert (OoT3D Gossip Stone) is handled centrally in Actor_Draw via the
-    // model table in soh3d.c — no per-actor edit needed here.
+    // Zelda3D divert (OoT3D Gossip Stone) is handled centrally in Actor_Draw via the
+    // model table in zelda3d.c — no per-actor edit needed here.
     if (!(this->unk_19E & 8)) {
         OPEN_DISPS(play->state.gfxCtx);
 

@@ -1087,7 +1087,7 @@ void MapSelect_Main(GameState* thisx) {
 
     // Zelda3D: headless debug-warp — on the first MapSelect frame, load a gameplay entrance straight
     // away so a no-input headless boot reaches real gameplay instead of the title attract-demo loop.
-    // Mirrors soh3d's Select_Main auto-warp (soh/src/overlays/gamestates/ovl_select/z_select.c).
+    // Mirrors zelda3d's Select_Main auto-warp (soh/src/overlays/gamestates/ovl_select/z_select.c).
     // fileNum 0xFF makes MapSelect_LoadGame seed a fresh debug save; spawn 0 matches the menu path.
     if (Z3D_AutoWarpEnabled()) {
         s32 entrance = Z3D_AutoWarpEntrance();

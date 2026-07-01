@@ -60,7 +60,7 @@ void Setup_InitImpl(SetupState* this) {
     // Zelda3D: after the essential global init above (save context + regs), route straight into the
     // MapSelect debug overlay when the headless debug-warp gate is set, instead of the title screen
     // + attract-demo loop. MapSelect_Main then auto-loads the target gameplay entrance. This mirrors
-    // OoT's soh3d boot-into-Select path (soh/src/code/graph.c). Gate off -> vanilla ConsoleLogo.
+    // OoT's zelda3d boot-into-Select path (soh/src/code/graph.c). Gate off -> vanilla ConsoleLogo.
     if (Z3D_AutoWarpEnabled()) {
         SET_NEXT_GAMESTATE(&this->state, MapSelect_Init, sizeof(MapSelectState));
     } else {

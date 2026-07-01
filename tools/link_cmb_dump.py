@@ -1,14 +1,14 @@
 #!/usr/bin/env python3
 """Dump per-mesh equipment/hand-variant info for a Link body CMB inside a romfs ZAR.
 
-Reuses the method that mapped childlink_v2 (see soh/src/soh3d/link_mesh_id_map.md):
+Reuses the method that mapped childlink_v2 (see soh/src/zelda3d/link_mesh_id_map.md):
 for every mesh in the body CMB print its mesh_id (mid), material, primary texture name,
 the bone_table it is rigidly bound to, and its posed (bind-pose) centroid/bbox. Combined
 with an in-game `linkmid only <n>` render sweep this labels each baked equipment/hand
-variant so SoH3D_LinkComputeMidMask can select the live subset.
+variant so Zelda3D_LinkComputeMidMask can select the live subset.
 
 Usage: link_cmb_dump.py /actor/zelda_link_boy_new.zar [out.cmb]
-       (defaults to the boy zar; picks the LARGEST .cmb = the body, like SoH3D_AutoModelId)
+       (defaults to the boy zar; picks the LARGEST .cmb = the body, like Zelda3D_AutoModelId)
 """
 import os, sys, struct
 sys.path.insert(0, os.path.dirname(__file__))
@@ -66,7 +66,7 @@ def mesh_posed_bbox(c: cmblib.Cmb, mesh_idx):
 
 def main():
     zar_path = sys.argv[1] if len(sys.argv) > 1 else "/actor/zelda_link_boy_new.zar"
-    rom = CtrRom(os.environ["SOH3D_3DS_ROM"])
+    rom = CtrRom(os.environ["ZELDA3D_3DS_ROM"])
     fe = rom.get(zar_path)
     z = Zar(rom.read(fe))
     body, allcmbs = pick_body_cmb(z)

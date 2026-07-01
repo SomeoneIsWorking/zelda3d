@@ -20,7 +20,7 @@
 #include <string>
 #include <vector>
 
-namespace SoH3D {
+namespace Zelda3D {
 
 class OoT3DCollision {
   public:
@@ -55,4 +55,4 @@ class OoT3DCollision {
     std::vector<Surface> mSurfaces;
 };
 
-} // namespace SoH3D
+} // namespace Zelda3D

@@ -1,13 +1,13 @@
 #!/usr/bin/env python3
-"""azahar_repl.py — interactive console for the SoH3D 3DS oracle (OoT3D headless in Azahar).
+"""azahar_repl.py — interactive console for the Zelda3D 3DS oracle (OoT3D headless in Azahar).
 
 One scriptable tool for everything the oracle needs over Azahar's RPC (UDP :45987, needs
-enable_rpc_server=true + the SoH3D Azahar mods: Screenshot + Input packets): drive input, capture
-the screen, and read emulated 3DS RAM. See issue #89, memory soh3d-azahar-oracle.
+enable_rpc_server=true + the Zelda3D Azahar mods: Screenshot + Input packets): drive input, capture
+the screen, and read emulated 3DS RAM. See issue #89, memory zelda3d-azahar-oracle.
 
 Launch OoT3D first (headless):
   source ./.env
-  DISPLAY=:95 QT_QPA_PLATFORM=xcb setsid Azahar/build/bin/Release/azahar "$SOH3D_3DS_ROM" &
+  DISPLAY=:95 QT_QPA_PLATFORM=xcb setsid Azahar/build/bin/Release/azahar "$ZELDA3D_3DS_ROM" &
 Then: tools/azahar_repl.py           # interactive
   or: tools/azahar_repl.py -c "start; sleep 1; shot t.png; read 8000000 32"   # batch (;-separated)
 
@@ -26,7 +26,7 @@ Commands:
   sleep <secs>              wait
   buttons                   list button names
 
-Camera / free-cam primitives (analogous to SoH3D acam):
+Camera / free-cam primitives (analogous to Zelda3D acam):
   cam_status                print current camera eye, at, Link pos, eye→at dist
   cam_eye <x> <y> <z>       set camera eye Vec3f (one frame; use before `shot`)
   cam_at  <x> <y> <z>       set camera look-at Vec3f (one frame; use before `shot`)
@@ -37,7 +37,7 @@ Camera / free-cam primitives (analogous to SoH3D acam):
   cam_orbit <tx> <ty> <tz> [dist [yawDeg [pitchDeg]]]
                             place camera at polar angle around target (tx,ty,tz), freeze it, and
                             screenshot. Defaults: dist=200, yaw=0 (north), pitch=20 (slightly above).
-                            yaw=0 → +Z side, yaw=90 → +X side. Analogous to SoH3D `acam`.
+                            yaw=0 → +Z side, yaw=90 → +X side. Analogous to Zelda3D `acam`.
                             Use `cam_orbit link` to orbit current Link position automatically.
   cam_orbit_actor <hexaddr> [dist [yawDeg [pitchDeg]]]
                             read actor's world.pos from RAM (hexaddr + A_POS offset) and orbit it.
@@ -148,7 +148,7 @@ def save_png(rpc, path):
         im = Image.open(ppm)
         im.save(path)
         # Azahar saves the 3DS dual-screen stacked 400x480 (top=game 400x240, bottom=touch).
-        # Also emit a TOP-SCREEN crop = the game view, for clean SoH3D-vs-oracle A/B compares.
+        # Also emit a TOP-SCREEN crop = the game view, for clean Zelda3D-vs-oracle A/B compares.
         if im.size == (400, 480):
             top = path[:-4] + "_top.png"
             im.crop((0, 0, 400, 240)).save(top)
@@ -231,7 +231,7 @@ def do(rpc, line):  # noqa: C901
         print(f"  loadstate slot {slot}: {'OK' if rpc.savestate(slot, False) else 'FAILED'}")
     elif cmd == "sleep":
         time.sleep(float(args[0]))
-    # ── camera / free-cam primitives (analogous to SoH3D acam) ───────────────
+    # ── camera / free-cam primitives (analogous to Zelda3D acam) ───────────────
     elif cmd == "cam_status":
         import math
         ps  = _cam_read_ps(rpc)
@@ -290,7 +290,7 @@ def do(rpc, line):  # noqa: C901
         # cam_holdshot <ex> <ey> <ez> <ax> <ay> <az> <outname> [settle_secs]
         # Spam-write an EXPLICIT eye+at (overriding the live camera that snaps back to
         # Link) in a background thread, let it settle, screenshot, then release. This is
-        # the oracle-matched free-cam primitive: hold any SoH3D repro camera and capture
+        # the oracle-matched free-cam primitive: hold any Zelda3D repro camera and capture
         # exactly what OoT3D draws from there (cam_eye/cam_at alone are reverted before
         # the frame is captured; cam_freeze re-reads the LIVE camera, not your override).
         ex, ey, ez = float(args[0]), float(args[1]), float(args[2])

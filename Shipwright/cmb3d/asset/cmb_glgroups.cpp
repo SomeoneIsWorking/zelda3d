@@ -8,24 +8,24 @@
 #include "pica_texture.h"
 #include "texpack.h"
 
-namespace SoH3D {
+namespace Zelda3D {
 
-// CmbVertex and SoH3DGlVtx MUST be layout-identical: MakeGlGroup aliases the CMB's
+// CmbVertex and Zelda3DGlVtx MUST be layout-identical: MakeGlGroup aliases the CMB's
 // vertex array straight into the renderer's vertex pointer. Guard it here so any
 // drift in either struct is a compile error, not a silent garbage-render.
-static_assert(sizeof(CmbVertex) == sizeof(SoH3DGlVtx), "CmbVertex/SoH3DGlVtx size mismatch");
-static_assert(offsetof(CmbVertex, nrm) == offsetof(SoH3DGlVtx, nrm), "nrm offset mismatch");
-static_assert(offsetof(CmbVertex, uv) == offsetof(SoH3DGlVtx, uv), "uv offset mismatch");
-static_assert(offsetof(CmbVertex, boneIds) == offsetof(SoH3DGlVtx, boneIds), "boneIds offset mismatch");
-static_assert(offsetof(CmbVertex, weights) == offsetof(SoH3DGlVtx, weights), "weights offset mismatch");
-static_assert(offsetof(CmbVertex, color) == offsetof(SoH3DGlVtx, color), "color offset mismatch");
+static_assert(sizeof(CmbVertex) == sizeof(Zelda3DGlVtx), "CmbVertex/Zelda3DGlVtx size mismatch");
+static_assert(offsetof(CmbVertex, nrm) == offsetof(Zelda3DGlVtx, nrm), "nrm offset mismatch");
+static_assert(offsetof(CmbVertex, uv) == offsetof(Zelda3DGlVtx, uv), "uv offset mismatch");
+static_assert(offsetof(CmbVertex, boneIds) == offsetof(Zelda3DGlVtx, boneIds), "boneIds offset mismatch");
+static_assert(offsetof(CmbVertex, weights) == offsetof(Zelda3DGlVtx, weights), "weights offset mismatch");
+static_assert(offsetof(CmbVertex, color) == offsetof(Zelda3DGlVtx, color), "color offset mismatch");
 
-SoH3DGlGroup MakeGlGroup(const Cmb& cmb, const CmbDrawGroup& g, const CmbVertex* srcVerts, int texBase) {
+Zelda3DGlGroup MakeGlGroup(const Cmb& cmb, const CmbDrawGroup& g, const CmbVertex* srcVerts, int texBase) {
     const CmbMaterial* mat =
         (g.material_index >= 0 && g.material_index < (int)cmb.materials().size()) ? &cmb.materials()[g.material_index]
                                                                                   : nullptr;
-    SoH3DGlGroup cg{};
-    cg.verts = reinterpret_cast<const SoH3DGlVtx*>(srcVerts);
+    Zelda3DGlGroup cg{};
+    cg.verts = reinterpret_cast<const Zelda3DGlVtx*>(srcVerts);
     cg.vertCount = (int)g.verts.size();
     cg.texIndex = cmb.materialTexture(g.material_index) + texBase;
     cg.alphaTest = mat && mat->alpha_test ? 1 : 0;
@@ -55,7 +55,7 @@ SoH3DGlGroup MakeGlGroup(const Cmb& cmb, const CmbDrawGroup& g, const CmbVertex*
         cg.matAmbient[k] = mat ? mat->mat_ambient[k] : 1.0f;
         cg.matDiffuse[k] = mat ? mat->mat_diffuse[k] : 1.0f;
     }
-    if (getenv("SOH3D_DBG_MAT")) {
+    if (getenv("ZELDA3D_DBG_MAT")) {
         fprintf(stderr, "[MAT] mi=%d vlit=%d comb=%.1f amb=(%.2f,%.2f,%.2f) dif=(%.2f,%.2f,%.2f)\n",
                 g.material_index, cg.vertexLighting, cg.combScaleRGB, cg.matAmbient[0], cg.matAmbient[1],
                 cg.matAmbient[2], cg.matDiffuse[0], cg.matDiffuse[1], cg.matDiffuse[2]);
@@ -72,11 +72,11 @@ int AppendCmbTextures(const Cmb& cmb, std::vector<std::vector<uint8_t>>& texRgba
         int w = t.width, h = t.height;
         std::vector<uint8_t> rgba;
         // Look up a hi-res replacement by the texture's Citra legacy hash.
-        auto lb = SoH3D::PicaLegacyHashBytes(t.glFormat(), t.width, t.height, raw);
-        uint64_t hash = lb.empty() ? 0 : SoH3D::CityHash64(reinterpret_cast<const char*>(lb.data()), lb.size());
-        if (hash == 0 || !SoH3D::TexPackLookup(hash, w, h, rgba)) {
+        auto lb = Zelda3D::PicaLegacyHashBytes(t.glFormat(), t.width, t.height, raw);
+        uint64_t hash = lb.empty() ? 0 : Zelda3D::CityHash64(reinterpret_cast<const char*>(lb.data()), lb.size());
+        if (hash == 0 || !Zelda3D::TexPackLookup(hash, w, h, rgba)) {
             w = t.width; h = t.height;
-            rgba = SoH3D::PicaDecode(t.glFormat(), t.width, t.height, raw);
+            rgba = Zelda3D::PicaDecode(t.glFormat(), t.width, t.height, raw);
         }
         texRgba.push_back(std::move(rgba));
         dims.push_back({ w, h });
@@ -84,4 +84,4 @@ int AppendCmbTextures(const Cmb& cmb, std::vector<std::vector<uint8_t>>& texRgba
     return base;
 }
 
-} // namespace SoH3D
+} // namespace Zelda3D

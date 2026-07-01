@@ -7,7 +7,7 @@ For the facial/material override channel (#3): prints
   - per-mesh mesh_id + material + tex name (for ocarina/hand mesh-visibility selection).
 
 Usage: face_cmb_dump.py /actor/zelda_sa.zar [cmb_name_substr]
-       (default picks the LARGEST cmb = body, like SoH3D_AutoModelId)
+       (default picks the LARGEST cmb = body, like Zelda3D_AutoModelId)
 """
 import os, sys
 sys.path.insert(0, os.path.dirname(__file__))
@@ -19,7 +19,7 @@ import cmb as cmblib
 def main():
     zar_path = sys.argv[1]
     want = sys.argv[2] if len(sys.argv) > 2 else None
-    rom = CtrRom(os.environ["SOH3D_3DS_ROM"])
+    rom = CtrRom(os.environ["ZELDA3D_3DS_ROM"])
     z = Zar(rom.read(rom.get(zar_path)))
     cmbs = [f for f in z.files if f.name.lower().endswith(".cmb")]
     if want:

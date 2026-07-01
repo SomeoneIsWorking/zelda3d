@@ -2,9 +2,9 @@
 """oracle_link_animid.py — capture OoT3D Link's LIVE selected animation (animId -> name) per frame.
 
 The SELECTION half of the Link parity sweep (#117): which CSAB does OoT3D PLAY, frame by frame?
-Pairs with the SoH3D side (REPL `skindump`, which tags the resolved CSAB name) and the geometry
+Pairs with the Zelda3D side (REPL `skindump`, which tags the resolved CSAB name) and the geometry
 half (oracle_link_pose.py / parity_pose_diff.py). The slide bug (#117) is a SELECTION divergence:
-SoH3D sometimes resolves a WAIT anim while OoT3D plays a locomotion anim.
+Zelda3D sometimes resolves a WAIT anim while OoT3D plays a locomotion anim.
 
 How animId resolves to a name (RE'd 2026-06-25, FUN_0034807c; oot3d-decomp docs/player_anim_states.md):
     skelAnime = PLAYER + 0x254

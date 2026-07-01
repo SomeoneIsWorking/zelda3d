@@ -1,4 +1,4 @@
-# Majora's Mask game module for Zelda3D / soh3d.
+# Majora's Mask game module for Zelda3D / zelda3d.
 #
 # Second executable in the monorepo (sibling to `soh`), linking the SAME in-tree
 # `libultraship` STATIC lib. Mirrors soh/CMakeLists.txt but with the MM decomp layout:
@@ -6,7 +6,7 @@
 #   mm/src   = the MM decomp game core (analogous to soh/src)
 # Globs + libultra prune follow 2 Ship 2 Harkinian's mm build (exclude ALL src/libultra;
 # the PC replacements gu_pc.c / mixer.c / framebuffer_effects.c live in 2s2h). SDL3 + link
-# environment follow soh3d. Windows/Switch/CafeOS branches are intentionally dropped — this
+# environment follow zelda3d. Windows/Switch/CafeOS branches are intentionally dropped — this
 # is a PC (Linux/macOS) port.
 
 cmake_minimum_required(VERSION 3.26.0 FATAL_ERROR)
@@ -71,7 +71,7 @@ file(GLOB_RECURSE ship__ RELATIVE ${CMAKE_CURRENT_SOURCE_DIR} CONFIGURE_DEPENDS
 # Trackers) to shrink the port, but the "shell" is woven into the game CORE and kept
 # enhancements (z_kaleido_mask.c calls HudEditor_*, enhancements call UIWidgets::*/Rando::*,
 # SaveManager calls Notification::Emit) — excluding it left 563 undefined references.
-# So we compile the WHOLE tree; the ImGui menu is inert at runtime (soh3d's ImGui is a
+# So we compile the WHOLE tree; the ImGui menu is inert at runtime (zelda3d's ImGui is a
 # no-op shim; live UI is RmlUi) but its symbols are defined, so the link resolves. The
 # only real work is the API-drift fixes (Fast::Fast3dGui casts, Fast:: includes).
 
@@ -106,7 +106,7 @@ else()
 endif()
 
 # The MM decomp is pre-C23 C, where `void f()` means "unspecified args" (e.g.
-# PadMgr_ThreadEntry called with &gPadMgr). soh3d globally forces C23, which
+# PadMgr_ThreadEntry called with &gPadMgr). zelda3d globally forces C23, which
 # reinterprets `()` as zero-args and breaks such calls. Build mm's C at C17 —
 # the standard 2S2H was validated against — rather than patching call sites.
 set_target_properties(${PROJECT_NAME} PROPERTIES C_STANDARD 17 C_EXTENSIONS ON)

@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
 """oracle_carry_drive.py — drive OoT3D oracle to LIFT a rock (En_Ishi) and CARRY-WALK, capturing
 Link's per-frame bone LOCAL rotations across the pickup + carry-walk so we can ID the CSAB sequence
-and diff geometry vs SoH3D's carry path (#117 carry-walk / pickup).
+and diff geometry vs Zelda3D's carry path (#117 carry-walk / pickup).
 
 Method: teleport Link adjacent to a target rock facing it, tap A to lift (poll heldActor @head+0x12b0
 until non-zero), then hold the circle pad forward and capture the carry-walk pose. Writes the same CSV

@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
 """GPU regression test for the SDL3-GPU skinned-draw crash (TDD oracle).
 
-Root cause this guards against: the SoH3D skinned-model vertex shader (soh3d_sdl3gpu.cpp `kVert`)
+Root cause this guards against: the Zelda3D skinned-model vertex shader (zelda3d_sdl3gpu.cpp `kVert`)
 declares TWO vertex uniform buffers — set=1 binding=0 `UBO` (common) and set=1 binding=1 `UBOBones`
 (bone matrices) — but the shader was created with `num_uniform_buffers = 1`. The pipeline layout then
 had no descriptor slot for `bones`, so every skinned draw bound an unbacked descriptor. At
@@ -14,11 +14,11 @@ The Vulkan validation layer flags the cause deterministically:
 Two phases, run against Kokiri Forest (entrance 238 — Saria/Mido/Kokiri are skinned actors):
 
   PHASE 1 (hard gate, default renderer): launch, run several seconds, assert the process did NOT crash
-  AND geomscan still reports SoH3D draws. Before the fix the skinned draw faulted the GPU within ~1s of
+  AND geomscan still reports Zelda3D draws. Before the fix the skinned draw faulted the GPU within ~1s of
   the first frame; after, the scene renders ~47 draws and stays up. This is the deterministic, reliable
   crash-regression signal (the default multi-threaded software-Vulkan path is where the race bites).
 
-  PHASE 2 (SOH3D_SDL3GPU_DEBUG=1 -> Vulkan validation layer): scan for the exact descriptor/
+  PHASE 2 (ZELDA3D_SDL3GPU_DEBUG=1 -> Vulkan validation layer): scan for the exact descriptor/
   pipeline-layout VUIDs above — the precise oracle that names the bug even on a driver that wouldn't
   crash. Validation runs at command-RECORD time, independent of GPU execution threading, so this phase
   forces serial software rasterization (LP_NUM_THREADS=0 on lavapipe) to take the async multi-thread
@@ -33,8 +33,8 @@ import os, re, subprocess, sys, time, signal, pathlib
 
 REPO = pathlib.Path(__file__).resolve().parent.parent
 SOH = REPO / "Shipwright/build-cmake/soh/soh.elf"
-FIFO = REPO / "scratch/soh3d.ctl"
-REPL = REPO / "tools/soh3d_repl.py"
+FIFO = REPO / "scratch/zelda3d.ctl"
+REPL = REPO / "tools/zelda3d_repl.py"
 LOGDIR = REPO / "scratch/logs"
 
 entrance = sys.argv[1] if len(sys.argv) > 1 else "238"
@@ -62,18 +62,18 @@ def ensure_xvfb():
 
 
 def provision_roms():
-    """Resolve SOH3D_3DS_ROM / SOH3D_N64_ROM via the shared rom_provision.sh (env -> .env -> drop-in),
-    exactly like tools/soh3d_game.sh. Without the 3DS ROM no OoT3D model loads -> no skinned draw."""
+    """Resolve ZELDA3D_3DS_ROM / ZELDA3D_N64_ROM via the shared rom_provision.sh (env -> .env -> drop-in),
+    exactly like tools/zelda3d_game.sh. Without the 3DS ROM no OoT3D model loads -> no skinned draw."""
     sohdir = str(SOH.parent)
     script = (f'. "{REPO}/tools/rom_provision.sh"; '
-              f'soh3d_provision_roms "{REPO}" "{sohdir}"; '
-              f'printf "%s\\n%s\\n" "${{SOH3D_3DS_ROM:-}}" "${{SOH3D_N64_ROM:-}}"')
+              f'zelda3d_provision_roms "{REPO}" "{sohdir}"; '
+              f'printf "%s\\n%s\\n" "${{ZELDA3D_3DS_ROM:-}}" "${{ZELDA3D_N64_ROM:-}}"')
     out = subprocess.run(["bash", "-c", script], capture_output=True, text=True).stdout.splitlines()
     roms = {}
     if len(out) >= 1 and out[0].strip():
-        roms["SOH3D_3DS_ROM"] = out[0].strip()
+        roms["ZELDA3D_3DS_ROM"] = out[0].strip()
     if len(out) >= 2 and out[1].strip():
-        roms["SOH3D_N64_ROM"] = out[1].strip()
+        roms["ZELDA3D_N64_ROM"] = out[1].strip()
     return roms
 
 
@@ -83,7 +83,7 @@ def read_geomscan():
                              capture_output=True, text=True, cwd=str(REPO), timeout=3).stdout
     except subprocess.TimeoutExpired:
         return None
-    m = re.search(r"\((\d+) SoH3D draws this frame\)", out)
+    m = re.search(r"\((\d+) Zelda3D draws this frame\)", out)
     return int(m.group(1)) if m else None
 
 
@@ -91,9 +91,9 @@ def launch(roms, extra_env, logname):
     for f in (FIFO, pathlib.Path(str(FIFO) + ".out")):
         f.unlink(missing_ok=True)
     env = {**os.environ, "DISPLAY": ":99", "XAUTHORITY": "/dev/null", "SDL_VIDEODRIVER": "x11",
-           "SDL_AUDIODRIVER": "dummy", "SOH3D": "1", "SOH3D_WARP": "1", "SOH3D_AUTO": "1",
-           "SOH3D_N64ANIM": "1", "SOH3D_ENTRANCE": entrance, "SOH3D_TIME": daytime,
-           "SOH3D_REPL": str(FIFO), **roms, **extra_env}
+           "SDL_AUDIODRIVER": "dummy", "SOH3D": "1", "ZELDA3D_WARP": "1", "ZELDA3D_AUTO": "1",
+           "ZELDA3D_N64ANIM": "1", "ZELDA3D_ENTRANCE": entrance, "ZELDA3D_TIME": daytime,
+           "ZELDA3D_REPL": str(FIFO), **roms, **extra_env}
     env.pop("WAYLAND_DISPLAY", None)
     LOGDIR.mkdir(parents=True, exist_ok=True)
     log = open(LOGDIR / logname, "w")
@@ -146,19 +146,19 @@ def phase1_stability(roms):
         return 1, "FAIL (phase 1): renderer CRASHED during skinned-model rendering — see " \
                   "scratch/logs/gpu_regression_phase1.log"
     if draws <= 0:
-        return 2, f"FAIL (phase 1): no SoH3D draws ever recorded (max={draws}); scene never populated, " \
+        return 2, f"FAIL (phase 1): no Zelda3D draws ever recorded (max={draws}); scene never populated, " \
                   "test is vacuous — see scratch/logs/gpu_regression_phase1.log"
     if final is not None and final <= 0:
-        return 1, f"FAIL (phase 1): SoH3D draws dropped to 0 after rendering (peaked at {draws}) — the " \
+        return 1, f"FAIL (phase 1): Zelda3D draws dropped to 0 after rendering (peaked at {draws}) — the " \
                   "draw path stopped, possible silent GPU failure."
-    return 0, f"phase 1 OK: no crash, {draws} SoH3D draws sustained"
+    return 0, f"phase 1 OK: no crash, {draws} Zelda3D draws sustained"
 
 
 def phase2_validation(roms):
     """Vulkan validation layer names the descriptor/layout bug explicitly. Forces serial software
     rasterization (LP_NUM_THREADS=0) so the async multi-thread execution race can't crash the run
     before validation (a record-time check) is read. Returns (fail: bool, message)."""
-    proc, log = launch(roms, {"SOH3D_SDL3GPU_DEBUG": "1", "LP_NUM_THREADS": "0"},
+    proc, log = launch(roms, {"ZELDA3D_SDL3GPU_DEBUG": "1", "LP_NUM_THREADS": "0"},
                        "gpu_regression_phase2.log")
     draws = 0
     try:
@@ -195,8 +195,8 @@ def phase2_validation(roms):
 def main():
     ensure_xvfb()
     roms = provision_roms()
-    if "SOH3D_3DS_ROM" not in roms:
-        print("FAIL: no OoT3D .3ds found — set SOH3D_3DS_ROM, add ./.env, or drop a *.3ds in the repo",
+    if "ZELDA3D_3DS_ROM" not in roms:
+        print("FAIL: no OoT3D .3ds found — set ZELDA3D_3DS_ROM, add ./.env, or drop a *.3ds in the repo",
               file=sys.stderr)
         return 2
 

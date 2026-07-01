@@ -66,7 +66,7 @@ constexpr int8_t OTR_G_DL_INDEX = OPCODE(0x3d);
 constexpr int8_t OTR_G_READFB = OPCODE(0x3e);
 constexpr int8_t OTR_G_REGBLENDEDTEX = OPCODE(0x3f);
 constexpr int8_t OTR_G_SETINTENSITY = OPCODE(0x40);
-constexpr int8_t OTR_G_SOH3D_DRAW = OPCODE(0x41); // SoH3D direct-GL model draw (w1=handle, w0[0:24]=tint RGB)
+constexpr int8_t OTR_G_ZELDA3D_DRAW = OPCODE(0x41); // Zelda3D direct-GL model draw (w1=handle, w0[0:24]=tint RGB)
 constexpr int8_t OTR_G_MOVEMEM_HASH = OPCODE(0x42);
 constexpr int8_t OTR_G_PUSH_SHADER = OPCODE(0x43);
 constexpr int8_t OTR_G_POP_SHADER = OPCODE(0x44);
@@ -75,10 +75,10 @@ constexpr int8_t RDP_G_SETTARGETINTERPINDEX = OPCODE(0x46);
 constexpr int8_t RDP_G_LOADBLOCK_WIDE = OPCODE(0x47);
 constexpr int8_t RDP_G_VTX_WIDE = OPCODE(0x48);
 constexpr int8_t RDP_G_TRI1_WIDE = OPCODE(0x49);
-// SoH3D auto-scale measure bracket: w1=key, w0 bit0 = phase (1=begin, 0=end). While
+// Zelda3D auto-scale measure bracket: w1=key, w0 bit0 = phase (1=begin, 0=end). While
 // "measuring" the interpreter accumulates the eye-space bbox of every vertex it loads,
 // so the N64 actor's drawn world size can be measured to derive the OoT3D model scale.
-constexpr int8_t OTR_G_SOH3D_MEASURE = OPCODE(0x4a);
+constexpr int8_t OTR_G_ZELDA3D_MEASURE = OPCODE(0x4a);
 
 /*
  * The following commands are the "generated" RDP commands; the user

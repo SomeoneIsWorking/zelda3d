@@ -347,7 +347,7 @@ extern uint32_t Ship_Hash(std::string str) {
 }
 
 void LoadGuiTextures() {
-    // soh3d moved the ImGui texture-loading API from the base Ship::Gui to Fast::Fast3dGui.
+    // zelda3d moved the ImGui texture-loading API from the base Ship::Gui to Fast::Fast3dGui.
     auto gui = std::dynamic_pointer_cast<Fast::Fast3dGui>(Ship::Context::GetRawInstance()->GetWindow()->GetGui());
     if (gui == nullptr) {
         return;

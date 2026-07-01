@@ -1,23 +1,23 @@
 #!/usr/bin/env python3
-"""Generate the PLAYER (Link) N64-anim -> OoT3D-CSAB table: soh3d_player_animmap.inc.
+"""Generate the PLAYER (Link) N64-anim -> OoT3D-CSAB table: zelda3d_player_animmap.inc.
 
-Link is special-cased (NOT the SOH3D_AUTO path): SoH3D_TryDrawPlayer reads the live
+Link is special-cased (NOT the ZELDA3D_AUTO path): Zelda3D_TryDrawPlayer reads the live
 Player.skelAnime.animation (a const char* OTR string, basename gPlayerAnim_link_*) and plays
-the OoT3D *_new link rig's OWN matching CSAB, phase-locked. See memory soh3d-link-player-path.
+the OoT3D *_new link rig's OWN matching CSAB, phase-locked. See memory zelda3d-link-player-path.
 
 The N64 decomp anim names map to the 3DS CSAB names by a small set of category-prefix + token
 rewrites (e.g. normal_->nml_, fighter_->ft_, demo_->dm_, finsh->fin, power->pow). This generator
 applies those rules to every gPlayerAnim_link_* symbol in the SoH source and EMITS ONLY the pairs
 whose resolved CSAB actually exists in BOTH the boy and child *_new zars (so one basename table is
 correct for either age). An N64 anim with no resolvable CSAB is omitted -> the runtime resolver
-falls back to SOH3D_LINK_IDLE_CSAB (so Link reads as standing, never frozen in bind pose).
+falls back to ZELDA3D_LINK_IDLE_CSAB (so Link reads as standing, never frozen in bind pose).
 
 The REWRITE RULES are the real knowledge here; the table is just their verified projection. To
 extend coverage, add a rule below and rerun. Validation against the live zar means a wrong rule
 can only ever drop an entry, never emit a bad one.
 
 Run:  . ./.env && python3 tools/gen_player_animmap.py
-Needs SOH3D_3DS_ROM (the decrypted OoT3D ROM) for the link zars.
+Needs ZELDA3D_3DS_ROM (the decrypted OoT3D ROM) for the link zars.
 """
 import os
 import re
@@ -29,7 +29,7 @@ from ctr_romfs import CtrRom  # noqa: E402
 import zar  # noqa: E402
 
 REPO = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
-OUT = os.path.join(REPO, "Shipwright/soh/src/soh3d/soh3d_player_animmap.inc")
+OUT = os.path.join(REPO, "Shipwright/soh/src/zelda3d/zelda3d_player_animmap.inc")
 SRC = os.path.join(REPO, "Shipwright/soh/src")
 
 PREFIX = "gPlayerAnim_link_"
@@ -123,7 +123,7 @@ def resolves_in(ageset, base):
 
 
 def main():
-    rom = CtrRom(os.environ["SOH3D_3DS_ROM"])
+    rom = CtrRom(os.environ["ZELDA3D_3DS_ROM"])
     boy = csab_basenames(rom, "/actor/zelda_link_boy_new.zar")
     child = csab_basenames(rom, "/actor/zelda_link_child_new.zar")
     shared = boy & child  # one basename table must resolve for either age
@@ -153,9 +153,9 @@ def main():
     lines.append("// Player.skelAnime.animation basename (gPlayerAnim_link_*); value = the CSAB base")
     lines.append("// played on the *_new link rig (resolved to boy/anim or child/anim by age). Only")
     lines.append("// pairs whose CSAB exists in BOTH age zars are emitted; an unlisted anim falls")
-    lines.append("// back to SOH3D_LINK_IDLE_CSAB at runtime. Edit the rewrite rules in the generator,")
-    lines.append("// not this file. See memory soh3d-link-player-path.")
-    lines.append("static const SoH3dPlayerAnimMap kPlayerAnimMap[] = {")
+    lines.append("// back to ZELDA3D_LINK_IDLE_CSAB at runtime. Edit the rewrite rules in the generator,")
+    lines.append("// not this file. See memory zelda3d-link-player-path.")
+    lines.append("static const Zelda3dPlayerAnimMap kPlayerAnimMap[] = {")
     for n, c in rows:
         lines.append('    { "%s", "%s" },' % (n, c))
     lines.append("};")

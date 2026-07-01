@@ -14,24 +14,24 @@
 
 #include <fast/interpreter.h> // SCREEN_WIDTH / SCREEN_HEIGHT
 
-// soh3d model bridge (soh3d_model.cpp, compiled into the tool). Pure C++/engine-agnostic.
-extern "C" int SoH3D_AutoModelId(const char* zarPath);
-extern "C" void SoH3D_EnsureModelProvider(void);
-extern "C" void SoH3D_UpdateAnim(int modelId, const char* animName, float frame);
+// zelda3d model bridge (zelda3d_model.cpp, compiled into the tool). Pure C++/engine-agnostic.
+extern "C" int Zelda3D_AutoModelId(const char* zarPath);
+extern "C" void Zelda3D_EnsureModelProvider(void);
+extern "C" void Zelda3D_UpdateAnim(int modelId, const char* animName, float frame);
 
 namespace cc {
 
-static std::unique_ptr<SoH3D::CtrRom> g_rom;
+static std::unique_ptr<Zelda3D::CtrRom> g_rom;
 static std::unordered_map<std::string, Model3ds> g_cache;
 
 bool InitRom(std::string& err) {
     if (g_rom && g_rom->ok()) return true;
-    const char* path = getenv("SOH3D_3DS_ROM");
+    const char* path = getenv("ZELDA3D_3DS_ROM");
     if (!path || !*path) {
-        err = "SOH3D_3DS_ROM not set — point it at the decrypted OoT3D .3ds";
+        err = "ZELDA3D_3DS_ROM not set — point it at the decrypted OoT3D .3ds";
         return false;
     }
-    g_rom = std::make_unique<SoH3D::CtrRom>(path);
+    g_rom = std::make_unique<Zelda3D::CtrRom>(path);
     if (!g_rom->ok()) {
         err = "CtrRom: " + g_rom->error();
         g_rom.reset();
@@ -51,11 +51,11 @@ Model3ds Load(const std::string& zarPath) {
 
     auto zb = g_rom->read(zarPath);
     if (zb.empty()) { m.error = "ZAR not found: " + zarPath; return m; }
-    SoH3D::Zar zar(std::move(zb));
+    Zelda3D::Zar zar(std::move(zb));
     if (!zar.ok()) { m.error = "Zar: " + zar.error(); return m; }
-    const SoH3D::ZarFile* cf = zar.firstWithSuffix(".cmb");
+    const Zelda3D::ZarFile* cf = zar.firstWithSuffix(".cmb");
     if (!cf) { m.error = "no .cmb in " + zarPath; return m; }
-    SoH3D::Cmb cmb(zar.read(*cf));
+    Zelda3D::Cmb cmb(zar.read(*cf));
     if (!cmb.ok()) { m.error = "Cmb: " + cmb.error(); return m; }
 
     // Bind-pose bbox for auto-fit framing.
@@ -78,15 +78,15 @@ Model3ds Load(const std::string& zarPath) {
         base = base.substr(0, base.size() - 5); // strip .csab
         m.anims.push_back(base);
         // Record the animation's frame count so the GUI can bound/wrap playback to its true length.
-        SoH3D::Csab csab(zar.read(f));
+        Zelda3D::Csab csab(zar.read(f));
         m.animLen[base] = csab.ok() ? csab.duration() : 0;
     }
 
-    // Register with the soh3d bridge for rendering (lazy-loads its own copy on first draw).
-    SoH3D_EnsureModelProvider();
-    m.modelId = SoH3D_AutoModelId(zarPath.c_str());
+    // Register with the zelda3d bridge for rendering (lazy-loads its own copy on first draw).
+    Zelda3D_EnsureModelProvider();
+    m.modelId = Zelda3D_AutoModelId(zarPath.c_str());
     m.ok = (m.modelId >= 0);
-    if (!m.ok) m.error = "SoH3D_AutoModelId failed";
+    if (!m.ok) m.error = "Zelda3D_AutoModelId failed";
 
     fprintf(stderr, "[cc_3ds] loaded %s: id=%d bbox x[%.0f,%.0f] y[%.0f,%.0f] z[%.0f,%.0f] %zu anims\n",
             zarPath.c_str(), m.modelId, lo[0], hi[0], lo[1], hi[1], lo[2], hi[2], m.anims.size());
@@ -97,7 +97,7 @@ Model3ds Load(const std::string& zarPath) {
 
 void SetAnim(const Model3ds& m, const std::string& animName, float frame) {
     if (!m.ok) return;
-    SoH3D_UpdateAnim(m.modelId, animName.empty() ? "" : animName.c_str(), frame);
+    Zelda3D_UpdateAnim(m.modelId, animName.empty() ? "" : animName.c_str(), frame);
 }
 
 int AnimLength(const Model3ds& m, const std::string& csabBase) {
@@ -117,7 +117,7 @@ void EmitDlist(const Model3ds& m, std::vector<Gfx>& dl, std::unordered_map<Mtx*,
     }
 
     // Identity projection; modelview = Scale(fit) * R(rx,ry,rz) about the centre, into
-    // ~80% NDC (mirrors dlist_harness BuildSoH3DDlist). Convention (GfxSpVertex):
+    // ~80% NDC (mirrors dlist_harness BuildZelda3DDlist). Convention (GfxSpVertex):
     // clip_j = sum_k pos_k * MV[k][j] + MV[3][j], so MV[k][j] = S_j * R_{jk}.
     // xComp widens clip-X by (full width / viewport width) so a narrow (split) viewport
     // doesn't squash the model horizontally (the viewport maps clip[-1,1] to vp.w px).
@@ -132,13 +132,13 @@ void EmitDlist(const Model3ds& m, std::vector<Gfx>& dl, std::unordered_map<Mtx*,
     const float fit = fitTarget / std::max(ext[1], 1.0f);
     const float fitZ = (fitTarget * 0.5f) / ext[2];
     // X is NEGATED so this modelview has a NEGATIVE determinant, matching the GAME's handedness.
-    // Root cause (same as the N64 cc_n64.cpp X-flip): in the live game the SoH3D draw is submitted
-    // with the SAME camera MP_matrix as the N64 Fast3D path (interpreter.cpp gfx_soh3d_draw_handler
+    // Root cause (same as the N64 cc_n64.cpp X-flip): in the live game the Zelda3D draw is submitted
+    // with the SAME camera MP_matrix as the N64 Fast3D path (interpreter.cpp gfx_zelda3d_draw_handler
     // passes mRsp->MP_matrix), whose 3x3 determinant is NEGATIVE (guPerspective handedness). This
     // hand-built modelview was a pure rotation+scale (det>0), so the 3DS half rendered MIRRORED vs
     // the game — and thus rotated OPPOSITE the (game-matched, det<0) N64 half. Negating clip-X makes
     // this MP det negative too, so both charcompare halves rotate the same way AND match in-game.
-    // (SoH3D_GL disables backface culling, so the sign flip can't render the model inside-out.)
+    // (Zelda3D_GL disables backface culling, so the sign flip can't render the model inside-out.)
     const float S[3] = { -fit * xComp, fit, fitZ };
     auto rad = [](float d) { return d * 3.14159265358979f / 180.0f; };
     float cx = cosf(rad(rx)), sx = sinf(rad(rx)), cyr = cosf(rad(ry)), syr = sinf(rad(ry)), cz = cosf(rad(rz)),
@@ -194,8 +194,8 @@ void EmitDlist(const Model3ds& m, std::vector<Gfx>& dl, std::unordered_map<Mtx*,
     { Gfx g = gsSPMatrix(mvKey, G_MTX_NOPUSH | G_MTX_LOAD | G_MTX_MODELVIEW); dl.push_back(g); }
     // High bit of the handle = "lit" (character half-Lambert form term). The model op is appended
     // inline into the unified op-list when the interpreter runs this dlist (bracketed by the render
-    // frame's SoH3D_GL_RenderFrameBegin/End) — no separate render-pass drain to emit.
-    { Gfx g; gSPSoH3DDraw(&g, m.modelId | (int)0x80000000, 255, 255, 255); dl.push_back(g); }
+    // frame's Zelda3D_GL_RenderFrameBegin/End) — no separate render-pass drain to emit.
+    { Gfx g; gSPZelda3DDraw(&g, m.modelId | (int)0x80000000, 255, 255, 255); dl.push_back(g); }
 }
 
 } // namespace cc

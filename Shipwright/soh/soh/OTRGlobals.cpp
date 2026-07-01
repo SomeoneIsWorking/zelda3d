@@ -279,12 +279,12 @@ static bool VerifyArchiveVersion(OTRVersion version);
 std::string portArchivePath = "";
 static bool sohArchiveVersionMatch = false;
 
-// soh3d: boot breadcrumbs. Each logs AND flushes immediately, so if a startup step hangs
+// zelda3d: boot breadcrumbs. Each logs AND flushes immediately, so if a startup step hangs
 // (e.g. an ImGui font-atlas build or a Vulkan wait on MoltenVK) the log shows the exact last
-// step reached instead of stalling silently. Grep the run log for "[soh3d boot]".
-#define SOH3D_BOOT(...)                                                                            \
+// step reached instead of stalling silently. Grep the run log for "[zelda3d boot]".
+#define ZELDA3D_BOOT(...)                                                                            \
     do {                                                                                           \
-        SPDLOG_INFO("[soh3d boot] " __VA_ARGS__);                                                  \
+        SPDLOG_INFO("[zelda3d boot] " __VA_ARGS__);                                                  \
         if (auto _lg = spdlog::default_logger())                                                   \
             _lg->flush();                                                                          \
     } while (0)
@@ -324,37 +324,37 @@ OTRGlobals::OTRGlobals() {
     context->InitWindow(sohFast3dWindow);
 
     SohGui::SetupMenu();
-    SOH3D_BOOT("ctor: SetupMenu done; sohArchiveVersionMatch={}", sohArchiveVersionMatch);
+    ZELDA3D_BOOT("ctor: SetupMenu done; sohArchiveVersionMatch={}", sohArchiveVersionMatch);
 
     if (sohArchiveVersionMatch) {
 
         auto overlay = context->GetRawInstance()->GetWindow()->GetGui()->GetGameOverlay();
-        SOH3D_BOOT("ctor: overlay->LoadFont PressStart2P");
+        ZELDA3D_BOOT("ctor: overlay->LoadFont PressStart2P");
         overlay->LoadFont("Press Start 2P", 12.0f, "fonts/PressStart2P-Regular.ttf");
-        SOH3D_BOOT("ctor: overlay->LoadFont Fipps");
+        ZELDA3D_BOOT("ctor: overlay->LoadFont Fipps");
         overlay->LoadFont("Fipps", 32.0f, "fonts/Fipps-Regular.otf");
         overlay->SetCurrentFont(CVarGetString(CVAR_GAME_OVERLAY_FONT, "Press Start 2P"));
 
-        SOH3D_BOOT("ctor: CreateFontWithSize Inconsolata x4");
+        ZELDA3D_BOOT("ctor: CreateFontWithSize Inconsolata x4");
         fontMonoSmall = CreateFontWithSize(14.0f, "fonts/Inconsolata-Regular.ttf");
         fontMono = CreateFontWithSize(16.0f, "fonts/Inconsolata-Regular.ttf");
         fontMonoLarger = CreateFontWithSize(20.0f, "fonts/Inconsolata-Regular.ttf");
         fontMonoLargest = CreateFontWithSize(24.0f, "fonts/Inconsolata-Regular.ttf");
-        SOH3D_BOOT("ctor: CreateFontWithSize Montserrat x3");
+        ZELDA3D_BOOT("ctor: CreateFontWithSize Montserrat x3");
         fontStandard = CreateFontWithSize(16.0f, "fonts/Montserrat-Regular.ttf");
         fontStandardLarger = CreateFontWithSize(20.0f, "fonts/Montserrat-Regular.ttf");
         fontStandardLargest = CreateFontWithSize(24.0f, "fonts/Montserrat-Regular.ttf");
-        SOH3D_BOOT("ctor: CreateFontWithSize NotoSansJP (full CJK atlas)");
+        ZELDA3D_BOOT("ctor: CreateFontWithSize NotoSansJP (full CJK atlas)");
         fontJapanese = CreateFontWithSize(24.0f, "fonts/NotoSansJP-Regular.ttf", true);
-        SOH3D_BOOT("ctor: fonts loaded");
+        ZELDA3D_BOOT("ctor: fonts loaded");
         ImGui::GetIO().FontDefault = fontStandardLarger;
     }
 
     previousImGuiScaleIndex = -1;
     previousImGuiScale = defaultImGuiScale;
-    SOH3D_BOOT("ctor: ScaleImGui");
+    ZELDA3D_BOOT("ctor: ScaleImGui");
     ScaleImGui();
-    SOH3D_BOOT("ctor: OTRGlobals constructor complete");
+    ZELDA3D_BOOT("ctor: OTRGlobals constructor complete");
 }
 
 typedef enum ExtractSteps {
@@ -418,12 +418,12 @@ namespace SohGui {
 extern std::shared_ptr<SohGui::SohMenu> mSohMenu;
 }
 
-// soh3d: fully automated, prompt-free vanilla extraction. SoH's stock RunExtract drives an
+// zelda3d: fully automated, prompt-free vanilla extraction. SoH's stock RunExtract drives an
 // interactive popup state machine (locate ROM / confirm / re-extract) and pumps the frame loop
 // waiting for clicks — which silently hangs in a headless/auto run (the popup may not even render).
 // Instead: find an OoT N64 ROM (.z64/.n64/.v64) near the binary or repo root, run it through ZAPD,
 // and write oot.o2r next to the binary where the engine looks. No questions asked. True on success.
-static bool SoH3D_AutoExtractVanilla() {
+static bool Zelda3D_AutoExtractVanilla() {
     namespace fs = std::filesystem;
     std::error_code ec;
 
@@ -458,25 +458,25 @@ static bool SoH3D_AutoExtractVanilla() {
         }
     }
 
-    SOH3D_BOOT("AutoExtract: scanned {} dir(s), found {} candidate ROM(s)", dirs.size(), roms.size());
+    ZELDA3D_BOOT("AutoExtract: scanned {} dir(s), found {} candidate ROM(s)", dirs.size(), roms.size());
     if (roms.empty()) {
         return false;
     }
 
     for (const auto& rom : roms) {
         Extractor extract;
-        SOH3D_BOOT("AutoExtract: validating ROM '{}'", rom);
+        ZELDA3D_BOOT("AutoExtract: validating ROM '{}'", rom);
         if (!extract.RunFileStandalone(rom)) {
-            SOH3D_BOOT("AutoExtract: '{}' is not a supported OoT N64 ROM, skipping", rom);
+            ZELDA3D_BOOT("AutoExtract: '{}' is not a supported OoT N64 ROM, skipping", rom);
             continue;
         }
         std::atomic<size_t> count = 0, total = 0;
-        SOH3D_BOOT("AutoExtract: extracting '{}' via ZAPD -> '{}' (this can take a bit)", rom, exportDir);
+        ZELDA3D_BOOT("AutoExtract: extracting '{}' via ZAPD -> '{}' (this can take a bit)", rom, exportDir);
         extract.CallZapd(installPath, exportDir, &count, &total); // always returns false; verify by file
         const bool ok =
             fs::exists(Ship::Context::LocateFileAcrossAppDirs("oot.o2r", appShortName)) ||
             fs::exists(Ship::Context::LocateFileAcrossAppDirs("oot-mq.o2r", appShortName));
-        SOH3D_BOOT("AutoExtract: ZAPD finished (isMQ={}), oot.o2r present={}", extract.IsMasterQuest(), ok);
+        ZELDA3D_BOOT("AutoExtract: ZAPD finished (isMQ={}), oot.o2r present={}", extract.IsMasterQuest(), ok);
         if (ok) {
             return true;
         }
@@ -485,23 +485,23 @@ static bool SoH3D_AutoExtractVanilla() {
 }
 
 void OTRGlobals::RunExtract(int argc, char* argv[]) {
-    SOH3D_BOOT("RunExtract: enter");
+    ZELDA3D_BOOT("RunExtract: enter");
 
-    // soh3d: no interactive extraction. If the vanilla archive is missing, auto-extract it from a
+    // zelda3d: no interactive extraction. If the vanilla archive is missing, auto-extract it from a
     // ROM with no prompts; if there's no usable ROM, fail fast with a clear message rather than
     // hanging forever on an invisible popup.
     if (!std::filesystem::exists(Ship::Context::LocateFileAcrossAppDirs("oot.o2r", appShortName)) &&
         !std::filesystem::exists(Ship::Context::LocateFileAcrossAppDirs("oot-mq.o2r", appShortName))) {
-        SOH3D_BOOT("RunExtract: oot.o2r missing — auto-extracting from ROM (no prompts)");
-        if (!SoH3D_AutoExtractVanilla()) {
-            SPDLOG_ERROR("[soh3d] No oot.o2r and no usable OoT N64 ROM (.z64/.n64/.v64) found near the binary "
+        ZELDA3D_BOOT("RunExtract: oot.o2r missing — auto-extracting from ROM (no prompts)");
+        if (!Zelda3D_AutoExtractVanilla()) {
+            SPDLOG_ERROR("[zelda3d] No oot.o2r and no usable OoT N64 ROM (.z64/.n64/.v64) found near the binary "
                          "or repo root to extract from. Drop a valid OoT ROM there and relaunch.");
             if (auto _lg = spdlog::default_logger()) {
                 _lg->flush();
             }
             exit(1);
         }
-        SOH3D_BOOT("RunExtract: auto-extract complete; continuing");
+        ZELDA3D_BOOT("RunExtract: auto-extract complete; continuing");
     }
 
     bool extractDone = false;
@@ -510,13 +510,13 @@ void OTRGlobals::RunExtract(int argc, char* argv[]) {
     auto wnd = std::dynamic_pointer_cast<Fast::Fast3dWindow>(OTRGlobals::Instance->context->GetWindow());
     auto gui = wnd->GetGui();
 
-    SOH3D_BOOT("RunExtract: DetectOTRVersion(oot.o2r)");
+    ZELDA3D_BOOT("RunExtract: DetectOTRVersion(oot.o2r)");
     OTRVersion vanillaVersion = DetectOTRVersion("oot.o2r", false);
-    SOH3D_BOOT("RunExtract: DetectOTRVersion(oot-mq.o2r)");
+    ZELDA3D_BOOT("RunExtract: DetectOTRVersion(oot-mq.o2r)");
     OTRVersion mqVersion = DetectOTRVersion("oot-mq.o2r", true);
 
     bool shouldRegen = VerifyArchiveVersion(vanillaVersion) || VerifyArchiveVersion(mqVersion);
-    SOH3D_BOOT("RunExtract: versions vanilla.major={} mq.major={} buildMajor={} shouldRegen={} sohArchiveVersionMatch={}",
+    ZELDA3D_BOOT("RunExtract: versions vanilla.major={} mq.major={} buildMajor={} shouldRegen={} sohArchiveVersionMatch={}",
                vanillaVersion.major, mqVersion.major, gBuildVersionMajor, shouldRegen, sohArchiveVersionMatch);
 
     std::filesystem::path ownPath;
@@ -550,16 +550,16 @@ void OTRGlobals::RunExtract(int argc, char* argv[]) {
     OSFatal();
 #endif
 
-    SOH3D_BOOT("RunExtract: installPath='{}' assetsExist={} dataPath='{}'", installPath,
+    ZELDA3D_BOOT("RunExtract: installPath='{}' assetsExist={} dataPath='{}'", installPath,
                std::filesystem::exists(installPath + "/assets"), dataPath);
     if (!std::filesystem::exists(installPath + "/assets")) {
-        SOH3D_BOOT("RunExtract: REGISTERING POPUP 'Extractor assets not found' (installPath/assets missing) — will block");
+        ZELDA3D_BOOT("RunExtract: REGISTERING POPUP 'Extractor assets not found' (installPath/assets missing) — will block");
         SohGui::RegisterPopup("Extractor assets not found",
                               "No O2R files found. Missing 'assets/' folder needed to generate OTR file.\nPlease "
                               "re-extract them from the download or.\n\nExiting...",
                               "OK", "", [&]() { exit(1); });
     } else if (shouldRegen) {
-        SOH3D_BOOT("RunExtract: REGISTERING POPUP 'Outdated ROM Archives' (shouldRegen) — will block");
+        ZELDA3D_BOOT("RunExtract: REGISTERING POPUP 'Outdated ROM Archives' (shouldRegen) — will block");
         SohGui::RegisterPopup("Outdated ROM Archives",
                               "Your oot.o2r or oot-mq.o2r were created with incompatible versions of SoH.\nYou will "
                               "now be redirected to re-extract them.");
@@ -578,7 +578,7 @@ void OTRGlobals::RunExtract(int argc, char* argv[]) {
     while (!extractDone) {
         if (SohGui::PopupsQueued() > 0 || extractionTask.has_value()) {
             if (!loggedRenderWait) {
-                SOH3D_BOOT("RunExtract: STUCK in render/wait loop — popupsQueued={} extractionTask={} extractStep={} "
+                ZELDA3D_BOOT("RunExtract: STUCK in render/wait loop — popupsQueued={} extractionTask={} extractStep={} "
                            "(blocked until a popup is dismissed; if the popup isn't visible/clickable this hangs)",
                            SohGui::PopupsQueued(), extractionTask.has_value(), (int)extractStep);
                 loggedRenderWait = true;
@@ -1646,14 +1646,14 @@ bool VerifyArchiveVersion(OTRVersion version) {
 }
 
 extern "C" void InitOTR(int argc, char* argv[]) {
-    SOH3D_BOOT("InitOTR: new OTRGlobals()");
+    ZELDA3D_BOOT("InitOTR: new OTRGlobals()");
     OTRGlobals::Instance = new OTRGlobals();
-    SOH3D_BOOT("InitOTR: RunExtract()");
+    ZELDA3D_BOOT("InitOTR: RunExtract()");
     OTRGlobals::Instance->RunExtract(argc, argv);
 
-    SOH3D_BOOT("InitOTR: Initialize() (loads oot.o2r)");
+    ZELDA3D_BOOT("InitOTR: Initialize() (loads oot.o2r)");
     OTRGlobals::Instance->Initialize();
-    SOH3D_BOOT("InitOTR: Initialize() done; managers/audio next");
+    ZELDA3D_BOOT("InitOTR: Initialize() done; managers/audio next");
     CustomMessageManager::Instance = new CustomMessageManager();
     ItemTableManager::Instance = new ItemTableManager();
     GameInteractor::Instance = new GameInteractor();
@@ -1712,16 +1712,16 @@ extern "C" void InitOTR(int argc, char* argv[]) {
         CVarClear(CVAR_GENERAL("LetItSnow"));
     }
 
-    // SoH3D display/range defaults: applied ONCE (persisted), so the user can still change them
+    // Zelda3D display/range defaults: applied ONCE (persisted), so the user can still change them
     // in-menu afterward. Match the monitor refresh rate (smooth high-FPS interpolation), extend
     // actor draw distance well past the N64 cull, and stop culling actors at the widescreen
     // edges. Aspect ratio already follows the window when unset, so it needs no override. Gated
     // on SOH3D mode (set by run.sh) so a plain SoH build is untouched.
-    if (getenv("SOH3D") != nullptr && CVarGetInteger(CVAR_GENERAL("SoH3DDefaults"), 0) < 1) {
+    if (getenv("SOH3D") != nullptr && CVarGetInteger(CVAR_GENERAL("Zelda3DDefaults"), 0) < 1) {
         CVarSetInteger(CVAR_SETTING("MatchRefreshRate"), 1);          // FPS follows monitor refresh
         CVarSetInteger(CVAR_ENHANCEMENT("DisableDrawDistance"), 20);  // 20x actor forward draw/cull range
         CVarSetInteger(CVAR_ENHANCEMENT("WidescreenActorCulling"), 1); // don't cull at widescreen X edges
-        CVarSetInteger(CVAR_GENERAL("SoH3DDefaults"), 1);
+        CVarSetInteger(CVAR_GENERAL("Zelda3DDefaults"), 1);
         CVarSave();
     }
 
@@ -1931,11 +1931,11 @@ extern "C" void Graph_StartFrame() {
 #endif
 }
 
-// SoH3D: per-subframe frame-interpolation step (parallel to mtx_replacements). Drives the OoT3D
-// skin-pose interpolation in libultraship (extern gSoH3dInterpStep) so replaced characters' limbs
+// Zelda3D: per-subframe frame-interpolation step (parallel to mtx_replacements). Drives the OoT3D
+// skin-pose interpolation in libultraship (extern gZelda3dInterpStep) so replaced characters' limbs
 // animate at the render FPS instead of snapping at the 20fps logic rate, like N64 matrices already do.
-extern "C" float gSoH3dInterpStep;
-static std::vector<float> sSoH3dStepList;
+extern "C" float gZelda3dInterpStep;
+static std::vector<float> sZelda3dStepList;
 
 void RunCommands(Gfx* Commands, const std::vector<std::unordered_map<Mtx*, MtxF>>& mtx_replacements) {
     auto wnd = std::dynamic_pointer_cast<Fast::Fast3dWindow>(OTRGlobals::Instance->context->GetWindow());
@@ -1955,12 +1955,12 @@ void RunCommands(Gfx* Commands, const std::vector<std::unordered_map<Mtx*, MtxF>
     ImGui::PushStyleColor(ImGuiCol_TitleBgActive, UIWidgets::ColorValues.at(themeColor));
     size_t idx = 0;
     for (const auto& m : mtx_replacements) {
-        gSoH3dInterpStep = (idx < sSoH3dStepList.size()) ? sSoH3dStepList[idx] : 1.0f;
+        gZelda3dInterpStep = (idx < sZelda3dStepList.size()) ? sZelda3dStepList[idx] : 1.0f;
         wnd->DrawAndRunGraphicsCommands(Commands, m);
         intp->mInterpolationIndex++;
         idx++;
     }
-    gSoH3dInterpStep = 1.0f; // leave at the final pose for any non-interpolated path
+    gZelda3dInterpStep = 1.0f; // leave at the final pose for any non-interpolated path
     ImGui::PopStyleColor();
 }
 
@@ -1974,12 +1974,12 @@ extern "C" void Graph_ProcessGfxCommands(Gfx* commands) {
     audio.cv_to_thread.notify_one();
     std::vector<std::unordered_map<Mtx*, MtxF>> mtx_replacements;
     // Render-unification differential gate (kanban #131): the subframe interpolation phase below
-    // (`time`) is a static counter advanced every render call regardless of gSoH3dFreeze (it only
+    // (`time`) is a static counter advanced every render call regardless of gZelda3dFreeze (it only
     // holds Play_Update, not this render-side smoothing), so it cycles with real elapsed render
     // frames — the same class of nondeterminism as the dither noise's frame_count. Pin it to the
     // un-interpolated (fps == original_fps) path so a screenshot always lands on the exact logic
     // pose, not an arbitrary subframe blend, for bit-reproducible test captures.
-    static const bool kFreezeInterp = getenv("SOH3D_FREEZE_INTERP") != nullptr;
+    static const bool kFreezeInterp = getenv("ZELDA3D_FREEZE_INTERP") != nullptr;
     int target_fps = OTRGlobals::Instance->GetInterpolationFPS();
     static int last_fps;
     static int last_update_rate;
@@ -1999,15 +1999,15 @@ extern "C" void Graph_ProcessGfxCommands(Gfx* commands) {
     // time_base = fps * original_fps (one second)
     int next_original_frame = fps;
 
-    sSoH3dStepList.clear(); // SoH3D: record each subframe's interpolation step (parallel to mtx_replacements)
+    sZelda3dStepList.clear(); // Zelda3D: record each subframe's interpolation step (parallel to mtx_replacements)
     while (time + original_fps <= next_original_frame) {
         time += original_fps;
         if (time != next_original_frame) {
             mtx_replacements.push_back(FrameInterpolation_Interpolate((float)time / next_original_frame));
-            sSoH3dStepList.push_back((float)time / next_original_frame);
+            sZelda3dStepList.push_back((float)time / next_original_frame);
         } else {
             mtx_replacements.emplace_back();
-            sSoH3dStepList.push_back(1.0f);
+            sZelda3dStepList.push_back(1.0f);
         }
     }
 
@@ -2021,7 +2021,7 @@ extern "C" void Graph_ProcessGfxCommands(Gfx* commands) {
     if (GfxDebuggerIsDebugging()) {
         mtx_replacements.clear();
         mtx_replacements.emplace_back();
-        sSoH3dStepList.assign(1, 1.0f); // keep the SoH3D step list in lockstep with mtx_replacements
+        sZelda3dStepList.assign(1, 1.0f); // keep the Zelda3D step list in lockstep with mtx_replacements
     }
 
     RunCommands(commands, mtx_replacements);

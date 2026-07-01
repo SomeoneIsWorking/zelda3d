@@ -801,7 +801,7 @@ void GfxWindowBackendSDL3::SyncFramerateWithTime() const {
     previous_time = t;
 }
 
-// SoH3D: on-demand frame-dump trigger, set by the interactive REPL in soh3d.c.
+// Zelda3D: on-demand frame-dump trigger, set by the interactive REPL in zelda3d.c.
 // gSoh3dDumpPending=1 captures the current frame to gSoh3dDumpPath without exiting.
 extern "C" {
 char gSoh3dDumpPath[1024] = { 0 };
@@ -861,7 +861,7 @@ void GfxWindowBackendSDL3::SwapBuffersBegin() {
 
     SyncFramerateWithTime();
 
-    // --- SoH3D headless frame dump (oracle/verification tool) ---
+    // --- Zelda3D headless frame dump (oracle/verification tool) ---
     // Inert unless SOH_FRAMEDUMP=<path.ppm> is set. Dumps the final window
     // framebuffer at frame SOH_FRAMEDUMP_FRAME (default 300) then exits, so we
     // can capture renders headlessly (Xvfb GL content isn't grabbable via X).
@@ -897,8 +897,8 @@ void GfxWindowBackendSDL3::SwapBuffersBegin() {
             }
         }
     }
-    // --- SoH3D on-demand frame dump (REPL) ---
-    // The interactive REPL (soh3d.c) sets gSoh3dDumpPath + gSoh3dDumpPending=1 to
+    // --- Zelda3D on-demand frame dump (REPL) ---
+    // The interactive REPL (zelda3d.c) sets gSoh3dDumpPath + gSoh3dDumpPending=1 to
     // capture the CURRENT frame to an arbitrary path WITHOUT exiting, so a single
     // long-lived instance can be poked and dumped repeatedly.
     if (gSoh3dDumpPending) {

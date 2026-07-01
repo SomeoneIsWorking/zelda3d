@@ -1,6 +1,6 @@
 #include "global.h"
 #include "vt.h"
-#include "soh3d/soh3d.h"
+#include "zelda3d/zelda3d.h"
 
 #include <string.h>
 
@@ -33,23 +33,23 @@ s16 sTransitionFillTimer;
 void* gDebugCutsceneScript = NULL;
 UNK_TYPE D_8012D1F4 = 0; // unused
 
-// SoH3D (#15 + #24): universal one-key "skip" for fast playtesting.
+// Zelda3D (#15 + #24): universal one-key "skip" for fast playtesting.
 //
 // The keyboard SPACE key is ALREADY mapped to the controller BTN_START button by default
-// (libultraship ControllerDefaultMappings.cpp), and the SoH3D build already routes BTN_START to:
+// (libultraship ControllerDefaultMappings.cpp), and the Zelda3D build already routes BTN_START to:
 //   - skip skippable in-game cutscenes (z_demo.c: "press START to skip", always on),
 //   - skip onepoint cutscenes (timesaver_hook_handlers.cpp VB_PLAY_ONEPOINT_CS, CVar-gated),
 //   - advance / fast-forward / close textboxes (Message_ShouldAdvance in z_message_PAL.c, which the
-//     SoH3D build extended so a HELD START fast-forwards dialog), and
+//     Zelda3D build extended so a HELD START fast-forwards dialog), and
 //   - end the get-item "item over head" hold (func_8084DFF4 in z_player.c ends the hold when its
 //     "You got X" textbox closes, which the same BTN_START advance drives).
 // So tapping SPACE skips a cutscene / onepoint / get-item, and holding SPACE blitzes dialog — with
 // no synthetic input needed. The only missing wiring was that several of these fast-forwards are
-// gated on TimeSaver enhancement CVars that defaulted off. SoH3D_SkipInit() force-enables them once
+// gated on TimeSaver enhancement CVars that defaulted off. Zelda3D_SkipInit() force-enables them once
 // at gameplay start so SPACE actually fast-forwards everything #15/#24 asks for, including the
 // chest-open animation (FastChests). It deliberately injects NO input, so a stray SPACE keeps its
 // normal BTN_START meaning (open the pause menu) and nothing is double-triggered.
-void SoH3D_SkipInit(void) {
+void Zelda3D_SkipInit(void) {
     static s32 sForced = 0;
     if (sForced) {
         return;
@@ -491,10 +491,10 @@ void Play_Init(GameState* thisx) {
         gSaveContext.skyboxTime = gSaveContext.nextDayTime;
     }
 
-    // SoH3D: force the requested time-of-day (env SOH3D_TIME) NOW, before the day/night scene
+    // Zelda3D: force the requested time-of-day (env ZELDA3D_TIME) NOW, before the day/night scene
     // setup layer + actor set are chosen below — else the scene loads the wrong NPC set (e.g.
     // night villagers) and just looks recoloured to day.
-    SoH3D_ApplyForceTime();
+    Zelda3D_ApplyForceTime();
 
     if (gSaveContext.dayTime > 0xC000 || gSaveContext.dayTime < 0x4555) {
         gSaveContext.nightFlag = 1;
@@ -586,7 +586,7 @@ void Play_Init(GameState* thisx) {
     // — world geometry was already bit-exact once frame_count/interp were pinned; only Link's own
     // RNG-driven pose still differed). Pin the seed for test captures the same way.
     {
-        const char* freezeRand = getenv("SOH3D_FREEZE_RAND_SEED");
+        const char* freezeRand = getenv("ZELDA3D_FREEZE_RAND_SEED");
         Rand_Seed(freezeRand != NULL ? (u32)strtoul(freezeRand, NULL, 0) : (u32)osGetTime());
     }
     Matrix_Init(&play->state);
@@ -1358,10 +1358,10 @@ skip:
     if (!isPaused || gDbgCamEnabled) {
         s32 i;
 
-        // SoH3D #2: press Start/Space to skip onepoint cutscene cameras (door/attention/treasure
+        // Zelda3D #2: press Start/Space to skip onepoint cutscene cameras (door/attention/treasure
         // pans) that take camera control. Runs before the camera update so the forced timer=0
         // takes effect this frame.
-        SoH3D_SkipControlTakers(play);
+        Zelda3D_SkipControlTakers(play);
 
         play->nextCamera = play->activeCamera;
 
@@ -1556,9 +1556,9 @@ void Play_Draw(PlayState* play) {
             if (play->skyboxId && (play->skyboxId != SKYBOX_UNSET_1D) && !play->envCtx.skyboxDisabled) {
                 if ((play->skyboxId == SKYBOX_NORMAL_SKY) || (play->skyboxId == SKYBOX_CUTSCENE_MAP)) {
                     Environment_UpdateSkybox(play, play->skyboxId, &play->envCtx, &play->skyboxCtx);
-                    // SoH3D #28: draw the OoT3D sky dome in place of the low-res N64 skybox (uses the
+                    // Zelda3D #28: draw the OoT3D sky dome in place of the low-res N64 skybox (uses the
                     // N64-computed skybox1Index for the time-of-day variant). 0 => keep the N64 path.
-                    if (!SoH3D_TryDrawSky(play)) {
+                    if (!Zelda3D_TryDrawSky(play)) {
                         SkyboxDraw_Draw(&play->skyboxCtx, gfxCtx, play->skyboxId, play->envCtx.skyboxBlend,
                                         play->view.eye.x, play->view.eye.y, play->view.eye.z);
                     }
@@ -1571,8 +1571,8 @@ void Play_Draw(PlayState* play) {
 
         if ((HREG(80) != 10) || (HREG(90) & 2)) {
             if (!play->envCtx.sunMoonDisabled) {
-                // SoH3D #28e: draw the OoT3D sun/moon discs in place of the N64 sprites. 0 => N64.
-                if (!SoH3D_TryDrawSunMoon(play)) {
+                // Zelda3D #28e: draw the OoT3D sun/moon discs in place of the N64 sprites. 0 => N64.
+                if (!Zelda3D_TryDrawSunMoon(play)) {
                     Environment_DrawSunAndMoon(play);
                 }
             }
@@ -1609,13 +1609,13 @@ void Play_Draw(PlayState* play) {
         }
 
         if ((HREG(80) != 10) || (HREG(83) != 0)) {
-            // SoH3D #134: this is the SECOND N64 "pre-rendered background image" path — a full-screen
+            // Zelda3D #134: this is the SECOND N64 "pre-rendered background image" path — a full-screen
             // 2D bg skybox drawn whenever the camera isn't PREREND_FIXED (typically PREREND_PIVOT).
-            // Room_Draw's opa handler is the first path; we already skip it via SoH3D_TryDrawRoom.
+            // Room_Draw's opa handler is the first path; we already skip it via Zelda3D_TryDrawRoom.
             // Without this guard the bg image draws over our OoT3D room CMB in Link's House normal
             // 3rd-person view (only C-up / first-person avoided it by dropping the cam-set entirely).
             if ((play->skyboxCtx.unk_140 != 0) && (GET_ACTIVE_CAM(play)->setting != CAM_SET_PREREND_FIXED) &&
-                !SoH3D_ShouldSuppressBgImageSkybox(play)) {
+                !Zelda3D_ShouldSuppressBgImageSkybox(play)) {
                 Vec3f quakeOffset;
 
                 Camera_GetSkyboxOffset(&quakeOffset, GET_ACTIVE_CAM(play));
@@ -1636,13 +1636,13 @@ void Play_Draw(PlayState* play) {
             func_800315AC(play, &play->actorCtx);
         }
 
-        // SoH3D: get-item A/B verification draws (append their model ops inline, like any actor).
-        // No-op unless env SOH3D_SPAWNGI is set.
-        SoH3D_DebugDrawGetItem(play);
+        // Zelda3D: get-item A/B verification draws (append their model ops inline, like any actor).
+        // No-op unless env ZELDA3D_SPAWNGI is set.
+        Zelda3D_DebugDrawGetItem(play);
 
-        // SoH3D: all 3D actors are drawn (their OoT3D model ops were appended inline into the one
+        // Zelda3D: all 3D actors are drawn (their OoT3D model ops were appended inline into the one
         // unified render pass). Run the per-frame bookkeeping that used to ride the render-pass marker.
-        SoH3D_FrameEndUpdate(play);
+        Zelda3D_FrameEndUpdate(play);
 
         if ((HREG(80) != 10) || (HREG(86) != 0)) {
             if (!play->envCtx.sunMoonDisabled) {
@@ -1725,12 +1725,12 @@ void Play_Draw(PlayState* play) {
         // so that they aren't drawn when the pause menu is up (e.g. collision viewer, actor name tags)
         GameInteractor_ExecuteOnPlayDrawEnd();
 
-        // SoH3D: debug-draw the OoT3D pot model at Link's position to verify the
-        // CMB->LUS render path in any scene (env SOH3D_DEBUGPOT=1).
-        SoH3D_DebugDrawPot(play);
-        SoH3D_DebugDrawGs(play);
-        SoH3D_DebugDrawKibako(play);
-        SoH3D_DebugDrawDrop(play);
+        // Zelda3D: debug-draw the OoT3D pot model at Link's position to verify the
+        // CMB->LUS render path in any scene (env ZELDA3D_DEBUGPOT=1).
+        Zelda3D_DebugDrawPot(play);
+        Zelda3D_DebugDrawGs(play);
+        Zelda3D_DebugDrawKibako(play);
+        Zelda3D_DebugDrawDrop(play);
 
     Play_Draw_DrawOverlayElements:
         if ((HREG(80) != 10) || (HREG(89) != 0)) {
@@ -1750,13 +1750,13 @@ Play_Draw_skip:
         Camera_Update(GET_ACTIVE_CAM(play));
         func_800AB944(&play->view);
         play->view.unk_124 = 0;
-        // SoH3D #16: when the OoT3D sky dome is active, the N64 SkyboxDraw_Draw was bypassed above
-        // (SoH3D_TryDrawSky drew our sky), so sSkyboxDrawMatrix was never allocated and is NULL.
+        // Zelda3D #16: when the OoT3D sky dome is active, the N64 SkyboxDraw_Draw was bypassed above
+        // (Zelda3D_TryDrawSky drew our sky), so sSkyboxDrawMatrix was never allocated and is NULL.
         // SkyboxDraw_UpdateMatrix would then deref it (guMtxF2L NULL dest) — the early-load
         // first-person crash. Skip it: its product (the N64 skybox model matrix) is dead work when
         // we draw our own sky.
         if (play->skyboxId && (play->skyboxId != SKYBOX_UNSET_1D) && !play->envCtx.skyboxDisabled &&
-            !SoH3D_SkyActive(play)) {
+            !Zelda3D_SkyActive(play)) {
             SkyboxDraw_UpdateMatrix(&play->skyboxCtx, play->view.eye.x, play->view.eye.y, play->view.eye.z);
         }
     }
@@ -1811,27 +1811,27 @@ void Play_Main(GameState* thisx) {
         HREG(94) = 10;
     }
 
-    // SoH3D (#15 + #24): one-time force-enable of the TimeSaver skip enhancements so the existing
+    // Zelda3D (#15 + #24): one-time force-enable of the TimeSaver skip enhancements so the existing
     // SPACE(=BTN_START) skip fast-forwards cutscenes / onepoint / dialog / get-item / chest-open.
-    SoH3D_SkipInit();
+    Zelda3D_SkipInit();
 
-    // SoH3D: inject any held `walkhold` control-stick input before the player reads it, so Link
+    // Zelda3D: inject any held `walkhold` control-stick input before the player reads it, so Link
     // really walks/runs via the locomotion system (for verifying the N64-retarget walk cycle).
-    SoH3D_WalkInject(play);
+    Zelda3D_WalkInject(play);
 
-    // SoH3D frame-step (#86 transient capture): when frozen, skip the per-frame logic tick so the
+    // Zelda3D frame-step (#86 transient capture): when frozen, skip the per-frame logic tick so the
     // game holds still; the REPL `step` command advances Play_Update N ticks on demand. REPL + draw
     // keep running, so dumped frames stay stable between steps.
-    if (((HREG(80) != 10) || (HREG(81) != 0)) && !gSoH3dFreeze) {
+    if (((HREG(80) != 10) || (HREG(81) != 0)) && !gZelda3dFreeze) {
         Play_Update(play);
     }
 
-    // SoH3D: poll the REPL command FIFO here (not in Play_Draw) so it stays
+    // Zelda3D: poll the REPL command FIFO here (not in Play_Draw) so it stays
     // responsive even when Play_Draw early-outs via a transition `goto`.
-    SoH3D_ReplPoll(play);
-    // SoH3D: clear any draws left collected from a prior frame before this frame's display
+    Zelda3D_ReplPoll(play);
+    // Zelda3D: clear any draws left collected from a prior frame before this frame's display
     // list is built (the render pass that drains them is emitted after the actor draw-all).
-    SoH3D_FrameBegin();
+    Zelda3D_FrameBegin();
 
     PLAY_LOG(4583);
 

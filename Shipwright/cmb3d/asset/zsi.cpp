@@ -1,7 +1,7 @@
 #include "zsi.h"
 #include <cstring>
 
-namespace SoH3D {
+namespace Zelda3D {
 
 static uint32_t u32le(const uint8_t* b, size_t o) {
     return (uint32_t)b[o] | ((uint32_t)b[o + 1] << 8) | ((uint32_t)b[o + 2] << 16) | ((uint32_t)b[o + 3] << 24);
@@ -69,4 +69,4 @@ std::vector<uint8_t> Zsi::cmbBytes() const {
     return std::vector<uint8_t>(mData.begin() + mCmbOff, mData.begin() + end);
 }
 
-} // namespace SoH3D
+} // namespace Zelda3D

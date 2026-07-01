@@ -9,7 +9,7 @@
 #include <unordered_map>
 #include <memory>
 
-namespace SoH3D {
+namespace Zelda3D {
 
 struct CtrFile {
     std::string name;
@@ -59,4 +59,4 @@ class CtrRom {
     ~CtrRom();
 };
 
-} // namespace SoH3D
+} // namespace Zelda3D

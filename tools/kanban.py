@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""kanban.py — thin wrapper over GitHub Issues so the SoH3D backlog is a kanban board
+"""kanban.py — thin wrapper over GitHub Issues so the Zelda3D backlog is a kanban board
 that ANY agent (local sessions, cloud subagents, another PC) can read/drive via the
 GitHub API, not just a file in one branch.
 
@@ -150,10 +150,10 @@ def cmd_render(a):
         cols.setdefault(st, []).append(i)
     now = datetime.datetime.now().strftime("%Y-%m-%d %H:%M")
     lines = [
-        "# SoH3D Kanban",
+        "# Zelda3D Kanban",
         "",
         f"> **Generated mirror — do not hand-edit.** Source of truth = GitHub Issues on",
-        f"> `SomeoneIsWorking/soh3d` (private). Regenerate with `tools/kanban.py render`.",
+        f"> `SomeoneIsWorking/zelda3d` (private). Regenerate with `tools/kanban.py render`.",
         f"> Move a card with `tools/kanban.py mv <#> <column>`; add with `tools/kanban.py add`.",
         f"> Columns: {' · '.join(COLUMNS)} · done(=closed).  Updated {now}.",
         "",

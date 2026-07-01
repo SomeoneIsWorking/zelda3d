@@ -5,7 +5,7 @@
 #include <array>
 #include <cmath>
 
-namespace SoH3D {
+namespace Zelda3D {
 
 typedef std::array<float, 16> Mat4;
 
@@ -56,4 +56,4 @@ inline Mat4 matInverse(const Mat4& M) {
     return out;
 }
 
-} // namespace SoH3D
+} // namespace Zelda3D

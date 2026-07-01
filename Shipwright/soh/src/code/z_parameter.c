@@ -22,7 +22,7 @@
 #include "soh/ResourceManagerHelpers.h"
 #include "soh/Enhancements/gameplaystats.h"
 #include "soh/ObjectExtension/ActorMaximumHealth.h"
-#include "soh3d/soh3d.h" // #32 — Xbox face-button HUD glyphs (SoH3D_XboxBtnEnabled / SoH3D_XboxGlyphTex)
+#include "zelda3d/zelda3d.h" // #32 — Xbox face-button HUD glyphs (Zelda3D_XboxBtnEnabled / Zelda3D_XboxGlyphTex)
 
 #include "message_data_static.h"
 extern MessageTableEntry* sNesMessageEntryTablePtr;
@@ -1382,9 +1382,9 @@ Gfx* Gfx_TextureIA8(Gfx* displayListHead, void* texture, s16 textureWidth, s16 t
     // is G_CC_MODULATEIA_PRIM, so a grayscale RGBA32 disc (a=coverage) tints to the per-button PRIM
     // colour exactly; rescale dsdx/dtdy so the full disc maps onto the same rect (the A-button quad
     // is handled separately in Interface_DrawActionButton).
-    if (SoH3D_HudTexEnabled() && texture == (void*)gButtonBackgroundTex) {
+    if (Zelda3D_HudTexEnabled() && texture == (void*)gButtonBackgroundTex) {
         int gw = 0, gh = 0;
-        const void* gt = SoH3D_ButtonBgTex(&gw, &gh);
+        const void* gt = Zelda3D_ButtonBgTex(&gw, &gh);
         if (gt != NULL && gw > 0 && gh > 0 && rectWidth > 0 && rectHeight > 0) {
             gDPLoadTextureBlock(displayListHead++, gt, G_IM_FMT_RGBA, G_IM_SIZ_32b, gw, gh, 0,
                                 G_TX_NOMIRROR | G_TX_WRAP, G_TX_NOMIRROR | G_TX_WRAP, G_TX_NOMASK, G_TX_NOMASK,
@@ -1400,18 +1400,18 @@ Gfx* Gfx_TextureIA8(Gfx* displayListHead, void* texture, s16 textureWidth, s16 t
     // #31 — substitute the crisp higher-res counter icons (rupee gem / small key / clock) for the
     // blocky N64 16x16 IA8 originals. Each is a FULL-LOAD single draw (no shared-tile reuse like
     // gButtonBackgroundTex), so just load the grayscale RGBA32 and rescale dsdx/dtdy to the rect.
-    if (SoH3D_HudTexEnabled()) {
+    if (Zelda3D_HudTexEnabled()) {
         int cKind = -1;
         if (texture == (void*)gRupeeCounterIconTex) {
-            cKind = SOH3D_CICON_RUPEE;
+            cKind = ZELDA3D_CICON_RUPEE;
         } else if (texture == (void*)gSmallKeyCounterIconTex) {
-            cKind = SOH3D_CICON_SMALLKEY;
+            cKind = ZELDA3D_CICON_SMALLKEY;
         } else if (texture == (void*)gClockIconTex) {
-            cKind = SOH3D_CICON_CLOCK;
+            cKind = ZELDA3D_CICON_CLOCK;
         }
         if (cKind >= 0) {
             int gw = 0, gh = 0;
-            const void* gt = SoH3D_CounterIconTex(cKind, &gw, &gh);
+            const void* gt = Zelda3D_CounterIconTex(cKind, &gw, &gh);
             if (gt != NULL && gw > 0 && gh > 0 && rectWidth > 0 && rectHeight > 0) {
                 gDPLoadTextureBlock(displayListHead++, gt, G_IM_FMT_RGBA, G_IM_SIZ_32b, gw, gh, 0,
                                     G_TX_NOMIRROR | G_TX_WRAP, G_TX_NOMIRROR | G_TX_WRAP, G_TX_NOMASK,
@@ -1442,12 +1442,12 @@ Gfx* Gfx_TextureIA8(Gfx* displayListHead, void* texture, s16 textureWidth, s16 t
 // crisp disc (gw x gw) is swapped in by the intercept above, the resident tile is gw texels wide,
 // so every reused texrect must scale its dsdx/dtdy by gw/32 to map the full disc onto the same rect.
 // Returns gw/32 (>=1) when the crisp disc is active, else 1 (vanilla, no change).
-static int SoH3D_ButtonBgTexScale(void) {
-    if (!SoH3D_HudTexEnabled()) {
+static int Zelda3D_ButtonBgTexScale(void) {
+    if (!Zelda3D_HudTexEnabled()) {
         return 1;
     }
     int gw = 0, gh = 0;
-    if (SoH3D_ButtonBgTex(&gw, &gh) == NULL || gw < 32) {
+    if (Zelda3D_ButtonBgTex(&gw, &gh) == NULL || gw < 32) {
         return 1;
     }
     return gw / 32;
@@ -1456,7 +1456,7 @@ static int SoH3D_ButtonBgTexScale(void) {
 // #31 — map an N64 counter-digit texture symbol to a glyph index (0..9 digit, 10 ':'), or -1 if
 // it isn't one of the counter digits. Used to intercept Gfx_TextureI8 (every counter — rupee/key/
 // ammo/timer/score — draws its digits through it) and substitute the crisp higher-res font.
-static int SoH3D_DigitIndex(void* tex) {
+static int Zelda3D_DigitIndex(void* tex) {
     static void* const kDigitSyms[11] = {
         (void*)gCounterDigit0Tex, (void*)gCounterDigit1Tex, (void*)gCounterDigit2Tex, (void*)gCounterDigit3Tex,
         (void*)gCounterDigit4Tex, (void*)gCounterDigit5Tex, (void*)gCounterDigit6Tex, (void*)gCounterDigit7Tex,
@@ -1475,11 +1475,11 @@ Gfx* Gfx_TextureI8(Gfx* displayListHead, void* texture, s16 textureWidth, s16 te
     // #31 — substitute the crisp higher-res counter font for the blocky N64 8x16 I8 digit. The
     // caller's combine is colour=PRIMITIVE, alpha=TEXEL0, so a grayscale RGBA32 glyph (a=coverage)
     // reproduces the digit exactly; rescale dsdx/dtdy so the full glyph maps onto the same rect.
-    if (SoH3D_HudTexEnabled()) {
-        int glyph = SoH3D_DigitIndex(texture);
+    if (Zelda3D_HudTexEnabled()) {
+        int glyph = Zelda3D_DigitIndex(texture);
         if (glyph >= 0) {
             int gw = 0, gh = 0;
-            const void* gt = SoH3D_DigitTex(glyph, &gw, &gh);
+            const void* gt = Zelda3D_DigitTex(glyph, &gw, &gh);
             if (gt != NULL && gw > 0 && gh > 0 && rectWidth > 0 && rectHeight > 0) {
                 gDPLoadTextureBlock(displayListHead++, gt, G_IM_FMT_RGBA, G_IM_SIZ_32b, gw, gh, 0,
                                     G_TX_NOMIRROR | G_TX_WRAP, G_TX_NOMIRROR | G_TX_WRAP, G_TX_NOMASK, G_TX_NOMASK,
@@ -1509,10 +1509,10 @@ Gfx* Gfx_TextureI8(Gfx* displayListHead, void* texture, s16 textureWidth, s16 te
 // prim alpha, loads the glyph as a 32b RGBA tile, and draws the rectangle. dsdx/dtdy are derived
 // from the glyph dims so any glyph size maps onto the same screen rect (the glyph is 64x64 today).
 // `which` = 'A'/'B'/'X'/'Y'. Returns the advanced display-list head. No-op (returns dl) if the glyph
-// can't be decoded — callers gate on SoH3D_XboxBtnEnabled() + a non-NULL SoH3D_XboxGlyphTex first.
-static Gfx* SoH3D_DrawXboxBtn(Gfx* dl, char which, s16 left, s16 top, s16 w, s16 h, u8 alpha) {
+// can't be decoded — callers gate on Zelda3D_XboxBtnEnabled() + a non-NULL Zelda3D_XboxGlyphTex first.
+static Gfx* Zelda3D_DrawXboxBtn(Gfx* dl, char which, s16 left, s16 top, s16 w, s16 h, u8 alpha) {
     int gw = 0, gh = 0;
-    const void* tex = SoH3D_XboxGlyphTex(which, &gw, &gh);
+    const void* tex = Zelda3D_XboxGlyphTex(which, &gw, &gh);
     if (tex == NULL || gw <= 0 || gh <= 0 || w <= 0 || h <= 0) {
         return dl;
     }
@@ -1528,11 +1528,11 @@ static Gfx* SoH3D_DrawXboxBtn(Gfx* dl, char which, s16 left, s16 top, s16 w, s16
     return dl;
 }
 
-// #32 hotswap — keyboard-key glyph badge, parallel to SoH3D_DrawXboxBtn but sourcing
-// SoH3D_KbdGlyphTex. Same Fast3D combine + dsdx/dtdy logic; only the texture pointer differs.
-static Gfx* SoH3D_DrawKbdBtn(Gfx* dl, char which, s16 left, s16 top, s16 w, s16 h, u8 alpha) {
+// #32 hotswap — keyboard-key glyph badge, parallel to Zelda3D_DrawXboxBtn but sourcing
+// Zelda3D_KbdGlyphTex. Same Fast3D combine + dsdx/dtdy logic; only the texture pointer differs.
+static Gfx* Zelda3D_DrawKbdBtn(Gfx* dl, char which, s16 left, s16 top, s16 w, s16 h, u8 alpha) {
     int gw = 0, gh = 0;
-    const void* tex = SoH3D_KbdGlyphTex(which, &gw, &gh);
+    const void* tex = Zelda3D_KbdGlyphTex(which, &gw, &gh);
     if (tex == NULL || gw <= 0 || gh <= 0 || w <= 0 || h <= 0) {
         return dl;
     }
@@ -1552,7 +1552,7 @@ static Gfx* SoH3D_DrawKbdBtn(Gfx* dl, char which, s16 left, s16 top, s16 w, s16 
 // BACKGROUND for a full Xbox disc (which the N64 item icon / do-action label then stacked on top
 // of, burying the letter), the button backgrounds stay vanilla and the item icons render normally;
 // each button's screen rect is recorded here during Interface_DrawItemButtons, and a SMALL Xbox
-// face-button glyph badge is drawn in the corner AFTER all the item icons (SoH3D_DrawHudBadges),
+// face-button glyph badge is drawn in the corner AFTER all the item icons (Zelda3D_DrawHudBadges),
 // so the controller button is identified without obscuring the item. Indices: 0=B,1=C-Left,
 // 2=C-Down,3=C-Right.
 typedef struct {
@@ -1560,64 +1560,64 @@ typedef struct {
     u8 alpha;
     char glyph;
     u8 active;
-} SoH3DHudBtnRect;
-static SoH3DHudBtnRect sSoH3dHudBtns[4];
-static void SoH3D_RecordHudBtn(int i, s16 x, s16 y, s16 w, u8 alpha, char glyph) {
+} Zelda3DHudBtnRect;
+static Zelda3DHudBtnRect sZelda3dHudBtns[4];
+static void Zelda3D_RecordHudBtn(int i, s16 x, s16 y, s16 w, u8 alpha, char glyph) {
     if (i < 0 || i >= 4) {
         return;
     }
-    sSoH3dHudBtns[i].x = x;
-    sSoH3dHudBtns[i].y = y;
-    sSoH3dHudBtns[i].w = w;
-    sSoH3dHudBtns[i].alpha = alpha;
-    sSoH3dHudBtns[i].glyph = glyph;
-    sSoH3dHudBtns[i].active = 1;
+    sZelda3dHudBtns[i].x = x;
+    sZelda3dHudBtns[i].y = y;
+    sZelda3dHudBtns[i].w = w;
+    sZelda3dHudBtns[i].alpha = alpha;
+    sZelda3dHudBtns[i].glyph = glyph;
+    sZelda3dHudBtns[i].active = 1;
 }
-static Gfx* SoH3D_DrawHudBadges(Gfx* dl) {
-    // #32 hotswap: pick glyph set from last-used input device (SoH3D_InputDevice(): 0=gamepad,
-    // 1=keyboard). Both draw helpers (SoH3D_DrawXboxBtn / SoH3D_DrawKbdBtn) are structurally
+static Gfx* Zelda3D_DrawHudBadges(Gfx* dl) {
+    // #32 hotswap: pick glyph set from last-used input device (Zelda3D_InputDevice(): 0=gamepad,
+    // 1=keyboard). Both draw helpers (Zelda3D_DrawXboxBtn / Zelda3D_DrawKbdBtn) are structurally
     // identical — same Fast3D combine + dsdx/dtdy math — so the layout is device-invariant.
-    int useKbd = SoH3D_XboxBtnEnabled() && (SoH3D_InputDevice() == 1);
+    int useKbd = Zelda3D_XboxBtnEnabled() && (Zelda3D_InputDevice() == 1);
     int i;
     for (i = 0; i < 4; i++) {
-        if (!sSoH3dHudBtns[i].active) {
+        if (!sZelda3dHudBtns[i].active) {
             continue;
         }
-        sSoH3dHudBtns[i].active = 0; // consume; re-recorded each frame
-        if (!SoH3D_XboxBtnEnabled()) {
+        sZelda3dHudBtns[i].active = 0; // consume; re-recorded each frame
+        if (!Zelda3D_XboxBtnEnabled()) {
             continue;
         }
         // Badge ~9/16 of the button, tucked into the TOP-RIGHT corner.
-        s16 bw = (s16)(sSoH3dHudBtns[i].w * 9 / 16);
-        s16 bx = (s16)(sSoH3dHudBtns[i].x + sSoH3dHudBtns[i].w - bw);
-        s16 by = sSoH3dHudBtns[i].y;
+        s16 bw = (s16)(sZelda3dHudBtns[i].w * 9 / 16);
+        s16 bx = (s16)(sZelda3dHudBtns[i].x + sZelda3dHudBtns[i].w - bw);
+        s16 by = sZelda3dHudBtns[i].y;
         if (useKbd) {
-            dl = SoH3D_DrawKbdBtn(dl, sSoH3dHudBtns[i].glyph, bx, by, bw, bw, sSoH3dHudBtns[i].alpha);
+            dl = Zelda3D_DrawKbdBtn(dl, sZelda3dHudBtns[i].glyph, bx, by, bw, bw, sZelda3dHudBtns[i].alpha);
         } else {
-            dl = SoH3D_DrawXboxBtn(dl, sSoH3dHudBtns[i].glyph, bx, by, bw, bw, sSoH3dHudBtns[i].alpha);
+            dl = Zelda3D_DrawXboxBtn(dl, sZelda3dHudBtns[i].glyph, bx, by, bw, bw, sZelda3dHudBtns[i].alpha);
         }
     }
     return dl;
 }
 
-// ---- SoH3D 6-slot hotbar (native Fast3D) --------------------------------------------------
+// ---- Zelda3D 6-slot hotbar (native Fast3D) --------------------------------------------------
 // A Minecraft-style horizontal bar of 6 item slots, drawn at the bottom-centre of the screen.
 // Each slot shows:
 //   - the real item icon texture (sourced from the SoH iconItemSegment, same as C-buttons)
 //   - a number-key keycap badge (keys 1-6) in the top-right corner (keyboard mode)
 //     OR nothing extra (gamepad mode — the slot number is shown by position)
-//   - a highlight box around the active slot (gSoH3dHotbarActive)
+//   - a highlight box around the active slot (gZelda3dHotbarActive)
 // Layout: 6 slots × SLOT_SIZE px each, centred horizontally, SLOT_Y from bottom.
 // The N64 screen coordinate space is 320×240 (with OTR widescreen: ~426×240).
 // We use OTRGetDimensionFromLeftEdge / OTRGetDimensionFromRightEdge for widescreen parity.
 
-static Gfx* SoH3D_DrawHotbar(PlayState* play, Gfx* dl) {
+static Gfx* Zelda3D_DrawHotbar(PlayState* play, Gfx* dl) {
     InterfaceContext* interfaceCtx = &play->interfaceCtx;
-    extern u8  gSoH3dHotbarItems[6];
-    extern int SoH3D_InputDevice(void);
-    extern int SoH3D_XboxBtnEnabled(void);
-    extern const void* SoH3D_NumGlyphTex(char which, int* w, int* h);
-    extern const void* SoH3D_XboxGlyphTex(char which, int* w, int* h);
+    extern u8  gZelda3dHotbarItems[6];
+    extern int Zelda3D_InputDevice(void);
+    extern int Zelda3D_XboxBtnEnabled(void);
+    extern const void* Zelda3D_NumGlyphTex(char which, int* w, int* h);
+    extern const void* Zelda3D_XboxGlyphTex(char which, int* w, int* h);
 
     // Slot geometry — same visual weight as the C-buttons (~24 px in 240p).
     const s16 SLOT_SIZE = 24;      // on-screen square size per slot (pixels)
@@ -1640,11 +1640,11 @@ static Gfx* SoH3D_DrawHotbar(PlayState* play, Gfx* dl) {
     for (i = 0; i < NSLOTS; i++) {
         s16 sx = (s16)(BAR_X + i * (SLOT_SIZE + SLOT_GAP));
         s16 sy = SLOT_Y;
-        u8 itemId = gSoH3dHotbarItems[i];
+        u8 itemId = gZelda3dHotbarItems[i];
 
-        // Draw slot background. soh3d: no active-slot cursor — every slot renders the same dark bg
+        // Draw slot background. zelda3d: no active-slot cursor — every slot renders the same dark bg
         // (user: "there should be no hotbar cursor"). The old gold highlight tracked
-        // gSoH3dHotbarActive, which the (buggy, now-removed) keyboard handler moved via WASD.
+        // gZelda3dHotbarActive, which the (buggy, now-removed) keyboard handler moved via WASD.
         gDPPipeSync(dl++);
         gDPSetCombineMode(dl++, G_CC_PRIMITIVE, G_CC_PRIMITIVE);
         gDPSetPrimColor(dl++, 0, 0, 40, 40, 40, 160); // dark slot bg (uniform, no highlight)
@@ -1678,13 +1678,13 @@ static Gfx* SoH3D_DrawHotbar(PlayState* play, Gfx* dl) {
         }
 
         // Slot-label badge — keyboard or gamepad mode.
-        if (SoH3D_XboxBtnEnabled()) {
-            int devIsKeyboard = (SoH3D_InputDevice() == 1);
+        if (Zelda3D_XboxBtnEnabled()) {
+            int devIsKeyboard = (Zelda3D_InputDevice() == 1);
             if (devIsKeyboard) {
                 // Keyboard: number keycap 1-6 in top-right corner.
                 char numch = (char)('1' + i);
                 int gw = 0, gh = 0;
-                const void* numtex = SoH3D_NumGlyphTex(numch, &gw, &gh);
+                const void* numtex = Zelda3D_NumGlyphTex(numch, &gw, &gh);
                 if (numtex != NULL && gw > 0 && gh > 0) {
                     s16 bw = 9;
                     s16 bx = (s16)(sx + SLOT_SIZE - bw);
@@ -1708,7 +1708,7 @@ static Gfx* SoH3D_DrawHotbar(PlayState* play, Gfx* dl) {
                 char glyphCh = kGamepadGlyphs[i];
                 int isChordSlot = (i >= 2); // slots 3-6 require RB chord
                 int gw = 0, gh = 0;
-                const void* gtex = SoH3D_XboxGlyphTex(glyphCh, &gw, &gh);
+                const void* gtex = Zelda3D_XboxGlyphTex(glyphCh, &gw, &gh);
                 if (gtex != NULL && gw > 0 && gh > 0) {
                     // For chord slots, draw a small cyan stripe above the icon as chord indicator.
                     if (isChordSlot) {
@@ -4465,7 +4465,7 @@ void Interface_DrawItemButtons(PlayState* play) {
     // #31 — the B-button Gfx_TextureIA8 call below loads gButtonBackgroundTex once; the C-button
     // texrects reuse that resident tile. When the crisp disc replaces it, the tile is bgScale*32
     // texels wide, so the reused texrects scale their dsdx/dtdy by bgScale (1 = vanilla 32x32).
-    s16 bgScale = SoH3D_ButtonBgTexScale();
+    s16 bgScale = Zelda3D_ButtonBgTexScale();
 
     // B Button Color & Texture
     // Also loads the Item Button Texture reused by other buttons afterwards
@@ -4475,18 +4475,18 @@ void Interface_DrawItemButtons(PlayState* play) {
     gDPSetEnvColor(OVERLAY_DISP++, 0, 0, 0, 255);
 
     // #32 — button backgrounds stay vanilla N64 (the Xbox glyph is now a small corner BADGE drawn
-    // on top of the item icons by SoH3D_DrawHudBadges, a clean replacement of the N64 button-label
+    // on top of the item icons by Zelda3D_DrawHudBadges, a clean replacement of the N64 button-label
     // role rather than a disc stacked under the icon). Record each button's screen rect + per-button
     // glyph (B->B, C-Left->X, C-Down->Y, C-Right->A) so the badge pass can place the glyph.
     {
         OVERLAY_DISP = Gfx_TextureIA8(OVERLAY_DISP, gButtonBackgroundTex, BBtn_Size, BBtn_Size, PosX_BtnB, PosY_BtnB,
                                       BBtnScaled, BBtnScaled, BBtn_factor, BBtn_factor);
-        SoH3D_RecordHudBtn(0, PosX_BtnB, PosY_BtnB, BBtnScaled, interfaceCtx->bAlpha, 'B');
+        Zelda3D_RecordHudBtn(0, PosX_BtnB, PosY_BtnB, BBtnScaled, interfaceCtx->bAlpha, 'B');
 
         // C-Left / C-Down / C-Right button background discs — suppressed when the PC hotbar is
-        // the sole item UI (gSoH3dHotbarOn). B-button disc above is always drawn (it's the
+        // the sole item UI (gZelda3dHotbarOn). B-button disc above is always drawn (it's the
         // roll/action button, not an item slot and is retained in the PC HUD).
-        if (!gSoH3dHotbarOn) {
+        if (!gZelda3dHotbarOn) {
             // C-Left Button Color & Texture
             gDPPipeSync(OVERLAY_DISP++);
             gDPSetPrimColor(OVERLAY_DISP++, 0, 0, cLeftButtonColor.r, cLeftButtonColor.g, cLeftButtonColor.b,
@@ -4495,7 +4495,7 @@ void Interface_DrawItemButtons(PlayState* play) {
                                     (C_Left_BTN_Pos[0] + R_ITEM_BTN_WIDTH(1)) << 2,
                                     (C_Left_BTN_Pos[1] + R_ITEM_BTN_WIDTH(1)) << 2, G_TX_RENDERTILE, 0, 0,
                                     (R_ITEM_BTN_DD(1) << 1) * bgScale, (R_ITEM_BTN_DD(1) << 1) * bgScale);
-            SoH3D_RecordHudBtn(1, C_Left_BTN_Pos[0], C_Left_BTN_Pos[1], R_ITEM_BTN_WIDTH(1), interfaceCtx->cLeftAlpha, 'X');
+            Zelda3D_RecordHudBtn(1, C_Left_BTN_Pos[0], C_Left_BTN_Pos[1], R_ITEM_BTN_WIDTH(1), interfaceCtx->cLeftAlpha, 'X');
 
             // C-Down Button Color & Texture
             gDPSetPrimColor(OVERLAY_DISP++, 0, 0, cDownButtonColor.r, cDownButtonColor.g, cDownButtonColor.b,
@@ -4504,7 +4504,7 @@ void Interface_DrawItemButtons(PlayState* play) {
                                     (C_Down_BTN_Pos[0] + R_ITEM_BTN_WIDTH(2)) << 2,
                                     (C_Down_BTN_Pos[1] + R_ITEM_BTN_WIDTH(2)) << 2, G_TX_RENDERTILE, 0, 0,
                                     (R_ITEM_BTN_DD(2) << 1) * bgScale, (R_ITEM_BTN_DD(2) << 1) * bgScale);
-            SoH3D_RecordHudBtn(2, C_Down_BTN_Pos[0], C_Down_BTN_Pos[1], R_ITEM_BTN_WIDTH(2), interfaceCtx->cDownAlpha, 'Y');
+            Zelda3D_RecordHudBtn(2, C_Down_BTN_Pos[0], C_Down_BTN_Pos[1], R_ITEM_BTN_WIDTH(2), interfaceCtx->cDownAlpha, 'Y');
 
             // C-Right Button Color & Texture
             gDPSetPrimColor(OVERLAY_DISP++, 0, 0, cRightButtonColor.r, cRightButtonColor.g, cRightButtonColor.b,
@@ -4513,7 +4513,7 @@ void Interface_DrawItemButtons(PlayState* play) {
                                     (C_Right_BTN_Pos[0] + R_ITEM_BTN_WIDTH(3)) << 2,
                                     (C_Right_BTN_Pos[1] + R_ITEM_BTN_WIDTH(3)) << 2, G_TX_RENDERTILE, 0, 0,
                                     (R_ITEM_BTN_DD(3) << 1) * bgScale, (R_ITEM_BTN_DD(3) << 1) * bgScale);
-            SoH3D_RecordHudBtn(3, C_Right_BTN_Pos[0], C_Right_BTN_Pos[1], R_ITEM_BTN_WIDTH(3), interfaceCtx->cRightAlpha,
+            Zelda3D_RecordHudBtn(3, C_Right_BTN_Pos[0], C_Right_BTN_Pos[1], R_ITEM_BTN_WIDTH(3), interfaceCtx->cRightAlpha,
                                'A');
         }
     }
@@ -4732,7 +4732,7 @@ void Interface_DrawItemButtons(PlayState* play) {
             }
 
             // #32 — empty C-button background: vanilla N64 circle (the Xbox glyph is the corner badge
-            // drawn by SoH3D_DrawHudBadges, recorded for these slots in the main cluster above).
+            // drawn by Zelda3D_DrawHudBadges, recorded for these slots in the main cluster above).
             {
                 OVERLAY_DISP =
                     Gfx_TextureIA8(OVERLAY_DISP, ((u8*)gButtonBackgroundTex), 32, 32, ItemIconPos[temp - 1][0],
@@ -5304,13 +5304,13 @@ void Interface_DrawActionButton(PlayState* play, f32 x, f32 y) {
     // #32 — the do-action 'A' button stays the vanilla N64 green circle + action label (the green
     // colour already reads as A; baking the Xbox 'A' glyph here just buried the "PutAway"/"Speak"
     // label that overlays it). The item-button cluster carries the Xbox glyphs via the corner
-    // badges (SoH3D_DrawHudBadges); this prompt is the action, not an item slot.
+    // badges (Zelda3D_DrawHudBadges); this prompt is the action, not an item slot.
     // #31 — but DO upgrade the disc itself to the crisp button-background texture (same one the
     // B/C buttons use via Gfx_TextureIA8). This is a 3D flip-animated quad with baked 32-texel
     // texcoords, so rescale the vtx tc by gw/32 to map the full higher-res disc onto the same quad.
     {
         int sButW = 0, sButH = 0;
-        const void* sButTex = SoH3D_HudTexEnabled() ? SoH3D_ButtonBgTex(&sButW, &sButH) : NULL;
+        const void* sButTex = Zelda3D_HudTexEnabled() ? Zelda3D_ButtonBgTex(&sButW, &sButH) : NULL;
         if (sButTex != NULL && sButW > 0 && sButH > 0) {
             s16 tcNearS = (s16)(-16 * sButW / 32);
             s16 tcFarS = (s16)((1024 - 16) * sButW / 32);
@@ -5461,13 +5461,13 @@ const char* digitTextures[] = { gCounterDigit0Tex, gCounterDigit1Tex, gCounterDi
                                 gCounterDigit6Tex, gCounterDigit7Tex, gCounterDigit8Tex };
 
 void Interface_Draw(PlayState* play) {
-    // SoH3D PC HUD: when the native Vulkan PC HUD is active, suppress the entire N64 Fast3D HUD
-    // (hearts/magic/rupees/buttons AND the SoH3D 6-slot hotbar drawn at the tail of this function)
-    // so the two don't stack. The PC HUD (soh3d_hud_vk.cpp, driven by SoH3D_HudFrame) draws them
-    // natively via Vulkan with the real HD textures. Env SOH3D_PCHUD=0 / REPL `pchud 0` reverts.
+    // Zelda3D PC HUD: when the native Vulkan PC HUD is active, suppress the entire N64 Fast3D HUD
+    // (hearts/magic/rupees/buttons AND the Zelda3D 6-slot hotbar drawn at the tail of this function)
+    // so the two don't stack. The PC HUD (zelda3d_hud_vk.cpp, driven by Zelda3D_HudFrame) draws them
+    // natively via Vulkan with the real HD textures. Env ZELDA3D_PCHUD=0 / REPL `pchud 0` reverts.
     {
-        extern int SoH3D_PcHudEnabled(void);
-        if (SoH3D_PcHudEnabled()) {
+        extern int Zelda3D_PcHudEnabled(void);
+        if (Zelda3D_PcHudEnabled()) {
             return;
         }
     }
@@ -5918,7 +5918,7 @@ void Interface_Draw(PlayState* play) {
         // The hotbar replaces the N64 top-right item cluster entirely; the C-button item-slot engine
         // still runs (so items stay equippable via the pause menu) but these on-screen icons are
         // hidden. Re-enable with REPL `hotbaron 0` for debugging.
-        if (!gSoH3dHotbarOn) {
+        if (!gZelda3dHotbarOn) {
             // C-Left Button Icon & Ammo Count
             if (gSaveContext.equips.buttonItems[1] < 0xF0) {
                 gDPSetPrimColor(OVERLAY_DISP++, 0, 0, 255, 255, 255, interfaceCtx->cLeftAlpha);
@@ -5955,10 +5955,10 @@ void Interface_Draw(PlayState* play) {
                                   PRIMITIVE, ENVIRONMENT, TEXEL0, ENVIRONMENT, TEXEL0, 0, PRIMITIVE, 0);
                 Interface_DrawAmmoCount(play, 3, interfaceCtx->cRightAlpha);
             }
-        } // end !gSoH3dHotbarOn
+        } // end !gZelda3dHotbarOn
 
         // D-pad item equip icons: suppressed when the PC hotbar is the sole item UI.
-        if (CVarGetInteger(CVAR_ENHANCEMENT("DpadEquips"), 0) != 0 && !gSoH3dHotbarOn) {
+        if (CVarGetInteger(CVAR_ENHANCEMENT("DpadEquips"), 0) != 0 && !gZelda3dHotbarOn) {
             // DPad is only greyed-out when all 4 DPad directions are too
             uint16_t dpadAlpha =
                 MAX(MAX(MAX(interfaceCtx->dpadUpAlpha, interfaceCtx->dpadDownAlpha), interfaceCtx->dpadLeftAlpha),
@@ -6059,8 +6059,8 @@ void Interface_Draw(PlayState* play) {
         }
 
         // #32 — draw the small Xbox face-button badges on top of the item icons (the buttons were
-        // recorded during Interface_DrawItemButtons). No-op unless SOH3D_XBOXUI is on.
-        OVERLAY_DISP = SoH3D_DrawHudBadges(OVERLAY_DISP);
+        // recorded during Interface_DrawItemButtons). No-op unless ZELDA3D_XBOXUI is on.
+        OVERLAY_DISP = Zelda3D_DrawHudBadges(OVERLAY_DISP);
 
         // A Button
         Gfx_SetupDL_42Overlay(play->state.gfxCtx);
@@ -6779,9 +6779,9 @@ void Interface_Draw(PlayState* play) {
         gDPFillRectangle(OVERLAY_DISP++, 0, 0, gScreenWidth - 1, gScreenHeight - 1);
     }
 
-    // SoH3D hotbar: 6-slot native Fast3D item bar at bottom-centre.
+    // Zelda3D hotbar: 6-slot native Fast3D item bar at bottom-centre.
     // Drawn last so it's on top of all other HUD elements.
-    OVERLAY_DISP = SoH3D_DrawHotbar(play, OVERLAY_DISP);
+    OVERLAY_DISP = Zelda3D_DrawHotbar(play, OVERLAY_DISP);
 
     CLOSE_DISPS(play->state.gfxCtx);
 }

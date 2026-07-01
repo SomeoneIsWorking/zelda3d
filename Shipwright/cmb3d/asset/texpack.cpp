@@ -11,7 +11,7 @@
 
 namespace fs = std::filesystem;
 
-namespace SoH3D {
+namespace Zelda3D {
 
 namespace {
 
@@ -66,7 +66,7 @@ bool readFlipPngFiles(const fs::path& root) {
     return true; // no pack.json -> assume Citra default (flip_png_files=true) -> no flip
 }
 
-// Locate the pack root: explicit SOH3D_TEXPACK, else "textures" relative to cwd, else a
+// Locate the pack root: explicit ZELDA3D_TEXPACK, else "textures" relative to cwd, else a
 // "textures" dir alongside the 3DS ROM. A valid root has at least one tex1_*.png under it.
 fs::path findPackRoot() {
     auto hasTextures = [](const fs::path& root) -> bool {
@@ -79,12 +79,12 @@ fs::path findPackRoot() {
         }
         return false;
     };
-    if (const char* env = std::getenv("SOH3D_TEXPACK"); env && *env) {
+    if (const char* env = std::getenv("ZELDA3D_TEXPACK"); env && *env) {
         fs::path p(env);
         if (hasTextures(p)) return p;
     }
     if (hasTextures("textures")) return "textures";
-    if (const char* romp = std::getenv("SOH3D_3DS_ROM"); romp && *romp) {
+    if (const char* romp = std::getenv("ZELDA3D_3DS_ROM"); romp && *romp) {
         fs::path cand = fs::path(romp).parent_path() / "textures";
         if (hasTextures(cand)) return cand;
     }
@@ -95,7 +95,7 @@ void scan() {
     g_pack.scanned = true;
     fs::path root = findPackRoot();
     if (root.empty()) {
-        fprintf(stderr, "[SoH3D] texpack: no pack found (set SOH3D_TEXPACK or place textures/)\n");
+        fprintf(stderr, "[Zelda3D] texpack: no pack found (set ZELDA3D_TEXPACK or place textures/)\n");
         return;
     }
     g_pack.ourFlip = readFlipPngFiles(root);
@@ -107,7 +107,7 @@ void scan() {
         if (parseHash(it->path().filename().string(), h))
             g_pack.index.emplace(h, it->path().string());
     }
-    fprintf(stderr, "[SoH3D] texpack: %zu textures indexed under %s (flip=%d)\n",
+    fprintf(stderr, "[Zelda3D] texpack: %zu textures indexed under %s (flip=%d)\n",
             g_pack.index.size(), root.string().c_str(), (int)g_pack.ourFlip);
 }
 
@@ -121,7 +121,7 @@ bool TexPackLookup(uint64_t hash, int& w, int& h, std::vector<uint8_t>& rgba) {
     int n = 0;
     stbi_uc* px = stbi_load(it->second.c_str(), &w, &h, &n, 4);
     if (!px) {
-        fprintf(stderr, "[SoH3D] texpack: failed to load %s\n", it->second.c_str());
+        fprintf(stderr, "[Zelda3D] texpack: failed to load %s\n", it->second.c_str());
         return false;
     }
     rgba.assign(px, px + (size_t)w * h * 4);
@@ -141,4 +141,4 @@ bool TexPackLookup(uint64_t hash, int& w, int& h, std::vector<uint8_t>& rgba) {
     return true;
 }
 
-} // namespace SoH3D
+} // namespace Zelda3D

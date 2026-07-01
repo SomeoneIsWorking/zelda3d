@@ -15,9 +15,9 @@
 #define M_TAU 6.2831853071795864769252867665590057 // 2 * pi
 #define MINIMUM_RADIUS_TO_MAP_NOTCH 0.9
 
-// #32 hotswap — last-used input device signal, defined in soh3d.c (C).
+// #32 hotswap — last-used input device signal, defined in zelda3d.c (C).
 extern "C" {
-    extern int gSoH3dInputDevice;
+    extern int gZelda3dInputDevice;
 }
 
 namespace Ship {
@@ -137,10 +137,10 @@ bool Controller::ProcessKeyboardEvent(KbEventType eventType, KbScancode scancode
     // #32 hotswap: a key-down event on port 0 means the player last used the keyboard.
     // Update the C-side last-input-device signal so the HUD picks keyboard glyphs next frame.
     if (eventType == KbEventType::LUS_KB_EVENT_KEY_DOWN && GetPortIndex() == 0 && result) {
-        gSoH3dInputDevice = 1; // keyboard
+        gZelda3dInputDevice = 1; // keyboard
     }
 
-    // soh3d: removed the keyboard hotbar slot-selection handler. It tested `scancode >= 30 && <= 35`
+    // zelda3d: removed the keyboard hotbar slot-selection handler. It tested `scancode >= 30 && <= 35`
     // assuming SDL scancodes (keys 1-6), but `scancode` here is a LUS/DIK scancode where 30-35 are
     // A, S, D, F, G, H — so the WASD movement keys silently moved the hotbar slot. There is no
     // hotbar selection cursor (the gold highlight in z_parameter.c is removed), so nothing to select.

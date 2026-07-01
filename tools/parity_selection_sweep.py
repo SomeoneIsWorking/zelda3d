@@ -1,17 +1,17 @@
 #!/usr/bin/env python3
-"""parity_selection_sweep.py — automatic Link anim-SELECTION parity sweep (SoH3D vs OoT3D oracle).
+"""parity_selection_sweep.py — automatic Link anim-SELECTION parity sweep (Zelda3D vs OoT3D oracle).
 
 The deliverable for #117's "mature parity sweep" mandate: drive a list of Link locomotion states on
-BOTH the live SoH3D game and the OoT3D oracle (Azahar), capture which CSAB each side SELECTS per
+BOTH the live Zelda3D game and the OoT3D oracle (Azahar), capture which CSAB each side SELECTS per
 frame, and report every state where the selected CSAB set diverges. Both sides resolve into the SAME
-OoT3D CSAB namespace (SoH3D plays the OoT3D rig's own CSABs), so the names compare directly.
+OoT3D CSAB namespace (Zelda3D plays the OoT3D rig's own CSABs), so the names compare directly.
 
 SIDES
 - ORACLE: tools/oracle_link_animid.py reads OoT3D's live curAnimId (PLAYER+0x254+0x30) -> CSAB name
   via the ZAR-order table (oot3d-decomp player_animid_names.json, RE'd from FUN_0034807c).
-- SoH3D:  REPL `linkanimstate` reports the resolved base CSAB per poll (the name SoH3D draws).
+- Zelda3D:  REPL `linkanimstate` reports the resolved base CSAB per poll (the name Zelda3D draws).
 
-Both are driven by an analog-stick hold (the oracle via its Input mod, SoH3D via `walkhold`), warped
+Both are driven by an analog-stick hold (the oracle via its Input mod, Zelda3D via `walkhold`), warped
 to open ground (Kokiri Forest 0xEE) so locomotion sustains. Cutscene-safe: both sides poll until
 free gameplay (stateFlags1 & IN_CUTSCENE == 0) before driving.
 
@@ -39,7 +39,7 @@ KOKIRI_ENTRANCE = 0xEE
 # the 3DS circle pad (±100) map a magnitude to different speeds. The fix is the SPEED-CALIBRATED sweep
 # tools/parity_speed_sweep.py, which compares selection at matched speedXZ. That sweep CONFIRMED a REAL
 # divergence at walk speed (NOT the "calibration artifact" earlier sessions assumed): at speedXZ~1.0 the
-# oracle selects nml_walk_free while SoH3D selects nml_run_free — SoH3D reads the live N64 player anim
+# oracle selects nml_walk_free while Zelda3D selects nml_run_free — Zelda3D reads the live N64 player anim
 # (one run anim, speed-scaled playback) and maps it straight to nml_run_free, whereas OoT3D/Grezzo
 # SELECTS distinct walk/run CSABs by speed. Use parity_speed_sweep.py for walk; this tool stays valid
 # for the unambiguous endpoints idle (no motion) and run (full deflection = top speed on both sides).
@@ -51,9 +51,9 @@ STATES = {
 }
 
 
-# ---------- SoH3D side (REPL) ----------
+# ---------- Zelda3D side (REPL) ----------
 def soh_cmd(text):
-    p = subprocess.run([os.path.join(HERE, "soh3d_repl.py"), "cmd", text],
+    p = subprocess.run([os.path.join(HERE, "zelda3d_repl.py"), "cmd", text],
                        capture_output=True, text=True, timeout=15)
     return (p.stdout or "").strip().splitlines()[:1] and (p.stdout or "").strip().splitlines()[0] or ""
 
@@ -163,14 +163,14 @@ def main():
     ap.add_argument("--frames", type=int, default=40)
     ap.add_argument("--hz", type=float, default=20.0)
     ap.add_argument("--json", default=None)
-    ap.add_argument("--skip-oracle", action="store_true", help="SoH3D side only")
+    ap.add_argument("--skip-oracle", action="store_true", help="Zelda3D side only")
     args = ap.parse_args()
 
     states = [s.strip() for s in args.states.split(",") if s.strip() in STATES]
     if not args.skip_oracle:
         oracle_warp_open()
     if not soh_ensure_free():
-        print("WARN: SoH3D never reached free gameplay (stuck in cutscene)", file=sys.stderr)
+        print("WARN: Zelda3D never reached free gameplay (stuck in cutscene)", file=sys.stderr)
 
     results = {}
     for name in states:
@@ -181,16 +181,16 @@ def main():
         else:
             ora_steady, ora_set = oracle_capture(sx, sy, args.frames, args.hz)
         match = (ora_steady is not None) and (soh_steady == ora_steady)
-        results[name] = {"drive": [sx, sy, btn], "soh3d_steady": soh_steady, "soh3d_set": soh_set,
+        results[name] = {"drive": [sx, sy, btn], "zelda3d_steady": soh_steady, "zelda3d_set": soh_set,
                          "oracle_steady": ora_steady, "oracle_set": ora_set, "match": match}
 
     # report — compare the STEADY-STATE selected CSAB (the front-half transition is morph's concern)
-    print(f"\n{'state':<10} {'verdict':<8} {'SoH3D steady':<24} {'OoT3D steady':<24}")
+    print(f"\n{'state':<10} {'verdict':<8} {'Zelda3D steady':<24} {'OoT3D steady':<24}")
     print("-" * 70)
     for name in states:
         r = results[name]
         m = "OK" if r["match"] else ("SKIP" if r["oracle_steady"] is None else "DIVERGE")
-        print(f"{name:<10} {m:<8} {(r['soh3d_steady'] or '-'):<24} {(r['oracle_steady'] or '(skipped)'):<24}")
+        print(f"{name:<10} {m:<8} {(r['zelda3d_steady'] or '-'):<24} {(r['oracle_steady'] or '(skipped)'):<24}")
     diverged = [n for n in states if not results[n]["match"] and results[n]["oracle_steady"] is not None]
     print(f"\n{len(diverged)} divergent state(s): {', '.join(diverged) or 'none'}")
     if args.json:

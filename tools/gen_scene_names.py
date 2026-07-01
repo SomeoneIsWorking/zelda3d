@@ -10,7 +10,7 @@ renamed (dungeon bosses, houses, shops, market entrances); those get explicit ov
 below. Scenes with no OoT3D equivalent (test/beta) map to NULL -> the engine falls back
 to the N64 room. Output is names only (no ROM assets) -> safe to commit.
 
-Run: SOH3D_3DS_ROM=<path.3ds> python3 tools/gen_scene_names.py
+Run: ZELDA3D_3DS_ROM=<path.3ds> python3 tools/gen_scene_names.py
 """
 import os, re, sys
 sys.path.insert(0, os.path.dirname(__file__))
@@ -18,7 +18,7 @@ from ctr_romfs import CtrRom
 
 REPO = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 SCENE_TABLE = os.path.join(REPO, "Shipwright/soh/include/tables/scene_table.h")
-OUT = os.path.join(REPO, "Shipwright/soh/src/soh3d/soh3d_scene_names.inc")
+OUT = os.path.join(REPO, "Shipwright/soh/src/zelda3d/zelda3d_scene_names.inc")
 
 # SoH scene segment name (sans `_scene`) -> OoT3D folder name, for the renamed scenes.
 OVERRIDES = {
@@ -50,7 +50,7 @@ OVERRIDES = {
 
 
 def main():
-    rom = CtrRom(os.environ["SOH3D_3DS_ROM"])
+    rom = CtrRom(os.environ["ZELDA3D_3DS_ROM"])
     folders = set()
     for f in rom.iter_files():
         p = f if isinstance(f, str) else getattr(f, "path", str(f))
@@ -83,7 +83,7 @@ def main():
         o.write("// folder name (for /scene/<name>_<R>_info.zsi). NULL = no OoT3D scene\n")
         o.write("// (fall back to the N64 room). Names only; no ROM-derived assets.\n")
         o.write(f"// {mapped}/{len(rows)} scenes mapped.\n")
-        o.write("static const char* const kSoH3dSceneNames[] = {\n")
+        o.write("static const char* const kZelda3dSceneNames[] = {\n")
         for i, (soh, enum, name) in enumerate(rows):
             val = f"\"{name}\"" if name else "NULL"
             o.write(f"    /* 0x{i:02X} {enum:<40} ({soh}) */ {val},\n")
