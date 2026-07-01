@@ -1973,6 +1973,13 @@ extern "C" void Graph_ProcessGfxCommands(Gfx* commands) {
 
     audio.cv_to_thread.notify_one();
     std::vector<std::unordered_map<Mtx*, MtxF>> mtx_replacements;
+    // Render-unification differential gate (kanban #131): the subframe interpolation phase below
+    // (`time`) is a static counter advanced every render call regardless of gSoH3dFreeze (it only
+    // holds Play_Update, not this render-side smoothing), so it cycles with real elapsed render
+    // frames — the same class of nondeterminism as the dither noise's frame_count. Pin it to the
+    // un-interpolated (fps == original_fps) path so a screenshot always lands on the exact logic
+    // pose, not an arbitrary subframe blend, for bit-reproducible test captures.
+    static const bool kFreezeInterp = getenv("SOH3D_FREEZE_INTERP") != nullptr;
     int target_fps = OTRGlobals::Instance->GetInterpolationFPS();
     static int last_fps;
     static int last_update_rate;
@@ -1981,7 +1988,7 @@ extern "C" void Graph_ProcessGfxCommands(Gfx* commands) {
     int original_fps = 60 / R_UPDATE_RATE;
     auto wnd = std::dynamic_pointer_cast<Fast::Fast3dWindow>(Ship::Context::GetRawInstance()->GetWindow());
 
-    if (target_fps == 20 || original_fps > target_fps) {
+    if (kFreezeInterp || target_fps == 20 || original_fps > target_fps) {
         fps = original_fps;
     }
 

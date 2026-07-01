@@ -1717,7 +1717,11 @@ void GfxRenderingAPISdl3Gpu::DrawTriangles(float bufVbo[], size_t bufVboLen, siz
     op.scissor = sc;
 
     SgUboData ubo{};
-    ubo.frame_count = (int32_t)mFrameCount;
+    // Test harnesses (tools/render_unify_corpus_sweep.py, tools/unified_ab_sweep.py) pin this so
+    // the frame_count-seeded alpha-dither noise (RAND_NOISE above) is bit-identical between two
+    // captures being pixel-diffed; without it, dither alone fails any raw LSB comparison.
+    static const char* freezeStr = getenv("SOH3D_FREEZE_NOISE_FRAME");
+    ubo.frame_count = freezeStr != nullptr ? atoi(freezeStr) : (int32_t)mFrameCount;
     ubo.noise_scale = mCurrentNoiseScale;
     ubo.prim_depth = mCurrentPrimDepth;
     for (int t = 0; t < 2; t++) {
