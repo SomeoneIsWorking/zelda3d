@@ -1,6 +1,8 @@
 #include "z_title_setup.h"
 #include "overlays/gamestates/ovl_title/z_title.h"
+#include "overlays/gamestates/ovl_select/z_select.h"
 #include "z64save.h"
+#include "Z3DBoot.h"
 
 void Setup_InitRegs(void) {
     XREG(2) = 0;
@@ -55,7 +57,15 @@ void Setup_InitImpl(SetupState* this) {
     Setup_InitRegs();
 
     STOP_GAMESTATE(&this->state);
-    SET_NEXT_GAMESTATE(&this->state, ConsoleLogo_Init, sizeof(ConsoleLogoState));
+    // Zelda3D: after the essential global init above (save context + regs), route straight into the
+    // MapSelect debug overlay when the headless debug-warp gate is set, instead of the title screen
+    // + attract-demo loop. MapSelect_Main then auto-loads the target gameplay entrance. This mirrors
+    // OoT's soh3d boot-into-Select path (soh/src/code/graph.c). Gate off -> vanilla ConsoleLogo.
+    if (Z3D_AutoWarpEnabled()) {
+        SET_NEXT_GAMESTATE(&this->state, MapSelect_Init, sizeof(MapSelectState));
+    } else {
+        SET_NEXT_GAMESTATE(&this->state, ConsoleLogo_Init, sizeof(ConsoleLogoState));
+    }
 }
 
 void Setup_Destroy(GameState* thisx) {
