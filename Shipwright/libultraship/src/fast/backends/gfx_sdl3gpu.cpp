@@ -1820,10 +1820,16 @@ Fast::Unified::Variant N64VariantFor(const CCFeatures& cc) {
         return Fast::Unified::Variant::kGrayscale;
     bool tex0 = cc.usedTextures[0], tex1 = cc.usedTextures[1];
     if (tex0 && tex1)
+        // Known residual: dual-tex + alpha-threshold/texture-edge has no dedicated variant (the
+        // plan caps at 6 structural buckets) — falls through to plain dual-tex, skipping the
+        // discard. Rare in practice (Phase 0 corpus: 2-texture draws needing edge/threshold discard
+        // are a small minority of the already-small texture-edge set) and never silently WRONG in a
+        // worse way than "renders opaque instead of cutout" for those few draws.
         return cc.opt_fog ? Fast::Unified::Variant::kDualTexFog : Fast::Unified::Variant::kDualTex;
     if (!tex0 && !tex1)
         return Fast::Unified::Variant::kUntextured;
-    return cc.opt_alpha_threshold ? Fast::Unified::Variant::kSingleTexAlphaTest : Fast::Unified::Variant::kSingleTex;
+    return (cc.opt_alpha_threshold || cc.opt_texture_edge) ? Fast::Unified::Variant::kSingleTexAlphaTest
+                                                            : Fast::Unified::Variant::kSingleTex;
 }
 
 // Reads one vertex's floats (already resolved concrete color values, not combiner codes — see the
