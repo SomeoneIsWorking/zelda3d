@@ -506,9 +506,18 @@ void SaveManager::StartupCheckAndInitMeta(int fileNum) {
             output.close();
             saveMtx.unlock();
         }
-        s16 major = metaSaveBlock["sections"]["sohStats"]["data"]["buildVersionMajor"];
-        s16 minor = metaSaveBlock["sections"]["sohStats"]["data"]["buildVersionMinor"];
-        s16 patch = metaSaveBlock["sections"]["sohStats"]["data"]["buildVersionPatch"];
+        // A save written before the "sohStats" section existed has no build-version metadata at
+        // all; treat that as version 0 (guaranteed to mismatch and fall into the outdated-save
+        // path below) instead of indexing a missing key (which would auto-vivify null and throw
+        // converting it to s16, or throw type_error.306 out of value() on that null).
+        s16 major = 0, minor = 0, patch = 0;
+        if (metaSaveBlock["sections"]["sohStats"].is_object() &&
+            metaSaveBlock["sections"]["sohStats"]["data"].is_object()) {
+            const nlohmann::json& sohStatsData = metaSaveBlock["sections"]["sohStats"]["data"];
+            major = sohStatsData.value("buildVersionMajor", (s16)0);
+            minor = sohStatsData.value("buildVersionMinor", (s16)0);
+            patch = sohStatsData.value("buildVersionPatch", (s16)0);
+        }
         // block loading outdated rando save
         if (!(major == gBuildVersionMajor && minor == gBuildVersionMinor && patch == gBuildVersionPatch)) {
             std::string newFileName =
@@ -588,23 +597,39 @@ void SaveManager::StartupCheckAndInitMeta(int fileNum) {
         fileMetaInfo[fileNum].requiresOriginal = randoBlock["masterQuestDungeonCount"] < 12;
     }
 
-    fileMetaInfo[fileNum].buildVersionMajor = metaSaveBlock["sections"]["sohStats"]["data"]["buildVersionMajor"];
-    fileMetaInfo[fileNum].buildVersionMinor = metaSaveBlock["sections"]["sohStats"]["data"]["buildVersionMinor"];
-    fileMetaInfo[fileNum].buildVersionPatch = metaSaveBlock["sections"]["sohStats"]["data"]["buildVersionPatch"];
-    SohUtils::CopyStringToCharArray(fileMetaInfo[fileNum].buildVersion,
-                                    metaSaveBlock["sections"]["sohStats"]["data"]["buildVersion"],
+    // Same pre-"sohStats" compatibility guard as above: a save from before this section existed
+    // has no build-version metadata to report, so leave it zeroed/empty rather than throwing.
+    fileMetaInfo[fileNum].buildVersionMajor = 0;
+    fileMetaInfo[fileNum].buildVersionMinor = 0;
+    fileMetaInfo[fileNum].buildVersionPatch = 0;
+    std::string buildVersionStr;
+    if (metaSaveBlock["sections"]["sohStats"].is_object() && metaSaveBlock["sections"]["sohStats"]["data"].is_object()) {
+        const nlohmann::json& sohStatsData = metaSaveBlock["sections"]["sohStats"]["data"];
+        fileMetaInfo[fileNum].buildVersionMajor = sohStatsData.value("buildVersionMajor", (s16)0);
+        fileMetaInfo[fileNum].buildVersionMinor = sohStatsData.value("buildVersionMinor", (s16)0);
+        fileMetaInfo[fileNum].buildVersionPatch = sohStatsData.value("buildVersionPatch", (s16)0);
+        buildVersionStr = sohStatsData.value("buildVersion", std::string());
+    }
+    SohUtils::CopyStringToCharArray(fileMetaInfo[fileNum].buildVersion, buildVersionStr,
                                     ARRAY_COUNT(fileMetaInfo[fileNum].buildVersion));
-    } catch ([[maybe_unused]] const std::exception& e) {
+    } catch (const std::exception& e) {
+        SPDLOG_ERROR("StartupCheckAndInitMeta: exception parsing {} : {}", fileName.string(), e.what());
         fileMetaInfo[fileNum].valid = false;
-        std::string newFileName =
-            Ship::Context::GetPathRelativeToAppDirectory("Save") +
-            ("/file" + std::to_string(fileNum + 1) + "-" + std::to_string(GetUnixTimestamp()) + ".bak");
+        // The rename below is best-effort recovery, not the failure being handled — if fileName
+        // doesn't exist (or the rename otherwise fails), swallow that too via the error_code
+        // overload instead of letting a second exception escape this handler and terminate().
+        std::error_code ec;
+        if (std::filesystem::exists(fileName, ec)) {
+            std::string newFileName =
+                Ship::Context::GetPathRelativeToAppDirectory("Save") +
+                ("/file" + std::to_string(fileNum + 1) + "-" + std::to_string(GetUnixTimestamp()) + ".bak");
 #if defined(__SWITCH__) || defined(__WIIU__)
-        copy_file(fileName.c_str(), newFileName.c_str());
-        std::filesystem::remove(fileName);
+            copy_file(fileName.c_str(), newFileName.c_str());
+            std::filesystem::remove(fileName, ec);
 #else
-        std::filesystem::rename(fileName, newFileName);
+            std::filesystem::rename(fileName, newFileName, ec);
 #endif
+        }
         SohGui::RegisterPopup("Error loading save file", "A problem occurred loading the save in slot " +
                                                              std::to_string(fileNum + 1) +
                                                              ".\nSave file corruption is suspected.\n" +
@@ -1344,17 +1369,23 @@ void SaveManager::LoadFile(int fileNum) {
         }
         InitMeta(fileNum);
         GameInteractor::Instance->ExecuteHooks<GameInteractor::OnLoadFile>(fileNum);
-    } catch ([[maybe_unused]] const std::exception& e) {
+    } catch (const std::exception& e) {
+        SPDLOG_ERROR("LoadFile: exception parsing {} : {}", GetFileName(fileNum).string(), e.what());
         input.close();
-        std::string newFileName =
-            Ship::Context::GetPathRelativeToAppDirectory("Save") +
-            ("/file" + std::to_string(fileNum + 1) + "-" + std::to_string(GetUnixTimestamp()) + ".bak");
+        // Best-effort recovery — must not itself throw (a missing fileName would otherwise
+        // escape this handler and terminate() the process on top of the original error).
+        std::error_code ec;
+        if (std::filesystem::exists(fileName, ec)) {
+            std::string newFileName =
+                Ship::Context::GetPathRelativeToAppDirectory("Save") +
+                ("/file" + std::to_string(fileNum + 1) + "-" + std::to_string(GetUnixTimestamp()) + ".bak");
 #if defined(__SWITCH__) || defined(__WIIU__)
-        copy_file(fileName.c_str(), newFileName.c_str());
-        std::filesystem::remove(fileName);
+            copy_file(fileName.c_str(), newFileName.c_str());
+            std::filesystem::remove(fileName, ec);
 #else
-        std::filesystem::rename(fileName, newFileName);
+            std::filesystem::rename(fileName, newFileName, ec);
 #endif
+        }
         SohGui::RegisterPopup("Error loading save file", "A problem occurred loading the save in slot " +
                                                              std::to_string(fileNum + 1) +
                                                              ".\nSave file corruption is suspected.\n" +

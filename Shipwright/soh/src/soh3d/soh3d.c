@@ -8,6 +8,8 @@
 #include "overlays/actors/ovl_En_Ex_Ruppy/z_en_ex_ruppy.h" // EnExRuppy colorIdx (ainfo rupee debug)
 #include "overlays/actors/ovl_En_Door/z_en_door.h" // EnDoor swing state (ainfo door trace, #115)
 #include "objects/object_ge1/object_ge1.h"       // dgGerudoWhite*Anim OTR-path strings
+#include "soh/SaveManager.h" // Save_LoadFile (diagnostic `savecycle` REPL command, #132)
+void Save_LoadFile(void); // z_sram.c
 #include <stdlib.h>
 #include <stdio.h>
 #include <string.h>
@@ -4207,6 +4209,23 @@ static void SoH3D_ReplExec(PlayState* play, char* line, const char* outPath) {
         p->actor.shape.rot.y = yaw;
         p->actor.world.rot.y = yaw;
         SoH3D_ReplReply(outPath, "turn -> %.0f deg (yaw=%d)", f1, yaw);
+    } else if (strcmp(cmd, "savecycle") == 0) {
+        // #132 diagnostic: exercise the real LoadFile call against file slot 0 on disk (whatever
+        // is currently in Save/file1.sav) to catch a real save/reload data-loss bug (vs a rare
+        // pre-existing-corruption crash). Forces fileNum=0 — gSaveContext.fileNum is 255 (no
+        // file) in this warp-boot harness, which isn't the case being diagnosed.
+        int prevFileNum = gSaveContext.fileNum;
+        gSaveContext.fileNum = 0;
+        SaveFileMetaInfo* before = Save_GetSaveMetaInfo(0);
+        u16 healthBefore = before->health;
+        u16 deathsBefore = before->deaths;
+        Save_LoadFile();
+        SaveFileMetaInfo* after = Save_GetSaveMetaInfo(0);
+        SoH3D_ReplReply(outPath,
+                        "savecycle: health %d->%d deaths %d->%d gCurrentHealth=%d gRupees=%d valid=%d",
+                        healthBefore, after->health, deathsBefore, after->deaths, gSaveContext.health,
+                        gSaveContext.rupees, after->valid);
+        gSaveContext.fileNum = prevFileNum;
     } else if (strcmp(cmd, "posinfo") == 0) {
         Player* p = GET_PLAYER(play);
         Camera* c = GET_ACTIVE_CAM(play);
