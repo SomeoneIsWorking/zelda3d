@@ -21,7 +21,7 @@
 #include "actor/push_block.h"
 #include "actor/en_tana.h"
 #include "actor/boss_goma.h"
-#include "../asset/mat4.h"
+#include "asset/mat4.h"
 
 extern "C" {
 // CSAB skinner channel: post-multiply a 3x3 rotation onto a bone's local transform (MTXMODE_APPLY).

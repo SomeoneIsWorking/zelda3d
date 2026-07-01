@@ -702,6 +702,7 @@ else()
      set(ADDITIONAL_LIBRARY_DEPENDENCIES
     "libultraship;"
         "ZAPDLib;"
+        "cmb3d;"
         "stb;"
         SDL3::SDL3
         "Ogg::ogg"
