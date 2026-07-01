@@ -194,6 +194,10 @@ target_compile_options(libultraship PRIVATE "${WARNING_OVERRIDE}")
 target_compile_definitions(libultraship PUBLIC INCLUDE_MPQ_SUPPORT)
 add_subdirectory(ZAPDTR/ZAPD ${CMAKE_BINARY_DIR}/ZAPD)
 add_subdirectory(OTRExporter)
+
+# cmb3d — shared 3DS asset layer (CMB/CSAB/ZAR/ZSI/CTR-ROM/…), linked by BOTH games.
+add_subdirectory(cmb3d ${CMAKE_BINARY_DIR}/cmb3d)
+
 add_subdirectory(soh)
 
 # Majora's Mask — second game module (Zelda3D N2), shares the in-tree libultraship.
