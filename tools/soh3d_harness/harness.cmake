@@ -10,9 +10,16 @@ set(_harness_root  ${CMAKE_CURRENT_LIST_DIR})
 
 add_executable(soh3d_harness
     ${_harness_root}/main.cpp
+    ${_harness_root}/soh_state.cpp
     ${_libretro_root}/citra_libretro.cpp
     $<TARGET_OBJECTS:azahar_libretro_common>
 )
+
+# soh_state.cpp includes SoH's z64.h / z64actor.h so it can read struct
+# fields through the 64-bit C++ layout (raw offsets from the N64 header
+# comments are wrong on a 64-bit build). It needs soh_settings' compile
+# flags — inherited transitively from soh_lib PRIVATE (soh_settings is
+# linked PUBLIC to soh_lib), so no extra wiring needed here.
 
 # These -D switches gate the renderer surface in common/settings.h and
 # citra_libretro.cpp. Azahar adds them via add_compile_definitions() in
