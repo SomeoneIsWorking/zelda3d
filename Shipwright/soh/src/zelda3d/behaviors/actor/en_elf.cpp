@@ -23,11 +23,13 @@
 // entrance 0x157 dayTime 0x8001 showing a blue-white glow orb where the N64 fairy sprite
 // used to be.
 //
-// Not-yet-ported: the N64 EnElf_Draw's `unk_2A8 == 8` / `fairyFlags & 8` vanish states
-// (Navi should be invisible during first-person / Z-target hover / hidden-in-Link modes).
-// Skipping the gate keeps the sprite always-visible during bringup so a live sweep
-// doesn't false-negative when the state machine has moved her to 8. Adding the gate is a
-// follow-up once we confirm the state timing across scene transitions.
+// TODO(navi-followups): (1) Apply the N64 EnElf_Draw vanish gate — skip emit when
+// unk_2A8 == 8 or (fairyFlags & 8), so Navi disappears during first-person / Z-target
+// hover / hidden-in-Link modes like the N64 sprite does. Verify the state timing across
+// scene transitions first (my in-scene trace showed state 7 at frame 1 with unknown later
+// transitions). (2) Swap `fine_sun.ctxb` for a dedicated Navi orb sprite — extract from
+// the OoT3D romfs (candidate: an effect/sprite zar outside `/actor/*.zar` — the Navi
+// sprite handles' texture pointer under Azahar RAM read at Init time would confirm).
 #include "z64.h"
 #include "src/overlays/actors/ovl_En_Elf/z_en_elf.h" // EnElf (timer, innerColor, outerColor, disappearTimer, fairyFlags)
 #include "en_elf.h"
