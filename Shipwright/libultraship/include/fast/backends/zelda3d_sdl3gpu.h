@@ -56,6 +56,7 @@ struct SgGroup {
         { 0, 0, 0, 1 }, { 0, 0, 0, 1 }, { 0, 0, 0, 1 },
     };
     int combConstIdx = 0;
+    int combUsesConst = 0;
     float dbgColor0[4] = { -1, -1, -1, -1 }; // sample of vertex[first].color (sgdump diagnostics)
     float dbgUv0[2] = { 0, 0 }, dbgUv1[2] = { 0, 0 }, dbgUv2[2] = { 0, 0 }; // sample uvs (sgdump)
 };
