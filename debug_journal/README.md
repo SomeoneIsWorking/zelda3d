@@ -35,3 +35,26 @@ texture / matrix that diverges between SoH and the OoT3D-decomp expectation
 ("lava missing", "sky looks off") as the defect. If your candidate defect can only be
 stated in pixels, either (a) go find the decomp function that draws that thing and
 state the divergence in draw-call terms, or (b) drop it — it's a mirage.
+
+## Sweep signals are structured — visual compare is the LAST step (2026-07-02 tighter rule)
+
+Full-game parity sweeps produce **structured signals only**. Never pixel-region
+observations as findings.
+
+- Structured signals allowed as sweep output:
+  1. per-actor draw records (actor id, matrix hash, texture id, tev/combiner config,
+     vtx format, primitive, vert count) — ordered by draw sequence
+  2. render-state hashes per frame
+  3. decomp-derived expectations (what OoT3D says should be drawn at that scene/frame)
+- Visual/pixel compare is only allowed as the **final confirmation** step, and only
+  AFTER upstream is already a full match: game state, camera coordinates, rendered
+  lights, geometry, textures. If any of those still diverges, the pixel diff is
+  caused by the upstream mismatch and teaches you nothing new.
+- When investigating a divergence: FIRST tool is the per-actor draw record diff
+  (structured), NOT a screenshot. Screenshots are reserved for the specific single
+  case where the defect literally cannot be expressed as a render-state difference
+  (extremely rare), and only after upstream is a full match at that state.
+
+**Tooling TODO (open):** `parity_ab.py` / GX-capture must expose a structured-record
+sweep mode as the default; the current PNG composite is for the acceptance-of-a-named-
+defect case, not the sweep signal.
