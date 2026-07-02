@@ -187,41 +187,15 @@ static const char* objectShortName(int objectId) {
     return nullptr;
 }
 
-// Allow-list of MM object ids the STATIC-prop draw path (Zelda3D_EmitModelDraw) can handle
-// safely — rigid actors only. Skinned/rigged characters need the SkelAnime replacement path
-// OoT grew, which isn't wired for MM yet; auto-probing them crashes on the first draw. Add
-// entries here as each MM object is verified against the Azahar oracle. First-guess scale
-// 0.1 (matches OoT's initial actor scale); calibrated live via REPL `mscale`.
-static const int kStaticObjects[] = {
-    // Clock-tower / Clock Town props — verified in South Clock Town.
-    0x1A4, // OBJECT_TOKEI_STEP     — clock-tower door/wall
-    0x197, // OBJECT_TOKEI_TOBIRA   — clock-tower swinging doors
-    0x18C, // OBJECT_OBJ_TOKEIDAI   — clock-tower body
-
-    // Broad-appearance rigid props (crates, pots, blocks, milk bin, boulder, tree).
-    // Each has a corresponding /actors/zelda2_<name>.gar.lzs archive; scale is a
-    // first-guess 0.1 and needs live calibration against the Azahar oracle before
-    // any is considered "done". Verified only that they load + draw without crashing.
-    0x00C, // OBJECT_BOX
-    0x133, // OBJECT_KIBAKO2         — crate variant
-    0x16F, // OBJECT_KIBAKO
-    0x19C, // OBJECT_RACETSUBO
-    0x1A8, // OBJECT_VISIBLOCK
-    0x1B3, // OBJECT_LIGHTBLOCK
-    0x261, // OBJECT_OBJ_MILK_BIN
-    0x20D, // OBJECT_TREE
-    0x0EF, // OBJECT_GOROIWA
-};
-
-// Resolve an objectId -> renderer modelId, probing the MM3D ROM once per allow-listed object.
-// Returns -1 for anything not on the allow-list (fall through to vanilla N64 draw).
+// Resolve an objectId -> renderer modelId. Probe the MM3D archive once per object; only
+// commit archives whose CMB is safe for the STATIC draw path (<=1 bone — no CSAB rig
+// needed). Skinned actors (bones > 1) return -1 so the caller falls through to vanilla
+// N64 draw until the SkelAnime replacement path is wired for MM. This supersedes the
+// old hardcoded allow-list gate (kept as a fast-lane "known-good, first-guess scale"
+// pass-through — everything else is auto-probed).
 static int resolveModelForObject(int objectId) {
     auto it = g_objectToModel.find(objectId);
     if (it != g_objectToModel.end()) return it->second;
-
-    bool allowed = false;
-    for (int oid : kStaticObjects) if (oid == objectId) { allowed = true; break; }
-    if (!allowed) { g_objectToModel[objectId] = -1; return -1; }
 
     const char* name = objectShortName(objectId);
     Zelda3D::CtrRom* r = rom();
@@ -249,10 +223,38 @@ static int resolveModelForObject(int objectId) {
         return -1;
     }
 
+    // Auto-probe: parse the GAR2 header + first CMB, reject if the CMB is skinned.
+    // The static draw path can't pose rigged models; drawing them would either T-pose
+    // or crash. Anything skinned falls through to N64 until the SkelAnime replacement
+    // path lands for MM (see mm3d_model.cpp header comment).
+    std::vector<uint8_t> probeBytes = bytes;  // copy — the lazy Load re-reads from ROM
+    Zelda3D::Gar probe(std::move(probeBytes));
+    if (!probe.ok()) {
+        g_objectToModel[objectId] = -1;
+        return -1;
+    }
+    const Zelda3D::GarFile* cmbFile = probe.firstWithSuffix(".cmb");
+    if (cmbFile == nullptr) {
+        g_objectToModel[objectId] = -1;
+        return -1;
+    }
+    Zelda3D::Cmb probeCmb(probe.read(*cmbFile));
+    if (!probeCmb.ok()) {
+        fprintf(stderr, "[MM3D] cmb probe %s: %s\n", path.c_str(), probeCmb.error().c_str());
+        g_objectToModel[objectId] = -1;
+        return -1;
+    }
+    if (probeCmb.bones().size() > 1) {
+        // Skinned — needs the animated-actor path; not wired for MM yet.
+        g_objectToModel[objectId] = -1;
+        return -1;
+    }
+
     int newId = (int)g_models.size();
     g_models.push_back({ path, 0.1f });
     g_objectToModel[objectId] = newId;
-    fprintf(stderr, "[MM3D] mapped obj=0x%03X (%s) -> modelId=%d\n", objectId, name, newId);
+    fprintf(stderr, "[MM3D] mapped obj=0x%03X (%s) -> modelId=%d (rigid, %zu bones)\n",
+            objectId, name, newId, probeCmb.bones().size());
     return newId;
 }
 
