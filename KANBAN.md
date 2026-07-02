@@ -3,11 +3,11 @@
 > **Generated mirror — do not hand-edit.** Source of truth = GitHub Issues on
 > `SomeoneIsWorking/zelda3d` (private). Regenerate with `tools/kanban.py render`.
 > Move a card with `tools/kanban.py mv <#> <column>`; add with `tools/kanban.py add`.
-> Columns: todo · in-progress · in-review · needs-confirmation · reopened · blocked · done(=closed).  Updated 2026-07-02 18:14.
+> Columns: todo · in-progress · in-review · needs-confirmation · reopened · blocked · done(=closed).  Updated 2026-07-02 18:20.
 
-**Counts:** todo:13 | in-progress:2 | in-review:1 | needs-confirmation:26 | reopened:0 | blocked:0 | done:80
+**Counts:** todo:14 | in-progress:2 | in-review:1 | needs-confirmation:26 | reopened:0 | blocked:0 | done:80
 
-## 📋 To Do  (13)
+## 📋 To Do  (14)
 - [#17](../../issues/17) Hi-res world/scene textures (texpack) _(render)_
 - [#33](../../issues/33) More foliage / vegetation density (lowest priority) _(scene)_
 - [#118](../../issues/118) Market (SCENE_MARKET_DAY) parity: crowd NPCs (En_Hy/En_Mu) mis-rendered, door still N64 _(render,scene,behavior)_
@@ -21,6 +21,7 @@
 - [#140](../../issues/140) Navi (EN_ELF) renders as N64 sprite — needs OoT3D native replacement _(render,behavior)_
 - [#141](../../issues/141) Kokiri Forest: EN_A_OBJ (message-block prop) renders N64 _(render,scene)_
 - [#142](../../issues/142) Kokiri Forest: OBJ_MURE2 (foliage cluster) renders N64 _(render,scene)_
+- [#143](../../issues/143) Kakariko: OBJ_MURE (foliage cluster) renders N64 _(render,scene)_
 
 ## 🔨 In Progress  (2)
 - [#111](../../issues/111) World night R/G too bright — flat tint under-darkens at night (needs vertex-lighting port) _(render)_
