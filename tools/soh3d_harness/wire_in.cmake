@@ -19,4 +19,18 @@ if(ENABLE_LIBRETRO)
             CALL include [[${_soh3d_harness_include}]]
         )
     ")
+
+    # Pull in Shipwright so soh_lib (and its transitive deps: libultraship,
+    # cmb3d, zelda3d_shared, ZAPDTR, OTRExporter) becomes a target the
+    # deferred harness.cmake can link against. This runs while Azahar is
+    # the top-level project — ${CMAKE_SOURCE_DIR} inside Shipwright's
+    # CMakeLists will resolve to Azahar's root, which is fine as long as
+    # we only build harness-reachable targets (the asset-copy / install
+    # / packaging commands that reference CMAKE_SOURCE_DIR are all attached
+    # to soh.elf or top-level install() and won't fire when we build the
+    # harness target).
+    set(_shipwright_root "${CMAKE_CURRENT_LIST_DIR}/../../Shipwright")
+    if(EXISTS "${_shipwright_root}/CMakeLists.txt")
+        add_subdirectory("${_shipwright_root}" "${CMAKE_BINARY_DIR}/shipwright" EXCLUDE_FROM_ALL)
+    endif()
 endif()
