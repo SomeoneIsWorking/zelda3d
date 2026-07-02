@@ -1309,6 +1309,24 @@ extern "C" void Zelda3D_Sg_DrawModel(int modelId, const float* mp16, const float
                                    float aspectAdj, const float* boneData, int boneCnt, unsigned long long midMask,
                                    int sky, float uvOffU, float uvOffV, const void* matTex,
                                    const void* matConst) {
+    // Zelda3D #140 render-side probe: log every DrawModel for the sun-billboard model id (2002 in
+    // typical runs). Non-sky submits are the Navi emit (sun/moon are sky=1). Serves as the runtime
+    // observable for tools/navi_close_test.py and to isolate whether an emit reaches the renderer,
+    // is filtered inside DrawModel, or is drawn but produces no visible pixel.
+    if (modelId == 2002) {
+        static int sN = 0;
+        if (++sN <= 20) {
+            // mp16[12..14] is the model-matrix translation column (mat4 column-major), so it reports
+            // WHERE the draw's origin sits — sun/moon are ~1000s of units away, Navi is at ~world pos.
+            float tx = mp16 ? mp16[12] : 0.0f;
+            float ty = mp16 ? mp16[13] : 0.0f;
+            float tz = mp16 ? mp16[14] : 0.0f;
+            printf("[Zelda3D sgDraw #%d] modelId=%d sky=%d lit=%d rgba=(%d,%d,%d,%d) boneCnt=%d "
+                   "mp_t=(%.1f,%.1f,%.1f)\n",
+                   sN, modelId, sky, lit, r8, g8, b8, a8, boneCnt, tx, ty, tz);
+            fflush(stdout);
+        }
+    }
     if (auto* r = sgRenderer())
         r->DrawModel(modelId, mp16, mv16, lit, invertY, r8, g8, b8, a8, aspectAdj, boneData, boneCnt, midMask, sky,
                      uvOffU, uvOffV, matTex, matConst);

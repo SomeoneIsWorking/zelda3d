@@ -476,6 +476,10 @@ int Zelda3D_BossGomaForceClimb(Actor* actor, float climbY, int hold); // enter t
 void Zelda3D_BossGomaClimbTick(Actor* actor);                         // per-frame hold (self-gated)
 int Zelda3D_BossGomaClimbHeld(void);                                  // 1 if the hold is active
 int Zelda3D_DrawActorModel(PlayState* play, int modelId, Actor* actor, float worldScale); // draw OoT3D CMB at actor xform
+// Camera-facing sprite emit at (actor.world.pos + off); uses sun/moon billboardMtxF path.
+int Zelda3D_EmitActorBillboard(PlayState* play, int modelId, Actor* actor,
+                               float xOff, float yOff, float zOff, float scale,
+                               u8 r, u8 g, u8 b, u8 a);
 float Zelda3D_GScale(int slot, float def);                              // live REPL `gscale <slot>` or def
 // Low-level retarget primitives (DEFINED in zelda3d_model.cpp); forwarded here so link.cpp sees them.
 void Zelda3D_SetTrackPosedMinY(int modelId, int enable);                  // per-frame posed-feet grounding

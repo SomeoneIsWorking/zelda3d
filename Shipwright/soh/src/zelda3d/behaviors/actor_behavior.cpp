@@ -12,6 +12,7 @@
 #include "actor/en_trap.h"
 #include "actor/en_jsjutan.h"
 #include "actor/en_butte.h"
+#include "actor/en_elf.h"
 #include "actor/en_fish.h"
 #include "actor/pot.h"
 #include "actor/comb.h"
@@ -104,6 +105,7 @@ ActorBehavior* findActorBehavior(s16 actorId) {
     static EnTrapBehavior sEnTrap;
     static EnJsjutanBehavior sEnJsjutan;
     static EnButteBehavior sEnButte;
+    static EnElfBehavior sEnElf;
     static EnFishBehavior sEnFish;
     static EnTuboTrapBehavior sEnTuboTrap;
     static ObjCombBehavior sObjComb;
@@ -131,6 +133,8 @@ ActorBehavior* findActorBehavior(s16 actorId) {
             return &sEnJsjutan;
         case ACTOR_EN_BUTTE:
             return &sEnButte;
+        case ACTOR_EN_ELF:
+            return &sEnElf;
         case ACTOR_EN_FISH:
             return &sEnFish;
         case ACTOR_EN_TUBO_TRAP:
