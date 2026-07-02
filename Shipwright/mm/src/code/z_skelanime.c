@@ -5,6 +5,7 @@
 
 #include "z64malloc.h"
 #include "2s2h/GameInteractor/GameInteractor.h"
+#include "2s2h/zelda3d/mm3d_draw.h" // Zelda3D_MM_InterceptSkelAnime — Stage 2 skinned MM3D port
 
 #define ANIM_INTERP 1
 
@@ -322,6 +323,12 @@ void SkelAnime_DrawOpa(PlayState* play, void** skeleton, Vec3s* jointTable, Over
         return;
     }
 
+    // MM3D SkelAnime intercept — if a skinned MM3D replacement is pending, drive
+    // the OoT3D bones from this actor's live N64 jointTable and skip the N64 walk.
+    if (Zelda3D_MM_InterceptSkelAnime(play, skeleton, jointTable)) {
+        return;
+    }
+
     OPEN_DISPS(play->state.gfxCtx);
 
     Matrix_Push();
@@ -426,11 +433,18 @@ void SkelAnime_DrawFlexOpa(PlayState* play, void** skeleton, Vec3s* jointTable, 
     Gfx* limbDList;
     Vec3f pos;
     Vec3s rot;
-    Mtx* mtx = GRAPH_ALLOC(play->state.gfxCtx, dListCount * sizeof(Mtx));
+    Mtx* mtx;
 
     if (skeleton == NULL) {
         return;
     }
+
+    // MM3D SkelAnime intercept — see SkelAnime_DrawOpa. Runs BEFORE the flex-matrix
+    // alloc so a replaced actor doesn't burn a per-frame GRAPH_ALLOC it won't use.
+    if (Zelda3D_MM_InterceptSkelAnime(play, skeleton, jointTable)) {
+        return;
+    }
+    mtx = GRAPH_ALLOC(play->state.gfxCtx, dListCount * sizeof(Mtx));
 
     OPEN_DISPS(play->state.gfxCtx);
 
@@ -563,6 +577,11 @@ void SkelAnime_DrawTransformFlexOpa(PlayState* play, void** skeleton, Vec3s* joi
     Mtx* mtx;
 
     if (skeleton == NULL) {
+        return;
+    }
+
+    // MM3D SkelAnime intercept — see SkelAnime_DrawOpa.
+    if (Zelda3D_MM_InterceptSkelAnime(play, skeleton, jointTable)) {
         return;
     }
 
