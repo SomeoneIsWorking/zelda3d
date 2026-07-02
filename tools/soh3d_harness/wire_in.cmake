@@ -9,6 +9,26 @@
 # This lets us wire the harness into Azahar's build without editing
 # Azahar/src/CMakeLists.txt (Azahar/ is gitignored in this repo).
 if(ENABLE_LIBRETRO)
+    # Turn off LTO for the harness build. Azahar defaults ENABLE_LTO=ON in
+    # release, which compiles citra_core / citra_common / video_core with
+    # `-flto=auto -fno-fat-lto-objects` (LTO-only object files). Mixing
+    # those with Shipwright's non-LTO static libraries triggers a linker
+    # bug where COMDAT weak function definitions (e.g. the local
+    # instantiation of std::vector<char>::resize inside ZAPDLib
+    # MemoryStream.cpp.o) fail to resolve calls in the SAME .o. LTO is a
+    # release-only knob anyway — for a dev harness that just needs to
+    # boot, off is fine and much faster to iterate on.
+    set(ENABLE_LTO OFF CACHE BOOL "harness: LTO mixed with non-LTO libs breaks link" FORCE)
+
+    # Force both projects onto the SAME glslang. Azahar defaults to its
+    # own externals/glslang subdirectory build, but Shipwright/libultraship
+    # uses find_package(glslang) which picks up /usr/lib64/libglslang.a
+    # (system Fedora libglslang-devel). Setting USE_SYSTEM_GLSLANG here —
+    # before Azahar's externals/ subdirectory is processed — makes Azahar
+    # also route through the system glslang, so only one copy flows into
+    # the harness link line.
+    set(USE_SYSTEM_GLSLANG ON CACHE BOOL "harness: share glslang with Shipwright" FORCE)
+
     # Bake the path into the deferred call — variables in DEFER args expand
     # at fire time, when CMAKE_CURRENT_LIST_DIR would refer to Azahar's own
     # top-level CMakeLists.txt, not this hook.
