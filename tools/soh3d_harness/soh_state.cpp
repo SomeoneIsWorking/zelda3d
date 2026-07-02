@@ -11,6 +11,7 @@
 #include "z64light.h"
 #include "z64camera.h"
 #include "z64skin.h"
+#include "z64player.h"
 
 extern "C" {
 
@@ -150,6 +151,17 @@ int SohState_Camera(float* eyeX,  float* eyeY,  float* eyeZ,
 // (matching the sink pattern used elsewhere in this file). Callers
 // generally want to iterate their WalkActors output and call
 // SohState_ActorSkeleton for actors they care about.
+// Skeleton dump — currently Player-only. Heuristic scans for a
+// SkelAnime-shaped region in an arbitrary Actor are unsafe: prop actors
+// often have four pointer-sized values whose byte pattern satisfies any
+// weak signature and dereferencing lands in the middle of the heap. So
+// we cast the actor to Player (SoH's typed struct) when its id is
+// ACTOR_PLAYER, and refuse everything else until per-actor SkelAnime
+// offsets get properly RE'd.
+//
+// Returns joint count written on success; 0 if actor exists but has no
+// exposed SkelAnime yet (non-Player actor); -1 if actor at cat+idx
+// doesn't exist.
 int SohState_ActorSkeleton(int cat, int listIndex,
                           short* jointsXYZ, int maxJoints,
                           int* outJointCount, int* outAnimFrame,
@@ -159,24 +171,11 @@ int SohState_ActorSkeleton(int cat, int listIndex,
     Actor* a = gPlayState->actorCtx.actorLists[cat].head;
     for (int i = 0; a != NULL && i < listIndex; ++i) a = a->next;
     if (a == NULL) return -1;
-    // Every Actor with a SkelAnime component embeds it near its top. We
-    // scan the first ~0x400 bytes of the actor for the two SkelAnime
-    // signature bytes (limbCount at +0x00, mode at +0x01). Not perfect,
-    // but for the title-demo cast (Link + a handful) it hits.
-    // Cheap alternative: hardcode by id later. Keep it dumb for now.
-    SkelAnime* sk = NULL;
-    const uint8_t* p = (const uint8_t*)a;
-    for (int off = 0; off < 0x400; off += 4) {
-        const SkelAnime* cand = (const SkelAnime*)(p + off);
-        if (cand->limbCount > 0 && cand->limbCount <= 32 &&
-            cand->mode >= 0 && cand->mode <= 4 &&
-            cand->jointTable != NULL && cand->morphTable != NULL &&
-            cand->skeleton != NULL) {
-            sk = (SkelAnime*)cand;
-            break;
-        }
-    }
-    if (sk == NULL) return 0;
+    if (a->id != ACTOR_PLAYER) return 0;
+    Player* player = (Player*)a;
+    SkelAnime* sk = &player->skelAnime;
+    if (sk->jointTable == NULL || sk->limbCount <= 0 || sk->limbCount > 32)
+        return 0;
     const int n = sk->limbCount < maxJoints ? sk->limbCount : maxJoints;
     for (int j = 0; j < n; ++j) {
         jointsXYZ[j * 3 + 0] = sk->jointTable[j].x;
