@@ -309,6 +309,23 @@ void HandleSohStep(std::istringstream& toks) {
     std::printf("ok soh_step %llu\n", static_cast<unsigned long long>(*n));
 }
 
+// The two-engine driver: advance BOTH engines one frame at a time, so
+// they stay lockstep. Requires soh_boot first; without it, `step` is
+// just an alias for `run` (Azahar-only).
+void HandleStep(std::istringstream& toks) {
+    std::string n_s;
+    if (!(toks >> n_s)) { PrintErr("step: usage: step <N>"); return; }
+    auto n = ParseNum(n_s);
+    if (!n) { PrintErr("step: bad N"); return; }
+    for (uint64_t i = 0; i < *n; ++i) {
+        retro_run();
+        if (g_soh_booted) RunFrame();
+    }
+    std::printf("ok step %llu %s\n",
+                static_cast<unsigned long long>(*n),
+                g_soh_booted ? "azahar+soh3d" : "azahar-only");
+}
+
 void HandleDiag(std::istringstream&) {
     std::printf("ok mask=0x%08x polls=%llu ids_seen=0x%08x\n",
                 g_input_mask,
@@ -459,6 +476,8 @@ void PrintHelp() {
         "  actors               dump current-scene actor table\n"
         "  soh_boot             bring up SoH3D (InitOTR/Heaps_Alloc/Main_Init)\n"
         "  soh_step <N>         advance SoH3D by N frames (RunFrame x N)\n"
+        "  step <N>             advance BOTH engines in lockstep (Azahar\n"
+        "                       retro_run + SoH3D RunFrame, per frame)\n"
         "  quit                 exit\n"
         "  help                 this list\n");
     std::printf("ok\n");
@@ -488,6 +507,7 @@ void RunRepl() {
         else if (cmd == "actors")    HandleActors(toks);
         else if (cmd == "soh_boot")  HandleSohBoot(toks);
         else if (cmd == "soh_step")  HandleSohStep(toks);
+        else if (cmd == "step")      HandleStep(toks);
         else if (cmd == "help")      PrintHelp();
         else if (cmd == "quit") { std::printf("ok\n"); std::fflush(stdout); return; }
         else                         PrintErr(("unknown cmd: " + cmd).c_str());
