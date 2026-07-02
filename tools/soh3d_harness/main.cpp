@@ -103,6 +103,7 @@ extern "C" {
                                        float px, float py, float pz,
                                        short rx, short ry, short rz);
     int SohState_WalkActors(SohState_ActorSink sink, void* user);
+    int SohState_Warp(unsigned short entrance);
     int SohState_Lighting(unsigned char ambient[3],
                          signed char light1Dir[3], unsigned char light1Color[3],
                          signed char light2Dir[3], unsigned char light2Color[3],
@@ -655,6 +656,81 @@ void CompareLightingImpl() {
                 lcFog[0], lcFog[1], lcFog[2], lcFogNear, lcFogFar);
 }
 
+// ============================================================================
+// force <sub> — write state into BOTH engines directly (no input driving)
+//
+// The point is to put both games into the same scripted starting state
+// so a compare can inspect the delta right away. Every sub does the
+// write on BOTH sides and reports which side accepted it.
+//
+// Current subs cover the "in-Play warp" case: both engines already
+// booted through their title/intro sequences to the Play gamestate,
+// and we tell each to trigger a scene transition to a shared entrance.
+// The write uses the same `nextEntranceIndex + transitionTrigger`
+// mechanism the game itself uses (see z_play.c:985).
+//
+// Forcing state OUTSIDE Play — e.g. "both engines at title screen" —
+// needs a gamestate-machinery poke (SET_NEXT_GAMESTATE on the current
+// gamestate's init/size fields). That requires locating each engine's
+// current-gamestate pointer, which is TODO — the runFrameContext
+// coroutine state in graph.c isn't exposed, and OoT3D's equivalent
+// isn't RE'd yet.
+// ============================================================================
+
+void ForceWarpImpl(uint16_t entrance) {
+    // 3ds side
+    auto ps = CurrentPlayState();
+    bool ok3ds = false;
+    if (ps) {
+        auto& mem = Core::System::GetInstance().Memory();
+        mem.Write16(*ps + NEXT_ENTRANCE_OFF, entrance);
+        mem.Write8(*ps + TRANSITION_TRIGGER_OFF, TRANS_TRIGGER_START);
+        ok3ds = true;
+    }
+    std::printf("  3ds: %s\n", ok3ds ? "warp queued" : "n/a (no playstate)");
+    // soh side
+    bool okSoh = g_soh_booted && SohState_Warp(entrance);
+    std::printf("  soh: %s\n", okSoh
+                ? "warp queued"
+                : (g_soh_booted ? "n/a (no playstate)" : "n/a (soh not booted)"));
+}
+
+void HandleForce(std::istringstream& toks) {
+    std::string sub;
+    if (!(toks >> sub)) {
+        PrintErr("force: usage: force <sub> — see `force list`");
+        return;
+    }
+    if (sub == "list") {
+        std::fprintf(stderr,
+            "force subs:\n"
+            "  warp <entrance>   set nextEntranceIndex + transitionTrigger\n"
+            "                    on BOTH engines; both games will process\n"
+            "                    the scene transition on their next tick.\n"
+            "                    Requires both engines to already be in\n"
+            "                    the Play gamestate.\n"
+            "\n"
+            "Not yet implemented (needs gamestate-machinery RE):\n"
+            "  gamestate <name>  jump both engines out of the current\n"
+            "                    gamestate and into a named one (title,\n"
+            "                    fileselect, opening, play) — useful for\n"
+            "                    parity checks on non-Play screens.\n");
+        std::printf("ok force list\n");
+        return;
+    }
+    if (sub == "warp") {
+        std::string ent_s;
+        if (!(toks >> ent_s)) { PrintErr("force warp: usage: force warp <entrance>"); return; }
+        auto ent = ParseNum(ent_s);
+        if (!ent) { PrintErr("force warp: bad entrance"); return; }
+        std::printf("force warp 0x%04x:\n", static_cast<unsigned>(*ent & 0xFFFF));
+        ForceWarpImpl(static_cast<uint16_t>(*ent & 0xFFFF));
+        std::printf("ok force warp 0x%04x\n", static_cast<unsigned>(*ent & 0xFFFF));
+        return;
+    }
+    PrintErr(("force: unknown sub: " + sub).c_str());
+}
+
 void HandleCompare(std::istringstream& toks) {
     std::string sub;
     if (!(toks >> sub)) {
@@ -707,6 +783,8 @@ void PrintHelp() {
         "  compare <sub>        side-by-side dump from both engines;\n"
         "                       `compare list` shows subs (scene/player/\n"
         "                       actors/lighting)\n"
+        "  force <sub>          write state into BOTH engines (RE, no\n"
+        "                       inputs); `force list` shows subs\n"
         "  quit                 exit\n"
         "  help                 this list\n");
     std::printf("ok\n");
@@ -738,6 +816,7 @@ void RunRepl() {
         else if (cmd == "soh_step")  HandleSohStep(toks);
         else if (cmd == "step")      HandleStep(toks);
         else if (cmd == "compare")   HandleCompare(toks);
+        else if (cmd == "force")     HandleForce(toks);
         else if (cmd == "help")      PrintHelp();
         else if (cmd == "quit") { std::printf("ok\n"); std::fflush(stdout); return; }
         else                         PrintErr(("unknown cmd: " + cmd).c_str());

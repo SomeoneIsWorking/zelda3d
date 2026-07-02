@@ -65,6 +65,19 @@ int SohState_WalkActors(SohState_ActorSink sink, void* user) {
     return total;
 }
 
+// Warp: set nextEntranceIndex + transitionTrigger through the typed
+// C struct — the same fields the game itself writes when handling an
+// in-scene warp (see z_play.c line 985 `SET_NEXT_GAMESTATE(...,
+// Play_Init, PlayState); gSaveContext.entranceIndex = ...`). Only
+// meaningful when gPlayState is populated (both engines are in the
+// Play gamestate); returns 0 otherwise.
+int SohState_Warp(unsigned short entrance) {
+    if (gPlayState == NULL) return 0;
+    gPlayState->nextEntranceIndex = (s16)entrance;
+    gPlayState->transitionTrigger = TRANS_TRIGGER_START;
+    return 1;
+}
+
 // Lighting: read the current active EnvLightSettings + LightContext.
 // SoH3D has its own renderer-side lighting/shadow model (see the
 // worldshade path) but still sources the underlying ambient/dir/fog
