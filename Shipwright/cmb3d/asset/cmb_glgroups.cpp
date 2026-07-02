@@ -55,10 +55,22 @@ Zelda3DGlGroup MakeGlGroup(const Cmb& cmb, const CmbDrawGroup& g, const CmbVerte
         cg.matAmbient[k] = mat ? mat->mat_ambient[k] : 1.0f;
         cg.matDiffuse[k] = mat ? mat->mat_diffuse[k] : 1.0f;
     }
+    // PICA200 TEV constant palette + stage-0 selector. Base defaults from the CMB file; the
+    // per-actor override channel (Zelda3D_GL_SetMatConstOverride in Step 2c) rewrites the
+    // affected slot(s) before submit for actors like EnHy townsfolk.
+    for (int s = 0; s < 6; s++) {
+        for (int k = 0; k < 4; k++) {
+            cg.matConstant[s][k] = mat ? mat->mat_constant[s][k] : (k == 3 ? 1.0f : 0.0f);
+        }
+    }
+    cg.combConstIdx = mat ? mat->comb_const_idx : 0;
     if (getenv("ZELDA3D_DBG_MAT")) {
-        fprintf(stderr, "[MAT] mi=%d vlit=%d comb=%.1f amb=(%.2f,%.2f,%.2f) dif=(%.2f,%.2f,%.2f)\n",
+        fprintf(stderr, "[MAT] mi=%d vlit=%d comb=%.1f amb=(%.2f,%.2f,%.2f) dif=(%.2f,%.2f,%.2f) "
+                        "constIdx=%d const%d=(%.2f,%.2f,%.2f,%.2f)\n",
                 g.material_index, cg.vertexLighting, cg.combScaleRGB, cg.matAmbient[0], cg.matAmbient[1],
-                cg.matAmbient[2], cg.matDiffuse[0], cg.matDiffuse[1], cg.matDiffuse[2]);
+                cg.matAmbient[2], cg.matDiffuse[0], cg.matDiffuse[1], cg.matDiffuse[2], cg.combConstIdx,
+                cg.combConstIdx, cg.matConstant[cg.combConstIdx][0], cg.matConstant[cg.combConstIdx][1],
+                cg.matConstant[cg.combConstIdx][2], cg.matConstant[cg.combConstIdx][3]);
     }
     return cg;
 }

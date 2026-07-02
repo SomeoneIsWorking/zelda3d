@@ -48,6 +48,14 @@ struct SgGroup {
     float combScaleRGB = 1.0f;
     float matAmbient[3] = { 1.0f, 1.0f, 1.0f };
     float matDiffuse[3] = { 1.0f, 1.0f, 1.0f };
+    // PICA200 TEV constant palette + stage-0 selector (see Zelda3DGlGroup::matConstant /
+    // combConstIdx). Populated by the model provider; overwritten by the per-actor override
+    // channel (Step 2c EnHy body-color port) before submit.
+    float matConstant[6][4] = {
+        { 0, 0, 0, 1 }, { 0, 0, 0, 1 }, { 0, 0, 0, 1 },
+        { 0, 0, 0, 1 }, { 0, 0, 0, 1 }, { 0, 0, 0, 1 },
+    };
+    int combConstIdx = 0;
     float dbgColor0[4] = { -1, -1, -1, -1 }; // sample of vertex[first].color (sgdump diagnostics)
     float dbgUv0[2] = { 0, 0 }, dbgUv1[2] = { 0, 0 }, dbgUv2[2] = { 0, 0 }; // sample uvs (sgdump)
 };
