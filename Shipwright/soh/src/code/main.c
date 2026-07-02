@@ -76,15 +76,19 @@ int main(int argc, char* argv[]) {
     return 0;
 }
 
-void Main(void* arg) {
-    IrqMgrClient irqClient;
-    OSMesgQueue irqMgrMsgQ;
-    OSMesg irqMgrMsgBuf[60];
+// SOH3D harness: post-frame-loop cleanup state, shared between Main_Init /
+// Main_Shutdown so a host driver embedding SoH3D can bracket its own step
+// loop with the same init/teardown Main() would run. See
+// tools/soh3d_harness/.
+static IrqMgrClient sMainIrqClient;
+static OSMesgQueue sMainIrqMgrMsgQ;
+static OSMesg sMainIrqMgrMsgBuf[60];
+
+void Main_Init(void* arg) {
     uintptr_t sysHeap;
     uintptr_t fb;
     void* debugHeap;
     size_t debugHeapSize;
-    s16* msg;
 
     osSyncPrintf("mainproc 実行開始\n"); // "Start running"
     gScreenWidth = SCREEN_WIDTH;
@@ -120,7 +124,7 @@ void Main(void* arg) {
 
     Main_LogSystemHeap();
 
-    osCreateMesgQueue(&irqMgrMsgQ, irqMgrMsgBuf, 0x3C);
+    osCreateMesgQueue(&sMainIrqMgrMsgQ, sMainIrqMgrMsgBuf, 0x3C);
     StackCheck_Init(&sIrqMgrStackInfo, sIrqMgrStack, sIrqMgrStack + sizeof(sIrqMgrStack), 0, 0x100, "irqmgr");
     IrqMgr_Init(&gIrqMgr, &sGraphStackInfo, Z_PRIORITY_IRQMGR, 1);
 
@@ -128,7 +132,7 @@ void Main(void* arg) {
     StackCheck_Init(&sSchedStackInfo, sSchedStack, sSchedStack + sizeof(sSchedStack), 0, 0x100, "sched");
     Sched_Init(&gSchedContext, &sAudioStack, Z_PRIORITY_SCHED, D_80013960, 1, &gIrqMgr);
 
-    IrqMgr_AddClient(&gIrqMgr, &irqClient, &irqMgrMsgQ);
+    IrqMgr_AddClient(&gIrqMgr, &sMainIrqClient, &sMainIrqMgrMsgQ);
 
     StackCheck_Init(&sAudioStackInfo, sAudioStack, sAudioStack + sizeof(sAudioStack), 0, 0x100, "audio");
     AudioMgr_Init(&gAudioMgr, sAudioStack + sizeof(sAudioStack), Z_PRIORITY_AUDIOMGR, 0xA, &gSchedContext, &gIrqMgr);
@@ -142,8 +146,11 @@ void Main(void* arg) {
     osCreateThread(&sGraphThread, 4, Graph_ThreadEntry, arg, sGraphStack + sizeof(sGraphStack), Z_PRIORITY_GRAPH);
     osStartThread(&sGraphThread);
     osSetThreadPri(0, Z_PRIORITY_SCHED);
+}
 
-    Graph_ThreadEntry(0);
+void Main_Shutdown(void) {
+    s16* msg;
+
     // Window closed: stop the audio thread immediately so it can't call
     // Context::GetRawInstance() while DeinitOTR() tears down the Context.
     // OTRAudio_Exit() is idempotent — the DeinitOTR() call below is a no-op
@@ -152,7 +159,7 @@ void Main(void* arg) {
 
     while (true) {
         msg = NULL;
-        osRecvMesg(&irqMgrMsgQ, (OSMesg*)&msg, OS_MESG_BLOCK);
+        osRecvMesg(&sMainIrqMgrMsgQ, (OSMesg*)&msg, OS_MESG_BLOCK);
         if (msg == NULL) {
             break;
         }
@@ -166,4 +173,14 @@ void Main(void* arg) {
     osDestroyThread(&sGraphThread);
     func_800FBFD8();
     osSyncPrintf("mainproc 実行終了\n"); // "End of execution"
+}
+
+void Main(void* arg) {
+    // Kept for compatibility with the vanilla-style call sites (main()
+    // in this file, tests) — a host driver embedding SoH3D as a library
+    // should instead call Main_Init + its own RunFrame() loop +
+    // Main_Shutdown, so it can interleave frames with another engine.
+    Main_Init(arg);
+    Graph_ThreadEntry(arg);
+    Main_Shutdown();
 }

@@ -1660,6 +1660,11 @@ void Graph_Destroy(GraphicsContext* gfxCtx);
 void Graph_TaskSet00(GraphicsContext* gfxCtx);
 void Graph_Update(GraphicsContext* gfxCtx, GameState* gameState);
 void Graph_ThreadEntry(void*);
+// SOH3D harness: one game frame. The Graph_ThreadEntry loop is just
+// `while (WindowIsRunning()) RunFrame();` — a host driver embedding
+// SoH3D can call RunFrame() directly to step the game cooperatively
+// alongside another engine (see tools/soh3d_harness/).
+void RunFrame(void);
 void* Graph_Alloc(GraphicsContext* gfxCtx, size_t size);
 void* Graph_Alloc2(GraphicsContext* gfxCtx, size_t size);
 void Graph_OpenDisps(Gfx** dispRefs, GraphicsContext* gfxCtx, const char* file, s32 line);
@@ -1673,6 +1678,11 @@ void ListAlloc_Free(ListAlloc* this, void* data);
 void ListAlloc_FreeAll(ListAlloc* this);
 void Main_LogSystemHeap(void);
 void Main(void* arg);
+// SOH3D harness: Main() split into init + shutdown so a host driver can
+// bracket its own RunFrame() loop between them, interleaving with another
+// engine. Existing Main() == Main_Init + Graph_ThreadEntry + Main_Shutdown.
+void Main_Init(void* arg);
+void Main_Shutdown(void);
 OSMesgQueue* PadMgr_LockSerialMesgQueue(PadMgr* padmgr);
 void PadMgr_UnlockSerialMesgQueue(PadMgr* padmgr, OSMesgQueue* ctrlrqueue);
 void PadMgr_LockPadData(PadMgr* padmgr);
