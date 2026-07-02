@@ -15,6 +15,7 @@
 #include "actor/en_elf.h"
 #include "actor/en_fish.h"
 #include "actor/en_mu.h"
+#include "actor/en_dog.h"
 #include "actor/pot.h"
 #include "actor/comb.h"
 #include "actor/hamishi.h"
@@ -109,6 +110,7 @@ ActorBehavior* findActorBehavior(s16 actorId) {
     static EnElfBehavior sEnElf;
     static EnFishBehavior sEnFish;
     static EnMuBehavior sEnMu;
+    static EnDogBehavior sEnDog;
     static EnTuboTrapBehavior sEnTuboTrap;
     static ObjCombBehavior sObjComb;
     static ObjHamishiBehavior sObjHamishi;
@@ -174,6 +176,8 @@ ActorBehavior* findActorBehavior(s16 actorId) {
             return &sTownsfolk;
         case ACTOR_EN_MU:
             return &sEnMu;
+        case ACTOR_EN_DOG:
+            return &sEnDog;
         default:
             return nullptr;
     }
