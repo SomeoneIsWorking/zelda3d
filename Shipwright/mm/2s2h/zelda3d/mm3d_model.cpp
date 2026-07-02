@@ -432,6 +432,59 @@ void Zelda3D_MM_AfterActorDraw(void) {
     g_pending.actor = nullptr;
 }
 
+// STAGE 3 auto-scale + ground-offset. See mm3d_model.h for the derivation.
+float Zelda3D_MM_ModelBoneLenSum(int modelId) {
+    Loaded* lm = loadModel(modelId);
+    if (lm == nullptr || !lm->ok || !lm->cmb) return 0.0f;
+    float sum = 0.0f;
+    for (const auto& bn : lm->cmb->bones()) {
+        if (bn.parent < 0) continue; // root translation is placement, not a bone length
+        sum += std::sqrt(bn.trans[0] * bn.trans[0] + bn.trans[1] * bn.trans[1] +
+                         bn.trans[2] * bn.trans[2]);
+    }
+    return sum;
+}
+
+float Zelda3D_MM_ModelMinY(int modelId) {
+    Loaded* lm = loadModel(modelId);
+    if (lm == nullptr || !lm->ok) return 0.0f;
+    float mn = 1e30f;
+    for (const auto& g : lm->groups)
+        for (const auto& v : g.verts) if (v.pos[1] < mn) mn = v.pos[1];
+    return (mn < 1e29f) ? mn : 0.0f;
+}
+
+void Zelda3D_MM_OverridePending(float worldScale, float groundOffset) {
+    if (g_pending.modelId < 0) return;
+    g_pending.scale = worldScale;
+    // STOPGAP: two MM3D archives (sdn, cs) yield a minY of ~1e34+ CMB units — the
+    // BindPose vert data blends through weird bone matrices during buildDrawGroups
+    // and accumulates junk on those specific rigs. Proper fix: audit cmb.cpp's
+    // smooth-skinning blend for those files. Until then, cap the ground lift so a
+    // 1e38 Matrix_Translate doesn't poison the pose stack for every other actor.
+    // Humanoid CMB feet sit no lower than a few thousand local units, so the cap
+    // is loose enough to preserve every well-formed rig.
+    if (!(groundOffset > -1e5f && groundOffset < 1e5f)) groundOffset = 0.0f;
+    g_pending.groundOff = groundOffset;
+    // One log per model — verify Stage 3 auto-scale is landing on live rigs.
+    // Gated by ZELDA3D_MM_SCALE_LOG=1 to keep the default log clean.
+    static int sLog = -1;
+    if (sLog < 0) {
+        const char* v = getenv("ZELDA3D_MM_SCALE_LOG");
+        sLog = (v != nullptr && v[0] != '\0' && v[0] != '0') ? 1 : 0;
+    }
+    if (sLog) {
+        static std::unordered_map<int, int> seen;
+        if (seen.find(g_pending.modelId) == seen.end()) {
+            seen[g_pending.modelId] = 1;
+            fprintf(stderr, "[MM3D-SCALE] modelId=%d worldScale=%.5f groundOff=%.3f\n",
+                    g_pending.modelId, worldScale, groundOffset);
+        }
+    }
+}
+
+int Zelda3D_MM_PendingModelId(void) { return g_pending.modelId; }
+
 void Zelda3D_ListModels(void (*emitLine)(const char* line, void* user), void* user) {
     if (emitLine == nullptr) return;
     // Sort by objectId for stable output.
