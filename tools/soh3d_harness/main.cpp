@@ -66,6 +66,10 @@
 
 #include "libretro.h"
 #include <SDL3/SDL.h>
+#include <fcntl.h>
+#include <sys/file.h>
+#include <sys/stat.h>
+#include <unistd.h>
 
 // ---------------------------------------------------------------------------
 // Direct-harness capture globals defined in libultraship's SDL3 renderer
@@ -128,6 +132,16 @@ extern "C" {
                          unsigned char lightCtxAmbient[3],
                          unsigned char lightCtxFogColor[3],
                          short* lightCtxFogNear, short* lightCtxFogFar);
+    int SohState_Camera(float* eyeX,  float* eyeY,  float* eyeZ,
+                       float* atX,   float* atY,   float* atZ,
+                       float* upX,   float* upY,   float* upZ,
+                       float* fov,
+                       short* roll,
+                       int*   activeCamId);
+    int SohState_ActorSkeleton(int cat, int listIndex,
+                              short* jointsXYZ, int maxJoints,
+                              int* outJointCount, int* outAnimFrame,
+                              int* outMorphFrame);
 }
 
 namespace {
@@ -510,10 +524,210 @@ void HandleStep(std::istringstream& toks) {
 }
 
 void HandleDiag(std::istringstream&) {
-    std::printf("ok mask=0x%08x polls=%llu ids_seen=0x%08x\n",
+    std::printf("ok mask=0x%08x polls=%llu ids_seen=0x%08x\n"
+                "  az:  booted=1 w=%u h=%u pitch=%zu dirty=%d\n"
+                "  soh: booted=%d captureW=%u captureH=%u pending=%d\n",
                 g_input_mask,
                 static_cast<unsigned long long>(g_input_poll_count),
-                g_input_poll_ids_seen);
+                g_input_poll_ids_seen,
+                g_az_w, g_az_h, g_az_pitch, g_az_dirty ? 1 : 0,
+                g_soh_booted ? 1 : 0,
+                gSoh3dCaptureW, gSoh3dCaptureH, gSoh3dCapturePending);
+}
+
+// Forward decls — Compare*Impl bodies live further down.
+void CompareSceneImpl();
+void ComparePlayerImpl();
+void CompareActorsImpl();
+void CompareCameraImpl();
+void CompareSkeletonImpl(int cat, int listIndex);
+void CompareLightingImpl();
+
+// -- Snapshot ---------------------------------------------------------------
+//
+// Dump both engines' latest captured framebuffers to <basepath>.az.ppm and
+// <basepath>.soh.ppm. This is the primitive every sweep builds on: after
+// the sweep drives both engines to a comparable state, snapshot() writes
+// the visual state to disk so offline tools can diff pixels.
+//
+// Formats: g_az_buf is XRGB8888 with stride g_az_pitch. On little-endian
+// that's byte order (B,G,R,X) per pixel. g_soh_buf is byte order (R,G,B,A)
+// tightly packed w*4. PPM P6 is (R,G,B) big-endian byte order.
+bool WriteAzahar_Ppm(const std::string& path) {
+    if (!g_az_w || !g_az_h || g_az_buf.empty()) return false;
+    std::FILE* f = std::fopen(path.c_str(), "wb");
+    if (!f) return false;
+    std::fprintf(f, "P6\n%u %u\n255\n", g_az_w, g_az_h);
+    for (uint32_t y = 0; y < g_az_h; ++y) {
+        const uint8_t* row = g_az_buf.data() + y * g_az_pitch;
+        for (uint32_t x = 0; x < g_az_w; ++x) {
+            const uint8_t* p = row + x * 4;      // B,G,R,X (XRGB8888 LE)
+            uint8_t rgb[3] = { p[2], p[1], p[0] };
+            std::fwrite(rgb, 1, 3, f);
+        }
+    }
+    std::fclose(f);
+    return true;
+}
+
+bool WriteSoh_Ppm(const std::string& path) {
+    if (!gSoh3dCaptureW || !gSoh3dCaptureH || g_soh_buf.empty()) return false;
+    std::FILE* f = std::fopen(path.c_str(), "wb");
+    if (!f) return false;
+    std::fprintf(f, "P6\n%u %u\n255\n", gSoh3dCaptureW, gSoh3dCaptureH);
+    const uint32_t w = gSoh3dCaptureW, h = gSoh3dCaptureH;
+    for (uint32_t y = 0; y < h; ++y) {
+        for (uint32_t x = 0; x < w; ++x) {
+            const uint8_t* p = g_soh_buf.data() + (y * w + x) * 4; // R,G,B,A
+            std::fwrite(p, 1, 3, f);
+        }
+    }
+    std::fclose(f);
+    return true;
+}
+
+void HandleSnapshot(std::istringstream& toks) {
+    std::string base;
+    if (!(toks >> base)) { PrintErr("snapshot: usage: snapshot <basepath>"); return; }
+    const std::string az_path  = base + ".az.ppm";
+    const std::string soh_path = base + ".soh.ppm";
+    const bool az_ok  = WriteAzahar_Ppm(az_path);
+    const bool soh_ok = WriteSoh_Ppm(soh_path);
+    std::printf("ok snapshot\n"
+                "  az:  %s %s (%ux%u)\n"
+                "  soh: %s %s (%ux%u)\n",
+                az_ok  ? "wrote" : "skip", az_path.c_str(),  g_az_w, g_az_h,
+                soh_ok ? "wrote" : "skip", soh_path.c_str(),
+                gSoh3dCaptureW, gSoh3dCaptureH);
+}
+
+// -- Sweep ------------------------------------------------------------------
+//
+// Automated parity driver. Sweep drives both engines to a shared state
+// then emits structured comparison records to stdout for a consumer
+// script (or an agent) to grep. Two modes so far:
+//
+//   sweep title <az_frames> <soh_frames> [basepath]
+//     Bring both engines to the title screen (Azahar naturally boots
+//     there; SoH3D via soh_boot if needed) and step each side to a
+//     steady state. Optional basepath writes both fbs as PPM at the end.
+//     This is the first-contact parity target — no Play state needed.
+//
+//   sweep entrances <az_frames> <soh_frames> <basepath> <ent1> <ent2> ...
+//     For each entrance: force warp both engines, step both engines,
+//     dump both compare subs + a snapshot at <basepath>.<ent>.{az,soh}.ppm.
+//     Requires both engines already in Play; use a loadstate/boot_to_play
+//     to get there first.
+//
+// Each record printed as one structured line for easy consumption:
+//   sweep begin phase=<phase> step=<n>
+//   sweep meta  key=val ...
+//   sweep dim   compare=<sub>          then the compare block
+//   sweep end   phase=<phase> ok=<0|1>
+void SweepStepBoth(uint64_t az_n, uint64_t soh_n) {
+    // Advance whichever side has the larger step count, or interleave
+    // them for the overlap. Simplest lockstep-preserving order:
+    const uint64_t lock = std::min(az_n, soh_n);
+    for (uint64_t i = 0; i < lock; ++i) {
+        retro_run();
+        if (g_soh_booted) { RequestSohCapture(); RunFrame(); }
+        PresentSbs();
+    }
+    for (uint64_t i = lock; i < az_n; ++i) { retro_run(); PresentSbs(); }
+    for (uint64_t i = lock; i < soh_n; ++i) {
+        if (g_soh_booted) { RequestSohCapture(); RunFrame(); PresentSbs(); }
+    }
+}
+
+void SweepEmitCompares() {
+    // Every compare that doesn't crash without a PlayState is safe here.
+    // CompareScene / ComparePlayer / CompareActors / CompareLighting all
+    // handle "no playstate" internally, so they work at title screen too
+    // (they just print n/a for both sides).
+    std::printf("sweep dim compare=scene\n");    CompareSceneImpl();
+    std::printf("sweep dim compare=player\n");   ComparePlayerImpl();
+    std::printf("sweep dim compare=actors\n");   CompareActorsImpl();
+    std::printf("sweep dim compare=camera\n");   CompareCameraImpl();
+    // Skeleton needs an actor selection — dump the first actor of each
+    // category that has one so the sweep touches every skinned entity
+    // in the scene without the caller enumerating.
+    for (int cat = 0; cat < 12; ++cat) {
+        std::printf("sweep dim compare=skeleton cat=%d idx=0\n", cat);
+        CompareSkeletonImpl(cat, 0);
+    }
+    std::printf("sweep dim compare=lighting\n"); CompareLightingImpl();
+}
+
+void HandleSweepTitle(std::istringstream& toks) {
+    std::string az_n_s, soh_n_s, base;
+    if (!(toks >> az_n_s >> soh_n_s)) {
+        PrintErr("sweep title: usage: sweep title <az_frames> <soh_frames> [basepath]");
+        return;
+    }
+    toks >> base; // optional
+    auto az_n  = ParseNum(az_n_s);
+    auto soh_n = ParseNum(soh_n_s);
+    if (!az_n || !soh_n) { PrintErr("sweep title: bad frame counts"); return; }
+
+    std::printf("sweep begin phase=title az_frames=%llu soh_frames=%llu soh_booted=%d\n",
+                (unsigned long long)*az_n, (unsigned long long)*soh_n,
+                g_soh_booted ? 1 : 0);
+
+    // Auto-boot SoH3D if not booted, so `sweep title` is a one-liner.
+    if (!g_soh_booted) {
+        std::istringstream empty("");
+        HandleSohBoot(empty);
+    }
+
+    SweepStepBoth(*az_n, *soh_n);
+
+    std::printf("sweep meta az=%ux%u soh=%ux%u soh_playstate=%d\n",
+                g_az_w, g_az_h, gSoh3dCaptureW, gSoh3dCaptureH,
+                g_soh_booted ? SohState_HasPlayState() : -1);
+
+    SweepEmitCompares();
+
+    bool snap_ok = true;
+    if (!base.empty()) {
+        const std::string az_p  = base + ".az.ppm";
+        const std::string soh_p = base + ".soh.ppm";
+        const bool az_ok  = WriteAzahar_Ppm(az_p);
+        const bool soh_ok = WriteSoh_Ppm(soh_p);
+        std::printf("sweep snapshot az=%s soh=%s az_path=%s soh_path=%s\n",
+                    az_ok  ? "ok" : "skip", soh_ok ? "ok" : "skip",
+                    az_p.c_str(), soh_p.c_str());
+        snap_ok = az_ok && soh_ok;
+    }
+    std::printf("sweep end phase=title ok=%d\n", snap_ok ? 1 : 0);
+    std::printf("ok sweep title\n");
+}
+
+void HandleSweep(std::istringstream& toks) {
+    std::string sub;
+    if (!(toks >> sub)) {
+        PrintErr("sweep: usage: sweep <sub> — see `sweep list`");
+        return;
+    }
+    if (sub == "list") {
+        std::fprintf(stderr,
+            "sweep subs:\n"
+            "  title <az_frames> <soh_frames> [basepath]\n"
+            "         Auto-boot SoH3D if needed, step both engines to a\n"
+            "         steady title-screen state, emit compare records for\n"
+            "         every dim, and (if basepath given) dump both fbs as\n"
+            "         <basepath>.{az,soh}.ppm. Structured output lines\n"
+            "         start with `sweep ` so consumers can grep them.\n"
+            "\n"
+            "Not yet implemented:\n"
+            "  entrances <az_frames> <soh_frames> <basepath> <ent1> ...\n"
+            "         Force-warp both engines to each entrance in turn,\n"
+            "         step, compare, snapshot. Needs both engines already\n"
+            "         in Play (Azahar boot-to-Play still TODO).\n");
+        std::printf("ok sweep list\n");
+        return;
+    }
+    if (sub == "title") { HandleSweepTitle(toks); return; }
+    PrintErr(("sweep: unknown sub: " + sub).c_str());
 }
 
 void HandleInput(std::istringstream& toks) {
@@ -787,6 +1001,58 @@ void CompareActorsImpl() {
     }
 }
 
+void CompareCameraImpl() {
+    // 3ds side: OoT3D's Camera pointer array within the 3DS PlayState is not
+    // RE'd yet. gPlayState + activeCamId + cameraPtrs[] offsets need to be
+    // decompiled; until then only the SoH side prints. When it lands, mirror
+    // the SoH branch below reading from Azahar's Memory::MemorySystem.
+    std::printf("  3ds: n/a (activeCamId/cameraPtrs offsets in OoT3D PlayState not RE'd yet)\n");
+    if (!SohState_HasPlayState()) {
+        std::printf("  soh: n/a (no playstate)\n");
+        return;
+    }
+    float ex, ey, ez, ax, ay, az, ux, uy, uz, fov;
+    short roll;
+    int activeCamId;
+    if (!SohState_Camera(&ex, &ey, &ez, &ax, &ay, &az, &ux, &uy, &uz,
+                         &fov, &roll, &activeCamId)) {
+        std::printf("  soh: n/a (no active camera)\n");
+        return;
+    }
+    std::printf("  soh: camId=%d eye=(%.2f,%.2f,%.2f) at=(%.2f,%.2f,%.2f) up=(%.2f,%.2f,%.2f)\n"
+                "       fov=%.2f roll=%d\n",
+                activeCamId, ex, ey, ez, ax, ay, az, ux, uy, uz, fov, roll);
+}
+
+void CompareSkeletonImpl(int cat, int listIndex) {
+    // 3ds side: needs Actor + SkelAnime offset RE. Same shape as the SoH
+    // side once the offset lands — scan the actor for a SkelAnime signature
+    // (limbCount+mode+jointTable) and dump the joint table.
+    std::printf("  3ds: n/a (Actor SkelAnime offset in OoT3D not RE'd yet)\n");
+    if (!SohState_HasPlayState()) {
+        std::printf("  soh: n/a (no playstate)\n");
+        return;
+    }
+    short joints[32 * 3] = {};
+    int jointCount = 0, animFrame = 0, morphFrame = 0;
+    int written = SohState_ActorSkeleton(cat, listIndex, joints, 32,
+                                         &jointCount, &animFrame, &morphFrame);
+    if (written < 0) {
+        std::printf("  soh: n/a (actor at cat=%d idx=%d not present)\n", cat, listIndex);
+        return;
+    }
+    if (written == 0) {
+        std::printf("  soh: cat=%d idx=%d has no SkelAnime\n", cat, listIndex);
+        return;
+    }
+    std::printf("  soh: cat=%d idx=%d limbs=%d animFrame=%d morphWeightBits=0x%08x\n",
+                cat, listIndex, jointCount, animFrame, (unsigned)morphFrame);
+    for (int j = 0; j < written; ++j) {
+        std::printf("       joint[%d] = (%d, %d, %d)\n",
+                    j, joints[j * 3 + 0], joints[j * 3 + 1], joints[j * 3 + 2]);
+    }
+}
+
 void CompareLightingImpl() {
     // 3ds side: OoT3D's EnvironmentContext offset within the 3DS PlayState
     // is not RE'd yet (the actorCtx / sceneNum / transitionTrigger fields
@@ -903,14 +1169,21 @@ void HandleCompare(std::istringstream& toks) {
     if (sub == "list") {
         std::fprintf(stderr,
             "compare subs:\n"
-            "  scene       sceneNum (+ soh roomNum)\n"
-            "  player      Link pos + rot\n"
-            "  actors      full actor tables (cat, id, addr, pos)\n"
-            "  lighting    envLightSettings + lightCtx (ambient, dirs,\n"
-            "              light1/2 dir+color, fog, fog near/far).\n"
-            "              SoH3D runs its own renderer-side lighting but\n"
-            "              samples the underlying scene values from here,\n"
-            "              so mismatches here explain shading divergence.\n");
+            "  scene              sceneNum (+ soh roomNum)\n"
+            "  player             Link pos + rot\n"
+            "  actors             full actor tables (cat, id, addr, pos)\n"
+            "  camera             active camera eye/at/up/fov/roll — the\n"
+            "                     title-screen demo drives this on a spline;\n"
+            "                     mismatches here explain framing/parallax\n"
+            "                     divergence before pixel comparison.\n"
+            "  skeleton <cat> <i> joint table (SkelAnime) for the i-th actor\n"
+            "                     in category <cat>. For pose parity: a\n"
+            "                     mispose in Link's title demo shows here.\n"
+            "  lighting           envLightSettings + lightCtx (ambient, dirs,\n"
+            "                     light1/2 dir+color, fog, fog near/far).\n"
+            "                     SoH3D runs its own renderer-side lighting\n"
+            "                     but samples underlying scene values here,\n"
+            "                     so mismatches here explain shading drift.\n");
         std::printf("ok compare list\n");
         return;
     }
@@ -918,6 +1191,17 @@ void HandleCompare(std::istringstream& toks) {
     if      (sub == "scene")    CompareSceneImpl();
     else if (sub == "player")   ComparePlayerImpl();
     else if (sub == "actors")   CompareActorsImpl();
+    else if (sub == "camera")   CompareCameraImpl();
+    else if (sub == "skeleton") {
+        std::string cat_s, idx_s;
+        if (!(toks >> cat_s >> idx_s)) {
+            PrintErr("compare skeleton: usage: compare skeleton <cat> <idx>");
+            return;
+        }
+        auto pc = ParseNum(cat_s); auto pi = ParseNum(idx_s);
+        if (!pc || !pi) { PrintErr("compare skeleton: bad cat/idx"); return; }
+        CompareSkeletonImpl((int)*pc, (int)*pi);
+    }
     else if (sub == "lighting") CompareLightingImpl();
     else { PrintErr(("compare: unknown sub: " + sub).c_str()); return; }
     std::printf("ok compare %s\n", sub.c_str());
@@ -948,6 +1232,10 @@ void PrintHelp() {
         "                       actors/lighting)\n"
         "  force <sub>          write state into BOTH engines (RE, no\n"
         "                       inputs); `force list` shows subs\n"
+        "  snapshot <basepath>  write both fbs as <basepath>.{az,soh}.ppm\n"
+        "  sweep <sub>          automated multi-step parity driver;\n"
+        "                       `sweep list` shows subs (title, ...)\n"
+        "  diag                 print harness diagnostics (input+capture)\n"
         "  quit                 exit\n"
         "  help                 this list\n");
     std::printf("ok\n");
@@ -980,6 +1268,8 @@ void RunRepl() {
         else if (cmd == "step")      HandleStep(toks);
         else if (cmd == "compare")   HandleCompare(toks);
         else if (cmd == "force")     HandleForce(toks);
+        else if (cmd == "snapshot")  HandleSnapshot(toks);
+        else if (cmd == "sweep")     HandleSweep(toks);
         else if (cmd == "help")      PrintHelp();
         else if (cmd == "quit") { std::printf("ok\n"); std::fflush(stdout); return; }
         else                         PrintErr(("unknown cmd: " + cmd).c_str());
@@ -989,7 +1279,55 @@ void RunRepl() {
 
 } // namespace
 
+// Single-instance guard: leaked harness processes fight over the same SDL
+// window / shipofharkinian.json / SoH captureBuf globals and produce output
+// that looks plausible but is coming from the wrong PID. Enforce one at a
+// time via an flock() on a per-user pidfile — deterministic, no PID race,
+// dies with the process (kernel drops the lock on any exit path).
+namespace {
+int g_instance_lock_fd = -1;
+
+bool AcquireSingletonLock() {
+    const char* rundir = std::getenv("XDG_RUNTIME_DIR");
+    std::string dir = rundir && *rundir ? std::string(rundir)
+                                        : std::string(std::getenv("HOME") ?: "/tmp") + "/.cache";
+    // Ensure the directory exists; mkdir failure is fine if already there.
+    (void)mkdir(dir.c_str(), 0700);
+    const std::string path = dir + "/soh3d_harness.lock";
+    g_instance_lock_fd = open(path.c_str(), O_CREAT | O_RDWR | O_CLOEXEC, 0600);
+    if (g_instance_lock_fd < 0) {
+        std::fprintf(stderr,
+                     "soh3d_harness: could not open lock %s: %s\n",
+                     path.c_str(), std::strerror(errno));
+        return false;
+    }
+    if (flock(g_instance_lock_fd, LOCK_EX | LOCK_NB) != 0) {
+        // Read the holder PID from the file for a useful error.
+        char buf[64] = {};
+        ssize_t n = pread(g_instance_lock_fd, buf, sizeof(buf) - 1, 0);
+        if (n < 0) n = 0;
+        buf[n] = 0;
+        std::fprintf(stderr,
+            "soh3d_harness: another instance is already running (pid %s).\n"
+            "  Kill it first: ~/.claude/skills/safe-kill/safekill soh3d_harness\n"
+            "  Lock file: %s\n",
+            buf[0] ? buf : "?", path.c_str());
+        close(g_instance_lock_fd);
+        g_instance_lock_fd = -1;
+        return false;
+    }
+    // Write our pid for the next attempt's error message.
+    if (ftruncate(g_instance_lock_fd, 0) == 0) {
+        char pidbuf[32];
+        int n = std::snprintf(pidbuf, sizeof(pidbuf), "%d\n", getpid());
+        (void)write(g_instance_lock_fd, pidbuf, n);
+    }
+    return true;
+}
+} // namespace
+
 int main(int argc, char** argv) {
+    if (!AcquireSingletonLock()) return EXIT_FAILURE;
     std::string rom_path;
     for (int i = 1; i < argc; ++i) {
         std::string a = argv[i];
