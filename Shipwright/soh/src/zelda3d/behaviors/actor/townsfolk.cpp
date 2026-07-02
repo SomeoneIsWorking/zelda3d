@@ -10,11 +10,14 @@
 #include "z64.h"
 #include "src/overlays/actors/ovl_En_Hy/z_en_hy.h"
 #include "townsfolk.h"
+#include "townsfolk_body_colors.h"
 
 #include <cstring>
 
 extern "C" {
 const char* Zelda3D_AutoModelZar(int modelId);
+void Zelda3D_GL_SetMatConstOverride(int modelId, int materialIndex, int constIdx,
+                                   float r, float g, float b, float a);
 }
 
 namespace Zelda3D {
@@ -65,6 +68,19 @@ void TownsfolkBehavior::applyDrawOverrides(int modelId, Actor* actor, bool track
     }
     if (facial && arch->eyeMaterial >= 0) {
         applyFacialFrame(modelId, arch->eyeMaterial, hy->curEyeIndex);
+    }
+    // Per-type body-color overrides. Ported from EnHy_Draw
+    // (oot3d-decomp/build/decomp/001b4944.c): the game writes two per-material CONSTANT-color
+    // overrides for a townsfolk actor based on (params & 0x7f). Without this every townsfolk
+    // clothing material renders BLACK — the CMB-file default matConstant values are
+    // (0, 0, 0, 1) and stage 1 = MODULATE(PREV, CONST) zeros out the fragment.
+    TownsfolkMatConstOverride bodyOv[2];
+    int type = actor->params & 0x7F;
+    int nOv = TownsfolkBodyColorOverrides(type, bodyOv);
+    for (int i = 0; i < nOv; i++) {
+        Zelda3D_GL_SetMatConstOverride(modelId, bodyOv[i].matIdx, bodyOv[i].constIdx,
+                                       bodyOv[i].rgba[0], bodyOv[i].rgba[1],
+                                       bodyOv[i].rgba[2], bodyOv[i].rgba[3]);
     }
 }
 

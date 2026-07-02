@@ -30,10 +30,13 @@ void Zelda3D_Sg_SetProvider(Zelda3DModelProvider fn);
 // The caller (Zelda3D_GL_RenderPass) does the per-item pose interpolation, exactly as for GL/Vulkan.
 void Zelda3D_Sg_BeginPass(void);
 // matTex: a const std::unordered_map<int,int>* (material->texIndex facial override), passed as void*.
+// matConst: a const std::unordered_map<int, MatConstOv>* (material->CONSTANT-color override for
+// EnHy townsfolk body colours), passed as void*. Layout of the value (in zelda3d_gl.cpp's
+// GlModel::PendingConstOv): { int constIdx; float rgba[4]; }. NULL / empty = no override.
 void Zelda3D_Sg_DrawModel(int modelId, const float* mp16, const float* mv16, int lit, int invertY,
                         unsigned char r, unsigned char g, unsigned char b, unsigned char a, float aspectAdj,
                         const float* boneData, int boneCnt, unsigned long long midMask, int sky,
-                        float uvOffU, float uvOffV, const void* matTex);
+                        float uvOffU, float uvOffV, const void* matTex, const void* matConst);
 void Zelda3D_Sg_EndPass(void);
 
 // Mirror of Zelda3D_GL_RequestEvictRange for the SDL3 GPU model store.

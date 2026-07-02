@@ -1307,10 +1307,11 @@ extern "C" void Zelda3D_Sg_BeginPass(void) {
 extern "C" void Zelda3D_Sg_DrawModel(int modelId, const float* mp16, const float* mv16, int lit, int invertY,
                                    unsigned char r8, unsigned char g8, unsigned char b8, unsigned char a8,
                                    float aspectAdj, const float* boneData, int boneCnt, unsigned long long midMask,
-                                   int sky, float uvOffU, float uvOffV, const void* matTex) {
+                                   int sky, float uvOffU, float uvOffV, const void* matTex,
+                                   const void* matConst) {
     if (auto* r = sgRenderer())
         r->DrawModel(modelId, mp16, mv16, lit, invertY, r8, g8, b8, a8, aspectAdj, boneData, boneCnt, midMask, sky,
-                     uvOffU, uvOffV, matTex);
+                     uvOffU, uvOffV, matTex, matConst);
 }
 extern "C" void Zelda3D_Sg_EndPass(void) {
     if (auto* r = sgRenderer())
@@ -1396,8 +1397,11 @@ void Fast::Zelda3DRenderer::BeginPass() {
 void Fast::Zelda3DRenderer::DrawModel(int modelId, const float* mp16, const float* mv16, int lit, int invertY,
                                     unsigned char r8, unsigned char g8, unsigned char b8, unsigned char a8,
                                     float aspectAdj, const float* boneData, int boneCnt, unsigned long long midMask,
-                                    int sky, float uvOffU, float uvOffV, const void* matTex) {
+                                    int sky, float uvOffU, float uvOffV, const void* matTex,
+                                    const void* matConst) {
     const std::unordered_map<int, int>* matTexMap = static_cast<const std::unordered_map<int, int>*>(matTex);
+    const std::unordered_map<int, Zelda3DMatConstOv>* matConstMap =
+        static_cast<const std::unordered_map<int, Zelda3DMatConstOv>*>(matConst);
     if (!g_ctxValid)
         return;
     SgModel* m = ensureUploaded(modelId);
@@ -1577,8 +1581,9 @@ void Fast::Zelda3DRenderer::DrawModel(int modelId, const float* mp16, const floa
         // stage, publish the selected slot's RGB with .a = 1 so the shader applies it. Materials
         // that never reference CONSTANT (e.g. plain MODULATE(PRIM, TEX0)) leave .a = 0 and the
         // shader skips the multiply — this matches OoT3D's per-material combiner semantics.
-        // The per-actor override channel (EnHy Step 2c) rewrites matConstant[grp.combConstIdx]
-        // before submit; the shader is unchanged.
+        // Per-actor override channel (EnHy Step 2c, TownsfolkBehavior::applyDrawOverrides):
+        // if this actor has an override for grp.materialIndex, its RGB replaces the CMB-file
+        // default and .a is forced to 1 so the shader applies it (townsfolk clothing colour).
         {
             int ci = grp.combConstIdx & 7;
             if (ci > 5) ci = 0;
@@ -1586,6 +1591,15 @@ void Fast::Zelda3DRenderer::DrawModel(int modelId, const float* mp16, const floa
             ubo.uMatConst[1] = grp.matConstant[ci][1];
             ubo.uMatConst[2] = grp.matConstant[ci][2];
             ubo.uMatConst[3] = grp.combUsesConst ? 1.0f : 0.0f;
+            if (matConstMap && grp.materialIndex >= 0) {
+                auto ov = matConstMap->find(grp.materialIndex);
+                if (ov != matConstMap->end() && ov->second.constIdx == ci) {
+                    ubo.uMatConst[0] = ov->second.rgba[0];
+                    ubo.uMatConst[1] = ov->second.rgba[1];
+                    ubo.uMatConst[2] = ov->second.rgba[2];
+                    ubo.uMatConst[3] = 1.0f; // force apply (townsfolk clothing colour)
+                }
+            }
         }
 
         // Facial material-anim override.

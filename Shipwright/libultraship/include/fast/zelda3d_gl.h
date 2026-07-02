@@ -32,6 +32,16 @@ typedef struct Zelda3DGlVtx {
 // vertex-uniform budget (64 mat4 = 1024 floats, plus uMP/uMV).
 #define ZELDA3D_GL_MAX_BONES 64
 
+// Per-actor per-material CONSTANT-color override, shared between the model layer (which
+// snapshots one per actor emit) and the SDL3 GPU render pass (which applies it to uMatConst
+// for the group whose materialIndex matches). Layout is POD so the void*-typed
+// std::unordered_map<int, Zelda3DMatConstOv>* pointer that Zelda3D_Sg_DrawModel receives is
+// well-typed on both sides — no reinterpret_cast between distinct value types.
+typedef struct Zelda3DMatConstOv {
+    int   constIdx;   // 0..5: which slot in the material's constant palette
+    float rgba[4];    // RGBA float (matches Model_SetMaterialConstantColor's replace-RGB semantics)
+} Zelda3DMatConstOv;
+
 // One per-material draw batch (triangle list).
 typedef struct Zelda3DGlGroup {
     const Zelda3DGlVtx* verts;
