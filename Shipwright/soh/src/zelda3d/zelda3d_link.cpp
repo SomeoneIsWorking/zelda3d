@@ -6,6 +6,7 @@
 #include "zelda3d.h"
 #include "zelda3d_link.h"
 #include "behaviors/actor/player.h" // PlayerBehavior — Link as a structured ActorBehavior class
+#include "player/link_midmask.h" // Stage 2a shared adult mesh-mask policy (Shipwright/zelda3d_shared/)
 #include <stdlib.h>
 #include <stdio.h>
 #include <string.h>
@@ -177,54 +178,48 @@ static const unsigned char kLinkUpperBodyMask[25] = {
 // back/sheath=21, waist=23/24) but a DIFFERENT mesh_id layout — identified the same way as child
 // (texture dump + posed-geometry + in-game `linkmid only <n>` render sweep, see link_mesh_id_map.md
 // "## ADULT"). Boy's shield set is Hylian (default) / Mirror, vs child's Deku / Hylian.
+//
+// Stage 2a of the MM/OoT unification (scratch/plans/mm_oot_link_unify.md): the actual mesh_id policy
+// now lives in Shipwright/zelda3d_shared/player/link_midmask.cpp and consumes a game-agnostic
+// LinkGear POD. This function is the OoT-side ADAPTER — translates the live OoT Player fields into
+// LinkGear, hands off to the shared computation, then returns. Zero behavior change (the shared
+// code is a verbatim port); MM will add its own translator in Stage 2b when MmPlayerBehavior lands.
 unsigned long long Zelda3D::LinkMidMask::boyMidMask(Player* player) const {
-    unsigned long long m = LINK_MID(45) | LINK_MID(46); // full body + head/face always
-    int hylian = (player->currentShield == PLAYER_SHIELD_HYLIAN);
-    int mirror = (player->currentShield == PLAYER_SHIELD_MIRROR);
-    int haveShield = (hylian || mirror);
+    Zelda3D::LinkGear g;
 
-    // LEFT hand (sword hand), bones 15/16.
     switch (player->leftHandType) {
         case PLAYER_MODELTYPE_LH_SWORD:
-        case PLAYER_MODELTYPE_LH_SWORD_2: m |= LINK_MID(16); break; // Master sword in hand
-        case PLAYER_MODELTYPE_LH_BGS:     m |= LINK_MID(37); break; // Biggoron/giant knife (long blade)
-        case PLAYER_MODELTYPE_LH_CLOSED:
-        case PLAYER_MODELTYPE_LH_BOTTLE:
-        case PLAYER_MODELTYPE_LH_HAMMER:  m |= LINK_MID(14); break; // closed fist (hammer drawn elsewhere)
+        case PLAYER_MODELTYPE_LH_SWORD_2: g.leftHand = LinkHandLeft::SwordOneHand; break;
+        case PLAYER_MODELTYPE_LH_BGS:     g.leftHand = LinkHandLeft::SwordTwoHand; break;
+        case PLAYER_MODELTYPE_LH_BOTTLE:  g.leftHand = LinkHandLeft::Bottle; break;
+        case PLAYER_MODELTYPE_LH_HAMMER:  g.leftHand = LinkHandLeft::Hammer; break;
+        case PLAYER_MODELTYPE_LH_CLOSED:  g.leftHand = LinkHandLeft::Closed; break;
         case PLAYER_MODELTYPE_LH_OPEN:
-        default:                          m |= LINK_MID(13); break; // open empty hand (idle)
+        default:                          g.leftHand = LinkHandLeft::Open; break;
     }
-
-    // RIGHT hand (shield/bow hand), bones 19/20.
     switch (player->rightHandType) {
-        case PLAYER_MODELTYPE_RH_SHIELD:
-            m |= haveShield ? LINK_MID(23) : LINK_MID(20); // Hylian/Mirror shield on the forearm
-            break;
+        case PLAYER_MODELTYPE_RH_SHIELD:  g.rightHand = LinkHandRight::Shield; break;
         case PLAYER_MODELTYPE_RH_BOW_SLINGSHOT:
-        case PLAYER_MODELTYPE_RH_BOW_SLINGSHOT_2: m |= LINK_MID(30); break; // bow drawn
-        case PLAYER_MODELTYPE_RH_CLOSED:   m |= LINK_MID(21); break; // closed fist
+        case PLAYER_MODELTYPE_RH_BOW_SLINGSHOT_2: g.rightHand = LinkHandRight::Bow; break;
+        case PLAYER_MODELTYPE_RH_CLOSED:  g.rightHand = LinkHandRight::Closed; break;
+        case PLAYER_MODELTYPE_RH_HOOKSHOT: g.rightHand = LinkHandRight::Hookshot; break;
+        case PLAYER_MODELTYPE_RH_OCARINA:  g.rightHand = LinkHandRight::Ocarina; break;
         case PLAYER_MODELTYPE_RH_OPEN:
-        case PLAYER_MODELTYPE_RH_HOOKSHOT: // adult hookshot model drawn separately -> empty hand
-        case PLAYER_MODELTYPE_RH_OCARINA:
-        default:                           m |= LINK_MID(20); break; // open empty hand
+        default:                          g.rightHand = LinkHandRight::Open; break;
     }
-
-    // BACK (shield panel + sheath), bone 21. Combine sheathType with currentShield.
     switch (player->sheathType) {
-        case PLAYER_MODELTYPE_SHEATH_18: // shield on back AND sword sheathed
-            m |= hylian ? LINK_MID(0) : (mirror ? LINK_MID(2) : LINK_MID(31));
-            break;
-        case PLAYER_MODELTYPE_SHEATH_19: // shield on back, empty sheath (sword drawn)
-            m |= hylian ? LINK_MID(1) : (mirror ? LINK_MID(3) : 0ull);
-            break;
-        case PLAYER_MODELTYPE_SHEATH_16: // sword on back, no shield
-            m |= LINK_MID(31);
-            break;
-        case PLAYER_MODELTYPE_SHEATH_17: // empty sheath, no shield (sword drawn, no shield)
-        default:
-            break;
+        case PLAYER_MODELTYPE_SHEATH_18: g.sheath = LinkSheath::ShieldOnBackSwordSheathed; break;
+        case PLAYER_MODELTYPE_SHEATH_19: g.sheath = LinkSheath::ShieldOnBackSwordDrawn; break;
+        case PLAYER_MODELTYPE_SHEATH_16: g.sheath = LinkSheath::SwordOnBackNoShield; break;
+        case PLAYER_MODELTYPE_SHEATH_17:
+        default:                         g.sheath = LinkSheath::EmptySheathNoShield; break;
     }
-    return m;
+    switch (player->currentShield) {
+        case PLAYER_SHIELD_HYLIAN: g.shield = LinkShield::Hylian; break;
+        case PLAYER_SHIELD_MIRROR: g.shield = LinkShield::Mirror; break;
+        default:                   g.shield = LinkShield::None; break;
+    }
+    return Zelda3D::linkAdultMidMask(g);
 }
 
 unsigned long long Zelda3D::LinkMidMask::compute(Player* player) const {
