@@ -12,15 +12,15 @@ Signal source: `actorsnear` output + `[Zelda3D] auto-loaded model …` lines in 
 | 0x009 | EN_DOOR | 6 | MODULE(3DS) | door.cpp inc3 → field-keep CMB (per-scene table) |
 | 0x018 | EN_ELF (Navi) | 1 | N64 | no OoT3D asset; universal, not market-specific |
 | 0x077 | EN_KUSA (tree/foliage) | 1 | AUTO | zelda_wood02.zar |
-| 0x0E7 | EN_MA1 (young Malon) | 1 | AUTO skin→skip → N64 | ZAR loads but skinned; needs behavior port |
+| 0x0E7 | EN_MA1 (young Malon) | 1 | AUTO skin (renders OoT3D) | ZAR loads but skinned; needs behavior port |
 | 0x112 | EN_WONDER_ITEM | 2 | N64 | invisible trigger, no visual gap |
 | 0x125 | (mgr) | many | N64 | env manager, non-drawing |
 | 0x16E | EN_HY (townsfolk) | 1+ | AUTO skin + TownsfolkBehavior | head-track + eye anim + body-color (Step 2c) |
-| 0x178 | EN_HEISHI4 (guards) | 2 | AUTO skin→skip → N64 | ZAR loads but skinned; needs behavior port |
-| 0x19B | EN_DOG | 6 | AUTO skin→skip → N64 | ZAR loads but skinned; needs behavior port |
+| 0x178 | EN_HEISHI4 (guards) | 2 | AUTO skin (renders OoT3D) | ZAR loads but skinned; needs behavior port |
+| 0x19B | EN_DOG | 6 | AUTO skin (renders OoT3D) | ZAR loads but skinned; needs behavior port |
 | 0x1A0 | (mgr) | 4 | N64 | env sound, non-drawing |
-| 0x1AC | EN_TG (dancing couple) | 1 | AUTO skin→skip → N64 | AUTO picks WRONG cmb (see below); needs behavior port |
-| 0x1AD | EN_MU (haggling townspeople) | 2 | AUTO skin→skip → N64 | spawns in Market Day at dayTime>=0x8001 (params 0x0000, 0x0001); AUTO picks marketpeople.cmb (correct CMB) but skinned→skip. Needs behavior port. |
+| 0x1AC | EN_TG (dancing couple) | 1 | AUTO skin (renders OoT3D) | AUTO picks WRONG cmb (see below); needs behavior port |
+| 0x1AD | EN_MU (haggling townspeople) | 2 | AUTO skin (renders OoT3D) | spawns in Market Day at dayTime>=0x8001 (params 0x0000, 0x0001); AUTO picks marketpeople.cmb (correct CMB) but skinned→skip. Needs behavior port. |
 
 At Market Night (ent 0xB1, dayTime 0xE000, scene 0x21): no EN_MU (nightlife swaps the
 crowd). EN_MU is Market-Day-only per the definitive sweep in
@@ -78,4 +78,22 @@ n64anim hook + optional head-track / material-swap):
 - En_Heishi4 (guards) — uses zelda_sd.zar; two instances patrol Market Day.
 - En_Dog — uses zelda_dog.zar; six instances scattered in Market Day.
 
-These are ports, not bug-fixes; each deserves its own kanban card if we intend to work them.
+These are ports, not bug-fixes; each is filed as a kanban card (#135-#139).
+
+## Correction on "skinned->skip -> N64 fallback"
+
+An earlier draft of this journal (before 2026-07-02) tagged all AUTO-skin actors as
+"skinned->skip -> N64 fallback". That was misread from the LOADER log line
+`(skinned->skip)` in `zelda3d_model.cpp:806`, which is emitted for any skinned CMB
+regardless of runtime routing. The RUNTIME `Zelda3D_TryAuto` path in `zelda3d.c:2189`
+skips only when `!Zelda3D_N64AnimEnabled() || !gZelda3dAnimLive`, both of which
+DEFAULT ON. So with default flags, every AUTO-skin actor above (EN_MU, EN_TG,
+EN_HEISHI4, EN_MA1, EN_DOG) actually renders as its OoT3D model, driven by the live
+N64 jointTable via the generic SkelAnime hook — not N64 fallback.
+
+What the pending "port" cards are really about, then, is per-actor material/behavior
+polish — CONSTANT-color overrides for palette variants (townsfolk.cpp pattern), any
+head/torso track, facial anim, held-item swap — on top of an already-correct rigged
+draw. The scope in the port cards (#135-#139) should read that way; the "skinned->skip
+→ N64 fallback" phrasing in each card body is stale for the same reason and can be
+edited when each card is picked up.
