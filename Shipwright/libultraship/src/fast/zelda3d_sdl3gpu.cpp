@@ -144,7 +144,8 @@ bool CompileGlsl(EShLanguage stage, const char* src, std::vector<uint32_t>& spv)
     "    vec4 uShadow;\n" \
     "    vec4 uFog;\n" \
     "    vec4 uFog2;\n" \
-    "    vec4 uAmbient;\n"
+    "    vec4 uAmbient;\n" \
+    "    vec4 uMatConst;\n"
 #define SG_UBO_BONES_BODY \
     "    mat4 uBones[" SG_STR(ZELDA3D_GL_MAX_BONES) "];\n"
 
@@ -221,6 +222,11 @@ const char* kFrag =
     "    if (ubo.uShadow.x > 0.5)\n"
     "        shade *= (1.0 - ubo.uShadow.z * (1.0 - shadowLit()));\n"
     "    vec3 rgb = t.rgb * vColor.rgb * shade;\n"
+    // PICA200 CONSTANT-color modulation (EnHy townsfolk body color). The apply flag lives in
+    // uMatConst.a; when >=0.5 the fragment gets multiplied by uMatConst.rgb (matches the
+    // OoT3D combiner MODULATE(current, CONSTANT) that runs after material-anim on townsfolk).
+    // Default upload leaves .a=0 so materials that don't reference CONSTANT are unchanged.
+    "    if (ubo.uMatConst.a >= 0.5) rgb *= ubo.uMatConst.rgb;\n"
     "    if (ubo.uParams.y < 0.5)\n"
     "        rgb = clamp(rgb, 0.0, 1.0) * ubo.uExtra.w;\n"
     "    if (ubo.uAmbient.w > 0.0)\n"
@@ -1566,6 +1572,17 @@ void Fast::Zelda3DRenderer::DrawModel(int modelId, const float* mp16, const floa
         ubo.uAmbient[1] = base.uAmbient[1] * grp.matAmbient[1];
         ubo.uAmbient[2] = base.uAmbient[2] * grp.matAmbient[2];
         ubo.uAmbient[3] = ambGroup ? gZelda3dWorldAmb : 0.0f;
+        // PICA200 TEV constant: publish the selected slot's RGB but leave the apply flag (.a)
+        // OFF by default so this commit is a no-op. Step 2c's per-actor override channel flips
+        // .a=1 when a townsfolk actor wants clothing color applied to this material.
+        {
+            int ci = grp.combConstIdx & 7;
+            if (ci > 5) ci = 0;
+            ubo.uMatConst[0] = grp.matConstant[ci][0];
+            ubo.uMatConst[1] = grp.matConstant[ci][1];
+            ubo.uMatConst[2] = grp.matConstant[ci][2];
+            ubo.uMatConst[3] = 0.0f; // bypass — Step 2c writes 1.0 when overriding
+        }
 
         // Facial material-anim override.
         int texIndex = grp.texIndex;

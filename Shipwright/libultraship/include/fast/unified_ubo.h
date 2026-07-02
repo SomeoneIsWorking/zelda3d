@@ -23,6 +23,10 @@ struct CommonUbo {
     float uParams1[4]; // x=noise_scale, y=polygonOffset, z=hasSkin, w=alreadyTransformed (N64)
     float uMatAmbient[4];
     float uMatDiffuse[4];
+    // Mirror of SgUbo::uMatConst so sizeof(UnifiedDrawUbo) stays == sizeof(SgUbo); the unified
+    // shader currently ignores it, but the size parity is enforced by static_assert and is what
+    // lets the unified path reuse the existing DRAW_MODEL push-block plumbing unchanged.
+    float uMatConst[4];
 };
 
 static_assert(sizeof(CommonUbo) == Zelda3DSg::kCommonBytes,
