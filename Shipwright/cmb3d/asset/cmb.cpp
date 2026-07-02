@@ -184,7 +184,22 @@ bool Cmb::parseMats() {
         };
         rgb_be(o + 0xA4, m.mat_ambient);
         rgb_be(o + 0xA8, m.mat_diffuse);
-        // Stage-0 combiner: op (+0x00), RGB scale (+0x04: 1/2/4), RGB sources (+0x0C/0E/10).
+        // PICA200 TEV constant-color palette: 6 slots at +0xB8..+0xCF (u8 RGBA per slot).
+        // Layout per noclip readMatsChunk (OcarinaOfTime3D/cmb.ts). File values are u8; the
+        // runtime struct + the SoH3D port carry them as float RGBA (matches the shader UBO
+        // and matches Model_SetMaterialConstantColor / FUN_003688a8, which writes float[4]).
+        // For most townsfolk archetype CMBs these are (0,0,0,0xFF) black-opaque defaults; the
+        // game overwrites them at runtime — see debug_journal/2026-07-02-en-hy-body-colors.md.
+        for (int k = 0; k < 6; k++) {
+            uint32_t co = o + 0xB8 + k * 4;
+            m.mat_constant[k][0] = b[co + 0] / 255.0f;
+            m.mat_constant[k][1] = b[co + 1] / 255.0f;
+            m.mat_constant[k][2] = b[co + 2] / 255.0f;
+            m.mat_constant[k][3] = b[co + 3] / 255.0f;
+        }
+        // Stage-0 combiner: op (+0x00), RGB scale (+0x04: 1/2/4), RGB sources (+0x0C/0E/10),
+        // constant-color selector for this stage (+0x14, u8: which of mat_constant[0..5] the
+        // CONSTANT source reads).
         m.comb_stage_count = (int)u32(b, o + 0x120);
         if (m.comb_stage_count > 0) {
             uint32_t cidx = u16(b, o + 0x124);          // first stage's settings index
@@ -195,6 +210,8 @@ bool Cmb::parseMats() {
             m.comb_src_rgb[0] = u16(b, co + 0x0C);
             m.comb_src_rgb[1] = u16(b, co + 0x0E);
             m.comb_src_rgb[2] = u16(b, co + 0x10);
+            m.comb_const_idx = b[co + 0x14] & 0x07;    // 0..5 valid; clamp mask
+            if (m.comb_const_idx > 5) m.comb_const_idx = 0;
         }
         o += stride;
     }

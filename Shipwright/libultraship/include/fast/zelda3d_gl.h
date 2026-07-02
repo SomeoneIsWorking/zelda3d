@@ -66,6 +66,12 @@ typedef struct Zelda3DGlGroup {
     float matAmbient[3];      // material ambient colour (RGB, [0,1])
     float matDiffuse[3];      // material diffuse colour (RGB, [0,1])
     float combScaleRGB;       // stage-0 TEV RGB scale (1/2/4); the brightness factor
+    // PICA200 TEV constant-color palette + stage-0 selector (see CmbMaterial). Populated by
+    // the model provider from the CMB; the render-side per-actor override channel patches
+    // matConstant[] before submit for townsfolk (EnHy body colours, #135 EnHy port). The
+    // combiner selects matConstant[combConstIdx] for a stage that sources CONSTANT (0x8576).
+    float matConstant[6][4];  // 6 RGBA slots, defaults zero-then-alpha-1
+    int   combConstIdx;       // 0..5: index into matConstant[] for stage-0 CONSTANT source
 } Zelda3DGlGroup;
 
 // One decoded texture (RGBA8, w*h*4 bytes, row 0 = top).
