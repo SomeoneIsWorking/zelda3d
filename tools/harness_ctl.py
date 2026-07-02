@@ -113,6 +113,33 @@ def wait_for_playstate(h: Harness, poll_every: int = 60,
                        "reach gameplay first (loadstate, or drive input)")
 
 
+# RETRO_DEVICE_ID_JOYPAD bit indices.
+BTN_B      = 1 << 0
+BTN_Y      = 1 << 1
+BTN_SELECT = 1 << 2
+BTN_START  = 1 << 3
+BTN_UP     = 1 << 4
+BTN_DOWN   = 1 << 5
+BTN_LEFT   = 1 << 6
+BTN_RIGHT  = 1 << 7
+BTN_A      = 1 << 8
+BTN_X      = 1 << 9
+
+
+def tap(h: Harness, mask: int, hold: int = 30, release: int = 60) -> None:
+    """Press <mask>, run <hold> frames, release, run <release> frames."""
+    h.send(f"input 0x{mask:x}")
+    h.send(f"run {hold}")
+    h.send("input 0")
+    h.send(f"run {release}")
+
+
+def poll_playstate(h: Harness) -> Optional[str]:
+    """Return the `playstate` response ONLY if it's ok (else None)."""
+    r = h.send("playstate")
+    return r if r.startswith("ok") else None
+
+
 # ---------------------------------------------------------------------------
 # Subcommands
 # ---------------------------------------------------------------------------
@@ -163,6 +190,34 @@ def cmd_warp(args, h: Harness) -> None:
           f"{args.settle_bursts * args.settle_step} settle frames", file=sys.stderr)
 
 
+def cmd_boot_to_play(args, h: Harness) -> None:
+    """Drive inputs from cold boot to gameplay (New Game -> Kokiri Forest).
+
+    Timing: 3DS logos then title screen emerges around ~1000 frames of emu.
+    We soak, then tap START to advance past title -> file select, then
+    tap A a few times: File 1 -> New Game / Confirm -> intro cutscene ->
+    spawn. During each idle burst we poll playstate; the moment it
+    populates, we're done. `--soak <N>` sets the initial cold-boot soak.
+    """
+    print(f"[harness_ctl] cold-boot soak {args.soak} frames...", file=sys.stderr)
+    h.send(f"run {args.soak}")
+    if (r := poll_playstate(h)):
+        print(f"[harness_ctl] playstate already populated after soak: {r}",
+              file=sys.stderr)
+        return
+
+    # Tap START, then A a bunch to blast through menus + cutscene.
+    schedule = ([BTN_START] * 3) + ([BTN_A] * args.a_presses)
+    for i, btn in enumerate(schedule):
+        tap(h, btn, hold=args.hold, release=args.release)
+        if (r := poll_playstate(h)):
+            print(f"[harness_ctl] playstate populated after tap {i+1}/{len(schedule)}: {r}",
+                  file=sys.stderr)
+            return
+    print("[harness_ctl] playstate still not populated after scripted taps — "
+          "extend the schedule or hand off to interactive REPL", file=sys.stderr)
+
+
 def cmd_peek(args, h: Harness) -> None:
     remaining = args.n
     va = args.va
@@ -201,6 +256,14 @@ def main(argv: Iterable[str]) -> int:
     w.add_argument("--settle-bursts", type=int, default=60)
     w.add_argument("--settle-step",   type=int, default=30)
     w.set_defaults(func=cmd_warp)
+
+    bt = sub.add_parser("boot-to-play",
+                        help="soak past logos, then tap START+A until playstate populates")
+    bt.add_argument("--soak",      type=int, default=1200)
+    bt.add_argument("--a-presses", type=int, default=40)
+    bt.add_argument("--hold",      type=int, default=30)
+    bt.add_argument("--release",   type=int, default=60)
+    bt.set_defaults(func=cmd_boot_to_play)
 
     pk = sub.add_parser("peek", help="hex-dump <n> bytes at <va>")
     pk.add_argument("va", type=lambda s: int(s, 0))
