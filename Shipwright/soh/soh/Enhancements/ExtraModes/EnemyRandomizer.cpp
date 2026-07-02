@@ -72,10 +72,10 @@ static EnemyEntry randomizedEnemySpawnTable[] = {
     { CVAR_ENHANCEMENT("RandomizedEnemyList.GohmaLarva"),       "Gohma Larva",           ACTOR_EN_GOMA,             7 }, // Gohma Larva (Non-Gohma rooms)
     { CVAR_ENHANCEMENT("RandomizedEnemyList.Guay"),             "Guay",                  ACTOR_EN_CROW,             0 }, // Guay
     { CVAR_ENHANCEMENT("RandomizedEnemyList.IceKeese"),         "Ice Keese",             ACTOR_EN_FIREFLY,          4 }, // Ice Keese
-    { CVAR_ENHANCEMENT("RandomizedEnemyList.InvisFireKeese"),   "Invisible Fire Keese",  ACTOR_EN_FIREFLY,     0x8001 }, // Fire Keese (invisible)
-    { CVAR_ENHANCEMENT("RandomizedEnemyList.InvisFloormaster"), "Invisible Floormaster", ACTOR_EN_FLOORMAS,    0x8000 }, // Floormaster (invisible)
-    { CVAR_ENHANCEMENT("RandomizedEnemyList.InvisIceKeese"),    "Invisible Ice Keese",   ACTOR_EN_FIREFLY,     0x8004 }, // Ice Keese (invisible)
-    { CVAR_ENHANCEMENT("RandomizedEnemyList.InvisKeese"),       "Invisible Keese",       ACTOR_EN_FIREFLY,     0x8002 }, // Keese (invisible)
+    { CVAR_ENHANCEMENT("RandomizedEnemyList.InvisFireKeese"),   "Invisible Fire Keese",  ACTOR_EN_FIREFLY,     static_cast<s16>(0x8001) }, // Fire Keese (invisible)
+    { CVAR_ENHANCEMENT("RandomizedEnemyList.InvisFloormaster"), "Invisible Floormaster", ACTOR_EN_FLOORMAS,    static_cast<s16>(0x8000) }, // Floormaster (invisible)
+    { CVAR_ENHANCEMENT("RandomizedEnemyList.InvisIceKeese"),    "Invisible Ice Keese",   ACTOR_EN_FIREFLY,     static_cast<s16>(0x8004) }, // Ice Keese (invisible)
+    { CVAR_ENHANCEMENT("RandomizedEnemyList.InvisKeese"),       "Invisible Keese",       ACTOR_EN_FIREFLY,     static_cast<s16>(0x8002) }, // Keese (invisible)
     { CVAR_ENHANCEMENT("RandomizedEnemyList.InvisRedead"),      "Invisible Redead",      ACTOR_EN_RD,               3 }, // Redead (invisible)
     { CVAR_ENHANCEMENT("RandomizedEnemyList.InvisSkulltula"),   "Invisible Skulltula",   ACTOR_EN_ST,               2 }, // Skulltula (invisible)
     { CVAR_ENHANCEMENT("RandomizedEnemyList.InvisStalfos"),     "Invisible Stalfos",     ACTOR_EN_TEST,             0 }, // Stalfos (invisible)

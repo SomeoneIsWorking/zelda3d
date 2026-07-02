@@ -162,6 +162,8 @@ target_compile_options(${PROJECT_NAME} PRIVATE
     -Wno-unused-variable
     -Wno-missing-field-initializers
     -Wno-parentheses
+    # STOPGAP: -Wno-narrowing here (banned per project policy) because MM's 2s2h
+    # port has many vendored narrowing sites; a proper fix is a separate audit.
     -Wno-narrowing
     -Wno-missing-braces
     $<$<COMPILE_LANGUAGE:C>:
@@ -170,6 +172,10 @@ target_compile_options(${PROJECT_NAME} PRIVATE
         -Wno-int-conversion
         -Wno-incompatible-pointer-types
     >
+    # STOPGAP: -fpermissive (banned per project policy) because MM's BenGui port
+    # has "declaration changes meaning" C++ conformance issues (methods named
+    # the same as in-scope enum types across UIWidgets*Options). Real fix is a
+    # rename refactor across the BenGui headers/callers — separate task.
     $<$<COMPILE_LANGUAGE:CXX>:-fpermissive>
     $<$<COMPILE_LANGUAGE:CXX>:-Wno-deprecated-enum-enum-conversion>
     -pthread
