@@ -658,7 +658,7 @@ static const Zelda3DAnimMap kZelda3dAnimMaps[] = {
     ZELDA3D_ANIMMAP("objects/object_ms/gBeanSalesmanEatingAnim", "ms_matsu"),
     // ---- /actor/zelda_mu.zar (object_mu) ----
     ZELDA3D_ANIMMAP("objects/object_mu/object_mu_Anim_0003F4", "mu_matsu"),
-    ZELDA3D_ANIMMAP("objects/object_mu/gDancingCoupleAnim", "mu_matsu"),
+    ZELDA3D_ANIMMAP("objects/object_mu/gDancingCoupleAnim", "tg_matsu"),  // OVERRIDE (was mu_matsu)
     // ---- /actor/zelda_nb.zar (object_nb) ----
     ZELDA3D_ANIMMAP("objects/object_nb/gNabooruPuttingHandsTogetherCastingMagicAnim", "km_nabo"),
     ZELDA3D_ANIMMAP("objects/object_nb/gNabooruSittingCrossLeggedAnim", "nabor_agura_wait"),
