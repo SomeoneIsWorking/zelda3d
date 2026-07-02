@@ -2047,6 +2047,29 @@ typedef struct {
 static Zelda3D_AutoEntry sAuto[ARRAY_COUNT(kZelda3dObjectZars)];
 static int sPendingMeasureKey = -1; // object id whose measure bracket is open this draw
 
+// Per-ACTOR forced CMB override. Some ZARs hold multiple CMBs — one per actor sharing the
+// object bank slot (e.g. zelda_mu.zar has couple.cmb for EN_TG's dancing couple + marketpeople.cmb
+// for EN_MU's haggling townspeople). AUTO's "largest CMB" heuristic picks one CMB per zar and
+// so gives every actor sharing that zar the SAME model — the wrong one for at least one of them.
+// This table lets a specific actor id force AUTO to use "<zar>|<cmbSubstr>" instead, routed
+// through its OWN sAuto slot (below) so a peer actor's correct CMB isn't stomped.
+// Verified structurally by tools/en_tg_cmb_close_test.py (asserts the couple.cmb load line lands
+// for EN_TG's object_mu even while EN_MU keeps marketpeople.cmb).
+typedef struct {
+    s16 actorId;
+    const char* cmbSubstr;    // ZAR-internal CMB name substring (matches Zelda3D_AutoModelId's "|" suffix)
+    Zelda3D_AutoEntry entry;  // parallel state slot (does not collide with sAuto[objId])
+} Zelda3D_ActorForcedAutoSlot;
+static Zelda3D_ActorForcedAutoSlot sActorForcedAuto[] = {
+    { ACTOR_EN_TG, "couple", {0} }, // dancing couple; peer EN_MU keeps marketpeople.cmb via default AUTO
+};
+static Zelda3D_ActorForcedAutoSlot* Zelda3D_FindActorForcedSlot(s16 actorId) {
+    for (size_t i = 0; i < ARRAY_COUNT(sActorForcedAuto); i++) {
+        if (sActorForcedAuto[i].actorId == actorId) return &sActorForcedAuto[i];
+    }
+    return NULL;
+}
+
 // Dedicated measure slots for forced-CMB actors that CANNOT use the per-object sAuto[objId]
 // cache because several actors share one object bank slot. Kakariko's windmill
 // (Bg_Spot01_Fusya), well-arch (Bg_Spot01_Idohashira) and well-water (Bg_Spot01_Idomizu) all
@@ -2141,12 +2164,24 @@ static int Zelda3D_TryAuto(PlayState* play, Actor* actor) {
     if (actor->category == ACTORCAT_DOOR) {
         return 0;
     }
-    e = &sAuto[objId];
+    // Per-actor forced-CMB routing (sActorForcedAuto): actors sharing a multi-CMB ZAR must
+    // route through their OWN slot with a "<zar>|<cmb>" key so AUTO loads the right mesh
+    // (see decl above). NULL slot -> default per-object cache.
+    Zelda3D_ActorForcedAutoSlot* forced = Zelda3D_FindActorForcedSlot(actor->id);
+    char forcedKeyBuf[256];
+    const char* modelKey = zar;
+    if (forced != NULL) {
+        e = &forced->entry;
+        snprintf(forcedKeyBuf, sizeof forcedKeyBuf, "%s|%s", zar, forced->cmbSubstr);
+        modelKey = forcedKeyBuf;
+    } else {
+        e = &sAuto[objId];
+    }
     if (e->state == 3) {
         return 0; // known-unreplaceable -> N64
     }
     if (e->modelId == 0) {
-        e->modelId = Zelda3D_AutoModelId(zar);
+        e->modelId = Zelda3D_AutoModelId(modelKey);
         if (e->modelId < 0) {
             e->state = 3;
             return 0;
