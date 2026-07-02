@@ -5,6 +5,7 @@
  */
 
 #include "global.h"
+#include "2s2h/zelda3d/mm3d_player.h" // Stage 1 MM/OoT Link unification hook
 #include "z64horse.h"
 #include "z64malloc.h"
 #include "z64quake.h"
@@ -13463,7 +13464,13 @@ void Player_Draw(Actor* thisx, PlayState* play) {
                 Matrix_Pop();
             }
 
-            Player_DrawGameplay(play, this, lod, gCullBackDList, sp84);
+            // MM/OoT Link unification Stage 1 seam. When MM_ZELDA3D_LINK is on and a
+            // per-form MM3D Link is available, the hook emits it and returns 1, and
+            // we skip the vanilla back-cull draw. Off by default -> hook returns 0
+            // and this branch is byte-identical to vanilla MM.
+            if (!Zelda3D_TryDrawPlayer(play, &this->actor)) {
+                Player_DrawGameplay(play, this, lod, gCullBackDList, sp84);
+            }
         }
 
         func_801229A0(play, this);
