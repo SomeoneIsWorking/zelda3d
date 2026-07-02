@@ -75,6 +75,11 @@ std::string g_save_dir;
 // asserted when the frontend is polled for RETRO_DEVICE_ID_JOYPAD_N.
 uint32_t g_input_mask = 0;
 
+// Diagnostic counters — every InputState call increments these so the
+// harness can prove whether the emulator is actually polling us.
+uint64_t g_input_poll_count = 0;
+uint32_t g_input_poll_ids_seen = 0; // bit N set if joypad id N was ever queried
+
 void CoreLog(retro_log_level level, const char* fmt, ...) {
     va_list ap;
     va_start(ap, fmt);
@@ -131,6 +136,8 @@ void InputPoll() {}
 int16_t InputState(unsigned /*port*/, unsigned device, unsigned /*index*/, unsigned id) {
     if (device != RETRO_DEVICE_JOYPAD) return 0;
     if (id >= 32) return 0;
+    ++g_input_poll_count;
+    g_input_poll_ids_seen |= (1u << id);
     return (g_input_mask >> id) & 1;
 }
 
@@ -240,6 +247,13 @@ void HandleLoadState(std::istringstream& toks) {
         return;
     }
     std::printf("ok\n");
+}
+
+void HandleDiag(std::istringstream&) {
+    std::printf("ok mask=0x%08x polls=%llu ids_seen=0x%08x\n",
+                g_input_mask,
+                static_cast<unsigned long long>(g_input_poll_count),
+                g_input_poll_ids_seen);
 }
 
 void HandleInput(std::istringstream& toks) {
@@ -403,6 +417,7 @@ void RunRepl() {
         else if (cmd == "w32")       HandleWrite(toks, 32);
         else if (cmd == "mem")       HandleMem(toks);
         else if (cmd == "input")     HandleInput(toks);
+        else if (cmd == "diag")      HandleDiag(toks);
         else if (cmd == "loadstate") HandleLoadState(toks);
         else if (cmd == "savestate") HandleSaveState(toks);
         else if (cmd == "playstate") HandlePlayState(toks);
