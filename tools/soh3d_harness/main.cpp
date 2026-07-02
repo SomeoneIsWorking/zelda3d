@@ -92,6 +92,25 @@ extern "C" {
     void Main_Init(void* arg);
     void Main_Shutdown(void);
     void RunFrame(void);
+
+    // SoH3D-side state readers (soh_state.cpp, compiled with soh_settings).
+    int SohState_HasPlayState(void);
+    int SohState_SceneNum(void);
+    int SohState_RoomNum(void);
+    int SohState_PlayerPos(float* px, float* py, float* pz,
+                          short* rx, short* ry, short* rz);
+    typedef void (*SohState_ActorSink)(void* user, int cat, int id, unsigned long addr,
+                                       float px, float py, float pz,
+                                       short rx, short ry, short rz);
+    int SohState_WalkActors(SohState_ActorSink sink, void* user);
+    int SohState_Lighting(unsigned char ambient[3],
+                         signed char light1Dir[3], unsigned char light1Color[3],
+                         signed char light2Dir[3], unsigned char light2Color[3],
+                         unsigned char fogColor[3],
+                         short* fogNear, short* fogFar,
+                         unsigned char lightCtxAmbient[3],
+                         unsigned char lightCtxFogColor[3],
+                         short* lightCtxFogNear, short* lightCtxFogFar);
 }
 
 namespace {
@@ -458,6 +477,213 @@ void HandleActors(std::istringstream&) {
     std::printf("ok end\n");
 }
 
+// ============================================================================
+// compare <sub> — side-by-side dumps of matching state from both engines
+//
+// Each sub reports Azahar (OoT3D, the 3DS ground truth) on one line and
+// SoH3D (the PC port under test) on the next, with the two prefixes
+// `3ds:` and `soh:`. If either engine hasn't reached the Play gamestate
+// yet (no PlayState populated), that side prints `n/a`.
+//
+// New subs go here — the dispatcher below just adds a name and a call.
+// ============================================================================
+
+void CompareSceneImpl() {
+    // 3ds side
+    auto ps = CurrentPlayState();
+    if (!ps) {
+        std::printf("  3ds: n/a (no playstate)\n");
+    } else {
+        auto& mem = Core::System::GetInstance().Memory();
+        auto sn = mem.Read32OrNullopt(*ps + SCENENUM_OFF);
+        std::printf("  3ds: sceneNum=0x%04x\n",
+                    sn ? static_cast<unsigned>(*sn & 0xFFFF) : 0xFFFFu);
+    }
+    // soh side
+    if (!SohState_HasPlayState()) {
+        std::printf("  soh: n/a (no playstate)\n");
+    } else {
+        std::printf("  soh: sceneNum=0x%04x roomNum=%d\n",
+                    static_cast<unsigned>(SohState_SceneNum() & 0xFFFF),
+                    SohState_RoomNum());
+    }
+}
+
+void ComparePlayerImpl() {
+    // 3ds side: walk the current-scene actor table and find category=Player.
+    auto ps = CurrentPlayState();
+    if (!ps) {
+        std::printf("  3ds: n/a (no playstate)\n");
+    } else {
+        auto& mem = Core::System::GetInstance().Memory();
+        const uint32_t ctx = *ps + ACTORCTX_OFF;
+        bool found = false;
+        for (uint32_t cat = 0; cat < 12 && !found; ++cat) {
+            auto head = mem.Read32OrNullopt(ctx + ACTOR_LISTS_OFF + cat * 8 + 4);
+            if (!head || *head == 0) continue;
+            auto id = mem.Read32OrNullopt(*head + ACTOR_ID_OFF);
+            if (!id || (*id & 0xFFFF) != 0) continue; // Player = actor id 0
+            auto px = mem.Read32OrNullopt(*head + ACTOR_POS_OFF + 0);
+            auto py = mem.Read32OrNullopt(*head + ACTOR_POS_OFF + 4);
+            auto pz = mem.Read32OrNullopt(*head + ACTOR_POS_OFF + 8);
+            auto rot = mem.Read32OrNullopt(*head + ACTOR_ROT_OFF + 0);
+            auto rz = mem.Read32OrNullopt(*head + ACTOR_ROT_OFF + 4);
+            if (!px || !py || !pz || !rot || !rz) break;
+            float fpx, fpy, fpz;
+            std::memcpy(&fpx, &*px, 4);
+            std::memcpy(&fpy, &*py, 4);
+            std::memcpy(&fpz, &*pz, 4);
+            std::printf("  3ds: pos=(%.2f,%.2f,%.2f) rot=(%d,%d,%d)\n",
+                        fpx, fpy, fpz,
+                        static_cast<int>(static_cast<int16_t>(*rot & 0xFFFF)),
+                        static_cast<int>(static_cast<int16_t>((*rot >> 16) & 0xFFFF)),
+                        static_cast<int>(static_cast<int16_t>(*rz & 0xFFFF)));
+            found = true;
+        }
+        if (!found) std::printf("  3ds: n/a (no player actor live)\n");
+    }
+    // soh side
+    if (!SohState_HasPlayState()) {
+        std::printf("  soh: n/a (no playstate)\n");
+    } else {
+        float px, py, pz;
+        short rx, ry, rz;
+        if (SohState_PlayerPos(&px, &py, &pz, &rx, &ry, &rz)) {
+            std::printf("  soh: pos=(%.2f,%.2f,%.2f) rot=(%d,%d,%d)\n",
+                        px, py, pz, rx, ry, rz);
+        } else {
+            std::printf("  soh: n/a (no player actor live)\n");
+        }
+    }
+}
+
+struct SohActor {
+    int cat; int id; unsigned long addr;
+    float pos[3]; short rot[3];
+};
+
+void CollectSohActor(void* user, int cat, int id, unsigned long addr,
+                     float px, float py, float pz,
+                     short rx, short ry, short rz) {
+    auto* v = static_cast<std::vector<SohActor>*>(user);
+    v->push_back(SohActor{cat, id, addr, {px, py, pz}, {rx, ry, rz}});
+}
+
+void CompareActorsImpl() {
+    // 3ds side
+    struct Entry3ds { int cat; int id; unsigned addr; float pos[3]; short rot[3]; };
+    std::vector<Entry3ds> a3;
+    auto ps = CurrentPlayState();
+    if (ps) {
+        auto& mem = Core::System::GetInstance().Memory();
+        const uint32_t ctx = *ps + ACTORCTX_OFF;
+        for (uint32_t cat = 0; cat < 12; ++cat) {
+            auto cnt = mem.Read32OrNullopt(ctx + ACTOR_LISTS_OFF + cat * 8 + 0);
+            auto head = mem.Read32OrNullopt(ctx + ACTOR_LISTS_OFF + cat * 8 + 4);
+            if (!cnt || !head) continue;
+            uint32_t addr = *head;
+            int32_t guard = static_cast<int32_t>(*cnt) + 4;
+            while (addr != 0 && guard-- > 0) {
+                auto id = mem.Read32OrNullopt(addr + ACTOR_ID_OFF);
+                auto px = mem.Read32OrNullopt(addr + ACTOR_POS_OFF + 0);
+                auto py = mem.Read32OrNullopt(addr + ACTOR_POS_OFF + 4);
+                auto pz = mem.Read32OrNullopt(addr + ACTOR_POS_OFF + 8);
+                auto rot = mem.Read32OrNullopt(addr + ACTOR_ROT_OFF + 0);
+                auto rz = mem.Read32OrNullopt(addr + ACTOR_ROT_OFF + 4);
+                if (!id || !px || !py || !pz || !rot || !rz) break;
+                Entry3ds e{};
+                e.cat = static_cast<int>(cat);
+                e.id  = static_cast<int>(*id & 0xFFFF);
+                e.addr = addr;
+                std::memcpy(&e.pos[0], &*px, 4);
+                std::memcpy(&e.pos[1], &*py, 4);
+                std::memcpy(&e.pos[2], &*pz, 4);
+                e.rot[0] = static_cast<int16_t>(*rot & 0xFFFF);
+                e.rot[1] = static_cast<int16_t>((*rot >> 16) & 0xFFFF);
+                e.rot[2] = static_cast<int16_t>(*rz & 0xFFFF);
+                a3.push_back(e);
+                auto next = mem.Read32OrNullopt(addr + ACTOR_NEXT_OFF);
+                if (!next) break;
+                addr = *next;
+            }
+        }
+    }
+    // soh side
+    std::vector<SohActor> as;
+    if (SohState_HasPlayState()) SohState_WalkActors(&CollectSohActor, &as);
+    std::printf("  3ds: %zu actor(s)\n", a3.size());
+    for (const auto& e : a3) {
+        std::printf("       cat=%d id=0x%04x addr=0x%08x pos=(%.1f,%.1f,%.1f)\n",
+                    e.cat, e.id, e.addr, e.pos[0], e.pos[1], e.pos[2]);
+    }
+    std::printf("  soh: %zu actor(s)\n", as.size());
+    for (const auto& e : as) {
+        std::printf("       cat=%d id=0x%04x addr=0x%016lx pos=(%.1f,%.1f,%.1f)\n",
+                    e.cat, e.id, e.addr, e.pos[0], e.pos[1], e.pos[2]);
+    }
+}
+
+void CompareLightingImpl() {
+    // 3ds side: OoT3D's EnvironmentContext offset within the 3DS PlayState
+    // is not RE'd yet (the actorCtx / sceneNum / transitionTrigger fields
+    // in this harness came from prior work; envCtx did not). Once that
+    // offset lands, add the read here mirroring the SoH branch below.
+    std::printf("  3ds: n/a (envCtx offset in OoT3D PlayState not RE'd yet)\n");
+    // soh side
+    if (!SohState_HasPlayState()) {
+        std::printf("  soh: n/a (no playstate)\n");
+        return;
+    }
+    unsigned char ambient[3], l1c[3], l2c[3], fog[3], lcAmb[3], lcFog[3];
+    signed char l1d[3], l2d[3];
+    short fogNear, fogFar, lcFogNear, lcFogFar;
+    if (!SohState_Lighting(ambient, l1d, l1c, l2d, l2c, fog, &fogNear, &fogFar,
+                          lcAmb, lcFog, &lcFogNear, &lcFogFar)) {
+        std::printf("  soh: n/a (SohState_Lighting failed)\n");
+        return;
+    }
+    std::printf("  soh: envLightSettings\n"
+                "       ambient=(%u,%u,%u) fog=(%u,%u,%u) fogNear=%d fogFar=%d\n"
+                "       light1 dir=(%d,%d,%d) color=(%u,%u,%u)\n"
+                "       light2 dir=(%d,%d,%d) color=(%u,%u,%u)\n",
+                ambient[0], ambient[1], ambient[2],
+                fog[0], fog[1], fog[2], fogNear, fogFar,
+                l1d[0], l1d[1], l1d[2], l1c[0], l1c[1], l1c[2],
+                l2d[0], l2d[1], l2d[2], l2c[0], l2c[1], l2c[2]);
+    std::printf("  soh: lightCtx  ambient=(%u,%u,%u) fog=(%u,%u,%u) fogNear=%d fogFar=%d\n",
+                lcAmb[0], lcAmb[1], lcAmb[2],
+                lcFog[0], lcFog[1], lcFog[2], lcFogNear, lcFogFar);
+}
+
+void HandleCompare(std::istringstream& toks) {
+    std::string sub;
+    if (!(toks >> sub)) {
+        PrintErr("compare: usage: compare <sub> — see `compare list`");
+        return;
+    }
+    if (sub == "list") {
+        std::fprintf(stderr,
+            "compare subs:\n"
+            "  scene       sceneNum (+ soh roomNum)\n"
+            "  player      Link pos + rot\n"
+            "  actors      full actor tables (cat, id, addr, pos)\n"
+            "  lighting    envLightSettings + lightCtx (ambient, dirs,\n"
+            "              light1/2 dir+color, fog, fog near/far).\n"
+            "              SoH3D runs its own renderer-side lighting but\n"
+            "              samples the underlying scene values from here,\n"
+            "              so mismatches here explain shading divergence.\n");
+        std::printf("ok compare list\n");
+        return;
+    }
+    std::printf("compare %s:\n", sub.c_str());
+    if      (sub == "scene")    CompareSceneImpl();
+    else if (sub == "player")   ComparePlayerImpl();
+    else if (sub == "actors")   CompareActorsImpl();
+    else if (sub == "lighting") CompareLightingImpl();
+    else { PrintErr(("compare: unknown sub: " + sub).c_str()); return; }
+    std::printf("ok compare %s\n", sub.c_str());
+}
+
 void PrintHelp() {
     std::fprintf(stderr,
         "soh3d_harness commands:\n"
@@ -478,6 +704,9 @@ void PrintHelp() {
         "  soh_step <N>         advance SoH3D by N frames (RunFrame x N)\n"
         "  step <N>             advance BOTH engines in lockstep (Azahar\n"
         "                       retro_run + SoH3D RunFrame, per frame)\n"
+        "  compare <sub>        side-by-side dump from both engines;\n"
+        "                       `compare list` shows subs (scene/player/\n"
+        "                       actors/lighting)\n"
         "  quit                 exit\n"
         "  help                 this list\n");
     std::printf("ok\n");
@@ -508,6 +737,7 @@ void RunRepl() {
         else if (cmd == "soh_boot")  HandleSohBoot(toks);
         else if (cmd == "soh_step")  HandleSohStep(toks);
         else if (cmd == "step")      HandleStep(toks);
+        else if (cmd == "compare")   HandleCompare(toks);
         else if (cmd == "help")      PrintHelp();
         else if (cmd == "quit") { std::printf("ok\n"); std::fflush(stdout); return; }
         else                         PrintErr(("unknown cmd: " + cmd).c_str());
