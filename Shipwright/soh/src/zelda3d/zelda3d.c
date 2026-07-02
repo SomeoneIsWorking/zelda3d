@@ -2051,21 +2051,40 @@ static int sPendingMeasureKey = -1; // object id whose measure bracket is open t
 // object bank slot (e.g. zelda_mu.zar has couple.cmb for EN_TG's dancing couple + marketpeople.cmb
 // for EN_MU's haggling townspeople). AUTO's "largest CMB" heuristic picks one CMB per zar and
 // so gives every actor sharing that zar the SAME model — the wrong one for at least one of them.
-// This table lets a specific actor id force AUTO to use "<zar>|<cmbSubstr>" instead, routed
-// through its OWN sAuto slot (below) so a peer actor's correct CMB isn't stomped.
-// Verified structurally by tools/en_tg_cmb_close_test.py (asserts the couple.cmb load line lands
-// for EN_TG's object_mu even while EN_MU keeps marketpeople.cmb).
+// This table lets a specific actor id (optionally scoped by params) force AUTO to use
+// "<zar>|<cmbSubstr>" instead, routed through its OWN sAuto slot (below) so a peer actor's
+// correct CMB isn't stomped.
+//
+// Two divergence patterns are supported:
+//  1. Actor id ⇔ CMB (paramMask = 0):  EN_TG → couple.cmb (zelda_mu.zar) regardless of params.
+//  2. Actor id + (params & mask == value) ⇔ CMB:  Obj_Syokudai's three torch styles select via
+//     `params >> 12` in N64 z_obj_syokudai.c:263 (Golden/Timed/Wooden) — the same actor draws
+//     three DIFFERENT display lists at N64 time, so on OoT3D it must pick different CMBs from
+//     zelda_syokudai.zar (syokudai_gn / syokudai_model / syokudai_ki_model) per bucket.
+//
+// Verified structurally by tools/en_tg_cmb_close_test.py + tools/syokudai_cmb_close_test.py.
 typedef struct {
     s16 actorId;
+    u16 paramMask;            // 0 = match any params; else params & mask must == paramValue
+    u16 paramValue;
     const char* cmbSubstr;    // ZAR-internal CMB name substring (matches Zelda3D_AutoModelId's "|" suffix)
     Zelda3D_AutoEntry entry;  // parallel state slot (does not collide with sAuto[objId])
 } Zelda3D_ActorForcedAutoSlot;
 static Zelda3D_ActorForcedAutoSlot sActorForcedAuto[] = {
-    { ACTOR_EN_TG, "couple", {0} }, // dancing couple; peer EN_MU keeps marketpeople.cmb via default AUTO
+    // Dancing couple (peer EN_MU keeps marketpeople.cmb via default AUTO).
+    { ACTOR_EN_TG, 0, 0, "couple", {0} },
+    // Wooden torch — Obj_Syokudai draws gWoodenTorchDL when (params >> 12) == 2. Route to
+    // syokudai_ki_model.cmb ("ki" = wood, JP). Golden torches (params >> 12 == 0) keep the
+    // default AUTO pick (syokudai_gn_model.cmb — largest CMB, correct default). Timed torches
+    // (params >> 12 == 1) still fall through to AUTO for now — their OoT3D CMB match is
+    // uncertain between syokudai_model.cmb and a variant; separate follow-up.
+    { ACTOR_OBJ_SYOKUDAI, 0xF000, 0x2000, "syokudai_ki", {0} },
 };
-static Zelda3D_ActorForcedAutoSlot* Zelda3D_FindActorForcedSlot(s16 actorId) {
+static Zelda3D_ActorForcedAutoSlot* Zelda3D_FindActorForcedSlot(s16 actorId, u16 params) {
     for (size_t i = 0; i < ARRAY_COUNT(sActorForcedAuto); i++) {
-        if (sActorForcedAuto[i].actorId == actorId) return &sActorForcedAuto[i];
+        Zelda3D_ActorForcedAutoSlot* s = &sActorForcedAuto[i];
+        if (s->actorId != actorId) continue;
+        if (s->paramMask == 0 || (params & s->paramMask) == s->paramValue) return s;
     }
     return NULL;
 }
@@ -2167,7 +2186,7 @@ static int Zelda3D_TryAuto(PlayState* play, Actor* actor) {
     // Per-actor forced-CMB routing (sActorForcedAuto): actors sharing a multi-CMB ZAR must
     // route through their OWN slot with a "<zar>|<cmb>" key so AUTO loads the right mesh
     // (see decl above). NULL slot -> default per-object cache.
-    Zelda3D_ActorForcedAutoSlot* forced = Zelda3D_FindActorForcedSlot(actor->id);
+    Zelda3D_ActorForcedAutoSlot* forced = Zelda3D_FindActorForcedSlot(actor->id, (u16)actor->params);
     char forcedKeyBuf[256];
     const char* modelKey = zar;
     if (forced != NULL) {
