@@ -37,11 +37,14 @@ Composite: `scratch/screenshots/ab_market_cmp.png`
 - OoT3D oracle at the same entrance loaded **SCENE_MARKET_NIGHT** — moonlit, "Market"
   placard visible.
 - Same entrance index (0xB1), same dayTime (0x6000), different scene selection.
-- This IS an OoT3D behavior fork (Market has 3 time-variant scenes: Day/Night/Ruins);
-  the SoH3D-vs-oracle disagreement is on the day/night threshold at 0x6000, or on
-  Market's scene-select fork logic. Sample both games' `SelectMarketScene` (name TBC)
-  at various times to bracket the threshold.
-- Root cause: **OPEN**. This falsifies "same entrance+time → same scene" for Market.
+- Root cause: **CLOSED** (2026-07-02) — this was pre-time-sync noise. The oracle
+  had been using whatever dayTime its save carried; commit 93d564c9 made parity_ab
+  forward `--time` to `link_ctl.py warp` and re-pin `gSaveContext.dayTime` post-warp.
+- Close-test: `tools/market_scene_probe.py 0xB1 <times…>` reads back `play->sceneNum`
+  from both engines and asserts equality. Green across the full bracket
+  (0x0000/0x2000/0x4555/0x6000/0x8000/0xC000/0xE000) — both correctly cross
+  MARKET_DAY (0x20) ↔ MARKET_NIGHT (0x21) at the same thresholds. Ran retroactively
+  after 93d564c9 and is now the standing red-if-forked signal.
 
 ### 3. Crowd NPCs (En_Hy adults) — NO significant divergence at close range
 - Initial suspicion from #118 ("mis-posed / low-detail") not reproduced on close
