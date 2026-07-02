@@ -36,20 +36,54 @@ N64 game swaps the palette per EN_HY_TYPE_XXX; OoT3D likely swaps a body texture
 overrides a material color per type in EnHy_Draw (@ 0x1b4944) or an OverrideAllLimbDraw
 we haven't yet decompiled.
 
-## Root cause: **OPEN** — needs RE
-- Decompile `EnHy_Draw @ 0x1b4944` in the OoT3D binary and identify the per-EnHy-type
-  material/texture swap point. Candidates: `Material_SetColor` on the body material, or
-  a `Model_SetTexture` overriding one texture slot. The BODY MATERIAL is CMB material
-  index — TBD (eye is 3 for men, 1 for women; body might be 0 or 2).
-- Log the material chain during a live draw: dump the CMB materials for zelda_boj.cmb
-  before/after the OoT3D Draw call. Where the RGBA differs across enHyType is the color
-  channel to override in SoH3D.
-- Data source: the OoT3D En_Hy overlay has a per-type constant table (color/texture id).
-  Decomp target file: `sys/OoT3D_decompiled/actor/EnHy.cpp` (path TBC in ghidra project).
+## Root cause: **PARTIALLY RE'd** (`build/decomp/001b4944.c` = EnHy_Draw)
 
-## Fix direction (not landed)
-Extend `TownsfolkBehavior::applyDrawOverrides` with an `applyBodyMaterial(modelId, type,
-kBodyColors[type])` step, keyed on `(actor->params & 0x7F)` = EN_HY_TYPE. Values from RE.
+The per-type color mechanism is now decoded. Two tables:
+
+- **`DAT_001b4c70`** — per-type "object id" table, stride 0x18 (first short = OBJECT_AHG (0x107) /
+  OBJECT_BOJ (0x108) / OBJECT_CNE (0x10C) / OBJECT_BOB (0x111) / …). Selects which body archetype
+  code path runs (each calls a different set of `FUN_0036932c` = `Model_ApplyMatAnim` on
+  specific material indices — e.g. BOJ applies mat 2, 3; AHG applies 1, 2, 3, 4; BOB applies 1–8).
+
+- **`DAT_001b4c70 - 0x348`** — per-type "body color override" table, stride 0x28 per EN_HY_TYPE.
+  Layout PER ENTRY (from the switch at 0x001b4b10):
+  ```
+  +0x00  u8   ??? (reset/pre-material index; -1 = skip)
+  +0x01  u8   ??? (BOB path only; -1 = skip)
+  +0x02  u8   materialIndex_A  (target for constant 4; -1 = skip)
+  +0x03  u8   materialIndex_B  (target for constant 3; -1 = skip)
+  +0x04  RGBA colorA[4]         (constant 4 override — clothing colour A)
+  +0x14  RGBA colorB[4]         (constant 3 override — clothing colour B)
+  +0x18  ??? (16 bytes trailing, unused in this switch — verify)
+  ```
+  The call is `FUN_00357a50(model, matIdx, constIdx, &color, 1)` =
+  `Model_SetMaterialConstantColor(model, matIdx, constIdx ∈ {3, 4}, u8[4] rgba)`.
+
+  Cases 6, 12 (index 0xC), 18 (0x12) are SKIPPED — no override applies (default palette).
+
+- Case 8 (BOJ variant): additionally overrides constant 2 on mat 2 with `DAT_001b4c74`
+  (probably a shared "generic clothes" colour).
+- Case 11 (0xB): overrides constant 2 on mat 2 with a 4-byte-inline colour at `DAT_001b4c78`.
+
+## Fix direction — MULTI-STEP (not landed)
+
+1. **Extract the tables from the OoT3D binary.** Read the raw bytes at
+   `DAT_001b4c70 - 0x348 + type*0x28` for each type 0..0x14, and at `DAT_001b4c70 + type*0x18`
+   for the object-id mapping. Bake into a static C array in the port. Tooling: extend
+   `oot3d-decomp/tools` with a `dump_enhy_body_table.py` that reads the .elf sections at
+   those absolute VAs (they're const-data in .rodata).
+
+2. **Add CMB material-constant-color override infrastructure to SoH3D.** Currently the
+   facial-CMB path swaps a TEXTURE frame (see `Zelda3D_ModelSetTextureFrame`); there is no
+   per-actor per-material *constant colour* override path yet. Needs: a per-actor array of
+   (matIdx, constIdx, rgba) written before submit, honored by the shader/emission code.
+   Distinct feature; do not conflate with facial-frame texture swap.
+
+3. **Wire `TownsfolkBehavior::applyDrawOverrides`** to read
+   `(actor->params & 0x7F)` and apply the two colour overrides for that type. Skip when
+   the table row indicates -1 (default palette).
+
+Each step is a separately-verifiable increment.
 
 ## Follow-ups + related workflow findings
 - **Tooling improvement (LANDED)**: `link_ctl.py warp` now accepts `[dayTime]` and
