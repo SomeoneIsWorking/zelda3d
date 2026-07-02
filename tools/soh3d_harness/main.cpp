@@ -21,6 +21,10 @@
 //   mem <va> <n>         -> ok <hex-bytes>      (or err)
 //   loadstate <path>     -> ok  (or err)
 //   savestate <path>     -> ok  (or err)
+//   input <mask>         -> ok
+//        held button mask (persists across run) — bit N = joypad id N
+//        (B=0,Y=1,SELECT=2,START=3,UP=4,DOWN=5,LEFT=6,RIGHT=7,
+//         A=8,X=9,L=10,R=11,L2=12,R2=13,L3=14,R3=15)
 //
 // HIGH-LEVEL OoT3D ops (RE knowledge lives here, not in scripts):
 //   playstate            -> ok 0x<ptr>           (or err "not populated")
@@ -66,6 +70,10 @@ namespace {
 
 std::string g_system_dir;
 std::string g_save_dir;
+
+// Persistent held-input mask driven by the `input` REPL command. Bit N is
+// asserted when the frontend is polled for RETRO_DEVICE_ID_JOYPAD_N.
+uint32_t g_input_mask = 0;
 
 void CoreLog(retro_log_level level, const char* fmt, ...) {
     va_list ap;
@@ -120,7 +128,11 @@ void VideoRefresh(const void*, unsigned, unsigned, size_t) {}
 void AudioSample(int16_t, int16_t) {}
 size_t AudioSampleBatch(const int16_t*, size_t frames) { return frames; }
 void InputPoll() {}
-int16_t InputState(unsigned, unsigned, unsigned, unsigned) { return 0; }
+int16_t InputState(unsigned /*port*/, unsigned device, unsigned /*index*/, unsigned id) {
+    if (device != RETRO_DEVICE_JOYPAD) return 0;
+    if (id >= 32) return 0;
+    return (g_input_mask >> id) & 1;
+}
 
 std::vector<uint8_t> SlurpFile(const std::string& path) {
     std::vector<uint8_t> data;
@@ -227,6 +239,15 @@ void HandleLoadState(std::istringstream& toks) {
         PrintErr("loadstate: core rejected buffer");
         return;
     }
+    std::printf("ok\n");
+}
+
+void HandleInput(std::istringstream& toks) {
+    std::string mask_s;
+    if (!(toks >> mask_s)) { PrintErr("input: usage: input <mask>"); return; }
+    auto m = ParseNum(mask_s);
+    if (!m) { PrintErr("input: bad mask"); return; }
+    g_input_mask = static_cast<uint32_t>(*m);
     std::printf("ok\n");
 }
 
@@ -353,6 +374,9 @@ void PrintHelp() {
         "  r8|r16|r32 <va>      read u8/u16/u32 at VA (0x prefix ok)\n"
         "  w8|w16|w32 <va> <v>  write u8/u16/u32 at VA\n"
         "  mem <va> <n>         hex-dump N bytes (N<=4096)\n"
+        "  input <mask>         set held button mask (RETRO_DEVICE_JOYPAD)\n"
+        "                       B=0 Y=1 SELECT=2 START=3 UP=4 DOWN=5\n"
+        "                       LEFT=6 RIGHT=7 A=8 X=9 L=10 R=11\n"
         "  loadstate <path>     load Azahar save state from file\n"
         "  savestate <path>     write Azahar save state to file\n"
         "  playstate            print gPlayState pointer\n"
@@ -378,6 +402,7 @@ void RunRepl() {
         else if (cmd == "w16")       HandleWrite(toks, 16);
         else if (cmd == "w32")       HandleWrite(toks, 32);
         else if (cmd == "mem")       HandleMem(toks);
+        else if (cmd == "input")     HandleInput(toks);
         else if (cmd == "loadstate") HandleLoadState(toks);
         else if (cmd == "savestate") HandleSaveState(toks);
         else if (cmd == "playstate") HandlePlayState(toks);
