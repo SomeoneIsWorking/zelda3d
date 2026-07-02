@@ -74,7 +74,10 @@ namespace fs = std::filesystem;
 #define MM_NTSC_JP_GC 0x8473D0C1
 
 bool ZRom::IsMQ() {
-    int crc = BitConverter::ToInt32BE(romData, 0x10);
+    // OOT/MM CRCs are u32 (values like 0xEC7011B7 exceed 0x7FFFFFFF), so store as u32 to
+    // match the `case OOT_*` labels below without narrowing. The BitConverter helper still
+    // returns int32; cast at the assignment point.
+    uint32_t crc = static_cast<uint32_t>(BitConverter::ToInt32BE(romData, 0x10));
     switch (crc) {
         case OOT_NTSC_10:
         case OOT_NTSC_11:
