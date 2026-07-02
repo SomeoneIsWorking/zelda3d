@@ -7,14 +7,15 @@
 // soh3d/CLAUDE.md ("Direction: build a direct harness that EMBEDS Azahar as
 // a library, not runs it").
 //
-// Milestone for this commit: prove Azahar's libretro core accepts and
-// validates the OoT3D ROM (retro_load_game returns true) with a null
-// video/audio/input path. Not booting to a scene yet — the software renderer
-// / HW context plumbing lands next.
+// Current milestone: retro_load_game succeeds, retro_run pumps frames
+// through the software renderer, and the harness reads OoT3D VA directly
+// via Azahar's Memory::MemorySystem — proven by observing gPlayState
+// (0x0050AF34) transition from 0 → an allocated pointer once the game
+// populates it. Scripted warp writes land next.
 //
 // Usage:
-//   soh3d_harness [rom_path]
-//   soh3d_harness                  # rom = $ZELDA3D_OOT3D_ROM
+//   soh3d_harness [rom_path] [--frames N]
+//   soh3d_harness                        # rom = $ZELDA3D_OOT3D_ROM, N=300
 #include <cstdarg>
 #include <cstdint>
 #include <cstdio>
@@ -25,13 +26,25 @@
 
 #include "libretro.h"
 
+// Direct Azahar API — the harness is linked in-process, so we bypass the
+// libretro memory-map path (which only exposes HEAP/LINEAR/VRAM, not the
+// process .data section where gPlayState lives) and read/write through
+// Memory::MemorySystem directly. This is the whole point of the embed-
+// not-run direction: use Azahar's own emulator API, not IPC.
+#include "core/core.h"
+#include "core/memory.h"
+
 namespace {
 
 std::string g_system_dir;
 std::string g_save_dir;
 
-retro_memory_map g_memory_map{};
-std::vector<retro_memory_descriptor> g_memory_descs;
+bool Read32(uint32_t va, uint32_t& out) {
+    auto v = Core::System::GetInstance().Memory().Read32OrNullopt(va);
+    if (!v) return false;
+    out = *v;
+    return true;
+}
 
 void CoreLog(retro_log_level level, const char* fmt, ...) {
     va_list ap;
@@ -77,16 +90,6 @@ bool EnvironmentCallback(unsigned cmd, void* data) {
         return false;
     }
 
-    case RETRO_ENVIRONMENT_SET_MEMORY_MAPS: {
-        const auto* mm = static_cast<const retro_memory_map*>(data);
-        g_memory_descs.assign(mm->descriptors, mm->descriptors + mm->num_descriptors);
-        g_memory_map.descriptors = g_memory_descs.data();
-        g_memory_map.num_descriptors = static_cast<unsigned>(g_memory_descs.size());
-        std::fprintf(stderr, "soh3d_harness: captured %u memory descriptor(s)\n",
-                     g_memory_map.num_descriptors);
-        return true;
-    }
-
     default:
         return false;
     }
@@ -121,13 +124,17 @@ std::vector<uint8_t> SlurpFile(const std::string& path) {
 
 int main(int argc, char** argv) {
     std::string rom_path;
+    int frames = 300;
     for (int i = 1; i < argc; ++i) {
         std::string a = argv[i];
-        if (a.rfind("--", 0) == 0) {
+        if (a == "--frames" && i + 1 < argc) {
+            frames = std::atoi(argv[++i]);
+        } else if (a.rfind("--", 0) == 0) {
             std::fprintf(stderr, "soh3d_harness: unknown option: %s\n", a.c_str());
             return EXIT_FAILURE;
+        } else if (rom_path.empty()) {
+            rom_path = a;
         }
-        if (rom_path.empty()) rom_path = a;
     }
     if (rom_path.empty()) {
         if (const char* env = std::getenv("ZELDA3D_OOT3D_ROM"); env && *env) {
@@ -182,6 +189,35 @@ int main(int argc, char** argv) {
     }
 
     std::fprintf(stdout, "boot succeeded\n");
+
+    // Frame-pump loop. Each retro_run() call runs the emulator until it
+    // submits one video frame — same "one frame per run" cadence RetroArch
+    // uses. We poll gPlayState (0x0050AF34, a pointer to PlayState — see
+    // tools/oracle_motion_sample.py and oot3d-decomp docs/actor_layout.md)
+    // and log the moment the game populates it, plus the u16 sceneNum at
+    // PlayState+0x104. Pure observation for now; warp writes land next.
+    constexpr uint32_t GPLAYSTATE_VA = 0x0050AF34;
+    constexpr uint32_t SCENENUM_OFF  = 0x104;
+    uint32_t last_ps = 0;
+    uint16_t last_scene = 0xFFFF;
+    for (int f = 0; f < frames; ++f) {
+        retro_run();
+        uint32_t ps = 0;
+        if (Read32(GPLAYSTATE_VA, ps) && ps != last_ps) {
+            uint32_t raw = 0;
+            uint16_t scene = 0xFFFF;
+            if (ps != 0 && Read32(ps + SCENENUM_OFF, raw)) {
+                scene = static_cast<uint16_t>(raw & 0xFFFF);
+            }
+            std::fprintf(stderr,
+                         "soh3d_harness: frame=%d gPlayState=0x%08x sceneNum=0x%04x\n",
+                         f, ps, scene);
+            last_ps = ps;
+            last_scene = scene;
+        }
+    }
+    std::fprintf(stderr, "soh3d_harness: ran %d frames, final gPlayState=0x%08x sceneNum=0x%04x\n",
+                 frames, last_ps, last_scene);
 
     retro_unload_game();
     retro_deinit();
