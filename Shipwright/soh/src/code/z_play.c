@@ -1562,6 +1562,10 @@ void Play_Draw(PlayState* play) {
                         SkyboxDraw_Draw(&play->skyboxCtx, gfxCtx, play->skyboxId, play->envCtx.skyboxBlend,
                                         play->view.eye.x, play->view.eye.y, play->view.eye.z);
                     }
+                } else if (Zelda3D_TryDrawSky(play)) {
+                    // Zelda3D #135: OUTDOOR non-NORMAL skyboxes (Market Day/Night, Market Adult,
+                    // Overcast Sunset) that would otherwise render as black void — Zelda3D_TryDrawSky
+                    // maps them to a BlueSky.zar dome variant. See debug_journal/2026-07-02-...md.
                 } else if (play->skyboxCtx.unk_140 == 0) {
                     SkyboxDraw_Draw(&play->skyboxCtx, gfxCtx, play->skyboxId, 0, play->view.eye.x, play->view.eye.y,
                                     play->view.eye.z);

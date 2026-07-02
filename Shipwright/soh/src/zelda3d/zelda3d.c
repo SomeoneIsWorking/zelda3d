@@ -3137,17 +3137,48 @@ static int Zelda3D_SkyStarModelId(int idx) {
 // that NULL and crash (#16 early-load first-person SIGSEGV in guMtxF2L). Callers MUST skip the N64
 // SkyboxDraw_UpdateMatrix when this returns 1 (its result is dead work anyway — we draw our own sky).
 // Mirrors exactly the accept conditions of Zelda3D_TryDrawSky.
+// #135 (debug_journal/2026-07-02-market-day-parity-sweep.md): Map non-NORMAL_SKY skyboxIds to a
+// BlueSky.zar tenkyu dome variant so the visible-sky scenes (Market Day/Night, Market Adult,
+// Overcast Sunset) don't render as a black void. The N64 handles these via a full-screen prerender
+// image drawn AFTER the room (which paints over Zelda3D room geometry — see Zelda3D_ShouldSuppress-
+// BgImageSkybox). Using the dome path keeps the sky BEHIND world geometry (far-plane draw, no depth
+// write). Only OUTDOOR skybox ids get a dome — interiors (all HOUSE_/SHOP_/BAZAAR/TENT) return -1
+// so the caller no-ops (their OoT3D CMB rooms are fully enclosed; no sky visible).
+//
+// Residual: this maps to a stock BlueSky variant, not the OoT3D per-scene VR backdrop (the 3DS
+// remake replaces Market Adult with a distinct desolate-sky asset, not a cloud-night dome). Full
+// parity here needs the OoT3D scene-specific vrbox asset — that's a follow-up when the OoT3D romfs
+// extraction lands (no docs/tool for it yet).
+static int Zelda3D_SkyBoxToTenkyuIndex(int skyboxId) {
+    switch (skyboxId) {
+        case SKYBOX_MARKET_CHILD_DAY:   return 1; // fine day (clear blue)
+        case SKYBOX_MARKET_CHILD_NIGHT: return 3; // fine night (dark blue + stars)
+        case SKYBOX_MARKET_ADULT:       return 7; // cloud night (desolate overcast)
+        case SKYBOX_OVERCAST_SUNSET:    return 2; // fine sunset (warm)
+        default:                        return -1;
+    }
+}
+
+// The skybox1Index to feed Zelda3D_SkyModelId this frame. Falls back to a scene-derived dome for
+// non-NORMAL skyboxIds; NORMAL passes the game's own envCtx index through unchanged.
+static int Zelda3D_ActiveSkyIndex(PlayState* play) {
+    if (play->skyboxId == SKYBOX_NORMAL_SKY) {
+        return play->envCtx.skybox1Index;
+    }
+    return Zelda3D_SkyBoxToTenkyuIndex(play->skyboxId);
+}
+
 int Zelda3D_SkyActive(PlayState* play) {
     if (!gZelda3dSky || !Zelda3D_Enabled()) {
         return 0;
     }
-    if (play->skyboxId != SKYBOX_NORMAL_SKY) {
+    if (play->skyboxId != SKYBOX_NORMAL_SKY && Zelda3D_SkyBoxToTenkyuIndex(play->skyboxId) < 0) {
         return 0;
     }
     if (Zelda3D_SceneName(play) == NULL) {
         return 0;
     }
-    if (Zelda3D_SkyModelId(play->envCtx.skybox1Index) < 0) {
+    if (Zelda3D_SkyModelId(Zelda3D_ActiveSkyIndex(play)) < 0) {
         return 0;
     }
     return 1;
@@ -3159,15 +3190,18 @@ int Zelda3D_TryDrawSky(PlayState* play) {
     if (!Zelda3D_SkyActive(play)) {
         return 0;
     }
-    modelId = Zelda3D_SkyModelId(play->envCtx.skybox1Index);
+    int activeIdx = Zelda3D_ActiveSkyIndex(play);
+    modelId = Zelda3D_SkyModelId(activeIdx);
     {
         // Dawn/dusk the game cross-fades two sky variants: skybox2Index drawn over skybox1Index at
         // alpha = skyboxBlend (0..255). Mirror that with our domes instead of snapping to the
         // dominant one, so the OoT3D sky transitions through the intermediate colour the way the
-        // N64 skybox did (e.g. blue day -> red sunset).
+        // N64 skybox did (e.g. blue day -> red sunset). Only meaningful for SKYBOX_NORMAL_SKY —
+        // the mapped non-NORMAL skyboxes have a single fixed dome variant (no blend companion).
         int idx2 = play->envCtx.skybox2Index;
         int blend = play->envCtx.skyboxBlend; // alpha of the upper (skybox2) variant
-        int doBlend = (blend > 0 && idx2 >= 0 && idx2 <= 8 && idx2 != play->envCtx.skybox1Index);
+        int doBlend = (play->skyboxId == SKYBOX_NORMAL_SKY) && (blend > 0 && idx2 >= 0 && idx2 <= 8
+                                                                && idx2 != play->envCtx.skybox1Index);
         OPEN_DISPS(play->state.gfxCtx);
         Zelda3D_EnsureModelProvider();
         Gfx_SetupDL_25Opa(play->state.gfxCtx);
@@ -3186,7 +3220,7 @@ int Zelda3D_TryDrawSky(PlayState* play) {
             // Stars sit just above their night gradient dome and BELOW the cloud band (clouds are
             // nearer). Drawn at the same alpha as the dome layer so they cross-fade in/out with the
             // night dome (no separate star-alpha curve to fabricate). #28c.
-            int starId = Zelda3D_SkyStarModelId(play->envCtx.skybox1Index);
+            int starId = Zelda3D_SkyStarModelId(activeIdx);
             if (starId >= 0) {
                 gSPZelda3DDraw(POLY_OPA_DISP++, starId | (1 << 30), 255, 255, 255);
             }
@@ -3194,9 +3228,9 @@ int Zelda3D_TryDrawSky(PlayState* play) {
         {
             // Cloud band: drift its texcoords per the .cmab scroll rate (#28b). Wrap the per-frame
             // U offset into [0,1) (WRAP_S repeats it) and pack as 16-bit fixed (offset*65536).
-            int cloudId = Zelda3D_SkyCloudModelId(play->envCtx.skybox1Index);
+            int cloudId = Zelda3D_SkyCloudModelId(activeIdx);
             if (cloudId >= 0) {
-                float u = (float)play->gameplayFrames * Zelda3D_SkyCloudScrollU(play->envCtx.skybox1Index);
+                float u = (float)play->gameplayFrames * Zelda3D_SkyCloudScrollU(activeIdx);
                 u -= floorf(u);
                 int uFx = (int)(u * 65536.0f) & 0xFFFF;
                 gSPZelda3DDrawUV(POLY_OPA_DISP++, cloudId | (1 << 30), 255, uFx, 0, 255, 255, 255);
@@ -3528,6 +3562,11 @@ void Zelda3D_FrameBegin(void) {
 // mixing them with OoT3D CMB rooms produces the "N64 side view / 3DS top view" split from #134. So
 // suppress unconditionally when Zelda3D is on. For a scene without an OoT3D room CMB yet (unmapped
 // coverage gap) the honest fallback is an empty room, NOT a 2D N64 backdrop.
+//
+// Ruled out (2026-07-02): unsuppressing outdoor bg-image skyboxes (MARKET_CHILD_DAY etc.) does NOT
+// fix the black-void-above-buildings symptom. The bg image is drawn AFTER Scene_Draw/Room_Draw so it
+// paints as a fullscreen overlay on top of the OoT3D geometry — the whole frame turns into the low-
+// res N64 backdrop with OoT3D actors floating over it. See debug_journal/2026-07-02-...md.
 int Zelda3D_ShouldSuppressBgImageSkybox(PlayState* play) {
     return (play != NULL && Zelda3D_Enabled()) ? 1 : 0;
 }
@@ -5307,9 +5346,15 @@ static void Zelda3D_ReplExec(PlayState* play, char* line, const char* outPath) {
         }
         // Also surface the live skybox state so a dawn/dusk two-dome cross-fade (#28a) can be
         // verified: skybox1Index/skybox2Index (0..8) and skyboxBlend (0..255 = alpha of variant 2).
-        Zelda3D_ReplReply(outPath, "sky=%d scale=%.2f skyboxId=%d idx1=%d idx2=%d blend=%d", gZelda3dSky,
-                        gZelda3dSkyScale, play->skyboxId, play->envCtx.skybox1Index, play->envCtx.skybox2Index,
-                        play->envCtx.skyboxBlend);
+        {
+            int activeIdx = Zelda3D_ActiveSkyIndex(play);
+            int active = Zelda3D_SkyActive(play);
+            int modelId = (activeIdx >= 0) ? Zelda3D_SkyModelId(activeIdx) : -1;
+            Zelda3D_ReplReply(outPath, "sky=%d scale=%.2f skyboxId=%d idx1=%d idx2=%d blend=%d active=%d activeIdx=%d modelId=%d",
+                            gZelda3dSky, gZelda3dSkyScale, play->skyboxId,
+                            play->envCtx.skybox1Index, play->envCtx.skybox2Index,
+                            play->envCtx.skyboxBlend, active, activeIdx, modelId);
+        }
     } else if (strcmp(cmd, "fog") == 0) {
         // N64/OoT3D F3DEX fog port. `fog <0|1>` toggles; `fog pos <near> [max]` overrides the F3DEX
         // fog position (0..1000 scale, exactly z_play.c's gSPFogPosition args; max defaults 1000);
