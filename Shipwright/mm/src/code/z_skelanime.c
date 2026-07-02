@@ -325,7 +325,17 @@ void SkelAnime_DrawOpa(PlayState* play, void** skeleton, Vec3s* jointTable, Over
 
     // MM3D SkelAnime intercept — if a skinned MM3D replacement is pending, drive
     // the OoT3D bones from this actor's live N64 jointTable and skip the N64 walk.
-    if (Zelda3D_MM_InterceptSkelAnime(play, skeleton, jointTable)) {
+    // #107 collider re-walk: re-invoke ourselves once with the intercept suppressed so
+    // Collider_UpdateSpheres (via postLimbDraw) still runs and the replaced actor's
+    // spheres track its limbs. Rewind polyOpa/polyXlu to discard the throwaway geometry.
+    if (Zelda3D_MM_InterceptSkelAnime(play, actor, skeleton, jointTable)) {
+        Gfx* opaP = play->state.gfxCtx->polyOpa.p;
+        Gfx* xluP = play->state.gfxCtx->polyXlu.p;
+        gZelda3dMmColliderPass = 1;
+        SkelAnime_DrawOpa(play, skeleton, jointTable, overrideLimbDraw, postLimbDraw, actor);
+        gZelda3dMmColliderPass = 0;
+        play->state.gfxCtx->polyOpa.p = opaP;
+        play->state.gfxCtx->polyXlu.p = xluP;
         return;
     }
 
@@ -441,7 +451,14 @@ void SkelAnime_DrawFlexOpa(PlayState* play, void** skeleton, Vec3s* jointTable, 
 
     // MM3D SkelAnime intercept — see SkelAnime_DrawOpa. Runs BEFORE the flex-matrix
     // alloc so a replaced actor doesn't burn a per-frame GRAPH_ALLOC it won't use.
-    if (Zelda3D_MM_InterceptSkelAnime(play, skeleton, jointTable)) {
+    if (Zelda3D_MM_InterceptSkelAnime(play, actor, skeleton, jointTable)) {
+        Gfx* opaP = play->state.gfxCtx->polyOpa.p;
+        Gfx* xluP = play->state.gfxCtx->polyXlu.p;
+        gZelda3dMmColliderPass = 1;
+        SkelAnime_DrawFlexOpa(play, skeleton, jointTable, dListCount, overrideLimbDraw, postLimbDraw, actor);
+        gZelda3dMmColliderPass = 0;
+        play->state.gfxCtx->polyOpa.p = opaP;
+        play->state.gfxCtx->polyXlu.p = xluP;
         return;
     }
     mtx = GRAPH_ALLOC(play->state.gfxCtx, dListCount * sizeof(Mtx));
@@ -581,7 +598,15 @@ void SkelAnime_DrawTransformFlexOpa(PlayState* play, void** skeleton, Vec3s* joi
     }
 
     // MM3D SkelAnime intercept — see SkelAnime_DrawOpa.
-    if (Zelda3D_MM_InterceptSkelAnime(play, skeleton, jointTable)) {
+    if (Zelda3D_MM_InterceptSkelAnime(play, actor, skeleton, jointTable)) {
+        Gfx* opaP = play->state.gfxCtx->polyOpa.p;
+        Gfx* xluP = play->state.gfxCtx->polyXlu.p;
+        gZelda3dMmColliderPass = 1;
+        SkelAnime_DrawTransformFlexOpa(play, skeleton, jointTable, dListCount, overrideLimbDraw, postLimbDraw,
+                                        transformLimbDraw, actor);
+        gZelda3dMmColliderPass = 0;
+        play->state.gfxCtx->polyOpa.p = opaP;
+        play->state.gfxCtx->polyXlu.p = xluP;
         return;
     }
 

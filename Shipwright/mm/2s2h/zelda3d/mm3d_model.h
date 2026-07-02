@@ -61,6 +61,23 @@ int Zelda3D_MM_SkelAnimeDrawRaw(struct PlayState* play, void** skeleton, void* j
 // so the next actor starts fresh. Called from a post-draw hook in mm3d_draw.c.
 void Zelda3D_MM_AfterActorDraw(void);
 
+// STAGE 3 auto-scale + ground-offset. Mirrors OoT's Zelda3D_AutoModelBoneLenSum
+// and Zelda3D_AutoModelMinY. The OoT3D CMB and the live N64 actor are the SAME
+// character (Grezzo port), so the rest-pose bone-length ratio
+//   worldScale = actor->scale.x * (n64BoneSum / cmbBoneSum)
+// is the correct OoT3D->world scale — pose-independent and free of the bbox
+// overshoot that made the default 0.1f-scale skinned actors render tiny.
+//
+// Zelda3D_MM_ModelBoneLenSum — Σ|CMB bone trans| for non-root bones. 0 if unloaded.
+// Zelda3D_MM_ModelMinY       — bind-pose local-space minimum vertex Y (feet lift).
+// Zelda3D_MM_OverridePending — replace the pending scale/groundOffset with the
+//                              auto-derived values. Called from the SkelAnime
+//                              intercept after the live N64 skeleton sum is known.
+float Zelda3D_MM_ModelBoneLenSum(int modelId);
+float Zelda3D_MM_ModelMinY(int modelId);
+void  Zelda3D_MM_OverridePending(float worldScale, float groundOffset);
+int   Zelda3D_MM_PendingModelId(void); // -1 if no pending replacement.
+
 #ifdef __cplusplus
 }
 #endif
