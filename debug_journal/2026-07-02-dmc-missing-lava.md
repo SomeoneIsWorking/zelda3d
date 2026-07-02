@@ -51,6 +51,28 @@ Verification steps for a next session:
   `oot3d-decomp/build/decomp/`).
 
 ## Status
-NOT FIXED. Recorded for next-session pickup — needs the OoT3D romfs enumeration
-+ scene-CMB XLU handling before a port is possible. Not a kanban card (per
-user directive parity findings live here, not on the board).
+**FALSE ALARM — NOT A BUG.** Follow-up 2026-07-02: the perceived "missing crater" in
+the spawn A/B was a **camera-framing artifact**, not missing geometry.
+
+Investigation:
+- Enumerated `/scene/spot17/`: exactly 2 rooms (spot17_0 = 397KB entrance corridor,
+  spot17_1 = 537KB crater). Rules out hypothesis (2) "wrong room count".
+- Parsed both room CMBs (tools/cmb.py). Room 1 CONTAINS the crater as OPAQUE meshes:
+  `s17_mgm_01` (lava plane, 1056 tris, Y=171-289), `s17_mgm_02` (magma flow, 1857 tris,
+  BLEND additive), `s17_kabe_07` (caldera wall, 3213 tris, bbox 8000×3700×7300),
+  `s17_kabe_05` (4008 tris). Rules out hypothesis (1) "XLU planes stripped" — the main
+  lava is opaque.
+- `ZELDA3D_DBG_ROOM=1` + `sgdump 1000`: confirmed all 23 groups are being submitted
+  to the SDL3 GPU renderer with sensible material state (cull, blend, alpha, tint).
+- Pulled the camera back with `cam` + `camfreeze` from Link's spawn (-1111, 1360, 2064):
+  the crater bowl walls, the lava plane, the ledge geometry ARE all rendered. The
+  "missing crater" impression came from SoH3D's default game camera being tight on
+  Link (looking down the entrance corridor) while OoT3D's DMC entry uses a wide
+  cinematic pan that reveals the whole caldera.
+
+Conclusion: DMC room geometry is complete and correct. The initial spawn A/B is
+misleading because the two engines choose very different camera framings at DMC
+entry; that's a camera-behavior parity issue (not a rendering bug), and is likely
+out of scope until the OoT3D camera/demo system is ported. Marking closed.
+
+Not a kanban card (per user directive parity findings live here, not on the board).
