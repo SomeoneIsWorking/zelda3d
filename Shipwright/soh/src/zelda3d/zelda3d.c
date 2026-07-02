@@ -1922,6 +1922,30 @@ int Zelda3D_DrawActorModel(PlayState* play, int modelId, Actor* actor, float wor
     return 1;
 }
 
+// Emit a tinted BILLBOARD/BILLBOARDADD sprite at (actor.world.pos + off) with a uniform
+// world scale. Same billboardMtxF path the sun/moon uses (Zelda3D_TryDrawSunMoon), lifted
+// into a bridge so behaviors/actor/<actor>.cpp modules can draw camera-facing sprites at
+// an actor's position — Navi's outer glow + inner core (#140) are the first user.
+int Zelda3D_EmitActorBillboard(PlayState* play, int modelId, Actor* actor,
+                               float xOff, float yOff, float zOff, float scale,
+                               u8 r, u8 g, u8 b, u8 a) {
+    if (modelId < 0 || actor == NULL) {
+        return 0;
+    }
+    OPEN_DISPS(play->state.gfxCtx);
+    Zelda3D_EnsureModelProvider();
+    Gfx_SetupDL_25Opa(play->state.gfxCtx);
+    Matrix_Translate(actor->world.pos.x + xOff, actor->world.pos.y + yOff,
+                     actor->world.pos.z + zOff, MTXMODE_NEW);
+    Matrix_Mult(&play->billboardMtxF, MTXMODE_APPLY);
+    Matrix_Scale(scale, scale, scale, MTXMODE_APPLY);
+    gSPMatrix(POLY_OPA_DISP++, MATRIX_NEWMTX(play->state.gfxCtx),
+              G_MTX_MODELVIEW | G_MTX_LOAD);
+    gSPZelda3DDrawA(POLY_OPA_DISP++, modelId, a, r, g, b);
+    CLOSE_DISPS(play->state.gfxCtx);
+    return 1;
+}
+
 float Zelda3D_GScale(int slot, float def) {
     return ZELDA3D_GSCALE(slot, def);
 }
