@@ -324,7 +324,7 @@ endif()
 # Compile definitions
 ################################################################################
 
-target_include_directories(${PROJECT_NAME} PRIVATE assets
+target_include_directories(soh_settings INTERFACE assets
     ${CMAKE_CURRENT_SOURCE_DIR}/include/
     ${CMAKE_CURRENT_SOURCE_DIR}/src/
     ${CMAKE_CURRENT_SOURCE_DIR}/../libultraship/include
@@ -686,7 +686,7 @@ elseif(CMAKE_SYSTEM_NAME STREQUAL "CafeOS")
 
         "$<$<CONFIG:Debug>:-Wl,--wrap=abort>"
     )
-    target_include_directories(${PROJECT_NAME} PRIVATE
+    target_include_directories(soh_settings INTERFACE
         ${DEVKITPRO}/portlibs/wiiu/include/
     )
 else()
