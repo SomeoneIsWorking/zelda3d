@@ -648,13 +648,12 @@ void SweepEmitCompares() {
     std::printf("sweep dim compare=player\n");   ComparePlayerImpl();
     std::printf("sweep dim compare=actors\n");   CompareActorsImpl();
     std::printf("sweep dim compare=camera\n");   CompareCameraImpl();
-    // Skeleton needs an actor selection — dump the first actor of each
-    // category that has one so the sweep touches every skinned entity
-    // in the scene without the caller enumerating.
-    for (int cat = 0; cat < 12; ++cat) {
-        std::printf("sweep dim compare=skeleton cat=%d idx=0\n", cat);
-        CompareSkeletonImpl(cat, 0);
-    }
+    // Skeleton dump — Player only (cat 2 idx 0). The SoH struct layout
+    // is known there; every other actor requires per-id RE that hasn't
+    // been done. If Player isn't present (SoH still booting or scene
+    // has no Link), CompareSkeletonImpl prints n/a — no crash.
+    std::printf("sweep dim compare=skeleton cat=2 idx=0\n");
+    CompareSkeletonImpl(2, 0);
     std::printf("sweep dim compare=lighting\n"); CompareLightingImpl();
 }
 
