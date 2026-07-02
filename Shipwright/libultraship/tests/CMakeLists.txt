@@ -26,8 +26,16 @@ add_executable(lus_tests
     archive_self_tests.cpp
     zelda3d_render_tests.cpp
     cmb_combiner_parse_tests.cpp
+    townsfolk_body_colors_tests.cpp
     zelda3d_test_stubs.cpp
 )
+
+# The townsfolk close-test depends on the pure lookup helper compiled from soh's
+# behaviors dir. Include it directly + the module implementation; no need to pull
+# in the whole soh tree (which would drag Actor / z64 headers).
+target_include_directories(lus_tests PRIVATE ${CMAKE_CURRENT_SOURCE_DIR}/../../soh/src/zelda3d/behaviors)
+target_sources(lus_tests PRIVATE
+    ${CMAKE_CURRENT_SOURCE_DIR}/../../soh/src/zelda3d/behaviors/actor/townsfolk_body_colors.cpp)
 
 if(ENABLE_SCRIPTING)
     target_sources(lus_tests PRIVATE script_test.cpp)

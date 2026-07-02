@@ -38,6 +38,15 @@ struct GlModel {
     // Zelda3D_GL_SetMatTexOverride before EmitPose; snapshotted into ItemPose so it survives the
     // deferred render (like midMask). Empty = no override (materials sample their static binding).
     std::unordered_map<int, int> pendingMatTex; // materialIndex -> texIndex (-1 entry = cleared)
+    // Per-frame material->CONSTANT-color override (EnHy townsfolk body colours, port of
+    // Model_SetMaterialConstantColor via TownsfolkBehavior::applyDrawOverrides). Same snapshot
+    // discipline as pendingMatTex: set before EmitPose, snapshot into ItemPose::matConst, applied
+    // by the render pass to uMatConst.rgb for the group whose materialIndex matches. The .constIdx
+    // must match the group's parsed combConstIdx (final-stage CONSTANT selector) — asserted at
+    // apply time so a stale write ends up as a diagnostic, not a mysterious wrong-slot tint.
+    // Zelda3DMatConstOv is defined in fast/zelda3d_gl.h (POD; shared with the render backend
+    // so the void*-typed map pointer that Zelda3D_Sg_DrawModel receives is well-typed).
+    std::unordered_map<int, Zelda3DMatConstOv> pendingMatConst; // materialIndex -> override
 };
 
 std::unordered_map<int, GlModel> g_models; // keyed by stable model id
@@ -53,6 +62,9 @@ struct ItemPose {
     int boneCount = 0;
     uint64_t midMask = ~0ull; // mesh_id visibility for this emit (see GlModel::pendingMidMask)
     std::unordered_map<int, int> matTex; // material->texIndex override for this emit (facial swap)
+    // material->CONSTANT-color override for this emit (EnHy townsfolk body colours). Snapshotted
+    // from GlModel::pendingMatConst at EmitPose so it pairs with the deferred draw.
+    std::unordered_map<int, Zelda3DMatConstOv> matConst;
 };
 std::unordered_map<int, std::vector<ItemPose>> g_curPoses;  // this logic frame, per modelId
 std::unordered_map<int, std::vector<ItemPose>> g_prevPoses; // last logic frame, per modelId
@@ -404,6 +416,34 @@ extern "C" void Zelda3D_GL_ClearMatTexOverrides(int modelId) {
     if (it != g_models.end()) it->second.pendingMatTex.clear();
 }
 
+// EnHy townsfolk body-color override: set (materialIndex → constIdx, RGBA) so the next EmitPose
+// snapshots it into the deferred draw. Cleared on frame boundary via ClearMatConstOverrides. See
+// TownsfolkBehavior::applyDrawOverrides + oot3d-decomp/build/decomp/001b4944.c (EnHy_Draw).
+extern "C" void Zelda3D_GL_SetMatConstOverride(int modelId, int materialIndex, int constIdx,
+                                             float r, float g, float b, float a) {
+    auto& pm = g_models[modelId].pendingMatConst;
+    Zelda3DMatConstOv ov{};
+    ov.constIdx = constIdx;
+    ov.rgba[0] = r;
+    ov.rgba[1] = g;
+    ov.rgba[2] = b;
+    ov.rgba[3] = a;
+    pm[materialIndex] = ov;
+    static int sDbg = -1;
+    if (sDbg < 0) {
+        const char* v = std::getenv("ZELDA3D_DBG_MATCONST");
+        sDbg = (v != nullptr && v[0] != '\0') ? 1 : 0;
+    }
+    if (sDbg) {
+        fprintf(stderr, "[MATCONST] model=%d mat=%d constIdx=%d rgba=(%.3f,%.3f,%.3f,%.3f)\n",
+                modelId, materialIndex, constIdx, r, g, b, a);
+    }
+}
+extern "C" void Zelda3D_GL_ClearMatConstOverrides(int modelId) {
+    auto it = g_models.find(modelId);
+    if (it != g_models.end()) it->second.pendingMatConst.clear();
+}
+
 extern "C" void Zelda3D_GL_EmitPose(int modelId) {
     // Snapshot this actor's just-set pose at EMIT time (during dlist build, logic-frame rate) so it
     // survives later same-modelId SetBones calls. Appended in emit order; the k-th submit of this
@@ -418,6 +458,7 @@ extern "C" void Zelda3D_GL_EmitPose(int modelId) {
         }
         p.midMask = it->second.pendingMidMask;
         p.matTex = it->second.pendingMatTex;
+        p.matConst = it->second.pendingMatConst;
     }
     g_curPoses[modelId].push_back(std::move(p));
 }
@@ -467,6 +508,9 @@ struct DrawItem {
     int boneCount = 0;
     uint64_t midMask = ~0ull;     // mesh_id visibility for this draw (see GlModel::pendingMidMask)
     std::unordered_map<int, int> matTex; // facial material->texIndex override for this draw
+    // Per-actor CONSTANT-color override (EnHy townsfolk). Same shape as matTex but per-material
+    // rgba + constIdx; passed to Zelda3D_Sg_DrawModel and consumed inside the render pass.
+    std::unordered_map<int, Zelda3DMatConstOv> matConst;
 };
 // Inline unified-render path: each OTR_G_ZELDA3D_DRAW appends its model op straight into the SDL3
 // GPU op-list at that point in the N64 dlist (depth-correct interleave, ONE pass for N64 + 3DS —
@@ -520,6 +564,7 @@ extern "C" void Zelda3D_GL_Submit(int modelId, const float* mp16, const float* m
     if (cit != g_curPoses.end() && k < cit->second.size()) {
         it.midMask = cit->second[k].midMask;
         it.matTex = cit->second[k].matTex;
+        it.matConst = cit->second[k].matConst;
     }
     if (cit != g_curPoses.end() && k < cit->second.size() && !cit->second[k].bones.empty()) {
         it.bones = cit->second[k].bones;
@@ -552,7 +597,7 @@ extern "C" void Zelda3D_GL_Submit(int modelId, const float* mp16, const float* m
             pose = lerped.data();
         }
         Zelda3D_Sg_DrawModel(it.modelId, it.mp, it.mv, it.lit, it.invertY, it.r, it.g, it.b, it.a, it.aspectAdj, pose,
-                           it.boneCount, it.midMask, it.sky, it.uvOffU, it.uvOffV, &it.matTex);
+                           it.boneCount, it.midMask, it.sky, it.uvOffU, it.uvOffV, &it.matTex, &it.matConst);
     }
 #else
     (void)it; // no SDL3 GPU backend: Zelda3D rendering has no other path

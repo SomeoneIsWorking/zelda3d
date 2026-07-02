@@ -15,6 +15,7 @@
 extern "C" {
 void Zelda3D_ClearBonePostRots(int modelId);
 void Zelda3D_GL_ClearMatTexOverrides(int modelId);
+void Zelda3D_GL_ClearMatConstOverrides(int modelId);
 }
 
 int gZelda3dTrack = -1;  // -1 = uninit (env ZELDA3D_TRACK, default on)
@@ -34,9 +35,10 @@ extern "C" void Zelda3D_ApplyActorOverrides(int modelId, void* actorv) {
         const char* v = std::getenv("ZELDA3D_FACIAL");
         gZelda3dFacial = (v != nullptr && v[0] == '0') ? 0 : 1;
     }
-    // Start from a clean slate each draw (no stale track pose / facial frame).
+    // Start from a clean slate each draw (no stale track pose / facial frame / body-color override).
     Zelda3D_ClearBonePostRots(modelId);
     Zelda3D_GL_ClearMatTexOverrides(modelId);
+    Zelda3D_GL_ClearMatConstOverrides(modelId);
     if (actorv == nullptr) {
         return;
     }
