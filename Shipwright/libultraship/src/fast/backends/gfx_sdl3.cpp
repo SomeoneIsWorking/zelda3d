@@ -806,6 +806,23 @@ void GfxWindowBackendSDL3::SyncFramerateWithTime() const {
 extern "C" {
 char gSoh3dDumpPath[1024] = { 0 };
 volatile int gSoh3dDumpPending = 0;
+
+// Zelda3D: on-demand framebuffer-capture-to-caller-buffer trigger for the
+// direct harness (tools/soh3d_harness). Same shape as the PPM dump above,
+// but the pixels land in a caller-provided buffer instead of a file so
+// the harness can present them alongside Azahar's frame in ONE window
+// without round-tripping through disk.
+//
+// Usage: harness fills gSoh3dCaptureBuf + gSoh3dCaptureCap, sets
+// gSoh3dCapturePending=1, calls RunFrame. The next FinishRender inside
+// the SDL3 GPU backend downloads fb 0's color texture into that buffer
+// (RGBA8, tightly packed by width in pixels), writes gSoh3dCaptureW/H,
+// and clears gSoh3dCapturePending.
+uint8_t*      gSoh3dCaptureBuf     = nullptr;
+uint32_t      gSoh3dCaptureCap     = 0;
+uint32_t      gSoh3dCaptureW       = 0;
+uint32_t      gSoh3dCaptureH       = 0;
+volatile int  gSoh3dCapturePending = 0;
 }
 
 // Write the current GL window framebuffer to a binary PPM (P6), flipped to top-down.

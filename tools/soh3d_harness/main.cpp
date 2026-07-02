@@ -57,6 +57,7 @@
 #include <cstdio>
 #include <cstdlib>
 #include <cstring>
+#include <filesystem>
 #include <iostream>
 #include <optional>
 #include <sstream>
@@ -64,6 +65,21 @@
 #include <vector>
 
 #include "libretro.h"
+#include <SDL3/SDL.h>
+
+// ---------------------------------------------------------------------------
+// Direct-harness capture globals defined in libultraship's SDL3 renderer
+// (Shipwright/libultraship/src/fast/backends/gfx_sdl3.cpp). We fill in the
+// buffer pointer + capacity, set gSoh3dCapturePending=1, and the very next
+// FinishRender inside SoH3D downloads its color-fb 0 into that buffer as
+// packed RGBA8, writing gSoh3dCaptureW/H, and clears the flag.
+extern "C" {
+extern uint8_t*     gSoh3dCaptureBuf;
+extern uint32_t     gSoh3dCaptureCap;
+extern uint32_t     gSoh3dCaptureW;
+extern uint32_t     gSoh3dCaptureH;
+extern volatile int gSoh3dCapturePending;
+}
 
 // Direct Azahar API — the harness is linked in-process, so we bypass the
 // libretro memory-map path (which only exposes HEAP/LINEAR/VRAM, not the
@@ -128,6 +144,110 @@ uint32_t g_input_mask = 0;
 uint64_t g_input_poll_count = 0;
 uint32_t g_input_poll_ids_seen = 0; // bit N set if joypad id N was ever queried
 
+// ---------------------------------------------------------------------------
+// SBS harness window
+//
+// The harness owns ONE SDL3 window. Neither engine draws into it directly:
+//
+//   - Azahar renders through its libretro core to CPU pixels delivered via
+//     VideoRefresh (XRGB8888). We force citra_layout_option = "single_screen"
+//     in the env callback so those frames contain only the TOP screen. We
+//     stash the latest frame in g_az_buf.
+//
+//   - SoH3D runs with SOH_HEADLESS=1 so libultraship creates its own SDL
+//     window HIDDEN. Its SDL3 GPU backend still renders into fb 0's color
+//     texture normally; before each RunFrame we set gSoh3dCapturePending=1
+//     pointing gSoh3dCaptureBuf at g_soh_buf, and FinishRender downloads
+//     the frame into it as tightly-packed RGBA8.
+//
+// Once we have (at least one side's) fresh pixels, PresentSbs() gets the
+// harness window's surface, blits Azahar to the LEFT half + SoH3D to the
+// RIGHT half, and calls SDL_UpdateWindowSurface. That's the entire SBS
+// compositor — no textures, no shaders, no render pipeline of our own.
+// ---------------------------------------------------------------------------
+// SoH3D bring-up flag. Declared here early so the capture / present
+// helpers below can gate their SoH3D-side branches; assigned inside
+// HandleSohBoot further down.
+bool g_soh_booted = false;
+
+SDL_Window* g_win = nullptr;
+int         g_win_w = 1280;  // total SBS width; ½ per engine
+int         g_win_h = 480;
+
+std::vector<uint8_t> g_az_buf;      // XRGB8888
+uint32_t g_az_w = 0, g_az_h = 0;
+size_t   g_az_pitch = 0;
+bool     g_az_dirty = false;
+
+std::vector<uint8_t> g_soh_buf;     // RGBA8 (gSoh3dCaptureBuf backing)
+bool     g_soh_dirty = false;
+
+void EnsureHarnessWindow() {
+    if (g_win) return;
+    if (!SDL_InitSubSystem(SDL_INIT_VIDEO)) {
+        std::fprintf(stderr, "harness: SDL_InitSubSystem(VIDEO) failed: %s\n",
+                     SDL_GetError());
+        return;
+    }
+    g_win = SDL_CreateWindow("SoH3D harness — Azahar | SoH3D",
+                             g_win_w, g_win_h, SDL_WINDOW_RESIZABLE);
+    if (!g_win) {
+        std::fprintf(stderr, "harness: SDL_CreateWindow failed: %s\n", SDL_GetError());
+    }
+}
+
+void RequestSohCapture() {
+    if (!g_soh_booted) return;
+    // We force a small render resolution in HandleSohBoot's config write
+    // (Window.Width/Height = 320/240) so fb 0 stays tiny. RmlUi still
+    // reports its own document size independently — 2000x1500 in practice
+    // on this box. Reserve 24 MB (2400x2400x4) to comfortably cover both.
+    constexpr size_t kCap = static_cast<size_t>(2400) * 2400 * 4;
+    if (g_soh_buf.size() < kCap) g_soh_buf.resize(kCap);
+    gSoh3dCaptureBuf     = g_soh_buf.data();
+    gSoh3dCaptureCap     = static_cast<uint32_t>(g_soh_buf.size());
+    gSoh3dCapturePending = 1;
+}
+
+void PresentSbs() {
+    EnsureHarnessWindow();
+    if (!g_win) return;
+    SDL_Surface* dst = SDL_GetWindowSurface(g_win);
+    if (!dst) return;
+    const int halfW = dst->w / 2;
+
+    SDL_FillSurfaceRect(dst, nullptr, 0);
+
+    // LEFT: Azahar top-screen frame (XRGB8888). Surface wraps g_az_buf.
+    if (g_az_w && g_az_h && !g_az_buf.empty()) {
+        SDL_Surface* src = SDL_CreateSurfaceFrom(
+            static_cast<int>(g_az_w), static_cast<int>(g_az_h),
+            SDL_PIXELFORMAT_XRGB8888, g_az_buf.data(),
+            static_cast<int>(g_az_pitch));
+        if (src) {
+            SDL_Rect r{0, 0, halfW, dst->h};
+            SDL_BlitSurfaceScaled(src, nullptr, dst, &r, SDL_SCALEMODE_LINEAR);
+            SDL_DestroySurface(src);
+        }
+    }
+    // RIGHT: SoH3D frame (RGBA8 tightly packed by W). Surface wraps g_soh_buf.
+    if (gSoh3dCaptureW && gSoh3dCaptureH && !g_soh_buf.empty()) {
+        const int w = static_cast<int>(gSoh3dCaptureW);
+        const int h = static_cast<int>(gSoh3dCaptureH);
+        SDL_Surface* src = SDL_CreateSurfaceFrom(
+            w, h, SDL_PIXELFORMAT_RGBA8888, g_soh_buf.data(), w * 4);
+        if (src) {
+            SDL_Rect r{halfW, 0, dst->w - halfW, dst->h};
+            SDL_BlitSurfaceScaled(src, nullptr, dst, &r, SDL_SCALEMODE_LINEAR);
+            SDL_DestroySurface(src);
+        }
+    }
+    SDL_UpdateWindowSurface(g_win);
+    SDL_PumpEvents();
+    g_az_dirty = false;
+    g_soh_dirty = false;
+}
+
 void CoreLog(retro_log_level level, const char* fmt, ...) {
     va_list ap;
     va_start(ap, fmt);
@@ -161,11 +281,17 @@ bool EnvironmentCallback(unsigned cmd, void* data) {
 
     case RETRO_ENVIRONMENT_GET_VARIABLE: {
         // Force the software renderer for headless operation — no window, no
-        // HW context needed. Every other core variable falls through to the
-        // core's built-in default.
+        // HW context needed.
         auto* var = static_cast<retro_variable*>(data);
         if (var->key && std::strcmp(var->key, "citra_graphics_api") == 0) {
             var->value = "Software";
+            return true;
+        }
+        // Only the 3DS top screen is useful for parity — bottom is UI, not
+        // game state. "single_screen" restricts VideoRefresh output to
+        // just the top screen at 400x240.
+        if (var->key && std::strcmp(var->key, "citra_layout_option") == 0) {
+            var->value = "single_screen";
             return true;
         }
         var->value = nullptr;
@@ -177,7 +303,16 @@ bool EnvironmentCallback(unsigned cmd, void* data) {
     }
 }
 
-void VideoRefresh(const void*, unsigned, unsigned, size_t) {}
+void VideoRefresh(const void* data, unsigned width, unsigned height, size_t pitch) {
+    if (!data || !width || !height) return;
+    const size_t need = pitch * height;
+    if (g_az_buf.size() < need) g_az_buf.resize(need);
+    std::memcpy(g_az_buf.data(), data, need);
+    g_az_w = width;
+    g_az_h = height;
+    g_az_pitch = pitch;
+    g_az_dirty = true;
+}
 void AudioSample(int16_t, int16_t) {}
 size_t AudioSampleBatch(const int16_t*, size_t frames) { return frames; }
 void InputPoll() {}
@@ -229,7 +364,10 @@ void HandleRun(std::istringstream& toks) {
     if (!(toks >> n_s)) { PrintErr("run: usage: run <N>"); return; }
     auto n = ParseNum(n_s);
     if (!n) { PrintErr("run: bad N"); return; }
-    for (uint64_t i = 0; i < *n; ++i) retro_run();
+    for (uint64_t i = 0; i < *n; ++i) {
+        retro_run();
+        PresentSbs();
+    }
     std::printf("ok run %llu\n", static_cast<unsigned long long>(*n));
 }
 
@@ -300,13 +438,33 @@ void HandleLoadState(std::istringstream& toks) {
 // SoH3D bring-up as a REPL command so failure modes are isolated —
 // call this from a test script instead of always booting SoH3D on
 // startup and taking the whole harness down on any early crash.
-bool g_soh_booted = false;
-
 void HandleSohBoot(std::istringstream&) {
     if (g_soh_booted) { PrintErr("soh_boot: already booted"); return; }
-    // Force headless — this is a Linux dev machine with Wayland; SoH3D's
-    // libultraship must NOT try to open a window.
+    // The harness owns the display; SoH3D must render to fb 0 but NOT open
+    // a visible window of its own. SOH_HEADLESS=1 makes libultraship's
+    // SDL3 backend create its window HIDDEN, and rendering into fb 0 (which
+    // is what our capture path downloads) still happens normally.
+    setenv("SOH_HEADLESS", "1", 1);
     setenv("SOH3D_HEADLESS", "1", 1);
+
+    // Force a small render resolution. Without this, libultraship reads
+    // Window.Width/Height from shipofharkinian.json — which on a HiDPI
+    // display is the full monitor pixel size (e.g. 3840x1975 -> a
+    // 9600x4938 fb 0 after internal scaling, ~190 MB / frame, enough to
+    // OOM the GPU). 320x240 is more than the 3DS top-screen resolution
+    // and plenty for parity work; keep it low for the harness.
+    if (!std::filesystem::exists("shipofharkinian.json")) {
+        std::FILE* f = std::fopen("shipofharkinian.json", "w");
+        if (f) {
+            std::fprintf(f,
+                "{\n"
+                "  \"Window\": { \"Width\": 320, \"Height\": 240 },\n"
+                "  \"CVars\": { \"gInternalResolution\": 1.0 }\n"
+                "}\n");
+            std::fclose(f);
+        }
+    }
+    EnsureHarnessWindow();
     static char argv0[] = "soh3d_harness";
     static char* argv[] = { argv0, nullptr };
     GameConsole_Init();
@@ -325,7 +483,11 @@ void HandleSohStep(std::istringstream& toks) {
     if (!(toks >> n_s)) { PrintErr("soh_step: usage: soh_step <N>"); return; }
     auto n = ParseNum(n_s);
     if (!n) { PrintErr("soh_step: bad N"); return; }
-    for (uint64_t i = 0; i < *n; ++i) RunFrame();
+    for (uint64_t i = 0; i < *n; ++i) {
+        RequestSohCapture();
+        RunFrame();
+        PresentSbs();
+    }
     std::printf("ok soh_step %llu\n", static_cast<unsigned long long>(*n));
 }
 
@@ -339,7 +501,8 @@ void HandleStep(std::istringstream& toks) {
     if (!n) { PrintErr("step: bad N"); return; }
     for (uint64_t i = 0; i < *n; ++i) {
         retro_run();
-        if (g_soh_booted) RunFrame();
+        if (g_soh_booted) { RequestSohCapture(); RunFrame(); }
+        PresentSbs();
     }
     std::printf("ok step %llu %s\n",
                 static_cast<unsigned long long>(*n),

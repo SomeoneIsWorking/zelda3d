@@ -62,6 +62,16 @@ extern "C" {
 extern char gSoh3dDumpPath[1024];
 extern volatile int gSoh3dDumpPending;
 extern int gUnifiedRenderer; // render-unification effort (kanban #131): bit 1 = N64 unified
+
+// Direct-harness capture-to-buffer path (defined in gfx_sdl3.cpp). See the
+// comment there for the protocol. FinishRender consumes gSoh3dCapturePending
+// after each frame — the download re-uses the exact same GPU copy pattern
+// as WriteFbPpm but writes RGBA8 into gSoh3dCaptureBuf instead of a file.
+extern uint8_t*     gSoh3dCaptureBuf;
+extern uint32_t     gSoh3dCaptureCap;
+extern uint32_t     gSoh3dCaptureW;
+extern uint32_t     gSoh3dCaptureH;
+extern volatile int gSoh3dCapturePending;
 }
 
 namespace {
@@ -1004,17 +1014,24 @@ void GfxRenderingAPISdl3Gpu::FinishRender() {
         }
     }
 
-    if (dumpPath != nullptr) {
+    const bool wantCapture = gSoh3dCapturePending != 0;
+    if (dumpPath != nullptr || wantCapture) {
         SDL_GPUFence* fence = SDL_SubmitGPUCommandBufferAndAcquireFence(mCmd);
         mCmd = nullptr;
         if (fence) {
             SDL_WaitForGPUFences(mDevice, true, &fence, 1);
             SDL_ReleaseGPUFence(mDevice, fence);
         }
-        WriteFbPpm(0, dumpPath);
-        gSoh3dDumpPending = 0;
-        if (exitAfter)
-            exit(0);
+        if (dumpPath != nullptr) {
+            WriteFbPpm(0, dumpPath);
+            gSoh3dDumpPending = 0;
+            if (exitAfter)
+                exit(0);
+        }
+        if (wantCapture) {
+            WriteFbToCaptureBuf(0);
+            gSoh3dCapturePending = 0;
+        }
     } else {
         SDL_SubmitGPUCommandBuffer(mCmd);
         mCmd = nullptr;
@@ -1105,6 +1122,57 @@ void GfxRenderingAPISdl3Gpu::WriteFbPpm(int fbId, const char* path) {
     }
     if (f)
         fclose(f);
+    SDL_UnmapGPUTransferBuffer(mDevice, tb);
+    SDL_ReleaseGPUTransferBuffer(mDevice, tb);
+}
+
+void GfxRenderingAPISdl3Gpu::WriteFbToCaptureBuf(int fbId) {
+    if (fbId < 0 || fbId >= (int)mFramebuffers.size())
+        return;
+    FramebufferSDL3& fb = mFramebuffers[fbId];
+    if (!fb.color)
+        return;
+    const uint32_t w = fb.width, h = fb.height;
+    const uint32_t size = w * h * 4;
+    if (gSoh3dCaptureBuf == nullptr || gSoh3dCaptureCap < size) {
+        SPDLOG_WARN("SoH3D capture: buffer too small ({} < {}) or null; skipping",
+                    (unsigned)gSoh3dCaptureCap, (unsigned)size);
+        return;
+    }
+
+    SDL_GPUTransferBufferCreateInfo tci{};
+    tci.usage = SDL_GPU_TRANSFERBUFFERUSAGE_DOWNLOAD;
+    tci.size = size;
+    SDL_GPUTransferBuffer* tb = SDL_CreateGPUTransferBuffer(mDevice, &tci);
+
+    SDL_GPUCommandBuffer* c = SDL_AcquireGPUCommandBuffer(mDevice);
+    SDL_GPUCopyPass* cp = SDL_BeginGPUCopyPass(c);
+    SDL_GPUTextureRegion reg{};
+    reg.texture = fb.color;
+    reg.w = w;
+    reg.h = h;
+    reg.d = 1;
+    SDL_GPUTextureTransferInfo ti{};
+    ti.transfer_buffer = tb;
+    ti.offset = 0;
+    ti.pixels_per_row = w;
+    ti.rows_per_layer = h;
+    SDL_DownloadFromGPUTexture(cp, &reg, &ti);
+    SDL_EndGPUCopyPass(cp);
+    SDL_GPUFence* fence = SDL_SubmitGPUCommandBufferAndAcquireFence(c);
+    if (fence) {
+        SDL_WaitForGPUFences(mDevice, true, &fence, 1);
+        SDL_ReleaseGPUFence(mDevice, fence);
+    }
+
+    const uint8_t* px = (const uint8_t*)SDL_MapGPUTransferBuffer(mDevice, tb, false);
+    if (px) {
+        std::memcpy(gSoh3dCaptureBuf, px, size);
+        gSoh3dCaptureW = w;
+        gSoh3dCaptureH = h;
+    } else {
+        SPDLOG_ERROR("SoH3D capture: map failed: {}", SDL_GetError());
+    }
     SDL_UnmapGPUTransferBuffer(mDevice, tb);
     SDL_ReleaseGPUTransferBuffer(mDevice, tb);
 }
