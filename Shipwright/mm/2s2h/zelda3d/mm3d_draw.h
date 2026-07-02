@@ -19,7 +19,17 @@ extern "C" {
 // If a skinned MM3D replacement is pending for this actor, poses OoT3D bones from
 // the live N64 jointTable and returns 1 (caller returns immediately). Else 0
 // (caller proceeds with the vanilla N64 limb walk).
-int Zelda3D_MM_InterceptSkelAnime(PlayState* play, void** skeleton, Vec3s* jointTable);
+int Zelda3D_MM_InterceptSkelAnime(PlayState* play, Actor* actor, void** skeleton, Vec3s* jointTable);
+
+// #107: after Zelda3D_MM_InterceptSkelAnime returns 1 (MM3D model drawn instead of the N64
+// limb walk), each SkelAnime_Draw*Opa call site re-invokes the same walk with
+// gZelda3dMmColliderPass=1 so the vanilla N64 postLimbDraw side effects still run —
+// most importantly Collider_UpdateSpheres, which keeps a replaced actor's OC/AC/AT
+// collision spheres pinned to its live limbs instead of stuck at the origin (else
+// enemies phantom-collide and zip away, exactly like OoT's own #107). The re-walked
+// gfx output is discarded by the caller rewinding polyOpa/polyXlu — this flag ONLY
+// suppresses the replacement so the walk proceeds. Mirrors OoT's gZelda3dColliderPass.
+extern int gZelda3dMmColliderPass;
 
 // 1 = drew the MM3D replacement (skip N64 draw); 0 = no replacement (draw vanilla N64).
 // This is the only MM-specific renderer surface: the per-actor divert (MM has its own
