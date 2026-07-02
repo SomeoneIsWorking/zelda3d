@@ -249,7 +249,11 @@ static int resolveModelForObject(int objectId) {
         return -1;
     }
     if (probeCmb.bones().size() > 1) {
-        // Skinned — needs the animated-actor path; not wired for MM yet.
+        // Skinned — needs the animated-actor path; not wired for MM yet. Log once per
+        // objectId so coverage gaps are visible (denominator: ~418 archives shipped;
+        // we currently only serve the rigid subset).
+        fprintf(stderr, "[MM3D] skip obj=0x%03X (%s): skinned (%zu bones)\n",
+                objectId, name, probeCmb.bones().size());
         g_objectToModel[objectId] = -1;
         return -1;
     }
