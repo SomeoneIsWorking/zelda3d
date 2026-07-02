@@ -5,7 +5,7 @@
 #include "Z3DRepl.h"
 
 #include "global.h" // gPlayState, GET_PLAYER, PlayState, Player, Actor, ACTORCAT_MAX
-#include "2s2h/zelda3d/mm3d_model.h" // Zelda3D_SetScaleOverride (live prop-scale calibration)
+#include "2s2h/zelda3d/mm3d_model.h" // Zelda3D_SetObjectScale (per-object calibration)
 
 #include <fcntl.h>
 #include <math.h>
@@ -20,6 +20,14 @@ static int sFd = -2; // -2 = not yet opened, -1 = disabled/failed
 static char sOutPath[512];
 static char sBuf[1024];
 static int sBufLen = 0;
+
+static void Z3D_Repl_Reply(const char* line);
+
+// Line sink adapter for Zelda3D_ListModels — matches the (line, user) shape.
+static void Z3D_Repl_ListLine(const char* line, void* user) {
+    (void)user;
+    Z3D_Repl_Reply(line);
+}
 
 static void Z3D_Repl_Reply(const char* line) {
     if (sOutPath[0] == '\0') {
@@ -170,11 +178,17 @@ static void Z3D_Repl_Exec(PlayState* play, char* line) {
     } else if (strncmp(line, "actors", 6) == 0) {
         Z3D_Repl_Actors(play, line + 6);
     } else if (strncmp(line, "mscale", 6) == 0) {
-        float s = (float)strtod(line + 6, NULL);
-        Zelda3D_SetScaleOverride(s);
-        char out[64];
-        snprintf(out, sizeof(out), "mscale = %.4f", s);
+        // `mscale <objId> <scale>` — per-object world-scale calibration. objId may be
+        // hex (0x1AD) or decimal. scale <= 0 clears the override back to the default.
+        char* end = NULL;
+        s32 objectId = (s32)strtol(line + 6, &end, 0);
+        float s = (end != NULL) ? (float)strtod(end, NULL) : 0.0f;
+        Zelda3D_SetObjectScale(objectId, s);
+        char out[96];
+        snprintf(out, sizeof(out), "mscale obj=0x%03X scale=%.4f", objectId, s);
         Z3D_Repl_Reply(out);
+    } else if (strncmp(line, "mlist", 5) == 0) {
+        Zelda3D_ListModels(Z3D_Repl_ListLine, NULL);
     } else if (strncmp(line, "ping", 4) == 0) {
         Z3D_Repl_Reply("pong");
     } else {
