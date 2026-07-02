@@ -24,9 +24,16 @@ int Zelda3D_LookupModel(int actorId, int objectId, int* modelId, float* worldSca
 // World scale for a resolved model id (1.0 if unknown). Kept parallel to the OoT API.
 float Zelda3D_ModelScaleById(int modelId);
 
-// Live world-scale override for the prop under calibration (REPL `mscale <f>`; <=0 clears
-// back to the table value). Debug knob for dialing in the first props against the oracle.
-void Zelda3D_SetScaleOverride(float scale);
+// Live per-object world-scale override for the prop under calibration
+// (REPL `mscale <objId> <scale>`). Persisted on the model's ModelSpec so it
+// survives across draws. If the object hasn't been auto-probed yet, the scale
+// is stashed and applied when the archive is first resolved. Passing scale <=0
+// clears any override for that object (falls back to the auto-probe default).
+void Zelda3D_SetObjectScale(int objectId, float scale);
+
+// Dump the current object->model->scale table via the supplied line sink
+// (one line per entry). Used by the REPL `mlist` command.
+void Zelda3D_ListModels(void (*emitLine)(const char* line, void* user), void* user);
 
 #ifdef __cplusplus
 }
