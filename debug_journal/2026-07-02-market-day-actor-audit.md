@@ -6,21 +6,25 @@ Signal source: `actorsnear` output + `[Zelda3D] auto-loaded model …` lines in 
 
 ## Sweep
 
+**Invariant reminder**: N64 rendering is a GAP, not an acceptable state. The unified
+renderer is meant to draw everything through OoT3D assets. Any row below tagged "N64"
+is a defect to close, not a documented status.
+
 | id | actor | count | render path | note |
 |----|-------|-------|-------------|------|
-| 0x000 | Player | 1 | N64 | separate track (#117 anim port, Link port pipeline) |
+| 0x000 | Player | 1 | **N64 (gap)** | Link port is a separate active track (#117 anim, player-port pipeline) — real gap being worked. |
 | 0x009 | EN_DOOR | 6 | MODULE(3DS) | door.cpp inc3 → field-keep CMB (per-scene table) |
-| 0x018 | EN_ELF (Navi) | 1 | N64 | no OoT3D asset; universal, not market-specific |
+| 0x018 | EN_ELF (Navi) | 1 | **N64 (gap)** | No OoT3D asset routing yet. Navi is engine-rendered in OoT3D (particle/effect surface), not an actor CMB — needs a native replacement path. Filed as its own card. |
 | 0x077 | EN_KUSA (tree/foliage) | 1 | AUTO | zelda_wood02.zar |
-| 0x0E7 | EN_MA1 (young Malon) | 1 | AUTO skin (renders OoT3D) | ZAR loads but skinned; needs behavior port |
-| 0x112 | EN_WONDER_ITEM | 2 | N64 | invisible trigger, no visual gap |
-| 0x125 | (mgr) | many | N64 | env manager, non-drawing |
+| 0x0E7 | EN_MA1 (young Malon) | 1 | AUTO skin (renders OoT3D) | Draws OoT3D via generic N64ANIM retarget; polish (materials/track) pending in #138 |
+| 0x112 | EN_WONDER_ITEM | 2 | invisible trigger | Never drawn — no visual surface, N64 tag inapplicable. |
+| 0x125 | (mgr) | many | invisible mgr | env manager, non-drawing. |
 | 0x16E | EN_HY (townsfolk) | 1+ | AUTO skin + TownsfolkBehavior | head-track + eye anim + body-color (Step 2c) |
-| 0x178 | EN_HEISHI4 (guards) | 2 | AUTO skin (renders OoT3D) | ZAR loads but skinned; needs behavior port |
-| 0x19B | EN_DOG | 6 | AUTO skin (renders OoT3D) | ZAR loads but skinned; needs behavior port |
-| 0x1A0 | (mgr) | 4 | N64 | env sound, non-drawing |
-| 0x1AC | EN_TG (dancing couple) | 1 | AUTO skin (renders OoT3D) | AUTO picks WRONG cmb (see below); needs behavior port |
-| 0x1AD | EN_MU (haggling townspeople) | 2 | AUTO skin (renders OoT3D) | spawns in Market Day at dayTime>=0x8001 (params 0x0000, 0x0001); AUTO picks marketpeople.cmb (correct CMB) but skinned→skip. Needs behavior port. |
+| 0x178 | EN_HEISHI4 (guards) | 2 | AUTO skin (renders OoT3D) | Draws OoT3D via generic N64ANIM retarget; polish pending in #137 |
+| 0x19B | EN_DOG | 6 | AUTO skin (renders OoT3D) | Draws OoT3D via generic N64ANIM retarget; polish pending in #139 |
+| 0x1A0 | (mgr) | 4 | invisible mgr | env sound, non-drawing. |
+| 0x1AC | EN_TG (dancing couple) | 1 | AUTO skin (renders OoT3D) | Wrong CMB routing FIXED (eff2e238); material polish pending in #135. |
+| 0x1AD | EN_MU (haggling townspeople) | 2 | AUTO skin (renders OoT3D) | Spawns Market Day dayTime>=0x8001; polish pending in #136. |
 
 At Market Night (ent 0xB1, dayTime 0xE000, scene 0x21): no EN_MU (nightlife swaps the
 crowd). EN_MU is Market-Day-only per the definitive sweep in

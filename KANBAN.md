@@ -3,11 +3,11 @@
 > **Generated mirror — do not hand-edit.** Source of truth = GitHub Issues on
 > `SomeoneIsWorking/zelda3d` (private). Regenerate with `tools/kanban.py render`.
 > Move a card with `tools/kanban.py mv <#> <column>`; add with `tools/kanban.py add`.
-> Columns: todo · in-progress · in-review · needs-confirmation · reopened · blocked · done(=closed).  Updated 2026-07-02 17:49.
+> Columns: todo · in-progress · in-review · needs-confirmation · reopened · blocked · done(=closed).  Updated 2026-07-02 18:00.
 
-**Counts:** todo:10 | in-progress:2 | in-review:1 | needs-confirmation:26 | reopened:0 | blocked:0 | done:80
+**Counts:** todo:11 | in-progress:2 | in-review:1 | needs-confirmation:26 | reopened:0 | blocked:0 | done:80
 
-## 📋 To Do  (10)
+## 📋 To Do  (11)
 - [#17](../../issues/17) Hi-res world/scene textures (texpack) _(render)_
 - [#33](../../issues/33) More foliage / vegetation density (lowest priority) _(scene)_
 - [#118](../../issues/118) Market (SCENE_MARKET_DAY) parity: crowd NPCs (En_Hy/En_Mu) mis-rendered, door still N64 _(render,scene,behavior)_
@@ -18,6 +18,7 @@
 - [#137](../../issues/137) Market: EN_HEISHI4 (patrolling guards) OoT3D port _(render,scene,behavior)_
 - [#138](../../issues/138) Market: EN_MA1 (young Malon) OoT3D port _(render,scene,behavior)_
 - [#139](../../issues/139) Market: EN_DOG OoT3D port _(render,scene,behavior)_
+- [#140](../../issues/140) Navi (EN_ELF) renders as N64 sprite — needs OoT3D native replacement _(render,behavior)_
 
 ## 🔨 In Progress  (2)
 - [#111](../../issues/111) World night R/G too bright — flat tint under-darkens at night (needs vertex-lighting port) _(render)_
