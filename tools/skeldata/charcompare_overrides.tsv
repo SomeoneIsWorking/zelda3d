@@ -60,3 +60,9 @@
 # sitting) -> baggy pants folded into a blob. Correct = nabor_hiza_wait (hiza=knee, kneeling, 24f,
 # matches the 24f N64 KneeingAtCrawlspace anim). Verified live: kneels at the crawlspace, legs intact.
 /actor/zelda_nb.zar	gNabooruKneeingAtCrawlspaceAnim	nabor_hiza_wait
+
+# En_Tg dancing couple: shares zelda_mu.zar with En_Mu haggling townspeople, but the two
+# actors use DIFFERENT N64 anims (En_Tg = gDancingCoupleAnim, En_Mu = object_mu_Anim_0003F4).
+# gDancingCoupleAnim was auto-picked to mu_matsu (the townsperson wait clip) -> couple stood
+# in the shopkeeper's idle pose instead of dancing. Correct = tg_matsu (dance clip, same ZAR).
+/actor/zelda_mu.zar	gDancingCoupleAnim	tg_matsu

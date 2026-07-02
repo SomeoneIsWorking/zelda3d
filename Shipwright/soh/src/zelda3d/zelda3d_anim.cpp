@@ -12,6 +12,8 @@
 #include <cmath>
 #include <cstdio>
 #include <cstdlib>
+#include <set>
+#include <utility>
 #include <cstring>
 #include <functional>
 #include <memory>
@@ -601,6 +603,18 @@ void Zelda3D_UpdateAnim(int modelId, const char* animName, float frame) {
     if (!animName || !*animName) { Zelda3D_GL_SetBones(modelId, nullptr, 0); return; }
     LoadedModel* lm = loadModel(modelId);
     if (!lm || !lm->ok || !lm->cmb || !lm->zar) return;
+    // Zelda3D #135 anim-selection probe: log once per (modelId, animName) pair so a
+    // close-test (e.g. tools/entg_anim_close_test.py) can grep run.log for which CSAB
+    // a particular model is actually being driven with. Emit-once per pair keeps the
+    // log compact; the set is per-process so restarts reset it.
+    {
+        static std::set<std::pair<int, std::string>> sSeen;
+        auto key = std::make_pair(modelId, std::string(animName));
+        if (sSeen.insert(key).second) {
+            printf("[Zelda3D animPlay] model=%d anim='%s'\n", modelId, animName);
+            fflush(stdout);
+        }
+    }
 
     Zelda3D::Csab* anim = getCsab(lm, animName);
     if (!anim) { Zelda3D_GL_SetBones(modelId, nullptr, 0); return; }
