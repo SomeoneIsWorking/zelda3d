@@ -67,11 +67,18 @@ struct CmbMaterial {
     uint16_t comb_combine_rgb = 0x2100;                    // MODULATE
     float comb_scale_rgb = 1.0f;                           // 1 / 2 / 4
     uint16_t comb_src_rgb[3] = { 0x8577, 0x84C0, 0x8576 }; // PRIMARY_COLOR, TEXTURE0, CONSTANT
-    // PICA200 TEV constant-color selector for stage 0: index 0..5 chosen from mat_constant[].
-    // A stage that sources CONSTANT (0x8576) reads mat_constant[comb_const_idx[stage]]. The
-    // per-stage selector is a u8 at combiner-entry +0x14 (see readMatsChunk in noclip's
-    // OcarinaOfTime3D/cmb.ts). Only stage 0 is captured today (matches comb_stage_count use).
+    // PICA200 TEV constant-color selector: index 0..5 chosen from mat_constant[]. Combiner-entry
+    // layout (verified empirically from AHG hyliaman2.cmb mat 0 stage 1, which sources
+    // CONST[4] — the exact slot EnHy_Draw overrides via colorA per oot3d-decomp
+    // build/decomp/001b4944.c): the selector is a u32 at combiner-entry +0x24, NOT +0x14 as
+    // noclip's readMatsChunk suggests (misdocumented / different game). comb_const_idx here is
+    // the FINAL stage's selector — that's what the "MODULATE(PREV, CONST)" post-tint stage uses
+    // to pick the runtime-overridable clothing color; multi-stage full emulation is a follow-up.
     uint8_t comb_const_idx = 0;
+    // comb_uses_const == true iff ANY stage's RGB sources include CONSTANT (0x8576). Materials
+    // WITHOUT this flag can safely skip the CONSTANT modulate in the shader (no-op); materials
+    // WITH this flag get their fragment output multiplied by mat_constant[comb_const_idx].
+    bool comb_uses_const = false;
 
     // PICA200 TEV constant-color palette: 6 float-RGBA slots per material. Base defaults come
     // from the CMB file (per readMatsChunk: matConstColor[0..5] at material +0xB8..+0xCF,

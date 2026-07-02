@@ -64,6 +64,7 @@ Zelda3DGlGroup MakeGlGroup(const Cmb& cmb, const CmbDrawGroup& g, const CmbVerte
         }
     }
     cg.combConstIdx = mat ? mat->comb_const_idx : 0;
+    cg.combUsesConst = (mat && mat->comb_uses_const) ? 1 : 0;
     if (getenv("ZELDA3D_DBG_MAT")) {
         fprintf(stderr, "[MAT] mi=%d vlit=%d comb=%.1f amb=(%.2f,%.2f,%.2f) dif=(%.2f,%.2f,%.2f) "
                         "constIdx=%d const%d=(%.2f,%.2f,%.2f,%.2f)\n",

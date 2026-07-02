@@ -556,6 +556,7 @@ SgModel* Fast::Zelda3DRenderer::ensureUploaded(int modelId) {
             for (int k = 0; k < 4; k++)
                 g.matConstant[s][k] = groups[i].matConstant[s][k];
         g.combConstIdx = groups[i].combConstIdx;
+        g.combUsesConst = groups[i].combUsesConst;
         if (groups[i].vertCount > 0) {
             for (int k = 0; k < 4; k++)
                 g.dbgColor0[k] = groups[i].verts[0].color[k];
@@ -1463,11 +1464,11 @@ void Fast::Zelda3DRenderer::DrawModel(int modelId, const float* mp16, const floa
             // main SG_DUMP row stays parseable by existing tools; format:
             //   [SG_DUMP]   g<n> constIdx=<i> const0..const5=(r,g,b,a) x 6
             fprintf(stderr,
-                    "[SG_DUMP]  g%-2d constIdx=%d "
+                    "[SG_DUMP]  g%-2d combUsesConst=%d constIdx=%d "
                     "const0=(%.3f,%.3f,%.3f,%.3f) const1=(%.3f,%.3f,%.3f,%.3f) "
                     "const2=(%.3f,%.3f,%.3f,%.3f) const3=(%.3f,%.3f,%.3f,%.3f) "
                     "const4=(%.3f,%.3f,%.3f,%.3f) const5=(%.3f,%.3f,%.3f,%.3f)\n",
-                    gi, grp.combConstIdx,
+                    gi, grp.combUsesConst, grp.combConstIdx,
                     grp.matConstant[0][0], grp.matConstant[0][1], grp.matConstant[0][2], grp.matConstant[0][3],
                     grp.matConstant[1][0], grp.matConstant[1][1], grp.matConstant[1][2], grp.matConstant[1][3],
                     grp.matConstant[2][0], grp.matConstant[2][1], grp.matConstant[2][2], grp.matConstant[2][3],
@@ -1572,16 +1573,19 @@ void Fast::Zelda3DRenderer::DrawModel(int modelId, const float* mp16, const floa
         ubo.uAmbient[1] = base.uAmbient[1] * grp.matAmbient[1];
         ubo.uAmbient[2] = base.uAmbient[2] * grp.matAmbient[2];
         ubo.uAmbient[3] = ambGroup ? gZelda3dWorldAmb : 0.0f;
-        // PICA200 TEV constant: publish the selected slot's RGB but leave the apply flag (.a)
-        // OFF by default so this commit is a no-op. Step 2c's per-actor override channel flips
-        // .a=1 when a townsfolk actor wants clothing color applied to this material.
+        // PICA200 TEV CONSTANT modulate: for materials whose combiner sources CONSTANT in any
+        // stage, publish the selected slot's RGB with .a = 1 so the shader applies it. Materials
+        // that never reference CONSTANT (e.g. plain MODULATE(PRIM, TEX0)) leave .a = 0 and the
+        // shader skips the multiply — this matches OoT3D's per-material combiner semantics.
+        // The per-actor override channel (EnHy Step 2c) rewrites matConstant[grp.combConstIdx]
+        // before submit; the shader is unchanged.
         {
             int ci = grp.combConstIdx & 7;
             if (ci > 5) ci = 0;
             ubo.uMatConst[0] = grp.matConstant[ci][0];
             ubo.uMatConst[1] = grp.matConstant[ci][1];
             ubo.uMatConst[2] = grp.matConstant[ci][2];
-            ubo.uMatConst[3] = 0.0f; // bypass — Step 2c writes 1.0 when overriding
+            ubo.uMatConst[3] = grp.combUsesConst ? 1.0f : 0.0f;
         }
 
         // Facial material-anim override.

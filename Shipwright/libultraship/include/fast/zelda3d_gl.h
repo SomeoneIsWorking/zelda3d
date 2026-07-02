@@ -71,7 +71,8 @@ typedef struct Zelda3DGlGroup {
     // matConstant[] before submit for townsfolk (EnHy body colours, #135 EnHy port). The
     // combiner selects matConstant[combConstIdx] for a stage that sources CONSTANT (0x8576).
     float matConstant[6][4];  // 6 RGBA slots, defaults zero-then-alpha-1
-    int   combConstIdx;       // 0..5: index into matConstant[] for stage-0 CONSTANT source
+    int   combConstIdx;       // 0..5: index into matConstant[] for the final stage's CONSTANT
+    int   combUsesConst;      // 1 iff ANY stage sources CONSTANT (0x8576) — else the shader skips the CONSTANT modulate
 } Zelda3DGlGroup;
 
 // One decoded texture (RGBA8, w*h*4 bytes, row 0 = top).
