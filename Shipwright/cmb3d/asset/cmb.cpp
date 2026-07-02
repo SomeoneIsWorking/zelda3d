@@ -197,21 +197,65 @@ bool Cmb::parseMats() {
             m.mat_constant[k][2] = b[co + 2] / 255.0f;
             m.mat_constant[k][3] = b[co + 3] / 255.0f;
         }
-        // Stage-0 combiner: op (+0x00), RGB scale (+0x04: 1/2/4), RGB sources (+0x0C/0E/10),
-        // constant-color selector for this stage (+0x14, u8: which of mat_constant[0..5] the
-        // CONSTANT source reads).
+        // Stage-N combiner. Each stage's 0x28-byte entry (verified vs AHG hyliaman2 mat 0
+        // combined with the runtime overrides EnHy_Draw writes):
+        //   +0x00  u16  rgb_combine op (0x2100 MODULATE / 0x0104 ADD / 0x6401 MULT_ADD / ...)
+        //   +0x04  u16  rgb_scale (1/2/4)
+        //   +0x0C  u16  rgb src A (0x8577 PRIMARY / 0x84C0 TEXTURE0 / 0x8576 CONSTANT / 0x8578 PREVIOUS)
+        //   +0x0E  u16  rgb src B
+        //   +0x10  u16  rgb src C
+        //   +0x24  u32  constant-color selector (0..5 index into mat_constant[])
+        // Stage 0's data goes into comb_combine_rgb/scale/src_rgb[] (existing world-lighting
+        // port relies on those). comb_const_idx captures the FINAL stage's selector — for
+        // townsfolk archetypes stage 1 is MODULATE(PREV, CONST[N]) with N = 3 or 4 = the slot
+        // EnHy_Draw overrides.  comb_uses_const = OR of "any stage sources CONSTANT".
         m.comb_stage_count = (int)u32(b, o + 0x120);
-        if (m.comb_stage_count > 0) {
-            uint32_t cidx = u16(b, o + 0x124);          // first stage's settings index
+        for (int s = 0; s < m.comb_stage_count && s < 6; s++) {
+            uint32_t cidx = u16(b, o + 0x124 + s * 2);   // per-stage combiner-settings index
             uint32_t co = combTableBase + cidx * 0x28;
-            m.comb_combine_rgb = u16(b, co + 0x00);
-            uint16_t scale = u16(b, co + 0x04);
-            m.comb_scale_rgb = (scale == 2 || scale == 4) ? (float)scale : 1.0f;
-            m.comb_src_rgb[0] = u16(b, co + 0x0C);
-            m.comb_src_rgb[1] = u16(b, co + 0x0E);
-            m.comb_src_rgb[2] = u16(b, co + 0x10);
-            m.comb_const_idx = b[co + 0x14] & 0x07;    // 0..5 valid; clamp mask
-            if (m.comb_const_idx > 5) m.comb_const_idx = 0;
+            uint16_t op = u16(b, co + 0x00);
+            uint16_t srcA = u16(b, co + 0x0C);
+            uint16_t srcB = u16(b, co + 0x0E);
+            uint16_t srcC = u16(b, co + 0x10);
+            // Which of the three source slots the OP actually consumes. MODULATE / ADD /
+            // SUBTRACT / DOT3_RGB / DOT3_RGBA only look at A and B; INTERPOLATE (0x8574) and
+            // MULT_ADD (0x6401) and ADD_SIGNED (0x0400) look at all three; REPLACE (0x1E01)
+            // uses A only. This matters because scene materials commonly have srcC=CONSTANT as
+            // a leftover default while running MODULATE(A,B) — treating that C as an active
+            // CONSTANT reference would darken every mesh to black.
+            int slotsUsed = 3; // default: assume all three (safe fail-open for unknown ops)
+            switch (op) {
+                case 0x2100: // MODULATE
+                case 0x0104: // ADD
+                case 0x8506: // SUBTRACT
+                case 0x86AE: // DOT3_RGB
+                case 0x86AF: // DOT3_RGBA
+                    slotsUsed = 2;
+                    break;
+                case 0x1E01: // REPLACE
+                    slotsUsed = 1;
+                    break;
+                default:
+                    break;
+            }
+            bool sourcesConst = false;
+            if (slotsUsed >= 1 && srcA == 0x8576) sourcesConst = true;
+            if (slotsUsed >= 2 && srcB == 0x8576) sourcesConst = true;
+            if (slotsUsed >= 3 && srcC == 0x8576) sourcesConst = true;
+            if (sourcesConst) {
+                m.comb_uses_const = true;
+                uint32_t idx32 = u32(b, co + 0x24);
+                m.comb_const_idx = (uint8_t)(idx32 & 0x07);
+                if (m.comb_const_idx > 5) m.comb_const_idx = 0;
+            }
+            if (s == 0) {
+                m.comb_combine_rgb = op;
+                uint16_t scale = u16(b, co + 0x04);
+                m.comb_scale_rgb = (scale == 2 || scale == 4) ? (float)scale : 1.0f;
+                m.comb_src_rgb[0] = srcA;
+                m.comb_src_rgb[1] = srcB;
+                m.comb_src_rgb[2] = srcC;
+            }
         }
         o += stride;
     }
