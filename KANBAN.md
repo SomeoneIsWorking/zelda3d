@@ -1,13 +1,13 @@
-# SoH3D Kanban
+# Zelda3D Kanban
 
 > **Generated mirror — do not hand-edit.** Source of truth = GitHub Issues on
-> `SomeoneIsWorking/soh3d` (private). Regenerate with `tools/kanban.py render`.
+> `SomeoneIsWorking/zelda3d` (private). Regenerate with `tools/kanban.py render`.
 > Move a card with `tools/kanban.py mv <#> <column>`; add with `tools/kanban.py add`.
-> Columns: todo · in-progress · in-review · needs-confirmation · reopened · blocked · done(=closed).  Updated 2026-07-01 20:55.
+> Columns: todo · in-progress · in-review · needs-confirmation · reopened · blocked · done(=closed).  Updated 2026-07-02 10:19.
 
-**Counts:** todo:9 | in-progress:2 | in-review:1 | needs-confirmation:27 | reopened:0 | blocked:0 | done:80
+**Counts:** todo:8 | in-progress:2 | in-review:1 | needs-confirmation:28 | reopened:0 | blocked:0 | done:80
 
-## 📋 To Do  (9)
+## 📋 To Do  (8)
 - [#17](../../issues/17) Hi-res world/scene textures (texpack) _(render)_
 - [#33](../../issues/33) More foliage / vegetation density (lowest priority) _(scene)_
 - [#118](../../issues/118) Market (SCENE_MARKET_DAY) parity: crowd NPCs (En_Hy/En_Mu) mis-rendered, door still N64 _(render,scene,behavior)_
@@ -16,7 +16,6 @@
 - [#130](../../issues/130) Make repo public — audit + clean git history first (no outside-repo paths, no copyrighted assets) _(infra)_
 - [#131](../../issues/131) Unified N64/3DS render pipeline: one vertex/material/shader/lighting system _(render)_
 - [#133](../../issues/133) Add HTTP/remote layer to the REPL control channel (beyond FIFO)
-- [#134](../../issues/134) Link's House interior wall looks N64-rough vs overview 3DS-smooth (unresolved)
 
 ## 🔨 In Progress  (2)
 - [#111](../../issues/111) World night R/G too bright — flat tint under-darkens at night (needs vertex-lighting port) _(render)_
@@ -25,7 +24,7 @@
 ## 🔍 In Review (agent verifying)  (1)
 - [#112](../../issues/112) START can't skip the final intro segment (Navi flies in / wakes Link) _(render,keyboard)_
 
-## 🙋 Needs User Confirmation  (27)
+## 🙋 Needs User Confirmation  (28)
 - [#12](../../issues/12) Inventory/pause background renders upside-down _(render,ui,inventory)_
 - [#16](../../issues/16) First-person camera: early-load crash + position snap _(camera,crash)_
 - [#18](../../issues/18) Crisp HUD/UI textures (hearts/digits/buttons/icons) _(ui,hud)_
@@ -53,6 +52,7 @@
 - [#126](../../issues/126) Keyboard/Start input dead after ImGui removal — stub GetTopMostPopupModal returns non-null _(keyboard)_
 - [#127](../../issues/127) RmlUi UI scales out of view on retina/HiDPI Mac (points-vs-pixels framebuffer mismatch) _(ui)_
 - [#132](../../issues/132) Corrupt save (null JSON field) crashes at title/file-select via std::terminate _(crash)_
+- [#134](../../issues/134) Link's House interior wall looks N64-rough vs overview 3DS-smooth (unresolved)
 
 ## ♻️ Reopened (was done, found broken)  (0)
 _none_
