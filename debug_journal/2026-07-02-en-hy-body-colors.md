@@ -65,13 +65,22 @@ The per-type color mechanism is now decoded. Two tables:
   (probably a shared "generic clothes" colour).
 - Case 11 (0xB): overrides constant 2 on mat 2 with a 4-byte-inline colour at `DAT_001b4c78`.
 
-## Fix direction — MULTI-STEP (not landed)
+## Fix direction — MULTI-STEP
 
-1. **Extract the tables from the OoT3D binary.** Read the raw bytes at
-   `DAT_001b4c70 - 0x348 + type*0x28` for each type 0..0x14, and at `DAT_001b4c70 + type*0x18`
-   for the object-id mapping. Bake into a static C array in the port. Tooling: extend
-   `oot3d-decomp/tools` with a `dump_enhy_body_table.py` that reads the .elf sections at
-   those absolute VAs (they're const-data in .rodata).
+### Correction on absolute VAs (READ BEFORE PORTING)
+
+`DAT_001b4c70` in the Ghidra decomp is a LITERAL-POOL ENTRY (a `u32` holding the
+real table pointer), NOT the table address. Reading `code.bin @ 0x1b4c70` gives
+`0x00527a4c` — the **real** object-id table address. The color-override table is at
+`0x00527a4c - 0x348 = 0x00527704`. Both tables are const-data in `.rodata`.
+
+### 1. **Extract the tables from the OoT3D binary. — LANDED**
+Extractor: `oot3d-decomp/tools/dump_enhy_body_table.py`. Emits `data/enhy_body_colors.inc`,
+a plain-C header with `EnHyBodyColorEntry kEnHyBodyColorTable[22]` (u16 objectId +
+s8 pre/pre2/matA/matB + float[4] colorA/colorB). Row layout + regen command are in
+`oot3d-decomp/docs/enhy_body_colors.md`. Colors ARE float RGBA (I misread as u8
+originally — the Ghidra layout note above `+0x04 RGBA colorA[4]` in the earlier
+draft is 4×float32, not 4×u8).
 
 2. **Add CMB material-constant-color override infrastructure to SoH3D.** Currently the
    facial-CMB path swaps a TEXTURE frame (see `Zelda3D_ModelSetTextureFrame`); there is no
