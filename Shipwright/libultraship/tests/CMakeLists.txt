@@ -25,6 +25,7 @@ add_executable(lus_tests
     resource_type_tests.cpp
     archive_self_tests.cpp
     zelda3d_render_tests.cpp
+    cmb_combiner_parse_tests.cpp
     zelda3d_test_stubs.cpp
 )
 
@@ -43,6 +44,7 @@ set_property(TARGET lus_tests PROPERTY CXX_STANDARD 20)
 
 target_link_libraries(lus_tests PRIVATE
     libultraship
+    cmb3d
     gtest_main
 )
 
