@@ -229,7 +229,15 @@ set(ALL_FILES
 ################################################################################
 # Target
 ################################################################################
+
+# INTERFACE target that carries "how to compile SoH3D source" — includes,
+# defines, options, link flags, and library deps. Attached to the exe below
+# and (in a future commit) to a soh_lib STATIC so a harness binary can
+# consume the same settings without touching the exe target.
+add_library(soh_settings INTERFACE)
+
 add_executable(${PROJECT_NAME} ${ALL_FILES})
+target_link_libraries(${PROJECT_NAME} PRIVATE soh_settings)
 
 if (CMAKE_SYSTEM_NAME STREQUAL "Windows")
 use_props(${PROJECT_NAME} "${CMAKE_CONFIGURATION_TYPES}" "${DEFAULT_CXX_PROPS}")
