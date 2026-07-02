@@ -32,6 +32,15 @@ target_link_libraries(soh3d_harness PRIVATE
     Boost::boost dds-ktx libretro tsl::robin_map
     ${PLATFORM_LIBRARIES} Threads::Threads
 )
+# soh_lib is BUILDABLE from this tree (via the Shipwright add_subdirectory
+# in wire_in.cmake — enables `cmake --build . --target soh_lib`) but NOT
+# yet linked into soh3d_harness. Linking soh_lib PUBLIC-transitively
+# drags libultraship + its vendored deps, which collide with Azahar's own
+# externals: system libglslang.a vs Azahar/externals/glslang, and
+# libZAPDLib.a linkage produces libstdc++ ABI-mismatch undefined refs to
+# std::vector<char>::resize. Reconciling the two dependency graphs is the
+# next task — pick one glslang, gate ZAPD out of soh_lib's transitive
+# closure (it's only needed at asset extraction, not runtime).
 if(ENABLE_VULKAN)
     target_link_libraries(soh3d_harness PRIVATE sirit vulkan-headers vma)
 endif()
