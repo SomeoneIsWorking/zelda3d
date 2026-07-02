@@ -24,6 +24,10 @@ int Zelda3D_LookupModel(int actorId, int objectId, int* modelId, float* worldSca
 // World scale for a resolved model id (1.0 if unknown). Kept parallel to the OoT API.
 float Zelda3D_ModelScaleById(int modelId);
 
+// True (1) if the resolved model's CMB is skinned (>1 bone) — the caller should
+// defer to the SkelAnime intercept instead of emitting a static draw.
+int Zelda3D_IsModelSkinned(int modelId);
+
 // Live per-object world-scale override for the prop under calibration
 // (REPL `mscale <objId> <scale>`). Persisted on the model's ModelSpec so it
 // survives across draws. If the object hasn't been auto-probed yet, the scale
@@ -34,6 +38,28 @@ void Zelda3D_SetObjectScale(int objectId, float scale);
 // Dump the current object->model->scale table via the supplied line sink
 // (one line per entry). Used by the REPL `mlist` command.
 void Zelda3D_ListModels(void (*emitLine)(const char* line, void* user), void* user);
+
+// STAGE 2 SkelAnime port surface. See docs/MM_SKELANIME_PORT.md.
+//
+// Zelda3D_MM_SetPending — called from mm3d_draw.c::Zelda3D_TryDrawActor when a
+// skinned model is resolved. Defers the draw: instead of emitting immediately,
+// stash actor + modelId + scale + groundOffset so the SkelAnime intercept can
+// pose the OoT3D bones from the live N64 jointTable.
+void Zelda3D_MM_SetPending(void* actor, int modelId, float worldScale, float groundOffset);
+
+// Zelda3D_MM_SkelAnimeDrawRaw — SkelAnime intercept. Called from the top of MM's
+// SkelAnime_DrawOpa / DrawFlexOpa / DrawLod / DrawFlexLod. If a pending model is
+// set, retargets N64 jointTable rotations onto the OoT3D CMB bones (identity
+// bone->limb correspondence), uploads the skin matrices to the renderer, emits
+// the OoT3D draw, and returns 1 (SkelAnime skips its N64 limb walk). Returns 0
+// to fall through to N64.
+struct PlayState;
+int Zelda3D_MM_SkelAnimeDrawRaw(struct PlayState* play, void** skeleton, void* jointTable /* Vec3s* */,
+                                int limbCount);
+
+// Zelda3D_MM_AfterActorDraw — clears pending state at the end of an actor's Draw
+// so the next actor starts fresh. Called from a post-draw hook in mm3d_draw.c.
+void Zelda3D_MM_AfterActorDraw(void);
 
 #ifdef __cplusplus
 }

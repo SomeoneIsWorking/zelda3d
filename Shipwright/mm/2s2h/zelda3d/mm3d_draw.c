@@ -10,6 +10,12 @@
 
 #include "global.h" // Actor, PlayState, POLY_OPA_DISP, Matrix_*, Gfx_SetupDL25_Opa, gSPZelda3DDraw
 
+// Public C bridge for the C++ SkelAnime intercept in mm3d_model.cpp (which can't
+// touch the decomp macros like POLY_OPA_DISP / OPEN_DISPS from a .cpp cleanly).
+// void* over PlayState*/Actor* so mm3d_model.h needs no decomp headers.
+void Zelda3D_MM_EmitModelDraw(void* play, void* actor, int modelId, float worldScale,
+                              float groundOffset);
+
 static void Zelda3D_EmitModelDraw(PlayState* play, Actor* actor, int modelId, float worldScale,
                                float groundOffset) {
     OPEN_DISPS(play->state.gfxCtx);
@@ -38,6 +44,44 @@ static void Zelda3D_EmitModelDraw(PlayState* play, Actor* actor, int modelId, fl
     CLOSE_DISPS(play->state.gfxCtx);
 }
 
+void Zelda3D_MM_EmitModelDraw(void* play, void* actor, int modelId, float worldScale,
+                              float groundOffset) {
+    Zelda3D_EmitModelDraw((PlayState*)play, (Actor*)actor, modelId, worldScale, groundOffset);
+}
+
+// Derive limbCount for a raw N64 skeleton — highest reachable limb index + 1, capped at 64.
+// Matches OoT's Zelda3D_CountN64Limbs (Shipwright/soh/src/zelda3d/zelda3d.c). Small iterative
+// walk to avoid recursion into the C++ retarget path from a C entry point.
+static int Zelda3D_MM_CountLimbs(void** skeleton) {
+    if (skeleton == NULL || skeleton[0] == NULL) return 0;
+    int stack[64];
+    s32 sp = 0;
+    stack[sp++] = 0;
+    int maxIdx = 0;
+    int steps = 0;
+    while (sp > 0 && steps < 256) {
+        int i = stack[--sp];
+        steps++;
+        if (i < 0 || i >= 64) continue;
+        if (skeleton[i] == NULL) continue;
+        StandardLimb* lb = (StandardLimb*)Lib_SegmentedToVirtual(skeleton[i]);
+        if (i > maxIdx) maxIdx = i;
+        if (lb->sibling != LIMB_DONE && sp < 64) stack[sp++] = lb->sibling;
+        if (lb->child != LIMB_DONE && sp < 64) stack[sp++] = lb->child;
+    }
+    return maxIdx + 1;
+}
+
+// Shared SkelAnime intercept prologue: called at the top of each MM SkelAnime_Draw*Opa entry
+// point. If a skinned MM3D replacement is pending for this actor, poses OoT3D bones from the
+// live N64 jointTable and returns 1; caller returns immediately without walking the N64 tree.
+int Zelda3D_MM_InterceptSkelAnime(PlayState* play, void** skeleton, Vec3s* jointTable) {
+    if (skeleton == NULL || jointTable == NULL) return 0;
+    int limbCount = Zelda3D_MM_CountLimbs(skeleton);
+    if (limbCount <= 0) return 0;
+    return Zelda3D_MM_SkelAnimeDrawRaw(play, skeleton, jointTable, limbCount);
+}
+
 int Zelda3D_TryDrawActor(PlayState* play, Actor* actor) {
     int modelId = -1;
     float worldScale = 1.0f;
@@ -57,6 +101,14 @@ int Zelda3D_TryDrawActor(PlayState* play, Actor* actor) {
     }
     if (!Zelda3D_LookupModel(actor->id, objectId, &modelId, &worldScale, &groundOffset)) {
         return 0; // no MM3D model registered -> vanilla N64 draw
+    }
+    // Stage 2 SkelAnime port: for skinned models, DEFER — stash the pending state and
+    // return 0 so the actor's own draw() runs, letting Zelda3D_MM_SkelAnimeDrawRaw
+    // (invoked at the top of MM's SkelAnime_DrawXxxOpa) pose the OoT3D bones from the
+    // live N64 jointTable and emit. See docs/MM_SKELANIME_PORT.md.
+    if (Zelda3D_IsModelSkinned(modelId)) {
+        Zelda3D_MM_SetPending((void*)actor, modelId, worldScale, groundOffset);
+        return 0;
     }
     Zelda3D_EmitModelDraw(play, actor, modelId, worldScale, groundOffset);
     return 1;

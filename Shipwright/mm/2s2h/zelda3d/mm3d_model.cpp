@@ -23,6 +23,11 @@
 #include "asset/ctr_rom.h"
 #include "asset/gar.h" // MM3D actor archives are Grezzo GAR2, not OoT3D ZAR
 #include "asset/lzs.h" // ~40% of MM3D actor .gar.lzs archives are LzS-wrapped GAR2
+#include "asset/mat4.h" // Mat4 helpers for the SkelAnime retarget port
+
+#include <array>
+#include <cmath>
+#include <functional>
 
 namespace {
 
@@ -37,6 +42,7 @@ namespace {
 struct ModelSpec {
     std::string garPath;  // "/actors/zelda2_<name>.gar.lzs"
     float worldScale;     // N64 world units per CMB unit; first-guess 0.1 until calibrated.
+    bool skinned = false; // true = draw via SkelAnime intercept (retarget from N64 pose)
 };
 std::vector<ModelSpec> g_models;
 // objectId -> renderer modelId (or -1 if resolution attempted and failed — cache miss).
@@ -269,6 +275,7 @@ static int resolveModelForObject(int objectId) {
         fprintf(stderr, "[MM3D] skinned-tpose obj=0x%03X (%s): %zu bones (Stage 1 bind-pose draw)\n",
                 objectId, name, probeCmb.bones().size());
     }
+    bool isSkinned = probeCmb.bones().size() > 1;
 
     int newId = (int)g_models.size();
     float initialScale = 0.1f;
@@ -276,11 +283,12 @@ static int resolveModelForObject(int objectId) {
     if (pending != g_pendingScale.end() && pending->second > 0.0f) {
         initialScale = pending->second;
     }
-    g_models.push_back({ path, initialScale });
+    g_models.push_back({ path, initialScale, isSkinned });
     g_objectToModel[objectId] = newId;
     g_objectName[objectId] = name;
-    fprintf(stderr, "[MM3D] mapped obj=0x%03X (%s) -> modelId=%d (rigid, %zu bones) scale=%.4f\n",
-            objectId, name, newId, probeCmb.bones().size(), initialScale);
+    fprintf(stderr, "[MM3D] mapped obj=0x%03X (%s) -> modelId=%d (%s, %zu bones) scale=%.4f\n",
+            objectId, name, newId, isSkinned ? "skinned" : "rigid",
+            probeCmb.bones().size(), initialScale);
     return newId;
 }
 
@@ -299,6 +307,11 @@ float Zelda3D_ModelScaleById(int modelId) {
     return g_models[modelId].worldScale;
 }
 
+int Zelda3D_IsModelSkinned(int modelId) {
+    if (modelId < 0 || modelId >= (int)g_models.size()) return 0;
+    return g_models[modelId].skinned ? 1 : 0;
+}
+
 void Zelda3D_SetObjectScale(int objectId, float scale) {
     if (scale <= 0.0f) {
         g_pendingScale.erase(objectId);
@@ -315,6 +328,108 @@ void Zelda3D_SetObjectScale(int objectId, float scale) {
     if (it != g_objectToModel.end() && it->second >= 0 && it->second < (int)g_models.size()) {
         g_models[it->second].worldScale = scale;
     }
+}
+
+// STAGE 2 SkelAnime port — live N64-anim retarget for skinned MM3D actors.
+// See docs/MM_SKELANIME_PORT.md. Mirrors OoT's Zelda3D_UpdateAnimN64Mapped
+// (Shipwright/soh/src/zelda3d/zelda3d_anim.cpp) — identity bone->limb map,
+// N64 rotation REPLACES the CMB rest rot in Rz*Ry*Rx order.
+
+// Pending state — set by mm3d_draw's TryDrawActor when a skinned model is
+// resolved; consumed by SkelAnimeDrawRaw and cleared in AfterActorDraw.
+struct MMPending {
+    void* actor = nullptr; // MM Actor*
+    int modelId = -1;
+    float scale = 1.0f;
+    float groundOff = 0.0f;
+};
+MMPending g_pending;
+
+// Retarget the CMB bones from the live N64 jointTable (identity boneId <-> limbIdx
+// mapping). Uploads skin matrices + bind matrices to the renderer.
+static void mmUpdateAnimN64(int modelId, const int16_t* jointRots, int rotCount) {
+    using namespace Zelda3D;
+    Loaded* lm = loadModel(modelId);
+    if (lm == nullptr || !lm->ok || !lm->cmb) {
+        Zelda3D_GL_SetBones(modelId, nullptr, 0);
+        return;
+    }
+    const auto& bones = lm->cmb->bones();
+    const auto& bind = lm->cmb->boneMatrices();
+    if (bind.empty()) {
+        Zelda3D_GL_SetBones(modelId, nullptr, 0);
+        return;
+    }
+    const float kBinangToRad = 3.14159265358979f / 32768.0f;
+
+    std::vector<Mat4> aw(bind.size(), matId());
+    std::vector<char> done(bind.size(), 0);
+    std::vector<const CmbBone*> byId(bind.size(), nullptr);
+    for (const auto& bn : bones) {
+        if (bn.id >= 0 && (size_t)bn.id < byId.size()) byId[bn.id] = &bn;
+    }
+
+    std::function<Mat4(int)> world = [&](int id) -> Mat4 {
+        if (id < 0 || (size_t)id >= aw.size() || byId[id] == nullptr) return matId();
+        if (done[id]) return aw[id];
+        const CmbBone* bn = byId[id];
+        Mat4 L = matT(bn->trans[0], bn->trans[1], bn->trans[2]);
+        // Identity retarget: bone id == limb index. Stage 3 will replace this with
+        // a per-archive bone-map lookup for rigs whose topology diverges.
+        int limb = id;
+        if (limb >= 0 && limb < rotCount) {
+            float rx = jointRots[limb * 3 + 0] * kBinangToRad;
+            float ry = jointRots[limb * 3 + 1] * kBinangToRad;
+            float rz = jointRots[limb * 3 + 2] * kBinangToRad;
+            L = matMul(L, matMul(matMul(matRz(rz), matRy(ry)), matRx(rx)));
+        } else {
+            L = matMul(L, matMul(matMul(matRz(bn->rot[2]), matRy(bn->rot[1])), matRx(bn->rot[0])));
+        }
+        L = matMul(L, matS(bn->scale[0], bn->scale[1], bn->scale[2]));
+        Mat4 W = (bn->parent < 0) ? L : matMul(world(bn->parent), L);
+        aw[id] = W;
+        done[id] = 1;
+        return W;
+    };
+    for (const auto& bn : bones) world(bn.id);
+
+    std::vector<std::array<float, 16>> sm(bind.size());
+    for (size_t id = 0; id < bind.size(); id++) sm[id] = matMul(aw[id], matInverse(bind[id]));
+    Zelda3D_GL_SetBoneBind(modelId, bind.front().data(), (int)bind.size());
+    Zelda3D_GL_SetBones(modelId, sm.front().data(), (int)sm.size());
+}
+
+// Forward-declared C bridge implemented in mm3d_draw.c (has access to POLY_OPA_DISP
+// / Gfx_SetupDL25_Opa / MATRIX_FINALIZE_AND_LOAD via the decomp global.h).
+extern "C" void Zelda3D_MM_EmitModelDraw(void* play, void* actor, int modelId, float worldScale,
+                                          float groundOffset);
+
+void Zelda3D_MM_SetPending(void* actor, int modelId, float worldScale, float groundOffset) {
+    g_pending.actor = actor;
+    g_pending.modelId = modelId;
+    g_pending.scale = worldScale;
+    g_pending.groundOff = groundOffset;
+}
+
+int Zelda3D_MM_SkelAnimeDrawRaw(struct PlayState* play, void** skeleton, void* jointTableV, int limbCount) {
+    if (g_pending.modelId < 0 || g_pending.actor == nullptr) return 0;
+    if (skeleton == nullptr || jointTableV == nullptr || limbCount <= 0) return 0;
+    // Vec3s* jointTable — index 0 is the root position; joint rotations start at index 1.
+    // Each joint = 3 s16 -> pass as (const int16_t*) starting 3 s16 past the base.
+    const int16_t* base = static_cast<const int16_t*>(jointTableV);
+    const int16_t* jointRots = base + 3; // skip jointTable[0]
+    mmUpdateAnimN64(g_pending.modelId, jointRots, limbCount);
+    Zelda3D_MM_EmitModelDraw(play, g_pending.actor, g_pending.modelId, g_pending.scale,
+                             g_pending.groundOff);
+    // Drawn — clear so a second SkelAnime call inside this same actor draw doesn't re-emit.
+    g_pending.modelId = -1;
+    g_pending.actor = nullptr;
+    return 1;
+}
+
+void Zelda3D_MM_AfterActorDraw(void) {
+    g_pending.modelId = -1;
+    g_pending.actor = nullptr;
 }
 
 void Zelda3D_ListModels(void (*emitLine)(const char* line, void* user), void* user) {
