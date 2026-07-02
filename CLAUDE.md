@@ -105,6 +105,38 @@ game reliably, you shouldn't be working on the bug fix." (user directive, 2026-0
   controls only for state with no generic form (e.g. the cucco wing state machine: `cuccostate`,
   `flapinfo`). Driven per-frame from `SoH3D_ActorPostUpdate` in `Actor_UpdateAll`.
 
+## Direction: build a direct harness that EMBEDS Azahar as a library, not runs it
+
+Current Azahar tooling (`tools/azahar_rpc.py`, `tools/azahar_repl.py`, `tools/azahar_scan.py`) treats
+Azahar as an external GUI process to be launched and poked. The durable direction is different: build
+a harness that **embeds Azahar's core** — link its emulator library into a headless C++ program that
+loads the ROM, drives to a target scene deterministically, and reads actor tables / object lists /
+memory ranges directly. No window, no manual warp, no IPC race.
+
+Capabilities the harness should ship:
+
+- Load OoT3D ROM into embedded Azahar core, boot to a specific scene/room deterministically
+  (scripted warp, no input driving).
+- Enumerate live objects/actors in the current room: print each entry's actorId, params, pos, rot,
+  plus a hex dump of `actor+0x00..0x1F0` for the ones we care about.
+- Compare SIDE-BY-SIDE with SoH3D's state at the same scene: for every actor SoH3D spawns, the
+  harness shows the corresponding OoT3D entry (or "not present" / "mismatched"). This is the direct
+  divergence surface — no more RPC round-trips, no more "is Azahar running."
+- Same shape for scene-object tables, collision, room metadata — whatever the current parity
+  investigation needs.
+
+**Rule:** when the current investigation's next observation would come from Azahar, the answer is
+"drive the direct harness" — not "start Azahar externally." Extend the harness (new dump routine,
+new comparison field, new scene warp) if it doesn't cover the observable yet. This is the same
+workflow-first principle as the existing "build the tool if you can't investigate" rule (§91), now
+applied to the OoT3D reference side.
+
+Approach the first cut incrementally: (a) audit whether Azahar exposes a library / core API or is
+GUI-only (skim `Azahar/src/core/` for entry points that don't touch the window layer); (b) if
+library-usable, land a minimal C++ program that loads a ROM and prints "boot succeeded" — commit
+that as the harness scaffold; (c) add scene warp; (d) add actor table dump; (e) wire the side-by-side
+against SoH3D. Each step commits + gets close-tested.
+
 ## Verify the FULL user-facing path, not a narrow mechanism
 
 A card is only fixed when the real user-facing behavior works in a realistic run — not when a
