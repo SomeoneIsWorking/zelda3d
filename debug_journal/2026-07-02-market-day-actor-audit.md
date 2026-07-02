@@ -20,11 +20,18 @@ Signal source: `actorsnear` output + `[Zelda3D] auto-loaded model …` lines in 
 | 0x19B | EN_DOG | 6 | AUTO skin→skip → N64 | ZAR loads but skinned; needs behavior port |
 | 0x1A0 | (mgr) | 4 | N64 | env sound, non-drawing |
 | 0x1AC | EN_TG (dancing couple) | 1 | AUTO skin→skip → N64 | AUTO picks WRONG cmb (see below); needs behavior port |
-| 0x1AD | EN_MU (haggling townspeople) | 0 | — | not spawned in Market Day at r≤10000 from spawn (user's "En_Mu mis-rendered" in #118 does not reproduce here — check Market Night rooms / other scenes) |
+| 0x1AD | EN_MU (haggling townspeople) | 2 | AUTO skin→skip → N64 | spawns in Market Day at dayTime>=0x8001 (params 0x0000, 0x0001); AUTO picks marketpeople.cmb (correct CMB) but skinned→skip. Needs behavior port. |
 
-At Market Night (ent 0xB1, dayTime 0xE000, scene 0x21): same actor list minus daytime-only
-NPCs, no EN_MU either. EN_MU may live in a different scene entirely (its N64 draws are
-"Haggling townspeople"; check where else object_mu is bound).
+At Market Night (ent 0xB1, dayTime 0xE000, scene 0x21): no EN_MU (nightlife swaps the
+crowd). EN_MU is Market-Day-only per the definitive sweep in
+`tools/enmu_spawn_probe.py` across the Market family (Market Entrance Day/Night,
+Guard House, Back Alley Day/Night, Market Day/Night, Bazaar, Back Alley House) —
+scene 0x20 is the ONLY spawn location.
+
+**Retroactive note**: an earlier probe at dayTime=0x6000 reported zero EN_MU and the
+first draft of this journal said "user's claim does not reproduce". That was a
+sampling error — the definitive sweep at 0x8001 reproduces the user's #118 claim
+faithfully. `enmu_spawn_probe.py` is now the standing red-if-EN_MU-drifts signal.
 
 ## Confirmed structural divergences
 
@@ -57,12 +64,16 @@ recent work:
 - En_Hy body colors — LANDED (commit 97145451, Step 2c).
 - EN_DOOR — LANDED (door.cpp inc3 covers field-keep default; the market door variant is not
   distinct, it uses `m_Fnormaldoor_omote_model.cmb`).
-- En_Mu mis-render — NOT REPRODUCED in Market Day/Night at reachable positions; may need a
-  different scene to observe. Left open pending user pointer to a specific instance.
+- En_Mu mis-render — REPRODUCES at ent 0xB1 dayTime>=0x8001 (2 instances). Sweep tool:
+  `tools/enmu_spawn_probe.py`. AUTO already picks the correct CMB (marketpeople.cmb);
+  the visible symptom is the skinned→skip → N64 fallback. Same fix path as the other
+  pending skinned-actor ports.
 
 Remaining Market-scene per-actor ports (each a full skinned behavior port — CSAB retarget or
 n64anim hook + optional head-track / material-swap):
 - En_Tg (dancing couple) — uses couple.cmb, tg_matsu.csab. See divergence #1 above.
+- En_Mu (haggling townspeople) — uses marketpeople.cmb (AUTO already picks correct); 2 instances
+  at ent 0xB1 dayTime>=0x8001. Just needs the skinned-actor retarget or a behavior port.
 - En_Ma1 (young Malon) — uses zelda_ma1.zar, day-market instance.
 - En_Heishi4 (guards) — uses zelda_sd.zar; two instances patrol Market Day.
 - En_Dog — uses zelda_dog.zar; six instances scattered in Market Day.
