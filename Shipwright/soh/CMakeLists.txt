@@ -231,13 +231,23 @@ set(ALL_FILES
 ################################################################################
 
 # INTERFACE target that carries "how to compile SoH3D source" — includes,
-# defines, options, link flags, and library deps. Attached to the exe below
-# and (in a future commit) to a soh_lib STATIC so a harness binary can
-# consume the same settings without touching the exe target.
+# defines, options, link flags, and library deps. Consumed by both the
+# game-engine STATIC library (soh_lib, below) and the exe.
 add_library(soh_settings INTERFACE)
 
-add_executable(${PROJECT_NAME} ${ALL_FILES})
-target_link_libraries(${PROJECT_NAME} PRIVATE soh_settings)
+# Game engine as a static library. Everything the SoH3D runtime needs —
+# N64 subsystem, boot chain, hooks, RunFrame, Main_Init/Main_Shutdown, all
+# the zelda3d/ port code — lives here so a harness binary can link the
+# same code and drive its own frame loop (see tools/soh3d_harness/).
+set(SOH_LIB_FILES ${ALL_FILES})
+list(FILTER SOH_LIB_FILES EXCLUDE REGEX "src/code/exe_entry\\.c$")
+add_library(soh_lib STATIC ${SOH_LIB_FILES})
+target_link_libraries(soh_lib PUBLIC soh_settings)
+
+# The soh.elf executable is now a thin wrapper — just the entry point in
+# src/code/exe_entry.c, which delegates to Main() in soh_lib.
+add_executable(${PROJECT_NAME} src/code/exe_entry.c)
+target_link_libraries(${PROJECT_NAME} PRIVATE soh_lib)
 
 if (CMAKE_SYSTEM_NAME STREQUAL "Windows")
 use_props(${PROJECT_NAME} "${CMAKE_CONFIGURATION_TYPES}" "${DEFAULT_CXX_PROPS}")
