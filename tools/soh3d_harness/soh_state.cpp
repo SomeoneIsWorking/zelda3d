@@ -9,6 +9,8 @@
 #include "z64actor.h"
 #include "z64environment.h"
 #include "z64light.h"
+#include "z64camera.h"
+#include "z64skin.h"
 
 extern "C" {
 
@@ -112,6 +114,79 @@ int SohState_Lighting(unsigned char ambient[3],
     *lightCtxFogNear = l->fogNear;
     *lightCtxFogFar  = l->fogFar;
     return 1;
+}
+
+// Camera: read the active camera's eye/at/up (view frame) + fov/roll from
+// gPlayState->cameraPtrs[activeCamId]. Title-screen demos drive the
+// camera on a scripted spline — comparing these values against OoT3D's
+// equivalent Camera fields locks down "same camera state, same frame".
+int SohState_Camera(float* eyeX,  float* eyeY,  float* eyeZ,
+                   float* atX,   float* atY,   float* atZ,
+                   float* upX,   float* upY,   float* upZ,
+                   float* fov,
+                   short* roll,
+                   int*   activeCamId) {
+    if (gPlayState == NULL) return 0;
+    const int idx = gPlayState->activeCamera;
+    if (idx < 0 || idx >= NUM_CAMS) return 0;
+    Camera* c = gPlayState->cameraPtrs[idx];
+    if (c == NULL) return 0;
+    *eyeX = c->eye.x; *eyeY = c->eye.y; *eyeZ = c->eye.z;
+    *atX  = c->at.x;  *atY  = c->at.y;  *atZ  = c->at.z;
+    *upX  = c->up.x;  *upY  = c->up.y;  *upZ  = c->up.z;
+    *fov  = c->fov;
+    *roll = c->roll;
+    *activeCamId = idx;
+    return 1;
+}
+
+// Skeleton: dump the first N joints of the SkelAnime bound to the actor
+// at index (in whatever list order SohState_WalkActors used). This is
+// how bone-pose parity gets measured — the joint table drives every
+// per-limb transform in Draw. Returns joint count actually written; 0
+// if the actor doesn't have a SkelAnime, -1 if out of range.
+//
+// The actor lookup is by category+index to keep the interface flat
+// (matching the sink pattern used elsewhere in this file). Callers
+// generally want to iterate their WalkActors output and call
+// SohState_ActorSkeleton for actors they care about.
+int SohState_ActorSkeleton(int cat, int listIndex,
+                          short* jointsXYZ, int maxJoints,
+                          int* outJointCount, int* outAnimFrame,
+                          int* outMorphFrame) {
+    if (gPlayState == NULL) return -1;
+    if (cat < 0 || cat >= ACTORCAT_MAX) return -1;
+    Actor* a = gPlayState->actorCtx.actorLists[cat].head;
+    for (int i = 0; a != NULL && i < listIndex; ++i) a = a->next;
+    if (a == NULL) return -1;
+    // Every Actor with a SkelAnime component embeds it near its top. We
+    // scan the first ~0x400 bytes of the actor for the two SkelAnime
+    // signature bytes (limbCount at +0x00, mode at +0x01). Not perfect,
+    // but for the title-demo cast (Link + a handful) it hits.
+    // Cheap alternative: hardcode by id later. Keep it dumb for now.
+    SkelAnime* sk = NULL;
+    const uint8_t* p = (const uint8_t*)a;
+    for (int off = 0; off < 0x400; off += 4) {
+        const SkelAnime* cand = (const SkelAnime*)(p + off);
+        if (cand->limbCount > 0 && cand->limbCount <= 32 &&
+            cand->mode >= 0 && cand->mode <= 4 &&
+            cand->jointTable != NULL && cand->morphTable != NULL &&
+            cand->skeleton != NULL) {
+            sk = (SkelAnime*)cand;
+            break;
+        }
+    }
+    if (sk == NULL) return 0;
+    const int n = sk->limbCount < maxJoints ? sk->limbCount : maxJoints;
+    for (int j = 0; j < n; ++j) {
+        jointsXYZ[j * 3 + 0] = sk->jointTable[j].x;
+        jointsXYZ[j * 3 + 1] = sk->jointTable[j].y;
+        jointsXYZ[j * 3 + 2] = sk->jointTable[j].z;
+    }
+    if (outJointCount)  *outJointCount  = sk->limbCount;
+    if (outAnimFrame)   *outAnimFrame   = (int)sk->curFrame;
+    if (outMorphFrame)  *outMorphFrame  = (int)sk->morphWeight;
+    return n;
 }
 
 } // extern "C"
