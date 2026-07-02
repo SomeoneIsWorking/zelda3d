@@ -435,7 +435,13 @@ extern AudioMgr gAudioMgr;
 
 extern void ProcessSaveStateRequests(void);
 
-static void RunFrame() {
+// SOH3D harness: exposed non-static so a host driver can step the game
+// one frame at a time (alternating with Azahar's retro_run) instead of
+// letting Graph_ThreadEntry own the loop. runFrameContext is file-static
+// state — the coroutine-style resume via `state`/`goto nextFrame` still
+// works across external calls because each RunFrame() call is one game
+// frame in isolation.
+void RunFrame(void) {
     u32 size;
     char faultMsg[0x50];
     static bool hasSetupSkybox = false;
