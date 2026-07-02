@@ -18,6 +18,16 @@ just a pointer; `KANBAN.md` is a generated offline mirror.
   regressed. Don't self-close a user-visible visual fix — post proof and let the user confirm.
 - **File a bug:** `tools/kanban.py add --title "..." --labels type:render,... [--body-file f]`.
   Capture new playtest reports as cards immediately.
+- **HARD RULE — kanban is for USER-DRIVEN work ONLY.** Kanban holds requests the user
+  has personally made or parity issues the user has personally reported. **Agent-run
+  parity sweeps do NOT produce kanban cards.** When a sweep uncovers a divergence
+  (wrong CMB, missing behavior, N64 fallback, whatever), fix it in-session — close-test
+  + fix + commit — and record the finding in `debug_journal/` for the durable trail.
+  A backlog of sweep-discovered gaps is a workflow smell: it lets parity work accumulate
+  as a to-do list instead of being closed in the session that found it. If the finding
+  is genuinely beyond in-session scope, note it in the journal and continue the loop
+  in the same session (or start a fresh context with a handoff brief). Do not file.
+  (User directive 2026-07-02 — cards #135-#143 were misfiled sweep output and cleaned up.)
 - **Screenshots:** `tools/kanban.py evidence <#> shot.png --caption "..."` — uploads to the
   `evidence-assets` GitHub release and embeds by URL. `--to-body` = original bug evidence;
   default (comment) = fix-verification proof. **Never commit PNGs to the repo.**
