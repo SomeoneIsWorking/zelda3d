@@ -95,7 +95,6 @@ def main():
         else: i += 1
 
     print(f"[parity_ab] entrance dec={dec} hex={hexs} time={time_arg} name={name}")
-    print(f"[parity_ab] keeper: {ensure_keeper()}")
 
     print("[parity_ab] restarting Zelda3D…")
     r = subprocess.run(f"ZELDA3D_HEADLESS=1 tools/zelda3d_game.sh restart {dec} {time_arg}",
@@ -106,11 +105,20 @@ def main():
     # Pass time_arg so the ORACLE lands at the same dayTime as Zelda3D (Market Day vs Night,
     # Kakariko Day vs Night etc. fork on this at scene-select; without pinning, oracle
     # kept whatever time its save state carried and the A/B silently compared different scenes).
+    #
+    # IMPORTANT (2026-07-02): start the oracle_keeper AFTER the warp completes, not before.
+    # The keeper polls memory at 12Hz; between the warp trigger and the new scene fully loading,
+    # Azahar transiently has no active process pointer, and the keeper's RPC calls hit a null
+    # `Kernel::Process` shared_ptr deref that KILLS the emulator (assertion in memory.cpp). The
+    # symptom that gave this away: after the pre-fix flow, link_ctl.py reported `scene=104
+    # head=00000000` and every A/B failed with "MISSING oracle shot". Running keeper only
+    # post-warp avoids the mid-transition race.
     w = subprocess.run(["python3", os.path.join(DECOMP, "tools", "link_ctl.py"), "warp", hexs, time_arg],
                        cwd=DECOMP, capture_output=True, text=True, timeout=30)
     print("  " + (w.stdout.strip().splitlines()[-1] if w.stdout.strip() else "warp: no output"))
 
     time.sleep(settle)
+    print(f"[parity_ab] keeper: {ensure_keeper()}")
 
     # --orbit: read the (matched) spawn pos from Zelda3D and frame Link from the same WORLD angle in
     # both engines -> identical framing with no per-scene coordinate guessing.
