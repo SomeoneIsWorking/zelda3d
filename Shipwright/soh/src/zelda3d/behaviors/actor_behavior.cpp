@@ -9,6 +9,7 @@
 #include "actor/door.h"
 #include "actor/door_ana.h"
 #include "actor/door_shutter.h"
+#include "actor/en_trap.h"
 #include "actor/en_butte.h"
 #include "actor/en_fish.h"
 #include "actor/pot.h"
@@ -99,6 +100,7 @@ ActorBehavior* findActorBehavior(s16 actorId) {
     static EnDoorBehavior sEnDoor;
     static DoorAnaBehavior sDoorAna;
     static DoorShutterBehavior sDoorShutter;
+    static EnTrapBehavior sEnTrap;
     static EnButteBehavior sEnButte;
     static EnFishBehavior sEnFish;
     static EnTuboTrapBehavior sEnTuboTrap;
@@ -121,6 +123,8 @@ ActorBehavior* findActorBehavior(s16 actorId) {
             return &sDoorAna;
         case ACTOR_DOOR_SHUTTER:
             return &sDoorShutter;
+        case ACTOR_EN_TRAP:
+            return &sEnTrap;
         case ACTOR_EN_BUTTE:
             return &sEnButte;
         case ACTOR_EN_FISH:
