@@ -417,7 +417,7 @@ endif()
 ################################################################################
 if(MSVC)
     if(SOH_WINDOWS_64BIT)
-        target_compile_options(${PROJECT_NAME} PRIVATE
+        target_compile_options(soh_settings INTERFACE
             $<$<CONFIG:Debug>:
                 /Od
             >
@@ -433,9 +433,9 @@ if(MSVC)
             ${DEFAULT_CXX_DEBUG_INFORMATION_FORMAT};
             ${DEFAULT_CXX_EXCEPTION_HANDLING}
         )
-        target_compile_options(${PROJECT_NAME} PRIVATE  $<$<CONFIG:Debug>:/ZI;>)
+        target_compile_options(soh_settings INTERFACE  $<$<CONFIG:Debug>:/ZI;>)
     elseif("${CMAKE_VS_PLATFORM_NAME}" STREQUAL "Win32")
-        target_compile_options(${PROJECT_NAME} PRIVATE
+        target_compile_options(soh_settings INTERFACE
             $<$<CONFIG:Debug>:
                 /RTCs
             >
@@ -453,7 +453,7 @@ if(MSVC)
         )
     endif()
     if(SOH_WINDOWS_64BIT)
-        target_link_options(${PROJECT_NAME} PRIVATE
+        target_link_options(soh_settings INTERFACE
             $<$<CONFIG:Debug>:
                 /INCREMENTAL
             >
@@ -468,7 +468,7 @@ if(MSVC)
             /SUBSYSTEM:WINDOWS
         )
     elseif("${CMAKE_VS_PLATFORM_NAME}" STREQUAL "Win32")
-        target_link_options(${PROJECT_NAME} PRIVATE
+        target_link_options(soh_settings INTERFACE
             $<$<CONFIG:Debug>:
                 /STACK:8777216
             >
@@ -487,7 +487,7 @@ endif()
 
 if (CMAKE_CXX_COMPILER_ID MATCHES "GNU|Clang|AppleClang")
     if (CMAKE_SYSTEM_NAME STREQUAL "Darwin")
-        target_compile_options(${PROJECT_NAME} PRIVATE
+        target_compile_options(soh_settings INTERFACE
             -Wall -Wextra
             -Wformat-security
             -Wno-unused-parameter
@@ -508,11 +508,11 @@ if (CMAKE_CXX_COMPILER_ID MATCHES "GNU|Clang|AppleClang")
             -pthread
         )
 
-        target_link_options(${PROJECT_NAME} PRIVATE
+        target_link_options(soh_settings INTERFACE
             -pthread
         )
     elseif (CMAKE_SYSTEM_NAME STREQUAL "NintendoSwitch")
-        target_compile_options(${PROJECT_NAME} PRIVATE
+        target_compile_options(soh_settings INTERFACE
             -Wall -Wextra
             -Wformat-security
             -Wno-unused-parameter
@@ -532,11 +532,11 @@ if (CMAKE_CXX_COMPILER_ID MATCHES "GNU|Clang|AppleClang")
             -pthread
         )
 
-        target_link_options(${PROJECT_NAME} PRIVATE
+        target_link_options(soh_settings INTERFACE
             -pthread
         )
     elseif (CMAKE_SYSTEM_NAME STREQUAL "CafeOS")
-        target_compile_options(${PROJECT_NAME} PRIVATE
+        target_compile_options(soh_settings INTERFACE
             -O2
 
             # disable some warnings to not clutter output
@@ -558,7 +558,7 @@ if (CMAKE_CXX_COMPILER_ID MATCHES "GNU|Clang|AppleClang")
         set(CPU_OPTION -msse2 -mfpmath=sse)
         endif()
 
-        target_compile_options(${PROJECT_NAME} PRIVATE
+        target_compile_options(soh_settings INTERFACE
             -Wall -Wextra
             -Wformat-security
             -Wno-unused-parameter
@@ -578,7 +578,7 @@ if (CMAKE_CXX_COMPILER_ID MATCHES "GNU|Clang|AppleClang")
         ${CPU_OPTION}
         )
 
-        target_link_options(${PROJECT_NAME} PRIVATE
+        target_link_options(soh_settings INTERFACE
             -pthread
                 #-fsanitize=address
             -Wl,-export-dynamic
