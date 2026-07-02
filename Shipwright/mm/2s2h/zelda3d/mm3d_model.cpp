@@ -5,6 +5,7 @@
 // heavy lifting (CMB parse, CMB -> renderer groups + textures) is the SHARED cmb3d code.
 #include "mm3d_model.h"
 
+#include <algorithm>
 #include <cstdint>
 #include <cstdio>
 #include <cstdlib>
@@ -40,6 +41,12 @@ struct ModelSpec {
 std::vector<ModelSpec> g_models;
 // objectId -> renderer modelId (or -1 if resolution attempted and failed — cache miss).
 std::unordered_map<int, int> g_objectToModel;
+// Pending per-object scale overrides set by REPL BEFORE the object has been auto-probed.
+// Applied to ModelSpec.worldScale when resolveModelForObject() first commits the mapping.
+std::unordered_map<int, float> g_pendingScale;
+// Object short-name (for `mlist` output) — populated at map time to avoid
+// re-searching kObjectNames on every dump. Keyed by objectId.
+std::unordered_map<int, std::string> g_objectName;
 
 // Lazily-loaded geometry; owns the CPU arrays the renderer reads during upload.
 struct Loaded {
@@ -172,9 +179,6 @@ void Zelda3D_EnsureModelProvider(void) {
     }
 }
 
-// Live scale override for the model under calibration (set via the `mscale` REPL command).
-// -1 = use the table value. A single knob is enough while one prop is being dialed in.
-float g_scaleOverride = -1.0f;
 
 // Look up the object short-name from the generated kObjectNames table (objectId ordered).
 static const char* objectShortName(int objectId) {
@@ -251,10 +255,16 @@ static int resolveModelForObject(int objectId) {
     }
 
     int newId = (int)g_models.size();
-    g_models.push_back({ path, 0.1f });
+    float initialScale = 0.1f;
+    auto pending = g_pendingScale.find(objectId);
+    if (pending != g_pendingScale.end() && pending->second > 0.0f) {
+        initialScale = pending->second;
+    }
+    g_models.push_back({ path, initialScale });
     g_objectToModel[objectId] = newId;
-    fprintf(stderr, "[MM3D] mapped obj=0x%03X (%s) -> modelId=%d (rigid, %zu bones)\n",
-            objectId, name, newId, probeCmb.bones().size());
+    g_objectName[objectId] = name;
+    fprintf(stderr, "[MM3D] mapped obj=0x%03X (%s) -> modelId=%d (rigid, %zu bones) scale=%.4f\n",
+            objectId, name, newId, probeCmb.bones().size(), initialScale);
     return newId;
 }
 
@@ -263,7 +273,7 @@ int Zelda3D_LookupModel(int actorId, int objectId, int* modelId, float* worldSca
     int id = resolveModelForObject(objectId);
     if (id < 0) return 0;
     if (modelId != nullptr) *modelId = id;
-    if (worldScale != nullptr) *worldScale = (g_scaleOverride > 0.0f) ? g_scaleOverride : g_models[id].worldScale;
+    if (worldScale != nullptr) *worldScale = g_models[id].worldScale;
     if (groundOffset != nullptr) *groundOffset = 0.0f;
     return 1;
 }
@@ -273,8 +283,46 @@ float Zelda3D_ModelScaleById(int modelId) {
     return g_models[modelId].worldScale;
 }
 
-void Zelda3D_SetScaleOverride(float scale) {
-    g_scaleOverride = scale;
+void Zelda3D_SetObjectScale(int objectId, float scale) {
+    if (scale <= 0.0f) {
+        g_pendingScale.erase(objectId);
+        // Reset the live model back to the default too so a fresh probe would
+        // reproduce the same result. 0.1f matches resolveModelForObject().
+        auto it = g_objectToModel.find(objectId);
+        if (it != g_objectToModel.end() && it->second >= 0 && it->second < (int)g_models.size()) {
+            g_models[it->second].worldScale = 0.1f;
+        }
+        return;
+    }
+    g_pendingScale[objectId] = scale;
+    auto it = g_objectToModel.find(objectId);
+    if (it != g_objectToModel.end() && it->second >= 0 && it->second < (int)g_models.size()) {
+        g_models[it->second].worldScale = scale;
+    }
+}
+
+void Zelda3D_ListModels(void (*emitLine)(const char* line, void* user), void* user) {
+    if (emitLine == nullptr) return;
+    // Sort by objectId for stable output.
+    std::vector<int> objs;
+    objs.reserve(g_objectToModel.size());
+    for (const auto& kv : g_objectToModel) {
+        if (kv.second >= 0) objs.push_back(kv.first);
+    }
+    std::sort(objs.begin(), objs.end());
+    char line[192];
+    for (int obj : objs) {
+        int mid = g_objectToModel[obj];
+        const char* nm = "?";
+        auto n = g_objectName.find(obj);
+        if (n != g_objectName.end()) nm = n->second.c_str();
+        snprintf(line, sizeof(line), "  obj=0x%03X (%s) -> modelId=%d scale=%.4f", obj, nm, mid,
+                 g_models[mid].worldScale);
+        emitLine(line, user);
+    }
+    if (objs.empty()) {
+        emitLine("  (no auto-mapped MM3D models yet)", user);
+    }
 }
 
 } // extern "C"
