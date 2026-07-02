@@ -12,10 +12,23 @@ Composite: `scratch/screenshots/ab_market_cmp.png`
 - NOT the deleted "SKYBUG unresolved segment 8" (that was a stale-texel warning that
   paints garbage, not a black void). This is the sky draw itself missing / culled.
 - Reproduce: launch Market Day (ent 0xB1) headless, look up from the fountain.
-- Root cause: **OPEN** — check the OoT3D BlueSky.zar dome dispatch path (memory
-  [[soh3d-oot3d-sky]]); is Market Day (SCENE_MARKET_DAY, id 0x20) in the sky-enabled
-  scene list, or does its skyboxId flag skip the dome? Trace the `handle bit 30`
-  far-plane sky draw flag mentioned in that memory.
+- Root cause: **FOUND** — `Zelda3D_TryDrawSky` (Shipwright/soh/src/zelda3d/zelda3d.c:3144)
+  early-outs when `play->skyboxId != SKYBOX_NORMAL_SKY`. Market Day uses
+  `SKYBOX_MARKET_CHILD_DAY` (=9, Shipwright/soh/include/z64.h:405); Market Night uses
+  `SKYBOX_MARKET_CHILD_NIGHT` (=0xA). Neither is `SKYBOX_NORMAL_SKY` (=1) so the
+  BlueSky.zar dome path is skipped. There is no fallback for the ~20 non-NORMAL
+  skybox variants (BAZAAR, MARKET_ADULT, HOUSE_LINK, HAPPY_MASK_SHOP, all houses,
+  shops, HOUSE_ROYAL_FAMILY, MARKET_RUINS, GANONS_TOWER_COLLAPSE, etc.), so every
+  scene using one of them shows a black void.
+- Fix direction: port the OoT3D **matte-painting** sky class. The N64 game handles
+  these via a prerendered fullscreen VR image (a full frame painted onto the
+  skybox). OoT3D uses a similar prerendered VR image per variant (`vrbox/*` in
+  kankyo). Extend `Zelda3D_TryDrawSky` to also handle `skyboxId >= 2` by looking
+  up the matching OoT3D vrbox texture and drawing it as a screen-space quad
+  (no dome geometry). Different code path from the BlueSky dome — DON'T reuse
+  Zelda3D_SkyModelId.
+- Scope note: this is a NEW rendering class, not tuning. Do NOT tune the existing
+  dome path to fake it. Per user directive [[soh3d-port-dont-pixelcompare]].
 
 ### 2. Scene-time divergence at 0x6000
 - SoH3D at time=0x6000 loaded **SCENE_MARKET_DAY** (0x20) — sunlit.
