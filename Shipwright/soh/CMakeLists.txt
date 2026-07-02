@@ -480,22 +480,19 @@ endif()
 if (CMAKE_CXX_COMPILER_ID MATCHES "GNU|Clang|AppleClang")
     if (CMAKE_SYSTEM_NAME STREQUAL "Darwin")
         target_compile_options(${PROJECT_NAME} PRIVATE
-            -Wall -Wextra -Wno-error
+            -Wall -Wextra
             -Wformat-security
-            -Wno-return-type
             -Wno-unused-parameter
             -Wno-unused-function
             -Wno-unused-variable
             -Wno-missing-field-initializers
             -Wno-parentheses
-            -Wno-narrowing
             -Wno-missing-braces
             $<$<COMPILE_LANGUAGE:C>:
                 -Werror-implicit-function-declaration
                 -Wno-incompatible-pointer-types
                 -Wno-int-conversion
             >
-            $<$<COMPILE_LANGUAGE:CXX>:-fpermissive>
             $<$<COMPILE_LANGUAGE:CXX>:
                 -Wno-c++11-narrowing
                 -Wno-deprecated-enum-enum-conversion
@@ -508,21 +505,18 @@ if (CMAKE_CXX_COMPILER_ID MATCHES "GNU|Clang|AppleClang")
         )
     elseif (CMAKE_SYSTEM_NAME STREQUAL "NintendoSwitch")
         target_compile_options(${PROJECT_NAME} PRIVATE
-            -Wall -Wextra -Wno-error
+            -Wall -Wextra
             -Wformat-security
-            -Wno-return-type
             -Wno-unused-parameter
             -Wno-unused-function
             -Wno-unused-variable
             -Wno-missing-field-initializers
             -Wno-parentheses
-            -Wno-narrowing
             -Wno-missing-braces
             $<$<COMPILE_LANGUAGE:C>:
                 -Werror-implicit-function-declaration
                 -Wno-incompatible-pointer-types
             >
-            $<$<COMPILE_LANGUAGE:CXX>:-fpermissive>
             $<$<COMPILE_LANGUAGE:CXX>:
                 -Wno-c++11-narrowing
                 -Wno-deprecated-enum-enum-conversion
@@ -539,8 +533,6 @@ if (CMAKE_CXX_COMPILER_ID MATCHES "GNU|Clang|AppleClang")
 
             # disable some warnings to not clutter output
             -Wno-multichar
-            -Wno-return-type
-            -Wno-narrowing
             -Wno-switch-outside-range
             $<$<COMPILE_LANGUAGE:C>:
                 -Werror-implicit-function-declaration
@@ -559,14 +551,13 @@ if (CMAKE_CXX_COMPILER_ID MATCHES "GNU|Clang|AppleClang")
         endif()
 
         target_compile_options(${PROJECT_NAME} PRIVATE
-            -Wall -Wextra -Wno-error
+            -Wall -Wextra
             -Wformat-security
             -Wno-unused-parameter
             -Wno-unused-function
             -Wno-unused-variable
             -Wno-missing-field-initializers
             -Wno-parentheses
-            -Wno-narrowing
             -Wno-missing-braces
             $<$<COMPILE_LANGUAGE:C>:
                 -Werror-implicit-function-declaration
@@ -574,7 +565,6 @@ if (CMAKE_CXX_COMPILER_ID MATCHES "GNU|Clang|AppleClang")
                 -Wno-incompatible-pointer-types
                 -Wno-int-conversion
             >
-            $<$<COMPILE_LANGUAGE:CXX>:-fpermissive>
             $<$<COMPILE_LANGUAGE:CXX>:-Wno-deprecated-enum-enum-conversion>
             -pthread
         ${CPU_OPTION}

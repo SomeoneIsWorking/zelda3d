@@ -191,13 +191,12 @@ endif()
 
 if ("${CMAKE_CXX_COMPILER_ID}" MATCHES "GNU|Clang|AppleClang")
 	target_compile_options(${PROJECT_NAME} PRIVATE
-	-Wall -Wextra -Wno-error
+	-Wall -Wextra
         -Wno-unused-parameter
         -Wno-unused-function
         -Wno-unused-variable
 	-Wno-missing-field-initializers
         -Wno-parentheses
-        -Wno-narrowing
         $<$<COMPILE_LANGUAGE:CXX>:-Wno-deprecated-enum-enum-conversion>
 	)
 endif()
