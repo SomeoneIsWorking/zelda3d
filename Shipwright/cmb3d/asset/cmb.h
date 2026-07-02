@@ -67,6 +67,23 @@ struct CmbMaterial {
     uint16_t comb_combine_rgb = 0x2100;                    // MODULATE
     float comb_scale_rgb = 1.0f;                           // 1 / 2 / 4
     uint16_t comb_src_rgb[3] = { 0x8577, 0x84C0, 0x8576 }; // PRIMARY_COLOR, TEXTURE0, CONSTANT
+    // PICA200 TEV constant-color selector for stage 0: index 0..5 chosen from mat_constant[].
+    // A stage that sources CONSTANT (0x8576) reads mat_constant[comb_const_idx[stage]]. The
+    // per-stage selector is a u8 at combiner-entry +0x14 (see readMatsChunk in noclip's
+    // OcarinaOfTime3D/cmb.ts). Only stage 0 is captured today (matches comb_stage_count use).
+    uint8_t comb_const_idx = 0;
+
+    // PICA200 TEV constant-color palette: 6 float-RGBA slots per material. Base defaults come
+    // from the CMB file (per readMatsChunk: matConstColor[0..5] at material +0xB8..+0xCF,
+    // u8 RGBA converted to float). Referenced by the combiner via CONSTANT (0x8576) with the
+    // stage's comb_const_idx picking which slot. The game also OVERWRITES these at runtime via
+    // Model_SetMaterialConstantColor (see oot3d-decomp/build/decomp/003688a8.c and the EnHy
+    // per-type body-color table at oot3d-decomp/data/enhy_body_colors.inc); the port carries
+    // that override channel as a per-actor input in the render layer.
+    float mat_constant[6][4] = {
+        { 0, 0, 0, 1 }, { 0, 0, 0, 1 }, { 0, 0, 0, 1 },
+        { 0, 0, 0, 1 }, { 0, 0, 0, 1 }, { 0, 0, 0, 1 },
+    };
 };
 
 struct CmbTexture {

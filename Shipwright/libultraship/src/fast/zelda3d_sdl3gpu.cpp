@@ -546,6 +546,10 @@ SgModel* Fast::Zelda3DRenderer::ensureUploaded(int modelId) {
             g.matAmbient[k] = groups[i].matAmbient[k];
             g.matDiffuse[k] = groups[i].matDiffuse[k];
         }
+        for (int s = 0; s < 6; s++)
+            for (int k = 0; k < 4; k++)
+                g.matConstant[s][k] = groups[i].matConstant[s][k];
+        g.combConstIdx = groups[i].combConstIdx;
         if (groups[i].vertCount > 0) {
             for (int k = 0; k < 4; k++)
                 g.dbgColor0[k] = groups[i].verts[0].color[k];
@@ -1449,6 +1453,21 @@ void Fast::Zelda3DRenderer::DrawModel(int modelId, const float* mp16, const floa
                     grp.matAmbient[0], grp.matAmbient[1], grp.matAmbient[2], grp.matDiffuse[0],
                     grp.matDiffuse[1], grp.matDiffuse[2], grp.dbgUv0[0], grp.dbgUv0[1], grp.dbgUv1[0],
                     grp.dbgUv1[1], grp.dbgUv2[0], grp.dbgUv2[1], grp.wrapS, grp.wrapT);
+            // PICA200 TEV constant palette + stage-0 selector — dumped on its own line so the
+            // main SG_DUMP row stays parseable by existing tools; format:
+            //   [SG_DUMP]   g<n> constIdx=<i> const0..const5=(r,g,b,a) x 6
+            fprintf(stderr,
+                    "[SG_DUMP]  g%-2d constIdx=%d "
+                    "const0=(%.3f,%.3f,%.3f,%.3f) const1=(%.3f,%.3f,%.3f,%.3f) "
+                    "const2=(%.3f,%.3f,%.3f,%.3f) const3=(%.3f,%.3f,%.3f,%.3f) "
+                    "const4=(%.3f,%.3f,%.3f,%.3f) const5=(%.3f,%.3f,%.3f,%.3f)\n",
+                    gi, grp.combConstIdx,
+                    grp.matConstant[0][0], grp.matConstant[0][1], grp.matConstant[0][2], grp.matConstant[0][3],
+                    grp.matConstant[1][0], grp.matConstant[1][1], grp.matConstant[1][2], grp.matConstant[1][3],
+                    grp.matConstant[2][0], grp.matConstant[2][1], grp.matConstant[2][2], grp.matConstant[2][3],
+                    grp.matConstant[3][0], grp.matConstant[3][1], grp.matConstant[3][2], grp.matConstant[3][3],
+                    grp.matConstant[4][0], grp.matConstant[4][1], grp.matConstant[4][2], grp.matConstant[4][3],
+                    grp.matConstant[5][0], grp.matConstant[5][1], grp.matConstant[5][2], grp.matConstant[5][3]);
         }
     }
 
