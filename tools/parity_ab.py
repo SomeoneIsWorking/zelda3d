@@ -103,7 +103,10 @@ def main():
     print("  " + (r.stdout.strip().splitlines()[-1] if r.stdout.strip() else r.stderr.strip()[-200:]))
 
     print("[parity_ab] warping oracle…")
-    w = subprocess.run(["python3", os.path.join(DECOMP, "tools", "link_ctl.py"), "warp", hexs],
+    # Pass time_arg so the ORACLE lands at the same dayTime as Zelda3D (Market Day vs Night,
+    # Kakariko Day vs Night etc. fork on this at scene-select; without pinning, oracle
+    # kept whatever time its save state carried and the A/B silently compared different scenes).
+    w = subprocess.run(["python3", os.path.join(DECOMP, "tools", "link_ctl.py"), "warp", hexs, time_arg],
                        cwd=DECOMP, capture_output=True, text=True, timeout=30)
     print("  " + (w.stdout.strip().splitlines()[-1] if w.stdout.strip() else "warp: no output"))
 
