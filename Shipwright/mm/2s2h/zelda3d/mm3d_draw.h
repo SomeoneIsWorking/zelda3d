@@ -4,6 +4,7 @@
 // OPA display list (via the shared G_ZELDA3D_DRAW opcode) and returns 1 so the caller skips
 // the vanilla N64 draw. Returns 0 to draw vanilla.
 #pragma once
+#include "global.h"
 
 // NB: MM's Room is a typedef of an anonymous struct (z64scene.h), so we can't forward-declare
 // it as `struct Room`. Callers of this header (z_room.c / z_play.c / mm3d_draw.c) all include
@@ -13,6 +14,12 @@
 #ifdef __cplusplus
 extern "C" {
 #endif
+
+// SkelAnime intercept — called at the top of MM's SkelAnime_Draw*Opa entry points.
+// If a skinned MM3D replacement is pending for this actor, poses OoT3D bones from
+// the live N64 jointTable and returns 1 (caller returns immediately). Else 0
+// (caller proceeds with the vanilla N64 limb walk).
+int Zelda3D_MM_InterceptSkelAnime(PlayState* play, void** skeleton, Vec3s* jointTable);
 
 // 1 = drew the MM3D replacement (skip N64 draw); 0 = no replacement (draw vanilla N64).
 // This is the only MM-specific renderer surface: the per-actor divert (MM has its own
