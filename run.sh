@@ -6,10 +6,10 @@
 #   ./run.sh tool         # the N64-vs-3DS character compare tool (charcompare)
 #   ./run.sh tool /actor/zelda_zl4.zar   # ...starting on a specific character
 #
-# The decrypted OoT3D .3ds is provided via env SOH3D_3DS_ROM (never hardcoded — repo
+# The decrypted OoT3D .3ds is provided via env ZELDA3D_OOT3D_ROM (never hardcoded — repo
 # rule). Either export it, drop a `.env` next to this script setting it, or just drop
 # the ROM file (any name) into the repo dir. The N64 .z64 (for first-run extraction)
-# is picked up the same way. Override the warp target with SOH3D_ENTRANCE=<decimal>.
+# is picked up the same way. Override the warp target with ZELDA3D_ENTRANCE=<decimal>.
 #
 # The engine (Shipwright + libultraship + ZAPDTR + OTRExporter) is vendored directly in this repo
 # (the old submodule chain was flattened into a single repo), so `git clone <soh3d> && ./run.sh` is
@@ -88,9 +88,9 @@ ensure_soh_o2r() {
 
 # ROM provisioning: env -> gitignored .env -> any *.3ds / *.z64 dropped in the repo dir.
 . "$REPO/tools/rom_provision.sh"
-soh3d_provision_roms "$REPO" "$SOH"
-if [ -z "${SOH3D_3DS_ROM:-}" ]; then
-    echo "error: no OoT3D .3ds found — set SOH3D_3DS_ROM, add ./.env, or drop a *.3ds into $REPO" >&2
+zelda3d_provision_roms "$REPO" "$SOH"
+if [ -z "${ZELDA3D_OOT3D_ROM:-}" ]; then
+    echo "error: no OoT3D .3ds found — set ZELDA3D_OOT3D_ROM, add ./.env, or drop a *.3ds into $REPO" >&2
     exit 1
 fi
 
@@ -122,17 +122,17 @@ export SOH3D=1                                  # render OoT3D assets
 # file select, New Game, the real intro, normal save + normal day/night clock. The dev-warp shortcuts
 # (skip title and teleport straight into a scene, with an optional clean save / pinned time) are
 # OPT-IN, off by default — set them on the command line when you want to test a specific scene:
-#   SOH3D_WARP=1 SOH3D_ENTRANCE=177 SOH3D_TIME=0x8000 SOH3D_COLDBOOT=1 ./run.sh   # warp to Market, noon, fresh save
-export SOH3D_WARP="${SOH3D_WARP:-}"              # set 1 to auto-warp past title/file-select (dev)
-export SOH3D_COLDBOOT="${SOH3D_COLDBOOT:-}"      # set 1 (with WARP) to start the warp save as a clean NEW game
-export SOH3D_ENTRANCE="${SOH3D_ENTRANCE:-219}"  # warp target when SOH3D_WARP=1 (219 = Kakariko front gate)
-export SOH3D_TIME="${SOH3D_TIME:-}"             # set e.g. 0x8000 to PIN time-of-day (else the game clock runs)
-export SOH3D_AUTO="${SOH3D_AUTO:-1}"            # 1 = auto-replace non-table actors with OoT3D models
-export SOH3D_N64ANIM="${SOH3D_N64ANIM:-1}"      # drive OoT3D skeletons from live N64 joints (req. for characters)
-export SOH3D_VULKAN="${SOH3D_VULKAN:-1}"         # 1 = single Vulkan Fast3D backend (default); 0 = legacy OpenGL
-# Skybox/HUD stripe corruption hunting: launch with SOH3D_GL_STATECHECK=1 ./run.sh — every SoH3D
+#   ZELDA3D_WARP=1 ZELDA3D_ENTRANCE=177 ZELDA3D_TIME=0x8000 ZELDA3D_COLDBOOT=1 ./run.sh   # warp to Market, noon, fresh save
+export ZELDA3D_WARP="${ZELDA3D_WARP:-}"              # set 1 to auto-warp past title/file-select (dev)
+export ZELDA3D_COLDBOOT="${ZELDA3D_COLDBOOT:-}"      # set 1 (with WARP) to start the warp save as a clean NEW game
+export ZELDA3D_ENTRANCE="${ZELDA3D_ENTRANCE:-219}"  # warp target when ZELDA3D_WARP=1 (219 = Kakariko front gate)
+export ZELDA3D_TIME="${ZELDA3D_TIME:-}"             # set e.g. 0x8000 to PIN time-of-day (else the game clock runs)
+export ZELDA3D_AUTO="${ZELDA3D_AUTO:-1}"            # 1 = auto-replace non-table actors with OoT3D models
+export ZELDA3D_N64ANIM="${ZELDA3D_N64ANIM:-1}"      # drive OoT3D skeletons from live N64 joints (req. for characters)
+export ZELDA3D_VULKAN="${ZELDA3D_VULKAN:-1}"         # 1 = single Vulkan Fast3D backend (default); 0 = legacy OpenGL
+# Skybox/HUD stripe corruption hunting: launch with ZELDA3D_GL_STATECHECK=1 ./run.sh — every SoH3D
 # render pass then logs (stderr) any GL state it failed to restore. Off by default (per-frame glGet).
-export SOH3D_GL_STATECHECK="${SOH3D_GL_STATECHECK:-}"
+export ZELDA3D_GL_STATECHECK="${ZELDA3D_GL_STATECHECK:-}"
 
 cd "$SOH"
 exec "./$SOH_BIN" "$@"
