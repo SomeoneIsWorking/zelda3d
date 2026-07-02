@@ -469,6 +469,53 @@ void HandleMem(std::istringstream& toks) {
     std::printf("\n");
 }
 
+// Dump a contiguous VA range to a binary file. Backbone of any RE
+// pass — dumping .data (RW-Private, ~830 KB on OoT3D) in one shot for
+// offline analysis is way faster than 200+ `mem` REPL round-trips.
+//
+// Reads through Azahar's MemorySystem::GetPointer, which returns a
+// raw pointer into the emulator's mapped-VA host memory. Unmapped
+// pages produce a null GetPointer and we bail early rather than
+// segfaulting on the memcpy.
+void HandleDumpRange(std::istringstream& toks) {
+    std::string va_s, n_s, path;
+    if (!(toks >> va_s >> n_s >> path)) {
+        PrintErr("dumprange: usage: dumprange <va> <size> <path>");
+        return;
+    }
+    auto va = ParseNum(va_s);
+    auto n  = ParseNum(n_s);
+    if (!va || !n) { PrintErr("dumprange: bad args"); return; }
+    if (*n == 0) { PrintErr("dumprange: size must be > 0"); return; }
+    auto& mem = Core::System::GetInstance().Memory();
+    std::FILE* f = std::fopen(path.c_str(), "wb");
+    if (!f) { PrintErr("dumprange: open failed"); return; }
+    // Chunk by 4KB (typical page boundary). Between chunks we
+    // re-resolve GetPointer so a page boundary that crosses a
+    // mapping change still reads correctly.
+    const uint64_t chunk_sz = 4096;
+    uint64_t written = 0, unmapped_bytes = 0;
+    for (uint64_t off = 0; off < *n; off += chunk_sz) {
+        const uint32_t cva = static_cast<uint32_t>(*va + off);
+        const uint64_t rem = std::min(chunk_sz, *n - off);
+        auto* p = mem.GetPointer(cva);
+        if (!p) {
+            // Unmapped — write zeros to keep offsets stable.
+            std::vector<uint8_t> zeros(rem, 0);
+            std::fwrite(zeros.data(), 1, rem, f);
+            unmapped_bytes += rem;
+        } else {
+            std::fwrite(p, 1, rem, f);
+        }
+        written += rem;
+    }
+    std::fclose(f);
+    std::printf("ok dumprange 0x%08x..0x%08x (%llu bytes, %llu unmapped) -> %s\n",
+                (unsigned)*va, (unsigned)(*va + *n),
+                (unsigned long long)written,
+                (unsigned long long)unmapped_bytes, path.c_str());
+}
+
 void HandleLoadState(std::istringstream& toks) {
     std::string path;
     if (!(toks >> path)) { PrintErr("loadstate: usage: loadstate <path>"); return; }
@@ -1299,6 +1346,7 @@ void RunRepl() {
         else if (cmd == "w16")       HandleWrite(toks, 16);
         else if (cmd == "w32")       HandleWrite(toks, 32);
         else if (cmd == "mem")       HandleMem(toks);
+        else if (cmd == "dumprange") HandleDumpRange(toks);
         else if (cmd == "input")     HandleInput(toks);
         else if (cmd == "diag")      HandleDiag(toks);
         else if (cmd == "loadstate") HandleLoadState(toks);
