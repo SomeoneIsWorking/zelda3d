@@ -249,13 +249,25 @@ static int resolveModelForObject(int objectId) {
         return -1;
     }
     if (probeCmb.bones().size() > 1) {
-        // Skinned — needs the animated-actor path; not wired for MM yet. Log once per
-        // objectId so coverage gaps are visible (denominator: ~418 archives shipped;
-        // we currently only serve the rigid subset).
-        fprintf(stderr, "[MM3D] skip obj=0x%03X (%s): skinned (%zu bones)\n",
+        // Skinned — full path (live N64 pose via the SkelAnime intercept, per
+        // docs/MM_SKELANIME_PORT.md) not yet wired. Env-var gate ZELDA3D_MM_SKINNED_TPOSE=1
+        // opts into Stage 1: render the archive at CMB bind pose (T-pose) via the same
+        // static draw path — proves end-to-end skinned CMB loading + rendering before the
+        // SkelAnime hook lands. Not enabled by default because a T-pose enemy walking
+        // around looks worse than the vanilla N64 model.
+        static int sTposeAll = -1;
+        if (sTposeAll < 0) {
+            const char* v = getenv("ZELDA3D_MM_SKINNED_TPOSE");
+            sTposeAll = (v != nullptr && v[0] != '\0' && v[0] != '0') ? 1 : 0;
+        }
+        if (!sTposeAll) {
+            fprintf(stderr, "[MM3D] skip obj=0x%03X (%s): skinned (%zu bones)\n",
+                    objectId, name, probeCmb.bones().size());
+            g_objectToModel[objectId] = -1;
+            return -1;
+        }
+        fprintf(stderr, "[MM3D] skinned-tpose obj=0x%03X (%s): %zu bones (Stage 1 bind-pose draw)\n",
                 objectId, name, probeCmb.bones().size());
-        g_objectToModel[objectId] = -1;
-        return -1;
     }
 
     int newId = (int)g_models.size();
