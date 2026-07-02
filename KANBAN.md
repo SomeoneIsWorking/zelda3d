@@ -3,18 +3,15 @@
 > **Generated mirror — do not hand-edit.** Source of truth = GitHub Issues on
 > `SomeoneIsWorking/zelda3d` (private). Regenerate with `tools/kanban.py render`.
 > Move a card with `tools/kanban.py mv <#> <column>`; add with `tools/kanban.py add`.
-> Columns: todo · in-progress · in-review · needs-confirmation · reopened · blocked · done(=closed).  Updated 2026-07-02 11:12.
+> Columns: todo · in-progress · in-review · needs-confirmation · reopened · blocked · done(=closed).  Updated 2026-07-02 13:23.
 
-**Counts:** todo:8 | in-progress:2 | in-review:1 | needs-confirmation:28 | reopened:0 | blocked:0 | done:80
+**Counts:** todo:5 | in-progress:2 | in-review:1 | needs-confirmation:26 | reopened:0 | blocked:0 | done:80
 
-## 📋 To Do  (8)
+## 📋 To Do  (5)
 - [#17](../../issues/17) Hi-res world/scene textures (texpack) _(render)_
 - [#33](../../issues/33) More foliage / vegetation density (lowest priority) _(scene)_
 - [#118](../../issues/118) Market (SCENE_MARKET_DAY) parity: crowd NPCs (En_Hy/En_Mu) mis-rendered, door still N64 _(render,scene,behavior)_
-- [#122](../../issues/122) Faithful Boss_Goma per-limb scale overrides (eye-iris open/close + tail extend) in combat states _(render,behavior)_
-- [#128](../../issues/128) SKYBUG: unresolved texture segment 8 paints stale/garbage texels (scene-load race) _(render)_
 - [#130](../../issues/130) Make repo public — audit + clean git history first (no outside-repo paths, no copyrighted assets) _(infra)_
-- [#131](../../issues/131) Unified N64/3DS render pipeline: one vertex/material/shader/lighting system _(render)_
 - [#133](../../issues/133) Add HTTP/remote layer to the REPL control channel (beyond FIFO)
 
 ## 🔨 In Progress  (2)
@@ -24,7 +21,7 @@
 ## 🔍 In Review (agent verifying)  (1)
 - [#112](../../issues/112) START can't skip the final intro segment (Navi flies in / wakes Link) _(render,keyboard)_
 
-## 🙋 Needs User Confirmation  (28)
+## 🙋 Needs User Confirmation  (26)
 - [#12](../../issues/12) Inventory/pause background renders upside-down _(render,ui,inventory)_
 - [#16](../../issues/16) First-person camera: early-load crash + position snap _(camera,crash)_
 - [#18](../../issues/18) Crisp HUD/UI textures (hearts/digits/buttons/icons) _(ui,hud)_
@@ -38,8 +35,6 @@
 - [#103](../../issues/103) OoT3D water surfaces render as flat opaque cyan (no texture/transparency/animation) _(render,scene)_
 - [#106](../../issues/106) Gerudo Valley deep gorge shows skybox through backface-culled far wall (not water) _(render,scene)_
 - [#107](../../issues/107) Stalchildren (En_Skb) zip away after spawning — broken behavior + visuals _(render,behavior)_
-- [#108](../../issues/108) Extend #107 collision-sphere fix to the other SkelAnime draw choke points (DrawFlexOpa etc.) _(render,behavior)_
-- [#109](../../issues/109) Stalchild (En_Skb) OoT3D model renders disassembled — bones scattered (visual half of #107) _(render,anim)_
 - [#110](../../issues/110) World night/dusk lighting hue wrong — stays warm-green, not OoT3D cool-blue (multiplicative shade can't add ambient) _(render)_
 - [#113](../../issues/113) Flat pale-tan triangle on Kokiri ground (distant plane slammed to full fog by steep ramp) _(render)_
 - [#114](../../issues/114) Deku Tree crashes on load (SIGSEGV) — En_Box chest collider re-walk uses wrong postLimbDraw ABI _(render,crash)_
