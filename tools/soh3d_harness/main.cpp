@@ -1,26 +1,54 @@
 // soh3d_harness — headless libretro-frontend host that drives Azahar's
 // libretro core in-process (no dlopen, no .so). Azahar's citra_libretro
 // source files are linked directly into this executable (see the sibling
-// CMakeLists.txt), so the retro_* entry points are just normal C symbols.
+// harness.cmake), so the retro_* entry points are just normal C symbols.
 //
-// This is the first scaffold toward the direction laid out in
-// soh3d/CLAUDE.md ("Direction: build a direct harness that EMBEDS Azahar as
-// a library, not runs it").
+// This is the C++ side of the "direct harness" direction laid out in
+// soh3d/CLAUDE.md ("Direction: build a direct harness that EMBEDS Azahar
+// as a library, not runs it"). It keeps the C++ deliberately small —
+// just a REPL that exposes retro_run + Azahar's Memory::MemorySystem +
+// save-state I/O — so warp injection, actor-table dumps, and SoH3D
+// side-by-side compare can live as Python scripts in tools/ instead of
+// being baked into the binary. Matches how tools/soh3d_repl.py drives
+// the SoH3D game today.
 //
-// Current milestone: retro_load_game succeeds, retro_run pumps frames
-// through the software renderer, and the harness reads OoT3D VA directly
-// via Azahar's Memory::MemorySystem — proven by observing gPlayState
-// (0x0050AF34) transition from 0 → an allocated pointer once the game
-// populates it. Scripted warp writes land next.
+// Protocol: newline-delimited text on stdin/stdout. Two tiers:
+//
+// LOW-LEVEL primitives (free-form poking):
+//   run <N>              -> ok run <N>
+//   r8|r16|r32 <va>      -> ok <hex>            (or err)
+//   w8|w16|w32 <va> <v>  -> ok
+//   mem <va> <n>         -> ok <hex-bytes>      (or err)
+//   loadstate <path>     -> ok  (or err)
+//   savestate <path>     -> ok  (or err)
+//
+// HIGH-LEVEL OoT3D ops (RE knowledge lives here, not in scripts):
+//   playstate            -> ok 0x<ptr>           (or err "not populated")
+//   scene                -> ok 0x<sceneNum>      (or err)
+//   warp <entrance>      -> ok warp 0x<entrance> (writes nextEntranceIndex
+//                                                 + transitionTrigger=20)
+//   actors               -> ok actors <N>\n<one line per actor>\nok end
+//                           (each line: cat id addr px py pz rx ry rz)
+//
+// Meta:
+//   quit                 -> ok  (then exit)
+//   help                 -> ok  (prints command list to stderr)
+//
+// All numeric args accept 0x prefix. On startup the harness prints
+// `boot succeeded` to stdout once retro_load_game returns true, and
+// then waits for commands on stdin. Send `quit` to exit cleanly.
 //
 // Usage:
-//   soh3d_harness [rom_path] [--frames N]
-//   soh3d_harness                        # rom = $ZELDA3D_OOT3D_ROM, N=300
+//   soh3d_harness [rom_path]
+//   soh3d_harness                        # rom = $ZELDA3D_OOT3D_ROM
 #include <cstdarg>
 #include <cstdint>
 #include <cstdio>
 #include <cstdlib>
 #include <cstring>
+#include <iostream>
+#include <optional>
+#include <sstream>
 #include <string>
 #include <vector>
 
@@ -38,13 +66,6 @@ namespace {
 
 std::string g_system_dir;
 std::string g_save_dir;
-
-bool Read32(uint32_t va, uint32_t& out) {
-    auto v = Core::System::GetInstance().Memory().Read32OrNullopt(va);
-    if (!v) return false;
-    out = *v;
-    return true;
-}
 
 void CoreLog(retro_log_level level, const char* fmt, ...) {
     va_list ap;
@@ -95,13 +116,11 @@ bool EnvironmentCallback(unsigned cmd, void* data) {
     }
 }
 
-void VideoRefresh(const void* /*data*/, unsigned /*width*/, unsigned /*height*/, size_t /*pitch*/) {}
-void AudioSample(int16_t /*l*/, int16_t /*r*/) {}
-size_t AudioSampleBatch(const int16_t* /*data*/, size_t frames) { return frames; }
+void VideoRefresh(const void*, unsigned, unsigned, size_t) {}
+void AudioSample(int16_t, int16_t) {}
+size_t AudioSampleBatch(const int16_t*, size_t frames) { return frames; }
 void InputPoll() {}
-int16_t InputState(unsigned /*port*/, unsigned /*device*/, unsigned /*index*/, unsigned /*id*/) {
-    return 0;
-}
+int16_t InputState(unsigned, unsigned, unsigned, unsigned) { return 0; }
 
 std::vector<uint8_t> SlurpFile(const std::string& path) {
     std::vector<uint8_t> data;
@@ -120,21 +139,269 @@ std::vector<uint8_t> SlurpFile(const std::string& path) {
     return data;
 }
 
+bool WriteWholeFile(const std::string& path, const std::vector<uint8_t>& data) {
+    std::FILE* f = std::fopen(path.c_str(), "wb");
+    if (!f) return false;
+    bool ok = std::fwrite(data.data(), 1, data.size(), f) == data.size();
+    std::fclose(f);
+    return ok;
+}
+
+std::optional<uint64_t> ParseNum(const std::string& s) {
+    if (s.empty()) return std::nullopt;
+    char* end = nullptr;
+    uint64_t v = std::strtoull(s.c_str(), &end, 0);
+    if (end == s.c_str() || *end != '\0') return std::nullopt;
+    return v;
+}
+
+void PrintErr(const char* what) { std::printf("err %s\n", what); }
+
+void HandleRun(std::istringstream& toks) {
+    std::string n_s;
+    if (!(toks >> n_s)) { PrintErr("run: usage: run <N>"); return; }
+    auto n = ParseNum(n_s);
+    if (!n) { PrintErr("run: bad N"); return; }
+    for (uint64_t i = 0; i < *n; ++i) retro_run();
+    std::printf("ok run %llu\n", static_cast<unsigned long long>(*n));
+}
+
+void HandleRead(std::istringstream& toks, int width) {
+    std::string va_s;
+    if (!(toks >> va_s)) { PrintErr("read: usage: r<8|16|32> <va>"); return; }
+    auto va = ParseNum(va_s);
+    if (!va) { PrintErr("read: bad va"); return; }
+    auto& mem = Core::System::GetInstance().Memory();
+    // Read8/16 have no OrNullopt variant; fall back to ReadBlock via GetPointer.
+    if (width == 32) {
+        auto v = mem.Read32OrNullopt(static_cast<uint32_t>(*va));
+        if (!v) { PrintErr("read: unmapped va"); return; }
+        std::printf("ok 0x%08x\n", *v);
+    } else {
+        auto* p = mem.GetPointer(static_cast<uint32_t>(*va));
+        if (!p) { PrintErr("read: unmapped va"); return; }
+        if (width == 8) std::printf("ok 0x%02x\n", static_cast<unsigned>(*p));
+        else {
+            uint16_t v = static_cast<uint16_t>(p[0]) | (static_cast<uint16_t>(p[1]) << 8);
+            std::printf("ok 0x%04x\n", v);
+        }
+    }
+}
+
+void HandleWrite(std::istringstream& toks, int width) {
+    std::string va_s, val_s;
+    if (!(toks >> va_s >> val_s)) { PrintErr("write: usage: w<8|16|32> <va> <val>"); return; }
+    auto va = ParseNum(va_s);
+    auto val = ParseNum(val_s);
+    if (!va || !val) { PrintErr("write: bad args"); return; }
+    auto& mem = Core::System::GetInstance().Memory();
+    switch (width) {
+    case 8:  mem.Write8(static_cast<uint32_t>(*va),  static_cast<uint8_t>(*val));  break;
+    case 16: mem.Write16(static_cast<uint32_t>(*va), static_cast<uint16_t>(*val)); break;
+    case 32: mem.Write32(static_cast<uint32_t>(*va), static_cast<uint32_t>(*val)); break;
+    }
+    std::printf("ok\n");
+}
+
+void HandleMem(std::istringstream& toks) {
+    std::string va_s, n_s;
+    if (!(toks >> va_s >> n_s)) { PrintErr("mem: usage: mem <va> <n>"); return; }
+    auto va = ParseNum(va_s);
+    auto n  = ParseNum(n_s);
+    if (!va || !n) { PrintErr("mem: bad args"); return; }
+    if (*n > 4096) { PrintErr("mem: n too large (max 4096)"); return; }
+    auto& mem = Core::System::GetInstance().Memory();
+    auto* p = mem.GetPointer(static_cast<uint32_t>(*va));
+    if (!p) { PrintErr("mem: unmapped va"); return; }
+    std::printf("ok ");
+    for (uint64_t i = 0; i < *n; ++i) std::printf("%02x", p[i]);
+    std::printf("\n");
+}
+
+void HandleLoadState(std::istringstream& toks) {
+    std::string path;
+    if (!(toks >> path)) { PrintErr("loadstate: usage: loadstate <path>"); return; }
+    auto buf = SlurpFile(path);
+    if (buf.empty()) { PrintErr("loadstate: read failed"); return; }
+    if (!Core::System::GetInstance().LoadStateBuffer(std::move(buf))) {
+        PrintErr("loadstate: core rejected buffer");
+        return;
+    }
+    std::printf("ok\n");
+}
+
+void HandleSaveState(std::istringstream& toks) {
+    std::string path;
+    if (!(toks >> path)) { PrintErr("savestate: usage: savestate <path>"); return; }
+    auto buf = Core::System::GetInstance().SaveStateBuffer();
+    if (!WriteWholeFile(path, buf)) { PrintErr("savestate: write failed"); return; }
+    std::printf("ok\n");
+}
+
+// -- OoT3D RE knowledge lives here -------------------------------------------
+//
+// gPlayState (0x0050AF34, .data) -> PlayState* (0 until the game is in
+// the Play gamestate, i.e. not in menus / logos / title). See
+// tools/oracle_motion_sample.py and oot3d-decomp docs/actor_layout.md
+// for the layout this walks.
+//
+// The transitionTrigger (u8 @ +0x5C2D, TRANS_TRIGGER_START = 20) and
+// nextEntranceIndex (u16 @ +0x5C32) offsets come from prior OoT3D RE
+// work (memory of a retired link_ctl.py); cross-checking them against
+// oot3d-decomp when it comes back on this machine is a proper follow-up.
+constexpr uint32_t GPLAYSTATE_VA           = 0x0050AF34;
+constexpr uint32_t SCENENUM_OFF            = 0x0104;
+constexpr uint32_t ACTORCTX_OFF            = 0x208C;
+constexpr uint32_t ACTOR_LISTS_OFF         = 0x000C;
+constexpr uint32_t ACTOR_ID_OFF            = 0x0000;
+constexpr uint32_t ACTOR_POS_OFF           = 0x0008;
+constexpr uint32_t ACTOR_ROT_OFF           = 0x0014;
+constexpr uint32_t ACTOR_NEXT_OFF          = 0x0130;
+constexpr uint32_t TRANSITION_TRIGGER_OFF  = 0x5C2D;
+constexpr uint32_t NEXT_ENTRANCE_OFF       = 0x5C32;
+constexpr uint8_t  TRANS_TRIGGER_START     = 20;
+
+std::optional<uint32_t> CurrentPlayState() {
+    auto& mem = Core::System::GetInstance().Memory();
+    auto v = mem.Read32OrNullopt(GPLAYSTATE_VA);
+    if (!v || *v == 0) return std::nullopt;
+    return *v;
+}
+
+void HandlePlayState(std::istringstream&) {
+    auto ps = CurrentPlayState();
+    if (!ps) { PrintErr("playstate: not populated (still in menu/title?)"); return; }
+    std::printf("ok 0x%08x\n", *ps);
+}
+
+void HandleScene(std::istringstream&) {
+    auto ps = CurrentPlayState();
+    if (!ps) { PrintErr("scene: no playstate"); return; }
+    auto sn = Core::System::GetInstance().Memory().Read32OrNullopt(*ps + SCENENUM_OFF);
+    if (!sn) { PrintErr("scene: sceneNum unmapped"); return; }
+    std::printf("ok 0x%04x\n", static_cast<unsigned>(*sn & 0xFFFF));
+}
+
+void HandleWarp(std::istringstream& toks) {
+    std::string ent_s;
+    if (!(toks >> ent_s)) { PrintErr("warp: usage: warp <entrance>"); return; }
+    auto ent = ParseNum(ent_s);
+    if (!ent) { PrintErr("warp: bad entrance"); return; }
+    auto ps = CurrentPlayState();
+    if (!ps) { PrintErr("warp: no playstate — run frames or loadstate first"); return; }
+    auto& mem = Core::System::GetInstance().Memory();
+    mem.Write16(*ps + NEXT_ENTRANCE_OFF, static_cast<uint16_t>(*ent));
+    mem.Write8(*ps + TRANSITION_TRIGGER_OFF, TRANS_TRIGGER_START);
+    std::printf("ok warp 0x%04x\n", static_cast<unsigned>(*ent & 0xFFFF));
+}
+
+void HandleActors(std::istringstream&) {
+    auto ps = CurrentPlayState();
+    if (!ps) { PrintErr("actors: no playstate"); return; }
+    auto& mem = Core::System::GetInstance().Memory();
+    const uint32_t ctx = *ps + ACTORCTX_OFF;
+
+    struct Entry { uint32_t cat; uint16_t id; uint32_t addr;
+                   float pos[3]; int16_t rot[3]; };
+    std::vector<Entry> entries;
+    entries.reserve(64);
+
+    for (uint32_t cat = 0; cat < 12; ++cat) {
+        auto cnt = mem.Read32OrNullopt(ctx + ACTOR_LISTS_OFF + cat * 8 + 0);
+        auto head = mem.Read32OrNullopt(ctx + ACTOR_LISTS_OFF + cat * 8 + 4);
+        if (!cnt || !head) continue;
+        uint32_t addr = *head;
+        int32_t guard = static_cast<int32_t>(*cnt) + 4;
+        while (addr != 0 && guard-- > 0) {
+            auto id  = mem.Read32OrNullopt(addr + ACTOR_ID_OFF);
+            auto px  = mem.Read32OrNullopt(addr + ACTOR_POS_OFF + 0);
+            auto py  = mem.Read32OrNullopt(addr + ACTOR_POS_OFF + 4);
+            auto pz  = mem.Read32OrNullopt(addr + ACTOR_POS_OFF + 8);
+            auto rot = mem.Read32OrNullopt(addr + ACTOR_ROT_OFF + 0);
+            auto rz  = mem.Read32OrNullopt(addr + ACTOR_ROT_OFF + 4);
+            if (!id || !px || !py || !pz || !rot || !rz) break;
+            Entry e{};
+            e.cat  = cat;
+            e.id   = static_cast<uint16_t>(*id & 0xFFFF);
+            e.addr = addr;
+            std::memcpy(&e.pos[0], &*px, 4);
+            std::memcpy(&e.pos[1], &*py, 4);
+            std::memcpy(&e.pos[2], &*pz, 4);
+            e.rot[0] = static_cast<int16_t>(*rot & 0xFFFF);
+            e.rot[1] = static_cast<int16_t>((*rot >> 16) & 0xFFFF);
+            e.rot[2] = static_cast<int16_t>(*rz & 0xFFFF);
+            entries.push_back(e);
+            auto next = mem.Read32OrNullopt(addr + ACTOR_NEXT_OFF);
+            if (!next) break;
+            addr = *next;
+        }
+    }
+    std::printf("ok actors %zu\n", entries.size());
+    for (const auto& e : entries) {
+        std::printf("  %u 0x%04x 0x%08x %.3f %.3f %.3f %d %d %d\n",
+                    e.cat, e.id, e.addr,
+                    e.pos[0], e.pos[1], e.pos[2],
+                    e.rot[0], e.rot[1], e.rot[2]);
+    }
+    std::printf("ok end\n");
+}
+
+void PrintHelp() {
+    std::fprintf(stderr,
+        "soh3d_harness commands:\n"
+        "  run <N>              advance N frames\n"
+        "  r8|r16|r32 <va>      read u8/u16/u32 at VA (0x prefix ok)\n"
+        "  w8|w16|w32 <va> <v>  write u8/u16/u32 at VA\n"
+        "  mem <va> <n>         hex-dump N bytes (N<=4096)\n"
+        "  loadstate <path>     load Azahar save state from file\n"
+        "  savestate <path>     write Azahar save state to file\n"
+        "  playstate            print gPlayState pointer\n"
+        "  scene                print current sceneNum\n"
+        "  warp <entrance>      write nextEntranceIndex + trigger=20\n"
+        "  actors               dump current-scene actor table\n"
+        "  quit                 exit\n"
+        "  help                 this list\n");
+    std::printf("ok\n");
+}
+
+void RunRepl() {
+    std::string line;
+    while (std::getline(std::cin, line)) {
+        std::istringstream toks(line);
+        std::string cmd;
+        if (!(toks >> cmd) || cmd.empty()) continue;
+        if      (cmd == "run")       HandleRun(toks);
+        else if (cmd == "r8")        HandleRead(toks, 8);
+        else if (cmd == "r16")       HandleRead(toks, 16);
+        else if (cmd == "r32")       HandleRead(toks, 32);
+        else if (cmd == "w8")        HandleWrite(toks, 8);
+        else if (cmd == "w16")       HandleWrite(toks, 16);
+        else if (cmd == "w32")       HandleWrite(toks, 32);
+        else if (cmd == "mem")       HandleMem(toks);
+        else if (cmd == "loadstate") HandleLoadState(toks);
+        else if (cmd == "savestate") HandleSaveState(toks);
+        else if (cmd == "playstate") HandlePlayState(toks);
+        else if (cmd == "scene")     HandleScene(toks);
+        else if (cmd == "warp")      HandleWarp(toks);
+        else if (cmd == "actors")    HandleActors(toks);
+        else if (cmd == "help")      PrintHelp();
+        else if (cmd == "quit") { std::printf("ok\n"); std::fflush(stdout); return; }
+        else                         PrintErr(("unknown cmd: " + cmd).c_str());
+        std::fflush(stdout);
+    }
+}
+
 } // namespace
 
 int main(int argc, char** argv) {
     std::string rom_path;
-    int frames = 300;
     for (int i = 1; i < argc; ++i) {
         std::string a = argv[i];
-        if (a == "--frames" && i + 1 < argc) {
-            frames = std::atoi(argv[++i]);
-        } else if (a.rfind("--", 0) == 0) {
+        if (a.rfind("--", 0) == 0) {
             std::fprintf(stderr, "soh3d_harness: unknown option: %s\n", a.c_str());
             return EXIT_FAILURE;
-        } else if (rom_path.empty()) {
-            rom_path = a;
         }
+        if (rom_path.empty()) rom_path = a;
     }
     if (rom_path.empty()) {
         if (const char* env = std::getenv("ZELDA3D_OOT3D_ROM"); env && *env) {
@@ -188,36 +455,10 @@ int main(int argc, char** argv) {
         return EXIT_FAILURE;
     }
 
-    std::fprintf(stdout, "boot succeeded\n");
+    std::printf("boot succeeded\n");
+    std::fflush(stdout);
 
-    // Frame-pump loop. Each retro_run() call runs the emulator until it
-    // submits one video frame — same "one frame per run" cadence RetroArch
-    // uses. We poll gPlayState (0x0050AF34, a pointer to PlayState — see
-    // tools/oracle_motion_sample.py and oot3d-decomp docs/actor_layout.md)
-    // and log the moment the game populates it, plus the u16 sceneNum at
-    // PlayState+0x104. Pure observation for now; warp writes land next.
-    constexpr uint32_t GPLAYSTATE_VA = 0x0050AF34;
-    constexpr uint32_t SCENENUM_OFF  = 0x104;
-    uint32_t last_ps = 0;
-    uint16_t last_scene = 0xFFFF;
-    for (int f = 0; f < frames; ++f) {
-        retro_run();
-        uint32_t ps = 0;
-        if (Read32(GPLAYSTATE_VA, ps) && ps != last_ps) {
-            uint32_t raw = 0;
-            uint16_t scene = 0xFFFF;
-            if (ps != 0 && Read32(ps + SCENENUM_OFF, raw)) {
-                scene = static_cast<uint16_t>(raw & 0xFFFF);
-            }
-            std::fprintf(stderr,
-                         "soh3d_harness: frame=%d gPlayState=0x%08x sceneNum=0x%04x\n",
-                         f, ps, scene);
-            last_ps = ps;
-            last_scene = scene;
-        }
-    }
-    std::fprintf(stderr, "soh3d_harness: ran %d frames, final gPlayState=0x%08x sceneNum=0x%04x\n",
-                 frames, last_ps, last_scene);
+    RunRepl();
 
     retro_unload_game();
     retro_deinit();
