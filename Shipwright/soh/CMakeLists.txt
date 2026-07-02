@@ -338,7 +338,7 @@ target_include_directories(soh_settings INTERFACE assets
 
 if (CMAKE_SYSTEM_NAME STREQUAL "Windows")
     if(SOH_WINDOWS_64BIT)
-        target_compile_definitions(${PROJECT_NAME} PRIVATE
+        target_compile_definitions(soh_settings INTERFACE
             "$<$<CONFIG:Debug>:"
                 "_DEBUG;"
                 "_CRT_SECURE_NO_WARNINGS;"
@@ -358,7 +358,7 @@ if (CMAKE_SYSTEM_NAME STREQUAL "Windows")
             NOMINMAX
         )
     elseif("${CMAKE_VS_PLATFORM_NAME}" STREQUAL "Win32")
-        target_compile_definitions(${PROJECT_NAME} PRIVATE
+        target_compile_definitions(soh_settings INTERFACE
             "$<$<CONFIG:Debug>:"
                 "NOINCLUDE_GAME_PRINTF;"
                 "_DEBUG;"
@@ -380,7 +380,7 @@ if (CMAKE_SYSTEM_NAME STREQUAL "Windows")
         )
     endif()
 elseif (CMAKE_SYSTEM_NAME STREQUAL "CafeOS")
-    target_compile_definitions(${PROJECT_NAME} PRIVATE
+    target_compile_definitions(soh_settings INTERFACE
         "$<$<CONFIG:Debug>:"
             "_DEBUG;"
         ">"
@@ -395,7 +395,7 @@ elseif (CMAKE_SYSTEM_NAME STREQUAL "CafeOS")
         LOG_LEVEL_GAME_PRINTS=${SPDLOG_LEVEL_OFF}
     )
 elseif ("${CMAKE_CXX_COMPILER_ID}" MATCHES "GNU|Clang|AppleClang")
-    target_compile_definitions(${PROJECT_NAME} PRIVATE
+    target_compile_definitions(soh_settings INTERFACE
         "$<$<CONFIG:Debug>:"
             "_DEBUG;"
         ">"
