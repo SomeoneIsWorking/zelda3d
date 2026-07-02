@@ -88,6 +88,38 @@ draft is 4×float32, not 4×u8).
    (matIdx, constIdx, rgba) written before submit, honored by the shader/emission code.
    Distinct feature; do not conflate with facial-frame texture swap.
 
+   **Step 2 RE (2026-07-02, from decomp @ oot3d-decomp/build/decomp/00358778.c)**:
+   `Model_SetMaterialConstantColor(model, matIdx, constIdx, rgba, mode)` = FUN_00357a50 →
+   FUN_00358778(assetHandle=`model[+0x10]`, matIdx, constIdx, rgba, mode). The inner
+   function operates on a runtime material struct with **stride 0x124 bytes** stored at
+   `assetHandle[+4]`. A per-constant "overridden" flag lives at
+   `matBase + 0x0A + constIdx` (set to 1 on any write). Mode enum:
+     1 = replace RGB (leaves A); 2 = set A only; 3 = add; 6 = sub; 9 = multiply;
+     0xC = multiply RGB + replace A. **EnHy uses mode 1 (replace RGB).**
+   The float-4 read/write of a constant slot goes through FUN_00331094 (read) +
+   FUN_003688a8 (write) — the actual per-constant byte offset lives inside those.
+   Decomp targets remaining: `00368xxx / 00331094` (to pin the exact offset of
+   constant N inside the 0x124 struct), and the CMB loader (to pin file→runtime map).
+
+   **Step 2a — extend CmbMaterial to decode all 6 constant colors + expose in sgdump.**
+   (Small, verifiable via structured signal, no visual compare needed.) The CMB file
+   material block already carries 6 slots at +0xB4..+0xCC (u8 RGBA each) — dumped raw
+   on AHG's hyliaman2.cmb: all 6 slots default to (0,0,0,0xFF) black-opaque, matching the
+   expectation that the game OVERWRITES the constants per NPC-type at load. The struct
+   fields + parse + `SG_DUMP` line are what land in this step; shader wiring in Step 2b.
+
+   **Step 2b — thread `matConst[6][4]` into the shader UBO + reference in the combiner.**
+   The current fragment shader combines `PRIMARY_COLOR * TEXTURE0`; the OoT3D combiner
+   also references CONSTANT for stages whose `comb_src_rgb[k] == 0x8576`. The referenced
+   constant index is not in the current parse — extend `_parse_mats` to also capture the
+   TEV constant selector per stage (PICA200 combiner block, currently unparsed) and pass
+   the resolved const-color to the fragment shader.
+
+   **Step 2c — per-actor override channel.** Zelda3D_GL_Submit / Zelda3D_Sg_DrawModel
+   gains a small `overrides[matIdx] = (constMask, rgba[6][4])` param (mirrors the facial
+   `matTex` map). Populated by TownsfolkBehavior::applyDrawOverrides from
+   `data/enhy_body_colors.inc`.
+
 3. **Wire `TownsfolkBehavior::applyDrawOverrides`** to read
    `(actor->params & 0x7F)` and apply the two colour overrides for that type. Skip when
    the table row indicates -1 (default palette).
