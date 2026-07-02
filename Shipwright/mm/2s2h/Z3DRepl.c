@@ -7,6 +7,14 @@
 #include "global.h" // gPlayState, GET_PLAYER, PlayState, Player, Actor, ACTORCAT_MAX
 #include "2s2h/zelda3d/mm3d_model.h" // Zelda3D_SetObjectScale (per-object calibration)
 
+// `cam` framing state (below). Non-static because Z3D_Repl_Tick needs to
+// apply it every frame (post-update) to override the game camera drift.
+extern int gZ3dRepl_CamActive;
+extern float gZ3dRepl_CamYawDeg;
+extern float gZ3dRepl_CamDist;
+extern float gZ3dRepl_CamHeight;
+void Z3DRepl_ApplyCam(PlayState* play);
+
 #include <fcntl.h>
 #include <math.h>
 #include <stdio.h>
@@ -15,6 +23,45 @@
 #include <sys/stat.h> // mkfifo
 #include <sys/types.h>
 #include <unistd.h>
+
+int gZ3dRepl_CamActive = 0;
+float gZ3dRepl_CamYawDeg = 0.0f;
+float gZ3dRepl_CamDist = 180.0f;
+float gZ3dRepl_CamHeight = 60.0f;
+
+// Snap the active MM camera to a side-profile of the focal actor (usually Link),
+// at (yaw, dist, height) around them. Called every REPL tick when cam is active,
+// so the game's per-frame camera update can't drift the framing back. This is
+// intentionally a HARD snap — no interpolation — because pose validation wants
+// deterministic framing, not natural camera motion.
+void Z3DRepl_ApplyCam(PlayState* play) {
+    if (!gZ3dRepl_CamActive || play == NULL) return;
+    Camera* cam = GET_ACTIVE_CAM(play);
+    if (cam == NULL) return;
+    Vec3f focus;
+    if (cam->focalActor != NULL) {
+        focus = cam->focalActor->world.pos;
+    } else {
+        Player* p = GET_PLAYER(play);
+        if (p == NULL) return;
+        focus = p->actor.world.pos;
+    }
+    float yawRad = gZ3dRepl_CamYawDeg * (3.14159265358979f / 180.0f);
+    Vec3f at;
+    at.x = focus.x;
+    at.y = focus.y + gZ3dRepl_CamHeight;
+    at.z = focus.z;
+    Vec3f eye;
+    eye.x = at.x + sinf(yawRad) * gZ3dRepl_CamDist;
+    eye.y = at.y;
+    eye.z = at.z + cosf(yawRad) * gZ3dRepl_CamDist;
+    cam->at = at;
+    cam->eye = eye;
+    cam->eyeNext = eye;
+    cam->up.x = 0.0f;
+    cam->up.y = 1.0f;
+    cam->up.z = 0.0f;
+}
 
 static int sFd = -2; // -2 = not yet opened, -1 = disabled/failed
 static char sOutPath[512];
@@ -189,6 +236,82 @@ static void Z3D_Repl_Exec(PlayState* play, char* line) {
         Z3D_Repl_Reply(out);
     } else if (strncmp(line, "mlist", 5) == 0) {
         Zelda3D_ListModels(Z3D_Repl_ListLine, NULL);
+    } else if (strncmp(line, "tp", 2) == 0 && (line[2] == ' ' || line[2] == '\t')) {
+        // `tp <x> <y> <z>` — teleport Link. Mirrors OoT's REPL tp; needed for
+        // framing skinned actors during MM3D pose validation.
+        Player* player = (play != NULL) ? GET_PLAYER(play) : NULL;
+        float x, y, z;
+        if (player != NULL && sscanf(line + 2, "%f %f %f", &x, &y, &z) == 3) {
+            player->actor.world.pos.x = x;
+            player->actor.world.pos.y = y;
+            player->actor.world.pos.z = z;
+            player->actor.prevPos = player->actor.world.pos;
+            char out[128];
+            snprintf(out, sizeof(out), "tp -> (%.0f,%.0f,%.0f)", x, y, z);
+            Z3D_Repl_Reply(out);
+        } else {
+            Z3D_Repl_Reply("usage: tp <x> <y> <z>");
+        }
+    } else if (strncmp(line, "turn", 4) == 0) {
+        // `turn <deg>` — snap Link's yaw. Pair with `tp` + `cam` to frame a rig.
+        Player* player = (play != NULL) ? GET_PLAYER(play) : NULL;
+        float deg;
+        if (player != NULL && sscanf(line + 4, "%f", &deg) == 1) {
+            s16 yaw = (s16)(deg * 182.0444f); // deg -> binang
+            player->actor.shape.rot.y = yaw;
+            player->actor.world.rot.y = yaw;
+            char out[64];
+            snprintf(out, sizeof(out), "turn -> %.0f deg (yaw=%d)", deg, yaw);
+            Z3D_Repl_Reply(out);
+        } else {
+            Z3D_Repl_Reply("usage: turn <deg>");
+        }
+    } else if (strncmp(line, "roomwarp", 8) == 0) {
+        // `roomwarp <n>` — force-load room n so its actors spawn, WITHOUT moving Link.
+        // Pair with `tp` to reach an unloaded-room actor for A/B framing. Mirrors OoT
+        // REPL roomwarp; uses MM's Room_RequestNewRoom.
+        s32 n;
+        if (play != NULL && sscanf(line + 8, "%d", &n) == 1) {
+            s32 cnt = (s32)play->roomList.count;
+            if (n >= 0 && n < cnt) {
+                s32 r = Room_RequestNewRoom(play, &play->roomCtx, n);
+                char out[128];
+                snprintf(out, sizeof(out), "roomwarp %d -> req=%d (rooms=%d)", n, r, cnt);
+                Z3D_Repl_Reply(out);
+            } else {
+                char out[64];
+                snprintf(out, sizeof(out), "roomwarp: bad room %d (rooms=%d)", n, cnt);
+                Z3D_Repl_Reply(out);
+            }
+        } else {
+            Z3D_Repl_Reply("usage: roomwarp <n>");
+        }
+    } else if (strncmp(line, "cam", 3) == 0 && (line[3] == ' ' || line[3] == '\t' || line[3] == '\0')) {
+        // `cam <yawDeg> [dist] [height]` — side-frame the active camera on Link (or on
+        // the current focal actor). Persistent — reasserted every REPL tick via
+        // Z3DRepl_ApplyCam so the game's cam-update doesn't override it. `cam off`
+        // releases and lets the game camera drive again.
+        char sub[16] = { 0 };
+        if (sscanf(line + 3, "%15s", sub) == 1 &&
+            (strcmp(sub, "off") == 0 || strcmp(sub, "release") == 0)) {
+            gZ3dRepl_CamActive = 0;
+            Z3D_Repl_Reply("cam released (game camera resumed)");
+        } else {
+            float yaw = 0.0f, dist = 180.0f, height = 60.0f;
+            int n = sscanf(line + 3, "%f %f %f", &yaw, &dist, &height);
+            if (n >= 1) {
+                gZ3dRepl_CamYawDeg = yaw;
+                if (n >= 2) gZ3dRepl_CamDist = dist;
+                if (n >= 3) gZ3dRepl_CamHeight = height;
+                gZ3dRepl_CamActive = 1;
+                char out[128];
+                snprintf(out, sizeof(out), "cam yaw=%.1f dist=%.1f h=%.1f (persistent)", gZ3dRepl_CamYawDeg,
+                         gZ3dRepl_CamDist, gZ3dRepl_CamHeight);
+                Z3D_Repl_Reply(out);
+            } else {
+                Z3D_Repl_Reply("usage: cam <yawDeg> [dist] [height] | cam off");
+            }
+        }
     } else if (strncmp(line, "ping", 4) == 0) {
         Z3D_Repl_Reply("pong");
     } else {
@@ -238,4 +361,8 @@ void Z3D_Repl_Tick(void) {
     }
     sBufLen = (int)strlen(start);
     memmove(sBuf, start, sBufLen + 1);
+
+    // Persistent `cam` framing — snap the active camera to the requested side view
+    // AFTER command processing so a same-tick `cam` change takes effect immediately.
+    Z3DRepl_ApplyCam(gPlayState);
 }
