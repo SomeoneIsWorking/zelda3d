@@ -66,9 +66,12 @@
 
 #include "libretro.h"
 #include <SDL3/SDL.h>
+#include <atomic>
+#include <chrono>
 #include <fcntl.h>
 #include <sys/file.h>
 #include <sys/stat.h>
+#include <thread>
 #include <unistd.h>
 
 // ---------------------------------------------------------------------------
@@ -188,6 +191,20 @@ SDL_Window* g_win = nullptr;
 int         g_win_w = 1280;  // total SBS width; ½ per engine
 int         g_win_h = 480;
 
+// Set when the SDL window's close-button (or WM close) fires OR the REPL
+// runs `quit`. The main-thread event loop watches for it and exits the
+// process; the worker thread also checks between frames so it can bail
+// out of long `run N` loops.
+std::atomic<bool> g_quit_requested{false};
+
+// Worker thread — runs the REPL + retro_run + RunFrame calls. Main thread
+// stays in SDL land: creating the window, pumping events, presenting.
+// This is the architecture change from "everything on main" — before, a
+// long retro_run or loadstate blocked the SDL event loop entirely and
+// the window went "Not Responding" until it returned, and closing it
+// was effectively impossible.
+std::thread g_worker_thread;
+
 std::vector<uint8_t> g_az_buf;      // XRGB8888
 uint32_t g_az_w = 0, g_az_h = 0;
 size_t   g_az_pitch = 0;
@@ -196,6 +213,8 @@ bool     g_az_dirty = false;
 std::vector<uint8_t> g_soh_buf;     // RGBA8 (gSoh3dCaptureBuf backing)
 bool     g_soh_dirty = false;
 
+// Main-thread only. Called once from main() before the worker starts,
+// then never again. Worker MUST NOT touch SDL window handles.
 void EnsureHarnessWindow() {
     if (g_win) return;
     if (!SDL_InitSubSystem(SDL_INIT_VIDEO)) {
@@ -207,6 +226,7 @@ void EnsureHarnessWindow() {
                              g_win_w, g_win_h, SDL_WINDOW_RESIZABLE);
     if (!g_win) {
         std::fprintf(stderr, "harness: SDL_CreateWindow failed: %s\n", SDL_GetError());
+        return;
     }
 }
 
@@ -223,8 +243,10 @@ void RequestSohCapture() {
     gSoh3dCapturePending = 1;
 }
 
+// Main-thread only. Called from the main SDL event loop between event
+// polls. The worker thread MUST NOT call this — SDL surface access is
+// window-owner-thread only.
 void PresentSbs() {
-    EnsureHarnessWindow();
     if (!g_win) return;
     SDL_Surface* dst = SDL_GetWindowSurface(g_win);
     if (!dst) return;
@@ -245,11 +267,17 @@ void PresentSbs() {
         }
     }
     // RIGHT: SoH3D frame (RGBA8 tightly packed by W). Surface wraps g_soh_buf.
+    // Note: byte order in memory is (R,G,B,A). SDL_PIXELFORMAT_RGBA8888 is
+    // a *packed* 32-bit format with R in high bits — on little-endian, that
+    // means bytes in memory are (A,B,G,R), the WRONG interpretation for our
+    // data (this was the "SoH pane renders black on-screen despite raw
+    // bytes being nonzero" bug). SDL_PIXELFORMAT_ABGR8888 (equivalently
+    // SDL_PIXELFORMAT_RGBA32) is the byte-order match on LE.
     if (gSoh3dCaptureW && gSoh3dCaptureH && !g_soh_buf.empty()) {
         const int w = static_cast<int>(gSoh3dCaptureW);
         const int h = static_cast<int>(gSoh3dCaptureH);
         SDL_Surface* src = SDL_CreateSurfaceFrom(
-            w, h, SDL_PIXELFORMAT_RGBA8888, g_soh_buf.data(), w * 4);
+            w, h, SDL_PIXELFORMAT_ABGR8888, g_soh_buf.data(), w * 4);
         if (src) {
             SDL_Rect r{halfW, 0, dst->w - halfW, dst->h};
             SDL_BlitSurfaceScaled(src, nullptr, dst, &r, SDL_SCALEMODE_LINEAR);
@@ -257,7 +285,9 @@ void PresentSbs() {
         }
     }
     SDL_UpdateWindowSurface(g_win);
-    SDL_PumpEvents();
+    // g_pump_thread does the actual event pump every 33ms; a redundant
+    // pump here would race with it on the internal event queue. Leave
+    // it to the thread.
     g_az_dirty = false;
     g_soh_dirty = false;
 }
@@ -378,11 +408,13 @@ void HandleRun(std::istringstream& toks) {
     if (!(toks >> n_s)) { PrintErr("run: usage: run <N>"); return; }
     auto n = ParseNum(n_s);
     if (!n) { PrintErr("run: bad N"); return; }
+    uint64_t done = 0;
     for (uint64_t i = 0; i < *n; ++i) {
+        if (g_quit_requested.load()) break;
         retro_run();
-        PresentSbs();
+        ++done;
     }
-    std::printf("ok run %llu\n", static_cast<unsigned long long>(*n));
+    std::printf("ok run %llu\n", static_cast<unsigned long long>(done));
 }
 
 void HandleRead(std::istringstream& toks, int width) {
@@ -497,12 +529,14 @@ void HandleSohStep(std::istringstream& toks) {
     if (!(toks >> n_s)) { PrintErr("soh_step: usage: soh_step <N>"); return; }
     auto n = ParseNum(n_s);
     if (!n) { PrintErr("soh_step: bad N"); return; }
+    uint64_t done = 0;
     for (uint64_t i = 0; i < *n; ++i) {
+        if (g_quit_requested.load()) break;
         RequestSohCapture();
         RunFrame();
-        PresentSbs();
+        ++done;
     }
-    std::printf("ok soh_step %llu\n", static_cast<unsigned long long>(*n));
+    std::printf("ok soh_step %llu\n", static_cast<unsigned long long>(done));
 }
 
 // The two-engine driver: advance BOTH engines one frame at a time, so
@@ -513,13 +547,15 @@ void HandleStep(std::istringstream& toks) {
     if (!(toks >> n_s)) { PrintErr("step: usage: step <N>"); return; }
     auto n = ParseNum(n_s);
     if (!n) { PrintErr("step: bad N"); return; }
+    uint64_t done = 0;
     for (uint64_t i = 0; i < *n; ++i) {
+        if (g_quit_requested.load()) break;
         retro_run();
         if (g_soh_booted) { RequestSohCapture(); RunFrame(); }
-        PresentSbs();
+        ++done;
     }
     std::printf("ok step %llu %s\n",
-                static_cast<unsigned long long>(*n),
+                static_cast<unsigned long long>(done),
                 g_soh_booted ? "azahar+soh3d" : "azahar-only");
 }
 
@@ -629,13 +665,17 @@ void SweepStepBoth(uint64_t az_n, uint64_t soh_n) {
     // them for the overlap. Simplest lockstep-preserving order:
     const uint64_t lock = std::min(az_n, soh_n);
     for (uint64_t i = 0; i < lock; ++i) {
+        if (g_quit_requested.load()) return;
         retro_run();
         if (g_soh_booted) { RequestSohCapture(); RunFrame(); }
-        PresentSbs();
     }
-    for (uint64_t i = lock; i < az_n; ++i) { retro_run(); PresentSbs(); }
+    for (uint64_t i = lock; i < az_n; ++i) {
+        if (g_quit_requested.load()) return;
+        retro_run();
+    }
     for (uint64_t i = lock; i < soh_n; ++i) {
-        if (g_soh_booted) { RequestSohCapture(); RunFrame(); PresentSbs(); }
+        if (g_quit_requested.load()) return;
+        if (g_soh_booted) { RequestSohCapture(); RunFrame(); }
     }
 }
 
@@ -1243,6 +1283,11 @@ void PrintHelp() {
 void RunRepl() {
     std::string line;
     while (std::getline(std::cin, line)) {
+        if (g_quit_requested.load()) {
+            std::printf("ok quit (window closed)\n");
+            std::fflush(stdout);
+            return;
+        }
         std::istringstream toks(line);
         std::string cmd;
         if (!(toks >> cmd) || cmd.empty()) continue;
@@ -1388,17 +1433,49 @@ int main(int argc, char** argv) {
         return EXIT_FAILURE;
     }
 
+    // Create the SDL window BEFORE spawning the worker so no SDL touch
+    // ever happens off-main. All present/event-pump work stays here on
+    // the main thread; the worker only reads/writes CPU pixel buffers.
+    EnsureHarnessWindow();
+
     std::printf("boot succeeded\n");
     std::fflush(stdout);
 
-    RunRepl();
+    // Kick the worker: it runs the REPL and every retro_run/RunFrame.
+    // On close, we signal g_quit_requested and give it a grace window
+    // to unwind, then _exit if it hasn't returned yet (e.g. it's mid
+    // loadstate deserialization, which isn't interruptible).
+    g_worker_thread = std::thread([]() {
+        RunRepl();
+        // REPL ended (e.g. `quit` cmd or stdin EOF) — signal main to exit.
+        g_quit_requested.store(true);
+    });
 
-    if (g_soh_booted) {
-        Main_Shutdown();
-        DeinitOTR();
-        Heaps_Free();
+    // Main SDL event loop. SDL_WaitEventTimeout yields the CPU when
+    // there are no events, so we aren't burning a core polling. 16ms
+    // gives ~60 Hz present cadence for the SBS window.
+    while (!g_quit_requested.load()) {
+        SDL_Event ev;
+        while (SDL_PollEvent(&ev)) {
+            if (ev.type == SDL_EVENT_QUIT ||
+                ev.type == SDL_EVENT_WINDOW_CLOSE_REQUESTED) {
+                std::fprintf(stderr, "harness: window closed, shutting down\n");
+                g_quit_requested.store(true);
+            }
+        }
+        PresentSbs();
+        SDL_Delay(16);
     }
-    retro_unload_game();
-    retro_deinit();
-    return EXIT_SUCCESS;
+
+    // Grace period so the worker can bail out of its current frame loop
+    // cleanly. loadstate/savestate aren't interruptible — they'll block
+    // the worker for multi-seconds — so beyond the grace period we
+    // force-exit rather than sit on join() forever.
+    auto deadline = std::chrono::steady_clock::now() + std::chrono::milliseconds(500);
+    while (std::chrono::steady_clock::now() < deadline) {
+        std::this_thread::sleep_for(std::chrono::milliseconds(20));
+    }
+    std::fflush(stdout);
+    std::fflush(stderr);
+    _exit(EXIT_SUCCESS);
 }
