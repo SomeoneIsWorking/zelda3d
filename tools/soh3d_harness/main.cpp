@@ -34,6 +34,13 @@
 //   actors               -> ok actors <N>\n<one line per actor>\nok end
 //                           (each line: cat id addr px py pz rx ry rz)
 //
+// SOH3D bring-up (embedded in the same process):
+//   soh_boot             -> ok soh_boot   (GameConsole_Init + InitOTR +
+//                                          BootCommands_Init + Heaps_Alloc +
+//                                          Main_Init; SOH3D_HEADLESS forced)
+//   soh_step <N>         -> ok soh_step <N>  (RunFrame() x N — advance
+//                                              SoH3D's Graph state machine)
+//
 // Meta:
 //   quit                 -> ok  (then exit)
 //   help                 -> ok  (prints command list to stderr)
@@ -65,6 +72,27 @@
 // not-run direction: use Azahar's own emulator API, not IPC.
 #include "core/core.h"
 #include "core/memory.h"
+
+// SoH3D game-engine entry points. Declared here as extern "C" instead of
+// #including soh's global.h / OTRGlobals.h to keep this TU compilable
+// as plain C++ against Azahar's headers — soh's headers assume the
+// zelda3d compile settings and would leak N64 types (u16, PlayState,
+// gSaveContext) that Azahar's namespace can't handle. All of these are
+// linked from soh_lib (see harness.cmake).
+extern "C" {
+    void GameConsole_Init(void);
+    void InitOTR(int argc, char* argv[]);
+    void DeinitOTR(void);
+    void CrashHandler_PrintSohData(char*, size_t*);
+    typedef void (*CrashHandlerCallback)(char*, size_t*);
+    void CrashHandlerRegisterCallback(CrashHandlerCallback callback);
+    void BootCommands_Init(void);
+    void Heaps_Alloc(void);
+    void Heaps_Free(void);
+    void Main_Init(void* arg);
+    void Main_Shutdown(void);
+    void RunFrame(void);
+}
 
 namespace {
 
@@ -249,6 +277,38 @@ void HandleLoadState(std::istringstream& toks) {
     std::printf("ok\n");
 }
 
+// SoH3D bring-up as a REPL command so failure modes are isolated —
+// call this from a test script instead of always booting SoH3D on
+// startup and taking the whole harness down on any early crash.
+bool g_soh_booted = false;
+
+void HandleSohBoot(std::istringstream&) {
+    if (g_soh_booted) { PrintErr("soh_boot: already booted"); return; }
+    // Force headless — this is a Linux dev machine with Wayland; SoH3D's
+    // libultraship must NOT try to open a window.
+    setenv("SOH3D_HEADLESS", "1", 1);
+    static char argv0[] = "soh3d_harness";
+    static char* argv[] = { argv0, nullptr };
+    GameConsole_Init();
+    InitOTR(1, argv);
+    CrashHandlerRegisterCallback(&CrashHandler_PrintSohData);
+    BootCommands_Init();
+    Heaps_Alloc();
+    Main_Init(nullptr);
+    g_soh_booted = true;
+    std::printf("ok soh_boot\n");
+}
+
+void HandleSohStep(std::istringstream& toks) {
+    if (!g_soh_booted) { PrintErr("soh_step: run soh_boot first"); return; }
+    std::string n_s;
+    if (!(toks >> n_s)) { PrintErr("soh_step: usage: soh_step <N>"); return; }
+    auto n = ParseNum(n_s);
+    if (!n) { PrintErr("soh_step: bad N"); return; }
+    for (uint64_t i = 0; i < *n; ++i) RunFrame();
+    std::printf("ok soh_step %llu\n", static_cast<unsigned long long>(*n));
+}
+
 void HandleDiag(std::istringstream&) {
     std::printf("ok mask=0x%08x polls=%llu ids_seen=0x%08x\n",
                 g_input_mask,
@@ -397,6 +457,8 @@ void PrintHelp() {
         "  scene                print current sceneNum\n"
         "  warp <entrance>      write nextEntranceIndex + trigger=20\n"
         "  actors               dump current-scene actor table\n"
+        "  soh_boot             bring up SoH3D (InitOTR/Heaps_Alloc/Main_Init)\n"
+        "  soh_step <N>         advance SoH3D by N frames (RunFrame x N)\n"
         "  quit                 exit\n"
         "  help                 this list\n");
     std::printf("ok\n");
@@ -424,6 +486,8 @@ void RunRepl() {
         else if (cmd == "scene")     HandleScene(toks);
         else if (cmd == "warp")      HandleWarp(toks);
         else if (cmd == "actors")    HandleActors(toks);
+        else if (cmd == "soh_boot")  HandleSohBoot(toks);
+        else if (cmd == "soh_step")  HandleSohStep(toks);
         else if (cmd == "help")      PrintHelp();
         else if (cmd == "quit") { std::printf("ok\n"); std::fflush(stdout); return; }
         else                         PrintErr(("unknown cmd: " + cmd).c_str());
@@ -500,6 +564,11 @@ int main(int argc, char** argv) {
 
     RunRepl();
 
+    if (g_soh_booted) {
+        Main_Shutdown();
+        DeinitOTR();
+        Heaps_Free();
+    }
     retro_unload_game();
     retro_deinit();
     return EXIT_SUCCESS;
