@@ -703,6 +703,7 @@ else()
     "libultraship;"
         "ZAPDLib;"
         "cmb3d;"
+        "zelda3d_shared;"
         "stb;"
         SDL3::SDL3
         "Ogg::ogg"

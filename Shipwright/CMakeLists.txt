@@ -198,6 +198,10 @@ add_subdirectory(OTRExporter)
 # cmb3d — shared 3DS asset layer (CMB/CSAB/ZAR/ZSI/CTR-ROM/…), linked by BOTH games.
 add_subdirectory(cmb3d ${CMAKE_BINARY_DIR}/cmb3d)
 
+# zelda3d_shared — shared Zelda3D policy (Link mesh-mask + retarget + REPL later),
+# game-agnostic. Linked by BOTH games. See scratch/plans/mm_oot_link_unify.md.
+add_subdirectory(zelda3d_shared ${CMAKE_BINARY_DIR}/zelda3d_shared)
+
 add_subdirectory(soh)
 
 # Majora's Mask — second game module (Zelda3D N2), shares the in-tree libultraship.
