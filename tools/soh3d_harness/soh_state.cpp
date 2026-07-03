@@ -91,8 +91,18 @@ int SohState_WalkActors(SohState_ActorSink sink, void* user) {
 // Play gamestate); returns 0 otherwise.
 int SohState_Warp(unsigned short entrance) {
     if (gPlayState == NULL) return 0;
+    // Mirror the SoH debug console's `entrance` handler: full transition-type
+    // setup, not just the two-field trigger. Without transitionType +
+    // gSaveContext.nextTransitionType a title-demo cutscene's own scheduled
+    // transitions can outrun our write and land the game at the wrong scene.
+    // Also stop any running cutscene — a title-demo cutscene has its own
+    // end-of-cs scheduled entrance that would overwrite our warp otherwise.
+    gPlayState->csCtx.state = CS_STATE_IDLE;
     gPlayState->nextEntranceIndex = (s16)entrance;
     gPlayState->transitionTrigger = TRANS_TRIGGER_START;
+    gPlayState->transitionType    = TRANS_TYPE_INSTANT;
+    gSaveContext.nextTransitionType = TRANS_TYPE_INSTANT;
+    gSaveContext.entranceIndex    = (s16)entrance;
     return 1;
 }
 
