@@ -194,6 +194,26 @@ extern "C" {
                                  unsigned long* out_wallPoly,
                                  float* out_speedXZ, float* out_velY);
     int SohState_TeleportPlayer(float x, float y, float z);
+
+    // watchhook.cpp — write-hook API on top of Azahar's RegisterWatchpoint.
+    struct WatchRecord {
+        uint32_t vaddr;
+        uint32_t size;
+        uint64_t data;
+        uint32_t arm_pc;
+        uint32_t arm_lr;
+        uint64_t cycles;
+    };
+    struct WatchRange {
+        uint32_t addr;
+        uint32_t size;
+    };
+    void Soh3d_WatchAddRange(uint32_t addr, uint32_t size);
+    void Soh3d_WatchRemoveRange(uint32_t addr, uint32_t size);
+    std::size_t Soh3d_WatchGetHits(uint32_t addr, WatchRecord* out,
+                                    std::size_t max_out);
+    void Soh3d_WatchClear(uint32_t addr);
+    std::size_t Soh3d_WatchListRanges(WatchRange* out, std::size_t max_out);
     int SohState_DumpControlFlags(unsigned int* out_stateFlags1,
                                    int* out_csState, unsigned int* out_csIndex,
                                    unsigned int* out_nextCsIndex,
@@ -2684,6 +2704,60 @@ void RunRepl() {
             std::printf("ok analog L=(%d,%d) R=(%d,%d)\n",
                         (int)g_az_analog_lx, (int)g_az_analog_ly,
                         (int)g_az_analog_rx, (int)g_az_analog_ry);
+        }
+        else if (cmd == "watch") {
+            std::string as, ss;
+            if (!(toks >> as)) { PrintErr("watch: usage: watch <addr> [size]"); continue; }
+            auto a = ParseNum(as);
+            if (!a) { PrintErr("watch: bad addr"); continue; }
+            uint32_t size = 4;
+            if (toks >> ss) { auto v = ParseNum(ss); if (v) size = (uint32_t)*v; }
+            Soh3d_WatchAddRange((uint32_t)*a, size);
+            std::printf("ok watch 0x%08x %u\n", (unsigned)*a, size);
+        }
+        else if (cmd == "unwatch") {
+            std::string as, ss;
+            if (!(toks >> as)) { PrintErr("unwatch: usage: unwatch <addr> [size]"); continue; }
+            auto a = ParseNum(as);
+            if (!a) { PrintErr("unwatch: bad addr"); continue; }
+            uint32_t size = 4;
+            if (toks >> ss) { auto v = ParseNum(ss); if (v) size = (uint32_t)*v; }
+            Soh3d_WatchRemoveRange((uint32_t)*a, size);
+            std::printf("ok unwatch 0x%08x %u\n", (unsigned)*a, size);
+        }
+        else if (cmd == "watches") {
+            WatchRange rs[32];
+            std::size_t n = Soh3d_WatchListRanges(rs, 32);
+            std::printf("ok watches %zu\n", n);
+            for (std::size_t i = 0; i < n; ++i) {
+                std::printf("  0x%08x %u\n", rs[i].addr, rs[i].size);
+            }
+            std::printf("ok end\n");
+        }
+        else if (cmd == "hits") {
+            std::string as;
+            if (!(toks >> as)) { PrintErr("hits: usage: hits <watch_base_addr>"); continue; }
+            auto a = ParseNum(as);
+            if (!a) { PrintErr("hits: bad addr"); continue; }
+            WatchRecord recs[32];
+            std::size_t n = Soh3d_WatchGetHits((uint32_t)*a, recs, 32);
+            std::printf("ok hits %zu\n", n);
+            for (std::size_t i = 0; i < n; ++i) {
+                std::printf("  vaddr=0x%08x size=%u data=0x%016lx "
+                            "pc=0x%08x lr=0x%08x ticks=%lu\n",
+                            recs[i].vaddr, recs[i].size,
+                            (unsigned long)recs[i].data,
+                            recs[i].arm_pc, recs[i].arm_lr,
+                            (unsigned long)recs[i].cycles);
+            }
+            std::printf("ok end\n");
+        }
+        else if (cmd == "hitclear") {
+            std::string as;
+            uint32_t a = 0;
+            if (toks >> as) { auto v = ParseNum(as); if (v) a = (uint32_t)*v; }
+            Soh3d_WatchClear(a);
+            std::printf("ok hitclear 0x%08x\n", a);
         }
         else if (cmd == "az_playerinfo") {
             // Read Az Player speedXZ from the discovered offset. Walks the

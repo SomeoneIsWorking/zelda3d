@@ -11,6 +11,7 @@ set(_harness_root  ${CMAKE_CURRENT_LIST_DIR})
 add_executable(soh3d_harness
     ${_harness_root}/main.cpp
     ${_harness_root}/soh_state.cpp
+    ${_harness_root}/watchhook.cpp
     ${_libretro_root}/citra_libretro.cpp
     $<TARGET_OBJECTS:azahar_libretro_common>
 )
