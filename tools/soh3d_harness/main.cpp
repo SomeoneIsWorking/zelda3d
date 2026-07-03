@@ -206,6 +206,11 @@ extern "C" {
         uint32_t arm_pc;
         uint32_t arm_lr;
         uint64_t cycles;
+        uint32_t arm_r0;
+        uint32_t arm_r1;
+        uint32_t arm_r2;
+        uint32_t arm_r3;
+        uint32_t arm_sp;
     };
     struct WatchRange {
         uint32_t addr;
@@ -3249,11 +3254,15 @@ void RunRepl() {
             std::printf("ok hits %zu\n", n);
             for (std::size_t i = 0; i < n; ++i) {
                 std::printf("  vaddr=0x%08x size=%u data=0x%016lx "
-                            "pc=0x%08x lr=0x%08x ticks=%lu\n",
+                            "pc=0x%08x lr=0x%08x ticks=%lu "
+                            "r0=0x%08x r1=0x%08x r2=0x%08x r3=0x%08x sp=0x%08x\n",
                             recs[i].vaddr, recs[i].size,
                             (unsigned long)recs[i].data,
                             recs[i].arm_pc, recs[i].arm_lr,
-                            (unsigned long)recs[i].cycles);
+                            (unsigned long)recs[i].cycles,
+                            recs[i].arm_r0, recs[i].arm_r1,
+                            recs[i].arm_r2, recs[i].arm_r3,
+                            recs[i].arm_sp);
             }
             std::printf("ok end\n");
         }
