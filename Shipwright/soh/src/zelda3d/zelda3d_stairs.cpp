@@ -200,7 +200,7 @@ void generateStairsGroup(Zelda3D::CmbDrawGroup& g) {
         if (stairDbg && ok) {
             float ac = (f.amin + f.amax) * 0.5f, cc = (f.cmin + f.cmax) * 0.5f;
             float wx = f.aDir[0] * ac + f.cDir[0] * cc, wz = f.aDir[2] * ac + f.cDir[2] * cc;
-            printf("[Zelda3D] stairdbg: patch world XZ=(%.0f,%.0f) y=[%.0f,%.0f] N=%d aSpan=%.0f cSpan=%.0f "
+            fprintf(stderr, "[Zelda3D] stairdbg: patch world XZ=(%.0f,%.0f) y=[%.0f,%.0f] N=%d aSpan=%.0f cSpan=%.0f "
                    "aDir=(%.2f,%.2f) cDir=(%.2f,%.2f)\n",
                    wx, wz, f.ymin, f.ymax, f.N, f.amax - f.amin, f.cmax - f.cmin,
                    f.aDir[0], f.aDir[2], f.cDir[0], f.cDir[2]);

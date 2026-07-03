@@ -152,6 +152,9 @@ extern volatile int gSoh3dCapturePending;
 // gSaveContext) that Azahar's namespace can't handle. All of these are
 // linked from soh_lib (see harness.cmake).
 extern "C" {
+    // Route spdlog's default_logger to stderr before ANY SoH code logs.
+    // Idempotent. Defined in libultraship/src/ship/Context.cpp.
+    void Ship_EarlyLogToStderr(void);
     void GameConsole_Init(void);
     void InitOTR(int argc, char* argv[]);
     void DeinitOTR(void);
@@ -1627,6 +1630,9 @@ bool AcquireSingletonLock() {
 int main(int argc, char** argv) {
     if (!AcquireSingletonLock()) return EXIT_FAILURE;
     InstallWatchdog();
+    // Keep stdout clean for the REPL wire — any SoH log before InitLogging
+    // goes to stderr instead. Must run before Main_Init / InitOTR.
+    Ship_EarlyLogToStderr();
     std::string rom_path;
     for (int i = 1; i < argc; ++i) {
         std::string a = argv[i];

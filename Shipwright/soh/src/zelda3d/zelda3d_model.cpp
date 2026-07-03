@@ -440,7 +440,7 @@ static void loadSceneRoom(int modelId, LoadedModel* out) {
     if (!out->cmb->ok()) { fprintf(stderr, "[Zelda3D] Cmb %s: %s\n", path.c_str(), out->cmb->error().c_str()); return; }
     // scene rooms carry OoT3D baked vertex lighting; #5 turns fake-flat kaidan ramps into real steps
     buildFromCmb(out, /*bakedVertexColor=*/true, /*skipMesh=*/{}, /*stairs=*/true);
-    printf("[Zelda3D] loaded scene-room model %d (%s): %zu groups, %zu textures\n", modelId, path.c_str(),
+    fprintf(stderr, "[Zelda3D] loaded scene-room model %d (%s): %zu groups, %zu textures\n", modelId, path.c_str(),
            out->cGroups.size(), out->cTexs.size());
     // #29 diagnostic: dump per-group material/texture + per-group bbox so the "untextured dome"
     // group can be identified by index (pair with ZELDA3D_SOLOGROUP to isolate it visually).
@@ -453,7 +453,7 @@ static void loadSceneRoom(int modelId, LoadedModel* out) {
             float mn[3] = { 1e30f, 1e30f, 1e30f }, mx[3] = { -1e30f, -1e30f, -1e30f };
             for (const auto& v : g.verts)
                 for (int k = 0; k < 3; k++) { mn[k] = std::min(mn[k], v.pos[k]); mx[k] = std::max(mx[k], v.pos[k]); }
-            printf("[Zelda3D_DBG_ROOM] grp%2zu mat%d tex%d %-18s verts%5zu mesh_id%d "
+            fprintf(stderr, "[Zelda3D_DBG_ROOM] grp%2zu mat%d tex%d %-18s verts%5zu mesh_id%d "
                    "x[%.0f,%.0f] y[%.0f,%.0f] z[%.0f,%.0f]\n",
                    i, g.material_index, ti, tn, g.verts.size(), g.mesh_id,
                    mn[0], mx[0], mn[1], mx[1], mn[2], mx[2]);
@@ -486,7 +486,7 @@ static void loadActorModel(int modelId, LoadedModel* out) {
     if (!out->cmb->ok()) { fprintf(stderr, "[Zelda3D] Cmb: %s\n", out->cmb->error().c_str()); return; }
     buildFromCmb(out, /*bakedVertexColor=*/false); // characters/props: dynamic lighting, color attr unused
     appendFacialFrames(out, kModels[modelId].zarPath); // eye/mouth .cmab frames (keystone #3)
-    printf("[Zelda3D] loaded model %d (%s): %zu groups, %zu textures\n", modelId, kModels[modelId].zarPath,
+    fprintf(stderr, "[Zelda3D] loaded model %d (%s): %zu groups, %zu textures\n", modelId, kModels[modelId].zarPath,
            out->cGroups.size(), out->cTexs.size());
 }
 
@@ -650,7 +650,7 @@ static void loadBillboard(LoadedModel* out, const std::string& zarPath, const st
     out->cGroups.push_back(cg);
     out->skinned = false;
     out->ok = true;
-    printf("[Zelda3D] billboard %s|%s%s: %dx%d tex\n", zarPath.c_str(), ctxbName.c_str(),
+    fprintf(stderr, "[Zelda3D] billboard %s|%s%s: %dx%d tex\n", zarPath.c_str(), ctxbName.c_str(),
            additive ? " [add]" : "", tw, th);
 }
 
@@ -713,7 +713,7 @@ static void loadAutoModel(int modelId, LoadedModel* out) {
             if (sky) {
                 for (auto& grp : out->cGroups) grp.depthWrite = 0; // never occlude the world
             }
-            printf("[Zelda3D] auto-loaded model %d (%s | %s)%s: cmb '%s', height=%.1f, %zu groups, %zu textures\n",
+            fprintf(stderr, "[Zelda3D] auto-loaded model %d (%s | %s)%s: cmb '%s', height=%.1f, %zu groups, %zu textures\n",
                    modelId, zarPath.c_str(), forcedCmb.c_str(), sky ? " [sky]" : "", f.name.c_str(),
                    bboxHeight(out->groups), out->cGroups.size(), out->cTexs.size());
             return;
@@ -750,7 +750,7 @@ static void loadAutoModel(int modelId, LoadedModel* out) {
             out->skinned = false; // hand-listed assemblies are static props (no skinning)
             buildFromCmbs(out, cmbs);
             out->cmb = std::move(cmbs[0]); // keep a resident CMB (the main part)
-            printf("[Zelda3D] auto-loaded ASSEMBLY model %d (%s): %zu cmbs merged, height=%.1f, %zu groups, %zu textures\n",
+            fprintf(stderr, "[Zelda3D] auto-loaded ASSEMBLY model %d (%s): %zu cmbs merged, height=%.1f, %zu groups, %zu textures\n",
                    modelId, zarPath.c_str(), nMerged, bboxHeight(out->groups), out->cGroups.size(), out->cTexs.size());
             return;
         }
@@ -801,7 +801,7 @@ static void loadAutoModel(int modelId, LoadedModel* out) {
     // visible subset per frame via Zelda3D_GL_SetMidMask. So NO build-time cull here.
     buildFromCmb(out, /*bakedVertexColor=*/false);
     appendFacialFrames(out, zarPath); // eye/mouth .cmab frames (keystone #3)
-    printf("[Zelda3D] auto-loaded model %d (%s): cmb '%s' of %d, height=%.1f, bones=%zu%s, %zu groups, %zu textures\n",
+    fprintf(stderr, "[Zelda3D] auto-loaded model %d (%s): cmb '%s' of %d, height=%.1f, bones=%zu%s, %zu groups, %zu textures\n",
            modelId, zarPath.c_str(), best ? best->name.c_str() : "?", nCmb, bboxHeight(out->groups),
            out->cmb->bones().size(), out->skinned ? " (skinned->skip)" : "", out->cGroups.size(), out->cTexs.size());
 }
@@ -1368,7 +1368,7 @@ extern "C" int Zelda3D_LoadSceneCollisionRaw(const char* sceneName, Zelda3D_RawC
         out->surf0[s] = surfs[s].data0;
         out->surf1[s] = surfs[s].data1;
     }
-    printf("[Zelda3D] loaded scene collision %s: %d verts, %d polys, %d surface types\n",
+    fprintf(stderr, "[Zelda3D] loaded scene collision %s: %d verts, %d polys, %d surface types\n",
            path.c_str(), out->numVerts, out->numPolys, out->numSurf);
     return 1;
 }

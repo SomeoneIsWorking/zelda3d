@@ -413,7 +413,7 @@ extern "C" int Zelda3D_PlayerDrawImpl(PlayState* play, Actor* actor) {
         if (gZelda3dAnimDebug) {
             static int dbg = 0;
             if ((dbg++ % 30) == 0) {
-                printf("SOH3D LINK: src=N64 jointTable limbCount=%d (live blended pose, per-bone corr)\n",
+                fprintf(stderr, "SOH3D LINK: src=N64 jointTable limbCount=%d (live blended pose, per-bone corr)\n",
                        player->skelAnime.limbCount);
                 fflush(stdout);
             }
@@ -492,7 +492,7 @@ extern "C" int Zelda3D_PlayerDrawImpl(PlayState* play, Actor* actor) {
             static int dbg = 0;
             if ((dbg++ % 30) == 0) {
                 const char* otr = (const char*)player->skelAnime.animation;
-                printf("SOH3D LINK: src=3DS n64=%s -> csab=%s frame=%.1f/%.1f speedXZ=%.2f\n",
+                fprintf(stderr, "SOH3D LINK: src=3DS n64=%s -> csab=%s frame=%.1f/%.1f speedXZ=%.2f\n",
                        otr ? otr : "(none)", csab, player->skelAnime.curFrame,
                        player->skelAnime.animLength, player->actor.speedXZ);
                 fflush(stdout);
@@ -543,7 +543,7 @@ extern "C" int Zelda3D_PlayerDrawImpl(PlayState* play, Actor* actor) {
     if (gZelda3dAnimDebug) {
         static int dbg = 0;
         if ((dbg++ % 30) == 0) {
-            printf("SOH3D LINK mids: LH=%d RH=%d sheath=%d shield=%d -> mask=0x%llx\n",
+            fprintf(stderr, "SOH3D LINK mids: LH=%d RH=%d sheath=%d shield=%d -> mask=0x%llx\n",
                    player->leftHandType, player->rightHandType, player->sheathType,
                    player->currentShield, midMask);
             fflush(stdout);
@@ -575,7 +575,7 @@ extern "C" int Zelda3D_PlayerDrawImpl(PlayState* play, Actor* actor) {
     if (gZelda3dAnimDebug) {
         static int dbg = 0;
         if ((dbg++ % 30) == 0) {
-            printf("SOH3D LINK groundOff=%.1f (model-local)%s\n", groundOff, climbPose ? " [climb:frozen]" : "");
+            fprintf(stderr, "SOH3D LINK groundOff=%.1f (model-local)%s\n", groundOff, climbPose ? " [climb:frozen]" : "");
             fflush(stdout);
         }
     }
@@ -647,7 +647,7 @@ extern "C" int Zelda3D_PlayerDrawImpl(PlayState* play, Actor* actor) {
             Vec3f l11 = {b11[0],b11[1],b11[2]}, w11; Matrix_MultVec3f(&l11, &w11);
             static int fdbg = 0;
             if ((fdbg++ % 30) == 0) {
-                printf("SOH3D FOCUS dbg b9=(%.0f,%.0f,%.0f) b10=(%.0f,%.0f,%.0f) b11=(%.0f,%.0f,%.0f) world=(%.0f,%.0f,%.0f)\n",
+                fprintf(stderr, "SOH3D FOCUS dbg b9=(%.0f,%.0f,%.0f) b10=(%.0f,%.0f,%.0f) b11=(%.0f,%.0f,%.0f) world=(%.0f,%.0f,%.0f)\n",
                        w9.x,w9.y,w9.z, w10.x,w10.y,w10.z, w11.x,w11.y,w11.z,
                        actor->world.pos.x, actor->world.pos.y, actor->world.pos.z);
                 fflush(stdout);

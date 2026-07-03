@@ -4,6 +4,7 @@
 #include <iostream>
 #include <spdlog/sinks/rotating_file_sink.h>
 #include <spdlog/sinks/stdout_color_sinks.h>
+#include <spdlog/spdlog.h>
 #include "ship/install_config.h"
 #include "ship/config/ConsoleVariable.h"
 #include "ship/controller/controldeck/ControlDeck.h"
@@ -90,9 +91,29 @@ Context* Context::CreateInstance(const std::string& name, const std::string& sho
     return GetRawInstance();
 }
 
+void Context::EarlyLogToStderr() {
+    // See declaration comment. Idempotent — calling twice is a no-op.
+    if (spdlog::get("ship_pre_init") != nullptr) return;
+    try {
+        auto _early = spdlog::stderr_color_mt("ship_pre_init");
+        spdlog::set_default_logger(_early);
+    } catch (const spdlog::spdlog_ex&) {
+        // Registry already has it or is locked; nothing to do.
+    }
+}
+
+// C-linkage wrapper so harnesses (soh3d_harness) can install the early
+// stderr sink without pulling in Ship::Context's header + spdlog headers.
+extern "C" void Ship_EarlyLogToStderr(void) {
+    Context::EarlyLogToStderr();
+}
+
 Context* Context::CreateUninitializedInstance(const std::string& name, const std::string& shortName,
                                               const std::string& configFilePath) {
     if (mContext == nullptr) {
+        // Belt-and-suspenders: also install here for callers that don't
+        // pre-call EarlyLogToStderr(). Idempotent.
+        EarlyLogToStderr();
         mContext = std::make_unique<Context>(name, shortName, configFilePath);
         return mContext.get();
     }
@@ -162,7 +183,11 @@ bool Context::InitLogging(spdlog::level::level_enum debugBuildLogLevel,
         std::wcerr.clear();
         std::wcin.clear();
 #endif
-        auto systemConsoleSink = std::make_shared<spdlog::sinks::stdout_color_sink_mt>();
+        // Log to STDERR, not STDOUT — otherwise driver scripts using stdout
+        // as a REPL wire protocol (e.g. tools/soh3d_harness with soh_boot)
+        // get log lines interleaved with command responses. Terminals see
+        // no difference; pipes get a clean protocol channel.
+        auto systemConsoleSink = std::make_shared<spdlog::sinks::stderr_color_sink_mt>();
         systemConsoleSink->set_level(spdlog::level::trace);
         sinks.push_back(systemConsoleSink);
 #endif

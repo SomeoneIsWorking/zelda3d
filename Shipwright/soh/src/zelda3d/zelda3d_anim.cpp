@@ -611,7 +611,7 @@ void Zelda3D_UpdateAnim(int modelId, const char* animName, float frame) {
         static std::set<std::pair<int, std::string>> sSeen;
         auto key = std::make_pair(modelId, std::string(animName));
         if (sSeen.insert(key).second) {
-            printf("[Zelda3D animPlay] model=%d anim='%s'\n", modelId, animName);
+            fprintf(stderr, "[Zelda3D animPlay] model=%d anim='%s'\n", modelId, animName);
             fflush(stdout);
         }
     }
@@ -794,7 +794,7 @@ void Zelda3D_UpdateAnimAuto(int modelId, const char* animName, float rate, float
             morphOut.erase(modelId); morphOutFrame.erase(modelId);
         }
         if (gZelda3dAnimDebug && modelId == Zelda3D_LinkModelId()) {
-            printf("SOH3D WALKSTOP: end=%s f=%.1f synthW=%.3f rate=%.3f morphOut=%s@%.1f\n",
+            fprintf(stderr, "SOH3D WALKSTOP: end=%s f=%.1f synthW=%.3f rate=%.3f morphOut=%s@%.1f\n",
                    en.c_str(), ef, w, locoStopRate[modelId],
                    morphOut.count(modelId) ? morphOut[modelId].c_str() : "(none)",
                    morphOut.count(modelId) ? morphOutFrame[modelId] : -1.0f);
@@ -845,7 +845,7 @@ void Zelda3D_UpdateAnimAuto(int modelId, const char* animName, float rate, float
     lastFrame[modelId] = f;
 
     if (gZelda3dAnimDebug && modelId == Zelda3D_LinkModelId() && (csabChanged || morphWeight > 0.0f)) {
-        printf("SOH3D ANIM XTRANS: %s f=%.2f morphW=%.3f morphOut=%s outFrame=%.2f%s\n",
+        fprintf(stderr, "SOH3D ANIM XTRANS: %s f=%.2f morphW=%.3f morphOut=%s outFrame=%.2f%s\n",
                animName, f, morphWeight,
                (morphOut.count(modelId) ? morphOut[modelId].c_str() : "(none)"),
                (morphOut.count(modelId) ? morphOutFrame[modelId] : -1.0f),

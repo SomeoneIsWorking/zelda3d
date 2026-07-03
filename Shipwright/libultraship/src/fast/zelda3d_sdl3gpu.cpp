@@ -1321,7 +1321,7 @@ extern "C" void Zelda3D_Sg_DrawModel(int modelId, const float* mp16, const float
             float tx = mp16 ? mp16[12] : 0.0f;
             float ty = mp16 ? mp16[13] : 0.0f;
             float tz = mp16 ? mp16[14] : 0.0f;
-            printf("[Zelda3D sgDraw #%d] modelId=%d sky=%d lit=%d rgba=(%d,%d,%d,%d) boneCnt=%d "
+            fprintf(stderr, "[Zelda3D sgDraw #%d] modelId=%d sky=%d lit=%d rgba=(%d,%d,%d,%d) boneCnt=%d "
                    "mp_t=(%.1f,%.1f,%.1f)\n",
                    sN, modelId, sky, lit, r8, g8, b8, a8, boneCnt, tx, ty, tz);
             fflush(stdout);

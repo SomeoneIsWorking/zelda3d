@@ -1306,7 +1306,7 @@ CollisionHeader* Zelda3D_BuildSceneCollision(PlayState* play, CollisionHeader* n
     int stairNT = 0;
     Zelda3D_CollectSceneStairTreads(sceneName, &stairV, &stairNV, &stairT, &stairNT);
     if (stairNT > 0 && (raw.numVerts + stairNV >= 8000 || raw.numPolys + stairNT >= 60000)) {
-        printf("[Zelda3D] stairs: %d verts + %d tread verts / %d polys + %d tread tris exceeds the "
+        fprintf(stderr, "[Zelda3D] stairs: %d verts + %d tread verts / %d polys + %d tread tris exceeds the "
                "collision index budget — skipping stepped stair collision for %s\n",
                raw.numVerts, stairNV, raw.numPolys, stairNT, sceneName);
         Zelda3D_FreeStairTreads(stairV, stairT);
@@ -1550,7 +1550,7 @@ CollisionHeader* Zelda3D_BuildSceneCollision(PlayState* play, CollisionHeader* n
         }
     }
     if (stairNT > 0) {
-        printf("[Zelda3D] stairs: spliced %d stepped tread polys (%d verts) into %s collision\n",
+        fprintf(stderr, "[Zelda3D] stairs: spliced %d stepped tread polys (%d verts) into %s collision\n",
                stairNT, stairNV, sceneName);
     }
     Zelda3D_FreeStairTreads(stairV, stairT);
@@ -1975,7 +1975,7 @@ static const char* Zelda3D_ResolveAnim_EnGe1(Actor* actor) {
     if (gZelda3dAnimDebug) {
         static int dbg = 0;
         if ((dbg++ % 20) == 0) {
-            printf("SOH3D anim: csab=%s curFrame=%.2f animLength=%.2f n64=%s\n",
+            fprintf(stderr, "SOH3D anim: csab=%s curFrame=%.2f animLength=%.2f n64=%s\n",
                    csab, ge->skelAnime.curFrame, ge->skelAnime.animLength, n64 ? n64 : "(null)");
             fflush(stdout);
         }
@@ -2279,7 +2279,7 @@ static int Zelda3D_TryAuto(PlayState* play, Actor* actor) {
             e->scale = e->measuredH / modelH;
             e->state = 2;
             if (Zelda3D_AutoMode() >= 1) {
-                printf("SOH3D AUTO: obj 0x%x %s -> scale=%.5f (n64h=%.1f modelh=%.1f)%s\n", objId, zar, e->scale,
+                fprintf(stderr, "SOH3D AUTO: obj 0x%x %s -> scale=%.5f (n64h=%.1f modelh=%.1f)%s\n", objId, zar, e->scale,
                        e->measuredH, modelH, e->skinned ? " [n64anim]" : "");
                 fflush(stdout);
             }
@@ -2378,7 +2378,7 @@ int Zelda3D_TryDrawActor(PlayState* play, Actor* actor) {
                         wm->scale = wm->measuredH / modelH;
                         wm->state = 2;
                         if (Zelda3D_AutoMode() >= 1) {
-                            printf("SOH3D AUTO: windmill (c_s01fusya) -> scale=%.5f (n64h=%.1f modelh=%.1f)\n",
+                            fprintf(stderr, "SOH3D AUTO: windmill (c_s01fusya) -> scale=%.5f (n64h=%.1f modelh=%.1f)\n",
                                    wm->scale, wm->measuredH, modelH);
                             fflush(stdout);
                         }
@@ -2432,7 +2432,7 @@ int Zelda3D_TryDrawActor(PlayState* play, Actor* actor) {
                         wa->scale = wa->measuredH / modelH;
                         wa->state = 2;
                         if (Zelda3D_AutoMode() >= 1) {
-                            printf("SOH3D AUTO: well-arch (c_s01idohashira) -> scale=%.5f (n64h=%.1f modelh=%.1f)\n",
+                            fprintf(stderr, "SOH3D AUTO: well-arch (c_s01idohashira) -> scale=%.5f (n64h=%.1f modelh=%.1f)\n",
                                    wa->scale, wa->measuredH, modelH);
                             fflush(stdout);
                         }
@@ -2978,7 +2978,7 @@ static int Zelda3D_DoRetarget(PlayState* play, void** skeleton, Vec3s* jointTabl
             if ((dbg++ % 30) == 0) {
                 const char* otr = gZelda3dPendingAnimOtr ? gZelda3dPendingAnimOtr : "(none)";
                 int locked = (gZelda3dPendingN64AnimLength > 4.0f);
-                printf("SOH3D ANIM: model %d n64=%s -> csab=%s%s scale=%.5f n64frame=%.1f/%.1f %s\n",
+                fprintf(stderr, "SOH3D ANIM: model %d n64=%s -> csab=%s%s scale=%.5f n64frame=%.1f/%.1f %s\n",
                        gZelda3dPendingModel, otr, csab ? csab : "(bind pose)", mapped ? "" : " [default-idle]",
                        gZelda3dPendingScale, gZelda3dPendingN64CurFrame, gZelda3dPendingN64AnimLength,
                        locked ? "[PHASE-LOCK]" : "[free-run]");
@@ -4060,7 +4060,7 @@ void Zelda3D_DebugDrawKibako(PlayState* play) {
         float fz = p->actor.world.pos.z + 120.0f * Math_CosS(yaw);
         Actor* a = Actor_Spawn(&play->actorCtx, play, ACTOR_OBJ_KIBAKO2, fx, p->actor.world.pos.y, fz, 0,
                                p->actor.shape.rot.y, 0, 0);
-        printf("SOH3D: SPAWNKIBAKO Actor_Spawn(OBJ_KIBAKO2) -> %s\n", a != NULL ? "OK" : "FAILED (object not in scene)");
+        fprintf(stderr, "SOH3D: SPAWNKIBAKO Actor_Spawn(OBJ_KIBAKO2) -> %s\n", a != NULL ? "OK" : "FAILED (object not in scene)");
         fflush(stdout);
         spawned = 1;
     }
@@ -4124,7 +4124,7 @@ void Zelda3D_ReplReply(const char* outPath, const char* fmt, ...) {
     va_start(ap, fmt);
     vsnprintf(msg, sizeof(msg), fmt, ap);
     va_end(ap);
-    printf("SOH3D REPL: %s\n", msg);
+    fprintf(stderr, "SOH3D REPL: %s\n", msg);
     fflush(stdout);
     f = fopen(outPath, "a");
     if (f != NULL) {

@@ -53,6 +53,13 @@ class Context {
     static Context* GetRawInstance();
     static void DestroyInstance();
     /**
+     * @brief Install a stderr-backed spdlog default_logger IMMEDIATELY, before
+     * any Context is created. Callable from process-start driver code (e.g.
+     * soh3d_harness main()) so that pre-InitLogging boot messages don't leak
+     * onto stdout (which drivers use as a REPL wire channel).
+     */
+    static void EarlyLogToStderr();
+    /**
      * @brief Creates, initializes, and stores the global Context instance.
      *
      * Convenience factory that calls CreateUninitializedInstance() followed by Init().
