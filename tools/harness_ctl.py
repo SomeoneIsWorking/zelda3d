@@ -23,6 +23,7 @@ Usage:
 from __future__ import annotations
 
 import argparse
+import os
 import subprocess
 import sys
 from pathlib import Path
@@ -40,7 +41,9 @@ class Harness:
         # raw fd can't see (was breaking every multi-line peek).
         self.proc = subprocess.Popen(
             cmd, cwd=str(REPO_ROOT),
-            stdin=subprocess.PIPE, stdout=subprocess.PIPE, stderr=subprocess.DEVNULL,
+            stdin=subprocess.PIPE, stdout=subprocess.PIPE,
+            stderr=(open(os.environ["HARNESS_STDERR"], "wb") if os.environ.get("HARNESS_STDERR")
+                    else subprocess.DEVNULL),
             bufsize=0,
         )
         self._buf = b""
