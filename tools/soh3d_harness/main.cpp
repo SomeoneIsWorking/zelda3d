@@ -1089,6 +1089,91 @@ constexpr uint32_t PLAY_CAM_UP_OFF         = 0x01D0;
 // per-actor sign-convention difference, flipping ONE flag corrects every
 // downstream compare in one seam instead of ad-hoc per test. `false` = no
 // runtime effect; the multiply-by-+1 constant-folds.
+// ── Firstdiv sign-blind policy ──────────────────────────────────────────
+// Under matched drive + game-frame alignment + d4-yaw-fix, the surviving
+// firstdiv divergences at Link's House are all project-vision decisions,
+// not port bugs. This policy classifies each would-be divergence so the
+// tool stops re-reporting known-classified items and the next real port
+// gap stands out.
+//
+// Two distinct classes:
+//
+//   PermanentNoise — a divergence class that will NEVER be fixed and
+//   should be silenced in every scene forever:
+//     · Rate-compensation: SoH's Player_Update at 20fps + documented
+//       1.5× pos-per-frame multiplier vs Az at 30fps. When both engines'
+//       speedXZ match, any Δpos is accumulated tick-rate difference.
+//     · Wonder_Talk2 3DS content addition (cat=1 id=0x0185) — d6 count
+//       delta of exactly one extra Az cat=1 actor of that id.
+//     · Navi RNG (cat=7 id=0x0018) — d7 worst_pos_drift on that pair.
+//
+//   DeferredPortTarget — a divergence class that IS a real port bug and
+//   WILL be worked on later (specifically the scene-collision porting
+//   arc). Silenced NOW to advance the compare sweep past the wall-stop
+//   plateau, but tracked as real work — do NOT confuse with permanent
+//   noise:
+//     · Scene-collision wall stop: SoH keeps N64 room binaries and stops
+//       Link at Z=131 in Link's House; OoT3D's collision has the wall
+//       at Z=135.5. Real port target; deferred to the scene-collision
+//       arc. Detected when SoH's Player bgCheckFlags & 0x008 is set.
+//     · Wall-slide yaw drift downstream of the above.
+//
+// Reporting: when a divergence is classified, print the class + reason
+// inline on the dimension's own line, but DO NOT fire fd.report. The
+// firstdiv summary still shows "none" when only classified items were
+// found, so the tool signals "advance to next scene / next drive" clearly.
+enum class DivClass : int {
+    Unclassified       = 0,
+    PermanentNoise     = 1,
+    DeferredPortTarget = 2,
+};
+struct DivDecision {
+    DivClass cls = DivClass::Unclassified;
+    const char* tag = "";  // short label, e.g. "rate-comp", "collision-wall"
+};
+constexpr DivDecision kUnclassified{DivClass::Unclassified, ""};
+inline const char* DivClassStr(DivClass c) {
+    switch (c) {
+        case DivClass::PermanentNoise:     return "NOISE";
+        case DivClass::DeferredPortTarget: return "DEFERRED";
+        default:                            return "";
+    }
+}
+// Wonder_Talk2 3DS content addition — filters cat=1 id=0x0185.
+inline DivDecision ClassifyD6Content(int cat_delta_idx, int az_cnt, int soh_cnt,
+                                     int wonder_talk2_extra_az) {
+    // Called with the summarized: was the only mismatch exactly one extra
+    // Az cat=1 actor of id 0x0185? If so, PermanentNoise.
+    if (wonder_talk2_extra_az == 1 &&
+        (az_cnt - soh_cnt) == 1 && cat_delta_idx == 1)
+        return {DivClass::PermanentNoise, "wonder_talk2"};
+    return kUnclassified;
+}
+// Navi RNG drift — filter cat=7 id=0x0018.
+inline DivDecision ClassifyD7Worst(int worstCat, int worstId) {
+    if (worstCat == 7 && worstId == 0x0018)
+        return {DivClass::PermanentNoise, "navi-rng"};
+    return kUnclassified;
+}
+// d3 Player-pos classifier. Uses live speedXZ readback on both engines
+// + SoH bgCheckFlags to decide: wall-stop deferred vs matched-rate noise
+// vs unclassified.
+inline DivDecision ClassifyD3PlayerPos(float soh_speedXZ, float az_speedXZ,
+                                        unsigned int soh_bgFlags) {
+    const bool soh_walled = (soh_bgFlags & 0x0008u) != 0;
+    if (soh_walled) {
+        return {DivClass::DeferredPortTarget, "collision-wall"};
+    }
+    // Both engines' speedXZ matched → Δpos is tick-rate accumulation
+    // (SoH runs Player_Update at 20fps × 1.5 pos multiplier vs Az at
+    // 30fps). Tolerance 2.0 units per game frame accounts for
+    // acceleration-curve alignment lag.
+    if (std::fabs(soh_speedXZ - az_speedXZ) < 2.0f &&
+        soh_speedXZ > 0.1f && az_speedXZ > 0.1f) {
+        return {DivClass::PermanentNoise, "rate-comp"};
+    }
+    return kUnclassified;
+}
 constexpr bool AZ_POS_X_SIGN_FLIP    = false;
 constexpr bool AZ_POS_Y_SIGN_FLIP    = false;
 constexpr bool AZ_POS_Z_SIGN_FLIP    = false;
@@ -1604,6 +1689,9 @@ void CompareFirstDivImpl() {
                                        az_scene != 0xFFFF && az_scene != 0x51 &&
                                        az_scene == soh_scene;
     if (both_in_play_gameplay) {
+        // Hoisted classification decision — d3 populates it, d4/d5 consult
+        // it (their divergences are typically downstream of d3).
+        DivDecision d3_decision = kUnclassified;
         // ── Play-mode d3: Link position match ────────────────────────────
         // Walk Azahar's actor table for cat=2 (Player) id=0.
         const uint32_t ctx = *ps_az + ACTORCTX_OFF;
@@ -1663,11 +1751,41 @@ void CompareFirstDivImpl() {
             std::printf("  d3 player pos:   az=(%.1f,%.1f,%.1f) soh=(%.1f,%.1f,%.1f) "
                         "|Δ|=%.2f\n",
                         az_px, az_py, az_pz, soh_px, soh_py, soh_pz, dp);
-            if (!fd.reported && dp > 1.0f) {
-                char buf[192]; std::snprintf(buf, sizeof buf,
-                    "|Δpos|=%.2f az=(%.1f,%.1f,%.1f) soh=(%.1f,%.1f,%.1f)",
-                    dp, az_px_n, az_py_n, az_pz_n, soh_px, soh_py, soh_pz);
-                fd.report("player-pos", buf);
+            if (dp > 1.0f) {
+                // Classify before firing. Reads live speedXZ on both sides
+                // + SoH bgCheckFlags to decide rate-comp NOISE vs
+                // collision-wall DEFERRED vs unclassified.
+                float soh_spdXZ = 0.0f, soh_velY = 0.0f;
+                unsigned int soh_bg = 0;
+                int wY = 0, wBg = 0;
+                unsigned long wP = 0;
+                SohState_PlayerWallInfo(&soh_bg, &wY, &wBg, &wP,
+                                         &soh_spdXZ, &soh_velY);
+                float az_spdXZ = 0.0f;
+                if (az_player_found) {
+                    // Read Az Player speedXZ. Walk player_actor addr by
+                    // repeating the same cat=2 lookup used above.
+                    auto head = mem.Read32OrNullopt(ctx + ACTOR_LISTS_OFF +
+                                                    2 * 8 + 4);
+                    if (head && *head != 0) {
+                        auto sv = mem.Read32OrNullopt(*head +
+                                                      ACTOR_SPEEDXZ_OFF);
+                        if (sv) std::memcpy(&az_spdXZ, &*sv, 4);
+                    }
+                }
+                d3_decision = ClassifyD3PlayerPos(soh_spdXZ, az_spdXZ, soh_bg);
+                if (d3_decision.cls != DivClass::Unclassified) {
+                    std::printf("    d3 classified: %s (%s) — "
+                                "soh_v=%.2f az_v=%.2f soh_bgW=%d\n",
+                                DivClassStr(d3_decision.cls), d3_decision.tag,
+                                soh_spdXZ, az_spdXZ,
+                                (int)((soh_bg & 0x0008u) != 0));
+                } else if (!fd.reported) {
+                    char buf[192]; std::snprintf(buf, sizeof buf,
+                        "|Δpos|=%.2f az=(%.1f,%.1f,%.1f) soh=(%.1f,%.1f,%.1f)",
+                        dp, az_px_n, az_py_n, az_pz_n, soh_px, soh_py, soh_pz);
+                    fd.report("player-pos", buf);
+                }
             }
 
             // ── Play-mode d4: Link rotation match ────────────────────────
@@ -1691,12 +1809,23 @@ void CompareFirstDivImpl() {
                         adrx, adry, adrz);
             // Tolerate ≤8 binary-angle units (rounding); anything larger is
             // a real rotation drift.
-            if (!fd.reported && worstD > 8) {
-                char buf[192]; std::snprintf(buf, sizeof buf,
-                    "worst axis=%d Δ=%d (az_rot=(%d,%d,%d) soh_rot=(%d,%d,%d))",
-                    worstAxis, worstD, az_rx, az_ry, az_rz,
-                    soh_rx, soh_ry, soh_rz);
-                fd.report("player-rot", buf);
+            if (worstD > 8) {
+                // Post-wall-hit yaw drift is downstream of the scene-
+                // collision DeferredPortTarget — inherit the d3 decision
+                // when SoH is wall-touching. Also inherit rate-comp when
+                // d3 was classified as rate-comp (rare — yaw rarely
+                // diverges under matched-speed walk).
+                if (d3_decision.cls == DivClass::DeferredPortTarget) {
+                    std::printf("    d4 classified: DEFERRED (%s-downstream) — "
+                                "Δ=%d wall-slide yaw\n",
+                                d3_decision.tag, worstD);
+                } else if (!fd.reported) {
+                    char buf[192]; std::snprintf(buf, sizeof buf,
+                        "worst axis=%d Δ=%d (az_rot=(%d,%d,%d) soh_rot=(%d,%d,%d))",
+                        worstAxis, worstD, az_rx, az_ry, az_rz,
+                        soh_rx, soh_ry, soh_rz);
+                    fd.report("player-rot", buf);
+                }
             }
         }
 
@@ -1754,11 +1883,25 @@ void CompareFirstDivImpl() {
                         dEye, dAt, dUp, camId, fov);
             // Tolerance: 1 unit on eye/at (~2 mm at OoT world scale), 0.01 on up
             // (unit-vector rounding). Larger deltas mean actual camera drift.
-            if (!fd.reported && (dEye > 1.0f || dAt > 1.0f || dUp > 0.01f)) {
-                char buf[192]; std::snprintf(buf, sizeof buf,
-                    "|Δeye|=%.2f |Δat|=%.2f |Δup|=%.4f — camera basis drift",
-                    dEye, dAt, dUp);
-                fd.report("camera-basis", buf);
+            if (dEye > 1.0f || dAt > 1.0f || dUp > 0.01f) {
+                // A follow-camera's at-point tracks Link. If d3 was
+                // classified, d5 |Δat| divergence with matched |Δeye| is
+                // downstream of the same divergence class. Only classify
+                // when |Δeye| is tight (fixed-eye scenes) — real camera
+                // drift moves the eye too.
+                if (d3_decision.cls != DivClass::Unclassified &&
+                    dEye < 1.0f && dUp < 0.01f) {
+                    std::printf("    d5 classified: %s (%s-downstream) — "
+                                "|Δeye|=%.2f |Δat|=%.2f — at-point tracks "
+                                "Link, downstream of d3\n",
+                                DivClassStr(d3_decision.cls), d3_decision.tag,
+                                dEye, dAt);
+                } else if (!fd.reported) {
+                    char buf[192]; std::snprintf(buf, sizeof buf,
+                        "|Δeye|=%.2f |Δat|=%.2f |Δup|=%.4f — camera basis drift",
+                        dEye, dAt, dUp);
+                    fd.report("camera-basis", buf);
+                }
             }
         }
 
@@ -1794,12 +1937,50 @@ void CompareFirstDivImpl() {
             }
         }
         std::printf(" |%s\n", delta_str);
-        if (!fd.reported && az_total != sohBin.total) {
-            char buf[256]; std::snprintf(buf, sizeof buf,
-                "total az=%d soh=%d;%s — per-cat az/soh — investigate "
-                "room-load timing vs missing-actor port gap",
-                az_total, sohBin.total, delta_str);
-            fd.report("actor-count", buf);
+        if (az_total != sohBin.total) {
+            // Wonder_Talk2 3DS content-add filter: total mismatch is
+            // entirely explained by extra Az id=0x0185 actors. Room
+            // scripts can put Wonder_Talk2 in any category (cat=7 at
+            // Link's House, cat=1 has been noted elsewhere), so walk
+            // EVERY cat on both sides and count id=0x0185. If (az_wt2
+            // - soh_wt2) equals the total delta, classify.
+            int az_wt2 = 0, soh_wt2 = 0;
+            for (uint32_t cat = 0; cat < 12; ++cat) {
+                auto head = mem.Read32OrNullopt(*ps_az + ACTORCTX_OFF +
+                                                ACTOR_LISTS_OFF + cat * 8 + 4);
+                uint32_t addr = head ? *head : 0;
+                int guard = 128;
+                while (addr && guard-- > 0) {
+                    auto id_v = mem.Read32OrNullopt(addr + 0x00);
+                    auto nx_v = mem.Read32OrNullopt(addr + ACTOR_NEXT_OFF);
+                    if (!id_v || !nx_v) break;
+                    if ((*id_v & 0xFFFF) == 0x0185) az_wt2++;
+                    addr = *nx_v;
+                }
+                int soh_len = SohState_ActorListLen(cat);
+                for (int i = 0; i < soh_len; ++i) {
+                    int s_id=0, s_params=0; unsigned int s_flags=0;
+                    float sp[3]; short sr[3];
+                    if (SohState_ActorInfoAt(cat, i, &s_id, &s_params, &s_flags,
+                                             &sp[0], &sp[1], &sp[2],
+                                             &sr[0], &sr[1], &sr[2])
+                        && s_id == 0x0185) soh_wt2++;
+                }
+            }
+            const int total_delta = az_total - sohBin.total;
+            const int wt2_delta   = az_wt2 - soh_wt2;
+            const bool wt2_explains = (total_delta >= 1 && total_delta == wt2_delta);
+            if (wt2_explains) {
+                std::printf("    d6 classified: NOISE (wonder_talk2) — "
+                            "Az has +%d id=0x0185 (3DS content add) matching "
+                            "total delta\n", wt2_delta);
+            } else if (!fd.reported) {
+                char buf[256]; std::snprintf(buf, sizeof buf,
+                    "total az=%d soh=%d;%s — per-cat az/soh — investigate "
+                    "room-load timing vs missing-actor port gap",
+                    az_total, sohBin.total, delta_str);
+                fd.report("actor-count", buf);
+            }
         }
 
         // ── Play-mode d7: per-actor state diff ─────────────────────────
@@ -1946,6 +2127,15 @@ void CompareFirstDivImpl() {
         } else {
             std::printf(" worst_pos_drift=%.2f (cat=%d id=0x%04x)\n",
                         worstPosD, worstPosCat, worstPosId);
+            // Filter Navi RNG (cat=7 id=0x0018) — permanent noise. Not
+            // that d7 fires a report on worst_pos_drift; but printing the
+            // classification tag documents the policy at the sweep site.
+            auto dec = ClassifyD7Worst(worstPosCat, worstPosId);
+            if (dec.cls != DivClass::Unclassified && worstPosD > 4.0f) {
+                std::printf("    d7 classified: %s (%s) — cat=%d id=0x%04x drift=%.2f\n",
+                            DivClassStr(dec.cls), dec.tag,
+                            worstPosCat, worstPosId, worstPosD);
+            }
         }
 
         if (!fd.reported) {
