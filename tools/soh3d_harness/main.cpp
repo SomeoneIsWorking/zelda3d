@@ -700,6 +700,7 @@ void CompareActorsImpl();
 void CompareCameraImpl();
 void CompareSkeletonImpl(int cat, int listIndex);
 void CompareLightingImpl();
+void CompareTitleActorsImpl();
 
 // -- Snapshot ---------------------------------------------------------------
 //
@@ -1318,6 +1319,62 @@ void CompareLightingImpl() {
                 lcFog[0], lcFog[1], lcFog[2], lcFogNear, lcFogFar);
 }
 
+// Compare titleactors: 3DS side reads the 25-entry SkelAnime pose table at
+// TITLE_POSE_TABLE_VA, SoH3D side dumps the Player joint table if the demo
+// Link actor is live. Both formats differ (3DS = 9 floats {pos,rot,scale};
+// N64 = Vec3s joints), so the loop is closed structurally — a mapping
+// between 3DS pose index K and N64 limb K is one visual alignment pass
+// away, driven by matching per-limb per-frame motion.
+void CompareTitleActorsImpl() {
+    // 3ds side
+    if (!TitleActive()) {
+        std::printf("  3ds: n/a (not at title)\n");
+    } else {
+        auto& mem = Core::System::GetInstance().Memory();
+        std::printf("  3ds: 25 poses @ 0x%08x  {Vec3 pos, Vec3 rot(rad), Vec3 scale}\n",
+                    TITLE_POSE_TABLE_VA);
+        for (uint32_t i = 0; i < TITLE_POSE_COUNT; ++i) {
+            const uint32_t va = TITLE_POSE_TABLE_VA + i * TITLE_POSE_STRIDE;
+            float p[3], r[3];
+            bool bad = false;
+            for (int j = 0; j < 3; ++j) {
+                auto vp = mem.Read32OrNullopt(va + 0  + j*4);
+                auto vr = mem.Read32OrNullopt(va + 12 + j*4);
+                if (!vp || !vr) { bad = true; break; }
+                std::memcpy(&p[j], &*vp, 4);
+                std::memcpy(&r[j], &*vr, 4);
+            }
+            if (bad) continue;
+            std::printf("       [%2u] pos=(%9.1f,%9.1f,%9.1f) rot=(%6.3f,%6.3f,%6.3f)\n",
+                        i, p[0], p[1], p[2], r[0], r[1], r[2]);
+        }
+    }
+    // soh side — walk actors, find Player, dump joint table
+    if (!SohState_HasPlayState()) {
+        std::printf("  soh: n/a (no playstate)\n");
+        return;
+    }
+    short joints[32 * 3] = {};
+    int jointCount = 0, animFrame = 0, morphFrame = 0;
+    // Actor category 2 = ACTORCAT_PLAYER in OoT
+    int n = SohState_ActorSkeleton(2, 0, joints, 32,
+                                   &jointCount, &animFrame, &morphFrame);
+    if (n < 0) {
+        std::printf("  soh: n/a (no Player actor live at title)\n");
+        return;
+    }
+    if (n == 0) {
+        std::printf("  soh: Player has no SkelAnime\n");
+        return;
+    }
+    std::printf("  soh: Player skelAnime  limbs=%d animFrame=%d morphWeight=0x%08x\n",
+                jointCount, animFrame, (unsigned)morphFrame);
+    for (int j = 0; j < n; ++j) {
+        std::printf("       [%2d] jointVec3s=(%6d,%6d,%6d)\n",
+                    j, joints[j * 3 + 0], joints[j * 3 + 1], joints[j * 3 + 2]);
+    }
+}
+
 // ============================================================================
 // force <sub> — write state into BOTH engines directly (no input driving)
 //
@@ -1436,6 +1493,7 @@ void HandleCompare(std::istringstream& toks) {
         CompareSkeletonImpl((int)*pc, (int)*pi);
     }
     else if (sub == "lighting") CompareLightingImpl();
+    else if (sub == "titleactors") CompareTitleActorsImpl();
     else { PrintErr(("compare: unknown sub: " + sub).c_str()); return; }
     std::printf("ok compare %s\n", sub.c_str());
 }
