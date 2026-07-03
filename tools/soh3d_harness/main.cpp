@@ -2907,6 +2907,37 @@ void CompareFirstDivImpl() {
                     std::printf(" +%02x=%.3f", off, f);
                 }
                 std::printf("\n");
+                // TASK16: OoT3D FUN_002d9e68 (LookAt) is LEFT-HANDED —
+                // forward = normalize(eye-at), right = up×forward. Az
+                // stored right at +0x140 = (-0.868, 0.195, 0.458). Print
+                // Az's LH right and the RH-flipped right SoH would need
+                // to match, alongside SoH's view frame (fov + eye/up
+                // above). If SoH's view matrix construction still doesn't
+                // match, the residual is projection/z/clip axis, not
+                // eye/dir/up.
+                {
+                    auto rd = [&](uint32_t va)->std::optional<float>{
+                        auto w = Core::System::GetInstance().Memory().Read32OrNullopt(va);
+                        if (!w) return std::nullopt;
+                        float f; uint32_t u=*w; std::memcpy(&f,&u,4); return f;
+                    };
+                    float dx=az_dir[0], dy=az_dir[1], dz=az_dir[2];
+                    float ux2=az_up[0], uy2=az_up[1], uz2=az_up[2];
+                    // LH: right = up × forward
+                    float rlx = uy2*dz - uz2*dy;
+                    float rly = uz2*dx - ux2*dz;
+                    float rlz = ux2*dy - uy2*dx;
+                    std::printf("  title-cam:LH-right derived (up × dir) = (%.3f,%.3f,%.3f)\n",
+                                rlx, rly, rlz);
+                    auto rx = rd(TITLE_CAM_BASIS_VA + 0x24);
+                    auto ry = rd(TITLE_CAM_BASIS_VA + 0x28);
+                    auto rz = rd(TITLE_CAM_BASIS_VA + 0x2c);
+                    if (rx && ry && rz) {
+                        std::printf("  title-cam:stored right @ +0x140 = (%.3f,%.3f,%.3f)  "
+                                    "(match LH → OoT3D uses LH view basis)\n",
+                                    *rx, *ry, *rz);
+                    }
+                }
                 if (!fd.reported && dEye > 200.0f) {
                     char buf[192]; std::snprintf(buf, sizeof buf,
                         "|Δeye|=%.1f (az=%.0f,%.0f,%.0f soh=%.0f,%.0f,%.0f)",
