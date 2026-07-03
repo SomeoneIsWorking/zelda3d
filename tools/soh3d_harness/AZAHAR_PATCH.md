@@ -142,6 +142,11 @@ extern "C" int  soh3d_draw_log_active = 0;
 Immediately after `vtxpos` is computed (~line 244), before the cull-mode
 switch:
 
+Includes per-vertex color (Vec4<f24>), the encoded normal quaternion
+(quat.x/y/z), and the master `regs.lighting.disable` bit — enough to
+answer "is PICA fragment lighting active for this draw, and what's the
+vertex color feeding the combiner?" for any composite-draw RE.
+
 ```cpp
     if (soh3d_draw_log_active && soh3d_draw_log_path[0]) {
         FILE* f = std::fopen(soh3d_draw_log_path, "a");
@@ -155,7 +160,10 @@ switch:
             std::fprintf(f,
                 "tri tex0=%08x tex1=%08x tex2=%08x "
                 "blendRGB=%d,%d,%d blendA=%d,%d,%d "
-                "sxy=(%.1f,%.1f),(%.1f,%.1f),(%.1f,%.1f) w=%d h=%d\n",
+                "sxy=(%.1f,%.1f),(%.1f,%.1f),(%.1f,%.1f) "
+                "w=%d h=%d "
+                "c0=(%.3f,%.3f,%.3f,%.3f) c1=(%.3f,%.3f,%.3f,%.3f) c2=(%.3f,%.3f,%.3f,%.3f) "
+                "n0=(%.3f,%.3f,%.3f) lit_dis=%d\n",
                 (unsigned)t0, (unsigned)t1, (unsigned)t2,
                 (int)blend.factor_source_rgb.Value(),
                 (int)blend.factor_dest_rgb.Value(),
@@ -169,7 +177,17 @@ switch:
                 (double)(u16)vtxpos[1].y / 16.0,
                 (double)(u16)vtxpos[2].x / 16.0,
                 (double)(u16)vtxpos[2].y / 16.0,
-                (int)texs[0].config.width, (int)texs[0].config.height);
+                (int)texs[0].config.width, (int)texs[0].config.height,
+                (double)v0.color.r().ToFloat32(), (double)v0.color.g().ToFloat32(),
+                (double)v0.color.b().ToFloat32(), (double)v0.color.a().ToFloat32(),
+                (double)v1.color.r().ToFloat32(), (double)v1.color.g().ToFloat32(),
+                (double)v1.color.b().ToFloat32(), (double)v1.color.a().ToFloat32(),
+                (double)v2.color.r().ToFloat32(), (double)v2.color.g().ToFloat32(),
+                (double)v2.color.b().ToFloat32(), (double)v2.color.a().ToFloat32(),
+                (double)v0.quat.x.ToFloat32(),
+                (double)v0.quat.y.ToFloat32(),
+                (double)v0.quat.z.ToFloat32(),
+                (int)regs.lighting.disable.Value());
             std::fclose(f);
         }
     }

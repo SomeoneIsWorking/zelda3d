@@ -1901,9 +1901,36 @@ static int Zelda3D_TitleCamEnabled(void) {
 // Returns 1 if we are currently in title-demo mode and applied the override. Called from
 // Zelda3D_ReplPoll AFTER the engine's per-frame view update, and only when gZelda3dCamOverride
 // is NOT set (so the REPL `cam` override takes full precedence for A/B).
+// Task #16 (world lighting at title). PICA200 fragment lighting is GLOBALLY
+// DISABLED throughout OoT3D's title-demo (verified by draw-log capture:
+// EVERY triangle at settled title has regs.lighting.disable=1, and vertex
+// color out of the vertex shader is (0,0,0,0) for all landscape draws —
+// no per-vertex-lit modulation, no per-fragment diffuse). The port-faithful
+// behavior is therefore to switch SoH3D's synthetic lighting math OFF at
+// title, not to tune ambient coefficients. See:
+//   oot3d-decomp/docs/title_lighting_disabled.md
+// gZelda3dLightEnable gates the character/prop half-Lambert (uParams.y);
+// gZelda3dWorldLit gates the scene-geometry vertex-lit combiner path.
+// Saved on rising edge (0->1) and restored on falling edge so exiting title
+// (SoH cutscene end -> gameplay) doesn't leave the world unlit.
+extern int gZelda3dLightEnable;   // libultraship zelda3d_gl.cpp
+extern int gZelda3dWorldLit;      // libultraship zelda3d_gl.cpp
+static int sZelda3dTitleLightSaved     = 0;
+static int sZelda3dTitleLightEnableSav = -1;
+static int sZelda3dTitleWorldLitSav    = 1;
+
+static void Zelda3D_TitleLightingRestore(void) {
+    if (sZelda3dTitleLightSaved) {
+        gZelda3dLightEnable = sZelda3dTitleLightEnableSav;
+        gZelda3dWorldLit    = sZelda3dTitleWorldLitSav;
+        sZelda3dTitleLightSaved = 0;
+    }
+}
+
 static int Zelda3D_ApplyTitleCam(PlayState* play) {
     if (play == NULL || !Zelda3D_TitleCamEnabled()) {
         gZelda3dInTitleDemo = 0;
+        Zelda3D_TitleLightingRestore();
         return 0;
     }
     // Title-demo conditions: no ZELDA3D_WARP warp target (empty string env) +
@@ -1915,14 +1942,23 @@ static int Zelda3D_ApplyTitleCam(PlayState* play) {
     if (Zelda3D_AutoWarpEnabled()) {
         gZelda3dRiderWasInTitle = 0;  // next entry will re-Reset (task #12)
         gZelda3dInTitleDemo = 0;
+        Zelda3D_TitleLightingRestore();
         return 0; // user has a warp target → not the title screen
     }
     if (play->sceneNum != SCENE_HYRULE_FIELD) {
         gZelda3dRiderWasInTitle = 0;
         gZelda3dInTitleDemo = 0;
+        Zelda3D_TitleLightingRestore();
         return 0;
     }
     gZelda3dInTitleDemo = 1;
+    if (!sZelda3dTitleLightSaved) {
+        sZelda3dTitleLightEnableSav = gZelda3dLightEnable;
+        sZelda3dTitleWorldLitSav    = gZelda3dWorldLit;
+        sZelda3dTitleLightSaved     = 1;
+    }
+    gZelda3dLightEnable = 0;
+    gZelda3dWorldLit    = 0;
     play->view.eye.x    = kZelda3dTitleEye[0];
     play->view.eye.y    = kZelda3dTitleEye[1];
     play->view.eye.z    = kZelda3dTitleEye[2];
