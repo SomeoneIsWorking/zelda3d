@@ -990,6 +990,26 @@ constexpr uint32_t TRANSITION_TRIGGER_OFF  = 0x5C2D;
 constexpr uint32_t NEXT_ENTRANCE_OFF       = 0x5C32;
 constexpr uint8_t  TRANS_TRIGGER_START     = 20;
 
+// OoT3D play-mode active camera basis inside PlayState. Located by a live
+// memory scan (scratch/scan_azcam.py-style probe) for eye=(0,34,0) at
+// Link's House frame 60 post-loadstate, cross-checked against SoH's
+// mainCamera state. The scan surfaced three matching Vec3f-triple blocks
+// inside PlayState at +0x1B8, +0x3E4, +0x408; the first is mainCamera,
+// the other two look like subCameras / eyeNext copies. GREZZO reordered
+// the fields vs the N64 Camera struct (which packs at at +0x50, eye at
+// +0x5C, up at +0x68); on 3DS the anchor block is packed EYE → AT → UP
+// starting at PlayState+0x1B8.
+//
+// Verified at Link's House frame 60:
+//   ps+0x1B8: eye = (0.000, 34.000, 0.000)
+//   ps+0x1C4: at  = (1.064, 34.010, 100.885)
+//   ps+0x1D0: up  = (0.000, 1.000, 0.000)
+// which matches SoH's SohState_Camera output byte-for-byte modulo FP
+// rounding.
+constexpr uint32_t PLAY_CAM_EYE_OFF        = 0x01B8;
+constexpr uint32_t PLAY_CAM_AT_OFF         = 0x01C4;
+constexpr uint32_t PLAY_CAM_UP_OFF         = 0x01D0;
+
 std::optional<uint32_t> CurrentPlayState() {
     auto& mem = Core::System::GetInstance().Memory();
     auto v = mem.Read32OrNullopt(GPLAYSTATE_VA);
@@ -1575,25 +1595,103 @@ void CompareFirstDivImpl() {
             }
         }
 
-        // ── Play-mode d5: camera basis — SoH-only for now ────────────────
-        // Azahar's play-mode active camera lives inside gPlayState (via
-        // cameraPtrs[activeCamId]). Offsets not yet RE'd; print SoH's basis
-        // so the log is legible, and note the Az side as TODO.
+        // ── Play-mode d5: camera basis ─────────────────────────────────
+        // Read Az mainCamera at PlayState+0x1B8 (eye,at,up as Vec3f × 3).
+        // Compute dir = normalize(at - eye) so we can compare on the same
+        // basis SoH exposes (SohState_Camera returns eye+at+up).
         float ex, ey, ez, ax, ay, az_at_pt, ux, uy, uz, fov;
         short roll; int camId;
-        if (SohState_Camera(&ex, &ey, &ez, &ax, &ay, &az_at_pt,
-                            &ux, &uy, &uz, &fov, &roll, &camId)) {
-            std::printf("  d5 camera basis: az=TODO(play-cam not RE'd) "
-                        "soh_eye=(%.1f,%.1f,%.1f) soh_at=(%.1f,%.1f,%.1f) "
-                        "camId=%d fov=%.1f\n",
-                        ex, ey, ez, ax, ay, az_at_pt, camId, fov);
+        bool soh_cam = SohState_Camera(&ex, &ey, &ez, &ax, &ay, &az_at_pt,
+                                       &ux, &uy, &uz, &fov, &roll, &camId) != 0;
+        float az_e[3] = {0,0,0}, az_a[3] = {0,0,0}, az_u[3] = {0,0,0};
+        bool az_cam_ok = true;
+        for (int j = 0; j < 3; ++j) {
+            auto ev = mem.Read32OrNullopt(*ps_az + PLAY_CAM_EYE_OFF + j*4);
+            auto av = mem.Read32OrNullopt(*ps_az + PLAY_CAM_AT_OFF  + j*4);
+            auto uv = mem.Read32OrNullopt(*ps_az + PLAY_CAM_UP_OFF  + j*4);
+            if (!ev || !av || !uv) { az_cam_ok = false; break; }
+            std::memcpy(&az_e[j], &*ev, 4);
+            std::memcpy(&az_a[j], &*av, 4);
+            std::memcpy(&az_u[j], &*uv, 4);
+        }
+        if (!az_cam_ok) {
+            std::printf("  d5 camera basis: az=(unmapped @ ps+0x%04x) soh=%s\n",
+                        PLAY_CAM_EYE_OFF, soh_cam ? "OK" : "no camera");
+            if (!fd.reported) fd.report("camera-mem",
+                "Azahar mainCamera bytes unreadable at ps+0x1B8");
+        } else if (!soh_cam) {
+            std::printf("  d5 camera basis: az_eye=(%.1f,%.1f,%.1f) "
+                        "soh=(no active camera)\n",
+                        az_e[0], az_e[1], az_e[2]);
+            if (!fd.reported) fd.report("camera-side",
+                "SoH has no active camera at scene load");
         } else {
-            std::printf("  d5 camera basis: az=TODO(play-cam not RE'd) "
-                        "soh=(no active camera)\n");
+            float dEye = std::sqrt((az_e[0]-ex)*(az_e[0]-ex)
+                                 + (az_e[1]-ey)*(az_e[1]-ey)
+                                 + (az_e[2]-ez)*(az_e[2]-ez));
+            float dAt  = std::sqrt((az_a[0]-ax)*(az_a[0]-ax)
+                                 + (az_a[1]-ay)*(az_a[1]-ay)
+                                 + (az_a[2]-az_at_pt)*(az_a[2]-az_at_pt));
+            float dUp  = std::sqrt((az_u[0]-ux)*(az_u[0]-ux)
+                                 + (az_u[1]-uy)*(az_u[1]-uy)
+                                 + (az_u[2]-uz)*(az_u[2]-uz));
+            std::printf("  d5 camera basis: az_eye=(%.1f,%.1f,%.1f) "
+                        "soh_eye=(%.1f,%.1f,%.1f) |Δeye|=%.2f "
+                        "|Δat|=%.2f |Δup|=%.4f  soh_camId=%d fov=%.1f\n",
+                        az_e[0], az_e[1], az_e[2], ex, ey, ez,
+                        dEye, dAt, dUp, camId, fov);
+            // Tolerance: 1 unit on eye/at (~2 mm at OoT world scale), 0.01 on up
+            // (unit-vector rounding). Larger deltas mean actual camera drift.
+            if (!fd.reported && (dEye > 1.0f || dAt > 1.0f || dUp > 0.01f)) {
+                char buf[192]; std::snprintf(buf, sizeof buf,
+                    "|Δeye|=%.2f |Δat|=%.2f |Δup|=%.4f — camera basis drift",
+                    dEye, dAt, dUp);
+                fd.report("camera-basis", buf);
+            }
+        }
+
+        // ── Play-mode d6: total actor count and per-category deltas ────
+        // Az: sum ACTOR_LISTS_OFF+cat*8+0 across all 12 categories.
+        // SoH: SohState_WalkActors bins each visited actor by cat.
+        int az_by_cat[12] = {0}, soh_by_cat[12] = {0};
+        for (uint32_t cat = 0; cat < 12; ++cat) {
+            auto cnt = mem.Read32OrNullopt(*ps_az + ACTORCTX_OFF +
+                                            ACTOR_LISTS_OFF + cat * 8 + 0);
+            if (cnt) az_by_cat[cat] = static_cast<int>(*cnt);
+        }
+        struct SohBin { int by_cat[12] = {0}; int total = 0; };
+        SohBin sohBin;
+        auto sink = +[](void* u, int cat, int, unsigned long, float, float, float,
+                        short, short, short) {
+            auto* b = static_cast<SohBin*>(u);
+            if (cat >= 0 && cat < 12) b->by_cat[cat]++;
+            b->total++;
+        };
+        SohState_WalkActors(sink, &sohBin);
+        int az_total = 0;
+        for (int c = 0; c < 12; ++c) az_total += az_by_cat[c];
+        std::printf("  d6 actor count:  az=%d soh=%d", az_total, sohBin.total);
+        // Print per-cat deltas for categories where either side is nonzero.
+        char delta_str[256]; delta_str[0] = 0;
+        int len = 0;
+        for (int c = 0; c < 12; ++c) {
+            if (az_by_cat[c] || sohBin.by_cat[c]) {
+                len += std::snprintf(delta_str + len,
+                    sizeof(delta_str) - len,
+                    " cat%d=%d/%d", c, az_by_cat[c], sohBin.by_cat[c]);
+            }
+        }
+        std::printf(" |%s\n", delta_str);
+        if (!fd.reported && az_total != sohBin.total) {
+            char buf[256]; std::snprintf(buf, sizeof buf,
+                "total az=%d soh=%d;%s — per-cat az/soh — investigate "
+                "room-load timing vs missing-actor port gap",
+                az_total, sohBin.total, delta_str);
+            fd.report("actor-count", buf);
         }
 
         if (!fd.reported) {
-            std::printf("  firstdiv: none — play-mode d1..d4 matched (d5 az-side pending RE)\n");
+            std::printf("  firstdiv: none — all 6 play-mode dimensions matched\n");
         }
         return;
     }
