@@ -56,6 +56,7 @@
 #include <cstdint>
 #include <cstdio>
 #include <cstdlib>
+#include <cmath>
 #include <cstring>
 #include <filesystem>
 #include <iostream>
@@ -1280,11 +1281,35 @@ void CompareActorsImpl() {
 }
 
 void CompareCameraImpl() {
-    // 3ds side: OoT3D's Camera pointer array within the 3DS PlayState is not
-    // RE'd yet. gPlayState + activeCamId + cameraPtrs[] offsets need to be
-    // decompiled; until then only the SoH side prints. When it lands, mirror
-    // the SoH branch below reading from Azahar's Memory::MemorySystem.
-    std::printf("  3ds: n/a (activeCamId/cameraPtrs offsets in OoT3D PlayState not RE'd yet)\n");
+    // 3ds side: at title, the camera basis lives at 0x005BE6D4 as
+    // eye + dir(unit) + up(unit) — 3 consecutive Vec3f. Located by
+    // find_cam_eye.py: scan for isolated Vec3f with X in [-6000,-3000]
+    // Y small, Z in [3000,7000], NOT part of a repeating stride table,
+    // and where +12 is a unit vector; that landed 0x005BE6D4 with
+    // eye ≈ (-4070, 58, 5219), dir ≈ (-0.45, 0.09, -0.89), up ≈ (0.21, 0.98, -0.01).
+    // Matches SoH's title camera magnitudes closely. Non-title state
+    // may use a different addr; for now this covers d5 at title only.
+    {
+        auto& mem = Core::System::GetInstance().Memory();
+        constexpr uint32_t AZ_CAM_VA = 0x005BE6D4;
+        float e[3], d[3], u[3];
+        bool ok = true;
+        for (int j = 0; j < 3; ++j) {
+            auto ev = mem.Read32OrNullopt(AZ_CAM_VA + 0  + j*4);
+            auto dv = mem.Read32OrNullopt(AZ_CAM_VA + 12 + j*4);
+            auto uv = mem.Read32OrNullopt(AZ_CAM_VA + 24 + j*4);
+            if (!ev || !dv || !uv) { ok = false; break; }
+            std::memcpy(&e[j], &*ev, 4);
+            std::memcpy(&d[j], &*dv, 4);
+            std::memcpy(&u[j], &*uv, 4);
+        }
+        if (ok) {
+            std::printf("  3ds (title, 0x%08x): eye=(%.2f,%.2f,%.2f) dir=(%.3f,%.3f,%.3f) up=(%.3f,%.3f,%.3f)\n",
+                        AZ_CAM_VA, e[0],e[1],e[2], d[0],d[1],d[2], u[0],u[1],u[2]);
+        } else {
+            std::printf("  3ds: n/a (0x%08x unmapped)\n", AZ_CAM_VA);
+        }
+    }
     if (!SohState_HasPlayState()) {
         std::printf("  soh: n/a (no playstate)\n");
         return;
@@ -1541,13 +1566,70 @@ void CompareFirstDivImpl() {
         }
     }
 
-    // Dim 5: camera basis. OoT3D-side camera at title lives inside the
-    // title context's sub-objects (not RE'd yet); leave 3ds side as
-    // sentinel and skip the comparison.
-    std::printf("  d5 camera basis: az=n/a (not RE'd) soh=(existing accessor)\n");
+    // Dim 5: camera basis. RE'd by find_cam_eye.py — the 3DS title-demo
+    // camera is stored as eye + dir(unit) + up(unit) at 0x005BE6D4/+12/+24.
+    // SoH stores eye + at + up; convert with at ≈ eye + dir*|eye→at_soh|
+    // for a comparable magnitude, but the invariant we care about is
+    // eye position ≈ eye and dir ≈ normalize(at-eye).
+    constexpr uint32_t AZ_CAM_EYE_VA = 0x005BE6D4;
+    if (az_at_title) {
+        float az_eye[3] = {0,0,0}, az_dir[3] = {0,0,0}, az_up[3] = {0,0,0};
+        bool ok = true;
+        for (int j = 0; j < 3; ++j) {
+            auto e = mem.Read32OrNullopt(AZ_CAM_EYE_VA + 0  + j*4);
+            auto d = mem.Read32OrNullopt(AZ_CAM_EYE_VA + 12 + j*4);
+            auto u = mem.Read32OrNullopt(AZ_CAM_EYE_VA + 24 + j*4);
+            if (!e || !d || !u) { ok = false; break; }
+            std::memcpy(&az_eye[j], &*e, 4);
+            std::memcpy(&az_dir[j], &*d, 4);
+            std::memcpy(&az_up [j], &*u, 4);
+        }
+        if (ok && soh_at_title) {
+            float ex, ey, ez, ax, ay, az_at, ux, uy, uz, fov;
+            short roll; int camId;
+            if (SohState_Camera(&ex, &ey, &ez, &ax, &ay, &az_at,
+                                &ux, &uy, &uz, &fov, &roll, &camId)) {
+                float soh_dir[3] = { ax-ex, ay-ey, az_at-ez };
+                float m = std::sqrt(soh_dir[0]*soh_dir[0]+soh_dir[1]*soh_dir[1]
+                                  + soh_dir[2]*soh_dir[2]);
+                if (m > 1e-4f) { soh_dir[0]/=m; soh_dir[1]/=m; soh_dir[2]/=m; }
+                float dEye  = std::sqrt((az_eye[0]-ex)*(az_eye[0]-ex)
+                                      + (az_eye[1]-ey)*(az_eye[1]-ey)
+                                      + (az_eye[2]-ez)*(az_eye[2]-ez));
+                float dDir  = std::sqrt((az_dir[0]-soh_dir[0])*(az_dir[0]-soh_dir[0])
+                                      + (az_dir[1]-soh_dir[1])*(az_dir[1]-soh_dir[1])
+                                      + (az_dir[2]-soh_dir[2])*(az_dir[2]-soh_dir[2]));
+                float dUp   = std::sqrt((az_up[0]-ux)*(az_up[0]-ux)
+                                      + (az_up[1]-uy)*(az_up[1]-uy)
+                                      + (az_up[2]-uz)*(az_up[2]-uz));
+                std::printf("  d5 camera basis: az_eye=(%.1f,%.1f,%.1f) "
+                            "soh_eye=(%.1f,%.1f,%.1f) |Δeye|=%.2f "
+                            "|Δdir|=%.4f |Δup|=%.4f\n",
+                            az_eye[0], az_eye[1], az_eye[2],
+                            ex, ey, ez, dEye, dDir, dUp);
+                if (!fd.reported && dEye > 200.0f) {
+                    char buf[192]; std::snprintf(buf, sizeof buf,
+                        "|Δeye|=%.1f (az=%.0f,%.0f,%.0f soh=%.0f,%.0f,%.0f)",
+                        dEye, az_eye[0], az_eye[1], az_eye[2], ex, ey, ez);
+                    fd.report("camera-eye", buf);
+                }
+            } else {
+                std::printf("  d5 camera basis: az_eye=(%.1f,%.1f,%.1f) "
+                            "soh=(no active camera)\n",
+                            az_eye[0], az_eye[1], az_eye[2]);
+            }
+        } else if (!ok) {
+            std::printf("  d5 camera basis: az=(unmapped) soh=?\n");
+        } else {
+            std::printf("  d5 camera basis: az_eye=(%.1f,%.1f,%.1f) soh=(no playstate)\n",
+                        az_eye[0], az_eye[1], az_eye[2]);
+        }
+    } else {
+        std::printf("  d5 camera basis: az=not-at-title\n");
+    }
 
     if (!fd.reported) {
-        std::printf("  firstdiv: none — all 4 checked dimensions matched\n");
+        std::printf("  firstdiv: none — all 5 checked dimensions matched\n");
     }
 }
 // ─────────────────────────────────────────────────────────────────────────────
