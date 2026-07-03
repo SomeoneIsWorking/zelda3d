@@ -1967,6 +1967,12 @@ static int Zelda3D_ApplyTitleCam(PlayState* play) {
     // the OoT3D-matching framing. Pinned every frame during title-demo,
     // like the cam basis + Player.pos above.
     gSaveContext.dayTime = 0x0000;
+
+    // Enable moon draw during title (task #16). SoH's title-cs sets
+    // sunMoonDisabled=true because the N64 title doesn't draw a moon;
+    // Az's OoT3D title DOES draw one top-right. Re-enable so
+    // Zelda3D_TryDrawSunMoon (or the N64 fallback) fires.
+    play->envCtx.sunMoonDisabled = false;
     return 1;
 }
 
