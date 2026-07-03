@@ -34,6 +34,10 @@ target_compile_definitions(soh3d_harness PRIVATE
 )
 target_include_directories(soh3d_harness PRIVATE ${CMAKE_SOURCE_DIR}/src)
 
+# -rdynamic so backtrace(3) can resolve our function names in the watchdog
+# stack dump. Cheap; only affects the harness executable's symbol table.
+target_link_options(soh3d_harness PRIVATE -rdynamic)
+
 target_link_libraries(soh3d_harness PRIVATE
     citra_common citra_core
     Boost::boost dds-ktx libretro tsl::robin_map
