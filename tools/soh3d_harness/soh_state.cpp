@@ -89,6 +89,20 @@ int SohState_TeleportPlayer(float x, float y, float z) {
     return 1;
 }
 
+// Force Player yaw (Y rotation, s16 bam). Also writes shape.rot.y (the
+// rendered facing) and Player.yaw (general Player-state yaw, z64player.h
+// line 865) so the Player state machine doesn't swing back to a stale value.
+int SohState_SetPlayerYaw(int yaw_s16) {
+    if (gPlayState == NULL) return 0;
+    Player* p = (Player*)gPlayState->actorCtx.actorLists[ACTORCAT_PLAYER].head;
+    if (p == NULL) return 0;
+    short y = (short)(yaw_s16 & 0xFFFF);
+    p->actor.world.rot.y = y;
+    p->actor.shape.rot.y = y;
+    p->yaw = y;
+    return 1;
+}
+
 // Player Link accessor: reads through the actor-category-Player list,
 // or falls back to gSaveContext.entranceIndex if no player is live yet.
 int SohState_PlayerPos(float* px, float* py, float* pz,

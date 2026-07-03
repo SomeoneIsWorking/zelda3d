@@ -194,6 +194,7 @@ extern "C" {
                                  unsigned long* out_wallPoly,
                                  float* out_speedXZ, float* out_velY);
     int SohState_TeleportPlayer(float x, float y, float z);
+    int SohState_SetPlayerYaw(int yaw_s16);
 
     // watchhook.cpp — write-hook API on top of Azahar's RegisterWatchpoint.
     struct WatchRecord {
@@ -2917,16 +2918,60 @@ void RunRepl() {
                         bgFlags, wallYaw, wallBgId, wallPoly, speedXZ, velY);
         }
         else if (cmd == "soh_tp") {
-            std::string xs, ys, zs;
+            std::string xs, ys, zs, yaws;
             if (!(toks >> xs) || !(toks >> ys) || !(toks >> zs)) {
-                PrintErr("soh_tp: usage: soh_tp <x> <y> <z>"); continue;
+                PrintErr("soh_tp: usage: soh_tp <x> <y> <z> [yaw_s16]"); continue;
             }
             float x = std::stof(xs), y = std::stof(ys), z = std::stof(zs);
             if (!g_soh_booted) { PrintErr("soh_tp: run soh_boot first"); continue; }
             if (!SohState_TeleportPlayer(x, y, z)) {
                 PrintErr("soh_tp: no player"); continue;
             }
-            std::printf("ok soh_tp %.2f %.2f %.2f\n", x, y, z);
+            int yaw_out = 0; bool yaw_set = false;
+            if (toks >> yaws) {
+                auto v = ParseNum(yaws);
+                if (!v) { PrintErr("soh_tp: bad yaw"); continue; }
+                yaw_out = (int)*v;
+                if (!SohState_SetPlayerYaw(yaw_out)) {
+                    PrintErr("soh_tp: no player (yaw)"); continue;
+                }
+                yaw_set = true;
+            }
+            if (yaw_set)
+                std::printf("ok soh_tp %.2f %.2f %.2f yaw=%d\n", x, y, z, yaw_out);
+            else
+                std::printf("ok soh_tp %.2f %.2f %.2f\n", x, y, z);
+        }
+        else if (cmd == "az_playerpos") {
+            // Read Az Player Actor world.pos + world.rot.y + live playerYaw.
+            // Used by the sweep to match SoH's start to Az's OoT3D-repacked
+            // spawn coord at Kokiri Forest.
+            auto ps = CurrentPlayState();
+            if (!ps) { PrintErr("az_playerpos: no playstate"); continue; }
+            auto& mem = Core::System::GetInstance().Memory();
+            auto head = mem.Read32OrNullopt(*ps + ACTORCTX_OFF +
+                                            ACTOR_LISTS_OFF + 2 * 8 + 4);
+            if (!head || *head == 0) {
+                PrintErr("az_playerpos: no Player actor"); continue;
+            }
+            auto px = mem.Read32OrNullopt(*head + ACTOR_POS_OFF + 0);
+            auto py = mem.Read32OrNullopt(*head + ACTOR_POS_OFF + 4);
+            auto pz = mem.Read32OrNullopt(*head + ACTOR_POS_OFF + 8);
+            auto rot = mem.Read32OrNullopt(*head + ACTOR_ROT_OFF + 0);
+            auto yaw_v = mem.Read32OrNullopt(*head + (PLAYER_YAW_OFF & ~3u));
+            if (!px || !py || !pz || !rot || !yaw_v) {
+                PrintErr("az_playerpos: mem read fail"); continue;
+            }
+            float x, y, z;
+            std::memcpy(&x, &*px, 4);
+            std::memcpy(&y, &*py, 4);
+            std::memcpy(&z, &*pz, 4);
+            short worldRy = static_cast<short>((*rot >> 16) & 0xFFFF);
+            short playerYaw = static_cast<short>(
+                (*yaw_v >> ((PLAYER_YAW_OFF & 2) * 8)) & 0xFFFF);
+            std::printf("ok az_playerpos pos=(%.4f,%.4f,%.4f) "
+                        "worldRy=%d playerYaw=%d\n",
+                        x, y, z, worldRy, playerYaw);
         }
         else if (cmd == "soh_input") {
             std::string bs, xs, ys;
