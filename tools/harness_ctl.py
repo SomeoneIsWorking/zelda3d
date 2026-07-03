@@ -58,19 +58,36 @@ class Harness:
         self.proc.stdin.flush()
         return self._readline().rstrip()
 
-    def send_multiline(self, cmd: str) -> list[str]:
-        """Send a command that streams multiple lines ending in `ok end`."""
+    def send_multiline(self, cmd: str, per_line_timeout: float = 30.0) -> list[str]:
+        """Send a command that streams multiple lines ending in `ok end`.
+
+        A per-line select() timeout catches the footgun where the caller uses
+        send_multiline for a single-line-response command (like `mem`, `r32`) —
+        the first `ok <payload>` line arrives fine, then we'd block forever
+        waiting for a sentinel that never comes. Instead, raise loudly.
+        """
+        import select
         assert self.proc.stdin is not None
+        assert self.proc.stdout is not None
         self.proc.stdin.write(cmd.rstrip() + "\n")
         self.proc.stdin.flush()
         lines: list[str] = []
-        first = self._readline().rstrip()
-        lines.append(first)
-        if not first.startswith("ok "):
-            return lines
+        fd = self.proc.stdout.fileno()
         while True:
-            line = self._readline().rstrip()
+            r, _, _ = select.select([fd], [], [], per_line_timeout)
+            if not r:
+                raise TimeoutError(
+                    f"send_multiline({cmd!r}): no line for {per_line_timeout}s; "
+                    f"got {len(lines)} lines so far — "
+                    f"is this actually a multiline command? (last: {lines[-1] if lines else None!r})"
+                )
+            line = self.proc.stdout.readline()
+            if not line:
+                raise RuntimeError(f"send_multiline({cmd!r}): harness closed stdout")
+            line = line.rstrip()
             lines.append(line)
+            if not lines[0].startswith("ok "):
+                return lines
             if line == "ok end":
                 return lines
 

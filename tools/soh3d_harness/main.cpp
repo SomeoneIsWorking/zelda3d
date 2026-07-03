@@ -68,11 +68,60 @@
 #include <SDL3/SDL.h>
 #include <atomic>
 #include <chrono>
+#include <execinfo.h>
 #include <fcntl.h>
+#include <signal.h>
 #include <sys/file.h>
 #include <sys/stat.h>
 #include <thread>
 #include <unistd.h>
+
+// -----------------------------------------------------------------------------
+// Frame watchdog. Arm alarm(kFrameWatchdogSecs) before every retro_run() /
+// RunFrame() call; disarm after. If a single frame takes longer than that we
+// treat the process as hung — SIGALRM fires and the handler prints a stderr
+// banner + a C stack trace via backtrace(3), then _exit's so the shell / driver
+// script gets a definitive kill instead of an indefinite stall.
+// Async-signal-safety note: printf isn't strictly signal-safe, but for a
+// debugging kill-switch on a hang we're fine — the process is about to die.
+// -----------------------------------------------------------------------------
+static constexpr int kFrameWatchdogSecs = 5;
+static std::atomic<const char*> g_watchdog_where{nullptr};
+static std::atomic<uint64_t>    g_watchdog_frame{0};
+
+static void WatchdogHandler(int) {
+    const char* where = g_watchdog_where.load();
+    std::fprintf(stderr,
+        "\n===== harness watchdog: frame stalled >%ds =====\n"
+        "  where     : %s\n"
+        "  frame idx : %llu\n"
+        "  backtrace :\n",
+        kFrameWatchdogSecs, where ? where : "(unknown)",
+        static_cast<unsigned long long>(g_watchdog_frame.load()));
+    void* bt[64];
+    int n = backtrace(bt, 64);
+    backtrace_symbols_fd(bt, n, fileno(stderr));
+    std::fprintf(stderr, "===== forcing _exit =====\n");
+    std::fflush(stderr);
+    _exit(124);
+}
+
+static void InstallWatchdog() {
+    struct sigaction sa{};
+    sa.sa_handler = WatchdogHandler;
+    sigemptyset(&sa.sa_mask);
+    sa.sa_flags = 0;
+    sigaction(SIGALRM, &sa, nullptr);
+}
+
+struct FrameWatchdog {
+    explicit FrameWatchdog(const char* where) {
+        g_watchdog_where.store(where);
+        g_watchdog_frame.fetch_add(1);
+        alarm(kFrameWatchdogSecs);
+    }
+    ~FrameWatchdog() { alarm(0); }
+};
 
 // ---------------------------------------------------------------------------
 // Direct-harness capture globals defined in libultraship's SDL3 renderer
@@ -213,10 +262,18 @@ bool     g_az_dirty = false;
 std::vector<uint8_t> g_soh_buf;     // RGBA8 (gSoh3dCaptureBuf backing)
 bool     g_soh_dirty = false;
 
+// SOH3D_HARNESS_HEADLESS=1 → no SBS window, no SDL video init.
+// Everything else (worker, REPL, retro_run, SoH child) still runs.
+static bool HarnessHeadless() {
+    const char* v = std::getenv("SOH3D_HARNESS_HEADLESS");
+    return v && *v && v[0] != '0';
+}
+
 // Main-thread only. Called once from main() before the worker starts,
 // then never again. Worker MUST NOT touch SDL window handles.
 void EnsureHarnessWindow() {
     if (g_win) return;
+    if (HarnessHeadless()) return;
     if (!SDL_InitSubSystem(SDL_INIT_VIDEO)) {
         std::fprintf(stderr, "harness: SDL_InitSubSystem(VIDEO) failed: %s\n",
                      SDL_GetError());
@@ -409,10 +466,24 @@ void HandleRun(std::istringstream& toks) {
     auto n = ParseNum(n_s);
     if (!n) { PrintErr("run: bad N"); return; }
     uint64_t done = 0;
+    const bool trace = std::getenv("SOH3D_HARNESS_TRACE_FRAMES") != nullptr;
+    auto t_last = std::chrono::steady_clock::now();
     for (uint64_t i = 0; i < *n; ++i) {
         if (g_quit_requested.load()) break;
-        retro_run();
+        {
+            FrameWatchdog wd("HandleRun/retro_run");
+            retro_run();
+        }
         ++done;
+        if (trace && (done % 30) == 0) {
+            auto now = std::chrono::steady_clock::now();
+            auto ms  = std::chrono::duration_cast<std::chrono::milliseconds>(now - t_last).count();
+            std::fprintf(stderr, "[harness] run: %llu / %llu (last 30 frames = %lld ms)\n",
+                         static_cast<unsigned long long>(done),
+                         static_cast<unsigned long long>(*n),
+                         static_cast<long long>(ms));
+            t_last = now;
+        }
     }
     std::printf("ok run %llu\n", static_cast<unsigned long long>(done));
 }
@@ -580,6 +651,7 @@ void HandleSohStep(std::istringstream& toks) {
     for (uint64_t i = 0; i < *n; ++i) {
         if (g_quit_requested.load()) break;
         RequestSohCapture();
+        FrameWatchdog wd("HandleSohStep/RunFrame");
         RunFrame();
         ++done;
     }
@@ -597,8 +669,11 @@ void HandleStep(std::istringstream& toks) {
     uint64_t done = 0;
     for (uint64_t i = 0; i < *n; ++i) {
         if (g_quit_requested.load()) break;
-        retro_run();
-        if (g_soh_booted) { RequestSohCapture(); RunFrame(); }
+        { FrameWatchdog wd("HandleStep/retro_run"); retro_run(); }
+        if (g_soh_booted) {
+            RequestSohCapture();
+            FrameWatchdog wd("HandleStep/RunFrame"); RunFrame();
+        }
         ++done;
     }
     std::printf("ok step %llu %s\n",
@@ -713,16 +788,22 @@ void SweepStepBoth(uint64_t az_n, uint64_t soh_n) {
     const uint64_t lock = std::min(az_n, soh_n);
     for (uint64_t i = 0; i < lock; ++i) {
         if (g_quit_requested.load()) return;
-        retro_run();
-        if (g_soh_booted) { RequestSohCapture(); RunFrame(); }
+        { FrameWatchdog wd("Sweep/retro_run"); retro_run(); }
+        if (g_soh_booted) {
+            RequestSohCapture();
+            FrameWatchdog wd("Sweep/RunFrame"); RunFrame();
+        }
     }
     for (uint64_t i = lock; i < az_n; ++i) {
         if (g_quit_requested.load()) return;
-        retro_run();
+        FrameWatchdog wd("Sweep/retro_run"); retro_run();
     }
     for (uint64_t i = lock; i < soh_n; ++i) {
         if (g_quit_requested.load()) return;
-        if (g_soh_booted) { RequestSohCapture(); RunFrame(); }
+        if (g_soh_booted) {
+            RequestSohCapture();
+            FrameWatchdog wd("Sweep/RunFrame"); RunFrame();
+        }
     }
 }
 
@@ -1420,6 +1501,7 @@ bool AcquireSingletonLock() {
 
 int main(int argc, char** argv) {
     if (!AcquireSingletonLock()) return EXIT_FAILURE;
+    InstallWatchdog();
     std::string rom_path;
     for (int i = 1; i < argc; ++i) {
         std::string a = argv[i];
@@ -1456,7 +1538,17 @@ int main(int argc, char** argv) {
     retro_set_input_poll(&InputPoll);
     retro_set_input_state(&InputState);
 
+    auto t0 = std::chrono::steady_clock::now();
+    auto tstamp = [&](const char* stage) {
+        auto ms = std::chrono::duration_cast<std::chrono::milliseconds>(
+            std::chrono::steady_clock::now() - t0).count();
+        std::fprintf(stderr, "[harness boot +%lldms] %s\n",
+                     static_cast<long long>(ms), stage);
+    };
+
+    tstamp("retro_init begin");
     retro_init();
+    tstamp("retro_init end");
 
     std::vector<uint8_t> rom;
     retro_game_info game{};
@@ -1475,7 +1567,15 @@ int main(int argc, char** argv) {
         game.size = rom.size();
     }
 
-    if (!retro_load_game(&game)) {
+    tstamp("retro_load_game begin");
+    // Watchdog around retro_load_game too — this is the long CPU-heavy step
+    // (LLE core init, kernel modules, filesystem setup) where hangs would
+    // otherwise be invisible. Give it more slack than a runtime frame.
+    alarm(120);
+    bool loaded = retro_load_game(&game);
+    alarm(0);
+    tstamp("retro_load_game end");
+    if (!loaded) {
         std::fprintf(stderr, "soh3d_harness: retro_load_game returned false\n");
         retro_deinit();
         return EXIT_FAILURE;
@@ -1502,17 +1602,22 @@ int main(int argc, char** argv) {
     // Main SDL event loop. SDL_WaitEventTimeout yields the CPU when
     // there are no events, so we aren't burning a core polling. 16ms
     // gives ~60 Hz present cadence for the SBS window.
+    const bool headless = HarnessHeadless();
     while (!g_quit_requested.load()) {
-        SDL_Event ev;
-        while (SDL_PollEvent(&ev)) {
-            if (ev.type == SDL_EVENT_QUIT ||
-                ev.type == SDL_EVENT_WINDOW_CLOSE_REQUESTED) {
-                std::fprintf(stderr, "harness: window closed, shutting down\n");
-                g_quit_requested.store(true);
+        if (!headless) {
+            SDL_Event ev;
+            while (SDL_PollEvent(&ev)) {
+                if (ev.type == SDL_EVENT_QUIT ||
+                    ev.type == SDL_EVENT_WINDOW_CLOSE_REQUESTED) {
+                    std::fprintf(stderr, "harness: window closed, shutting down\n");
+                    g_quit_requested.store(true);
+                }
             }
+            PresentSbs();
+            SDL_Delay(16);
+        } else {
+            std::this_thread::sleep_for(std::chrono::milliseconds(50));
         }
-        PresentSbs();
-        SDL_Delay(16);
     }
 
     // Grace period so the worker can bail out of its current frame loop
