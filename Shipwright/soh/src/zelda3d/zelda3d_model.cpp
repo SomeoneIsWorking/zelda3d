@@ -801,9 +801,17 @@ static void loadAutoModel(int modelId, LoadedModel* out) {
     // visible subset per frame via Zelda3D_GL_SetMidMask. So NO build-time cull here.
     buildFromCmb(out, /*bakedVertexColor=*/false);
     appendFacialFrames(out, zarPath); // eye/mouth .cmab frames (keystone #3)
+    // Note: `skinned` on its own doesn't mean the model is skipped — with the
+    // default N64ANIM path (ZELDA3D_N64ANIM=1, gZelda3dAnimLive=1) skinned
+    // characters render as their OoT3D model driven by the live N64
+    // SkelAnime joint table (see Zelda3D_AutoModelSkinned callers). The
+    // old " (skinned->skip)" tag was misleading; state=3 (real skip) only
+    // fires when the retarget path is unavailable.
     fprintf(stderr, "[Zelda3D] auto-loaded model %d (%s): cmb '%s' of %d, height=%.1f, bones=%zu%s, %zu groups, %zu textures\n",
            modelId, zarPath.c_str(), best ? best->name.c_str() : "?", nCmb, bboxHeight(out->groups),
-           out->cmb->bones().size(), out->skinned ? " (skinned->skip)" : "", out->cGroups.size(), out->cTexs.size());
+           out->cmb->bones().size(),
+           out->skinned ? " (skinned=SkelAnime retarget)" : "",
+           out->cGroups.size(), out->cTexs.size());
 }
 
 } // end anonymous namespace — loadModel needs EXTERNAL linkage (declared in zelda3d_model_internal.h
