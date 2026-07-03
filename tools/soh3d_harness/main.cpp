@@ -1129,9 +1129,16 @@ enum class DivClass : int {
 };
 struct DivDecision {
     DivClass cls = DivClass::Unclassified;
-    const char* tag = "";  // short label, e.g. "rate-comp", "collision-wall"
+    const char* tag = "";       // short label, e.g. "rate-comp", "collision-wall"
+    // Origin annotation — this is the manager-directed extension so the
+    // tool tells the human WHERE the classification came from without a
+    // manual chase. Each field points at either a RE'd memory offset or
+    // an in-doc RE journal entry.
+    const char* origin_az   = ""; // e.g. "Actor+0x068 (speedXZ)"
+    const char* origin_soh  = ""; // e.g. "Actor.speedXZ (z64actor.h:227)"
+    const char* origin_doc  = ""; // e.g. "oot3d-decomp/docs/gameplay_firstdiv.md#speedXZ"
 };
-constexpr DivDecision kUnclassified{DivClass::Unclassified, ""};
+constexpr DivDecision kUnclassified{DivClass::Unclassified, "", "", "", ""};
 inline const char* DivClassStr(DivClass c) {
     switch (c) {
         case DivClass::PermanentNoise:     return "NOISE";
@@ -1146,13 +1153,19 @@ inline DivDecision ClassifyD6Content(int cat_delta_idx, int az_cnt, int soh_cnt,
     // Az cat=1 actor of id 0x0185? If so, PermanentNoise.
     if (wonder_talk2_extra_az == 1 &&
         (az_cnt - soh_cnt) == 1 && cat_delta_idx == 1)
-        return {DivClass::PermanentNoise, "wonder_talk2"};
+        return {DivClass::PermanentNoise, "wonder_talk2",
+                "cat=1 id=0x0185 (En_Wonder_Talk2)",
+                "no SoH equivalent — 3DS-only",
+                "oot3d-decomp/docs/gameplay_firstdiv.md#sign-blind-policy"};
     return kUnclassified;
 }
 // Navi RNG drift — filter cat=7 id=0x0018.
 inline DivDecision ClassifyD7Worst(int worstCat, int worstId) {
     if (worstCat == 7 && worstId == 0x0018)
-        return {DivClass::PermanentNoise, "navi-rng"};
+        return {DivClass::PermanentNoise, "navi-rng",
+                "cat=7 id=0x0018 (En_Elf/Navi)",
+                "same (En_Elf) — RNG seed divergence",
+                "oot3d-decomp/docs/gameplay_firstdiv.md#rng-determinism"};
     return kUnclassified;
 }
 // d3 Player-pos classifier. Uses live speedXZ readback on both engines
@@ -1162,7 +1175,10 @@ inline DivDecision ClassifyD3PlayerPos(float soh_speedXZ, float az_speedXZ,
                                         unsigned int soh_bgFlags) {
     const bool soh_walled = (soh_bgFlags & 0x0008u) != 0;
     if (soh_walled) {
-        return {DivClass::DeferredPortTarget, "collision-wall"};
+        return {DivClass::DeferredPortTarget, "collision-wall",
+                "Player Actor+0x088 bgCheckFlags (needs Az-side RE)",
+                "Actor.bgCheckFlags & 0x008 (z64actor.h:237, :281)",
+                "oot3d-decomp/docs/gameplay_firstdiv.md#scene-collision"};
     }
     // Both engines' speedXZ matched → Δpos is tick-rate accumulation
     // (SoH runs Player_Update at 20fps × 1.5 pos multiplier vs Az at
@@ -1170,7 +1186,10 @@ inline DivDecision ClassifyD3PlayerPos(float soh_speedXZ, float az_speedXZ,
     // acceleration-curve alignment lag.
     if (std::fabs(soh_speedXZ - az_speedXZ) < 2.0f &&
         soh_speedXZ > 0.1f && az_speedXZ > 0.1f) {
-        return {DivClass::PermanentNoise, "rate-comp"};
+        return {DivClass::PermanentNoise, "rate-comp",
+                "Player Actor+0x068 speedXZ (soh3d f70e927)",
+                "Actor.speedXZ (z64actor.h:227)",
+                "oot3d-decomp/docs/gameplay_firstdiv.md#per-frame-firstdiv"};
     }
     return kUnclassified;
 }
@@ -1776,10 +1795,14 @@ void CompareFirstDivImpl() {
                 d3_decision = ClassifyD3PlayerPos(soh_spdXZ, az_spdXZ, soh_bg);
                 if (d3_decision.cls != DivClass::Unclassified) {
                     std::printf("    d3 classified: %s (%s) — "
-                                "soh_v=%.2f az_v=%.2f soh_bgW=%d\n",
+                                "soh_v=%.2f az_v=%.2f soh_bgW=%d\n"
+                                "      origin: az=%s  soh=%s  doc=%s\n",
                                 DivClassStr(d3_decision.cls), d3_decision.tag,
                                 soh_spdXZ, az_spdXZ,
-                                (int)((soh_bg & 0x0008u) != 0));
+                                (int)((soh_bg & 0x0008u) != 0),
+                                d3_decision.origin_az,
+                                d3_decision.origin_soh,
+                                d3_decision.origin_doc);
                 } else if (!fd.reported) {
                     char buf[192]; std::snprintf(buf, sizeof buf,
                         "|Δpos|=%.2f az=(%.1f,%.1f,%.1f) soh=(%.1f,%.1f,%.1f)",
@@ -1817,8 +1840,11 @@ void CompareFirstDivImpl() {
                 // diverges under matched-speed walk).
                 if (d3_decision.cls == DivClass::DeferredPortTarget) {
                     std::printf("    d4 classified: DEFERRED (%s-downstream) — "
-                                "Δ=%d wall-slide yaw\n",
-                                d3_decision.tag, worstD);
+                                "Δ=%d wall-slide yaw\n"
+                                "      origin: inherits d3 (%s)  soh=%s\n",
+                                d3_decision.tag, worstD,
+                                d3_decision.origin_az,
+                                d3_decision.origin_soh);
                 } else if (!fd.reported) {
                     char buf[192]; std::snprintf(buf, sizeof buf,
                         "worst axis=%d Δ=%d (az_rot=(%d,%d,%d) soh_rot=(%d,%d,%d))",
@@ -1893,9 +1919,12 @@ void CompareFirstDivImpl() {
                     dEye < 1.0f && dUp < 0.01f) {
                     std::printf("    d5 classified: %s (%s-downstream) — "
                                 "|Δeye|=%.2f |Δat|=%.2f — at-point tracks "
-                                "Link, downstream of d3\n",
+                                "Link, downstream of d3\n"
+                                "      origin: inherits d3 (%s)  soh=%s\n",
                                 DivClassStr(d3_decision.cls), d3_decision.tag,
-                                dEye, dAt);
+                                dEye, dAt,
+                                d3_decision.origin_az,
+                                d3_decision.origin_soh);
                 } else if (!fd.reported) {
                     char buf[192]; std::snprintf(buf, sizeof buf,
                         "|Δeye|=%.2f |Δat|=%.2f |Δup|=%.4f — camera basis drift",
@@ -1971,9 +2000,15 @@ void CompareFirstDivImpl() {
             const int wt2_delta   = az_wt2 - soh_wt2;
             const bool wt2_explains = (total_delta >= 1 && total_delta == wt2_delta);
             if (wt2_explains) {
+                auto dec = ClassifyD6Content(0, 0, 0, wt2_delta);
+                (void)dec;
                 std::printf("    d6 classified: NOISE (wonder_talk2) — "
                             "Az has +%d id=0x0185 (3DS content add) matching "
-                            "total delta\n", wt2_delta);
+                            "total delta\n"
+                            "      origin: az=cat=*/id=0x0185 (En_Wonder_Talk2 — 3DS-only)  "
+                            "soh=no equivalent  "
+                            "doc=oot3d-decomp/docs/gameplay_firstdiv.md#sign-blind-policy\n",
+                            wt2_delta);
             } else if (!fd.reported) {
                 char buf[256]; std::snprintf(buf, sizeof buf,
                     "total az=%d soh=%d;%s — per-cat az/soh — investigate "
@@ -2132,9 +2167,11 @@ void CompareFirstDivImpl() {
             // classification tag documents the policy at the sweep site.
             auto dec = ClassifyD7Worst(worstPosCat, worstPosId);
             if (dec.cls != DivClass::Unclassified && worstPosD > 4.0f) {
-                std::printf("    d7 classified: %s (%s) — cat=%d id=0x%04x drift=%.2f\n",
+                std::printf("    d7 classified: %s (%s) — cat=%d id=0x%04x drift=%.2f\n"
+                            "      origin: az=%s  soh=%s  doc=%s\n",
                             DivClassStr(dec.cls), dec.tag,
-                            worstPosCat, worstPosId, worstPosD);
+                            worstPosCat, worstPosId, worstPosD,
+                            dec.origin_az, dec.origin_soh, dec.origin_doc);
             }
         }
 
