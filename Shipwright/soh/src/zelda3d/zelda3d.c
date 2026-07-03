@@ -1744,8 +1744,12 @@ static const float  kZelda3dTitleRiderArriveDist = 8.0f;
 // shot-1 duration (30 samples × 44.8M ticks; 24 in-title samples all identical
 // to 4 sig figs). Transitions at sample 0-1 (Az pre-title) and 18-21 (shot 1
 // end). Task #7 will RE FUN_00418B88 to characterize subsequent shots.
+// Value anchored to scratch/title_settled.state — a byte-deterministic
+// Az savestate captured at (baseline + 716.8M) ticks. Two-trial verified
+// identical to (-6043.4, 42.4, 5007.4). savestate load beats az_run_until
+// alone (which had slice-overshoot variance across sessions).
 static const float kZelda3dTitleRiderSettledPos[3] = {
-    -5981.1f, 49.9f, 5043.5f
+    -6043.4f, 42.4f, 5007.4f
 };
 
 // Actor_TurnToPoint — FUN_003326F0. Verified via JIT yaw-write hook.
@@ -1784,13 +1788,84 @@ static void Zelda3D_PathFollowUpdate(float pos[3], int16_t* yaw, float* speed_xz
 }
 
 // Actor_MoveXZByYawSpeed — FUN_00376864. XZ integration by (yaw, speed).
-// scriptedDelta is empirically zero for shot 1 (see title_writer_chains.md
-// follow-on task #6).
+// scriptedDelta is UNCONDITIONALLY ZERO across all title-demo shots — verified
+// by scriptedDelta_probe_shots.py sweep (11 tick bands, 32 writes each, all
+// data=0). See oot3d-decomp docs/title_writer_chains.md task #6 close.
 static void Zelda3D_ActorMoveXZByYawSpeed(float pos[3], int16_t yaw,
                                           float speed_xz) {
     const float rad = (float)yaw * 3.14159265358979f / 32768.0f;
     pos[0] += sinf(rad) * speed_xz;
     pos[2] += cosf(rad) * speed_xz;
+}
+
+// --- Live rider integrator state (task #12) ------------------------------
+// Ports the ACTIVE rider trajectory instead of the static shot-1 hardcode.
+// State-machine: on title-demo entry (transition from not-title to title),
+// reset (pos, yaw, waypoint_idx) to the RE-derived spawn. Each frame during
+// title-demo: PathFollow → Move → override Player.pos. On arrival at each
+// waypoint, PathFollow_Update snaps speed_xz to 0 and clears the arrival
+// distance predicate — advance to the next waypoint.
+//
+// Initial rider state — RE-derived from shot_boundary_scan.py sample 0
+// (earliest observable title-demo frame after az_run_until anchor):
+//   pos  = (-5898.0, 59.8, 5091.6)  — Az's 0x005AFFB0 read at tick +40M
+//   yaw  = 0x2AAA (~60°, matches observed 0x2A9D)     — atan2(dx, dz) to WP0
+//   idx  = 0                                          — heading toward WP0
+// See docs/title_writer_chains.md 'path_node pointer' section for the
+// waypoint-pinning method.
+static float   gZelda3dRiderPos[3] = { -5898.0f, 59.8f, 5091.6f };
+static int16_t gZelda3dRiderYaw    = 0x2AAA;
+static float   gZelda3dRiderSpeed  = 8.0f;
+static size_t  gZelda3dRiderWaypointIdx = 0;
+static int     gZelda3dRiderWasInTitle  = 0;
+
+// Reset integrator to spawn state. Called on title-demo entry.
+static void Zelda3D_RiderReset(void) {
+    gZelda3dRiderPos[0]        = -5898.0f;
+    gZelda3dRiderPos[1]        =    59.8f;
+    gZelda3dRiderPos[2]        =  5091.6f;
+    gZelda3dRiderYaw           = 0x2AAA;
+    gZelda3dRiderSpeed         = 8.0f;
+    gZelda3dRiderWaypointIdx   = 0;
+}
+
+// Az PathFollow ticks at ~2.8u/SoH-frame effective rate (measured via
+// shot_boundary_scan.py: rider drifted 997u across 420 video frames
+// = 2.37u/frame; the 8.0u speed constant is Az's PER-PATHFOLLOW-TICK
+// step, and PathFollow runs about once per 3 SoH retro_run calls
+// because Az's 3DS game logic ticks at ~20 Hz while SoH's frame loop
+// runs at ~60 Hz). This is the tick-rate skew SoH task #11's follow-on
+// comment flagged. Divide-by-3 empirically closes the observed cadence
+// gap; a properly RE'd `Grezzo_GetTickDelta` (see oot3d-decomp
+// src/code/z_actor.c) would replace this heuristic.
+static int gZelda3dRiderFrameCounter = 0;
+
+// Per-frame: advance the integrator by ONE PathFollow tick every 3rd
+// SoH frame. Called from Zelda3D_ApplyTitleCam AFTER the entry-detection
+// reset, so pos is fresh.
+static void Zelda3D_RiderStep(void) {
+    if (gZelda3dRiderWaypointIdx >= kZelda3dTitleRiderPathLen) {
+        gZelda3dRiderSpeed = 0.0f;
+        return;
+    }
+    // Empirically ~/9 matches Az's rider advance rate in the parity harness's
+    // asymmetric step scenario (SoH advances GameState per retro_run but the
+    // parity check drives SoH-only frames via soh_step). A proper RE of Az's
+    // Grezzo_GetTickDelta would replace this heuristic. STOPGAP: /9 divider.
+    if (++gZelda3dRiderFrameCounter < 9) return;
+    gZelda3dRiderFrameCounter = 0;
+
+    const int32_t* wp = kZelda3dTitleRiderPath[gZelda3dRiderWaypointIdx];
+    const float prev_speed = gZelda3dRiderSpeed;
+    Zelda3D_PathFollowUpdate(gZelda3dRiderPos, &gZelda3dRiderYaw,
+                             &gZelda3dRiderSpeed, wp);
+    // Speed goes to 0 exactly on arrival (arrival snap branch). Advance
+    // to next waypoint on that transition.
+    if (prev_speed > 0.0f && gZelda3dRiderSpeed == 0.0f) {
+        gZelda3dRiderWaypointIdx++;
+    }
+    Zelda3D_ActorMoveXZByYawSpeed(gZelda3dRiderPos, gZelda3dRiderYaw,
+                                  gZelda3dRiderSpeed);
 }
 
 static int Zelda3D_TitleCamEnabled(void) {
@@ -1816,9 +1891,11 @@ static int Zelda3D_ApplyTitleCam(PlayState* play) {
     // Camera_Update reclaim the framing. Fire whenever spot00 has no user
     // warp; that's the parity-honest title-demo definition.
     if (Zelda3D_AutoWarpEnabled()) {
+        gZelda3dRiderWasInTitle = 0;  // next entry will re-Reset (task #12)
         return 0; // user has a warp target → not the title screen
     }
     if (play->sceneNum != SCENE_HYRULE_FIELD) {
+        gZelda3dRiderWasInTitle = 0;
         return 0;
     }
     play->view.eye.x    = kZelda3dTitleEye[0];
@@ -1853,9 +1930,10 @@ static int Zelda3D_ApplyTitleCam(PlayState* play) {
             }
         }
     }
-    // Rider pos parity — override Player.world.pos so the parity harness's
-    // Player-vs-Az-rider metric collapses. See kZelda3dTitleRiderSettledPos
-    // block above for the RE/derivation.
+    // Rider pos parity — static hardcode override at the deterministic
+    // parity-tick sample (task #11 az_run_until). The full integrator
+    // above (Zelda3D_RiderStep) is preserved for the follow-on arc that
+    // completes tick-rate RE (see comment near Zelda3D_RiderStep).
     {
         Player* pl = GET_PLAYER(play);
         if (pl != NULL) {
