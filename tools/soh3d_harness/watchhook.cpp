@@ -39,6 +39,16 @@ struct WriteRecord {
     u32  arm_pc;
     u32  arm_lr;
     u64  cycles;
+    // Arg-reg snapshot at fire time. Captures caller-context values that
+    // outlive PC/LR clobbering (e.g. path_node passed as r2 to
+    // PathFollow_Update — recoverable from r2 at the fn's first write to
+    // its own local frame, before r2 is reused). Also SP for stack window
+    // inspection.
+    u32  arm_r0;
+    u32  arm_r1;
+    u32  arm_r2;
+    u32  arm_r3;
+    u32  arm_sp;
 };
 
 // Global watchlist state.
@@ -176,6 +186,11 @@ extern "C" void Soh3d_OnMemoryWrite(u32 vaddr, u32 size, u64 data) {
     rec.data   = data;
     rec.arm_pc = cpu.GetPC();
     rec.arm_lr = cpu.GetReg(14);
+    rec.arm_r0 = cpu.GetReg(0);
+    rec.arm_r1 = cpu.GetReg(1);
+    rec.arm_r2 = cpu.GetReg(2);
+    rec.arm_r3 = cpu.GetReg(3);
+    rec.arm_sp = cpu.GetReg(13);
     rec.cycles = static_cast<u64>(cpu.GetTimer().GetTicks());
 
     const u32 key = RangeKey(vaddr, size);
