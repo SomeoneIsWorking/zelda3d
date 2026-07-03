@@ -59,12 +59,18 @@ class Harness:
         return self._readline().rstrip()
 
     def send_multiline(self, cmd: str, per_line_timeout: float = 30.0) -> list[str]:
-        """Send a command that streams multiple lines ending in `ok end`.
+        """Send a command that streams multiple lines ending in an `ok …` line.
 
-        A per-line select() timeout catches the footgun where the caller uses
-        send_multiline for a single-line-response command (like `mem`, `r32`) —
-        the first `ok <payload>` line arrives fine, then we'd block forever
-        waiting for a sentinel that never comes. Instead, raise loudly.
+        Handles two harness output shapes:
+          A) single-line success: first line already starts with `ok `
+             (e.g. `mem`, `r32`, `playstate`). Return immediately.
+          B) multi-line: header line does NOT start with `ok ` (e.g.
+             `compare scene:`, `actors`), then a body, then a terminator
+             line matching `ok …` (`ok end`, `ok compare scene`, etc.).
+             Keep reading until that terminator arrives.
+
+        A per-line select() timeout catches hangs where the harness died
+        or the terminator convention doesn't match.
         """
         import select
         assert self.proc.stdin is not None
@@ -78,17 +84,19 @@ class Harness:
             if not r:
                 raise TimeoutError(
                     f"send_multiline({cmd!r}): no line for {per_line_timeout}s; "
-                    f"got {len(lines)} lines so far — "
-                    f"is this actually a multiline command? (last: {lines[-1] if lines else None!r})"
+                    f"got {len(lines)} lines so far "
+                    f"(last: {lines[-1] if lines else None!r})"
                 )
-            line = self.proc.stdout.readline()
-            if not line:
+            raw = self.proc.stdout.readline()
+            if not raw:
                 raise RuntimeError(f"send_multiline({cmd!r}): harness closed stdout")
-            line = line.rstrip()
+            line = raw.rstrip()
             lines.append(line)
-            if not lines[0].startswith("ok "):
+            # (A) first line is a full `ok …` → single-line reply, done.
+            if len(lines) == 1 and line.startswith("ok "):
                 return lines
-            if line == "ok end":
+            # (B) any subsequent `ok …` or `err …` is the terminator.
+            if len(lines) > 1 and (line.startswith("ok ") or line.startswith("err ")):
                 return lines
 
     def quit(self) -> None:
