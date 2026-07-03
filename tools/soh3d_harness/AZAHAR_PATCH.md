@@ -211,3 +211,118 @@ unique `(tex, w, h)` groups; the three moon quads correspond to
 `0x20910e80` (64×64, ADD). Address values will drift session-to-session
 (they're the runtime FCRAM allocation), but the WxH and blend
 signatures are stable.
+
+# Patch 3 — MemoryFill / DisplayTransfer / VBlank blit log (task #16 atmos RE)
+
+`Azahar/src/video_core/gpu.cpp` — adds an env-gated tap that dumps every
+`MemoryFill`, `DisplayTransfer`, and `VBlank` (with LCD framebuffer
+config) to a file when `SOH3D_HARNESS_LOG_BLIT=<path>` is set. Used to
+locate the visible top-screen scanout source outside the SW-rasterizer
+path — see `docs/title_atmos_layer.md`.
+
+### Hunk 1 — includes + statics near top of file
+
+Just after `#include "common/microprofile.h"`:
+
+```cpp
+#include <cstdio>
+#include <cstdlib>
+#include <mutex>
+```
+
+Just after the `VADDR_LCD` / `VADDR_GPU` constants:
+
+```cpp
+static FILE* g_soh3d_blit_log = nullptr;
+static bool g_soh3d_blit_log_tried = false;
+static std::mutex g_soh3d_blit_log_mtx;
+static u64 g_soh3d_blit_frame_index = 0;
+
+static FILE* Soh3dOpenBlitLog() {
+    std::lock_guard<std::mutex> lk(g_soh3d_blit_log_mtx);
+    if (!g_soh3d_blit_log_tried) {
+        g_soh3d_blit_log_tried = true;
+        const char* path = std::getenv("SOH3D_HARNESS_LOG_BLIT");
+        if (path && path[0]) {
+            g_soh3d_blit_log = std::fopen(path, "w");
+            if (g_soh3d_blit_log) {
+                std::fprintf(g_soh3d_blit_log,
+                             "# soh3d blit log — MemoryFill / DisplayTransfer / VBlank\n");
+                std::fflush(g_soh3d_blit_log);
+            }
+        }
+    }
+    return g_soh3d_blit_log;
+}
+```
+
+### Hunk 2 — MemoryFill entry log
+
+Inside `GPU::MemoryFill`, just after the `config.trigger` early-return:
+
+```cpp
+if (FILE* fp = Soh3dOpenBlitLog()) {
+    std::lock_guard<std::mutex> lk(g_soh3d_blit_log_mtx);
+    std::fprintf(fp,
+                 "F%llu MemoryFill idx=%u start=0x%08X end=0x%08X value=0x%08X width=%s\n",
+                 (unsigned long long)g_soh3d_blit_frame_index, index,
+                 config.GetStartAddress(), config.GetEndAddress(), config.value_32bit,
+                 config.fill_32bit ? "32" : (config.fill_24bit ? "24" : "16"));
+    std::fflush(fp);
+}
+```
+
+### Hunk 3 — DisplayTransfer entry log
+
+Inside `GPU::MemoryTransfer`, just before `u64 delay{};`:
+
+```cpp
+if (FILE* fp = Soh3dOpenBlitLog()) {
+    std::lock_guard<std::mutex> lk(g_soh3d_blit_log_mtx);
+    const char* kind = config.is_texture_copy ? "TextureCopy" : "DisplayTransfer";
+    std::fprintf(
+        fp,
+        "F%llu %s in=0x%08X out=0x%08X inW=%u inH=%u outW=%u outH=%u ifmt=%u ofmt=%u "
+        "flags=0x%08X scale=%u vflip=%u ilin=%u crop=%u tccpy_sz=%u tccpy_iw=%u tccpy_ig=%u "
+        "tccpy_ow=%u tccpy_og=%u\n",
+        (unsigned long long)g_soh3d_blit_frame_index, kind,
+        config.GetPhysicalInputAddress(), config.GetPhysicalOutputAddress(),
+        (unsigned)config.input_width.Value(), (unsigned)config.input_height.Value(),
+        (unsigned)config.output_width.Value(), (unsigned)config.output_height.Value(),
+        (unsigned)config.input_format.Value(), (unsigned)config.output_format.Value(),
+        config.flags, (unsigned)config.scaling.Value(),
+        (unsigned)config.flip_vertically.Value(), (unsigned)config.input_linear.Value(),
+        (unsigned)config.crop_input_lines.Value(),
+        config.texture_copy.size, (unsigned)config.texture_copy.input_width.Value(),
+        (unsigned)config.texture_copy.input_gap.Value(),
+        (unsigned)config.texture_copy.output_width.Value(),
+        (unsigned)config.texture_copy.output_gap.Value());
+    std::fflush(fp);
+}
+```
+
+### Hunk 4 — VBlank entry log (LCD FB config)
+
+Inside `GPU::VBlankCallback`, at the very top before `SwapBuffers`:
+
+```cpp
+if (FILE* fp = Soh3dOpenBlitLog()) {
+    std::lock_guard<std::mutex> lk(g_soh3d_blit_log_mtx);
+    auto& top = impl->pica.regs.framebuffer_config[0];
+    auto& bot = impl->pica.regs.framebuffer_config[1];
+    std::fprintf(fp,
+                 "F%llu VBlank topFB1=0x%08X topFB2=0x%08X topStride=%u topW=%u topH=%u "
+                 "topFmt=%u topActive=%u botFB1=0x%08X botFB2=0x%08X botStride=%u botFmt=%u "
+                 "botActive=%u\n",
+                 (unsigned long long)g_soh3d_blit_frame_index,
+                 top.address_left1, top.address_left2, top.stride,
+                 (unsigned)top.width.Value(), (unsigned)top.height.Value(),
+                 (unsigned)top.color_format.Value(),
+                 (unsigned)top.second_fb_active.Value(),
+                 bot.address_left1, bot.address_left2, bot.stride,
+                 (unsigned)bot.color_format.Value(),
+                 (unsigned)bot.second_fb_active.Value());
+    std::fflush(fp);
+    g_soh3d_blit_frame_index++;
+}
+```

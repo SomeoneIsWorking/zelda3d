@@ -623,6 +623,32 @@ void HandleMem(std::istringstream& toks) {
 // raw pointer into the emulator's mapped-VA host memory. Unmapped
 // pages produce a null GetPointer and we bail early rather than
 // segfaulting on the memcpy.
+// Dump a contiguous PHYSICAL-address range to a file. Same as dumprange but reads via
+// MemorySystem::GetPhysicalPointer — the accessor Az's SW rasterizer uses to reach texture
+// data at FCRAM/VRAM physical addresses (0x18xxxxxx / 0x20xxxxxx) which don't appear in the
+// virtual mapping GetPointer walks. Task-#16 atmospheric-overlay RE: the two title-demo
+// full-screen textures live at physical 0x2095aa00 / 0x2091a900 and dumprange (virtual)
+// reports the whole range unmapped.
+void HandleDumpPhys(std::istringstream& toks) {
+    std::string pa_s, n_s, path;
+    if (!(toks >> pa_s >> n_s >> path)) {
+        PrintErr("dumpphys: usage: dumpphys <phys_addr> <size> <path>");
+        return;
+    }
+    auto pa = ParseNum(pa_s);
+    auto n  = ParseNum(n_s);
+    if (!pa || !n || *n == 0) { PrintErr("dumpphys: bad args"); return; }
+    auto& mem = Core::System::GetInstance().Memory();
+    auto* p = mem.GetPhysicalPointer(static_cast<uint32_t>(*pa));
+    if (!p) { PrintErr("dumpphys: physical addr not mapped"); return; }
+    std::FILE* f = std::fopen(path.c_str(), "wb");
+    if (!f) { PrintErr("dumpphys: open failed"); return; }
+    std::fwrite(p, 1, *n, f);
+    std::fclose(f);
+    std::printf("ok dumpphys 0x%08x..0x%08x (%llu bytes) -> %s\n",
+                (unsigned)*pa, (unsigned)(*pa + *n), (unsigned long long)*n, path.c_str());
+}
+
 void HandleDumpRange(std::istringstream& toks) {
     std::string va_s, n_s, path;
     if (!(toks >> va_s >> n_s >> path)) {
@@ -3282,6 +3308,7 @@ void RunRepl() {
         else if (cmd == "w32")       HandleWrite(toks, 32);
         else if (cmd == "mem")       HandleMem(toks);
         else if (cmd == "dumprange") HandleDumpRange(toks);
+        else if (cmd == "dumpphys")  HandleDumpPhys(toks);
         else if (cmd == "input")     HandleInput(toks);
         else if (cmd == "diag")      HandleDiag(toks);
         else if (cmd == "loadstate") HandleLoadState(toks);

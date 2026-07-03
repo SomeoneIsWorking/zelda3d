@@ -596,20 +596,31 @@ static size_t vertCountGroups(const std::vector<Zelda3D::CmbDrawGroup>& groups) 
 // plane (handle bit 30) and faces it to the camera via play->billboardMtxF. `additive` selects the
 // blend: the sun/lens-flare discs are a glow on black (src_alpha,ONE = add over the sky), the moon
 // is an alpha-masked disc (src_alpha,1-src_alpha = normal alpha blend).
+// Load a standalone CTXB texture and build a quad. If zarPath ends in ".ctxb" the file is read
+// DIRECTLY from the romfs (no ZAR wrap — used for /menu/ and /misc/ atmospheric textures at title,
+// task #16); otherwise zarPath is the ZAR archive and ctxbName picks the file inside it.
 static void loadBillboard(LoadedModel* out, const std::string& zarPath, const std::string& ctxbName,
                           bool additive, float u0 = 0.0f, float v0 = 0.0f,
                           float u1 = 1.0f, float v1 = 1.0f) {
     Zelda3D::CtrRom* r = rom();
     if (!r) return;
-    auto zarBytes = r->read(zarPath);
-    if (zarBytes.empty()) { fprintf(stderr, "[Zelda3D] billboard: zar not found: %s\n", zarPath.c_str()); return; }
-    out->zar = std::make_unique<Zelda3D::Zar>(std::move(zarBytes));
-    if (!out->zar->ok()) { fprintf(stderr, "[Zelda3D] billboard Zar %s: %s\n", zarPath.c_str(), out->zar->error().c_str()); return; }
-    const Zelda3D::ZarFile* zf = nullptr;
-    for (const auto& f : out->zar->files())
-        if (f.name.find(ctxbName) != std::string::npos) { zf = &f; break; }
-    if (!zf) { fprintf(stderr, "[Zelda3D] billboard %s: no '%s'\n", zarPath.c_str(), ctxbName.c_str()); return; }
-    Zelda3D::Ctxb ctxb(out->zar->read(*zf));
+    std::vector<uint8_t> ctxbBytes;
+    bool directCtxb = (zarPath.size() >= 5 && zarPath.compare(zarPath.size() - 5, 5, ".ctxb") == 0);
+    if (directCtxb) {
+        ctxbBytes = r->read(zarPath);
+        if (ctxbBytes.empty()) { fprintf(stderr, "[Zelda3D] billboard: ctxb not found: %s\n", zarPath.c_str()); return; }
+    } else {
+        auto zarBytes = r->read(zarPath);
+        if (zarBytes.empty()) { fprintf(stderr, "[Zelda3D] billboard: zar not found: %s\n", zarPath.c_str()); return; }
+        out->zar = std::make_unique<Zelda3D::Zar>(std::move(zarBytes));
+        if (!out->zar->ok()) { fprintf(stderr, "[Zelda3D] billboard Zar %s: %s\n", zarPath.c_str(), out->zar->error().c_str()); return; }
+        const Zelda3D::ZarFile* zf = nullptr;
+        for (const auto& f : out->zar->files())
+            if (f.name.find(ctxbName) != std::string::npos) { zf = &f; break; }
+        if (!zf) { fprintf(stderr, "[Zelda3D] billboard %s: no '%s'\n", zarPath.c_str(), ctxbName.c_str()); return; }
+        ctxbBytes = out->zar->read(*zf);
+    }
+    Zelda3D::Ctxb ctxb(std::move(ctxbBytes));
     if (!ctxb.ok() || ctxb.textures().empty()) {
         fprintf(stderr, "[Zelda3D] billboard ctxb %s: %s\n", ctxbName.c_str(), ctxb.error().c_str());
         return;
