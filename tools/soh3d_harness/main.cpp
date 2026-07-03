@@ -927,6 +927,16 @@ void HandleSaveState(std::istringstream& toks) {
 // oot3d-decomp when it comes back on this machine is a proper follow-up.
 constexpr uint32_t GPLAYSTATE_VA           = 0x0050AF34;
 constexpr uint32_t SCENENUM_OFF            = 0x0104;
+
+// OoT3D title-demo state. GREZZO refactored the title/opening path on 3DS
+// so it is NOT a Play gamestate — gPlayState @ 0x0050AF34 stays 0 during
+// the whole title+demo loop. Instead the title context lives INLINE in
+// .data at the SAME VA that gPlayState occupies during Play (overloaded
+// slot: 0 in title mode = the inline struct's field +0x00; heap pointer
+// in Play mode). RE'd from FUN_0046ac98 (title-state init) in code.bin.
+constexpr uint32_t TITLE_CTX_VA            = 0x0050AF34;
+constexpr uint32_t TITLE_SCENE_OFF         = 0x006C;  // *0x0050afa0 == 0x51 at title
+constexpr uint32_t TITLE_ACTIVE_OFF        = 0x0078;  // *0x0050afac == 1 at title
 constexpr uint32_t ACTORCTX_OFF            = 0x208C;
 constexpr uint32_t ACTOR_LISTS_OFF         = 0x000C;
 constexpr uint32_t ACTOR_ID_OFF            = 0x0000;
@@ -942,6 +952,18 @@ std::optional<uint32_t> CurrentPlayState() {
     auto v = mem.Read32OrNullopt(GPLAYSTATE_VA);
     if (!v || *v == 0) return std::nullopt;
     return *v;
+}
+
+// True when the emulator is in the title-demo (logo + Hyrule-field flyover),
+// which is NOT a Play gamestate on 3DS but an inline .data-resident context.
+// Detection: scene==0x51 at TITLE_SCENE_OFF and active flag set — the two
+// discriminators FUN_0046ac98 sets during title init. Both must match; a
+// stale post-Play read of the slot would fail either check.
+bool TitleActive() {
+    auto& mem = Core::System::GetInstance().Memory();
+    auto scn = mem.Read32OrNullopt(TITLE_CTX_VA + TITLE_SCENE_OFF);
+    auto act = mem.Read32OrNullopt(TITLE_CTX_VA + TITLE_ACTIVE_OFF);
+    return scn && act && (*scn & 0xFFFF) == 0x51 && *act == 1;
 }
 
 void HandlePlayState(std::istringstream&) {
@@ -1036,13 +1058,18 @@ void HandleActors(std::istringstream&) {
 void CompareSceneImpl() {
     // 3ds side
     auto ps = CurrentPlayState();
-    if (!ps) {
-        std::printf("  3ds: n/a (no playstate)\n");
-    } else {
+    if (ps) {
         auto& mem = Core::System::GetInstance().Memory();
         auto sn = mem.Read32OrNullopt(*ps + SCENENUM_OFF);
         std::printf("  3ds: sceneNum=0x%04x\n",
                     sn ? static_cast<unsigned>(*sn & 0xFFFF) : 0xFFFFu);
+    } else if (TitleActive()) {
+        // Title context: sceneNum is inline in .data — the SAME sentinel
+        // that N64 OoT uses for its title-demo scene (SCENE_TESTROOM=0x51).
+        std::printf("  3ds: sceneNum=0x0051 (title, inline ctx @ 0x%08x)\n",
+                    TITLE_CTX_VA);
+    } else {
+        std::printf("  3ds: n/a (no playstate, no title)\n");
     }
     // soh side
     if (!SohState_HasPlayState()) {
