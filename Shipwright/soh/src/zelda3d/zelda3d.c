@@ -3639,18 +3639,25 @@ static int Zelda3D_SunModelId(void) {
 static int Zelda3D_MoonModelId(void) {
     return Zelda3D_AutoModelId("BILLBOARD:/kankyo/BlueSky.zar|tex/fine_moon0.ctxb");
 }
-// Moon glow halo — reuse tex/fine_moon0.ctxb as an ADDITIVE billboard
-// behind the standard alpha-masked disc, warm-tinted, at ~1.8× disc
-// scale. That produces the soft radiant aura around OoT3D's title
-// moon without shipping an anamorphic lens-flare pattern (which is
-// what tex/fine_lensflare.ctxb actually is — a strip of scattered
-// flare orbs, NOT the moon halo, verified by wiring it in and seeing
-// pink flare orbs paint across the sky). The `_ADD` suffix picks the
-// BILLBOARDADD variant of the ctxb quad; loadBillboard dedupes on
-// the full key so it's a distinct model from the alpha-blend disc.
-static int Zelda3D_MoonHaloModelId(void) {
-    return Zelda3D_AutoModelId("BILLBOARDADD:/kankyo/BlueSky.zar|tex/fine_moon0.ctxb");
-}
+// BlueSky.zar carries these ctxb assets (from `cmb_export --list`):
+//   tex/fine_sun.ctxb  tex/fine_lensflare.ctxb  tex/cloud_sun.ctxb
+//   tex/cloud_lensflare.ctxb  tex/fine_moon0.ctxb  tex/fine_moon1.ctxb
+//   tex/fine_moon2.ctxb
+// FUN_002E47C8 (build/decomp/002e47c8.c in oot3d-decomp) is the sky
+// element-setup dispatcher, param-driven by an element-type byte
+// (0..8, 0x1d); it selects per-element scale/color/blend from a 0x50-byte
+// metadata table (UNK_002e4dc8). Called once from FUN_004490D8 per
+// scene init.
+//
+// The moon halo/aura around OoT3D's title moon is NOT a separately
+// drawn geometry pass. It's the 3DS PICA200 hardware bloom post-effect
+// applied to bright pixels in the framebuffer. SoH has no bloom pass.
+// Faking it with an ADDITIVE billboard behind the disc looks wrong
+// (either invisible or a hero glow); faking with fine_lensflare paints
+// anamorphic flare orbs across the sky (that ctxb is the SUN's lens
+// flare, not a halo). A real fix requires porting a bloom postprocess
+// pass to Zelda3D_GL_RenderPass — logged as a follow-on arc, not
+// masked with tuned billboards here.
 
 int Zelda3D_TryDrawSunMoon(PlayState* play) {
     f32 y, color, scale, temp, alpha;
@@ -3737,30 +3744,10 @@ int Zelda3D_TryDrawSunMoon(PlayState* play) {
         alpha = temp * 255.0f;
         if (alpha > 0.0f && moonId >= 0) {
             if (alpha > 255.0f) alpha = 255.0f;
-            // OoT3D moon disc is markedly smaller than the N64 sprite —
-            // the N64 quad is -31..32 units, the 3DS asset is drawn on
-            // a smaller quad in the engine. Apply a 0.55× correction to
-            // the N64-derived scale so the visible disc matches Az's
-            // title framing (verified by SxS: N64-scaled disc was ~2×
-            // Az's). Halo sits 1.3× disc size (SUBTLE aura, not a hero
-            // glow), additive, half-alpha, warm-tint.
-            f32 discScale = scale * 0.55f;
-            f32 haloScale = discScale * 1.3f;
-            int haloId = Zelda3D_MoonHaloModelId();
-            if (haloId >= 0) {
-                Matrix_Translate(play->view.eye.x - play->envCtx.sunPos.x,
-                                 play->view.eye.y - play->envCtx.sunPos.y,
-                                 play->view.eye.z - play->envCtx.sunPos.z, MTXMODE_NEW);
-                Matrix_Mult(&play->billboardMtxF, MTXMODE_APPLY);
-                Matrix_Scale(haloScale, haloScale, haloScale, MTXMODE_APPLY);
-                gSPMatrix(POLY_OPA_DISP++, MATRIX_NEWMTX(play->state.gfxCtx),
-                          G_MTX_MODELVIEW | G_MTX_LOAD);
-                gSPZelda3DDrawA(POLY_OPA_DISP++, haloId | (1 << 30), (u8)(alpha * 0.6f), 255, 232, 176);
-            }
             Matrix_Translate(play->view.eye.x - play->envCtx.sunPos.x, play->view.eye.y - play->envCtx.sunPos.y,
                              play->view.eye.z - play->envCtx.sunPos.z, MTXMODE_NEW);
             Matrix_Mult(&play->billboardMtxF, MTXMODE_APPLY);
-            Matrix_Scale(discScale, discScale, discScale, MTXMODE_APPLY);
+            Matrix_Scale(scale, scale, scale, MTXMODE_APPLY);
             gSPMatrix(POLY_OPA_DISP++, MATRIX_NEWMTX(play->state.gfxCtx), G_MTX_MODELVIEW | G_MTX_LOAD);
             gSPZelda3DDrawA(POLY_OPA_DISP++, moonId | (1 << 30), (u8)alpha, 255, 255, 255);
         }
