@@ -1765,6 +1765,7 @@ void CompareFirstDivImpl() {
         static uint32_t s_watched_bgflag_addr = 0;
         static uint32_t s_watched_speed_addr  = 0;
         static uint32_t s_watched_yaw_addr    = 0;
+        static uint32_t s_watched_cam_eye_addr = 0;
         // Look up Az Player addr this call.
         {
             uint32_t az_player_addr = 0;
@@ -1792,6 +1793,14 @@ void CompareFirstDivImpl() {
                             az_player_addr + ACTOR_SPEEDXZ_OFF, 4);
                 reregister(s_watched_yaw_addr,
                             az_player_addr + PLAYER_YAW_OFF, 2);
+                // Camera eye lives on PlayState, not Player. Piggyback on
+                // scene-load (Player-addr change) to also refresh a 12-byte
+                // watchpoint covering the full eye Vec3f — Kakariko sweep
+                // (2026-07-03) surfaced d5 |Δeye|=28 with matching Link
+                // pos+yaw, so the OoT3D camera update site is the new port
+                // frontier for d5.
+                reregister(s_watched_cam_eye_addr,
+                            *ps_az + PLAY_CAM_EYE_OFF, 12);
             }
         }
         // ── Play-mode d3: Link position match ────────────────────────────
@@ -2099,6 +2108,27 @@ void CompareFirstDivImpl() {
                         "|Δeye|=%.2f |Δat|=%.2f |Δup|=%.4f — camera basis drift",
                         dEye, dAt, dUp);
                     fd.report("camera-basis", buf);
+                    // Auto-attach: query the most recent write to Az's eye
+                    // Vec3f. mask=0 → match any write. Emits the guest ARM
+                    // PC that wrote the eye — Ghidra-jump this PC for the
+                    // OoT3D camera-update site (Camera_Update /
+                    // Play_UpdateMainCamera / etc.).
+                    if (s_watched_cam_eye_addr != 0) {
+                        WatchRecord wr{};
+                        if (Soh3d_WatchGetLatestMatching(
+                                s_watched_cam_eye_addr, 0, 0, &wr)) {
+                            std::printf("        writer: "
+                                "az_pc=0x%08x lr=0x%08x eye_off=+%u "
+                                "data=0x%016lx ticks=%lu — Ghidra-jump this PC "
+                                "for OoT3D's camera-eye update site\n",
+                                wr.arm_pc, wr.arm_lr,
+                                wr.vaddr - s_watched_cam_eye_addr,
+                                wr.data, (unsigned long)wr.cycles);
+                        } else {
+                            std::printf("        writer: (no eye writes "
+                                "captured yet — advance more frames)\n");
+                        }
+                    }
                 }
             }
         }
