@@ -3169,6 +3169,41 @@ void RunRepl() {
         std::string cmd;
         if (!(toks >> cmd) || cmd.empty()) continue;
         if      (cmd == "run")       HandleRun(toks);
+        else if (cmd == "az_ticks") {
+            // Emu-tick counter — the DETERMINISTIC substrate under `run`.
+            // `run <N>` calls retro_run N times, but each retro_run advances a
+            // variable slice depending on host wall-clock scheduling → different
+            // stop-ticks across sessions. Use `az_ticks` + `az_run_until` for
+            // session-repeatable parity work (see task #11 in soh3d/BACKLOG).
+            const auto ticks = Core::System::GetInstance().CoreTiming().GetGlobalTicks();
+            std::printf("ok az_ticks %lld\n", static_cast<long long>(ticks));
+        }
+        else if (cmd == "az_run_until") {
+            std::string n_s;
+            if (!(toks >> n_s)) { PrintErr("az_run_until: usage: az_run_until <ticks>"); continue; }
+            auto target = ParseNum(n_s);
+            if (!target) { PrintErr("az_run_until: bad ticks"); continue; }
+            // Advance one retro_run at a time until we reach the target. May
+            // OVERSHOOT (retro_run's slice granularity is variable and >1); the
+            // overshoot is bounded by one video frame ≈ 5.6M ARM11 ticks. For
+            // sub-frame determinism, use `run 1` in a Python loop that watches
+            // az_ticks and calls SingleStep for the tail. That's overkill for
+            // parity work — anchoring to a fixed target-tick within ~one video
+            // frame is enough to eliminate the current session-drift problem.
+            auto& sys = Core::System::GetInstance();
+            uint64_t frames = 0;
+            const int kMaxFrames = 100000;  // safety cap; kills runaway
+            while (sys.CoreTiming().GetGlobalTicks() < static_cast<s64>(*target)
+                   && frames < kMaxFrames && !g_quit_requested.load()) {
+                { FrameWatchdog wd("az_run_until/retro_run"); retro_run(); }
+                ++frames;
+            }
+            const auto final_ticks = sys.CoreTiming().GetGlobalTicks();
+            std::printf("ok az_run_until frames=%llu final_ticks=%lld target=%lld\n",
+                        static_cast<unsigned long long>(frames),
+                        static_cast<long long>(final_ticks),
+                        static_cast<long long>(*target));
+        }
         else if (cmd == "r8")        HandleRead(toks, 8);
         else if (cmd == "r16")       HandleRead(toks, 16);
         else if (cmd == "r32")       HandleRead(toks, 32);
