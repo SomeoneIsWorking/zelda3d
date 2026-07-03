@@ -1038,6 +1038,33 @@ constexpr uint32_t PLAY_CAM_EYE_OFF        = 0x01B8;
 constexpr uint32_t PLAY_CAM_AT_OFF         = 0x01C4;
 constexpr uint32_t PLAY_CAM_UP_OFF         = 0x01D0;
 
+// ── Per-dimension sign-convention invariant ─────────────────────────────
+// Every position/basis compare between Az and SoH implicitly assumes the two
+// engines share coordinate conventions. Empirically verified true at Link's
+// House:
+//   - Player spawn matches at (+1, 0, +95) on both engines (d3 baseline).
+//   - Camera basis matches: eye=(0,34,0) at=(1.06,34.01,100.89) up=(0,1,0)
+//     on both engines (d5 baseline).
+//   - Under matched-convention "forward" input (soh_input 0 0 +127 +
+//     analog 0 -32000), both engines walk +Z ~36-40 units in one direction
+//     (scratch/direction_matched.py, 2026-07-03).
+//
+// So all AZ_*_SIGN_FLIP flags below are `false` today. This is deliberately
+// a per-axis descriptor so if OoT3D later turns out to flip a specific
+// world axis (e.g. camera Up on a scene that inverts) or if we discover a
+// per-actor sign-convention difference, flipping ONE flag corrects every
+// downstream compare in one seam instead of ad-hoc per test. `false` = no
+// runtime effect; the multiply-by-+1 constant-folds.
+constexpr bool AZ_POS_X_SIGN_FLIP    = false;
+constexpr bool AZ_POS_Y_SIGN_FLIP    = false;
+constexpr bool AZ_POS_Z_SIGN_FLIP    = false;
+constexpr bool AZ_CAM_X_SIGN_FLIP    = false;
+constexpr bool AZ_CAM_Y_SIGN_FLIP    = false;
+constexpr bool AZ_CAM_Z_SIGN_FLIP    = false;
+
+// Convenience: signed multiplier for a bool flag (constant-folds to +1/-1).
+constexpr float FlipMul(bool flip) { return flip ? -1.0f : +1.0f; }
+
 std::optional<uint32_t> CurrentPlayState() {
     auto& mem = Core::System::GetInstance().Memory();
     auto v = mem.Read32OrNullopt(GPLAYSTATE_VA);
@@ -1580,16 +1607,21 @@ void CompareFirstDivImpl() {
                 az_player_found ? "SoH has no live Player actor" :
                                   "Azahar has no cat=2 id=0 actor");
         } else {
-            float dp = std::sqrt((az_px-soh_px)*(az_px-soh_px)
-                               + (az_py-soh_py)*(az_py-soh_py)
-                               + (az_pz-soh_pz)*(az_pz-soh_pz));
+            // Apply the per-axis position sign-flip invariant (all false
+            // today; see AZ_POS_*_SIGN_FLIP block near the RE offsets).
+            const float az_px_n = az_px * FlipMul(AZ_POS_X_SIGN_FLIP);
+            const float az_py_n = az_py * FlipMul(AZ_POS_Y_SIGN_FLIP);
+            const float az_pz_n = az_pz * FlipMul(AZ_POS_Z_SIGN_FLIP);
+            float dp = std::sqrt((az_px_n-soh_px)*(az_px_n-soh_px)
+                               + (az_py_n-soh_py)*(az_py_n-soh_py)
+                               + (az_pz_n-soh_pz)*(az_pz_n-soh_pz));
             std::printf("  d3 player pos:   az=(%.1f,%.1f,%.1f) soh=(%.1f,%.1f,%.1f) "
                         "|Δ|=%.2f\n",
                         az_px, az_py, az_pz, soh_px, soh_py, soh_pz, dp);
             if (!fd.reported && dp > 1.0f) {
                 char buf[192]; std::snprintf(buf, sizeof buf,
                     "|Δpos|=%.2f az=(%.1f,%.1f,%.1f) soh=(%.1f,%.1f,%.1f)",
-                    dp, az_px, az_py, az_pz, soh_px, soh_py, soh_pz);
+                    dp, az_px_n, az_py_n, az_pz_n, soh_px, soh_py, soh_pz);
                 fd.report("player-pos", buf);
             }
 
@@ -1654,15 +1686,22 @@ void CompareFirstDivImpl() {
             if (!fd.reported) fd.report("camera-side",
                 "SoH has no active camera at scene load");
         } else {
-            float dEye = std::sqrt((az_e[0]-ex)*(az_e[0]-ex)
-                                 + (az_e[1]-ey)*(az_e[1]-ey)
-                                 + (az_e[2]-ez)*(az_e[2]-ez));
-            float dAt  = std::sqrt((az_a[0]-ax)*(az_a[0]-ax)
-                                 + (az_a[1]-ay)*(az_a[1]-ay)
-                                 + (az_a[2]-az_at_pt)*(az_a[2]-az_at_pt));
-            float dUp  = std::sqrt((az_u[0]-ux)*(az_u[0]-ux)
-                                 + (az_u[1]-uy)*(az_u[1]-uy)
-                                 + (az_u[2]-uz)*(az_u[2]-uz));
+            // Apply per-axis camera sign-flip invariant (all false today).
+            const float cmx = FlipMul(AZ_CAM_X_SIGN_FLIP);
+            const float cmy = FlipMul(AZ_CAM_Y_SIGN_FLIP);
+            const float cmz = FlipMul(AZ_CAM_Z_SIGN_FLIP);
+            const float az_e0 = az_e[0]*cmx, az_e1 = az_e[1]*cmy, az_e2 = az_e[2]*cmz;
+            const float az_a0 = az_a[0]*cmx, az_a1 = az_a[1]*cmy, az_a2 = az_a[2]*cmz;
+            const float az_u0 = az_u[0]*cmx, az_u1 = az_u[1]*cmy, az_u2 = az_u[2]*cmz;
+            float dEye = std::sqrt((az_e0-ex)*(az_e0-ex)
+                                 + (az_e1-ey)*(az_e1-ey)
+                                 + (az_e2-ez)*(az_e2-ez));
+            float dAt  = std::sqrt((az_a0-ax)*(az_a0-ax)
+                                 + (az_a1-ay)*(az_a1-ay)
+                                 + (az_a2-az_at_pt)*(az_a2-az_at_pt));
+            float dUp  = std::sqrt((az_u0-ux)*(az_u0-ux)
+                                 + (az_u1-uy)*(az_u1-uy)
+                                 + (az_u2-uz)*(az_u2-uz));
             std::printf("  d5 camera basis: az_eye=(%.1f,%.1f,%.1f) "
                         "soh_eye=(%.1f,%.1f,%.1f) |Δeye|=%.2f "
                         "|Δat|=%.2f |Δup|=%.4f  soh_camId=%d fov=%.1f\n",
@@ -1797,7 +1836,12 @@ void CompareFirstDivImpl() {
                                           &s_px, &s_py, &s_pz,
                                           &s_rx, &s_ry, &s_rz)) continue;
                 if (s_id != a.id) continue;
-                float dx = s_px - a.px, dy = s_py - a.py, dz = s_pz - a.pz;
+                // Apply per-axis position sign-flip invariant to the Az side
+                // before differencing. All flags false today.
+                const float a_px = a.px * FlipMul(AZ_POS_X_SIGN_FLIP);
+                const float a_py = a.py * FlipMul(AZ_POS_Y_SIGN_FLIP);
+                const float a_pz = a.pz * FlipMul(AZ_POS_Z_SIGN_FLIP);
+                float dx = s_px - a_px, dy = s_py - a_py, dz = s_pz - a_pz;
                 float d2 = dx*dx + dy*dy + dz*dz;
                 if (d2 < bestD2) {
                     bestD2 = d2; best = i;
