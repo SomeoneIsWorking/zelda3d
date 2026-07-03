@@ -98,6 +98,12 @@ int SohState_Warp(unsigned short entrance) {
     // Also stop any running cutscene — a title-demo cutscene has its own
     // end-of-cs scheduled entrance that would overwrite our warp otherwise.
     gPlayState->csCtx.state = CS_STATE_IDLE;
+    // Force NORMAL game mode so the transition path in z_play.c goes
+    // Play_Init (loads by entranceIndex) instead of FileChoose_Init when
+    // called from title/file-select state. Also clear cutsceneIndex which
+    // gates a lot of scripted intro flow.
+    gSaveContext.gameMode      = GAMEMODE_NORMAL;
+    gSaveContext.cutsceneIndex = 0;
     gPlayState->nextEntranceIndex = (s16)entrance;
     gPlayState->transitionTrigger = TRANS_TRIGGER_START;
     gPlayState->transitionType    = TRANS_TYPE_INSTANT;

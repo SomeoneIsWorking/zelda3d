@@ -1455,13 +1455,20 @@ void CompareFirstDivImpl() {
     const bool az_at_title  = TitleActive();
     const bool soh_at_title = SohState_HasPlayState() &&
                               (SohState_SceneNum() & 0xFFFF) == 0x51;
+    const bool soh_in_play  = SohState_HasPlayState();
+    auto ps_az              = CurrentPlayState();
+    const bool az_in_play   = !az_at_title && ps_az.has_value();
     std::printf("  d1 gamestate:    az=%s soh=%s\n",
-                az_at_title ? "title(inline)" : "play",
-                soh_at_title ? "play(scene=0x51)" : "not-title");
-    if (az_at_title != soh_at_title) {
+                az_at_title ? "title(inline)" :
+                az_in_play  ? "play"          : "n/a",
+                soh_at_title ? "play(scene=0x51)" :
+                soh_in_play  ? "play"             : "not-title");
+    if (az_at_title != soh_at_title && !(az_in_play && soh_in_play)) {
         char buf[128]; std::snprintf(buf, sizeof buf,
-            "az=%d soh=%d — one side isn't at title yet",
-            (int)az_at_title, (int)soh_at_title);
+            "az_title=%d soh_title=%d az_play=%d soh_play=%d "
+            "— engines in different gamestate machinery",
+            (int)az_at_title, (int)soh_at_title,
+            (int)az_in_play, (int)soh_in_play);
         fd.report("gamestate-mode", buf);
     }
 
@@ -1469,8 +1476,8 @@ void CompareFirstDivImpl() {
     auto& mem = Core::System::GetInstance().Memory();
     unsigned az_scene = 0xFFFF, soh_scene = 0xFFFF;
     if (az_at_title) az_scene = 0x51;  // inline title always 0x51 at title
-    else if (auto ps = CurrentPlayState()) {
-        auto sn = mem.Read32OrNullopt(*ps + SCENENUM_OFF);
+    else if (ps_az) {
+        auto sn = mem.Read32OrNullopt(*ps_az + SCENENUM_OFF);
         if (sn) az_scene = *sn & 0xFFFF;
     }
     if (SohState_HasPlayState()) soh_scene = SohState_SceneNum() & 0xFFFF;
@@ -1480,6 +1487,117 @@ void CompareFirstDivImpl() {
             "az=0x%04x soh=0x%04x", az_scene, soh_scene);
         fd.report("sceneNum", buf);
     }
+
+    // Are both engines in the SAME gameplay scene (Play mode, not title-demo)?
+    // If so, route d3..d5 through the play-mode checks below and skip the
+    // title-only pose/camera work at the bottom.
+    const bool both_in_play_gameplay = az_in_play && soh_in_play &&
+                                       az_scene != 0xFFFF && az_scene != 0x51 &&
+                                       az_scene == soh_scene;
+    if (both_in_play_gameplay) {
+        // ── Play-mode d3: Link position match ────────────────────────────
+        // Walk Azahar's actor table for cat=2 (Player) id=0.
+        const uint32_t ctx = *ps_az + ACTORCTX_OFF;
+        bool az_player_found = false;
+        float az_px=0, az_py=0, az_pz=0;
+        short az_rx=0, az_ry=0, az_rz=0;
+        for (uint32_t cat = 0; cat < 12 && !az_player_found; ++cat) {
+            auto head = mem.Read32OrNullopt(ctx + ACTOR_LISTS_OFF + cat * 8 + 4);
+            if (!head || *head == 0) continue;
+            auto id = mem.Read32OrNullopt(*head + ACTOR_ID_OFF);
+            if (!id || (*id & 0xFFFF) != 0) continue;
+            auto rx = mem.Read32OrNullopt(*head + ACTOR_POS_OFF + 0);
+            auto ry = mem.Read32OrNullopt(*head + ACTOR_POS_OFF + 4);
+            auto rz = mem.Read32OrNullopt(*head + ACTOR_POS_OFF + 8);
+            auto rr = mem.Read32OrNullopt(*head + ACTOR_ROT_OFF + 0);
+            auto rr2= mem.Read32OrNullopt(*head + ACTOR_ROT_OFF + 4);
+            if (!rx || !ry || !rz || !rr || !rr2) break;
+            std::memcpy(&az_px, &*rx, 4);
+            std::memcpy(&az_py, &*ry, 4);
+            std::memcpy(&az_pz, &*rz, 4);
+            az_rx = static_cast<short>(*rr & 0xFFFF);
+            az_ry = static_cast<short>((*rr >> 16) & 0xFFFF);
+            az_rz = static_cast<short>(*rr2 & 0xFFFF);
+            az_player_found = true;
+        }
+        float soh_px=0, soh_py=0, soh_pz=0;
+        short soh_rx=0, soh_ry=0, soh_rz=0;
+        bool soh_player_found = SohState_PlayerPos(&soh_px, &soh_py, &soh_pz,
+                                                    &soh_rx, &soh_ry, &soh_rz) != 0;
+        if (!az_player_found || !soh_player_found) {
+            std::printf("  d3 player pos:   az=%s soh=%s\n",
+                        az_player_found ? "found" : "no Player actor",
+                        soh_player_found ? "found" : "no Player actor");
+            if (!fd.reported) fd.report("player-actor",
+                az_player_found ? "SoH has no live Player actor" :
+                                  "Azahar has no cat=2 id=0 actor");
+        } else {
+            float dp = std::sqrt((az_px-soh_px)*(az_px-soh_px)
+                               + (az_py-soh_py)*(az_py-soh_py)
+                               + (az_pz-soh_pz)*(az_pz-soh_pz));
+            std::printf("  d3 player pos:   az=(%.1f,%.1f,%.1f) soh=(%.1f,%.1f,%.1f) "
+                        "|Δ|=%.2f\n",
+                        az_px, az_py, az_pz, soh_px, soh_py, soh_pz, dp);
+            if (!fd.reported && dp > 1.0f) {
+                char buf[192]; std::snprintf(buf, sizeof buf,
+                    "|Δpos|=%.2f az=(%.1f,%.1f,%.1f) soh=(%.1f,%.1f,%.1f)",
+                    dp, az_px, az_py, az_pz, soh_px, soh_py, soh_pz);
+                fd.report("player-pos", buf);
+            }
+
+            // ── Play-mode d4: Link rotation match ────────────────────────
+            // s16 Vec3s rot: X,Y,Z on both sides (OoT3D packs rx/ry into 4B,
+            // rz into next 4B; reads above already unpacked to shorts).
+            int drx = (int)az_rx - (int)soh_rx;
+            int dry = (int)az_ry - (int)soh_ry;
+            int drz = (int)az_rz - (int)soh_rz;
+            auto wrap = [](int d){
+                if (d >  32768) d -= 65536;
+                if (d < -32768) d += 65536;
+                return d < 0 ? -d : d;
+            };
+            int adrx = wrap(drx), adry = wrap(dry), adrz = wrap(drz);
+            int worstAxis = 0; int worstD = adrx;
+            if (adry > worstD) { worstAxis = 1; worstD = adry; }
+            if (adrz > worstD) { worstAxis = 2; worstD = adrz; }
+            std::printf("  d4 player rot:   az=(%d,%d,%d) soh=(%d,%d,%d) "
+                        "|Δaxis0..2|=(%d,%d,%d)\n",
+                        az_rx, az_ry, az_rz, soh_rx, soh_ry, soh_rz,
+                        adrx, adry, adrz);
+            // Tolerate ≤8 binary-angle units (rounding); anything larger is
+            // a real rotation drift.
+            if (!fd.reported && worstD > 8) {
+                char buf[192]; std::snprintf(buf, sizeof buf,
+                    "worst axis=%d Δ=%d (az_rot=(%d,%d,%d) soh_rot=(%d,%d,%d))",
+                    worstAxis, worstD, az_rx, az_ry, az_rz,
+                    soh_rx, soh_ry, soh_rz);
+                fd.report("player-rot", buf);
+            }
+        }
+
+        // ── Play-mode d5: camera basis — SoH-only for now ────────────────
+        // Azahar's play-mode active camera lives inside gPlayState (via
+        // cameraPtrs[activeCamId]). Offsets not yet RE'd; print SoH's basis
+        // so the log is legible, and note the Az side as TODO.
+        float ex, ey, ez, ax, ay, az_at_pt, ux, uy, uz, fov;
+        short roll; int camId;
+        if (SohState_Camera(&ex, &ey, &ez, &ax, &ay, &az_at_pt,
+                            &ux, &uy, &uz, &fov, &roll, &camId)) {
+            std::printf("  d5 camera basis: az=TODO(play-cam not RE'd) "
+                        "soh_eye=(%.1f,%.1f,%.1f) soh_at=(%.1f,%.1f,%.1f) "
+                        "camId=%d fov=%.1f\n",
+                        ex, ey, ez, ax, ay, az_at_pt, camId, fov);
+        } else {
+            std::printf("  d5 camera basis: az=TODO(play-cam not RE'd) "
+                        "soh=(no active camera)\n");
+        }
+
+        if (!fd.reported) {
+            std::printf("  firstdiv: none — play-mode d1..d4 matched (d5 az-side pending RE)\n");
+        }
+        return;
+    }
+    // Fall through to title-mode d3..d5 below.
 
     // Dim 3: Link ↔ Link limb count under the RE'd index mapping.
     //
