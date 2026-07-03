@@ -1696,7 +1696,14 @@ int gZelda3dTitleCam = 1;
 // OoT3D's slight roll rather than forcing straight-up, so the horizon tilt
 // matches OoT3D's title-screen framing.
 static const float kZelda3dTitleEye[3] = { -4071.49f,  57.81f, 5217.30f };
-static const float kZelda3dTitleAt[3]  = { -4521.49f, 142.81f, 4328.30f }; // eye + dir*1000
+// JIT-caught writer (FUN_004235B8 @ 0x004235d4) inverts the OoT3D view
+// matrix and stores {right, up, at−eye} at 0x005BE6E0, 0x005BE6EC,
+// 0x005BE6F8. The RE'd "dir" at +0x0C was actually the RIGHT axis;
+// the actual viewing direction (target − eye) lives at +0x18 as
+// (-0.868, +0.195, +0.458). See oot3d-decomp/docs/title_view_matrix_lh.md
+// and the JIT trail in title_basis_writer_static_deadend.md.
+// So `at = eye + at_dir * 1000`:
+static const float kZelda3dTitleAt[3]  = { -4939.49f, 252.81f, 5675.30f };
 static const float kZelda3dTitleUp[3]  = {     0.212f,   0.977f,   -0.014f };
 
 // --- OoT3D title-demo rider port -----------------------------------------
