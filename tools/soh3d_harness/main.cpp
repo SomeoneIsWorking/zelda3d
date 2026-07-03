@@ -1048,6 +1048,26 @@ constexpr uint32_t ACTOR_SPEEDXZ_OFF       = 0x0068;
 // offset on the Az side so the compare doesn't fabricate a rotation
 // divergence from the static spawn-rot field.
 constexpr uint32_t PLAYER_YAW_OFF           = 0x0036;
+
+// Actor.bgCheckFlags — u16 bitfield of "what am I touching" queried by
+// Player_Update to gate wall-slide, wall-climb, jump-off-ledge, etc.
+// SoH-N64's docblock (z64actor.h:277-288):
+//   bit 0x001  standing on the ground
+//   bit 0x008  touching a wall
+//   bit 0x010  touching a ceiling
+//   bit 0x080  similar to 0x001 but with no velocity check
+//   bit 0x200  set/used only by Player
+// Discovered by 3-state wall-walk scan (scratch/az_bgflags_scan.py +
+// az_bgflags_confirm.py, 2026-07-03): at Actor+0x0090 the u16 transitions
+//   rest (Link at spawn, standing):  0x0081  (0x01 + 0x80)
+//   wall (walked into wall, held):   0x0289  (0x01 + 0x08 + 0x80 + 0x200)
+//   released (stick zeroed, on gnd): 0x0081  (wall bit cleared)
+// Byte-for-byte matches SoH-N64's bgCheckFlags bit pattern. GREZZO shifted
+// the field from N64's 0x088 by +8 bytes; probably one extra pointer/f32
+// slot inserted earlier in Actor.
+constexpr uint32_t ACTOR_BGCHECKFLAGS_OFF   = 0x0090;
+constexpr uint16_t BGCF_WALL                = 0x0008;
+constexpr uint16_t BGCF_GROUND              = 0x0001;
 constexpr uint32_t TRANSITION_TRIGGER_OFF  = 0x5C2D;
 constexpr uint32_t NEXT_ENTRANCE_OFF       = 0x5C32;
 constexpr uint8_t  TRANS_TRIGGER_START     = 20;
@@ -1169,14 +1189,16 @@ inline DivDecision ClassifyD7Worst(int worstCat, int worstId) {
     return kUnclassified;
 }
 // d3 Player-pos classifier. Uses live speedXZ readback on both engines
-// + SoH bgCheckFlags to decide: wall-stop deferred vs matched-rate noise
-// vs unclassified.
+// + bgCheckFlags on BOTH sides (Az RE'd at Actor+0x0090, soh3d b50560b+)
+// to decide: wall-stop deferred vs matched-rate noise vs unclassified.
 inline DivDecision ClassifyD3PlayerPos(float soh_speedXZ, float az_speedXZ,
-                                        unsigned int soh_bgFlags) {
+                                        unsigned int soh_bgFlags,
+                                        unsigned int az_bgFlags) {
     const bool soh_walled = (soh_bgFlags & 0x0008u) != 0;
-    if (soh_walled) {
+    const bool az_walled  = (az_bgFlags  & 0x0008u) != 0;
+    if (soh_walled || az_walled) {
         return {DivClass::DeferredPortTarget, "collision-wall",
-                "Player Actor+0x088 bgCheckFlags (needs Az-side RE)",
+                "Player Actor+0x0090 bgCheckFlags & 0x008 (soh3d TBD)",
                 "Actor.bgCheckFlags & 0x008 (z64actor.h:237, :281)",
                 "oot3d-decomp/docs/gameplay_firstdiv.md#scene-collision"};
     }
@@ -1781,25 +1803,37 @@ void CompareFirstDivImpl() {
                 SohState_PlayerWallInfo(&soh_bg, &wY, &wBg, &wP,
                                          &soh_spdXZ, &soh_velY);
                 float az_spdXZ = 0.0f;
+                unsigned int az_bg = 0;
                 if (az_player_found) {
-                    // Read Az Player speedXZ. Walk player_actor addr by
-                    // repeating the same cat=2 lookup used above.
+                    // Read Az Player speedXZ + bgCheckFlags. Walk player_actor
+                    // addr by repeating the same cat=2 lookup used above.
                     auto head = mem.Read32OrNullopt(ctx + ACTOR_LISTS_OFF +
                                                     2 * 8 + 4);
                     if (head && *head != 0) {
                         auto sv = mem.Read32OrNullopt(*head +
                                                       ACTOR_SPEEDXZ_OFF);
                         if (sv) std::memcpy(&az_spdXZ, &*sv, 4);
+                        auto bv = mem.Read32OrNullopt(*head +
+                                                      (ACTOR_BGCHECKFLAGS_OFF & ~3u));
+                        if (bv) {
+                            unsigned int raw = *bv;
+                            // bgCheckFlags is u16 at 0x0090; that's aligned
+                            // to the u32 low half.
+                            az_bg = raw & 0xFFFFu;
+                        }
                     }
                 }
-                d3_decision = ClassifyD3PlayerPos(soh_spdXZ, az_spdXZ, soh_bg);
+                d3_decision = ClassifyD3PlayerPos(soh_spdXZ, az_spdXZ,
+                                                    soh_bg, az_bg);
                 if (d3_decision.cls != DivClass::Unclassified) {
                     std::printf("    d3 classified: %s (%s) — "
-                                "soh_v=%.2f az_v=%.2f soh_bgW=%d\n"
+                                "soh_v=%.2f az_v=%.2f "
+                                "soh_bgW=%d az_bgW=%d\n"
                                 "      origin: az=%s  soh=%s  doc=%s\n",
                                 DivClassStr(d3_decision.cls), d3_decision.tag,
                                 soh_spdXZ, az_spdXZ,
                                 (int)((soh_bg & 0x0008u) != 0),
+                                (int)((az_bg & 0x0008u) != 0),
                                 d3_decision.origin_az,
                                 d3_decision.origin_soh,
                                 d3_decision.origin_doc);
