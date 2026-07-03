@@ -1078,6 +1078,24 @@ void HandleWarp(std::istringstream& toks) {
     std::printf("ok warp 0x%04x\n", static_cast<unsigned>(*ent & 0xFFFF));
 }
 
+// SoH-only warp: schedule a scene transition on the SoH side without
+// touching Azahar. Needed when we've put Azahar into the target scene
+// via a savestate and now want SoH to warp there independently — the
+// combined `force warp` writes both, which re-triggers Azahar's
+// already-loaded Play and (empirically) sends it back to title.
+void HandleSohWarp(std::istringstream& toks) {
+    std::string ent_s;
+    if (!(toks >> ent_s)) { PrintErr("soh_warp: usage: soh_warp <entrance>"); return; }
+    auto ent = ParseNum(ent_s);
+    if (!ent) { PrintErr("soh_warp: bad entrance"); return; }
+    if (!g_soh_booted) { PrintErr("soh_warp: run soh_boot first"); return; }
+    if (!SohState_Warp(static_cast<unsigned short>(*ent & 0xFFFF))) {
+        PrintErr("soh_warp: no playstate — soh_step until Play is up first");
+        return;
+    }
+    std::printf("ok soh_warp 0x%04x\n", static_cast<unsigned>(*ent & 0xFFFF));
+}
+
 void HandleActors(std::istringstream&) {
     auto ps = CurrentPlayState();
     if (!ps) { PrintErr("actors: no playstate"); return; }
@@ -1455,7 +1473,7 @@ void CompareFirstDivImpl() {
         auto sn = mem.Read32OrNullopt(*ps + SCENENUM_OFF);
         if (sn) az_scene = *sn & 0xFFFF;
     }
-    if (soh_at_title) soh_scene = SohState_SceneNum() & 0xFFFF;
+    if (SohState_HasPlayState()) soh_scene = SohState_SceneNum() & 0xFFFF;
     std::printf("  d2 sceneNum:     az=0x%04x soh=0x%04x\n", az_scene, soh_scene);
     if (!fd.reported && az_scene != soh_scene) {
         char buf[128]; std::snprintf(buf, sizeof buf,
@@ -1904,6 +1922,7 @@ void RunRepl() {
         else if (cmd == "titleactors") HandleTitleActors(toks);
         else if (cmd == "scene")     HandleScene(toks);
         else if (cmd == "warp")      HandleWarp(toks);
+        else if (cmd == "soh_warp")  HandleSohWarp(toks);
         else if (cmd == "actors")    HandleActors(toks);
         else if (cmd == "soh_boot")  HandleSohBoot(toks);
         else if (cmd == "soh_step")  HandleSohStep(toks);
