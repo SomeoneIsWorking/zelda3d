@@ -779,8 +779,15 @@ static void Zelda3D_HudRect(float x, float y, float w, float h, unsigned int tin
     Zelda3D_Hud_Draw(0, x, y, w, h, 0.0f, 0.0f, 1.0f, 1.0f, tint);
 }
 
+extern int gZelda3dInTitleDemo;   // defined below; forward for Zelda3D_HudFrame's early gate
+
 void Zelda3D_HudFrame(void) {
     if (!Zelda3D_PcHudEnabled()) {
+        return;
+    }
+    // Az's title-demo shot 1 shows no HUD — suppress here so the PC-HUD
+    // path also honours the title-demo (task #14, alongside Interface_Draw).
+    if (gZelda3dInTitleDemo) {
         return;
     }
     const Zelda3dHudState* s = &gZelda3dHudState;
@@ -1819,6 +1826,13 @@ static float   gZelda3dRiderSpeed  = 8.0f;
 static size_t  gZelda3dRiderWaypointIdx = 0;
 static int     gZelda3dRiderWasInTitle  = 0;
 
+// Set to 1 at the tail of Zelda3D_ApplyTitleCam each frame the title-demo
+// override is active; cleared everywhere Zelda3D_ApplyTitleCam early-returns.
+// Read by Interface_Draw (z_parameter.c) to suppress the N64 HUD, and by
+// title-overlay draw sites to suppress the "PRESS START" / logo overlays.
+// See task #14/#15.
+int gZelda3dInTitleDemo = 0;
+
 // Reset integrator to spawn state. Called on title-demo entry.
 static void Zelda3D_RiderReset(void) {
     gZelda3dRiderPos[0]        = -5898.0f;
@@ -1882,6 +1896,7 @@ static int Zelda3D_TitleCamEnabled(void) {
 // is NOT set (so the REPL `cam` override takes full precedence for A/B).
 static int Zelda3D_ApplyTitleCam(PlayState* play) {
     if (play == NULL || !Zelda3D_TitleCamEnabled()) {
+        gZelda3dInTitleDemo = 0;
         return 0;
     }
     // Title-demo conditions: no ZELDA3D_WARP warp target (empty string env) +
@@ -1892,12 +1907,15 @@ static int Zelda3D_ApplyTitleCam(PlayState* play) {
     // warp; that's the parity-honest title-demo definition.
     if (Zelda3D_AutoWarpEnabled()) {
         gZelda3dRiderWasInTitle = 0;  // next entry will re-Reset (task #12)
+        gZelda3dInTitleDemo = 0;
         return 0; // user has a warp target → not the title screen
     }
     if (play->sceneNum != SCENE_HYRULE_FIELD) {
         gZelda3dRiderWasInTitle = 0;
+        gZelda3dInTitleDemo = 0;
         return 0;
     }
+    gZelda3dInTitleDemo = 1;
     play->view.eye.x    = kZelda3dTitleEye[0];
     play->view.eye.y    = kZelda3dTitleEye[1];
     play->view.eye.z    = kZelda3dTitleEye[2];
@@ -1942,6 +1960,13 @@ static int Zelda3D_ApplyTitleCam(PlayState* play) {
             pl->actor.world.pos.z = kZelda3dTitleRiderSettledPos[2];
         }
     }
+    // Nighttime — task #13. Az's OoT3D title shows a deep-blue sky with
+    // moon top-right and silhouette cliffs. SoH's own title-demo picks a
+    // day dayTime because the N64 title-cs sweep runs a day setup; force
+    // midnight (0x0000) here so envCtx's sun/moon/ambient blend produces
+    // the OoT3D-matching framing. Pinned every frame during title-demo,
+    // like the cam basis + Player.pos above.
+    gSaveContext.dayTime = 0x0000;
     return 1;
 }
 

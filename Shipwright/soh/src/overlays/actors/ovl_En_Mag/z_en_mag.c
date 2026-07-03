@@ -755,6 +755,16 @@ void EnMag_DrawInner(Actor* thisx, PlayState* play, Gfx** gfxP) {
 }
 
 void EnMag_Draw(Actor* thisx, PlayState* play) {
+    // Zelda3D title-demo — Az's OoT3D title shot 1 shows no N64 logo /
+    // PRESS START / copyright. Suppress the whole En_Mag draw (which is
+    // "Title Screen Manager & Logo") while our title-demo override is
+    // active. Task #15.
+    {
+        extern int gZelda3dInTitleDemo;
+        if (gZelda3dInTitleDemo) {
+            return;
+        }
+    }
     s32 pad;
     Gfx* gfx;
     Gfx* gfxRef;
