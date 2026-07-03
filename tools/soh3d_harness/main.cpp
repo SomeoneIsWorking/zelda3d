@@ -937,6 +937,17 @@ constexpr uint32_t SCENENUM_OFF            = 0x0104;
 constexpr uint32_t TITLE_CTX_VA            = 0x0050AF34;
 constexpr uint32_t TITLE_SCENE_OFF         = 0x006C;  // *0x0050afa0 == 0x51 at title
 constexpr uint32_t TITLE_ACTIVE_OFF        = 0x0078;  // *0x0050afac == 1 at title
+
+// OoT3D title-demo actor pose table. RE'd by dumping .data across snapshots
+// at frames N and N+300 (soh3d/scratch/gamestate_re/data_dt_*.bin): 24
+// contiguous 36-byte entries {Vec3 pos, Vec3 rot(rad), Vec3 scale} start
+// at 0x005642F4, all with scale==(1,1,1) at title, several with per-frame
+// motion consistent with the Hyrule-field flyover. The static-analysis
+// pool scan finds no direct u32 refs to the table (writers use register-
+// indexed stores), so we read-only via Memory here.
+constexpr uint32_t TITLE_POSE_TABLE_VA     = 0x005642F4;
+constexpr uint32_t TITLE_POSE_COUNT        = 24;
+constexpr uint32_t TITLE_POSE_STRIDE       = 36;
 constexpr uint32_t ACTORCTX_OFF            = 0x208C;
 constexpr uint32_t ACTOR_LISTS_OFF         = 0x000C;
 constexpr uint32_t ACTOR_ID_OFF            = 0x0000;
@@ -970,6 +981,35 @@ void HandlePlayState(std::istringstream&) {
     auto ps = CurrentPlayState();
     if (!ps) { PrintErr("playstate: not populated (still in menu/title?)"); return; }
     std::printf("ok 0x%08x\n", *ps);
+}
+
+// Dump all 24 title-demo pose entries. Multiline reply, terminated by `ok end`.
+// Only meaningful at title (TitleActive()); returns err otherwise.
+void HandleTitleActors(std::istringstream&) {
+    if (!TitleActive()) {
+        PrintErr("titleactors: not at title (scene!=0x51 or active flag clear)");
+        return;
+    }
+    auto& mem = Core::System::GetInstance().Memory();
+    std::printf("ok titleactors %u\n", TITLE_POSE_COUNT);
+    for (uint32_t i = 0; i < TITLE_POSE_COUNT; ++i) {
+        const uint32_t va = TITLE_POSE_TABLE_VA + i * TITLE_POSE_STRIDE;
+        float p[3], r[3], s[3];
+        bool bad = false;
+        for (int j = 0; j < 3; ++j) {
+            auto vp = mem.Read32OrNullopt(va + 0  + j*4);
+            auto vr = mem.Read32OrNullopt(va + 12 + j*4);
+            auto vs = mem.Read32OrNullopt(va + 24 + j*4);
+            if (!vp || !vr || !vs) { bad = true; break; }
+            std::memcpy(&p[j], &*vp, 4);
+            std::memcpy(&r[j], &*vr, 4);
+            std::memcpy(&s[j], &*vs, 4);
+        }
+        if (bad) { std::printf("  %2u @ 0x%08x  <unmapped>\n", i, va); continue; }
+        std::printf("  %2u @ 0x%08x  pos=(%9.2f,%9.2f,%9.2f)  rot=(%6.3f,%6.3f,%6.3f)  scale=(%.2f,%.2f,%.2f)\n",
+                    i, va, p[0], p[1], p[2], r[0], r[1], r[2], s[0], s[1], s[2]);
+    }
+    std::printf("ok end\n");
 }
 
 void HandleScene(std::istringstream&) {
@@ -1460,6 +1500,7 @@ void RunRepl() {
         else if (cmd == "loadstate") HandleLoadState(toks);
         else if (cmd == "savestate") HandleSaveState(toks);
         else if (cmd == "playstate") HandlePlayState(toks);
+        else if (cmd == "titleactors") HandleTitleActors(toks);
         else if (cmd == "scene")     HandleScene(toks);
         else if (cmd == "warp")      HandleWarp(toks);
         else if (cmd == "actors")    HandleActors(toks);
