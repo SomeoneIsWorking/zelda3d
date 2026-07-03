@@ -2241,6 +2241,37 @@ void CompareFirstDivImpl() {
                                     p_yOff, p_dMin, p_dMax, p_u0C,
                                     p_u10, p_u14, p_fov, p_atLS,
                                     (int)p_pitch, (unsigned)p_flags);
+                                // Δ-A probe: FUN_00338ac8 (Camera_CalcAtDefault)
+                                // hand-disasm found an extra Y adjustment gated
+                                // on *(u32*)(player + 0x29b8) & 0x100, where the
+                                // adjustment magnitude is *(f32*)(player+0x1760)
+                                // * -0.01f. Read both live fields to confirm
+                                // the |Δeye|=25 Y drift is from this block.
+                                // See oot3d-decomp docs/gameplay_firstdiv.md
+                                // "Δ-A resolution".
+                                auto w_player = mem.Read32OrNullopt(
+                                    *cam_ptr + 0xD8);
+                                if (w_player && *w_player != 0) {
+                                    auto w_state = mem.Read32OrNullopt(
+                                        *w_player + 0x29B8);
+                                    auto w_ybias = mem.Read32OrNullopt(
+                                        *w_player + 0x1760);
+                                    float ybias = 0.0f;
+                                    if (w_ybias) std::memcpy(
+                                        &ybias, &*w_ybias, 4);
+                                    uint32_t state = w_state ? *w_state : 0;
+                                    bool bit100 = (state & 0x100) != 0;
+                                    float extraAtY = bit100
+                                        ? (ybias * -0.01f) : 0.0f;
+                                    std::printf(
+                                        "        az_deltaA: player=0x%08x "
+                                        "state[+0x29B8]=0x%08x bit0x100=%d "
+                                        "ybias[+0x1760]=%.2f "
+                                        "→ extraAtY=%.2f (predicts Δat.y "
+                                        "= -%.2f; observed |Δeye|~25)\n",
+                                        *w_player, state, (int)bit100,
+                                        ybias, extraAtY, -extraAtY);
+                                }
                             }
                         } else {
                             std::printf("        az_cam: cam@0x%08x — "
