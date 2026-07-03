@@ -103,6 +103,28 @@ int SohState_SetPlayerYaw(int yaw_s16) {
     return 1;
 }
 
+// Set gSaveContext.linkAge (0 = adult, 1 = child). Camera_CalcAtDefault
+// and any Player_GetHeight consumer keys off this — without a match,
+// engines with different ages produce a 24-unit (68−44) at.y drift that
+// looks like a camera bug but isn't. Set BEFORE soh_warp so the freshly
+// spawned Player uses the requested age. Returns 1 on success (always,
+// since gSaveContext is a global — the check just documents intent).
+int SohState_SetLinkAge(int age) {
+    gSaveContext.linkAge = (s32)(age != 0 ? 1 : 0);
+    // Also update the per-Play mirror so z_play.c:271's inequality check
+    // doesn't re-swap equipment on the next scene teardown (it copies
+    // gSaveContext.linkAge into play->linkAgeOnLoad at z_scene.c:207
+    // during scene load anyway; this pins them in advance).
+    if (gPlayState != NULL) {
+        gPlayState->linkAgeOnLoad = (u8)gSaveContext.linkAge;
+    }
+    return 1;
+}
+
+int SohState_GetLinkAge(void) {
+    return (int)gSaveContext.linkAge;
+}
+
 // Player Link accessor: reads through the actor-category-Player list,
 // or falls back to gSaveContext.entranceIndex if no player is live yet.
 int SohState_PlayerPos(float* px, float* py, float* pz,
