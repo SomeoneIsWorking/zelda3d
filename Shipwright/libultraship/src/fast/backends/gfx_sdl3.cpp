@@ -325,6 +325,20 @@ void GfxWindowBackendSDL3::Init(const char* gameName, const char* gfxApiName, bo
                                 uint32_t height, int32_t posX, int32_t posY) {
     mWindowWidth = width;
     mWindowHeight = height;
+    // Env overrides for the harness / parity workflows where the SoH3D framebuffer must match a
+    // target size exactly (e.g. task #16 title parity vs the 3DS top screen aspect 5:3, rendered
+    // at 1000×600 so the harness snapshot lines up with an upscaled Az capture). Not used for
+    // normal gameplay windows.
+    const char* wEnv = getenv("SOH3D_WIN_W");
+    const char* hEnv = getenv("SOH3D_WIN_H");
+    if (wEnv) {
+        int wv = atoi(wEnv);
+        if (wv > 0) mWindowWidth = (uint32_t)wv;
+    }
+    if (hEnv) {
+        int hv = atoi(hEnv);
+        if (hv > 0) mWindowHeight = (uint32_t)hv;
+    }
 
 #if defined(_WIN32) && SDL_VERSION_ATLEAST(2, 24, 0)
     /* fix DPI scaling issues on Windows */
@@ -443,6 +457,10 @@ void GfxWindowBackendSDL3::Init(const char* gameName, const char* gfxApiName, bo
     if (mUseSdl3Gpu) {
         // The SDL3-GPU rendering API claims mWnd for its GPU device in its Init(). No GL context.
         SDL_GetWindowSizeInPixels(mWnd, &mWindowWidth, &mWindowHeight);
+        // Re-apply the env override (SDL_GetWindowSizeInPixels can report a compositor-default size
+        // on hidden Wayland windows, silently overriding our requested small size).
+        if (wEnv) { int v = atoi(wEnv); if (v > 0) mWindowWidth  = (uint32_t)v; }
+        if (hEnv) { int v = atoi(hEnv); if (v > 0) mWindowHeight = (uint32_t)v; }
         if (startFullScreen) {
             SetFullscreenImpl(true, false);
         }
@@ -591,6 +609,10 @@ void GfxWindowBackendSDL3::GetDimensions(uint32_t* width, uint32_t* height, int3
         SDL_GetWindowSizeInPixels(mWnd, static_cast<int*>((void*)width), static_cast<int*>((void*)height));
 #endif
     }
+    // SOH3D_WIN_W/H env override: on hidden Wayland windows, SDL can report a compositor-default
+    // size instead of the requested one — force the render target to match the harness's request.
+    if (const char* w = getenv("SOH3D_WIN_W")) { int v = atoi(w); if (v > 0) *width  = (uint32_t)v; }
+    if (const char* h = getenv("SOH3D_WIN_H")) { int v = atoi(h); if (v > 0) *height = (uint32_t)v; }
     SDL_GetWindowPosition(mWnd, static_cast<int*>(posX), static_cast<int*>(posY));
 }
 

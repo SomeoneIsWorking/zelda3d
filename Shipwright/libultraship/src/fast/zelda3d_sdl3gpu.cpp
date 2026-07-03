@@ -739,10 +739,12 @@ Fast::SgModel* Fast::Zelda3DRenderer::ensureUnifiedUploaded(int modelId) {
 
     std::vector<UnifiedVtx> all;
     for (int i = 0; i < groupCount; i++) {
-        // gZelda3dWorldLit gates the TEV scale exactly like the old path's uExtra[3] (ubo.uExtra[3] in
-        // DrawModel) — legacy-off leaves it at 1.0 (no scale) to match the old texture*vColor*uTint
-        // behavior when the port is toggled off.
-        float scale = (groups[i].vertexLighting && gZelda3dWorldLit) ? groups[i].combScaleRGB : 1.0f;
+        // combScaleRGB is the CMB material's authored TEV stage-0 RGB scale (Kokiri grass ×2, etc)
+        // — a static material property that runs unconditionally on the 3DS regardless of PICA
+        // fragment-lighting state. Apply it whenever the material declares vertexLighting=1; do
+        // NOT gate on gZelda3dWorldLit here, which only controls the ambient+diffuse*NdotL
+        // computation (task #16: at title, that compute is off but combScaleRGB must remain).
+        float scale = groups[i].vertexLighting ? groups[i].combScaleRGB : 1.0f;
         for (uint32_t k = 0; k < groups[i].vertCount; k++)
             all.push_back(PackUnifiedVtx(groups[i].verts[k], scale));
     }
@@ -1589,7 +1591,11 @@ void Fast::Zelda3DRenderer::DrawModel(int modelId, const float* mp16, const floa
         }
         ubo.uParams[2] = grp.alphaTest ? grp.alphaRef : 0.0f;
         ubo.uParams[3] = grp.polygonOffset;
-        ubo.uExtra[3] = (grp.vertexLighting && gZelda3dWorldLit) ? grp.combScaleRGB : 1.0f;
+        // combScaleRGB is the CMB material's authored TEV stage-0 RGB scale — always apply when
+        // the material asks for it. Only the additive scene-ambient floor (uAmbient.w below) is
+        // gated by gZelda3dWorldLit (task #16: at title we skip the synthetic vertex-lit compute
+        // but keep the material's static brightness).
+        ubo.uExtra[3] = grp.vertexLighting ? grp.combScaleRGB : 1.0f;
         bool ambGroup = (grp.vertexLighting && gZelda3dWorldLit);
         ubo.uAmbient[0] = base.uAmbient[0] * grp.matAmbient[0];
         ubo.uAmbient[1] = base.uAmbient[1] * grp.matAmbient[1];
@@ -1608,7 +1614,15 @@ void Fast::Zelda3DRenderer::DrawModel(int modelId, const float* mp16, const floa
             ubo.uMatConst[0] = grp.matConstant[ci][0];
             ubo.uMatConst[1] = grp.matConstant[ci][1];
             ubo.uMatConst[2] = grp.matConstant[ci][2];
-            ubo.uMatConst[3] = grp.combUsesConst ? 1.0f : 0.0f;
+            // Only apply the CONSTANT modulation when it's a valid MODULATE colour (non-zero
+            // RGB). Some CMB materials list CONSTANT as a stage source but the actual combiner
+            // op is REPLACE / ADD (multi-stage full emulation is a documented follow-up); their
+            // baked constant is (0,0,0,1) which our MODULATE-only fallback would turn to BLACK.
+            // fine_star.cmb is the flagship case: combUsesConst=1 + matConst[0]=(0,0,0,1) is
+            // just a stage-source marker, and multiplying by 0 hides every star (task #16).
+            bool constBlack = (grp.matConstant[ci][0] < 1e-4f && grp.matConstant[ci][1] < 1e-4f &&
+                               grp.matConstant[ci][2] < 1e-4f);
+            ubo.uMatConst[3] = (grp.combUsesConst && !constBlack) ? 1.0f : 0.0f;
             if (matConstMap && grp.materialIndex >= 0) {
                 auto ov = matConstMap->find(grp.materialIndex);
                 if (ov != matConstMap->end() && ov->second.constIdx == ci) {
