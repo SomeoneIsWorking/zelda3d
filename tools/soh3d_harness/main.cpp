@@ -1627,6 +1627,17 @@ void CompareFirstDivImpl() {
             az_rx = static_cast<short>(*rr & 0xFFFF);
             az_ry = static_cast<short>((*rr >> 16) & 0xFFFF);
             az_rz = static_cast<short>(*rr2 & 0xFFFF);
+            // OoT3D decoupled Actor.world.rot.y (static spawn value) from
+            // the live-facing yaw the Player_Update writes each frame.
+            // Live yaw lives at Player+0x36 (see PLAYER_YAW_OFF block).
+            // Without this override d4 fabricates a ~32700 rotation
+            // divergence on every startup because it reads the spawn slot.
+            auto yaw_u32 = mem.Read32OrNullopt(*head +
+                (PLAYER_YAW_OFF & ~3u));
+            if (yaw_u32) {
+                az_ry = static_cast<short>(
+                    (*yaw_u32 >> ((PLAYER_YAW_OFF & 2) * 8)) & 0xFFFF);
+            }
             az_player_found = true;
         }
         float soh_px=0, soh_py=0, soh_pz=0;
