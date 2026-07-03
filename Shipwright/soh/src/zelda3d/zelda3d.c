@@ -1982,7 +1982,15 @@ static int Zelda3D_ApplyTitleCam(PlayState* play) {
     // skyboxId to SKYBOX_NORMAL_SKY (the N64 title uses SKYBOX_CUTSCENE_MAP
     // or similar which trips the early-out inside TryDrawSunMoon).
     play->envCtx.sunMoonDisabled = false;
+    play->envCtx.skyboxDisabled  = false;   // title-cs sets this; blocks Zelda3D_TryDrawSky
     play->skyboxId = SKYBOX_NORMAL_SKY;
+    // Force the night sky variant (index 3 = fine_tenkyu_3): the 3DS
+    // title renders the BlueSky dome's dark-blue night dome + kumo cloud
+    // band + fine_star stars — none of which show up if the N64 sSkybox-
+    // Table lookup lands on a day/dusk index. Task #16 sky-parity arc.
+    play->envCtx.skybox1Index = 3;
+    play->envCtx.skybox2Index = 3;
+    play->envCtx.skyboxBlend  = 0;
     // Pin FOV to the OoT3D title value (probe read at
     // TITLE_CAM_BASIS_VA+0x34 = 48.803°; SoH's title-cs otherwise
     // holds ~45.4°). Task #16 handedness/framing arc.
