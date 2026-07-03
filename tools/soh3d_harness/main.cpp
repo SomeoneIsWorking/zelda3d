@@ -189,6 +189,11 @@ extern "C" {
                               float* out_px, float* out_py, float* out_pz,
                               short* out_rx, short* out_ry, short* out_rz);
     int SohState_SetInput(unsigned int button, int stickX, int stickY);
+    int SohState_PlayerWallInfo(unsigned int* out_bgFlags,
+                                 int* out_wallYaw, int* out_wallBgId,
+                                 unsigned long* out_wallPoly,
+                                 float* out_speedXZ, float* out_velY);
+    int SohState_TeleportPlayer(float x, float y, float z);
     int SohState_DumpControlFlags(unsigned int* out_stateFlags1,
                                    int* out_csState, unsigned int* out_csIndex,
                                    unsigned int* out_nextCsIndex,
@@ -2378,6 +2383,30 @@ void RunRepl() {
             std::printf("ok analog L=(%d,%d) R=(%d,%d)\n",
                         (int)g_az_analog_lx, (int)g_az_analog_ly,
                         (int)g_az_analog_rx, (int)g_az_analog_ry);
+        }
+        else if (cmd == "soh_wallinfo") {
+            if (!g_soh_booted) { PrintErr("soh_wallinfo: run soh_boot first"); continue; }
+            unsigned int bgFlags = 0; int wallYaw = 0, wallBgId = 0;
+            unsigned long wallPoly = 0; float speedXZ = 0, velY = 0;
+            if (!SohState_PlayerWallInfo(&bgFlags, &wallYaw, &wallBgId,
+                                         &wallPoly, &speedXZ, &velY)) {
+                PrintErr("soh_wallinfo: no player"); continue;
+            }
+            std::printf("ok bgFlags=0x%04x wallYaw=%d wallBgId=%d wallPoly=0x%lx "
+                        "speedXZ=%.3f velY=%.3f\n",
+                        bgFlags, wallYaw, wallBgId, wallPoly, speedXZ, velY);
+        }
+        else if (cmd == "soh_tp") {
+            std::string xs, ys, zs;
+            if (!(toks >> xs) || !(toks >> ys) || !(toks >> zs)) {
+                PrintErr("soh_tp: usage: soh_tp <x> <y> <z>"); continue;
+            }
+            float x = std::stof(xs), y = std::stof(ys), z = std::stof(zs);
+            if (!g_soh_booted) { PrintErr("soh_tp: run soh_boot first"); continue; }
+            if (!SohState_TeleportPlayer(x, y, z)) {
+                PrintErr("soh_tp: no player"); continue;
+            }
+            std::printf("ok soh_tp %.2f %.2f %.2f\n", x, y, z);
         }
         else if (cmd == "soh_input") {
             std::string bs, xs, ys;
