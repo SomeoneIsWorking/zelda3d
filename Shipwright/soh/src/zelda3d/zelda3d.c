@@ -3639,25 +3639,29 @@ static int Zelda3D_SunModelId(void) {
 static int Zelda3D_MoonModelId(void) {
     return Zelda3D_AutoModelId("BILLBOARD:/kankyo/BlueSky.zar|tex/fine_moon0.ctxb");
 }
-// BlueSky.zar carries these ctxb assets (from `cmb_export --list`):
-//   tex/fine_sun.ctxb  tex/fine_lensflare.ctxb  tex/cloud_sun.ctxb
-//   tex/cloud_lensflare.ctxb  tex/fine_moon0.ctxb  tex/fine_moon1.ctxb
-//   tex/fine_moon2.ctxb
-// FUN_002E47C8 (build/decomp/002e47c8.c in oot3d-decomp) is the sky
-// element-setup dispatcher, param-driven by an element-type byte
-// (0..8, 0x1d); it selects per-element scale/color/blend from a 0x50-byte
-// metadata table (UNK_002e4dc8). Called once from FUN_004490D8 per
-// scene init.
+// OoT3D's moon is a THREE-LAYER composite, RE'd via a draw-log probe
+// instrumenting Azahar's SW rasterizer at settled title. The captured
+// frame shows three quads in the moon area, in this exact order:
 //
-// The moon halo/aura around OoT3D's title moon is NOT a separately
-// drawn geometry pass. It's the 3DS PICA200 hardware bloom post-effect
-// applied to bright pixels in the framebuffer. SoH has no bloom pass.
-// Faking it with an ADDITIVE billboard behind the disc looks wrong
-// (either invisible or a hero glow); faking with fine_lensflare paints
-// anamorphic flare orbs across the sky (that ctxb is the SUN's lens
-// flare, not a halo). A real fix requires porting a bloom postprocess
-// pass to Zelda3D_GL_RenderPass — logged as a follow-on arc, not
-// masked with tuned billboards here.
+//   1. fine_moon1 (64×64) ADDITIVE (srcAlpha, One)   — inner glow
+//                                                      screen 188×133
+//   2. fine_moon0 (128×128) ALPHA (srcAlpha, 1-srcA) — crescent disc
+//                                                      screen 103×91
+//   3. fine_moon2 (64×64) ADDITIVE (srcAlpha, One)   — outer glow
+//                                                      screen 200×139
+//
+// Screen-size ratios of the additive halos to the disc:
+//   fine_moon1: ~1.72× wider (188/103), 1.46× taller (133/91)
+//   fine_moon2: ~1.94× wider, 1.53× taller
+// Averaged uniformly: 1.65× and 1.85×.
+//
+// See oot3d-decomp docs/title_moon_composition.md for the RE trail.
+static int Zelda3D_MoonInnerHaloId(void) {
+    return Zelda3D_AutoModelId("BILLBOARDADD:/kankyo/BlueSky.zar|tex/fine_moon1.ctxb");
+}
+static int Zelda3D_MoonOuterHaloId(void) {
+    return Zelda3D_AutoModelId("BILLBOARDADD:/kankyo/BlueSky.zar|tex/fine_moon2.ctxb");
+}
 
 int Zelda3D_TryDrawSunMoon(PlayState* play) {
     f32 y, color, scale, temp, alpha;
@@ -3744,12 +3748,44 @@ int Zelda3D_TryDrawSunMoon(PlayState* play) {
         alpha = temp * 255.0f;
         if (alpha > 0.0f && moonId >= 0) {
             if (alpha > 255.0f) alpha = 255.0f;
-            Matrix_Translate(play->view.eye.x - play->envCtx.sunPos.x, play->view.eye.y - play->envCtx.sunPos.y,
-                             play->view.eye.z - play->envCtx.sunPos.z, MTXMODE_NEW);
+            // Faithful port of OoT3D's 3-layer moon composition
+            // (RE'd via draw-log; see Zelda3D_MoonInnerHaloId comment).
+            const f32 moonWorldX = play->view.eye.x - play->envCtx.sunPos.x;
+            const f32 moonWorldY = play->view.eye.y - play->envCtx.sunPos.y;
+            const f32 moonWorldZ = play->view.eye.z - play->envCtx.sunPos.z;
+            const u8  aA         = (u8)alpha;
+
+            // Layer 1: fine_moon1 (inner glow) — ADDITIVE, ~1.65× disc.
+            int m1 = Zelda3D_MoonInnerHaloId();
+            if (m1 >= 0) {
+                f32 s1 = scale * 1.65f;
+                Matrix_Translate(moonWorldX, moonWorldY, moonWorldZ, MTXMODE_NEW);
+                Matrix_Mult(&play->billboardMtxF, MTXMODE_APPLY);
+                Matrix_Scale(s1, s1, s1, MTXMODE_APPLY);
+                gSPMatrix(POLY_OPA_DISP++, MATRIX_NEWMTX(play->state.gfxCtx),
+                          G_MTX_MODELVIEW | G_MTX_LOAD);
+                gSPZelda3DDrawA(POLY_OPA_DISP++, m1 | (1 << 30), aA, 255, 255, 255);
+            }
+
+            // Layer 2: fine_moon0 (crescent disc) — ALPHA-blend, base scale.
+            Matrix_Translate(moonWorldX, moonWorldY, moonWorldZ, MTXMODE_NEW);
             Matrix_Mult(&play->billboardMtxF, MTXMODE_APPLY);
             Matrix_Scale(scale, scale, scale, MTXMODE_APPLY);
-            gSPMatrix(POLY_OPA_DISP++, MATRIX_NEWMTX(play->state.gfxCtx), G_MTX_MODELVIEW | G_MTX_LOAD);
-            gSPZelda3DDrawA(POLY_OPA_DISP++, moonId | (1 << 30), (u8)alpha, 255, 255, 255);
+            gSPMatrix(POLY_OPA_DISP++, MATRIX_NEWMTX(play->state.gfxCtx),
+                      G_MTX_MODELVIEW | G_MTX_LOAD);
+            gSPZelda3DDrawA(POLY_OPA_DISP++, moonId | (1 << 30), aA, 255, 255, 255);
+
+            // Layer 3: fine_moon2 (outer glow) — ADDITIVE, ~1.85× disc.
+            int m2 = Zelda3D_MoonOuterHaloId();
+            if (m2 >= 0) {
+                f32 s2 = scale * 1.85f;
+                Matrix_Translate(moonWorldX, moonWorldY, moonWorldZ, MTXMODE_NEW);
+                Matrix_Mult(&play->billboardMtxF, MTXMODE_APPLY);
+                Matrix_Scale(s2, s2, s2, MTXMODE_APPLY);
+                gSPMatrix(POLY_OPA_DISP++, MATRIX_NEWMTX(play->state.gfxCtx),
+                          G_MTX_MODELVIEW | G_MTX_LOAD);
+                gSPZelda3DDrawA(POLY_OPA_DISP++, m2 | (1 << 30), aA, 255, 255, 255);
+            }
         }
 
         CLOSE_DISPS(play->state.gfxCtx);
