@@ -301,6 +301,19 @@ if (FILE* fp = Soh3dOpenBlitLog()) {
 }
 ```
 
+## Watchhook — 64-word stack window (boot-dispatch RE, task #16)
+
+`tools/soh3d_harness/watchhook.cpp` records 64 stack words at write-fire
+time to walk the return-address chain multiple frames deep. Required by
+the boot-dispatch RE arc (docs/boot_dispatch_thread.md) — the writer's
+enclosing fn is 4-6 frames below the top-level "opening/title mode
+Main", and a shallower window doesn't reach it. If Azahar is re-cloned,
+the watchhook's `WriteRecord::stack_words[64]` field + the per-fire loop
+that fills it via `Memory::Read32` are self-contained in the harness
+tree (no Azahar patch needed for it — just rebuild the harness). The
+mirror `WatchRecord::stack_words[64]` in `main.cpp` + the `hits` REPL
+printer must stay in sync.
+
 ### Hunk 4 — VBlank entry log (LCD FB config)
 
 Inside `GPU::VBlankCallback`, at the very top before `SwapBuffers`:
