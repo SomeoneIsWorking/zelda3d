@@ -1673,11 +1673,24 @@ static float Zelda3D_ReconcileCutsceneCam(PlayState* play) {
 // The diagnostic REPL `cam` override (gZelda3dCamOverride) always takes precedence so A/B
 // testing still works.
 int gZelda3dTitleCam = 1;
-// OoT3D title-screen framing: Castle/Market walls on the right, sky + moon upper-left,
-// field in the lower half. Eye is in Hyrule Field looking diagonally toward the Market/
-// Castle entrance so the castle walls occupy the right frame quadrant.
-static const float kZelda3dTitleEye[3] = {  800.0f,  80.0f, 3000.0f };
-static const float kZelda3dTitleAt[3]  = { -500.0f, 400.0f,  500.0f };
+// OoT3D title-screen framing — RE-derived from the OoT3D title camera basis at
+// VA 0x005BE6D4 (Vec3f eye / Vec3f dir(unit) / Vec3f up(unit); layout pinned in
+// oot3d-decomp docs/title_camera_lead.md). The OoT3D title-demo cycles through
+// several static "shots"; SHOT 1 is the dominant/first framing, live for
+// frames ~300-800 with |Δeye| < 4/100f (effectively static, ignoring slight
+// spline sampler drift). Values here are shot-1 at frame ~400, sampled via
+// scratch/dump_title_camera.py:
+//     eye = (-4071.49, 57.81, 5217.30)
+//     dir = (-0.450, +0.085, -0.889)   (unit-checked)
+//     up  = (+0.212, +0.977, -0.014)   (unit-checked, slight roll)
+// SoH's view uses (eye, lookAt, up); we synthesize lookAt = eye + dir * D with
+// D = 1000 (arbitrary positive; only the direction matters — SoH re-normalizes
+// via at-eye when building the view matrix). The kZelda3dTitleUp value KEEPS
+// OoT3D's slight roll rather than forcing straight-up, so the horizon tilt
+// matches OoT3D's title-screen framing.
+static const float kZelda3dTitleEye[3] = { -4071.49f,  57.81f, 5217.30f };
+static const float kZelda3dTitleAt[3]  = { -4521.49f, 142.81f, 4328.30f }; // eye + dir*1000
+static const float kZelda3dTitleUp[3]  = {     0.212f,   0.977f,   -0.014f };
 
 static int Zelda3D_TitleCamEnabled(void) {
     static int cached = -1;
@@ -1695,16 +1708,17 @@ static int Zelda3D_ApplyTitleCam(PlayState* play) {
     if (play == NULL || !Zelda3D_TitleCamEnabled()) {
         return 0;
     }
-    // Title-demo conditions: no ZELDA3D_WARP warp target (empty string env), Hyrule Field
-    // scene (spot00, 0x51), and the cutscene context is active (the N64 title intro cs).
+    // Title-demo conditions: no ZELDA3D_WARP warp target (empty string env) +
+    // Hyrule Field scene (spot00, 0x51). The prior csCtx.state != IDLE gate
+    // was too tight — SoH's title cutscene cycles through IDLE moments
+    // between shots, and dropping the override during those windows lets
+    // Camera_Update reclaim the framing. Fire whenever spot00 has no user
+    // warp; that's the parity-honest title-demo definition.
     if (Zelda3D_AutoWarpEnabled()) {
         return 0; // user has a warp target → not the title screen
     }
     if (play->sceneNum != SCENE_HYRULE_FIELD) {
         return 0;
-    }
-    if (play->csCtx.state == CS_STATE_IDLE) {
-        return 0; // cutscene not running — gameplay, not title demo
     }
     play->view.eye.x    = kZelda3dTitleEye[0];
     play->view.eye.y    = kZelda3dTitleEye[1];
@@ -1712,9 +1726,32 @@ static int Zelda3D_ApplyTitleCam(PlayState* play) {
     play->view.lookAt.x = kZelda3dTitleAt[0];
     play->view.lookAt.y = kZelda3dTitleAt[1];
     play->view.lookAt.z = kZelda3dTitleAt[2];
-    play->view.up.x = 0.0f;
-    play->view.up.y = 1.0f;
-    play->view.up.z = 0.0f;
+    play->view.up.x     = kZelda3dTitleUp[0];
+    play->view.up.y     = kZelda3dTitleUp[1];
+    play->view.up.z     = kZelda3dTitleUp[2];
+    // Also propagate to the active Camera so upstream game state (which
+    // SohState_Camera and any downstream cinematics read) matches. Without
+    // this the render matrix uses OoT3D framing but Camera->eye stays on
+    // SoH's own title-cs spline — the parity harness (d5) would then read
+    // the untouched Camera and still show the pre-port |Δeye|~93.
+    {
+        const int idx = play->activeCamera;
+        if (idx >= 0 && idx < NUM_CAMS) {
+            Camera* c = play->cameraPtrs[idx];
+            if (c != NULL) {
+                c->eye.x     = kZelda3dTitleEye[0];
+                c->eye.y     = kZelda3dTitleEye[1];
+                c->eye.z     = kZelda3dTitleEye[2];
+                c->eyeNext   = c->eye;   // pin the LERP target too
+                c->at.x      = kZelda3dTitleAt[0];
+                c->at.y      = kZelda3dTitleAt[1];
+                c->at.z      = kZelda3dTitleAt[2];
+                c->up.x      = kZelda3dTitleUp[0];
+                c->up.y      = kZelda3dTitleUp[1];
+                c->up.z      = kZelda3dTitleUp[2];
+            }
+        }
+    }
     return 1;
 }
 
@@ -6514,41 +6551,45 @@ void Zelda3D_ReplPoll(PlayState* play) {
         const char* p = getenv("ZELDA3D_REPL");
         if (p == NULL || p[0] == '\0') {
             fd = -1;
-            return;
-        }
-        mkfifo(p, 0666); // ignore EEXIST
-        fd = open(p, O_RDWR | O_NONBLOCK); // O_RDWR: we keep a writer so reads never EOF
-        snprintf(outPath, sizeof(outPath), "%s.out", p);
-        if (fd >= 0) {
-            FILE* f = fopen(outPath, "w");
-            if (f != NULL) {
-                fprintf(f, "SOH3D REPL ready (fifo=%s)\n", p);
-                fclose(f);
+        } else {
+            mkfifo(p, 0666); // ignore EEXIST
+            fd = open(p, O_RDWR | O_NONBLOCK); // O_RDWR: we keep a writer so reads never EOF
+            snprintf(outPath, sizeof(outPath), "%s.out", p);
+            if (fd >= 0) {
+                FILE* f = fopen(outPath, "w");
+                if (f != NULL) {
+                    fprintf(f, "SOH3D REPL ready (fifo=%s)\n", p);
+                    fclose(f);
+                }
             }
         }
     }
-    if (fd < 0) {
-        return;
-    }
-    for (;;) {
-        if (buflen >= (int)sizeof(buf) - 1) {
-            buflen = 0; // overflow guard: drop garbage
+    // Per-frame camera overrides (title-cam / diagnostic cam / camlift) MUST
+    // run regardless of REPL state — the harness (soh3d_harness) doesn't set
+    // ZELDA3D_REPL, and dropping the FIFO would otherwise silently disable
+    // these ports. Bail to the override block on fd<0; only skip the FIFO
+    // command read/parse loop.
+    if (fd >= 0) {
+        for (;;) {
+            if (buflen >= (int)sizeof(buf) - 1) {
+                buflen = 0; // overflow guard: drop garbage
+            }
+            n = read(fd, buf + buflen, sizeof(buf) - 1 - buflen);
+            if (n <= 0) {
+                break;
+            }
+            buflen += (int)n;
         }
-        n = read(fd, buf + buflen, sizeof(buf) - 1 - buflen);
-        if (n <= 0) {
-            break;
+        buf[buflen] = '\0';
+        start = buf;
+        while ((nl = strchr(start, '\n')) != NULL) {
+            *nl = '\0';
+            Zelda3D_ReplExec(play, start, outPath);
+            start = nl + 1;
         }
-        buflen += (int)n;
+        buflen = (int)strlen(start);
+        memmove(buf, start, buflen + 1);
     }
-    buf[buflen] = '\0';
-    start = buf;
-    while ((nl = strchr(start, '\n')) != NULL) {
-        *nl = '\0';
-        Zelda3D_ReplExec(play, start, outPath);
-        start = nl + 1;
-    }
-    buflen = (int)strlen(start);
-    memmove(buf, start, buflen + 1);
 
     // Hold the diagnostic camera: re-apply every frame so the engine's per-update
     // recompute doesn't reclaim it. up is forced to world +Y (an orbit never rolls).
