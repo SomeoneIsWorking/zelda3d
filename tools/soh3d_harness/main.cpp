@@ -1068,6 +1068,39 @@ static bool Az_ReadTitleCameraBasis(Az3dsTitleCameraBasis* out) {
     }
     return true;
 }
+
+// OoT3D title-demo rider (Epona-carrying-Link) WORLD POSITION: single Vec3f
+// at 0x005AFFB0. RE'd via a 4-byte-aligned Vec3f scan across three time
+// deltas on gamestate_re/data_dt_{A,B60,B300}.bin — the only slot outside
+// the two known pose tables and camera basis that held world-scale coords
+// in the Hyrule Field range, moved at gallop speed (~3.9 units/frame), and
+// stayed directionally consistent (cos(Δ60,Δ300)=0.999). See oot3d-decomp
+// docs/title_actor_world_pos.md for the full derivation. LANDED in
+// oot3d-decomp z_title_demo.c/.h as TitleDemo_GetRiderWorldPos().
+//
+// This slot serves as Link's effective world position at title (Link is
+// drawn attached via Epona's SkelAnime; no second world-pos slot surfaced
+// in the same scan). Used by CompareFirstDivImpl's title-actor block to
+// compute a real |Δpos| metric against SoH's Player.world.pos, replacing
+// the diagnostic-only limb-local dump.
+constexpr uint32_t TITLE_LINK_WORLD_POS_VA = 0x005AFFB0;
+struct Az3dsTitleLinkWorldPos {
+    float pos[3];
+};
+
+// Typed accessor for the OoT3D title-demo rider world position. Returns
+// true on success. The read is 12 contiguous bytes at
+// TITLE_LINK_WORLD_POS_VA; any unmapped byte aborts and returns false so
+// the caller falls through to "unmapped" rather than reporting garbage.
+static bool Az_ReadTitleLinkPos(Az3dsTitleLinkWorldPos* out) {
+    auto& mem = Core::System::GetInstance().Memory();
+    for (int j = 0; j < 3; ++j) {
+        auto v = mem.Read32OrNullopt(TITLE_LINK_WORLD_POS_VA + j*4);
+        if (!v) return false;
+        std::memcpy(&out->pos[j], &*v, 4);
+    }
+    return true;
+}
 constexpr uint32_t ACTORCTX_OFF            = 0x208C;
 constexpr uint32_t ACTOR_LISTS_OFF         = 0x000C;
 constexpr uint32_t ACTOR_ID_OFF            = 0x0000;
@@ -2762,43 +2795,50 @@ void CompareFirstDivImpl() {
         }
     }
 
-    // title-actor: diagnostic-only dump of Az's Table B entry 1 pos + SoH's
-    // Player world.pos. NO cross-engine |Δpos| is computed — the two are
-    // not apples-to-apples: Az's Table B entries are SkelAnime LIMB-LOCAL
-    // transforms (entry 1's y≈7875 is a mount-attachment offset in local
-    // space, per docs/title_gamestate.md), whereas SoH's Player world.pos
-    // is a WORLD-space coord. Az's actual Link WORLD position lives in a
-    // separate .data slot that's not RE'd yet — locating it is the next
-    // arc for a real title-actor world-pos compare. Meanwhile emitting
-    // both sides as a diagnostic surface flags "we have title-actor state
-    // to look at" without inventing a false parity metric.
+    // title-actor: real cross-engine |Δpos| between Az's title-demo rider
+    // world.pos (RE'd 0x005AFFB0 — see oot3d-decomp z_title_demo.c and
+    // docs/title_actor_world_pos.md) and SoH's Player.world.pos.
+    //
+    // The prior version dumped Table B entry 1 (limb-local mount-attachment
+    // offset y≈7875) alongside SoH's world.pos as a DIAGNOSTIC only, with
+    // no |Δ| computed because it would be nonsense (limb-local vs world).
+    // Now that Az's actual rider WORLD.pos slot is RE'd, this emits a real
+    // metric. Firstdiv threshold picked at 500u — Hyrule Field flyover
+    // motion is ~3.9 units/frame; a few-second desync would exceed 500u.
     if (az_at_title && soh_at_title) {
-        constexpr uint32_t AZ_LINK_ROOT_ENTRY = 1;
-        const uint32_t va =
-            TITLE_POSE_TABLE_B_VA + AZ_LINK_ROOT_ENTRY * TITLE_POSE_STRIDE;
-        float az_lb1[3] = {0,0,0};
-        bool ok = true;
-        for (int j = 0; j < 3; ++j) {
-            auto v = mem.Read32OrNullopt(va + 0 + j * 4);
-            if (!v) { ok = false; break; }
-            std::memcpy(&az_lb1[j], &*v, 4);
-        }
+        Az3dsTitleLinkWorldPos az_link{};
+        const bool az_ok = Az_ReadTitleLinkPos(&az_link);
         float spx=0, spy=0, spz=0;
         short srx=0, sry=0, srz=0;
         const bool soh_ok = SohState_PlayerPos(&spx, &spy, &spz,
                                                &srx, &sry, &srz) != 0;
-        if (ok && soh_ok) {
-            std::printf("  title-actor: az_tblB[1](limb-local)="
-                        "(%.1f,%.1f,%.1f)  soh_player_world="
-                        "(%.1f,%.1f,%.1f)  — no |Δ| (limb-local vs "
-                        "world; Az world-pos slot TODO-RE)\n",
-                        az_lb1[0], az_lb1[1], az_lb1[2], spx, spy, spz);
-        } else if (ok && !soh_ok) {
-            std::printf("  title-actor: az_tblB[1](limb-local)="
-                        "(%.1f,%.1f,%.1f)  soh=(no Player actor live)\n",
-                        az_lb1[0], az_lb1[1], az_lb1[2]);
+        if (az_ok && soh_ok) {
+            const float dx = az_link.pos[0] - spx;
+            const float dy = az_link.pos[1] - spy;
+            const float dz = az_link.pos[2] - spz;
+            const float d  = std::sqrt(dx*dx + dy*dy + dz*dz);
+            std::printf("  title-actor: az_world=(%.1f,%.1f,%.1f)  "
+                        "soh_world=(%.1f,%.1f,%.1f)  |Δ|=%.1f\n",
+                        az_link.pos[0], az_link.pos[1], az_link.pos[2],
+                        spx, spy, spz, d);
+            if (d > 500.0f) {
+                char buf[192];
+                std::snprintf(buf, sizeof(buf),
+                    "|Δ|=%.1fu  az=(%.1f,%.1f,%.1f) soh=(%.1f,%.1f,%.1f)",
+                    d, az_link.pos[0], az_link.pos[1], az_link.pos[2],
+                    spx, spy, spz);
+                fd.report("title-actor", buf);
+            }
+        } else if (az_ok && !soh_ok) {
+            std::printf("  title-actor: az_world=(%.1f,%.1f,%.1f)  "
+                        "soh=(no Player actor live)\n",
+                        az_link.pos[0], az_link.pos[1], az_link.pos[2]);
+        } else if (!az_ok && soh_ok) {
+            std::printf("  title-actor: az=(unmapped 0x%08x)  "
+                        "soh_world=(%.1f,%.1f,%.1f)\n",
+                        TITLE_LINK_WORLD_POS_VA, spx, spy, spz);
         } else {
-            std::printf("  title-actor: az=(unmapped) soh=?\n");
+            std::printf("  title-actor: az=(unmapped) soh=(no Player)\n");
         }
     } else if (az_at_title) {
         std::printf("  title-actor: az_at_title=yes soh_at_title=no\n");
