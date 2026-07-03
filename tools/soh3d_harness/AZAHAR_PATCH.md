@@ -99,3 +99,97 @@ If the hook returns 0 hits despite Az reaching the wall, check:
 3. That the harness rebuild picked up the patched `memory.cpp`
    (`ninja -C Azahar/build-libretro citra_core` should show
    `memory.cpp.o` recompiling).
+
+# Azahar patch 2 — SW rasterizer draw log (task #16)
+
+Adds a per-triangle log to Azahar's software rasterizer so the harness
+can enumerate exactly which textures + blend modes make up a given
+frame (e.g. the 3-layer moon at title, RE'd in
+`oot3d-decomp/docs/title_moon_composition.md`).
+
+## What it does
+
+Two `extern "C"` globals `soh3d_draw_log_path[256]` and
+`soh3d_draw_log_active` sit inside
+`Azahar/src/video_core/renderer_software/sw_rasterizer.cpp`. When the
+harness sets both via the REPL `draw_log <path>` command, every triangle
+that ProcessTriangle receives appends one CSV-shaped line to the file:
+
+    tri tex0=<hex> tex1=<hex> tex2=<hex>
+        blendRGB=<srcF>,<dstF>,<eq> blendA=<srcF>,<dstF>,<eq>
+        sxy=(x0,y0),(x1,y1),(x2,y2)
+        w=<texW> h=<texH>
+
+Zero overhead when off — the branch on `soh3d_draw_log_active` is
+predicted-untaken and skips the fopen.
+
+## The patch
+
+Two hunks in `Azahar/src/video_core/renderer_software/sw_rasterizer.cpp`.
+
+### Hunk 1 — include + globals near the top of the file
+
+Add `#include <cstdio>` to the include list. Just above the definition
+of `RasterizerSoftware::AddTriangle` (or the first Rasterizer method):
+
+```cpp
+extern "C" char soh3d_draw_log_path[256] = "";
+extern "C" int  soh3d_draw_log_active = 0;
+```
+
+### Hunk 2 — draw-log block inside `ProcessTriangle`
+
+Immediately after `vtxpos` is computed (~line 244), before the cull-mode
+switch:
+
+```cpp
+    if (soh3d_draw_log_active && soh3d_draw_log_path[0]) {
+        FILE* f = std::fopen(soh3d_draw_log_path, "a");
+        if (f) {
+            const auto texs = regs.texturing.GetTextures();
+            const auto out = regs.framebuffer.output_merger;
+            const u32 t0 = texs[0].enabled ? texs[0].config.GetPhysicalAddress() : 0u;
+            const u32 t1 = texs[1].enabled ? texs[1].config.GetPhysicalAddress() : 0u;
+            const u32 t2 = texs[2].enabled ? texs[2].config.GetPhysicalAddress() : 0u;
+            const auto& blend = out.alpha_blending;
+            std::fprintf(f,
+                "tri tex0=%08x tex1=%08x tex2=%08x "
+                "blendRGB=%d,%d,%d blendA=%d,%d,%d "
+                "sxy=(%.1f,%.1f),(%.1f,%.1f),(%.1f,%.1f) w=%d h=%d\n",
+                (unsigned)t0, (unsigned)t1, (unsigned)t2,
+                (int)blend.factor_source_rgb.Value(),
+                (int)blend.factor_dest_rgb.Value(),
+                (int)blend.blend_equation_rgb.Value(),
+                (int)blend.factor_source_a.Value(),
+                (int)blend.factor_dest_a.Value(),
+                (int)blend.blend_equation_a.Value(),
+                (double)(u16)vtxpos[0].x / 16.0,
+                (double)(u16)vtxpos[0].y / 16.0,
+                (double)(u16)vtxpos[1].x / 16.0,
+                (double)(u16)vtxpos[1].y / 16.0,
+                (double)(u16)vtxpos[2].x / 16.0,
+                (double)(u16)vtxpos[2].y / 16.0,
+                (int)texs[0].config.width, (int)texs[0].config.height);
+            std::fclose(f);
+        }
+    }
+```
+
+## How to re-apply
+
+1. Open `Azahar/src/video_core/renderer_software/sw_rasterizer.cpp`.
+2. Add `#include <cstdio>` to the includes.
+3. Above `RasterizerSoftware::AddTriangle` add the two `extern "C"`
+   globals from Hunk 1.
+4. Inside `ProcessTriangle`, just after the `vtxpos` initialisation
+   and before the `cull_mode` switch, paste Hunk 2.
+5. Rebuild: `ninja -C Azahar/build-libretro soh3d_harness`.
+
+## Verification
+
+Run `scratch/title_draw_log.py`. At settled title it should print 18
+unique `(tex, w, h)` groups; the three moon quads correspond to
+`0x2090ec80` (64×64, ADD), `0x20906a80` (128×128, ALPHA),
+`0x20910e80` (64×64, ADD). Address values will drift session-to-session
+(they're the runtime FCRAM allocation), but the WxH and blend
+signatures are stable.

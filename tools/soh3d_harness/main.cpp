@@ -249,6 +249,11 @@ extern "C" {
                               int* outMorphFrame);
 }
 
+extern "C" {
+    extern char soh3d_draw_log_path[256];
+    extern int  soh3d_draw_log_active;
+}
+
 namespace {
 
 std::string g_system_dir;
@@ -3219,6 +3224,21 @@ void RunRepl() {
         std::string cmd;
         if (!(toks >> cmd) || cmd.empty()) continue;
         if      (cmd == "run")       HandleRun(toks);
+        else if (cmd == "draw_log") {
+            // draw_log <path>  → open + enable one-frame draw log
+            // draw_log off     → disable
+            std::string arg; toks >> arg;
+            if (arg == "off" || arg.empty()) {
+                soh3d_draw_log_active = 0;
+                std::printf("ok draw_log off\n");
+            } else {
+                std::snprintf(soh3d_draw_log_path, sizeof soh3d_draw_log_path, "%s", arg.c_str());
+                std::FILE* f = std::fopen(arg.c_str(), "w");
+                if (f) std::fclose(f);  // truncate
+                soh3d_draw_log_active = 1;
+                std::printf("ok draw_log %s\n", arg.c_str());
+            }
+        }
         else if (cmd == "az_ticks") {
             // Emu-tick counter — the DETERMINISTIC substrate under `run`.
             // `run <N>` calls retro_run N times, but each retro_run advances a
