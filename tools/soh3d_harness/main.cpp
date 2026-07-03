@@ -1829,6 +1829,7 @@ void CompareFirstDivImpl() {
         static uint32_t s_watched_speed_addr  = 0;
         static uint32_t s_watched_yaw_addr    = 0;
         static uint32_t s_watched_cam_eye_addr = 0;
+        static uint32_t s_watched_deltaA_addr = 0;
         // Look up Az Player addr this call.
         {
             uint32_t az_player_addr = 0;
@@ -1876,6 +1877,16 @@ void CompareFirstDivImpl() {
                         : (*ps_az + PLAY_CAM_EYE_OFF);
                     reregister(s_watched_cam_eye_addr, eye_watch_addr, 12);
                 }
+                // Δ-A activation watch: catch any write to the state word
+                // at Player+0x29B8. When bit 0x100 gets set, OoT3D's
+                // Camera_CalcAtDefault adds an extra Y bias to at.y —
+                // a real code divergence vs SoH (see docs Δ-A). We know
+                // the block is INERT at Kakariko-idle; this watch lets a
+                // future scene sweep catch the guest PC that SETS the bit
+                // (climbing / pull / grab candidates), identifying the
+                // upstream Player state machine that owns the flag.
+                reregister(s_watched_deltaA_addr,
+                            az_player_addr + 0x29B8, 4);
             }
         }
         // ── Play-mode d3: Link position match ────────────────────────────
@@ -2307,6 +2318,29 @@ void CompareFirstDivImpl() {
                                         "= -%.2f; observed |Δeye|~25)\n",
                                         *w_player, state, (int)bit100,
                                         ybias, extraAtY, -extraAtY);
+                                    // Δ-A activation writer PC: if bit 0x100
+                                    // is SET, consult the watchpoint history
+                                    // for the last write to this word — the
+                                    // guest PC identifies which OoT3D code
+                                    // owns the state flag. Fresh info in
+                                    // scenes where the block fires.
+                                    if (bit100 &&
+                                        s_watched_deltaA_addr != 0) {
+                                        WatchRecord wr{};
+                                        if (Soh3d_WatchGetLatestMatching(
+                                                s_watched_deltaA_addr, 0, 0,
+                                                &wr)) {
+                                            std::printf(
+                                                "        az_deltaA_writer: "
+                                                "az_pc=0x%08x lr=0x%08x "
+                                                "data=0x%016lx ticks=%lu — "
+                                                "Ghidra-jump this PC to find "
+                                                "OoT3D's state-flag owner\n",
+                                                wr.arm_pc, wr.arm_lr,
+                                                wr.data,
+                                                (unsigned long)wr.cycles);
+                                        }
+                                    }
                                 }
                                 // Age/height probe: OoT3D Player_GetHeight
                                 // (FUN_00367ef0) reads *(0x0058795C) as the
