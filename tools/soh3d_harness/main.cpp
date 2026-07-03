@@ -214,6 +214,9 @@ extern "C" {
                                     std::size_t max_out);
     void Soh3d_WatchClear(uint32_t addr);
     std::size_t Soh3d_WatchListRanges(WatchRange* out, std::size_t max_out);
+    bool Soh3d_WatchGetLatestMatching(uint32_t range_base, uint64_t mask,
+                                       uint64_t expected, WatchRecord* out);
+    bool Soh3d_WatchIsRegistered(uint32_t addr);
     int SohState_DumpControlFlags(unsigned int* out_stateFlags1,
                                    int* out_csState, unsigned int* out_csIndex,
                                    unsigned int* out_nextCsIndex,
@@ -1753,6 +1756,30 @@ void CompareFirstDivImpl() {
         // Hoisted classification decision — d3 populates it, d4/d5 consult
         // it (their divergences are typically downstream of d3).
         DivDecision d3_decision = kUnclassified;
+        // Track Az Player addr across firstdiv calls so bgCheckFlags watch
+        // auto-registers once per scene load. Kept static to survive across
+        // calls; if the Player addr changes (scene reload) the new addr
+        // triggers a fresh RegisterWatchpoint.
+        static uint32_t s_watched_player_addr = 0;
+        static uint32_t s_watched_bgflag_addr = 0;
+        // Look up Az Player addr this call.
+        {
+            uint32_t az_player_addr = 0;
+            const uint32_t ctx = *ps_az + ACTORCTX_OFF;
+            auto head = mem.Read32OrNullopt(ctx + ACTOR_LISTS_OFF + 2 * 8 + 4);
+            if (head && *head != 0) az_player_addr = *head;
+            if (az_player_addr != 0 && az_player_addr != s_watched_player_addr) {
+                // Scene load changed the Player Actor addr — re-register
+                // the bgCheckFlags watch at the new location.
+                if (s_watched_bgflag_addr != 0 &&
+                    Soh3d_WatchIsRegistered(s_watched_bgflag_addr)) {
+                    Soh3d_WatchRemoveRange(s_watched_bgflag_addr, 2);
+                }
+                s_watched_player_addr = az_player_addr;
+                s_watched_bgflag_addr = az_player_addr + ACTOR_BGCHECKFLAGS_OFF;
+                Soh3d_WatchAddRange(s_watched_bgflag_addr, 2);
+            }
+        }
         // ── Play-mode d3: Link position match ────────────────────────────
         // Walk Azahar's actor table for cat=2 (Player) id=0.
         const uint32_t ctx = *ps_az + ACTORCTX_OFF;
@@ -1857,6 +1884,46 @@ void CompareFirstDivImpl() {
                                 d3_decision.origin_az,
                                 d3_decision.origin_soh,
                                 d3_decision.origin_doc);
+                    // Manager-directed auto-attach: on collision-wall
+                    // classify, query the most recent write to Az's
+                    // bgCheckFlags that has bit 0x08 set — that's the
+                    // guest instruction that flagged wall-touching.
+                    // Ghidra-jumping to writer_pc lands on OoT3D's
+                    // wall-touch handler; cross-check vs SoH's equivalent
+                    // closes the RE-first loop.
+                    if (d3_decision.cls == DivClass::DeferredPortTarget &&
+                        s_watched_bgflag_addr != 0) {
+                        WatchRecord rec;
+                        if (Soh3d_WatchGetLatestMatching(
+                                s_watched_bgflag_addr, 0x0008u, 0x0008u, &rec)) {
+                            std::printf("      writer:  az_pc=0x%08x lr=0x%08x "
+                                        "data=0x%04x ticks=%lu "
+                                        "— Ghidra-jump this PC for OoT3D's "
+                                        "wall-touch handler\n",
+                                        rec.arm_pc, rec.arm_lr,
+                                        (unsigned)(rec.data & 0xFFFFu),
+                                        (unsigned long)rec.cycles);
+                        } else {
+                            // Fall back to most-recent-any-write for
+                            // triage — if bit-0x08 hasn't fired yet, at
+                            // least point at whoever last touched the
+                            // field.
+                            WatchRecord any;
+                            if (Soh3d_WatchGetLatestMatching(
+                                    s_watched_bgflag_addr, 0u, 0u, &any)) {
+                                std::printf("      writer:  (no wall-bit-set "
+                                            "capture yet; last write) "
+                                            "az_pc=0x%08x lr=0x%08x data=0x%04x\n",
+                                            any.arm_pc, any.arm_lr,
+                                            (unsigned)(any.data & 0xFFFFu));
+                            } else {
+                                std::printf("      writer:  no hits recorded "
+                                            "on 0x%08x — watch may not be "
+                                            "firing (check AZAHAR_PATCH.md)\n",
+                                            s_watched_bgflag_addr);
+                            }
+                        }
+                    }
                 } else if (!fd.reported) {
                     char buf[192]; std::snprintf(buf, sizeof buf,
                         "|Δpos|=%.2f az=(%.1f,%.1f,%.1f) soh=(%.1f,%.1f,%.1f)",

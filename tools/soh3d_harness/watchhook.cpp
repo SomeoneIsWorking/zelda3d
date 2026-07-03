@@ -125,6 +125,37 @@ extern "C" std::size_t Soh3d_WatchListRanges(WatchRange* out, std::size_t max_ou
     return n;
 }
 
+// Return most recent write hit to the range keyed by `range_base` where
+// (data & mask) == expected. Used by the classifier auto-attach: on
+// `d3 collision-wall`, look up the most recent write to bgCheckFlags
+// with bit 0x08 set. Returns true if found, populating out.
+extern "C" bool Soh3d_WatchGetLatestMatching(u32 range_base, u64 mask,
+                                              u64 expected,
+                                              WriteRecord* out) {
+    std::lock_guard lock(g_mtx);
+    auto it = g_hits.find(range_base);
+    if (it == g_hits.end()) return false;
+    // Walk backwards for the most recent matching write.
+    for (auto ri = it->second.rbegin(); ri != it->second.rend(); ++ri) {
+        if ((ri->data & mask) == expected) {
+            if (out) *out = *ri;
+            return true;
+        }
+    }
+    return false;
+}
+
+// True iff a range starting at exactly `addr` is already registered.
+// Cheap check used by the auto-attach path to avoid re-registering the
+// same watchpoint every firstdiv call.
+extern "C" bool Soh3d_WatchIsRegistered(u32 addr) {
+    std::lock_guard lock(g_mtx);
+    for (auto& r : g_ranges) {
+        if (r.addr == addr) return true;
+    }
+    return false;
+}
+
 } // namespace Soh3d
 
 // Called from Azahar/src/core/memory.cpp (AZAHAR_PATCH.md, MemoryWatchpoint
