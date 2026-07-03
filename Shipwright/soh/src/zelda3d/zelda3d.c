@@ -1901,38 +1901,32 @@ static int Zelda3D_TitleCamEnabled(void) {
 // Returns 1 if we are currently in title-demo mode and applied the override. Called from
 // Zelda3D_ReplPoll AFTER the engine's per-frame view update, and only when gZelda3dCamOverride
 // is NOT set (so the REPL `cam` override takes full precedence for A/B).
-// Task #16 (world lighting at title). PICA200 fragment lighting is GLOBALLY
-// DISABLED throughout OoT3D's title-demo (verified by draw-log capture:
-// EVERY triangle at settled title has regs.lighting.disable=1, and vertex
-// color out of the vertex shader is (0,0,0,0) for all landscape draws —
-// no per-vertex-lit modulation, no per-fragment diffuse). The port-faithful
-// behavior is therefore to switch SoH3D's synthetic lighting math OFF at
-// title, not to tune ambient coefficients. See:
-//   oot3d-decomp/docs/title_lighting_disabled.md
+// Task #16 (world lighting at title).
 //
-// gZelda3dLightEnable gates the character/prop half-Lambert (uParams.y in
-// the fragment shader); gZelda3dWorldLit gates the scene-vertex-lit
-// computation (ambient*matAmbient + diffuse*matDiffuse*NdotL) AND the
-// #110 additive ambient floor. Both zeroed at title.
-//
-// combScaleRGB (the CMB material's authored TEV stage-0 RGB scale) was
-// previously conflated with gZelda3dWorldLit. As of the same task-#16
-// commit, zelda3d_sdl3gpu.cpp applies combScaleRGB whenever the material
-// declares vertexLighting=1, independent of the gZelda3dWorldLit gate,
-// so zeroing gZelda3dWorldLit at title no longer dims the scene.
+// The draw-log capture showed regs.lighting.disable=1 for every triangle
+// at settled title. That is the PICA200 PER-FRAGMENT lighting unit — NOT
+// the per-vertex scene-lit compute (ambient*matAmb + diffuse*matDif*NdotL)
+// which runs in the game's OWN vertex shader and stays active. So the
+// port-faithful move at title is:
+//   - gZelda3dLightEnable = 0  (SoH's character/prop half-Lambert is
+//     synthetic; OoT3D never runs it at title)
+//   - gZelda3dWorldLit stays 1 — scene geometry needs its per-vertex lit
+//     compute at title to darken mountains to the moonlit silhouette Az
+//     shows (envCtx.lightSettings blends to night from dayTime=0x0000
+//     forced above; sceneAmb/sceneDif then correctly dim the CMB baked
+//     colour). Zeroing it left mountains fully-textured/day-bright, which
+//     was visibly wrong against the oracle SxS.
+// See oot3d-decomp/docs/title_lighting_disabled.md.
 //
 // Saved on rising edge (0->1) and restored on falling edge so exiting
 // title (SoH cutscene end -> gameplay) doesn't leave the world unlit.
 extern int gZelda3dLightEnable;   // libultraship zelda3d_gl.cpp
-extern int gZelda3dWorldLit;      // libultraship zelda3d_gl.cpp
 static int sZelda3dTitleLightSaved     = 0;
 static int sZelda3dTitleLightEnableSav = -1;
-static int sZelda3dTitleWorldLitSav    = 1;
 
 static void Zelda3D_TitleLightingRestore(void) {
     if (sZelda3dTitleLightSaved) {
         gZelda3dLightEnable = sZelda3dTitleLightEnableSav;
-        gZelda3dWorldLit    = sZelda3dTitleWorldLitSav;
         sZelda3dTitleLightSaved = 0;
     }
 }
@@ -1964,11 +1958,9 @@ static int Zelda3D_ApplyTitleCam(PlayState* play) {
     gZelda3dInTitleDemo = 1;
     if (!sZelda3dTitleLightSaved) {
         sZelda3dTitleLightEnableSav = gZelda3dLightEnable;
-        sZelda3dTitleWorldLitSav    = gZelda3dWorldLit;
         sZelda3dTitleLightSaved     = 1;
     }
     gZelda3dLightEnable = 0;
-    gZelda3dWorldLit    = 0;
     play->view.eye.x    = kZelda3dTitleEye[0];
     play->view.eye.y    = kZelda3dTitleEye[1];
     play->view.eye.z    = kZelda3dTitleEye[2];
