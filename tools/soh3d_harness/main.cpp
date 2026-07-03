@@ -2888,6 +2888,25 @@ void CompareFirstDivImpl() {
                             "|Δdir|=%.4f |Δup|=%.4f  (expect <5u post-port)\n",
                             az_eye[0], az_eye[1], az_eye[2],
                             ex, ey, ez, dEye, dDir, dUp);
+                // TASK16 landscape/moon-position probe. Both engines nominally
+                // share the same eye + dir + up, yet render different terrain
+                // (SoH shows Lon-Lon area, Az shows Death Mountain) and the
+                // moon opcode SoH emits lands ~66° off-frame. Suspect the
+                // projection (FOV) differs. Print SoH fov + dump 32 words of
+                // 3DS mem just after the RE'd basis so we can eyeball a
+                // plausible fov slot (deg range 30..90, rad range 0.5..1.6).
+                std::printf("  title-cam:fov soh=%.2f°  activeCamId=%d\n",
+                            fov, camId);
+                std::printf("  title-cam:probe @ 0x%08x+0x24..0x84 (post-basis):",
+                            TITLE_CAM_BASIS_VA);
+                for (int off = 0x24; off <= 0x84; off += 4) {
+                    auto w = Core::System::GetInstance().Memory()
+                                 .Read32OrNullopt(TITLE_CAM_BASIS_VA + off);
+                    if (!w) { std::printf(" ??"); continue; }
+                    float f; uint32_t u = *w; std::memcpy(&f, &u, 4);
+                    std::printf(" +%02x=%.3f", off, f);
+                }
+                std::printf("\n");
                 if (!fd.reported && dEye > 200.0f) {
                     char buf[192]; std::snprintf(buf, sizeof buf,
                         "|Δeye|=%.1f (az=%.0f,%.0f,%.0f soh=%.0f,%.0f,%.0f)",

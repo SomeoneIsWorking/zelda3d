@@ -1976,6 +1976,18 @@ static int Zelda3D_ApplyTitleCam(PlayState* play) {
     // or similar which trips the early-out inside TryDrawSunMoon).
     play->envCtx.sunMoonDisabled = false;
     play->skyboxId = SKYBOX_NORMAL_SKY;
+    // Pin FOV to the OoT3D title value (probe read at
+    // TITLE_CAM_BASIS_VA+0x34 = 48.803°; SoH's title-cs otherwise
+    // holds ~45.4°). Task #16 handedness/framing arc.
+    {
+        const int idx = play->activeCamera;
+        if (idx >= 0 && idx < NUM_CAMS) {
+            Camera* c = play->cameraPtrs[idx];
+            if (c != NULL) {
+                c->fov = 48.803f;
+            }
+        }
+    }
     return 1;
 }
 
