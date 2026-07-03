@@ -3639,6 +3639,18 @@ static int Zelda3D_SunModelId(void) {
 static int Zelda3D_MoonModelId(void) {
     return Zelda3D_AutoModelId("BILLBOARD:/kankyo/BlueSky.zar|tex/fine_moon0.ctxb");
 }
+// Moon glow halo — reuse tex/fine_moon0.ctxb as an ADDITIVE billboard
+// behind the standard alpha-masked disc, warm-tinted, at ~1.8× disc
+// scale. That produces the soft radiant aura around OoT3D's title
+// moon without shipping an anamorphic lens-flare pattern (which is
+// what tex/fine_lensflare.ctxb actually is — a strip of scattered
+// flare orbs, NOT the moon halo, verified by wiring it in and seeing
+// pink flare orbs paint across the sky). The `_ADD` suffix picks the
+// BILLBOARDADD variant of the ctxb quad; loadBillboard dedupes on
+// the full key so it's a distinct model from the alpha-blend disc.
+static int Zelda3D_MoonHaloModelId(void) {
+    return Zelda3D_AutoModelId("BILLBOARDADD:/kankyo/BlueSky.zar|tex/fine_moon0.ctxb");
+}
 
 int Zelda3D_TryDrawSunMoon(PlayState* play) {
     f32 y, color, scale, temp, alpha;
@@ -3725,21 +3737,32 @@ int Zelda3D_TryDrawSunMoon(PlayState* play) {
         alpha = temp * 255.0f;
         if (alpha > 0.0f && moonId >= 0) {
             if (alpha > 255.0f) alpha = 255.0f;
-            // Title-demo: the env-driven scale under-sizes the moon at title
-            // relative to Az's shot. Bump modestly (not a hero glow) and
-            // pin alpha to full so faint-moon under-render doesn't wash out.
-            float moonScale = scale;
-            u8    moonAlpha = (u8)alpha;
-            if (gZelda3dInTitleDemo) {
-                moonScale *= 1.5f;
-                moonAlpha  = 255;
+            // OoT3D moon disc is markedly smaller than the N64 sprite —
+            // the N64 quad is -31..32 units, the 3DS asset is drawn on
+            // a smaller quad in the engine. Apply a 0.55× correction to
+            // the N64-derived scale so the visible disc matches Az's
+            // title framing (verified by SxS: N64-scaled disc was ~2×
+            // Az's). Halo sits 1.3× disc size (SUBTLE aura, not a hero
+            // glow), additive, half-alpha, warm-tint.
+            f32 discScale = scale * 0.55f;
+            f32 haloScale = discScale * 1.3f;
+            int haloId = Zelda3D_MoonHaloModelId();
+            if (haloId >= 0) {
+                Matrix_Translate(play->view.eye.x - play->envCtx.sunPos.x,
+                                 play->view.eye.y - play->envCtx.sunPos.y,
+                                 play->view.eye.z - play->envCtx.sunPos.z, MTXMODE_NEW);
+                Matrix_Mult(&play->billboardMtxF, MTXMODE_APPLY);
+                Matrix_Scale(haloScale, haloScale, haloScale, MTXMODE_APPLY);
+                gSPMatrix(POLY_OPA_DISP++, MATRIX_NEWMTX(play->state.gfxCtx),
+                          G_MTX_MODELVIEW | G_MTX_LOAD);
+                gSPZelda3DDrawA(POLY_OPA_DISP++, haloId | (1 << 30), (u8)(alpha * 0.6f), 255, 232, 176);
             }
             Matrix_Translate(play->view.eye.x - play->envCtx.sunPos.x, play->view.eye.y - play->envCtx.sunPos.y,
                              play->view.eye.z - play->envCtx.sunPos.z, MTXMODE_NEW);
             Matrix_Mult(&play->billboardMtxF, MTXMODE_APPLY);
-            Matrix_Scale(moonScale, moonScale, moonScale, MTXMODE_APPLY);
+            Matrix_Scale(discScale, discScale, discScale, MTXMODE_APPLY);
             gSPMatrix(POLY_OPA_DISP++, MATRIX_NEWMTX(play->state.gfxCtx), G_MTX_MODELVIEW | G_MTX_LOAD);
-            gSPZelda3DDrawA(POLY_OPA_DISP++, moonId | (1 << 30), moonAlpha, 255, 255, 255);
+            gSPZelda3DDrawA(POLY_OPA_DISP++, moonId | (1 << 30), (u8)alpha, 255, 255, 255);
         }
 
         CLOSE_DISPS(play->state.gfxCtx);
