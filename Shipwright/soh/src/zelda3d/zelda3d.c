@@ -3725,12 +3725,21 @@ int Zelda3D_TryDrawSunMoon(PlayState* play) {
         alpha = temp * 255.0f;
         if (alpha > 0.0f && moonId >= 0) {
             if (alpha > 255.0f) alpha = 255.0f;
+            // Title-demo: the env-driven scale under-sizes the moon at title
+            // relative to Az's shot. Bump modestly (not a hero glow) and
+            // pin alpha to full so faint-moon under-render doesn't wash out.
+            float moonScale = scale;
+            u8    moonAlpha = (u8)alpha;
+            if (gZelda3dInTitleDemo) {
+                moonScale *= 1.5f;
+                moonAlpha  = 255;
+            }
             Matrix_Translate(play->view.eye.x - play->envCtx.sunPos.x, play->view.eye.y - play->envCtx.sunPos.y,
                              play->view.eye.z - play->envCtx.sunPos.z, MTXMODE_NEW);
             Matrix_Mult(&play->billboardMtxF, MTXMODE_APPLY);
-            Matrix_Scale(scale, scale, scale, MTXMODE_APPLY);
+            Matrix_Scale(moonScale, moonScale, moonScale, MTXMODE_APPLY);
             gSPMatrix(POLY_OPA_DISP++, MATRIX_NEWMTX(play->state.gfxCtx), G_MTX_MODELVIEW | G_MTX_LOAD);
-            gSPZelda3DDrawA(POLY_OPA_DISP++, moonId | (1 << 30), (u8)alpha, 255, 255, 255);
+            gSPZelda3DDrawA(POLY_OPA_DISP++, moonId | (1 << 30), moonAlpha, 255, 255, 255);
         }
 
         CLOSE_DISPS(play->state.gfxCtx);
