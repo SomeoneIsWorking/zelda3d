@@ -45,6 +45,50 @@ int SohState_RoomNum(void) {
     return (gPlayState != NULL) ? (int)gPlayState->roomCtx.curRoom.num : -1;
 }
 
+// Wall / floor / motion diagnostic. Reads the Player Actor's collision-
+// probe outputs (Actor.wallPoly, Actor.wallBgId, Actor.wallYaw,
+// Actor.bgCheckFlags — see z64actor.h:230-238) plus velocity/speed so
+// firstdiv can name whether Link is "wall-clamped by scene collision"
+// (bgCheckFlags & 0x008 set + wallPoly nonzero) vs "walking freely"
+// vs "wall-slide-cancelled by Player_Update constant".
+//
+// out_bgFlags:   bit set from BgCheckFlags docblock (0x001=on-ground,
+//                0x008=touching-wall, 0x010=touching-ceiling, ...)
+// out_wallYaw:   Y rotation of the wall polygon (0 if none)
+// out_wallBgId:  which bg piece the wall belongs to
+// out_wallPoly:  raw pointer (nonzero = actual poly hit)
+// out_speedXZ:   Actor.speedXZ (post-Player_Update)
+// out_velY:      Actor.velocity.y
+int SohState_PlayerWallInfo(unsigned int* out_bgFlags,
+                             int* out_wallYaw, int* out_wallBgId,
+                             unsigned long* out_wallPoly,
+                             float* out_speedXZ, float* out_velY) {
+    if (gPlayState == NULL) return 0;
+    Actor* p = gPlayState->actorCtx.actorLists[ACTORCAT_PLAYER].head;
+    if (p == NULL) return 0;
+    if (out_bgFlags)  *out_bgFlags  = (unsigned int)p->bgCheckFlags;
+    if (out_wallYaw)  *out_wallYaw  = (int)p->wallYaw;
+    if (out_wallBgId) *out_wallBgId = (int)p->wallBgId;
+    if (out_wallPoly) *out_wallPoly = (unsigned long)p->wallPoly;
+    if (out_speedXZ)  *out_speedXZ  = p->speedXZ;
+    if (out_velY)     *out_velY     = p->velocity.y;
+    return 1;
+}
+
+// Force Player's world position to (x,y,z), leaving rotation alone. Used
+// to test whether a stop position is dictated by scene collision (Player
+// snaps back to a fixed wall) or by a Player_Update stop-clamp constant
+// (Player stays put when input is released). Returns 1 on success.
+int SohState_TeleportPlayer(float x, float y, float z) {
+    if (gPlayState == NULL) return 0;
+    Actor* p = gPlayState->actorCtx.actorLists[ACTORCAT_PLAYER].head;
+    if (p == NULL) return 0;
+    p->world.pos.x = x;
+    p->world.pos.y = y;
+    p->world.pos.z = z;
+    return 1;
+}
+
 // Player Link accessor: reads through the actor-category-Player list,
 // or falls back to gSaveContext.entranceIndex if no player is live yet.
 int SohState_PlayerPos(float* px, float* py, float* pz,
