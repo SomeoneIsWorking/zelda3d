@@ -1039,6 +1039,35 @@ constexpr uint32_t TITLE_POSE_STRIDE       = 36;
 // table A, so the two are independent live pose streams.
 constexpr uint32_t TITLE_POSE_TABLE_B_VA   = 0x005A54D8;
 constexpr uint32_t TITLE_POSE_B_COUNT      = 25;
+
+// OoT3D title-demo camera basis: contiguous 36-byte {Vec3f eye, Vec3f dir(unit),
+// Vec3f up(unit)} at 0x005BE6D4. RE'd via find_cam_eye.py (see oot3d-decomp
+// docs/title_camera_lead.md). Ported into SoH's title-cam override at
+// zelda3d.c kZelda3dTitleEye/At/Up (soh3d 17221301).
+constexpr uint32_t TITLE_CAM_BASIS_VA      = 0x005BE6D4;
+struct Az3dsTitleCameraBasis {
+    float eye[3];
+    float dir[3];
+    float up[3];
+};
+
+// Typed accessor for the OoT3D title-camera basis. Returns true on success.
+// The read is 36 contiguous bytes at TITLE_CAM_BASIS_VA; any unmapped byte
+// aborts and returns false so the caller falls through to "unmapped" rather
+// than reporting garbage.
+static bool Az_ReadTitleCameraBasis(Az3dsTitleCameraBasis* out) {
+    auto& mem = Core::System::GetInstance().Memory();
+    for (int j = 0; j < 3; ++j) {
+        auto e = mem.Read32OrNullopt(TITLE_CAM_BASIS_VA + 0  + j*4);
+        auto d = mem.Read32OrNullopt(TITLE_CAM_BASIS_VA + 12 + j*4);
+        auto u = mem.Read32OrNullopt(TITLE_CAM_BASIS_VA + 24 + j*4);
+        if (!e || !d || !u) return false;
+        std::memcpy(&out->eye[j], &*e, 4);
+        std::memcpy(&out->dir[j], &*d, 4);
+        std::memcpy(&out->up [j], &*u, 4);
+    }
+    return true;
+}
 constexpr uint32_t ACTORCTX_OFF            = 0x208C;
 constexpr uint32_t ACTOR_LISTS_OFF         = 0x000C;
 constexpr uint32_t ACTOR_ID_OFF            = 0x0000;
@@ -2738,19 +2767,12 @@ void CompareFirstDivImpl() {
     // SoH stores eye + at + up; convert with at ≈ eye + dir*|eye→at_soh|
     // for a comparable magnitude, but the invariant we care about is
     // eye position ≈ eye and dir ≈ normalize(at-eye).
-    constexpr uint32_t AZ_CAM_EYE_VA = 0x005BE6D4;
     if (az_at_title) {
-        float az_eye[3] = {0,0,0}, az_dir[3] = {0,0,0}, az_up[3] = {0,0,0};
-        bool ok = true;
-        for (int j = 0; j < 3; ++j) {
-            auto e = mem.Read32OrNullopt(AZ_CAM_EYE_VA + 0  + j*4);
-            auto d = mem.Read32OrNullopt(AZ_CAM_EYE_VA + 12 + j*4);
-            auto u = mem.Read32OrNullopt(AZ_CAM_EYE_VA + 24 + j*4);
-            if (!e || !d || !u) { ok = false; break; }
-            std::memcpy(&az_eye[j], &*e, 4);
-            std::memcpy(&az_dir[j], &*d, 4);
-            std::memcpy(&az_up [j], &*u, 4);
-        }
+        Az3dsTitleCameraBasis basis{};
+        const bool ok = Az_ReadTitleCameraBasis(&basis);
+        float* az_eye = basis.eye;
+        float* az_dir = basis.dir;
+        float* az_up  = basis.up;
         if (ok && soh_at_title) {
             float ex, ey, ez, ax, ay, az_at, ux, uy, uz, fov;
             short roll; int camId;
@@ -2769,30 +2791,35 @@ void CompareFirstDivImpl() {
                 float dUp   = std::sqrt((az_up[0]-ux)*(az_up[0]-ux)
                                       + (az_up[1]-uy)*(az_up[1]-uy)
                                       + (az_up[2]-uz)*(az_up[2]-uz));
-                std::printf("  d5 camera basis: az_eye=(%.1f,%.1f,%.1f) "
+                // Distinct "title-cam:" tag (not "d5 camera basis:") — makes
+                // firstdiv output separately grep-able from actor-drift
+                // channels. Post-17221301 the expected residual is ~2u eye
+                // + <0.001 dir/up (float precision from the eye→at
+                // synthesis). Anything larger is a real regression.
+                std::printf("  title-cam: az_eye=(%.1f,%.1f,%.1f) "
                             "soh_eye=(%.1f,%.1f,%.1f) |Δeye|=%.2f "
-                            "|Δdir|=%.4f |Δup|=%.4f\n",
+                            "|Δdir|=%.4f |Δup|=%.4f  (expect <5u post-port)\n",
                             az_eye[0], az_eye[1], az_eye[2],
                             ex, ey, ez, dEye, dDir, dUp);
                 if (!fd.reported && dEye > 200.0f) {
                     char buf[192]; std::snprintf(buf, sizeof buf,
                         "|Δeye|=%.1f (az=%.0f,%.0f,%.0f soh=%.0f,%.0f,%.0f)",
                         dEye, az_eye[0], az_eye[1], az_eye[2], ex, ey, ez);
-                    fd.report("camera-eye", buf);
+                    fd.report("title-cam", buf);
                 }
             } else {
-                std::printf("  d5 camera basis: az_eye=(%.1f,%.1f,%.1f) "
+                std::printf("  title-cam: az_eye=(%.1f,%.1f,%.1f) "
                             "soh=(no active camera)\n",
                             az_eye[0], az_eye[1], az_eye[2]);
             }
         } else if (!ok) {
-            std::printf("  d5 camera basis: az=(unmapped) soh=?\n");
+            std::printf("  title-cam: az=(unmapped) soh=?\n");
         } else {
-            std::printf("  d5 camera basis: az_eye=(%.1f,%.1f,%.1f) soh=(no playstate)\n",
+            std::printf("  title-cam: az_eye=(%.1f,%.1f,%.1f) soh=(no playstate)\n",
                         az_eye[0], az_eye[1], az_eye[2]);
         }
     } else {
-        std::printf("  d5 camera basis: az=not-at-title\n");
+        std::printf("  title-cam: az=not-at-title\n");
     }
 
     if (!fd.reported) {
