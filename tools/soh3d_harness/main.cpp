@@ -1826,8 +1826,20 @@ void CompareFirstDivImpl() {
                 // (2026-07-03) surfaced d5 |Δeye|=28 with matching Link
                 // pos+yaw, so the OoT3D camera update site is the new port
                 // frontier for d5.
-                reregister(s_watched_cam_eye_addr,
-                            *ps_az + PLAY_CAM_EYE_OFF, 12);
+                //
+                // Prefer cam_ptr+0x8C (the actual heap Camera's eye field) so
+                // captured writer PCs land INSIDE the mode function (e.g.
+                // Camera_Normal1 @ 0x00239fd8) rather than in Camera_Update's
+                // mode-agnostic tail (0x002d92a4). Fall back to PS+0x1B8 iff
+                // cam_ptr isn't set up yet.
+                {
+                    auto cp = mem.Read32OrNullopt(
+                        *ps_az + PLAY_CAMERAPTRS_OFF);
+                    uint32_t eye_watch_addr = (cp && *cp != 0)
+                        ? (*cp + 0x8C)
+                        : (*ps_az + PLAY_CAM_EYE_OFF);
+                    reregister(s_watched_cam_eye_addr, eye_watch_addr, 12);
+                }
             }
         }
         // ── Play-mode d3: Link position match ────────────────────────────
@@ -2187,6 +2199,49 @@ void CompareFirstDivImpl() {
                                 (unsigned)(az_setting & 0xFF),
                                 (unsigned)(az_mode    & 0xFF),
                                 (unsigned)(az_status  & 0xFF));
+                            // Delta B probe: when setting=2 (CAM_SET_NORMAL1)
+                            // mode=0 (CAM_MODE_NORMAL), the mode function is
+                            // Camera_Normal1 (OoT3D FUN_00239fd8). Its params
+                            // live inline at Camera+0x00..+0x22 (Grezzo folded
+                            // Camera.paramData into Camera itself — see
+                            // FUN_00239fd8 field map in the handoff). Reading
+                            // them here gives the fully-resolved runtime
+                            // Normal1 values without needing SohState plumbing;
+                            // compare against SoH's CAM_FUNCDATA_NORM1(0, 200,
+                            // 400, 10, 12, 20, 40, 60, 60, 0x0003).
+                            if ((az_setting & 0xFF) == 2 &&
+                                (az_mode    & 0xFF) == 0) {
+                                float p_yOff=0, p_dMin=0, p_dMax=0, p_u0C=0,
+                                      p_u10=0, p_u14=0, p_fov=0, p_atLS=0;
+                                auto rf = [&](uint32_t off, float& out) {
+                                    auto v = mem.Read32OrNullopt(*cam_ptr+off);
+                                    if (v) std::memcpy(&out, &*v, 4);
+                                };
+                                rf(0x00, p_yOff);
+                                rf(0x04, p_dMin);
+                                rf(0x08, p_dMax);
+                                rf(0x0C, p_u0C);
+                                rf(0x10, p_u10);
+                                rf(0x14, p_u14);
+                                rf(0x18, p_fov);
+                                rf(0x1C, p_atLS);
+                                auto pw =
+                                    mem.Read32OrNullopt(*cam_ptr + 0x20);
+                                int16_t p_pitch = pw ?
+                                    static_cast<int16_t>(*pw & 0xFFFF) : 0;
+                                uint16_t p_flags = pw ?
+                                    static_cast<uint16_t>(*pw >> 16) : 0;
+                                std::printf(
+                                    "        az_norm1: "
+                                    "yOff=%.2f dMin=%.1f dMax=%.1f unk_0C=%.2f "
+                                    "unk_10=%.2f unk_14=%.4f fov=%.1f "
+                                    "atLERP=%.4f pitchTgt=%d flags=0x%04x  "
+                                    "— SoH: (0, 200, 400, 12, 20, 0.40, 60, "
+                                    "0.60, 10, 0x0003)\n",
+                                    p_yOff, p_dMin, p_dMax, p_u0C,
+                                    p_u10, p_u14, p_fov, p_atLS,
+                                    (int)p_pitch, (unsigned)p_flags);
+                            }
                         } else {
                             std::printf("        az_cam: cam@0x%08x — "
                                 "st/mode reads returned nullopt "
