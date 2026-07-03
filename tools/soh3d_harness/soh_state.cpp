@@ -83,6 +83,27 @@ int SohState_WalkActors(SohState_ActorSink sink, void* user) {
     return total;
 }
 
+// Look up a live actor by (category, list-index) and return its params —
+// the s16 spawn-data variable set from the room's actor list. Used by
+// compare firstdiv d6 to name the params of any actor either side has
+// that the other doesn't, so port-vs-3DS-content divergences are
+// diagnosable without extending the walk callback signature.
+// Returns 0x7FFFFFFF if not found (params is s16 so any real value fits
+// in the low 16 bits).
+int SohState_ActorParamsAt(int cat, int index) {
+    if (gPlayState == NULL) return 0x7FFFFFFF;
+    if (cat < 0 || cat >= ACTORCAT_MAX) return 0x7FFFFFFF;
+    Actor* a = gPlayState->actorCtx.actorLists[cat].head;
+    int guard = gPlayState->actorCtx.actorLists[cat].length + 4;
+    int i = 0;
+    while (a != NULL && guard-- > 0) {
+        if (i == index) return (int)(short)a->params;
+        a = a->next;
+        ++i;
+    }
+    return 0x7FFFFFFF;
+}
+
 // Warp: set nextEntranceIndex + transitionTrigger through the typed
 // C struct — the same fields the game itself writes when handling an
 // in-scene warp (see z_play.c line 985 `SET_NEXT_GAMESTATE(...,
