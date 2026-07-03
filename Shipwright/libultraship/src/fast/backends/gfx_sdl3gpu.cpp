@@ -72,6 +72,16 @@ extern uint32_t     gSoh3dCaptureCap;
 extern uint32_t     gSoh3dCaptureW;
 extern uint32_t     gSoh3dCaptureH;
 extern volatile int gSoh3dCapturePending;
+
+// Harness introspection: last-seen state of fb 0 at capture time. Written by
+// WriteFbToCaptureBuf on every capture attempt (whether it succeeded or hit
+// an early-return), so the harness can `diag` the exact reason capture is
+// empty — usually fb0 not yet sized (no game-render frame at title).
+extern "C" volatile int      gSoh3dFb0LastCaptureAttempt = 0;  // count of attempts
+extern "C" volatile uint32_t gSoh3dFb0LastW = 0;
+extern "C" volatile uint32_t gSoh3dFb0LastH = 0;
+extern "C" volatile int      gSoh3dFb0LastHasColor = 0;    // fb.color != nullptr
+extern "C" volatile int      gSoh3dFb0LastInRange = 0;     // fbId in [0, size)
 }
 
 namespace {
@@ -1127,9 +1137,15 @@ void GfxRenderingAPISdl3Gpu::WriteFbPpm(int fbId, const char* path) {
 }
 
 void GfxRenderingAPISdl3Gpu::WriteFbToCaptureBuf(int fbId) {
-    if (fbId < 0 || fbId >= (int)mFramebuffers.size())
-        return;
+    // Stamp introspection state EVERY call so `diag` can see why capture
+    // came up empty. Written before any early-return.
+    gSoh3dFb0LastCaptureAttempt = (int)((int)gSoh3dFb0LastCaptureAttempt + 1);
+    gSoh3dFb0LastInRange = (fbId >= 0 && fbId < (int)mFramebuffers.size()) ? 1 : 0;
+    if (!gSoh3dFb0LastInRange) return;
     FramebufferSDL3& fb = mFramebuffers[fbId];
+    gSoh3dFb0LastHasColor = (fb.color != nullptr) ? 1 : 0;
+    gSoh3dFb0LastW = fb.width;
+    gSoh3dFb0LastH = fb.height;
     if (!fb.color)
         return;
     const uint32_t w = fb.width, h = fb.height;

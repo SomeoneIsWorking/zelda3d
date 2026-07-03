@@ -618,9 +618,14 @@ void HandleSohBoot(std::istringstream&) {
     // Window.Width/Height from shipofharkinian.json — which on a HiDPI
     // display is the full monitor pixel size (e.g. 3840x1975 -> a
     // 9600x4938 fb 0 after internal scaling, ~190 MB / frame, enough to
-    // OOM the GPU). 320x240 is more than the 3DS top-screen resolution
-    // and plenty for parity work; keep it low for the harness.
-    if (!std::filesystem::exists("shipofharkinian.json")) {
+    // OOM the GPU AND overflow the 24 MB gSoh3dCaptureBuf, silently
+    // dropping every capture). 320x240 is more than the 3DS top-screen
+    // resolution and plenty for parity work.
+    //
+    // Write UNCONDITIONALLY — a stale config from a prior session
+    // (created before the harness added this fixup) has the huge HiDPI
+    // dims baked in and would defeat the whole point of the check.
+    {
         std::FILE* f = std::fopen("shipofharkinian.json", "w");
         if (f) {
             std::fprintf(f,
@@ -684,16 +689,27 @@ void HandleStep(std::istringstream& toks) {
                 g_soh_booted ? "azahar+soh3d" : "azahar-only");
 }
 
+extern "C" volatile int      gSoh3dFb0LastCaptureAttempt;
+extern "C" volatile uint32_t gSoh3dFb0LastW;
+extern "C" volatile uint32_t gSoh3dFb0LastH;
+extern "C" volatile int      gSoh3dFb0LastHasColor;
+extern "C" volatile int      gSoh3dFb0LastInRange;
+
 void HandleDiag(std::istringstream&) {
     std::printf("ok mask=0x%08x polls=%llu ids_seen=0x%08x\n"
                 "  az:  booted=1 w=%u h=%u pitch=%zu dirty=%d\n"
-                "  soh: booted=%d captureW=%u captureH=%u pending=%d\n",
+                "  soh: booted=%d captureW=%u captureH=%u pending=%d\n"
+                "  fb0: attempts=%d inRange=%d hasColor=%d lastW=%u lastH=%u\n"
+                "ok end\n",
                 g_input_mask,
                 static_cast<unsigned long long>(g_input_poll_count),
                 g_input_poll_ids_seen,
                 g_az_w, g_az_h, g_az_pitch, g_az_dirty ? 1 : 0,
                 g_soh_booted ? 1 : 0,
-                gSoh3dCaptureW, gSoh3dCaptureH, gSoh3dCapturePending);
+                gSoh3dCaptureW, gSoh3dCaptureH, gSoh3dCapturePending,
+                (int)gSoh3dFb0LastCaptureAttempt,
+                (int)gSoh3dFb0LastInRange, (int)gSoh3dFb0LastHasColor,
+                (unsigned)gSoh3dFb0LastW, (unsigned)gSoh3dFb0LastH);
 }
 
 // Forward decls — Compare*Impl bodies live further down.
@@ -757,7 +773,8 @@ void HandleSnapshot(std::istringstream& toks) {
     const bool soh_ok = WriteSoh_Ppm(soh_path);
     std::printf("ok snapshot\n"
                 "  az:  %s %s (%ux%u)\n"
-                "  soh: %s %s (%ux%u)\n",
+                "  soh: %s %s (%ux%u)\n"
+                "ok end\n",
                 az_ok  ? "wrote" : "skip", az_path.c_str(),  g_az_w, g_az_h,
                 soh_ok ? "wrote" : "skip", soh_path.c_str(),
                 gSoh3dCaptureW, gSoh3dCaptureH);
