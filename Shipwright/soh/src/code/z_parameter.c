@@ -5471,6 +5471,13 @@ void Interface_Draw(PlayState* play) {
             return;
         }
     }
+    // Zelda3D title-demo — Az's OoT3D title shows no HUD at all. Task #14.
+    {
+        extern int gZelda3dInTitleDemo;
+        if (gZelda3dInTitleDemo) {
+            return;
+        }
+    }
     static s16 magicArrowEffectsR[] = { 255, 100, 255 };
     static s16 magicArrowEffectsG[] = { 0, 100, 255 };
     static s16 magicArrowEffectsB[] = { 0, 255, 100 };
