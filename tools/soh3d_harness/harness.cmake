@@ -31,6 +31,15 @@ target_compile_definitions(soh3d_harness PRIVATE
     $<$<BOOL:${ENABLE_SOFTWARE_RENDERER}>:ENABLE_SOFTWARE_RENDERER>
     $<$<BOOL:${ENABLE_OPENGL}>:ENABLE_OPENGL>
     $<$<BOOL:${ENABLE_VULKAN}>:ENABLE_VULKAN>
+    # Shipwright/CMakeLists.txt sets this via `add_compile_definitions()`
+    # at the top-level scope, which applies to targets in that scope and
+    # under — but soh3d_harness lives in tools/ (this file is deferred-
+    # included from wire_in.cmake) so it does NOT inherit. Without it,
+    # soh_state.cpp's `OSContPad` struct has button as u16 while soh_lib
+    # code (z_player.c etc.) has it as u32; the resulting 2-byte layout
+    # skew means a scripted-input write from the harness lands 2 bytes
+    # off the field Player_Update reads, and Link never sees any injection.
+    CONTROLLERBUTTONS_T=uint32_t
 )
 target_include_directories(soh3d_harness PRIVATE ${CMAKE_SOURCE_DIR}/src)
 

@@ -188,6 +188,11 @@ extern "C" {
                               int* out_id, int* out_params, unsigned int* out_flags,
                               float* out_px, float* out_py, float* out_pz,
                               short* out_rx, short* out_ry, short* out_rz);
+    int SohState_SetInput(unsigned int button, int stickX, int stickY);
+    int SohState_DumpControlFlags(unsigned int* out_stateFlags1,
+                                   int* out_csState, unsigned int* out_csIndex,
+                                   unsigned int* out_nextCsIndex,
+                                   int* out_transTrigger, int* out_csAction);
     int SohState_Lighting(unsigned char ambient[3],
                          signed char light1Dir[3], unsigned char light1Color[3],
                          signed char light2Dir[3], unsigned char light2Color[3],
@@ -429,7 +434,24 @@ void VideoRefresh(const void* data, unsigned width, unsigned height, size_t pitc
 void AudioSample(int16_t, int16_t) {}
 size_t AudioSampleBatch(const int16_t*, size_t frames) { return frames; }
 void InputPoll() {}
-int16_t InputState(unsigned /*port*/, unsigned device, unsigned /*index*/, unsigned id) {
+// Az analog-stick override in libretro s16 range [-32768, 32767]. Written
+// by the `analog <lx> <ly> [rx] [ry]` REPL cmd. Independent from
+// g_input_mask (which is joypad bits only).
+int16_t g_az_analog_lx = 0, g_az_analog_ly = 0, g_az_analog_rx = 0, g_az_analog_ry = 0;
+
+int16_t InputState(unsigned /*port*/, unsigned device, unsigned index, unsigned id) {
+    if (device == RETRO_DEVICE_ANALOG) {
+        // index: RETRO_DEVICE_INDEX_ANALOG_LEFT=0, _RIGHT=1
+        // id:    RETRO_DEVICE_ID_ANALOG_X=0, _Y=1
+        if (index == RETRO_DEVICE_INDEX_ANALOG_LEFT) {
+            if (id == RETRO_DEVICE_ID_ANALOG_X) return g_az_analog_lx;
+            if (id == RETRO_DEVICE_ID_ANALOG_Y) return g_az_analog_ly;
+        } else if (index == RETRO_DEVICE_INDEX_ANALOG_RIGHT) {
+            if (id == RETRO_DEVICE_ID_ANALOG_X) return g_az_analog_rx;
+            if (id == RETRO_DEVICE_ID_ANALOG_Y) return g_az_analog_ry;
+        }
+        return 0;
+    }
     if (device != RETRO_DEVICE_JOYPAD) return 0;
     if (id >= 32) return 0;
     ++g_input_poll_count;
@@ -2286,6 +2308,47 @@ void RunRepl() {
         else if (cmd == "scene")     HandleScene(toks);
         else if (cmd == "warp")      HandleWarp(toks);
         else if (cmd == "soh_warp")  HandleSohWarp(toks);
+        else if (cmd == "soh_ctlflags") {
+            if (!g_soh_booted) { PrintErr("soh_ctlflags: run soh_boot first"); continue; }
+            unsigned int sf1=0, csI=0, nCsI=0;
+            int csS=0, tt=0, csA=0;
+            if (!SohState_DumpControlFlags(&sf1, &csS, &csI, &nCsI, &tt, &csA)) {
+                PrintErr("soh_ctlflags: no playstate"); continue;
+            }
+            std::printf("ok stateFlags1=0x%08x csState=%d cutsceneIndex=0x%04x "
+                        "nextCsIndex=0x%04x transitionTrigger=%d csAction=%d\n",
+                        sf1, csS, csI, nCsI, tt, csA);
+        }
+        else if (cmd == "analog") {
+            std::string lx_s, ly_s, rx_s, ry_s;
+            if (!(toks >> lx_s) || !(toks >> ly_s)) {
+                PrintErr("analog: usage: analog <lx> <ly> [rx] [ry]  (s16 range -32768..32767)");
+                continue;
+            }
+            auto lx = ParseNum(lx_s), ly = ParseNum(ly_s);
+            if (!lx || !ly) { PrintErr("analog: bad number"); continue; }
+            g_az_analog_lx = static_cast<int16_t>(*lx);
+            g_az_analog_ly = static_cast<int16_t>(*ly);
+            if (toks >> rx_s) { auto v = ParseNum(rx_s); if (v) g_az_analog_rx = static_cast<int16_t>(*v); }
+            if (toks >> ry_s) { auto v = ParseNum(ry_s); if (v) g_az_analog_ry = static_cast<int16_t>(*v); }
+            std::printf("ok analog L=(%d,%d) R=(%d,%d)\n",
+                        (int)g_az_analog_lx, (int)g_az_analog_ly,
+                        (int)g_az_analog_rx, (int)g_az_analog_ry);
+        }
+        else if (cmd == "soh_input") {
+            std::string bs, xs, ys;
+            if (!(toks >> bs)) { PrintErr("soh_input: usage: soh_input <button-mask> [stickX] [stickY]"); continue; }
+            auto b = ParseNum(bs);
+            if (!b) { PrintErr("soh_input: bad mask"); continue; }
+            int sx = 0, sy = 0;
+            if (toks >> xs) { auto v = ParseNum(xs); if (v) sx = (int)*v; }
+            if (toks >> ys) { auto v = ParseNum(ys); if (v) sy = (int)*v; }
+            if (!g_soh_booted) { PrintErr("soh_input: run soh_boot first"); continue; }
+            int ok = SohState_SetInput((unsigned int)(*b & 0xFFFF), sx, sy);
+            if (!ok) { PrintErr("soh_input: no playstate — soh_step until Play is up first"); continue; }
+            std::printf("ok soh_input 0x%04x stick=(%d,%d)\n",
+                        (unsigned)(*b & 0xFFFF), sx, sy);
+        }
         else if (cmd == "actors")    HandleActors(toks);
         else if (cmd == "soh_boot")  HandleSohBoot(toks);
         else if (cmd == "soh_step")  HandleSohStep(toks);
