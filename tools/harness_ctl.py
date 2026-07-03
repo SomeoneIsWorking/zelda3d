@@ -35,73 +35,121 @@ HARNESS_BIN = REPO_ROOT / "Azahar" / "build-libretro" / "bin" / "Release" / "soh
 
 class Harness:
     def __init__(self, cmd: list[str]):
+        # bufsize=0 → unbuffered binary I/O so Python's TextIOWrapper doesn't
+        # gobble multiple lines into an internal buffer that select() on the
+        # raw fd can't see (was breaking every multi-line peek).
         self.proc = subprocess.Popen(
             cmd, cwd=str(REPO_ROOT),
             stdin=subprocess.PIPE, stdout=subprocess.PIPE, stderr=subprocess.DEVNULL,
-            text=True, bufsize=1,
+            bufsize=0,
         )
+        self._buf = b""
         line = self._readline()
         if line.strip() != "boot succeeded":
             raise RuntimeError(f"harness did not boot: got {line!r}")
 
-    def _readline(self) -> str:
-        assert self.proc.stdout is not None
-        line = self.proc.stdout.readline()
-        if not line:
-            raise RuntimeError("harness closed stdout unexpectedly")
-        return line
+    def _readline(self, timeout: float = 60.0):
+        """Read one \\n-terminated line from the raw fd, honoring `timeout`.
+        Returns the line (stripped of the newline) as str, or None on timeout.
+        Raises on pipe close."""
+        import os, select
+        fd = self.proc.stdout.fileno()
+        import time
+        deadline = time.time() + timeout
+        while b"\n" not in self._buf:
+            remaining = max(0.0, deadline - time.time())
+            r, _, _ = select.select([fd], [], [], remaining)
+            if not r:
+                return None
+            chunk = os.read(fd, 8192)
+            if not chunk:
+                raise RuntimeError("harness closed stdout unexpectedly")
+            self._buf += chunk
+        line, self._buf = self._buf.split(b"\n", 1)
+        return line.decode("utf-8", errors="replace")
+
+    def _peek_has_data(self) -> bool:
+        """True if there's already buffered data or the pipe has bytes ready."""
+        import select
+        if self._buf:
+            return True
+        fd = self.proc.stdout.fileno()
+        r, _, _ = select.select([fd], [], [], 0)
+        return bool(r)
 
     def send(self, cmd: str) -> str:
         """Send one command; return the first response line (chomped)."""
         assert self.proc.stdin is not None
-        self.proc.stdin.write(cmd.rstrip() + "\n")
+        self.proc.stdin.write((cmd.rstrip() + "\n").encode())
         self.proc.stdin.flush()
-        return self._readline().rstrip()
+        line = self._readline()
+        if line is None:
+            raise TimeoutError(f"send({cmd!r}): no response within timeout")
+        return line.rstrip()
 
-    def send_multiline(self, cmd: str, per_line_timeout: float = 30.0) -> list[str]:
-        """Send a command that streams multiple lines ending in an `ok …` line.
+    def send_multiline(self, cmd: str, per_line_timeout: float = 30.0,
+                       peek_timeout: float = 0.2) -> list[str]:
+        """Send a command that may stream multiple lines.
 
-        Handles two harness output shapes:
-          A) single-line success: first line already starts with `ok `
-             (e.g. `mem`, `r32`, `playstate`). Return immediately.
-          B) multi-line: header line does NOT start with `ok ` (e.g.
-             `compare scene:`, `actors`), then a body, then a terminator
-             line matching `ok …` (`ok end`, `ok compare scene`, etc.).
-             Keep reading until that terminator arrives.
+        Harness reply shapes:
+          A) single-line: `ok <payload>` (e.g. `mem`, `r32`, `playstate`)
+          B) streaming header first: `ok <name> <N>` then body lines then
+             `ok end` (e.g. `actors`, `titleactors`)
+          C) title/label header first (does NOT start with `ok `): body,
+             then `ok <terminator>` (e.g. `compare scene:` ... `ok compare scene`)
 
-        A per-line select() timeout catches hangs where the harness died
-        or the terminator convention doesn't match.
+        Distinguishing A from B needs a peek — after the first `ok …` line
+        arrives, wait `peek_timeout` for another line. If none comes, it
+        was A. If one arrives, keep reading until `ok end`.
         """
-        import select
         assert self.proc.stdin is not None
         assert self.proc.stdout is not None
-        self.proc.stdin.write(cmd.rstrip() + "\n")
+        self.proc.stdin.write((cmd.rstrip() + "\n").encode())
         self.proc.stdin.flush()
         lines: list[str] = []
-        fd = self.proc.stdout.fileno()
+
+        def _read_line(timeout):
+            line = self._readline(timeout=timeout)
+            if line is None:
+                return None
+            return line.rstrip()
+
+        first = _read_line(per_line_timeout)
+        if first is None:
+            raise TimeoutError(f"send_multiline({cmd!r}): no first line in {per_line_timeout}s")
+        lines.append(first)
+
+        first_ok = first.startswith("ok ")
+        if first_ok:
+            # (A) or (B) — peek for a body line.
+            peek = _read_line(peek_timeout)
+            if peek is None:
+                return lines  # (A)
+            lines.append(peek)
+            # (B): keep reading until `ok end` (or any `ok`/`err` terminator).
+        # For (C), we haven't started reading the body yet — first line was
+        # the header (not an "ok" line), so we already know we're streaming.
+
         while True:
-            r, _, _ = select.select([fd], [], [], per_line_timeout)
-            if not r:
+            line = _read_line(per_line_timeout)
+            if line is None:
                 raise TimeoutError(
                     f"send_multiline({cmd!r}): no line for {per_line_timeout}s; "
                     f"got {len(lines)} lines so far "
-                    f"(last: {lines[-1] if lines else None!r})"
+                    f"(last: {lines[-1]!r})"
                 )
-            raw = self.proc.stdout.readline()
-            if not raw:
-                raise RuntimeError(f"send_multiline({cmd!r}): harness closed stdout")
-            line = raw.rstrip()
             lines.append(line)
-            # (A) first line is a full `ok …` → single-line reply, done.
-            if len(lines) == 1 and line.startswith("ok "):
+            if line == "ok end":
                 return lines
-            # (B) any subsequent `ok …` or `err …` is the terminator.
-            if len(lines) > 1 and (line.startswith("ok ") or line.startswith("err ")):
+            # For shape (C), the terminator is `ok <label>` (not `ok end`).
+            # Recognize it if the header did NOT start with `ok`.
+            if not first_ok and (line.startswith("ok ") or line.startswith("err ")):
                 return lines
 
     def quit(self) -> None:
         try:
-            self.send("quit")
+            self.proc.stdin.write(b"quit\n")
+            self.proc.stdin.flush()
         except Exception:
             pass
         self.proc.wait(timeout=5)
