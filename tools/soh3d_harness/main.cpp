@@ -1019,6 +1019,15 @@ constexpr uint32_t ACTOR_ID_OFF            = 0x0000;
 constexpr uint32_t ACTOR_POS_OFF           = 0x0008;
 constexpr uint32_t ACTOR_ROT_OFF           = 0x0014;
 constexpr uint32_t ACTOR_NEXT_OFF          = 0x0130;
+// Player.speedXZ inside the OoT3D Actor struct. Discovered by a live
+// memory scan under scripted walk-forward (scratch/az_speedxz_scan.py,
+// 2026-07-03): 6 successive game-frame snapshots showed one offset with
+// the acceleration signature 0.0 → 0.0 → 1.33 → 2.67 → 4.00 → 5.00 —
+// classic Player speedXZ ramp saturating at the walking-speed cap 5.0.
+// Same byte offset as SoH's N64 Actor.speedXZ (z64actor.h:227). 0x06c
+// held the same value; may be a paired duplicate or an adjacent
+// horizontal-speed field. Only 0x068 is confirmed as speedXZ.
+constexpr uint32_t ACTOR_SPEEDXZ_OFF       = 0x0068;
 constexpr uint32_t TRANSITION_TRIGGER_OFF  = 0x5C2D;
 constexpr uint32_t NEXT_ENTRANCE_OFF       = 0x5C32;
 constexpr uint8_t  TRANS_TRIGGER_START     = 20;
@@ -2383,6 +2392,25 @@ void RunRepl() {
             std::printf("ok analog L=(%d,%d) R=(%d,%d)\n",
                         (int)g_az_analog_lx, (int)g_az_analog_ly,
                         (int)g_az_analog_rx, (int)g_az_analog_ry);
+        }
+        else if (cmd == "az_playerinfo") {
+            // Read Az Player speedXZ from the discovered offset. Walks the
+            // cat=2 (Player) actor list head to find the Player, then
+            // reads +0x068 as f32.
+            auto ps = CurrentPlayState();
+            if (!ps) { PrintErr("az_playerinfo: no playstate"); continue; }
+            auto& mem = Core::System::GetInstance().Memory();
+            auto head = mem.Read32OrNullopt(*ps + ACTORCTX_OFF +
+                                            ACTOR_LISTS_OFF + 2 * 8 + 4);
+            if (!head || *head == 0) {
+                PrintErr("az_playerinfo: no Player actor"); continue;
+            }
+            auto spd_v = mem.Read32OrNullopt(*head + ACTOR_SPEEDXZ_OFF);
+            if (!spd_v) { PrintErr("az_playerinfo: mem read fail"); continue; }
+            float speedXZ;
+            std::memcpy(&speedXZ, &*spd_v, 4);
+            std::printf("ok az_playerinfo speedXZ=%.4f addr=0x%08x\n",
+                        speedXZ, *head);
         }
         else if (cmd == "soh_wallinfo") {
             if (!g_soh_booted) { PrintErr("soh_wallinfo: run soh_boot first"); continue; }
