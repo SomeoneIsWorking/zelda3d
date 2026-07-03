@@ -352,6 +352,19 @@ static void buildFromCmb(LoadedModel* out, bool bakedVertexColor,
     if (!bakedVertexColor) {
         for (auto& g : out->groups)
             for (auto& v : g.verts) { v.color[0] = v.color[1] = v.color[2] = v.color[3] = 1.0f; }
+    } else {
+        // Even in bakedVertexColor mode, some sky-dome CMBs (fine_star being the flagship
+        // case, task #16) declare a vertex COLOR attribute in the SEPD but the stream data
+        // isn't valid vColor — the CMB parser reads it and produces NaN / huge values, which
+        // then propagate through `texture * vColor * shade` and NaN-out to black, hiding the
+        // stars entirely. Sanitize: anything non-finite or wildly outside [0,1] falls back to
+        // 1.0. This is port-faithful (the 3DS treats an un-authored attribute as identity too).
+        auto sane = [](float c) { return std::isfinite(c) && c >= 0.0f && c <= 2.0f; };
+        for (auto& g : out->groups) {
+            for (auto& v : g.verts) {
+                for (int k = 0; k < 4; k++) if (!sane(v.color[k])) v.color[k] = 1.0f;
+            }
+        }
     }
     if (stairs) generateRoomStairs(out);
 
