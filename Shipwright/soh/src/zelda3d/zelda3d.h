@@ -135,6 +135,11 @@ int Zelda3D_SkyActive(PlayState* play);
 // of the N64 Environment_DrawSunAndMoon sprites. Called from Play_Draw at that call site; returns 1
 // if it drew the OoT3D sun/moon (caller skips the N64 path), 0 otherwise (caller draws N64). #28e.
 int Zelda3D_TryDrawSunMoon(PlayState* play);
+// Task #16 title atmosphere: composite the OoT3D menu-bg + ura CTXBs OVER the 3D scene at
+// title. This is what paints the visible grass / mountain / sky colours on Az's title-demo
+// (the 3D geometry alone draws effectively black through the game's TEV combiner). Returns
+// 1 when the atmosphere was drawn (title-demo active), 0 otherwise.
+int Zelda3D_TryDrawTitleAtmos(PlayState* play);
 
 // Once-per-frame Zelda3D bookkeeping after the actor draw-all: advance the hand-flap frame counter
 // and update the scene light direction. (The 3DS model draws are appended INLINE during the actor
