@@ -1436,12 +1436,26 @@ void CompareFirstDivImpl() {
         fd.report("sceneNum", buf);
     }
 
-    // Dim 3: Link ↔ Link limb count. Table B = 0x005A54D8 is the candidate
-    // Link-side pose table (see title_gamestate.md — 25 entries, rider-on-
-    // steed pattern with entry-1 high Y). SoH Player skelAnime lives at
-    // actor+ACTORCAT_PLAYER.
-    int az_link_limbs = 0;
-    if (az_at_title) az_link_limbs = TITLE_POSE_B_COUNT;
+    // Dim 3: Link ↔ Link limb count under the RE'd index mapping.
+    //
+    // Table B (0x005A54D8) has 25 entries but only 22 are "SkelAnime-shaped":
+    //   entry 0    = zero-filled default (unused root-parent slot)
+    //   entry 1    = root translation  (matches SoH jointTable[0])
+    //   entries 2..22 = 21 limb rotations (match SoH jointTable[1..21])
+    //   entries 23, 24 = trailing zeros (OoT3D-only extras — facial or
+    //                    finger joints the N64 rig doesn't have)
+    //
+    // So table B IS a 22-limb Link rig with 3 OoT3D-specific extras. The
+    // port-native mapping is `3ds_idx = soh_idx + 1`; d3 counts under this
+    // mapping should match. This preserves SoH's animation-resolver
+    // invariants (Link's SkelAnime stays 22 limbs; the compare tool learns
+    // the layout, not the engine).
+    constexpr int AZ_LIMB_OFFSET   = 1;   // 3ds_idx = soh_idx + AZ_LIMB_OFFSET
+    constexpr int AZ_EXTRAS_TRAIL  = 2;   // entries 23, 24 skipped
+    const int az_link_limbs_raw = az_at_title ? (int)TITLE_POSE_B_COUNT : 0;
+    const int az_link_limbs_mapped = az_at_title
+        ? az_link_limbs_raw - AZ_LIMB_OFFSET - AZ_EXTRAS_TRAIL  // 25 - 1 - 2 = 22
+        : 0;
     int soh_link_limbs = 0;
     short soh_joints[32 * 3] = {};
     int animFrame = 0, morphFrame = 0;
@@ -1450,24 +1464,35 @@ void CompareFirstDivImpl() {
                                        &soh_link_limbs, &animFrame, &morphFrame);
         if (n < 0) soh_link_limbs = -1;
     }
-    std::printf("  d3 link limbs:   az(table B)=%d soh(Player)=%d\n",
-                az_link_limbs, soh_link_limbs);
-    if (!fd.reported && az_link_limbs != soh_link_limbs) {
+    std::printf("  d3 link limbs:   az(table B mapped)=%d "
+                "(raw=%d, drop entry0 + 2 trailing extras) soh(Player)=%d\n",
+                az_link_limbs_mapped, az_link_limbs_raw, soh_link_limbs);
+    if (!fd.reported && az_link_limbs_mapped != soh_link_limbs) {
         char buf[192]; std::snprintf(buf, sizeof buf,
-            "az(0x005A54D8 rig)=%d soh(gPlayer skelAnime)=%d — different rig topology",
-            az_link_limbs, soh_link_limbs);
+            "az(table B mapped)=%d soh(gPlayer skelAnime)=%d "
+            "— mapping needs tuning",
+            az_link_limbs_mapped, soh_link_limbs);
         fd.report("link-limb-count", buf);
     }
 
-    // Dim 4: per-limb rotation delta (only if counts match — otherwise
-    // limb-by-limb correspondence is undefined). Convert 3DS rad → binary
-    // angle and compute max |Δ| across all limbs & 3 axes.
-    if (!fd.reported && az_link_limbs > 0 && az_link_limbs == soh_link_limbs) {
+    // Dim 4: per-limb rotation delta under the mapping. SoH jointTable[0]
+    // stores ROOT TRANSLATION as Vec3s (not a rotation), so skip index 0
+    // on the rotation-delta check — its natural pair is 3DS entry[1].pos.
+    // Rotations are at SoH jointTable[1..21] ↔ 3DS entry[2..22].rot.
+    if (!fd.reported && az_link_limbs_mapped > 0 &&
+        az_link_limbs_mapped == soh_link_limbs) {
         int worstLimb = -1, worstAxis = -1;
         int worstDelta = 0;
         short worstAz = 0, worstSoh = 0;
-        for (int i = 0; i < az_link_limbs; ++i) {
-            const uint32_t va = TITLE_POSE_TABLE_B_VA + i * TITLE_POSE_STRIDE;
+        // Also tally delta statistics per axis so we can see if the
+        // divergence is uniform (sign flip / axis convention) or random
+        // (demos out of phase).
+        long long sumAbsPerAxis[3] = {0, 0, 0};
+        int hitsPerAxis[3] = {0, 0, 0};
+        int nearHalfTurnCount = 0;  // deltas within 0x0400 of ±0x8000
+        for (int soh_i = 1; soh_i < soh_link_limbs; ++soh_i) {
+            const int az_i = soh_i + AZ_LIMB_OFFSET;
+            const uint32_t va = TITLE_POSE_TABLE_B_VA + az_i * TITLE_POSE_STRIDE;
             float rad[3];
             bool ok = true;
             for (int j = 0; j < 3; ++j) {
@@ -1477,27 +1502,38 @@ void CompareFirstDivImpl() {
             }
             if (!ok) continue;
             for (int j = 0; j < 3; ++j) {
-                short az_bin = RadToBinaryAngle(rad[j]);
-                short soh_bin = soh_joints[i * 3 + j];
-                // Signed wrap-around distance on a 16-bit ring
+                short az_bin  = RadToBinaryAngle(rad[j]);
+                short soh_bin = soh_joints[soh_i * 3 + j];
                 int d = az_bin - soh_bin;
                 if (d >  32768) d -= 65536;
                 if (d < -32768) d += 65536;
                 int a = d < 0 ? -d : d;
+                sumAbsPerAxis[j] += a;
+                hitsPerAxis[j]++;
+                // Half-turn signature: |a - 0x8000| < 0x0400
+                if (a > 0x7c00 && a < 0x8400) nearHalfTurnCount++;
                 if (a > worstDelta) {
                     worstDelta = a;
-                    worstLimb = i; worstAxis = j;
+                    worstLimb = soh_i; worstAxis = j;
                     worstAz = az_bin; worstSoh = soh_bin;
                 }
             }
         }
-        std::printf("  d4 rot delta:    worst=%d (limb %d axis %d) az_bin=%d soh_bin=%d\n",
-                    worstDelta, worstLimb, worstAxis, worstAz, worstSoh);
-        // A tolerance of 0x0800 (~11°) covers per-frame drift and unit
-        // conversion rounding; anything worse is a real divergence.
+        std::printf("  d4 rot delta:    worst=%d (soh limb %d axis %d, "
+                    "az entry %d) az_bin=%d soh_bin=%d\n",
+                    worstDelta, worstLimb, worstAxis,
+                    worstLimb + AZ_LIMB_OFFSET, worstAz, worstSoh);
+        std::printf("  d4 mean |Δ|:     axis0=%lld axis1=%lld axis2=%lld  "
+                    "half-turn hits=%d/%d\n",
+                    hitsPerAxis[0] ? sumAbsPerAxis[0]/hitsPerAxis[0] : 0,
+                    hitsPerAxis[1] ? sumAbsPerAxis[1]/hitsPerAxis[1] : 0,
+                    hitsPerAxis[2] ? sumAbsPerAxis[2]/hitsPerAxis[2] : 0,
+                    nearHalfTurnCount,
+                    hitsPerAxis[0] + hitsPerAxis[1] + hitsPerAxis[2]);
         if (worstDelta > 0x0800) {
             char buf[256]; std::snprintf(buf, sizeof buf,
-                "worst limb %d axis %d Δ=%d (az=%d soh=%d) — pose retarget not aligned",
+                "worst soh limb %d axis %d Δ=%d (az=%d soh=%d) "
+                "— see d4 mean|Δ| line for uniform-vs-random signature",
                 worstLimb, worstAxis, worstDelta, worstAz, worstSoh);
             fd.report("link-limb-rot", buf);
         }
