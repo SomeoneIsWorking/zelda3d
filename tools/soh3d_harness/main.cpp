@@ -1028,6 +1028,26 @@ constexpr uint32_t ACTOR_NEXT_OFF          = 0x0130;
 // held the same value; may be a paired duplicate or an adjacent
 // horizontal-speed field. Only 0x068 is confirmed as speedXZ.
 constexpr uint32_t ACTOR_SPEEDXZ_OFF       = 0x0068;
+
+// Player live-facing yaw. On N64, Actor.world.rot.y (at 0x14+2) tracks
+// the actor's physical facing direction and Player_UpdateCommon writes
+// it on every yaw update. On 3DS GREZZO decoupled these: the s16 at
+// Actor+0x14+2 stores the initial spawn rotation and stays STATIC
+// through gameplay, while the live "current facing" yaw is at
+// Actor+0x36. Discovered by memory scan (scratch/az_playeryaw_scan.py,
+// 2026-07-03): during walk_forward from Link's House the s16 at 0x36
+// transitions -32767 → +110 on frame [01] (~180° flip to face motion),
+// matching SoH's Actor.world.rot.y transition from -32768 → +108 to
+// within 2 binary-angle units (float rounding).
+//
+// Two other candidates flipped in the same scan (0xBE, 0x3CA) — 0xBE
+// pre-flipped by the first snapshot (probably targetYaw / actionYaw),
+// 0x3CA snapped to exactly 0 (likely a related but not-yet-named field
+// like the Player-struct's own yaw goal). Only 0x36 is committed as
+// the live-facing yaw; d4 in firstdiv should switch to reading this
+// offset on the Az side so the compare doesn't fabricate a rotation
+// divergence from the static spawn-rot field.
+constexpr uint32_t PLAYER_YAW_OFF           = 0x0036;
 constexpr uint32_t TRANSITION_TRIGGER_OFF  = 0x5C2D;
 constexpr uint32_t NEXT_ENTRANCE_OFF       = 0x5C32;
 constexpr uint8_t  TRANS_TRIGGER_START     = 20;
@@ -2406,11 +2426,23 @@ void RunRepl() {
                 PrintErr("az_playerinfo: no Player actor"); continue;
             }
             auto spd_v = mem.Read32OrNullopt(*head + ACTOR_SPEEDXZ_OFF);
-            if (!spd_v) { PrintErr("az_playerinfo: mem read fail"); continue; }
+            auto rot_v = mem.Read32OrNullopt(*head + ACTOR_ROT_OFF);
+            // PLAYER_YAW_OFF is an s16; Read16 not available so read
+            // the enclosing u32 and mask.
+            auto yaw_v = mem.Read32OrNullopt(*head + (PLAYER_YAW_OFF & ~3u));
+            if (!spd_v || !rot_v || !yaw_v) {
+                PrintErr("az_playerinfo: mem read fail"); continue;
+            }
             float speedXZ;
             std::memcpy(&speedXZ, &*spd_v, 4);
-            std::printf("ok az_playerinfo speedXZ=%.4f addr=0x%08x\n",
-                        speedXZ, *head);
+            short rx = static_cast<short>(*rot_v & 0xFFFF);
+            short ry = static_cast<short>((*rot_v >> 16) & 0xFFFF);
+            // PLAYER_YAW_OFF = 0x36 sits in the high half of the u32 at 0x34.
+            short playerYaw = static_cast<short>(
+                (*yaw_v >> ((PLAYER_YAW_OFF & 2) * 8)) & 0xFFFF);
+            std::printf("ok az_playerinfo speedXZ=%.4f rot=(%d,%d) "
+                        "playerYaw=%d addr=0x%08x\n",
+                        speedXZ, rx, ry, playerYaw, *head);
         }
         else if (cmd == "soh_wallinfo") {
             if (!g_soh_booted) { PrintErr("soh_wallinfo: run soh_boot first"); continue; }
