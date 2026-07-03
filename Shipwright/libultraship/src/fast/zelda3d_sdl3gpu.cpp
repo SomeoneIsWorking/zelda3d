@@ -59,6 +59,11 @@ extern "C" float gZelda3dFogOffset;
 extern "C" float gZelda3dWorldAmbColor[3];
 extern "C" float gZelda3dWorldAmb;
 extern "C" int gZelda3dWorldLit;
+// Live scene light params fed by z_kankyo via Zelda3D_GL_SetLightParams (zelda3d_gl.cpp).
+// Used at UBO fill time to pre-bake scene-modulated matAmbient / matDiffuse for the unified
+// vertex-lit shader so it matches OoT3D's real formula sceneAmb*matAmb + sceneDif*matDif*NdotL.
+extern "C" float gZelda3dAmbient[3];
+extern "C" float gZelda3dLight1Col[3];
 extern "C" int gUnifiedRenderer; // render-unification effort (kanban #131): bit 0 = CMB unified
 // REPL `sgdump <modelId>`: arm a one-shot per-group render-state dump for the next draw of that model.
 extern "C" int g_sgDumpModel = -1;
@@ -227,10 +232,16 @@ const char* kFrag =
     // OoT3D combiner MODULATE(current, CONSTANT) that runs after material-anim on townsfolk).
     // Default upload leaves .a=0 so materials that don't reference CONSTANT are unchanged.
     "    if (ubo.uMatConst.a >= 0.5) rgb *= ubo.uMatConst.rgb;\n"
-    "    if (ubo.uParams.y < 0.5)\n"
+    "    if (ubo.uParams.y < 0.5) {\n"
+    // OoT3D scene-vertex-lit port (task #16): when uAmbient.w > 0 uAmbient.xyz carries
+    // sceneAmb*matAmbient — MULTIPLY (matches OoT3D's saturate(sceneAmb*matAmb + ...)),
+    // do NOT add. The pre-#16 code used uAmbient as an additive floor which never modulated
+    // the day-baked vertex colours, so scenes stayed day-bright at midnight vs the oracle's
+    // near-silhouette. See docs/oot3d_world_lighting_re.md.
+    "        if (ubo.uAmbient.w > 0.0)\n"
+    "            rgb *= ubo.uAmbient.xyz;\n"
     "        rgb = clamp(rgb, 0.0, 1.0) * ubo.uExtra.w;\n"
-    "    if (ubo.uAmbient.w > 0.0)\n"
-    "        rgb = clamp(rgb + ubo.uAmbient.xyz * ubo.uAmbient.w, 0.0, 1.0);\n"
+    "    }\n"
     "    if (ubo.uFog.w > 0.5 && ubo.uLightDir.w < 0.5) {\n"
     "        float f = clamp(vFogDist * ubo.uFog2.x + ubo.uFog2.y, 0.0, 255.0) * (1.0 / 255.0);\n"
     "        rgb = mix(rgb, ubo.uFog.xyz, f);\n"
@@ -1596,11 +1607,14 @@ void Fast::Zelda3DRenderer::DrawModel(int modelId, const float* mp16, const floa
         // gated by gZelda3dWorldLit (task #16: at title we skip the synthetic vertex-lit compute
         // but keep the material's static brightness).
         ubo.uExtra[3] = grp.vertexLighting ? grp.combScaleRGB : 1.0f;
+        // OoT3D scene-vertex-lit path (task #16): feed uAmbient.xyz = sceneAmb * matAmbient so
+        // the shader can MULTIPLY (matches OoT3D's saturate(sceneAmb*matAmb + ...) * bakedColor).
+        // Only applied to lit scene materials — character/prop draws (uParams.y>0.5) skip it.
         bool ambGroup = (grp.vertexLighting && gZelda3dWorldLit);
-        ubo.uAmbient[0] = base.uAmbient[0] * grp.matAmbient[0];
-        ubo.uAmbient[1] = base.uAmbient[1] * grp.matAmbient[1];
-        ubo.uAmbient[2] = base.uAmbient[2] * grp.matAmbient[2];
-        ubo.uAmbient[3] = ambGroup ? gZelda3dWorldAmb : 0.0f;
+        ubo.uAmbient[0] = gZelda3dAmbient[0] * grp.matAmbient[0];
+        ubo.uAmbient[1] = gZelda3dAmbient[1] * grp.matAmbient[1];
+        ubo.uAmbient[2] = gZelda3dAmbient[2] * grp.matAmbient[2];
+        ubo.uAmbient[3] = ambGroup ? 1.0f : 0.0f;
         // PICA200 TEV CONSTANT modulate: for materials whose combiner sources CONSTANT in any
         // stage, publish the selected slot's RGB with .a = 1 so the shader applies it. Materials
         // that never reference CONSTANT (e.g. plain MODULATE(PRIM, TEX0)) leave .a = 0 and the
@@ -1696,10 +1710,24 @@ void Fast::Zelda3DRenderer::DrawModel(int modelId, const float* mp16, const floa
             uu.common.uParams1[1] = grp.polygonOffset;
             uu.common.uParams1[2] = (boneData && boneCnt > 0) ? 1.0f : 0.0f;
             uu.common.uParams1[3] = 0.0f;
-            uu.common.uMatAmbient[0] = grp.matAmbient[0]; uu.common.uMatAmbient[1] = grp.matAmbient[1];
-            uu.common.uMatAmbient[2] = grp.matAmbient[2]; uu.common.uMatAmbient[3] = 0.0f;
-            uu.common.uMatDiffuse[0] = grp.matDiffuse[0]; uu.common.uMatDiffuse[1] = grp.matDiffuse[1];
-            uu.common.uMatDiffuse[2] = grp.matDiffuse[2]; uu.common.uMatDiffuse[3] = 0.0f;
+            // OoT3D's real vertex-lit formula (docs/oot3d_world_lighting_re.md,
+            // cmb.h vertex_lighting header) is:
+            //   v_Color = saturate(sceneAmb*matAmbient + sceneDif*matDiffuse*max(0,N.L)) * bakedColor
+            // The unified vertex shader computes `lit = uMatAmbient + uMatDiffuse*NdotL`, no
+            // separate scene-uniform multiplication — so the scene modulation MUST be pre-baked
+            // here at UBO fill. Otherwise sceneAmb / sceneDif are dead data (as they were pre-
+            // task-#16 for the unified path), materials with matAmb=(1,1,1) render at full day
+            // brightness even at midnight (visible in the title SxS: bright red-brown mountains
+            // where the oracle showed near-silhouette). This is the actual port defect; the
+            // "environment-value tuning" earlier was chasing a symptom of it.
+            uu.common.uMatAmbient[0] = grp.matAmbient[0] * gZelda3dAmbient[0];
+            uu.common.uMatAmbient[1] = grp.matAmbient[1] * gZelda3dAmbient[1];
+            uu.common.uMatAmbient[2] = grp.matAmbient[2] * gZelda3dAmbient[2];
+            uu.common.uMatAmbient[3] = 0.0f;
+            uu.common.uMatDiffuse[0] = grp.matDiffuse[0] * gZelda3dLight1Col[0];
+            uu.common.uMatDiffuse[1] = grp.matDiffuse[1] * gZelda3dLight1Col[1];
+            uu.common.uMatDiffuse[2] = grp.matDiffuse[2] * gZelda3dLight1Col[2];
+            uu.common.uMatDiffuse[3] = 0.0f;
             memcpy(uu.bones, base.uBones, sizeof(uu.bones));
             static_assert(sizeof(uu) == sizeof(SgUbo), "UnifiedDrawUbo must match DrawGroup::ubo's byte size");
             memcpy(dg.ubo.data(), &uu, sizeof(uu));
