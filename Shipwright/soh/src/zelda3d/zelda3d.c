@@ -1737,8 +1737,14 @@ static const float  kZelda3dTitleRiderArriveDist = 8.0f;
 // initial rider spawn pos (currently unknown). Until then a static
 // hardcode paralleling the 17221301 cam PORT closes shot 1.
 // See oot3d-decomp docs/title_writer_chains.md follow-on.
+// Corrected 2026-07-03 via multi-shot sweep (scratch/title_multishot_parity.py):
+// the earlier (-6008.8, 46.6, 5027.5) sample was a mid-transit tick, not a
+// settled value. Az's 0x005AFFB0 read is STATIC at (-6057.0, 40.8, 4999.0) for
+// the entire shot-1 duration (3000-tick sweep, 24 samples all identical). At
+// tick boundaries (~1900-2200) title-actor line drops entirely = shot
+// transition. Task #7 will RE FUN_00418B88 to characterize each subsequent shot.
 static const float kZelda3dTitleRiderSettledPos[3] = {
-    -6008.8f, 46.6f, 5027.5f
+    -6057.0f, 40.8f, 4999.0f
 };
 
 // Actor_TurnToPoint — FUN_003326F0. Verified via JIT yaw-write hook.
