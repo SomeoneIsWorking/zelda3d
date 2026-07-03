@@ -584,7 +584,8 @@ static size_t vertCountGroups(const std::vector<Zelda3D::CmbDrawGroup>& groups) 
 // blend: the sun/lens-flare discs are a glow on black (src_alpha,ONE = add over the sky), the moon
 // is an alpha-masked disc (src_alpha,1-src_alpha = normal alpha blend).
 static void loadBillboard(LoadedModel* out, const std::string& zarPath, const std::string& ctxbName,
-                          bool additive) {
+                          bool additive, float u0 = 0.0f, float v0 = 0.0f,
+                          float u1 = 1.0f, float v1 = 1.0f) {
     Zelda3D::CtrRom* r = rom();
     if (!r) return;
     auto zarBytes = r->read(zarPath);
@@ -618,8 +619,8 @@ static void loadBillboard(LoadedModel* out, const std::string& zarPath, const st
         vtx.color[0] = vtx.color[1] = vtx.color[2] = vtx.color[3] = 1.0f;
         return vtx;
     };
-    Zelda3D::CmbVertex bl = mkv(-31, -31, 0, 0), br = mkv(32, -31, 1, 0), tl = mkv(-31, 32, 0, 1),
-                     tr = mkv(32, 32, 1, 1);
+    Zelda3D::CmbVertex bl = mkv(-31, -31, u0, v0), br = mkv(32, -31, u1, v0),
+                       tl = mkv(-31,  32, u0, v1), tr = mkv(32,  32, u1, v1);
     Zelda3D::CmbDrawGroup g;
     g.material_index = -1;
     g.mesh_id = -1;
@@ -665,6 +666,11 @@ static void loadAutoModel(int modelId, LoadedModel* out) {
     std::string key = g_autoModelPaths[idx];
     // "BILLBOARD:" / "BILLBOARDADD:" prefix marks a standalone CTXB sprite (no CMB) drawn as a
     // camera-facing quad — the OoT3D sun/moon discs (#28e). Key = "<prefix><zar>|<ctxbName>".
+    // Optional trailing "#u0,v0,u1,v1" clamps the sampled texture region to that UV subrect —
+    // e.g. "#0,0.4,0.5,1" samples only the upper-left quadrant. Used for the fine_lensflare
+    // atlas: its rainbow-ring halo lives in the upper-left quadrant of the texture, and the
+    // sun-flare orbs live in the right half. To render just the halo behind the moon we
+    // sample only the ring region.
     {
         bool add = false;
         const char* pfx = nullptr;
@@ -674,8 +680,18 @@ static void loadAutoModel(int modelId, LoadedModel* out) {
             std::string rest = key.substr(std::strlen(pfx));
             auto bar = rest.find('|');
             std::string zp = (bar == std::string::npos) ? rest : rest.substr(0, bar);
-            std::string ctxb = (bar == std::string::npos) ? std::string() : rest.substr(bar + 1);
-            loadBillboard(out, zp, ctxb, add);
+            std::string tail = (bar == std::string::npos) ? std::string() : rest.substr(bar + 1);
+            std::string ctxb = tail;
+            float u0 = 0.0f, v0 = 0.0f, u1 = 1.0f, v1 = 1.0f;
+            auto hash = tail.find('#');
+            if (hash != std::string::npos) {
+                ctxb = tail.substr(0, hash);
+                std::string uv = tail.substr(hash + 1);
+                if (std::sscanf(uv.c_str(), "%f,%f,%f,%f", &u0, &v0, &u1, &v1) != 4) {
+                    u0 = 0.0f; v0 = 0.0f; u1 = 1.0f; v1 = 1.0f;
+                }
+            }
+            loadBillboard(out, zp, ctxb, add, u0, v0, u1, v1);
             return;
         }
     }
