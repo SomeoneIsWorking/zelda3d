@@ -3701,6 +3701,28 @@ static int Zelda3D_MoonOuterHaloId(void) {
     return Zelda3D_AutoModelId("BILLBOARDADD:/kankyo/BlueSky.zar|tex/fine_moon2.ctxb");
 }
 
+// Task #16 title-atmosphere: STUB (open RE arc).
+//
+// Az's title-demo composites a visible landscape (green grass, dark mountains, dim sky) OVER a
+// 3D scene mesh whose triangles all output color=0 through the TEV combiner (MODULATE(primary,
+// tex) with primary=0). Traced via the SW-rasterizer draw log (task16_lighting.log): out of 34
+// unique textures at settled title, only two have non-zero primary_color — 0x2095aa00
+// (common_bg01.ctxb, the ZELDA-logo UI overlay drawn on top screen) and 0x2091a900
+// (ura.ctxb, a small UI strip). Neither is the atmospheric background — an initial port of them
+// as full-screen billboards revealed the Zelda title logo overlaying the scene at title, NOT
+// the landscape colours.
+//
+// So the visible landscape colours must come from a NON-SW-rasterizer path — likely a 2D bg
+// image copied to the framebuffer via PICA200 DisplayTransfer, or the bg-image scanout layer
+// that composites under the 3D top-screen output. The draw-log substrate doesn't capture those
+// paths (they don't go through ProcessTriangle). Next step: instrument Az's
+// video_core/renderer_software/sw_framebuffer + DisplayTransferConfig to log large writes to
+// the top-screen scanout region during title. See oot3d-decomp/docs/title_landscape_atmospheric_layer.md.
+int Zelda3D_TryDrawTitleAtmos(PlayState* play) {
+    (void)play;
+    return 0;
+}
+
 int Zelda3D_TryDrawSunMoon(PlayState* play) {
     f32 y, color, scale, temp, alpha;
     int sunId, moonId;
