@@ -2762,6 +2762,48 @@ void CompareFirstDivImpl() {
         }
     }
 
+    // title-actor: diagnostic-only dump of Az's Table B entry 1 pos + SoH's
+    // Player world.pos. NO cross-engine |Δpos| is computed — the two are
+    // not apples-to-apples: Az's Table B entries are SkelAnime LIMB-LOCAL
+    // transforms (entry 1's y≈7875 is a mount-attachment offset in local
+    // space, per docs/title_gamestate.md), whereas SoH's Player world.pos
+    // is a WORLD-space coord. Az's actual Link WORLD position lives in a
+    // separate .data slot that's not RE'd yet — locating it is the next
+    // arc for a real title-actor world-pos compare. Meanwhile emitting
+    // both sides as a diagnostic surface flags "we have title-actor state
+    // to look at" without inventing a false parity metric.
+    if (az_at_title && soh_at_title) {
+        constexpr uint32_t AZ_LINK_ROOT_ENTRY = 1;
+        const uint32_t va =
+            TITLE_POSE_TABLE_B_VA + AZ_LINK_ROOT_ENTRY * TITLE_POSE_STRIDE;
+        float az_lb1[3] = {0,0,0};
+        bool ok = true;
+        for (int j = 0; j < 3; ++j) {
+            auto v = mem.Read32OrNullopt(va + 0 + j * 4);
+            if (!v) { ok = false; break; }
+            std::memcpy(&az_lb1[j], &*v, 4);
+        }
+        float spx=0, spy=0, spz=0;
+        short srx=0, sry=0, srz=0;
+        const bool soh_ok = SohState_PlayerPos(&spx, &spy, &spz,
+                                               &srx, &sry, &srz) != 0;
+        if (ok && soh_ok) {
+            std::printf("  title-actor: az_tblB[1](limb-local)="
+                        "(%.1f,%.1f,%.1f)  soh_player_world="
+                        "(%.1f,%.1f,%.1f)  — no |Δ| (limb-local vs "
+                        "world; Az world-pos slot TODO-RE)\n",
+                        az_lb1[0], az_lb1[1], az_lb1[2], spx, spy, spz);
+        } else if (ok && !soh_ok) {
+            std::printf("  title-actor: az_tblB[1](limb-local)="
+                        "(%.1f,%.1f,%.1f)  soh=(no Player actor live)\n",
+                        az_lb1[0], az_lb1[1], az_lb1[2]);
+        } else {
+            std::printf("  title-actor: az=(unmapped) soh=?\n");
+        }
+    } else if (az_at_title) {
+        std::printf("  title-actor: az_at_title=yes soh_at_title=no\n");
+    }
+
     // Dim 5: camera basis. RE'd by find_cam_eye.py — the 3DS title-demo
     // camera is stored as eye + dir(unit) + up(unit) at 0x005BE6D4/+12/+24.
     // SoH stores eye + at + up; convert with at ≈ eye + dir*|eye→at_soh|
