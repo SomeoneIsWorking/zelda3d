@@ -295,6 +295,12 @@ void Graph_Update(GraphicsContext* gfxCtx, GameState* gameState) {
     CLOSE_DISPS(gfxCtx);
 
     GameState_ReqPadData(gameState);
+    // SoH3D harness hook: sticky input override applied AFTER PadMgr's
+    // poll so scripted-input tests aren't clobbered by the SDL-driven
+    // controller state. No-op unless the harness has called
+    // SohState_SetInput; safe to always call.
+    { extern int SohState_ApplyInputOverride(void* input0_ptr);
+      SohState_ApplyInputOverride(&gameState->input[0]); }
     GameState_Update(gameState);
 
     OPEN_DISPS(gfxCtx);

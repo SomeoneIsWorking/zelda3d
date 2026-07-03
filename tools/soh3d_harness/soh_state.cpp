@@ -141,6 +141,83 @@ int SohState_ActorListLen(int cat) {
     return gPlayState->actorCtx.actorLists[cat].length;
 }
 
+// Sticky input override. graph.c calls GameState_ReqPadData() every
+// frame right before GameState_Update() — that would clobber any
+// write we made between frames. Instead, `SohState_SetInput` sets a
+// sticky override that `SohState_ApplyInputOverride()` (called from
+// a graph.c hook AFTER ReqPadData) applies to input[0] each frame.
+static bool s_input_override_active = false;
+static u16  s_override_button = 0;
+static s8   s_override_stickX = 0;
+static s8   s_override_stickY = 0;
+static OSContPad s_prev_cur = {};
+
+int SohState_SetInput(unsigned int button, int stickX, int stickY) {
+    if (gPlayState == NULL) return 0;
+    s_input_override_active = true;
+    s_override_button = (u16)(button & 0xFFFF);
+    s_override_stickX = (s8)stickX;
+    s_override_stickY = (s8)stickY;
+    return 1;
+}
+
+// Diagnostic dump of the state-flags Player_UpdateCommon consults to
+// decide whether user input is respected — used to catch the "Link is
+// stuck in the Navi intro cutscene" case where control is locked and
+// injected input does nothing.
+int SohState_DumpControlFlags(unsigned int* out_stateFlags1,
+                               int* out_csState, unsigned int* out_csIndex,
+                               unsigned int* out_nextCsIndex,
+                               int* out_transTrigger, int* out_csAction) {
+    if (gPlayState == NULL) return 0;
+    Player* p = GET_PLAYER(gPlayState);
+    if (out_stateFlags1)  *out_stateFlags1  = p ? p->stateFlags1 : 0;
+    if (out_csState)      *out_csState      = (int)gPlayState->csCtx.state;
+    if (out_csIndex)      *out_csIndex      = (unsigned int)(gSaveContext.cutsceneIndex & 0xFFFFu);
+    if (out_nextCsIndex)  *out_nextCsIndex  = (unsigned int)(gSaveContext.nextCutsceneIndex & 0xFFFFu);
+    if (out_transTrigger) *out_transTrigger = gPlayState->transitionTrigger;
+    if (out_csAction)     *out_csAction     = p ? p->csAction : -1;
+    return 1;
+}
+
+int SohState_ClearInputOverride(void) {
+    s_input_override_active = false;
+    s_override_button = 0;
+    s_override_stickX = 0;
+    s_override_stickY = 0;
+    s_prev_cur = {};
+    return 1;
+}
+
+// Called from graph.c after GameState_ReqPadData and before
+// GameState_Update. Overwrites input[0] with the sticky override and
+// recomputes press/rel against the *last override state* — so a
+// single-frame "tap" doesn't repeatedly report as press.
+int SohState_ApplyInputOverride(void* input0_ptr) {
+    if (!s_input_override_active) return 0;
+    Input* in = static_cast<Input*>(input0_ptr);
+    in->cur.button  = s_override_button;
+    in->cur.stick_x = s_override_stickX;
+    in->cur.stick_y = s_override_stickY;
+    in->press.button = (u16)((in->cur.button ^ s_prev_cur.button) & in->cur.button);
+    in->rel.button   = (u16)((in->cur.button ^ s_prev_cur.button) & s_prev_cur.button);
+    in->prev = s_prev_cur;
+    s_prev_cur = in->cur;
+    // Recompute the deadzone-adjusted rel.stick_x/y — SoH's Player_Update
+    // and z_lib.c:func_80077D10 read `rel.stick_x/y`, not `cur.stick_x/y`,
+    // so overwriting `cur` alone is insufficient. Mirrors
+    // PadUtils_UpdateRelXY (src/code/padutils.c:70): dead-zone 7,
+    // clamp to ±(0x43-7)=±60.
+    auto deadzone = [](int c) -> int {
+        if (c >  7) return (c <  0x43) ? c - 7 : 0x43 - 7;
+        if (c < -7) return (c > -0x43) ? c + 7 : -(0x43 - 7);
+        return 0;
+    };
+    in->rel.stick_x = (s8)deadzone((int)s_override_stickX);
+    in->rel.stick_y = (s8)deadzone((int)s_override_stickY);
+    return 1;
+}
+
 // Warp: set nextEntranceIndex + transitionTrigger through the typed
 // C struct — the same fields the game itself writes when handling an
 // in-scene warp (see z_play.c line 985 `SET_NEXT_GAMESTATE(...,
@@ -158,10 +235,16 @@ int SohState_Warp(unsigned short entrance) {
     gPlayState->csCtx.state = CS_STATE_IDLE;
     // Force NORMAL game mode so the transition path in z_play.c goes
     // Play_Init (loads by entranceIndex) instead of FileChoose_Init when
-    // called from title/file-select state. Also clear cutsceneIndex which
-    // gates a lot of scripted intro flow.
-    gSaveContext.gameMode      = GAMEMODE_NORMAL;
-    gSaveContext.cutsceneIndex = 0;
+    // called from title/file-select state. Also clear cutsceneIndex AND
+    // nextCutsceneIndex: Play_Init reads nextCutsceneIndex first and, if
+    // it's not the 0xFFEF "no override" sentinel, overwrites cutsceneIndex
+    // with it. Without this the Link's-House Navi intro (cutsceneIndex
+    // 0xFFF1, sets PLAYER_STATE1_IN_CUTSCENE and never releases control)
+    // fires and Link is unresponsive to any injected input for the
+    // remainder of the scene.
+    gSaveContext.gameMode          = GAMEMODE_NORMAL;
+    gSaveContext.cutsceneIndex     = 0;
+    gSaveContext.nextCutsceneIndex = 0xFFEF;
     gPlayState->nextEntranceIndex = (s16)entrance;
     gPlayState->transitionTrigger = TRANS_TRIGGER_START;
     gPlayState->transitionType    = TRANS_TYPE_INSTANT;
