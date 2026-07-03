@@ -938,15 +938,14 @@ constexpr uint32_t TITLE_CTX_VA            = 0x0050AF34;
 constexpr uint32_t TITLE_SCENE_OFF         = 0x006C;  // *0x0050afa0 == 0x51 at title
 constexpr uint32_t TITLE_ACTIVE_OFF        = 0x0078;  // *0x0050afac == 1 at title
 
-// OoT3D title-demo actor pose table. RE'd by dumping .data across snapshots
-// at frames N and N+300 (soh3d/scratch/gamestate_re/data_dt_*.bin): 24
-// contiguous 36-byte entries {Vec3 pos, Vec3 rot(rad), Vec3 scale} start
-// at 0x005642F4, all with scale==(1,1,1) at title, several with per-frame
-// motion consistent with the Hyrule-field flyover. The static-analysis
-// pool scan finds no direct u32 refs to the table (writers use register-
-// indexed stores), so we read-only via Memory here.
-constexpr uint32_t TITLE_POSE_TABLE_VA     = 0x005642F4;
-constexpr uint32_t TITLE_POSE_COUNT        = 24;
+// OoT3D title-demo SkelAnime limb-transform table. The writer chain is
+// FUN_003204a4 (anim dispatcher, base=DAT_003208DC=0x005642D0, stride=0x24)
+// → FUN_00347550 (keyframe evaluator: mask&1→pos, mask&2→rot, mask&4→scale).
+// This is one statically-pre-allocated actor's live limb array — likely the
+// title-demo Link or Epona; 25 entries = 25 limbs. Provenance +
+// interpretation in oot3d-decomp/docs/title_gamestate.md.
+constexpr uint32_t TITLE_POSE_TABLE_VA     = 0x005642D0;
+constexpr uint32_t TITLE_POSE_COUNT        = 25;
 constexpr uint32_t TITLE_POSE_STRIDE       = 36;
 constexpr uint32_t ACTORCTX_OFF            = 0x208C;
 constexpr uint32_t ACTOR_LISTS_OFF         = 0x000C;
