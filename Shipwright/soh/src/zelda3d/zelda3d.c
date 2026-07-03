@@ -1909,20 +1909,29 @@ static int Zelda3D_TitleCamEnabled(void) {
 // behavior is therefore to switch SoH3D's synthetic lighting math OFF at
 // title, not to tune ambient coefficients. See:
 //   oot3d-decomp/docs/title_lighting_disabled.md
-// gZelda3dLightEnable gates the character/prop half-Lambert (uParams.y);
-// gZelda3dWorldLit gates the scene-geometry vertex-lit combiner path.
-// Saved on rising edge (0->1) and restored on falling edge so exiting title
-// (SoH cutscene end -> gameplay) doesn't leave the world unlit.
+//
+// gZelda3dLightEnable gates the character/prop half-Lambert (uParams.y in
+// the fragment shader). Saved on rising edge (0->1) and restored on falling
+// edge so exiting title (SoH cutscene end -> gameplay) doesn't leave the
+// world unlit.
+//
+// NOTE: gZelda3dWorldLit is NOT touched here even though it also gates the
+// scene-vertex-lit computation. It ALSO gates combScaleRGB (the CMB
+// material's authored TEV stage-0 RGB scale — Kokiri grass ×2 etc), which
+// is a static material property that runs unconditionally on the 3DS.
+// Zeroing gZelda3dWorldLit at title nukes combScaleRGB and dims the whole
+// scene ~15-25 RGB units vs the oracle (measured via scratch/
+// title_parity_diff.py). The scene-vertex-lit math is a residual delta but
+// preserving the material's base brightness matters more; a follow-on
+// change decouples combScaleRGB from the vertex-lit gate so both can be
+// port-faithful at once.
 extern int gZelda3dLightEnable;   // libultraship zelda3d_gl.cpp
-extern int gZelda3dWorldLit;      // libultraship zelda3d_gl.cpp
 static int sZelda3dTitleLightSaved     = 0;
 static int sZelda3dTitleLightEnableSav = -1;
-static int sZelda3dTitleWorldLitSav    = 1;
 
 static void Zelda3D_TitleLightingRestore(void) {
     if (sZelda3dTitleLightSaved) {
         gZelda3dLightEnable = sZelda3dTitleLightEnableSav;
-        gZelda3dWorldLit    = sZelda3dTitleWorldLitSav;
         sZelda3dTitleLightSaved = 0;
     }
 }
@@ -1954,11 +1963,9 @@ static int Zelda3D_ApplyTitleCam(PlayState* play) {
     gZelda3dInTitleDemo = 1;
     if (!sZelda3dTitleLightSaved) {
         sZelda3dTitleLightEnableSav = gZelda3dLightEnable;
-        sZelda3dTitleWorldLitSav    = gZelda3dWorldLit;
         sZelda3dTitleLightSaved     = 1;
     }
     gZelda3dLightEnable = 0;
-    gZelda3dWorldLit    = 0;
     play->view.eye.x    = kZelda3dTitleEye[0];
     play->view.eye.y    = kZelda3dTitleEye[1];
     play->view.eye.z    = kZelda3dTitleEye[2];
