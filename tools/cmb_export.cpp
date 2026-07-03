@@ -87,6 +87,15 @@ int main(int argc, char** argv) {
         for (const auto& f : zar.files())
             if (f.name.size() >= 5 && f.name.compare(f.name.size() - 5, 5, ".csab") == 0)
                 fprintf(stderr, "  %s\n", f.name.c_str());
+        // Enumerate ALL non-cmb, non-csab files (textures, cmab, misc). Useful when
+        // hunting for a moon-halo / glow asset not carried as a CMB.
+        fprintf(stderr, "ZAR %s: other files:\n", zarPath.c_str());
+        for (const auto& f : zar.files()) {
+            bool isCmb  = f.name.size() >= 4 && f.name.compare(f.name.size() - 4, 4, ".cmb")  == 0;
+            bool isCsab = f.name.size() >= 5 && f.name.compare(f.name.size() - 5, 5, ".csab") == 0;
+            if (!isCmb && !isCsab)
+                fprintf(stderr, "  %-50s size=%u\n", f.name.c_str(), (unsigned)f.size);
+        }
     }
     if (listOnly || cmbs.empty()) {
         fprintf(stderr, "ZAR %s: %zu .cmb files:\n", zarPath.c_str(), cmbs.size());
