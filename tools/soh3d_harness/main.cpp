@@ -1116,6 +1116,33 @@ constexpr uint32_t PLAY_CAM_EYE_OFF        = 0x01B8;
 constexpr uint32_t PLAY_CAM_AT_OFF         = 0x01C4;
 constexpr uint32_t PLAY_CAM_UP_OFF         = 0x01D0;
 
+// ── OoT3D mainCamera pointer + setting/mode ─────────────────────────────
+// mainCamera is HEAP-ALLOCATED, not embedded. The array of Camera pointers
+// (cameraPtrs[MAIN_CAM..]) lives at PlayState+0xA54 — RE'd from
+// FUN_002d84c4 line 88 (`*(int*)(*(int*)(param_2 + 0xd4) + 0xa54) + 0xd8`
+// chains play→cameraPtrs→mainCamera→sOOBTimer holder) and from
+// FUN_002e2e60 line 793 (Play_UpdateMainCamera caller dispatches
+// cameraPtrs[i] into FUN_002d84c4).
+//
+// Inside a Camera struct:
+//   Camera+0x188 = status (s16)
+//   Camera+0x18A = setting (low byte of u16)
+//   Camera+0x18C = mode    (low byte of u16)
+// (Also RE'd from FUN_002d84c4's indirect dispatch at line 217-219.)
+//
+// So the read chain is:
+//   cam_ptr = *(u32*)(PlayState + 0xA54)
+//   setting = *(u16*)(cam_ptr + 0x18A) & 0xFF
+//
+// The eye Vec3f at PLAY_CAM_EYE_OFF = 0x1B8 is play->view.eye (the view
+// basis written back by Camera_Update's tail via func_800AA358) — NOT
+// Camera->eye. The initial harness scan matched view.eye against
+// SohState_Camera, which returns view.eye too — that's why both sides
+// agreed byte-for-byte at Link's House.
+constexpr uint32_t PLAY_CAMERAPTRS_OFF     = 0x0A54;
+constexpr uint32_t CAMERA_STATUS_OFF       = 0x0188;
+constexpr uint32_t CAMERA_MODE_OFF         = 0x018C;
+
 // ── Per-dimension sign-convention invariant ─────────────────────────────
 // Every position/basis compare between Az and SoH implicitly assumes the two
 // engines share coordinate conventions. Empirically verified true at Link's
@@ -2128,6 +2155,47 @@ void CompareFirstDivImpl() {
                             std::printf("        writer: (no eye writes "
                                 "captured yet — advance more frames)\n");
                         }
+                    }
+                    // Chase mainCamera pointer at PS+0xA54, then read
+                    // setting/mode/status. This is the actual Camera
+                    // struct (heap-allocated), not the view-basis copy at
+                    // PS+0x1B8. Expected at Kakariko:
+                    //   setting=SCENE_CAM_SET_NORMAL0(=1)
+                    //   mode=CAM_MODE_NORMAL(=0)
+                    //   status=CAM_STAT_ACTIVE(=7)
+                    auto cam_ptr = mem.Read32OrNullopt(
+                        *ps_az + PLAY_CAMERAPTRS_OFF);
+                    if (cam_ptr && *cam_ptr != 0) {
+                        // Camera+0x188 (status u16, aligned) shares its
+                        // u32 word with +0x18A (setting).
+                        auto w_stset = mem.Read32OrNullopt(
+                            *cam_ptr + CAMERA_STATUS_OFF);
+                        auto w_mode  = mem.Read32OrNullopt(
+                            *cam_ptr + CAMERA_MODE_OFF);
+                        if (w_stset && w_mode) {
+                            const uint16_t az_status  =
+                                static_cast<uint16_t>(*w_stset);
+                            const uint16_t az_setting =
+                                static_cast<uint16_t>(*w_stset >> 16);
+                            const uint16_t az_mode    =
+                                static_cast<uint16_t>(*w_mode);
+                            std::printf("        az_cam: cam@0x%08x "
+                                "setting=%u mode=%u status=%u — identifies "
+                                "OoT3D sCameraFunctions[funcIdx] mode "
+                                "function (expect setting=1 mode=0)\n",
+                                *cam_ptr,
+                                (unsigned)(az_setting & 0xFF),
+                                (unsigned)(az_mode    & 0xFF),
+                                (unsigned)(az_status  & 0xFF));
+                        } else {
+                            std::printf("        az_cam: cam@0x%08x — "
+                                "st/mode reads returned nullopt "
+                                "(unmapped?)\n", *cam_ptr);
+                        }
+                    } else {
+                        std::printf("        az_cam: cam_ptr @ ps+0x%04x "
+                            "= 0 or unreadable — cameraPtrs offset guess "
+                            "may be wrong\n", PLAY_CAMERAPTRS_OFF);
                     }
                 }
             }
