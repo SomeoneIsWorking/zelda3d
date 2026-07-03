@@ -195,6 +195,8 @@ extern "C" {
                                  float* out_speedXZ, float* out_velY);
     int SohState_TeleportPlayer(float x, float y, float z);
     int SohState_SetPlayerYaw(int yaw_s16);
+    int SohState_SetLinkAge(int age);
+    int SohState_GetLinkAge(void);
 
     // watchhook.cpp — write-hook API on top of Azahar's RegisterWatchpoint.
     struct WatchRecord {
@@ -1382,6 +1384,40 @@ void HandleSohWarp(std::istringstream& toks) {
     std::printf("ok soh_warp 0x%04x\n", static_cast<unsigned>(*ent & 0xFFFF));
 }
 
+// soh_setage <0|1>  — write gSaveContext.linkAge (0=adult, 1=child).
+// Camera_CalcAtDefault / Player_GetHeight consume this synchronously
+// via LINK_IS_ADULT. Use BEFORE soh_warp so the newly-spawned Player
+// picks up the age. Kakariko sweep uses this to match Azahar's
+// linkshouse savestate (child) — see gameplay_firstdiv.md ROOT CAUSE.
+void HandleSohSetAge(std::istringstream& toks) {
+    std::string age_s;
+    if (!(toks >> age_s)) {
+        PrintErr("soh_setage: usage: soh_setage <0|1>");
+        return;
+    }
+    auto age = ParseNum(age_s);
+    if (!age || (*age != 0 && *age != 1)) {
+        PrintErr("soh_setage: bad age (must be 0 or 1)");
+        return;
+    }
+    if (!g_soh_booted) {
+        PrintErr("soh_setage: run soh_boot first");
+        return;
+    }
+    SohState_SetLinkAge(static_cast<int>(*age));
+    int now = SohState_GetLinkAge();
+    std::printf("ok soh_setage %ld (%s)  now=%d\n",
+                static_cast<long>(*age),
+                *age == 0 ? "adult" : "child", now);
+}
+
+void HandleSohGetAge(std::istringstream&) {
+    if (!g_soh_booted) { PrintErr("soh_getage: run soh_boot first"); return; }
+    int age = SohState_GetLinkAge();
+    std::printf("ok soh_getage %d (%s)\n",
+                age, age == 0 ? "adult" : "child");
+}
+
 void HandleActors(std::istringstream&) {
     auto ps = CurrentPlayState();
     if (!ps) { PrintErr("actors: no playstate"); return; }
@@ -2272,6 +2308,31 @@ void CompareFirstDivImpl() {
                                         *w_player, state, (int)bit100,
                                         ybias, extraAtY, -extraAtY);
                                 }
+                                // Age/height probe: OoT3D Player_GetHeight
+                                // (FUN_00367ef0) reads *(0x0058795C) as the
+                                // adult/child flag; nonzero → 44 (child),
+                                // zero → 68 (adult). Plus 0 or 32 from
+                                // *(player+0x1710) & 0x800000. Read both;
+                                // compute expected height to see if it
+                                // matches the observed |Δat|=24 (== 68-44).
+                                auto w_age = mem.Read32OrNullopt(0x0058795C);
+                                auto w_pstate = w_player
+                                    ? mem.Read32OrNullopt(*w_player + 0x1710)
+                                    : std::optional<uint32_t>{};
+                                float base_h = w_age
+                                    ? (*w_age != 0 ? 44.0f : 68.0f) : -1.0f;
+                                float adj_h = w_pstate
+                                    ? ((*w_pstate & 0x800000) ? 32.0f : 0.0f)
+                                    : 0.0f;
+                                std::printf(
+                                    "        az_height: linkAge[0x58795C]=%s "
+                                    "pstate[+0x1710]=0x%08x → "
+                                    "Player_GetHeight=%.1f  (SoH adult=100 "
+                                    "child=68 baseline via z_player.c)\n",
+                                    w_age ? (std::to_string(*w_age).c_str())
+                                          : "?",
+                                    w_pstate ? *w_pstate : 0u,
+                                    base_h + adj_h);
                             }
                         } else {
                             std::printf("        az_cam: cam@0x%08x — "
@@ -2977,6 +3038,8 @@ void RunRepl() {
         else if (cmd == "scene")     HandleScene(toks);
         else if (cmd == "warp")      HandleWarp(toks);
         else if (cmd == "soh_warp")  HandleSohWarp(toks);
+        else if (cmd == "soh_setage") HandleSohSetAge(toks);
+        else if (cmd == "soh_getage") HandleSohGetAge(toks);
         else if (cmd == "soh_ctlflags") {
             if (!g_soh_booted) { PrintErr("soh_ctlflags: run soh_boot first"); continue; }
             unsigned int sf1=0, csI=0, nCsI=0;
