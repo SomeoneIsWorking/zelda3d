@@ -948,9 +948,17 @@ constexpr uint32_t TITLE_ACTIVE_OFF        = 0x0078;  // *0x0050afac == 1 at tit
 // This is one statically-pre-allocated actor's live limb array — likely the
 // title-demo Link or Epona; 25 entries = 25 limbs. Provenance +
 // interpretation in oot3d-decomp/docs/title_gamestate.md.
-constexpr uint32_t TITLE_POSE_TABLE_VA     = 0x005642D0;
+constexpr uint32_t TITLE_POSE_TABLE_VA     = 0x005642D0;  // Table A: Epona
 constexpr uint32_t TITLE_POSE_COUNT        = 25;
 constexpr uint32_t TITLE_POSE_STRIDE       = 36;
+
+// Table B: a second statically-pre-allocated title-demo actor. Writer is
+// FUN_002bd9ec (DAT_002bdd38 = 0x005A54D8, stride 0x24), same shape as
+// table A. Also 25 entries — the sibling actor in the demo (Link or a
+// second horse). Runtime pos/rot data lands on separate values from
+// table A, so the two are independent live pose streams.
+constexpr uint32_t TITLE_POSE_TABLE_B_VA   = 0x005A54D8;
+constexpr uint32_t TITLE_POSE_B_COUNT      = 25;
 constexpr uint32_t ACTORCTX_OFF            = 0x208C;
 constexpr uint32_t ACTOR_LISTS_OFF         = 0x000C;
 constexpr uint32_t ACTOR_ID_OFF            = 0x0000;
@@ -986,17 +994,30 @@ void HandlePlayState(std::istringstream&) {
     std::printf("ok 0x%08x\n", *ps);
 }
 
-// Dump all 24 title-demo pose entries. Multiline reply, terminated by `ok end`.
-// Only meaningful at title (TitleActive()); returns err otherwise.
-void HandleTitleActors(std::istringstream&) {
+// Dump title-demo pose entries. Reads the SkelAnime pose stream for one of
+// the two statically-pre-allocated demo actors: `titleactors [a|b]` (default
+// a = Epona, b = the sibling demo actor at 0x005A54D8). Multiline reply,
+// terminated by `ok end`. Only meaningful at title (TitleActive()).
+void HandleTitleActors(std::istringstream& toks) {
+    std::string which; toks >> which;
+    if (which.empty()) which = "a";
+    uint32_t base, count;
+    const char* tag;
+    if (which == "a") {
+        base = TITLE_POSE_TABLE_VA; count = TITLE_POSE_COUNT; tag = "epona";
+    } else if (which == "b") {
+        base = TITLE_POSE_TABLE_B_VA; count = TITLE_POSE_B_COUNT; tag = "sibling";
+    } else {
+        PrintErr("titleactors: usage: titleactors [a|b]"); return;
+    }
     if (!TitleActive()) {
         PrintErr("titleactors: not at title (scene!=0x51 or active flag clear)");
         return;
     }
     auto& mem = Core::System::GetInstance().Memory();
-    std::printf("ok titleactors %u\n", TITLE_POSE_COUNT);
-    for (uint32_t i = 0; i < TITLE_POSE_COUNT; ++i) {
-        const uint32_t va = TITLE_POSE_TABLE_VA + i * TITLE_POSE_STRIDE;
+    std::printf("ok titleactors %s %u\n", tag, count);
+    for (uint32_t i = 0; i < count; ++i) {
+        const uint32_t va = base + i * TITLE_POSE_STRIDE;
         float p[3], r[3], s[3];
         bool bad = false;
         for (int j = 0; j < 3; ++j) {
