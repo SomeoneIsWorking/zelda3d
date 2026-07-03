@@ -211,6 +211,7 @@ extern "C" {
         uint32_t arm_r2;
         uint32_t arm_r3;
         uint32_t arm_sp;
+        uint32_t stack_words[64];
     };
     struct WatchRange {
         uint32_t addr;
@@ -3395,6 +3396,11 @@ void RunRepl() {
                             recs[i].arm_r0, recs[i].arm_r1,
                             recs[i].arm_r2, recs[i].arm_r3,
                             recs[i].arm_sp);
+                std::printf("    stack:");
+                for (int j = 0; j < 64; ++j) {
+                    std::printf(" %08x", recs[i].stack_words[j]);
+                }
+                std::printf("\n");
             }
             std::printf("ok end\n");
         }

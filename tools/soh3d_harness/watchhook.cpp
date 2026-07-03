@@ -49,6 +49,10 @@ struct WriteRecord {
     u32  arm_r2;
     u32  arm_r3;
     u32  arm_sp;
+    // 64 words of stack at SP..SP+255 — enough to catch a saved-LR chain 4-6
+    // frames deep for the common "push {r4..r7, lr}" ARM prologue and read
+    // back the calling function's return address without an interp arg tracer.
+    u32  stack_words[64];
 };
 
 // Global watchlist state.
@@ -191,6 +195,16 @@ extern "C" void Soh3d_OnMemoryWrite(u32 vaddr, u32 size, u64 data) {
     rec.arm_r2 = cpu.GetReg(2);
     rec.arm_r3 = cpu.GetReg(3);
     rec.arm_sp = cpu.GetReg(13);
+    // Snapshot the top 64 bytes of stack — cheap, and often contains the
+    // caller-of-caller LR the ARM prologue pushed. Read via the guest memory
+    // system so we honor page mappings (SP could be in stack heap page).
+    for (int i = 0; i < 64; ++i) {
+        u32 sp_va = rec.arm_sp + (u32)(i * 4);
+        rec.stack_words[i] = 0;
+        if (auto p = sys.Kernel().GetCurrentProcess()) {
+            rec.stack_words[i] = sys.Memory().Read32(sp_va);
+        }
+    }
     rec.cycles = static_cast<u64>(cpu.GetTimer().GetTicks());
 
     const u32 key = RangeKey(vaddr, size);
