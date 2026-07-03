@@ -172,6 +172,8 @@ extern "C" {
     int SohState_HasPlayState(void);
     int SohState_SceneNum(void);
     int SohState_RoomNum(void);
+    int SohState_CsFrames(void);
+    int SohState_SetCsFrames(int frames);
     int SohState_PlayerPos(float* px, float* py, float* pz,
                           short* rx, short* ry, short* rz);
     typedef void (*SohState_ActorSink)(void* user, int cat, int id, unsigned long addr,
@@ -1670,6 +1672,40 @@ void HandleForce(std::istringstream& toks) {
         std::printf("force warp 0x%04x:\n", static_cast<unsigned>(*ent & 0xFFFF));
         ForceWarpImpl(static_cast<uint16_t>(*ent & 0xFFFF));
         std::printf("ok force warp 0x%04x\n", static_cast<unsigned>(*ent & 0xFFFF));
+        return;
+    }
+    if (sub == "titletime") {
+        // Sync anchor for the title-demo cursors: write N to
+        //   OoT3D 0x0054CC3C (u32) — the +1/frame counter found by the
+        //     runtime dump-diff scan; RE'd writers are FUN_004175d4 (reset
+        //     via *iVar1+8 store) + register-indexed increment path.
+        //   SoH   gPlayState->csCtx.frames (u16) — the game's cutscene
+        //     frame counter for the title-demo cutscene playing at
+        //     SCENE_HYRULE_FIELD.
+        // Both engines evaluate keyframe interpolation off their own
+        // cursor, so seeding them to the same N puts the pose eval at
+        // the same phase — expected to collapse d4's out-of-phase drift.
+        std::string n_s;
+        if (!(toks >> n_s)) { PrintErr("force titletime: usage: force titletime <N>"); return; }
+        auto n = ParseNum(n_s);
+        if (!n) { PrintErr("force titletime: bad N"); return; }
+        const uint32_t v = static_cast<uint32_t>(*n & 0xFFFFFFFFu);
+        auto& mem = Core::System::GetInstance().Memory();
+        mem.Write32(0x0054CC3C, v);
+        int soh_ok = SohState_SetCsFrames(static_cast<int>(v & 0xFFFF));
+        std::printf("ok force titletime %u  az_write=0x0054CC3C soh_write=%s\n",
+                    (unsigned)v, soh_ok ? "csCtx.frames" : "err(no playstate)");
+        return;
+    }
+    if (sub == "titletime_read") {
+        auto& mem = Core::System::GetInstance().Memory();
+        auto az = mem.Read32OrNullopt(0x0054CC3C);
+        int soh = SohState_HasPlayState() ? SohState_CsFrames() : -1;
+        std::printf("ok force titletime_read\n"
+                    "  az=0x0054CC3C: %s\n"
+                    "  soh csCtx.frames: %d\n"
+                    "ok end\n",
+                    az ? std::to_string(*az).c_str() : "unmapped", soh);
         return;
     }
     PrintErr(("force: unknown sub: " + sub).c_str());

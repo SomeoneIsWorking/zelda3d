@@ -26,6 +26,21 @@ int SohState_SceneNum(void) {
     return (gPlayState != NULL) ? (int)gPlayState->sceneNum : -1;
 }
 
+// Read / write SoH's cutscene-frame counter. This is the SoH-side title-
+// demo cursor — the sync anchor for `force titletime`. Returns -1 when
+// no PlayState.
+int SohState_CsFrames(void) {
+    return (gPlayState != NULL) ? (int)gPlayState->csCtx.frames : -1;
+}
+
+int SohState_SetCsFrames(int frames) {
+    if (gPlayState == NULL) return 0;
+    // csCtx.frames is a u16 — mask to that width so writes wrap the same
+    // way the engine does when it increments past 65535.
+    gPlayState->csCtx.frames = (uint16_t)(frames & 0xFFFF);
+    return 1;
+}
+
 int SohState_RoomNum(void) {
     return (gPlayState != NULL) ? (int)gPlayState->roomCtx.curRoom.num : -1;
 }
