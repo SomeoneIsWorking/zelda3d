@@ -1971,8 +1971,11 @@ static int Zelda3D_ApplyTitleCam(PlayState* play) {
     // Enable moon draw during title (task #16). SoH's title-cs sets
     // sunMoonDisabled=true because the N64 title doesn't draw a moon;
     // Az's OoT3D title DOES draw one top-right. Re-enable so
-    // Zelda3D_TryDrawSunMoon (or the N64 fallback) fires.
+    // Zelda3D_TryDrawSunMoon (or the N64 fallback) fires. Also force
+    // skyboxId to SKYBOX_NORMAL_SKY (the N64 title uses SKYBOX_CUTSCENE_MAP
+    // or similar which trips the early-out inside TryDrawSunMoon).
     play->envCtx.sunMoonDisabled = false;
+    play->skyboxId = SKYBOX_NORMAL_SKY;
     return 1;
 }
 
@@ -3617,11 +3620,28 @@ int Zelda3D_TryDrawSunMoon(PlayState* play) {
     if (!gZelda3dSky || !Zelda3D_Enabled()) {
         return 0;
     }
-    if (play->skyboxId != SKYBOX_NORMAL_SKY) {
-        return 0;
-    }
-    if (Zelda3D_SceneName(play) == NULL) {
-        return 0;
+    // Title-demo bypasses the skyboxId + scene-name guards so the moon
+    // draw is at least ATTEMPTED during Az-parity shot 1 even though
+    // SoH's title-cs sets a non-NORMAL skybox. Task #16.
+    // NOTE: after this unblock the moon opcode is emitted (moonId=2004,
+    // alpha≈191 at midnight) but at a WORLD position derived from
+    // sunPos alone (formula: eye - sunPos, sunPos = ±sin/cos(dayTime)
+    // *120*25). For the OoT3D title cam (eye≈(-4072,58,5217), forward
+    // ≈(-0.45,+0.09,-0.89), i.e. facing NW-ish across Hyrule Field),
+    // the resulting moon lies ~66° off the left of the forward axis
+    // (i.e. way outside the FOV), so it never appears on-frame. Az's
+    // title moon is fixed in the FRAMING (top-right of the shot) and
+    // is almost certainly baked into OoT3D's title BlueSky.zar night
+    // dome variant — NOT the environment sun/moon path. Follow-on
+    // work: identify the OoT3D title-sky asset and render it in place
+    // of the N64 sky; the dyn sun/moon path is likely a dead end here.
+    if (!gZelda3dInTitleDemo) {
+        if (play->skyboxId != SKYBOX_NORMAL_SKY) {
+            return 0;
+        }
+        if (Zelda3D_SceneName(play) == NULL) {
+            return 0;
+        }
     }
 
     // Update sunPos exactly as Environment_DrawSunAndMoon does (we skip the N64 draw, so we must
