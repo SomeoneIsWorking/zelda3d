@@ -720,6 +720,7 @@ void CompareCameraImpl();
 void CompareSkeletonImpl(int cat, int listIndex);
 void CompareLightingImpl();
 void CompareTitleActorsImpl();
+void CompareFirstDivImpl();
 
 // -- Snapshot ---------------------------------------------------------------
 //
@@ -1366,6 +1367,153 @@ void CompareLightingImpl() {
 // N64 = Vec3s joints), so the loop is closed structurally — a mapping
 // between 3DS pose index K and N64 limb K is one visual alignment pass
 // away, driven by matching per-limb per-frame motion.
+// ─── compare firstdiv ────────────────────────────────────────────────────────
+// Structured dimension sweep. Walks a fixed list of comparable fields at
+// this frame and reports THE FIRST field where the two engines diverge.
+// Naming the divergence is the deliverable; visual PPM eyeballing is not
+// how parity closes here (manager doctrine 2026-07-03).
+//
+// Dimensions ordered outer-to-inner by expected divergence blast radius:
+//   1. gamestate mode      (title vs Play — must both be at title)
+//   2. sceneNum
+//   3. Link ↔ Link limb count (25 3ds table B vs 22 soh Player)
+//   4. per-limb rotation delta after 3DS-rad → N64-binary-angle conversion
+//   5. camera basis (RE'd on both sides — currently 3ds unavailable; skip)
+//
+// Emits `firstdiv: <field> <details>` on the first mismatch and stops,
+// or `firstdiv: none` if everything checked matched within tolerance.
+
+// 3DS radians → N64 binary angle (0..0x10000 covers 0..2π). Wraps into
+// s16 by taking the low 16 bits — the same convention SoH uses for
+// Vec3s rot fields.
+static short RadToBinaryAngle(float rad) {
+    // 0x10000 / (2π) ≈ 10430.378
+    const float scale = 10430.378350470453f;
+    float x = rad * scale;
+    // Wrap to [-32768, 32767]
+    long long q = static_cast<long long>(x);
+    return static_cast<short>(q & 0xFFFF);
+}
+
+struct FirstDivReporter {
+    bool reported = false;
+    void report(const char* field, const std::string& details) {
+        if (reported) return;
+        std::printf("  firstdiv: %s %s\n", field, details.c_str());
+        reported = true;
+    }
+};
+
+void CompareFirstDivImpl() {
+    FirstDivReporter fd;
+    // Dim 1: gamestate mode
+    const bool az_at_title  = TitleActive();
+    const bool soh_at_title = SohState_HasPlayState() &&
+                              (SohState_SceneNum() & 0xFFFF) == 0x51;
+    std::printf("  d1 gamestate:    az=%s soh=%s\n",
+                az_at_title ? "title(inline)" : "play",
+                soh_at_title ? "play(scene=0x51)" : "not-title");
+    if (az_at_title != soh_at_title) {
+        char buf[128]; std::snprintf(buf, sizeof buf,
+            "az=%d soh=%d — one side isn't at title yet",
+            (int)az_at_title, (int)soh_at_title);
+        fd.report("gamestate-mode", buf);
+    }
+
+    // Dim 2: sceneNum
+    auto& mem = Core::System::GetInstance().Memory();
+    unsigned az_scene = 0xFFFF, soh_scene = 0xFFFF;
+    if (az_at_title) az_scene = 0x51;  // inline title always 0x51 at title
+    else if (auto ps = CurrentPlayState()) {
+        auto sn = mem.Read32OrNullopt(*ps + SCENENUM_OFF);
+        if (sn) az_scene = *sn & 0xFFFF;
+    }
+    if (soh_at_title) soh_scene = SohState_SceneNum() & 0xFFFF;
+    std::printf("  d2 sceneNum:     az=0x%04x soh=0x%04x\n", az_scene, soh_scene);
+    if (!fd.reported && az_scene != soh_scene) {
+        char buf[128]; std::snprintf(buf, sizeof buf,
+            "az=0x%04x soh=0x%04x", az_scene, soh_scene);
+        fd.report("sceneNum", buf);
+    }
+
+    // Dim 3: Link ↔ Link limb count. Table B = 0x005A54D8 is the candidate
+    // Link-side pose table (see title_gamestate.md — 25 entries, rider-on-
+    // steed pattern with entry-1 high Y). SoH Player skelAnime lives at
+    // actor+ACTORCAT_PLAYER.
+    int az_link_limbs = 0;
+    if (az_at_title) az_link_limbs = TITLE_POSE_B_COUNT;
+    int soh_link_limbs = 0;
+    short soh_joints[32 * 3] = {};
+    int animFrame = 0, morphFrame = 0;
+    if (soh_at_title) {
+        int n = SohState_ActorSkeleton(2, 0, soh_joints, 32,
+                                       &soh_link_limbs, &animFrame, &morphFrame);
+        if (n < 0) soh_link_limbs = -1;
+    }
+    std::printf("  d3 link limbs:   az(table B)=%d soh(Player)=%d\n",
+                az_link_limbs, soh_link_limbs);
+    if (!fd.reported && az_link_limbs != soh_link_limbs) {
+        char buf[192]; std::snprintf(buf, sizeof buf,
+            "az(0x005A54D8 rig)=%d soh(gPlayer skelAnime)=%d — different rig topology",
+            az_link_limbs, soh_link_limbs);
+        fd.report("link-limb-count", buf);
+    }
+
+    // Dim 4: per-limb rotation delta (only if counts match — otherwise
+    // limb-by-limb correspondence is undefined). Convert 3DS rad → binary
+    // angle and compute max |Δ| across all limbs & 3 axes.
+    if (!fd.reported && az_link_limbs > 0 && az_link_limbs == soh_link_limbs) {
+        int worstLimb = -1, worstAxis = -1;
+        int worstDelta = 0;
+        short worstAz = 0, worstSoh = 0;
+        for (int i = 0; i < az_link_limbs; ++i) {
+            const uint32_t va = TITLE_POSE_TABLE_B_VA + i * TITLE_POSE_STRIDE;
+            float rad[3];
+            bool ok = true;
+            for (int j = 0; j < 3; ++j) {
+                auto v = mem.Read32OrNullopt(va + 12 + j * 4);
+                if (!v) { ok = false; break; }
+                std::memcpy(&rad[j], &*v, 4);
+            }
+            if (!ok) continue;
+            for (int j = 0; j < 3; ++j) {
+                short az_bin = RadToBinaryAngle(rad[j]);
+                short soh_bin = soh_joints[i * 3 + j];
+                // Signed wrap-around distance on a 16-bit ring
+                int d = az_bin - soh_bin;
+                if (d >  32768) d -= 65536;
+                if (d < -32768) d += 65536;
+                int a = d < 0 ? -d : d;
+                if (a > worstDelta) {
+                    worstDelta = a;
+                    worstLimb = i; worstAxis = j;
+                    worstAz = az_bin; worstSoh = soh_bin;
+                }
+            }
+        }
+        std::printf("  d4 rot delta:    worst=%d (limb %d axis %d) az_bin=%d soh_bin=%d\n",
+                    worstDelta, worstLimb, worstAxis, worstAz, worstSoh);
+        // A tolerance of 0x0800 (~11°) covers per-frame drift and unit
+        // conversion rounding; anything worse is a real divergence.
+        if (worstDelta > 0x0800) {
+            char buf[256]; std::snprintf(buf, sizeof buf,
+                "worst limb %d axis %d Δ=%d (az=%d soh=%d) — pose retarget not aligned",
+                worstLimb, worstAxis, worstDelta, worstAz, worstSoh);
+            fd.report("link-limb-rot", buf);
+        }
+    }
+
+    // Dim 5: camera basis. OoT3D-side camera at title lives inside the
+    // title context's sub-objects (not RE'd yet); leave 3ds side as
+    // sentinel and skip the comparison.
+    std::printf("  d5 camera basis: az=n/a (not RE'd) soh=(existing accessor)\n");
+
+    if (!fd.reported) {
+        std::printf("  firstdiv: none — all 4 checked dimensions matched\n");
+    }
+}
+// ─────────────────────────────────────────────────────────────────────────────
+
 void CompareTitleActorsImpl() {
     // 3ds side
     if (!TitleActive()) {
@@ -1535,6 +1683,7 @@ void HandleCompare(std::istringstream& toks) {
     }
     else if (sub == "lighting") CompareLightingImpl();
     else if (sub == "titleactors") CompareTitleActorsImpl();
+    else if (sub == "firstdiv")    CompareFirstDivImpl();
     else { PrintErr(("compare: unknown sub: " + sub).c_str()); return; }
     std::printf("ok compare %s\n", sub.c_str());
 }
