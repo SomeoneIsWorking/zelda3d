@@ -1762,6 +1762,8 @@ void CompareFirstDivImpl() {
         // triggers a fresh RegisterWatchpoint.
         static uint32_t s_watched_player_addr = 0;
         static uint32_t s_watched_bgflag_addr = 0;
+        static uint32_t s_watched_speed_addr  = 0;
+        static uint32_t s_watched_yaw_addr    = 0;
         // Look up Az Player addr this call.
         {
             uint32_t az_player_addr = 0;
@@ -1770,14 +1772,25 @@ void CompareFirstDivImpl() {
             if (head && *head != 0) az_player_addr = *head;
             if (az_player_addr != 0 && az_player_addr != s_watched_player_addr) {
                 // Scene load changed the Player Actor addr — re-register
-                // the bgCheckFlags watch at the new location.
-                if (s_watched_bgflag_addr != 0 &&
-                    Soh3d_WatchIsRegistered(s_watched_bgflag_addr)) {
-                    Soh3d_WatchRemoveRange(s_watched_bgflag_addr, 2);
-                }
+                // watches on the three RE'd Player fields we consult in
+                // classifier auto-attach: bgCheckFlags, speedXZ, yaw.
+                // Same page-granular watchpoint mechanism; each RE'd
+                // offset gets its own range slot for RangeKey lookup.
+                auto reregister = [&](uint32_t& slot, uint32_t new_addr,
+                                       uint32_t size) {
+                    if (slot != 0 && Soh3d_WatchIsRegistered(slot)) {
+                        Soh3d_WatchRemoveRange(slot, size);
+                    }
+                    slot = new_addr;
+                    Soh3d_WatchAddRange(slot, size);
+                };
                 s_watched_player_addr = az_player_addr;
-                s_watched_bgflag_addr = az_player_addr + ACTOR_BGCHECKFLAGS_OFF;
-                Soh3d_WatchAddRange(s_watched_bgflag_addr, 2);
+                reregister(s_watched_bgflag_addr,
+                            az_player_addr + ACTOR_BGCHECKFLAGS_OFF, 2);
+                reregister(s_watched_speed_addr,
+                            az_player_addr + ACTOR_SPEEDXZ_OFF, 4);
+                reregister(s_watched_yaw_addr,
+                            az_player_addr + PLAYER_YAW_OFF, 2);
             }
         }
         // ── Play-mode d3: Link position match ────────────────────────────
@@ -1891,36 +1904,53 @@ void CompareFirstDivImpl() {
                     // Ghidra-jumping to writer_pc lands on OoT3D's
                     // wall-touch handler; cross-check vs SoH's equivalent
                     // closes the RE-first loop.
-                    if (d3_decision.cls == DivClass::DeferredPortTarget &&
-                        s_watched_bgflag_addr != 0) {
+                    // Route each classifier tag to the relevant field's
+                    // ring buffer.
+                    uint32_t query_addr = 0;
+                    uint64_t match_mask = 0, match_expected = 0;
+                    const char* hint = "";
+                    if (d3_decision.cls == DivClass::DeferredPortTarget) {
+                        // collision-wall: look for the write that set
+                        // bit 0x08 on bgCheckFlags.
+                        query_addr    = s_watched_bgflag_addr;
+                        match_mask    = 0x0008u;
+                        match_expected = 0x0008u;
+                        hint          = "Ghidra-jump this PC for OoT3D's "
+                                        "wall-touch handler";
+                    } else if (d3_decision.tag[0] != '\0' &&
+                                d3_decision.tag[0] == 'r' /* rate-comp */) {
+                        // rate-comp: latest speedXZ write. No bit-mask
+                        // predicate — just the most recent write to
+                        // Actor+0x0068 (mask=0, expected=0).
+                        query_addr    = s_watched_speed_addr;
+                        hint          = "Ghidra-jump this PC for OoT3D's "
+                                        "Player_Update speedXZ integrate";
+                    }
+                    if (query_addr != 0) {
                         WatchRecord rec;
                         if (Soh3d_WatchGetLatestMatching(
-                                s_watched_bgflag_addr, 0x0008u, 0x0008u, &rec)) {
+                                query_addr, match_mask, match_expected, &rec)) {
                             std::printf("      writer:  az_pc=0x%08x lr=0x%08x "
-                                        "data=0x%04x ticks=%lu "
-                                        "— Ghidra-jump this PC for OoT3D's "
-                                        "wall-touch handler\n",
+                                        "data=0x%016lx ticks=%lu — %s\n",
                                         rec.arm_pc, rec.arm_lr,
-                                        (unsigned)(rec.data & 0xFFFFu),
-                                        (unsigned long)rec.cycles);
+                                        (unsigned long)rec.data,
+                                        (unsigned long)rec.cycles, hint);
                         } else {
-                            // Fall back to most-recent-any-write for
-                            // triage — if bit-0x08 hasn't fired yet, at
-                            // least point at whoever last touched the
-                            // field.
+                            // Fall back to most-recent-any-write on the
+                            // same range for triage.
                             WatchRecord any;
                             if (Soh3d_WatchGetLatestMatching(
-                                    s_watched_bgflag_addr, 0u, 0u, &any)) {
-                                std::printf("      writer:  (no wall-bit-set "
-                                            "capture yet; last write) "
-                                            "az_pc=0x%08x lr=0x%08x data=0x%04x\n",
+                                    query_addr, 0u, 0u, &any)) {
+                                std::printf("      writer:  (predicate not "
+                                            "yet matched; last write) "
+                                            "az_pc=0x%08x lr=0x%08x data=0x%016lx\n",
                                             any.arm_pc, any.arm_lr,
-                                            (unsigned)(any.data & 0xFFFFu));
+                                            (unsigned long)any.data);
                             } else {
                                 std::printf("      writer:  no hits recorded "
                                             "on 0x%08x — watch may not be "
                                             "firing (check AZAHAR_PATCH.md)\n",
-                                            s_watched_bgflag_addr);
+                                            query_addr);
                             }
                         }
                     }
@@ -1966,6 +1996,23 @@ void CompareFirstDivImpl() {
                                 d3_decision.tag, worstD,
                                 d3_decision.origin_az,
                                 d3_decision.origin_soh);
+                    // Player.yaw writer — Actor+0x036 was RE'd to be
+                    // OoT3D's live-facing yaw slot (soh3d ec25ea2). The
+                    // last write to it is the guest instruction that
+                    // rotated Link this frame. Ghidra-jump → OoT3D's
+                    // yaw-update path.
+                    if (s_watched_yaw_addr != 0) {
+                        WatchRecord y;
+                        if (Soh3d_WatchGetLatestMatching(s_watched_yaw_addr,
+                                0u, 0u, &y)) {
+                            std::printf("      writer:  az_pc=0x%08x lr=0x%08x "
+                                        "yaw=%d ticks=%lu — Ghidra-jump this PC "
+                                        "for OoT3D's Player yaw update\n",
+                                        y.arm_pc, y.arm_lr,
+                                        (int)(short)(y.data & 0xFFFFu),
+                                        (unsigned long)y.cycles);
+                        }
+                    }
                 } else if (!fd.reported) {
                     char buf[192]; std::snprintf(buf, sizeof buf,
                         "worst axis=%d Δ=%d (az_rot=(%d,%d,%d) soh_rot=(%d,%d,%d))",
