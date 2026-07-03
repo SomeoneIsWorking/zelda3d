@@ -1536,6 +1536,14 @@ s32 Camera_Free(Camera* camera) {
 }
 
 s32 Camera_Normal1(Camera* camera) {
+    // Zelda3D port seam: if a CameraBehavior owns CAM_FUNC_NORM1, delegate. The behavior returns
+    // 1 when it has fully driven the frame (skip legacy body); 0 = fall through to legacy. Landed
+    // as scaffolding first — see zelda3d/behaviors/camera/normal1.cpp for the OoT3D FUN_00239fd8 port.
+    extern int Zelda3D_TryCameraBehavior(s16 funcIdx, Camera* camera);
+    if (Zelda3D_TryCameraBehavior(CAM_FUNC_NORM1, camera)) {
+        return 1;
+    }
+
     if (CVarGetInteger(CVAR_SETTING("FreeLook.Enabled"), 0) && SetCameraManual(camera) == 1) {
         Camera_Free(camera);
         return 1;
