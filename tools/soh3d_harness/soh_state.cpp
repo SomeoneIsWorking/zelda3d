@@ -104,6 +104,43 @@ int SohState_ActorParamsAt(int cat, int index) {
     return 0x7FFFFFFF;
 }
 
+// Fully-populated per-actor info at (cat, index). Returns 1 on hit,
+// 0 on miss. The full-info variant is what firstdiv d7 pairs across
+// Az's live actor list (SoH's side is walked the same way).
+int SohState_ActorInfoAt(int cat, int index,
+                          int* out_id, int* out_params, unsigned int* out_flags,
+                          float* out_px, float* out_py, float* out_pz,
+                          short* out_rx, short* out_ry, short* out_rz) {
+    if (gPlayState == NULL) return 0;
+    if (cat < 0 || cat >= ACTORCAT_MAX) return 0;
+    Actor* a = gPlayState->actorCtx.actorLists[cat].head;
+    int guard = gPlayState->actorCtx.actorLists[cat].length + 4;
+    int i = 0;
+    while (a != NULL && guard-- > 0) {
+        if (i == index) {
+            *out_id     = (int)a->id;
+            *out_params = (int)(short)a->params;
+            *out_flags  = (unsigned int)a->flags;
+            *out_px = a->world.pos.x;
+            *out_py = a->world.pos.y;
+            *out_pz = a->world.pos.z;
+            *out_rx = a->world.rot.x;
+            *out_ry = a->world.rot.y;
+            *out_rz = a->world.rot.z;
+            return 1;
+        }
+        a = a->next;
+        ++i;
+    }
+    return 0;
+}
+
+int SohState_ActorListLen(int cat) {
+    if (gPlayState == NULL) return -1;
+    if (cat < 0 || cat >= ACTORCAT_MAX) return -1;
+    return gPlayState->actorCtx.actorLists[cat].length;
+}
+
 // Warp: set nextEntranceIndex + transitionTrigger through the typed
 // C struct — the same fields the game itself writes when handling an
 // in-scene warp (see z_play.c line 985 `SET_NEXT_GAMESTATE(...,

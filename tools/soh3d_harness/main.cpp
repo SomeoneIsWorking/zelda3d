@@ -182,6 +182,12 @@ extern "C" {
                                        short rx, short ry, short rz);
     int SohState_WalkActors(SohState_ActorSink sink, void* user);
     int SohState_Warp(unsigned short entrance);
+    int SohState_ActorParamsAt(int cat, int index);
+    int SohState_ActorListLen(int cat);
+    int SohState_ActorInfoAt(int cat, int index,
+                              int* out_id, int* out_params, unsigned int* out_flags,
+                              float* out_px, float* out_py, float* out_pz,
+                              short* out_rx, short* out_ry, short* out_rz);
     int SohState_Lighting(unsigned char ambient[3],
                          signed char light1Dir[3], unsigned char light1Color[3],
                          signed char light2Dir[3], unsigned char light2Color[3],
@@ -1690,8 +1696,149 @@ void CompareFirstDivImpl() {
             fd.report("actor-count", buf);
         }
 
+        // ── Play-mode d7: per-actor state diff ─────────────────────────
+        // For each Az actor, find the best-matching SoH actor by
+        // (cat, id, closest position). If any pair has a params mismatch
+        // or a world-flags divergence, name the first one. Positions
+        // already covered by d3 for Player; this dim catches:
+        //  - port gap where an NPC/pickup spawns with different params
+        //    (different message id, different item type, different mode);
+        //  - flag drift where two actors of the same id are in different
+        //    lifecycle states (e.g. one is DRAW_ENABLED, the other isn't).
+        //
+        // Uses the ACTOR_LISTS walking pattern (per-cat linked list) on
+        // both sides, matched by (cat, id, nearest position).
+        struct AzActor {
+            int cat, id, params;
+            uint32_t flags;
+            float px, py, pz;
+            short rx, ry, rz;
+        };
+        std::vector<AzActor> az_list;
+        for (uint32_t cat = 0; cat < 12; ++cat) {
+            auto head = mem.Read32OrNullopt(*ps_az + ACTORCTX_OFF +
+                                              ACTOR_LISTS_OFF + cat * 8 + 4);
+            if (!head || *head == 0) continue;
+            uint32_t addr = *head;
+            int guard = 128;
+            while (addr != 0 && guard-- > 0) {
+                auto id_v = mem.Read32OrNullopt(addr + 0x00);
+                auto fl_v = mem.Read32OrNullopt(addr + 0x04);
+                auto px_v = mem.Read32OrNullopt(addr + ACTOR_POS_OFF + 0);
+                auto py_v = mem.Read32OrNullopt(addr + ACTOR_POS_OFF + 4);
+                auto pz_v = mem.Read32OrNullopt(addr + ACTOR_POS_OFF + 8);
+                auto rot_v= mem.Read32OrNullopt(addr + ACTOR_ROT_OFF + 0);
+                auto rz_v = mem.Read32OrNullopt(addr + ACTOR_ROT_OFF + 4);
+                auto pr_v = mem.Read32OrNullopt(addr + 0x1C);
+                auto nx_v = mem.Read32OrNullopt(addr + ACTOR_NEXT_OFF);
+                if (!id_v || !fl_v || !px_v || !py_v || !pz_v ||
+                    !rot_v || !rz_v || !pr_v || !nx_v) break;
+                AzActor a{};
+                a.cat = static_cast<int>(cat);
+                a.id  = static_cast<int>(*id_v & 0xFFFF);
+                short p16 = static_cast<short>(*pr_v & 0xFFFF);
+                a.params = static_cast<int>(p16);
+                a.flags = *fl_v;
+                std::memcpy(&a.px, &*px_v, 4);
+                std::memcpy(&a.py, &*py_v, 4);
+                std::memcpy(&a.pz, &*pz_v, 4);
+                a.rx = static_cast<short>(*rot_v & 0xFFFF);
+                a.ry = static_cast<short>((*rot_v >> 16) & 0xFFFF);
+                a.rz = static_cast<short>(*rz_v & 0xFFFF);
+                az_list.push_back(a);
+                addr = *nx_v;
+            }
+        }
+        // For each Az actor, try to pair with SoH's matching actor
+        // (same cat, same id, nearest position). If either side has more
+        // actors of that (cat,id) than the other, skip — d6 already flagged
+        // the count mismatch and it's the reason for the extra.
+        int checked = 0, mismatched = 0;
+        std::string first_delta;
+        // Track the worst per-pair position delta so time-sweeps surface
+        // NPC drift even when it doesn't trip a firstdiv report.
+        float worstPosD = 0.0f;
+        int worstPosCat = -1, worstPosId = 0;
+        for (const auto& a : az_list) {
+            int soh_len = SohState_ActorListLen(a.cat);
+            if (soh_len <= 0) continue;
+            int best = -1;
+            float bestD2 = 1e30f;
+            int b_id = 0, b_params = 0; unsigned int b_flags = 0;
+            float b_px = 0, b_py = 0, b_pz = 0;
+            short b_rx = 0, b_ry = 0, b_rz = 0;
+            for (int i = 0; i < soh_len; ++i) {
+                int s_id=0, s_params=0; unsigned int s_flags=0;
+                float s_px=0, s_py=0, s_pz=0;
+                short s_rx=0, s_ry=0, s_rz=0;
+                if (!SohState_ActorInfoAt(a.cat, i, &s_id, &s_params, &s_flags,
+                                          &s_px, &s_py, &s_pz,
+                                          &s_rx, &s_ry, &s_rz)) continue;
+                if (s_id != a.id) continue;
+                float dx = s_px - a.px, dy = s_py - a.py, dz = s_pz - a.pz;
+                float d2 = dx*dx + dy*dy + dz*dz;
+                if (d2 < bestD2) {
+                    bestD2 = d2; best = i;
+                    b_id = s_id; b_params = s_params; b_flags = s_flags;
+                    b_px = s_px; b_py = s_py; b_pz = s_pz;
+                    b_rx = s_rx; b_ry = s_ry; b_rz = s_rz;
+                }
+            }
+            // Position-proximity gate: an Az actor is considered "paired"
+            // with a SoH actor only when the same-cat/same-id nearest is
+            // within a generous threshold. Otherwise d7 would fabricate a
+            // fake pair (e.g. Az's Wonder_Talk2 at (0,20,120) matched
+            // against SoH's Wonder_Talk2 at (78,38,116) because they
+            // share id 0x0185) and mis-report a params mismatch that d6
+            // already flagged as a missing actor. Threshold: 40 units
+            // — one Link-height, generous enough for slow-moving NPCs
+            // between the two engine step points, tight enough that
+            // cross-room duplicates don't collide.
+            const float PAIR_DIST2 = 40.0f * 40.0f;
+            if (best < 0 || bestD2 > PAIR_DIST2) continue;
+            checked++;
+            float posD = std::sqrt(bestD2);
+            if (posD > worstPosD) {
+                worstPosD = posD; worstPosCat = a.cat; worstPosId = a.id;
+            }
+            // Params must match exactly (they're the spawn-data seed).
+            if (b_params != a.params) {
+                mismatched++;
+                if (first_delta.empty()) {
+                    char buf[256]; std::snprintf(buf, sizeof buf,
+                        "cat=%d id=0x%04x az_params=0x%04x soh_params=0x%04x "
+                        "az_pos=(%.1f,%.1f,%.1f) soh_pos=(%.1f,%.1f,%.1f)",
+                        a.cat, a.id, a.params & 0xFFFF, b_params & 0xFFFF,
+                        a.px, a.py, a.pz, b_px, b_py, b_pz);
+                    first_delta = buf;
+                }
+                continue;
+            }
+            // Flags: bits >= 0x10 are lifecycle/behavior; the low bits
+            // (0x01..0x08) toggle every frame and are noisy. Mask them.
+            uint32_t azf = a.flags & 0xFFFFFFF0u;
+            uint32_t sof = b_flags & 0xFFFFFFF0u;
+            if (azf != sof && first_delta.empty()) {
+                mismatched++;
+                char buf[256]; std::snprintf(buf, sizeof buf,
+                    "cat=%d id=0x%04x az_flags=0x%08x soh_flags=0x%08x "
+                    "(masked hi bits) at az_pos=(%.1f,%.1f,%.1f)",
+                    a.cat, a.id, azf, sof, a.px, a.py, a.pz);
+                first_delta = "flags: " + std::string(buf);
+            }
+        }
+        std::printf("  d7 actor pairs:  checked=%d mismatched=%d",
+                    checked, mismatched);
+        if (mismatched > 0) {
+            std::printf("  first=%s\n", first_delta.c_str());
+            if (!fd.reported) fd.report("actor-state", first_delta);
+        } else {
+            std::printf(" worst_pos_drift=%.2f (cat=%d id=0x%04x)\n",
+                        worstPosD, worstPosCat, worstPosId);
+        }
+
         if (!fd.reported) {
-            std::printf("  firstdiv: none — all 6 play-mode dimensions matched\n");
+            std::printf("  firstdiv: none — all 7 play-mode dimensions matched\n");
         }
         return;
     }
