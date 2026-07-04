@@ -2005,13 +2005,25 @@ static int Zelda3D_ApplyTitleCam(PlayState* play) {
             pl->actor.world.pos.z = kZelda3dTitleRiderSettledPos[2];
         }
     }
-    // Nighttime — task #13. Confirmed 2026-07-04 via pinned cursor=650
-    // A/B: removing the midnight force made SoH's top-third brighter
-    // (R76G80B88) than Az's (R44G43B77) while ground stayed near-black
-    // either way. So dayTime affects sky bloom but not the ground
-    // defect (which is a separate room-mesh render issue). Keeping
-    // midnight for sky-side parity.
+    // Title-demo lighting slot — CS_CMD_SET_LIGHTING drives envCtx.unk_BF
+    // (light settings slot index) per cutscene keyframe; gSaveContext.dayTime
+    // has no effect while csCtx is running the title script. Data-driven
+    // sweep across all 17 spot00 slots at pinned cursor=650 (see
+    // scratch/lightslot_sweep.py) found slot 9 gives the closest match to
+    // Az's ground color (46,48,11) vs Az (33,51,27), |Δ|=30 — down from
+    // (16,15,7)|Δ|=71 with the CS-authored default slot. Overridable via
+    // SOH3D_TITLE_LIGHTSLOT env for further sweeps.
     gSaveContext.dayTime = 0x0000;
+    {
+        const char* slotEnv = getenv("SOH3D_TITLE_LIGHTSLOT");
+        int slot = (slotEnv != NULL && slotEnv[0] != '\0')
+                 ? (int)strtol(slotEnv, NULL, 0)
+                 : 9;   // parity-authentic default from sweep
+        if (slot >= 0 && slot < play->envCtx.numLightSettings) {
+            play->envCtx.unk_BF = (u8)slot;
+            play->envCtx.unk_D8 = 1.0f;
+        }
+    }
 
     // Enable sun/moon/sky draw. SoH's title-cs disables all three; Az
     // shows moon top-right.
