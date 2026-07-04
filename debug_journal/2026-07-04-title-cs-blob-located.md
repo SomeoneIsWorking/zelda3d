@@ -76,14 +76,88 @@ The magic ` BDQ` and 20-byte prefix suggest a versioned wrapper — NOT
 N64's raw command stream. Needs Ghidra decomp of the CS interpreter
 entry point to decode.
 
+## Format decoded further via header comparison (setup0 vs setup7)
+
+Dumping the SECOND cs blob (setup 7, at file-offset 0x24a8c) with the
+same tool confirms the container format is stable across cutscenes:
+
+| Offset | Setup 0 | Setup 7 | Interpretation                          |
+|-------:|--------:|--------:|-----------------------------------------|
+| +0x00  | (hash A)| (hash B)| 20-byte GREZZO signature/hash (differs) |
+| +0x14  | `20424451` | same | Magic `" BDQ"` (constant)              |
+| +0x18  | 3       | 3       | Version = 3 (constant)                  |
+| +0x1C  | `0x12c0` | `0x1059`| Command-stream length (differs)        |
+| +0x20  | 13      | 10      | Command count                           |
+| +0x24  | 1       | 3       | ?                                       |
+| +0x28  | 1       | 0x38    | ?                                       |
+| +0x2C  | `0x8ca` | `0x3fc` | End frame (setup0 = 2250 = ~37.5s @60fps; setup7 = 1020 = ~17s) |
+| +0x30  | cmd table start                              |
+
+So the header is a **32-byte GREZZO cutscene container** (`GREZZO_CS_V3`
+= " BDQ" 3), followed by command records, followed by parameter/keyframe
+data referenced from commands. Total blob length = header + command
+stream + keyframe pool.
+
+Command records: the byte stream at +0x30 in setup0 is
+`00000000 00000000 feffffff 10000000 00000000 feffffff 10000000
+00000000 00000000 00000000 2d000000 00000000 0b000000 01000000 ...`.
+That's a mix of 16-byte and 8-byte-ish records — needs the CS
+interpreter decomp to disambiguate.
+
+## What the RE hit this session
+
+- **FUN_0023449c = Scene_CmdCutsceneData handler** (40-byte
+  trampoline). Confirms the cs script pointer path:
+  `csctx_or_play[0x229c] = scene_data_base + cmd[4]`.
+- **FUN_0037573c = CsCtx_SetScript**: sets `+0x229c` (script ptr) and
+  clears `+0x22ac` (frame counter). 20-byte fn.
+- **FUN_00357ea0 = CsCtx_GetScript**: reads `+0x229c`. 12-byte fn.
+- **FUN_0037571c = CsCtx_GetU8At_0x22a0**: reads `+0x22a0` (u8 state?).
+- **FUN_00375750 = CsCmd_GetKeyframe(cs_ctx, idx)**:
+  - `cs_ctx + 0xC` = command table base (16-byte stride)
+  - `cs_ctx + 0x34` = current command index (-1 = idle)
+  - `cs_ctx + 0x60` = keyframe u32 pool base
+  - Returns `keyframe_pool[idx]` if `idx < *(command_table[current_cmd])`.
+- **Every command record is 16 bytes** (0x10 stride confirmed by the
+  ARM decomp of FUN_00375750).
+
+So the csCtx (or a sub-struct of it, offset TBD from PlayState base)
+has this layout:
+
+| CsCtx offset | Field                        |
+|-------------:|------------------------------|
+| +0x0C        | cmd table base ptr (16B stride) |
+| +0x34        | current cmd index (int; -1 = idle) |
+| +0x60        | keyframe u32 pool base ptr  |
+| +0x229c      | raw script ptr (installed by CsCtx_SetScript) |
+| +0x22a0      | u8 state byte               |
+| +0x22ac      | frame counter (u32? cleared to 0 by SetScript) |
+
+## Live-verify handle (harness)
+
+Az play @ VA `0x0871E840`. So:
+- `r32 0x087210F4` (= play+0x08 or a csCtx sub-struct? — TBD) — check
+  the parsed csCtx pointer if csCtx is a nested struct.
+- `r32 0x08720ADC` (= play+0x229c) — if `+0x229c` is a PLAY offset,
+  this reads the current cs script ptr. Expected value at title:
+  `0x28a24 + scene_data_base` (setup 0) or `0x24a8c + scene_base`
+  (setup 7). Distinguishes which setup Az actually runs.
+- `r32 0x08720AF4` (= play+0x22ac) — frame counter. Should advance
+  monotonically during title playback.
+
 ## Next-session concrete moves
 
-1. **Decode the CS format via Ghidra:**
-   - `FUN_0023449c` = Scene_CmdCutsceneData (per `scene_command_handler.md`)
-   - Its callee that consumes the cs blob is the CS interpreter — find
-     via forward xref from FUN_0023449c on the ptr it stores.
-   - Identify: 20-byte prefix (skip? checksum?), 4-byte length field,
-     command-stream opcode table.
+1. **Find the CS interpreter fn.** The one that reads the raw script
+   at `+0x229c` and populates the parsed cmd-table at `+0xC` +
+   keyframe pool at `+0x60`. It runs once per csctx install (i.e. at
+   scene load, not per-frame). Candidates: FUN_00358188 (2253 bytes)
+   or a fn in `00375...` family. Find via callers of FUN_00357ea0
+   whose first action is `LDR base, [_, #0x229c]; skip 32; walk cmds`.
+
+2. **Find the per-frame CS advancer.** The one that increments
+   `+0x22ac` (frame counter) and evaluates cmds. Likely called from
+   `Play_Main` or a sub-fn. Candidates: search fns that STORE to
+   `+0x22ac` (not just SetScript's clear-to-0).
 
 2. **Confirm which setup Az's title plays:**
    - Harness: read Az's active cs script pointer from PlayState (offset
