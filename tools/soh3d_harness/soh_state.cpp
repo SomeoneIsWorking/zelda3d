@@ -397,9 +397,14 @@ int SohState_Lighting(unsigned char ambient[3],
                      short* fogNear, short* fogFar,
                      unsigned char lightCtxAmbient[3],
                      unsigned char lightCtxFogColor[3],
-                     short* lightCtxFogNear, short* lightCtxFogFar) {
+                     short* lightCtxFogNear, short* lightCtxFogFar,
+                     unsigned char* outUnkBF, unsigned char* outUnkBD,
+                     float* outUnkD8) {
     if (gPlayState == NULL) return 0;
     const EnvLightSettings* s = &gPlayState->envCtx.lightSettings;
+    if (outUnkBF) *outUnkBF = gPlayState->envCtx.unk_BF;
+    if (outUnkBD) *outUnkBD = gPlayState->envCtx.unk_BD;
+    if (outUnkD8) *outUnkD8 = gPlayState->envCtx.unk_D8;
     for (int i = 0; i < 3; ++i) {
         ambient[i]     = s->ambientColor[i];
         light1Dir[i]   = s->light1Dir[i];
