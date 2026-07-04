@@ -127,3 +127,62 @@ Deferred — the arc is well-scoped; the next session's tools are the
 harness watchpoint + Ghidra decomp of the CS-lighting handler. Session
 ran out of runway; full parity target is the same but the path is
 identified.
+
+## Additional Ghidra-side findings (2026-07-04 late)
+
+- **Prior Play_Main decomp had one incorrect BL line**: Ghidra printed
+  `FUN_002e25f0(param_1)` as the third call after Actor_UpdateAll, but
+  the actual BL sequence in `Play_Main` (0x0045238c..0x00452598) is:
+  ```
+  0x004523f0  BL 0x002f70c4   (early sync)
+  0x004523fc  BL 0x0034fc6c   (early sync)
+  0x0045241c  BL 0x002e4514   (delayed-effect cleanup, 252 B)
+  0x00452428  BL 0x002e2e60   (Actor_UpdateAll, 5372 B)
+  0x004524b8  BL 0x00347258   (712 B — keyframe evaluator, per-entry;
+                                   NOT env update)
+  0x0045252c  BL 0x00343280   (memset0 utility, 84 B)
+  ```
+  So Environment_Update-equivalent must be nested INSIDE
+  FUN_002e2e60 (Actor_UpdateAll) or elsewhere in the update thread —
+  it isn't a direct Play_Main call.
+
+- **Palette-slot-size (0x1C) static scan**: 1024 uses of the constant
+  0x1C across the binary. Top fns by usage:
+  - FUN_002c8434 × 57 (utility-heavy — buffer stride?)
+  - FUN_0014da40 × 15
+  - FUN_002ee864 × 14
+  These are candidates for the palette-indexing loop but need
+  filtering by "index * 0x1C + palette_base" pattern (not just
+  0x1C as a constant).
+
+- **Cutscene_Command_SetLighting search**: 138 candidates matching
+  `sub #1; strb Rd, [Rn, #imm]` across the binary. Filtered by
+  base register R0 (play), only ONE match at 0x001758f8 — but no
+  containing fn in Ghidra's fn table (Thumb-only fn, unrecognized).
+  Decompiling adjacent code and identifying the fn boundary is the
+  next Ghidra step.
+
+- **The one small fn with a 1.0f pool constant** (candidate for
+  Cutscene_Command_SetLighting via "stores 1.0f" heuristic) was
+  FUN_0021cde4 (126 B) — decompiled but turned out to be a
+  Math_MatrixCopy-shape VFP-based float copy. Not the target.
+
+## What actually WOULD work next session
+
+The palette VAs at 0x0877dc74 (source) and 0x099d7284 (runtime copy)
+were LOCATED — the whole 17-slot spot00 palette is byte-identical to
+SoH's `zelda3d_scene_lighting.inc`. The remaining unknown is which
+slot Az actively uses at title.
+
+Concrete next-step attack (RE-driven, not tuning):
+
+1. Extend `watchhook.cpp` to also catch READs (currently only
+   writes). Watch reads to 0x099d7284..0x099d7460 (whole palette).
+   Environment_Update-equivalent WILL read slot X during the CS-active
+   window; hitting a specific slot-X's byte pinpoints X.
+
+2. Or Ghidra static-analyze FUN_00347258 (712 B, called from Play_Main
+   right after Actor_UpdateAll) — it may contain the palette lookup +
+   ambient blend even if it's tagged "keyframe evaluator" per its
+   FUN_00350820(anim_ptr, ..., 0x60, 3) call. Env update's lerp between
+   two slots IS a per-channel keyframe blend — same evaluator subsystem.
