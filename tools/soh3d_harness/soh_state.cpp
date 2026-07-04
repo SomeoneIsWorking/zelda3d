@@ -176,6 +176,20 @@ int SohState_GetLinkAge(void) {
     return (int)gSaveContext.linkAge;
 }
 
+// Force SoH's envCtx.unk_BF (title-cs slot index) and commit the lerp
+// weight. Used by the harness's live-mirror path: each frame, Az's
+// envCtx.unk_BF value is read via the harness (Core::System memory read
+// of play+0x3135+0xA5) and pushed into SoH via this call. Result: both
+// engines pick the same spot00 slot at every frame, byte-identical
+// palette → same lightSettings → same shader input.
+// Returns 1 on success (playstate present), 0 otherwise.
+int SohState_SetEnvSlot(unsigned char slot) {
+    if (gPlayState == NULL) return 0;
+    gPlayState->envCtx.unk_BF = slot;
+    gPlayState->envCtx.unk_D8 = 1.0f;  // commit lerp immediately
+    return 1;
+}
+
 // Player Link accessor: reads through the actor-category-Player list,
 // or falls back to gSaveContext.entranceIndex if no player is live yet.
 int SohState_PlayerPos(float* px, float* py, float* pz,
