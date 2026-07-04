@@ -1807,11 +1807,41 @@ void CompareSkeletonImpl(int cat, int listIndex) {
 }
 
 void CompareLightingImpl() {
-    // 3ds side: OoT3D's EnvironmentContext offset within the 3DS PlayState
-    // is not RE'd yet (the actorCtx / sceneNum / transitionTrigger fields
-    // in this harness came from prior work; envCtx did not). Once that
-    // offset lands, add the read here mirroring the SoH branch below.
-    std::printf("  3ds: n/a (envCtx offset in OoT3D PlayState not RE'd yet)\n");
+    // 3ds side — envCtx offset RE'd 2026-07-04 via harness cursor-diff +
+    // JIT watchpoint + Ghidra decomp of FUN_0045dd30 (Environment_Update).
+    // envCtx base = play + 0x3135; unk_BF (current slot) at +0xA5;
+    // shadow at +0xA6; lerp weight (float) at +0xC8. Palette lookup uses
+    // 0x1C stride. See oot3d-decomp/docs/env_context_layout.md.
+    auto& mem = Core::System::GetInstance().Memory();
+    // gPlayState pointer at GPLAYSTATE_VA can lag until boot completes,
+    // but the play struct itself is heap-alloc'd at a stable VA the RE
+    // scripts rely on. Try the indirection first; fall back to the fixed
+    // VA so `compare lighting` works during the same early window that
+    // `mem 0x0871E840 …` already reads from in the sweep scripts.
+    constexpr uint32_t AZ_PLAY_STRUCT_VA = 0x0871E840;
+    auto p = mem.Read32OrNullopt(GPLAYSTATE_VA);
+    uint32_t play_va = (p && *p != 0) ? *p : AZ_PLAY_STRUCT_VA;
+    {
+        const uint32_t env_base = play_va + 0x3135;
+        // Read the u8 fields via Read32OrNullopt on the containing word,
+        // then extract the byte at the right sub-offset. Read8OrNullopt
+        // doesn't exist in this Azahar branch.
+        auto w_a4 = mem.Read32OrNullopt(env_base + 0xA4);         // covers +A4..+A7
+        auto w_cc = mem.Read32OrNullopt(env_base + 0xCC);         // covers +CC..+CF
+        auto weight_i = mem.Read32OrNullopt(env_base + 0xC8);
+        auto byte_from = [](std::optional<uint32_t> w, uint32_t sub) -> unsigned {
+            if (!w) return 0xFFu;
+            return (unsigned)((*w >> (sub * 8)) & 0xFFu);
+        };
+        float weight = 0.0f;
+        if (weight_i) std::memcpy(&weight, &*weight_i, sizeof(float));
+        std::printf("  3ds: envCtx@0x%08x  slot=%u  prevSlot=%u  lerpWeight=%.3f  mode=0x%02x\n",
+                    (unsigned)env_base,
+                    byte_from(w_a4, 1),   // +0xA5 = current slot
+                    byte_from(w_a4, 2),   // +0xA6 = shadow slot
+                    weight_i ? weight : 0.0f,
+                    byte_from(w_cc, 0));  // +0xCC = mode/flag
+    }
     // soh side
     if (!SohState_HasPlayState()) {
         std::printf("  soh: n/a (no playstate)\n");
