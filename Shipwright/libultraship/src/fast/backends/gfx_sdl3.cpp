@@ -403,7 +403,12 @@ void GfxWindowBackendSDL3::Init(const char* gameName, const char* gfxApiName, bo
 #ifdef __IOS__
     SDL_WindowFlags flags = SDL_WINDOW_BORDERLESS;
 #else
-    SDL_WindowFlags flags = SDL_WINDOW_RESIZABLE | SDL_WINDOW_HIGH_PIXEL_DENSITY;
+    // HIGH_PIXEL_DENSITY is dropped: SoH3D renders at the fixed 3DS top-screen
+    // resolution 400x240 (from shipofharkinian.json Window.Width/Height) so
+    // side-by-side captures against Az are like-for-like. HIGH_PIXEL_DENSITY
+    // silently inflates the drawable on HiDPI displays (400x240 -> 1000x600
+    // on a 2.5x display), breaking render parity.
+    SDL_WindowFlags flags = SDL_WINDOW_RESIZABLE;
 #endif
 
     // Headless mode (env SOH_HEADLESS=1): create the window HIDDEN so nothing appears on

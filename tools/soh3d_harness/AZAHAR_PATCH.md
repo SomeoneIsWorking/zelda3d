@@ -301,6 +301,65 @@ if (FILE* fp = Soh3dOpenBlitLog()) {
 }
 ```
 
+## Patch 4 — inline memlog for narrow-VA writer PC surfacing (title-cs RE, 2026-07-04)
+
+`Azahar/src/core/memory.cpp` — an ALWAYS-ON inline logger placed
+directly in the guest write path (both fast path + all page-type
+cases), keyed to a small set of target VAs supplied via env vars.
+Bypasses the page-granular MemoryWatchpoint mechanism (which nulls
+the fast-path pointer for the whole page, adding overhead to every
+write, AND misses RasterizerCachedMemory writes unless the page has
+been RegisterWatchpoint'd separately).
+
+Trigger via env:
+- `SOH3D_MEMLOG_VAS=0x08721a1a` — comma-separated hex list of vaddrs
+  to log (byte-granular, matches any sizeof(T) write that overlaps).
+  Up to 16 vaddrs.
+- `SOH3D_MEMLOG_PATH=/tmp/memlog.out` — output path; default stderr.
+
+On each qualifying write the logger prints one line:
+```
+MW pc=0x<pc> lr=0x<lr> va=0x<vaddr> sz=<sizeof(T)> data=0x<data> \
+   r0=... r1=... r2=... r3=... sp=...
+```
+
+### The patch
+
+Two hunks in `Azahar/src/core/memory.cpp`.
+
+**Hunk A — near the top of the file, just after the
+`Soh3d_OnMemoryWrite` forward decl:** the `Soh3dMemLog<T>()` template +
+`Soh3dMemLogInit()` static + env-parsed target-VA array. See the
+current source in-tree for the exact block (starts with
+`// Inline, per-VA write logger for RE.`).
+
+**Hunk B — in `MemorySystem::Write<T>`:** call `Soh3dMemLog(vaddr, data)`
+right after each `std::memcpy` store site:
+
+- Fast path (line ~765, guarded by `if (page_pointer)`).
+- `case PageType::MemoryWatchpoint` after the memcpy.
+- `case PageType::RasterizerCachedMemory` after the memcpy.
+- `case PageType::RasterizerCachedMemoryWatchpoint` after the memcpy.
+
+Each site guarded by `if (g_soh3d_memlog_n_vas > 0)` so the branch is
+predicted-not-taken when the env var isn't set — near-zero fast-path
+overhead in production.
+
+### Why an inline logger instead of the watchhook
+
+The existing watchhook only fires on `PageType::MemoryWatchpoint`, and
+only after `RegisterWatchpoint` marks the enclosing page. That has
+two problems for narrow-target RE:
+
+1. Page-granular fast-path takedown affects performance of every
+   write on the watched page (envCtx sits in play struct at
+   0x08720000-region, HOT page).
+2. Writes on RasterizerCachedMemory pages don't reach the hook at all.
+
+The inline logger has ZERO effect on unrelated writes (guard =
+`g_soh3d_memlog_n_vas > 0`) and reaches every write on every page
+type once the target VA hits.
+
 ## Watchhook — 64-word stack window (boot-dispatch RE, task #16)
 
 `tools/soh3d_harness/watchhook.cpp` records 64 stack words at write-fire
