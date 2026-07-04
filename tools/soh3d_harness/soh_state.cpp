@@ -18,6 +18,39 @@ extern "C" {
 // Returns 1 if gPlayState is populated (game is in the Play gamestate),
 // 0 otherwise. Every other accessor is undefined-behavior when this
 // returns 0, so callers must gate on it.
+// Read the current SoH-side lighting-relevant state for parity work — the
+// live daytime, envCtx skybox indices/blend, and the live ambient/fog
+// values that the render pipeline actually reads. Used by scratch/
+// lighting-parity probes at pinned title-demo frames.
+// Read SoH's live letterbox (ShrinkWindow) current value — non-zero
+// means cutscene black bars are on. Suspected culprit for the bottom-
+// third of the title-demo frame being near-black while Az shows grass.
+extern "C" u32 ShrinkWindow_GetCurrentVal(void);
+int SohState_ShrinkWindowVal(void) {
+    return (int)ShrinkWindow_GetCurrentVal();
+}
+
+int SohState_DayTimeAndEnv(unsigned int* daytime,
+                           unsigned char* skybox1Idx, unsigned char* skybox2Idx,
+                           float* skyboxBlend,
+                           unsigned char* liveAmbient /*[3]*/,
+                           unsigned char* liveFogColor /*[3]*/,
+                           short* liveFogNear, short* liveFogFar) {
+    if (gPlayState == NULL) return 0;
+    *daytime     = gSaveContext.dayTime;
+    *skybox1Idx  = gPlayState->envCtx.skybox1Index;
+    *skybox2Idx  = gPlayState->envCtx.skybox2Index;
+    *skyboxBlend = gPlayState->envCtx.skyboxBlend;
+    const LightContext* lc = &gPlayState->lightCtx;
+    for (int i = 0; i < 3; ++i) {
+        liveAmbient[i]  = lc->ambientColor[i];
+        liveFogColor[i] = lc->fogColor[i];
+    }
+    *liveFogNear = lc->fogNear;
+    *liveFogFar  = lc->fogFar;
+    return 1;
+}
+
 int SohState_HasPlayState(void) {
     return (gPlayState != NULL) ? 1 : 0;
 }

@@ -248,6 +248,13 @@ extern "C" {
                               short* jointsXYZ, int maxJoints,
                               int* outJointCount, int* outAnimFrame,
                               int* outMorphFrame);
+    int SohState_ShrinkWindowVal(void);
+    int SohState_DayTimeAndEnv(unsigned int* daytime,
+                              unsigned char* skybox1Idx, unsigned char* skybox2Idx,
+                              float* skyboxBlend,
+                              unsigned char* liveAmbient,
+                              unsigned char* liveFogColor,
+                              short* liveFogNear, short* liveFogFar);
 }
 
 extern "C" {
@@ -1077,27 +1084,30 @@ constexpr uint32_t TITLE_POSE_STRIDE       = 36;
 constexpr uint32_t TITLE_POSE_TABLE_B_VA   = 0x005A54D8;
 constexpr uint32_t TITLE_POSE_B_COUNT      = 25;
 
-// OoT3D title-demo camera basis: contiguous 36-byte {Vec3f eye, Vec3f dir(unit),
-// Vec3f up(unit)} at 0x005BE6D4. RE'd via find_cam_eye.py (see oot3d-decomp
-// docs/title_camera_lead.md). Ported into SoH's title-cam override at
-// zelda3d.c kZelda3dTitleEye/At/Up (soh3d 17221301).
+// OoT3D title-demo camera basis: at 0x005BE6D4.
+// CORRECTED layout (JIT-caught writer FUN_004235B8 @ 0x004235d4 stores an
+// inverted view matrix — see oot3d-decomp/docs/title_view_matrix_lh.md):
+//   +0x00  eye     (Vec3f)
+//   +0x0C  right   (Vec3f, unit; = forward × up, RH-shape)
+//   +0x18  up      (Vec3f, unit)
+//   +0x24  forward (Vec3f, unit; = at − eye normalised — the actual view dir)
+// The dir[] field name below preserves what the SoH port sees at
+// kZelda3dTitleAt-eye — the actual view forward at +0x24 — so parity
+// metrics compare like-for-like against SoH's viewing direction.
 constexpr uint32_t TITLE_CAM_BASIS_VA      = 0x005BE6D4;
 struct Az3dsTitleCameraBasis {
     float eye[3];
-    float dir[3];
+    float dir[3];   // view forward — read from +0x24, NOT +0x0C
     float up[3];
 };
 
 // Typed accessor for the OoT3D title-camera basis. Returns true on success.
-// The read is 36 contiguous bytes at TITLE_CAM_BASIS_VA; any unmapped byte
-// aborts and returns false so the caller falls through to "unmapped" rather
-// than reporting garbage.
 static bool Az_ReadTitleCameraBasis(Az3dsTitleCameraBasis* out) {
     auto& mem = Core::System::GetInstance().Memory();
     for (int j = 0; j < 3; ++j) {
-        auto e = mem.Read32OrNullopt(TITLE_CAM_BASIS_VA + 0  + j*4);
-        auto d = mem.Read32OrNullopt(TITLE_CAM_BASIS_VA + 12 + j*4);
-        auto u = mem.Read32OrNullopt(TITLE_CAM_BASIS_VA + 24 + j*4);
+        auto e = mem.Read32OrNullopt(TITLE_CAM_BASIS_VA + 0    + j*4);
+        auto u = mem.Read32OrNullopt(TITLE_CAM_BASIS_VA + 0x18 + j*4);
+        auto d = mem.Read32OrNullopt(TITLE_CAM_BASIS_VA + 0x24 + j*4);  // forward
         if (!e || !d || !u) return false;
         std::memcpy(&out->eye[j], &*e, 4);
         std::memcpy(&out->dir[j], &*d, 4);
@@ -3314,6 +3324,26 @@ void RunRepl() {
         else if (cmd == "diag")      HandleDiag(toks);
         else if (cmd == "loadstate") HandleLoadState(toks);
         else if (cmd == "savestate") HandleSaveState(toks);
+        else if (cmd == "soh_letterbox") {
+            std::printf("ok soh_letterbox %d\n", SohState_ShrinkWindowVal());
+        }
+        else if (cmd == "soh_env") {
+            // Structured env dump: SoH-side live daytime, skybox indices,
+            // and lightCtx ambient/fog. Used by parity probes.
+            unsigned int daytime = 0;
+            unsigned char sk1 = 0, sk2 = 0;
+            float blend = 0;
+            unsigned char amb[3] = {0}, fog[3] = {0};
+            short fn = 0, ff = 0;
+            if (!SohState_DayTimeAndEnv(&daytime, &sk1, &sk2, &blend, amb, fog, &fn, &ff)) {
+                PrintErr("soh_env: no playstate"); continue;
+            }
+            std::printf("ok soh_env daytime=0x%04x skybox1=%u skybox2=%u blend=%.3f "
+                        "ambient=(%u,%u,%u) fog=(%u,%u,%u) fogNear=%d fogFar=%d\n",
+                        daytime, sk1, sk2, blend,
+                        amb[0], amb[1], amb[2],
+                        fog[0], fog[1], fog[2], fn, ff);
+        }
         else if (cmd == "playstate") HandlePlayState(toks);
         else if (cmd == "titleactors") HandleTitleActors(toks);
         else if (cmd == "scene")     HandleScene(toks);

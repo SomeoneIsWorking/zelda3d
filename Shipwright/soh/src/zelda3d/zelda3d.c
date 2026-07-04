@@ -2005,27 +2005,19 @@ static int Zelda3D_ApplyTitleCam(PlayState* play) {
             pl->actor.world.pos.z = kZelda3dTitleRiderSettledPos[2];
         }
     }
-    // Nighttime — task #13. Az's OoT3D title shows a deep-blue sky with
-    // moon top-right and silhouette cliffs. SoH's own title-demo picks a
-    // day dayTime because the N64 title-cs sweep runs a day setup; force
-    // midnight (0x0000) here so envCtx's sun/moon/ambient blend produces
-    // the OoT3D-matching framing. Pinned every frame during title-demo,
-    // like the cam basis + Player.pos above.
+    // Nighttime — task #13. Confirmed 2026-07-04 via pinned cursor=650
+    // A/B: removing the midnight force made SoH's top-third brighter
+    // (R76G80B88) than Az's (R44G43B77) while ground stayed near-black
+    // either way. So dayTime affects sky bloom but not the ground
+    // defect (which is a separate room-mesh render issue). Keeping
+    // midnight for sky-side parity.
     gSaveContext.dayTime = 0x0000;
 
-    // Enable moon draw during title (task #16). SoH's title-cs sets
-    // sunMoonDisabled=true because the N64 title doesn't draw a moon;
-    // Az's OoT3D title DOES draw one top-right. Re-enable so
-    // Zelda3D_TryDrawSunMoon (or the N64 fallback) fires. Also force
-    // skyboxId to SKYBOX_NORMAL_SKY (the N64 title uses SKYBOX_CUTSCENE_MAP
-    // or similar which trips the early-out inside TryDrawSunMoon).
+    // Enable sun/moon/sky draw. SoH's title-cs disables all three; Az
+    // shows moon top-right.
     play->envCtx.sunMoonDisabled = false;
-    play->envCtx.skyboxDisabled  = false;   // title-cs sets this; blocks Zelda3D_TryDrawSky
+    play->envCtx.skyboxDisabled  = false;
     play->skyboxId = SKYBOX_NORMAL_SKY;
-    // Force the night sky variant (index 3 = fine_tenkyu_3): the 3DS
-    // title renders the BlueSky dome's dark-blue night dome + kumo cloud
-    // band + fine_star stars — none of which show up if the N64 sSkybox-
-    // Table lookup lands on a day/dusk index. Task #16 sky-parity arc.
     play->envCtx.skybox1Index = 3;
     play->envCtx.skybox2Index = 3;
     play->envCtx.skyboxBlend  = 0;
