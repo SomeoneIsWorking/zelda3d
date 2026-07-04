@@ -1614,9 +1614,15 @@ void Fast::Zelda3DRenderer::DrawModel(int modelId, const float* mp16, const floa
         // gated by gZelda3dWorldLit (task #16: at title we skip the synthetic vertex-lit compute
         // but keep the material's static brightness).
         ubo.uExtra[3] = grp.vertexLighting ? grp.combScaleRGB : 1.0f;
-        // OoT3D scene-vertex-lit path (task #16): feed uAmbient.xyz = sceneAmb * matAmbient so
-        // the shader can MULTIPLY (matches OoT3D's saturate(sceneAmb*matAmb + ...) * bakedColor).
-        // Only applied to lit scene materials — character/prop draws (uParams.y>0.5) skip it.
+        // OoT3D scene-vertex-lit path (task #16): feed uAmbient.xyz = sceneAmb * matAmb.
+        // Per LIGHTDIAG at pinned title cursor=650: grass room groups have
+        // matAmb=(1,1,1) matDif=(0,0,0), combScale=2. So the diffuse term contributes
+        // nothing for these materials — the entire lit result rides on
+        // t * vColor * sceneAmb * combScale. The remaining ground dimness is a
+        // SCENE-AMBIENT mismatch (SoH forces midnight → sceneAmb=(0.16,0.14,0.30)
+        // blue-heavy), not a shader defect. The Az-matching fix is to use OoT3D's
+        // actual title-demo lightSettings values, not to change the shader math. See
+        // debug_journal/2026-07-04-title-parity-pinned650.md.
         bool ambGroup = (grp.vertexLighting && gZelda3dWorldLit);
         ubo.uAmbient[0] = gZelda3dAmbient[0] * grp.matAmbient[0];
         ubo.uAmbient[1] = gZelda3dAmbient[1] * grp.matAmbient[1];

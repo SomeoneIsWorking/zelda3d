@@ -249,6 +249,7 @@ extern "C" {
                               int* outJointCount, int* outAnimFrame,
                               int* outMorphFrame);
     int SohState_ShrinkWindowVal(void);
+    int SohState_Zelda3DLive(float* amb, float* l1col, float* l2col);
     int SohState_DayTimeAndEnv(unsigned int* daytime,
                               unsigned char* skybox1Idx, unsigned char* skybox2Idx,
                               float* skyboxBlend,
@@ -3324,6 +3325,15 @@ void RunRepl() {
         else if (cmd == "diag")      HandleDiag(toks);
         else if (cmd == "loadstate") HandleLoadState(toks);
         else if (cmd == "savestate") HandleSaveState(toks);
+        else if (cmd == "soh_z3dlive") {
+            // Structured dump of the live zelda3d gl scene light state — what
+            // the fragment shader sees after Zelda3D_GL_SetLightParams.
+            float amb[3] = {0}, l1[3] = {0}, l2[3] = {0};
+            SohState_Zelda3DLive(amb, l1, l2);
+            std::printf("ok soh_z3dlive ambient=(%.3f,%.3f,%.3f) "
+                        "light1Col=(%.3f,%.3f,%.3f) light2Col=(%.3f,%.3f,%.3f)\n",
+                        amb[0], amb[1], amb[2], l1[0], l1[1], l1[2], l2[0], l2[1], l2[2]);
+        }
         else if (cmd == "soh_letterbox") {
             std::printf("ok soh_letterbox %d\n", SohState_ShrinkWindowVal());
         }

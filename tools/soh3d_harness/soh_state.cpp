@@ -30,6 +30,24 @@ int SohState_ShrinkWindowVal(void) {
     return (int)ShrinkWindow_GetCurrentVal();
 }
 
+// Read the LIVE zelda3d gl scene light params — the values Zelda3D_GL_SetLightParams
+// pushed into the shader-side globals this frame. Bypasses the envCtx→lightSettings
+// path so we see exactly what the renderer sees (after all overrides). Used to
+// verify diffuse-term pre-bake is receiving non-zero light1Color at title.
+extern "C" float gZelda3dAmbient[3];
+extern "C" float gZelda3dLight1Col[3];
+extern "C" float gZelda3dLight2Col[3];
+int SohState_Zelda3DLive(float* amb /*[3]*/,
+                         float* l1col /*[3]*/,
+                         float* l2col /*[3]*/) {
+    for (int i = 0; i < 3; ++i) {
+        amb[i]   = gZelda3dAmbient[i];
+        l1col[i] = gZelda3dLight1Col[i];
+        l2col[i] = gZelda3dLight2Col[i];
+    }
+    return 1;
+}
+
 int SohState_DayTimeAndEnv(unsigned int* daytime,
                            unsigned char* skybox1Idx, unsigned char* skybox2Idx,
                            float* skyboxBlend,
