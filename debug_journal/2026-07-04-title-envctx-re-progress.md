@@ -94,3 +94,36 @@ prior-RE'd transition/scene-control area at `play+0x5c2d = transitionTrigger`.
   worked)
 - `scratch/find_az_env_live.py` (palette dump + pointer scan)
 - `scratch/find_az_envctx.py` (structural lightSetting-shape scan)
+
+## Update — palette is in the SCENE-DATA blob, not envCtx
+
+Dumping 256 bytes BEFORE the source palette VA `0x0877dc74` reveals
+actor-list-shaped data (`0fff0000 <params> <pos> <rot>` records with the
+`0x0FFF` flag mask characteristic of OoT Actor.flags). So `0x0877dc74`
+sits inside a scene-setup ZSI blob that also contains the room's actor
+list. It's the ROM-loaded scene payload, not the runtime env state.
+
+The runtime envCtx must be a separate heap allocation whose pointer
+lives inside play struct. All 17 lightSettings-slot fingerprint scans of
+play (32KB, 4KB chunks) returned 0 hits — meaning the LIVE blended
+ambient values do NOT match any raw palette slot byte-for-byte. This is
+consistent with Environment_Update lerping between adjacent slots (the
+blended result rarely equals a slot exactly).
+
+Ghidra approach — post-actor fn (`FUN_002e25f0`, called from Play_Main
+AFTER Actor_UpdateAll, 12 KB decomp) accesses many `param_1+0x17xx`
+byte-offset fields. These could be envCtx.skyboxDisabled / unk_BF /
+etc. based on N64 layout adjacency. Confirming which specific offset
+holds envCtx.lightSettings.ambientColor requires cross-referencing the
+Cutscene_Command_SetLighting equivalent — that fn writes exactly
+`envCtx.unk_BF = cmd->setting - 1` (a u8 field), which pins the offset
+directly. Prior LR-chain RE showed pose eval on the update thread; the
+CS-lighting handler would be on the same update thread's dispatch, so
+watchpointing a candidate u8 slot at cursor pinning to catch CS write
+would identify envCtx.unk_BF's exact play-offset. Then envCtx base +
+lightSettings offset is derivable.
+
+Deferred — the arc is well-scoped; the next session's tools are the
+harness watchpoint + Ghidra decomp of the CS-lighting handler. Session
+ran out of runway; full parity target is the same but the path is
+identified.
