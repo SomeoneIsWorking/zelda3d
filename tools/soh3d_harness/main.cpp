@@ -724,23 +724,17 @@ void HandleSohBoot(std::istringstream&) {
     setenv("SOH_HEADLESS", "1", 1);
     setenv("SOH3D_HEADLESS", "1", 1);
 
-    // Force a small render resolution. Without this, libultraship reads
-    // Window.Width/Height from shipofharkinian.json — which on a HiDPI
-    // display is the full monitor pixel size (e.g. 3840x1975 -> a
-    // 9600x4938 fb 0 after internal scaling, ~190 MB / frame, enough to
-    // OOM the GPU AND overflow the 24 MB gSoh3dCaptureBuf, silently
-    // dropping every capture). 320x240 is more than the 3DS top-screen
-    // resolution and plenty for parity work.
-    //
-    // Write UNCONDITIONALLY — a stale config from a prior session
-    // (created before the harness added this fixup) has the huge HiDPI
-    // dims baked in and would defeat the whole point of the check.
+    // Match Az's 3DS top-screen native render resolution 400x240 so
+    // side-by-side captures are like-for-like (no upscale/downscale
+    // filtering in the diff). Written UNCONDITIONALLY to defeat any
+    // stale HiDPI-scaled window dims baked into a prior session's
+    // shipofharkinian.json.
     {
         std::FILE* f = std::fopen("shipofharkinian.json", "w");
         if (f) {
             std::fprintf(f,
                 "{\n"
-                "  \"Window\": { \"Width\": 320, \"Height\": 240 },\n"
+                "  \"Window\": { \"Width\": 400, \"Height\": 240 },\n"
                 "  \"CVars\": { \"gInternalResolution\": 1.0 }\n"
                 "}\n");
             std::fclose(f);
@@ -776,31 +770,6 @@ void HandleSohStep(std::istringstream& toks) {
     std::printf("ok soh_step %llu\n", static_cast<unsigned long long>(done));
 }
 
-// Live-mirror of Az's envCtx.unk_BF into SoH's — bridges the CS-driven
-// slot from the 3DS oracle into the SoH title-cs so both engines render
-// with the same spot00 slot every frame. Toggled by REPL `mirror envctx`
-// / `mirror off`. When on and both engines have populated play states,
-// the two-engine driver reads the Az byte at play+0x3135+0xA5 and pushes
-// it into SoH via SohState_SetEnvSlot. Guaranteed matching slot by
-// construction; not a production port, but closes visual parity in-
-// harness while the deeper CS-byte-stream RE lands.
-static bool g_mirror_envctx = false;
-constexpr uint32_t AZ_PLAY_STRUCT_VA_FOR_MIRROR = 0x0871E840;
-constexpr uint32_t GPLAYSTATE_VA_FOR_MIRROR     = 0x0050AF34;  // see GPLAYSTATE_VA later in file
-
-static void MirrorAzEnvCtxIntoSoh() {
-    if (!g_soh_booted || !SohState_HasPlayState()) return;
-    auto& mem = Core::System::GetInstance().Memory();
-    auto p = mem.Read32OrNullopt(GPLAYSTATE_VA_FOR_MIRROR);
-    uint32_t play_va = (p && *p != 0) ? *p : AZ_PLAY_STRUCT_VA_FOR_MIRROR;
-    const uint32_t env_base = play_va + 0x3135;
-    auto w = mem.Read32OrNullopt(env_base + 0xA4);  // covers +A4..+A7
-    if (!w) return;
-    const unsigned az_slot = ((*w) >> 8) & 0xFFu;   // +0xA5
-    if (az_slot >= 32) return;                       // skip 0xFF/0xFE sentinels
-    SohState_SetEnvSlot((unsigned char)az_slot);
-}
-
 // The two-engine driver: advance BOTH engines one frame at a time, so
 // they stay lockstep. Requires soh_boot first; without it, `step` is
 // just an alias for `run` (Azahar-only).
@@ -814,16 +783,14 @@ void HandleStep(std::istringstream& toks) {
         if (g_quit_requested.load()) break;
         { FrameWatchdog wd("HandleStep/retro_run"); retro_run(); }
         if (g_soh_booted) {
-            if (g_mirror_envctx) MirrorAzEnvCtxIntoSoh();
             RequestSohCapture();
             FrameWatchdog wd("HandleStep/RunFrame"); RunFrame();
         }
         ++done;
     }
-    std::printf("ok step %llu %s%s\n",
+    std::printf("ok step %llu %s\n",
                 static_cast<unsigned long long>(done),
-                g_soh_booted ? "azahar+soh3d" : "azahar-only",
-                g_mirror_envctx ? " mirror=envctx" : "");
+                g_soh_booted ? "azahar+soh3d" : "azahar-only");
 }
 
 extern "C" volatile int      gSoh3dFb0LastCaptureAttempt;
@@ -3634,13 +3601,6 @@ void RunRepl() {
         else if (cmd == "step")      HandleStep(toks);
         else if (cmd == "compare")   HandleCompare(toks);
         else if (cmd == "force")     HandleForce(toks);
-        else if (cmd == "mirror") {
-            std::string sub;
-            if (!(toks >> sub)) { PrintErr("mirror: usage: mirror envctx | mirror off"); continue; }
-            if (sub == "envctx") { g_mirror_envctx = true;  std::printf("ok mirror envctx (on)\n"); }
-            else if (sub == "off"){ g_mirror_envctx = false; std::printf("ok mirror off\n"); }
-            else PrintErr(("mirror: unknown sub: " + sub).c_str());
-        }
         else if (cmd == "snapshot")  HandleSnapshot(toks);
         else if (cmd == "sweep")     HandleSweep(toks);
         else if (cmd == "help")      PrintHelp();
