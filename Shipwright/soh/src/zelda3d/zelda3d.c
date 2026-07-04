@@ -2007,18 +2007,21 @@ static int Zelda3D_ApplyTitleCam(PlayState* play) {
     }
     // Title-demo lighting slot — CS_CMD_SET_LIGHTING drives envCtx.unk_BF
     // (light settings slot index) per cutscene keyframe; gSaveContext.dayTime
-    // has no effect while csCtx is running the title script. Data-driven
-    // sweep across all 17 spot00 slots at pinned cursor=650 (see
-    // scratch/lightslot_sweep.py) found slot 9 gives the closest match to
-    // Az's ground color (46,48,11) vs Az (33,51,27), |Δ|=30 — down from
-    // (16,15,7)|Δ|=71 with the CS-authored default slot. Overridable via
-    // SOH3D_TITLE_LIGHTSLOT env for further sweeps.
+    // is a no-op while the title cs runs. Data-driven full-frame sweep
+    // across all 17 spot00 slots at pinned cursor=650 (see scratch/
+    // lightslot_sweep_full.py) — SLOT 12 wins on full-frame parity:
+    //   slot 12: full mean|Δ|=21.01  (top=29.5, mid=14.3, bot=19.2)
+    //   slot  2: full mean|Δ|=30.76
+    //   slot  9: full mean|Δ|=34.90  (bot-only optimum but top-heavy loss)
+    //   slot  0: full mean|Δ|=34.37  (CS default baseline)
+    // Slot 12 balances sky/mountain/ground vs Az, vs slot 9 which
+    // over-warms the sky. Overridable via SOH3D_TITLE_LIGHTSLOT env.
     gSaveContext.dayTime = 0x0000;
     {
         const char* slotEnv = getenv("SOH3D_TITLE_LIGHTSLOT");
         int slot = (slotEnv != NULL && slotEnv[0] != '\0')
                  ? (int)strtol(slotEnv, NULL, 0)
-                 : 9;   // parity-authentic default from sweep
+                 : 12;  // parity-authentic default from full-frame sweep
         if (slot >= 0 && slot < play->envCtx.numLightSettings) {
             play->envCtx.unk_BF = (u8)slot;
             play->envCtx.unk_D8 = 1.0f;
