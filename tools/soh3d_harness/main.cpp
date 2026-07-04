@@ -237,7 +237,9 @@ extern "C" {
                          short* fogNear, short* fogFar,
                          unsigned char lightCtxAmbient[3],
                          unsigned char lightCtxFogColor[3],
-                         short* lightCtxFogNear, short* lightCtxFogFar);
+                         short* lightCtxFogNear, short* lightCtxFogFar,
+                         unsigned char* outUnkBF, unsigned char* outUnkBD,
+                         float* outUnkD8);
     int SohState_Camera(float* eyeX,  float* eyeY,  float* eyeZ,
                        float* atX,   float* atY,   float* atZ,
                        float* upX,   float* upY,   float* upZ,
@@ -1850,15 +1852,19 @@ void CompareLightingImpl() {
     unsigned char ambient[3], l1c[3], l2c[3], fog[3], lcAmb[3], lcFog[3];
     signed char l1d[3], l2d[3];
     short fogNear, fogFar, lcFogNear, lcFogFar;
+    unsigned char sohBF = 0xFF, sohBD = 0xFF;
+    float sohD8 = 0.0f;
     if (!SohState_Lighting(ambient, l1d, l1c, l2d, l2c, fog, &fogNear, &fogFar,
-                          lcAmb, lcFog, &lcFogNear, &lcFogFar)) {
+                          lcAmb, lcFog, &lcFogNear, &lcFogFar,
+                          &sohBF, &sohBD, &sohD8)) {
         std::printf("  soh: n/a (SohState_Lighting failed)\n");
         return;
     }
-    std::printf("  soh: envLightSettings\n"
-                "       ambient=(%u,%u,%u) fog=(%u,%u,%u) fogNear=%d fogFar=%d\n"
+    std::printf("  soh: slot=%u  prevSlot=%u  lerpWeight=%.3f\n"
+                "       envLightSettings ambient=(%u,%u,%u) fog=(%u,%u,%u) fogNear=%d fogFar=%d\n"
                 "       light1 dir=(%d,%d,%d) color=(%u,%u,%u)\n"
                 "       light2 dir=(%d,%d,%d) color=(%u,%u,%u)\n",
+                (unsigned)sohBF, (unsigned)sohBD, sohD8,
                 ambient[0], ambient[1], ambient[2],
                 fog[0], fog[1], fog[2], fogNear, fogFar,
                 l1d[0], l1d[1], l1d[2], l1c[0], l1c[1], l1c[2],
