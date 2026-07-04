@@ -196,6 +196,12 @@ static const char* Zelda3D_SceneName(PlayState* play);
 // positionally by sceneNum, same as kZelda3dSceneNames. Used to drive the world-geometry shade
 // from OoT3D's own env data (vs the N64 flat tint that over-brightens at night).
 #include "zelda3d_scene_lighting.inc"
+// Az OoT3D title-demo lighting timeline transcribed from live envCtx.
+// Provides Zelda3d_TitleSlotForCursor(csCtx.frames) — the slot Az uses
+// at that cursor. Applied inside Zelda3D_ApplyTitleCam to close the
+// title-cs slot divergence pinned in
+// debug_journal/2026-07-04-title-slot-divergence.md.
+#include "zelda3d_title_lighting_timeline.inc"
 // Current scene's OoT3D env palette (set each frame in Zelda3D_UpdateLight from
 // kZelda3dSceneLighting[sceneNum]); NULL = no palette -> the z_kankyo blend hook is a no-op.
 const Zelda3dLightSlot* gZelda3dScenePalette = 0;
@@ -2006,6 +2012,28 @@ static int Zelda3D_ApplyTitleCam(PlayState* play) {
         }
     }
     gSaveContext.dayTime = 0x0000;
+
+    // Title-lighting slot override. SoH's N64 title-cs picks slot=1
+    // constant; Az's OoT3D title-cs picks a scripted sequence across
+    // spot00 slots {8,7,9,8,7,6,5,4,3,2,1,0,0xFF,0xFE,0xFD}. Both
+    // engines use byte-identical spot00 palettes, so replacing SoH's
+    // slot pick with Az's per-cursor slot makes the two engines render
+    // the same lightSettings at the same cursor. Cursor = csCtx.frames.
+    // Skip when the slot lookup returns a sentinel we can't yet map
+    // (0xFF / 0xFE / 0xFD are OoT special-case values; leave the CS
+    // pick intact for those windows). Overridable with
+    // SOH3D_TITLE_NO_LIGHTING_OVERRIDE=1 to A/B against the old behavior.
+    {
+        const char* off = getenv("SOH3D_TITLE_NO_LIGHTING_OVERRIDE");
+        int enabled = !(off && off[0] == '1');
+        if (enabled) {
+            uint8_t az_slot = Zelda3d_TitleSlotForCursor(play->csCtx.frames);
+            if (az_slot < 32) {  // real palette index (skip 0xFF/0xFE/0xFD sentinels)
+                play->envCtx.unk_BF = az_slot;
+                play->envCtx.unk_D8 = 1.0f;  // commit lerp immediately
+            }
+        }
+    }
 
     // Enable sun/moon/sky draw. SoH's title-cs disables all three; Az
     // shows moon top-right.
