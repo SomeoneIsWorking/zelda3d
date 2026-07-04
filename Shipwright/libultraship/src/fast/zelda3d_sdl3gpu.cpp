@@ -226,18 +226,25 @@ const char* kFrag =
     "    }\n"
     "    if (ubo.uShadow.x > 0.5)\n"
     "        shade *= (1.0 - ubo.uShadow.z * (1.0 - shadowLit()));\n"
-    "    vec3 rgb = t.rgb * vColor.rgb * shade;\n"
+    // Character/prop path (uParams.y > 0.5) keeps the shade compound. Scene-lit path
+    // (uParams.y < 0.5, ambGroup active via uAmbient.w > 0) skips the shade compound
+    // and uses ONLY uAmbient — matches OoT3D's authentic scene-vertex-lit model,
+    // saturate(sceneAmb*matAmb + ...) * bakedColor, per debug_journal/
+    // 2026-07-04-title-parity-pinned650.md. Prior compound of both shade * uAmbient
+    // was ~5.5× too dark at cursor=650 title-demo ground (R6G7B4 vs Az R33G51B27).
+    "    bool sceneLitPath = (ubo.uParams.y < 0.5 && ubo.uAmbient.w > 0.0);\n"
+    "    vec3 rgb;\n"
+    "    if (sceneLitPath) {\n"
+    "        rgb = t.rgb * vColor.rgb;\n"                     // skip shade
+    "    } else {\n"
+    "        rgb = t.rgb * vColor.rgb * shade;\n"             // char/prop keep shade
+    "    }\n"
     // PICA200 CONSTANT-color modulation (EnHy townsfolk body color). The apply flag lives in
     // uMatConst.a; when >=0.5 the fragment gets multiplied by uMatConst.rgb (matches the
     // OoT3D combiner MODULATE(current, CONSTANT) that runs after material-anim on townsfolk).
     // Default upload leaves .a=0 so materials that don't reference CONSTANT are unchanged.
     "    if (ubo.uMatConst.a >= 0.5) rgb *= ubo.uMatConst.rgb;\n"
     "    if (ubo.uParams.y < 0.5) {\n"
-    // OoT3D scene-vertex-lit port (task #16): when uAmbient.w > 0 uAmbient.xyz carries
-    // sceneAmb*matAmbient — MULTIPLY (matches OoT3D's saturate(sceneAmb*matAmb + ...)),
-    // do NOT add. The pre-#16 code used uAmbient as an additive floor which never modulated
-    // the day-baked vertex colours, so scenes stayed day-bright at midnight vs the oracle's
-    // near-silhouette. See docs/oot3d_world_lighting_re.md.
     "        if (ubo.uAmbient.w > 0.0)\n"
     "            rgb *= ubo.uAmbient.xyz;\n"
     "        rgb = clamp(rgb, 0.0, 1.0) * ubo.uExtra.w;\n"
