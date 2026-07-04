@@ -2005,28 +2005,7 @@ static int Zelda3D_ApplyTitleCam(PlayState* play) {
             pl->actor.world.pos.z = kZelda3dTitleRiderSettledPos[2];
         }
     }
-    // Title-demo lighting slot — CS_CMD_SET_LIGHTING drives envCtx.unk_BF
-    // (light settings slot index) per cutscene keyframe; gSaveContext.dayTime
-    // is a no-op while the title cs runs. Data-driven full-frame sweep
-    // across all 17 spot00 slots at pinned cursor=650 (see scratch/
-    // lightslot_sweep_full.py) — SLOT 12 wins on full-frame parity:
-    //   slot 12: full mean|Δ|=21.01  (top=29.5, mid=14.3, bot=19.2)
-    //   slot  2: full mean|Δ|=30.76
-    //   slot  9: full mean|Δ|=34.90  (bot-only optimum but top-heavy loss)
-    //   slot  0: full mean|Δ|=34.37  (CS default baseline)
-    // Slot 12 balances sky/mountain/ground vs Az, vs slot 9 which
-    // over-warms the sky. Overridable via SOH3D_TITLE_LIGHTSLOT env.
     gSaveContext.dayTime = 0x0000;
-    {
-        const char* slotEnv = getenv("SOH3D_TITLE_LIGHTSLOT");
-        int slot = (slotEnv != NULL && slotEnv[0] != '\0')
-                 ? (int)strtol(slotEnv, NULL, 0)
-                 : 12;  // parity-authentic default from full-frame sweep
-        if (slot >= 0 && slot < play->envCtx.numLightSettings) {
-            play->envCtx.unk_BF = (u8)slot;
-            play->envCtx.unk_D8 = 1.0f;
-        }
-    }
 
     // Enable sun/moon/sky draw. SoH's title-cs disables all three; Az
     // shows moon top-right.
