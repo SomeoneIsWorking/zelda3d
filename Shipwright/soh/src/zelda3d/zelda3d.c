@@ -390,8 +390,25 @@ static s32 sZelda3dMotionFrame = 0;
 // Pin the selected actor's transform after its own update each frame, so a debug-held actor can't
 // wander/hop/flee/AI-drift. Pointer-identity match against the live actor being iterated, so a
 // killed selection simply stops matching (no dangling deref).
+// Title-demo rider state (defined with the title-cs port further down).
+static float   gZelda3dRiderPos[3];
+static int16_t gZelda3dRiderYaw;
+extern int gZelda3dInTitleDemo;
+
 void Zelda3D_ActorPostUpdate(PlayState* play, Actor* actor) {
     Zelda3D_LinkApplyPin(play, actor); // #8 linkpin (pins the player transform; defined in zelda3d_link.cpp)
+    // Title-demo rider: the ported OoT3D title-cs actor cues own the player
+    // transform (state integrated in Zelda3D_RiderStepCue). Applied HERE —
+    // after the actor's own update — so nothing downstream overwrites it.
+    if (gZelda3dInTitleDemo && actor != NULL && actor->id == ACTOR_PLAYER) {
+        actor->world.pos.x = gZelda3dRiderPos[0];
+        actor->world.pos.y = gZelda3dRiderPos[1];
+        actor->world.pos.z = gZelda3dRiderPos[2];
+        actor->shape.rot.y = gZelda3dRiderYaw;
+        actor->world.rot.y = gZelda3dRiderYaw;
+        actor->velocity.x = actor->velocity.y = actor->velocity.z = 0.0f;
+        actor->speedXZ = 0.0f;
+    }
     // Motion sampler: stream the selected actor's live state once per frame (BEFORE the freeze pin,
     // so a frozen actor logs zeroed motion correctly and a free actor logs its real trajectory).
     if (sZelda3dMotionFile != NULL && actor == sZelda3dMotionActor && sZelda3dMotionRemaining > 0) {
@@ -1890,6 +1907,53 @@ static void Zelda3D_RiderStep(void) {
                                   gZelda3dRiderSpeed);
 }
 
+// --- Cue-driven rider (title cs op-0x0a port) ------------------------------
+// The title cs carries the rider's itinerary as N64-shaped actor cues
+// (zelda3d_cutscene.cpp). Semantics verified vs Az (scratch/
+// verify_rider_cues.py): on a cue-chain discontinuity the rider TELEPORTS
+// to the new cue's p0 (shot cut), then INTEGRATES toward p1 with the RE'd
+// PathFollow dynamics (speed 8.0, yaw step 267) — Az's trajectory is not a
+// lerp (curved approach, terrain-following Y). Frame-indexed by the cs
+// cursor, so no tick-rate heuristics are needed.
+static int gZelda3dRiderCueIdx = -1;
+static void Zelda3D_RiderStepCue(PlayState* play, int frame) {
+    int cueIdx, startF, endF;
+    int16_t cueYaw;
+    float p0[3], p1[3];
+    if (!Zelda3D_TitleCsRiderCue(frame, &cueIdx, p0, p1, &startF, &endF, &cueYaw)) {
+        return; // no cue this frame — hold pose
+    }
+    if (cueIdx != gZelda3dRiderCueIdx) {
+        // Teleport only on discontinuity: consecutive cues share p1==p0
+        // (continued motion); a shot cut authors a fresh p0.
+        const float dx = p0[0] - gZelda3dRiderPos[0];
+        const float dz = p0[2] - gZelda3dRiderPos[2];
+        if (gZelda3dRiderCueIdx < 0 || dx * dx + dz * dz > 100.0f * 100.0f) {
+            gZelda3dRiderPos[0] = p0[0];
+            gZelda3dRiderPos[1] = p0[1];
+            gZelda3dRiderPos[2] = p0[2];
+            gZelda3dRiderYaw = cueYaw;
+        }
+        gZelda3dRiderCueIdx = cueIdx;
+    }
+    const int32_t wp[3] = { (int32_t)p1[0], (int32_t)p1[1], (int32_t)p1[2] };
+    Zelda3D_PathFollowUpdate(gZelda3dRiderPos, &gZelda3dRiderYaw,
+                             &gZelda3dRiderSpeed, wp);
+    Zelda3D_ActorMoveXZByYawSpeed(gZelda3dRiderPos, gZelda3dRiderYaw,
+                                  gZelda3dRiderSpeed);
+    // Y: Az's rider follows the terrain (Epona walks the ground); raycast
+    // SoH's floor at the integrated XZ. Fall back to the cue-endpoint Y.
+    {
+        Vec3f q = { gZelda3dRiderPos[0], gZelda3dRiderPos[1] + 200.0f,
+                    gZelda3dRiderPos[2] };
+        CollisionPoly* poly = NULL;
+        f32 y = BgCheck_AnyRaycastFloor1(&play->colCtx, &poly, &q);
+        if (y > BGCHECK_Y_MIN + 1.0f) {
+            gZelda3dRiderPos[1] = y;
+        }
+    }
+}
+
 static int Zelda3D_TitleCamEnabled(void) {
     static int cached = -1;
     if (cached < 0) {
@@ -2015,18 +2079,13 @@ static int Zelda3D_ApplyTitleCam(PlayState* play) {
             }
         }
     }
-    // Rider pos parity — static hardcode override at the deterministic
-    // parity-tick sample (task #11 az_run_until). The full integrator
-    // above (Zelda3D_RiderStep) is preserved for the follow-on arc that
-    // completes tick-rate RE (see comment near Zelda3D_RiderStep).
-    {
-        Player* pl = GET_PLAYER(play);
-        if (pl != NULL) {
-            pl->actor.world.pos.x = kZelda3dTitleRiderSettledPos[0];
-            pl->actor.world.pos.y = kZelda3dTitleRiderSettledPos[1];
-            pl->actor.world.pos.z = kZelda3dTitleRiderSettledPos[2];
-        }
-    }
+    // Rider — driven by the ported title-cs actor cues (op-0x0a), replacing
+    // the static settled-pos hardcode AND the /9 tick STOPGAP: the cue
+    // system is frame-indexed by the same cs cursor as the camera.
+    // (state only; the transform is APPLIED to the Player actor in
+    // Zelda3D_ActorPostUpdate — after Player's own update — so SoH's
+    // native title-cs/physics can't fight the ported cue trajectory.)
+    Zelda3D_RiderStepCue(play, Zelda3D_TitleCsFrame());
     gSaveContext.dayTime = 0x0000;
 
     // Title lighting is driven by the 3DS title cutscene byte stream ported

@@ -34,6 +34,13 @@ int Zelda3D_TitleCsCamera(int frame, float eye[3], float at[3],
 // Title cs frame cursor, advanced once per applied title frame by the
 // caller; wraps at end_frame. Exposed for the parity harness so A/B runs
 // can read/pin the SoH-side frame.
+// Active rider (player) cue for a cs frame — op-0x0a records (N64
+// CsCmdActorAction shape). p0/p1 = segment start/end world pos, yaw =
+// authored facing (binang). Returns 0 when no cue covers the frame.
+int Zelda3D_TitleCsRiderCue(int frame, int* cueIndex,
+                            float p0[3], float p1[3],
+                            int* startF, int* endF, int16_t* yawBinang);
+
 int  Zelda3D_TitleCsFrame(void);
 void Zelda3D_TitleCsSetFrame(int frame);
 int  Zelda3D_TitleCsAdvance(void);   // returns new frame
