@@ -118,6 +118,10 @@ int Zelda3D_ShouldSuppressBgImageSkybox(PlayState* play);
 // Called from the OUTDOOR time-of-day blend with the SAME slot indices + weights z_kankyo uses, so
 // no schedule logic is duplicated. No-op if the current scene has no OoT3D palette. Result feeds the
 // scene/room shade when REPL `worldshade 1` is set (vs the N64 flat tint). See docs #111.
+// Title-demo: override envCtx.lightSettings from the ported 3DS title
+// palette + time schedule (no-op outside the title demo). Called by
+// z_kankyo before the lightSettings -> lightCtx application.
+void Zelda3D_TitleLightSettingsOverride(PlayState* play);
 void Zelda3D_WorldShadeBlend(int a1, int b1, int a2, int b2, float w1, float w2);
 
 // Draw the OoT3D sky (BlueSky.zar tenkyu gradient dome) in place of the N64 normal-sky skybox.

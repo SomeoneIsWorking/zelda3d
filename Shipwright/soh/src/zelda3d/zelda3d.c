@@ -2034,6 +2034,50 @@ static void Zelda3D_TitleLightingRestore(void) {
     }
 }
 
+// Title lighting override — called from z_kankyo's Environment_Update right
+// before the lightSettings -> lightCtx application, so it wins over the N64
+// title-cs SETTINGS path while staying upstream of every consumer. Ports the
+// 3DS behavior exactly: time-based schedule (config 0) blending the 4-slot
+// title palette at the flowing cs dayTime. Fog near/far: units un-RE'd,
+// N64 values kept for now (journal 2026-07-07-title-lighting-solved.md).
+void Zelda3D_TitleLightSettingsOverride(PlayState* play) {
+    uint8_t amb[3], l1c[3], l2c[3], fogc[3];
+    int8_t l1d[3], l2d[3];
+    uint16_t t;
+    int j;
+    if (!gZelda3dInTitleDemo) {
+        return;
+    }
+    if (!Zelda3D_TitleCsTimeOfDay(Zelda3D_TitleCsFrame(), &t)) {
+        return;
+    }
+    if (!Zelda3D_TitleCsBlendedLight(t, amb, l1d, l1c, l2d, l2c, fogc)) {
+        return;
+    }
+    for (j = 0; j < 3; j++) {
+        play->envCtx.lightSettings.ambientColor[j] = amb[j];
+        play->envCtx.lightSettings.light1Color[j] = l1c[j];
+        play->envCtx.lightSettings.light2Color[j] = l2c[j];
+        play->envCtx.lightSettings.fogColor[j] = fogc[j];
+    }
+    // Sun direction: the 3DS computes it from dayTime (Env_Update trig with
+    // pool scales -120/120/20 at 0x0045e804..0c), it does NOT come from the
+    // palette dir fields. Verified against live bytes: t=0x338F ->
+    // (-114, 36, 6). light2 = negation (Env_Update writes -dir).
+    {
+        const float rad = (float)t * (3.14159265f * 2.0f / 65536.0f);
+        const float sx = -120.0f * sinf(rad);
+        const float cy = 120.0f * cosf(rad);
+        const float cz = 20.0f * cosf(rad);
+        play->envCtx.lightSettings.light1Dir[0] = (s8)(sx >= 0 ? sx + 0.5f : sx - 0.5f);
+        play->envCtx.lightSettings.light1Dir[1] = (s8)(cy >= 0 ? cy + 0.5f : cy - 0.5f);
+        play->envCtx.lightSettings.light1Dir[2] = (s8)(cz >= 0 ? cz + 0.5f : cz - 0.5f);
+        for (j = 0; j < 3; j++) {
+            play->envCtx.lightSettings.light2Dir[j] = -play->envCtx.lightSettings.light1Dir[j];
+        }
+    }
+}
+
 static int Zelda3D_ApplyTitleCam(PlayState* play) {
     if (play == NULL || !Zelda3D_TitleCamEnabled()) {
         gZelda3dInTitleDemo = 0;

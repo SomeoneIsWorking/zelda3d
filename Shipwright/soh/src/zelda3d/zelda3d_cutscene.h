@@ -53,6 +53,12 @@ int Zelda3D_TitleCsLightSlotsRaw(const uint8_t** outSlots, int* outCount);
 int Zelda3D_TitleCsLightBlend(uint16_t daytime, int* slotFrom, int* slotTo,
                               float* weight);
 
+// Title palette blended at a dayTime per the 3DS schedule (colors + dirs;
+// fog near/far units still un-RE'd — not included).
+int Zelda3D_TitleCsBlendedLight(uint16_t daytime,
+                                uint8_t amb[3], int8_t l1dir[3], uint8_t l1col[3],
+                                int8_t l2dir[3], uint8_t l2col[3], uint8_t fogCol[3]);
+
 int  Zelda3D_TitleCsFrame(void);
 void Zelda3D_TitleCsSetFrame(int frame);
 int  Zelda3D_TitleCsAdvance(void);   // returns new frame
