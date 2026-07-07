@@ -41,6 +41,13 @@ int Zelda3D_TitleCsRiderCue(int frame, int* cueIndex,
                             float p0[3], float p1[3],
                             int* startF, int* endF, int16_t* yawBinang);
 
+// Time-of-day from op-0x8c cues (latched; title = 4:01 AM). Returns 0
+// before the first cue frame.
+int Zelda3D_TitleCsTimeOfDay(int frame, uint16_t* outDayTime);
+
+// spot99's scene light settings (raw ZSI cmd-0x0F 28-byte entries).
+int Zelda3D_TitleCsLightSlotsRaw(const uint8_t** outSlots, int* outCount);
+
 int  Zelda3D_TitleCsFrame(void);
 void Zelda3D_TitleCsSetFrame(int frame);
 int  Zelda3D_TitleCsAdvance(void);   // returns new frame
