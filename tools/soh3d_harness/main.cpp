@@ -131,6 +131,11 @@ struct FrameWatchdog {
 // FinishRender inside SoH3D downloads its color-fb 0 into that buffer as
 // packed RGBA8, writing gSoh3dCaptureW/H, and clears the flag.
 extern "C" {
+// zelda3d_cutscene.cpp — title-cs frame cursor (parity A/B)
+int  Zelda3D_TitleCsFrame(void);
+void Zelda3D_TitleCsSetFrame(int frame);
+int  Zelda3D_TitleCsEndFrame(void);
+
 extern uint8_t*     gSoh3dCaptureBuf;
 extern uint32_t     gSoh3dCaptureCap;
 extern uint32_t     gSoh3dCaptureW;
@@ -3424,6 +3429,18 @@ void RunRepl() {
             std::printf("ok soh_z3dlive ambient=(%.3f,%.3f,%.3f) "
                         "light1Col=(%.3f,%.3f,%.3f) light2Col=(%.3f,%.3f,%.3f)\n",
                         amb[0], amb[1], amb[2], l1[0], l1[1], l1[2], l2[0], l2[1], l2[2]);
+        }
+        else if (cmd == "soh_titlecs") {
+            // Get/set SoH's ported title-cs frame cursor (zelda3d_cutscene.cpp).
+            // Usage: soh_titlecs [frame] — pin to Az's csCtx frame for lockstep A/B.
+            std::string f_s;
+            if (toks >> f_s) {
+                auto f = ParseNum(f_s);
+                if (!f) { PrintErr("soh_titlecs: bad frame"); continue; }
+                Zelda3D_TitleCsSetFrame(static_cast<int>(*f));
+            }
+            std::printf("ok soh_titlecs frame=%d end=%d\n",
+                        Zelda3D_TitleCsFrame(), Zelda3D_TitleCsEndFrame());
         }
         else if (cmd == "soh_letterbox") {
             std::printf("ok soh_letterbox %d\n", SohState_ShrinkWindowVal());

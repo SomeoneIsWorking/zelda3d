@@ -1,5 +1,6 @@
 // Zelda3D runtime toggle + helpers. See repo-root PROGRESS.md.
 #include "zelda3d.h"
+#include "zelda3d_cutscene.h"
 #include "zelda3d_collision.h" // C-ABI bridge for OoT3D scene collision (zelda3d_model.cpp)
 #include "zelda3d_link.h"      // Link (player) replacement policy split out of this file
 #include "zelda3d_anim_override.h" // skeletal-actor draw-override port (head/torso track, facial, DLs)
@@ -1961,15 +1962,36 @@ static int Zelda3D_ApplyTitleCam(PlayState* play) {
         sZelda3dTitleLightSaved     = 1;
     }
     gZelda3dLightEnable = 0;
-    play->view.eye.x    = kZelda3dTitleEye[0];
-    play->view.eye.y    = kZelda3dTitleEye[1];
-    play->view.eye.z    = kZelda3dTitleEye[2];
-    play->view.lookAt.x = kZelda3dTitleAt[0];
-    play->view.lookAt.y = kZelda3dTitleAt[1];
-    play->view.lookAt.z = kZelda3dTitleAt[2];
-    play->view.up.x     = kZelda3dTitleUp[0];
-    play->view.up.y     = kZelda3dTitleUp[1];
-    play->view.up.z     = kZelda3dTitleUp[2];
+    // OoT3D title cutscene camera — the real ported OP97 spline (see
+    // zelda3d_cutscene.cpp; verified 0.00 vs Az). The static kZelda3dTitle*
+    // constants remain only as a fallback when the cs can't be loaded.
+    float csEye[3], csAt[3], csUp[3], csFov = 0.0f;
+    int csLive = 0;
+    if (Zelda3D_TitleCsLoad()) {
+        int f = Zelda3D_TitleCsAdvance();
+        csLive = Zelda3D_TitleCsCamera(f, csEye, csAt, csUp, &csFov);
+        if (!csLive) {
+            // frame outside all spline segments (segment boundaries are
+            // exclusive) — hold the previous frame's camera this tick.
+            csLive = Zelda3D_TitleCsCamera(f > 0 ? f - 1 : 1, csEye, csAt, csUp, &csFov);
+        }
+    }
+    if (!csLive) {
+        csEye[0] = kZelda3dTitleEye[0]; csEye[1] = kZelda3dTitleEye[1]; csEye[2] = kZelda3dTitleEye[2];
+        csAt[0]  = kZelda3dTitleAt[0];  csAt[1]  = kZelda3dTitleAt[1];  csAt[2]  = kZelda3dTitleAt[2];
+        csUp[0]  = kZelda3dTitleUp[0];  csUp[1]  = kZelda3dTitleUp[1];  csUp[2]  = kZelda3dTitleUp[2];
+        csFov = 48.803f;
+    }
+    play->view.eye.x    = csEye[0];
+    play->view.eye.y    = csEye[1];
+    play->view.eye.z    = csEye[2];
+    play->view.lookAt.x = csAt[0];
+    play->view.lookAt.y = csAt[1];
+    play->view.lookAt.z = csAt[2];
+    play->view.up.x     = csUp[0];
+    play->view.up.y     = csUp[1];
+    play->view.up.z     = csUp[2];
+    play->view.fovy     = csFov;
     // Also propagate to the active Camera so upstream game state (which
     // SohState_Camera and any downstream cinematics read) matches. Without
     // this the render matrix uses OoT3D framing but Camera->eye stays on
@@ -1980,16 +2002,16 @@ static int Zelda3D_ApplyTitleCam(PlayState* play) {
         if (idx >= 0 && idx < NUM_CAMS) {
             Camera* c = play->cameraPtrs[idx];
             if (c != NULL) {
-                c->eye.x     = kZelda3dTitleEye[0];
-                c->eye.y     = kZelda3dTitleEye[1];
-                c->eye.z     = kZelda3dTitleEye[2];
+                c->eye.x     = csEye[0];
+                c->eye.y     = csEye[1];
+                c->eye.z     = csEye[2];
                 c->eyeNext   = c->eye;   // pin the LERP target too
-                c->at.x      = kZelda3dTitleAt[0];
-                c->at.y      = kZelda3dTitleAt[1];
-                c->at.z      = kZelda3dTitleAt[2];
-                c->up.x      = kZelda3dTitleUp[0];
-                c->up.y      = kZelda3dTitleUp[1];
-                c->up.z      = kZelda3dTitleUp[2];
+                c->at.x      = csAt[0];
+                c->at.y      = csAt[1];
+                c->at.z      = csAt[2];
+                c->up.x      = csUp[0];
+                c->up.y      = csUp[1];
+                c->up.z      = csUp[2];
             }
         }
     }
@@ -2022,15 +2044,15 @@ static int Zelda3D_ApplyTitleCam(PlayState* play) {
     play->envCtx.skybox1Index = 3;
     play->envCtx.skybox2Index = 3;
     play->envCtx.skyboxBlend  = 0;
-    // Pin FOV to the OoT3D title value (probe read at
-    // TITLE_CAM_BASIS_VA+0x34 = 48.803°; SoH's title-cs otherwise
-    // holds ~45.4°). Task #16 handedness/framing arc.
+    // FOV comes from the ported cs spline (per-segment default + type-7
+    // track; e.g. 35 deg in shot 0, 45.4 deg mid-demo). Fallback 48.803
+    // was the old single-frame probe value.
     {
         const int idx = play->activeCamera;
         if (idx >= 0 && idx < NUM_CAMS) {
             Camera* c = play->cameraPtrs[idx];
             if (c != NULL) {
-                c->fov = 48.803f;
+                c->fov = csFov;
             }
         }
     }

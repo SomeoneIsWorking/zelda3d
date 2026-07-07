@@ -1367,6 +1367,22 @@ int Zelda3D_RoomGroundDeltaAt(int modelId, float x, float z, float* outD) {
 
 #include "zelda3d_collision.h"
 
+// Generic romfs file read for C callers (e.g. zelda3d_cutscene.cpp).
+// Returns a malloc'd buffer (caller frees) or NULL.
+extern "C" uint8_t* Zelda3D_RomReadAlloc(const char* path, size_t* outSize) {
+    if (outSize) *outSize = 0;
+    if (!path || !*path) return nullptr;
+    Zelda3D::CtrRom* r = rom();
+    if (!r) return nullptr;
+    auto bytes = r->read(path);
+    if (bytes.empty()) return nullptr;
+    uint8_t* buf = (uint8_t*)malloc(bytes.size());
+    if (!buf) return nullptr;
+    memcpy(buf, bytes.data(), bytes.size());
+    if (outSize) *outSize = bytes.size();
+    return buf;
+}
+
 extern "C" int Zelda3D_LoadSceneCollisionRaw(const char* sceneName, Zelda3D_RawCollision* out) {
     if (!sceneName || !*sceneName || !out) return 0;
     memset(out, 0, sizeof(*out));
