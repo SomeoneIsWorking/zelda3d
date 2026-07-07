@@ -4,8 +4,13 @@
 // See debug_journal/2026-07-04-cs-interpreter-located.md and
 // debug_journal/2026-07-04-cs-format-is-n64-shape.md.
 //
-// Encoding: each cutscene command track = (opcode u32, sub_count u32,
-// then sub_count * 48-byte sub-records). SAME shape as N64 z_demo cs.
+// Encoding (CORRECTED 2026-07-07): the stream starts at the " BDQ"
+// header {magic, u16 ver, u16 0, s32 cmd_count, s32 end_frame}; most
+// commands are (opcode u32, sub_count u32, sub_count * 48B records —
+// the N64 CsCmdActorAction shape) but strides are OPCODE-SPECIFIC:
+// cam cmds 1/2/5/6 = 12B hdr + 16B atoms, 7/8 = 28B, 0x8c = 12B recs,
+// 0x97 = length-prefixed "ccb" camera-spline block, 1000 = 16B.
+// Full walker: tools/walk_oot3d_cs.py; port: zelda3d_cutscene.cpp.
 //
 // The 0x0B..0x50 range mirrors N64 z_demo opcodes semantically; where
 // the semantics match, the port reuses SoH's existing handlers. The
