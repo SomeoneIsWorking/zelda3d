@@ -200,6 +200,41 @@ static const char* Zelda3D_SceneName(PlayState* play);
 // Current scene's OoT3D env palette (set each frame in Zelda3D_UpdateLight from
 // kZelda3dSceneLighting[sceneNum]); NULL = no palette -> the z_kankyo blend hook is a no-op.
 const Zelda3dLightSlot* gZelda3dScenePalette = 0;
+// spot99 title palette — converted on first use from the raw ZSI cmd-0x0F
+// entries the title-cs loader keeps (zelda3d_cutscene.cpp). Same emit shape
+// as the generated kZelda3dSceneLighting rows (ALL entries incl. metadata
+// entry 0, so the +1 slot bias applies identically).
+static Zelda3dLightSlot sZelda3dTitleLightSlots[32];
+static int sZelda3dTitleLightSlotN = -1; // -1 = not converted yet
+static void Zelda3D_TitleLightSlotsConvert(void) {
+    const unsigned char* raw;
+    int n;
+    sZelda3dTitleLightSlotN = 0;
+    if (!Zelda3D_TitleCsLightSlotsRaw(&raw, &n)) {
+        return;
+    }
+    if (n > (int)ARRAY_COUNT(sZelda3dTitleLightSlots)) n = ARRAY_COUNT(sZelda3dTitleLightSlots);
+    for (int i = 0; i < n; i++) {
+        const unsigned char* e = raw + i * 28;
+        Zelda3dLightSlot* o = &sZelda3dTitleLightSlots[i];
+        for (int j = 0; j < 3; j++) {
+            o->amb[j]   = e[0x00 + j];
+            o->l0col[j] = e[0x04 + j];
+            o->l0dir[j] = (signed char)e[0x07 + j];
+            o->l1col[j] = e[0x0a + j];
+            o->l1dir[j] = (signed char)e[0x0d + j];
+        }
+    }
+    sZelda3dTitleLightSlotN = n;
+}
+static const Zelda3dLightSlot* Zelda3D_TitleLightSlots(void) {
+    if (sZelda3dTitleLightSlotN < 0) Zelda3D_TitleLightSlotsConvert();
+    return sZelda3dTitleLightSlots;
+}
+static int Zelda3D_TitleLightSlotCount(void) {
+    if (sZelda3dTitleLightSlotN < 0) Zelda3D_TitleLightSlotsConvert();
+    return sZelda3dTitleLightSlotN;
+}
 // N64 object id -> OoT3D actor ZAR path (kZelda3dObjectZars). Generated, paths only.
 #include "zelda3d_object_zars.inc"
 // Per-character N64<->OoT3D bone correspondence + scale (kZelda3dBoneMaps). Generated offline by
@@ -2086,7 +2121,16 @@ static int Zelda3D_ApplyTitleCam(PlayState* play) {
     // Zelda3D_ActorPostUpdate — after Player's own update — so SoH's
     // native title-cs/physics can't fight the ported cue trajectory.)
     Zelda3D_RiderStepCue(play, Zelda3D_TitleCsFrame());
-    gSaveContext.dayTime = 0x0000;
+    // Time of day from the ported cs op-0x8c cues (4:01 AM — NOT midnight;
+    // the old 0x0000 force was a pre-decode approximation).
+    {
+        uint16_t csTime;
+        if (Zelda3D_TitleCsTimeOfDay(Zelda3D_TitleCsFrame(), &csTime)) {
+            gSaveContext.dayTime = csTime;
+        } else {
+            gSaveContext.dayTime = 0x0000;
+        }
+    }
 
     // Title lighting is driven by the 3DS title cutscene byte stream ported
     // from the OoT3D binary — the CS handler emits SET_LIGHTING commands
@@ -4007,7 +4051,13 @@ static void Zelda3D_UpdateLight(PlayState* play) {
     // lookup by sceneNum (same order as kZelda3dSceneNames). {0,0} entry = no palette -> hook is a no-op.
     {
         s32 sn = play->sceneNum;
-        if (sn >= 0 && sn < (s32)ARRAY_COUNT(kZelda3dSceneLighting) && kZelda3dSceneLighting[sn].numSlots) {
+        if (gZelda3dInTitleDemo && Zelda3D_TitleLightSlotCount() > 0) {
+            // Title demo: the OoT3D title runs on spot99, whose light
+            // settings are NOT in kZelda3dSceneLighting (no N64 sceneNum).
+            // Use the palette parsed from spot99_info.zsi at cs load.
+            gZelda3dScenePalette = Zelda3D_TitleLightSlots();
+            gZelda3dScenePaletteN = Zelda3D_TitleLightSlotCount();
+        } else if (sn >= 0 && sn < (s32)ARRAY_COUNT(kZelda3dSceneLighting) && kZelda3dSceneLighting[sn].numSlots) {
             gZelda3dScenePalette = kZelda3dSceneLighting[sn].slots;
             gZelda3dScenePaletteN = kZelda3dSceneLighting[sn].numSlots;
         } else {

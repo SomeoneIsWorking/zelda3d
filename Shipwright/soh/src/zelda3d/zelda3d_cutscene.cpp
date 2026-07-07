@@ -84,6 +84,20 @@ struct RiderCue {
     float p0[3], p1[3];
 };
 std::vector<RiderCue> sRiderCues;
+
+// op-0x8c time-of-day cues: fires when csFrame == frame; value derived per
+// FUN_002c5ba0 case 0x8c: s16 = (int)(hours*60*45.511) + (int)((min+1)*45.511)
+// (45.511 = 0x10000/1440 = daytime units per minute; 60.0 = DAT_002c5ff4,
+// 45.511 = DAT_002c5ffc). Title: 4:01 AM at f=0 and f=301.
+struct TimeCue { int frame; uint16_t daytime; };
+std::vector<TimeCue> sTimeCues;
+
+// spot99 scene light settings (ZSI cmd 0x0F), raw 28-byte entries. Layout
+// validated in tools/gen_oot3d_scene_lighting.py: +0 amb[3], +4 l0col[3],
+// +7 l0dir s8[3], +0xA l1col[3], +0xD l1dir s8[3], +0x10 fogEnd, +0x14 drawDist.
+std::vector<uint8_t> sLightSlotsRaw;
+int sLightSlotCount = 0;
+
 int sEndFrame = 0;
 int sFrame = 0;
 int sLoadState = 0;                      // 0 not tried, 1 ok, -1 failed
@@ -159,6 +173,23 @@ bool ParseSpline(const uint8_t* d, size_t len, size_t payload, CamSpline* out) {
     return out->ok;
 }
 
+// Parse the scene's cmd-0x0F environment light settings into sLightSlotsRaw.
+void ParseLightSettings(const uint8_t* d, size_t len) {
+    size_t off = 16;
+    while (off + 8 <= len) {
+        const uint32_t cmd = U32BE(d, off);
+        const uint8_t type = (cmd >> 24) & 0xFF;
+        const uint8_t count = (cmd >> 16) & 0xFF;
+        const uint32_t ptr = U32(d, off + 4);
+        if (type == 0x0F && ptr + count * 28u <= len) {
+            sLightSlotsRaw.assign(d + ptr, d + ptr + count * 28u);
+            sLightSlotCount = count;
+        }
+        off += 8;
+        if (type == 0x14) break;
+    }
+}
+
 // Locate the " BDQ" cs inside a scene _info.zsi: scene cmd 0x18 (alt
 // headers) -> entry[0] must be inline (0x17, ptr) -> ptr + 0x10 = " BDQ".
 // (The 16 bytes at ptr are the container prefix, e.g. "OHHH…".)
@@ -195,6 +226,7 @@ extern "C" int Zelda3D_TitleCsLoad(void) {
         fprintf(stderr, "[Zelda3D] title cs: spot99_info.zsi not readable\n");
         return 0;
     }
+    ParseLightSettings(d, len);
     size_t bdq = 0;
     if (!LocateTitleCs(d, len, &bdq)) {
         fprintf(stderr, "[Zelda3D] title cs: no ' BDQ' stream in spot99_info.zsi\n");
@@ -212,6 +244,21 @@ extern "C" int Zelda3D_TitleCsLoad(void) {
         if (op == 0x97) {
             found = ParseSpline(d, len, p + 8, &sSpline);
             break;
+        }
+        if (op == 0x8c) {               // time-of-day cues (12-byte records)
+            const int32_t cnt = S32(d, p + 4);
+            for (int r = 0; r < cnt && p + 8 + (r + 1) * 12 <= len; r++) {
+                const size_t ro = p + 8 + (size_t)r * 12;
+                uint16_t f;
+                memcpy(&f, d + ro + 2, 2);
+                const float kPerMin = 45.511f;   // 0x10000/1440
+                const int hours = d[ro + 6], mins = d[ro + 7];
+                const uint16_t t = (uint16_t)((int16_t)(int)(hours * 60.0f * kPerMin) +
+                                              (int16_t)(int)((mins + 1) * kPerMin));
+                sTimeCues.push_back({ (int)f, t });
+            }
+            p += 8 + (size_t)S32(d, p + 4) * 12;
+            continue;
         }
         if (op == 0x0a) {               // player (rider) cue track
             const int32_t cnt = S32(d, p + 4);
@@ -353,4 +400,27 @@ extern "C" int Zelda3D_TitleCsRiderCue(int frame, int* cueIndex,
         }
     }
     return 0;
+}
+
+// Latched time-of-day for a cs frame (last op-0x8c cue with cueFrame <= frame).
+extern "C" int Zelda3D_TitleCsTimeOfDay(int frame, uint16_t* outDayTime) {
+    if (sLoadState <= 0) return 0;
+    int best = -1;
+    for (const auto& c : sTimeCues) {
+        if (c.frame <= frame && c.frame >= best) {
+            best = c.frame;
+            *outDayTime = c.daytime;
+        }
+    }
+    return best >= 0;
+}
+
+// spot99's raw ZSI cmd-0x0F light-settings entries (28 bytes each, entry 0 =
+// metadata like every scene; caller applies the same +1 slot bias as the
+// generated kZelda3dSceneLighting rows).
+extern "C" int Zelda3D_TitleCsLightSlotsRaw(const uint8_t** outSlots, int* outCount) {
+    if (sLoadState <= 0 || sLightSlotsRaw.empty()) return 0;
+    *outSlots = sLightSlotsRaw.data();
+    *outCount = sLightSlotCount;
+    return 1;
 }
