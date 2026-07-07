@@ -59,3 +59,24 @@ increments 1/frame; end_frame 2400 confirms the 40 s loop).
 3. Actor motion (Link/Epona) — NOT in OP97 (it's pure camera). Their driver
    is still open: check op 0x0d / op 1000 / title-demo actor code
    (TITLE_POSE tables at 0x005642D0/0x005A54D8 already RE'd).
+
+## PORTED into SoH (same session)
+
+- `Shipwright/soh/src/zelda3d/zelda3d_cutscene.{h,cpp}` — " BDQ" locate
+  (spot99_info.zsi cmd-0x18 alt-header entry[0] → cmd 0x17 → +0x10) +
+  OP97 spline parse + per-frame camera eval (literal port of FUN_0033cb90 /
+  FUN_003087a4). Frame cursor advances once per title frame, wraps at 2400.
+- `Zelda3D_ApplyTitleCam` now drives view+Camera from the spline each
+  frame (eye/at/up-from-roll/fov). Static kZelda3dTitle* constants remain
+  ONLY as fallback when the ROM/cs is unavailable.
+- Harness: new REPL `soh_titlecs [frame]` pins SoH's cursor for lockstep A/B.
+- **VERIFIED live (scratch/ab_title_cam3.py):** pin SoH frame to Az csCtx
+  frame, step, `compare camera` → eye identical to the last printed digit
+  at exactly-aligned samples, e.g. both engines eye=(3592.49,-12.35,6582.57)
+  at f=437; up matches including animated roll easing (0.069,0.962,-0.264).
+  Off-by-half-frame samples show ~3-6u offset = Az tick-slicing phase in
+  the harness (Az cs advances 0.5/step), not decode error.
+
+Remaining title-parity gaps after this: actor motion (Link/Epona driver),
+env/lighting cues (op 0x0a family), time-of-day (op 0x8c), transition
+timing (op 0x7c), and the spot99 scene geometry itself.
