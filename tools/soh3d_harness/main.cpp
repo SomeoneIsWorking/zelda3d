@@ -612,6 +612,65 @@ void HandleWrite(std::istringstream& toks, int width) {
     std::printf("ok\n");
 }
 
+// Scan a guest VA range for a byte pattern. Walks page-by-page via
+// MemorySystem::GetPointer (skipping unmapped pages), handling matches that
+// straddle two contiguously-mapped pages. Prints up to 32 hit VAs.
+// Usage: memscan <va_start> <va_end> <hexpattern>
+void HandleMemScan(std::istringstream& toks) {
+    std::string s_s, e_s, pat_s;
+    if (!(toks >> s_s >> e_s >> pat_s)) {
+        PrintErr("memscan: usage: memscan <va_start> <va_end> <hexpattern>");
+        return;
+    }
+    auto s = ParseNum(s_s);
+    auto e = ParseNum(e_s);
+    if (!s || !e || *e <= *s || (pat_s.size() % 2) || pat_s.size() < 8) {
+        PrintErr("memscan: bad args (pattern >= 4 bytes hex)");
+        return;
+    }
+    std::vector<uint8_t> pat(pat_s.size() / 2);
+    for (size_t i = 0; i < pat.size(); ++i)
+        pat[i] = static_cast<uint8_t>(std::stoul(pat_s.substr(i * 2, 2), nullptr, 16));
+    auto& mem = Core::System::GetInstance().Memory();
+    constexpr uint32_t kPage = 0x1000;
+    std::vector<uint32_t> hits;
+    std::vector<uint8_t> buf;      // rolling contiguous run
+    uint32_t run_start = 0;
+    auto flush = [&]() {
+        if (buf.size() >= pat.size()) {
+            for (size_t i = 0; i + pat.size() <= buf.size(); ++i) {
+                if (std::memcmp(buf.data() + i, pat.data(), pat.size()) == 0) {
+                    hits.push_back(run_start + static_cast<uint32_t>(i));
+                    if (hits.size() >= 32) return;
+                }
+            }
+        }
+        buf.clear();
+    };
+    for (uint64_t page = *s & ~static_cast<uint64_t>(kPage - 1);
+         page < *e && hits.size() < 32; page += kPage) {
+        auto* p = mem.GetPointer(static_cast<uint32_t>(page));
+        if (!p) { flush(); if (hits.size() >= 32) break; continue; }
+        if (buf.empty()) run_start = static_cast<uint32_t>(page);
+        buf.insert(buf.end(), p, p + kPage);
+        if (buf.size() > (1u << 22)) {  // cap run buffer at 4MB, keep overlap
+            for (size_t i = 0; i + pat.size() <= buf.size(); ++i)
+                if (std::memcmp(buf.data() + i, pat.data(), pat.size()) == 0) {
+                    hits.push_back(run_start + static_cast<uint32_t>(i));
+                    if (hits.size() >= 32) break;
+                }
+            size_t keep = pat.size() - 1;
+            run_start += static_cast<uint32_t>(buf.size() - keep);
+            std::vector<uint8_t> tail(buf.end() - keep, buf.end());
+            buf.swap(tail);
+        }
+    }
+    flush();
+    std::printf("ok memscan %zu", hits.size());
+    for (auto h : hits) std::printf(" 0x%08x", h);
+    std::printf("\n");
+}
+
 void HandleMem(std::istringstream& toks) {
     std::string va_s, n_s;
     if (!(toks >> va_s >> n_s)) { PrintErr("mem: usage: mem <va> <n>"); return; }
@@ -3350,6 +3409,7 @@ void RunRepl() {
         else if (cmd == "w16")       HandleWrite(toks, 16);
         else if (cmd == "w32")       HandleWrite(toks, 32);
         else if (cmd == "mem")       HandleMem(toks);
+        else if (cmd == "memscan")   HandleMemScan(toks);
         else if (cmd == "dumprange") HandleDumpRange(toks);
         else if (cmd == "dumpphys")  HandleDumpPhys(toks);
         else if (cmd == "input")     HandleInput(toks);
