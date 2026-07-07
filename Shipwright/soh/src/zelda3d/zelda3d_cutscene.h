@@ -48,6 +48,11 @@ int Zelda3D_TitleCsTimeOfDay(int frame, uint16_t* outDayTime);
 // spot99's scene light settings (raw ZSI cmd-0x0F 28-byte entries).
 int Zelda3D_TitleCsLightSlotsRaw(const uint8_t** outSlots, int* outCount);
 
+// 3DS time-based light schedule (config 0): daytime -> runtime slot pair
+// + blend weight (palette entry = slot + 1).
+int Zelda3D_TitleCsLightBlend(uint16_t daytime, int* slotFrom, int* slotTo,
+                              float* weight);
+
 int  Zelda3D_TitleCsFrame(void);
 void Zelda3D_TitleCsSetFrame(int frame);
 int  Zelda3D_TitleCsAdvance(void);   // returns new frame

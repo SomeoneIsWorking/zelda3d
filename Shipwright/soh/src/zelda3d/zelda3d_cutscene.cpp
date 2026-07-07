@@ -424,3 +424,36 @@ extern "C" int Zelda3D_TitleCsLightSlotsRaw(const uint8_t** outSlots, int* outCo
     *outCount = sLightSlotCount;
     return 1;
 }
+
+// OoT3D time-based light schedule, config 0 — static engine data at
+// [pool 0x0045e168] = 0x00531EFC in code.bin (rows of 9 x 6-byte spans
+// {u16 startTime, u16 endTime, u8 slotFrom, u8 slotTo}; row = env[0x21],
+// which is 0 at title). Same mechanism as N64 z_kankyo's
+// sTimeBasedLightConfigs; consumer decomp: FUN_0045dd30 @0x0045e4a8
+// (blend weight = (time - start) / (end - start)).
+namespace {
+struct LightSpan { uint16_t start, end; uint8_t from, to; };
+const LightSpan kTitleLightSchedule[9] = {
+    { 0x0000, 0x2AAC, 3, 3 }, { 0x2AAC, 0x4000, 3, 0 },
+    { 0x4000, 0x4AAB, 0, 0 }, { 0x4AAB, 0x6000, 0, 1 },
+    { 0x6000, 0xA000, 1, 1 }, { 0xA000, 0xB556, 1, 2 },
+    { 0xB556, 0xC001, 2, 2 }, { 0xC001, 0xD556, 2, 3 },
+    { 0xD556, 0xFFFF, 3, 3 },
+};
+} // namespace
+
+// Resolve the title light-schedule span for a daytime value. Slots are
+// RUNTIME slots (palette entry = slot + 1, entry 0 being metadata).
+extern "C" int Zelda3D_TitleCsLightBlend(uint16_t daytime, int* slotFrom,
+                                         int* slotTo, float* weight) {
+    for (const LightSpan& sp : kTitleLightSchedule) {
+        if (sp.start <= daytime && (daytime < sp.end || sp.end == 0xFFFF)) {
+            *slotFrom = sp.from;
+            *slotTo = sp.to;
+            const float d = (float)(sp.end - sp.start);
+            *weight = (d > 0.0f) ? (float)(daytime - sp.start) / d : 0.0f;
+            return 1;
+        }
+    }
+    return 0;
+}

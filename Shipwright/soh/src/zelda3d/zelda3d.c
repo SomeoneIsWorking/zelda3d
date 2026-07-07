@@ -425,6 +425,9 @@ static s32 sZelda3dMotionFrame = 0;
 // Pin the selected actor's transform after its own update each frame, so a debug-held actor can't
 // wander/hop/flee/AI-drift. Pointer-identity match against the live actor being iterated, so a
 // killed selection simply stops matching (no dangling deref).
+// Palette lerp helpers (defined with the #111 world-shade blend below).
+static unsigned char zelda3d_lerp8(int a, int b, float t);
+static signed char zelda3d_lerp8s(int a, int b, float t);
 // Title-demo rider state (defined with the title-cs port further down).
 static float   gZelda3dRiderPos[3];
 static int16_t gZelda3dRiderYaw;
@@ -2124,12 +2127,22 @@ static int Zelda3D_ApplyTitleCam(PlayState* play) {
     // Time of day from the ported cs op-0x8c cues (4:01 AM — NOT midnight;
     // the old 0x0000 force was a pre-decode approximation).
     {
-        uint16_t csTime;
-        if (Zelda3D_TitleCsTimeOfDay(Zelda3D_TitleCsFrame(), &csTime)) {
-            gSaveContext.dayTime = csTime;
-        } else {
-            gSaveContext.dayTime = 0x0000;
+        uint16_t csTime = 0x0000;
+        if (!Zelda3D_TitleCsTimeOfDay(Zelda3D_TitleCsFrame(), &csTime)) {
+            csTime = 0x0000;
         }
+        gSaveContext.dayTime = csTime;
+        // Lighting: OoT3D's title has NO cs SET_LIGHTING — it runs the
+        // TIME-based schedule (config 0, static table at code.bin 0x00531EFC)
+        // over spot99's palette. Schedule PORTED (Zelda3D_TitleCsLightBlend:
+        // 4:01 AM -> slots 3->0, w=0.0079). NOT yet applied to envCtx here:
+        // a post-frame write to envCtx.lightSettings is overwritten by the
+        // engine's own Environment_Update before consumers read it (verified
+        // via soh_env), and the runtime palette FIELD LAYOUT is still
+        // ambiguous (Env_Update reads colors at +0xA/+0x10/+0x16 of the
+        // 28-byte entry — conflicts with gen_oot3d_scene_lighting.py's
+        // +0/+4/+0xA map). Apply at the z_kankyo seam once the layout is
+        // pinned — see debug_journal/2026-07-07-title-lighting-schedule.md.
     }
 
     // Title lighting is driven by the 3DS title cutscene byte stream ported
