@@ -72,6 +72,18 @@ struct CamSpline {
 };
 
 CamSpline sSpline;
+
+// op-0x0a player/rider cue records — the N64 CsCmdActorAction 48-byte
+// shape: {u16 action, u16 start, u16 end, u16 rot[3], s32 p0[3], s32 p1[3],
+// f32 extra[3]}. Verified against Az: the live path_node pointers pinned in
+// docs/title_writer_chains.md point AT these records inside the loaded ZSI.
+struct RiderCue {
+    uint16_t action;
+    uint16_t start, end;
+    int16_t yaw;                        // rot[1] binang
+    float p0[3], p1[3];
+};
+std::vector<RiderCue> sRiderCues;
 int sEndFrame = 0;
 int sFrame = 0;
 int sLoadState = 0;                      // 0 not tried, 1 ok, -1 failed
@@ -201,6 +213,24 @@ extern "C" int Zelda3D_TitleCsLoad(void) {
             found = ParseSpline(d, len, p + 8, &sSpline);
             break;
         }
+        if (op == 0x0a) {               // player (rider) cue track
+            const int32_t cnt = S32(d, p + 4);
+            for (int r = 0; r < cnt && p + 8 + (r + 1) * 48 <= len; r++) {
+                const size_t ro = p + 8 + (size_t)r * 48;
+                RiderCue cue;
+                memcpy(&cue.action, d + ro, 2);
+                memcpy(&cue.start, d + ro + 2, 2);
+                memcpy(&cue.end, d + ro + 4, 2);
+                cue.yaw = S16(d, ro + 8);
+                for (int j = 0; j < 3; j++) {
+                    cue.p0[j] = (float)S32(d, ro + 12 + j * 4);
+                    cue.p1[j] = (float)S32(d, ro + 24 + j * 4);
+                }
+                sRiderCues.push_back(cue);
+            }
+            p += 8 + (cnt > 0 ? (size_t)cnt * 48 : 0);
+            continue;
+        }
         // stride rules from FUN_002c5ba0 (subset needed for spot99's stream;
         // full table in tools/walk_oot3d_cs.py)
         if (op == 1 || op == 2 || op == 5 || op == 6) {
@@ -221,6 +251,7 @@ extern "C" int Zelda3D_TitleCsLoad(void) {
         }
     }
     free(d);
+    fprintf(stderr, "[Zelda3D] title cs: %zu rider cues\n", sRiderCues.size());
     if (!found) {
         fprintf(stderr, "[Zelda3D] title cs: OP97 spline block not found\n");
         return 0;
@@ -299,4 +330,27 @@ extern "C" int Zelda3D_TitleCsAdvance(void) {
     sFrame++;
     if (sEndFrame > 0 && sFrame >= sEndFrame) sFrame = 0;
     return sFrame;
+}
+
+// Active rider cue for a cs frame (start <= f < end). Returns 1 and fills
+// outputs; 0 when no cue covers the frame. cueIndex identifies the cue so
+// callers can detect cue changes / teleport discontinuities.
+extern "C" int Zelda3D_TitleCsRiderCue(int frame, int* cueIndex,
+                                       float p0[3], float p1[3],
+                                       int* startF, int* endF,
+                                       int16_t* yawBinang) {
+    if (sLoadState <= 0) return 0;
+    for (size_t i = 0; i < sRiderCues.size(); i++) {
+        const RiderCue& c = sRiderCues[i];
+        if (c.start <= frame && frame < c.end) {
+            *cueIndex = (int)i;
+            memcpy(p0, c.p0, sizeof(c.p0));
+            memcpy(p1, c.p1, sizeof(c.p1));
+            *startF = c.start;
+            *endF = c.end;
+            *yawBinang = c.yaw;
+            return 1;
+        }
+    }
+    return 0;
 }
