@@ -92,11 +92,27 @@ std::vector<RiderCue> sRiderCues;
 struct TimeCue { int frame; uint16_t daytime; };
 std::vector<TimeCue> sTimeCues;
 
-// spot99 scene light settings (ZSI cmd 0x0F), raw 28-byte entries. Layout
-// validated in tools/gen_oot3d_scene_lighting.py: +0 amb[3], +4 l0col[3],
-// +7 l0dir s8[3], +0xA l1col[3], +0xD l1dir s8[3], +0x10 fogEnd, +0x14 drawDist.
+// spot99 scene light settings (ZSI cmd 0x0F), raw 28-byte entries — kept
+// for reference/actors; NOT what the title blends (see sTitlePal below).
 std::vector<uint8_t> sLightSlotsRaw;
 int sLightSlotCount = 0;
+
+// THE title palette: 4 x 28-byte entries immediately BEFORE the " BDQ" cs
+// (zsi+0x34B8; the live runtime ptr [play+0x3230] points here — verified,
+// and blended output value-matched over 5 dayTime samples). Runtime layout
+// (pinned by regression, debug_journal/2026-07-07-title-lighting-solved.md):
+//   +0x00 f32 fogEnd   +0x04 f32 drawDist   +0x08 u16 fogNear-ish
+//   +0x0A u8 ambient[3]   +0x0D s8 light1Dir[3]  +0x10 u8 light1Color[3]
+//   +0x13 s8 light2Dir[3] +0x16 u8 light2Color[3] +0x19 u8 fogColor[3]
+// Schedule slots 0..3 index this table DIRECTLY (no metadata bias).
+struct TitleLightEntry {
+    float fogEnd, drawDist;
+    uint16_t fogNear;
+    uint8_t amb[3]; int8_t l1dir[3]; uint8_t l1col[3];
+    int8_t l2dir[3]; uint8_t l2col[3]; uint8_t fogCol[3];
+};
+TitleLightEntry sTitlePal[4];
+bool sTitlePalOk = false;
 
 int sEndFrame = 0;
 int sFrame = 0;
@@ -234,6 +250,25 @@ extern "C" int Zelda3D_TitleCsLoad(void) {
         return 0;
     }
     sEndFrame = S32(d, bdq + 0xC);
+    // Title palette: the 4 x 28B entries directly before the " BDQ".
+    if (bdq >= 4 * 28) {
+        for (int i = 0; i < 4; i++) {
+            const uint8_t* e = d + bdq - 4 * 28 + i * 28;
+            TitleLightEntry* o = &sTitlePal[i];
+            memcpy(&o->fogEnd, e, 4);
+            memcpy(&o->drawDist, e + 4, 4);
+            memcpy(&o->fogNear, e + 8, 2);
+            for (int j = 0; j < 3; j++) {
+                o->amb[j] = e[0x0A + j];
+                o->l1dir[j] = (int8_t)e[0x0D + j];
+                o->l1col[j] = e[0x10 + j];
+                o->l2dir[j] = (int8_t)e[0x13 + j];
+                o->l2col[j] = e[0x16 + j];
+                o->fogCol[j] = e[0x19 + j];
+            }
+        }
+        sTitlePalOk = true;
+    }
     // walk the command stream for OP97 (the camera spline block)
     const int32_t cmdCount = S32(d, bdq + 8);
     size_t p = bdq + 0x10;
@@ -402,17 +437,23 @@ extern "C" int Zelda3D_TitleCsRiderCue(int frame, int* cueIndex,
     return 0;
 }
 
-// Latched time-of-day for a cs frame (last op-0x8c cue with cueFrame <= frame).
+// Time-of-day for a cs frame: the last op-0x8c cue sets the anchor, then
+// time FLOWS at 6 dayTime units per cs frame (measured live: d(t)/d(f) =
+// 6.000 across the whole demo; scratch/time_slope.py). The title's dawn
+// progression (4:01 AM -> ~9 AM over the 2400-frame loop) comes from this.
 extern "C" int Zelda3D_TitleCsTimeOfDay(int frame, uint16_t* outDayTime) {
     if (sLoadState <= 0) return 0;
-    int best = -1;
+    int bestF = -1;
+    uint16_t bestT = 0;
     for (const auto& c : sTimeCues) {
-        if (c.frame <= frame && c.frame >= best) {
-            best = c.frame;
-            *outDayTime = c.daytime;
+        if (c.frame <= frame && c.frame >= bestF) {
+            bestF = c.frame;
+            bestT = c.daytime;
         }
     }
-    return best >= 0;
+    if (bestF < 0) return 0;
+    *outDayTime = (uint16_t)(bestT + 6 * (frame - bestF));
+    return 1;
 }
 
 // spot99's raw ZSI cmd-0x0F light-settings entries (28 bytes each, entry 0 =
@@ -456,4 +497,29 @@ extern "C" int Zelda3D_TitleCsLightBlend(uint16_t daytime, int* slotFrom,
         }
     }
     return 0;
+}
+
+// Blend the title palette per the 3DS schedule at a dayTime. Fills the
+// EnvLightSettings-shaped fields the z_kankyo override consumes. Slots
+// index sTitlePal directly. Returns 0 when the palette isn't loaded.
+extern "C" int Zelda3D_TitleCsBlendedLight(uint16_t daytime,
+                                           uint8_t amb[3], int8_t l1dir[3], uint8_t l1col[3],
+                                           int8_t l2dir[3], uint8_t l2col[3], uint8_t fogCol[3]) {
+    if (!sTitlePalOk) return 0;
+    int sf, st;
+    float w;
+    if (!Zelda3D_TitleCsLightBlend(daytime, &sf, &st, &w)) return 0;
+    const TitleLightEntry& a = sTitlePal[sf & 3];
+    const TitleLightEntry& b = sTitlePal[st & 3];
+    for (int j = 0; j < 3; j++) {
+        amb[j]    = (uint8_t)(a.amb[j]    + (b.amb[j]    - a.amb[j])    * w + 0.5f);
+        l1col[j]  = (uint8_t)(a.l1col[j]  + (b.l1col[j]  - a.l1col[j])  * w + 0.5f);
+        l2col[j]  = (uint8_t)(a.l2col[j]  + (b.l2col[j]  - a.l2col[j])  * w + 0.5f);
+        fogCol[j] = (uint8_t)(a.fogCol[j] + (b.fogCol[j] - a.fogCol[j]) * w + 0.5f);
+        float d1 = a.l1dir[j] + (b.l1dir[j] - a.l1dir[j]) * w;
+        float d2 = a.l2dir[j] + (b.l2dir[j] - a.l2dir[j]) * w;
+        l1dir[j] = (int8_t)(d1 >= 0 ? d1 + 0.5f : d1 - 0.5f);
+        l2dir[j] = (int8_t)(d2 >= 0 ? d2 + 0.5f : d2 - 0.5f);
+    }
+    return 1;
 }
