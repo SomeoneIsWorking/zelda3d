@@ -1149,6 +1149,11 @@ void Environment_Update(PlayState* play, EnvironmentContext* envCtx, LightContex
 
         envCtx->blendIndoorLights = true;
 
+        // SoH3D: title-demo lighting comes from the ported OoT3D title
+        // palette + time schedule (overrides whatever the N64 title cs
+        // set above). No-op outside the title demo.
+        Zelda3D_TitleLightSettingsOverride(play);
+
         // Apply lighting adjustments
         for (i = 0; i < 3; i++) {
             if ((s16)(envCtx->lightSettings.ambientColor[i] + envCtx->adjAmbientColor[i]) > 255) {
