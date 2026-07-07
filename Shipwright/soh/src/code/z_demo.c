@@ -58,6 +58,43 @@ CutsceneStateHandler sCsStateHandlers2[] = {
 
 u8 sTitleCsState = 0;
 
+// OoT3D title-demo parity (zelda3d.c). While the 3DS title cutscene is
+// active it owns the destination timing: its 0x3E8 command (dest id 104,
+// fires at cs end frame 2400 in the spot99 ' BDQ' script) triggers
+// Cutscene_TitleDestination below — the N64 script's earlier terminator
+// is gated off meanwhile.
+extern int gZelda3dInTitleDemo;
+
+// Destination id 104: the title-screen attract cycle (spirit temple ->
+// death mountain crater -> cutscene map, then back). Shared between the
+// N64 script's terminator command and the OoT3D title script's
+// destination command.
+void Cutscene_TitleDestination(PlayState* play) {
+    switch (sTitleCsState) {
+        case 0:
+            play->nextEntranceIndex = ENTR_SPIRIT_TEMPLE_BOSS_ENTRANCE;
+            play->transitionTrigger = TRANS_TRIGGER_START;
+            gSaveContext.cutsceneIndex = 0xFFF2;
+            play->transitionType = TRANS_TYPE_FADE_BLACK;
+            sTitleCsState++;
+            break;
+        case 1:
+            play->nextEntranceIndex = ENTR_DEATH_MOUNTAIN_CRATER_UPPER_EXIT;
+            play->transitionTrigger = TRANS_TRIGGER_START;
+            gSaveContext.cutsceneIndex = 0xFFF1;
+            play->transitionType = TRANS_TYPE_FADE_BLACK;
+            sTitleCsState++;
+            break;
+        case 2:
+            play->nextEntranceIndex = ENTR_CUTSCENE_MAP_0;
+            play->transitionTrigger = TRANS_TRIGGER_START;
+            gSaveContext.cutsceneIndex = 0xFFF6;
+            play->transitionType = TRANS_TYPE_FADE_BLACK;
+            sTitleCsState = 0;
+            break;
+    }
+}
+
 EntranceCutscene sEntranceCutsceneTable[] = {
     { ENTR_HYRULE_FIELD_WOODED_EXIT, 2, 0xA0, gHyruleFieldIntroCs },
     { ENTR_DEATH_MOUNTAIN_TRAIL_BOTTOM_EXIT, 2, 0xA1, gDMTIntroCs },
@@ -1199,28 +1236,11 @@ void Cutscene_Command_Terminator(PlayState* play, CutsceneContext* csCtx, CsCmdB
                 play->transitionType = TRANS_TYPE_FADE_BLACK;
                 break;
             case 104:
-                switch (sTitleCsState) {
-                    case 0:
-                        play->nextEntranceIndex = ENTR_SPIRIT_TEMPLE_BOSS_ENTRANCE;
-                        play->transitionTrigger = TRANS_TRIGGER_START;
-                        gSaveContext.cutsceneIndex = 0xFFF2;
-                        play->transitionType = TRANS_TYPE_FADE_BLACK;
-                        sTitleCsState++;
-                        break;
-                    case 1:
-                        play->nextEntranceIndex = ENTR_DEATH_MOUNTAIN_CRATER_UPPER_EXIT;
-                        play->transitionTrigger = TRANS_TRIGGER_START;
-                        gSaveContext.cutsceneIndex = 0xFFF1;
-                        play->transitionType = TRANS_TYPE_FADE_BLACK;
-                        sTitleCsState++;
-                        break;
-                    case 2:
-                        play->nextEntranceIndex = ENTR_CUTSCENE_MAP_0;
-                        play->transitionTrigger = TRANS_TRIGGER_START;
-                        gSaveContext.cutsceneIndex = 0xFFF6;
-                        play->transitionType = TRANS_TYPE_FADE_BLACK;
-                        sTitleCsState = 0;
-                        break;
+                // The 3DS title script fires this at ITS end frame (2400)
+                // via Cutscene_TitleDestination from zelda3d.c — the N64
+                // script's earlier terminator must not double-fire.
+                if (!gZelda3dInTitleDemo) {
+                    Cutscene_TitleDestination(play);
                 }
                 break;
             case 105:

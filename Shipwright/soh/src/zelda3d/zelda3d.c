@@ -1,6 +1,11 @@
 // Zelda3D runtime toggle + helpers. See repo-root PROGRESS.md.
 #include "zelda3d.h"
 #include "zelda3d_cutscene.h"
+
+// z_demo.c — destination id 104 (title attract cycle); the 3DS title script
+// fires it at its own end frame (see Zelda3D_ApplyTitleCam).
+struct PlayState;
+void Cutscene_TitleDestination(struct PlayState* play);
 #include "zelda3d_collision.h" // C-ABI bridge for OoT3D scene collision (zelda3d_model.cpp)
 #include "zelda3d_link.h"      // Link (player) replacement policy split out of this file
 #include "zelda3d_anim_override.h" // skeletal-actor draw-override port (head/torso track, facial, DLs)
@@ -2115,6 +2120,14 @@ static int Zelda3D_ApplyTitleCam(PlayState* play) {
     int csLive = 0;
     if (Zelda3D_TitleCsLoad()) {
         int f = Zelda3D_TitleCsAdvance();
+        // 3DS script end (frame wrapped past end_frame 2400): fire the
+        // script's destination command (0x3E8, id 104) — the attract-cycle
+        // transition — instead of silently looping the flyover in place.
+        // The N64 script's own (earlier) terminator is gated off in
+        // z_demo.c while gZelda3dInTitleDemo holds.
+        if (f == 0 && play->transitionTrigger == TRANS_TRIGGER_OFF) {
+            Cutscene_TitleDestination(play);
+        }
         csLive = Zelda3D_TitleCsCamera(f, csEye, csAt, csUp, &csFov);
         if (!csLive) {
             // frame outside all spline segments (segment boundaries are
