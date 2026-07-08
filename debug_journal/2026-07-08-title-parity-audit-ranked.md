@@ -1,3 +1,10 @@
+> **SUPERSEDED 2026-07-08 (see 2026-07-08-title-divergence-remeasure.md):** the pairs used here
+> (az360↔soh360, az396↔soh413) were NOT actually content-matched — tools/title_ab.py proved the
+> true match is az360↔soh449 (~89 frames off). The magnitudes below are inflated/mis-framed by the
+> mismatch. Re-measured verdicts at matched frames: terrain darkness REAL but ~2x (not 3x); stars
+> REAL but it's per-star BRIGHTNESS (SoH max ~70 vs Az >140), not count; sky collapse REAL +
+> sky-unfreeze confirmed warranted. Trust the remeasure doc, not the numbers here.
+
 # 2026-07-08 — Title-screen parity audit: ranked REAL divergences (content-matched)
 
 Content-matched A/B (both engines free-run from `scratch/title_settled.state` via plain `step N`,
