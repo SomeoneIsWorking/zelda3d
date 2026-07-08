@@ -3973,27 +3973,49 @@ int Zelda3D_TryDrawSunMoon(PlayState* play) {
             gSPZelda3DDraw(POLY_OPA_DISP++, sunId | (1 << 30), 255, 255, 255);
         }
 
-        // Moon: alpha-masked disc at eye - sunPos. scale = -15 * color + 25, color = max(-y/120, 0);
-        // alpha fades the moon in at night = clamp(min(-y/80, 1) * 255). Drawn only when alpha > 0.
+        // Moon: 3-layer disc+halo composite at eye - sunPos. `alpha` (the N64
+        // night fade-in, clamp(min(-y/80,1)*255)) is used ONLY as the night
+        // VISIBILITY gate here — see kMoonDrawAlpha below for why it must NOT
+        // modulate the draw. color/scale kept for the N64-derived base scale.
         color = -y / 120.0f;
         if (color < 0.0f) color = 0.0f;
         scale = (-15.0f * color) + 25.0f;
         temp = -y / 80.0f;
         if (temp > 1.0f) temp = 1.0f;
         alpha = temp * 255.0f;
+        // #146: two ground-truth calibrations against Azahar (OoT3D) at the title.
+        //
+        // (1) DISC SIZE. The disc reuses the N64 sprite's VTX -31..32 quad * scale,
+        //     but OoT3D's moon subtends a SMALLER angular size than the N64 moon.
+        //     Circle-fit on Az (4 title frames): disc diameter ~55px = ~25% of the
+        //     240px top screen. SoH's N64-scale disc renders ~125px. kMoonDiscScale
+        //     rescales it to Az's angular size (measured 0.44 -> 53px vs Az 55px).
+        //
+        // (2) DISC/HALO OPACITY. The draw-log RE (docs/title_moon_composition.md)
+        //     shows OoT3D draws all three moon quads with vertex colour (0,0,0,0):
+        //     the moon is TEXTURE-ONLY, drawn fully opaque, NOT modulated by a
+        //     time-of-day alpha. The N64 `alpha` night-fade (=191 at the title) was
+        //     an unfaithful port that made the disc ~0.75 transparent -> washed,
+        //     dim (peak lum 177 vs Az 232) and let the additive halos dominate.
+        //     Drawing at kMoonDrawAlpha=220 reproduces Az's measured disc peak
+        //     (~232) and footprint; the night gate above still hides the moon by
+        //     day. (Full 255 clips SoH's brighter-decoded texture to white and
+        //     loses the lunar-surface detail Az retains at 232.)
+        const f32 kMoonDiscScale = 0.44f;
+        const u8  kMoonDrawAlpha = 220;
         if (alpha > 0.0f && moonId >= 0) {
-            if (alpha > 255.0f) alpha = 255.0f;
             // Faithful port of OoT3D's 3-layer moon composition
             // (RE'd via draw-log; see Zelda3D_MoonInnerHaloId comment).
             const f32 moonWorldX = play->view.eye.x - play->envCtx.sunPos.x;
             const f32 moonWorldY = play->view.eye.y - play->envCtx.sunPos.y;
             const f32 moonWorldZ = play->view.eye.z - play->envCtx.sunPos.z;
-            const u8  aA         = (u8)alpha;
+            const u8  aA         = kMoonDrawAlpha;
+            const f32 discScale  = scale * kMoonDiscScale;
 
             // Layer 1: fine_moon1 (inner glow) — ADDITIVE, ~1.65× disc.
             int m1 = Zelda3D_MoonInnerHaloId();
             if (m1 >= 0) {
-                f32 s1 = scale * 1.65f;
+                f32 s1 = discScale * 1.65f;
                 Matrix_Translate(moonWorldX, moonWorldY, moonWorldZ, MTXMODE_NEW);
                 Matrix_Mult(&play->billboardMtxF, MTXMODE_APPLY);
                 Matrix_Scale(s1, s1, s1, MTXMODE_APPLY);
@@ -4005,7 +4027,7 @@ int Zelda3D_TryDrawSunMoon(PlayState* play) {
             // Layer 2: fine_moon0 (crescent disc) — ALPHA-blend, base scale.
             Matrix_Translate(moonWorldX, moonWorldY, moonWorldZ, MTXMODE_NEW);
             Matrix_Mult(&play->billboardMtxF, MTXMODE_APPLY);
-            Matrix_Scale(scale, scale, scale, MTXMODE_APPLY);
+            Matrix_Scale(discScale, discScale, discScale, MTXMODE_APPLY);
             gSPMatrix(POLY_OPA_DISP++, MATRIX_NEWMTX(play->state.gfxCtx),
                       G_MTX_MODELVIEW | G_MTX_LOAD);
             gSPZelda3DDrawA(POLY_OPA_DISP++, moonId | (1 << 30), aA, 255, 255, 255);
@@ -4013,7 +4035,7 @@ int Zelda3D_TryDrawSunMoon(PlayState* play) {
             // Layer 3: fine_moon2 (outer glow) — ADDITIVE, ~1.85× disc.
             int m2 = Zelda3D_MoonOuterHaloId();
             if (m2 >= 0) {
-                f32 s2 = scale * 1.85f;
+                f32 s2 = discScale * 1.85f;
                 Matrix_Translate(moonWorldX, moonWorldY, moonWorldZ, MTXMODE_NEW);
                 Matrix_Mult(&play->billboardMtxF, MTXMODE_APPLY);
                 Matrix_Scale(s2, s2, s2, MTXMODE_APPLY);
