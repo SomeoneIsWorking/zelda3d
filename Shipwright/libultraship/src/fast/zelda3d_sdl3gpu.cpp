@@ -1328,7 +1328,7 @@ extern "C" void Zelda3D_Sg_DrawModel(int modelId, const float* mp16, const float
                                    unsigned char r8, unsigned char g8, unsigned char b8, unsigned char a8,
                                    float aspectAdj, const float* boneData, int boneCnt, unsigned long long midMask,
                                    int sky, float uvOffU, float uvOffV, const void* matTex,
-                                   const void* matConst) {
+                                   const void* matConst, int forceUnlit) {
     // Zelda3D #140 render-side probe: log every DrawModel for the sun-billboard model id (2002 in
     // typical runs). Non-sky submits are the Navi emit (sun/moon are sky=1). Serves as the runtime
     // observable for tools/navi_close_test.py and to isolate whether an emit reaches the renderer,
@@ -1349,7 +1349,7 @@ extern "C" void Zelda3D_Sg_DrawModel(int modelId, const float* mp16, const float
     }
     if (auto* r = sgRenderer())
         r->DrawModel(modelId, mp16, mv16, lit, invertY, r8, g8, b8, a8, aspectAdj, boneData, boneCnt, midMask, sky,
-                     uvOffU, uvOffV, matTex, matConst);
+                     uvOffU, uvOffV, matTex, matConst, forceUnlit);
 }
 extern "C" void Zelda3D_Sg_EndPass(void) {
     if (auto* r = sgRenderer())
@@ -1436,7 +1436,7 @@ void Fast::Zelda3DRenderer::DrawModel(int modelId, const float* mp16, const floa
                                     unsigned char r8, unsigned char g8, unsigned char b8, unsigned char a8,
                                     float aspectAdj, const float* boneData, int boneCnt, unsigned long long midMask,
                                     int sky, float uvOffU, float uvOffV, const void* matTex,
-                                    const void* matConst) {
+                                    const void* matConst, int forceUnlit) {
     const std::unordered_map<int, int>* matTexMap = static_cast<const std::unordered_map<int, int>*>(matTex);
     const std::unordered_map<int, Zelda3DMatConstOv>* matConstMap =
         static_cast<const std::unordered_map<int, Zelda3DMatConstOv>*>(matConst);
@@ -1623,7 +1623,9 @@ void Fast::Zelda3DRenderer::DrawModel(int modelId, const float* mp16, const floa
         // blue-heavy), not a shader defect. The Az-matching fix is to use OoT3D's
         // actual title-demo lightSettings values, not to change the shader math. See
         // debug_journal/2026-07-04-title-parity-pinned650.md.
-        bool ambGroup = (grp.vertexLighting && gZelda3dWorldLit);
+        // forceUnlit (title logo / self-illuminated overlays, ZELDA3D_HANDLE_FORCE_UNLIT): ignore
+        // this material's own vertex_lighting flag so the scene ambient never darkens the draw.
+        bool ambGroup = (grp.vertexLighting && gZelda3dWorldLit && !forceUnlit);
         ubo.uAmbient[0] = gZelda3dAmbient[0] * grp.matAmbient[0];
         ubo.uAmbient[1] = gZelda3dAmbient[1] * grp.matAmbient[1];
         ubo.uAmbient[2] = gZelda3dAmbient[2] * grp.matAmbient[2];
@@ -1715,7 +1717,9 @@ void Fast::Zelda3DRenderer::DrawModel(int modelId, const float* mp16, const floa
             uu.common.uFogColor[0] = base.uFog[0]; uu.common.uFogColor[1] = base.uFog[1]; uu.common.uFogColor[2] = base.uFog[2];
             uu.common.uFogColor[3] = 0.0f;
             uu.common.uParams0[0] = grp.alphaTest ? grp.alphaRef : 0.0f;
-            int lightingMode = (grp.vertexLighting && gZelda3dWorldLit) ? 2 : ((lit && gZelda3dLightEnable != 0) ? 1 : 0);
+            int lightingMode = (grp.vertexLighting && gZelda3dWorldLit && !forceUnlit)
+                                    ? 2
+                                    : ((lit && gZelda3dLightEnable != 0 && !forceUnlit) ? 1 : 0);
             uu.common.uParams0[1] = (float)lightingMode;
             uu.common.uParams0[2] = 1.0f; // cycleCount — CMB never needs the N64 2-cycle shape
             uu.common.uParams0[3] = 0.0f; // frame_count — CMB draws don't use SHADER_NOISE

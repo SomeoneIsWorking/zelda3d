@@ -116,7 +116,7 @@ class Zelda3DRenderer {
     void DrawModel(int modelId, const float* mp16, const float* mv16, int lit, int invertY, unsigned char r8,
                    unsigned char g8, unsigned char b8, unsigned char a8, float aspectAdj, const float* boneData,
                    int boneCnt, unsigned long long midMask, int sky, float uvOffU, float uvOffV,
-                   const void* matTex, const void* matConst);
+                   const void* matTex, const void* matConst, int forceUnlit);
     void EndPass();
     int BeginShadowPass();
     void ShadowCasterDraw(int modelId, const float* mp16, const float* mv16, const float* boneData, int boneCnt,

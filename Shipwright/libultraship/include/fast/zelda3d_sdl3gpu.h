@@ -36,7 +36,7 @@ void Zelda3D_Sg_BeginPass(void);
 void Zelda3D_Sg_DrawModel(int modelId, const float* mp16, const float* mv16, int lit, int invertY,
                         unsigned char r, unsigned char g, unsigned char b, unsigned char a, float aspectAdj,
                         const float* boneData, int boneCnt, unsigned long long midMask, int sky,
-                        float uvOffU, float uvOffV, const void* matTex, const void* matConst);
+                        float uvOffU, float uvOffV, const void* matTex, const void* matConst, int forceUnlit);
 void Zelda3D_Sg_EndPass(void);
 
 // Mirror of Zelda3D_GL_RequestEvictRange for the SDL3 GPU model store.

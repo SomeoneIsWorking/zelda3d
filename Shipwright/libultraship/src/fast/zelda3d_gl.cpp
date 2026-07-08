@@ -498,6 +498,7 @@ struct DrawItem {
     float mv[16]; // modelview (for the view-space normal lighting term)
     int lit;      // 1 = apply the half-Lambert form term (characters/props); 0 = scene geometry
     int sky;      // 1 = skybox dome (force far-plane depth, no shadow cast, no AO occlusion)
+    int forceUnlit = 0; // 1 = ignore this model's own vertex_lighting material flag (title logo)
     int invertY;
     unsigned char r, g, b;
     unsigned char a = 255; // per-draw opacity (255 = opaque); <255 cross-fades (e.g. dawn/dusk dome)
@@ -539,13 +540,14 @@ extern "C" void Zelda3D_GL_Draw(int modelId, const float* mp16, int invertY, uns
 
 extern "C" void Zelda3D_GL_Submit(int modelId, const float* mp16, const float* mv16, int lit, int invertY,
                                 unsigned char r, unsigned char g, unsigned char b, unsigned char a, float aspectAdj,
-                                int sky, float uvOffU, float uvOffV) {
+                                int sky, float uvOffU, float uvOffV, int forceUnlit) {
     DrawItem it;
     it.modelId = modelId;
     memcpy(it.mp, mp16, sizeof(it.mp));
     memcpy(it.mv, mv16 ? mv16 : mp16, sizeof(it.mv));
     it.lit = lit;
     it.sky = sky;
+    it.forceUnlit = forceUnlit;
     it.invertY = invertY;
     it.r = r;
     it.g = g;
@@ -597,7 +599,8 @@ extern "C" void Zelda3D_GL_Submit(int modelId, const float* mp16, const float* m
             pose = lerped.data();
         }
         Zelda3D_Sg_DrawModel(it.modelId, it.mp, it.mv, it.lit, it.invertY, it.r, it.g, it.b, it.a, it.aspectAdj, pose,
-                           it.boneCount, it.midMask, it.sky, it.uvOffU, it.uvOffV, &it.matTex, &it.matConst);
+                           it.boneCount, it.midMask, it.sky, it.uvOffU, it.uvOffV, &it.matTex, &it.matConst,
+                           it.forceUnlit);
     }
 #else
     (void)it; // no SDL3 GPU backend: Zelda3D rendering has no other path

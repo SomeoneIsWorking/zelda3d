@@ -2776,9 +2776,19 @@ typedef union Gfx {
 // alpha in w1[32:40] (255 = opaque), and a per-draw texcoord SCROLL offset in w0[32:48]=U,
 // w0[48:64]=V (16-bit fixed: value/65536 = fractional UV, 0 = none). The alpha rides the upper 32
 // bits of the 64-bit w1 and the UV offset the upper 32 bits of w0, so neither disturbs the 32-bit
-// handle (model id + lit bit31 + sky bit30) nor the 24-bit tint the interpreter already decodes.
-// (64-bit native port: uintptr_t is 64-bit; the alpha/UV bytes are only meaningful there.) The UV
-// offset animates the OoT3D sky cloud band (kumo) per its BlueSky.zar .cmab scroll rate — #28b.
+// handle (model id + lit bit31 + sky bit30 + force-unlit bit29) nor the 24-bit tint the interpreter
+// already decodes. (64-bit native port: uintptr_t is 64-bit; the alpha/UV bytes are only meaningful
+// there.) The UV offset animates the OoT3D sky cloud band (kumo) per its BlueSky.zar .cmab scroll
+// rate — #28b.
+//
+// Bit 29 (ZELDA3D_HANDLE_FORCE_UNLIT below) overrides the CMB material's own `vertex_lighting`
+// flag for THIS draw only: it forces the scene-vertex-lit ambient term (title-parity pinned650,
+// docs/oot3d_world_lighting_re.md formula) off even when the model's authored material asks for
+// it, so a self-illuminated 2D overlay (e.g. the title-demo logo wordmark) renders at its baked/
+// texture colours full-bright instead of being darkened by whatever world ambient the scene
+// behind it is running. Distinct from bit30 (sky), which only affects depth/AO treatment, not
+// the lighting term.
+#define ZELDA3D_HANDLE_FORCE_UNLIT (1u << 29)
 #define gSPZelda3DDrawUV(pkt, handle, alpha, uvU, uvV, tintR, tintG, tintB)                         \
     {                                                                                             \
         Gfx* _g = (Gfx*)(pkt);                                                                    \
