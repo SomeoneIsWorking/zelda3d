@@ -1,7 +1,7 @@
 #include "global.h"
 #include "vt.h"
 #include "zelda3d/zelda3d.h"
-#include "zelda3d/behaviors/title/title_logo.h"
+#include "zelda3d/behaviors/title/title_presentation.h"
 
 #include <string.h>
 
@@ -1394,10 +1394,10 @@ void Play_DrawOverlayElements(PlayState* play) {
         Interface_Draw(play);
     }
 
-    // Zelda3D: OoT3D title-demo logo wordmark, composited over the field/rider scene like the
-    // real game's 2D overlay (biggest confirmed title-parity gap; see
-    // behaviors/title/title_logo.cpp). No-op outside gZelda3dInTitleDemo.
-    Zelda3D_TryDrawTitleLogo(play);
+    // Zelda3D: OoT3D title-demo overlay draw (currently just the logo wordmark, biggest
+    // confirmed title-parity gap; see behaviors/title/title_logo.cpp), driven by
+    // Zelda3D::TitlePresentation::draw() via this C bridge. No-op outside the title demo.
+    Zelda3D_Title_Draw(play);
 
     Message_Draw(play);
 
