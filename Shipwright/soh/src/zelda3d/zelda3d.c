@@ -10,6 +10,7 @@
 #include "overlays/actors/ovl_En_Door/z_en_door.h" // EnDoor swing state (ainfo door trace, #115)
 #include "objects/object_ge1/object_ge1.h"       // dgGerudoWhite*Anim OTR-path strings
 #include "soh/SaveManager.h" // Save_LoadFile (diagnostic `savecycle` REPL command, #132)
+#include "soh/frame_interpolation.h" // per-layer interp child nodes for the sun/moon draw (#145)
 void Save_LoadFile(void); // z_sram.c
 #include <stdlib.h>
 #include <stdio.h>
@@ -3957,6 +3958,20 @@ int Zelda3D_TryDrawSunMoon(PlayState* play) {
         Zelda3D_EnsureModelProvider();
         Gfx_SetupDL_25Opa(play->state.gfxCtx);
 
+        // Each layer below (sun + 3 moon layers) is an independently-GATED group of
+        // Matrix_* ops, so each gets its OWN FrameInterpolation child node keyed by
+        // (play, layerIdx) — the same idiom z_actor.c uses (e.g. the chain loop at
+        // RecordOpenChild(entry, i)). Without this, a layer that appears or vanishes
+        // between two logic frames (moon alpha crossing zero at dawn, or a halo model
+        // id transiently -1 while BlueSky.zar sub-assets stream in) shifts every LATER
+        // layer's positional op index within a shared node, so FrameInterpolation pairs
+        // a later layer's new matrix against an unrelated earlier layer's old matrix — a
+        // garbage interpolated transform that flashes for the affected subframes. Lower
+        // interpolation FPS = fewer/longer subframes, so each bad subframe is on-screen
+        // longer: "sky flickers when fps < 60" (#145). Separate nodes make a missing
+        // layer fall back to its own new (un-lerped) transform for the transition tick —
+        // a correct one-frame snap, not a flash.
+
         // Sun: glow disc at eye + sunPos. scale = (color * 2) + 10, color = clamp(y / 80, 0, 1)
         // (matches N64). Additive over the sky; far-plane pinned (bit 30) so terrain occludes it
         // when it dips below the horizon, exactly like the N64 sprite.
@@ -3964,6 +3979,7 @@ int Zelda3D_TryDrawSunMoon(PlayState* play) {
         if (color < 0.0f) color = 0.0f;
         if (color > 1.0f) color = 1.0f;
         scale = (color * 2.0f) + 10.0f;
+        FrameInterpolation_RecordOpenChild(play, 0);
         Matrix_Translate(play->view.eye.x + play->envCtx.sunPos.x, play->view.eye.y + play->envCtx.sunPos.y,
                          play->view.eye.z + play->envCtx.sunPos.z, MTXMODE_NEW);
         Matrix_Mult(&play->billboardMtxF, MTXMODE_APPLY);
@@ -3972,6 +3988,7 @@ int Zelda3D_TryDrawSunMoon(PlayState* play) {
         if (sunId >= 0) {
             gSPZelda3DDraw(POLY_OPA_DISP++, sunId | (1 << 30), 255, 255, 255);
         }
+        FrameInterpolation_RecordCloseChild();
 
         // Moon: alpha-masked disc at eye - sunPos. scale = -15 * color + 25, color = max(-y/120, 0);
         // alpha fades the moon in at night = clamp(min(-y/80, 1) * 255). Drawn only when alpha > 0.
@@ -3994,32 +4011,38 @@ int Zelda3D_TryDrawSunMoon(PlayState* play) {
             int m1 = Zelda3D_MoonInnerHaloId();
             if (m1 >= 0) {
                 f32 s1 = scale * 1.65f;
+                FrameInterpolation_RecordOpenChild(play, 1);
                 Matrix_Translate(moonWorldX, moonWorldY, moonWorldZ, MTXMODE_NEW);
                 Matrix_Mult(&play->billboardMtxF, MTXMODE_APPLY);
                 Matrix_Scale(s1, s1, s1, MTXMODE_APPLY);
                 gSPMatrix(POLY_OPA_DISP++, MATRIX_NEWMTX(play->state.gfxCtx),
                           G_MTX_MODELVIEW | G_MTX_LOAD);
                 gSPZelda3DDrawA(POLY_OPA_DISP++, m1 | (1 << 30), aA, 255, 255, 255);
+                FrameInterpolation_RecordCloseChild();
             }
 
             // Layer 2: fine_moon0 (crescent disc) — ALPHA-blend, base scale.
+            FrameInterpolation_RecordOpenChild(play, 2);
             Matrix_Translate(moonWorldX, moonWorldY, moonWorldZ, MTXMODE_NEW);
             Matrix_Mult(&play->billboardMtxF, MTXMODE_APPLY);
             Matrix_Scale(scale, scale, scale, MTXMODE_APPLY);
             gSPMatrix(POLY_OPA_DISP++, MATRIX_NEWMTX(play->state.gfxCtx),
                       G_MTX_MODELVIEW | G_MTX_LOAD);
             gSPZelda3DDrawA(POLY_OPA_DISP++, moonId | (1 << 30), aA, 255, 255, 255);
+            FrameInterpolation_RecordCloseChild();
 
             // Layer 3: fine_moon2 (outer glow) — ADDITIVE, ~1.85× disc.
             int m2 = Zelda3D_MoonOuterHaloId();
             if (m2 >= 0) {
                 f32 s2 = scale * 1.85f;
+                FrameInterpolation_RecordOpenChild(play, 3);
                 Matrix_Translate(moonWorldX, moonWorldY, moonWorldZ, MTXMODE_NEW);
                 Matrix_Mult(&play->billboardMtxF, MTXMODE_APPLY);
                 Matrix_Scale(s2, s2, s2, MTXMODE_APPLY);
                 gSPMatrix(POLY_OPA_DISP++, MATRIX_NEWMTX(play->state.gfxCtx),
                           G_MTX_MODELVIEW | G_MTX_LOAD);
                 gSPZelda3DDrawA(POLY_OPA_DISP++, m2 | (1 << 30), aA, 255, 255, 255);
+                FrameInterpolation_RecordCloseChild();
             }
         }
 

@@ -1005,15 +1005,31 @@ void GfxRenderingAPISdl3Gpu::FinishRender() {
     ReplayOps(swap, sw, sh);
 
     // On-demand / scripted frame dump. Reads fb 0 after the frame submit completes.
+    // Sequence mode (SOH_FRAMEDUMP_SEQ=1, same contract as the GL backend in gfx_sdl3.cpp):
+    // dump every STEP frames from START to END into <path>_<frame>.ppm, then exit — captures a
+    // whole camera pan / animation at render rate in one headless run for frame-to-frame diffing.
     const char* dumpPath = nullptr;
+    char seqPath[1100];
     bool exitAfter = false;
     {
         static const char* envDump = getenv("SOH_FRAMEDUMP");
         static long frame = 0;
+        static const bool seq = getenv("SOH_FRAMEDUMP_SEQ") != nullptr;
         static long targetFrame = getenv("SOH_FRAMEDUMP_FRAME") ? atol(getenv("SOH_FRAMEDUMP_FRAME")) : 300;
         if (envDump != nullptr) {
             ++frame;
-            if (frame == targetFrame) {
+            if (seq) {
+                static long start = getenv("SOH_FRAMEDUMP_START") ? atol(getenv("SOH_FRAMEDUMP_START")) : 1;
+                static long end = getenv("SOH_FRAMEDUMP_END") ? atol(getenv("SOH_FRAMEDUMP_END")) : 300;
+                static long step = getenv("SOH_FRAMEDUMP_STEP") ? atol(getenv("SOH_FRAMEDUMP_STEP")) : 10;
+                if (frame >= start && frame <= end && (frame - start) % step == 0) {
+                    snprintf(seqPath, sizeof(seqPath), "%s_%04ld.ppm", envDump, frame);
+                    dumpPath = seqPath;
+                }
+                if (frame >= end) {
+                    exitAfter = true;
+                }
+            } else if (frame == targetFrame) {
                 dumpPath = envDump;
                 exitAfter = true;
             }
@@ -1035,16 +1051,18 @@ void GfxRenderingAPISdl3Gpu::FinishRender() {
         if (dumpPath != nullptr) {
             WriteFbPpm(0, dumpPath);
             gSoh3dDumpPending = 0;
-            if (exitAfter)
-                exit(0);
         }
         if (wantCapture) {
             WriteFbToCaptureBuf(0);
             gSoh3dCapturePending = 0;
         }
+        if (exitAfter)
+            exit(0);
     } else {
         SDL_SubmitGPUCommandBuffer(mCmd);
         mCmd = nullptr;
+        if (exitAfter) // SEQ mode reached END on a non-dump step: still terminate the scripted run
+            exit(0);
     }
 
     // The frame's ops are submitted: any texture whose release we deferred this frame is no longer
