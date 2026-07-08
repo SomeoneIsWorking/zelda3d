@@ -3,25 +3,15 @@
 > **Generated mirror — do not hand-edit.** Source of truth = GitHub Issues on
 > `SomeoneIsWorking/zelda3d` (private). Regenerate with `tools/kanban.py render`.
 > Move a card with `tools/kanban.py mv <#> <column>`; add with `tools/kanban.py add`.
-> Columns: todo · in-progress · in-review · needs-confirmation · reopened · blocked · done(=closed).  Updated 2026-07-02 18:20.
+> Columns: todo · in-progress · in-review · needs-confirmation · reopened · blocked · done(=closed).  Updated 2026-07-08 10:51.
 
-**Counts:** todo:14 | in-progress:2 | in-review:1 | needs-confirmation:26 | reopened:0 | blocked:0 | done:80
+**Counts:** todo:4 | in-progress:2 | in-review:1 | needs-confirmation:27 | reopened:0 | blocked:0 | done:80
 
-## 📋 To Do  (14)
+## 📋 To Do  (4)
 - [#17](../../issues/17) Hi-res world/scene textures (texpack) _(render)_
 - [#33](../../issues/33) More foliage / vegetation density (lowest priority) _(scene)_
-- [#118](../../issues/118) Market (SCENE_MARKET_DAY) parity: crowd NPCs (En_Hy/En_Mu) mis-rendered, door still N64 _(render,scene,behavior)_
 - [#130](../../issues/130) Make repo public — audit + clean git history first (no outside-repo paths, no copyrighted assets) _(infra)_
 - [#133](../../issues/133) Add HTTP/remote layer to the REPL control channel (beyond FIFO)
-- [#135](../../issues/135) Market: EN_TG (dancing couple) OoT3D port _(render,scene,behavior)_
-- [#136](../../issues/136) Market: EN_MU (haggling townspeople) OoT3D port _(render,scene,behavior)_
-- [#137](../../issues/137) Market: EN_HEISHI4 (patrolling guards) OoT3D port _(render,scene,behavior)_
-- [#138](../../issues/138) Market: EN_MA1 (young Malon) OoT3D port _(render,scene,behavior)_
-- [#139](../../issues/139) Market: EN_DOG OoT3D port _(render,scene,behavior)_
-- [#140](../../issues/140) Navi (EN_ELF) renders as N64 sprite — needs OoT3D native replacement _(render,behavior)_
-- [#141](../../issues/141) Kokiri Forest: EN_A_OBJ (message-block prop) renders N64 _(render,scene)_
-- [#142](../../issues/142) Kokiri Forest: OBJ_MURE2 (foliage cluster) renders N64 _(render,scene)_
-- [#143](../../issues/143) Kakariko: OBJ_MURE (foliage cluster) renders N64 _(render,scene)_
 
 ## 🔨 In Progress  (2)
 - [#111](../../issues/111) World night R/G too bright — flat tint under-darkens at night (needs vertex-lighting port) _(render)_
@@ -30,7 +20,7 @@
 ## 🔍 In Review (agent verifying)  (1)
 - [#112](../../issues/112) START can't skip the final intro segment (Navi flies in / wakes Link) _(render,keyboard)_
 
-## 🙋 Needs User Confirmation  (26)
+## 🙋 Needs User Confirmation  (27)
 - [#12](../../issues/12) Inventory/pause background renders upside-down _(render,ui,inventory)_
 - [#16](../../issues/16) First-person camera: early-load crash + position snap _(camera,crash)_
 - [#18](../../issues/18) Crisp HUD/UI textures (hearts/digits/buttons/icons) _(ui,hud)_
@@ -56,7 +46,8 @@
 - [#126](../../issues/126) Keyboard/Start input dead after ImGui removal — stub GetTopMostPopupModal returns non-null _(keyboard)_
 - [#127](../../issues/127) RmlUi UI scales out of view on retina/HiDPI Mac (points-vs-pixels framebuffer mismatch) _(ui)_
 - [#132](../../issues/132) Corrupt save (null JSON field) crashes at title/file-select via std::terminate _(crash)_
-- [#134](../../issues/134) Link's House interior wall looks N64-rough vs overview 3DS-smooth (unresolved)
+- [#145](../../issues/145) Title: sky flickers when fps < 60 _(render)_
+- [#146](../../issues/146) Title: moon is too big vs OoT3D _(render)_
 
 ## ♻️ Reopened (was done, found broken)  (0)
 _none_
