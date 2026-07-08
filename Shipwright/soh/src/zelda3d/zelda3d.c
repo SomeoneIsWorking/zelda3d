@@ -2201,9 +2201,26 @@ static int Zelda3D_ApplyTitleCam(PlayState* play) {
     play->envCtx.sunMoonDisabled = false;
     play->envCtx.skyboxDisabled  = false;
     play->skyboxId = SKYBOX_NORMAL_SKY;
-    play->envCtx.skybox1Index = 3;
-    play->envCtx.skybox2Index = 3;
-    play->envCtx.skyboxBlend  = 0;
+    // Dome variant + cross-fade: do NOT hardcode. play->skyboxId/skyboxDisabled
+    // are re-enabled above (title-cs disables them); the engine's own
+    // Environment_UpdateSkybox (called at Play_Draw time, AFTER this function
+    // runs in Play_Update) reads them and derives skybox1Index/skybox2Index/
+    // skyboxBlend from the flowing title gSaveContext.dayTime — the exact
+    // schedule that already drives the ported title LIGHTING
+    // (Zelda3D_TitleCsLightBlend). A prior version of this function pinned
+    // these three fields to fine_tenkyu_3 (night) every frame, which stomped
+    // the schedule and froze the dome at night while the lighting brightened
+    // toward dawn underneath it (oot3d-decomp/docs/title_sky_dome.md gap 1).
+    //
+    // Guard: skybox1Index/skybox2Index are seeded to the sentinel 99 at
+    // Environment_Init (z_kankyo.c) and only get a real value once
+    // Environment_UpdateSkybox runs with skyboxDisabled==false. If the very
+    // first title-cam-active frame is drawn before that has happened, force
+    // one compute right now (using the enabled state just set above) instead
+    // of re-hardcoding a variant.
+    if (play->envCtx.skybox1Index == 99 || play->envCtx.skybox2Index == 99) {
+        Environment_UpdateSkybox(play, play->skyboxId, &play->envCtx, &play->skyboxCtx);
+    }
     // FOV comes from the ported cs spline (per-segment default + type-7
     // track; e.g. 35 deg in shot 0, 45.4 deg mid-demo). Fallback 48.803
     // was the old single-frame probe value.
