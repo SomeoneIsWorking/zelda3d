@@ -3975,7 +3975,7 @@ int Zelda3D_TryDrawSunMoon(PlayState* play) {
 
         // Moon: 3-layer disc+halo composite at eye - sunPos. `alpha` (the N64
         // night fade-in, clamp(min(-y/80,1)*255)) is used ONLY as the night
-        // VISIBILITY gate here — see kMoonDrawAlpha below for why it must NOT
+        // VISIBILITY gate here — see kMoonDiscAlpha/full-white below for opacity.
         // modulate the draw. color/scale kept for the N64-derived base scale.
         color = -y / 120.0f;
         if (color < 0.0f) color = 0.0f;
@@ -3994,14 +3994,12 @@ int Zelda3D_TryDrawSunMoon(PlayState* play) {
         //     (~25% of the 240px top screen); SoH's raw N64-scale disc renders
         //     ~108px. kMoonDiscScale rescales to Az (0.505 -> 54.5px vs Az 54.6).
         //
-        // (2) DISC/HALO OPACITY. The draw-log RE (docs/title_moon_composition.md)
-        //     shows OoT3D draws all three moon quads with vertex colour (0,0,0,0):
-        //     TEXTURE-ONLY, fully opaque, NOT modulated by a time-of-day alpha. The
-        //     N64 `alpha` night-fade (=191 at the title) was an unfaithful port that
-        //     made the disc ~0.75 transparent -> washed/dim (peak 177 vs Az 232) and
-        //     let the additive halos dominate. kMoonDrawAlpha=205 reproduces Az's
-        //     measured disc peak (233 vs 232); the night gate above still hides the
-        //     moon by day. (Full 255 clips SoH's brighter-decoded texture to white.)
+        // (2) DISC/HALO OPACITY. Per-pixel combiner RE (sw-rasterizer TEV probe) shows
+        //     OoT3D draws all three moon quads TEXTURE-ONLY at full white: primary_color
+        //     feeding the Modulate stage = (255,255,255,255) and combined == texture on
+        //     every pixel. Halos are RGB565 (falloff baked into RGB, no alpha channel);
+        //     the disc is RGBA4 (real crescent alpha). So the FAITHFUL draw is prim 255.
+        //     The N64 night-fade `alpha` is used ONLY as the night VISIBILITY gate below.
         //
         // RESIDUAL (not tuned away): both engines' discs grow later in the title
         // camera move, but SoH undershoots Az's growth by ~10% at the shot's end —
@@ -4009,26 +4007,38 @@ int Zelda3D_TryDrawSunMoon(PlayState* play) {
         // proper fix needs the OoT3D moon scale-over-time decompiled, not more
         // constant tuning. 0.505/205 nails the primary reported shot.
         const f32 kMoonDiscScale = 0.505f;
-        const u8  kMoonDrawAlpha = 205;
+        // Disc opacity STOPGAP (not faithful): faithful is prim 255 (above), but SoH decodes
+        // fine_moon0 (RGBA4) ~brighter than the asset, so 255 clips the disc to white (peak 255
+        // vs Az ~235) and loses crescent detail. 205 matches Az's disc peak; the REAL fix is the
+        // fine_moon0 decode, a residual (oot3d-decomp/docs/env_sun_moon_draw.md Session 4).
+        const u8  kMoonDiscAlpha = 205;
+        // Halo scale GROUND TRUTH: OoT3D vertex-shader model-matrix uniforms give disc
+        // diagonal-scale 640 and BOTH halos 1280 = exactly 2.0x (byte-exact 2:1). The earlier
+        // 1.65x/1.85x asymmetry was a screen-pixel guess conflating DEPTH PARALLAX with scale:
+        // OoT3D sits the quads at different z (disc -2684, inner -2774 behind, outer -2595
+        // front), which SoH does NOT reproduce (all far-plane pinned). SoH draws both halos at
+        // the true 2.0x; the depth-offset port that would reduce them to OoT3D's on-screen
+        // 1.72-1.94x is a documented residual, not a scale to hand-pick.
+        const f32 kMoonHaloScale = 2.0f;
         if (alpha > 0.0f && moonId >= 0) {
             // Faithful port of OoT3D's 3-layer moon composition
             // (RE'd via draw-log; see Zelda3D_MoonInnerHaloId comment).
             const f32 moonWorldX = play->view.eye.x - play->envCtx.sunPos.x;
             const f32 moonWorldY = play->view.eye.y - play->envCtx.sunPos.y;
             const f32 moonWorldZ = play->view.eye.z - play->envCtx.sunPos.z;
-            const u8  aA         = kMoonDrawAlpha;
+            const u8  aA         = kMoonDiscAlpha;
             const f32 discScale  = scale * kMoonDiscScale;
 
-            // Layer 1: fine_moon1 (inner glow) — ADDITIVE, ~1.65× disc.
+            // Layer 1: fine_moon1 (inner glow) — ADDITIVE, 2.0× disc, full-white (texture-only).
             int m1 = Zelda3D_MoonInnerHaloId();
             if (m1 >= 0) {
-                f32 s1 = discScale * 1.65f;
+                f32 s1 = discScale * kMoonHaloScale;
                 Matrix_Translate(moonWorldX, moonWorldY, moonWorldZ, MTXMODE_NEW);
                 Matrix_Mult(&play->billboardMtxF, MTXMODE_APPLY);
                 Matrix_Scale(s1, s1, s1, MTXMODE_APPLY);
                 gSPMatrix(POLY_OPA_DISP++, MATRIX_NEWMTX(play->state.gfxCtx),
                           G_MTX_MODELVIEW | G_MTX_LOAD);
-                gSPZelda3DDrawA(POLY_OPA_DISP++, m1 | (1 << 30), aA, 255, 255, 255);
+                gSPZelda3DDrawA(POLY_OPA_DISP++, m1 | (1 << 30), 255, 255, 255, 255);
             }
 
             // Layer 2: fine_moon0 (crescent disc) — ALPHA-blend, base scale.
@@ -4039,16 +4049,16 @@ int Zelda3D_TryDrawSunMoon(PlayState* play) {
                       G_MTX_MODELVIEW | G_MTX_LOAD);
             gSPZelda3DDrawA(POLY_OPA_DISP++, moonId | (1 << 30), aA, 255, 255, 255);
 
-            // Layer 3: fine_moon2 (outer glow) — ADDITIVE, ~1.85× disc.
+            // Layer 3: fine_moon2 (outer glow) — ADDITIVE, 2.0× disc, full-white (texture-only).
             int m2 = Zelda3D_MoonOuterHaloId();
             if (m2 >= 0) {
-                f32 s2 = discScale * 1.85f;
+                f32 s2 = discScale * kMoonHaloScale;
                 Matrix_Translate(moonWorldX, moonWorldY, moonWorldZ, MTXMODE_NEW);
                 Matrix_Mult(&play->billboardMtxF, MTXMODE_APPLY);
                 Matrix_Scale(s2, s2, s2, MTXMODE_APPLY);
                 gSPMatrix(POLY_OPA_DISP++, MATRIX_NEWMTX(play->state.gfxCtx),
                           G_MTX_MODELVIEW | G_MTX_LOAD);
-                gSPZelda3DDrawA(POLY_OPA_DISP++, m2 | (1 << 30), aA, 255, 255, 255);
+                gSPZelda3DDrawA(POLY_OPA_DISP++, m2 | (1 << 30), 255, 255, 255, 255);
             }
         }
 
