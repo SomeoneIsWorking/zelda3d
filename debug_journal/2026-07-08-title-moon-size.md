@@ -70,10 +70,60 @@ Two sub-parts, both quantitative:
    `Zelda3D_TryDrawSunMoon` comment already flags). Measure Az's moon screen
    centre across shots 0-2 and compare to SoH's before deciding.
 
-## Status
+## Status (diagnosis pass — superseded by RESOLVED below)
 
 Diagnosis complete and quantified; NO fix applied this session (a verified fix
 needs build+capture iteration + the position decision above, and a scale-only
 change would be a bandaid). Card kept in-progress with this analysis + the SxS
 measurement posted as evidence. Tooling: `scratch/measure_moon.py`,
 `scratch/moon_sxs.py` (harness Az/SoH SxS at an aligned cs frame).
+
+---
+
+## RESOLVED (2026-07-08, follow-up session)
+
+Two ground-truth calibrations against Az, both baked into `Zelda3D_TryDrawSunMoon`.
+
+### Method / new tooling
+- The earlier "cs frame 100" A/B was INVALID: the csCtx frame counter does NOT
+  map to a stable title shot across boots (Az's demo free-runs vs when SoH boots),
+  so at "frame 100" Az showed an interior vignette while SoH showed the moon-field
+  shot. Alignment must be by CONTENT, not frame number. `scratch/moon/scan_az.py`
+  scans Az's title loop and locates the moon-over-Hyrule-field shot by luminance.
+- The moon is a far-plane billboard (fixed angular size, position moves with the
+  camera pan), so disc SIZE is comparable across shots via a least-squares
+  **circle-fit to the disc edge** at a matched fraction of each image's own peak
+  (`scratch/moon/circlefit.py`, `calib.py`). Az disc = **54.6px** (≈25% of the
+  240px screen), peak lum **232**, footprint ~5317.
+- The draw-log RGBA capture (extended `sw_rasterizer` hook) shows OoT3D draws all
+  three moon quads with **vertex colour (0,0,0,0)** — the moon is TEXTURE-ONLY,
+  fully opaque, NOT modulated by any time-of-day alpha.
+
+### The two fixes (both derived from Az measurements, not fudged)
+1. **Disc size** — `kMoonDiscScale = 0.44`. The disc reused the N64 sprite's
+   VTX -31..32 quad*scale, which renders ~125px; OoT3D's moon subtends only ~55px.
+   0.44 rescales to Az's angular size.
+2. **Disc/halo opacity** — `kMoonDrawAlpha = 220`, decoupled from the N64 night
+   fade. The old code modulated the disc by the fade alpha (=191 at the title),
+   which the draw-log proves is unfaithful (Az = opaque) and which made the disc
+   ~0.75 transparent → washed, dim (peak 177 vs 232) and let the additive halos
+   dominate → the "18× too filled" blob. 220 reproduces Az's peak (255 clips
+   SoH's brighter-decoded texture to white and loses lunar detail). The N64 fade
+   is still used ONLY as the night VISIBILITY gate (`alpha > 0`).
+
+### Verified (baked constants, no env, harness Az-vs-SoH @ title)
+| | SoH (fixed) | Az | Δ |
+|---|---|---|---|
+| disc diameter | 53.4px | 54.6px | 1.2px |
+| peak luminance | 237 | 232 | 5 |
+| footprint | 5077 | 5317 | 4.5% |
+
+Evidence: `scratch/moon/FINAL_baked_sxs.png` (Az top / SoH bottom, size matches).
+
+### Residual (NOT fixed — different camera pans, minor)
+- Halo HUE: Az's additive glow reads greenish-teal, SoH's warm-yellow — a
+  fine_moon1/2 colour/decode difference, small.
+- Screen POSITION: not compared here (Az and SoH were on different title pans;
+  the moon is a far-plane billboard so position tracks the camera). If a
+  position divergence remains at a matched pan, it is a camera/dayTime issue,
+  separate from size. Left for a matched-shot A/B if the user reports it.
