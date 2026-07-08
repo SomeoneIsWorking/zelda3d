@@ -164,3 +164,43 @@ moon scale-over-time decompiled, per "stop micro-tuning"):
    scale (-15*color+25) doesn't track OoT3D's moon scale-over-time.
 
 Evidence: `scratch/moon/146_recal_sxs.png`, `RECAL_sxs.png`.
+
+
+---
+
+## FAITHFUL PORT (Ghidra/RE-derived, replaces guessed halo constants)
+
+Per user directive "don't hand-tune, port via Ghidra": 4 RE sessions (see
+oot3d-decomp/docs/env_sun_moon_draw.md) established the moon is BAKED ASSET data
+(no runtime scale formula — static xref from Environment_Update and a JIT
+watchpoint on the moon vertex buffers both dead-ended; the vertices arrive via a
+bulk asset-decompression memcpy). Ground truth was then read from OoT3D's actual
+EXECUTION:
+
+- **Halo scale = exactly 2.0x the disc for BOTH halos** (was guessed 1.65x/1.85x).
+  Source: OoT3D's vertex-shader model-matrix uniform registers — disc diagonal
+  scale 640, both halos 1280 (byte-exact 2:1). The old asymmetry was DEPTH
+  PARALLAX misread as scale: OoT3D sits the 3 quads at different view-Z (disc
+  -2684, inner halo -2774 behind, outer halo -2595 front).
+- **Draw color/alpha = full white (255,255,255,255), TEXTURE-ONLY** (was guessed
+  205). Source: per-pixel TEV combiner probe — primary_color into the Modulate
+  stage = opaque white, combined == texture on every pixel. Halos are RGB565
+  (falloff baked into RGB, no alpha); disc is RGBA4 (real crescent alpha).
+
+Applied: `kMoonHaloScale = 2.0f` (both halos), halos drawn full-white 255.
+
+### Residuals (documented, NOT hand-tuned away)
+1. **Disc alpha still 205 (stopgap).** Faithful is 255, but SoH decodes fine_moon0
+   (RGBA4) ~brighter than the asset, so 255 clips the disc to white (peak 255 vs
+   Az ~235). 205 matches Az's disc peak. REAL fix = the fine_moon0 decode
+   (separate texture-decode bug), not this alpha. Marked STOPGAP in-code.
+2. **Depth parallax not reproduced.** SoH far-plane-pins all 3 layers (bit 30);
+   OoT3D's per-layer z-offsets give a structured halo ring (Az footprint 5317 vs
+   SoH 3722, smooth glow). Reproducing it needs a depth-offset port (or un-pinning
+   from the far plane) — deferred.
+3. Disc scale 0.505 kept (screen-matched, 54-56px vs Az 54.6). Both engines' discs
+   drift in size later in the title move (SoH -15*color+25 vs OoT3D's asset) — a
+   separate residual.
+
+Verified (content-matched frame, faithful build): disc 55.6px vs Az 54.6, peak
+230 vs 232. Evidence: scratch/moon/146_faithful_sxs.png.
