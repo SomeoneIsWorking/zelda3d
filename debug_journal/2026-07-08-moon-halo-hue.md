@@ -1,5 +1,17 @@
 # Title moon halo hue: greenish (Az) vs warm-yellow (SoH) — NOT a decode bug, no fix landed
 
+> **CORRECTION (2026-07-08, see `2026-07-08-title-sky-color.md`):** Finding 3 below (the
+> "real, separate rendering divergence in the base sky gradient/color") is **falsified**. It was
+> measured by compositing an Az frame from one naturally-clocked harness run against a SoH frame
+> captured with `soh_titlecs` forcibly set to an unrelated cursor value — a clock-desync artifact,
+> not a real cross-engine difference. At a genuinely content-matched frame (verified by eye, same
+> rider/terrain/moon framing), Az and SoH base sky colour are close (`R<G<B`, both moderately
+> saturated blue-gray, within ~10-15/255). The halo-hue question itself (this file's Findings 1-2)
+> is unaffected by the correction — no colored TEV tint, texture is genuinely warm on both engines
+> — but the "it's an emergent artifact of two different backgrounds" explanation in Finding 3 no
+> longer holds; if the perceived hue difference is confirmed again at a matched frame, it needs a
+> fresh look.
+
 User/agent-sweep observation: after #146 (disc size/brightness), the title moon's additive glow
 halo still diverges in HUE — greenish-teal on Az (OoT3D oracle) vs warm-yellow on SoH. This entry
 records why no code change was made: the divergence traces to background-sky compositing, not to
