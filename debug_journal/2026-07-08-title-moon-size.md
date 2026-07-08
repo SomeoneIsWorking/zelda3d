@@ -204,3 +204,12 @@ Applied: `kMoonHaloScale = 2.0f` (both halos), halos drawn full-white 255.
 
 Verified (content-matched frame, faithful build): disc 55.6px vs Az 54.6, peak
 230 vs 232. Evidence: scratch/moon/146_faithful_sxs.png.
+
+## ADDENDUM 2026-07-08 (main): "fine_moon0 RGBA4 decode brightness bug" is a MISDIAGNOSIS
+A parallel RE agent flagged kMoonDiscAlpha=205 as a stopgap for the RGBA4 decode being "too
+bright." Checked the actual decode: `pica_texture.cpp:6` `e4(n)=(n<<4)|n` is the STANDARD,
+CORRECT 4-bit->8-bit bit-replication (0xF->255, 0x8->136) — exactly what hardware does. There is
+NO decode bug. The Az-peak-235 vs SoH-would-clip-255 difference is a RENDER-TIME effect
+(additive-blend saturation / compositing), not the texture decoding too bright. Do not "fix" the
+decode, and do not re-chase this. Moon is faithful (2.0x halo scale, full-white combiner, dynamic
+eye±sunPos — all RE-derived from Azahar hardware-register readback).
