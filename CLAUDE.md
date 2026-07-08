@@ -164,7 +164,12 @@ gitignored — never commit them.
 
 ## Hard rules
 
-- **Headless always:** this is a Wayland machine — `SOH3D_HEADLESS=1`, never a headed window.
-- Run the game via `tools/soh3d_game.sh`; REPL via `tools/soh3d_repl.py` (skill soh3d-game-control).
+- **Headless always:** this is a Wayland machine — launch the game with **`ZELDA3D_HEADLESS=1`**,
+  never a headed window. NOTE: `SOH3D_HEADLESS=1` is STALE (renamed in the SoH3D→Zelda3D refactor)
+  and is SILENTLY IGNORED → real window on `DISPLAY=:0` (bit multiple agents 2026-07-08). The
+  embedded-Azahar oracle harness is windowless and uses `SOH3D_HARNESS_HEADLESS=1` (separate var).
+- Run the game via `tools/zelda3d_game.sh` (formerly `soh3d_game.sh`); REPL via
+  `tools/zelda3d_repl.py` (skill soh3d-game-control). Assume every stale `soh3d_*`/`SOH3D_*`
+  reference in older notes maps to `zelda3d_*`/`ZELDA3D_*`.
 - Scratch/build artifacts go in the gitignored `scratch/`, never `/tmp`, never committed.
 - Verify quantitatively/visually; send screenshots for any UI/UX call.
