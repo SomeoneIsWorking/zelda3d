@@ -126,9 +126,12 @@ void Zelda3D_GL_Draw(int modelId, const float* mp16, int invertY, unsigned char 
 // excluded from shadow casting and AO. Its model is loaded with depth-write off (see zelda3d_model.cpp).
 // uvOffU/uvOffV = per-draw texcoord scroll offset (fractional UV; 0 = none) — animates the OoT3D
 // sky cloud band per its BlueSky.zar .cmab rate (#28b); 0 for every other draw.
+// forceUnlit=1 overrides the CMB material's own vertex_lighting flag for this draw only, disabling
+// the scene-vertex-lit ambient term so a self-illuminated overlay (title logo) renders at its
+// baked/texture colours full-bright (ZELDA3D_HANDLE_FORCE_UNLIT, gbi.h).
 void Zelda3D_GL_Submit(int modelId, const float* mp16, const float* mv16, int lit, int invertY, unsigned char r,
                      unsigned char g, unsigned char b, unsigned char a, float aspectAdj, int sky,
-                     float uvOffU, float uvOffV);
+                     float uvOffU, float uvOffV, int forceUnlit);
 // RenderFrameBegin / RenderFrameEnd: open/close the per-render-frame Zelda3D context on the RENDER
 // thread, bracketing the N64 dlist interpret (Interpreter::Run). Zelda3D_GL_Submit appends each 3DS
 // model op inline between them, into the SAME op-list / single render pass as the N64 geometry —

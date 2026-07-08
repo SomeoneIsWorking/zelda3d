@@ -475,6 +475,8 @@ const char* Zelda3D_ResolvePlayerCsab(const char* otr);                  // play
 const char* Zelda3D_LinkWalkRunGate(const char* csab, float speedXZ);    // #117 walk/run selection gate
 void Zelda3D_EnsureModelProvider(void);                                   // lazy GL model provider init
 int Zelda3D_AutoModelId(const char* zarPath);                            // get-or-alloc a GL model id
+float Zelda3D_AutoModelHeight(int modelId);                              // bind-pose local-space Y extent
+float Zelda3D_AutoModelMinY(int modelId);                                // bind-pose local-space min Y (feet)
 // Bridges for the structured model-REPLACEMENT behaviors (behaviors/actor/<actor>.cpp):
 int Zelda3D_TryActorModelDraw(PlayState* play, Actor* actor);            // dispatch actor->behavior->tryDrawModel
 int Zelda3D_ActorDrawSpaceTransform(void* actor, float* outLiftY, float* outLocalOff); // faithful draw-space offset

@@ -4358,7 +4358,11 @@ bool gfx_zelda3d_draw_handler_custom(F3DGfx** cmd0) {
     // to recover the model id.
     int lit = (handle < 0) ? 1 : 0;    // bit 31 = lit (half-Lambert form term)
     int sky = (handle >> 30) & 1;      // bit 30 = skybox dome (far-plane depth, no shadow/AO)
-    int modelId = handle & 0x3FFFFFFF; // low 30 bits = model id (small)
+    // bit 29 = force-unlit override (ZELDA3D_HANDLE_FORCE_UNLIT): ignore the CMB material's own
+    // vertex_lighting flag for this draw so a self-illuminated overlay (title logo) isn't darkened
+    // by the scene's ambient/world lighting term. See gbi.h comment above gSPZelda3DDrawUV.
+    int forceUnlit = (handle >> 29) & 1;
+    int modelId = handle & 0x1FFFFFFF; // low 29 bits = model id (small)
     uint8_t a = (uint8_t)((w1 >> 32) & 0xFF); // w1[32:40] = per-draw alpha (255 = opaque)
     uint64_t w0 = (uint64_t)cmd->words.w0;
     uint32_t tint = (uint32_t)(w0 & 0xFFFFFF);
@@ -4381,7 +4385,7 @@ bool gfx_zelda3d_draw_handler_custom(F3DGfx** cmd0) {
     // still-buffered N64 geometry it was actually emitted after (or before) in the game's dlist.
     gfx->Flush();
     Zelda3D_GL_Submit(modelId, &gfx->mRsp->MP_matrix[0][0], mv, lit, invertY ? 1 : 0, r, g, b, a, aspectAdj, sky,
-                    uvOffU, uvOffV);
+                    uvOffU, uvOffV, forceUnlit);
     return false;
 }
 
