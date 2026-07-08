@@ -127,3 +127,40 @@ Evidence: `scratch/moon/FINAL_baked_sxs.png` (Az top / SoH bottom, size matches)
   the moon is a far-plane billboard so position tracks the camera). If a
   position divergence remains at a matched pan, it is a camera/dayTime issue,
   separate from size. Left for a matched-shot A/B if the user reports it.
+
+
+---
+
+## CORRECTION (same day) — recalibrated at content-matched frames: 0.505 / 205
+
+The RESOLVED values above (0.44 / 220) were WRONG because they were measured with
+`soh_titlecs 100` forced. `soh_titlecs` is not cosmetic: it drives
+`gSaveContext.dayTime`, which sets the sky variant, world-shade lighting AND the
+sun/moon base scale/alpha. Forcing an uncalibrated cursor put SoH at a different
+time-of-day than the naturally-clocked Az reference frame — so the 0.44 disc match
+was against a mis-timed SoH moon. (This same artifact produced a phantom
+"night-sky color divergence" — see 2026-07-08-title-sky-color.md.)
+
+**Correct method:** boot from `title_settled.state` + plain `step 40`×N (NO
+`soh_titlecs`). At 9×40=360 steps both engines show the same moon-behind-rider
+shot (rider pose, hill silhouette, moon position match by eye).
+
+Recalibrated at that matched frame → **kMoonDiscScale = 0.505, kMoonDrawAlpha = 205**.
+
+Final verify (baked constants, no env, content-matched 360-step frame):
+| | SoH | Az | Δ |
+|---|---|---|---|
+| disc diameter | 53.9px | 54.6px | 0.7px |
+| peak luminance | 233 | 232 | 1 |
+| footprint (>=0.55*peak) | 3724 | 5317 | -30% |
+
+Disc + peak nailed. RESIDUALS (noted, not tuned — a proper fix needs the OoT3D
+moon scale-over-time decompiled, per "stop micro-tuning"):
+1. Halo GLOW SPREAD ~30% tighter than Az (footprint 3724 vs 5317). SoH uses
+   uniform disc*1.65/1.85 halo scales (decomp-doc averages); Az's measured ratios
+   are non-uniform (1.72-1.94 wide / 1.46-1.53 tall).
+2. Disc size drifts vs Az late in the title camera move: both grow, but SoH
+   undershoots Az's growth by ~10% at the shot's end — the N64 dayTime-dependent
+   scale (-15*color+25) doesn't track OoT3D's moon scale-over-time.
+
+Evidence: `scratch/moon/146_recal_sxs.png`, `RECAL_sxs.png`.

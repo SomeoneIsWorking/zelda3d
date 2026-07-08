@@ -3983,26 +3983,33 @@ int Zelda3D_TryDrawSunMoon(PlayState* play) {
         temp = -y / 80.0f;
         if (temp > 1.0f) temp = 1.0f;
         alpha = temp * 255.0f;
-        // #146: two ground-truth calibrations against Azahar (OoT3D) at the title.
+        // #146: two ground-truth calibrations against Azahar (OoT3D), measured at
+        // CONTENT-MATCHED title frames (boot from title_settled + plain step*40; do
+        // NOT force soh_titlecs — that drives gSaveContext.dayTime and desyncs the
+        // moon's base scale/alpha vs a naturally-clocked Az frame).
         //
         // (1) DISC SIZE. The disc reuses the N64 sprite's VTX -31..32 quad * scale,
         //     but OoT3D's moon subtends a SMALLER angular size than the N64 moon.
-        //     Circle-fit on Az (4 title frames): disc diameter ~55px = ~25% of the
-        //     240px top screen. SoH's N64-scale disc renders ~125px. kMoonDiscScale
-        //     rescales it to Az's angular size (measured 0.44 -> 53px vs Az 55px).
+        //     Circle-fit at the canonical moon-behind-rider shot: Az disc = 54.6px
+        //     (~25% of the 240px top screen); SoH's raw N64-scale disc renders
+        //     ~108px. kMoonDiscScale rescales to Az (0.505 -> 54.5px vs Az 54.6).
         //
         // (2) DISC/HALO OPACITY. The draw-log RE (docs/title_moon_composition.md)
         //     shows OoT3D draws all three moon quads with vertex colour (0,0,0,0):
-        //     the moon is TEXTURE-ONLY, drawn fully opaque, NOT modulated by a
-        //     time-of-day alpha. The N64 `alpha` night-fade (=191 at the title) was
-        //     an unfaithful port that made the disc ~0.75 transparent -> washed,
-        //     dim (peak lum 177 vs Az 232) and let the additive halos dominate.
-        //     Drawing at kMoonDrawAlpha=220 reproduces Az's measured disc peak
-        //     (~232) and footprint; the night gate above still hides the moon by
-        //     day. (Full 255 clips SoH's brighter-decoded texture to white and
-        //     loses the lunar-surface detail Az retains at 232.)
-        const f32 kMoonDiscScale = 0.44f;
-        const u8  kMoonDrawAlpha = 220;
+        //     TEXTURE-ONLY, fully opaque, NOT modulated by a time-of-day alpha. The
+        //     N64 `alpha` night-fade (=191 at the title) was an unfaithful port that
+        //     made the disc ~0.75 transparent -> washed/dim (peak 177 vs Az 232) and
+        //     let the additive halos dominate. kMoonDrawAlpha=205 reproduces Az's
+        //     measured disc peak (233 vs 232); the night gate above still hides the
+        //     moon by day. (Full 255 clips SoH's brighter-decoded texture to white.)
+        //
+        // RESIDUAL (not tuned away): both engines' discs grow later in the title
+        // camera move, but SoH undershoots Az's growth by ~10% at the shot's end —
+        // the N64 dayTime-dependent scale (-15*color+25) doesn't track OoT3D's. A
+        // proper fix needs the OoT3D moon scale-over-time decompiled, not more
+        // constant tuning. 0.505/205 nails the primary reported shot.
+        const f32 kMoonDiscScale = 0.505f;
+        const u8  kMoonDrawAlpha = 205;
         if (alpha > 0.0f && moonId >= 0) {
             // Faithful port of OoT3D's 3-layer moon composition
             // (RE'd via draw-log; see Zelda3D_MoonInnerHaloId comment).
