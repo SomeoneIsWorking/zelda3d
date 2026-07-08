@@ -760,8 +760,8 @@ void EnMag_Draw(Actor* thisx, PlayState* play) {
     // "Title Screen Manager & Logo") while our title-demo override is
     // active. Task #15.
     {
-        extern int gZelda3dInTitleDemo;
-        if (gZelda3dInTitleDemo) {
+        extern int Zelda3D_Title_IsActive(void);
+        if (Zelda3D_Title_IsActive()) {
             return;
         }
     }

@@ -5473,8 +5473,8 @@ void Interface_Draw(PlayState* play) {
     }
     // Zelda3D title-demo — Az's OoT3D title shows no HUD at all. Task #14.
     {
-        extern int gZelda3dInTitleDemo;
-        if (gZelda3dInTitleDemo) {
+        extern int Zelda3D_Title_IsActive(void);
+        if (Zelda3D_Title_IsActive()) {
             return;
         }
     }

@@ -1,6 +1,7 @@
 // Zelda3D runtime toggle + helpers. See repo-root PROGRESS.md.
 #include "zelda3d.h"
 #include "zelda3d_cutscene.h"
+#include "behaviors/title/title_presentation.h" // Zelda3D::TitlePresentation — see that header
 #include "zelda3d_collision.h" // C-ABI bridge for OoT3D scene collision (zelda3d_model.cpp)
 #include "zelda3d_link.h"      // Link (player) replacement policy split out of this file
 #include "zelda3d_anim_override.h" // skeletal-actor draw-override port (head/torso track, facial, DLs)
@@ -428,22 +429,23 @@ static s32 sZelda3dMotionFrame = 0;
 // Palette lerp helpers (defined with the #111 world-shade blend below).
 static unsigned char zelda3d_lerp8(int a, int b, float t);
 static signed char zelda3d_lerp8s(int a, int b, float t);
-// Title-demo rider state (defined with the title-cs port further down).
-static float   gZelda3dRiderPos[3];
-static int16_t gZelda3dRiderYaw;
-extern int gZelda3dInTitleDemo;
-
 void Zelda3D_ActorPostUpdate(PlayState* play, Actor* actor) {
     Zelda3D_LinkApplyPin(play, actor); // #8 linkpin (pins the player transform; defined in zelda3d_link.cpp)
-    // Title-demo rider: the ported OoT3D title-cs actor cues own the player
-    // transform (state integrated in Zelda3D_RiderStepCue). Applied HERE —
-    // after the actor's own update — so nothing downstream overwrites it.
-    if (gZelda3dInTitleDemo && actor != NULL && actor->id == ACTOR_PLAYER) {
-        actor->world.pos.x = gZelda3dRiderPos[0];
-        actor->world.pos.y = gZelda3dRiderPos[1];
-        actor->world.pos.z = gZelda3dRiderPos[2];
-        actor->shape.rot.y = gZelda3dRiderYaw;
-        actor->world.rot.y = gZelda3dRiderYaw;
+    // Title-demo rider: the ported OoT3D title-cs actor cues own the player transform (state
+    // integrated by Zelda3D::TitleRider inside TitlePresentation::update(), zelda3d/behaviors/
+    // title/title_presentation.cpp). Applied HERE — after the actor's own update — so nothing
+    // downstream overwrites it. Reads the resolved per-frame state via the C bridge rather than
+    // the old file-scope gZelda3dRiderPos/gZelda3dRiderYaw globals (removed; see the title-module
+    // migration, debug_journal/2026-07-08-oot3d-title-module-design.md).
+    if (Zelda3D_Title_IsActive() && actor != NULL && actor->id == ACTOR_PLAYER) {
+        float riderPos[3];
+        int16_t riderYaw;
+        Zelda3D_Title_RiderTransform(riderPos, &riderYaw);
+        actor->world.pos.x = riderPos[0];
+        actor->world.pos.y = riderPos[1];
+        actor->world.pos.z = riderPos[2];
+        actor->shape.rot.y = riderYaw;
+        actor->world.rot.y = riderYaw;
         actor->velocity.x = actor->velocity.y = actor->velocity.z = 0.0f;
         actor->speedXZ = 0.0f;
     }
@@ -835,15 +837,13 @@ static void Zelda3D_HudRect(float x, float y, float w, float h, unsigned int tin
     Zelda3D_Hud_Draw(0, x, y, w, h, 0.0f, 0.0f, 1.0f, 1.0f, tint);
 }
 
-extern int gZelda3dInTitleDemo;   // defined below; forward for Zelda3D_HudFrame's early gate
-
 void Zelda3D_HudFrame(void) {
     if (!Zelda3D_PcHudEnabled()) {
         return;
     }
     // Az's title-demo shot 1 shows no HUD — suppress here so the PC-HUD
     // path also honours the title-demo (task #14, alongside Interface_Draw).
-    if (gZelda3dInTitleDemo) {
+    if (Zelda3D_Title_IsActive()) {
         return;
     }
     const Zelda3dHudState* s = &gZelda3dHudState;
@@ -1751,7 +1751,9 @@ int gZelda3dTitleCam = 1;
 // via at-eye when building the view matrix). The kZelda3dTitleUp value KEEPS
 // OoT3D's slight roll rather than forcing straight-up, so the horizon tilt
 // matches OoT3D's title-screen framing.
-static const float kZelda3dTitleEye[3] = { -4071.49f,  57.81f, 5217.30f };
+// Non-static: behaviors/title/title_presentation.cpp reads these as the cs-unavailable
+// fallback framing (moved verbatim from Zelda3D_ApplyTitleCam).
+const float kZelda3dTitleEye[3] = { -4071.49f,  57.81f, 5217.30f };
 // JIT-caught writer (FUN_004235B8 @ 0x004235d4) inverts the OoT3D view
 // matrix and stores {right, up, at−eye} at 0x005BE6E0, 0x005BE6EC,
 // 0x005BE6F8. The RE'd "dir" at +0x0C was actually the RIGHT axis;
@@ -1759,8 +1761,8 @@ static const float kZelda3dTitleEye[3] = { -4071.49f,  57.81f, 5217.30f };
 // (-0.868, +0.195, +0.458). See oot3d-decomp/docs/title_view_matrix_lh.md
 // and the JIT trail in title_basis_writer_static_deadend.md.
 // So `at = eye + at_dir * 1000`:
-static const float kZelda3dTitleAt[3]  = { -4939.49f, 252.81f, 5675.30f };
-static const float kZelda3dTitleUp[3]  = {     0.212f,   0.977f,   -0.014f };
+const float kZelda3dTitleAt[3]  = { -4939.49f, 252.81f, 5675.30f };
+const float kZelda3dTitleUp[3]  = {     0.212f,   0.977f,   -0.014f };
 
 // --- OoT3D title-demo rider port -----------------------------------------
 // The 3DS title cycles a rider actor along a waypoint path. Parity metric
@@ -1823,7 +1825,9 @@ static const float kZelda3dTitleRiderSettledPos[3] = {
 };
 
 // Actor_TurnToPoint — FUN_003326F0. Verified via JIT yaw-write hook.
-static int16_t Zelda3D_ActorTurnToPoint(int16_t cur_yaw, float dx, float dz,
+// Non-static: behaviors/title/title_rider.cpp (TitleRider::step) calls this, plus the
+// still-dead Zelda3D_RiderStep() below — see title_rider.h for why this stayed here.
+int16_t Zelda3D_ActorTurnToPoint(int16_t cur_yaw, float dx, float dz,
                                         int32_t max_step) {
     int16_t target_yaw = (int16_t)(atan2f(dx, dz) * 32768.0f / 3.14159265358979f);
     int32_t diff = (int16_t)(target_yaw - cur_yaw);
@@ -1840,7 +1844,7 @@ static int16_t Zelda3D_ActorTurnToPoint(int16_t cur_yaw, float dx, float dz,
 
 // PathFollow_Update — FUN_003CF3C4. Reads s32 waypoint at path_node
 // +0x18/1C/20; snaps if within kArriveDist; else turns + sets speed_xz.
-static void Zelda3D_PathFollowUpdate(float pos[3], int16_t* yaw, float* speed_xz,
+void Zelda3D_PathFollowUpdate(float pos[3], int16_t* yaw, float* speed_xz,
                                      const int32_t waypoint[3]) {
     const float tx = (float)waypoint[0];
     const float ty = (float)waypoint[1];
@@ -1861,7 +1865,7 @@ static void Zelda3D_PathFollowUpdate(float pos[3], int16_t* yaw, float* speed_xz
 // scriptedDelta is UNCONDITIONALLY ZERO across all title-demo shots — verified
 // by scriptedDelta_probe_shots.py sweep (11 tick bands, 32 writes each, all
 // data=0). See oot3d-decomp docs/title_writer_chains.md task #6 close.
-static void Zelda3D_ActorMoveXZByYawSpeed(float pos[3], int16_t yaw,
+void Zelda3D_ActorMoveXZByYawSpeed(float pos[3], int16_t yaw,
                                           float speed_xz) {
     const float rad = (float)yaw * 3.14159265358979f / 32768.0f;
     pos[0] += sinf(rad) * speed_xz;
@@ -1887,14 +1891,6 @@ static float   gZelda3dRiderPos[3] = { -5898.0f, 59.8f, 5091.6f };
 static int16_t gZelda3dRiderYaw    = 0x2AAA;
 static float   gZelda3dRiderSpeed  = 8.0f;
 static size_t  gZelda3dRiderWaypointIdx = 0;
-static int     gZelda3dRiderWasInTitle  = 0;
-
-// Set to 1 at the tail of Zelda3D_ApplyTitleCam each frame the title-demo
-// override is active; cleared everywhere Zelda3D_ApplyTitleCam early-returns.
-// Read by Interface_Draw (z_parameter.c) to suppress the N64 HUD, and by
-// title-overlay draw sites to suppress the "PRESS START" / logo overlays.
-// See task #14/#15.
-int gZelda3dInTitleDemo = 0;
 
 // Reset integrator to spawn state. Called on title-demo entry.
 static void Zelda3D_RiderReset(void) {
@@ -1946,53 +1942,15 @@ static void Zelda3D_RiderStep(void) {
 }
 
 // --- Cue-driven rider (title cs op-0x0a port) ------------------------------
-// The title cs carries the rider's itinerary as N64-shaped actor cues
-// (zelda3d_cutscene.cpp). Semantics verified vs Az (scratch/
-// verify_rider_cues.py): on a cue-chain discontinuity the rider TELEPORTS
-// to the new cue's p0 (shot cut), then INTEGRATES toward p1 with the RE'd
-// PathFollow dynamics (speed 8.0, yaw step 267) — Az's trajectory is not a
-// lerp (curved approach, terrain-following Y). Frame-indexed by the cs
-// cursor, so no tick-rate heuristics are needed.
-static int gZelda3dRiderCueIdx = -1;
-static void Zelda3D_RiderStepCue(PlayState* play, int frame) {
-    int cueIdx, startF, endF;
-    int16_t cueYaw;
-    float p0[3], p1[3];
-    if (!Zelda3D_TitleCsRiderCue(frame, &cueIdx, p0, p1, &startF, &endF, &cueYaw)) {
-        return; // no cue this frame — hold pose
-    }
-    if (cueIdx != gZelda3dRiderCueIdx) {
-        // Teleport only on discontinuity: consecutive cues share p1==p0
-        // (continued motion); a shot cut authors a fresh p0.
-        const float dx = p0[0] - gZelda3dRiderPos[0];
-        const float dz = p0[2] - gZelda3dRiderPos[2];
-        if (gZelda3dRiderCueIdx < 0 || dx * dx + dz * dz > 100.0f * 100.0f) {
-            gZelda3dRiderPos[0] = p0[0];
-            gZelda3dRiderPos[1] = p0[1];
-            gZelda3dRiderPos[2] = p0[2];
-            gZelda3dRiderYaw = cueYaw;
-        }
-        gZelda3dRiderCueIdx = cueIdx;
-    }
-    const int32_t wp[3] = { (int32_t)p1[0], (int32_t)p1[1], (int32_t)p1[2] };
-    Zelda3D_PathFollowUpdate(gZelda3dRiderPos, &gZelda3dRiderYaw,
-                             &gZelda3dRiderSpeed, wp);
-    Zelda3D_ActorMoveXZByYawSpeed(gZelda3dRiderPos, gZelda3dRiderYaw,
-                                  gZelda3dRiderSpeed);
-    // Y: Az's rider follows the terrain (Epona walks the ground); raycast
-    // SoH's floor at the integrated XZ. Fall back to the cue-endpoint Y.
-    {
-        Vec3f q = { gZelda3dRiderPos[0], gZelda3dRiderPos[1] + 200.0f,
-                    gZelda3dRiderPos[2] };
-        CollisionPoly* poly = NULL;
-        f32 y = BgCheck_AnyRaycastFloor1(&play->colCtx, &poly, &q);
-        if (y > BGCHECK_Y_MIN + 1.0f) {
-            gZelda3dRiderPos[1] = y;
-        }
-    }
-}
+// MOVED to Zelda3D::TitleRider (behaviors/title/title_rider.h/.cpp) as part of the
+// title-presentation module consolidation — see
+// debug_journal/2026-07-08-oot3d-title-module-design.md. The math primitives just below
+// (Zelda3D_ActorTurnToPoint/PathFollowUpdate/ActorMoveXZByYawSpeed) stay here (now non-static)
+// since TitleRider::step() and the still-dead Zelda3D_RiderStep() below both call them.
 
-static int Zelda3D_TitleCamEnabled(void) {
+// Non-static so behaviors/title/title_rider.cpp can call it (see title_rider.h for why the
+// math primitives stayed in zelda3d.c instead of moving with the cue integrator).
+int Zelda3D_TitleCamEnabled(void) {
     static int cached = -1;
     if (cached < 0) {
         const char* v = getenv("ZELDA3D_TITLECAM");
@@ -2001,239 +1959,20 @@ static int Zelda3D_TitleCamEnabled(void) {
     return Zelda3D_Enabled() && cached && gZelda3dTitleCam;
 }
 
-// Returns 1 if we are currently in title-demo mode and applied the override. Called from
-// Zelda3D_ReplPoll AFTER the engine's per-frame view update, and only when gZelda3dCamOverride
-// is NOT set (so the REPL `cam` override takes full precedence for A/B).
-// Task #16 (world lighting at title).
-//
-// The draw-log capture showed regs.lighting.disable=1 for every triangle
-// at settled title. That is the PICA200 PER-FRAGMENT lighting unit — NOT
-// the per-vertex scene-lit compute (ambient*matAmb + diffuse*matDif*NdotL)
-// which runs in the game's OWN vertex shader and stays active. So the
-// port-faithful move at title is:
-//   - gZelda3dLightEnable = 0  (SoH's character/prop half-Lambert is
-//     synthetic; OoT3D never runs it at title)
-//   - gZelda3dWorldLit stays 1 — scene geometry needs its per-vertex lit
-//     compute at title to darken mountains to the moonlit silhouette Az
-//     shows (envCtx.lightSettings blends to night from dayTime=0x0000
-//     forced above; sceneAmb/sceneDif then correctly dim the CMB baked
-//     colour). Zeroing it left mountains fully-textured/day-bright, which
-//     was visibly wrong against the oracle SxS.
-// See oot3d-decomp/docs/title_lighting_disabled.md.
-//
-// Saved on rising edge (0->1) and restored on falling edge so exiting
-// title (SoH cutscene end -> gameplay) doesn't leave the world unlit.
-extern int gZelda3dLightEnable;   // libultraship zelda3d_gl.cpp
-static int sZelda3dTitleLightSaved     = 0;
-static int sZelda3dTitleLightEnableSav = -1;
-
-static void Zelda3D_TitleLightingRestore(void) {
-    if (sZelda3dTitleLightSaved) {
-        gZelda3dLightEnable = sZelda3dTitleLightEnableSav;
-        sZelda3dTitleLightSaved = 0;
-    }
-}
-
-// Title lighting override — called from z_kankyo's Environment_Update right
-// before the lightSettings -> lightCtx application, so it wins over the N64
-// title-cs SETTINGS path while staying upstream of every consumer. Ports the
-// 3DS behavior exactly: time-based schedule (config 0) blending the 4-slot
-// title palette at the flowing cs dayTime. Fog near/far: units un-RE'd,
-// N64 values kept for now (journal 2026-07-07-title-lighting-solved.md).
+// Title-demo camera/lighting/rider/sky-enable driver — MOVED into
+// Zelda3D::TitlePresentation (behaviors/title/title_presentation.h/.cpp) as the title-module
+// consolidation (debug_journal/2026-07-08-oot3d-title-module-design.md). The two entry points
+// below are now thin wrappers so every existing call site in this file (and z_kankyo.c) keeps
+// working unchanged:
+//   - Zelda3D_TitleLightSettingsOverride(play) -> TitlePresentation::applyLightOverride(play),
+//     called from z_kankyo.c's Environment_Update at the EXACT SAME call site/timing as before
+//     (see title_presentation.h's TitleFrameState comment for why this one piece was NOT folded
+//     into the module's single per-frame update() — doing so would shift a real value by one
+//     frame, which is a behavior change, not a relocation).
+//   - The old Zelda3D_ApplyTitleCam is gone; Zelda3D_ReplPoll below now calls
+//     Zelda3D_Title_Update(play) (declared in title_presentation.h) directly.
 void Zelda3D_TitleLightSettingsOverride(PlayState* play) {
-    uint8_t amb[3], l1c[3], l2c[3], fogc[3];
-    int8_t l1d[3], l2d[3];
-    uint16_t t;
-    int j;
-    if (!gZelda3dInTitleDemo) {
-        return;
-    }
-    if (!Zelda3D_TitleCsTimeOfDay(Zelda3D_TitleCsFrame(), &t)) {
-        return;
-    }
-    if (!Zelda3D_TitleCsBlendedLight(t, amb, l1d, l1c, l2d, l2c, fogc)) {
-        return;
-    }
-    for (j = 0; j < 3; j++) {
-        play->envCtx.lightSettings.ambientColor[j] = amb[j];
-        play->envCtx.lightSettings.light1Color[j] = l1c[j];
-        play->envCtx.lightSettings.light2Color[j] = l2c[j];
-        play->envCtx.lightSettings.fogColor[j] = fogc[j];
-    }
-    // Sun direction: the 3DS computes it from dayTime (Env_Update trig with
-    // pool scales -120/120/20 at 0x0045e804..0c), it does NOT come from the
-    // palette dir fields. Verified against live bytes: t=0x338F ->
-    // (-114, 36, 6). light2 = negation (Env_Update writes -dir).
-    {
-        const float rad = (float)t * (3.14159265f * 2.0f / 65536.0f);
-        const float sx = -120.0f * sinf(rad);
-        const float cy = 120.0f * cosf(rad);
-        const float cz = 20.0f * cosf(rad);
-        play->envCtx.lightSettings.light1Dir[0] = (s8)(sx >= 0 ? sx + 0.5f : sx - 0.5f);
-        play->envCtx.lightSettings.light1Dir[1] = (s8)(cy >= 0 ? cy + 0.5f : cy - 0.5f);
-        play->envCtx.lightSettings.light1Dir[2] = (s8)(cz >= 0 ? cz + 0.5f : cz - 0.5f);
-        for (j = 0; j < 3; j++) {
-            play->envCtx.lightSettings.light2Dir[j] = -play->envCtx.lightSettings.light1Dir[j];
-        }
-    }
-}
-
-static int Zelda3D_ApplyTitleCam(PlayState* play) {
-    if (play == NULL || !Zelda3D_TitleCamEnabled()) {
-        gZelda3dInTitleDemo = 0;
-        Zelda3D_TitleLightingRestore();
-        return 0;
-    }
-    // Title-demo conditions: no ZELDA3D_WARP warp target (empty string env) +
-    // Hyrule Field scene (spot00, 0x51). The prior csCtx.state != IDLE gate
-    // was too tight — SoH's title cutscene cycles through IDLE moments
-    // between shots, and dropping the override during those windows lets
-    // Camera_Update reclaim the framing. Fire whenever spot00 has no user
-    // warp; that's the parity-honest title-demo definition.
-    if (Zelda3D_AutoWarpEnabled()) {
-        gZelda3dRiderWasInTitle = 0;  // next entry will re-Reset (task #12)
-        gZelda3dInTitleDemo = 0;
-        Zelda3D_TitleLightingRestore();
-        return 0; // user has a warp target → not the title screen
-    }
-    if (play->sceneNum != SCENE_HYRULE_FIELD) {
-        gZelda3dRiderWasInTitle = 0;
-        gZelda3dInTitleDemo = 0;
-        Zelda3D_TitleLightingRestore();
-        return 0;
-    }
-    gZelda3dInTitleDemo = 1;
-    if (!sZelda3dTitleLightSaved) {
-        sZelda3dTitleLightEnableSav = gZelda3dLightEnable;
-        sZelda3dTitleLightSaved     = 1;
-    }
-    gZelda3dLightEnable = 0;
-    // OoT3D title cutscene camera — the real ported OP97 spline (see
-    // zelda3d_cutscene.cpp; verified 0.00 vs Az). The static kZelda3dTitle*
-    // constants remain only as a fallback when the cs can't be loaded.
-    float csEye[3], csAt[3], csUp[3], csFov = 0.0f;
-    int csLive = 0;
-    if (Zelda3D_TitleCsLoad()) {
-        int f = Zelda3D_TitleCsAdvance();
-        csLive = Zelda3D_TitleCsCamera(f, csEye, csAt, csUp, &csFov);
-        if (!csLive) {
-            // frame outside all spline segments (segment boundaries are
-            // exclusive) — hold the previous frame's camera this tick.
-            csLive = Zelda3D_TitleCsCamera(f > 0 ? f - 1 : 1, csEye, csAt, csUp, &csFov);
-        }
-    }
-    if (!csLive) {
-        csEye[0] = kZelda3dTitleEye[0]; csEye[1] = kZelda3dTitleEye[1]; csEye[2] = kZelda3dTitleEye[2];
-        csAt[0]  = kZelda3dTitleAt[0];  csAt[1]  = kZelda3dTitleAt[1];  csAt[2]  = kZelda3dTitleAt[2];
-        csUp[0]  = kZelda3dTitleUp[0];  csUp[1]  = kZelda3dTitleUp[1];  csUp[2]  = kZelda3dTitleUp[2];
-        csFov = 48.803f;
-    }
-    play->view.eye.x    = csEye[0];
-    play->view.eye.y    = csEye[1];
-    play->view.eye.z    = csEye[2];
-    play->view.lookAt.x = csAt[0];
-    play->view.lookAt.y = csAt[1];
-    play->view.lookAt.z = csAt[2];
-    play->view.up.x     = csUp[0];
-    play->view.up.y     = csUp[1];
-    play->view.up.z     = csUp[2];
-    play->view.fovy     = csFov;
-    // Also propagate to the active Camera so upstream game state (which
-    // SohState_Camera and any downstream cinematics read) matches. Without
-    // this the render matrix uses OoT3D framing but Camera->eye stays on
-    // SoH's own title-cs spline — the parity harness (d5) would then read
-    // the untouched Camera and still show the pre-port |Δeye|~93.
-    {
-        const int idx = play->activeCamera;
-        if (idx >= 0 && idx < NUM_CAMS) {
-            Camera* c = play->cameraPtrs[idx];
-            if (c != NULL) {
-                c->eye.x     = csEye[0];
-                c->eye.y     = csEye[1];
-                c->eye.z     = csEye[2];
-                c->eyeNext   = c->eye;   // pin the LERP target too
-                c->at.x      = csAt[0];
-                c->at.y      = csAt[1];
-                c->at.z      = csAt[2];
-                c->up.x      = csUp[0];
-                c->up.y      = csUp[1];
-                c->up.z      = csUp[2];
-            }
-        }
-    }
-    // Rider — driven by the ported title-cs actor cues (op-0x0a), replacing
-    // the static settled-pos hardcode AND the /9 tick STOPGAP: the cue
-    // system is frame-indexed by the same cs cursor as the camera.
-    // (state only; the transform is APPLIED to the Player actor in
-    // Zelda3D_ActorPostUpdate — after Player's own update — so SoH's
-    // native title-cs/physics can't fight the ported cue trajectory.)
-    Zelda3D_RiderStepCue(play, Zelda3D_TitleCsFrame());
-    // Time of day from the ported cs op-0x8c cues (4:01 AM — NOT midnight;
-    // the old 0x0000 force was a pre-decode approximation).
-    {
-        uint16_t csTime = 0x0000;
-        if (!Zelda3D_TitleCsTimeOfDay(Zelda3D_TitleCsFrame(), &csTime)) {
-            csTime = 0x0000;
-        }
-        gSaveContext.dayTime = csTime;
-        // Lighting: OoT3D's title has NO cs SET_LIGHTING — it runs the
-        // TIME-based schedule (config 0, static table at code.bin 0x00531EFC)
-        // over spot99's palette. Schedule PORTED (Zelda3D_TitleCsLightBlend:
-        // 4:01 AM -> slots 3->0, w=0.0079). NOT yet applied to envCtx here:
-        // a post-frame write to envCtx.lightSettings is overwritten by the
-        // engine's own Environment_Update before consumers read it (verified
-        // via soh_env), and the runtime palette FIELD LAYOUT is still
-        // ambiguous (Env_Update reads colors at +0xA/+0x10/+0x16 of the
-        // 28-byte entry — conflicts with gen_oot3d_scene_lighting.py's
-        // +0/+4/+0xA map). Apply at the z_kankyo seam once the layout is
-        // pinned — see debug_journal/2026-07-07-title-lighting-schedule.md.
-    }
-
-    // Title lighting is driven by the 3DS title cutscene byte stream ported
-    // from the OoT3D binary — the CS handler emits SET_LIGHTING commands
-    // at the same frames Az does. That port is the RE arc in
-    // oot3d-decomp/docs/title_cs_stream.md; do NOT re-introduce a static
-    // Az-transcribed timeline table here or a live-mirror crutch — the
-    // 3DS behavior IS the SoH3D behavior via faithful CS data.
-
-    // Enable sun/moon/sky draw. SoH's title-cs disables all three; Az
-    // shows moon top-right.
-    play->envCtx.sunMoonDisabled = false;
-    play->envCtx.skyboxDisabled  = false;
-    play->skyboxId = SKYBOX_NORMAL_SKY;
-    // Dome variant + cross-fade: do NOT hardcode. play->skyboxId/skyboxDisabled
-    // are re-enabled above (title-cs disables them); the engine's own
-    // Environment_UpdateSkybox (called at Play_Draw time, AFTER this function
-    // runs in Play_Update) reads them and derives skybox1Index/skybox2Index/
-    // skyboxBlend from the flowing title gSaveContext.dayTime — the exact
-    // schedule that already drives the ported title LIGHTING
-    // (Zelda3D_TitleCsLightBlend). A prior version of this function pinned
-    // these three fields to fine_tenkyu_3 (night) every frame, which stomped
-    // the schedule and froze the dome at night while the lighting brightened
-    // toward dawn underneath it (oot3d-decomp/docs/title_sky_dome.md gap 1).
-    //
-    // Guard: skybox1Index/skybox2Index are seeded to the sentinel 99 at
-    // Environment_Init (z_kankyo.c) and only get a real value once
-    // Environment_UpdateSkybox runs with skyboxDisabled==false. If the very
-    // first title-cam-active frame is drawn before that has happened, force
-    // one compute right now (using the enabled state just set above) instead
-    // of re-hardcoding a variant.
-    if (play->envCtx.skybox1Index == 99 || play->envCtx.skybox2Index == 99) {
-        Environment_UpdateSkybox(play, play->skyboxId, &play->envCtx, &play->skyboxCtx);
-    }
-    // FOV comes from the ported cs spline (per-segment default + type-7
-    // track; e.g. 35 deg in shot 0, 45.4 deg mid-demo). Fallback 48.803
-    // was the old single-frame probe value.
-    {
-        const int idx = play->activeCamera;
-        if (idx >= 0 && idx < NUM_CAMS) {
-            Camera* c = play->cameraPtrs[idx];
-            if (c != NULL) {
-                c->fov = csFov;
-            }
-        }
-    }
-    return 1;
+    Zelda3D_Title_ApplyLightOverride(play);
 }
 
 // Resolve the actor's CURRENT animation to a CSAB base name, by reading the actor's
@@ -3937,7 +3676,7 @@ int Zelda3D_TryDrawSunMoon(PlayState* play) {
     // dome variant — NOT the environment sun/moon path. Follow-on
     // work: identify the OoT3D title-sky asset and render it in place
     // of the N64 sky; the dyn sun/moon path is likely a dead end here.
-    if (!gZelda3dInTitleDemo) {
+    if (!Zelda3D_Title_IsActive()) {
         if (play->skyboxId != SKYBOX_NORMAL_SKY) {
             return 0;
         }
@@ -4164,7 +3903,7 @@ static void Zelda3D_UpdateLight(PlayState* play) {
     // lookup by sceneNum (same order as kZelda3dSceneNames). {0,0} entry = no palette -> hook is a no-op.
     {
         s32 sn = play->sceneNum;
-        if (gZelda3dInTitleDemo && Zelda3D_TitleLightSlotCount() > 0) {
+        if (Zelda3D_Title_IsActive() && Zelda3D_TitleLightSlotCount() > 0) {
             // Title demo: the OoT3D title runs on spot99, whose light
             // settings are NOT in kZelda3dSceneLighting (no N64 sceneNum).
             // Use the palette parsed from spot99_info.zsi at cs load.
@@ -7226,8 +6965,9 @@ void Zelda3D_ReplPoll(PlayState* play) {
     } else {
         // #92: title-screen camera override — match OoT3D's fixed title framing when in
         // title-demo mode (spot00, csCtx active, no warp target). Falls through to camlift
-        // when not in title-demo mode.
-        if (!Zelda3D_ApplyTitleCam(play)) {
+        // when not in title-demo mode. Driven by Zelda3D::TitlePresentation
+        // (behaviors/title/title_presentation.cpp) via this C bridge.
+        if (!Zelda3D_Title_Update(play)) {
             // #4: lift a buried cinematic camera out of the OoT3D terrain (skipped while
             // the diagnostic `cam` override holds the view, so A/B tests see the raw cam).
             Zelda3D_ReconcileCutsceneCam(play);

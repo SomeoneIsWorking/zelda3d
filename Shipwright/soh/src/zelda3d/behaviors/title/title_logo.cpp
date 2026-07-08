@@ -45,7 +45,11 @@ int Zelda3D_AutoModelId(const char* zarPath);
 float Zelda3D_AutoModelHeight(int modelId);
 void Zelda3D_EnsureModelProvider(void);
 void Zelda3D_UpdateAnim(int modelId, const char* animName, float frame);
-extern int gZelda3dInTitleDemo;
+// Zelda3D::TitlePresentation's active flag (title_presentation.h/.cpp) — this module is now
+// driven FROM that module's draw() rather than reading the old gZelda3dInTitleDemo global
+// directly, but the guard below is kept (belt-and-suspenders: TitlePresentation::draw() only
+// calls this while active, but this stays safe to call standalone too).
+int Zelda3D_Title_IsActive(void);
 }
 
 namespace {
@@ -74,7 +78,7 @@ int titleLogoModelId() {
 } // namespace
 
 extern "C" int Zelda3D_TryDrawTitleLogo(PlayState* play) {
-    if (!gZelda3dInTitleDemo || play == nullptr) {
+    if (!Zelda3D_Title_IsActive() || play == nullptr) {
         return 0;
     }
     Zelda3D_EnsureModelProvider();
