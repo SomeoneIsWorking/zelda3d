@@ -143,16 +143,25 @@ std::vector<uint8_t> PicaDecode(uint32_t glFormat, int width, int height, const 
                 r = d[i * 2 + 1]; g = d[i * 2]; b = 0xFF; a = 0xFF;
             });
         case GF_L8:
+            // L8 (PICA200 "Luminance") carries ONLY a luminance channel -- there is no stored
+            // alpha data, so the hardware convention (matching GL_LUMINANCE / PicaLegacyHashBytes'
+            // own "I8 -> {L,L,L,255}" correction just below) is alpha = fully OPAQUE. Previously
+            // this set a = L, aliasing luminance into alpha; any additive-blend material that
+            // reads texture alpha as its SRC_ALPHA blend factor (e.g. fine_star: blend_src_rgb=
+            // GL_SRC_ALPHA, blend_dst_rgb=GL_ONE) then squared its own brightness (contribution =
+            // L * L/255 instead of L), crushing bright texels toward black. Root cause of the
+            // title-screen star-brightness deficit (SoH capped ~70/255 vs oracle >140/255).
             return tiled(width, height, [&](int i, uint8_t& r, uint8_t& g, uint8_t& b, uint8_t& a) {
-                uint8_t L = d[i]; r = g = b = a = L;
+                uint8_t L = d[i]; r = g = b = L; a = 0xFF;
             });
         case GF_A8:
             return tiled(width, height, [&](int i, uint8_t& r, uint8_t& g, uint8_t& b, uint8_t& a) {
                 r = g = b = 0xFF; a = d[i];
             });
         case GF_L4:
+            // Same luminance-only convention as GF_L8 above -- alpha is opaque, not aliased to L.
             return tiled(width, height, [&](int i, uint8_t& r, uint8_t& g, uint8_t& b, uint8_t& a) {
-                uint8_t p = d[i >> 1]; uint8_t nn = (i & 1) ? (p >> 4) : (p & 0xF); uint8_t L = e4(nn); r = g = b = a = L;
+                uint8_t p = d[i >> 1]; uint8_t nn = (i & 1) ? (p >> 4) : (p & 0xF); uint8_t L = e4(nn); r = g = b = L; a = 0xFF;
             });
         case GF_A4:
             return tiled(width, height, [&](int i, uint8_t& r, uint8_t& g, uint8_t& b, uint8_t& a) {
@@ -182,12 +191,10 @@ std::vector<uint8_t> PicaLegacyHashBytes(uint32_t glFormat, int width, int heigh
         // RGBA8-output formats: Citra's decoded == our RGBA8 decode, but stored bottom-up.
         auto rgba = PicaDecode(glFormat, width, height, data);
         if (rgba.empty()) return {};
-        // A few single-channel formats differ from our renderer's decode in the unused
-        // channels; match Citra's exact convention so the hash lines up (Common::Color):
-        //   I8 -> {L,L,L,255}, I4 -> {L,L,L,255}, A8 -> {0,0,0,A}, A4 -> {0,0,0,A}.
-        if (glFormat == GF_L8 || glFormat == GF_L4) {
-            for (size_t i = 3; i < rgba.size(); i += 4) rgba[i] = 0xFF;
-        } else if (glFormat == GF_A8 || glFormat == GF_A4) {
+        // A8/A4 differ from our renderer's decode in the unused RGB channels; match Citra's
+        // exact convention so the hash lines up (Common::Color): A8/A4 -> {0,0,0,A}. (L8/L4
+        // already decode as {L,L,L,255} in PicaDecode itself now — see its GF_L8/GF_L4 cases.)
+        if (glFormat == GF_A8 || glFormat == GF_A4) {
             for (size_t i = 0; i + 3 < rgba.size(); i += 4) rgba[i] = rgba[i + 1] = rgba[i + 2] = 0;
         }
         std::vector<uint8_t> out(rgba.size());
