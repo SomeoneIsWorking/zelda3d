@@ -3530,8 +3530,8 @@ void RunRepl() {
             if (!(toks >> as)) { PrintErr("hits: usage: hits <watch_base_addr>"); continue; }
             auto a = ParseNum(as);
             if (!a) { PrintErr("hits: bad addr"); continue; }
-            WatchRecord recs[32];
-            std::size_t n = Soh3d_WatchGetHits((uint32_t)*a, recs, 32);
+            WatchRecord recs[128];
+            std::size_t n = Soh3d_WatchGetHits((uint32_t)*a, recs, 128);
             std::printf("ok hits %zu\n", n);
             for (std::size_t i = 0; i < n; ++i) {
                 std::printf("  vaddr=0x%08x size=%u data=0x%016lx "
