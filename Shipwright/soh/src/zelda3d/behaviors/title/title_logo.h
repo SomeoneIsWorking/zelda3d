@@ -50,6 +50,24 @@ void Zelda3D_TitleWordmarkPlacementFracs(float* outCenterXFrac, float* outCenter
 // call and for converting a *Frac constant to pixels (frac * refW/refH) anywhere else.
 void Zelda3D_TitleOverlayRefWH(float* outRefW, float* outRefH);
 
+// Press-START skip path (oot3d-decomp/docs/title_logo_actor.md §7, actor 0x171's update fn
+// FUN_001da9f8, decompiled+traced 2026-07-10): on a confirm press while the logo is in DISPLAY
+// (or the natural cs fade-out already running), the actor inserts a fixed 25-frame grace delay,
+// then MANUALLY fires the same scene-transition trigger the natural cs end would fire
+// (play+0x5C2D=0x14 in the decomp; ported here as gSaveContext.gameMode=GAMEMODE_FILE_SELECT +
+// play->transitionTrigger=TRANS_TRIGGER_START, the exact fields SoH's own N64-equivalent
+// z_en_mag.c EnMag_Update already uses for the same purpose), and switches the alpha fade to an
+// accelerated -25/frame ramp (vs the natural -10/frame). Call once per frame, with `play` valid,
+// from TitlePresentation::update() — NOT from the draw functions (which may run more than once a
+// frame and lack a guaranteed once-per-frame input-edge read).
+void Zelda3D_TitleLogoStepSkip(PlayState* play);
+
+// Resets the skip state machine (press latch, grace timer, accelerated-fade override) — call once
+// on the title-demo active edge (TitlePresentation::enter()'s entry-edge branch) so a fresh title
+// session (e.g. after backing out of file select and returning) doesn't inherit a stale latch from
+// a previous visit.
+void Zelda3D_TitleLogoResetSkip(void);
+
 #ifdef __cplusplus
 }
 #endif

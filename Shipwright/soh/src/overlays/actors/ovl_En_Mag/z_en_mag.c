@@ -153,6 +153,21 @@ void EnMag_Update(Actor* thisx, PlayState* play) {
     EnMag* this = (EnMag*)thisx;
     bool isMQ = ResourceMgr_IsGameMasterQuest();
 
+    // Zelda3D title-demo: this actor's own N64-timed press-START handling (immediate transition
+    // trigger, no grace delay) is superseded by the OoT3D-ported skip path
+    // (Zelda3D_TitleLogoStepSkip, behaviors/title/title_logo.cpp — oot3d-decomp/docs/
+    // title_logo_actor.md §7: a 25-frame grace delay before the transition fires, then a 25/frame
+    // accelerated fade, vs this actor's instant same-frame trigger). EnMag_Draw is already
+    // suppressed while Zelda3D title is active (Task #15); gate the input/transition side the same
+    // way so a START press during the ported title demo doesn't ALSO fire this actor's own instant
+    // gSaveContext.gameMode/transitionTrigger write racing the ported one.
+    {
+        extern int Zelda3D_Title_IsActive(void);
+        if (Zelda3D_Title_IsActive()) {
+            return;
+        }
+    }
+
     if (gSaveContext.fileNum != 0xFEDC) {
         if (this->globalState < MAG_STATE_DISPLAY) {
             if (CHECK_BTN_ALL(play->state.input[0].press.button, BTN_START) ||

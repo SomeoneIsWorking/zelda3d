@@ -135,6 +135,11 @@ constexpr int kLogoCsabDuration = 120;
 constexpr uint16_t kMiscSubFadeIn  = 0x1e; // Flags_SetEnv(play, 3)
 constexpr uint16_t kMiscSubFadeOut = 0x1f; // Flags_SetEnv(play, 4)
 
+// Press-START skip constants (title_logo_actor.md §7, actor field offsets in the decompiled
+// FUN_001da9f8 cited for traceability, not read/poked directly — see Zelda3D_TitleLogoStepSkip).
+constexpr int   kSkipGraceFrames = 25;  // §7.2 +0x1C0: grace delay before the transition fires
+constexpr float kSkipFadeStep    = 25.0f; // §7.3 +0x1CC override: accelerated fade rate
+
 int gTitleLogoModelId = -1;
 
 int titleLogoModelId() {
@@ -249,6 +254,49 @@ constexpr float kCopyrightCenterYFrac =
 // — kept as the original independent oracle measurement (28px tall / 240px = 0.117).
 constexpr float kCopyrightHeightFrac  = 0.117f;
 
+// Press-START skip state (title_logo_actor.md §7). Advanced once per frame by
+// Zelda3D_TitleLogoStepSkip (called from TitlePresentation::update()); consulted by
+// Zelda3D_TitleLogoPhaseAlpha3 to override the natural cs-driven alpha once a skip is in flight.
+//
+// DELIBERATELY frame-NUMBER-anchored (pressCsFrame), not a per-call decrementing counter: SoH's
+// title cs cursor (Zelda3D_TitleCsFrame) advances once every TWO real engine updates (60fps engine,
+// 30fps cs — confirmed live: ZELDA3D_DBG_TITLESKIP trace showed the same csFrame value logged
+// twice per tick). A counter ticked once per Zelda3D_TitleLogoStepSkip call (i.e. once per real
+// engine frame) would therefore elapse the decomp's "25 cs-frame" grace delay in ~12-13 real cs
+// frames — HALF the correct latency — exactly the same class of bug the rest of this file avoids
+// by keeping every timing computation (resolveLogoPhase, stagedRamp) a pure function of the
+// absolute csFrame value rather than a per-call counter. Anchoring on the press's own csFrame and
+// computing `elapsed = csFrame - pressCsFrame` is idempotent under repeated same-csFrame calls,
+// exactly like the rest of the file, and was verified via the live trace after this fix (see the
+// journal entry for the corrected 25/11-frame trace).
+struct TitleSkipState {
+    bool  latched = false;              // §7.2 +0x1C2 "seen" latch: detect a press only once
+    int   pressCsFrame = -1;            // cs frame the press was detected on; -1 = no press yet
+    bool  duringNaturalFadeOut = false; // §7.2 case-3 fan-out (globalState 3->6) vs case-2/5 (->4)
+};
+TitleSkipState gSkip;
+
+void resetSkip() {
+    gSkip = TitleSkipState{};
+}
+
+// Fires the same scene-transition trigger the natural (un-skipped) cs end would eventually fire —
+// per §7.3, under the normal flow this actor never writes play+0x5C2D at all (the cs script itself
+// presumably does), so the skip path has to manufacture it. Ported onto the exact fields SoH's own
+// N64-equivalent already uses for the identical purpose (z_en_mag.c EnMag_Update's
+// `gSaveContext.gameMode = GAMEMODE_FILE_SELECT; play->transitionTrigger = TRANS_TRIGGER_START;
+// play->transitionType = TRANS_TYPE_FADE_BLACK;`) rather than inventing a new transition path —
+// that IS "SoH's existing title->file-select transition path" the port target calls for. Guarded
+// on `!= TRANS_TRIGGER_START` exactly like both decompiled call sites (§7.3/§7.4), so a
+// double-press or an already-fired transition doesn't refire it.
+void fireSkipTransition(PlayState* play) {
+    if (play->transitionTrigger != TRANS_TRIGGER_START) {
+        gSaveContext.gameMode = GAMEMODE_FILE_SELECT;
+        play->transitionTrigger = TRANS_TRIGGER_START;
+        play->transitionType = TRANS_TYPE_FADE_BLACK;
+    }
+}
+
 int gTitleCopyrightModelId = -1;
 
 int titleCopyrightModelId() {
@@ -283,12 +331,92 @@ extern "C" void Zelda3D_TitleOverlayRefWH(float* outRefW, float* outRefH) {
 // *outFadeInFrame is the cs frame the fade-in trigger fired, or -1 (resolveLogoPhase's fallback).
 extern "C" int Zelda3D_TitleLogoPhaseAlpha3(float* outWordmarkAlpha, float* outBackdropAlpha,
                                             float* outCopyrightAlpha, int* outFadeInFrame) {
-    const LogoPhaseState ps = resolveLogoPhase(Zelda3D_TitleCsFrame());
+    const int csFrame = Zelda3D_TitleCsFrame();
+    LogoPhaseState ps = resolveLogoPhase(csFrame);
+    // Press-START skip override (§7.3/7.4): once the 25-frame grace delay has elapsed on a press
+    // that landed during DISPLAY/DONE, the actor's own accelerated -25/frame ramp REPLACES the
+    // natural cs-driven alpha (which would otherwise just sit at 255 in Display forever, since the
+    // cs's own fadeOutFrame trigger may be far off / this loop iteration may never reach it). A
+    // press that landed during an already-running NATURAL fade-out (duringNaturalFadeOut) does NOT
+    // override alpha here — per the traced code (§7.4), state 6 keeps decrementing at whatever
+    // rate +0x1CC already had (10, untouched by that fan-out branch), which is exactly what
+    // resolveLogoPhase's own natural FadeOut computation already produces; the skip machinery only
+    // needed to guarantee the transition trigger fires (done in Zelda3D_TitleLogoStepSkip).
+    if (gSkip.pressCsFrame >= 0 && !gSkip.duringNaturalFadeOut) {
+        const int elapsed = csFrame - gSkip.pressCsFrame;
+        if (elapsed >= kSkipGraceFrames) {
+            const int fadeElapsed = elapsed - kSkipGraceFrames; // §7.3: 0 at the transition frame
+            const float a = std::max(0.0f, 255.0f - (float)fadeElapsed * kSkipFadeStep);
+            ps.wordmarkAlpha = ps.backdropAlpha = ps.copyrightAlpha = a;
+            ps.phase = (a > 0.0f) ? LogoPhase::FadeOut : LogoPhase::Hidden;
+        }
+    }
     if (outWordmarkAlpha) *outWordmarkAlpha = ps.wordmarkAlpha;
     if (outBackdropAlpha) *outBackdropAlpha = ps.backdropAlpha;
     if (outCopyrightAlpha) *outCopyrightAlpha = ps.copyrightAlpha;
     if (outFadeInFrame) *outFadeInFrame = ps.fadeInFrame;
     return ps.phase != LogoPhase::Hidden;
+}
+
+// Advances the press-START skip state machine — see title_logo.h's doc comment for the call
+// contract (once per frame, from TitlePresentation::update()). Detection + timing fully traced in
+// oot3d-decomp/docs/title_logo_actor.md §7.1-7.4.
+extern "C" void Zelda3D_TitleLogoStepSkip(PlayState* play) {
+    if (play == nullptr) {
+        return;
+    }
+    const int csFrame = Zelda3D_TitleCsFrame();
+    const LogoPhaseState natural = resolveLogoPhase(csFrame);
+
+    // §7.1: "confirm pressed" — the decomp's own input read isn't gated on a specific button code
+    // (byte pre-resolved elsewhere in OoT3D), so this mirrors SoH's own N64-equivalent detection
+    // (z_en_mag.c EnMag_Update: START, A, or B all count as confirm).
+    const bool pressed = CHECK_BTN_ALL(play->state.input[0].press.button, BTN_START) ||
+                         CHECK_BTN_ALL(play->state.input[0].press.button, BTN_A) ||
+                         CHECK_BTN_ALL(play->state.input[0].press.button, BTN_B);
+
+    // §7.2: detect once (latched), only while DISPLAY/DONE (state 2/5 -> 4) or an already-running
+    // natural FADE_OUT (state 3 -> 6) — i.e. anywhere the logo is at least fully visible.
+    if (!gSkip.latched && pressed &&
+        (natural.phase == LogoPhase::Display || natural.phase == LogoPhase::FadeOut)) {
+        gSkip.latched = true;
+        gSkip.pressCsFrame = csFrame;
+        gSkip.duringNaturalFadeOut = (natural.phase == LogoPhase::FadeOut);
+    }
+
+    // §7.3/7.4: once the 25-frame grace delay has elapsed (idempotent on csFrame, safe to call
+    // every frame past that point — matches the decomp's own repeated `!= TRANS_TRIGGER_START`
+    // guard at both call sites), fire the transition. The state-6/natural-fade-out branch calls
+    // this a "safety net" re-fire in case state 6 was entered directly without ever passing
+    // through state 4 — same guarded call either way, no separate code path needed here.
+    if (gSkip.pressCsFrame >= 0 && (csFrame - gSkip.pressCsFrame) >= kSkipGraceFrames) {
+        fireSkipTransition(play);
+    }
+
+    // Verification aid (ZELDA3D_DBG_TITLESKIP=1) — per-frame trace of the skip state machine,
+    // reused pattern from title_fireglow.cpp's ZELDA3D_DBG_FIREGLOW (screenshot timing is an
+    // unreliable isolation of a ~25+11-frame input-driven sequence; this prints the exact frame
+    // the grace timer elapses, the transition fires, and the accelerated alpha ramp).
+    {
+        static int sDbg = -1;
+        if (sDbg < 0) {
+            const char* v = std::getenv("ZELDA3D_DBG_TITLESKIP");
+            sDbg = (v != nullptr && v[0] != '\0') ? 1 : 0;
+        }
+        if (sDbg && (pressed || gSkip.pressCsFrame >= 0)) {
+            const int elapsed = (gSkip.pressCsFrame >= 0) ? (csFrame - gSkip.pressCsFrame) : -1;
+            fprintf(stderr,
+                    "[TITLESKIP] csFrame=%d pressed=%d pressCsFrame=%d elapsed=%d duringFadeOut=%d "
+                    "transitionTrigger=%d gameMode=%d\n",
+                    csFrame, pressed ? 1 : 0, gSkip.pressCsFrame, elapsed,
+                    gSkip.duringNaturalFadeOut ? 1 : 0, play->transitionTrigger,
+                    gSaveContext.gameMode);
+        }
+    }
+}
+
+extern "C" void Zelda3D_TitleLogoResetSkip(void) {
+    resetSkip();
 }
 
 extern "C" int Zelda3D_TryDrawTitleLogo(PlayState* play) {

@@ -64,6 +64,11 @@ void TitlePresentation::enter(PlayState* play) {
     if (!mLightSaved) {
         mLightEnableSaved = gZelda3dLightEnable;
         mLightSaved = 1;
+        // Entry-edge only (not every active frame, unlike the rest of this block): fresh title
+        // session shouldn't inherit a stale press-START skip latch from a previous visit (e.g.
+        // backing out of file select with B and returning to the title demo) — see
+        // Zelda3D_TitleLogoResetSkip's doc comment.
+        Zelda3D_TitleLogoResetSkip();
     }
     gZelda3dLightEnable = 0;
 }
@@ -204,6 +209,12 @@ int TitlePresentation::update(PlayState* play) {
     mFrame.fov   = csFov;
 
     applyScreenFade(play);
+
+    // Press-START skip (oot3d-decomp/docs/title_logo_actor.md §7) — once per frame, after the cs
+    // cursor for THIS frame has been advanced (Zelda3D_TitleCsAdvance ran above), so the skip's own
+    // "natural phase" read (resolveLogoPhase inside title_logo.cpp) sees the same cursor value the
+    // rest of this frame's overlay draw will use.
+    Zelda3D_TitleLogoStepSkip(play);
 
     return 1;
 }
