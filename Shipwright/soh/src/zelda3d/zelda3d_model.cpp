@@ -1383,6 +1383,31 @@ extern "C" uint8_t* Zelda3D_RomReadAlloc(const char* path, size_t* outSize) {
     return buf;
 }
 
+// Generic sibling-file read for an already-allocated auto model (Zelda3D_AutoModelId): finds the
+// first file in that model's own ZAR whose name ends with `suffix` and returns its raw bytes as a
+// malloc'd buffer (caller frees), or NULL if the model/zar/file isn't found. Loads the model lazily
+// (same as Zelda3D_AutoModelHeight etc.) so callers don't need a separate load step. Generalizes the
+// facial-cmab sibling-read pattern in appendFacialFrames() to any raw asset next to a loaded CMB —
+// e.g. the title fire-glow's g_title_fire.cmab living alongside g_title.cmb in zelda_mag.zar
+// (oot3d-decomp/docs/title_logo_fireglow_cmab.md).
+extern "C" uint8_t* Zelda3D_AutoModelReadZarFile(int modelId, const char* suffix, size_t* outSize) {
+    if (outSize) *outSize = 0;
+    if (!suffix || !*suffix) return nullptr;
+    LoadedModel* lm = loadModel(modelId);
+    if (!lm || !lm->zar) return nullptr;
+    for (const auto& f : lm->zar->files()) {
+        if (!strEndsWith(f.name, suffix)) continue;
+        std::vector<uint8_t> bytes = lm->zar->read(f);
+        if (bytes.empty()) return nullptr;
+        uint8_t* buf = (uint8_t*)malloc(bytes.size());
+        if (!buf) return nullptr;
+        memcpy(buf, bytes.data(), bytes.size());
+        if (outSize) *outSize = bytes.size();
+        return buf;
+    }
+    return nullptr;
+}
+
 extern "C" int Zelda3D_LoadSceneCollisionRaw(const char* sceneName, Zelda3D_RawCollision* out) {
     if (!sceneName || !*sceneName || !out) return 0;
     memset(out, 0, sizeof(*out));
