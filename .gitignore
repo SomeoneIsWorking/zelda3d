@@ -23,3 +23,6 @@ Azahar/
 imgui.ini
 shipofharkinian.json
 Save/
+
+# machine-local agent-relay tool state (not project content)
+.pi/

@@ -59,6 +59,15 @@ int Zelda3D_TitleCsBlendedLight(uint16_t daytime,
                                 uint8_t amb[3], int8_t l1dir[3], uint8_t l1col[3],
                                 int8_t l2dir[3], uint8_t l2col[3], uint8_t fogCol[3]);
 
+// Misc / transition / loop triggers — op-0x03 (misc) sub-op 0x1e = logo
+// FADE_IN trigger, sub-op 0x1f = logo FADE_OUT trigger; op-0x7c =
+// screen-level fade window; op-0x3e8 = loop-restart frame. All byte-confirmed
+// in spot99's " BDQ" stream (see `oot3d-decomp/docs/title_gamestate_driver.md`
+// §3). Returns -1 / 0 when the cs lacks the requested trigger.
+int Zelda3D_TitleCsMiscTriggerFrame(uint16_t sub);
+int Zelda3D_TitleCsScreenFade(int* start, int* end);
+int Zelda3D_TitleCsLoopFrame(void);
+
 int  Zelda3D_TitleCsFrame(void);
 void Zelda3D_TitleCsSetFrame(int frame);
 int  Zelda3D_TitleCsAdvance(void);   // returns new frame

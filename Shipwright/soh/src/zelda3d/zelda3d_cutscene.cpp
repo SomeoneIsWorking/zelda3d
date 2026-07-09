@@ -92,6 +92,26 @@ std::vector<RiderCue> sRiderCues;
 struct TimeCue { int frame; uint16_t daytime; };
 std::vector<TimeCue> sTimeCues;
 
+// op-0x03 misc triggers (one entry per 48-byte record): the decomp
+// (`oot3d-decomp/docs/title_gamestate_driver.md` §3) pins sub-op 0x1e =
+// Flags_SetEnv(play,3) (logo fade-in trigger) and sub-op 0x1f = Flags_SetEnv
+// (play,4) (logo fade-out trigger) — byte-confirmed in spot99's BDQ stream
+// at +0x36a0/+0x36d8. Other sub-ops in this cs (e.g. 0x01 at frames 0..90,
+// 0x04 in op-0x7c at 2310..2460) are stored too; consumers select by type.
+struct MiscCue { uint16_t sub; uint16_t start, end; };
+std::vector<MiscCue> sMiscCues;
+
+// op-0x7c transition/fade window: title cs uses sub-op 0x04 over frames
+// 2310..2460 — the screen-level fade straddling the loop boundary.
+struct FadeCue { uint16_t sub; uint16_t start, end; };
+std::vector<FadeCue> sFadeCues;
+
+// op-0x3e8 destination marker — purely a "this is the cs end" sentinel in N64
+// (z_demo.c case 0x3E8 just sets state = CS_STATE_UNSKIPPABLE_INIT). The loop
+// point itself comes from the " BDQ" header's end_frame (2400 for title), not
+// from this command's payload. Tracked here only so the loader can log it.
+bool sHasDest = false;
+
 // spot99 scene light settings (ZSI cmd 0x0F), raw 28-byte entries — kept
 // for reference/actors; NOT what the title blends (see sTitlePal below).
 std::vector<uint8_t> sLightSlotsRaw;
@@ -313,6 +333,39 @@ extern "C" int Zelda3D_TitleCsLoad(void) {
             p += 8 + (cnt > 0 ? (size_t)cnt * 48 : 0);
             continue;
         }
+        if (op == 0x03) {               // misc triggers (48-byte recs, sub-op @ ro)
+            const int32_t cnt = S32(d, p + 4);
+            for (int r = 0; r < cnt && p + 8 + (r + 1) * 48 <= len; r++) {
+                const size_t ro = p + 8 + (size_t)r * 48;
+                MiscCue mc;
+                memcpy(&mc.sub,   d + ro,     2);
+                memcpy(&mc.start, d + ro + 2, 2);
+                memcpy(&mc.end,   d + ro + 4, 2);
+                sMiscCues.push_back(mc);
+            }
+            p += 8 + (cnt > 0 ? (size_t)cnt * 48 : 0);
+            continue;
+        }
+        if (op == 0x7c) {               // transition/fade window
+            const int32_t cnt = S32(d, p + 4);
+            for (int r = 0; r < cnt && p + 8 + (r + 1) * 48 <= len; r++) {
+                const size_t ro = p + 8 + (size_t)r * 48;
+                FadeCue fc;
+                memcpy(&fc.sub,   d + ro,     2);
+                memcpy(&fc.start, d + ro + 2, 2);
+                memcpy(&fc.end,   d + ro + 4, 2);
+                sFadeCues.push_back(fc);
+            }
+            p += 8 + (cnt > 0 ? (size_t)cnt * 48 : 0);
+            continue;
+        }
+        if (op == 0x3e8) {              // loop destination marker (end of demo)
+            // N64 z_demo.c case 0x3E8 is a state-flip sentinel — no payload frame
+            // value to read; the loop point is the BDQ header's end_frame (sEndFrame).
+            sHasDest = true;
+            p += 16;
+            continue;
+        }
         // stride rules from FUN_002c5ba0 (subset needed for spot99's stream;
         // full table in tools/walk_oot3d_cs.py)
         if (op == 1 || op == 2 || op == 5 || op == 6) {
@@ -325,15 +378,14 @@ extern "C" int Zelda3D_TitleCsLoad(void) {
             p += 8 + (size_t)S32(d, p + 4) * 12;
         } else if (op == 0x96) {
             p += 12 + (size_t)S16(d, p + 10) * 32;
-        } else if (op == 1000) {
-            p += 16;
         } else {
             const int32_t cnt = S32(d, p + 4);
             p += 8 + (cnt > 0 ? (size_t)cnt * 48 : 0);
         }
     }
     free(d);
-    fprintf(stderr, "[Zelda3D] title cs: %zu rider cues\n", sRiderCues.size());
+    fprintf(stderr, "[Zelda3D] title cs: %zu rider cues, %zu misc cues, %zu fade cues, hasDest=%d\n",
+            sRiderCues.size(), sMiscCues.size(), sFadeCues.size(), (int)sHasDest);
     if (!found) {
         fprintf(stderr, "[Zelda3D] title cs: OP97 spline block not found\n");
         return 0;
@@ -412,6 +464,37 @@ extern "C" int Zelda3D_TitleCsAdvance(void) {
     sFrame++;
     if (sEndFrame > 0 && sFrame >= sEndFrame) sFrame = 0;
     return sFrame;
+}
+
+// First cs frame at which a given op-0x03 misc sub-op fires, or -1 if absent.
+// Sub-ops of interest (per `oot3d-decomp/docs/title_gamestate_driver.md` §3):
+//   0x1e = Flags_SetEnv(play, 3) — title-logo FADE_IN trigger
+//   0x1f = Flags_SetEnv(play, 4) — title-logo FADE_OUT trigger
+// (Other misc sub-ops in this cs: 0x01 at frames 0..90 — startup trigger.)
+extern "C" int Zelda3D_TitleCsMiscTriggerFrame(uint16_t sub) {
+    if (sLoadState <= 0) return -1;
+    for (const MiscCue& m : sMiscCues) {
+        if (m.sub == sub) return m.start;
+    }
+    return -1;
+}
+
+// First op-0x7c transition/fade window (sub-op 0x04 in title cs: frames 2310
+// ..2460 — the screen-level fade straddling the loop boundary). Returns 1 if
+// any fade cue is present; fills *start/*end with its [start,end) frame range.
+extern "C" int Zelda3D_TitleCsScreenFade(int* start, int* end) {
+    if (sLoadState <= 0 || sFadeCues.empty()) return 0;
+    *start = sFadeCues.front().start;
+    *end   = sFadeCues.front().end;
+    return 1;
+}
+
+// The op-0x3e8 destination marker = the cs end. The loop-restart frame is the
+// " BDQ" header's end_frame (2400 in title cs) — exposed via
+// Zelda3D_TitleCsEndFrame(); this function just reports whether the cs had a
+// destination marker at all (a malformed/missing one means no loop).
+extern "C" int Zelda3D_TitleCsLoopFrame(void) {
+    return sHasDest ? sEndFrame : -1;
 }
 
 // Active rider cue for a cs frame (start <= f < end). Returns 1 and fills

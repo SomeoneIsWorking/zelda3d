@@ -161,9 +161,54 @@ class Harness:
     def __exit__(self, *a): self.quit()
 
 
+def _ensure_headless_env() -> None:
+    """Force the harness onto a private Xvfb display so neither its SBS
+    window nor the embedded SoH3D's Vulkan window reaches the user's
+    Wayland desktop. Idempotent — once a process has set these, child
+    spawns inherit them. Mirrors tools/zelda3d_game.sh's setup_headless,
+    required because SDL3-GPU's window creation ignores libultraship's
+    SOH_HEADLESS knob (the GPU backend has no headless path; only the
+    legacy gfx_sdl3.cpp one does). ZELDA3D_HEADLESS=0 opts out (debugging
+    only — the SBS window will then appear on the user's display)."""
+    if os.environ.get("ZELDA3D_HEADLESS", "1") != "1":
+        return
+    disp = os.environ.get("ZELDA3D_HEADLESS_DISPLAY", ":99")
+    # Bring up Xvfb on :99 if it isn't already up.
+    import subprocess as _sp
+    try:
+        _sp.run(["xdpyinfo"], check=True, env={**os.environ, "DISPLAY": disp},
+                 stdout=_sp.DEVNULL, stderr=_sp.DEVNULL)
+    except Exception:
+        import pathlib as _pl
+        log_dir = REPO_ROOT / "scratch" / "logs"
+        log_dir.mkdir(parents=True, exist_ok=True)
+        log = open(log_dir / "xvfb_harness.log", "wb")
+        _sp.Popen(["Xvfb", disp, "-screen", "0", "1920x1080x24"],
+                  stdout=log, stderr=_sp.STDOUT, start_new_session=True)
+        import time as _t
+        up = False
+        for _ in range(20):
+            try:
+                _sp.run(["xdpyinfo"], check=True, env={**os.environ, "DISPLAY": disp},
+                         stdout=_sp.DEVNULL, stderr=_sp.DEVNULL)
+                up = True
+                break
+            except Exception:
+                _t.sleep(0.5)
+        if not up:
+            raise RuntimeError(f"Xvfb failed to come up on {disp}")
+    os.environ["DISPLAY"]            = disp
+    os.environ["XAUTHORITY"]         = "/dev/null"
+    os.environ["SDL_VIDEODRIVER"]    = "x11"
+    os.environ["SDL_AUDIODRIVER"]    = "dummy"
+    os.environ["SOH3D_HARNESS_HEADLESS"] = "1"  # disable harness SBS window
+    os.environ.pop("WAYLAND_DISPLAY", None)
+
+
 def spawn(save_state: Optional[str] = None) -> Harness:
     if not HARNESS_BIN.exists() and not HARNESS_SH.exists():
         raise RuntimeError(f"soh3d_harness not found; expected {HARNESS_BIN} or {HARNESS_SH}")
+    _ensure_headless_env()
     cmd = [str(HARNESS_BIN)] if HARNESS_BIN.exists() else [str(HARNESS_SH)]
     h = Harness(cmd)
     if save_state:

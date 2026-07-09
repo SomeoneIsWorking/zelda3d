@@ -6544,6 +6544,22 @@ static void Zelda3D_ReplExec(PlayState* play, char* line, const char* outPath) {
             gZelda3dTitleCam, play->sceneNum, play->csCtx.state, Zelda3D_AutoWarpEnabled(),
             play->view.eye.x, play->view.eye.y, play->view.eye.z,
             kZelda3dTitleEye[0], kZelda3dTitleEye[1], kZelda3dTitleEye[2]);
+    } else if (strcmp(cmd, "titlecs") == 0) {
+        // Read/pin the ported title-cs cursor (Zelda3D_TitleCsFrame — the clock the
+        // TitlePresentation module and logo phase gating run off). `titlecs` alone reads;
+        // `titlecs <n>` pins the cursor to n (it keeps advancing from there). NOTE: pinning
+        // moves ALL cs-derived state (dayTime/lighting/logo phase) to that instant — fine for
+        // phase-boundary verification, wrong for oracle A/B calibration (use tools/title_ab.py).
+        if (sscanf(line, "%*s %i", &iv) == 1) {
+            Zelda3D_TitleCsSetFrame(iv);
+        }
+        int fadeStart = -1, fadeEnd = -1;
+        Zelda3D_TitleCsScreenFade(&fadeStart, &fadeEnd);
+        Zelda3D_ReplReply(outPath,
+            "titlecs frame=%d end=%d fadeIn=%d fadeOut=%d screenFade=[%d,%d) loop=%d",
+            Zelda3D_TitleCsFrame(), Zelda3D_TitleCsEndFrame(),
+            Zelda3D_TitleCsMiscTriggerFrame(0x1e), Zelda3D_TitleCsMiscTriggerFrame(0x1f),
+            fadeStart, fadeEnd, Zelda3D_TitleCsLoopFrame());
     } else if (strcmp(cmd, "camlift") == 0) {
         // #4 toggle/inspect the cutscene/title camera-lift. `camlift 0|1` sets it; `camlift` alone
         // reports state + the live view eye and the lift applied THIS frame (post-reconcile).
