@@ -68,76 +68,45 @@ OUTDIR = REPO / "scratch" / "title_ab"
 SAVESTATE = REPO / "scratch" / "title_settled.state"
 
 # ---------------------------------------------------------------------------
-# Empirically-verified (az_frames, soh_frames) anchor pairs — same content,
-# confirmed BY EYE (rider pose, hill silhouette, moon position all aligned)
-# in debug_journal/2026-07-08-title-parity-audit-ranked.md and re-confirmed
-# live while building this tool (scratch/title_ab/{anchor360,earlyB}_sxs.png).
-# Do not add an anchor without an eyeballed SxS to back it — this table is
-# the thing that keeps the whole tool honest.
+# az_step -> soh_step SEED, derived from the RE'd rate law (2026-07-09 phase-
+# sync fix), NOT from eyeballed/SSIM-matched anchor pairs anymore. Prior to
+# the fix, SoH's ported Zelda3D_TitleCsAdvance() bumped its cs cursor once
+# per engine tick (soh_step), while the oracle's REAL title cs advances at
+# HALF that rate per Az retro_run() call — a genuine 2x RATE bug, not a
+# fixed phase offset (see debug_journal/2026-07-09-title-cs-phase-sync.md).
+# That's why the old two-point ANCHORS table ((200,397),(360,449)) had a
+# non-constant, shrinking gap (197 -> 89): it was sampling two points on a
+# curve produced by two clocks running at different SPEEDS, not a single
+# lag. The fix makes SoH's cursor advance at the same 0.5 cs-frame/tick rate
+# as the oracle, so the relationship collapses to a single affine formula:
 #
-#   az=200 -> soh=397   found by calibrate's content search (score 0.93,
-#                        unambiguous peak), NOT a linear extrapolation from
-#                        the other anchors — SoH's own N64-splash/boot
-#                        sequence eats ~250-300 SoH-side frames of "no
-#                        title-cs content yet" before its title cutscene
-#                        starts, so early az targets need a SoH frame far
-#                        ahead of the naive az==soh guess.
-#   az=360 -> soh=449   found by calibrate with a wide (+-200) margin: the
-#                        score climbs smoothly from soh~360 (0.695) all the
-#                        way to a sharp, unambiguous peak at soh=449 (0.912)
-#                        before falling off a cliff after soh~530 (score
-#                        collapses to ~0.13-0.28 — a real content-regime
-#                        change, not noise). This SUPERSEDES the older
-#                        "raw step 360/360, matched by eye" claim from
-#                        debug_journal/2026-07-08-title-sky-color.md /
-#                        title-moon-size.md: that pairing was in the right
-#                        neighborhood (same rider-crossing-field shot) but
-#                        NOT the true peak — off by ~89 frames. This is
-#                        exactly the failure mode this tool exists to fix:
-#                        "looks about right by eye" vs "is provably the
-#                        best-scoring instant".
+#   az_cs(az_step)  = 88 + 0.5 * az_step          (measured intercept: the
+#                      title_settled.state savestate is captured 88 cs-
+#                      frames into the loop, not at cs frame 0)
+#   soh_cs(soh_step) = 0.5 * (soh_step - 232)      (232 = SoH's own N64-
+#                      splash/boot tick count before TitlePresentation first
+#                      activates; unaffected by the rate fix)
+#   content match (az_cs == soh_cs)  =>  soh_step = az_step + 408
 #
-# SUPERSEDED / DO NOT REUSE: the older audit anchor (az=396 -> soh=413,
-# from debug_journal/2026-07-08-title-parity-audit-ranked.md "pair2") is
-# INCONSISTENT with the (360,449) anchor above — soh must be non-decreasing
-# in az (both clocks only run forward, no loops in this range), and 413 <
-# 449 violates that. It was another "close enough by eye" measurement, not
-# a content-search result; treat it as falsified, not as data.
-#
-# CONSEQUENCE: the az->soh relationship is NOT monotonic-slope across the
-# splash region (soh lags by ~200 frames at az=200, then the lag drops to
-# ~90 by az=360) — piecewise-LINEAR interpolation between anchors is only a
-# rough SEARCH SEED (see estimate_soh_frame); calibrate()'s fine
-# content-search is what actually establishes the match. Pass a generous
-# --margin for az < ~400 (the splash-recovery zone) — the default is sized
-# for the post-splash region, not this one.
-ANCHORS = [(200, 397), (360, 449)]
-# NOTE: no anchor below az=200 — we have not established a content match
-# there (see title_parity doc); az<200 is untested territory for this tool.
-# NOTE: az >~ 650-700 hits Azahar's scripted "Legend of Zelda OoT3D" logo
-# overlay card, which SoH3D does not currently render at all — calibrate()
-# correctly reports a low, non-peaked score there (no fix belongs in THIS
-# tool; see the title_ab doc for that finding).
+# Both constants (88, 232) were measured directly off Az/SoH's own cs-cursor
+# state (not SSIM-guessed): Az's via exact camera-eye-position inversion
+# against the ported OP97 spline table (byte-exact, <0.1 world-unit
+# residual); SoH's via the live `soh_titlecs` cursor readout at soh_step
+# checkpoints (exact, slope==0.5 confirmed to the frame). This seed can be
+# WRONG by the boot-splash constant if a build changes SoH's own pre-title
+# frame count — that's fine, it's still only a search SEED; calibrate()'s
+# fine content sweep is what actually establishes the match. Give the sweep
+# enough --margin (all recent verified matches needed >=150) since the
+# early-night sky content is low-motion and the SSIM curve is a broad
+# plateau, not a sharp spike, in that regime.
+SOH_STEP_INTERCEPT = 408  # soh_step ≈ az_step + SOH_STEP_INTERCEPT (post 2026-07-09 fix)
 
 
 def estimate_soh_frame(az_frames: int) -> int:
-    """Piecewise-linear extrapolation/interpolation from ANCHORS. This is
-    only a SEARCH SEED — the fine sweep in calibrate() is what actually
-    verifies the match by content; a wrong estimate just costs a wider
-    bulk-step, never a wrong answer."""
-    pts = ANCHORS
-    if az_frames <= pts[0][0]:
-        return pts[0][1]
-    for (ax0, sx0), (ax1, sx1) in zip(pts, pts[1:]):
-        if ax0 <= az_frames <= ax1:
-            if ax1 == ax0:
-                return sx0
-            t = (az_frames - ax0) / (ax1 - ax0)
-            return round(sx0 + t * (sx1 - sx0))
-    # past the last anchor: extrapolate at the last segment's slope
-    (ax0, sx0), (ax1, sx1) = pts[-2], pts[-1]
-    slope = (sx1 - sx0) / (ax1 - ax0)
-    return round(sx1 + slope * (az_frames - ax1))
+    """Affine SEARCH SEED derived from the RE'd rate law above — NOT the
+    final answer. calibrate()'s fine content-search is what actually
+    verifies the match; a wrong estimate just costs a wider bulk-step."""
+    return az_frames + SOH_STEP_INTERCEPT
 
 
 def load_gray_small(path, size=(48, 28)) -> np.ndarray:
@@ -239,19 +208,19 @@ def _spawn():
 
 
 def cmd_list_anchors(_args):
-    print("az_frames  soh_frames  (both stepped from the same title_settled.state, verified by eye)")
-    for a, s in ANCHORS:
-        print(f"{a:9d}  {s:10d}")
+    print("Post-2026-07-09-fix affine seed: soh_step ~= az_step + "
+          f"{SOH_STEP_INTERCEPT} (see the derivation comment above ANCHORS' old home "
+          "in this file). No more eyeballed anchor table — the rate-law fix collapsed "
+          "the az->soh relationship to a single constant offset.")
 
 
 def cmd_calibrate(args):
     _require_env()
-    if args.az < 360 and args.margin < 150:
-        print(f"[title_ab] WARNING: az={args.az} is in the splash-recovery zone (SoH's own "
-              "N64-splash eats ~250-300 SoH frames before title-cs content starts, and the lag "
-              "collapses nonlinearly by az~360 — see ANCHORS note in this file). A margin of "
-              f"{args.margin} is likely too small to find the true match; consider --margin 200+.",
-              file=sys.stderr)
+    if args.margin < 150:
+        print(f"[title_ab] WARNING: the early-night sky content is low-motion (broad, "
+              "near-flat SSIM plateau, not a sharp peak) — a margin of "
+              f"{args.margin} may land inside the plateau without covering its true edges. "
+              "Consider --margin 150+.", file=sys.stderr)
     h = _spawn()
     try:
         print(f"[title_ab] az: run {args.az} frames...", file=sys.stderr)

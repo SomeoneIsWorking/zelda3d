@@ -67,11 +67,16 @@ void TitlePresentation::enter(PlayState* play) {
 }
 
 void TitlePresentation::exit(PlayState* play) {
-    (void)play;
     mActive = false;
     if (mLightSaved) {
         gZelda3dLightEnable = mLightEnableSaved;
         mLightSaved = 0;
+    }
+    // Clear the ported screen fade (applyScreenFade only ever runs while active) so it can't
+    // leave play->transitionFade — a shared overlay real gameplay transitions also use — stuck
+    // showing a stale alpha after title hands off.
+    if (play != nullptr) {
+        play->transitionFade.fadeColor.a = 0;
     }
 }
 
@@ -196,11 +201,59 @@ int TitlePresentation::update(PlayState* play) {
     mFrame.up.x  = csUp[0];  mFrame.up.y  = csUp[1];  mFrame.up.z  = csUp[2];
     mFrame.fov   = csFov;
 
+    applyScreenFade(play);
+
     return 1;
 }
 
 void TitlePresentation::draw(PlayState* play) {
     Zelda3D_TryDrawTitleLogo(play);
+}
+
+// Screen-level loop fade — ports OoT3D's op-0x7c window (Zelda3D_TitleCsScreenFade: cs frames
+// [2310,2460), straddling the 2400 loop point) onto play->transitionFade, the engine's existing
+// full-screen fade overlay (unconditionally drawn every frame by Play_Draw's
+// TransitionFade_Draw call, after every other draw pass — exactly the "screen-level" compositing
+// order op-0x7c needs). Op-0x7c's raw bytes only carry a sub-op + [start,end) window (see that
+// function's header comment for why the record's other fields aren't independently parsed);
+// there's no separate color/curve payload to port, so this assumes the standard OoT cutscene
+// screen-fade shape: a triangular ramp to full black exactly at the loop-restart instant (hiding
+// the camera's hard cut back to frame 0 under a hard fade), then back out. Since
+// Zelda3D_TitleCsFrame() wraps at Zelda3D_TitleCsEndFrame() (2400) — it never actually reports
+// 2400..2459 — the post-wrap tail of the window is read back as low post-wrap cs frames
+// [0, end-loopFrame) and re-mapped onto the window's absolute timeline below.
+void TitlePresentation::applyScreenFade(PlayState* play) {
+    int start = 0, end = 0;
+    uint8_t alpha = 0;
+    if (Zelda3D_TitleCsScreenFade(&start, &end)) {
+        const int loopFrame = Zelda3D_TitleCsEndFrame();  // 2400 — wrap point
+        const int csFrame = Zelda3D_TitleCsFrame();
+        int absFrame = -1;
+        if (csFrame >= start && csFrame < loopFrame) {
+            absFrame = csFrame;                    // pre-wrap half of the window
+        } else if (loopFrame > 0 && csFrame < (end - loopFrame)) {
+            absFrame = csFrame + loopFrame;         // post-wrap tail, re-mapped past `loopFrame`
+        }
+        if (absFrame >= start && absFrame < end) {
+            const int upWidth   = loopFrame - start;  // ramping TO black
+            const int downWidth = end - loopFrame;    // ramping FROM black
+            const int pos = absFrame - start;
+            float a;
+            if (pos < upWidth) {
+                a = (upWidth > 0) ? (float)pos / (float)upWidth : 1.0f;
+            } else {
+                const int downPos = pos - upWidth;
+                a = (downWidth > 0) ? 1.0f - (float)downPos / (float)downWidth : 0.0f;
+            }
+            if (a < 0.0f) a = 0.0f;
+            if (a > 1.0f) a = 1.0f;
+            alpha = (uint8_t)(a * 255.0f + 0.5f);
+        }
+    }
+    play->transitionFade.fadeColor.r = 0;
+    play->transitionFade.fadeColor.g = 0;
+    play->transitionFade.fadeColor.b = 0;
+    play->transitionFade.fadeColor.a = alpha;
 }
 
 // Title lighting override — called from z_kankyo's Environment_Update right before the

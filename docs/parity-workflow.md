@@ -32,7 +32,11 @@ used mismatched frames and had to be superseded).
 For each real gap, extend the OoT3D decomp until it covers the behavior; derive the correct
 value/behavior from the 3DS binary (decomp-port / ghidra-re skills), NOT from guessed SoH
 struct offsets (SoH is 64-bit; N64 offset comments are wrong past ~0x74). Record in
-`oot3d-decomp/docs/`. **"It's an asset difference" is NOT a terminal answer** — SoH already
+`oot3d-decomp/docs/`. **Ghidra derives; the running game only locates** (user directive
+2026-07-09): constants/behavior come from static decompilation, never from measuring the
+live oracle — dynamic observation (harness watchpoints, dump diffs) is permitted solely to
+find the writer PC / struct address that static xrefs missed, after which you return to
+Ghidra and derive the mechanism from code. **"It's an asset difference" is NOT a terminal answer** — SoH already
 renders 3DS assets from the ROM, so an asset-rooted gap means "port that exact 3DS asset."
 
 ## Phase 3 — FIX, and honor proven-negatives
