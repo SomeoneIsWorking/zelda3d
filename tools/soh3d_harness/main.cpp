@@ -1118,6 +1118,15 @@ void HandleSaveState(std::istringstream& toks) {
 constexpr uint32_t GPLAYSTATE_VA           = 0x0050AF34;
 constexpr uint32_t SCENENUM_OFF            = 0x0104;
 
+// gSaveContext (fixed .bss global, confirmed by content — oot3d-decomp
+// docs/ram_map.md:56) @ 0x00587958. dayTime is a u16 @ +0x0C (+0x0A is a
+// u16-aligned pad per the doc's "0x0C" byte offset; read the containing
+// word and shift). This is a GLOBAL, not play-relative, so it is valid to
+// read even during the title/opening-demo GameState (gPlayState==0) where
+// the normal Play struct doesn't exist yet.
+constexpr uint32_t GSAVECONTEXT_VA         = 0x00587958;
+constexpr uint32_t SAVECONTEXT_DAYTIME_OFF = 0x0C;
+
 // OoT3D title-demo state. GREZZO refactored the title/opening path on 3DS
 // so it is NOT a Play gamestate — gPlayState @ 0x0050AF34 stays 0 during
 // the whole title+demo loop. Instead the title context lives INLINE in
@@ -3461,6 +3470,18 @@ void RunRepl() {
                         daytime, sk1, sk2, blend,
                         amb[0], amb[1], amb[2],
                         fog[0], fog[1], fog[2], fn, ff);
+        }
+        else if (cmd == "az_daytime") {
+            // Read gSaveContext.dayTime straight from the fixed .bss VA —
+            // works during title (gPlayState==0) since gSaveContext is a
+            // global, not play-relative. u16 lives at offset 0x0C; the
+            // word read covers 0x0C..0x0F, dayTime is the low 16 bits
+            // (little-endian ARM).
+            auto& mem = Core::System::GetInstance().Memory();
+            auto w = mem.Read32OrNullopt(GSAVECONTEXT_VA + SAVECONTEXT_DAYTIME_OFF);
+            if (!w) { PrintErr("az_daytime: unmapped"); continue; }
+            unsigned dayTime = (*w) & 0xFFFFu;
+            std::printf("ok az_daytime daytime=0x%04x\n", dayTime);
         }
         else if (cmd == "playstate") HandlePlayState(toks);
         else if (cmd == "titleactors") HandleTitleActors(toks);
