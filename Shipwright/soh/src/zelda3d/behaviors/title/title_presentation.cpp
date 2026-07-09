@@ -7,6 +7,7 @@
 #include "global.h"
 #include "title_presentation.h"
 #include "title_logo.h"
+#include "title_fireglow.h"
 #include "../../zelda3d.h"          // Zelda3D_Enabled/Zelda3D_AutoWarpEnabled
 #include "../../zelda3d_cutscene.h"
 
@@ -207,7 +208,12 @@ int TitlePresentation::update(PlayState* play) {
 }
 
 void TitlePresentation::draw(PlayState* play) {
+    // Draw order matches OoT3D's own compositing (title_logo_fireglow_cmab.md §3): the fire-glow
+    // is additive-blended and drawn AFTER the wordmark so it washes over it; the copyright block
+    // is a separate screen region so its order relative to the other two doesn't matter.
     Zelda3D_TryDrawTitleLogo(play);
+    Zelda3D_TryDrawTitleFireGlow(play);
+    Zelda3D_TryDrawTitleCopyright(play);
 }
 
 // Screen-level loop fade — ports OoT3D's op-0x7c window (Zelda3D_TitleCsScreenFade: cs frames
