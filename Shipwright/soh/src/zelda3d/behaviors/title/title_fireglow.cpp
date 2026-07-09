@@ -11,10 +11,12 @@
 // during the fade-in flourish, then holds the frame-300 value — NOT a perpetual loop), 4 mmad
 // entries, of which entries 0-1 (mat=0 chan=1 Translation V-track "flame drift", mat=0 chan=0
 // ConstColor R/G/B "warm gold flicker") are the confirmed pair driving THIS mesh; entries 2-3
-// target the SEPARATE ura.ctxb billboard strip (title_2d_overlay_logo.md §2's draw-log finding of
-// a second, independent quad) — that second target is the still-open "true 2D ortho pass" item
-// (title_2d_overlay_logo.md §5 item 1.d) and is NOT drawn here; out of scope for this port (the
-// existing camera-relative overlay technique has no ortho screen-space quad primitive yet).
+// target the SEPARATE ura.ctxb billboard strip — CONFIRMED (title_logo_actor.md §6.1/§6.4, full
+// decompile of the draw fn FUN_001da4f4 and every callee) NOT drawn by the logo actor (0x171) at
+// all: the draw fn has exactly THREE draw blocks (backdrop/wordmark/copyright, all ported here),
+// no fourth handle, no `_ura` reference anywhere in the function or its callees. Whatever draws
+// ura.ctxb is a separate, still-unidentified subsystem — out of scope for this actor's port; not
+// guessed at here (flagged back to the decomp stream, see this change's journal entry).
 //
 // DRAW MECHANISM: reuses the exact seams the sky cloud-band scroll (zelda3d.c #28b) and the EnHy
 // townsfolk body-color override already exercise — no new renderer plumbing needed.
@@ -29,13 +31,21 @@
 //     visually equivalent to a texture*tint multiply for a single-material, single-texture mesh.
 //   - Translation V-track -> the draw's UV SCROLL offset (gSPZelda3DDrawUV's uvV arg), the same
 //     per-draw texcoord-scroll seam the sky cloud band already uses (zelda3d.c #28b).
-//   - Placement: same camera-relative overlay technique as the wordmark (title_logo.cpp), at the
-//     SAME screen-fraction card position (Zelda3D_TitleWordmarkPlacementFracs) — g_title.cmb is
-//     authored to wash over the wordmark, not sit elsewhere (title_logo_fireglow_cmab.md §3).
-//   - Alpha: this element's OWN decompiled channel (title_logo_actor.md §5.2/§5.3, instance
-//     +0x1D0/backdrop riding with +0x1DC/sheen) via Zelda3D_TitleLogoPhaseAlpha3's backdrop
-//     output — staged to fade in AFTER the wordmark ramp completes (cf fadeIn+40+81), not
-//     simultaneously with it, then falls together with the other two elements on fade-out.
+//   - Placement: same 2D ortho overlay pass as the wordmark (title_logo.cpp,
+//     zelda3d_overlay2d.h), at the SAME screen-fraction card position
+//     (Zelda3D_TitleWordmarkPlacementFracs) — g_title.cmb is authored to wash over the wordmark,
+//     not sit elsewhere (title_logo_fireglow_cmab.md §3; confirmed by the decompiled draw fn too,
+//     title_logo_actor.md §6.4's local-offset table: backdrop's own local translate is
+//     (0,0,-33.99), i.e. no X/Y offset from the wordmark's own placement at all).
+//   - Alpha: this element's OWN decompiled channel, actor instance +0x1D0 (title_logo_actor.md
+//     §5.2/§5.3/§6.2 — const-color-5.a, multiplicative into the texture's own alpha) via
+//     Zelda3D_TitleLogoPhaseAlpha3's backdrop output — staged to fade in AFTER the wordmark ramp
+//     completes (cf fadeIn+40+81), not simultaneously with it, then falls together with the other
+//     two elements on fade-out. CORRECTION (title_logo_actor.md §6.3, 2026-07-10): the sibling
+//     field +0x1DC ("sheen") does NOT ride with this alpha — full decompile of the draw fn shows
+//     it is a light-DIRECTION parameter feeding a fragment-light term on the WORDMARK's own
+//     material (title_logo_us.cmb), not an alpha channel at all, and not on g_title.cmb. See
+//     title_logo.cpp's header for the still-unported follow-up.
 //   - cmab frame cursor: anchored at the fade-in TRIGGER frame (same anchor the wordmark's csab
 //     playhead uses) — the flicker starts counting from the trigger, independent of this
 //     element's own later-starting alpha ramp, and (being loopMode=Once) settles at its
@@ -44,6 +54,7 @@
 #include "title_fireglow.h"
 #include "title_logo.h"
 #include "../../zelda3d_cmab.h"
+#include "../../zelda3d_overlay2d.h"
 
 #include <cmath>
 #include <cstdlib>
@@ -150,21 +161,14 @@ extern "C" int Zelda3D_TryDrawTitleFireGlow(PlayState* play) {
         }
     }
 
-    float centerXFrac, centerYFrac, heightFrac, dist;
-    Zelda3D_TitleWordmarkPlacementFracs(&centerXFrac, &centerYFrac, &heightFrac, &dist);
-    float pxyz[3];
-    float scale;
-    if (!Zelda3D_TitleOverlayPlacement(play, centerXFrac, centerYFrac, heightFrac, dist,
-                                       localHeight, pxyz, &scale)) {
-        return 0;
-    }
+    float centerXFrac, centerYFrac, heightFrac, refW, refH;
+    Zelda3D_TitleWordmarkPlacementFracs(&centerXFrac, &centerYFrac, &heightFrac);
+    Zelda3D_TitleOverlayRefWH(&refW, &refH);
 
     OPEN_DISPS(play->state.gfxCtx);
     Gfx_SetupDL_25Opa(play->state.gfxCtx);
-    Matrix_Translate(pxyz[0], pxyz[1], pxyz[2], MTXMODE_NEW);
-    Matrix_Mult(&play->billboardMtxF, MTXMODE_APPLY);
-    Matrix_Scale(scale, scale, scale, MTXMODE_APPLY);
-    gSPMatrix(POLY_OPA_DISP++, MATRIX_NEWMTX(play->state.gfxCtx), G_MTX_MODELVIEW | G_MTX_LOAD);
+    Zelda3D_Overlay2D_PlaceModel(play, centerXFrac * refW, centerYFrac * refH, heightFrac * refH,
+                                 localHeight);
 
     // Wrap the sampled V offset into [0,1) and pack as 16-bit fixed, same convention as the sky
     // cloud-band scroll (zelda3d.c #28b).

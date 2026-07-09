@@ -34,12 +34,15 @@
 // ALPHA FADE (oot3d-decomp/docs/title_logo_actor.md §5, 2026-07-10): the logo IS a conventional
 // OoT3D Actor (id 0x171, objectId 330/zelda_mag, update FUN_001da9f8) — decompiled AND
 // live-verified on the embedded-Azahar harness (full fade-in and fade-out per-frame traces
-// matched the decompiled constants exactly). It drives THREE separate f32 alpha fields
-// (instance +0x1D0 backdrop/g_title, +0x1D4 wordmark, +0x1D8 copyright, +0x1DC wordmark sheen
-// riding with +0x1D0), staged sequentially on fade-in and synchronized on fade-out — see
-// Zelda3D_TitleLogoPhaseAlpha3 below for the ported state machine. This SUPERSEDES the earlier
-// STOPGAP (N64 En_Mag's single +6/frame ramp) on every element except the copyright's step,
-// which happens to also be 6/frame.
+// matched the decompiled constants exactly). It drives THREE alpha fields (instance +0x1D0
+// backdrop/g_title, +0x1D4 wordmark, +0x1D8 copyright — all const-color-5.a, multiplicative into
+// each element's texture alpha per the draw fn's full decompile, §6.2), staged sequentially on
+// fade-in and synchronized on fade-out — see Zelda3D_TitleLogoPhaseAlpha3 below for the ported
+// state machine. A fourth field, +0x1DC, is NOT a fourth alpha (§6.3 corrects §5.2's earlier
+// "sheen" guess): it's a light-direction sweep on the WORDMARK's own material, not yet ported —
+// see the follow-up comment at its draw call below. This SUPERSEDES the earlier STOPGAP (N64
+// En_Mag's single +6/frame ramp) on every element except the copyright's step, which happens to
+// also be 6/frame.
 //
 // PLACEMENT DERIVATION (oracle, not guesswork): measured directly off the oracle capture
 // scratch/title_verify/az1000.png (400x240, Azahar OoT3D title-demo, logo-visible frame) via a
@@ -50,18 +53,30 @@
 // (Copyright text sits separately below — its own placement, measured from a later oracle
 // capture, is derived where it's drawn: Zelda3D_TryDrawTitleCopyright below.)
 //
-// Since Zelda3D has no dedicated 2D/orthographic draw pass for skinned CMB models (only the
-// flat-quad HUD blitter in zelda3d_hud_tex.cpp, which can't skin a 13-bone CSAB), this places
-// the logo as an ordinary 3D object at a fixed, camera-relative offset each frame (camera eye +
-// forward*dist, offset along camera right/up by the screen-fraction bbox above), oriented with
-// play->billboardMtxF (the same camera-facing matrix the sun/moon discs use, zelda3d.c
-// Zelda3D_TryDrawSunMoon) so it always faces the viewer like a HUD card regardless of the title
-// cutscene's camera pan. This is a legitimate "2D overlay via 3D placement" technique (the sun
-// and moon already use it for camera-facing sprites); a true orthographic CMB pass is future
-// work if the camera-relative placement is ever shown to drift from the oracle framing.
+// TRUE 2D ORTHOGRAPHIC PASS (oot3d-decomp/docs/title_2d_overlay_logo.md §5.1): the POSITION/SCALE
+// of the old placement — camera eye + forward*dist, offset by a screen-fraction derived from the
+// camera's own FOV — is replaced with zelda3d_overlay2d.{h,cpp}'s generic ortho pass:
+// TitlePresentation::draw() brackets the whole overlay (wordmark + fire-glow + copyright) in
+// Zelda3D_Overlay2D_Begin/End, which swaps in an orthographic G_MTX_PROJECTION over a fixed
+// 400x240 virtual box — OoT3D's own top-screen resolution, matching the coordinate space every
+// placement fraction below was measured in directly (no unit conversion, no FOV/aspect math, no
+// "near-parallel forward/up" degenerate guard that could silently drop a frame). Position/scale no
+// longer depend on the camera at all.
+//
+// ORIENTATION is a FIXED constant (zelda3d_overlay2d.cpp's kOverlayFixedRotX), not derived from
+// the camera — see that file's comment for the full derivation, including a tried-and-falsified
+// intermediate step: the decompiled 3DS logo actor's draw fn genuinely composites each element via
+// "a fixed 3×4 matrix, camera-relative — the overlay's existing camera-basis technique"
+// (oot3d-decomp/docs/title_logo_actor.md §6.1), which reads as "compose with the live camera's
+// rotation" — but doing that here (play->billboardMtxF) was empirically WRONG: it only looked
+// correct at the one cs frame it was tuned against and flipped the wordmark upside-down at a later,
+// differently-angled camera frame in the same cutscene. The camera this ortho pass projects
+// through is fixed by construction (that's the whole point of the pass), so the decomp-correct
+// equivalent of "the camera-basis technique" here is a single fixed basis, not the live one.
 #include "global.h"
 #include "title_logo.h"
 #include "../../zelda3d_cutscene.h"
+#include "../../zelda3d_overlay2d.h"
 
 #include <algorithm>
 #include <cmath>
@@ -84,12 +99,15 @@ namespace {
 constexpr float kCenterXFrac = 0.53f;
 constexpr float kCenterYFrac = 0.55f;
 constexpr float kHeightFrac  = 0.55f; // wordmark bbox height / screen height
-// Fixed camera-relative distance the logo card sits at. Not oracle-derived (the oracle's overlay
-// has no 3D depth at all) — chosen far enough past the game's near plane and near enough that the
-// required scale stays numerically sane; the height-fraction scale compensates for whatever
-// distance is picked, so this value does not change the on-screen result.
-constexpr float kDist = 200.0f;
-constexpr float kPi = 3.14159265358979323846f;
+
+// Virtual reference box the ortho pass projects (Zelda3D_Overlay2D_Begin) — OoT3D's own
+// top-screen resolution (title_2d_overlay_logo.md §2's SW-rasterizer draw log measured every
+// element's screen-space triangles in this exact space, and az1000.png/fireglow_probe2.az.png
+// were captured at 400x240 too), so every *Frac constant here converts to pixels with a single
+// multiply, no aspect/unit correction. Shared with title_fireglow.cpp and
+// TitlePresentation::draw()'s Begin() call via Zelda3D_TitleOverlayRefWH below.
+constexpr float kOverlayRefW = 400.0f;
+constexpr float kOverlayRefH = 240.0f;
 
 // Decompiled fade-in stage constants (title_logo_actor.md §5.3, actor 0x171 FUN_001da9f8 /
 // FUN_0018cbb8, live-verified against the embedded-Azahar harness's FCRAM trace). Cs-frame
@@ -134,7 +152,8 @@ struct LogoPhaseState {
     int       fadeInFrame  = -1;   // cs frame the fade-in trigger fires
     int       fadeOutFrame = -1;   // cs frame the fade-out trigger fires
     float     wordmarkAlpha  = 0.0f; // 0..255, title_logo_us.cmb (+0x1D4)
-    float     backdropAlpha  = 0.0f; // 0..255, g_title.cmb backdrop/sheen (+0x1D0/+0x1DC)
+    float     backdropAlpha  = 0.0f; // 0..255, g_title.cmb backdrop (+0x1D0 only — +0x1DC is a
+                                      // light-direction param, not an alpha; see §6.3)
     float     copyrightAlpha = 0.0f; // 0..255, copy_nintendo.cmb (+0x1D8)
 };
 
@@ -202,16 +221,32 @@ LogoPhaseState resolveLogoPhase(int csFrame) {
     return s;
 }
 
-// Copyright block placement — measured directly off a fresh oracle capture
-// (scratch/title_ab/fireglow_probe2.az.png, Azahar OoT3D title-demo, az_step=1800, a frame
-// showing wordmark + fire-glow + copyright simultaneously) via a luminance/low-saturation mask
-// restricted to the screen's bottom quarter (bbox in the 400x240 reference: x:[133,280],
-// y:[197,225]; see debug_journal/2026-07-10-title-fireglow-copyright.md for the derivation and
-// tools/ad-hoc mask script). Two text lines ("(c) 1998 - 2011 Nintendo" / "Codeveloped by
-// GREZZO"), sitting below the wordmark — matches the decomp doc's expectation that the
-// copyright appears with the logo (title_2d_overlay_logo.md §5 item 1.e).
-constexpr float kCopyrightCenterXFrac = 0.516f;
-constexpr float kCopyrightCenterYFrac = 0.879f;
+// Copyright block placement — X/Y now DECOMP-DERIVED (title_logo_actor.md §6.4's local-offset
+// table, from the fully decompiled draw fn FUN_001da4f4), superseding the earlier independent
+// oracle-mask measurement (kept only as a cross-check comment below): the copyright's own local
+// translate composed with the SAME shared camera-facing basis as the wordmark is (0,-11.0,-34.0)
+// — i.e. X offset 0 (exactly the wordmark's own X) and a -11.0 local-unit nudge on the axis the
+// overlay's basis uses as "screen up/down". Converting that to a screen fraction reuses the
+// wordmark's own already-established local-unit -> pixel scale (kHeightFrac*refH pixels per
+// kWordmarkLocalHeight local units — kWordmarkLocalHeight is the CMB's authored bind-pose height,
+// 19.1, cited in this file's header and independently confirmed via Zelda3D_AutoModelHeight):
+//   pxPerLocalUnit = (kHeightFrac * kOverlayRefH) / kWordmarkLocalHeight
+//   kCopyrightCenterYFrac = kCenterYFrac + (11.0 local units * pxPerLocalUnit) / kOverlayRefH
+// (sign: the decomp's -11 nudges the copyright AWAY from the camera along the basis's "up" row —
+// on screen that reads as DOWN, matching the oracle's own independent measurement below).
+// CROSS-CHECK: this formula predicts kCopyrightCenterYFrac ~= 0.867; the original independent
+// oracle-mask measurement (scratch/title_ab/fireglow_probe2.az.png, az_step=1800, luminance/
+// low-saturation mask over the bottom screen quarter, bbox x:[133,280] y:[197,225] in the 400x240
+// reference — see debug_journal/2026-07-10-title-fireglow-copyright.md) got 0.879 — a ~3px
+// agreement at 240px height, confirming both derivations describe the same real placement. The
+// decomp value is used below since it's derived from ground truth rather than a threshold mask.
+constexpr float kWordmarkLocalHeight       = 19.1f;  // CMB bind-pose height (file header, §GROUND TRUTH)
+constexpr float kCopyrightLocalOffsetY     = 11.0f;  // title_logo_actor.md §6.4: local translate (0,-11.0,-34.0)
+constexpr float kCopyrightCenterXFrac = kCenterXFrac; // decomp: 0 local X offset from the wordmark
+constexpr float kCopyrightCenterYFrac =
+    kCenterYFrac + (kCopyrightLocalOffsetY * (kHeightFrac * kOverlayRefH) / kWordmarkLocalHeight) / kOverlayRefH;
+// Height/size: decomp gives no scale info for copy_nintendo.cmb (only the translate offset above)
+// — kept as the original independent oracle measurement (28px tall / 240px = 0.117).
 constexpr float kCopyrightHeightFrac  = 0.117f;
 
 int gTitleCopyrightModelId = -1;
@@ -225,81 +260,25 @@ int titleCopyrightModelId() {
 
 } // namespace
 
-// Camera-relative overlay placement shared by every 2D-overlay element drawn via the "billboard
-// at a fixed screen-fraction" technique (see file header): the wordmark (title_logo.cpp), the
-// fire-glow (title_fireglow.cpp), and the copyright block below. Computes the world-space
-// translation + uniform scale for a model of local-space height `localHeight` so it lands at
-// (centerXFrac, centerYFrac) of the screen at `heightFrac` of the screen height, `dist` world
-// units along the camera's forward axis. Returns 0 (outPXYZ/outScale untouched) if the camera
-// basis is degenerate (near-zero forward/right vector) — callers should skip the draw.
-extern "C" int Zelda3D_TitleOverlayPlacement(PlayState* play, float centerXFrac, float centerYFrac,
-                                              float heightFrac, float dist, float localHeight,
-                                              float outPXYZ[3], float* outScale) {
-    if (play == nullptr || outPXYZ == nullptr || outScale == nullptr) {
-        return 0;
-    }
-    // Camera basis: forward (eye->lookAt), right = forward x up, up' = right x forward
-    // (re-orthogonalized so a non-perpendicular authored up doesn't skew the offsets).
-    float fx = play->view.lookAt.x - play->view.eye.x;
-    float fy = play->view.lookAt.y - play->view.eye.y;
-    float fz = play->view.lookAt.z - play->view.eye.z;
-    float flen = std::sqrt(fx * fx + fy * fy + fz * fz);
-    if (flen < 0.0001f) {
-        return 0;
-    }
-    fx /= flen; fy /= flen; fz /= flen;
-
-    float ux = play->view.up.x, uy = play->view.up.y, uz = play->view.up.z;
-    // right = forward x up
-    float rx = fy * uz - fz * uy;
-    float ry = fz * ux - fx * uz;
-    float rz = fx * uy - fy * ux;
-    float rlen = std::sqrt(rx * rx + ry * ry + rz * rz);
-    if (rlen < 0.0001f) {
-        return 0;
-    }
-    rx /= rlen; ry /= rlen; rz /= rlen;
-    // up' = right x forward (unit, since right and forward are already orthonormal)
-    float upx = ry * fz - rz * fy;
-    float upy = rz * fx - rx * fz;
-    float upz = rx * fy - ry * fx;
-
-    // play->view carries no width/height; the OoT3D top screen (and the oracle captures every
-    // placement constant here was measured from) is a fixed 400x240 (5:3).
-    const float aspect = 400.0f / 240.0f;
-
-    float fovyRad = play->view.fovy * kPi / 180.0f;
-    float halfH = dist * std::tan(fovyRad * 0.5f);
-    float visibleHeight = 2.0f * halfH;
-    float visibleWidth = visibleHeight * aspect;
-
-    float offX = (centerXFrac - 0.5f) * visibleWidth;
-    float offY = -(centerYFrac - 0.5f) * visibleHeight; // screen-down = -up'
-
-    outPXYZ[0] = play->view.eye.x + fx * dist + rx * offX + upx * offY;
-    outPXYZ[1] = play->view.eye.y + fy * dist + ry * offX + upy * offY;
-    outPXYZ[2] = play->view.eye.z + fz * dist + rz * offX + upz * offY;
-
-    float worldHeight = heightFrac * visibleHeight;
-    *outScale = (localHeight > 0.0f) ? (worldHeight / localHeight) : 0.0f;
-    return 1;
-}
-
 // Wordmark placement fractions, exposed so title_fireglow.cpp can place g_title.cmb at the SAME
 // card position (it's authored to overlay this exact wordmark, per title_logo_fireglow_cmab.md
 // §3: "g_title.cmb is drawn AFTER the wordmark... composites as a warm glow wash over the
 // already-rendered logo") without duplicating the measured constants above.
 extern "C" void Zelda3D_TitleWordmarkPlacementFracs(float* outCenterXFrac, float* outCenterYFrac,
-                                                     float* outHeightFrac, float* outDist) {
+                                                     float* outHeightFrac) {
     if (outCenterXFrac) *outCenterXFrac = kCenterXFrac;
     if (outCenterYFrac) *outCenterYFrac = kCenterYFrac;
     if (outHeightFrac) *outHeightFrac = kHeightFrac;
-    if (outDist) *outDist = kDist;
+}
+
+extern "C" void Zelda3D_TitleOverlayRefWH(float* outRefW, float* outRefH) {
+    if (outRefW) *outRefW = kOverlayRefW;
+    if (outRefH) *outRefH = kOverlayRefH;
 }
 
 // Shared phase/alpha gate for every element of the 2D title overlay — resolves the THREE
-// decompiled alpha channels (title_logo_actor.md §5.2/§5.3: wordmark +0x1D4, backdrop/sheen
-// +0x1D0/+0x1DC, copyright +0x1D8) for the current cs frame in one call. Returns 0 (all alphas
+// decompiled alpha channels (title_logo_actor.md §5.2/§5.3/§6.2: wordmark +0x1D4, backdrop
+// +0x1D0, copyright +0x1D8) for the current cs frame in one call. Returns 0 (all alphas
 // 0) when fully Hidden (before fade-in starts / after fade-out completes), else 1.
 // *outFadeInFrame is the cs frame the fade-in trigger fired, or -1 (resolveLogoPhase's fallback).
 extern "C" int Zelda3D_TitleLogoPhaseAlpha3(float* outWordmarkAlpha, float* outBackdropAlpha,
@@ -333,27 +312,35 @@ extern "C" int Zelda3D_TryDrawTitleLogo(PlayState* play) {
         return 0; // model failed to load this frame; try again next frame
     }
 
-    // Drive the wordmark's assembly animation. The csab playhead is offset by the fade-in
-    // trigger frame so the letters fly in once when the logo appears, then hold the end pose
-    // (frame 119 = fully assembled) for the duration of the display phase.
-    if (ps.fadeInFrame >= 0) {
-        const float csabFrame = std::clamp(csFrame - ps.fadeInFrame, 0, kLogoCsabDuration - 1);
+    // Drive the wordmark's assembly animation. REALIGNED (this pass) to the wordmark's own alpha
+    // ramp start — cf(fadeInFrame + kFadeInDelayFrames) = fadeIn+40 = 385 in the measured trace
+    // (title_logo_actor.md §5.3) — NOT the flag-3 trigger frame (345) the previous version used.
+    // The trigger only fires the 40-frame lead-in delay (state 0->1); nothing about the wordmark
+    // (alpha or assembly) actually starts until that delay elapses, so holding the csab at frame 0
+    // (bind pose) through the delay and starting the fly-in exactly when the alpha ramp starts is
+    // the decomp-faithful timing (previously flagged as a gap in
+    // debug_journal/2026-07-10-title-fireglow-copyright.md's "Gaps" section).
+    const int wordmarkStart = (ps.fadeInFrame >= 0) ? (ps.fadeInFrame + kFadeInDelayFrames) : -1;
+    if (wordmarkStart >= 0) {
+        const float csabFrame = std::clamp(csFrame - wordmarkStart, 0, kLogoCsabDuration - 1);
         Zelda3D_UpdateAnim(modelId, "title_logo_us", csabFrame);
-    }
-
-    float pxyz[3];
-    float scale;
-    if (!Zelda3D_TitleOverlayPlacement(play, kCenterXFrac, kCenterYFrac, kHeightFrac, kDist,
-                                       localHeight, pxyz, &scale)) {
-        return 0;
     }
 
     OPEN_DISPS(play->state.gfxCtx);
     Gfx_SetupDL_25Opa(play->state.gfxCtx);
-    Matrix_Translate(pxyz[0], pxyz[1], pxyz[2], MTXMODE_NEW);
-    Matrix_Mult(&play->billboardMtxF, MTXMODE_APPLY);
-    Matrix_Scale(scale, scale, scale, MTXMODE_APPLY);
-    gSPMatrix(POLY_OPA_DISP++, MATRIX_NEWMTX(play->state.gfxCtx), G_MTX_MODELVIEW | G_MTX_LOAD);
+    Zelda3D_Overlay2D_PlaceModel(play, kCenterXFrac * kOverlayRefW, kCenterYFrac * kOverlayRefH,
+                                 kHeightFrac * kOverlayRefH, localHeight);
+    // FOLLOW-UP, not ported this pass (title_logo_actor.md §6.3, 2026-07-10): the decompiled draw
+    // fn also feeds actor field +0x1DC into a light-DIRECTION parameter on this model's own
+    // material (light-env slot 0: static ambient/diffuse/specular/emission, only the direction
+    // sweeps, over the same cf466-525 window as the backdrop alpha ramp, then freezes) — a real
+    // specular "gleam" sweep across the wordmark. NOT ported here: it needs a light-direction
+    // uniform the shared Zelda3D draw seam (gSPZelda3DDrawA below) has no parameter for — adding
+    // one is a real renderer-plumbing change, not a cheap seam reuse (checked: gSPZelda3DDrawA
+    // only carries alpha+flat RGB tint, gbi.h). FORCE_UNLIT (used below) already disables this
+    // model's baked vertex_lighting entirely for an unrelated reason (see next comment), so the
+    // gleam is invisible either way until that plumbing exists.
+    //
     // The wordmark is a self-illuminated overlay (an authored fire-glow logo composited over the
     // title scene, not a piece of lit world geometry) — the oracle draws it independent of the
     // scene's ambient/world lighting. title_logo_us.cmb's material still carries OoT3D's own
@@ -375,7 +362,7 @@ extern "C" int Zelda3D_TryDrawTitleLogo(PlayState* play) {
 }
 
 // copy_nintendo.cmb — the "(c) 1998 - 2011 Nintendo / Codeveloped by GREZZO" block. Static
-// geometry (no CSAB), same camera-relative overlay technique as the wordmark. Alpha = the
+// geometry (no CSAB), same ortho overlay pass as the wordmark. Alpha = the
 // decompiled copyright channel (+0x1D8, title_logo_actor.md §5.3): 0 until the backdrop stage
 // completes (cf fadeIn+40+81+60 = fadeIn+181), then +6.0/frame for 43 frames — i.e. the
 // copyright fades in LAST, after the wordmark and backdrop/sheen have both finished. Placement
@@ -398,18 +385,11 @@ extern "C" int Zelda3D_TryDrawTitleCopyright(PlayState* play) {
     if (localHeight <= 0.0f) {
         return 0;
     }
-    float pxyz[3];
-    float scale;
-    if (!Zelda3D_TitleOverlayPlacement(play, kCopyrightCenterXFrac, kCopyrightCenterYFrac,
-                                       kCopyrightHeightFrac, kDist, localHeight, pxyz, &scale)) {
-        return 0;
-    }
     OPEN_DISPS(play->state.gfxCtx);
     Gfx_SetupDL_25Opa(play->state.gfxCtx);
-    Matrix_Translate(pxyz[0], pxyz[1], pxyz[2], MTXMODE_NEW);
-    Matrix_Mult(&play->billboardMtxF, MTXMODE_APPLY);
-    Matrix_Scale(scale, scale, scale, MTXMODE_APPLY);
-    gSPMatrix(POLY_OPA_DISP++, MATRIX_NEWMTX(play->state.gfxCtx), G_MTX_MODELVIEW | G_MTX_LOAD);
+    Zelda3D_Overlay2D_PlaceModel(play, kCopyrightCenterXFrac * kOverlayRefW,
+                                 kCopyrightCenterYFrac * kOverlayRefH,
+                                 kCopyrightHeightFrac * kOverlayRefH, localHeight);
     const uint8_t alphaU8 = (uint8_t)(alpha + 0.5f);
     gSPZelda3DDrawA(POLY_OPA_DISP++, modelId | (int)ZELDA3D_HANDLE_FORCE_UNLIT,
                     alphaU8, 255, 255, 255);
