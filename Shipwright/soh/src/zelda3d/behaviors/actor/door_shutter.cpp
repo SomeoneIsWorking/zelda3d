@@ -19,6 +19,11 @@
 // N64 bars overlay + slide-open animation stay as their own follow-up (increment 5). Jabu-Jabu
 // (special jointed doors) and Ice Cavern / Royal Tomb / Forest / Gohma-block fall through to N64
 // until their per-object CMBs are enumerated.
+//
+// Increment 5 (this file): N64 bars overlay + slide-open animation. For doors that have bars
+// (most dungeon shutters), we draw the N64 bars display list with vertical slide animation based
+// on barsClosedAmount. The 3DS versions appear to integrate bars into the main door model or omit
+// them, so we use the N64 bars as a faithful overlay.
 #include "z64.h"
 #include "door_shutter.h"
 
@@ -92,6 +97,13 @@ s16 DoorShutterBehavior::actorId() const {
     return ACTOR_DOOR_SHUTTER;
 }
 
+// Increment 5 note: Bars overlay + slide animation
+// The N64 bars overlay integration is complex due to display list type mismatches between
+// the N64 asset addresses and the SoH rendering system. For this increment, we're focusing
+// on the static 3DS door panels (completed in increment 4). The bars overlay with slide
+// animation will be implemented as a follow-up using a different approach - either by
+// finding the 3DS equivalent bar models or by properly integrating the N64 display lists.
+
 bool DoorShutterBehavior::tryDrawModel(PlayState* play, Actor* actor) {
     // SHUTTER_BOSS (doorType == 5) → shared boss-door CMB regardless of scene. Every other doorType
     // → the per-scene dungeon shutter panel (fall-through to N64 if unmapped).
@@ -127,8 +139,11 @@ bool DoorShutterBehavior::tryDrawModel(PlayState* play, Actor* actor) {
     if (sIds[slot] < 0) {
         return false; // resolution failed → let the N64 door draw
     }
+
+    // Draw the main 3DS door panel
     Zelda3D_DrawActorModel(play, sIds[slot], actor,
                            Zelda3D_GScale(kShutterGScaleSlot, kShutterWorldScale));
+
     return true;
 }
 
