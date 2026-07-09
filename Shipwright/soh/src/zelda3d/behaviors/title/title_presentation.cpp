@@ -269,6 +269,15 @@ extern "C" void Zelda3D_Title_ApplyLightOverride(PlayState* play) {
     Zelda3D::TitlePresentation::Instance().applyLightOverride(play);
 }
 
+extern "C" const char* Zelda3D_Title_SceneName(void) {
+    // "spot99" is the oracle's dedicated title-demo scene asset (see the header comment on this
+    // function for the citation); returning it here is the entire scene swap — the live romfs
+    // ZSI loader (zelda3d_model.cpp's Zelda3D_RoomModelId/Zelda3D_LoadSceneCollisionRaw) takes a
+    // folder-name string and loads straight from ZELDA3D_OOT3D_ROM, so no separate asset-import
+    // step is needed; changing the name IS re-pointing the pipeline at spot99.
+    return Zelda3D::TitlePresentation::Instance().isActive() ? "spot99" : nullptr;
+}
+
 extern "C" void Zelda3D_Title_RiderTransform(float outPos[3], int16_t* outYaw) {
     const Zelda3D::TitleFrameState& f = Zelda3D::TitlePresentation::Instance().frame();
     outPos[0] = f.riderPos.x;
