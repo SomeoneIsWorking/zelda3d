@@ -52,6 +52,11 @@ When a subsystem needs real work (the title), rebuild it as a cohesive, first-cl
 file is the failure mode; a single owner with one per-frame resolved state is the fix.
 
 ## Agent orchestration (what actually held up)
+- **The main context only GUIDES — all work goes to sonnet subagents.** (user directive
+  2026-07-09) The orchestrator reads handoffs/journals, decomposes, prompts agents with the
+  needed project context (headless env vars, scratch/ rule, evidence rules), and synthesizes/
+  commits results; it does not run builds, verification, RE, or fixes inline. Spawn as many
+  sonnet agents as useful.
 - **Fan out RE/spec/decomp agents freely** (Ghidra + docs, no soh build → no resource contention).
 - **ONE soh build at a time.** This is a 16GB-RAM machine: `-j$(nproc)` or concurrent cold
   builds OOM, orphan their `cc1plus` children, and cascade-kill each other. Cap `-j4`; check

@@ -10,13 +10,35 @@
 // retracted): `/actor/zelda_mag.zar` (OBJECT_MAG / En_Mag's ZAR) contains
 //   Model/title_logo_us.cmb    162432B  13-bone skinned wordmark, US ROM. Bind-pose local
 //                                        height 19.1 (measured via Zelda3D_AutoModelHeight).
-//   Anim/title_logo_us.csab     1812B   assembly/idle animation for the wordmark.
+//   Anim/title_logo_us.csab     1812B   assembly/idle animation for the wordmark (120 frames,
+//                                        per-bone Z-translation ramp -6 -> 0 = letters fly in).
 //   Model/g_title.cmb + Misc/g_title_fire*.cmab                 fire-glow material anim (deferred, phase 3).
 //   Model/copy_nintendo.cmb                                     copyright block (deferred, lowest priority).
 // En_Mag does NOT spawn under SoH3D's title (SoH hijacks spot00; the actor lives in spot99), so
 // there is no actor to hang an ActorBehavior draw-override on — this module is driven directly
 // from the title-demo draw seam (Play_DrawOverlayElements, z_play.c) instead of the actor
 // registry, gated on the existing gZelda3dInTitleDemo flag.
+//
+// PHASE GROUND TRUTH (oot3d-decomp/docs/title_gamestate_driver.md §3, byte-confirmed in
+// spot99's " BDQ" stream): the cs carries two op-0x03 misc triggers that drive the logo
+// phase — sub-op 0x1e @ cs-frame 345 (Flags_SetEnv(play,3) -> logo FADE_IN) and sub-op 0x1f
+// @ cs-frame 1930 (Flags_SetEnv(play,4) -> logo FADE_OUT). The screen-level op-0x7c transition
+// runs cs-frames 2310..2460 straddling the 2400-frame loop restart. N64's En_Mag state
+// machine (z_en_mag.c) gates exactly the same way on the same two env flags; OoT3D kept that
+// mechanism structurally even though the assets changed (3D animated wordmark vs N64 sprites).
+// SoH3D's title-cs cursor may lag the oracle's by a phase offset
+// (debug_journal/2026-07-08-title-daytime-schedule-re.md), but the TRIGGERS are absolute
+// against this engine's own cs cursor — so reading them here is faithful regardless of the
+// cursor-phase divergence against Az.
+//
+// STOPGAP — alpha fade rate: N64's En_Mag uses multi-stage per-layer ramps (effectAlpha +
+// mainAlpha + subAlpha + copyrightAlpha at +6.375/+6/+2/+6 per frame; full logo fade-in is
+// ~244 frames in N64). OoT3D's En_Mag-equivalent actor (open decomp item, title_gamestate_
+// driver.md §4 #1) drives a SINGLE wordmark, so its alpha is almost certainly a simpler
+// single ramp — but the exact rate/duration is not yet decompiled. As a faithful-N64
+// reference, this port uses mainAlpha's +6/frame rate over the first ~43 frames after the
+// trigger (210/6 ≈ 35 frames to N64's mainAlpha cap of 210, scaled to 255 here), giving a
+// ~0.7 s linear fade. Replace with the OoT3D-derived rate once that actor is decompiled.
 //
 // PLACEMENT DERIVATION (oracle, not guesswork): measured directly off the oracle capture
 // scratch/title_verify/az1000.png (400x240, Azahar OoT3D title-demo, logo-visible frame) via a
@@ -37,7 +59,9 @@
 // work if the camera-relative placement is ever shown to drift from the oracle framing.
 #include "global.h"
 #include "title_logo.h"
+#include "../../zelda3d_cutscene.h"
 
+#include <algorithm>
 #include <cmath>
 
 extern "C" {
@@ -65,8 +89,24 @@ constexpr float kHeightFrac  = 0.55f; // wordmark bbox height / screen height
 constexpr float kDist = 200.0f;
 constexpr float kPi = 3.14159265358979323846f;
 
+// Fade rate: mainAlpha +6/frame from N64 En_Mag (z_en_mag.c), scaled so the visible cap (N64's
+// 210) maps to full 255 here over the same number of frames it takes N64 to reach 210.
+//   N64: 210 / 6 = 35 frames to "fully visible" (at 210/255 intensity). We ramp 0 -> 255 over
+//   the same 35 frames (255/35 ~ 7.29/frame) to preserve N64's perceived fade-in DURATION while
+//   reaching full opacity at the same wall-clock time. See STOPGAP note in the file header.
+constexpr int   kFadeFrames = 35;
+constexpr float kFadeStep   = 255.0f / kFadeFrames;
+
+// title_logo_us.csab duration (per-bone Z-translation tracks run frames 0..120; verified via
+// tools/csab.py). Drives the letters-fly-in assembly animation; played once from the fade-in
+// trigger and held at the end-pose thereafter.
+constexpr int kLogoCsabDuration = 120;
+
+// OoT3D title cs misc sub-ops (per title_gamestate_driver.md §3).
+constexpr uint16_t kMiscSubFadeIn  = 0x1e; // Flags_SetEnv(play, 3)
+constexpr uint16_t kMiscSubFadeOut = 0x1f; // Flags_SetEnv(play, 4)
+
 int gTitleLogoModelId = -1;
-float gTitleLogoFrame = 0.0f; // free-running CSAB playhead (phase 2)
 
 int titleLogoModelId() {
     if (gTitleLogoModelId < 0) {
@@ -75,10 +115,64 @@ int titleLogoModelId() {
     return gTitleLogoModelId;
 }
 
+// Logo phase at a given cs frame, derived purely from the cs's own op-0x03 triggers.
+// Mirrors N64 En_Mag's MAG_STATE_* shape (initial/fade_in/display/fade_out/post).
+enum class LogoPhase { Hidden, FadeIn, Display, FadeOut };
+struct LogoPhaseState {
+    LogoPhase phase = LogoPhase::Hidden;
+    int       fadeInFrame  = -1;   // cs frame the fade-in trigger fires
+    int       fadeOutFrame = -1;   // cs frame the fade-out trigger fires
+    float     alpha = 0.0f;        // 0..255 resolved for this frame
+};
+
+LogoPhaseState resolveLogoPhase(int csFrame) {
+    LogoPhaseState s;
+    s.fadeInFrame  = Zelda3D_TitleCsMiscTriggerFrame(kMiscSubFadeIn);
+    s.fadeOutFrame = Zelda3D_TitleCsMiscTriggerFrame(kMiscSubFadeOut);
+    if (s.fadeInFrame < 0) {
+        // No trigger in the loaded cs — fall back to "always visible" (preserves the prior
+        // behavior of this module so a malformed/missing cs stream doesn't suppress the logo
+        // entirely).
+        s.phase = LogoPhase::Display;
+        s.alpha = 255.0f;
+        return s;
+    }
+    if (csFrame < s.fadeInFrame) {
+        s.phase = LogoPhase::Hidden;
+        s.alpha = 0.0f;
+        return s;
+    }
+    if (csFrame < s.fadeInFrame + kFadeFrames) {
+        s.phase = LogoPhase::FadeIn;
+        s.alpha = std::min(255.0f, (csFrame - s.fadeInFrame) * kFadeStep);
+        return s;
+    }
+    if (s.fadeOutFrame < 0 || csFrame < s.fadeOutFrame) {
+        s.phase = LogoPhase::Display;
+        s.alpha = 255.0f;
+        return s;
+    }
+    if (csFrame < s.fadeOutFrame + kFadeFrames) {
+        s.phase = LogoPhase::FadeOut;
+        s.alpha = std::max(0.0f, 255.0f - (csFrame - s.fadeOutFrame) * kFadeStep);
+        return s;
+    }
+    s.phase = LogoPhase::Hidden;
+    s.alpha = 0.0f;
+    return s;
+}
+
 } // namespace
 
 extern "C" int Zelda3D_TryDrawTitleLogo(PlayState* play) {
     if (!Zelda3D_Title_IsActive() || play == nullptr) {
+        return 0;
+    }
+    // Resolve phase from the ported cs's own op-0x03 triggers — Hidden suppresses the draw
+    // entirely (matches OoT3D: no logo visible before fade-in or after fade-out completes).
+    const int csFrame = Zelda3D_TitleCsFrame();
+    const LogoPhaseState ps = resolveLogoPhase(csFrame);
+    if (ps.phase == LogoPhase::Hidden) {
         return 0;
     }
     Zelda3D_EnsureModelProvider();
@@ -91,10 +185,13 @@ extern "C" int Zelda3D_TryDrawTitleLogo(PlayState* play) {
         return 0; // model failed to load this frame; try again next frame
     }
 
-    // Phase 2: drive the wordmark's own assembly/idle animation (free-run; the title-demo has no
-    // N64 SkelAnime clock to phase-lock to here, same rationale as sky/sun free-run elsewhere).
-    Zelda3D_UpdateAnim(modelId, "title_logo_us", gTitleLogoFrame);
-    gTitleLogoFrame += 1.0f;
+    // Drive the wordmark's assembly animation. The csab playhead is offset by the fade-in
+    // trigger frame so the letters fly in once when the logo appears, then hold the end pose
+    // (frame 119 = fully assembled) for the duration of the display phase.
+    if (ps.fadeInFrame >= 0) {
+        const float csabFrame = std::clamp(csFrame - ps.fadeInFrame, 0, kLogoCsabDuration - 1);
+        Zelda3D_UpdateAnim(modelId, "title_logo_us", csabFrame);
+    }
 
     // Camera basis: forward (eye->lookAt), right = forward x up, up' = right x forward
     // (re-orthogonalized so a non-perpendicular authored up doesn't skew the offsets).
@@ -156,7 +253,13 @@ extern "C" int Zelda3D_TryDrawTitleLogo(PlayState* play) {
     // silhouette instead of the bright red/gold wordmark. ZELDA3D_HANDLE_FORCE_UNLIT (gbi.h) tells
     // the draw handler to ignore that material flag for this draw only, so only the CMB's own
     // baked texture/vertex colours (times this call's white tint) reach the screen.
-    gSPZelda3DDraw(POLY_OPA_DISP++, modelId | (int)ZELDA3D_HANDLE_FORCE_UNLIT, 255, 255, 255);
+    //
+    // Alpha = the phase-resolved fade value (gSPZelda3DDrawA's alpha arg). During Display this is
+    // 255 (fully opaque, matching the prior always-on behavior). During FadeIn/FadeOut it ramps
+    // 0 <-> 255 per the N64 En_Mag-derived kFadeStep (STOPGAP — see file header).
+    const uint8_t alphaU8 = (uint8_t)(ps.alpha + 0.5f);
+    gSPZelda3DDrawA(POLY_OPA_DISP++, modelId | (int)ZELDA3D_HANDLE_FORCE_UNLIT,
+                    alphaU8, 255, 255, 255);
     CLOSE_DISPS(play->state.gfxCtx);
     return 1;
 }
