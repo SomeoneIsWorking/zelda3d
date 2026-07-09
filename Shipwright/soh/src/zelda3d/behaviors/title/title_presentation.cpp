@@ -10,6 +10,7 @@
 #include "title_fireglow.h"
 #include "../../zelda3d.h"          // Zelda3D_Enabled/Zelda3D_AutoWarpEnabled
 #include "../../zelda3d_cutscene.h"
+#include "../../zelda3d_overlay2d.h"
 
 extern "C" {
 // Env-gated title-cam toggle (zelda3d.c; env ZELDA3D_TITLECAM + REPL `gZelda3dTitleCam`). Was
@@ -208,12 +209,24 @@ int TitlePresentation::update(PlayState* play) {
 }
 
 void TitlePresentation::draw(PlayState* play) {
-    // Draw order matches OoT3D's own compositing (title_logo_fireglow_cmab.md §3): the fire-glow
-    // is additive-blended and drawn AFTER the wordmark so it washes over it; the copyright block
-    // is a separate screen region so its order relative to the other two doesn't matter.
+    if (play == nullptr || !mActive) {
+        return; // avoid swapping the projection matrix on every non-title frame (this is called
+                // unconditionally from Play_DrawOverlayElements every frame of the whole game).
+    }
+    // Real 2D screen-space ortho pass (oot3d-decomp/docs/title_2d_overlay_logo.md §5.1;
+    // zelda3d_overlay2d.h) — brackets the whole overlay in a fixed 400x240 (OoT3D top-screen)
+    // orthographic projection, independent of the title-cs 3D camera, so none of the three
+    // elements drift/rescale as the camera pans. Draw order matches OoT3D's own compositing
+    // (title_logo_fireglow_cmab.md §3): the fire-glow is additive-blended and drawn AFTER the
+    // wordmark so it washes over it; the copyright block is a separate screen region so its order
+    // relative to the other two doesn't matter.
+    float refW = 0.0f, refH = 0.0f;
+    Zelda3D_TitleOverlayRefWH(&refW, &refH);
+    Zelda3D_Overlay2D_Begin(play, refW, refH);
     Zelda3D_TryDrawTitleLogo(play);
     Zelda3D_TryDrawTitleFireGlow(play);
     Zelda3D_TryDrawTitleCopyright(play);
+    Zelda3D_Overlay2D_End(play);
 }
 
 // Screen-level loop fade — ports OoT3D's op-0x7c window (Zelda3D_TitleCsScreenFade: cs frames

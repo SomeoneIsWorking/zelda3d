@@ -27,17 +27,12 @@ int Zelda3D_TryDrawTitleLogo(PlayState* play);
 // alongside Zelda3D_TryDrawTitleLogo. Returns 1 if it drew.
 int Zelda3D_TryDrawTitleCopyright(PlayState* play);
 
-// Shared camera-relative overlay placement (see title_logo.cpp's file header for the technique
-// rationale) — used by every element of the 2D title overlay, including title_fireglow.cpp's
-// g_title.cmb draw. Returns 0 if the camera basis is degenerate.
-int Zelda3D_TitleOverlayPlacement(PlayState* play, float centerXFrac, float centerYFrac,
-                                   float heightFrac, float dist, float localHeight,
-                                   float outPXYZ[3], float* outScale);
-
 // Shared phase/alpha gate for the whole 2D title overlay — resolves all THREE decompiled alpha
-// channels (oot3d-decomp/docs/title_logo_actor.md §5.2/§5.3, actor 0x171): wordmark (+0x1D4),
-// backdrop/sheen (+0x1D0/+0x1DC, drives title_fireglow.cpp's g_title.cmb), and copyright
-// (+0x1D8). Any output pointer may be NULL if that channel isn't needed. Returns 0 (all alphas
+// channels (oot3d-decomp/docs/title_logo_actor.md §5.2/§5.3/§6.2, actor 0x171): wordmark
+// (+0x1D4), backdrop (+0x1D0, drives title_fireglow.cpp's g_title.cmb), and copyright (+0x1D8).
+// (+0x1DC is NOT a fourth alpha — §6.3 corrects the earlier "sheen" guess; it's a wordmark
+// light-direction parameter, not yet ported.) Any output pointer may be NULL if that channel
+// isn't needed. Returns 0 (all alphas
 // 0) when fully Hidden. *outFadeInFrame is the cs frame the fade-in trigger fired, or -1 (see
 // resolveLogoPhase's fallback in title_logo.cpp).
 int Zelda3D_TitleLogoPhaseAlpha3(float* outWordmarkAlpha, float* outBackdropAlpha,
@@ -47,7 +42,13 @@ int Zelda3D_TitleLogoPhaseAlpha3(float* outWordmarkAlpha, float* outBackdropAlph
 // title_fireglow.cpp can overlay g_title.cmb at the same card position without duplicating the
 // oracle-measured constants.
 void Zelda3D_TitleWordmarkPlacementFracs(float* outCenterXFrac, float* outCenterYFrac,
-                                          float* outHeightFrac, float* outDist);
+                                          float* outHeightFrac);
+
+// The virtual reference box (pixels) the 2D overlay ortho pass projects — OoT3D's own top-screen
+// resolution (400x240), the same space every *Frac constant in this file/title_fireglow.cpp was
+// measured in. Single source of truth for TitlePresentation::draw()'s Zelda3D_Overlay2D_Begin
+// call and for converting a *Frac constant to pixels (frac * refW/refH) anywhere else.
+void Zelda3D_TitleOverlayRefWH(float* outRefW, float* outRefH);
 
 #ifdef __cplusplus
 }
