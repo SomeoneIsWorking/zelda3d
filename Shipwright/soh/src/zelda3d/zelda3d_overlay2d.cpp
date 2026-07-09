@@ -38,12 +38,42 @@ extern "C" void Zelda3D_Overlay2D_Begin(PlayState* play, float refW, float refH)
 // correct, but at cf1500 (a different camera angle later in the same cutscene) the SAME live
 // rotation flipped the wordmark upside-down/mirrored again, proving the live camera basis has no
 // valid meaning once the outer camera projection it used to compose against (P*V) is gone — this
-// ortho pass has no "V" for a camera-relative rotation to be relative TO. The correct, decomp-
-// compatible reading of §6.1 is: OoT3D's mechanism needs SOME camera basis to define "facing the
-// viewer" for a genuinely moving 3D camera; our ortho pass has a FIXED, non-moving virtual camera
-// by construction, so the equivalent fixed basis is this single constant, applied identically every
-// frame regardless of the title-cs camera's own motion — which is exactly what makes the placement
-// camera-independent (the actual goal of this port).
+// ortho pass has no "V" for a camera-relative rotation to be relative TO.
+//
+// ROOT CAUSE (traced 2026-07-10, not just empirically fitted): this is a Y-axis CONVENTION flip,
+// not a camera-facing correction at all. Confirmed by tracing both sides:
+//   - CMB import (cmb3d/cmb.cpp Cmb::readAttr/computeBoneMatrices) applies NO axis flip/swap to
+//     vertex positions or bone matrices — a model's local space is exactly what's authored in the
+//     CMB file, Y-up (same convention SoH's N64 world already uses).
+//   - Every OTHER consumer of that local space in this engine treats it as Y-up: normal 3D actor/
+//     room draws (zelda3d.c Zelda3D_EmitModelDraw) apply only the actor's own rot/scale, no baked
+//     axis correction; SoH's own PRE-EXISTING 2D ortho primitive (z_view.c View_ApplyOrtho) builds
+//     its guOrtho box as guOrtho(proj, -w/2, w/2, -h/2, h/2, ...) — a standard CENTERED, Y-UP box
+//     (larger Y = toward screen top), matching CMB/world space directly with no per-model flip.
+//   - Zelda3D_Overlay2D_Begin (below), by contrast, DELIBERATELY builds its guOrtho box the other
+//     way: guOrtho(ortho, 0, refW, refH, 0, ...) — bottom=refH, top=0, i.e. a top-left-origin,
+//     Y-DOWN pixel box (Y increases going DOWN the screen), chosen so every placement fraction in
+//     title_logo.cpp/title_fireglow.cpp (measured directly off oracle screenshots, which are
+//     naturally Y-down pixel coordinates) converts to this pass's space with a single multiply, no
+//     unit/axis conversion at the call site — and so the primitive stays ergonomic for its stated
+//     future consumers (file-select/HUD overlays, which think in screen pixels, not centered
+//     world-style Y-up units).
+// That deliberate Y-down choice is exactly what a Y-up-authored CMB model needs corrected for: a
+// pure X-axis 180 rotation maps local (x,y,z) -> (x,-y,-z), turning "local Y-up" into "local
+// Y-down", which is what this Y-down box expects. The accompanying Z-sign flip is inert here (no
+// compensating culling/winding fix needed): Begin() disables the Z-buffer geometry mode entirely
+// (compositing is pure draw-call order in this pass), and there is no depth test for a flipped
+// winding to interact with.
+//
+// Proper home: THIS is the correct location for the fix, not Begin()'s guOrtho call. Flipping
+// Begin() to a Y-up box instead would remove the need for this per-model constant, but would
+// require re-deriving every existing placement fraction in title_logo.cpp/title_fireglow.cpp
+// (measured as Y-down pixel offsets from oracle screenshots) into centered Y-up units, AND would
+// make the primitive less ergonomic for the HUD/file-select consumers this module's header
+// explicitly anticipates (screen-space pixel placement, not centered world units) — regressing the
+// primitive's own design goal to remove one now-well-understood constant. Keeping the flip here,
+// applied uniformly to every model Zelda3D_Overlay2D_PlaceModel places, is the generic, correct
+// fix: every future 2D-overlay consumer of this pass inherits it automatically.
 static constexpr float kOverlayFixedRotX = 3.14159265f;
 
 extern "C" void Zelda3D_Overlay2D_PlaceModel(PlayState* play, float cxPx, float cyPx, float heightPx,
