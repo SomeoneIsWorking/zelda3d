@@ -75,9 +75,17 @@ public:
 
     // Overlay draw driver (replaces the direct Zelda3D_TryDrawTitleLogo call site in
     // Play_DrawOverlayElements, via the Zelda3D_Title_Draw C bridge). Currently just forwards to
-    // the logo draw; future fire-glow / copyright / fade steps land here once ported (design
-    // doc §4 open gaps).
+    // the logo draw; future fire-glow / copyright steps land here once ported (design doc §4
+    // open gaps).
     void draw(PlayState* play);
+
+    // Screen-level loop fade — drives play->transitionFade (the engine's existing full-screen
+    // fade overlay, unconditionally drawn every frame by Play_Draw) from the ported op-0x7c
+    // window (Zelda3D_TitleCsScreenFade: cs frames [2310,2460), straddling the 2400 loop point).
+    // Called from update() once per active frame (the fade window is defined purely in terms of
+    // the cs cursor, so it belongs on the same per-frame cadence as camera/dayTime/rider, unlike
+    // applyLightOverride's special one-frame-lagged call site).
+    void applyScreenFade(PlayState* play);
 
     // Lighting override — logic moved verbatim from Zelda3D_TitleLightSettingsOverride, but
     // still CALLED from z_kankyo.c's Environment_Update at that function's original call site

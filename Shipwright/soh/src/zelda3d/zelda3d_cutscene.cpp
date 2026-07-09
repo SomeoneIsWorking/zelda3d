@@ -138,6 +138,26 @@ int sEndFrame = 0;
 int sFrame = 0;
 int sLoadState = 0;                      // 0 not tried, 1 ok, -1 failed
 
+// The title cs interpreter's own cursor tick vs the engine's per-frame call cadence:
+// OoT3D's real title cutscene runs its cs cursor at HALF the rate SoH's port previously
+// used. Verified empirically (2026-07-09) against the live Az oracle: reading Az's own
+// title camera eye (fixed VA, byte-exact against the ported OP97 spline evaluator —
+// see 2026-07-07-op97-camera-decode-verified.md) at a dozen retro_run()-step checkpoints
+// and inverse-matching it against Zelda3D_TitleCsCamera's frame table gives an EXACT
+// az_cs_frame = 88 + 0.5*az_step relationship (residual < 0.1 world units, i.e. float
+// noise) across the full sampled range az_step in [0,600]. Meanwhile SoH's own ported
+// cursor (this file, pre-fix) advanced 1 cs-frame per engine tick — an exact 1:1,
+// confirmed by probing Zelda3D_TitleCsFrame() at soh_step checkpoints (constant 231-tick
+// boot offset, slope exactly 1.0). So SoH's title demo was running the cutscene at TWICE
+// the real 3DS speed — a genuine RATE bug, not a fixed phase offset (this is why the
+// previously-recorded content-matched anchors, debug_journal/2026-07-08-title-*-schedule-
+// re.md / tools/title_ab.py's ANCHORS table, showed a SHRINKING soh-az gap with elapsed
+// time: that shrinkage is the signature of two clocks running at different RATES, not a
+// one-time startup lag). See debug_journal/2026-07-09-title-cs-phase-sync.md for the full
+// derivation. sTickParity halves the effective advance rate; toggled every call so the
+// cursor only actually increments on every OTHER call, matching the oracle's real cadence.
+int sTickParity = 0;
+
 uint32_t U32(const uint8_t* d, size_t o) { uint32_t v; memcpy(&v, d + o, 4); return v; }
 int32_t  S32(const uint8_t* d, size_t o) { int32_t v; memcpy(&v, d + o, 4); return v; }
 int16_t  S16(const uint8_t* d, size_t o) { int16_t v; memcpy(&v, d + o, 2); return v; }
@@ -461,6 +481,11 @@ extern "C" void Zelda3D_TitleCsSetFrame(int frame) {
     if (sFrame < 0) sFrame = 0;
 }
 extern "C" int Zelda3D_TitleCsAdvance(void) {
+    // Half-rate advance — see sTickParity's declaration comment above for the RE trail.
+    sTickParity ^= 1;
+    if (sTickParity) {
+        return sFrame;   // hold: this engine-tick has no corresponding cs-tick on the oracle
+    }
     sFrame++;
     if (sEndFrame > 0 && sFrame >= sEndFrame) sFrame = 0;
     return sFrame;
