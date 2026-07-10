@@ -92,6 +92,13 @@ public:
     // (NOT folded into update() — see TitleFrameState's header comment above for why).
     void applyLightOverride(PlayState* play);
 
+    // Sky-dome variant + cross-fade override — called from z_play.c's Play_Draw right after the
+    // N64 Environment_UpdateSkybox() call, overwriting its skybox1Index/skybox2Index/skyboxBlend
+    // with the 3DS dome consumer's OWN schedule (Zelda3D_TitleCsDomeBlend,
+    // oot3d-decomp/docs/title_sky_dome.md §9) instead of N64's D_8011FC1C table (narrower
+    // night->sunrise blend window — title_sky_dome.md §9.2's boundary diff).
+    void applyDomeOverride(PlayState* play);
+
     const TitleFrameState& frame() const { return mFrame; }
 
 private:
@@ -118,6 +125,9 @@ int  Zelda3D_Title_IsActive(void);
 // Bridge for Zelda3D_TitleLightSettingsOverride (zelda3d.c), which z_kankyo.c calls at its
 // original call site/timing — see TitleFrameState's comment above for why.
 void Zelda3D_Title_ApplyLightOverride(PlayState* play);
+// Bridge for TitlePresentation::applyDomeOverride — called from z_play.c's Play_Draw right
+// after Environment_UpdateSkybox(). No-op when the title cs isn't active.
+void Zelda3D_Title_ApplyDomeOverride(PlayState* play);
 // Writes the current frame's resolved rider transform to *outPos/*outYaw (used by
 // Zelda3D_ActorPostUpdate in zelda3d.c). Only meaningful while Zelda3D_Title_IsActive() is true —
 // mirrors the contract of the old direct gZelda3dRiderPos/gZelda3dRiderYaw reads.
