@@ -468,3 +468,53 @@ addresses (`0x20906a80/0x2090ec80/0x20910e80`, task #16 era) plus ONE generic
 runtime-selected address via env `SOH3D_PIXEL_TEX=<hex physaddr>` (added
 2026-07-10 for the cloud-vortex RE; see oot3d-decomp `title_cloud_vortex.md`).
 Search `SOH3D_PIXEL_TEX` in the in-tree copy for the exact block.
+
+# Azahar Patch 6 (2026-07-10, dawn-hue fog RE): `az_fog` + per-draw fog fields + pixel probes
+
+Four blocks, all in the gitignored Azahar tree — re-apply after a fresh clone
+(the harness-side `az_fog` command in `tools/soh3d_harness/main.cpp` is committed
+and will fail to link without block 1).
+
+## 1. `src/video_core/pica/pica_core.cpp` — `soh3d_fog_dump`
+
+- Near the existing vsuni globals: `static void* soh3d_picacore = nullptr;`
+- First line of `PicaCore::PicaCore(...)` body: `soh3d_picacore = this;`
+- After the closing `} // namespace Pica`: an `extern "C" int soh3d_fog_dump(char* out,
+  int cap)` that prints `mode/flip/color` from `regs.internal.texturing.fog_*`,
+  `depthScale/depthOffset/wbuffer` from `regs.internal.rasterizer.viewport_depth_*`
+  / `depthmap_enable`, then all 128 `fog.lut[i]` entries as `value/diff` float pairs
+  (`ToFloat()/DiffToFloat()`). **Dump BOTH fields** — at title the entire fog action
+  lives in entry 127's difference field (−0.7); value-only reads as "no fog".
+  Consumed by harness REPL `az_fog` (terminator `ok end`).
+  CAVEAT: registers are per-draw command-list state — an end-of-frame dump reflects
+  the LAST draw (usually UI, fog off). For per-draw truth use block 2.
+
+## 2. `src/video_core/pica/pica_core.cpp` — vsuni_log extensions
+
+Inside the existing Patch-5 vsuni_log block (trigger_draw):
+- names/regs arrays extended with `proj0..proj3` = float uniforms c0..c3 (uProjection —
+  recovers the live projection for depth↔distance conversion).
+- After the uniform loop, one extra fragment per draw line:
+  `fog=<mode>/<flip>(r,g,b) lutS=(lut16,lut48,lut96,lut127 values)` read from
+  `regs.internal.texturing` + `fog.lut`.
+
+## 3. `src/video_core/renderer_software/sw_rasterizer.cpp` — `SOH3D_PIXEL_UNTEX`
+
+In the Patch-5 PIXEL block's target check: env `SOH3D_PIXEL_UNTEX=1` also selects
+draws with tex0 DISABLED (untextured, e.g. the title horizon fill / dawn glow),
+skipping fragments whose combiner RGB is all zero (the black letterbox quads would
+otherwise eat the 200-line cap).
+
+## 4. `src/video_core/renderer_software/sw_rasterizer.cpp` — `SOH3D_PIXEL_XY`
+
+Same site: env `SOH3D_PIXEL_XY=<x>,<y>` dumps EVERY draw's fragment landing on that
+one framebuffer pixel (pre depth-test), as
+`PIXELXY cbuf=<pa> tex0=<pa> xy=(x,y) texcol=... primary=... combined=... blend=<src>,<dst>
+depth=<f>` — the full compositing stack at one coordinate. Coordinate space is the
+480x400 3D FB (NOT the final 400x240 image): image_x = fb_y, image_y ≈ 240 − fb_x/2;
+the display pass at (x,y) samples the 3D FB at (2x, y).
+
+Verification signature: at title `run 1000` (dayTime 0x3197), `az_fog` prints
+`color=(0,0,0)` end-of-frame but per-draw `vsuni_log` shows 51 draws `fog=5/0(56,42,40)`,
+and the LUT dump has `lut[127] = 0.9819/-0.7338` (75.2% max fog). See oot3d-decomp
+`title_env_lighting.md` §12.
