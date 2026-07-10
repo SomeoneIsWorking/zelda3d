@@ -146,13 +146,36 @@ scratch/title_ab/fsweep_*.png — machine-local, per never-commit-PNGs).
    demo-end transition, loop the cs at 2400 per the op-0x3e8 destination + op-0x7c fade)
    rather than riding the N64 flow. The three sweep rows past cs 811 measure THIS, not
    rendering.
-2. **Terrain/vegetation darkness, ~2x per channel** — d≈+20..+40 on every ground region at
+2. **[UPDATED 2026-07-10 — see `2026-07-10-title-terrain-uboverify-and-followups.md`.
+   NOT a lighting-tuning item: RULED OUT as an ambient/vColor/shader-math or UBO-fill bug by
+   direct runtime measurement (`<oot3d-decomp>/docs/title_env_lighting.md` static derivation +
+   this session's live `lightparams`/`sgdump 1000` readback: `ambient=(0.192,0.263,0.435)`
+   matches the doc's ROM-derived expectation `~(0.20,0.26,0.43)` to within frame noise;
+   `vtxLit=1 matAmb=(1,1,1) matDif=(0,0,0) combScale=2.0` — exact formula match). Re-measured
+   on a pixel-aligned pair (az=500/soh=908, content score 0.6001, confirmed NOT the
+   framing-mismatched az=700 pair) with the CURRENT build: ratio persists at 1.9–2.3x on all
+   12 regions (e.g. (100,0)-(200,80): Az(38,63,24) vs SoH(18,28,11), R2.1 G2.3 B2.2 —
+   unchanged from the numbers below). Verdict: honest negative — everything
+   derivable from ROM bytes through the shader checks out; the residual's cause is NOT
+   identified and is NOT being chased further by tuning constants per the
+   stop-micro-tuning-lighting directive.]**
+   Terrain/vegetation darkness, ~2x per channel — d≈+20..+40 on every ground region at
    every matched pair (e.g. az=500 region (100,0)-(200,80): Az (38,63,24) vs SoH (18,28,11) —
-   R2.1 G2.3 B2.2).
-   Same magnitude as the 2026-07-08 remeasure (1.9–2.6x); unchanged, known lighting-tuning
-   item (scene-ambient mismatch, journal 2026-07-04-title-parity-pinned650), NOT re-tuned per
-   the stop-micro-tuning-lighting directive.
-3. **Dawn warmth lag** — by cs 588+ Az's mid-frame warm regions run d=+52..+79 R: the oracle's
+   R2.1 G2.3 B2.2). Same magnitude as the 2026-07-08 remeasure (1.9–2.6x).
+3. **[FIXED 2026-07-10, see `2026-07-10-title-terrain-uboverify-and-followups.md`. Root cause:
+   `gSaveContext.skyboxTime` was never written by the title cs's direct `dayTime` assignment
+   (`TitlePresentation::step`), so `Environment_UpdateSkybox`'s sync guard
+   (`(sceneSetupIndex>=5 || gTimeIncrement!=0) && dayTime>skyboxTime`) never fired —
+   `skyboxTime` stuck at its scene-load value and the schedule kept re-selecting the SAME
+   `D_8011FC1C` row every frame, collapsing `skybox1Index==skybox2Index` (matches the
+   idx1==idx2==3-constant smoking gun below) and freezing the cross-fade's warm channel.
+   Fix: `title_presentation.cpp` now writes `gSaveContext.skyboxTime = csTime` alongside
+   `dayTime`, mirroring the existing pattern at every other dayTime-jump site (z_scene.c,
+   z_demo.c). Verified live: `sky info` now reports `idx1=3 idx2=0` (previously idx1==idx2)
+   with `blend` actively climbing/cycling across cs frames 154→378, and `lightparams` ambient
+   tracks the expected schedule. Title-only change; general gameplay's own skyboxTime writes
+   (z_scene.c/z_demo.c) untouched.]**
+   Dawn warmth lag — by cs 588+ Az's mid-frame warm regions run d=+52..+79 R: the oracle's
    sky/scene warm-up outpaces SoH's (sky unfreeze landed, but the warm channel still lags).
    Extension of the known sky R/G item (2026-07-08-title-divergence-remeasure verdict 3).
 4. **Fire-glow intensity** — both engines draw g_title.cmb's glow, but Az's is a prominent
@@ -176,8 +199,17 @@ scratch/title_ab/fsweep_*.png — machine-local, per never-commit-PNGs).
    textures in SoH's panes, so pixel deltas over the logo/copyright regions partly measure
    deliberate texture substitutions. A clean parity sweep of the overlay should disable the
    texpack.
-8. **Star brightness** (unchanged known item) — SoH's stars ~2x too dim to clear the noise
-   floor (2026-07-08 remeasure verdict 2); visible in the night rows' sky regions.
+8. **[UPDATED 2026-07-10 — see `2026-07-10-title-terrain-uboverify-and-followups.md`. The
+   2026-07-08 L8-decode fix IS live in the current build (confirmed by reading
+   `pica_texture.cpp`); the "unchanged" note above was the stale-harness-binary artifact the
+   Task-2-sweep session already flagged (§ "Harness rebuilt before measuring"). Re-measured
+   peak star luminance (moon-masked sky region, matched pairs az=200/soh=608 and
+   az=360/soh=768) on a freshly rebuilt binary: Az peak ≈154–157, SoH peak now ≈112–125
+   (ratio 0.73–0.80) — up from the pre-fix ~70/140 (ratio ~0.5) this doc originally measured.
+   IMPROVED, not fully closed: SoH's brightest stars still run ~25-30% below the oracle's.
+   Marked open with numbers, not re-tuned further.]**
+   Star brightness — SoH's stars ~2x too dim to clear the noise floor (2026-07-08 remeasure
+   verdict 2); visible in the night rows' sky regions.
 
 ### What now matches
 

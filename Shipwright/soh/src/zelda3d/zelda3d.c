@@ -218,12 +218,18 @@ static void Zelda3D_TitleLightSlotsConvert(void) {
     for (int i = 0; i < n; i++) {
         const unsigned char* e = raw + i * 28;
         Zelda3dLightSlot* o = &sZelda3dTitleLightSlots[i];
+        // Offsets per oot3d-decomp/docs/title_env_lighting.md §6 (decompiled
+        // Environment_Update consumer, on-disk cmd-0x0F layout): direction
+        // BEFORE color within each light group, matching N64's EnvLightSettings
+        // field order byte-for-byte. The prior offsets read l0col/l1col before
+        // their dir (swapped, off-by-one) and produced degenerate (0,0,0) or
+        // constant (-72,-72,-72) directions for ~15/17 spot99 slots.
         for (int j = 0; j < 3; j++) {
             o->amb[j]   = e[0x00 + j];
-            o->l0col[j] = e[0x04 + j];
-            o->l0dir[j] = (signed char)e[0x07 + j];
-            o->l1col[j] = e[0x0a + j];
-            o->l1dir[j] = (signed char)e[0x0d + j];
+            o->l0dir[j] = (signed char)e[0x03 + j];
+            o->l0col[j] = e[0x06 + j];
+            o->l1dir[j] = (signed char)e[0x09 + j];
+            o->l1col[j] = e[0x0c + j];
         }
     }
     sZelda3dTitleLightSlotN = n;
