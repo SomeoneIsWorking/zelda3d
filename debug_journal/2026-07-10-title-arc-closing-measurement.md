@@ -171,6 +171,13 @@ scratch/title_ab/fsweep_*.png — machine-local, per never-commit-PNGs).
    derivable from ROM bytes through the shader checks out; the residual's cause is NOT
    identified and is NOT being chased further by tuning constants per the
    stop-micro-tuning-lighting directive.]**
+   **[RESOLVED 2026-07-10, commit 02181072 — see `2026-07-10-title-arc-closing-measurement-v2.md`.
+   The decomp stream disassembled /CmbVShader.shbin (title_env_lighting.md §10/§11): the real
+   PICA vertex-lit program sums matAmbient·LightAmbientColor_i once PER ENABLED light slot
+   (2 for standard scenes) — the "oracle ~1.9x above the formula" was the FORMULA missing the
+   per-light sum. Ported as a real sum (uAmbient.w = enabled-light count from live envCtx
+   light data, no fitted constant); az=500 region deltas collapsed from R2.1 G2.3 B2.2 to
+   |d|≤4/255 on all 12 regions.]**
    Terrain/vegetation darkness, ~2x per channel — d≈+20..+40 on every ground region at
    every matched pair (e.g. az=500 region (100,0)-(200,80): Az (38,63,24) vs SoH (18,28,11) —
    R2.1 G2.3 B2.2). Same magnitude as the 2026-07-08 remeasure (1.9–2.6x).
