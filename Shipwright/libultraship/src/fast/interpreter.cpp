@@ -4390,6 +4390,24 @@ bool gfx_zelda3d_draw_handler_custom(F3DGfx** cmd0) {
     // frame end); without this, a G_ZELDA3D_DRAW firing mid-batch would jump ahead of (or behind)
     // still-buffered N64 geometry it was actually emitted after (or before) in the game's dlist.
     gfx->Flush();
+    // TEMP DIAGNOSTIC (ZELDA3D_DBG_OVERLAY_MP=1): dump the P/MV/MP the overlay draws actually carry,
+    // to root-cause the measured anisotropic overlay scale error (X~0.87, Y~0.72 of commanded).
+    if (screenSpace) {
+        static int sDbgOverlayMp = -1;
+        if (sDbgOverlayMp < 0) {
+            const char* v = getenv("ZELDA3D_DBG_OVERLAY_MP");
+            sDbgOverlayMp = (v && *v == '1') ? 1 : 0;
+        }
+        if (sDbgOverlayMp) {
+            const float* P = &gfx->mRsp->P_matrix[0][0];
+            const float* MP = &gfx->mRsp->MP_matrix[0][0];
+            fprintf(stderr,
+                    "[OVERLAY_MP] model=%d P diag=(%.6f,%.6f,%.6f) P row3=(%.4f,%.4f,%.4f) "
+                    "MV diag=(%.4f,%.4f,%.4f) MV trans=(%.2f,%.2f,%.2f) MP diag=(%.6f,%.6f) MP trans=(%.4f,%.4f)\n",
+                    modelId, P[0], P[5], P[10], P[12], P[13], P[14], mv[0], mv[5], mv[10], mv[12], mv[13], mv[14],
+                    MP[0], MP[5], MP[12], MP[13]);
+        }
+    }
     Zelda3D_GL_Submit(modelId, &gfx->mRsp->MP_matrix[0][0], mv, lit, invertY ? 1 : 0, r, g, b, a, aspectAdj, sky,
                     uvOffU, uvOffV, forceUnlit);
     return false;

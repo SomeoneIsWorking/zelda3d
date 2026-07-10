@@ -44,14 +44,10 @@
 // En_Mag's single +6/frame ramp) on every element except the copyright's step, which happens to
 // also be 6/frame.
 //
-// PLACEMENT DERIVATION (oracle, not guesswork): measured directly off the oracle capture
-// scratch/title_verify/az1000.png (400x240, Azahar OoT3D title-demo, logo-visible frame) via a
-// red/gold color-mask bounding box of the wordmark glyphs (tools ad hoc, see analysis in the
-// commit message / debug_journal entry for this change):
-//   bbox x:[99,388]px -> center cx~0.53 of screen width, width ~0.73 of screen width
-//   bbox y:[58,198]px -> center cy~0.55 of screen height, height ~0.55 of screen height
-// (Copyright text sits separately below — its own placement, measured from a later oracle
-// capture, is derived where it's drawn: Zelda3D_TryDrawTitleCopyright below.)
+// PLACEMENT DERIVATION (decomp, 2026-07-10 — supersedes the earlier oracle-screenshot color-mask
+// fractions, which were fitted constants): every element composes with ONE shared camera-facing
+// basis at depth -34 through the live scene projection — see the kOverlayComposeDepth block below
+// for the full derivation and its oracle verification numbers.
 //
 // TRUE 2D ORTHOGRAPHIC PASS (oot3d-decomp/docs/title_2d_overlay_logo.md §5.1): the POSITION/SCALE
 // of the old placement — camera eye + forward*dist, offset by a screen-fraction derived from the
@@ -99,10 +95,26 @@ void Zelda3D_GL_SetLightDirOverride(int modelId, float dx, float dy, float dz);
 
 namespace {
 
-// Screen-fraction placement derived from scratch/title_verify/az1000.png (see file header).
-constexpr float kCenterXFrac = 0.53f;
-constexpr float kCenterYFrac = 0.55f;
-constexpr float kHeightFrac  = 0.55f; // wordmark bbox height / screen height
+// DECOMP-DERIVED overlay compose (title_logo_actor.md §6.1/§6.4, supersedes the oracle-screenshot
+// screen fractions this block used to hold — kCenterXFrac/kCenterYFrac/kHeightFrac, all fitted
+// constants, are GONE): the 3DS logo actor composes each element with ONE shared camera-facing
+// basis whose local translate is (0, 0, -34.0) for the wordmark, (0, 0, -33.99) for the backdrop
+// and (0, -11.0, -34.0) for the copyright — i.e. every element's model ORIGIN sits on the camera
+// axis (screen center), 34 units in front of the camera, rendered through the scene's LIVE
+// perspective projection. The ortho-pass equivalent is exact:
+//   pxPerLocalUnit = (refH/2) / (tan(fovY/2) * 34)        [perspective similar-triangles]
+//   element center = screen center (+ the copyright's own -11-unit basis-Y offset, which reads
+//                    as DOWN on screen — the same sign derivation the previous port verified)
+//   element size   = pxPerLocalUnit * its OWN geometry (local offsets inside each CMB carry
+//                    themselves; the origin is what the basis places)
+// fovY is the live cs-camera fov (play->view.fovy, set per-frame by TitlePresentation from the
+// ported OP97 spline — verified 0.00 vs Az), so the overlay breathes with the camera exactly as
+// the oracle's scene-composited elements do. VERIFIED against the oracle at az=1000 (cs display
+// phase, fov-derived pxPerUnit ~8.2-8.3): predicted copyright ink-center y-frac 0.8725 vs
+// measured 0.875, predicted copyright ink extent 30.7px vs measured 29.5, predicted wordmark
+// height 159px vs measured gold-mask 161 (debug_journal/2026-07-10 measurement notes).
+constexpr float kOverlayComposeDepth   = 34.0f; // §6.4 placement literal 0x001da8a4 = -34.0f
+constexpr float kCopyrightLocalOffsetY = 11.0f; // §6.4 copyright local translate (0,-11.0,-34.0)
 
 // Virtual reference box the ortho pass projects (Zelda3D_Overlay2D_Begin) — OoT3D's own
 // top-screen resolution (title_2d_overlay_logo.md §2's SW-rasterizer draw log measured every
@@ -249,33 +261,11 @@ LogoPhaseState resolveLogoPhase(int csFrame) {
     return s;
 }
 
-// Copyright block placement — X/Y now DECOMP-DERIVED (title_logo_actor.md §6.4's local-offset
-// table, from the fully decompiled draw fn FUN_001da4f4), superseding the earlier independent
-// oracle-mask measurement (kept only as a cross-check comment below): the copyright's own local
-// translate composed with the SAME shared camera-facing basis as the wordmark is (0,-11.0,-34.0)
-// — i.e. X offset 0 (exactly the wordmark's own X) and a -11.0 local-unit nudge on the axis the
-// overlay's basis uses as "screen up/down". Converting that to a screen fraction reuses the
-// wordmark's own already-established local-unit -> pixel scale (kHeightFrac*refH pixels per
-// kWordmarkLocalHeight local units — kWordmarkLocalHeight is the CMB's authored bind-pose height,
-// 19.1, cited in this file's header and independently confirmed via Zelda3D_AutoModelHeight):
-//   pxPerLocalUnit = (kHeightFrac * kOverlayRefH) / kWordmarkLocalHeight
-//   kCopyrightCenterYFrac = kCenterYFrac + (11.0 local units * pxPerLocalUnit) / kOverlayRefH
-// (sign: the decomp's -11 nudges the copyright AWAY from the camera along the basis's "up" row —
-// on screen that reads as DOWN, matching the oracle's own independent measurement below).
-// CROSS-CHECK: this formula predicts kCopyrightCenterYFrac ~= 0.867; the original independent
-// oracle-mask measurement (scratch/title_ab/fireglow_probe2.az.png, az_step=1800, luminance/
-// low-saturation mask over the bottom screen quarter, bbox x:[133,280] y:[197,225] in the 400x240
-// reference — see debug_journal/2026-07-10-title-fireglow-copyright.md) got 0.879 — a ~3px
-// agreement at 240px height, confirming both derivations describe the same real placement. The
-// decomp value is used below since it's derived from ground truth rather than a threshold mask.
-constexpr float kWordmarkLocalHeight       = 19.1f;  // CMB bind-pose height (file header, §GROUND TRUTH)
-constexpr float kCopyrightLocalOffsetY     = 11.0f;  // title_logo_actor.md §6.4: local translate (0,-11.0,-34.0)
-constexpr float kCopyrightCenterXFrac = kCenterXFrac; // decomp: 0 local X offset from the wordmark
-constexpr float kCopyrightCenterYFrac =
-    kCenterYFrac + (kCopyrightLocalOffsetY * (kHeightFrac * kOverlayRefH) / kWordmarkLocalHeight) / kOverlayRefH;
-// Height/size: decomp gives no scale info for copy_nintendo.cmb (only the translate offset above)
-// — kept as the original independent oracle measurement (28px tall / 240px = 0.117).
-constexpr float kCopyrightHeightFrac  = 0.117f;
+// (Copyright placement/scale: fully derived from the shared-basis compose above — see
+// Zelda3D_TitleOverlayPxPerUnit and the Zelda3D_TryDrawTitleCopyright call site. The former
+// fitted constants — kCopyrightHeightFrac 0.117 from a screenshot mask, and the
+// kHeightFrac-chained center fraction — are gone; a bbox A/B (tools/title_copyright_bbox.py,
+// 2026-07-10) measured the fitted version at width 0.913x / off-center vs oracle.)
 
 // Press-START skip state (title_logo_actor.md §7). Advanced once per frame by
 // Zelda3D_TitleLogoStepSkip (called from TitlePresentation::update()); consulted by
@@ -335,11 +325,11 @@ int titleCopyrightModelId() {
 // card position (it's authored to overlay this exact wordmark, per title_logo_fireglow_cmab.md
 // §3: "g_title.cmb is drawn AFTER the wordmark... composites as a warm glow wash over the
 // already-rendered logo") without duplicating the measured constants above.
-extern "C" void Zelda3D_TitleWordmarkPlacementFracs(float* outCenterXFrac, float* outCenterYFrac,
-                                                     float* outHeightFrac) {
-    if (outCenterXFrac) *outCenterXFrac = kCenterXFrac;
-    if (outCenterYFrac) *outCenterYFrac = kCenterYFrac;
-    if (outHeightFrac) *outHeightFrac = kHeightFrac;
+// The shared local-unit -> overlay-pixel scale for every title 2D element this frame (see the
+// derivation comment at kOverlayComposeDepth). Shared with title_fireglow.cpp.
+extern "C" float Zelda3D_TitleOverlayPxPerUnit(PlayState* play) {
+    float fovDeg = (play != nullptr && play->view.fovy > 1.0f) ? play->view.fovy : 48.803f;
+    return (kOverlayRefH * 0.5f) / (tanf(fovDeg * 0.5f * (float)M_PI / 180.0f) * kOverlayComposeDepth);
 }
 
 extern "C" void Zelda3D_TitleOverlayRefWH(float* outRefW, float* outRefH) {
@@ -479,8 +469,11 @@ extern "C" int Zelda3D_TryDrawTitleLogo(PlayState* play) {
 
     OPEN_DISPS(play->state.gfxCtx);
     Gfx_SetupDL_25Opa(play->state.gfxCtx);
-    Zelda3D_Overlay2D_PlaceModel(play, kCenterXFrac * kOverlayRefW, kCenterYFrac * kOverlayRefH,
-                                 kHeightFrac * kOverlayRefH, localHeight);
+    // Shared-basis compose (kOverlayComposeDepth comment): model origin at screen center, size =
+    // pxPerUnit * its own geometry.
+    const float pxPerUnit = Zelda3D_TitleOverlayPxPerUnit(play);
+    Zelda3D_Overlay2D_PlaceModel(play, 0.5f * kOverlayRefW, 0.5f * kOverlayRefH,
+                                 pxPerUnit * localHeight, localHeight);
     // Wordmark sheen (title_logo_actor.md §6.3, ported 2026-07-10): actor field +0x1DC feeds a
     // light-DIRECTION parameter into the wordmark's own material (light-env slot 0: STATIC
     // ambient={1,1,1,1} diffuse={0.1834,0.1834,0.1834,1} specular={1,1,1,1} emission=0; only the
@@ -545,8 +538,8 @@ extern "C" int Zelda3D_TryDrawTitleLogo(PlayState* play) {
 // decompiled copyright channel (+0x1D8, title_logo_actor.md §5.3): 0 until the backdrop stage
 // completes (cf fadeIn+40+81+60 = fadeIn+181), then +6.0/frame for 43 frames — i.e. the
 // copyright fades in LAST, after the wordmark and backdrop/sheen have both finished. Placement
-// measured from the oracle — see kCopyrightCenterXFrac/kCopyrightCenterYFrac/
-// kCopyrightHeightFrac above.
+// (position AND scale) is decomp-derived — see kCopyrightCenterXFrac/kCopyrightCenterYFrac/
+// kOverlayPxPerLocalUnit above.
 extern "C" int Zelda3D_TryDrawTitleCopyright(PlayState* play) {
     if (!Zelda3D_Title_IsActive() || play == nullptr) {
         return 0;
@@ -566,9 +559,13 @@ extern "C" int Zelda3D_TryDrawTitleCopyright(PlayState* play) {
     }
     OPEN_DISPS(play->state.gfxCtx);
     Gfx_SetupDL_25Opa(play->state.gfxCtx);
-    Zelda3D_Overlay2D_PlaceModel(play, kCopyrightCenterXFrac * kOverlayRefW,
-                                 kCopyrightCenterYFrac * kOverlayRefH,
-                                 kCopyrightHeightFrac * kOverlayRefH, localHeight);
+    // Shared-basis compose (kOverlayComposeDepth comment): same origin-at-center placement and
+    // pxPerUnit scale as the wordmark, plus the copyright's OWN decomp local-translate offset
+    // (0,-11,-34) — the -11 basis-Y units read as DOWN on screen.
+    const float pxPerUnit = Zelda3D_TitleOverlayPxPerUnit(play);
+    Zelda3D_Overlay2D_PlaceModel(play, 0.5f * kOverlayRefW,
+                                 0.5f * kOverlayRefH + kCopyrightLocalOffsetY * pxPerUnit,
+                                 pxPerUnit * localHeight, localHeight);
     const uint8_t alphaU8 = (uint8_t)(alpha + 0.5f);
     gSPZelda3DDrawA(POLY_OPA_DISP++, modelId | (int)ZELDA3D_HANDLE_FORCE_UNLIT | (int)ZELDA3D_HANDLE_SCREEN_SPACE,
                     alphaU8, 255, 255, 255);

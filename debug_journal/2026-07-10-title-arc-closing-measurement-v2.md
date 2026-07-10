@@ -139,15 +139,24 @@ now measure real rendering (v1 measured "SoH left the title"); the terrain-domin
 3. Night-sky R/G: SoH's mid-sky runs brighter/greener than Az at night points (d −10..−52 on
    R/G in sky regions, stable v1→v2 sign) and the dawn warm-up still diverges at cs 588+
    (v1 residual 3's remnant). OPEN — sky-dome path, not the terrain ambient (unchanged by §1).
-4. Fire-glow additive delta 0.31–0.54 of oracle (v1 residual 4) — OPEN; vertex-lit hypothesis
-   falsified (§2), candidates narrowed to texture decode / alpha staging.
+4. Fire-glow additive delta 0.31–0.54 of oracle (v1 residual 4) — NARROWED to R 0.86 / G 1.02 /
+   coverage 0.92 by the shared-basis overlay-scale fix (the glow was drawn at the wordmark's pixel
+   height, ~31% under its authored footprint) — see
+   `2026-07-10-title-star-footprint-and-overlay-scale-derivation.md` §3. B 0.60 still OPEN;
+   candidates remain texture decode / alpha staging.
 5. Camera framing at cs 438 (v1 residual 5) — largely resolved in practice (az=700 score
    0.0741 → 0.4335; one region residual d=(−7,−24,−24)); segment-boundary audit still open.
-6. Overlay placement/scale (v1 residual 6) — aspect-squeeze fix landed (SCREEN_SPACE bit);
-   copyright-block scale still smaller than oracle. OPEN (small).
+6. ~~Overlay placement/scale (v1 residual 6)~~ — **RESOLVED** (2026-07-10 follow-up): the whole
+   overlay placement/scale is now the decomp perspective-compose derivation (shared basis at depth
+   -34 through the live cs fov; all fitted fraction constants deleted). Copyright bbox 0.987/1.000
+   of oracle, center within 1 px; az=1000 frame score 0.4305 → 0.6954. See
+   `2026-07-10-title-star-footprint-and-overlay-scale-derivation.md` §2.
 7. Texpack contamination (v1 residual 7) — measurement caveat closed: v2 ran `ZELDA3D_TEXPACK=off`.
-8. Star brightness (v1 residual 8) — point-size/rasterization footprint gap (peak 0.73–0.80,
-   integrated 1.03); OPEN, geometry-level.
+8. ~~Star brightness (v1 residual 8)~~ — **RESOLVED** (2026-07-10 follow-up): SoH's synthetic mip
+   chain was blurring the single-level L8 star texture's sparse bright texels (peak crushed, integral
+   preserved — exactly the measured signature). Additive point-sprite material class now samples
+   max_lod=0; peak ratio 0.744 → 0.970. See
+   `2026-07-10-title-star-footprint-and-overlay-scale-derivation.md` §1.
 
 ### Conditions
 
