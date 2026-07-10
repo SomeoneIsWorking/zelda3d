@@ -286,18 +286,50 @@ def cmd_calibrate(args):
 def cmd_ab(args):
     """Skip the search — drive straight to a known-good (az, soh) pair
     (e.g. one already established by `calibrate`) and just emit the SxS +
-    diff. Useful once a mapping is known, to avoid re-searching."""
+    diff. Useful once a mapping is known, to avoid re-searching.
+
+    Oracle (Az) side is CACHE-AWARE (see harness_ctl.OracleCache /
+    docs/parity-workflow.md "Oracle data cache"): the Az frame at `args.az`
+    is deterministic given (savestate, ROM, Azahar patches), so a repeat
+    request for the same az frame under the same cache key reuses the
+    stored PNG instead of re-running Az forward to it. The SoH side is
+    NEVER cached — it changes every build, so soh_step always runs live.
+    This is the minimal change that skips the actual expensive cost (the
+    `run <az>` stepping loop): the harness process still boots both
+    engines together (title_ab's harness has no clean SoH-only boot path),
+    but on a cache hit we skip straight past the Az stepping and reuse the
+    cached frame for the az_png used in scoring/compositing.
+    """
     _require_env()
+    from harness_ctl import OracleCache
+    cache = OracleCache(SAVESTATE)
+    cached_frame = cache.get_frame(args.az)
     h = _spawn()
     try:
-        print(f"[title_ab] az: run {args.az}, soh: soh_step {args.soh}", file=sys.stderr)
-        _step_chunked(h, "run", args.az)
-        _step_chunked(h, "soh_step", args.soh)
         base = OUTDIR / args.name
+        if cached_frame is not None:
+            print(f"[title_ab] oracle: cache hit (az={args.az}, key={cache.key})", file=sys.stderr)
+        else:
+            print(f"[title_ab] oracle: live run (cached now) az={args.az}, key={cache.key}",
+                  file=sys.stderr)
+            _step_chunked(h, "run", args.az)
+
+        print(f"[title_ab] soh: soh_step {args.soh}", file=sys.stderr)
+        _step_chunked(h, "soh_step", args.soh)
+        # snapshot always captures the SoH side (mandatory, always live);
+        # its az side is only used when we didn't already have a cached one.
         h.send_multiline(f"snapshot {base}")
-        az_png = ppm_to_png(str(base) + ".az.ppm")
         soh_png = ppm_to_png(str(base) + ".soh.ppm")
-        score = content_score(str(base) + ".az.ppm", str(base) + ".soh.ppm")
+
+        if cached_frame is None:
+            az_png = ppm_to_png(str(base) + ".az.ppm")
+            cache.put_frame(args.az, az_png)
+        else:
+            az_png = OUTDIR / f"{args.name}.az.png"
+            from PIL import Image as _Image
+            _Image.open(cached_frame).convert("RGB").save(az_png)
+
+        score = content_score(str(az_png), str(soh_png))
         print(f"[title_ab] content-match score at az={args.az}/soh={args.soh}: {score:.4f}")
         sxs = compose_sxs(az_png, soh_png, OUTDIR / f"{args.name}_sxs.png")
         print(f"[title_ab] sxs -> {sxs}")
