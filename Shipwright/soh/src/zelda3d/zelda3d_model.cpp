@@ -1175,6 +1175,32 @@ int Zelda3D_AutoModelExtentXZ(int modelId, float* outX, float* outZ) {
     return 1;
 }
 
+// Model-space vertex centroid of the draw groups using one CMB material slot. Lets a consumer
+// anchor a companion draw on a specific piece of a larger model — e.g. the title cloud-vortex
+// actor ring is concentric with spot99's room-mesh ring (material 0), so its world anchor is
+// derived from the room's own asset instead of a hardcoded position (behaviors/title/
+// title_cloud_vortex.cpp). Returns 1 with the centroid, 0 if the model/material has no geometry.
+int Zelda3D_ModelGroupCentroid(int modelId, int materialIndex, float out[3]) {
+    LoadedModel* lm = loadModel(modelId);
+    if (!lm || !lm->ok) return 0;
+    double sum[3] = { 0.0, 0.0, 0.0 };
+    long n = 0;
+    for (const auto& g : lm->groups) {
+        if (g.material_index != materialIndex) continue;
+        for (const auto& v : g.verts) {
+            sum[0] += v.pos[0]; sum[1] += v.pos[1]; sum[2] += v.pos[2];
+            n++;
+        }
+    }
+    if (n == 0) return 0;
+    if (out) {
+        out[0] = (float)(sum[0] / n);
+        out[1] = (float)(sum[1] / n);
+        out[2] = (float)(sum[2] / n);
+    }
+    return 1;
+}
+
 // 1 if a loaded auto model is skinned (articulated skeleton -> the auto path leaves it to
 // N64 to avoid a frozen T-pose), else 0. Loads the model lazily; treats a load failure as
 // "skinned" (==skip) so a bad model never auto-replaces.
