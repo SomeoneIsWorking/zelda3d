@@ -196,7 +196,7 @@ extern "C" int Zelda3D_TryDrawTitleFireGlow(PlayState* play) {
 
     // FORCE_UNLIT: g_title.cmb is a self-illuminated additive overlay, same reasoning as the
     // wordmark (title_logo.cpp) — don't let the scene's ambient darken the glow.
-    gSPZelda3DDrawUV(POLY_OPA_DISP++, modelId | (int)ZELDA3D_HANDLE_FORCE_UNLIT, a8, 0, vFx, r8, g8,
+    gSPZelda3DDrawUV(POLY_OPA_DISP++, modelId | (int)ZELDA3D_HANDLE_FORCE_UNLIT | (int)ZELDA3D_HANDLE_SCREEN_SPACE, a8, 0, vFx, r8, g8,
                      b8);
     CLOSE_DISPS(play->state.gfxCtx);
     return 1;

@@ -4362,7 +4362,11 @@ bool gfx_zelda3d_draw_handler_custom(F3DGfx** cmd0) {
     // vertex_lighting flag for this draw so a self-illuminated overlay (title logo) isn't darkened
     // by the scene's ambient/world lighting term. See gbi.h comment above gSPZelda3DDrawUV.
     int forceUnlit = (handle >> 29) & 1;
-    int modelId = handle & 0x1FFFFFFF; // low 29 bits = model id (small)
+    // bit 28 = screen-space override (ZELDA3D_HANDLE_SCREEN_SPACE): this draw's MP already came
+    // from a self-contained fixed-aspect ortho projection (title overlay), not the 3D camera's
+    // N64-4:3-authored one — skip the widescreen aspect correction below. See gbi.h.
+    int screenSpace = (handle >> 28) & 1;
+    int modelId = handle & 0x0FFFFFFF; // low 28 bits = model id (small)
     uint8_t a = (uint8_t)((w1 >> 32) & 0xFF); // w1[32:40] = per-draw alpha (255 = opaque)
     uint64_t w0 = (uint64_t)cmd->words.w0;
     uint32_t tint = (uint32_t)(w0 & 0xFFFFFF);
@@ -4373,8 +4377,10 @@ bool gfx_zelda3d_draw_handler_custom(F3DGfx** cmd0) {
     float uvOffV = (float)((w0 >> 48) & 0xFFFF) / 65536.0f;
     bool invertY = gfx->mRapi->GetClipParameters().invertY;
     // N64 vertices get `x = AdjXForAspectRatio(x)` per-vertex (see gfx_sp_vertex); our draw must
-    // apply the SAME clip-X scale or the OoT3D scene shears vs the N64 actors as the camera pans.
-    float aspectAdj = gfx->AdjXForAspectRatio(1.0f);
+    // apply the SAME clip-X scale or the OoT3D scene shears vs the N64 actors as the camera pans —
+    // EXCEPT for a screen-space overlay draw, whose own ortho box already IS the correct aspect
+    // (see ZELDA3D_HANDLE_SCREEN_SPACE, gbi.h).
+    float aspectAdj = screenSpace ? 1.0f : gfx->AdjXForAspectRatio(1.0f);
     // Modelview (no projection) for the view-space normal: top of the current modelview stack, the
     // same matrix MP_matrix was built from (gSPMatrix LOAD set it just before this opcode).
     const float* mv = &gfx->mRsp->modelview_matrix_stack[gfx->mRsp->modelview_matrix_stack_size - 1][0][0];
