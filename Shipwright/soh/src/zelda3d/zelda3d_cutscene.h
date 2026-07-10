@@ -59,6 +59,17 @@ int Zelda3D_TitleCsBlendedLight(uint16_t daytime,
                                 uint8_t amb[3], int8_t l1dir[3], uint8_t l1col[3],
                                 int8_t l2dir[3], uint8_t l2col[3], uint8_t fogCol[3]);
 
+// 3DS sky-DOME schedule (config 0, "fine"/kind=1): daytime -> skybox1Index /
+// skybox2Index + blend weight (0..1). This is `FUN_002e47c8`'s OWN table at
+// VA 0x0053200a (oot3d-decomp/docs/title_sky_dome.md §9.2) — a SEPARATE,
+// purpose-built table from kTitleLightSchedule (VA 0x00531efc) even though
+// its 9 rows are byte-identical in boundary/idx values (the two tables are
+// contiguous in the ROM's data blob). Kept as its own table/function per
+// title_sky_dome.md §9.5's explicit instruction not to silently alias the
+// light schedule's index field for the dome consumer.
+int Zelda3D_TitleCsDomeBlend(uint16_t daytime, int* skybox1Index,
+                             int* skybox2Index, float* blendWeight);
+
 // Misc / transition / loop triggers — op-0x03 (misc) sub-op 0x1e = logo
 // FADE_IN trigger, sub-op 0x1f = logo FADE_OUT trigger; op-0x7c =
 // screen-level fade window; op-0x3e8 = loop-restart frame. All byte-confirmed

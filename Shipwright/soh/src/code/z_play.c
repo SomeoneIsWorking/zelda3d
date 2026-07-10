@@ -1562,6 +1562,11 @@ void Play_Draw(PlayState* play) {
             if (play->skyboxId && (play->skyboxId != SKYBOX_UNSET_1D) && !play->envCtx.skyboxDisabled) {
                 if ((play->skyboxId == SKYBOX_NORMAL_SKY) || (play->skyboxId == SKYBOX_CUTSCENE_MAP)) {
                     Environment_UpdateSkybox(play, play->skyboxId, &play->envCtx, &play->skyboxCtx);
+                    // Title dome override: overwrite skybox1Index/skybox2Index/skyboxBlend with the
+                    // 3DS dome consumer's OWN schedule (title_sky_dome.md §9), replacing the N64
+                    // D_8011FC1C values Environment_UpdateSkybox just computed above. No-op outside
+                    // the title cs.
+                    Zelda3D_Title_ApplyDomeOverride(play);
                     // Zelda3D #28: draw the OoT3D sky dome in place of the low-res N64 skybox (uses the
                     // N64-computed skybox1Index for the time-of-day variant). 0 => keep the N64 path.
                     if (!Zelda3D_TryDrawSky(play)) {

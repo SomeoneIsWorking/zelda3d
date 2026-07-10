@@ -564,6 +564,45 @@ extern "C" int Zelda3D_TitleCsTimeOfDay(int frame, uint16_t* outDayTime) {
     return 1;
 }
 
+// 3DS dome selector/blend table, `FUN_002e47c8`'s row 0 ("fine", the non-rain
+// case, which is what title uses) at VA 0x0053200a
+// (oot3d-decomp/docs/title_sky_dome.md §9.2/§9.5). Entry shape on the 3DS is
+// {u16 start, u16 end, u8 blendFlag, u8 idx1, u16 idx2(low byte used)}; the
+// blendFlag is not carried separately here because LerpWeight's own ceiling
+// clamp already reproduces the flag=0 rows' "no blend" behavior (span
+// nonzero, weight saturates to 1.0 for the whole row).
+namespace {
+struct DomeSpan { uint16_t start, end; int idx1, idx2; };
+const DomeSpan kTitleDomeSchedule[9] = {
+    { 0x0000, 0x2AAC, 3, 3 }, { 0x2AAC, 0x4000, 3, 0 },
+    { 0x4000, 0x4AAB, 0, 0 }, { 0x4AAB, 0x6000, 0, 1 },
+    { 0x6000, 0xA000, 1, 1 }, { 0xA000, 0xB556, 1, 2 },
+    { 0xB556, 0xC001, 2, 2 }, { 0xC001, 0xD556, 2, 3 },
+    { 0xD556, 0xFFFF, 3, 3 },
+};
+} // namespace
+
+// Sky-dome variant + cross-fade at a dayTime, per the 3DS's OWN dome
+// consumer (FUN_002e47c8/§9.2 above) — a SEPARATE, purpose-built table from
+// kTitleLightSchedule below even though the two are boundary/value-identical
+// (contiguous tables in the ROM's data blob, title_sky_dome.md §9.2). Do not
+// alias kTitleLightSchedule's index field for this per §9.5's explicit note.
+extern "C" int Zelda3D_TitleCsDomeBlend(uint16_t daytime, int* skybox1Index,
+                                        int* skybox2Index, float* blendWeight) {
+    for (const DomeSpan& sp : kTitleDomeSchedule) {
+        if (sp.start <= daytime && (daytime < sp.end || sp.end == 0xFFFF)) {
+            *skybox1Index = sp.idx1;
+            *skybox2Index = sp.idx2;
+            const float d = (float)(sp.end - sp.start);
+            // FUN_00361490 shape: w = (t-start)/(end-start), ceiling clamp only.
+            float w = (d > 0.0f) ? (float)(daytime - sp.start) / d : 1.0f;
+            *blendWeight = (w < 1.0f) ? w : 1.0f;
+            return 1;
+        }
+    }
+    return 0;
+}
+
 // spot99's raw ZSI cmd-0x0F light-settings entries (28 bytes each, entry 0 =
 // metadata like every scene; caller applies the same +1 slot bias as the
 // generated kZelda3dSceneLighting rows).

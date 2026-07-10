@@ -354,7 +354,34 @@ void TitlePresentation::applyLightOverride(PlayState* play) {
     }
 }
 
+// Sky-dome override — see header comment. Reads the SAME cs-derived dayTime as
+// applyLightOverride (Zelda3D_TitleCsTimeOfDay at the current cs frame) but drives the
+// dome-specific table (Zelda3D_TitleCsDomeBlend, title_sky_dome.md §9.2), not the light
+// palette's. skyboxBlend is u8 0..255 = alpha of the skybox2Index variant (existing SoH/N64
+// convention, z_kankyo.c's D_8011FC1C consumer); the dome table's own weight is 0..1.
+void TitlePresentation::applyDomeOverride(PlayState* play) {
+    if (!mActive) {
+        return;
+    }
+    uint16_t t;
+    if (!Zelda3D_TitleCsTimeOfDay(Zelda3D_TitleCsFrame(), &t)) {
+        return;
+    }
+    int idx1, idx2;
+    float w;
+    if (!Zelda3D_TitleCsDomeBlend(t, &idx1, &idx2, &w)) {
+        return;
+    }
+    play->envCtx.skybox1Index = (uint8_t)idx1;
+    play->envCtx.skybox2Index = (uint8_t)idx2;
+    play->envCtx.skyboxBlend  = (uint8_t)(w * 255.0f + 0.5f);
+}
+
 } // namespace Zelda3D
+
+extern "C" void Zelda3D_Title_ApplyDomeOverride(PlayState* play) {
+    Zelda3D::TitlePresentation::Instance().applyDomeOverride(play);
+}
 
 extern "C" int Zelda3D_Title_Update(PlayState* play) {
     return Zelda3D::TitlePresentation::Instance().update(play);
