@@ -398,3 +398,53 @@ if (FILE* fp = Soh3dOpenBlitLog()) {
     g_soh3d_blit_frame_index++;
 }
 ```
+
+# Patch 5 — per-draw vertex-shader uniform log (title sheen RE, 2026-07-10)
+
+`Azahar/src/video_core/pica/pica_core.cpp` — logs the decoded VS uniform
+state relevant to CmbVShader lighting at every draw trigger, so the
+harness can read back EXACTLY what the game wrote into
+`LightDir0..2 / LightDiffuseColor0..2 / LightAmbientColor0..2` (c80–c88),
+`MatDiffuseColor/MatAmbientColor` (c8/c9) and the `HasColor /
+IsVertexLighting / IsFragmentLighting` bools (b5/b9/b10) for a given
+frame's draws. This is how the wordmark light-env slot-color ROLES were
+pinned (oot3d-decomp `docs/title_logo_actor.md` §6.6): the slot's first
+color (WHITE) lands in LightDiffuseColor0 and its second (0.18) in
+LightAmbientColor0 — the reverse of the doc's earlier guess.
+
+## The patch
+
+Two hunks in `Azahar/src/video_core/pica/pica_core.cpp`.
+
+### Hunk 1 — globals just above `namespace Pica {`
+
+```cpp
+extern "C" char soh3d_vsuni_log_path[256] = "";
+extern "C" int soh3d_vsuni_log_active = 0;
+
+#include <cstdio>
+```
+
+### Hunk 2 — inside `WriteInternalReg`, at the top of the
+`case PICA_REG_INDEX(pipeline.trigger_draw):` block (before `DrawArrays`)
+
+Appends one line per draw:
+`draw idx=<indexed> hasCol=<b5> vLit=<b9> fLit=<b10> matDif=(...) matAmb=(...)
+dir0=(...) dif0=(...) amb0=(...) dir1=... dif1=... amb1=... dir2=... dif2=...
+amb2=... vtxScl0=(...)` — reading `vs_setup.uniforms.f[8,9,80..88,90]` via
+`.ToFloat32()` and `uniforms.b[5,9,10]`. See the in-tree copy for the exact
+block (search `soh3d_vsuni_log_active`).
+
+## Harness side (committed in this repo)
+
+- `tools/soh3d_harness/main.cpp`: extern decls + REPL command
+  `vsuni_log <path>` / `vsuni_log off` (same shape as `draw_log`).
+
+## Verification signature
+
+From `scratch/title_settled.state` + `run 1000` (title cs588, sheen t=1),
+`vsuni_log` over one frame contains wordmark draws with
+`dir0=(0.57735,-0.57735,-0.57735,1) dif0=(1,1,1,1) amb0=(0.18,0.18,0.18,1)
+matAmb=(1,1,1,0) hasCol=0` and terrain draws showing the SAME scene
+ambient duplicated into amb0 AND amb1 (the ×2 terrain mechanism of
+oot3d-decomp `title_env_lighting.md` §10).

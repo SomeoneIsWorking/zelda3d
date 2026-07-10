@@ -39,8 +39,8 @@
 // each element's texture alpha per the draw fn's full decompile, §6.2), staged sequentially on
 // fade-in and synchronized on fade-out — see Zelda3D_TitleLogoPhaseAlpha3 below for the ported
 // state machine. A fourth field, +0x1DC, is NOT a fourth alpha (§6.3 corrects §5.2's earlier
-// "sheen" guess): it's a light-direction sweep on the WORDMARK's own material, not yet ported —
-// see the follow-up comment at its draw call below. This SUPERSEDES the earlier STOPGAP (N64
+// "sheen" guess): it's a light-direction sweep on the WORDMARK's own material, ported at its draw
+// call below (see that comment for the verified light-env constants). This SUPERSEDES the earlier STOPGAP (N64
 // En_Mag's single +6/frame ramp) on every element except the copyright's step, which happens to
 // also be 6/frame.
 //
@@ -474,25 +474,30 @@ extern "C" int Zelda3D_TryDrawTitleLogo(PlayState* play) {
     const float pxPerUnit = Zelda3D_TitleOverlayPxPerUnit(play);
     Zelda3D_Overlay2D_PlaceModel(play, 0.5f * kOverlayRefW, 0.5f * kOverlayRefH,
                                  pxPerUnit * localHeight, localHeight);
-    // Wordmark sheen (title_logo_actor.md §6.3, ported 2026-07-10): actor field +0x1DC feeds a
-    // light-DIRECTION parameter into the wordmark's own material (light-env slot 0: STATIC
-    // ambient={1,1,1,1} diffuse={0.1834,0.1834,0.1834,1} specular={1,1,1,1} emission=0; only the
+    // Wordmark sheen (title_logo_actor.md §6.3/§6.6, ported 2026-07-10; slot colors corrected +
+    // mechanism verified same day): actor field +0x1DC feeds a light-DIRECTION parameter into the
+    // wordmark's own material (light-env slot 0: STATIC light ambient={0.18,0.18,0.18,1}, light
+    // diffuse=WHITE {1,1,1,1}, specular={1,1,1,1} (unused — the vertex-lit CmbVShader path has no
+    // specular term), 4th color={0,0,0,1}; byte-exact from the code.bin pool at 0x004d9924 and
+    // read back live from the oracle's c81/c82 vertex uniforms at the wordmark draw. Only the
     // direction sweeps, over the same cf466-525 window as the backdrop alpha ramp, then freezes at
     // its t=1 endpoint forever). §6.3's decompiled formula, with basisRow0/1/2 = the rows of the
     // wordmark's own placement basis (an IDENTITY rotation per the decomp — "fStack_58 block,
     // identity rotation + local translate (0,0,-34.0)"), reduces algebraically to:
     //   t = clamp(sheenT/255, 0, 1)
     //   dir = (2t-1, 1-2t, -0.5-0.5t)              [= w0*row0 + w1*row1 + w2*row2 with rows=identity]
-    // dir is in the wordmark's OWN object space (same space its placement basis and vertex normals
-    // use) — Zelda3D_GL_SetLightDirOverride transforms it by THIS draw's placement matrix at render
-    // time (mat3(uMV), mirroring the normal transform), so it composes correctly with this ortho
+    // (verified bit-exact against the oracle's live light slot: az=764 -> normalize = (-0.64838,
+    // 0.64838, -0.399), az=1000 -> (0.57735, -0.57735, -0.57735)). dir is in the wordmark's OWN
+    // object space (same space its placement basis and vertex normals use) —
+    // Zelda3D_GL_SetLightDirOverride transforms it by THIS draw's placement matrix at render time
+    // (mat3(uMV), mirroring the normal transform), so it composes correctly with this ortho
     // overlay's fixed placement (zelda3d_overlay2d.cpp) without this file needing its own copy of
-    // that transform. Fed to the renderer as an ADDITIVE diffuse boost (uSheen, zelda3d_sg_ubo.h) —
-    // NOT the shared half-Lambert term, which darkens from full-bright and would be the wrong shape
-    // for this actor's ambient-always-1.0 lighting (see uSheen's declaration comment for the
-    // derivation). Specular is NOT ported (proven negative, same comment): the PICA specular
-    // exponent lives in the CMB material's own light-LUT config, not this actor's code, and this
-    // ortho overlay pass has no real camera/view vector for a Blinn-Phong term to reduce to.
+    // that transform — and because BOTH N and L go through the same mat3, the shader's
+    // dot(N, -L) is invariant under the overlay's RotateX(180)+reversed-ortho basis. The renderer
+    // applies the faithful CmbVShader term shade = clamp(0.18 + max(0, dot(N, -L)), 0, 1) (uSheen,
+    // zelda3d_sg_ubo.h — see that comment for the falsified earlier 1+0.1834*N·(+L) version).
+    // With the letters' flat N=(0,0,1) this shades them uniformly from 0.513 (t=0) to 0.757 (t=1),
+    // the oracle-measured x1.3-1.4 brightening across the ramp.
     {
         const float t = std::clamp(ps.sheenT / 255.0f, 0.0f, 1.0f);
         const float dx = 2.0f * t - 1.0f;
