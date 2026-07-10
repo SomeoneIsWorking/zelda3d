@@ -45,6 +45,7 @@ struct SgGroup {
     int meshId = -1;
     int materialIndex = -1;
     int vertexLighting = 0;
+    int fogEnabled = 0; // CMB isFogEnabled (+0x02): PICA distance fog applies to this draw
     float combScaleRGB = 1.0f;
     float matAmbient[3] = { 1.0f, 1.0f, 1.0f };
     float matDiffuse[3] = { 1.0f, 1.0f, 1.0f };

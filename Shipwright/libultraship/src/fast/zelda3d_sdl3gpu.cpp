@@ -66,6 +66,8 @@ extern "C" int gZelda3dFogEnable;
 extern "C" float gZelda3dFogColor[3];
 extern "C" float gZelda3dFogMul;
 extern "C" float gZelda3dFogOffset;
+extern "C" int gZelda3dFog3dOn;     // OoT3D PICA distance fog (title port) — zelda3d_gl.cpp
+extern "C" float gZelda3dFog3d[8];  // { a, b, fogNear, fogFar, fwd.xyz, dot(fwd, eye) }
 extern "C" float gZelda3dWorldAmbColor[3];
 extern "C" float gZelda3dWorldAmb;
 extern "C" int gZelda3dWorldLit;
@@ -165,7 +167,9 @@ bool CompileGlsl(EShLanguage stage, const char* src, std::vector<uint32_t>& spv)
     "    vec4 uAmbient;\n" \
     "    vec4 uMatConst;\n" \
     "    vec4 uSheen;\n" \
-    "    vec4 uTex1Xf;\n"
+    "    vec4 uTex1Xf;\n" \
+    "    vec4 uFog3d0;\n" \
+    "    vec4 uFog3d1;\n"
 #define SG_UBO_BONES_BODY \
     "    mat4 uBones[" SG_STR(ZELDA3D_GL_MAX_BONES) "];\n"
 
@@ -197,7 +201,18 @@ const char* kVert =
     "        sp = acc.xyz;\n"
     "    } else { sp = aPos; nM = aNrm; }\n"
     "    vec4 c = ubo.uMP * vec4(sp, 1.0);\n"
-    "    vFogDist = c.z / c.w;\n"
+    // 3DS PICA fog (uFog.w == 2.0, title port): vFogDist carries the 3DS z-buffer DEPTH of this
+    // vertex, depth = a - b/d with d = the eye depth along the view axis (uMV maps model->WORLD
+    // for these draws — the camera lives in uMP — so d = dot(world, fwd) - dot(fwd, eye)).
+    // a - b/d is this world point's z/w under the 3DS projection, affine in screen space, so the
+    // plain varying interpolation reproduces the 3DS per-fragment depth exactly. N64 ramp mode
+    // keeps the existing NDC z/w.
+    "    if (ubo.uFog.w > 1.5) {\n"
+    "        float d = dot((ubo.uMV * vec4(sp, 1.0)).xyz, ubo.uFog3d1.xyz) - ubo.uFog3d1.w;\n"
+    "        vFogDist = ubo.uFog3d0.x - ubo.uFog3d0.y / max(d, 1e-3);\n"
+    "    } else {\n"
+    "        vFogDist = c.z / c.w;\n"
+    "    }\n"
     "    c.y *= ubo.uParams.x;\n"
     "    c.z = (c.z + c.w) * 0.5;\n"          // GL clip z [-1,1] -> SDL3 GPU/Vulkan [0,1]
     "    if (ubo.uLightDir.w > 0.5) c.z = c.w;\n" // skybox: pin to far plane
@@ -238,6 +253,15 @@ const char* kFrag =
     "            lit += (p.z - ubo.uShadow.y > d) ? 0.0 : 1.0;\n"
     "        }\n"
     "    return lit / 9.0;\n"
+    "}\n"
+    // RE'd 3DS fog LUT node value at t = i/128 (FogResUpdater FUN_002cdbfc, mode 0 linear —
+    // oot3d-decomp title_env_lighting.md §13): eyeDist = b/(a - t) (inverse projection), then
+    // the linear fogNear..fogFar window. uFog3d0 = (a, b, fogNear, fogFar).
+    "float fog3dNode(float t) {\n"
+    "    float d = ubo.uFog3d0.y / max(ubo.uFog3d0.x - t, 1e-6);\n"
+    "    if (d < ubo.uFog3d0.z) return 1.0;\n"
+    "    if (d > ubo.uFog3d0.w) return 0.0;\n"
+    "    return (ubo.uFog3d0.w - d) / (ubo.uFog3d0.w - ubo.uFog3d0.z);\n"
     "}\n"
     "void main() {\n"
     "    vec4 t = texture(uTex, vUv);\n"
@@ -315,7 +339,22 @@ const char* kFrag =
     "            rgb *= ubo.uAmbient.xyz * ubo.uAmbient.w;\n"
     "        rgb = clamp(rgb, 0.0, 1.0) * ubo.uExtra.w;\n"
     "    }\n"
-    "    if (ubo.uFog.w > 0.5 && ubo.uLightDir.w < 0.5) {\n"
+    // OoT3D PICA distance fog (uFog.w == 2.0; title port — oot3d-decomp title_env_lighting.md
+    // §13). vFogDist = the 3DS z-buffer depth (see vertex shader). PICA samples a 128-entry LUT
+    // at index depth*128 and LERPs value->value+diff INSIDE the entry; with the scene's
+    // compressed depth range entry 127 spans eye ~873..zFar, so this piecewise-linear-in-DEPTH
+    // interpolation (not the underlying distance curve) is the visible haze. fog3dNode() is the
+    // RE'd FogResUpdater node value (linear mode 0): eyeDist(t) = b/(a-t), then the fogNear/
+    // fogFar linear window. (The 3DS's 11/13-bit LUT quantization is omitted: <=1/2048 in the
+    // factor, sub-LSB of the 8-bit output.) Never applied to sky (uLightDir.w).
+    "    if (ubo.uFog.w > 1.5 && ubo.uLightDir.w < 0.5) {\n"
+    "        float x = clamp(vFogDist, 0.0, 1.0) * 128.0;\n"
+    "        float i0 = min(floor(x), 127.0);\n"
+    "        float f0 = fog3dNode(i0 * (1.0 / 128.0));\n"
+    "        float f1 = fog3dNode((i0 + 1.0) * (1.0 / 128.0));\n"
+    "        float factor = clamp(f0 + (f1 - f0) * (x - i0), 0.0, 1.0);\n"
+    "        rgb = mix(ubo.uFog.xyz, rgb, factor);\n"
+    "    } else if (ubo.uFog.w > 0.5 && ubo.uLightDir.w < 0.5) {\n"
     "        float f = clamp(vFogDist * ubo.uFog2.x + ubo.uFog2.y, 0.0, 255.0) * (1.0 / 255.0);\n"
     "        rgb = mix(rgb, ubo.uFog.xyz, f);\n"
     "    }\n"
@@ -654,6 +693,7 @@ SgModel* Fast::Zelda3DRenderer::ensureUploaded(int modelId) {
         g.meshId = groups[i].meshId;
         g.materialIndex = groups[i].materialIndex;
         g.vertexLighting = groups[i].vertexLighting;
+        g.fogEnabled = groups[i].fogEnabled;
         g.combScaleRGB = groups[i].combScaleRGB;
         for (int k = 0; k < 3; k++) {
             g.matAmbient[k] = groups[i].matAmbient[k];
@@ -1797,6 +1837,10 @@ void Fast::Zelda3DRenderer::DrawModel(int modelId, const float* mp16, const floa
     base.uFog[3] = gZelda3dFogEnable ? 1.0f : 0.0f;
     base.uFog2[0] = gZelda3dFogMul;
     base.uFog2[1] = gZelda3dFogOffset;
+    // OoT3D PICA distance fog (title port): frame-level params; the per-group loop below flips
+    // uFog.w to 2.0 for materials whose CMB isFogEnabled byte is set.
+    memcpy(base.uFog3d0, gZelda3dFog3d, 4 * sizeof(float));
+    memcpy(base.uFog3d1, gZelda3dFog3d + 4, 4 * sizeof(float));
     base.uAmbient[0] = gZelda3dWorldAmbColor[0];
     base.uAmbient[1] = gZelda3dWorldAmbColor[1];
     base.uAmbient[2] = gZelda3dWorldAmbColor[2];
@@ -1834,6 +1878,13 @@ void Fast::Zelda3DRenderer::DrawModel(int modelId, const float* mp16, const floa
         }
         ubo.uParams[2] = grp.alphaTest ? grp.alphaRef : 0.0f;
         ubo.uParams[3] = grp.polygonOffset;
+        // OoT3D PICA distance fog (title port): per-DRAW enable = the frame-level 3DS-fog state
+        // AND this material's CMB isFogEnabled byte (fog_mode=5 on the 3DS; the additive/effect
+        // materials opt out). uFog.w == 2.0 selects the 3DS LUT path in the shader, overriding
+        // the (default-off) F3DEX ramp; sky is excluded shader-side via uLightDir.w.
+        if (gZelda3dFog3dOn && grp.fogEnabled) {
+            ubo.uFog[3] = 2.0f;
+        }
         // combScaleRGB is the CMB material's authored TEV stage-0 RGB scale — always apply when
         // the material asks for it. Only the additive scene-ambient floor (uAmbient.w below) is
         // gated by gZelda3dWorldLit (task #16: at title we skip the synthetic vertex-lit compute

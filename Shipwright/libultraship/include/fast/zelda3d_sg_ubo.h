@@ -69,6 +69,17 @@ struct SgUbo {
     // The dual-tex ENABLE flag rides uSheen.y (uSheen.z/.w still reserved); when off, uTex1Xf
     // is dead data and uTex1 is bound to the dummy texture.
     float uTex1Xf[4];
+    // OoT3D PICA distance fog (title port — oot3d-decomp docs/title_env_lighting.md §13, the
+    // RE'd FogResUpdater LUT fill). Active per-draw when uFog.w == 2.0 (the material's CMB
+    // isFogEnabled byte + the frame-level enable, never sky).
+    //   uFog3d0 = (a, b, fogNear, fogFar): a/b are the 3DS projection z-row coefficients
+    //             (eyeDist at LUT node t = b/(a - t)); fogNear/fogFar the palette-blended
+    //             linear fog window in eye units.
+    //   uFog3d1 = (fwd.xyz, dot(fwd, eye)): camera forward + eye projection, so the vertex
+    //             shader recovers eye depth d = dot(worldPos, fwd) - w without a view matrix
+    //             (the camera lives folded into uMP for scene draws).
+    float uFog3d0[4];
+    float uFog3d1[4];
     float uBones[ZELDA3D_GL_MAX_BONES * 16]; // MUST stay last: pushed as its own <=4096 B block
 };
 

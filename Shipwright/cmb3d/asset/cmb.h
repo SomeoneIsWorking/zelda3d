@@ -63,6 +63,9 @@ struct CmbMaterial {
     // texture*a_Color*uTint, dropping both the lighting and the combiner scale below.
     bool vertex_lighting = false;
     bool fragment_lighting = false;
+    // isFogEnabled (material +0x02): the PICA distance-fog stage applies to this material's
+    // draws (fog_mode=5 with the palette-blended fog color/LUT). See cmb.cpp parse comment.
+    bool is_fog = false;
     float mat_ambient[3] = { 1, 1, 1 };
     float mat_diffuse[3] = { 1, 1, 1 };
     // Stage-0 TEV combiner. Scene materials are overwhelmingly a single
