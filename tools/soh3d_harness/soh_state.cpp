@@ -73,6 +73,25 @@ int SohState_HasPlayState(void) {
     return (gPlayState != NULL) ? 1 : 0;
 }
 
+// TEMPORARY (item A, #146 moon-scale derivation): read the live
+// envCtx.sunPos.y SoH's title-moon draw actually used this frame and
+// recompute Zelda3D_TryDrawSunMoon's moon `scale`/`discScale` formula
+// verbatim (zelda3d.c ~L3755-3805), so we can oracle-anchor a fixed
+// replacement constant instead of guessing one. Remove once the fixed
+// scale lands (this is a one-shot readback aid, not a permanent API).
+int SohState_MoonDebug(float* sunPosY, float* color, float* scale, float* discScale) {
+    if (gPlayState == NULL) return 0;
+    const float y = gPlayState->envCtx.sunPos.y / 25.0f;
+    float c = -y / 120.0f;
+    if (c < 0.0f) c = 0.0f;
+    const float s = (-15.0f * c) + 25.0f;
+    *sunPosY  = gPlayState->envCtx.sunPos.y;
+    *color    = c;
+    *scale    = s;
+    *discScale = s * 0.505f; // kMoonDiscScale, kept in sync with zelda3d.c
+    return 1;
+}
+
 int SohState_SceneNum(void) {
     return (gPlayState != NULL) ? (int)gPlayState->sceneNum : -1;
 }

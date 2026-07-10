@@ -17,12 +17,42 @@ extern "C" void Zelda3D_Overlay2D_Begin(PlayState* play, float refW, float refH)
     }
     // Top-left origin, Y DOWN: bottom=refH maps to clip -1 (screen bottom), top=0 maps to clip +1
     // (screen top) — a pixel-space translate of (x,y) with x in [0,refW], y in [0,refH] lands
-    // exactly where it visually reads. near/far are arbitrary (no real depth in this space; all
-    // ordering is draw-call order with the Z-buffer disabled below), picked wide enough that any
-    // z a caller might pass never clips.
-    guOrtho(ortho, 0.0f, refW, refH, 0.0f, -1000.0f, 1000.0f, 1.0f);
+    // exactly where it visually reads.
+    //
+    // near/far are NOT arbitrary (#146 item B): the SG renderer's model pipelines always
+    // depth-test (zelda3d_sdl3gpu.cpp getPipeline, LESS_OR_EQUAL), so intra-model depth ordering
+    // within this pass is real. PlaceModel's fixed 180° X rotation (kOverlayFixedRotX, the
+    // Y-up->Y-down convention flip below) also negates model Z, which INVERTS the authored depth
+    // sense: a sub-mesh modeled BEHIND (more negative local z — title_logo_us.cmb's shield at z
+    // -6.3..-9.7 vs the ZELDA letters at -5.0..-5.6) came out NEARER, so the shield depth-tested
+    // in FRONT of the letters — the occlusion inversion measured in
+    // debug_journal/2026-07-10-shield-sword-attribution.md §5. Passing the ortho near/far
+    // REVERSED (near=+1000, far=-1000) re-flips clip z so the authored order is restored
+    // (modeled-behind maps farther, matching the oracle's own projection). Range stays wide
+    // enough that any caller z never clips.
+    guOrtho(ortho, 0.0f, refW, refH, 0.0f, 1000.0f, -1000.0f, 1.0f);
     OPEN_DISPS(gfxCtx);
     gSPMatrix(POLY_OPA_DISP++, ortho, G_MTX_NOPUSH | G_MTX_LOAD | G_MTX_PROJECTION);
+    // #146 item B: give this pass its OWN depth scope instead of disabling depth entirely.
+    // gSPClearGeometryMode(G_ZBUFFER) below is the legacy Fast3D signal (kept for any interleaved
+    // N64 geometry) but has NO effect on the OoT3D CMB models this pass actually draws — those go
+    // through the unified Zelda3D SG renderer (gSPZelda3DDrawA -> DrawModel), whose depth test is
+    // always on and whose depth WRITE is a static per-material flag baked from the CMB. For
+    // title_logo_us.cmb specifically that leaves intra-model ordering (shield/sword vs the "ZELDA"
+    // letters — see debug_journal/2026-07-10-shield-sword-attribution.md) to raw draw-call
+    // submission order, which is wrong: the model's own vertex depth places the shield/sword
+    // BEHIND the letters, but SoH shows it unoccluded.
+    //
+    // Fix: reset the shared depth buffer to far HERE (a fullscreen depth-only draw, color writes
+    // off — Fast::Zelda3DRenderer::ClearOverlayDepth, no render-pass split) so this pass starts
+    // with a blank depth canvas. Safe to do unconditionally: the 3D scene behind this overlay has
+    // already been fully composited into the COLOR buffer by this point, so wiping depth cannot
+    // damage it — it only affects what THIS pass's own models depth-test against, restoring
+    // correct self-occlusion within title_logo_us.cmb without needing per-mesh sorting or a
+    // depth-write override on the CMB materials themselves (still statically false/true as
+    // authored — depth WRITE is still governed by the CMB's own material flags, this fixes the
+    // buffer's *starting state*, not per-material write behavior).
+    gSPZelda3DClearDepth(POLY_OPA_DISP++);
     // No depth test/write against the already-finished 3D scene's Z-buffer — this pass composites
     // purely by draw order (same reasoning z_eff_blure.c/z_eff_spark.c already use G_ZBUFFER
     // clears for their own screen-relative effects).

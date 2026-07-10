@@ -63,6 +63,13 @@ void Zelda3D_Sg_DepthPrepassDraw(int modelId, const float* mp16, const float* mv
 void Zelda3D_Sg_EndDepthPrepass(void);
 void Zelda3D_Sg_AoComposite(void);
 
+// #146 item B: reset the shared depth buffer to "far" via a fullscreen depth-only draw (color
+// writes off) appended at THIS point in the op-list — no render-pass split. Called once by
+// Zelda3D_Overlay2D_Begin (via gSPZelda3DClearDepth / Zelda3D_ClearOverlayDepth) so the title
+// overlay's own models depth-test correctly against each other without inheriting stale depth
+// from the already-composited 3D scene.
+void Zelda3D_Sg_ClearOverlayDepth(void);
+
 #ifdef __cplusplus
 }
 #endif

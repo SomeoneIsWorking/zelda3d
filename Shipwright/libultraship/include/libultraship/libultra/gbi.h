@@ -179,6 +179,7 @@
 #define G_REGBLENDEDTEX 0x3f
 #define G_ZELDA3D_DRAW 0x41
 #define G_ZELDA3D_MEASURE 0x4a
+#define G_ZELDA3D_CLEARDEPTH 0x4b
 #define G_MOVEMEM_OTR 0x42
 #define G_LOADBLOCK_WIDE 0x47
 #define G_VTX_WIDE 0x48
@@ -2824,6 +2825,19 @@ typedef union Gfx {
         _g->words.w0 = _SHIFTL(G_ZELDA3D_MEASURE, 24, 8) |  \
                        _SHIFTL((begin) & 0x1, 0, 24);     \
         _g->words.w1 = (uintptr_t)(key);                  \
+    }
+
+// Zelda3D overlay depth-scope reset (#146 item B): reset the shared depth buffer's contents to
+// "far" at this point in the dlist, WITHOUT ending/restarting the SDL3 GPU render pass (a fullscreen
+// depth-only draw, color writes off — see Fast::Zelda3DRenderer::ClearOverlayDepth). Emitted once by
+// Zelda3D_Overlay2D_Begin so the title overlay's own models can self-occlude via normal depth test
+// (shield/sword behind letters) without depth-fighting whatever the already-composited 3D scene left
+// in the depth buffer. No operands.
+#define gSPZelda3DClearDepth(pkt)                            \
+    {                                                       \
+        Gfx* _g = (Gfx*)(pkt);                              \
+        _g->words.w0 = _SHIFTL(G_ZELDA3D_CLEARDEPTH, 24, 8); \
+        _g->words.w1 = 0;                                   \
     }
 
 #define gsSPSetFB(pkt, fb)                      \

@@ -138,6 +138,7 @@ class Zelda3DRenderer {
                           const float* boneData, int boneCnt, unsigned long long midMask, int sky);
     void EndDepthPrepass();
     void AoComposite();
+    void ClearOverlayDepth(); // #146 item B — fullscreen depth-only reset, in-pass, no color write.
 
     // ---- internal helpers (former anonymous-namespace functions) ----
     SDL_GPUSampler* getSampler(unsigned wrapS, unsigned wrapT, bool noMip = false);
@@ -152,6 +153,7 @@ class Zelda3DRenderer {
     SDL_GPUShader* makeShader(const char* glsl, EShLanguage stage, uint32_t numSamplers, uint32_t numUbo);
     SDL_GPUGraphicsPipeline* getDepthPipeline(bool doCull, int frontCW);
     bool ensureShadowAoResources();
+    bool ensureOverlayDepthResources(); // #146 item B
     SDL_GPUTexture* makeDepthTarget(uint32_t w, uint32_t h, SDL_GPUTextureFormat fmt, SDL_GPUTextureUsageFlags usage);
     bool ensureShadowTargets(uint32_t dim);
     bool ensureAoTargets(uint32_t w, uint32_t h);
@@ -216,6 +218,15 @@ class Zelda3DRenderer {
     std::vector<DepthDraw> g_aoDraws;
     SDL_GPUViewport g_aoVp{};
     SDL_Rect g_aoSc{};
+
+    // #146 item B: fullscreen depth-only reset (Zelda3D_Overlay2D_Begin's depth scope). A minimal
+    // pipeline: color_write_mask=0 (composited 3D scene color untouched), depth test ALWAYS +
+    // depth write ON, fragment shader unconditionally writes gl_FragDepth=1.0 (far, matching the
+    // 0=near/1=far convention the shadow/AO depth passes already use — see kDepthColorFormat's
+    // dt.clear_depth=1.0f in replayDepthPass). Reuses kAoCompVert's fullscreen-triangle trick.
+    bool g_overlayDepthResReady = false;
+    SDL_GPUShader* g_overlayDepthFrag = nullptr;
+    SDL_GPUGraphicsPipeline* g_overlayDepthPipe = nullptr;
 };
 
 // ---- HUD record types (verbatim from zelda3d_hud_sdl3gpu.cpp) ----
