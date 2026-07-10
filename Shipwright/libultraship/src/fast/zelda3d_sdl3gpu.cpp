@@ -239,7 +239,19 @@ const char* kFrag =
     // PICA TEV stage 0 dual-texture combine (ADD_MULT: (t0 + t1) * t0, saturating the sum per
     // stage — g_title.cmb fire-glow detail mask, title_logo_fireglow_cmab.md §3.1). The alpha
     // chain does NOT include TEXTURE1 (stage-0 alpha = primary.a * t0.a), so only .rgb changes.
-    "    if (ubo.uSheen.y > 0.5) {\n"
+    // Mode 1 (g_title.cmb fire-glow): (t0+t1)*t0, all in this stage. Mode 2 (shield glint,
+    // title_logo_us mat6/9): (t0+t1)*PRIMARY — leaves the *PRIMARY to the existing
+    // `rgb = t.rgb * vColor.rgb` compound below, so only the ADD+clamp happens here. Mode 3
+    // (sword/shield detail mask, title_logo_us mat4/5/7): scale2*(PRIMARY*t0*t1) — same
+    // deferred-PRIMARY trick, this stage does scale2*t0*t1.
+    "    if (ubo.uSheen.y > 1.5) {\n"
+    "        vec3 t1 = texture(uTex1, vUv1).rgb;\n"
+    "        if (ubo.uSheen.y > 2.5) {\n"
+    "            t.rgb = clamp(t.rgb * t1 * ubo.uSheen.z, 0.0, 1.0);\n"
+    "        } else {\n"
+    "            t.rgb = clamp(t.rgb + t1, 0.0, 1.0);\n"
+    "        }\n"
+    "    } else if (ubo.uSheen.y > 0.5) {\n"
     "        vec3 t1 = texture(uTex1, vUv1).rgb;\n"
     "        t.rgb = clamp(t.rgb + t1, 0.0, 1.0) * t.rgb;\n"
     "    }\n"
@@ -642,8 +654,9 @@ SgModel* Fast::Zelda3DRenderer::ensureUploaded(int modelId) {
         g.combConstIdx = groups[i].combConstIdx;
         g.combUsesConst = groups[i].combUsesConst;
         g.combConstScaleRGB = (groups[i].combConstScaleRGB > 0.0f) ? groups[i].combConstScaleRGB : 1.0f;
-        g.dualTexAddMult = groups[i].dualTexAddMult;
-        if (g.dualTexAddMult) {
+        g.dualTexMode = groups[i].dualTexMode;
+        if (g.dualTexMode) {
+            g.dualTexScale2 = groups[i].dualTexScale2;
             g.tex1Index = groups[i].tex1Index;
             g.wrap1S = groups[i].wrap1S;
             g.wrap1T = groups[i].wrap1T;
@@ -1667,7 +1680,7 @@ void Fast::Zelda3DRenderer::DrawModel(int modelId, const float* mp16, const floa
                     "blend=%d(src=%#06x dst=%#06x) aTest=%d aRef=%.3f depthW=%d polyOff=%.4f first=%u count=%u "
                     "vColor0=(%.3f,%.3f,%.3f,%.3f) matAmb=(%.2f,%.2f,%.2f) matDif=(%.2f,%.2f,%.2f) "
                     "uv=[(%.2f,%.2f)(%.2f,%.2f)(%.2f,%.2f)] wrap=(%#06x,%#06x) "
-                    "tex1=%d dual=%d constScale=%.1f uv1Xf=(%.2f,%.2f,%.2f,%.4f)\n",
+                    "tex1=%d dualMode=%d dualScale2=%.1f constScale=%.1f uv1Xf=(%.2f,%.2f,%.2f,%.4f)\n",
                     gi, grp.cull, grp.faceCull, grp.meshId, grp.texIndex, hasTex ? "" : "(MISSING->dummy)",
                     grp.materialIndex, grp.vertexLighting, grp.combScaleRGB, grp.blendEnable, grp.bSrcRGB,
                     grp.bDstRGB, grp.alphaTest, grp.alphaRef, grp.depthWrite, grp.polygonOffset, grp.first,
@@ -1675,7 +1688,7 @@ void Fast::Zelda3DRenderer::DrawModel(int modelId, const float* mp16, const floa
                     grp.matAmbient[0], grp.matAmbient[1], grp.matAmbient[2], grp.matDiffuse[0],
                     grp.matDiffuse[1], grp.matDiffuse[2], grp.dbgUv0[0], grp.dbgUv0[1], grp.dbgUv1[0],
                     grp.dbgUv1[1], grp.dbgUv2[0], grp.dbgUv2[1], grp.wrapS, grp.wrapT, grp.tex1Index,
-                    grp.dualTexAddMult, grp.combConstScaleRGB, grp.uv1Scale[0], grp.uv1Scale[1],
+                    grp.dualTexMode, grp.dualTexScale2, grp.combConstScaleRGB, grp.uv1Scale[0], grp.uv1Scale[1],
                     grp.uv1Trans[0], grp.uv1Trans[1]);
             // PICA200 TEV constant palette + stage-0 selector — dumped on its own line so the
             // main SG_DUMP row stays parseable by existing tools; format:
@@ -1875,8 +1888,9 @@ void Fast::Zelda3DRenderer::DrawModel(int modelId, const float* mp16, const floa
         // to coordinator 1 here (the material the CMAB animates — its Translation track is
         // channelIndex 1, title_logo_fireglow_cmab.md §3.2 fix 3) instead of the coordinator-0
         // offset uExtra.yz used by single-texture scroll consumers (sky cloud band, #28b).
-        if (grp.dualTexAddMult) {
-            ubo.uSheen[1] = 1.0f;
+        if (grp.dualTexMode) {
+            ubo.uSheen[1] = (float)grp.dualTexMode;
+            ubo.uSheen[2] = grp.dualTexScale2;
             ubo.uTex1Xf[0] = grp.uv1Scale[0];
             ubo.uTex1Xf[1] = grp.uv1Scale[1];
             ubo.uTex1Xf[2] = grp.uv1Trans[0] + uvOffU;
@@ -1899,11 +1913,11 @@ void Fast::Zelda3DRenderer::DrawModel(int modelId, const float* mp16, const floa
             tex = m->textures[texIndex];
             samp = getSampler(grp.wrapS, grp.wrapT, additive);
         }
-        // Second texture binding (dual-texture detail mask): only ever non-dummy when the group's
-        // dual-tex combine is on (uSheen.y gates the shader-side sample).
+        // Second texture binding (dual-texture combine): only ever non-dummy when the group's
+        // dual-tex mode is on (uSheen.y gates the shader-side sample).
         SDL_GPUTexture* tex1 = nullptr;
         SDL_GPUSampler* samp1 = nullptr;
-        if (grp.dualTexAddMult && grp.tex1Index >= 0 && grp.tex1Index < (int)m->textures.size() &&
+        if (grp.dualTexMode && grp.tex1Index >= 0 && grp.tex1Index < (int)m->textures.size() &&
             m->textures[grp.tex1Index]) {
             tex1 = m->textures[grp.tex1Index];
             samp1 = getSampler(grp.wrap1S, grp.wrap1T, additive);

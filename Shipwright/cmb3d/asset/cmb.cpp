@@ -229,6 +229,10 @@ bool Cmb::parseMats() {
         // townsfolk archetypes stage 1 is MODULATE(PREV, CONST[N]) with N = 3 or 4 = the slot
         // EnHy_Draw overrides.  comb_uses_const = OR of "any stage sources CONSTANT".
         m.comb_stage_count = (int)u32(b, o + 0x120);
+        // Stage-1 op/scale/sources, captured alongside stage 0 below — needed to classify
+        // multi-stage dual-texture shapes (title_logo_us.cmb's shield/sword glint materials;
+        // see comb_dual_tex_mode below). Only meaningful when m.comb_stage_count >= 2.
+        uint16_t stage1Op = 0, stage1SrcA = 0, stage1SrcB = 0, stage1SrcC = 0, stage1Scale = 1;
         for (int s = 0; s < m.comb_stage_count && s < 6; s++) {
             uint32_t cidx = u16(b, o + 0x124 + s * 2);   // per-stage combiner-settings index
             uint32_t co = combTableBase + cidx * 0x28;
@@ -236,6 +240,13 @@ bool Cmb::parseMats() {
             uint16_t srcA = u16(b, co + 0x0C);
             uint16_t srcB = u16(b, co + 0x0E);
             uint16_t srcC = u16(b, co + 0x10);
+            if (s == 1) {
+                stage1Op = op;
+                stage1SrcA = srcA;
+                stage1SrcB = srcB;
+                stage1SrcC = srcC;
+                stage1Scale = u16(b, co + 0x04);
+            }
             // Which of the three source slots the OP actually consumes. MODULATE / ADD /
             // SUBTRACT / DOT3_RGB / DOT3_RGBA only look at A and B; INTERPOLATE (0x8574) and
             // MULT_ADD (0x6401) and ADD_SIGNED (0x0400) look at all three; REPLACE (0x1E01)
@@ -283,6 +294,37 @@ bool Cmb::parseMats() {
                 // (t0 + t1) * t0, sampling binding 1 through coordinator 1 (fireglow doc §3.1).
                 m.comb0_dual_addmult = (op == 0x6402 /*ADD_MULT*/ && srcA == 0x84C0 /*TEXTURE0*/ &&
                                         srcB == 0x84C1 /*TEXTURE1*/ && srcC == 0x84C0 && m.tex1_idx >= 0);
+            }
+        }
+        // Multi-stage dual-texture shapes: title_logo_us.cmb's shield glint (mat6/9) and
+        // sword/shield detail-mask (mat4/5/7) materials sample binding 1 through TWO combiner
+        // stages instead of g_title.cmb's single ADD_MULT stage (comb0_dual_addmult above).
+        // Verified byte-for-byte against title_logo_us.cmb (oot3d-decomp; scratch dump
+        // 2026-07-10) — TEXTURE1 (0x84C1) must be an ACTUALLY-CONSUMED source (within the op's
+        // slot arity) in one of the first two stages, not just a leftover tex1_idx binding
+        // (mat8's tex1 is declared but never read by either stage — stays kDualTexNone).
+        m.dual_tex_mode = CmbMaterial::kDualTexNone;
+        if (m.tex1_idx >= 0 && m.comb0_dual_addmult) {
+            m.dual_tex_mode = CmbMaterial::kDualTexAddMult; // (t0+t1)*t0, single stage
+        } else if (m.tex1_idx >= 0 && m.comb_stage_count >= 2) {
+            uint16_t op0 = m.comb_combine_rgb;
+            uint16_t a0 = m.comb_src_rgb[0], b0 = m.comb_src_rgb[1];
+            bool stage0AddTex01 = (op0 == 0x0104 /*ADD*/ && a0 == 0x84C0 && b0 == 0x84C1);
+            bool stage0ModPrimTex0 = (op0 == 0x2100 /*MODULATE*/ &&
+                                      ((a0 == 0x8577 && b0 == 0x84C0) || (a0 == 0x84C0 && b0 == 0x8577)));
+            bool stage1ModPrevPrim = (stage1Op == 0x2100 &&
+                                      ((stage1SrcA == 0x8578 && stage1SrcB == 0x8577) ||
+                                       (stage1SrcA == 0x8577 && stage1SrcB == 0x8578)));
+            bool stage1ModPrevTex1 = (stage1Op == 0x2100 &&
+                                      ((stage1SrcA == 0x8578 && stage1SrcB == 0x84C1) ||
+                                       (stage1SrcA == 0x84C1 && stage1SrcB == 0x8578)));
+            if (stage0AddTex01 && stage1ModPrevPrim) {
+                // stage0: PREVIOUS = t0 + t1; stage1: PREVIOUS = PREVIOUS * PRIMARY.
+                m.dual_tex_mode = CmbMaterial::kDualTexAddThenModulatePrimary;
+            } else if (stage0ModPrimTex0 && stage1ModPrevTex1) {
+                // stage0: PREVIOUS = PRIMARY * t0; stage1: PREVIOUS = scale * (PREVIOUS * t1).
+                m.dual_tex_mode = CmbMaterial::kDualTexModulateThenScale;
+                m.dual_tex_scale2 = (stage1Scale == 2 || stage1Scale == 4) ? (float)stage1Scale : 1.0f;
             }
         }
         o += stride;

@@ -60,8 +60,11 @@ struct SgGroup {
     // Hardware RGB scale (1/2/4) of the CONSTANT-sourcing stage; applied with the CONSTANT
     // modulate via uMatConst.a (fire-glow ×2 — title_logo_fireglow_cmab.md §3.2 fix 1).
     float combConstScaleRGB = 1.0f;
-    // Dual-texture stage 0 (ADD_MULT detail mask): sample tex1Index through coordinator 1.
-    int dualTexAddMult = 0;
+    // Dual-texture combine: sample tex1Index through coordinator 1 and combine per dualTexMode
+    // (0=off, 1=(t0+t1)*t0, 2=(t0+t1)*primary, 3=dualTexScale2*(primary*t0*t1); see
+    // CmbMaterial::DualTexMode in cmb.h).
+    int dualTexMode = 0;
+    float dualTexScale2 = 1.0f;
     int tex1Index = -1;
     unsigned wrap1S = 0x2901, wrap1T = 0x2901;
     float uv1Scale[2] = { 1.0f, 1.0f };

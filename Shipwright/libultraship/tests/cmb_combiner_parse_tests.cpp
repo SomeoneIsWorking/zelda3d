@@ -184,3 +184,70 @@ TEST(CmbCombinerParse, TitleGlowDualTexAddMultAndConstScale) {
     EXPECT_FLOAT_EQ(m.trans1_s, 0.0f);
     EXPECT_NEAR(m.trans1_t, 0.94333f, 1e-4f);
 }
+
+namespace {
+
+// Load title_logo_us.cmb (the title wordmark model, /actor/zelda_mag.zar) — the shield/sword
+// dark-square glint bug (debug_journal/2026-07-10-shield-glint-dualtex.md). Unlike g_title.cmb's
+// single-stage ADD_MULT dual-texture combine, this asset's shield/sword materials spread the
+// dual-texture combine across TWO combiner stages, which the pre-fix parser (only recognizing
+// the single-stage ADD_MULT shape) never classified as dual-texture — and the pre-fix SgGroup
+// population was ALSO gated on that single flag, so tex1 was dropped before the renderer ever
+// saw it. This test locks the byte-verified classification (dual_tex_mode per material).
+static std::vector<uint8_t> LoadTitleLogoUsCmb() {
+    CtrRom rom(OoT3dRomPath());
+    auto zar_bytes = rom.read("/actor/zelda_mag.zar");
+    Zar zar(std::move(zar_bytes));
+    for (const auto& f : zar.files()) {
+        if (f.name.find("title_logo_us.cmb") != std::string::npos) {
+            return zar.read(f);
+        }
+    }
+    return {};
+}
+
+} // namespace
+
+// Close-test for the 2026-07-10 multi-stage dual-texture classification (cmb.cpp
+// parseMats' dual_tex_mode). Locks the byte-verified combiner shape of title_logo_us.cmb's
+// shield materials (6, 7, 8, 9 — sepd 16-19) and sword material (4):
+//   mat6/mat9 (shield glint dot):  stage0 ADD(TEX0,TEX1), stage1 MODULATE(PREV,PRIMARY)
+//                                  -> kDualTexAddThenModulatePrimary, (t0+t1)*primary.
+//   mat7      (shield sparkle):    stage0 MODULATE(PRIM,TEX0), stage1 MODULATE(PREV,TEX1) x2
+//                                  -> kDualTexModulateThenScale, scale2=2.0.
+//   mat4      (sword detail mask): same shape as mat7, scale2=2.0.
+//   mat8      (shield, unused tex1 binding): tex1_idx >= 0 but TEXTURE1 is never an ACTIVE
+//                                  combiner source in either stage -> kDualTexNone (the
+//                                  detection must not fire on a merely-declared binding).
+TEST(CmbCombinerParse, TitleLogoUsShieldSwordDualTexModes) {
+    if (OoT3dRomPath().empty()) {
+        GTEST_SKIP() << "ZELDA3D_OOT3D_ROM not set — cannot exercise real-asset close-test";
+    }
+    Cmb cmb(LoadTitleLogoUsCmb());
+    ASSERT_TRUE(cmb.ok()) << cmb.error();
+    ASSERT_EQ(cmb.materials().size(), 12u);
+
+    const CmbMaterial& mat4 = cmb.materials()[4];
+    EXPECT_EQ(mat4.tex1_idx, 2);
+    EXPECT_EQ(mat4.dual_tex_mode, CmbMaterial::kDualTexModulateThenScale);
+    EXPECT_FLOAT_EQ(mat4.dual_tex_scale2, 2.0f);
+
+    const CmbMaterial& mat6 = cmb.materials()[6];
+    EXPECT_EQ(mat6.tex1_idx, 5);
+    EXPECT_EQ(mat6.dual_tex_mode, CmbMaterial::kDualTexAddThenModulatePrimary);
+
+    const CmbMaterial& mat7 = cmb.materials()[7];
+    EXPECT_EQ(mat7.tex1_idx, 6);
+    EXPECT_EQ(mat7.dual_tex_mode, CmbMaterial::kDualTexModulateThenScale);
+    EXPECT_FLOAT_EQ(mat7.dual_tex_scale2, 2.0f);
+
+    const CmbMaterial& mat8 = cmb.materials()[8];
+    EXPECT_EQ(mat8.tex1_idx, 7);
+    EXPECT_EQ(mat8.dual_tex_mode, CmbMaterial::kDualTexNone)
+        << "mat8 declares a tex1 binding but never sources TEXTURE1 from an active combiner "
+           "slot (both stages ignore it) — must NOT be classified as dual-texture";
+
+    const CmbMaterial& mat9 = cmb.materials()[9];
+    EXPECT_EQ(mat9.tex1_idx, 7);
+    EXPECT_EQ(mat9.dual_tex_mode, CmbMaterial::kDualTexAddThenModulatePrimary);
+}
