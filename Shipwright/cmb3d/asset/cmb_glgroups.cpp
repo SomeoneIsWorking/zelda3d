@@ -66,8 +66,11 @@ Zelda3DGlGroup MakeGlGroup(const Cmb& cmb, const CmbDrawGroup& g, const CmbVerte
     cg.combConstIdx = mat ? mat->comb_const_idx : 0;
     cg.combUsesConst = (mat && mat->comb_uses_const) ? 1 : 0;
     cg.combConstScaleRGB = mat ? mat->comb_const_scale_rgb : 1.0f;
-    // Dual-texture stage 0 (fire-glow detail mask): second binding + coordinator-1 transform.
-    cg.dualTexAddMult = (mat && mat->comb0_dual_addmult) ? 1 : 0;
+    // Dual-texture combine: second binding + coordinator-1 transform. dual_tex_mode is a
+    // byte-driven classification of the material's own combiner stages (cmb.cpp parseMats) —
+    // NOT gated by model name (see CmbMaterial::DualTexMode).
+    cg.dualTexMode = mat ? mat->dual_tex_mode : 0;
+    cg.dualTexScale2 = mat ? mat->dual_tex_scale2 : 1.0f;
     cg.tex1Index = (mat && mat->tex1_idx >= 0) ? mat->tex1_idx + texBase : -1;
     cg.wrap1S = mat ? mat->wrap1_s : 0x2901;
     cg.wrap1T = mat ? mat->wrap1_t : 0x2901;

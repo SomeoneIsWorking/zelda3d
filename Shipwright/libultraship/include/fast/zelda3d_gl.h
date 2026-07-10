@@ -87,9 +87,12 @@ typedef struct Zelda3DGlGroup {
     // AFTER the modulate. Applied by the shader together with the CONSTANT multiply (g_title.cmb
     // fire-glow stage 1 = 2.0*(PREV*CONST0) — oot3d-decomp title_logo_fireglow_cmab.md §3.1).
     float combConstScaleRGB;  // 1.0 when unused
-    // Dual-texture stage 0 (ADD_MULT detail mask): when dualTexAddMult, the shader samples
-    // tex1Index through coordinator 1's uv transform and computes (t0 + t1) * t0 as the texel.
-    int   dualTexAddMult;     // 0/1
+    // Dual-texture combine: when dualTexMode != 0, the shader samples tex1Index through
+    // coordinator 1's uv transform and combines it with the primary texel per the mode (see
+    // CmbMaterial::DualTexMode in cmb.h — 1 = (t0+t1)*t0 [g_title.cmb fire-glow], 2 =
+    // (t0+t1)*primary, 3 = dualTexScale2*(primary*t0*t1) [title_logo_us shield/sword glint]).
+    int   dualTexMode;        // 0 = off, else CmbMaterial::DualTexMode value
+    float dualTexScale2;      // mode 3's stage-1 hardware RGB scale (1/2/4); 1.0 otherwise
     int   tex1Index;          // second texture binding, -1 = none
     unsigned wrap1S, wrap1T;  // binding-1 GL wrap enums
     float uv1Scale[2];        // coordinator-1 scale (S, T)

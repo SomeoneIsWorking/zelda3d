@@ -95,9 +95,24 @@ struct CmbMaterial {
     float comb_const_scale_rgb = 1.0f;
     // Dual-texture stage 0: true iff stage 0 is ADD_MULT(TEXTURE0, TEXTURE1, TEXTURE0) —
     // `(t0 + t1) * t0`, the detail-mask brightening combine used by g_title.cmb (§3.1). The
-    // renderer samples binding 1 through coordinator 1 and applies the combine; other dual-tex
-    // stage shapes are a documented follow-up (none observed in OoT3D content besides this one).
+    // renderer samples binding 1 through coordinator 1 and applies the combine. Kept for the
+    // existing close-test (cmb_combiner_parse_tests.cpp); dual_tex_mode below is the general
+    // classifier (this flag implies dual_tex_mode == kDualTexAddMult).
     bool comb0_dual_addmult = false;
+    // General dual-texture combine shape, classified from stage 0 (+ stage 1 when needed) of
+    // the material's combiner chain. title_logo_us.cmb's shield/sword glint materials sample
+    // binding 1 through a TWO-stage sequence (not g_title.cmb's single ADD_MULT stage) — see
+    // cmb.cpp parseMats for the byte-level detection, verified against title_logo_us.cmb
+    // 2026-07-10 (debug_journal/2026-07-10-shield-glint-dualtex.md).
+    enum DualTexMode {
+        kDualTexNone = 0,
+        kDualTexAddMult = 1,                    // (t0 + t1) * t0            [g_title.cmb fire-glow]
+        kDualTexAddThenModulatePrimary = 2,      // (t0 + t1) * primary       [shield glint]
+        kDualTexModulateThenScale = 3,           // scale2 * (primary*t0*t1) [sword / shield detail]
+    };
+    int dual_tex_mode = kDualTexNone;
+    // Stage-1 hardware RGB scale for kDualTexModulateThenScale (1/2/4); 1.0 for other modes.
+    float dual_tex_scale2 = 1.0f;
 
     // PICA200 TEV constant-color palette: 6 float-RGBA slots per material. Base defaults come
     // from the CMB file (matConstColor[0..5] at material +0xB4..+0xCB, big-endian RGBA8 —
