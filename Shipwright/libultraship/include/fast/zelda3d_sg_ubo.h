@@ -45,19 +45,21 @@ struct SgUbo {
     // channel (EnHy Step 2c) flips a=1 when an actor wants the constant applied. See
     // debug_journal/2026-07-02-en-hy-body-colors.md.
     float uMatConst[4];
-    // Additive diffuse "sheen" boost for a per-draw light-direction override (title wordmark,
-    // title_logo_actor.md §6.3: actor field +0x1DC sweeps a fragment-light DIRECTION across the
-    // wordmark's own material — decompiled ambient={1,1,1,1} diffuse={0.1834,...} specular={1,1,1,1}
-    // emission=0, direction the only animated part). .x = diffuse strength (0 = no override / no
-    // boost, 0.1834 = the decompiled constant when a draw sets a light-dir override); .y/.z/.w
-    // unused (reserved, always 0). The shader does shade *= (1.0 + uSheen.x * max(0,N.L)), i.e. an
-    // ADDITIVE brightening on top of the existing full-bright tint — NOT the shared uParams.y
-    // half-Lambert term (that one DARKENS via a 0.55..1.0 multiplier, which is not what the
-    // decomp's ambient=1-always + small diffuse bonus reduces to). Specular is NOT ported: the
-    // PICA specular exponent isn't in the actor's own code (title_logo_actor.md §6.2/§6.3 — it's a
-    // CMB-material-side LUT config this decomp pass didn't need to touch), and this ortho overlay
-    // pass has no real camera/view vector for a Blinn-Phong H term to reduce to — proven-negative,
-    // not guessed at.
+    // Wordmark "sheen" — the CmbVShader vertex-lit color term for a per-draw light-direction
+    // override (title wordmark, title_logo_actor.md §6.3/§6.6: actor field +0x1DC sweeps the
+    // light-env slot-0 DIRECTION across the wordmark's own material; light ambient={0.18,...},
+    // light diffuse=WHITE {1,1,1,1} — byte-exact from code.bin pool 0x004d9924 AND read back from
+    // the oracle's live c81/c82 vertex uniforms at the wordmark draw, 2026-07-10). .x = the light
+    // AMBIENT coefficient (0 = no override; 0.18 when a draw sets a light-dir override — doubles
+    // as the gate); .y/.z used by the dual-texture path; .w reserved. The shader does
+    //   shade *= clamp(uSheen.x + max(0, dot(N, -L)), 0, 1)
+    // i.e. the faithful  matAmb*lightAmb + max(0,N·(-L))*matDif*lightDif  with both material
+    // colors white, matching PICA's dp3 against the NEGATED c80 light dir. (A previous port used
+    // shade *= 1 + 0.1834*max(0,N·(+L)) — slot colors swapped AND light-dir sign flipped; it
+    // measured bit-flat while the oracle brightens x1.40 across the ramp. Falsified 2026-07-10.)
+    // Specular is NOT ported: the vertex-lit CmbVShader path has no specular term at all
+    // (oot3d-decomp title_env_lighting.md §10 disassembly — uniform table has only
+    // dir/diffuse/ambient per light), so there is nothing to port for this draw class.
     float uSheen[4];
     // Dual-texture stage 0 (PICA ADD_MULT detail mask, g_title.cmb fire-glow —
     // oot3d-decomp/docs/title_logo_fireglow_cmab.md §3.1): coordinator-1 UV transform for the

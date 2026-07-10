@@ -47,10 +47,15 @@ using Zelda3DSg::SgUbo;
 constexpr uint32_t kSgCommonBytes = Zelda3DSg::kCommonBytes;
 constexpr uint32_t kSgBonesBytes = Zelda3DSg::kBonesBytes;
 
-// Title wordmark sheen (title_logo_actor.md §6.3): the decompiled light-env's static diffuse
-// color (0.1834,0.1834,0.1834,1) — only the DIRECTION is animated per-frame by the caller
-// (Zelda3D_GL_SetLightDirOverride); this magnitude is a fixed decomp constant, not tuned.
-constexpr float kWordmarkSheenDiffuse = 0.1834f;
+// Title wordmark sheen (title_logo_actor.md §6.3/§6.6): the light-env slot's AMBIENT color is
+// (0.18,0.18,0.18,1) and its DIFFUSE color is WHITE (1,1,1,1) — byte-exact from the literal pool
+// at 0x004d9924 in code.bin AND read back live from CmbVShader's c81/c82 uniforms at the wordmark
+// draw (oracle vsuni log, 2026-07-10: dif0=(1,1,1,1), amb0=(0.18,0.18,0.18,1), one enabled
+// light). The per-vertex expression is therefore shade = 0.18 + max(0, dot(N, -L(t))) — the
+// DIRECTIONAL term is the dominant one (not a small additive bonus on an ambient of 1; the old
+// 0.1834 "diffuse" constant here had the two slot colors swapped). Only the direction L(t) is
+// animated per-frame by the caller (Zelda3D_GL_SetLightDirOverride).
+constexpr float kWordmarkLightAmbient = 0.18f;
 
 // ---- Shared scene/light/effect globals (owned by zelda3d_gl.cpp, set per frame by zelda3d.c) ----
 extern "C" float gZelda3dLightDirWorld[3];
@@ -262,15 +267,21 @@ const char* kFrag =
     "        float hl = dot(normalize(vNrmView), normalize(ubo.uLightDir.xyz)) * 0.5 + 0.5;\n"
     "        shade = ubo.uTintSkin.xyz * (0.55 + 0.45 * hl);\n"
     "    }\n"
-    // Wordmark sheen (title_logo_actor.md §6.3): a per-draw light-direction override feeding an
-    // ADDITIVE diffuse boost on top of the full-bright tint (decomp: ambient={1,1,1,1} always,
-    // diffuse={0.1834,...}*max(0,N.L) on top) — orthogonal to and independent of the uParams.y
-    // half-Lambert term above (that one DARKENS from a full-bright baseline, which is the wrong
-    // shape for this actor's ambient-always-1.0 + small-diffuse-bonus lighting). Only ever nonzero
-    // for the title wordmark's own draw (zelda3d_gl.cpp's per-model light-dir override).
+    // Wordmark sheen (title_logo_actor.md §6.3/§6.6): CmbVShader's vertex-lit color term for the
+    // wordmark's single enabled light, verified against the oracle's live c81/c82 uniforms:
+    //   o1 = matAmb(1)*lightAmb(0.18) + max(0, dot(N, -L)) * matDif(1)*lightDif(1)
+    //      = 0.18 + max(0, dot(N, -L))
+    // Two load-bearing details vs the previous (falsified) additive-boost port: (a) the light
+    // AMBIENT is 0.18 and the DIFFUSE is WHITE (the old 1+0.1834*ndotl had the slot colors
+    // swapped — it capped the sheen swing at x1.18 while the oracle measures x1.40); (b) PICA's
+    // dp3 uses -c80 (the NEGATED light dir) — with the letters' flat N=(0,0,1) and +L the dot is
+    // negative and max() kills the term entirely (SoH measured bit-flat x1.000 across the ramp).
+    // uSheen.x carries the 0.18 ambient (also the >0 gate). PICA clamps the vertex color to [0,1]
+    // before the TEV reads it. Only ever nonzero for the title wordmark's own draws
+    // (zelda3d_gl.cpp's per-model light-dir override).
     "    if (ubo.uSheen.x > 0.0) {\n"
-    "        float ndotl = max(dot(normalize(vNrmView), normalize(ubo.uLightDir.xyz)), 0.0);\n"
-    "        shade *= (1.0 + ubo.uSheen.x * ndotl);\n"
+    "        float ndotl = max(dot(normalize(vNrmView), -normalize(ubo.uLightDir.xyz)), 0.0);\n"
+    "        shade *= clamp(ubo.uSheen.x + ndotl, 0.0, 1.0);\n"
     "    }\n"
     "    if (ubo.uShadow.x > 0.5)\n"
     "        shade *= (1.0 - ubo.uShadow.z * (1.0 - shadowLit()));\n"
@@ -1763,10 +1774,9 @@ void Fast::Zelda3DRenderer::DrawModel(int modelId, const float* mp16, const floa
         base.uLightDir[2] = gZelda3dLightDirWorld[2];
     }
     base.uLightDir[3] = sky ? 1.0f : 0.0f;
-    // §6.3's decompiled diffuse color (0.1834,0.1834,0.1834,1) — the only non-static (direction)
-    // part of the light-env is ported here as an additive strength; see uSheen's declaration
-    // comment (zelda3d_sg_ubo.h) for why this is additive, not the shared darkening hl term.
-    base.uSheen[0] = lightDirOv ? kWordmarkSheenDiffuse : 0.0f;
+    // §6.3/§6.6's light-env ambient (0.18,0.18,0.18,1); the diffuse coefficient is WHITE and
+    // lives directly in the shader's ndotl term. uSheen.x doubles as the wordmark-path gate.
+    base.uSheen[0] = lightDirOv ? kWordmarkLightAmbient : 0.0f;
     base.uSheen[1] = base.uSheen[2] = base.uSheen[3] = 0.0f;
     base.uExtra[0] = a8 / 255.0f;
     base.uExtra[1] = uvOffU;

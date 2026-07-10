@@ -271,6 +271,9 @@ extern "C" {
 extern "C" {
     extern char soh3d_draw_log_path[256];
     extern int  soh3d_draw_log_active;
+    // VS-uniform per-draw log (pica_core.cpp, AZAHAR_PATCH.md Patch 5)
+    extern char soh3d_vsuni_log_path[256];
+    extern int  soh3d_vsuni_log_active;
 }
 
 namespace {
@@ -3381,6 +3384,21 @@ void RunRepl() {
                 if (f) std::fclose(f);  // truncate
                 soh3d_draw_log_active = 1;
                 std::printf("ok draw_log %s\n", arg.c_str());
+            }
+        }
+        else if (cmd == "vsuni_log") {
+            // vsuni_log <path> → per-draw vertex-shader uniform log (CmbVShader
+            // lighting uniforms b5/b9/b10, c8/c9, c80..c88). vsuni_log off → stop.
+            std::string arg; toks >> arg;
+            if (arg == "off" || arg.empty()) {
+                soh3d_vsuni_log_active = 0;
+                std::printf("ok vsuni_log off\n");
+            } else {
+                std::snprintf(soh3d_vsuni_log_path, sizeof soh3d_vsuni_log_path, "%s", arg.c_str());
+                std::FILE* f = std::fopen(arg.c_str(), "w");
+                if (f) std::fclose(f);  // truncate
+                soh3d_vsuni_log_active = 1;
+                std::printf("ok vsuni_log %s\n", arg.c_str());
             }
         }
         else if (cmd == "az_ticks") {
