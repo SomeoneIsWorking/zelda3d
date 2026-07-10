@@ -75,6 +75,9 @@ void TitlePresentation::enter(PlayState* play) {
 
 void TitlePresentation::exit(PlayState* play) {
     mActive = false;
+    // Symmetric teardown for the horse-attribution port (2026-07-10): un-mount Link and kill the
+    // title-scoped EN_HORSE instance mRider.applyToActor() spawned — see title_rider.h/.cpp.
+    mRider.releaseMount(play);
     if (mLightSaved) {
         gZelda3dLightEnable = mLightEnableSaved;
         mLightSaved = 0;
@@ -418,12 +421,6 @@ extern "C" const char* Zelda3D_Title_SceneName(void) {
     return Zelda3D::TitlePresentation::Instance().isActive() ? "spot99" : nullptr;
 }
 
-extern "C" void Zelda3D_Title_RiderTransform(float outPos[3], int16_t* outYaw) {
-    const Zelda3D::TitleFrameState& f = Zelda3D::TitlePresentation::Instance().frame();
-    outPos[0] = f.riderPos.x;
-    outPos[1] = f.riderPos.y;
-    outPos[2] = f.riderPos.z;
-    if (outYaw != nullptr) {
-        *outYaw = f.riderYaw;
-    }
+extern "C" void Zelda3D_Title_RiderApply(PlayState* play, Actor* actor) {
+    Zelda3D::TitlePresentation::Instance().mutableRider().applyToActor(play, actor);
 }

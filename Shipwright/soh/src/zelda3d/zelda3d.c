@@ -440,23 +440,18 @@ static unsigned char zelda3d_lerp8(int a, int b, float t);
 static signed char zelda3d_lerp8s(int a, int b, float t);
 void Zelda3D_ActorPostUpdate(PlayState* play, Actor* actor) {
     Zelda3D_LinkApplyPin(play, actor); // #8 linkpin (pins the player transform; defined in zelda3d_link.cpp)
-    // Title-demo rider: the ported OoT3D title-cs actor cues own the player transform (state
+    // Title-demo rider: the ported OoT3D title-cs actor cues own Epona's transform (state
     // integrated by Zelda3D::TitleRider inside TitlePresentation::update(), zelda3d/behaviors/
-    // title/title_presentation.cpp). Applied HERE — after the actor's own update — so nothing
-    // downstream overwrites it. Reads the resolved per-frame state via the C bridge rather than
-    // the old file-scope gZelda3dRiderPos/gZelda3dRiderYaw globals (removed; see the title-module
-    // migration, debug_journal/2026-07-08-oot3d-title-module-design.md).
-    if (Zelda3D_Title_IsActive() && actor != NULL && actor->id == ACTOR_PLAYER) {
-        float riderPos[3];
-        int16_t riderYaw;
-        Zelda3D_Title_RiderTransform(riderPos, &riderYaw);
-        actor->world.pos.x = riderPos[0];
-        actor->world.pos.y = riderPos[1];
-        actor->world.pos.z = riderPos[2];
-        actor->shape.rot.y = riderYaw;
-        actor->world.rot.y = riderYaw;
-        actor->velocity.x = actor->velocity.y = actor->velocity.z = 0.0f;
-        actor->speedXZ = 0.0f;
+    // title/title_presentation.cpp), with Link mounted onto her via the native gameplay mount
+    // mechanism (2026-07-10 horse-attribution port, oot3d-decomp/docs/title_rider_port_spec.md;
+    // debug_journal/2026-07-10-oracle-horse-attribution.md — the oracle's rider IS Epona, not a
+    // bare teleported Player). Applied HERE — after the actor's own update — so nothing downstream
+    // overwrites it. The whole per-actor decision (spawn/mount the title EN_HORSE instance once,
+    // apply this frame's transform, force-select the cued gait) lives in TitleRider::applyToActor;
+    // this call site only needs to know it runs for every actor while title is active.
+    if (Zelda3D_Title_IsActive() && actor != NULL &&
+        (actor->id == ACTOR_PLAYER || actor->id == ACTOR_EN_HORSE)) {
+        Zelda3D_Title_RiderApply(play, actor);
     }
     // Motion sampler: stream the selected actor's live state once per frame (BEFORE the freeze pin,
     // so a frozen actor logs zeroed motion correctly and a free actor logs its real trajectory).

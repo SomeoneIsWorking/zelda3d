@@ -36,10 +36,14 @@ int Zelda3D_TitleCsCamera(int frame, float eye[3], float at[3],
 // can read/pin the SoH-side frame.
 // Active rider (player) cue for a cs frame — op-0x0a records (N64
 // CsCmdActorAction shape). p0/p1 = segment start/end world pos, yaw =
-// authored facing (binang). Returns 0 when no cue covers the frame.
+// authored facing (binang). outAction (may be NULL) receives the cue's raw
+// action field (0x40/0x41/0x24 per the 15-cue itinerary,
+// oot3d-decomp/docs/2026-07-07-rider-cue-port.md) for CSAB selection
+// (title_rider_port_spec.md step 4). Returns 0 when no cue covers the frame.
 int Zelda3D_TitleCsRiderCue(int frame, int* cueIndex,
                             float p0[3], float p1[3],
-                            int* startF, int* endF, int16_t* yawBinang);
+                            int* startF, int* endF, int16_t* yawBinang,
+                            uint16_t* outAction);
 
 // Time-of-day from op-0x8c cues (latched; title = 4:01 AM). Returns 0
 // before the first cue frame.

@@ -569,7 +569,8 @@ extern "C" int Zelda3D_TitleCsLoopFrame(void) {
 extern "C" int Zelda3D_TitleCsRiderCue(int frame, int* cueIndex,
                                        float p0[3], float p1[3],
                                        int* startF, int* endF,
-                                       int16_t* yawBinang) {
+                                       int16_t* yawBinang,
+                                       uint16_t* outAction) {
     if (sLoadState <= 0) return 0;
     for (size_t i = 0; i < sRiderCues.size(); i++) {
         const RiderCue& c = sRiderCues[i];
@@ -580,6 +581,9 @@ extern "C" int Zelda3D_TitleCsRiderCue(int frame, int* cueIndex,
             *startF = c.start;
             *endF = c.end;
             *yawBinang = c.yaw;
+            if (outAction != nullptr) {
+                *outAction = c.action;
+            }
             return 1;
         }
     }
