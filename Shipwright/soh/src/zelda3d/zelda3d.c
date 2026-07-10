@@ -3644,11 +3644,16 @@ static int Zelda3D_MoonModelId(void) {
 // Averaged uniformly: 1.65× and 1.85×.
 //
 // See oot3d-decomp docs/title_moon_composition.md for the RE trail.
+// fine_moon1/fine_moon2 are each a single QUADRANT of a symmetric radial glow (bright at one
+// corner, black at the other three) — the "~MIRROR" tag mirror-expands the quadrant 2x2 into a
+// full centred halo at load (see loadBillboard's mirrorExpandQuadrant, zelda3d_model.cpp). Without
+// it the raw quadrant painted the whole quad: halo invisible at some camera angles, a hard-edged
+// bright rectangle at others (debug_journal/2026-07-10-moon-epona-fade-attribution.md §1).
 static int Zelda3D_MoonInnerHaloId(void) {
-    return Zelda3D_AutoModelId("BILLBOARDADD:/kankyo/BlueSky.zar|tex/fine_moon1.ctxb");
+    return Zelda3D_AutoModelId("BILLBOARDADD:/kankyo/BlueSky.zar|tex/fine_moon1.ctxb~MIRROR");
 }
 static int Zelda3D_MoonOuterHaloId(void) {
-    return Zelda3D_AutoModelId("BILLBOARDADD:/kankyo/BlueSky.zar|tex/fine_moon2.ctxb");
+    return Zelda3D_AutoModelId("BILLBOARDADD:/kankyo/BlueSky.zar|tex/fine_moon2.ctxb~MIRROR");
 }
 
 // Task #16 title-atmosphere: STUB (open RE arc).
