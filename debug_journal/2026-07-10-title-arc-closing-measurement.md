@@ -146,7 +146,19 @@ scratch/title_ab/fsweep_*.png — machine-local, per never-commit-PNGs).
    demo-end transition, loop the cs at 2400 per the op-0x3e8 destination + op-0x7c fade)
    rather than riding the N64 flow. The three sweep rows past cs 811 measure THIS, not
    rendering.
-2. **[UPDATED 2026-07-10 — see `2026-07-10-title-terrain-uboverify-and-followups.md`.
+2. **[DECOMPOSED 2026-07-10 — verdict: ORACLE-side, see `2026-07-10-fireglow-combiner-and-
+   terrain-decomposition.md` §2. Analytic single-pixel decomposition
+   (tools/terrain_pixel_decompose.py: raycast of the real spot99 room-0 ROM geometry from
+   the live byte-matched camera, exact texel + baked vertex color + live ambient per pixel):
+   SoH's rendered pixels equal saturate(2·t·v·a) to sub-LSB precision (mean |err|
+   0.32–0.56/255 over 400 near-ground pixels) — SoH's whole chain is formula-EXACT. The
+   oracle's pixels are ~1.9x ABOVE the formula, channel-uniform on region means
+   (1.89/1.93/1.85 RGB). Texpack confound also ruled out (ZELDA3D_TEXPACK=off: ratio
+   unchanged, pack shifts means ≤5%). The missing term is on the DECOMP/oracle side
+   (~ one extra x2, or an Az output-stage curve) — reported to the decomp stream
+   (title_env_lighting.md open item). No SoH change made; nothing to tune here until the
+   decomp names the term.]**
+   **[UPDATED 2026-07-10 — see `2026-07-10-title-terrain-uboverify-and-followups.md`.
    NOT a lighting-tuning item: RULED OUT as an ambient/vColor/shader-math or UBO-fill bug by
    direct runtime measurement (`<oot3d-decomp>/docs/title_env_lighting.md` static derivation +
    this session's live `lightparams`/`sgdump 1000` readback: `ambient=(0.192,0.263,0.435)`
@@ -178,7 +190,19 @@ scratch/title_ab/fsweep_*.png — machine-local, per never-commit-PNGs).
    Dawn warmth lag — by cs 588+ Az's mid-frame warm regions run d=+52..+79 R: the oracle's
    sky/scene warm-up outpaces SoH's (sky unfreeze landed, but the warm channel still lags).
    Extension of the known sky R/G item (2026-07-08-title-divergence-remeasure verdict 3).
-4. **Fire-glow intensity** — both engines draw g_title.cmb's glow, but Az's is a prominent
+4. **[PARTIALLY RESOLVED 2026-07-10 — see `2026-07-10-fireglow-combiner-and-terrain-
+   decomposition.md`. The material's REAL 3-stage TEV chain was decoded byte-level
+   (`<oot3d-decomp>/docs/title_logo_fireglow_cmab.md` §3.1) and ported: stage-1's hardware
+   scaleRGB=x2 (the direct "half brightness" cause) + stage-0's dual-texture
+   ADD_MULT (efc+mableT)*efc detail-mask brightening + CMAB UV-scroll retargeted to
+   coordinator 1 — all as first-class renderer features (uTex1/uTex1Xf/uMatConst.a-as-scale).
+   Measured (tools/fireglow_ab.py, gold-hue flame mask, matched frames): az=936 SoH glow
+   R mean 123.8→160.9 vs Az 200.6; az=1100 SoH 168.2 vs Az 201.4. REMAINING (still open):
+   intensity ~0.8x + flame-pixel coverage ~45% of Az's, and at az=730 (cs 453) Az already
+   shows a full wash while SoH's glow hasn't started — both point at THIS element's
+   alpha-channel STAGING (+0x1D0 ramp timing/ceiling vs the oracle), no longer at combiner
+   gain.]**
+   Fire-glow intensity — both engines draw g_title.cmb's glow, but Az's is a prominent
    flame wash around the whole logo while SoH's is a faint gold tinge (fsweep_1000/1300).
    The CMAB ConstColor/UV port is live; the additive blend's effective gain is visibly low.
    Candidate: the glow mesh's own alpha path (+0x1D0 staging is correct; the additive
@@ -198,7 +222,9 @@ scratch/title_ab/fsweep_*.png — machine-local, per never-commit-PNGs).
    replaces the wordmark ("OCARINA OF TIME 4K") and copyright ("4K TEXTURED BY HENRIKO")
    textures in SoH's panes, so pixel deltas over the logo/copyright regions partly measure
    deliberate texture substitutions. A clean parity sweep of the overlay should disable the
-   texpack.
+   texpack. [2026-07-10: a real disable now exists — `ZELDA3D_TEXPACK=0|off|none`
+   (texpack.cpp); previously there was no off switch. Terrain measurements are pack-neutral
+   (≤5% shift, see `2026-07-10-fireglow-combiner-and-terrain-decomposition.md` §2a).]
 8. **[UPDATED 2026-07-10 — see `2026-07-10-title-terrain-uboverify-and-followups.md`. The
    2026-07-08 L8-decode fix IS live in the current build (confirmed by reading
    `pica_texture.cpp`); the "unchanged" note above was the stale-harness-binary artifact the

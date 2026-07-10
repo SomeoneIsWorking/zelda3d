@@ -65,6 +65,16 @@ Zelda3DGlGroup MakeGlGroup(const Cmb& cmb, const CmbDrawGroup& g, const CmbVerte
     }
     cg.combConstIdx = mat ? mat->comb_const_idx : 0;
     cg.combUsesConst = (mat && mat->comb_uses_const) ? 1 : 0;
+    cg.combConstScaleRGB = mat ? mat->comb_const_scale_rgb : 1.0f;
+    // Dual-texture stage 0 (fire-glow detail mask): second binding + coordinator-1 transform.
+    cg.dualTexAddMult = (mat && mat->comb0_dual_addmult) ? 1 : 0;
+    cg.tex1Index = (mat && mat->tex1_idx >= 0) ? mat->tex1_idx + texBase : -1;
+    cg.wrap1S = mat ? mat->wrap1_s : 0x2901;
+    cg.wrap1T = mat ? mat->wrap1_t : 0x2901;
+    cg.uv1Scale[0] = mat ? mat->scale1_s : 1.0f;
+    cg.uv1Scale[1] = mat ? mat->scale1_t : 1.0f;
+    cg.uv1Trans[0] = mat ? mat->trans1_s : 0.0f;
+    cg.uv1Trans[1] = mat ? mat->trans1_t : 0.0f;
     if (getenv("ZELDA3D_DBG_MAT")) {
         fprintf(stderr, "[MAT] mi=%d vlit=%d comb=%.1f amb=(%.2f,%.2f,%.2f) dif=(%.2f,%.2f,%.2f) "
                         "constIdx=%d const%d=(%.2f,%.2f,%.2f,%.2f)\n",

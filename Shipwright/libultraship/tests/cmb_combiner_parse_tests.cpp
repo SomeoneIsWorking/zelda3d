@@ -125,3 +125,62 @@ TEST(CmbCombinerParse, AhgSingleStageMaterialsDoNotFlagConstant) {
                "that MODULATE ignores; flagging it as live CONSTANT usage would darken the mesh to black";
     }
 }
+
+namespace {
+
+// Load g_title.cmb (the title fire-glow overlay, /actor/zelda_mag.zar) — the single
+// material whose full TEV chain is byte-decoded in oot3d-decomp/docs/
+// title_logo_fireglow_cmab.md §3.1: stage0 = ADD_MULT(TEX0, TEX1, TEX0) dual-texture,
+// stage1 = MODULATE(PREV, CONST0) at scaleRGB=x2, stage2 = passthrough.
+static std::vector<uint8_t> LoadTitleGlowCmb() {
+    CtrRom rom(OoT3dRomPath());
+    auto zar_bytes = rom.read("/actor/zelda_mag.zar");
+    Zar zar(std::move(zar_bytes));
+    for (const auto& f : zar.files()) {
+        if (f.name.find("g_title.cmb") != std::string::npos) {
+            return zar.read(f);
+        }
+    }
+    return {};
+}
+
+} // namespace
+
+// Close-test for the 2026-07-10 fire-glow combiner parse additions + the constant-color
+// palette base fix. Locks four byte-verified facts about g_title.cmb material 0:
+//   (a) mat_constant[0] = white (255,255,255,255). RED on the pre-fix parse, which read
+//       the palette at +0xB8 (one slot late; the real base is +0xB4 per noclip
+//       readMatsChunk AND a direct byte dump) and returned black — which is also why the
+//       shader-side "constBlack skip" heuristic existed.
+//   (b) comb_const_scale_rgb = 2.0 — stage 1's hardware RGB x2, the fire-glow
+//       "half brightness" root cause (fireglow doc §3.2 fix 1).
+//   (c) comb0_dual_addmult with tex1_idx=1 — stage 0's (t0+t1)*t0 detail-mask combine
+//       (fix 2), sampling g_title_mable_t through binding 1.
+//   (d) coordinator 1's baked UV transform scale(3,2)/trans(0,0.9433) (fix 3's target).
+TEST(CmbCombinerParse, TitleGlowDualTexAddMultAndConstScale) {
+    if (OoT3dRomPath().empty()) {
+        GTEST_SKIP() << "ZELDA3D_OOT3D_ROM not set — cannot exercise real-asset close-test";
+    }
+    Cmb cmb(LoadTitleGlowCmb());
+    ASSERT_TRUE(cmb.ok()) << cmb.error();
+    ASSERT_EQ(cmb.materials().size(), 1u);
+    const CmbMaterial& m = cmb.materials()[0];
+    EXPECT_EQ(m.comb_stage_count, 3);
+    // (a) palette base +0xB4: slot 0 is the CMAB-animated register, baked WHITE.
+    EXPECT_FLOAT_EQ(m.mat_constant[0][0], 1.0f);
+    EXPECT_FLOAT_EQ(m.mat_constant[0][1], 1.0f);
+    EXPECT_FLOAT_EQ(m.mat_constant[0][2], 1.0f);
+    EXPECT_FLOAT_EQ(m.mat_constant[0][3], 1.0f);
+    // (b) stage 1 MODULATE(PREV, CONST0) at x2.
+    EXPECT_TRUE(m.comb_uses_const);
+    EXPECT_EQ((int)m.comb_const_idx, 0);
+    EXPECT_FLOAT_EQ(m.comb_const_scale_rgb, 2.0f);
+    // (c) stage 0 dual-texture ADD_MULT sampling binding 1.
+    EXPECT_TRUE(m.comb0_dual_addmult);
+    EXPECT_EQ(m.tex1_idx, 1);
+    // (d) coordinator-1 baked transform.
+    EXPECT_FLOAT_EQ(m.scale1_s, 3.0f);
+    EXPECT_FLOAT_EQ(m.scale1_t, 2.0f);
+    EXPECT_FLOAT_EQ(m.trans1_s, 0.0f);
+    EXPECT_NEAR(m.trans1_t, 0.94333f, 1e-4f);
+}

@@ -57,6 +57,15 @@ struct SgGroup {
     };
     int combConstIdx = 0;
     int combUsesConst = 0;
+    // Hardware RGB scale (1/2/4) of the CONSTANT-sourcing stage; applied with the CONSTANT
+    // modulate via uMatConst.a (fire-glow ×2 — title_logo_fireglow_cmab.md §3.2 fix 1).
+    float combConstScaleRGB = 1.0f;
+    // Dual-texture stage 0 (ADD_MULT detail mask): sample tex1Index through coordinator 1.
+    int dualTexAddMult = 0;
+    int tex1Index = -1;
+    unsigned wrap1S = 0x2901, wrap1T = 0x2901;
+    float uv1Scale[2] = { 1.0f, 1.0f };
+    float uv1Trans[2] = { 0.0f, 0.0f };
     float dbgColor0[4] = { -1, -1, -1, -1 }; // sample of vertex[first].color (sgdump diagnostics)
     float dbgUv0[2] = { 0, 0 }, dbgUv1[2] = { 0, 0 }, dbgUv2[2] = { 0, 0 }; // sample uvs (sgdump)
 };

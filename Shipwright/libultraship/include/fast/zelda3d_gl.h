@@ -83,6 +83,17 @@ typedef struct Zelda3DGlGroup {
     float matConstant[6][4];  // 6 RGBA slots, defaults zero-then-alpha-1
     int   combConstIdx;       // 0..5: index into matConstant[] for the final stage's CONSTANT
     int   combUsesConst;      // 1 iff ANY stage sources CONSTANT (0x8576) — else the shader skips the CONSTANT modulate
+    // Hardware RGB scale (1/2/4) of the CONSTANT-sourcing stage: PICA scales that stage's output
+    // AFTER the modulate. Applied by the shader together with the CONSTANT multiply (g_title.cmb
+    // fire-glow stage 1 = 2.0*(PREV*CONST0) — oot3d-decomp title_logo_fireglow_cmab.md §3.1).
+    float combConstScaleRGB;  // 1.0 when unused
+    // Dual-texture stage 0 (ADD_MULT detail mask): when dualTexAddMult, the shader samples
+    // tex1Index through coordinator 1's uv transform and computes (t0 + t1) * t0 as the texel.
+    int   dualTexAddMult;     // 0/1
+    int   tex1Index;          // second texture binding, -1 = none
+    unsigned wrap1S, wrap1T;  // binding-1 GL wrap enums
+    float uv1Scale[2];        // coordinator-1 scale (S, T)
+    float uv1Trans[2];        // coordinator-1 translate (S, T); uv1 = scale * (uv - trans)
 } Zelda3DGlGroup;
 
 // One decoded texture (RGBA8, w*h*4 bytes, row 0 = top).

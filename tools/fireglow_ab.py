@@ -1,0 +1,119 @@
+#!/usr/bin/env python3
+"""fireglow_ab.py — matched-frame A/B measurement of the title fire-glow (g_title.cmb).
+
+Walks ONE harness session (both engines embedded, forward-only) through several
+(az, soh=az+408) matched pairs chosen to sample the g_title_fire.cmab gold-flicker
+curve at distinct phases, snapshots both panes at each, and reports the mean RGB of
+the GLOW REGION (the warm pixels around the wordmark) per pane — the quantitative
+before/after surface for the fire-glow combiner port
+(oot3d-decomp/docs/title_logo_fireglow_cmab.md §3.2).
+
+Glow-region definition (same on both panes so the comparison is symmetric): within
+the central wordmark box, pixels that are "warm" (R > B + 16 and R > 40) — i.e. the
+gold wash + wordmark glyphs, excluding the night sky/terrain backdrop. Reported as
+mean R,G,B over that mask plus the mask pixel count.
+
+Usage:  source .env && tools/fireglow_ab.py [--tag before|after] [--frames 594 730 936]
+Outputs: scratch/title_ab/fireglow_<tag>_az<N>.{az,soh}.ppm (+ printed table).
+"""
+from __future__ import annotations
+
+import argparse
+import os
+import sys
+from pathlib import Path
+
+import numpy as np
+
+REPO = Path(__file__).resolve().parent.parent
+sys.path.insert(0, str(REPO / "tools"))
+import harness_ctl as hc  # noqa: E402
+
+OUTDIR = REPO / "scratch" / "title_ab"
+SAVESTATE = REPO / "scratch" / "title_settled.state"
+SOH_STEP_INTERCEPT = 408  # soh_step ~= az_step + 408 (title_ab.py rate-law derivation)
+
+
+def read_ppm(path: Path) -> np.ndarray:
+    with open(path, "rb") as f:
+        assert f.readline().strip() == b"P6"
+        line = f.readline()
+        while line.startswith(b"#"):
+            line = f.readline()
+        w, h = map(int, line.split())
+        maxv = int(f.readline())
+        assert maxv == 255
+        return np.frombuffer(f.read(w * h * 3), dtype=np.uint8).reshape(h, w, 3)
+
+
+def glow_stats(img: np.ndarray) -> tuple[float, float, float, int]:
+    """Mean RGB over the GOLD-hue flame mask inside the logo box.
+
+    Box (full-frame 400x240 coords): x 110..300, y 40..190 — the shield + flame wash area
+    both panes place the logo in during the title demo. Gold-hue mask separates the FLAME
+    (orange/gold: G between 30% and 90% of R, B well below R) from the deep-red wordmark
+    letters (G < 30% of R) and the green/blue scenery; threshold R > 60 rejects the dim
+    night grass. Same box+mask on both panes so the comparison is symmetric."""
+    box = img[40:190, 110:300].astype(np.int32)
+    r, g, b = box[..., 0], box[..., 1], box[..., 2]
+    mask = (r > 60) & (g * 10 > r * 3) & (g * 10 < r * 9) & (b * 2 < r)
+    n = int(mask.sum())
+    if n == 0:
+        return 0.0, 0.0, 0.0, 0
+    sel = box[mask]
+    return float(sel[..., 0].mean()), float(sel[..., 1].mean()), float(sel[..., 2].mean()), n
+
+
+def step_chunked(h, cmd: str, n: int, chunk: int = 20) -> None:
+    while n > 0:
+        k = min(chunk, n)
+        h.send(f"{cmd} {k}")
+        n -= k
+
+
+def main(argv):
+    p = argparse.ArgumentParser(description=__doc__.splitlines()[0])
+    p.add_argument("--tag", default="run", help="label for output files (before/after)")
+    p.add_argument("--frames", type=int, nargs="+", default=[594, 730, 936],
+                   help="az frame numbers (ascending); soh pairs at az+408")
+    args = p.parse_args(argv)
+
+    if not SAVESTATE.exists():
+        sys.exit(f"missing {SAVESTATE}")
+    OUTDIR.mkdir(parents=True, exist_ok=True)
+    (REPO / "scratch" / "logs").mkdir(parents=True, exist_ok=True)
+    os.environ.setdefault("HARNESS_STDERR",
+                          str(REPO / "scratch" / "logs" / "fireglow_ab_harness.log"))
+
+    frames = sorted(args.frames)
+    h = hc.spawn(save_state=str(SAVESTATE))
+    rows = []
+    try:
+        r = h.send("soh_boot")
+        if not r.startswith("ok"):
+            sys.exit(f"soh_boot failed: {r}")
+        az_cur = soh_cur = 0
+        for az in frames:
+            soh = az + SOH_STEP_INTERCEPT
+            step_chunked(h, "run", az - az_cur)
+            step_chunked(h, "soh_step", soh - soh_cur)
+            az_cur, soh_cur = az, soh
+            base = OUTDIR / f"fireglow_{args.tag}_az{az}"
+            h.send_multiline(f"snapshot {base}")
+            a = glow_stats(read_ppm(Path(str(base) + ".az.ppm")))
+            s = glow_stats(read_ppm(Path(str(base) + ".soh.ppm")))
+            rows.append((az, soh, a, s))
+    finally:
+        h.quit()
+
+    print(f"\n== fire-glow glow-region mean RGB ({args.tag}) — warm mask in central box ==")
+    print(f"{'az':>5} {'soh':>5} | {'Az R':>6} {'G':>6} {'B':>6} {'px':>6} | "
+          f"{'SoH R':>6} {'G':>6} {'B':>6} {'px':>6} | R ratio soh/az")
+    for az, soh, a, s in rows:
+        ratio = (s[0] / a[0]) if a[0] > 0 else float("nan")
+        print(f"{az:>5} {soh:>5} | {a[0]:6.1f} {a[1]:6.1f} {a[2]:6.1f} {a[3]:6d} | "
+              f"{s[0]:6.1f} {s[1]:6.1f} {s[2]:6.1f} {s[3]:6d} | {ratio:6.3f}")
+
+
+if __name__ == "__main__":
+    main(sys.argv[1:])

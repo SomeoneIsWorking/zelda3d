@@ -3,15 +3,26 @@
 // oot3d-decomp/docs/title_2d_overlay_logo.md §5 (item 1.c); CMAB byte format + curve data fully
 // decoded in oot3d-decomp/docs/title_logo_fireglow_cmab.md.
 //
-// GROUND TRUTH (title_logo_fireglow_cmab.md §2/§3): g_title.cmb is a 1-material, 1-mesh, 21760B
-// model (textures g_title_efc 128x128 — the flame/glow gradient sprite — and an unused
-// g_title_mable_t) with BAKED material state: blend_enable=true, src=SRC_ALPHA dst=ONE (standard
-// "additive glow": brightens whatever was drawn before it, never occludes), depth_write=false.
+// GROUND TRUTH (title_logo_fireglow_cmab.md §2/§3/§3.1): g_title.cmb is a 1-material, 1-mesh,
+// 21760B model with TWO live texture bindings — g_title_efc 128x128 (the flame/glow gradient
+// sprite, binding 0) and g_title_mable_t 64x64 (a detail/brightening mask, binding 1, sampled
+// through coordinator 1's baked scale(3,2)/trans(0,0.9433) transform) — and BAKED material state:
+// blend_enable=true, src=SRC_ALPHA dst=ONE (standard "additive glow": brightens whatever was
+// drawn before it, never occludes), depth_write=false. Its 3-stage TEV combiner is
+//     stage0.rgb = (efc + mableT) * efc         (ADD_MULT dual-texture, x1)
+//     stage1.rgb = 2.0 * (stage0 * constColor0)  (MODULATE at scaleRGB=x2 — the CMAB-driven stage)
+//     stage2     = passthrough
+// Both the dual-texture stage 0 and the x2 stage-1 scale are first-class renderer features since
+// 2026-07-10 (cmb.cpp comb0_dual_addmult / comb_const_scale_rgb -> zelda3d_sdl3gpu.cpp
+// uSheen.y/uTex1Xf/uMatConst.a), so THIS module only supplies the CMAB-animated inputs per frame.
 // Misc/g_title_fire.cmab (1296B, same ZAR) drives it: duration=300, loopMode=Once (plays once
 // during the fade-in flourish, then holds the frame-300 value — NOT a perpetual loop), 4 mmad
 // entries, of which entries 0-1 (mat=0 chan=1 Translation V-track "flame drift", mat=0 chan=0
 // ConstColor R/G/B "warm gold flicker") are the confirmed pair driving THIS mesh; entries 2-3
-// target the SEPARATE ura.ctxb billboard strip — CONFIRMED (title_logo_actor.md §6.1/§6.4, full
+// were once hypothesized to target the SEPARATE ura.ctxb billboard strip, but that reading is
+// SUPERSEDED (title_ura_ctxb_identified.md §3: ura.ctxb is a file-select UI atlas with no fire
+// imagery and no material list — both cmabs almost certainly target g_title.cmb's own material;
+// entries 2-3 are duplicates in the non-ura file). Historical context — CONFIRMED (title_logo_actor.md §6.1/§6.4, full
 // decompile of the draw fn FUN_001da4f4 and every callee) NOT drawn by the logo actor (0x171) at
 // all: the draw fn has exactly THREE draw blocks (backdrop/wordmark/copyright, all ported here),
 // no fourth handle, no `_ura` reference anywhere in the function or its callees. Whatever draws
@@ -23,14 +34,18 @@
 //   - ConstColor R/G/B -> the draw's flat TINT (gSPZelda3DDrawUV's tintR/G/B), which the shared
 //     Zelda3D fragment shader multiplies unconditionally into the final color
 //     (`rgb = t.rgb * vColor.rgb * shade`, shade = uTintSkin.xyz — see
-//     zelda3d_sdl3gpu.cpp's kSgFrag). This is simpler and more robust than the per-material
-//     Zelda3D_GL_SetMatConstOverride mechanism (townsfolk.cpp), which only applies when the
-//     override's constIdx matches the CMB's OWN combiner-selected constant slot (unverified for
-//     g_title.cmb) — the flat per-draw tint has no such precondition and the doc's read of
-//     ConstColor as "drives the CONSTANT register that gets multiplied into the glow texture" is
-//     visually equivalent to a texture*tint multiply for a single-material, single-texture mesh.
-//   - Translation V-track -> the draw's UV SCROLL offset (gSPZelda3DDrawUV's uvV arg), the same
-//     per-draw texcoord-scroll seam the sky cloud band already uses (zelda3d.c #28b).
+//     zelda3d_sdl3gpu.cpp's kSgFrag). Mathematically identical to writing the CONSTANT0 register
+//     the CMAB actually targets: the material's own baked constColor0 is (255,255,255,255)
+//     (verified byte-level, fireglow doc §3.1), so the renderer's const-modulate contributes
+//     only the x2 stage scale and the tint carries the animated color — one multiply either way.
+//     (The townsfolk Zelda3D_GL_SetMatConstOverride channel can't serve here anyway: it rides
+//     the EmitPose/ItemPose pairing, and this raw gSPZelda3DDrawUV overlay never emits a pose —
+//     same reason the wordmark's light-dir override needed a direct-read path.)
+//   - Translation V-track (materialIndex 0, channelIndex 1) -> the draw's UV SCROLL offset
+//     (gSPZelda3DDrawUV's uvV arg). The renderer routes a dual-texture group's per-draw scroll
+//     to COORDINATOR 1 (the mableT mask's UV transform — exactly the coordinator a channel-1
+//     Translation track drives, fireglow doc §3.2 fix 3), not to the efc/coordinator-0 UV the
+//     single-texture sky cloud band uses.
 //   - Placement: same 2D ortho overlay pass as the wordmark (title_logo.cpp,
 //     zelda3d_overlay2d.h), at the SAME screen-fraction card position
 //     (Zelda3D_TitleWordmarkPlacementFracs) — g_title.cmb is authored to wash over the wordmark,

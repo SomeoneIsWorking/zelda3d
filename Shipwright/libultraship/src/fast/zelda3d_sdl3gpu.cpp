@@ -156,7 +156,8 @@ bool CompileGlsl(EShLanguage stage, const char* src, std::vector<uint32_t>& spv)
     "    vec4 uFog2;\n" \
     "    vec4 uAmbient;\n" \
     "    vec4 uMatConst;\n" \
-    "    vec4 uSheen;\n"
+    "    vec4 uSheen;\n" \
+    "    vec4 uTex1Xf;\n"
 #define SG_UBO_BONES_BODY \
     "    mat4 uBones[" SG_STR(ZELDA3D_GL_MAX_BONES) "];\n"
 
@@ -173,6 +174,7 @@ const char* kVert =
     "layout(location=2) out vec3 vNrmView;\n"
     "layout(location=3) out vec3 vWorld;\n"
     "layout(location=4) out float vFogDist;\n"
+    "layout(location=5) out vec2 vUv1;\n"
     "layout(set=1, binding=0, std140) uniform UBO {\n" SG_UBO_COMMON_BODY "} ubo;\n"
     "layout(set=1, binding=1, std140) uniform UBOBones {\n" SG_UBO_BONES_BODY "} bones;\n"
     "void main() {\n"
@@ -195,6 +197,12 @@ const char* kVert =
     "    vNrmView = mat3(ubo.uMV) * nM;\n"
     "    vWorld = (ubo.uMV * vec4(sp, 1.0)).xyz;\n"
     "    vUv = vec2(aUv.x + ubo.uExtra.y, 1.0 - aUv.y + ubo.uExtra.z);\n"
+    // Coordinator-1 UV for the dual-texture detail mask (uTex1Xf: .xy = scale, .zw = translate
+    // incl. per-draw CMAB scroll). noclip calcTexMtx (DccMaya, rot=0): uv1 = scale * (uv - trans),
+    // applied in CMB UV space, then the same V flip the primary sample uses (textures are decoded
+    // row-0-top). Dead data when the group's dual-tex flag (uSheen.y) is off.
+    "    vec2 uv1 = vec2((aUv.x - ubo.uTex1Xf.z) * ubo.uTex1Xf.x, (aUv.y - ubo.uTex1Xf.w) * ubo.uTex1Xf.y);\n"
+    "    vUv1 = vec2(uv1.x, 1.0 - uv1.y);\n"
     "}\n";
 
 const char* kFrag =
@@ -204,10 +212,12 @@ const char* kFrag =
     "layout(location=2) in vec3 vNrmView;\n"
     "layout(location=3) in vec3 vWorld;\n"
     "layout(location=4) in float vFogDist;\n"
+    "layout(location=5) in vec2 vUv1;\n"
     "layout(location=0) out vec4 frag;\n"
     "layout(set=3, binding=0, std140) uniform UBO {\n" SG_UBO_COMMON_BODY "} ubo;\n"
     "layout(set=2, binding=0) uniform sampler2D uTex;\n"
     "layout(set=2, binding=1) uniform sampler2D uShadowMap;\n"
+    "layout(set=2, binding=2) uniform sampler2D uTex1;\n"
     "float shadowLit() {\n"
     "    vec4 lc = ubo.uLightVP * vec4(vWorld, 1.0);\n"
     "    vec3 p = lc.xyz / lc.w;\n"
@@ -223,6 +233,13 @@ const char* kFrag =
     "}\n"
     "void main() {\n"
     "    vec4 t = texture(uTex, vUv);\n"
+    // PICA TEV stage 0 dual-texture combine (ADD_MULT: (t0 + t1) * t0, saturating the sum per
+    // stage — g_title.cmb fire-glow detail mask, title_logo_fireglow_cmab.md §3.1). The alpha
+    // chain does NOT include TEXTURE1 (stage-0 alpha = primary.a * t0.a), so only .rgb changes.
+    "    if (ubo.uSheen.y > 0.5) {\n"
+    "        vec3 t1 = texture(uTex1, vUv1).rgb;\n"
+    "        t.rgb = clamp(t.rgb + t1, 0.0, 1.0) * t.rgb;\n"
+    "    }\n"
     "    if (t.a < ubo.uParams.z) discard;\n"
     "    gl_FragDepth = gl_FragCoord.z + ubo.uParams.w;\n"
     "    vec3 shade = ubo.uTintSkin.xyz;\n"
@@ -255,11 +272,12 @@ const char* kFrag =
     "    } else {\n"
     "        rgb = t.rgb * vColor.rgb * shade;\n"             // char/prop keep shade
     "    }\n"
-    // PICA200 CONSTANT-color modulation (EnHy townsfolk body color). The apply flag lives in
-    // uMatConst.a; when >=0.5 the fragment gets multiplied by uMatConst.rgb (matches the
-    // OoT3D combiner MODULATE(current, CONSTANT) that runs after material-anim on townsfolk).
-    // Default upload leaves .a=0 so materials that don't reference CONSTANT are unchanged.
-    "    if (ubo.uMatConst.a >= 0.5) rgb *= ubo.uMatConst.rgb;\n"
+    // PICA200 CONSTANT-color modulation (EnHy townsfolk body color, title fire-glow gold
+    // flicker). uMatConst.a is both the apply flag AND the CONSTANT-stage's hardware RGB scale:
+    // 0 = skip (materials that don't reference CONSTANT), 1/2/4 = multiply by uMatConst.rgb then
+    // by the stage scale (PICA scales each stage's output AFTER the combine — g_title.cmb's
+    // stage 1 is 2.0*(PREV*CONST0), the fire-glow "half brightness" factor, fireglow doc §3.2).
+    "    if (ubo.uMatConst.a >= 0.5) rgb = clamp(rgb * ubo.uMatConst.rgb * ubo.uMatConst.a, 0.0, 1.0);\n"
     "    if (ubo.uParams.y < 0.5) {\n"
     "        if (ubo.uAmbient.w > 0.0)\n"
     "            rgb *= ubo.uAmbient.xyz;\n"
@@ -456,7 +474,7 @@ bool Fast::Zelda3DRenderer::ensureResources() {
     fci.entrypoint = "main";
     fci.format = SDL_GPU_SHADERFORMAT_SPIRV;
     fci.stage = SDL_GPU_SHADERSTAGE_FRAGMENT;
-    fci.num_samplers = 2;        // uTex + uShadowMap
+    fci.num_samplers = 3;        // uTex + uShadowMap + uTex1 (dual-texture detail mask)
     fci.num_uniform_buffers = 1; // UBO
     g_frag = SDL_CreateGPUShader(g_device, &fci);
 
@@ -591,6 +609,17 @@ SgModel* Fast::Zelda3DRenderer::ensureUploaded(int modelId) {
                 g.matConstant[s][k] = groups[i].matConstant[s][k];
         g.combConstIdx = groups[i].combConstIdx;
         g.combUsesConst = groups[i].combUsesConst;
+        g.combConstScaleRGB = (groups[i].combConstScaleRGB > 0.0f) ? groups[i].combConstScaleRGB : 1.0f;
+        g.dualTexAddMult = groups[i].dualTexAddMult;
+        if (g.dualTexAddMult) {
+            g.tex1Index = groups[i].tex1Index;
+            g.wrap1S = groups[i].wrap1S;
+            g.wrap1T = groups[i].wrap1T;
+            g.uv1Scale[0] = groups[i].uv1Scale[0];
+            g.uv1Scale[1] = groups[i].uv1Scale[1];
+            g.uv1Trans[0] = groups[i].uv1Trans[0];
+            g.uv1Trans[1] = groups[i].uv1Trans[1];
+        }
         if (groups[i].vertCount > 0) {
             for (int k = 0; k < 4; k++)
                 g.dbgColor0[k] = groups[i].verts[0].color[k];
@@ -935,6 +964,10 @@ struct DrawGroup {
     SDL_GPUGraphicsPipeline* pipeline;
     SDL_GPUTexture* tex;
     SDL_GPUSampler* samp;
+    // Second texture binding (dual-texture detail mask, fire-glow). nullptr = none (the append
+    // path substitutes the dummy texture so fragment sampler slot 2 is always backed).
+    SDL_GPUTexture* tex1 = nullptr;
+    SDL_GPUSampler* samp1 = nullptr;
     uint32_t first, count;
     std::array<uint8_t, sizeof(SgUbo)> ubo;
 };
@@ -1510,14 +1543,17 @@ void Fast::Zelda3DRenderer::DrawModel(int modelId, const float* mp16, const floa
                     "[SG_DUMP]  g%-2d cull=%d faceCull=%d meshId=%d tex=%d%s mat=%d vtxLit=%d combScale=%.3f "
                     "blend=%d(src=%#06x dst=%#06x) aTest=%d aRef=%.3f depthW=%d polyOff=%.4f first=%u count=%u "
                     "vColor0=(%.3f,%.3f,%.3f,%.3f) matAmb=(%.2f,%.2f,%.2f) matDif=(%.2f,%.2f,%.2f) "
-                    "uv=[(%.2f,%.2f)(%.2f,%.2f)(%.2f,%.2f)] wrap=(%#06x,%#06x)\n",
+                    "uv=[(%.2f,%.2f)(%.2f,%.2f)(%.2f,%.2f)] wrap=(%#06x,%#06x) "
+                    "tex1=%d dual=%d constScale=%.1f uv1Xf=(%.2f,%.2f,%.2f,%.4f)\n",
                     gi, grp.cull, grp.faceCull, grp.meshId, grp.texIndex, hasTex ? "" : "(MISSING->dummy)",
                     grp.materialIndex, grp.vertexLighting, grp.combScaleRGB, grp.blendEnable, grp.bSrcRGB,
                     grp.bDstRGB, grp.alphaTest, grp.alphaRef, grp.depthWrite, grp.polygonOffset, grp.first,
                     grp.count, grp.dbgColor0[0], grp.dbgColor0[1], grp.dbgColor0[2], grp.dbgColor0[3],
                     grp.matAmbient[0], grp.matAmbient[1], grp.matAmbient[2], grp.matDiffuse[0],
                     grp.matDiffuse[1], grp.matDiffuse[2], grp.dbgUv0[0], grp.dbgUv0[1], grp.dbgUv1[0],
-                    grp.dbgUv1[1], grp.dbgUv2[0], grp.dbgUv2[1], grp.wrapS, grp.wrapT);
+                    grp.dbgUv1[1], grp.dbgUv2[0], grp.dbgUv2[1], grp.wrapS, grp.wrapT, grp.tex1Index,
+                    grp.dualTexAddMult, grp.combConstScaleRGB, grp.uv1Scale[0], grp.uv1Scale[1],
+                    grp.uv1Trans[0], grp.uv1Trans[1]);
             // PICA200 TEV constant palette + stage-0 selector — dumped on its own line so the
             // main SG_DUMP row stays parseable by existing tools; format:
             //   [SG_DUMP]   g<n> constIdx=<i> const0..const5=(r,g,b,a) x 6
@@ -1694,16 +1730,34 @@ void Fast::Zelda3DRenderer::DrawModel(int modelId, const float* mp16, const floa
             // just a stage-source marker, and multiplying by 0 hides every star (task #16).
             bool constBlack = (grp.matConstant[ci][0] < 1e-4f && grp.matConstant[ci][1] < 1e-4f &&
                                grp.matConstant[ci][2] < 1e-4f);
-            ubo.uMatConst[3] = (grp.combUsesConst && !constBlack) ? 1.0f : 0.0f;
+            // uMatConst.a carries the CONSTANT stage's hardware RGB scale (1/2/4) as the apply
+            // value; 0 = skip. The shader multiplies by uMatConst.rgb * uMatConst.a so the PICA
+            // per-stage scale (fire-glow ×2) rides the same seam.
+            ubo.uMatConst[3] = (grp.combUsesConst && !constBlack) ? grp.combConstScaleRGB : 0.0f;
             if (matConstMap && grp.materialIndex >= 0) {
                 auto ov = matConstMap->find(grp.materialIndex);
                 if (ov != matConstMap->end() && ov->second.constIdx == ci) {
                     ubo.uMatConst[0] = ov->second.rgba[0];
                     ubo.uMatConst[1] = ov->second.rgba[1];
                     ubo.uMatConst[2] = ov->second.rgba[2];
-                    ubo.uMatConst[3] = 1.0f; // force apply (townsfolk clothing colour)
+                    ubo.uMatConst[3] = grp.combConstScaleRGB; // force apply (townsfolk clothing colour)
                 }
             }
+        }
+
+        // Dual-texture stage 0 (fire-glow detail mask): enable flag on uSheen.y, coordinator-1
+        // transform (+ this draw's CMAB UV-scroll) on uTex1Xf. The per-draw scroll offset routes
+        // to coordinator 1 here (the material the CMAB animates — its Translation track is
+        // channelIndex 1, title_logo_fireglow_cmab.md §3.2 fix 3) instead of the coordinator-0
+        // offset uExtra.yz used by single-texture scroll consumers (sky cloud band, #28b).
+        if (grp.dualTexAddMult) {
+            ubo.uSheen[1] = 1.0f;
+            ubo.uTex1Xf[0] = grp.uv1Scale[0];
+            ubo.uTex1Xf[1] = grp.uv1Scale[1];
+            ubo.uTex1Xf[2] = grp.uv1Trans[0] + uvOffU;
+            ubo.uTex1Xf[3] = grp.uv1Trans[1] + uvOffV;
+            ubo.uExtra[1] = 0.0f;
+            ubo.uExtra[2] = 0.0f;
         }
 
         // Facial material-anim override.
@@ -1718,6 +1772,15 @@ void Fast::Zelda3DRenderer::DrawModel(int modelId, const float* mp16, const floa
         if (texIndex >= 0 && texIndex < (int)m->textures.size() && m->textures[texIndex]) {
             tex = m->textures[texIndex];
             samp = getSampler(grp.wrapS, grp.wrapT);
+        }
+        // Second texture binding (dual-texture detail mask): only ever non-dummy when the group's
+        // dual-tex combine is on (uSheen.y gates the shader-side sample).
+        SDL_GPUTexture* tex1 = nullptr;
+        SDL_GPUSampler* samp1 = nullptr;
+        if (grp.dualTexAddMult && grp.tex1Index >= 0 && grp.tex1Index < (int)m->textures.size() &&
+            m->textures[grp.tex1Index]) {
+            tex1 = m->textures[grp.tex1Index];
+            samp1 = getSampler(grp.wrap1S, grp.wrap1T);
         }
 
         // Translucent draw over an opaque material: synthesize a standard alpha-over pipeline.
@@ -1735,6 +1798,8 @@ void Fast::Zelda3DRenderer::DrawModel(int modelId, const float* mp16, const floa
         DrawGroup dg;
         dg.tex = tex;
         dg.samp = samp;
+        dg.tex1 = tex1;
+        dg.samp1 = samp1;
         dg.first = grp.first;
         dg.count = grp.count;
         if (unified) {
@@ -1815,7 +1880,7 @@ void Fast::Zelda3DRenderer::DrawModel(int modelId, const float* mp16, const floa
     // sequential append (matters for translucency).
     for (const DrawGroup& g : dgs)
         api->AppendZelda3DModelDraw(g.pipeline, vbo, g.first, g.count, g.ubo.data(), g.tex, g.samp, shadowTex, shadowSamp,
-                                  vp, sc);
+                                  g.tex1, g.samp1, vp, sc);
 }
 
 void Fast::Zelda3DRenderer::EndPass() {
