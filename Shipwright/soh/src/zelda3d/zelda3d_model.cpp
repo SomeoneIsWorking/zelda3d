@@ -599,9 +599,38 @@ static size_t vertCountGroups(const std::vector<Zelda3D::CmbDrawGroup>& groups) 
 // Load a standalone CTXB texture and build a quad. If zarPath ends in ".ctxb" the file is read
 // DIRECTLY from the romfs (no ZAR wrap — used for /menu/ and /misc/ atmospheric textures at title,
 // task #16); otherwise zarPath is the ZAR archive and ctxbName picks the file inside it.
+// mirrorQuadrant: some standalone billboard textures (the moon's fine_moon1/fine_moon2 halo
+// glows) are authored as a SINGLE QUADRANT of a symmetric radial gradient, with the brightest
+// texel at one corner and the opposite corner/edges at zero — meant to be reconstructed by
+// mirroring that quadrant across both axes into a full glow, centred on the quadrant's bright
+// corner. The CTXB container for these standalone sprites carries no material/sampler chunk (RE'd
+// via scratch/ctxb_hdr_dump.cpp: chunkCount=1, only a "tex " chunk — no wrap-mode byte anywhere in
+// the asset), so there's no declared wrap mode to honor; this bakes the mirrored expansion
+// explicitly at load time instead of relying on GPU mirrored-repeat addressing (whose mirror axis
+// falls at a texel boundary, not at the quadrant's bright corner, so it doesn't reconstruct this
+// asset's specific corner-centred layout without an extra UV pre-flip). Verified against the
+// measured source texture (bright corner isolated, all others near-zero) — see
+// debug_journal/2026-07-10-moon-mirror-and-fade-attenuation.md.
+static std::vector<uint8_t> mirrorExpandQuadrant(const std::vector<uint8_t>& src, int q, int* outW, int* outH) {
+    int n = 2 * q;
+    std::vector<uint8_t> out(n * n * 4);
+    auto srcPx = [&](int x, int y) -> const uint8_t* { return &src[(y * q + x) * 4]; };
+    for (int Y = 0; Y < n; Y++) {
+        int sy = (Y < q) ? (q - 1 - Y) : (Y - q);
+        for (int X = 0; X < n; X++) {
+            int sx = (X < q) ? X : (n - 1 - X);
+            const uint8_t* s = srcPx(sx, sy);
+            uint8_t* d = &out[(Y * n + X) * 4];
+            d[0] = s[0]; d[1] = s[1]; d[2] = s[2]; d[3] = s[3];
+        }
+    }
+    *outW = n; *outH = n;
+    return out;
+}
+
 static void loadBillboard(LoadedModel* out, const std::string& zarPath, const std::string& ctxbName,
                           bool additive, float u0 = 0.0f, float v0 = 0.0f,
-                          float u1 = 1.0f, float v1 = 1.0f) {
+                          float u1 = 1.0f, float v1 = 1.0f, bool mirrorQuadrant = false) {
     Zelda3D::CtrRom* r = rom();
     if (!r) return;
     std::vector<uint8_t> ctxbBytes;
@@ -628,6 +657,11 @@ static void loadBillboard(LoadedModel* out, const std::string& zarPath, const st
     int tw = 0, th = 0;
     auto rgba = ctxb.decodeRGBA(0, &tw, &th);
     if (rgba.empty()) { fprintf(stderr, "[Zelda3D] billboard %s: decode failed\n", ctxbName.c_str()); return; }
+    if (mirrorQuadrant) {
+        int mw = 0, mh = 0;
+        rgba = mirrorExpandQuadrant(rgba, tw, &mw, &mh);
+        tw = mw; th = mh;
+    }
     out->texRgba.push_back(std::move(rgba));
     out->cTexs.push_back({ out->texRgba[0].data(), tw, th });
 
@@ -695,6 +729,9 @@ static void loadAutoModel(int modelId, LoadedModel* out) {
     // atlas: its rainbow-ring halo lives in the upper-left quadrant of the texture, and the
     // sun-flare orbs live in the right half. To render just the halo behind the moon we
     // sample only the ring region.
+    // Optional trailing "~MIRROR" (before any "#uv") marks the ctxb as a single QUADRANT of a
+    // symmetric radial glow that must be mirror-expanded 2x2 at load — see
+    // mirrorExpandQuadrant()'s comment. Used for the moon's fine_moon1/fine_moon2 halo sprites.
     {
         bool add = false;
         const char* pfx = nullptr;
@@ -715,7 +752,14 @@ static void loadAutoModel(int modelId, LoadedModel* out) {
                     u0 = 0.0f; v0 = 0.0f; u1 = 1.0f; v1 = 1.0f;
                 }
             }
-            loadBillboard(out, zp, ctxb, add, u0, v0, u1, v1);
+            bool mirror = false;
+            const std::string mirrorTag = "~MIRROR";
+            if (ctxb.size() >= mirrorTag.size() &&
+                ctxb.compare(ctxb.size() - mirrorTag.size(), mirrorTag.size(), mirrorTag) == 0) {
+                mirror = true;
+                ctxb = ctxb.substr(0, ctxb.size() - mirrorTag.size());
+            }
+            loadBillboard(out, zp, ctxb, add, u0, v0, u1, v1, mirror);
             return;
         }
     }
