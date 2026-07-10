@@ -47,6 +47,17 @@ struct GlModel {
     // Zelda3DMatConstOv is defined in fast/zelda3d_gl.h (POD; shared with the render backend
     // so the void*-typed map pointer that Zelda3D_Sg_DrawModel receives is well-typed).
     std::unordered_map<int, Zelda3DMatConstOv> pendingMatConst; // materialIndex -> override
+
+    // Per-draw light-DIRECTION override (title wordmark sheen, title_logo_actor.md §6.3). Unlike
+    // the fields above, this is read DIRECTLY at Submit time rather than snapshotted through
+    // EmitPose/ItemPose: the wordmark draws itself via a raw gSPZelda3DDrawA opcode (not the
+    // actor-registry Zelda3D_EmitModelDraw path), so it never calls Zelda3D_GL_EmitPose and would
+    // never see an ItemPose-snapshotted value. A direct read is correct here because this model has
+    // exactly one live instance per frame (the title overlay), so there is no same-modelId,
+    // multiple-actors emit-order pairing problem to solve (the problem EmitPose/ItemPose exists
+    // for). See Zelda3D_GL_SetLightDirOverride below and its use in Submit().
+    bool hasLightDirOv = false;
+    float lightDirOv[3] = { 0.0f, 0.0f, 1.0f };
 };
 
 std::unordered_map<int, GlModel> g_models; // keyed by stable model id
@@ -444,6 +455,20 @@ extern "C" void Zelda3D_GL_ClearMatConstOverrides(int modelId) {
     if (it != g_models.end()) it->second.pendingMatConst.clear();
 }
 
+// See the GlModel::hasLightDirOv comment: direct (unpaired) state, read straight from g_models at
+// Submit time — no EmitPose snapshot needed since this model draws once per frame.
+extern "C" void Zelda3D_GL_SetLightDirOverride(int modelId, float dx, float dy, float dz) {
+    GlModel& m = g_models[modelId];
+    m.hasLightDirOv = true;
+    m.lightDirOv[0] = dx;
+    m.lightDirOv[1] = dy;
+    m.lightDirOv[2] = dz;
+}
+extern "C" void Zelda3D_GL_ClearLightDirOverride(int modelId) {
+    auto it = g_models.find(modelId);
+    if (it != g_models.end()) it->second.hasLightDirOv = false;
+}
+
 extern "C" void Zelda3D_GL_EmitPose(int modelId) {
     // Snapshot this actor's just-set pose at EMIT time (during dlist build, logic-frame rate) so it
     // survives later same-modelId SetBones calls. Appended in emit order; the k-th submit of this
@@ -512,6 +537,9 @@ struct DrawItem {
     // Per-actor CONSTANT-color override (EnHy townsfolk). Same shape as matTex but per-material
     // rgba + constIdx; passed to Zelda3D_Sg_DrawModel and consumed inside the render pass.
     std::unordered_map<int, Zelda3DMatConstOv> matConst;
+    // Per-draw light-direction override (title wordmark sheen, see GlModel::hasLightDirOv).
+    bool hasLightDirOv = false;
+    float lightDirOv[3] = { 0.0f, 0.0f, 1.0f };
 };
 // Inline unified-render path: each OTR_G_ZELDA3D_DRAW appends its model op straight into the SDL3
 // GPU op-list at that point in the N64 dlist (depth-correct interleave, ONE pass for N64 + 3DS —
@@ -582,6 +610,18 @@ extern "C" void Zelda3D_GL_Submit(int modelId, const float* mp16, const float* m
             it.boneCount = mit->second.boneCount;
         }
     }
+    // Light-direction override: read DIRECTLY (not through the ItemPose emit-order pairing above —
+    // see GlModel::hasLightDirOv). Applies whether or not this draw took the emit-paired or the
+    // fallback pose path above.
+    {
+        auto mit = g_models.find(modelId);
+        if (mit != g_models.end() && mit->second.hasLightDirOv) {
+            it.hasLightDirOv = true;
+            it.lightDirOv[0] = mit->second.lightDirOv[0];
+            it.lightDirOv[1] = mit->second.lightDirOv[1];
+            it.lightDirOv[2] = mit->second.lightDirOv[2];
+        }
+    }
 
 #ifdef ENABLE_SDL3GPU
     // Unified inline draw: append THIS model op into the op-list right here, interleaved with the
@@ -600,7 +640,7 @@ extern "C" void Zelda3D_GL_Submit(int modelId, const float* mp16, const float* m
         }
         Zelda3D_Sg_DrawModel(it.modelId, it.mp, it.mv, it.lit, it.invertY, it.r, it.g, it.b, it.a, it.aspectAdj, pose,
                            it.boneCount, it.midMask, it.sky, it.uvOffU, it.uvOffV, &it.matTex, &it.matConst,
-                           it.forceUnlit);
+                           it.forceUnlit, it.hasLightDirOv ? it.lightDirOv : nullptr);
     }
 #else
     (void)it; // no SDL3 GPU backend: Zelda3D rendering has no other path

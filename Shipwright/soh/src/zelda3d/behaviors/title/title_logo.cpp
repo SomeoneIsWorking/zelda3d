@@ -91,6 +91,10 @@ void Zelda3D_UpdateAnim(int modelId, const char* animName, float frame);
 // directly, but the guard below is kept (belt-and-suspenders: TitlePresentation::draw() only
 // calls this while active, but this stays safe to call standalone too).
 int Zelda3D_Title_IsActive(void);
+// Per-model light-direction override feeding the wordmark's sheen (title_logo_actor.md §6.3;
+// see zelda3d_gl.h's declaration for the full contract). dirObj is OBJECT space; the renderer
+// transforms it by this draw's own placement matrix before use.
+void Zelda3D_GL_SetLightDirOverride(int modelId, float dx, float dy, float dz);
 }
 
 namespace {
@@ -160,6 +164,14 @@ struct LogoPhaseState {
     float     backdropAlpha  = 0.0f; // 0..255, g_title.cmb backdrop (+0x1D0 only — +0x1DC is a
                                       // light-direction param, not an alpha; see §6.3)
     float     copyrightAlpha = 0.0f; // 0..255, copy_nintendo.cmb (+0x1D8)
+    // 0..255, wordmark light-direction sweep parameter (+0x1DC, title_logo_actor.md §6.3). Ramps
+    // in LOCKSTEP with backdropAlpha during the SAME fade-in stage (same start/step/frames — the
+    // decomp's own trace: both driven by the identical +4.25/frame over cf466-525), but UNLIKE
+    // backdropAlpha it never decrements: the decompiled draw fn only ever WRITES this field during
+    // that one fade-in stage, so once it reaches 255 it stays there through Display, FadeOut, and
+    // beyond (the "freezes at its t=1 endpoint" behavior §6.3 documents). Computed unconditionally
+    // below (not inside the fade-out/fade-in branches) so it naturally holds across every phase.
+    float     sheenT = 0.0f;
 };
 
 // One staged ramp: 0 before `start`, linearly steps up by `step`/frame from `start`, and is
@@ -189,7 +201,18 @@ LogoPhaseState resolveLogoPhase(int csFrame) {
         // entirely).
         s.phase = LogoPhase::Display;
         s.wordmarkAlpha = s.backdropAlpha = s.copyrightAlpha = 255.0f;
+        s.sheenT = 255.0f;
         return s;
+    }
+    // sheenT: computed unconditionally from fadeInFrame alone (not inside the Hidden/FadeOut/
+    // FadeIn branches below) so the same expression naturally returns 0 before the backdrop stage
+    // starts, ramps during it, and STAYS at 255 forever after (stagedRamp saturates for any
+    // csFrame past the ramp window) — matching the decomp's "never decremented" behavior without
+    // needing a separate freeze/latch. backdropStart mirrors the fade-in block's own derivation.
+    {
+        const int wordmarkStart = s.fadeInFrame + kFadeInDelayFrames;
+        const int backdropStart = wordmarkStart + kWordmarkFadeFrames;
+        s.sheenT = stagedRamp(csFrame, backdropStart, kBackdropFadeStep, kBackdropFadeFrames);
     }
     if (csFrame < s.fadeInFrame) {
         s.phase = LogoPhase::Hidden;
@@ -458,16 +481,44 @@ extern "C" int Zelda3D_TryDrawTitleLogo(PlayState* play) {
     Gfx_SetupDL_25Opa(play->state.gfxCtx);
     Zelda3D_Overlay2D_PlaceModel(play, kCenterXFrac * kOverlayRefW, kCenterYFrac * kOverlayRefH,
                                  kHeightFrac * kOverlayRefH, localHeight);
-    // FOLLOW-UP, not ported this pass (title_logo_actor.md §6.3, 2026-07-10): the decompiled draw
-    // fn also feeds actor field +0x1DC into a light-DIRECTION parameter on this model's own
-    // material (light-env slot 0: static ambient/diffuse/specular/emission, only the direction
-    // sweeps, over the same cf466-525 window as the backdrop alpha ramp, then freezes) — a real
-    // specular "gleam" sweep across the wordmark. NOT ported here: it needs a light-direction
-    // uniform the shared Zelda3D draw seam (gSPZelda3DDrawA below) has no parameter for — adding
-    // one is a real renderer-plumbing change, not a cheap seam reuse (checked: gSPZelda3DDrawA
-    // only carries alpha+flat RGB tint, gbi.h). FORCE_UNLIT (used below) already disables this
-    // model's baked vertex_lighting entirely for an unrelated reason (see next comment), so the
-    // gleam is invisible either way until that plumbing exists.
+    // Wordmark sheen (title_logo_actor.md §6.3, ported 2026-07-10): actor field +0x1DC feeds a
+    // light-DIRECTION parameter into the wordmark's own material (light-env slot 0: STATIC
+    // ambient={1,1,1,1} diffuse={0.1834,0.1834,0.1834,1} specular={1,1,1,1} emission=0; only the
+    // direction sweeps, over the same cf466-525 window as the backdrop alpha ramp, then freezes at
+    // its t=1 endpoint forever). §6.3's decompiled formula, with basisRow0/1/2 = the rows of the
+    // wordmark's own placement basis (an IDENTITY rotation per the decomp — "fStack_58 block,
+    // identity rotation + local translate (0,0,-34.0)"), reduces algebraically to:
+    //   t = clamp(sheenT/255, 0, 1)
+    //   dir = (2t-1, 1-2t, -0.5-0.5t)              [= w0*row0 + w1*row1 + w2*row2 with rows=identity]
+    // dir is in the wordmark's OWN object space (same space its placement basis and vertex normals
+    // use) — Zelda3D_GL_SetLightDirOverride transforms it by THIS draw's placement matrix at render
+    // time (mat3(uMV), mirroring the normal transform), so it composes correctly with this ortho
+    // overlay's fixed placement (zelda3d_overlay2d.cpp) without this file needing its own copy of
+    // that transform. Fed to the renderer as an ADDITIVE diffuse boost (uSheen, zelda3d_sg_ubo.h) —
+    // NOT the shared half-Lambert term, which darkens from full-bright and would be the wrong shape
+    // for this actor's ambient-always-1.0 lighting (see uSheen's declaration comment for the
+    // derivation). Specular is NOT ported (proven negative, same comment): the PICA specular
+    // exponent lives in the CMB material's own light-LUT config, not this actor's code, and this
+    // ortho overlay pass has no real camera/view vector for a Blinn-Phong term to reduce to.
+    {
+        const float t = std::clamp(ps.sheenT / 255.0f, 0.0f, 1.0f);
+        const float dx = 2.0f * t - 1.0f;
+        const float dy = 1.0f - 2.0f * t;
+        const float dz = -0.5f - 0.5f * t;
+        Zelda3D_GL_SetLightDirOverride(modelId, dx, dy, dz);
+        // Verification aid (ZELDA3D_DBG_SHEEN=1) — traces the sweep parameter/direction so the
+        // ramp can be confirmed from a log without relying on eyeballing a subtle (diffuse-only,
+        // no specular — see the block comment above) screen-space brightness change.
+        static int sDbg = -1;
+        if (sDbg < 0) {
+            const char* v = std::getenv("ZELDA3D_DBG_SHEEN");
+            sDbg = (v != nullptr && v[0] != '\0') ? 1 : 0;
+        }
+        if (sDbg) {
+            fprintf(stderr, "[SHEEN] csFrame=%d sheenT=%.2f t=%.3f dir=(%.3f,%.3f,%.3f)\n", csFrame,
+                    ps.sheenT, t, dx, dy, dz);
+        }
+    }
     //
     // The wordmark is a self-illuminated overlay (an authored fire-glow logo composited over the
     // title scene, not a piece of lit world geometry) — the oracle draws it independent of the

@@ -51,7 +51,9 @@ TEST(Zelda3DUboLayout, CommonFieldOffsetsMatchStd140) {
     EXPECT_EQ(offsetof(SgUbo, uFog), 272u);
     EXPECT_EQ(offsetof(SgUbo, uFog2), 288u);
     EXPECT_EQ(offsetof(SgUbo, uAmbient), 304u);
-    EXPECT_EQ(offsetof(SgUbo, uBones), 320u);
+    EXPECT_EQ(offsetof(SgUbo, uMatConst), 320u);
+    EXPECT_EQ(offsetof(SgUbo, uSheen), 336u);
+    EXPECT_EQ(offsetof(SgUbo, uBones), 352u);
 }
 
 // The skin-enable flag and shade tint live in uTintSkin (offset 160) — comfortably inside the COMMON
