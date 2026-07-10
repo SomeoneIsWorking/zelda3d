@@ -274,6 +274,8 @@ extern "C" {
     // VS-uniform per-draw log (pica_core.cpp, AZAHAR_PATCH.md Patch 5)
     extern char soh3d_vsuni_log_path[256];
     extern int  soh3d_vsuni_log_active;
+    // Live PICA fog state dump (pica_core.cpp, AZAHAR_PATCH.md Patch 6)
+    extern int soh3d_fog_dump(char* out, int cap);
 }
 
 namespace {
@@ -3502,6 +3504,16 @@ void RunRepl() {
             }
             std::printf("ok soh_moon sunPosY=%.4f color=%.4f scale=%.4f discScale=%.4f\n",
                         sunPosY, color, scale, discScale);
+        }
+        else if (cmd == "az_fog") {
+            // Live PICA fog state: mode/flip/color + the 128-entry fog LUT
+            // (AZAHAR_PATCH.md Patch 6). The LUT is the oracle's ACTUAL
+            // per-frame fog curve — ground truth for any fog-port question.
+            static char buf[16384];
+            int n = soh3d_fog_dump(buf, sizeof buf);
+            if (n < 0) { PrintErr("az_fog: pica not up"); continue; }
+            std::printf("ok az_fog %s", buf);
+            std::printf("ok end\n");
         }
         else if (cmd == "az_daytime") {
             // Read gSaveContext.dayTime straight from the fixed .bss VA —
