@@ -59,6 +59,14 @@ struct SgUbo {
     // pass has no real camera/view vector for a Blinn-Phong H term to reduce to — proven-negative,
     // not guessed at.
     float uSheen[4];
+    // Dual-texture stage 0 (PICA ADD_MULT detail mask, g_title.cmb fire-glow —
+    // oot3d-decomp/docs/title_logo_fireglow_cmab.md §3.1): coordinator-1 UV transform for the
+    // second sampler (uTex1). .xy = coordinator scale (S,T), .zw = coordinator translate (S,T)
+    // PLUS any per-draw CMAB UV-scroll routed to coordinator 1. The shader computes
+    // uv1 = scale * (uv - trans) (noclip calcTexMtx, rot=0) and samples uTex1 with it.
+    // The dual-tex ENABLE flag rides uSheen.y (uSheen.z/.w still reserved); when off, uTex1Xf
+    // is dead data and uTex1 is bound to the dummy texture.
+    float uTex1Xf[4];
     float uBones[ZELDA3D_GL_MAX_BONES * 16]; // MUST stay last: pushed as its own <=4096 B block
 };
 

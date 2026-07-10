@@ -6,8 +6,8 @@
 // Render-unification effort (kanban #131), Phase 2. CPU-side mirror of the combined UBO declared
 // in unified_shader.cpp's kCommonUboBody — MUST stay byte-identical (same field order/sizes; every
 // field is vec4/mat4/ivec4-sized so std140 offsets equal C offsets, same discipline as SgUbo in
-// zelda3d_sg_ubo.h). Deliberately sized to fit Zelda3DSg::kCommonBytes (352 bytes, since the
-// title-wordmark-sheen uSheen field was added) exactly so a unified draw reuses the EXISTING
+// zelda3d_sg_ubo.h). Deliberately sized to fit Zelda3DSg::kCommonBytes (368 bytes, since the
+// uSheen + uTex1Xf fields were added) exactly so a unified draw reuses the EXISTING
 // DRAW_MODEL Op / AppendZelda3DModelDraw / mSoh3dModelUbos plumbing (gfx_sdl3gpu.h/.cpp) unchanged
 // — see unified_shader.cpp's kCommonUboBody comment.
 namespace Zelda3DUnified {
@@ -32,11 +32,14 @@ struct CommonUbo {
     // renderer (gUnifiedRenderer, off by default) doesn't draw the title overlay today — this is
     // pure size-parity padding, same rationale as uMatConst above.
     float uSheen[4];
+    // Mirror of SgUbo::uTex1Xf (dual-texture coordinator-1 transform, fire-glow). Size-parity
+    // padding for the unified path, same rationale as uMatConst/uSheen above.
+    float uTex1Xf[4];
 };
 
 static_assert(sizeof(CommonUbo) == Zelda3DSg::kCommonBytes,
               "CommonUbo must byte-match unified_shader.cpp's kCommonUboBody AND Zelda3DSg::kCommonBytes "
-              "(352) — the whole point is reusing the existing DRAW_MODEL push path unchanged");
+              "(368) — the whole point is reusing the existing DRAW_MODEL push path unchanged");
 
 // Combined blob layout reused verbatim from SgUbo: kCommonBytes of CommonUbo, then kBonesBytes of
 // bone matrices (ZELDA3D_GL_MAX_BONES mat4s) — the SAME two-block push AppendZelda3DModelDraw already

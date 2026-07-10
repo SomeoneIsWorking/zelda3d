@@ -80,6 +80,11 @@ fs::path findPackRoot() {
         return false;
     };
     if (const char* env = std::getenv("ZELDA3D_TEXPACK"); env && *env) {
+        // Explicit DISABLE values: skip the pack entirely (including the fallback candidates
+        // below). Needed for A/B'ing pack-texture brightness against the ROM texel the OoT3D
+        // lighting formula assumes (terrain-darkness texpack-confound test, 2026-07-10).
+        if (!strcmp(env, "0") || !strcmp(env, "off") || !strcmp(env, "none"))
+            return {};
         fs::path p(env);
         if (hasTextures(p)) return p;
     }

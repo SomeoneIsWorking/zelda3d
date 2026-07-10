@@ -153,12 +153,26 @@ bool Cmb::parseMats() {
         m.tex0_idx = s16(b, bo);
         m.wrap_s = u16(b, bo + 8);
         m.wrap_t = u16(b, bo + 0x0A);
+        // Texture binding 1 (bindings are 3 x 0x18-byte entries at +0x10; noclip readMatsChunk).
+        uint32_t bo1 = o + 0x10 + 0x18;
+        m.tex1_idx = s16(b, bo1);
+        m.wrap1_s = u16(b, bo1 + 8);
+        m.wrap1_t = u16(b, bo1 + 0x0A);
+        // Texture coordinators: 3 x 0x18-byte entries at +0x58 (scaleS/T @ +4/+8, transS/T @
+        // +0xC/+0x10, rot @ +0x14; noclip readMatsChunk). Coordinator 0 feeds binding 0,
+        // coordinator 1 feeds binding 1 (g_title.cmb's mableT detail mask has the baked
+        // scale(3,2)/trans(0,0.9433) transform on coordinator 1).
         uint32_t co = o + 0x58;
         m.scale_s = f32(b, co + 4);
         m.scale_t = f32(b, co + 8);
         m.trans_s = f32(b, co + 12);
         m.trans_t = f32(b, co + 16);
         m.rot = f32(b, co + 20);
+        uint32_t co1 = o + 0x58 + 0x18;
+        m.scale1_s = f32(b, co1 + 4);
+        m.scale1_t = f32(b, co1 + 8);
+        m.trans1_s = f32(b, co1 + 12);
+        m.trans1_t = f32(b, co1 + 16);
         m.alpha_test = u8(b, o + 0x130) != 0;
         m.alpha_ref = u8(b, o + 0x131) / 255.0f;
         // Blend state (GL-ES enum values, used verbatim — see CmbMaterial). Offsets per
@@ -184,14 +198,19 @@ bool Cmb::parseMats() {
         };
         rgb_be(o + 0xA4, m.mat_ambient);
         rgb_be(o + 0xA8, m.mat_diffuse);
-        // PICA200 TEV constant-color palette: 6 slots at +0xB8..+0xCF (u8 RGBA per slot).
-        // Layout per noclip readMatsChunk (OcarinaOfTime3D/cmb.ts). File values are u8; the
-        // runtime struct + the SoH3D port carry them as float RGBA (matches the shader UBO
-        // and matches Model_SetMaterialConstantColor / FUN_003688a8, which writes float[4]).
-        // For most townsfolk archetype CMBs these are (0,0,0,0xFF) black-opaque defaults; the
-        // game overwrites them at runtime — see debug_journal/2026-07-02-en-hy-body-colors.md.
+        // PICA200 TEV constant-color palette: 6 slots at +0xB4..+0xCB (u8 RGBA per slot, matching
+        // noclip readMatsChunk's constantColors[0]=+0xB4 and the byte-level decode in
+        // oot3d-decomp/docs/title_logo_fireglow_cmab.md §3.1). BUGFIX 2026-07-10: this used to
+        // read +0xB8, shifting the whole palette down one slot (slot k returned the file's slot
+        // k+1) — g_title.cmb's constColor[0]=(255,255,255,255) read as black, fine_star.cmb's
+        // (255,255,127) star tint read as black (which is what the shader-side "constBlack skip"
+        // heuristic was then built around). File values are u8; the runtime struct + the SoH3D
+        // port carry them as float RGBA (matches the shader UBO and matches
+        // Model_SetMaterialConstantColor / FUN_003688a8, which writes float[4]). Townsfolk
+        // archetype CMBs bake black-opaque defaults and the game overwrites them at runtime —
+        // see debug_journal/2026-07-02-en-hy-body-colors.md.
         for (int k = 0; k < 6; k++) {
-            uint32_t co = o + 0xB8 + k * 4;
+            uint32_t co = o + 0xB4 + k * 4;
             m.mat_constant[k][0] = b[co + 0] / 255.0f;
             m.mat_constant[k][1] = b[co + 1] / 255.0f;
             m.mat_constant[k][2] = b[co + 2] / 255.0f;
@@ -247,6 +266,11 @@ bool Cmb::parseMats() {
                 uint32_t idx32 = u32(b, co + 0x24);
                 m.comb_const_idx = (uint8_t)(idx32 & 0x07);
                 if (m.comb_const_idx > 5) m.comb_const_idx = 0;
+                // Hardware RGB scale of the CONSTANT-sourcing stage itself (PICA scales the
+                // stage output AFTER the combine). g_title.cmb stage 1 = MODULATE(PREV, CONST0)
+                // at x2 — the fire-glow "half brightness" factor (fireglow doc §3.2 fix 1).
+                uint16_t cScale = u16(b, co + 0x04);
+                m.comb_const_scale_rgb = (cScale == 2 || cScale == 4) ? (float)cScale : 1.0f;
             }
             if (s == 0) {
                 m.comb_combine_rgb = op;
@@ -255,6 +279,10 @@ bool Cmb::parseMats() {
                 m.comb_src_rgb[0] = srcA;
                 m.comb_src_rgb[1] = srcB;
                 m.comb_src_rgb[2] = srcC;
+                // Dual-texture detail-mask combine: ADD_MULT(TEXTURE0, TEXTURE1, TEXTURE0) =
+                // (t0 + t1) * t0, sampling binding 1 through coordinator 1 (fireglow doc §3.1).
+                m.comb0_dual_addmult = (op == 0x6402 /*ADD_MULT*/ && srcA == 0x84C0 /*TEXTURE0*/ &&
+                                        srcB == 0x84C1 /*TEXTURE1*/ && srcC == 0x84C0 && m.tex1_idx >= 0);
             }
         }
         o += stride;

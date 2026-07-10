@@ -25,6 +25,15 @@ struct CmbMaterial {
     int tex0_idx = -1;
     uint16_t wrap_s = 0x2901, wrap_t = 0x2901; // GL enums
     float scale_s = 1, scale_t = 1, trans_s = 0, trans_t = 0, rot = 0;
+    // Texture binding 1 (second sampler) + its coordinator-1 UV transform. Most materials leave
+    // binding 1 empty (tex1_idx = -1); dual-texture combiners (g_title.cmb's fire-glow
+    // `(TEX0+TEX1)*TEX0` ADD_MULT stage, oot3d-decomp/docs/title_logo_fireglow_cmab.md §3.1)
+    // sample it through textureCoordinator[1]'s baked scale/translate (DccMaya convention,
+    // noclip calcTexMtx: uv' = scale * (uv - trans), rot unsupported here — no OoT3D material
+    // observed using coordinator-1 rotation).
+    int tex1_idx = -1;
+    uint16_t wrap1_s = 0x2901, wrap1_t = 0x2901;
+    float scale1_s = 1, scale1_t = 1, trans1_s = 0, trans1_t = 0;
     int cull = 0;
     bool alpha_test = false;
     float alpha_ref = 0;
@@ -79,10 +88,21 @@ struct CmbMaterial {
     // WITHOUT this flag can safely skip the CONSTANT modulate in the shader (no-op); materials
     // WITH this flag get their fragment output multiplied by mat_constant[comb_const_idx].
     bool comb_uses_const = false;
+    // Hardware RGB scale (x1/x2/x4) of the CONSTANT-sourcing stage itself. PICA doubles/quadruples
+    // that stage's output AFTER the modulate; dropping it is a direct, quantifiable gain gap
+    // (g_title.cmb's fire-glow stage 1 is `2.0 * (PREVIOUS * CONSTANT0)` — the "half brightness"
+    // root cause, title_logo_fireglow_cmab.md §3.2 fix 1). 1.0 when no stage sources CONSTANT.
+    float comb_const_scale_rgb = 1.0f;
+    // Dual-texture stage 0: true iff stage 0 is ADD_MULT(TEXTURE0, TEXTURE1, TEXTURE0) —
+    // `(t0 + t1) * t0`, the detail-mask brightening combine used by g_title.cmb (§3.1). The
+    // renderer samples binding 1 through coordinator 1 and applies the combine; other dual-tex
+    // stage shapes are a documented follow-up (none observed in OoT3D content besides this one).
+    bool comb0_dual_addmult = false;
 
     // PICA200 TEV constant-color palette: 6 float-RGBA slots per material. Base defaults come
-    // from the CMB file (per readMatsChunk: matConstColor[0..5] at material +0xB8..+0xCF,
-    // u8 RGBA converted to float). Referenced by the combiner via CONSTANT (0x8576) with the
+    // from the CMB file (matConstColor[0..5] at material +0xB4..+0xCB, big-endian RGBA8 —
+    // verified against real bytes of g_title.cmb / fine_star.cmb 2026-07-10; an earlier +0xB8
+    // read was off by one slot, shifting every baked palette down by one). Referenced by the combiner via CONSTANT (0x8576) with the
     // stage's comb_const_idx picking which slot. The game also OVERWRITES these at runtime via
     // Model_SetMaterialConstantColor (see oot3d-decomp/build/decomp/003688a8.c and the EnHy
     // per-type body-color table at oot3d-decomp/data/enhy_body_colors.inc); the port carries
