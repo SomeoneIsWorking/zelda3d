@@ -715,3 +715,22 @@ extern "C" int Zelda3D_TitleCsBlendedLight(uint16_t daytime,
     }
     return 1;
 }
+
+// Fog params blended with the SAME schedule/weights as BlendedLight — see the header comment
+// for the RE'd units (oot3d-decomp title_env_lighting.md §13). The palette's packed u16's top
+// bits are the N64-style blendRate; only the low 10 bits are the fog near distance.
+extern "C" int Zelda3D_TitleCsBlendedFog(uint16_t daytime, float* fogNear, float* fogFar,
+                                         float* fogEnd) {
+    if (!sTitlePalOk) return 0;
+    int sf, st;
+    float w;
+    if (!Zelda3D_TitleCsLightBlend(daytime, &sf, &st, &w)) return 0;
+    const TitleLightEntry& a = sTitlePal[sf & 3];
+    const TitleLightEntry& b = sTitlePal[st & 3];
+    const float nearA = (float)(a.fogNear & 0x3ff);
+    const float nearB = (float)(b.fogNear & 0x3ff);
+    *fogNear = nearA + (nearB - nearA) * w;
+    *fogFar = a.drawDist + (b.drawDist - a.drawDist) * w;
+    *fogEnd = a.fogEnd + (b.fogEnd - a.fogEnd) * w;
+    return 1;
+}

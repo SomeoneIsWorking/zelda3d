@@ -19,6 +19,11 @@ extern "C" {
 int Zelda3D_TitleCamEnabled(void);
 // libultraship's per-fragment lighting toggle (zelda3d_gl.cpp).
 extern int gZelda3dLightEnable;
+// OoT3D PICA distance fog (zelda3d_gl.cpp / zelda3d_gl.h): the title module feeds the blended
+// palette fog window + the 3DS projection/camera params once per frame while active.
+void Zelda3D_Fog3dSet(float camNear, float zFar, float fogNear, float fogFar,
+                      const float eyeWorld[3], const float fwdWorld[3]);
+void Zelda3D_Fog3dOff(void);
 // OoT3D title-screen fallback framing constants (zelda3d.c). Was `static const`; exposed
 // (non-static) for the same reason as Zelda3D_TitleCamEnabled above. Values/derivation
 // unchanged — see zelda3d.c's comment above their definition for the RE trail.
@@ -88,6 +93,9 @@ void TitlePresentation::exit(PlayState* play) {
     if (play != nullptr) {
         play->transitionFade.fadeColor.a = 0;
     }
+    // 3DS distance fog is a title-scoped feed; real gameplay scenes drive their own fog (or
+    // none) — don't leave the title's window applied to whatever loads next.
+    Zelda3D_Fog3dOff();
 }
 
 int TitlePresentation::update(PlayState* play) {
@@ -363,6 +371,39 @@ void TitlePresentation::applyLightOverride(PlayState* play) {
         play->envCtx.lightSettings.light1Dir[2] = (int8_t)(cz >= 0 ? cz + 0.5f : cz - 0.5f);
         for (j = 0; j < 3; j++) {
             play->envCtx.lightSettings.light2Dir[j] = -play->envCtx.lightSettings.light1Dir[j];
+        }
+    }
+    // 3DS PICA distance fog — the dawn-hue root cause (debug_journal/2026-07-10-dawn-hue-fog-
+    // rootcause.md; mechanism RE'd in oot3d-decomp title_env_lighting.md §13). Blend the palette
+    // fog window at the same dayTime and feed the renderer's 3DS fog path. The N64
+    // lightSettings.fogNear/fogFar fields are deliberately NOT rewritten: the 3DS values are in
+    // EYE units (near 40..800, far 40000..56000 — the latter doesn't even fit the s16), the N64
+    // fields carry F3DEX fog-space semantics, and the (default-off) F3DEX ramp is bypassed by
+    // this path anyway.
+    {
+        float fogNear, fogFar, fogEnd;
+        if (Zelda3D_TitleCsBlendedFog(t, &fogNear, &fogFar, &fogEnd)) {
+            // 3DS title camera near plane: 7.0, measured bit-exact from the oracle's live
+            // inverse projection (inv[3][3] = f32(1/7)) at dayTimes 0x2bbb/0x3197/0x37b5 —
+            // constant across the cutscene. The blended fogEnd (32000, all slots) is the far
+            // plane that same projection is built against.
+            const float kTitleCamNear3ds = 7.0f;
+            // Camera eye/forward from the ported OP97 cs spline (pure function of the cs
+            // frame, byte-exact vs the oracle) — NOT play->view: at this call point in the
+            // frame (z_kankyo, before update()) view/Camera carry a mid-frame mixture whose
+            // LOOK direction measurably disagrees with the rendered camera (verified live at
+            // cs 338: view dir (0.28,0.12,-0.95) vs the real grazing (0.97,0,0.26)), and the
+            // fog factor is hypersensitive to the view-axis distance it defines.
+            float eye[3], at[3], up[3], fov = 0.0f;
+            int f = Zelda3D_TitleCsFrame();
+            int camOk = Zelda3D_TitleCsCamera(f, eye, at, up, &fov);
+            if (!camOk && f > 0) {
+                camOk = Zelda3D_TitleCsCamera(f - 1, eye, at, up, &fov);
+            }
+            if (camOk) {
+                const float fwd[3] = { at[0] - eye[0], at[1] - eye[1], at[2] - eye[2] };
+                Zelda3D_Fog3dSet(kTitleCamNear3ds, fogEnd, fogNear, fogFar, eye, fwd);
+            }
         }
     }
 }

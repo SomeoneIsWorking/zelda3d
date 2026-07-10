@@ -276,6 +276,10 @@ extern "C" {
     extern int  soh3d_vsuni_log_active;
     // Live PICA fog state dump (pica_core.cpp, AZAHAR_PATCH.md Patch 6)
     extern int soh3d_fog_dump(char* out, int cap);
+    // 3DS PICA fog port globals (embedded soh, zelda3d_gl.cpp) — soh_fog3d A/B latch.
+    extern int gZelda3dFog3dForceOff;
+    extern int gZelda3dFog3dOn;
+    extern float gZelda3dFog3d[8];
 }
 
 namespace {
@@ -3460,6 +3464,22 @@ void RunRepl() {
             std::printf("ok soh_z3dlive ambient=(%.3f,%.3f,%.3f) "
                         "light1Col=(%.3f,%.3f,%.3f) light2Col=(%.3f,%.3f,%.3f)\n",
                         amb[0], amb[1], amb[2], l1[0], l1[1], l1[2], l2[0], l2[1], l2[2]);
+        }
+        else if (cmd == "soh_fog3d") {
+            // A/B latch for the 3DS PICA fog port (zelda3d_gl.cpp): `soh_fog3d 0` forces the
+            // mechanism OFF (title module's per-frame feed is ignored); `soh_fog3d 1` restores
+            // normal (always-on-at-title) behavior. Also dumps the live fog params.
+            std::string v_s;
+            if (toks >> v_s) {
+                auto v = ParseNum(v_s);
+                if (!v) { PrintErr("soh_fog3d: bad arg"); continue; }
+                gZelda3dFog3dForceOff = (*v == 0) ? 1 : 0;
+            }
+            std::printf("ok soh_fog3d forceOff=%d on=%d a=%.6f b=%.4f near=%.1f far=%.1f "
+                        "fwd=(%.3f,%.3f,%.3f) fwdDotEye=%.1f\n",
+                        gZelda3dFog3dForceOff, gZelda3dFog3dOn,
+                        gZelda3dFog3d[0], gZelda3dFog3d[1], gZelda3dFog3d[2], gZelda3dFog3d[3],
+                        gZelda3dFog3d[4], gZelda3dFog3d[5], gZelda3dFog3d[6], gZelda3dFog3d[7]);
         }
         else if (cmd == "soh_titlecs") {
             // Get/set SoH's ported title-cs frame cursor (zelda3d_cutscene.cpp).

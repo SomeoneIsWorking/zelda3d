@@ -342,6 +342,54 @@ extern "C" float gZelda3dFogColor[3] = { 0.0f, 0.0f, 0.0f };
 extern "C" float gZelda3dFogMul = 0.0f;    // F3DEX fog multiplier (s16 range), = 128000/(1000-fogNear)
 extern "C" float gZelda3dFogOffset = 0.0f; // F3DEX fog offset    (s16 range), = (500-fogNear)*256/(1000-fogNear)
 
+// OoT3D PICA distance fog (title port) — see Zelda3D_Fog3dSet's header comment (zelda3d_gl.h)
+// and oot3d-decomp docs/title_env_lighting.md §13 for the RE'd LUT-fill derivation.
+// gZelda3dFog3d = { a, b, fogNear, fogFar, fwd.x, fwd.y, fwd.z, dot(fwd, eye) }, consumed by the
+// SDL3-GPU render pass as uFog3d0/uFog3d1. Enabled per-frame by the title module; per-DRAW the
+// pass additionally requires the material's CMB isFogEnabled byte.
+extern "C" int gZelda3dFog3dOn = 0;
+extern "C" float gZelda3dFog3d[8] = { 0, 0, 0, 0, 0, 0, 1, 0 };
+// Diagnostic latch (harness/REPL A/B only — same pattern as gZelda3dFogOverride above): 1 keeps
+// the 3DS fog OFF even while the title module feeds it, so a fixed frame can be measured with
+// and without the mechanism in one process. Never set by game code.
+extern "C" int gZelda3dFog3dForceOff = 0;
+
+extern "C" void Zelda3D_Fog3dSet(float camNear, float zFar, float fogNear, float fogFar,
+                                 const float eyeWorld[3], const float fwdWorld[3]) {
+    if (gZelda3dFog3dForceOff) {
+        gZelda3dFog3dOn = 0;
+        return;
+    }
+    if (!(zFar > camNear) || !(fogFar > fogNear)) {
+        gZelda3dFog3dOn = 0;
+        return;
+    }
+    // 3DS projection z-row coefficients (CTR convention, z_clip = a*z_eye + b*w, w_clip = -z_eye):
+    // verified bit-exact against the live inverse projection (inv[3][2] = 1/b, inv[3][3] = a/b).
+    const float a = zFar / (zFar - camNear);
+    const float b = camNear * a;
+    float f[3] = { fwdWorld[0], fwdWorld[1], fwdWorld[2] };
+    float len = sqrtf(f[0] * f[0] + f[1] * f[1] + f[2] * f[2]);
+    if (len < 1e-6f) {
+        gZelda3dFog3dOn = 0;
+        return;
+    }
+    for (float& v : f) v /= len;
+    gZelda3dFog3d[0] = a;
+    gZelda3dFog3d[1] = b;
+    gZelda3dFog3d[2] = fogNear;
+    gZelda3dFog3d[3] = fogFar;
+    gZelda3dFog3d[4] = f[0];
+    gZelda3dFog3d[5] = f[1];
+    gZelda3dFog3d[6] = f[2];
+    gZelda3dFog3d[7] = f[0] * eyeWorld[0] + f[1] * eyeWorld[1] + f[2] * eyeWorld[2];
+    gZelda3dFog3dOn = 1;
+}
+
+extern "C" void Zelda3D_Fog3dOff(void) {
+    gZelda3dFog3dOn = 0;
+}
+
 // #110: additive env-AMBIENT floor for the VK world path. The world frag is purely multiplicative,
 // so OoT3D's blue night ambient can't enter a green grass texture; OoT3D adds the scene ambient
 // additively. gZelda3dWorldAmbColor = live env ambient (fed from envCtx.lightSettings.ambient by

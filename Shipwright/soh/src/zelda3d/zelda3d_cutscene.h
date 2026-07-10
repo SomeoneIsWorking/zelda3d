@@ -57,11 +57,20 @@ int Zelda3D_TitleCsLightSlotsRaw(const uint8_t** outSlots, int* outCount);
 int Zelda3D_TitleCsLightBlend(uint16_t daytime, int* slotFrom, int* slotTo,
                               float* weight);
 
-// Title palette blended at a dayTime per the 3DS schedule (colors + dirs;
-// fog near/far units still un-RE'd — not included).
+// Title palette blended at a dayTime per the 3DS schedule (colors + dirs).
 int Zelda3D_TitleCsBlendedLight(uint16_t daytime,
                                 uint8_t amb[3], int8_t l1dir[3], uint8_t l1col[3],
                                 int8_t l2dir[3], uint8_t l2col[3], uint8_t fogCol[3]);
+
+// Title palette FOG params blended at a dayTime (same schedule/weights as BlendedLight).
+// Units RE'd 2026-07-10 (oot3d-decomp title_env_lighting.md §13, live-verified against the
+// oracle's FogResUpdater inputs at three dayTimes): fogNear = the per-slot u16&0x3ff field,
+// ALREADY in eye units (night 40 / sunrise 200 / day 800 / sunset 200; blended 48/92/138 at
+// dayTime 0x2bbb/0x3197/0x37b5 == the oracle's live LUT-object near); fogFar = the blended
+// per-slot drawDist f32 (blended 40414/42612/44906 at the same frames == the oracle's live
+// far); fogEnd = the per-slot fogEnd f32 (32000 all slots) = the 3DS camera far plane the fog
+// LUT's depth mapping is built against.
+int Zelda3D_TitleCsBlendedFog(uint16_t daytime, float* fogNear, float* fogFar, float* fogEnd);
 
 // 3DS sky-DOME schedule (config 0, "fine"/kind=1): daytime -> skybox1Index /
 // skybox2Index + blend weight (0..1). This is `FUN_002e47c8`'s OWN table at

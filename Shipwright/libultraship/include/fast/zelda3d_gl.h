@@ -73,6 +73,7 @@ typedef struct Zelda3DGlGroup {
     // and the TEV combiner output v*tex scaled by combScaleRGB (Kokiri grass = x2). When
     // vertexLighting is 0 the old behaviour is kept.
     int vertexLighting;       // 0/1: material uses PICA vertex lighting (scene geometry)
+    int fogEnabled;           // 0/1: CMB isFogEnabled (+0x02) — PICA distance fog applies (fog_mode=5)
     float matAmbient[3];      // material ambient colour (RGB, [0,1])
     float matDiffuse[3];      // material diffuse colour (RGB, [0,1])
     float combScaleRGB;       // stage-0 TEV RGB scale (1/2/4); the brightness factor
@@ -175,6 +176,29 @@ void Zelda3D_GL_EmitPose(int modelId);
 // FORM term so shading tracks time of day. Need not be normalized (the shader renormalizes).
 // Call once per frame before the render pass; defaults to a fixed direction until first set.
 void Zelda3D_GL_SetLightDir(const float dirWorld[3]);
+
+// OoT3D PICA distance fog (title port; oot3d-decomp docs/title_env_lighting.md §13). The 3DS
+// builds a 128-entry fog LUT per frame (FogResUpdater.cpp / FUN_002cdbfc): for LUT node t=i/128
+// the eye distance is eyeDist(t) = b/(a - t) — the inverse of the 3DS projection's z/w rows
+// (a = zFar/(zFar - zNear), b = zNear*a) — and the LINEAR fog factor is
+//   factor = 1                                (eyeDist <  fogNear)
+//          = (fogFar - eyeDist)/(fogFar - fogNear)  (fogNear <= eyeDist <= fogFar)
+//          = 0                                (eyeDist >  fogFar)
+// The fragment factor is the LUT value LERPED between the two nodes bracketing the fragment's
+// depth — with the scene's compressed depth range this piecewise-linear (in DEPTH, not distance)
+// interpolation IS the visible haze (entry 127 spans eye ~873..zFar), so the renderer reproduces
+// the node/lerp structure, not just the underlying curve. Inputs per frame:
+//   camNear  = 3DS camera near plane (title: 7.0, measured bit-exact from the live inverse
+//              projection at three dayTimes), zFar = the palette-blended fogEnd (32000),
+//   fogNear  = palette-blended fog near (eye units — the u16&0x3ff palette field is ALREADY in
+//              eye units on the 3DS), fogFar = palette-blended drawDist,
+//   eye/fwd  = camera position + normalized view forward (world), for per-vertex eye depth.
+// Fog color rides the existing gZelda3dFogColor feed. Applies only to draws whose CMB material
+// has isFogEnabled (Zelda3DGlGroup::fogEnabled), never to sky. Overrides the (default-off) F3DEX
+// ramp while active.
+void Zelda3D_Fog3dSet(float camNear, float zFar, float fogNear, float fogFar,
+                      const float eyeWorld[3], const float fwdWorld[3]);
+void Zelda3D_Fog3dOff(void);
 
 // Per-model, per-draw light-DIRECTION override (title_logo_actor.md §6.3: the OoT3D title
 // wordmark's actor field +0x1DC drives a fragment-light DIRECTION on that model's own material,

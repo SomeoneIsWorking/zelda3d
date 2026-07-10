@@ -113,7 +113,9 @@ const char* kUnifiedShaderTemplate = R"PRISM(@prism(type='fragment', name='Unifi
     vec4 uMatDiffuse; \
     vec4 uMatConst; \
     vec4 uSheen; \
-    vec4 uTex1Xf;
+    vec4 uTex1Xf; \
+    vec4 uFog3d0; \
+    vec4 uFog3d1;
 
 @if(VERTEX_SHADER)
     layout(location=0) in vec4 aPos;

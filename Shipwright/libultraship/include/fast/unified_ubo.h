@@ -35,11 +35,16 @@ struct CommonUbo {
     // Mirror of SgUbo::uTex1Xf (dual-texture coordinator-1 transform, fire-glow). Size-parity
     // padding for the unified path, same rationale as uMatConst/uSheen above.
     float uTex1Xf[4];
+    // Mirror of SgUbo::uFog3d0/uFog3d1 (OoT3D PICA distance fog, title port — zelda3d_sg_ubo.h).
+    // Size-parity padding today: the (default-off) unified path doesn't apply the 3DS fog yet;
+    // wire these through UNIFIED_COMMON_UBO_BODY when the unified renderer takes over CMB draws.
+    float uFog3d0[4];
+    float uFog3d1[4];
 };
 
 static_assert(sizeof(CommonUbo) == Zelda3DSg::kCommonBytes,
               "CommonUbo must byte-match unified_shader.cpp's kCommonUboBody AND Zelda3DSg::kCommonBytes "
-              "(368) — the whole point is reusing the existing DRAW_MODEL push path unchanged");
+              "— the whole point is reusing the existing DRAW_MODEL push path unchanged");
 
 // Combined blob layout reused verbatim from SgUbo: kCommonBytes of CommonUbo, then kBonesBytes of
 // bone matrices (ZELDA3D_GL_MAX_BONES mat4s) — the SAME two-block push AppendZelda3DModelDraw already
