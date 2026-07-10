@@ -323,16 +323,39 @@ SDL_GPUSamplerAddressMode wrapMode(unsigned glWrap) {
     }
 }
 
+// True for the additive-blend point-sprite VFX class (stars, sparkles, glow) that must sample
+// only the CMB's real, single native texture level — see getSampler's noMip comment.
+bool isAdditiveBlendGroup(const SgGroup& g) {
+    return g.blendEnable && g.bSrcRGB == 0x0302 /*SRC_ALPHA*/ && g.bDstRGB == 0x0001 /*ONE*/;
+}
+
 } // namespace
 
-SDL_GPUSampler* Fast::Zelda3DRenderer::getSampler(unsigned wrapS, unsigned wrapT) {
+SDL_GPUSampler* Fast::Zelda3DRenderer::getSampler(unsigned wrapS, unsigned wrapT, bool noMip) {
     // Use the backend's single sampler cache. The model path needs LINEAR + max_lod=1000: left at the
     // zero default, a LINEAR-minified large texture (e.g. the 2048² Kokiri ground) computes an LOD > 0
     // that clamps against max_lod=0 and samples nothing -> the surface renders BLACK. Only large/
     // minified textures hit it (small ones stay at LOD 0), which is why the terrain vanished but
     // props/sky did not. max_lod=1000 lands in a distinct cache slot from the N64 samplers (max_lod=0).
+    //
+    // `noMip` (title star-brightness residual, debug_journal/2026-07-10): every CMB texture Zelda3D
+    // uploads gets a SYNTHETIC full mip chain generated at upload time (uploadTexture below) — the CMB
+    // format itself never carries baked mip levels (verified byte-for-byte: fine_star.cmb's texture
+    // entry data_len=4096 for a 64x64 L8 texture = exactly ONE level's worth of bytes, no room for a
+    // chain), so the PICA200 hardware/Citra always samples that single level, full detail, no LOD blur.
+    // For opaque/modulate materials (terrain, walls) the synthetic chain is a deliberate, worthwhile
+    // antialiasing enhancement over strict fidelity (grazing-angle shimmer, #134). But for a materially
+    // different class — small ADDITIVE point-sprite-style VFX textures (stars, sparkles: blend
+    // src=SRC_ALPHA(0x302) dst=ONE(0x1), matching fine_star's own material bytes) — mip-averaging is
+    // actively wrong: it blends each sparse bright texel into its near-black neighbors, which crushes
+    // the peak (measured SoH/Az peak ratio 0.73-0.80) while leaving the LOCAL average roughly intact
+    // (measured integrated ratio ~1.03x) — exactly the "peak low, integrated matches" signature
+    // documented in debug_journal/2026-07-08-title-star-brightness-L8-decode.md §4. Forcing max_lod=0
+    // for these draws makes the sampler read only the real, single, unblurred level — matching the
+    // oracle's own hardware behavior exactly, not a fitted brightness constant.
+    float maxLod = noMip ? 0.0f : 1000.0f;
     return Fast::g_activeSdl3GpuApi->GetOrCreateSamplerEx(SDL_GPU_FILTER_LINEAR, wrapMode(wrapS), wrapMode(wrapT),
-                                                          1000.0f);
+                                                          maxLod);
 }
 
 namespace {
@@ -1780,9 +1803,10 @@ void Fast::Zelda3DRenderer::DrawModel(int modelId, const float* mp16, const floa
         }
         SDL_GPUTexture* tex = Fast::g_activeSdl3GpuApi->DummyTexture();
         SDL_GPUSampler* samp = Fast::g_activeSdl3GpuApi->DummySampler();
+        bool additive = isAdditiveBlendGroup(grp);
         if (texIndex >= 0 && texIndex < (int)m->textures.size() && m->textures[texIndex]) {
             tex = m->textures[texIndex];
-            samp = getSampler(grp.wrapS, grp.wrapT);
+            samp = getSampler(grp.wrapS, grp.wrapT, additive);
         }
         // Second texture binding (dual-texture detail mask): only ever non-dummy when the group's
         // dual-tex combine is on (uSheen.y gates the shader-side sample).
@@ -1791,7 +1815,7 @@ void Fast::Zelda3DRenderer::DrawModel(int modelId, const float* mp16, const floa
         if (grp.dualTexAddMult && grp.tex1Index >= 0 && grp.tex1Index < (int)m->textures.size() &&
             m->textures[grp.tex1Index]) {
             tex1 = m->textures[grp.tex1Index];
-            samp1 = getSampler(grp.wrap1S, grp.wrap1T);
+            samp1 = getSampler(grp.wrap1S, grp.wrap1T, additive);
         }
 
         // Translucent draw over an opaque material: synthesize a standard alpha-over pipeline.

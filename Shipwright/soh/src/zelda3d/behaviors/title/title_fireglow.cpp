@@ -47,8 +47,8 @@
 //     Translation track drives, fireglow doc §3.2 fix 3), not to the efc/coordinator-0 UV the
 //     single-texture sky cloud band uses.
 //   - Placement: same 2D ortho overlay pass as the wordmark (title_logo.cpp,
-//     zelda3d_overlay2d.h), at the SAME screen-fraction card position
-//     (Zelda3D_TitleWordmarkPlacementFracs) — g_title.cmb is authored to wash over the wordmark,
+//     zelda3d_overlay2d.h), through the SAME shared-basis compose
+//     (Zelda3D_TitleOverlayPxPerUnit) — g_title.cmb is authored to wash over the wordmark,
 //     not sit elsewhere (title_logo_fireglow_cmab.md §3; confirmed by the decompiled draw fn too,
 //     title_logo_actor.md §6.4's local-offset table: backdrop's own local translate is
 //     (0,0,-33.99), i.e. no X/Y offset from the wordmark's own placement at all).
@@ -176,13 +176,19 @@ extern "C" int Zelda3D_TryDrawTitleFireGlow(PlayState* play) {
         }
     }
 
-    float centerXFrac, centerYFrac, heightFrac, refW, refH;
-    Zelda3D_TitleWordmarkPlacementFracs(&centerXFrac, &centerYFrac, &heightFrac);
+    float refW, refH;
     Zelda3D_TitleOverlayRefWH(&refW, &refH);
 
     OPEN_DISPS(play->state.gfxCtx);
     Gfx_SetupDL_25Opa(play->state.gfxCtx);
-    Zelda3D_Overlay2D_PlaceModel(play, centerXFrac * refW, centerYFrac * refH, heightFrac * refH,
+    // Shared-basis compose (title_logo.cpp kOverlayComposeDepth): g_title's decomp local translate
+    // is (0, 0, -33.99) — same origin-at-screen-center placement as the wordmark, and its OWN
+    // geometry (taller than the wordmark: it's authored to wash over it) through the SAME
+    // pxPerUnit. The previous fitted version squeezed g_title into the wordmark's own pixel
+    // height, shrinking the glow footprint ~31% — a measured contributor to the fire-glow
+    // coverage residual (debug_journal/2026-07-10).
+    const float pxPerUnit = Zelda3D_TitleOverlayPxPerUnit(play);
+    Zelda3D_Overlay2D_PlaceModel(play, 0.5f * refW, 0.5f * refH, pxPerUnit * localHeight,
                                  localHeight);
 
     // Wrap the sampled V offset into [0,1) and pack as 16-bit fixed, same convention as the sky

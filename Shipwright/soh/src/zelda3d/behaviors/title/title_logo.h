@@ -38,11 +38,14 @@ int Zelda3D_TryDrawTitleCopyright(PlayState* play);
 int Zelda3D_TitleLogoPhaseAlpha3(float* outWordmarkAlpha, float* outBackdropAlpha,
                                   float* outCopyrightAlpha, int* outFadeInFrame);
 
-// The wordmark's measured screen-fraction placement (title_logo.cpp file header), exposed so
-// title_fireglow.cpp can overlay g_title.cmb at the same card position without duplicating the
-// oracle-measured constants.
-void Zelda3D_TitleWordmarkPlacementFracs(float* outCenterXFrac, float* outCenterYFrac,
-                                          float* outHeightFrac);
+// The shared local-unit -> overlay-pixel scale for every title 2D element this frame — the
+// decomp-derived perspective compose (title_logo.cpp kOverlayComposeDepth comment):
+//   pxPerUnit = (refH/2) / (tan(liveFovY/2) * 34)
+// Every element places its model ORIGIN at screen center (plus its own decomp local-translate
+// offset) and scales its own geometry by this. Exposed so title_fireglow.cpp shares it without
+// duplicating the derivation. Replaces the former fitted-fraction accessor
+// (Zelda3D_TitleWordmarkPlacementFracs).
+float Zelda3D_TitleOverlayPxPerUnit(PlayState* play);
 
 // The virtual reference box (pixels) the 2D overlay ortho pass projects — OoT3D's own top-screen
 // resolution (400x240), the same space every *Frac constant in this file/title_fireglow.cpp was
