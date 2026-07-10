@@ -158,6 +158,24 @@ int sLoadState = 0;                      // 0 not tried, 1 ok, -1 failed
 // cursor only actually increments on every OTHER call, matching the oracle's real cadence.
 int sTickParity = 0;
 
+// Residual 1 (debug_journal/2026-07-10-title-arc-closing-measurement-v4.md): even after the
+// half-rate fix above, SoH's dayTime read a CONSTANT +6 units (== +1 cs-frame, at the
+// established +6/frame rate) BEHIND the oracle's at three content-matched points spanning
+// cs 338/588/849 (measured via `az_daytime` vs `soh_env`, scratch/task2_daytime_check.py,
+// 2026-07-10-title-arc-closing-measurement-v3.md Task 2) — exact and non-drifting across a
+// wide span, the signature of a fixed BOOT-PHASE deficit, not a per-tick rate/parity bug (a
+// parity bug would show N-call-count-parity-dependent jitter, which the clean constant rules
+// out). Root cause: `sTickParity`'s init (0) makes this cursor's very FIRST Advance() call a
+// HOLD (see below) — SoH's N64-splash/boot pre-roll before TitlePresentation first activates
+// consumes exactly one fewer effective cs-tick than the real 3DS's boot sequence needs before
+// its own title-cs interpreter's curFrame begins advancing, so SoH's cursor starts one
+// "increment slot" behind and never catches up. Fixed at the ONE shared cursor site (this
+// flag + the first-call branch in Zelda3D_TitleCsAdvance below), not per-consumer: every
+// reader of Zelda3D_TitleCsFrame() (camera, rider, dayTime, dome, lighting) inherits the same
+// +1 correction, so they stay mutually consistent — no separate +1 offsets scattered across
+// title_presentation.cpp's callers.
+bool sFirstAdvance = true;
+
 uint32_t U32(const uint8_t* d, size_t o) { uint32_t v; memcpy(&v, d + o, 4); return v; }
 int32_t  S32(const uint8_t* d, size_t o) { int32_t v; memcpy(&v, d + o, 4); return v; }
 int16_t  S16(const uint8_t* d, size_t o) { int16_t v; memcpy(&v, d + o, 2); return v; }
@@ -481,6 +499,18 @@ extern "C" void Zelda3D_TitleCsSetFrame(int frame) {
     if (sFrame < 0) sFrame = 0;
 }
 extern "C" int Zelda3D_TitleCsAdvance(void) {
+    // One-time boot-phase seed — see sFirstAdvance's declaration comment (residual 1) for the
+    // RE trail. Consumes this call's "increment slot" itself (sTickParity left at 1, i.e. the
+    // NEXT call holds) instead of falling into the normal hold-first pattern below, which
+    // shifts every subsequent sFrame value by exactly +1 versus the pre-fix sequence for any
+    // call count — provably (by induction: old(t) = floor(t/2), new(t) = floor(t/2)+1 for all
+    // t >= 1), not just at even call counts.
+    if (sFirstAdvance) {
+        sFirstAdvance = false;
+        sFrame = 1;
+        sTickParity = 1;
+        return sFrame;
+    }
     // Half-rate advance — see sTickParity's declaration comment above for the RE trail.
     sTickParity ^= 1;
     if (sTickParity) {
