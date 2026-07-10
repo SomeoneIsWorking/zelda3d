@@ -176,6 +176,12 @@ int sTickParity = 0;
 // title_presentation.cpp's callers.
 bool sFirstAdvance = true;
 
+// Set by Zelda3D_TitleCsAdvance() every call: true iff sFrame actually incremented (or wrapped)
+// this call, false on a sTickParity hold tick. Read by Zelda3D_TitleCsDidAdvance() — see that
+// function's declaration comment in zelda3d_cutscene.h for why stateful per-tick consumers
+// (the rider) need it and pure-function consumers (camera/dayTime/dome) don't.
+bool sLastAdvanced = false;
+
 uint32_t U32(const uint8_t* d, size_t o) { uint32_t v; memcpy(&v, d + o, 4); return v; }
 int32_t  S32(const uint8_t* d, size_t o) { int32_t v; memcpy(&v, d + o, 4); return v; }
 int16_t  S16(const uint8_t* d, size_t o) { int16_t v; memcpy(&v, d + o, 2); return v; }
@@ -509,17 +515,22 @@ extern "C" int Zelda3D_TitleCsAdvance(void) {
         sFirstAdvance = false;
         sFrame = 1;
         sTickParity = 1;
+        sLastAdvanced = true;   // 0 -> 1 is a real step, not a hold
         return sFrame;
     }
     // Half-rate advance — see sTickParity's declaration comment above for the RE trail.
     sTickParity ^= 1;
     if (sTickParity) {
+        sLastAdvanced = false;
         return sFrame;   // hold: this engine-tick has no corresponding cs-tick on the oracle
     }
     sFrame++;
     if (sEndFrame > 0 && sFrame >= sEndFrame) sFrame = 0;
+    sLastAdvanced = true;
     return sFrame;
 }
+
+extern "C" int Zelda3D_TitleCsDidAdvance(void) { return sLastAdvanced ? 1 : 0; }
 
 // First cs frame at which a given op-0x03 misc sub-op fires, or -1 if absent.
 // Sub-ops of interest (per `oot3d-decomp/docs/title_gamestate_driver.md` §3):

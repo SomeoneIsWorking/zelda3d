@@ -152,8 +152,18 @@ int TitlePresentation::update(PlayState* play) {
     // APPLIED to the Player actor in zelda3d.c's Zelda3D_ActorPostUpdate (after Player's own
     // update) via Zelda3D_Title_RiderTransform / frame().riderPos/riderYaw below, so SoH's native
     // title-cs/physics can't fight the ported cue trajectory.
+    //
+    // mRider.step() is a STATEFUL integrator (PathFollow, fixed distance-per-call) — unlike the
+    // camera/dayTime/dome above, which are pure functions of Zelda3D_TitleCsFrame() and are safe
+    // to re-evaluate every engine tick, stepping this every tick double-integrates now that
+    // Zelda3D_TitleCsAdvance() only advances the cursor every OTHER tick (sTickParity): 2 physics
+    // steps per cs frame = 2x the authored cue speed (measured ratio 1.99 at cs 188 — see
+    // debug_journal/2026-07-10-rider-missing-attribution.md). Gate the step on the same cadence
+    // the cursor itself advances at so 1 step == 1 cs frame, matching the 2026-07-07 verified port.
     mFrame.riderCueDiscontinuity = false;
-    mRider.step(play, Zelda3D_TitleCsFrame(), &mFrame.riderCueDiscontinuity);
+    if (Zelda3D_TitleCsDidAdvance()) {
+        mRider.step(play, Zelda3D_TitleCsFrame(), &mFrame.riderCueDiscontinuity);
+    }
     mFrame.riderPos.x = mRider.pos()[0];
     mFrame.riderPos.y = mRider.pos()[1];
     mFrame.riderPos.z = mRider.pos()[2];
