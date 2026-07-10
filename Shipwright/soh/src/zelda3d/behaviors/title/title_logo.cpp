@@ -534,7 +534,7 @@ extern "C" int Zelda3D_TryDrawTitleLogo(PlayState* play) {
     // cf(fadeIn+40), then +3.0/frame for 81 frames, snapping to 255; synchronized -10/frame
     // fade-out with the other two elements once flag 4 fires).
     const uint8_t alphaU8 = (uint8_t)(ps.wordmarkAlpha + 0.5f);
-    gSPZelda3DDrawA(POLY_OPA_DISP++, modelId | (int)ZELDA3D_HANDLE_FORCE_UNLIT,
+    gSPZelda3DDrawA(POLY_OPA_DISP++, modelId | (int)ZELDA3D_HANDLE_FORCE_UNLIT | (int)ZELDA3D_HANDLE_SCREEN_SPACE,
                     alphaU8, 255, 255, 255);
     CLOSE_DISPS(play->state.gfxCtx);
     return 1;
@@ -570,7 +570,7 @@ extern "C" int Zelda3D_TryDrawTitleCopyright(PlayState* play) {
                                  kCopyrightCenterYFrac * kOverlayRefH,
                                  kCopyrightHeightFrac * kOverlayRefH, localHeight);
     const uint8_t alphaU8 = (uint8_t)(alpha + 0.5f);
-    gSPZelda3DDrawA(POLY_OPA_DISP++, modelId | (int)ZELDA3D_HANDLE_FORCE_UNLIT,
+    gSPZelda3DDrawA(POLY_OPA_DISP++, modelId | (int)ZELDA3D_HANDLE_FORCE_UNLIT | (int)ZELDA3D_HANDLE_SCREEN_SPACE,
                     alphaU8, 255, 255, 255);
     CLOSE_DISPS(play->state.gfxCtx);
     return 1;

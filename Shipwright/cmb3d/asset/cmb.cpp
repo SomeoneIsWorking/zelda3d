@@ -428,6 +428,23 @@ Cmb::Prm Cmb::parsePrm(uint32_t p) {
     return r;
 }
 
+// An optional vertex attribute (color/normal/texCoord0) is only real data if either its mode
+// is CONSTANT (attr.constant[] always readable, no VATR backing needed) or its ARRAY mode has a
+// nonzero-size backing VATR buffer. parseSepd() unconditionally sets `.present = true` for every
+// declared attribute slot regardless of whether the exporter actually wrote data for it (many
+// CMB files declare a slot as ARRAY with a 0-byte VATR entry as a "no data here" placeholder) —
+// `.present` alone is NOT a safe gate for readAttr(): reading an ARRAY attr with a 0-size VATR
+// buffer reads whatever bytes happen to follow it in the vatr blob (the next attribute's data),
+// silently corrupting the CPU-side vertex with garbage instead of falling back to the sensible
+// default (v.color/v.nrm/v.uv's own struct-init value). Found via the title fire-glow's ~2x dim
+// residual (oot3d-decomp/docs/title_logo_fireglow_cmab.md): g_title.cmb declares "color" as
+// ARRAY with a 0-byte VATR buffer, so every vertex silently read whatever bytes trailed it
+// (texCoord0's buffer) as a bogus per-vertex tint instead of the intended baked white.
+bool Cmb::attrHasData(const SepdAttr& attr, int attrSlot) const {
+    if (attr.mode == 1) return true; // CONSTANT: attr.constant[] is always valid.
+    return attrSlot >= 0 && attrSlot < (int)mVatr.size() && mVatr[attrSlot].size > 0;
+}
+
 void Cmb::readAttr(const SepdAttr& attr, int attrSlot, uint32_t idx, int comps, float* out) const {
     if (attr.mode == 1) { // constant
         for (int i = 0; i < comps; i++) out[i] = attr.constant[i];
@@ -498,7 +515,7 @@ std::vector<CmbDrawGroup> Cmb::buildDrawGroupsSkinned(const std::array<float, 16
         if (mesh.sepd_index >= mSepds.size()) continue;
         const Sepd& sepd = mSepds[mesh.sepd_index];
         int bd = sepd.bone_dimension;
-        bool hasNormal = slotNrm >= 0 && sepd.attrs[slotNrm].present;
+        bool hasNormal = slotNrm >= 0 && sepd.attrs[slotNrm].present && attrHasData(sepd.attrs[slotNrm], slotNrm);
         CmbDrawGroup& g = groupFor(mesh.material_index, mesh.mesh_id);
         for (const auto& prms : sepd.prms) {
             const Prm& prm = prms.prm;
@@ -539,7 +556,8 @@ std::vector<CmbDrawGroup> Cmb::buildDrawGroupsSkinned(const std::array<float, 16
                 float pos[3], nrm[3] = { 0, 0, 1 }, uv[2] = { 0, 0 };
                 readAttr(sepd.attrs[slotPos], slotPos, idx, 3, pos);
                 if (hasNormal) readAttr(sepd.attrs[slotNrm], slotNrm, idx, 3, nrm);
-                if (slotUv0 >= 0 && sepd.attrs[slotUv0].present) readAttr(sepd.attrs[slotUv0], slotUv0, idx, 2, uv);
+                if (slotUv0 >= 0 && sepd.attrs[slotUv0].present && attrHasData(sepd.attrs[slotUv0], slotUv0))
+                    readAttr(sepd.attrs[slotUv0], slotUv0, idx, 2, uv);
                 // RIGID_SKINNING: resolve this vertex's own bone + bind matrix (see rigidPV above).
                 int vBone = boneId;
                 Mat4 Mv = M;
@@ -591,7 +609,7 @@ std::vector<CmbDrawGroup> Cmb::buildDrawGroupsSkinned(const std::array<float, 16
                 // Per-vertex color: OoT3D's baked scene lighting (walls dimmed, AO on the
                 // ground) and the additive light-shaft/god-ray alpha falloff. Defaults to
                 // white when the attribute is absent, so untinted models are unaffected.
-                if (slotCol >= 0 && sepd.attrs[slotCol].present) {
+                if (slotCol >= 0 && sepd.attrs[slotCol].present && attrHasData(sepd.attrs[slotCol], slotCol)) {
                     readAttr(sepd.attrs[slotCol], slotCol, idx, 4, v.color);
                 }
                 // record the (model-space) bone bindings for GPU skinning. The CPU

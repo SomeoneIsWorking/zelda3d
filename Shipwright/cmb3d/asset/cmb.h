@@ -242,6 +242,7 @@ class Cmb {
 
     // Read a single attribute value (comps components) at element idx for a sepd attr.
     void readAttr(const SepdAttr& attr, int attrSlot, uint32_t idx, int comps, float* out) const;
+    bool attrHasData(const SepdAttr& attr, int attrSlot) const;
 };
 
 } // namespace Zelda3D

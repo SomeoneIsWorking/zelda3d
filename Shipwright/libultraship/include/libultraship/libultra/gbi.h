@@ -2789,6 +2789,19 @@ typedef union Gfx {
 // behind it is running. Distinct from bit30 (sky), which only affects depth/AO treatment, not
 // the lighting term.
 #define ZELDA3D_HANDLE_FORCE_UNLIT (1u << 29)
+// Bit 28 (ZELDA3D_HANDLE_SCREEN_SPACE below): this draw's MP_matrix already came from a
+// self-contained, fixed-aspect orthographic projection (Zelda3D_Overlay2D_Begin's 400x240
+// top-screen ortho box, NOT the game's 3D camera projection sharing N64 4:3-authored content).
+// gfx_zelda3d_draw_handler_custom otherwise computes `aspectAdj = AdjXForAspectRatio(1.0)`
+// unconditionally for EVERY Zelda3D draw and the renderer applies it as an extra clip-space X
+// scale — correct for 3D-scene OoT3D model draws (which must shear in lockstep with the N64
+// actors sharing the same widescreen-corrected projection as the camera pans, per bit31/bit30's
+// own comment above), but WRONG for this overlay: its own guOrtho box already maps the 3DS's
+// real 400x240 top-screen aspect (5:3) to clip space with no assumption of 4:3 content, so
+// applying the N64-widescreen correction on top double-corrects it, squeezing/offsetting the
+// title logo relative to the oracle (oot3d-decomp/docs/title_logo_actor.md residual: overlay
+// placement ~3-5% off). Skips the correction (aspectAdj forced to 1.0) for draws carrying it.
+#define ZELDA3D_HANDLE_SCREEN_SPACE (1u << 28)
 #define gSPZelda3DDrawUV(pkt, handle, alpha, uvU, uvV, tintR, tintG, tintB)                         \
     {                                                                                             \
         Gfx* _g = (Gfx*)(pkt);                                                                    \
