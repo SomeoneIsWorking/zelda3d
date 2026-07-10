@@ -1077,6 +1077,17 @@ struct AoPush {
     float p1[4]; // x=bias, y=maxDiff
 };
 
+// #146 item B: fullscreen depth-only reset (Zelda3D_Overlay2D_Begin's private depth scope).
+// Fragment unconditionally writes gl_FragDepth=1.0 (far, this backend's 0=near/1=far convention —
+// matches replayDepthPass's dt.clear_depth=1.0f). No color output (the pipeline disables the color
+// write mask entirely, so the already-composited 3D scene's color is untouched); depth write ON,
+// compare ALWAYS so this reset always lands regardless of whatever the buffer held before.
+const char* kOverlayDepthFrag =
+    "#version 450\n"
+    "void main() {\n"
+    "    gl_FragDepth = 1.0;\n"
+    "}\n";
+
 // The DepthDraw record and all M4 module state (g_sgAoResReady, g_depthFrag, g_aoCompVert/Frag,
 // g_aoCompPipe, g_depthPipes, g_shadowSampler, g_shadow*/g_ao* targets, g_n64Caster*, g_sgShadowOn,
 // g_sgLightVP, the per-pass phase flags + g_shadowDraws/g_aoDraws/g_aoVp/g_aoSc) are now members of
@@ -1477,6 +1488,10 @@ extern "C" void Zelda3D_Sg_AoComposite(void) {
     if (auto* r = sgRenderer())
         r->AoComposite();
 }
+extern "C" void Zelda3D_Sg_ClearOverlayDepth(void) {
+    if (auto* r = sgRenderer())
+        r->ClearOverlayDepth();
+}
 
 // geomscan bridge: copy the last completed frame's per-draw world AABBs out to the REPL (zelda3d.c
 // `geomscan`, #115/#120). Returns the count written; modelIds[i], mins[i*3..], maxs[i*3..] = draw i.
@@ -1498,6 +1513,82 @@ void Fast::Zelda3DRenderer::RequestEvictRange(int lo, int hi) {
     g_evictLo = lo;
     g_evictHi = hi;
     g_evictPending = true;
+}
+
+// #146 item B: one-time resources for the overlay depth-scope reset. Independent of
+// ensureShadowAoResources() (that path is gated behind gZelda3dShadowEnable/gZelda3dAoEnable and
+// this reset must work regardless of whether shadows/AO are on).
+bool Fast::Zelda3DRenderer::ensureOverlayDepthResources() {
+    if (g_overlayDepthResReady)
+        return true;
+    if (!ensureResources())
+        return false;
+
+    g_overlayDepthFrag = makeShader(kOverlayDepthFrag, EShLangFragment, /*samplers=*/0, /*ubo=*/0);
+    if (!g_overlayDepthFrag) {
+        fprintf(stderr, "[Zelda3D_SG] overlay depth-reset shader create failed: %s\n", SDL_GetError());
+        return false;
+    }
+    // Reuses the model vertex shader slot? No — needs its own fullscreen-triangle vertex shader
+    // (no vertex buffer, matches kAoCompVert's gl_VertexIndex trick) since g_vert expects the
+    // full per-vertex model attribute layout. Compile a private copy so this reset has no
+    // dependency on the AO module's lazy init/enable gating.
+    static const char* kFsVert =
+        "#version 450\n"
+        "void main() {\n"
+        "    vec2 p = vec2((gl_VertexIndex == 2) ? 3.0 : -1.0, (gl_VertexIndex == 1) ? 3.0 : -1.0);\n"
+        "    gl_Position = vec4(p, 0.0, 1.0);\n"
+        "}\n";
+    SDL_GPUShader* vert = makeShader(kFsVert, EShLangVertex, 0, 0);
+    if (!vert) {
+        fprintf(stderr, "[Zelda3D_SG] overlay depth-reset vertex shader create failed: %s\n", SDL_GetError());
+        return false;
+    }
+
+    SDL_GPUGraphicsPipelineCreateInfo pci{};
+    pci.vertex_shader = vert;
+    pci.fragment_shader = g_overlayDepthFrag;
+    pci.primitive_type = SDL_GPU_PRIMITIVETYPE_TRIANGLELIST;
+    pci.rasterizer_state.fill_mode = SDL_GPU_FILLMODE_FILL;
+    pci.rasterizer_state.cull_mode = SDL_GPU_CULLMODE_NONE;
+    pci.multisample_state.sample_count = SDL_GPU_SAMPLECOUNT_1;
+    pci.depth_stencil_state.enable_depth_test = true;
+    pci.depth_stencil_state.enable_depth_write = true;
+    pci.depth_stencil_state.compare_op = SDL_GPU_COMPAREOP_ALWAYS;
+    pci.depth_stencil_state.enable_stencil_test = false;
+
+    SDL_GPUColorTargetDescription ct{};
+    ct.format = g_activeSdl3GpuApi->GpuColorFormat();
+    ct.blend_state.enable_blend = false;
+    ct.blend_state.enable_color_write_mask = true;
+    ct.blend_state.color_write_mask = 0; // no color channels written — color buffer untouched
+    pci.target_info.color_target_descriptions = &ct;
+    pci.target_info.num_color_targets = 1;
+    pci.target_info.has_depth_stencil_target = true;
+    pci.target_info.depth_stencil_format = g_activeSdl3GpuApi->GpuDepthFormat();
+
+    g_overlayDepthPipe = SDL_CreateGPUGraphicsPipeline(g_device, &pci);
+    if (!g_overlayDepthPipe) {
+        fprintf(stderr, "[Zelda3D_SG] overlay depth-reset pipeline create failed: %s\n", SDL_GetError());
+        return false;
+    }
+    g_overlayDepthResReady = true;
+    return true;
+}
+
+void Fast::Zelda3DRenderer::ClearOverlayDepth() {
+    if (!g_ctxValid || !g_activeSdl3GpuApi)
+        return;
+    if (!ensureOverlayDepthResources() || !g_overlayDepthPipe)
+        return;
+    SDL_GPUViewport vp{};
+    SDL_Rect sc{};
+    g_activeSdl3GpuApi->GetZelda3DViewportScissor(vp, sc);
+    // No UBO / texture — the shader is a constant fullscreen write.
+    float dummyUbo[4] = { 0, 0, 0, 0 };
+    g_activeSdl3GpuApi->AppendZelda3DFullscreen(g_overlayDepthPipe, dummyUbo, sizeof(dummyUbo),
+                                              g_activeSdl3GpuApi->DummyTexture(), g_activeSdl3GpuApi->DummySampler(),
+                                              vp, sc);
 }
 
 void Fast::Zelda3DRenderer::BeginPass() {

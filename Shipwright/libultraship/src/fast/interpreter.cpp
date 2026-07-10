@@ -4434,6 +4434,21 @@ bool gfx_zelda3d_measure_handler_custom(F3DGfx** cmd0) {
     return false;
 }
 
+// Zelda3D overlay depth-scope reset (#146 item B, gSPZelda3DClearDepth). No operands — flush any
+// pending Fast3D batch first (same reasoning as gfx_zelda3d_draw_handler_custom: keeps this op's
+// position in the unified stream exactly where the caller emitted it, relative to the surrounding
+// G_ZELDA3D_DRAW ops), then bridge into the SG renderer's depth-only fullscreen reset. Bridged
+// through zelda3d_gl.cpp (Zelda3D_ClearOverlayDepth) exactly like Zelda3D_GL_Submit, so this file
+// stays free of a direct Zelda3D_Sg_* / ENABLE_SDL3GPU dependency.
+extern "C" void Zelda3D_ClearOverlayDepth(void);
+bool gfx_zelda3d_cleardepth_handler_custom(F3DGfx** cmd0) {
+    Interpreter* gfx = mInstance.lock().get();
+    (void)cmd0;
+    gfx->Flush();
+    Zelda3D_ClearOverlayDepth();
+    return false;
+}
+
 bool gfx_register_blended_texture_handler_custom(F3DGfx** cmd0) {
     Interpreter* gfx = mInstance.lock().get();
     F3DGfx* cmd = *cmd0;
@@ -4938,6 +4953,8 @@ static constexpr UcodeHandler otrHandlers = {
     { OTR_G_SETINTENSITY, { "G_SETINTENSITY", gfx_set_intensity_handler_custom } }, // G_SETINTENSITY (0x40)
     { OTR_G_ZELDA3D_DRAW, { "G_ZELDA3D_DRAW", gfx_zelda3d_draw_handler_custom } },         // G_ZELDA3D_DRAW (0x41)
     { OTR_G_ZELDA3D_MEASURE, { "G_ZELDA3D_MEASURE", gfx_zelda3d_measure_handler_custom } }, // G_ZELDA3D_MEASURE (0x4a)
+    { OTR_G_ZELDA3D_CLEARDEPTH,
+      { "G_ZELDA3D_CLEARDEPTH", gfx_zelda3d_cleardepth_handler_custom } }, // G_ZELDA3D_CLEARDEPTH (0x4b)
     { OTR_G_MOVEMEM_HASH, { "OTR_G_MOVEMEM_HASH", gfx_movemem_handler_otr } },      // OTR_G_MOVEMEM_HASH
     { OTR_G_PUSH_SHADER, { "G_PUSH_SHADER", gfx_push_shader } },
     { OTR_G_POP_SHADER, { "G_POP_SHADER", gfx_pop_shader } },

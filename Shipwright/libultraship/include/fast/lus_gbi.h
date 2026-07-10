@@ -79,6 +79,8 @@ constexpr int8_t RDP_G_TRI1_WIDE = OPCODE(0x49);
 // "measuring" the interpreter accumulates the eye-space bbox of every vertex it loads,
 // so the N64 actor's drawn world size can be measured to derive the OoT3D model scale.
 constexpr int8_t OTR_G_ZELDA3D_MEASURE = OPCODE(0x4a);
+// Zelda3D overlay depth-scope reset (#146 item B): no operands. See gSPZelda3DClearDepth (gbi.h).
+constexpr int8_t OTR_G_ZELDA3D_CLEARDEPTH = OPCODE(0x4b);
 
 /*
  * The following commands are the "generated" RDP commands; the user

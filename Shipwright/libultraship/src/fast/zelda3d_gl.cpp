@@ -681,6 +681,15 @@ extern "C" void Zelda3D_GL_RenderFrameEnd(void) {
 #endif
 }
 
+// #146 item B bridge for gfx_zelda3d_cleardepth_handler_custom (interpreter.cpp) — keeps that file
+// free of a direct Zelda3D_Sg_*/ENABLE_SDL3GPU dependency, matching every other Zelda3D_GL_* shim
+// here.
+extern "C" void Zelda3D_ClearOverlayDepth(void) {
+#ifdef ENABLE_SDL3GPU
+    if (Zelda3D_Sg_Active()) Zelda3D_Sg_ClearOverlayDepth();
+#endif
+}
+
 extern "C" void Zelda3D_GL_FrameBegin(void) {
     // Rotate this logic frame's emit-ordered poses into "previous" so the next frame can interpolate
     // each item from where it was. (Called once per logic frame, before the actors emit their poses.)

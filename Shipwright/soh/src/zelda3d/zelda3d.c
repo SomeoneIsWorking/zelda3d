@@ -3754,7 +3754,25 @@ int Zelda3D_TryDrawSunMoon(PlayState* play) {
         // modulate the draw. color/scale kept for the N64-derived base scale.
         color = -y / 120.0f;
         if (color < 0.0f) color = 0.0f;
-        scale = (-15.0f * color) + 25.0f;
+        if (Zelda3D_Title_IsActive()) {
+            // #146 item A: oot3d-decomp/docs/title_moon.md establishes the OoT3D title moon's
+            // model-space scale is a FIXED per-draw vertex-shader uniform (disc diagonal 640,
+            // halos 1280 — no dayTime dependence at all). SoH's `-15*color+25` elevation curve
+            // below is carried over unmodified from N64's Environment_DrawSunAndMoon and has no
+            // decomp anchor for the title path — replace it with a fixed constant here.
+            //
+            // The constant is ORACLE-ANCHORED, not guessed: a prior attempt picked 10.0 (the old
+            // formula's deep-night floor) and it regressed the already-verified az=200/soh=608
+            // calibration frame (see debug_journal/2026-07-10-title-moon-reimplementation.md §3-4).
+            // This session added a one-shot harness readback (`soh_moon`, tools/soh3d_harness) that
+            // reads envCtx.sunPos.y LIVE at that exact frame and recomputes this formula's own
+            // output verbatim: scale=19.0204 (color=0.3986). Using that measured value as the fixed
+            // replacement reproduces the calibration frame exactly instead of re-guessing a constant.
+            const f32 kMoonTitleFixedScale = 19.0204f;
+            scale = kMoonTitleFixedScale;
+        } else {
+            scale = (-15.0f * color) + 25.0f;
+        }
         temp = -y / 80.0f;
         if (temp > 1.0f) temp = 1.0f;
         alpha = temp * 255.0f;

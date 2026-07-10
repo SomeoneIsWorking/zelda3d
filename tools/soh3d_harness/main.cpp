@@ -264,6 +264,8 @@ extern "C" {
                               unsigned char* liveAmbient,
                               unsigned char* liveFogColor,
                               short* liveFogNear, short* liveFogFar);
+    // TEMPORARY (item A, #146 moon-scale derivation) — see soh_state.cpp.
+    int SohState_MoonDebug(float* sunPosY, float* color, float* scale, float* discScale);
 }
 
 extern "C" {
@@ -3470,6 +3472,18 @@ void RunRepl() {
                         daytime, sk1, sk2, blend,
                         amb[0], amb[1], amb[2],
                         fog[0], fog[1], fog[2], fn, ff);
+        }
+        else if (cmd == "soh_moon") {
+            // TEMPORARY (item A, #146 moon-scale derivation): print SoH's
+            // live envCtx.sunPos.y and the moon color/scale/discScale it
+            // implies, so a fixed replacement constant can be oracle-
+            // anchored instead of guessed. Remove once the fixed scale lands.
+            float sunPosY = 0, color = 0, scale = 0, discScale = 0;
+            if (!SohState_MoonDebug(&sunPosY, &color, &scale, &discScale)) {
+                PrintErr("soh_moon: no playstate"); continue;
+            }
+            std::printf("ok soh_moon sunPosY=%.4f color=%.4f scale=%.4f discScale=%.4f\n",
+                        sunPosY, color, scale, discScale);
         }
         else if (cmd == "az_daytime") {
             // Read gSaveContext.dayTime straight from the fixed .bss VA —
