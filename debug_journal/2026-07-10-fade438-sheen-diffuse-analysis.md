@@ -47,3 +47,52 @@ measurement:
 
 - Do not add any compensating brightness/alpha constant to SoH's fade.
 - Do not touch the ramp constants (byte-confirmed) or const5 plumbing (verified correct).
+
+## Measurement result (agent)
+
+Executed the discriminating measurement (2026-07-10, measurement-only agent). Captures:
+`tools/title_ab.py ab 764 --soh 1172 --name sheen_disc_470` and
+`ab 1000 --soh 1408 --name sheen_disc_588` (content mapping az = 2·cs − 176, soh = az + 408 per
+the RE'd rate law in `tools/title_ab.py`; artifacts in `scratch/title_ab/sheen_disc_{470,588}*`).
+
+Frame-identity guards: (a) the az→cs mapping is the byte-exact affine law (`az_cs = 88 + 0.5·az`,
+verified previously by camera-eye inversion against the OP97 spline), so az=764→cs470,
+az=1000→cs588 deterministically from `title_settled.state`; (b) visual timeline markers confirm
+both instants — the cs470 frame shows the wordmark fully drawn with NO fire glow (sheen t≈0.07,
+ramp starts cf466) and the cs588 frame shows the saturated glow plus the "© 1998-2011" copyright
+fade-in, exactly the recheck_1000 framing. (A live `soh_titlecs` cursor read was skipped: the
+single-instance harness lock was contended by a concurrent fix agent; the deterministic mapping +
+timeline markers stand in.)
+
+Method: same red-letter HSV-value approach as `2026-07-10-moon-epona-fade-attribution.md` §3
+(hue ∈ [340,360]∪[0,25], sat>0.35, val>0.12 over a wordmark crop x[100:320] y[85:200] of each
+400×240 pane), PLUS a 1-iteration binary erosion of the mask to drop antialiased letter borders.
+Glow exclusion: the fire glow is orange/yellow (hue ≳25) so the red hue-gate excludes its body,
+and the erosion removes letter-edge pixels where glow bleed could contaminate; a stricter
+robustness variant (hue ≤ 15, sat > 0.5, erosion ×2 — letter cores only) was run alongside and
+agrees, confirming no glow contamination in the baseline numbers.
+
+| pane | cs470 mean V | cs588 mean V | factor 588/470 |
+|---|---|---|---|
+| oracle (Az) | 0.431 | 0.602 | **×1.40** |
+| SoH | 0.273 | 0.274 | **×1.01** |
+
+(Strict-mask variant: oracle 0.440 → 0.605 = ×1.38; SoH 0.269 → 0.269 = ×1.000 — SoH's letter
+cores are bit-flat across the ramp.)
+
+**Verdict: sheen-diffuse CONFIRMED as the visible modulator.** With alpha provably constant at
+255 across cs470→cs588 (wordmark ramp ends cf465), the oracle's letters still brighten by ×1.40 —
+even more than the ~×1.1–1.18 first-order prediction (the analysis' 0.1834·N·L estimate was a
+lower bound using the raw sheen scale; the measured excess says the letters' beveled normals catch
+the animated light harder than the flat-facing assumption, and/or the vertex-diffuse term is not
+the only sheen-coupled contribution — worth reading the shader term exactly during the fix). SoH
+over the same pair is ×1.01 (×1.000 on letter cores) — zero sheen modulation, exactly the
+predicted gap. The fix target stands as analyzed: make SoH's `uSheen` diffuse term actually vary
+on the wordmark letters across the ramp (check the light-dir transform under the overlay's
+RotateX(180°)+flipped-ortho basis).
+
+Caveats: (i) the SoH pane rendered with the 4K logo texture pack active (TEXPACK=off was not in
+the capture env) — harmless here because the within-engine 588/470 ratio cancels any static
+texture/color bias, but absolute SoH V values (0.27 vs oracle 0.43) are not comparable across
+engines for that reason (plus the known scene-exposure mismatch); (ii) the oracle factor
+1.40 > the predicted band, so treat 1.18 as a floor, not the target, when verifying the fix.
