@@ -47,6 +47,11 @@ using Zelda3DSg::SgUbo;
 constexpr uint32_t kSgCommonBytes = Zelda3DSg::kCommonBytes;
 constexpr uint32_t kSgBonesBytes = Zelda3DSg::kBonesBytes;
 
+// Title wordmark sheen (title_logo_actor.md §6.3): the decompiled light-env's static diffuse
+// color (0.1834,0.1834,0.1834,1) — only the DIRECTION is animated per-frame by the caller
+// (Zelda3D_GL_SetLightDirOverride); this magnitude is a fixed decomp constant, not tuned.
+constexpr float kWordmarkSheenDiffuse = 0.1834f;
+
 // ---- Shared scene/light/effect globals (owned by zelda3d_gl.cpp, set per frame by zelda3d.c) ----
 extern "C" float gZelda3dLightDirWorld[3];
 extern "C" int gZelda3dLightEnable;
@@ -150,7 +155,8 @@ bool CompileGlsl(EShLanguage stage, const char* src, std::vector<uint32_t>& spv)
     "    vec4 uFog;\n" \
     "    vec4 uFog2;\n" \
     "    vec4 uAmbient;\n" \
-    "    vec4 uMatConst;\n"
+    "    vec4 uMatConst;\n" \
+    "    vec4 uSheen;\n"
 #define SG_UBO_BONES_BODY \
     "    mat4 uBones[" SG_STR(ZELDA3D_GL_MAX_BONES) "];\n"
 
@@ -223,6 +229,16 @@ const char* kFrag =
     "    if (ubo.uParams.y > 0.5) {\n"
     "        float hl = dot(normalize(vNrmView), normalize(ubo.uLightDir.xyz)) * 0.5 + 0.5;\n"
     "        shade = ubo.uTintSkin.xyz * (0.55 + 0.45 * hl);\n"
+    "    }\n"
+    // Wordmark sheen (title_logo_actor.md §6.3): a per-draw light-direction override feeding an
+    // ADDITIVE diffuse boost on top of the full-bright tint (decomp: ambient={1,1,1,1} always,
+    // diffuse={0.1834,...}*max(0,N.L) on top) — orthogonal to and independent of the uParams.y
+    // half-Lambert term above (that one DARKENS from a full-bright baseline, which is the wrong
+    // shape for this actor's ambient-always-1.0 + small-diffuse-bonus lighting). Only ever nonzero
+    // for the title wordmark's own draw (zelda3d_gl.cpp's per-model light-dir override).
+    "    if (ubo.uSheen.x > 0.0) {\n"
+    "        float ndotl = max(dot(normalize(vNrmView), normalize(ubo.uLightDir.xyz)), 0.0);\n"
+    "        shade *= (1.0 + ubo.uSheen.x * ndotl);\n"
     "    }\n"
     "    if (ubo.uShadow.x > 0.5)\n"
     "        shade *= (1.0 - ubo.uShadow.z * (1.0 - shadowLit()));\n"
@@ -1328,7 +1344,7 @@ extern "C" void Zelda3D_Sg_DrawModel(int modelId, const float* mp16, const float
                                    unsigned char r8, unsigned char g8, unsigned char b8, unsigned char a8,
                                    float aspectAdj, const float* boneData, int boneCnt, unsigned long long midMask,
                                    int sky, float uvOffU, float uvOffV, const void* matTex,
-                                   const void* matConst, int forceUnlit) {
+                                   const void* matConst, int forceUnlit, const float* lightDirOv) {
     // Zelda3D #140 render-side probe: log every DrawModel for the sun-billboard model id (2002 in
     // typical runs). Non-sky submits are the Navi emit (sun/moon are sky=1). Serves as the runtime
     // observable for tools/navi_close_test.py and to isolate whether an emit reaches the renderer,
@@ -1349,7 +1365,7 @@ extern "C" void Zelda3D_Sg_DrawModel(int modelId, const float* mp16, const float
     }
     if (auto* r = sgRenderer())
         r->DrawModel(modelId, mp16, mv16, lit, invertY, r8, g8, b8, a8, aspectAdj, boneData, boneCnt, midMask, sky,
-                     uvOffU, uvOffV, matTex, matConst, forceUnlit);
+                     uvOffU, uvOffV, matTex, matConst, forceUnlit, lightDirOv);
 }
 extern "C" void Zelda3D_Sg_EndPass(void) {
     if (auto* r = sgRenderer())
@@ -1436,7 +1452,7 @@ void Fast::Zelda3DRenderer::DrawModel(int modelId, const float* mp16, const floa
                                     unsigned char r8, unsigned char g8, unsigned char b8, unsigned char a8,
                                     float aspectAdj, const float* boneData, int boneCnt, unsigned long long midMask,
                                     int sky, float uvOffU, float uvOffV, const void* matTex,
-                                    const void* matConst, int forceUnlit) {
+                                    const void* matConst, int forceUnlit, const float* lightDirOv) {
     const std::unordered_map<int, int>* matTexMap = static_cast<const std::unordered_map<int, int>*>(matTex);
     const std::unordered_map<int, Zelda3DMatConstOv>* matConstMap =
         static_cast<const std::unordered_map<int, Zelda3DMatConstOv>*>(matConst);
@@ -1549,10 +1565,37 @@ void Fast::Zelda3DRenderer::DrawModel(int modelId, const float* mp16, const floa
     base.uTintSkin[1] = g8 / 255.0f;
     base.uTintSkin[2] = b8 / 255.0f;
     base.uTintSkin[3] = (boneData && boneCnt > 0) ? 1.0f : 0.0f;
-    base.uLightDir[0] = gZelda3dLightDirWorld[0];
-    base.uLightDir[1] = gZelda3dLightDirWorld[1];
-    base.uLightDir[2] = gZelda3dLightDirWorld[2];
+    if (lightDirOv) {
+        // Wordmark sheen (title_logo_actor.md §6.3): lightDirOv is OBJECT-space (same space as
+        // this model's own vertex normals aNrm) — transform by THIS draw's own mv16 (column-major,
+        // matching the vertex shader's `vNrmView = mat3(ubo.uMV) * nM`) so the light direction and
+        // the geometry it lights land in the same space, then renormalize (the decomp's own
+        // formula produces a non-unit vector before its own normalize() call too).
+        float wd[3] = {
+            mv16[0] * lightDirOv[0] + mv16[4] * lightDirOv[1] + mv16[8] * lightDirOv[2],
+            mv16[1] * lightDirOv[0] + mv16[5] * lightDirOv[1] + mv16[9] * lightDirOv[2],
+            mv16[2] * lightDirOv[0] + mv16[6] * lightDirOv[1] + mv16[10] * lightDirOv[2],
+        };
+        float len = std::sqrt(wd[0] * wd[0] + wd[1] * wd[1] + wd[2] * wd[2]);
+        if (len > 1e-6f) {
+            wd[0] /= len;
+            wd[1] /= len;
+            wd[2] /= len;
+        }
+        base.uLightDir[0] = wd[0];
+        base.uLightDir[1] = wd[1];
+        base.uLightDir[2] = wd[2];
+    } else {
+        base.uLightDir[0] = gZelda3dLightDirWorld[0];
+        base.uLightDir[1] = gZelda3dLightDirWorld[1];
+        base.uLightDir[2] = gZelda3dLightDirWorld[2];
+    }
     base.uLightDir[3] = sky ? 1.0f : 0.0f;
+    // §6.3's decompiled diffuse color (0.1834,0.1834,0.1834,1) — the only non-static (direction)
+    // part of the light-env is ported here as an additive strength; see uSheen's declaration
+    // comment (zelda3d_sg_ubo.h) for why this is additive, not the shared darkening hl term.
+    base.uSheen[0] = lightDirOv ? kWordmarkSheenDiffuse : 0.0f;
+    base.uSheen[1] = base.uSheen[2] = base.uSheen[3] = 0.0f;
     base.uExtra[0] = a8 / 255.0f;
     base.uExtra[1] = uvOffU;
     base.uExtra[2] = uvOffV;

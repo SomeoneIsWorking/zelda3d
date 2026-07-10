@@ -45,6 +45,20 @@ struct SgUbo {
     // channel (EnHy Step 2c) flips a=1 when an actor wants the constant applied. See
     // debug_journal/2026-07-02-en-hy-body-colors.md.
     float uMatConst[4];
+    // Additive diffuse "sheen" boost for a per-draw light-direction override (title wordmark,
+    // title_logo_actor.md §6.3: actor field +0x1DC sweeps a fragment-light DIRECTION across the
+    // wordmark's own material — decompiled ambient={1,1,1,1} diffuse={0.1834,...} specular={1,1,1,1}
+    // emission=0, direction the only animated part). .x = diffuse strength (0 = no override / no
+    // boost, 0.1834 = the decompiled constant when a draw sets a light-dir override); .y/.z/.w
+    // unused (reserved, always 0). The shader does shade *= (1.0 + uSheen.x * max(0,N.L)), i.e. an
+    // ADDITIVE brightening on top of the existing full-bright tint — NOT the shared uParams.y
+    // half-Lambert term (that one DARKENS via a 0.55..1.0 multiplier, which is not what the
+    // decomp's ambient=1-always + small diffuse bonus reduces to). Specular is NOT ported: the
+    // PICA specular exponent isn't in the actor's own code (title_logo_actor.md §6.2/§6.3 — it's a
+    // CMB-material-side LUT config this decomp pass didn't need to touch), and this ortho overlay
+    // pass has no real camera/view vector for a Blinn-Phong H term to reduce to — proven-negative,
+    // not guessed at.
+    float uSheen[4];
     float uBones[ZELDA3D_GL_MAX_BONES * 16]; // MUST stay last: pushed as its own <=4096 B block
 };
 

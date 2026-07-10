@@ -162,6 +162,22 @@ void Zelda3D_GL_EmitPose(int modelId);
 // Call once per frame before the render pass; defaults to a fixed direction until first set.
 void Zelda3D_GL_SetLightDir(const float dirWorld[3]);
 
+// Per-model, per-draw light-DIRECTION override (title_logo_actor.md §6.3: the OoT3D title
+// wordmark's actor field +0x1DC drives a fragment-light DIRECTION on that model's own material,
+// not the scene's global sun). dirObj is in the model's OBJECT space (same space as its vertex
+// normals aNrm) — the render pass transforms it by that draw's own model matrix (mat3(uMV), the
+// same transform applied to aNrm to get vNrmView) so it lands in the shader's lighting space
+// consistently with the geometry, then feeds the additive diffuse "sheen" term (see uSheen in
+// zelda3d_sg_ubo.h) instead of gZelda3dLightDirWorld for THIS model's draws only — the scene/
+// other actors' lighting is untouched. Overwrites any previous override for this modelId; there
+// is no emit-order pairing (unlike SetMatConstOverride) because this model draws once per frame
+// with no sibling instances. Not normalized here (the shader renormalizes).
+void Zelda3D_GL_SetLightDirOverride(int modelId, float dx, float dy, float dz);
+// Clears a previously-set override (falls back to the scene's global light dir + no sheen boost
+// for this model's draws). Symmetry with Zelda3D_GL_ClearMatConstOverrides; not required if the
+// caller simply stops drawing the model (an unused override is inert), but kept for hygiene.
+void Zelda3D_GL_ClearLightDirOverride(int modelId);
+
 // Set the per-bone skinning matrices for a model (row-major float[16] each, indexed
 // by bone id). Applied as the shader's uBones at the next draw. n is clamped to
 // ZELDA3D_GL_MAX_BONES. Passing n==0 resets to the bind pose (identity). Cheap — just
