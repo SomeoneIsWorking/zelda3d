@@ -83,6 +83,15 @@ int  Zelda3D_TitleCsFrame(void);
 void Zelda3D_TitleCsSetFrame(int frame);
 int  Zelda3D_TitleCsAdvance(void);   // returns new frame
 
+// Whether the most recent Zelda3D_TitleCsAdvance() call actually incremented sFrame (including
+// the loop wrap 2399->0) vs. held it (sTickParity's off-tick). Consumers with STATEFUL per-tick
+// integrators (e.g. the title rider's PathFollow, which advances position every call it's given)
+// must gate their own step on this — the cursor now advances at half the engine's tick rate
+// (sTickParity), so a consumer stepping unconditionally every engine tick runs at 2x the
+// authored cue speed. Pure functions of Zelda3D_TitleCsFrame() (camera, dayTime, dome) don't
+// need this: they re-evaluate from the frame value itself, which is unchanged on a hold tick.
+int  Zelda3D_TitleCsDidAdvance(void);
+
 #ifdef __cplusplus
 }
 #endif
