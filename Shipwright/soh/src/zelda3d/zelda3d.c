@@ -2,6 +2,7 @@
 #include "zelda3d.h"
 #include "zelda3d_cutscene.h"
 #include "behaviors/title/title_presentation.h" // Zelda3D::TitlePresentation — see that header
+#include "behaviors/title/title_cloud_vortex.h" // Death Mountain cloud-vortex actor ring at title
 #include "zelda3d_collision.h" // C-ABI bridge for OoT3D scene collision (zelda3d_model.cpp)
 #include "zelda3d_link.h"      // Link (player) replacement policy split out of this file
 #include "zelda3d_anim_override.h" // skeletal-actor draw-override port (head/torso track, facial, DLs)
@@ -3405,6 +3406,10 @@ static void Zelda3D_DrawRoomGL(PlayState* play, int modelId) {
     gSPZelda3DDraw(POLY_OPA_DISP++, modelId, tint[0], tint[1], tint[2]);
 
     CLOSE_DISPS(play->state.gfxCtx);
+
+    // Title demo: composite the Death Mountain cloud vortex's ACTOR-layer ring over the room's
+    // own ring (behaviors/title/title_cloud_vortex.cpp; no-op outside the title).
+    Zelda3D_TitleCloudVortex_Emit(play, modelId);
 }
 
 // #28 — map a N64 normal-sky index (envCtx.skybox1Index, 0..8 into the game's sSkyboxTable:
@@ -3977,15 +3982,16 @@ static void Zelda3D_UpdateLight(PlayState* play) {
             l2dir[2] /= l2len;
         }
         // Enabled-light count for the real per-enabled-light ambient sum (title_env_lighting.md
-        // §10/§11). light1 is the scene's key directional light and is always authored/enabled in
-        // N64 EnvLightSettings; light2 (fill) is present but its direction is near-zero/degenerate
-        // in a handful of scenes (same degeneracy test already used above to gate normalization) —
-        // treat those as light2 disabled for THIS frame, matching the shader's own per-slot
-        // LightDir_i.w enable gating rather than hardcoding "always 2".
-        {
-            int numEnabledLights = 1 + (l2len > 0.5f ? 1 : 0);
-            Zelda3D_GL_SetLightParams(ambient, l1col, l2dir, l2col, numEnabledLights);
-        }
+        // §10/§11, title_cloud_vortex.md). The 3DS per-slot enable flag (FUN_003fa5d0's
+        // lightRec+0xe4 == 1.0f) is PRESENCE-based: both EnvLightSettings lights are always
+        // bound (N64 Lights_BindAll semantics), so both slots contribute their AMBIENT term
+        // even when a light's direction is the degenerate (0,0,0) — a zero direction only
+        // nulls that light's DIFFUSE (N·L) term. Oracle-proven at the title's night slots
+        // (spot99 slots with light1/2 Dir=(0,0,0)): the doughnut cloud-vortex draw's
+        // PRIMARY_COLOR measures ambient*2*vColor(0.502) — an earlier direction-degeneracy
+        // gate here (`1 + (l2len > 0.5)`) halved every vertex-lit scene material at night
+        // and was the Death Mountain cloud-vortex dimness root cause.
+        Zelda3D_GL_SetLightParams(ambient, l1col, l2dir, l2col, 2);
         // #110: feed the live (time-blended) env ambient colour to the VK world path's additive
         // ambient floor. The coefficient (gZelda3dWorldAmb, REPL `worldamb`) gates/scales it. When the
         // REPL has pinned a colour (gZelda3dWorldAmbOverride, for deriving OoT3D's scene-constant

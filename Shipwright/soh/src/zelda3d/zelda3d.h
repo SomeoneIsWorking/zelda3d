@@ -477,6 +477,7 @@ void Zelda3D_EnsureModelProvider(void);                                   // laz
 int Zelda3D_AutoModelId(const char* zarPath);                            // get-or-alloc a GL model id
 float Zelda3D_AutoModelHeight(int modelId);                              // bind-pose local-space Y extent
 float Zelda3D_AutoModelMinY(int modelId);                                // bind-pose local-space min Y (feet)
+int Zelda3D_ModelGroupCentroid(int modelId, int materialIndex, float out[3]); // centroid of one material's groups
 // Bridges for the structured model-REPLACEMENT behaviors (behaviors/actor/<actor>.cpp):
 int Zelda3D_TryActorModelDraw(PlayState* play, Actor* actor);            // dispatch actor->behavior->tryDrawModel
 int Zelda3D_ActorDrawSpaceTransform(void* actor, float* outLiftY, float* outLocalOff); // faithful draw-space offset

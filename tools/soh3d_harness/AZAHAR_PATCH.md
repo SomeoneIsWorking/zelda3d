@@ -448,3 +448,23 @@ From `scratch/title_settled.state` + `run 1000` (title cs588, sheen t=1),
 matAmb=(1,1,1,0) hasCol=0` and terrain draws showing the SAME scene
 ambient duplicated into amb0 AND amb1 (the ×2 terrain mechanism of
 oot3d-decomp `title_env_lighting.md` §10).
+
+# Azahar patch: per-pixel TEV dump (`PIXEL` lines) + `SOH3D_PIXEL_TEX` selector
+
+`sw_rasterizer.cpp` also carries a per-PIXEL dump inside `ProcessTriangle`'s
+shading loop (just after `WriteTevConfig`): when `draw_log` is active AND the
+draw's tex0 physical address matches a target, it appends up to 200 lines
+per target per activation:
+
+```
+PIXEL tex0=<pa> xy=(x,y) texcol=(r,g,b,a) primary=(r,g,b,a) combined=(r,g,b,a)
+```
+
+`primary` is the interpolated PRIMARY_COLOR the TEV actually consumed (the
+per-triangle `tri ... c0=/c1=/c2=` vertex-color fields read ZERO for every
+CmbVShader draw — do NOT trust them; the PIXEL dump is the reliable probe),
+`combined` the TEV output before blending. Targets: three hardcoded moon/fire
+addresses (`0x20906a80/0x2090ec80/0x20910e80`, task #16 era) plus ONE generic
+runtime-selected address via env `SOH3D_PIXEL_TEX=<hex physaddr>` (added
+2026-07-10 for the cloud-vortex RE; see oot3d-decomp `title_cloud_vortex.md`).
+Search `SOH3D_PIXEL_TEX` in the in-tree copy for the exact block.
