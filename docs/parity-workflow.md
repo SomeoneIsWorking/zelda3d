@@ -74,6 +74,38 @@ file is the failure mode; a single owner with one per-frame resolved state is th
 - **Keep notes honest**: retract falsified findings in place (this session has explicit
   RETRACTION/SUPERSEDED docs). A confidently-wrong note sends the next session down a dead end.
 
+## Oracle data cache — warm once, reuse across sessions
+
+The embedded-Azahar oracle's output at a given az (Azahar) title-cs frame is fully
+deterministic given three inputs: the loaded savestate, the ROM bytes, and whatever the
+`soh3d_harness` Azahar patches (`tools/soh3d_harness/AZAHAR_PATCH.md`) do to rendering.
+Held fixed, re-running Az to frame N always reproduces the same pixels — so repeated A/B
+and probe runs (`tools/title_ab.py`, future probes) shouldn't pay the Az boot+step cost
+again for a frame already captured in a prior session.
+
+- **Cache**: `scratch/oracle_cache/<key>/` (gitignored — contains ROM-derived frame data,
+  never committed). `<key>` = `sha256(savestate)[:16]_sha256(rom)[:16]_<patch-marker>`
+  (`harness_ctl.cache_key()`); the patch marker is derived from `AZAHAR_PATCH.md`'s
+  heading list, so editing a patch mints a fresh key instead of silently serving stale
+  frames. Frames stored as PNG; each context has an `index.json` recording the full key
+  metadata (savestate/ROM paths+hashes, patch marker) for auditability.
+- **API**: `harness_ctl.OracleCache` — `get_frame`/`put_frame` (by az frame number),
+  `get_probe`/`put_probe` (by probe name + az frame + args, for deterministic structured
+  probes like camera eye/at, `az_daytime`, `az_fog`, `vsuni_log`). `stats()`/`invalidate()`
+  for housekeeping.
+- **CLI**: `tools/oracle_cache.py stats|warm [frames...]|invalidate`. `warm` with no args
+  pre-captures the standard title sweep points ({100,200,360,500,700,764,1000,1300,1522,
+  1700,1900}) in one harness session.
+- **title_ab.py `ab`** is cache-aware: a cache hit on the target az frame skips the `run
+  <az>` stepping loop entirely and reuses the stored PNG for the oracle side; the SoH side
+  is NEVER cached (it changes every build) and always runs live via `soh_step`. Reports
+  "oracle: cache hit" or "oracle: live run (cached now)" so a caller can see which path ran.
+- **Invalidate** whenever the savestate, ROM, or an `AZAHAR_PATCH.md` entry changes — the
+  key naturally rotates, so a stale cache just sits unused rather than serving wrong data;
+  run `invalidate` to reclaim the disk space it would otherwise occupy.
+- **soh3d_harness is single-instance** (PID-locked) — the frame cache does not change
+  that; `warm`/`ab` cache-miss paths still need exclusive access to the harness process.
+
 ## The loop, in one line
 tooling → audit@matched-frames → RE-to-ground-truth → fix-or-proven-negative → verify@matched-frames
 → land-on-main → next; decomp stream always running; one build at a time; build the module, not a patch.

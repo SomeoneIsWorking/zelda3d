@@ -23,15 +23,203 @@ Usage:
 from __future__ import annotations
 
 import argparse
+import hashlib
+import json
 import os
+import re
 import subprocess
 import sys
+import time
 from pathlib import Path
 from typing import Iterable, Optional
 
 REPO_ROOT   = Path(__file__).resolve().parent.parent
 HARNESS_SH  = REPO_ROOT / "tools" / "soh3d_harness.sh"
 HARNESS_BIN = REPO_ROOT / "Azahar" / "build-libretro" / "bin" / "Release" / "soh3d_harness"
+
+# ---------------------------------------------------------------------------
+# OracleCache — persistent cache of deterministic embedded-Azahar output.
+# ---------------------------------------------------------------------------
+#
+# The oracle's output at az (Azahar) frame N is fully determined by three
+# inputs: the savestate loaded at t=0, the ROM bytes, and whatever the
+# soh3d_harness Azahar patches (tools/soh3d_harness/AZAHAR_PATCH.md) do to
+# rendering. Given those three held fixed, re-running Az to frame N always
+# produces the same pixels/state — so it's cacheable and repeated A/B or
+# probe runs shouldn't pay the Az boot+step cost again for a frame already
+# captured. See docs/parity-workflow.md "Oracle data cache" and
+# debug_journal/2026-07-11-oracle-cache.md for the design writeup.
+#
+# Cache lives at scratch/oracle_cache/<key>/ (gitignored — ROM-derived pixel
+# data must never be committed). <key> = sha256(savestate)[:16] +
+# sha256(rom)[:16] + a marker derived from AZAHAR_PATCH.md's heading list,
+# so any savestate change, ROM swap, or Azahar-patch edit mints a fresh,
+# independent cache context instead of silently serving stale frames.
+
+CACHE_ROOT = REPO_ROOT / "scratch" / "oracle_cache"
+AZAHAR_PATCH_MD = REPO_ROOT / "tools" / "soh3d_harness" / "AZAHAR_PATCH.md"
+
+
+def _sha256_file(path: Path) -> str:
+    h = hashlib.sha256()
+    with open(path, "rb") as f:
+        for chunk in iter(lambda: f.read(1 << 20), b""):
+            h.update(chunk)
+    return h.hexdigest()
+
+
+def _patch_marker() -> str:
+    """Short marker derived from AZAHAR_PATCH.md's heading list (patch
+    count + a hash of the heading text). Changes whenever a patch is
+    added/removed/renamed — a coarse but cheap proxy for "did the Azahar
+    rendering patches change" without diffing the (gitignored, not always
+    present) Azahar tree itself."""
+    if not AZAHAR_PATCH_MD.exists():
+        return "nopatchmd"
+    headings = re.findall(r'^#{1,2}\s.*$', AZAHAR_PATCH_MD.read_text(), re.MULTILINE)
+    h = hashlib.sha256("\n".join(headings).encode()).hexdigest()[:8]
+    return f"p{len(headings)}-{h}"
+
+
+def cache_key(savestate: Path, rom: Optional[Path] = None) -> tuple[str, dict]:
+    """Compute the cache key + full metadata (for auditability — stored
+    verbatim in each cache context's index.json)."""
+    savestate = Path(savestate)
+    savestate_sha = _sha256_file(savestate)[:16] if savestate.exists() else "nostate"
+    rom_path = Path(rom) if rom else (
+        Path(os.environ["ZELDA3D_OOT3D_ROM"]) if os.environ.get("ZELDA3D_OOT3D_ROM") else None)
+    rom_sha = _sha256_file(rom_path)[:16] if rom_path and rom_path.exists() else "norom"
+    patch = _patch_marker()
+    key = f"{savestate_sha}_{rom_sha}_{patch}"
+    meta = {
+        "key": key,
+        "savestate_path": str(savestate),
+        "savestate_sha256_16": savestate_sha,
+        "rom_path": str(rom_path) if rom_path else None,
+        "rom_sha256_16": rom_sha,
+        "azahar_patch_marker": patch,
+        "azahar_patch_md": str(AZAHAR_PATCH_MD),
+    }
+    return key, meta
+
+
+class OracleCache:
+    """get/put cache for deterministic embedded-Azahar oracle output.
+
+    Two kinds of entries, both under scratch/oracle_cache/<key>/:
+      - frames: PNG captures at a given az (Azahar) frame number, e.g. the
+        `<name>.az.ppm` snapshots title_ab.py produces (frames/az<N>.png).
+      - probes: JSON blobs for structured, deterministic probe commands
+        (az camera eye/at, az_daytime, titleactors, vsuni_log, az_fog, ...)
+        keyed by (probe_name, az_frame, args).
+
+    index.json at the context root records the full key metadata (for
+    auditability) plus a manifest of every cached frame/probe.
+    """
+
+    def __init__(self, savestate: Path, rom: Optional[Path] = None):
+        self.key, self.meta = cache_key(savestate, rom)
+        self.dir = CACHE_ROOT / self.key
+        self.frames_dir = self.dir / "frames"
+        self.probes_dir = self.dir / "probes"
+        self.index_path = self.dir / "index.json"
+        self._index: Optional[dict] = None
+
+    def _load_index(self) -> dict:
+        if self._index is not None:
+            return self._index
+        if self.index_path.exists():
+            self._index = json.loads(self.index_path.read_text())
+        else:
+            self._index = {"meta": self.meta, "frames": {}, "probes": {}}
+        return self._index
+
+    def _save_index(self) -> None:
+        self.dir.mkdir(parents=True, exist_ok=True)
+        idx = self._load_index()
+        idx["meta"] = self.meta
+        self.index_path.write_text(json.dumps(idx, indent=2, sort_keys=True))
+
+    # -- frames --------------------------------------------------------
+
+    def get_frame(self, az_frame: int) -> Optional[Path]:
+        idx = self._load_index()
+        entry = idx["frames"].get(str(az_frame))
+        if not entry:
+            return None
+        p = self.dir / entry["file"]
+        return p if p.exists() else None
+
+    def put_frame(self, az_frame: int, src_image_path) -> Path:
+        from PIL import Image
+        idx = self._load_index()
+        self.frames_dir.mkdir(parents=True, exist_ok=True)
+        dst = self.frames_dir / f"az{az_frame}.png"
+        Image.open(src_image_path).convert("RGB").save(dst)
+        idx["frames"][str(az_frame)] = {
+            "file": str(dst.relative_to(self.dir)),
+            "captured": time.time(),
+            "source": str(src_image_path),
+        }
+        self._save_index()
+        return dst
+
+    # -- probes ----------------------------------------------------------
+
+    @staticmethod
+    def _probe_key(probe_name: str, az_frame: int, args: Optional[dict]) -> str:
+        args_s = json.dumps(args or {}, sort_keys=True)
+        h = hashlib.sha256(args_s.encode()).hexdigest()[:10]
+        return f"{probe_name}_{az_frame}_{h}"
+
+    def get_probe(self, probe_name: str, az_frame: int, args: Optional[dict] = None):
+        idx = self._load_index()
+        pk = self._probe_key(probe_name, az_frame, args)
+        entry = idx["probes"].get(pk)
+        if not entry:
+            return None
+        p = self.dir / entry["file"]
+        if not p.exists():
+            return None
+        return json.loads(p.read_text())
+
+    def put_probe(self, probe_name: str, az_frame: int, args: Optional[dict], data) -> None:
+        idx = self._load_index()
+        pk = self._probe_key(probe_name, az_frame, args)
+        self.probes_dir.mkdir(parents=True, exist_ok=True)
+        dst = self.probes_dir / f"{pk}.json"
+        dst.write_text(json.dumps(data, indent=2, sort_keys=True, default=str))
+        idx["probes"][pk] = {
+            "file": str(dst.relative_to(self.dir)),
+            "probe_name": probe_name,
+            "az_frame": az_frame,
+            "args": args or {},
+            "captured": time.time(),
+        }
+        self._save_index()
+
+    # -- housekeeping ------------------------------------------------------
+
+    def stats(self) -> dict:
+        idx = self._load_index()
+        total_bytes = 0
+        if self.dir.exists():
+            for root, _dirs, files in os.walk(self.dir):
+                for fn in files:
+                    total_bytes += (Path(root) / fn).stat().st_size
+        return {
+            "key": self.key,
+            "dir": str(self.dir),
+            "n_frames": len(idx["frames"]),
+            "n_probes": len(idx["probes"]),
+            "bytes": total_bytes,
+        }
+
+    def invalidate(self) -> None:
+        import shutil
+        if self.dir.exists():
+            shutil.rmtree(self.dir)
+        self._index = None
 
 
 class Harness:
