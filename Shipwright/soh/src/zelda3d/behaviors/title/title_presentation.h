@@ -100,6 +100,10 @@ public:
     void applyDomeOverride(PlayState* play);
 
     const TitleFrameState& frame() const { return mFrame; }
+    // Non-const accessor for the per-actor apply/release calls (Zelda3D_Title_RiderApply bridge,
+    // exit()'s releaseMount() call) — TitleRider owns actor-pointer state (mHorseActor/
+    // mPlayerActor) that those calls mutate, unlike the read-only TitleFrameState snapshot above.
+    TitleRider& mutableRider() { return mRider; }
 
 private:
     bool mActive = false;
@@ -128,10 +132,14 @@ void Zelda3D_Title_ApplyLightOverride(PlayState* play);
 // Bridge for TitlePresentation::applyDomeOverride — called from z_play.c's Play_Draw right
 // after Environment_UpdateSkybox(). No-op when the title cs isn't active.
 void Zelda3D_Title_ApplyDomeOverride(PlayState* play);
-// Writes the current frame's resolved rider transform to *outPos/*outYaw (used by
-// Zelda3D_ActorPostUpdate in zelda3d.c). Only meaningful while Zelda3D_Title_IsActive() is true —
-// mirrors the contract of the old direct gZelda3dRiderPos/gZelda3dRiderYaw reads.
-void Zelda3D_Title_RiderTransform(float outPos[3], int16_t* outYaw);
+// Per-actor rider apply (used by Zelda3D_ActorPostUpdate in zelda3d.c, called for EVERY actor at
+// the end of Actor_UpdateAll). Forwards to TitleRider::applyToActor — spawns/mounts the title
+// EN_HORSE instance once and applies this frame's cue-driven transform to it (2026-07-10
+// horse-attribution port, oot3d-decomp/docs/title_rider_port_spec.md). Replaces the old
+// Zelda3D_Title_RiderTransform(outPos,outYaw) accessor, which only ever fed the ACTOR_PLAYER
+// branch directly — the horse needs actor identity (to spawn/match the EN_HORSE instance), not
+// just the resolved pos/yaw, so the whole per-actor decision moved behind this one call.
+void Zelda3D_Title_RiderApply(PlayState* play, Actor* actor);
 // OoT3D scene-folder-name override for the title demo, or NULL when title isn't active (falls
 // back to the normal sceneNum -> kZelda3dSceneNames lookup in zelda3d.c's Zelda3D_SceneName).
 // The oracle's title demo loads its OWN dedicated scene, `spot99` — a Grezzo-authored clone of
