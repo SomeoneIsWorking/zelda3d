@@ -129,7 +129,12 @@ scratch/title_ab/fsweep_*.png — machine-local, per never-commit-PNGs).
 
 ### Residuals, named and attributed
 
-1. **Title lifetime is still the N64 gamestate flow's, not the 3DS cs's** — the biggest
+1. **[RESOLVED 2026-07-10, commit c95948ae — see `2026-07-10-title-lifetime-ownership.md`.
+   Root cause: z_demo.c's Cutscene_Command_Terminator has no gameMode gate on its
+   `playCutscene` trigger, so the N64-authored title cs's own 0x3E8 terminator ended the
+   PlayState at its shorter length; now suppressed while Zelda3D_Title_IsActive(). Full
+   2400-frame loop, wrap fade, second loop and press-START skip verified free-running.]**
+   Title lifetime is still the N64 gamestate flow's, not the 3DS cs's — the biggest
    remaining structural divergence, measured precisely this session: SoH's title-cs cursor
    advances at exactly 0.5 cs/engine-step until **cs frame 811** (soh_step ~1854), freezes
    there, and the game exits into the N64 attract sequence (gameplay demo with HUD — visible
