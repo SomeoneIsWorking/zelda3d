@@ -168,6 +168,26 @@ int TitlePresentation::update(PlayState* play) {
         }
         gSaveContext.dayTime = csTime;
         mFrame.dayTime = csTime;
+        // Keep skyboxTime in lockstep with the cs-driven dayTime — mirrors the same-frame
+        // `skyboxTime = dayTime` writes at every other place the engine jumps dayTime
+        // discontinuously instead of ticking it via gTimeIncrement (z_scene.c:370/390 on
+        // scene load, z_demo.c:496 for scripted cutscenes). Without this, z_kankyo.c's
+        // Environment_Update sync guard (`(sceneSetupIndex>=5 || gTimeIncrement!=0) &&
+        // dayTime>skyboxTime`) never fires here — sceneSetupIndex isn't >=5 and
+        // gTimeIncrement is 0 while the title cs owns time — so skyboxTime sticks at its
+        // scene-load value and Environment_UpdateSkybox keeps re-selecting the SAME
+        // D_8011FC1C row every frame: skybox1Index==skybox2Index collapses the cross-fade
+        // guard (`idx2 != skybox1Index` in Zelda3D_TryDrawTitleSky) and the dome/ambient's
+        // warm (R/G) channel visibly freezes even though the title's own ported ambient
+        // palette keeps blending correctly. Root-caused via oot3d-decomp/docs/
+        // title_env_lighting.md §8 (cross-fade guard) cross-referenced against
+        // debug_journal/2026-07-08-title-divergence-remeasure.md Verdict 3 (skybox1==
+        // skybox2==3 constant while ambient kept changing — the smoking gun that only the
+        // INDEX schedule was stuck, not the color blend). Title-only: no other caller of
+        // Environment_Update writes dayTime this way, so the general gameplay skybox path
+        // (which already sets skyboxTime via z_scene.c/z_demo.c at its own discontinuities)
+        // is untouched.
+        gSaveContext.skyboxTime = csTime;
         // Lighting: applied separately by applyLightOverride(), called from z_kankyo's
         // Environment_Update at ITS OWN pre-existing call site — see this class's header comment
         // for why that is NOT folded into this function.
