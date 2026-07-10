@@ -279,14 +279,30 @@ extern "C" float gZelda3dLight1Col[3]  = { 0.80f, 0.75f, 0.65f }; // warm sun
 extern "C" float gZelda3dLight2Dir[3]  = {-0.40f,-0.55f,-0.73f }; // opposite sun (fill)
 extern "C" float gZelda3dLight2Col[3]  = { 0.05f, 0.08f, 0.15f }; // cool sky fill
 
+// Number of ENABLED N64 directional light slots feeding this frame's ambient term (1 or 2; set by
+// zelda3d.c from the live envCtx.lightSettings, NOT hardcoded here). Ground truth:
+// <oot3d-decomp>/docs/title_env_lighting.md §10/§11 disassembled /CmbVShader.shbin and found the
+// PICA vertex-lit program does NOT apply `matAmbient * sceneAmbient` once — it accumulates
+// `matAmbient * LightAmbientColor_i` in an unrolled loop, ONCE PER ENABLED LIGHT SLOT (3 slots,
+// each independently gated by its own `LightDir_i.w` enable flag). SoH's `envCtx.lightSettings`
+// only tracks ONE scene ambient colour (the N64 shape), so every enabled slot on the 3DS side
+// carries an IDENTICAL copy of it — the real per-light sum therefore collapses exactly to
+// `ambient * numEnabledLights` (not an approximation: each of the N identical terms is really
+// there). This is that N, so the ambient term in the shader can be that real sum rather than a
+// fitted multiplier; when SoH's light model grows distinct per-slot ambient colours, this becomes
+// a genuine loop of N differing terms instead of an N-way repeat of the same one.
+extern "C" float gZelda3dAmbientLightCount = 2.0f;
+
 extern "C" void Zelda3D_GL_SetLightParams(const float ambient[3], const float light1Col[3],
-                                         const float light2Dir[3], const float light2Col[3]) {
+                                         const float light2Dir[3], const float light2Col[3],
+                                         int numEnabledLights) {
     for (int i = 0; i < 3; i++) {
         gZelda3dAmbient[i]   = ambient[i];
         gZelda3dLight1Col[i] = light1Col[i];
         gZelda3dLight2Dir[i] = light2Dir[i];
         gZelda3dLight2Col[i] = light2Col[i];
     }
+    gZelda3dAmbientLightCount = (numEnabledLights > 0) ? (float)numEnabledLights : 1.0f;
 }
 
 // --- Dynamic shadow tunables (REPL `shadow*` in zelda3d.c; env ZELDA3D_SHADOW for the master gate) ---

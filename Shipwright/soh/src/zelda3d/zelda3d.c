@@ -129,9 +129,12 @@ void Zelda3D_EnsureModelProvider(void);
 void Zelda3D_GL_FrameBegin(void); // drop any Zelda3D draws left unrendered from a prior frame
 void Zelda3D_GL_SetLightDir(const float dirWorld[3]); // scene sun dir (world space) for the form term
 // Push all four scene light parameters (ambient, key-light color, fill-light dir+color) from
-// envCtx.lightSettings so the shader runs the real N64 two-light diffuse equation.
+// envCtx.lightSettings so the shader runs the real N64 two-light diffuse equation. numEnabledLights
+// is the count of live directional light slots this frame (1 or 2) — see title_env_lighting.md
+// §10/§11: the real PICA vertex-lit program sums matAmbient*sceneAmbient once PER ENABLED slot.
 void Zelda3D_GL_SetLightParams(const float ambient[3], const float light1Col[3],
-                              const float light2Dir[3], const float light2Col[3]);
+                              const float light2Dir[3], const float light2Col[3],
+                              int numEnabledLights);
 void Zelda3D_GL_SetShadowFocus(float x, float y, float z); // per-frame world focus for the sun-shadow box
 void Zelda3D_GL_EmitPose(int modelId); // snapshot this actor's pose at emit time (per-item skinning)
 void Zelda3D_GL_SetMidMask(int modelId, unsigned long long mask); // per-frame mesh_id visibility (Link equipment)
@@ -3955,7 +3958,16 @@ static void Zelda3D_UpdateLight(PlayState* play) {
             l2dir[1] /= l2len;
             l2dir[2] /= l2len;
         }
-        Zelda3D_GL_SetLightParams(ambient, l1col, l2dir, l2col);
+        // Enabled-light count for the real per-enabled-light ambient sum (title_env_lighting.md
+        // §10/§11). light1 is the scene's key directional light and is always authored/enabled in
+        // N64 EnvLightSettings; light2 (fill) is present but its direction is near-zero/degenerate
+        // in a handful of scenes (same degeneracy test already used above to gate normalization) —
+        // treat those as light2 disabled for THIS frame, matching the shader's own per-slot
+        // LightDir_i.w enable gating rather than hardcoding "always 2".
+        {
+            int numEnabledLights = 1 + (l2len > 0.5f ? 1 : 0);
+            Zelda3D_GL_SetLightParams(ambient, l1col, l2dir, l2col, numEnabledLights);
+        }
         // #110: feed the live (time-blended) env ambient colour to the VK world path's additive
         // ambient floor. The coefficient (gZelda3dWorldAmb, REPL `worldamb`) gates/scales it. When the
         // REPL has pinned a colour (gZelda3dWorldAmbOverride, for deriving OoT3D's scene-constant
