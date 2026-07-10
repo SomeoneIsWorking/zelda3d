@@ -39,6 +39,12 @@
 u16 D_8011E1C0 = 0;
 u16 D_8011E1C4 = 0;
 
+// Zelda3D::TitlePresentation activity query (behaviors/title/title_presentation.h/.cpp). Declared
+// inline rather than including the C++ header, matching the existing precedent
+// (z_en_mag.c's EnMag_Update suppression, 332e1868) — see Cutscene_Command_Terminator's comment
+// for why this file needs it.
+extern int Zelda3D_Title_IsActive(void);
+
 typedef void (*CutsceneStateHandler)(PlayState*, CutsceneContext*);
 
 void func_80064720(PlayState* play, CutsceneContext* csCtx);
@@ -496,6 +502,35 @@ void func_80065134(PlayState* play, CutsceneContext* csCtx, CsCmdDayTime* cmd) {
 void Cutscene_Command_Terminator(PlayState* play, CutsceneContext* csCtx, CsCmdBase* cmd) {
     Player* player = GET_PLAYER(play);
     s32 temp = 0;
+
+    // Zelda3D title-demo: this command's `playCutscene` trigger below fires purely on
+    // `cmd->startFrame == csCtx->frames` (see that check a few lines down) with NO gameMode gate
+    // at all — unlike every other branch in this function, which explicitly excludes
+    // GAMEMODE_TITLE_SCREEN. That means the underlying N64-authored title/attract cutscene's OWN
+    // terminator command fires this function's case-switch (play->nextEntranceIndex +
+    // transitionTrigger = TRANS_TRIGGER_START) at ITS OWN, much shorter authored length, ending
+    // the title's PlayState (usually into a following "attract gameplay" demo scene) long before
+    // the ported OoT3D title cs (spot99_info.zsi, 2400-frame loop, driven independently by
+    // Zelda3D::TitlePresentation/Zelda3D_TitleCsAdvance) has run its course. Measured: SoH's
+    // ported cs cursor froze at cs frame 811 and the game fell into N64 attract gameplay with a
+    // visible HUD (debug_journal/2026-07-10-title-arc-closing-measurement.md residual 1).
+    //
+    // OoT3D's title is a self-owned scripted-playback gamestate that loops its own 2400-frame cs
+    // forever until a confirm press (oot3d-decomp/docs/title_gamestate_driver.md) — TitlePresentation
+    // already implements that loop (Zelda3D_TitleCsAdvance wraps at end_frame; TitleRider::step
+    // teleports on the wrap's cue-index discontinuity; the ported op-0x7c screen fade + press-START
+    // skip already fire off the wrapping cursor). The only missing piece was OWNERSHIP of the
+    // underlying PlayState's lifetime: suppress this N64-authored terminator's scene-exit switch
+    // entirely while the ported title is active, so `play->sceneNum` never leaves SCENE_HYRULE_FIELD
+    // and TitlePresentation keeps ticking — the same suppression EnMag_Update already got (332e1868)
+    // for its own instant press-START transition, now applied to the underlying cutscene engine's
+    // exit path too. `csCtx->frames` keeps free-running past the N64 script's own command count with
+    // no further commands to match — harmless, mirroring how any other idle post-terminator cs frame
+    // behaves — since every visible/authoritative value (camera/dayTime/rider/sky/overlay) is driven
+    // by the independent ported cs cursor, not by this csCtx.
+    if (Zelda3D_Title_IsActive()) {
+        return;
+    }
 
     bool shouldSkipCommand = false;
 
