@@ -69,6 +69,9 @@ extern "C" int gZelda3dWorldLit;
 // vertex-lit shader so it matches OoT3D's real formula sceneAmb*matAmb + sceneDif*matDif*NdotL.
 extern "C" float gZelda3dAmbient[3];
 extern "C" float gZelda3dLight1Col[3];
+// Enabled-light count for the real per-enabled-light ambient sum (see uAmbient.w fill/consumer
+// comments below; zelda3d_gl.cpp, set from live envCtx.lightSettings by zelda3d.c).
+extern "C" float gZelda3dAmbientLightCount;
 extern "C" int gUnifiedRenderer; // render-unification effort (kanban #131): bit 0 = CMB unified
 // REPL `sgdump <modelId>`: arm a one-shot per-group render-state dump for the next draw of that model.
 extern "C" int g_sgDumpModel = -1;
@@ -278,9 +281,15 @@ const char* kFrag =
     // by the stage scale (PICA scales each stage's output AFTER the combine — g_title.cmb's
     // stage 1 is 2.0*(PREV*CONST0), the fire-glow "half brightness" factor, fireglow doc §3.2).
     "    if (ubo.uMatConst.a >= 0.5) rgb = clamp(rgb * ubo.uMatConst.rgb * ubo.uMatConst.a, 0.0, 1.0);\n"
+    // uAmbient.w carries the ENABLED-LIGHT COUNT for this draw (0 = ambient path inactive), not a
+    // 0/1 gate: title_env_lighting.md §10/§11 disassembled OoT3D's real PICA vertex-lit program and
+    // found `matAmbient*sceneAmbient` is summed once PER ENABLED light slot (2 for standard N64
+    // scenes), not applied once. Every enabled slot in SoH's data model carries the identical scene
+    // ambient colour (SoH tracks one ambient, not per-slot ones), so the real N-term sum reduces
+    // exactly to `uAmbient.xyz * uAmbient.w` here — a real sum, not a fitted multiplier.
     "    if (ubo.uParams.y < 0.5) {\n"
     "        if (ubo.uAmbient.w > 0.0)\n"
-    "            rgb *= ubo.uAmbient.xyz;\n"
+    "            rgb *= ubo.uAmbient.xyz * ubo.uAmbient.w;\n"
     "        rgb = clamp(rgb, 0.0, 1.0) * ubo.uExtra.w;\n"
     "    }\n"
     "    if (ubo.uFog.w > 0.5 && ubo.uLightDir.w < 0.5) {\n"
@@ -1708,7 +1717,9 @@ void Fast::Zelda3DRenderer::DrawModel(int modelId, const float* mp16, const floa
         ubo.uAmbient[0] = gZelda3dAmbient[0] * grp.matAmbient[0];
         ubo.uAmbient[1] = gZelda3dAmbient[1] * grp.matAmbient[1];
         ubo.uAmbient[2] = gZelda3dAmbient[2] * grp.matAmbient[2];
-        ubo.uAmbient[3] = ambGroup ? 1.0f : 0.0f;
+        // .w = enabled-light count (title_env_lighting.md §10/§11's per-enabled-light ambient sum;
+        // see the kFrag comment at its consumer). 0 keeps the ambient path off exactly as before.
+        ubo.uAmbient[3] = ambGroup ? gZelda3dAmbientLightCount : 0.0f;
         // PICA200 TEV CONSTANT modulate: for materials whose combiner sources CONSTANT in any
         // stage, publish the selected slot's RGB with .a = 1 so the shader applies it. Materials
         // that never reference CONSTANT (e.g. plain MODULATE(PRIM, TEX0)) leave .a = 0 and the
