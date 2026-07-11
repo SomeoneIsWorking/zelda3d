@@ -225,12 +225,19 @@ const char* kVert =
     "    vNrmView = mat3(ubo.uMV) * nM;\n"
     "    vWorld = (ubo.uMV * vec4(sp, 1.0)).xyz;\n"
     "    vUv = vec2(aUv.x + ubo.uExtra.y, 1.0 - aUv.y + ubo.uExtra.z);\n"
-    // Coordinator-1 UV for the dual-texture detail mask (uTex1Xf: .xy = scale, .zw = translate
-    // incl. per-draw CMAB scroll). noclip calcTexMtx (DccMaya, rot=0): uv1 = scale * (uv - trans),
-    // applied in CMB UV space, then the same V flip the primary sample uses (textures are decoded
-    // row-0-top). Dead data when the group's dual-tex flag (uSheen.y) is off.
-    "    vec2 uv1 = vec2((aUv.x - ubo.uTex1Xf.z) * ubo.uTex1Xf.x, (aUv.y - ubo.uTex1Xf.w) * ubo.uTex1Xf.y);\n"
-    "    vUv1 = vec2(uv1.x, 1.0 - uv1.y);\n"
+    // Coordinator-1 UV for the dual-texture detail mask. uSheen.w carries the coordinator-1
+    // mapping method (noclip TextureCoordinatorMappingMethod): 1=UvCoordinateMap (scale*(uv-trans)),
+    // 3=CameraSphereEnvMap (normal-derived UV: reflect the view vector about the normal, map to
+    // [0,1]²). The wordmark's decorations (mat4-9) use sphere mapping — for the flat (0,0,1) normals
+    // this samples the texture's center, which is bright, not a per-vertex UV location (which was
+    // dim, making the multiply combiner produce near-black output). uTex1Xf: .xy=scale, .zw=trans.
+    "    if (ubo.uSheen.w > 2.5) {\n"
+    "        vec3 nv = normalize(mat3(ubo.uMV) * nM);\n"
+    "        vUv1 = vec2(nv.x * 0.5 + 0.5, nv.y * 0.5 + 0.5);\n"
+    "    } else {\n"
+    "        vec2 uv1 = vec2((aUv.x - ubo.uTex1Xf.z) * ubo.uTex1Xf.x, (aUv.y - ubo.uTex1Xf.w) * ubo.uTex1Xf.y);\n"
+    "        vUv1 = vec2(uv1.x, 1.0 - uv1.y);\n"
+    "    }\n"
     "}\n";
 
 const char* kFrag =
@@ -720,6 +727,7 @@ SgModel* Fast::Zelda3DRenderer::ensureUploaded(int modelId) {
             g.uv1Scale[1] = groups[i].uv1Scale[1];
             g.uv1Trans[0] = groups[i].uv1Trans[0];
             g.uv1Trans[1] = groups[i].uv1Trans[1];
+            g.coord1Mapping = groups[i].coord1Mapping;
         }
         if (groups[i].vertCount > 0) {
             for (int k = 0; k < 4; k++)
@@ -1957,6 +1965,7 @@ void Fast::Zelda3DRenderer::DrawModel(int modelId, const float* mp16, const floa
         if (grp.dualTexMode) {
             ubo.uSheen[1] = (float)grp.dualTexMode;
             ubo.uSheen[2] = grp.dualTexScale2;
+            ubo.uSheen[3] = (float)grp.coord1Mapping; // 1=UV, 3=SphereEnvMap (shader selects)
             ubo.uTex1Xf[0] = grp.uv1Scale[0];
             ubo.uTex1Xf[1] = grp.uv1Scale[1];
             ubo.uTex1Xf[2] = grp.uv1Trans[0] + uvOffU;

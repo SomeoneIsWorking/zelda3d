@@ -98,6 +98,7 @@ typedef struct Zelda3DGlGroup {
     unsigned wrap1S, wrap1T;  // binding-1 GL wrap enums
     float uv1Scale[2];        // coordinator-1 scale (S, T)
     float uv1Trans[2];        // coordinator-1 translate (S, T); uv1 = scale * (uv - trans)
+    int   coord1Mapping;      // coordinator-1 mapping method (noclip): 1=UV, 3=SphereEnvMap
 } Zelda3DGlGroup;
 
 // One decoded texture (RGBA8, w*h*4 bytes, row 0 = top).

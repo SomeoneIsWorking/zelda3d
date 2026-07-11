@@ -70,6 +70,7 @@ struct SgGroup {
     unsigned wrap1S = 0x2901, wrap1T = 0x2901;
     float uv1Scale[2] = { 1.0f, 1.0f };
     float uv1Trans[2] = { 0.0f, 0.0f };
+    int coord1Mapping = 1; // coordinator-1 mapping method: 1=UV, 3=SphereEnvMap
     float dbgColor0[4] = { -1, -1, -1, -1 }; // sample of vertex[first].color (sgdump diagnostics)
     float dbgUv0[2] = { 0, 0 }, dbgUv1[2] = { 0, 0 }, dbgUv2[2] = { 0, 0 }; // sample uvs (sgdump)
 };

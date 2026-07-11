@@ -173,6 +173,9 @@ bool Cmb::parseMats() {
         m.scale1_t = f32(b, co1 + 8);
         m.trans1_s = f32(b, co1 + 12);
         m.trans1_t = f32(b, co1 + 16);
+        // Coordinator-1 mapping method (noclip byte[2] of the coordinator entry): determines how
+        // the second texture's UVs are generated. 3 = CameraSphereEnvMap (normal-derived UV).
+        m.coord1_mapping = u8(b, co1 + 2);
         m.alpha_test = u8(b, o + 0x130) != 0;
         m.alpha_ref = u8(b, o + 0x131) / 255.0f;
         // Blend state (GL-ES enum values, used verbatim — see CmbMaterial). Offsets per
