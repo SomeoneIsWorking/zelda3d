@@ -79,6 +79,7 @@ Zelda3DGlGroup MakeGlGroup(const Cmb& cmb, const CmbDrawGroup& g, const CmbVerte
     cg.uv1Scale[1] = mat ? mat->scale1_t : 1.0f;
     cg.uv1Trans[0] = mat ? mat->trans1_s : 0.0f;
     cg.uv1Trans[1] = mat ? mat->trans1_t : 0.0f;
+    cg.coord1Mapping = mat ? mat->coord1_mapping : 1;
     if (getenv("ZELDA3D_DBG_MAT")) {
         fprintf(stderr, "[MAT] mi=%d vlit=%d comb=%.1f amb=(%.2f,%.2f,%.2f) dif=(%.2f,%.2f,%.2f) "
                         "constIdx=%d const%d=(%.2f,%.2f,%.2f,%.2f)\n",

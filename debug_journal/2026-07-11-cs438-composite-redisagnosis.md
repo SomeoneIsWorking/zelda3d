@@ -228,3 +228,55 @@ partial cause but only affects 92 of 676 decoration triangles. The remaining 584
 (mat4/5/6/9) have matching formulas but still produce no visible output — this needs UV-level
 instrumentation (dump the actual vUv1 values and sampled texels at a decoration fragment) to
 close out. Not attempted this session — the budget went to the combiner/TEV analysis above.
+
+## Addendum 2: ROOT CAUSE FOUND — coordinator-1 uses CameraSphereEnvMap, not UV
+
+Continued the investigation. The mystery of "matching formulas, correct textures, correct
+binding, yet dim/invisible output" was resolved by discovering that the wordmark's decorative
+materials use **CameraSphereEnvMap** (noclip `TextureCoordinatorMappingMethod = 3`) for
+coordinator-1, NOT `UvCoordinateMap` (1). SoH's shader was computing `vUv1` from `aUv`
+(vertex texCoord0), but the oracle generates the second texture's UVs from the **view-space
+normal** via sphere mapping (`uv = normal.xy * 0.5 + 0.5`).
+
+For the wordmark's flat normals (mostly (0,0,±1)), sphere mapping samples the texture's
+**center** — which is bright (RGB≈247,243,247 for i_ctex04c). The old UV-based sampling hit
+random per-vertex UV locations that were dim (mean R≈29/255). The multiply `tex0 * tex1 * 2`
+with a bright tex1 (≈0.97) produces `tex0 * 1.9` (visible), vs `tex0 * 0.11 * 2` (invisible)
+with the dim UV-based tex1.
+
+### The fix
+
+- **CMB parser** (`cmb.cpp`/`cmb.h`): parse `coord1_mapping` from byte[2] of the coordinator-1
+  entry (noclip `TextureCoordinatorMappingMethod`).
+- **Group propagation** (`cmb_glgroups.cpp` → `zelda3d_gl.h` → `zelda3d_sdl3gpu.h` →
+  `zelda3d_sdl3gpu.cpp`): thread `coord1Mapping` through to the SgGroup and set it on
+  `uSheen.w` (previously unused) for dual-tex groups.
+- **Vertex shader** (`kVert`): when `uSheen.w > 2.5` (sphere map), compute `vUv1` from the
+  view-space normal (`normalize(mat3(uMV) * nM).xy * 0.5 + 0.5`) instead of from `aUv`.
+
+### Verification
+
+- `lus_tests`: 438 passed / 6 skipped (pre-existing), 0 failed.
+- Fully-assembled frame (az=900/soh=1303): wm-warm pixels 8242 → 8542 (+4%), strict letters
+  1530 → 1546. Small but real improvement — the sphere mapping only affects 5 of 17 decorative
+  meshes (the dual-tex groups mat4/5/6/7/9).
+- cs438 mid-fade (az=700/soh=1105): wm-warm 2204 → 2615 (+19%).
+- The cs438 ratio (SoH 0.720→0.774 vs oracle 0.579) moved AWAY from the oracle — the sphere
+  fix brightens cs438 decorations but not cs588 (where alpha=0, no decorations draw). This is
+  expected: the fix is a correctness improvement (the UV computation was genuinely wrong), but
+  the ratio metric is confounded by the coverage difference and the remaining unfixed decorations.
+
+### Why the fix is partial
+
+The sphere mapping fixes the dual-tex groups (mat4/5/6/7/9, 5 meshes). The remaining
+decorations are still broken:
+- **mat10/11** (zelda_logo_ev01/ev02, 5 meshes, 92 oracle triangles): the oracle overrides
+  the CMB's simple MODULATE→REPLACE with a custom `2*TEX0 + TEX1` (MULT_ADD). The CMB has
+  `tex1_idx=-1` (no second binding), but the oracle binds the same texture to both slots.
+  This is a game-side draw-time override not present in the CMB — needs decomp RE.
+- **mat3** (i_ctex04a, 3 meshes): simple MODULATE, no dual-tex, but the oracle's live TEV
+  may also differ. Not investigated.
+
+The full fix requires implementing the game's draw-time TEV overrides for the wordmark,
+which are not in the CMB file. This needs decomp-side RE of the wordmark's draw function
+to find where the custom TEV stages and texture bindings are configured.

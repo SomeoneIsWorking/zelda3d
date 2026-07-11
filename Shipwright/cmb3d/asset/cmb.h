@@ -34,6 +34,11 @@ struct CmbMaterial {
     int tex1_idx = -1;
     uint16_t wrap1_s = 0x2901, wrap1_t = 0x2901;
     float scale1_s = 1, scale1_t = 1, trans1_s = 0, trans1_t = 0;
+    // Coordinator-1 mapping method (noclip TextureCoordinatorMappingMethod): 0=None, 1=UvCoordinateMap,
+    // 2=CameraCubeEnvMap, 3=CameraSphereEnvMap, 4=ProjectionMap. title_logo_us mat4-9 use 3 (sphere):
+    // the second texture is sampled at a normal-derived UV, not the vertex UV — for the flat-normaled
+    // wordmark this samples the texture's center (bright), not a per-vertex UV location (dim).
+    int coord1_mapping = 1; // default UV (most materials)
     int cull = 0;
     bool alpha_test = false;
     float alpha_ref = 0;
