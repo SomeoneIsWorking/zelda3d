@@ -532,6 +532,25 @@ extern "C" int Zelda3D_TryDrawTitleLogo(PlayState* play) {
     // cf(fadeIn+40), then +3.0/frame for 81 frames, snapping to 255; synchronized -10/frame
     // fade-out with the other two elements once flag 4 fires).
     const uint8_t alphaU8 = (uint8_t)(ps.wordmarkAlpha + 0.5f);
+    // Verification aid (ZELDA3D_DBG_WORDMARK_ALPHA=1) — traces the resolved wordmark alpha at the
+    // actual draw-call site, to confirm the runtime value matches the paper derivation at a given
+    // csFrame (e.g. csFrame=438 → wordmarkStart=fadeIn+40, elapsed=54, alpha=54*3=162/255=0.635).
+    // The alpha value reaches the draw correctly on paper (zelda3d_sdl3gpu.cpp threads uExtra.x =
+    // a8/255 into the fragment shader's alpha), but a measured composite-axis residual
+    // (debug_journal/2026-07-11-attr-cs438-composite.md, gap 0.141) shows SoH's mid-fade letters are
+    // ~0% dimmed vs the oracle's ~15% — so confirming the runtime alpha here is step 1 of ruling
+    // alpha-value-correctness in or out before chasing the blend destination.
+    {
+        static int sDbgWma = -1;
+        if (sDbgWma < 0) {
+            const char* v = std::getenv("ZELDA3D_DBG_WORDMARK_ALPHA");
+            sDbgWma = (v != nullptr && v[0] != '\0') ? 1 : 0;
+        }
+        if (sDbgWma) {
+            fprintf(stderr, "[WORDMARK_ALPHA] csFrame=%d phase=%d wordmarkAlpha=%.2f alphaU8=%u\n",
+                    csFrame, (int)ps.phase, ps.wordmarkAlpha, (unsigned)alphaU8);
+        }
+    }
     gSPZelda3DDrawA(POLY_OPA_DISP++, modelId | (int)ZELDA3D_HANDLE_FORCE_UNLIT | (int)ZELDA3D_HANDLE_SCREEN_SPACE,
                     alphaU8, 255, 255, 255);
     CLOSE_DISPS(play->state.gfxCtx);
