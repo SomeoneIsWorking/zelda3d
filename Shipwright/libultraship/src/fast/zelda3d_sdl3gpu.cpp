@@ -287,7 +287,12 @@ const char* kFrag =
     // deferred-PRIMARY trick, this stage does scale2*t0*t1.
     "    if (ubo.uSheen.y > 1.5) {\n"
     "        vec3 t1 = texture(uTex1, vUv1).rgb;\n"
-    "        if (ubo.uSheen.y > 2.5) {\n"
+    "        if (ubo.uSheen.y > 3.5) {\n"
+    // Mode 4 (mat10/11 self-sphere-add): coordinator-0 is also sphere-mapped, so re-sample
+    // tex0 at the sphere UV. Result: 2*TEX0 + TEX1 = 3*TEX0 (tex1=tex0, same sphere UV).
+    "            vec3 t0s = texture(uTex, vUv1).rgb;\n"
+    "            t.rgb = clamp(t0s * ubo.uSheen.z + t1, 0.0, 1.0);\n"
+    "        } else if (ubo.uSheen.y > 2.5) {\n"
     "            t.rgb = clamp(t.rgb * t1 * ubo.uSheen.z, 0.0, 1.0);\n"
     "        } else {\n"
     "            t.rgb = clamp(t.rgb + t1, 0.0, 1.0);\n"
@@ -1965,7 +1970,7 @@ void Fast::Zelda3DRenderer::DrawModel(int modelId, const float* mp16, const floa
         if (grp.dualTexMode) {
             ubo.uSheen[1] = (float)grp.dualTexMode;
             ubo.uSheen[2] = grp.dualTexScale2;
-            ubo.uSheen[3] = (float)grp.coord1Mapping; // 1=UV, 3=SphereEnvMap (shader selects)
+            ubo.uSheen[3] = (grp.dualTexMode == 4) ? 3.0f : (float)grp.coord1Mapping;
             ubo.uTex1Xf[0] = grp.uv1Scale[0];
             ubo.uTex1Xf[1] = grp.uv1Scale[1];
             ubo.uTex1Xf[2] = grp.uv1Trans[0] + uvOffU;
