@@ -168,6 +168,8 @@ bool Cmb::parseMats() {
         m.trans_s = f32(b, co + 12);
         m.trans_t = f32(b, co + 16);
         m.rot = f32(b, co + 20);
+        // Coordinator-0 mapping method (noclip byte[2] of coordinator entry 0).
+        m.coord0_mapping = u8(b, co + 2);
         uint32_t co1 = o + 0x58 + 0x18;
         m.scale1_s = f32(b, co1 + 4);
         m.scale1_t = f32(b, co1 + 8);
@@ -334,6 +336,20 @@ bool Cmb::parseMats() {
                 m.dual_tex_mode = CmbMaterial::kDualTexModulateThenScale;
                 m.dual_tex_scale2 = (stage1Scale == 2 || stage1Scale == 4) ? (float)stage1Scale : 1.0f;
             }
+        }
+        // Wordmark decoration override (title_logo_us mat10/11): coordinator-0 uses
+        // CameraSphereEnvMap (mapping method 3) and the material has no tex1 binding
+        // (tex1_idx=-1). The game's CTR render-object binds tex1=tex0 at draw time and
+        // uses a 2-stage TEV: tev[0]=2*(PRIMARY*TEX0), tev[1]=MULT_ADD(PRIMARY,TEX1,PREV)
+        // = PRIMARY*(2*TEX0 + TEX1) = 3*PRIMARY*TEX0 (since tex1=tex0 via sphere map).
+        // Verified from oracle draw_log at az=760/900 (92 triangles, tex0=tex1=180cba80).
+        // coord1_mapping holds coordinator-0's mapping method here (coordinator-0 is the
+        // primary coordinator, stored separately from coordinator-1's own mapping field).
+        if (m.dual_tex_mode == CmbMaterial::kDualTexNone && m.coord0_mapping == 3 &&
+            m.tex1_idx < 0 && m.tex0_idx >= 0) {
+            m.dual_tex_mode = CmbMaterial::kDualTexSelfSphereAdd;
+            m.tex1_idx = m.tex0_idx; // self-reference: tex1 = tex0
+            m.dual_tex_scale2 = 2.0f;
         }
         o += stride;
     }

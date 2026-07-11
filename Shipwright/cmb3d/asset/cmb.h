@@ -34,11 +34,11 @@ struct CmbMaterial {
     int tex1_idx = -1;
     uint16_t wrap1_s = 0x2901, wrap1_t = 0x2901;
     float scale1_s = 1, scale1_t = 1, trans1_s = 0, trans1_t = 0;
-    // Coordinator-1 mapping method (noclip TextureCoordinatorMappingMethod): 0=None, 1=UvCoordinateMap,
-    // 2=CameraCubeEnvMap, 3=CameraSphereEnvMap, 4=ProjectionMap. title_logo_us mat4-9 use 3 (sphere):
-    // the second texture is sampled at a normal-derived UV, not the vertex UV — for the flat-normaled
-    // wordmark this samples the texture's center (bright), not a per-vertex UV location (dim).
-    int coord1_mapping = 1; // default UV (most materials)
+    // Coordinator mapping methods (noclip TextureCoordinatorMappingMethod): 0=None, 1=UvCoordinateMap,
+    // 2=CameraCubeEnvMap, 3=CameraSphereEnvMap, 4=ProjectionMap. title_logo_us mat4-9 use coord1=3
+    // (sphere) for the second texture; mat10-11 use coord0=3 (sphere) for the primary texture.
+    int coord0_mapping = 1; // coordinator-0 (primary texture): default UV
+    int coord1_mapping = 1; // coordinator-1 (second texture): default UV
     int cull = 0;
     bool alpha_test = false;
     float alpha_ref = 0;
@@ -117,6 +117,7 @@ struct CmbMaterial {
         kDualTexAddMult = 1,                    // (t0 + t1) * t0            [g_title.cmb fire-glow]
         kDualTexAddThenModulatePrimary = 2,      // (t0 + t1) * primary       [shield glint]
         kDualTexModulateThenScale = 3,           // scale2 * (primary*t0*t1) [sword / shield detail]
+        kDualTexSelfSphereAdd = 4,              // primary*(2*t0+t1), t1=tex0 via sphere map [wordmark mat10/11]
     };
     int dual_tex_mode = kDualTexNone;
     // Stage-1 hardware RGB scale for kDualTexModulateThenScale (1/2/4); 1.0 for other modes.
