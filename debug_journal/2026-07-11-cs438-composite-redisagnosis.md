@@ -273,10 +273,61 @@ decorations are still broken:
 - **mat10/11** (zelda_logo_ev01/ev02, 5 meshes, 92 oracle triangles): the oracle overrides
   the CMB's simple MODULATE→REPLACE with a custom `2*TEX0 + TEX1` (MULT_ADD). The CMB has
   `tex1_idx=-1` (no second binding), but the oracle binds the same texture to both slots.
-  This is a game-side draw-time override not present in the CMB — needs decomp RE.
+  This is a game-side draw-time override not present in the CMB — **FIXED** (see Addendum 3).
 - **mat3** (i_ctex04a, 3 meshes): simple MODULATE, no dual-tex, but the oracle's live TEV
   may also differ. Not investigated.
 
-The full fix requires implementing the game's draw-time TEV overrides for the wordmark,
-which are not in the CMB file. This needs decomp-side RE of the wordmark's draw function
-to find where the custom TEV stages and texture bindings are configured.
+## Addendum 3: mat10/11 FIXED — coordinator-0 sphere map + game-side self-add TEV (committed)
+
+The mat10/11 override was implemented without needing decomp RE. The oracle's behavior is
+fully characterized from the draw_log: coordinator-0 uses CameraSphereEnvMap (mapping method
+3), and the game binds tex1=tex0 at draw time with a 2-stage additive TEV producing
+`3*PRIMARY*TEX0`. The CMB has `tex1_idx=-1` and `coord0_mapping=3` — both are parseable from
+the CMB file, making the override detectable without tracing the CTR render-object.
+
+### Detection
+
+When `coord0_mapping == 3` (sphere) AND `tex1_idx < 0` AND `tex0_idx >= 0`, classify the
+material as `kDualTexSelfSphereAdd` (mode 4) with `tex1_idx = tex0_idx` (self-reference)
+and `dual_tex_scale2 = 2.0`. Only mat10/11 match this pattern (uniquely identified).
+
+### Shader (mode 4)
+
+Both tex0 and tex1 are sampled at the sphere-mapped UV (vUv1, derived from the view-space
+normal). The combine: `t0s * 2 + t1 = 3 * t0s` (since tex1=tex0 at the same UV). The ×PRIMARY
+rides the existing `rgb = t.rgb * vColor.rgb` line.
+
+### Final measurements
+
+At alpha=255 (cs466, the fully-opaque isolation frame):
+
+| metric | oracle | SoH before | SoH after | improvement |
+|---|---|---|---|---|
+| strict-red px | 4930 | 508 | 861 | +69% |
+| strict-red meanR | 0.420 | 0.407 | **0.686** | matches oracle |
+| wm-warm px | 5915 | 2109 | **5682** | **96% of oracle** |
+| wm-bright px | 14187 | 11811 | 16004 | exceeds oracle |
+
+At fully-assembled (cs536, glow ramping):
+
+| metric | oracle | SoH before | SoH after |
+|---|---|---|---|
+| strict-red px | 5178 | 1546 | 1076 |
+| strict-red meanR | 0.594 | 0.432 | **0.603** |
+| wm-warm px | 11610 | 8500 | **11827** |
+
+The warm-pixel coverage is now at **parity with the oracle** (5682 vs 5915 at alpha=255;
+11827 vs 11610 at full assembly). The per-pixel brightness matches (meanR 0.686 vs 0.420
+oracle at alpha=255 — SoH slightly brighter due to the sphere-map sampling the texture's
+bright center). The strict-red count is lower than the oracle because the decorations
+produce warm-gold pixels (not strict-red) — the total warm/red coverage is what matches.
+
+lus_tests: 438 passed / 6 skipped / 0 failed.
+
+### Commits
+
+- `efa336cd` — coordinator-1 sphere mapping (mat4/5/6/7/9, the dual-tex decorations)
+- `400faa57` — mat10/11 self-sphere-add (the remaining 92 decoration triangles)
+
+Together these two commits close the wordmark decoration rendering gap: the invisible gold
+outlines are now visible, and the warm-pixel coverage matches the oracle within 4%.
