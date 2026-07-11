@@ -150,3 +150,81 @@ samples at the same UV, and determine whether the RGBA4444 alpha-edge handling d
 the investigation was diagnostic, and the fixSpec's proposed hypotheses were falsified
 before any "fix" was attempted (per the no-bandaid directive: the cause was not what the
 prior session expected, so no constant-tuning was applied).
+
+## Addendum: deeper root-cause investigation (same session, continued)
+
+Pursued the coverage gap to its mechanism. Key findings:
+
+### The coverage gap is in the DECORATIVE meshes (gold outlines), not the letter fill
+
+The wordmark model (title_logo_us.cmb, model ID 2014) has 22 groups across 12 materials:
+- mat0/1/2 (title_all, RGBA4444): the red letter fill — 5 meshes, 12 triangles
+- mat3-11 (i_ctex*/zelda_logo_ev*): the gold-outline decorations — 17 meshes
+
+Oracle draw_log (az=760, captured via harness `draw_log`): the oracle draws **676 dual-tex
+decoration triangles** + **12 letter-fill triangles**. The decorations vastly outnumber the
+letters. SoH's 508 strict-letter pixels vs the oracle's 4930 is because SoH renders the
+decorations invisibly (black output) while the oracle renders them as visible gold/red.
+
+### Decorations DO reach the fragment shader — confirmed via magenta debug
+
+Temporarily replaced the dual-tex fragment output with bright magenta: **39158 pixels**
+turned magenta. The decoration geometry IS being drawn and passes the alpha test. The issue
+is the combiner MATH producing black/invisible RGB, not culling or depth.
+
+### Oracle's live TEV registers vs CMB file — they MATCH for most decorations
+
+Decoded the oracle's live PICA TEV stages from the draw_log for each decoration type:
+
+| material | oracle tev[0] | oracle tev[1] | result | CMB file says | SoH mode |
+|---|---|---|---|---|---|
+| mat4/5 (i_ctex04a) | MODULATE(PRIM,TEX0)×2 | MODULATE(PREV,TEX1)×2 | 2*PRIM*TEX0*TEX1*2 | same | mode 3 ✓ |
+| mat6/9 (i_ctex10a) | ADD(TEX0,TEX1) | MODULATE(PREV,PRIMARY) | (TEX0+TEX1)*PRIM | same | mode 2 ✓ |
+| mat10 (zelda_logo_ev01) | MODULATE(PRIM,TEX0)×2 | MULT_ADD(PRIM,TEX1,PREV) | PRIM*(2*TEX0+TEX1) | MODULATE→REPLACE (no dual-tex!) | NONE |
+
+**The combiner formulas MATCH for mat4/5/6/9.** SoH implements the same multiply/add as the
+oracle. Yet the decorations are invisible. The CMB file's combiner for mat4/5 is correctly
+parsed and the dual-tex detection works (verified via `[DBG_DUALTEX]` trace: mode=3, tex1Idx
+correct, tex1Bound=1).
+
+**mat10 (zelda_logo_ev01) is the exception**: the oracle overrides the CMB's simple
+MODULATE→REPLACE with a custom 2-stage `2*TEX0 + TEX1` (MULT_ADD). The CMB file says no
+dual-tex, but the oracle binds the same texture to both slots and adds them. This is a
+game-side draw-time override not present in the CMB — 92 triangles affected.
+
+### Dual-tex binding is correct
+
+Traced via `[DBG_DUALTEX]` stderr trace: all 5 dual-tex groups (g0/g2/g13/g14/g15) have
+correct dualTexMode, tex1Index, and tex1 is bound (not null). The second texture IS sampled.
+
+### What's still unexplained
+
+For mat4/5/6/9, the combiner formula, texture binding, and depth handling ALL match the
+oracle, yet the decorations produce invisible output. The remaining suspects:
+1. **vUv1 (second texture UV) mapping** — the shader computes `vUv1 = (aUv - trans) * scale`,
+   but the coordinator-1's `sourceCoordinate` byte (byte 0 of the coordinator entry, per
+   noclip cmb.ts) is NOT read by the CMB parser. For mat4 it's 0 (use texCoord0), which the
+   shader already does. But if other materials use a different source, vUv1 would be wrong.
+2. **The texture content at the sampled UVs** — the decorative textures (RGB565, no alpha)
+   have real content (verified via dump), but the vUv1 mapping might sample a blank region.
+3. **Draw order** — the overlay composites by submission order (no depth test). If the letter
+   meshes draw AFTER the decorations and overwrite them (alpha=255 = opaque replace), the
+   decorations would be hidden. But the decorations should still show where letters don't
+   cover — unless the decoration geometry is very thin and entirely under the letters.
+
+### Tooling added (additional, this session)
+
+- `ZELDA3D_SG_DUMPTEX=all` — dumps ALL models' textures (was single-modelId only). Used to
+  find the wordmark's model ID (2014) and verify title_all's decode is byte-exact.
+- Oracle draw_log capture (`scratch/draw_log_wordmark.txt`) — 27K lines of per-triangle TEV
+  register state at az=760. THE reference for what the oracle actually renders.
+
+### Honest status
+
+The investigation reached the mechanism (invisible decorative meshes) but did NOT fully
+root-cause why the multiply combiner produces black output when the oracle's identical
+formula produces visible gold. The mat10 override (game-side TEV not in CMB) is a confirmed
+partial cause but only affects 92 of 676 decoration triangles. The remaining 584 triangles
+(mat4/5/6/9) have matching formulas but still produce no visible output — this needs UV-level
+instrumentation (dump the actual vUv1 values and sampled texels at a decoration fragment) to
+close out. Not attempted this session — the budget went to the combiner/TEV analysis above.

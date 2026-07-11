@@ -82,12 +82,17 @@ extern "C" float gZelda3dAmbientLightCount;
 extern "C" int gUnifiedRenderer; // render-unification effort (kanban #131): bit 0 = CMB unified
 // REPL `sgdump <modelId>`: arm a one-shot per-group render-state dump for the next draw of that model.
 extern "C" int g_sgDumpModel = -1;
-// ZELDA3D_SG_DUMPTEX=<modelId>: at that model's upload, log each source texture's mean RGBA (catches a
+// ZELDA3D_SG_DUMPTEX=<modelId|all>: at that model's upload, log each source texture's mean RGBA (catches a
 // black/failed texture decode, which uploads happen at scene-load before the REPL can arm sgdump).
+// "all" dumps every model's textures (for finding the right modelId without a prior run).
 static int g_sgDumpTexModel = []() {
     const char* v = getenv("ZELDA3D_SG_DUMPTEX");
-    return v ? atoi(v) : -1;
+    if (!v) return -1;
+    if (strcmp(v, "all") == 0) return -2;  // sentinel: dump all
+    return atoi(v);
 }();
+static bool g_sgDumpTexAll = (g_sgDumpTexModel == -2);
+static int g_sgDumpTexActual = g_sgDumpTexAll ? -1 : g_sgDumpTexModel;
 extern "C" int gZelda3dHlGroup;
 // Dynamic sun-shadow + screen-space AO tunables (M4), owned by zelda3d_gl.cpp; driven by the REPL
 // `shadow`/`ao` + RmlUi Graphics menu. The dispatcher (zelda3d_gl.cpp) resolves the master enables
@@ -771,8 +776,8 @@ SgModel* Fast::Zelda3DRenderer::ensureUploaded(int modelId) {
 
     for (int i = 0; i < texCount; i++) {
         m.textures.push_back(uploadTexture(texs[i].w, texs[i].h, texs[i].rgba));
-        if (modelId == g_sgDumpModel || g_sgDumpTexModel == modelId) {
-            if (g_sgDumpTexModel == modelId && texs[i].rgba) {
+        if (modelId == g_sgDumpModel || g_sgDumpTexActual == modelId || g_sgDumpTexAll) {
+            if ((g_sgDumpTexActual == modelId || g_sgDumpTexAll) && texs[i].rgba) {
                 // One-off raw-pixel dump (PPM, no library needed) so the SOURCE texel data can be
                 // eyeballed directly, bypassing the whole render/sampler pipeline.
                 char path[256];
