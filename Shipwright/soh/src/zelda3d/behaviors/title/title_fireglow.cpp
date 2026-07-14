@@ -149,8 +149,27 @@ extern "C" int Zelda3D_TryDrawTitleFireGlow(PlayState* play) {
     // cmab frame cursor: anchored at the fade-in trigger, same as the wordmark's csab playhead.
     // Zelda3D_CmabSampleTranslationV/ConstColorRGB clamp internally per the cmab's own loopMode
     // (Once: hold frame-300's value past duration; see file header).
+    //
+    // FRAME-DOMAIN FIX (2026-07-14, cs1093 fireglow-extent residual, debug_journal entry same
+    // date): `g_title_fire.cmab`'s `duration=300`/keyframe timestamps are authored in the H3D
+    // material-animation's native tick domain, which every other CMAB/CSAB player in this port
+    // runs at the REAL, per-engine-tick rate (confirmed for the title screen specifically —
+    // `zelda3d_cutscene.cpp`'s `Zelda3D_TitleCsAdvance()` is called once per real engine update
+    // from `TitlePresentation::update()`, and only advances its OWN returned cursor,
+    // `Zelda3D_TitleCsFrame()`, every OTHER call (`sTickParity`) — i.e. `csFrame` is a HALF-RATE
+    // derived clock, not the tick clock itself. This exact ratio is independently confirmed twice:
+    // statically (title_logo_actor.md §5.5's `csCtx.curFrame` vs the raw emulated-frame counter)
+    // and live (title_logo.cpp:282's `ZELDA3D_DBG_TITLESKIP` trace, "same csFrame value logged
+    // twice per tick"). Sampling the cmab directly at `csFrame - fadeInFrame` therefore fed it
+    // frames at HALF its authored rate — the flame-tongue phase (and the V-track UV scroll)
+    // reached only half its intended extent by any given csFrame, which is exactly the shape of
+    // the measured residual (extent/coverage gap, NOT a brightness/gain gap — matches
+    // 2026-07-14 journal's finding that per-pixel luminance was already at parity). Converting the
+    // cs-frame delta to the cmab's native tick domain is a straight unit conversion at the domain
+    // boundary (2 native ticks per cs-frame, the same ratio `Zelda3D_TitleCsAdvance` already
+    // enforces for every other cs-driven system) — not a fitted scale on the glow's own output.
     const int csFrame = Zelda3D_TitleCsFrame();
-    float cmabFrame = (fadeInFrame >= 0) ? (float)(csFrame - fadeInFrame) : 0.0f;
+    float cmabFrame = (fadeInFrame >= 0) ? 2.0f * (float)(csFrame - fadeInFrame) : 0.0f;
     if (cmabFrame < 0.0f) {
         cmabFrame = 0.0f;
     }
