@@ -18,6 +18,18 @@ void Zelda3D_ActorMoveXZByYawSpeed(float pos[3], int16_t yaw, float speed_xz);
 void EnHorse_MountedGallopReset(EnHorse* horse);
 void EnHorse_MountedTrotReset(EnHorse* horse);
 void EnHorse_StartMountedIdleResetAnim(EnHorse* horse);
+// EnHorse's own cs-action init/action funcs (z_en_horse.c ~2240-2355) — the vendored N64
+// EnHorse_CutsceneUpdate's sCutsceneInitFuncs[3]/[5] and sCutsceneActionFuncs[3]/[5], confirmed
+// 1:1 structurally with the 3DS FUN_002b6c00 (idx5 init: teleport + animationIdx=ENHORSE_ANIM_
+// REARING, ANIMMODE_ONCE via Animation_Change) and FUN_002535f0 (idx5 action: speedXZ=0 every
+// frame; on SkelAnime_Update completion, animationIdx -> ENHORSE_ANIM_IDLE) per
+// oot3d-decomp/docs/title_rider_cs_dispatch.md's 2026-07-14 addendum. Reused verbatim below
+// instead of the old ENHORSE_ACT_MOUNTED_IDLE approximation (no anim-select hack needed — these
+// functions already ARE the correct anim-select+SFX+end-behavior logic).
+void EnHorse_CsRearingInit(EnHorse* horse, PlayState* play, CsCmdActorCue* cue);
+void EnHorse_CsRearing(EnHorse* horse, PlayState* play, CsCmdActorCue* cue);
+void EnHorse_CsWarpRearingInit(EnHorse* horse, PlayState* play, CsCmdActorCue* cue);
+void EnHorse_CsWarpRearing(EnHorse* horse, PlayState* play, CsCmdActorCue* cue);
 // Player's native ongoing-mounted-ride action func (z_player.c ~13825) and the generic standing
 // idle func (~8492) reused verbatim so Link's rider pose/anim selection (mount) and post-title
 // fallback pose (release) fall out of the same code real gameplay uses (port spec step 3). Neither
@@ -166,6 +178,57 @@ void TitleRider::applyToActor(PlayState* play, Actor* actor) {
     horse->actor.shape.rot.y = horse->actor.world.rot.y = mYaw;
     horse->actor.velocity.x = horse->actor.velocity.y = horse->actor.velocity.z = 0.0f;
 
+    // Rearing (cue 0x41/0x26): drive EnHorse's OWN cs-action init/action funcs (z_en_horse.c
+    // EnHorse_CsWarpRearingInit/-CsWarpRearing, EnHorse_CsRearingInit/-CsRearing) instead of
+    // approximating with the mounted-idle gait. These are the literal vendored N64 dispatch-table
+    // entries EnHorse_CutsceneUpdate would call for this cue action (sCutsceneInitFuncs[3]/[5],
+    // sCutsceneActionFuncs[3]/[5]) and are structurally 1:1 with the decompiled 3DS FUN_002b6c00/
+    // FUN_002535f0 (oot3d-decomp/docs/title_rider_cs_dispatch.md) — same teleport-on-init +
+    // ANIMMODE_ONCE rearing clip + speedXZ=0 + auto-transition to ENHORSE_ANIM_IDLE when the once-
+    // clip finishes. `horse->cutsceneAction` (the native field these functions themselves use,
+    // z_en_horse.h +0x380) doubles as the transition-edge flag here exactly as it does inside the
+    // real EnHorse_CutsceneUpdate — the title path just supplies the cue instead of csCtx.linkAction.
+    const int funcIdx = RiderCsFuncIdx(mCueAction);
+    if (funcIdx == 3 || funcIdx == 5) {
+        CsCmdActorCue cue{};
+        cue.action = mCueAction;
+        // Only the *Init funcs read startPos/urot.y (teleport target); at the exact transition
+        // frame mPos/mYaw already equal the cue's p0/cueYaw (TitleRider::step() teleported them
+        // there this same frame, before applyToActor runs) — see step()'s teleport branch.
+        cue.startPos.x = (s32)mPos[0];
+        cue.startPos.y = (s32)mPos[1];
+        cue.startPos.z = (s32)mPos[2];
+        cue.urot.y = (uint16_t)mYaw;
+        if (horse->cutsceneAction != funcIdx) {
+            horse->cutsceneAction = funcIdx;
+            if (funcIdx == 5) {
+                EnHorse_CsWarpRearingInit(horse, play, &cue);
+            } else {
+                EnHorse_CsRearingInit(horse, play, &cue);
+            }
+        }
+        if (funcIdx == 5) {
+            EnHorse_CsWarpRearing(horse, play, &cue);
+        } else {
+            EnHorse_CsRearing(horse, play, &cue);
+        }
+        // horse->action/animationIdx/speedXZ are now authoritatively owned by the Cs func just
+        // called (including its own end-of-clip -> ENHORSE_ANIM_IDLE transition). Park the horse's
+        // own next-frame dispatch on ENHORSE_ACT_CS_UPDATE: its action func (EnHorse_CutsceneUpdate)
+        // returns immediately while play->csCtx.linkAction is NULL (which it always is at title —
+        // the title cs runs on Zelda3D's own interpreter, not the N64 csCtx), so THIS post-update
+        // call is the horse's sole animation driver — the same single-dispatcher structure as the
+        // 3DS FUN_0026a30c. Anything else (e.g. ENHORSE_ACT_MOUNTED_REARING) would make
+        // EnHorse_Update run a SECOND stick-driven action func each frame, double-stepping
+        // SkelAnime_Update (2x playback) and fighting the end-transition.
+        horse->action = ENHORSE_ACT_CS_UPDATE;
+        horse->playerControlled = 1;
+        horse->cyl1.base.ocFlags1 |= OC1_ON;
+        horse->cyl2.base.ocFlags1 |= OC1_ON;
+        horse->jntSph.base.ocFlags1 |= OC1_ON;
+        return;
+    }
+
     // Force-select the cued gait (port spec step 4) EVERY frame, not just on the cue-action
     // transition: EnHorse's stock action funcs (EnHorse_MountedGallop/-Trot/-MountedIdle) read
     // REAL controller stick input to decide whether to hold/demote the gait, which the title
@@ -181,15 +244,6 @@ void TitleRider::applyToActor(PlayState* play, Actor* actor) {
     s32 wantAnimIdx;
     f32 wantSpeed;
     switch (mCueAction) {
-        case 0x41: // CsWarpRearing — rearing-into-idle in place. Approximated with the mounted
-                   // idle gait for now (no rearing Reset helper is exposed by z_en_horse.c);
-                   // trajectory-correct (speed 0), anim divergence noted in the 2026-07-14
-                   // rider-cs-dispatch journal as a follow-up.
-        case 0x26: // CsRearing — same approximation
-            wantAction = ENHORSE_ACT_MOUNTED_IDLE;
-            wantAnimIdx = ENHORSE_ANIM_IDLE;
-            wantSpeed = 0.0f;
-            break;
         case 0x24: // CsMove — GALLOP anim, decomp-confirmed: CsMoveInit (FUN_0016ca48) selects
                    // anim slot 7, the same slot WarpMoveInit (FUN_002a8af8) uses for its gallop
                    // default; matches N64 EnHorse_CsMoveInit's ENHORSE_ANIM_GALLOP. (The earlier
@@ -216,6 +270,11 @@ void TitleRider::applyToActor(PlayState* play, Actor* actor) {
     horse->action = wantAction;
     horse->animationIdx = wantAnimIdx;
     horse->actor.speedXZ = wantSpeed;
+    // Keep the native cs-action index tracking the CURRENT cue here too (the real dispatcher
+    // writes this->cutsceneAction on every idx change) — otherwise it would stay parked at 5
+    // after a rearing cue and the NEXT title loop's 0x41 latch would never re-run
+    // EnHorse_CsWarpRearingInit (no transition edge).
+    horse->cutsceneAction = funcIdx;
     // Stop EnHorse_MountDismount's one-shot mount-edge Freeze transition (z_en_horse.c) from
     // re-firing every frame — it only fires while playerControlled==false, and its target
     // (ENHORSE_ACT_FROZEN) would otherwise fight the gait forced above.

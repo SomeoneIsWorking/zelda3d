@@ -331,7 +331,15 @@ extern "C" int Zelda3D_PlayerDrawImpl(PlayState* play, Actor* actor) {
     Player* player;
     int modelId;
     u8 tint[3];
-    if (!Zelda3D_Enabled() || !Zelda3D_LinkEnabled()) {
+    // The general OoT3D Link body replacement is still WIP and stays gated behind ZELDA3D_LINK
+    // (default off) for ordinary on-foot gameplay. The MOUNTED case is scoped ON unconditionally:
+    // it is not a toggle for "N64-original vs 3DS" (the no-gates rule bans exactly that) — it is a
+    // code-level narrowing of an already-3DS-default feature to the one state (horseback) that is
+    // verified correct (position sync via the native z_player.c mount code + the groundOff fix
+    // above). Riding N64-blocky-Link floating off Epona is the reported bug; this closes it without
+    // waiting on the rest of the on-foot player port to finish.
+    int mountedForDraw = (((Player*)actor)->stateFlags1 & PLAYER_STATE1_ON_HORSE) != 0;
+    if (!Zelda3D_Enabled() || (!Zelda3D_LinkEnabled() && !mountedForDraw)) {
         return 0;
     }
     // Use the *_new (link_v2/childlink_v2) body: a single CMB with FULL embedded textures
@@ -567,7 +575,20 @@ extern "C" int Zelda3D_PlayerDrawImpl(PlayState* play, Actor* actor) {
     static float sLinkLastGroundedOff = 0.0f;
     s32 climbPose = gZelda3dClimbGroundFix && csab != NULL &&
                     (strstr(csab, "climb") != NULL || strstr(csab, "hang") != NULL);
-    if (climbPose) {
+    // Mounted (horseback): actor.world.pos.y is ALREADY the correct seat height, set every frame
+    // by the native mount code (z_player.c Player_Action_8084CC98: world.pos.y = rideActor->
+    // actor.world.pos.y + rideActor->riderPos.y - 27.0f — Epona's back position, not the ground).
+    // The feet-grounding heuristic below assumes the pose's lowest visible vertex is a planted
+    // foot on the floor; for the riding pose that lowest vertex is a bent knee/stirrup nowhere
+    // near actor.world.pos.y, so applying it here shoves the whole body up/down by that offset —
+    // this IS the reported "Link floats detached above/behind Epona" bug. No grounding is correct
+    // (same as N64's own mounted draw, which never grounds either) — zero it outright rather than
+    // freeze-last (unlike climb, the seat height genuinely changes every frame as Epona moves over
+    // terrain, so a frozen offset would itself drift stale).
+    s32 mountedPose = (player->stateFlags1 & PLAYER_STATE1_ON_HORSE) != 0;
+    if (mountedPose) {
+        groundOff = 0.0f;
+    } else if (climbPose) {
         groundOff = sLinkLastGroundedOff;
     } else {
         sLinkLastGroundedOff = groundOff;
@@ -575,7 +596,8 @@ extern "C" int Zelda3D_PlayerDrawImpl(PlayState* play, Actor* actor) {
     if (gZelda3dAnimDebug) {
         static int dbg = 0;
         if ((dbg++ % 30) == 0) {
-            fprintf(stderr, "SOH3D LINK groundOff=%.1f (model-local)%s\n", groundOff, climbPose ? " [climb:frozen]" : "");
+            fprintf(stderr, "SOH3D LINK groundOff=%.1f (model-local)%s\n", groundOff,
+                   mountedPose ? " [mounted:zeroed]" : (climbPose ? " [climb:frozen]" : ""));
             fflush(stdout);
         }
     }
