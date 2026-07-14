@@ -13,6 +13,22 @@
 # stays off the user's Wayland desktop. Override with ZELDA3D_HEADLESS=0 to get
 # the harness's SBS window on :0 (debugging only).
 #
+# Title-cs frame sync (DEFAULT, no flag needed): the harness's `step <N>`
+# REPL command (the combined Az+SoH driver used for live/SBS viewing) auto-
+# arms TitleSyncController on its first call in a fresh process — the oracle
+# loads scratch/title_settled.state and HOLDS there while SoH3D boots cold
+# through the title cs; once SoH's raw frame count passes 408, a native
+# content search (grayscale structure match, same formula as
+# tools/title_ab.py) locks the oracle onto SoH's current frame, then 1:1
+# stepping keeps both halves showing the same title-cs instant —
+# recalibrating via the same search on every title-cs loop wrap (1:1
+# stepping alone was measured to drift over a full ~2400-frame loop, see
+# tools/soh3d_harness/title_sync.h). Tools that drive their own scene via
+# explicit `loadstate`/`soh_boot` (title_ab.py, oracle_cache.py, ...) are
+# unaffected — they never call `step`, and title-sync auto-arm is skipped
+# whenever manual loadstate/soh_boot already ran before the first `step`
+# anyway. See debug_journal/2026-07-14-harness-title-sync.md.
+#
 # Usage:
 #   tools/soh3d_harness.sh                       # rom from $ZELDA3D_OOT3D_ROM
 #   tools/soh3d_harness.sh /path/to/oot3d.3ds    # explicit rom

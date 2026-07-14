@@ -40,6 +40,19 @@
 //                                          Main_Init; SOH3D_HEADLESS forced)
 //   soh_step <N>         -> ok soh_step <N>  (RunFrame() x N — advance
 //                                              SoH3D's Graph state machine)
+//   step <N>             -> ok step <N> <mode> [titlesync=HOLD|LOCKED]
+//                           Combined driver — DEFAULT title-sync engages on
+//                           the first call (see title_sync.h): the oracle
+//                           loads scratch/title_settled.state and holds
+//                           there while SoH boots cold; once SoH passes
+//                           frame 408 a native content search locks the
+//                           oracle onto SoH's current frame, then 1:1
+//                           stepping keeps them locked (recalibrating via
+//                           the same search on every title-cs loop wrap —
+//                           1:1 stepping alone drifts over a full loop, see
+//                           title_sync.h). No-op (legacy passthrough) if
+//                           loadstate/soh_boot already ran manually.
+//   titlesync             -> ok titlesync state=... sohFrame=... azFrame=...
 //
 // Meta:
 //   quit                 -> ok  (then exit)
@@ -58,6 +71,7 @@
 #include <cstdlib>
 #include <cmath>
 #include <cstring>
+#include <algorithm>
 #include <filesystem>
 #include <iostream>
 #include <optional>
@@ -66,6 +80,7 @@
 #include <vector>
 
 #include "libretro.h"
+#include "title_sync.h"
 #include <SDL3/SDL.h>
 #include <atomic>
 #include <chrono>
@@ -321,6 +336,14 @@ uint32_t g_input_poll_ids_seen = 0; // bit N set if joypad id N was ever queried
 // helpers below can gate their SoH3D-side branches; assigned inside
 // HandleSohBoot further down.
 bool g_soh_booted = false;
+
+// Set true the moment a manual `loadstate` REPL command runs. Consulted by
+// HandleStep's first invocation: if something has already manually loaded
+// an Az state (or booted SoH directly) before the first `step`, that's a
+// script driving its own scene, not the fresh-boot title default -- the
+// TitleSyncController stays permanently DISABLED and `step` behaves exactly
+// like the old unconditional lockstep passthrough. See title_sync.h.
+bool g_manual_state_touch = false;
 
 SDL_Window* g_win = nullptr;
 int         g_win_w = 1280;  // total SBS width; ½ per engine
@@ -775,23 +798,32 @@ void HandleDumpRange(std::istringstream& toks) {
                 (unsigned long long)unmapped_bytes, path.c_str());
 }
 
+// Raw loadstate body, factored out of HandleLoadState so ArmTitleSync()
+// (title-sync auto-engage, see title_sync.h) can reuse it WITHOUT setting
+// g_manual_state_touch -- that flag means "something ELSE manually touched
+// state", which an auto-arm triggered by the default `step` path is not.
+bool LoadStateFileInternal(const std::string& path) {
+    auto buf = SlurpFile(path);
+    if (buf.empty()) return false;
+    return Core::System::GetInstance().LoadStateBuffer(std::move(buf));
+}
+
 void HandleLoadState(std::istringstream& toks) {
     std::string path;
     if (!(toks >> path)) { PrintErr("loadstate: usage: loadstate <path>"); return; }
-    auto buf = SlurpFile(path);
-    if (buf.empty()) { PrintErr("loadstate: read failed"); return; }
-    if (!Core::System::GetInstance().LoadStateBuffer(std::move(buf))) {
-        PrintErr("loadstate: core rejected buffer");
-        return;
-    }
+    if (!LoadStateFileInternal(path)) { PrintErr("loadstate: read/deserialize failed"); return; }
+    g_manual_state_touch = true;
     std::printf("ok\n");
 }
 
 // SoH3D bring-up as a REPL command so failure modes are isolated —
 // call this from a test script instead of always booting SoH3D on
 // startup and taking the whole harness down on any early crash.
-void HandleSohBoot(std::istringstream&) {
-    if (g_soh_booted) { PrintErr("soh_boot: already booted"); return; }
+// Raw SoH3D bring-up body, factored out of HandleSohBoot so ArmTitleSync()
+// (title-sync auto-engage, see title_sync.h) can reuse it silently (no
+// "already booted"/"ok" REPL framing) from HandleStep's first invocation.
+// Caller must check !g_soh_booted first.
+void SohBootInternal() {
     // The harness owns the display; SoH3D must render to fb 0 but NOT open
     // a visible window of its own. SOH_HEADLESS=1 makes libultraship's
     // SDL3 backend create its window HIDDEN, and rendering into fb 0 (which
@@ -825,6 +857,11 @@ void HandleSohBoot(std::istringstream&) {
     Heaps_Alloc();
     Main_Init(nullptr);
     g_soh_booted = true;
+}
+
+void HandleSohBoot(std::istringstream&) {
+    if (g_soh_booted) { PrintErr("soh_boot: already booted"); return; }
+    SohBootInternal();
     std::printf("ok soh_boot\n");
 }
 
@@ -845,27 +882,236 @@ void HandleSohStep(std::istringstream& toks) {
     std::printf("ok soh_step %llu\n", static_cast<unsigned long long>(done));
 }
 
-// The two-engine driver: advance BOTH engines one frame at a time, so
-// they stay lockstep. Requires soh_boot first; without it, `step` is
-// just an alias for `run` (Azahar-only).
+// -- Native content score (title-sync calibration) --------------------------
+//
+// Ports tools/title_ab.py's content_score/load_gray_small to C++ so
+// CalibrateAndLock() below can run its search INLINE against the raw
+// in-memory framebuffers (g_az_buf / g_soh_buf) -- no PNG round-trip, cheap
+// enough to run on every loop-wrap resync without stalling the live SBS
+// view. Same formula: downsample each side to a small (48x28) grayscale
+// grid (ITU-R 601 luma, matching PIL's convert("L")), zero-mean + unit-norm
+// each independently (so brightness/hue differences -- the separate,
+// already-tracked lighting divergence -- don't move the score; only
+// position/pose/silhouette differences do), then dot-product.
+void DownsampleGrayAz(std::vector<float>& out, int gx, int gy) {
+    out.assign(static_cast<size_t>(gx) * gy, 0.0f);
+    if (!g_az_w || !g_az_h || g_az_buf.empty()) return;
+    for (int j = 0; j < gy; ++j) {
+        uint32_t sy = std::min<uint32_t>(g_az_h - 1,
+            static_cast<uint32_t>(static_cast<uint64_t>(j) * g_az_h / gy));
+        const uint8_t* row = g_az_buf.data() + static_cast<size_t>(sy) * g_az_pitch;
+        for (int i = 0; i < gx; ++i) {
+            uint32_t sx = std::min<uint32_t>(g_az_w - 1,
+                static_cast<uint32_t>(static_cast<uint64_t>(i) * g_az_w / gx));
+            const uint8_t* p = row + static_cast<size_t>(sx) * 4;  // B,G,R,X (XRGB8888 LE)
+            out[static_cast<size_t>(j) * gx + i] =
+                0.299f * p[2] + 0.587f * p[1] + 0.114f * p[0];
+        }
+    }
+}
+void DownsampleGraySoh(std::vector<float>& out, int gx, int gy) {
+    out.assign(static_cast<size_t>(gx) * gy, 0.0f);
+    const uint32_t w = gSoh3dCaptureW, h = gSoh3dCaptureH;
+    if (!w || !h || g_soh_buf.empty()) return;
+    for (int j = 0; j < gy; ++j) {
+        uint32_t sy = std::min<uint32_t>(h - 1,
+            static_cast<uint32_t>(static_cast<uint64_t>(j) * h / gy));
+        for (int i = 0; i < gx; ++i) {
+            uint32_t sx = std::min<uint32_t>(w - 1,
+                static_cast<uint32_t>(static_cast<uint64_t>(i) * w / gx));
+            const uint8_t* p = g_soh_buf.data() + (static_cast<size_t>(sy) * w + sx) * 4; // R,G,B,A
+            out[static_cast<size_t>(j) * gx + i] =
+                0.299f * p[0] + 0.587f * p[1] + 0.114f * p[2];
+        }
+    }
+}
+float ContentScoreNative(int gx = 48, int gy = 28) {
+    static std::vector<float> a, b;
+    DownsampleGrayAz(a, gx, gy);
+    DownsampleGraySoh(b, gx, gy);
+    auto normalize = [](std::vector<float>& v) {
+        double mean = 0.0;
+        for (float x : v) mean += x;
+        mean /= static_cast<double>(v.size());
+        for (float& x : v) x = static_cast<float>(x - mean);
+        double norm = 0.0;
+        for (float x : v) norm += static_cast<double>(x) * x;
+        norm = std::sqrt(norm);
+        if (norm > 1e-6) for (float& x : v) x = static_cast<float>(x / norm);
+    };
+    normalize(a);
+    normalize(b);
+    double dot = 0.0;
+    for (size_t i = 0; i < a.size(); ++i) dot += static_cast<double>(a[i]) * b[i];
+    return static_cast<float>(dot);
+}
+
+// A bare LoadStateFileInternal() never triggers a render (VideoRefresh only
+// fires from retro_run()), so it alone leaves g_az_buf holding STALE pixels
+// from whatever ran before -- wrong for HOLD (task requirement: the oracle
+// pane must show the settled title frame immediately, not a blank/stale
+// one) and wrong as CalibrateAndLock's search step=0 baseline. Reload +
+// render exactly one frame so g_az_buf reflects the loaded state; this
+// post-load render IS the canonical az_step=0 baseline every calibration
+// search and replay counts additional retro_run() calls from.
+bool ReloadOracleToBaseline() {
+    if (!LoadStateFileInternal(kTitleSettledStatePath)) return false;
+    FrameWatchdog wd("ReloadOracleToBaseline/retro_run");
+    retro_run();
+    return true;
+}
+
+// (Re)calibrate the oracle's timeline against SoH's CURRENT frame (held
+// fixed for the whole search -- SoH is not stepped here). Sweeps the
+// oracle forward from a fresh title_settled.state load through
+// [0, kCalibrateMargin] az-steps, scores each candidate against SoH's
+// frame, then -- since stepping is forward-only and the search itself
+// overshoots to kCalibrateMargin -- reloads title_settled.state once more
+// and replays EXACTLY the best-scoring step count so the oracle lands
+// precisely there (not at the overshot search endpoint) before locking.
+// Called from HandleStep: once when SoH's raw frame count first crosses
+// kSyncSohFrame (HOLD -> LOCKED), and again every time a SoH title-cs loop
+// wrap is detected while LOCKED (the caller reloads title_settled.state
+// itself before calling, matching the first-calibration precondition of
+// "oracle currently sitting at az=0").
+void CalibrateAndLock() {
+    float best = -2.0f;
+    uint64_t bestStep = 0;
+    for (int step = 0; step <= TitleSyncController::kCalibrateMargin; ++step) {
+        if (step > 0) { FrameWatchdog wd("CalibrateAndLock/search"); retro_run(); }
+        float score = ContentScoreNative();
+        if (score > best) { best = score; bestStep = static_cast<uint64_t>(step); }
+    }
+    ReloadOracleToBaseline();
+    for (uint64_t i = 0; i < bestStep; ++i) {
+        FrameWatchdog wd("CalibrateAndLock/replay"); retro_run();
+    }
+    g_titleSync.SetLocked(bestStep);
+    std::fprintf(stderr,
+        "[titlesync] calibrated #%d: az_step=%llu score=%.4f (searched 0..%d)\n",
+        g_titleSync.calibrations(), static_cast<unsigned long long>(bestStep), best,
+        TitleSyncController::kCalibrateMargin);
+}
+
+// Title-sync auto-engage (see title_sync.h). Called ONCE, from HandleStep's
+// very first invocation, when nothing has manually touched Az/SoH state yet
+// (see g_manual_state_touch). Loads scratch/title_settled.state (auto-
+// generating it via tools/title_settle.py if missing) and boots SoH3D cold.
+// Returns false -- with a clear stderr diagnostic -- if either step fails;
+// NEVER silently falls back to a cold-booted oracle instead (that would
+// silently break the "frame-synced by default" contract).
+bool ArmTitleSync() {
+    namespace fs = std::filesystem;
+    if (!fs::exists(kTitleSettledStatePath)) {
+        std::fprintf(stderr,
+            "[titlesync] %s missing -- attempting auto-generation via "
+            "tools/title_settle.py (see that script's docstring)...\n",
+            kTitleSettledStatePath);
+        std::fflush(stderr);
+        int rc = std::system("tools/title_settle.py 1>&2");
+        if (rc != 0 || !fs::exists(kTitleSettledStatePath)) {
+            std::fprintf(stderr,
+                "[titlesync] ERROR: %s still missing after auto-generation "
+                "(title_settle.py exit=%d). Generate it manually: "
+                "`source .env && tools/title_settle.py`, then retry `step`. "
+                "Refusing to silently cold-boot the oracle instead.\n",
+                kTitleSettledStatePath, rc);
+            return false;
+        }
+        std::fprintf(stderr, "[titlesync] auto-generated %s\n", kTitleSettledStatePath);
+    }
+    if (!ReloadOracleToBaseline()) {
+        std::fprintf(stderr, "[titlesync] ERROR: loadstate %s failed\n",
+                      kTitleSettledStatePath);
+        return false;
+    }
+    if (!g_soh_booted) SohBootInternal();
+    return g_soh_booted;
+}
+
+// The two-engine driver: advance BOTH engines, so they stay lockstep.
+//
+// DEFAULT behavior (see title_sync.h): the FIRST `step` call of a fresh
+// harness process (nothing manually loaded/booted yet) auto-arms the
+// TitleSyncController -- the oracle is loaded to title_settled.state and
+// HELD there while SoH boots cold from N64-logo through the title cs; once
+// SoH's raw frame count passes 408 the oracle starts advancing 1:1, so both
+// sides show the SAME title-cs instant from then on (verified: no periodic
+// resync needed, see the class comment). If a script/human already called
+// `loadstate`/`soh_boot` manually before the first `step`, title-sync
+// engagement is skipped entirely and `step` is the old unconditional
+// lockstep passthrough (both engines advance every iteration).
 void HandleStep(std::istringstream& toks) {
     std::string n_s;
     if (!(toks >> n_s)) { PrintErr("step: usage: step <N>"); return; }
     auto n = ParseNum(n_s);
     if (!n) { PrintErr("step: bad N"); return; }
+
+    if (g_titleSync.IsUnarmed()) {
+        if (g_manual_state_touch || g_soh_booted) {
+            // Manual setup already in flight -- not the fresh-boot title
+            // default path. Disable permanently; legacy passthrough below.
+            g_titleSync.Arm(false);
+        } else if (ArmTitleSync()) {
+            g_titleSync.Arm(true);
+            std::fprintf(stderr,
+                "[titlesync] armed: oracle held at %s (az=0); SoH booting cold "
+                "-> HOLD until soh frame > %llu, then content-calibrate + LOCKED "
+                "1:1 (recalibrates on every title-cs loop wrap; see title_sync.h)\n",
+                kTitleSettledStatePath,
+                static_cast<unsigned long long>(TitleSyncController::kSyncSohFrame));
+        } else {
+            PrintErr("step: title-sync arm failed (see stderr above) -- not "
+                      "stepping; fix the issue and retry, or run a manual "
+                      "`loadstate`+`soh_boot` first for legacy passthrough "
+                      "stepping of a different scene");
+            return;
+        }
+    }
+
+    const bool syncActive = g_titleSync.IsActive();
     uint64_t done = 0;
     for (uint64_t i = 0; i < *n; ++i) {
         if (g_quit_requested.load()) break;
-        { FrameWatchdog wd("HandleStep/retro_run"); retro_run(); }
-        if (g_soh_booted) {
-            RequestSohCapture();
-            FrameWatchdog wd("HandleStep/RunFrame"); RunFrame();
+        if (syncActive) {
+            if (g_soh_booted) {
+                RequestSohCapture();
+                { FrameWatchdog wd("HandleStep/RunFrame"); RunFrame(); }
+
+                bool needCalibrate = g_titleSync.NoteSohFrame();  // HOLD floor crossed?
+                if (!needCalibrate && g_titleSync.state() == TitleSyncController::State::LOCKED) {
+                    const int cs = Zelda3D_TitleCsFrame();
+                    if (g_titleSync.NoteCsFrameAndDetectWrap(cs)) {
+                        std::fprintf(stderr,
+                            "[titlesync] loop wrap detected (cs=%d) -- reloading "
+                            "oracle + recalibrating\n", cs);
+                        ReloadOracleToBaseline();
+                        needCalibrate = true;
+                    }
+                }
+
+                if (needCalibrate) {
+                    CalibrateAndLock();
+                } else if (g_titleSync.state() == TitleSyncController::State::LOCKED) {
+                    FrameWatchdog wd("HandleStep/retro_run"); retro_run();
+                }
+            }
+        } else {
+            { FrameWatchdog wd("HandleStep/retro_run"); retro_run(); }
+            if (g_soh_booted) {
+                RequestSohCapture();
+                FrameWatchdog wd("HandleStep/RunFrame"); RunFrame();
+            }
         }
         ++done;
     }
-    std::printf("ok step %llu %s\n",
+    const char* syncTag =
+        g_titleSync.state() == TitleSyncController::State::HOLD   ? " titlesync=HOLD" :
+        g_titleSync.state() == TitleSyncController::State::LOCKED ? " titlesync=LOCKED" : "";
+    std::printf("ok step %llu %s%s\n",
                 static_cast<unsigned long long>(done),
-                g_soh_booted ? "azahar+soh3d" : "azahar-only");
+                g_soh_booted ? "azahar+soh3d" : "azahar-only",
+                syncTag);
 }
 
 extern "C" volatile int      gSoh3dFb0LastCaptureAttempt;
@@ -3350,7 +3596,13 @@ void PrintHelp() {
         "  soh_boot             bring up SoH3D (InitOTR/Heaps_Alloc/Main_Init)\n"
         "  soh_step <N>         advance SoH3D by N frames (RunFrame x N)\n"
         "  step <N>             advance BOTH engines in lockstep (Azahar\n"
-        "                       retro_run + SoH3D RunFrame, per frame)\n"
+        "                       retro_run + SoH3D RunFrame, per frame).\n"
+        "                       DEFAULT title-sync: first call auto-loads\n"
+        "                       title_settled.state + soh_boot and content-\n"
+        "                       locks the oracle to SoH's title cs from soh\n"
+        "                       frame 408 on (see title_sync.h). Skipped if\n"
+        "                       loadstate/soh_boot already ran manually.\n"
+        "  titlesync             print TitleSyncController state/counters\n"
         "  compare <sub>        side-by-side dump from both engines;\n"
         "                       `compare list` shows subs (scene/player/\n"
         "                       actors/lighting)\n"
@@ -3761,6 +4013,21 @@ void RunRepl() {
         else if (cmd == "soh_boot")  HandleSohBoot(toks);
         else if (cmd == "soh_step")  HandleSohStep(toks);
         else if (cmd == "step")      HandleStep(toks);
+        else if (cmd == "titlesync") {
+            const char* stateName =
+                g_titleSync.state() == TitleSyncController::State::UNARMED  ? "UNARMED"  :
+                g_titleSync.state() == TitleSyncController::State::HOLD     ? "HOLD"     :
+                g_titleSync.state() == TitleSyncController::State::LOCKED   ? "LOCKED"   : "DISABLED";
+            std::printf("ok titlesync state=%s sohFrame=%llu azFrame=%llu "
+                        "syncSohFrameFloor=%llu calibrations=%d lastCsFrame=%d "
+                        "csFrame=%d\n",
+                        stateName,
+                        static_cast<unsigned long long>(g_titleSync.sohFrameCount()),
+                        static_cast<unsigned long long>(g_titleSync.azFrameCount()),
+                        static_cast<unsigned long long>(TitleSyncController::kSyncSohFrame),
+                        g_titleSync.calibrations(), g_titleSync.lastCsFrame(),
+                        g_soh_booted ? Zelda3D_TitleCsFrame() : -1);
+        }
         else if (cmd == "compare")   HandleCompare(toks);
         else if (cmd == "force")     HandleForce(toks);
         else if (cmd == "snapshot")  HandleSnapshot(toks);
