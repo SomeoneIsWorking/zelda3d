@@ -41,10 +41,28 @@ namespace Zelda3D {
 class TitleRider {
 public:
     // Integrate one frame from the title cs actor cues (op-0x0a records). No-op (holds pose) if
-    // the cs has no cue covering `csFrame`. `outDiscontinuity`, if non-null, is set true the exact
-    // frame the rider teleports on a shot-cut cue-chain break (new: not read by anything yet — a
-    // seam for the future rider-mount/teleport-not-lerp fix, task #8; the underlying teleport
-    // DECISION itself is unchanged from the original Zelda3D_RiderStepCue).
+    // the cs has no cue covering `csFrame`.
+    //
+    // This is a literal port of the 3DS EnHorse cutscene dispatcher, FUN_0026a30c
+    // (oot3d-decomp docs/title_rider_cs_dispatch.md, decompiled 2026-07-14) — byte-for-byte the
+    // N64 EnHorse_CutsceneUpdate shape:
+    //   - cue action -> cs-function index via the pair table at 0x00526dfc
+    //     {0x24->1 Move, 0x25->2 Jump, 0x26->3 Rearing, 0x40->4 WarpMove, 0x41->5 WarpRearing};
+    //     unknown action -> idx 0 -> hold.
+    //   - init funcs (0x00526dcc) run ONLY when the function index CHANGES. WarpMoveInit
+    //     (FUN_002a8af8) and CsWarpRearingInit (FUN_002b6c00) teleport to the cue's p0 + set yaw
+    //     from cue rot[1]; CsMoveInit (FUN_0016ca48) does NOT touch the transform. The very first
+    //     cue (csAction still 0) also teleports (dispatcher body, matching N64).
+    //   - action funcs (0x00526de4) run EVERY frame: CsMoveToPoint (FUN_003cf3c4) and
+    //     CsWarpMoveToPoint (FUN_00230d84) are the identical PathFollow integrator (turn cap 267
+    //     binang, speed 8.0, 3D arrive-snap at 8.0); CsRearing/CsWarpRearing hold speed 0.
+    //   There is NO distance heuristic anywhere — the pre-2026-07-14 "teleport when the new cue's
+    //   p0 is >100u away" rule was a guess and diverged ~170-200u from the oracle on every plain
+    //   0x24 cue-chain boundary the rider couldn't reach in time (cs 750, 1108; RED table in
+    //   debug_journal/2026-07-14-title-rider-cs-dispatch-port.md).
+    //
+    // `outDiscontinuity`, if non-null, is set true the exact frame a warp init (or the first-cue
+    // seed) teleports the rider.
     void step(PlayState* play, int csFrame, bool* outDiscontinuity);
 
     const float* pos() const { return mPos; }
@@ -77,7 +95,9 @@ private:
     float mPos[3]  = { -5898.0f, 59.8f, 5091.6f };
     int16_t mYaw   = 0x2AAA;
     float mSpeed   = 8.0f;
-    int mCueIdx    = -1;
+    // Current cs-function index (horse+0x100e in FUN_0026a30c) — 0 = "no cue consumed yet", which
+    // makes the first consumed cue teleport-seed the transform exactly like the 3DS dispatcher.
+    int mCsFuncIdx = 0;
     uint16_t mCueAction = 0x40; // last-seen RiderCue::action (default gallop; see step())
 
     Actor* mHorseActor  = nullptr; // the title-scoped EN_HORSE instance, or null before/after mount

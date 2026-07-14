@@ -28,6 +28,25 @@ void Player_Action_Idle(Player* player, PlayState* play);
 
 namespace Zelda3D {
 
+namespace {
+
+// Cue action id -> cs-function index. Literal port of the pair table at .data 0x00526dfc
+// (byte-identical to N64 z_en_horse.c sCsActionTable) and the inlined
+// EnHorse_GetCutsceneFunctionIndex lookup in FUN_0026a30c: exact match returns the paired index,
+// anything else returns 0 (hold). See title_rider.h's step() doc for the derivation trail.
+int RiderCsFuncIdx(uint16_t action) {
+    switch (action) {
+        case 0x24: return 1; // CsMoveToPoint      (FUN_003cf3c4)
+        case 0x25: return 2; // CsJump             (FUN_001033d4; unused by the title cs)
+        case 0x26: return 3; // CsRearing          (FUN_0010360c; unused by the title cs)
+        case 0x40: return 4; // CsWarpMoveToPoint  (FUN_00230d84)
+        case 0x41: return 5; // CsWarpRearing      (FUN_002535f0)
+        default:   return 0;
+    }
+}
+
+} // namespace
+
 void TitleRider::step(PlayState* play, int csFrame, bool* outDiscontinuity) {
     if (outDiscontinuity != nullptr) {
         *outDiscontinuity = false;
@@ -37,28 +56,60 @@ void TitleRider::step(PlayState* play, int csFrame, bool* outDiscontinuity) {
     float p0[3], p1[3];
     uint16_t cueAction = mCueAction;
     if (!Zelda3D_TitleCsRiderCue(csFrame, &cueIdx, p0, p1, &startF, &endF, &cueYaw, &cueAction)) {
-        return; // no cue this frame — hold pose (and hold the last-seen cue action too)
+        return; // no cue latched this frame — hold pose (3DS dispatcher: NULL channel ptr -> return)
     }
     mCueAction = cueAction;
-    if (cueIdx != mCueIdx) {
-        // Teleport only on discontinuity: consecutive cues share p1==p0 (continued motion); a
-        // shot cut authors a fresh p0.
-        const float dx = p0[0] - mPos[0];
-        const float dz = p0[2] - mPos[2];
-        if (mCueIdx < 0 || dx * dx + dz * dz > 100.0f * 100.0f) {
+
+    const int funcIdx = RiderCsFuncIdx(cueAction);
+    if (funcIdx == 0) {
+        return; // unknown action id — 3DS dispatcher holds (uVar5 == 0 branch)
+    }
+    if (funcIdx != mCsFuncIdx) {
+        // First-ever cue: the dispatcher body itself seeds the transform from the cue before
+        // running the init func (FUN_0026a30c's csAction==0 branch).
+        const bool teleport = (mCsFuncIdx == 0) ||
+                              (funcIdx == 4) ||  // WarpMoveInit      (FUN_002a8af8) teleports
+                              (funcIdx == 5);    // CsWarpRearingInit (FUN_002b6c00) teleports
+        mCsFuncIdx = funcIdx;
+        if (teleport) {
             mPos[0] = p0[0];
             mPos[1] = p0[1];
             mPos[2] = p0[2];
-            mYaw = cueYaw;
+            mYaw = cueYaw; // cue rot[1], exactly what both warp inits store to world.rot.y
             if (outDiscontinuity != nullptr) {
                 *outDiscontinuity = true;
             }
         }
-        mCueIdx = cueIdx;
+        // CsMoveInit / CsJumpInit / CsRearingInit do not touch the transform (anim-only inits;
+        // gait selection lives in applyToActor's cue-action mapping).
     }
-    const int32_t wp[3] = { (int32_t)p1[0], (int32_t)p1[1], (int32_t)p1[2] };
-    Zelda3D_PathFollowUpdate(mPos, &mYaw, &mSpeed, wp);
-    Zelda3D_ActorMoveXZByYawSpeed(mPos, mYaw, mSpeed);
+
+    // Per-frame action func.
+    switch (mCsFuncIdx) {
+        case 3:
+        case 5:
+            // CsRearing / CsWarpRearing: speed_xz = 0 every frame, no movement (FUN_002535f0's
+            // first store; the rest of those bodies is anim/sfx).
+            mSpeed = 0.0f;
+            break;
+        case 2:
+            // CsJump falls through to the move integrator when its jump flag isn't armed (N64
+            // EnHorse_CsJump -> EnHorse_CsMoveToPoint); the title cs never authors 0x25, so the
+            // full parabolic-jump body (FUN_003ab99c family) is deliberately not ported here.
+        case 1:
+        case 4: {
+            // CsMoveToPoint / CsWarpMoveToPoint — byte-identical integrator bodies (FUN_003cf3c4 /
+            // FUN_00230d84): 3D dist to the cue's p1; <= 8.0 snaps + speed 0, else turn toward it
+            // capped at 267 binang and set speed 8.0; then Actor_MoveXZByYawSpeed integrates.
+            const int32_t wp[3] = { (int32_t)p1[0], (int32_t)p1[1], (int32_t)p1[2] };
+            Zelda3D_PathFollowUpdate(mPos, &mYaw, &mSpeed, wp);
+            Zelda3D_ActorMoveXZByYawSpeed(mPos, mYaw, mSpeed);
+            break;
+        }
+        default:
+            break;
+    }
+
     // Y: Az's rider follows the terrain (Epona walks the ground); raycast SoH's floor at the
     // integrated XZ. Fall back to the cue-endpoint Y (i.e. leave mPos[1] as PathFollowUpdate/
     // ActorMoveXZByYawSpeed left it) when there's no floor.
@@ -130,17 +181,20 @@ void TitleRider::applyToActor(PlayState* play, Actor* actor) {
     s32 wantAnimIdx;
     f32 wantSpeed;
     switch (mCueAction) {
-        case 0x41: // idle
+        case 0x41: // CsWarpRearing — rearing-into-idle in place. Approximated with the mounted
+                   // idle gait for now (no rearing Reset helper is exposed by z_en_horse.c);
+                   // trajectory-correct (speed 0), anim divergence noted in the 2026-07-14
+                   // rider-cs-dispatch journal as a follow-up.
+        case 0x26: // CsRearing — same approximation
             wantAction = ENHORSE_ACT_MOUNTED_IDLE;
             wantAnimIdx = ENHORSE_ANIM_IDLE;
             wantSpeed = 0.0f;
             break;
-        case 0x24: // trot — tentative mapping, see title_rider_port_spec.md step 4's open question
-            wantAction = ENHORSE_ACT_MOUNTED_TROT;
-            wantAnimIdx = ENHORSE_ANIM_TROT;
-            wantSpeed = 4.5f;
-            break;
-        case 0x40: // gallop
+        case 0x24: // CsMove — GALLOP anim, decomp-confirmed: CsMoveInit (FUN_0016ca48) selects
+                   // anim slot 7, the same slot WarpMoveInit (FUN_002a8af8) uses for its gallop
+                   // default; matches N64 EnHorse_CsMoveInit's ENHORSE_ANIM_GALLOP. (The earlier
+                   // trot mapping was a guess and made Epona trot at 8 u/frame.)
+        case 0x40: // CsWarpMove — gallop
         default:
             wantAction = ENHORSE_ACT_MOUNTED_GALLOP;
             wantAnimIdx = ENHORSE_ANIM_GALLOP;
@@ -192,7 +246,7 @@ void TitleRider::releaseMount(PlayState* play) {
         Actor_Kill(mHorseActor);
         mHorseActor = nullptr;
     }
-    mCueIdx = -1; // force a fresh teleport (not a lerp from the stale pose) on the next title entry
+    mCsFuncIdx = 0; // next title entry re-seeds from its first cue (dispatcher csAction==0 branch)
 }
 
 } // namespace Zelda3D

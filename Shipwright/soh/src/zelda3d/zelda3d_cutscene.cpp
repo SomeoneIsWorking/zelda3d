@@ -563,31 +563,49 @@ extern "C" int Zelda3D_TitleCsLoopFrame(void) {
     return sHasDest ? sEndFrame : -1;
 }
 
-// Active rider cue for a cs frame (start <= f < end). Returns 1 and fills
-// outputs; 0 when no cue covers the frame. cueIndex identifies the cue so
-// callers can detect cue changes / teleport discontinuities.
+// Active rider cue for a cs frame. Latch semantics are the 3DS interpreter's
+// own (FUN_002c5ba0, oot3d-decomp docs/cutscene_format.md +
+// docs/title_rider_cs_dispatch.md):
+//   - predicate `startFrame < curFrame <= endFrame` — STRICT lower bound,
+//     INCLUSIVE upper bound (NOT the N64-ish [start, end) this function used
+//     before 2026-07-14, which made every window fire one cs frame early);
+//   - the interpreter walks the script's commands IN ORDER and every op-0x0a
+//     command stores its matching record into the SAME csCtx channel slot
+//     (play+0x22D8), so when two channels' windows overlap on a boundary
+//     frame the LAST match in script order wins. sRiderCues preserves script
+//     order, so this scan keeps the last match. The title cs depends on this:
+//     at f=925 both the plain-move window [750,925] (earlier command) and the
+//     1-frame warp cue [924,925] (later command) match, and the WARP must win
+//     or the rider never teleports across the shot cut (live-falsified: the
+//     first-match version left the rider ~2500u off-course for the rest of
+//     the loop — rider_traj_green FAIL table, 2026-07-14 journal).
+// Returns 1 and fills outputs; 0 when no cue covers the frame. cueIndex
+// identifies the cue so callers can detect cue changes.
 extern "C" int Zelda3D_TitleCsRiderCue(int frame, int* cueIndex,
                                        float p0[3], float p1[3],
                                        int* startF, int* endF,
                                        int16_t* yawBinang,
                                        uint16_t* outAction) {
     if (sLoadState <= 0) return 0;
+    int found = -1;
     for (size_t i = 0; i < sRiderCues.size(); i++) {
         const RiderCue& c = sRiderCues[i];
-        if (c.start <= frame && frame < c.end) {
-            *cueIndex = (int)i;
-            memcpy(p0, c.p0, sizeof(c.p0));
-            memcpy(p1, c.p1, sizeof(c.p1));
-            *startF = c.start;
-            *endF = c.end;
-            *yawBinang = c.yaw;
-            if (outAction != nullptr) {
-                *outAction = c.action;
-            }
-            return 1;
+        if (c.start < frame && frame <= c.end) {
+            found = (int)i; // keep scanning: last match in script order wins
         }
     }
-    return 0;
+    if (found < 0) return 0;
+    const RiderCue& c = sRiderCues[found];
+    *cueIndex = found;
+    memcpy(p0, c.p0, sizeof(c.p0));
+    memcpy(p1, c.p1, sizeof(c.p1));
+    *startF = c.start;
+    *endF = c.end;
+    *yawBinang = c.yaw;
+    if (outAction != nullptr) {
+        *outAction = c.action;
+    }
+    return 1;
 }
 
 // Time-of-day for a cs frame: the last op-0x8c cue sets the anchor, then
