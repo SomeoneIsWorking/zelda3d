@@ -39,11 +39,15 @@ void Zelda3D_Sg_BeginPass(void);
 // transform) and fed as this draw's uLightDir, PLUS enables the additive diffuse "sheen" boost
 // (uSheen in zelda3d_sg_ubo.h) instead of the shared darkening half-Lambert term. See
 // title_logo_actor.md §6.3 / title_logo.cpp for the ground truth and derivation.
+// sphRotOv: NULL = sphere-mapped (CameraSphereEnvMap) coordinator UVs derive from mat3(uMV)*n as
+// before. Non-NULL = float[9] row-major view-rotation matrix (rows = the live camera's LH view
+// basis right/up/forward) used INSTEAD of mat3(uMV) for the sphere-map normal — required for the
+// title 2D ortho-overlay pass whose uMV carries no camera (see zelda3d_sg_ubo.h uSphRot*).
 void Zelda3D_Sg_DrawModel(int modelId, const float* mp16, const float* mv16, int lit, int invertY,
                         unsigned char r, unsigned char g, unsigned char b, unsigned char a, float aspectAdj,
                         const float* boneData, int boneCnt, unsigned long long midMask, int sky,
                         float uvOffU, float uvOffV, const void* matTex, const void* matConst, int forceUnlit,
-                        const float* lightDirOv = nullptr);
+                        const float* lightDirOv = nullptr, const float* sphRotOv = nullptr);
 void Zelda3D_Sg_EndPass(void);
 
 // Mirror of Zelda3D_GL_RequestEvictRange for the SDL3 GPU model store.

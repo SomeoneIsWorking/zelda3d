@@ -174,7 +174,10 @@ bool CompileGlsl(EShLanguage stage, const char* src, std::vector<uint32_t>& spv)
     "    vec4 uSheen;\n" \
     "    vec4 uTex1Xf;\n" \
     "    vec4 uFog3d0;\n" \
-    "    vec4 uFog3d1;\n"
+    "    vec4 uFog3d1;\n" \
+    "    vec4 uSphRot0;\n" \
+    "    vec4 uSphRot1;\n" \
+    "    vec4 uSphRot2;\n"
 #define SG_UBO_BONES_BODY \
     "    mat4 uBones[" SG_STR(ZELDA3D_GL_MAX_BONES) "];\n"
 
@@ -231,9 +234,25 @@ const char* kVert =
     // [0,1]²). The wordmark's decorations (mat4-9) use sphere mapping — for the flat (0,0,1) normals
     // this samples the texture's center, which is bright, not a per-vertex UV location (which was
     // dim, making the multiply combiner produce near-black output). uTex1Xf: .xy=scale, .zw=trans.
+    // Sphere-map normal space: view space. For scene draws mat3(uMV) approximates it; for the
+    // title 2D ortho-overlay pass uMV is a fixed screen placement carrying NO camera at all, so
+    // the caller supplies the live camera's view-rotation rows in uSphRot0..2 (uSphRot0.w = gate)
+    // and the normal is rotated into REAL view space — matching the 3DS, where these decorations
+    // are composited through the live cs-camera's view matrix (title_logo_actor.md §6.1).
     "    if (ubo.uSheen.w > 2.5) {\n"
-    "        vec3 nv = normalize(mat3(ubo.uMV) * nM);\n"
-    "        vUv1 = vec2(nv.x * 0.5 + 0.5, nv.y * 0.5 + 0.5);\n"
+    "        vec3 ns = (ubo.uSphRot0.w > 0.5)\n"
+    "            ? vec3(dot(ubo.uSphRot0.xyz, nM), dot(ubo.uSphRot1.xyz, nM), dot(ubo.uSphRot2.xyz, nM))\n"
+    "            : (mat3(ubo.uMV) * nM);\n"
+    // Same texture-space y-flip as the UV-coordinate path below (SoH uploads textures y-flipped
+    // relative to PICA texture space, which is why the UvCoordinateMap branch samples 1-uv1.y);
+    // the sphere-mapped UV must flip identically or it mirrors the sampled gradient vertically.
+    // The coordinator's own scale/trans applies to the sphere-mapped UV too (noclip render.ts
+    // CalcTextureCoordRaw: the sphere src is still multiplied by the coordinator texture matrix
+    // before the final flip) — identity for every wordmark decoration except mat4 (scaleT=2).
+    "        vec3 nv = normalize(ns);\n"
+    "        vec2 suv = vec2((nv.x * 0.5 + 0.5 - ubo.uTex1Xf.z) * ubo.uTex1Xf.x,\n"
+    "                        (nv.y * 0.5 + 0.5 - ubo.uTex1Xf.w) * ubo.uTex1Xf.y);\n"
+    "        vUv1 = vec2(suv.x, 1.0 - suv.y);\n"
     "    } else {\n"
     "        vec2 uv1 = vec2((aUv.x - ubo.uTex1Xf.z) * ubo.uTex1Xf.x, (aUv.y - ubo.uTex1Xf.w) * ubo.uTex1Xf.y);\n"
     "        vUv1 = vec2(uv1.x, 1.0 - uv1.y);\n"
@@ -1502,7 +1521,8 @@ extern "C" void Zelda3D_Sg_DrawModel(int modelId, const float* mp16, const float
                                    unsigned char r8, unsigned char g8, unsigned char b8, unsigned char a8,
                                    float aspectAdj, const float* boneData, int boneCnt, unsigned long long midMask,
                                    int sky, float uvOffU, float uvOffV, const void* matTex,
-                                   const void* matConst, int forceUnlit, const float* lightDirOv) {
+                                   const void* matConst, int forceUnlit, const float* lightDirOv,
+                                   const float* sphRotOv) {
     // Zelda3D #140 render-side probe: log every DrawModel for the sun-billboard model id (2002 in
     // typical runs). Non-sky submits are the Navi emit (sun/moon are sky=1). Serves as the runtime
     // observable for tools/navi_close_test.py and to isolate whether an emit reaches the renderer,
@@ -1523,7 +1543,7 @@ extern "C" void Zelda3D_Sg_DrawModel(int modelId, const float* mp16, const float
     }
     if (auto* r = sgRenderer())
         r->DrawModel(modelId, mp16, mv16, lit, invertY, r8, g8, b8, a8, aspectAdj, boneData, boneCnt, midMask, sky,
-                     uvOffU, uvOffV, matTex, matConst, forceUnlit, lightDirOv);
+                     uvOffU, uvOffV, matTex, matConst, forceUnlit, lightDirOv, sphRotOv);
 }
 extern "C" void Zelda3D_Sg_EndPass(void) {
     if (auto* r = sgRenderer())
@@ -1690,7 +1710,8 @@ void Fast::Zelda3DRenderer::DrawModel(int modelId, const float* mp16, const floa
                                     unsigned char r8, unsigned char g8, unsigned char b8, unsigned char a8,
                                     float aspectAdj, const float* boneData, int boneCnt, unsigned long long midMask,
                                     int sky, float uvOffU, float uvOffV, const void* matTex,
-                                    const void* matConst, int forceUnlit, const float* lightDirOv) {
+                                    const void* matConst, int forceUnlit, const float* lightDirOv,
+                                    const float* sphRotOv) {
     const std::unordered_map<int, int>* matTexMap = static_cast<const std::unordered_map<int, int>*>(matTex);
     const std::unordered_map<int, Zelda3DMatConstOv>* matConstMap =
         static_cast<const std::unordered_map<int, Zelda3DMatConstOv>*>(matConst);
@@ -1806,6 +1827,15 @@ void Fast::Zelda3DRenderer::DrawModel(int modelId, const float* mp16, const floa
     base.uTintSkin[1] = g8 / 255.0f;
     base.uTintSkin[2] = b8 / 255.0f;
     base.uTintSkin[3] = (boneData && boneCnt > 0) ? 1.0f : 0.0f;
+    if (sphRotOv) {
+        // Sphere-map view-rotation override (see zelda3d_sg_ubo.h uSphRot* comment): sphRotOv is
+        // the row-major 3x3 view-rotation the caller derived from the live camera. uSphRot0.w is
+        // the shader-side gate. base{} zero-init keeps it off for every draw that doesn't set it.
+        memcpy(base.uSphRot0, sphRotOv + 0, 3 * sizeof(float));
+        memcpy(base.uSphRot1, sphRotOv + 3, 3 * sizeof(float));
+        memcpy(base.uSphRot2, sphRotOv + 6, 3 * sizeof(float));
+        base.uSphRot0[3] = 1.0f;
+    }
     if (lightDirOv) {
         // Wordmark sheen (title_logo_actor.md §6.3): lightDirOv is OBJECT-space (same space as
         // this model's own vertex normals aNrm) — transform by THIS draw's own mv16 (column-major,

@@ -58,6 +58,10 @@ struct GlModel {
     // for). See Zelda3D_GL_SetLightDirOverride below and its use in Submit().
     bool hasLightDirOv = false;
     float lightDirOv[3] = { 0.0f, 0.0f, 1.0f };
+    // Sphere-map view-rotation override (title overlay decorations; see
+    // Zelda3D_GL_SetSphereMapViewRot). Same direct-read contract as lightDirOv.
+    bool hasSphRotOv = false;
+    float sphRotOv[9] = { 1, 0, 0, 0, 1, 0, 0, 0, 1 };
 };
 
 std::unordered_map<int, GlModel> g_models; // keyed by stable model id
@@ -533,6 +537,17 @@ extern "C" void Zelda3D_GL_ClearLightDirOverride(int modelId) {
     if (it != g_models.end()) it->second.hasLightDirOv = false;
 }
 
+// Sphere-map view-rotation override — same direct-read contract as SetLightDirOverride above.
+extern "C" void Zelda3D_GL_SetSphereMapViewRot(int modelId, const float m9[9]) {
+    GlModel& m = g_models[modelId];
+    m.hasSphRotOv = true;
+    memcpy(m.sphRotOv, m9, sizeof(m.sphRotOv));
+}
+extern "C" void Zelda3D_GL_ClearSphereMapViewRot(int modelId) {
+    auto it = g_models.find(modelId);
+    if (it != g_models.end()) it->second.hasSphRotOv = false;
+}
+
 extern "C" void Zelda3D_GL_EmitPose(int modelId) {
     // Snapshot this actor's just-set pose at EMIT time (during dlist build, logic-frame rate) so it
     // survives later same-modelId SetBones calls. Appended in emit order; the k-th submit of this
@@ -604,6 +619,9 @@ struct DrawItem {
     // Per-draw light-direction override (title wordmark sheen, see GlModel::hasLightDirOv).
     bool hasLightDirOv = false;
     float lightDirOv[3] = { 0.0f, 0.0f, 1.0f };
+    // Per-draw sphere-map view-rotation override (see GlModel::hasSphRotOv).
+    bool hasSphRotOv = false;
+    float sphRotOv[9] = { 1, 0, 0, 0, 1, 0, 0, 0, 1 };
 };
 // Inline unified-render path: each OTR_G_ZELDA3D_DRAW appends its model op straight into the SDL3
 // GPU op-list at that point in the N64 dlist (depth-correct interleave, ONE pass for N64 + 3DS —
@@ -685,6 +703,10 @@ extern "C" void Zelda3D_GL_Submit(int modelId, const float* mp16, const float* m
             it.lightDirOv[1] = mit->second.lightDirOv[1];
             it.lightDirOv[2] = mit->second.lightDirOv[2];
         }
+        if (mit != g_models.end() && mit->second.hasSphRotOv) {
+            it.hasSphRotOv = true;
+            memcpy(it.sphRotOv, mit->second.sphRotOv, sizeof(it.sphRotOv));
+        }
     }
 
 #ifdef ENABLE_SDL3GPU
@@ -704,7 +726,8 @@ extern "C" void Zelda3D_GL_Submit(int modelId, const float* mp16, const float* m
         }
         Zelda3D_Sg_DrawModel(it.modelId, it.mp, it.mv, it.lit, it.invertY, it.r, it.g, it.b, it.a, it.aspectAdj, pose,
                            it.boneCount, it.midMask, it.sky, it.uvOffU, it.uvOffV, &it.matTex, &it.matConst,
-                           it.forceUnlit, it.hasLightDirOv ? it.lightDirOv : nullptr);
+                           it.forceUnlit, it.hasLightDirOv ? it.lightDirOv : nullptr,
+                           it.hasSphRotOv ? it.sphRotOv : nullptr);
     }
 #else
     (void)it; // no SDL3 GPU backend: Zelda3D rendering has no other path

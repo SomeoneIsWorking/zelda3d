@@ -40,6 +40,12 @@ struct CommonUbo {
     // wire these through UNIFIED_COMMON_UBO_BODY when the unified renderer takes over CMB draws.
     float uFog3d0[4];
     float uFog3d1[4];
+    // Mirror of SgUbo::uSphRot0/1/2 (sphere-map view-rotation override, title wordmark
+    // decorations — zelda3d_sg_ubo.h). Size-parity padding for the unified path, same
+    // rationale as uMatConst/uSheen/uTex1Xf/uFog3d* above.
+    float uSphRot0[4];
+    float uSphRot1[4];
+    float uSphRot2[4];
 };
 
 static_assert(sizeof(CommonUbo) == Zelda3DSg::kCommonBytes,

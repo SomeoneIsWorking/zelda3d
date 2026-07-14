@@ -217,6 +217,18 @@ void Zelda3D_GL_SetLightDirOverride(int modelId, float dx, float dy, float dz);
 // caller simply stops drawing the model (an unused override is inert), but kept for hygiene.
 void Zelda3D_GL_ClearLightDirOverride(int modelId);
 
+// Per-model sphere-map VIEW-rotation override, for models drawn through the title 2D ortho
+// overlay pass whose model-view matrix carries no camera (a fixed screen placement). The 3DS
+// sphere-map (CameraSphereEnvMap) coordinator consumes the VIEW-space normal; for these draws
+// the caller must supply the live camera's view rotation explicitly or the sampled sphere UV is
+// camera-independent (systematically dead-center = brightest texel — the measured mat10/11
+// decoration overshoot, debug_journal/2026-07-14). m9 = row-major 3x3, rows = the LH view basis
+// (right / up / forward=normalize(eye-at), the FUN_002d9e68 convention,
+// oot3d-decomp/docs/title_view_matrix_lh.md). Same direct-read (non-emit-paired) contract as
+// Zelda3D_GL_SetLightDirOverride: one live instance per frame.
+void Zelda3D_GL_SetSphereMapViewRot(int modelId, const float m9[9]);
+void Zelda3D_GL_ClearSphereMapViewRot(int modelId);
+
 // Set the per-bone skinning matrices for a model (row-major float[16] each, indexed
 // by bone id). Applied as the shader's uBones at the next draw. n is clamped to
 // ZELDA3D_GL_MAX_BONES. Passing n==0 resets to the bind pose (identity). Cheap — just
