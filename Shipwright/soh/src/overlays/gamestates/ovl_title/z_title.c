@@ -150,24 +150,36 @@ void Title_Destroy(GameState* thisx) {
     Sram_InitSram(&this->state);
 }
 
+// OoT3D (the ground-truth boot: oot3d-decomp) has no N64/console-logo screen — the 3DS title
+// flow boots straight into the attract sequence. This state (formerly the "Displays the
+// Nintendo Logo" gamestate, later hijacked by the SoH CustomLogoTitle enhancement to also draw
+// a spinning ship logo) is kept only for its non-visual side effects: SRAM init + audio setup
+// (Title_Destroy -> Sram_InitSram, run by the engine's GameState_Destroy teardown) and the
+// GameInteractor_ExecuteOnZTitleInit hook point. Title_Main / Title_Draw (the logo draw + fade
+// hold) are never ticked: this state never assigns state.main and marks itself not-running
+// before GameState_Init returns, so the engine goes straight to GameState_Destroy -> Opening_Init
+// without ever rendering a frame of this state. This is a hardwired seam, not a CVar toggle: the
+// SoH "Skip Logo" / BootSequence enhancement (CustomLogoTitle.cpp, Warping.cpp's
+// BOOTSEQUENCE_DEBUGWARPSCREEN/WARPPOINT) drove its skip through titleContext->state.main, which
+// no longer runs — that enhancement code is now dead in this fork (see
+// debug_journal/2026-07-14-boot-logo-skip.md).
 void Title_Init(GameState* thisx) {
     TitleContext* this = (TitleContext*)thisx;
 
     this->staticSegment = NULL;
     osSyncPrintf("z_title.c\n");
 
-    R_UPDATE_RATE = 1;
-    Matrix_Init(&this->state);
-    View_Init(&this->view, this->state.gfxCtx);
-    this->state.main = Title_Main;
-    this->state.destroy = Title_Destroy;
-    this->exit = false;
     gSaveContext.fileNum = 0xFF;
-    this->ult = 0;
-    this->unk_1D4 = 0x14;
-    this->coverAlpha = 255;
-    this->addAlpha = -3;
-    this->visibleDuration = 0x3C;
 
     GameInteractor_ExecuteOnZTitleInit(this);
+
+    // Side effects that Title_Main's exit branch would otherwise apply on the (now skipped)
+    // final logo frame.
+    gSaveContext.seqId = (u8)NA_BGM_DISABLED;
+    gSaveContext.natureAmbienceId = 0xFF;
+    gSaveContext.gameMode = GAMEMODE_TITLE_SCREEN;
+
+    this->state.destroy = Title_Destroy;
+    this->state.running = false;
+    SET_NEXT_GAMESTATE(&this->state, Opening_Init, OpeningContext);
 }
