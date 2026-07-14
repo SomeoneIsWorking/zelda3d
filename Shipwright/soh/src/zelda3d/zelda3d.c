@@ -3356,15 +3356,10 @@ int Zelda3D_Enabled(void) {
 // equivalent — caller falls back to the N64 room).
 static const char* Zelda3D_SceneName(PlayState* play) {
     s32 n;
-    // Title demo loads its own dedicated OoT3D scene (spot99), not spot00/Hyrule Field, even
-    // though it runs on the real SCENE_HYRULE_FIELD PlayState — see
-    // Zelda3D_Title_SceneName's header comment (title_presentation.h) for why. This is the ONE
-    // seam every OoT3D-scene-name consumer below goes through (room draw, terrain-warp collision
-    // build, cam-lift floor query, meshfloor REPL), so the swap applies uniformly.
-    const char* titleName = Zelda3D_Title_SceneName();
-    if (titleName != NULL) {
-        return titleName;
-    }
+    // SCENE_TITLE (spot99) is a first-class scene: kZelda3dSceneNames[SCENE_TITLE] = "spot99"
+    // returns the OoT3D folder name naturally from the sceneNum. No runtime override needed
+    // (the old Zelda3D_Title_SceneName() overlay hack is retired — it used to swap spot00→spot99
+    // while the title ran on SCENE_HYRULE_FIELD).
     n = play->sceneNum;
     if (n < 0 || n >= (s32)ARRAY_COUNT(kZelda3dSceneNames)) {
         return NULL;

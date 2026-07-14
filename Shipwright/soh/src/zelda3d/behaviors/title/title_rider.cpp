@@ -83,7 +83,7 @@ void TitleRider::applyToActor(PlayState* play, Actor* actor) {
             // pos/yaw. params=1 -> HORSE_EPONA, the same "plain ridable Epona" params z_horse.c's
             // own spawn sites use (e.g. z_horse.c:76) — EnHorse_Init's early Actor_Kill branches
             // all gate on SCENE_LON_LON_RANCH/SCENE_STABLE/SCENE_GERUDOS_FORTRESS, none of which is
-            // the title's SCENE_HYRULE_FIELD, so the spawn always survives init here.
+            // the title's SCENE_TITLE, so the spawn always survives init here.
             mHorseActor = Actor_Spawn(&play->actorCtx, play, ACTOR_EN_HORSE,
                                        mPos[0], mPos[1], mPos[2], 0, mYaw, 0, 1);
             if (mHorseActor != nullptr) {

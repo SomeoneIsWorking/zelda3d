@@ -120,3 +120,10 @@
 /* 0x6B */ DEFINE_SCENE(hairal_niwa2_scene, g_pn_12, SCENE_HAIRAL_NIWA2, SDC_CASTLE_COURTYARD_GUARDS, 0, 0)
 /* 0x6C */ DEFINE_SCENE(sasatest_scene, none, SCENE_SASATEST, SDC_DEFAULT, 0, 0)
 /* 0x6D */ DEFINE_SCENE(testroom_scene, none, SCENE_TESTROOM, SDC_DEFAULT, 0, 0)
+// SoH3D title scene (spot99): OoT3D's dedicated title-demo scene (scene index 0x6b in the 3DS
+// ROM). Its N64 actor/object/collision/spawn/cs data is byte-identical to spot00 (Hyrule Field) —
+// verified in <oot3d-decomp>/docs/title_scene_spot99.md §3/§4 — so OTRPlay_SpawnScene redirects
+// this scene to spot00_scene's OTR asset for the N64 data, while the OoT3D render/collision layer
+// (kZelda3dSceneNames[SCENE_TITLE] = "spot99") loads spot99's own ZSI for geometry. This makes the
+// title a first-class scene (no runtime overlay hack on SCENE_HYRULE_FIELD).
+/* 0x6E */ DEFINE_SCENE(spot99_scene, none, SCENE_TITLE, SDC_HYRULE_FIELD, 0, 0)
