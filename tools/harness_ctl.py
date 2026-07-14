@@ -345,8 +345,31 @@ class Harness:
             pass
         self.proc.wait(timeout=5)
 
+    def close(self, timeout: float = 5.0) -> None:
+        """Terminate the harness subprocess cleanly and unconditionally.
+
+        Tries the graceful `quit` REPL command first (same as quit()), then
+        falls back to SIGTERM, then SIGKILL if it still hasn't exited. Only
+        ever signals THIS instance's own tracked self.proc (a specific pid
+        this object Popen'd) -- never pkill/pgrep by name/pattern, which
+        risks self-matching the calling shell (see the safe-kill skill).
+        Safe to call multiple times / after the process already exited."""
+        if self.proc.poll() is not None:
+            return
+        try:
+            self.quit()
+        except Exception:
+            pass
+        if self.proc.poll() is None:
+            self.proc.terminate()
+            try:
+                self.proc.wait(timeout=timeout)
+            except subprocess.TimeoutExpired:
+                self.proc.kill()
+                self.proc.wait(timeout=timeout)
+
     def __enter__(self):  return self
-    def __exit__(self, *a): self.quit()
+    def __exit__(self, *a): self.close()
 
 
 def _ensure_headless_env() -> None:

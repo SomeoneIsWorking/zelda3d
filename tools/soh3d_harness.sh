@@ -16,18 +16,18 @@
 # Title-cs frame sync (DEFAULT, no flag needed): the harness's `step <N>`
 # REPL command (the combined Az+SoH driver used for live/SBS viewing) auto-
 # arms TitleSyncController on its first call in a fresh process — the oracle
-# loads scratch/title_settled.state and HOLDS there while SoH3D boots cold
-# through the title cs; once SoH's raw frame count passes 408, a native
-# content search (grayscale structure match, same formula as
-# tools/title_ab.py) locks the oracle onto SoH's current frame, then 1:1
-# stepping keeps both halves showing the same title-cs instant —
-# recalibrating via the same search on every title-cs loop wrap (1:1
-# stepping alone was measured to drift over a full ~2400-frame loop, see
-# tools/soh3d_harness/title_sync.h). Tools that drive their own scene via
-# explicit `loadstate`/`soh_boot` (title_ab.py, oracle_cache.py, ...) are
-# unaffected — they never call `step`, and title-sync auto-arm is skipped
-# whenever manual loadstate/soh_boot already ran before the first `step`
-# anyway. See debug_journal/2026-07-14-harness-title-sync.md.
+# loads scratch/title_settled.state, its RE'd title-cs cursor (u32 @
+# 0x0054CC3C) is read as the integer lock target, and it HOLDS there while
+# SoH3D boots cold through the title cs; the first frame SoH's own cursor
+# (Zelda3D_TitleCsFrame()) reaches that value the controller LOCKs and steps
+# the oracle per-frame under a 0/1/2-step integer governor that keeps the
+# modular cursor delta at 0 (wrap-safe — no content search, no resync; see
+# tools/soh3d_harness/title_sync.h for the falsification history). Tools
+# that drive their own scene via explicit `loadstate`/`soh_boot`
+# (title_ab.py, oracle_cache.py, ...) are unaffected — they never call
+# `step`, and title-sync auto-arm is skipped whenever manual
+# loadstate/soh_boot already ran before the first `step` anyway. See
+# debug_journal/2026-07-14-harness-title-sync.md.
 #
 # Usage:
 #   tools/soh3d_harness.sh                       # rom from $ZELDA3D_OOT3D_ROM
