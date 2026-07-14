@@ -319,6 +319,12 @@ void Zelda3D_SkipControlTakers(PlayState* play);
 #define ZSPOT06 "/actor/zelda_spot06_objects.zar"
 #define ZELDA3D_SPOT06_WATER_WORLD_SCALE 1.0f
 
+// Field-keep ZAR (OBJECT_GAMEPLAY_FIELD_KEEP's OoT3D counterpart) — grass05_model.cmb (field
+// grass tuft, En_Kusa type 0 / Obj_Mure2 clusters), obj_isi01/obj_ginbure (En_Ishi rocks),
+// flower1 (Obj_Hana flower) all live here. Scale is self-calibrated per prop, not a shared
+// constant (see sFieldGrassMeas in zelda3d.c).
+#define ZKEEP_FIELD "/actor/zelda_field_keep.zar"
+
 // World scale for the OoT3D Gerudo (En_Ge1). FIRST CHARACTER divert: the OoT3D
 // model is smooth-skinned and baked UPRIGHT + grounded (cmb_to_c --rotx 180
 // --ground), so it drops into the same Translate*RotateY*Scale path as the props
