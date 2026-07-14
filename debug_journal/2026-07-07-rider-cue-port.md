@@ -39,9 +39,13 @@ PathFollow dynamics (speed 8.0, yaw step 267) and terrain-following Y.
 
 1. ~2-frame phase offset between engines' cs cursors (harness sampling
    or cs-start anchor); chase with a boundary-anchored probe.
-2. f~1118 cue-boundary divergence (cue 1108..1380): check Az's target-
-   switch timing (maybe strict start<f vs start<=f) + arrival snapping.
-3. Rider ANIMATION per cue action id (0x40/0x41/0x24) — map to Epona
-   gallop/trot/idle CSABs.
+2. RESOLVED 2026-07-14 (commit 0a711e4c): f~1118 divergence was SoH's
+   >100u any-cue-change teleport heuristic; the decompiled 3DS dispatcher
+   (FUN_0026a30c = EnHorse_CutsceneUpdate) teleports ONLY on warp actions
+   0x40/0x41, latch is start<f<=end last-match-wins. See
+   2026-07-14-title-rider-cs-dispatch-port.md.
+3. Rider ANIMATION per cue action id — PARTIAL 2026-07-14 (0a711e4c):
+   0x24 corrected to GALLOP per CsMoveInit (FUN_0016ca48); 0x41 rearing
+   animation still an idle approximation (journaled follow-up).
 4. Env cue (op 0x0a is rider; env palette driver still unlocated —
    check op 0x03/0x3e consumers next).
