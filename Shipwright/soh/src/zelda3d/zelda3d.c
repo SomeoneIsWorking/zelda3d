@@ -2388,6 +2388,7 @@ static Zelda3D_ActorForcedAutoSlot* Zelda3D_FindActorForcedSlot(s16 actorId, u16
 // the auto path — no borrowed/magic constant. Keyed by a sentinel above the object-id range.
 #define ZELDA3D_MEASKEY_WELLARCH 0x40000 // > any object id; routes to sWellArchMeas, not sAuto[]
 #define ZELDA3D_MEASKEY_WINDMILL 0x40001 // > any object id; routes to sWindmillMeas, not sAuto[]
+#define ZELDA3D_MEASKEY_FIELDGRASS 0x40002 // > any object id; routes to sFieldGrassMeas, not sAuto[]
 typedef struct {
     float measuredH; // N64 world-space height from the measure pass (0 = none yet)
     float scale;     // derived worldScale (valid when state==2)
@@ -2403,6 +2404,22 @@ static Zelda3D_ForcedMeas sWellArchMeas;
 // windmill's own scale from its own N64 draw height (scale = n64H / OoT3D-CMB-H), exactly like
 // the well-arch (#77) does. REPL `gscale 7 <f>` still overrides.
 static Zelda3D_ForcedMeas sWindmillMeas;
+// En_Kusa type 0 (ENKUSA_TYPE_0, params&3==0) is the FIELD grass tuft: N64's z_en_kusa.c
+// (sObjectIds[]/dLists[], see z_en_kusa.c) draws it from OBJECT_GAMEPLAY_FIELD_KEEP's
+// gFieldBushDL, NOT from OBJECT_KUSA's Kokiri-bush DL that types 1/2 use. It is exclusively
+// spawned by Obj_Mure2 (z_obj_mure2.c: sActorSpawnIDs[]=EN_KUSA, ObjMure2_SetActorSpawnParams
+// always emits params&3==0) as the scattered/circle grass clusters seen across Hyrule Field
+// (spot00) and its title-cs stand-in spot99 (~7 Obj_Mure2 spawners per room per
+// title_scene_spot99.md). Before this port, sModelTable's single unconditional ACTOR_EN_KUSA
+// entry (glModelId 2 = zelda_kusa.zar obj_kusa01_model, the leafy Kokiri bush) rendered EVERY
+// En_Kusa the same way, including these field clusters — the wrong CMB, which is why the field
+// terrain looked greener/flatter with sparse flowers instead of the OoT3D field's dense
+// yellow-speckled grass tufts. The correct asset (confirmed by ROM zar dump) is
+// grass05_model.cmb inside /actor/zelda_field_keep.zar (that zar also ships obj_isi01/
+// obj_ginbure/flower1, already ported for En_Ishi/Obj_Hana). Self-calibrate its scale from its
+// own N64 draw height exactly like the well-arch/windmill above — no borrowed/magic constant.
+// REPL `gscale 12 <f>` overrides.
+static Zelda3D_ForcedMeas sFieldGrassMeas;
 
 // Interpreter callback (libultraship): the measure bracket closed for `key` (object id)
 // with the actor's measured world-space bbox diagonal. Store it; the scale is derived
@@ -2414,6 +2431,10 @@ void Zelda3D_MeasureResult(int key, float height) {
     }
     if (key == ZELDA3D_MEASKEY_WINDMILL) {
         sWindmillMeas.measuredH = height;
+        return;
+    }
+    if (key == ZELDA3D_MEASKEY_FIELDGRASS) {
+        sFieldGrassMeas.measuredH = height;
         return;
     }
     if (key >= 0 && key < (int)ARRAY_COUNT(sAuto)) {
@@ -2596,6 +2617,64 @@ int Zelda3D_TryDrawActor(PlayState* play, Actor* actor) {
         // these are deliberately-placed collidable rock-rubble props that otherwise stay N64-gray.
         // OoT3D's zelda_field_keep.zar ships no dedicated "kakera" CMB, so use the small field rock
         // (obj_isi01 = model 4, the same asset as En_Ishi's liftable rock) as the faithful match.
+        // En_Kusa type 0 (params&3==0, ENKUSA_TYPE_0): the field grass tuft exclusively spawned
+        // by Obj_Mure2's scatter/circle clusters (z_obj_mure2.c) — draws from
+        // OBJECT_GAMEPLAY_FIELD_KEEP's gFieldBushDL on N64 (z_en_kusa.c: sObjectIds[]/dLists[]),
+        // NOT the Kokiri-bush OBJECT_KUSA that sModelTable's ACTOR_EN_KUSA entry below assumes
+        // for types 1/2. See sFieldGrassMeas comment above for the asset provenance. Intercept
+        // it here so types 1/2 still fall through to the existing sModelTable entry unchanged.
+        if (actor->id == ACTOR_EN_KUSA && (actor->params & 3) == 0) {
+            Zelda3D_ForcedMeas* fg = &sFieldGrassMeas;
+            if (fg->modelId == 0) {
+                fg->modelId = Zelda3D_AutoModelId(ZKEEP_FIELD "|grass05_model");
+                if (fg->modelId < 0) { fg->state = 3; }
+            }
+            if (fg->modelId < 0) {
+                return 0; // no OoT3D field-grass CMB -> let the N64 tuft draw
+            }
+            if (gZelda3dGScale[12] > 0.0f) {
+                Zelda3D_DrawModelGL(play, fg->modelId, actor, gZelda3dGScale[12], NULL, 0.0f, NULL, NULL);
+                return 1;
+            }
+            if (fg->state == 2) {
+                Zelda3D_DrawModelGL(play, fg->modelId, actor, fg->scale, NULL, 0.0f, NULL, NULL);
+                return 1;
+            }
+            if (fg->state != 3) {
+                if (fg->measuredH > 0.0f) {
+                    float modelH = Zelda3D_AutoModelHeight(fg->modelId);
+                    if (modelH > 1e-3f) {
+                        fg->scale = fg->measuredH / modelH;
+                        fg->state = 2;
+                        if (Zelda3D_AutoMode() >= 1) {
+                            fprintf(stderr, "SOH3D AUTO: field-grass (grass05_model) -> scale=%.5f (n64h=%.1f modelh=%.1f)\n",
+                                   fg->scale, fg->measuredH, modelH);
+                            fflush(stdout);
+                        }
+                        Zelda3D_DrawModelGL(play, fg->modelId, actor, fg->scale, NULL, 0.0f, NULL, NULL);
+                        return 1;
+                    }
+                    fg->state = 3; // model has no geometry -> cannot scale -> N64
+                    return 0;
+                }
+                // Unlike the well-arch/windmill (one instance each), the title cs has ~5 live
+                // field-grass instances sharing this ONE calibration slot, each spending a try
+                // per frame it's visited — so the visit-counted budget burns out in ~2 frames,
+                // well before the GPU-side measure-bracket result (which lands a frame later,
+                // via Zelda3D_MeasureResult, off the render/present path) can arrive. Scale the
+                // budget up so it survives that many-instances-per-frame fan-out; the underlying
+                // mechanism (measured N64 bbox / OoT3D model bbox) is unchanged.
+                if (fg->tries < 64) {
+                    fg->tries++;
+                    fg->state = 1;
+                    Zelda3D_EmitMeasure(play, ZELDA3D_MEASKEY_FIELDGRASS, /*begin=*/1);
+                    sPendingMeasureKey = ZELDA3D_MEASKEY_FIELDGRASS;
+                    return 0; // let the N64 tuft draw so it can be measured this frame
+                }
+                fg->state = 3; // never measured (always culled) -> give up, stay N64
+            }
+            return 0;
+        }
         if (actor->id == ACTOR_OBJ_HANA) {
             int v = actor->params & 3;
             if (v == 2) { Zelda3D_DrawModelGL(play, 2, actor, ZELDA3D_GSCALE(2, ZELDA3D_HANABUSH_WORLD_SCALE), NULL, 0.0f, NULL, NULL); return 1; }
@@ -5351,6 +5430,8 @@ static void Zelda3D_ReplExec(PlayState* play, char* line, const char* outPath) {
                     cov = (v == 2) ? "HANA-bush(3DS)" : (v == 0) ? "HANA-flower(3DS)" : "HANA-debris(3DS)";
                 } else if (a->id == ACTOR_EN_ISHI) {
                     cov = "ISHI-rock(3DS)";
+                } else if (a->id == ACTOR_EN_KUSA && (a->params & 3) == 0) {
+                    cov = "KUSA-field-grass(3DS)";
                 } else if (inTable) {
                     cov = "TABLE";
                 } else {
