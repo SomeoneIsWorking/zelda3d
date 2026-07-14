@@ -2168,7 +2168,25 @@ void func_80068DC0(PlayState* play, CutsceneContext* csCtx) {
 
         osSyncPrintf("\n\n\n\n\nやっぱりここかいな"); // "Right here, huh"
         gSaveContext.cutsceneIndex = 0;
-        gSaveContext.gameMode = GAMEMODE_NORMAL;
+        // Zelda3D: this teardown fires every frame, forever, once csCtx->frames outruns the
+        // ALIASED spot00 N64 script's own (much shorter) cutsceneEndFrame — see
+        // Cutscene_ProcessCommands above (cutsceneEndFrame < csCtx->frames -> permanently parks
+        // csCtx->state at CS_STATE_UNSKIPPABLE_INIT, which dispatches here via sCsStateHandlers2
+        // every subsequent frame). Under the ported OoT3D title (Zelda3D_Title_IsActive()) that's
+        // exactly the free-running-csCtx behavior Cutscene_Command_Terminator's own comment above
+        // (~line 527) already documents as harmless — EXCEPT this line: unconditionally stomping
+        // gameMode back to GAMEMODE_NORMAL every frame clobbers whatever the PORTED title/skip
+        // logic (title_logo.cpp fireSkipTransition) set one frame earlier (GAMEMODE_FILE_SELECT on
+        // a post-Epona-mount press), so by the time the transition instance finishes, z_play.c's
+        // switch (~line 984, `gameMode != GAMEMODE_FILE_SELECT`) sees NORMAL and reloads the same
+        // scene instead of handing off to FileChoose — the bug: START does nothing at the title
+        // after the rider mounts. This legacy N64 cutscene-teardown machinery isn't driving the
+        // ported title at all (spot99's own cs cursor is; see Zelda3D_TitleCsAdvance), so it must
+        // not own gameMode while the ported title owns it — same seam already used at this file's
+        // Cutscene_Command_Terminator (~line 531) and EnMag_Update for the identical reason.
+        if (!Zelda3D_Title_IsActive()) {
+            gSaveContext.gameMode = GAMEMODE_NORMAL;
+        }
 
         if (D_8015FCC8 != 0) {
             switch (gSaveContext.entranceIndex) {
