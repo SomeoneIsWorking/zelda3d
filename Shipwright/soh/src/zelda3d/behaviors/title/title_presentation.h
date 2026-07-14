@@ -140,18 +140,10 @@ void Zelda3D_Title_ApplyDomeOverride(PlayState* play);
 // branch directly — the horse needs actor identity (to spawn/match the EN_HORSE instance), not
 // just the resolved pos/yaw, so the whole per-actor decision moved behind this one call.
 void Zelda3D_Title_RiderApply(PlayState* play, Actor* actor);
-// OoT3D scene-folder-name override for the title demo, or NULL when title isn't active (falls
-// back to the normal sceneNum -> kZelda3dSceneNames lookup in zelda3d.c's Zelda3D_SceneName).
-// The oracle's title demo loads its OWN dedicated scene, `spot99` — a Grezzo-authored clone of
-// spot00/Hyrule Field with a drastically decimated, camera-path-only room mesh + collision
-// (~13% the collision poly count, ~79% the room-mesh size) but byte-identical actor spawn table
-// and env-light palette (see <oot3d-decomp>/docs/title_scene_spot99.md §3/§4/§7). SoH boots the
-// title demo on the real N64 SCENE_HYRULE_FIELD PlayState (that's the only way to get vanilla's
-// title-demo actor/cs/collision machinery running at all — spot99 has no N64-side scene table
-// entry), so this hook lets the OoT3D geometry/collision *render* source diverge from the
-// underlying N64 scene without touching sceneNum: every Zelda3D_SceneName(play) caller in
-// zelda3d.c (room draw, terrain-warp collision build, cam-lift floor query, meshfloor REPL) goes
-// through this one seam, so all of them pick up spot99 uniformly.
+// RETIRED stub — always returns NULL. SCENE_TITLE is now a first-class scene
+// (kZelda3dSceneNames[SCENE_TITLE] = "spot99"), so Zelda3D_SceneName() returns "spot99"
+// naturally from the sceneNum. Kept for link compatibility; safe to delete once all callers
+// are confirmed gone.
 const char* Zelda3D_Title_SceneName(void);
 #ifdef __cplusplus
 }

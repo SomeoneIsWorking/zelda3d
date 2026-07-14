@@ -53,7 +53,7 @@ bool TitlePresentation::shouldBeActive(PlayState* play) const {
     if (Zelda3D_AutoWarpEnabled()) {
         return false;
     }
-    if (play->sceneNum != SCENE_HYRULE_FIELD) {
+    if (play->sceneNum != SCENE_TITLE) {
         return false;
     }
     return true;
@@ -454,12 +454,11 @@ extern "C" void Zelda3D_Title_ApplyLightOverride(PlayState* play) {
 }
 
 extern "C" const char* Zelda3D_Title_SceneName(void) {
-    // "spot99" is the oracle's dedicated title-demo scene asset (see the header comment on this
-    // function for the citation); returning it here is the entire scene swap — the live romfs
-    // ZSI loader (zelda3d_model.cpp's Zelda3D_RoomModelId/Zelda3D_LoadSceneCollisionRaw) takes a
-    // folder-name string and loads straight from ZELDA3D_OOT3D_ROM, so no separate asset-import
-    // step is needed; changing the name IS re-pointing the pipeline at spot99.
-    return Zelda3D::TitlePresentation::Instance().isActive() ? "spot99" : nullptr;
+    // RETIRED: SCENE_TITLE is now a first-class scene with kZelda3dSceneNames[SCENE_TITLE] =
+    // "spot99", so Zelda3D_SceneName() returns "spot99" naturally from the sceneNum. This
+    // runtime override (which used to swap spot00→spot99 while the title ran on
+    // SCENE_HYRULE_FIELD) is no longer needed. Kept as a nullptr stub for any stale callers.
+    return nullptr;
 }
 
 extern "C" void Zelda3D_Title_RiderApply(PlayState* play, Actor* actor) {

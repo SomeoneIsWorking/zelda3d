@@ -26,6 +26,16 @@ extern "C" void OTRPlay_SpawnScene(PlayState* play, s32 sceneId, s32 spawn) {
     play->sceneNum = sceneId;
     play->sceneConfig = scene->config;
 
+    // SoH3D: SCENE_TITLE (spot99) has no OTR asset — its N64 actor/object/collision/cs data is
+    // byte-identical to spot00 (verified in oot3d-decomp/docs/title_scene_spot99.md §3/§4), so load
+    // spot00_scene's OTR resource for the N64-side scene data while keeping sceneNum = SCENE_TITLE.
+    // The OoT3D render/collision layer (kZelda3dSceneNames[SCENE_TITLE] = "spot99") independently
+    // loads spot99's ZSI for geometry.
+    SceneTableEntry* loadScene = scene;
+    if (sceneId == SCENE_TITLE) {
+        loadScene = &gSceneTable[SCENE_HYRULE_FIELD];
+    }
+
     // osSyncPrintf("\nSCENE SIZE %fK\n", (scene->sceneFile.vromEnd - scene->sceneFile.vromStart) / 1024.0f);
 
     // Scenes considered "dungeon" with a MQ variant
@@ -36,8 +46,8 @@ extern "C" void OTRPlay_SpawnScene(PlayState* play, s32 sceneId, s32 spawn) {
     if (inNonSharedScene) {
         sceneVersion = ResourceMgr_IsGameMasterQuest() ? "mq" : "nonmq";
     }
-    std::string scenePath = StringHelper::Sprintf("scenes/%s/%s/%s", sceneVersion.c_str(), scene->sceneFile.fileName,
-                                                  scene->sceneFile.fileName);
+    std::string scenePath = StringHelper::Sprintf("scenes/%s/%s/%s", sceneVersion.c_str(), loadScene->sceneFile.fileName,
+                                                  loadScene->sceneFile.fileName);
 
     play->sceneSegment = OTRPlay_LoadFile(play, scenePath.c_str());
 

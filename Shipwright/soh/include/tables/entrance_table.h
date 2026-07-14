@@ -1932,3 +1932,18 @@
 /* 0x611 */ DEFINE_ENTRANCE(ENTR_DESERT_COLOSSUS_8_1, SCENE_DESERT_COLOSSUS, 8, false, true, TRANS_TYPE_FADE_WHITE, TRANS_TYPE_FADE_WHITE)
 /* 0x612 */ DEFINE_ENTRANCE(ENTR_DESERT_COLOSSUS_8_2, SCENE_DESERT_COLOSSUS, 8, false, true, TRANS_TYPE_FADE_WHITE, TRANS_TYPE_FADE_WHITE)
 /* 0x613 */ DEFINE_ENTRANCE(ENTR_DESERT_COLOSSUS_8_3, SCENE_DESERT_COLOSSUS, 8, false, true, TRANS_TYPE_FADE_WHITE, TRANS_TYPE_FADE_WHITE)
+
+// SoH3D title-demo entrances. SCENE_TITLE aliases spot00's N64 data (byte-identical actor/
+// object/collision per oot3d-decomp/docs/title_scene_spot99.md §3/§4); the OoT3D render layer maps
+// it to spot99. The title boots with sceneSetupIndex=7 (cutscene layer), so 8 layers are needed
+// for the entranceIndex+sceneSetupIndex lookup to resolve cleanly. Only ENTR_TITLE_0 (layer 0,
+// == entranceIndex for this group) is referenced in code; the rest are positional fill for the
+// layered entrance system (see the WARNING at the top of this file).
+/* 0x614 */ DEFINE_ENTRANCE(ENTR_TITLE_0,     SCENE_TITLE, 0, false, true, TRANS_TYPE_FADE_BLACK, TRANS_TYPE_FADE_BLACK)
+/* 0x615 */ DEFINE_ENTRANCE(ENTR_TITLE_0_1,   SCENE_TITLE, 0, false, true, TRANS_TYPE_FADE_BLACK, TRANS_TYPE_FADE_BLACK)
+/* 0x616 */ DEFINE_ENTRANCE(ENTR_TITLE_0_2,   SCENE_TITLE, 0, false, true, TRANS_TYPE_FADE_BLACK, TRANS_TYPE_FADE_BLACK)
+/* 0x617 */ DEFINE_ENTRANCE(ENTR_TITLE_0_3,   SCENE_TITLE, 0, false, true, TRANS_TYPE_FADE_BLACK, TRANS_TYPE_FADE_BLACK)
+/* 0x618 */ DEFINE_ENTRANCE(ENTR_TITLE_0_4,   SCENE_TITLE, 0, false, true, TRANS_TYPE_FADE_BLACK, TRANS_TYPE_FADE_BLACK)
+/* 0x619 */ DEFINE_ENTRANCE(ENTR_TITLE_0_5,   SCENE_TITLE, 0, false, true, TRANS_TYPE_FADE_BLACK, TRANS_TYPE_FADE_BLACK)
+/* 0x61A */ DEFINE_ENTRANCE(ENTR_TITLE_0_6,   SCENE_TITLE, 0, false, true, TRANS_TYPE_FADE_BLACK, TRANS_TYPE_FADE_BLACK)
+/* 0x61B */ DEFINE_ENTRANCE(ENTR_TITLE_0_7,   SCENE_TITLE, 0, false, true, TRANS_TYPE_FADE_BLACK, TRANS_TYPE_FADE_BLACK)

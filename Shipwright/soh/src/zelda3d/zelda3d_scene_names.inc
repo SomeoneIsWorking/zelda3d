@@ -114,4 +114,8 @@ static const char* const kZelda3dSceneNames[] = {
     /* 0x6B SCENE_HAIRAL_NIWA2                       (hairal_niwa2) */ NULL,
     /* 0x6C SCENE_SASATEST                           (sasatest) */ NULL,
     /* 0x6D SCENE_TESTROOM                           (testroom) */ NULL,
+    // SoH3D title scene: OoT3D's dedicated title-demo scene (3DS scene index 0x6b). Its N64
+    // actor/object/collision data is aliased from spot00 (byte-identical per title_scene_spot99.md
+    // §3/§4), but the OoT3D render/collision layer loads spot99's own ZSI from here.
+    /* 0x6E SCENE_TITLE                              (spot99) */ "spot99",
 };

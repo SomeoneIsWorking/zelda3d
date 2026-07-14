@@ -42,7 +42,7 @@ void Object_InitBank(PlayState* play, ObjectContext* objectCtx) {
     size_t spaceSize;
     s32 i;
 
-    if (play2->sceneNum == SCENE_HYRULE_FIELD) {
+    if (play2->sceneNum == SCENE_HYRULE_FIELD || play2->sceneNum == SCENE_TITLE) {
         spaceSize = 1024000;
     } else if (play2->sceneNum == SCENE_GANON_BOSS) {
         if (gSaveContext.sceneSetupIndex != 4) {
