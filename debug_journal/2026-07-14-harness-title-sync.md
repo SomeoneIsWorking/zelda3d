@@ -169,3 +169,143 @@ fires correctly and re-locks content across the loop restart.**
   the harness's `step` command exists yet that would conflict with the new
   default (verified by grepping every `tools/*.py` for `step` sent to the
   harness's own REPL vs. the separate SoH3D-game REPL, `zelda3d_repl.py`).
+
+## Session 2 — content-search sync RETIRED; integer-cursor sync (design redirect)
+
+User redirect: the content-search calibration (above) is a hack compensating
+for two things that needed root-causing instead. Both were root-caused and
+the sync mechanism was replaced wholesale.
+
+### Falsification 1: "retro_run advances a variable slice" does NOT mean
+### content nondeterminism
+
+`scratch/az_determinism_check.py` ran the identical schedule in two fresh
+harness processes from `scratch/title_settled.state` and compared, at
+checkpoints 100/500/1000/2000/4500 retro_runs: the title-state vblank
+counter, `CoreTiming().GetGlobalTicks()`, and the sha256 of the az
+framebuffer:
+
+```
+run  frames  cs/vbl        ticks                    result
+   100       185/185       3353908754/3353908754    SAME
+   500       585/585       5146363077/5146363077    SAME
+  1000      1085/1085      7386931077/7386931077    SAME
+  2000      2085/2085     11868067109/11868067109   SAME
+  4500      4585/4585     23070907077/23070907077   SAME
+framebuffer sha256: 38ff366fe5923488 == 38ff366fe5923488
+CONTENT DETERMINISTIC
+```
+
+Even the GLOBAL TICK COUNT is bit-identical across processes. The old
+`az_ticks` caveat ("variable slice depending on host wall-clock
+scheduling") described tick-boundary variance WITHIN a frame in some other
+context; `retro_run()` itself loops `RunLoop()` until exactly one frame is
+submitted (`EmuWindow_LibRetro::HasSubmittedFrame`, one per vblank), and
+core scheduling is cycle-based — no wall-clock input to emulated content.
+Session 1's loop_period_check "black frame at +4800" observation was a
+wrong-loop-period artifact (the settled state sits BEFORE the cs loop
+start, see below), not jitter. **1 retro_run == 1 deterministic emulated
+frame.**
+
+### Falsification 2 (recorded 2026-07-04, re-surfaced): 0x0054CC3C is the
+### VBLANK counter, not the cs cursor
+
+Session 1's content search existed because "the oracle has no readable cs
+cursor". Wrong on two counts: (a) VA 0x0054CC3C is a deterministic +1/frame
+vblank counter (usable as the LOCKED rate-model clock via the RE'd law
+az_cs advances 0.5/frame — 2026-07-09-title-cs-phase-sync.md), and (b) the
+oracle's ABSOLUTE cs frame is recoverable exactly by inverting its live
+title-camera eye (RE'd basis @ 0x005BE6D4) against the byte-exact ported
+OP97 spline (`Zelda3D_TitleCsCamera`) — the same inversion that derived the
+2026-07-09 rate law (residual <0.1 world units).
+
+New empirical finding while wiring this: after loading
+`title_settled.state`, the camera basis VA holds an identity placeholder
+(eye=(0,0,1), dir=(1,0,0)) for the first ~85 frames — the settled state
+sits BEFORE the first camera-spline segment activates. The arm sequence
+therefore advances the oracle +85 frames (discovered dynamically: run until
+the basis publishes, cap 600) to the "anchor", where eye-inversion returned
+**cs frame 1 with residual 0.0007 world units** (runner-up frame 7 at
+0.439 — unambiguous).
+
+### New mechanism (tools/soh3d_harness/title_sync.h/.cpp + main.cpp)
+
+- **Arm**: load settled state → advance to camera-spline coverage (+85
+  frames, discovered not hardcoded; `g_armAdvanceRuns`/`g_armAnchorEye`
+  recorded) → HOLD.
+- **Anchor**: lazily (once SoH's cs data is parsed) invert the held eye →
+  `azLockCs` (=1 for the current settled state).
+- **Lock**: first frame SoH's own cursor (`Zelda3D_TitleCsFrame()`) reaches
+  `azLockCs` — integer equality, no search.
+- **LOCKED**: per frame, model the oracle's cs as
+  `azLockCs + (vbl - vblAtLock)/2` (vblank counter read from guest memory)
+  and run a 0/1/2-step integer governor keeping `sohCs - modelAzCs == 0`.
+  The governor absorbs the ±1 tick-parity offset (~1 correction per ~35
+  frames observed); `maxAbsDelta` never exceeded 1 over a full loop.
+- **Wrap**: when SoH's cursor drops ≥1500, reload settled state + replay
+  exactly `g_armAdvanceRuns` frames (determinism-verified, eye re-checked
+  against the recorded anchor) → re-HOLD → same integer lock. No content
+  search anywhere. csFrames in [0, azLockCs) at each wrap are by-design
+  unsynced (oracle holds at the anchor); with azLockCs=1 that window is
+  2 engine frames.
+
+`ContentScoreNative`/`DownsampleGray*`, `CalibrateAndLock`, the periodic
+checkpoint recalibration, and `kSyncSohFrame`/`kCalibrateMargin`/
+`kWrapDropThreshold(old use)` were all REMOVED from main.cpp.
+content_score survives only as the Python VERIFICATION metric.
+
+Session 1's residual worth keeping: the content search demonstrably
+MISLOCKED (first lock chose az_step=399, score 0.79, on a near-black
+frame; the cursor says the true offset was ~12) — pixel similarity on
+low-signal frames is not a sync mechanism.
+
+### Texture-pack poisoning (harness-only neutralization)
+
+The embedded SoH half was picking up the user's Henriko 4K pack ("4K"
+wordmark + different copyright), corrupting every compare. Mechanism: the
+pack is NOT CVar-driven — `Shipwright/cmb3d/asset/texpack.cpp:findPackRoot()`
+resolves `ZELDA3D_TEXPACK` env → cwd `textures/` → `textures/` next to
+`ZELDA3D_OOT3D_ROM`. It already honors `ZELDA3D_TEXPACK=off|0|none` as an
+explicit disable (added 2026-07-10 for the terrain-darkness A/B). Fix:
+`SohBootInternal()` (tools/soh3d_harness/main.cpp) now
+`setenv("ZELDA3D_TEXPACK", "off", 1)` before booting the embedded SoH —
+harness-process-only; the user's config and `tools/zelda3d_game.sh` are
+untouched. Verified visually: SoH half shows the vanilla "3D" wordmark and
+"© 1998-2011 Nintendo / Codeveloped by GREZZO" (intsync2_03 SxS).
+
+### Verification — tools/title_sbs_verify.py (durable, committed)
+
+Drives the default arm→lock path, samples K=8 instants across one full
+loop, writes SxS PNGs + content_score table (verification metric only).
+`harness_ctl.py` gained `close()` (quit → SIGTERM → SIGKILL on the tracked
+pid only — no pkill patterns). Run `intsync2` (fresh process, headless):
+
+| target_cs | actual_cs | score  | governor delta | note |
+|-----------|-----------|--------|----------------|------|
+| 150       | 150       | 0.9482 | 0 | |
+| 464       | 464       | 0.6912 | 0 | LOW — same camera segment both halves; SoH wordmark dimmer (fade alpha) |
+| 779       | 779       | 0.8729 | 0 | |
+| 1093      | 1093      | 0.6393 | 0 | LOW — same segment (rider at right edge on BOTH); SoH wordmark glow weaker + terrain saturation |
+| 1407      | 1407      | 0.8765 | 0 | |
+| 1721      | 1721      | 0.9160 | 0 | late-loop |
+| 2036      | 2036      | 0.9863 | 0 | late-loop |
+| 2350      | 2350      | 0.9959 | 0 | late-loop |
+
+Every instant landed on the exact requested cs frame (actual==target),
+governor delta 0 at every sample, maxAbsDelta=1 across the whole loop, 131
+±1-parity corrections over 4700 frames. Late-loop (cs>1600) — where the
+retired content-search sync decayed to 0.25 with visibly different camera
+segments — now scores 0.92-1.00. The two sub-0.7 rows were individually
+inspected (`scratch/title_ab/intsync2_01_cs464_sxs.png`, `_03_cs1093_`):
+both show the SAME camera segment/framing on both halves; the score dips
+are real content divergences, NOT sync drift.
+
+### Candidate REAL content divergences (seen in the clean compare, NOT fixed — out of scope)
+
+- Wordmark fade/alpha timing: SoH logo noticeably dimmer at cs~464 while
+  the oracle's is fully opaque.
+- Wordmark golden glow (fireglow) weaker on SoH at cs~1093.
+- Terrain color saturation: oracle grass is warmer/more saturated in
+  daylight segments (known lighting-divergence family).
+- Slight wordmark placement/scale offset (SoH logo sits ~2-3% lower/right
+  at cs464).

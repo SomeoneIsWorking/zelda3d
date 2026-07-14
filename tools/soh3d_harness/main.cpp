@@ -43,15 +43,17 @@
 //   step <N>             -> ok step <N> <mode> [titlesync=HOLD|LOCKED]
 //                           Combined driver — DEFAULT title-sync engages on
 //                           the first call (see title_sync.h): the oracle
-//                           loads scratch/title_settled.state and holds
-//                           there while SoH boots cold; once SoH passes
-//                           frame 408 a native content search locks the
-//                           oracle onto SoH's current frame, then 1:1
-//                           stepping keeps them locked (recalibrating via
-//                           the same search on every title-cs loop wrap —
-//                           1:1 stepping alone drifts over a full loop, see
-//                           title_sync.h). No-op (legacy passthrough) if
-//                           loadstate/soh_boot already ran manually.
+//                           loads scratch/title_settled.state, its RE'd
+//                           title-cs cursor (u32 @0x0054CC3C) is read as the
+//                           integer lock target, and it holds there while
+//                           SoH boots cold; the first frame SoH's own cursor
+//                           (Zelda3D_TitleCsFrame()) reaches that value the
+//                           controller LOCKs and steps the oracle per-frame
+//                           under a 0/1/2-step integer governor that keeps
+//                           the modular cursor delta at 0 (wrap-safe — no
+//                           content search, no resync). No-op (legacy
+//                           passthrough) if loadstate/soh_boot already ran
+//                           manually.
 //   titlesync             -> ok titlesync state=... sohFrame=... azFrame=...
 //
 // Meta:
@@ -150,6 +152,11 @@ extern "C" {
 int  Zelda3D_TitleCsFrame(void);
 void Zelda3D_TitleCsSetFrame(int frame);
 int  Zelda3D_TitleCsEndFrame(void);
+// zelda3d_cutscene.cpp — ported byte-exact OP97 camera spline evaluator;
+// title-sync's eye-inversion (DeriveAzLockCsByEyeInversion) inverts the
+// oracle's live camera eye against this to derive its held cs frame.
+int  Zelda3D_TitleCsCamera(int frame, float eye[3], float at[3], float up[3],
+                           float* fovDeg);
 
 extern uint8_t*     gSoh3dCaptureBuf;
 extern uint32_t     gSoh3dCaptureCap;
@@ -831,6 +838,19 @@ void SohBootInternal() {
     setenv("SOH_HEADLESS", "1", 1);
     setenv("SOH3D_HEADLESS", "1", 1);
 
+    // Force the hi-res texture pack OFF for this harness's embedded SoH
+    // instance ONLY -- Shipwright/cmb3d/asset/texpack.cpp:findPackRoot()
+    // already supports this override (added 2026-07-10 for a lighting A/B
+    // test); "off" makes every TexPackLookup() miss, so the CMB path falls
+    // through to the original decoded texels (vanilla "3D" wordmark), which
+    // is what the oracle renders too. Without this, the harness would pick
+    // up the user's real shipofharkinian.json / cwd `textures/` pack (e.g.
+    // Henriko 4K) and permanently corrupt the SBS content-search compare
+    // with mismatched wordmark/copyright text. Env-only: does NOT touch the
+    // user's real config, and tools/zelda3d_game.sh (the normal game) never
+    // sets this, so its default (pack ON if present) is unaffected.
+    setenv("ZELDA3D_TEXPACK", "off", 1);
+
     // Match Az's 3DS top-screen native render resolution 400x240 so
     // side-by-side captures are like-for-like (no upscale/downscale
     // filtering in the diff). Written UNCONDITIONALLY to defeat any
@@ -882,78 +902,11 @@ void HandleSohStep(std::istringstream& toks) {
     std::printf("ok soh_step %llu\n", static_cast<unsigned long long>(done));
 }
 
-// -- Native content score (title-sync calibration) --------------------------
-//
-// Ports tools/title_ab.py's content_score/load_gray_small to C++ so
-// CalibrateAndLock() below can run its search INLINE against the raw
-// in-memory framebuffers (g_az_buf / g_soh_buf) -- no PNG round-trip, cheap
-// enough to run on every loop-wrap resync without stalling the live SBS
-// view. Same formula: downsample each side to a small (48x28) grayscale
-// grid (ITU-R 601 luma, matching PIL's convert("L")), zero-mean + unit-norm
-// each independently (so brightness/hue differences -- the separate,
-// already-tracked lighting divergence -- don't move the score; only
-// position/pose/silhouette differences do), then dot-product.
-void DownsampleGrayAz(std::vector<float>& out, int gx, int gy) {
-    out.assign(static_cast<size_t>(gx) * gy, 0.0f);
-    if (!g_az_w || !g_az_h || g_az_buf.empty()) return;
-    for (int j = 0; j < gy; ++j) {
-        uint32_t sy = std::min<uint32_t>(g_az_h - 1,
-            static_cast<uint32_t>(static_cast<uint64_t>(j) * g_az_h / gy));
-        const uint8_t* row = g_az_buf.data() + static_cast<size_t>(sy) * g_az_pitch;
-        for (int i = 0; i < gx; ++i) {
-            uint32_t sx = std::min<uint32_t>(g_az_w - 1,
-                static_cast<uint32_t>(static_cast<uint64_t>(i) * g_az_w / gx));
-            const uint8_t* p = row + static_cast<size_t>(sx) * 4;  // B,G,R,X (XRGB8888 LE)
-            out[static_cast<size_t>(j) * gx + i] =
-                0.299f * p[2] + 0.587f * p[1] + 0.114f * p[0];
-        }
-    }
-}
-void DownsampleGraySoh(std::vector<float>& out, int gx, int gy) {
-    out.assign(static_cast<size_t>(gx) * gy, 0.0f);
-    const uint32_t w = gSoh3dCaptureW, h = gSoh3dCaptureH;
-    if (!w || !h || g_soh_buf.empty()) return;
-    for (int j = 0; j < gy; ++j) {
-        uint32_t sy = std::min<uint32_t>(h - 1,
-            static_cast<uint32_t>(static_cast<uint64_t>(j) * h / gy));
-        for (int i = 0; i < gx; ++i) {
-            uint32_t sx = std::min<uint32_t>(w - 1,
-                static_cast<uint32_t>(static_cast<uint64_t>(i) * w / gx));
-            const uint8_t* p = g_soh_buf.data() + (static_cast<size_t>(sy) * w + sx) * 4; // R,G,B,A
-            out[static_cast<size_t>(j) * gx + i] =
-                0.299f * p[0] + 0.587f * p[1] + 0.114f * p[2];
-        }
-    }
-}
-float ContentScoreNative(int gx = 48, int gy = 28) {
-    static std::vector<float> a, b;
-    DownsampleGrayAz(a, gx, gy);
-    DownsampleGraySoh(b, gx, gy);
-    auto normalize = [](std::vector<float>& v) {
-        double mean = 0.0;
-        for (float x : v) mean += x;
-        mean /= static_cast<double>(v.size());
-        for (float& x : v) x = static_cast<float>(x - mean);
-        double norm = 0.0;
-        for (float x : v) norm += static_cast<double>(x) * x;
-        norm = std::sqrt(norm);
-        if (norm > 1e-6) for (float& x : v) x = static_cast<float>(x / norm);
-    };
-    normalize(a);
-    normalize(b);
-    double dot = 0.0;
-    for (size_t i = 0; i < a.size(); ++i) dot += static_cast<double>(a[i]) * b[i];
-    return static_cast<float>(dot);
-}
-
 // A bare LoadStateFileInternal() never triggers a render (VideoRefresh only
 // fires from retro_run()), so it alone leaves g_az_buf holding STALE pixels
-// from whatever ran before -- wrong for HOLD (task requirement: the oracle
-// pane must show the settled title frame immediately, not a blank/stale
-// one) and wrong as CalibrateAndLock's search step=0 baseline. Reload +
-// render exactly one frame so g_az_buf reflects the loaded state; this
-// post-load render IS the canonical az_step=0 baseline every calibration
-// search and replay counts additional retro_run() calls from.
+// from whatever ran before -- wrong for HOLD (the oracle pane must show the
+// settled title frame immediately, not a blank/stale one). Reload + render
+// exactly one frame so g_az_buf reflects the loaded state.
 bool ReloadOracleToBaseline() {
     if (!LoadStateFileInternal(kTitleSettledStatePath)) return false;
     FrameWatchdog wd("ReloadOracleToBaseline/retro_run");
@@ -961,45 +914,160 @@ bool ReloadOracleToBaseline() {
     return true;
 }
 
-// (Re)calibrate the oracle's timeline against SoH's CURRENT frame (held
-// fixed for the whole search -- SoH is not stepped here). Sweeps the
-// oracle forward from a fresh title_settled.state load through
-// [0, kCalibrateMargin] az-steps, scores each candidate against SoH's
-// frame, then -- since stepping is forward-only and the search itself
-// overshoots to kCalibrateMargin -- reloads title_settled.state once more
-// and replays EXACTLY the best-scoring step count so the oracle lands
-// precisely there (not at the overshot search endpoint) before locking.
-// Called from HandleStep: once when SoH's raw frame count first crosses
-// kSyncSohFrame (HOLD -> LOCKED), and again every time a SoH title-cs loop
-// wrap is detected while LOCKED (the caller reloads title_settled.state
-// itself before calling, matching the first-calibration precondition of
-// "oracle currently sitting at az=0").
-void CalibrateAndLock() {
-    float best = -2.0f;
-    uint64_t bestStep = 0;
-    for (int step = 0; step <= TitleSyncController::kCalibrateMargin; ++step) {
-        if (step > 0) { FrameWatchdog wd("CalibrateAndLock/search"); retro_run(); }
-        float score = ContentScoreNative();
-        if (score > best) { best = score; bestStep = static_cast<uint64_t>(step); }
+// Read the oracle's title-state vblank counter (u32 @ 0x0054CC3C -- the
+// LOCKED rate-model clock, see title_sync.h for provenance and why this
+// is NOT the cs cursor). Returns false if unmapped.
+bool ReadAzVblankCounter(uint32_t* out) {
+    auto v = Core::System::GetInstance().Memory().Read32OrNullopt(
+        TitleSyncController::kAzVblankCounterVA);
+    if (!v) return false;
+    *out = *v;
+    return true;
+}
+
+// Read the oracle's live title-camera eye (Vec3f @ TITLE_CAM_BASIS_VA+0).
+bool ReadAzTitleCamEye(float eye[3]) {
+    auto& mem = Core::System::GetInstance().Memory();
+    for (int j = 0; j < 3; ++j) {
+        auto v = mem.Read32OrNullopt(TitleSyncController::kAzTitleCamEyeVA + j * 4);
+        if (!v) return false;
+        std::memcpy(&eye[j], &*v, 4);
     }
-    ReloadOracleToBaseline();
-    for (uint64_t i = 0; i < bestStep; ++i) {
-        FrameWatchdog wd("CalibrateAndLock/replay"); retro_run();
+    return true;
+}
+
+// True once the oracle's camera basis has been PUBLISHED by the title-cs
+// spline driver. Before the first camera segment activates (the settled
+// state sits at cs ~88, before spline coverage -- measured 2026-07-14
+// session 2), the basis VA holds an identity placeholder
+// (eye=(0,0,1) dir=(1,0,0)) which must not be fed to the inversion.
+bool AzTitleCamPublished() {
+    float eye[3];
+    if (!ReadAzTitleCamEye(eye)) return false;
+    return !(eye[0] == 0.0f && eye[1] == 0.0f && eye[2] == 1.0f);
+}
+
+// Arm bookkeeping for the deterministic anchor (see ArmTitleSync): how
+// many retro_run()s past the settled state the oracle was advanced to
+// reach camera-spline coverage, and the eye it landed on. The wrap-time
+// re-hold replays exactly this many runs after reloading the state --
+// determinism (az_determinism_check.py) guarantees it lands on the same
+// frame, and the eye is re-checked against g_armAnchorEye as an assert.
+uint64_t g_armAdvanceRuns = 0;
+float    g_armAnchorEye[3] = {0, 0, 0};
+
+// Reload the settled state and advance to the recorded anchor. Used at
+// arm time (discovering the advance count) and at every wrap re-hold
+// (replaying it). Returns false on load failure or anchor mismatch.
+bool ReArmOracleToAnchor(bool discover) {
+    if (!ReloadOracleToBaseline()) return false;
+    if (discover) {
+        constexpr uint64_t kArmAdvanceCap = 600;
+        g_armAdvanceRuns = 0;
+        while (!AzTitleCamPublished() && g_armAdvanceRuns < kArmAdvanceCap) {
+            FrameWatchdog wd("ReArmOracleToAnchor/advance");
+            retro_run();
+            ++g_armAdvanceRuns;
+        }
+        if (!AzTitleCamPublished()) {
+            std::fprintf(stderr,
+                "[titlesync] ERROR: oracle camera basis never published within "
+                "%llu frames of %s -- not a title state?\n",
+                static_cast<unsigned long long>(g_armAdvanceRuns),
+                kTitleSettledStatePath);
+            return false;
+        }
+        ReadAzTitleCamEye(g_armAnchorEye);
+        std::fprintf(stderr,
+            "[titlesync] anchor: settled state +%llu frames -> camera spline "
+            "active, eye=(%.1f,%.1f,%.1f)\n",
+            static_cast<unsigned long long>(g_armAdvanceRuns),
+            g_armAnchorEye[0], g_armAnchorEye[1], g_armAnchorEye[2]);
+        return true;
     }
-    g_titleSync.SetLocked(bestStep);
+    for (uint64_t i = 0; i < g_armAdvanceRuns; ++i) {
+        FrameWatchdog wd("ReArmOracleToAnchor/replay");
+        retro_run();
+    }
+    float eye[3];
+    if (!ReadAzTitleCamEye(eye) ||
+        std::fabs(eye[0] - g_armAnchorEye[0]) > 0.5f ||
+        std::fabs(eye[1] - g_armAnchorEye[1]) > 0.5f ||
+        std::fabs(eye[2] - g_armAnchorEye[2]) > 0.5f) {
+        std::fprintf(stderr,
+            "[titlesync] WARNING: wrap re-anchor eye=(%.1f,%.1f,%.1f) != "
+            "recorded (%.1f,%.1f,%.1f) -- determinism assumption violated?\n",
+            eye[0], eye[1], eye[2],
+            g_armAnchorEye[0], g_armAnchorEye[1], g_armAnchorEye[2]);
+    }
+    return true;
+}
+
+// Derive the oracle's held title-cs frame EXACTLY by inverting its live
+// camera eye against the byte-exact ported OP97 camera spline
+// (Zelda3D_TitleCsCamera -- the same data both engines play). This is the
+// same inversion the 2026-07-09 rate-law derivation used (residual <0.1
+// world units at every checkpoint). Requires SoH's title cs data to be
+// loaded (Zelda3D_TitleCsEndFrame() > 0), so it runs lazily during HOLD.
+// Returns -1 (with a stderr diagnostic) on failure: eye unmapped, no
+// spline coverage, residual too large, or an ambiguous (non-unique) match.
+int DeriveAzLockCsByEyeInversion() {
+    float azEye[3];
+    if (!ReadAzTitleCamEye(azEye)) {
+        std::fprintf(stderr, "[titlesync] eye-inversion: oracle camera eye "
+                              "@0x%08x unmapped\n",
+                      TitleSyncController::kAzTitleCamEyeVA);
+        return -1;
+    }
+    const int endFrame = Zelda3D_TitleCsEndFrame();
+    float bestD2 = 1e30f, secondD2 = 1e30f;
+    int bestF = -1, secondF = -1;
+    for (int f = 1; f < endFrame; ++f) {
+        float e[3], a[3], u[3], fov;
+        if (!Zelda3D_TitleCsCamera(f, e, a, u, &fov)) continue;  // segment gap
+        const float dx = e[0] - azEye[0], dy = e[1] - azEye[1], dz = e[2] - azEye[2];
+        const float d2 = dx * dx + dy * dy + dz * dz;
+        if (d2 < bestD2) {
+            if (bestF >= 0 && (f - bestF) > 5) { secondD2 = bestD2; secondF = bestF; }
+            bestD2 = d2; bestF = f;
+        } else if (d2 < secondD2 && bestF >= 0 && (f - bestF) > 5) {
+            secondD2 = d2; secondF = f;
+        }
+    }
+    const float kMaxR = TitleSyncController::kEyeInvertMaxResidual;
+    if (bestF < 0 || bestD2 > kMaxR * kMaxR) {
+        std::fprintf(stderr,
+            "[titlesync] eye-inversion FAILED: best frame=%d residual=%.3f "
+            "(max %.3f) -- settled state not on a covered camera segment?\n",
+            bestF, std::sqrt(std::max(0.0f, bestD2)), kMaxR);
+        return -1;
+    }
+    // Uniqueness: a distant runner-up nearly as close as the winner means
+    // the camera revisits this eye position -- refuse to guess.
+    if (secondF >= 0 && secondD2 < 4.0f * std::max(bestD2, 0.01f)) {
+        std::fprintf(stderr,
+            "[titlesync] eye-inversion AMBIGUOUS: frame %d (r=%.3f) vs frame "
+            "%d (r=%.3f) -- regenerate title_settled.state on a moving shot\n",
+            bestF, std::sqrt(bestD2), secondF, std::sqrt(secondD2));
+        return -1;
+    }
     std::fprintf(stderr,
-        "[titlesync] calibrated #%d: az_step=%llu score=%.4f (searched 0..%d)\n",
-        g_titleSync.calibrations(), static_cast<unsigned long long>(bestStep), best,
-        TitleSyncController::kCalibrateMargin);
+        "[titlesync] eye-inversion: oracle held at cs frame %d "
+        "(residual %.4f world units, runner-up frame %d at %.3f)\n",
+        bestF, std::sqrt(bestD2), secondF, std::sqrt(std::min(secondD2, 1e15f)));
+    return bestF;
 }
 
 // Title-sync auto-engage (see title_sync.h). Called ONCE, from HandleStep's
 // very first invocation, when nothing has manually touched Az/SoH state yet
 // (see g_manual_state_touch). Loads scratch/title_settled.state (auto-
-// generating it via tools/title_settle.py if missing) and boots SoH3D cold.
-// Returns false -- with a clear stderr diagnostic -- if either step fails;
-// NEVER silently falls back to a cold-booted oracle instead (that would
-// silently break the "frame-synced by default" contract).
+// generating it via tools/title_settle.py if missing) and boots SoH3D
+// cold; the held oracle's cs frame is derived LAZILY during HOLD (eye
+// inversion needs SoH's cs data loaded -- see
+// DeriveAzLockCsByEyeInversion). Returns false -- with a clear stderr
+// diagnostic -- if any step fails; NEVER silently falls back to a
+// cold-booted oracle instead (that would silently break the "frame-synced
+// by default" contract).
 bool ArmTitleSync() {
     namespace fs = std::filesystem;
     if (!fs::exists(kTitleSettledStatePath)) {
@@ -1020,8 +1088,8 @@ bool ArmTitleSync() {
         }
         std::fprintf(stderr, "[titlesync] auto-generated %s\n", kTitleSettledStatePath);
     }
-    if (!ReloadOracleToBaseline()) {
-        std::fprintf(stderr, "[titlesync] ERROR: loadstate %s failed\n",
+    if (!ReArmOracleToAnchor(/*discover=*/true)) {
+        std::fprintf(stderr, "[titlesync] ERROR: loadstate/anchor of %s failed\n",
                       kTitleSettledStatePath);
         return false;
     }
@@ -1033,11 +1101,12 @@ bool ArmTitleSync() {
 //
 // DEFAULT behavior (see title_sync.h): the FIRST `step` call of a fresh
 // harness process (nothing manually loaded/booted yet) auto-arms the
-// TitleSyncController -- the oracle is loaded to title_settled.state and
-// HELD there while SoH boots cold from N64-logo through the title cs; once
-// SoH's raw frame count passes 408 the oracle starts advancing 1:1, so both
-// sides show the SAME title-cs instant from then on (verified: no periodic
-// resync needed, see the class comment). If a script/human already called
+// TitleSyncController -- the oracle is loaded to title_settled.state, its
+// title-cs cursor is read out as the integer lock target, and it is HELD
+// there while SoH boots cold from N64-logo through the title cs; the first
+// frame SoH's own cursor (Zelda3D_TitleCsFrame()) reaches that target the
+// controller goes LOCKED and steps the oracle per-frame under the integer
+// governor (see title_sync.h). If a script/human already called
 // `loadstate`/`soh_boot` manually before the first `step`, title-sync
 // engagement is skipped entirely and `step` is the old unconditional
 // lockstep passthrough (both engines advance every iteration).
@@ -1055,11 +1124,11 @@ void HandleStep(std::istringstream& toks) {
         } else if (ArmTitleSync()) {
             g_titleSync.Arm(true);
             std::fprintf(stderr,
-                "[titlesync] armed: oracle held at %s (az=0); SoH booting cold "
-                "-> HOLD until soh frame > %llu, then content-calibrate + LOCKED "
-                "1:1 (recalibrates on every title-cs loop wrap; see title_sync.h)\n",
-                kTitleSettledStatePath,
-                static_cast<unsigned long long>(TitleSyncController::kSyncSohFrame));
+                "[titlesync] armed: oracle held at %s; SoH booting cold -> "
+                "HOLD (held cs frame derived by camera-eye inversion once "
+                "SoH's cs data loads), lock at cursor equality, then the "
+                "vblank-model integer governor (see title_sync.h)\n",
+                kTitleSettledStatePath);
         } else {
             PrintErr("step: title-sync arm failed (see stderr above) -- not "
                       "stepping; fix the issue and retry, or run a manual "
@@ -1077,23 +1146,78 @@ void HandleStep(std::istringstream& toks) {
             if (g_soh_booted) {
                 RequestSohCapture();
                 { FrameWatchdog wd("HandleStep/RunFrame"); RunFrame(); }
+                g_titleSync.NoteSohFrame();
 
-                bool needCalibrate = g_titleSync.NoteSohFrame();  // HOLD floor crossed?
-                if (!needCalibrate && g_titleSync.state() == TitleSyncController::State::LOCKED) {
-                    const int cs = Zelda3D_TitleCsFrame();
-                    if (g_titleSync.NoteCsFrameAndDetectWrap(cs)) {
+                const int sohCs = Zelda3D_TitleCsFrame();
+                const int endFrame = Zelda3D_TitleCsEndFrame();
+
+                // Lazy absolute anchor: once SoH's cs data is parsed the
+                // ported spline exists -- invert the held oracle's camera
+                // eye against it exactly once (see title_sync.h #1).
+                if (g_titleSync.state() == TitleSyncController::State::HOLD &&
+                    !g_titleSync.HasAzLockCs() && endFrame > 0) {
+                    const int cs = DeriveAzLockCsByEyeInversion();
+                    if (cs >= 0) {
+                        g_titleSync.SetAzLockCs(cs);
+                    }
+                    // On failure keep HOLDing; the diagnostic already
+                    // printed. (No silent fallback to unanchored stepping.)
+                }
+
+                if (g_titleSync.ShouldLock(sohCs)) {
+                    uint32_t vbl = 0;
+                    ReadAzVblankCounter(&vbl);
+                    g_titleSync.SetLocked(vbl);
+                    std::fprintf(stderr,
+                        "[titlesync] LOCKED at cursor equality: sohCs=%d "
+                        "azLockCs=%d vbl=%u (sohFrame=%llu, lock #%d)\n",
+                        sohCs, g_titleSync.azLockCs(), vbl,
+                        static_cast<unsigned long long>(g_titleSync.sohFrameCount()),
+                        g_titleSync.locks());
+                }
+
+                if (g_titleSync.state() == TitleSyncController::State::LOCKED) {
+                    // Loop wrap: SoH's cursor dropped -> reload the settled
+                    // state and re-enter HOLD; the SAME integer lock
+                    // mechanism as boot re-locks within this new loop.
+                    if (g_titleSync.DetectWrap(sohCs)) {
                         std::fprintf(stderr,
-                            "[titlesync] loop wrap detected (cs=%d) -- reloading "
-                            "oracle + recalibrating\n", cs);
-                        ReloadOracleToBaseline();
-                        needCalibrate = true;
+                            "[titlesync] SoH loop wrap (sohCs=%d) -- replaying "
+                            "oracle to anchor, re-HOLD until sohCs reaches %d\n",
+                            sohCs, g_titleSync.azLockCs());
+                        if (!ReArmOracleToAnchor(/*discover=*/false)) {
+                            std::fprintf(stderr,
+                                "[titlesync] ERROR: anchor replay failed at "
+                                "wrap -- oracle pane now unsynced\n");
+                        }
+                        g_titleSync.ReHold();
                     }
                 }
 
-                if (needCalibrate) {
-                    CalibrateAndLock();
-                } else if (g_titleSync.state() == TitleSyncController::State::LOCKED) {
-                    FrameWatchdog wd("HandleStep/retro_run"); retro_run();
+                if (g_titleSync.state() == TitleSyncController::State::LOCKED) {
+                    uint32_t vbl = 0;
+                    int steps = 1;
+                    if (ReadAzVblankCounter(&vbl)) {
+                        const int modelAzCs = g_titleSync.ModelAzCs(vbl);
+                        steps = g_titleSync.GovernorSteps(sohCs, modelAzCs);
+                        if (g_titleSync.lastDelta() >= TitleSyncController::kDeltaWarnThreshold ||
+                            g_titleSync.lastDelta() <= -TitleSyncController::kDeltaWarnThreshold) {
+                            std::fprintf(stderr,
+                                "[titlesync] WARNING: cursor delta %d (sohCs=%d "
+                                "modelAzCs=%d vbl=%u) left the tick-parity band "
+                                "-- determinism assumption violated?\n",
+                                g_titleSync.lastDelta(), sohCs, modelAzCs, vbl);
+                        }
+                    } else {
+                        std::fprintf(stderr,
+                            "[titlesync] WARNING: vblank counter unmapped while "
+                            "LOCKED (sohCs=%d) -- stepping 1:1 blind\n", sohCs);
+                    }
+                    for (int k = 0; k < steps; ++k) {
+                        FrameWatchdog wd("HandleStep/retro_run");
+                        retro_run();
+                        g_titleSync.BumpAzFrame();
+                    }
                 }
             }
         } else {
@@ -4018,15 +4142,19 @@ void RunRepl() {
                 g_titleSync.state() == TitleSyncController::State::UNARMED  ? "UNARMED"  :
                 g_titleSync.state() == TitleSyncController::State::HOLD     ? "HOLD"     :
                 g_titleSync.state() == TitleSyncController::State::LOCKED   ? "LOCKED"   : "DISABLED";
+            uint32_t vbl = 0;
+            const bool haveVbl = ReadAzVblankCounter(&vbl);
             std::printf("ok titlesync state=%s sohFrame=%llu azFrame=%llu "
-                        "syncSohFrameFloor=%llu calibrations=%d lastCsFrame=%d "
-                        "csFrame=%d\n",
+                        "azLockCs=%d vbl=%lld csFrame=%d delta=%d "
+                        "corrections=%d maxAbsDelta=%d locks=%d\n",
                         stateName,
                         static_cast<unsigned long long>(g_titleSync.sohFrameCount()),
                         static_cast<unsigned long long>(g_titleSync.azFrameCount()),
-                        static_cast<unsigned long long>(TitleSyncController::kSyncSohFrame),
-                        g_titleSync.calibrations(), g_titleSync.lastCsFrame(),
-                        g_soh_booted ? Zelda3D_TitleCsFrame() : -1);
+                        g_titleSync.azLockCs(),
+                        haveVbl ? static_cast<long long>(vbl) : -1LL,
+                        g_soh_booted ? Zelda3D_TitleCsFrame() : -1,
+                        g_titleSync.lastDelta(), g_titleSync.corrections(),
+                        g_titleSync.maxAbsDelta(), g_titleSync.locks());
         }
         else if (cmd == "compare")   HandleCompare(toks);
         else if (cmd == "force")     HandleForce(toks);
