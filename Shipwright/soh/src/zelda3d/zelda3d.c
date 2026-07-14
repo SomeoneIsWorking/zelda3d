@@ -10,6 +10,7 @@
 #include "overlays/actors/ovl_En_Ko/z_en_ko.h"   // EnKo ENKO_TYPE_* (shared-CMB head-variant select)
 #include "overlays/actors/ovl_En_Ex_Ruppy/z_en_ex_ruppy.h" // EnExRuppy colorIdx (ainfo rupee debug)
 #include "overlays/actors/ovl_En_Door/z_en_door.h" // EnDoor swing state (ainfo door trace, #115)
+#include "overlays/actors/ovl_En_Horse/z_en_horse.h" // EnHorse anim state (ainfo horse trace, title rearing verify)
 #include "objects/object_ge1/object_ge1.h"       // dgGerudoWhite*Anim OTR-path strings
 #include "soh/SaveManager.h" // Save_LoadFile (diagnostic `savecycle` REPL command, #132)
 void Save_LoadFile(void); // z_sram.c
@@ -6439,6 +6440,25 @@ static void Zelda3D_ReplExec(PlayState* play, char* line, const char* outPath) {
                                 d->jointTable[3].z, d->jointTable[4].z, d->jointTable[4].x,
                                 d->jointTable[4].y, d->jointTable[4].z);
             }
+            if (a->id == ACTOR_EN_HORSE) {
+                // Title-rider rearing-anim verify (2026-07-15): read live EnHorse anim-select
+                // state through the proper C struct (never a raw N64-offset poke — SoH is 64-bit,
+                // see CLAUDE.md). animationIdx/curFrame/action/cutsceneAction are exactly the
+                // fields EnHorse_CsWarpRearingInit/-CsWarpRearing (ported into title_rider.cpp)
+                // write; ENHORSE_ANIM_REARING == 3, ENHORSE_ANIM_IDLE == 0.
+                EnHorse* h = (EnHorse*)a;
+                Zelda3D_ReplReply(outPath,
+                                "ainfo horse action=%d animationIdx=%d curFrame=%.1f "
+                                "cutsceneAction=%d speedXZ=%.2f",
+                                h->action, h->animationIdx, h->curFrame, h->cutsceneAction,
+                                a->speedXZ);
+                Zelda3D_ReplReply(outPath,
+                                "ainfo horse skel startFrame=%.1f endFrame=%.1f animLength=%.1f "
+                                "playSpeed=%.2f morphWeight=%.2f mode=%d",
+                                h->skin.skelAnime.startFrame, h->skin.skelAnime.endFrame,
+                                h->skin.skelAnime.animLength, h->skin.skelAnime.playSpeed,
+                                h->skin.skelAnime.morphWeight, h->skin.skelAnime.mode);
+            }
             if (a->id == ACTOR_EN_ITEM00) {
                 EnItem00* it = (EnItem00*)a;
                 Zelda3D_ReplReply(outPath,
@@ -6692,6 +6712,24 @@ static void Zelda3D_ReplExec(PlayState* play, char* line, const char* outPath) {
             Zelda3D_TitleCsFrame(), Zelda3D_TitleCsEndFrame(),
             Zelda3D_TitleCsMiscTriggerFrame(0x1e), Zelda3D_TitleCsMiscTriggerFrame(0x1f),
             fadeStart, fadeEnd, Zelda3D_TitleCsLoopFrame());
+    } else if (strcmp(cmd, "titlecue") == 0) {
+        // Debug: dump the active rider cue's action/window at a given (or current) cs frame, so
+        // agents can find real 0x41/0x26 rearing-cue bounds instead of guessing them (title rider
+        // rearing-anim verify, 2026-07-15).
+        int qFrame = Zelda3D_TitleCsFrame();
+        sscanf(line, "%*s %i", &qFrame);
+        int cueIndex = -1, startF = -1, endF = -1;
+        float p0[3], p1[3];
+        int16_t yaw = 0;
+        uint16_t action = 0;
+        int ok = Zelda3D_TitleCsRiderCue(qFrame, &cueIndex, p0, p1, &startF, &endF, &yaw, &action);
+        if (ok) {
+            Zelda3D_ReplReply(outPath,
+                "titlecue frame=%d cueIndex=%d action=0x%x window=(%d,%d] yaw=%d",
+                qFrame, cueIndex, action, startF, endF, yaw);
+        } else {
+            Zelda3D_ReplReply(outPath, "titlecue frame=%d: no cue", qFrame);
+        }
     } else if (strcmp(cmd, "camlift") == 0) {
         // #4 toggle/inspect the cutscene/title camera-lift. `camlift 0|1` sets it; `camlift` alone
         // reports state + the live view eye and the lift applied THIS frame (post-reconcile).
