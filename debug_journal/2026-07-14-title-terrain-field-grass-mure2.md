@@ -74,5 +74,16 @@ one calibration slot — the budget burned out in ~2 frames, before the GPU-side
    decomp pointers in `2026-07-10-fireglow-combiner-and-terrain-decomposition.md` §1 (alpha
    staging/fade-in timing, title_logo_actor.md §5.2/§6.2).
 2. Rider (Link/Epona) framing at the right edge (~33%) — pose/position offset vs oracle.
-3. PICA fog LUT port (blocked on LUT-fill decompile) and the oracle-side terrain ~1.9x
-   brightness question — both unchanged, do not tune.
+3. ~~PICA fog LUT port (blocked on LUT-fill decompile)~~ — **CORRECTION (2026-07-14, later
+   session, see `2026-07-14-fog-lut-already-ported.md`): this line was stale/wrong when
+   written.** The LUT-fill was decompiled and the fog port SHIPPED on 2026-07-10 (commit
+   `19081f9a`, ground truth in `oot3d-decomp/docs/title_env_lighting.md` §13; SoH-side
+   journal `2026-07-10-title-3ds-fog-port.md`). Re-verified in the later session:
+   `fog3dNode()` + `gZelda3dFog3d`/`Zelda3D_Fog3dSet` in
+   `Shipwright/libultraship/src/fast/{zelda3d_gl,zelda3d_sdl3gpu}.cpp` still implement the
+   exact node/128-entry-LERP structure from §13, unchanged since the port commit, and are
+   still wired from `title_presentation.cpp:405`. Nothing to port here; this entry mis-listed
+   it as open, likely leftover from drafting before the fog-port session's numbers were
+   folded in. The oracle-side terrain ~1.9x brightness question (the per-light
+   ambient-summation mechanism, §10/§11 of `title_env_lighting.md`) remains genuinely open —
+   that part of the line was correct.
