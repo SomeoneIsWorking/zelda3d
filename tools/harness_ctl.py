@@ -416,10 +416,34 @@ def _ensure_headless_env() -> None:
     os.environ.pop("WAYLAND_DISPLAY", None)
 
 
+def _ensure_scalable_malloc() -> None:
+    """Preload jemalloc (else tcmalloc) into the harness so Azahar's headless
+    SOFTWARE rasterizer doesn't livelock. That rasterizer runs a multi-threaded
+    per-scanline worker pool that allocates on one thread and frees on another;
+    under a complex scene with motion (Kokiri Forest while Link walks) glibc's
+    malloc arena lock serializes those cross-thread alloc/frees, each frame slows
+    ~10x, and the 5s frame-watchdog kills the harness — the walk/run oracle-sweep
+    hang (gdb 2026-07-15: SwRenderer work threads all in _int_free_chunk on the
+    arena lock). A per-thread-cache allocator removes the contention: ~seconds ->
+    ~70ms/frame. os.environ is inherited by the Popen below. No-op if the caller
+    already set LD_PRELOAD or if neither lib is present."""
+    if os.environ.get("LD_PRELOAD"):
+        return
+    import glob as _glob
+    cands = ["/usr/lib64/libjemalloc.so.2", "/usr/lib/x86_64-linux-gnu/libjemalloc.so.2"]
+    cands += _glob.glob("/usr/lib*/libjemalloc.so.2") + _glob.glob("/lib*/libjemalloc.so.2")
+    cands += _glob.glob("/usr/lib*/libtcmalloc_minimal.so.4")
+    for c in cands:
+        if c and os.path.exists(c):
+            os.environ["LD_PRELOAD"] = c
+            return
+
+
 def spawn(save_state: Optional[str] = None) -> Harness:
     if not HARNESS_BIN.exists() and not HARNESS_SH.exists():
         raise RuntimeError(f"soh3d_harness not found; expected {HARNESS_BIN} or {HARNESS_SH}")
     _ensure_headless_env()
+    _ensure_scalable_malloc()
     cmd = [str(HARNESS_BIN)] if HARNESS_BIN.exists() else [str(HARNESS_SH)]
     h = Harness(cmd)
     if save_state:

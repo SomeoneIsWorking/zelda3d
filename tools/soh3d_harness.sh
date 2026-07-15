@@ -80,5 +80,28 @@ setup_headless() {
 }
 setup_headless
 
+# Preload a scalable allocator (jemalloc, else tcmalloc). Azahar's headless SOFTWARE
+# rasterizer (forced in main.cpp because there's no GL window) runs a multi-threaded
+# per-scanline worker pool that allocates on one thread and frees on another; under a
+# complex scene with motion (e.g. Kokiri Forest while Link walks) glibc's malloc arena
+# lock serializes those cross-thread alloc/frees and each frame slows ~10x, tripping the
+# 5s frame-watchdog and killing the harness ("harness closed stdout unexpectedly" — the
+# walk/run oracle-sweep hang, diagnosed 2026-07-15 via gdb: SwRenderer work threads all
+# blocked in _int_free_chunk on the arena lock). A per-thread-cache allocator removes the
+# contention: frames drop from seconds to ~70ms and the sweep completes. Skip if the
+# caller already set LD_PRELOAD, or if neither lib is present.
+if [ -z "${LD_PRELOAD:-}" ]; then
+    for _cand in \
+        "$(ldconfig -p 2>/dev/null | grep -m1 'libjemalloc\.so\.2' | awk '{print $NF}')" \
+        /usr/lib64/libjemalloc.so.2 /usr/lib/x86_64-linux-gnu/libjemalloc.so.2 \
+        "$(ldconfig -p 2>/dev/null | grep -m1 'libtcmalloc_minimal\.so' | awk '{print $NF}')"; do
+        if [ -n "${_cand}" ] && [ -e "${_cand}" ]; then
+            export LD_PRELOAD="${_cand}"
+            echo "harness: LD_PRELOAD=${_cand} (scalable allocator for the SW rasterizer)" >&2
+            break
+        fi
+    done
+fi
+
 cd "${repo_root}"
 exec "${harness_bin}" "$@"
