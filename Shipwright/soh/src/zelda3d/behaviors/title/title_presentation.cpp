@@ -9,7 +9,7 @@
 #include "title_logo.h"
 #include "title_fireglow.h"
 #include "../../zelda3d.h"          // Zelda3D_Enabled/Zelda3D_AutoWarpEnabled
-#include "../../zelda3d_cutscene.h"
+#include "../../cutscene/zelda3d_cutscene.h"
 #include "../../model/zelda3d_overlay2d.h"
 
 extern "C" {

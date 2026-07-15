@@ -3,7 +3,7 @@
 // port (title_rider.h's header comment, oot3d-decomp/docs/title_rider_port_spec.md).
 #include "global.h"
 #include "title_rider.h"
-#include "../../zelda3d_cutscene.h"
+#include "../../cutscene/zelda3d_cutscene.h"
 #include "overlays/actors/ovl_En_Horse/z_en_horse.h"
 
 extern "C" {

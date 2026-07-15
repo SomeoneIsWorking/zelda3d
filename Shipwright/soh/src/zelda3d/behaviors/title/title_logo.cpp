@@ -71,7 +71,7 @@
 // equivalent of "the camera-basis technique" here is a single fixed basis, not the live one.
 #include "global.h"
 #include "title_logo.h"
-#include "../../zelda3d_cutscene.h"
+#include "../../cutscene/zelda3d_cutscene.h"
 #include "../../model/zelda3d_overlay2d.h"
 
 #include <algorithm>

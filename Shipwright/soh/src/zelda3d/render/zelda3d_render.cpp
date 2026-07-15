@@ -5,7 +5,7 @@
 #include "zelda3d.h"
 #include "render/zelda3d_render.h"
 #include "zelda3d_collision.h"            // Zelda3D_CollisionEnabled (Zelda3D_TerrainWarpEnabled)
-#include "zelda3d_cutscene.h"             // Zelda3D_TitleCsLightSlotsRaw (title light-slot convert)
+#include "cutscene/zelda3d_cutscene.h"             // Zelda3D_TitleCsLightSlotsRaw (title light-slot convert)
 #include "behaviors/title/title_presentation.h" // Zelda3D_Title_IsActive
 #include "overlays/actors/ovl_En_Ge1/z_en_ge1.h" // EnGe1 (read live SkelAnime state)
 #include "objects/object_ge1/object_ge1.h" // dgGerudoWhite*Anim OTR-path strings
