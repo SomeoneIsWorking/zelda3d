@@ -503,6 +503,14 @@ float Zelda3D_GScale(int slot, float def);                              // live 
 void Zelda3D_SetTrackPosedMinY(int modelId, int enable);                  // per-frame posed-feet grounding
 float Zelda3D_PosedGroundOffset(int modelId, unsigned long long midMask); // model-local Y to ground feet
 int Zelda3D_PosedBoneWorldPos(int modelId, int boneId, float* outModelPos); // posed bone origin (model-local), #6 held-actor attach
+// En_Horse hoof-dust Y reconciliation: given a hoof's ALREADY-COMPUTED native world position
+// (ioPos, from z_en_horse.c's own Skin_GetLimbPos), lift/drop its Y onto the OoT3D-warped render
+// terrain at the hoof's own XZ (same class of fix as the title tree-grounding commit 36525326) so the
+// dust doesn't punch through / float above hill relief the N64 collision mesh never had. Modifies
+// ioPos[1] in place. Returns 1 if a correction was applied, 0 if none was needed/available (terrain
+// warp inactive, no OoT3D room mesh here, etc — ioPos is left unchanged either way). See
+// oot3d-decomp/docs/en_horse_hoof_dust.md and debug_journal/2026-07-15-epona-hoof-dust-depth.md.
+int Zelda3D_HoofDustWorldPos(PlayState* play, Actor* horseActor, float* ioPos);
 void Zelda3D_UpdateAnim(int modelId, const char* animName, float frame);
 void Zelda3D_SkinDumpArm(int modelId, const char* path, int frames); // #117 resolved-pose capture
 void Zelda3D_UpdateAnimAuto(int modelId, const char* animName, float rate, float n64CurFrame,

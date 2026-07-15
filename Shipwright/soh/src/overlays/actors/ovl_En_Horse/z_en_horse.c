@@ -9,7 +9,10 @@
 #include "objects/object_horse/object_horse.h"
 #include "objects/object_hni/object_hni.h"
 #include "scenes/overworld/spot09/spot09_scene.h"
+#include "zelda3d/zelda3d.h" // Zelda3D_HoofDustWorldPos: posed-3DS hoof position for dust spawns
 #include <assert.h>
+#include <stdio.h>
+#include <stdlib.h>
 
 #define FLAGS ACTOR_FLAG_UPDATE_CULLING_DISABLED
 
@@ -3678,6 +3681,26 @@ void EnHorse_RandomOffset(Vec3f* src, f32 dist, Vec3f* dst) {
     dst->z = (Rand_ZeroOne() * (dist * 2.0f) + src->z) - dist;
 }
 
+// Resolve a hoof's dust-spawn position: compute it the native way (Skin_GetLimbPos, unchanged), then
+// let Zelda3D reconcile its Y onto the OoT3D-warped render terrain at the hoof's own XZ — see
+// oot3d-decomp/docs/en_horse_hoof_dust.md + debug_journal/2026-07-15-epona-hoof-dust-depth.md for why
+// the raw native Y (derived from the N64 collision mesh) doesn't match hill relief the OoT3D render
+// mesh has and the N64 one doesn't, and why that's the SAME class of fix as the title tree-grounding
+// commit (36525326), just applied to the dust effect instead of an actor model. A no-op (native
+// position unchanged) whenever Zelda3D/the terrain warp isn't active.
+static void EnHorse_ResolveHoofPos(Actor* thisx, PlayState* play, Skin* skin, s32 n64LimbIndex,
+                                    Vec3f* hoofOffset, Vec3f* dst) {
+    Skin_GetLimbPos(skin, n64LimbIndex, hoofOffset, dst);
+    int corrected = Zelda3D_HoofDustWorldPos(play, thisx, (float*)dst);
+    // Diagnostic (ZELDA3D_DUST_DEBUG=1): dust is a small, short-lived, easily-occluded effect that's
+    // hard to confirm by eye alone — this is the durable tooling hook for the next investigation,
+    // same convention as zelda3d.c's gZelda3dAnimDebug [SKELSCALE] print.
+    if (getenv("ZELDA3D_DUST_DEBUG") != NULL) {
+        fprintf(stderr, "[Zelda3D dust] limb=%d pos=(%.1f,%.1f,%.1f) corrected=%d actorY=%.1f\n",
+                n64LimbIndex, dst->x, dst->y, dst->z, corrected, thisx->world.pos.y);
+    }
+}
+
 void EnHorse_PostDraw(Actor* thisx, PlayState* play, Skin* skin) {
     EnHorse* this = (EnHorse*)thisx;
     s32 pad;
@@ -3711,7 +3734,7 @@ void EnHorse_PostDraw(Actor* thisx, PlayState* play, Skin* skin) {
          (frame > 28.0f && frame < 33.0f && this->type == HORSE_HNI))) {
         if (Rand_ZeroOne() < 0.6f) {
             this->dustFlags |= 1;
-            Skin_GetLimbPos(skin, 28, &hoofOffset, &this->frontRightHoof);
+            EnHorse_ResolveHoofPos(thisx, play, skin, 28, &hoofOffset, &this->frontRightHoof);
             this->frontRightHoof.y = this->frontRightHoof.y - 5.0f;
         }
     } else {
@@ -3719,12 +3742,12 @@ void EnHorse_PostDraw(Actor* thisx, PlayState* play, Skin* skin) {
             if ((frame > 10.0f && frame < 13.0f) || (frame > 25.0f && frame < 33.0f)) {
                 if (Rand_ZeroOne() < 0.7f) {
                     this->dustFlags |= 2;
-                    Skin_GetLimbPos(skin, 20, &hoofOffset, &sp70);
+                    EnHorse_ResolveHoofPos(thisx, play, skin, 20, &hoofOffset, &sp70);
                     EnHorse_RandomOffset(&sp70, 10.0f, &this->frontLeftHoof);
                 }
                 if (Rand_ZeroOne() < 0.7f) {
                     this->dustFlags |= 1;
-                    Skin_GetLimbPos(skin, 28, &hoofOffset, &sp70);
+                    EnHorse_ResolveHoofPos(thisx, play, skin, 28, &hoofOffset, &sp70);
                     EnHorse_RandomOffset(&sp70, 10.0f, &this->frontRightHoof);
                 }
             }
@@ -3732,7 +3755,7 @@ void EnHorse_PostDraw(Actor* thisx, PlayState* play, Skin* skin) {
             if ((frame > 6.0f && frame < 10.0f) || (frame > 23.0f && frame < 29.0f)) {
                 if (Rand_ZeroOne() < 0.7f) {
                     this->dustFlags |= 8;
-                    Skin_GetLimbPos(skin, 37, &hoofOffset, &sp70);
+                    EnHorse_ResolveHoofPos(thisx, play, skin, 37, &hoofOffset, &sp70);
                     EnHorse_RandomOffset(&sp70, 10.0f, &this->backLeftHoof);
                 }
             }
@@ -3740,60 +3763,60 @@ void EnHorse_PostDraw(Actor* thisx, PlayState* play, Skin* skin) {
             if ((frame > 7.0f && frame < 14.0f) || (frame > 26.0f && frame < 30.0f)) {
                 if (Rand_ZeroOne() < 0.7f) {
                     this->dustFlags |= 4;
-                    Skin_GetLimbPos(skin, 45, &hoofOffset, &sp70);
+                    EnHorse_ResolveHoofPos(thisx, play, skin, 45, &hoofOffset, &sp70);
                     EnHorse_RandomOffset(&sp70, 10.0f, &this->backRightHoof);
                 }
             }
         } else if (this->animationIdx == ENHORSE_ANIM_GALLOP) {
             if ((frame > 14.0f) && (frame < 16.0f)) {
                 this->dustFlags |= 1;
-                Skin_GetLimbPos(skin, 28, &hoofOffset, &sp70);
+                EnHorse_ResolveHoofPos(thisx, play, skin, 28, &hoofOffset, &sp70);
                 EnHorse_RandomOffset(&sp70, 5.0f, &this->frontRightHoof);
             } else if (frame > 8.0f && frame < 10.0f) {
                 this->dustFlags |= 2;
-                Skin_GetLimbPos(skin, 20, &hoofOffset, &sp70);
+                EnHorse_ResolveHoofPos(thisx, play, skin, 20, &hoofOffset, &sp70);
                 EnHorse_RandomOffset(&sp70, 10.0f, &this->frontLeftHoof);
             } else if (frame > 1.0f && frame < 3.0f) {
                 this->dustFlags |= 4;
-                Skin_GetLimbPos(skin, 45, &hoofOffset, &sp70);
+                EnHorse_ResolveHoofPos(thisx, play, skin, 45, &hoofOffset, &sp70);
                 EnHorse_RandomOffset(&sp70, 10.0f, &this->backRightHoof);
             } else if ((frame > 26.0f) && (frame < 28.0f)) {
                 this->dustFlags |= 8;
-                Skin_GetLimbPos(skin, 37, &hoofOffset, &sp70);
+                EnHorse_ResolveHoofPos(thisx, play, skin, 37, &hoofOffset, &sp70);
                 EnHorse_RandomOffset(&sp70, 10.0f, &this->backLeftHoof);
             }
         } else if (this->action == ENHORSE_ACT_LOW_JUMP && frame > 6.0f &&
                    Rand_ZeroOne() < 1.0f - (frame - 6.0f) * (1.0f / 17.0f)) {
             if (Rand_ZeroOne() < 0.5f) {
                 this->dustFlags |= 8;
-                Skin_GetLimbPos(skin, 37, &hoofOffset, &sp70);
+                EnHorse_ResolveHoofPos(thisx, play, skin, 37, &hoofOffset, &sp70);
                 EnHorse_RandomOffset(&sp70, 10.0f, &this->backLeftHoof);
             }
             if (Rand_ZeroOne() < 0.5f) {
                 this->dustFlags |= 4;
-                Skin_GetLimbPos(skin, 45, &hoofOffset, &sp70);
+                EnHorse_ResolveHoofPos(thisx, play, skin, 45, &hoofOffset, &sp70);
                 EnHorse_RandomOffset(&sp70, 10.0f, &this->backRightHoof);
             }
         } else if (this->action == ENHORSE_ACT_HIGH_JUMP && frame > 5.0f &&
                    Rand_ZeroOne() < 1.0f - (frame - 5.0f) * (1.0f / 25.0f)) {
             if (Rand_ZeroOne() < 0.5f) {
                 this->dustFlags |= 8;
-                Skin_GetLimbPos(skin, 37, &hoofOffset, &sp70);
+                EnHorse_ResolveHoofPos(thisx, play, skin, 37, &hoofOffset, &sp70);
                 EnHorse_RandomOffset(&sp70, 10.0f, &this->backLeftHoof);
             }
             if (Rand_ZeroOne() < 0.5f) {
                 this->dustFlags |= 4;
-                Skin_GetLimbPos(skin, 45, &hoofOffset, &sp70);
+                EnHorse_ResolveHoofPos(thisx, play, skin, 45, &hoofOffset, &sp70);
                 EnHorse_RandomOffset(&sp70, 10.0f, &this->backRightHoof);
             }
         } else if (this->action == ENHORSE_ACT_BRIDGE_JUMP && Rand_ZeroOne() < 0.5f) {
             if (Rand_ZeroOne() < 0.5f) {
                 this->dustFlags |= 8;
-                Skin_GetLimbPos(skin, 37, &hoofOffset, &sp70);
+                EnHorse_ResolveHoofPos(thisx, play, skin, 37, &hoofOffset, &sp70);
                 EnHorse_RandomOffset(&sp70, 10.0f, &this->backLeftHoof);
             } else {
                 this->dustFlags |= 4;
-                Skin_GetLimbPos(skin, 45, &hoofOffset, &sp70);
+                EnHorse_ResolveHoofPos(thisx, play, skin, 45, &hoofOffset, &sp70);
                 EnHorse_RandomOffset(&sp70, 10.0f, &this->backRightHoof);
             }
         }
