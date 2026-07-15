@@ -78,3 +78,23 @@ forward for the next tick:
      perspective pass's depth), instead of at FinishRender.
 
 The `soh_depthdump` tool itself is committed and reusable for both.
+
+## Update 2026-07-16 (conclusion): GAMEPLAY depth is CORRECT → the bug is title-demo-specific
+
+Drove SoH into gameplay (`soh_warp 0xCD` → scene 0x51 spot00, Temple-of-Time courtyard) and
+`soh_depthdump` (`scratch/harness/gp_field*`). The world depth there is a NORMAL perspective range
+**[0.926, 0.998]** and the depth image shows textbook sorting: Link near (bright), ground receding
+to the walls (darker), interior far (darkest) — **occlusion is correct**. The renderer's depth path
+is fundamentally sound in normal gameplay.
+
+CONCLUSION: the tree-in-front / smoke-over-terrain artifacts are **specific to the TITLE DEMO**, not
+a general depth-sorting failure. The render config (ruled out above), the shared depth buffer, and
+the projection all work correctly for the ordinary world pass. Whatever puts the title tree in front
+is something title-render-specific (a title-cs element drawn without depth, a sky/far-plane-flagged
+draw mis-tagged, or an interaction with the ortho overlay pass) — a narrow, lower-priority
+title-arc item, NOT the broad depth bug it first looked like.
+
+Next (if pursued): capture the title demo's world-pass depth BEFORE the ortho overlay clears it (a
+mid-frame `soh_depthdump`, or temporarily disabling the overlay clear) to see whether the title tree
+writes a wrong depth or is drawn depth-test-off. Deprioritized: gameplay — the thing that matters —
+is correct.
