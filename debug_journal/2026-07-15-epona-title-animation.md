@@ -240,3 +240,34 @@ rider moved (dx=+1039, dz=+601) over the samples, and `atan2(dx,dz) = 60.0deg` �
 NEXT: read the ORACLE's EnHorse yaw+pos at the same cs frames (harness already reads Az RAM for the
 rider trajectory — see tools/title_rider_traj.py) and A/B against these `soh_rider` values. If yaw
 matches but pos diverges → (a), a path bug. If pos matches but yaw diverges → the render offset (b).
+
+---
+
+## Update 2026-07-16 (oracle A/B): SoH rider MATCHES the oracle at step 600 — rider port is correct
+
+Ran the matched A/B the previous note set up. At step 600 (titlesync LOCKED, delta=0 — the frame the
+user's SBS sweep showed as "off"):
+
+| quantity | SoH (`soh_rider`)        | Oracle (EnHorse @0x09906A80)      | delta        |
+|----------|--------------------------|-----------------------------------|--------------|
+| pos      | (-4561.6, 71.0, 5864.8)  | (-4561.7, 71.2, 5864.8) [+0x28]   | ~0.2 units   |
+| yaw      | 10913 (59.9deg)          | 0x2AA5 = 10917 (59.9deg) [+0x36]  | 4 bam (0.02deg) |
+
+(Oracle read via harness `r16 0x09906AB6` / `mem 0x09906AA8 12`; VAs from
+tools/title_rider_traj.py.) Oracle static mirror @0x005AFFB0 = (-4568.6,70.9,5860.8), consistent.
+
+**The rider's world position AND heading match the oracle within noise.** So the rider port (path,
+position, yaw) is CORRECT in steady-state gallop — the "sideways / completely broken" appearance is
+NOT a rider pos/yaw divergence. Candidates, in priority order:
+  1. **Camera divergence** — if the title cs camera differs from the oracle at this frame, the whole
+     scene (rider included) is framed differently, so a correctly-placed rider looks mis-positioned.
+     (In the s0600 SBS the horse is barely visible on the SoH side vs clearly framed on the oracle —
+     consistent with a camera/framing difference, not a rider move.) The camera was "ported+verified"
+     per soh3d-title-scene-spot99, but verify at THIS frame.
+  2. **Transient cut-frame glitches** — the user said "bisected frame by frame"; the title cs has
+     warp/rearing cues (e.g. cs ~925) where the rider teleports across shot cuts. Yaw/pose could snap
+     wrong for a frame or two there while steady segments (like 600) are fine.
+  3. Model/pose render at specific frames (gait already ruled subtle above).
+
+NEXT: read the SoH title camera eye/at vs the oracle camera at step 600 (and a few cut frames) to
+confirm/deny (1). `soh_rider` + the oracle EnHorse read now make per-frame rider A/B cheap.
