@@ -55,3 +55,26 @@ its draw state in that scene. Confirming (1) vs (2) needs either:
 NEXT STEP: gameplay repro + a per-draw depth introspection, then confirm which candidate before ANY
 code change. Do NOT guess-fix the depth path without that data (the whole point — the config is
 already correct, so a blind change would be a bandaid).
+
+## Update 2026-07-16 (later): built a depth-buffer dump; title-demo fb0 depth is USELESS here
+
+Built `WriteFbDepthPpm` (gfx_sdl3gpu.cpp) + harness `soh_depthdump <path>` command (grayscale,
+auto-contrast; near=bright, far=dark, black=depth 1.0/cleared). Dumped the title demo at step 900
+(`scratch/harness/depth900*`).
+
+Result: the dumped fb0 depth spans only **[0.497, 0.510]** and the image shows **ONLY the 2D title
+logo** wrote depth — the ENTIRE world (grass/hills/tree) reads as cleared (depth 1.0). Cause: the
+title's **ortho overlay pass clears fb0's Z-buffer** before drawing the logo (see
+debug_journal/2026-07-10-title-ortho-overlay-pass.md: "clears G_ZBUFFER"). So by the time fb0's
+depth is captured at FinishRender, the WORLD's occlusion depth is already gone — the tree-vs-terrain
+sorting happened earlier in the frame's perspective pass and the evidence is overwritten.
+
+CONSEQUENCE: the title demo cannot answer the tree-depth question from FINAL fb0 depth. Two ways
+forward for the next tick:
+  1. **Gameplay repro** (no title overlay clearing depth): warp into normal Hyrule-field gameplay,
+     find a tree on a hill, `soh_depthdump` — the world depth is intact there. Also tells us whether
+     the bug is title-demo-specific (overlay interaction) or general.
+  2. **Mid-frame depth capture**: dump depth right BEFORE the ortho overlay pass runs (the world
+     perspective pass's depth), instead of at FinishRender.
+
+The `soh_depthdump` tool itself is committed and reusable for both.

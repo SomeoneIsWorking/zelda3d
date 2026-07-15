@@ -311,6 +311,7 @@ class GfxRenderingAPISdl3Gpu : public GfxRenderingAPI {
     // Submit what is recorded so far, wait for the GPU, then start fresh (for CPU readback paths).
     void FlushAndWait();
     void WriteFbPpm(int fbId, const char* path);
+    void WriteFbDepthPpm(int fbId, const char* path);
     // Zelda3D direct-harness capture: reads fb <fbId> (color texture) into
     // gSoh3dCaptureBuf as RGBA8. Same GPU download pattern as WriteFbPpm
     // but the pixels land in a caller-supplied buffer for in-process

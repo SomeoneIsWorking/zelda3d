@@ -174,6 +174,8 @@ extern uint32_t     gSoh3dCaptureCap;
 extern uint32_t     gSoh3dCaptureW;
 extern uint32_t     gSoh3dCaptureH;
 extern volatile int gSoh3dCapturePending;
+extern char         gSoh3dDepthDumpPath[1024];
+extern volatile int gSoh3dDepthDumpPending;
 }
 
 // Direct Azahar API — the harness is linked in-process, so we bypass the
@@ -4335,6 +4337,17 @@ void RunRepl() {
         else if (cmd == "actors")    HandleActors(toks);
         else if (cmd == "soh_boot")  HandleSohBoot(toks);
         else if (cmd == "soh_step")  HandleSohStep(toks);
+        else if (cmd == "soh_depthdump") {
+            // Dump SoH fb0's DEPTH buffer (auto-contrast grayscale PPM) for the CURRENT scene, to
+            // diagnose depth-sorting bugs. Renders one frame with the depth-dump trigger armed.
+            std::string path;
+            if (!(toks >> path)) { PrintErr("soh_depthdump: usage: soh_depthdump <path>"); continue; }
+            if (!g_soh_booted) { PrintErr("soh_depthdump: run soh_boot first"); continue; }
+            std::snprintf(gSoh3dDepthDumpPath, sizeof(gSoh3dDepthDumpPath), "%s", path.c_str());
+            gSoh3dDepthDumpPending = 1;
+            { FrameWatchdog wd("soh_depthdump/RunFrame"); RunFrame(); }
+            std::printf("ok soh_depthdump %s\n", path.c_str());
+        }
         else if (cmd == "step")      HandleStep(toks);
         else if (cmd == "titlesync") {
             const char* stateName =

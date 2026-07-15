@@ -61,6 +61,8 @@
 extern "C" {
 extern char gSoh3dDumpPath[1024];
 extern volatile int gSoh3dDumpPending;
+extern char gSoh3dDepthDumpPath[1024];
+extern volatile int gSoh3dDepthDumpPending;
 extern int gUnifiedRenderer; // render-unification effort (kanban #131): bit 1 = N64 unified
 
 // Direct-harness capture-to-buffer path (defined in gfx_sdl3.cpp). See the
@@ -1025,7 +1027,8 @@ void GfxRenderingAPISdl3Gpu::FinishRender() {
     }
 
     const bool wantCapture = gSoh3dCapturePending != 0;
-    if (dumpPath != nullptr || wantCapture) {
+    const bool wantDepthDump = gSoh3dDepthDumpPending != 0;
+    if (dumpPath != nullptr || wantCapture || wantDepthDump) {
         SDL_GPUFence* fence = SDL_SubmitGPUCommandBufferAndAcquireFence(mCmd);
         mCmd = nullptr;
         if (fence) {
@@ -1037,6 +1040,10 @@ void GfxRenderingAPISdl3Gpu::FinishRender() {
             gSoh3dDumpPending = 0;
             if (exitAfter)
                 exit(0);
+        }
+        if (wantDepthDump) {
+            WriteFbDepthPpm(0, gSoh3dDepthDumpPath);
+            gSoh3dDepthDumpPending = 0;
         }
         if (wantCapture) {
             WriteFbToCaptureBuf(0);
@@ -1129,6 +1136,69 @@ void GfxRenderingAPISdl3Gpu::WriteFbPpm(int fbId, const char* path) {
         SPDLOG_INFO("SDL3 GPU frame dump written: {} ({}x{})", path, w, h);
     } else if (!px) {
         SPDLOG_ERROR("SDL3 GPU frame dump: map failed: {}", SDL_GetError());
+    }
+    if (f)
+        fclose(f);
+    SDL_UnmapGPUTransferBuffer(mDevice, tb);
+    SDL_ReleaseGPUTransferBuffer(mDevice, tb);
+}
+
+// Dump fb's DEPTH buffer (D32_FLOAT) as an auto-contrast grayscale PPM. The raw [0,1] depth is
+// crushed near 1.0 (far), so we min/max-stretch over the in-range texels (depth < 1.0, i.e. not
+// the cleared far plane) — near geometry = bright, far = dark, cleared = black. Diagnostic only.
+void GfxRenderingAPISdl3Gpu::WriteFbDepthPpm(int fbId, const char* path) {
+    if (fbId < 0 || fbId >= (int)mFramebuffers.size())
+        return;
+    FramebufferSDL3& fb = mFramebuffers[fbId];
+    if (!fb.depth)
+        return;
+    const uint32_t w = fb.width, h = fb.height;
+    const uint32_t size = w * h * (uint32_t)sizeof(float);
+
+    SDL_GPUTransferBufferCreateInfo tci{};
+    tci.usage = SDL_GPU_TRANSFERBUFFERUSAGE_DOWNLOAD;
+    tci.size = size;
+    SDL_GPUTransferBuffer* tb = SDL_CreateGPUTransferBuffer(mDevice, &tci);
+
+    SDL_GPUCommandBuffer* c = SDL_AcquireGPUCommandBuffer(mDevice);
+    SDL_GPUCopyPass* cp = SDL_BeginGPUCopyPass(c);
+    SDL_GPUTextureRegion reg{};
+    reg.texture = fb.depth;
+    reg.w = w;
+    reg.h = h;
+    reg.d = 1;
+    SDL_GPUTextureTransferInfo ti{};
+    ti.transfer_buffer = tb;
+    ti.offset = 0;
+    ti.pixels_per_row = w;
+    ti.rows_per_layer = h;
+    SDL_DownloadFromGPUTexture(cp, &reg, &ti);
+    SDL_EndGPUCopyPass(cp);
+    SDL_GPUFence* fence = SDL_SubmitGPUCommandBufferAndAcquireFence(c);
+    if (fence) {
+        SDL_WaitForGPUFences(mDevice, true, &fence, 1);
+        SDL_ReleaseGPUFence(mDevice, fence);
+    }
+
+    const float* dz = (const float*)SDL_MapGPUTransferBuffer(mDevice, tb, false);
+    FILE* f = fopen(path, "wb");
+    if (f && dz) {
+        float lo = 1.0f, hi = 0.0f;
+        for (uint32_t i = 0; i < w * h; i++) {
+            float d = dz[i];
+            if (d < 1.0f) { lo = std::min(lo, d); hi = std::max(hi, d); }
+        }
+        const float range = (hi > lo) ? (hi - lo) : 1.0f;
+        fprintf(f, "P6\n%u %u\n255\n", w, h);
+        for (uint32_t i = 0; i < w * h; i++) {
+            float d = dz[i];
+            uint8_t g = (d >= 1.0f) ? 0 : (uint8_t)(255.0f * (1.0f - (d - lo) / range));
+            uint8_t rgb[3] = { g, g, g };
+            fwrite(rgb, 1, 3, f);
+        }
+        SPDLOG_INFO("SDL3 GPU depth dump written: {} ({}x{}) depth[{},{}]", path, w, h, lo, hi);
+    } else if (!dz) {
+        SPDLOG_ERROR("SDL3 GPU depth dump: map failed: {}", SDL_GetError());
     }
     if (f)
         fclose(f);

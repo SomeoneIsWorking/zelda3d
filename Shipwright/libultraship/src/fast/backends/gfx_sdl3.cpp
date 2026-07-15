@@ -834,6 +834,12 @@ extern "C" {
 char gSoh3dDumpPath[1024] = { 0 };
 volatile int gSoh3dDumpPending = 0;
 
+// Zelda3D: on-demand DEPTH-buffer dump (grayscale, auto-contrast). Same trigger shape as the
+// colour dump above; used to diagnose depth-sorting bugs (e.g. actor/effect in front of terrain)
+// by seeing exactly what the shared depth buffer holds. See WriteFbDepthPpm in gfx_sdl3gpu.cpp.
+char gSoh3dDepthDumpPath[1024] = { 0 };
+volatile int gSoh3dDepthDumpPending = 0;
+
 // Zelda3D: on-demand framebuffer-capture-to-caller-buffer trigger for the
 // direct harness (tools/soh3d_harness). Same shape as the PPM dump above,
 // but the pixels land in a caller-provided buffer instead of a file so
