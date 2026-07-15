@@ -7830,6 +7830,48 @@ s32 Zelda3D_PlayerForceDeath(Player* this, PlayState* play) {
     return 1;
 }
 
+// Zelda3D item_bottle_use/pickup_carry/throw expansion (2026-07-16, docs/link_parity_checklist.md):
+// same Force* contract as the states above — install the REAL action func + anim a live trigger
+// installs, bypassing only the entry gate (a spawned liftable actor / a caught bottle item)
+// headless control can't satisfy.
+
+// Pickup carry-hold: the SAME action+anim the generic-actor branch of func_8083A0F4's caller
+// (z_player.c ~5572-5574, entered from Player_SetupWaitForPutAway once the lift animation reaches
+// its grab frame) installs for any liftable actor id that isn't BG_HEAVY_BLOCK/silver EN_ISHI/
+// strength-gated EN_BOMBF|EN_KUSA. We set CARRYING_ACTOR directly since that's the state-bit the
+// checklist's forcestate verdict reads (parity_state_sweep "carry" expect="carryB"). Left
+// deliberately WITHOUT installing a real interactRangeActor: Player_Action_80846050 only derefs it
+// on skelAnime frame 4 (LinkAnimation_OnFrame), which never runs while the sweep reads under
+// `freeze` (freeze->linkstate carry->read->linkstate idle, all before Play_Update advances) — see
+// the zelda3d.c REPL `linkstate carry` reply for the same caveat spelled out for interactive use.
+s32 Zelda3D_PlayerForceCarry(Player* this, PlayState* play) {
+    this->stateFlags1 |= PLAYER_STATE1_CARRYING_ACTOR;
+    Player_SetupAction(play, this, Player_Action_80846050, 0);
+    Player_AnimPlayOnce(play, this, GET_PLAYER_ANIM(PLAYER_ANIMGROUP_carryB, this->modelAnimType));
+    return 1;
+}
+
+// Throw-release: literally the same internal helper (func_8083EA94, defined above at z_player.c
+// ~7458: Player_Action_80846578 + PLAYER_ANIMGROUP_throw) the real throw branch of
+// Player_ActionHandler_9 (~7486) calls once func_8083EAF0 selects THROW over PUT_DOWN (moving fast
+// enough, or a bomchu). No new action-func/anim derivation — just calls the existing function.
+s32 Zelda3D_PlayerForceThrow(Player* this, PlayState* play) {
+    func_8083EA94(this, play);
+    return 1;
+}
+
+// Item-use (bottle raise/swing): Player_Action_SwingBottle + sBottleSwingInfo[0]'s dry-land
+// missAnimation (gPlayerAnim_link_bottle_bug_miss) — the SAME action+anim func_8083C6B8's C-button
+// "use held bottle" dispatch (z_player.c ~6564-6577) installs for a held bottle. Forces
+// av2.inWater=0 so the deterministic dry-land swing family is picked (not the water-scoop variant,
+// which needs actor.yDistToWater state headless can't fake cleanly).
+s32 Zelda3D_PlayerForceItemUse(Player* this, PlayState* play) {
+    this->av2.inWater = false;
+    Player_SetupAction(play, this, Player_Action_SwingBottle, 0);
+    Player_AnimPlayOnceAdjusted(play, this, sBottleSwingInfo[0].missAnimation);
+    return 1;
+}
+
 // ztarget-as-its-own-state query: is Link CURRENTLY in the real N64 Z-hold/standing-aim action
 // func (Player_Action_80840450, the twin of OoT3D's FUN_00488b40)? This is what
 // func_80839E88/func_80839F90 install automatically once a hostile-category focusActor is locked

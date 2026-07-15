@@ -472,6 +472,27 @@ s32 Zelda3D_PlayerForceGetItem(Player* player, PlayState* play);
 // needed; this just supplies the natural trigger condition.
 s32 Zelda3D_PlayerForceDeath(Player* player, PlayState* play);
 
+// 2026-07-16 (item_bottle_use/pickup_carry/throw expansion, docs/link_parity_checklist.md): same
+// Force* contract — install the REAL OoT N64 action func + canonical anim a real trigger would,
+// bypassing only the entry gate headless can't satisfy (a spawned liftable actor / a caught bottle
+// item). REPL `linkstate carry|throw|itemuse`.
+// Pickup carry-hold: Player_Action_80846050 + PLAYER_ANIMGROUP_carryB — the SAME action+anim the
+// real lift path (z_player.c ~5573, Player_SetupWaitForPutAway(func_8083A0F4)'s generic-actor
+// branch) installs once the lift animation reaches its grab frame. Skips only the requirement for a
+// live interactRangeActor (no liftable spawned headlessly); see zelda3d.c REPL comment for the
+// resulting on-frame(4) NULL-interactRangeActor caveat (harmless under the sweep's freeze protocol).
+s32 Zelda3D_PlayerForceCarry(Player* player, PlayState* play);
+// Throw-release: literally the same call (func_8083EA94: Player_Action_80846578 +
+// PLAYER_ANIMGROUP_throw) the real throw branch of Player_ActionHandler_9 (z_player.c ~7486)
+// makes once func_8083EAF0 (moving fast enough, or a bomchu) selects THROW over PUT_DOWN. No new
+// action-func/anim derivation needed — this just calls the existing internal helper directly.
+s32 Zelda3D_PlayerForceThrow(Player* player, PlayState* play);
+// Item-use (bottle raise/swing): Player_Action_SwingBottle + gPlayerAnim_link_bottle_bug_miss (the
+// dry-land entry of sBottleSwingInfo[0]) — the SAME action+anim func_8083C6B8's C-button
+// "use held bottle" dispatch (z_player.c ~6564) installs when a bottle is the held item. Forces
+// av2.inWater=0 so the deterministic dry-land swing anim is selected (not the water-scoop variant).
+s32 Zelda3D_PlayerForceItemUse(Player* player, PlayState* play);
+
 // ztarget-as-its-own-state query (docs/link_parity_checklist.md "ztarget" row, separate scope
 // from the locomotion-gate primitive above): true iff Link's action func is the REAL OoT N64
 // Z-hold/standing-aim state (Player_Action_80840450 — decomp ground truth: oot3d-decomp
