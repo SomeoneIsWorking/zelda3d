@@ -5058,10 +5058,21 @@ static void Zelda3D_ReplExec(PlayState* play, char* line, const char* outPath) {
             Zelda3D_PlayerForceDeath(p, play);
             Zelda3D_ReplReply(outPath, "linkstate death -> gSaveContext.health=0 (real per-frame death "
                             "trigger will fire over the next few frames; `step` or let free-run advance)");
+        } else if (strcmp(arg, "carry") == 0) {
+            Zelda3D_PlayerForceCarry(p, play);
+            Zelda3D_ReplReply(outPath, "linkstate carry -> carry-hold pose (st1=0x%x; NOTE: no live "
+                            "interactRangeActor installed — reset with `linkstate idle` BEFORE "
+                            "`freeze 0`/`step`, since the anim's frame-4 grab derefs it)", p->stateFlags1);
+        } else if (strcmp(arg, "throw") == 0) {
+            Zelda3D_PlayerForceThrow(p, play);
+            Zelda3D_ReplReply(outPath, "linkstate throw -> throw-release pose (st1=0x%x)", p->stateFlags1);
+        } else if (strcmp(arg, "itemuse") == 0) {
+            Zelda3D_PlayerForceItemUse(p, play);
+            Zelda3D_ReplReply(outPath, "linkstate itemuse -> bottle raise/swing pose (st1=0x%x)", p->stateFlags1);
         } else {
             Zelda3D_ReplReply(outPath,
                             "usage: linkstate <roll|talk|idle|jump|swim|damage|shield|attack|attack2|"
-                            "climb|dive|getitem|death>");
+                            "climb|dive|getitem|death|carry|throw|itemuse>");
         }
     } else if (strcmp(cmd, "freeze") == 0 && sscanf(line, "%*s %i", &iv) == 1) {
         // Frame-step harness: `freeze 1` holds the game logic still (Play_Update skipped) so a brief

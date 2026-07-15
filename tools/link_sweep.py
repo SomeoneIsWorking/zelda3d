@@ -448,11 +448,30 @@ STATE_MATRIX = [
              "normal_kiru_finsh -> CSAB ft_nml_kiru_fin (zelda3d_player_animmap.inc); RE'd "
              "2026-07-15 from z_player.c D_80854190 table + Player_Action_808502D0"},
     {"name": "shield", "group": "action", "kind": "forcestate", "pss": "shield"},
-    {"name": "item_bottle_use", "group": "action", "kind": "unreachable", "reason": UNREACHABLE_NO_RECIPE +
-     " (no equipped item/bottle in the headless save + no linkstate recipe for item-use anim)"},
-    {"name": "pickup_carry", "group": "action", "kind": "carry", "pss": "carry"},
-    {"name": "throw", "group": "action", "kind": "unreachable", "reason": UNREACHABLE_NO_RECIPE +
-     " (carry recipe reaches carry-hold; no recipe drives the throw release)"},
+    {"name": "item_bottle_use", "group": "action", "kind": "forcestate", "force": "itemuse",
+     "expect": "bt_bug_miss",
+     "note": "2026-07-16: added Zelda3D_PlayerForceItemUse (z_player.c) — installs "
+             "Player_Action_SwingBottle + sBottleSwingInfo[0].missAnimation (av2.inWater forced 0 "
+             "for the deterministic dry-land pick), the SAME action+anim func_8083C6B8's C-button "
+             "'use held bottle' dispatch installs, bypassing only the need for a live equipped "
+             "bottle -> CSAB bt_bug_miss (oot3d-decomp docs/player_anim_states.md "
+             "'item_bottle_use', direct anim ref, not a PLAYER_ANIMGROUP table entry)"},
+    {"name": "pickup_carry", "group": "action", "kind": "forcestate", "force": "carry",
+     "expect": "carryB",
+     "note": "2026-07-16: superseded the SESSION-5 cucco-grab recipe (flaky — no id=0x19 cucco "
+             "reliably spawns at the scouted scene/time) with Zelda3D_PlayerForceCarry "
+             "(z_player.c) — installs Player_Action_80846050 + "
+             "GET_PLAYER_ANIM(PLAYER_ANIMGROUP_carryB, modelAnimType) directly, the SAME "
+             "action+anim the real generic-liftable pickup path installs, bypassing only the "
+             "need for a live interactRangeActor -> CSAB nml_carryB_free (oot3d-decomp "
+             "docs/player_anim_states.md 'pickup_carry', anim-group table @ 0x53a778)"},
+    {"name": "throw", "group": "action", "kind": "forcestate", "force": "throw", "expect": "nml_throw",
+     "note": "2026-07-16: added Zelda3D_PlayerForceThrow (z_player.c) — a thin wrapper that calls "
+             "the existing internal func_8083EA94(this, play) directly (Player_Action_80846578 + "
+             "GET_PLAYER_ANIM(PLAYER_ANIMGROUP_throw, modelAnimType)), literally the same helper "
+             "the real throw-release branch of Player_ActionHandler_9 calls once func_8083EAF0 "
+             "selects THROW over PUT_DOWN -> CSAB nml_throw_free (oot3d-decomp "
+             "docs/player_anim_states.md 'throw', anim-group table @ 0x53a970)"},
     {"name": "climb_hang", "group": "action", "kind": "forcestate", "pss": "climb"},
     {"name": "climb_updown", "group": "action", "kind": "climb_updown", "expect": "climb_up",
      "reason":
