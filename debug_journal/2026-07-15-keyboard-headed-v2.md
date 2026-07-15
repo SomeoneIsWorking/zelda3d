@@ -166,3 +166,103 @@ separate project:
   `Shipwright/libultraship/src/ship/window/gui/Gui.cpp` — new `IsInteractiveMenuOpen()` seam.
 - `Shipwright/libultraship/include/fast/Fast3dGui.h` /
   `Shipwright/libultraship/src/fast/Fast3dGui.cpp` — override reporting RmlUi visibility.
+
+## v3: psxport comparative sweep (2026-07-15) — every psxport-derived lead already covered or moot; NO fix landed this session
+
+User's lead: "psxport also had the same issue and it was fixed there." Did a file:line comparison of
+psxport's SDL keyboard path (`../psxport/runtime/recomp/pad_input.cpp`,
+`../psxport/runtime/recomp/gpu_gpu.cpp`) against soh3d's (`gfx_sdl3.cpp`, `Fast3dGui.cpp`,
+`KeyboardKeyToAnyMapping.cpp`, `Fast3dWindow.cpp`). Result: **no unapplied psxport fix found** — every
+real psxport input fix is either architecturally moot for soh3d's SDL3 build, or already landed in the
+v1/v2 session above. No guess-patch applied (would violate the no-bandaid rule); this is a report, not
+a fix.
+
+### psxport's actual historical Wayland/KDE input fixes (traced via `git -C ../psxport log`)
+
+1. **`dc8df469` "stop SDL/IME text-input from stealing WASD on Linux/KDE (#18)"** — SDL2-era bug: SDL
+   left text input ON by default, so KDE's IME compose/accent-picker ate held WASD. Fix: call
+   `SDL_StopTextInput()` every frame unless a UI field wants the keyboard.
+   **Moot for soh3d**: psxport's own later comment (`pad_input.cpp:178-181`, added when psxport migrated
+   to SDL3 in `3fd50c4f`) says outright: *"SDL3 leaves text input OFF by default (it is per-window and
+   opt-in) ... so there is no IME/compose widget to suppress here any more (the old GH#18
+   SDL_StopTextInput dance is unnecessary)."* soh3d is already SDL3-only (`gfx_sdl3.cpp`), so this bug
+   class never applies. soh3d's `SohRmlUi::Init` (`SohRmlUi.cpp:243-250`) also proactively calls
+   `DeactivateKeyboard()` once at startup, which is stricter than psxport ever needed for SDL3 — a
+   confirmed non-issue, not a gap.
+2. **`0eddfabb` "fix imgui keyboard-steal (WASD dead)"** — psxport was gating the keyboard read on
+   `io.WantCaptureKeyboard` (true whenever the overlay is merely visible/hovered), not
+   `io.WantTextInput` (true only when a text field is focused) — over-blocking gameplay keys any time
+   the dev overlay was on screen. **Already fixed in soh3d's v1/v2 session** (this same journal, above):
+   `ControlDeck::KeyboardGameInputBlocked()` had its `ImGui::GetIO().WantCaptureKeyboard` read deleted
+   outright (proven dead — ImGui is a compile-only stub, `GetIO()` always returns a zeroed struct) and
+   now gates purely on `AllGameInputBlocked()` (the real RmlUi-menu-open signal via the new
+   `IsInteractiveMenuOpen()` seam). No live over-blocking source remains.
+3. **`d76aad80` "fix WASD dead from drifting controller"** — phantom/drifting SDL gamepad ORing a
+   direction into the pad mask. Not applicable — this is about gamepad axis handling, not keyboard
+   delivery, and there's no evidence of a connected gamepad in the user's headed repro.
+
+**No psxport commit anywhere touches Wayland window creation, keyboard focus/grab, or an SDL hint.**
+Confirmed via `grep -rn "WAYLAND\|SetWindowKeyboardGrab\|RaiseWindow\|SDL_HINT" ../psxport/runtime
+../psxport/game` — zero hits. psxport's `SDL_CreateWindow` call (`gpu_gpu.cpp:463-465`) is a plain
+`SDL_CreateWindow(title, 960, 720, SDL_WINDOW_RESIZABLE|SDL_WINDOW_FULLSCREEN)` — no flags or hints
+soh3d's `gfx_sdl3.cpp:404-438` doesn't already have (both just use `SDL_WINDOW_RESIZABLE` +
+backend-surface flag). `SDL_Init` is `SDL_Init(SDL_INIT_VIDEO)` in both, byte-identical subsystem set.
+
+### The one real architectural difference: event-driven latch (soh3d) vs per-frame state poll (psxport)
+
+psxport's `Pad::pollSdl()` (`pad_input.cpp:174-182`) does `SDL_PumpEvents(); const bool* ks =
+SDL_GetKeyboardState(NULL);` every frame and reads live key state directly — it never depends on
+individual `SDL_EVENT_KEY_DOWN`/`KEY_UP` events being correctly latched. soh3d's path is fully
+event-driven and stateful: `SDL_EVENT_KEY_DOWN` → `OnKeydown` → `Fast3dWindow::KeyDown` →
+`ControlDeck::ProcessKeyboardEvent` → `KeyboardKeyToAnyMapping::ProcessKeyboardEvent` sets
+`mKeyPressed = true` (`KeyboardKeyToAnyMapping.cpp:19-36`), and `UpdatePad` just reads that latched bool
+next frame (`KeyboardKeyToButtonMapping.cpp:15-23`). This is a real, transferable pattern difference and
+was the prime suspect for this session — **but tracing soh3d's own event-drain code shows it isn't
+buggy**, so switching to polling would not fix anything currently provably broken:
+
+- `GfxWindowBackendSDL3::HandleEvents()` (`gfx_sdl3.cpp:754-766`) drains the **entire** SDL event queue
+  every call via `SDL_PeepEvents(..., SDL_EVENT_FIRST, SDL_EVENT_LAST)` (split only to skip the
+  gamepad-add/remove range, itself handled elsewhere) — no per-window-ID filter, no early exit. Every
+  queued `SDL_EVENT_KEY_DOWN`/`UP` reaches `HandleSingleEvent` unconditionally.
+- `HandleSingleEvent` (`gfx_sdl3.cpp:694-751`) offers the event to RmlUi/ImGui first but **ignores the
+  return value** before falling into the `switch` that calls `OnKeydown`/`OnKeyup` — confirmed (again)
+  no consume-and-drop path exists for key events.
+- `HandleEvents()` is called every single rendered frame, unconditionally, from
+  `RunCommands()` (`Shipwright/soh/soh/OTRGlobals.cpp:1948`, `wnd->HandleEvents();` before any drawing) —
+  not gated behind any menu/pause/focus state. No starvation path found.
+- No `SDL_EVENT_WINDOW_FOCUS_LOST`/`GAINED` handling exists in `gfx_sdl3.cpp` at all (grepped, zero
+  hits), and `Fast3dWindow::AllKeysUp()` / the `mOnAllKeysUp` callback it would route through is wired
+  (`Fast3dWindow.cpp:109`) but **never invoked** anywhere in the SDL3 backend — so there's no
+  focus-transition auto-clear silently eating keys either.
+
+Net: soh3d's event→latch chain is provably correct end-to-end *given that SDL enqueues the KEY_DOWN
+event at all*. `SDL_GetKeyboardState` would not diverge from this, because SDL3 populates that array
+from the exact same platform-backend event stream — if Wayland never delivers keyboard focus to the
+window, both the event path and a poll-based path see nothing. Switching to polling is not a no-op
+change (different failure modes for dropped/misordered *individual* events, a real hardening win in
+general) but there is no evidence in this codebase that soh3d is currently dropping or misordering
+events it does receive — so it would not be a grounded fix for *this* symptom, only a defensive
+rewrite. Per the no-bandaid rule, did not land it speculatively.
+
+### Conclusion — the remaining suspect is outside application code, needs the headed diagnostic
+
+Every software-side gate and event-plumbing step downstream of "SDL enqueues the KEY_DOWN event" is now
+proven correct in both codebases. The only remaining explanation compatible with all evidence is that
+the OS/compositor (Wayland/GTK/KDE, whichever the user runs) is not delivering keyboard focus/events to
+this specific SDL window at all — a layer neither soh3d nor psxport's history has any special handling
+for (psxport apparently just doesn't hit it, or the user hasn't hit it there under the same compositor).
+**This needs the headed `ZELDA3D_DBG_INPUT=1` run from the v2 section above to confirm**: if
+`[zelda3d_dbg_input] key event=...` never prints while physically pressing keys, that is the smoking gun
+for "SDL/compositor never delivers the event" and the next step is compositor-side (check
+`XDG_SESSION_TYPE`, whether the window actually has `xdg_toplevel` activation/focus, try
+`SDL_VIDEODRIVER=x11` as an isolation test to see if the bug is Wayland-backend-specific) — not another
+pass over soh3d's or psxport's C++.
+
+### Dead ends recorded this session (do not re-derive)
+
+- IME/`SDL_StopTextInput` dance (psxport GH#18) — moot on SDL3 for both projects.
+- `WantCaptureKeyboard` vs `WantTextInput` over-blocking (psxport 0eddfabb) — already fixed in soh3d
+  v1/v2 (`ImGui::GetIO()` read deleted from `KeyboardGameInputBlocked`).
+- Gamepad drift masking keys (psxport d76aad80) — gamepad-specific, not this symptom.
+- Wayland-specific SDL hint/flag in psxport — does not exist; psxport's window creation is plain.
+- Event queue starvation / focus-loss auto-clear in soh3d's SDL3 backend — traced, not present.
