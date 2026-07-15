@@ -16,7 +16,7 @@
 #include "ship/window/gui/resource/GuiTextureFactory.h"
 #include "ship/window/gui/resource/GuiTexture.h"
 
-// Zelda3D native PC HUD render entry (defined in soh/src/zelda3d/zelda3d.c). C linkage; called from
+// Zelda3D native PC HUD render entry (defined in soh/src/zelda3d/core/zelda3d.c). C linkage; called from
 // Gui::EndFrame before the RmlUi menu so the HUD draws under an open ESC menu. No-op when disabled.
 extern "C" void Zelda3D_HudFrame(void);
 

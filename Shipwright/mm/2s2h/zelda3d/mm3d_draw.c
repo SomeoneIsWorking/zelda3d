@@ -50,7 +50,7 @@ void Zelda3D_MM_EmitModelDraw(void* play, void* actor, int modelId, float worldS
 }
 
 // Derive limbCount for a raw N64 skeleton — highest reachable limb index + 1, capped at 64.
-// Matches OoT's Zelda3D_CountN64Limbs (Shipwright/soh/src/zelda3d/zelda3d.c). Small iterative
+// Matches OoT's Zelda3D_CountN64Limbs (Shipwright/soh/src/zelda3d/core/zelda3d.c). Small iterative
 // walk to avoid recursion into the C++ retarget path from a C entry point.
 static int Zelda3D_MM_CountLimbs(void** skeleton) {
     if (skeleton == NULL || skeleton[0] == NULL) return 0;
