@@ -211,3 +211,32 @@ NEXT (tooling-first, before any yaw code change): extend the harness rider intro
 En_Horse actor so SoH rider yaw can be A/B'd against the oracle per cs frame. Only then diagnose the
 yaw path (title_rider.cpp heading vs the 3DS cs dispatcher's own heading). Do NOT guess-fix the yaw
 without that read — it would be a bandaid, and the path/gait are already carefully ported.
+
+---
+
+## Update 2026-07-16 (autonomous tick): built `soh_rider` introspection; SoH yaw is PATH-CONSISTENT
+
+Closed the tooling gap: added `Zelda3D_Title_RiderState` (title_presentation.cpp) reading
+`TitleRider::pos()/yaw()` (computed path) + the rendered EnHorse actor's `world.rot.y`/`shape.rot.y`,
+exposed via harness `soh_rider`. Works (unlike `compare player`, which reads the empty
+ACTORCAT_PLAYER list — the title Link isn't a Player actor).
+
+First readings (steps 300/450/600, rider mounted):
+```
+pos=(-5600.2,82.8,5263.9) computedYaw=10913(59.9deg) horseWorldYaw=10913 horseShapeYaw=10913
+pos=(-5080.9,80.5,5564.4) computedYaw=10913(59.9deg) horseWorldYaw=10913 horseShapeYaw=10913
+pos=(-4561.6,71.0,5864.8) computedYaw=10913(59.9deg) horseWorldYaw=10913 horseShapeYaw=10913
+```
+
+FINDING: the SoH rider yaw is INTERNALLY CONSISTENT and matches its own movement direction — the
+rider moved (dx=+1039, dz=+601) over the samples, and `atan2(dx,dz) = 60.0deg` ≈ the reported yaw
+59.9deg; computed == world == shape. So a gross yaw-COMPUTATION bug is ruled out. The user's
+"sideways" look must be one of:
+  (a) PATH-POSITION divergence vs the oracle — the rider is at a different point on the (curving)
+      cs path than the oracle at the same frame, so it faces a different absolute direction; OR
+  (b) a MODEL-ORIENTATION offset — the EnHorse CMB's forward axis vs the actor yaw (a fixed rotation
+      offset would make a correct yaw render visibly rotated).
+
+NEXT: read the ORACLE's EnHorse yaw+pos at the same cs frames (harness already reads Az RAM for the
+rider trajectory — see tools/title_rider_traj.py) and A/B against these `soh_rider` values. If yaw
+matches but pos diverges → (a), a path bug. If pos matches but yaw diverges → the render offset (b).

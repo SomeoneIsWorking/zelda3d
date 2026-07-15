@@ -464,3 +464,22 @@ extern "C" const char* Zelda3D_Title_SceneName(void) {
 extern "C" void Zelda3D_Title_RiderApply(PlayState* play, Actor* actor) {
     Zelda3D::TitlePresentation::Instance().mutableRider().applyToActor(play, actor);
 }
+
+// Rider introspection for the title-cs yaw/animation bisection (harness `soh_rider`). Fills the
+// computed path pos/yaw (TitleRider::mPos/mYaw) AND the rendered EnHorse actor's world/shape yaw, so
+// a divergence between "what the path wants" and "what the horse renders as" is directly visible.
+// Returns 0 (nothing filled) when the title isn't active or the rider hasn't mounted yet.
+extern "C" int Zelda3D_Title_RiderState(float* outPos, int* outComputedYaw, int* outHorseWorldYaw,
+                                        int* outHorseShapeYaw) {
+    auto& tp = Zelda3D::TitlePresentation::Instance();
+    if (!tp.isActive())
+        return 0;
+    const Zelda3D::TitleRider& r = tp.mutableRider();
+    const float* p = r.pos();
+    if (outPos) { outPos[0] = p[0]; outPos[1] = p[1]; outPos[2] = p[2]; }
+    if (outComputedYaw) *outComputedYaw = (int)(int16_t)r.yaw();
+    const Actor* h = r.horseActor();
+    if (outHorseWorldYaw) *outHorseWorldYaw = h ? (int)(int16_t)h->world.rot.y : 0x7FFFFFFF;
+    if (outHorseShapeYaw) *outHorseShapeYaw = h ? (int)(int16_t)h->shape.rot.y : 0x7FFFFFFF;
+    return h ? 1 : 2; // 1 = full (horse mounted), 2 = computed-only (pre-mount)
+}

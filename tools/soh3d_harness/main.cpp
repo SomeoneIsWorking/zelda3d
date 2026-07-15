@@ -176,6 +176,11 @@ extern uint32_t     gSoh3dCaptureH;
 extern volatile int gSoh3dCapturePending;
 extern char         gSoh3dDepthDumpPath[1024];
 extern volatile int gSoh3dDepthDumpPending;
+// Title-rider (Epona) introspection for the yaw/animation bisection (title_presentation.cpp).
+// pos[3] + computed path yaw + rendered EnHorse world/shape yaw (s16 bam). Returns 0 (title
+// inactive), 1 (horse mounted, all filled), 2 (computed-only, pre-mount).
+extern int Zelda3D_Title_RiderState(float* outPos, int* outComputedYaw, int* outHorseWorldYaw,
+                                    int* outHorseShapeYaw);
 }
 
 // Direct Azahar API — the harness is linked in-process, so we bypass the
@@ -4347,6 +4352,24 @@ void RunRepl() {
             gSoh3dDepthDumpPending = 1;
             { FrameWatchdog wd("soh_depthdump/RunFrame"); RunFrame(); }
             std::printf("ok soh_depthdump %s\n", path.c_str());
+        }
+        else if (cmd == "soh_rider") {
+            // Print the title rider's computed path yaw vs the rendered EnHorse yaw (+ pos), for the
+            // title-cs yaw/animation bisection. bam s16 -> degrees for readability.
+            if (!g_soh_booted) { PrintErr("soh_rider: run soh_boot first"); continue; }
+            float pos[3] = {0,0,0};
+            int cyaw = 0, wyaw = 0x7FFFFFFF, syaw = 0x7FFFFFFF;
+            int r = Zelda3D_Title_RiderState(pos, &cyaw, &wyaw, &syaw);
+            if (r == 0) { std::printf("ok soh_rider inactive (title not active)\n"); continue; }
+            auto deg = [](int bam){ return (double)(int16_t)bam * 360.0 / 65536.0; };
+            char wbuf[48], sbuf[48];
+            if (wyaw == 0x7FFFFFFF) std::snprintf(wbuf, sizeof(wbuf), "n/a");
+            else std::snprintf(wbuf, sizeof(wbuf), "%d(%.1fdeg)", (int16_t)wyaw, deg(wyaw));
+            if (syaw == 0x7FFFFFFF) std::snprintf(sbuf, sizeof(sbuf), "n/a");
+            else std::snprintf(sbuf, sizeof(sbuf), "%d(%.1fdeg)", (int16_t)syaw, deg(syaw));
+            std::printf("ok soh_rider mounted=%d pos=(%.1f,%.1f,%.1f) computedYaw=%d(%.1fdeg)"
+                        " horseWorldYaw=%s horseShapeYaw=%s\n",
+                        r == 1 ? 1 : 0, pos[0], pos[1], pos[2], (int16_t)cyaw, deg(cyaw), wbuf, sbuf);
         }
         else if (cmd == "step")      HandleStep(toks);
         else if (cmd == "titlesync") {

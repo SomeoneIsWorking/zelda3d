@@ -67,6 +67,7 @@ public:
 
     const float* pos() const { return mPos; }
     int16_t yaw() const { return mYaw; }
+    const Actor* horseActor() const { return mHorseActor; } // rendered rider (null before mount)
 
     // Per-actor apply, called from Zelda3D_ActorPostUpdate (zelda3d.c) for EVERY actor while the
     // title demo is active — mirrors the call shape Zelda3D_ActorPostUpdate already uses for every
