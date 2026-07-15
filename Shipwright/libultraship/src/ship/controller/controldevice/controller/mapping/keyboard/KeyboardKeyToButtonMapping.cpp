@@ -4,6 +4,8 @@
 #include "ship/config/ConsoleVariable.h"
 #include "ship/controller/controldeck/ControlDeck.h"
 #include "ship/Context.h"
+#include <cstdio>
+#include <unordered_map>
 
 namespace Ship {
 KeyboardKeyToButtonMapping::KeyboardKeyToButtonMapping(uint8_t portIndex, CONTROLLERBUTTONS_T bitmask,
@@ -12,16 +14,49 @@ KeyboardKeyToButtonMapping::KeyboardKeyToButtonMapping(uint8_t portIndex, CONTRO
       ControllerButtonMapping(PhysicalDeviceType::Keyboard, portIndex, bitmask) {
 }
 
+// Poll-time half of the ZELDA3D_DBG_INPUT diagnostic (debug_journal/2026-07-15-keyboard-headed-v2.md
+// / 2026-07-15-phase1-input-consolidation.md), extended into this mapping so a poll where
+// mKeyPressed is true can be told apart from one where the bit never reached the pad. Logs
+// on-change only (per scancode): whether the key is latched pressed, whether this poll was
+// blocked, and whether the bit was OR'd into padButtons. The event-time log (Ship::ControlDeck::
+// ProcessKeyboardEvent) proves the SDL event reached ControlDeck at all; this proves the LATCHED
+// press actually survived to the next WriteToOSContPad poll (ruling in/out a poll-time-only drop
+// the event-time log can't see, e.g. a block flag that flips true between the keydown event and
+// the next poll).
+extern "C" int Zelda3D_DbgInputEnabled(void);
+static void Zelda3dDbgInputLogPoll(KbScancode scancode, bool keyPressed, bool blocked, bool applied) {
+    if (Zelda3D_DbgInputEnabled() == 0) {
+        return;
+    }
+    struct State { bool keyPressed = false; bool blocked = false; bool applied = false; bool seen = false; };
+    static std::unordered_map<int, State> sLast;
+    State cur{ keyPressed, blocked, applied, true };
+    State& last = sLast[static_cast<int>(scancode)];
+    if (last.seen && last.keyPressed == cur.keyPressed && last.blocked == cur.blocked &&
+        last.applied == cur.applied) {
+        return;
+    }
+    last = cur;
+    fprintf(stderr,
+            "[zelda3d_dbg_input] poll scancode=%d keyPressed=%d KeyboardGameInputBlocked=%d "
+            "appliedToPad=%d\n",
+            static_cast<int>(scancode), keyPressed, blocked, applied);
+}
+
 void KeyboardKeyToButtonMapping::UpdatePad(CONTROLLERBUTTONS_T& padButtons) {
-    if (Context::GetRawInstance()->GetControlDeck()->KeyboardGameInputBlocked()) {
+    bool blocked = Context::GetRawInstance()->GetControlDeck()->KeyboardGameInputBlocked();
+    if (blocked) {
+        Zelda3dDbgInputLogPoll(mKeyboardScancode, mKeyPressed, true, false);
         return;
     }
 
     if (!mKeyPressed) {
+        Zelda3dDbgInputLogPoll(mKeyboardScancode, false, false, false);
         return;
     }
 
     padButtons |= mBitmask;
+    Zelda3dDbgInputLogPoll(mKeyboardScancode, true, false, true);
 }
 
 int8_t KeyboardKeyToButtonMapping::GetMappingType() {

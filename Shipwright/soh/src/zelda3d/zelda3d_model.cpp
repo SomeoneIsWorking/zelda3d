@@ -18,8 +18,6 @@
 #include "asset/cmb_glgroups.h"   // shared CMB -> renderer GlGroup/texture converter
 #include "fast/zelda3d_gl.h"
 #include "zelda3d_model_internal.h" // LoadedModel + loadModel (shared with zelda3d_anim.cpp)
-#include "ship/Context.h"                              // #20 keyboard-inject verification shim
-#include "ship/controller/controldeck/ControlDeck.h"   // #20 ProcessKeyboardEvent path
 #include <stb_image.h>
 #include "zelda3d_stairs.h" // procedural stair geometry (gZelda3dStairs, generateStairsGroup, ...)
 
@@ -1623,22 +1621,6 @@ extern "C" void Zelda3D_FreeRawCollision(Zelda3D_RawCollision* out) {
     memset(out, 0, sizeof(*out));
 }
 
-// #20 — headless keyboard verification. Feed a raw KbScancode through the EXACT same path the SDL
-// window handler uses (Fast3dWindow::KeyDown/KeyUp -> ControlDeck::ProcessKeyboardEvent), so the
-// default keyboard->N64-button mapping (LUS::ControllerDefaultMappings) can be exercised and
-// observed live with no physical keyboard. Only the SDL physical-key->scancode step is skipped
-// (generic libultraship plumbing, not Zelda3D-specific). Returns 1 if the deck consumed the event,
-// 0 if not, -1 if no control deck. Used by the REPL `key` command.
-extern "C" int Zelda3D_InjectKey(int scancode, int down) {
-    auto* ctx = Ship::Context::GetRawInstance();
-    if (ctx == nullptr) {
-        return -1;
-    }
-    auto controlDeck = ctx->GetControlDeck();
-    if (controlDeck == nullptr) {
-        return -1;
-    }
-    Ship::KbEventType ev = down ? Ship::KbEventType::LUS_KB_EVENT_KEY_DOWN
-                                : Ship::KbEventType::LUS_KB_EVENT_KEY_UP;
-    return controlDeck->ProcessKeyboardEvent(ev, static_cast<Ship::KbScancode>(scancode)) ? 1 : 0;
-}
+// Zelda3D_InjectKey (headless keyboard verification, REPL `key` command) moved to
+// zelda3d/input/zelda3d_input.cpp (Phase 1 input consolidation) — it was orphaned here, unrelated
+// to the .3ds model loader this file otherwise owns. See input/zelda3d_input.h.

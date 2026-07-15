@@ -23,6 +23,7 @@
 #include "soh/Enhancements/gameplaystats.h"
 #include "soh/ObjectExtension/ActorMaximumHealth.h"
 #include "zelda3d/zelda3d.h" // #32 — Xbox face-button HUD glyphs (Zelda3D_XboxBtnEnabled / Zelda3D_XboxGlyphTex)
+#include "zelda3d/input/zelda3d_input.h" // Zelda3D_XboxBtnEnabled / Zelda3D_InputDevice / Zelda3D_HotbarSlot
 
 #include "message_data_static.h"
 extern MessageTableEntry* sNesMessageEntryTablePtr;
@@ -1614,8 +1615,8 @@ static Gfx* Zelda3D_DrawHudBadges(Gfx* dl) {
 static Gfx* Zelda3D_DrawHotbar(PlayState* play, Gfx* dl) {
     InterfaceContext* interfaceCtx = &play->interfaceCtx;
     extern u8  gZelda3dHotbarItems[6];
-    extern int Zelda3D_InputDevice(void);
-    extern int Zelda3D_XboxBtnEnabled(void);
+    // Zelda3D_InputDevice / Zelda3D_XboxBtnEnabled declared via zelda3d/input/zelda3d_input.h
+    // (included above).
     extern const void* Zelda3D_NumGlyphTex(char which, int* w, int* h);
     extern const void* Zelda3D_XboxGlyphTex(char which, int* w, int* h);
 

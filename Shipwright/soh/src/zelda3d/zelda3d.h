@@ -193,7 +193,8 @@ float Zelda3D_GetStairRiserY(void);
 // HUD draws this raw pointer in place of the shared N64 button circle when gZelda3dXboxBtn is set.
 const void* Zelda3D_XboxGlyphTex(char which, int* w, int* h);
 extern int gZelda3dXboxBtn;       // env ZELDA3D_XBOXUI / REPL `xboxui` gate (-1=uninit, 0/1)
-int Zelda3D_XboxBtnEnabled(void); // lazily resolves the env on first call; HUD draws gate on this
+// Zelda3D_XboxBtnEnabled() declared in input/zelda3d_input.h (moved there, Phase 1 input
+// consolidation); lazily resolves the env on first call, HUD draws gate on this.
 
 // #32 hotswap — keyboard-key HUD glyphs. Returns a persistent RGBA8888 buffer for the key glyph
 // for the given HUD slot: 'B'=B-button (C key), 'X'=C-Left (←), 'Y'=C-Down (↓), 'A'=C-Right (→).
@@ -210,7 +211,8 @@ const void* Zelda3D_NumGlyphTex(char which, int* w, int* h);
 // glyph set. -1 = uninitialized (lazily resolved from ZELDA3D_INPUTDEV env on first call).
 // REPL `inputdev <0|1>` overrides for testing. Zelda3D_InputDevice() is the lazily-initialized getter.
 extern int gZelda3dInputDevice;
-int Zelda3D_InputDevice(void);
+// Zelda3D_InputDevice() declared in input/zelda3d_input.h (moved there, Phase 1 input
+// consolidation) — the lazily-initialized getter for gZelda3dInputDevice above.
 
 // #31 — crisp higher-res HUD textures (hearts first). Returns a persistent RGBA8888
 // (G_IM_FMT_RGBA/32b) buffer for a heart kind + its dims, or NULL on failure. The buffer is
@@ -414,9 +416,10 @@ int Zelda3D_CollisionEnabled(void);
 // ZELDA3D_REPL is unset. Drive it with tools/zelda3d_repl.py.
 void Zelda3D_ReplPoll(PlayState* play);
 
-// Inject the `walkhold` REPL control-stick value into player input. Call from Play_Main right
-// BEFORE Play_Update so the player reads it (input is re-sampled each frame). No-op unless active.
-void Zelda3D_WalkInject(PlayState* play);
+// Zelda3D_WalkInject() declared in input/zelda3d_input.h (moved there, Phase 1 input
+// consolidation) — injects the `walkhold`/`btnhold`/ztarget/pause-nav/FP_REPRO state into player
+// input. Call from Play_Main right BEFORE Play_Update so the player reads it (input is re-sampled
+// each frame). No-op unless one of those harnesses is active.
 
 // Force Link to grab-climb the wall he is flush against (#79/#74 climb repro). Lives in z_player.c
 // (needs the static touched-wall flags + the static climb-entry func). Returns 1 grabbed, 0 declined,
@@ -621,8 +624,9 @@ extern int gZelda3dHotbarActive;    // currently selected slot 0-5
 // gZelda3dHotbarFireB: set to 1 by the gamepad chord path (LUS Controller) when it wants to fire
 // the newly-selected slot this frame (i.e. inject a B press). Consumed by Zelda3D_HotbarSync.
 extern int gZelda3dHotbarFireB;
-int  Zelda3D_HotbarSlot(void);      // returns gZelda3dHotbarActive
-void Zelda3D_HotbarSync(PlayState* play); // called each frame from Zelda3D_ReplPoll
+// Zelda3D_HotbarSlot()/Zelda3D_HotbarSync() declared in input/zelda3d_input.h (moved there, Phase 1
+// input consolidation). HotbarSlot() returns gZelda3dHotbarActive; HotbarSync() runs each frame
+// from Zelda3D_ReplPoll.
 
 // ---- PC HUD (native Vulkan, replaces the N64 Fast3D HUD) -----------------------------------
 // User directive 2026-06-23: the in-game HUD is a MODERN PC HUD rendered DIRECTLY via Vulkan

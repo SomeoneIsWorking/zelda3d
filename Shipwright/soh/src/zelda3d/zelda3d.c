@@ -5,6 +5,7 @@
 #include "behaviors/title/title_cloud_vortex.h" // Death Mountain cloud-vortex actor ring at title
 #include "zelda3d_collision.h" // C-ABI bridge for OoT3D scene collision (zelda3d_model.cpp)
 #include "zelda3d_link.h"      // Link (player) replacement policy split out of this file
+#include "input/zelda3d_input.h" // input harness (WalkInject/key-inject/xbox-glyph/hotbar) split out of this file
 #include "zelda3d_anim_override.h" // skeletal-actor draw-override port (head/torso track, facial, DLs)
 #include "overlays/actors/ovl_En_Ge1/z_en_ge1.h" // EnGe1 (read live SkelAnime state)
 #include "overlays/actors/ovl_En_Ko/z_en_ko.h"   // EnKo ENKO_TYPE_* (shared-CMB head-variant select)
@@ -721,76 +722,12 @@ float gZelda3dSkyScale = 12.0f;
 // suspect backdrop group (e.g. the untextured "dome") can be identified by index live.
 int gZelda3dHlGroup = -1;
 
-// #32 — show Xbox face-button glyphs (A/B/X/Y) in the in-game HUD button prompts instead of
-// the shared N64 colored circle. -1 = uninit (read ZELDA3D_XBOXUI env, default on). The HUD
-// (z_parameter.c) reads this and swaps the per-button texture; see Zelda3D_XboxGlyphTex.
-// The Xbox glyph must REPLACE the N64 button UI cleanly (user 2026-06-19), not be stacked
-// under the N64 item icon / do-action label — see z_parameter.c draw sites.
-int gZelda3dXboxBtn = -1;
-int Zelda3D_XboxBtnEnabled(void) {
-    if (gZelda3dXboxBtn < 0) {
-        const char* v = getenv("ZELDA3D_XBOXUI");
-        gZelda3dXboxBtn = (v != NULL && v[0] == '0') ? 0 : 1;
-    }
-    return gZelda3dXboxBtn;
-}
-
-// #32 hotswap — last-used input device. 0 = gamepad (show Xbox glyphs), 1 = keyboard (show key
-// labels). Updated by the C++ LUS input layer (Controller.cpp) on every key/gamepad event.
-// The HUD glyph draw (Zelda3D_DrawHudBadges) reads this each frame and picks the glyph set.
-// -1 = default (read ZELDA3D_INPUTDEV env; if absent, default to 0=gamepad).
-// REPL `inputdev <0|1>` overrides for testing.
-int gZelda3dInputDevice = -1;
-int Zelda3D_InputDevice(void) {
-    if (gZelda3dInputDevice < 0) {
-        const char* v = getenv("ZELDA3D_INPUTDEV");
-        // Default to keyboard (1) when no env set so the headless game shows keyboard glyphs
-        // without requiring a connected gamepad. (A real gamepad event flips it to 0 instantly.)
-        gZelda3dInputDevice = (v != NULL && v[0] == '0') ? 0 : 1;
-    }
-    return gZelda3dInputDevice;
-}
-
-// ---- Hotbar: 6-slot item hotbar drawn natively via Fast3D HUD injection ----------------------
-// gZelda3dHotbarItems[6]: item id (0xFF=ITEM_NONE) in each slot.
-// gZelda3dHotbarActive: currently selected slot (0-5).
-// Slots are set by REPL `hotbar <0-5>` (headless) and by SDL key press (keys 1-6, live).
-// When a slot is "selected" by pressing 1-6, the item in that slot is routed to B button
-// (buttonItems[0]) so the existing SoH use-item engine handles it without duplication.
-// gZelda3dHotbarOn: 1 = hotbar is the sole item UI; N64 C-button/D-pad cluster is suppressed.
-// Default on. REPL `hotbaron <0|1>`.
-int gZelda3dHotbarOn = 1;
-
-u8 gZelda3dHotbarItems[6] = { 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF };
-int gZelda3dHotbarActive  = 0;   // 0-5
-// Set to 1 by the gamepad chord path (LUS Controller) when it wants to fire the newly-selected
-// slot this frame (i.e. inject a virtual B press). Consumed by Zelda3D_HotbarSync.
-int gZelda3dHotbarFireB   = 0;
-
-int Zelda3D_HotbarSlot(void) {
-    return gZelda3dHotbarActive;
-}
-
-// Called from Zelda3D_ReplPoll each frame: sync hotbar slot[active] <-> buttonItems[0] so pressing
-// the existing B-button use path fires the hotbar item.
-// For gamepad: when gZelda3dHotbarFireB is set (gamepad Y press or chord+ABXY), we also inject a
-// virtual B press via the engine's input so the item fires immediately.
-void Zelda3D_HotbarSync(PlayState* play) {
-    // Slot active's item must be on B (buttonItems[0]) for the SoH engine to use it.
-    // We write the hotbar item into B; if the user hasn't assigned slots, B is already ITEM_NONE.
-    u8 activeItem = gZelda3dHotbarItems[gZelda3dHotbarActive];
-    if (activeItem != (u8)gSaveContext.equips.buttonItems[0]) {
-        gSaveContext.equips.buttonItems[0] = activeItem;
-    }
-    // Gamepad chord path: fire the active slot's item this frame by injecting a B-button press.
-    // gZelda3dHotbarFireB is set by ReadToOSContPad (gamepad Y or chord+ABXY) and consumed here.
-    if (gZelda3dHotbarFireB && play != NULL) {
-        // Inject a press into the engine's input pad so B-button press handling runs this frame.
-        play->state.input[0].press.button  |= BTN_B;
-        play->state.input[0].cur.button    |= BTN_B;
-        gZelda3dHotbarFireB = 0;
-    }
-}
+// #32 Xbox face-button HUD glyphs, #32 hotswap input-device state, and the item hotbar
+// (gZelda3dXboxBtn/Zelda3D_XboxBtnEnabled, gZelda3dInputDevice/Zelda3D_InputDevice,
+// gZelda3dHotbarOn/Items/Active/FireB, Zelda3D_HotbarSlot/Sync) moved to
+// zelda3d/input/zelda3d_input.cpp (Phase 1 input consolidation). Declared `extern` in zelda3d.h;
+// the "xboxui"/"inputdev"/"hotbaron"/"hotbar"/"hotbarset" REPL handlers below still write them
+// directly (unchanged — REPL command routing stays here, only the backing state/accessors moved).
 
 // ---- PC HUD (native Vulkan, zelda3d_hud_vk.cpp) -----------------------------------------------
 // The in-game HUD rendered directly through the Vulkan backend (user directive 2026-06-23): a
@@ -4379,27 +4316,18 @@ float gZelda3dGiDisp = 0.2f;      // debug-spawn display matrix scale (REPL `gid
 // keeps only the locomotion/input injection harness below (walkhold/btnhold/gcam/fp_repro), which is
 // shared with the generic actor controls, not Link-specific.
 
-// `walkhold` REPL: inject a held control-stick value for N frames so Link actually WALKS/RUNS via
-// the real locomotion system (the `move` command only teleports, leaving SkelAnime in idle). Used
-// to verify the N64-retarget walk cycle live and to capture a big-arm-motion jointTable for a
-// better-conditioned per-bone correction. Applied in Zelda3D_WalkInject just before Play_Update.
+// The walkhold/btnhold globals, Zelda3D_WalkInject itself, and the #16 FP_REPRO state all moved to
+// zelda3d/input/zelda3d_input.cpp (Phase 1 input consolidation) — they're file-local there, shared
+// only between Zelda3D_WalkInject and its own `walkhold`/`btnhold` REPL handler bodies (also
+// moved). gZelda3dGCam, gZelda3dZTargetActor, and gZelda3dPauseTarget stay HERE (their REPL
+// handlers — `gcam`/`ztarget`/`pause` — are unaffected by this pass) and are now `extern`-declared
+// from the input module since Zelda3D_WalkInject (moved) still reads them each frame.
 int gZelda3dGCam = 0; // #25 force game camera behind Link (drive locomotion headless); REPL `gcam`
-static int gZelda3dWalkHoldFrames = 0;
-static s8 gZelda3dWalkStickX = 0;
-static s8 gZelda3dWalkStickY = 0;
 
 // `ztarget` REPL: the actor to hold a native Z-target lock-on (Player_SetAutoLockOnActor) onto,
 // re-asserted every frame from Zelda3D_WalkInject (see the REPL `ztarget` handler for why this
 // must be per-frame, not one-shot: autoLockOnActor is a one-frame latch by design). NULL = inactive.
 Actor* gZelda3dZTargetActor = NULL;
-
-// `btnhold` REPL: inject a held button mask for N frames (verify equipment-state transitions, e.g.
-// press B to draw the sword and confirm Link's mesh_id selection switches to sword-in-hand + shield
-// -on-arm). Applied in Zelda3D_WalkInject alongside the stick injection. Edge bits are set on the
-// first injected frame so a tap (e.g. B to draw/sheathe) registers, then held.
-static int gZelda3dBtnHoldFrames = 0;
-static unsigned gZelda3dBtnHoldMask = 0;
-static int gZelda3dBtnHoldFirst = 0;
 
 // #71 `pause` REPL: generic, reusable pause-menu navigation primitive. Drives the REAL kaleido
 // input path (no state poking) so the menu opens/switches pages exactly as a player would, which is
@@ -4408,19 +4336,9 @@ static int gZelda3dBtnHoldFirst = 0;
 // to open when closed, then BTN_R press edges (each rotates one page right) once the menu is settled
 // in its navigable idle state (pauseCtx->state==6, unk_1E4==0 i.e. not mid-rotation), until pageIndex
 // reaches the target. To close it re-injects START from the idle state. Reach the map subscreen with
-// `pause map`, frame it, screenshot, then `pause close`.
-static int gZelda3dPauseTarget = -1;
-
-// #16 first-person early-load crash repro harness. ZELDA3D_FP_REPRO=1 synthesizes C-up (BTN_CUP)
-// press edges for the first ~window frames after control returns at a COLD boot load, so the
-// cold-scene-load settle (the texture-segment race) reliably overlaps first-person engagement —
-// the crash window. The generic `btnhold` REPL can't do this: it needs a human to hammer the edge
-// at the exact early frame, and the shell race that drives it is flaky. Here the engine itself
-// generates the edges deterministically from the first controllable frame. Cycle: kPress frames
-// held (rising edge on the first) then kRelease frames released, repeating across kWindow frames,
-// so every dangerous early frame is covered by a fresh engage edge.
-static int gZelda3dFpRepro = -1; // -1 uninit, 0 off, 1 on
-static int gZelda3dFpFrames = 0; // frames elapsed since first controllable
+// `pause map`, frame it, screenshot, then `pause close`. NOT `static` any more: Zelda3D_WalkInject
+// (the reader, driven each frame) now lives in zelda3d/input/zelda3d_input.cpp, a different TU.
+int gZelda3dPauseTarget = -1;
 
 // Zelda3D_LinkEnabled() / Zelda3D_LinkAnimSrc() moved to zelda3d_link.cpp (declared in zelda3d.h for the
 // menu integration in Zelda3D_ReplPoll below, which seeds/reads the live Link mode).
@@ -4880,36 +4798,13 @@ static void Zelda3D_ReplExec(PlayState* play, char* line, const char* outPath) {
         Zelda3D_ReplReply(outPath, "gcam=%d (force game camera behind Link for walkhold-driven locomotion)",
                         gZelda3dGCam);
     } else if (strcmp(cmd, "walkhold") == 0) {
-        // `walkhold <frames> [stickX] [stickY]` — inject a held control stick for N frames so Link
-        // really WALKS/RUNS via the locomotion system (default stickY=+60 forward; stick range +-60
-        // walk / ~+-127 run). For verifying the N64-retarget walk cycle and capturing big-motion
-        // jointTables. `walkhold 0` cancels.
-        int frames = 0, sx = 0, sy = 60;
-        int nargs = sscanf(line, "%*s %d %d %d", &frames, &sx, &sy);
-        if (nargs >= 1) {
-            gZelda3dWalkHoldFrames = frames;
-            gZelda3dWalkStickX = (s8)sx;
-            gZelda3dWalkStickY = (s8)(nargs >= 3 ? sy : 60);
-            Zelda3D_ReplReply(outPath, "walkhold frames=%d stick=(%d,%d)", gZelda3dWalkHoldFrames,
-                            gZelda3dWalkStickX, gZelda3dWalkStickY);
-        } else {
-            Zelda3D_ReplReply(outPath, "usage: walkhold <frames> [stickX] [stickY]");
-        }
+        // Body moved to zelda3d/input/zelda3d_input.cpp (Zelda3D_Input_HandleWalkHoldCmd) alongside
+        // the gZelda3dWalkHold* globals it mutates; this is still the REPL routing site.
+        Zelda3D_Input_HandleWalkHoldCmd(line, outPath);
     } else if (strcmp(cmd, "btnhold") == 0) {
-        // `btnhold <hexmask> <frames>` — inject a held button for N frames (rising edge on frame 1).
-        // Verify equipment-state transitions: e.g. `btnhold 0x4000 4` taps B to draw/sheathe the
-        // sword and confirm Link's mesh_id selection switches (sword-in-hand + shield-on-arm).
-        // Button bits: B=0x4000 A=0x8000 (see libultra controller.h). `btnhold 0 0` cancels.
-        unsigned mask = 0;
-        int frames = 0;
-        if (sscanf(line, "%*s %x %d", &mask, &frames) == 2) {
-            gZelda3dBtnHoldMask = mask;
-            gZelda3dBtnHoldFrames = frames;
-            gZelda3dBtnHoldFirst = 1;
-            Zelda3D_ReplReply(outPath, "btnhold mask=0x%x frames=%d", mask, frames);
-        } else {
-            Zelda3D_ReplReply(outPath, "usage: btnhold <hexmask> <frames>  (B=0x4000 A=0x8000)");
-        }
+        // Body moved to zelda3d/input/zelda3d_input.cpp (Zelda3D_Input_HandleBtnHoldCmd) alongside
+        // the gZelda3dBtnHold* globals it mutates; this is still the REPL routing site.
+        Zelda3D_Input_HandleBtnHoldCmd(line, outPath);
     } else if (strcmp(cmd, "pause") == 0) {
         // `pause <item|map|quest|equip|close>` — generic pause-menu nav (see Zelda3D_PauseNav / #71).
         // Drives the real kaleido input path: opens the menu and rotates to the named page (or closes
@@ -6222,7 +6117,8 @@ static void Zelda3D_ReplExec(PlayState* play, char* line, const char* outPath) {
         // or to hold a button. SoH default map: A=X(45) B=C(46) L=E(18) R=R(19) Z=Z(44)
         // Start=SPACE(57) C-up/dn/lt/rt=arrows(328/336/331/333) D-up/dn/lt/rt=T/G/F/H(20/34/33/35)
         // stick L/R/U/D=A/D/W/S(30/32/17/31). Pair with posinfo/btnhold to observe the effect.
-        extern int Zelda3D_InjectKey(int scancode, int down);
+        // Zelda3D_InjectKey declared via input/zelda3d_input.h (included above); moved from
+        // zelda3d_model.cpp to zelda3d/input/zelda3d_input.cpp (Phase 1 input consolidation).
         int sc = 0, down = 1;
         int n = sscanf(line, "%*s %d %d", &sc, &down);
         if (n >= 1) {
@@ -6985,101 +6881,12 @@ repl_done:
     ;
 }
 
-// Inject the held `walkhold` control-stick value into player input. Called from Play_Main right
-// BEFORE Play_Update (input is re-sampled each frame, so setting it later would be clobbered). No-op
-// unless a walkhold is active. Drives the real locomotion so Link genuinely walks/runs (vs `move`'s
-// teleport) — for verifying the live N64-retarget walk cycle and capturing big-motion jointTables.
-void Zelda3D_WalkInject(PlayState* play) {
-    if (play == NULL) {
-        return;
-    }
-    if (gZelda3dWalkHoldFrames > 0) {
-        play->state.input[0].cur.stick_x = gZelda3dWalkStickX;
-        play->state.input[0].cur.stick_y = gZelda3dWalkStickY;
-        play->state.input[0].rel.stick_x = gZelda3dWalkStickX;
-        play->state.input[0].rel.stick_y = gZelda3dWalkStickY;
-        gZelda3dWalkHoldFrames--;
-    }
-    if (gZelda3dBtnHoldFrames > 0) {
-        play->state.input[0].cur.button |= (u16)gZelda3dBtnHoldMask;
-        if (gZelda3dBtnHoldFirst) {
-            play->state.input[0].press.button |= (u16)gZelda3dBtnHoldMask; // rising edge on frame 1
-            gZelda3dBtnHoldFirst = 0;
-        }
-        gZelda3dBtnHoldFrames--;
-    }
-
-    // `ztarget` REPL: re-assert the native auto-lock-on every frame (autoLockOnActor is a
-    // one-frame latch by design — see the REPL `ztarget` handler). Mirrors how e.g. En_Rd/En_Dh
-    // call Player_SetAutoLockOnActor from their own per-frame Update while aggro holds.
-    if (gZelda3dZTargetActor != NULL) {
-        Player_SetAutoLockOnActor(play, gZelda3dZTargetActor);
-    }
-
-    // #71 pause-menu nav: open/switch-page/close via the real kaleido input path (see gZelda3dPauseTarget).
-    if (gZelda3dPauseTarget != -1) {
-        PauseContext* pc = &play->pauseCtx;
-        if (gZelda3dPauseTarget == -2) { // close
-            if (pc->state == 0) {
-                gZelda3dPauseTarget = -1; // fully closed
-            } else if (pc->state == 6 && pc->unk_1E4 == 0) {
-                play->state.input[0].cur.button |= BTN_START;
-                play->state.input[0].press.button |= BTN_START; // edge: trigger close
-            }
-        } else if (pc->state == 0) { // closed -> open
-            play->state.input[0].cur.button |= BTN_START;
-            play->state.input[0].press.button |= BTN_START; // edge: trigger open
-        } else if (pc->state == 6 && pc->unk_1E4 == 0) { // open & settled (not mid-rotation)
-            if (pc->pageIndex == (u16)gZelda3dPauseTarget) {
-                gZelda3dPauseTarget = -1; // arrived
-            } else {
-                play->state.input[0].cur.button |= BTN_R;
-                play->state.input[0].press.button |= BTN_R; // edge: rotate one page right
-            }
-        }
-    }
-
-    // #6/#9 linkgrab: hold the selected actor in front of Link + inject fresh A edges until grabbed.
-    // The driver lives in zelda3d_link.cpp (Link policy); it's a no-op unless `linkgrab` armed it.
-    Zelda3D_LinkWalkInject(play);
-
-    // #16 FP_REPRO: deterministically engage first-person right as the cold scene-load settles.
-    if (gZelda3dFpRepro < 0) {
-        const char* e = getenv("ZELDA3D_FP_REPRO");
-        gZelda3dFpRepro = (e != NULL && atoi(e) != 0) ? 1 : 0;
-    }
-    if (gZelda3dFpRepro) {
-        Player* pl = GET_PLAYER(play);
-        if (pl != NULL && !Player_InCsMode(play)) {
-            enum { kWindow = 300, kPress = 3, kRelease = 3, kCycle = kPress + kRelease };
-            if (gZelda3dFpFrames < kWindow) {
-                int ph = gZelda3dFpFrames % kCycle;
-                if (ph < kPress) {
-                    play->state.input[0].cur.button |= BTN_CUP;
-                    if (ph == 0) {
-                        play->state.input[0].press.button |= BTN_CUP; // fresh rising edge each cycle
-                    }
-                }
-                if (gZelda3dFpFrames == 0) {
-                    fprintf(stderr, "SOH3D FP_REPRO: start injecting C-up edges (scene=0x%x dayTime=0x%x)\n",
-                            play->sceneNum, gSaveContext.dayTime);
-                    fflush(stderr);
-                }
-                // One-shot log when first-person actually engages, so we KNOW the harness works.
-                {
-                    static int sFpEngagedLogged = 0;
-                    Camera* ac = GET_ACTIVE_CAM(play);
-                    if (!sFpEngagedLogged && ac != NULL && ac->mode == CAM_MODE_FIRSTPERSON) {
-                        sFpEngagedLogged = 1;
-                        fprintf(stderr, "SOH3D FP_REPRO: first-person ENGAGED at fpFrame=%d\n", gZelda3dFpFrames);
-                        fflush(stderr);
-                    }
-                }
-                gZelda3dFpFrames++;
-            }
-        }
-    }
-}
+// Zelda3D_WalkInject (the walkhold/btnhold/ztarget/pause-nav/FP_REPRO per-frame injector) moved to
+// zelda3d/input/zelda3d_input.cpp (Phase 1 input consolidation, debug_journal/
+// 2026-07-15-phase1-input-consolidation.md) — declared in input/zelda3d_input.h, included above.
+// Its two call sites (z_play.c:Play_Main and the manual-step REPL tick below) are unchanged; it
+// still reads/writes gZelda3dZTargetActor and gZelda3dPauseTarget, which stay defined here (their
+// REPL setters — `ztarget`/`pause` — are unaffected) and are now shared cross-TU via extern.
 
 void Zelda3D_ReplPoll(PlayState* play) {
     static int fd = -2; // -2 uninit, -1 disabled
