@@ -4,7 +4,7 @@
 #include "zelda3d_input.h"
 
 #include "../zelda3d.h"
-#include "../zelda3d_link.h" // Zelda3D_LinkWalkInject — called from Zelda3D_WalkInject below
+#include "../player/zelda3d_link.h" // Zelda3D_LinkWalkInject — called from Zelda3D_WalkInject below
 #include "ship/Context.h"                              // #20 keyboard-inject verification shim
 #include "ship/controller/controldeck/ControlDeck.h"   // #20 ProcessKeyboardEvent path
 

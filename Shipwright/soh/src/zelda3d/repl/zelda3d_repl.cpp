@@ -10,7 +10,7 @@
 #include "behaviors/title/title_presentation.h"
 #include "behaviors/title/title_cloud_vortex.h"
 #include "zelda3d_collision.h"
-#include "zelda3d_link.h"
+#include "../player/zelda3d_link.h"
 #include "input/zelda3d_input.h"
 #include "../anim/zelda3d_anim_override.h"
 #include "overlays/actors/ovl_En_Ge1/z_en_ge1.h"

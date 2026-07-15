@@ -7,7 +7,7 @@
 // input. Per-game adapters read Player-native enums and translate to LinkGear.
 //
 // mesh_id map (bit index into the returned bitmask == CMB mesh_id):
-//   see Shipwright/soh/src/zelda3d/link_mesh_id_map.md (ADULT section).
+//   see Shipwright/soh/src/zelda3d/player/link_mesh_id_map.md (ADULT section).
 #ifndef ZELDA3D_SHARED_PLAYER_LINK_MIDMASK_H
 #define ZELDA3D_SHARED_PLAYER_LINK_MIDMASK_H
 
