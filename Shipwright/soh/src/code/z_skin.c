@@ -1,4 +1,5 @@
 #include "global.h"
+#include "zelda3d/zelda3d.h"
 
 MtxF gSkinLimbMatrices[60]; // holds matrices for each limb of the skeleton currently being drawn
 
@@ -200,6 +201,29 @@ void Skin_DrawImpl(Actor* actor, PlayState* play, Skin* skin, SkinPostDraw postD
     }
 
     skeleton = SEGMENTED_TO_VIRTUAL(skin->skeletonHeader->segment);
+
+    // Zelda3D: the Skin system (En_Horse/En_fHG/En_Horse_* and En_Viewer's procedural skinned
+    // meshes) has its own limb walk distinct from z_skelanime.c's SkelAnime_Draw* family, so it
+    // never hit any Zelda3D choke point -> these actors always drew the native N64 mesh even when
+    // Zelda3D_TryAuto had already classified them "skinned"/AUTO-replaceable (dead classification;
+    // see oot3d-decomp/docs/en_horse_epona_render_gap.md). Skin embeds a REAL `SkelAnime
+    // skelAnime` (z64skin.h), driven every frame by the actor's own SkelAnime_Update/
+    // Animation_Change calls exactly like any SkelAnime-based actor (z_en_horse.c switches
+    // `skin.skelAnime.animation` per live gait: idle/walk/trot/gallop) -- so it carries the same
+    // .animation/.curFrame/.animLength/.morphWeight/.skeleton/.jointTable fields the existing
+    // SkelAnime*-bearing choke point (Zelda3D_SkelAnimeDraw) already consumes to phase-lock AND
+    // gait-select the OoT3D CSAB (Zelda3D_UpdateAnimAuto's N64-anim-name -> CSAB map, e.g.
+    // gEponaGallopingAnim -> hl_anim_fastrun2_30). SkinLimb's jointPos/child/sibling fields also
+    // share StandardLimb's exact byte layout (see z64skin.h vs z64animation.h), so the walk/retarget
+    // machinery needs no Skin-specific variant. Run this AFTER Skin_ApplyAnimTransformations (so
+    // postDraw's Skin_GetLimbPos reads still see a valid gSkinLimbMatrices, e.g. EnHorse_PostDraw's
+    // hoof-dust spawn) but BEFORE any N64 limb Gfx is emitted.
+    if (Zelda3D_SkelAnimeDraw(play, &skin->skelAnime)) {
+        if (postDraw != NULL) {
+            postDraw(actor, play, skin);
+        }
+        goto close_disps;
+    }
 
     if (!(drawFlags & SKIN_DRAW_FLAG_CUSTOM_MATRIX)) {
         Mtx* mtx;
