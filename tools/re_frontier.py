@@ -113,36 +113,81 @@ class Entry:
         return "\n".join(out)
 
 
+# Non-entry content the parser must round-trip losslessly: prose written directly under a
+# `## area` header before its first `### entry` (e.g. the mm-player intro paragraph), and
+# anything after the LAST entry in the whole file (e.g. a hand-written "## Current hacks
+# list" / "## Top next RE-ready steps" summary with no `### id` entries of its own — those
+# areas have zero entries, so `save()`'s area list -- built only from entries' `.area` --
+# would silently drop them without this). Found 2026-07-15 when `set` truncated ~50 lines of
+# hand-written summary off the end of the file; fixed here instead of hand-restoring once and
+# leaving the same trap for the next `add`/`set` call. Populated by `load()`, consumed by
+# `save()`; empty/no-op for a roadmap that has no such trailing/prelude prose.
+# The project-customized header prose (title/rules/links, everything before the first `## area`
+# line) is likewise round-tripped verbatim rather than overwritten by the generic HEADER
+# constant below — this project's actual header (links to docs/parity-map.md, a customized
+# hard-rule list, etc.) is NOT the generic template. HEADER is only used to scaffold a brand-new
+# roadmap that has no header yet.
+FILE_HEADER = None
+AREA_PRELUDE = {}
+TAIL_LINES = []
+
+
 def load():
     """Parse docs/re-frontier.md into {id: Entry}, preserving area order."""
+    global FILE_HEADER, AREA_PRELUDE, TAIL_LINES
+    FILE_HEADER = None
+    AREA_PRELUDE = {}
+    TAIL_LINES = []
     if not os.path.exists(ROADMAP):
         return {}, []
     entries = {}
     order = []
     area = "misc"
     cur = None
-    with open(ROADMAP, encoding="utf-8") as fh:
-        for line in fh:
-            line = line.rstrip("\n")
-            m = re.match(r"^## +(.+)$", line)
-            if m and not line.startswith("### "):
-                area = m.group(1).strip()
-                continue
-            m = re.match(r"^### +(\S+) +— +(.+)$", line)
-            if not m:
-                m = re.match(r"^### +(\S+) +- +(.+)$", line)
-            if m:
-                cur = Entry(m.group(1).strip(), m.group(2).strip(), area)
-                entries[cur.id] = cur
-                order.append(cur.id)
-                continue
-            m = re.match(r"^- +(\w+): ?(.*)$", line)
-            if m and cur:
-                key, val = m.group(1), m.group(2).strip()
-                if key == "deps":
-                    cur.deps = [d.strip() for d in val.split(",") if d.strip()]
-                elif key in ("status", "evidence", "where", "gap", "notes"):
-                    setattr(cur, key, val)
+    prelude_buf = []
+    capturing_prelude = False
+    lines = open(ROADMAP, encoding="utf-8").read().split("\n")
+    last_consumed_idx = -1
+    header_buf = []
+    in_header = True
+    for i, line in enumerate(lines):
+        m = re.match(r"^## +(.+)$", line)
+        if m and not line.startswith("### "):
+            if in_header:
+                FILE_HEADER = "\n".join(header_buf).rstrip("\n") + "\n"
+                in_header = False
+            area = m.group(1).strip()
+            prelude_buf = []
+            capturing_prelude = True
+            continue
+        if in_header:
+            header_buf.append(line)
+            continue
+        m = re.match(r"^### +(\S+) +— +(.+)$", line)
+        if not m:
+            m = re.match(r"^### +(\S+) +- +(.+)$", line)
+        if m:
+            if capturing_prelude:
+                if area not in AREA_PRELUDE:
+                    AREA_PRELUDE[area] = list(prelude_buf)
+                capturing_prelude = False
+            cur = Entry(m.group(1).strip(), m.group(2).strip(), area)
+            entries[cur.id] = cur
+            order.append(cur.id)
+            last_consumed_idx = i
+            continue
+        m = re.match(r"^- +(\w+): ?(.*)$", line)
+        if m and cur:
+            key, val = m.group(1), m.group(2).strip()
+            if key == "deps":
+                cur.deps = [d.strip() for d in val.split(",") if d.strip()]
+            elif key in ("status", "evidence", "where", "gap", "notes"):
+                setattr(cur, key, val)
+            last_consumed_idx = i
+            continue
+        if capturing_prelude:
+            prelude_buf.append(line)
+    TAIL_LINES = lines[last_consumed_idx + 1:] if last_consumed_idx >= 0 else []
     return entries, order
 
 
@@ -153,12 +198,20 @@ def save(entries, order):
         if a not in areas:
             areas.append(a)
     with open(ROADMAP, "w", encoding="utf-8") as fh:
-        fh.write(HEADER)
+        fh.write(FILE_HEADER if FILE_HEADER is not None else HEADER)
         for a in areas:
             fh.write(f"\n## {a}\n\n")
+            pre = AREA_PRELUDE.get(a)
+            if pre:
+                pre_text = "\n".join(pre).strip("\n")
+                if pre_text:
+                    fh.write(pre_text + "\n\n")
             for eid in order:
                 if entries[eid].area == a:
                     fh.write(entries[eid].serialize() + "\n\n")
+        tail_text = "\n".join(TAIL_LINES).strip("\n")
+        if tail_text:
+            fh.write(tail_text + "\n")
 
 
 def effective_status(e, entries):

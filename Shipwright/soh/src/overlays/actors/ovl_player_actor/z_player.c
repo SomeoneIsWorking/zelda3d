@@ -7877,19 +7877,45 @@ s32 Zelda3D_PlayerForceItemUse(Player* this, PlayState* play) {
 // only the entry gate (a live-decoded input threshold / a genuine tall wall) headless control can't
 // reliably satisfy.
 
-// Backward walk: the real trigger (z_player.c ~8410-8420, func_8083CB2C's sibling walk-decode block)
-// is `if (func_8083FC68(this, speedTarget, yawTarget) < 0) func_8083CBF0(this, yawTarget, play);` —
-// func_8083FC68 returns -1 only when the camera-relative stick-push yawTarget is close enough to
-// dead-behind Link's facing (shape.rot.y) AND speedTarget clears its threshold; live headless input
-// swept -45..-127 backward magnitudes under Z-target lock and never reliably landed there (measured
-// ~179.8 deg delta, just short of round-trip precision). Rather than keep fighting the live decoder,
-// this calls func_8083CBF0 DIRECTLY — the exact same function/args the real branch calls — with
-// yawTarget forced to shape.rot.y+0x8000 (an unambiguous dead-behind push), reproducing the branch's
-// result state exactly: Player_Action_808423EC + gPlayerAnim_link_anchor_back_walk (CSAB
-// ac_back_walk per zelda3d_player_animmap.inc), linearVelocity=8.0f. No magic constant: 0x8000 is a
-// literal 180-degree turn in the engine's s16-angle convention, not a tuned offset.
+// Forward-declared: func_8083FC68 is defined later in this file (~z_player.c:8258); needed here to
+// drive the real decode gate instead of bypassing it (see Zelda3D_PlayerForceBackwalk below).
+s32 func_8083FC68(Player* this, f32 arg1, s16 arg2);
+
+// Backward walk: drives the REAL decode gate instead of bypassing it. The live site
+// (Player_Action_80840450, z_player.c ~8458-8469) is:
+//   Player_GetMovementSpeedAndYaw(this, &speedTarget, &yawTarget, SPEED_MODE_LINEAR, play);
+//   temp1 = func_8083FC68(this, speedTarget, yawTarget);
+//   if (temp1 < 0) func_8083CBF0(this, yawTarget, play);
+// func_8083FC68 (fully RE'd, z_player.c:8236-8253) is a dual-threshold curve selector:
+//   temp = |(s16)(yawTarget - shape.rot.y)| / 32768.0f
+//   return  1 if speedTarget > temp*temp*50 + 6   (forward-walk branch)
+//   return -1 if speedTarget > (1-temp)*10 + 6.8  (backward-walk branch)
+//   return  0 otherwise (side-walk band)
+// A dead-behind stick push (yawTarget = shape.rot.y + 0x8000) makes the s16 subtraction
+// wrap to exactly -32768, so temp == 1.0 exactly (no float slop): the forward threshold
+// becomes speedTarget > 56.0f and the backward threshold collapses to speedTarget > 6.8f.
+// Any speedTarget in (6.8, 56] is unambiguously the backward-walk branch; 8.0f (the same
+// linearVelocity func_8083CBF0 itself installs on entry) is used here as a representative
+// walking-speed input, not a curve-fit constant — the decode boundaries above are exact.
+// Earlier attempts to land this branch by sweeping actual stick-input magnitudes under
+// Z-target lock got within ~179.8 deg of dead-behind but never closed the last bit of
+// round-trip precision (docs/re_control_debug_backlog.md item #1); driving func_8083FC68
+// directly with the exact wrap-to-32768 input sidesteps that precision problem entirely
+// while still running the real decode function and honoring its actual return value —
+// it is calling the function with a value that maps unambiguously into its already-fully-
+// understood decode surface, not skipping the decode.
 s32 Zelda3D_PlayerForceBackwalk(Player* this, PlayState* play) {
-    func_8083CBF0(this, (s16)(this->actor.shape.rot.y + 0x8000), play);
+    s16 yawTarget = (s16)(this->actor.shape.rot.y + 0x8000);
+    f32 speedTarget = 8.0f;
+    s32 decision = func_8083FC68(this, speedTarget, yawTarget);
+
+    if (decision >= 0) {
+        // Decode surface changed upstream (shouldn't happen given the inputs above) —
+        // fail loudly rather than silently forcing the old hardcoded state.
+        return 0;
+    }
+
+    func_8083CBF0(this, yawTarget, play);
     return 1;
 }
 

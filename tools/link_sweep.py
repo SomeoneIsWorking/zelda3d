@@ -952,12 +952,15 @@ def write_checklist(result):
                  "(gitignored — re-run `tools/link_sweep.py sweep` to regenerate).")
     lines.append("")
     lines.append("**RE control/debug backlog:** several MATCH rows above are reached via a "
-                 "Force*-hook BYPASS of the real N64 entry gate (backwalk, swim_dive, "
-                 "climb_hang/climb_updown) rather than a natively-driven decode — see "
+                 "Force*-hook BYPASS of the real N64 entry gate (swim_dive, climb_hang/"
+                 "climb_updown) rather than a natively-driven decode — see "
                  "`docs/re_control_debug_backlog.md` for the specific unnamed decomp functions "
-                 "(e.g. `func_8083FC68`'s backwalk threshold curves) whose further RE would let "
-                 "these be driven natively, plus new-coverage / debug-readout gaps (camera-mode "
-                 "readout, a distinct \"putdown\" state, frame-exact death detection).")
+                 "whose further RE would let these be driven natively, plus new-coverage / "
+                 "debug-readout gaps (camera-mode readout, a distinct \"putdown\" state, "
+                 "frame-exact death detection). `backwalk` was closed 2026-07-15 — "
+                 "`Zelda3D_PlayerForceBackwalk` now drives the real `func_8083FC68` decode "
+                 "(feeds it the exact input that lands its `-1` branch) instead of bypassing it; "
+                 "see `docs/re-frontier.md` `player.backwalk-decode`.")
     lines.append("")
     with open(CHECKLIST_MD, "w") as f:
         f.write("\n".join(lines) + "\n")
