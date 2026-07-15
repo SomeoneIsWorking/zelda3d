@@ -408,6 +408,10 @@ void Zelda3D_DebugDrawDrop(PlayState* play);
 // since those sub-lists aren't REd yet; pass NULL to skip).
 CollisionHeader* Zelda3D_BuildSceneCollision(PlayState* play, CollisionHeader* n64);
 int Zelda3D_CollisionEnabled(void);
+// SoH sceneNum -> OoT3D scene folder name, or NULL if unmapped. DEFINED in zelda3d.c; exposed here
+// (Phase 2 codebase reorg) so zelda3d/scene/zelda3d_collision.cpp can resolve the scene it's
+// building collision for.
+const char* Zelda3D_SceneName(PlayState* play);
 
 // Interactive REPL poll, called once per frame from Play_Draw. When env
 // ZELDA3D_REPL=<fifo path> is set, reads control commands from that FIFO and applies
