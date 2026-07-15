@@ -106,6 +106,42 @@ again for a frame already captured in a prior session.
 - **soh3d_harness is single-instance** (PID-locked) — the frame cache does not change
   that; `warm`/`ab` cache-miss paths still need exclusive access to the harness process.
 
+## Link (on-foot) state-matrix sweep — `tools/link_sweep.py`
+
+Reusable for the ZELDA3D_LINK on-foot Link body specifically (locomotion + discrete actions).
+Don't re-derive a Link state matrix or a fresh oracle transport — start here.
+
+- **Tool**: `tools/link_sweep.py sweep [--skip-oracle] [--only a,b,c]` drives Link through a
+  full state matrix in BOTH engines and writes `docs/link_parity_checklist.md`
+  (auto-generated — never hand-edit it; edit `STATE_MATRIX` in the tool instead). Raw
+  per-run JSON: `scratch/link_sweep/<ts>.json` + `latest.json` (gitignored, diffable).
+  `show <state>` / `list [--status]` / `resolve <state> --commit <hash>` round out the CLI.
+- **Composes, does not reimplement**: `parity_state_sweep.py` (discrete forced-state CSAB
+  selection vs oot3d-decomp ground truth) and `parity_speed_sweep.py` (locomotion continuum
+  by speedXZ, `classify()`/`windows_overlap()` reused verbatim) supply the per-dimension
+  drive/verdict logic; `link_sweep.py` only orchestrates + adds states those tools don't
+  cover + writes the checklist.
+- **Oracle transport is the EMBEDDED harness, not `azahar_rpc.py`**: `parity_state_sweep.py`
+  /`parity_speed_sweep.py`/`oracle_link_pose.py`/`oracle_link_animid.py` all default to the
+  external `azahar_rpc.py` oracle, which needs a standalone Qt-frontend Azahar binary
+  (`Azahar/build/bin/Release/azahar`) — this fork only builds that frontend with
+  `ENABLE_QT=ON`, and Qt6 is **not installed** on this machine (confirmed 2026-07-15; no
+  `qmake6`, no `Qt6` pkg-config modules). `link_sweep.py`'s `OracleSession` instead drives
+  the ALREADY-BUILT embedded harness (`Azahar/build-libretro`, target `soh3d_harness`, via
+  `harness_ctl.py`) — the CLAUDE.md-blessed direction anyway. It reads Link's selected
+  animation through a new REPL command, **`az_linkanim`** (added to
+  `tools/soh3d_harness/main.cpp` this session), at the same `PLAYER+0x254+0x30` offset
+  `oracle_link_animid.py` documents, so both oracle transports name selections identically
+  against `oot3d-decomp/tools/skeldata/player_animid_names.json`. If a future session gets
+  Qt6 installed and rebuilds the RPC oracle, the external tools become usable again — no
+  further plumbing needed on that side.
+- **State matrix is honestly bounded by drivable recipes.** States with no existing
+  REPL/oracle input recipe (backwalk, sidestep, turn-in-place, combo, item/bottle use,
+  throw, climb traversal, dive, Z-target, get-item pose, death) are recorded
+  `UNREACHABLE` with a concrete reason — never guessed into a verdict. Extend
+  `STATE_MATRIX` (and the underlying REPL primitive) before trying to force a verdict for
+  one of these.
+
 ## The loop, in one line
 tooling → audit@matched-frames → RE-to-ground-truth → fix-or-proven-negative → verify@matched-frames
 → land-on-main → next; decomp stream always running; one build at a time; build the module, not a patch.
