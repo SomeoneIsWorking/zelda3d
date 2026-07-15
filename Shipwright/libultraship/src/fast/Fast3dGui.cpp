@@ -52,6 +52,10 @@ bool Fast3dGui::SupportsViewports() {
     return true;
 }
 
+bool Fast3dGui::IsInteractiveMenuOpen() {
+    return mRml && mRml->IsVisible();
+}
+
 void Fast3dGui::HandleWindowEvents(Fast::WindowEvent event) {
     // Offer the event to the RmlUi menu first. It always handles its toggle binding, and consumes
     // input while open so the ImGui menu / game do not also react.
