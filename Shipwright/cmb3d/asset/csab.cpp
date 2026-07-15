@@ -444,6 +444,22 @@ void Csab::skinMatricesMorph(const Cmb& model, float frameIn, const Csab& outgoi
         out[id] = matMul(aw[id], matInverse(bind[id]));
 }
 
+void Csab::localTransforms(const Cmb& model, float frame, std::vector<BoneLocal>& out) const {
+    const auto& bones = model.bones();
+    float fr = animFrame(frame);
+    out.clear();
+    out.reserve(bones.size());
+    for (const auto& bn : bones) {
+        BoneLocal bl;
+        bl.id = bn.id;
+        bl.parent = bn.parent;
+        // Same signature/args the world builders pass (sampleLocalTRS handles the rest-fallback and
+        // the non-root static-translation-ignore rule) — nonRoot == (parent >= 0).
+        sampleLocalTRS(bn.id, bn.parent >= 0, bn.trans, bn.rot, bn.scale, fr, bl.t, bl.r, bl.s);
+        out.push_back(bl);
+    }
+}
+
 void Csab::skinMatrices(const Cmb& model, float frame, std::vector<std::array<float, 16>>& out,
                         const float* boneRotDelta, int deltaCount, const float* bonePostRot,
                         int postCount) const {

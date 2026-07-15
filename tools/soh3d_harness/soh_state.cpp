@@ -529,4 +529,21 @@ int SohState_ActorSkeleton(int cat, int listIndex,
     return n;
 }
 
+// Per-bone ANIMATED LOCAL rotation (radians, rX/rY/rZ per bone in CMB bone order) of an AUTO/CSAB-
+// replaced OoT3D model, at the clip+frame the live draw path last resolved. For the title Epona
+// (modelId 2010, /actor/zelda_horse.zar) this is the SoH-side counterpart of the oracle's
+// `titleactors a` (its own SkelAnime limb pose table): letting the harness diff both engines'
+// title-Epona bones cs-frame-locked in one process (debug_journal 2026-07-15-epona-title-animation).
+// Returns bone count (<= maxBones), or -1 if the model has no live CSAB pose. Does NOT need
+// gPlayState — the 3DS title path is not a Play gamestate; the AUTO model + sLastAuto are valid at
+// title regardless. outCsab (optional) receives the resolved clip name; *outFrame the resolved frame.
+extern "C" int Zelda3D_GetAnimBonesLocal(int modelId, const char* animName, float frame,
+                                         float* outRot3, int* outId, int* outParent, int maxBones,
+                                         char* outCsab, int outCsabLen, float* outResolvedFrame);
+int SohState_AutoModelBonesLocal(int modelId, float* outRot3, int* outId, int* outParent,
+                                 int maxBones, char* outCsab, int outCsabLen, float* outFrame) {
+    return Zelda3D_GetAnimBonesLocal(modelId, /*animName=*/NULL, /*frame=*/-1.0f,
+                                     outRot3, outId, outParent, maxBones, outCsab, outCsabLen, outFrame);
+}
+
 } // extern "C"

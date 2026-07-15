@@ -25,6 +25,21 @@ class Csab {
     int boneCount() const { return mBoneCount; }
     int animNodeCount() const { return (int)mNodes.size(); }
 
+    // VERIFICATION helper (REPL `boneinfo`, debug_journal 2026-07-15-epona-title-animation):
+    // per-bone ANIMATED LOCAL TRS at `frame`, in the SAME sampling the renderer uses
+    // (sampleLocalTRS -> the exact rest-fallback + static-translation rules skinMatrices applies).
+    // Lets a bone-for-bone quantitative diff against the OoT3D oracle's own live limb-pose table
+    // (harness `titleactors a`, TITLE_POSE_TABLE_VA) without going through world matrices — so a
+    // divergence localizes to a specific bone's local rotation, not a propagated parent transform.
+    struct BoneLocal {
+        int id = 0;
+        int parent = -1;
+        float t[3] = { 0, 0, 0 };
+        float r[3] = { 0, 0, 0 }; // radians, local euler (Rz.Ry.Rx order per this class' convention)
+        float s[3] = { 1, 1, 1 };
+    };
+    void localTransforms(const Cmb& model, float frame, std::vector<BoneLocal>& out) const;
+
     // Per-bone-id skinning matrix at `frame` = animWorld(bone) . inverse(bindWorld).
     // out is sized to match model.boneMatrices(); identity for any bone without anim.
     // boneRotDelta (optional): 3 radians per bone id (rX,rY,rZ) ADDED to that bone's animated

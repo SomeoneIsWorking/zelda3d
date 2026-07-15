@@ -685,6 +685,76 @@ int gZelda3dMorph = -1;
 // Logic-frame clock (= play->gameplayFrames), set by the Link draw path each frame. The walk-stop
 // synthetic morph must advance ONCE per LOGIC frame, not per draw (headless renders many draws/tick).
 int gZelda3dLogicFrame = 0;
+
+// Last CSAB name + resolved playhead the AUTO path drove each model with, so REPL `boneinfo` can
+// dump the live per-bone pose at the exact clip/frame currently on screen (verification tooling —
+// debug_journal 2026-07-15-epona-title-animation). Keyed by modelId.
+static std::unordered_map<int, std::pair<std::string, float>> sLastAuto;
+void Zelda3D_RecordLastAuto(int modelId, const char* csab, float frame) {
+    if (csab && *csab) sLastAuto[modelId] = { std::string(csab), frame };
+}
+
+// CORE: fill per-bone ANIMATED LOCAL rotation (radians, rX/rY/rZ) at the given clip+frame, using
+// the SAME sampling the renderer uses (Csab::localTransforms). With animName NULL, uses the clip+
+// frame the live AUTO draw path last resolved for this model (sLastAuto) — so a caller gets the
+// exact pose currently on screen. Returns bone count (>=0), or -1 on error. outRot3 holds
+// count*3 floats (rX,rY,rZ per bone in CMB bone order); outParent[i]/outId[i] optional (may be
+// NULL). Shared by the REPL `boneinfo` stderr dump and the harness `soh_titlebones` comparison.
+int Zelda3D_GetAnimBonesLocal(int modelId, const char* animName, float frame,
+                             float* outRot3, int* outId, int* outParent, int maxBones,
+                             char* outCsab, int outCsabLen, float* outResolvedFrame) {
+    LoadedModel* lm = loadModel(modelId);
+    if (!lm || !lm->ok || !lm->cmb) return -1;
+    std::string csabName;
+    float useFrame = frame;
+    if (animName && *animName) {
+        csabName = animName;
+    } else {
+        auto it = sLastAuto.find(modelId);
+        if (it == sLastAuto.end()) return -1;
+        csabName = it->second.first;
+        if (frame < 0.0f) useFrame = it->second.second;
+    }
+    Zelda3D::Csab* c = getCsab(lm, csabName.c_str());
+    if (!c || !c->ok()) return -1;
+    std::vector<Zelda3D::Csab::BoneLocal> bl;
+    c->localTransforms(*lm->cmb, useFrame, bl);
+    int n = (int)bl.size();
+    if (n > maxBones) n = maxBones;
+    for (int i = 0; i < n; i++) {
+        if (outRot3) { outRot3[i*3+0] = bl[i].r[0]; outRot3[i*3+1] = bl[i].r[1]; outRot3[i*3+2] = bl[i].r[2]; }
+        if (outId) outId[i] = bl[i].id;
+        if (outParent) outParent[i] = bl[i].parent;
+    }
+    if (outCsab && outCsabLen > 0) {
+        strncpy(outCsab, csabName.c_str(), outCsabLen - 1);
+        outCsab[outCsabLen - 1] = '\0';
+    }
+    if (outResolvedFrame) *outResolvedFrame = useFrame;
+    return n;
+}
+
+// REPL `boneinfo <modelId> [anim] [frame]`: print the AUTO model's per-bone ANIMATED LOCAL rotation
+// for a bone-for-bone quantitative diff against the OoT3D oracle's own live limb table (harness
+// `titleactors a`). With anim/frame omitted, uses the values the live draw path last resolved.
+void Zelda3D_DumpAnimBonesLocal(int modelId, const char* animName, float frame) {
+    float rot[25 * 3];
+    int id[25], parent[25];
+    char csab[64];
+    float rf = 0.0f;
+    int n = Zelda3D_GetAnimBonesLocal(modelId, animName, frame, rot, id, parent, 25, csab, sizeof csab, &rf);
+    if (n < 0) {
+        fprintf(stderr, "[BONEINFO] model %d: no cmb / csab not found / no live anim recorded\n", modelId);
+        return;
+    }
+    fprintf(stderr, "[BONEINFO] model %d csab=%s frame=%.3f bones=%d\n", modelId, csab, rf, n);
+    for (int i = 0; i < n; i++) {
+        fprintf(stderr, "[BONEINFO] b id=%d parent=%d localRot=(%.4f,%.4f,%.4f)\n",
+                id[i], parent[i], rot[i*3+0], rot[i*3+1], rot[i*3+2]);
+    }
+    fflush(stderr);
+}
+
 void Zelda3D_UpdateAnimAuto(int modelId, const char* animName, float rate, float n64CurFrame,
                           float n64AnimLength, float morphWeight) {
     static std::unordered_map<int, float> frames;
@@ -843,6 +913,7 @@ void Zelda3D_UpdateAnimAuto(int modelId, const char* animName, float rate, float
     if (morphWeight <= 0.0f) { morphOut.erase(modelId); morphOutFrame.erase(modelId); }
     lastCsab[modelId] = animName;
     lastFrame[modelId] = f;
+    Zelda3D_RecordLastAuto(modelId, animName, f); // for REPL `boneinfo` live-frame dump
 
     if (gZelda3dAnimDebug && modelId == Zelda3D_LinkModelId() && (csabChanged || morphWeight > 0.0f)) {
         fprintf(stderr, "SOH3D ANIM XTRANS: %s f=%.2f morphW=%.3f morphOut=%s outFrame=%.2f%s\n",

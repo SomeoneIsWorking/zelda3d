@@ -121,3 +121,70 @@ cs1600 in both before/after crops is within the already-documented ~1-2 cs-frame
 - `oot3d-decomp/docs/en_horse_title_gallop_rate.md` — new: the RE'd constants, the tempo-parity
   computation, and the honest "what this doesn't explain" note.
 - `oot3d-decomp/build/` (gitignored) — regenerated `code.bin` + Ghidra project (not committed).
+
+---
+
+## ADDENDUM — bone-level localization tooling (2026-07-15, same day, follow-up request)
+
+A follow-up asked to LOCALIZE the divergence to specific bone(s) — the thing whole-frame pixel
+crops cannot resolve (mane bone 14, tail bones 23/24). Built the tooling for a bone-for-bone,
+same-units, cs-frame-locked diff of SoH's title Epona against the OoT3D oracle:
+
+### Tooling added (all verified-to-compile; SoH path live-verified)
+
+- `Shipwright/cmb3d/asset/csab.{h,cpp}`: `Csab::localTransforms(model, frame, out)` — per-bone
+  ANIMATED LOCAL TRS via the exact `sampleLocalTRS` the renderer uses (rest-fallback + non-root
+  static-translation-ignore rules included), so a divergence localizes to a bone's LOCAL rotation
+  rather than a propagated parent transform.
+- `Shipwright/soh/src/zelda3d/zelda3d_anim.cpp`: `Zelda3D_GetAnimBonesLocal(...)` core (fills a
+  caller buffer) + `Zelda3D_DumpAnimBonesLocal(...)` stderr dumper; captures the live AUTO
+  clip+frame per model (`sLastAuto`, recorded in `Zelda3D_UpdateAnimAuto`) so a dump uses the exact
+  pose on screen.
+- `Shipwright/soh/src/zelda3d/zelda3d.c`: REPL `boneinfo <modelId> [animBase] [frame]`.
+- `tools/soh3d_harness/soh_state.cpp`: `SohState_AutoModelBonesLocal(...)` (thin wrapper over
+  `Zelda3D_GetAnimBonesLocal`, valid at title — no gPlayState needed).
+- `tools/soh3d_harness/main.cpp`: extended `compare titleactors` to ALSO dump SoH's OoT3D
+  epona.cmb 25-bone LOCAL rotation in RADIANS, right under the oracle's own "25 poses ... rot(rad)"
+  block — so ONE harness process prints both engines' title-Epona bones cs-frame-locked, in the
+  same units, ready to diff.
+
+### SoH-side result (live-verified, `scratch/soh_epona_gallop_bones.txt`)
+
+`boneinfo 2010` on the live headless title demo (`ZELDA3D_WARP= tools/zelda3d_game.sh start`,
+model 2010 = /actor/zelda_horse.zar this session — NOTE model ids are per-session load-order, NOT
+stable) at a live GALLOP frame (`csab=hl_anim_fastrun2_30`):
+
+- All 25 bones carry real ANIMATED local rotations — front legs (3-6, 10-13), hind legs (15-22),
+  neck/head (7-9), and BOTH tail bones (23=`(1.36,1.79,1.45)`, 24=`(-0.03,0.06,0.61)`) are posed
+  off bind, confirming the CSAB drives the tail live (matches the earlier static track-coverage
+  finding, now confirmed on the LIVE draw path, not just a static dump).
+- Mane bone 14 = `(0,0,0)` at this phase — consistent with its single small rZ-only track being
+  near zero at frame 0; NOT a stuck/undriven bone (its parent bone 1 is fully posed).
+
+### Cross-engine numeric diff — BLOCKED this session by concurrent harness use (honest)
+
+The oracle half (`compare titleactors`' 3DS "25 poses rot(rad)" table) requires the embedded-Azahar
+harness, which is a SINGLE-INSTANCE resource (lockfile `/run/user/1000/soh3d_harness.lock`). During
+this work a CONCURRENT teammate session was actively holding it (`tools/link_sweep.py sweep --only
+walk,run`, live pid holding the lock). Running a second harness would either fail on the lock or
+OOM the 15 GB machine (a `-j4` build already OOM-killed a harness mid-session — do NOT run the
+harness and a build, or two harnesses, concurrently). I did NOT interfere with the teammate's
+harness. So the before/after numeric bone-diff TABLE is not in this entry — it is one
+`compare titleactors` at a gallop cs away once the harness frees, with all tooling built + the SoH
+path verified.
+
+### Analytical localization (from architecture + the live SoH dump)
+
+Both engines sample the SAME CSAB asset (`hl_anim_fastrun2_30`, from the same ROM): the 3DS via its
+own SkelAnime keyframe evaluator (FUN_00347550, `mask&2 -> rot`, populating the oracle table at
+`TITLE_POSE_TABLE_VA`), SoH via `Csab::sampleLocalTRS`. With no runtime procedural bone override on
+the title-demo horse (unlike En_Ko head-look), the 3DS's per-bone local rotation IS the CSAB sample
+— so SoH's `boneinfo` pose should agree with the oracle's `titleactors` table to within sampler-math
+fidelity + phase. The live dump shows SoH samples the correct clip, phase-locked, with every bone
+(incl. tail) driven — no stuck/bind-pose bone, no missing track. This is consistent with the
+tempo-parity finding above and points AWAY from an animation-data divergence as the cause of the
+"looks off" perception; the remaining candidates to check with the ready bone-diff (once the harness
+frees) are (a) a per-bone sampler-math delta on specific bones, and (b) whether the 3DS applies any
+title-specific procedural pose the CSAB doesn't carry. If the bone diff comes back all-match, the
+"looks off" is NOT animation and the real candidates are model orientation / spawn pose / camera —
+to be run as the immediate next step when the shared harness is available.
