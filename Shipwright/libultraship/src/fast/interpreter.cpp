@@ -59,7 +59,7 @@ std::stack<std::string> currentDir;
 static bool s_zelda3dMeasuring = false;
 static int s_zelda3dMeasureKey = 0;
 static float s_zelda3dMeasHMin, s_zelda3dMeasHMax;
-extern "C" void Zelda3D_MeasureResult(int key, float height); // implemented in soh/src/zelda3d/zelda3d.c
+extern "C" void Zelda3D_MeasureResult(int key, float height); // implemented in soh/src/zelda3d/core/zelda3d.c
 
 // charcompare: measure the MODEL-SPACE (modelview-transformed) vertex bbox over a frame, so the tool
 // can frame the model — especially the DEPTH axis — by its true geometry extent. The modelview is the

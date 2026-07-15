@@ -350,7 +350,7 @@ void Zelda3DHudRenderer::End() {
 // ---- Public C-ABI (Zelda3D_Hud_*) ----------------------------------------------------------------
 // Previously lived in zelda3d_hud_vk.cpp and dispatched between the Vulkan HUD and this SDL3 GPU one.
 // The Vulkan backend was removed (P4): SDL3 GPU is the only renderer, so these now delegate straight
-// to the Fast::SgHud_* op-emitting collector. Called from soh/src/zelda3d/zelda3d.c (Zelda3D_HudFrame) and
+// to the Fast::SgHud_* op-emitting collector. Called from soh/src/zelda3d/core/zelda3d.c (Zelda3D_HudFrame) and
 // libultraship Gui.cpp.
 extern "C" {
 
