@@ -22,7 +22,7 @@
 #define ZELDA3D_BEHAVIORS_ACTOR_PLAYER_H
 
 #include "../actor_behavior.h"
-#include "../../zelda3d_link.h" // Zelda3dBoneCorr (C-ABI retarget correction record)
+#include "../../player/zelda3d_link.h" // Zelda3dBoneCorr (C-ABI retarget correction record)
 #include <cstdio>             // FILE*
 
 namespace Zelda3D {
