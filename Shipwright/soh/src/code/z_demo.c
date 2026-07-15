@@ -2180,10 +2180,14 @@ void func_80068DC0(PlayState* play, CutsceneContext* csCtx) {
         // a post-Epona-mount press), so by the time the transition instance finishes, z_play.c's
         // switch (~line 984, `gameMode != GAMEMODE_FILE_SELECT`) sees NORMAL and reloads the same
         // scene instead of handing off to FileChoose — the bug: START does nothing at the title
-        // after the rider mounts. This legacy N64 cutscene-teardown machinery isn't driving the
-        // ported title at all (spot99's own cs cursor is; see Zelda3D_TitleCsAdvance), so it must
-        // not own gameMode while the ported title owns it — same seam already used at this file's
-        // Cutscene_Command_Terminator (~line 531) and EnMag_Update for the identical reason.
+        // after the rider mounts. Decomp-confirmed (oot3d-decomp/docs/
+        // title_n64_cs_teardown_has_no_3ds_counterpart.md): the 3DS title tick's ENTIRE per-frame
+        // orchestration is Play_Main -> Actor_UpdateAll + the OoT3D cs interpreter (FUN_002c5ba0);
+        // there is no second "cutscene teardown" state machine on real hardware at all, so this
+        // free-running N64-only machinery isn't driving the ported title's presentation (spot99's
+        // own cs cursor is; see Zelda3D_TitleCsAdvance) and must not own gameMode while the ported
+        // title owns it — same seam already used at this file's Cutscene_Command_Terminator
+        // (~line 531) and EnMag_Update for the identical reason.
         if (!Zelda3D_Title_IsActive()) {
             gSaveContext.gameMode = GAMEMODE_NORMAL;
         }
