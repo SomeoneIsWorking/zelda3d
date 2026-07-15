@@ -7,6 +7,7 @@
 #include "../scene/zelda3d_collision.h"            // Zelda3D_CollisionEnabled (Zelda3D_TerrainWarpEnabled)
 #include "../cutscene/zelda3d_cutscene.h"          // Zelda3D_TitleCsLightSlotsRaw (title light-slot convert)
 #include "../behaviors/title/title_presentation.h" // Zelda3D_Title_IsActive
+#include "../behaviors/title/title_cloud_vortex.h" // Zelda3D_TitleCloudVortex_Emit
 #include "../behaviors/actor/actor_overrides.h" // Zelda3D_ResolveAnim_EnGe1 / Zelda3D_Joints_EnGe1
 
 #include <stdlib.h>
@@ -456,7 +457,11 @@ static void Zelda3D_DrawModelGL(PlayState* play, int modelId, Actor* actor, floa
         int limbCount = 0;
         if (resolveJoints(actor, &jointRots, &limbCount) && jointRots != NULL && limbCount > 0) {
             Zelda3D_UpdateAnimN64(modelId, jointRots, limbCount);
-            goto draw; // pose set from N64 joints; skip the CSAB path
+            // pose set from N64 joints; skip the CSAB path below (early return replaces the old
+            // `goto draw` — C++ forbids jumping forward over the initialized CSAB-path locals below,
+            // unlike the C compilation this code previously lived under before the phase-2b split).
+            Zelda3D_EmitModelDraw(play, modelId, actor, worldScale, groundOffset);
+            return;
         }
     }
     // Apply this model's skeletal animation (GPU skinning), once per Actor_Draw.
@@ -484,7 +489,6 @@ static void Zelda3D_DrawModelGL(PlayState* play, int modelId, Actor* actor, floa
         Zelda3D_UpdateAnim(modelId, animToPlay, *frame);
         *frame += gZelda3dAnimRate;
     }
-draw:
     Zelda3D_EmitModelDraw(play, modelId, actor, worldScale, groundOffset);
 }
 

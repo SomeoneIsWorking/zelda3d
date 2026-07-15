@@ -145,7 +145,7 @@ extern int gZelda3dPauseTarget;
 // ~+-127 run). For verifying the N64-retarget walk cycle and capturing big-motion jointTables.
 // `walkhold 0` cancels. Moved from zelda3d.c's REPL else-if chain; zelda3d.c still does the
 // `strcmp(cmd, "walkhold")` routing and calls this.
-void Zelda3D_Input_HandleWalkHoldCmd(const char* line, char* outPath) {
+void Zelda3D_Input_HandleWalkHoldCmd(const char* line, const char* outPath) {
     int frames = 0, sx = 0, sy = 60;
     int nargs = sscanf(line, "%*s %d %d %d", &frames, &sx, &sy);
     if (nargs >= 1) {
@@ -164,7 +164,7 @@ void Zelda3D_Input_HandleWalkHoldCmd(const char* line, char* outPath) {
 // confirm Link's mesh_id selection switches (sword-in-hand + shield-on-arm). Button bits:
 // B=0x4000 A=0x8000 (see libultra controller.h). `btnhold 0 0` cancels. Moved from zelda3d.c's
 // REPL else-if chain; zelda3d.c still does the `strcmp(cmd, "btnhold")` routing and calls this.
-void Zelda3D_Input_HandleBtnHoldCmd(const char* line, char* outPath) {
+void Zelda3D_Input_HandleBtnHoldCmd(const char* line, const char* outPath) {
     unsigned mask = 0;
     int frames = 0;
     if (sscanf(line, "%*s %x %d", &mask, &frames) == 2) {

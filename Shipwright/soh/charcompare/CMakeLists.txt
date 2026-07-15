@@ -23,14 +23,15 @@ add_executable(charcompare
     ${SOH_DIR}/soh/resource/type/SkeletonLimb.cpp
     ${SOH_DIR}/soh/resource/type/Animation.cpp
     ${SOH_DIR}/soh/resource/type/Array.cpp
-    ${CMAKE_CURRENT_SOURCE_DIR}/../src/zelda3d/zelda3d_model.cpp
+    ${CMAKE_CURRENT_SOURCE_DIR}/../src/zelda3d/model/zelda3d_model.cpp
     # asset/ parsers now come from the shared cmb3d static lib (linked below).
 )
 
 target_include_directories(charcompare PRIVATE
     ${CMAKE_CURRENT_SOURCE_DIR}
     ${CMAKE_CURRENT_SOURCE_DIR}/../src
-    ${CMAKE_CURRENT_SOURCE_DIR}/../src/zelda3d   # so zelda3d_model.cpp's local headers resolve
+    ${CMAKE_CURRENT_SOURCE_DIR}/../src/zelda3d       # zelda3d_model.cpp's "../scene/..." etc relative includes
+    ${CMAKE_CURRENT_SOURCE_DIR}/../src/zelda3d/model # so zelda3d_model.cpp's own-dir headers resolve
     ${CMAKE_CURRENT_SOURCE_DIR}/..             # so "soh/resource/..." resolves in the SOH factories
     ${CMAKE_CURRENT_SOURCE_DIR}/../include     # z64animation.h / z64math.h / libc
     ${CMAKE_CURRENT_SOURCE_DIR}/../../libultraship/include

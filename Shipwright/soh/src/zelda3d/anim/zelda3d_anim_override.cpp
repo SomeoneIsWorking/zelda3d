@@ -8,7 +8,7 @@
 // each draw, and dispatches to the actor's behavior module.
 #include "zelda3d_anim_override.h"
 #include "z64.h"                      // Actor
-#include "behaviors/actor_behavior.h" // per-actor behavior modules (registry by actor->id)
+#include "../behaviors/actor_behavior.h" // per-actor behavior modules (registry by actor->id)
 
 #include <cstdlib>
 

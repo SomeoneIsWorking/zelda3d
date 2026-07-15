@@ -10,7 +10,7 @@
 #define ZELDA3D_REPL_H
 
 #include "global.h"
-#include "render/zelda3d_render.h"
+#include "../render/zelda3d_render.h"
 
 #ifdef __cplusplus
 extern "C" {
