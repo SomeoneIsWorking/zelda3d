@@ -39,6 +39,8 @@ sys.path.insert(0, HERE)
 
 import parity_state_sweep as PSS   # noqa: E402  (forcestate/idle/carry drive + verdict)
 import parity_speed_sweep as SPD   # noqa: E402  (locomotion continuum: soh_curve/classify)
+import parity_pose_sweep as PPS    # noqa: E402  (walk/run soh_mag/csab config — reused, not re-picked)
+import parity_pose_diff as PPD     # noqa: E402  (geodesic per-bone LOCAL-rotation compare, reused verbatim)
 import harness_ctl as HC           # noqa: E402  (embedded-Azahar oracle transport)
 
 SCRATCH = os.path.join(REPO, "scratch", "link_sweep")
@@ -49,6 +51,8 @@ NAMES_TABLE = os.path.abspath(NAMES_TABLE)
 SAVE_STATE = os.path.join(REPO, "scratch", "title_settled.state")
 
 KOKIRI = 0xEE
+LINKJOINTS_NBONE = 25  # childlink_v2 rig; must match soh3d_harness/main.cpp LINKJOINTS_NBONE
+POSE_OUT = os.path.join(REPO, "scratch", "link_sweep", "pose")
 
 
 # ---------------------------------------------------------------------------
@@ -161,6 +165,51 @@ class OracleSession:
             out.append({"mag": d, "speedXZ": round(abs(spd or 0.0), 3), "csab": name})
         self.h.send("analog 0 0")
         return out
+
+    def sample_joints(self):
+        """One `az_linkjoints` capture: 25 bones x 3x3 LOCAL rotation (see soh3d_harness/main.cpp
+        SKELANIME_JOINTTABLE_OFF, 2026-07-15 — the embedded-harness POSE analog of `az_linkanim`
+        SELECTION). Returns {bone: (r0..r8)} or None on any parse failure."""
+        try:
+            lines = self.h.send_multiline("az_linkjoints")
+        except Exception:
+            return None
+        if not lines or not lines[0].startswith("ok linkjoints"):
+            return None
+        out = {}
+        for line in lines[1:]:
+            line = line.strip()
+            if line in ("ok end",) or line.startswith("ok "):
+                continue
+            toks = line.split()
+            if len(toks) != 10:
+                continue
+            bone = int(toks[0])
+            out[bone] = tuple(float(x) for x in toks[1:])
+        return out if len(out) == LINKJOINTS_NBONE else None
+
+    def capture_pose(self, deflection, n_samples=40, step_frames=3, warmup_frames=45):
+        """Hold a calibrated forward analog deflection (see FORWARD_DEFLECTIONS) and take
+        `n_samples` `az_linkjoints` captures spaced `step_frames` apart — the embedded-harness
+        POSE analog of `curve()` (which only samples SELECTION). Returns a list of
+        (cap, t_ms, bone, r0..r8) rows in the SAME shape tools/oracle_link_pose.py's CSV uses, so
+        tools/parity_pose_diff.py consumes it unchanged. None if the drive/read never produced a
+        usable sample."""
+        self.resettle()
+        self.h.send(f"analog 0 {int(deflection)}")
+        self.h.send(f"run {warmup_frames}")
+        rows = []
+        for i in range(n_samples):
+            self.h.send(f"analog 0 {int(deflection)}")
+            self.h.send(f"run {step_frames}")
+            joints = self.sample_joints()
+            if joints is None:
+                continue
+            t_ms = round(i * step_frames * (1000.0 / 60.0), 1)
+            for bone, r in joints.items():
+                rows.append((i, t_ms, bone, r))
+        self.h.send("analog 0 0")
+        return rows if rows else None
 
     def close(self):
         if self.h:
@@ -488,6 +537,135 @@ STATE_MATRIX = [
 ]
 
 
+# ---------------------------------------------------------------------------
+# POSE dimension (2026-07-15): selection-only verdicts above can't catch a
+# state where SoH picks the RIGHT csab but poses it WRONG (bad retarget,
+# wrong frame, joint offset) — exactly the class of bug the Epona
+# right-anim/wrong-drive gait stutter turned out to be. This section adds a
+# geometry-level per-bone verdict for the two states an oracle can actually
+# be DRIVEN to hold live (walk/run — see parity_pose_sweep.py's own
+# docstring on why gated states can't be posed on the equipment-less oracle
+# save). Reuses parity_pose_sweep's STATES config (soh_mag/csab/minspd) and
+# parity_pose_diff's geodesic-angle math verbatim — no re-derivation.
+# ---------------------------------------------------------------------------
+POSE_PASS_DEG = PPS.PASS_DEG          # MATCH threshold, shared with parity_pose_sweep (12deg)
+POSE_DIVERGENT_DEG = 20.0             # matches parity_pose_diff.py's own MATCH/DIVERGENT split
+
+
+def write_pose_csv(rows, path):
+    os.makedirs(os.path.dirname(path), exist_ok=True)
+    with open(path, "w") as f:
+        f.write("cap,t_ms,bone,r0,r1,r2,r3,r4,r5,r6,r7,r8\n")
+        for cap, t_ms, bone, r in rows:
+            f.write(f"{cap},{t_ms},{bone}," + ",".join(f"{v:.6f}" for v in r) + "\n")
+
+
+def capture_soh_pose(csab, mag, minspd, out_path, max_iters=80, burst_frames=400, burst_draws=120):
+    """SoH-side pose capture: drive to a steady CSAB at speed via `walkhold`, then `skindump` a
+    dense burst. Same recipe as parity_pose_sweep.capture_soh (not reimplemented, ported inline
+    because link_sweep drives SoH through PSS.S.soh_cmd, not a bare subprocess helper)."""
+    cmd = PSS.S.soh_cmd
+    cmd(f"warp 0x{KOKIRI:x}")
+    time.sleep(0.6)
+    cmd("link 1")
+    cmd("gcam 1")
+    base, spd = None, 0.0
+    steady = False
+    for _ in range(max_iters):
+        cmd(f"walkhold 30 0 {mag}")
+        time.sleep(0.05)
+        line = cmd("linkanimstate")
+        base, st1 = _parse_linkanimstate(line)
+        m = None
+        for tok in line.split():
+            if tok.startswith("speedXZ="):
+                try:
+                    spd = float(tok.split("=", 1)[1])
+                except ValueError:
+                    spd = 0.0
+        if base == csab and spd >= minspd:
+            steady = True
+            break
+    if not steady:
+        cmd("walkhold 0")
+        return None, f"soh never reached steady {csab} (last base={base} spd={spd})"
+    cmd(f"walkhold {burst_frames} 0 {mag}")
+    cmd(f"skindump {out_path} {burst_draws}")
+    for _ in range(20):
+        cmd(f"walkhold {burst_frames} 0 {mag}")
+        time.sleep(0.03)
+    cmd("walkhold 0")
+    return (out_path if os.path.exists(out_path) else None), None
+
+
+def pose_verdict_for(name, oracle):
+    """Run the geometry-level POSE compare for `name` (walk|run) — the pose analog of the
+    `speed` kind's selection verdict. Returns a dict merged into the row: pose_verdict,
+    pose_metric_deg, pose_worst_bones, pose_reason."""
+    cfg = PPS.STATES.get(name)
+    if not cfg:
+        return {"pose_verdict": "N/A", "pose_reason": f"no parity_pose_sweep config for {name}"}
+    if oracle is None or not oracle.ok:
+        return {"pose_verdict": "N/A",
+                "pose_reason": f"oracle unavailable: {oracle.fail_reason if oracle else 'not booted'}"}
+    defl = {"walk": -24000, "run": -32000}.get(name)
+    if defl is None:
+        return {"pose_verdict": "N/A", "pose_reason": f"no calibrated oracle deflection for {name}"}
+
+    ora_rows = oracle.capture_pose(defl)
+    if not ora_rows:
+        return {"pose_verdict": "N/A",
+                "pose_reason": "oracle capture_pose produced no samples (drive/read failure)"}
+    ora_csv = os.path.join(POSE_OUT, f"oracle_{name}.csv")
+    write_pose_csv(ora_rows, ora_csv)
+
+    soh_csv = os.path.join(POSE_OUT, f"soh_{name}.csv")
+    soh_out, err = capture_soh_pose(cfg["csab"], cfg["soh_mag"], cfg["minspd"], soh_csv)
+    if not soh_out:
+        return {"pose_verdict": "N/A", "pose_reason": err or "soh capture_soh_pose failed"}
+
+    bones = PPD.parse_bones("1-21")
+    soh_local = PPD.load_soh_local(soh_csv, set(bones))
+    ora_local = PPD.load_oracle_local(ora_csv, set(bones))
+    if not soh_local or not ora_local:
+        return {"pose_verdict": "N/A",
+                "pose_reason": f"empty pose capture (soh={len(soh_local)}f oracle={len(ora_local)}f)"}
+
+    import numpy as np
+    best_means = []
+    worst_bone = {}
+    for ocap in sorted(ora_local):
+        of = ora_local[ocap]
+        best = None
+        for scap in sorted(soh_local):
+            sf = soh_local[scap]
+            common = [b for b in bones if b in of and b in sf]
+            if len(common) < 4:
+                continue
+            per = {b: PPD.geo_angle(of[b], sf[b]) for b in common}
+            mean = sum(per.values()) / len(per)
+            if best is None or mean < best[0]:
+                best = (mean, per)
+        if best is None:
+            continue
+        best_means.append(best[0])
+        for b, d in best[1].items():
+            worst_bone[b] = max(worst_bone.get(b, 0.0), d)
+    if not best_means:
+        return {"pose_verdict": "N/A", "pose_reason": "no comparable (soh,oracle) frame pairs"}
+
+    med = float(np.median(best_means))
+    verdict = "POSE-MATCH" if med < POSE_PASS_DEG else (
+        "POSE-DIVERGENT" if med > POSE_DIVERGENT_DEG else "POSE-MARGINAL")
+    top = sorted(worst_bone, key=lambda b: -worst_bone[b])[:3]
+    top_str = ", ".join(f"{PPD.LABEL.get(b, '?')}({b})={worst_bone[b]:.1f}deg" for b in top)
+    return {"pose_verdict": verdict, "pose_metric_deg": round(med, 1),
+            "pose_worst_bones": top_str,
+            "pose_reason": f"median best-phase per-bone geodesic angle over {len(best_means)} "
+                           f"oracle frames vs {len(soh_local)} soh frames "
+                           f"(MATCH<{POSE_PASS_DEG:.0f}deg, DIVERGENT>{POSE_DIVERGENT_DEG:.0f}deg)"}
+
+
 def find(name):
     for st in STATE_MATRIX:
         if st["name"] == name:
@@ -517,7 +695,15 @@ def soh_model_check():
 def run_state(st, oracle):
     name = st["name"]
     kind = st["kind"]
-    row = {"name": name, "group": st["group"]}
+    row = {"name": name, "group": st["group"],
+           # Default POSE verdict: selection-only kinds (forcestate/carry/ztarget_move/idle_oracle/
+           # model/death/ztarget_state/observe/prior/unreachable) have no live geometry oracle — the
+           # equipment-less oracle save can't be driven into these states at all (same constraint
+           # parity_pose_sweep.py's own docstring documents for gated states). Only `speed`
+           # (walk/run) below overrides this with a real POSE-MATCH/MARGINAL/DIVERGENT verdict.
+           "pose_verdict": "N/A",
+           "pose_reason": "no live pose oracle for this state (selection-only; gt=decomp/oracle-id "
+                          "above) — see docs/link_parity_checklist.md pose-verdict column note"}
 
     if kind == "unreachable":
         row.update(verdict="UNREACHABLE", reason=st["reason"])
@@ -646,6 +832,7 @@ def run_state(st, oracle):
                    soh_class=sc, oracle_class=oc, soh_select=s_sel, oracle_select=o_sel,
                    window_overlap=ov, gt="oracle",
                    metric="selected CSAB family at matched speedXZ + walk/run threshold-window overlap")
+        row.update(pose_verdict_for(name, oracle))
         return row
 
     row.update(verdict="UNREACHABLE", reason=f"unhandled kind {kind}")
@@ -717,8 +904,23 @@ def write_checklist(result):
                  "action-func CSAB family (the equipment-less oracle save can't reach these "
                  "states live — see `tools/parity_state_sweep.py` docstring).")
     lines.append("")
-    lines.append("| State | Group | Verdict | Metric / gt | Evidence | Resolved commit |")
-    lines.append("|---|---|---|---|---|---|")
+    lines.append("**Selection vs POSE (2026-07-15):** the `Verdict` column below checks anim "
+                 "SELECTION only — does SoH pick the same CSAB as the ground truth. It CANNOT catch "
+                 "a state where SoH picks the right anim but poses it wrong (bad retarget, wrong "
+                 "frame, joint offset) — the class of bug the Epona right-anim/wrong-drive gait "
+                 "stutter turned out to be. `Pose verdict` is a SEPARATE geometry-level check: "
+                 "per-bone LOCAL-rotation geodesic angle between SoH's `skindump` and a live "
+                 "`az_linkjoints` oracle capture (`tools/parity_pose_diff.py` math, reused "
+                 "verbatim), best-phase matched since the two playheads aren't frame-locked. "
+                 "POSE-MATCH < 8°, POSE-MARGINAL 8-20°, POSE-DIVERGENT > 20° (median across "
+                 "frames). Only walk/run currently have a live pose oracle (the equipment-less "
+                 "oracle save can't be driven into gated states at all — same constraint "
+                 "`parity_pose_sweep.py` documents); all other rows are `N/A` for pose and remain "
+                 "selection-only until a rendered-crop A/B or a state-specific pose recipe is "
+                 "built for them.")
+    lines.append("")
+    lines.append("| State | Group | Verdict | Metric / gt | Evidence | Pose verdict | Pose detail | Resolved commit |")
+    lines.append("|---|---|---|---|---|---|---|---|")
     for r in rows:
         name = r["name"]
         group = r["group"]
@@ -732,8 +934,19 @@ def write_checklist(result):
             evid_bits.append(f"reason: {r['reason']}")
         evidence = "; ".join(evid_bits) if evid_bits else "-"
         evidence = evidence.replace("|", "\\|")
+        pose_verdict = r.get("pose_verdict", "N/A")
+        pose_bits = []
+        if r.get("pose_metric_deg") is not None:
+            pose_bits.append(f"median={r['pose_metric_deg']}deg")
+        if r.get("pose_worst_bones"):
+            pose_bits.append(f"worst: {r['pose_worst_bones']}")
+        if r.get("pose_reason"):
+            pose_bits.append(r["pose_reason"])
+        pose_detail = "; ".join(pose_bits) if pose_bits else "-"
+        pose_detail = pose_detail.replace("|", "\\|")
         resolved = r.get("resolved_commit", "-")
-        lines.append(f"| {name} | {group} | {verdict} | {metric} | {evidence} | {resolved} |")
+        lines.append(f"| {name} | {group} | {verdict} | {metric} | {evidence} | {pose_verdict} | "
+                     f"{pose_detail} | {resolved} |")
     lines.append("")
     lines.append("Raw per-run data (full curves, oracle transcripts): `scratch/link_sweep/*.json` "
                  "(gitignored — re-run `tools/link_sweep.py sweep` to regenerate).")
