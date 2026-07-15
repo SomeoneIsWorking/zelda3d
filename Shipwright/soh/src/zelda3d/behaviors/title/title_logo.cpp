@@ -75,6 +75,7 @@
 #include "../../model/zelda3d_overlay2d.h"
 
 #include <algorithm>
+#include <climits>
 #include <cmath>
 
 extern "C" {
@@ -158,10 +159,22 @@ constexpr int kLogoCsabDuration = 120;
 constexpr uint16_t kMiscSubFadeIn  = 0x1e; // Flags_SetEnv(play, 3)
 constexpr uint16_t kMiscSubFadeOut = 0x1f; // Flags_SetEnv(play, 4)
 
-// Press-START skip constants (title_logo_actor.md §7, actor field offsets in the decompiled
-// FUN_001da9f8 cited for traceability, not read/poked directly — see Zelda3D_TitleLogoStepSkip).
-constexpr int   kSkipGraceFrames = 25;  // §7.2 +0x1C0: grace delay before the transition fires
-constexpr float kSkipFadeStep    = 25.0f; // §7.3 +0x1CC override: accelerated fade rate
+// Press-START skip — ported FAITHFULLY from the N64 title's own handler EnMag_Update
+// (ovl_En_Mag/z_en_mag.c), which is the authoritative two-press behavior (OoT3D matches it 1:1).
+// EnMag_Update's input side is deliberately suppressed while the ported title is active
+// (z_en_mag.c line ~166: `if (Zelda3D_Title_IsActive()) return;`) so THIS is its replacement;
+// the semantics must match En_Mag exactly:
+//   - Press #1 (globalState < MAG_STATE_DISPLAY): snap the logo to full INSTANTLY (En_Mag sets
+//     mainAlpha=210 in one frame, no lead-in) and arm a 20-frame sDelayTimer lockout.
+//   - Press #2 (globalState >= MAG_STATE_DISPLAY, sDelayTimer == 0): fire the file-select
+//     transition INSTANTLY (same frame — En_Mag has NO grace delay) and fade the logo out.
+constexpr int   kSkipDisplayLockout = 20;   // En_Mag sDelayTimer: frames after #1 before #2 counts
+constexpr float kSkipFadeOutStep    = 25.0f; // En_Mag fadeOutAlphaStep: logo fade rate after #2
+// Snap-in offset for press #1: setting gTitleFadeInOverride this many frames in the "past" makes
+// resolveLogoPhase report the logo already fully displayed THIS frame (the full staged fade-in is
+// delay + wordmark + backdrop + copyright frames long) — i.e. instant, matching En_Mag.
+constexpr int   kLogoFullFadeInFrames =
+    kFadeInDelayFrames + kWordmarkFadeFrames + kBackdropFadeFrames + kCopyrightFadeFrames; // 224
 
 int gTitleLogoModelId = -1;
 
@@ -210,20 +223,23 @@ float stagedRamp(int csFrame, int start, float step, int frames) {
     return std::min(255.0f, n * step);
 }
 
-// Two-press skip, press #1 ("bring the logo in early"): the cs's own fade-in
-// trigger is fixed (cf345). When START is pressed while the logo is still
-// Hidden (the pre-logo intro demo), the fade-in is pulled forward to that press
-// frame instead. -1 = no override (natural cs timing). Set by
-// Zelda3D_TitleLogoStepSkip, consumed here + cleared by resetSkip().
-int gTitleFadeInOverride = -1;
+// Two-press skip, press #1 ("snap the logo in"): the cs's own fade-in trigger is fixed (cf345).
+// Press #1 sets this to (pressFrame - kLogoFullFadeInFrames) so the staged ramp reads as already
+// complete THIS frame — i.e. the logo is instantly full, matching En_Mag's one-frame mainAlpha=210.
+// The value is often NEGATIVE (press #1 lands well before cf224); that is intentional and lands on
+// resolveLogoPhase's `fadeInFrame < 0` -> Display-full path. kNoFadeInOverride (not -1, which is a
+// legal snap value) means "no override / natural cs timing". Set by Zelda3D_TitleLogoStepSkip,
+// consumed here, cleared by resetSkip().
+constexpr int kNoFadeInOverride = INT_MIN;
+int gTitleFadeInOverride = kNoFadeInOverride;
 
 LogoPhaseState resolveLogoPhase(int csFrame) {
     LogoPhaseState s;
     s.fadeInFrame  = Zelda3D_TitleCsMiscTriggerFrame(kMiscSubFadeIn);
     s.fadeOutFrame = Zelda3D_TitleCsMiscTriggerFrame(kMiscSubFadeOut);
-    // Press-#1 override wins only when it pulls the fade-in EARLIER than the cs
-    // trigger (a press after the logo already showed must not push it later).
-    if (gTitleFadeInOverride >= 0 &&
+    // Press-#1 override wins only when it pulls the fade-in EARLIER than the cs trigger (a press
+    // after the logo already showed must not push it later). Applies even when negative.
+    if (gTitleFadeInOverride != kNoFadeInOverride &&
         (s.fadeInFrame < 0 || gTitleFadeInOverride < s.fadeInFrame)) {
         s.fadeInFrame = gTitleFadeInOverride;
     }
@@ -302,16 +318,20 @@ LogoPhaseState resolveLogoPhase(int csFrame) {
 // computing `elapsed = csFrame - pressCsFrame` is idempotent under repeated same-csFrame calls,
 // exactly like the rest of the file, and was verified via the live trace after this fix (see the
 // journal entry for the corrected 25/11-frame trace).
+// Mirrors EnMag_Update's own state (z_en_mag.c): globalState + sDelayTimer, plus the cs frame the
+// press-#2 transition fired (drives the fade-out, replacing En_Mag's per-frame mainAlpha decrement
+// with the file's absolute-csFrame idiom).
+enum { SKIP_PRE_DISPLAY = 0, SKIP_DISPLAY, SKIP_FADE_OUT }; // == En_Mag MAG_STATE_{FADE_IN,DISPLAY,FADE_OUT}
 struct TitleSkipState {
-    bool  latched = false;              // §7.2 +0x1C2 "seen" latch: detect a press only once
-    int   pressCsFrame = -1;            // cs frame the press was detected on; -1 = no press yet
-    bool  duringNaturalFadeOut = false; // §7.2 case-3 fan-out (globalState 3->6) vs case-2/5 (->4)
+    int globalState      = SKIP_PRE_DISPLAY; // En_Mag globalState
+    int delayTimer       = 0;                // En_Mag sDelayTimer (20-frame lockout after press #1)
+    int fadeOutStartFrame = -1;              // cs frame press #2 fired the transition; -1 = none
 };
 TitleSkipState gSkip;
 
 void resetSkip() {
     gSkip = TitleSkipState{};
-    gTitleFadeInOverride = -1;
+    gTitleFadeInOverride = kNoFadeInOverride;
 }
 
 // Fires the same scene-transition trigger the natural (un-skipped) cs end would eventually fire —
@@ -367,23 +387,14 @@ extern "C" int Zelda3D_TitleLogoPhaseAlpha3(float* outWordmarkAlpha, float* outB
                                             float* outCopyrightAlpha, int* outFadeInFrame) {
     const int csFrame = Zelda3D_TitleCsFrame();
     LogoPhaseState ps = resolveLogoPhase(csFrame);
-    // Press-START skip override (§7.3/7.4): once the 25-frame grace delay has elapsed on a press
-    // that landed during DISPLAY/DONE, the actor's own accelerated -25/frame ramp REPLACES the
-    // natural cs-driven alpha (which would otherwise just sit at 255 in Display forever, since the
-    // cs's own fadeOutFrame trigger may be far off / this loop iteration may never reach it). A
-    // press that landed during an already-running NATURAL fade-out (duringNaturalFadeOut) does NOT
-    // override alpha here — per the traced code (§7.4), state 6 keeps decrementing at whatever
-    // rate +0x1CC already had (10, untouched by that fan-out branch), which is exactly what
-    // resolveLogoPhase's own natural FadeOut computation already produces; the skip machinery only
-    // needed to guarantee the transition trigger fires (done in Zelda3D_TitleLogoStepSkip).
-    if (gSkip.pressCsFrame >= 0 && !gSkip.duringNaturalFadeOut) {
-        const int elapsed = csFrame - gSkip.pressCsFrame;
-        if (elapsed >= kSkipGraceFrames) {
-            const int fadeElapsed = elapsed - kSkipGraceFrames; // §7.3: 0 at the transition frame
-            const float a = std::max(0.0f, 255.0f - (float)fadeElapsed * kSkipFadeStep);
-            ps.wordmarkAlpha = ps.backdropAlpha = ps.copyrightAlpha = a;
-            ps.phase = (a > 0.0f) ? LogoPhase::FadeOut : LogoPhase::Hidden;
-        }
+    // Press-#2 fade-out (En_Mag: fadeOutAlphaStep=25 starting the transition frame — NO grace). The
+    // accelerated ramp REPLACES the natural cs-driven alpha (which would otherwise sit at 255 in
+    // Display until the cs's own far-off fadeOutFrame). fadeElapsed==0 on the press frame.
+    if (gSkip.fadeOutStartFrame >= 0) {
+        const int fadeElapsed = csFrame - gSkip.fadeOutStartFrame;
+        const float a = std::max(0.0f, 255.0f - (float)fadeElapsed * kSkipFadeOutStep);
+        ps.wordmarkAlpha = ps.backdropAlpha = ps.copyrightAlpha = a;
+        ps.phase = (a > 0.0f) ? LogoPhase::FadeOut : LogoPhase::Hidden;
     }
     if (outWordmarkAlpha) *outWordmarkAlpha = ps.wordmarkAlpha;
     if (outBackdropAlpha) *outBackdropAlpha = ps.backdropAlpha;
@@ -409,61 +420,61 @@ extern "C" void Zelda3D_TitleLogoStepSkip(PlayState* play) {
                          CHECK_BTN_ALL(play->state.input[0].press.button, BTN_A) ||
                          CHECK_BTN_ALL(play->state.input[0].press.button, BTN_B);
 
-    // Two-press skip. Which press this is depends on whether the logo is on screen yet:
-    //
-    //   PRESS #1 — logo still Hidden (the pre-logo intro demo, e.g. cf<345): "bring the logo in
-    //   early". Pull the fade-in trigger forward to now (gTitleFadeInOverride) instead of waiting
-    //   for the cs's fixed cf345 trigger. Does NOT transition. Guarded on the NATURAL cs fade-in so
-    //   a press during the post-fade-out tail (Hidden again near the cs loop) doesn't re-summon it.
-    //
-    //   PRESS #2 — logo visible (FadeIn/Display/FadeOut, whether it got there naturally or via
-    //   press #1): "go to file select". Latch once (§7.2) and let the grace timer below fire the
-    //   transition. A single press with no prior #1 (user waited for the logo) lands here directly.
-    if (pressed) {
-        const int csFadeIn = Zelda3D_TitleCsMiscTriggerFrame(kMiscSubFadeIn);
-        const bool beforeLogo = natural.phase == LogoPhase::Hidden &&
-                                (csFadeIn < 0 || csFrame < csFadeIn);
-        if (beforeLogo) {
-            if (gTitleFadeInOverride < 0) {
-                gTitleFadeInOverride = csFrame;
+    // Faithful port of EnMag_Update's two-press state machine (z_en_mag.c). The logo is "on screen"
+    // (En_Mag globalState >= MAG_STATE_DISPLAY) once the wordmark has fully faded in — naturally
+    // from the cs, OR snapped in by a prior press #1.
+    if (gSkip.globalState < SKIP_DISPLAY && natural.phase == LogoPhase::Display) {
+        gSkip.globalState = SKIP_DISPLAY; // En_Mag: fade-in completed -> MAG_STATE_DISPLAY
+    }
+
+    if (gSkip.globalState < SKIP_DISPLAY) {
+        // En_Mag `globalState < MAG_STATE_DISPLAY` branch — PRESS #1: snap the logo to full THIS
+        // frame (En_Mag sets mainAlpha=210 instantly) and arm the 20-frame sDelayTimer lockout. No
+        // transition. resolveLogoPhase consumes the override, so `natural` reports Display next tick.
+        if (pressed) {
+            gTitleFadeInOverride = csFrame - kLogoFullFadeInFrames;
+            gSkip.globalState = SKIP_DISPLAY;
+            gSkip.delayTimer = kSkipDisplayLockout;
+        }
+    } else if (gSkip.globalState == SKIP_DISPLAY) {
+        // En_Mag `globalState >= MAG_STATE_DISPLAY` branch, gated on sDelayTimer.
+        if (gSkip.delayTimer == 0) {
+            // PRESS #2: fire the file-select transition INSTANTLY (En_Mag: same-frame, no grace) and
+            // start the -25/frame logo fade-out. A single press after the logo appeared naturally
+            // (delayTimer never armed -> 0) lands here directly.
+            if (pressed && gSkip.fadeOutStartFrame < 0) {
+                fireSkipTransition(play);
+                gSkip.fadeOutStartFrame = csFrame;
+                gSkip.globalState = SKIP_FADE_OUT;
             }
-        } else if (!gSkip.latched &&
-                   (natural.phase == LogoPhase::Display || natural.phase == LogoPhase::FadeIn ||
-                    natural.phase == LogoPhase::FadeOut)) {
-            gSkip.latched = true;
-            gSkip.pressCsFrame = csFrame;
-            gSkip.duringNaturalFadeOut = (natural.phase == LogoPhase::FadeOut);
+        } else {
+            gSkip.delayTimer--; // En_Mag: sDelayTimer--
         }
     }
 
-    // §7.3/7.4: once the 25-frame grace delay has elapsed (idempotent on csFrame, safe to call
-    // every frame past that point — matches the decomp's own repeated `!= TRANS_TRIGGER_START`
-    // guard at both call sites), fire the transition. The state-6/natural-fade-out branch calls
-    // this a "safety net" re-fire in case state 6 was entered directly without ever passing
-    // through state 4 — same guarded call either way, no separate code path needed here.
-    if (gSkip.pressCsFrame >= 0 && (csFrame - gSkip.pressCsFrame) >= kSkipGraceFrames) {
-        fireSkipTransition(play);
-    }
-
-    // Verification aid (ZELDA3D_DBG_TITLESKIP=1) — per-frame trace of the skip state machine,
-    // reused pattern from title_fireglow.cpp's ZELDA3D_DBG_FIREGLOW (screenshot timing is an
-    // unreliable isolation of a ~25+11-frame input-driven sequence; this prints the exact frame
-    // the grace timer elapses, the transition fires, and the accelerated alpha ramp).
+    // Verification aid (ZELDA3D_DBG_TITLESKIP=1) — per-frame trace of the En_Mag-ported state
+    // machine: press edges, globalState/delayTimer, the snap-in override, and the transition.
+    // Prints only on a state change or a press so it doesn't flood a real terminal.
     {
         static int sDbg = -1;
         if (sDbg < 0) {
             const char* v = std::getenv("ZELDA3D_DBG_TITLESKIP");
             sDbg = (v != nullptr && v[0] != '\0') ? 1 : 0;
         }
-        if (sDbg && (pressed || gSkip.pressCsFrame >= 0 || gTitleFadeInOverride >= 0)) {
-            const int elapsed = (gSkip.pressCsFrame >= 0) ? (csFrame - gSkip.pressCsFrame) : -1;
+        static int sLastState = -1, sLastTimer = -1, sLastTrig = -1;
+        const bool changed = pressed || gSkip.globalState != sLastState ||
+                             gSkip.delayTimer != sLastTimer || play->transitionTrigger != sLastTrig;
+        if (sDbg && changed) {
             fprintf(stderr,
-                    "[TITLESKIP] csFrame=%d pressed=%d phase=%d fadeInOverride=%d pressCsFrame=%d "
-                    "elapsed=%d duringFadeOut=%d transitionTrigger=%d gameMode=%d\n",
-                    csFrame, pressed ? 1 : 0, (int)natural.phase, gTitleFadeInOverride,
-                    gSkip.pressCsFrame, elapsed, gSkip.duringNaturalFadeOut ? 1 : 0,
-                    play->transitionTrigger, gSaveContext.gameMode);
+                    "[TITLESKIP] csFrame=%d pressed=%d phase=%d globalState=%d delayTimer=%d "
+                    "fadeInOverride=%d fadeOutStart=%d transitionTrigger=%d gameMode=%d\n",
+                    csFrame, pressed ? 1 : 0, (int)natural.phase, gSkip.globalState, gSkip.delayTimer,
+                    gTitleFadeInOverride, gSkip.fadeOutStartFrame, play->transitionTrigger,
+                    gSaveContext.gameMode);
         }
+        sLastState = gSkip.globalState;
+        sLastTimer = gSkip.delayTimer;
+        sLastTrig = play->transitionTrigger;
     }
 }
 
