@@ -4,6 +4,10 @@ The workflow that worked for title-screen parity. Reusable for ANY SoH3D↔OoT3D
 work (a scene, an actor, a lighting pass). Distilled 2026-07-08 from a session where the
 first three "bugs" turned out to be false alarms — the method below is what fixed that.
 
+See also: **`docs/codemap.md`** (what subsystem you're closing a gap in) and
+**`docs/re-frontier.md`** (the ordered RE step this workflow is verifying — a step only becomes
+`re-verified` there once it survives the matched-frame audit below).
+
 ## The one rule everything else serves
 **Verify against the oracle at CONTENT-MATCHED frames before you trust a finding OR a fix.**
 Static-only RE and eyeballed screenshots repeatedly produce confident-but-wrong claims

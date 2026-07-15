@@ -1,5 +1,8 @@
 # RE control/debug backlog — N64-side decomp gaps that block sweep coverage
 
+See also: **`docs/re-frontier.md`** (the `player-link`/`mm-player` areas integrate the HIGH/MEDIUM
+items below by reference — don't duplicate rows between the two docs) and **`docs/codemap.md`**.
+
 **Purpose:** a durable, greppable registry of concrete RE items on the N64-side decomp SoH ships
 in-tree (`Shipwright/soh/src/...` for OoT, `Shipwright/mm/...` for MM) that — if further
 reverse-engineered/named/documented — would unlock either a better **CONTROL** primitive (force
