@@ -16,7 +16,7 @@
 // (no regression); the divergent spine/upper-arms are HAND-WOVEN (#7/#31) — a constant fitted C
 // provably can't reconcile the re-authored OoT3D arm motion, so the arm corrections are tuned by
 // hand against the OoT3D CSAB ground truth (linksrc 3ds), NOT auto-fit.
-#include "zelda3d_link_bonecorr.inc"
+#include "tables/zelda3d_link_bonecorr.inc"
 
 // HAND-WEAVE live-tune scaffold (#7 long arm). A mutable runtime copy of the table that the player
 // path actually passes, so each upper-body bone's correction can be adjusted LIVE over the REPL

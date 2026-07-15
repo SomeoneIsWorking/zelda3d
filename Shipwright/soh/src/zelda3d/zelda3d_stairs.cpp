@@ -2,7 +2,7 @@
 #include "zelda3d_stairs.h"
 #include "asset/cmb.h"
 #include <stb_image.h>
-#include "stairs_stone_png.h" // embedded PNG of assets/zelda3d/stairs_stone.svg (custom stair texture)
+#include "assets/stairs_stone_png.h" // embedded PNG of assets/zelda3d/stairs_stone.svg (custom stair texture)
 #include <algorithm>
 #include <functional>
 #include <unordered_map>
