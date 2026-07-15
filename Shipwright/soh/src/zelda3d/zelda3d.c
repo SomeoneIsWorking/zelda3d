@@ -1104,6 +1104,14 @@ static int Zelda3D_TerrainWarpEnabled(void) {
     // these scripted actors, so they render at their raw legacy-N64 height and can poke through
     // (or float above) OoT3D terrain relief the N64 mesh didn't have. Ground them unconditionally
     // during the title cs.
+    //
+    // HONEST SCOPE NOTE (oot3d-decomp/docs/title_terrain_actor_grounding.md): this raycast-based
+    // render offset is an ENGINEERING APPROXIMATION of the observed 3DS output (tree correctly
+    // occluded behind the hill), NOT a confirmed-decomp mechanism — no Ghidra RE has located a
+    // per-actor BgCheck floor-snap for title-cs static props/rider on the real 3DS binary, and the
+    // one related decomp finding we DO have (title_rider_port_spec.md) shows the mounted rider's
+    // world position is a literal copy with no grounding step at all. See that doc for the full
+    // honest breakdown and the concrete next-RE-step if this ever needs to become decomp-confirmed.
     if (Zelda3D_Title_IsActive()) {
         return 1;
     }
