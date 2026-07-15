@@ -63,6 +63,10 @@ int Zelda3D_ActorObjectId(PlayState* play, Actor* actor);            // shared: 
 void Zelda3D_InitForceTime(void);                                    // shared: Zelda3D_ReplPoll
 float Zelda3D_N64FloorCb(float x, float z);                          // shared: REPL floor-probe commands
 
+extern int gZelda3dAuto;              // -1=uninit, 0=off, 1=fill, 2=all (validation); REPL `auto`
+extern int gZelda3dLightDirOverride;  // REPL `lightdir`
+extern float gZelda3dLightDirLast[3]; // last applied/overridden scene sun dir; REPL `lightdir`
+
 // Deferred N64-anim draw handoff: SET by Zelda3D_TryAuto/Zelda3D_TryDrawActor (render.cpp), READ by
 // Zelda3D_DoRetarget/Zelda3D_SkelAnimeDraw/Zelda3D_SkelAnimeDrawRaw/Zelda3D_AfterActorDraw and
 // WRITTEN by Zelda3D_SetCurAnim (all still in zelda3d.c) -- genuinely bidirectional, so these

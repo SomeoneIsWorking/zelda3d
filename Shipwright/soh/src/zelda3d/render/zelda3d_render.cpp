@@ -54,19 +54,15 @@ void Zelda3D_UpdateAnimN64(int modelId, const s16* jointRots, int rotCount);
 // 1 = drive replaced skinned characters from their live N64 SkelAnime joints (port N64
 // animations onto the OoT3D skeleton) instead of a CSAB. Env ZELDA3D_N64ANIM (default OFF —
 // WIP, see Zelda3D_N64AnimEnabled) + REPL `n64anim`. The CSAB path stays available for A/B.
-int gZelda3dN64Anim = -1;
+extern int gZelda3dN64Anim; // defined in zelda3d.c
 
 // N64-anim deferral state. When Zelda3D_TryDrawActor sees an n64anim-flagged actor (and
 // ZELDA3D_N64ANIM is on) it records the actor + its OoT3D model here and returns 0, letting
 // the actor's own Draw run; the SkelAnime_Draw hook (Zelda3D_SkelAnimeDraw) then retargets the
 // OoT3D model from the live jointTable and skips the N64 limb draw. Cleared in
 // Zelda3D_AfterActorDraw. gZelda3dPendingModel = -1 means no pending replacement this actor.
-Actor* gZelda3dPendingActor = NULL;
-int gZelda3dPendingModel = -1;
-float gZelda3dPendingScale = 1.0f;
-float gZelda3dPendingGroundOff = 0.0f;
-int gZelda3dPendingAuto = 0; // 1 = auto-replaced (apply the rig-mismatch guard); 0 = hand-verified table entry
-float gZelda3dAutoYoffNudge = 0.0f; // #22 live global Y nudge on top of the static-prop -minY base-anchor (REPL `autoyoff`)
+// gZelda3dPending{Actor,Model,Scale,GroundOff,Auto} defined (non-static) in zelda3d.c; declared extern in render/zelda3d_render.h.
+extern float gZelda3dAutoYoffNudge; // defined in zelda3d.c (REPL `autoyoff`)
 
 // Get-or-allocate a scene-room model id (zelda3d_model.cpp). Keyed by ZSI path; loads
 // the embedded room CMB lazily on first draw. Returns -1 for an unmapped scene.
