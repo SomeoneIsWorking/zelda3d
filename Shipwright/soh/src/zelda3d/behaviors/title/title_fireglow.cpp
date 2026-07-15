@@ -68,8 +68,8 @@
 #include "global.h"
 #include "title_fireglow.h"
 #include "title_logo.h"
-#include "../../zelda3d_cmab.h"
-#include "../../zelda3d_overlay2d.h"
+#include "../../model/zelda3d_cmab.h"
+#include "../../model/zelda3d_overlay2d.h"
 
 #include <cmath>
 #include <cstdlib>

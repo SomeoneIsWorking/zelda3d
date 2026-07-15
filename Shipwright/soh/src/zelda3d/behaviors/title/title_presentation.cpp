@@ -10,7 +10,7 @@
 #include "title_fireglow.h"
 #include "../../zelda3d.h"          // Zelda3D_Enabled/Zelda3D_AutoWarpEnabled
 #include "../../zelda3d_cutscene.h"
-#include "../../zelda3d_overlay2d.h"
+#include "../../model/zelda3d_overlay2d.h"
 
 extern "C" {
 // Env-gated title-cam toggle (zelda3d.c; env ZELDA3D_TITLECAM + REPL `gZelda3dTitleCam`). Was
