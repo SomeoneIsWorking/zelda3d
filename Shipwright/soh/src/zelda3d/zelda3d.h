@@ -493,6 +493,19 @@ s32 Zelda3D_PlayerForceThrow(Player* player, PlayState* play);
 // av2.inWater=0 so the deterministic dry-land swing anim is selected (not the water-scoop variant).
 s32 Zelda3D_PlayerForceItemUse(Player* player, PlayState* play);
 
+// Backward walk: calls the real func_8083CBF0 directly with a forced dead-behind yawTarget,
+// reproducing exactly the state func_8083FC68's -1 branch installs (Player_Action_808423EC +
+// gPlayerAnim_link_anchor_back_walk / CSAB ac_back_walk) — see the z_player.c implementation
+// comment for why the live input-decoded route (`ztarget` + backward stick) doesn't reliably land
+// in this branch headlessly.
+s32 Zelda3D_PlayerForceBackwalk(Player* player, PlayState* play);
+// Climb traversal (up/down): installs the REAL ladder-traversal action func (Player_Action_8084BF1C,
+// via func_8083A3B0 — the identical call func_8083EC18/`forceclimb` makes) and the moving Fclimb_upL/R
+// family, bypassing only the yDistToLedge>=79 geometric requirement (no genuine tall wall found near
+// a headless spawn). dir>=0 selects the up-playback CSAB; dir<0 flips skelAnime.playSpeed negative,
+// which is the SAME anim played in reverse (down), per the real function's own encoding.
+s32 Zelda3D_PlayerForceClimbMove(Player* player, PlayState* play, s32 dir);
+
 // ztarget-as-its-own-state query (docs/link_parity_checklist.md "ztarget" row, separate scope
 // from the locomotion-gate primitive above): true iff Link's action func is the REAL OoT N64
 // Z-hold/standing-aim state (Player_Action_80840450 — decomp ground truth: oot3d-decomp

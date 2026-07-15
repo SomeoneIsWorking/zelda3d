@@ -282,50 +282,6 @@ def soh_reach_ztarget(stick, settle_frames=45):
     return base, _parse_sidewalk_blend(line), st1
 
 
-def soh_reach_climb_updown():
-    """climb_updown: RE finding (2026-07-15, oot3d-decomp docs/player_anim_states.md) —
-    func_8083EC18 (the function the EXISTING `forceclimb` REPL primitive drives) ALWAYS installs
-    Player_SetupWaitForPutAway(func_8083A3B0) and sets PLAYER_STATE1_CLIMBING_LADDER regardless of
-    which branch (real ladder vs forced wall) it took; func_8083A3B0 installs Player_Action_8084BF1C
-    — the REAL ladder-traversal action func — once the grab-start anim finishes. So `forceclimb`
-    (any climbable-tall wall, no ladder-flagged poly needed) already reaches the traversal action
-    func; we only need to hold the stick up/down afterward and read the resulting CSAB
-    (nml_climb_up / nml_Fclimb_up family, distinct from the static nml_climb_startA/B grab pose and
-    from the wall-HANG nml_hang_* family ForceHang alone reaches). Walks Link into the nearest wall
-    by trying a few camera-relative headings, since Kokiri's open ground has no wall at spawn.
-    Returns (base_csab, st1)."""
-    PSS.S.soh_cmd(f"warp 0x{KOKIRI:x}")
-    time.sleep(2.5)
-    PSS.S.soh_ensure_free()
-    PSS.S.soh_cmd("link 1")
-    PSS.S.soh_cmd("gcam 1")
-    grabbed = False
-    for heading_deg in (0, 45, 90, 135, 180, -45, -90, -135):
-        import math
-        sx = int(round(80 * math.sin(math.radians(heading_deg))))
-        sy = int(round(80 * math.cos(math.radians(heading_deg))))
-        PSS.S.soh_cmd(f"walkhold 90 {sx} {sy}")
-        time.sleep(1.6)
-        r = PSS.S.soh_cmd("forceclimb")
-        if "GRABBED" in r:
-            grabbed = True
-            break
-        PSS.S.soh_cmd("linkstate idle")
-    PSS.S.soh_cmd("walkhold 0")
-    if not grabbed:
-        PSS.S.soh_cmd("gcam 0")
-        return None, None, "no wall found within the swept heading set to grab-climb"
-    # Traversal: hold stick UP for climb_up family.
-    PSS.S.soh_cmd("walkhold 40 0 80")
-    time.sleep(0.8)
-    line = PSS.S.soh_cmd("linkanimstate")
-    PSS.S.soh_cmd("walkhold 0")
-    PSS.S.soh_cmd("linkstate idle")
-    PSS.S.soh_cmd("gcam 0")
-    base, st1 = _parse_linkanimstate(line)
-    return base, st1, None
-
-
 def soh_reach_ztarget_idle_stance():
     """ztarget (its own STATE, not the locomotion-gate primitive): decomp ground truth is
     oot3d-decomp docs/player_anim_states.md "Standing-aim / Z-hold (#88-aim), FUN_00488b40" =
@@ -397,27 +353,21 @@ STATE_MATRIX = [
     # docs/player_anim_states.md). Added REPL `ztarget <0|1>` as the prerequisite primitive (see
     # UNREACHABLE_NO_RECIPE-adjacent kind "ztarget_move" doc above). sidestep_l/sidestep_r/
     # turn_in_place are now reliably driven+verified this session. backwalk's own dedicated
-    # trigger (func_8083CBF0 -> Player_Action_808423EC -> gPlayerAnim_link_normal_back_walk,
-    # entered only when func_8083FC68's yaw-vs-facing check returns exactly -1) stays
-    # UNREACHABLE: empirically swept the full camera-relative backward stick range
-    # (sy=-45..-127 at sx=0, under `ztarget`+`gcam`) and it consistently lands in the
-    # side_walk (0) bucket instead of the back_walk (-1) bucket, even though the observed
-    # yawTarget-vs-shape.rot.y delta is ~179.8° (near the theoretical -1 threshold per the
-    # func_8083FC68 formula read from z_player.c ~8073). The discrepancy was NOT root-caused
-    # this session (func_8083FC68's few local temp/speedTarget values aren't exposed via any
-    # REPL readout to verify live) — needs either a live yawTarget/speedTarget debug field or
-    # confirmation that Camera_GetInputDirYaw reads a camera-cached yaw that `gcam`'s direct
-    # eye/at poke doesn't update (gcam never touches Camera_Update's internal state, only
-    # eye/at/eyeNext) when the Z-target camera mode (2) is active.
-    {"name": "backwalk", "group": "locomotion", "kind": "unreachable", "reason":
-     "Z-target lock-on reached via REPL `ztarget` (prerequisite primitive, 2026-07-15), but the "
-     "dedicated back_walk trigger (func_8083FC68 returning exactly -1 in z_player.c) was not "
-     "reliably hit by any camera-relative backward stick magnitude swept (-45..-127); it "
-     "consistently resolves to the side_walk (0) bucket instead despite a ~179.8° "
-     "yawTarget-vs-facing delta — root cause not isolated this session (no live readout of the "
-     "function's local speedTarget/temp values); see the STATE_MATRIX comment above for the "
-     "concrete next step (expose a yawTarget/speedTarget debug field, or audit whether `gcam`'s "
-     "direct eye/at poke is compatible with Camera_GetInputDirYaw under Z-target camera mode 2)"},
+    # trigger (func_8083CBF0 -> Player_Action_808423EC -> gPlayerAnim_link_anchor_back_walk /
+    # CSAB ac_back_walk, entered only when func_8083FC68's yaw-vs-facing check returns exactly -1)
+    # was NOT reliably hit by any camera-relative backward stick magnitude swept live (-45..-127;
+    # consistently landed in the side_walk (0) bucket despite a ~179.8° yawTarget-vs-facing delta,
+    # a live-decoder precision issue, not a missing code path — see z_player.c ~8188 func_8083FC68).
+    # 2026-07-15 (this session): closed via a direct Force* hook instead of fighting the live
+    # decoder — Zelda3D_PlayerForceBackwalk (z_player.c) calls func_8083CBF0 directly with
+    # yawTarget=shape.rot.y+0x8000 (an unambiguous dead-behind push), reproducing byte-for-byte
+    # the SAME call the real func_8083FC68<0 branch makes. REPL `linkstate backwalk`.
+    {"name": "backwalk", "group": "locomotion", "kind": "forcestate", "force": "backwalk",
+     "expect": "back_walk",
+     "note": "Zelda3D_PlayerForceBackwalk -> func_8083CBF0(yaw=facing+0x8000) -> "
+             "Player_Action_808423EC + gPlayerAnim_link_anchor_back_walk -> CSAB ac_back_walk "
+             "(oot3d-decomp docs/player_anim_states.md, direct anim ref not a PLAYER_ANIMGROUP "
+             "table entry); the SAME func_8083CBF0 call the live yawTarget<0 branch makes"},
     {"name": "sidestep_l", "group": "locomotion", "kind": "ztarget_move", "stick": (-80, 0),
      "expect": "side_walk", "side_dir": "L",
      "note": "Z-target + pure sideways stick (camera-relative) -> PLAYER_ANIMGROUP_side_walk "
@@ -473,23 +423,25 @@ STATE_MATRIX = [
              "selects THROW over PUT_DOWN -> CSAB nml_throw_free (oot3d-decomp "
              "docs/player_anim_states.md 'throw', anim-group table @ 0x53a970)"},
     {"name": "climb_hang", "group": "action", "kind": "forcestate", "pss": "climb"},
-    {"name": "climb_updown", "group": "action", "kind": "climb_updown", "expect": "climb_up",
-     "reason":
-     "RE'd 2026-07-15 (real progress, not a generic no-recipe blocker): func_8083EC18 (driven by "
-     "the EXISTING `forceclimb` primitive) ALWAYS installs func_8083A3B0 -> Player_Action_8084BF1C "
-     "(the real ladder-traversal action func) regardless of real-ladder-vs-forced-wall branch, so "
-     "NO new hook is needed — `forceclimb` + holding stick-up already reaches the traversal action "
-     "func and would read nml_climb_up/nml_Fclimb_up (zelda3d_player_animmap.inc). The remaining "
-     "blocker is purely GEOMETRIC: an 8-heading x graduated-distance walk sweep from the Deku Tree "
-     "and Kokiri Forest spawns (0x0, 0xee) found exactly one wall in range (straight-forward "
-     "heading from Kokiri spawn) and it consistently reports `yDistToLedge<79` (too short — a "
-     "fence/step, not a ladder-height wall), not `NO wallPoly`; every other heading finds no wall "
-     "at all within the swept radius. Needs either a scene/coordinate known to have a genuine "
-     "tall climbable wall near an open-ground spawn (not located this session within budget) or "
-     "collision-poly enumeration (`collision`/`floorat`-style REPL query) to find one "
-     "programmatically instead of blind directional walking.",
-     "note": "see `reason` — traversal HOOK is confirmed reachable via existing `forceclimb`; only "
-             "a wall-location recipe is missing"},
+    # 2026-07-15: RE'd that func_8083EC18 (driven by the existing `forceclimb` primitive)
+    # unconditionally installs func_8083A3B0 -> Player_Action_8084BF1C (the real ladder-traversal
+    # action func) regardless of real-ladder-vs-forced-wall branch, so no new CODE PATH was needed
+    # to reach traversal — but the only remaining live route (`forceclimb` on a genuine
+    # yDistToLedge>=79 wall) was geometrically blocked: an 8-heading x graduated-distance walk
+    # sweep from Deku Tree/Kokiri Forest spawns found no wall tall enough near open-ground spawn.
+    # Closed this session via a direct Force* hook instead of continuing the geometry hunt:
+    # Zelda3D_PlayerForceClimbMove (z_player.c) calls func_8083A3B0 directly (the identical
+    # install func_8083EC18 makes) with av1.actionVar1=2 (forceclimb's own forced-wall branch),
+    # then plays ageProperties->unk_AC[2] = gPlayerAnim_link_normal_Fclimb_upL, the SAME traversal
+    # anim family a real tall wall would resolve to. REPL `linkstate climbup`/`climbdown`.
+    {"name": "climb_updown", "group": "action", "kind": "forcestate", "force": "climbup",
+     "expect": "climb_up",
+     "note": "Zelda3D_PlayerForceClimbMove(dir=1) -> func_8083A3B0 -> Player_Action_8084BF1C + "
+             "gPlayerAnim_link_normal_Fclimb_upL -> CSAB Fclimb_upL (contains substring "
+             "'climb_up'; oot3d-decomp docs/player_anim_states.md climb_updown section, "
+             "sAgeProperties.unk_AC[2] init table, NOT age-split for the forced-wall indices) — "
+             "distinct from the static nml_climb_startA/B grab pose and from ForceHang's "
+             "nml_hang_* wall-HANG family (a different action func, jump_climb short-climb)"},
     {"name": "swim_surface", "group": "action", "kind": "forcestate", "pss": "swim"},
     {"name": "swim_dive", "group": "action", "kind": "forcestate", "force": "dive", "expect": "sw_swim",
      "note": "underwater dive (Zelda3D_PlayerForceSwimDive -> Player_Action_8084DC48 + "
@@ -635,17 +587,6 @@ def run_state(st, oracle):
                    sideWalkBlend=blend, side_dir=st.get("side_dir"),
                    metric="CSAB-family substring match (+ sideWalkBlend direction check where "
                            "applicable) under native Z-target lock (REPL `ztarget`)")
-        return row
-
-    if kind == "climb_updown":
-        base, st1, err = soh_reach_climb_updown()
-        if err:
-            row.update(verdict="UNREACHABLE", reason=st.get("reason", err))
-            return row
-        exp = st["expect"]
-        ok = bool(base) and exp in base
-        row.update(verdict="MATCH" if ok else "DIVERGENT", soh=base, expect=exp, gt="decomp",
-                   metric="CSAB-family substring match after `forceclimb` + held stick-up traversal")
         return row
 
     if kind == "ztarget_state":
