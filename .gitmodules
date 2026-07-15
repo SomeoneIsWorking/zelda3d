@@ -1,3 +1,6 @@
 [submodule "oot3d-decomp"]
 	path = oot3d-decomp
 	url = https://github.com/SomeoneIsWorking/oot3d-decomp.git
+[submodule "mm3d-decomp"]
+	path = mm3d-decomp
+	url = https://github.com/SomeoneIsWorking/mm3d-decomp.git

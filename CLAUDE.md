@@ -75,14 +75,19 @@ soh/src/soh3d/behaviors/actor_behavior.h       // base interface + registry (dis
 
 OoT3D decomp (the private `oot3d-decomp` repo, fed by the **decomp-port** skill / Ghidra pipeline) is
 vendored **in-repo as a git submodule at `oot3d-decomp/`** (remote `SomeoneIsWorking/oot3d-decomp`,
-added 2026-07-15). This is a DELIBERATE exception to the "no submodules" flatten (see "Commit chain"
-below): the engine itself stays flattened to kill multi-repo build friction, but `oot3d-decomp` is a
-read-mostly external reference repo, not part of the soh3d build, so a submodule is the right shape.
-Update it like any submodule: `cd oot3d-decomp && git pull origin main && cd .. && git add oot3d-decomp
-&& git commit`. All soh3d tooling (`tools/parity_ab.py`, `oracle_cache.py`, `link_sweep.py`, etc.)
-resolves the decomp path repo-relatively (`REPO/oot3d-decomp`), never via a hardcoded home path — do
-not reintroduce `os.path.expanduser("<oot3d-decomp>")` or a sibling-repo (`../oot3d-decomp`)
-assumption. It is a
+added 2026-07-15). The same pattern applies to **MM (Majora's Mask 3D) decomp**, vendored at
+`mm3d-decomp/` (remote `SomeoneIsWorking/mm3d-decomp`, added 2026-07-15) — both are the SAME
+deliberate exception to the "no submodules" flatten (see "Commit chain" below): the engine itself
+stays flattened to kill multi-repo build friction, but `oot3d-decomp`/`mm3d-decomp` are read-mostly
+external reference repos, not part of the soh3d build, so a submodule is the right shape for both.
+Update either like any submodule: `cd oot3d-decomp && git pull origin main && cd .. && git add
+oot3d-decomp && git commit` (same for `mm3d-decomp`). All soh3d tooling (`tools/parity_ab.py`,
+`oracle_cache.py`, `link_sweep.py`, etc.) resolves the decomp path repo-relatively
+(`REPO/oot3d-decomp`), never via a hardcoded home path — do not reintroduce
+`os.path.expanduser("<oot3d-decomp>")` or a sibling-repo (`../oot3d-decomp`) assumption; the
+same rule applies to any future `mm3d-decomp` reference. As of 2026-07-15 there are zero code
+references to `mm3d-decomp` in the repo (MM work is early/native) — if/when tooling needs it, resolve
+it the same repo-relative way. OoT3D decomp is a
 **primary project goal and a prerequisite for full parity** — not a side quest. So when you find a
 behavioral difference (an actor moving/posing/animating wrong vs OoT3D), the correct response is to
 **extend the OoT3D decomp until it covers that behavior**, derive the ground truth from the 3DS binary,
