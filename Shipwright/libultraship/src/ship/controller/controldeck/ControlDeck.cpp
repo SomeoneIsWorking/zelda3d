@@ -101,12 +101,18 @@ bool ControlDeck::GamepadGameInputBlocked() {
 }
 
 bool ControlDeck::KeyboardGameInputBlocked() {
-    // block keyboard input when typing in imgui
-    ImGuiWindow* activeIDWindow = ImGui::GetCurrentContext()->ActiveIdWindow;
-    return AllGameInputBlocked() ||
-           (activeIDWindow != NULL &&
-            activeIDWindow->ID != Context::GetRawInstance()->GetWindow()->GetGui()->GetMainGameWindowID()) ||
-           ImGui::GetTopMostPopupModal() != NULL; // ImGui::GetIO().WantCaptureKeyboard, but ActiveId check altered
+    // SoH3D: block keyboard game input only when the UI genuinely wants the keyboard.
+    //   - AllGameInputBlocked() covers the RmlUi menu — the interactive menu in this fork, which
+    //     registers a game-input blocker via BlockGameInput() while open (SohRmlUi::SetVisible).
+    //   - ImGui::GetIO().WantCaptureKeyboard covers a VISIBLE ImGui dev window being typed into;
+    //     it is false in normal play (the legacy ImGui menu is force-hidden — SohGui::SetupMenu).
+    // The previous `ActiveIdWindow->ID != main-game-window` heuristic false-positived in the real
+    // windowed build: any lingering ImGui ActiveId (even on a hidden window) blocked ALL game
+    // keyboard input, killing input at the title and in-game (regression re-reported 2026-07-15).
+    // Reference (same bug class, known-good fix): the sibling psxport gates its keyboard read
+    // purely on the overlay actually wanting keyboard (runtime/recomp/pad_input.cpp —
+    // `rml_overlay.wantsKeyboard()`), not on stale ImGui focus state.
+    return AllGameInputBlocked() || ImGui::GetIO().WantCaptureKeyboard;
 }
 
 bool ControlDeck::MouseGameInputBlocked() {
