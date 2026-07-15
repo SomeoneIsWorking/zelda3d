@@ -74,6 +74,9 @@ class Fast3dGui : public Ship::Gui {
 
     bool SupportsViewports() override;
 
+    /** @brief True while the RmlUi ESC menu is open. See Ship::Gui::IsInteractiveMenuOpen(). */
+    bool IsInteractiveMenuOpen() override;
+
     /**
      * @brief Initialises the ImGui context with the given backend-specific handles.
      * @param windowImpl Backend-specific handles required by the ImGui backend.

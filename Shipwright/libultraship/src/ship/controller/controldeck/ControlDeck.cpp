@@ -6,8 +6,27 @@
 #include "ship/config/ConsoleVariable.h"
 #include <imgui.h>
 #include "ship/controller/controldevice/controller/mapping/mouse/WheelHandler.h"
+#include "ship/window/Window.h"
+#include "ship/window/gui/Gui.h"
+#include <cstdlib>
+#include <cstdio>
 
 namespace Ship {
+
+// Headed-keyboard-input diagnostic (debug_journal/2026-07-15-keyboard-headed-v2.md). Physical
+// keyboard input reaching the game cannot be reproduced headless (the REPL injects pad state
+// directly, bypassing the real SDL event -> ControlDeck path), so this is the tool a user runs
+// in a real windowed session to pinpoint where a keypress is getting dropped: it logs the
+// decisive blocking state at the moment of every real SDL key event. Gated behind
+// ZELDA3D_DBG_INPUT=1 so it costs nothing by default; only fires on an actual key event (not a
+// per-frame poll), so it is inherently "log on change" and cheap.
+static bool Zelda3dDbgInputEnabled() {
+    static const bool enabled = [] {
+        const char* e = std::getenv("ZELDA3D_DBG_INPUT");
+        return e != nullptr && e[0] == '1';
+    }();
+    return enabled;
+}
 
 ControlDeck::ControlDeck(std::vector<CONTROLLERBUTTONS_T> additionalBitmasks,
                          std::shared_ptr<ControllerDefaultMappings> controllerDefaultMappings,
@@ -73,6 +92,23 @@ bool ControlDeck::ProcessKeyboardEvent(KbEventType eventType, KbScancode scancod
         }
     }
 
+    if (Zelda3dDbgInputEnabled()) {
+        // This line firing at all proves the raw SDL key event reached ControlDeck (rules out
+        // "SDL isn't delivering keys"/Wayland focus as the drop point). If it never fires while
+        // physically pressing keys in the headed build, the drop is upstream of here (SDL event
+        // pump / window focus) and none of the flags below are reachable — go straight to
+        // checking window focus / `SDL_GetKeyboardFocus()` on that build.
+        bool menuOpen = false;
+        if (auto ctx = Context::GetRawInstance(); ctx && ctx->GetWindow() && ctx->GetWindow()->GetGui()) {
+            menuOpen = ctx->GetWindow()->GetGui()->IsInteractiveMenuOpen();
+        }
+        fprintf(stderr,
+                "[zelda3d_dbg_input] key event=%d scancode=%d consumed=%d | AllGameInputBlocked=%d "
+                "KeyboardGameInputBlocked=%d RmlMenuOpen=%d\n",
+                static_cast<int>(eventType), static_cast<int>(scancode), result, AllGameInputBlocked(),
+                KeyboardGameInputBlocked(), menuOpen);
+    }
+
     return result;
 }
 
@@ -101,18 +137,25 @@ bool ControlDeck::GamepadGameInputBlocked() {
 }
 
 bool ControlDeck::KeyboardGameInputBlocked() {
-    // SoH3D: block keyboard game input only when the UI genuinely wants the keyboard.
-    //   - AllGameInputBlocked() covers the RmlUi menu — the interactive menu in this fork, which
-    //     registers a game-input blocker via BlockGameInput() while open (SohRmlUi::SetVisible).
-    //   - ImGui::GetIO().WantCaptureKeyboard covers a VISIBLE ImGui dev window being typed into;
-    //     it is false in normal play (the legacy ImGui menu is force-hidden — SohGui::SetupMenu).
-    // The previous `ActiveIdWindow->ID != main-game-window` heuristic false-positived in the real
-    // windowed build: any lingering ImGui ActiveId (even on a hidden window) blocked ALL game
-    // keyboard input, killing input at the title and in-game (regression re-reported 2026-07-15).
-    // Reference (same bug class, known-good fix): the sibling psxport gates its keyboard read
-    // purely on the overlay actually wanting keyboard (runtime/recomp/pad_input.cpp —
-    // `rml_overlay.wantsKeyboard()`), not on stale ImGui focus state.
-    return AllGameInputBlocked() || ImGui::GetIO().WantCaptureKeyboard;
+    // SoH3D: keyboard game input is blocked ONLY by the real interactive menu (RmlUi), never by
+    // ImGui state. ImGui itself is stubbed out at runtime in this fork (see
+    // imgui_shim/imgui_stub.cpp): ImGui::GetIO() returns a zero-initialized static ImGuiIO, and
+    // ImGui::NewFrame() is never called anywhere (Gui::StartFrame()/ImGuiBackendNewFrame() are
+    // no-ops), so `WantCaptureKeyboard` never gets recomputed and reading it is dead code by
+    // construction — it happened to read false, but relying on a stub struct staying zeroed is
+    // not a real invariant, and the prior `ActiveIdWindow->ID != main-game-window` version of
+    // this check DID false-positive in a real windowed build (any lingering ImGui ActiveId, even
+    // on a force-hidden window, blocked ALL game keyboard input — regression re-reported
+    // 2026-07-15 even after the WantCaptureKeyboard swap, consistent with ImGui state never being
+    // a reliable signal here at all).
+    //
+    // AllGameInputBlocked() is the correct and sufficient gate: it is driven by
+    // SohRmlUi::SetVisible() registering/clearing ZELDA3D_RML_MENU_BLOCK_ID exactly while the
+    // menu is open (ship/window/gui/rml/SohRmlUi.cpp). Reference (same bug class, known-good
+    // fix): the sibling psxport gates its keyboard read purely on the overlay actually wanting
+    // keyboard (runtime/recomp/pad_input.cpp — `rml_overlay.wantsKeyboard()`), never on ImGui
+    // focus/capture state. User authorized removing ImGui from this path outright (2026-07-15).
+    return AllGameInputBlocked();
 }
 
 bool ControlDeck::MouseGameInputBlocked() {

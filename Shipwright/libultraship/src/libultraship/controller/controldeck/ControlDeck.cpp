@@ -7,8 +7,23 @@
 #include <imgui.h>
 #include "ship/controller/controldevice/controller/mapping/mouse/WheelHandler.h"
 #include "ship/controller/scripted/ScriptedInput.h"
+#include <cstdlib>
+#include <cstdio>
 
 namespace LUS {
+
+// See ship/controller/controldeck/ControlDeck.cpp for the per-key-event half of this diagnostic
+// (ZELDA3D_DBG_INPUT=1). This half runs every frame regardless of whether any key event fired, so
+// it catches the case where SDL delivers NO key events at all (e.g. a Wayland focus problem): if
+// the user mashes a key and neither this nor the per-event log ever prints a changed/blocked
+// line, the drop is upstream of ControlDeck entirely.
+static bool Zelda3dDbgInputEnabled() {
+    static const bool enabled = [] {
+        const char* e = std::getenv("ZELDA3D_DBG_INPUT");
+        return e != nullptr && e[0] == '1';
+    }();
+    return enabled;
+}
 ControlDeck::ControlDeck(std::vector<CONTROLLERBUTTONS_T> additionalBitmasks,
                          std::shared_ptr<Ship::ControllerDefaultMappings> controllerDefaultMappings,
                          std::unordered_map<CONTROLLERBUTTONS_T, std::string> buttonNames)
@@ -57,6 +72,16 @@ void ControlDeck::WriteToPad(void* pad) {
 void ControlDeck::WriteToOSContPad(OSContPad* pad) {
     SDL_PumpEvents();
     Ship::WheelHandler::GetInstance()->Update();
+
+    if (Zelda3dDbgInputEnabled()) {
+        static bool sLastBlocked = false;
+        bool blocked = AllGameInputBlocked();
+        if (blocked != sLastBlocked) {
+            fprintf(stderr, "[zelda3d_dbg_input] AllGameInputBlocked changed: %d -> %d (pad fill %s)\n",
+                    sLastBlocked, blocked, blocked ? "SKIPPED" : "resumed");
+            sLastBlocked = blocked;
+        }
+    }
 
     if (AllGameInputBlocked()) {
         return;

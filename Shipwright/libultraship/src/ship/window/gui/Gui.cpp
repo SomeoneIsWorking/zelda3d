@@ -271,6 +271,11 @@ bool Gui::GetMenuOrMenubarVisible() {
     return (GetMenuBar() && GetMenuBar()->IsVisible()) || (GetMenu() && GetMenu()->IsVisible());
 }
 
+bool Gui::IsInteractiveMenuOpen() {
+    // Base Gui has no menu of its own; Fast3dGui overrides this to report the RmlUi menu.
+    return false;
+}
+
 bool Gui::IsMouseOverAnyGuiItem() {
     return ImGui::IsAnyItemHovered();
 }
