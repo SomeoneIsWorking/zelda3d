@@ -1636,6 +1636,16 @@ constexpr uint32_t ACTOR_SPEEDXZ_OFF       = 0x0068;
 // divergence from the static spawn-rot field.
 constexpr uint32_t PLAYER_YAW_OFF           = 0x0036;
 
+// Player's embedded SkelAnime controller + selected-animation id. RE'd
+// independently for the (Qt-only, unbuilt-on-this-machine) external RPC
+// oracle path (tools/oracle_link_animid.py, FUN_0034807c; see
+// oot3d-decomp/docs/player_anim_states.md): skelAnime = PLAYER + 0x254,
+// curAnimId = *(skelAnime + 0x30). Ported here (2026-07-15, link_sweep) so
+// the ALREADY-BUILT embedded harness can serve as the animId oracle
+// without depending on the external Qt frontend + RPC server.
+constexpr uint32_t PLAYER_SKELANIME_OFF     = 0x0254;
+constexpr uint32_t SKELANIME_ANIMID_OFF     = 0x0030;
+
 // Actor.bgCheckFlags — u16 bitfield of "what am I touching" queried by
 // Player_Update to gate wall-slide, wall-climb, jump-off-ledge, etc.
 // SoH-N64's docblock (z64actor.h:277-288):
@@ -4050,6 +4060,32 @@ void RunRepl() {
             std::printf("ok az_playerinfo speedXZ=%.4f rot=(%d,%d) "
                         "playerYaw=%d addr=0x%08x\n",
                         speedXZ, rx, ry, playerYaw, *head);
+        }
+        else if (cmd == "az_linkanim") {
+            // link_sweep.py oracle probe: raw selected animId for the live
+            // Player (see PLAYER_SKELANIME_OFF / SKELANIME_ANIMID_OFF
+            // above). Name resolution (animId -> CSAB name string) is done
+            // Python-side against oot3d-decomp's player_animid_names.json,
+            // same table oracle_link_animid.py uses, so both oracle paths
+            // agree on naming.
+            auto ps = CurrentPlayState();
+            if (!ps) { PrintErr("az_linkanim: no playstate"); continue; }
+            auto& mem = Core::System::GetInstance().Memory();
+            auto head = mem.Read32OrNullopt(*ps + ACTORCTX_OFF +
+                                            ACTOR_LISTS_OFF + 2 * 8 + 4);
+            if (!head || *head == 0) {
+                PrintErr("az_linkanim: no Player actor"); continue;
+            }
+            auto animId_v = mem.Read32OrNullopt(*head + PLAYER_SKELANIME_OFF +
+                                                SKELANIME_ANIMID_OFF);
+            auto spd_v = mem.Read32OrNullopt(*head + ACTOR_SPEEDXZ_OFF);
+            if (!animId_v || !spd_v) {
+                PrintErr("az_linkanim: mem read fail"); continue;
+            }
+            float speedXZ;
+            std::memcpy(&speedXZ, &*spd_v, 4);
+            std::printf("ok az_linkanim animId=%u speedXZ=%.4f addr=0x%08x\n",
+                        *animId_v, speedXZ, *head);
         }
         else if (cmd == "soh_wallinfo") {
             if (!g_soh_booted) { PrintErr("soh_wallinfo: run soh_boot first"); continue; }
