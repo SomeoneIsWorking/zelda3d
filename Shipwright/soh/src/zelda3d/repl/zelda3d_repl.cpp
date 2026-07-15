@@ -12,7 +12,7 @@
 #include "zelda3d_collision.h"
 #include "zelda3d_link.h"
 #include "input/zelda3d_input.h"
-#include "zelda3d_anim_override.h"
+#include "../anim/zelda3d_anim_override.h"
 #include "overlays/actors/ovl_En_Ge1/z_en_ge1.h"
 #include "overlays/actors/ovl_En_Ko/z_en_ko.h"
 #include "overlays/actors/ovl_En_Ex_Ruppy/z_en_ex_ruppy.h"

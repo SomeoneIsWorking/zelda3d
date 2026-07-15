@@ -11,7 +11,7 @@
 #include "zelda3d_collision.h" // C-ABI bridge for OoT3D scene collision (zelda3d_model.cpp)
 #include "zelda3d_link.h"      // Link (player) replacement policy split out of this file
 #include "input/zelda3d_input.h" // input harness (WalkInject/key-inject/xbox-glyph/hotbar) split out of this file
-#include "zelda3d_anim_override.h" // skeletal-actor draw-override port (head/torso track, facial, DLs)
+#include "anim/zelda3d_anim_override.h" // skeletal-actor draw-override port (head/torso track, facial, DLs)
 #include "overlays/actors/ovl_En_Ge1/z_en_ge1.h" // EnGe1 (read live SkelAnime state)
 #include "overlays/actors/ovl_En_Ko/z_en_ko.h"   // EnKo ENKO_TYPE_* (shared-CMB head-variant select)
 #include "overlays/actors/ovl_En_Ex_Ruppy/z_en_ex_ruppy.h" // EnExRuppy colorIdx (ainfo rupee debug)

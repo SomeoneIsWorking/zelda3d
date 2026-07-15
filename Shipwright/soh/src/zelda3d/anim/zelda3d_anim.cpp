@@ -3,7 +3,7 @@
 // resolved-pose capture (skindump). Split out of zelda3d_model.cpp (pure move). Uses the model core
 // (LoadedModel / loadModel) via zelda3d_model_internal.h.
 #include "zelda3d.h"
-#include "model/zelda3d_model_internal.h"
+#include "../model/zelda3d_model_internal.h"
 #include "asset/cmb.h"
 #include "asset/csab.h"
 #include "asset/mat4.h"

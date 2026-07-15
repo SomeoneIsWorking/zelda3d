@@ -332,7 +332,7 @@ void Zelda3D_SetObjectScale(int objectId, float scale) {
 
 // STAGE 2 SkelAnime port — live N64-anim retarget for skinned MM3D actors.
 // See docs/MM_SKELANIME_PORT.md. Mirrors OoT's Zelda3D_UpdateAnimN64Mapped
-// (Shipwright/soh/src/zelda3d/zelda3d_anim.cpp) — identity bone->limb map,
+// (Shipwright/soh/src/zelda3d/anim/zelda3d_anim.cpp) — identity bone->limb map,
 // N64 rotation REPLACES the CMB rest rot in Rz*Ry*Rx order.
 
 // Pending state — set by mm3d_draw's TryDrawActor when a skinned model is
