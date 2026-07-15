@@ -39,6 +39,13 @@ find the writer PC / struct address that static xrefs missed, after which you re
 Ghidra and derive the mechanism from code. **"It's an asset difference" is NOT a terminal answer** — SoH already
 renders 3DS assets from the ROM, so an asset-rooted gap means "port that exact 3DS asset."
 
+**A separate, complementary RE track — CONTROL/DEBUG tooling on the N64-side decomp** (the
+`Shipwright/soh/src/`/`Shipwright/mm/` code SoH vendors in-tree, NOT the 3DS ground-truth decomp
+above): `docs/re_control_debug_backlog.md` tracks unnamed/poorly-understood N64-decomp functions
+and fields whose further RE would unlock a better FORCE-state primitive or a cleaner debug readout
+for the sweeps, instead of the current bypass-the-gate Force* hooks. Consult it before re-deriving
+a sweep control/debug gap; add rows when a sweep session hits a fresh one.
+
 ## Phase 3 — FIX, and honor proven-negatives
 Root-cause, never bandaid. If RE proves the "divergence" isn't a bug (this session: terrain
 "3× dark" back-solved to a title-clock phase offset, byte-exact to ROM), REPORT THE

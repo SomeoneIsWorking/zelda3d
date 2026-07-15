@@ -738,6 +738,14 @@ def write_checklist(result):
     lines.append("Raw per-run data (full curves, oracle transcripts): `scratch/link_sweep/*.json` "
                  "(gitignored — re-run `tools/link_sweep.py sweep` to regenerate).")
     lines.append("")
+    lines.append("**RE control/debug backlog:** several MATCH rows above are reached via a "
+                 "Force*-hook BYPASS of the real N64 entry gate (backwalk, swim_dive, "
+                 "climb_hang/climb_updown) rather than a natively-driven decode — see "
+                 "`docs/re_control_debug_backlog.md` for the specific unnamed decomp functions "
+                 "(e.g. `func_8083FC68`'s backwalk threshold curves) whose further RE would let "
+                 "these be driven natively, plus new-coverage / debug-readout gaps (camera-mode "
+                 "readout, a distinct \"putdown\" state, frame-exact death detection).")
+    lines.append("")
     with open(CHECKLIST_MD, "w") as f:
         f.write("\n".join(lines) + "\n")
     print(f"[link_sweep] wrote {CHECKLIST_MD}", file=sys.stderr)
