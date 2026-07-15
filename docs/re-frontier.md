@@ -19,6 +19,11 @@ an oracle compare are `re-partial` or `in-progress`, never `re-verified`.
 Statuses: ✅ re-verified · 🟡 re-partial (honest gap) · 🔬 in-progress · ⛔ hack (debt, must
 remove) · ⬜ todo · ➖ skip-by-design · ⏸ blocked (computed from deps).
 
+See also **`docs/parity-map.md`** — the CLOSED-CASES registry. A step here reaching `re-verified`
+that is a user-facing parity win should also land a CLOSED-parity row there (and must NOT be
+re-swept once closed). This doc tracks the RE *mechanism*; parity-map tracks the *confirmed
+result*.
+
 This doc **organizes and links to** the existing RE corpus rather than duplicating it:
 - `oot3d-decomp/docs/*.md` (69 docs) — the OoT3D ground-truth corpus (Ghidra-derived).
 - `mm3d-decomp/docs/*.md` (3 docs) — the much younger MM3D corpus.

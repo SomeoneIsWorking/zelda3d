@@ -6,8 +6,10 @@ that lands or changes a subsystem. Maintained with `tools/codemap.py` (`tree` re
 annotated source tree below, `check` flags drift between this table and the real tree — run it
 before committing a structural change).
 
-Companion docs (read together, cross-linked, see bottom): **`docs/re-frontier.md`** (ordered RE
-progress: which behavior is real reverse-engineering vs a hack standing in for it),
+Companion docs (read together, cross-linked, see bottom): **`docs/parity-map.md`** (the
+CLOSED-CASES registry — what's confirmed at parity and must NOT be re-examined unless the user
+reopens it), **`docs/re-frontier.md`** (ordered RE progress: which behavior is real
+reverse-engineering vs a hack standing in for it),
 **`docs/parity-workflow.md`** (the oracle-driven method used to CLOSE a gap this map records),
 **`KANBAN.md`**/GitHub Issues (user-driven work items — NOT a dumping ground for sweep findings,
 see `CLAUDE.md`), **`docs/re_control_debug_backlog.md`** (N64-decomp control/debug gaps that
