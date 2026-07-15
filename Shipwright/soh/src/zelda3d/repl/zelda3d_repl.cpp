@@ -6,7 +6,7 @@
 #include "zelda3d.h"
 #include "render/zelda3d_render.h"
 #include "repl/zelda3d_repl.h"
-#include "zelda3d_cutscene.h"
+#include "../cutscene/zelda3d_cutscene.h"
 #include "behaviors/title/title_presentation.h"
 #include "behaviors/title/title_cloud_vortex.h"
 #include "zelda3d_collision.h"

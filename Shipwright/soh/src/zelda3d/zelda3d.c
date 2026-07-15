@@ -5,7 +5,7 @@
                                     // functions still here (DoRetarget/SkelAnimeDraw/AfterActorDraw/
                                     // SetCurAnim/ActorPostUpdate/ActorHasReplacement/AutoActorMidMask/
                                     // HoofDustWorldPos) read or write across that boundary.
-#include "zelda3d_cutscene.h"
+#include "cutscene/zelda3d_cutscene.h"
 #include "behaviors/title/title_presentation.h" // Zelda3D::TitlePresentation — see that header
 #include "behaviors/title/title_cloud_vortex.h" // Death Mountain cloud-vortex actor ring at title
 #include "zelda3d_collision.h" // C-ABI bridge for OoT3D scene collision (zelda3d_model.cpp)
