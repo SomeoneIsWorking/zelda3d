@@ -3,7 +3,10 @@
 // for reference) but THIS FILE IS EDITED BY HAND and never overwritten by the generator — fix
 // partial/wrong rigs here directly. boneToLimb[oot3d bone id] = N64 limb driving that bone
 // (-1 = keep the CMB rest pose). Add custom mapping types by extending Zelda3DBoneMap + a new macro.
-typedef struct {
+// Tagged (not anonymous) so zelda3d/render/zelda3d_render.h can forward-declare `struct
+// Zelda3DBoneMap` for the cross-TU gZelda3dPendingBoneMap pointer without needing this whole
+// table visible at that point (Phase 2b codebase reorg).
+typedef struct Zelda3DBoneMap {
     const char* zar;
     float scaleRatio;           // * actor->scale = OoT3D->world scale (0 = derive at runtime)
     int boneCount;              // valid boneToLimb entries (= OoT3D bone count)
