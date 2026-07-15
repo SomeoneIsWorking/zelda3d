@@ -1,5 +1,19 @@
 # Epona mane/tail secondary motion — investigation result: already correct, no fix needed
 
+> **CORRECTION ADDENDUM (2026-07-15, later same day, hoof-dust session):** the "live verification"
+> below (visible mane-tuft reorientation between two frames) is almost certainly the NATIVE N64
+> Epona mesh's own mane polygon animating via its native N64 anim, not the OoT3D CMB's bone 14. A
+> later session (`debug_journal/2026-07-15-epona-hoof-dust-depth.md`) traced the actual draw call
+> chain and found `z_skin.c`'s `Skin_DrawImpl` (which `EnHorse_Draw` uses) has ZERO Zelda3D hooks —
+> the AUTO-skinned classification `actorsnear` reports for Epona is a static eligibility tag, not
+> live confirmation the OoT3D model draws; confirmed live (`ZELDA3D_DUST_DEBUG=1` instrumentation)
+> that Epona currently ALWAYS renders as the native N64 mesh (+ HD texture pack) regardless of
+> `ZELDA3D_N64ANIM`. The conclusion below ("no fix needed") may still hold once the OoT3D body draw
+> is actually wired up (a separate, bigger port — see that journal's remaining-work list) — CSAB
+> track coverage for the mane/tail bones was verified via static dump and is presumably still
+> correct — but the LIVE-VERIFICATION half of this entry's evidence is retracted; re-verify against
+> the actual OoT3D draw once that's wired up, don't trust the old screenshots.
+
 Task ask: drive Epona's mane/tail bones (unmapped by the N64 jointTable retarget) from the
 3DS CSAB so they flow instead of sitting in bind pose, either full-CSAB or blended with the
 N64 retarget.

@@ -420,6 +420,39 @@ static float sZelda3dSelDrawDsLocal[3] = { 0.0f, 0.0f, 0.0f };
 static float gZelda3dAimCenter[3] = { 0, 0, 0 }; // last computed posed-model world center (for aorbit)
 static float gZelda3dAimRadius = 50.0f;          // its world-space radius (for auto framing distance)
 
+// --- En_Horse hoof-dust world-Y reconciliation (Zelda3D_HoofDustWorldPos, called from z_en_horse.c's
+// EnHorse_PostDraw). HONEST ROOT-CAUSE CORRECTION (superseding an earlier draft of this fix that
+// assumed Epona's BODY draws as the OoT3D epona.cmb model under Zelda3D AUTO skinned replacement —
+// disproved live this session, see oot3d-decomp/docs/en_horse_hoof_dust.md "mechanism correction":
+// z_skin.c's Skin_DrawImpl has NO Zelda3D hook at all (only z_skelanime.c's SkelAnime_Draw family
+// does), so En_Horse — which exclusively uses the Skin system — currently ALWAYS renders its native
+// N64 mesh (with the HD texture pack), regardless of the AUTO-skinned classification `actorsnear`
+// reports. Fixing that is a separate, larger port (wiring a Zelda3D choke point into Skin_DrawImpl)
+// and is OUT OF SCOPE here (journaled as the honest remainder).
+//
+// What's real and fixable now: `Zelda3D_TerrainWarpEnabled()` (this file, ~line 1115) already
+// documents "the title tree/dust-vs-hill occlusion bug" — title-cs actors/effects positioned from
+// raw legacy-N64 coordinates are never reconciled against the OoT3D-warped RENDER TERRAIN (which the
+// N64 collision mesh the hoof position derives from never had the relief for). That reconciliation
+// already runs for actor MODELS (Zelda3D_ActorRenderYOffset, draw-time only, doesn't touch
+// world.pos) and for scripted title-cs actors unconditionally — but EffectSsDust particles spawn
+// through their own path and never got it. This applies the SAME reconciliation to the dust's own
+// spawn XZ (not the horse's root XZ, so a hoof laterally offset from the actor still lands on the
+// terrain under ITSELF, not under the horse's center) directly on the NATIVE hoof position
+// Skin_GetLimbPos already computed — independent of whether Epona's body is OoT3D or N64. ---
+static float Zelda3D_RenderYOffsetAtXZ(PlayState* play, Actor* actor, float x, float z); // fwd (defn below)
+int Zelda3D_HoofDustWorldPos(PlayState* play, Actor* horseActor, float* ioPos) {
+    if (play == NULL || horseActor == NULL || ioPos == NULL) {
+        return 0;
+    }
+    float dy = Zelda3D_RenderYOffsetAtXZ(play, horseActor, ioPos[0], ioPos[2]);
+    if (dy == 0.0f) {
+        return 0;
+    }
+    ioPos[1] += dy;
+    return 1;
+}
+
 // BEHAVIORAL motion-parity sampler (REPL `asample <n> <path>`): stream the selected actor's
 // per-frame pos/rot/vel to a CSV for N frames, then close. The selected actor is post-updated
 // exactly once per game frame, so each match = one frame regardless of headless being uncapped
@@ -4234,7 +4267,12 @@ int Zelda3D_TryDrawRoom(PlayState* play, Room* room) {
     return 1; // drew the OoT3D room -> caller skips the N64 mesh
 }
 
-float Zelda3D_ActorRenderYOffset(PlayState* play, Actor* actor) {
+// Shared core of Zelda3D_ActorRenderYOffset: the OoT3D-floor-minus-N64-floor delta at an explicit
+// (x,z), using `actor` only to pick the right room (its own room, or the current room for a
+// persistent actor). Factored out so a position OFFSET FROM the actor's own root (e.g. a hoof, which
+// sits laterally away from the actor's world.pos) can be reconciled against the OoT3D terrain at ITS
+// OWN xz instead of the actor root's — see Zelda3D_HoofDustWorldPos.
+static float Zelda3D_RenderYOffsetAtXZ(PlayState* play, Actor* actor, float x, float z) {
     const char* sceneName;
     int modelId, room;
     float n64, oot;
@@ -4252,19 +4290,26 @@ float Zelda3D_ActorRenderYOffset(PlayState* play, Actor* actor) {
         return 0.0f;
     }
     // Ground the render EXACTLY on the visible OoT3D mesh: offset = OoT3D_floor - N64_floor at
-    // the actor's XZ (the OoT3D floor closest to the N64 floor, so multi-level spots pick the
-    // right surface). Direct raycast of the actual render mesh — no 100u grid approximation
-    // (which hole-filled/smeared and sank actors). For an airborne actor this shifts by the
-    // ground delta, preserving its height above ground.
+    // (x,z) (the OoT3D floor closest to the N64 floor, so multi-level spots pick the right
+    // surface). Direct raycast of the actual render mesh — no 100u grid approximation (which
+    // hole-filled/smeared and sank actors). For an airborne point this shifts by the ground delta,
+    // preserving its height above ground.
     sWarpPlay = play; // Zelda3D_N64FloorCb needs the PlayState/colCtx
-    n64 = Zelda3D_N64FloorCb(actor->world.pos.x, actor->world.pos.z);
+    n64 = Zelda3D_N64FloorCb(x, z);
     if (n64 <= -31000.0f) {
-        return 0.0f; // no N64 floor under the actor -> can't reconcile, leave it
+        return 0.0f; // no N64 floor under this point -> can't reconcile, leave it
     }
-    if (!Zelda3D_RoomOoT3DFloorAt(modelId, actor->world.pos.x, actor->world.pos.z, n64, &oot)) {
+    if (!Zelda3D_RoomOoT3DFloorAt(modelId, x, z, n64, &oot)) {
         return 0.0f; // no OoT3D render floor here -> no offset
     }
     return oot - n64; // lift/drop the render onto the visible OoT3D ground
+}
+
+float Zelda3D_ActorRenderYOffset(PlayState* play, Actor* actor) {
+    if (actor == NULL) {
+        return 0.0f;
+    }
+    return Zelda3D_RenderYOffsetAtXZ(play, actor, actor->world.pos.x, actor->world.pos.z);
 }
 
 int Zelda3D_AutoWarpEnabled(void) {
