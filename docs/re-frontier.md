@@ -46,7 +46,7 @@ foundational finding the whole arc depends on.
 
 ### title.oot3d-not-play — OoT3D title is scripted playback, not Play/PlayState
 - status: re-verified
-- deps:
+- deps: 
 - evidence: `oot3d-decomp/docs/title_gamestate.md`, `title_gamestate_v2.md`, `title_gamestate_driver.md`; memory `soh3d-oot3d-title-not-play`
 - where: `Shipwright/soh/src/zelda3d/behaviors/title/title_presentation.cpp` (`TitlePresentation` class, ported scripted-playback owner)
 - gap: none — foundational finding, do not re-derive
@@ -90,7 +90,7 @@ foundational finding the whole arc depends on.
 - evidence: `oot3d-decomp/docs/title_terrain_actor_grounding.md`; `debug_journal/2026-07-14-title-terrain-field-grass-mure2.md`
 - where: title terrain port (see journal for exact seam)
 - gap: none noted
-- notes:
+- notes: 
 
 ### title.fireglow-cloud-vortex — fireglow + cloud-vortex overlay effects
 - status: re-verified
@@ -98,7 +98,7 @@ foundational finding the whole arc depends on.
 - evidence: `oot3d-decomp/docs/title_cloud_vortex.md`, `title_logo_fireglow_cmab.md`, `title_dawn_layers.md`
 - where: `behaviors/title/title_cloud_vortex.cpp/.h`, `title_fireglow.cpp/.h`
 - gap: none noted this pass (fireglow re-measured and exonerated per `title-cs464-composition-exonerated-fireglow-remeasure.md`)
-- notes:
+- notes: 
 
 ### title.moon-sky-logo — moon composition, sky dome, 2D logo overlay
 - status: re-verified
@@ -116,6 +116,7 @@ foundational finding the whole arc depends on.
 - gap: open per 2026-07-15 journal; not confirmed closed
 - notes: overlaps with the `en-horse` area below — the title-specific gallop timing is the title-side slice of that broader arc.
 
+
 ## en-horse
 
 Epona/En_Horse render and behavior — spans both the title cs (mounted intro) and general
@@ -124,11 +125,11 @@ landed as a `behaviors/actor/en_horse.cpp` module per the CLAUDE.md game-structu
 
 ### enhorse.render-gap — general En_Horse/Epona render divergence
 - status: re-verified
-- deps:
+- deps: 
 - evidence: `oot3d-decomp/docs/en_horse_epona_render_gap.md`; `debug_journal/2026-07-15-epona-en-horse-3ds-render.md`
 - where: no dedicated module — see gap
 - gap: RE'd and journal-fixed in-session (2026-07-15) but landed as journal-only pokes, not a `behaviors/actor/en_horse.cpp` module — **structural debt**, not an RE debt (the CLAUDE.md OOP-module rule flags this explicitly).
-- notes:
+- notes: 
 
 ### enhorse.hoof-dust — hoof-dust particle depth
 - status: re-verified
@@ -136,7 +137,7 @@ landed as a `behaviors/actor/en_horse.cpp` module per the CLAUDE.md game-structu
 - evidence: `oot3d-decomp/docs/en_horse_hoof_dust.md`; `debug_journal/2026-07-15-epona-hoof-dust-depth.md`
 - where: see journal for exact seam
 - gap: none noted
-- notes:
+- notes: 
 
 ### enhorse.mane-tail — mane/tail secondary motion
 - status: re-verified
@@ -149,20 +150,21 @@ landed as a `behaviors/actor/en_horse.cpp` module per the CLAUDE.md game-structu
 ### enhorse.module-port — port en_horse behaviors into behaviors/actor/en_horse.cpp
 - status: todo
 - deps: enhorse.render-gap, enhorse.hoof-dust, title.epona-gallop-rate
-- evidence:
+- evidence: 
 - where: target `Shipwright/soh/src/zelda3d/behaviors/actor/en_horse.cpp` (does not exist yet)
 - gap: this is pure structural/porting debt now that the underlying RE is mostly done — next concrete step for this arc.
-- notes:
+- notes: 
+
 
 ## camera
 
 ### camera.dispatch-map — Camera_Update per-mode function dispatch table understood
 - status: re-verified
-- deps:
+- deps: 
 - evidence: `Shipwright/soh/src/zelda3d/behaviors/camera_behavior.h` header comment (cites SoH z_camera.c:7470, OoT3D FUN_002d84c4); `oot3d-decomp/docs/camera_calc_at_default.md`, `camera_math_helpers.md`
 - where: `behaviors/camera_behavior.h/.cpp` (registry), legacy `sCameraFunctions[...]` table in vendored `z_camera.c`
 - gap: none — the dispatch mechanism itself is fully understood; only individual mode functions remain to be ported (see below).
-- notes:
+- notes: 
 
 ### camera.normal1 — Camera_Normal1 (CAM_FUNC_NORM1) ported
 - status: re-verified
@@ -170,15 +172,16 @@ landed as a `behaviors/actor/en_horse.cpp` module per the CLAUDE.md game-structu
 - evidence: `behaviors/camera/normal1.cpp`; header notes OoT3D FUN_00239fd8 diverges from SoH's Camera_Normal1 by "~28-unit Δeye-Y at Kakariko even under matched Link pose" — the divergence that motivated the port
 - where: `behaviors/camera/normal1.cpp/.h`
 - gap: verification against oracle at matched frames not re-confirmed this pass — trust prior work but spot-check before relying on it for a new investigation.
-- notes:
+- notes: 
 
 ### camera.normal0-and-others — remaining camera mode functions (Normal0, Parallel*, etc.)
 - status: todo
 - deps: camera.dispatch-map
-- evidence:
+- evidence: 
 - where: legacy fallthrough only — no `behaviors/camera/*.cpp` beyond normal1
 - gap: header notes "Camera_Normal0 became an 8-byte return-1 stub" on 3DS — likely a cheap port once picked up. All non-Normal1 modes still run legacy SoH math.
 - notes: this is the next RE-ready step in the camera arc — Normal0 specifically looks cheap (trivial 3DS stub).
+
 
 ## player-link
 
@@ -189,11 +192,11 @@ below, not duplicated).
 
 ### player.draw-hook — Player_Draw hook + textured body
 - status: re-verified
-- deps:
+- deps: 
 - evidence: memory `soh3d-link-player-path`
 - where: `Shipwright/soh/src/zelda3d/zelda3d_link.cpp` (`Zelda3D_TryDrawPlayer`)
 - gap: none noted
-- notes:
+- notes: 
 
 ### player.anim-states — walk/stop/carry/pickup pose parity
 - status: re-verified
@@ -201,7 +204,7 @@ below, not duplicated).
 - evidence: memory `soh3d-pose-parity` (#117 "anim parity COMPLETE"); `oot3d-decomp/docs/player_anim_states.md`, `link_bone_map.md`; `debug_journal/2026-07-15-link-pose-sweep.md`
 - where: `zelda3d_link_bonecorr.inc`, `zelda3d_player_animmap.inc`
 - gap: #115 render audit still open per memory — anim/pose correctness verified, full render pass not yet re-audited.
-- notes:
+- notes: 
 
 ### player.force-state-sweep — force-hook coverage for driving/testing states
 - status: re-partial
@@ -212,12 +215,12 @@ below, not duplicated).
 - notes: cross-ref, don't duplicate: `docs/re_control_debug_backlog.md` items #1-#10 (OoT) are the exact sub-steps hiding behind this row.
 
 ### player.backwalk-decode — func_8083FC68 dual-threshold stick-decode (backwalk gate)
-- status: hack
+- status: re-verified
 - deps: player.force-state-sweep
-- evidence: `docs/re_control_debug_backlog.md` item #1 — function fully READ (decode formula documented: `temp=|yawTarget-shape.rot.y|/32768`; branch thresholds `speedTarget > temp²·50+6` / `speedTarget > (1-temp)·10+6.8`) but the CONTROL layer still calls the downstream installer directly instead of driving the real decode
-- where: `Zelda3D_PlayerForceBackwalk` (vendored z_player.c) — calls `func_8083CBF0` directly
-- gap: the RE is essentially done (full formula known); porting a real decode-driven trigger (feed `speedTarget`/`yawTarget` to land the `-1` branch) would retire this hack. HIGH priority per the backlog.
-- notes: this is a case where RE is ahead of the control layer, not behind it — unusual for this tracker but recorded honestly.
+- evidence: tools/link_sweep.py sweep --only backwalk,sidestep_l,sidestep_r,turn_in_place (2026-07-15) -- backwalk MATCH via the REAL func_8083FC68 decode (no longer bypassed); sidestep_l/sidestep_r/turn_in_place (func_8083FD78 sibling) unaffected, also MATCH. Full sweep re-run: no regressions.
+- where: Zelda3D_PlayerForceBackwalk (vendored z_player.c ~7891) -- now calls func_8083FC68(this, 8.0f, yawTarget=shape.rot.y+0x8000) for real and only calls func_8083CBF0 when it returns <0, mirroring the live site's if (func_8083FC68(...) < 0) func_8083CBF0(...) shape exactly
+- gap: none -- the decode-driven trigger is ported: temp==1.0 at the dead-behind yawTarget makes the backward threshold speedTarget>6.8f exact (no float slop), so 8.0f lands the real -1 branch every time
+- notes: closes the sole tracked hack; see oot3d-decomp/docs/player_anim_states.md backwalk section for the full derivation
 
 ### player.zaim-parallel-decode — func_8083FD78 (Z-target-locked stick decode)
 - status: in-progress
@@ -225,7 +228,7 @@ below, not duplicated).
 - evidence: `docs/re_control_debug_backlog.md` item #2 — call sites traced (6 sites) but thresholds/branches beyond entry not fully read
 - where: `Player_Action_8084193C` call site (z_player.c:8989)
 - gap: full read would clarify whether sidestep_l/sidestep_r (currently reported MATCH) are landing on genuinely-decoded branches or a lucky stick magnitude.
-- notes:
+- notes: 
 
 ### player.camera-mode-readout — camera->mode/setting debug readout
 - status: todo
@@ -241,7 +244,7 @@ below, not duplicated).
 - evidence: `docs/re_control_debug_backlog.md` item #4
 - where: `Zelda3D_PlayerForceSwimDive` bypasses via direct `actionVar1=2` + `func_8083D330` force
 - gap: full condition set for the real A-press gate not yet read.
-- notes:
+- notes: 
 
 ### player.putdown-state — distinct "put down" state (func_8083EAF0)
 - status: todo
@@ -249,12 +252,13 @@ below, not duplicated).
 - evidence: `docs/re_control_debug_backlog.md` item #7 — function FULLY understood, zero RE cost remaining
 - where: target a new `Zelda3D_PlayerForcePutDown` hook (pattern-match existing Force* hooks)
 - gap: pure porting task, no RE — cheapest new-coverage item after the camera readout above.
-- notes:
+- notes: 
 
 ### player.ztarget-substates — func_80839F90 possible Z-idle sub-variants
 - status: todo
 - deps: player.force-state-sweep
 - evidence: `docs/re_control_debug_backlog.md` item #5
+- where: 
 - gap: two unread entry branches may mean `ztarget` (currently one collapsed MATCH row) is actually several distinct states.
 - notes: LOW-MEDIUM priority per backlog.
 
@@ -264,21 +268,22 @@ below, not duplicated).
 - evidence: `docs/re_control_debug_backlog.md` item #6 — branch conditions confirmed (yDistToLedge>=79.0f, water/iron-boots check, forced-wall bit distinct from real-ladder bit)
 - where: `Zelda3D_PlayerForceClimb` (forced-wall path, skips lateral-centering math)
 - gap: debug-observability gap only, not missing RE — forced path already reaches the real action func; a live `yDistToLedge`/`wallFlags` readout would let a sweep find a genuinely climbable wall instead of bit-forcing.
-- notes:
+- notes: 
 
 ### player.death-trigger — gSaveContext.health==0 death trigger
 - status: re-verified
-- deps:
+- deps: 
 - evidence: `docs/re_control_debug_backlog.md` item #9 — mechanism fully read and trivial (direct field read in the caller, NOT `func_8083D53C` which is a red herring)
 - where: `soh_reach_death` in `tools/link_sweep.py`
 - gap: none in RE; only a tooling tightening (poll the transition instead of a fixed sleep) remains, tracked as tooling debt not RE debt.
 - notes: `func_8083D53C` explicitly ruled out as the death gate — do not re-chase it.
 
+
 ## skinned-actor-render
 
 ### skin.rigid-skinning — CMB skin_mode 1 per-vertex single-bone from multi-bone table
 - status: re-verified
-- deps:
+- deps: 
 - evidence: memory `soh3d-cmb-rigid-skinning` (#109)
 - where: `zelda3d_model.cpp` CMB skin path
 - gap: none — closed
@@ -290,17 +295,18 @@ below, not duplicated).
 - evidence: memory `soh3d-skinned-actor-collision` (#107)
 - where: replaced skinned-skip limb walk at `DrawSkeletonOpa`
 - gap: none — closed
-- notes:
+- notes: 
+
 
 ## lighting-fog
 
 ### lighting.envctx-layout — envCtx memory layout RE'd
 - status: re-verified
-- deps:
+- deps: 
 - evidence: memory `soh3d-envctx-pinned` — `play+0x3135`, `unk_BF` at `+0xA5`, stride `0x1C`; `Env_Update=FUN_0045dd30`
 - where: `Shipwright/soh/src/zelda3d/zelda3d_scene_lighting.inc`
 - gap: none — pinned, do not re-derive by memory-poking (per CLAUDE.md decomp-is-ground-truth rule, this WAS derived from the decomp, not a poke).
-- notes:
+- notes: 
 
 ### lighting.worldshade-port — vertex-lighting / worldshade engine port
 - status: re-verified
@@ -308,7 +314,7 @@ below, not duplicated).
 - evidence: memory `soh3d-lighting-port` (#111 RESOLVED), `soh3d-stop-microtuning-lighting`
 - where: worldshade toggle, opt-in default off
 - gap: none — explicitly: **do not reopen or tune further**, this is a closed arc per direct user instruction.
-- notes:
+- notes: 
 
 ### lighting.fog-lut — fog LUT port
 - status: re-verified
@@ -318,6 +324,7 @@ below, not duplicated).
 - gap: none — this was investigated as a suspected gap and found to be a FALSE ALARM (already correctly ported). Recorded so it isn't re-investigated.
 - notes: dead end, not a win — kept per "record dead ends too" global rule.
 
+
 ## mm-player
 
 MM's player/camera RE is far behind OoT's — no control layer exists at all yet. This is the
@@ -325,7 +332,7 @@ highest-leverage TODO in the whole tracker (blocks all future MM sweeps).
 
 ### mm.action-func-naming — name MM's ~83 numbered Player_Action_NN + 327 unnamed func_80XXXXXX
 - status: todo
-- deps:
+- deps: 
 - evidence: `docs/re_control_debug_backlog.md` item #11 — 19 action funcs already named (`Player_Action_Idle`, `_Rolling`, `_Talk`, `_TurnInPlace`, `_HookshotFly`, `_Shielding`, `_Throwing`, ...) via `PlayerActionFunc` typedef (`z64player.h:1121`), install primitive `Player_SetAction` (`z_player.c:4470`)
 - where: `Shipwright/mm/src/overlays/actors/ovl_player_actor/z_player.c`
 - gap: this IS the RE-ready next step for MM player — comparable scope to OoT's z_player.c RE debt.
@@ -337,11 +344,11 @@ highest-leverage TODO in the whole tracker (blocks all future MM sweeps).
 - evidence: `docs/re_control_debug_backlog.md` item #11; source pattern at OoT `Shipwright/soh/src/overlays/actors/ovl_player_actor/z_player.c:7611-7891`
 - where: target `Shipwright/mm/2s2h/zelda3d/mm3d_player_force.c` (does not exist)
 - gap: blocked on action-func naming above.
-- notes:
+- notes: 
 
 ### mm.repl-transport — MM REPL/FIFO transport
 - status: re-verified
-- deps:
+- deps: 
 - evidence: `docs/re_control_debug_backlog.md` item #12 (recorded there as DONE / informational)
 - where: `Shipwright/mm/2s2h/Z3DRepl.c` (`$ZELDA3D_MM_REPL` FIFO: posinfo/warp/actors/ping), `tools/mm_control.py`, `tools/mm_game.sh`
 - gap: none — this is plumbing the force-hook layer above should REUSE, not build fresh.
@@ -355,11 +362,12 @@ highest-leverage TODO in the whole tracker (blocks all future MM sweeps).
 - gap: not locatable until the action-func naming pass above is further along — likely found incidentally while tracing MM's Z-idle-stance action func.
 - notes: MEDIUM priority, explicitly sequenced AFTER mm.action-func-naming.
 
+
 ## mm3d-assets
 
 ### mm3d.gar2-parser — GAR2 archive format parser
 - status: todo
-- deps:
+- deps: 
 - evidence: memory `mm3d-assets-gar2`; `mm3d-decomp/docs/lzs_hunt.md`, `formats/lzs.md`
 - where: none yet
 - gap: MM3D assets (`/actors/zelda2_*.gar.lzs`) are GAR2-packed; the shared Zar loader rejects them outright. Confirmed BLOCKER for any MM3D asset replacement work.
@@ -372,13 +380,21 @@ highest-leverage TODO in the whole tracker (blocks all future MM sweeps).
 Manually curated from the arcs above (run `tools/re_frontier.py hacks` after adding entries via
 `add`/`set` for the machine-checked live view; this list is the human summary as of this pass):
 
-1. **`player.backwalk-decode`** — `Zelda3D_PlayerForceBackwalk` bypasses the fully-RE'd
-   `func_8083FC68` decode and calls `func_8083CBF0` directly. HIGH priority to retire — the RE
-   is done, only the port is missing.
-2. Several OoT `Zelda3D_PlayerForce*` hooks in general are, by design, control-layer
+`tools/re_frontier.py hacks` reports **zero** as of 2026-07-15 — `player.backwalk-decode` (the
+sole tracked hack) was closed: `Zelda3D_PlayerForceBackwalk` now DRIVES the fully-RE'd
+`func_8083FC68` decode for real (feeds it `speedTarget=8.0f` / `yawTarget=shape.rot.y+0x8000`,
+the exact input that lands the decode's `-1` branch, and only calls `func_8083CBF0` when the
+decode itself returns `<0`) instead of bypassing it and calling `func_8083CBF0` directly. See
+`oot3d-decomp/docs/player_anim_states.md` for the derivation and `docs/link_parity_checklist.md`
+for the re-verified sweep (backwalk/sidestep_l/sidestep_r/turn_in_place all MATCH).
+
+Remaining non-hack debt (tracked as `re-partial`/`todo`/`in-progress`, not `hack` — none jump
+ahead of the RE, they're just incomplete):
+
+1. Several OoT `Zelda3D_PlayerForce*` hooks in general are, by design, control-layer
    conveniences for the sweep harness rather than natively-driven states — tracked per-function
    above (`player.swim-dive-gate`, `player.real-ladder-geometry`) rather than as one blob.
-3. **MM has NO force-hook layer at all** (`mm.force-hook-layer` = blocked/todo) — every future MM
+2. **MM has NO force-hook layer at all** (`mm.force-hook-layer` = blocked/todo) — every future MM
    sweep state will need to be driven some other way (or wait) until this lands, which itself
    waits on `mm.action-func-naming`.
 
