@@ -2,6 +2,7 @@
 #include "vt.h"
 #include "zelda3d/zelda3d.h"
 #include "zelda3d/behaviors/title/title_presentation.h"
+#include "zelda3d/input/zelda3d_input.h" // Zelda3D_WalkInject (Phase 1 input consolidation)
 
 #include <string.h>
 

@@ -17,12 +17,14 @@ namespace LUS {
 // it catches the case where SDL delivers NO key events at all (e.g. a Wayland focus problem): if
 // the user mashes a key and neither this nor the per-event log ever prints a changed/blocked
 // line, the drop is upstream of ControlDeck entirely.
+//
+// The enabled-check is a SINGLE source of truth in
+// Shipwright/soh/src/zelda3d/input/zelda3d_input.cpp (Zelda3D_DbgInputEnabled) — see that file's
+// comment and the matching forward-decl in ship/controller/controldeck/ControlDeck.cpp for why
+// this is a local extern "C" decl rather than a soh header include.
+extern "C" int Zelda3D_DbgInputEnabled(void);
 static bool Zelda3dDbgInputEnabled() {
-    static const bool enabled = [] {
-        const char* e = std::getenv("ZELDA3D_DBG_INPUT");
-        return e != nullptr && e[0] == '1';
-    }();
-    return enabled;
+    return Zelda3D_DbgInputEnabled() != 0;
 }
 ControlDeck::ControlDeck(std::vector<CONTROLLERBUTTONS_T> additionalBitmasks,
                          std::shared_ptr<Ship::ControllerDefaultMappings> controllerDefaultMappings,

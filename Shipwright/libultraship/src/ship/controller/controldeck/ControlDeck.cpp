@@ -20,12 +20,17 @@ namespace Ship {
 // decisive blocking state at the moment of every real SDL key event. Gated behind
 // ZELDA3D_DBG_INPUT=1 so it costs nothing by default; only fires on an actual key event (not a
 // per-frame poll), so it is inherently "log on change" and cheap.
+//
+// The enabled-check itself is now a SINGLE source of truth in
+// Shipwright/soh/src/zelda3d/input/zelda3d_input.cpp (Zelda3D_DbgInputEnabled) — this file used to
+// keep its own private copy of the same env-check lambda, duplicated verbatim in the LUS:: half of
+// this diagnostic (libultraship/controller/controldeck/ControlDeck.cpp). Forward-declared here
+// rather than including a soh header: libultraship is a lower layer that soh links against, not
+// the reverse (same one-directional pattern as Zelda3D_MeasureResult / Gui.cpp's native-HUD entry
+// point).
+extern "C" int Zelda3D_DbgInputEnabled(void);
 static bool Zelda3dDbgInputEnabled() {
-    static const bool enabled = [] {
-        const char* e = std::getenv("ZELDA3D_DBG_INPUT");
-        return e != nullptr && e[0] == '1';
-    }();
-    return enabled;
+    return Zelda3D_DbgInputEnabled() != 0;
 }
 
 ControlDeck::ControlDeck(std::vector<CONTROLLERBUTTONS_T> additionalBitmasks,
