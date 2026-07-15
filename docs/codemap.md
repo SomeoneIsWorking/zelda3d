@@ -102,6 +102,57 @@ debug_journal/                 dated findings entries — the append-only invest
 | **RmlUi menu port** | 🟡 partial | — | memory `soh3d-rmlui-menu` | Phases 0-1 done (Dusklight-style); Phase 2 input/nav is next. |
 | **Input scheme (PC-native + hotswap glyphs)** | ✅ done | `lus_input_architecture.md`-adjacent code; `gSoH3dInputDevice` | `docs/lus_input_architecture.md`, memory `soh3d-hud-glyphs`, `soh3d-input-scheme` | ESC decoupled from BTN_START; scheme versioned for re-migration; keyboard/gamepad HUD glyphs hotswap via SVG assets + REPL `inputdev 0|1`. |
 
+## zelda3d/ reorganization — target tree & migration status
+
+`zelda3d/` is being reorganized top-down per the approved plan
+(`<local-notes>`, tracked here per the "codemap =
+live record of the reorg" instruction). `zelda3d.c` is a 7,363-line dumping ground (render +
+149-command REPL + input injection + collision + HUD + camera all in one file — banned by
+CLAUDE.md's game-structure rule) and 36 source files sat flat at the `zelda3d/` top level with
+only `behaviors/{actor,camera,title}` organized into subdirs. The migration is **sequential,
+one phase at a time**, no swarm; build/verify happens once at the end of all phases, not
+per-phase. This table is the per-module migration status, updated in the same commit that lands
+each phase.
+
+**Target tree** (`Shipwright/soh/src/zelda3d/`):
+
+```
+core/        lifecycle + global tunables (Zelda3D_Enabled, FrameBegin/FrameEndUpdate, ColdBoot,
+             AutoWarp, SceneName) — gathered from zelda3d.c top-of-file
+input/       THE ONE input path — consolidates today's 5 scattered pad-mutators + 2 block-checks
+             (Zelda3D_InjectKey, Zelda3D_WalkInject, btnhold/walkhold, ZELDA3D_DBG_INPUT)
+render/      actor-draw dispatch, room/scene draw, sky/moon/fog/atmos/light, terrain-warp
+model/       CMB/CSAB load + skinning (zelda3d_model.cpp, zelda3d_cmab.*, model_internal)
+anim/        N64→3DS anim retarget, CSAB resolve (zelda3d_anim.cpp, zelda3d_anim_override.*)
+player/      Link draw/pose (zelda3d_link.cpp/.h)
+scene/       collision, stairs, lighting/fog table consumers (zelda3d_collision.h,
+             zelda3d_stairs.*)
+cutscene/    zelda3d_cutscene.cpp/.h + oot3d opcodes header
+repl/        the REPL interpreter (~2,270 lines / 149 commands, extracted from zelda3d.c)
+hud/         HUD draw (extracted from zelda3d.c) + zelda3d_hud_tex.cpp
+behaviors/   EXISTS — actor/camera/title OOP registry, unaffected by this reorg
+tables/      .inc data tables, split by concern (anim/player/scene/model) — Phase 0 landed FLAT
+assets/      generated *_png.h texture blobs (527 KB) — Phase 0 DONE
+```
+
+**Migration status** (updated per phase; build/verify deferred to the end of all phases):
+
+| Module | Status | Notes |
+|---|---|---|
+| `assets/` | ✅ Phase 0 done | 8 `*_png.h` blobs (button_tex, counter_icon, digit_tex, heart_tex, kbd_glyphs, num_glyphs, stairs_stone, xbox_glyphs) moved via `git mv`; all 8 `#include` sites updated (`zelda3d_hud_tex.cpp` ×7, `zelda3d_stairs.cpp` ×1). |
+| `tables/` | ✅ Phase 0 done | 7 `.inc` files moved via `git mv`, kept FLAT (not split into `tables/{anim,player,scene,model}/` — flat chosen over the plan's optional per-concern split for simplicity, since consumers are already few and named per-concern in the filename itself). All 7 `#include` sites updated across `zelda3d.c` (×5), `zelda3d_anim.cpp` (×1), `zelda3d_link.cpp` (×1). |
+| `input/` | ⬜ pending (Phase 1 — highest priority, active keyboard blocker) | Not started. |
+| `core/` | ⬜ pending (Phase 2) | Not started. |
+| `render/` | ⬜ pending (Phase 2) | Not started. |
+| `repl/` | ⬜ pending (Phase 2) | Not started. |
+| `hud/` | ⬜ pending (Phase 2) | Not started. |
+| `scene/` (collision extraction) | ⬜ pending (Phase 2) | `zelda3d_collision.h` exists but the L1165-1746 collision body is still inline in `zelda3d.c`. |
+| `model/` | ⬜ pending (Phase 3) | `zelda3d_model.cpp/.h`, `zelda3d_cmab.*` still at `zelda3d/` top level. |
+| `anim/` | ⬜ pending (Phase 3) | `zelda3d_anim.cpp`, `zelda3d_anim_override.*` still at `zelda3d/` top level. |
+| `player/` | ⬜ pending (Phase 3) | `zelda3d_link.cpp/.h` still at `zelda3d/` top level. |
+| `cutscene/` | ⬜ pending (Phase 3) | `zelda3d_cutscene.cpp/.h`, opcodes header still at `zelda3d/` top level. |
+| `behaviors/` (en_horse + per-actor override glue) | ⬜ pending (Phase 3) | `en_horse` pokes and EnGe1/EnKo/EnHy/cucco override glue not yet migrated into `behaviors/actor/*.cpp` — tracked separately in the "En_Horse / Epona" subsystem row above. |
+
 ## Where is X? (direct index)
 
 | Looking for... | Go to |
@@ -113,11 +164,11 @@ debug_journal/                 dated findings entries — the append-only invest
 | Force-state layer (Link) | `Shipwright/soh/src/overlays/actors/ovl_player_actor/z_player.c` `Zelda3D_PlayerForce*` hooks (search that name); catalog of gaps in `docs/re_control_debug_backlog.md` |
 | Oracle transport (external Azahar) | `tools/azahar_rpc.py`, `tools/azahar_repl.py`, `tools/azahar_scan.py` |
 | Oracle transport (embedded harness, durable direction) | `tools/soh3d_harness/main.cpp`, `soh_state.cpp`, `watchhook.cpp` |
-| Fog / lighting port | `Shipwright/soh/src/zelda3d/zelda3d_scene_lighting.inc`; RE in `oot3d-decomp/docs/scene_lighting.md`, `env_context_layout.md` |
-| Object→ZAR replacement tables | `Shipwright/soh/src/zelda3d/zelda3d_object_zars.inc` (generated by `tools/gen_object_zars.py`); coverage in `COVERAGE.md` |
+| Fog / lighting port | `Shipwright/soh/src/zelda3d/tables/zelda3d_scene_lighting.inc`; RE in `oot3d-decomp/docs/scene_lighting.md`, `env_context_layout.md` |
+| Object→ZAR replacement tables | `Shipwright/soh/src/zelda3d/tables/zelda3d_object_zars.inc` (generated by `tools/gen_object_zars.py`); coverage in `COVERAGE.md` |
 | Actor behavior registry | `Shipwright/soh/src/zelda3d/behaviors/actor_behavior.h/.cpp` (`findActorBehavior`) |
 | Camera behavior registry | `Shipwright/soh/src/zelda3d/behaviors/camera_behavior.h/.cpp` |
-| N64→3DS anim retarget | `Shipwright/soh/src/zelda3d/zelda3d_anim.cpp`, `zelda3d_animmap.inc`, `zelda3d_bonemap.inc`; memory `soh3d-n64anim-retarget` |
+| N64→3DS anim retarget | `Shipwright/soh/src/zelda3d/zelda3d_anim.cpp`, `tables/zelda3d_animmap.inc`, `tables/zelda3d_bonemap.inc`; memory `soh3d-n64anim-retarget` |
 | MM player state (WIP, stub) | `Shipwright/mm/2s2h/zelda3d/mm3d_player.c/.h` — draw-only, no behavior yet |
 | MM REPL / control transport | `Shipwright/mm/2s2h/Z3DRepl.c` (`$ZELDA3D_MM_REPL` FIFO), `tools/mm_control.py`, `tools/mm_game.sh` |
 | Kanban / backlog | `tools/kanban.py`, `KANBAN.md`, GitHub Issues (`SomeoneIsWorking/soh3d`) |
