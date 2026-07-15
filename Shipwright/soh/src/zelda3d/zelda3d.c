@@ -4386,6 +4386,11 @@ static int gZelda3dWalkHoldFrames = 0;
 static s8 gZelda3dWalkStickX = 0;
 static s8 gZelda3dWalkStickY = 0;
 
+// `ztarget` REPL: the actor to hold a native Z-target lock-on (Player_SetAutoLockOnActor) onto,
+// re-asserted every frame from Zelda3D_WalkInject (see the REPL `ztarget` handler for why this
+// must be per-frame, not one-shot: autoLockOnActor is a one-frame latch by design). NULL = inactive.
+Actor* gZelda3dZTargetActor = NULL;
+
 // `btnhold` REPL: inject a held button mask for N frames (verify equipment-state transitions, e.g.
 // press B to draw the sword and confirm Link's mesh_id selection switches to sword-in-hand + shield
 // -on-arm). Applied in Zelda3D_WalkInject alongside the stick injection. Edge bits are set on the
@@ -5073,15 +5078,24 @@ static void Zelda3D_ReplExec(PlayState* play, char* line, const char* outPath) {
         baseCsab = Zelda3D_LinkWalkRunGate(baseCsab, p->actor.speedXZ);  // #117 report the gated (drawn) CSAB
         const char* upOtr = (const char*)p->upperSkelAnime.animation;
         const char* upCsab = upOtr ? Zelda3D_ResolvePlayerCsab(upOtr) : "(none)";
+        // sideWalkBlend (Player+0x870, `unk_870`) is the L<->R blend weight
+        // `Player_Action_8084193C`/`func_80841860` uses to LinkAnimation_BlendToJoint between the
+        // side_walkR/side_walkL CSABs — the SIDE-WALK action always sets `skelAnime.animation` to
+        // the L pointer regardless of actual direction (see func_80841860, z_player.c ~8792), so
+        // `base=nml_side_walkL_free` alone can't distinguish sidestep_l from sidestep_r; this field
+        // does (0.0=full R-source blend .. 1.0=full L-source blend per LinkAnimation_BlendToJoint's
+        // (animA=R,weightA) vs (animB=L,weightB=unk_870) argument order).
         Zelda3D_ReplReply(outPath,
             "base=%s f=%.1f/%.1f spd=%.2f morph=%.2f | upper=%s f=%.1f/%.1f morph=%.2f | "
-            "upperLimbRot=(%d,%d,%d) headRotY=%d | shapeY=%d yaw=%d focusY=%d speedXZ=%.2f st1=0x%x",
+            "upperLimbRot=(%d,%d,%d) headRotY=%d | shapeY=%d yaw=%d focusY=%d speedXZ=%.2f st1=0x%x "
+            "sideWalkBlend=%.2f",
             baseCsab ? baseCsab : "(unmapped)", p->skelAnime.curFrame, p->skelAnime.animLength,
             p->skelAnime.playSpeed, p->skelAnime.morphWeight,
             upCsab ? upCsab : "(unmapped)", p->upperSkelAnime.curFrame, p->upperSkelAnime.animLength,
             p->upperSkelAnime.morphWeight,
             p->upperLimbRot.x, p->upperLimbRot.y, p->upperLimbRot.z, p->headLimbRot.y,
-            p->actor.shape.rot.y, p->yaw, p->actor.focus.rot.y, p->actor.speedXZ, p->stateFlags1);
+            p->actor.shape.rot.y, p->yaw, p->actor.focus.rot.y, p->actor.speedXZ, p->stateFlags1,
+            p->unk_870);
     } else if (strcmp(cmd, "posescan") == 0) {
         // Anim QA logger: records each DRAWN player frame's max per-bone rotation jump (+bone +resolved
         // csab) so a hard-cut / missing-morph pop shows as an isolated spike. Sampled in the draw path,
@@ -6324,6 +6338,49 @@ static void Zelda3D_ReplExec(PlayState* play, char* line, const char* outPath) {
                             sel->id, sel->world.pos.x, sel->world.pos.y, sel->world.pos.z,
                             sel->world.rot.y, sel->params, m);
         }
+    } else if (strcmp(cmd, "ztarget") == 0) {
+        // GENERIC Z-target hold primitive (prerequisite for backwalk/sidestep_l/sidestep_r/
+        // turn_in_place headless driving — see docs/link_parity_checklist.md; the `ztarget`
+        // STATE_MATRIX row itself is a DIFFERENT card, not claimed here).
+        //
+        // `ztarget 1` locks Link's `focusActor` onto the currently `asel`-selected actor via the
+        // REAL native N64 lock-on entry point `Player_SetAutoLockOnActor` (z_player_lib.c) — the
+        // exact function used by e.g. En_Rd/En_Dh to auto-target the player. `autoLockOnActor` is
+        // a ONE-FRAME latch (z_player.c ~12369 unconditionally clears it at the end of every
+        // Player_Update tick) BY DESIGN, so its native callers (En_Rd_Update etc.) call it EVERY
+        // frame the aggro condition holds; we do the same here, re-asserting from
+        // Zelda3D_WalkInject each frame `ztarget` is armed (gZelda3dZTargetActor) — not a one-shot
+        // struct poke. This is what reaches the real Z-targeting-gated locomotion branch:
+        // `func_8083FC68`/`func_8083FD78` (z_player.c ~8073/8092) gate backwalk (`func_8083CBF0`
+        // -> Player_Action_808423EC -> gPlayerAnim_link_anchor_back_walk / CSAB ac_back_walk),
+        // side-walk (`func_8083CC9C` -> Player_Action_8084193C -> PLAYER_ANIMGROUP_side_walkL/R),
+        // and turn-in-place (`Player_SetupTurnInPlace` -> Player_Action_TurnInPlace ->
+        // PLAYER_ANIMGROUP_45_turn) on `this->focusActor != NULL`. Confirmed against
+        // oot3d-decomp (docs/player_anim_states.md "Back-walk / Z-target" / "Side-walk / strafe"):
+        // OoT3D's Grezzo action funcs FUN_004b9920/FUN_004bf3bc are the same N64-twin action
+        // funcs, entered the same way (Z-target lock-on active).
+        // `ztarget 1` needs a prior `asel <id|any>` (works with ANY actor, hostile or not — the
+        // gate only checks focusActor non-NULL). `ztarget 0` disarms + releases via
+        // Player_ClearZTargeting.
+        Player* zp = GET_PLAYER(play);
+        if (sscanf(line, "%*s %i", &iv) == 1) {
+            if (iv) {
+                if (gZelda3dSelActor == NULL) {
+                    Zelda3D_ReplReply(outPath, "ztarget: no actor selected -- run `asel <id|any>` first");
+                } else {
+                    gZelda3dZTargetActor = gZelda3dSelActor;
+                    Player_SetAutoLockOnActor(play, gZelda3dZTargetActor);
+                    Zelda3D_ReplReply(outPath, "ztarget=1 focusActor=0x%X st1=0x%x",
+                                    gZelda3dZTargetActor->id, zp->stateFlags1);
+                }
+            } else {
+                gZelda3dZTargetActor = NULL;
+                Player_ClearZTargeting(zp);
+                Zelda3D_ReplReply(outPath, "ztarget=0 st1=0x%x", zp->stateFlags1);
+            }
+        } else {
+            Zelda3D_ReplReply(outPath, "usage: ztarget <0|1> (locks focusActor onto the asel-selected actor)");
+        }
     } else if (strcmp(cmd, "afreeze") == 0) {
         // GENERIC: pin the selected actor's transform every frame. 0=off, 1=pin pos+rot,
         // 2=pin position only (rotation free — e.g. so a held cucco's body shake stays visible).
@@ -6884,6 +6941,13 @@ void Zelda3D_WalkInject(PlayState* play) {
             gZelda3dBtnHoldFirst = 0;
         }
         gZelda3dBtnHoldFrames--;
+    }
+
+    // `ztarget` REPL: re-assert the native auto-lock-on every frame (autoLockOnActor is a
+    // one-frame latch by design — see the REPL `ztarget` handler). Mirrors how e.g. En_Rd/En_Dh
+    // call Player_SetAutoLockOnActor from their own per-frame Update while aggro holds.
+    if (gZelda3dZTargetActor != NULL) {
+        Player_SetAutoLockOnActor(play, gZelda3dZTargetActor);
     }
 
     // #71 pause-menu nav: open/switch-page/close via the real kaleido input path (see gZelda3dPauseTarget).
