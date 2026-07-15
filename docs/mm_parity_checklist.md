@@ -1,5 +1,8 @@
 # MM (native 2S2H) Link state parity checklist
 
+Consolidated into the closed-cases registry at **`docs/parity-map.md`** (MM section); this file is
+the live per-state detail. See also `docs/codemap.md` / `docs/re-frontier.md`.
+
 **Status: SEED (2026-07-15).** Mirrors `docs/link_parity_checklist.md`'s shape but MM has no
 Force*-hook layer, no MM3D-model substitution for the player, and no MM3D/oracle A/B yet — see
 `docs/re_control_debug_backlog.md` item #11 for the full RE-debt accounting. This file grows one

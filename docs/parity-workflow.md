@@ -4,9 +4,11 @@ The workflow that worked for title-screen parity. Reusable for ANY SoH3D↔OoT3D
 work (a scene, an actor, a lighting pass). Distilled 2026-07-08 from a session where the
 first three "bugs" turned out to be false alarms — the method below is what fixed that.
 
-See also: **`docs/codemap.md`** (what subsystem you're closing a gap in) and
+See also: **`docs/codemap.md`** (what subsystem you're closing a gap in),
 **`docs/re-frontier.md`** (the ordered RE step this workflow is verifying — a step only becomes
-`re-verified` there once it survives the matched-frame audit below).
+`re-verified` there once it survives the matched-frame audit below), and **`docs/parity-map.md`**
+(the CLOSED-CASES registry — when this workflow moves an item to parity, record a CLOSED-parity
+row there so sweeps/loops don't re-examine it; check it FIRST so you don't re-audit a closed case).
 
 ## The one rule everything else serves
 **Verify against the oracle at CONTENT-MATCHED frames before you trust a finding OR a fix.**

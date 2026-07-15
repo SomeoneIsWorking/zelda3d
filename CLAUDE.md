@@ -3,8 +3,15 @@
 SoH3D = Ship of Harkinian rendering OoT3D (3DS) models/world instead of N64. See `README`/notes for
 the project itself; this file is the working contract for agents.
 
-## Orient here FIRST — codemap + RE frontier
+## Orient here FIRST — parity-map + codemap + RE frontier
 
+Start every task by checking these THREE maps: skip closed cases (parity-map), find the code
+(codemap), pick the next RE step (re-frontier).
+
+- **`docs/parity-map.md`** — the CLOSED-CASES registry: what is CONFIRMED AT PARITY with the
+  oracle. **A CLOSED item is NOT to be re-examined by sweeps/loops — it reopens ONLY on explicit
+  user request or a confirmed regression.** This is the enforcement mechanism for "mark verified,
+  don't revisit"; several lighting/terrain rows are OFF-LIMITS to tuning by user instruction.
 - **`docs/codemap.md`** — subsystem-keyed map of what's where, what's done, what's missing. Find
   the subsystem before touching it; update the row in the same commit that changes it. Governed by
   `tools/codemap.py check`.
@@ -12,9 +19,9 @@ the project itself; this file is the working contract for agents.
   reverse-engineering (ground truth from the ROM) vs a `⛔ hack` standing in for it, and the next
   RE-ready step (`tools/re_frontier.py next`). This is where the "decomp is ground truth" rule
   (below) gets tracked concretely, per-arc.
-- Together with `docs/parity-workflow.md` (the method for closing a gap) and the kanban
-  (user-driven work items), these four form one system: codemap = what exists, re-frontier = RE
-  progress, parity-workflow = method, kanban = work items.
+- Together with `docs/parity-workflow.md` (the method for moving an item OPEN→CLOSED) and the
+  kanban (user-driven work items), these form one system: parity-map = what's closed,
+  codemap = what exists, re-frontier = RE progress, parity-workflow = method, kanban = work items.
 
 ## The backlog is a kanban on GitHub Issues — USE IT
 
