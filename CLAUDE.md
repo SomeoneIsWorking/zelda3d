@@ -3,6 +3,19 @@
 SoH3D = Ship of Harkinian rendering OoT3D (3DS) models/world instead of N64. See `README`/notes for
 the project itself; this file is the working contract for agents.
 
+## Orient here FIRST — codemap + RE frontier
+
+- **`docs/codemap.md`** — subsystem-keyed map of what's where, what's done, what's missing. Find
+  the subsystem before touching it; update the row in the same commit that changes it. Governed by
+  `tools/codemap.py check`.
+- **`docs/re-frontier.md`** — the ordered RE dependency chain: which behavior is real
+  reverse-engineering (ground truth from the ROM) vs a `⛔ hack` standing in for it, and the next
+  RE-ready step (`tools/re_frontier.py next`). This is where the "decomp is ground truth" rule
+  (below) gets tracked concretely, per-arc.
+- Together with `docs/parity-workflow.md` (the method for closing a gap) and the kanban
+  (user-driven work items), these four form one system: codemap = what exists, re-frontier = RE
+  progress, parity-workflow = method, kanban = work items.
+
 ## The backlog is a kanban on GitHub Issues — USE IT
 
 The backlog is **GitHub Issues** on this repo (`SomeoneIsWorking/soh3d`, private), driven by
