@@ -3,15 +3,15 @@
 // (Phase 2b codebase reorg, see docs/codemap.md); see render/zelda3d_render.h for the shared
 // render-owned symbols this file pokes (sModelTable/sAuto, the generic actor-pin/aim/motion-sample
 // debug surface, cam-lift/terrain-warp/fog/sky diagnostics, etc).
-#include "zelda3d.h"
-#include "render/zelda3d_render.h"
-#include "repl/zelda3d_repl.h"
+#include "../zelda3d.h"
+#include "../render/zelda3d_render.h"
+#include "zelda3d_repl.h"
 #include "../cutscene/zelda3d_cutscene.h"
-#include "behaviors/title/title_presentation.h"
-#include "behaviors/title/title_cloud_vortex.h"
+#include "../behaviors/title/title_presentation.h"
+#include "../behaviors/title/title_cloud_vortex.h"
 #include "../scene/zelda3d_collision.h"
 #include "../player/zelda3d_link.h"
-#include "input/zelda3d_input.h"
+#include "../input/zelda3d_input.h"
 #include "../anim/zelda3d_anim_override.h"
 #include "overlays/actors/ovl_En_Ge1/z_en_ge1.h"
 #include "overlays/actors/ovl_En_Ko/z_en_ko.h"
@@ -20,7 +20,14 @@
 #include "overlays/actors/ovl_En_Horse/z_en_horse.h"
 #include "objects/object_ge1/object_ge1.h"
 #include "soh/SaveManager.h" // Save_LoadFile (`savecycle`)
-void Save_LoadFile(void); // z_sram.c
+// Save_LoadFile (z_sram.c) and Save_GetSaveMetaInfo (defined extern "C" in soh/SaveManager.cpp) both
+// have C linkage; SaveManager.h only declares Save_GetSaveMetaInfo in its C branch (the C++ branch
+// exposes the SaveManager class instead) — forward-declare both directly for this C++ TU
+// (`savecycle`), matching core/zelda3d.c's C-file declaration of Save_LoadFile.
+extern "C" {
+void Save_LoadFile(void);
+SaveFileMetaInfo* Save_GetSaveMetaInfo(int fileNum);
+}
 
 #include <stdlib.h>
 #include <stdio.h>
@@ -117,7 +124,7 @@ extern Actor* gZelda3dZTargetActor;
 
 // N64 object id -> OoT3D actor ZAR path (kZelda3dObjectZars): sizes sAuto[] the same way render.cpp
 // does (REPL `autostate`/`auto`/`enkomask` inspect it directly).
-#include "tables/zelda3d_object_zars.inc"
+#include "../tables/zelda3d_object_zars.inc"
 
 // ===========================================================================
 // Zelda3D REPL — interactive control of a long-lived headless instance.
@@ -2392,6 +2399,10 @@ static void Zelda3D_ReplExec(PlayState* play, char* line, const char* outPath) {
                         gZelda3dCamEye[0], gZelda3dCamEye[1], gZelda3dCamEye[2], gZelda3dCamAt[0], gZelda3dCamAt[1],
                         gZelda3dCamAt[2], rad);
     } else if (strcmp(cmd, "dump") == 0 && sscanf(line, "%*s %1023s", path) == 1) {
+        // On-demand frame dump trigger, defined in libultraship's gfx_sdl3(gpu).cpp (same pair
+        // render/zelda3d_render.cpp declares locally).
+        extern char gSoh3dDumpPath[1024];
+        extern volatile int gSoh3dDumpPending;
         strncpy(gSoh3dDumpPath, path, sizeof(gSoh3dDumpPath) - 1);
         gSoh3dDumpPath[sizeof(gSoh3dDumpPath) - 1] = '\0';
         gSoh3dDumpPending = 1;

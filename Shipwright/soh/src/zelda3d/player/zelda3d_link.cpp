@@ -3,9 +3,9 @@
 // + hand-weave state, the pose-freeze, linkpin, the cucco-grab repro driver, and all the `link*`
 // REPL commands. The LOW-LEVEL CMB skeleton forward-kinematics primitives stay in zelda3d_model.cpp
 // (Zelda3D_UpdateAnimN64*, Zelda3D_PosedGroundOffset, ...); this file CALLS them.
-#include "zelda3d.h"
+#include "../zelda3d.h"
 #include "zelda3d_link.h"
-#include "behaviors/actor/player.h" // PlayerBehavior — Link as a structured ActorBehavior class
+#include "../behaviors/actor/player.h" // PlayerBehavior — Link as a structured ActorBehavior class
 #include "player/link_midmask.h" // Stage 2a shared adult mesh-mask policy (Shipwright/zelda3d_shared/)
 #include <stdlib.h>
 #include <stdio.h>
@@ -16,7 +16,7 @@
 // (no regression); the divergent spine/upper-arms are HAND-WOVEN (#7/#31) — a constant fitted C
 // provably can't reconcile the re-authored OoT3D arm motion, so the arm corrections are tuned by
 // hand against the OoT3D CSAB ground truth (linksrc 3ds), NOT auto-fit.
-#include "tables/zelda3d_link_bonecorr.inc"
+#include "../tables/zelda3d_link_bonecorr.inc"
 
 // HAND-WEAVE live-tune scaffold (#7 long arm). A mutable runtime copy of the table that the player
 // path actually passes, so each upper-body bone's correction can be adjusted LIVE over the REPL

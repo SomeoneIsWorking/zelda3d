@@ -29,7 +29,8 @@ struct Zelda3DBoneMap;
 int Zelda3D_TryDrawActor(PlayState* play, Actor* actor);          // also declared in zelda3d.h
 int Zelda3D_DrawActorModel(PlayState* play, int modelId, Actor* actor, float worldScale); // also in zelda3d.h
 int Zelda3D_EmitActorBillboard(PlayState* play, int modelId, Actor* actor,
-                             float worldX, float worldY, float worldZ, float halfSize); // also in zelda3d.h
+                             float xOff, float yOff, float zOff, float scale,
+                             u8 r, u8 g, u8 b, u8 a); // also in zelda3d.h
 float Zelda3D_GScale(int slot, float def);                         // also declared in zelda3d.c prelude
 
 // --- Room/scene draw -----------------------------------------------------------------------------
@@ -142,6 +143,38 @@ extern FILE* sZelda3dMotionFile;
 extern Actor* sZelda3dMotionActor;
 extern s32 sZelda3dMotionRemaining;
 extern s32 sZelda3dMotionFrame;
+
+// --- REPL-tunable render globals (still DEFINED in zelda3d.c; declared here since render.cpp and
+// repl/zelda3d_repl.cpp both read/write them and neither includes zelda3d.c directly). Phase-3
+// codebase reorg (2026-07): these were only visible before because render.cpp/repl.cpp were
+// physically the same translation unit as zelda3d.c; splitting them into real files surfaced the
+// missing declarations, which this header — the documented shared-symbol contract — now carries.
+extern int gZelda3dForceTime;         // REPL `forcetime`
+extern int gZelda3dTerrainWarp;       // REPL `terrainwarp`
+extern float gZelda3dTintDiff, gZelda3dTintMul; // flat scene-tint REPL `tint`
+extern float gZelda3dRotX, gZelda3dRotY, gZelda3dRotZ; // REPL debug model rotation
+extern int gZelda3dSwTilt;            // #75 En_Sw wall/tree draw tilt; REPL `swtilt`
+extern int gZelda3dAnimLive;          // REPL `animlive`
+extern float gZelda3dGScale[32];      // per-slot REPL `gscale`; see ZELDA3D_GSCALE below
+extern float gZelda3dSceneOffX, gZelda3dSceneOffY, gZelda3dSceneOffZ; // REPL scene offset
+extern float gZelda3dSceneScale;      // REPL scene scale
+extern int gZelda3dWorldShade;        // #111 world-shade opt-in; REPL `worldshade`
+extern float gZelda3dWorldShadeKa, gZelda3dWorldShadeKd, gZelda3dWorldShadeKe; // #111 shade coeffs
+extern unsigned char gZelda3dWorldShadeAmb[3];
+extern unsigned char gZelda3dWorldShadeL0Col[3];
+extern unsigned char gZelda3dWorldShadeL1Col[3];
+extern signed char gZelda3dWorldShadeL0Dir[3];
+extern signed char gZelda3dWorldShadeL1Dir[3];
+extern int gZelda3dWorldShadeSlotBias; // #111 palette-slot index bias
+extern int gZelda3dSky;               // REPL `sky`
+extern float gZelda3dSkyScale;        // REPL `sky` scale override
+extern int gZelda3dGCam;              // #25 force game camera behind Link; REPL `gcam`
+
+// Per-slot REPL gscale override (REPL `gscale <slot> <value>`), falling back to `def` when unset.
+#define ZELDA3D_GSCALE(id, def) (((id) >= 0 && (id) < 32 && gZelda3dGScale[id] > 0.0f) ? gZelda3dGScale[id] : (def))
+
+// z_play.c (engine-internal); REPL `step` drives one Play_Update under freeze.
+void Play_Update(PlayState* play);
 
 #ifdef __cplusplus
 }

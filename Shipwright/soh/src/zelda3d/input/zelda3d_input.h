@@ -41,8 +41,8 @@ void Zelda3D_WalkInject(PlayState* play);
 // itself is a monolithic dispatcher, out of scope for this phase — see the empty
 // soh/src/zelda3d/repl/ scaffold left by Phase 0 for where that consolidation belongs); these two
 // functions are the actual command bodies.
-void Zelda3D_Input_HandleWalkHoldCmd(const char* line, char* outPath);
-void Zelda3D_Input_HandleBtnHoldCmd(const char* line, char* outPath);
+void Zelda3D_Input_HandleWalkHoldCmd(const char* line, const char* outPath);
+void Zelda3D_Input_HandleBtnHoldCmd(const char* line, const char* outPath);
 
 // #32 — Xbox face-button HUD glyphs. -1=uninit (reads env ZELDA3D_XBOXUI, default on). z_parameter.c
 // reads this to swap the per-button texture. Moved from zelda3d.c.

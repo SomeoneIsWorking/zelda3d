@@ -1,7 +1,7 @@
 // Zelda3D math/locomotion primitives + the still-dead standalone rider integrator (superseded by
 // Zelda3D::TitleRider, behaviors/title/title_rider.cpp) -- extracted out of zelda3d.c (Phase 2b
 // codebase reorg step 3, see docs/codemap.md and core/zelda3d_math.h).
-#include "core/zelda3d_math.h"
+#include "zelda3d_math.h"
 
 #include <math.h>
 #include <stddef.h>

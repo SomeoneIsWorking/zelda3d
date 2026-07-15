@@ -101,7 +101,8 @@ int gZelda3dDoorHold = (-2147483647 - 1); // INT32_MIN = off (use live swing); e
 // and a too-small array silently made `gscale <id>` a no-op for those (the macro fell back to def for
 // id>=16, so e.g. kibako slot 18 could never be live-tuned). Sized to cover every assigned slot.
 float gZelda3dGScale[32] = { 0 };
-#define ZELDA3D_GSCALE(id, def) (((id) >= 0 && (id) < 32 && gZelda3dGScale[id] > 0.0f) ? gZelda3dGScale[id] : (def))
+// ZELDA3D_GSCALE macro moved to render/zelda3d_render.h (the shared-symbol contract with render.cpp
+// and repl.cpp, phase-3 reorg).
 
 // Live CSAB animation playback (GPU skinning). gZelda3dAnimRate = anim-frames advanced
 // per draw (the OoT3D logic tick is ~20 fps; tune live over the REPL). The frame is
@@ -459,7 +460,7 @@ int gZelda3dHlGroup = -1;
 // the proper post-cam state). -1 = uninit (read ZELDA3D_SKIP env, default on). REPL `skip <0|1>`.
 int gZelda3dSkip = -1;
 int gZelda3dFreeze = 0; // frame-step harness: 1 = hold Play_Update; REPL `step` ticks it (see zelda3d.h)
-void Play_Update(PlayState* play); // engine-internal (z_play.c); REPL `step` drives it under freeze
+// Play_Update forward decl moved to render/zelda3d_render.h (shared-symbol contract).
 int Zelda3D_SkipEnabled(void) {
     if (gZelda3dSkip < 0) {
         const char* v = getenv("ZELDA3D_SKIP");
@@ -923,7 +924,7 @@ static int Zelda3D_DoRetarget(PlayState* play, void** skeleton, Vec3s* jointTabl
         // Port the OoT3D actor draw-overrides (head/torso tracking, #93) onto the OoT3D bones via the
         // post-rotation channel. Reads the live interactInfo the faithful actor logic computed.
         Zelda3D_ApplyActorOverrides(gZelda3dPendingModel, gZelda3dPendingActor);
-        gZelda3dPendingOverride = NULL; // consumed; the next actor's choke point sets it afresh
+        Zelda3D_SetLimbOverride(NULL, NULL, 0); // consumed; the next actor's choke point sets it afresh
         Zelda3D_UpdateAnimAuto(gZelda3dPendingModel, csab, gZelda3dAnimRate, gZelda3dPendingN64CurFrame,
                              gZelda3dPendingN64AnimLength, gZelda3dPendingMorphWeight);
         // Shared multi-variant CMBs (En_Ko Kokiri kids) bake several heads on distinct mesh_ids;
