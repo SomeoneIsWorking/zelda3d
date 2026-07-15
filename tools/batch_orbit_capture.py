@@ -32,7 +32,7 @@ from typing import List, Optional
 # ── paths ─────────────────────────────────────────────────────────────────────
 _HERE   = Path(__file__).resolve().parent
 _SOH3D  = _HERE.parent
-_DECOMP = _SOH3D.parent / "oot3d-decomp"
+_DECOMP = _SOH3D / "oot3d-decomp"  # in-repo submodule
 
 sys.path.insert(0, str(_HERE))
 sys.path.insert(0, str(_DECOMP / "tools"))

@@ -148,7 +148,7 @@ def oracle_capture(stick_x, stick_y, frames, hz):
 
 def oracle_warp_open():
     """Warp the oracle to Kokiri Forest via oot3d-decomp link_ctl (open ground for sustained run)."""
-    lc = os.path.join(HERE, "..", "..", "oot3d-decomp", "tools", "link_ctl.py")
+    lc = os.path.join(HERE, "..", "oot3d-decomp", "tools", "link_ctl.py")
     if os.path.exists(lc):
         try:
             subprocess.run([lc, "warp", "0xEE"], capture_output=True, text=True, timeout=20)

@@ -43,7 +43,7 @@ import harness_ctl as HC           # noqa: E402  (embedded-Azahar oracle transpo
 
 SCRATCH = os.path.join(REPO, "scratch", "link_sweep")
 CHECKLIST_MD = os.path.join(REPO, "docs", "link_parity_checklist.md")
-NAMES_TABLE = os.path.join(REPO, "..", "oot3d-decomp", "tools", "skeldata",
+NAMES_TABLE = os.path.join(REPO, "oot3d-decomp", "tools", "skeldata",
                            "player_animid_names.json")
 NAMES_TABLE = os.path.abspath(NAMES_TABLE)
 SAVE_STATE = os.path.join(REPO, "scratch", "title_settled.state")
