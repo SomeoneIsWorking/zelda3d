@@ -137,16 +137,28 @@ class OracleSession:
         _, name, _ = self.sample()
         return name
 
-    def curve(self, mags, hold_frames=40):
-        """Speed->CSAB curve at each analog magnitude (forward = +ly), matching
-        parity_speed_sweep's Oracle.curve() shape ({"mag","speedXZ","csab"})."""
+    # Calibrated forward analog-Y deflections (libretro s16, forward = NEGATIVE Y). The embedded
+    # harness feeds `analog <lx> <ly>` straight to libretro InputState in the full s16 range
+    # [-32768,32767] (tools/soh3d_harness/main.cpp), which Azahar's libretro core maps to the 3DS
+    # circle pad through a DEADZONE + nonlinear curve. Empirically probed 2026-07-15
+    # (scratch/oracle_walkmag_probe.py, Kokiri 0xEE): deflections shallower than ~-16000 stay in
+    # the circle-pad deadzone (Link idle, speedXZ 0); -24000 -> nml_walk_free (speedXZ ~1.3);
+    # -32000 -> nml_run_free (speedXZ ~4.2). So a curve MUST use near-full deflections to separate
+    # walk from run — circle-pad-style 0..100 magnitudes (the external azahar_rpc oracle's unit)
+    # are ~0.3% deflection here and never move Link. These four points straddle idle/walk/run.
+    FORWARD_DEFLECTIONS = [0, -24000, -28000, -32000]
+
+    def curve(self, deflections=None, hold_frames=45):
+        """Speed->CSAB curve at each calibrated forward analog-Y deflection (s16, forward=neg).
+        Returns parity_speed_sweep's Oracle.curve() shape ({"mag","speedXZ","csab"}) so
+        SPD.classify()/SPD.windows_overlap() consume it unchanged."""
         out = []
-        for m in mags:
+        for d in (deflections if deflections is not None else self.FORWARD_DEFLECTIONS):
             self.resettle()
-            self.h.send(f"analog 0 {int(m)}")
+            self.h.send(f"analog 0 {int(d)}")
             self.h.send(f"run {hold_frames}")
             _, name, spd = self.sample()
-            out.append({"mag": m, "speedXZ": round(spd or 0.0, 3), "csab": name})
+            out.append({"mag": d, "speedXZ": round(abs(spd or 0.0), 3), "csab": name})
         self.h.send("analog 0 0")
         return out
 
@@ -198,9 +210,11 @@ STATE_MATRIX = [
      " (no REPL primitive isolates a stationary yaw-only turn from the locomotion stick)"},
 
     {"name": "jump", "group": "action", "kind": "forcestate", "pss": "jump"},
-    {"name": "roll", "group": "action", "kind": "observe", "force": "roll",
-     "note": "linkstate roll exists (Zelda3D_PlayerForceRoll); decomp ground-truth CSAB family "
-             "for the N64 dodge-roll action func not yet RE'd this session -> observe only"},
+    {"name": "roll", "group": "action", "kind": "forcestate", "force": "roll", "expect": "landing_roll",
+     "note": "forward dodge-roll: Zelda3D_PlayerForceRoll -> Player_SetupRoll (byte-faithful N64) "
+             "plays PLAYER_ANIMGROUP_landing_roll; OoT3D anim-group table @0x53a7c0 = "
+             "{138,139,139,138,138,138} = nml_landing_roll_free/nml_landing_roll (oot3d-decomp "
+             "docs/player_anim_states.md, RE'd 2026-07-15 via ReadWord.py)"},
     {"name": "attack", "group": "action", "kind": "forcestate", "pss": "attack"},
     {"name": "attack_combo", "group": "action", "kind": "unreachable",
      "reason": UNREACHABLE_NO_RECIPE + " (linkstate attack forces ONE slash; no recipe chains "
@@ -275,7 +289,15 @@ def run_state(st, oracle):
         return row
 
     if kind == "forcestate":
-        pss_st = next(s for s in PSS.STATES if s["name"] == st["pss"])
+        # Two ways a forcestate names its decomp ground truth: reuse a parity_state_sweep STATE
+        # (via `pss`), or carry its own `force`+`expect` inline (states link_sweep RE'd itself,
+        # e.g. roll). Both drive Zelda3D_PlayerForce* through REPL `linkstate` under freeze and
+        # substring-match the resolved CSAB against the decomp anim-group family.
+        if "pss" in st:
+            pss_st = next(s for s in PSS.STATES if s["name"] == st["pss"])
+        else:
+            pss_st = {"name": name, "kind": "forcestate", "force": st["force"],
+                      "gt": "decomp", "expect": st["expect"]}
         soh = PSS.soh_reach(pss_st)
         v = PSS.verdict(pss_st, soh, None)
         row.update(verdict={"PASS": "MATCH", "FAIL": "DIVERGENT"}.get(v, "UNREACHABLE"),
@@ -325,8 +347,7 @@ def run_state(st, oracle):
             row.update(verdict="UNREACHABLE", soh_curve=soh_curve, soh_class=sc,
                        reason=f"oracle unavailable: {oracle.fail_reason if oracle else 'not booted'}")
             return row
-        ora_mags = [0, 40, 70, 100]
-        ora_curve = oracle.curve(ora_mags)
+        ora_curve = oracle.curve()  # calibrated forward deflections (see OracleSession.curve)
         oc = SPD.classify(ora_curve)
         key = "walk_csab" if name == "walk" else "run_csab"
         s_sel, o_sel = sc.get(key), oc.get(key)
@@ -376,9 +397,9 @@ def do_sweep(skip_oracle=False, only=None):
     os.makedirs(SCRATCH, exist_ok=True)
     ts_path = os.path.join(SCRATCH, f"{int(time.time())}.json")
     json.dump(result, open(ts_path, "w"), indent=2)
-    latest_path = os.path.join(SCRATCH, "latest.json")
-    json.dump(result, open(latest_path, "w"), indent=2)
-    print(f"[link_sweep] wrote {ts_path} and {latest_path}", file=sys.stderr)
+    print(f"[link_sweep] wrote raw {ts_path}", file=sys.stderr)
+    # NOTE: latest.json is written by the CALLER (cmd_sweep), AFTER merging when --only is used —
+    # writing it here would clobber the rows a scoped run didn't re-drive before _merged reads them.
     return result
 
 
@@ -443,12 +464,15 @@ def write_checklist(result):
 def cmd_sweep(args):
     only = set(args.only.split(",")) if args.only else None
     result = do_sweep(skip_oracle=args.skip_oracle, only=only)
-    write_checklist(result if not only else _merged(result))
+    final = _merged(result) if only else result
+    # Write latest.json exactly once, from the FINAL (merged, when scoped) row set.
+    json.dump(final, open(os.path.join(SCRATCH, "latest.json"), "w"), indent=2)
+    write_checklist(final)
 
 
 def _merged(partial):
     """When --only is used, merge the partial result into the existing latest.json instead of
-    clobbering rows that weren't re-run."""
+    clobbering rows that weren't re-run. Returns the merged result (caller writes latest.json)."""
     path = os.path.join(SCRATCH, "latest.json")
     if not os.path.exists(path):
         return partial
@@ -458,9 +482,7 @@ def _merged(partial):
         by_name[r["name"]] = r
     order = [st["name"] for st in STATE_MATRIX]
     merged_rows = [by_name[n] for n in order if n in by_name]
-    merged = {"timestamp": partial["timestamp"], "rows": merged_rows}
-    json.dump(merged, open(path, "w"), indent=2)
-    return merged
+    return {"timestamp": partial["timestamp"], "rows": merged_rows}
 
 
 def cmd_show(args):
