@@ -12,14 +12,14 @@ Ground truth (`gt`): `oracle` = live OoT3D reading via the embedded-Azahar harne
 |---|---|---|---|---|---|
 | model_render | render | MATCH | - | - | - |
 | idle | locomotion | MATCH | both sides select a *_wait* family CSAB while standing | soh=nml_wait_free; oracle=nml_wait_free | - |
-| walk | locomotion | MATCH | selected CSAB family at matched speedXZ + walk/run threshold-window overlap | soh_select=nml_walk_free; oracle_select=nml_walk_free; window_overlap=True | - |
-| run | locomotion | MATCH | selected CSAB family at matched speedXZ + walk/run threshold-window overlap | soh_select=nml_run_free; oracle_select=nml_run_free; window_overlap=True | - |
+| walk | locomotion | MATCH | selected CSAB family at matched speedXZ + walk/run threshold-window overlap | soh_select=nml_walk_free; oracle_select=nml_walk_free; window_overlap=True | 7ae915bf |
+| run | locomotion | MATCH | selected CSAB family at matched speedXZ + walk/run threshold-window overlap | soh_select=nml_run_free; oracle_select=nml_run_free; window_overlap=True | 7ae915bf |
 | backwalk | locomotion | UNREACHABLE | - | reason: no existing REPL/oracle input recipe drives this state headlessly (walkhold/analog only drives a magnitude, not a signed reverse-relative-to-facing vector; no REPL primitive distinguishes backwalk from turning to face the stick) | - |
 | sidestep_l | locomotion | UNREACHABLE | - | reason: no existing REPL/oracle input recipe drives this state headlessly | - |
 | sidestep_r | locomotion | UNREACHABLE | - | reason: no existing REPL/oracle input recipe drives this state headlessly | - |
 | turn_in_place | locomotion | UNREACHABLE | - | reason: no existing REPL/oracle input recipe drives this state headlessly (no REPL primitive isolates a stationary yaw-only turn from the locomotion stick) | - |
 | jump | action | MATCH | CSAB-family substring match vs oot3d-decomp action-func anim group | soh=nml_jump | - |
-| roll | action | MATCH | CSAB-family substring match vs oot3d-decomp action-func anim group | soh=nml_landing_roll_free | - |
+| roll | action | MATCH | CSAB-family substring match vs oot3d-decomp action-func anim group | soh=nml_landing_roll_free | 7ae915bf |
 | attack | action | MATCH | CSAB-family substring match vs oot3d-decomp action-func anim group | soh=ft_nml_kiru | - |
 | attack_combo | action | UNREACHABLE | - | reason: no existing REPL/oracle input recipe drives this state headlessly (linkstate attack forces ONE slash; no recipe chains repeated timed A presses into a combo under freeze) | - |
 | shield | action | MATCH | CSAB-family substring match vs oot3d-decomp action-func anim group | soh=nml_defense_free | - |
