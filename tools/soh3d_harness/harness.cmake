@@ -13,6 +13,7 @@ add_executable(soh3d_harness
     ${_harness_root}/soh_state.cpp
     ${_harness_root}/watchhook.cpp
     ${_harness_root}/title_sync.cpp
+    ${_harness_root}/harness_vk.cpp
     ${_libretro_root}/citra_libretro.cpp
     $<TARGET_OBJECTS:azahar_libretro_common>
 )
@@ -70,6 +71,17 @@ target_link_libraries(soh3d_harness PRIVATE
     "$<LINK_LIBRARY:WHOLE_ARCHIVE,ZAPDLib>")
 if(ENABLE_VULKAN)
     target_link_libraries(soh3d_harness PRIVATE sirit vulkan-headers vma)
+    # harness_vk.cpp is a real libretro Vulkan HW-render FRONTEND: it creates
+    # its own VkInstance/VkDevice and calls vkCreateInstance / vkCmd* directly,
+    # so it needs the Vulkan loader at link time (vulkan-headers is headers-
+    # only). Azahar's own renderer loads Vulkan dynamically, hence no existing
+    # link dep to inherit.
+    find_library(HARNESS_VULKAN_LOADER NAMES vulkan vulkan-1)
+    if(HARNESS_VULKAN_LOADER)
+        target_link_libraries(soh3d_harness PRIVATE ${HARNESS_VULKAN_LOADER})
+    else()
+        target_link_libraries(soh3d_harness PRIVATE vulkan)
+    endif()
 endif()
 if(ENABLE_OPENGL)
     target_link_libraries(soh3d_harness PRIVATE glad)

@@ -518,3 +518,42 @@ Verification signature: at title `run 1000` (dayTime 0x3197), `az_fog` prints
 `color=(0,0,0)` end-of-frame but per-draw `vsuni_log` shows 51 draws `fog=5/0(56,42,40)`,
 and the LUT dump has `lut[127] = 0.9819/-0.7338` (75.2% max fog). See oot3d-decomp
 `title_env_lighting.md` §12.
+
+---
+
+# Azahar patch — libretro logging never honored the global filter
+
+## Where
+
+`src/common/logging/backend.cpp`, `Impl::Initialize(retro_log_printf_t)` (the
+`#ifdef HAVE_LIBRETRO` overload).
+
+## The bug
+
+`FmtLogMessageImpl` only consults the global filter when `logging_initialized`
+is true:
+
+```cpp
+if (logging_initialized) {
+    if (!Impl::Instance().GetFilter().CheckMessage(log_class, log_level)) return;
+    Impl::Instance().PushEntry(...);
+} else {
+    // pre-init: write straight to stderr, UNFILTERED
+    PrintMessage(...);
+}
+```
+
+The file-based `Initialize(std::string_view)` sets `logging_initialized = true`,
+but the libretro `Initialize(retro_log_printf_t callback)` overload never did.
+So in the harness (which always takes the libretro path) EVERY log message hit
+the `else` branch and printed to stderr unfiltered — `SetGlobalFilter()` was a
+complete no-op. Per-frame `LOG_DEBUG` spam (`Audio.DSP mixers remaining_dirty`,
+`Render.Vulkan`, ...) — thousands of synchronous stderr writes per second —
+flooded the harness and throttled the frame loop.
+
+## The patch
+
+Add `logging_initialized = true;` in the libretro `Initialize` overload, right
+after the `instance` is constructed (mirroring the file-based overload). Then
+the harness's `Common::Log::SetGlobalFilter(Filter(Level::Warning))` (called in
+`main()` after `retro_init`) takes effect and the debug flood stops.
