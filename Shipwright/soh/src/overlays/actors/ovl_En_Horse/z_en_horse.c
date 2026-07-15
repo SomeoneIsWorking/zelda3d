@@ -2153,6 +2153,38 @@ void EnHorse_CsMoveToPoint(EnHorse* this, PlayState* play, CsCmdActorCue* action
     }
 }
 
+// ANIMATION-ONLY tail of EnHorse_CsMoveToPoint/EnHorse_CsWarpMoveToPoint (both bodies above are
+// byte-identical past the position/turn block, per oot3d-decomp docs/title_rider_cs_dispatch.md's
+// "byte-identical body to PathFollow_Update" note on FUN_00230d84 vs FUN_003cf3c4). Exported for
+// the SoH3D title rider (title_rider.cpp), which owns cue 0x24/0x40's POSITION via its own
+// oracle-verified Zelda3D_PathFollowUpdate/ActorMoveXZByYawSpeed integrator (title_rider_traj.py-
+// verified against the Az world-pos mirror) — calling the position-mutating halves of
+// EnHorse_CsMoveToPoint/EnHorse_CsWarpMoveToPoint verbatim would double-integrate the same cue
+// endpoint every frame. This wrapper carries ONLY the SkelAnime-driving tail (speedXZ*0.3 playSpeed
+// + loop-restart via Animation_PlayOnceSetSpeed), so the title's gallop anim advances via the exact
+// cs-dispatcher mechanism instead of the gameplay EnHorse_MountedGallop action func (which additionally
+// reads live stick input via EnHorse_UpdateSpeed/EnHorse_StickDirection and gates on
+// EnHorse_PlayerCanMove — none of which the title cs's own native code path exercises).
+void EnHorse_CsMoveAnimOnly(EnHorse* this) {
+    this->skin.skelAnime.playSpeed = this->actor.speedXZ * 0.3f;
+    if (SkelAnime_Update(&this->skin.skelAnime)) {
+        EnHorse_PlayGallopingSound(this);
+        func_800AA000(0.0f, 120, 8, 255);
+        Animation_PlayOnceSetSpeed(&this->skin.skelAnime, sAnimationHeaders[this->type][this->animationIdx],
+                                   this->actor.speedXZ * 0.3f);
+    }
+}
+
+// ANIMATION-ONLY init counterpart, for the transition edge — the exact `animationIdx`/
+// `Animation_PlayOnceSetSpeed` statements from EnHorse_CsMoveInit/EnHorse_WarpMoveInit (both use
+// ENHORSE_ANIM_GALLOP + the same speedXZ*0.3f call), split out so title_rider.cpp doesn't need
+// direct access to the file-static `sAnimationHeaders` table.
+void EnHorse_CsMoveInitAnimOnly(EnHorse* this) {
+    this->animationIdx = ENHORSE_ANIM_GALLOP;
+    Animation_PlayOnceSetSpeed(&this->skin.skelAnime, sAnimationHeaders[this->type][this->animationIdx],
+                               this->actor.speedXZ * 0.3f);
+}
+
 void EnHorse_CsSetAnimHighJump(EnHorse* this, PlayState* play) {
     this->skin.skelAnime.curFrame = 0.0f;
     EnHorse_CsPlayHighJumpAnim(this, play);
