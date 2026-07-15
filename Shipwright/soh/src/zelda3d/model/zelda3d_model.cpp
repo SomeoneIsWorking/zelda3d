@@ -19,7 +19,7 @@
 #include "fast/zelda3d_gl.h"
 #include "zelda3d_model_internal.h" // LoadedModel + loadModel (shared with zelda3d_anim.cpp)
 #include <stb_image.h>
-#include "zelda3d_stairs.h" // procedural stair geometry (gZelda3dStairs, generateStairsGroup, ...)
+#include "../zelda3d_stairs.h" // procedural stair geometry (gZelda3dStairs, generateStairsGroup, ...)
 
 #include <algorithm>
 #include <array>
@@ -1433,7 +1433,7 @@ int Zelda3D_RoomGroundDeltaAt(int modelId, float x, float z, float* outD) {
 } // extern "C"
 
 
-#include "zelda3d_collision.h"
+#include "../zelda3d_collision.h"
 
 // Generic romfs file read for C callers (e.g. zelda3d_cutscene.cpp).
 // Returns a malloc'd buffer (caller frees) or NULL.

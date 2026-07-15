@@ -72,7 +72,7 @@
 #include "global.h"
 #include "title_logo.h"
 #include "../../zelda3d_cutscene.h"
-#include "../../zelda3d_overlay2d.h"
+#include "../../model/zelda3d_overlay2d.h"
 
 #include <algorithm>
 #include <cmath>
