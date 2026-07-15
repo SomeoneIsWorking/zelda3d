@@ -191,8 +191,95 @@ class OracleSession:
 #   observe      — driven via the SAME forcestate mechanism but with NO verified decomp
 #                  ground-truth CSAB family yet; records what SoH selects for follow-up RE
 #                  instead of fabricating a PASS/FAIL against a guessed `expect`
+#   ztarget_move — sidestep_l/sidestep_r/turn_in_place (2026-07-15 RE): native N64 Z-targeting
+#                  gates these on `Player_focusActor != NULL` (z_player.c func_8083FC68/FD78,
+#                  confirmed identically gated in OoT3D decomp FUN_004b9920/FUN_004bf3bc — see
+#                  oot3d-decomp docs/player_anim_states.md "Back-walk / Z-target" and "Side-walk
+#                  / strafe"). REPL `ztarget <0|1>` (zelda3d.c) locks focusActor onto the
+#                  `asel`-selected actor via the real native lock-on entry point
+#                  Player_SetAutoLockOnActor, re-asserted every frame (that function is a
+#                  one-frame latch by native design — see the REPL handler comment). Drives
+#                  `walkhold` under the lock + `gcam` (camera-relative stick), reads the
+#                  resolved CSAB via `linkanimstate` (+ its `sideWalkBlend` field, since
+#                  Player_Action_8084193C/func_80841860 ALWAYS reports the side_walkL CSAB
+#                  pointer in skelAnime.animation and encodes the actual L/R choice as a blend
+#                  weight against side_walkR — see the REPL handler comment in zelda3d.c).
+#                  gt=decomp (no live-oracle drive wired for the Z-target recipe this session —
+#                  the equipment-less oracle save's reachable-state constraint from
+#                  parity_state_sweep.py's docstring applies the same way here).
 #   unreachable  — no existing REPL/oracle input recipe reaches this state headlessly at all
 UNREACHABLE_NO_RECIPE = "no existing REPL/oracle input recipe drives this state headlessly"
+
+
+def _parse_sidewalk_blend(line):
+    for tok in line.split():
+        if tok.startswith("sideWalkBlend="):
+            try:
+                return float(tok.split("=", 1)[1])
+            except ValueError:
+                return None
+    return None
+
+
+def _parse_linkanimstate(line):
+    base = None
+    seg = line.split("upper=")
+    if seg and "base=" in seg[0]:
+        base = seg[0].split("base=")[1].split()[0]
+    if base in ("(unmapped)", "(null)", "(none)"):
+        base = None
+    st1 = None
+    for tok in line.split():
+        if tok.startswith("st1=0x"):
+            try:
+                st1 = int(tok[4:], 16)
+            except ValueError:
+                pass
+    return base, st1
+
+
+def soh_reach_ztarget(stick, settle_frames=45):
+    """Drive Zelda3D into a Z-target-locked locomotion state: warp clean, lock focus onto the
+    nearest actor (`asel any 0` + `ztarget 1`), force the camera behind Link's facing (`gcam 1`,
+    re-evaluated every frame so it tracks the Z-target turn), then either:
+      - stick == (0, 0): turn_in_place. The turn-to-face-target fires IMMEDIATELY on lock
+        acquisition and is often done within a few frames (PLAYER_ANIMGROUP_45_turn only plays
+        while shape.rot.y hasn't caught up to the target yaw yet) — so POLL linkanimstate right
+        after `ztarget 1` instead of settling first, and return the first "45_turn" reading seen
+        (falling back to the last reading if the turn never appears, e.g. already facing target).
+      - otherwise: settle onto the lock, then hold `stick`=(sx,sy) for `settle_frames` and read
+        the settled selection (this is the sidestep_l/sidestep_r recipe).
+    Returns (base_csab, sideWalkBlend, st1)."""
+    PSS.S.soh_cmd(f"warp 0x{KOKIRI:x}")
+    time.sleep(2.5)
+    PSS.S.soh_ensure_free()
+    PSS.S.soh_cmd("link 1")
+    PSS.S.soh_cmd("asel any 0")
+    PSS.S.soh_cmd("gcam 1")
+    if stick == (0, 0):
+        PSS.S.soh_cmd("ztarget 1")
+        line = None
+        last_line = None
+        for _ in range(15):
+            time.sleep(0.05)
+            last_line = PSS.S.soh_cmd("linkanimstate")
+            base, _ = _parse_linkanimstate(last_line)
+            if base and "45_turn" in base:
+                line = last_line
+                break
+        line = line or last_line or ""
+    else:
+        PSS.S.soh_cmd("ztarget 1")
+        time.sleep(0.6)
+        sx, sy = stick
+        PSS.S.soh_cmd(f"walkhold {settle_frames} {sx} {sy}")
+        time.sleep(settle_frames / 60.0 + 0.2)
+        line = PSS.S.soh_cmd("linkanimstate")
+    PSS.S.soh_cmd("walkhold 0")
+    PSS.S.soh_cmd("ztarget 0")
+    PSS.S.soh_cmd("gcam 0")
+    base, st1 = _parse_linkanimstate(line)
+    return base, _parse_sidewalk_blend(line), st1
 
 STATE_MATRIX = [
     {"name": "model_render", "group": "render", "kind": "model",
@@ -201,13 +288,47 @@ STATE_MATRIX = [
     {"name": "idle", "group": "locomotion", "kind": "idle_oracle"},
     {"name": "walk", "group": "locomotion", "kind": "speed"},
     {"name": "run", "group": "locomotion", "kind": "speed"},
-    {"name": "backwalk", "group": "locomotion", "kind": "unreachable", "reason": UNREACHABLE_NO_RECIPE +
-     " (walkhold/analog only drives a magnitude, not a signed reverse-relative-to-facing vector; "
-     "no REPL primitive distinguishes backwalk from turning to face the stick)"},
-    {"name": "sidestep_l", "group": "locomotion", "kind": "unreachable", "reason": UNREACHABLE_NO_RECIPE},
-    {"name": "sidestep_r", "group": "locomotion", "kind": "unreachable", "reason": UNREACHABLE_NO_RECIPE},
-    {"name": "turn_in_place", "group": "locomotion", "kind": "unreachable", "reason": UNREACHABLE_NO_RECIPE +
-     " (no REPL primitive isolates a stationary yaw-only turn from the locomotion stick)"},
+    # 2026-07-15: RE'd that backwalk/sidestep_l/sidestep_r/turn_in_place ALL require a Z-target
+    # lock-on (Player.focusActor != NULL) to reach in the native N64 code — confirmed the SAME
+    # gate exists in the OoT3D decomp (FUN_004b9920/FUN_004bf3bc; oot3d-decomp
+    # docs/player_anim_states.md). Added REPL `ztarget <0|1>` as the prerequisite primitive (see
+    # UNREACHABLE_NO_RECIPE-adjacent kind "ztarget_move" doc above). sidestep_l/sidestep_r/
+    # turn_in_place are now reliably driven+verified this session. backwalk's own dedicated
+    # trigger (func_8083CBF0 -> Player_Action_808423EC -> gPlayerAnim_link_normal_back_walk,
+    # entered only when func_8083FC68's yaw-vs-facing check returns exactly -1) stays
+    # UNREACHABLE: empirically swept the full camera-relative backward stick range
+    # (sy=-45..-127 at sx=0, under `ztarget`+`gcam`) and it consistently lands in the
+    # side_walk (0) bucket instead of the back_walk (-1) bucket, even though the observed
+    # yawTarget-vs-shape.rot.y delta is ~179.8° (near the theoretical -1 threshold per the
+    # func_8083FC68 formula read from z_player.c ~8073). The discrepancy was NOT root-caused
+    # this session (func_8083FC68's few local temp/speedTarget values aren't exposed via any
+    # REPL readout to verify live) — needs either a live yawTarget/speedTarget debug field or
+    # confirmation that Camera_GetInputDirYaw reads a camera-cached yaw that `gcam`'s direct
+    # eye/at poke doesn't update (gcam never touches Camera_Update's internal state, only
+    # eye/at/eyeNext) when the Z-target camera mode (2) is active.
+    {"name": "backwalk", "group": "locomotion", "kind": "unreachable", "reason":
+     "Z-target lock-on reached via REPL `ztarget` (prerequisite primitive, 2026-07-15), but the "
+     "dedicated back_walk trigger (func_8083FC68 returning exactly -1 in z_player.c) was not "
+     "reliably hit by any camera-relative backward stick magnitude swept (-45..-127); it "
+     "consistently resolves to the side_walk (0) bucket instead despite a ~179.8° "
+     "yawTarget-vs-facing delta — root cause not isolated this session (no live readout of the "
+     "function's local speedTarget/temp values); see the STATE_MATRIX comment above for the "
+     "concrete next step (expose a yawTarget/speedTarget debug field, or audit whether `gcam`'s "
+     "direct eye/at poke is compatible with Camera_GetInputDirYaw under Z-target camera mode 2)"},
+    {"name": "sidestep_l", "group": "locomotion", "kind": "ztarget_move", "stick": (-80, 0),
+     "expect": "side_walk", "side_dir": "L",
+     "note": "Z-target + pure sideways stick (camera-relative) -> PLAYER_ANIMGROUP_side_walk "
+             "(func_8083CC9C -> Player_Action_8084193C); direction read from linkanimstate's "
+             "sideWalkBlend field (blend>0.5 = L-sourced)"},
+    {"name": "sidestep_r", "group": "locomotion", "kind": "ztarget_move", "stick": (80, 0),
+     "expect": "side_walk", "side_dir": "R",
+     "note": "same recipe as sidestep_l, opposite stick sign; sideWalkBlend<0.5 = R-sourced"},
+    {"name": "turn_in_place", "group": "locomotion", "kind": "ztarget_move", "stick": (0, 0),
+     "expect": "45_turn",
+     "note": "Z-target lock with a NEUTRAL stick while not yet facing the target -> "
+             "Player_SetupTurnInPlace -> PLAYER_ANIMGROUP_45_turn (nml_45_turn_free); this is "
+             "literally the natural first-frame behavior of acquiring a lock-on, no extra input "
+             "recipe needed beyond `ztarget 1`"},
 
     {"name": "jump", "group": "action", "kind": "forcestate", "pss": "jump"},
     {"name": "roll", "group": "action", "kind": "forcestate", "force": "roll", "expect": "landing_roll",
@@ -234,8 +355,18 @@ STATE_MATRIX = [
     {"name": "mount_dismount", "group": "action", "kind": "prior",
      "note": "Epona/En_Horse 3DS mount render already ported+verified prior session — see "
              "debug_journal/2026-07-15-epona-en-horse-3ds-render.md; not re-driven by this sweep"},
-    {"name": "ztarget", "group": "action", "kind": "unreachable", "reason": UNREACHABLE_NO_RECIPE +
-     " (no lock-on target actor + no REPL primitive to hold Z-target headlessly)"},
+    # NOTE 2026-07-15 (backwalk/sidestep/turn_in_place task): a Z-target hold primitive (REPL
+    # `ztarget <0|1>`, zelda3d.c) now exists — it was added as a PREREQUISITE for the
+    # locomotion-cluster states above and is reused by their "ztarget_move" driver. This row is
+    # intentionally left UNREACHABLE/unclaimed: it belongs to a separate card (verifying the
+    # Z-target STATE itself — reticle/HUD/camera-mode behavior, not just the locomotion gate the
+    # other states needed) that a different session owns. Don't resolve this row without that
+    # session's own verdict criteria.
+    {"name": "ztarget", "group": "action", "kind": "unreachable", "reason":
+     "no existing REPL/oracle input recipe verifies the Z-target STATE itself (lock-on reticle/"
+     "HUD/camera-mode) headlessly — a locomotion-gating primitive (REPL `ztarget`) now exists "
+     "(added 2026-07-15 as a prerequisite for backwalk/sidestep_l/sidestep_r/turn_in_place) but "
+     "this card is about verifying Z-targeting as its own state, which is separate scope"},
     {"name": "damage_knockback", "group": "action", "kind": "forcestate", "pss": "damage"},
     {"name": "getitem_pose", "group": "action", "kind": "unreachable", "reason": UNREACHABLE_NO_RECIPE +
      " (get-item pose is triggered by a chest/pickup flag sequence with no headless recipe)"},
@@ -322,6 +453,27 @@ def run_state(st, oracle):
         st2 = {"name": name, "kind": "forcestate", "force": st["force"]}
         soh = PSS.soh_reach(st2)
         row.update(verdict="UNREACHABLE", soh=soh, reason=st["note"])
+        return row
+
+    if kind == "ztarget_move":
+        base, blend, st1 = soh_reach_ztarget(st["stick"])
+        exp = st["expect"]
+        if not base:
+            row.update(verdict="UNREACHABLE", soh=base, expect=exp, gt="decomp",
+                       reason=f"ztarget_move drive produced no resolved base CSAB (st1=0x{st1 or 0:x})")
+            return row
+        ok = exp in base
+        if ok and "side_dir" in st:
+            if blend is None:
+                ok = False
+            elif st["side_dir"] == "L":
+                ok = blend > 0.5
+            else:
+                ok = blend < 0.5
+        row.update(verdict="MATCH" if ok else "DIVERGENT", soh=base, expect=exp, gt="decomp",
+                   sideWalkBlend=blend, side_dir=st.get("side_dir"),
+                   metric="CSAB-family substring match (+ sideWalkBlend direction check where "
+                           "applicable) under native Z-target lock (REPL `ztarget`)")
         return row
 
     if kind == "idle_oracle":
