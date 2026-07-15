@@ -82,6 +82,17 @@
 #include <vector>
 
 #include "libretro.h"
+#include "libretro_vulkan.h"
+#include "harness_vk.h"
+
+// Azahar's own logging backend (Common::Log). retro_init() sets the global
+// filter to Level::Debug, which floods stderr with per-frame spam like
+// "Audio.DSP <Debug> mixers remaining_dirty=..." — thousands of synchronous
+// stderr writes per second that measurably throttle the harness. We override
+// the filter to Warning right after retro_init (see main()).
+#include "common/logging/backend.h"
+#include "common/logging/filter.h"
+#include "common/logging/types.h"
 #include "title_sync.h"
 #include <SDL3/SDL.h>
 #include <atomic>
@@ -355,7 +366,10 @@ bool g_soh_booted = false;
 bool g_manual_state_touch = false;
 
 SDL_Window* g_win = nullptr;
-int         g_win_w = 1280;  // total SBS width; ½ per engine
+// Both engines render at 2x the 3DS top-screen native (400x240 -> 800x480):
+// Azahar via the Vulkan HW renderer at citra_resolution_factor=2, SoH via its
+// 800x480 shipofharkinian.json window. Total SBS window = two 800-wide panels.
+int         g_win_w = 1600;  // total SBS width; ½ per engine
 int         g_win_h = 480;
 
 // Set when the SDL window's close-button (or WM close) fires OR the REPL
@@ -376,6 +390,15 @@ std::vector<uint8_t> g_az_buf;      // XRGB8888
 uint32_t g_az_w = 0, g_az_h = 0;
 size_t   g_az_pitch = 0;
 bool     g_az_dirty = false;
+
+// Vulkan HW-render wiring. Captured from EnvironmentCallback during
+// retro_load_game; consumed right after load to bring up the frontend Vulkan
+// device and kick the core's context_reset. g_use_vulkan gates the whole path
+// — when false the harness falls back to the software VideoRefresh feed.
+bool g_use_vulkan = true;
+retro_hw_render_callback g_hw_render{};
+const retro_hw_render_context_negotiation_interface_vulkan* g_vk_nego = nullptr;
+bool g_vk_ready = false;
 
 std::vector<uint8_t> g_soh_buf;     // RGBA8 (gSoh3dCaptureBuf backing)
 bool     g_soh_dirty = false;
@@ -498,12 +521,43 @@ bool EnvironmentCallback(unsigned cmd, void* data) {
         *static_cast<const char**>(data) = g_save_dir.c_str();
         return true;
 
+    case RETRO_ENVIRONMENT_SET_HW_RENDER: {
+        // The core wants a HW render context. Capture its callbacks (we need
+        // context_reset) and accept only Vulkan; anything else, refuse so the
+        // core can fall back.
+        auto* cb = static_cast<retro_hw_render_callback*>(data);
+        if (!g_use_vulkan || cb->context_type != RETRO_HW_CONTEXT_VULKAN) return false;
+        g_hw_render = *cb;
+        return true;
+    }
+
+    case RETRO_ENVIRONMENT_SET_HW_RENDER_CONTEXT_NEGOTIATION_INTERFACE: {
+        // Vulkan device-negotiation interface (get_application_info +
+        // create_device). Stashed for HarnessVk::Init after load_game.
+        g_vk_nego =
+            static_cast<const retro_hw_render_context_negotiation_interface_vulkan*>(data);
+        return true;
+    }
+
+    case RETRO_ENVIRONMENT_GET_HW_RENDER_INTERFACE: {
+        // Hand the core our retro_hw_render_interface_vulkan (set_image, sync,
+        // queue lock, ...). Valid only once HarnessVk::Init succeeded.
+        const retro_hw_render_interface_vulkan* iface = HarnessVk::Interface();
+        if (!iface) return false;
+        *static_cast<const void**>(data) = iface;
+        return true;
+    }
+
     case RETRO_ENVIRONMENT_GET_VARIABLE: {
-        // Force the software renderer for headless operation — no window, no
-        // HW context needed.
         auto* var = static_cast<retro_variable*>(data);
+        // Vulkan HW renderer at 2x internal resolution (400x240 -> 800x480),
+        // matched by SoH's 800x480 window so the SBS panels are like-for-like.
         if (var->key && std::strcmp(var->key, "citra_graphics_api") == 0) {
-            var->value = "Software";
+            var->value = g_use_vulkan ? "Vulkan" : "Software";
+            return true;
+        }
+        if (var->key && std::strcmp(var->key, "citra_resolution_factor") == 0) {
+            var->value = "2";
             return true;
         }
         // Only the 3DS top screen is useful for parity — bottom is UI, not
@@ -523,7 +577,25 @@ bool EnvironmentCallback(unsigned cmd, void* data) {
 }
 
 void VideoRefresh(const void* data, unsigned width, unsigned height, size_t pitch) {
-    if (!data || !width || !height) return;
+    if (!width || !height) return;
+
+    // Vulkan HW-render path: the core rendered into a VkImage and passed it to
+    // HarnessVk::set_image; `data` is the RETRO_HW_FRAME_BUFFER_VALID sentinel,
+    // not a CPU pointer. Read the image back into g_az_buf as XRGB8888. Frame
+    // dupes (data == nullptr with a valid last image) reuse the prior readback.
+    if (data == RETRO_HW_FRAME_BUFFER_VALID) {
+        size_t rpitch = 0;
+        if (HarnessVk::Readback(g_az_buf, width, height, rpitch)) {
+            g_az_w = width;
+            g_az_h = height;
+            g_az_pitch = rpitch;
+            g_az_dirty = true;
+        }
+        return;
+    }
+    if (!data) return; // duped frame, keep last g_az_buf
+
+    // Software fallback (g_use_vulkan == false): CPU framebuffer, XRGB8888.
     const size_t need = pitch * height;
     if (g_az_buf.size() < need) g_az_buf.resize(need);
     std::memcpy(g_az_buf.data(), data, need);
@@ -853,19 +925,27 @@ void SohBootInternal() {
     // sets this, so its default (pack ON if present) is unaffected.
     setenv("ZELDA3D_TEXPACK", "off", 1);
 
-    // Match Az's 3DS top-screen native render resolution 400x240 so
-    // side-by-side captures are like-for-like (no upscale/downscale
-    // filtering in the diff). Written UNCONDITIONALLY to defeat any
-    // stale HiDPI-scaled window dims baked into a prior session's
-    // shipofharkinian.json.
+    // Match Az's 2x 3DS top-screen resolution (400x240 * 2 = 800x480) so the
+    // side-by-side panels are like-for-like (Azahar renders at
+    // citra_resolution_factor=2 via the Vulkan HW renderer). Written
+    // UNCONDITIONALLY to defeat any stale HiDPI-scaled window dims baked into a
+    // prior session's shipofharkinian.json.
     {
+        // Resolution override for repro/debugging: ZELDA3D_HARNESS_SOH_W/H let
+        // us reproduce resolution-dependent SoH bugs (e.g. the night sky-dome
+        // black-out) headless by rendering at the same odd/HiDPI-scaled dims a
+        // real windowed session would pick. Default 800x480 = 2x the 3DS top
+        // screen (matches the Azahar Vulkan oracle).
+        int sohW = 800, sohH = 480;
+        if (const char* w = std::getenv("ZELDA3D_HARNESS_SOH_W")) { int v = std::atoi(w); if (v > 0) sohW = v; }
+        if (const char* h = std::getenv("ZELDA3D_HARNESS_SOH_H")) { int v = std::atoi(h); if (v > 0) sohH = v; }
         std::FILE* f = std::fopen("shipofharkinian.json", "w");
         if (f) {
             std::fprintf(f,
                 "{\n"
-                "  \"Window\": { \"Width\": 400, \"Height\": 240 },\n"
+                "  \"Window\": { \"Width\": %d, \"Height\": %d },\n"
                 "  \"CVars\": { \"gInternalResolution\": 1.0 }\n"
-                "}\n");
+                "}\n", sohW, sohH);
             std::fclose(f);
         }
     }
@@ -4387,6 +4467,10 @@ int main(int argc, char** argv) {
 
     tstamp("retro_init begin");
     retro_init();
+    // retro_init() just set the global log filter to Debug (see CitraLibRetro
+    // ctor). Quiet it to Warning so the per-frame Audio.DSP/GPU debug flood
+    // stops hammering stderr — that flood alone throttles the frame loop.
+    Common::Log::SetGlobalFilter(Common::Log::Filter(Common::Log::Level::Warning));
     tstamp("retro_init end");
 
     std::vector<uint8_t> rom;
@@ -4418,6 +4502,36 @@ int main(int argc, char** argv) {
         std::fprintf(stderr, "soh3d_harness: retro_load_game returned false\n");
         retro_deinit();
         return EXIT_FAILURE;
+    }
+
+    // Vulkan HW render: for HW contexts, retro_load_game only registers the
+    // hw_render callbacks + negotiation interface — it does NOT load the game
+    // (Azahar defers that to context_reset, which needs the graphics context
+    // ready). The FRONTEND owns that step: create the Vulkan device via the
+    // core's negotiation interface, then call context_reset so the core builds
+    // its renderer and loads the game. (Software path already loaded inside
+    // retro_load_game, so g_use_vulkan==false skips all of this.)
+    if (g_use_vulkan) {
+        tstamp("vulkan bringup begin");
+        if (!g_vk_nego) {
+            std::fprintf(stderr, "soh3d_harness: core never set the Vulkan "
+                                 "negotiation interface\n");
+            retro_deinit();
+            return EXIT_FAILURE;
+        }
+        alarm(120);
+        bool vk_ok = HarnessVk::Init(g_vk_nego);
+        if (vk_ok && g_hw_render.context_reset) {
+            g_hw_render.context_reset();
+            g_vk_ready = true;
+        }
+        alarm(0);
+        tstamp("vulkan bringup end");
+        if (!g_vk_ready) {
+            std::fprintf(stderr, "soh3d_harness: Vulkan HW render bring-up failed\n");
+            retro_deinit();
+            return EXIT_FAILURE;
+        }
     }
 
     // Create the SDL window BEFORE spawning the worker so no SDL touch
