@@ -2,7 +2,7 @@
 // icons, digits) packed from embedded PNGs. Split out of zelda3d_model.cpp (pure move, no behavior
 // change) so the model loader stays focused. Declarations live in zelda3d.h; the renderer/HUD path
 // calls these by name. See #18/#21/#31/#32.
-#include "zelda3d.h"
+#include "../zelda3d.h"
 #include <vector>
 #include <string>
 #include <cstdint>
@@ -10,11 +10,11 @@
 #include <cmath>
 #include <stb_image.h>
 #include "asset/texpack.h"     // Zelda3D::TexPackLookup (HD texture-pack atlas source)
-#include "assets/xbox_glyphs_png.h"   // assets/zelda3d/xbox_{a,b,x,y}.svg (HUD button glyphs, #32)
-#include "assets/heart_tex_png.h"     // crisp HUD heart textures (#31)
-#include "assets/digit_tex_png.h"     // crisp HUD counter font (#31)
-#include "assets/button_tex_png.h"    // crisp HUD button-background disc (#31)
-#include "assets/counter_icon_png.h"  // crisp HUD counter icons (#31)
+#include "../assets/xbox_glyphs_png.h"   // assets/zelda3d/xbox_{a,b,x,y}.svg (HUD button glyphs, #32)
+#include "../assets/heart_tex_png.h"     // crisp HUD heart textures (#31)
+#include "../assets/digit_tex_png.h"     // crisp HUD counter font (#31)
+#include "../assets/button_tex_png.h"    // crisp HUD button-background disc (#31)
+#include "../assets/counter_icon_png.h"  // crisp HUD counter icons (#31)
 
 extern "C" {
 
@@ -151,7 +151,7 @@ const void* Zelda3D_XboxGlyphTex(char which, int* w, int* h) {
 // Gray disc + white key label, matching the default keyboard bindings (C / ← / ↓ / →).
 // Same 64x64 RGBA layout as Zelda3D_XboxGlyphTex — the draw path is identical, only the texture
 // changes. Decoded lazily once. See also gZelda3dInputDevice / Zelda3D_InputDevice().
-#include "assets/kbd_glyphs_png.h"
+#include "../assets/kbd_glyphs_png.h"
 
 const void* Zelda3D_KbdGlyphTex(char which, int* w, int* h) {
     // Slots: 0=B, 1=C-Left, 2=C-Down, 3=C-Right (mirrors Zelda3D_RecordHudBtn glyph chars)
@@ -203,7 +203,7 @@ const void* Zelda3D_KbdGlyphTex(char which, int* w, int* h) {
 // Hotbar number-key glyphs 1-6 (keycap style, matching the approved keycap aesthetic).
 // Loaded lazily from num_glyphs_png.h; returns RGBA32 pointer + dims.
 // `which` = '1'..'6'. Returns nullptr on failure.
-#include "assets/num_glyphs_png.h"
+#include "../assets/num_glyphs_png.h"
 
 const void* Zelda3D_NumGlyphTex(char which, int* w, int* h) {
     struct Glyph { std::vector<uint8_t> rgba; int w = 0, hh = 0; };
