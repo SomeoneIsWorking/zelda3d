@@ -5044,9 +5044,24 @@ static void Zelda3D_ReplExec(PlayState* play, char* line, const char* outPath) {
         } else if (strcmp(arg, "climb") == 0) {
             Zelda3D_PlayerForceHang(p, play);
             Zelda3D_ReplReply(outPath, "linkstate climb -> jump_climb/hang anim (st1=0x%x)", p->stateFlags1);
+        } else if (strcmp(arg, "attack2") == 0) {
+            Zelda3D_PlayerForceAttackCombo2(p, play);
+            Zelda3D_ReplReply(outPath, "linkstate attack2 -> combo-swing 2 (st1=0x%x)", p->stateFlags1);
+        } else if (strcmp(arg, "dive") == 0) {
+            Zelda3D_PlayerForceSwimDive(p, play);
+            Zelda3D_ReplReply(outPath, "linkstate dive -> underwater dive-swim (st1=0x%x st2=0x%x)",
+                            p->stateFlags1, p->stateFlags2);
+        } else if (strcmp(arg, "getitem") == 0) {
+            Zelda3D_PlayerForceGetItem(p, play);
+            Zelda3D_ReplReply(outPath, "linkstate getitem -> raised-arm get-item pose (st1=0x%x)", p->stateFlags1);
+        } else if (strcmp(arg, "death") == 0) {
+            Zelda3D_PlayerForceDeath(p, play);
+            Zelda3D_ReplReply(outPath, "linkstate death -> gSaveContext.health=0 (real per-frame death "
+                            "trigger will fire over the next few frames; `step` or let free-run advance)");
         } else {
             Zelda3D_ReplReply(outPath,
-                            "usage: linkstate <roll|talk|idle|jump|swim|damage|shield|attack|climb>");
+                            "usage: linkstate <roll|talk|idle|jump|swim|damage|shield|attack|attack2|"
+                            "climb|dive|getitem|death>");
         }
     } else if (strcmp(cmd, "freeze") == 0 && sscanf(line, "%*s %i", &iv) == 1) {
         // Frame-step harness: `freeze 1` holds the game logic still (Play_Update skipped) so a brief
@@ -6381,6 +6396,16 @@ static void Zelda3D_ReplExec(PlayState* play, char* line, const char* outPath) {
         } else {
             Zelda3D_ReplReply(outPath, "usage: ztarget <0|1> (locks focusActor onto the asel-selected actor)");
         }
+    } else if (strcmp(cmd, "ztargetstate") == 0) {
+        // ztarget-as-its-own-STATE query (docs/link_parity_checklist.md "ztarget" row — separate
+        // scope from the `ztarget` locomotion-gate primitive above). Read-only: no side effects.
+        // idleStance=1 iff Link's live actionFunc is the real Player_Action_80840450 (OoT3D twin:
+        // FUN_00488b40, "Standing-aim / Z-hold"), i.e. the native lock-on idle pose is actually
+        // engaged (requires a HOSTILE-category focusActor + neutral stick — Player_CheckHostileLockOn).
+        Player* ztp = GET_PLAYER(play);
+        s32 idleStance = Zelda3D_PlayerIsZTargetIdleStance(ztp);
+        Zelda3D_ReplReply(outPath, "idleStance=%d focusActor=0x%X st1=0x%x",
+                        idleStance, ztp->focusActor ? ztp->focusActor->id : 0, ztp->stateFlags1);
     } else if (strcmp(cmd, "afreeze") == 0) {
         // GENERIC: pin the selected actor's transform every frame. 0=off, 1=pin pos+rot,
         // 2=pin position only (rotation free — e.g. so a held cucco's body shake stays visible).
