@@ -2,13 +2,12 @@
 // and terrain-warp Y-offset. Extracted out of zelda3d.c (Phase 2b codebase reorg, see
 // docs/codemap.md); see render/zelda3d_render.h for the shared-symbol contract with zelda3d.c and
 // (after the REPL extraction) zelda3d/repl/zelda3d_repl.cpp.
-#include "zelda3d.h"
-#include "render/zelda3d_render.h"
+#include "../zelda3d.h"
+#include "zelda3d_render.h"
 #include "../scene/zelda3d_collision.h"            // Zelda3D_CollisionEnabled (Zelda3D_TerrainWarpEnabled)
-#include "cutscene/zelda3d_cutscene.h"             // Zelda3D_TitleCsLightSlotsRaw (title light-slot convert)
-#include "behaviors/title/title_presentation.h" // Zelda3D_Title_IsActive
-#include "overlays/actors/ovl_En_Ge1/z_en_ge1.h" // EnGe1 (read live SkelAnime state)
-#include "objects/object_ge1/object_ge1.h" // dgGerudoWhite*Anim OTR-path strings
+#include "../cutscene/zelda3d_cutscene.h"          // Zelda3D_TitleCsLightSlotsRaw (title light-slot convert)
+#include "../behaviors/title/title_presentation.h" // Zelda3D_Title_IsActive
+#include "../behaviors/actor/actor_overrides.h" // Zelda3D_ResolveAnim_EnGe1 / Zelda3D_Joints_EnGe1
 
 #include <stdlib.h>
 #include <stdio.h>
@@ -16,13 +15,13 @@
 #include <math.h>
 
 // Per-character N64<->OoT3D bone correspondence (kZelda3dBoneMaps), for Zelda3D_FindBoneMap.
-#include "tables/zelda3d_bonemap.inc"
+#include "../tables/zelda3d_bonemap.inc"
 // N64 object id -> OoT3D actor ZAR path (kZelda3dObjectZars): sizes sAuto[] and drives the
 // ZELDA3D_AUTO actor-replacement scan.
-#include "tables/zelda3d_object_zars.inc"
+#include "../tables/zelda3d_object_zars.inc"
 // SoH sceneNum -> OoT3D per-time-of-day env-light palette (kZelda3dSceneLighting), for
 // Zelda3D_UpdateLight.
-#include "tables/zelda3d_scene_lighting.inc"
+#include "../tables/zelda3d_scene_lighting.inc"
 
 #ifdef __cplusplus
 extern "C" {
@@ -532,45 +531,8 @@ float Zelda3D_GScale(int slot, float def) {
 // and, on a hit, draws the OoT3D model and skips the N64 draw. Add an object by
 // adding a row here — no actor-source edits.
 // En_Ge1 (white Gerudo): map her N64 animation -> the OoT3D CSAB, and phase-sync to her
-// SkelAnime clock. The N64 actor stores the current anim as an OTR-path string in
-// this->animation (SoH ALIGN_ASSET pattern), so identify it by strcmp. Mapping (by use
-// site in z_en_ge1.c): Idle->ge1_s_wait, Clap(open-gate)->ge1_mon_akeru, Dismissive
-// (post-talk reaction)->ge1_hanasi. ge1_matsu is unused by this actor's 3 N64 anims.
-static const char* Zelda3D_ResolveAnim_EnGe1(Actor* actor) {
-    EnGe1* ge = (EnGe1*)actor;
-    const char* n64 = (const char*)ge->animation;
-    const char* csab = "ge1_s_wait"; // idle / unknown
-    if (n64 != NULL) {
-        if (strcmp(n64, dgGerudoWhiteClapAnim) == 0) {
-            csab = "ge1_mon_akeru";
-        } else if (strcmp(n64, dgGerudoWhiteDismissiveAnim) == 0) {
-            csab = "ge1_hanasi";
-        }
-    }
-    if (gZelda3dAnimDebug) {
-        static int dbg = 0;
-        if ((dbg++ % 20) == 0) {
-            fprintf(stderr, "SOH3D anim: csab=%s curFrame=%.2f animLength=%.2f n64=%s\n",
-                   csab, ge->skelAnime.curFrame, ge->skelAnime.animLength, n64 ? n64 : "(null)");
-            fflush(stdout);
-        }
-    }
-    return csab;
-}
-
-// En_Ge1 joints for the N64-animation port: hand back &jointTable[1] (per-limb binang
-// rotations; skip jointTable[0] root translation) + limbCount. The OoT3D geldwoman skeleton
-// is the SAME rig as N64 En_Ge1 (15 limbs, same order: WAIST, L/R legs ×3, TORSO, L/R arms
-// ×3, HEAD), so OoT3D bone i == N64 limb (i+1) and Zelda3D_UpdateAnimN64 maps bone i <- rots[i].
-static int Zelda3D_Joints_EnGe1(Actor* actor, const s16** outJointRots, int* outLimbCount) {
-    EnGe1* ge = (EnGe1*)actor;
-    if (ge->skelAnime.jointTable == NULL || ge->skelAnime.limbCount <= 0) {
-        return 0;
-    }
-    *outJointRots = (const s16*)&ge->skelAnime.jointTable[1]; // [0] = root translation, skip it
-    *outLimbCount = ge->skelAnime.limbCount;
-    return 1;
-}
+// SkelAnime clock (Zelda3D_ResolveAnim_EnGe1 / Zelda3D_Joints_EnGe1, ported to
+// behaviors/actor/actor_overrides.cpp — see actor_overrides.h for the declarations used below).
 
 // Non-const so the REPL can tune worldScale/groundOffset live.
 Zelda3D_ModelEntry sModelTable[4] = {
