@@ -210,10 +210,23 @@ float stagedRamp(int csFrame, int start, float step, int frames) {
     return std::min(255.0f, n * step);
 }
 
+// Two-press skip, press #1 ("bring the logo in early"): the cs's own fade-in
+// trigger is fixed (cf345). When START is pressed while the logo is still
+// Hidden (the pre-logo intro demo), the fade-in is pulled forward to that press
+// frame instead. -1 = no override (natural cs timing). Set by
+// Zelda3D_TitleLogoStepSkip, consumed here + cleared by resetSkip().
+int gTitleFadeInOverride = -1;
+
 LogoPhaseState resolveLogoPhase(int csFrame) {
     LogoPhaseState s;
     s.fadeInFrame  = Zelda3D_TitleCsMiscTriggerFrame(kMiscSubFadeIn);
     s.fadeOutFrame = Zelda3D_TitleCsMiscTriggerFrame(kMiscSubFadeOut);
+    // Press-#1 override wins only when it pulls the fade-in EARLIER than the cs
+    // trigger (a press after the logo already showed must not push it later).
+    if (gTitleFadeInOverride >= 0 &&
+        (s.fadeInFrame < 0 || gTitleFadeInOverride < s.fadeInFrame)) {
+        s.fadeInFrame = gTitleFadeInOverride;
+    }
     if (s.fadeInFrame < 0) {
         // No trigger in the loaded cs — fall back to "always visible" (preserves the prior
         // behavior of this module so a malformed/missing cs stream doesn't suppress the logo
@@ -298,6 +311,7 @@ TitleSkipState gSkip;
 
 void resetSkip() {
     gSkip = TitleSkipState{};
+    gTitleFadeInOverride = -1;
 }
 
 // Fires the same scene-transition trigger the natural (un-skipped) cs end would eventually fire —
@@ -395,13 +409,31 @@ extern "C" void Zelda3D_TitleLogoStepSkip(PlayState* play) {
                          CHECK_BTN_ALL(play->state.input[0].press.button, BTN_A) ||
                          CHECK_BTN_ALL(play->state.input[0].press.button, BTN_B);
 
-    // §7.2: detect once (latched), only while DISPLAY/DONE (state 2/5 -> 4) or an already-running
-    // natural FADE_OUT (state 3 -> 6) — i.e. anywhere the logo is at least fully visible.
-    if (!gSkip.latched && pressed &&
-        (natural.phase == LogoPhase::Display || natural.phase == LogoPhase::FadeOut)) {
-        gSkip.latched = true;
-        gSkip.pressCsFrame = csFrame;
-        gSkip.duringNaturalFadeOut = (natural.phase == LogoPhase::FadeOut);
+    // Two-press skip. Which press this is depends on whether the logo is on screen yet:
+    //
+    //   PRESS #1 — logo still Hidden (the pre-logo intro demo, e.g. cf<345): "bring the logo in
+    //   early". Pull the fade-in trigger forward to now (gTitleFadeInOverride) instead of waiting
+    //   for the cs's fixed cf345 trigger. Does NOT transition. Guarded on the NATURAL cs fade-in so
+    //   a press during the post-fade-out tail (Hidden again near the cs loop) doesn't re-summon it.
+    //
+    //   PRESS #2 — logo visible (FadeIn/Display/FadeOut, whether it got there naturally or via
+    //   press #1): "go to file select". Latch once (§7.2) and let the grace timer below fire the
+    //   transition. A single press with no prior #1 (user waited for the logo) lands here directly.
+    if (pressed) {
+        const int csFadeIn = Zelda3D_TitleCsMiscTriggerFrame(kMiscSubFadeIn);
+        const bool beforeLogo = natural.phase == LogoPhase::Hidden &&
+                                (csFadeIn < 0 || csFrame < csFadeIn);
+        if (beforeLogo) {
+            if (gTitleFadeInOverride < 0) {
+                gTitleFadeInOverride = csFrame;
+            }
+        } else if (!gSkip.latched &&
+                   (natural.phase == LogoPhase::Display || natural.phase == LogoPhase::FadeIn ||
+                    natural.phase == LogoPhase::FadeOut)) {
+            gSkip.latched = true;
+            gSkip.pressCsFrame = csFrame;
+            gSkip.duringNaturalFadeOut = (natural.phase == LogoPhase::FadeOut);
+        }
     }
 
     // §7.3/7.4: once the 25-frame grace delay has elapsed (idempotent on csFrame, safe to call
@@ -423,14 +455,14 @@ extern "C" void Zelda3D_TitleLogoStepSkip(PlayState* play) {
             const char* v = std::getenv("ZELDA3D_DBG_TITLESKIP");
             sDbg = (v != nullptr && v[0] != '\0') ? 1 : 0;
         }
-        if (sDbg && (pressed || gSkip.pressCsFrame >= 0)) {
+        if (sDbg && (pressed || gSkip.pressCsFrame >= 0 || gTitleFadeInOverride >= 0)) {
             const int elapsed = (gSkip.pressCsFrame >= 0) ? (csFrame - gSkip.pressCsFrame) : -1;
             fprintf(stderr,
-                    "[TITLESKIP] csFrame=%d pressed=%d pressCsFrame=%d elapsed=%d duringFadeOut=%d "
-                    "transitionTrigger=%d gameMode=%d\n",
-                    csFrame, pressed ? 1 : 0, gSkip.pressCsFrame, elapsed,
-                    gSkip.duringNaturalFadeOut ? 1 : 0, play->transitionTrigger,
-                    gSaveContext.gameMode);
+                    "[TITLESKIP] csFrame=%d pressed=%d phase=%d fadeInOverride=%d pressCsFrame=%d "
+                    "elapsed=%d duringFadeOut=%d transitionTrigger=%d gameMode=%d\n",
+                    csFrame, pressed ? 1 : 0, (int)natural.phase, gTitleFadeInOverride,
+                    gSkip.pressCsFrame, elapsed, gSkip.duringNaturalFadeOut ? 1 : 0,
+                    play->transitionTrigger, gSaveContext.gameMode);
         }
     }
 }
