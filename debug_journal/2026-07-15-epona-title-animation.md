@@ -188,3 +188,26 @@ frees) are (a) a per-bone sampler-math delta on specific bones, and (b) whether 
 title-specific procedural pose the CSAB doesn't carry. If the bone diff comes back all-match, the
 "looks off" is NOT animation and the real candidates are model orientation / spawn pose / camera —
 to be run as the immediate next step when the shared harness is available.
+
+---
+
+## Scoping note 2026-07-16 (autonomous tick): user's "yaw" report is a DISTINCT axis from the gait work above
+
+User (this session) reports Link+Epona "completely broken ... turn sideways yaw rotation and their
+animation etc completely looks wrong ... can only be bisected frame by frame". Frame-locked SBS at
+step 600 (titlesync delta=0) shows the rider at a different screen position AND heading than the
+oracle — i.e. the divergence the user calls out is HEADING/YAW (and coupled path position), NOT the
+gait-cycle phase this journal's prior entries studied (tempo ruled out, pose near-identical). So the
+prior gait conclusion stands and should NOT be re-litigated; the open item is the rider's yaw/heading
+(and its path position) in the title cs.
+
+BLOCKER (same tooling gap flagged in Step 1): the harness can't introspect the title rider. The title
+demo's mounted Link is NOT an `ACTORCAT_PLAYER` actor (`compare player`/`soh_player_pos` read that
+list, which is empty at title instants) — the rider is the En_Horse actor with Link rendered mounted.
+Clean yaw bisection needs the harness to read the rider's En_Horse actor (pos + `world.rot.y` /
+`shape.rot.y`) instead of the Player list, OR a purely-visual frame-by-frame heading comparison.
+
+NEXT (tooling-first, before any yaw code change): extend the harness rider introspection to the
+En_Horse actor so SoH rider yaw can be A/B'd against the oracle per cs frame. Only then diagnose the
+yaw path (title_rider.cpp heading vs the 3DS cs dispatcher's own heading). Do NOT guess-fix the yaw
+without that read — it would be a bandaid, and the path/gait are already carefully ported.
