@@ -4,7 +4,7 @@
 // (after the REPL extraction) zelda3d/repl/zelda3d_repl.cpp.
 #include "zelda3d.h"
 #include "render/zelda3d_render.h"
-#include "zelda3d_collision.h"            // Zelda3D_CollisionEnabled (Zelda3D_TerrainWarpEnabled)
+#include "../scene/zelda3d_collision.h"            // Zelda3D_CollisionEnabled (Zelda3D_TerrainWarpEnabled)
 #include "cutscene/zelda3d_cutscene.h"             // Zelda3D_TitleCsLightSlotsRaw (title light-slot convert)
 #include "behaviors/title/title_presentation.h" // Zelda3D_Title_IsActive
 #include "overlays/actors/ovl_En_Ge1/z_en_ge1.h" // EnGe1 (read live SkelAnime state)
