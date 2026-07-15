@@ -42,7 +42,7 @@ import sys
 from pathlib import Path
 
 REPO = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
-DECOMP = os.path.expanduser("<oot3d-decomp>")
+DECOMP = os.path.join(REPO, "oot3d-decomp")
 CACHE_DIR = os.path.join(REPO, "scratch/oracle_cache/warp")
 
 sys.path.insert(0, os.path.join(REPO, "tools"))

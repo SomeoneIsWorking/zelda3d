@@ -36,7 +36,7 @@ MORPH_OFF = 0x34         # skelAnime -> morphWeight
 CURFRAME_OFF = 0x3c      # skelAnime -> curFrame
 PLAYSPEED_OFF = 0x40     # skelAnime -> playSpeed
 
-_TABLE = os.path.join(os.path.dirname(__file__), "..", "..", "oot3d-decomp",
+_TABLE = os.path.join(os.path.dirname(__file__), "..", "oot3d-decomp",
                       "tools", "skeldata", "player_animid_names.json")
 
 

@@ -143,12 +143,12 @@ def soh_curve(mags):
 
 # ---------------- Oracle side (RPC) ----------------
 def _load_table():
-    t = os.path.join(HERE, "..", "..", "oot3d-decomp", "tools", "skeldata", "player_animid_names.json")
+    t = os.path.join(HERE, "..", "oot3d-decomp", "tools", "skeldata", "player_animid_names.json")
     return json.load(open(os.path.abspath(t)))["names"]
 
 
 def oracle_warp_open():
-    lc = os.path.join(HERE, "..", "..", "oot3d-decomp", "tools", "link_ctl.py")
+    lc = os.path.join(HERE, "..", "oot3d-decomp", "tools", "link_ctl.py")
     if os.path.exists(lc):
         subprocess.run([lc, "warp", "0xEE"], capture_output=True, text=True, timeout=20)
         time.sleep(2.0)

@@ -25,7 +25,7 @@ import argparse, os, re, subprocess, sys, time
 
 HERE = os.path.dirname(os.path.abspath(__file__))
 ROOT = os.path.dirname(HERE)
-DECOMP = os.path.join(os.path.dirname(ROOT), "oot3d-decomp")  # sibling repo
+DECOMP = os.path.join(ROOT, "oot3d-decomp")  # in-repo submodule
 OUT = os.path.join(ROOT, "scratch", "parity")
 KOKIRI = 0xEE
 PASS_DEG = 12.0  # median best-mean per-bone angle below this = MATCH (phase-granularity headroom)

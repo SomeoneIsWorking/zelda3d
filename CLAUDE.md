@@ -73,7 +73,16 @@ soh/src/soh3d/behaviors/actor_behavior.h       // base interface + registry (dis
 
 ## RULE: ground truth for any behavioral divergence is the OoT3D DECOMP — extend it, don't memory-poke
 
-OoT3D decomp (the private `oot3d-decomp` repo, fed by the **decomp-port** skill / Ghidra pipeline) is a
+OoT3D decomp (the private `oot3d-decomp` repo, fed by the **decomp-port** skill / Ghidra pipeline) is
+vendored **in-repo as a git submodule at `oot3d-decomp/`** (remote `SomeoneIsWorking/oot3d-decomp`,
+added 2026-07-15). This is a DELIBERATE exception to the "no submodules" flatten (see "Commit chain"
+below): the engine itself stays flattened to kill multi-repo build friction, but `oot3d-decomp` is a
+read-mostly external reference repo, not part of the soh3d build, so a submodule is the right shape.
+Update it like any submodule: `cd oot3d-decomp && git pull origin main && cd .. && git add oot3d-decomp
+&& git commit`. All soh3d tooling (`tools/parity_ab.py`, `oracle_cache.py`, `link_sweep.py`, etc.)
+resolves the decomp path repo-relatively (`REPO/oot3d-decomp`), never via a hardcoded home path — do
+not reintroduce `os.path.expanduser("<oot3d-decomp>")` or a sibling-repo (`../oot3d-decomp`)
+assumption. It is a
 **primary project goal and a prerequisite for full parity** — not a side quest. So when you find a
 behavioral difference (an actor moving/posing/animating wrong vs OoT3D), the correct response is to
 **extend the OoT3D decomp until it covers that behavior**, derive the ground truth from the 3DS binary,

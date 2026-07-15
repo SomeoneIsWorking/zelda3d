@@ -22,7 +22,7 @@ import os, sys, time, subprocess, struct
 REPO = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 TOOLS = os.path.join(REPO, "tools")
 SHOTDIR = os.path.join(REPO, "scratch", "screenshots")
-DECOMP = os.path.expanduser("<oot3d-decomp>")
+DECOMP = os.path.join(REPO, "oot3d-decomp")
 sys.path.insert(0, TOOLS)
 
 
