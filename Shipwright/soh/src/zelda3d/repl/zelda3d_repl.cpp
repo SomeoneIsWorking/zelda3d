@@ -9,7 +9,7 @@
 #include "../cutscene/zelda3d_cutscene.h"
 #include "behaviors/title/title_presentation.h"
 #include "behaviors/title/title_cloud_vortex.h"
-#include "zelda3d_collision.h"
+#include "../scene/zelda3d_collision.h"
 #include "../player/zelda3d_link.h"
 #include "input/zelda3d_input.h"
 #include "../anim/zelda3d_anim_override.h"

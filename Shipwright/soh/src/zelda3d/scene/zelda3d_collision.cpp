@@ -4,7 +4,7 @@
 // is the single public entry point (declared in zelda3d.h, called from Scene_CommandCollisionHeader);
 // everything else here is a file-local helper.
 #include "../zelda3d.h"
-#include "../zelda3d_collision.h" // C-ABI bridge: Zelda3D_RawCollision / LoadSceneCollisionRaw / stair treads
+#include "zelda3d_collision.h" // C-ABI bridge: Zelda3D_RawCollision / LoadSceneCollisionRaw / stair treads
 #include <stdlib.h> // getenv, malloc/calloc/free
 #include <stdio.h>  // fprintf/stderr
 #include <string.h> // memcpy

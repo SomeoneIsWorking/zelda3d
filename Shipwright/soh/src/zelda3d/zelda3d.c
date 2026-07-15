@@ -8,7 +8,7 @@
 #include "cutscene/zelda3d_cutscene.h"
 #include "behaviors/title/title_presentation.h" // Zelda3D::TitlePresentation — see that header
 #include "behaviors/title/title_cloud_vortex.h" // Death Mountain cloud-vortex actor ring at title
-#include "zelda3d_collision.h" // C-ABI bridge for OoT3D scene collision (zelda3d_model.cpp)
+#include "scene/zelda3d_collision.h" // C-ABI bridge for OoT3D scene collision (zelda3d_model.cpp)
 #include "player/zelda3d_link.h"      // Link (player) replacement policy split out of this file
 #include "input/zelda3d_input.h" // input harness (WalkInject/key-inject/xbox-glyph/hotbar) split out of this file
 #include "anim/zelda3d_anim_override.h" // skeletal-actor draw-override port (head/torso track, facial, DLs)
