@@ -183,6 +183,8 @@ int Zelda3D_AutoModelHasCsab(int modelId, const char* base); // 1 if the model's
 void Zelda3D_UpdateAnimAuto(int modelId, const char* animName, float rate, float n64CurFrame,
                           float n64AnimLength, float morphWeight); // play OoT3D's own CSAB, phase-locked + morph-blended to the N64 anim
 void Zelda3D_DumpModelBones(int modelId); // oracle: print OoT3D skeleton (gated by caller)
+void Zelda3D_DumpAnimBonesLocal(int modelId, const char* animName, float frame); // live per-bone LOCAL pose (REPL boneinfo)
+void Zelda3D_RecordLastAuto(int modelId, const char* csab, float frame); // record live AUTO clip/frame (zelda3d_anim.cpp)
 // Per-OoT3D-bone local-rotation delta (radians) added on top of the CSAB pose; used to replay a
 // PROCEDURAL per-limb rotation the N64 actor applies in an OverrideLimbDraw (the cucco wing-flap,
 // z_en_niw.c, lives here — not in any anim). Cleared then re-set each auto draw. (zelda3d_model.cpp)
@@ -6059,6 +6061,22 @@ static void Zelda3D_ReplExec(PlayState* play, char* line, const char* outPath) {
     } else if (strcmp(cmd, "animdbg") == 0 && sscanf(line, "%*s %f", &f1) == 1) {
         gZelda3dAnimDebug = (int)f1;
         Zelda3D_ReplReply(outPath, "animdbg=%d", gZelda3dAnimDebug);
+    } else if (strcmp(cmd, "boneinfo") == 0) {
+        // `boneinfo <modelId> [animBase] [frame]` — dump the AUTO model's per-bone animated LOCAL
+        // rotation (Csab::localTransforms) to stderr for a bone-for-bone diff vs the oracle's
+        // `titleactors a`. With anim/frame omitted, uses the live-resolved clip+frame. Title Epona
+        // is model 2010 (auto /actor/zelda_horse.zar). Output goes to the run log, not the REPL fifo.
+        int mid = -1;
+        char animBase[64] = { 0 };
+        float bframe = -1.0f;
+        int nread = sscanf(line, "%*s %d %63s %f", &mid, animBase, &bframe);
+        if (nread >= 1) {
+            Zelda3D_DumpAnimBonesLocal(mid, animBase[0] ? animBase : NULL, bframe);
+            Zelda3D_ReplReply(outPath, "boneinfo model=%d anim=%s frame=%.3f -> stderr", mid,
+                              animBase[0] ? animBase : "(live)", bframe);
+        } else {
+            Zelda3D_ReplReply(outPath, "usage: boneinfo <modelId> [animBase] [frame]");
+        }
     } else if (strcmp(cmd, "scenescale") == 0 && sscanf(line, "%*s %f", &f1) == 1) {
         gZelda3dSceneScale = f1;
         Zelda3D_ReplReply(outPath, "scenescale=%.4f", gZelda3dSceneScale);

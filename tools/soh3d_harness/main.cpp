@@ -278,6 +278,8 @@ extern "C" {
                               short* jointsXYZ, int maxJoints,
                               int* outJointCount, int* outAnimFrame,
                               int* outMorphFrame);
+    int SohState_AutoModelBonesLocal(int modelId, float* outRot3, int* outId, int* outParent,
+                                     int maxBones, char* outCsab, int outCsabLen, float* outFrame);
     int SohState_ShrinkWindowVal(void);
     int SohState_Zelda3DLive(float* amb, float* l1col, float* l2col);
     int SohState_DayTimeAndEnv(unsigned int* daytime,
@@ -1645,6 +1647,18 @@ constexpr uint32_t PLAYER_YAW_OFF           = 0x0036;
 // without depending on the external Qt frontend + RPC server.
 constexpr uint32_t PLAYER_SKELANIME_OFF     = 0x0254;
 constexpr uint32_t SKELANIME_ANIMID_OFF     = 0x0030;
+
+// SkelAnime.jointTable — live per-bone LOCAL 3x4 transform array (RE'd for
+// the (Qt-only, unbuilt) external RPC oracle path, tools/oracle_link_pose.py:
+// PLAYER+0x254 (SkelAnime) -> *(+0x78) = jointTable ptr, stride 13 floats/
+// bone (3x3 rotation {0,1,2/4,5,6/8,9,10} + translation {3,7,11} + 1 pad),
+// 25 bones (childlink_v2 rig). Ported here 2026-07-15 (link_sweep POSE
+// verdict) so the embedded harness can serve as a per-frame POSE oracle
+// (`az_linkjoints`) the same way `az_linkanim` already serves SELECTION —
+// no dependency on the unbuilt external Qt/RPC frontend.
+constexpr uint32_t SKELANIME_JOINTTABLE_OFF = 0x0078;
+constexpr uint32_t LINKJOINTS_BONE_STRIDE   = 13 * 4;   // 13 floats/bone
+constexpr int       LINKJOINTS_NBONE        = 25;       // childlink_v2 rig
 
 // Actor.bgCheckFlags — u16 bitfield of "what am I touching" queried by
 // Player_Update to gate wall-slide, wall-climb, jump-off-ledge, etc.
@@ -3551,6 +3565,30 @@ void CompareTitleActorsImpl() {
         std::printf("       [%2d] jointVec3s=(%6d,%6d,%6d)\n",
                     j, joints[j * 3 + 0], joints[j * 3 + 1], joints[j * 3 + 2]);
     }
+
+    // soh Epona: the OoT3D CMB (model 2010, /actor/zelda_horse.zar, 25 bones) per-bone ANIMATED
+    // LOCAL rotation in RADIANS — the SoH-side counterpart of the 3DS "25 poses ... rot(rad)" block
+    // above, so the two can be diffed bone-for-bone in the SAME units, cs-frame-locked in one
+    // process (debug_journal 2026-07-15-epona-title-animation). This is what whole-frame pixel crops
+    // cannot resolve (mane bone 14, tail bones 23/24). Uses the clip+frame the live SoH draw path
+    // last resolved for the model (its own AUTO/phase-lock playhead), not a re-derived frame.
+    {
+        float er[25 * 3] = {};
+        int eid[25] = {}, epar[25] = {};
+        char ecsab[64] = { 0 };
+        float ef = 0.0f;
+        int en = SohState_AutoModelBonesLocal(2010, er, eid, epar, 25, ecsab, sizeof ecsab, &ef);
+        if (en < 0) {
+            std::printf("  soh-epona: n/a (model 2010 has no live CSAB pose yet)\n");
+        } else {
+            std::printf("  soh-epona: OoT3D epona.cmb model 2010  csab=%s frame=%.3f bones=%d "
+                        "localRot(rad)\n", ecsab, ef, en);
+            for (int j = 0; j < en; ++j) {
+                std::printf("       b[%2d] parent=%2d localRot=(%7.4f,%7.4f,%7.4f)\n",
+                            eid[j], epar[j], er[j * 3 + 0], er[j * 3 + 1], er[j * 3 + 2]);
+            }
+        }
+    }
 }
 
 // ============================================================================
@@ -4086,6 +4124,51 @@ void RunRepl() {
             std::memcpy(&speedXZ, &*spd_v, 4);
             std::printf("ok az_linkanim animId=%u speedXZ=%.4f addr=0x%08x\n",
                         *animId_v, speedXZ, *head);
+        }
+        else if (cmd == "az_linkjoints") {
+            // link_sweep.py POSE oracle probe: one live capture of the
+            // Player's SkelAnime jointTable (see SKELANIME_JOINTTABLE_OFF
+            // above) — 25 bones x 3x3 LOCAL rotation, same byte layout
+            // tools/oracle_link_pose.py reads via the external RPC oracle,
+            // so both oracle transports produce comparable CSV rows for
+            // tools/parity_pose_diff.py.
+            auto ps = CurrentPlayState();
+            if (!ps) { PrintErr("az_linkjoints: no playstate"); continue; }
+            auto& mem = Core::System::GetInstance().Memory();
+            auto head = mem.Read32OrNullopt(*ps + ACTORCTX_OFF +
+                                            ACTOR_LISTS_OFF + 2 * 8 + 4);
+            if (!head || *head == 0) {
+                PrintErr("az_linkjoints: no Player actor"); continue;
+            }
+            auto jt_v = mem.Read32OrNullopt(*head + PLAYER_SKELANIME_OFF +
+                                            SKELANIME_JOINTTABLE_OFF);
+            if (!jt_v || *jt_v == 0) {
+                PrintErr("az_linkjoints: jointTable ptr null/unreadable"); continue;
+            }
+            const uint32_t jt = *jt_v;
+            bool ok = true;
+            float rots[LINKJOINTS_NBONE][9];
+            for (int b = 0; b < LINKJOINTS_NBONE && ok; ++b) {
+                float m[12];
+                for (int w = 0; w < 12 && ok; ++w) {
+                    auto v = mem.Read32OrNullopt(jt + b * LINKJOINTS_BONE_STRIDE + w * 4);
+                    if (!v) { ok = false; break; }
+                    std::memcpy(&m[w], &*v, 4);
+                }
+                if (!ok) break;
+                // 3x3 rotation sub-block of the row-major 3x4: rows {0,1,2/4,5,6/8,9,10}
+                float rr[9] = {m[0], m[1], m[2], m[4], m[5], m[6], m[8], m[9], m[10]};
+                std::memcpy(rots[b], rr, sizeof rr);
+            }
+            if (!ok) { PrintErr("az_linkjoints: mem read fail mid-table"); continue; }
+            std::printf("ok linkjoints %d addr=0x%08x\n", LINKJOINTS_NBONE, jt);
+            for (int b = 0; b < LINKJOINTS_NBONE; ++b) {
+                std::printf("  %d %.6f %.6f %.6f %.6f %.6f %.6f %.6f %.6f %.6f\n",
+                            b, rots[b][0], rots[b][1], rots[b][2],
+                            rots[b][3], rots[b][4], rots[b][5],
+                            rots[b][6], rots[b][7], rots[b][8]);
+            }
+            std::printf("ok end\n");
         }
         else if (cmd == "soh_wallinfo") {
             if (!g_soh_booted) { PrintErr("soh_wallinfo: run soh_boot first"); continue; }
