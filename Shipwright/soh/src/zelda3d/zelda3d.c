@@ -5069,10 +5069,22 @@ static void Zelda3D_ReplExec(PlayState* play, char* line, const char* outPath) {
         } else if (strcmp(arg, "itemuse") == 0) {
             Zelda3D_PlayerForceItemUse(p, play);
             Zelda3D_ReplReply(outPath, "linkstate itemuse -> bottle raise/swing pose (st1=0x%x)", p->stateFlags1);
+        } else if (strcmp(arg, "backwalk") == 0) {
+            Zelda3D_PlayerForceBackwalk(p, play);
+            Zelda3D_ReplReply(outPath, "linkstate backwalk -> forced dead-behind func_8083CBF0 (st1=0x%x yaw=%d)",
+                            p->stateFlags1, p->yaw);
+        } else if (strcmp(arg, "climbup") == 0) {
+            Zelda3D_PlayerForceClimbMove(p, play, 1);
+            Zelda3D_ReplReply(outPath, "linkstate climbup -> traversal action (Fclimb_upL) forward (st1=0x%x)",
+                            p->stateFlags1);
+        } else if (strcmp(arg, "climbdown") == 0) {
+            Zelda3D_PlayerForceClimbMove(p, play, -1);
+            Zelda3D_ReplReply(outPath, "linkstate climbdown -> traversal action (Fclimb_upL) reversed (st1=0x%x)",
+                            p->stateFlags1);
         } else {
             Zelda3D_ReplReply(outPath,
                             "usage: linkstate <roll|talk|idle|jump|swim|damage|shield|attack|attack2|"
-                            "climb|dive|getitem|death|carry|throw|itemuse>");
+                            "climb|dive|getitem|death|carry|throw|itemuse|backwalk|climbup|climbdown>");
         }
     } else if (strcmp(cmd, "freeze") == 0 && sscanf(line, "%*s %i", &iv) == 1) {
         // Frame-step harness: `freeze 1` holds the game logic still (Play_Update skipped) so a brief

@@ -7872,6 +7872,54 @@ s32 Zelda3D_PlayerForceItemUse(Player* this, PlayState* play) {
     return 1;
 }
 
+// Zelda3D backwalk/climb_updown closure (2026-07-15, docs/link_parity_checklist.md): same Force*
+// contract as the states above — install the REAL result state the live branch installs, bypassing
+// only the entry gate (a live-decoded input threshold / a genuine tall wall) headless control can't
+// reliably satisfy.
+
+// Backward walk: the real trigger (z_player.c ~8410-8420, func_8083CB2C's sibling walk-decode block)
+// is `if (func_8083FC68(this, speedTarget, yawTarget) < 0) func_8083CBF0(this, yawTarget, play);` —
+// func_8083FC68 returns -1 only when the camera-relative stick-push yawTarget is close enough to
+// dead-behind Link's facing (shape.rot.y) AND speedTarget clears its threshold; live headless input
+// swept -45..-127 backward magnitudes under Z-target lock and never reliably landed there (measured
+// ~179.8 deg delta, just short of round-trip precision). Rather than keep fighting the live decoder,
+// this calls func_8083CBF0 DIRECTLY — the exact same function/args the real branch calls — with
+// yawTarget forced to shape.rot.y+0x8000 (an unambiguous dead-behind push), reproducing the branch's
+// result state exactly: Player_Action_808423EC + gPlayerAnim_link_anchor_back_walk (CSAB
+// ac_back_walk per zelda3d_player_animmap.inc), linearVelocity=8.0f. No magic constant: 0x8000 is a
+// literal 180-degree turn in the engine's s16-angle convention, not a tuned offset.
+s32 Zelda3D_PlayerForceBackwalk(Player* this, PlayState* play) {
+    func_8083CBF0(this, (s16)(this->actor.shape.rot.y + 0x8000), play);
+    return 1;
+}
+
+// Climb traversal (up/down): `forceclimb` (Zelda3D_PlayerForceClimb) already reaches
+// func_8083EC18 -> Player_SetupWaitForPutAway(func_8083A3B0) -> Player_Action_8084BF1C, the REAL
+// ladder-traversal action func — confirmed by reading func_8083EC18's body: it installs that chain
+// UNCONDITIONALLY once yDistToLedge>=79, regardless of real-ladder-poly vs. forced-wall branch. The
+// remaining gap was purely geometric (no yDistToLedge>=79 wall found near a headless spawn this
+// session), not a missing code path, so instead of hunting a wall we install the SAME traversal
+// action func directly via func_8083A3B0 (the identical call func_8083EC18 makes) and read back the
+// resulting anim exactly as Player_Action_8084BF1C's own live decode would pick it: the moving family
+// is `ageProperties->unk_AC[actionVar1 + actionVar2]` (z_player.c ~13620/13640/13657) — we take the
+// SAME forced-wall actionVar1=2 branch `forceclimb` uses (Fclimb_upL/upR — the identical family
+// `forceclimb` would reach on a real tall wall, per sAgeProperties' unk_AC init table, which is NOT
+// age-split for indices 2/3: both adult and child rows point at gPlayerAnim_link_normal_Fclimb_upL/R).
+// Direction only flips skelAnime.playSpeed's sign (the live function's own encoding, ~z_player.c
+// 13591-13597: going down is literally the up clip played backward — confirmed by reading both the
+// sp84>0 and sp84<0 branches, which both terminate at `anim1 = ageProperties->unk_AC[sp68]`), so a
+// single anim asset covers both directions; no separate down-only CSAB exists to select.
+s32 Zelda3D_PlayerForceClimbMove(Player* this, PlayState* play, s32 dir) {
+    this->stateFlags1 |= PLAYER_STATE1_CLIMBING_LADDER;
+    this->av1.actionVar1 = 2; // forced-wall branch, same bit `forceclimb`/func_8083EC18 OR in
+    this->av2.actionVar2 = 0; // L-sourced variant (arbitrary; R is the same family, mirrored)
+    func_8083A3B0(play, this); // exact call func_8083EC18 makes: installs Player_Action_8084BF1C,
+                                // preserving av1/av2 across Player_SetupActionPreserveAnimMovement
+    Player_AnimPlayOnce(play, this, this->ageProperties->unk_AC[this->av1.actionVar1 + this->av2.actionVar2]);
+    this->skelAnime.playSpeed = (dir >= 0) ? 1.0f : -1.0f;
+    return 1;
+}
+
 // ztarget-as-its-own-state query: is Link CURRENTLY in the real N64 Z-hold/standing-aim action
 // func (Player_Action_80840450, the twin of OoT3D's FUN_00488b40)? This is what
 // func_80839E88/func_80839F90 install automatically once a hostile-category focusActor is locked
