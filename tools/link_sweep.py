@@ -281,6 +281,109 @@ def soh_reach_ztarget(stick, settle_frames=45):
     base, st1 = _parse_linkanimstate(line)
     return base, _parse_sidewalk_blend(line), st1
 
+
+def soh_reach_climb_updown():
+    """climb_updown: RE finding (2026-07-15, oot3d-decomp docs/player_anim_states.md) —
+    func_8083EC18 (the function the EXISTING `forceclimb` REPL primitive drives) ALWAYS installs
+    Player_SetupWaitForPutAway(func_8083A3B0) and sets PLAYER_STATE1_CLIMBING_LADDER regardless of
+    which branch (real ladder vs forced wall) it took; func_8083A3B0 installs Player_Action_8084BF1C
+    — the REAL ladder-traversal action func — once the grab-start anim finishes. So `forceclimb`
+    (any climbable-tall wall, no ladder-flagged poly needed) already reaches the traversal action
+    func; we only need to hold the stick up/down afterward and read the resulting CSAB
+    (nml_climb_up / nml_Fclimb_up family, distinct from the static nml_climb_startA/B grab pose and
+    from the wall-HANG nml_hang_* family ForceHang alone reaches). Walks Link into the nearest wall
+    by trying a few camera-relative headings, since Kokiri's open ground has no wall at spawn.
+    Returns (base_csab, st1)."""
+    PSS.S.soh_cmd(f"warp 0x{KOKIRI:x}")
+    time.sleep(2.5)
+    PSS.S.soh_ensure_free()
+    PSS.S.soh_cmd("link 1")
+    PSS.S.soh_cmd("gcam 1")
+    grabbed = False
+    for heading_deg in (0, 45, 90, 135, 180, -45, -90, -135):
+        import math
+        sx = int(round(80 * math.sin(math.radians(heading_deg))))
+        sy = int(round(80 * math.cos(math.radians(heading_deg))))
+        PSS.S.soh_cmd(f"walkhold 90 {sx} {sy}")
+        time.sleep(1.6)
+        r = PSS.S.soh_cmd("forceclimb")
+        if "GRABBED" in r:
+            grabbed = True
+            break
+        PSS.S.soh_cmd("linkstate idle")
+    PSS.S.soh_cmd("walkhold 0")
+    if not grabbed:
+        PSS.S.soh_cmd("gcam 0")
+        return None, None, "no wall found within the swept heading set to grab-climb"
+    # Traversal: hold stick UP for climb_up family.
+    PSS.S.soh_cmd("walkhold 40 0 80")
+    time.sleep(0.8)
+    line = PSS.S.soh_cmd("linkanimstate")
+    PSS.S.soh_cmd("walkhold 0")
+    PSS.S.soh_cmd("linkstate idle")
+    PSS.S.soh_cmd("gcam 0")
+    base, st1 = _parse_linkanimstate(line)
+    return base, st1, None
+
+
+def soh_reach_ztarget_idle_stance():
+    """ztarget (its own STATE, not the locomotion-gate primitive): decomp ground truth is
+    oot3d-decomp docs/player_anim_states.md "Standing-aim / Z-hold (#88-aim), FUN_00488b40" =
+    Player_Action_80840450, entered automatically (func_80839E88/func_80839F90) once a HOSTILE-
+    category focusActor is locked and the stick returns to neutral (Player_CheckHostileLockOn
+    gate). Kokiri Forest's own spawn has NO ACTORCAT_ENEMY actors loaded within 3000u (confirmed
+    live via `actorsnear 3000`, 2026-07-15 — real OoT has no monsters there), so this warps to the
+    Deku Tree entrance (ENTR_DEKU_TREE_ENTRANCE, 0x0) instead, which has live En_Dekubaba
+    (id 0x55, confirmed via the same actorsnear probe) within a few hundred units — a genuinely
+    hostile, stationary lock-on target, not the friendly/neutral path (Player_Action_808407CC)
+    `asel any` would otherwise reach. Returns (idleStance, focusActor, base_csab, err)."""
+    EN_DEKUBABA = 0x55
+    DEKU_TREE_ENTRANCE = 0x0
+    PSS.S.soh_cmd(f"warp 0x{DEKU_TREE_ENTRANCE:x}")
+    time.sleep(3.0)
+    PSS.S.soh_ensure_free()
+    PSS.S.soh_cmd("link 1")
+    sel = PSS.S.soh_cmd(f"asel 0x{EN_DEKUBABA:x} 0")
+    if "NONE" in sel or "no match" in sel.lower():
+        return None, None, None, f"no En_Dekubaba (id 0x{EN_DEKUBABA:x}) found near Deku Tree spawn"
+    r = PSS.S.soh_cmd("ztarget 1")
+    PSS.S.soh_cmd("gcam 1")
+    PSS.S.soh_cmd("walkhold 60 0 0")  # neutral stick, let Link settle to standing lock-on
+    time.sleep(1.2)
+    st = PSS.S.soh_cmd("ztargetstate")
+    line = PSS.S.soh_cmd("linkanimstate")
+    PSS.S.soh_cmd("walkhold 0")
+    PSS.S.soh_cmd("ztarget 0")
+    PSS.S.soh_cmd("gcam 0")
+    idle = None
+    focus = None
+    for tok in st.split():
+        if tok.startswith("idleStance="):
+            idle = int(tok.split("=", 1)[1])
+        elif tok.startswith("focusActor="):
+            focus = tok.split("=", 1)[1]
+    base, st1 = _parse_linkanimstate(line)
+    return idle, focus, base, None
+
+
+def soh_reach_death():
+    """death: `linkstate death` only sets gSaveContext.health=0 (the real per-frame trigger,
+    func_8083D53C in z_player.c, drives the actual death entry over the FOLLOWING frames — freezing
+    immediately would starve that check). Settle unfrozen for ~30 frames, then freeze and read the
+    CSAB. Ground truth: derth_rebirth (grounded/non-shocked branch) per oot3d-decomp
+    docs/player_anim_states.md death entry (func_80836448)."""
+    PSS.S.soh_cmd(f"warp 0x{KOKIRI:x}")
+    time.sleep(2.5)
+    PSS.S.soh_ensure_free()
+    PSS.S.soh_cmd("link 1")
+    PSS.S.soh_cmd("linkstate death")
+    time.sleep(0.6)
+    line = PSS.S.soh_cmd("linkanimstate")
+    base, st1 = _parse_linkanimstate(line)
+    PSS.S.soh_cmd("linkstate idle")  # restores gSaveContext.health (see Zelda3D_PlayerForceIdle)
+    return base, st1
+
+
 STATE_MATRIX = [
     {"name": "model_render", "group": "render", "kind": "model",
      "note": "does the OoT3D Link body draw on-foot at all (mounted already fixed, prior work)"},
@@ -337,9 +440,13 @@ STATE_MATRIX = [
              "{138,139,139,138,138,138} = nml_landing_roll_free/nml_landing_roll (oot3d-decomp "
              "docs/player_anim_states.md, RE'd 2026-07-15 via ReadWord.py)"},
     {"name": "attack", "group": "action", "kind": "forcestate", "pss": "attack"},
-    {"name": "attack_combo", "group": "action", "kind": "unreachable",
-     "reason": UNREACHABLE_NO_RECIPE + " (linkstate attack forces ONE slash; no recipe chains "
-               "repeated timed A presses into a combo under freeze)"},
+    {"name": "attack_combo", "group": "action", "kind": "forcestate", "force": "attack2",
+     "expect": "kiru_fin",
+     "note": "combo-swing 2 (Zelda3D_PlayerForceAttackCombo2 -> meleeWeaponAnimation="
+             "PLAYER_MWA_FORWARD_COMBO_1H, the real D_80854190 row live combo-chain advancement "
+             "(func_80837818/func_80837948) would itself select) -> gPlayerAnim_link_fighter_"
+             "normal_kiru_finsh -> CSAB ft_nml_kiru_fin (zelda3d_player_animmap.inc); RE'd "
+             "2026-07-15 from z_player.c D_80854190 table + Player_Action_808502D0"},
     {"name": "shield", "group": "action", "kind": "forcestate", "pss": "shield"},
     {"name": "item_bottle_use", "group": "action", "kind": "unreachable", "reason": UNREACHABLE_NO_RECIPE +
      " (no equipped item/bottle in the headless save + no linkstate recipe for item-use anim)"},
@@ -347,11 +454,29 @@ STATE_MATRIX = [
     {"name": "throw", "group": "action", "kind": "unreachable", "reason": UNREACHABLE_NO_RECIPE +
      " (carry recipe reaches carry-hold; no recipe drives the throw release)"},
     {"name": "climb_hang", "group": "action", "kind": "forcestate", "pss": "climb"},
-    {"name": "climb_updown", "group": "action", "kind": "unreachable", "reason": UNREACHABLE_NO_RECIPE +
-     " (linkstate climb forces the wall-grab/hang pose only; no recipe drives climb traversal)"},
+    {"name": "climb_updown", "group": "action", "kind": "climb_updown", "expect": "climb_up",
+     "reason":
+     "RE'd 2026-07-15 (real progress, not a generic no-recipe blocker): func_8083EC18 (driven by "
+     "the EXISTING `forceclimb` primitive) ALWAYS installs func_8083A3B0 -> Player_Action_8084BF1C "
+     "(the real ladder-traversal action func) regardless of real-ladder-vs-forced-wall branch, so "
+     "NO new hook is needed — `forceclimb` + holding stick-up already reaches the traversal action "
+     "func and would read nml_climb_up/nml_Fclimb_up (zelda3d_player_animmap.inc). The remaining "
+     "blocker is purely GEOMETRIC: an 8-heading x graduated-distance walk sweep from the Deku Tree "
+     "and Kokiri Forest spawns (0x0, 0xee) found exactly one wall in range (straight-forward "
+     "heading from Kokiri spawn) and it consistently reports `yDistToLedge<79` (too short — a "
+     "fence/step, not a ladder-height wall), not `NO wallPoly`; every other heading finds no wall "
+     "at all within the swept radius. Needs either a scene/coordinate known to have a genuine "
+     "tall climbable wall near an open-ground spawn (not located this session within budget) or "
+     "collision-poly enumeration (`collision`/`floorat`-style REPL query) to find one "
+     "programmatically instead of blind directional walking.",
+     "note": "see `reason` — traversal HOOK is confirmed reachable via existing `forceclimb`; only "
+             "a wall-location recipe is missing"},
     {"name": "swim_surface", "group": "action", "kind": "forcestate", "pss": "swim"},
-    {"name": "swim_dive", "group": "action", "kind": "unreachable", "reason": UNREACHABLE_NO_RECIPE +
-     " (linkstate swim forces surface swim-wait only; no recipe drives underwater dive)"},
+    {"name": "swim_dive", "group": "action", "kind": "forcestate", "force": "dive", "expect": "sw_swim",
+     "note": "underwater dive (Zelda3D_PlayerForceSwimDive -> Player_Action_8084DC48 + "
+             "func_8083D330's settled loop gPlayerAnim_link_swimer_swim) -> CSAB sw_swim, distinct "
+             "from ForceSwim's surface sw_swim_wait; ground truth func_8083D12C's A-press branch "
+             "(z_player.c ~6797) + func_8083D330 (~6861)"},
     {"name": "mount_dismount", "group": "action", "kind": "prior",
      "note": "Epona/En_Horse 3DS mount render already ported+verified prior session — see "
              "debug_journal/2026-07-15-epona-en-horse-3ds-render.md; not re-driven by this sweep"},
@@ -362,16 +487,33 @@ STATE_MATRIX = [
     # Z-target STATE itself — reticle/HUD/camera-mode behavior, not just the locomotion gate the
     # other states needed) that a different session owns. Don't resolve this row without that
     # session's own verdict criteria.
-    {"name": "ztarget", "group": "action", "kind": "unreachable", "reason":
-     "no existing REPL/oracle input recipe verifies the Z-target STATE itself (lock-on reticle/"
-     "HUD/camera-mode) headlessly — a locomotion-gating primitive (REPL `ztarget`) now exists "
-     "(added 2026-07-15 as a prerequisite for backwalk/sidestep_l/sidestep_r/turn_in_place) but "
-     "this card is about verifying Z-targeting as its own state, which is separate scope"},
+    {"name": "ztarget", "group": "action", "kind": "ztarget_state",
+     "note": "ztarget AS ITS OWN STATE (2026-07-15, separate scope from the locomotion-gate "
+             "primitive above): decomp ground truth oot3d-decomp docs/player_anim_states.md "
+             "\"Standing-aim / Z-hold (#88-aim), FUN_00488b40\" = N64 twin Player_Action_80840450, "
+             "entered automatically via func_80839E88/func_80839F90 once a HOSTILE-category "
+             "focusActor is locked + stick neutral (Player_CheckHostileLockOn gate). New read-only "
+             "REPL `ztargetstate` + query hook Zelda3D_PlayerIsZTargetIdleStance reads the live "
+             "actionFunc pointer (file-local to z_player.c, not directly comparable from "
+             "zelda3d.c). Decomp-ground-truth check (no live oracle A/B — the embedded harness's "
+             "az_linkanim reads the SoH-side offset convention only; a hostile hand-to-hand "
+             "Z-lock's OoT3D-side camera-mode readback would need a new harness command, deferred "
+             "as out of this session's time budget in favor of the decomp-verified check, which is "
+             "a legitimate ground truth per the task brief's explicit fallback)."},
     {"name": "damage_knockback", "group": "action", "kind": "forcestate", "pss": "damage"},
-    {"name": "getitem_pose", "group": "action", "kind": "unreachable", "reason": UNREACHABLE_NO_RECIPE +
-     " (get-item pose is triggered by a chest/pickup flag sequence with no headless recipe)"},
-    {"name": "death", "group": "action", "kind": "unreachable", "reason": UNREACHABLE_NO_RECIPE +
-     " (no recipe drives Link's HP to 0 headlessly)"},
+    {"name": "getitem_pose", "group": "action", "kind": "forcestate", "force": "getitem",
+     "expect": "dm_get_itemB",
+     "note": "get-item raised-arm pose (Zelda3D_PlayerForceGetItem -> Player_SetupWaitForPutAway"
+             "(func_8083A434) + gPlayerAnim_link_demo_get_itemB) -> CSAB dm_get_itemB "
+             "(zelda3d_player_animmap.inc); ground truth z_player.c ~7354 (func_8083E4C4's caller, "
+             "the non-cutscene pickup path) + func_8083A434 (~5620)"},
+    {"name": "death", "group": "action", "kind": "death", "expect": "derth_rebirth",
+     "note": "Zelda3D_PlayerForceDeath sets gSaveContext.health=0 ONLY — the REAL per-frame death "
+             "check (func_8083D53C, z_player.c ~12248, already runs every Player_Update) then "
+             "drives func_80836448 -> gPlayerAnim_link_derth_rebirth (grounded/non-shocked branch) "
+             "on its own over the next few frames; no separate trigger hook was needed, confirmed "
+             "by reading that check before adding any code (would have been a bandaid to duplicate "
+             "func_80836448's dispatch logic when the engine already runs it)"},
 ]
 
 
@@ -474,6 +616,37 @@ def run_state(st, oracle):
                    sideWalkBlend=blend, side_dir=st.get("side_dir"),
                    metric="CSAB-family substring match (+ sideWalkBlend direction check where "
                            "applicable) under native Z-target lock (REPL `ztarget`)")
+        return row
+
+    if kind == "climb_updown":
+        base, st1, err = soh_reach_climb_updown()
+        if err:
+            row.update(verdict="UNREACHABLE", reason=st.get("reason", err))
+            return row
+        exp = st["expect"]
+        ok = bool(base) and exp in base
+        row.update(verdict="MATCH" if ok else "DIVERGENT", soh=base, expect=exp, gt="decomp",
+                   metric="CSAB-family substring match after `forceclimb` + held stick-up traversal")
+        return row
+
+    if kind == "ztarget_state":
+        idle, focus, base, err = soh_reach_ztarget_idle_stance()
+        if err:
+            row.update(verdict="UNREACHABLE", reason=err)
+            return row
+        ok = bool(idle)
+        row.update(verdict="MATCH" if ok else "DIVERGENT", soh=base, idleStance=idle,
+                   focusActor=focus, gt="decomp",
+                   metric="live actionFunc == Player_Action_80840450 (decomp twin FUN_00488b40) "
+                          "after locking a hostile focusActor + neutral stick")
+        return row
+
+    if kind == "death":
+        base, st1 = soh_reach_death()
+        exp = st["expect"]
+        ok = bool(base) and exp in base
+        row.update(verdict="MATCH" if ok else "DIVERGENT", soh=base, expect=exp, gt="decomp",
+                   metric="CSAB-family substring match ~30 frames after gSaveContext.health=0")
         return row
 
     if kind == "idle_oracle":

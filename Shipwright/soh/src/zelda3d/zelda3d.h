@@ -448,6 +448,38 @@ s32 Zelda3D_PlayerForceAttack(Player* player, PlayState* play);
 // Wall-hang (jump_climb) SELECTION force (no wallPoly needed) — exercises the jump_climb->hang map.
 s32 Zelda3D_PlayerForceHang(Player* player, PlayState* play);
 
+// 2026-07-15 (6-state Link parity expansion, see docs/link_parity_checklist.md):
+// each of these installs the real OoT N64 action func (kept byte-faithful from the community
+// decomp base this z_player.c is built from) that OoT3D's own equivalent state machine drives,
+// bypassing ONLY the entry gate headless control can't satisfy (repeated timed input, deep-water
+// depth, a chest/pickup trigger actor, HP reaching 0) — same "Force*" contract as the existing
+// jump/swim/damage/shield/attack helpers above. REPL `linkstate attack2|dive|getitem|death`.
+// Combo-swing 2: sets meleeWeaponAnimation to the REAL PLAYER_MWA_FORWARD_COMBO_1H table row
+// (D_80854190) that live combo-chain advancement (func_80837818/func_80837948) would itself pick
+// after a second well-timed A-press — same CSAB-selection path, entry gate bypassed.
+s32 Zelda3D_PlayerForceAttackCombo2(Player* player, PlayState* play);
+// Underwater dive: Player_Action_8084DC48 (the SAME action func Player_TryEnteringWater's A-press
+// branch installs) + func_8083D330's representative in-dive pose (link_swimer_swim, looping),
+// distinct from the surface-tread ForceSwim (link_swimer_swim_wait).
+s32 Zelda3D_PlayerForceSwimDive(Player* player, PlayState* play);
+// Get-item raised-arm pose: the same Player_SetupWaitForPutAway(func_8083A434) + demo_get_itemB
+// sequence func_8083E4C4's caller installs on a real pickup, without needing a live chest/item
+// actor interaction headless can't trigger reliably.
+s32 Zelda3D_PlayerForceGetItem(Player* player, PlayState* play);
+// Death: zeroes gSaveContext.health only — func_8083D53C's existing per-frame HP==0 check (already
+// running every Player_Update, see z_player.c ~12246) then drives the REAL death entry
+// (func_80836448 -> gPlayerAnim_link_derth_rebirth or the swim/shock variants) with no new hook
+// needed; this just supplies the natural trigger condition.
+s32 Zelda3D_PlayerForceDeath(Player* player, PlayState* play);
+
+// ztarget-as-its-own-state query (docs/link_parity_checklist.md "ztarget" row, separate scope
+// from the locomotion-gate primitive above): true iff Link's action func is the REAL OoT N64
+// Z-hold/standing-aim state (Player_Action_80840450 — decomp ground truth: oot3d-decomp
+// docs/player_anim_states.md "Standing-aim / Z-hold (#88-aim), FUN_00488b40"), i.e. the native
+// lock-on idle stance entered automatically via func_80839E88/func_80839F90 once `ztarget 1`
+// holds a HOSTILE-category focusActor and Link's stick returns to neutral. REPL `ztargetstate`.
+s32 Zelda3D_PlayerIsZTargetIdleStance(Player* player);
+
 // Per-frame pose-scan LOGGER (anim QA). Active=on records each drawn player frame's max bone-rotation
 // jump + bone + resolved csab + frame into a log the REPL reads back (`posescan on|off|dump`). Sampled
 // in the DRAW path (where the pose updates), so it works at normal speed, not under frame-step.

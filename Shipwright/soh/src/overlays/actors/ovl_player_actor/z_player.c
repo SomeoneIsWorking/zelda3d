@@ -7698,12 +7698,19 @@ s32 Zelda3D_PlayerForceTalk(Player* this, PlayState* play, f32 range) {
 // focusActor, force-closes any open textbox, and forces the standing-idle action directly (NOT by
 // advancing the textbox with A, which routes through the crashy Player_Action_Talk CLOSING branch).
 s32 Zelda3D_PlayerForceIdle(Player* this, PlayState* play) {
-    this->stateFlags1 &= ~(PLAYER_STATE1_TALKING | PLAYER_STATE1_IN_CUTSCENE);
+    this->stateFlags1 &= ~(PLAYER_STATE1_TALKING | PLAYER_STATE1_IN_CUTSCENE | PLAYER_STATE1_DEAD);
     this->talkActor = NULL;
     this->focusActor = NULL;
     this->actor.textId = 0;
     if (play->msgCtx.msgMode != MSGMODE_NONE) {
         Message_CloseTextbox(play);
+    }
+    // Undo Zelda3D_PlayerForceDeath's precondition (gSaveContext.health=0), which otherwise
+    // persists across warps/states since it's global save data, not per-actor — `linkstate idle`
+    // is the documented safe-reset out of ANY forced state, so it must undo this one too.
+    if (gSaveContext.health <= 0) {
+        gSaveContext.health = gSaveContext.healthCapacity;
+        play->gameOverCtx.state = GAMEOVER_INACTIVE;
     }
     func_80839E88(this, play); // standing idle
     return 1;
@@ -7765,6 +7772,72 @@ s32 Zelda3D_PlayerForceAttack(Player* this, PlayState* play) {
 s32 Zelda3D_PlayerForceHang(Player* this, PlayState* play) {
     Player_AnimPlayLoop(play, this, &gPlayerAnim_link_normal_jump_climb_wait_free);
     return 1;
+}
+
+// Zelda3D 6-state parity expansion (2026-07-15, docs/link_parity_checklist.md): each of these
+// mirrors the Force* contract above — install the SAME action func + anim the real trigger would,
+// bypassing only the entry gate headless can't hit. RE'd from this file's own N64 action-func
+// bodies (ground truth for the OoT3D-equivalent CSAB families is in oot3d-decomp
+// docs/player_anim_states.md).
+
+// Combo-swing 2: PLAYER_MWA_FORWARD_COMBO_1H is the real second row of D_80854190 — exactly what
+// live combo-chain advancement (Player_ActionHandler_7 -> func_80837818 -> func_80837948, entered
+// from Player_Action_808502D0's LinkAnimation_Update-finished branch on a well-timed repeat A
+// press) selects for slash #2. We install it directly so the sweep reads the representative combo2
+// pose without needing to chain two precisely-timed REPL taps under freeze.
+s32 Zelda3D_PlayerForceAttackCombo2(Player* this, PlayState* play) {
+    this->meleeWeaponAnimation = PLAYER_MWA_FORWARD_COMBO_1H;
+    Player_SetupAction(play, this, Player_Action_808502D0, 0);
+    Player_AnimPlayOnce(play, this, D_80854190[PLAYER_MWA_FORWARD_COMBO_1H].unk_00);
+    return 1;
+}
+
+// Underwater dive: func_8083D12C's A-press branch (entered from swim-wait, see Player_Action_8084D610)
+// installs Player_Action_8084DC48 + gPlayerAnim_link_swimer_swim_deep_start, then (once av1.actionVar1
+// reaches 2, see Player_Action_8084DC48's own body ~z_player.c:14212) settles into func_8083D330's
+// looping gPlayerAnim_link_swimer_swim — the representative "swimming underwater" pose, distinct
+// from ForceSwim's surface gPlayerAnim_link_swimer_swim_wait. We install that settled state directly
+// (skipping the deep_start transition anim, which is a one-shot entry flourish, not a selectable
+// steady-state CSAB) so the read is deterministic under `freeze`.
+s32 Zelda3D_PlayerForceSwimDive(Player* this, PlayState* play) {
+    this->stateFlags1 |= PLAYER_STATE1_IN_WATER;
+    this->stateFlags2 |= PLAYER_STATE2_UNDERWATER;
+    Player_SetupAction(play, this, Player_Action_8084DC48, 0);
+    func_8083D330(play, this);
+    return 1;
+}
+
+// Get-item raised-arm pose: the real "picked up a non-cutscene-worthy item" path (z_player.c
+// ~7354/7391, func_8083E4C4's caller) does Player_SetupWaitForPutAway(func_8083A434) +
+// Player_AnimPlayOnceAdjusted(gPlayerAnim_link_demo_get_itemB) under GETTING_ITEM|CARRYING_ACTOR|
+// IN_CUTSCENE. We install exactly that without needing a live EnItem00/chest interaction actor.
+s32 Zelda3D_PlayerForceGetItem(Player* this, PlayState* play) {
+    this->stateFlags1 |= PLAYER_STATE1_GETTING_ITEM | PLAYER_STATE1_CARRYING_ACTOR | PLAYER_STATE1_IN_CUTSCENE;
+    Player_SetupWaitForPutAway(play, this, func_8083A434);
+    Player_AnimPlayOnceAdjusted(play, this, &gPlayerAnim_link_demo_get_itemB);
+    return 1;
+}
+
+// Death: NOT a new action-func hook — func_8083D53C's existing per-frame check (z_player.c ~12248,
+// runs every Player_Update via Player_UpdateCommon) ALREADY drives the real death entry
+// (func_80836448 -> gPlayerAnim_link_derth_rebirth, or the swim_down/electric_shock_end variants)
+// as soon as gSaveContext.health == 0 while grounded/in-water. Confirmed by reading that check: no
+// separate trigger exists to bypass, so this hook supplies only the natural precondition and lets
+// the real per-frame code drive the transition on subsequent frames (the sweep reads it a few
+// frames after calling this, not on the same frame).
+s32 Zelda3D_PlayerForceDeath(Player* this, PlayState* play) {
+    gSaveContext.health = 0;
+    return 1;
+}
+
+// ztarget-as-its-own-state query: is Link CURRENTLY in the real N64 Z-hold/standing-aim action
+// func (Player_Action_80840450, the twin of OoT3D's FUN_00488b40)? This is what
+// func_80839E88/func_80839F90 install automatically once a hostile-category focusActor is locked
+// and Link is stick-neutral (Player_CheckHostileLockOn gate) — no forcing needed, just reads the
+// live actionFunc pointer, which zelda3d.c can't compare directly since Player_Action_80840450 is
+// file-local to z_player.c.
+s32 Zelda3D_PlayerIsZTargetIdleStance(Player* this) {
+    return this->actionFunc == Player_Action_80840450;
 }
 
 void func_8083F070(Player* this, LinkAnimationHeader* anim, PlayState* play) {
