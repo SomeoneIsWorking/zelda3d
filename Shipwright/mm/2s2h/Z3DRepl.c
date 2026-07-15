@@ -6,6 +6,7 @@
 
 #include "global.h" // gPlayState, GET_PLAYER, PlayState, Player, Actor, ACTORCAT_MAX
 #include "2s2h/zelda3d/mm3d_model.h" // Zelda3D_SetObjectScale (per-object calibration)
+#include "2s2h/zelda3d/mm3d_player_force.h" // Zelda3D_PlayerForce{Idle,Walk,Run}
 
 // `cam` framing state (below). Non-static because Z3D_Repl_Tick needs to
 // apply it every frame (post-update) to override the game camera drift.
@@ -311,6 +312,34 @@ static void Z3D_Repl_Exec(PlayState* play, char* line) {
             } else {
                 Z3D_Repl_Reply("usage: cam <yawDeg> [dist] [height] | cam off");
             }
+        }
+    } else if (strncmp(line, "linkstate", 9) == 0) {
+        // `linkstate <idle|walk|run>` — MM analog of OoT's REPL `linkstate` (docs/
+        // re_control_debug_backlog.md item #11), driving the real Zelda3D_PlayerForce*
+        // hooks in mm z_player.c. Seed of the MM parity sweep (docs/mm_parity_checklist.md).
+        Player* player = (play != NULL) ? GET_PLAYER(play) : NULL;
+        if (player == NULL) {
+            Z3D_Repl_Reply("linkstate err (no player)");
+        } else {
+            char arg[32] = { 0 };
+            sscanf(line + 9, "%31s", arg);
+            char out[128];
+            if (strcmp(arg, "idle") == 0) {
+                Zelda3D_PlayerForceIdle(player, play);
+                snprintf(out, sizeof(out), "linkstate idle -> Player_Action_Idle (actionVar1=%d)",
+                         player->av1.actionVar1);
+            } else if (strcmp(arg, "walk") == 0) {
+                Zelda3D_PlayerForceWalk(player, play);
+                snprintf(out, sizeof(out), "linkstate walk -> Player_Action_13 (speedXZ=%.2f)",
+                         player->speedXZ);
+            } else if (strcmp(arg, "run") == 0) {
+                Zelda3D_PlayerForceRun(player, play);
+                snprintf(out, sizeof(out), "linkstate run -> Player_Action_14 (speedXZ=%.2f)",
+                         player->speedXZ);
+            } else {
+                snprintf(out, sizeof(out), "usage: linkstate <idle|walk|run>");
+            }
+            Z3D_Repl_Reply(out);
         }
     } else if (strncmp(line, "ping", 4) == 0) {
         Z3D_Repl_Reply("pong");

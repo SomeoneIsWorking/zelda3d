@@ -8662,6 +8662,49 @@ void func_8083A794(Player* this, PlayState* play) {
     Player_SetAction(play, this, Player_IsZTargeting(this) ? Player_Action_14 : Player_Action_13, 1);
 }
 
+// Zelda3D MM force-state layer (docs/re_control_debug_backlog.md item #11 — the MM analog of
+// OoT's Zelda3D_PlayerForce* hooks, soh z_player.c ~7580-7890). Each installs the REAL action
+// func + anim the natural trigger would install, bypassing only the input-decode entry gate.
+// Deliberately the SAME bodies as the real installer funcs just above (func_80839E74,
+// func_8083A794), with the branch that reads live input pinned to the requested state instead —
+// no synthetic pose, no magic constants. Generic & reusable. REPL `linkstate <idle|walk|run>`.
+
+// Standing idle: installs Player_Action_Idle + the idle anim. Literally func_80839E74's body;
+// duplicated (not called) so this header-visible entry point stays independent of that
+// internal-linkage-adjacent helper's signature. Safe reset out of walk/run. Returns 1.
+s32 Zelda3D_PlayerForceIdle(Player* this, PlayState* play) {
+    Player_SetAction(play, this, Player_Action_Idle, 1);
+    Player_Anim_PlayOnce(play, this, Player_GetIdleAnim(this));
+    this->yaw = this->actor.shape.rot.y;
+    return 1;
+}
+
+// Walk: func_8083A794's body with the Z-target branch pinned to Player_Action_13 (the
+// non-Z-target ground locomotion action) instead of reading Player_IsZTargeting live.
+s32 Zelda3D_PlayerForceWalk(Player* this, PlayState* play) {
+    if ((Player_Action_13 != this->actionFunc) && (Player_Action_14 != this->actionFunc)) {
+        this->unk_B70 = 0;
+        this->unk_B34 = 0.0f;
+        this->unk_B38 = 0.0f;
+        Player_Anim_PlayLoopMorph(play, this, D_8085BE84[PLAYER_ANIMGROUP_run][this->modelAnimType]);
+    }
+    Player_SetAction(play, this, Player_Action_13, 1);
+    return 1;
+}
+
+// Run: same body, pinned to Player_Action_14 (the Z-targeting ground locomotion action) —
+// the branch func_8083A794 takes when Player_IsZTargeting(this) is true.
+s32 Zelda3D_PlayerForceRun(Player* this, PlayState* play) {
+    if ((Player_Action_13 != this->actionFunc) && (Player_Action_14 != this->actionFunc)) {
+        this->unk_B70 = 0;
+        this->unk_B34 = 0.0f;
+        this->unk_B38 = 0.0f;
+        Player_Anim_PlayLoopMorph(play, this, D_8085BE84[PLAYER_ANIMGROUP_run][this->modelAnimType]);
+    }
+    Player_SetAction(play, this, Player_Action_14, 1);
+    return 1;
+}
+
 void func_8083A844(Player* this, PlayState* play, s16 yaw) {
     this->yaw = yaw;
     this->actor.shape.rot.y = this->yaw;
