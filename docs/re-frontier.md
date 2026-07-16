@@ -133,12 +133,12 @@ foundational finding the whole arc depends on.
 - notes: the " BDQ" header's end_frame=2400 does NOT restart playback; the earlier "80s loop" model came from that header field, never from observed playback.
 
 ### title.moon-transform — moon disc/halo transform generator
-- status: re-partial
+- status: re-verified
 - deps: title.moon-sky-logo
-- evidence: `oot3d-decomp/docs/env_sun_moon_draw.md` Session 4 (uniform readback: disc scale 640, halos 1280, per-layer depth; sessions 1-3 static/watchpoint dead ends recorded)
-- where: `zelda3d_render.cpp` moon draw (kMoonDiscScale=0.505, kMoonTitleFixedScale=19.0204, halo 1.94/2.07 — measurement-fitted)
-- gap: the RUNTIME writer of the per-layer model matrix (f20-f22 uniforms) is unfound; the port carries fitted constants. Plan: draw_log at the moon frame → exact f20 row bits → `memscan` FCRAM → `watch` the source copy → writer PC → Ghidra.
-- notes: scalar watchpoints on the quad payload are BLIND to the bulk-copy materialization (session 3) — watch the uniform staging instead.
+- evidence: `oot3d-decomp/docs/title_sequence_full_re.md` §3 (parametric model: one view ray, disc scale 640 exact at D=2684.47, halos 1280 exact at D·(1±1/30)); `env_sun_moon_draw.md` Session 4 uniform readback; commit `6fc8c4b4`
+- where: `zelda3d_render.cpp` moon draw — every fitted constant replaced by the derived transform
+- gap: matched-frame pixel A/B (texpack off) pending; the CPU matrix-builder FUNCTION stays unlocated statically (5 sessions of recorded dead ends — the derived transform is complete without it; only re-chase with a dynamic watch if the A/B disagrees).
+- notes: disc alpha 205 remains the documented fine_moon0-decode STOPGAP (faithful is 255).
 
 ### title.rider-trajectory — rider position vs oracle across cue 6 window
 - status: todo
