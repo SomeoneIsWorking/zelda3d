@@ -46,6 +46,13 @@ struct CommonUbo {
     float uSphRot0[4];
     float uSphRot1[4];
     float uSphRot2[4];
+    // Mirror of SgUbo::uLitDif1/uLitDif2/uLightDir2 (per-light diffuse products + light2 dir,
+    // #153 CmbVShader vertex-lit port — zelda3d_sg_ubo.h). Size-parity padding today: the
+    // (default-off) unified path still runs its single-light uMatAmbient/uMatDiffuse form; wire
+    // these through UNIFIED_COMMON_UBO_BODY when the unified renderer takes over CMB draws.
+    float uLitDif1[4];
+    float uLitDif2[4];
+    float uLightDir2[4];
 };
 
 static_assert(sizeof(CommonUbo) == Zelda3DSg::kCommonBytes,

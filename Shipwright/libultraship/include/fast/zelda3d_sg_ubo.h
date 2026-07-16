@@ -92,6 +92,18 @@ struct SgUbo {
     float uSphRot0[4];
     float uSphRot1[4];
     float uSphRot2[4];
+    // OoT3D CmbVShader per-light DIFFUSE terms (#153/#111 — oot3d-decomp title_env_lighting.md
+    // §10 disassembly). The PICA vertex-lit program computes, per enabled light i:
+    //   o1 += matAmbient*LightAmbientColor_i + max(0, dot(N, -LightDir_i))*matDiffuse*LightDiffuseColor_i
+    // uAmbient already carries the ambient half (matAmb*sceneAmb, summed via uAmbient.w).
+    //   uLitDif1.rgb = matDiffuse * sceneLight1Color   (light slot 1's diffuse product)
+    //   uLitDif2.rgb = matDiffuse * sceneLight2Color   (light slot 2's diffuse product)
+    //   uLightDir2.xyz = light2 world direction (uLightDir carries light1); both normalized
+    //   CPU-side, or (0,0,0) when the slot's direction is degenerate — a zero dir nulls only
+    //   that light's DIFFUSE term (FUN_003fa5d0 semantics), never its ambient contribution.
+    float uLitDif1[4];
+    float uLitDif2[4];
+    float uLightDir2[4];
     float uBones[ZELDA3D_GL_MAX_BONES * 16]; // MUST stay last: pushed as its own <=4096 B block
 };
 
