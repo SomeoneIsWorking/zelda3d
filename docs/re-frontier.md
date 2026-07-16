@@ -210,11 +210,11 @@ landed as a `behaviors/actor/en_horse.cpp` module per the CLAUDE.md game-structu
 - notes: 
 
 ### camera.normal1 — Camera_Normal1 (CAM_FUNC_NORM1) ported
-- status: re-verified
+- status: re-partial
 - deps: camera.dispatch-map
-- evidence: `behaviors/camera/normal1.cpp`; header notes OoT3D FUN_00239fd8 diverges from SoH's Camera_Normal1 by "~28-unit Δeye-Y at Kakariko even under matched Link pose" — the divergence that motivated the port
+- evidence: `behaviors/camera/normal1.cpp` — **SCAFFOLDING ONLY**: `Normal1Behavior::update()` returns false, so SoH's legacy Camera_Normal1 (z_camera.c:1538) still runs. The dispatch hook + module exist and the divergence is documented (OoT3D FUN_00239fd8 vs SoH: ~28-unit Δeye-Y at Kakariko under matched Link pose, per the header), but the OoT3D body (oot3d-decomp/build/decomp/00239fd8.c, 418 lines) is NOT yet ported.
 - where: `behaviors/camera/normal1.cpp/.h`
-- gap: verification against oracle at matched frames not re-confirmed this pass — trust prior work but spot-check before relying on it for a new investigation.
+- gap: **the actual port is not landed** — `update()` is a TODO stub returning false (legacy fallthrough). Corrected 2026-07-16 from a prior over-optimistic `re-verified` mark: the module is a scaffold, not a verified port. Next: port FUN_00239fd8's body into `update()` and flip the return to true, then A/B the Kakariko Δeye-Y against the oracle.
 - notes: 
 
 ### camera.normal0-and-others — remaining camera mode functions (Normal0, Parallel*, etc.)
