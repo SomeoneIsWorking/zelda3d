@@ -112,3 +112,29 @@ NEXT (unblocked, no trajectory harness): check whether the clip FUN_002535f0 sel
 index into the table at `iRam00253750`) has baked root translation — if yes, (a) is the cause and
 the port must apply the clip's root motion to the horse pos, not just integrate speed. If the clip
 is in-place, fall back to (b) and re-derive the cue window/timebase from the cue table (§5 dump).
+
+## 5c. Horse-CSAB root-motion characterization (2026-07-17) — gallop is IN-PLACE
+
+Built a standalone probe (`scratch/mm3d_gar_test/csab_rootmotion.cpp`: CtrRom→Zar→Cmb+Csab, samples
+the root bone's local `t[]` across each clip) to test hypothesis (a) — does the clip FUN_002535f0
+plays carry root motion? Ran over all 15 `zelda_horse.zar` CSABs. Reporting **net** (end−start, true
+root displacement) vs **range** (hi−lo, includes gait oscillation) of root Z:
+
+  - `hl_anim_fastrun2_30` (the TITLE GALLOP): **netZ=−5.6, rangeZ=797.5 → IN-PLACE per loop.** The big
+    range is the stride reach-and-return; over a full 36f loop the root returns to start. So the
+    gallop's forward progress is SPEED-driven, exactly as the port assumes — the gallop clip does NOT
+    supply net root motion.
+  - `hl_anim_walk2_30`: netZ=−17.5 (small), mostly in-place.
+  - `hl_anim_slowrun2_30`: **netZ=−50.2** — real net root motion.
+  - transitions `hl_anim_slowrun_to_fastrun` (netZ=−61) / `hl_anim_fastrun_to_slowrun` (netZ=−88):
+    real net root motion (one-shot displacing clips).
+  - wait/stop/stand clips: net≈0 (in-place), large range = idle sway.
+
+**Refines §5b hypothesis (a):** the oracle's 0x41-window translation is NOT explained by the gallop
+(in-place). It IS explained IF the 0x41 cue plays `slowrun2_30` or a transition clip (which have net
+root motion) while zeroing speed — then the port must consume that clip's root Z, not integrate speed.
+So the decisive remaining question is unchanged but sharper: **WHICH clip does FUN_002535f0 select via
+the +0x1b0 index during 1380–1619?** If gallop → hypothesis (b) cue-decode; if slowrun/transition →
+hypothesis (a) root motion. Resolving +0x1b0 (index into the table at iRam00253750) is the next
+Ghidra step. (Probe kept in scratch; rebuild: `g++ -std=c++17 -I Shipwright/cmb3d
+scratch/mm3d_gar_test/csab_rootmotion.cpp Shipwright/cmb3d/asset/{ctr_rom,zar,lzs,cmb,csab}.cpp`.)
