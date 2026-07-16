@@ -484,3 +484,28 @@ rotations) vs the oracle's mounted Link pose (compare skeleton / the title pose 
 whether the mounted anim should be the OoT3D CSAB (hl_...) instead of the N64 uma anim. Fix = use the
 3DS mounted pose, or cap the speed-lean to the 3DS value. (Rider position + yaw + horse gait are
 already correct; this is specifically Link's torso lean.)
+
+---
+
+## Update 2026-07-16 (FIXED + VERIFIED): mounted-Link pose — dual-dispatcher fight resolved
+
+Full Ghidra-backed chain (title-screen port arc):
+- The 3DS riding CSABs live in **`zelda_link_opening.zar`** (21 CSABs, `uma_*` family mirroring
+  N64's `gPlayerAnim_link_uma_*`; gallop-ride = `uma_anim_fastrun`, 24f both sides). The animID-8
+  mapping already existed in zelda3d_player_animmap.inc — selection, not mapping, was broken.
+- `log link` trace: mounted Link played `uma_anim_stand` with `horseAnimIdx=3 (REARING)` during the
+  gallop — Player's D_80854944 selector (z_player.c ~14048) keyed off a wrong horse index.
+- `log rider` trace at the cue transition: `cutsceneAction` flip-flopped 5->1->5 and `animationIdx`
+  3->6->3 every frame — TWO dispatchers fighting: the ported 3DS title dispatcher (title_rider.cpp)
+  AND the vendored N64 `EnHorse_CutsceneUpdate`, which dispatches from `play->csCtx.linkAction` —
+  NON-NULL at the title (the N64-authored cs still ticks underneath; the old "always NULL at title"
+  assumption in title_rider's comment is FALSIFIED). Each re-inited against the other; Link's
+  selector sampled whichever index was live at its update — the racy stand/hunched pose.
+
+FIX: suppress `EnHorse_CutsceneUpdate`'s csCtx dispatch while `Zelda3D_Title_IsActive()` — the same
+suppression family as EnMag_Update and Cutscene_Command_Terminator; the ported 3DS dispatcher
+(decomp FUN_0026a30c) is the sole title-horse driver, as on the 3DS.
+
+VERIFIED: (1) trace — clean REARING(cs0-15) -> one MOVE transition -> steady idx=6, Link plays
+`uma_anim_fastrun` with av2=6; (2) visual — rider filmstrip cs240-276 re-captured
+(scratch/harness/rider_film_fixed.png): Link sits upright matching the oracle in all 10 frames.

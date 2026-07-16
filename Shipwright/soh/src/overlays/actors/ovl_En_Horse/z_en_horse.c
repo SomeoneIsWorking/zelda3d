@@ -2415,6 +2415,23 @@ void EnHorse_CutsceneUpdate(EnHorse* this, PlayState* play) {
     s32 csFunctionIdx;
     CsCmdActorCue* linkCsAction = play->csCtx.linkAction;
 
+    // Zelda3D title-demo: the ported 3DS title dispatcher (behaviors/title/title_rider.cpp,
+    // decomp FUN_0026a30c) is the SOLE driver of the title horse — this N64-csCtx path must not
+    // ALSO dispatch, or the two fight every frame: the N64-authored title cs (which still ticks
+    // underneath, csCtx.linkAction NON-NULL — the "always NULL at title" assumption was falsified
+    // by the `log rider` trace) sets cutsceneAction/animationIdx from ITS cue timeline, then
+    // title_rider sees the changed cutsceneAction and re-runs its own init, re-teleporting and
+    // flip-flopping animationIdx (GALLOP<->REARING) every frame. Player's mounted-anim selector
+    // (z_player.c D_80854944, keyed on rideActor->animationIdx) then samples whichever value is
+    // live at ITS update — the racy hunched-forward/stand riding pose. Same suppression family as
+    // EnMag_Update and Cutscene_Command_Terminator (both gate on Zelda3D_Title_IsActive).
+    {
+        extern int Zelda3D_Title_IsActive(void);
+        if (Zelda3D_Title_IsActive()) {
+            return;
+        }
+    }
+
     if (play->csCtx.state == 3) {
         this->playerControlled = 1;
         this->actor.params = 10;
