@@ -266,37 +266,9 @@ int Zelda3D_PosedModelLocalAABB(int modelId, unsigned long long midMask, float* 
 // can frame the model where it ACTUALLY draws (the -4000 local translate moves Gohma's model far off
 // her world.pos when she tilts — without this aaim would aim at the un-offset anchor). 0 = none.
 
-// --- En_Horse hoof-dust world-Y reconciliation (Zelda3D_HoofDustWorldPos, called from z_en_horse.c's
-// EnHorse_PostDraw). HONEST ROOT-CAUSE CORRECTION (superseding an earlier draft of this fix that
-// assumed Epona's BODY draws as the OoT3D epona.cmb model under Zelda3D AUTO skinned replacement —
-// disproved live this session, see oot3d-decomp/docs/en_horse_hoof_dust.md "mechanism correction":
-// z_skin.c's Skin_DrawImpl has NO Zelda3D hook at all (only z_skelanime.c's SkelAnime_Draw family
-// does), so En_Horse — which exclusively uses the Skin system — currently ALWAYS renders its native
-// N64 mesh (with the HD texture pack), regardless of the AUTO-skinned classification `actorsnear`
-// reports. Fixing that is a separate, larger port (wiring a Zelda3D choke point into Skin_DrawImpl)
-// and is OUT OF SCOPE here (journaled as the honest remainder).
-//
-// What's real and fixable now: `Zelda3D_TerrainWarpEnabled()` (this file, ~line 1115) already
-// documents "the title tree/dust-vs-hill occlusion bug" — title-cs actors/effects positioned from
-// raw legacy-N64 coordinates are never reconciled against the OoT3D-warped RENDER TERRAIN (which the
-// N64 collision mesh the hoof position derives from never had the relief for). That reconciliation
-// already runs for actor MODELS (Zelda3D_ActorRenderYOffset, draw-time only, doesn't touch
-// world.pos) and for scripted title-cs actors unconditionally — but EffectSsDust particles spawn
-// through their own path and never got it. This applies the SAME reconciliation to the dust's own
-// spawn XZ (not the horse's root XZ, so a hoof laterally offset from the actor still lands on the
-// terrain under ITSELF, not under the horse's center) directly on the NATIVE hoof position
-// Skin_GetLimbPos already computed — independent of whether Epona's body is OoT3D or N64. ---
-int Zelda3D_HoofDustWorldPos(PlayState* play, Actor* horseActor, float* ioPos) {
-    if (play == NULL || horseActor == NULL || ioPos == NULL) {
-        return 0;
-    }
-    float dy = Zelda3D_RenderYOffsetAtXZ(play, horseActor, ioPos[0], ioPos[2]);
-    if (dy == 0.0f) {
-        return 0;
-    }
-    ioPos[1] += dy;
-    return 1;
-}
+// En_Horse (Epona) draw-adjacent behaviors — Zelda3D_HoofDustWorldPos (hoof-dust Y reconcile) and
+// Zelda3D_HorseSaddleOffset (#152 rider seat) — live in behaviors/actor/en_horse.cpp (per-actor-module
+// rule; the enhorse.module-port step).
 
 // BEHAVIORAL motion-parity sampler (REPL `asample <n> <path>`): stream the selected actor's
 // per-frame pos/rot/vel to a CSV for N frames, then close. The selected actor is post-updated

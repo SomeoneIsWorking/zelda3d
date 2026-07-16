@@ -21,6 +21,7 @@
 #include "overlays/actors/ovl_En_Horse/z_en_horse.h"
 #include "objects/object_ge1/object_ge1.h"
 #include "soh/SaveManager.h" // Save_LoadFile (`savecycle`)
+#include "soh/ActorDB.h"     // ActorDBEntry struct (spawn: actor->object lookup for isolated testing)
 // Save_LoadFile (z_sram.c) and Save_GetSaveMetaInfo (defined extern "C" in soh/SaveManager.cpp) both
 // have C linkage; SaveManager.h only declares Save_GetSaveMetaInfo in its C branch (the C++ branch
 // exposes the SaveManager class instead) — forward-declare both directly for this C++ TU
@@ -28,6 +29,11 @@
 extern "C" {
 void Save_LoadFile(void);
 SaveFileMetaInfo* Save_GetSaveMetaInfo(int fileNum);
+// ActorDB.h only declares ActorDB_Retrieve in its C branch (C++ gets the ActorDB class); Object_Spawn
+// (z_scene.c) has no header at all. Both have C linkage — forward-declare for this C++ TU (`spawn`
+// object auto-load), matching the Save_LoadFile pattern above.
+ActorDBEntry* ActorDB_Retrieve(const int id);
+s32 Object_Spawn(ObjectContext* objectCtx, s16 objectId);
 }
 
 #include <stdlib.h>
@@ -169,7 +175,24 @@ static Zelda3D_ModelEntry* Zelda3D_FindModel(const char* name) {
     return NULL;
 }
 
+// Ensure `actorId`'s dependency object is resident so the actor can spawn in ANY scene (isolated
+// testing), not only scenes whose setup already loaded its object. SoH gates actor init on
+// Object_IsLoaded (which Object_Spawn marks true the same frame) and resolves the actual asset bytes
+// through the resource manager, so a runtime Object_Spawn of the actor's object is sufficient for its
+// init + draw to run. No-op when the object is already loaded (or the actor has none / an invalid id).
+static void Zelda3D_EnsureActorObject(PlayState* play, s16 actorId) {
+    ActorDBEntry* db = ActorDB_Retrieve(actorId);
+    if (db == NULL || !db->valid) {
+        return;
+    }
+    s16 objId = db->objectId;
+    if (objId > 0 && Object_GetIndex(&play->objectCtx, objId) < 0) {
+        Object_Spawn(&play->objectCtx, objId);
+    }
+}
+
 static Actor* Zelda3D_SpawnInFrontP(PlayState* play, s16 actorId, float dist, s16 params) {
+    Zelda3D_EnsureActorObject(play, actorId);
     Player* p = GET_PLAYER(play);
     s16 yaw = p->actor.shape.rot.y;
     s16 right = yaw + 0x4000; // Link's right, to clear his body so feet/ground are visible
@@ -177,10 +200,6 @@ static Actor* Zelda3D_SpawnInFrontP(PlayState* play, s16 actorId, float dist, s1
     float fz = p->actor.world.pos.z + dist * Math_CosS(yaw) + 55.0f * Math_CosS(right);
     return Actor_Spawn(&play->actorCtx, play, actorId, fx, p->actor.world.pos.y, fz, 0, p->actor.shape.rot.y, 0,
                        params);
-}
-
-static Actor* Zelda3D_SpawnInFront(PlayState* play, s16 actorId, float dist) {
-    return Zelda3D_SpawnInFrontP(play, actorId, dist, 0);
 }
 
 void Zelda3D_ReplReply(const char* outPath, const char* fmt, ...) {
@@ -1127,24 +1146,22 @@ static void Zelda3D_ReplExec(PlayState* play, char* line, const char* outPath) {
         } else {
             Zelda3D_ReplReply(outPath, "no model '%s'", arg);
         }
-    } else if (strcmp(cmd, "spawn") == 0 && sscanf(line, "%*s %63s", arg) == 1) {
-        Zelda3D_ModelEntry* e = Zelda3D_FindModel(arg);
-        if (e != NULL) {
-            Actor* a = Zelda3D_SpawnInFront(play, e->actorId, 120.0f);
-            Zelda3D_ReplReply(outPath, "spawn %s -> %s", e->name, a != NULL ? "OK" : "FAILED (object not in scene)");
-        } else {
-            Zelda3D_ReplReply(outPath, "no model '%s'", arg);
-        }
-    } else if (strcmp(cmd, "spawnp") == 0 && sscanf(line, "%*s %63s %i", arg, &iv) == 2) {
-        // spawn-with-params (#75 repro): like `spawn` but with explicit init params, so variant-gated
-        // actors can be posed (e.g. En_Sw Gold Skulltula wall/tree variant needs params bits 13..15).
-        // The name is a sModelTable name OR a raw actor id (0x..); raw lets auto-path actors (not in
-        // the table, e.g. En_Sw) be spawned for verification, provided their object is in the scene.
+    } else if ((strcmp(cmd, "spawn") == 0 || strcmp(cmd, "spawnp") == 0) &&
+               sscanf(line, "%*s %63s", arg) == 1) {
+        // Spawn a live actor in front of Link, for isolated testing. `arg` is a sModelTable NAME or a
+        // raw actor id (0x14, 20, ...) — raw lets ANY actor (not just table entries) be spawned. An
+        // optional trailing value is the init params (default 0), so variant-gated actors can be posed
+        // (e.g. En_Sw Gold Skulltula wall/tree variant needs params bits 13..15; En_Horse 0x8003 =
+        // rideable Epona). The actor's dependency object is auto-loaded (Zelda3D_EnsureActorObject),
+        // so the spawn works in ANY scene, not only ones whose setup already loaded that object.
+        // `spawnp` is retained as an alias (its old signature required the params arg; now optional).
         Zelda3D_ModelEntry* e = Zelda3D_FindModel(arg);
         s16 actorId = (e != NULL) ? e->actorId : (s16)strtol(arg, NULL, 0);
-        Actor* a = Zelda3D_SpawnInFrontP(play, actorId, 120.0f, (s16)iv);
-        Zelda3D_ReplReply(outPath, "spawnp id=0x%x params=0x%x -> %s", actorId, (u16)iv,
-                        a != NULL ? "OK" : "FAILED (object not in scene)");
+        s32 pv = 0;
+        sscanf(line, "%*s %*s %i", &pv); // optional params; leaves pv=0 when absent
+        Actor* a = Zelda3D_SpawnInFrontP(play, actorId, 120.0f, (s16)pv);
+        Zelda3D_ReplReply(outPath, "spawn id=0x%x params=0x%x -> %s", (u16)actorId, (u16)pv,
+                        a != NULL ? "OK" : "FAILED (bad id / no object / arena full)");
     } else if (strcmp(cmd, "swtilt") == 0 && sscanf(line, "%*s %i", &iv) == 1) {
         // #75 A/B: toggle the En_Sw wall/tree draw-tilt replication. `swtilt 0` reproduces the bug
         // (Gold Skulltula renders upright/splayed); default 1 leans it onto the surface.
