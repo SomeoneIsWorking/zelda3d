@@ -221,10 +221,10 @@ landed as a `behaviors/actor/en_horse.cpp` module per the CLAUDE.md game-structu
 ### camera.normal0-and-others — remaining camera mode functions (Normal0, Parallel*, etc.)
 - status: todo
 - deps: camera.dispatch-map
-- evidence: 
+- evidence: static dispatch analysis 2026-07-17 — `CAM_FUNC_NORM0` appears in ZERO entries of the camera mode tables (`z_camera_data.inc`: 0 refs; `z_camera.c`: 0 refs) and there is no runtime `.funcIdx =` override; dispatch is purely table-driven (`sCameraFunctions[sCameraSettings[setting].cameraModes[mode].funcIdx]`). Even `CAM_SET_NORMAL0`'s NORMAL mode routes to `CAM_FUNC_NORM1` (z_camera_data.inc:1147).
 - where: legacy fallthrough only — no `behaviors/camera/*.cpp` beyond normal1
-- gap: header notes "Camera_Normal0 became an 8-byte return-1 stub" on 3DS — likely a cheap port once picked up. All non-Normal1 modes still run legacy SoH math.
-- notes: this is the next RE-ready step in the camera arc — Normal0 specifically looks cheap (trivial 3DS stub).
+- gap: **the "cheap Normal0 port" is a MIRAGE — `Camera_Normal0` is DEAD CODE.** Nothing dispatches CAM_FUNC_NORM0 on N64/SoH OR 3DS, so Grezzo stubbing it to `return 1` is behaviorally irrelevant (never called either way). There is nothing to port. The REAL remaining work is the OTHER modes that ARE dispatched (CAM_FUNC_NORM2, PARA0/PARA1, KEEP*, BATT*, etc.) — each a substantial decomp body like Camera_Normal1 (see `camera.normal1` re-partial), NOT cheap.
+- notes: corrected 2026-07-17 — the "Normal0 looks cheap (trivial stub)" framing led toward porting dead code; a naive Normal0Behavior would be harmless (never invoked) but pointless. Split resolved: Normal0 = skip-by-design (dead); "-and-others" = genuine multi-step ports, do them like normal1 (map struct offsets + helpers first).
 
 
 ## player-link
