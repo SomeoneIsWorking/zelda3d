@@ -493,6 +493,23 @@ extern "C" int Zelda3D_TitleCsCamera(int frame, float eye[3], float at[3],
         eye[j] = e[j] * kPosScale;
         at[j] = a[j] * kPosScale;
     }
+    // Diagnostic (ZELDA3D_DBG_TITLECAM=1): raw eye/at defs + evaluated + which track types the
+    // segment carries — to see why the ported AT/direction diverges from the oracle while eye is
+    // right (debug_journal/2026-07-15-epona-title-animation.md).
+    {
+        static int sDbg = -1;
+        if (sDbg < 0) { const char* v = std::getenv("ZELDA3D_DBG_TITLECAM"); sDbg = (v && v[0]) ? 1 : 0; }
+        if (sDbg) {
+            char tks[64] = {0}; size_t tl = 0;
+            for (const Track& tr : seg->tracks) tl += (size_t)snprintf(tks+tl, sizeof(tks)-tl, "%d ", tr.type);
+            fprintf(stderr, "[TITLECAM] f=%d seg[%d,%d] eyeDef=(%.1f,%.1f,%.1f) atDef=(%.1f,%.1f,%.1f) "
+                    "eyeEval=(%.1f,%.1f,%.1f) atEval=(%.1f,%.1f,%.1f) tracks=[%s]\n",
+                    frame, seg->start, seg->end,
+                    seg->eyeDef[0]*kPosScale, seg->eyeDef[1]*kPosScale, seg->eyeDef[2]*kPosScale,
+                    seg->atDef[0]*kPosScale, seg->atDef[1]*kPosScale, seg->atDef[2]*kPosScale,
+                    eye[0], eye[1], eye[2], at[0], at[1], at[2], tks);
+        }
+    }
     // up from roll about the view dir; sign verified against Az's live up
     // (roll=0.0873 rad -> up=(0.212,0.977,-0.013) vs Az (0.212,0.977,-0.014)).
     float f[3] = { at[0] - eye[0], at[1] - eye[1], at[2] - eye[2] };

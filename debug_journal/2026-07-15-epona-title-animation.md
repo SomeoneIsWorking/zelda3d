@@ -395,3 +395,32 @@ so the divergence is specific to the at channel. NEXT: diff the at-track parse/e
 (and vs the oracle forward @0x005BE6D4+12) — the oracle gives forward directly, so `at = eye +
 forward*dist` is the target; find why the ported at-track produces (0.221,-0.323,-0.920) instead.
 Tools ready: az_camera (oracle basis), soh_camera (SoH spline), CurrentPlayState title fallback.
+
+---
+
+## Update 2026-07-16 (raw values): the ported "at" -> forward mapping is wrong; eye is right
+
+Instrumented Zelda3D_TitleCsCamera (ZELDA3D_DBG_TITLECAM=1). seg1 at cs320:
+```
+eyeDef=(3921.0,-118.2,7460.0)  atDef=(3940.5,-152.2,7362.3)  tracks=[1(eye) 2(at)]
+eyeEval=(3884.4,-108.0,7342.1) atEval=(3907.7,-142.0,7245.0)
+```
+- eyeEval (3884,-108,7342) MATCHES the oracle 0x005BE6D4 eye (3882,-107,7336). So the eye track is
+  correct and 0x005BE6D4 IS this camera (not a spectator slot).
+- forward the ported code derives = normalize(atEval - eyeEval) = (0.221,-0.323,-0.920) — down/back.
+- oracle actual view dir @0x005BE6D4+12 = (0.972,0.000,0.235) — +X, toward the rider (X=4227).
+  RENDER agrees: oracle frames the rider, SoH looks at grass.
+
+So `at` as a naive look-at point (`forward = normalize(at - eye)`) is WRONG. The at-eye offset from
+the cs data is (~+19,-34,-98) (down/back) regardless of track animation, but the real view is +X.
+This is not a simple axis swap (eye is un-swapped and correct), nor the seam issue (whole-segment).
+The OoT3D title "at" field must map to the view direction some other way — likely the decompiled cs
+camera interpreter FUN_002c5ba0 case 0x97 (oot3d-decomp; the "segment select by frame range" note in
+zelda3d_cutscene.cpp cites it) defines `at`'s semantics (a rotated/relative target, or eye+at are a
+different basis). That RE is the definitive next step — do NOT patch the forward blindly (the seam
+`<=` patch already regressed once).
+
+Tools in place for the fix loop: ZELDA3D_DBG_TITLECAM (raw defs/eval/tracks), az_camera (oracle
+basis @0x005BE6D4), soh_camera (SoH spline), CurrentPlayState title fallback (oracle title
+introspection), soh_rider. Nothing here is blocked — it's a bounded decomp-read of the at->forward
+map, then a verified port.
