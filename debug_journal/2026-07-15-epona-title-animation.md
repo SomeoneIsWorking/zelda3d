@@ -364,3 +364,34 @@ cut is a few frames off from SoH's seg starts). Fixing it needs the oracle's REA
 (0x005BE6D4 is the spectator slot; the render camera VA is still unknown — a title-cam RE task with
 prior Ghidra-xref dead ends). Deprioritized vs gameplay. Tools now in place: `soh_camera` (SoH
 spline), per-seg range logging, `soh_rider`, and the oracle EnHorse read.
+
+---
+
+## Update 2026-07-16 (LOCATED): SoH title camera eye+up are CORRECT, the AT/direction is WRONG
+
+"Nothing is blocked." Fixed the title-introspection gap at its source: CurrentPlayState() read
+gPlayState @0x0050AF34 (stays 0 at the title); added the fallback to the live title play ptr
+@0x00539F98 ([it] = 0x0871e854). Now oracle scene/actors/camera resolve at the title. Also repointed
+`az_camera` at the RE'd 3DS title-camera basis @0x005BE6D4 (eye + forward + up, LIVE/moving; NOT
+play->view.eye+0x1B8 which is the N64 offset — that read garbage on the 3DS PlayState).
+
+Clean A/B at cs~320 (step 640, seg1 interior), `az_camera` vs `soh_camera`:
+```
+             eye                       up                      direction
+oracle   (3882.4,-107.3,7336.2)  (0.076,0.946,-0.314)  fwd=(0.972, 0.000, 0.235)  -> +X, level (at rider)
+SoH      (3884.4,-108.0,7342.1)  (0.075,0.947,-0.314)  dir=(0.221,-0.323,-0.920)  -> -Z, DOWN (at grass)
+rider pos=(4227.5,-147.9,7364.2)  (east of the camera)
+```
+
+EYE matches within ~6 units. UP matches. **DIRECTION is wrong** — the oracle looks EAST at the rider;
+SoH looks NORTH-and-DOWN at the ground. So the ported title camera computes the right eye + up but
+the wrong LOOK-AT — that IS the "Link/Epona/everything looks broken, frame by frame" report (it's the
+camera aim, and it's wrong across the whole segment, not just seams — reverting the seam experiment
+was right).
+
+ROOT CAUSE now precise: `Zelda3D_TitleCsCamera`'s at-point (seg->atDef + the type-2 "at" track), or
+the eye->at handedness, is wrong while the eye track (type-1) is right. Both are parsed the same way,
+so the divergence is specific to the at channel. NEXT: diff the at-track parse/eval vs the eye track
+(and vs the oracle forward @0x005BE6D4+12) — the oracle gives forward directly, so `at = eye +
+forward*dist` is the target; find why the ported at-track produces (0.221,-0.323,-0.920) instead.
+Tools ready: az_camera (oracle basis), soh_camera (SoH spline), CurrentPlayState title fallback.
