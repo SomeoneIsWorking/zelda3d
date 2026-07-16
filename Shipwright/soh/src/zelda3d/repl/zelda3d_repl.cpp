@@ -34,6 +34,8 @@ SaveFileMetaInfo* Save_GetSaveMetaInfo(int fileNum);
 // object auto-load), matching the Save_LoadFile pattern above.
 ActorDBEntry* ActorDB_Retrieve(const int id);
 s32 Object_Spawn(ObjectContext* objectCtx, s16 objectId);
+// `cammode` readout: active camera's dispatched funcIdx + name (defined in z_camera.c, C linkage).
+s16 Zelda3D_CameraActiveFuncIdx(Camera* camera, const char** outName);
 }
 
 #include <stdlib.h>
@@ -441,6 +443,21 @@ static void Zelda3D_ReplExec(PlayState* play, char* line, const char* outPath) {
                         play->sceneNum, p->actor.world.pos.x, p->actor.world.pos.y, p->actor.world.pos.z,
                         p->actor.shape.rot.y, c->eye.x, c->eye.y, c->eye.z, c->at.x, c->at.y, c->at.z,
                         p->actor.focus.pos.x, p->actor.focus.pos.y, p->actor.focus.pos.z);
+    } else if (strcmp(cmd, "cammode") == 0) {
+        // Active-camera mode readout (docs/re_control_debug_backlog.md #3): the live setting/mode/
+        // camDataIdx + the DISPATCHED camera function (funcIdx + name) resolved from the settings
+        // tables. Tells a camera-port sweep WHICH mode function is running (e.g. is CAM_FUNC_NORM1
+        // actually live in this scene?) instead of assuming it from the scene table.
+        Camera* c = GET_ACTIVE_CAM(play);
+        const char* fname = "(none)";
+        s16 funcIdx = Zelda3D_CameraActiveFuncIdx(c, &fname);
+        if (c != NULL) {
+            Zelda3D_ReplReply(outPath,
+                            "cammode scene=0x%x setting=%d mode=%d camDataIdx=%d -> funcIdx=%d (%s) | roll=%d fov=%.1f",
+                            play->sceneNum, c->setting, c->mode, c->camDataIdx, funcIdx, fname, c->roll, c->fov);
+        } else {
+            Zelda3D_ReplReply(outPath, "cammode: no active camera");
+        }
     } else if (strcmp(cmd, "climbinfo") == 0) {
         // #25 climb-drop diagnostic: dump Link's per-frame wall-climb decision state so we can see
         // WHY he won't grab a climbable (facing/flags) and, once climbing, WHY he detaches partway
