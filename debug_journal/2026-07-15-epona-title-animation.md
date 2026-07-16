@@ -457,3 +457,30 @@ was already correct. The title-demo camera now tracks the oracle across the whol
 
 Tools left in place: az_camera (correct 0x005BE6D4 layout), soh_camera, ZELDA3D_DBG_TITLECAM,
 CurrentPlayState title fallback, soh_rider.
+
+---
+
+## Update 2026-07-16 (rider frame-by-frame): LINK's mounted POSE leans too far forward
+
+Per user request, built a frame-by-frame rider A/B where the rider is clearly visible: seg0 following
+shot, cs~240-276, 10 frames every 4 (scratch/harness/rf_00..09, rider_film2.png — LEFT oracle, RIGHT
+SoH, horse-centered crops). soh_rider confirmed pos moving straight, yaw constant 59.9deg (matches
+movement dir) — so this window is a clean straight gallop, no warp/yaw issue.
+
+FINDING (consistent across ALL 10 frames): the HORSE gait is close, but **Link's mounted posture is
+wrong** — in the oracle Link sits roughly UPRIGHT (slight forward lean); in SoH Link is HUNCHED far
+forward, torso nearly horizontal over Epona's neck. This is Link's rider pose, not the horse, and not
+yaw (yaw is correct here). This is almost certainly the "animation ... completely looks wrong" part
+of the user report; the "sideways yaw" is a separate thing at the warp/cut frames.
+
+LIKELY CAUSE: mounted Link is posed by the Player's native N64 mounted-ride action func (title_rider.
+cpp reuses z_player.c ~13825) driving the N64 horseback animation retargeted onto the OoT3D rig
+(soh3d-n64anim-retarget). The N64 gallop-ride pose has a strong forward lean; OoT3D's title Link
+pose is gentler/upright. So the port is showing the N64 lean, not the 3DS one — OR a speed-based
+upper-body lean (Player_UpdateUpperBody, proportional to horse speedXZ=8.0) is over-applied on top.
+
+NEXT: identify which animation/lean drives it — dump Link's SkelAnime joint table (torso/root
+rotations) vs the oracle's mounted Link pose (compare skeleton / the title pose table), and check
+whether the mounted anim should be the OoT3D CSAB (hl_...) instead of the N64 uma anim. Fix = use the
+3DS mounted pose, or cap the speed-lean to the 3DS value. (Rider position + yaw + horse gait are
+already correct; this is specifically Link's torso lean.)
