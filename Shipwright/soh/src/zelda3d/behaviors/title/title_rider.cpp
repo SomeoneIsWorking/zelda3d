@@ -2,6 +2,7 @@
 // zelda3d.c's Zelda3D_RiderStepCue; applyToActor()/releaseMount() are the new horse-attribution
 // port (title_rider.h's header comment, oot3d-decomp/docs/title_rider_port_spec.md).
 #include "global.h"
+#include <cmath>
 #include "title_rider.h"
 #include "../../core/zelda3d_log.h"
 #include "../../cutscene/zelda3d_cutscene.h"
@@ -180,6 +181,32 @@ void TitleRider::applyToActor(PlayState* play, Actor* actor) {
     horse->actor.world.pos.x = mPos[0];
     horse->actor.world.pos.y = mPos[1];
     horse->actor.world.pos.z = mPos[2];
+    // 60fps sub-frame: mPos integrates once per cs tick (30fps); on the hold engine frame render
+    // half a step ahead along the heading so the rider moves EVERY engine frame instead of
+    // stepping at half rate (kanban #149; pairs with the camera's fractional spline eval in
+    // title_presentation.cpp). Move cues only — rearing/idle have speed 0, and teleport frames
+    // land on the advance tick (subframe 0), so no discontinuity is smeared.
+    {
+        const float sub = Zelda3D_TitleCsSubframe();
+        if (sub > 0.0f && mSpeed > 0.0f) {
+            const int fi = RiderCsFuncIdx(mCueAction);
+            if (fi == 1 || fi == 4) {
+                const float yawRad = (float)mYaw * (float)M_PI / 32768.0f;
+                horse->actor.world.pos.x += sinf(yawRad) * mSpeed * sub;
+                horse->actor.world.pos.z += cosf(yawRad) * mSpeed * sub;
+                // Y follows the terrain (step()'s raycast) but only at cs cadence — re-raycast at
+                // the advanced XZ so the ground-follow is also per-engine-frame (the measured
+                // ~2.7-unit 30Hz vertical stepping on the uphill gallop, kanban #149).
+                Vec3f q = { horse->actor.world.pos.x, horse->actor.world.pos.y + 200.0f,
+                            horse->actor.world.pos.z };
+                CollisionPoly poly;
+                f32 y = BgCheck_AnyRaycastFloor1(&play->colCtx, &poly, &q);
+                if (y > BGCHECK_Y_MIN + 1.0f) {
+                    horse->actor.world.pos.y = y;
+                }
+            }
+        }
+    }
     horse->actor.shape.rot.y = horse->actor.world.rot.y = mYaw;
     horse->actor.velocity.x = horse->actor.velocity.y = horse->actor.velocity.z = 0.0f;
 
@@ -262,8 +289,11 @@ void TitleRider::applyToActor(PlayState* play, Actor* actor) {
     if (funcIdx == 1 || funcIdx == 4) {
         // `log rider 1`: catch who stomps animationIdx between our per-frame calls (the mounted-Link
         // stand-pose diagnosis: Player reads idx=REARING while this branch sets GALLOP).
-        Z3D_LOG(RIDER, "MOVE funcIdx=%d cutsceneAction(before)=%d animIdx(before)=%d action=%d\n",
-                funcIdx, (int)horse->cutsceneAction, (int)horse->animationIdx, (int)horse->action);
+        Z3D_LOG(RIDER, "MOVE funcIdx=%d cutsceneAction(before)=%d animIdx(before)=%d action=%d "
+                "pos=(%.1f,%.1f,%.1f) animFrame=%.2f\n",
+                funcIdx, (int)horse->cutsceneAction, (int)horse->animationIdx, (int)horse->action,
+                horse->actor.world.pos.x, horse->actor.world.pos.y, horse->actor.world.pos.z,
+                horse->skin.skelAnime.curFrame);
         if (horse->cutsceneAction != funcIdx) {
             horse->cutsceneAction = funcIdx;
             // WarpMoveInit teleports (this->actor.world.pos = cue startPos) — mPos/mYaw already

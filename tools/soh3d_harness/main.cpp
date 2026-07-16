@@ -166,7 +166,7 @@ int  Zelda3D_TitleCsEndFrame(void);
 // zelda3d_cutscene.cpp — ported byte-exact OP97 camera spline evaluator;
 // title-sync's eye-inversion (DeriveAzLockCsByEyeInversion) inverts the
 // oracle's live camera eye against this to derive its held cs frame.
-int  Zelda3D_TitleCsCamera(int frame, float eye[3], float at[3], float up[3],
+int  Zelda3D_TitleCsCamera(float frame, float eye[3], float at[3], float up[3],
                            float* fovDeg);
 
 extern uint8_t*     gSoh3dCaptureBuf;

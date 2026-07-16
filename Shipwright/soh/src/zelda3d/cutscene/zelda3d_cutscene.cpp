@@ -454,9 +454,12 @@ extern "C" int Zelda3D_TitleCsLoad(void) {
 
 extern "C" int Zelda3D_TitleCsEndFrame(void) { return sEndFrame; }
 
-extern "C" int Zelda3D_TitleCsCamera(int frame, float eye[3], float at[3],
+extern "C" int Zelda3D_TitleCsCamera(float frame, float eye[3], float at[3],
                                      float up[3], float* fovDeg) {
     if (sLoadState <= 0 || !sSpline.ok) return 0;
+    // Segment select on the INTEGER frame (curve keys are integer-frame ranges); the fractional
+    // part flows into the track Eval below for 60fps sub-frame interpolation (kanban #149).
+    const int fi = (int)frame;
     // INCLUSIVE bounds. Segments are contiguous inclusive ranges (0,299)(300,929)... . The old
     // strict `s.start < frame < s.end` dropped BOTH seam frames of every boundary (299 AND 300, ...)
     // to the caller's fixed static-default camera — a jarring per-seam camera jump (the title-demo
@@ -471,7 +474,7 @@ extern "C" int Zelda3D_TitleCsCamera(int frame, float eye[3], float at[3],
     //     too. Adjacent segments differ by 1 frame so no frame matches two.
     const Segment* seg = nullptr;
     for (const Segment& s : sSpline.segments) {
-        if (s.start <= frame && frame <= s.end) { seg = &s; break; }
+        if (s.start <= fi && fi <= s.end) { seg = &s; break; }
     }
     if (!seg) return 0;
     float e[3], a[3];
@@ -479,7 +482,7 @@ extern "C" int Zelda3D_TitleCsCamera(int frame, float eye[3], float at[3],
     memcpy(a, seg->atDef, sizeof(a));
     float rollRad = seg->rollRad;
     float fovRad = seg->fovRad;
-    const float t = (float)frame;
+    const float t = frame; // fractional — sub-frame interpolated eval
     for (const Track& tr : seg->tracks) {
         switch (tr.type) {
             case 1:
@@ -509,7 +512,7 @@ extern "C" int Zelda3D_TitleCsCamera(int frame, float eye[3], float at[3],
     if (Zelda3D_LogEnabled(Z3D_LOG_TITLECAM)) {
         char tks[64] = {0}; size_t tl = 0;
         for (const Track& tr : seg->tracks) tl += (size_t)snprintf(tks+tl, sizeof(tks)-tl, "%d ", tr.type);
-        Z3D_LOG(TITLECAM, "f=%d seg[%d,%d] eyeDef=(%.1f,%.1f,%.1f) atDef=(%.1f,%.1f,%.1f) "
+        Z3D_LOG(TITLECAM, "f=%.1f seg[%d,%d] eyeDef=(%.1f,%.1f,%.1f) atDef=(%.1f,%.1f,%.1f) "
                 "eyeEval=(%.1f,%.1f,%.1f) atEval=(%.1f,%.1f,%.1f) tracks=[%s]\n",
                 frame, seg->start, seg->end,
                 seg->eyeDef[0]*kPosScale, seg->eyeDef[1]*kPosScale, seg->eyeDef[2]*kPosScale,
@@ -536,6 +539,13 @@ extern "C" int Zelda3D_TitleCsCamera(int frame, float eye[3], float at[3],
 }
 
 extern "C" int Zelda3D_TitleCsFrame(void) { return sFrame; }
+
+// Sub-frame fraction of the CURRENT engine tick within the current cs frame. The cs cursor ticks
+// once per TWO engine frames (sTickParity): parity==0 right after an increment (first engine frame
+// of cs frame sFrame -> 0.0), parity==1 on the hold tick (second engine frame -> 0.5). Lets 60fps
+// consumers (camera spline eval, rider render position) interpolate between 30fps cs ticks instead
+// of stepping — the user-visible "everything jitters at half rate" fix (kanban #149).
+extern "C" float Zelda3D_TitleCsSubframe(void) { return sTickParity ? 0.5f : 0.0f; }
 extern "C" void Zelda3D_TitleCsSetFrame(int frame) {
     sFrame = (sEndFrame > 0) ? frame % sEndFrame : frame;
     if (sFrame < 0) sFrame = 0;

@@ -85,6 +85,7 @@ float Zelda3D_AutoModelHeight(int modelId);
 void Zelda3D_EnsureModelProvider(void);
 int Zelda3D_Title_IsActive(void);
 int Zelda3D_TitleCsFrame(void);
+float Zelda3D_TitleCsSubframe(void);
 uint8_t* Zelda3D_AutoModelReadZarFile(int modelId, const char* suffix, size_t* outSize);
 }
 
@@ -170,7 +171,11 @@ extern "C" int Zelda3D_TryDrawTitleFireGlow(PlayState* play) {
     // boundary (2 native ticks per cs-frame, the same ratio `Zelda3D_TitleCsAdvance` already
     // enforces for every other cs-driven system) — not a fitted scale on the glow's own output.
     const int csFrame = Zelda3D_TitleCsFrame();
-    float cmabFrame = (fadeInFrame >= 0) ? 2.0f * (float)(csFrame - fadeInFrame) : 0.0f;
+    // + Zelda3D_TitleCsSubframe(): sample the cmab at the fractional cs frame so the UV scroll /
+    // color curve advances every ENGINE tick (1 native tick per engine frame), not in 2-tick
+    // steps at half rate — same 60fps sub-frame interp as the camera spline (kanban #149).
+    float cmabFrame = (fadeInFrame >= 0)
+        ? 2.0f * ((float)(csFrame - fadeInFrame) + Zelda3D_TitleCsSubframe()) : 0.0f;
     if (cmabFrame < 0.0f) {
         cmabFrame = 0.0f;
     }
