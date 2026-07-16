@@ -594,6 +594,34 @@ extern "C" int Zelda3D_PlayerDrawImpl(PlayState* play, Actor* actor) {
     // freeze-last (unlike climb, the seat height genuinely changes every frame as Epona moves over
     // terrain, so a frozen offset would itself drift stale).
     s32 mountedPose = (player->stateFlags1 & PLAYER_STATE1_ON_HORSE) != 0;
+    // #152 seat diagnostics (`log rider 1`): posed origins of the first rig bones while mounted —
+    // identifies which bone carries the riding clip's root translation (the term the 3DS subtracts
+    // from the attach: player.pos = anchor - rootJoint*scale, FUN_002b7fd0 / en_horse_rider_pos.md).
+    if (mountedPose && Zelda3D_LogEnabled(Z3D_LOG_RIDER)) {
+        float b0[3] = {0}, b1[3] = {0}, b2[3] = {0};
+        Zelda3D_PosedBoneWorldPos(modelId, 0, b0);
+        Zelda3D_PosedBoneWorldPos(modelId, 1, b1);
+        Zelda3D_PosedBoneWorldPos(modelId, 2, b2);
+        Z3D_LOG(RIDER, "LINKROOT b0=(%.0f,%.0f,%.0f) b1=(%.0f,%.0f,%.0f) b2=(%.0f,%.0f,%.0f) "
+                "scale=%.5f csab=%s\n", b0[0], b0[1], b0[2], b1[0], b1[1], b1[2],
+                b2[0], b2[1], b2[2], gZelda3dLinkScale, csab ? csab : "(n64)");
+    }
+    // Mounted seat anchor (#152, RE'd: oot3d-decomp/docs/en_horse_rider_pos.md FUN_002b7fd0):
+    // OoT3D sets player.pos = seatAnchor - rootJoint*scale and draws the pose WITH its root, so
+    // the pelvis lands exactly on the seat anchor. Our z_player port subtracts the N64's folded
+    // constant 27 instead of the live root, and the 3DS riding clips carry a much larger root
+    // (uma_anim_*: bone-1 y=3538 * 0.011 = 38.9) — net: Link drew ~12 world units above the
+    // saddle. Reproduce the 3DS algebra at draw time: cancel the pose's live root translation and
+    // add back the 27 world units z_player already removed, so pelvis == horse.pos + riderPos.
+    float mountRootFix[3] = { 0.0f, 0.0f, 0.0f };
+    if (mountedPose && gZelda3dLinkScale > 1e-6f) {
+        float rootL[3];
+        if (Zelda3D_PosedBoneWorldPos(modelId, 1, rootL)) {
+            mountRootFix[0] = -rootL[0];
+            mountRootFix[1] = -rootL[1] + 27.0f / gZelda3dLinkScale;
+            mountRootFix[2] = -rootL[2];
+        }
+    }
     if (mountedPose) {
         groundOff = 0.0f;
     } else if (climbPose) {
@@ -616,6 +644,9 @@ extern "C" int Zelda3D_PlayerDrawImpl(PlayState* play, Actor* actor) {
     if (gZelda3dLinkRotY != 0.0f) Matrix_RotateY(gZelda3dLinkRotY * (3.14159265f / 180.0f), MTXMODE_APPLY);
     if (gZelda3dLinkRotZ != 0.0f) Matrix_RotateZ(gZelda3dLinkRotZ * (3.14159265f / 180.0f), MTXMODE_APPLY);
     if (groundOff != 0.0f) Matrix_Translate(0.0f, groundOff, 0.0f, MTXMODE_APPLY);
+    if (mountRootFix[0] != 0.0f || mountRootFix[1] != 0.0f || mountRootFix[2] != 0.0f) {
+        Matrix_Translate(mountRootFix[0], mountRootFix[1], mountRootFix[2], MTXMODE_APPLY);
+    }
     gSPMatrix(POLY_OPA_DISP++, MATRIX_NEWMTX(play->state.gfxCtx), G_MTX_MODELVIEW | G_MTX_LOAD);
     // #6: attach a carried actor (e.g. held cucco) to the 3DS Link's hands. The held actor's
     // world.pos is normally set by Player_PostLimbDrawGameplay (midpoint of the hands), the post-limb
