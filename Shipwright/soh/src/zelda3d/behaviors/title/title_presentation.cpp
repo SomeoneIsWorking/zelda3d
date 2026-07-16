@@ -18,7 +18,6 @@ extern "C" {
 // sun-moon draw primitives the design doc keeps in zelda3d.c (§5).
 int Zelda3D_TitleCamEnabled(void);
 // libultraship's per-fragment lighting toggle (zelda3d_gl.cpp).
-extern int gZelda3dLightEnable;
 // OoT3D PICA distance fog (zelda3d_gl.cpp / zelda3d_gl.h): the title module feeds the blended
 // palette fog window + the 3DS projection/camera params once per frame while active.
 void Zelda3D_Fog3dSet(float camNear, float zFar, float fogNear, float fogFar,
@@ -61,21 +60,21 @@ bool TitlePresentation::shouldBeActive(PlayState* play) const {
 
 void TitlePresentation::enter(PlayState* play) {
     (void)play;
-    // Idempotent per-active-frame setup: Zelda3D_ApplyTitleCam ran this exact block (flag set,
-    // save-if-not-saved, unconditional light disable) on EVERY frame title was active, not just
-    // the entry edge — preserved here for byte-identical behavior (gZelda3dLightEnable is
-    // re-zeroed every active frame in case something else re-enables it mid-title).
     mActive = true;
-    if (!mLightSaved) {
-        mLightEnableSaved = gZelda3dLightEnable;
-        mLightSaved = 1;
+    if (!mEnterLatched) {
+        mEnterLatched = 1;
         // Entry-edge only (not every active frame, unlike the rest of this block): fresh title
         // session shouldn't inherit a stale press-START skip latch from a previous visit (e.g.
         // backing out of file select with B and returning to the title demo) — see
         // Zelda3D_TitleLogoResetSkip's doc comment.
         Zelda3D_TitleLogoResetSkip();
     }
-    gZelda3dLightEnable = 0;
+    // NOTE (#153): the former unconditional `gZelda3dLightEnable = 0` here (inherited verbatim
+    // from Zelda3D_ApplyTitleCam) was a blanket disable that rendered the rider/horse FLAT while
+    // the oracle shades them. Actors now take the real CmbVShader vertex-lit path (their CMB
+    // materials are vertexLighting=1, matDiffuse=0.5 — zelda3d_sdl3gpu.cpp kFrag), fed by the
+    // same title palette lighting applyLightOverride() already writes, so there is nothing to
+    // disable: vertex-lit draws don't consume the half-Lambert gate at all.
 }
 
 void TitlePresentation::exit(PlayState* play) {
@@ -83,10 +82,7 @@ void TitlePresentation::exit(PlayState* play) {
     // Symmetric teardown for the horse-attribution port (2026-07-10): un-mount Link and kill the
     // title-scoped EN_HORSE instance mRider.applyToActor() spawned — see title_rider.h/.cpp.
     mRider.releaseMount(play);
-    if (mLightSaved) {
-        gZelda3dLightEnable = mLightEnableSaved;
-        mLightSaved = 0;
-    }
+    mEnterLatched = 0;
     // Clear the ported screen fade (applyScreenFade only ever runs while active) so it can't
     // leave play->transitionFade — a shared overlay real gameplay transitions also use — stuck
     // showing a stale alpha after title hands off.

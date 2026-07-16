@@ -112,8 +112,14 @@ void TitleRider::step(PlayState* play, int csFrame, bool* outDiscontinuity) {
             break;
         case 2:
             // CsJump falls through to the move integrator when its jump flag isn't armed (N64
-            // EnHorse_CsJump -> EnHorse_CsMoveToPoint); the title cs never authors 0x25, so the
-            // full parabolic-jump body (FUN_003ab99c family) is deliberately not ported here.
+            // EnHorse_CsJump -> EnHorse_CsMoveToPoint); the title cs never authors 0x25 (jump),
+            // so no jump body is needed here AT ALL. RE'd 2026-07-16
+            // (scratch/decomp_agent/rider_jump/): FUN_003ab99c is NOT a title-cs function — it is
+            // the Gerudo Valley bridge jump (N64 EnHorse_BridgeJumpMove family, byte-exact
+            // constants + the sBridgeJumps table at 0x00526d68), dispatched from EnHorse's
+            // gameplay action table; and the cs dispatch table's own 0x25 slot
+            // (FUN_00190A20/FUN_001033D4) is a third, separate jump implementation that the
+            // title script never invokes.
         case 1:
         case 4: {
             // CsMoveToPoint / CsWarpMoveToPoint — byte-identical integrator bodies (FUN_003cf3c4 /

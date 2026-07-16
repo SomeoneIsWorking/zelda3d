@@ -1777,6 +1777,8 @@ void Zelda3D_UpdateLight(PlayState* play) {
     EnvLightSettings* ls = &play->envCtx.lightSettings;
     float d[3];
     float len;
+    s8 titleDirs = 0;
+    int8_t tl1d[3] = { 0, 0, 0 }, tl2d[3] = { 0, 0, 0 };
     // #111: cache this scene's OoT3D env palette so the z_kankyo blend hook can index it. Positional
     // lookup by sceneNum (same order as kZelda3dSceneNames). {0,0} entry = no palette -> hook is a no-op.
     {
@@ -1805,10 +1807,25 @@ void Zelda3D_UpdateLight(PlayState* play) {
         float ambient[3], l1col[3], l2dir[3], l2col[3];
         float l2len;
         s32 i;
+        // #153: ACTOR light DIRECTIONS at the title come from the blended 4-slot title palette,
+        // not the trig sun formula. Oracle vsuni capture at cs1575
+        // (scratch/title_ab/actor_light_uniforms.log): the Epona/Link draw's light pair is
+        // ±(0.577,0.577,0.577) — the palette's l1dir=(72,72,72)/l2dir=(-72,-72,-72) — under the
+        // view rotation, while its colors/ambient are byte-exact the palette slot blend. The
+        // trig sun dir applyLightOverride writes into envCtx stays (byte-verified against the
+        // oracle's OWN envCtx), but the 3DS actor light bank does not read envCtx dirs at title.
+        if (Zelda3D_Title_IsActive()) {
+            uint16_t t;
+            uint8_t a8[3], c1[3], c2[3], fc[3];
+            if (Zelda3D_TitleCsTimeOfDay((float)Zelda3D_TitleCsFrame() + Zelda3D_TitleCsSubframe(), &t) &&
+                Zelda3D_TitleCsBlendedLight(t, a8, tl1d, c1, tl2d, c2, fc)) {
+                titleDirs = 1;
+            }
+        }
         for (i = 0; i < 3; i++) {
             ambient[i] = (float)(ls->ambientColor[i]) / 255.0f;
             l1col[i]   = (float)(ls->light1Color[i])  / 255.0f;
-            l2dir[i]   = (float)(ls->light2Dir[i]);
+            l2dir[i]   = titleDirs ? (float)tl2d[i] : (float)(ls->light2Dir[i]);
             l2col[i]   = (float)(ls->light2Color[i])  / 255.0f;
         }
         l2len = sqrtf(l2dir[0]*l2dir[0] + l2dir[1]*l2dir[1] + l2dir[2]*l2dir[2]);
@@ -1880,11 +1897,19 @@ void Zelda3D_UpdateLight(PlayState* play) {
     if (gZelda3dLightDirOverride) {
         return; // light1Dir held by REPL `lightdir x y z`; colors + ambient updated above
     }
-    d[0] = (float)ls->light1Dir[0];
-    d[1] = (float)ls->light1Dir[1];
-    d[2] = (float)ls->light1Dir[2];
+    // #153: title actor light1 dir = the palette blend (see the titleDirs comment above).
+    d[0] = titleDirs ? (float)tl1d[0] : (float)ls->light1Dir[0];
+    d[1] = titleDirs ? (float)tl1d[1] : (float)ls->light1Dir[1];
+    d[2] = titleDirs ? (float)tl1d[2] : (float)ls->light1Dir[2];
     len = sqrtf(d[0] * d[0] + d[1] * d[1] + d[2] * d[2]);
     if (len < 1.0f) {
+        if (titleDirs) {
+            // Degenerate palette dir (title night slots author (0,0,0)): pass the zero vector
+            // through so this light's DIFFUSE term nulls in the shader (dot with a zero vector),
+            // matching FUN_003fa5d0's semantics — do NOT hold a stale direction.
+            d[0] = d[1] = d[2] = 0.0f;
+            Zelda3D_GL_SetLightDir(d);
+        }
         return; // no usable directional light this frame; keep the last/default dir
     }
     d[0] /= len;

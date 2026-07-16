@@ -110,8 +110,9 @@ private:
     TitleFrameState mFrame{};
     TitleRider mRider;
 
-    int mLightSaved       = 0;
-    int mLightEnableSaved = -1;
+    // Entry-edge latch: 0 until the first active frame of a fresh title visit (gates the
+    // one-shot Zelda3D_TitleLogoResetSkip in enter()); cleared on exit().
+    int mEnterLatched = 0;
 };
 
 } // namespace Zelda3D

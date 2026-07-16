@@ -76,6 +76,8 @@ extern "C" int gZelda3dWorldLit;
 // vertex-lit shader so it matches OoT3D's real formula sceneAmb*matAmb + sceneDif*matDif*NdotL.
 extern "C" float gZelda3dAmbient[3];
 extern "C" float gZelda3dLight1Col[3];
+extern "C" float gZelda3dLight2Dir[3];
+extern "C" float gZelda3dLight2Col[3];
 // Enabled-light count for the real per-enabled-light ambient sum (see uAmbient.w fill/consumer
 // comments below; zelda3d_gl.cpp, set from live envCtx.lightSettings by zelda3d.c).
 extern "C" float gZelda3dAmbientLightCount;
@@ -177,7 +179,10 @@ bool CompileGlsl(EShLanguage stage, const char* src, std::vector<uint32_t>& spv)
     "    vec4 uFog3d1;\n" \
     "    vec4 uSphRot0;\n" \
     "    vec4 uSphRot1;\n" \
-    "    vec4 uSphRot2;\n"
+    "    vec4 uSphRot2;\n" \
+    "    vec4 uLitDif1;\n" \
+    "    vec4 uLitDif2;\n" \
+    "    vec4 uLightDir2;\n"
 #define SG_UBO_BONES_BODY \
     "    mat4 uBones[" SG_STR(ZELDA3D_GL_MAX_BONES) "];\n"
 
@@ -345,18 +350,30 @@ const char* kFrag =
     "    }\n"
     "    if (ubo.uShadow.x > 0.5)\n"
     "        shade *= (1.0 - ubo.uShadow.z * (1.0 - shadowLit()));\n"
-    // Character/prop path (uParams.y > 0.5) keeps the shade compound. Scene-lit path
-    // (uParams.y < 0.5, ambGroup active via uAmbient.w > 0) skips the shade compound
-    // and uses ONLY uAmbient — matches OoT3D's authentic scene-vertex-lit model,
-    // saturate(sceneAmb*matAmb + ...) * bakedColor, per debug_journal/
-    // 2026-07-04-title-parity-pinned650.md. Prior compound of both shade * uAmbient
-    // was ~5.5× too dark at cursor=650 title-demo ground (R6G7B4 vs Az R33G51B27).
-    "    bool sceneLitPath = (ubo.uParams.y < 0.5 && ubo.uAmbient.w > 0.0);\n"
+    // OoT3D CmbVShader vertex-lit path (#153/#111 — oot3d-decomp title_env_lighting.md §10):
+    // for EVERY vertexLighting=1 material (scene rooms AND characters/props) the 3DS computes
+    //   o1 = clamp(Σ_i matAmb·lightAmb_i + max(0, dot(N, -L_i))·matDif·lightDif_i, 0, 1) · vColor
+    // then the TEV modulates the texel by that PRIMARY_COLOR (stage scale on uExtra.w below).
+    // Terrain materials have matDif=BLACK so their diffuse terms vanish — this reduces exactly
+    // to the previously-verified ambient-only scene path (parity-map rows unaffected). Character
+    // materials (Link/Epona: matAmb=0.4, matDif=0.5) get the real directional shading the
+    // synthetic half-Lambert `shade` branch only approximated; that branch remains solely as the
+    // fallback for vertexLighting=0 draws. Characters keep the (enhancement) shadow-map receive
+    // by scaling the light sum — scene rooms never received it, unchanged.
+    "    bool vtxLit = (ubo.uAmbient.w > 0.0);\n"
     "    vec3 rgb;\n"
-    "    if (sceneLitPath) {\n"
-    "        rgb = t.rgb * vColor.rgb;\n"                     // skip shade
+    "    if (vtxLit) {\n"
+    "        vec3 n = normalize(vNrmView);\n"
+    "        vec3 lit = ubo.uAmbient.xyz * ubo.uAmbient.w\n"
+    "                 + ubo.uLitDif1.rgb * max(dot(n, -ubo.uLightDir.xyz), 0.0)\n"
+    "                 + ubo.uLitDif2.rgb * max(dot(n, -ubo.uLightDir2.xyz), 0.0);\n"
+    "        if (ubo.uParams.y > 0.5 && ubo.uShadow.x > 0.5)\n"
+    "            lit *= (1.0 - ubo.uShadow.z * (1.0 - shadowLit()));\n"
+    "        rgb = t.rgb * clamp(lit * vColor.rgb, 0.0, 1.0);\n"
+    "    } else if (ubo.uParams.y > 0.5) {\n"
+    "        rgb = t.rgb * vColor.rgb * shade;\n"             // legacy char fallback (vtxLit=0 draws)
     "    } else {\n"
-    "        rgb = t.rgb * vColor.rgb * shade;\n"             // char/prop keep shade
+    "        rgb = t.rgb * vColor.rgb;\n"                     // unlit scene
     "    }\n"
     // PICA200 CONSTANT-color modulation (EnHy townsfolk body color, title fire-glow gold
     // flicker). uMatConst.a is both the apply flag AND the CONSTANT-stage's hardware RGB scale:
@@ -370,9 +387,11 @@ const char* kFrag =
     // scenes), not applied once. Every enabled slot in SoH's data model carries the identical scene
     // ambient colour (SoH tracks one ambient, not per-slot ones), so the real N-term sum reduces
     // exactly to `uAmbient.xyz * uAmbient.w` here — a real sum, not a fitted multiplier.
-    "    if (ubo.uParams.y < 0.5) {\n"
-    "        if (ubo.uAmbient.w > 0.0)\n"
-    "            rgb *= ubo.uAmbient.xyz * ubo.uAmbient.w;\n"
+    // TEV stage scale (uExtra.w = the material's authored combiner RGB scale). The ambient term
+    // itself moved into the vtxLit light sum above; vertex-lit characters (uParams.y > 0.5 &&
+    // vtxLit) take the scale too — their stage-0 combiner is the same MODULATE ×2 as scene
+    // materials (offline CMB dump, #153) that the old half-Lambert branch never applied.
+    "    if (ubo.uParams.y < 0.5 || vtxLit) {\n"
     "        rgb = clamp(rgb, 0.0, 1.0) * ubo.uExtra.w;\n"
     "    }\n"
     // OoT3D PICA distance fog (uFog.w == 2.0; title port — oot3d-decomp title_env_lighting.md
@@ -1862,6 +1881,13 @@ void Fast::Zelda3DRenderer::DrawModel(int modelId, const float* mp16, const floa
         base.uLightDir[2] = gZelda3dLightDirWorld[2];
     }
     base.uLightDir[3] = sky ? 1.0f : 0.0f;
+    // Light slot 2's world direction for the vertex-lit diffuse sum (#153). Normalized by
+    // Zelda3D_UpdateLight; a degenerate (0,0,0) slot direction stays zero and nulls only that
+    // light's diffuse term (dot = 0), matching FUN_003fa5d0's semantics.
+    base.uLightDir2[0] = gZelda3dLight2Dir[0];
+    base.uLightDir2[1] = gZelda3dLight2Dir[1];
+    base.uLightDir2[2] = gZelda3dLight2Dir[2];
+    base.uLightDir2[3] = 0.0f;
     // §6.3/§6.6's light-env ambient (0.18,0.18,0.18,1); the diffuse coefficient is WHITE and
     // lives directly in the shader's ndotl term. uSheen.x doubles as the wordmark-path gate.
     base.uSheen[0] = lightDirOv ? kWordmarkLightAmbient : 0.0f;
@@ -1955,7 +1981,21 @@ void Fast::Zelda3DRenderer::DrawModel(int modelId, const float* mp16, const floa
         ubo.uAmbient[2] = gZelda3dAmbient[2] * grp.matAmbient[2];
         // .w = enabled-light count (title_env_lighting.md §10/§11's per-enabled-light ambient sum;
         // see the kFrag comment at its consumer). 0 keeps the ambient path off exactly as before.
-        ubo.uAmbient[3] = ambGroup ? gZelda3dAmbientLightCount : 0.0f;
+        // CHARACTER draws (lit) apply ambient ONCE: oracle vsuni capture at title cs1575
+        // (scratch/title_ab/actor_light_uniforms.log) shows the Epona/Link draw with
+        // amb0=(0.408,0.408,0.239) but amb1=(0,0,0) — N64 Lights_BindAll semantics (one scene
+        // ambient) — while the same frame's terrain draws carry the identical ambient in BOTH
+        // slots. The per-slot duplication is a scene-material binding, not a global rule.
+        ubo.uAmbient[3] = ambGroup ? (lit ? 1.0f : gZelda3dAmbientLightCount) : 0.0f;
+        // Per-light diffuse products for the vertex-lit sum (#153): matDiffuse * sceneLightColor.
+        // Terrain materials bake matDiffuse=BLACK, so these are zero there and the light sum
+        // reduces to the previously-verified ambient-only value.
+        for (int k = 0; k < 3; k++) {
+            ubo.uLitDif1[k] = grp.matDiffuse[k] * gZelda3dLight1Col[k];
+            ubo.uLitDif2[k] = grp.matDiffuse[k] * gZelda3dLight2Col[k];
+        }
+        ubo.uLitDif1[3] = 0.0f;
+        ubo.uLitDif2[3] = 0.0f;
         // PICA200 TEV CONSTANT modulate: for materials whose combiner sources CONSTANT in any
         // stage, publish the selected slot's RGB with .a = 1 so the shader applies it. Materials
         // that never reference CONSTANT (e.g. plain MODULATE(PRIM, TEX0)) leave .a = 0 and the
