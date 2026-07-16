@@ -108,13 +108,16 @@ foundational finding the whole arc depends on.
 - gap: none noted this pass
 - notes: memory records a "whole wrong-asset 2D overlay" false alarm retracted during the matched-frame audit — a dead end, not a current gap.
 
-### title.epona-gallop-rate — title Epona gallop-rate matching
-- status: re-partial
+### title.epona-gallop-rate — title Epona gallop-rate + mounted-Link pose
+- status: re-verified
 - deps: title.rider-dispatch
-- evidence: `oot3d-decomp/docs/en_horse_title_gallop_rate.md`; `debug_journal/2026-07-15-epona-title-animation.md`
-- where: no dedicated module yet — see en-horse arc below
-- gap: open per 2026-07-15 journal; not confirmed closed
-- notes: overlaps with the `en-horse` area below — the title-specific gallop timing is the title-side slice of that broader arc.
+- evidence: `oot3d-decomp/docs/en_horse_title_gallop_rate.md`; `debug_journal/2026-07-15-epona-title-animation.md` (2026-07-16 FIXED+VERIFIED update)
+- where: `z_en_horse.c` EnHorse_CutsceneUpdate title gate; `behaviors/title/title_rider.cpp` (sole title dispatcher)
+- notes: gallop RATE was verified matching (0.45 vs 0.3 compensate exactly); the residual "looks off"
+  was the mounted-Link POSE — a dual-dispatcher fight (N64 csCtx EnHorse_CutsceneUpdate vs the ported
+  3DS dispatcher) flip-flopping animationIdx; fixed by the title gate (commit 1be5fb66), verified by
+  trace (steady idx=6 -> uma_anim_fastrun) + filmstrip vs oracle. The 3DS Link riding CSABs live in
+  `zelda_link_opening.zar` (uma_* family).
 
 
 ## en-horse
