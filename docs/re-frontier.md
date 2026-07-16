@@ -410,12 +410,12 @@ highest-leverage TODO in the whole tracker (blocks all future MM sweeps).
 ## mm3d-assets
 
 ### mm3d.gar2-parser — GAR2 archive format parser
-- status: todo
+- status: re-verified
 - deps: 
-- evidence: memory `mm3d-assets-gar2`; `mm3d-decomp/docs/lzs_hunt.md`, `formats/lzs.md`
-- where: none yet
-- gap: MM3D assets (`/actors/zelda2_*.gar.lzs`) are GAR2-packed; the shared Zar loader rejects them outright. Confirmed BLOCKER for any MM3D asset replacement work.
-- notes: this is the root blocker for the entire MM3D visual-parity side, analogous to what title.oot3d-not-play was for the OoT title arc.
+- evidence: `Shipwright/cmb3d/asset/gar.{h,cpp}` (GAR2 "GAR\2" parser) + `lzs.{h,cpp}` (LzS "LzS\1" LZSS inflate), consumed by `Shipwright/mm/2s2h/zelda3d/mm3d_model.cpp` (full CtrRom→LzS→GAR2→CMB pipeline). **Verified 2026-07-17 on the real MM3D ROM** via a standalone probe (scratch/mm3d_gar_test/gar_probe.cpp): zelda2_bh → model/skylark.cmb + anim/bh_fly.csab; zelda2_dnk (11 files), zelda2_tk (10), zelda2_am (7); and the **LzS-compressed** zelda2_cs (lzs=1) inflated + parsed to 38 files (model/bombers.cmb + 37 CSAB) — correct types/paths/sizes/offsets for both raw and LzS-wrapped archives.
+- where: `Shipwright/cmb3d/asset/gar.{h,cpp}` + `lzs.{h,cpp}`; wired in `mm/2s2h/zelda3d/mm3d_model.cpp`.
+- gap: none — the parser + LzS inflate exist, are wired into MM3D model loading, and parse real archives (raw + compressed). This was the STALE label corrected 2026-07-17: the blocker was resolved when gar.cpp/lzs.cpp landed; only the frontier/memory were behind. Downstream MM3D visual-parity work (CMB skinning support, actor auto-map coverage) is now unblocked at the archive layer.
+- notes: was "the root blocker for the entire MM3D visual-parity side" — no longer a blocker. Some archives are raw GAR2, ~40% LzS-wrapped (auto-detected via LzsIsCompressed). The CMB payloads are the same 3DS format the shared Cmb parser handles.
 
 ---
 

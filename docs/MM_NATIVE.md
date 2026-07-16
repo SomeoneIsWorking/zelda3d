@@ -486,6 +486,15 @@ EMPTY so MM renders vanilla N64 with zero regression (VERIFIED South Clock Town,
 
 ### N4.2b BLOCKER FOUND (2026-07-01) — MM3D assets are GAR2, not ZAR. Need a GAR parser first.
 
+> **✅ RESOLVED (2026-07-17).** The GAR2 parser (`cmb3d/asset/gar.{h,cpp}`) and LzS inflate
+> (`cmb3d/asset/lzs.{h,cpp}`) both exist and are wired into `mm/2s2h/zelda3d/mm3d_model.cpp`. Verified
+> on the real MM3D ROM (scratch/mm3d_gar_test/gar_probe.cpp): zelda2_bh/dnk/tk/am parse raw, and
+> **zelda2_cs is LzS-compressed** (inflates to model/bombers.cmb + 37 CSAB). This corrects the
+> "NOT compressed / no LZS decompressor needed" claim below — **~40% of actor archives ARE
+> LzS-wrapped** (auto-detected via `LzsIsCompressed`). No longer a blocker; see
+> `docs/re-frontier.md` `mm3d.gar2-parser` = re-verified. The historical RE notes below are kept
+> for provenance.
+
 Inventoried the MM3D RomFS with `tools/ctr_romfs.py "$ZELDA3D_MM3D_ROM"` (the shared `CtrRom`
 Python twin). **MM3D does NOT use the OoT3D `.zar`/`.cmb` layout the shared `Zar` parser expects.**
 Findings (product `CTR-P-AJRE`, romfs 0x27191000):
