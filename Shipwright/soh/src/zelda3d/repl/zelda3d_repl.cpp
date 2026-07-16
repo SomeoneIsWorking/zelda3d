@@ -45,6 +45,14 @@ SaveFileMetaInfo* Save_GetSaveMetaInfo(int fileNum);
 extern "C" {
 #endif
 
+// `fps` command helpers — defined next to Zelda3D_ReplPoll (which feeds the sample ring).
+static double Zelda3D_ReplLogicFps(void);
+static int    Zelda3D_ReplLogicFpsSamples(void);
+static double Zelda3D_ReplLogicFpsWindow(void);
+// Render-side rates (OTRGlobals.cpp): actual present rate + the interpolation target fps.
+double   Zelda3D_PresentFps(void);
+uint32_t OTRGlobals_GetInterpolationFPS(void);
+
 // Forward declarations mirrored from zelda3d.c's own top-of-file prelude (private to that file
 // rather than zelda3d.h) -- the REPL calls several of these debug/inspection entry points too.
 void Zelda3D_EnsureModelProvider(void);
@@ -2333,6 +2341,15 @@ static void Zelda3D_ReplExec(PlayState* play, char* line, const char* outPath) {
                         "| world: bottom=Y%+.1f top=Y%+.1f (actorY=%.1f) -> drawnBottom=%.1f drawnTop=%.1f",
                         mid, miny, h, ex, ez, ws, miny * ws, (miny + h) * ws, ay,
                         ay + miny * ws, ay + (miny + h) * ws);
+    } else if (strcmp(cmd, "fps") == 0) {
+        // Logic-frame rate over the last ~2s (Zelda3D_ReplPoll runs once per Play_Main). With the
+        // 1:1 present path (no interpolation) this IS the render rate — the direct measurement for
+        // "is the game actually holding 60fps here" (kanban #145/#149 jitter diagnosis).
+        Zelda3D_ReplReply(outPath, "logicFps=%.1f (n=%d over %.2fs) presentFps=%.1f "
+                          "R_UPDATE_RATE=%d interpTarget=%d",
+                          Zelda3D_ReplLogicFps(), Zelda3D_ReplLogicFpsSamples(),
+                          Zelda3D_ReplLogicFpsWindow(), Zelda3D_PresentFps(),
+                          R_UPDATE_RATE, (int)OTRGlobals_GetInterpolationFPS());
     } else if (strcmp(cmd, "titlecam") == 0) {
         // #92 toggle/inspect the title-screen camera override. `titlecam 0|1` sets it; `titlecam`
         // alone reports current state + the live view eye so you can verify framing.
@@ -2452,9 +2469,31 @@ repl_done:
 // still reads/writes gZelda3dZTargetActor and gZelda3dPauseTarget, which stay defined here (their
 // REPL setters — `ztarget`/`pause` — are unaffected) and are now shared cross-TU via extern.
 
+// `fps` command backing store: a ring of the last 128 Play_Main wall-clock stamps (Zelda3D_ReplPoll
+// runs once per Play_Main). Rate = samples / elapsed over the ring window (~2s at 60fps).
+static struct timespec sFpsRing[128];
+static int sFpsHead = 0, sFpsCount = 0;
+static void Zelda3D_ReplFpsTick(void) {
+    clock_gettime(CLOCK_MONOTONIC, &sFpsRing[sFpsHead]);
+    sFpsHead = (sFpsHead + 1) & 127;
+    if (sFpsCount < 128) sFpsCount++;
+}
+static double Zelda3D_ReplLogicFpsWindow(void) {
+    if (sFpsCount < 2) return 0.0;
+    const struct timespec& newest = sFpsRing[(sFpsHead + 127) & 127];
+    const struct timespec& oldest = sFpsRing[(sFpsHead - sFpsCount + 128) & 127];
+    return (newest.tv_sec - oldest.tv_sec) + (newest.tv_nsec - oldest.tv_nsec) * 1e-9;
+}
+static int Zelda3D_ReplLogicFpsSamples(void) { return sFpsCount; }
+static double Zelda3D_ReplLogicFps(void) {
+    double w = Zelda3D_ReplLogicFpsWindow();
+    return (w > 0.0) ? (sFpsCount - 1) / w : 0.0;
+}
+
 void Zelda3D_ReplPoll(PlayState* play) {
     static int fd = -2; // -2 uninit, -1 disabled
     static char outPath[1100];
+    Zelda3D_ReplFpsTick();
     static char buf[8192];
     static int buflen = 0;
     char* start;
@@ -2552,6 +2591,24 @@ void Zelda3D_ReplPoll(PlayState* play) {
             CVarSetInteger(CVAR_ENHANCEMENT("DpadEquips"), want);
             fprintf(stderr, "[Zelda3D #32] chords -> %d, DpadEquips -> %d\n", want,
                     CVarGetInteger(CVAR_ENHANCEMENT("DpadEquips"), -1));
+        }
+    }
+
+    // 60fps presentation default. SoH ships InterpolationFPS at 20 (the raw N64 logic rate) and
+    // relies on the user finding the menu slider; a PC-native port presents 60 out of the box
+    // (gameplay logic stays 20fps and FrameInterpolation renders the in-betweens; the title demo
+    // runs its own 60fps logic via TitlePresentation::enter). Same force-both-directions pattern
+    // as the blocks above; ZELDA3D_NO60FPS=1 opts back to 20. (kanban #149 follow-on: the default
+    // 20 was measured as the title/gameplay "not like 60fps" presentation floor.)
+    {
+        static int donefps = 0;
+        if (!donefps) {
+            const char* off = getenv("ZELDA3D_NO60FPS");
+            int want = (off != NULL && off[0] == '1') ? 20 : 60;
+            donefps = 1;
+            CVarSetInteger(CVAR_SETTING("InterpolationFPS"), want);
+            fprintf(stderr, "[Zelda3D #149] InterpolationFPS -> %d\n",
+                    CVarGetInteger(CVAR_SETTING("InterpolationFPS"), -1));
         }
     }
 

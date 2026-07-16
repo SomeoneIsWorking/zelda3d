@@ -1937,6 +1937,21 @@ extern "C" void Graph_StartFrame() {
 extern "C" float gZelda3dInterpStep;
 static std::vector<float> sZelda3dStepList;
 
+// REPL `fps` present-rate measurement: stamp every DrawAndRunGraphicsCommands (one per presented
+// frame, including interpolation subframes). Rate over the last 256 presents (~4s at 60fps).
+static struct timespec sZelda3dPresentRing[256];
+static int sZelda3dPresentHead = 0, sZelda3dPresentCount = 0;
+extern "C" double Zelda3D_PresentFps(void) {
+    if (sZelda3dPresentCount < 2) return 0.0;
+    const struct timespec& newest = sZelda3dPresentRing[(sZelda3dPresentHead + 255) & 255];
+    const struct timespec& oldest = sZelda3dPresentRing[(sZelda3dPresentHead - sZelda3dPresentCount + 256) & 255];
+    double w = (newest.tv_sec - oldest.tv_sec) + (newest.tv_nsec - oldest.tv_nsec) * 1e-9;
+    return (w > 0.0) ? (sZelda3dPresentCount - 1) / w : 0.0;
+}
+extern "C" uint32_t OTRGlobals_GetInterpolationFPS(void) {
+    return OTRGlobals::Instance->GetInterpolationFPS();
+}
+
 void RunCommands(Gfx* Commands, const std::vector<std::unordered_map<Mtx*, MtxF>>& mtx_replacements) {
     auto wnd = std::dynamic_pointer_cast<Fast::Fast3dWindow>(OTRGlobals::Instance->context->GetWindow());
 
@@ -1956,6 +1971,9 @@ void RunCommands(Gfx* Commands, const std::vector<std::unordered_map<Mtx*, MtxF>
     size_t idx = 0;
     for (const auto& m : mtx_replacements) {
         gZelda3dInterpStep = (idx < sZelda3dStepList.size()) ? sZelda3dStepList[idx] : 1.0f;
+        clock_gettime(CLOCK_MONOTONIC, &sZelda3dPresentRing[sZelda3dPresentHead]);
+        sZelda3dPresentHead = (sZelda3dPresentHead + 1) & 255;
+        if (sZelda3dPresentCount < 256) sZelda3dPresentCount++;
         wnd->DrawAndRunGraphicsCommands(Commands, m);
         intp->mInterpolationIndex++;
         idx++;
