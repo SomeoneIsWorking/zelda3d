@@ -223,8 +223,14 @@ void TitleRider::applyToActor(PlayState* play, Actor* actor) {
     const int funcIdx = RiderCsFuncIdx(mCueAction);
     if (funcIdx == 3 || funcIdx == 5) {
         // `log rider 1`: transition diagnosis (see the Move branch's twin below).
-        Z3D_LOG(RIDER, "REARING funcIdx=%d cutsceneAction(before)=%d animIdx(before)=%d action=%d\n",
-                funcIdx, (int)horse->cutsceneAction, (int)horse->animationIdx, (int)horse->action);
+        Z3D_LOG(RIDER, "REARING funcIdx=%d cutsceneAction(before)=%d animIdx(before)=%d action=%d "
+                "animFrame=%.2f riderPos=(%.1f,%.1f,%.1f) playerPos=(%.1f,%.1f,%.1f)\n",
+                funcIdx, (int)horse->cutsceneAction, (int)horse->animationIdx, (int)horse->action,
+                horse->skin.skelAnime.curFrame,
+                horse->riderPos.x, horse->riderPos.y, horse->riderPos.z,
+                mPlayerActor ? mPlayerActor->world.pos.x : 0.0f,
+                mPlayerActor ? mPlayerActor->world.pos.y : 0.0f,
+                mPlayerActor ? mPlayerActor->world.pos.z : 0.0f);
         CsCmdActorCue cue{};
         cue.action = mCueAction;
         // Only the *Init funcs read startPos/urot.y (teleport target); at the exact transition

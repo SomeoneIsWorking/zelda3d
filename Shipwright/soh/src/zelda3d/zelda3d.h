@@ -584,6 +584,10 @@ int Zelda3D_PosedBoneWorldPos(int modelId, int boneId, float* outModelPos); // p
 // warp inactive, no OoT3D room mesh here, etc — ioPos is left unchanged either way). See
 // oot3d-decomp/docs/en_horse_hoof_dust.md and debug_journal/2026-07-15-epona-hoof-dust-depth.md.
 int Zelda3D_HoofDustWorldPos(PlayState* play, Actor* horseActor, float* ioPos);
+// #152 rider seat: actor-relative offset of the DRAWN 3DS horse's rider-attach bone (bone 14),
+// through the exact replaced-draw transform. Returns 0 when the horse isn't Zelda3D-drawn (caller
+// falls back to the native N64 Skin_GetLimbPos path). Defined in zelda3d_render.cpp.
+int Zelda3D_HorseSaddleOffset(Actor* horseActor, float out[3]);
 void Zelda3D_UpdateAnim(int modelId, const char* animName, float frame);
 void Zelda3D_SkinDumpArm(int modelId, const char* path, int frames); // #117 resolved-pose capture
 void Zelda3D_UpdateAnimAuto(int modelId, const char* animName, float rate, float n64CurFrame,

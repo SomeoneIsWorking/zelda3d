@@ -366,6 +366,49 @@ void Zelda3D_SceneTint(PlayState* play, u8 out[3]) {
 // POLY_OPA. Assumes the model's GPU pose (skin matrices) was already set this frame (via
 // Zelda3D_UpdateAnim or Zelda3D_UpdateAnimN64). Shared by the table/auto draw path and the
 // generic N64-anim SkelAnime hook.
+// #152: last replaced-draw transform for the (single) live EnHorse — see EmitModelDraw's record and
+// Zelda3D_HorseSaddleOffset below.
+static Actor* sZelda3dHorseDrawActor = NULL;
+static int    sZelda3dHorseDrawModel = -1;
+static float  sZelda3dHorseDrawScale = 0.0f;
+static float  sZelda3dHorseDrawGroundOff = 0.0f;
+
+// #152 rider seat: model-space -> actor-space offset of the DRAWN 3DS horse's rider-attach bone.
+// GROUND TRUTH (oot3d-decomp/docs/en_horse_rider_pos.md): OoT3D's EnHorse_Update (FUN_0014a5a8)
+// computes riderPos (+0xEB8) as the actor-relative offset of posed JOINT 14 via FUN_00408828 —
+// the rig's dedicated zero-geometry rider-attach bone (parent = torso, local trans (1268,-1764,0);
+// the N64 {600,-1670,0} riderOffset constant does not exist in code.bin — Grezzo baked it into the
+// skeleton as this bone). The N64 EnHorse_PostDraw instead derives riderPos from the N64 Skin pose
+// (limb 30) — but under the Zelda3D replacement the horse VISIBLY plays a 3DS CSAB whose pose can
+// diverge entirely from the N64 skelAnime's (title rear: N64 side idles while the 3DS clip rears
+// -> Link buried in the neck). So anchor the seat to the on-screen pose, exactly as the 3DS does:
+// posed bone-14 origin lifted through the transform EmitModelDraw applied this frame
+// (T(pos)·R_YXZ(shape.rot)·S(worldScale)·T(0,groundOff,0)) minus the actor position — the same
+// actor-relative convention riderPos already uses (and the same walk FUN_00408828 performs).
+extern "C" int Zelda3D_HorseSaddleOffset(Actor* horse, float out[3]) {
+    if (horse == NULL || out == NULL || horse != sZelda3dHorseDrawActor || sZelda3dHorseDrawModel < 0) {
+        return 0;
+    }
+    float local[3];
+    if (!Zelda3D_PosedBoneWorldPos(sZelda3dHorseDrawModel, 14, local)) {
+        return 0;
+    }
+    Matrix_Push();
+    Matrix_Translate(0.0f, 0.0f, 0.0f, MTXMODE_NEW);
+    Matrix_RotateY(BINANG_TO_RAD(horse->shape.rot.y), MTXMODE_APPLY);
+    Matrix_RotateX(BINANG_TO_RAD(horse->shape.rot.x), MTXMODE_APPLY);
+    Matrix_RotateZ(BINANG_TO_RAD(horse->shape.rot.z), MTXMODE_APPLY);
+    Matrix_Scale(sZelda3dHorseDrawScale, sZelda3dHorseDrawScale, sZelda3dHorseDrawScale, MTXMODE_APPLY);
+    Vec3f l = { local[0], local[1] + sZelda3dHorseDrawGroundOff, local[2] };
+    Vec3f w;
+    Matrix_MultVec3f(&l, &w);
+    Matrix_Pop();
+    out[0] = w.x;
+    out[1] = w.y;
+    out[2] = w.z;
+    return 1;
+}
+
 void Zelda3D_EmitModelDraw(PlayState* play, int modelId, Actor* actor, float worldScale,
                                 float groundOffset) {
     u8 tint[3];
@@ -376,6 +419,18 @@ void Zelda3D_EmitModelDraw(PlayState* play, int modelId, Actor* actor, float wor
         sZelda3dSelDrawModel = modelId;
         sZelda3dSelDrawScale = worldScale;
         sZelda3dSelDrawGroundOff = groundOffset;
+        Zelda3D_SetTrackPosedMinY(modelId, 1);
+    }
+    // #152 rider seat: record EnHorse's replaced-draw transform so EnHorse_PostDraw can anchor
+    // riderPos to the DRAWN 3DS pose (saddle bone) instead of the N64 skin pose — see
+    // Zelda3D_HorseSaddleOffset below.
+    if (actor != NULL && actor->id == ACTOR_EN_HORSE) {
+        sZelda3dHorseDrawActor = actor;
+        sZelda3dHorseDrawModel = modelId;
+        sZelda3dHorseDrawScale = worldScale;
+        sZelda3dHorseDrawGroundOff = groundOffset;
+        // The posed-skin cache Zelda3D_PosedBoneWorldPos reads is only maintained while
+        // min-Y tracking is on (same enable the selected-actor path uses above).
         Zelda3D_SetTrackPosedMinY(modelId, 1);
     }
     // Faithful draw-space transform offset: some actors' OoT3D Draw applies extra translate(s) the
