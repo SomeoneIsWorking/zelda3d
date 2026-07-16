@@ -523,6 +523,10 @@ s32 Zelda3D_PlayerForceClimbMove(Player* player, PlayState* play, s32 dir);
 // lock-on idle stance entered automatically via func_80839E88/func_80839F90 once `ztarget 1`
 // holds a HOSTILE-category focusActor and Link's stick returns to neutral. REPL `ztargetstate`.
 s32 Zelda3D_PlayerIsZTargetIdleStance(Player* player);
+// Richer variant of the above: func_80839F90 dispatches THREE ways, not one. Returns 0 (none),
+// 1 (hostile stance waitR), 2 (hostile stance waitL), 3 (friendly/parallel stance,
+// Player_Action_808407CC — a distinct state the bare idle-stance check collapses). REPL `ztargetstate`.
+s32 Zelda3D_PlayerZTargetStanceVariant(Player* player);
 
 // Per-frame pose-scan LOGGER (anim QA). Active=on records each drawn player frame's max bone-rotation
 // jump + bone + resolved csab + frame into a log the REPL reads back (`posescan on|off|dump`). Sampled
