@@ -108,6 +108,38 @@ foundational finding the whole arc depends on.
 - gap: none noted this pass
 - notes: memory records a "whole wrong-asset 2D overlay" false alarm retracted during the matched-frame audit — a dead end, not a current gap.
 
+### title.actor-lighting — title actor (rider/horse/props) vertex lighting
+- status: re-verified
+- deps: title.oot3d-not-play
+- evidence: `oot3d-decomp/docs/title_env_lighting.md` §10 (CmbVShader disasm); offline CMB dump `scratch/decomp_agent/dump_actor_mat_lighting.py` (Epona/Link matAmb=0.4 matDif≈0.5 vtxLit=1); oracle vsuni capture `scratch/title_ab/actor_light_uniforms.log` (cs1575: actor amb ONCE, palette dirs ±(72,72,72), colors byte-exact palette blend); `debug_journal/2026-07-16-title-faithful-port-arc.md`
+- where: `zelda3d_sdl3gpu.cpp` kFrag vertex-lit path + `zelda3d_render.cpp` Zelda3D_UpdateLight title dirs; commit `7575b509`
+- gap: none — the former blanket `gZelda3dLightEnable=0` title disable (the #153 hack) is deleted; characters use the real per-light formula.
+- notes: ACTORS apply ambient once (N64 Lights_BindAll semantics); only scene materials sum ambient per enabled slot. Actor dirs at title = the blended 4-slot title palette, NOT the trig sun formula (which stays byte-correct for envCtx itself).
+
+### title.screen-fade — cs op-0x7c loop-boundary fade
+- status: re-partial
+- deps: title.oot3d-not-play
+- evidence: `scratch/decomp_agent/fade_0x7c/{002c5ba0,003655d0,0030b44c}.c`; `debug_journal/2026-07-16-title-faithful-port-arc.md` §4
+- where: `title_presentation.cpp` applyScreenFade (still the OLD assumed shape)
+- gap: the port's 90/60 triangular ramp hinged at loop-frame 2400 is FALSIFIED — the real handler is a one-shot LINEAR interpolator armed at cs2310, duration = currentValue·150, never reads 2400. Fade-in side is runtime heap state (statically unreachable, 3 scan methods exhausted). Next: empirical oracle luminance sweep (`scratch/decomp_agent/fade_curve_sweep.py`) then port the measured+decompiled curve.
+- notes: do NOT re-chase the transition object's constructor statically — Reference-DB, literal-pool, and movw/movt scans all returned zero hits.
+
+### title.moon-transform — moon disc/halo transform generator
+- status: re-partial
+- deps: title.moon-sky-logo
+- evidence: `oot3d-decomp/docs/env_sun_moon_draw.md` Session 4 (uniform readback: disc scale 640, halos 1280, per-layer depth; sessions 1-3 static/watchpoint dead ends recorded)
+- where: `zelda3d_render.cpp` moon draw (kMoonDiscScale=0.505, kMoonTitleFixedScale=19.0204, halo 1.94/2.07 — measurement-fitted)
+- gap: the RUNTIME writer of the per-layer model matrix (f20-f22 uniforms) is unfound; the port carries fitted constants. Plan: draw_log at the moon frame → exact f20 row bits → `memscan` FCRAM → `watch` the source copy → writer PC → Ghidra.
+- notes: scalar watchpoints on the quad payload are BLIND to the bulk-copy materialization (session 3) — watch the uniform staging instead.
+
+### title.rider-trajectory — rider position vs oracle across cue 6 window
+- status: todo
+- deps: title.rider-dispatch
+- evidence: `scratch/title_ab/seat4x_fix.{az,soh}.png` (same camera, oracle horse walking off bottom-right while SoH's stands at cue-6 p0); full cue table dump in `debug_journal/2026-07-16-title-faithful-port-arc.md` §5
+- where: `title_rider.cpp` step() + `zelda3d_cutscene.cpp` cue decode
+- gap: the oracle's horse translates during the 0x41 window (1380,1619] whose 3DS handler (FUN_002535f0) provably zeroes speed — cue decode (window/action/timebase) or cursor-sync suspect. `tools/title_rider_traj.py --dense 1360:1700` run pending.
+- notes: jump ruled out (see title.rider-dispatch notes / 2026-07-16 journal §3).
+
 ### title.epona-gallop-rate — title Epona gallop-rate + mounted-Link pose
 - status: re-verified
 - deps: title.rider-dispatch
