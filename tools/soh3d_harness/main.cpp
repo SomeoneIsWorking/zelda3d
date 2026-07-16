@@ -181,6 +181,9 @@ extern volatile int gSoh3dDepthDumpPending;
 // inactive), 1 (horse mounted, all filled), 2 (computed-only, pre-mount).
 extern int Zelda3D_Title_RiderState(float* outPos, int* outComputedYaw, int* outHorseWorldYaw,
                                     int* outHorseShapeYaw);
+// Title-cs camera (ported spline) eye/at/up/fov — reliable at the title (bypasses gPlayState).
+// Returns 0 (inactive), 1 (live spline), 2 (held).
+extern int Zelda3D_Title_CameraState(float* outEye, float* outAt, float* outUp, float* outFov);
 }
 
 // Direct Azahar API — the harness is linked in-process, so we bypass the
@@ -4352,6 +4355,20 @@ void RunRepl() {
             gSoh3dDepthDumpPending = 1;
             { FrameWatchdog wd("soh_depthdump/RunFrame"); RunFrame(); }
             std::printf("ok soh_depthdump %s\n", path.c_str());
+        }
+        else if (cmd == "soh_camera") {
+            // Print the SoH ported title-cs camera (spline output) eye/at/up/fov + derived forward
+            // dir — for the title-camera A/B vs the oracle. Reliable at title (bypasses play-ptr gap).
+            if (!g_soh_booted) { PrintErr("soh_camera: run soh_boot first"); continue; }
+            float eye[3]={0,0,0}, at[3]={0,0,0}, up[3]={0,0,0}, fov=0;
+            int r = Zelda3D_Title_CameraState(eye, at, up, &fov);
+            if (r == 0) { std::printf("ok soh_camera inactive (title not active)\n"); continue; }
+            float dx=at[0]-eye[0], dy=at[1]-eye[1], dz=at[2]-eye[2];
+            float dl=std::sqrt(dx*dx+dy*dy+dz*dz); if (dl<1e-6f) dl=1;
+            std::printf("ok soh_camera live=%d eye=(%.1f,%.1f,%.1f) at=(%.1f,%.1f,%.1f)"
+                        " dir=(%.3f,%.3f,%.3f) up=(%.3f,%.3f,%.3f) fov=%.2f\n",
+                        r==1?1:0, eye[0],eye[1],eye[2], at[0],at[1],at[2],
+                        dx/dl,dy/dl,dz/dl, up[0],up[1],up[2], fov);
         }
         else if (cmd == "soh_rider") {
             // Print the title rider's computed path yaw vs the rendered EnHorse yaw (+ pos), for the

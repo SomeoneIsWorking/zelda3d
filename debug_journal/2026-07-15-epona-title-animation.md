@@ -301,3 +301,39 @@ BLOCKER for the fix: cleanly A/B'ing the camera needs (1) the REAL oracle demo-c
 handedness), and (2) reading the SoH ported title-cs camera spline output directly (like `soh_rider`
 does for the rider via TitlePresentation, NOT via gPlayState->cameraPtrs). Both are title-arc RE,
 deep and dead-end-prone. Deprioritized relative to gameplay correctness; the rider itself is fine.
+
+---
+
+## Update 2026-07-16 (root cause found): camera-spline GAP at cs 300 → SoH falls back to a static default
+
+Built `soh_camera` (Zelda3D_Title_CameraState → the ported spline `Zelda3D_TitleCsCamera` at the
+current cs frame; reliable at the title, bypasses gPlayState). At step 600 (cs frame 300):
+
+- `soh_camera` → **live=0, eye=(0,0,0)** — i.e. NO camera segment covers cs 300 (the impl matches
+  `s.start < frame < s.end`; 8 segments loaded, end_frame=2400).
+- When the spline returns 0, title_presentation.cpp's camera block holds via `f-1` (also in the gap
+  → 0) and then falls back to the STATIC default `kZelda3dTitleEye=(-4071.5,57.8,5217.3)` /
+  `kZelda3dTitleAt=(-4939.5,252.8,5675.3)` (zelda3d.c) — exactly the (-4071,5217) SohState_Camera
+  reported. That camera looks WEST (toward the rider) with ~+11deg pitch.
+- Oracle `0x005BE6D4` = (3919,7454) looking +X (east, AWAY from the rider) — confirmed the SPECTATOR
+  slot (soh3d-title-cam-handedness), not the render camera; ignore it.
+
+VISUAL CONFIRMATION (s0600 SBS, `scratch/harness/s0600_azsoh.png`): same scene, but the MOON sits
+far lower in the SoH frame than the oracle — a pure camera-PITCH divergence (moon is at infinity).
+Consistent with SoH using the fixed static default (too much up-pitch) during the cs-300 gap while
+the oracle's camera is elsewhere in pitch.
+
+ROOT CAUSE (SoH side, concrete): the ported title camera has 8 segments with GAPS between them (and/
+or before the first). During a gap, SoH freezes at the fixed `kZelda3dTitleEye` static default
+instead of tracking whatever the oracle does there → the framing/moon-height divergence the user
+sees as "everything looks wrong". The rider is correctly placed underneath (previous updates);
+it's the CAMERA that's wrong during gaps.
+
+NEXT (the fix — needs care, not a bandaid): determine the correct gap behavior. Two candidates:
+  (a) the segment PARSER is dropping coverage that should exist (cs 300 should be inside a segment) —
+      check the 8 segments' [start,end] ranges vs the cs's authored camera commands; OR
+  (b) gaps are real and the camera should HOLD the nearest PRECEDING segment's end value (not a
+      fixed global default, and not `f-1` which fails for multi-frame gaps).
+Confirm which against the oracle's actual camera at cs 300 before changing title_presentation's gap
+fallback. `soh_camera` now makes per-frame SoH camera A/B cheap; the oracle side still needs its real
+render-camera VA (not 0x005BE6D4).
