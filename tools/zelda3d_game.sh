@@ -84,12 +84,15 @@ status() {
     return 0
 }
 
-# Headless mode (ZELDA3D_HEADLESS=1): run on a private Xvfb X server so NO window appears on the
+# Headless mode (the DEFAULT): run on a private Xvfb X server so NO window appears on the
 # user's desktop. Required on Wayland — SDL ignores X11 DISPLAY there and would open a visible
 # Wayland window — so we force SDL's X11 backend onto the Xvfb display and drop WAYLAND_DISPLAY.
 # Rendering still uses the real GPU; screenshots (REPL `shot`) read the in-process framebuffer.
+# This manager is agent tooling, and agents must never open a window on the user's desktop
+# (project hard rule) — so headless is opt-OUT here: set ZELDA3D_HEADLESS=0 for a headed run
+# (the user's own headed path is ./run.sh, which is unaffected).
 setup_headless() {
-    [ "${ZELDA3D_HEADLESS:-0}" = "1" ] || return 0
+    [ "${ZELDA3D_HEADLESS:-1}" = "1" ] || return 0
     local disp="${ZELDA3D_HEADLESS_DISPLAY:-$DEFDISP}"
     if ! DISPLAY="$disp" xdpyinfo >/dev/null 2>&1; then
         echo "headless: starting Xvfb on $disp" >&2

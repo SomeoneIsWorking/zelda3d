@@ -28,7 +28,7 @@ int Zelda3D_TitleCsEndFrame(void);
 // vector (roll applied around the view direction, sign verified vs Az).
 // Returns 1 if a spline segment covers the frame, 0 otherwise (caller
 // should hold the previous camera).
-int Zelda3D_TitleCsCamera(int frame, float eye[3], float at[3],
+int Zelda3D_TitleCsCamera(float frame, float eye[3], float at[3],
                           float up[3], float* fovDeg);
 
 // Title cs frame cursor, advanced once per applied title frame by the
@@ -93,6 +93,8 @@ int Zelda3D_TitleCsScreenFade(int* start, int* end);
 int Zelda3D_TitleCsLoopFrame(void);
 
 int  Zelda3D_TitleCsFrame(void);
+// Sub-frame fraction (0.0 or 0.5) of the current engine tick within the cs frame — 60fps interp.
+float Zelda3D_TitleCsSubframe(void);
 void Zelda3D_TitleCsSetFrame(int frame);
 int  Zelda3D_TitleCsAdvance(void);   // returns new frame
 

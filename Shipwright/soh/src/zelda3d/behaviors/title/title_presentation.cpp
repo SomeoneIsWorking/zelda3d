@@ -114,11 +114,14 @@ int TitlePresentation::update(PlayState* play) {
     int csLive = 0;
     if (Zelda3D_TitleCsLoad()) {
         int f = Zelda3D_TitleCsAdvance();
-        csLive = Zelda3D_TitleCsCamera(f, csEye, csAt, csUp, &csFov);
+        // Fractional frame: the cs ticks at 30fps (one increment per two engine frames); the
+        // spline evaluates at f + 0.5 on the hold tick so the camera moves EVERY engine frame
+        // (the "whole title jitters at half rate" fix, kanban #149).
+        const float ff = (float)f + Zelda3D_TitleCsSubframe();
+        csLive = Zelda3D_TitleCsCamera(ff, csEye, csAt, csUp, &csFov);
         if (!csLive) {
-            // frame outside all spline segments (segment boundaries are exclusive) — hold the
-            // previous frame's camera this tick.
-            csLive = Zelda3D_TitleCsCamera(f > 0 ? f - 1 : 1, csEye, csAt, csUp, &csFov);
+            // frame outside all spline segments — hold the previous frame's camera this tick.
+            csLive = Zelda3D_TitleCsCamera(f > 0 ? (float)(f - 1) : 1.0f, csEye, csAt, csUp, &csFov);
         }
     }
     if (!csLive) {
@@ -396,9 +399,13 @@ void TitlePresentation::applyLightOverride(PlayState* play) {
             // fog factor is hypersensitive to the view-axis distance it defines.
             float eye[3], at[3], up[3], fov = 0.0f;
             int f = Zelda3D_TitleCsFrame();
-            int camOk = Zelda3D_TitleCsCamera(f, eye, at, up, &fov);
+            // Same fractional-frame eval as update()'s render camera (kanban #149) — the fog
+            // factor is view-axis-distance sensitive, so a 30fps-stepping eye against the 60fps
+            // camera would shimmer.
+            const float ff = (float)f + Zelda3D_TitleCsSubframe();
+            int camOk = Zelda3D_TitleCsCamera(ff, eye, at, up, &fov);
             if (!camOk && f > 0) {
-                camOk = Zelda3D_TitleCsCamera(f - 1, eye, at, up, &fov);
+                camOk = Zelda3D_TitleCsCamera((float)(f - 1), eye, at, up, &fov);
             }
             if (camOk) {
                 const float fwd[3] = { at[0] - eye[0], at[1] - eye[1], at[2] - eye[2] };
@@ -478,9 +485,11 @@ extern "C" int Zelda3D_Title_CameraState(float* outEye, float* outAt, float* out
     if (!Zelda3D::TitlePresentation::Instance().isActive())
         return 0;
     const int f = Zelda3D_TitleCsFrame();
+    // Fractional frame — mirrors update()'s rendered camera exactly (60fps sub-frame interp).
+    const float ff = (float)f + Zelda3D_TitleCsSubframe();
     float e[3] = {0,0,0}, a[3] = {0,0,0}, u[3] = {0,0,0}, fv = 0.0f;
-    int live = Zelda3D_TitleCsCamera(f, e, a, u, &fv);
-    if (!live) live = Zelda3D_TitleCsCamera(f > 0 ? f - 1 : 1, e, a, u, &fv); // hold last (segment gap)
+    int live = Zelda3D_TitleCsCamera(ff, e, a, u, &fv);
+    if (!live) live = Zelda3D_TitleCsCamera(f > 0 ? (float)(f - 1) : 1.0f, e, a, u, &fv); // hold last (segment gap)
     if (outEye) { outEye[0]=e[0]; outEye[1]=e[1]; outEye[2]=e[2]; }
     if (outAt)  { outAt[0]=a[0];  outAt[1]=a[1];  outAt[2]=a[2]; }
     if (outUp)  { outUp[0]=u[0];  outUp[1]=u[1];  outUp[2]=u[2]; }
@@ -495,7 +504,13 @@ extern "C" int Zelda3D_Title_RiderState(float* outPos, int* outComputedYaw, int*
         return 0;
     const Zelda3D::TitleRider& r = tp.mutableRider();
     const float* p = r.pos();
-    if (outPos) { outPos[0] = p[0]; outPos[1] = p[1]; outPos[2] = p[2]; }
+    // Prefer the RENDERED horse position (includes the 60fps sub-frame advance) over the 30fps
+    // integrator state, so this accessor mirrors what's on screen.
+    const Actor* hp = r.horseActor();
+    if (outPos) {
+        if (hp) { outPos[0] = hp->world.pos.x; outPos[1] = hp->world.pos.y; outPos[2] = hp->world.pos.z; }
+        else    { outPos[0] = p[0]; outPos[1] = p[1]; outPos[2] = p[2]; }
+    }
     if (outComputedYaw) *outComputedYaw = (int)(int16_t)r.yaw();
     const Actor* h = r.horseActor();
     if (outHorseWorldYaw) *outHorseWorldYaw = h ? (int)(int16_t)h->world.rot.y : 0x7FFFFFFF;
