@@ -1953,11 +1953,19 @@ constexpr bool AZ_CAM_Z_SIGN_FLIP    = false;
 // Convenience: signed multiplier for a bool flag (constant-folds to +1/-1).
 constexpr float FlipMul(bool flip) { return flip ? -1.0f : +1.0f; }
 
+// VA of the LIVE title play ptr. The title demo runs Play_Main on scene 0x51 (soh3d-oot3d-title-
+// not-play), but gPlayState @0x0050AF34 stays 0 during it — the title's PlayState* lives here
+// instead. Reading it makes scene/actors/camera introspection work AT THE TITLE (previously empty).
+constexpr uint32_t TITLE_PLAYSTATE_PTR_VA = 0x00539F98;
+
 std::optional<uint32_t> CurrentPlayState() {
     auto& mem = Core::System::GetInstance().Memory();
     auto v = mem.Read32OrNullopt(GPLAYSTATE_VA);
-    if (!v || *v == 0) return std::nullopt;
-    return *v;
+    if (v && *v != 0) return *v;
+    // Title demo: gPlayState is 0, but the live PlayState* is at TITLE_PLAYSTATE_PTR_VA.
+    auto t = mem.Read32OrNullopt(TITLE_PLAYSTATE_PTR_VA);
+    if (t && *t != 0) return *t;
+    return std::nullopt;
 }
 
 // True when the emulator is in the title-demo (logo + Hyrule-field flyover),
@@ -4355,6 +4363,26 @@ void RunRepl() {
             gSoh3dDepthDumpPending = 1;
             { FrameWatchdog wd("soh_depthdump/RunFrame"); RunFrame(); }
             std::printf("ok soh_depthdump %s\n", path.c_str());
+        }
+        else if (cmd == "az_camera") {
+            // Oracle 3DS title RENDER camera BASIS @0x005BE6D4: eye + forward(unit) + up(unit), 3
+            // consecutive Vec3f (RE'd by find_cam_eye.py; it's LIVE — moves with the demo). NOT
+            // play->view.eye+0x1B8 (that's the N64 PlayState offset — wrong for the 3DS oracle).
+            // The basis is LEFT-handed (up x forward), so the actual view direction is +forward.
+            // Pairs with soh_camera for the title-camera A/B.
+            auto& mem = Core::System::GetInstance().Memory();
+            constexpr uint32_t AZ_CAM_VA = 0x005BE6D4;
+            float e[3]={0,0,0}, fwd[3]={0,0,0}, u[3]={0,0,0}; bool ok=true;
+            for (int j=0;j<3;j++){
+                auto ev=mem.Read32OrNullopt(AZ_CAM_VA+0 +j*4);
+                auto fv=mem.Read32OrNullopt(AZ_CAM_VA+12+j*4);
+                auto uv=mem.Read32OrNullopt(AZ_CAM_VA+24+j*4);
+                if(!ev||!fv||!uv){ok=false;break;}
+                std::memcpy(&e[j],&*ev,4); std::memcpy(&fwd[j],&*fv,4); std::memcpy(&u[j],&*uv,4);
+            }
+            if(!ok){ std::printf("ok az_camera unmapped\n"); continue; }
+            std::printf("ok az_camera eye=(%.1f,%.1f,%.1f) fwd=(%.3f,%.3f,%.3f) up=(%.3f,%.3f,%.3f)\n",
+                        e[0],e[1],e[2], fwd[0],fwd[1],fwd[2], u[0],u[1],u[2]);
         }
         else if (cmd == "soh_camera") {
             // Print the SoH ported title-cs camera (spline output) eye/at/up/fov + derived forward
