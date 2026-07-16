@@ -98,3 +98,27 @@ Next (if pursued): capture the title demo's world-pass depth BEFORE the ortho ov
 mid-frame `soh_depthdump`, or temporarily disabling the overlay clear) to see whether the title tree
 writes a wrong depth or is drawn depth-test-off. Deprioritized: gameplay — the thing that matters —
 is correct.
+
+## Update 2026-07-16 (ROOT-CAUSED + FIXED): the title overlay depth-clear ran BEFORE the XLU pass
+
+User re-reported both artifacts (hoof dust + tree drawn over terrain that should occlude them).
+The missing structural piece was already in this journal: at the title, fb0's final depth held ONLY
+the logo, because the title 2D overlay pass CLEARS the Z-buffer (zelda3d_overlay2d.cpp
+gSPZelda3DClearDepth — legitimately needed for the logo's own intra-model self-occlusion).
+
+The bug: that clear was emitted into **POLY_OPA** — but graph.c branches OVERLAY at the END of
+POLY_XLU, i.e. execution order is OPA (incl. the clear) -> XLU -> OVERLAY. Every alpha-blended
+world draw (EffectSsDust hoof puffs, tree foliage) lives in POLY_XLU and therefore executed
+AGAINST A CLEARED DEPTH BUFFER -> no terrain occlusion, drawn on top of everything. The emit-site
+comment's assertion ("the 3D scene has already been fully composited by this point") was true for
+color+OPA but FALSE for XLU. Gameplay has no overlay clear -> depth correct there (as this journal
+already measured).
+
+FIX: emit the entire title 2D overlay pass (Overlay2D_Begin/End, wordmark, fire-glow, copyright —
+9 sites) into **OVERLAY_DISP** instead of POLY_OPA. OVERLAY executes after OPA AND XLU (it's the
+HUD/transition-fade layer — the true "over the finished scene" slot), so the depth clear now runs
+after all world rendering, and the logo still gets its blank depth canvas for self-occlusion.
+
+VERIFIED (SBS vs oracle): tree view cs~450 — no tree poking through the hill, logo composites with
+shield/sword self-occlusion intact (depthfix_tree_combo.png); gallop view cs~240 — no dust smear
+over the terrain (depthfix_dust_combo.png). Both match the oracle.

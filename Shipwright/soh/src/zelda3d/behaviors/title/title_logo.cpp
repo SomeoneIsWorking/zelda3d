@@ -611,7 +611,7 @@ extern "C" int Zelda3D_TryDrawTitleLogo(PlayState* play) {
     // alpha-value-correctness in or out before chasing the blend destination.
     Z3D_LOG(WORDMARK, "csFrame=%d phase=%d wordmarkAlpha=%.2f alphaU8=%u\n",
             csFrame, (int)ps.phase, ps.wordmarkAlpha, (unsigned)alphaU8);
-    gSPZelda3DDrawA(POLY_OPA_DISP++, modelId | (int)ZELDA3D_HANDLE_FORCE_UNLIT | (int)ZELDA3D_HANDLE_SCREEN_SPACE,
+    gSPZelda3DDrawA(OVERLAY_DISP++, modelId | (int)ZELDA3D_HANDLE_FORCE_UNLIT | (int)ZELDA3D_HANDLE_SCREEN_SPACE,
                     alphaU8, 255, 255, 255);
     CLOSE_DISPS(play->state.gfxCtx);
     return 1;
@@ -651,7 +651,7 @@ extern "C" int Zelda3D_TryDrawTitleCopyright(PlayState* play) {
                                  0.5f * kOverlayRefH + kCopyrightLocalOffsetY * pxPerUnit,
                                  pxPerUnit * localHeight, localHeight);
     const uint8_t alphaU8 = (uint8_t)(alpha + 0.5f);
-    gSPZelda3DDrawA(POLY_OPA_DISP++, modelId | (int)ZELDA3D_HANDLE_FORCE_UNLIT | (int)ZELDA3D_HANDLE_SCREEN_SPACE,
+    gSPZelda3DDrawA(OVERLAY_DISP++, modelId | (int)ZELDA3D_HANDLE_FORCE_UNLIT | (int)ZELDA3D_HANDLE_SCREEN_SPACE,
                     alphaU8, 255, 255, 255);
     CLOSE_DISPS(play->state.gfxCtx);
     return 1;
