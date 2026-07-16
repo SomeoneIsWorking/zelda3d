@@ -100,6 +100,9 @@ STATES = [
      "note": "sword slash (Player_Action_808502D0 + fighter_normal_kiru) -> ft_nml_kiru"},
     {"name": "climb",  "kind": "forcestate", "force": "climb",  "gt": "decomp", "expect": "hang",
      "note": "wall-grab/hang (jump_climb -> hang family, task #2) -> nml_hang_* ; forced via climb anim"},
+    {"name": "putdown", "kind": "forcestate", "force": "putdown", "gt": "decomp", "expect": "nml_put",
+     "note": "PUT_DOWN branch of func_8083EAF0 (Player_Action_808464B0 + ANIMGROUP_put) -> nml_put; "
+             "distinct from THROW (func_8083EA94). Run standalone: reads the selected base CSAB"},
 
     # --- carry: two-source state, driven by the SESSION-5 cucco-grab recipe (Kakariko 0xDB). Read the
     #     UPPER csab (the carry hold); lower is locomotion (speed-gated, covered by the speed sweep).

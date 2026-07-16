@@ -545,6 +545,11 @@ static void Zelda3D_ReplExec(PlayState* play, char* line, const char* outPath) {
         } else if (strcmp(arg, "throw") == 0) {
             Zelda3D_PlayerForceThrow(p, play);
             Zelda3D_ReplReply(outPath, "linkstate throw -> throw-release pose (st1=0x%x)", p->stateFlags1);
+        } else if (strcmp(arg, "putdown") == 0) {
+            Zelda3D_PlayerForcePutDown(p, play);
+            Zelda3D_ReplReply(outPath, "linkstate putdown -> put-down pose (Player_Action_808464B0 + "
+                            "ANIMGROUP_put; st1=0x%x). Run after `linkstate carry` for a held-actor start pose",
+                            p->stateFlags1);
         } else if (strcmp(arg, "itemuse") == 0) {
             Zelda3D_PlayerForceItemUse(p, play);
             Zelda3D_ReplReply(outPath, "linkstate itemuse -> bottle raise/swing pose (st1=0x%x)", p->stateFlags1);
@@ -563,7 +568,7 @@ static void Zelda3D_ReplExec(PlayState* play, char* line, const char* outPath) {
         } else {
             Zelda3D_ReplReply(outPath,
                             "usage: linkstate <roll|talk|idle|jump|swim|damage|shield|attack|attack2|"
-                            "climb|dive|getitem|death|carry|throw|itemuse|backwalk|climbup|climbdown>");
+                            "climb|dive|getitem|death|carry|throw|putdown|itemuse|backwalk|climbup|climbdown>");
         }
     } else if (strcmp(cmd, "freeze") == 0 && sscanf(line, "%*s %i", &iv) == 1) {
         // Frame-step harness: `freeze 1` holds the game logic still (Play_Update skipped) so a brief

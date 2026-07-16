@@ -7860,6 +7860,19 @@ s32 Zelda3D_PlayerForceThrow(Player* this, PlayState* play) {
     return 1;
 }
 
+// Put-down: the PUT_DOWN branch of Player_ActionHandler_9 (~7483) — the state func_8083EAF0 selects
+// over THROW when the held actor is slow-moving (linearVelocity < 1.1) and not ACTOR_FLAG_THROW_ONLY.
+// Distinct from Zelda3D_PlayerForceThrow (the `else` branch of that same gate). Installs the SAME
+// action+anim the live branch installs (Player_Action_808464B0 + PLAYER_ANIMGROUP_put) — no new
+// derivation, just the result state, bypassing only the input-gate/held-actor context the live
+// handler checks. The sweep runs it after `linkstate carry` (which establishes CARRYING_ACTOR +
+// held-actor state) so the put-down anim has a sensible starting pose.
+s32 Zelda3D_PlayerForcePutDown(Player* this, PlayState* play) {
+    Player_SetupAction(play, this, Player_Action_808464B0, 1);
+    Player_AnimPlayOnce(play, this, GET_PLAYER_ANIM(PLAYER_ANIMGROUP_put, this->modelAnimType));
+    return 1;
+}
+
 // Item-use (bottle raise/swing): Player_Action_SwingBottle + sBottleSwingInfo[0]'s dry-land
 // missAnimation (gPlayerAnim_link_bottle_bug_miss) — the SAME action+anim func_8083C6B8's C-button
 // "use held bottle" dispatch (z_player.c ~6564-6577) installs for a held bottle. Forces
