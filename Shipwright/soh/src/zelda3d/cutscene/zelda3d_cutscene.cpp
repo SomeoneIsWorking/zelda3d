@@ -658,18 +658,23 @@ extern "C" int Zelda3D_TitleCsRiderCue(int frame, int* cueIndex,
 // time FLOWS at 6 dayTime units per cs frame (measured live: d(t)/d(f) =
 // 6.000 across the whole demo; scratch/time_slope.py). The title's dawn
 // progression (4:01 AM -> ~9 AM over the 2400-frame loop) comes from this.
-extern "C" int Zelda3D_TitleCsTimeOfDay(int frame, uint16_t* outDayTime) {
+extern "C" int Zelda3D_TitleCsTimeOfDay(float frame, uint16_t* outDayTime) {
     if (sLoadState <= 0) return 0;
+    // Cue latch on the INTEGER frame; the fractional part only advances the +6/cs-frame drift so
+    // dayTime (and everything derived: sun/moon position, dome blend, light palette) moves every
+    // ENGINE frame instead of stepping per cs tick — same fractional-frame idiom as the camera
+    // spline (kanban #149; the drift becomes +3/engine frame, FrameInterpolation covers the rest).
+    const int fi = (int)frame;
     int bestF = -1;
     uint16_t bestT = 0;
     for (const auto& c : sTimeCues) {
-        if (c.frame <= frame && c.frame >= bestF) {
+        if (c.frame <= fi && c.frame >= bestF) {
             bestF = c.frame;
             bestT = c.daytime;
         }
     }
     if (bestF < 0) return 0;
-    *outDayTime = (uint16_t)(bestT + 6 * (frame - bestF));
+    *outDayTime = (uint16_t)(bestT + (int)(6.0f * (frame - (float)bestF)));
     return 1;
 }
 
