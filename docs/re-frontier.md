@@ -215,6 +215,7 @@ landed as a `behaviors/actor/en_horse.cpp` module per the CLAUDE.md game-structu
 - evidence: `behaviors/camera/normal1.cpp` — **SCAFFOLDING ONLY**: `Normal1Behavior::update()` returns false, so SoH's legacy Camera_Normal1 (z_camera.c:1538) still runs. The dispatch hook + module exist and the divergence is documented (OoT3D FUN_00239fd8 vs SoH: ~28-unit Δeye-Y at Kakariko under matched Link pose, per the header), but the OoT3D body (oot3d-decomp/build/decomp/00239fd8.c, 418 lines) is NOT yet ported.
 - where: `behaviors/camera/normal1.cpp/.h`
 - gap: **the actual port is not landed** — `update()` is a TODO stub returning false (legacy fallthrough). Corrected 2026-07-16 from a prior over-optimistic `re-verified` mark: the module is a scaffold, not a verified port. Next: port FUN_00239fd8's body into `update()` and flip the return to true, then A/B the Kakariko Δeye-Y against the oracle.
+- notes: **NOT a cheap flip** (assessed 2026-07-16 from oot3d-decomp/build/decomp/00239fd8.c): the raw Ghidra body is 3152 bytes with ~15 unresolved helper calls (FUN_00355780 spring-lerp, FUN_00372474 vec-sub, FUN_00337624, FUN_003553fc, FUN_00338ac8, FUN_0033743c, FUN_00331440, …), ~30 unnamed DAT_ tuning constants, and every field as a raw param_1[N] float index. A faithful port needs, FIRST, (1) the Camera struct offset map (param_1[0x20]=at, [0x23]=eye, [0x35]=play known; the rest unmapped) and (2) identifying/naming each helper against SoH's Camera_Normal1 + Camera_CalcAtDefault/spring helpers. That is a multi-step RE task, not a one-iteration port — do it as its own focused effort, use `cammode` for the A/B, and do NOT shortcut with guessed offsets/magic constants (that would be the exact bandaid the no-hacks rule forbids).
 - notes: 
 
 ### camera.normal0-and-others — remaining camera mode functions (Normal0, Parallel*, etc.)
@@ -274,12 +275,12 @@ below, not duplicated).
 - notes: 
 
 ### player.camera-mode-readout — camera->mode/setting debug readout
-- status: todo
+- status: re-verified
 - deps: player.backwalk-decode
-- evidence: `docs/re_control_debug_backlog.md` item #3 — zero RE cost, pure wiring gap (mechanism already fully understood via `Player_UpdateCamAndSeqModes`)
-- where: REPL, not yet added
-- gap: cheapest item in the whole backlog — a `Zelda3D_*` REPL readout of `camera->mode`/`->setting`, no RE needed.
-- notes: pick this up opportunistically; it directly de-risks #1/#2 above.
+- evidence: REPL `cammode` (zelda3d_repl.cpp) + `Zelda3D_CameraActiveFuncIdx` (z_camera.c). Live-verified: Kokiri (0x55) setting=1→funcIdx=2 NORM1; Kakariko (0x52) DEMO1 during entry cutscene then setting=2→funcIdx=2 NORM1 at gameplay — correctly tracks scene + state transitions.
+- where: REPL `cammode` reports scene/setting/mode/camDataIdx + the DISPATCHED funcIdx and its name (resolved via the new `Zelda3D_CameraActiveFuncIdx` accessor over the file-static sCameraSettings/sCameraFunctionNames), plus roll/fov.
+- gap: none — landed. Directly de-risks the camera-port and stick-decode rows (confirms which mode function is actually live rather than assuming it from the scene table).
+- notes: this is the observation tool the camera.normal1 body port needs for its Kakariko A/B (confirm NORM1 is live before comparing eye-Y).
 
 ### player.swim-dive-gate — func_8083D12C underwater A-press dive gate
 - status: in-progress

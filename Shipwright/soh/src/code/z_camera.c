@@ -1535,6 +1535,26 @@ s32 Camera_Free(Camera* camera) {
     return 1;
 }
 
+// Zelda3D REPL `cammode` readout (docs/re_control_debug_backlog.md #3): resolve the active camera's
+// DISPATCHED funcIdx (and its name) from the file-local static sCameraSettings/sCameraFunctionNames
+// tables — the same lookup Camera_Update's dispatch uses
+// (sCameraSettings[setting].cameraModes[mode].funcIdx). Lets a sweep confirm WHICH camera mode
+// function is live (e.g. is CAM_FUNC_NORM1 actually running here?) instead of assuming. Returns the
+// funcIdx, or -1 for a NULL camera; *outName (optional) gets the function name.
+s16 Zelda3D_CameraActiveFuncIdx(Camera* camera, const char** outName) {
+    if (camera == NULL) {
+        if (outName != NULL) {
+            *outName = "(null)";
+        }
+        return -1;
+    }
+    s16 funcIdx = sCameraSettings[camera->setting].cameraModes[camera->mode].funcIdx;
+    if (outName != NULL) {
+        *outName = sCameraFunctionNames[funcIdx];
+    }
+    return funcIdx;
+}
+
 s32 Camera_Normal1(Camera* camera) {
     // Zelda3D port seam: if a CameraBehavior owns CAM_FUNC_NORM1, delegate. The behavior returns
     // 1 when it has fully driven the frame (skip legacy body); 0 = fall through to legacy. Landed
