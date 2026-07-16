@@ -450,17 +450,21 @@ extern "C" int Zelda3D_TitleCsEndFrame(void) { return sEndFrame; }
 extern "C" int Zelda3D_TitleCsCamera(int frame, float eye[3], float at[3],
                                      float up[3], float* fovDeg) {
     if (sLoadState <= 0 || !sSpline.ok) return 0;
-    // NOTE (2026-07-16): the segment seams (299/300, 929/930, ...) drop 2 frames each to the
-    // caller's static-default camera (strict `<` both ends). That IS a real per-boundary glitch, BUT
-    // the naive fix (`<=` both ends) REGRESSED: it put a seam's START frame into the NEXT segment,
-    // whose opening pose is a fresh shot (e.g. cs300 = seg1 opens looking down at grass) that does
-    // NOT match the oracle's render at that frame. So the OP97 spline this reads is NOT the oracle's
-    // render camera anyway (it tracks 0x005BE6D4, the spectator/basis slot — see the journal). The
-    // correct seam convention needs the oracle's REAL render camera to verify (blocked: that VA is
-    // unknown). Left strict until then rather than ship a verified-worse change.
+    // INCLUSIVE bounds. Segments are contiguous inclusive ranges (0,299)(300,929)... . The old
+    // strict `s.start < frame < s.end` dropped BOTH seam frames of every boundary (299 AND 300, ...)
+    // to the caller's fixed static-default camera — a jarring per-seam camera jump (the title-demo
+    // "everything looks broken, only bisectable frame by frame" report; 7 seams x 2 frames).
+    //
+    // VERIFIED correct against the oracle's REAL view direction (the at-eye vector @0x005BE6D4+0x24,
+    // decompiled in oot3d-decomp/title_basis_writer_jit_solved.md — NOT the +0x0C RIGHT vector an
+    // earlier pass mislabeled "dir", which made this look wrong and got a first attempt reverted):
+    //   cs320 (interior): SoH eye/fwd/up/right all match the oracle within noise.
+    //   cs300 (seam, now seg1 via `<=`): SoH eye=(3921,7460) dir=(0.182,-0.323,-0.920) matches the
+    //     oracle eye=(3919.7,7454.0) fwd=(0.184,-0.322,-0.929) — the oracle is at seg1's opening
+    //     too. Adjacent segments differ by 1 frame so no frame matches two.
     const Segment* seg = nullptr;
     for (const Segment& s : sSpline.segments) {
-        if (s.start < frame && frame < s.end) { seg = &s; break; }
+        if (s.start <= frame && frame <= s.end) { seg = &s; break; }
     }
     if (!seg) return 0;
     float e[3], a[3];
