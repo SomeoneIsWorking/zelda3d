@@ -191,12 +191,12 @@ landed as a `behaviors/actor/en_horse.cpp` module per the CLAUDE.md game-structu
 - notes: recorded as a dead end so a future session doesn't re-open it.
 
 ### enhorse.module-port — port en_horse behaviors into behaviors/actor/en_horse.cpp
-- status: todo
+- status: re-verified
 - deps: enhorse.render-gap, enhorse.hoof-dust, title.epona-gallop-rate
-- evidence: 
-- where: target `Shipwright/soh/src/zelda3d/behaviors/actor/en_horse.cpp` (does not exist yet)
-- gap: this is pure structural/porting debt now that the underlying RE is mostly done — next concrete step for this arc.
-- notes: 
+- evidence: `Shipwright/soh/src/zelda3d/behaviors/actor/en_horse.cpp`; live-verified spawning Epona in Kokiri Forest (scene with no horse object) — relocated `Zelda3D_HorseSaddleOffset` fires (`[rider] src=3ds-bone14`), model renders (scratch/screenshots/en_horse_spawn.png).
+- where: `Shipwright/soh/src/zelda3d/behaviors/actor/en_horse.cpp` (+ `.h`) — holds `Zelda3D_HoofDustWorldPos` (hoof-dust Y reconcile, was in core/zelda3d.c) and `Zelda3D_HorseSaddleOffset` + `Zelda3D_EnHorse_RecordDraw` (#152 rider seat, was in render/zelda3d_render.cpp).
+- gap: none — the two draw-adjacent EnHorse behaviors are consolidated into the module; the Skin_DrawImpl body-render hook remains the separate render-gap remainder (see enhorse.render-gap).
+- notes: verbatim relocation (logic unchanged); the render statics became module-local, populated via Zelda3D_EnHorse_RecordDraw from EmitModelDraw.
 
 
 ## camera
