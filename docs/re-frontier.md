@@ -267,12 +267,12 @@ below, not duplicated).
 - notes: closes the sole tracked hack; see oot3d-decomp/docs/player_anim_states.md backwalk section for the full derivation
 
 ### player.zaim-parallel-decode — func_8083FD78 (Z-target-locked stick decode)
-- status: in-progress
+- status: re-verified
 - deps: player.backwalk-decode
-- evidence: `docs/re_control_debug_backlog.md` item #2 — call sites traced (6 sites) but thresholds/branches beyond entry not fully read
-- where: `Player_Action_8084193C` call site (z_player.c:8989)
-- gap: full read would clarify whether sidestep_l/sidestep_r (currently reported MATCH) are landing on genuinely-decoded branches or a lucky stick magnitude.
-- notes: 
+- evidence: `docs/re_control_debug_backlog.md` item #2 — FULLY READ (2026-07-17): three branches (A aim-no-actor → aim-strafe, returns 0; B actor-locked → delegates to func_8083FC68; C parallel-no-target → sin-curve). Sidestep robustness confirmed live: `ztargetstate` reports focusActor=0x18 under Z-lock, so the sidestep recipe hits branch B (the re-verified func_8083FC68 dual-threshold), not a lucky magnitude.
+- where: `func_8083FD78` (z_player.c:8294-8360), called by `Player_Action_8084193C` at 8973.
+- gap: none for the robustness question — sidestep_l/r/turn_in_place MATCH is genuinely decoded (branch B). New states branches A (aim-strafe) and C (parallel-no-target walk) reach are not yet in STATE_MATRIX — that's future sweep-coverage expansion, not an RE gap.
+- notes: the `else` path with focusActor!=NULL is a pure delegation to the #1 decoder (player.backwalk-decode), so no new threshold constants to port — the sidestep decode IS the backwalk decode when actor-locked.
 
 ### player.camera-mode-readout — camera->mode/setting debug readout
 - status: re-verified
