@@ -1894,8 +1894,14 @@ static void Zelda3D_ReplExec(PlayState* play, char* line, const char* outPath) {
         // engaged (requires a HOSTILE-category focusActor + neutral stick — Player_CheckHostileLockOn).
         Player* ztp = GET_PLAYER(play);
         s32 idleStance = Zelda3D_PlayerIsZTargetIdleStance(ztp);
-        Zelda3D_ReplReply(outPath, "idleStance=%d focusActor=0x%X st1=0x%x",
-                        idleStance, ztp->focusActor ? ztp->focusActor->id : 0, ztp->stateFlags1);
+        // Sub-variant (func_80839F90 is a 3-way dispatch, not one collapsed "ztarget" state): 0=none,
+        // 1=hostile-waitR, 2=hostile-waitL, 3=friendly/parallel. idleStance stays the legacy
+        // hostile-only bool for back-compat with the sweep's `idleStance=` field.
+        s32 variant = Zelda3D_PlayerZTargetStanceVariant(ztp);
+        static const char* kVariantName[] = { "none", "hostile-waitR", "hostile-waitL", "friendly-parallel" };
+        Zelda3D_ReplReply(outPath, "idleStance=%d variant=%d(%s) focusActor=0x%X st1=0x%x",
+                        idleStance, variant, kVariantName[(variant >= 0 && variant <= 3) ? variant : 0],
+                        ztp->focusActor ? ztp->focusActor->id : 0, ztp->stateFlags1);
     } else if (strcmp(cmd, "afreeze") == 0) {
         // GENERIC: pin the selected actor's transform every frame. 0=off, 1=pin pos+rot,
         // 2=pin position only (rotation free — e.g. so a held cucco's body shake stays visible).

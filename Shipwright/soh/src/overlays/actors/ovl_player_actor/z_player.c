@@ -7969,6 +7969,28 @@ s32 Zelda3D_PlayerIsZTargetIdleStance(Player* this) {
     return this->actionFunc == Player_Action_80840450;
 }
 
+// Richer ztarget-idle-stance query: func_80839F90 does NOT install one collapsed "ztarget" state — it
+// dispatches THREE ways, and the bare `== Player_Action_80840450` check above sees only the first.
+// Both action funcs are file-local to z_player.c, so the compare must live here. Returns:
+//   0 = not in any ztarget idle stance
+//   1 = HOSTILE lock-on stance, waitR  (Player_Action_80840450; func_80839E88 picked func_808334E4
+//                                       -> waitR, i.e. unk_870 < 0.5 — body angled right of target)
+//   2 = HOSTILE lock-on stance, waitL  (Player_Action_80840450; func_80833528 -> waitL, unk_870 >= 0.5)
+//   3 = FRIENDLY / parallel stance     (Player_Action_808407CC; func_80839F30 -> plain idle anim) — a
+//                                       DISTINCT state (NPC lock-on or Z-parallel with no hostile target)
+//                                       that the old idle-stance check collapsed away entirely.
+// The hostile waitR/waitL split follows the SAME unk_870 threshold func_80839E88 selects the anim with
+// (the strafe-side tracker Math_StepToF'd toward 0=R / 1=L by func_80840138).
+s32 Zelda3D_PlayerZTargetStanceVariant(Player* this) {
+    if (this->actionFunc == Player_Action_80840450) {
+        return (this->unk_870 < 0.5f) ? 1 : 2;
+    }
+    if (this->actionFunc == Player_Action_808407CC) {
+        return 3;
+    }
+    return 0;
+}
+
 void func_8083F070(Player* this, LinkAnimationHeader* anim, PlayState* play) {
     Player_SetupActionPreserveAnimMovement(play, this, Player_Action_8084C5F8, 0);
     LinkAnimation_PlayOnceSetSpeed(play, &this->skelAnime, anim, (4.0f / 3.0f));

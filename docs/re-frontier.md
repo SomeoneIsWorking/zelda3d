@@ -299,12 +299,12 @@ below, not duplicated).
 - notes: GET_PLAYER_ANIM resolves ANIMGROUP_put -> nml_put_free with no held item (faithful modelAnimType variant); put-down family selected correctly.
 
 ### player.ztarget-substates — func_80839F90 possible Z-idle sub-variants
-- status: todo
+- status: re-verified
 - deps: player.force-state-sweep
-- evidence: `docs/re_control_debug_backlog.md` item #5
-- where: 
-- gap: two unread entry branches may mean `ztarget` (currently one collapsed MATCH row) is actually several distinct states.
-- notes: LOW-MEDIUM priority per backlog.
+- evidence: `docs/re_control_debug_backlog.md` item #5 — func_80839F90 FULLY READ (2026-07-17): confirmed a 3-way dispatch, NOT one collapsed state. New `Zelda3D_PlayerZTargetStanceVariant` (z_player.c) + `ztargetstate` readout distinguish them. Live-verified variant 3 (friendly-parallel) on a townsfolk AND a not-yet-aggro'd spawned enemy — the state the old `idleStance` check reported as 0.
+- where: `func_80839F90` (z_player.c:5498); `Zelda3D_PlayerZTargetStanceVariant` (z_player.c) + REPL `ztargetstate variant=`.
+- gap: none — hypothesis confirmed: `ztarget` is (at least) TWO distinct states. HOSTILE lock-on (Player_Action_80840450) with a waitR/waitL anim split (func_808334E4/func_80833528, gated on unk_870), vs FRIENDLY/parallel (Player_Action_808407CC, plain idle) — a distinct state the bare pointer-compare collapsed. Hostile waitR/waitL is code-trace-definitive; live confirmation of the RED-reticle hostile lock isn't cleanly forceable headless (needs Navi hostile-attention state, not just an enemy-category focusActor — itself confirmed live: a spawned Stalchild still read friendly-parallel until aggro).
+- notes: the friendly-parallel variant means the sweep's single `ztarget` row conflates two OoT3D states; future coverage could add a hostile-stance row once a red-reticle lock is forceable (a new Force hook setting the hostile-attention state).
 
 ### player.real-ladder-geometry — func_8083EC18 real-ladder branch geometry
 - status: re-partial
