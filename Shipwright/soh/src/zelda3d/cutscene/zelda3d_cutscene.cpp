@@ -436,6 +436,11 @@ extern "C" int Zelda3D_TitleCsLoad(void) {
     }
     fprintf(stderr, "[Zelda3D] title cs loaded: %zu camera segments, end_frame=%d\n",
             sSpline.segments.size(), sEndFrame);
+    // Per-segment frame coverage — diagnoses camera-spline GAPS (frames covered by no segment fall
+    // back to the static default; see debug_journal/2026-07-15-epona-title-animation.md).
+    for (size_t si = 0; si < sSpline.segments.size(); ++si)
+        fprintf(stderr, "[Zelda3D]   cam seg %zu: frames (%d, %d)\n",
+                si, sSpline.segments[si].start, sSpline.segments[si].end);
     sLoadState = 1;
     return 1;
 }
@@ -445,6 +450,14 @@ extern "C" int Zelda3D_TitleCsEndFrame(void) { return sEndFrame; }
 extern "C" int Zelda3D_TitleCsCamera(int frame, float eye[3], float at[3],
                                      float up[3], float* fovDeg) {
     if (sLoadState <= 0 || !sSpline.ok) return 0;
+    // NOTE (2026-07-16): the segment seams (299/300, 929/930, ...) drop 2 frames each to the
+    // caller's static-default camera (strict `<` both ends). That IS a real per-boundary glitch, BUT
+    // the naive fix (`<=` both ends) REGRESSED: it put a seam's START frame into the NEXT segment,
+    // whose opening pose is a fresh shot (e.g. cs300 = seg1 opens looking down at grass) that does
+    // NOT match the oracle's render at that frame. So the OP97 spline this reads is NOT the oracle's
+    // render camera anyway (it tracks 0x005BE6D4, the spectator/basis slot — see the journal). The
+    // correct seam convention needs the oracle's REAL render camera to verify (blocked: that VA is
+    // unknown). Left strict until then rather than ship a verified-worse change.
     const Segment* seg = nullptr;
     for (const Segment& s : sSpline.segments) {
         if (s.start < frame && frame < s.end) { seg = &s; break; }

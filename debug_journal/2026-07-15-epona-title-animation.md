@@ -337,3 +337,30 @@ NEXT (the fix — needs care, not a bandaid): determine the correct gap behavior
 Confirm which against the oracle's actual camera at cs 300 before changing title_presentation's gap
 fallback. `soh_camera` now makes per-frame SoH camera A/B cheap; the oracle side still needs its real
 render-camera VA (not 0x005BE6D4).
+
+---
+
+## Update 2026-07-16 (fix attempted + REVERTED — the spline isn't the render camera): where it really stands
+
+Dumped the 8 camera-segment ranges (added per-seg logging to zelda3d_cutscene.cpp):
+`(0,299)(300,929)(930,1379)(1380,1619)(1620,1656)(1657,1776)(1777,2031)(2032,2455)`. The lookup
+`s.start < frame < s.end` (strict both ends) drops BOTH seam frames (299 AND 300, 929 AND 930, ...)
+to the caller's static default — a real per-seam glitch.
+
+Tried the naive fix `<=` both ends and VERIFIED it — it REGRESSED. At cs300 (`<=`) the lookup lands
+in seg1, whose opening pose renders LOOKING DOWN AT GRASS (soh_camera eye=(3921,-118,7460) matching
+0x005BE6D4 exactly), whereas the oracle at cs300 renders the rider+moon (a level shot). So:
+  - the OP97 spline `Zelda3D_TitleCsCamera` reads is NOT the oracle's render camera at seam-opening
+    frames — it matches 0x005BE6D4, i.e. the SPECTATOR/basis slot (soh3d-title-cam-handedness was
+    right). The static default (rider+moon, moon a bit low) was actually CLOSER to the oracle than
+    seg1 (grass).
+  - so `<=` shipped a verified-worse frame. REVERTED to strict `<` (documented in-code). No net
+    code-behavior change this tick; the tools + diagnosis are the deliverable.
+
+REAL STATE of the title-camera issue (honest): the rider is correct (matches oracle). The camera is
+wrong, but it's NOT a one-line seam fix — the ported spline's seam-opening poses don't match the
+oracle's render camera (a wrong-camera-data or seam-frame-alignment problem, e.g. the oracle's shot
+cut is a few frames off from SoH's seg starts). Fixing it needs the oracle's REAL render-camera VA
+(0x005BE6D4 is the spectator slot; the render camera VA is still unknown — a title-cam RE task with
+prior Ghidra-xref dead ends). Deprioritized vs gameplay. Tools now in place: `soh_camera` (SoH
+spline), per-seg range logging, `soh_rider`, and the oracle EnHorse read.
