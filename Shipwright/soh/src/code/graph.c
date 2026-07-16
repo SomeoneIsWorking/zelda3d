@@ -306,6 +306,15 @@ void Graph_Update(GraphicsContext* gfxCtx, GameState* gameState) {
           SohState_ApplyInputOverride(&gameState->input[0]); }
     GameState_Update(gameState);
 
+    // Zelda3D: keep the REPL FIFO alive in NON-Play gamestates (file select, opening, map select).
+    // Play polls it itself (z_play.c, with the live PlayState); this fallback fires only when that
+    // per-frame poll didn't run, so headless tooling can keep injecting keys / taking shots across
+    // the title -> file-select -> ingame route instead of going deaf outside Play (2026-07-16).
+    {
+        void Zelda3D_ReplPollNoPlay(void);
+        Zelda3D_ReplPollNoPlay();
+    }
+
     OPEN_DISPS(gfxCtx);
 
     gDPNoOpString(WORK_DISP++, "WORK_DISP 終了", 0);

@@ -222,6 +222,24 @@ static void Zelda3D_ReplExec(PlayState* play, char* line, const char* outPath) {
     if (sscanf(line, "%31s", cmd) != 1) {
         return;
     }
+    // NULL-play gate (non-Play gamestates: file select, opening, map select — the graph.c
+    // fallback poll). Only the play-free commands run; everything else replies instead of
+    // dereferencing a null PlayState. Keeps headless tooling (key injection, screenshots,
+    // logging) alive across the title -> file-select -> ingame route.
+    if (play == NULL) {
+        static const char* kPlayFree[] = { "key", "log", "fps", "dump", "inputdev", "menu", "help" };
+        int ok = 0;
+        for (size_t i = 0; i < sizeof(kPlayFree) / sizeof(kPlayFree[0]); i++) {
+            if (strcmp(cmd, kPlayFree[i]) == 0) {
+                ok = 1;
+                break;
+            }
+        }
+        if (!ok) {
+            Zelda3D_ReplReply(outPath, "%s: no playstate (non-Play gamestate; play-gated command)", cmd);
+            return;
+        }
+    }
     if (Zelda3D_LinkRepl(play, cmd, line, outPath)) {
         /* handled in zelda3d_link.cpp (all `link*` commands) */
     } else if (strcmp(cmd, "mul") == 0 && sscanf(line, "%*s %f", &f1) == 1) {
@@ -2418,7 +2436,10 @@ static double Zelda3D_ReplLogicFps(void) {
     return (w > 0.0) ? (sFpsCount - 1) / w : 0.0;
 }
 
+int gZelda3dReplPolledThisFrame = 0; // set by the Play-side poll; graph.c's fallback checks+clears
+
 void Zelda3D_ReplPoll(PlayState* play) {
+    if (play != NULL) gZelda3dReplPolledThisFrame = 1;
     static int fd = -2; // -2 uninit, -1 disabled
     static char outPath[1100];
     Zelda3D_ReplFpsTick();
@@ -2430,11 +2451,11 @@ void Zelda3D_ReplPoll(PlayState* play) {
 
     // Hotbar sync: keep the active hotbar slot's item on B button each frame so the SoH use-item
     // engine fires the right item when B is pressed.
-    Zelda3D_HotbarSync(play);
+    if (play != NULL) Zelda3D_HotbarSync(play);
 
     // PC HUD snapshot: copy gSaveContext HUD state into gZelda3dHudState so the native Vulkan HUD
     // (drawn on the render thread from Gui::EndFrame, where there is no PlayState) can read it.
-    Zelda3D_HudUpdateFrame(play);
+    if (play != NULL) Zelda3D_HudUpdateFrame(play);
 
     // Force time-of-day (e.g. day instead of night). Applied every frame, before the
     // FIFO handling, so it holds regardless of whether the REPL is connected.
@@ -2452,7 +2473,7 @@ void Zelda3D_ReplPoll(PlayState* play) {
     // it, `gcam 1`, `walkhold`.
     {
         extern int gZelda3dGCam;
-        if (gZelda3dGCam) {
+        if (gZelda3dGCam && play != NULL) {
             Camera* c = GET_ACTIVE_CAM(play);
             Player* pl = GET_PLAYER(play);
             if (c != NULL && pl != NULL) {
@@ -2472,7 +2493,7 @@ void Zelda3D_ReplPoll(PlayState* play) {
     // the floor height directly under Link (the installed colCtx, i.e. OoT3D collision by default).
     {
         extern char gZelda3dDiagText[512];
-        Player* pl = GET_PLAYER(play);
+        Player* pl = (play != NULL) ? GET_PLAYER(play) : NULL;
         if (pl != NULL) {
             Vec3f pos = { pl->actor.world.pos.x, pl->actor.world.pos.y, pl->actor.world.pos.z };
             Vec3f rc = { pos.x, pos.y + 50.0f, pos.z };
@@ -2695,7 +2716,7 @@ void Zelda3D_ReplPoll(PlayState* play) {
 
     // Hold the diagnostic camera: re-apply every frame so the engine's per-update
     // recompute doesn't reclaim it. up is forced to world +Y (an orbit never rolls).
-    if (gZelda3dCamOverride) {
+    if (gZelda3dCamOverride && play != NULL) {
         play->view.eye.x = gZelda3dCamEye[0];
         play->view.eye.y = gZelda3dCamEye[1];
         play->view.eye.z = gZelda3dCamEye[2];
@@ -2721,3 +2742,14 @@ void Zelda3D_ReplPoll(PlayState* play) {
 #ifdef __cplusplus
 } // extern "C"
 #endif
+
+// graph.c fallback (non-Play gamestates): poll the FIFO with play=NULL unless the Play-side
+// per-frame poll already ran this frame. Keeps the REPL responsive in file select / opening /
+// map select so headless tooling can drive the full title -> file-select -> ingame route.
+extern "C" void Zelda3D_ReplPollNoPlay(void) {
+    if (gZelda3dReplPolledThisFrame) {
+        gZelda3dReplPolledThisFrame = 0;
+        return;
+    }
+    Zelda3D_ReplPoll(NULL);
+}

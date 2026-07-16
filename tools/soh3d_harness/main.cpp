@@ -933,6 +933,27 @@ void HandleLoadState(std::istringstream& toks) {
 // "already booted"/"ok" REPL framing) from HandleStep's first invocation.
 // Caller must check !g_soh_booted first.
 void SohBootInternal() {
+    // Isolate the embedded SoH's WORKING DIRECTORY from the user's repo-root game files.
+    // The block below writes a fresh shipofharkinian.json into the cwd, and the embedded SoH
+    // itself saves its CVars/config back into cwd on exit — running the harness from the repo
+    // root was silently CLOBBERING the user's real config (controller keybinds included; found
+    // 2026-07-16 while chasing the "input is finicky" report). Everything the harness is given
+    // (ROM, states, snapshot paths) is absolute, so a one-time chdir into a scratch cwd is safe.
+    {
+        char cwd[1024];
+        if (getcwd(cwd, sizeof cwd)) {
+            std::string sohCwd = std::string(cwd) + "/scratch/harness/soh_cwd";
+            if (const char* ov = std::getenv("ZELDA3D_HARNESS_SOH_CWD")) sohCwd = ov;
+            std::error_code ec;
+            std::filesystem::create_directories(sohCwd, ec);
+            if (chdir(sohCwd.c_str()) == 0) {
+                std::fprintf(stderr, "harness: SoH cwd isolated -> %s\n", sohCwd.c_str());
+            } else {
+                std::fprintf(stderr, "harness: WARNING could not chdir to %s — the embedded SoH "
+                             "will read/WRITE shipofharkinian.json in the launch cwd\n", sohCwd.c_str());
+            }
+        }
+    }
     // The harness owns the display; SoH3D must render to fb 0 but NOT open
     // a visible window of its own. SOH_HEADLESS=1 makes libultraship's
     // SDL3 backend create its window HIDDEN, and rendering into fb 0 (which
