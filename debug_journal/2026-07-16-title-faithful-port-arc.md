@@ -82,3 +82,33 @@ exact f20–f22 uniform bits from a draw_log at the moon frame → `memscan` FCR
 → `watch` the hits → writer PC → Ghidra decompile (the method that solved the camera-basis
 writer; sessions 1–3's scalar-watch failures were the bulk-copy blind spot, session 4 already
 extracted the ground-truth values 640/1280 + per-layer depth).
+
+## 5b. Rider trajectory follow-up (2026-07-17) — diagnostic blocked; FUN_002535f0 read
+
+**The `tools/title_rider_traj.py --dense 1360:1700` diagnostic (§5 NEXT) is impractical with the
+current harness.** A default-plan run locks fine (titlesync LOCKED) but 240s of stepping reached
+only cs=188 (the first sample); reaching the cs≈1400–1700 mystery window is ~10× that and hits the
+known long-step fragility (memory `soh3d-harness-longstep-fragility`). So the oracle's per-frame
+motion over that window can't be cheaply sampled — the diagnostic needs a harness **seek-to-cs**
+(boot/settle closer to the window) before it's runnable, OR the mystery gets resolved statically.
+
+**Static read of FUN_002535f0 (the 0x41 cue handler, `oot3d-decomp/build/decomp/002535f0.c`):**
+it is an **ANIMATION-SETUP handler, not a position mover.** It (1) writes speed `+0x6c =
+fRam0025373c` (the 0.0 pool const — confirms §5's "zeroes speed"), then (2) sets up / plays an
+animation on the anim object at `+0x1c4` (FUN_0036ae14 = pick clip by `+0x1b0` index,
+FUN_003204a4 / FUN_00358338 = animation-change, and it writes anim frame/rate at `+0x1f8/0x1fc`
+and anim state at `+0x200/0x208/0x20c/0x210`, action byte `+0x234/0x235`). It never writes
+`world.pos` or sets up a position interpolator.
+
+**So the oracle translation during the 0x41 window is NOT from speed and NOT from this handler
+directly** — it is one of:
+  (a) **root motion of the animation FUN_002535f0 plays** (a walk/gallop clip whose root bone
+      translates the actor even at speed 0) — our port integrates position from speed only, so a
+      zero-speed clip leaves SoH's horse standing while the oracle's root-motion clip walks it; OR
+  (b) a **cue-window decode error** — the 0x41 window is not really (1380,1619], and a different,
+      moving cue is active there (the journal §5 original suspicion).
+
+NEXT (unblocked, no trajectory harness): check whether the clip FUN_002535f0 selects (via `+0x1b0`
+index into the table at `iRam00253750`) has baked root translation — if yes, (a) is the cause and
+the port must apply the clip's root motion to the horse pos, not just integrate speed. If the clip
+is in-place, fall back to (b) and re-derive the cue window/timebase from the cue table (§5 dump).
