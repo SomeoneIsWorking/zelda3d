@@ -145,8 +145,8 @@ foundational finding the whole arc depends on.
 - deps: title.rider-dispatch
 - evidence: `scratch/title_ab/seat4x_fix.{az,soh}.png` (same camera, oracle horse walking off bottom-right while SoH's stands at cue-6 p0); full cue table dump in `debug_journal/2026-07-16-title-faithful-port-arc.md` §5
 - where: `title_rider.cpp` step() + `zelda3d_cutscene.cpp` cue decode
-- gap: the oracle's horse translates during the 0x41 window (1380,1619] whose 3DS handler (FUN_002535f0) provably zeroes speed — cue decode (window/action/timebase) or cursor-sync suspect. `tools/title_rider_traj.py --dense 1360:1700` run pending.
-- notes: jump ruled out (see title.rider-dispatch notes / 2026-07-16 journal §3).
+- gap: the oracle's horse translates during the 0x41 window (1380,1619] whose 3DS handler (FUN_002535f0) provably zeroes speed. NARROWED 2026-07-17 (journal §5b): FUN_002535f0 is an ANIMATION-SETUP handler (zeroes speed + plays a clip via the +0x1c4 anim object / +0x1b0 index), NOT a position mover — so the oracle translation is either (a) **root motion of the played clip** (port integrates speed only → SoH stands), or (b) a **cue-window decode error**. The `--dense 1360:1700` diagnostic is BLOCKED: 240s of harness stepping reached only cs=188 (long-step fragility) — needs a harness seek-to-cs, OR resolve statically.
+- notes: jump ruled out (2026-07-16 journal §3). Next unblocked step (no trajectory harness): check whether the clip FUN_002535f0 selects has baked root translation — if yes, cause (a), port must apply clip root motion; if in-place, cause (b), re-derive the cue window/timebase. See journal §5b.
 
 ### title.epona-gallop-rate — title Epona gallop-rate + mounted-Link pose
 - status: re-verified
