@@ -283,12 +283,12 @@ below, not duplicated).
 - notes: this is the observation tool the camera.normal1 body port needs for its Kakariko A/B (confirm NORM1 is live before comparing eye-Y).
 
 ### player.swim-dive-gate — func_8083D12C underwater A-press dive gate
-- status: in-progress
+- status: re-verified
 - deps: player.force-state-sweep
-- evidence: `docs/re_control_debug_backlog.md` item #4
-- where: `Zelda3D_PlayerForceSwimDive` bypasses via direct `actionVar1=2` + `func_8083D330` force
-- gap: full condition set for the real A-press gate not yet read.
-- notes: 
+- evidence: `docs/re_control_debug_backlog.md` item #4 — gate FULLY READ (2026-07-17): dive iff `!GETTING_ITEM && !UNDERWATER && (arg2==NULL || (A-press && ABS(unk_6C2)<12000 && boots!=IRON))`. Verified live: `linkstate dive` → base CSAB `sw_swim` (the sweep expect).
+- where: `func_8083D12C` (z_player.c:6796-6859); `Zelda3D_PlayerForceSwimDive` (z_player.c:7802) installs the settled state directly.
+- gap: none — the gate condition set is read, and `ForceSwimDive` is confirmed a JUSTIFIED steady-state installer (not a bad bandaid): it reaches the same settled `Player_Action_8084DC48 + func_8083D330` swim-loop (`sw_swim`) the real gate settles into, deliberately skipping the one-shot `deep_start` entry flourish (can't settle under `freeze`). The skipped `DIVING` flag is HUD-only (dive-depth icon), no CSAB effect.
+- notes: no code change needed — the "bypass-the-gate bandaid" concern was resolved as not-a-bandaid once the gate was read; the force hook is correct for a deterministic frozen steady-state read.
 
 ### player.putdown-state — distinct "put down" state (func_8083EAF0)
 - status: re-verified
