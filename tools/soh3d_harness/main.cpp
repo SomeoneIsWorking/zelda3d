@@ -381,6 +381,20 @@ SDL_Window* g_win = nullptr;
 // 800x480 shipofharkinian.json window. Total SBS window = two 800-wide panels.
 int         g_win_w = 1600;  // total SBS width; ½ per engine
 int         g_win_h = 480;
+// Render-resolution multiplier for BOTH panels (ZELDA3D_HARNESS_RES_FACTOR, default 2):
+// Azahar's citra_resolution_factor and SoH's window are derived from it (400x240 * factor
+// each), so higher-res evidence crops (e.g. rider-seat A/B at 4x) stay like-for-like.
+int Zelda3D_HarnessResFactor(void) {
+    static int f = -1;
+    if (f < 0) {
+        f = 2;
+        if (const char* v = std::getenv("ZELDA3D_HARNESS_RES_FACTOR")) {
+            int n = std::atoi(v);
+            if (n >= 1 && n <= 8) f = n;
+        }
+    }
+    return f;
+}
 
 // Set when the SDL window's close-button (or WM close) fires OR the REPL
 // runs `quit`. The main-thread event loop watches for it and exits the
@@ -425,6 +439,8 @@ static bool HarnessHeadless() {
 void EnsureHarnessWindow() {
     if (g_win) return;
     if (HarnessHeadless()) return;
+    g_win_w = 2 * 400 * Zelda3D_HarnessResFactor(); // two SBS panels
+    g_win_h = 240 * Zelda3D_HarnessResFactor();
     if (!SDL_InitSubSystem(SDL_INIT_VIDEO)) {
         std::fprintf(stderr, "harness: SDL_InitSubSystem(VIDEO) failed: %s\n",
                      SDL_GetError());
@@ -567,7 +583,9 @@ bool EnvironmentCallback(unsigned cmd, void* data) {
             return true;
         }
         if (var->key && std::strcmp(var->key, "citra_resolution_factor") == 0) {
-            var->value = "2";
+            static char resBuf[4] = {0};
+            if (!resBuf[0]) std::snprintf(resBuf, sizeof(resBuf), "%d", Zelda3D_HarnessResFactor());
+            var->value = resBuf;
             return true;
         }
         // Only the 3DS top screen is useful for parity — bottom is UI, not
@@ -946,7 +964,7 @@ void SohBootInternal() {
         // black-out) headless by rendering at the same odd/HiDPI-scaled dims a
         // real windowed session would pick. Default 800x480 = 2x the 3DS top
         // screen (matches the Azahar Vulkan oracle).
-        int sohW = 800, sohH = 480;
+        int sohW = 400 * Zelda3D_HarnessResFactor(), sohH = 240 * Zelda3D_HarnessResFactor();
         if (const char* w = std::getenv("ZELDA3D_HARNESS_SOH_W")) { int v = std::atoi(w); if (v > 0) sohW = v; }
         if (const char* h = std::getenv("ZELDA3D_HARNESS_SOH_H")) { int v = std::atoi(h); if (v > 0) sohH = v; }
         std::FILE* f = std::fopen("shipofharkinian.json", "w");
