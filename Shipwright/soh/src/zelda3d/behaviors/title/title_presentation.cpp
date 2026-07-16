@@ -469,6 +469,25 @@ extern "C" void Zelda3D_Title_RiderApply(PlayState* play, Actor* actor) {
 // computed path pos/yaw (TitleRider::mPos/mYaw) AND the rendered EnHorse actor's world/shape yaw, so
 // a divergence between "what the path wants" and "what the horse renders as" is directly visible.
 // Returns 0 (nothing filled) when the title isn't active or the rider hasn't mounted yet.
+// Title-cs CAMERA introspection (harness `soh_camera`): the ported OP97 spline output
+// (Zelda3D_TitleCsCamera at the current cs frame) — the SoH title camera as SoH computes it,
+// bypassing gPlayState->cameraPtrs (unreliable at the title, wrong play-ptr). Lets the camera be
+// A/B'd against the oracle without the play-ptr gap. Returns 0 (title inactive), 1 (live spline
+// segment), 2 (held — frame outside all segments).
+extern "C" int Zelda3D_Title_CameraState(float* outEye, float* outAt, float* outUp, float* outFov) {
+    if (!Zelda3D::TitlePresentation::Instance().isActive())
+        return 0;
+    const int f = Zelda3D_TitleCsFrame();
+    float e[3] = {0,0,0}, a[3] = {0,0,0}, u[3] = {0,0,0}, fv = 0.0f;
+    int live = Zelda3D_TitleCsCamera(f, e, a, u, &fv);
+    if (!live) live = Zelda3D_TitleCsCamera(f > 0 ? f - 1 : 1, e, a, u, &fv); // hold last (segment gap)
+    if (outEye) { outEye[0]=e[0]; outEye[1]=e[1]; outEye[2]=e[2]; }
+    if (outAt)  { outAt[0]=a[0];  outAt[1]=a[1];  outAt[2]=a[2]; }
+    if (outUp)  { outUp[0]=u[0];  outUp[1]=u[1];  outUp[2]=u[2]; }
+    if (outFov) *outFov = fv;
+    return live ? 1 : 2;
+}
+
 extern "C" int Zelda3D_Title_RiderState(float* outPos, int* outComputedYaw, int* outHorseWorldYaw,
                                         int* outHorseShapeYaw) {
     auto& tp = Zelda3D::TitlePresentation::Instance();
