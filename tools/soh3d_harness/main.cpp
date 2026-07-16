@@ -4365,24 +4365,26 @@ void RunRepl() {
             std::printf("ok soh_depthdump %s\n", path.c_str());
         }
         else if (cmd == "az_camera") {
-            // Oracle 3DS title RENDER camera BASIS @0x005BE6D4: eye + forward(unit) + up(unit), 3
-            // consecutive Vec3f (RE'd by find_cam_eye.py; it's LIVE — moves with the demo). NOT
-            // play->view.eye+0x1B8 (that's the N64 PlayState offset — wrong for the 3DS oracle).
-            // The basis is LEFT-handed (up x forward), so the actual view direction is +forward.
-            // Pairs with soh_camera for the title-camera A/B.
+            // Oracle 3DS title camera basis @0x005BE6D4. CORRECT layout (oot3d-decomp
+            // title_basis_writer_jit_solved.md): +0x00 eye, +0x0C RIGHT, +0x18 up, +0x24 at-eye
+            // (the actual RH viewing direction). The old code read +0x0C as "dir" — that's the RIGHT
+            // vector, not forward. Reads all four; `fwd` = the +0x24 at-eye direction.
             auto& mem = Core::System::GetInstance().Memory();
             constexpr uint32_t AZ_CAM_VA = 0x005BE6D4;
-            float e[3]={0,0,0}, fwd[3]={0,0,0}, u[3]={0,0,0}; bool ok=true;
+            float e[3]={0}, rt[3]={0}, u[3]={0}, fwd[3]={0}; bool ok=true;
             for (int j=0;j<3;j++){
-                auto ev=mem.Read32OrNullopt(AZ_CAM_VA+0 +j*4);
-                auto fv=mem.Read32OrNullopt(AZ_CAM_VA+12+j*4);
-                auto uv=mem.Read32OrNullopt(AZ_CAM_VA+24+j*4);
-                if(!ev||!fv||!uv){ok=false;break;}
-                std::memcpy(&e[j],&*ev,4); std::memcpy(&fwd[j],&*fv,4); std::memcpy(&u[j],&*uv,4);
+                auto ev=mem.Read32OrNullopt(AZ_CAM_VA+0x00+j*4);
+                auto rv=mem.Read32OrNullopt(AZ_CAM_VA+0x0C+j*4);
+                auto uv=mem.Read32OrNullopt(AZ_CAM_VA+0x18+j*4);
+                auto fv=mem.Read32OrNullopt(AZ_CAM_VA+0x24+j*4);
+                if(!ev||!rv||!uv||!fv){ok=false;break;}
+                std::memcpy(&e[j],&*ev,4); std::memcpy(&rt[j],&*rv,4);
+                std::memcpy(&u[j],&*uv,4); std::memcpy(&fwd[j],&*fv,4);
             }
             if(!ok){ std::printf("ok az_camera unmapped\n"); continue; }
-            std::printf("ok az_camera eye=(%.1f,%.1f,%.1f) fwd=(%.3f,%.3f,%.3f) up=(%.3f,%.3f,%.3f)\n",
-                        e[0],e[1],e[2], fwd[0],fwd[1],fwd[2], u[0],u[1],u[2]);
+            std::printf("ok az_camera eye=(%.1f,%.1f,%.1f) fwd=(%.3f,%.3f,%.3f) right=(%.3f,%.3f,%.3f)"
+                        " up=(%.3f,%.3f,%.3f)\n",
+                        e[0],e[1],e[2], fwd[0],fwd[1],fwd[2], rt[0],rt[1],rt[2], u[0],u[1],u[2]);
         }
         else if (cmd == "soh_camera") {
             // Print the SoH ported title-cs camera (spline output) eye/at/up/fov + derived forward

@@ -424,3 +424,36 @@ Tools in place for the fix loop: ZELDA3D_DBG_TITLECAM (raw defs/eval/tracks), az
 basis @0x005BE6D4), soh_camera (SoH spline), CurrentPlayState title fallback (oracle title
 introspection), soh_rider. Nothing here is blocked — it's a bounded decomp-read of the at->forward
 map, then a verified port.
+
+---
+
+## Update 2026-07-16 (RESOLVED): title-cam matches the oracle; the bug was the SEAM fallback + a mislabeled vector
+
+The whole "camera divergence" was a MEASUREMENT ERROR. oot3d-decomp
+`title_basis_writer_jit_solved.md` gives the corrected 0x005BE6D4 layout:
+`+0x00 eye, +0x0C RIGHT, +0x18 up, +0x24 at-eye (the real view dir)`. Earlier passes (and my
+az_camera) read +0x0C (the RIGHT vector) as "forward" — so comparing SoH's real forward to the
+oracle's RIGHT of course diverged 90deg. Fixed az_camera to read +0x24.
+
+With the correct vector, the SoH title camera MATCHES the oracle:
+```
+             eye                     forward                   up
+cs320  SoH (3884,-108,7342)    (0.221,-0.323,-0.920)   (0.075,0.947,-0.314)
+       AZ  (3882,-107,7336)    (0.223,-0.324,-0.920)   (0.076,0.946,-0.314)   MATCH
+cs300  SoH (3921,-118,7460)    (0.182,-0.323,-0.929)   (0.062,0.946,-0.317)
+       AZ  (3920,-118,7454)    (0.184,-0.322,-0.929)   (0.063,0.947,-0.316)   MATCH
+```
+
+So the ONLY real defect was the SEAM handling: strict `s.start<frame<s.end` dropped both boundary
+frames of every seam (299/300, 929/930, ...) to the fixed static-default camera — 7 seams x 2 frames
+of a jarring camera jump = the user's "everything looks broken, bisectable frame by frame". The
+oracle at cs300 is already at seg1's opening (verified above), so the `<=`-inclusive lookup is
+correct and makes SoH match the oracle at the seams too. (My first `<=` attempt was reverted because
+I judged it against the RIGHT vector + eyeballed a 1-frame-desynced render — a false negative.)
+
+FIX (shipped this session): inclusive segment bounds in Zelda3D_TitleCsCamera. Verified: SoH camera
+eye/forward/up match the oracle within noise at both interior (cs320) and seam (cs300) frames. Rider
+was already correct. The title-demo camera now tracks the oracle across the whole cs.
+
+Tools left in place: az_camera (correct 0x005BE6D4 layout), soh_camera, ZELDA3D_DBG_TITLECAM,
+CurrentPlayState title fallback, soh_rider.
