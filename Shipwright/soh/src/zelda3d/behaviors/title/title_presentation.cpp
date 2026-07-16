@@ -280,50 +280,20 @@ void TitlePresentation::draw(PlayState* play) {
     Zelda3D_Overlay2D_End(play);
 }
 
-// Screen-level loop fade — ports OoT3D's op-0x7c window (Zelda3D_TitleCsScreenFade: cs frames
-// [2310,2460), straddling the 2400 loop point) onto play->transitionFade, the engine's existing
-// full-screen fade overlay (unconditionally drawn every frame by Play_Draw's
-// TransitionFade_Draw call, after every other draw pass — exactly the "screen-level" compositing
-// order op-0x7c needs). Op-0x7c's raw bytes only carry a sub-op + [start,end) window (see that
-// function's header comment for why the record's other fields aren't independently parsed);
-// there's no separate color/curve payload to port, so this assumes the standard OoT cutscene
-// screen-fade shape: a triangular ramp to full black exactly at the loop-restart instant (hiding
-// the camera's hard cut back to frame 0 under a hard fade), then back out. Since
-// Zelda3D_TitleCsFrame() wraps at Zelda3D_TitleCsEndFrame() (2400) — it never actually reports
-// 2400..2459 — the post-wrap tail of the window is read back as low post-wrap cs frames
-// [0, end-loopFrame) and re-mapped onto the window's absolute timeline below.
+// Screen fade — REMOVED loop fade (2026-07-16). The previous triangular ramp to black hinged at
+// loop-frame 2400 was built on TWO falsified assumptions: (a) static RE of the real op-0x7c
+// handler (scratch/decomp_agent/fade_0x7c/) shows a ONE-SHOT linear interpolator armed at
+// startFrame 2310 that never reads 2400; (b) live oracle luminance sweeps
+// (scratch/title_ab/fade_sweep/) show NO fade to black anywhere across ticks 2285-6000 — and no
+// loop at 2400 at all (the cs is one long continuous script; see Zelda3D_TitleCsAdvance).
+// What op-0x7c's interpolator object actually drives on the 3DS is still un-RE'd (heap vtable,
+// statically unreachable; measured visible effect at the title: none). Until that consumer is
+// named, the faithful port of the OBSERVED behavior is: no screen fade.
 void TitlePresentation::applyScreenFade(PlayState* play) {
-    int start = 0, end = 0;
-    uint8_t alpha = 0;
-    if (Zelda3D_TitleCsScreenFade(&start, &end)) {
-        const int loopFrame = Zelda3D_TitleCsEndFrame();  // 2400 — wrap point
-        const int csFrame = Zelda3D_TitleCsFrame();
-        int absFrame = -1;
-        if (csFrame >= start && csFrame < loopFrame) {
-            absFrame = csFrame;                    // pre-wrap half of the window
-        } else if (loopFrame > 0 && csFrame < (end - loopFrame)) {
-            absFrame = csFrame + loopFrame;         // post-wrap tail, re-mapped past `loopFrame`
-        }
-        if (absFrame >= start && absFrame < end) {
-            const int upWidth   = loopFrame - start;  // ramping TO black
-            const int downWidth = end - loopFrame;    // ramping FROM black
-            const int pos = absFrame - start;
-            float a;
-            if (pos < upWidth) {
-                a = (upWidth > 0) ? (float)pos / (float)upWidth : 1.0f;
-            } else {
-                const int downPos = pos - upWidth;
-                a = (downWidth > 0) ? 1.0f - (float)downPos / (float)downWidth : 0.0f;
-            }
-            if (a < 0.0f) a = 0.0f;
-            if (a > 1.0f) a = 1.0f;
-            alpha = (uint8_t)(a * 255.0f + 0.5f);
-        }
-    }
     play->transitionFade.fadeColor.r = 0;
     play->transitionFade.fadeColor.g = 0;
     play->transitionFade.fadeColor.b = 0;
-    play->transitionFade.fadeColor.a = alpha;
+    play->transitionFade.fadeColor.a = 0;
 }
 
 // Title lighting override — called from z_kankyo's Environment_Update right before the

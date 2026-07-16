@@ -30,9 +30,6 @@
 				<div class="section-heading">Graphics</div>
 				<!-- Curated, live toggles: SohRmlUi reads each `toggle` id's CVar/feature state on
 				     open and flips it (immediate + persisted) on Enter/A. -->
-				<select-button tabindex="auto" toggle="shadows"><key>Dynamic Shadows</key><value>On</value></select-button>
-				<select-button tabindex="auto" toggle="ao"><key>Ambient Occlusion</key><value>On</value></select-button>
-				<select-button tabindex="auto" toggle="lighting"><key>Scene Lighting</key><value>On</value></select-button>
 				<!-- Cycle row: 0 N64 model+anim / 1 3DS model + N64-retarget anim / 2 3DS model + 3DS anim. -->
 				<select-button tabindex="auto" cycle="linkmode"><key>Link Model / Anim</key><value>N64</value></select-button>
 				<!-- Generated stair step size: Small / Medium / Large (applies live to loaded scenes). -->

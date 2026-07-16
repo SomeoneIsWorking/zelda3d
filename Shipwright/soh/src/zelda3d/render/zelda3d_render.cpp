@@ -43,7 +43,6 @@ void Zelda3D_GL_SetLightDir(const float dirWorld[3]); // scene sun dir (world sp
 void Zelda3D_GL_SetLightParams(const float ambient[3], const float light1Col[3],
                               const float light2Dir[3], const float light2Col[3],
                               int numEnabledLights);
-void Zelda3D_GL_SetShadowFocus(float x, float y, float z); // per-frame world focus for the sun-shadow box
 void Zelda3D_GL_EmitPose(int modelId); // snapshot this actor's pose at emit time (per-item skinning)
 void Zelda3D_GL_SetMidMask(int modelId, unsigned long long mask); // per-frame mesh_id visibility (Link equipment)
 void Zelda3D_UpdateAnim(int modelId, const char* animName, float frame);
@@ -164,8 +163,6 @@ Actor* sZelda3dMotionActor = NULL; // pinned at asample time so reselecting does
 s32 sZelda3dMotionRemaining = 0;
 s32 sZelda3dMotionFrame = 0;
 
-static unsigned char zelda3d_lerp8(int a, int b, float t);
-static signed char zelda3d_lerp8s(int a, int b, float t);
 
 PlayState* sWarpPlay = NULL; // current PlayState for the floor callback (set per draw)
 
@@ -1211,23 +1208,7 @@ static void Zelda3D_DrawRoomGL(PlayState* play, int modelId) {
     Matrix_Translate(gZelda3dSceneOffX, gZelda3dSceneOffY, gZelda3dSceneOffZ, MTXMODE_NEW);
     Matrix_Scale(gZelda3dSceneScale, gZelda3dSceneScale, gZelda3dSceneScale, MTXMODE_APPLY);
     gSPMatrix(POLY_OPA_DISP++, MATRIX_NEWMTX(play->state.gfxCtx), G_MTX_MODELVIEW | G_MTX_LOAD);
-    if (gZelda3dWorldShade && gZelda3dScenePalette != 0) {
-        // #111: OoT3D world shade = saturate(ka*ambient + kd*light0Color) per channel, from OoT3D's
-        // own time-blended env palette. The day/night darkening lives in light0Color (the sun: noon
-        // ~255, dim ~63 at night) — ambient is ~constant (verified vs the Azahar oracle), so the N64
-        // flat tint (ambient + 0.5*lights) over-brightens night. This tracks the sun, fixing #111.
-        // ka/kd tunable live via REPL `worldshade ka/kd`. The room gets one shade (matches the
-        // existing single-tint architecture; per-vertex NdotL is a possible future refinement).
-        s32 i;
-        for (i = 0; i < 3; i++) {
-            float v = gZelda3dWorldShadeKa * (float)gZelda3dWorldShadeAmb[i] +
-                      gZelda3dWorldShadeKd * (float)gZelda3dWorldShadeL0Col[i] +
-                      gZelda3dWorldShadeKe * (float)gZelda3dWorldShadeL1Col[i];
-            tint[i] = (u8)(v <= 0.0f ? 0 : v >= 255.0f ? 255 : (int)(v + 0.5f));
-        }
-    } else {
-        Zelda3D_SceneTint(play, tint);
-    }
+    Zelda3D_SceneTint(play, tint);
     gSPZelda3DDraw(POLY_OPA_DISP++, modelId, tint[0], tint[1], tint[2]);
 
     CLOSE_DISPS(play->state.gfxCtx);
@@ -1731,47 +1712,6 @@ void Zelda3D_FogSetPosition(float fmin, float fmax) {
     gZelda3dFogOffset = (float)(int16_t)(int)((500.0f - fmin) * 256.0f / span);
 }
 
-// #111: compute the OoT3D-palette world shade in parallel with the N64 envCtx ambient. Called from
-// z_kankyo's OUTDOOR time-blend with the SAME slot indices + weights it uses for the N64 palette
-// (so no schedule logic is duplicated): the inner LERP is by w1 (intra-keyframe time), the outer by
-// w2 (weather cross-fade). No-op when this scene has no OoT3D palette. Slot bias resolves the
-// entry-0-metadata alignment (see gZelda3dWorldShadeSlotBias).
-static unsigned char zelda3d_lerp8(int a, int b, float t) {
-    float v = (float)a + ((float)b - (float)a) * t;
-    return (v <= 0.0f) ? 0 : (v >= 255.0f) ? 255 : (unsigned char)(v + 0.5f);
-}
-static signed char zelda3d_lerp8s(int a, int b, float t) {
-    float v = (float)a + ((float)b - (float)a) * t;
-    return (v <= -128.0f) ? -128 : (v >= 127.0f) ? 127 : (signed char)(v >= 0 ? v + 0.5f : v - 0.5f);
-}
-void Zelda3D_WorldShadeBlend(int a1, int b1, int a2, int b2, float w1, float w2) {
-    const Zelda3dLightSlot* p = gZelda3dScenePalette;
-    int n = gZelda3dScenePaletteN;
-    int j;
-    if (p == 0 || n <= 0) {
-        return;
-    }
-#define CLI(i) (((i) + gZelda3dWorldShadeSlotBias) < 0 ? 0 : (((i) + gZelda3dWorldShadeSlotBias) >= n ? n - 1 : ((i) + gZelda3dWorldShadeSlotBias)))
-    int ia1 = CLI(a1), ib1 = CLI(b1), ia2 = CLI(a2), ib2 = CLI(b2);
-#undef CLI
-    for (j = 0; j < 3; j++) {
-        gZelda3dWorldShadeAmb[j] = zelda3d_lerp8(
-            zelda3d_lerp8(p[ia1].amb[j], p[ib1].amb[j], w1),
-            zelda3d_lerp8(p[ia2].amb[j], p[ib2].amb[j], w1), w2);
-        gZelda3dWorldShadeL0Col[j] = zelda3d_lerp8(
-            zelda3d_lerp8(p[ia1].l0col[j], p[ib1].l0col[j], w1),
-            zelda3d_lerp8(p[ia2].l0col[j], p[ib2].l0col[j], w1), w2);
-        gZelda3dWorldShadeL1Col[j] = zelda3d_lerp8(
-            zelda3d_lerp8(p[ia1].l1col[j], p[ib1].l1col[j], w1),
-            zelda3d_lerp8(p[ia2].l1col[j], p[ib2].l1col[j], w1), w2);
-        gZelda3dWorldShadeL0Dir[j] = zelda3d_lerp8s(
-            zelda3d_lerp8s(p[ia1].l0dir[j], p[ib1].l0dir[j], w1),
-            zelda3d_lerp8s(p[ia2].l0dir[j], p[ib2].l0dir[j], w1), w2);
-        gZelda3dWorldShadeL1Dir[j] = zelda3d_lerp8s(
-            zelda3d_lerp8s(p[ia1].l1dir[j], p[ib1].l1dir[j], w1),
-            zelda3d_lerp8s(p[ia2].l1dir[j], p[ib2].l1dir[j], w1), w2);
-    }
-}
 
 void Zelda3D_UpdateLight(PlayState* play) {
     EnvLightSettings* ls = &play->envCtx.lightSettings;
@@ -1797,10 +1737,6 @@ void Zelda3D_UpdateLight(PlayState* play) {
             gZelda3dScenePaletteN = 0;
         }
     }
-    // Center the sun-shadow frustum on the camera's look-at point (covers whatever the player is
-    // looking at, even when Link is off to the side). Set every frame so the shadow box follows.
-    Zelda3D_GL_SetShadowFocus(play->view.lookAt.x, play->view.lookAt.y, play->view.lookAt.z);
-
     // Always push the real scene light colors + ambient so the shader lighting equation matches
     // OoT3D regardless of the lightdir override. All values live-interpolated by z_kankyo.c.
     {

@@ -1,4 +1,5 @@
 #include "SohRmlUi.h"
+#include <vector>
 
 #include "RmlUi_Platform_SDL.h"
 #ifdef ENABLE_SDL3GPU
@@ -25,9 +26,6 @@
 // GL pass reads each frame). The RML rows flip these directly for an immediate, visible effect and
 // persist the choice to a CVar (which the GL pass also reads to seed the global at first use).
 extern "C" {
-extern int gZelda3dShadowEnable;
-extern int gZelda3dAoEnable;
-extern int gZelda3dLightEnable;
 }
 
 // Debug-menu warp request: a row with `warp="<entrance>"` sets this to the target entrance index;
@@ -81,11 +79,10 @@ struct ToggleSpec {
     const char* cvar;
     int* live;
 };
-static const ToggleSpec kToggles[] = {
-    { "shadows", "gZelda3d.Shadows", &gZelda3dShadowEnable },
-    { "ao", "gZelda3d.AO", &gZelda3dAoEnable },
-    { "lighting", "gZelda3d.Lighting", &gZelda3dLightEnable },
-};
+// EMPTY since the custom shadow-map/SSAO/half-Lambert effects were removed (2026-07-16, user
+// directive: OoT3D lighting and shading only — there is nothing left to toggle). The machinery
+// stays for future REAL settings rows.
+static const std::vector<ToggleSpec> kToggles;
 static const ToggleSpec* FindToggle(const Rml::String& id) {
     for (const auto& t : kToggles) {
         if (id == t.id) {

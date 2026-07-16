@@ -246,8 +246,6 @@ static void interpSkinPose(const float* prev, const float* cur, const float* bin
 } // namespace
 
 // Character/prop lighting gate, toggled by zelda3d.c's REPL (`light 0|1`) and seeded from env
-// ZELDA3D_LIGHT. -1 = uninit (read env on first draw), 0 = off (flat tint), 1 = on (half-Lambert form).
-extern "C" int gZelda3dLightEnable = -1;
 // OoT3D world (scene) vertex-lit combiner port (docs/oot3d_world_lighting_re.md). 1 = on
 // (real PICA vertex lighting + per-material TEV scale for scene geometry), 0 = legacy
 // texture*vColor*uTint path. Toggle live via REPL `worldlit 0|1` for A/B vs the oracle.
@@ -308,25 +306,6 @@ extern "C" void Zelda3D_GL_SetLightParams(const float ambient[3], const float li
     }
     gZelda3dAmbientLightCount = (numEnabledLights > 0) ? (float)numEnabledLights : 1.0f;
 }
-
-// --- Dynamic shadow tunables (REPL `shadow*` in zelda3d.c; env ZELDA3D_SHADOW for the master gate) ---
-// -1 = uninit (read env on first pass), 0 = off, 1 = on. Default on.
-extern "C" int gZelda3dShadowEnable = -1;
-// 0 = only "lit" draws (characters/props) cast shadows -> clean character-on-ground shadows, no
-// ground self-shadow acne. 1 = scene geometry casts too (walls etc.), at the cost of self-shadowing.
-extern "C" int gZelda3dShadowCastAll = 0;
-// World-space focus point for the light frustum (the camera look-at target), set per frame by
-// zelda3d.c. hasFocus stays 0 until first set (no shadows on the title/no-scene frames).
-extern "C" float gZelda3dShadowFocus[3] = { 0.0f, 0.0f, 0.0f };
-extern "C" int gZelda3dShadowHasFocus = 0;
-extern "C" float gZelda3dShadowRadius = 600.0f;   // half-size of the ortho box around the focus (world units).
-                                                // 600 (was 240) covers distant actors so they cast shadows
-                                                // too — the small box clipped anything >240u from the look-at
-                                                // out of the shadow map (the "distant actors no shadow" bug).
-                                                // g_shadowRes bumped to 4096 to hold texel density. REPL `shadow rad`.
-extern "C" float gZelda3dShadowDist = 1600.0f;    // light "camera" pullback along the sun dir
-extern "C" float gZelda3dShadowBias = 0.0030f;    // depth-compare bias (acne vs peter-panning)
-extern "C" float gZelda3dShadowStrength = 0.55f;  // how dark the shadowed area gets (0..1)
 
 // OoT3D / N64 F3DEX fog (ported from envCtx.lightSettings + z_play.c gSPFogPosition), set each
 // frame by zelda3d.c Zelda3D_UpdateLight; read by both the GL and Vulkan world draws. Default on.
@@ -410,19 +389,7 @@ extern "C" float gZelda3dWorldAmbColor[3] = { 0.0f, 0.0f, 1.0f };
 extern "C" float gZelda3dWorldAmb = 0.02f;
 extern "C" int   gZelda3dWorldAmbOverride = 1; // colour is the scene constant, not the env feed
 
-extern "C" void Zelda3D_GL_SetShadowFocus(float x, float y, float z) {
-    gZelda3dShadowFocus[0] = x;
-    gZelda3dShadowFocus[1] = y;
-    gZelda3dShadowFocus[2] = z;
-    gZelda3dShadowHasFocus = 1;
-}
 
-// --- Ambient-occlusion tunables (REPL `ao*`; env ZELDA3D_AO master gate). -1 = uninit. ---
-extern "C" int gZelda3dAoEnable = -1;
-extern "C" float gZelda3dAoRadius = 22.0f;     // SSAO sample radius in PIXELS
-extern "C" float gZelda3dAoStrength = 0.7f;    // how dark fully-occluded fragments get (0..1)
-extern "C" float gZelda3dAoBias = 0.00040f;    // min depth delta to count an occluder (fights flat-surface noise)
-extern "C" float gZelda3dAoMaxDiff = 0.0090f;  // depth delta beyond which a neighbour is a silhouette, not a crease
 
 // Backface culling of OoT3D meshes (honor the CMB cull byte; matches N64 G_CULL_BACK so
 // the camera never sees terrain undersides / mesh interiors). gZelda3dFaceCull: -1 uninit
