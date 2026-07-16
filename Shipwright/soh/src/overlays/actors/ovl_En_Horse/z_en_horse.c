@@ -10,6 +10,7 @@
 #include "objects/object_hni/object_hni.h"
 #include "scenes/overworld/spot09/spot09_scene.h"
 #include "zelda3d/zelda3d.h" // Zelda3D_HoofDustWorldPos: posed-3DS hoof position for dust spawns
+#include "zelda3d/core/zelda3d_log.h" // Z3D_LOG(RIDER, ...) — #152 saddle/riderPos diagnostics
 #include <assert.h>
 #include <stdio.h>
 #include <stdlib.h>
@@ -3768,10 +3769,27 @@ void EnHorse_PostDraw(Actor* thisx, PlayState* play, Skin* skin) {
     f32 sp28;
 
     if (!(this->stateFlags & ENHORSE_CALC_RIDER_POS)) {
-        Skin_GetLimbPos(skin, 30, &riderOffset, &this->riderPos);
-        this->riderPos.x = this->riderPos.x - this->actor.world.pos.x;
-        this->riderPos.y = this->riderPos.y - this->actor.world.pos.y;
-        this->riderPos.z = this->riderPos.z - this->actor.world.pos.z;
+        float saddle[3];
+        if (Zelda3D_HorseSaddleOffset(thisx, saddle)) {
+            // #152: the horse draws as the OoT3D model playing a 3DS CSAB — its on-screen pose can
+            // diverge entirely from the N64 skin pose (title rear: N64 skelAnime idles while the
+            // 3DS clip rears). Anchor the rider to the DRAWN pose's rider-attach bone (joint 14 —
+            // OoT3D's own mechanism: EnHorse_Update FUN_0014a5a8 -> FUN_00408828(joint 0xE),
+            // oot3d-decomp/docs/en_horse_rider_pos.md); N64 limb path below stays the native-draw
+            // fallback.
+            this->riderPos.x = saddle[0];
+            this->riderPos.y = saddle[1];
+            this->riderPos.z = saddle[2];
+        } else {
+            Skin_GetLimbPos(skin, 30, &riderOffset, &this->riderPos);
+            this->riderPos.x = this->riderPos.x - this->actor.world.pos.x;
+            this->riderPos.y = this->riderPos.y - this->actor.world.pos.y;
+            this->riderPos.z = this->riderPos.z - this->actor.world.pos.z;
+        }
+        // `log rider 1` (#152 seat diagnosis): which pose is the seat anchored to?
+        Z3D_LOG(RIDER, "PostDraw riderPos=(%.1f,%.1f,%.1f) n64AnimFrame=%.2f animIdx=%d src=%s\n",
+                this->riderPos.x, this->riderPos.y, this->riderPos.z, this->skin.skelAnime.curFrame,
+                (int)this->animationIdx, Zelda3D_HorseSaddleOffset(thisx, saddle) ? "3ds-bone14" : "n64-limb30");
     } else {
         this->stateFlags &= ~ENHORSE_CALC_RIDER_POS;
     }
