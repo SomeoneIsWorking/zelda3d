@@ -18,6 +18,7 @@
 #include "asset/cmb_glgroups.h"   // shared CMB -> renderer GlGroup/texture converter
 #include "fast/zelda3d_gl.h"
 #include "zelda3d_model_internal.h" // LoadedModel + loadModel (shared with zelda3d_anim.cpp)
+#include "../core/zelda3d_log.h"
 #include <stb_image.h>
 #include "../scene/zelda3d_stairs.h" // procedural stair geometry (gZelda3dStairs, generateStairsGroup, ...)
 
@@ -453,9 +454,10 @@ static void loadSceneRoom(int modelId, LoadedModel* out) {
     buildFromCmb(out, /*bakedVertexColor=*/true, /*skipMesh=*/{}, /*stairs=*/true);
     fprintf(stderr, "[Zelda3D] loaded scene-room model %d (%s): %zu groups, %zu textures\n", modelId, path.c_str(),
            out->cGroups.size(), out->cTexs.size());
-    // #29 diagnostic: dump per-group material/texture + per-group bbox so the "untextured dome"
-    // group can be identified by index (pair with ZELDA3D_SOLOGROUP to isolate it visually).
-    if (getenv("ZELDA3D_DBG_ROOM")) {
+    // #29 diagnostic (`log room 1`): dump per-group material/texture + per-group bbox so the
+    // "untextured dome" group can be identified by index (pair with ZELDA3D_SOLOGROUP to isolate
+    // it visually).
+    if (Zelda3D_LogEnabled(Z3D_LOG_ROOM)) {
         const auto& texs = out->cmb->textures();
         for (size_t i = 0; i < out->cGroups.size(); i++) {
             const auto& g = out->groups[i];
@@ -464,10 +466,10 @@ static void loadSceneRoom(int modelId, LoadedModel* out) {
             float mn[3] = { 1e30f, 1e30f, 1e30f }, mx[3] = { -1e30f, -1e30f, -1e30f };
             for (const auto& v : g.verts)
                 for (int k = 0; k < 3; k++) { mn[k] = std::min(mn[k], v.pos[k]); mx[k] = std::max(mx[k], v.pos[k]); }
-            fprintf(stderr, "[Zelda3D_DBG_ROOM] grp%2zu mat%d tex%d %-18s verts%5zu mesh_id%d "
-                   "x[%.0f,%.0f] y[%.0f,%.0f] z[%.0f,%.0f]\n",
-                   i, g.material_index, ti, tn, g.verts.size(), g.mesh_id,
-                   mn[0], mx[0], mn[1], mx[1], mn[2], mx[2]);
+            Z3D_LOG(ROOM, "grp%2zu mat%d tex%d %-18s verts%5zu mesh_id%d "
+                    "x[%.0f,%.0f] y[%.0f,%.0f] z[%.0f,%.0f]\n",
+                    i, g.material_index, ti, tn, g.verts.size(), g.mesh_id,
+                    mn[0], mx[0], mn[1], mx[1], mn[2], mx[2]);
         }
     }
 }

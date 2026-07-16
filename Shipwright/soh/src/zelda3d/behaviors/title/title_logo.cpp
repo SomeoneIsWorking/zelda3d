@@ -71,6 +71,7 @@
 // equivalent of "the camera-basis technique" here is a single fixed basis, not the live one.
 #include "global.h"
 #include "title_logo.h"
+#include "../../core/zelda3d_log.h"
 #include "../../cutscene/zelda3d_cutscene.h"
 #include "../../model/zelda3d_overlay2d.h"
 
@@ -452,21 +453,16 @@ extern "C" void Zelda3D_TitleLogoStepSkip(PlayState* play) {
         }
     }
 
-    // Verification aid (ZELDA3D_DBG_TITLESKIP=1) — per-frame trace of the En_Mag-ported state
-    // machine: press edges, globalState/delayTimer, the snap-in override, and the transition.
-    // Prints only on a state change or a press so it doesn't flood a real terminal.
+    // Verification aid (`log titleskip 1`) — per-frame trace of the En_Mag-ported state machine:
+    // press edges, globalState/delayTimer, the snap-in override, and the transition. Prints only on
+    // a state change or a press so it doesn't flood a real terminal.
     {
-        static int sDbg = -1;
-        if (sDbg < 0) {
-            const char* v = std::getenv("ZELDA3D_DBG_TITLESKIP");
-            sDbg = (v != nullptr && v[0] != '\0') ? 1 : 0;
-        }
         static int sLastState = -1, sLastTimer = -1, sLastTrig = -1;
         const bool changed = pressed || gSkip.globalState != sLastState ||
                              gSkip.delayTimer != sLastTimer || play->transitionTrigger != sLastTrig;
-        if (sDbg && changed) {
-            fprintf(stderr,
-                    "[TITLESKIP] csFrame=%d pressed=%d phase=%d globalState=%d delayTimer=%d "
+        if (changed) {
+            Z3D_LOG(TITLESKIP,
+                    "csFrame=%d pressed=%d phase=%d globalState=%d delayTimer=%d "
                     "fadeInOverride=%d fadeOutStart=%d transitionTrigger=%d gameMode=%d\n",
                     csFrame, pressed ? 1 : 0, (int)natural.phase, gSkip.globalState, gSkip.delayTimer,
                     gTitleFadeInOverride, gSkip.fadeOutStartFrame, play->transitionTrigger,
@@ -584,18 +580,11 @@ extern "C" int Zelda3D_TryDrawTitleLogo(PlayState* play) {
         const float dy = 1.0f - 2.0f * t;
         const float dz = -0.5f - 0.5f * t;
         Zelda3D_GL_SetLightDirOverride(modelId, dx, dy, dz);
-        // Verification aid (ZELDA3D_DBG_SHEEN=1) — traces the sweep parameter/direction so the
-        // ramp can be confirmed from a log without relying on eyeballing a subtle (diffuse-only,
-        // no specular — see the block comment above) screen-space brightness change.
-        static int sDbg = -1;
-        if (sDbg < 0) {
-            const char* v = std::getenv("ZELDA3D_DBG_SHEEN");
-            sDbg = (v != nullptr && v[0] != '\0') ? 1 : 0;
-        }
-        if (sDbg) {
-            fprintf(stderr, "[SHEEN] csFrame=%d sheenT=%.2f t=%.3f dir=(%.3f,%.3f,%.3f)\n", csFrame,
-                    ps.sheenT, t, dx, dy, dz);
-        }
+        // Verification aid (`log sheen 1`) — traces the sweep parameter/direction so the ramp can
+        // be confirmed from a log without relying on eyeballing a subtle (diffuse-only, no
+        // specular — see the block comment above) screen-space brightness change.
+        Z3D_LOG(SHEEN, "csFrame=%d sheenT=%.2f t=%.3f dir=(%.3f,%.3f,%.3f)\n", csFrame,
+                ps.sheenT, t, dx, dy, dz);
     }
     //
     // The wordmark is a self-illuminated overlay (an authored fire-glow logo composited over the
@@ -612,25 +601,16 @@ extern "C" int Zelda3D_TryDrawTitleLogo(PlayState* play) {
     // cf(fadeIn+40), then +3.0/frame for 81 frames, snapping to 255; synchronized -10/frame
     // fade-out with the other two elements once flag 4 fires).
     const uint8_t alphaU8 = (uint8_t)(ps.wordmarkAlpha + 0.5f);
-    // Verification aid (ZELDA3D_DBG_WORDMARK_ALPHA=1) — traces the resolved wordmark alpha at the
-    // actual draw-call site, to confirm the runtime value matches the paper derivation at a given
-    // csFrame (e.g. csFrame=438 → wordmarkStart=fadeIn+40, elapsed=54, alpha=54*3=162/255=0.635).
+    // Verification aid (`log wordmark 1`) — traces the resolved wordmark alpha at the actual
+    // draw-call site, to confirm the runtime value matches the paper derivation at a given csFrame
+    // (e.g. csFrame=438 → wordmarkStart=fadeIn+40, elapsed=54, alpha=54*3=162/255=0.635).
     // The alpha value reaches the draw correctly on paper (zelda3d_sdl3gpu.cpp threads uExtra.x =
     // a8/255 into the fragment shader's alpha), but a measured composite-axis residual
     // (debug_journal/2026-07-11-attr-cs438-composite.md, gap 0.141) shows SoH's mid-fade letters are
     // ~0% dimmed vs the oracle's ~15% — so confirming the runtime alpha here is step 1 of ruling
     // alpha-value-correctness in or out before chasing the blend destination.
-    {
-        static int sDbgWma = -1;
-        if (sDbgWma < 0) {
-            const char* v = std::getenv("ZELDA3D_DBG_WORDMARK_ALPHA");
-            sDbgWma = (v != nullptr && v[0] != '\0') ? 1 : 0;
-        }
-        if (sDbgWma) {
-            fprintf(stderr, "[WORDMARK_ALPHA] csFrame=%d phase=%d wordmarkAlpha=%.2f alphaU8=%u\n",
-                    csFrame, (int)ps.phase, ps.wordmarkAlpha, (unsigned)alphaU8);
-        }
-    }
+    Z3D_LOG(WORDMARK, "csFrame=%d phase=%d wordmarkAlpha=%.2f alphaU8=%u\n",
+            csFrame, (int)ps.phase, ps.wordmarkAlpha, (unsigned)alphaU8);
     gSPZelda3DDrawA(POLY_OPA_DISP++, modelId | (int)ZELDA3D_HANDLE_FORCE_UNLIT | (int)ZELDA3D_HANDLE_SCREEN_SPACE,
                     alphaU8, 255, 255, 255);
     CLOSE_DISPS(play->state.gfxCtx);

@@ -4,6 +4,7 @@
 #include "zelda3d_input.h"
 
 #include "../zelda3d.h"
+#include "../core/zelda3d_log.h"
 #include "../player/zelda3d_link.h" // Zelda3D_LinkWalkInject — called from Zelda3D_WalkInject below
 #include "ship/Context.h"                              // #20 keyboard-inject verification shim
 #include "ship/controller/controldeck/ControlDeck.h"   // #20 ProcessKeyboardEvent path
@@ -274,7 +275,7 @@ void Zelda3D_WalkInject(PlayState* play) {
 }
 
 // ---------------------------------------------------------------------------------------------
-// Consolidated ZELDA3D_DBG_INPUT diagnostic gate. Was a private static `Zelda3dDbgInputEnabled()`
+// Consolidated input diagnostic gate (`log input 1`). Was a private static `Zelda3dDbgInputEnabled()`
 // lambda duplicated verbatim in both
 // Shipwright/libultraship/src/ship/controller/controldeck/ControlDeck.cpp (event-time) and
 // Shipwright/libultraship/src/libultraship/controller/controldeck/ControlDeck.cpp (poll-time).
@@ -282,9 +283,7 @@ void Zelda3D_WalkInject(PlayState* play) {
 // (libultraship does not include soh headers — one-directional dependency, same as
 // Zelda3D_MeasureResult / the native-HUD entry point in Gui.cpp).
 int Zelda3D_DbgInputEnabled(void) {
-    static const bool enabled = [] {
-        const char* e = std::getenv("ZELDA3D_DBG_INPUT");
-        return e != nullptr && e[0] == '1';
-    }();
-    return enabled ? 1 : 0;
+    // Routed through the diagnostic-logger registry (`log input 1` / ZELDA3D_LOG=input) — this
+    // extern stays because libultraship's ControlDeck call sites can't include soh headers.
+    return Zelda3D_LogEnabled(Z3D_LOG_INPUT);
 }
