@@ -457,6 +457,11 @@ extern "C" int Zelda3D_TitleCsEndFrame(void) { return sEndFrame; }
 extern "C" int Zelda3D_TitleCsCamera(float frame, float eye[3], float at[3],
                                      float up[3], float* fovDeg) {
     if (sLoadState <= 0 || !sSpline.ok) return 0;
+    // FREEZE past end_frame (title_sequence_full_re.md §1): the 3DS interpreter stops evaluating
+    // every command once curFrame exceeds end_frame(2400) — the spline HAS authored segments past
+    // 2400, but hardware never plays them. Hold the 2400 pose. (dayTime is NOT clamped — the
+    // continuous day flow is the ordinary Play tick, not a cs consumer.)
+    if (sEndFrame > 0 && frame > (float)sEndFrame) frame = (float)sEndFrame;
     // Segment select on the INTEGER frame (curve keys are integer-frame ranges); the fractional
     // part flows into the track Eval below for 60fps sub-frame interpolation (kanban #149).
     const int fi = (int)frame;
@@ -638,6 +643,9 @@ extern "C" int Zelda3D_TitleCsRiderCue(int frame, int* cueIndex,
                                        int16_t* yawBinang,
                                        uint16_t* outAction) {
     if (sLoadState <= 0) return 0;
+    // FREEZE past end_frame — same clamp as Zelda3D_TitleCsCamera (cues are authored to 3036 but
+    // the 3DS interpreter never plays past 2400; see title_sequence_full_re.md §1).
+    if (sEndFrame > 0 && frame > sEndFrame) frame = sEndFrame;
     int found = -1;
     for (size_t i = 0; i < sRiderCues.size(); i++) {
         const RiderCue& c = sRiderCues[i];
