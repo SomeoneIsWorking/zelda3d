@@ -1572,104 +1572,70 @@ int Zelda3D_TryDrawSunMoon(PlayState* play) {
         color = -y / 120.0f;
         if (color < 0.0f) color = 0.0f;
         if (Zelda3D_Title_IsActive()) {
-            // #146 item A: oot3d-decomp/docs/title_moon.md establishes the OoT3D title moon's
-            // model-space scale is a FIXED per-draw vertex-shader uniform (disc diagonal 640,
-            // halos 1280 — no dayTime dependence at all). SoH's `-15*color+25` elevation curve
-            // below is carried over unmodified from N64's Environment_DrawSunAndMoon and has no
-            // decomp anchor for the title path — replace it with a fixed constant here.
-            //
-            // The constant is ORACLE-ANCHORED, not guessed: a prior attempt picked 10.0 (the old
-            // formula's deep-night floor) and it regressed the already-verified az=200/soh=608
-            // calibration frame (see debug_journal/2026-07-10-title-moon-reimplementation.md §3-4).
-            // This session added a one-shot harness readback (`soh_moon`, tools/soh3d_harness) that
-            // reads envCtx.sunPos.y LIVE at that exact frame and recomputes this formula's own
-            // output verbatim: scale=19.0204 (color=0.3986). Using that measured value as the fixed
-            // replacement reproduces the calibration frame exactly instead of re-guessing a constant.
-            const f32 kMoonTitleFixedScale = 19.0204f;
-            scale = kMoonTitleFixedScale;
+            // Title: the N64 dayTime scale curve below is superseded by the RE'd parametric
+            // transform (kMoonRay* constants at the draw) — scale is unused on this path.
+            scale = 0.0f;
         } else {
             scale = (-15.0f * color) + 25.0f;
         }
         temp = -y / 80.0f;
         if (temp > 1.0f) temp = 1.0f;
         alpha = temp * 255.0f;
-        // #146: two ground-truth calibrations against Azahar (OoT3D), measured at
-        // CONTENT-MATCHED title frames (boot from title_settled + plain step*40; do
-        // NOT force soh_titlecs — that drives gSaveContext.dayTime and desyncs the
-        // moon's base scale/alpha vs a naturally-clocked Az frame).
-        //
-        // (1) DISC SIZE. The disc reuses the N64 sprite's VTX -31..32 quad * scale,
-        //     but OoT3D's moon subtends a SMALLER angular size than the N64 moon.
-        //     Circle-fit at the canonical moon-behind-rider shot: Az disc = 54.6px
-        //     (~25% of the 240px top screen); SoH's raw N64-scale disc renders
-        //     ~108px. kMoonDiscScale rescales to Az (0.505 -> 54.5px vs Az 54.6).
-        //
-        // (2) DISC/HALO OPACITY. Per-pixel combiner RE (sw-rasterizer TEV probe) shows
-        //     OoT3D draws all three moon quads TEXTURE-ONLY at full white: primary_color
-        //     feeding the Modulate stage = (255,255,255,255) and combined == texture on
-        //     every pixel. Halos are RGB565 (falloff baked into RGB, no alpha channel);
-        //     the disc is RGBA4 (real crescent alpha). So the FAITHFUL draw is prim 255.
-        //     The N64 night-fade `alpha` is used ONLY as the night VISIBILITY gate below.
-        //
-        // RESIDUAL (not tuned away): both engines' discs grow later in the title
-        // camera move, but SoH undershoots Az's growth by ~10% at the shot's end —
-        // the N64 dayTime-dependent scale (-15*color+25) doesn't track OoT3D's. A
-        // proper fix needs the OoT3D moon scale-over-time decompiled, not more
-        // constant tuning. 0.505/205 nails the primary reported shot.
-        const f32 kMoonDiscScale = 0.505f;
-        // Disc opacity STOPGAP (not faithful): faithful is prim 255 (above), but SoH decodes
-        // fine_moon0 (RGBA4) ~brighter than the asset, so 255 clips the disc to white (peak 255
-        // vs Az ~235) and loses crescent detail. 205 matches Az's disc peak; the REAL fix is the
-        // fine_moon0 decode, a residual (oot3d-decomp/docs/env_sun_moon_draw.md Session 4).
+        // Moon transform — PARAMETRIC GROUND TRUTH (oot3d-decomp/docs/title_sequence_full_re.md §3
+        // + env_sun_moon_draw.md session 4 uniform readback): all three layers lie on ONE view ray:
+        //   disc  : distance D = 2684.47, authored model scale 640.0 (exact; unit ±0.5 quad)
+        //   haloA : distance D·(1+1/30), scale 1280.0 (exact 2×) — fine_moon1, additive
+        //   haloB : distance D·(1−1/30), scale 1280.0            — fine_moon2, additive
+        // Our N64 sprite quad spans -31..32 (63 world units at scale 1), so the per-layer draw
+        // scale = authoredScale / 63. Color is (255,255,255,255) — zero modulation; the textures
+        // carry all shape/alpha (disc RGBA4, halos RGB565 with falloff baked into RGB).
+        const f32 kMoonRayDist       = 2684.47f;         // D, view-ray distance (uniform readback)
+        const f32 kMoonRayDepthSplit = 1.0f / 30.0f;     // halo depth offsets = ±D/30
+        const f32 kMoonN64QuadWidth  = 63.0f;            // our sprite mesh: VTX -31..32
+        const f32 kMoonDiscDrawScale = 640.0f / kMoonN64QuadWidth;
+        const f32 kMoonHaloDrawScale = 1280.0f / kMoonN64QuadWidth;
+        // Disc opacity STOPGAP (not faithful): faithful is 255, but SoH decodes fine_moon0 (RGBA4)
+        // ~brighter than the console texture, so 255 clips the crescent to white (peak 255 vs Az
+        // ~235). 205 matches Az's disc peak; the REAL fix is the fine_moon0 decode
+        // (oot3d-decomp/docs/env_sun_moon_draw.md session 4, quantified caveat).
         const u8  kMoonDiscAlpha = 205;
-        // Halo scale GROUND TRUTH: OoT3D vertex-shader model-matrix uniforms give disc
-        // diagonal-scale 640 and BOTH halos 1280 = exactly 2.0x (byte-exact 2:1) in MODEL
-        // space. But OoT3D sits the quads at different z (disc -2684, inner -2774 behind,
-        // outer -2595 front), which SoH does NOT reproduce (all far-plane pinned) — so the
-        // model-space 2.0x/2.0x does not match the on-screen ratio after perspective divide.
-        // Session 4 (oot3d-decomp/docs/env_sun_moon_draw.md) re-read the vertex-shader
-        // model-matrix output at the canonical shot and derived the actual ON-SCREEN ratios:
-        // inner glow (drawn first, farther) ~1.94x, outer glow (drawn last, nearer) ~2.07x.
-        // Ported directly (not hand-tuned) as the per-layer on-screen scale replacing the
-        // single model-space 2.0x.
-        const f32 kMoonHaloScaleInner = 1.94f;
-        const f32 kMoonHaloScaleOuter = 2.07f;
         if (alpha > 0.0f && moonId >= 0) {
-            // Faithful port of OoT3D's 3-layer moon composition
-            // (RE'd via draw-log; see Zelda3D_MoonInnerHaloId comment).
-            const f32 moonWorldX = play->view.eye.x - play->envCtx.sunPos.x;
-            const f32 moonWorldY = play->view.eye.y - play->envCtx.sunPos.y;
-            const f32 moonWorldZ = play->view.eye.z - play->envCtx.sunPos.z;
-            const u8  aA         = kMoonDiscAlpha;
-            const f32 discScale  = scale * kMoonDiscScale;
+            // One shared view ray from the camera toward the moon (moon direction = -sunPos;
+            // envCtx.sunPos is the SUN offset from the eye, N64-identical trig).
+            f32 mdx = -play->envCtx.sunPos.x, mdy = -play->envCtx.sunPos.y, mdz = -play->envCtx.sunPos.z;
+            const f32 mlen = sqrtf(mdx * mdx + mdy * mdy + mdz * mdz);
+            if (mlen > 1e-3f) { mdx /= mlen; mdy /= mlen; mdz /= mlen; }
+            const f32 ex = play->view.eye.x, ey = play->view.eye.y, ez = play->view.eye.z;
+            const u8  aA = kMoonDiscAlpha;
 
-            // Layer 1: fine_moon1 (inner glow) — ADDITIVE, 2.0× disc, full-white (texture-only).
+            // Layer 1: fine_moon1 (inner glow) — ADDITIVE, farther along the ray (behind the disc).
             int m1 = Zelda3D_MoonInnerHaloId();
             if (m1 >= 0) {
-                f32 s1 = discScale * kMoonHaloScaleInner;
-                Matrix_Translate(moonWorldX, moonWorldY, moonWorldZ, MTXMODE_NEW);
+                const f32 d1 = kMoonRayDist * (1.0f + kMoonRayDepthSplit);
+                Matrix_Translate(ex + mdx * d1, ey + mdy * d1, ez + mdz * d1, MTXMODE_NEW);
                 Matrix_Mult(&play->billboardMtxF, MTXMODE_APPLY);
-                Matrix_Scale(s1, s1, s1, MTXMODE_APPLY);
+                Matrix_Scale(kMoonHaloDrawScale, kMoonHaloDrawScale, kMoonHaloDrawScale, MTXMODE_APPLY);
                 gSPMatrix(POLY_OPA_DISP++, MATRIX_NEWMTX(play->state.gfxCtx),
                           G_MTX_MODELVIEW | G_MTX_LOAD);
                 gSPZelda3DDrawA(POLY_OPA_DISP++, m1 | (1 << 30), 255, 255, 255, 255);
             }
 
-            // Layer 2: fine_moon0 (crescent disc) — ALPHA-blend, base scale.
-            Matrix_Translate(moonWorldX, moonWorldY, moonWorldZ, MTXMODE_NEW);
+            // Layer 2: fine_moon0 (crescent disc) — ALPHA-blend, at D.
+            Matrix_Translate(ex + mdx * kMoonRayDist, ey + mdy * kMoonRayDist, ez + mdz * kMoonRayDist,
+                             MTXMODE_NEW);
             Matrix_Mult(&play->billboardMtxF, MTXMODE_APPLY);
-            Matrix_Scale(discScale, discScale, discScale, MTXMODE_APPLY);
+            Matrix_Scale(kMoonDiscDrawScale, kMoonDiscDrawScale, kMoonDiscDrawScale, MTXMODE_APPLY);
             gSPMatrix(POLY_OPA_DISP++, MATRIX_NEWMTX(play->state.gfxCtx),
                       G_MTX_MODELVIEW | G_MTX_LOAD);
             gSPZelda3DDrawA(POLY_OPA_DISP++, moonId | (1 << 30), aA, 255, 255, 255);
 
-            // Layer 3: fine_moon2 (outer glow) — ADDITIVE, 2.0× disc, full-white (texture-only).
+            // Layer 3: fine_moon2 (outer glow) — ADDITIVE, nearer along the ray (in front).
             int m2 = Zelda3D_MoonOuterHaloId();
             if (m2 >= 0) {
-                f32 s2 = discScale * kMoonHaloScaleOuter;
-                Matrix_Translate(moonWorldX, moonWorldY, moonWorldZ, MTXMODE_NEW);
+                const f32 d2 = kMoonRayDist * (1.0f - kMoonRayDepthSplit);
+                Matrix_Translate(ex + mdx * d2, ey + mdy * d2, ez + mdz * d2, MTXMODE_NEW);
                 Matrix_Mult(&play->billboardMtxF, MTXMODE_APPLY);
-                Matrix_Scale(s2, s2, s2, MTXMODE_APPLY);
+                Matrix_Scale(kMoonHaloDrawScale, kMoonHaloDrawScale, kMoonHaloDrawScale, MTXMODE_APPLY);
                 gSPMatrix(POLY_OPA_DISP++, MATRIX_NEWMTX(play->state.gfxCtx),
                           G_MTX_MODELVIEW | G_MTX_LOAD);
                 gSPZelda3DDrawA(POLY_OPA_DISP++, m2 | (1 << 30), 255, 255, 255, 255);
