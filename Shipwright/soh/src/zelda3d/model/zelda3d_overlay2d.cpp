@@ -32,7 +32,7 @@ extern "C" void Zelda3D_Overlay2D_Begin(PlayState* play, float refW, float refH)
     // enough that any caller z never clips.
     guOrtho(ortho, 0.0f, refW, refH, 0.0f, 1000.0f, -1000.0f, 1.0f);
     OPEN_DISPS(gfxCtx);
-    gSPMatrix(POLY_OPA_DISP++, ortho, G_MTX_NOPUSH | G_MTX_LOAD | G_MTX_PROJECTION);
+    gSPMatrix(OVERLAY_DISP++, ortho, G_MTX_NOPUSH | G_MTX_LOAD | G_MTX_PROJECTION);
     // #146 item B: give this pass its OWN depth scope instead of disabling depth entirely.
     // gSPClearGeometryMode(G_ZBUFFER) below is the legacy Fast3D signal (kept for any interleaved
     // N64 geometry) but has NO effect on the OoT3D CMB models this pass actually draws — those go
@@ -52,11 +52,11 @@ extern "C" void Zelda3D_Overlay2D_Begin(PlayState* play, float refW, float refH)
     // depth-write override on the CMB materials themselves (still statically false/true as
     // authored — depth WRITE is still governed by the CMB's own material flags, this fixes the
     // buffer's *starting state*, not per-material write behavior).
-    gSPZelda3DClearDepth(POLY_OPA_DISP++);
+    gSPZelda3DClearDepth(OVERLAY_DISP++);
     // No depth test/write against the already-finished 3D scene's Z-buffer — this pass composites
     // purely by draw order (same reasoning z_eff_blure.c/z_eff_spark.c already use G_ZBUFFER
     // clears for their own screen-relative effects).
-    gSPClearGeometryMode(POLY_OPA_DISP++, G_ZBUFFER);
+    gSPClearGeometryMode(OVERLAY_DISP++, G_ZBUFFER);
     CLOSE_DISPS(gfxCtx);
 }
 
@@ -117,7 +117,7 @@ extern "C" void Zelda3D_Overlay2D_PlaceModel(PlayState* play, float cxPx, float 
     Matrix_Translate(cxPx, cyPx, 0.0f, MTXMODE_NEW);
     Matrix_RotateX(kOverlayFixedRotX, MTXMODE_APPLY);
     Matrix_Scale(scale, scale, scale, MTXMODE_APPLY);
-    gSPMatrix(POLY_OPA_DISP++, MATRIX_NEWMTX(gfxCtx), G_MTX_MODELVIEW | G_MTX_LOAD);
+    gSPMatrix(OVERLAY_DISP++, MATRIX_NEWMTX(gfxCtx), G_MTX_MODELVIEW | G_MTX_LOAD);
     CLOSE_DISPS(gfxCtx);
 }
 
@@ -127,9 +127,9 @@ extern "C" void Zelda3D_Overlay2D_End(PlayState* play) {
     }
     GraphicsContext* gfxCtx = play->state.gfxCtx;
     OPEN_DISPS(gfxCtx);
-    gSPSetGeometryMode(POLY_OPA_DISP++, G_ZBUFFER);
+    gSPSetGeometryMode(OVERLAY_DISP++, G_ZBUFFER);
     if (play->view.projectionPtr != nullptr) {
-        gSPMatrix(POLY_OPA_DISP++, play->view.projectionPtr, G_MTX_NOPUSH | G_MTX_LOAD | G_MTX_PROJECTION);
+        gSPMatrix(OVERLAY_DISP++, play->view.projectionPtr, G_MTX_NOPUSH | G_MTX_LOAD | G_MTX_PROJECTION);
     }
     CLOSE_DISPS(gfxCtx);
 }
