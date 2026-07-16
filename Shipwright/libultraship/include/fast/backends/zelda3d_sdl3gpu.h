@@ -107,16 +107,6 @@ struct PipeKey {
     }
 };
 
-// One captured depth draw (shadow caster / AO occluder), replayed inside an own offscreen pass.
-struct DepthDraw {
-    SDL_GPUGraphicsPipeline* pipeline;
-    SDL_GPUTexture* tex; // for the alpha-test discard
-    SDL_GPUSampler* samp;
-    SDL_GPUBuffer* vbo;
-    uint32_t first, count;
-    std::array<uint8_t, sizeof(Zelda3DSg::SgUbo)> ubo;
-};
-
 // The OoT3D skinned-model + dynamic sun-shadow + SSAO renderer. Holds every former file-scope `g_*`
 // of zelda3d_sdl3gpu.cpp as a data member with the same name. Methods borrow the backend (device,
 // AppendZelda3DModelDraw / AppendZelda3DFullscreen / AppendZelda3DOwnPass, GpuColorFormat, ...) via the
@@ -133,17 +123,6 @@ class Zelda3DRenderer {
                    const void* matTex, const void* matConst, int forceUnlit, const float* lightDirOv = nullptr,
                    const float* sphRotOv = nullptr);
     void EndPass();
-    int BeginShadowPass();
-    void ShadowCasterDraw(int modelId, const float* mp16, const float* mv16, const float* boneData, int boneCnt,
-                          unsigned long long midMask);
-    void ShadowCasterTris(const float* worldXYZ, size_t triCount, const float* lightVP16);
-    void EndShadowPass();
-    void SetShadow(int on, const float* lightVP16);
-    int BeginDepthPrepass();
-    void DepthPrepassDraw(int modelId, const float* mp16, const float* mv16, int invertY, float aspectAdj,
-                          const float* boneData, int boneCnt, unsigned long long midMask, int sky);
-    void EndDepthPrepass();
-    void AoComposite();
     void ClearOverlayDepth(); // #146 item B — fullscreen depth-only reset, in-pass, no color write.
 
     // ---- internal helpers (former anonymous-namespace functions) ----
@@ -158,13 +137,7 @@ class Zelda3DRenderer {
     void applyPendingEvict();
     SDL_GPUShader* makeShader(const char* glsl, EShLanguage stage, uint32_t numSamplers, uint32_t numUbo);
     SDL_GPUGraphicsPipeline* getDepthPipeline(bool doCull, int frontCW);
-    bool ensureShadowAoResources();
     bool ensureOverlayDepthResources(); // #146 item B
-    SDL_GPUTexture* makeDepthTarget(uint32_t w, uint32_t h, SDL_GPUTextureFormat fmt, SDL_GPUTextureUsageFlags usage);
-    bool ensureShadowTargets(uint32_t dim);
-    bool ensureAoTargets(uint32_t w, uint32_t h);
-    void recordDepthGroups(std::vector<DepthDraw>& out, int modelId, const float* mp16, const float* mv16, int invertY,
-                           float aspectAdj, const float* boneData, int boneCnt, unsigned long long midMask);
 
     // ---- state (former module globals; names unchanged) ----
     std::unordered_map<int, SgModel> g_models;
@@ -191,39 +164,6 @@ class Zelda3DRenderer {
     // Deferred model eviction (mirror of the GL/VK path).
     int g_evictLo = 0, g_evictHi = 0;
     bool g_evictPending = false;
-
-    // ---- M4 module state (shadow + SSAO) ----
-    bool g_sgAoResReady = false;
-    SDL_GPUShader* g_depthFrag = nullptr;
-    SDL_GPUShader* g_aoCompVert = nullptr;
-    SDL_GPUShader* g_aoCompFrag = nullptr;
-    SDL_GPUGraphicsPipeline* g_aoCompPipe = nullptr;
-    std::map<uint32_t, SDL_GPUGraphicsPipeline*> g_depthPipes; // key (doCull<<1)|frontCW
-    SDL_GPUSampler* g_shadowSampler = nullptr;                 // nearest + clamp
-
-    SDL_GPUTexture* g_shadowColor = nullptr; // R32F sun-shadow depth (sampled by the model frag)
-    SDL_GPUTexture* g_shadowZ = nullptr;     // transient D32F z-test
-    uint32_t g_shadowDim = 0;
-
-    SDL_GPUTexture* g_aoColor = nullptr; // R32F camera depth (sampled by the SSAO composite)
-    SDL_GPUTexture* g_aoZ = nullptr;     // transient D32F z-test
-    uint32_t g_aoW = 0, g_aoH = 0;
-
-    SDL_GPUBuffer* g_n64CasterBuf = nullptr; // per-frame N64 opaque caster triangle soup (shadow)
-    uint32_t g_n64CasterCap = 0;
-
-    // Per-RenderPass shadow state (set by SetShadow, consumed by DrawModel).
-    bool g_sgShadowOn = false;
-    float g_sgLightVP[16] = { 1, 0, 0, 0, 0, 1, 0, 0, 0, 0, 1, 0, 0, 0, 0, 1 };
-
-    // Per-pass phase flags + accumulators.
-    bool g_sgShadowPassActive = false;
-    bool g_sgAoPassActive = false;
-    bool g_sgAoReady = false; // an AO depth pass produced occluders this frame -> composite is valid
-    std::vector<DepthDraw> g_shadowDraws;
-    std::vector<DepthDraw> g_aoDraws;
-    SDL_GPUViewport g_aoVp{};
-    SDL_Rect g_aoSc{};
 
     // #146 item B: fullscreen depth-only reset (Zelda3D_Overlay2D_Begin's depth scope). A minimal
     // pipeline: color_write_mask=0 (composited 3D scene color untouched), depth test ALWAYS +

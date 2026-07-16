@@ -38,43 +38,6 @@ float gZelda3dTintDiff = 0.5f; // diffuse fraction in the flat scene tint
 float gZelda3dTintMul = 1.0f;  // overall tint brightness multiplier
 int gZelda3dEnabled = -1;      // -1 = uninit (read env), 0/1 = OoT3D render off/on
 
-// #111 OoT3D world vertex-lighting port. When gZelda3dWorldShade != 0, scene/room geometry's SHADE
-// (the tint passed to the world frag) is driven by OoT3D's own time-blended env palette
-// (gZelda3dWorldShade*, computed in z_kankyo from the kZelda3dSceneLighting palette) instead of the N64
-// flat tint (Zelda3D_SceneTint, which over-brightens at night — #111). This is SEPARATE from
-// gZelda3dWorldLit (zelda3d_gl.cpp, default on) which gates the increment-1 combiner SCALE + #110 floor.
-// Default 0 (no-op) until verified live vs the oracle. REPL `worldshade`.
-int gZelda3dWorldShade = 0;
-// OoT3D-palette time-blended world light, written each frame by the z_kankyo hook (parallel to the
-// N64 envCtx.lightSettings blend, using the same time schedule). RGB 0..255.
-unsigned char gZelda3dWorldShadeAmb[3] = { 80, 80, 80 };
-unsigned char gZelda3dWorldShadeL0Col[3] = { 255, 255, 255 };
-unsigned char gZelda3dWorldShadeL1Col[3] = { 255, 255, 255 };
-signed char gZelda3dWorldShadeL0Dir[3] = { 0, 127, 0 };
-signed char gZelda3dWorldShadeL1Dir[3] = { 0, -127, 0 };
-// Current scene's OoT3D env palette pointer is defined just after zelda3d_scene_lighting.inc (where the
-// Zelda3dLightSlot type becomes visible). Slot count + tunables live here (no struct dependency).
-int gZelda3dScenePaletteN = 0;
-// OoT3D entry 0 is a metadata blob that the RUNTIME drops, so runtime slot i = ZSI entry (i+1).
-// Confirmed vs the live Azahar oracle (oot3d-decomp ram_map.md): noon N64-slot1 -> OoT3D entry2.
-// So bias = +1 aligns the N64 z_kankyo schedule index with the matching OoT3D entry. Tunable live
-// (REPL `worldshade bias <n>`).
-int gZelda3dWorldShadeSlotBias = 1;
-// #111 world-shade model coefficients (REPL `worldshade ka/kd/ke <f>`). The day/night darkening is
-// carried by light0Color (the sun: noon ~255, night ~63), NOT the ~constant ambient; light1Color is
-// the cool moonlight FILL (night ~(99,170,219) green+blue) that keeps night G/B up. World shade =
-// saturate(ka*ambient + kd*light0Color + ke*light1Color) per channel.
-// ka=0 (STRUCTURAL FIX, measured 2026-06-24p): the Kokiri ambient is red-dominant (160,72,72; G,B
-// pinned ~72), so a non-zero ka folds that red into a MULTIPLICATIVE tint and DE-GREENS noon grass
-// (live A/B at a pinned grass frame: ka=0.16 dropped noon G/R 1.19->1.12 AND dimmed it 63->54). The
-// reddish ambient belongs in the ADDITIVE #110 floor, not the multiply, so ka=0 here. kd~0.9 keeps
-// the sun (l0col ~white at noon) at ~oracle brightness; night l0col~(63,63,99) still darkens R
-// (night/noon R 0.28, oracle 0.34) = the #111 fix. ke lifts night G/B via the moon fill. The
-// residual (night G ratio 0.32 vs oracle 0.55) is irreducible with a single global tint and is a
-// #110-floor follow-up, NOT more coefficient grinding ([[zelda3d-stop-microtuning-lighting]]).
-float gZelda3dWorldShadeKa = 0.0f;
-float gZelda3dWorldShadeKd = 0.9f;
-float gZelda3dWorldShadeKe = 0.12f;
 
 // Live debug orientation (degrees) applied in the direct-GL draw (Zelda3D_EmitModelDraw)
 // BEFORE the model, so a correct in-game rest->upright orientation can be found over the
@@ -132,7 +95,6 @@ void Zelda3D_GL_SetLightDir(const float dirWorld[3]); // scene sun dir (world sp
 void Zelda3D_GL_SetLightParams(const float ambient[3], const float light1Col[3],
                               const float light2Dir[3], const float light2Col[3],
                               int numEnabledLights);
-void Zelda3D_GL_SetShadowFocus(float x, float y, float z); // per-frame world focus for the sun-shadow box
 void Zelda3D_GL_EmitPose(int modelId); // snapshot this actor's pose at emit time (per-item skinning)
 void Zelda3D_GL_SetMidMask(int modelId, unsigned long long mask); // per-frame mesh_id visibility (Link equipment)
 void Zelda3D_UpdateAnim(int modelId, const char* animName, float frame);
@@ -203,6 +165,9 @@ const char* Zelda3D_SceneName(PlayState* play);
 #include "../tables/zelda3d_scene_lighting.inc"
 // Current scene's OoT3D env palette (set each frame in Zelda3D_UpdateLight from
 // kZelda3dSceneLighting[sceneNum]); NULL = no palette -> the z_kankyo blend hook is a no-op.
+// OoT3D per-scene env light palette cache (fed by Zelda3D_UpdateLight; consumers read the
+// RE'd palette data — the former worldshade flat-tint experiment that used it was removed).
+int gZelda3dScenePaletteN = 0;
 const Zelda3dLightSlot* gZelda3dScenePalette = 0;
 // spot99 title palette — converted on first use from the raw ZSI cmd-0x0F
 // entries the title-cs loader keeps (zelda3d_cutscene.cpp). Same emit shape

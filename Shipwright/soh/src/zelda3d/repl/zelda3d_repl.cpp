@@ -65,7 +65,6 @@ void Zelda3D_GL_SetLightDir(const float dirWorld[3]); // scene sun dir (world sp
 void Zelda3D_GL_SetLightParams(const float ambient[3], const float light1Col[3],
                               const float light2Dir[3], const float light2Col[3],
                               int numEnabledLights);
-void Zelda3D_GL_SetShadowFocus(float x, float y, float z); // per-frame world focus for the sun-shadow box
 void Zelda3D_GL_EmitPose(int modelId); // snapshot this actor's pose at emit time (per-item skinning)
 void Zelda3D_GL_SetMidMask(int modelId, unsigned long long mask); // per-frame mesh_id visibility (Link equipment)
 void Zelda3D_UpdateAnim(int modelId, const char* animName, float frame);
@@ -1192,11 +1191,6 @@ static void Zelda3D_ReplExec(PlayState* play, char* line, const char* outPath) {
         } else {
             Zelda3D_ReplReply(outPath, "gscale: id out of range (0..31)");
         }
-    } else if (strcmp(cmd, "light") == 0 && sscanf(line, "%*s %f", &f1) == 1) {
-        extern int gZelda3dLightEnable; // libultraship zelda3d_gl.cpp: character/prop form lighting
-        gZelda3dLightEnable = (int)f1;
-        Zelda3D_ReplReply(outPath, "light=%d (1=half-Lambert form on characters/props, 0=flat tint)",
-                        gZelda3dLightEnable);
     } else if (strcmp(cmd, "statecheck") == 0 && sscanf(line, "%*s %f", &f1) == 1) {
         // GL state-leak detector (libultraship zelda3d_gl.cpp). Flip on the moment the skybox/HUD
         // stripe corruption appears: every render pass then verifies it handed back all captured GL
@@ -1237,42 +1231,6 @@ static void Zelda3D_ReplExec(PlayState* play, char* line, const char* outPath) {
             gZelda3dLightDirLast[0], gZelda3dLightDirLast[1], gZelda3dLightDirLast[2],
             gZelda3dLight2Dir[0], gZelda3dLight2Dir[1], gZelda3dLight2Dir[2],
             gZelda3dLight2Col[0], gZelda3dLight2Col[1], gZelda3dLight2Col[2]);
-    } else if (strcmp(cmd, "shadow") == 0) {
-        // Dynamic sun-shadow controls (libultraship zelda3d_gl.cpp). `shadow <0|1>` toggles; the
-        // tunables let me fit the light frustum / cure acne live without a rebuild. `shadow` alone prints.
-        extern int gZelda3dShadowEnable, gZelda3dShadowCastAll;
-        extern float gZelda3dShadowRadius, gZelda3dShadowDist, gZelda3dShadowBias, gZelda3dShadowStrength;
-        char sub[32];
-        if (sscanf(line, "%*s %f", &f1) == 1 && sscanf(line, "%*s %31s", sub) == 1 &&
-            (strcmp(sub, "0") == 0 || strcmp(sub, "1") == 0)) {
-            gZelda3dShadowEnable = (int)f1;
-        } else if (sscanf(line, "%*s %31s %f", sub, &f1) == 2) {
-            if (strcmp(sub, "bias") == 0) gZelda3dShadowBias = f1;
-            else if (strcmp(sub, "str") == 0) gZelda3dShadowStrength = f1;
-            else if (strcmp(sub, "rad") == 0) gZelda3dShadowRadius = f1;
-            else if (strcmp(sub, "dist") == 0) gZelda3dShadowDist = f1;
-            else if (strcmp(sub, "all") == 0) gZelda3dShadowCastAll = (int)f1;
-        }
-        Zelda3D_ReplReply(outPath, "shadow=%d castAll=%d rad=%.0f dist=%.0f bias=%.4f str=%.2f",
-                        gZelda3dShadowEnable, gZelda3dShadowCastAll, gZelda3dShadowRadius, gZelda3dShadowDist,
-                        gZelda3dShadowBias, gZelda3dShadowStrength);
-    } else if (strcmp(cmd, "ao") == 0) {
-        // Ambient occlusion (libultraship zelda3d_gl.cpp). `ao <0|1>` toggles; `ao rad|str|bias|maxdiff <f>`
-        // tunes live. `ao` alone prints. rad is in screen pixels; bias/maxdiff are window-depth units.
-        extern int gZelda3dAoEnable;
-        extern float gZelda3dAoRadius, gZelda3dAoStrength, gZelda3dAoBias, gZelda3dAoMaxDiff;
-        char sub[32];
-        if (sscanf(line, "%*s %f", &f1) == 1 && sscanf(line, "%*s %31s", sub) == 1 &&
-            (strcmp(sub, "0") == 0 || strcmp(sub, "1") == 0)) {
-            gZelda3dAoEnable = (int)f1;
-        } else if (sscanf(line, "%*s %31s %f", sub, &f1) == 2) {
-            if (strcmp(sub, "rad") == 0) gZelda3dAoRadius = f1;
-            else if (strcmp(sub, "str") == 0) gZelda3dAoStrength = f1;
-            else if (strcmp(sub, "bias") == 0) gZelda3dAoBias = f1;
-            else if (strcmp(sub, "maxdiff") == 0) gZelda3dAoMaxDiff = f1;
-        }
-        Zelda3D_ReplReply(outPath, "ao=%d rad=%.1f str=%.2f bias=%.5f maxdiff=%.5f", gZelda3dAoEnable,
-                        gZelda3dAoRadius, gZelda3dAoStrength, gZelda3dAoBias, gZelda3dAoMaxDiff);
     } else if (strcmp(cmd, "worldlit") == 0) {
         // OoT3D world (scene) vertex-lit combiner port (docs/oot3d_world_lighting_re.md).
         // `worldlit 0` = legacy texture*vColor*uTint; `worldlit 1` = real PICA vertex lighting
@@ -1286,36 +1244,6 @@ static void Zelda3D_ReplExec(PlayState* play, char* line, const char* outPath) {
         extern int gUnifiedRenderer;
         if (sscanf(line, "%*s %i", &iv) == 1) gUnifiedRenderer = iv;
         Zelda3D_ReplReply(outPath, "unified=%d", gUnifiedRenderer);
-    } else if (strcmp(cmd, "worldshade") == 0) {
-        // #111: drive the world (scene/room) SHADE from OoT3D's own time-blended env palette
-        // (gZelda3dWorldShade*) instead of the N64 flat tint (Zelda3D_SceneTint), which over-brightens at
-        // night. `worldshade 0` = N64 flat tint (legacy); `worldshade 1` = OoT3D env shade. Prints the
-        // currently-blended OoT3D world ambient/light colours for live A/B vs the oracle.
-        extern int gZelda3dWorldShade, gZelda3dWorldShadeSlotBias;
-        extern unsigned char gZelda3dWorldShadeAmb[3], gZelda3dWorldShadeL0Col[3], gZelda3dWorldShadeL1Col[3];
-        extern int gZelda3dScenePaletteN;
-        extern float gZelda3dWorldShadeKa, gZelda3dWorldShadeKd, gZelda3dWorldShadeKe;
-        float fv;
-        // `worldshade bias <n>` tunes slot alignment; `worldshade ka/kd/ke <f>` tune the
-        // ambient/light0Color/light1Color coefficients; `worldshade <0|1>` toggles the OoT3D shade.
-        if (sscanf(line, "%*s bias %i", &iv) == 1) {
-            gZelda3dWorldShadeSlotBias = iv;
-        } else if (sscanf(line, "%*s ka %f", &fv) == 1) {
-            gZelda3dWorldShadeKa = fv;
-        } else if (sscanf(line, "%*s kd %f", &fv) == 1) {
-            gZelda3dWorldShadeKd = fv;
-        } else if (sscanf(line, "%*s ke %f", &fv) == 1) {
-            gZelda3dWorldShadeKe = fv;
-        } else if (sscanf(line, "%*s %i", &iv) == 1) {
-            gZelda3dWorldShade = iv;
-        }
-        Zelda3D_ReplReply(outPath,
-            "worldshade=%d bias=%d ka=%.2f kd=%.2f ke=%.2f slots=%d amb=(%d,%d,%d) l0col=(%d,%d,%d) l1col=(%d,%d,%d)",
-            gZelda3dWorldShade, gZelda3dWorldShadeSlotBias, gZelda3dWorldShadeKa, gZelda3dWorldShadeKd,
-            gZelda3dWorldShadeKe, gZelda3dScenePaletteN,
-            gZelda3dWorldShadeAmb[0], gZelda3dWorldShadeAmb[1], gZelda3dWorldShadeAmb[2],
-            gZelda3dWorldShadeL0Col[0], gZelda3dWorldShadeL0Col[1], gZelda3dWorldShadeL0Col[2],
-            gZelda3dWorldShadeL1Col[0], gZelda3dWorldShadeL1Col[1], gZelda3dWorldShadeL1Col[2]);
     } else if (strcmp(cmd, "worldamb") == 0) {
         // #110: additive env-AMBIENT floor coefficient for the VK world path. `worldamb <coef>`
         // (0 = off). The world frag adds gZelda3dWorldAmb * envAmbient to vertex-lit scene geom, so a

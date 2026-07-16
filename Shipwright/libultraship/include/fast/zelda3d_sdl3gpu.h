@@ -53,19 +53,6 @@ void Zelda3D_Sg_EndPass(void);
 // Mirror of Zelda3D_GL_RequestEvictRange for the SDL3 GPU model store.
 void Zelda3D_Sg_RequestEvictRange(int lo, int hi);
 
-// --- Dynamic sun-shadows + screen-space AO (offscreen passes; appended as own-pass ops) ---
-// Same dispatch shape as the Vulkan path. Return 0 / no-op until the effect is enabled.
-int Zelda3D_Sg_BeginShadowPass(void);
-void Zelda3D_Sg_ShadowCasterDraw(int modelId, const float* mp16, const float* mv16, const float* boneData,
-                               int boneCnt, unsigned long long midMask);
-void Zelda3D_Sg_ShadowCasterTris(const float* worldXYZ, size_t triCount, const float* lightVP16);
-void Zelda3D_Sg_EndShadowPass(void);
-void Zelda3D_Sg_SetShadow(int on, const float* lightVP16);
-int Zelda3D_Sg_BeginDepthPrepass(void);
-void Zelda3D_Sg_DepthPrepassDraw(int modelId, const float* mp16, const float* mv16, int invertY, float aspectAdj,
-                               const float* boneData, int boneCnt, unsigned long long midMask, int sky);
-void Zelda3D_Sg_EndDepthPrepass(void);
-void Zelda3D_Sg_AoComposite(void);
 
 // #146 item B: reset the shared depth buffer to "far" via a fullscreen depth-only draw (color
 // writes off) appended at THIS point in the op-list — no render-pass split. Called once by

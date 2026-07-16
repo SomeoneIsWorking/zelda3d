@@ -41,7 +41,6 @@ int Zelda3D_TryDrawSky(PlayState* play);                           // also decla
 int Zelda3D_SkyActive(PlayState* play);                            // also declared in zelda3d.h
 int Zelda3D_TryDrawSunMoon(PlayState* play);                       // also declared in zelda3d.h
 int Zelda3D_TryDrawTitleAtmos(PlayState* play);                    // also declared in zelda3d.h
-void Zelda3D_WorldShadeBlend(int a1, int b1, int a2, int b2, float w1, float w2); // also in zelda3d.h
 int Zelda3D_SkyModelId(int idx);                                   // shared: REPL sky debug commands
 int Zelda3D_ActiveSkyIndex(PlayState* play);                       // shared: REPL sky debug commands
 void Zelda3D_UpdateLight(PlayState* play);                         // shared: Zelda3D_FrameEndUpdate
@@ -158,14 +157,6 @@ extern int gZelda3dAnimLive;          // REPL `animlive`
 extern float gZelda3dGScale[32];      // per-slot REPL `gscale`; see ZELDA3D_GSCALE below
 extern float gZelda3dSceneOffX, gZelda3dSceneOffY, gZelda3dSceneOffZ; // REPL scene offset
 extern float gZelda3dSceneScale;      // REPL scene scale
-extern int gZelda3dWorldShade;        // #111 world-shade opt-in; REPL `worldshade`
-extern float gZelda3dWorldShadeKa, gZelda3dWorldShadeKd, gZelda3dWorldShadeKe; // #111 shade coeffs
-extern unsigned char gZelda3dWorldShadeAmb[3];
-extern unsigned char gZelda3dWorldShadeL0Col[3];
-extern unsigned char gZelda3dWorldShadeL1Col[3];
-extern signed char gZelda3dWorldShadeL0Dir[3];
-extern signed char gZelda3dWorldShadeL1Dir[3];
-extern int gZelda3dWorldShadeSlotBias; // #111 palette-slot index bias
 extern int gZelda3dSky;               // REPL `sky`
 extern float gZelda3dSkyScale;        // REPL `sky` scale override
 extern int gZelda3dGCam;              // #25 force game camera behind Link; REPL `gcam`

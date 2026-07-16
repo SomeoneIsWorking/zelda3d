@@ -547,7 +547,7 @@ extern "C" int Zelda3D_TitleCsFrame(void) { return sFrame; }
 // of stepping — the user-visible "everything jitters at half rate" fix (kanban #149).
 extern "C" float Zelda3D_TitleCsSubframe(void) { return sTickParity ? 0.5f : 0.0f; }
 extern "C" void Zelda3D_TitleCsSetFrame(int frame) {
-    sFrame = (sEndFrame > 0) ? frame % sEndFrame : frame;
+    sFrame = frame; // no wrap — the cs is one continuous script (see Zelda3D_TitleCsAdvance)
     if (sFrame < 0) sFrame = 0;
 }
 extern "C" int Zelda3D_TitleCsAdvance(void) {
@@ -571,7 +571,12 @@ extern "C" int Zelda3D_TitleCsAdvance(void) {
         return sFrame;   // hold: this engine-tick has no corresponding cs-tick on the oracle
     }
     sFrame++;
-    if (sEndFrame > 0 && sFrame >= sEndFrame) sFrame = 0;
+    // NO wrap at end_frame (2400): the loop assumption is FALSIFIED against the live oracle
+    // (2026-07-16, scratch/decomp_agent/wrap_discriminator.py + fade_curve_sweep*): the 3DS
+    // title cs is one long continuous script — camera at tick 2705 is nowhere near tick 305's
+    // pose, cues are authored to 3036, dayTime flows uninterrupted (dawn -> day -> night storm)
+    // to at least tick 6000 with no cursor reset and no fade-to-black anywhere. The " BDQ"
+    // header's end_frame does NOT restart playback on the 3DS.
     sLastAdvanced = true;
     return sFrame;
 }
