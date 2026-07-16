@@ -271,3 +271,33 @@ NOT a rider pos/yaw divergence. Candidates, in priority order:
 
 NEXT: read the SoH title camera eye/at vs the oracle camera at step 600 (and a few cut frames) to
 confirm/deny (1). `soh_rider` + the oracle EnHorse read now make per-frame rider A/B cheap.
+
+---
+
+## Update 2026-07-16 (camera A/B): the divergence is CAMERA-framing, not the rider — but reads are gap-blocked
+
+`compare camera` at step 600:
+- oracle title-cam @0x005BE6D4: eye=(3919.7,-117.9,7454.0) dir=(0.981,0,0.194) up=(0.063,0.947,-0.316)
+- SoH (SohState_Camera): camId=1 eye=(-4071.5,57.8,5217.3) at=(-4939.5,252.8,5675.3) fov=48.80
+
+Both reads are UNRELIABLE at the title and must not be taken as literal ground truth:
+- `0x005BE6D4` is almost certainly the "spectator slot" flagged in memory `soh3d-title-cam-handedness`
+  — its eye (3919,7454) looking +X (east) cannot frame the rider, which is at west X=-4561 and IS
+  clearly visible in the s0600 oracle frame. So this VA is NOT the render/demo camera at this shot.
+- SoH `SohState_Camera` reads `gPlayState->cameraPtrs[...]`, but the title's live PlayState isn't at
+  the harness's standard ptr (`soh3d-oot3d-title-not-play`: live play @0x00539F98, 0x0050AF34 stays
+  0) — same gap that makes `compare scene/actors/player` empty at the title. The ~constant
+  (-4071,57.8,5217) is likely a stale/default camera, not the ported title-cs spline output.
+
+ROBUST CONCLUSION (independent of those unreliable values): the rider's WORLD pos+yaw match the
+oracle (previous update), yet the scene is framed differently (the moon sits at a different screen
+height in the s0600 SBS — a pure camera-DIRECTION tell, since the moon is at infinity). A correctly-
+placed rider under a differently-aimed camera looks mis-positioned/"sideways". So the user's
+"Link+Epona completely broken" is a **title-CAMERA divergence**, NOT a rider port bug. The fix
+belongs in the title-camera port, not title_rider.cpp.
+
+BLOCKER for the fix: cleanly A/B'ing the camera needs (1) the REAL oracle demo-camera VA (not the
+0x005BE6D4 spectator slot — an RE task with prior Ghidra-xref dead ends per soh3d-title-cam-
+handedness), and (2) reading the SoH ported title-cs camera spline output directly (like `soh_rider`
+does for the rider via TitlePresentation, NOT via gPlayState->cameraPtrs). Both are title-arc RE,
+deep and dead-end-prone. Deprioritized relative to gameplay correctness; the rider itself is fine.
