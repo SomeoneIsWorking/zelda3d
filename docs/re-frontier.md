@@ -116,13 +116,21 @@ foundational finding the whole arc depends on.
 - gap: none — the former blanket `gZelda3dLightEnable=0` title disable (the #153 hack) is deleted; characters use the real per-light formula.
 - notes: ACTORS apply ambient once (N64 Lights_BindAll semantics); only scene materials sum ambient per enabled slot. Actor dirs at title = the blended 4-slot title palette, NOT the trig sun formula (which stays byte-correct for envCtx itself).
 
-### title.screen-fade — cs op-0x7c loop-boundary fade
-- status: re-partial
+### title.screen-fade — cs op-0x7c "transition/fade"
+- status: re-verified
 - deps: title.oot3d-not-play
-- evidence: `scratch/decomp_agent/fade_0x7c/{002c5ba0,003655d0,0030b44c}.c`; `debug_journal/2026-07-16-title-faithful-port-arc.md` §4
-- where: `title_presentation.cpp` applyScreenFade (still the OLD assumed shape)
-- gap: the port's 90/60 triangular ramp hinged at loop-frame 2400 is FALSIFIED — the real handler is a one-shot LINEAR interpolator armed at cs2310, duration = currentValue·150, never reads 2400. Fade-in side is runtime heap state (statically unreachable, 3 scan methods exhausted). Next: empirical oracle luminance sweep (`scratch/decomp_agent/fade_curve_sweep.py`) then port the measured+decompiled curve.
-- notes: do NOT re-chase the transition object's constructor statically — Reference-DB, literal-pool, and movw/movt scans all returned zero hits.
+- evidence: `scratch/decomp_agent/fade_0x7c/{002c5ba0,003655d0,0030b44c}.c` (static: one-shot linear interpolator armed at cs2310, duration=currentValue·150, never reads 2400); `scratch/title_ab/fade_sweep/fade_curve*.csv` (live: NO visible fade anywhere, ticks 2285-6000); commit `39cda5e6`
+- where: `title_presentation.cpp` applyScreenFade — ports the OBSERVED behavior: none
+- gap: what the interpolator object actually drives on the 3DS is unnamed (heap vtable, statically unreachable — Reference-DB/literal-pool/movw-movt scans all zero; do NOT re-chase statically). Its measured visible effect at the title is nil, so nothing further is owed for parity.
+- notes: the previous 90/60 triangular to-black ramp hinged at loop-frame 2400 was DOUBLY falsified and removed.
+
+### title.sequencing-no-loop — the title cs is one continuous script (no 2400 loop)
+- status: re-verified
+- deps: title.oot3d-not-play
+- evidence: `scratch/decomp_agent/wrap_discriminator.py` (oracle camera at tick 2705 ≠ tick 305 — no replay); `scratch/title_ab/fade_sweep/fade_curve*.csv` (dayTime flows dawn→day→night storm through tick 6000, no cursor reset); cues authored to 3036; commit `39cda5e6`
+- where: `zelda3d_cutscene.cpp` Zelda3D_TitleCsAdvance (wrap removed)
+- gap: ultimate END behavior unknown (does the 3DS demo ever restart? needs a >6000-tick oracle run or input-driven observation) — flagged, not blocking.
+- notes: the " BDQ" header's end_frame=2400 does NOT restart playback; the earlier "80s loop" model came from that header field, never from observed playback.
 
 ### title.moon-transform — moon disc/halo transform generator
 - status: re-partial
