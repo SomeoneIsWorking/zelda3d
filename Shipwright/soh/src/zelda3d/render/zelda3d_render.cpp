@@ -9,6 +9,7 @@
 #include "../behaviors/title/title_presentation.h" // Zelda3D_Title_IsActive
 #include "../behaviors/title/title_cloud_vortex.h" // Zelda3D_TitleCloudVortex_Emit
 #include "../behaviors/actor/actor_overrides.h" // Zelda3D_ResolveAnim_EnGe1 / Zelda3D_Joints_EnGe1
+#include "soh/frame_interpolation.h" // keyed RecordOpenChild for the sun/moon draw (#149)
 
 #include <stdlib.h>
 #include <stdio.h>
@@ -1553,6 +1554,12 @@ int Zelda3D_TryDrawSunMoon(PlayState* play) {
     // it: skip both sprites but still own the call (return 1) so the N64 path stays off.
     if (gSaveContext.entranceIndex != ENTR_HYRULE_FIELD_PAST_BRIDGE_SPAWN ||
         ((void)0, gSaveContext.sceneSetupIndex) != 5) {
+        // Frame interpolation (#149 moon jitter): this draw runs at ROOT level of the recording
+        // tree, where matrices only pair POSITIONALLY between consecutive logic frames — any op
+        // drift elsewhere in the frame breaks the pairing and the moon snaps at logic rate for
+        // that pair (measured: moon holds + 1.5px catch-ups every ~6 presented frames while the
+        // world interpolates smoothly). A keyed child pairs deterministically.
+        FrameInterpolation_RecordOpenChild("Zelda3D SunMoon", 0);
         sunId = Zelda3D_SunModelId();
         moonId = Zelda3D_MoonModelId();
         y = play->envCtx.sunPos.y / 25.0f;
@@ -1688,6 +1695,7 @@ int Zelda3D_TryDrawSunMoon(PlayState* play) {
             }
         }
 
+        FrameInterpolation_RecordCloseChild();
         CLOSE_DISPS(play->state.gfxCtx);
     }
     return 1;

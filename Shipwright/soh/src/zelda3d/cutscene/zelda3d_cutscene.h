@@ -47,7 +47,9 @@ int Zelda3D_TitleCsRiderCue(int frame, int* cueIndex,
 
 // Time-of-day from op-0x8c cues (latched; title = 4:01 AM). Returns 0
 // before the first cue frame.
-int Zelda3D_TitleCsTimeOfDay(int frame, uint16_t* outDayTime);
+// Fractional frame (f + Zelda3D_TitleCsSubframe()): cue latch is integer, the +6/cs-frame drift
+// advances fractionally so dayTime-derived state moves every engine frame (#149).
+int Zelda3D_TitleCsTimeOfDay(float frame, uint16_t* outDayTime);
 
 // spot99's scene light settings (raw ZSI cmd-0x0F 28-byte entries).
 int Zelda3D_TitleCsLightSlotsRaw(const uint8_t** outSlots, int* outCount);
