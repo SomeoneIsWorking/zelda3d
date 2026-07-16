@@ -290,12 +290,12 @@ below, not duplicated).
 - notes: 
 
 ### player.putdown-state — distinct "put down" state (func_8083EAF0)
-- status: todo
+- status: re-verified
 - deps: player.force-state-sweep
-- evidence: `docs/re_control_debug_backlog.md` item #7 — function FULLY understood, zero RE cost remaining
-- where: target a new `Zelda3D_PlayerForcePutDown` hook (pattern-match existing Force* hooks)
-- gap: pure porting task, no RE — cheapest new-coverage item after the camera readout above.
-- notes: 
+- evidence: `Zelda3D_PlayerForcePutDown` (z_player.c) + REPL `linkstate putdown` + `parity_state_sweep.py` putdown row; sweep PASS (soh=nml_put_free matches expect nml_put).
+- where: `Zelda3D_PlayerForcePutDown` in z_player.c (installs Player_Action_808464B0 + PLAYER_ANIMGROUP_put, the PUT_DOWN branch of func_8083EAF0); wired to REPL `linkstate putdown`.
+- gap: none — new sweep-coverage row landed. Distinct from ForceThrow (the else branch of the same gate).
+- notes: GET_PLAYER_ANIM resolves ANIMGROUP_put -> nml_put_free with no held item (faithful modelAnimType variant); put-down family selected correctly.
 
 ### player.ztarget-substates — func_80839F90 possible Z-idle sub-variants
 - status: todo
