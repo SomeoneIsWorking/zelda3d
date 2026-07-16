@@ -66,6 +66,14 @@ void TitlePresentation::enter(PlayState* play) {
     // the entry edge — preserved here for byte-identical behavior (gZelda3dLightEnable is
     // re-zeroed every active frame in case something else re-enables it mid-title).
     mActive = true;
+    // 60fps engine at title — see mUpdateRateSaved's header comment. Re-asserted every active
+    // frame (same idempotent pattern as the light disable below) so nothing mid-title can drop
+    // the demo back to the N64 20fps logic rate.
+    if (!mUpdateRateSaved) {
+        mUpdateRatePrev = R_UPDATE_RATE;
+        mUpdateRateSaved = 1;
+    }
+    R_UPDATE_RATE = 1;
     if (!mLightSaved) {
         mLightEnableSaved = gZelda3dLightEnable;
         mLightSaved = 1;
@@ -83,6 +91,10 @@ void TitlePresentation::exit(PlayState* play) {
     // Symmetric teardown for the horse-attribution port (2026-07-10): un-mount Link and kill the
     // title-scoped EN_HORSE instance mRider.applyToActor() spawned — see title_rider.h/.cpp.
     mRider.releaseMount(play);
+    if (mUpdateRateSaved) {
+        R_UPDATE_RATE = mUpdateRatePrev;
+        mUpdateRateSaved = 0;
+    }
     if (mLightSaved) {
         gZelda3dLightEnable = mLightEnableSaved;
         mLightSaved = 0;

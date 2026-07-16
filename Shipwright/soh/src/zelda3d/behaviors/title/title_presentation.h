@@ -112,6 +112,15 @@ private:
 
     int mLightSaved       = 0;
     int mLightEnableSaved = -1;
+    // R_UPDATE_RATE save/restore (enter/exit): the title runs the engine at 60fps logic
+    // (R_UPDATE_RATE=1) so the cs cursor's parity-halving lands on the authentic 3DS 30fps cs
+    // rate and the game PRESENTS 60fps. The N64 default (3 -> 20fps logic, 10fps cs) played the
+    // whole demo at 1/3 speed and 20fps presentation — the user-visible "everything jitters,
+    // not like 60fps" (kanban #149; measured via the REPL `fps` command: logic 20.0, present
+    // 20.0 before, 60/60 after). Per-cs-frame parity is unaffected: updates-per-cs-frame stays
+    // 2:1, so every frame-matched oracle A/B result carries over unchanged.
+    int mUpdateRateSaved  = 0;
+    int mUpdateRatePrev   = -1;
 };
 
 } // namespace Zelda3D
