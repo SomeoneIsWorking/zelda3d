@@ -3,6 +3,7 @@
 // port (title_rider.h's header comment, oot3d-decomp/docs/title_rider_port_spec.md).
 #include "global.h"
 #include "title_rider.h"
+#include "../../core/zelda3d_log.h"
 #include "../../cutscene/zelda3d_cutscene.h"
 #include "overlays/actors/ovl_En_Horse/z_en_horse.h"
 
@@ -194,6 +195,9 @@ void TitleRider::applyToActor(PlayState* play, Actor* actor) {
     // real EnHorse_CutsceneUpdate — the title path just supplies the cue instead of csCtx.linkAction.
     const int funcIdx = RiderCsFuncIdx(mCueAction);
     if (funcIdx == 3 || funcIdx == 5) {
+        // `log rider 1`: transition diagnosis (see the Move branch's twin below).
+        Z3D_LOG(RIDER, "REARING funcIdx=%d cutsceneAction(before)=%d animIdx(before)=%d action=%d\n",
+                funcIdx, (int)horse->cutsceneAction, (int)horse->animationIdx, (int)horse->action);
         CsCmdActorCue cue{};
         cue.action = mCueAction;
         // Only the *Init funcs read startPos/urot.y (teleport target); at the exact transition
@@ -256,6 +260,10 @@ void TitleRider::applyToActor(PlayState* play, Actor* actor) {
     // per-frame speed jitter it caused, matching the real cs dispatcher exactly instead of
     // approximating it. See debug_journal/2026-07-15-epona-title-animation.md.
     if (funcIdx == 1 || funcIdx == 4) {
+        // `log rider 1`: catch who stomps animationIdx between our per-frame calls (the mounted-Link
+        // stand-pose diagnosis: Player reads idx=REARING while this branch sets GALLOP).
+        Z3D_LOG(RIDER, "MOVE funcIdx=%d cutsceneAction(before)=%d animIdx(before)=%d action=%d\n",
+                funcIdx, (int)horse->cutsceneAction, (int)horse->animationIdx, (int)horse->action);
         if (horse->cutsceneAction != funcIdx) {
             horse->cutsceneAction = funcIdx;
             // WarpMoveInit teleports (this->actor.world.pos = cue startPos) — mPos/mYaw already

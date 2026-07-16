@@ -68,6 +68,7 @@
 #include "global.h"
 #include "title_fireglow.h"
 #include "title_logo.h"
+#include "../../core/zelda3d_log.h"
 #include "../../model/zelda3d_cmab.h"
 #include "../../model/zelda3d_overlay2d.h"
 
@@ -179,21 +180,12 @@ extern "C" int Zelda3D_TryDrawTitleFireGlow(PlayState* play) {
     float rgb[3] = { 1.0f, 1.0f, 1.0f };
     Zelda3D_CmabSampleConstColorRGB(cmab, /*materialIndex=*/0, /*channelIndex=*/0, cmabFrame, rgb);
 
-    // Verification aid (ZELDA3D_DBG_FIREGLOW=1): print the sampled curve values so the CMAB
-    // player can be confirmed live-varying quantitatively, independent of screen-capture timing
-    // (camera pan/attract-mode cuts make screenshot diffing an unreliable isolation of the
-    // material-anim's own contribution — see debug_journal/2026-07-10-title-fireglow-copyright.md).
-    {
-        static int sDbg = -1;
-        if (sDbg < 0) {
-            const char* v = std::getenv("ZELDA3D_DBG_FIREGLOW");
-            sDbg = (v != nullptr && v[0] != '\0') ? 1 : 0;
-        }
-        if (sDbg) {
-            fprintf(stderr, "[FIREGLOW] csFrame=%d cmabFrame=%.1f rgb=(%.4f,%.4f,%.4f) uvV=%.4f alpha=%.1f\n",
-                    csFrame, cmabFrame, rgb[0], rgb[1], rgb[2], uvV, alpha);
-        }
-    }
+    // Verification aid (`log fireglow 1`): print the sampled curve values so the CMAB player can
+    // be confirmed live-varying quantitatively, independent of screen-capture timing (camera pan/
+    // attract-mode cuts make screenshot diffing an unreliable isolation of the material-anim's own
+    // contribution — see debug_journal/2026-07-10-title-fireglow-copyright.md).
+    Z3D_LOG(FIREGLOW, "csFrame=%d cmabFrame=%.1f rgb=(%.4f,%.4f,%.4f) uvV=%.4f alpha=%.1f\n",
+            csFrame, cmabFrame, rgb[0], rgb[1], rgb[2], uvV, alpha);
 
     float refW, refH;
     Zelda3D_TitleOverlayRefWH(&refW, &refH);

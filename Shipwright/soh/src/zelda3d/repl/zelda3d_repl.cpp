@@ -5,6 +5,7 @@
 // debug surface, cam-lift/terrain-warp/fog/sky diagnostics, etc).
 #include "../zelda3d.h"
 #include "../render/zelda3d_render.h"
+#include "../core/zelda3d_log.h"
 #include "zelda3d_repl.h"
 #include "../cutscene/zelda3d_cutscene.h"
 #include "../behaviors/title/title_presentation.h"
@@ -539,6 +540,23 @@ static void Zelda3D_ReplExec(PlayState* play, char* line, const char* outPath) {
             Play_Update(play);
         }
         Zelda3D_ReplReply(outPath, "step %d (frame advanced; freeze=%d)", n, gZelda3dFreeze);
+    } else if (strcmp(cmd, "log") == 0) {
+        // Diagnostic-logger channel toggles (core/zelda3d_log.h — the ONE debug-channel registry).
+        //   log list            -> per-channel on/off state
+        //   log <channel> <0|1> -> toggle one channel ("all" toggles every channel)
+        char name[32] = { 0 };
+        int on = -1;
+        if (sscanf(line, "%*s %31s %i", name, &on) == 2 && on >= 0) {
+            if (Zelda3D_LogSet(name, on)) {
+                Zelda3D_ReplReply(outPath, "log %s=%d", name, on ? 1 : 0);
+            } else {
+                Zelda3D_ReplReply(outPath, "log: unknown channel '%s' (try `log list`)", name);
+            }
+        } else {
+            char buf[512];
+            Zelda3D_LogList(buf, (int)sizeof(buf));
+            Zelda3D_ReplReply(outPath, "log channels: %s (env ZELDA3D_LOG=name,.. or all)", buf);
+        }
     } else if (strcmp(cmd, "linkanimstate") == 0) {
         // #86 quantitative trace: dump Link's live animation state so a transient (e.g. the walk-stop
         // torso snap) is read as a numeric discontinuity, not eyeballed. Drive it under `freeze`/`step`

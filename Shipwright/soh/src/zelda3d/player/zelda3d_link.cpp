@@ -5,6 +5,8 @@
 // (Zelda3D_UpdateAnimN64*, Zelda3D_PosedGroundOffset, ...); this file CALLS them.
 #include "../zelda3d.h"
 #include "zelda3d_link.h"
+#include "../core/zelda3d_log.h"
+#include "overlays/actors/ovl_En_Horse/z_en_horse.h" // EnHorse animationIdx/curFrame (LINKTRACE mounted extras)
 #include "../behaviors/actor/player.h" // PlayerBehavior — Link as a structured ActorBehavior class
 #include "player/link_midmask.h" // Stage 2a shared adult mesh-mask policy (Shipwright/zelda3d_shared/)
 #include <stdlib.h>
@@ -65,8 +67,8 @@ float gZelda3dLinkRotY = 0.0f;
 float gZelda3dLinkRotZ = 0.0f;
 char gZelda3dLinkForceCsab[64] = ""; // REPL `linkanim <csab>` pins a CSAB on Link (verify idle/walk/run
                                    // deterministically without real movement input); empty = live-resolve
-int gZelda3dLinkTrace = 0; // REPL `linktrace 1`: per-draw log of heldActor/carryWalk/lower+upper anim/csab
-                         // to stdout (scratch/logs/run.log) — diagnoses the #117 pickup (carryB) path.
+// Per-draw Link trace (`log link 1` / REPL `linktrace 1`): heldActor/carryWalk/lower+upper anim/
+// csab + mounted extras — routed through the diagnostic-logger registry (core/zelda3d_log.h).
 // REPL `linktwo <lower> <upper>`: force the #85 two-source per-limb blend (lower loco + upper carry)
 // with explicit CSAB bases, so the carry-walk pose can be captured/verified WITHOUT a live grab
 // (skindump + the bone partition). Lower free-runs at gZelda3dAnimRate (legs cycle); upper free-runs
@@ -484,17 +486,23 @@ extern "C" int Zelda3D_PlayerDrawImpl(PlayState* play, Actor* actor) {
         if (gZelda3dLinkForceCsab[0] != '\0') {
             csab = gZelda3dLinkForceCsab; // REPL `linkanim` override (verification)
         }
-        if (gZelda3dLinkTrace) {
+        if (Zelda3D_LogEnabled(Z3D_LOG_LINK)) {
             // #117 pickup diagnosis: trace the exact fields that decide the carry/lift CSAB per draw.
             const char* lo = (const char*)player->skelAnime.animation;
             const char* lob = lo ? strrchr(lo, '/') : NULL; lob = lob ? lob + 1 : (lo ? lo : "(null)");
             const char* up = (const char*)player->upperSkelAnime.animation;
             const char* upb = up ? strrchr(up, '/') : NULL; upb = upb ? upb + 1 : (up ? up : "(null)");
-            printf("LINKTRACE held=%d carryWalk=%d lin=%.2f spd=%.2f lower=%s(cf=%.1f/%.1f) upper=%s(cf=%.1f) -> csab=%s\n",
-                   player->heldActor != NULL, carryWalk, player->linearVelocity, player->actor.speedXZ,
-                   lob, player->skelAnime.curFrame, player->skelAnime.animLength,
-                   upb, player->upperSkelAnime.curFrame, csab);
-            fflush(stdout);
+            // Mounted extras: the horse anim index the Player's D_80854944 selector keys on, the
+            // Player's latched copy (av2.actionVar2), and the horse frame Link syncs to (z_player.c
+            // ~14048/14081) — the title-demo riding-pose diagnosis needs exactly these three.
+            EnHorse* rh = (EnHorse*)player->rideActor;
+            Z3D_LOG(LINK, "held=%d carryWalk=%d lin=%.2f spd=%.2f lower=%s(cf=%.1f/%.1f) upper=%s(cf=%.1f)"
+                    " horseAnimIdx=%d av2=%d horseCurFrame=%.1f -> csab=%s\n",
+                    player->heldActor != NULL, carryWalk, player->linearVelocity, player->actor.speedXZ,
+                    lob, player->skelAnime.curFrame, player->skelAnime.animLength,
+                    upb, player->upperSkelAnime.curFrame,
+                    rh ? (int)rh->animationIdx : -1, (int)player->av2.actionVar2,
+                    rh ? rh->curFrame : -1.0f, csab);
         }
         if (gZelda3dAnimDebug) {
             static int dbg = 0;
@@ -795,9 +803,10 @@ int Zelda3D::PlayerBehavior::repl(PlayState* play, const char* cmd, const char* 
             }
         }
     } else if (strcmp(cmd, "linktrace") == 0 && sscanf(line, "%*s %i", &iv) == 1) {
-        gZelda3dLinkTrace = iv ? 1 : 0;
+        // Routed through the diagnostic-logger registry (equivalent to `log link <0|1>`).
+        Zelda3D_LogSet("link", iv ? 1 : 0);
         Zelda3D_ReplReply(outPath, "linktrace=%d (per-draw held/carryWalk/lower+upper anim/csab -> run.log)",
-                        gZelda3dLinkTrace);
+                        iv ? 1 : 0);
     } else if (strcmp(cmd, "link") == 0 && sscanf(line, "%*s %i", &iv) == 1) {
         gZelda3dLinkOn = iv ? 1 : 0;
         Zelda3D_ReplReply(outPath, "link=%d (OoT3D player body replacement, proof-of-hook bind pose)",

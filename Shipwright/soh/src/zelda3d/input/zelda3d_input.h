@@ -6,7 +6,7 @@
 //
 // This does NOT yet own the whole input path (event-time SDL->ControlDeck, poll-time
 // WriteToOSContPad/UpdatePad still live in Shipwright/libultraship/ — see
-// docs/lus_input_architecture.md). What it DOES centralize: the single ZELDA3D_DBG_INPUT enabled
+// docs/lus_input_architecture.md). What it DOES centralize: the single input-diagnostics enabled
 // check (previously duplicated as a private static lambda in both
 // libultraship/src/ship/controller/controldeck/ControlDeck.cpp and
 // libultraship/src/libultraship/controller/controldeck/ControlDeck.cpp) — libultraship
@@ -59,7 +59,7 @@ int Zelda3D_InputDevice(void);
 int  Zelda3D_HotbarSlot(void);
 void Zelda3D_HotbarSync(PlayState* play);
 
-// Consolidated ZELDA3D_DBG_INPUT diagnostic gate — the single source of truth for "is the headed
+// Consolidated input diagnostic gate (`log input 1`) — the single source of truth for "is the headed
 // keyboard-input diagnostic enabled" (debug_journal/2026-07-15-keyboard-headed-v2.md). Read once,
 // cached. libultraship's two ControlDeck.cpp files (Ship:: event-time, LUS:: poll-time) each
 // forward-declare this locally and call it instead of keeping their own private copy.

@@ -10,6 +10,7 @@
 // and 2026-07-07-op97-camera-decode-verified.md.
 
 #include "zelda3d_cutscene.h"
+#include "../core/zelda3d_log.h"
 
 #include <cmath>
 #include <cstdio>
@@ -441,6 +442,12 @@ extern "C" int Zelda3D_TitleCsLoad(void) {
     for (size_t si = 0; si < sSpline.segments.size(); ++si)
         fprintf(stderr, "[Zelda3D]   cam seg %zu: frames (%d, %d)\n",
                 si, sSpline.segments[si].start, sSpline.segments[si].end);
+    // Rider cue windows + actions — diagnoses which EnHorse cs func drives each frame range
+    // (0x24 Move / 0x26 Rearing / 0x40 WarpMove / 0x41 WarpRearing; title_rider.cpp RiderCsFuncIdx).
+    for (size_t ci = 0; ci < sRiderCues.size(); ++ci)
+        fprintf(stderr, "[Zelda3D]   rider cue %zu: action=0x%02x frames (%u, %u] yaw=%d\n",
+                ci, sRiderCues[ci].action, sRiderCues[ci].start, sRiderCues[ci].end,
+                (int)sRiderCues[ci].yaw);
     sLoadState = 1;
     return 1;
 }
@@ -497,22 +504,17 @@ extern "C" int Zelda3D_TitleCsCamera(int frame, float eye[3], float at[3],
         eye[j] = e[j] * kPosScale;
         at[j] = a[j] * kPosScale;
     }
-    // Diagnostic (ZELDA3D_DBG_TITLECAM=1): raw eye/at defs + evaluated + which track types the
-    // segment carries — to see why the ported AT/direction diverges from the oracle while eye is
-    // right (debug_journal/2026-07-15-epona-title-animation.md).
-    {
-        static int sDbg = -1;
-        if (sDbg < 0) { const char* v = std::getenv("ZELDA3D_DBG_TITLECAM"); sDbg = (v && v[0]) ? 1 : 0; }
-        if (sDbg) {
-            char tks[64] = {0}; size_t tl = 0;
-            for (const Track& tr : seg->tracks) tl += (size_t)snprintf(tks+tl, sizeof(tks)-tl, "%d ", tr.type);
-            fprintf(stderr, "[TITLECAM] f=%d seg[%d,%d] eyeDef=(%.1f,%.1f,%.1f) atDef=(%.1f,%.1f,%.1f) "
-                    "eyeEval=(%.1f,%.1f,%.1f) atEval=(%.1f,%.1f,%.1f) tracks=[%s]\n",
-                    frame, seg->start, seg->end,
-                    seg->eyeDef[0]*kPosScale, seg->eyeDef[1]*kPosScale, seg->eyeDef[2]*kPosScale,
-                    seg->atDef[0]*kPosScale, seg->atDef[1]*kPosScale, seg->atDef[2]*kPosScale,
-                    eye[0], eye[1], eye[2], at[0], at[1], at[2], tks);
-        }
+    // `log titlecam 1`: raw eye/at defs + evaluated + which track types the segment carries — the
+    // per-frame spline evaluation trail (debug_journal/2026-07-15-epona-title-animation.md).
+    if (Zelda3D_LogEnabled(Z3D_LOG_TITLECAM)) {
+        char tks[64] = {0}; size_t tl = 0;
+        for (const Track& tr : seg->tracks) tl += (size_t)snprintf(tks+tl, sizeof(tks)-tl, "%d ", tr.type);
+        Z3D_LOG(TITLECAM, "f=%d seg[%d,%d] eyeDef=(%.1f,%.1f,%.1f) atDef=(%.1f,%.1f,%.1f) "
+                "eyeEval=(%.1f,%.1f,%.1f) atEval=(%.1f,%.1f,%.1f) tracks=[%s]\n",
+                frame, seg->start, seg->end,
+                seg->eyeDef[0]*kPosScale, seg->eyeDef[1]*kPosScale, seg->eyeDef[2]*kPosScale,
+                seg->atDef[0]*kPosScale, seg->atDef[1]*kPosScale, seg->atDef[2]*kPosScale,
+                eye[0], eye[1], eye[2], at[0], at[1], at[2], tks);
     }
     // up from roll about the view dir; sign verified against Az's live up
     // (roll=0.0873 rad -> up=(0.212,0.977,-0.013) vs Az (0.212,0.977,-0.014)).
