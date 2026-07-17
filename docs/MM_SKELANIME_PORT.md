@@ -154,3 +154,15 @@ Once actors pose correctly:
 > mm_termina_slime.png`.) NEXT for the skinned grade: identify which MM3D archives are >1 bone from
 > `scratch/mm3d_actor_archives.md`, then reach an actor using one — a humanoid NPC (Clock Town
 > townsfolk) or a humanoid enemy (Garo/Stalchild/ReDead/dungeon boss), NOT the rigid field creatures.
+
+> **Drive #3 (2026-07-17) — skinned humanoid/animal rigs CONFIRMED loading + rendering in Clock Town.**
+> Booted default South Clock Town (scene 111) with `ZELDA3D_MM_SKINNED_TPOSE=1`. The run log shows real
+> multi-bone skinned archives loading through the MM3D retarget path: **obj 0x0E2 `an1` (20 bones,
+> humanoid NPC)**, obj 0x1B6 `sdn` (16 bones), obj 0x132 `dog` (12 bones), obj 0x223 `lodmoon` (2), obj
+> 0x00C `box` (3). So the earlier "only the box is skinned in Clock Town" was too pessimistic — full
+> humanoid rigs are present here. Framing recipe that works: `tp` Link adjacent to the actor (positions
+> from `actors`), then `cam <yaw> <dist> <h>` (cam orbits Link, so put the target beside him). Framed the
+> `dog` (obj 0x132) at ~125u: it renders in-frame **without mangling/explosion** (scratch/screenshots/
+> mm_ct_dog.png) — a preliminary pass for the identity retarget on that rig. NEXT for a definitive grade:
+> A/B each rig gate-on vs gate-off (isolate MM3D-vs-N64), and get a close frame of the 20-bone `an1`
+> humanoid (the divergent-rig stress test) — where the identity map mis-poses, add a per-archive BoneMap.
