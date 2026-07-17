@@ -96,6 +96,10 @@ s32 Zelda3D_PlayerForceItemUse(Player* player, PlayState* play);
 // anim). Returns 1, or 0 if the decode surface changed.
 s32 Zelda3D_PlayerForceBackwalk(Player* player, PlayState* play);
 
+// Sidestep (side-walk while Z-targeting): the real func_8083B030 installer -> Player_Action_9 +
+// side_walkR loop anim. Context-gated on Z-targeting (faithful, like Carry/Climb). Returns 1.
+s32 Zelda3D_PlayerForceSidestep(Player* player, PlayState* play);
+
 #ifdef __cplusplus
 }
 #endif

@@ -408,10 +408,13 @@ static void Z3D_Repl_Exec(PlayState* play, char* line) {
                 s32 ok = Zelda3D_PlayerForceBackwalk(player, play);
                 snprintf(out, sizeof(out), "linkstate backwalk -> %s (speedXZ=%.2f)",
                          ok ? "Player_Action_15" : "decode declined", player->speedXZ);
+            } else if (strcmp(arg, "sidestep") == 0) {
+                Zelda3D_PlayerForceSidestep(player, play);
+                snprintf(out, sizeof(out), "linkstate sidestep -> Player_Action_9 (side_walkR; Z-target-gated)");
             } else {
                 snprintf(out, sizeof(out),
                          "usage: linkstate <idle|walk|run|turn|roll|throw|attack|jump|shield|getitem|talk|"
-                         "putdown|death|damage|hang|carry|climb|swim|swimdive|itemuse|backwalk>");
+                         "putdown|death|damage|hang|carry|climb|swim|swimdive|itemuse|backwalk|sidestep>");
             }
             Z3D_Repl_Reply(out);
         }
