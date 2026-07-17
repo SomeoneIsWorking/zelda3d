@@ -389,12 +389,12 @@ highest-leverage TODO in the whole tracker (blocks all future MM sweeps).
 - notes: HIGH priority — blocks item mm.force-hook-layer below and everything downstream.
 
 ### mm.force-hook-layer — port Zelda3D_PlayerForce* pattern to MM
-- status: todo
+- status: re-partial
 - deps: mm.action-func-naming
-- evidence: `docs/re_control_debug_backlog.md` item #11; source pattern at OoT `Shipwright/soh/src/overlays/actors/ovl_player_actor/z_player.c:7611-7891`
-- where: target `Shipwright/mm/2s2h/zelda3d/mm3d_player_force.c` (does not exist)
-- gap: blocked on action-func naming above.
-- notes: 
+- evidence: **11 states ported + runtime-verified** (headless, South Clock Town). Foundation idle/walk/run (2026-07-15) + 8 more landed 2026-07-17: turn→Player_Action_TurnInPlace, roll→Player_Action_26, throw→Player_Action_42, attack→Player_Action_84, jump→Player_Action_25, shield→Player_Action_18, getitem→Player_Action_WaitForPutAway, talk→Player_Action_Talk. Each identified via OoT z_player.c Rosetta + adversarial decomp verify + per-symbol spot-check, installs the REAL action func via Player_SetAction (no synthetic pose/magic constant). Bodies `Shipwright/mm/src/overlays/actors/ovl_player_actor/z_player.c:8705+`, decls `Shipwright/mm/2s2h/zelda3d/mm3d_player_force.h`, REPL `linkstate <...>` in `Z3DRepl.c`. See `debug_journal/2026-07-17-mm-force-hooks-8-states.md`.
+- where: `Shipwright/mm/src/overlays/actors/ovl_player_actor/z_player.c` (hooks live in the actor overlay, next to the real installers, so they can call the file-static funcs/anims) + `mm/2s2h/zelda3d/mm3d_player_force.h` + `mm/2s2h/Z3DRepl.c`. (NOT a separate `mm3d_player_force.c` — that file never existed; the earlier note was wrong.)
+- gap: remaining states — climb/hang, death, backwalk/sidestep, and transformation-specific variants (Goron/Zora/Deku shield/roll) — each needs the same per-behavior MM action-func identification. NOT hard-blocked on the full 83-func naming pass: the per-behavior OoT-Rosetta approach identifies funcs one at a time as needed.
+- notes: also fixed a pre-existing MM-link regression along the way (shared libultraship's `Zelda3D_DbgInputEnabled` was defined SoH-side only → MM link failed; added the MM per-engine definition `mm/2s2h/zelda3d/mm3d_input_shim.c`). MM target now links clean.
 
 ### mm.repl-transport — MM REPL/FIFO transport
 - status: re-verified
