@@ -194,15 +194,20 @@ this repo — it's gitignored. ROMs (`*.z64`), archives (`*.o2r`/`*.otr`) and `b
 gitignored — never commit them.
 
 **Exception — genuinely third-party libs are NOT vendored flat; they are fork/upstream submodules.**
-Our own engine code (soh/2ship/libultraship/ZAPDTR) stays flattened as above, but third-party
-dependencies do NOT live in-tree. `StormLib` is patched (v9.25 + free-space optimization), so it is a
-**GitHub fork** `SomeoneIsWorking/StormLib` (branch `zelda3d`, byte-identical to the old vendored tree
-so the build is unchanged) referenced as a submodule at `Shipwright/libultraship/extern/StormLib` —
-update it there and bump the pointer. The CMake-`FetchContent` deps (rmlui/prism/dr_libs/monocypher/
-libgfxd-in-libultraship/…) already point at their real upstreams. STILL VENDORED FLAT (pristine, a
-follow-up to point at upstream `glankk/libgfxd` + `leethomason/tinyxml2`): `Shipwright/ZAPDTR/lib/
-libgfxd` and `.../tinyxml2` — these aren't patched, so they only need an upstream-pinned submodule, not
-a fork. (User directive 2026-07-17: third-party code is a fork/upstream submodule, not flattened.)
+Our own engine code (soh/2ship/libultraship) stays flattened as above, but third-party dependencies do
+NOT live in-tree. Two are GitHub forks (patched, so a fork carries the patch; each on a `zelda3d`
+branch byte-identical to the old vendored tree so the build is unchanged):
+- `SomeoneIsWorking/StormLib` (fork of ladislav-zezula/StormLib v9.25 + free-space optimization) →
+  submodule `Shipwright/libultraship/extern/StormLib`.
+- `SomeoneIsWorking/ZAPDTR` (fork of HarbourMasters/ZAPDTR @ #36 base + the ZTextMM MM message-table
+  extraction + a ZRom narrowing fix) → submodule `Shipwright/ZAPDTR`. **libgfxd + tinyxml2 live INSIDE
+  ZAPDTR** (`ZAPDTR/lib/…`, as upstream vendors them) — so they're out of the zelda3d repo via this one
+  submodule, no separate entries.
+
+Update a fork like any submodule (edit on its `zelda3d` branch, push, bump the pointer here). The
+CMake-`FetchContent` deps (rmlui/prism/dr_libs/monocypher/libgfxd-in-libultraship/…) already point at
+their real upstreams. (User directive 2026-07-17: third-party code is a fork/upstream submodule, not
+flattened. The old flat copies were also purged from git history to shrink the repo.)
 
 ## Hard rules
 

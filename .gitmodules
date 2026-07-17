@@ -8,3 +8,7 @@
 	path = Shipwright/libultraship/extern/StormLib
 	url = https://github.com/SomeoneIsWorking/StormLib.git
 	branch = zelda3d
+[submodule "Shipwright/ZAPDTR"]
+	path = Shipwright/ZAPDTR
+	url = https://github.com/SomeoneIsWorking/ZAPDTR.git
+	branch = zelda3d
