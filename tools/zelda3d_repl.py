@@ -8,6 +8,9 @@ rebuild + 7-min headless render. Tooling-first: never hand-run xvfb again.
 Subcommands:
   ready                 wait until the instance has warped in and the REPL is live
   cmd "<text>"          send a raw REPL command, print the reply
+  menu <button>...      drive a menu by button NAME (correct PC-native scancodes+timing):
+                        a=confirm(SPACE) start=open(ENTER) up/down/left/right=stick cup..=C dup..=D-pad
+                        e.g. `menu a` (confirm), `menu down a` (down+confirm)
                         (mul/diff/tint/enable/scale/spawn/dump/state)
   shot <name> [x0 y0 x1 y1]   dump the current frame -> scratch/screenshots/<name>.png
                         (optional crop box: also writes <name>_crop.png, upscaled)
@@ -85,6 +88,40 @@ def send(cmd, timeout=3.0):
                 return f.read().strip()
         time.sleep(0.03)
     return "(no reply)"
+
+
+# PC-native default keyboard->N64 button scancodes (#96; see memory soh3d-key-inject-menu-limit).
+# Codified so headless menu-driving needn't re-derive them — the pre-#96 "A=X/Start=SPACE" values
+# baked into the `key` command's old doc misled multiple sessions (menu confirm silently pressed an
+# unmapped key). Menu CONFIRM = a (SPACE=57); pause/menu OPEN = start (ENTER=28).
+MENU_KEYS = {
+    "a": 57, "b": 33, "z": 16, "r": 29, "l": 42, "start": 28,
+    "cup": 328, "cdown": 336, "cleft": 331, "cright": 333,
+    "dup": 23, "ddown": 37, "dleft": 36, "dright": 38,
+    "up": 17, "down": 31, "left": 30, "right": 32,  # left stick = WASD
+}
+
+
+def tap(scancode, hold=0.04, settle=0.5):
+    """One clean button press: down, brief hold, up, settle. hold ~0.04s = a single menu cursor step;
+    longer holds trigger the menu's key-repeat (moves several steps). Returns after `settle` seconds."""
+    send(f"key {scancode} 1")
+    time.sleep(hold)
+    send(f"key {scancode} 0")
+    time.sleep(settle)
+
+
+def menu(tokens, hold=0.04):
+    """Tap a sequence of buttons by NAME (a/b/z/r/l/start/up/down/left/right/cup/.../dup/...) or a raw
+    scancode int. e.g. `menu a` = confirm, `menu down a` = move-down-then-confirm. Codifies the correct
+    scancodes + single-step timing (the manual new-game/intro drive from the #151 session, now reusable
+    for any menu: file-select, name-entry, pause, options)."""
+    for tok in tokens:
+        sc = MENU_KEYS.get(tok.lower())
+        if sc is None:
+            sc = int(tok, 0)  # raw scancode fallback
+        tap(sc, hold=hold)
+        print(f"tapped {tok} (scancode {sc})")
 
 
 def wait_ready(timeout=180):
@@ -230,6 +267,13 @@ def main():
         print("ready" if wait_ready() else "TIMEOUT (instance not up)")
     elif sub == "cmd":
         print(send(sys.argv[2]))
+    elif sub == "menu":
+        # menu <button|scancode>...  — drive a menu by NAME with correct scancodes+timing.
+        # a=confirm(SPACE) start=open(ENTER) up/down/left/right=stick(WASD) cup..=arrows dup..=IJKL.
+        if len(sys.argv) < 3:
+            sys.exit("usage: menu <button|scancode>...  (a b z r l start up down left right "
+                     "cup cdown cleft cright dup ddown dleft dright); a=confirm, start=menu-open")
+        menu(sys.argv[2:])
     elif sub == "shot":
         png = shot(sys.argv[2])
         print(png)
