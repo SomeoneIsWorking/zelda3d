@@ -383,8 +383,9 @@ static void Z3D_Repl_Exec(PlayState* play, char* line) {
                 snprintf(out, sizeof(out), "linkstate hang -> Player_Action_48 (stateFlags1=0x%08X)",
                          player->stateFlags1);
             } else if (strcmp(arg, "carry") == 0) {
-                Zelda3D_PlayerForceCarry(player, play);
-                snprintf(out, sizeof(out), "linkstate carry -> Player_UpperAction_CarryActor (stateFlags1=0x%08X)",
+                s32 ok = Zelda3D_PlayerForceCarry(player, play);
+                snprintf(out, sizeof(out), "linkstate carry -> %s (stateFlags1=0x%08X)",
+                         ok ? "Player_UpperAction_CarryActor" : "NO heldActor (needs a lifted actor)",
                          player->stateFlags1);
             } else if (strcmp(arg, "climb") == 0) {
                 s32 entered = Zelda3D_PlayerForceClimb(player, play);
