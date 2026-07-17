@@ -108,7 +108,7 @@ struct HookRegisteringInfo {
                         const char* _function, HookType _type)
         : valid(true), file(_file), line(_line), column(_column), function(_function), type(_type) {
         // Trim off user parent directories
-        const char* trimmed = strstr(_file, "mm/2s2h/");
+        const char* trimmed = strstr(_file, "2ship/2s2h/");
         if (trimmed != nullptr) {
             file = trimmed;
         }

@@ -9,7 +9,7 @@
 // the sweep observes the real engine behavior. Bodies live in z_player.c itself (next
 // to func_80839E74/func_8083A794, whose non-static-but-undeclared internals they call).
 //
-// REPL surface: mm/2s2h/Z3DRepl.c `linkstate <idle|walk|run>`.
+// REPL surface: 2ship/2s2h/Z3DRepl.c `linkstate <idle|walk|run>`.
 #pragma once
 #include "global.h" // PlayState, Player
 
