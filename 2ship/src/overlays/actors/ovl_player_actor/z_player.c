@@ -8918,6 +8918,8 @@ s32 Zelda3D_PlayerForceClimb(Player* this, PlayState* play) {
 // block; forward-decl so ForceBackwalk drives the REAL decode + installer rather than bypassing them.
 s32 func_8083E404(Player* this, f32 arg1, s16 arg2);
 void func_8083AF8C(Player* this, s16 yaw, PlayState* play);
+// func_8083B030 (sidestep installer: Player_Action_9 + side_walkR loop anim) is defined below too.
+void func_8083B030(Player* this, PlayState* play);
 
 // Swim (treading water on the surface): func_808353DC's body (z_player.c:6452) — the surface-swim
 // action Player_Action_54 + swimer_swim_wait anim (MM analog of OoT's func_80838F18/ForceSwim).
@@ -8971,6 +8973,20 @@ s32 Zelda3D_PlayerForceBackwalk(Player* this, PlayState* play) {
         return 0;
     }
     func_8083AF8C(this, yawTarget, play);
+    return 1;
+}
+
+// Sidestep (side-walk while Z-targeting): func_8083B030 (z_player.c:9175) — the REAL installer for
+// Player_Action_9 + PLAYER_ANIMGROUP_side_walkR loop anim. Identified via the lock-on locomotion
+// dispatch (z_player.c:14974): `else if (speedTarget > 4.0f) func_8083B030(...)` is the sidestep
+// branch (stick-decode func_8083E404 == 0, i.e. lateral movement, at speed). Context-gated like
+// Carry/Climb: Player_Action_9's body exits to func_8083A794 unless Z-targeting
+// (Player_IsZTargetingWithHostileUpdate) — faithful precondition, not synthesized. Crash-safe:
+// func_8083B030 only plays an anim + installs the action (no heldActor/wallPoly deref).
+s32 Zelda3D_PlayerForceSidestep(Player* this, PlayState* play) {
+    if (Player_Action_9 != this->actionFunc) {
+        func_8083B030(this, play);
+    }
     return 1;
 }
 
