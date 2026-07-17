@@ -154,7 +154,7 @@ scary "Large" part is the shell we're already dropping.**
   `OTRExporter/OTRExporter/Exporter.h:9` + `VersionInfo.cpp:4` include
   `../../mm/2s2h/resource/type/2shResourceType.h`; `OTRExporter/CMakeLists.txt:93` has a
   `GAME_MM` vs `GAME_OOT` branch. BUT `GAME_STR` is **never `set()`** anywhere → always OOT, and there
-  is **no `mm/` dir on disk**. So the expected home is **`Shipwright/mm/2s2h/`**, currently a stub.
+  is **no `mm/` dir on disk**. So the expected home is **`2ship/2s2h/`**, currently a stub.
 - **ATTACH PLAN:** new `add_subdirectory(mm)` at top-level (~line 197) → a **second
   `add_executable(mm ...)`** linking the same in-tree `libultraship` STATIC. Two separate binaries is
   the natural model (avoids the one-process `Ship::Context` singleton collision — this is also the N3
@@ -192,7 +192,7 @@ Break table (effort assumes we DROP BenGui, per the N2 plan):
 
 ### N2 execution order (next)
 
-1. Populate `Shipwright/mm/` from 2S2H: `mm/src`, `mm/include`, `mm/assets`+`mm/data`, and a **trimmed**
+1. Populate `2ship/` from 2S2H: `mm/src`, `mm/include`, `mm/assets`+`mm/data`, and a **trimmed**
    `mm/2s2h/` = only the glue the core needs (BenPort minus the BenGui menu, GameInteractor hook layer,
    Extractor, libultra shims `mixer.c`/`gu_pc.c`/`framebuffer_effects.c`, resource types incl.
    `2shResourceType.h` the OTRExporter seam wants). Leave BenGui out (or stub its entry points).
@@ -206,7 +206,7 @@ Break table (effort assumes we DROP BenGui, per the N2 plan):
 
 ## N2 execution log (2026-07-01 — measured; supersedes the optimistic "N2 scouting" estimates)
 
-Integration home: `<engine>/Shipwright/mm/` (working tree; NOT yet committed — doesn't link yet).
+Integration home: `<engine>/2ship/` (working tree; NOT yet committed — doesn't link yet).
 Build: `cmake build-cmake && ninja -C build-cmake mm -k 0` (logs in zelda3d `scratch/logs/mm_n2/`).
 
 **Done (steps 1–3, all in the working tree):**
@@ -265,7 +265,7 @@ anim, etc.), NOT by soh/mm/top-level. So the clean path is a SEPARATE build dir:
 `cmake -S . -B build-mm-extract -G Ninja -DCMAKE_BUILD_TYPE=Release -DGAME_STR=MM` then
 `ninja -C build-mm-extract ZAPD` → `build-mm-extract/ZAPD/ZAPD.out` (a GAME_MM ZAPD; ~711 targets, it
 pulls libultraship as a dep — the trailing custom step exits 2 but `ZAPD.out` is built and valid). Run
-extraction from `Shipwright/mm/` mirroring 2ship's `ExtractAssets`:
+extraction from `2ship/` mirroring 2ship's `ExtractAssets`:
 `python3 ../OTRExporter/extract_assets.py -z <ZAPD.out> --non-interactive --xml-root ../mm/assets/xml
 --custom-otr-file 2ship.o2r --custom-assets-path $PWD/assets/custom --port-ver 9.2.3 "$ZELDA3D_MM_ROM"`
 → produces `mm.o2r` (36 MB, ROM assets, 660 xmls) + `2ship.o2r` (1 MB, custom). Copy both to

@@ -29,11 +29,11 @@ zelda   (base: N64-asset PC ports)          zelda3d  (our layer: 3DS-asset rende
 |------|-----------|----------|--------------------|
 | **zelda** | umbrella for the N64 base engines | `Shipwright/` | — |
 | **soh** | Ship of Harkinian (OoT N64 PC port) | `Shipwright/soh/` | `soh` / N64 `z_*` |
-| **2ship** | 2 Ship 2 Harkinian (MM N64 PC port) | `Shipwright/mm/` (dir/code say `2s2h` — see below) | `2s2h` / N64 `z_*` |
+| **2ship** | 2 Ship 2 Harkinian (MM N64 PC port) | `2ship/` (dir/code say `2s2h` — see below) | `2s2h` / N64 `z_*` |
 | shared base | libultraship (windowing, input, Fast3D, resources) | `Shipwright/libultraship/` | `Ship::` / `LUS::` |
 | **zelda3d** | umbrella for the 3DS render layer + its shared code | see the two branches | `zelda3d` / `Zelda3D_` |
 | **soh3d** | OoT3D render layer (in soh) | `Shipwright/soh/src/zelda3d/` | `zelda3d_*` / `Zelda3D_` |
-| **2ship3d** | MM3D render layer (in 2ship) | `Shipwright/mm/2s2h/zelda3d/` | `mm3d_*` / `Zelda3D_` |
+| **2ship3d** | MM3D render layer (in 2ship) | `2ship/2s2h/zelda3d/` | `mm3d_*` / `Zelda3D_` |
 | shared zelda3d | unified Link/player across soh3d + 2ship3d | `Shipwright/zelda3d_shared/` | `Zelda3D_` |
 | shared zelda3d | CMB (3DS model/texture format) library | `Shipwright/cmb3d/` | `cmb3d` |
 | reference | OoT3D decomp (ground truth for soh3d) | `oot3d-decomp/` (submodule) | — |

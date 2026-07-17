@@ -34,11 +34,11 @@ MM's action system parallels OoT's: `PlayerActionFunc` typedef (`mm/include/z64p
 (`z_player.c:4470`, OoT's `Player_SetupAction` analog; `this->actionFunc` at Player+0x748).
 
 **New files:**
-- `Shipwright/mm/2s2h/zelda3d/mm3d_player_force.h` — the C-API header, declaring
+- `2ship/2s2h/zelda3d/mm3d_player_force.h` — the C-API header, declaring
   `Zelda3D_PlayerForce{Idle,Walk,Run}`, mirroring `soh/.../z_player.c`'s `Zelda3D_PlayerForce*`
   surface.
 
-**New code in `Shipwright/mm/src/overlays/actors/ovl_player_actor/z_player.c`** (placed right after
+**New code in `2ship/src/overlays/actors/ovl_player_actor/z_player.c`** (placed right after
 `func_8083A794`, whose body Walk/Run reuse):
 - `Zelda3D_PlayerForceIdle` — installs `Player_Action_Idle` + `Player_GetIdleAnim(this)`. This is a
   literal duplication of `func_80839E74`'s body (the real idle installer), duplicated rather than
@@ -57,7 +57,7 @@ bodies), plus the live drive below.
 
 ## 3. REPL primitive wired
 
-`Shipwright/mm/2s2h/Z3DRepl.c` gained a `linkstate <idle|walk|run>` command (mirroring OoT's REPL
+`2ship/2s2h/Z3DRepl.c` gained a `linkstate <idle|walk|run>` command (mirroring OoT's REPL
 `linkstate`), dispatching to the three Force* hooks and replying with the installed action-func name
 + a state field (actionVar1 / speedXZ). Driven via `tools/mm_control.py query "linkstate <s>"` — no
 tool change needed since `query` passes arbitrary REPL strings through.
@@ -99,9 +99,9 @@ its own "find the natural installer → RE its body → add a Force* hook" pass:
   harness, neither of which exists. Selection-vs-decomp is the only axis available today.
 
 ## Files touched
-- `Shipwright/mm/2s2h/zelda3d/mm3d_player_force.h` (new)
-- `Shipwright/mm/src/overlays/actors/ovl_player_actor/z_player.c` (3 Force* hooks)
-- `Shipwright/mm/2s2h/Z3DRepl.c` (`linkstate` command + include)
+- `2ship/2s2h/zelda3d/mm3d_player_force.h` (new)
+- `2ship/src/overlays/actors/ovl_player_actor/z_player.c` (3 Force* hooks)
+- `2ship/2s2h/Z3DRepl.c` (`linkstate` command + include)
 - `docs/mm_parity_checklist.md` (new, seed)
 - `docs/re_control_debug_backlog.md` (item #11 → DONE-foundation)
 - `debug_journal/2026-07-15-mm-sweep-enablement.md` (this file)
