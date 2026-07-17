@@ -336,8 +336,40 @@ static void Z3D_Repl_Exec(PlayState* play, char* line) {
                 Zelda3D_PlayerForceRun(player, play);
                 snprintf(out, sizeof(out), "linkstate run -> Player_Action_14 (speedXZ=%.2f)",
                          player->speedXZ);
+            } else if (strcmp(arg, "turn") == 0) {
+                Zelda3D_PlayerForceTurnInPlace(player, play);
+                snprintf(out, sizeof(out), "linkstate turn -> Player_Action_TurnInPlace (turnRate=%d)",
+                         player->turnRate);
+            } else if (strcmp(arg, "roll") == 0) {
+                Zelda3D_PlayerForceRoll(player, play);
+                snprintf(out, sizeof(out), "linkstate roll -> Player_Action_26 (curFrame=%.2f)",
+                         player->skelAnime.curFrame);
+            } else if (strcmp(arg, "throw") == 0) {
+                Zelda3D_PlayerForceThrow(player, play);
+                snprintf(out, sizeof(out), "linkstate throw -> Player_Action_42 (PLAYER_ANIMGROUP_throw)");
+            } else if (strcmp(arg, "attack") == 0) {
+                Zelda3D_PlayerForceAttack(player, play);
+                snprintf(out, sizeof(out), "linkstate attack -> Player_Action_84 (meleeWeaponAnimation=%d)",
+                         player->meleeWeaponAnimation);
+            } else if (strcmp(arg, "jump") == 0) {
+                Zelda3D_PlayerForceJump(player, play);
+                snprintf(out, sizeof(out), "linkstate jump -> Player_Action_25 (velocityY=%.2f)",
+                         player->actor.velocity.y);
+            } else if (strcmp(arg, "shield") == 0) {
+                Zelda3D_PlayerForceShield(player, play);
+                snprintf(out, sizeof(out), "linkstate shield -> Player_Action_18 (stateFlags1=0x%08X)",
+                         player->stateFlags1);
+            } else if (strcmp(arg, "getitem") == 0) {
+                Zelda3D_PlayerForceGetItem(player, play);
+                snprintf(out, sizeof(out), "linkstate getitem -> Player_Action_WaitForPutAway (stateFlags1=0x%08X)",
+                         player->stateFlags1);
+            } else if (strcmp(arg, "talk") == 0) {
+                s32 id = Zelda3D_PlayerForceTalk(player, play, 600.0f);
+                snprintf(out, sizeof(out), "linkstate talk -> %s (talkActor textId=0x%x st1=0x%08X)",
+                         id ? "talking" : "NO NPC within 600u", player->actor.textId, player->stateFlags1);
             } else {
-                snprintf(out, sizeof(out), "usage: linkstate <idle|walk|run>");
+                snprintf(out, sizeof(out),
+                         "usage: linkstate <idle|walk|run|turn|roll|throw|attack|jump|shield|getitem|talk>");
             }
             Z3D_Repl_Reply(out);
         }
