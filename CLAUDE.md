@@ -29,38 +29,27 @@ Start every task by checking these THREE maps: skip closed cases (parity-map), f
   kanban (user-driven work items), these form one system: parity-map = what's closed,
   codemap = what exists, re-frontier = RE progress, parity-workflow = method, kanban = work items.
 
-## The backlog is a kanban on GitHub Issues — USE IT
+## The backlog is a LOCAL kanban in `KANBAN.md` — USE IT
 
-The backlog is **GitHub Issues** on this repo (`SomeoneIsWorking/zelda3d`, private), driven by
-**`tools/kanban.py`**. It is the source of truth across all agents and machines. `BACKLOG.md` is
-just a pointer; `KANBAN.md` is a generated offline mirror.
+The backlog is a **local markdown board, `KANBAN.md`** — it IS the source of truth (no GitHub
+Issues; GitHub made screenshot attachment awkward, user directive 2026-07-17). `BACKLOG.md` is just a
+pointer. Edit `KANBAN.md` directly with the normal file tools — there is no `kanban.py` / `gh` round-trip.
 
-- **Find work:** `tools/kanban.py ls` (open cards by column) / `ls --status reopened` / `show <#>`.
-  Offline or fresh: read `KANBAN.md`.
-- **Columns** are `status:<col>` labels; **done = closed issue**:
-  `todo · in-progress · in-review · needs-confirmation · reopened · blocked`.
-- **Work a card:** `mv <#> in-progress` → fix → `mv <#> in-review` (while verifying) →
-  `mv <#> needs-confirmation` (fix shipped, awaiting user) → user closes it. `reopen <#>` if it
-  regressed. Don't self-close a user-visible visual fix — post proof and let the user confirm.
-- **File a bug:** `tools/kanban.py add --title "..." --labels type:render,... [--body-file f]`.
-  Capture new playtest reports as cards immediately.
-- **HARD RULE — kanban is for USER-DRIVEN work ONLY.** Kanban holds requests the user
-  has personally made or parity issues the user has personally reported. **Agent-run
-  parity sweeps do NOT produce kanban cards.** When a sweep uncovers a divergence
-  (wrong CMB, missing behavior, N64 fallback, whatever), fix it in-session — close-test
-  + fix + commit — and record the finding in `debug_journal/` for the durable trail.
-  A backlog of sweep-discovered gaps is a workflow smell: it lets parity work accumulate
-  as a to-do list instead of being closed in the session that found it. If the finding
-  is genuinely beyond in-session scope, note it in the journal and continue the loop
-  in the same session (or start a fresh context with a handoff brief). Do not file.
-  (User directive 2026-07-02 — cards #135-#143 were misfiled sweep output and cleaned up.)
-- **Screenshots:** `tools/kanban.py evidence <#> shot.png --caption "..."` — uploads to the
-  `evidence-assets` GitHub release and embeds by URL. `--to-body` = original bug evidence;
-  default (comment) = fix-verification proof. **Never commit PNGs to the repo.**
-- After board changes, `tools/kanban.py render` and commit `KANBAN.md`.
-
-Full workflow: the **soh3d-kanban** skill. Detail on any item: its issue body +
-`kanban/ARCHIVE_BACKLOG_pre_kanban.md` (pre-migration history).
+- **Find work:** read `KANBAN.md` (cards grouped under column headings).
+- **Columns:** `todo · in-progress · in-review · needs-confirmation · blocked · done`.
+- **Work a card:** move its line under the next column heading — `todo` → `in-progress` → `in-review`
+  (while verifying) → `needs-confirmation` (fix shipped, awaiting user). The user confirms user-visible
+  fixes (move to `done` / delete it); don't self-close them. Move back to an earlier column if it regressed.
+- **Add a card:** append `- [#N] <title> — <notes>` under `todo` (N = next simple id). Capture user
+  reports immediately.
+- **HARD RULE — kanban is for USER-DRIVEN work ONLY.** It holds requests the user has personally made
+  or parity issues the user has personally reported. **Agent-run parity sweeps do NOT produce cards.**
+  When a sweep uncovers a divergence (wrong CMB, missing behavior, N64 fallback, whatever), fix it
+  in-session — close-test + fix + commit — and record the finding in `debug_journal/`. A backlog of
+  sweep-discovered gaps is a workflow smell. If a finding is genuinely beyond in-session scope, note it
+  in the journal and continue the loop. Do not file. (User directive 2026-07-02.)
+- **Screenshots:** attach them in chat, or drop the file under `scratch/kanban/` (gitignored) and link
+  it from the card. **Never commit PNGs to the repo.**
 
 ## RULE: every fix MUST post evidence before it leaves `in-progress`
 
