@@ -9,6 +9,13 @@
 // early Zelda3D_TryCameraBehavior(CAM_FUNC_NORM1, camera) check. During staged porting, `update`
 // returns false → legacy runs; when the port is verified against the Kakariko sweep it flips to
 // true and takes over.
+//
+// NOTE (2026-07-17): the 28-unit drift is NOT the extra Camera_CalcAtDefault at.y term first
+// suspected — that term (`at.y += player[0x1760]·-0.01`) is a Grezzo motion-only Y-bias that decays
+// to 0 at rest, so it is exactly 0 at the matched/idle pose this drift was measured under. Cause is
+// unlocalized; likely the eye distance/pitch path. Next step is an empirical converged-pose eye.y
+// A/B (SoH `posinfo` vs oracle `cam_eye`), not more static diffing. See docs/re-frontier.md
+// camera.normal1 + debug_journal/2026-07-17-oot3d-dat-constants-and-camera-normal1-yoffset.md.
 #ifndef ZELDA3D_BEHAVIORS_CAMERA_NORMAL1_H
 #define ZELDA3D_BEHAVIORS_CAMERA_NORMAL1_H
 

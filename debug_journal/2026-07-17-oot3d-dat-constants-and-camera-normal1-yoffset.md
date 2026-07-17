@@ -1,5 +1,23 @@
 # OoT3D DAT-constant resolution + Camera_Normal1 yOffset match (2026-07-17)
 
+> **FALSIFIED (2026-07-17, later same day) — read this first.** The conclusion below that
+> Camera_CalcAtDefault's extra at-Y term (`at.y += player[0x1760]·−0.01`) is "the SOLE divergence"
+> for the persistent ~28-unit Kakariko eye-Y drift is **WRONG**. That term is driven by
+> `player[0x1760]`, an accumulator that **decays 400/frame to 0 and clears its enable flag (0x100)
+> whenever Link is NOT actively rising in the walk/run action** (writer `FUN_00250ad0` else-branch,
+> 00250ad0.c:1186-1205). So at a *matched/idle* pose (how the 28-unit drift was measured — normal1.h:
+> "matched Link pose", commit 28f24f23) the term is **exactly 0** and at.y is identical on both sides
+> (`playerPos.y + posOffset.y`). A zero term cannot produce a *persistent* offset. The at.y Y-bias is a
+> **real but motion-only** 3DS behavior (camera Y lags Link's fast vertical rises), NOT the idle-drift
+> cause. Since `eye.y = at.y + r·sin(pitch)` and at.y matches at idle, the real steady-state drift
+> (if it is real and not a non-converged-spring / init-path artifact) is in the **eye distance (r) or
+> pitch** path — the very candidates §"pitch clamps RULED OUT" listed before this note wrongly latched
+> onto at.y. **Next step is EMPIRICAL, not more static RE:** re-measure Kakariko eye-Y under matched
+> pose held to spring convergence (SoH `posinfo` eye vs oracle cam), confirm the drift is a real
+> steady state, THEN diff eye r/pitch. RE gains from the at.y detour that DO stand: action
+> `0x4ba378` = the ground walk/run locomotion action (drives the bias); `player[0x2c]` = world.pos.y;
+> `player[0x10c]` = a world.pos.y snapshot taken at state transitions; decay 400/frame, threshold 9.
+
 ## Unblocked: reading ANY OoT3D `DAT_00xxxxxx` pool constant
 
 The raw Ghidra decomps (`oot3d-decomp/build/decomp/*.c`) reference tuning constants as
