@@ -57,6 +57,30 @@ s32 Zelda3D_PlayerForceGetItem(Player* player, PlayState* play);
 // Player_Action_Talk (Player_SetupTalk). Returns the NPC's actor id, or 0 if none in range.
 s32 Zelda3D_PlayerForceTalk(Player* player, PlayState* play, f32 range);
 
+// --- Extended states batch 2 (2026-07-17) ---
+
+// Put-down: Player_Action_41 + put anim (Player_ActionHandler_9's PUT_DOWN branch, sibling of Throw).
+s32 Zelda3D_PlayerForcePutDown(Player* player, PlayState* play);
+
+// Death: sets playerData.health = 0; MM's per-frame check drives the real Player_Action_77 entry next
+// frame(s) (precondition-only, mirrors OoT's ForceDeath). Read the state a few frames later, not same-frame.
+s32 Zelda3D_PlayerForceDeath(Player* player, PlayState* play);
+
+// Damage recoil: Player_Action_20 + front-hit anim (func_80833B18's grounded-recoil branch).
+s32 Zelda3D_PlayerForceDamage(Player* player, PlayState* play);
+
+// Hang (ledge grab, hands-only): Player_Action_48 + jump_climb_hold anim + PLAYER_STATE1_2000
+// (func_80837CEC's non-poly core). Needs a real ledge to hold beyond the install frame.
+s32 Zelda3D_PlayerForceHang(Player* player, PlayState* play);
+
+// Carry-idle: CarryActor upper action + carryB_wait (func_808313F0's true branch). Needs a live
+// heldActor to persist beyond the install frame (Player_UpperAction_CarryActor drops carry otherwise).
+s32 Zelda3D_PlayerForceCarry(Player* player, PlayState* play);
+
+// Climb (ladder/wall): runs the real func_8083D860 gate (-> Player_Action_50). Returns 1 entered,
+// 0 declined, -1 no wallPoly. Requires a real wallPoly + tall-enough wall.
+s32 Zelda3D_PlayerForceClimb(Player* player, PlayState* play);
+
 #ifdef __cplusplus
 }
 #endif
