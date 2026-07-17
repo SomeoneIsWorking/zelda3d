@@ -8877,6 +8877,12 @@ s32 Zelda3D_PlayerForceHang(Player* this, PlayState* play) {
 // Player_UpperAction_CarryActor re-checks heldActor==NULL every tick and drops carry if unset, so without
 // a genuinely-lifted actor this holds for the install frame only.
 s32 Zelda3D_PlayerForceCarry(Player* this, PlayState* play) {
+    // Carry needs something to carry — this is the real PRECONDITION, not an entry gate to bypass:
+    // the natural path (func_808313A8) also bails on heldActor==NULL, and forcing CARRYING_ACTOR with
+    // no heldActor null-derefs a frame later (verified: it crashes MM). Return 0 when nothing is held.
+    if (this->heldActor == NULL) {
+        return 0;
+    }
     this->stateFlags1 |= PLAYER_STATE1_CARRYING_ACTOR;
     func_80836988(this, play);
     Player_SetUpperAction(play, this, Player_UpperAction_CarryActor);
