@@ -385,8 +385,8 @@ highest-leverage TODO in the whole tracker (blocks all future MM sweeps).
 - deps: 
 - evidence: `docs/re_control_debug_backlog.md` item #11 — 19 action funcs already named (`Player_Action_Idle`, `_Rolling`, `_Talk`, `_TurnInPlace`, `_HookshotFly`, `_Shielding`, `_Throwing`, ...) via `PlayerActionFunc` typedef (`z64player.h:1121`), install primitive `Player_SetAction` (`z_player.c:4470`)
 - where: `2ship/src/overlays/actors/ovl_player_actor/z_player.c`
-- gap: this IS the RE-ready next step for MM player — comparable scope to OoT's z_player.c RE debt.
-- notes: HIGH priority — blocks item mm.force-hook-layer below and everything downstream.
+- gap: this IS the RE-ready next step for MM player — comparable scope to OoT's z_player.c RE debt. 83 numbered `Player_Action_NN` remain unnamed in `2ship/src/overlays/actors/ovl_player_actor/z_player.c` (19 already named via the `PlayerActionFunc` typedef + `Player_SetAction` install primitive).
+- notes: HIGH priority — blocks mm.force-hook-layer + everything downstream. **PREREQUISITE / METHOD (assessed 2026-07-17):** no upstream MM decomp naming reference is vendored in-repo (checked: only our `2ship/` fork tree + `2ship/2s2h/zelda3d/mm3d_player.c`), and OoT's `z_player.c` is only a PARTIAL Rosetta stone (OoT names ~9 action funcs; MM has 83 — MM adds transformations/masks with no OoT analog). So each name must come from **per-function behavioral RE** (call-site context, `Player_SetAction*` install sites, SFX/anim IDs, state-flag reads), NOT a mechanical cross-map — a genuine MULTI-SESSION effort. Do NOT batch-guess names (confidently-wrong names are worse than numbered). Best done in a dedicated fresh context, one verified function at a time.
 
 ### mm.force-hook-layer — port Zelda3D_PlayerForce* pattern to MM
 - status: re-partial
