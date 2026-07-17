@@ -142,3 +142,15 @@ Once actors pose correctly:
 - Stage 2: play a scene with an NPC; pose animates. Screenshot per anim state.
 - Stage 3: run the collider regression that #107 introduced.
 - Stage 4: motion-parity harness (existing OoT one) — port to MM oracle.
+
+> **Drive #2 (2026-07-17) — MM3D rigid actor rendering CONFIRMED live in gameplay; still no skinned rig
+> to grade.** `tp` works (the earlier "tp broken" was a false read — (-2698,48,-1139) was a non-walkable
+> enemy position that voided Link back; tp to walkable spots moves him fine, Y auto-snaps to floor).
+> Drove Link across Termina Field via `tp`; the MM3D provider mapped + rendered these actors, **ALL
+> rigid (1 bone)**: slime (obj 0x16A), bigicicle (0x1AD), bombiwa (0x12A), gs (0x143), plus scene props
+> (obj_tokeidai/keikoku_obj/fall). So MM3D actor substitution is live in real gameplay — but Termina
+> Field's common enemies are rigid, so NONE exercises the skinned retarget. (Also: the slime rendered
+> visibly mis-scaled at the 0.1 default — a Stage-3 scale-calibration TODO, `scratch/screenshots/
+> mm_termina_slime.png`.) NEXT for the skinned grade: identify which MM3D archives are >1 bone from
+> `scratch/mm3d_actor_archives.md`, then reach an actor using one — a humanoid NPC (Clock Town
+> townsfolk) or a humanoid enemy (Garo/Stalchild/ReDead/dungeon boss), NOT the rigid field creatures.
