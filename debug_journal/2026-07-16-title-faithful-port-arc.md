@@ -138,3 +138,37 @@ the +0x1b0 index during 1380–1619?** If gallop → hypothesis (b) cue-decode; 
 hypothesis (a) root motion. Resolving +0x1b0 (index into the table at iRam00253750) is the next
 Ghidra step. (Probe kept in scratch; rebuild: `g++ -std=c++17 -I Shipwright/cmb3d
 scratch/mm3d_gar_test/csab_rootmotion.cpp Shipwright/cmb3d/asset/{ctr_rom,zar,lzs,cmb,csab}.cpp`.)
+
+## 5d. RESOLVED (mechanism) 2026-07-17 — SoH forces rearing; oracle plays a moving root-motion clip
+
+Cross-reading FUN_002535f0 (§5b), the horse-CSAB root-motion probe (§5c), and the SoH port's own
+0x41 handling pins the mechanism of the §5 divergence.
+
+**SoH side (z_en_horse.c, cue 0x41 → funcIdx 5):**
+- `EnHorse_CsWarpRearingInit` (idx5 init): warp-teleport to cue startPos, then
+  `this->animationIdx = ENHORSE_ANIM_REARING` + Animation_Change(rearing, ONCE).
+- `EnHorse_CsWarpRearing` (idx5 action, the claimed FUN_002535f0 twin): `speedXZ = 0.0f` every frame;
+  on SkelAnime_Update completion → ENHORSE_ANIM_IDLE. **No position update; rearing/idle are in-place.**
+  So SoH's horse rears then stands — it CANNOT translate.
+
+**3DS side (FUN_002535f0):** zeroes speed (+0x6c=0) BUT actively SELECTS/CHANGES the animation via the
+`+0x1b0` index (FUN_0036ae14 pick + FUN_003204a4/FUN_00358338 animation-change). It does NOT hardcode
+rearing — the clip is dynamic.
+
+**Root-motion probe (§5c):** rearing/idle are in-place; but `slowrun2_30` (netZ=−50) and the transition
+clips (−61/−88) carry net root Z. The oracle horse TRANSLATES during 1380–1619, and an in-place clip
+(rearing/idle/gallop) cannot translate at speed 0 → **the oracle's +0x1b0 clip is a net-root-motion
+locomotion clip (slowrun / a transition), and the horse moves via that clip's root motion.**
+
+**Therefore the SoH twin `EnHorse_CsWarpRearing` is NOT a faithful port of FUN_002535f0** — the "1:1
+structural" claim (title_rider.cpp L25) is wrong on the animation selection: SoH plays a fixed
+rearing→idle while the 3DS plays the +0x1b0-indexed moving clip. That's the whole §5 divergence:
+SoH rears/stands in place, the oracle walks via clip root motion.
+
+**FIX DIRECTION (next):** the 0x41 handler must replicate FUN_002535f0's clip selection — play the
++0x1b0-indexed clip and CONSUME its root-bone translation onto the horse world.pos (Zelda3D applies the
+clip root motion; do NOT integrate speed, which is 0). Exact clip id still needs the +0x1b0 value
+(dynamic obs via harness, or Ghidra correlation of the +0x1b0 writer — a NON-rider-struct write per the
+2026-07-17 static-search dead end), but the mechanism + fix shape are now settled. This is hypothesis
+(a) CONFIRMED (root motion), hypothesis (b) cue-window-decode RULED OUT (the window/action decode is
+right; the handler port's anim selection is what's wrong).
