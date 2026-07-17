@@ -392,10 +392,26 @@ static void Z3D_Repl_Exec(PlayState* play, char* line) {
                 snprintf(out, sizeof(out), "linkstate climb -> Player_Action_50 (%s, av1=%d st1=0x%08X)",
                          entered == 1 ? "entered" : entered == 0 ? "declined" : "no wallPoly",
                          player->av1.actionVar1, player->stateFlags1);
+            } else if (strcmp(arg, "swim") == 0) {
+                Zelda3D_PlayerForceSwim(player, play);
+                snprintf(out, sizeof(out), "linkstate swim -> Player_Action_54 (depthInWater=%.2f)",
+                         player->actor.depthInWater);
+            } else if (strcmp(arg, "swimdive") == 0) {
+                Zelda3D_PlayerForceSwimDive(player, play);
+                snprintf(out, sizeof(out), "linkstate swimdive -> Player_Action_59 (av2=%d st1=0x%08X st2=0x%08X)",
+                         player->av2.actionVar2, player->stateFlags1, player->stateFlags2);
+            } else if (strcmp(arg, "itemuse") == 0) {
+                Zelda3D_PlayerForceItemUse(player, play);
+                snprintf(out, sizeof(out), "linkstate itemuse -> Player_Action_68 (av2.actionVar2=%d)",
+                         player->av2.actionVar2);
+            } else if (strcmp(arg, "backwalk") == 0) {
+                s32 ok = Zelda3D_PlayerForceBackwalk(player, play);
+                snprintf(out, sizeof(out), "linkstate backwalk -> %s (speedXZ=%.2f)",
+                         ok ? "Player_Action_15" : "decode declined", player->speedXZ);
             } else {
                 snprintf(out, sizeof(out),
                          "usage: linkstate <idle|walk|run|turn|roll|throw|attack|jump|shield|getitem|talk|"
-                         "putdown|death|damage|hang|carry|climb>");
+                         "putdown|death|damage|hang|carry|climb|swim|swimdive|itemuse|backwalk>");
             }
             Z3D_Repl_Reply(out);
         }
