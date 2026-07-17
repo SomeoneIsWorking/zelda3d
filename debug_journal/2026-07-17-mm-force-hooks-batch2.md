@@ -45,3 +45,20 @@ must set up that context, or drive Link into it, to observe those two poses).
 
 swim/swimdive, itemuse, backwalk/sidestep, climbmove, and transformation-specific variants (Goron/Zora/
 Deku). Same per-behavior OoT-Rosetta approach. Tracked on re-frontier `mm.force-hook-layer`.
+
+---
+
+## Batch 3 (+4 → 21 total)
+
+Same pipeline. Identified + verified + runtime-confirmed (South Clock Town, MM survives all 4):
+
+| behavior | MM install | source |
+|----------|-----------|--------|
+| swim | `Player_Action_54` + swimer_swim_wait | func_808353DC :6452 (no water precondition — only reads always-valid Actor fields) |
+| swimdive | `Player_Action_59` + swim anim + own water flags | mirrors OoT ForceSwimDive; sets PLAYER_STATE1_8000000(IN_WATER)+PLAYER_STATE2_400(UNDERWATER), unk_AAA=0x3E80, av2=1 |
+| itemuse | `Player_Action_68` + bottle miss anim | func_8083A6C0 dispatch :8637 (av2=0 dry-land family; body only compares bottle state, safe w/o bottle) |
+| backwalk | `Player_Action_15` + anchor_back_walk | drives the REAL func_8083E404 decode (byte-identical to OoT func_8083FC68) with a dead-behind stick → func_8083AF8C :9105 (not a bypass) |
+
+Runtime: `swim -> Player_Action_54`, `swimdive -> Player_Action_59 (st1=0x08000000 st2=0x00000400)` (the exact water flags the hook sets), `itemuse -> Player_Action_68`, `backwalk -> Player_Action_15 (speedXZ=8.00)` (real decode entered the backward branch). No crashes; MM posinfo live after.
+
+Remaining: transformation-specific states (Goron/Zora/Deku), climbmove, and the mm_sweep orchestrator (blocked on an MM oracle). Same per-behavior Rosetta approach.
