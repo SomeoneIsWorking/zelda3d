@@ -106,10 +106,27 @@ Prove skinned CMB rendering end-to-end using MM3D bind-pose bones only.
 > + the identity bone→limb map produce correct-looking poses on complex animated humanoid (15–20 bone)
 > AND quadruped (12 bone) rigs — the divergent-bone-order fear did not materialize on these. (The
 > `[MM3D] skinned-tpose ... (Stage 1 bind-pose draw)` log TEXT is stale — the actual draw is the wired
-> Stage-2 path; the dynamic NPC pose proves it.) NEXT (rigorous): oracle A/B (Azahar MM3D, same SCT
-> view) to catch SUBTLE per-bone retarget errors a gross visual grade can miss; if that holds, the
-> case for enabling the gate by default (dropping `ZELDA3D_MM_SKINNED_TPOSE`) is strong. The stale
-> `mm3d_model.cpp:275` log text should also be updated to say "Stage-2 posed draw".
+> Stage-2 path; the dynamic NPC pose proves it.)
+>
+> **Stage-2 CODE-VERIFIED (2026-07-17, follow-up):** confirmed by reading the path, not just the
+> screenshot — the intercept is wired at THREE SkelAnime choke points (`2ship/src/code/z_skelanime.c`
+> :331/:454/:601 → `Zelda3D_MM_InterceptSkelAnime`), and `mmUpdateAnimN64` (mm3d_model.cpp:350) poses
+> each CMB bone from the LIVE N64 `jointRots[limb*3..]` (binang→rad, `Rz·Ry·Rx`, parent-walk, skin =
+> `world·inverse(bind)`) with the identity `limb = bone.id` retarget. So the visible rigs are genuinely
+> live-animated MM3D skinned CMBs — the grade is now code-verified, not just visual. Fixed the stale
+> `mm3d_model.cpp:258-275` comment + log (said "Stage 1 T-pose / not yet wired / T-pose ugly" — all
+> stale; now "Stage-2 live-posed draw", with the legacy env-var name noted).
+>
+> NEXT (rigorous grade — oracle A/B is INFEASIBLE right now): there is **no MM3D oracle tooling** (all
+> `tools/oracle_*` are OoT3D-only) and frame-matching *animated, moving* actors between two runs is
+> unreliable — so "oracle A/B" needs MM oracle infra built first (a separate effort). The feasible,
+> deterministic rigorous grade instead is a **static skeleton-topology check**: for each skinned
+> archive, compare the CMB bone hierarchy (parent-index array / bone order) against the N64 actor's
+> FlexSkeleton limb hierarchy — where they match, the identity map is provably correct; where they
+> diverge, that archive needs a per-archive `BoneMap` (replacing mmUpdateAnimN64's identity
+> `limb = bone.id`). Plus a broader rig/scene survey (enemy-dense scenes) to catch any grossly-divergent
+> rig. Once identity is validated (or bone-maps added) across the common rigs, **enable the gate by
+> default** — the old "T-pose looks worse than N64" reason is gone (it live-poses correctly now).
 
 Now pose the skinned model from the LIVE N64 animation.
 

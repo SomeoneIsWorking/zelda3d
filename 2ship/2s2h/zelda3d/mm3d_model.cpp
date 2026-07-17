@@ -255,24 +255,27 @@ static int resolveModelForObject(int objectId) {
         return -1;
     }
     if (probeCmb.bones().size() > 1) {
-        // Skinned — full path (live N64 pose via the SkelAnime intercept, per
-        // docs/MM_SKELANIME_PORT.md) not yet wired. Env-var gate ZELDA3D_MM_SKINNED_TPOSE=1
-        // opts into Stage 1: render the archive at CMB bind pose (T-pose) via the same
-        // static draw path — proves end-to-end skinned CMB loading + rendering before the
-        // SkelAnime hook lands. Not enabled by default because a T-pose enemy walking
-        // around looks worse than the vanilla N64 model.
-        static int sTposeAll = -1;
-        if (sTposeAll < 0) {
+        // Skinned — the Stage-2 SkelAnime intercept IS wired (z_skelanime.c choke points ->
+        // Zelda3D_MM_InterceptSkelAnime -> SkelAnimeDrawRaw -> mmUpdateAnimN64, which poses the
+        // CMB from the LIVE N64 jointTable via the identity bone->limb retarget). Accepting a
+        // skinned archive here therefore yields a live-animated MM3D draw, NOT a T-pose.
+        // Graded POSITIVE on complex rigs in default South Clock Town (dog 12-bone, humanoid
+        // NPC 15-20 bone pose correctly — docs/MM_SKELANIME_PORT.md Stage-2 status).
+        // Still behind the ZELDA3D_MM_SKINNED_TPOSE env gate (legacy name — no longer T-pose)
+        // pending broader game-wide validation + per-archive bone-maps for rigs whose CMB bone
+        // order diverges from the N64 limb order (mmUpdateAnimN64's identity assumption).
+        static int sSkinnedEnable = -1;
+        if (sSkinnedEnable < 0) {
             const char* v = getenv("ZELDA3D_MM_SKINNED_TPOSE");
-            sTposeAll = (v != nullptr && v[0] != '\0' && v[0] != '0') ? 1 : 0;
+            sSkinnedEnable = (v != nullptr && v[0] != '\0' && v[0] != '0') ? 1 : 0;
         }
-        if (!sTposeAll) {
+        if (!sSkinnedEnable) {
             fprintf(stderr, "[MM3D] skip obj=0x%03X (%s): skinned (%zu bones)\n",
                     objectId, name, probeCmb.bones().size());
             g_objectToModel[objectId] = -1;
             return -1;
         }
-        fprintf(stderr, "[MM3D] skinned-tpose obj=0x%03X (%s): %zu bones (Stage 1 bind-pose draw)\n",
+        fprintf(stderr, "[MM3D] skinned obj=0x%03X (%s): %zu bones (Stage-2 live-posed draw)\n",
                 objectId, name, probeCmb.bones().size());
     }
     bool isSkinned = probeCmb.bones().size() > 1;
