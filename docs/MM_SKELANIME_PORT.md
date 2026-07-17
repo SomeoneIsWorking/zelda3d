@@ -152,6 +152,24 @@ Prove skinned CMB rendering end-to-end using MM3D bind-pose bones only.
 > mmUpdateAnimN64's identity `limb = id` with the map, and re-run `[MM3D-TOPO]` (should report OK) +
 > a visual re-check. The `an1`/`mm` bone-count deltas need handling too (extra/absent bones).
 
+> **FIXED — auto-derived retarget map, all rigs now hierarchy-consistent (2026-07-17).** The
+> divergence is NOT a re-rig (my earlier CSAB worry was wrong): dumping the full both-side structure
+> (`ZELDA3D_MM_SKINNED_TOPO=1`, positions added to `[MM3D-TOPO]`) showed the N64 `jointPos` and CMB
+> `trans` are in the SAME scale and the two skeletons are a **clean bijection that preserves the
+> hierarchy** — a pure reordering (dog: n64 limb2↔cmb bone4, limb3↔bone7, … verified by both parent
+> AND identical local rest-position; idx0/1/11 already identity). So `Zelda3D_MM_BuildRetargetMap`
+> (mm3d_model.cpp) auto-derives the correspondence per archive: walk the CMB tree parent-first and,
+> among N64 limbs whose already-mapped parent matches, pick the one whose local rest-position is
+> nearest. mmUpdateAnimN64 now uses `boneToN64[bone.id]` instead of identity `limb = id`. Result
+> (`scratch/logs/mm3d_retarget_result.txt`) — **every rig maps hierarchy-consistently**: dog 12/12,
+> sdn 16/16, mm 15/15 FULL/CONSISTENT (all previously DIVERGENT); an1 13/20 mapped + consistent (the
+> 7 extra Grezzo detail bones have no N64 limb → correctly stay at bind rot). The self-check
+> (`n64Parent[map[B]] == map[cmbParent[B]]` for every mapped bone) passes 100%. Visual: rigs render
+> clean (`scratch/screenshots/retarget_dog.png`), no mangling/T-pose. NEXT: broader enemy-scene survey
+> to confirm the auto-map holds game-wide (structurally-identical siblings with equal rest-positions —
+> e.g. symmetric limbs — are matched arbitrarily among themselves, harmless when interchangeable but
+> worth a spot-check on a rig with distinct-but-mirrored limbs), then **enable the gate by default**.
+
 Now pose the skinned model from the LIVE N64 animation.
 
 - Add `MM_Zelda3D_SkelAnimeDraw{,Raw}` + `MM_Zelda3D_SetLimbOverride` +

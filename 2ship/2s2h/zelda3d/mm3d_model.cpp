@@ -62,6 +62,12 @@ struct Loaded {
     std::vector<Zelda3DGlGroup> cGroups;
     std::vector<Zelda3DGlTex> cTexs;
     bool ok = false;
+    // Retarget map: boneToN64[cmbBoneId] = N64 limb index whose jointRot poses that bone,
+    // or -1 (no N64 counterpart -> stays at bind rot). Auto-derived once from the live N64
+    // skeleton (parent + local-pos correspondence) by Zelda3D_MM_BuildRetargetMap; empty
+    // until built (mmUpdateAnimN64 falls back to identity while empty).
+    std::vector<int> boneToN64;
+    bool retargetBuilt = false;
 };
 std::unordered_map<int, std::unique_ptr<Loaded>> g_loaded;
 
@@ -377,9 +383,13 @@ static void mmUpdateAnimN64(int modelId, const int16_t* jointRots, int rotCount)
         if (done[id]) return aw[id];
         const CmbBone* bn = byId[id];
         Mat4 L = matT(bn->trans[0], bn->trans[1], bn->trans[2]);
-        // Identity retarget: bone id == limb index. Stage 3 will replace this with
-        // a per-archive bone-map lookup for rigs whose topology diverges.
+        // Retarget: use the auto-derived N64-limb->CMB-bone correspondence
+        // (Zelda3D_MM_BuildRetargetMap) when available; fall back to identity `limb = id`
+        // only while the map is unbuilt. -1 (no N64 counterpart) -> bind rot via the guard below.
         int limb = id;
+        if (!lm->boneToN64.empty() && id >= 0 && id < (int)lm->boneToN64.size()) {
+            limb = lm->boneToN64[id];
+        }
         if (limb >= 0 && limb < rotCount) {
             float rx = jointRots[limb * 3 + 0] * kBinangToRad;
             float ry = jointRots[limb * 3 + 1] * kBinangToRad;
@@ -488,7 +498,7 @@ void Zelda3D_MM_OverridePending(float worldScale, float groundOffset) {
 
 int Zelda3D_MM_PendingModelId(void) { return g_pending.modelId; }
 
-void Zelda3D_MM_GradeTopology(int modelId, const int* n64Parents, int n64LimbCount) {
+void Zelda3D_MM_GradeTopology(int modelId, const int* n64Parents, const float* n64Pos, int n64LimbCount) {
     static int sTopoEnable = -1;
     if (sTopoEnable < 0) {
         const char* v = getenv("ZELDA3D_MM_SKINNED_TOPO");
@@ -506,18 +516,22 @@ void Zelda3D_MM_GradeTopology(int modelId, const int* n64Parents, int n64LimbCou
     if (lm == nullptr || !lm->ok || !lm->cmb) return;
     const auto& bones = lm->cmb->bones();
 
-    // CMB parent array indexed by bone id (identity map means bone.id == N64 limb index).
+    // CMB parent + local-trans indexed by bone id (identity map means bone.id == N64 limb index).
     int cmbMax = -1;
     for (const auto& b : bones) cmbMax = std::max(cmbMax, b.id);
     std::vector<int> cmbParent(cmbMax + 1, -2); // -2 = no bone with this id
+    std::vector<std::array<float, 3>> cmbTrans(cmbMax + 1, { 0, 0, 0 });
     for (const auto& b : bones) {
-        if (b.id >= 0 && b.id <= cmbMax) cmbParent[b.id] = b.parent;
+        if (b.id >= 0 && b.id <= cmbMax) {
+            cmbParent[b.id] = b.parent;
+            cmbTrans[b.id] = { b.trans[0], b.trans[1], b.trans[2] };
+        }
     }
 
     const char* garName = g_models[modelId].garPath.c_str();
     int n = std::max(n64LimbCount, cmbMax + 1);
     int match = 0, mismatch = 0;
-    fprintf(stderr, "[MM3D-TOPO] model=%d (%s): n64Limbs=%d cmbBones=%d\n",
+    fprintf(stderr, "[MM3D-TOPO] model=%d (%s): n64Limbs=%d cmbBones=%d  (full dump: idx n64[parent pos] cmb[parent trans])\n",
             modelId, garName, n64LimbCount, cmbMax + 1);
     for (int i = 0; i < n; i++) {
         int np = (i < n64LimbCount) ? n64Parents[i] : -99;   // -99 = index absent this side
@@ -525,15 +539,83 @@ void Zelda3D_MM_GradeTopology(int modelId, const int* n64Parents, int n64LimbCou
         bool present = (i < n64LimbCount) && (i <= cmbMax) && (cp != -2);
         bool ok = present && (np == cp);
         if (present) { if (ok) match++; else mismatch++; }
-        if (!ok) {
-            fprintf(stderr, "[MM3D-TOPO]   limb %2d: n64Parent=%d cmbParent=%d  <-- %s\n",
-                    i, np, cp, present ? "MISMATCH" : "COUNT/ID GAP");
-        }
+        float nx = (i < n64LimbCount) ? n64Pos[i * 3] : 0, ny = (i < n64LimbCount) ? n64Pos[i * 3 + 1] : 0,
+              nz = (i < n64LimbCount) ? n64Pos[i * 3 + 2] : 0;
+        float cx = (i <= cmbMax) ? cmbTrans[i][0] : 0, cy = (i <= cmbMax) ? cmbTrans[i][1] : 0,
+              cz = (i <= cmbMax) ? cmbTrans[i][2] : 0;
+        fprintf(stderr,
+                "[MM3D-TOPO]   %2d: n64[par=%3d pos=(%7.1f,%7.1f,%7.1f)]  cmb[par=%3d trans=(%8.2f,%8.2f,%8.2f)] %s\n",
+                i, np, nx, ny, nz, cp, cx, cy, cz, ok ? "" : (present ? "<-- MISMATCH" : "<-- GAP"));
     }
     bool countOk = (n64LimbCount == cmbMax + 1);
     fprintf(stderr, "[MM3D-TOPO] model=%d (%s): IDENTITY %s (%d match, %d mismatch, count %s)\n",
             modelId, garName, (mismatch == 0 && countOk) ? "OK" : "DIVERGENT",
             match, mismatch, countOk ? "match" : "MISMATCH");
+}
+
+void Zelda3D_MM_BuildRetargetMap(int modelId, const int* n64Parents, const float* n64Pos, int n64LimbCount) {
+    if (modelId < 0 || modelId >= (int)g_models.size()) return;
+    Loaded* lm = loadModel(modelId);
+    if (lm == nullptr || !lm->ok || !lm->cmb) return;
+    if (lm->retargetBuilt) return;
+    lm->retargetBuilt = true; // build once; don't retry even if inputs were degenerate
+    if (n64Parents == nullptr || n64Pos == nullptr || n64LimbCount <= 0) return;
+
+    const auto& bones = lm->cmb->bones();
+    int cmbMax = -1;
+    for (const auto& b : bones) cmbMax = std::max(cmbMax, b.id);
+    if (cmbMax < 0) return;
+    std::vector<int> cmbParent(cmbMax + 1, -2);
+    std::vector<std::array<float, 3>> cmbTrans(cmbMax + 1, { 0, 0, 0 });
+    for (const auto& b : bones) {
+        if (b.id >= 0 && b.id <= cmbMax) {
+            cmbParent[b.id] = b.parent;
+            cmbTrans[b.id] = { b.trans[0], b.trans[1], b.trans[2] };
+        }
+    }
+
+    // Process CMB bones parent-first (ascending depth) so a bone's parent is already mapped.
+    std::vector<int> depth(cmbMax + 1, 0);
+    for (int id = 0; id <= cmbMax; id++) {
+        int d = 0, p = cmbParent[id], guard = 0;
+        while (p >= 0 && p <= cmbMax && guard++ < 256) { d++; p = cmbParent[p]; }
+        depth[id] = d;
+    }
+    std::vector<int> order;
+    for (int id = 0; id <= cmbMax; id++) if (cmbParent[id] != -2) order.push_back(id);
+    std::sort(order.begin(), order.end(), [&](int a, int b) { return depth[a] < depth[b]; });
+
+    lm->boneToN64.assign(cmbMax + 1, -1);
+    std::vector<char> used(n64LimbCount, 0);
+    for (int id : order) {
+        int mp = (cmbParent[id] < 0 || cmbParent[id] > cmbMax) ? -1 : lm->boneToN64[cmbParent[id]];
+        int best = -1;
+        float bestD = 1e30f;
+        for (int L = 0; L < n64LimbCount; L++) {
+            if (used[L] || n64Parents[L] != mp) continue;
+            float dx = n64Pos[L * 3] - cmbTrans[id][0];
+            float dy = n64Pos[L * 3 + 1] - cmbTrans[id][1];
+            float dz = n64Pos[L * 3 + 2] - cmbTrans[id][2];
+            float d = dx * dx + dy * dy + dz * dz;
+            if (d < bestD) { bestD = d; best = L; }
+        }
+        if (best >= 0) { lm->boneToN64[id] = best; used[best] = 1; }
+    }
+
+    // Self-check: coverage + hierarchy consistency (N64 parent of a bone's map == map of its CMB parent).
+    int mapped = 0, consistent = 0, boneCount = 0;
+    for (int id = 0; id <= cmbMax; id++) {
+        if (cmbParent[id] == -2) continue;
+        boneCount++;
+        int L = lm->boneToN64[id];
+        if (L < 0) continue;
+        mapped++;
+        int pL = (cmbParent[id] < 0 || cmbParent[id] > cmbMax) ? -1 : lm->boneToN64[cmbParent[id]];
+        if (n64Parents[L] == pL) consistent++;
+    }
+    fprintf(stderr, "[MM3D-RETARGET] model=%d (%s): n64Limbs=%d cmbBones=%d -> mapped %d, %d hierarchy-consistent %s\n",
+            modelId, g_models[modelId].garPath.c_str(), n64LimbCount, boneCount, mapped, consistent,
+            (mapped == boneCount && consistent == mapped) ? "(FULL/CONSISTENT)" : "(partial — extra/absent bones use bind rot)");
 }
 
 void Zelda3D_ListModels(void (*emitLine)(const char* line, void* user), void* user) {
