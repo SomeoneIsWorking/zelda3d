@@ -48,14 +48,23 @@ void Zelda3D_ListModels(void (*emitLine)(const char* line, void* user), void* us
 void Zelda3D_MM_SetPending(void* actor, int modelId, float worldScale, float groundOffset);
 
 // Zelda3D_MM_SkelAnimeDrawRaw — SkelAnime intercept. Called from the top of MM's
-// SkelAnime_DrawOpa / DrawFlexOpa / DrawLod / DrawFlexLod. If a pending model is
-// set, retargets N64 jointTable rotations onto the OoT3D CMB bones (identity
-// bone->limb correspondence), uploads the skin matrices to the renderer, emits
-// the OoT3D draw, and returns 1 (SkelAnime skips its N64 limb walk). Returns 0
-// to fall through to N64.
+// SkelAnime_DrawOpa / DrawFlexOpa / DrawLod / DrawFlexLod. If a pending model is set,
+// drives the MM3D CMB skeleton with the MODEL'S OWN 3DS CSAB animation (resolved from
+// this actor's live N64 animation via Zelda3D_MM_ResolveAutoCsab, phase-locked to the
+// N64 curFrame/animLength captured in SkelAnime_Update), uploads the sampled skin
+// matrices, emits the 3DS draw, and returns 1 (SkelAnime skips its N64 limb walk).
+// Returns 0 to fall through to N64. Mirrors OoT's Zelda3D_SkelAnimeDraw + auto CSAB path.
 struct PlayState;
 int Zelda3D_MM_SkelAnimeDrawRaw(struct PlayState* play, void** skeleton, void* jointTable /* Vec3s* */,
                                 int limbCount);
+
+// Zelda3D_MM_CaptureAnimState — called from SkelAnime_Update / PlayerAnimation_Update (the only
+// MM entry points that carry the SkelAnime*). Stashes this actor's live N64 animation identity
+// (the ogAnim OTR path string) + playhead (curFrame/animLength/morphWeight), keyed by the stable
+// jointTable pointer, so the draw choke (which only has jointTable) can resolve the matching 3DS
+// CSAB and phase-lock it. `animation` is the raw skelAnime->animation (an OTR path in 2s2h).
+void Zelda3D_MM_CaptureAnimState(void* jointTable, void* animation, float curFrame, float animLength,
+                                 float morphWeight);
 
 // Zelda3D_MM_AfterActorDraw — clears pending state at the end of an actor's Draw
 // so the next actor starts fresh. Called from a post-draw hook in mm3d_draw.c.
@@ -77,23 +86,6 @@ float Zelda3D_MM_ModelBoneLenSum(int modelId);
 float Zelda3D_MM_ModelMinY(int modelId);
 void  Zelda3D_MM_OverridePending(float worldScale, float groundOffset);
 int   Zelda3D_MM_PendingModelId(void); // -1 if no pending replacement.
-
-// Zelda3D_MM_GradeTopology — deterministic grade of the identity bone->limb retarget
-// (mmUpdateAnimN64's `limb = bone.id` assumption). Compares the live N64 skeleton's
-// per-limb PARENT array (caller reconstructs it from the child/sibling tree) against
-// the loaded CMB bone hierarchy, index-for-index. Where the parent arrays match, the
-// identity map is provably correct; where they diverge, that archive needs a per-archive
-// BoneMap. Env-gated by ZELDA3D_MM_SKINNED_TOPO=1, logs [MM3D-TOPO] once per modelId.
-void  Zelda3D_MM_GradeTopology(int modelId, const int* n64Parents, const float* n64Pos, int n64LimbCount);
-
-// Zelda3D_MM_BuildRetargetMap — auto-derive the per-archive N64-limb->CMB-bone correspondence
-// (once per model) so mmUpdateAnimN64 poses each CMB bone from the CORRECT N64 joint, replacing
-// the divergent identity `limb = bone.id` assumption. Matches CMB bone -> N64 limb by walking the
-// CMB tree parent-first and, among the N64 limbs whose (already-mapped) parent matches, picking the
-// one whose local rest-position is nearest — N64 jointPos and CMB trans share the same scale (verified
-// on zelda2_dog: idx0 n64(0,1436,-1072)~cmb(0,1414,-1072), idx11 both (540,315,0)). Not env-gated
-// (needed for correct rendering). Logs [MM3D-RETARGET] once per archive.
-void  Zelda3D_MM_BuildRetargetMap(int modelId, const int* n64Parents, const float* n64Pos, int n64LimbCount);
 
 #ifdef __cplusplus
 }

@@ -5,7 +5,8 @@
 
 #include "z64malloc.h"
 #include "2s2h/GameInteractor/GameInteractor.h"
-#include "2s2h/zelda3d/mm3d_draw.h" // Zelda3D_MM_InterceptSkelAnime — Stage 2 skinned MM3D port
+#include "2s2h/zelda3d/mm3d_draw.h" // Zelda3D_MM_InterceptSkelAnime — skinned MM3D port
+#include "2s2h/zelda3d/mm3d_model.h" // Zelda3D_MM_CaptureAnimState — live N64 anim state for CSAB phase-lock
 
 #define ANIM_INTERP 1
 
@@ -1387,7 +1388,10 @@ void PlayerAnimation_SetUpdateFunction(SkelAnime* skelAnime) {
  * finishes.
  */
 s32 PlayerAnimation_Update(PlayState* play, SkelAnime* skelAnime) {
-    return skelAnime->update.player(play, skelAnime);
+    s32 ret = skelAnime->update.player(play, skelAnime);
+    Zelda3D_MM_CaptureAnimState(skelAnime->jointTable, skelAnime->animation, skelAnime->curFrame,
+                               skelAnime->animLength, skelAnime->morphWeight);
+    return ret;
 }
 
 /**
@@ -1766,7 +1770,12 @@ void SkelAnime_SetUpdate(SkelAnime* skelAnime) {
  * finishes.
  */
 s32 SkelAnime_Update(SkelAnime* skelAnime) {
-    return skelAnime->update.normal(skelAnime);
+    s32 ret = skelAnime->update.normal(skelAnime);
+    // Capture the live N64 anim identity + playhead for the MM3D CSAB path (keyed by jointTable,
+    // the only handle the draw choke shares). skelAnime->animation holds the ogAnim OTR path.
+    Zelda3D_MM_CaptureAnimState(skelAnime->jointTable, skelAnime->animation, skelAnime->curFrame,
+                               skelAnime->animLength, skelAnime->morphWeight);
+    return ret;
 }
 
 /**
