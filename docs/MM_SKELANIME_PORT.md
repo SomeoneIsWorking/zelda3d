@@ -98,7 +98,7 @@ Now pose the skinned model from the LIVE N64 animation.
 - Add `MM_Zelda3D_SkelAnimeDraw{,Raw}` + `MM_Zelda3D_SetLimbOverride` +
   `gMmZelda3dPending{Actor,Model,Scale,GroundOff,BoneMap}` (or share via a
   libultraship shim if OoT-side gets refactored first).
-- Wire the six SkelAnime choke points in `Shipwright/mm/src/code/z_skelanime.c`.
+- Wire the six SkelAnime choke points in `2ship/src/code/z_skelanime.c`.
   Structure exactly mirrors OoT — copy the `Zelda3D_SetLimbOverride` + `if(...)
   return;` bookends.
 - Identity retarget first (no bone-map): assume N64 limb order == CMB bone
@@ -126,10 +126,10 @@ Once actors pose correctly:
 | File | Change |
 |---|---|
 | `Shipwright/cmb3d/asset/cmb_glgroups.{h,cpp}` | `MakeGlSkinnedGroup` (bind-pose) |
-| `Shipwright/mm/2s2h/zelda3d/mm3d_model.{h,cpp}` | Accept skinned; expose bone table |
-| `Shipwright/mm/2s2h/zelda3d/mm3d_draw.c` | `Zelda3D_TryDrawSkinnedActor` |
-| `Shipwright/mm/2s2h/zelda3d/mm3d_skel.{h,cpp}` NEW | SkelAnime intercept + retarget |
-| `Shipwright/mm/src/code/z_skelanime.c` | 6 intercept sites (copy OoT pattern) |
+| `2ship/2s2h/zelda3d/mm3d_model.{h,cpp}` | Accept skinned; expose bone table |
+| `2ship/2s2h/zelda3d/mm3d_draw.c` | `Zelda3D_TryDrawSkinnedActor` |
+| `2ship/2s2h/zelda3d/mm3d_skel.{h,cpp}` NEW | SkelAnime intercept + retarget |
+| `2ship/src/code/z_skelanime.c` | 6 intercept sites (copy OoT pattern) |
 
 ## Non-goals for this port
 - Do NOT reimplement OoT's full 6.5k-line `zelda3d.c`. That's not the substrate

@@ -46,7 +46,7 @@ Ghidra and derive the mechanism from code. **"It's an asset difference" is NOT a
 renders 3DS assets from the ROM, so an asset-rooted gap means "port that exact 3DS asset."
 
 **A separate, complementary RE track — CONTROL/DEBUG tooling on the N64-side decomp** (the
-`Shipwright/soh/src/`/`Shipwright/mm/` code SoH vendors in-tree, NOT the 3DS ground-truth decomp
+`Shipwright/soh/src/`/`2ship/` code SoH vendors in-tree, NOT the 3DS ground-truth decomp
 above): `docs/re_control_debug_backlog.md` tracks unnamed/poorly-understood N64-decomp functions
 and fields whose further RE would unlock a better FORCE-state primitive or a cleaner debug readout
 for the sweeps, instead of the current bypass-the-gate Force* hooks. Consult it before re-deriving

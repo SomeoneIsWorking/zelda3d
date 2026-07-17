@@ -384,15 +384,15 @@ highest-leverage TODO in the whole tracker (blocks all future MM sweeps).
 - status: todo
 - deps: 
 - evidence: `docs/re_control_debug_backlog.md` item #11 — 19 action funcs already named (`Player_Action_Idle`, `_Rolling`, `_Talk`, `_TurnInPlace`, `_HookshotFly`, `_Shielding`, `_Throwing`, ...) via `PlayerActionFunc` typedef (`z64player.h:1121`), install primitive `Player_SetAction` (`z_player.c:4470`)
-- where: `Shipwright/mm/src/overlays/actors/ovl_player_actor/z_player.c`
+- where: `2ship/src/overlays/actors/ovl_player_actor/z_player.c`
 - gap: this IS the RE-ready next step for MM player — comparable scope to OoT's z_player.c RE debt.
 - notes: HIGH priority — blocks item mm.force-hook-layer below and everything downstream.
 
 ### mm.force-hook-layer — port Zelda3D_PlayerForce* pattern to MM
 - status: re-partial
 - deps: mm.action-func-naming
-- evidence: **21 states ported + runtime-verified** (headless, South Clock Town). Foundation idle/walk/run (2026-07-15); batch 1 (+8, 2026-07-17): turn→Player_Action_TurnInPlace, roll→_26, throw→_42, attack→_84, jump→_25, shield→_18, getitem→WaitForPutAway, talk→Talk; batch 2 (+6, 2026-07-17): putdown→_41, death→playerData.health=0 (precondition-only, drives _77 later), damage→_20, hang→_48, carry→CarryActor upper-action, climb→_50 (runs the real func_8083D860 gate); batch 3 (+4, 2026-07-17): swim→_54, swimdive→_59 (sets its own water flags), itemuse→_68 (bottle dispatch), backwalk→_15 (drives the REAL func_8083E404 decode gate, not a bypass). Each identified via OoT z_player.c Rosetta + adversarial/per-symbol decomp verify, installs the REAL action func via Player_SetAction (no synthetic pose/magic constant). Two are context-gated (faithful preconditions, verified crash-safe): **carry** returns 0 without a heldActor (guard added after runtime caught a null-deref crash), **climb** returns -1 without a wallPoly. Bodies `Shipwright/mm/src/overlays/actors/ovl_player_actor/z_player.c:8705+`, decls `mm/2s2h/zelda3d/mm3d_player_force.h`, REPL `linkstate <...>` in `Z3DRepl.c`. See journals `2026-07-17-mm-force-hooks-8-states.md` (batch 1) + `2026-07-17-mm-force-hooks-batch2.md`.
-- where: `Shipwright/mm/src/overlays/actors/ovl_player_actor/z_player.c` (hooks live in the actor overlay, next to the real installers, so they can call the file-static funcs/anims) + `mm/2s2h/zelda3d/mm3d_player_force.h` + `mm/2s2h/Z3DRepl.c`. (NOT a separate `mm3d_player_force.c` — that file never existed; the earlier note was wrong.)
+- evidence: **21 states ported + runtime-verified** (headless, South Clock Town). Foundation idle/walk/run (2026-07-15); batch 1 (+8, 2026-07-17): turn→Player_Action_TurnInPlace, roll→_26, throw→_42, attack→_84, jump→_25, shield→_18, getitem→WaitForPutAway, talk→Talk; batch 2 (+6, 2026-07-17): putdown→_41, death→playerData.health=0 (precondition-only, drives _77 later), damage→_20, hang→_48, carry→CarryActor upper-action, climb→_50 (runs the real func_8083D860 gate); batch 3 (+4, 2026-07-17): swim→_54, swimdive→_59 (sets its own water flags), itemuse→_68 (bottle dispatch), backwalk→_15 (drives the REAL func_8083E404 decode gate, not a bypass). Each identified via OoT z_player.c Rosetta + adversarial/per-symbol decomp verify, installs the REAL action func via Player_SetAction (no synthetic pose/magic constant). Two are context-gated (faithful preconditions, verified crash-safe): **carry** returns 0 without a heldActor (guard added after runtime caught a null-deref crash), **climb** returns -1 without a wallPoly. Bodies `2ship/src/overlays/actors/ovl_player_actor/z_player.c:8705+`, decls `mm/2s2h/zelda3d/mm3d_player_force.h`, REPL `linkstate <...>` in `Z3DRepl.c`. See journals `2026-07-17-mm-force-hooks-8-states.md` (batch 1) + `2026-07-17-mm-force-hooks-batch2.md`.
+- where: `2ship/src/overlays/actors/ovl_player_actor/z_player.c` (hooks live in the actor overlay, next to the real installers, so they can call the file-static funcs/anims) + `mm/2s2h/zelda3d/mm3d_player_force.h` + `mm/2s2h/Z3DRepl.c`. (NOT a separate `mm3d_player_force.c` — that file never existed; the earlier note was wrong.)
 - gap: remaining states — climb/hang, death, backwalk/sidestep, and transformation-specific variants (Goron/Zora/Deku shield/roll) — each needs the same per-behavior MM action-func identification. NOT hard-blocked on the full 83-func naming pass: the per-behavior OoT-Rosetta approach identifies funcs one at a time as needed.
 - notes: also fixed a pre-existing MM-link regression along the way (shared libultraship's `Zelda3D_DbgInputEnabled` was defined SoH-side only → MM link failed; added the MM per-engine definition `mm/2s2h/zelda3d/mm3d_input_shim.c`). MM target now links clean.
 
@@ -400,7 +400,7 @@ highest-leverage TODO in the whole tracker (blocks all future MM sweeps).
 - status: re-verified
 - deps: 
 - evidence: `docs/re_control_debug_backlog.md` item #12 (recorded there as DONE / informational)
-- where: `Shipwright/mm/2s2h/Z3DRepl.c` (`$ZELDA3D_MM_REPL` FIFO: posinfo/warp/actors/ping), `tools/mm_control.py`, `tools/mm_game.sh`
+- where: `2ship/2s2h/Z3DRepl.c` (`$ZELDA3D_MM_REPL` FIFO: posinfo/warp/actors/ping), `tools/mm_control.py`, `tools/mm_game.sh`
 - gap: none — this is plumbing the force-hook layer above should REUSE, not build fresh.
 - notes: `mm3d_player.c`/`.h` (draw-only stub) already exists alongside this and is explicitly documented as awaiting "Stage 2 MmPlayerBehavior" — see codemap MM row.
 
@@ -408,7 +408,7 @@ highest-leverage TODO in the whole tracker (blocks all future MM sweeps).
 - status: todo
 - deps: mm.action-func-naming
 - evidence: `docs/re_control_debug_backlog.md` item #13 — zero grep hits for `Force`/`Zelda3D` in `z_camera.c` (8195 lines); `CAM_MODE_*` enum structurally similar to OoT's (`z64camera.h:240-269+`, adds transformation-specific modes: GORONDASH/DEKUFLY/ZORAFIN/DEKUSHOOT/BOWARROWZ)
-- where: `Shipwright/mm/src/code/z_camera.c`
+- where: `2ship/src/code/z_camera.c`
 - gap: not locatable until the action-func naming pass above is further along — likely found incidentally while tracing MM's Z-idle-stance action func.
 - notes: MEDIUM priority, explicitly sequenced AFTER mm.action-func-naming.
 
@@ -418,7 +418,7 @@ highest-leverage TODO in the whole tracker (blocks all future MM sweeps).
 ### mm3d.gar2-parser — GAR2 archive format parser
 - status: re-verified
 - deps: 
-- evidence: `Shipwright/cmb3d/asset/gar.{h,cpp}` (GAR2 "GAR\2" parser) + `lzs.{h,cpp}` (LzS "LzS\1" LZSS inflate), consumed by `Shipwright/mm/2s2h/zelda3d/mm3d_model.cpp` (full CtrRom→LzS→GAR2→CMB pipeline). **Verified 2026-07-17 on the real MM3D ROM** via a standalone probe (scratch/mm3d_gar_test/gar_probe.cpp): zelda2_bh → model/skylark.cmb + anim/bh_fly.csab; zelda2_dnk (11 files), zelda2_tk (10), zelda2_am (7); and the **LzS-compressed** zelda2_cs (lzs=1) inflated + parsed to 38 files (model/bombers.cmb + 37 CSAB) — correct types/paths/sizes/offsets for both raw and LzS-wrapped archives.
+- evidence: `Shipwright/cmb3d/asset/gar.{h,cpp}` (GAR2 "GAR\2" parser) + `lzs.{h,cpp}` (LzS "LzS\1" LZSS inflate), consumed by `2ship/2s2h/zelda3d/mm3d_model.cpp` (full CtrRom→LzS→GAR2→CMB pipeline). **Verified 2026-07-17 on the real MM3D ROM** via a standalone probe (scratch/mm3d_gar_test/gar_probe.cpp): zelda2_bh → model/skylark.cmb + anim/bh_fly.csab; zelda2_dnk (11 files), zelda2_tk (10), zelda2_am (7); and the **LzS-compressed** zelda2_cs (lzs=1) inflated + parsed to 38 files (model/bombers.cmb + 37 CSAB) — correct types/paths/sizes/offsets for both raw and LzS-wrapped archives.
 - where: `Shipwright/cmb3d/asset/gar.{h,cpp}` + `lzs.{h,cpp}`; wired in `mm/2s2h/zelda3d/mm3d_model.cpp`.
 - gap: none — the parser + LzS inflate exist, are wired into MM3D model loading, and parse real archives (raw + compressed). This was the STALE label corrected 2026-07-17: the blocker was resolved when gar.cpp/lzs.cpp landed; only the frontier/memory were behind. Downstream MM3D visual-parity work (CMB skinning support, actor auto-map coverage) is now unblocked at the archive layer.
 - notes: was "the root blocker for the entire MM3D visual-parity side" — no longer a blocker. Some archives are raw GAR2, ~40% LzS-wrapped (auto-detected via LzsIsCompressed). The CMB payloads are the same 3DS format the shared Cmb parser handles.
