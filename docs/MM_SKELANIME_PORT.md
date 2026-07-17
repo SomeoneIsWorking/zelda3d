@@ -127,6 +127,30 @@ Prove skinned CMB rendering end-to-end using MM3D bind-pose bones only.
 > `limb = bone.id`). Plus a broader rig/scene survey (enemy-dense scenes) to catch any grossly-divergent
 > rig. Once identity is validated (or bone-maps added) across the common rigs, **enable the gate by
 > default** — the old "T-pose looks worse than N64" reason is gone (it live-poses correctly now).
+>
+> **TOPOLOGY GRADE — tool built, identity map is DIVERGENT; earlier "positive grade" OVERTURNED
+> (2026-07-17).** Built the deterministic grader (env `ZELDA3D_MM_SKINNED_TOPO=1`): at the SkelAnime
+> intercept it reconstructs the live N64 limb-parent array from the child/sibling tree
+> (`Zelda3D_MM_SkelParents`, mm3d_draw.c) and compares it index-for-index against the CMB bone
+> hierarchy (`Zelda3D_MM_GradeTopology`, mm3d_model.cpp), logging `[MM3D-TOPO]` once per archive.
+> Result (South Clock Town, `scratch/logs/mm3d_topology_grade.txt`) — **the identity `limb = bone.id`
+> retarget is DIVERGENT on EVERY complex rig**:
+> - `pst` 2 bones: OK (trivial).
+> - `sdn` 16/16: DIVERGENT, 4 mismatched parents (limbs 10,12,13,15).
+> - `dog` 12/12: DIVERGENT, **8 of 12** mismatched (limbs 3–10).
+> - `an1` 15 N64 limbs vs **20** CMB bones: DIVERGENT, 7 mismatches + 5 extra CMB bones.
+> - `mm` 16 N64 limbs vs **15** CMB bones: count mismatch (N64 limb 15 has no CMB bone).
+>
+> So **the CMB bone order ≠ the N64 limb order** — `jointRots[bone.id]` is applied to the WRONG bone,
+> and bone counts don't even match on `an1`/`mm`. **This DIRECTLY REFUTES the earlier "grade POSITIVE
+> / divergent-bone-order fear did not materialize" note above** (commits 4483db65, 7f9b8ab7): that was
+> a low-confidence VISUAL grade of small/distant rigs — the poses looked plausible but are actually
+> mis-posed; the eyeball missed it. The tool is ground truth. **Per-archive `BoneMap`s ARE required**
+> (the divergent-topology risk the code always flagged at mm3d_model.cpp is real). Do NOT enable the
+> gate by default yet. NEXT: build a per-archive N64-limb→CMB-bone map — match body parts across the
+> two skeletons (by hierarchy shape + rest-position, since CMB bones carry no names), replace
+> mmUpdateAnimN64's identity `limb = id` with the map, and re-run `[MM3D-TOPO]` (should report OK) +
+> a visual re-check. The `an1`/`mm` bone-count deltas need handling too (extra/absent bones).
 
 Now pose the skinned model from the LIVE N64 animation.
 

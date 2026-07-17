@@ -488,6 +488,54 @@ void Zelda3D_MM_OverridePending(float worldScale, float groundOffset) {
 
 int Zelda3D_MM_PendingModelId(void) { return g_pending.modelId; }
 
+void Zelda3D_MM_GradeTopology(int modelId, const int* n64Parents, int n64LimbCount) {
+    static int sTopoEnable = -1;
+    if (sTopoEnable < 0) {
+        const char* v = getenv("ZELDA3D_MM_SKINNED_TOPO");
+        sTopoEnable = (v != nullptr && v[0] != '\0' && v[0] != '0') ? 1 : 0;
+    }
+    if (!sTopoEnable || n64Parents == nullptr || n64LimbCount <= 0) return;
+    if (modelId < 0 || modelId >= (int)g_models.size()) return;
+
+    // Grade each archive exactly once.
+    static std::unordered_map<int, char> sGraded;
+    if (sGraded.count(modelId)) return;
+    sGraded[modelId] = 1;
+
+    Loaded* lm = loadModel(modelId);
+    if (lm == nullptr || !lm->ok || !lm->cmb) return;
+    const auto& bones = lm->cmb->bones();
+
+    // CMB parent array indexed by bone id (identity map means bone.id == N64 limb index).
+    int cmbMax = -1;
+    for (const auto& b : bones) cmbMax = std::max(cmbMax, b.id);
+    std::vector<int> cmbParent(cmbMax + 1, -2); // -2 = no bone with this id
+    for (const auto& b : bones) {
+        if (b.id >= 0 && b.id <= cmbMax) cmbParent[b.id] = b.parent;
+    }
+
+    const char* garName = g_models[modelId].garPath.c_str();
+    int n = std::max(n64LimbCount, cmbMax + 1);
+    int match = 0, mismatch = 0;
+    fprintf(stderr, "[MM3D-TOPO] model=%d (%s): n64Limbs=%d cmbBones=%d\n",
+            modelId, garName, n64LimbCount, cmbMax + 1);
+    for (int i = 0; i < n; i++) {
+        int np = (i < n64LimbCount) ? n64Parents[i] : -99;   // -99 = index absent this side
+        int cp = (i <= cmbMax) ? cmbParent[i] : -99;
+        bool present = (i < n64LimbCount) && (i <= cmbMax) && (cp != -2);
+        bool ok = present && (np == cp);
+        if (present) { if (ok) match++; else mismatch++; }
+        if (!ok) {
+            fprintf(stderr, "[MM3D-TOPO]   limb %2d: n64Parent=%d cmbParent=%d  <-- %s\n",
+                    i, np, cp, present ? "MISMATCH" : "COUNT/ID GAP");
+        }
+    }
+    bool countOk = (n64LimbCount == cmbMax + 1);
+    fprintf(stderr, "[MM3D-TOPO] model=%d (%s): IDENTITY %s (%d match, %d mismatch, count %s)\n",
+            modelId, garName, (mismatch == 0 && countOk) ? "OK" : "DIVERGENT",
+            match, mismatch, countOk ? "match" : "MISMATCH");
+}
+
 void Zelda3D_ListModels(void (*emitLine)(const char* line, void* user), void* user) {
     if (emitLine == nullptr) return;
     // Sort by objectId for stable output.
