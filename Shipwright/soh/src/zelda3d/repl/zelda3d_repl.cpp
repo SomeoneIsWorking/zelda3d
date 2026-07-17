@@ -1667,9 +1667,12 @@ static void Zelda3D_ReplExec(PlayState* play, char* line, const char* outPath) {
         // #20 — inject a raw keyboard scancode through the real SDL->ControlDeck path so the
         // DEFAULT keyboard->N64-button mapping can be verified headless. `key <scancode> <0|1>`
         // (1=key down/held, 0=key up). Hold a key (down, wait, up) to drive locomotion (WASD=stick)
-        // or to hold a button. SoH default map: A=X(45) B=C(46) L=E(18) R=R(19) Z=Z(44)
-        // Start=SPACE(57) C-up/dn/lt/rt=arrows(328/336/331/333) D-up/dn/lt/rt=T/G/F/H(20/34/33/35)
-        // stick L/R/U/D=A/D/W/S(30/32/17/31). Pair with posinfo/btnhold to observe the effect.
+        // or to hold a button. CURRENT PC-native default map (#96, verified 2026-07-17 vs
+        // libultraship ControllerDefaultMappings.cpp — the PRE-#96 "A=X(45)/Start=SPACE(57)" values
+        // this comment used to list are WRONG and misled menu-driving): A=SPACE(57) B=F(33) Z=Q(16)
+        // R=CTRL(29) L=SHIFT(42) Start=ENTER(28) C-up/dn/lt/rt=arrows(328/336/331/333)
+        // D-up/dn/lt/rt=I/K/J/L(23/37/36/38) stick L/R/U/D=A/D/W/S(30/32/17/31). So a menu CONFIRM
+        // is `key 57` (A=SPACE), pause/menu open is `key 28` (Start=ENTER). Pair with posinfo to observe.
         // Zelda3D_InjectKey declared via input/zelda3d_input.h (included above); moved from
         // zelda3d_model.cpp to zelda3d/input/zelda3d_input.cpp (Phase 1 input consolidation).
         int sc = 0, down = 1;
