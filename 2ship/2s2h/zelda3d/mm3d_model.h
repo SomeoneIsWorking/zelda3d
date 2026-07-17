@@ -78,6 +78,14 @@ float Zelda3D_MM_ModelMinY(int modelId);
 void  Zelda3D_MM_OverridePending(float worldScale, float groundOffset);
 int   Zelda3D_MM_PendingModelId(void); // -1 if no pending replacement.
 
+// Zelda3D_MM_GradeTopology — deterministic grade of the identity bone->limb retarget
+// (mmUpdateAnimN64's `limb = bone.id` assumption). Compares the live N64 skeleton's
+// per-limb PARENT array (caller reconstructs it from the child/sibling tree) against
+// the loaded CMB bone hierarchy, index-for-index. Where the parent arrays match, the
+// identity map is provably correct; where they diverge, that archive needs a per-archive
+// BoneMap. Env-gated by ZELDA3D_MM_SKINNED_TOPO=1, logs [MM3D-TOPO] once per modelId.
+void  Zelda3D_MM_GradeTopology(int modelId, const int* n64Parents, int n64LimbCount);
+
 #ifdef __cplusplus
 }
 #endif
