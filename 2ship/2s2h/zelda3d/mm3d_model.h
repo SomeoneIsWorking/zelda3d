@@ -84,7 +84,16 @@ int   Zelda3D_MM_PendingModelId(void); // -1 if no pending replacement.
 // the loaded CMB bone hierarchy, index-for-index. Where the parent arrays match, the
 // identity map is provably correct; where they diverge, that archive needs a per-archive
 // BoneMap. Env-gated by ZELDA3D_MM_SKINNED_TOPO=1, logs [MM3D-TOPO] once per modelId.
-void  Zelda3D_MM_GradeTopology(int modelId, const int* n64Parents, int n64LimbCount);
+void  Zelda3D_MM_GradeTopology(int modelId, const int* n64Parents, const float* n64Pos, int n64LimbCount);
+
+// Zelda3D_MM_BuildRetargetMap — auto-derive the per-archive N64-limb->CMB-bone correspondence
+// (once per model) so mmUpdateAnimN64 poses each CMB bone from the CORRECT N64 joint, replacing
+// the divergent identity `limb = bone.id` assumption. Matches CMB bone -> N64 limb by walking the
+// CMB tree parent-first and, among the N64 limbs whose (already-mapped) parent matches, picking the
+// one whose local rest-position is nearest — N64 jointPos and CMB trans share the same scale (verified
+// on zelda2_dog: idx0 n64(0,1436,-1072)~cmb(0,1414,-1072), idx11 both (540,315,0)). Not env-gated
+// (needed for correct rendering). Logs [MM3D-RETARGET] once per archive.
+void  Zelda3D_MM_BuildRetargetMap(int modelId, const int* n64Parents, const float* n64Pos, int n64LimbCount);
 
 #ifdef __cplusplus
 }
