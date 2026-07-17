@@ -80,6 +80,18 @@ Prove skinned CMB rendering end-to-end using MM3D bind-pose bones only.
 > identity-map on a divergent ANIMATED rig. Grading that still needs an MM scene with a complex
 > animated skinned enemy — reaching one requires an MM entrance number (derive from the MM entrance
 > table; Termina Field / a swamp enemy scene), the concrete blocker for the full grade.
+>
+> **Entrance resolved + first drive (2026-07-17):** `ENTRANCE(scene,spawn) = ((ENTR_SCENE_##scene &
+> 0x7F) << 9) | ((spawn & 0x1F) << 4)` (z64scene.h:755); `ENTR_SCENE_TERMINA_FIELD = 0x2A`, so
+> **Termina Field spawn 0 = `0x5400`**. `ZELDA3D_MM_SKINNED_TPOSE=1 tools/mm_game.sh start 0x5400`
+> boots there (scene 45), MM3D provider live (rigid scene objects obj_tokeidai/keikoku_obj/fall map +
+> render). BUT the entrance-corridor spawn is **enemy-sparse — the run log shows ZERO skinned-MM3D
+> archive loads** (no `[MM3D] skinned-tpose ...`), so nothing skinned rendered to grade. The 12
+> nearest actors are mostly obj=0x001 (gameplay_keep) + a few scene props; none pulled a skinned
+> `zelda2_*.gar.lzs`. NEXT: either navigate/`tp` Link to a confirmed skinned enemy within Termina
+> Field (Leever/Chuchu/Guay), OR pick an enemy-dense entrance (Woodfall/swamp), OR check whether the
+> nearby enemy OBJECTS even have MM3D archives (if not, that's a separate auto-map-coverage gap). Only
+> once a skinned enemy actually loads (`skinned-tpose` log line) can the identity retarget be graded.
 
 Now pose the skinned model from the LIVE N64 animation.
 
