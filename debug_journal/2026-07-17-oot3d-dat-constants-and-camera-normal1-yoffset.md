@@ -78,3 +78,40 @@ vs the 3DS equivalent — eye.y = at.y + r·sin(pitch), so a difference in r or 
 Next: diff the 3DS eye r/pitch computation (FUN_00355780 spring-lerps into param_1[0x45..0x47], and the
 FUN_00367df4 at→eye VecSph add at lines 291/350/371) against SoH's eyeAdjustment.r + Camera_CalcDefaultPitch,
 OR do an intermediate-value A/B (cammode eye/at + oracle eye) since the static diff is converging slowly.
+
+## Camera_Normal1 divergence LOCALIZED — it's Camera_CalcAtDefault's extra at-Y term (not the body)
+
+Decompiled the 3DS at-calc `FUN_00338ac8` (= Camera_CalcAtDefault) via Ghidra
+(`analyzeHeadless build/ghidra oot3d -process code.bin -postScript DecompDump.py`) and diffed it
+line-for-line against SoH `Camera_CalcAtDefault` (z_camera.c:906). Everything matches EXCEPT one term:
+
+- 3DS `FUN_00338ac8:32-36`: `atTarget.y = playerPos.y + posOffset.y + fVar3`, where
+  `fVar3 = player[0x1760] · fRam00338bfc` (= `player[0x1760] · −0.01f`) IFF `player[0x29b8] & 0x100`,
+  else `fVar3 = 0`. Constants (code.bin @ VA−0x100000): 00338bfc=−0.01, 00338bec=0.0, LERP rates
+  0.1/0.2 (match SoH). Camera ptr param_2, `param_2+0xd8 = camera->player`.
+- SoH `Camera_CalcAtDefault:929`: `atTarget.y = playerPos.y + posOffset.y` — NO extra term.
+
+**Independently re-derived AND already in `oot3d-decomp/docs/gameplay_firstdiv.md:1120-1179`** (should
+have consulted first — workflow smell). That doc's conclusion holds and is now cross-validated: the
+**418-line FUN_00239fd8 body port is NOT needed** — Camera_CalcAtDefault's extra at-Y is the SOLE
+functional divergence for the ~28-unit Δeye-Y (yOffset + both pitch clamps + LERP rates all match).
+Port target: a shared `behaviors/camera/at_default.cpp` (CalcAtDefault feeds Normal0/1/2 + Jump1), NOT
+normal1.cpp; Normal1Behavior::update stays a no-op delegate.
+
+## What `player[0x1760]` IS (the Grezzo 3DS-only Y-bias) — writer RE'd
+
+Writer = `FUN_00250ad0` (10 KB Player func, 1 caller @001e1d68), which also owns the `player[0x29b8]`
+flag word. The `player[0x1760]` mechanic (00250ad0.c:1174-1204):
+- SET path: when `player[0x1708]==DAT_00251cd8` (a state/action id) AND a Y-delta
+  `(player[0x2c]−player[0x10c]) >= [DAT_0025293c+0x94]` (threshold), it sets flag 0x100 and
+  `player[0x1760] += Ydelta · fVar22` (accumulate).
+- DECAY path (flag set): `player[0x1760] −= [DAT_0025293c+0x90]` each frame; when it reaches ~0, clear
+  flag 0x100. Also clamped to [fVar4, fVar32].
+
+So `player[0x1760]` is an **accumulated, decaying camera Y-bias** driven by Link's vertical position
+change (step/fall) exceeding a threshold — a Grezzo 3DS camera Y-smoothing (camera vertically lags
+Link's elevation changes, e.g. Kakariko's stairs/slopes ⇒ the ~2500→−25 Kakariko-idle bias). N64/SoH
+has no equivalent field, so a FAITHFUL port must reimplement this accumulate/decay in the SoH Player +
+apply `at.y += bias·−0.01` in the at_default seam. NEXT: resolve the writer's constants (DAT_0025293c
++0x90 decay, +0x94 threshold, DAT_00251cd8 state id, fVar4/fVar32 clamps) and map player[0x2c]/[0x10c]/
+[0x1708] to SoH Player fields, then port. Do NOT approximate with a magic −25 constant (bandaid).
