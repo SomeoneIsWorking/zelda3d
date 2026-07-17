@@ -1,6 +1,6 @@
 # SoH3D backlog → moved to a GitHub-Issues kanban
 
-The backlog is now a **kanban board on GitHub Issues** (`SomeoneIsWorking/soh3d`, private), so
+The backlog is now a **kanban board on GitHub Issues** (`SomeoneIsWorking/zelda3d`, private), so
 any agent — local sessions, cloud subagents, another PC — can read and drive it via the GitHub
 API, not just a file in one checkout.
 
