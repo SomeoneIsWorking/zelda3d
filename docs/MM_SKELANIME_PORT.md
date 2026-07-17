@@ -72,6 +72,14 @@ Prove skinned CMB rendering end-to-end using MM3D bind-pose bones only.
 > limb order (mm3d_model.cpp:377 flags the per-archive bone-map as the fix). NEXT: frame a complex
 > skinned NPC/enemy with the gate on and grade the identity retarget — where it mis-poses, add a
 > per-archive `BoneMap` (the [[soh3d-n64anim-retarget]] per-bone-correction pattern from OoT).
+>
+> **Partial grade (2026-07-17):** the only skinned MM3D actor in default Clock Town (scene 111) is
+> obj 0x00C `box` (3 bones) — it renders CORRECTLY through the Stage-2 path (a properly-posed 3DS
+> treasure chest, scratch/screenshots/mm3d_box_skinned.png), confirming skinned CMB load+draw+retarget
+> works end-to-end for a SIMPLE rig. But a closed chest is near-static, so it does NOT exercise the
+> identity-map on a divergent ANIMATED rig. Grading that still needs an MM scene with a complex
+> animated skinned enemy — reaching one requires an MM entrance number (derive from the MM entrance
+> table; Termina Field / a swamp enemy scene), the concrete blocker for the full grade.
 
 Now pose the skinned model from the LIVE N64 animation.
 
