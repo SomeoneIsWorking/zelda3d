@@ -81,6 +81,21 @@ s32 Zelda3D_PlayerForceCarry(Player* player, PlayState* play);
 // 0 declined, -1 no wallPoly. Requires a real wallPoly + tall-enough wall.
 s32 Zelda3D_PlayerForceClimb(Player* player, PlayState* play);
 
+// --- Extended states batch 3 (2026-07-17) ---
+
+// Swim (treading water): Player_Action_54 + swimer_swim_wait anim. No water precondition needed.
+s32 Zelda3D_PlayerForceSwim(Player* player, PlayState* play);
+
+// Swim dive (settled underwater): Player_Action_59 + swim anim + own water flags. No precondition.
+s32 Zelda3D_PlayerForceSwimDive(Player* player, PlayState* play);
+
+// Item-use (bottle raise/swing): Player_Action_68 + bottle miss anim (func_8083A6C0's dispatch).
+s32 Zelda3D_PlayerForceItemUse(Player* player, PlayState* play);
+
+// Backward walk: drives the real func_8083E404 decode -> func_8083AF8C (Player_Action_15 + back_walk
+// anim). Returns 1, or 0 if the decode surface changed.
+s32 Zelda3D_PlayerForceBackwalk(Player* player, PlayState* play);
+
 #ifdef __cplusplus
 }
 #endif

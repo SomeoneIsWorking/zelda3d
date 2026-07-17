@@ -8912,6 +8912,68 @@ s32 Zelda3D_PlayerForceClimb(Player* this, PlayState* play) {
     return entered ? 1 : 0;
 }
 
+// --- Extended force-state hooks batch 3 (2026-07-17) — same OoT-Rosetta + decomp-verify method. ---
+
+// func_8083E404 (backwalk decode gate) + func_8083AF8C (backwalk installer) are defined below this
+// block; forward-decl so ForceBackwalk drives the REAL decode + installer rather than bypassing them.
+s32 func_8083E404(Player* this, f32 arg1, s16 arg2);
+void func_8083AF8C(Player* this, s16 yaw, PlayState* play);
+
+// Swim (treading water on the surface): func_808353DC's body (z_player.c:6452) — the surface-swim
+// action Player_Action_54 + swimer_swim_wait anim (MM analog of OoT's func_80838F18/ForceSwim).
+// Player_Action_54 only reads always-valid Actor fields (depthInWater/floorPoly/ageProperties), so no
+// water precondition is forced — MM has no PLAYER_STATE1_IN_WATER-style bit for OoT's hook to fake.
+s32 Zelda3D_PlayerForceSwim(Player* this, PlayState* play) {
+    Player_SetAction(play, this, Player_Action_54, 0);
+    Player_Anim_PlayLoopSlowMorph(play, this, &gPlayerAnim_link_swimer_swim_wait);
+    return 1;
+}
+
+// Swim dive (settled underwater): the settled-dive state Player_Action_59 (z_player.c:17774) — mirrors
+// OoT's ForceSwimDive. Installs its OWN water flags (PLAYER_STATE1_8000000 = IN_WATER, PLAYER_STATE2_400
+// = UNDERWATER, confirmed via the func_8083B930/func_8083B3B4 water-entry path) + the swim loop anim +
+// the settled-loop field sets (unk_AAA=0x3E80, av2.actionVar2=1) that Action_59's actionVar1==1 branch
+// (z_player.c:17815) uses. The action force-zeros gravity every tick, so no water invariant must pre-exist.
+s32 Zelda3D_PlayerForceSwimDive(Player* this, PlayState* play) {
+    this->stateFlags1 |= PLAYER_STATE1_8000000;
+    this->stateFlags2 |= PLAYER_STATE2_400;
+    Player_SetAction(play, this, Player_Action_59, 0);
+    Player_Anim_PlayLoopSlowMorph(play, this, &gPlayerAnim_link_swimer_swim);
+    this->unk_AAA = 0x3E80;
+    this->av2.actionVar2 = 1;
+    return 1;
+}
+
+// Item-use (bottle raise/swing): func_8083A6C0's held-bottle dispatch (z_player.c:8637) — Player_Action_68
+// + D_8085D200[0]'s dry-land miss anim (gPlayerAnim_link_bottle_bug_miss). Forces av2.actionVar2=0 for the
+// dry-land swing family (index 1 is the water-scoop variant), mirroring OoT's ForceItemUse forcing
+// inWater=false. Action_68's body only COMPARES bottle state (never unconditionally derefs), so it is
+// safe to force without a real held bottle — same fidelity as OoT's own hook.
+s32 Zelda3D_PlayerForceItemUse(Player* this, PlayState* play) {
+    this->av2.actionVar2 = 0;
+    Player_SetAction(play, this, Player_Action_68, 0);
+    Player_Anim_PlayOnceAdjusted(play, this, D_8085D200[this->av2.actionVar2].unk_0);
+    return 1;
+}
+
+// Backward walk: MM analog of OoT's ForceBackwalk (soh z_player.c:7920). Drives the REAL decode gate
+// func_8083E404 (byte-identical dual-threshold curve to OoT's func_8083FC68) with a dead-behind stick
+// (yaw = shape.rot.y + 0x8000 → the s16 subtraction wraps to -32768 so |Δ|=1.0 exactly, collapsing the
+// backward threshold to speedTarget>6.8); speedTarget 8.0 (the speedXZ func_8083AF8C itself installs) is
+// unambiguously the backward branch. On decision<0 the real installer func_8083AF8C (z_player.c:9105)
+// installs Player_Action_15 + gPlayerAnim_link_anchor_back_walk, speedXZ=8, yaw. Returns 0 if the decode
+// surface changed (shouldn't, given these inputs) rather than force a stale state.
+s32 Zelda3D_PlayerForceBackwalk(Player* this, PlayState* play) {
+    s16 yawTarget = (s16)(this->actor.shape.rot.y + 0x8000);
+    f32 speedTarget = 8.0f;
+
+    if (func_8083E404(this, speedTarget, yawTarget) >= 0) {
+        return 0;
+    }
+    func_8083AF8C(this, yawTarget, play);
+    return 1;
+}
+
 void func_8083A844(Player* this, PlayState* play, s16 yaw) {
     this->yaw = yaw;
     this->actor.shape.rot.y = this->yaw;
