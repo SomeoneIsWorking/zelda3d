@@ -55,3 +55,26 @@ the now-readable DAT constants, and diff to localize the 28-unit-eye-Y delta. On
 specific divergent computation into `Normal1Behavior::update()` (do NOT rewrite the whole 3152-byte
 body — port the delta over SoH's already-faithful N64 Camera_Normal1). Struct-offset anchors so far:
 param_1[0x20]=at, [0x23]=eye, [0x29]=eyeNext(?), [0x35]=play, [0x36]=player, [0x6c]=speedXZ.
+
+## Camera_Normal1 divergence hunt — pitch clamps also RULED OUT (both match)
+
+Continued the FUN_00239fd8 vs SoH Camera_Normal1 diff with the now-readable eye-path DAT constants
+(code.bin @ VA−0x100000):
+
+- Eye-path constants resolved: a6b8=0.2222(2/9) a6c4=0.1(lerp rate) a6c8=0.05 a6cc/a6d0=−40 aa88=0.2
+  aa98=0.75 ac84=2 ac88=0.99 ac90=10000 ac94=0.8; **aa90=14500 (0x38A4)** and **aa94=−15500
+  (−0x3C8C)** = the pitch clamp bounds at FUN_00239fd8:329-334 (`clamp local_6c to [−15500,14500]`).
+- SoH Camera_Normal1 pitch clamp (z_camera.c:1742-1746): `if pitch > 0x38A4 → 0x38A4; if pitch <
+  −0x3C8C → −0x3C8C`. **IDENTICAL** (14500 / −15500 both).
+
+So RULED OUT so far as the ~28-unit eye-Y divergence source: (1) yOffset/height formula (algebraically
+identical), (2) upper pitch clamp (0x38A4 both), (3) lower pitch clamp (−0x3C8C both). Also, clamps
+only bite at pitch extremes — they can't produce a *persistent* Kakariko offset regardless.
+
+**Remaining candidates** for the 28-unit persistent eye-Y delta (narrowed): the eye DISTANCE
+(`eyeAdjustment.r`, set from norm1->distTarget/distMin via the swing block) or the PITCH VALUE before
+clamp (`Camera_CalcDefaultPitch(atEyeNextGeo.pitch, norm1->pitchTarget, slopePitchAdj)`, z_camera.c:1738)
+vs the 3DS equivalent — eye.y = at.y + r·sin(pitch), so a difference in r or pitch-value shifts eye.y.
+Next: diff the 3DS eye r/pitch computation (FUN_00355780 spring-lerps into param_1[0x45..0x47], and the
+FUN_00367df4 at→eye VecSph add at lines 291/350/371) against SoH's eyeAdjustment.r + Camera_CalcDefaultPitch,
+OR do an intermediate-value A/B (cammode eye/at + oracle eye) since the static diff is converging slowly.
