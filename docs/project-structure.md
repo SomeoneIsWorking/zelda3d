@@ -61,15 +61,15 @@ The repo/working dir and the GitHub repo are named `soh3d` for historical reason
 first); it now hosts both soh3d and 2ship3d under the zelda3d umbrella. Renaming the repo to `zelda3d`
 would better reflect that but is disruptive (remote URL, `.env`, all tooling paths) — not done.
 
-## Open rename decisions (NOT executed — they change code, so they're the user's call)
+## Code names — RESOLVED: keep the embedded names, no renames
 
-These would make the *code* match the taxonomy more literally, at a cost. Listed so the choice is
-explicit, not silently made:
+The user is indifferent to `2ship` vs `2s2h` as a label (2026-07-17), so the code keeps its embedded
+names and prose may use either. No renames are done:
 
-1. `2s2h` / `mm` dirs+code → `2ship`  — **~660 files, diverges from upstream 2 Ship 2 Harkinian.**
-   Recommendation: keep as-is; alias in prose. High cost, no functional gain.
-2. `mm3d_*` files → `2ship3d_*` (our code, ~28 files, needs an MM rebuild) — makes the 2ship3d layer's
-   file prefix match its branch name. Lower cost; still a code change. Deferred pending user intent.
+- `2s2h` / `mm` stay (renaming to `2ship` would be ~660 files diverging from upstream 2 Ship 2 Harkinian
+  for zero functional gain).
+- `mm3d_*` stays as the 2ship3d layer's file prefix (renaming to `2ship3d_*` is ~28 files of churn with
+  no benefit the user cares about).
 
-Until told otherwise, prose uses the clean taxonomy (zelda / zelda3d · soh / soh3d · 2ship / 2ship3d)
-and code keeps its embedded names (`2s2h`, `mm`, `mm3d_*`, `zelda3d_*`).
+Prose uses the clean taxonomy (zelda / zelda3d · soh / soh3d · 2ship / 2ship3d); code keeps `2s2h`,
+`mm`, `mm3d_*`, `zelda3d_*`. `2ship`≡`2s2h` and `2ship3d`≡`mm3d` are interchangeable.
