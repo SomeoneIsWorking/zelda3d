@@ -115,3 +115,22 @@ has no equivalent field, so a FAITHFUL port must reimplement this accumulate/dec
 apply `at.y += bias·−0.01` in the at_default seam. NEXT: resolve the writer's constants (DAT_0025293c
 +0x90 decay, +0x94 threshold, DAT_00251cd8 state id, fVar4/fVar32 clamps) and map player[0x2c]/[0x10c]/
 [0x1708] to SoH Player fields, then port. Do NOT approximate with a magic −25 constant (bandaid).
+
+## Y-bias writer constants resolved (FUN_00250ad0)
+
+- `DAT_0025293c` = pointer `0x0053a07c` (a tuning-table in .data, in code.bin range). Its indexed
+  values: `[+0x90] = 400.0` (per-frame DECAY amount), `[+0x94] = 9.0` (Y-delta trigger THRESHOLD).
+- `DAT_00251cd8 = 0x004ba378` — an ADDRESS (not a scalar), so `player[0x1708]` is an **action-func
+  pointer** and the bias's SET path fires only when Link is in the specific action at 0x004ba378
+  (`player[0x1708] == 0x4ba378`). `DAT_00251cf0 = 0x004b9920` (a sibling action addr, used elsewhere).
+- So: in action-state 0x4ba378, if the tracked Y-delta ≥ 9, set flag 0x100 and accumulate the delta
+  into `player[0x1760]`; otherwise it decays 400/frame until it hits the flag-clear. The at-calc then
+  applies `at.y += player[0x1760]·−0.01`.
+
+REMAINING for the faithful port (do NOT bandaid with a magic −25): (1) identify what OoT3D action
+0x004ba378 is (which Link action drives the camera Y-bias — likely a landing/step/slope action) so
+the SoH equivalent can be gated the same way; (2) map `player[0x2c]`/`[0x10c]`/`[0x1708]` (3DS Player
+struct) to SoH Player fields for the Y-delta + action check; (3) reimplement accumulate(thr=9)/
+decay(400)/clamp in the SoH Player, and add the `at.y += bias·−0.01` term in a shared
+`behaviors/camera/at_default.cpp` seam routed from Camera_Normal1 (Normal1Behavior stays a delegate).
+Then A/B the Kakariko Δeye-Y → 0 with `cammode` vs the oracle. This is the concrete, no-guess path.
