@@ -17,6 +17,18 @@
 > steady state, THEN diff eye r/pitch. RE gains from the at.y detour that DO stand: action
 > `0x4ba378` = the ground walk/run locomotion action (drives the bias); `player[0x2c]` = world.pos.y;
 > `player[0x10c]` = a world.pos.y snapshot taken at state transitions; decay 400/frame, threshold 9.
+>
+> **RESOLVED — the empirical answer already existed (gameplay_firstdiv.md:1243-1323, 2026-07-03).**
+> This whole file re-investigated a question that was already CLOSED. The Kakariko "~28-unit eye-Y
+> drift" is a **TEST-HARNESS LinkAge artifact**, not a camera divergence: the oracle loaded a
+> CHILD-Link savestate (Player_GetHeight=44) while SoH booted its ADULT default (=68); 68−44=24 =
+> the observed |Δat|, propagated through the IDENTICAL Camera_CalcAtDefault→Normal1 flow. With ages
+> matched (`soh_setage`), |Δeye| 27.96→**2.07**, |Δat| 24.10→**0.10** — Camera_Normal1 is AT PARITY.
+> The 2026-07-17 work below (and the frontier re-partial it produced) was a **"read before you
+> re-derive" failure**: the gameplay_firstdiv.md link in the frontier entry already carried the
+> falsification AND the root cause. Everything below is retained only as a record of the detour;
+> the Δ-A extra-Y block it characterized is real but inert at Kakariko-idle and is now tracked as
+> re-frontier `camera.calc-at-default-ybias`. camera.normal1 is re-verified (at parity).
 
 ## Unblocked: reading ANY OoT3D `DAT_00xxxxxx` pool constant
 
