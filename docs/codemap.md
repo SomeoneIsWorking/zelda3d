@@ -112,9 +112,8 @@ debug_journal/                 dated findings entries — the append-only invest
 
 ## zelda3d/ reorganization — target tree & migration status
 
-`zelda3d/` is being reorganized top-down per the approved plan (agent-local plan doc
-`<local-notes>`, tracked here per the "codemap = live record of the reorg"
-instruction). `zelda3d.c` was originally a 7,170-line dumping ground (render +
+`zelda3d/` is being reorganized top-down per the approved plan (an agent-local plan doc in
+the local workspace, tracked here per the "codemap = live record of the reorg" instruction). `zelda3d.c` was originally a 7,170-line dumping ground (render +
 149-command REPL + input injection + collision + HUD + camera all in one file — banned by
 CLAUDE.md's game-structure rule) and 36 source files sat flat at the `zelda3d/` top level with
 only `behaviors/{actor,camera,title}` organized into subdirs. The migration is **sequential,
