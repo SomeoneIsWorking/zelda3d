@@ -3,17 +3,16 @@
 > **Generated mirror — do not hand-edit.** Source of truth = GitHub Issues on
 > `SomeoneIsWorking/zelda3d` (private). Regenerate with `tools/kanban.py render`.
 > Move a card with `tools/kanban.py mv <#> <column>`; add with `tools/kanban.py add`.
-> Columns: todo · in-progress · in-review · needs-confirmation · reopened · blocked · done(=closed).  Updated 2026-07-17 05:14.
+> Columns: todo · in-progress · in-review · needs-confirmation · reopened · blocked · done(=closed).  Updated 2026-07-17 10:18.
 
-**Counts:** todo:6 | in-progress:2 | in-review:1 | needs-confirmation:30 | reopened:0 | blocked:0 | done:80
+**Counts:** todo:5 | in-progress:2 | in-review:1 | needs-confirmation:31 | reopened:0 | blocked:0 | done:80
 
-## 📋 To Do  (6)
+## 📋 To Do  (5)
 - [#17](../../issues/17) Hi-res world/scene textures (texpack) _(render)_
 - [#33](../../issues/33) More foliage / vegetation density (lowest priority) _(scene)_
 - [#130](../../issues/130) Make repo public — audit + clean git history first (no outside-repo paths, no copyrighted assets) _(infra)_
 - [#133](../../issues/133) Add HTTP/remote layer to the REPL control channel (beyond FIFO)
 - [#151](../../issues/151) Link can't move after the intro (Navi wakes Link, inside Link's house) — controls dead from this point _(keyboard,behavior)_
-- [#153](../../issues/153) Title: rider/horse lack OoT3D's fine shading — title path force-disables per-fragment lighting _(render)_
 
 ## 🔨 In Progress  (2)
 - [#111](../../issues/111) World night R/G too bright — flat tint under-darkens at night (needs vertex-lighting port) _(render)_
@@ -22,7 +21,7 @@
 ## 🔍 In Review (agent verifying)  (1)
 - [#112](../../issues/112) START can't skip the final intro segment (Navi flies in / wakes Link) _(render,keyboard)_
 
-## 🙋 Needs User Confirmation  (30)
+## 🙋 Needs User Confirmation  (31)
 - [#12](../../issues/12) Inventory/pause background renders upside-down _(render,ui,inventory)_
 - [#16](../../issues/16) First-person camera: early-load crash + position snap _(camera,crash)_
 - [#18](../../issues/18) Crisp HUD/UI textures (hearts/digits/buttons/icons) _(ui,hud)_
@@ -53,6 +52,7 @@
 - [#149](../../issues/149) Title demo jittery (~30fps stepping): camera/rider/anims not interpolated to 60fps _(render)_
 - [#150](../../issues/150) Verify hoof dust + tree still render when unoccluded (post overlay-depth fix) _(render)_
 - [#152](../../issues/152) Title: Link isn't seated well on Epona (mounted pose offset vs oracle) _(render,anim)_
+- [#153](../../issues/153) Title: rider/horse lack OoT3D's fine shading — title path force-disables per-fragment lighting _(render)_
 
 ## ♻️ Reopened (was done, found broken)  (0)
 _none_
