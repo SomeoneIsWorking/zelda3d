@@ -139,7 +139,17 @@ hypothesis (a) root motion. Resolving +0x1b0 (index into the table at iRam002537
 Ghidra step. (Probe kept in scratch; rebuild: `g++ -std=c++17 -I Shipwright/cmb3d
 scratch/mm3d_gar_test/csab_rootmotion.cpp Shipwright/cmb3d/asset/{ctr_rom,zar,lzs,cmb,csab}.cpp`.)
 
-## 5d. RESOLVED (mechanism) 2026-07-17 — SoH forces rearing; oracle plays a moving root-motion clip
+## 5d. ~~RESOLVED (mechanism) 2026-07-17 — SoH forces rearing; oracle plays a moving root-motion clip~~ — **FALSIFIED, see §5e**
+
+> **FALSIFIED 2026-07-17 (later): this section is wrong.** It rests on the premise that horse
+> `+0x1b0` is the *clip index* and that FUN_002535f0 selects a *moving* clip through it. Re-reading
+> the actual ARM decompile of BOTH FUN_002535f0 and FUN_002b6c00 shows the anim lookup is **2D**:
+> `clip = table[ horse+0x1b0 ][ horse+0xe74 ]`. `+0x1b0` is the animation **SET** (row, a stable
+> per-horse selector); `+0xe74` is the **clip index within the set** (column) — and `+0xe74` is the
+> N64 `animationIdx`: the init sets it to **3 (REARING)**, the action sets it to **0 (IDLE)** every
+> frame. Both are in-place clips (§5c). So FUN_002535f0 plays rearing→idle in place, EXACTLY as the
+> N64 Rosetta-stone and SoH's port already do — there is NO moving root-motion clip. Hypothesis (a)
+> is falsified. See §5e for the corrected conclusion. Original (wrong) reasoning kept below, marked.
 
 Cross-reading FUN_002535f0 (§5b), the horse-CSAB root-motion probe (§5c), and the SoH port's own
 0x41 handling pins the mechanism of the §5 divergence.
@@ -172,3 +182,70 @@ clip root motion; do NOT integrate speed, which is 0). Exact clip id still needs
 2026-07-17 static-search dead end), but the mechanism + fix shape are now settled. This is hypothesis
 (a) CONFIRMED (root motion), hypothesis (b) cue-window-decode RULED OUT (the window/action decode is
 right; the handler port's anim selection is what's wrong).
+
+## 5e. CORRECTED (mechanism) 2026-07-17 — the 0x41 handler is IN-PLACE and the SoH port already matches it
+
+Supersedes §5d (falsified above). Full static re-read of the two decompiled bodies +
+`oot3d-decomp/build/decomp/{002535f0,002b6c00,0036ae14}.c` + the SoH port
+(`title_rider.cpp`), no harness needed.
+
+**The anim lookup is 2D — this is the crux §5d got wrong.** Both init (FUN_002b6c00) and action
+(FUN_002535f0) resolve the clip as `table[ horse+0x1b0 ][ horse+0xe74 ]`
+(`iRam00253750[ (u8)param_1[0x1b0] ][ (u8)param_1[0xe74] ]`, each level a pointer deref × index×4):
+- `+0x1b0` = animation **SET** / row — a stable per-horse selector; NEITHER init nor action writes
+  it (the "static-search dead end" for a `+0x1b0` writer was looking for a writer that isn't in the
+  handler because there isn't one — it's set once at horse init).
+- `+0xe74` = **clip index within the set** (column) = the N64 `ENHORSE_ANIM_*` `animationIdx`. Init
+  `FUN_002b6c00` sets `+0xe74 = 3` (**REARING**); action `FUN_002535f0` sets `+0xe74 = 0` (**IDLE**)
+  every frame at its top. Both in-place (§5c: net root ≈ 0 for rearing/idle).
+
+So FUN_002535f0 plays **rearing → idle, in place**, zeroes speed (`+0x6c`=0), and never writes
+`world.pos`. It **provably cannot translate** the horse within a 0x41 window. This is byte-for-byte
+what the N64 `EnHorse_CsWarpRearingInit`/`EnHorse_CsWarpRearing` do, and what SoH's port drives.
+
+**Cue-window decode is clean, too.** Full cue table (logged, `rider cue N`): within (1380,1619] ONLY
+cue 6 (0x41) matches — no overlapping later-command cue to win the last-match latch. So the oracle is
+unambiguously in WarpRearing for the whole window. Hypothesis (b) (window/action mis-decode) is NOT
+supported.
+
+**The SoH port already reproduces the handler faithfully** (`title_rider.cpp`):
+- step():88-95 — on the idx 1→5 transition it teleports `mPos = cue6.startPos` (`teleport |= funcIdx==5`),
+  exactly as FUN_002b6c00 teleports to `cue.startPos`.
+- step():111 — `mSpeed = 0` during idx5 (matches FUN_002535f0 `+0x6c`=0).
+- applyToActor():229-249 — drives the vendored `EnHorse_CsWarpRearingInit`/`EnHorse_CsWarpRearing`
+  (in-place rearing→idle).
+
+**Conclusion:** there is NO unported moving-clip behavior. The 0x41 handler port is faithful to the
+ground-truth decomp. Under both oracle and port the horse teleports to `cue6.startPos` at frame 1381
+and stands (rear→idle) in place through 1619 — they are co-located within the window.
+
+**What §5's "oracle keeps translating during cue 6" almost certainly was:** the cue-6-boundary
+**teleport** — a real, large, discrete forward jump to `cue6.startPos` at 1381 — which the port DOES
+reproduce (step():92-95). A same-camera A/B straddling frame 1380 reads that jump as motion. A
+secondary candidate is cue 5's long PathFollow Move (1108,1380] accumulating integration drift by
+1380, but the cue6 teleport **re-converges** both sides at 1381, so any cue5 drift cannot survive into
+the window. Either way it is not a 0x41-handler divergence.
+
+**The `seat4x_fix` "oracle walks off bottom-right while SoH stands at cue-6 p0" evidence is a
+WALL-CLOCK cs-RATE effect, not a handler divergence — RESOLVED here:**
+- `scratch/title_ab/verify_04_cs1407.{az,soh}.png` is **cs-frame-LOCKED at cs1407 (inside cue6)** and
+  shows the two co-located (no horse translation divergence). `seat4x_fix.{az,soh}.png` is a
+  **wall-clock** capture (no cs-frame in the name) and shows the oracle well ahead/moving while SoH
+  rears in place. Co-located when locked to the same cs-frame, diverged at the same wall-clock = the
+  textbook signature of a **cutscene-clock rate desync**, not a position bug.
+- Cause is already documented: `debug_journal/2026-07-16-title-20fps-root-cause.md` — SoH's title cs
+  advances at **10 cs-frames/s** (20fps logic × every-other-tick `sTickParity`) vs the oracle's
+  **30/s**, so the SoH demo progresses at ~1/3 wall-clock speed and the oracle's rider runs ahead into
+  a later *moving* cue while SoH is still in cue6's in-place rear. Interpolation (60fps present) masks
+  the slowness as smoothness but does not change the cs progression rate.
+- This rate is **contested and user-owned**, not a free parameter to "fix" here: commit `7b3e53eb`
+  reverted the R_UPDATE_RATE=1 (→ cs 30/s, oracle-matched) override because **the user reported it
+  "made the demo run too fast"** and chose the original rate. So matching the oracle's 30/s rider
+  progression is exactly what the user rejected. The wall-clock rider desync is therefore a downstream
+  manifestation of the **title-cs advance-rate decision tracked by card #149** (title fps,
+  needs-confirmation) — NOT an independent 0x41-handler defect.
+
+**Bottom line:** the 0x41 handler port is faithful to the ground-truth decomp; frame-locked rider
+parity is clean; do NOT chase root motion / a moving clip (falsified) and do NOT unilaterally change
+the cs rate (user rejected the oracle-matched rate). The rider follows whatever cs advance-rate #149
+settles on. No 0x41-handler code change is indicated.
