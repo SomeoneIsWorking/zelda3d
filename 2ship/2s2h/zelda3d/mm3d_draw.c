@@ -99,40 +99,6 @@ static float Zelda3D_MM_SkelBoneLenSum(void** skeleton, int limbCap) {
     return sum;
 }
 
-// Reconstruct the per-limb PARENT array from the N64 child/sibling limb tree (child's parent
-// = current limb; sibling's parent = current limb's parent). Fills parents[0..limbCount) and
-// returns the count filled (0 on failure). Feeds Zelda3D_MM_GradeTopology's identity-retarget
-// grade. Iterative (idx,parent) stack, same no-recurse-from-C-entry convention as the walks above.
-static int Zelda3D_MM_SkelParents(void** skeleton, int limbCount, int* parents, float* posOut, int cap) {
-    if (skeleton == NULL || skeleton[0] == NULL || parents == NULL || limbCount <= 0) return 0;
-    if (limbCount > cap) limbCount = cap;
-    for (int i = 0; i < limbCount; i++) {
-        parents[i] = -1;
-        if (posOut != NULL) { posOut[i * 3] = 0; posOut[i * 3 + 1] = 0; posOut[i * 3 + 2] = 0; }
-    }
-    int stkIdx[128], stkPar[128];
-    s32 sp = 0;
-    stkIdx[sp] = 0; stkPar[sp] = -1; sp++;
-    int steps = 0;
-    while (sp > 0 && steps < 512) {
-        sp--;
-        int i = stkIdx[sp], par = stkPar[sp];
-        steps++;
-        if (i < 0 || i >= limbCount || i >= 128) continue;
-        if (skeleton[i] == NULL) continue;
-        parents[i] = par;
-        StandardLimb* lb = (StandardLimb*)Lib_SegmentedToVirtual(skeleton[i]);
-        if (posOut != NULL) {
-            posOut[i * 3] = (float)lb->jointPos.x;
-            posOut[i * 3 + 1] = (float)lb->jointPos.y;
-            posOut[i * 3 + 2] = (float)lb->jointPos.z;
-        }
-        if (lb->sibling != LIMB_DONE && sp < 128) { stkIdx[sp] = lb->sibling; stkPar[sp] = par; sp++; }
-        if (lb->child != LIMB_DONE && sp < 128) { stkIdx[sp] = lb->child; stkPar[sp] = i; sp++; }
-    }
-    return limbCount;
-}
-
 // Shared SkelAnime intercept prologue: called at the top of each MM SkelAnime_Draw*Opa entry
 // point. If a skinned MM3D replacement is pending for this actor, poses OoT3D bones from the
 // live N64 jointTable and returns 1; caller returns immediately without walking the N64 tree.
@@ -159,20 +125,6 @@ int Zelda3D_MM_InterceptSkelAnime(PlayState* play, Actor* actor, void** skeleton
             if (n64Sum > 1e-3f && cmbSum > 1e-3f) {
                 float scale = actor->scale.x * (n64Sum / cmbSum);
                 Zelda3D_MM_OverridePending(scale, -minY);
-            }
-        }
-    }
-    // Deterministic identity-retarget grade (env ZELDA3D_MM_SKINNED_TOPO=1, once per model):
-    // reconstruct the N64 limb-parent array and compare against the CMB bone hierarchy.
-    {
-        int gmid = Zelda3D_MM_PendingModelId();
-        if (gmid >= 0) {
-            int parents[128];
-            float pos[128 * 3];
-            int np = Zelda3D_MM_SkelParents(skeleton, limbCount, parents, pos, 128);
-            if (np > 0) {
-                Zelda3D_MM_BuildRetargetMap(gmid, parents, pos, np); // the fix: auto bone-map
-                Zelda3D_MM_GradeTopology(gmid, parents, pos, np);    // env-gated identity diagnostic
             }
         }
     }

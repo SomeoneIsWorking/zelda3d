@@ -193,10 +193,25 @@ Once actors pose correctly:
 - Per-archive scale entries land in `g_models` so `mscale`/`mlist` calibrate
   skinned actors too.
 
-### Stage 4 (later, larger) — CSAB anim
-- CSAB parser (small — Grezzo format is documented in cmb3d already for OoT)
-- Per-actor N64→CSAB anim map (hand-tuned; OoT started tiny and grew)
-- Phase-lock to N64 `curFrame` / `animLength`
+### Stage 4 — CSAB anim — **THIS IS THE ARCHITECTURE (landed 2026-07-17)**
+
+> **The Stage-2 "retarget N64 joints onto CMB bones" path was the WRONG architecture and has been
+> REMOVED.** MM3D actor GARs ship the actor's OWN 3DS animations (`.csab`) next to the `.cmb`
+> (`zelda2_dog.gar.lzs` → `dog_wait/walk/run/bark/sit/...`). There is nothing to retarget: play the
+> 3DS clip on the 3DS rig, exactly as OoT's soh3d layer does. See
+> `debug_journal/2026-07-17-mm-skinned-csab-architecture.md`.
+
+**Landed + verified (dog renders posed by its own `dog_wait`, scratch/screenshots/mm_dog_csab_mapped.png):**
+- **CSAB parser** — the shared `cmb3d/asset/csab.cpp` now parses MM3D **subversion 5** ("Majora")
+  as well as OoT3D subversion 3. Only header offsets + anod base differ (0x24 vs 0x18); anod/track
+  layout identical (noclip csab.ts). Validated: dog 12/12, an1 37/37, dnt 19/19 — bone counts match CMBs.
+- **Capture** live N64 anim state in `SkelAnime_Update`/`PlayerAnimation_Update`
+  (`Zelda3D_MM_CaptureAnimState`, keyed by jointTable) — MM has no `SkelAnime*` at the draw choke.
+- **Resolve** N64 anim OTR → 3DS CSAB via `kMMAnimMaps` (`__OTR__` stripped) + data-driven default idle.
+- **Phase-lock** the CSAB to N64 `curFrame`/`animLength`; sample via `Csab::skinMatrices`; upload.
+
+**Next (incremental, same as OoT grew):** fill `kMMAnimMaps` per actor from the `[MM3D-ANIM]` harvest
+log; port the morph cross-fade + walk-stop synthetic morph; then flip `ZELDA3D_MM_SKINNED` on by default.
 
 ## Files to touch (MVP)
 

@@ -347,6 +347,14 @@ below, not duplicated).
 - gap: none — closed
 - notes: 
 
+### mm.skinned-csab — MM3D skinned actors play their OWN 3DS CSAB animations
+- status: re-partial
+- deps: skin.rigid-skinning
+- evidence: `debug_journal/2026-07-17-mm-skinned-csab-architecture.md`; live dog render `scratch/screenshots/mm_dog_csab_mapped.png`; standalone parse validation (dog 12/12, an1 37/37, dnt 19/19 clips, bone counts match CMBs)
+- where: `2ship/2s2h/zelda3d/mm3d_model.cpp` (capture/resolve/phase-lock/sample), `2ship/2s2h/zelda3d/mm3d_draw.c`, `2ship/src/code/z_skelanime.c` (capture hook), `Shipwright/cmb3d/asset/csab.cpp` (subver-5 parse)
+- gap: **the earlier N64-joint RETARGET (identity → auto bone-map → topology grader) was a ⛔ hack that jumped ahead of the real CSAB RE and is now REMOVED.** The correct architecture mirrors OoT (`Zelda3D_UpdateAnim` + auto CSAB path): 3DS rig plays its own 3DS clip, phase-locked to the N64 playhead — correct-by-construction (no cross-rig bone correspondence). Landed + verified. Remaining: `kMMAnimMaps` seeded only for `dog`; grow per actor from the `[MM3D-ANIM]` harvest, port morph, then flip `ZELDA3D_MM_SKINNED` default-on.
+- notes: MM3D CSAB is subversion 5 ("Majora"), not 3 — the shared parser gained the branch (offsets: anod base 0x24, dur 0x34, anodCount 0x3C, boneCount 0x40, boneToAnim 0x44). N64 anim identity = `(const char*)skelAnime->animation` (ogAnim OTR path), captured in SkelAnime_Update keyed by jointTable since MM's draw choke lacks the SkelAnime*.
+
 
 ## lighting-fog
 

@@ -20,14 +20,14 @@
 
 #include "asset/cmb.h"
 #include "asset/cmb_glgroups.h" // shared Zelda3D::MakeGlGroup / AppendCmbTextures
+#include "asset/csab.h" // shared 3DS CSAB sampler — plays the MM3D actor's OWN animations
 #include "asset/ctr_rom.h"
 #include "asset/gar.h" // MM3D actor archives are Grezzo GAR2, not OoT3D ZAR
 #include "asset/lzs.h" // ~40% of MM3D actor .gar.lzs archives are LzS-wrapped GAR2
-#include "asset/mat4.h" // Mat4 helpers for the SkelAnime retarget port
 
 #include <array>
 #include <cmath>
-#include <functional>
+#include <set>
 
 namespace {
 
@@ -42,7 +42,7 @@ namespace {
 struct ModelSpec {
     std::string garPath;  // "/actors/zelda2_<name>.gar.lzs"
     float worldScale;     // N64 world units per CMB unit; first-guess 0.1 until calibrated.
-    bool skinned = false; // true = draw via SkelAnime intercept (retarget from N64 pose)
+    bool skinned = false; // true = draw via SkelAnime intercept (3DS CSAB anim on the 3DS rig)
 };
 std::vector<ModelSpec> g_models;
 // objectId -> renderer modelId (or -1 if resolution attempted and failed — cache miss).
@@ -56,18 +56,21 @@ std::unordered_map<int, std::string> g_objectName;
 
 // Lazily-loaded geometry; owns the CPU arrays the renderer reads during upload.
 struct Loaded {
+    std::unique_ptr<Zelda3D::Gar> gar; // kept alive so CSAB anims can be read lazily
     std::unique_ptr<Zelda3D::Cmb> cmb;
     std::vector<Zelda3D::CmbDrawGroup> groups; // owns verts (cGroups alias into these)
     std::vector<std::vector<uint8_t>> texRgba;
     std::vector<Zelda3DGlGroup> cGroups;
     std::vector<Zelda3DGlTex> cTexs;
     bool ok = false;
-    // Retarget map: boneToN64[cmbBoneId] = N64 limb index whose jointRot poses that bone,
-    // or -1 (no N64 counterpart -> stays at bind rot). Auto-derived once from the live N64
-    // skeleton (parent + local-pos correspondence) by Zelda3D_MM_BuildRetargetMap; empty
-    // until built (mmUpdateAnimN64 falls back to identity while empty).
-    std::vector<int> boneToN64;
-    bool retargetBuilt = false;
+    // Parsed CSAB cache, keyed by base name ("dog_wait"). The MM3D actor's OWN 3DS animations,
+    // read from the same GAR as the CMB. Mirrors OoT's LoadedModel::anims (zar-sourced there).
+    std::unordered_map<std::string, std::unique_ptr<Zelda3D::Csab>> anims;
+    // Data-driven default idle CSAB (the *_wait clip, else the first CSAB) — the fallback when
+    // this actor's live N64 animation isn't in the N64->3DS map, so an unmapped state reads as
+    // standing rather than freezing at bind pose. Resolved once from the GAR's file list.
+    std::string defaultAnim;
+    bool defaultAnimResolved = false;
 };
 std::unordered_map<int, std::unique_ptr<Loaded>> g_loaded;
 
@@ -126,17 +129,17 @@ Loaded* loadModel(int modelId) {
         }
         garBytes = std::move(inflated);
     }
-    Zelda3D::Gar gar(std::move(garBytes));
-    if (!gar.ok()) {
-        fprintf(stderr, "[MM3D] gar parse %s: %s\n", spec.garPath.c_str(), gar.error().c_str());
+    out->gar = std::make_unique<Zelda3D::Gar>(std::move(garBytes));
+    if (!out->gar->ok()) {
+        fprintf(stderr, "[MM3D] gar parse %s: %s\n", spec.garPath.c_str(), out->gar->error().c_str());
         return out;
     }
-    const Zelda3D::GarFile* cmbFile = gar.firstWithSuffix(".cmb");
+    const Zelda3D::GarFile* cmbFile = out->gar->firstWithSuffix(".cmb");
     if (cmbFile == nullptr) {
         fprintf(stderr, "[MM3D] no .cmb in %s\n", spec.garPath.c_str());
         return out;
     }
-    out->cmb = std::make_unique<Zelda3D::Cmb>(gar.read(*cmbFile));
+    out->cmb = std::make_unique<Zelda3D::Cmb>(out->gar->read(*cmbFile));
     if (!out->cmb->ok()) {
         fprintf(stderr, "[MM3D] cmb parse %s: %s\n", spec.garPath.c_str(), out->cmb->error().c_str());
         return out;
@@ -261,18 +264,15 @@ static int resolveModelForObject(int objectId) {
         return -1;
     }
     if (probeCmb.bones().size() > 1) {
-        // Skinned — the Stage-2 SkelAnime intercept IS wired (z_skelanime.c choke points ->
-        // Zelda3D_MM_InterceptSkelAnime -> SkelAnimeDrawRaw -> mmUpdateAnimN64, which poses the
-        // CMB from the LIVE N64 jointTable via the identity bone->limb retarget). Accepting a
-        // skinned archive here therefore yields a live-animated MM3D draw, NOT a T-pose.
-        // Graded POSITIVE on complex rigs in default South Clock Town (dog 12-bone, humanoid
-        // NPC 15-20 bone pose correctly — docs/MM_SKELANIME_PORT.md Stage-2 status).
-        // Still behind the ZELDA3D_MM_SKINNED_TPOSE env gate (legacy name — no longer T-pose)
-        // pending broader game-wide validation + per-archive bone-maps for rigs whose CMB bone
-        // order diverges from the N64 limb order (mmUpdateAnimN64's identity assumption).
+        // Skinned — the SkelAnime intercept (z_skelanime.c choke points -> Zelda3D_MM_InterceptSkelAnime
+        // -> SkelAnimeDrawRaw) drives the 3DS CMB rig with the actor's OWN 3DS CSAB animation (resolved
+        // from the live N64 anim, phase-locked). Accepting a skinned archive here therefore yields a
+        // live-animated MM3D draw from real 3DS motion data. Behind the ZELDA3D_MM_SKINNED env gate
+        // pending the N64->3DS anim map growing to cover each actor's states (docs/MM_SKELANIME_PORT.md
+        // Stage 4); unmapped states fall back to the model's default idle CSAB.
         static int sSkinnedEnable = -1;
         if (sSkinnedEnable < 0) {
-            const char* v = getenv("ZELDA3D_MM_SKINNED_TPOSE");
+            const char* v = getenv("ZELDA3D_MM_SKINNED");
             sSkinnedEnable = (v != nullptr && v[0] != '\0' && v[0] != '0') ? 1 : 0;
         }
         if (!sSkinnedEnable) {
@@ -281,7 +281,7 @@ static int resolveModelForObject(int objectId) {
             g_objectToModel[objectId] = -1;
             return -1;
         }
-        fprintf(stderr, "[MM3D] skinned obj=0x%03X (%s): %zu bones (Stage-2 live-posed draw)\n",
+        fprintf(stderr, "[MM3D] skinned obj=0x%03X (%s): %zu bones (3DS CSAB-animated draw)\n",
                 objectId, name, probeCmb.bones().size());
     }
     bool isSkinned = probeCmb.bones().size() > 1;
@@ -339,10 +339,12 @@ void Zelda3D_SetObjectScale(int objectId, float scale) {
     }
 }
 
-// STAGE 2 SkelAnime port — live N64-anim retarget for skinned MM3D actors.
-// See docs/MM_SKELANIME_PORT.md. Mirrors OoT's Zelda3D_UpdateAnimN64Mapped
-// (Shipwright/soh/src/zelda3d/anim/zelda3d_anim.cpp) — identity bone->limb map,
-// N64 rotation REPLACES the CMB rest rot in Rz*Ry*Rx order.
+// STAGE 4 — CSAB anim: skinned MM3D actors play their OWN 3DS animations (the .csab clips
+// shipped in the same GAR as the .cmb), NOT a retarget of the N64 pose. This mirrors OoT's
+// architecture (Shipwright/soh/src/zelda3d/anim/zelda3d_anim.cpp Zelda3D_UpdateAnim +
+// core/zelda3d.c auto path): resolve the actor's live N64 animation -> a 3DS CSAB name via
+// the N64->3DS map, sample that CSAB (shared Zelda3D::Csab) phase-locked to the N64 playhead,
+// upload the skin matrices. The 3DS rig is posed by its own 3DS motion data.
 
 // Pending state — set by mm3d_draw's TryDrawActor when a skinned model is
 // resolved; consumed by SkelAnimeDrawRaw and cleared in AfterActorDraw.
@@ -354,62 +356,123 @@ struct MMPending {
 };
 MMPending g_pending;
 
-// Retarget the CMB bones from the live N64 jointTable (identity boneId <-> limbIdx
-// mapping). Uploads skin matrices + bind matrices to the renderer.
-static void mmUpdateAnimN64(int modelId, const int16_t* jointRots, int rotCount) {
-    using namespace Zelda3D;
+// Live N64 anim state captured in SkelAnime_Update (Zelda3D_MM_CaptureAnimState), keyed by the
+// stable jointTable pointer. The draw choke has only jointTable, so this is how it recovers WHICH
+// N64 animation is playing + its playhead — the inputs to CSAB selection + phase-lock.
+struct MMAnimState {
+    const char* animOtr = nullptr; // skelAnime->animation (an OTR path string in 2s2h)
+    float curFrame = 0.0f;
+    float animLength = 0.0f;
+    float morphWeight = 0.0f;
+};
+std::unordered_map<void*, MMAnimState> g_animState;
+
+// --- N64 animation OTR -> 3DS CSAB base-name map. Seeded small and grown, exactly as OoT's
+// kZelda3dAnimMaps did. An unmapped anim falls back to the model's default idle (below), so a
+// skinned actor always stands rather than freezing at bind pose. The [MM3D-ANIM] log (emitted
+// once per unmapped OTR) harvests the real N64 OTR strings to fill this table.
+struct MMAnimMap { const char* n64otr; const char* csab; };
+static const MMAnimMap kMMAnimMaps[] = {
+    // Seeded from the [MM3D-ANIM] harvest (keys are the OTR path WITHOUT the __OTR__ prefix, as
+    // OoT's kZelda3dAnimMaps does). Grows per actor exactly as OoT's did — an unmapped anim falls
+    // back to the model's default idle CSAB. See docs/MM_SKELANIME_PORT.md Stage 4.
+    // ---- object_dog (obj 0x132) ----
+    { "objects/object_dog/gDogRunAnim",  "dog_run" },
+    { "objects/object_dog/gDogWalkAnim", "dog_walk" },
+    { "objects/object_dog/gDogBarkAnim", "dog_bark" },
+    { "objects/object_dog/gDogSitAnim",  "dog_sit" },
+};
+static const char* resolveAutoCsab(const char* animOtr) {
+    if (animOtr == nullptr) return nullptr;
+    // skelAnime->animation is an OTR resource path, usually with a "__OTR__" signature prefix
+    // (2s2h keeps ogAnim there). Match against the prefix-stripped key.
+    const char* key = animOtr;
+    if (strncmp(key, "__OTR__", 7) == 0) key += 7;
+    for (const auto& m : kMMAnimMaps) {
+        if (strcmp(m.n64otr, key) == 0) return m.csab;
+    }
+    return nullptr;
+}
+
+// Resolve (once) the model's default idle CSAB from the GAR file list: prefer a "*wait*" clip
+// (MM convention: dog_wait, an_wait), else the first CSAB. Data-driven — no per-actor hardcoding.
+static const char* defaultAnimFor(Loaded* lm) {
+    if (lm->defaultAnimResolved) return lm->defaultAnim.empty() ? nullptr : lm->defaultAnim.c_str();
+    lm->defaultAnimResolved = true;
+    if (lm->gar) {
+        const Zelda3D::GarFile* first = nullptr;
+        for (const auto& f : lm->gar->files()) {
+            if (f.type != "csab") continue;
+            if (first == nullptr) first = &f;
+            if (f.name.find("wait") != std::string::npos) { lm->defaultAnim = f.name; break; }
+        }
+        if (lm->defaultAnim.empty() && first != nullptr) lm->defaultAnim = first->name;
+    }
+    return lm->defaultAnim.empty() ? nullptr : lm->defaultAnim.c_str();
+}
+
+// Get-or-parse the CSAB named `base` from this model's GAR (MM CSAB files are flat-named, e.g.
+// "dog_wait", type "csab"). Mirrors OoT's getCsab, minus the ZAR "Anim/" pathing. Cached per model.
+static Zelda3D::Csab* getCsabMM(Loaded* lm, const char* base) {
+    if (base == nullptr || base[0] == '\0' || !lm->gar) return nullptr;
+    std::string key(base);
+    auto it = lm->anims.find(key);
+    if (it != lm->anims.end()) return it->second.get();
+    const Zelda3D::GarFile* af = nullptr;
+    for (const auto& f : lm->gar->files()) {
+        if (f.type == "csab" && f.name == key) { af = &f; break; }
+    }
+    std::unique_ptr<Zelda3D::Csab> csab;
+    if (af != nullptr) {
+        csab = std::make_unique<Zelda3D::Csab>(lm->gar->read(*af));
+        if (!csab->ok()) {
+            fprintf(stderr, "[MM3D] Csab %s: %s\n", key.c_str(), csab->error().c_str());
+            csab.reset();
+        }
+    } else {
+        fprintf(stderr, "[MM3D] csab not found: %s\n", key.c_str());
+    }
+    it = lm->anims.emplace(std::move(key), std::move(csab)).first;
+    return it->second.get();
+}
+
+// Sample CSAB `name` at `frame` and upload the skin + bind matrices. Mirrors OoT's
+// Zelda3D_UpdateAnim. name==NULL -> clear (bind pose).
+static void mmUpdateAnim(int modelId, const char* name, float frame) {
     Loaded* lm = loadModel(modelId);
-    if (lm == nullptr || !lm->ok || !lm->cmb) {
-        Zelda3D_GL_SetBones(modelId, nullptr, 0);
-        return;
-    }
-    const auto& bones = lm->cmb->bones();
+    if (lm == nullptr || !lm->ok || !lm->cmb) { Zelda3D_GL_SetBones(modelId, nullptr, 0); return; }
+    if (name == nullptr || name[0] == '\0') { Zelda3D_GL_SetBones(modelId, nullptr, 0); return; }
+    Zelda3D::Csab* anim = getCsabMM(lm, name);
+    if (anim == nullptr) { Zelda3D_GL_SetBones(modelId, nullptr, 0); return; }
+    std::vector<std::array<float, 16>> sm;
+    anim->skinMatrices(*lm->cmb, frame, sm);
     const auto& bind = lm->cmb->boneMatrices();
-    if (bind.empty()) {
-        Zelda3D_GL_SetBones(modelId, nullptr, 0);
-        return;
+    Zelda3D_GL_SetBoneBind(modelId, bind.empty() ? nullptr : bind.front().data(), (int)bind.size());
+    Zelda3D_GL_SetBones(modelId, sm.empty() ? nullptr : sm.front().data(), (int)sm.size());
+}
+
+// Drive the model's CSAB `name`, phase-locked to the live N64 anim: play the 3DS clip at the SAME
+// fractional progress as the N64 animation (csab_frame = (n64Cur/n64Len) * csab_duration). When the
+// N64 length is unusable (short idle stub / not yet known) free-run at `rate` frames/draw so the
+// clip still animates. Mirrors OoT's Zelda3D_UpdateAnimAuto core (minus the morph polish, added later).
+static void mmUpdateAnimAuto(int modelId, const char* name, float rate, float n64Cur, float n64Len) {
+    static std::unordered_map<int, float> frames; // free-run playhead per model
+    if (name == nullptr || name[0] == '\0') { frames.erase(modelId); mmUpdateAnim(modelId, nullptr, 0); return; }
+    Loaded* lm = loadModel(modelId);
+    float dur = 0.0f;
+    if (lm != nullptr && lm->ok && lm->cmb) {
+        Zelda3D::Csab* c = getCsabMM(lm, name);
+        if (c != nullptr) dur = (float)c->duration();
     }
-    const float kBinangToRad = 3.14159265358979f / 32768.0f;
-
-    std::vector<Mat4> aw(bind.size(), matId());
-    std::vector<char> done(bind.size(), 0);
-    std::vector<const CmbBone*> byId(bind.size(), nullptr);
-    for (const auto& bn : bones) {
-        if (bn.id >= 0 && (size_t)bn.id < byId.size()) byId[bn.id] = &bn;
+    float f;
+    if (n64Len > 4.0f && n64Cur >= 0.0f && dur > 0.0f) {
+        f = (n64Cur / n64Len) * dur; // phase-lock
+        frames[modelId] = f;
+    } else {
+        f = frames.count(modelId) ? frames[modelId] + rate : 0.0f; // free-run
+        frames[modelId] = f;
     }
-
-    std::function<Mat4(int)> world = [&](int id) -> Mat4 {
-        if (id < 0 || (size_t)id >= aw.size() || byId[id] == nullptr) return matId();
-        if (done[id]) return aw[id];
-        const CmbBone* bn = byId[id];
-        Mat4 L = matT(bn->trans[0], bn->trans[1], bn->trans[2]);
-        // Retarget: use the auto-derived N64-limb->CMB-bone correspondence
-        // (Zelda3D_MM_BuildRetargetMap) when available; fall back to identity `limb = id`
-        // only while the map is unbuilt. -1 (no N64 counterpart) -> bind rot via the guard below.
-        int limb = id;
-        if (!lm->boneToN64.empty() && id >= 0 && id < (int)lm->boneToN64.size()) {
-            limb = lm->boneToN64[id];
-        }
-        if (limb >= 0 && limb < rotCount) {
-            float rx = jointRots[limb * 3 + 0] * kBinangToRad;
-            float ry = jointRots[limb * 3 + 1] * kBinangToRad;
-            float rz = jointRots[limb * 3 + 2] * kBinangToRad;
-            L = matMul(L, matMul(matMul(matRz(rz), matRy(ry)), matRx(rx)));
-        } else {
-            L = matMul(L, matMul(matMul(matRz(bn->rot[2]), matRy(bn->rot[1])), matRx(bn->rot[0])));
-        }
-        L = matMul(L, matS(bn->scale[0], bn->scale[1], bn->scale[2]));
-        Mat4 W = (bn->parent < 0) ? L : matMul(world(bn->parent), L);
-        aw[id] = W;
-        done[id] = 1;
-        return W;
-    };
-    for (const auto& bn : bones) world(bn.id);
-
-    std::vector<std::array<float, 16>> sm(bind.size());
-    for (size_t id = 0; id < bind.size(); id++) sm[id] = matMul(aw[id], matInverse(bind[id]));
-    Zelda3D_GL_SetBoneBind(modelId, bind.front().data(), (int)bind.size());
-    Zelda3D_GL_SetBones(modelId, sm.front().data(), (int)sm.size());
+    mmUpdateAnim(modelId, name, f);
 }
 
 // Forward-declared C bridge implemented in mm3d_draw.c (has access to POLY_OPA_DISP
@@ -424,14 +487,46 @@ void Zelda3D_MM_SetPending(void* actor, int modelId, float worldScale, float gro
     g_pending.groundOff = groundOffset;
 }
 
+void Zelda3D_MM_CaptureAnimState(void* jointTable, void* animation, float curFrame, float animLength,
+                                 float morphWeight) {
+    if (jointTable == nullptr) return;
+    MMAnimState& s = g_animState[jointTable];
+    s.animOtr = static_cast<const char*>(animation);
+    s.curFrame = curFrame;
+    s.animLength = animLength;
+    s.morphWeight = morphWeight;
+}
+
 int Zelda3D_MM_SkelAnimeDrawRaw(struct PlayState* play, void** skeleton, void* jointTableV, int limbCount) {
     if (g_pending.modelId < 0 || g_pending.actor == nullptr) return 0;
     if (skeleton == nullptr || jointTableV == nullptr || limbCount <= 0) return 0;
-    // Vec3s* jointTable — index 0 is the root position; joint rotations start at index 1.
-    // Each joint = 3 s16 -> pass as (const int16_t*) starting 3 s16 past the base.
-    const int16_t* base = static_cast<const int16_t*>(jointTableV);
-    const int16_t* jointRots = base + 3; // skip jointTable[0]
-    mmUpdateAnimN64(g_pending.modelId, jointRots, limbCount);
+
+    // Recover this actor's live N64 anim state (captured in SkelAnime_Update, keyed by jointTable).
+    const char* animOtr = nullptr;
+    float n64Cur = -1.0f, n64Len = 0.0f;
+    auto asIt = g_animState.find(jointTableV);
+    if (asIt != g_animState.end()) {
+        animOtr = asIt->second.animOtr;
+        n64Cur = asIt->second.curFrame;
+        n64Len = asIt->second.animLength;
+    }
+
+    // Select the 3DS CSAB from the live N64 animation; unmapped -> the model's default idle so the
+    // actor stands rather than freezing. Harvest unmapped OTRs (once each) to grow kMMAnimMaps.
+    const char* csab = resolveAutoCsab(animOtr);
+    if (csab == nullptr) {
+        Loaded* lm = loadModel(g_pending.modelId);
+        if (lm != nullptr) csab = defaultAnimFor(lm);
+        if (animOtr != nullptr) {
+            static std::set<std::string> seen;
+            if (seen.insert(animOtr).second) {
+                fprintf(stderr, "[MM3D-ANIM] model=%d unmapped n64='%s' -> default '%s'\n",
+                        g_pending.modelId, animOtr, csab ? csab : "(none)");
+            }
+        }
+    }
+
+    mmUpdateAnimAuto(g_pending.modelId, csab, /*rate=*/1.0f, n64Cur, n64Len);
     Zelda3D_MM_EmitModelDraw(play, g_pending.actor, g_pending.modelId, g_pending.scale,
                              g_pending.groundOff);
     // Drawn — clear so a second SkelAnime call inside this same actor draw doesn't re-emit.
@@ -497,126 +592,6 @@ void Zelda3D_MM_OverridePending(float worldScale, float groundOffset) {
 }
 
 int Zelda3D_MM_PendingModelId(void) { return g_pending.modelId; }
-
-void Zelda3D_MM_GradeTopology(int modelId, const int* n64Parents, const float* n64Pos, int n64LimbCount) {
-    static int sTopoEnable = -1;
-    if (sTopoEnable < 0) {
-        const char* v = getenv("ZELDA3D_MM_SKINNED_TOPO");
-        sTopoEnable = (v != nullptr && v[0] != '\0' && v[0] != '0') ? 1 : 0;
-    }
-    if (!sTopoEnable || n64Parents == nullptr || n64LimbCount <= 0) return;
-    if (modelId < 0 || modelId >= (int)g_models.size()) return;
-
-    // Grade each archive exactly once.
-    static std::unordered_map<int, char> sGraded;
-    if (sGraded.count(modelId)) return;
-    sGraded[modelId] = 1;
-
-    Loaded* lm = loadModel(modelId);
-    if (lm == nullptr || !lm->ok || !lm->cmb) return;
-    const auto& bones = lm->cmb->bones();
-
-    // CMB parent + local-trans indexed by bone id (identity map means bone.id == N64 limb index).
-    int cmbMax = -1;
-    for (const auto& b : bones) cmbMax = std::max(cmbMax, b.id);
-    std::vector<int> cmbParent(cmbMax + 1, -2); // -2 = no bone with this id
-    std::vector<std::array<float, 3>> cmbTrans(cmbMax + 1, { 0, 0, 0 });
-    for (const auto& b : bones) {
-        if (b.id >= 0 && b.id <= cmbMax) {
-            cmbParent[b.id] = b.parent;
-            cmbTrans[b.id] = { b.trans[0], b.trans[1], b.trans[2] };
-        }
-    }
-
-    const char* garName = g_models[modelId].garPath.c_str();
-    int n = std::max(n64LimbCount, cmbMax + 1);
-    int match = 0, mismatch = 0;
-    fprintf(stderr, "[MM3D-TOPO] model=%d (%s): n64Limbs=%d cmbBones=%d  (full dump: idx n64[parent pos] cmb[parent trans])\n",
-            modelId, garName, n64LimbCount, cmbMax + 1);
-    for (int i = 0; i < n; i++) {
-        int np = (i < n64LimbCount) ? n64Parents[i] : -99;   // -99 = index absent this side
-        int cp = (i <= cmbMax) ? cmbParent[i] : -99;
-        bool present = (i < n64LimbCount) && (i <= cmbMax) && (cp != -2);
-        bool ok = present && (np == cp);
-        if (present) { if (ok) match++; else mismatch++; }
-        float nx = (i < n64LimbCount) ? n64Pos[i * 3] : 0, ny = (i < n64LimbCount) ? n64Pos[i * 3 + 1] : 0,
-              nz = (i < n64LimbCount) ? n64Pos[i * 3 + 2] : 0;
-        float cx = (i <= cmbMax) ? cmbTrans[i][0] : 0, cy = (i <= cmbMax) ? cmbTrans[i][1] : 0,
-              cz = (i <= cmbMax) ? cmbTrans[i][2] : 0;
-        fprintf(stderr,
-                "[MM3D-TOPO]   %2d: n64[par=%3d pos=(%7.1f,%7.1f,%7.1f)]  cmb[par=%3d trans=(%8.2f,%8.2f,%8.2f)] %s\n",
-                i, np, nx, ny, nz, cp, cx, cy, cz, ok ? "" : (present ? "<-- MISMATCH" : "<-- GAP"));
-    }
-    bool countOk = (n64LimbCount == cmbMax + 1);
-    fprintf(stderr, "[MM3D-TOPO] model=%d (%s): IDENTITY %s (%d match, %d mismatch, count %s)\n",
-            modelId, garName, (mismatch == 0 && countOk) ? "OK" : "DIVERGENT",
-            match, mismatch, countOk ? "match" : "MISMATCH");
-}
-
-void Zelda3D_MM_BuildRetargetMap(int modelId, const int* n64Parents, const float* n64Pos, int n64LimbCount) {
-    if (modelId < 0 || modelId >= (int)g_models.size()) return;
-    Loaded* lm = loadModel(modelId);
-    if (lm == nullptr || !lm->ok || !lm->cmb) return;
-    if (lm->retargetBuilt) return;
-    lm->retargetBuilt = true; // build once; don't retry even if inputs were degenerate
-    if (n64Parents == nullptr || n64Pos == nullptr || n64LimbCount <= 0) return;
-
-    const auto& bones = lm->cmb->bones();
-    int cmbMax = -1;
-    for (const auto& b : bones) cmbMax = std::max(cmbMax, b.id);
-    if (cmbMax < 0) return;
-    std::vector<int> cmbParent(cmbMax + 1, -2);
-    std::vector<std::array<float, 3>> cmbTrans(cmbMax + 1, { 0, 0, 0 });
-    for (const auto& b : bones) {
-        if (b.id >= 0 && b.id <= cmbMax) {
-            cmbParent[b.id] = b.parent;
-            cmbTrans[b.id] = { b.trans[0], b.trans[1], b.trans[2] };
-        }
-    }
-
-    // Process CMB bones parent-first (ascending depth) so a bone's parent is already mapped.
-    std::vector<int> depth(cmbMax + 1, 0);
-    for (int id = 0; id <= cmbMax; id++) {
-        int d = 0, p = cmbParent[id], guard = 0;
-        while (p >= 0 && p <= cmbMax && guard++ < 256) { d++; p = cmbParent[p]; }
-        depth[id] = d;
-    }
-    std::vector<int> order;
-    for (int id = 0; id <= cmbMax; id++) if (cmbParent[id] != -2) order.push_back(id);
-    std::sort(order.begin(), order.end(), [&](int a, int b) { return depth[a] < depth[b]; });
-
-    lm->boneToN64.assign(cmbMax + 1, -1);
-    std::vector<char> used(n64LimbCount, 0);
-    for (int id : order) {
-        int mp = (cmbParent[id] < 0 || cmbParent[id] > cmbMax) ? -1 : lm->boneToN64[cmbParent[id]];
-        int best = -1;
-        float bestD = 1e30f;
-        for (int L = 0; L < n64LimbCount; L++) {
-            if (used[L] || n64Parents[L] != mp) continue;
-            float dx = n64Pos[L * 3] - cmbTrans[id][0];
-            float dy = n64Pos[L * 3 + 1] - cmbTrans[id][1];
-            float dz = n64Pos[L * 3 + 2] - cmbTrans[id][2];
-            float d = dx * dx + dy * dy + dz * dz;
-            if (d < bestD) { bestD = d; best = L; }
-        }
-        if (best >= 0) { lm->boneToN64[id] = best; used[best] = 1; }
-    }
-
-    // Self-check: coverage + hierarchy consistency (N64 parent of a bone's map == map of its CMB parent).
-    int mapped = 0, consistent = 0, boneCount = 0;
-    for (int id = 0; id <= cmbMax; id++) {
-        if (cmbParent[id] == -2) continue;
-        boneCount++;
-        int L = lm->boneToN64[id];
-        if (L < 0) continue;
-        mapped++;
-        int pL = (cmbParent[id] < 0 || cmbParent[id] > cmbMax) ? -1 : lm->boneToN64[cmbParent[id]];
-        if (n64Parents[L] == pL) consistent++;
-    }
-    fprintf(stderr, "[MM3D-RETARGET] model=%d (%s): n64Limbs=%d cmbBones=%d -> mapped %d, %d hierarchy-consistent %s\n",
-            modelId, g_models[modelId].garPath.c_str(), n64LimbCount, boneCount, mapped, consistent,
-            (mapped == boneCount && consistent == mapped) ? "(FULL/CONSISTENT)" : "(partial — extra/absent bones use bind rot)");
-}
 
 void Zelda3D_ListModels(void (*emitLine)(const char* line, void* user), void* user) {
     if (emitLine == nullptr) return;

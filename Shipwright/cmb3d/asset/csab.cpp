@@ -79,15 +79,25 @@ Csab::AnimNode Csab::parseAnod(uint32_t o) const {
 Csab::Csab(std::vector<uint8_t> data) : mData(std::move(data)) {
     const uint8_t* b = mData.data();
     if (mData.size() < 0x38 || memcmp(b, "csab", 4) != 0) { mErr = "not a CSAB"; return; }
+    // CSAB has two header layouts (noclip OcarinaOfTime3D/csab.ts): Ocarina/OoT3D = subversion 3,
+    // Majora/MM3D = subversion 5. Only the header field offsets + the anod-table base differ; the
+    // 'anod' node layout and the track encoding are identical, so the rest of the parser is shared.
     uint32_t subver = u32(b, 0x08);
-    if (subver != 0x03) { mErr = "only Ocarina subversion 3 supported"; return; }
-    uint32_t anodBase = u32(b, 0x14); // = 0x18
-    mDuration = (int)u32(b, 0x28) + 1;
-    uint32_t anodCount = u32(b, 0x30);
-    mBoneCount = (int)u32(b, 0x34);
+    uint32_t anodBase, durOff, anodCountOff, boneCountOff, boneTableOff;
+    if (subver == 0x03) {
+        anodBase = 0x18; durOff = 0x28; anodCountOff = 0x30; boneCountOff = 0x34; boneTableOff = 0x38;
+    } else if (subver == 0x05) {
+        anodBase = 0x24; durOff = 0x34; anodCountOff = 0x3C; boneCountOff = 0x40; boneTableOff = 0x44;
+    } else {
+        mErr = "unsupported CSAB subversion (want 3=OoT3D or 5=MM3D)"; return;
+    }
+    if (mData.size() < boneTableOff) { mErr = "CSAB truncated"; return; }
+    mDuration = (int)u32(b, durOff) + 1;
+    uint32_t anodCount = u32(b, anodCountOff);
+    mBoneCount = (int)u32(b, boneCountOff);
     mBoneToAnim.resize(mBoneCount);
-    for (int i = 0; i < mBoneCount; i++) mBoneToAnim[i] = s16(b, 0x38 + 2 * i);
-    uint32_t idx = 0x38 + 2 * (uint32_t)mBoneCount;
+    for (int i = 0; i < mBoneCount; i++) mBoneToAnim[i] = s16(b, boneTableOff + 2 * i);
+    uint32_t idx = boneTableOff + 2 * (uint32_t)mBoneCount;
     idx = (idx + 3) & ~3u;
     mNodes.reserve(anodCount);
     for (uint32_t i = 0; i < anodCount; i++) {
