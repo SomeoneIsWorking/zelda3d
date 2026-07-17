@@ -60,6 +60,19 @@ Prove skinned CMB rendering end-to-end using MM3D bind-pose bones only.
   chest) is the trivial target.
 
 ### Stage 2 — SkelAnime intercept (drive OoT3D bones from N64 joints)
+
+> **STATUS (2026-07-17 code read): Stage 2 is WIRED and LIVE (gated).** `Zelda3D_TryDrawActor`
+> (mm3d_draw.c:158) defers skinned actors → `Zelda3D_MM_SetPending`; the SkelAnime hook
+> (`Zelda3D_MM_SkelAnimeDrawRaw`, called at mm3d_draw.c:131) runs `mmUpdateAnimN64` (mm3d_model.cpp:350
+> — retarget from the live N64 jointTable, Rz·Ry·Rx, identity bone→limb map) then
+> `Zelda3D_MM_EmitModelDraw`. Verified live: with `ZELDA3D_MM_SKINNED_TPOSE=1`, skinned MM3D archives
+> load + go through this path (run log `[MM3D] skinned-tpose obj=0x00C (box) -> modelId (skinned, 3
+> bones)`). It is NOT stuck at Stage-1 bind-pose. It stays **gated off by default** because the
+> **identity bone→limb map** isn't ship-quality for rigs whose CMB bone order diverges from the N64
+> limb order (mm3d_model.cpp:377 flags the per-archive bone-map as the fix). NEXT: frame a complex
+> skinned NPC/enemy with the gate on and grade the identity retarget — where it mis-poses, add a
+> per-archive `BoneMap` (the [[soh3d-n64anim-retarget]] per-bone-correction pattern from OoT).
+
 Now pose the skinned model from the LIVE N64 animation.
 
 - Add `MM_Zelda3D_SkelAnimeDraw{,Raw}` + `MM_Zelda3D_SetLimbOverride` +
