@@ -1,0 +1,6 @@
+# Generated / build-time files. Mirrors the `mm/…` rules that lived in Shipwright/.gitignore
+# before the `Shipwright/mm` -> `2ship` move — those were relative to Shipwright/ and no longer
+# reach this now-top-level dir.
+src/boot/build.c
+properties.h
+windows/properties.h

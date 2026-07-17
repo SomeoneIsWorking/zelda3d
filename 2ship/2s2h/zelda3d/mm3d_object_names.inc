@@ -1,4 +1,4 @@
-// Generated from Shipwright/mm/include/tables/object_table.h — objectId -> short name.
+// Generated from 2ship/include/tables/object_table.h — objectId -> short name.
 // Used by Zelda3D_LookupModel to auto-probe /actors/zelda2_<name>.gar.lzs.
 static const struct { int id; const char* name; } kObjectNames[] = {
     { 0x004, "nb" },

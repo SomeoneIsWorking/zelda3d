@@ -204,8 +204,10 @@ add_subdirectory(zelda3d_shared ${CMAKE_BINARY_DIR}/zelda3d_shared)
 
 add_subdirectory(soh)
 
-# Majora's Mask — second game module (Zelda3D N2), shares the in-tree libultraship.
-add_subdirectory(mm)
+# Majora's Mask — second game module (2 Ship 2 Harkinian / "2ship"), lives in the sibling
+# `2ship/` dir (its own project, NOT under the SoH "Shipwright" name) but shares this tree's
+# libultraship. Out-of-tree source, binary dir kept as `mm` so the build output stays build/mm/.
+add_subdirectory(${CMAKE_SOURCE_DIR}/../2ship ${CMAKE_BINARY_DIR}/mm)
 
 set_property(TARGET soh PROPERTY APPIMAGE_DESKTOP_FILE_TERMINAL YES)
 set_property(TARGET soh PROPERTY APPIMAGE_DESKTOP_FILE "${CMAKE_SOURCE_DIR}/scripts/linux/appimage/soh.desktop")

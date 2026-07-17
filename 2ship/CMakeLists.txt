@@ -40,10 +40,10 @@ FetchContent_MakeAvailable(dr_libs)
 # the NOT TARGET guards make this a no-op — mm links the same static libs as soh.
 ################################################################################
 if (NOT TARGET libultraship)
-    add_subdirectory(${CMAKE_CURRENT_SOURCE_DIR}/../libultraship ${CMAKE_BINARY_DIR}/libultraship)
+    add_subdirectory(${CMAKE_CURRENT_SOURCE_DIR}/../Shipwright/libultraship ${CMAKE_BINARY_DIR}/libultraship)
 endif()
 if (NOT TARGET ZAPDLib)
-    add_subdirectory(${CMAKE_CURRENT_SOURCE_DIR}/../ZAPDTR/ZAPD ${CMAKE_BINARY_DIR}/ZAPD)
+    add_subdirectory(${CMAKE_CURRENT_SOURCE_DIR}/../Shipwright/ZAPDTR/ZAPD ${CMAKE_BINARY_DIR}/ZAPD)
 endif()
 
 set(PROJECT_NAME mm)
@@ -120,8 +120,8 @@ target_include_directories(${PROJECT_NAME} PRIVATE assets
     ${CMAKE_CURRENT_SOURCE_DIR}/include/
     ${CMAKE_CURRENT_SOURCE_DIR}/include/PR
     ${CMAKE_CURRENT_SOURCE_DIR}/src/
-    ${CMAKE_CURRENT_SOURCE_DIR}/../libultraship/include
-    ${CMAKE_CURRENT_SOURCE_DIR}/../ZAPDTR/ZAPD/resource/type
+    ${CMAKE_CURRENT_SOURCE_DIR}/../Shipwright/libultraship/include
+    ${CMAKE_CURRENT_SOURCE_DIR}/../Shipwright/ZAPDTR/ZAPD/resource/type
     ${CMAKE_CURRENT_SOURCE_DIR}
     ${CMAKE_CURRENT_SOURCE_DIR}/2s2h/
     ${SDL3_INCLUDE_DIRS}

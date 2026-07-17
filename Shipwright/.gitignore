@@ -472,6 +472,3 @@ soh/properties.h
 /clang-format
 /clang-format.exe
 *.o2r
-mm/src/boot/build.c
-mm/properties.h
-mm/windows/properties.h
