@@ -92,6 +92,24 @@ Prove skinned CMB rendering end-to-end using MM3D bind-pose bones only.
 > Field (Leever/Chuchu/Guay), OR pick an enemy-dense entrance (Woodfall/swamp), OR check whether the
 > nearby enemy OBJECTS even have MM3D archives (if not, that's a separate auto-map-coverage gap). Only
 > once a skinned enemy actually loads (`skinned-tpose` log line) can the identity retarget be graded.
+>
+> **BLOCKER FALSIFIED + first real grade — POSITIVE (2026-07-17, later):** the "reach a scene with a
+> complex animated skinned rig" blocker was FALSE. **Default South Clock Town (scene 111, no entrance
+> arg) already loads multiple complex skinned MM3D rigs** under `ZELDA3D_MM_SKINNED_TPOSE=1` — run log
+> (`scratch/logs/mm_n2/run_mm.log`): `dog` obj=0x132 **12 bones**, `an1` obj=0x0E2 **20 bones**, `mm`
+> obj=0x107 **15 bones**, `sdn` obj=0x1B6 **16 bones** (plus box/pst/lodmoon). No Termina Field / enemy
+> hunt needed. **Grade of the identity retarget = POSITIVE (gross):** screenshots
+> `scratch/screenshots/{skinned_grade_sct,dog_grade,dog_closeup}.png` show the dog rendering as a
+> coherent posed quadruped (alert stance, moves around the plaza live — its N64 actor updates) and a
+> Clock Town humanoid NPC rendering in a **dynamic animated pose (arms spread wide, one leg bent — a
+> gesture/dance idle)** — NOT a T-pose, NOT bind-pose, NOT mangled. So Stage-2 (N64-joint-driven) posing
+> + the identity bone→limb map produce correct-looking poses on complex animated humanoid (15–20 bone)
+> AND quadruped (12 bone) rigs — the divergent-bone-order fear did not materialize on these. (The
+> `[MM3D] skinned-tpose ... (Stage 1 bind-pose draw)` log TEXT is stale — the actual draw is the wired
+> Stage-2 path; the dynamic NPC pose proves it.) NEXT (rigorous): oracle A/B (Azahar MM3D, same SCT
+> view) to catch SUBTLE per-bone retarget errors a gross visual grade can miss; if that holds, the
+> case for enabling the gate by default (dropping `ZELDA3D_MM_SKINNED_TPOSE`) is strong. The stale
+> `mm3d_model.cpp:275` log text should also be updated to say "Stage-2 posed draw".
 
 Now pose the skinned model from the LIVE N64 animation.
 
