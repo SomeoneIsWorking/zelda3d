@@ -193,6 +193,17 @@ old history still lives on those fork remotes if ever needed. `Azahar/` (the ora
 this repo — it's gitignored. ROMs (`*.z64`), archives (`*.o2r`/`*.otr`) and `build-cmake/` stay
 gitignored — never commit them.
 
+**Exception — genuinely third-party libs are NOT vendored flat; they are fork/upstream submodules.**
+Our own engine code (soh/2ship/libultraship/ZAPDTR) stays flattened as above, but third-party
+dependencies do NOT live in-tree. `StormLib` is patched (v9.25 + free-space optimization), so it is a
+**GitHub fork** `SomeoneIsWorking/StormLib` (branch `zelda3d`, byte-identical to the old vendored tree
+so the build is unchanged) referenced as a submodule at `Shipwright/libultraship/extern/StormLib` —
+update it there and bump the pointer. The CMake-`FetchContent` deps (rmlui/prism/dr_libs/monocypher/
+libgfxd-in-libultraship/…) already point at their real upstreams. STILL VENDORED FLAT (pristine, a
+follow-up to point at upstream `glankk/libgfxd` + `leethomason/tinyxml2`): `Shipwright/ZAPDTR/lib/
+libgfxd` and `.../tinyxml2` — these aren't patched, so they only need an upstream-pinned submodule, not
+a fork. (User directive 2026-07-17: third-party code is a fork/upstream submodule, not flattened.)
+
 ## Hard rules
 
 - **Headless always:** this is a Wayland machine — never open a headed window.

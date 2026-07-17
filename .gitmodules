@@ -4,3 +4,7 @@
 [submodule "mm3d-decomp"]
 	path = mm3d-decomp
 	url = https://github.com/SomeoneIsWorking/mm3d-decomp.git
+[submodule "Shipwright/libultraship/extern/StormLib"]
+	path = Shipwright/libultraship/extern/StormLib
+	url = https://github.com/SomeoneIsWorking/StormLib.git
+	branch = zelda3d
