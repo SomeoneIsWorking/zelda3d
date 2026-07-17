@@ -30,6 +30,33 @@ s32 Zelda3D_PlayerForceWalk(Player* player, PlayState* play);
 // blend-tree anim — func_8083A794's body pinned to the Z-target branch. Returns 1.
 s32 Zelda3D_PlayerForceRun(Player* player, PlayState* play);
 
+// --- Extended states (2026-07-17, RE'd via OoT Rosetta + adversarial decomp verify) ---
+
+// Turn-in-place: Player_Action_TurnInPlace + 45-turn loop anim (Player_SetupTurnInPlace's body).
+s32 Zelda3D_PlayerForceTurnInPlace(Player* player, PlayState* play);
+
+// Roll: Player_Action_26 (ground/landing roll) + landing_roll anim. Human/Deku/Zora form.
+s32 Zelda3D_PlayerForceRoll(Player* player, PlayState* play);
+
+// Throw-release: Player_Action_42 + throw anim (func_8083D6DC's body). Only while carrying an actor.
+s32 Zelda3D_PlayerForceThrow(Player* player, PlayState* play);
+
+// Attack (sword/melee): Player_Action_84 + one-handed forward-slash anim (installer func_80833864).
+s32 Zelda3D_PlayerForceAttack(Player* player, PlayState* play);
+
+// Jump / freefall (airborne): Player_Action_25 + normal_jump anim (func_80834DB8), zero launch velocity.
+s32 Zelda3D_PlayerForceJump(Player* player, PlayState* play);
+
+// Shield / defend: Player_Action_18 + human-form shield-hold state + defense anim. Human form only.
+s32 Zelda3D_PlayerForceShield(Player* player, PlayState* play);
+
+// Get-item raise: Player_Action_WaitForPutAway (via Player_SetupWaitForPutAway) + demo_get_itemB anim.
+s32 Zelda3D_PlayerForceGetItem(Player* player, PlayState* play);
+
+// Talk: picks the nearest live NPC within `range`, supplies the talk precondition, installs
+// Player_Action_Talk (Player_SetupTalk). Returns the NPC's actor id, or 0 if none in range.
+s32 Zelda3D_PlayerForceTalk(Player* player, PlayState* play, f32 range);
+
 #ifdef __cplusplus
 }
 #endif

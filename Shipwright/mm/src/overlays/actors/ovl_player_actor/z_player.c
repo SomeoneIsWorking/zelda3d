@@ -8705,6 +8705,118 @@ s32 Zelda3D_PlayerForceRun(Player* this, PlayState* play) {
     return 1;
 }
 
+// --- Extended force-state hooks (docs/re_control_debug_backlog.md item #11, 2026-07-17) ---
+// Each installs the REAL MM action func + the anim/state the natural trigger installs, bypassing
+// only the input-decode/handshake entry gate. Bodies are the identified installer's body (cited),
+// with the live-input branch pinned to the requested state. No synthetic pose, no magic constant.
+
+// Turn-in-place: Player_SetupTurnInPlace's body (z_player.c:8917) — installs Player_Action_TurnInPlace
+// + the 45-turn loop anim + turnRate. Target yaw seeded from current facing (no stick headless); the
+// live action reads Player_GetMovementSpeedAndYaw each frame, so an actual turn still tracks input.
+s32 Zelda3D_PlayerForceTurnInPlace(Player* this, PlayState* play) {
+    this->yaw = this->actor.shape.rot.y;
+    Player_SetAction(play, this, Player_Action_TurnInPlace, 1);
+    this->turnRate = 0x4B0;
+    this->turnRate *= sWaterSpeedFactor;
+    PlayerAnimation_Change(play, &this->skelAnime, D_8085BE84[PLAYER_ANIMGROUP_45_turn][this->modelAnimType],
+                           PLAYER_ANIM_NORMAL_SPEED, 0.0f, 0.0f, ANIMMODE_LOOP, -6.0f);
+    return 1;
+}
+
+// Roll: func_80836B3C's non-Goron branch (z_player.c:7068-7072) — Player_Action_26 (ground/landing
+// roll) + the landing_roll anim. Human/Deku/Zora ground roll (Goron ball roll intentionally not forced).
+s32 Zelda3D_PlayerForceRoll(Player* this, PlayState* play) {
+    PlayerAnimationHeader* anim = D_8085BE84[PLAYER_ANIMGROUP_landing_roll][this->modelAnimType];
+
+    Player_SetAction(play, this, Player_Action_26, 0);
+    PlayerAnimation_Change(play, &this->skelAnime, anim, 1.25f * sWaterSpeedFactor, 0.0f,
+                           Animation_GetLastFrame(anim), ANIMMODE_ONCE, 0.0f);
+    return 1;
+}
+
+// Throw-release: func_8083D6DC's body (z_player.c:9752, the THROW branch of Player_ActionHandler_9,
+// selected over PUT_DOWN by Player_CanThrowCarriedActor) — Player_Action_42 + the throw play-once
+// anim. Inlined (func_8083D6DC is defined below with no forward decl). Only meaningful while carrying.
+s32 Zelda3D_PlayerForceThrow(Player* this, PlayState* play) {
+    Player_SetAction(play, this, Player_Action_42, 1);
+    Player_Anim_PlayOnce(play, this, D_8085BE84[PLAYER_ANIMGROUP_throw][this->modelAnimType]);
+    return 1;
+}
+
+// Attack (sword/melee): the result state of the installer func_80833864 (z_player.c:5789) — pins the
+// basic one-handed forward slash. Player_Action_84 derefs sMeleeAttackAnimInfo[meleeWeaponAnimation]
+// every frame, so it MUST be set. Bypasses the button decode AND the weapon-damage-quad/combo setup
+// (func_8083375C / unk_ADD) the pose sweep doesn't need.
+s32 Zelda3D_PlayerForceAttack(Player* this, PlayState* play) {
+    this->meleeWeaponAnimation = PLAYER_MWA_FORWARD_SLASH_1H;
+    this->av2.actionVar2 = 0;
+    Player_SetAction(play, this, Player_Action_84, 0);
+    Player_Anim_PlayOnceAdjusted(play, this, sMeleeAttackAnimInfo[PLAYER_MWA_FORWARD_SLASH_1H].unk_0);
+    return 1;
+}
+
+// Jump / freefall: func_80834DB8's install (z_player.c:6328) with speed 0.0f (frozen airborne read;
+// func_80834CD0 still clears BGCHECKFLAG_GROUND + sets STATE1_40000/fallStartHeight so Player_Action_25's
+// !GROUND branch holds). The MM analog of OoT's ForceJump. Bypasses only the button/floor-leave gate.
+s32 Zelda3D_PlayerForceJump(Player* this, PlayState* play) {
+    func_80834DB8(this, &gPlayerAnim_link_normal_jump, 0.0f, play);
+    return 1;
+}
+
+// Shield / defend: the human-form install branch of Player_ActionHandler_11 (z_player.c:8538-8546) —
+// Player_Action_18 + PLAYER_STATE1_400000 + Player_SetModelsForHoldingShield + the defense entry anim.
+// Human form only (Goron/Zora/Deku shield variants, guarded by Player_IsGoronOrDeku, not forced).
+s32 Zelda3D_PlayerForceShield(Player* this, PlayState* play) {
+    this->stateFlags1 |= PLAYER_STATE1_400000;
+    Player_SetModelsForHoldingShield(this);
+    Player_Anim_PlayOnce(play, this, D_8085BE84[PLAYER_ANIMGROUP_defense][this->modelAnimType]);
+    Player_SetAction(play, this, Player_Action_18, 0);
+    return 1;
+}
+
+// Get-item raise: the non-cutscene get-item path (Player_ActionHandler_2, z_player.c:9648-9657) —
+// Player_SetupWaitForPutAway(afterPutAwayFunc=func_80837C78) + the demo_get_itemB raise anim under the
+// get-item state bits (copied verbatim from :9656-9657). No-CS wrapper (like OoT's ForceGetItem) so no
+// live playerCsIds cutscene context is needed; afterPutAwayFunc installs the real raise action.
+s32 Zelda3D_PlayerForceGetItem(Player* this, PlayState* play) {
+    this->stateFlags1 |= PLAYER_STATE1_400 | PLAYER_STATE1_CARRYING_ACTOR | PLAYER_STATE1_20000000;
+    Player_SetupWaitForPutAway(play, this, func_80837C78);
+    Player_Anim_PlayOnceAdjusted(play, this, &gPlayerAnim_link_demo_get_itemB);
+    return 1;
+}
+
+// Talk: supplies the NPC-handshake precondition the natural Player_StartTalking->Player_SetupTalk path
+// would (nearest live ACTORCAT_NPC within `range`, talkActor/focusActor + ACTOR_FLAG_TALK + the NPC's
+// own textId — no magic fallback textId), then installs the real action via Player_SetupTalk. Returns
+// the NPC's actor id, or 0 if none in range.
+s32 Zelda3D_PlayerForceTalk(Player* this, PlayState* play, f32 range) {
+    Actor* best = NULL;
+    f32 bestDistSq = range * range;
+    Actor* it = play->actorCtx.actorLists[ACTORCAT_NPC].first;
+    for (; it != NULL; it = it->next) {
+        if (it == &this->actor) {
+            continue;
+        }
+        f32 dx = it->world.pos.x - this->actor.world.pos.x;
+        f32 dz = it->world.pos.z - this->actor.world.pos.z;
+        f32 dsq = (dx * dx) + (dz * dz);
+        if (dsq < bestDistSq) {
+            bestDistSq = dsq;
+            best = it;
+        }
+    }
+    if (best == NULL) {
+        return 0;
+    }
+    this->actor.shape.rot.y = this->yaw = Math_Vec3f_Yaw(&this->actor.world.pos, &best->world.pos);
+    this->talkActor = best;
+    this->focusActor = best;
+    this->actor.textId = best->textId; // NPC's own textId only; Player_SetupTalk guards the 0 case.
+    best->flags |= ACTOR_FLAG_TALK;
+    Player_SetupTalk(play, this);
+    return best->id;
+}
+
 void func_8083A844(Player* this, PlayState* play, s16 yaw) {
     this->yaw = yaw;
     this->actor.shape.rot.y = this->yaw;
