@@ -189,7 +189,7 @@ over an initialized local (legal in C, ill-formed once that code became a `.cpp`
 | N64→3DS anim retarget | `Shipwright/soh/src/zelda3d/anim/zelda3d_anim.cpp`, `tables/zelda3d_animmap.inc`, `tables/zelda3d_bonemap.inc`; memory `soh3d-n64anim-retarget` |
 | MM player state (WIP, stub) | `Shipwright/mm/2s2h/zelda3d/mm3d_player.c/.h` — draw-only, no behavior yet |
 | MM REPL / control transport | `Shipwright/mm/2s2h/Z3DRepl.c` (`$ZELDA3D_MM_REPL` FIFO), `tools/mm_control.py`, `tools/mm_game.sh` |
-| Kanban / backlog | `tools/kanban.py`, `KANBAN.md`, GitHub Issues (`SomeoneIsWorking/soh3d`) |
+| Kanban / backlog | `tools/kanban.py`, `KANBAN.md`, GitHub Issues (`SomeoneIsWorking/zelda3d`) |
 | Sweep-discovered non-user gaps | `debug_journal/` (dated entries) — NOT kanban, per CLAUDE.md hard rule |
 
 ## Governance

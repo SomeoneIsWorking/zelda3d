@@ -16,7 +16,7 @@ built on top of work that already exists and already runs:
   instead of N64. Its renderer was **already migrated to a single unified SDL3
   GPU backend** that draws N64 F3DEX + 3DS CMB in one pass, with an **RmlUi** UI.
   This is the user's (and this assistant's) own prior work — mature and playable.
-  Lives in a sibling checkout `<repo-root>/soh3d` (GitHub `SomeoneIsWorking/soh3d`).
+  Lives in a sibling checkout `<repo-root>/soh3d` (GitHub `SomeoneIsWorking/zelda3d`).
 - **MM → Zelda64Recomp.** The static recompilation that already plays Majora's
   Mask on PC.
 

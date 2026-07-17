@@ -31,7 +31,7 @@ Start every task by checking these THREE maps: skip closed cases (parity-map), f
 
 ## The backlog is a kanban on GitHub Issues — USE IT
 
-The backlog is **GitHub Issues** on this repo (`SomeoneIsWorking/soh3d`, private), driven by
+The backlog is **GitHub Issues** on this repo (`SomeoneIsWorking/zelda3d`, private), driven by
 **`tools/kanban.py`**. It is the source of truth across all agents and machines. `BACKLOG.md` is
 just a pointer; `KANBAN.md` is a generated offline mirror.
 
