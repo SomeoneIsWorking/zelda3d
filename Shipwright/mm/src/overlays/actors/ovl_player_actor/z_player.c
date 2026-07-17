@@ -8817,6 +8817,95 @@ s32 Zelda3D_PlayerForceTalk(Player* this, PlayState* play, f32 range) {
     return best->id;
 }
 
+// --- Extended force-state hooks batch 2 (2026-07-17) — same OoT-Rosetta + decomp-verify method. ---
+
+// func_8083D860 (ladder/wall-climb entry gate) is defined below this block (z_player.c:9907); forward
+// decl so Zelda3D_PlayerForceClimb can call it in place.
+s32 func_8083D860(Player* this, PlayState* play);
+
+// Put-down (gentle release): Player_ActionHandler_9's PUT_DOWN branch (z_player.c:9893-9896, the
+// sibling gated by !Player_CanThrowCarriedActor, selecting Player_Action_41 over throw's Player_Action_42)
+// — Player_Action_41 + the put-down play-once anim. Only meaningful while carrying.
+s32 Zelda3D_PlayerForcePutDown(Player* this, PlayState* play) {
+    Player_SetAction(play, this, Player_Action_41, 1);
+    Player_Anim_PlayOnce(play, this, D_8085BE84[PLAYER_ANIMGROUP_put][this->modelAnimType]);
+    return 1;
+}
+
+// Death: NOT a new action-func hook (mirrors OoT's Zelda3D_PlayerForceDeath, soh z_player.c:7828).
+// MM's own per-frame check inside func_80844D80 (~z_player.c:12914-12933, every Player_Update) drives
+// the real death entry (func_80834140-style install -> Player_Action_77 + gPlayerAnim_link_derth_rebirth)
+// once playerData.health == 0 while grounded/in-water. So supply only the precondition; the state
+// appears on a subsequent frame, not the same one.
+s32 Zelda3D_PlayerForceDeath(Player* this, PlayState* play) {
+    gSaveContext.save.saveInfo.playerData.health = 0;
+    return 1;
+}
+
+// Damage recoil (grounded, in-place "took a hit"): the stable-recoil branch of func_80833B18
+// (z_player.c:5985, MM's analog of OoT's front-hit installer) — Player_Action_20 (grounded in-place
+// damage action, :15573) + D_8085D0D4[4] = gPlayerAnim_link_normal_front_hit (the exact anim that branch
+// selects). Bypasses only the AC_HIT/colChkInfo entry gate, like OoT's ForceDamage.
+s32 Zelda3D_PlayerForceDamage(Player* this, PlayState* play) {
+    Player_SetAction(play, this, Player_Action_20, 0);
+    Player_Anim_PlayOnceAdjusted(play, this, &gPlayerAnim_link_normal_front_hit);
+    return 1;
+}
+
+// Hang (post-jump ledge grab, hands-only, pre-climb-up): the airborne ledge-grab branch
+// (z_player.c:15804-15816) installs Player_Action_48 via func_80837CEC + the jump_climb_hold anim, then
+// sets PLAYER_STATE1_2000 (MM's un-renamed HANGING_OFF_LEDGE bit). That branch needs a real wallPoly
+// (unreachable on open ground), so we replicate func_80837CEC's non-poly core (action install, held-actor
+// detach func_8082DE50, anim, func_8082DAD4, velocity.y=0) + the call-site's state flag — bypassing ONLY
+// the wallPoly ledge-detection gate. Needs a real ledge to visibly hold beyond the install frame.
+s32 Zelda3D_PlayerForceHang(Player* this, PlayState* play) {
+    PlayerAnimationHeader* anim = GET_PLAYER_ANIM(PLAYER_ANIMGROUP_jump_climb_hold, this->modelAnimType);
+
+    Player_SetAction(play, this, Player_Action_48, 0);
+    func_8082DE50(play, this);
+    Player_Anim_PlayOnce(play, this, anim);
+    func_8082DAD4(this);
+    this->actor.velocity.y = 0.0f;
+    this->stateFlags1 |= PLAYER_STATE1_2000;
+    return 1;
+}
+
+// Carry-idle (holding a lifted actor overhead): func_808313F0's true-branch body (z_player.c:4456-4459),
+// the state MM installs once the lift anim completes — restore the base locomotion action (func_80836988)
+// then the CarryActor UPPER action + carryB_wait loop on skelAnimeUpper. Sets PLAYER_STATE1_CARRYING_ACTOR
+// directly (the bit a real pickup sets). Bypasses only the func_808313A8 heldActor==NULL gate. CAVEAT:
+// Player_UpperAction_CarryActor re-checks heldActor==NULL every tick and drops carry if unset, so without
+// a genuinely-lifted actor this holds for the install frame only.
+s32 Zelda3D_PlayerForceCarry(Player* this, PlayState* play) {
+    this->stateFlags1 |= PLAYER_STATE1_CARRYING_ACTOR;
+    func_80836988(this, play);
+    Player_SetUpperAction(play, this, Player_UpperAction_CarryActor);
+    PlayerAnimation_PlayLoop(play, &this->skelAnimeUpper, &gPlayerAnim_link_normal_carryB_wait);
+    return 1;
+}
+
+// Climb (ladder/wall): func_8083D860 is MM's func_8083EC18 equivalent (same yDistToLedge>=79 gate, same
+// WALL_FLAG_3(0x08)/WALL_FLAG_1 wall-flag OR, same 3-hop install -> Player_SetupWaitForPutAway(func_80837C20)
+// -> Player_Action_50, PLAYER_STATE1_200000). Unlike OoT's func_8083EC18(this,play,wallFlags), it reads the
+// file-global sPlayerTouchedWallFlags directly, so we OR in WALL_FLAG_3 around the call and restore it,
+// rather than mutate a param — no check is skipped or faked. Requires a real wallPoly + tall wall; returns
+// -1 (no wall), 0 (gate declined), or 1 (entered).
+s32 Zelda3D_PlayerForceClimb(Player* this, PlayState* play) {
+    u32 savedWallFlags = sPlayerTouchedWallFlags;
+    s32 entered;
+
+    if (this->actor.wallPoly == NULL) {
+        return -1;
+    }
+    this->actor.shape.rot.y = this->yaw = this->actor.wallYaw + 0x8000; // face into the wall (mirrors OoT)
+
+    sPlayerTouchedWallFlags |= WALL_FLAG_3;
+    entered = func_8083D860(this, play);
+    sPlayerTouchedWallFlags = savedWallFlags;
+
+    return entered ? 1 : 0;
+}
+
 void func_8083A844(Player* this, PlayState* play, s16 yaw) {
     this->yaw = yaw;
     this->actor.shape.rot.y = this->yaw;

@@ -367,9 +367,34 @@ static void Z3D_Repl_Exec(PlayState* play, char* line) {
                 s32 id = Zelda3D_PlayerForceTalk(player, play, 600.0f);
                 snprintf(out, sizeof(out), "linkstate talk -> %s (talkActor textId=0x%x st1=0x%08X)",
                          id ? "talking" : "NO NPC within 600u", player->actor.textId, player->stateFlags1);
+            } else if (strcmp(arg, "putdown") == 0) {
+                Zelda3D_PlayerForcePutDown(player, play);
+                snprintf(out, sizeof(out), "linkstate putdown -> Player_Action_41 (PLAYER_ANIMGROUP_put)");
+            } else if (strcmp(arg, "death") == 0) {
+                Zelda3D_PlayerForceDeath(player, play);
+                snprintf(out, sizeof(out), "linkstate death -> health=0 (Player_Action_77 entry on a later frame, st1=0x%08X)",
+                         player->stateFlags1);
+            } else if (strcmp(arg, "damage") == 0) {
+                Zelda3D_PlayerForceDamage(player, play);
+                snprintf(out, sizeof(out), "linkstate damage -> Player_Action_20 (curFrame=%.2f)",
+                         player->skelAnime.curFrame);
+            } else if (strcmp(arg, "hang") == 0) {
+                Zelda3D_PlayerForceHang(player, play);
+                snprintf(out, sizeof(out), "linkstate hang -> Player_Action_48 (stateFlags1=0x%08X)",
+                         player->stateFlags1);
+            } else if (strcmp(arg, "carry") == 0) {
+                Zelda3D_PlayerForceCarry(player, play);
+                snprintf(out, sizeof(out), "linkstate carry -> Player_UpperAction_CarryActor (stateFlags1=0x%08X)",
+                         player->stateFlags1);
+            } else if (strcmp(arg, "climb") == 0) {
+                s32 entered = Zelda3D_PlayerForceClimb(player, play);
+                snprintf(out, sizeof(out), "linkstate climb -> Player_Action_50 (%s, av1=%d st1=0x%08X)",
+                         entered == 1 ? "entered" : entered == 0 ? "declined" : "no wallPoly",
+                         player->av1.actionVar1, player->stateFlags1);
             } else {
                 snprintf(out, sizeof(out),
-                         "usage: linkstate <idle|walk|run|turn|roll|throw|attack|jump|shield|getitem|talk>");
+                         "usage: linkstate <idle|walk|run|turn|roll|throw|attack|jump|shield|getitem|talk|"
+                         "putdown|death|damage|hang|carry|climb>");
             }
             Z3D_Repl_Reply(out);
         }
