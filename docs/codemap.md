@@ -1,5 +1,8 @@
 # SoH3D codemap — what's where, what's done, what's missing
 
+For the project's overall shape + naming (the **zelda / zelda3d × soh / 2ship** taxonomy and where
+each part lives), see `docs/project-structure.md`. This file is the per-subsystem detail beneath it.
+
 The single-page orientation map. Consult this FIRST at the start of any task (find the
 subsystem, its honest status, its entry point); update the relevant row in the SAME commit
 that lands or changes a subsystem. Maintained with `tools/codemap.py` (`tree` regenerates the

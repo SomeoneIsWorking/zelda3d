@@ -3,6 +3,12 @@
 SoH3D = Ship of Harkinian rendering OoT3D (3DS) models/world instead of N64. See `README`/notes for
 the project itself; this file is the working contract for agents.
 
+**Project structure & naming: `docs/project-structure.md` is the canonical map** — the two-tier
+taxonomy (**zelda** = N64 base engines: **soh** / **2ship**; **zelda3d** = the 3DS render layer built
+on them: **soh3d** / **2ship3d**), where each part's code lives, and the human-facing-name ↔ embedded-
+code-name aliases (`2ship`=vendored `2s2h`, `2ship3d`=`mm3d_*`; `zelda3d` is both the umbrella and the
+literal `Zelda3D_*`/`src/zelda3d/` prefix shared by both branches). Use those terms consistently.
+
 ## Orient here FIRST — parity-map + codemap + RE frontier
 
 Start every task by checking these THREE maps: skip closed cases (parity-map), find the code
@@ -71,24 +77,26 @@ issue. **No evidence = not fixed.** This is mandatory, not optional.
 
 ## RULE: structure SoH3D like a real PC game — per-behavior modules, OOP, NOT one giant soh3d.c
 
-Treat SoH3D as a brand-new PC game that needs proper structure. Do **NOT** keep cramming logic into
-`soh3d.c` (it is already a multi-thousand-line dumping ground). When we RE/decomp an OoT3D behavior and
-port it, it goes into a **dedicated, well-named module** under a game-like tree, e.g.:
+Treat the zelda3d layer as a brand-new PC game that needs proper structure. Do **NOT** keep cramming
+logic into `core/zelda3d.c` (the multi-thousand-line dumping ground). When we RE/decomp an OoT3D
+behavior and port it, it goes into a **dedicated, well-named module** under a game-like tree, e.g.:
 
 ```
-soh/src/soh3d/behaviors/actor/kokiri_kid.cpp   // En_Ko head/torso track + facial, ported from OoT3D
-soh/src/soh3d/behaviors/actor/<actor>.cpp      // one module per actor behavior
-soh/src/soh3d/behaviors/actor_behavior.h       // base interface + registry (dispatch by actor id)
+soh/src/zelda3d/behaviors/actor/kokiri_kid.cpp   // En_Ko head/torso track + facial, ported from OoT3D
+soh/src/zelda3d/behaviors/actor/<actor>.cpp      // one module per actor behavior
+soh/src/zelda3d/behaviors/actor_behavior.h       // base interface + registry (dispatch by actor id)
 ```
+
+(The 2ship3d layer mirrors this under `mm/2s2h/zelda3d/` — see `docs/project-structure.md`.)
 
 - **Use OOP** where it fits: a base `ActorBehavior` (virtuals like `applyDrawOverrides`), concrete
   subclasses per actor, a registry that dispatches by `actor->id`. Prefer C++ classes over C-struct
   vtables when the headers cooperate.
 - **The port carries the structure.** When a divergence needs RE, the deliverable is: (1) decomp it,
-  (2) document the ground truth in `oot3d-decomp/docs/`, (3) port it into a properly-structured SoH3D
-  module — not a patch bolted onto `soh3d.c`.
+  (2) document the ground truth in `oot3d-decomp/docs/`, (3) port it into a properly-structured zelda3d
+  module — not a patch bolted onto `core/zelda3d.c`.
 - **Restructuring existing code into this shape is welcome**, incrementally: each time you touch a
-  behavior, migrate it out of `soh3d.c` / monolithic files into its module. Don't regress working
+  behavior, migrate it out of `core/zelda3d.c` / monolithic files into its module. Don't regress working
   behavior; fall through to legacy for not-yet-migrated actors. (user directive, 2026-06-25, hard rule)
 
 ## RULE: ground truth for any behavioral divergence is the OoT3D DECOMP — extend it, don't memory-poke
