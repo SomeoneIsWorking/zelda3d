@@ -322,14 +322,19 @@ needs proportionally more — measured with the new `ZELDA3D_NODE_EST` estimator
 
 The N64 mesh fits that budget (1685 polys, ~6470 nodes granted, ~3.8/poly of headroom); ours does not.
 
-**Fix (built, compiles clean, NOT yet verified live):** `BgCheck_CountStaticLookupNodes` walks the same
+**Fix (VERIFIED live 2026-07-22):** `BgCheck_CountStaticLookupNodes` walks the same
 bounds+intersection predicate as the build loop and returns the EXACT node requirement; when the
 installed header is ours (`Zelda3D_MM_CollisionDiverted`), the pool is sized from that count instead of
 the inherited budget. Counting rather than scaling by a guessed factor keeps it correct for any mesh.
 
-RISK still open: `SSNodeList_Alloc` does not null-check its `tbl` allocation, so if the tail heap
-cannot satisfy ~14k SSNodes (~56 KB) the failure mode would be a crash rather than a clean error.
-Verify a live Termina Field load before calling this done.
+VERIFIED live: Termina Field now loads instead of hanging —
+`[MM3D-COL] /scenes/z2_00keikoku_info.zsi: 2914 verts, 4503 polys, 65 surface types (N64 was 1265/1685)`,
+the REPL keeps responding (`posinfo scene=45`), and the scene renders. The tail heap satisfies the
+~14k SSNodes (~56 KB) fine, so the un-null-checked `SSNodeList_Alloc` allocation was not hit.
+
+Runtime collision confirmed too, not just scene load: walking Link with held stick input moved him
+(-2406, 68, -400) -> (-3040.9, 32.0, -400) — 635 units across with his ground height tracking 68 -> 32
+down the slope. So BgCheck is querying the MM3D mesh every frame correctly.
 
 ### Exits: encoding CONFIRMED offline, live walk-through BLOCKED on harness control
 
