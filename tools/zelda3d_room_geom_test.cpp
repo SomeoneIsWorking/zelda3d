@@ -21,6 +21,7 @@
 #include <cmath>
 #include <cstdio>
 #include <cstdlib>
+#include <map>
 #include <string>
 #include <vector>
 
@@ -44,6 +45,7 @@ struct RoomStats {
     size_t insane = 0;         // |component| beyond any plausible scene extent
     double maxAbs = 0.0;       // largest |component| seen
     float sampleBad[3] = { 0, 0, 0 };
+    std::map<uint16_t, int> idxHist;
 };
 
 float diag(const float lo[3], const float hi[3]) {
@@ -131,6 +133,7 @@ RoomStats analyze(const char* romEnv, const char* path) {
         }
         if (uniq) s.distinctCentroids++;
     }
+    s.idxHist = c.indexTypeHistogram();
     s.ok = true;
     return s;
 }
@@ -141,6 +144,11 @@ void report(const char* label, const RoomStats& s) {
            label, s.groups, s.verts, s.roomDiag, s.medGroupDiag, s.spread, s.distinctCentroids, s.nonFinite, s.insane, s.maxAbs);
     if (s.nonFinite || s.insane) {
         printf("%-28s   first bad vertex: (%g, %g, %g)\n", "", s.sampleBad[0], s.sampleBad[1], s.sampleBad[2]);
+    }
+    if (!s.idxHist.empty()) {
+        printf("%-28s   prm.index_type:", "");
+        for (const auto& kv : s.idxHist) printf(" 0x%X x%d", kv.first, kv.second);
+        printf("\n");
     }
 }
 

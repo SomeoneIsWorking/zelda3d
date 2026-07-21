@@ -7,6 +7,7 @@
 #pragma once
 #include <cstdint>
 #include <string>
+#include <map>
 #include <vector>
 #include <array>
 
@@ -191,6 +192,12 @@ class Cmb {
 
     // Assemble all meshes into per-material draw groups (bind pose).
     std::vector<CmbDrawGroup> buildDrawGroups() const;
+
+    // Diagnostic: histogram of prm.index_type over every prm in the file, as
+    // {gl data type -> count}. Exposed because the index element size is the one
+    // place our reader and the shipped MM3D engine are known to differ (the engine
+    // uploads one flat index buffer sized index_count<<1, i.e. uniform u16).
+    std::map<uint16_t, int> indexTypeHistogram() const;
 
     // Same, but with CSAB skinning applied: skinMats is indexed by bone id and is
     // skinMatrix = animWorld . bindInverse for each bone (see asset/csab). Each
