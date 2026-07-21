@@ -282,9 +282,32 @@ scores **99.9%** on it, matching the figure `zcol.h` records for OoT3D. Across t
 
     MM3D SCENES: PASS=110 FAIL=0 NO_COLLISION=1
 
-Remaining: WIRE it into MM (an `Zelda3D_LoadSceneCollisionRaw` equivalent + install path, mirroring
-OoT's `zelda3d_model.cpp`). Parsing is solved; the player still walks on N64 collision until that
-lands.
+### WIRED IN AND VERIFIED — MM now walks on the geometry it renders
+
+`2ship/2s2h/zelda3d/mm3d_collision.{h,cpp}` converts the parsed MM3D collision into MM's runtime
+`CollisionHeader` and hands it to `BgCheck_Allocate`. N64 water boxes and bg-camera regions are
+carried over from the N64 header rather than reinterpreted, so swimming and camera regions behave
+exactly as before and only the GEOMETRY changes.
+
+**Hook location matters:** the live path for this build is the resource-backed
+`Scene_CommandCollisionHeader` in `2s2h/z_scene_2SH.cpp`, NOT `src/code/z_scene.c`. Hooking only the
+latter produced no `[MM3D-COL]` log at all and looked like a silent failure — the same OTR-vs-plain
+split OoT documents. Both are hooked now; the 2SH one is the one that fires.
+
+Verified quantitatively — the exact case that exposed the mismatch:
+
+    before (N64 collision):  tp -100 10 -700  ->  settled (-160.4, 25.4, -729.3)
+    after  (MM3D collision): tp -100 10 -700  ->  settled (-100.0,  0.0, -700.0)
+    3DS mesh ground probe at XZ(-100,-700): exactly one surface, y = 0.0
+
+Link now rests exactly on the surface the renderer draws. Scene transitions rebuild it
+(`z2_clocktower` 651v/731p vs N64 416/508; `z2_town` 530v/614p vs N64 413/489 — the 3DS meshes are
+finer), and East Clock Town renders and stands correctly after a warp.
+
+Still to check (NOT yet verified, do not assume): exits and conveyors. MM3D `CollisionPoly` has no
+flags word, so the poly-exclusion/conveyor bits MM keeps in `flags_vIA/vIB` are zero here, and exit
+indices come from MM3D's own surface types rather than the N64 list. Walking an actual scene exit is
+the test that matters.
 
 ## CORRECTION: the MM REPL `tp` is NOT broken (I claimed it was)
 

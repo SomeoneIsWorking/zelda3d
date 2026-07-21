@@ -199,7 +199,7 @@ static int mmSceneDivertEnabled(void) {
     return v;
 }
 
-static const char* mm3dSceneName(PlayState* play) {
+const char* Zelda3D_MM_SceneName(PlayState* play) {
     int n;
     if (play == NULL) {
         return NULL;
@@ -218,7 +218,7 @@ int Zelda3D_TryDrawRoom(PlayState* play, Room* room) {
     if (!mmSceneDivertEnabled() || play == NULL || room == NULL) {
         return 0;
     }
-    sceneName = mm3dSceneName(play);
+    sceneName = Zelda3D_MM_SceneName(play);
     {
         static int logged = 0;
         if (!logged) {
@@ -274,5 +274,5 @@ int Zelda3D_TryDrawRoom(PlayState* play, Room* room) {
 // it composites over/under the MM3D room. Suppress exactly when this scene has an MM3D mapping (and
 // the room divert is enabled), so uncovered scenes keep their N64 bg and stay visible.
 int Zelda3D_ShouldSuppressBgImageSkybox(PlayState* play) {
-    return mmSceneDivertEnabled() && mm3dSceneName(play) != NULL;
+    return mmSceneDivertEnabled() && Zelda3D_MM_SceneName(play) != NULL;
 }

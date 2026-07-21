@@ -707,3 +707,8 @@ void Zelda3D_ListModels(void (*emitLine)(const char* line, void* user), void* us
 }
 
 } // extern "C"
+
+// Shared ROM handle for sibling zelda3d modules (see mm3d_model.h). Keeps ONE CtrRom open.
+Zelda3D::CtrRom* Zelda3D_MM_Rom() {
+    return rom();
+}

@@ -45,6 +45,10 @@ int Zelda3D_TryDrawActor(PlayState* play, Actor* actor);
 // day the first mapping lands. #134-style.
 int Zelda3D_TryDrawRoom(PlayState* play, Room* room);
 
+// MM3D scene folder name for this scene ("z2_clocktower"), or NULL when the scene has no MM3D
+// counterpart. Shared with the collision path so the sceneNum->name table has ONE owner.
+const char* Zelda3D_MM_SceneName(PlayState* play);
+
 // Predicate mirror of Zelda3D_TryDrawRoom used to suppress the N64 pre-rendered
 // background image (skybox path in Play_Draw): returns 1 when MM3D is going to
 // cover this scene — the same rule OoT applies. Under the game-wide "no N64
