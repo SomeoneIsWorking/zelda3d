@@ -179,9 +179,22 @@ positioned and correctly textured. No fragmentation, no screen-spanning triangle
 ## REMAINING (separate defect, now visible): the GROUND is missing
 
 With the geometry fixed, buildings render but the floor/terrain does not — they float over the fog
-clear colour. This is NOT the index bug (that one is closed by test + render). Next: determine whether
-the ground sepds are being built but dropped at draw (material/alpha/cull state), or never built. Do
-not re-open the index math for it.
+clear colour. This is NOT the index bug (that one is closed by test + render). Do not re-open the index math for it.
+
+Narrowed with two measurements:
+
+1. **The geometry IS parsed.** Per-group bbox dump (`ZELDA3D_GROUP_DUMP=1` on the room test) shows all
+   14 MM3D groups spanning y~0 upward (grp2 y[0,579], grp10 y[-2.6,694], grp12 y[0,553]) across a
+   +-2000..3300 XZ footprint. There is no missing floor in the parse, and no separate floor group to
+   lose — ground polys live inside the same groups as the walls that DO render.
+2. **The room draw is genuinely contributing.** `ZELDA3D_MM_SCENE=2` (room draw off) renders ONLY
+   actors — scaffold, Link, flags — over the same pink field. `=1` adds the stalls, awnings and brick
+   walls, correctly placed and correctly textured. So the pink expanse is BACKGROUND/fog present in
+   both, not an untextured floor, and our draw is placing far geometry correctly.
+
+So: far room geometry draws, near ground does not. Next candidates (untested, do not assume):
+depth/pass ordering against the background plane, or per-material state (cull winding / alpha) on the
+ground materials specifically. Take a matched pair of screenshots per hypothesis; do not tune.
 
 ## State
 
