@@ -11,6 +11,7 @@
 #include "soh/ResourceManagerHelpers.h"
 
 #include <stdlib.h>
+#include "zelda3d/player/zelda3d_sword_trail.h" // OoT3D sword-trail geometry port
 
 typedef struct {
     /* 0x00 */ u8 flag;
@@ -1583,7 +1584,14 @@ void func_800906D4(PlayState* play, Player* this, Vec3f* newTipPos) {
     if (func_80090480(play, NULL, &this->meleeWeaponInfo[0], &newTipPos[0], &newBasePos[0]) &&
         !(this->stateFlags1 & PLAYER_STATE1_SHIELDING) &&
         !CVarGetInteger(CVAR_ENHANCEMENT("DisableLinkSwordTrail"), 0)) {
-        EffectBlure_AddVertex(Effect_GetByIndex(this->meleeWeaponEffectIndex), &this->meleeWeaponInfo[0].tip,
+        // OoT3D (0x002b9a88) trims the trail tip toward the base per weapon before handing it to
+        // the blure, so the visible streak covers only part of the blade. The COLLIDER above keeps
+        // the untrimmed tip — 3DS applies the trim to the blure only, and that asymmetry is
+        // deliberate. See zelda3d/player/zelda3d_sword_trail.cpp.
+        Vec3f trailTip;
+        Zelda3D_SwordTrail_TrimTip(this, &this->meleeWeaponInfo[0].tip, &this->meleeWeaponInfo[0].base,
+                                   &trailTip);
+        EffectBlure_AddVertex(Effect_GetByIndex(this->meleeWeaponEffectIndex), &trailTip,
                               &this->meleeWeaponInfo[0].base);
     }
 
