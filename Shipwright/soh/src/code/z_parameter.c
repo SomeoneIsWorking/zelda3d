@@ -2925,6 +2925,16 @@ u8 Item_CheckObtainability(u8 item) {
         }
     } else if ((item >= ITEM_WEIRD_EGG) && (item <= ITEM_CLAIM_CHECK)) {
         return ITEM_NONE;
+    } else if (item == ITEM_LENS) {
+        // OoT3D adds an explicit ITEM_LENS -> ITEM_NONE branch that N64 lacks, so a Lens of Truth
+        // pickup is always treated as not-yet-owned. Ground truth: OoT3D Item_CheckObtainability
+        // @ 0x00377a50, test `cmp r0,#0x0f` at 0x00377ce4 falling into the ITEM_NONE epilogue at
+        // 0x00377cec. N64 instead falls through to items[SLOT(ITEM_LENS)].
+        //
+        // Placement is byte-equivalent to the 3DS ordering: there the 0x0F test sits in the else-arm
+        // after the trade-item test, and no earlier branch in either version captures 0x0F, so
+        // "last else-if before the default return" matches.
+        return ITEM_NONE;
     }
 
     return gSaveContext.inventory.items[slot];
