@@ -21,6 +21,10 @@ extern "C" {
 // The returned header and its arrays are owned by this module and freed on the next scene build.
 CollisionHeader* Zelda3D_MM_BuildSceneCollision(PlayState* play, CollisionHeader* n64);
 
+// Non-zero while the collision header installed in colCtx is the MM3D one. BgCheck's per-scene
+// subdivision / node-pool constants are hand-tuned to the N64 mesh and MUST NOT be applied to it.
+int Zelda3D_MM_CollisionDiverted(void);
+
 #ifdef __cplusplus
 }
 #endif

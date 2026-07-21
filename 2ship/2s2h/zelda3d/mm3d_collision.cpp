@@ -44,20 +44,43 @@ void freePrevious() {
     sSurf = nullptr;
 }
 
-// Debug isolation, mirroring ZELDA3D_MM_SCENE: 0 disables ONLY the collision divert so a problem can
-// be bisected collision-vs-render without a rebuild. Default 1.
+// OPT-IN (ZELDA3D_MM_COLLISION=1) and OFF BY DEFAULT — this HANGS on some scenes.
+//
+// The parse and the geometry are correct (Clock Town verified: Link lands exactly on the 3DS floor,
+// and scene exits fire — walking the south gate transitioned to Termina Field). But entering a LARGE
+// scene hangs the game on load, spinning forever inside StaticLookup_AddPolyToSSList <-
+// BgCheck_InitStaticLookup <- BgCheck_Allocate (gdb backtrace, reproduced on z2_00keikoku /
+// Termina Field: 2914 verts, 4503 polys vs the N64 mesh's 1265/1685).
+//
+// RULED OUT: the per-scene hand-tuned node cap. sSceneSubdivisionList's nodeListMax is sized for the
+// N64 mesh, and z_bgcheck applies it WITHOUT an overflow check (its own comment says so), so it was
+// the obvious suspect; bypassing it for diverted headers (Zelda3D_MM_CollisionDiverted) did NOT fix
+// the hang. The cause is elsewhere in the static-lookup build — most likely a poly whose subdivision
+// bounds explode, or an SS list driven circular.
+//
+// A hang on scene entry is worse than N64 collision, so this stays off until that is understood.
+// Do NOT default it back on without reproducing a clean Termina Field load.
 int collisionDivertEnabled() {
     static int v = -1;
     if (v < 0) {
         const char* e = getenv("ZELDA3D_MM_COLLISION");
-        v = (e != nullptr && e[0] != '\0') ? atoi(e) : 1;
+        v = (e != nullptr && e[0] != '\0') ? atoi(e) : 0;
     }
     return v;
 }
 
+// Set while the header handed to BgCheck is OURS. z_bgcheck's per-scene subdivision/node-pool
+// constants (sSceneSubdivisionList) are hand-tuned to the N64 mesh, so they do not apply to it.
+int sDiverted = 0;
+
 } // namespace
 
+extern "C" int Zelda3D_MM_CollisionDiverted(void) {
+    return sDiverted;
+}
+
 extern "C" CollisionHeader* Zelda3D_MM_BuildSceneCollision(PlayState* play, CollisionHeader* n64) {
+    sDiverted = 0;
     if (play == nullptr || !collisionDivertEnabled()) {
         return nullptr;
     }
@@ -166,6 +189,7 @@ extern "C" CollisionHeader* Zelda3D_MM_BuildSceneCollision(PlayState* play, Coll
         sHeader->waterBoxes = n64->waterBoxes;
     }
 
+    sDiverted = 1;
     fprintf(stderr, "[MM3D-COL] %s: %zu verts, %zu polys, %zu surface types (N64 was %u/%u)\n",
             path.c_str(), V.size(), P.size(), S.size(), n64 ? n64->numVertices : 0,
             n64 ? n64->numPolygons : 0);

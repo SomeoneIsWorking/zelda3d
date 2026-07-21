@@ -22,6 +22,7 @@
 #include "asset/lzs.h"
 #include "asset/zcol.h"
 
+#include <algorithm>
 #include <cmath>
 #include <cstdio>
 #include <cstdlib>
@@ -45,6 +46,7 @@ struct ColStats {
 };
 
 void reportExits(const char* label, const OoT3DCollision& col);
+void nodeEstimate(const char* label, const OoT3DCollision& col);
 
 ColStats analyze(const char* romEnv, const std::string& path) {
     ColStats s;
@@ -64,6 +66,7 @@ ColStats analyze(const char* romEnv, const std::string& path) {
     OoT3DCollision col(bytes);
     if (!col.ok()) { s.err = col.error(); return s; }
     if (getenv("ZELDA3D_EXIT_CENSUS")) reportExits(path.c_str(), col);
+    if (getenv("ZELDA3D_NODE_EST")) nodeEstimate(path.c_str(), col);
 
     const auto& V = col.verts();
     const auto& P = col.polys();
@@ -144,6 +147,54 @@ void reportExits(const char* label, const OoT3DCollision& col) {
                byExit[i].x / byExit[i].n, byExit[i].y / byExit[i].n, byExit[i].z / byExit[i].n);
     }
     if (total == 0) printf("%-34s   NO exit-bearing polys found\n", label);
+}
+
+// Static-lookup node-requirement estimate. z_bgcheck inserts ONE SSNode per (poly, intersecting
+// subdivision cell); its pool is sized from a per-scene memSize budget tuned to the N64 mesh. The
+// denser MM3D mesh can need far more, and overflowing the pool hangs scene load inside
+// StaticLookup_AddPolyToSSList. This counts the (poly, cell) pairs by AABB overlap — the same
+// quantity, minus z_bgcheck's exact triangle test, so it is a close upper bound.
+//   ZELDA3D_NODE_EST="sx,sy,sz"  (subdivAmount, e.g. Termina Field's 36,1,36; default 16,4,16)
+void nodeEstimate(const char* label, const OoT3DCollision& col) {
+    int sa[3] = { 16, 4, 16 };
+    if (const char* q = getenv("ZELDA3D_NODE_EST")) sscanf(q, "%d,%d,%d", &sa[0], &sa[1], &sa[2]);
+    const auto& V = col.verts();
+    const auto& P = col.polys();
+    if (V.empty() || P.empty()) return;
+    float lo[3] = { 1e30f, 1e30f, 1e30f }, hi[3] = { -1e30f, -1e30f, -1e30f };
+    for (const auto& v : V) {
+        const float c[3] = { (float)v.x, (float)v.y, (float)v.z };
+        for (int k = 0; k < 3; k++) { lo[k] = std::min(lo[k], c[k]); hi[k] = std::max(hi[k], c[k]); }
+    }
+    // BgCheck_SetSubdivisionDimension: subdivLength = (int)(length / subdivAmount) + 1, min-clamped.
+    float len[3];
+    for (int k = 0; k < 3; k++) {
+        len[k] = (float)((int)((hi[k] - lo[k]) / sa[k]) + 1);
+        if (len[k] < 1.0f) len[k] = 1.0f;
+    }
+    long pairs = 0;
+    for (const auto& q : P) {
+        if (q.vA >= V.size() || q.vB >= V.size() || q.vC >= V.size()) continue;
+        const OoT3DCollision::Vert* t[3] = { &V[q.vA], &V[q.vB], &V[q.vC] };
+        long span = 1;
+        for (int k = 0; k < 3; k++) {
+            float pmin = 1e30f, pmax = -1e30f;
+            for (int j = 0; j < 3; j++) {
+                const float c = (k == 0) ? t[j]->x : (k == 1) ? t[j]->y : t[j]->z;
+                pmin = std::min(pmin, c);
+                pmax = std::max(pmax, c);
+            }
+            // 50-unit overlap on each side, matching BGCHECK_SUBDIV_OVERLAP
+            int a = (int)((pmin - 50.0f - lo[k]) / len[k]);
+            int b = (int)((pmax + 50.0f - lo[k]) / len[k]);
+            a = std::max(a, 0);
+            b = std::min(b, sa[k] - 1);
+            span *= (b >= a) ? (b - a + 1) : 1;
+        }
+        pairs += span;
+    }
+    printf("%-34s   node estimate: %ld (poly,cell) pairs for %zu polys over %dx%dx%d cells (%.1f/poly)\n",
+           label, pairs, P.size(), sa[0], sa[1], sa[2], (double)pairs / (double)P.size());
 }
 
 void report(const char* label, const ColStats& s) {
