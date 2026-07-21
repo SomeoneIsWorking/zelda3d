@@ -1781,6 +1781,18 @@ void Player_PlayJumpingSfx(Player* this) {
         sfxId = NA_SE_PL_JUMP_HEAVYBOOTS;
     } else {
         sfxId = Player_ApplyFloorAndAgeSfxOffsets(this, NA_SE_PL_JUMP);
+        // OoT3D: jumping with a sword equipped on B plays an extra metallic clank alongside the
+        // jump SFX. Ground truth: OoT3D func_8083BA90 @ 0x00330efc (and its inline copies at
+        // 0x0034b3dc / 0x00183634 / 0x00360a1c — the check lives in this shared helper, not in one
+        // caller). The condition is literally gSaveContext.equips.buttonItems[0] in {0x3B,0x3C,0x3D};
+        // OoT3D deliberately does NOT accept ITEM_SWORD_KNIFE (0x55), so it is not listed here.
+        // The extra SFX is emitted BEFORE the jump SFX and is raw — no floor/age offsets applied —
+        // and the whole check is nested inside the non-Iron-Boots branch, so Iron Boots play only
+        // NA_SE_PL_JUMP_HEAVYBOOTS.
+        u8 bItem = gSaveContext.equips.buttonItems[0];
+        if ((bItem == ITEM_SWORD_KOKIRI) || (bItem == ITEM_SWORD_MASTER) || (bItem == ITEM_SWORD_BGS)) {
+            Player_PlaySfx(this, NA_SE_PL_JUMP_METAL);
+        }
     }
 
     Player_PlaySfx(this, sfxId);
