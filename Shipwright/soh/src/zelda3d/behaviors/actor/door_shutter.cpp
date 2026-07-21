@@ -16,9 +16,11 @@
 //
 // Increment 4 (this file): STATIC panels for the most common dungeon shutters — Deku Tree, Dodongo,
 // Fire, Water, Shadow/Well, Spirit, Gerudo Training, Boss doors, Ganon interior, Ganon's Tower. The
-// N64 bars overlay + slide-open animation stay as their own follow-up (increment 5). Jabu-Jabu
-// (special jointed doors) and Ice Cavern / Royal Tomb / Forest / Gohma-block fall through to N64
-// until their per-object CMBs are enumerated.
+// N64 bars overlay + slide-open animation stay as their own follow-up (increment 5).
+// Increment 6 (this file): STATIC panels for Ice Cavern (ice_tobira), Royal Family's Tomb
+// (ouke_tobira — the ouke_haka zar's sole CMB), and the Deku Tree boss-room Gohma block
+// (a_yb_door). Only Jabu-Jabu (special jointed doors) and Forest Temple shutters still fall
+// through to N64 (their per-object shutter CMBs are not a plain single panel).
 //
 // Increment 5 (this file): N64 bars overlay + slide-open animation. For doors that have bars
 // (most dungeon shutters), we draw the N64 bars display list with vertical slide animation based
@@ -61,6 +63,12 @@ static const ShutterAsset kSceneShutterAsset[] = {
     // Ganon's Tower + Ganondorf boss room — ganon_tdoor
     { SCENE_GANONS_TOWER, "/actor/zelda_ganon_objects.zar|Model/ganon_tdoor_model.cmb" },
     { SCENE_GANONDORF_BOSS, "/actor/zelda_ganon_objects.zar|Model/ganon_tdoor_model.cmb" },
+    // Ice Cavern — ice_tobira (OBJECT_ICE_OBJECTS, N64 sObjectInfo styleType 16)
+    { SCENE_ICE_CAVERN, "/actor/zelda_ice_objects.zar|Model/ice_tobira_model.cmb" },
+    // Royal Family's Tomb — ouke_tobira (OBJECT_OUKE_HAKA, styleType 19; ouke_haka.zar's sole CMB)
+    { SCENE_ROYAL_FAMILYS_TOMB, "/actor/zelda_ouke_haka.zar|Model/ouke_tobira_model.cmb" },
+    // Deku Tree boss room (Gohma block) — a_yb_door (OBJECT_GOMA, styleType 5)
+    { SCENE_DEKU_TREE_BOSS, "/actor/zelda_goma.zar|Model/a_yb_door_model.cmb" },
     { -1, nullptr },
 };
 
