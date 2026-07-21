@@ -523,6 +523,13 @@ void Cmb::readAttr(const SepdAttr& attr, int attrSlot, uint32_t idx, int comps, 
     for (int i = 0; i < comps; i++) out[i] = dtRead(b, off + i * sz, attr.data_type) * attr.scale;
 }
 
+std::map<uint16_t, int> Cmb::indexTypeHistogram() const {
+    std::map<uint16_t, int> h;
+    for (const auto& sepd : mSepds)
+        for (const auto& prms : sepd.prms) h[prms.prm.index_type]++;
+    return h;
+}
+
 std::vector<int> Cmb::meshBones(size_t i) const {
     std::vector<int> out;
     if (i >= mMeshes.size() || mMeshes[i].sepd_index >= mSepds.size()) return out;
