@@ -52,6 +52,7 @@ struct RoomStats {
     size_t insane = 0;         // |component| beyond any plausible scene extent
     double maxAbs = 0.0;       // largest |component| seen
     float sampleBad[3] = { 0, 0, 0 };
+    size_t orphanSepds = 0;
     std::map<uint16_t, int> idxHist;
     std::string rangeReport;
 };
@@ -250,6 +251,7 @@ RoomStats analyze(const char* romEnv, const char* path) {
         }
         if (uniq) s.distinctCentroids++;
     }
+    s.orphanSepds = c.unreferencedSepdCount();
     s.idxHist = c.indexTypeHistogram();
     s.rangeReport = c.indexRangeReport();
     s.ok = true;
@@ -260,6 +262,7 @@ void report(const char* label, const RoomStats& s) {
     if (!s.ok) { printf("%-28s FAILED: %s\n", label, s.err.c_str()); return; }
     printf("%-28s groups=%3zu verts=%6zu roomDiag=%9.1f medGroupDiag=%8.1f spread=%6.2f distinct=%d nonFinite=%zu insane=%zu maxAbs=%.3g\n",
            label, s.groups, s.verts, s.roomDiag, s.medGroupDiag, s.spread, s.distinctCentroids, s.nonFinite, s.insane, s.maxAbs);
+    printf("%-28s   orphanSepds=%zu\n", "", s.orphanSepds);
     if (s.nonFinite || s.insane) {
         printf("%-28s   first bad vertex: (%g, %g, %g)\n", "", s.sampleBad[0], s.sampleBad[1], s.sampleBad[2]);
     }
@@ -306,11 +309,18 @@ int main(int argc, char** argv) {
                mm.nonFinite);
         return 1;
     }
-    // SECONDARY: placement spread should resemble the known-good reference.
-    const float bar = oot.spread * 0.5f;
-    printf("\nbar = 0.5 * OoT3D spread = %.2f ; MM3D spread = %.2f\n", bar, mm.spread);
-    if (mm.spread < bar) {
-        printf("RESULT: FAIL — MM3D room geometry is not spread like a real scene room.\n");
+    // SECONDARY: every sepd must be reachable from a mesh entry.
+    //
+    // This REPLACES an earlier "spread resembles the reference room" heuristic, which was a bad
+    // discriminator: it assumed a room is many small groups scattered over a large area, so
+    // legitimately simple single-chamber rooms (z2_zolashop_0 at 36 verts, z2_redead_0, z2_inisie_bs_0)
+    // failed with spread ~1.0 despite being perfectly well-formed. Orphaned sepds are a real
+    // structural invariant instead of a shape assumption, and are exactly what the MM3D mesh-stride
+    // bug produced (27 of 41 sepds unreachable -> the room's ground silently never built) while every
+    // finiteness/extent check still passed.
+    printf("\norphan sepds — OoT3D: %zu, MM3D: %zu (both must be 0)\n", oot.orphanSepds, mm.orphanSepds);
+    if (oot.orphanSepds != 0 || mm.orphanSepds != 0) {
+        printf("RESULT: FAIL — sepds unreachable from any mesh entry; that geometry never builds.\n");
         return 1;
     }
     printf("RESULT: PASS\n");

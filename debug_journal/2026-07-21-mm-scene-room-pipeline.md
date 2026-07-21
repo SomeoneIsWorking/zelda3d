@@ -233,6 +233,30 @@ Ground truth (both agree): MM3D's engine walks the mesh table with a 0xC stride 
 Live: South Clock Town renders complete — tiled stone ground under Link, painted walls, thatched
 awnings, stairs, notice board. `uploaded model 1000000: 41 groups, 41 textures, 31521 verts`.
 
+## SWEEP: all 313 MM3D rooms
+
+With both parser fixes in, every MM3D room in the ROM was run through the structural test
+(finite positions, sane extent, zero orphan sepds):
+
+    ALL 313 MM3D ROOMS: PASS=310 FAIL=3
+
+The 3 are `spot00_0` (an OoT leftover in the MM3D romfs), `z2_02keikoku_0` and `z2_inisie_r_5`:
+all report "no room geometry" — no embedded CMB in the room ZSI at all, so `Zelda3D_TryDrawRoom`
+returns 0 and the N64 room draws. Graceful fallback, not a defect.
+
+### The test's secondary assertion was replaced (it was producing false failures)
+
+The original secondary check compared "spread" (roomDiag / median group diag) against the OoT3D
+reference. That encodes a SHAPE assumption — many small groups scattered over a large room — and
+legitimately simple single-chamber rooms failed it: `z2_zolashop_0` (36 verts), `z2_redead_0`,
+`z2_inisie_bs_0` (12 verts) all reported spread ~1.0 with nonFinite=0 and insane=0. Nothing was wrong
+with them.
+
+It is now **orphan sepds == 0** (`Cmb::unreferencedSepdCount`): every sepd must be reachable from a
+mesh entry. That is a structural invariant independent of room shape, and it is exactly what the
+mesh-stride bug violated (27 of 41 orphaned) while every finiteness and extent check still passed —
+i.e. the assertion that would have caught this class of bug immediately.
+
 ## SUPERSEDED reading (kept so it is not re-derived): "the GROUND is missing" 
 
 With the geometry fixed, buildings render but the floor/terrain does not — they float over the fog

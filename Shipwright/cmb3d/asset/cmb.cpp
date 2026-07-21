@@ -666,6 +666,15 @@ std::vector<int> Cmb::meshBones(size_t i) const {
     return out;
 }
 
+size_t Cmb::unreferencedSepdCount() const {
+    std::vector<uint8_t> used(mSepds.size(), 0);
+    for (const auto& m : mMeshes)
+        if (m.sepd_index < used.size()) used[m.sepd_index] = 1;
+    size_t n = 0;
+    for (uint8_t u : used) n += (u ? 0 : 1);
+    return n;
+}
+
 std::vector<CmbDrawGroup> Cmb::buildDrawGroups() const {
     return buildDrawGroupsSkinned(nullptr, 0, {});
 }
