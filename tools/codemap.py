@@ -94,6 +94,34 @@ def _auto_roots():
                   if os.path.isdir(d) and d not in SKIP_DIRS and not d.startswith("."))
 
 
+def _tracked_files():
+    """Return normalized paths of ALL git-TRACKED files, or None if this isn't a
+    git work tree (or git is unavailable). Using the tracked set is what makes
+    `check` correct: it excludes gitignored trees (a vendored oracle, build dirs,
+    logs, scratch) and does NOT descend into submodules (they appear only as a
+    single gitlink entry), so the codemap is audited against the project's OWN
+    committed source rather than everything on disk."""
+    import subprocess
+    try:
+        out = subprocess.run(["git", "ls-files", "-z"], capture_output=True,
+                             text=True, check=True).stdout
+    except (OSError, subprocess.CalledProcessError):
+        return None
+    files = [os.path.normpath(p) for p in out.split("\0") if p]
+    return files or None
+
+
+def _expand_ref(r):
+    """Expand the codemap's `stem.ext1/.ext2[/.ext3]` shorthand (one token that
+    asserts several sibling files, e.g. `behaviors/actor_behavior.h/.cpp`) into the
+    concrete paths it stands for. A plain path expands to itself."""
+    if "/." not in r:
+        return [r]
+    head, *tails = r.split("/.")
+    stem = head.rsplit(".", 1)[0]  # drop head's own extension
+    return [head] + [stem + "." + t for t in tails]
+
+
 def _exts_in(per_file, dirpath):
     e = {}
     for p in per_file:
@@ -196,17 +224,63 @@ def cmd_check(args):
     referenced = set()
     for m in _PATH_RE.finditer(text):
         referenced.add(m.group(1).rstrip("/"))
-    roots = args.roots or _auto_roots()
-    # (a) coverage: top-level subsystem dirs not mentioned anywhere in the map
+
+    # Prefer the git-tracked source set (excludes vendored/ignored/build trees and
+    # submodule internals); fall back to an os.walk of the auto/explicit roots when
+    # not in a git work tree. `real_files` are all source-file paths we consider
+    # part of the project; `real_dirs` is every ancestor directory of those files.
+    roots = args.roots
+    real_files = None
+    if not roots:
+        real_files = _tracked_files()
+    if real_files is None:
+        real_files = []
+        for root in (roots or _auto_roots()):
+            if os.path.isdir(root):
+                real_files.extend(sorted(_dir_stats(root)[1]))
+        real_files = [os.path.normpath(p) for p in real_files]
+    real_dirs = set()
+    for p in real_files:
+        d = os.path.dirname(p)
+        while d and d not in real_dirs:
+            real_dirs.add(d)
+            d = os.path.dirname(d)
+    real_all = set(real_files) | real_dirs
+
+    def _one_present(r):
+        """One concrete path is present if it exists relative to the repo root, OR
+        resolves as a segment-boundary SUFFIX of a real path — so the map may write
+        a subsystem-relative shorthand (`behaviors/camera/normal1.cpp`) instead of
+        the full `Shipwright/soh/src/zelda3d/...` path."""
+        if os.path.exists(r):
+            return True
+        r = r.strip("/")
+        if r in real_all:
+            return True
+        key = os.sep + r
+        return any(p.endswith(key) for p in real_all)
+
+    def _present(r):
+        # a `stem.ext1/.ext2` token asserts several sibling files: all must exist.
+        return all(_one_present(p) for p in _expand_ref(r))
+
+    # (a) coverage: subsystem dirs (depth-1 under each top-level source dir) that
+    # hold source files but aren't mentioned anywhere in the map. Coverage uses the
+    # CODE files only (docs/asset dirs aren't "source subsystems" to map).
+    code_files = [p for p in real_files if _is_code(p)]
+    top_dirs = sorted({p.split(os.sep)[0] for p in code_files if os.sep in p})
     gaps = []
-    for root in roots:
-        if not os.path.isdir(root):
-            continue
-        agg, _ = _dir_stats(root)
-        subs = [d for d in agg if _depth(d, root) == 1] or [root]
+    for root in top_dirs:
+        subs = sorted({os.path.join(root, p[len(root) + 1:].split(os.sep)[0])
+                       for p in code_files
+                       if p.startswith(root + os.sep) and os.sep in p[len(root) + 1:]})
+        subs = subs or [root]
         for d in subs:
-            nd = os.path.normpath(d)
-            if not any(nd == os.path.normpath(r) or r.startswith(nd) for r in referenced):
+            # "mentioned" = the dir path appears anywhere in the map prose, even
+            # inside notation the path regex can't parse (brace-globs like
+            # `cmb3d/asset/{gar,lzs}.{h,cpp}`, prose references, ...).
+            nd = os.path.normpath(d).replace(os.sep, "/")
+            if nd not in text:
                 gaps.append(d)
     # (b) stale: referenced PATHS (multi-segment, containing '/') that no longer
     # exist. Bare filenames (e.g. `interpreter.cpp` cited in prose without a
@@ -214,7 +288,7 @@ def cmd_check(args):
     # written as real relative paths are.
     stale = []
     for r in sorted(referenced):
-        if "/" in r and not os.path.exists(r):
+        if "/" in r and not _present(r):
             stale.append(r)
     if gaps:
         print("COVERAGE GAPS — source subsystems not mentioned in the codemap:")
