@@ -4,9 +4,9 @@
 //
 // Build: see tools/build_asset_test.sh
 // Run:   ZELDA3D_OOT3D_ROM=<path.3ds> scratch/bin/zsi_test [/scene/gerudoway_0_info.zsi]
-#include "../Shipwright/soh/src/zelda3d/asset/ctr_rom.h"
-#include "../Shipwright/soh/src/zelda3d/asset/zsi.h"
-#include "../Shipwright/soh/src/zelda3d/asset/cmb.h"
+#include "../Shipwright/cmb3d/asset/ctr_rom.h"
+#include "../Shipwright/cmb3d/asset/zsi.h"
+#include "../Shipwright/cmb3d/asset/cmb.h"
 #include <cstdio>
 #include <cstdlib>
 
