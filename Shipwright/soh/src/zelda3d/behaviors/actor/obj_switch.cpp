@@ -9,20 +9,26 @@
 // where `subType = (params >> 4) & 7`.
 //
 // OoT3D keeps the same models in `/actor/zelda_dangeon_keep.zar` as `switch_{1,2,4,5,6,7,9,10,11}_model.cmb`.
-// This module ports the STATIC subtypes first (floor + rusty floor): a plain CMB drawn at the actor's
-// world transform, exactly like door.cpp — the up/down press is a Y-translation the N64 actor already
-// applies to world.pos, so the draw needs no state. The EYE and CRYSTAL subtypes have dynamic material
-// state (eye-frame texture, crystal env-color + UV scroll) and are a follow-up increment; this module
-// returns false for them so the N64 switch still draws.
+// Every switch_N identity below was established with tools/model_match.py (batch capture + ranked
+// shape/colour scoring + contact sheet), NOT by eye — see oot3d-decomp/docs/keep_objects.md:
+//   floor pads  switch_1 GOLD / switch_2 RED / switch_11 BLUE   (gFloorSwitch1/3/2 DL)
+//   rusty floor switch_10 (orange)                              (gRustyFloorSwitchDL)
+//   crystal     switch_6 core / switch_7 diamond                (gCrystalSwitchCore/Diamond*)
+//   eye         switch_4 gold / switch_5 silver                 (gEyeSwitch1/2DL) — NOT ported
 //
-// switch_N identities (confirmed live 2026-07-21 by color-matching the OoT3D CMB against the N64 DL it
-// replaces — see oot3d-decomp/docs/keep_objects.md): the floor pads are colored trapezoids —
-// switch_1=GOLD (gFloorSwitch1DL), switch_2=RED (gFloorSwitch3DL), switch_11=BLUE (gFloorSwitch2DL).
-// Crystal switches are the upright diamond gems (switch_6, switch_9). The rusty floor pad (brown) and
-// eye switches are not yet matched, so those subtypes fall through to N64. A `gscale`-slot override
-// (kSwitchIdentSlot) forces switch_<N> on every switch for continued live identification.
+// PORTED: floor, rusty floor, crystal. The floor/rusty press is a Y-translation the N64 actor already
+// applies to world.pos, so those draws need no state. The CRYSTAL additionally carries its on/off
+// state, which z_obj_switch.c expresses as crystalColor (OFF=(0,0,0), ON=(255,255,255)) fed to
+// gDPSetEnvColor — i.e. a brightness modulation over the subtype model, NOT a second model. We pass it
+// through Zelda3D_DrawActorModelTinted. NOT PORTED: EYE, whose N64 draw animates by swapping
+// eyeTextures[subType][eyeTexIndex] (open/opening/closing/closed); OoT3D ships only the two colour
+// CMBs, so a static swap would freeze the blink — it still falls through to N64.
+//
+// A `gscale`-slot override (kSwitchIdentSlot) forces switch_<N> on every switch for further live
+// identification; it also bypasses the crystal tint so a forced CMB shows its own colours.
 #include "z64.h"
 #include "obj_switch.h"
+#include "overlays/actors/ovl_Obj_Switch/z_obj_switch.h" // ObjSwitch: read crystalColor via the C STRUCT
 #include <stdio.h>
 
 #define ZELDA3D_SWITCH_ZAR "/actor/zelda_dangeon_keep.zar"
@@ -38,6 +44,12 @@ constexpr int kFloorCmb[4] = { 1, 2, 11, 11 }; // subType 0..3 -> switch_N (gold
 // switch_10 as "orange, not brown" — the OoT3D CMB renders brighter than the N64 DL (N64 subjects sit
 // at val 0.19-0.25 vs 0.50-0.80 for CMBs), which is exactly the bias the matcher normalises away.
 constexpr int kRustyCmb    = 10;
+// Crystal: the two CMBs are the two SUBTYPE models (same housing, different base gem colour), NOT two
+// states — z_obj_switch.c drives the state through crystalColor (OFF=(0,0,0), ON=(255,255,255)) via
+// gDPSetEnvColor, so the state is a brightness modulation applied over whichever subtype is drawn.
+// N64 DrawCrystal opaDLists[subType] = {core, diamond, -, -, core}.
+constexpr int kCrystalCore    = 6; // subType 0 and 4 (gCrystalSwitchCore*)
+constexpr int kCrystalDiamond = 7; // subType 1        (gCrystalSwitchDiamond*)
 
 constexpr float kSwitchWorldScale = 0.06f; // calibrated live vs the N64 floor-switch footprint
 constexpr int kSwitchGScaleSlot   = 24;    // live scale tune: REPL `gscale 24`
@@ -47,6 +59,8 @@ constexpr int kSwitchIdentSlot    = 25;    // >0 forces switch_<N> on EVERY swit
 extern "C" {
 int Zelda3D_AutoModelId(const char* zarPath);
 int Zelda3D_DrawActorModel(PlayState* play, int modelId, Actor* actor, float worldScale);
+int Zelda3D_DrawActorModelTinted(PlayState* play, int modelId, Actor* actor, float worldScale,
+                                 unsigned char r, unsigned char g, unsigned char b);
 float Zelda3D_GScale(int slot, float def);
 }
 
@@ -80,6 +94,7 @@ bool ObjSwitchBehavior::tryDrawModel(PlayState* play, Actor* actor) {
 
     // Bring-up identification: gscale slot 25 forces switch_<N> on every switch.
     int ident = (int)Zelda3D_GScale(kSwitchIdentSlot, 0.0f);
+    const bool crystal = (type == 3 /*CRYSTAL*/ || type == 4 /*CRYSTAL_TARGETABLE*/);
     int cmbN;
     if (ident > 0) {
         cmbN = ident;
@@ -87,15 +102,27 @@ bool ObjSwitchBehavior::tryDrawModel(PlayState* play, Actor* actor) {
         cmbN = kFloorCmb[subType & 3];
     } else if (type == 1) { // rusty floor
         cmbN = kRustyCmb;
+    } else if (crystal) {
+        cmbN = (subType == 1 /*CRYSTAL_1*/) ? kCrystalDiamond : kCrystalCore;
     } else {
-        return false; // eye / crystal — dynamic-material follow-up; let the N64 switch draw
+        return false; // eye — needs the animated eye-frame texture; let the N64 switch draw
     }
 
     int modelId = switchModelId(cmbN);
     if (modelId < 0) {
         return false; // not identified / unresolved -> N64 switch draws
     }
-    Zelda3D_DrawActorModel(play, modelId, actor, Zelda3D_GScale(kSwitchGScaleSlot, kSwitchWorldScale));
+    const float scale = Zelda3D_GScale(kSwitchGScaleSlot, kSwitchWorldScale);
+    if (crystal && ident <= 0) {
+        // Carry the actor's live crystalColor so the crystal dims/brightens with the puzzle state,
+        // mirroring N64 gDPSetEnvColor(crystalColor). Read through the C struct: this is a 64-bit
+        // build, so the N64 struct-offset comments in z_obj_switch.h do NOT match the runtime layout.
+        const ObjSwitch* sw = reinterpret_cast<const ObjSwitch*>(actor);
+        const Color_RGB8 c = sw->crystalColor;
+        Zelda3D_DrawActorModelTinted(play, modelId, actor, scale, c.r, c.g, c.b);
+        return true;
+    }
+    Zelda3D_DrawActorModel(play, modelId, actor, scale);
     return true;
 }
 

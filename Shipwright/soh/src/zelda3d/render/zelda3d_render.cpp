@@ -369,6 +369,17 @@ void Zelda3D_SceneTint(PlayState* play, u8 out[3]) {
 // behaviors/actor/en_horse.cpp; EmitModelDraw records its replaced-draw transform there via
 // Zelda3D_EnHorse_RecordDraw (see the record call below).
 
+// Optional per-draw colour override for model-REPLACEMENT behaviors whose N64 original carries a
+// state-driven material colour the scene ambient tint cannot express — Obj_Switch's crystal switch is
+// the case this exists for: z_obj_switch.c sets crystalColor (0,0,0) when OFF and (255,255,255) when
+// ON and applies it via gDPSetEnvColor, so the crystal visibly dims/brightens with the puzzle state.
+// When set, it MODULATES the scene tint (final = sceneTint * override / 255) so the model still
+// respects scene lighting. Scoped to exactly one draw by Zelda3D_DrawActorModelTinted.
+// CAVEAT: the N64 env colour applies only to the gem's combiner, whereas this modulates the WHOLE
+// model, so an OFF crystal darkens its housing/base too — an approximation, measured not assumed.
+static u8 sZelda3dDrawTint[3] = { 255, 255, 255 };
+static int sZelda3dDrawTintHas = 0;
+
 void Zelda3D_EmitModelDraw(PlayState* play, int modelId, Actor* actor, float worldScale,
                                 float groundOffset) {
     u8 tint[3];
@@ -442,6 +453,11 @@ void Zelda3D_EmitModelDraw(PlayState* play, int modelId, Actor* actor, float wor
     if (!dsHave && groundOffset != 0.0f) Matrix_Translate(0.0f, groundOffset, 0.0f, MTXMODE_APPLY);
     gSPMatrix(POLY_OPA_DISP++, MATRIX_NEWMTX(play->state.gfxCtx), G_MTX_MODELVIEW | G_MTX_LOAD);
     Zelda3D_SceneTint(play, tint);
+    if (sZelda3dDrawTintHas) {
+        tint[0] = (u8)((tint[0] * sZelda3dDrawTint[0]) / 255);
+        tint[1] = (u8)((tint[1] * sZelda3dDrawTint[1]) / 255);
+        tint[2] = (u8)((tint[2] * sZelda3dDrawTint[2]) / 255);
+    }
     // Snapshot this actor's pose NOW (its SkelAnime/CSAB pose was just set via Zelda3D_UpdateAnim*),
     // before a later same-model actor overwrites the per-model bone store; the deferred draw is
     // interpreted long after build, so per-item pose must be captured here. See Zelda3D_GL_EmitPose.
@@ -506,6 +522,19 @@ static void Zelda3D_DrawModelGL(PlayState* play, int modelId, Actor* actor, floa
 // knobs without reaching into zelda3d.c's statics. Declared in zelda3d.h.
 int Zelda3D_DrawActorModel(PlayState* play, int modelId, Actor* actor, float worldScale) {
     Zelda3D_DrawModelGL(play, modelId, actor, worldScale, NULL, 0.0f, NULL, NULL);
+    return 1;
+}
+
+// Draw with an explicit material colour modulating the scene tint (see sZelda3dDrawTint). For
+// state-coloured props such as the crystal switch. The override is scoped to this single draw.
+int Zelda3D_DrawActorModelTinted(PlayState* play, int modelId, Actor* actor, float worldScale,
+                                 unsigned char r, unsigned char g, unsigned char b) {
+    sZelda3dDrawTint[0] = r;
+    sZelda3dDrawTint[1] = g;
+    sZelda3dDrawTint[2] = b;
+    sZelda3dDrawTintHas = 1;
+    Zelda3D_DrawModelGL(play, modelId, actor, worldScale, NULL, 0.0f, NULL, NULL);
+    sZelda3dDrawTintHas = 0;
     return 1;
 }
 
