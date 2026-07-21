@@ -32,7 +32,12 @@ namespace {
 // N64 floorSwitchDLists[(params>>4)&7] = {gFloorSwitch1DL, gFloorSwitch3DL, gFloorSwitch2DL, gFloorSwitch2DL}
 // = colors {gold, red, blue, blue}; matched to switch_{1,2,11,11}.
 constexpr int kFloorCmb[4] = { 1, 2, 11, 11 }; // subType 0..3 -> switch_N (gold/red/blue/blue)
-constexpr int kRustyCmb    = -1;               // gRustyFloorSwitchDL (brown) -> switch_N not yet matched
+// gRustyFloorSwitchDL -> switch_10. Identified by tools/model_match.py (ranked #1: shape 0.83,
+// colour 0.85) and confirmed by elimination: the four flat pads are colour variants of ONE mesh and
+// gold/red/blue are already taken by the three floor subtypes. An earlier by-eye pass wrongly rejected
+// switch_10 as "orange, not brown" — the OoT3D CMB renders brighter than the N64 DL (N64 subjects sit
+// at val 0.19-0.25 vs 0.50-0.80 for CMBs), which is exactly the bias the matcher normalises away.
+constexpr int kRustyCmb    = 10;
 
 constexpr float kSwitchWorldScale = 0.06f; // calibrated live vs the N64 floor-switch footprint
 constexpr int kSwitchGScaleSlot   = 24;    // live scale tune: REPL `gscale 24`

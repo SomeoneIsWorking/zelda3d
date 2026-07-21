@@ -67,6 +67,7 @@ import shutil
 import statistics
 import subprocess
 import sys
+import tempfile
 import time
 from collections import deque
 from dataclasses import dataclass, field
@@ -268,6 +269,35 @@ class Session:
         self.staged_ident = spec.ident()
         self.forced = None
         time.sleep(spec.settle)
+        # A warp draws a transient SCENE TITLE CARD ("Hyrule Field") over the frame for several
+        # seconds. It is NOT cancelled by the empty plate (the plate is taken later, once it is gone),
+        # so a baseline shot taken too early isolates the TITLE TEXT instead of the subject and every
+        # score is garbage. Fixed sleeps are guesswork; wait for the frame to actually stop changing.
+        self._wait_stable()
+
+    def _wait_stable(self, interval: float = 1.0, tries: int = 12, thresh: float = 1.2) -> bool:
+        """Block until two consecutive frames are ~identical (transient overlays finished).
+
+        Returns True once stable, False if it never settled within `tries` (caller continues anyway —
+        a noisy scene should not hard-fail a capture, but the caller is warned)."""
+        try:
+            from PIL import Image, ImageChops, ImageStat
+        except Exception:
+            time.sleep(interval * 3)  # no Pillow: fall back to a conservative wait
+            return False
+        prev = None
+        with tempfile.TemporaryDirectory() as td:
+            for i in range(tries):
+                p = _shot(os.path.join(td, f"stab{i}.png"))
+                cur = Image.open(p).convert("RGB")
+                if prev is not None:
+                    d = ImageStat.Stat(ImageChops.difference(prev, cur)).mean
+                    if sum(d) / len(d) < thresh:
+                        return True
+                prev = cur
+                time.sleep(interval)
+        sys.stderr.write("model_match: frame never stabilised; captures may include a transient overlay\n")
+        return False
 
     def _require_staged(self) -> SpawnSpec:
         if self.spec is None:
