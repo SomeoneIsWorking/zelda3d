@@ -145,6 +145,44 @@ RoomStats analyze(const char* romEnv, const char* path) {
                    (flat > 8.0f && std::max(ex, ez) > 300.0f) ? "  <-- FLOOR-LIKE" : "");
         }
     }
+    // FLOOR CENSUS: does the room actually contain horizontal, ground-height triangles? A missing
+    // floor on screen has two very different causes -- drawn-but-invisible (material/cull/depth) vs
+    // simply not in this file (MM3D storing terrain elsewhere). Counting flat low triangles tells
+    // them apart without touching the renderer. ZELDA3D_FLOOR_CENSUS=1.
+    if (getenv("ZELDA3D_FLOOR_CENSUS")) {
+        double floorArea = 0.0;
+        size_t floorTris = 0, totalTris = 0;
+        float fy = 0.0f;
+        for (const auto& g : groups) {
+            for (size_t i = 0; i + 2 < g.verts.size(); i += 3) {
+                const float* p0 = g.verts[i].pos;
+                const float* p1 = g.verts[i + 1].pos;
+                const float* p2 = g.verts[i + 2].pos;
+                bool fin = true;
+                for (int k = 0; k < 3; k++)
+                    fin = fin && std::isfinite(p0[k]) && std::isfinite(p1[k]) && std::isfinite(p2[k]);
+                if (!fin) continue;
+                totalTris++;
+                const float u[3] = { p1[0] - p0[0], p1[1] - p0[1], p1[2] - p0[2] };
+                const float v[3] = { p2[0] - p0[0], p2[1] - p0[1], p2[2] - p0[2] };
+                const float nx = u[1] * v[2] - u[2] * v[1];
+                const float ny = u[2] * v[0] - u[0] * v[2];
+                const float nz = u[0] * v[1] - u[1] * v[0];
+                const float len = std::sqrt(nx * nx + ny * ny + nz * nz);
+                if (len <= 1e-6f) continue;
+                // |normal.y| dominant => horizontal surface; low y => ground height, not a ceiling.
+                const float upness = std::fabs(ny) / len;
+                const float ymax = std::max(p0[1], std::max(p1[1], p2[1]));
+                if (upness > 0.85f && ymax < 120.0f) {
+                    floorTris++;
+                    floorArea += 0.5 * len;
+                    fy += ymax;
+                }
+            }
+        }
+        printf("      [floor] horizontal low tris=%zu / %zu   area=%.3g sq units   meanY=%.1f\n",
+               floorTris, totalTris, floorArea, floorTris ? fy / floorTris : 0.0f);
+    }
     s.groups = gdiag.size();
     if (gdiag.empty()) { s.err = "no non-empty draw groups"; return s; }
     std::sort(gdiag.begin(), gdiag.end());
