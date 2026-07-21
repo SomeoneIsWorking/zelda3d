@@ -28,3 +28,9 @@ g++ -std=c++17 -O2 -Wall -I"$REPO/Shipwright/cmb3d" -o "$REPO/scratch/bin/collis
     "$REPO/tools/zelda3d_collision_test.cpp" \
     "$A/ctr_rom.cpp" "$A/zcol.cpp" "$A/lzs.cpp"
 echo "built $REPO/scratch/bin/collision_test"
+
+# MM3D collision LAYOUT derivation aid (reads the collision command offset from the ZSI header).
+g++ -std=c++17 -O2 -Wall -I"$REPO/Shipwright/cmb3d" -o "$REPO/scratch/bin/collision_layout" \
+    "$REPO/tools/zelda3d_collision_layout.cpp" \
+    "$A/ctr_rom.cpp" "$A/zsi.cpp" "$A/cmb.cpp" "$A/pica_texture.cpp" "$A/lzs.cpp"
+echo "built $REPO/scratch/bin/collision_layout"
