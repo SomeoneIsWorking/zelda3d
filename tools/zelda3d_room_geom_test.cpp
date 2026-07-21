@@ -4,6 +4,13 @@
 // correct. Both go through the same Zsi -> Cmb -> buildDrawGroups path, so this compares the two
 // games' room geometry structurally, with the OoT3D room as the known-good reference.
 //
+// RECONCILED (measured): excluding the bad components, the MM3D room's extent is HEALTHY
+// (roomDiag 6493 vs OoT3D 2707, spread 1.51 vs 2.05) — Clock Town is simply a bigger room. So the
+// room geometry PARSES CORRECTLY and the defect is narrow: a handful of vertices whose index
+// overruns their attribute buffer. Those land at ~1e38, which stretches a few triangles across the
+// whole screen — which is what read as "fragmented/inverted" geometry in-game. The magnitude check
+// below is therefore testing the real visible bug, not a cosmetic outlier.
+//
 // PRIMARY ASSERTION: every room vertex position must be FINITE. Written first as a spread metric,
 // which wrongly "passed" the MM3D room because its bbox came out as inf -- i.e. the decoded positions
 // contain inf/NaN. That non-finiteness IS the bug (garbage positions scatter the geometry), so it is
@@ -103,6 +110,7 @@ RoomStats analyze(const char* romEnv, const char* path) {
                         s.sampleBad[0] = v.pos[0]; s.sampleBad[1] = v.pos[1]; s.sampleBad[2] = v.pos[2];
                     }
                     s.insane++;
+                    continue; // keep the CLEAN extent measurable
                 }
                 glo[k] = std::min(glo[k], v.pos[k]);
                 ghi[k] = std::max(ghi[k], v.pos[k]);
