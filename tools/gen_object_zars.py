@@ -22,7 +22,7 @@ from ctr_romfs import CtrRom
 
 REPO = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 OBJ_TABLE = os.path.join(REPO, "Shipwright/soh/include/tables/object_table.h")
-OUT = os.path.join(REPO, "Shipwright/soh/src/zelda3d/zelda3d_object_zars.inc")
+OUT = os.path.join(REPO, "Shipwright/soh/src/zelda3d/tables/zelda3d_object_zars.inc")
 
 # N64 object name -> OoT3D /actor/zelda_<basename>.zar, for CREATURES whose OoT3D archive was
 # RENAMED (so the exact object_<name> match misses). Each was confirmed by dumping the zar's main
@@ -53,6 +53,7 @@ ALIAS = {
     # confirmed by the CMB basename matching the N64 object/actor's single drawn model.
     "lightbox": "dk_lightbox",  # En_Lightbox (Forest Temple light box) (dk_lightbox/lightbox4_model.cmb)
     "shop_dungen": "shop_tana",  # En_Tana shop shelves (shop_tana01/02/03_model.cmb) — #115
+    "gol": "kogoma",            # En_Goma baby-Gohma larva (uses gObjectGolSkel egg-hatch) (kogoma/childgoma.cmb)
 }
 
 # Alias values are OoT3D zar BASENAMES. Resolve to a real /actor path, trying the common
