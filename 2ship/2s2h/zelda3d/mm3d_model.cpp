@@ -19,6 +19,7 @@
 #include <fast/zelda3d_gl.h> // renderer contract + Zelda3D_GL_SetModelProvider
 
 #include "asset/cmb.h"
+#include "asset/zsi.h"
 #include "asset/cmb_glgroups.h" // shared Zelda3D::MakeGlGroup / AppendCmbTextures
 #include "asset/csab.h" // shared 3DS CSAB sampler — plays the MM3D actor's OWN animations
 #include "asset/ctr_rom.h"
@@ -45,6 +46,13 @@ struct ModelSpec {
     bool skinned = false; // true = draw via SkelAnime intercept (3DS CSAB anim on the 3DS rig)
 };
 std::vector<ModelSpec> g_models;
+
+// Scene-room model id space. Room ids live ABOVE every actor model id so the two never collide
+// (actor ids are plain indices into g_models, which grows at runtime). Mirrors OoT's
+// kSceneModelBase in soh/src/zelda3d/model/zelda3d_model.cpp.
+constexpr int kMmSceneModelBase = 1000000;
+std::vector<std::string> g_sceneRoomPaths;              // index = modelId - kMmSceneModelBase
+std::unordered_map<std::string, int> g_sceneRoomIds;    // zsi path -> modelId
 // objectId -> renderer modelId (or -1 if resolution attempted and failed — cache miss).
 std::unordered_map<int, int> g_objectToModel;
 // Pending per-object scale overrides set by REPL BEFORE the object has been auto-probed.
@@ -95,6 +103,67 @@ Zelda3D::CtrRom* rom() {
     return g_rom.get();
 }
 
+// Load a scene-room model: read its ZSI, take the single embedded room CMB and build draw groups.
+// No skeleton/animation — scene verts are already WORLD-space, so it draws at the origin.
+// Unlike the actor path below, the CMB's vertex colour is KEPT: scene rooms carry MM3D's baked
+// vertex lighting/AO, which is exactly what makes them look right unlit.
+static void loadSceneRoom(int modelId, Loaded* out) {
+    int idx = modelId - kMmSceneModelBase;
+    if (idx < 0 || idx >= (int)g_sceneRoomPaths.size()) {
+        return;
+    }
+    const std::string& path = g_sceneRoomPaths[idx];
+    Zelda3D::CtrRom* r = rom();
+    if (r == nullptr) {
+        return;
+    }
+    auto bytes = r->read(path);
+    if (bytes.empty()) {
+        fprintf(stderr, "[MM3D] zsi not found: %s\n", path.c_str());
+        return;
+    }
+    // MM3D stores its scene ZSIs LzS-COMPRESSED ("LzS\x01"), unlike OoT3D which stores them raw
+    // ("ZSI\x01") — same codec the actor GARs use, so inflate before parsing or the shared parser
+    // (correctly) reports "bad ZSI magic".
+    if (Zelda3D::LzsIsCompressed(bytes)) {
+        std::string lzsErr;
+        std::vector<uint8_t> inflated = Zelda3D::LzsDecompress(bytes, &lzsErr);
+        if (inflated.empty()) {
+            fprintf(stderr, "[MM3D] LzS inflate %s: %s\n", path.c_str(), lzsErr.c_str());
+            return;
+        }
+        bytes = std::move(inflated);
+    }
+    Zelda3D::Zsi zsi(std::move(bytes));
+    if (!zsi.ok()) {
+        fprintf(stderr, "[MM3D] Zsi %s: %s\n", path.c_str(), zsi.error().c_str());
+        return;
+    }
+    if (!zsi.hasGeometry()) {
+        fprintf(stderr, "[MM3D] no room geometry in %s\n", path.c_str());
+        return;
+    }
+    out->cmb = std::make_unique<Zelda3D::Cmb>(zsi.cmbBytes());
+    if (!out->cmb->ok()) {
+        fprintf(stderr, "[MM3D] Cmb %s: %s\n", path.c_str(), out->cmb->error().c_str());
+        return;
+    }
+    out->groups = out->cmb->buildDrawGroups();
+    std::vector<std::pair<int, int>> dims;
+    Zelda3D::AppendCmbTextures(*out->cmb, out->texRgba, dims);
+    out->cTexs.resize(out->texRgba.size());
+    for (size_t i = 0; i < out->texRgba.size(); i++) {
+        out->cTexs[i] = { out->texRgba[i].data(), dims[i].first, dims[i].second };
+    }
+    out->cGroups.reserve(out->groups.size());
+    for (const auto& g : out->groups) {
+        out->cGroups.push_back(Zelda3D::MakeGlGroup(*out->cmb, g, g.verts.data(), 0));
+    }
+    out->ok = true;
+    fprintf(stderr, "[MM3D] loaded scene-room model %d (%s): %zu groups, %zu textures\n", modelId,
+            path.c_str(), out->cGroups.size(), out->cTexs.size());
+}
+
 Loaded* loadModel(int modelId) {
     auto it = g_loaded.find(modelId);
     if (it != g_loaded.end()) {
@@ -104,6 +173,10 @@ Loaded* loadModel(int modelId) {
     Loaded* out = owned.get();
     g_loaded[modelId] = std::move(owned);
 
+    if (modelId >= kMmSceneModelBase) {
+        loadSceneRoom(modelId, out);
+        return out;
+    }
     if (modelId < 0 || modelId >= (int)g_models.size()) {
         return out;
     }
@@ -314,6 +387,23 @@ int Zelda3D_LookupModel(int actorId, int objectId, int* modelId, float* worldSca
 float Zelda3D_ModelScaleById(int modelId) {
     if (modelId < 0 || modelId >= (int)g_models.size()) return 1.0f;
     return g_models[modelId].worldScale;
+}
+
+// Register (or return) the model id for an MM3D scene room. Geometry loads lazily on first draw.
+// MM3D uses /scenes/ (plural); OoT3D uses /scene/. Returns -1 for a null/empty scene name.
+int Zelda3D_MM_RoomModelId(const char* sceneName, int roomNum) {
+    if (sceneName == nullptr || *sceneName == '\0' || roomNum < 0) {
+        return -1;
+    }
+    std::string path = "/scenes/" + std::string(sceneName) + "_" + std::to_string(roomNum) + "_info.zsi";
+    auto it = g_sceneRoomIds.find(path);
+    if (it != g_sceneRoomIds.end()) {
+        return it->second;
+    }
+    int id = kMmSceneModelBase + (int)g_sceneRoomPaths.size();
+    g_sceneRoomPaths.push_back(path);
+    g_sceneRoomIds[path] = id;
+    return id;
 }
 
 int Zelda3D_IsModelSkinned(int modelId) {
