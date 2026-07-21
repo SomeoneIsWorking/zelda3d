@@ -2,15 +2,22 @@
 # Build the standalone C++ asset-loader verifier (tools/zelda3d_asset_test.cpp).
 set -eu
 REPO="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
-A="$REPO/Shipwright/soh/src/zelda3d/asset"
+# asset parsers moved to the shared cmb3d layer (Shipwright/cmb3d/asset) in the reorg.
+A="$REPO/Shipwright/cmb3d/asset"
 mkdir -p "$REPO/scratch/bin"
-g++ -std=c++17 -O2 -Wall -o "$REPO/scratch/bin/asset_test" \
+g++ -std=c++17 -O2 -Wall -I"$REPO/Shipwright/cmb3d" -o "$REPO/scratch/bin/asset_test" \
     "$REPO/tools/zelda3d_asset_test.cpp" \
     "$A/ctr_rom.cpp" "$A/zar.cpp" "$A/cmb.cpp" "$A/csab.cpp" "$A/pica_texture.cpp"
 echo "built $REPO/scratch/bin/asset_test"
 
 # ZSI (scene/room) parser verifier — cross-checks tools/zsi.py.
-g++ -std=c++17 -O2 -Wall -o "$REPO/scratch/bin/zsi_test" \
+g++ -std=c++17 -O2 -Wall -I"$REPO/Shipwright/cmb3d" -o "$REPO/scratch/bin/zsi_test" \
     "$REPO/tools/zelda3d_zsi_test.cpp" \
-    "$A/ctr_rom.cpp" "$A/zsi.cpp" "$A/cmb.cpp" "$A/pica_texture.cpp"
+    "$A/ctr_rom.cpp" "$A/zsi.cpp" "$A/cmb.cpp" "$A/pica_texture.cpp" "$A/lzs.cpp"
 echo "built $REPO/scratch/bin/zsi_test"
+
+# Room-geometry well-formedness check (OoT3D reference vs MM3D under test).
+g++ -std=c++17 -O2 -Wall -I"$REPO/Shipwright/cmb3d" -o "$REPO/scratch/bin/room_geom_test" \
+    "$REPO/tools/zelda3d_room_geom_test.cpp" \
+    "$A/ctr_rom.cpp" "$A/zsi.cpp" "$A/cmb.cpp" "$A/pica_texture.cpp" "$A/lzs.cpp"
+echo "built $REPO/scratch/bin/room_geom_test"

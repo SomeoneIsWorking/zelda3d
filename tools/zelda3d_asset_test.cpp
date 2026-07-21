@@ -4,11 +4,11 @@
 //
 // Build: see tools/build_asset_test.sh
 // Run:   ZELDA3D_OOT3D_ROM=<path.3ds> scratch/bin/asset_test [/actor/zelda_ge1.zar]
-#include "../Shipwright/soh/src/zelda3d/asset/ctr_rom.h"
-#include "../Shipwright/soh/src/zelda3d/asset/zar.h"
-#include "../Shipwright/soh/src/zelda3d/asset/cmb.h"
-#include "../Shipwright/soh/src/zelda3d/asset/csab.h"
-#include "../Shipwright/soh/src/zelda3d/asset/pica_texture.h"
+#include "../Shipwright/cmb3d/asset/ctr_rom.h"
+#include "../Shipwright/cmb3d/asset/zar.h"
+#include "../Shipwright/cmb3d/asset/cmb.h"
+#include "../Shipwright/cmb3d/asset/csab.h"
+#include "../Shipwright/cmb3d/asset/pica_texture.h"
 #include <cstdio>
 #include <cstdlib>
 #include <cstring>
