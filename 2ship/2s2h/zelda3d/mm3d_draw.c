@@ -174,28 +174,27 @@ int Zelda3D_TryDrawActor(PlayState* play, Actor* actor) {
 // vertex-colour lighting/AO and must not be re-shaded.
 #include "mm3d_scene_names.inc"
 
-// ZELDA3D_MM_SCENE=1 OPTS IN to the room divert; it is OFF by default.
+// Debug isolation: ZELDA3D_MM_SCENE=0 disables ONLY the scene/room divert (actors still divert), so a
+// crash can be bisected room-divert vs actor-divert without a rebuild. 2 = skip the N64 room but draw
+// nothing. Mirrors OoT's ZELDA3D_SCENE exactly, including the default of 1 (draw).
 //
-// The pipeline works end to end (scene table -> ZSI -> LzS inflate -> CMB -> draw groups) and the
-// geometry itself is now CORRECT: the old "inverted/fragmented world" was the CMB index-region offset
-// bug (prm.first is in u16 slots -> always *2, see cmb.cpp). Clock Town's stalls, walls and gates
-// render upright, correctly placed relative to each other, and correctly textured.
+// DEFAULT ON since 2026-07-21. It was opt-in during bring-up because the world rendered wrong; both
+// causes were CMB parser bugs that MM3D was simply the first content to exercise (OoT3D hid both by
+// coincidence):
+//   1. the index-region offset -- prm.first counts u16 SLOTS, so the byte offset is always first*2,
+//      never first*elementSize (OoT3D prms are all USHORT, making the two identical)
+//   2. the mesh-entry stride -- version-gated 0x04 (v6) vs 0x0C (v10), previously hardcoded to 4,
+//      which orphaned 27 of 41 sepds in a room and built only 49% of its geometry
 //
-// STILL OPT-IN because of a REMAINING, DIFFERENT defect: the room is drawn DISPLACED (upward)
-// relative to Link, who is positioned in N64 coordinates. Measured, not guessed:
-//   - the floor EXISTS in the data -- 363 horizontal ground-height tris, 1.34e6 sq units, on par with
-//     the working OoT3D reference room's 478 / 1.30e6 (tools/zelda3d_room_geom_test.cpp floor census)
-//   - from an overhead camera the dirt plane renders ABOVE the viewpoint
-//   - A/B at an identical camera vs ZELDA3D_MM_SCENE=0 shows the SAME props sitting higher and
-//     smaller than their N64 counterparts
-// So this is a scene-space -> N64-world-space placement question (origin/scale convention for MM3D
-// scenes), NOT a parse or a draw-state problem. Resolve it from the MM3D scene data/engine, not by
-// tuning an offset until it lines up.
+// Evidence for defaulting on: all 313 MM3D rooms pass the structural test (finite positions, sane
+// extent, zero orphan sepds) except 3 that carry no CMB at all and fall back to the N64 room; and
+// South Clock Town, East Clock Town and Termina Field were each verified rendering complete in a live
+// run, ground included.
 static int mmSceneDivertEnabled(void) {
     static int v = -1;
     if (v < 0) {
         const char* e = getenv("ZELDA3D_MM_SCENE");
-        v = (e != NULL && e[0] != '\0') ? atoi(e) : 0;
+        v = (e != NULL && e[0] != '\0') ? atoi(e) : 1; // 0=off, 1=draw, 2=skip-only
     }
     return v;
 }
