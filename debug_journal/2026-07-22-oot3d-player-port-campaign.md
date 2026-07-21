@@ -24,6 +24,7 @@ checking the target code exists where claimed. Engine items (Message_Decode ×2,
 were excluded as not-Link.
 
     41 specs  ->  14 READY · 10 REJECTED · 9 NOT-DIVERGENT · 9 BLOCKED
+    (corrected below: one "blocked" is really a negative result -> 10 not-divergent / 8 blocked)
 
 **The verify stage rejected 42% of implementable specs.** Rejection reasons were substantive, not
 style: a missed second divergence inside the very branch being edited; inlining noise mistaken for a
@@ -102,9 +103,29 @@ The Zora-tunic test assumes OoT3D `Player+0x1a4` is `currentTunic` (3DS Actor si
 while wearing a known tunic settles it; if it were `currentShield`, the constant 2 would mean
 PLAYER_SHIELD_HYLIAN and the code would look right while doing the wrong thing.
 
-## The 9 blocked items (need more RE before any port)
-auto-aim acquisition assist · standing-aim look-around fidget · animated boots-swap action ·
-hookshot 3D reticle (real CMB oriented to the hit-surface normal) · camera-mode decision tree
-(renumbered enum, 8-step depth-graded diving cam, 30-frame hysteresis) · ledge-grab wall-embed test ·
-six-button item scan · plus two UI/do-action items. Agents were told to say "blocked" rather than
-invent a plausible change, and did.
+## Blocked-list bookkeeping correction
+
+`0x0037547c` is tallied under "blocked" only because `implementable=false`, but its own spec is
+explicit that it is a **completed negative result**: the function is OoT3D's SFX request builder, it
+is not player code, and it contains no region gate — there is simply no player-side change to make.
+So the honest split is **10 not-divergent / 8 genuinely blocked**, not 9/9.
+
+## The 8 genuinely blocked items (need more RE before any port)
+1. `0x002bf814` auto-aim acquisition assist — the APPLIER is resolved; the search producing the
+   candidate at `play+0x2130` is not.
+2. `0x002c3e34` standing-aim look-around fidget — target fully resolved, but its only activation path
+   runs through a variant gate in caller `FUN_00488b40` with two unresolved runtime values.
+3. `0x002c3fac` animated boots-swap action — needs the consumer of `Player+0x1b8` identified (no
+   decompiled function reads it); a Ghidra data-xref or a live watchpoint would settle it.
+4. `0x004c55c0` hookshot 3D reticle — every literal resolved, but the 3DS MODELS behind
+   `Player+0x290c/+0x2910/+0x2914` are not.
+5. `0x003c45f4` camera-mode decision tree — the 3DS camera-mode enum is renumbered AND extended and
+   the mapping is unknown (FIRST_PERSON emits 3 where N64 CAM_MODE_FIRSTPERSON = 6).
+6. `0x0033ebfc` ledge-grab wall-embed test — needs the `.bss` value at `0x0051b2f4 + 0x110` (selects
+   checkHeight 23.0f vs 26.0f).
+7. `0x002c3970` six-button item scan — needs the writers of uiCtx `+0x44/+0x48/+0x60` identified.
+8. `0x002c2700` do-action label promotion — the MEANING of its 11 return values is unmapped.
+
+Agents were told to say "blocked" rather than invent a plausible change, and did. Note how many of
+these bottom out in the SAME place: a runtime value or a 3DS-engine subsystem, not player logic —
+consistent with the ring-4 finding that the frontier has left gameplay code.
