@@ -115,8 +115,32 @@ And the romfs has **no CRO/CRS modules** (extensions are only lzs/ctxb/zsi/gar/b
 code is not hiding in a dynamic module. Conclusion: the shipped engine does not VALIDATE magics — it
 reads the CMB header pointers at fixed offsets — so there is nothing to anchor on by magic.
 
-**Next anchor must be different**, e.g. the PICA200 vertex-attribute/array register setup, or code
-loading the CMB header pointer slots (`+0x3C` = vatr, `+0x34` = sklm) and walking sepds from there.
+**Next anchor must be different.** Two strong ones found in the binary's own data:
+
+1. **Original source paths are in the binary.** MM3D's codename is *joker*, and asserts carry real
+   filenames + line numbers, e.g.
+   `C:\Jenkins\workspace\joker\prog\game\sources\original\z_player.cpp(28254)`.
+   Those strings are xref-able in Ghidra → they name the function you land in. This is the highest-value
+   anchor in the binary and should be used before anything else.
+2. **Asset path tables**, e.g. `rom:/scenes/z2_20sichitai2_info.zsi`, `rom:/actors/zelda2_keep.gar.lzs`
+   at ~0x0069B34C / 0x0069281C — xref these to reach the asset loader and walk down to the parser.
+
+## MM3D SCENE ARCHITECTURE — it is SPLIT, unlike OoT3D (this is likely why our parse is wrong)
+
+Enumerated from the ROM. For scene `z2_clocktower`, MM3D ships FOUR files where OoT3D ships one:
+
+    /scenes/z2_clocktower_info.zsi     scene-level ZSI, magic ZSI\x09, references the ctxb by name
+    /scenes/z2_clocktower_info.ctxb    scene TEXTURES — a SEPARATE EXTERNAL FILE
+    /scenes/z2_clocktower_info.gar     GAR2, 340 bytes — holds Z2_clocktower_00.cmab (material ANIM)
+    /scenes/z2_clocktower_0_info.zsi   per-ROOM ZSI (the one we extract the room CMB from)
+
+Counts: 424 `/scenes/*.zsi`, 111 `/scenes/*.gar`, plus per-scene `.ctxb`.
+
+**OoT3D embeds textures inside the room CMB; MM3D externalizes them into a per-scene CTXB.** Our port
+extracts the room CMB from the room ZSI and treats it as self-contained (the OoT3D shape) — it reported
+"41 textures" for a CMB whose pixel data is not actually in the file. Whether this also explains the
+VATR index overrun is NOT yet established, but the port is modelling the wrong asset layout, and that
+must be settled before any index-math change.
 
 ## State
 
