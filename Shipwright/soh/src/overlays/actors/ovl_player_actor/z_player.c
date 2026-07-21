@@ -2621,7 +2621,17 @@ void Player_UpdateItems(Player* this, PlayState* play) {
     if ((this->actor.category == ACTORCAT_PLAYER) &&
         (CVarGetInteger(CVAR_ENHANCEMENT("QuickPutaway"), 0) ||
          !(this->stateFlags1 & PLAYER_STATE1_START_CHANGING_HELD_ITEM)) &&
-        ((this->heldItemAction == this->itemAction) || (this->stateFlags1 & PLAYER_STATE1_SHIELDING)) &&
+        // OoT3D (0x0034cc78) allows item-button processing while IN_WATER when the upper-body action
+        // is one of the two put-away/hookshot handlers, where N64 blocks it outright. Player_UseItem's
+        // own inner guard keeps the effect narrow — in practice this lets a pending put-away or a
+        // shore-standing hookshot go through while the IN_WATER flag is still set.
+        //
+        // NOT ported from that function: the 3DS wraps this whole block in a touch-UI gate on variant
+        // bit 0x1000000, which has no meaning on PC, and rebuilds the button scan for six 3DS item
+        // slots against N64's four. Everything else in it is byte-equivalent to N64.
+        ((this->heldItemAction == this->itemAction) || (this->stateFlags1 & PLAYER_STATE1_SHIELDING) ||
+         ((this->stateFlags1 & PLAYER_STATE1_IN_WATER) &&
+          ((this->upperActionFunc == func_80834B5C) || (this->upperActionFunc == func_8083485C)))) &&
         (gSaveContext.health != 0) && (play->csCtx.state == CS_STATE_IDLE) && (this->csAction == 0) &&
         (play->shootingGalleryStatus == 0) && (play->activeCamera == MAIN_CAM) &&
         (play->transitionTrigger != TRANS_TRIGGER_START) && (gSaveContext.timerState != TIMER_STATE_STOP)) {
