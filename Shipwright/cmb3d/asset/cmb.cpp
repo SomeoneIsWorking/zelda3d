@@ -423,12 +423,23 @@ bool Cmb::parseSklm() {
     if (memcmp(b + mshsOff, "mshs", 4) != 0) { mErr = "bad mshs"; return false; }
     uint32_t meshCount = u32(b, mshsOff + 8);
     uint32_t mo = mshsOff + 0x10;
+    // Mesh-entry stride is VERSION-GATED like qtrs / the bone stride (0x28 vs 0x2C) and the material
+    // stride (0x15C vs 0x16C): OoT3D (v6) packs mesh entries at 0x04, MM3D (v10) at 0x0C. The leading
+    // sepd/material/id fields are identical; v>=7 simply carries extra per-mesh fields after them.
+    // Ground truth: MM3D's engine walks the mesh table with a 0xC stride (FUN_005e1f84, recorded in
+    // mm3d-decomp/docs/joker_anchors.md), and noclip's OcarinaOfTime3D/cmb.ts switches the same way.
+    //
+    // Reading MM3D at stride 4 walked off into the middle of the table, so most entries decoded to
+    // garbage sepd indices: 27 of clocktower_0's 41 sepds ended up referenced by NO mesh and their
+    // geometry was never built (only 49% of the room's prm indices reached a draw group, vs 100% for
+    // OoT3D). That is what left the ground missing while upper-level geometry drew fine.
+    const uint32_t meshStride = (mVersion >= 7) ? 0x0C : 0x04;
     mMeshes.resize(meshCount);
     for (uint32_t i = 0; i < meshCount; i++) {
         mMeshes[i].sepd_index = u16(b, mo);
         mMeshes[i].material_index = u8(b, mo + 2);
         mMeshes[i].mesh_id = u8(b, mo + 3);
-        mo += 4;
+        mo += meshStride;
     }
     if (memcmp(b + shpOff, "shp ", 4) != 0) { mErr = "bad shp"; return false; }
     uint32_t sepdCount = u32(b, shpOff + 8);
