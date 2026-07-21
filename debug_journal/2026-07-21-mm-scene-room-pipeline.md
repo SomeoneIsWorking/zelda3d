@@ -304,6 +304,33 @@ Link now rests exactly on the surface the renderer draws. Scene transitions rebu
 (`z2_clocktower` 651v/731p vs N64 416/508; `z2_town` 530v/614p vs N64 413/489 — the 3DS meshes are
 finer), and East Clock Town renders and stands correctly after a warp.
 
+### HANG on large scenes — cause found (node pool sized for the N64 mesh), fix built, LIVE CHECK PENDING
+
+Entering Termina Field with the collision divert on HANGS the game at scene load, spinning forever in
+`StaticLookup_AddPolyToSSList` <- `BgCheck_InitStaticLookup` <- `BgCheck_Allocate` (gdb backtrace).
+
+**First theory was WRONG:** I assumed `sSceneSubdivisionList`'s hand-tuned `nodeListMax` overflowed.
+It is **-1** for SCENE_00KEIKOKU, i.e. unused — bypassing it changed nothing. Do not re-try that.
+
+The real cause is the OTHER sizing path. `tblMax = (colCtx->memSize - used) / sizeof(SSNode)`, where
+`memSize` is a hardcoded per-scene budget (`sSceneMemList`: SCENE_00KEIKOKU = 0xC800) tuned to the
+**N64** mesh. z_bgcheck inserts one SSNode per (poly, intersecting subdivision cell), so a denser mesh
+needs proportionally more — measured with the new `ZELDA3D_NODE_EST` estimator on the real data:
+
+    z2_00keikoku (MM3D): 14078 (poly,cell) pairs for 4503 polys over 36x1x36 cells (3.1/poly)
+    budget grants:       ~5766 nodes  ->  2.4x oversubscribed
+
+The N64 mesh fits that budget (1685 polys, ~6470 nodes granted, ~3.8/poly of headroom); ours does not.
+
+**Fix (built, compiles clean, NOT yet verified live):** `BgCheck_CountStaticLookupNodes` walks the same
+bounds+intersection predicate as the build loop and returns the EXACT node requirement; when the
+installed header is ours (`Zelda3D_MM_CollisionDiverted`), the pool is sized from that count instead of
+the inherited budget. Counting rather than scaling by a guessed factor keeps it correct for any mesh.
+
+RISK still open: `SSNodeList_Alloc` does not null-check its `tbl` allocation, so if the tail heap
+cannot satisfy ~14k SSNodes (~56 KB) the failure mode would be a crash rather than a clean error.
+Verify a live Termina Field load before calling this done.
+
 ### Exits: encoding CONFIRMED offline, live walk-through BLOCKED on harness control
 
 MM keeps the scene exit index in SurfaceType data0 bits 8..12 (`SURFACETYPE0`, z64bgcheck.h).
@@ -322,6 +349,12 @@ installed collision has real, plausibly-placed exits.
 **What is NOT verified: actually walking through one.** Exits are triggered by wall contact during
 MOVEMENT, so teleporting onto the poly does not fire them (tried: Link is pushed back to
 (-484.7, 0, 586) short of exit[2] at z=772, scene unchanged).
+
+UPDATE — the walk-through DID happen, by accident, and it WORKED: the scripted stick input was left
+held, Link walked out the south gate, and the run log shows
+`Cutscene_HandleConditionalTriggers: entrance: 21600` (0x5460 = Termina Field, spawn 6) followed by the
+next scene's collision loading. So MM3D collision exits DO fire. The scene it transitioned INTO is the
+one that then hung (see the hang section above).
 
 **BLOCKER — player movement control in the MM harness is unreliable.** After one `tp`, Link stops
 responding to further `tp` AND to scripted stick input (`stick 0 70` via SHIP_SCRIPTED_FIFO) — he sits

@@ -7,6 +7,7 @@
 #include "2s2h/BenPort.h"
 #include "2s2h/GameInteractor/GameInteractor.h"
 #include <libultraship/bridge/consolevariablebridge.h>
+#include "2s2h/zelda3d/mm3d_collision.h"
 
 #define DYNA_RAYCAST_FLOORS 1
 #define DYNA_RAYCAST_WALLS 2
@@ -1392,6 +1393,53 @@ s32 BgCheck_PolyIntersectsSubdivision(Vec3f* min, Vec3f* max, CollisionPoly* pol
  * Initialize StaticLookup Table
  * returns size of table, in bytes
  */
+// Zelda3D: exact node requirement for the static lookup — one node per (poly, intersecting
+// subdivision cell), counted with the SAME bounds+intersection predicate the build loop uses.
+// Needed because the stock pool sizes are tuned to the N64 collision mesh and silently overflow on
+// the denser MM3D mesh (see the call site in BgCheck_Allocate). Counting, rather than scaling by a
+// guessed factor, keeps this exact for any mesh.
+s32 BgCheck_CountStaticLookupNodes(CollisionContext* colCtx) {
+    CollisionHeader* colHeader = colCtx->colHeader;
+    Vec3s* vtxList = colHeader->vtxList;
+    CollisionPoly* polyList = colHeader->polyList;
+    Vec3f curSubdivMin;
+    Vec3f curSubdivMax;
+    s32 sx, sy, sz;
+    s16 sxMin, syMin, szMin, sxMax, syMax, szMax;
+    s32 polyIdx;
+    s32 count = 0;
+    f32 subdivLengthX = colCtx->subdivLength.x + (2 * BGCHECK_SUBDIV_OVERLAP);
+    f32 subdivLengthY = colCtx->subdivLength.y + (2 * BGCHECK_SUBDIV_OVERLAP);
+    f32 subdivLengthZ = colCtx->subdivLength.z + (2 * BGCHECK_SUBDIV_OVERLAP);
+
+    for (polyIdx = 0; polyIdx < colHeader->numPolygons; polyIdx++) {
+        BgCheck_GetPolySubdivisionBounds(colCtx, vtxList, polyList, &sxMin, &syMin, &szMin, &sxMax, &syMax, &szMax,
+                                         polyIdx);
+        curSubdivMin.z = (colCtx->subdivLength.z * szMin + colCtx->minBounds.z) - BGCHECK_SUBDIV_OVERLAP;
+        curSubdivMax.z = curSubdivMin.z + subdivLengthZ;
+        for (sz = szMin; sz < szMax + 1; sz++) {
+            curSubdivMin.y = (colCtx->subdivLength.y * syMin + colCtx->minBounds.y) - BGCHECK_SUBDIV_OVERLAP;
+            curSubdivMax.y = curSubdivMin.y + subdivLengthY;
+            for (sy = syMin; sy < syMax + 1; sy++) {
+                curSubdivMin.x = (colCtx->subdivLength.x * sxMin + colCtx->minBounds.x) - BGCHECK_SUBDIV_OVERLAP;
+                curSubdivMax.x = curSubdivMin.x + subdivLengthX;
+                for (sx = sxMin; sx < sxMax + 1; sx++) {
+                    if (BgCheck_PolyIntersectsSubdivision(&curSubdivMin, &curSubdivMax, polyList, vtxList, polyIdx)) {
+                        count++;
+                    }
+                    curSubdivMin.x += colCtx->subdivLength.x;
+                    curSubdivMax.x += colCtx->subdivLength.x;
+                }
+                curSubdivMin.y += colCtx->subdivLength.y;
+                curSubdivMax.y += colCtx->subdivLength.y;
+            }
+            curSubdivMin.z += colCtx->subdivLength.z;
+            curSubdivMax.z += colCtx->subdivLength.z;
+        }
+    }
+    return count;
+}
+
 u32 BgCheck_InitStaticLookup(CollisionContext* colCtx, PlayState* play, StaticLookup* lookupTbl) {
     Vec3s* vtxList;
     CollisionPoly* polyList;
@@ -1420,6 +1468,7 @@ u32 BgCheck_InitStaticLookup(CollisionContext* colCtx, PlayState* play, StaticLo
     f32 subdivLengthX;
     f32 subdivLengthY;
     f32 subdivLengthZ;
+
 
     for (iLookup = lookupTbl;
          iLookup < (colCtx->subdivAmount.x * colCtx->subdivAmount.y * colCtx->subdivAmount.z + lookupTbl); iLookup++) {
@@ -1605,6 +1654,22 @@ void BgCheck_Allocate(CollisionContext* colCtx, PlayState* play, CollisionHeader
               colCtx->colHeader->numPolygons * sizeof(u8) + colCtx->dyna.polyNodesMax * sizeof(SSNode) +
               colCtx->dyna.polyListMax * sizeof(CollisionPoly) + colCtx->dyna.vtxListMax * sizeof(Vec3s) +
               sizeof(CollisionContext);
+    // Zelda3D: BOTH ways of sizing the static-lookup node pool are tuned to the N64 mesh and neither
+    // bounds ours. sSceneSubdivisionList's nodeListMax is a hand-picked constant applied WITHOUT an
+    // overflow check (see the decomp's own comment below), and the computed branch derives tblMax
+    // from colCtx->memSize, itself a hardcoded arena budget (0xF000 / a per-scene custom value).
+    // The MM3D mesh is denser — Termina Field is 4503 polys against the N64 mesh's 1685 — so the
+    // pool ran out mid-build, and the overflow drove StaticLookup_AddPolyToSSList into an endless
+    // loop (gdb: spinning there under BgCheck_InitStaticLookup on scene load).
+    //
+    // So COUNT what this mesh actually needs instead of inheriting a number meant for another mesh.
+    // The insertion loop below adds one node per (poly, intersecting subdivision cell), so counting
+    // those pairs with the same predicate gives the exact requirement — no guessed multiplier.
+    if (Zelda3D_MM_CollisionDiverted()) {
+        s32 needed = BgCheck_CountStaticLookupNodes(colCtx);
+        customNodeListMax = needed + 2; // headroom: SSNodeList_GetNextNode increments BEFORE testing
+                                        // against max, so the last slot is unusable
+    }
     if (customNodeListMax > 0) {
         // tblMax is set without checking if customNodeListMax will result in a memory overflow
         // this is a non-issue as long as sSceneSubdivisionList.nodeListMax is -1
