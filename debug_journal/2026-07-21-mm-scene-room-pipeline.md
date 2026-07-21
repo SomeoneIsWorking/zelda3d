@@ -90,6 +90,34 @@ right in both games; and `parseVatr` sizes its slot array from the same version-
 NOTE: do NOT "fix" this by clamping the read. Clamping hides a wrong index computation. Find why the
 index exceeds the array (per-sepd vertex base/count handling) first.
 
+## GHIDRA (static RE) — environment up, magic-anchoring is a DEAD END
+
+Per the standing rule that black-box probing is banned for format questions, the remaining work moved
+to static RE. (My earlier `readAttr` bounds-counter, the `ZELDA3D_MM_SCENE_ROT` 0/1/2/3 sweep and a
+hand-rolled `skl` reader were all probing and should not have been used to infer format.)
+
+Environment (reusable):
+- `mm3d-decomp/tools/extract_code.py` now resolves the engine tools dir repo-relatively (it shipped
+  with the literal placeholder `<engine>/tools` from the go-public scrub and could not run).
+  Extracts MM3D `.code` → 0x5b1000 bytes, `.text` load addr **0x00100000**.
+- Ghidra project `build/ghidra` / program `mm3d.code`, imported with
+  `-processor ARM:LE:32:v6 -loader BinaryLoader -loader-baseAddr 0x00100000`; auto-analysis succeeded.
+- Reuse `oot3d-decomp/tools/ghidra_scripts` via `-scriptPath`. NOTE the output prefix is `SCALARHIT`
+  (grepping for a bare address finds nothing and looks like a false negative).
+
+**FINDING — do not retry this anchor.** MM3D `code.bin` contains **ZERO** references to the CMB chunk
+magics, as immediates or as literal bytes:
+
+    'sepd' 0x64706573 → 0 hits      'vatr' 0x72746176 → 0 hits      movw-half 0x6573 → 0 hits
+    (tool sanity-checked: 0x3F800000 → 928 hits, so this is a real absence, not a broken scan)
+
+And the romfs has **no CRO/CRS modules** (extensions are only lzs/ctxb/zsi/gar/bcstm/moflex/...), so the
+code is not hiding in a dynamic module. Conclusion: the shipped engine does not VALIDATE magics — it
+reads the CMB header pointers at fixed offsets — so there is nothing to anchor on by magic.
+
+**Next anchor must be different**, e.g. the PICA200 vertex-attribute/array register setup, or code
+loading the CMB header pointer slots (`+0x3C` = vatr, `+0x34` = sklm) and walking sepds from there.
+
 ## State
 
 OPT-IN and OFF by default (`ZELDA3D_MM_SCENE=1`); MM renders its N64 world unchanged (verified, no
