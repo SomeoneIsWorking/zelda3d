@@ -202,11 +202,36 @@ so the missing ground is not an unloaded second room.
     OoT3D ydan_0 (works)      9195                   9195       100%
     MM3D  clocktower_0       31521                  15519        49%
 
-OoT3D consumes every index; the MM3D room builds barely half. That is the defect: prms are being
-dropped in `buildDrawGroups`, so ground-level geometry never reaches a draw group while upper-level
-geometry does. Next: instrument which prms/meshes are dropped and why (mesh->sepd resolution,
-per-prm mode, bone-dimension classification) — a count of contributed vs skipped prms with reasons,
-not a guess.
+OoT3D consumes every index; the MM3D room built barely half.
+
+### ROOT CAUSE: the mesh-entry stride is VERSION-GATED and we hardcoded OoT3D's
+
+No prm is dropped inside `buildDrawGroups` — it iterates MESHES, and each mesh names one sepd. Counting
+mesh references per sepd:
+
+    OoT3D ydan_0       18 sepds,  0 unreferenced
+    MM3D  clocktower_0 41 sepds, 27 unreferenced   <- 66% of the room had no mesh pointing at it
+
+`parseSklm` advanced the mesh cursor with a hardcoded `mo += 4`. The stride is version-gated exactly
+like `qtrs`, the bone stride (0x28 -> 0x2C) and the material stride (0x15C -> 0x16C):
+**OoT3D (v6) = 0x04, MM3D (v10) = 0x0C.** Reading MM3D at stride 4 walked into the middle of the table
+and decoded garbage sepd indices, so most sepds were never referenced and never built.
+
+Ground truth (both agree): MM3D's engine walks the mesh table with a 0xC stride (`FUN_005e1f84`, see
+`mm3d-decomp/docs/joker_anchors.md`), and noclip's `OcarinaOfTime3D/cmb.ts` switches stride on version.
+
+### Verified
+
+    MM3D groups        14 -> 41
+    MM3D verts      15519 -> 31521   (= 100% of sum(count), matching OoT3D's 100%)
+    unreferenced       27 -> 0
+    OoT3D            18 groups / 9195 verts, UNCHANGED (no regression)
+    spread           1.53 -> 2.03    (OoT3D reference 2.05)
+    ground at Link's XZ: no y~0 surface -> surfaces at 0.0/140/180/220/240
+    floor census      363 tris / 1.34e6 -> 946 tris / 4.36e6
+
+Live: South Clock Town renders complete — tiled stone ground under Link, painted walls, thatched
+awnings, stairs, notice board. `uploaded model 1000000: 41 groups, 41 textures, 31521 verts`.
 
 ## SUPERSEDED reading (kept so it is not re-derived): "the GROUND is missing" 
 
