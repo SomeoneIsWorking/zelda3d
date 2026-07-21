@@ -199,6 +199,11 @@ class Cmb {
     // uploads one flat index buffer sized index_count<<1, i.e. uniform u16).
     std::map<uint16_t, int> indexTypeHistogram() const;
 
+    // Diagnostic: for each sepd, the highest vertex index any of its prms references vs how many
+    // vertices its POSITION VATR buffer can actually hold. Lines where max >= capacity are reads
+    // past the end of the buffer (the MM3D room defect).
+    std::string indexRangeReport() const;
+
     // Same, but with CSAB skinning applied: skinMats is indexed by bone id and is
     // skinMatrix = animWorld . bindInverse for each bone (see asset/csab). Each
     // vertex is taken to MODEL space exactly as buildDrawGroups() does (rigid:

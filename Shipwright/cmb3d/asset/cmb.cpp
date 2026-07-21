@@ -523,6 +523,48 @@ void Cmb::readAttr(const SepdAttr& attr, int attrSlot, uint32_t idx, int comps, 
     for (int i = 0; i < comps; i++) out[i] = dtRead(b, off + i * sz, attr.data_type) * attr.scale;
 }
 
+std::string Cmb::indexRangeReport() const {
+    const uint8_t* b = mData.data();
+    int count = 0;
+    const AttrDef* defs = Cmb_attrsDef(mVersion, &count);
+    int slotPos = -1;
+    for (int i = 0; i < count; i++)
+        if (!strcmp(defs[i].name, "position")) slotPos = i;
+    std::string out;
+    char line[256];
+    if (slotPos < 0 || slotPos >= (int)mVatr.size()) return "(no position slot)";
+    // Only sepds a MESH actually references are ever drawn; an unreferenced sepd overrunning is
+    // harmless bookkeeping, a referenced one is a real defect. Distinguish them.
+    std::map<size_t, int> refCount;
+    for (const auto& m : mMeshes) refCount[m.sepd_index]++;
+    for (size_t si = 0; si < mSepds.size(); si++) {
+        const Sepd& sepd = mSepds[si];
+        const SepdAttr& a = sepd.attrs[slotPos];
+        int sz = dtSize(a.data_type);
+        // vertices addressable from this sepd's start within the position buffer
+        long cap = ((long)mVatr[slotPos].size - (long)a.start) / (3 * sz);
+        long maxIdx = -1;
+        for (const auto& prms : sepd.prms) {
+            const Prm& prm = prms.prm;
+            int isz = dtSize(prm.index_type);
+            for (uint16_t k = 0; k < prm.count; k++) {
+                long idx = (long)dtRead(b, mIdxPtr + (size_t)(prm.first + k) * isz, prm.index_type);
+                if (idx > maxIdx) maxIdx = idx;
+            }
+        }
+        if (getenv("CMB_RANGE_ALL") != nullptr || maxIdx >= cap) {
+            snprintf(line, sizeof(line),
+                     "  sepd%-3zu %-8s maxIdx=%-5ld cap=%-5ld start=%-7u mode=%u dt=0x%X meshRefs=%d%s\n",
+                     si, (maxIdx >= cap ? "OVERRUN" : "ok"), maxIdx, cap, a.start, a.mode,
+                     a.data_type, refCount[si],
+                     refCount[si] ? (maxIdx >= cap ? "  <-- DRAWN, REAL DEFECT" : "  drawn") : "  (unreferenced)");
+            out += line;
+        }
+    }
+    if (out.empty()) out = "  (no sepd overruns)\n";
+    return out;
+}
+
 std::map<uint16_t, int> Cmb::indexTypeHistogram() const {
     std::map<uint16_t, int> h;
     for (const auto& sepd : mSepds)

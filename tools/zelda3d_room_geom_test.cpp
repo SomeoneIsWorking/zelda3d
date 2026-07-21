@@ -53,6 +53,7 @@ struct RoomStats {
     double maxAbs = 0.0;       // largest |component| seen
     float sampleBad[3] = { 0, 0, 0 };
     std::map<uint16_t, int> idxHist;
+    std::string rangeReport;
 };
 
 float diag(const float lo[3], const float hi[3]) {
@@ -142,6 +143,7 @@ RoomStats analyze(const char* romEnv, const char* path) {
         if (uniq) s.distinctCentroids++;
     }
     s.idxHist = c.indexTypeHistogram();
+    s.rangeReport = c.indexRangeReport();
     s.ok = true;
     return s;
 }
@@ -158,6 +160,7 @@ void report(const char* label, const RoomStats& s) {
         for (const auto& kv : s.idxHist) printf(" 0x%X x%d", kv.first, kv.second);
         printf("\n");
     }
+    if (!s.rangeReport.empty()) printf("%s", s.rangeReport.c_str());
 }
 
 } // namespace
