@@ -532,6 +532,71 @@ std::string Cmb::indexRangeReport() const {
         if (!strcmp(defs[i].name, "position")) slotPos = i;
     std::string out;
     char line[256];
+    { // Index-region accounting: does sum(count*declaredWidth) match the byte span between the
+      // index buffer (+0x40) and the texture data (+0x44)? That distinguishes a flat mixed-width
+      // stream (where `first` would be a BYTE offset) from an element-indexed array.
+        long sumBytes = 0, sumElems = 0, maxFirstPlusCount = 0;
+        for (const auto& sp : mSepds)
+            for (const auto& pr : sp.prms) {
+                sumBytes += (long)pr.prm.count * dtSize(pr.prm.index_type);
+                sumElems += pr.prm.count;
+                long e = (long)pr.prm.first + pr.prm.count;
+                if (e > maxFirstPlusCount) maxFirstPlusCount = e;
+            }
+        snprintf(line, sizeof(line),
+                 "  [idx] mIndexCount=%u idxPtr=%u texdataPtr=%u span=%ld | sum(count*w)=%ld sum(count)=%ld max(first+count)=%ld\n",
+                 mIndexCount, mIdxPtr, mTexdataPtr, (long)mTexdataPtr - (long)mIdxPtr,
+                 sumBytes, sumElems, maxFirstPlusCount);
+        out += line;
+    }
+    { // Per-width-class ranges: if the stream is segregated by index width, `first` would be an
+      // element index WITHIN its class and each class would occupy a contiguous span.
+        std::map<uint16_t, long> maxF, cnt, sumC;
+        for (const auto& sp : mSepds)
+            for (const auto& pr : sp.prms) {
+                uint16_t t = pr.prm.index_type;
+                cnt[t]++; sumC[t] += pr.prm.count;
+                long e = (long)pr.prm.first + pr.prm.count;
+                if (e > maxF[t]) maxF[t] = e;
+            }
+        for (const auto& kv : cnt) {
+            snprintf(line, sizeof(line),
+                     "  [cls] itype=0x%X prms=%ld sumCount=%ld max(first+count)=%ld  bytesIfOwnClass=%ld\n",
+                     kv.first, kv.second, sumC[kv.first], maxF[kv.first],
+                     sumC[kv.first] * dtSize(kv.first));
+            out += line;
+        }
+    }
+    { // Is `first` the running ELEMENT index over prms in file order? If so, with MIXED widths the
+      // byte offset must accumulate preceding widths, and first*thisWidth is wrong.
+        long elems = 0, bytes = 0; int mismatch = 0, byteMismatch = 0, total = 0; long firstBad = -1;
+        for (const auto& sp : mSepds)
+            for (const auto& pr : sp.prms) {
+                total++;
+                if ((long)pr.prm.first != elems) {
+                    if (mismatch == 0) firstBad = (long)pr.prm.first - elems;
+                    mismatch++;
+                }
+                if ((long)pr.prm.first != bytes) byteMismatch++;
+                elems += pr.prm.count;
+                bytes += (long)pr.prm.count * dtSize(pr.prm.index_type);
+            }
+        snprintf(line, sizeof(line),
+                 "  [first] prms=%d  vs runningELEMENT mismatches=%d (delta=%ld)  vs runningBYTE mismatches=%d  totalElems=%ld totalBytes=%ld\n",
+                 total, mismatch, firstBad, byteMismatch, elems, bytes);
+        out += line;
+    }
+    { // VATR slot layout: are the per-attribute buffers contiguous, and does the last one end at
+      // the end of the CMB? A short final size would explain a tail sepd overrunning.
+        snprintf(line, sizeof(line), "  [vatr] cmbSize=%zu vatrPtr=%u slots=%zu\n",
+                 mData.size(), mVatrPtr, mVatr.size());
+        out += line;
+        for (size_t i = 0; i < mVatr.size(); i++) {
+            snprintf(line, sizeof(line), "    slot%zu off=%-8u size=%-8u end=%-8u\n",
+                     i, mVatr[i].off, mVatr[i].size, mVatr[i].off + mVatr[i].size);
+            out += line;
+        }
+    }
     if (slotPos < 0 || slotPos >= (int)mVatr.size()) return "(no position slot)";
     // Only sepds a MESH actually references are ever drawn; an unreferenced sepd overrunning is
     // harmless bookkeeping, a referenced one is a real defect. Distinguish them.
@@ -553,6 +618,13 @@ std::string Cmb::indexRangeReport() const {
             }
         }
         if (getenv("CMB_RANGE_ALL") != nullptr || maxIdx >= cap) {
+            for (const auto& prms : sepd.prms) {
+                const Prm& pr = prms.prm;
+                snprintf(line, sizeof(line),
+                         "      prm first=%-6u count=%-6u itype=0x%X skin=%u boneTbl=%zu\n",
+                         pr.first, pr.count, pr.index_type, prms.skinning_mode, prms.bone_table.size());
+                out += line;
+            }
             snprintf(line, sizeof(line),
                      "  sepd%-3zu %-8s maxIdx=%-5ld cap=%-5ld start=%-7u mode=%u dt=0x%X meshRefs=%d%s\n",
                      si, (maxIdx >= cap ? "OVERRUN" : "ok"), maxIdx, cap, a.start, a.mode,
