@@ -8,6 +8,8 @@
 #include "2s2h/zelda3d/mm3d_draw.h"
 #include "2s2h/zelda3d/mm3d_model.h"
 
+#include <stdio.h>  // fprintf (bring-up diagnostic)
+#include <stdlib.h> // getenv, atoi
 #include "global.h" // Actor, PlayState, POLY_OPA_DISP, Matrix_*, Gfx_SetupDL25_Opa, gSPZelda3DDraw
 
 // Public C bridge for the C++ SkelAnime intercept in mm3d_model.cpp (which can't
@@ -163,20 +165,81 @@ int Zelda3D_TryDrawActor(PlayState* play, Actor* actor) {
     return 1;
 }
 
-// MM room-divert stub. No MM3D scene coverage table yet, so this always returns 0
-// (fall through to N64 room draw). Present now so z_room.c can call it once and stay
-// clean when MM3D scene mappings land — same shape as Zelda3D_TryDrawRoom in OoT.
-int Zelda3D_TryDrawRoom(PlayState* play, Room* room) {
-    (void)play;
-    (void)room;
-    return 0;
+// MM3D scene-room divert. MM3D ships /scenes/<name>_<room>_info.zsi in the same ZSI format OoT3D
+// uses, so this mirrors Zelda3D_TryDrawRoom in OoT: map sceneNum -> MM3D scene folder name, register
+// the room's model id, draw it, and return 1 so the caller skips the N64 room mesh.
+//
+// The room CMB's verts are already WORLD-space, so the transform is identity (no per-room placement).
+// The model id is emitted WITHOUT the high "lit" bit that actors use: scene rooms carry MM3D's baked
+// vertex-colour lighting/AO and must not be re-shaded.
+#include "mm3d_scene_names.inc"
+
+// ZELDA3D_MM_SCENE=1 OPTS IN to the room divert; it is OFF by default.
+//
+// The pipeline works end to end (scene table -> ZSI -> LzS inflate -> CMB -> draw groups; verified
+// "loaded scene-room model ... 14 groups, 41 textures"), but the drawn frame is WRONG: the world
+// renders vertically flipped. That is an unresolved transform issue, not a data problem, and
+// suppressing the N64 bg image does not account for it. Until it is fixed, defaulting this ON would
+// ship a broken world, so it stays opt-in for bring-up.
+static int mmSceneDivertEnabled(void) {
+    static int v = -1;
+    if (v < 0) {
+        const char* e = getenv("ZELDA3D_MM_SCENE");
+        v = (e != NULL && e[0] != '\0') ? atoi(e) : 0;
+    }
+    return v;
 }
 
-// Predicate used to suppress the N64 pre-rendered bg-image skybox (Play_Draw path in
-// OoT's #134). MM has no MM3D scene coverage yet, so we still WANT the vanilla N64
-// bg image to draw (else nothing appears). Returns 0 for now; flips to 1 the day the
-// first MM3D room CMB is registered (same rule OoT already uses).
+static const char* mm3dSceneName(PlayState* play) {
+    int n;
+    if (play == NULL) {
+        return NULL;
+    }
+    n = play->sceneId;
+    if (n < 0 || n >= (int)(sizeof(kMm3dSceneNames) / sizeof(kMm3dSceneNames[0]))) {
+        return NULL;
+    }
+    return kMm3dSceneNames[n];
+}
+
+int Zelda3D_TryDrawRoom(PlayState* play, Room* room) {
+    const char* sceneName;
+    int modelId;
+
+    if (!mmSceneDivertEnabled() || play == NULL || room == NULL) {
+        return 0;
+    }
+    sceneName = mm3dSceneName(play);
+    {
+        static int logged = 0;
+        if (!logged) {
+            logged = 1;
+            fprintf(stderr, "[MM3D-ROOM] sceneId=%d room=%d name=%s\n", (int)play->sceneId,
+                    (int)room->num, sceneName ? sceneName : "(none)");
+        }
+    }
+    if (sceneName == NULL) {
+        return 0; // no MM3D scene for this sceneId -> N64 room
+    }
+    modelId = Zelda3D_MM_RoomModelId(sceneName, room->num);
+    if (modelId < 0) {
+        return 0;
+    }
+
+    Zelda3D_EnsureModelProvider();
+    OPEN_DISPS(play->state.gfxCtx);
+    Gfx_SetupDL25_Opa(play->state.gfxCtx);
+    Matrix_Translate(0.0f, 0.0f, 0.0f, MTXMODE_NEW); // scene verts are world-space
+    MATRIX_FINALIZE_AND_LOAD(POLY_OPA_DISP++, play->state.gfxCtx);
+    gSPZelda3DDraw(POLY_OPA_DISP++, modelId, 255, 255, 255);
+    CLOSE_DISPS(play->state.gfxCtx);
+    return 1; // drew the MM3D room -> caller skips the N64 mesh
+}
+
+// Predicate used to suppress the N64 pre-rendered bg-image skybox (Play_Draw path in OoT's #134).
+// Now that MM3D room CMBs render, the vanilla N64 bg image must NOT also draw for a covered scene —
+// it composites over/under the MM3D room. Suppress exactly when this scene has an MM3D mapping (and
+// the room divert is enabled), so uncovered scenes keep their N64 bg and stay visible.
 int Zelda3D_ShouldSuppressBgImageSkybox(PlayState* play) {
-    (void)play;
-    return 0;
+    return mmSceneDivertEnabled() && mm3dSceneName(play) != NULL;
 }

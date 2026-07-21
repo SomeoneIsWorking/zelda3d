@@ -28,6 +28,10 @@ float Zelda3D_ModelScaleById(int modelId);
 // defer to the SkelAnime intercept instead of emitting a static draw.
 int Zelda3D_IsModelSkinned(int modelId);
 
+// Zelda3D_MM_RoomModelId — register/return the model id for an MM3D scene room; geometry loads
+// lazily on first draw from /scenes/<sceneName>_<roomNum>_info.zsi. -1 if sceneName is null/empty.
+int Zelda3D_MM_RoomModelId(const char* sceneName, int roomNum);
+
 // Live per-object world-scale override for the prop under calibration
 // (REPL `mscale <objId> <scale>`). Persisted on the model's ModelSpec so it
 // survives across draws. If the object hasn't been auto-probed yet, the scale
