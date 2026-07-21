@@ -6175,7 +6175,13 @@ s32 Player_ActionHandler_Talk(Player* this, PlayState* play) {
                 ((this->heldActor != NULL) &&
                  (forceTalkToNavi || (talkOfferActor == this->heldActor) || (cUpTalkActor == this->heldActor) ||
                   ((talkOfferActor != NULL) && (talkOfferActor->flags & ACTOR_FLAG_TALK_OFFER_AUTO_ACCEPTED))))) {
-                if ((this->actor.bgCheckFlags & 1) || (this->stateFlags1 & PLAYER_STATE1_ON_HORSE) ||
+                // OoT3D (0x00354f70 @ 0x355074-0x3550bc): the GROUNDED clause is vetoed while
+                // submerged without Iron Boots — standing on the floor is not by itself enough to
+                // accept a talk offer or summon Navi underwater. 3DS proceeds on the grounded path
+                // only if !(stateFlags2 & UNDERWATER) || currentBoots == PLAYER_BOOTS_IRON.
+                if (((this->actor.bgCheckFlags & 1) && (!(this->stateFlags2 & PLAYER_STATE2_UNDERWATER) ||
+                                                        (this->currentBoots == PLAYER_BOOTS_IRON))) ||
+                    (this->stateFlags1 & PLAYER_STATE1_ON_HORSE) ||
                     (func_808332B8(this) && !(this->stateFlags2 & PLAYER_STATE2_UNDERWATER))) {
 
                     if (talkOfferActor != NULL) {
