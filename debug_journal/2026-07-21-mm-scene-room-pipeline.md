@@ -254,11 +254,37 @@ a wrong header, not of real level collision. So MM3D's collision layout differs 
 as the CMB index-slot scaling and mesh stride did. The test is RED on purpose and guards the install:
 shipping this mesh would be strictly worse than the current N64 collision fallback.
 
-**This is an RE step, not a tuning step. Do not adjust offsets until one lines up.** Anchor note: the
-MM3D binary carries 105 `.cpp` assert-string names, and there is NO bgcheck/collision source among them
-(`z_room.cpp` and `z_scene_proc.cpp` are the closest), so the loader must be reached another way —
-e.g. from the ZSI command walk in `z_scene_proc.cpp`, which is already a resolved anchor
-(`FUN_004938d8`, see `mm3d-decomp/docs/joker_anchors.md`).
+### RESOLVED — MM3D collision layout derived (110/111 scenes)
+
+Ghidra had no anchor to offer here: the MM3D binary's 105 `.cpp` assert names include NO
+bgcheck/collision source, and `z_scene_proc.cpp`'s `FUN_004938d8` turned out to be a small allocation
+helper, not the command walk. So the layout was derived from the DATA, the same way the OoT3D layout in
+`zcol.h` originally was — and the derivation is oracle-driven, not fitted:
+
+1. The ZSI header names the collision command's offset itself (cmd 0x03), so the header location is
+   read from the format, never guessed.
+2. The header's stored BBOX pins the count triplet: at +0x12 the bbox reads
+   min(-2204,-424,-3187) max(1700,995,1120) — valid on all three axes — putting nVtx at +0x1e.
+3. Array arithmetic confirms those counts independently:
+   `pVtx(616) + 651*6 = 4522 == pPoly(4524) - 2` (the same -2 anchor OoT3D documents), and
+   `4522 + 731*20 = 19142 ~= pSurf(19144)`. Reading OoT3D's +0x1c gives nVtx=1120, whose vertex array
+   would overlap the polygon array.
+4. The poly record was swept over anchors x normal-offset x dist-offset, scored by the plane identity
+   `n . vA == -dist`. **The sweep recovers OoT3D's documented layout first** (anchor -2, normal +0x8,
+   dist +0xE -> 100%, 2844/2844) before being trusted on MM3D (anchor -2, normal **+0x6**, dist +0xE
+   -> 100%, 730/730). A wrong offset scores ~0%, not "slightly worse".
+
+So MM3D omits OoT3D's 2-byte flags word at +0x06 and starts the normal there instead.
+
+**Verification is INDEPENDENT of the derivation:** the sweep optimised only the plane identity, while
+the face-normal invariant (stored normal == geometric normal of vA,vB,vC) was never fitted — MM3D
+scores **99.9%** on it, matching the figure `zcol.h` records for OoT3D. Across the whole game:
+
+    MM3D SCENES: PASS=110 FAIL=0 NO_COLLISION=1
+
+Remaining: WIRE it into MM (an `Zelda3D_LoadSceneCollisionRaw` equivalent + install path, mirroring
+OoT's `zelda3d_model.cpp`). Parsing is solved; the player still walks on N64 collision until that
+lands.
 
 ## CORRECTION: the MM REPL `tp` is NOT broken (I claimed it was)
 

@@ -47,9 +47,22 @@ OoT3DCollision::OoT3DCollision(const std::vector<uint8_t>& data) {
         mErr = "no collision command";
         return;
     }
-    uint16_t nVtx = u16le(d, hdr + 0x1c);
-    uint16_t nPoly = u16le(d, hdr + 0x1e);
-    uint16_t nSurf = u16le(d, hdr + 0x20);
+    // MM3D shifts the COUNT triplet 2 bytes later than OoT3D; the bbox that precedes it sits at
+    // +0x12 instead of +0x10. The POINTERS at +0x28/+0x2C/+0x30 are NOT shifted. Discriminated by the
+    // ZSI version in the magic (OoT3D "ZSI\x01" vs MM3D "ZSI\x09"), which is the format's own
+    // version field rather than a guess about the game.
+    //
+    // Derived, not tuned — z2_clocktower's counts are pinned by the array arithmetic:
+    //   verts: pVtx(616)  + 651*6  = 4522 == pPoly(4524) - 2      <- the same -2 anchor as OoT3D
+    //   polys: 4522       + 731*20 = 19142 ~= pSurf(19144)
+    //   surfs: pSurf+0x10 + 24*8   = 19352 <= waterBox(19360)
+    // Reading OoT3D's +0x1c/+0x1e here instead yields nVtx=1120, whose vertex array would run past
+    // the polygon array — and the plane/face-normal invariants collapse to 0.6%/2.2%.
+    const bool mm3d = (d[3] == 0x09);
+    const size_t cnt = hdr + (mm3d ? 0x1e : 0x1c);
+    uint16_t nVtx = u16le(d, cnt);
+    uint16_t nPoly = u16le(d, cnt + 2);
+    uint16_t nSurf = u16le(d, cnt + 4);
     uint32_t pVtx = u32le(d, hdr + 0x28);
     uint32_t pPoly = u32le(d, hdr + 0x2c);
     uint32_t pSurf = u32le(d, hdr + 0x30);
@@ -77,9 +90,19 @@ OoT3DCollision::OoT3DCollision(const std::vector<uint8_t>& data) {
         p.vA = u16le(d, o) & 0x1fff;
         p.vB = u16le(d, o + 2) & 0x1fff;
         p.vC = u16le(d, o + 4) & 0x1fff;
-        p.nx = s16le(d, o + 8);
-        p.ny = s16le(d, o + 10);
-        p.nz = s16le(d, o + 12);
+        // MM3D's 20-byte CollisionPoly omits the 2-byte flags word OoT3D carries at +0x06, so its
+        // normal starts at +0x06 instead of +0x08. Everything else is shared: same -2 array anchor,
+        // same f32 plane distance at +0x0E, same s16/32767 normal encoding.
+        //
+        // Derived against the format's own plane identity (n . vA == -dist), swept over anchors and
+        // field offsets by tools/zelda3d_collision_layout.cpp. The sweep recovers OoT3D's documented
+        // layout (anchor -2, normal +0x8, dist +0xE -> 100%, 2844/2844) before being trusted on MM3D
+        // (anchor -2, normal +0x6, dist +0xE -> 100%, 730/730). A wrong offset scores ~0%, not
+        // "slightly worse", so this is a derivation rather than a fit.
+        const int oNrm = mm3d ? 6 : 8;
+        p.nx = s16le(d, o + oNrm);
+        p.ny = s16le(d, o + oNrm + 2);
+        p.nz = s16le(d, o + oNrm + 4);
         p.dist = f32le(d, o + 14);
         p.type = u16le(d, o + 18); // index into the surfaceType list
         if (p.type >= nSurf) p.type = 0;

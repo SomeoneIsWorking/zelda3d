@@ -1,4 +1,12 @@
-// Parser for OoT3D scene collision (the N64 cmd-0x03 analogue) inside `<scene>_info.zsi`.
+// Parser for OoT3D **and MM3D** scene collision (the N64 cmd-0x03 analogue) inside `<scene>_info.zsi`.
+//
+// MM3D (ZSI\x09) differs from OoT3D (ZSI\x01) in exactly two places, both version-gated below:
+//   * the COUNT triplet (nVtx/nPoly/nSurf) sits at +0x1e/+0x20/+0x22 instead of +0x1c/+0x1e/+0x20
+//     (the bbox preceding it is at +0x12, not +0x10). The POINTERS at +0x28/+0x2c/+0x30 do NOT move.
+//   * CollisionPoly omits OoT3D's 2-byte flags word at +0x06, so the normal starts at +0x06, not
+//     +0x08. Stride is still 20, the array is still anchored at polyList-2, dist is still f32 @+0x0e.
+// Derived with tools/zelda3d_collision_layout.cpp and guarded by tools/zelda3d_collision_test.cpp:
+// 110/111 MM3D scenes parse with plane identity 100% and face-normal agreement 99.9%.
 // Port of tools/oot3d_collision.py. Pure C++ (no SoH/LUS deps).
 //
 // noclip has the `Collision = 0x03` enum but never parses it — this layout was
