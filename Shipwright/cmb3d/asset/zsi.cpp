@@ -47,6 +47,15 @@ Zsi::Zsi(std::vector<uint8_t> data) : mData(std::move(data)) {
                 mEnvSettings.push_back(e);
             }
         }
+        {
+            // Keep every command's raw header. Cheap, and it is the only way to answer "what else is
+            // in this file" (actor lists, spawns, collision) without reopening the parser each time.
+            ZsiCommand c;
+            c.type = ctype;
+            c.count = b[off + 1];
+            c.offset = u32le(b, off + 4);
+            mCommands.push_back(c);
+        }
         off += 8;
         if (ctype == CMD_END) break;
     }

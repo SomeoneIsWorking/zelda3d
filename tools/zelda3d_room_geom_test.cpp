@@ -87,6 +87,26 @@ RoomStats analyze(const char* romEnv, const char* path) {
     Cmb c(z.cmbBytes());
     if (!c.ok()) { s.err = "Cmb: " + c.error(); return s; }
 
+    // ZSI command inventory + actor list. MM3D room geometry is drawn DISPLACED relative to Link
+    // (who is in N64 coordinates), so the scene-space -> world-space convention has to be derived.
+    // A room's actor entries are the correspondence to do it with: the same actors exist in the N64
+    // scene, so pairs of positions determine the transform (and let the residual be checked) instead
+    // of an offset being tuned by eye. ZELDA3D_ZSI_CMDS=1.
+    if (getenv("ZELDA3D_ZSI_CMDS")) {
+        const auto& raw = z.raw();
+        for (const auto& cmd : z.commands()) {
+            printf("      [zsi] cmd=0x%02X count=%-3u off=%u\n", cmd.type, cmd.count, cmd.offset);
+            if (cmd.type != 0x01 || cmd.count == 0) continue; // 0x01 = actor list
+            for (unsigned i = 0; i < cmd.count && i < 12; i++) {
+                const size_t o = (size_t)cmd.offset + (size_t)i * 16; // N64-shaped entry: id,xyz,rot,params
+                if (o + 16 > raw.size()) break;
+                auto s16at = [&](size_t k) { return (int16_t)(raw[o + k] | (raw[o + k + 1] << 8)); };
+                printf("        actor[%2u] id=0x%04X pos=(%6d,%6d,%6d) rot=(%6d,%6d,%6d) params=0x%04X\n",
+                       i, (uint16_t)s16at(0), s16at(2), s16at(4), s16at(6), s16at(8), s16at(10),
+                       s16at(12), (uint16_t)s16at(14));
+            }
+        }
+    }
     auto groups = c.buildDrawGroups();
     float lo[3] = { 1e30f, 1e30f, 1e30f }, hi[3] = { -1e30f, -1e30f, -1e30f };
     std::vector<float> gdiag;
@@ -143,6 +163,36 @@ RoomStats analyze(const char* romEnv, const char* path) {
             printf("      grp%-3zu verts=%5zu  x[%8.1f %8.1f] y[%8.1f %8.1f] z[%8.1f %8.1f]  ext=%.0fx%.0fx%.0f flat=%.1f%s\n",
                    gi, g.verts.size(), a[0], b2[0], a[1], b2[1], a[2], b2[2], ex, ey, ez, flat,
                    (flat > 8.0f && std::max(ex, ez) > 300.0f) ? "  <-- FLOOR-LIKE" : "");
+        }
+    }
+    // GROUND PROBE: ray-cast straight down (and up) through the room mesh at a given XZ and report
+    // every horizontal surface height there. This answers the placement question numerically at the
+    // exact spot the player stands, instead of inferring a displacement from screenshots.
+    //   ZELDA3D_GROUND_AT="x,z"   (e.g. Link's live N64 position)
+    if (const char* q = getenv("ZELDA3D_GROUND_AT")) {
+        double qx = 0, qz = 0;
+        if (sscanf(q, "%lf,%lf", &qx, &qz) == 2) {
+            std::vector<float> hits;
+            for (const auto& g : groups) {
+                for (size_t i = 0; i + 2 < g.verts.size(); i += 3) {
+                    const float* p0 = g.verts[i].pos;
+                    const float* p1 = g.verts[i + 1].pos;
+                    const float* p2 = g.verts[i + 2].pos;
+                    // barycentric containment in the XZ plane
+                    const double d = (p1[2] - p2[2]) * (p0[0] - p2[0]) + (p2[0] - p1[0]) * (p0[2] - p2[2]);
+                    if (std::fabs(d) < 1e-9) continue;
+                    const double a = ((p1[2] - p2[2]) * (qx - p2[0]) + (p2[0] - p1[0]) * (qz - p2[2])) / d;
+                    const double bb = ((p2[2] - p0[2]) * (qx - p2[0]) + (p0[0] - p2[0]) * (qz - p2[2])) / d;
+                    const double cc = 1.0 - a - bb;
+                    if (a < 0 || bb < 0 || cc < 0) continue;
+                    const double y = a * p0[1] + bb * p1[1] + cc * p2[1];
+                    if (std::isfinite(y)) hits.push_back((float)y);
+                }
+            }
+            std::sort(hits.begin(), hits.end());
+            printf("      [ground] at XZ=(%.1f, %.1f): %zu surface(s):", qx, qz, hits.size());
+            for (size_t i = 0; i < hits.size() && i < 10; i++) printf(" %.1f", hits[i]);
+            printf("\n");
         }
     }
     // FLOOR CENSUS: does the room actually contain horizontal, ground-height triangles? A missing

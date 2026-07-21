@@ -176,7 +176,39 @@ WIDTH (insane 3 -> 1144, nonFinite 0 -> 211, reverted). Only the OFFSET scales b
 Live MM run with `ZELDA3D_MM_SCENE=1`: Clock Town's stalls, awnings and walls render UPRIGHT, correctly
 positioned and correctly textured. No fragmentation, no screen-spanning triangles.
 
-## REMAINING (separate defect, now visible): the GROUND is missing
+## REMAINING: ~HALF the room's geometry is never built (this is the real defect)
+
+### FALSIFIED first: "the room is drawn displaced/offset from N64 coordinates"
+
+I read the screenshots as the world sitting above Link and wrote that up as a scene-space -> world-space
+placement question. **That was wrong.** The MM3D room ZSI carries an actor list (header command 0x01,
+55 entries) whose coordinates can be compared directly against the live N64 actor list (`actors <n>`):
+
+    MM3D ZSI   id=0x000E pos=(-279, 240, -755) params=0x0A06
+    N64 live   id=0x00E  pos=(-279.0, 240.0, -755.0) params=0x0006
+    MM3D ZSI   id=0x011B pos=(-692, 0, -348) params=0x017F
+    N64 live   id=0x183  pos=(-692.0, 0.0, -348.0) params=0x017F
+
+**MM3D scene coordinates are IDENTICAL to N64** — no offset, no scale. Do not add a placement
+transform. The ground probe at Link's XZ found surfaces at y=220/240 and none at y~0; N64 confirms
+y=240 is a genuine upper level there, so what we draw is correctly placed but INCOMPLETE.
+
+Also checked: MM3D ships ONE room for this scene (`/scenes/z2_clocktower_0_info.zsi` + the scene file),
+so the missing ground is not an unloaded second room.
+
+### The measurement that names it
+
+    room                 prm indices sum(count)   verts built   used
+    OoT3D ydan_0 (works)      9195                   9195       100%
+    MM3D  clocktower_0       31521                  15519        49%
+
+OoT3D consumes every index; the MM3D room builds barely half. That is the defect: prms are being
+dropped in `buildDrawGroups`, so ground-level geometry never reaches a draw group while upper-level
+geometry does. Next: instrument which prms/meshes are dropped and why (mesh->sepd resolution,
+per-prm mode, bone-dimension classification) — a count of contributed vs skipped prms with reasons,
+not a guess.
+
+## SUPERSEDED reading (kept so it is not re-derived): "the GROUND is missing" 
 
 With the geometry fixed, buildings render but the floor/terrain does not — they float over the fog
 clear colour. This is NOT the index bug (that one is closed by test + render). Do not re-open the index math for it.
