@@ -6118,8 +6118,14 @@ s32 Player_ActionHandler_13(Player* this, PlayState* play) {
                 }
             } else if (func_8083AD4C(play, this)) {
                 if (!(this->stateFlags1 & PLAYER_STATE1_ON_HORSE)) {
+                    // OoT3D (0x351920): when entering first person out of the Z-target side/back
+                    // walk, reset to the idle animation first. Player_Action_8084B1D8 never sets an
+                    // animation, so on N64 Link stays frozen in the side-walk pose.
+                    if (this->actionFunc == Player_Action_80840DE4) {
+                        Player_AnimPlayOnce(play, this, Player_GetIdleAnim(this));
+                    }
                     Player_SetupAction(play, this, Player_Action_8084B1D8, 1);
-                    this->av2.actionVar2 = 13;
+                    this->av2.actionVar2 = 12; // OoT3D uses 0xC here; N64 used 13
                     func_8083B010(this);
                 }
                 this->stateFlags1 |= PLAYER_STATE1_FIRST_PERSON;

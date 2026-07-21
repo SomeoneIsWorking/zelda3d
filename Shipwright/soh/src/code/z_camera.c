@@ -7806,10 +7806,10 @@ s32 Camera_ChangeModeFlags(Camera* camera, s16 mode, u8 flags) {
     }
 
     if (!((sCameraSettings[camera->setting].unk_00 & 0x3FFFFFFF) & (1 << mode))) {
-        if (mode == CAM_MODE_FIRSTPERSON) {
-            osSyncPrintf("camera: error sound\n");
-            Sfx_PlaySfxCentered(NA_SE_SY_ERROR);
-        }
+        // OoT3D (0x0033228c @ 0x003323[00-30]) has NO error beep here: its refusal path goes straight
+        // from the validModes test to the force-NORMAL handling, with no sound call and no test on
+        // `mode` at all. So on 3DS, asking for first-person in a setting that disallows it is SILENT,
+        // where N64/SoH plays NA_SE_SY_ERROR.
 
         if (camera->mode != CAM_MODE_NORMAL) {
             osSyncPrintf(VT_COL(YELLOW, BLACK) "camera: change camera mode: force NORMAL: %s %s refused\n" VT_RST,
@@ -7895,9 +7895,10 @@ s32 Camera_ChangeModeFlags(Camera* camera, s16 mode, u8 flags) {
         modeChangeFlags &= ~0x10;
         if (camera->status == CAM_STAT_ACTIVE) {
             switch (modeChangeFlags) {
-                case 1:
-                    Sfx_PlaySfxCentered(0);
-                    break;
+                // OoT3D omits N64's `case 1: Sfx_PlaySfxCentered(0);` — it compiles the guard as
+                // `if (status != CAM_STAT_ACTIVE || modeChangeFlags == 1) goto skip_sfx;`, i.e. flag
+                // value 1 is explicitly excluded from the sound block. The remaining cases are
+                // byte-faithful and unchanged.
                 case 2:
                     if (camera->play->roomCtx.curRoom.behaviorType1 == ROOM_BEHAVIOR_TYPE1_1) {
                         Sfx_PlaySfxCentered(NA_SE_SY_ATTENTION_URGENCY);
