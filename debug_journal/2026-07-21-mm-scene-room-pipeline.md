@@ -233,6 +233,33 @@ Ground truth (both agree): MM3D's engine walks the mesh table with a 0xC stride 
 Live: South Clock Town renders complete — tiled stone ground under Link, painted walls, thatched
 awnings, stairs, notice board. `uploaded model 1000000: 41 groups, 41 textures, 31521 verts`.
 
+## NEXT ARC OPENED: MM3D collision — layout is NOT OoT3D's (measured, red test committed)
+
+MM renders 3DS geometry but collides against N64 geometry (see the CORRECTION section below). The
+obvious move was to reuse the shared `asset/zcol.{h,cpp}` parser that already drives OoT3D collision.
+**Do not do that** — it produces garbage on MM3D.
+
+`tools/zelda3d_collision_test.cpp` checks the format's OWN invariants rather than assuming the layout:
+a correctly parsed CollisionPoly satisfies `n . vA == -dist`, and its stored normal equals the
+geometric face normal of (vA, vB, vC). OoT3D is run as a known-good reference in the same process, so
+a shared-parser regression is distinguishable from an MM3D layout difference.
+
+    OoT3D /scene/ydan_info.zsi        verts=1665 polys=2844 surfaces= 39  plane=100.0% normal=100.0%
+                                      bbox x[-2787 478] y[-1960 1152] z[-1191 1713]
+    MM3D  /scenes/z2_clocktower_info  verts=1120 polys= 651 surfaces=731  plane=  0.6% normal=  2.2%
+                                      bbox x[-32768 32767] y[-32768 32767] z[-32768 32767]
+
+The MM3D bbox spanning the full s16 range, polys < verts, and 731 "surface types" are all the shape of
+a wrong header, not of real level collision. So MM3D's collision layout differs from OoT3D's, exactly
+as the CMB index-slot scaling and mesh stride did. The test is RED on purpose and guards the install:
+shipping this mesh would be strictly worse than the current N64 collision fallback.
+
+**This is an RE step, not a tuning step. Do not adjust offsets until one lines up.** Anchor note: the
+MM3D binary carries 105 `.cpp` assert-string names, and there is NO bgcheck/collision source among them
+(`z_room.cpp` and `z_scene_proc.cpp` are the closest), so the loader must be reached another way —
+e.g. from the ZSI command walk in `z_scene_proc.cpp`, which is already a resolved anchor
+(`FUN_004938d8`, see `mm3d-decomp/docs/joker_anchors.md`).
+
 ## CORRECTION: the MM REPL `tp` is NOT broken (I claimed it was)
 
 Mid-session I reported "`tp` doesn't move Link". **That was wrong**, from two bad reads:

@@ -21,3 +21,10 @@ g++ -std=c++17 -O2 -Wall -I"$REPO/Shipwright/cmb3d" -o "$REPO/scratch/bin/room_g
     "$REPO/tools/zelda3d_room_geom_test.cpp" \
     "$A/ctr_rom.cpp" "$A/zsi.cpp" "$A/cmb.cpp" "$A/pica_texture.cpp" "$A/lzs.cpp"
 echo "built $REPO/scratch/bin/room_geom_test"
+
+# Scene-collision layout check (OoT3D reference vs MM3D under test). Validates the format's own
+# invariants (plane identity, face normal) rather than assuming MM3D shares OoT3D's layout.
+g++ -std=c++17 -O2 -Wall -I"$REPO/Shipwright/cmb3d" -o "$REPO/scratch/bin/collision_test" \
+    "$REPO/tools/zelda3d_collision_test.cpp" \
+    "$A/ctr_rom.cpp" "$A/zcol.cpp" "$A/lzs.cpp"
+echo "built $REPO/scratch/bin/collision_test"
