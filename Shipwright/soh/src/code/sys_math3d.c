@@ -921,14 +921,22 @@ f32 Math3D_Plane(Plane* plane, Vec3f* pointOnPlane) {
  */
 f32 Math3D_UDistPlaneToPos(f32 nx, f32 ny, f32 nz, f32 originDist, Vec3f* p) {
 
-    if (IS_ZERO(sqrtf(SQ(nx) + SQ(ny) + SQ(nz)))) {
-        osSyncPrintf(VT_COL(YELLOW, BLACK));
-        // "Math3DLengthPlaneAndPos(): Normal size is near zero %f %f %f"
-        osSyncPrintf("Math3DLengthPlaneAndPos():法線size がゼロ近いです%f %f %f\n", nx, ny, nz);
-        osSyncPrintf(VT_RST);
-        return 0.0f;
+    // OoT3D (0x0033ee60) inlines the distance math and uses a much smaller degeneracy epsilon than
+    // N64: 0.00008f rather than IS_ZERO's 0.008f. So planes whose normal magnitude falls between
+    // those two values are treated as VALID by OoT3D and as degenerate (distance 0) by N64.
+    // The 3DS form has no debug print — its body is 80 bytes, straight-line, with no BL.
+    //
+    // 3DS compares the magnitude as a signed integer against 0x38A7C5AC (the bit pattern of
+    // 0.00008f). For a non-negative finite float — which sqrt of a sum of squares always is — IEEE-754
+    // bit ordering matches numeric ordering, so the plain float compare below is faithful, not an
+    // approximation.
+    f32 normMagnitude = sqrtf(SQ(nx) + SQ(ny) + SQ(nz));
+    f32 dist = 0.0f;
+
+    if (!(fabsf(normMagnitude) < 0.00008f)) {
+        dist = ((nx * p->x) + (ny * p->y) + (nz * p->z) + originDist) / normMagnitude;
     }
-    return fabsf(Math3D_DistPlaneToPos(nx, ny, nz, originDist, p));
+    return fabsf(dist);
 }
 
 /*
