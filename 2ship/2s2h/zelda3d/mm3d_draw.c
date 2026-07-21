@@ -226,10 +226,35 @@ int Zelda3D_TryDrawRoom(PlayState* play, Room* room) {
         return 0;
     }
 
+    // ZELDA3D_MM_SCENE=2: skip the N64 room mesh but draw NOTHING, to bisect "skipping the N64
+    // room breaks the frame" vs "our GL draw is wrong". Same escape hatch OoT's ZELDA3D_SCENE has.
+    if (mmSceneDivertEnabled() == 2) {
+        return 1;
+    }
     Zelda3D_EnsureModelProvider();
     OPEN_DISPS(play->state.gfxCtx);
     Gfx_SetupDL25_Opa(play->state.gfxCtx);
     Matrix_Translate(0.0f, 0.0f, 0.0f, MTXMODE_NEW); // scene verts are world-space
+    // BRING-UP PROBE: ZELDA3D_MM_SCENE_ROT tries a room orientation without a rebuild.
+    //   0 = none (as-authored)   1 = 180deg about X   2 = 180deg about Z   3 = Y mirror (scale -1)
+    // RESULT SO FAR: none of these is the answer. As-authored renders the world INVERTED; 180deg
+    // about X un-inverts it but leaves the geometry FRAGMENTED and mispositioned. So this is not a
+    // simple orientation flip -- it is a data-interpretation problem (how the MM3D room CMB is laid
+    // out), in the same family as the LzS container discovery. Kept only as a diagnostic knob.
+    {
+        static int rotMode = -1;
+        if (rotMode < 0) {
+            const char* e = getenv("ZELDA3D_MM_SCENE_ROT");
+            rotMode = (e != NULL && e[0] != '\0') ? atoi(e) : 0;
+        }
+        if (rotMode == 1) {
+            Matrix_RotateXF(M_PI, MTXMODE_APPLY);
+        } else if (rotMode == 2) {
+            Matrix_RotateZF(M_PI, MTXMODE_APPLY);
+        } else if (rotMode == 3) {
+            Matrix_Scale(1.0f, -1.0f, 1.0f, MTXMODE_APPLY);
+        }
+    }
     MATRIX_FINALIZE_AND_LOAD(POLY_OPA_DISP++, play->state.gfxCtx);
     gSPZelda3DDraw(POLY_OPA_DISP++, modelId, 255, 255, 255);
     CLOSE_DISPS(play->state.gfxCtx);
