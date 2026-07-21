@@ -9,6 +9,7 @@
 #include "actor/door.h"
 #include "actor/door_ana.h"
 #include "actor/door_shutter.h"
+#include "actor/obj_switch.h"
 #include "actor/en_trap.h"
 #include "actor/en_jsjutan.h"
 #include "actor/en_butte.h"
@@ -104,6 +105,7 @@ ActorBehavior* findActorBehavior(s16 actorId) {
     static EnDoorBehavior sEnDoor;
     static DoorAnaBehavior sDoorAna;
     static DoorShutterBehavior sDoorShutter;
+    static ObjSwitchBehavior sObjSwitch;
     static EnTrapBehavior sEnTrap;
     static EnJsjutanBehavior sEnJsjutan;
     static EnButteBehavior sEnButte;
@@ -131,6 +133,8 @@ ActorBehavior* findActorBehavior(s16 actorId) {
             return &sDoorAna;
         case ACTOR_DOOR_SHUTTER:
             return &sDoorShutter;
+        case ACTOR_OBJ_SWITCH:
+            return &sObjSwitch;
         case ACTOR_EN_TRAP:
             return &sEnTrap;
         case ACTOR_EN_JSJUTAN:
