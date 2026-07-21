@@ -61,6 +61,35 @@ TRUSTWORTHY room bone count.
 CAUTION: I tried hand-rolling a `skl` chunk reader to get bone counts and it produced garbage (claimed
 544 bones for the dog, which the engine logs as 12). Do not trust those numbers; use the real parser.
 
+## ROOT CAUSE CONFIRMED (2026-07-21, via TDD + instrumentation)
+
+A red test (`tools/zelda3d_room_geom_test.cpp`, commit `06e7b5c3`) compares a known-good OoT3D room
+against the MM3D room through the same Zsi -> Cmb -> buildDrawGroups path:
+
+    OoT3D /scene/ydan_0_info.zsi       maxAbs=1.15e+03  insane=0   <- sane
+    MM3D  /scenes/z2_clocktower_0.zsi  maxAbs=1.71e+38  insane=3
+          first bad vertex: (1.18468e-38, 1.70811e+38, -7.56339e-16)
+
+Denormals next to near-float-max = reading float32 out of the wrong bytes.
+
+Instrumenting `Cmb::readAttr` with a bounds check against the attribute's VATR buffer shows the MM3D
+room reads PAST THE END of **every** attribute buffer at the **same vertex indices**, while OoT3D
+produces no overrun at all:
+
+    [CMB-OOB] slot=0 idx=77 off=217420 last=217432 bufEnd=216592 over=840  (position, DT_FLOAT)
+    [CMB-OOB] slot=1 idx=77 over=210   slot=3 idx=77 over=280   slot=4 idx=77 over=280
+
+Because it is every slot at the same index, this is NOT a per-attribute type/scale problem — the
+**vertex index -> buffer offset mapping is wrong for MM3D sepds**. `readAttr` has no bounds check, so
+the overrun silently returns adjacent bytes as floats.
+
+Additionally ELIMINATED (so don't re-derive): attribute SLOT resolution is correct — slots are matched
+by NAME against the version-gated table, so MM3D's extra `tangent` slot is handled and `slotPos` is
+right in both games; and `parseVatr` sizes its slot array from the same version-correct table.
+
+NOTE: do NOT "fix" this by clamping the read. Clamping hides a wrong index computation. Find why the
+index exceeds the array (per-sepd vertex base/count handling) first.
+
 ## State
 
 OPT-IN and OFF by default (`ZELDA3D_MM_SCENE=1`); MM renders its N64 world unchanged (verified, no
