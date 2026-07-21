@@ -304,10 +304,34 @@ Link now rests exactly on the surface the renderer draws. Scene transitions rebu
 (`z2_clocktower` 651v/731p vs N64 416/508; `z2_town` 530v/614p vs N64 413/489 — the 3DS meshes are
 finer), and East Clock Town renders and stands correctly after a warp.
 
-Still to check (NOT yet verified, do not assume): exits and conveyors. MM3D `CollisionPoly` has no
-flags word, so the poly-exclusion/conveyor bits MM keeps in `flags_vIA/vIB` are zero here, and exit
-indices come from MM3D's own surface types rather than the N64 list. Walking an actual scene exit is
-the test that matters.
+### Exits: encoding CONFIRMED offline, live walk-through BLOCKED on harness control
+
+MM keeps the scene exit index in SurfaceType data0 bits 8..12 (`SURFACETYPE0`, z64bgcheck.h).
+`ZELDA3D_EXIT_CENSUS=1` on the collision test shows MM3D encodes it the SAME way — South Clock Town
+yields 9 distinct exits, each a 2-poly doorway plus one 22-poly area:
+
+    exit[ 1]:  2 polys, centroid ( -333,  47,  -840)      exit[ 6]:  2 polys, centroid ( -517,   0,   -79)
+    exit[ 2]:  2 polys, centroid ( -511,   0,   772)      exit[ 7]:  2 polys, centroid (-1214, 150,   728)
+    exit[ 3]:  2 polys, centroid (  269, 100, -1117)      exit[ 8]:  2 polys, centroid (  697,  17,  -188)
+    exit[ 4]:  2 polys, centroid (-1364, 167, -1100)      exit[ 9]: 22 polys, centroid ( -281, 366,  -941)
+    exit[ 5]:  2 polys, centroid ( -321, 227, -2206)
+
+(OoT3D's ydan yields 2, the expected count.) So the surface-type exit encoding carries over and the
+installed collision has real, plausibly-placed exits.
+
+**What is NOT verified: actually walking through one.** Exits are triggered by wall contact during
+MOVEMENT, so teleporting onto the poly does not fire them (tried: Link is pushed back to
+(-484.7, 0, 586) short of exit[2] at z=772, scene unchanged).
+
+**BLOCKER — player movement control in the MM harness is unreliable.** After one `tp`, Link stops
+responding to further `tp` AND to scripted stick input (`stick 0 70` via SHIP_SCRIPTED_FIFO) — he sits
+frozen at the same coordinates, not even falling. A fresh `warp` restores control. Per the project
+rule that a fix starts by proving the tooling can investigate it, the exit test must NOT be attempted
+on top of this: any "it works" or "it's broken" reading would be luck, not evidence.
+
+So the next work item is HARNESS, not collision: a reliable "move Link to X and walk in direction D"
+primitive for MM (the OoT side's `walkhold` recipe has no MM equivalent), plus finding why Link freezes
+after a teleport. Only then is the exit walk-through a real test.
 
 ## CORRECTION: the MM REPL `tp` is NOT broken (I claimed it was)
 
