@@ -44,6 +44,8 @@ struct ColStats {
     float lo[3] = { 0, 0, 0 }, hi[3] = { 0, 0, 0 };
 };
 
+void reportExits(const char* label, const OoT3DCollision& col);
+
 ColStats analyze(const char* romEnv, const std::string& path) {
     ColStats s;
     const char* rom = getenv(romEnv);
@@ -61,6 +63,7 @@ ColStats analyze(const char* romEnv, const std::string& path) {
     }
     OoT3DCollision col(bytes);
     if (!col.ok()) { s.err = col.error(); return s; }
+    if (getenv("ZELDA3D_EXIT_CENSUS")) reportExits(path.c_str(), col);
 
     const auto& V = col.verts();
     const auto& P = col.polys();
@@ -110,6 +113,37 @@ ColStats analyze(const char* romEnv, const std::string& path) {
     }
     s.ok = true;
     return s;
+}
+
+// Exit-poly census. MM keeps the scene exit index in SurfaceType data0 bits 8..12
+// (SURFACETYPE0's exitIndex field, z64bgcheck.h). Listing which polys carry a non-zero exit — and
+// where they are — is what makes an exit testable in-game without guessing at map layout, and it
+// answers whether MM3D's surface types even encode exits the same way. ZELDA3D_EXIT_CENSUS=1.
+void reportExits(const char* label, const OoT3DCollision& col) {
+    const auto& V = col.verts();
+    const auto& P = col.polys();
+    const auto& S = col.surfaces();
+    struct Acc { int n = 0; double x = 0, y = 0, z = 0; };
+    std::vector<Acc> byExit(32);
+    for (const auto& q : P) {
+        if (q.type >= S.size()) continue;
+        const unsigned exitIdx = (S[q.type].data0 >> 8) & 0x1F;
+        if (exitIdx == 0) continue;
+        if (q.vA >= V.size() || q.vB >= V.size() || q.vC >= V.size()) continue;
+        Acc& a = byExit[exitIdx];
+        a.n++;
+        a.x += (V[q.vA].x + V[q.vB].x + V[q.vC].x) / 3.0;
+        a.y += (V[q.vA].y + V[q.vB].y + V[q.vC].y) / 3.0;
+        a.z += (V[q.vA].z + V[q.vB].z + V[q.vC].z) / 3.0;
+    }
+    int total = 0;
+    for (size_t i = 0; i < byExit.size(); i++) {
+        if (byExit[i].n == 0) continue;
+        total++;
+        printf("%-34s   exit[%2zu]: %3d polys, centroid (%.0f, %.0f, %.0f)\n", label, i, byExit[i].n,
+               byExit[i].x / byExit[i].n, byExit[i].y / byExit[i].n, byExit[i].z / byExit[i].n);
+    }
+    if (total == 0) printf("%-34s   NO exit-bearing polys found\n", label);
 }
 
 void report(const char* label, const ColStats& s) {
