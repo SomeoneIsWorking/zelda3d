@@ -7387,7 +7387,12 @@ s32 Player_ActionHandler_2(Player* this, PlayState* play) {
             }
         } else if (CHECK_BTN_ALL(sControlInput->press.button, BTN_A) &&
                    !(this->stateFlags1 & PLAYER_STATE1_CARRYING_ACTOR) &&
-                   !(this->stateFlags2 & PLAYER_STATE2_UNDERWATER)) {
+                   !(this->stateFlags2 & PLAYER_STATE2_UNDERWATER) &&
+                   // OoT3D (0x00354894) adds a fourth term: sunk in water wearing Iron Boots blocks
+                   // every A interaction — no grabbing, lifting or chest-opening. 3DS evaluates it
+                   // right after the CARRYING_ACTOR/UNDERWATER chain and before any chest/lift work.
+                   !((this->stateFlags1 & PLAYER_STATE1_IN_WATER) &&
+                     (this->currentBoots == PLAYER_BOOTS_IRON))) {
             if (this->getItemId != GI_NONE) {
                 if (GameInteractor_Should(VB_OPEN_CHEST, true)) {
                     GetItemEntry giEntry;

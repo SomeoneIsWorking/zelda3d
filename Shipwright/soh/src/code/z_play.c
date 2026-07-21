@@ -2265,7 +2265,19 @@ void Play_LoadToLastEntrance(PlayState* play) {
         (play->sceneNum == SCENE_GANONS_TOWER_COLLAPSE_EXTERIOR) ||
         (play->sceneNum == SCENE_INSIDE_GANONS_CASTLE_COLLAPSE) || (play->sceneNum == SCENE_GANON_BOSS)) {
         play->nextEntranceIndex = ENTR_GANONS_TOWER_COLLAPSE_EXTERIOR_0;
-        Item_Give(play, ITEM_SWORD_MASTER);
+        // OoT3D (0x0036f4f0) only re-gives and re-equips the Master Sword when it is NOT already
+        // owned; N64 calls Item_Give unconditionally, which re-runs the give path every time the
+        // player dies in the four Ganon collapse/boss scenes. The 3DS form is the guarded inline
+        // below (own-flag check, then set the flag, put it on B, and rewrite the equip nibble).
+        if (!CHECK_OWNED_EQUIP(EQUIP_TYPE_SWORD, EQUIP_INV_SWORD_MASTER)) {
+            gSaveContext.inventory.equipment |= OWNED_EQUIP_FLAG(EQUIP_TYPE_SWORD, EQUIP_INV_SWORD_MASTER);
+            gSaveContext.equips.buttonItems[0] = ITEM_SWORD_MASTER;
+            gSaveContext.equips.equipment = (gSaveContext.equips.equipment & gEquipNegMasks[EQUIP_TYPE_SWORD]) |
+                                            (EQUIP_VALUE_SWORD_MASTER << gEquipShifts[EQUIP_TYPE_SWORD]);
+            // SoH plumbing only: refresh the B-button icon that Item_Give used to refresh. 3DS has
+            // no equivalent call (different HUD path); this is not a behavior change.
+            Interface_LoadItemIcon1(play, 0);
+        }
     } else if ((gSaveContext.entranceIndex == ENTR_HYRULE_FIELD_11) ||
                (gSaveContext.entranceIndex == ENTR_HYRULE_FIELD_12) ||
                (gSaveContext.entranceIndex == ENTR_HYRULE_FIELD_13) ||
