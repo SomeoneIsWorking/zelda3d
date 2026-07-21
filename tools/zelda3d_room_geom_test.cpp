@@ -125,6 +125,26 @@ RoomStats analyze(const char* romEnv, const char* path) {
         centroids.push_back({ (float)(acc[0] / g.verts.size()), (float)(acc[1] / g.verts.size()),
                               (float)(acc[2] / g.verts.size()) });
     }
+    // Per-group bbox dump: a scene floor is a WIDE, FLAT, LOW group. If one exists here but not on
+    // screen, the defect is at draw (material/cull/alpha), not in parsing. Set ZELDA3D_GROUP_DUMP=1.
+    if (getenv("ZELDA3D_GROUP_DUMP")) {
+        for (size_t gi = 0; gi < groups.size(); gi++) {
+            const auto& g = groups[gi];
+            if (g.verts.empty()) continue;
+            float a[3] = { 1e30f, 1e30f, 1e30f }, b2[3] = { -1e30f, -1e30f, -1e30f };
+            for (const auto& v : g.verts)
+                for (int k = 0; k < 3; k++) {
+                    if (!std::isfinite(v.pos[k])) continue;
+                    a[k] = std::min(a[k], v.pos[k]);
+                    b2[k] = std::max(b2[k], v.pos[k]);
+                }
+            const float ex = b2[0] - a[0], ey = b2[1] - a[1], ez = b2[2] - a[2];
+            const float flat = (ey > 1e-3f) ? std::max(ex, ez) / ey : 1e9f;
+            printf("      grp%-3zu verts=%5zu  x[%8.1f %8.1f] y[%8.1f %8.1f] z[%8.1f %8.1f]  ext=%.0fx%.0fx%.0f flat=%.1f%s\n",
+                   gi, g.verts.size(), a[0], b2[0], a[1], b2[1], a[2], b2[2], ex, ey, ez, flat,
+                   (flat > 8.0f && std::max(ex, ez) > 300.0f) ? "  <-- FLOOR-LIKE" : "");
+        }
+    }
     s.groups = gdiag.size();
     if (gdiag.empty()) { s.err = "no non-empty draw groups"; return s; }
     std::sort(gdiag.begin(), gdiag.end());
