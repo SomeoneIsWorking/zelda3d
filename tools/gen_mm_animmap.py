@@ -475,9 +475,46 @@ ACCEPT = 0.90
 TIE_MARGIN = 0.05
 
 
+
+# ---------------------------------------------- authoritative XML "Original name" annotations
+# The 2ship decomp XMLs annotate most animations with the asset's ORIGINAL (romaji) name, which is
+# exactly what the MM3D GAR names its CSAB clip:
+#     <Animation Name="gDogBarkAnim" Offset="0x998" /> <!-- Original name is "dog_bark" -->
+# 1555 of 1746 Animation entries carry it. This is an AUTHORITATIVE mapping written by the decomp
+# authors, so it beats any lexical guess — and it is the only thing that bridges the romaji gap
+# (MM3D clips are Japanese: an_hokiwalk, dnt_iyaiyaTOmuun), which pure name matching cannot do.
+XML_DIRS = ("N64_US", "GC_US")
+_ANIM_ORIG_RE = re.compile(
+    r'<Animation\s+Name="([A-Za-z0-9_]+)"[^>]*/>\s*<!--[^>]*?Original name is\s+"([^"]+)"')
+
+def xml_original_names(repo: str = REPO) -> Dict[str, Dict[str, str]]:
+    """{object_name: {n64_symbol: original_clip_name}} from the 2ship asset XMLs."""
+    out: Dict[str, Dict[str, str]] = {}
+    for d in XML_DIRS:
+        base = os.path.join(repo, "2ship", "assets", "xml", d, "objects")
+        if not os.path.isdir(base):
+            continue
+        for fn in sorted(os.listdir(base)):
+            if not fn.endswith(".xml"):
+                continue
+            obj = fn[:-4]
+            try:
+                txt = open(os.path.join(base, fn), encoding="utf-8", errors="ignore").read()
+            except OSError:
+                continue
+            for sym, orig in _ANIM_ORIG_RE.findall(txt):
+                # first XML dir wins; don't let a later variant overwrite a known name
+                out.setdefault(obj, {}).setdefault(sym, orig)
+    return out
+
+
 def match_anims(symbols: List[str], clip_names: List[str], object_name: str = "",
-                accept: float = ACCEPT) -> List[Match]:
-    """Match each N64 animation symbol to at most one CSAB clip; ambiguous/weak => unmatched."""
+                accept: float = ACCEPT, orig: Optional[Dict[str, str]] = None) -> List[Match]:
+    """Match each N64 animation symbol to at most one CSAB clip; ambiguous/weak => unmatched.
+
+    `orig` = {symbol: original_clip_name} from the decomp XML annotations. When the annotated name
+    is actually present in this actor's GAR it is taken verbatim at confidence 1.0 — authoritative,
+    and the only signal that crosses the English<->romaji vocabulary gap."""
     if not object_name and symbols and "/" in symbols[0]:
         object_name = symbols[0].split("/")[1]
     extra = actor_tokens_for(object_name)
@@ -490,8 +527,15 @@ def match_anims(symbols: List[str], clip_names: List[str], object_name: str = ""
         clip_toks = [(s[1:] if len(s) > 1 and s[0] in noise else s) for s in clip_toks]
     clip_num = [n for _t, n in raw_clip]
 
+    orig = orig or {}
+    clipset = set(clip_names)
     out: List[Match] = []
     for s, toks in zip(symbols, sym_toks):
+        # AUTHORITATIVE: the decomp XML's "Original name is ..." annotation, when that clip exists.
+        o = orig.get(symbol_of(s))
+        if o and o in clipset:
+            out.append(Match(s, o, 1.0, "xml original-name annotation"))
+            continue
         if any(t in NON_SKEL_TOKENS for t in toks):
             out.append(Match(s, None, 0.0, "non-skeletal symbol (%s)" % "+".join(toks)))
             continue
@@ -554,13 +598,14 @@ def build(only: Optional[str] = None, accept: float = ACCEPT) -> Tuple[List[Acto
             raise SystemExit("no animation symbols for object %r" % only)
     actors = Mm3dActors()
     known = set(actors.actors)
+    orig_all = xml_original_names()
     results: List[ActorResult] = []
     for obj in sorted(anims):
         cands = object_to_gar(obj, known)
         gar = cands[0] if cands else None
         clips = actors.clips(gar) if gar else []
         clips = clips or []
-        matches = match_anims(anims[obj], clips, obj, accept) if clips else [
+        matches = match_anims(anims[obj], clips, obj, accept, orig_all.get(obj)) if clips else [
             Match(s, None, 0.0, "no GAR" if not gar else "GAR has no CSAB clips")
             for s in anims[obj]]
         hint = _alt_gar_hint(obj, gar, actors) if (gar and not clips) else None
