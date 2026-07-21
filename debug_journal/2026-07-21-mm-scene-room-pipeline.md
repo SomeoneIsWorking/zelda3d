@@ -142,9 +142,51 @@ extracts the room CMB from the room ZSI and treats it as self-contained (the OoT
 VATR index overrun is NOT yet established, but the port is modelling the wrong asset layout, and that
 must be settled before any index-math change.
 
+## ROOT CAUSE FIXED — `prm.first` is in 2-BYTE SLOTS, always (2026-07-21)
+
+The index-region offset is **always** `prm.first * 2`, independent of `prm.index_type`. The ELEMENT is
+still read at its declared width. Our parser scaled the offset by the element size:
+
+    size_t ibase = mIdxPtr + (size_t)prm.first * dtSize(prm.index_type);   // WRONG
+    size_t ibase = mIdxPtr + (size_t)prm.first * 2;                        // right
+
+Two independent sources agree:
+- The MM3D engine (`FUN_005e1994`, Ghidra) allocates the index region as `*(cmb+0x20) << 1` — u16
+  slots for the whole CMB, i.e. a slot index, not a byte index.
+- noclip's `src/OcarinaOfTime3D/cmb.ts` (the RE reference our own `cmb.h` cites):
+  `prm.offset = view.getUint16(0x16, true) * 2;` — literally `* 2`, never `* elementSize`.
+
+**Why OoT3D never showed it:** every OoT3D prm is USHORT, so `first*2 == first*dtSize`. The two models
+are indistinguishable there. MM3D room CMBs mix UBYTE and USHORT prms; for the 24 UBYTE ones we landed
+mid-buffer. clocktower_0 sepd40: `first=28643` gave byte 28643 instead of 57286, producing indices up
+to 90 against an 8-vertex window -> positions at ~1e38 -> a few triangles stretched across the screen,
+which is what read as "fragmented/inverted".
+
+DISTINCT from the earlier failed attempt: "force uniform u16 indices" changed the stride AND the read
+WIDTH (insane 3 -> 1144, nonFinite 0 -> 211, reverted). Only the OFFSET scales by 2.
+
+### Verified
+
+`scratch/bin/room_geom_test` (the red test, `06e7b5c3`) goes GREEN:
+
+    OoT3D ydan_0        insane=0  maxAbs=1.15e+03   (unchanged -> no regression)
+    MM3D  clocktower_0  insane=3 -> 0   maxAbs=1.71e+38 -> 3.35e+03
+    RESULT: PASS
+
+Live MM run with `ZELDA3D_MM_SCENE=1`: Clock Town's stalls, awnings and walls render UPRIGHT, correctly
+positioned and correctly textured. No fragmentation, no screen-spanning triangles.
+
+## REMAINING (separate defect, now visible): the GROUND is missing
+
+With the geometry fixed, buildings render but the floor/terrain does not — they float over the fog
+clear colour. This is NOT the index bug (that one is closed by test + render). Next: determine whether
+the ground sepds are being built but dropped at draw (material/alpha/cull state), or never built. Do
+not re-open the index math for it.
+
 ## State
 
-OPT-IN and OFF by default (`ZELDA3D_MM_SCENE=1`); MM renders its N64 world unchanged (verified, no
-regression). A `ZELDA3D_MM_SCENE_ROT` probe and the `=2` skip-only bisection are kept as bring-up knobs.
+Still OPT-IN (`ZELDA3D_MM_SCENE=1`) — the index bug is fixed but the missing ground blocks un-gating.
+MM renders its N64 world unchanged by default (verified, no regression). The `ZELDA3D_MM_SCENE_ROT`
+probe and the `=2` skip-only bisection are kept as bring-up knobs.
 
 Commits: scene table `2108f196`, pipeline `a9853700`, bisection+findings `d073a94e`.

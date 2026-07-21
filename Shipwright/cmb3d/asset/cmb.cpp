@@ -613,7 +613,8 @@ std::string Cmb::indexRangeReport() const {
             const Prm& prm = prms.prm;
             int isz = dtSize(prm.index_type);
             for (uint16_t k = 0; k < prm.count; k++) {
-                long idx = (long)dtRead(b, mIdxPtr + (size_t)(prm.first + k) * isz, prm.index_type);
+                // must mirror buildDrawGroups: base scaled by 2 (u16 slots), element at its own width
+                long idx = (long)dtRead(b, mIdxPtr + (size_t)prm.first * 2 + (size_t)k * isz, prm.index_type);
                 if (idx > maxIdx) maxIdx = idx;
             }
         }
@@ -730,8 +731,18 @@ std::vector<CmbDrawGroup> Cmb::buildDrawGroupsSkinned(const std::array<float, 16
             // its matrix per vertex inside the loop, so leave M at the bone_table[0] default.
             Mat4 M = smooth ? matId()
                             : (boneId < (int)mBoneMatrix.size() ? mBoneMatrix[boneId] : matId());
+            // prm.first is expressed in 2-BYTE SLOTS and is ALWAYS scaled by 2 to get the byte
+            // offset — independent of the element width given by prm.index_type. Ground truth:
+            // noclip's OcarinaOfTime3D/cmb.ts does `prm.offset = getUint16(0x16) * 2`, and MM3D's
+            // engine allocates the index region as `index_count << 1` (FUN_005e1994), i.e. u16
+            // slots. The ELEMENT is still read at its declared width.
+            //
+            // OoT3D is unaffected: every prm there is USHORT, so first*2 == first*dtSize. MM3D room
+            // CMBs mix UBYTE and USHORT prms, and for the UBYTE ones scaling by 1 landed mid-buffer
+            // and produced out-of-range indices (clocktower_0 sepd40: first=28643 -> 28643 instead
+            // of 57286, indices up to 90 against an 8-vertex window).
             int isz = dtSize(prm.index_type);
-            size_t ibase = mIdxPtr + (size_t)prm.first * isz;
+            size_t ibase = mIdxPtr + (size_t)prm.first * 2;
             // per-vertex bone bindings (model-space terms): rigid -> single bound
             // bone w=1; smooth -> boneIndices(local into bone_table)+boneWeights.
             int biSz = (slotBi >= 0) ? dtSize(sepd.attrs[slotBi].data_type) : 1;
