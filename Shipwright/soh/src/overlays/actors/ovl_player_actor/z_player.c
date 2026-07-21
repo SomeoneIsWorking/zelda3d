@@ -3949,8 +3949,13 @@ s32 Player_CalcSpeedAndYawFromControlStick(PlayState* play, Player* this, f32* o
     f32 floorPitchInfluence;
     f32 speedCap;
 
+    // OoT3D (0x002bbbcc) adds a fourth early-out: while the player actor is dead the control stick
+    // produces no target speed at all. The category test is Grezzo's own guard (always true for the
+    // real player) and is kept verbatim rather than simplified away — 3DS takes the zero path only
+    // when BOTH category == ACTORCAT_PLAYER and health == 0, which C's && reproduces exactly.
     if ((this->unk_6AD != 0) || (play->transitionTrigger == TRANS_TRIGGER_START) ||
-        (this->stateFlags1 & PLAYER_STATE1_LOADING)) {
+        (this->stateFlags1 & PLAYER_STATE1_LOADING) ||
+        ((this->actor.category == ACTORCAT_PLAYER) && (gSaveContext.health == 0))) {
         *outSpeedTarget = 0.0f;
         *outYawTarget = this->actor.shape.rot.y;
     } else {
@@ -13275,9 +13280,13 @@ void func_8084B000(Player* this) {
 
     phi_f14 = -5.0f;
 
+    // OoT3D (0x0034b17c) rescaled Link's in-water buoyancy by 2/3 across three terms: the
+    // sink-threshold bump 1.0f -> 0.6666667f (0x3f2aaaab) here, the rise damping -0.3f -> -0.2f
+    // and the rise accel 0.1f -> 0.06666667f (0x3d888889) in the else branch below. It also
+    // anim-gates the Iron-Boots velocity floor. Everything else is byte-for-byte N64.
     phi_f16 = this->ageProperties->unk_28;
     if (this->actor.velocity.y < 0.0f) {
-        phi_f16 += 1.0f;
+        phi_f16 += 0.6666667f;
     }
 
     if (this->actor.yDistToWater < phi_f16) {
@@ -13288,17 +13297,23 @@ void func_8084B000(Player* this) {
         }
         phi_f18 = -0.1f - phi_f16;
     } else {
+        // OoT3D anim-gates the Iron-Boots velocity floor: while the surface swim-wait animation is
+        // playing, iron boots keep accelerating down to -6.0f instead of cutting off at -3.0f.
+        // The animation-pointer compare is the same idiom already used elsewhere in this file.
+        f32 ironBootsVelFloor =
+            (this->skelAnime.animation == &gPlayerAnim_link_swimer_swim_wait) ? -6.0f : -3.0f;
+
         if (!(this->stateFlags1 & PLAYER_STATE1_DEAD) && (this->currentBoots == PLAYER_BOOTS_IRON) &&
-            (this->actor.velocity.y >= -3.0f)) {
+            (this->actor.velocity.y >= ironBootsVelFloor)) {
             phi_f18 = -0.2f;
         } else {
             phi_f14 = 2.0f;
             if (this->actor.velocity.y >= 0.0f) {
                 phi_f16 = 0.0f;
             } else {
-                phi_f16 = this->actor.velocity.y * -0.3f;
+                phi_f16 = this->actor.velocity.y * -0.2f; // OoT3D: rise damping, N64 -0.3f
             }
-            phi_f18 = phi_f16 + 0.1f;
+            phi_f18 = phi_f16 + 0.06666667f; // OoT3D: rise accel, N64 0.1f
         }
 
         yDistToWater = this->actor.yDistToWater;
