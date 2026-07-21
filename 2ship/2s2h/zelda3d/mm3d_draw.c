@@ -176,11 +176,21 @@ int Zelda3D_TryDrawActor(PlayState* play, Actor* actor) {
 
 // ZELDA3D_MM_SCENE=1 OPTS IN to the room divert; it is OFF by default.
 //
-// The pipeline works end to end (scene table -> ZSI -> LzS inflate -> CMB -> draw groups; verified
-// "loaded scene-room model ... 14 groups, 41 textures"), but the drawn frame is WRONG: the world
-// renders vertically flipped. That is an unresolved transform issue, not a data problem, and
-// suppressing the N64 bg image does not account for it. Until it is fixed, defaulting this ON would
-// ship a broken world, so it stays opt-in for bring-up.
+// The pipeline works end to end (scene table -> ZSI -> LzS inflate -> CMB -> draw groups) and the
+// geometry itself is now CORRECT: the old "inverted/fragmented world" was the CMB index-region offset
+// bug (prm.first is in u16 slots -> always *2, see cmb.cpp). Clock Town's stalls, walls and gates
+// render upright, correctly placed relative to each other, and correctly textured.
+//
+// STILL OPT-IN because of a REMAINING, DIFFERENT defect: the room is drawn DISPLACED (upward)
+// relative to Link, who is positioned in N64 coordinates. Measured, not guessed:
+//   - the floor EXISTS in the data -- 363 horizontal ground-height tris, 1.34e6 sq units, on par with
+//     the working OoT3D reference room's 478 / 1.30e6 (tools/zelda3d_room_geom_test.cpp floor census)
+//   - from an overhead camera the dirt plane renders ABOVE the viewpoint
+//   - A/B at an identical camera vs ZELDA3D_MM_SCENE=0 shows the SAME props sitting higher and
+//     smaller than their N64 counterparts
+// So this is a scene-space -> N64-world-space placement question (origin/scale convention for MM3D
+// scenes), NOT a parse or a draw-state problem. Resolve it from the MM3D scene data/engine, not by
+// tuning an offset until it lines up.
 static int mmSceneDivertEnabled(void) {
     static int v = -1;
     if (v < 0) {
@@ -237,10 +247,9 @@ int Zelda3D_TryDrawRoom(PlayState* play, Room* room) {
     Matrix_Translate(0.0f, 0.0f, 0.0f, MTXMODE_NEW); // scene verts are world-space
     // BRING-UP PROBE: ZELDA3D_MM_SCENE_ROT tries a room orientation without a rebuild.
     //   0 = none (as-authored)   1 = 180deg about X   2 = 180deg about Z   3 = Y mirror (scale -1)
-    // RESULT SO FAR: none of these is the answer. As-authored renders the world INVERTED; 180deg
-    // about X un-inverts it but leaves the geometry FRAGMENTED and mispositioned. So this is not a
-    // simple orientation flip -- it is a data-interpretation problem (how the MM3D room CMB is laid
-    // out), in the same family as the LzS container discovery. Kept only as a diagnostic knob.
+    // RESOLVED: the answer is 0 (as-authored). The "inverted/fragmented" symptom these modes were
+    // chasing was the CMB index-offset bug, now fixed -- rotating was treating a data bug as a
+    // transform bug. Kept only as a diagnostic knob; do NOT reach for it for the placement gap.
     {
         static int rotMode = -1;
         if (rotMode < 0) {
