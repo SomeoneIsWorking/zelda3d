@@ -185,6 +185,11 @@ class Cmb {
     // skinning to form skinMatrix = animWorld . inverse(bindWorld).
     const std::vector<std::array<float, 16>>& boneMatrices() const { return mBoneMatrix; }
 
+    // Sepds that no mesh entry references. A well-formed CMB has ZERO: every sepd's geometry is
+    // reachable. A non-zero count means part of the model silently never builds, which is how the
+    // MM3D mesh-stride bug hid (27 of 41 sepds orphaned -> the room's ground never drew).
+    size_t unreferencedSepdCount() const;
+
     // Texture index used by a material's primary binding (0 if unknown/none).
     int materialTexture(int matIndex) const;
     // Raw (still-encoded) bytes of a texture, sliced from the CMB texdata block.
