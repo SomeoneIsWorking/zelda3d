@@ -233,6 +233,32 @@ Ground truth (both agree): MM3D's engine walks the mesh table with a 0xC stride 
 Live: South Clock Town renders complete — tiled stone ground under Link, painted walls, thatched
 awnings, stairs, notice board. `uploaded model 1000000: 41 groups, 41 textures, 31521 verts`.
 
+## CORRECTION: the MM REPL `tp` is NOT broken (I claimed it was)
+
+Mid-session I reported "`tp` doesn't move Link". **That was wrong**, from two bad reads:
+- `Z3D_Repl_Reply` APPENDS to `<fifo>.out`, so `cat`ing the file shows OLD lines first. I read stale
+  replies as if they were the current ones, including a "wrong coordinate order" that does not exist —
+  the reply prints x,y,z correctly.
+- Link had been teleported into a stuck state, and after a warp he sits in an idle/entering state where
+  Player does not update, so a teleport looks inert.
+
+Verified working: after a warp to East Clock Town, `tp 1200 100 -600` lands at EXACTLY
+`(1200.0, 100.0, -600.0)`. Read the TAIL of `<fifo>.out`, and re-warp before position work.
+
+### The real finding underneath it: COLLISION IS STILL N64
+
+In South Clock Town the same `tp` settles at `(-160.4, 25.4, -729.3)` instead of the requested spot.
+The ground probe shows the 3DS room mesh has a single surface at y=0.0 at the target XZ, and NOTHING at
+y=25.4 where Link actually rests — because Link is resolving against the **N64 collision mesh**, which
+the room divert does not touch.
+
+So MM currently RENDERS 3DS geometry while COLLIDING against N64 geometry. For Clock Town the two
+agree closely enough to be unnoticeable, but they are independent sources, and anywhere the 3DS
+remodel moved a surface the player will float or clip. This is a real parity gap, distinct from
+rendering, and it is the natural next step for the MM scene arc — OoT3D's collision format is already
+RE'd (`memory soh3d-oot3d-collision-format`), and MM3D room ZSIs carry a collision command
+(the `ZELDA3D_ZSI_CMDS` dump shows commands 0x03/0x0B/0x16/0x18 alongside the mesh and actor lists).
+
 ## SWEEP: all 313 MM3D rooms
 
 With both parser fixes in, every MM3D room in the ROM was run through the structural test
