@@ -248,6 +248,19 @@ def n64_anims(objects_dir: str = OBJ_DIR) -> Dict[str, List[str]]:
                     continue
         if syms:
             out[obj] = ["objects/%s/%s" % (obj, s) for s in sorted(syms)]
+    # Union in every animation the asset XMLs declare -- this is what picks up the address-named
+    # ones the header regex cannot see (see xml_anim_symbols).
+    for obj, syms in xml_anim_symbols().items():
+        if not os.path.isdir(os.path.join(objects_dir, obj)):
+            continue
+        keys = out.setdefault(obj, [])
+        have = set(keys)
+        for sym in syms:
+            k = "objects/%s/%s" % (obj, sym)
+            if k not in have:
+                keys.append(k)
+                have.add(k)
+        keys.sort()
     return out
 
 
@@ -484,14 +497,50 @@ TIE_MARGIN = 0.05
 # authors, so it beats any lexical guess — and it is the only thing that bridges the romaji gap
 # (MM3D clips are Japanese: an_hokiwalk, dnt_iyaiyaTOmuun), which pure name matching cannot do.
 XML_DIRS = ("N64_US", "GC_US")
+# KNOWN GAP: 11 animation symbols live in assets/overlays/ (e.g. ovl_En_Sth) rather than
+# objects/. They are deliberately NOT scanned: an overlay has no MM3D actor GAR of its own
+# (its model comes from some object), and that overlay->object association is not recorded
+# in the XML, so scanning them would only produce unresolvable entries.
+XML_SUBDIRS = ("objects",)
 _ANIM_ORIG_RE = re.compile(
     r'<Animation\s+Name="([A-Za-z0-9_]+)"[^>]*/>\s*<!--[^>]*?Original name is\s+"([^"]+)"')
+
+_ANIM_ANY_RE = re.compile(r'<Animation\s+Name="([A-Za-z0-9_]+)"')
+
+def xml_anim_symbols(repo: str = REPO) -> Dict[str, List[str]]:
+    r"""{object_name: [animation symbol...]} declared in the 2ship asset XMLs.
+
+    AUTHORITATIVE and broader than grepping the headers for /g\w+Anim/: many animations are still
+    address-named (object_daiku_Anim_00B690) because they have not been given a symbolic name, and
+    566 such entries exist -- 536 of them WITH an "Original name" annotation, i.e. fully mappable.
+    A g-prefixed regex silently drops all of them."""
+    out: Dict[str, List[str]] = {}
+    for d in XML_DIRS:
+        for sub in XML_SUBDIRS:
+            base = os.path.join(repo, "2ship", "assets", "xml", d, sub)
+            if not os.path.isdir(base):
+                continue
+            for fn in sorted(os.listdir(base)):
+                if not fn.endswith(".xml"):
+                    continue
+                obj = fn[:-4]
+                try:
+                    txt = open(os.path.join(base, fn), encoding="utf-8", errors="ignore").read()
+                except OSError:
+                    continue
+                for sym in _ANIM_ANY_RE.findall(txt):
+                    lst = out.setdefault(obj, [])
+                    if sym not in lst:
+                        lst.append(sym)
+    return out
+
 
 def xml_original_names(repo: str = REPO) -> Dict[str, Dict[str, str]]:
     """{object_name: {n64_symbol: original_clip_name}} from the 2ship asset XMLs."""
     out: Dict[str, Dict[str, str]] = {}
     for d in XML_DIRS:
-        base = os.path.join(repo, "2ship", "assets", "xml", d, "objects")
+      for sub in XML_SUBDIRS:
+        base = os.path.join(repo, "2ship", "assets", "xml", d, sub)
         if not os.path.isdir(base):
             continue
         for fn in sorted(os.listdir(base)):

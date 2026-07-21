@@ -373,14 +373,13 @@ std::unordered_map<void*, MMAnimState> g_animState;
 // once per unmapped OTR) harvests the real N64 OTR strings to fill this table.
 struct MMAnimMap { const char* n64otr; const char* csab; };
 static const MMAnimMap kMMAnimMaps[] = {
-    // Seeded from the [MM3D-ANIM] harvest (keys are the OTR path WITHOUT the __OTR__ prefix, as
-    // OoT's kZelda3dAnimMaps does). Grows per actor exactly as OoT's did — an unmapped anim falls
-    // back to the model's default idle CSAB. See docs/MM_SKELANIME_PORT.md Stage 4.
-    // ---- object_dog (obj 0x132) ----
-    { "objects/object_dog/gDogRunAnim",  "dog_run" },
-    { "objects/object_dog/gDogWalkAnim", "dog_walk" },
-    { "objects/object_dog/gDogBarkAnim", "dog_bark" },
-    { "objects/object_dog/gDogSitAnim",  "dog_sit" },
+// Generated table: N64 animation OTR -> MM3D CSAB clip, produced by
+// tools/gen_mm_animmap.py (regenerate after asset/ROM changes; do not hand-edit the .inc).
+// Primary signal is the 2ship asset XMLs' "Original name is ..." annotation, which is the
+// decomp authors' record of the asset's ORIGINAL (romaji) name and is exactly what the MM3D
+// GAR calls the clip -- the only thing that crosses the English<->Japanese naming gap.
+// Unmapped animations still fall back to the model's default idle CSAB.
+#include "mm3d_animmap.inc"
 };
 static const char* resolveAutoCsab(const char* animOtr) {
     if (animOtr == nullptr) return nullptr;
