@@ -24,6 +24,15 @@ namespace Zelda3D {
 // these (time-of-day variants); OoT3D selects/blends among them by dayTime. Used to drive Zelda3D's
 // world lighting from OoT3D's OWN data for graphical parity (docs/oot3d_world_lighting_re.md).
 // Non-Majora (OoT3D) per-setting stride 0x1C; colours are u8 [0,255], dirs are s8/0x7F in [-1,1].
+// Raw ZSI header-command record (type, count, data offset). Retained for every command so callers can
+// inspect lists this parser does not itself decode (actor/spawn/collision) — needed to relate MM3D
+// scene-space coordinates to the N64 scene.
+struct ZsiCommand {
+    uint8_t type = 0;
+    uint8_t count = 0;
+    uint32_t offset = 0;
+};
+
 struct ZsiEnvSetting {
     uint8_t ambient[3] = { 0, 0, 0 };       // scene ambient (shared by both lights as light[i].ambient)
     float light0Dir[3] = { 0, 0, 0 };       // primary directional light (normalized-ish, [-1,1])
@@ -54,6 +63,11 @@ class Zsi {
     int cmbOffset() const { return mCmbOff; }
     uint32_t cmbSize() const { return mCmbSize; }
 
+    // Every header command in file order, as raw (type, count, offset) records.
+    const std::vector<ZsiCommand>& commands() const { return mCommands; }
+    // Raw file bytes, so callers can decode a command's data array at its offset.
+    const std::vector<uint8_t>& raw() const { return mData; }
+
     // OoT3D scene environment-lighting settings (header command 0x0F), in file order. Empty for
     // room files / scenes without the command. These are the time-of-day variants OoT3D selects
     // among to light the world; Zelda3D drives its world lighting from them for graphical parity.
@@ -68,6 +82,7 @@ class Zsi {
     int mCmbOff = -1;
     uint32_t mCmbSize = 0;
     std::vector<ZsiEnvSetting> mEnvSettings;
+    std::vector<ZsiCommand> mCommands;
 };
 
 } // namespace Zelda3D
