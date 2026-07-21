@@ -37,6 +37,7 @@
 #include "2s2h/resource/type/scenecommand/SetMinimapList.h"
 #include "2s2h/resource/type/scenecommand/SetMinimapChests.h"
 #include "2s2h/resource/type/scenecommand/SetCsCamera.h"
+#include "2s2h/zelda3d/mm3d_collision.h"
 
 s32 OTRScene_ExecuteCommands(PlayState* play, SOH::Scene* scene);
 
@@ -84,7 +85,21 @@ void Scene_CommandActorCutsceneCamList(PlayState* play, SOH::ISceneCommand* cmd)
 
 void Scene_CommandCollisionHeader(PlayState* play, SOH::ISceneCommand* cmd) {
     SOH::SetCollisionHeader* colHeader = (SOH::SetCollisionHeader*)cmd;
-    BgCheck_Allocate(&play->colCtx, play, (CollisionHeader*)colHeader->GetRawPointer());
+    CollisionHeader* n64 = (CollisionHeader*)colHeader->GetRawPointer();
+
+    // Zelda3D: drive gameplay collision from the MM3D scene-collision mesh, so the world the player
+    // SEES and the world they WALK ON are one geometry. Until this, MM rendered MM3D rooms but
+    // collided against the N64 mesh, so the player floated or clipped wherever the 3DS remodel moved
+    // a surface. NULL = no MM3D scene (or the divert is off) -> N64 collision, unchanged.
+    //
+    // THIS is the live path for this build (resource-backed scene commands); the mirror in
+    // src/code/z_scene.c covers the non-resource path.
+    CollisionHeader* mm3d = Zelda3D_MM_BuildSceneCollision(play, n64);
+    if (mm3d != NULL) {
+        BgCheck_Allocate(&play->colCtx, play, mm3d);
+        return;
+    }
+    BgCheck_Allocate(&play->colCtx, play, n64);
 }
 
 void Scene_CommandRoomList(PlayState* play, SOH::ISceneCommand* cmd) {

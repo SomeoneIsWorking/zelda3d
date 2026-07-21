@@ -93,4 +93,11 @@ int   Zelda3D_MM_PendingModelId(void); // -1 if no pending replacement.
 
 #ifdef __cplusplus
 }
+
+// C++-only: the shared MM3D asset ROM handle. Exposed so other zelda3d modules (collision) reuse the
+// SAME CtrRom rather than opening the ROM a second time.
+namespace Zelda3D {
+class CtrRom;
+}
+Zelda3D::CtrRom* Zelda3D_MM_Rom();
 #endif

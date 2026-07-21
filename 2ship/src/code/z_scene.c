@@ -1,6 +1,7 @@
 #include "global.h"
 #include <libultraship/bridge/consolevariablebridge.h>
 #include "GameInteractor/GameInteractor.h"
+#include "2s2h/zelda3d/mm3d_collision.h"
 
 /**
  * Spawn an object file of a specified ID that will persist through room changes.
@@ -218,6 +219,18 @@ void Scene_CommandCollisionHeader(PlayState* play, SceneCmd* cmd) {
 
     if (colHeader->waterBoxes != NULL) {
         colHeader->waterBoxes = Lib_SegmentedToVirtual(colHeader->waterBoxes);
+    }
+
+    // Zelda3D: drive gameplay collision from the MM3D scene-collision mesh, so the world the player
+    // sees and the world they walk on are ONE geometry. Until this, MM rendered MM3D rooms but
+    // collided against the N64 mesh, so the player floated or clipped wherever the 3DS remodel moved
+    // a surface. NULL = no MM3D scene (or the divert is off) -> N64 collision unchanged.
+    {
+        CollisionHeader* mm3d = Zelda3D_MM_BuildSceneCollision(play, colHeader);
+        if (mm3d != NULL) {
+            BgCheck_Allocate(&play->colCtx, play, mm3d);
+            return;
+        }
     }
 
     BgCheck_Allocate(&play->colCtx, play, colHeader);
