@@ -8,7 +8,7 @@ signal for [[2026-07-02-market-day-parity-sweep]] finding #2 (Market Day/Night s
 The two engines are considered a match iff sceneNum agrees for every (ent, dayTime). Prints
 a summary line and exits nonzero on mismatch (usable as a red/green test).
 
-Assumes: Zelda3D binary already built; Azahar oracle already booted (tools/oracle_boot.sh).
+Assumes: Zelda3D binary already built; the oracle is booted on demand by oracle_cache.warp().
 
 Usage:
     tools/market_scene_probe.py 0xB1 0x0000 0x2000 0x4555 0x6000 0x8000 0xC000 0xE000

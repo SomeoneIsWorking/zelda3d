@@ -8,7 +8,7 @@ PASS/FAIL verdict:
 
   Zelda3D : REPL `walkhold` (re-armed each tick so the hold survives headless's uncapped frame rate) until
           linkanimstate reports the target CSAB at steady speed, then `skindump` a short burst.
-  oracle: oot3d-decomp link_ctl.py warp 0xEE -> tools/oracle_link_pose.py with --hold-circle.
+  oracle: NOT WIRED — see capture_oracle(); --reuse re-diffs existing CSVs.
 
 Only locomotion (walk/run) is covered: it is the only motion the equipment-less oracle save can REACH
 live, so it is the only state where a geometry-level oracle A/B is possible. idle is low-motion + fidget-
@@ -73,16 +73,15 @@ def capture_soh(st, cfg):
 
 
 def capture_oracle(st, cfg):
-    out = os.path.join(OUT, f"oracle_{st}.csv")
-    lc = os.path.join(DECOMP, "tools", "link_ctl.py")
-    subprocess.run([sys.executable, lc, "warp", "0xEE"], capture_output=True, text=True,
-                   cwd=DECOMP, timeout=20)
-    time.sleep(2.0)
-    r = subprocess.run([sys.executable, os.path.join(HERE, "oracle_link_pose.py"),
-                        "--frames", "90", "--hold-circle", f"0,{cfg['ora_mag']}",
-                        "--settle", "0.9", "--out", out], capture_output=True, text=True, timeout=90)
-    print("  oracle", r.stdout.strip().splitlines()[-1] if r.stdout.strip() else r.stderr.strip()[-160:])
-    return out if os.path.exists(out) else None
+    """Oracle-side capture is not wired to the embedded harness yet.
+
+    The standalone-Azahar tools it shelled out to are gone. link_sweep.py imports this
+    module only for STATES/PASS_DEG, so nothing else depends on this path; re-implement
+    it against harness_ctl when a two-sided pose sweep is next needed.
+    """
+    raise NotImplementedError(
+        "oracle pose capture needs re-wiring to the embedded harness (harness_ctl.py); "
+        "run with --reuse to re-diff existing CSVs")
 
 
 def diff(st, soh_csv, ora_csv):

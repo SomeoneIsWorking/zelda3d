@@ -9,10 +9,10 @@ exists — it composes:
                              classify()/windows_overlap() reused verbatim for the oracle side)
   - REPL primitives (zelda3d_repl.py: link/linksrc/linkanimstate/linkstate/warp/...)
   - the EMBEDDED-Azahar oracle harness (harness_ctl.py + tools/soh3d_harness), NOT the
-    external Qt+RPC `azahar_rpc.py` oracle that parity_state_sweep/parity_speed_sweep default
+    embedded harness (the only oracle transport) that parity_state_sweep/parity_speed_sweep
     to — that external frontend needs Qt6, which is not installed on this machine (see
     OracleSession docstring below). `az_linkanim` (added to tools/soh3d_harness/main.cpp this
-    session) reads the SAME PLAYER+0x254+0x30 animId documented in oracle_link_animid.py, so
+    session) reads the PLAYER+0x254+0x30 animId, so
     both oracle transports name selections identically (player_animid_names.json).
 
 State matrix: every dimension the brief calls out, extended ONLY as far as an existing input
@@ -56,7 +56,7 @@ POSE_OUT = os.path.join(REPO, "scratch", "link_sweep", "pose")
 
 
 # ---------------------------------------------------------------------------
-# Oracle transport: EMBEDDED Azahar harness (soh3d_harness), not azahar_rpc.
+# Oracle transport: the embedded Azahar harness (soh3d_harness).
 # ---------------------------------------------------------------------------
 class OracleSession:
     """One embedded-Azahar (soh3d_harness) process, booted to free gameplay at Kokiri Forest,
@@ -64,20 +64,11 @@ class OracleSession:
     cold-boot cost (title_settled.state -> START/A taps -> gPlayState populated -> warp 0xEE)
     over ONE session instead of paying it per state.
 
-    Why this transport and not tools/azahar_rpc.py (which parity_state_sweep.py /
-    parity_speed_sweep.py / oracle_link_pose.py / oracle_link_animid.py all default to): that
-    RPC oracle requires a STANDALONE Azahar frontend binary (`Azahar/build/bin/Release/azahar`)
-    which this Azahar checkout can only build with ENABLE_QT=ON (there is no SDL2-only
-    executable target left in this fork — citra_cli/citra_meta are themselves gated behind
-    ENABLE_QT). Qt6 is NOT installed on this machine (no qmake6, no Qt6 pkg-config modules) —
-    a genuine, concrete infra blocker, not a workaround-able one from this session. The
-    embedded harness (`Azahar/build-harness`, target `soh3d_harness`, driven by
-    `tools/harness_ctl.py`) was ALREADY built (2026-07-15, for the title-cs work) and embeds
-    the same Azahar/OoT3D core — so it is a legitimate, already-blessed (see CLAUDE.md
-    "Direction: build a direct harness that EMBEDS Azahar as a library") oracle transport. This
-    session extended it with one new REPL command, `az_linkanim` (tools/soh3d_harness/main.cpp),
-    reading the identical PLAYER+0x254+0x30 offset oracle_link_animid.py documents, so animId
-    naming (player_animid_names.json) is shared and comparable across BOTH oracle transports.
+    Transport: the embedded-Azahar harness (`Azahar/build-harness`, target `soh3d_harness`,
+    driven by tools/harness_ctl.py). It is the only oracle transport — the standalone
+    Qt-frontend Azahar and its UDP-RPC tools were removed. Link's selected animation comes
+    from the `az_linkanim` REPL command at PLAYER+0x254+0x30, named against
+    oot3d-decomp/tools/skeldata/player_animid_names.json.
     """
 
     def __init__(self):
@@ -142,7 +133,7 @@ class OracleSession:
     # (scratch/oracle_walkmag_probe.py, Kokiri 0xEE): deflections shallower than ~-16000 stay in
     # the circle-pad deadzone (Link idle, speedXZ 0); -24000 -> nml_walk_free (speedXZ ~1.3);
     # -32000 -> nml_run_free (speedXZ ~4.2). So a curve MUST use near-full deflections to separate
-    # walk from run — circle-pad-style 0..100 magnitudes (the external azahar_rpc oracle's unit)
+    # walk from run — circle-pad-style 0..100 magnitudes
     # are ~0.3% deflection here and never move Link. These four points straddle idle/walk/run.
     FORWARD_DEFLECTIONS = [0, -24000, -28000, -32000]
 
@@ -186,7 +177,7 @@ class OracleSession:
         """Hold a calibrated forward analog deflection (see FORWARD_DEFLECTIONS) and take
         `n_samples` `az_linkjoints` captures spaced `step_frames` apart — the embedded-harness
         POSE analog of `curve()` (which only samples SELECTION). Returns a list of
-        (cap, t_ms, bone, r0..r8) rows in the SAME shape tools/oracle_link_pose.py's CSV uses, so
+        (cap, t_ms, bone, r0..r8) rows in the per-bone LOCAL-rotation CSV shape, so
         tools/parity_pose_diff.py consumes it unchanged. None if the drive/read never produced a
         usable sample."""
         self.resettle()

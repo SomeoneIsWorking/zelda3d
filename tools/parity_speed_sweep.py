@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
 """parity_speed_sweep.py — SPEED-CALIBRATED Link anim-SELECTION parity sweep (Zelda3D vs OoT3D oracle).
 
-Supersedes the raw-stick comparison in parity_selection_sweep.py for INTERMEDIATE states. That tool
+Supersedes an earlier raw-stick comparison for INTERMEDIATE states. That approach
 drove both sides at the same raw analog magnitude and dismissed `walk` as a "calibration artifact"
 because the N64 control stick (~±84) and the 3DS circle pad (±100) map a given magnitude to a
 DIFFERENT speed. That excuse hid a REAL divergence. The fix is to compare at matched SPEED, not
@@ -39,7 +39,6 @@ import argparse, json, os, struct, subprocess, sys, time
 
 HERE = os.path.dirname(os.path.abspath(__file__))
 sys.path.insert(0, HERE)
-import azahar_rpc as A  # noqa: E402
 
 OOT3D_TID = 0x0004000000033500
 GPLAYSTATE = 0x0050AF34
@@ -141,89 +140,11 @@ def soh_curve(mags):
     return out
 
 
-# ---------------- Oracle side (RPC) ----------------
-def _load_table():
-    t = os.path.join(HERE, "..", "oot3d-decomp", "tools", "skeldata", "player_animid_names.json")
-    return json.load(open(os.path.abspath(t)))["names"]
-
-
-def oracle_warp_open():
-    lc = os.path.join(HERE, "..", "oot3d-decomp", "tools", "link_ctl.py")
-    if os.path.exists(lc):
-        subprocess.run([lc, "warp", "0xEE"], capture_output=True, text=True, timeout=20)
-        time.sleep(2.0)
-
-
-class Oracle:
-    def __init__(self):
-        self.rpc = A.Rpc()
-        for pid, tid, _ in self.rpc.processes():
-            if tid == OOT3D_TID:
-                self.rpc.select(pid)
-        self.names = _load_table()
-        self._reactor()
-
-    def _reactor(self):
-        ps = self.rpc.read32(GPLAYSTATE)
-        self.actor = self.rpc.read32(ps + 0x208C + 0x0C + 2 * 8 + 4) if ps else 0
-
-    def speedXZ(self):
-        return struct.unpack("<f", self.rpc.read(self.actor + SPEEDXZ_OFF, 4))[0]
-
-    def animid(self):
-        aid = self.rpc.read32(self.actor + SKELANIME_OFF + ANIMID_OFF)
-        return aid, (self.names[aid] if 0 <= aid < len(self.names) else f"<id {aid}>")
-
-    CUTSCENE_ANIMS = ("cl_dm_", "demo")  # name prefixes that mean "not free gameplay"
-
-    def _drive(self, cx, cy, frames, hz=30.0):
-        """Hold a circle-pad vector for `frames`; return (lastSpeed, lastCsabName)."""
-        period = 1.0 / hz
-        spd_last, name_last = 0.0, None
-        for _ in range(frames):
-            self.rpc.set_input(0, (cx, cy))
-            try:
-                spd_last = self.speedXZ(); _, name_last = self.animid()
-            except Exception:
-                pass
-            time.sleep(period)
-        return spd_last, name_last
-
-    def find_open_dir(self, mag=100, settle=3.5):
-        """Warp to open ground, then find a circle-pad ANGLE Link actually moves along (spawn facing
-        varies / may point at a wall). Returns (cx, cy) unit-ish vector at `mag`, or None if Link is
-        wedged in a cutscene / never moves (oracle unusable this run). This is the robustness fix for
-        the post-Spirit-Temple 0xEE standup-cutscene wedge."""
-        import math
-        oracle_warp_open(); self._reactor()
-        for deg in range(0, 360, 45):
-            cx = int(mag * math.sin(math.radians(deg)))
-            cy = int(mag * math.cos(math.radians(deg)))
-            spd, name = self._drive(cx, cy, 30)
-            if name and any(name.startswith(p) for p in self.CUTSCENE_ANIMS):
-                return None  # wedged in a spawn cutscene — re-warp won't help mid-run
-            if spd > 0.8:
-                return (cx, cy, math.radians(deg))
-        return None
-
-    def curve(self, mags):
-        d = self.find_open_dir()
-        if d is None:
-            print("  [ora] UNAVAILABLE: Link wedged in a cutscene or no open direction at the spawn "
-                  "(0xEE standup-cutscene wedge). Re-boot the oracle or warp it to free gameplay.",
-                  file=sys.stderr)
-            return []
-        import math
-        _, _, ang = d
-        out = []
-        for m in mags:
-            oracle_warp_open(); self._reactor()
-            cx = int(m * math.sin(ang)); cy = int(m * math.cos(ang))
-            spd, name = self._drive(cx, cy, int(1.2 * 30))
-            out.append({"mag": m, "speedXZ": round(spd, 3), "csab": name})
-            print(f"  [ora] mag={m:4d} (dir {math.degrees(ang):.0f}deg) speedXZ={spd:5.2f} -> {name}")
-        return out
-
+# The oracle half of this sweep used to live here, driving the standalone Azahar
+# over UDP RPC. That transport is gone; link_sweep.py's OracleSession drives the
+# embedded harness and calls into this module for the SoH-side curve only
+# (classify / soh_curve / windows_overlap). Run this tool with --skip-oracle, or
+# go through link_sweep.py for a two-sided comparison.
 
 # ---------------- compare ----------------
 def windows_overlap(a, b):
@@ -239,13 +160,11 @@ def windows_overlap(a, b):
 def main():
     ap = argparse.ArgumentParser()
     ap.add_argument("--soh-mags", default="0,20,40,60,80,100,127")
-    ap.add_argument("--ora-mags", default="0,30,45,60,80,100")
     ap.add_argument("--json", default=None)
     ap.add_argument("--skip-oracle", action="store_true")
     args = ap.parse_args()
 
     soh_mags = [int(x) for x in args.soh_mags.split(",")]
-    ora_mags = [int(x) for x in args.ora_mags.split(",")]
 
     print("== Zelda3D speed->selection curve ==")
     if not soh_ensure_free():
@@ -254,8 +173,8 @@ def main():
 
     ora = []
     if not args.skip_oracle:
-        print("== Oracle speed->selection curve ==")
-        ora = Oracle().curve(ora_mags)
+        sys.exit("this tool is SoH-side only — pass --skip-oracle, or use "
+                 "link_sweep.py for a two-sided comparison against the harness oracle")
 
     sc = classify(soh)
     oc = classify(ora) if ora else None

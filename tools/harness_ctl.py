@@ -503,6 +503,10 @@ def in_gameplay(h: Harness) -> bool:
 # with `loadstate` + `warp` and never touches the input path again.
 GAMEPLAY_STATE = REPO_ROOT / "scratch" / "gameplay_settled.state"
 
+# gSaveContext is a fixed .bss global (0x00587958, oot3d-decomp docs/ram_map.md);
+# dayTime is the u16 at +0x0C. Global, so it is writable at the title too.
+GSAVECONTEXT_DAYTIME_VA = 0x00587958 + 0x0C
+
 
 def boot_to_gameplay(h: Harness, entrance: Optional[int] = None,
                      settle_frames: int = 180) -> bool:

@@ -130,24 +130,16 @@ Don't re-derive a Link state matrix or a fresh oracle transport — start here.
   per-run JSON: `scratch/link_sweep/<ts>.json` + `latest.json` (gitignored, diffable).
   `show <state>` / `list [--status]` / `resolve <state> --commit <hash>` round out the CLI.
 - **Composes, does not reimplement**: `parity_state_sweep.py` (discrete forced-state CSAB
-  selection vs oot3d-decomp ground truth) and `parity_speed_sweep.py` (locomotion continuum
-  by speedXZ, `classify()`/`windows_overlap()` reused verbatim) supply the per-dimension
+  selection vs oot3d-decomp ground truth) and `parity_speed_sweep.py` (SoH-side locomotion
+  continuum by speedXZ, `classify()`/`windows_overlap()` reused verbatim) supply the per-dimension
   drive/verdict logic; `link_sweep.py` only orchestrates + adds states those tools don't
   cover + writes the checklist.
-- **Oracle transport is the EMBEDDED harness, not `azahar_rpc.py`**: `parity_state_sweep.py`
-  /`parity_speed_sweep.py`/`oracle_link_pose.py`/`oracle_link_animid.py` all default to the
-  external `azahar_rpc.py` oracle, which needs a standalone Qt-frontend Azahar binary
-  (`Azahar/build/bin/Release/azahar`) — this fork only builds that frontend with
-  `ENABLE_QT=ON`, and Qt6 is **not installed** on this machine (confirmed 2026-07-15; no
-  `qmake6`, no `Qt6` pkg-config modules). `link_sweep.py`'s `OracleSession` instead drives
-  the ALREADY-BUILT embedded harness (`Azahar/build-harness`, target `soh3d_harness`, via
-  `harness_ctl.py`) — the CLAUDE.md-blessed direction anyway. It reads Link's selected
-  animation through a new REPL command, **`az_linkanim`** (added to
-  `tools/soh3d_harness/main.cpp` this session), at the same `PLAYER+0x254+0x30` offset
-  `oracle_link_animid.py` documents, so both oracle transports name selections identically
-  against `oot3d-decomp/tools/skeldata/player_animid_names.json`. If a future session gets
-  Qt6 installed and rebuilds the RPC oracle, the external tools become usable again — no
-  further plumbing needed on that side.
+- **Oracle transport is the embedded harness** — the only one. `link_sweep.py`'s `OracleSession`
+  drives `soh3d_harness` through `harness_ctl.py`, reaching gameplay via
+  `boot_to_gameplay()` (loadstate a gameplay save, then warp — no input driving) and reading Link's
+  selected animation with the `az_linkanim` REPL command at `PLAYER+0x254+0x30`, named against
+  `oot3d-decomp/tools/skeldata/player_animid_names.json`. The standalone Qt-frontend Azahar and its
+  UDP-RPC tools are gone.
 - **State matrix is honestly bounded by drivable recipes.** States with no existing
   REPL/oracle input recipe (backwalk, sidestep, turn-in-place, combo, item/bottle use,
   throw, climb traversal, dive, Z-target, get-item pose, death) are recorded

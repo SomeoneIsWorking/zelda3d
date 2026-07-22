@@ -98,8 +98,8 @@ deliberate exception to the "no submodules" flatten (see "Commit chain" below): 
 stays flattened to kill multi-repo build friction, but `oot3d-decomp`/`mm3d-decomp` are read-mostly
 external reference repos, not part of the soh3d build, so a submodule is the right shape for both.
 Update either like any submodule: `cd oot3d-decomp && git pull origin main && cd .. && git add
-oot3d-decomp && git commit` (same for `mm3d-decomp`). All soh3d tooling (`tools/parity_ab.py`,
-`oracle_cache.py`, `link_sweep.py`, etc.) resolves the decomp path repo-relatively
+oot3d-decomp && git commit` (same for `mm3d-decomp`). All soh3d tooling (`tools/oracle_cache.py`,
+`link_sweep.py`, etc.) resolves the decomp path repo-relatively
 (`REPO/oot3d-decomp`), never via a hardcoded home path — do not reintroduce
 `os.path.expanduser("<oot3d-decomp>")` or a sibling-repo (`../oot3d-decomp`) assumption; the
 same rule applies to any future `mm3d-decomp` reference. As of 2026-07-15 there are zero code
@@ -136,37 +136,21 @@ game reliably, you shouldn't be working on the bug fix." (user directive, 2026-0
   controls only for state with no generic form (e.g. the cucco wing state machine: `cuccostate`,
   `flapinfo`). Driven per-frame from `SoH3D_ActorPostUpdate` in `Actor_UpdateAll`.
 
-## Direction: build a direct harness that EMBEDS Azahar as a library, not runs it
+## The OoT3D oracle IS the embedded harness — there is no external Azahar
 
-Current Azahar tooling (`tools/azahar_rpc.py`, `tools/azahar_repl.py`, `tools/azahar_scan.py`) treats
-Azahar as an external GUI process to be launched and poked. The durable direction is different: build
-a harness that **embeds Azahar's core** — link its emulator library into a headless C++ program that
-loads the ROM, drives to a target scene deterministically, and reads actor tables / object lists /
-memory ranges directly. No window, no manual warp, no IPC race.
+`tools/soh3d_harness` links Azahar's core as a **library** into a headless C++ program that loads the
+ROM, warps deterministically, reads actor tables / memory / framebuffers, and runs SoH3D side-by-side
+in the same process. Build/run it with `tools/soh3d_harness.sh`; drive it with `tools/harness_ctl.py`
+(`boot_to_gameplay()` is the entry point — it loadstates a gameplay save and warps, with no input
+driving). `oot3d-decomp/docs/oracle.md` documents the REPL surface.
 
-Capabilities the harness should ship:
+**Rule:** when the next observation would come from OoT3D, drive the harness — and if it doesn't
+cover the observable yet, EXTEND it (new dump routine, new comparison field). Same workflow-first
+principle as "build the tool if you can't investigate", applied to the reference side.
 
-- Load OoT3D ROM into embedded Azahar core, boot to a specific scene/room deterministically
-  (scripted warp, no input driving).
-- Enumerate live objects/actors in the current room: print each entry's actorId, params, pos, rot,
-  plus a hex dump of `actor+0x00..0x1F0` for the ones we care about.
-- Compare SIDE-BY-SIDE with SoH3D's state at the same scene: for every actor SoH3D spawns, the
-  harness shows the corresponding OoT3D entry (or "not present" / "mismatched"). This is the direct
-  divergence surface — no more RPC round-trips, no more "is Azahar running."
-- Same shape for scene-object tables, collision, room metadata — whatever the current parity
-  investigation needs.
-
-**Rule:** when the current investigation's next observation would come from Azahar, the answer is
-"drive the direct harness" — not "start Azahar externally." Extend the harness (new dump routine,
-new comparison field, new scene warp) if it doesn't cover the observable yet. This is the same
-workflow-first principle as the existing "build the tool if you can't investigate" rule (§91), now
-applied to the OoT3D reference side.
-
-Approach the first cut incrementally: (a) audit whether Azahar exposes a library / core API or is
-GUI-only (skim `Azahar/src/core/` for entry points that don't touch the window layer); (b) if
-library-usable, land a minimal C++ program that loads a ROM and prints "boot succeeded" — commit
-that as the harness scaffold; (c) add scene warp; (d) add actor table dump; (e) wire the side-by-side
-against SoH3D. Each step commits + gets close-tested.
+Gate readiness on `gameplay` (ok yes|no), never on `playstate`: `playstate` deliberately falls back
+to the title demo's PlayState so introspection works there, so it answers ok on the title screen.
+`warp` needs a loaded save — it is inert at the title, where nothing can spawn.
 
 ## Verify the FULL user-facing path, not a narrow mechanism
 

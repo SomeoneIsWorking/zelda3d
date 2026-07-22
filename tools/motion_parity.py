@@ -3,7 +3,7 @@
 
 The synthesis half of the BEHAVIORAL motion-parity harness:
   Zelda3D side : in-game REPL `asample <n> scratch/motion/zelda3d.csv`   (per-frame, exact)
-  oracle side: tools/oracle_motion_sample.py --id ... --out scratch/motion/oracle.csv
+  oracle side: sample the harness per-frame into scratch/motion/oracle.csv
   this tool  : motion_parity.py scratch/motion/zelda3d.csv scratch/motion/oracle.csv
 
 Zelda3D and OoT3D share world coordinates + entrance spawn coords ([[zelda3d-oracle-entrance-match]]),

@@ -1621,13 +1621,13 @@ void HandleSaveState(std::istringstream& toks) {
 //
 // gPlayState (0x0050AF34, .data) -> PlayState* (0 until the game is in
 // the Play gamestate, i.e. not in menus / logos / title). See
-// tools/oracle_motion_sample.py and oot3d-decomp docs/actor_layout.md
+// oot3d-decomp docs/actor_layout.md
 // for the layout this walks.
 //
 // The transitionTrigger (u8 @ +0x5C2D, TRANS_TRIGGER_START = 20) and
 // nextEntranceIndex (u16 @ +0x5C32) offsets come from prior OoT3D RE
-// work (memory of a retired link_ctl.py); cross-checking them against
-// oot3d-decomp when it comes back on this machine is a proper follow-up.
+// work; confirmed against oot3d-decomp docs/ram_map.md (nextEntranceIndex
+// s16 @ play+0x5C32, transitionTrigger s8 @ play+0x5C2D = 20).
 constexpr uint32_t GPLAYSTATE_VA           = 0x0050AF34;
 constexpr uint32_t SCENENUM_OFF            = 0x0104;
 
@@ -1770,7 +1770,7 @@ constexpr uint32_t PLAYER_YAW_OFF           = 0x0036;
 
 // Player's embedded SkelAnime controller + selected-animation id. RE'd
 // independently for the (Qt-only, unbuilt-on-this-machine) external RPC
-// oracle path (tools/oracle_link_animid.py, FUN_0034807c; see
+// oracle path (FUN_0034807c; see
 // oot3d-decomp/docs/player_anim_states.md): skelAnime = PLAYER + 0x254,
 // curAnimId = *(skelAnime + 0x30). Ported here (2026-07-15, link_sweep) so
 // the ALREADY-BUILT embedded harness can serve as the animId oracle
@@ -1779,7 +1779,7 @@ constexpr uint32_t PLAYER_SKELANIME_OFF     = 0x0254;
 constexpr uint32_t SKELANIME_ANIMID_OFF     = 0x0030;
 
 // SkelAnime.jointTable — live per-bone LOCAL 3x4 transform array (RE'd for
-// the (Qt-only, unbuilt) external RPC oracle path, tools/oracle_link_pose.py:
+// the per-bone LOCAL-rotation read:
 // PLAYER+0x254 (SkelAnime) -> *(+0x78) = jointTable ptr, stride 13 floats/
 // bone (3x3 rotation {0,1,2/4,5,6/8,9,10} + translation {3,7,11} + 1 pad),
 // 25 bones (childlink_v2 rig). Ported here 2026-07-15 (link_sweep POSE
@@ -4277,7 +4277,7 @@ void RunRepl() {
             // Player (see PLAYER_SKELANIME_OFF / SKELANIME_ANIMID_OFF
             // above). Name resolution (animId -> CSAB name string) is done
             // Python-side against oot3d-decomp's player_animid_names.json,
-            // same table oracle_link_animid.py uses, so both oracle paths
+            // the shared player_animid_names.json table, so every consumer
             // agree on naming.
             auto ps = CurrentPlayState();
             if (!ps) { PrintErr("az_linkanim: no playstate"); continue; }
@@ -4302,7 +4302,7 @@ void RunRepl() {
             // link_sweep.py POSE oracle probe: one live capture of the
             // Player's SkelAnime jointTable (see SKELANIME_JOINTTABLE_OFF
             // above) — 25 bones x 3x3 LOCAL rotation, same byte layout
-            // tools/oracle_link_pose.py reads via the external RPC oracle,
+            // the per-bone LOCAL rotations,
             // so both oracle transports produce comparable CSV rows for
             // tools/parity_pose_diff.py.
             auto ps = CurrentPlayState();
