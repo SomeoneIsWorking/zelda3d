@@ -563,6 +563,57 @@ void Zelda3D_TitleLightSettingsOverride(PlayState* play) {
 }
 
 
+// GAMEPLAY env lighting from OoT3D's OWN per-scene palette (#111).
+//
+// kZelda3dSceneLighting carries the ZSI env palette for 101/110 scenes, and
+// Zelda3D_UpdateLight caches the current scene's rows in gZelda3dScenePalette every
+// frame — but until now NOTHING read it during gameplay. z_kankyo.c had exactly one
+// Zelda3D hook and it was title-only, so every gameplay scene was lit by N64 env data
+// while its geometry and actors came from OoT3D. Measured at Kokiri Forest 0x6000: the
+// oracle's scene mean RGB (89.5, 98.8, 29.6) vs ours (37.0, 40.5, 11.9), and Saria's
+// skin/tunic luma ratio 1.10 vs ours 2.07 — the contrast blowout of an ambient that is
+// gray 80 where OoT3D's is (160, 72, 72).
+//
+// This re-runs the SAME blend z_kankyo just performed (slots unk_BE -> unk_BD at weight
+// unk_D8) against the OoT3D rows, so the N64 time schedule keeps choosing WHEN to switch
+// and only the colour data changes. Fog is deliberately left to the N64 path (the 3DS fog
+// values are in eye units and are fed separately — same reasoning as the title override).
+//
+// SLOT BIAS +1: the generated rows include ZSI metadata entry 0, which the runtime drops,
+// so runtime slot i is palette row i+1.
+void Zelda3D_SceneLightSettingsOverride(PlayState* play) {
+    EnvironmentContext* envCtx = &play->envCtx;
+    const Zelda3dLightSlot* pal = gZelda3dScenePalette;
+    s32 n = gZelda3dScenePaletteN;
+    s32 cur, prev, i;
+    f32 w;
+
+    // The title runs its own palette + schedule (Zelda3D_TitleLightSettingsOverride).
+    if (pal == NULL || n <= 0 || Zelda3D_Title_IsActive()) {
+        return;
+    }
+    cur = (s32)envCtx->unk_BD + 1;
+    prev = (s32)envCtx->unk_BE + 1;
+    if (cur < 0 || cur >= n || prev < 0 || prev >= n) {
+        return; // out-of-range slot: leave the N64 values rather than read past the palette
+    }
+    w = envCtx->unk_D8;
+    if (w < 0.0f) {
+        w = 0.0f;
+    } else if (w > 1.0f) {
+        w = 1.0f;
+    }
+
+    for (i = 0; i < 3; i++) {
+        envCtx->lightSettings.ambientColor[i] = (u8)LERP(pal[prev].amb[i], pal[cur].amb[i], w);
+        envCtx->lightSettings.light1Color[i] = (u8)LERP(pal[prev].l0col[i], pal[cur].l0col[i], w);
+        envCtx->lightSettings.light2Color[i] = (u8)LERP(pal[prev].l1col[i], pal[cur].l1col[i], w);
+        envCtx->lightSettings.light1Dir[i] = (s8)LERP16(pal[prev].l0dir[i], pal[cur].l0dir[i], w);
+        envCtx->lightSettings.light2Dir[i] = (s8)LERP16(pal[prev].l1dir[i], pal[cur].l1dir[i], w);
+    }
+}
+
+
 // Pure predicate (no drawing): does this actor currently have an OoT3D replacement? Mirrors the
 // lookups in Zelda3D_TryDrawActor / Zelda3D_TryAuto without side effects. The engine's draw-distance
 // check (Ship_CalcShouldDrawAndUpdate) calls this so replaced actors — e.g. the Kokiri kids — keep

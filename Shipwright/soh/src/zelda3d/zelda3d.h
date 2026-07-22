@@ -122,6 +122,8 @@ int Zelda3D_ShouldSuppressBgImageSkybox(PlayState* play);
 // palette + time schedule (no-op outside the title demo). Called by
 // z_kankyo before the lightSettings -> lightCtx application.
 void Zelda3D_TitleLightSettingsOverride(PlayState* play);
+// Gameplay counterpart: OoT3D per-scene env palette -> envCtx.lightSettings (#111).
+void Zelda3D_SceneLightSettingsOverride(PlayState* play);
 
 // Draw the OoT3D sky (BlueSky.zar tenkyu gradient dome) in place of the N64 normal-sky skybox.
 // Called from Play_Draw at the skybox point; returns 1 if it drew the OoT3D sky (caller skips the

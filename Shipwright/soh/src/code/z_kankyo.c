@@ -1148,6 +1148,11 @@ void Environment_Update(PlayState* play, EnvironmentContext* envCtx, LightContex
         // set above). No-op outside the title demo.
         Zelda3D_TitleLightSettingsOverride(play);
 
+        // SoH3D: gameplay lighting comes from OoT3D's own per-scene ZSI env palette,
+        // re-blending what the N64 schedule just chose. No-op at the title / for scenes
+        // with no palette.
+        Zelda3D_SceneLightSettingsOverride(play);
+
         // Apply lighting adjustments
         for (i = 0; i < 3; i++) {
             if ((s16)(envCtx->lightSettings.ambientColor[i] + envCtx->adjAmbientColor[i]) > 255) {
