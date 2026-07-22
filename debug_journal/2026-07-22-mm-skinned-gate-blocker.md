@@ -111,8 +111,31 @@ by itself evidence of a fault", but wrong to treat that as grounds for doubting 
 once you know the actor is a SOLDIER, a hat that size is obviously wrong. The lesson is that the
 missing step was IDENTIFICATION, not another mechanism hypothesis.
 
-Fix direction (unchanged from round 2, now justified): the height/bone-length-sum auto-scale
-over-estimates for `sdn`. Compare its rig against the dog's (0.0075, renders correctly) to see which
+## ROOT CAUSE (round 5) — the Stage-3 auto-scale is a NO-OP
+
+Logged the three input terms of `scale = actor->scale.x * (n64Sum / cmbSum)`
+(`ZELDA3D_MM_SCALE_LOG=1`, new `[MM3D-SCALE-IN]` line):
+
+    model=10 (soldier) actorScale=0.01000 n64Sum=16469.93 cmbSum=16469.93 ratio=1.0000 limbs=16
+    model=11 (dog)     actorScale=0.00750 n64Sum= 7148.46 cmbSum= 7148.46 ratio=1.0000 limbs=12
+
+`n64Sum` and `cmbSum` are **BIT-IDENTICAL** for both actors, so the ratio is exactly 1.0000 and the
+formula collapses to `scale = actor->scale.x`. Two different rigs — a 16-limb soldier and a 12-limb
+dog — cannot coincidentally produce matching bone-length sums. **`Zelda3D_MM_SkelBoneLenSum(skeleton)`
+and `Zelda3D_MM_ModelBoneLenSum(modelId)` are measuring the SAME data**, so Stage-3 auto-scale has
+never actually scaled anything.
+
+That explains the whole symptom set: every skinned actor silently inherits the N64 actor scale, which
+happens to look right when the 3DS model shares the N64 proportions (the dog) and looks wrong when it
+does not (the soldier's oversized helmet). It also explains why the dog's 0.0075 "works" — it is just
+the N64 value, not a derived one.
+
+**Fix target:** find why the two sums coincide. Likely `Zelda3D_MM_SkelBoneLenSum` walks the CMB rig
+(or a cached value keyed the same way) instead of the live N64 `SkeletonHeader` limb tree. Once they
+measure different things the ratio becomes meaningful and the soldier should land near the ~0.004 the
+`mscale` bisection indicated — WITHOUT hardcoding anything.
+
+Superseded fix direction: the height/bone-length-sum auto-scale over-estimates for `sdn`. Compare its rig against the dog's (0.0075, renders correctly) to see which
 term diverges. `mscale 0x1B6 <s>` bisects the right value live; ~0.004 is in the right neighbourhood
 but was not tuned precisely — do NOT hardcode 0.004, fix the derivation.
 
