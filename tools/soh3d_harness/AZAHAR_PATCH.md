@@ -557,3 +557,45 @@ Add `logging_initialized = true;` in the libretro `Initialize` overload, right
 after the `instance` is constructed (mirroring the file-based overload). Then
 the harness's `Common::Log::SetGlobalFilter(Filter(Level::Warning))` (called in
 `main()` after `retro_init`) takes effect and the debug flood stops.
+
+# Azahar Patch 7 (2026-07-22, per-draw light-setup RE): draw ISOLATION + draw identity
+
+`pica_core.cpp`, in the same `trigger_draw` case as Patch 5/6.
+
+Two globals:
+
+```cpp
+extern "C" int soh3d_draw_index = 0;   // per-frame draw counter (harness resets it per retro_run)
+extern "C" int soh3d_draw_skip  = -1;  // -1 = none; otherwise suppress that draw's DrawArrays
+```
+
+and at the end of the `trigger_draw` case:
+
+```cpp
+if (soh3d_draw_skip >= 0 && soh3d_draw_index == soh3d_draw_skip) { ++soh3d_draw_index; break; }
+++soh3d_draw_index;
+DrawArrays(is_indexed);
+```
+
+Harness: `main.cpp` resets `soh3d_draw_index = 0` before every `retro_run()` in `HandleRun`, and
+adds the REPL command `drawskip <n>|off`.
+
+**Why**: the Patch-5 uniform log says WHAT lighting state a draw used but not WHICH surface it
+painted. Skipping one draw and diffing the frame against the unmodified one yields that draw's
+exact screen footprint — the oracle-side draw→material mapping. Driver: `tools/oracle_draw_isolate.py`.
+
+The Patch-5 log line also gained draw IDENTITY, which is what ties an oracle draw to one of our
+CMB material groups: `tex0=<paddr>/<w>x<h>/f<fmt> en=<n> nv=<vertexCount>`,
+`tev0=src.../mod.../op<c>-<a>/sc<rgb>x<a>/k<const>`, `texEn=<t0>/<t1>/<t2>` and
+`tev1..5=<sources>:<colorOp>:<scale>,...`. `nv` alone matched our 21 Zora room groups 1:1 to the
+oracle's room draws by vertex count.
+
+## Two protocol gotchas (both cost a full debug cycle; do not re-derive)
+
+1. **A single `retro_run()` after `loadstate` renders a CORRUPT frame** — the Vulkan HW renderer's
+   caches/framebuffers are not in the save state, so the first frame is garbage tile blocks. From
+   ≥3 frames the output is *bit-exact* reproducible across loadstates (measured: 0 differing pixels).
+2. **OoT3D draws one 3D frame per TWO `retro_run` calls** (30 fps logic on the 60 Hz libretro
+   cadence) and the captured framebuffer trails the emulated GPU by ~2 frames. `drawskip` therefore
+   has *zero* visible effect if you only run 1 or 2 frames with the latch set; it bites at 3+.
+   `oracle_draw_isolate.py` uses warm=2, probe=4.

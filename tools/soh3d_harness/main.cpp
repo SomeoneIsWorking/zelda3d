@@ -320,6 +320,10 @@ extern "C" {
     // VS-uniform per-draw log (pica_core.cpp, AZAHAR_PATCH.md Patch 5)
     extern char soh3d_vsuni_log_path[256];
     extern int  soh3d_vsuni_log_active;
+    // Per-draw isolation (pica_core.cpp, AZAHAR_PATCH.md Patch 7): index resets
+    // every frame; skip suppresses one draw so a frame diff localises it.
+    extern int soh3d_draw_index;
+    extern int soh3d_draw_skip;
     // Live PICA fog state dump (pica_core.cpp, AZAHAR_PATCH.md Patch 6)
     extern int soh3d_fog_dump(char* out, int cap);
     // 3DS PICA fog port globals (embedded soh, zelda3d_gl.cpp) — soh_fog3d A/B latch.
@@ -708,6 +712,9 @@ void HandleRun(std::istringstream& toks) {
         if (g_quit_requested.load()) break;
         {
             FrameWatchdog wd("HandleRun/retro_run");
+            // Patch 7: per-frame draw numbering must restart every frame so a
+            // draw index means the same thing across the isolation sweep.
+            soh3d_draw_index = 0;
             retro_run();
         }
         ++done;
@@ -3960,6 +3967,7 @@ void PrintHelp() {
         "  force <sub>          write state into BOTH engines (RE, no\n"
         "                       inputs); `force list` shows subs\n"
         "  snapshot <basepath>  write both fbs as <basepath>.{az,soh}.ppm\n"
+        "  drawskip <n>|off     suppress per-frame PICA draw #n (draw isolation)\n"
         "  sweep <sub>          automated multi-step parity driver;\n"
         "                       `sweep list` shows subs (title, ...)\n"
         "  diag                 print harness diagnostics (input+capture)\n"
@@ -4008,6 +4016,23 @@ void RunRepl() {
                 if (f) std::fclose(f);  // truncate
                 soh3d_vsuni_log_active = 1;
                 std::printf("ok vsuni_log %s\n", arg.c_str());
+            }
+        }
+        else if (cmd == "drawskip") {
+            // drawskip <n>|off → suppress per-frame draw #n (Patch 7). Diffing the
+            // resulting frame against the unmodified one gives that draw's exact
+            // screen footprint = the oracle draw -> material mapping.
+            std::string arg; toks >> arg;
+            if (arg == "off" || arg.empty()) {
+                soh3d_draw_skip = -1;
+                std::printf("ok drawskip off\n");
+            } else {
+                auto n = ParseNum(arg);
+                if (!n) { PrintErr("drawskip: bad n"); }
+                else {
+                    soh3d_draw_skip = (int)*n;
+                    std::printf("ok drawskip %d\n", soh3d_draw_skip);
+                }
             }
         }
         else if (cmd == "az_ticks") {

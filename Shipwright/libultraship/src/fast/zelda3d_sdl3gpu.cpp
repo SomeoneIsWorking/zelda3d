@@ -1548,6 +1548,12 @@ void Fast::Zelda3DRenderer::DrawModel(int modelId, const float* mp16, const floa
         // gated by gZelda3dWorldLit (task #16: at title we skip the synthetic vertex-lit compute
         // but keep the material's static brightness).
         ubo.uExtra[3] = grp.vertexLighting ? grp.combScaleRGB : 1.0f;
+        // KNOWN GAP (measured 2026-07-22, per_draw_light_setup.md §6): we emulate ONE texture
+        // through ONE TEV stage. Zora's Domain's water/waterfall materials enable texture1 (and
+        // sometimes texture2) and run TEV stage 1/2 with color_op = MultiplyThenAdd; those are
+        // exactly the surfaces measuring 0.62-0.88 of the oracle, while every single-texture
+        // single-stage surface in the same frame is far closer. Fixing "Zora's water is dark and
+        // desaturated" means emulating multi-texture + stages 1..5, NOT touching the lighting.
         // OoT3D scene-vertex-lit path (task #16): feed uAmbient.xyz = sceneAmb * matAmb.
         // Per LIGHTDIAG at pinned title cursor=650: grass room groups have
         // matAmb=(1,1,1) matDif=(0,0,0), combScale=2. So the diffuse term contributes
@@ -1570,6 +1576,21 @@ void Fast::Zelda3DRenderer::DrawModel(int modelId, const float* mp16, const floa
         // amb0=(0.408,0.408,0.239) but amb1=(0,0,0) — N64 Lights_BindAll semantics (one scene
         // ambient) — while the same frame's terrain draws carry the identical ambient in BOTH
         // slots. The per-slot duplication is a scene-material binding, not a global rule.
+        //
+        // RE-CONFIRMED 2026-07-22 against the live oracle at Zora's Domain AND Kokiri Forest, four
+        // times of day, using per-draw ISOLATION (oot3d-decomp/docs/per_draw_light_setup.md).
+        // OoT3D binds exactly TWO configurations per frame and this file implements both:
+        //   SCENE draw: both slots bound; dir = world (0,-1,0); light diffuse (0,0,0) in BOTH
+        //               slots; ambient = sceneAmbient in BOTH slots  -> the x2 below.
+        //   ACTOR draw: slot0 dir=+sunVec dif=light2Col amb=sceneAmbient;
+        //               slot1 dir=-sunVec dif=light1Col amb=(0,0,0)  -> the `lit ? 1.0f` below.
+        // Falsified there, do NOT re-chase:
+        //   - "draws carrying matDif=(1,1,1) are lit differently": a SCENE slot's light diffuse
+        //     is ZERO, so matDiffuse cannot contribute to any room draw whatever its value.
+        //   - "our light dirs (+-0.702,+-0.702,+-0.117) differ from the oracle's
+        //     (+-0.121,+-0.816,-+0.565)": the PICA c80/c83 registers are VIEW space; mapped back
+        //     with right*x + up*y - fwd*z they equal ours to 3 decimals at BOTH scenes, and they
+        //     track the same dayTime sun rotation the engine already computes.
         ubo.uAmbient[3] = ambGroup ? (lit ? 1.0f : gZelda3dAmbientLightCount) : 0.0f;
         // Per-light diffuse products for the vertex-lit sum (#153): matDiffuse * sceneLightColor.
         // Terrain materials bake matDiffuse=BLACK, so these are zero there and the light sum
