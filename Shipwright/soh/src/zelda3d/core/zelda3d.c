@@ -586,6 +586,14 @@ void Zelda3D_TitleLightSettingsOverride(PlayState* play) {
 // palette to one fixed row at ALL times of day. Fog is deliberately left to the N64 path (the
 // 3DS fog values are in eye units and are fed separately — same reasoning as the title override).
 //
+// WHERE THE BLENDED COLORS LAND (unified-shading decision, 2026-07-23 — full rationale at the
+// Zelda3dEnvColors comment in zelda3d.h): ambient/light1/light2 COLORS go into gZelda3dEnvColors
+// (the CMB renderer feed) and are NO LONGER written into envCtx.lightSettings, so the N64 rows
+// keep flowing lightSettings -> lightCtx -> Lights_BindAll and N64-format draws stay in their own
+// calibration space. Light DIRS (settings path) and the FOG color/window ARE still written into
+// envCtx: those are shared world truth — one sun direction, one haze — and feeding N64 draws the
+// 3DS fog keeps them compositing into the same atmosphere as the CMB scene around them.
+//
 // Light DIRS: only overridden on the settings path (where N64 also takes dirs from the
 // settings list). On the time-of-day path N64 computes sun/moon dirs from dayTime — OoT3D's
 // Environment_Update is a port of the same code, so the computed dirs stand.
@@ -595,6 +603,12 @@ void Zelda3D_TitleLightSettingsOverride(PlayState* play) {
 // "metadata entry 0"); it re-aligned the color/dir fields by accident but corrupted amb.
 // Both the generator and this consumer are now bias-free (gen_oot3d_scene_lighting.py).
 Zelda3dEnvBlend gZelda3dEnvBlend;
+
+// OoT3D env COLOR blend for the CMB renderer (see the struct comment in zelda3d.h for the
+// unified-shading design: one env STATE, two calibration palettes). .valid is recomputed every
+// Environment_Update frame below — 0 on every path that does not apply the OoT3D palette, so
+// consumers (Zelda3D_UpdateLight, Zelda3D_SceneTint) fall back to envCtx.lightSettings there.
+Zelda3dEnvColors gZelda3dEnvColors;
 
 void Zelda3D_SceneLightSettingsOverride(PlayState* play) {
     EnvironmentContext* envCtx = &play->envCtx;
@@ -606,9 +620,11 @@ void Zelda3D_SceneLightSettingsOverride(PlayState* play) {
 
     // The title runs its own palette + schedule + fog (Zelda3D_TitleLightSettingsOverride).
     if (Zelda3D_Title_IsActive()) {
+        gZelda3dEnvColors.valid = 0; // title colors live in envCtx.lightSettings (title override)
         return;
     }
     if (pal == NULL || n <= 0 || !b->valid) {
+        gZelda3dEnvColors.valid = 0; // no OoT3D palette -> CMB feed falls back to the N64 rows
         Zelda3D_Fog3dOff();
         return;
     }
@@ -617,6 +633,7 @@ void Zelda3D_SceneLightSettingsOverride(PlayState* play) {
     b0 = (s32)b->idx[2];
     b1 = (s32)b->idx[3];
     if (a0 >= n || a1 >= n || b0 >= n || b1 >= n) {
+        gZelda3dEnvColors.valid = 0;
         return; // out-of-range slot: leave the N64 values rather than read past the palette
     }
     wT = b->wTime;
@@ -626,15 +643,20 @@ void Zelda3D_SceneLightSettingsOverride(PlayState* play) {
 
     for (i = 0; i < 3; i++) {
         f32 cfgA, cfgB;
+        // COLORS go to the CMB renderer feed (gZelda3dEnvColors), NOT into envCtx.lightSettings:
+        // the N64 rows z_kankyo just blended stay in envCtx -> lightCtx and keep lighting the
+        // N64-format draws in their own calibration space (unified-shading decision — see the
+        // Zelda3dEnvColors comment in zelda3d.h; the u8 quantization is kept so the values are
+        // bit-identical to what the old envCtx round-trip delivered to the renderer).
         cfgA = LERP(pal[a0].amb[i], pal[a1].amb[i], wT);
         cfgB = LERP(pal[b0].amb[i], pal[b1].amb[i], wT);
-        envCtx->lightSettings.ambientColor[i] = (u8)LERP(cfgA, cfgB, wC);
+        gZelda3dEnvColors.amb[i] = (f32)((u8)LERP(cfgA, cfgB, wC)) / 255.0f;
         cfgA = LERP(pal[a0].l0col[i], pal[a1].l0col[i], wT);
         cfgB = LERP(pal[b0].l0col[i], pal[b1].l0col[i], wT);
-        envCtx->lightSettings.light1Color[i] = (u8)LERP(cfgA, cfgB, wC);
+        gZelda3dEnvColors.l1col[i] = (f32)((u8)LERP(cfgA, cfgB, wC)) / 255.0f;
         cfgA = LERP(pal[a0].l1col[i], pal[a1].l1col[i], wT);
         cfgB = LERP(pal[b0].l1col[i], pal[b1].l1col[i], wT);
-        envCtx->lightSettings.light2Color[i] = (u8)LERP(cfgA, cfgB, wC);
+        gZelda3dEnvColors.l2col[i] = (f32)((u8)LERP(cfgA, cfgB, wC)) / 255.0f;
         if (!b->timeBased) {
             // The ZSI record's colour block is N64's EnvLightSettings byte-for-byte, so the dirs
             // are ALREADY in the N64 (toward-light) convention — copy them straight through.
@@ -658,6 +680,7 @@ void Zelda3D_SceneLightSettingsOverride(PlayState* play) {
         cfgB = LERP(pal[b0].fogCol[i], pal[b1].fogCol[i], wT);
         envCtx->lightSettings.fogColor[i] = (u8)LERP(cfgA, cfgB, wC);
     }
+    gZelda3dEnvColors.valid = 1;
 
     // OoT3D PICA distance fog, gameplay feed. Ground truth (Kokiri gameplay, harness az_fog +
     // per-draw vsuni): the 3DS renders every fog-enabled CMB material (fog_mode=5) through the
