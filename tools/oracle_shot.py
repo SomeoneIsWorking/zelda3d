@@ -48,7 +48,8 @@ def _pos_of(h) -> str:
     return "" if (not r or not r.startswith("ok")) else r
 
 
-def capture(entrance: int, out_png: str, settle_frames: int, keep_ppm: bool) -> int:
+def capture(entrance: int, out_png: str, settle_frames: int, keep_ppm: bool,
+            daytime: int = None) -> int:
     import harness_ctl as HC
     import link_sweep as LS  # for SAVE_STATE (the cold-boot title state)
 
@@ -62,6 +63,11 @@ def capture(entrance: int, out_png: str, settle_frames: int, keep_ppm: bool) -> 
         print("oracle_shot: never reached gameplay — refusing to write a "
               "title-screen frame.", file=sys.stderr)
         return 3
+    # Time-of-day must match the SoH3D side or a comparison is measuring the clock,
+    # not the renderer. gSaveContext is a global, so this is a plain u16 write.
+    if daytime is not None:
+        h.send(f"w16 0x{HC.GSAVECONTEXT_DAYTIME_VA:08x} 0x{daytime:04x}")
+        h.send("run 60")
     live = _pos_of(h) or "gameplay"
 
     base = os.path.splitext(out_png)[0]
@@ -92,10 +98,13 @@ def main() -> int:
                     help="OoT3D/SoH entrance index (default 0xEE = Kokiri Forest)")
     ap.add_argument("--out", default=os.path.join(REPO, "scratch", "screenshots", "oracle.png"))
     ap.add_argument("--settle", type=int, default=180, help="frames to run after warping")
+    ap.add_argument("--daytime", type=lambda s: int(s, 0), default=None,
+                    help="force gSaveContext dayTime (e.g. 0x6000) so the oracle and "
+                         "Zelda3D sides share a clock")
     ap.add_argument("--keep-ppm", action="store_true")
     a = ap.parse_args()
     os.makedirs(os.path.dirname(os.path.abspath(a.out)), exist_ok=True)
-    return capture(a.entrance, a.out, a.settle, a.keep_ppm)
+    return capture(a.entrance, a.out, a.settle, a.keep_ppm, a.daytime)
 
 
 if __name__ == "__main__":
