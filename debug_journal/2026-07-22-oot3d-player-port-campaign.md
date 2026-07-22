@@ -167,8 +167,32 @@ because in six months it would otherwise read as faithful porting.
   either use a save/scene where water is guaranteed (Zora's Domain, or Lake Hylia with the water
   restored) or query the water box directly rather than hunting coordinates.
 
-  So the buoyancy port remains unverified, but the tooling is in better shape than I claimed:
-  `asel link` + `asample` + `tp` all work, and only the force-state-to-real-water step is missing.
+  **RESOLVED — BUOYANCY PORT VERIFIED LIVE (2026-07-22).** The blocker was never the tooling; it was
+  that Lake Hylia is DRAINED in this save. Water exists in **Zora's Domain** (`warp 0x109`), found by
+  grid-probing `st1 & PLAYER_STATE1_IN_WATER` (0x8000000): first hit at (-1094, -2, -340).
+
+  Recipe that works, end to end:
+
+      warp 0x109                      # Zora's Domain — water independent of the lake-drain flag
+      tp -1094 -160 -340              # push Link well under the surface
+      asel link                       # the player IS selectable; `asel 0` is not the way
+      asample 90 scratch/motion/swim_soh.csv
+
+  Result (`scratch/motion/swim_buoyancy_verified.csv`, 90 frames): the per-frame velY increment while
+  rising is **0.0666–0.0667**, i.e. exactly the ported `0.06666667f`. N64's constant is `0.1f`.
+
+  The damping term confirms it INDEPENDENTLY. Predicted `dVelY = (-velY * 0.2) + 0.0667` vs observed:
+
+      velY -0.3709 -> predicted 0.1409, observed 0.1409   (N64 would be 0.2113)
+      velY -0.2300 -> predicted 0.1127, observed 0.1126   (N64 would be 0.1690)
+      velY -0.1174 -> predicted 0.0902, observed 0.0902   (N64 would be 0.1352)
+      velY -0.0272 -> predicted 0.0721, observed 0.0721   (N64 would be 0.1082)
+      velY +0.0449 -> predicted 0.0667, observed 0.0667   (N64 would be 0.1000)
+
+  Every point matches the ported constants to four decimals and none is close to the N64 set. The
+  `phi_f14 = 2.0f` rise clamp also appears exactly (velY saturates at 2.0). So `func_8084B000` is
+  live, correctly signed, and running the OoT3D values — the first port in this campaign confirmed by
+  MEASUREMENT rather than by build-success plus anim-selection parity.
 
   METHOD NOTE: the one-shot full sweep is unreliable — it was killed by a 30-minute timeout after
   only 4 states, and `link_sweep.py list` then still showed the STALE baseline, which is an easy way
