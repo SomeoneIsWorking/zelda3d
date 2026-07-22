@@ -94,6 +94,10 @@
 #include "common/logging/backend.h"
 #include "common/logging/filter.h"
 #include "common/logging/types.h"
+// Hi-res texture-pack parity (see HarnessTexPack below): we flip Azahar's own
+// custom-texture settings on the same pack our cmb3d texpack.cpp uses, so an
+// A/B has the SAME textures on BOTH sides.
+#include "common/settings.h"
 #include "title_sync.h"
 #include <SDL3/SDL.h>
 #include <atomic>
@@ -194,6 +198,11 @@ extern int Zelda3D_Title_CameraState(float* outEye, float* outAt, float* outUp, 
 // not-run direction: use Azahar's own emulator API, not IPC.
 #include "core/core.h"
 #include "core/memory.h"
+// Oracle-side hi-res texture-pack stats (AZAHAR_PATCH.md Patch 8) and our own
+// cmb3d-side counterpart — the `texpack` REPL command reports BOTH so "hi-res
+// is in effect on both sides" is a measurement.
+#include "video_core/custom_textures/custom_tex_manager.h"
+#include "asset/texpack.h" // cmb3d's PUBLIC include dir (Shipwright/cmb3d)
 
 // SoH3D game-engine entry points. Declared here as extern "C" instead of
 // #including soh's global.h / OTRGlobals.h to keep this TU compilable
@@ -336,6 +345,136 @@ namespace {
 
 std::string g_system_dir;
 std::string g_save_dir;
+
+// -----------------------------------------------------------------------------
+// Hi-res texture pack — ONE switch that governs BOTH sides.
+//
+// A side-by-side is only honest if the oracle and SoH3D sample the SAME
+// texels. Historically the harness force-disabled the Zelda3D-side pack
+// (ZELDA3D_TEXPACK=off) because the embedded Azahar rendered vanilla; that
+// removed the asymmetry in the VANILLA direction. The user runs Azahar WITH
+// Henriko's 4K pack, so the useful default is the other direction: hi-res on
+// BOTH sides.
+//
+// Both sides consume the SAME pack directory:
+//   · Zelda3D  — Shipwright/cmb3d/asset/texpack.cpp indexes <root>/**/tex1_*.png
+//                by Citra "legacy" hash and substitutes RGBA at CMB decode.
+//   · Azahar   — VideoCore::CustomTexManager scans
+//                {UserPath::LoadDir}textures/{TITLE_ID}/ (Azahar's user dir is
+//                <save_dir>/Azahar/, so LoadDir = <save_dir>/Azahar/load/).
+//                We do NOT copy the pack: a `load/textures` SYMLINK points at
+//                the very same root, so there is exactly one pack on disk.
+//   The pack's own pack.json carries "use_new_hash": false, i.e. Azahar uses
+//   the same legacy CityHash64 keying our PicaLegacyHashBytes() reimplements.
+//
+// Control (explicit, documented — this is a TEST-HARNESS control that keeps an
+// A/B honest, not an N64-vs-3DS behaviour gate):
+//   ZELDA3D_HARNESS_TEXPACK = on   (default) hi-res on BOTH sides
+//                           = off            vanilla on BOTH sides
+//   ZELDA3D_TEXPACK         = <path>         pack root override (both sides);
+//                             off|0|none     same as HARNESS_TEXPACK=off
+// There is deliberately no way to get hi-res on one side only.
+bool g_texpack_on = false;      // resolved at startup
+std::string g_texpack_root;     // absolute path to the pack root, "" when off
+
+// Mirror of Zelda3D::findPackRoot() (Shipwright/cmb3d/asset/texpack.cpp): a
+// valid root has at least one tex1_*.png under it. Kept in lockstep with it
+// on purpose — both sides must land on the same directory.
+bool TexPackRootValid(const std::filesystem::path& root) {
+    namespace fs = std::filesystem;
+    std::error_code ec;
+    if (!fs::is_directory(root, ec)) return false;
+    for (auto it = fs::recursive_directory_iterator(root, ec);
+         !ec && it != fs::recursive_directory_iterator(); it.increment(ec)) {
+        if (it->is_regular_file(ec) &&
+            it->path().filename().string().rfind("tex1_", 0) == 0)
+            return true;
+    }
+    return false;
+}
+
+// Resolve the pack root the same way texpack.cpp does, but ALWAYS absolute:
+// the embedded SoH chdir()s into scratch/harness/soh_cwd during soh_boot, so
+// a relative "textures" would stop resolving.
+std::string ResolveTexPackRoot(const std::string& rom_path) {
+    namespace fs = std::filesystem;
+    std::error_code ec;
+    auto abs = [&](const fs::path& p) { return fs::absolute(p, ec).lexically_normal().string(); };
+    if (const char* env = std::getenv("ZELDA3D_TEXPACK"); env && *env) {
+        if (!std::strcmp(env, "0") || !std::strcmp(env, "off") || !std::strcmp(env, "none"))
+            return {};
+        if (TexPackRootValid(env)) return abs(env);
+        std::fprintf(stderr, "harness: texpack: ZELDA3D_TEXPACK=%s has no tex1_*.png\n", env);
+        return {};
+    }
+    if (TexPackRootValid("textures")) return abs("textures");
+    if (!rom_path.empty()) {
+        fs::path cand = fs::path(rom_path).parent_path() / "textures";
+        if (TexPackRootValid(cand)) return abs(cand);
+    }
+    return {};
+}
+
+// Called from main() BEFORE retro_load_game: Core::System::Load() runs
+// CustomTexManager::FindCustomTextures() when Settings::values.custom_textures
+// is set, and that latches textures_loaded, so both the setting and the
+// LoadDir symlink must be in place first.
+void SetupTexPack(const std::string& rom_path) {
+    namespace fs = std::filesystem;
+    const char* mode = std::getenv("ZELDA3D_HARNESS_TEXPACK");
+    const bool want = !(mode && (!std::strcmp(mode, "0") || !std::strcmp(mode, "off") ||
+                                 !std::strcmp(mode, "none")));
+    g_texpack_root = want ? ResolveTexPackRoot(rom_path) : std::string{};
+    g_texpack_on = !g_texpack_root.empty();
+
+    if (!g_texpack_on) {
+        Settings::values.custom_textures = false;
+        std::fprintf(stderr, "harness: texpack: OFF on BOTH sides (%s)\n",
+                     want ? "no pack found" : "ZELDA3D_HARNESS_TEXPACK=off");
+        return;
+    }
+
+    // Azahar side: point its LoadDir at our pack via a symlink, so
+    // {LoadDir}textures/{TITLE_ID}/ resolves into the repo pack.
+    std::error_code ec;
+    const fs::path userDir = fs::absolute(g_save_dir, ec) / "Azahar";
+    const fs::path loadDir = userDir / "load";
+    const fs::path link = loadDir / "textures";
+    fs::create_directories(loadDir, ec);
+    if (fs::is_symlink(link, ec)) {
+        if (fs::read_symlink(link, ec) != fs::path(g_texpack_root)) fs::remove(link, ec);
+    } else if (fs::exists(link, ec)) {
+        std::fprintf(stderr, "harness: texpack: %s exists and is NOT a symlink — leaving it\n",
+                     link.c_str());
+    }
+    if (!fs::exists(link, ec)) fs::create_directory_symlink(g_texpack_root, link, ec);
+    if (ec) {
+        std::fprintf(stderr, "harness: texpack: could not link %s -> %s (%s); oracle stays "
+                             "VANILLA, disabling our side too to keep the A/B honest\n",
+                     link.c_str(), g_texpack_root.c_str(), ec.message().c_str());
+        g_texpack_on = false;
+        g_texpack_root.clear();
+        Settings::values.custom_textures = false;
+        return;
+    }
+
+    Settings::values.custom_textures = true;
+    // async_custom_loading is deliberately LEFT AT AZAHAR'S DEFAULT (true).
+    // Setting it false looks attractive (a replacement then lands on the frame
+    // the surface is first sampled, instead of up to MAX_UPLOADS_PER_TICK=8
+    // frames later) but Azahar's synchronous path is BROKEN: CustomTexManager::
+    // Decode() then calls upload() inline from inside the rasterizer's surface
+    // fill, which re-enters MemorySystem::RasterizerMarkRegionCached on an
+    // already-cached page and aborts on `core/memory.cpp:1130: Unreachable
+    // code!` (measured 2026-07-22: crashes ~3.5s into a Kokiri warp, 100%
+    // reproducible; async runs the same schedule to completion).
+    // CONSEQUENCE for parity runs: replacements trickle in at <=8 per rendered
+    // frame after a scene load, so a capture taken too early can show the
+    // oracle still vanilla while our side is already hi-res. Step until the
+    // `texpack` hit counter stops growing before capturing.
+    std::fprintf(stderr, "harness: texpack: ON on BOTH sides — root %s (az load dir %s)\n",
+                 g_texpack_root.c_str(), loadDir.c_str());
+}
 
 // Persistent held-input mask driven by the `input` REPL command. Bit N is
 // asserted when the frontend is polled for RETRO_DEVICE_ID_JOYPAD_N.
@@ -596,6 +735,14 @@ bool EnvironmentCallback(unsigned cmd, void* data) {
         // Only the 3DS top screen is useful for parity — bottom is UI, not
         // game state. "single_screen" restricts VideoRefresh output to
         // just the top screen at 400x240.
+        // Hi-res texture pack for the ORACLE. retro_load_game -> UpdateSettings
+        // -> ParseCoreOptions re-reads this variable and would otherwise reset
+        // Settings::values.custom_textures to the core default (disabled), so
+        // SetupTexPack's decision has to be answered HERE, not just assigned.
+        if (var->key && std::strcmp(var->key, "citra_custom_textures") == 0) {
+            var->value = g_texpack_on ? "enabled" : "disabled";
+            return true;
+        }
         if (var->key && std::strcmp(var->key, "citra_layout_option") == 0) {
             var->value = "single_screen";
             return true;
@@ -969,18 +1116,14 @@ void SohBootInternal() {
     setenv("SOH_HEADLESS", "1", 1);
     setenv("SOH3D_HEADLESS", "1", 1);
 
-    // Force the hi-res texture pack OFF for this harness's embedded SoH
-    // instance ONLY -- Shipwright/cmb3d/asset/texpack.cpp:findPackRoot()
-    // already supports this override (added 2026-07-10 for a lighting A/B
-    // test); "off" makes every TexPackLookup() miss, so the CMB path falls
-    // through to the original decoded texels (vanilla "3D" wordmark), which
-    // is what the oracle renders too. Without this, the harness would pick
-    // up the user's real shipofharkinian.json / cwd `textures/` pack (e.g.
-    // Henriko 4K) and permanently corrupt the SBS content-search compare
-    // with mismatched wordmark/copyright text. Env-only: does NOT touch the
-    // user's real config, and tools/zelda3d_game.sh (the normal game) never
-    // sets this, so its default (pack ON if present) is unaffected.
-    setenv("ZELDA3D_TEXPACK", "off", 1);
+    // Texture pack: whatever SetupTexPack() decided for the ORACLE, force the
+    // embedded SoH to match — the two sides are never allowed to diverge here
+    // (see the HarnessTexPack block near g_texpack_root). The value is an
+    // ABSOLUTE path because we are about to chdir() out of the launch cwd, so
+    // texpack.cpp's relative "textures" fallback would stop resolving.
+    // Env-only: does NOT touch the user's real config, and
+    // tools/zelda3d_game.sh (the normal game) never sets this.
+    setenv("ZELDA3D_TEXPACK", g_texpack_on ? g_texpack_root.c_str() : "off", 1);
 
     // Match Az's 2x 3DS top-screen resolution (400x240 * 2 = 800x480) so the
     // side-by-side panels are like-for-like (Azahar renders at
@@ -3884,6 +4027,28 @@ void HandleForce(std::istringstream& toks) {
     PrintErr(("force: unknown sub: " + sub).c_str());
 }
 
+// `texpack` — report the hi-res texture-pack state of BOTH sides in one line,
+// so a parity run can PROVE they match instead of assuming it. Counters are
+// cumulative since load on both sides.
+//   ok texpack mode=on root=<abs> az=<files>/<materials> az_hits=<hit>/<miss>
+//      soh=<indexed> soh_hits=<hit>/<miss>
+void HandleTexPack(std::istringstream& toks) {
+    const auto s = Zelda3D::TexPackGetStats();
+    const auto az = Core::System::GetInstance().CustomTexManager().GetStats();
+    std::printf("ok texpack mode=%s root=%s az=%zu/%zu az_hits=%llu/%llu "
+                "soh=%llu soh_hits=%llu/%llu%s\n",
+                g_texpack_on ? "on" : "off",
+                g_texpack_on ? g_texpack_root.c_str() : "-",
+                az.files, az.materials,
+                static_cast<unsigned long long>(az.hits),
+                static_cast<unsigned long long>(az.misses),
+                static_cast<unsigned long long>(s.indexed),
+                static_cast<unsigned long long>(s.hits),
+                static_cast<unsigned long long>(s.misses),
+                s.scanned ? "" : " (soh side not scanned yet)");
+    (void)toks;
+}
+
 void HandleCompare(std::istringstream& toks) {
     std::string sub;
     if (!(toks >> sub)) {
@@ -3970,6 +4135,8 @@ void PrintHelp() {
         "  drawskip <n>|off     suppress per-frame PICA draw #n (draw isolation)\n"
         "  sweep <sub>          automated multi-step parity driver;\n"
         "                       `sweep list` shows subs (title, ...)\n"
+        "  texpack              hi-res texture-pack state + hit counters for\n"
+        "                       BOTH sides (ZELDA3D_HARNESS_TEXPACK=on|off)\n"
         "  diag                 print harness diagnostics (input+capture)\n"
         "  quit                 exit\n"
         "  help                 this list\n");
@@ -4545,6 +4712,7 @@ void RunRepl() {
                         g_titleSync.lastDelta(), g_titleSync.corrections(),
                         g_titleSync.maxAbsDelta(), g_titleSync.locks());
         }
+        else if (cmd == "texpack")   HandleTexPack(toks);
         else if (cmd == "compare")   HandleCompare(toks);
         else if (cmd == "force")     HandleForce(toks);
         else if (cmd == "snapshot")  HandleSnapshot(toks);
@@ -4629,8 +4797,21 @@ int main(int argc, char** argv) {
         }
     }
 
-    g_system_dir = "scratch/harness/system";
-    g_save_dir = "scratch/harness/save";
+    // ABSOLUTE, not relative: SohBootInternal() chdir()s the process into
+    // scratch/harness/soh_cwd to isolate the embedded SoH's config, and Azahar
+    // keeps these as its user-dir roots for the whole run. With relative paths
+    // every Azahar file access issued AFTER soh_boot resolved against the wrong
+    // cwd — which is exactly how the hi-res pack died mid-run ("Failed to open
+    // custom texture: scratch/harness/save/Azahar/load/textures/...", then a
+    // zero-extent VkImage and an UNREACHABLE abort in vk_texture_runtime).
+    {
+        std::error_code ec;
+        namespace fs = std::filesystem;
+        fs::create_directories("scratch/harness/system", ec);
+        fs::create_directories("scratch/harness/save", ec);
+        g_system_dir = fs::absolute("scratch/harness/system", ec).lexically_normal().string();
+        g_save_dir   = fs::absolute("scratch/harness/save",   ec).lexically_normal().string();
+    }
 
     std::fprintf(stderr, "soh3d_harness: rom = %s\n", rom_path.c_str());
 
@@ -4679,6 +4860,11 @@ int main(int argc, char** argv) {
         game.data = rom.data();
         game.size = rom.size();
     }
+
+    // Both-sides texture-pack decision. MUST be after retro_init() (Settings
+    // globals live in the core) and before retro_load_game() (Core::System::
+    // Load latches CustomTexManager::FindCustomTextures).
+    SetupTexPack(rom_path);
 
     tstamp("retro_load_game begin");
     // Watchdog around retro_load_game too — this is the long CPU-heavy step

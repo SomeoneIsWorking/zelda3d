@@ -119,6 +119,34 @@ again for a frame already captured in a prior session.
 - **soh3d_harness is single-instance** (PID-locked) — the frame cache does not change
   that; `warm`/`ab` cache-miss paths still need exclusive access to the harness process.
 
+## Hi-res texture pack — ONE switch, both sides (`ZELDA3D_HARNESS_TEXPACK`)
+
+An A/B is only honest if both engines sample the same texels. The harness therefore governs
+the hi-res pack for BOTH sides from a single control, and there is deliberately **no way to
+get hi-res on one side and vanilla on the other**:
+
+| `ZELDA3D_HARNESS_TEXPACK` | oracle (Azahar) | Zelda3D |
+| --- | --- | --- |
+| `on` (default) | `citra_custom_textures=enabled`, `LoadDir/textures` symlinked at the pack | `ZELDA3D_TEXPACK=<abs pack root>` |
+| `off` | `citra_custom_textures=disabled` | `ZELDA3D_TEXPACK=off` |
+
+- Pack root resolution is the same rule on both sides (`ZELDA3D_TEXPACK=<path>`, else
+  `textures/` next to the repo root, else `<romdir>/textures`), resolved to an **absolute**
+  path because `soh_boot` chdir()s. `ZELDA3D_TEXPACK=off|0|none` still means "off, both sides".
+  One pack on disk, no copies: Azahar reaches it through a
+  `scratch/harness/save/Azahar/load/textures` symlink.
+- This is a **test-harness control**, not an N64-vs-3DS behaviour gate — the no-opt-out-gates
+  rule is about game behaviour; keeping an A/B like-for-like is exactly what a harness switch
+  is for. Use `off` when a comparison depends on stock texture content (e.g. the title
+  wordmark/copyright that `tools/title_sbs_verify.py`'s `content_score` reads) — but set it
+  for the whole run, so both sides move together.
+- **Prove it, don't assume it**: the `texpack` REPL command prints both sides in one line —
+  `ok texpack mode=on root=<abs> az=<files>/<materials> az_hits=<h>/<m> soh=<indexed>
+  soh_hits=<h>/<m>`. Because Azahar loads replacements asynchronously (≤8 uploads per rendered
+  frame; its synchronous path crashes, see `AZAHAR_PATCH.md` Patch 8), **step until the hit
+  counters stop growing before capturing a frame**, or an early capture can show the oracle
+  still vanilla while our side is already hi-res.
+
 ## Link (on-foot) state-matrix sweep — `tools/link_sweep.py`
 
 Reusable for the ZELDA3D_LINK on-foot Link body specifically (locomotion + discrete actions).

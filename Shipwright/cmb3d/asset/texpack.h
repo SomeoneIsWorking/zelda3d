@@ -13,4 +13,16 @@ namespace Zelda3D {
 // when no pack is found or the hash is absent.
 bool TexPackLookup(uint64_t hash, int& w, int& h, std::vector<uint8_t>& rgba);
 
+// Whether a pack was found (only meaningful after the first lookup), how many textures
+// are indexed, and how many lookups hit / missed it. The parity harness reports these so
+// "hi-res is actually in effect" is a measurement rather than an assumption.
+struct TexPackStats {
+    bool scanned;
+    bool active;
+    uint64_t indexed;
+    uint64_t hits;
+    uint64_t misses;
+};
+TexPackStats TexPackGetStats();
+
 } // namespace Zelda3D

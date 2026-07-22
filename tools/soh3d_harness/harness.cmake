@@ -55,6 +55,11 @@ target_link_libraries(soh3d_harness PRIVATE
     Boost::boost dds-ktx libretro tsl::robin_map
     ${PLATFORM_LIBRARIES} Threads::Threads
     soh_lib
+    # main.cpp's `texpack` REPL command reads Zelda3D::TexPackGetStats() so the
+    # hi-res-pack A/B can be measured on OUR side (the oracle side comes from
+    # CustomTexManager::GetStats, AZAHAR_PATCH.md Patch 8). soh_lib links cmb3d
+    # PRIVATEly, so its PUBLIC include dir does not propagate — name it here.
+    cmb3d
 )
 
 # soh_lib pulls in the whole Shipwright side (ZAPDLib, libultraship,

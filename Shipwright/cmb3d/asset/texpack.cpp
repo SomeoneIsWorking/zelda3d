@@ -19,6 +19,8 @@ struct TexPack {
     bool scanned = false;
     bool ourFlip = false; // flip the loaded PNG vertically to match our top-down texture space
     std::unordered_map<uint64_t, std::string> index; // Citra legacy hash -> PNG path
+    uint64_t hits = 0;
+    uint64_t misses = 0;
 };
 
 TexPack g_pack;
@@ -121,12 +123,15 @@ void scan() {
 bool TexPackLookup(uint64_t hash, int& w, int& h, std::vector<uint8_t>& rgba) {
     if (!g_pack.scanned) scan();
     auto it = g_pack.index.find(hash);
-    if (it == g_pack.index.end()) return false;
+    if (it == g_pack.index.end()) { g_pack.misses++; return false; }
+    g_pack.hits++;
 
     int n = 0;
     stbi_uc* px = stbi_load(it->second.c_str(), &w, &h, &n, 4);
     if (!px) {
         fprintf(stderr, "[Zelda3D] texpack: failed to load %s\n", it->second.c_str());
+        g_pack.hits--;
+        g_pack.misses++;
         return false;
     }
     rgba.assign(px, px + (size_t)w * h * 4);
@@ -144,6 +149,11 @@ bool TexPackLookup(uint64_t hash, int& w, int& h, std::vector<uint8_t>& rgba) {
         }
     }
     return true;
+}
+
+TexPackStats TexPackGetStats() {
+    return TexPackStats{g_pack.scanned, !g_pack.index.empty(),
+                        static_cast<uint64_t>(g_pack.index.size()), g_pack.hits, g_pack.misses};
 }
 
 } // namespace Zelda3D
