@@ -27,6 +27,7 @@
 #include "2s2h/Enhancements/FrameInterpolation/FrameInterpolation.h"
 #include "2s2h/GameInteractor/GameInteractor.h"
 #include "2s2h/zelda3d/mm3d_draw.h" // MM3D actor draw-divert (3DS CMB substitution)
+#include "2s2h/zelda3d/mm3d_model.h" // Zelda3D_MM_AfterActorDraw — clears the deferred skinned slot
 #include "2s2h/BenPort.h"
 #include "2s2h/ShipUtils.h"
 #include "2s2h/ObjectExtension/ObjectExtension.h"
@@ -2990,6 +2991,13 @@ void Actor_Draw(PlayState* play, Actor* actor) {
         if (!Zelda3D_TryDrawActor(play, actor)) {
             actor->draw(actor, play);
         }
+        // MM3D: clear the deferred skinned-model slot once THIS actor's draw is done. Skinned
+        // actors stash a pending {actor, modelId, scale, groundOffset} and return 0 so their own
+        // draw() runs, and Zelda3D_MM_SkelAnimeDrawRaw consumes it from inside SkelAnime_Draw*.
+        // Without this clear the slot outlives its owner, so the NEXT actor to reach that path
+        // consumes a STALE pending entry and draws someone else's model at its own position —
+        // observed as a skinned actor rendering on top of Link at the South Clock Town spawn.
+        Zelda3D_MM_AfterActorDraw();
         GameInteractor_ExecuteOnActorDraw(actor);
     }
 
