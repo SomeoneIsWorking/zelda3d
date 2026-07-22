@@ -117,7 +117,10 @@ POSE column is noted. **Last swept 2026-07-15T12:36Z.**
 | Actor light-DIRECTION sign (3DS stores travel dirs) | CLOSED-parity | oracle actor uniforms; matched-camera A/B | `2389731c` | 2026-07-22 |
 | 3DS camera values (all 66 settings; vertical FOV 52°) | CLOSED-parity | live Camera struct + captured projection; row alignment −17 → 0 | `381d1209` | 2026-07-22 |
 | En_Elf fairy (wings + glow transform + proximity fade) | CLOSED-parity | draw-list structural identity vs oracle handles; matched-camera A/B | `cd1f4f46` / decomp `46b03ce` | 2026-07-22 |
-| Kokiri Forest overall frame parity @0x6000 | CLOSED-parity | frame mean 72.4 vs oracle 72.6 (rows 60–420) | `cd1f4f46` | 2026-07-22 |
+| Kokiri Forest overall frame parity @0x6000 | **REOPENED** — frame-mean only | frame mean 72.4 vs oracle 72.6 (rows 60–420) | `cd1f4f46` | 2026-07-22 |
+| Kokiri NEAR-terrain brightness | OPEN | per-draw mask: d8 **1.169** (1.192 exclusive) vs oracle, while far terrain d9 is 1.018 with a byte-identical material | — | 2026-07-22 |
+
+**Why the Kokiri row was reopened the same day it was closed:** it was closed on a FRAME MEAN, and a frame mean cannot see a per-surface error — a +19% overshoot on near terrain was being cancelled out in the average (and, separately, masked by a hi-res texture pack darkening our side). Per-draw pixel masks (`tools/tev_mask_ratio.py`) are the metric that exposed it. **Do not close a render row on a frame mean again.**
 
 **Scope note:** these were verified AT KOKIRI FOREST. The changes are global (102-scene palette,
 global camera table, global fog path); a multi-scene sweep is the outstanding check.
