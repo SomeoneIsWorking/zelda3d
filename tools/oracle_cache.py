@@ -6,7 +6,7 @@ Two independent cache namespaces share the scratch/oracle_cache/ root
   scratch/oracle_cache/warp/<ent>_<dayTime>.json
       The ORIGINAL warp-probe cache (this module's `warp()`/`invalidate()`
       functions, used by tools/market_scene_probe.py): memoizes
-      `oot3d-decomp/tools/link_ctl.py warp <ent> <dayTime>` results —
+      a harness warp to (<ent>, <dayTime>) —
       scene/head/pos/rot — since a warp costs ~3-5s of oracle time and is
       deterministic for a given (entrance, dayTime).
 
@@ -62,31 +62,49 @@ def _cache_path(entrance, day_time):
     return os.path.join(CACHE_DIR, f"{ent_norm}_{dt_norm}.json")
 
 
-def _parse_link_ctl(stdout):
-    # link_ctl.py final line: "scene=32 head=098f4010 pos=(-4.0,0.0,715.9) rot=(0,-32767,0)"
-    m = re.search(
-        r"scene=(\d+)\s+head=([0-9a-fA-F]+)\s+pos=\(([-\d.,]+)\)\s+rot=\(([-\d,]+)\)",
-        stdout,
-    )
-    if not m:
+def _probe_oracle(entrance, day_time, timeout):
+    """Warp a fresh harness oracle to (entrance, dayTime) and read the Player back.
+
+    Returns the same {scene, head, pos, rot, raw} shape the cache has always stored.
+    """
+    import harness_ctl as HC
+
+    ent = entrance if isinstance(entrance, int) else int(str(entrance), 0)
+    dt = day_time if isinstance(day_time, int) else int(str(day_time), 0)
+
+    h = HC.spawn(save_state=os.path.join(REPO, "scratch", "title_settled.state"))
+    try:
+        if not HC.boot_to_gameplay(h, entrance=ent):
+            return None
+        if dt:
+            h.send(f"w16 0x{HC.GSAVECONTEXT_DAYTIME_VA:08x} 0x{dt:04x}")
+            h.send("run 30")
+        scene = (h.send("scene") or "").strip()
+        pos_r = (h.send("az_playerpos") or "").strip()
+        anim_r = (h.send("az_linkanim") or "").strip()
+    finally:
+        h.close()
+
+    m_s = re.search(r"ok 0x([0-9a-fA-F]+)", scene)
+    m_p = re.search(r"pos=\(([-\d.,]+)\)\s+worldRy=(-?\d+)", pos_r)
+    m_h = re.search(r"addr=0x([0-9a-fA-F]+)", anim_r)
+    if not (m_s and m_p):
         return None
-    pos = tuple(float(x) for x in m.group(3).split(","))
-    rot = tuple(int(x) for x in m.group(4).split(","))
     return {
-        "scene": int(m.group(1)),
-        "head": m.group(2),
-        "pos": pos,
-        "rot": rot,
-        "raw": stdout.strip().splitlines()[-1],
+        "scene": int(m_s.group(1), 16),
+        "head": m_h.group(1) if m_h else None,
+        "pos": tuple(float(x) for x in m_p.group(1).split(",")),
+        "rot": (0, int(m_p.group(2)), 0),
+        "raw": f"{scene} | {pos_r}",
     }
 
 
-def warp(entrance, day_time, refresh=False, timeout=30):
-    """Warp the oracle to (entrance, dayTime). Returns a dict {scene, head, pos, rot, raw}.
+def warp(entrance, day_time, refresh=False, timeout=300):
+    """Warp the oracle to (entrance, dayTime). Returns {scene, head, pos, rot, raw}.
 
-    Cache hit skips the oracle entirely; miss drives link_ctl.py and stores the result.
-    Callers that need the oracle in a specific memory state (post-warp for further RAM
-    probes) should pass refresh=True — a cache hit does NOT touch Azahar.
+    Cache hit skips the oracle entirely; a miss boots a harness oracle and warps.
+    Callers that need the oracle left in a specific memory state should not use this
+    (the harness process is closed once the probe is read).
     """
     path = _cache_path(entrance, day_time)
     if not refresh and os.path.exists(path):
@@ -95,17 +113,10 @@ def warp(entrance, day_time, refresh=False, timeout=30):
         data["_cache_hit"] = True
         return data
 
-    ent = entrance if isinstance(entrance, str) else f"0x{entrance:X}"
-    dt = day_time if isinstance(day_time, str) else f"0x{day_time:04X}"
-    r = subprocess.run(
-        ["python3", "tools/link_ctl.py", "warp", ent, dt],
-        cwd=DECOMP, capture_output=True, text=True, timeout=timeout,
-    )
-    parsed = _parse_link_ctl(r.stdout)
+    parsed = _probe_oracle(entrance, day_time, timeout)
     if parsed is None:
-        # Do NOT cache a failed probe.
         return {"scene": None, "head": None, "pos": None, "rot": None,
-                "raw": r.stdout.strip(), "_cache_hit": False, "_error": True}
+                "raw": "oracle probe failed", "_cache_hit": False, "_error": True}
     with open(path, "w") as f:
         json.dump(parsed, f, indent=2, sort_keys=True)
     parsed["_cache_hit"] = False

@@ -3,10 +3,10 @@
 Documents the OoT3D (3DS) emulated-RAM layout we reverse-engineer to drive the Azahar oracle:
 warp-to-any-scene injection + per-actor variant/animation dumps for matching SoH3D to the 3DS game.
 OoT3D has **no symbols**, so addresses here are derived empirically (RAM scanning + OoT-N64 layout
-similarity). Tools: `tools/azahar_repl.py` / `tools/azahar_rpc.py` (read/write/screenshot/input over
-Azahar RPC :45987). See memory soh3d-azahar-oracle. **Update this as facts are found; mark guesses.**
+similarity). Tool: the embedded harness (`tools/harness_ctl.py` — `mem`/`r`/`w`/`snapshot`/`input`/`warp`);
+see `oot3d-decomp/docs/oracle.md`. **Update this as facts are found; mark guesses.**
 
-## Address space (3DS virtual, per the running OoT3D process, pid from `procs`)
+## Address space (3DS virtual, per the running OoT3D process)
 - `0x00100000` — `.text` (ARM code; BL-opcode stream confirmed).
 - `0x08000000` — heap.
 - (3DS regions per Azahar memory.h: PROCESS_IMAGE, HEAP, LINEAR_HEAP, N3DS_EXTRA_RAM.)

@@ -1,9 +1,8 @@
 #!/usr/bin/env python3
 """oracle_shot.py — capture a VERIFIED gameplay screenshot from the embedded-Azahar oracle.
 
-The visual half of the oracle A/B. `tools/parity_ab.py` drives the EXTERNAL Azahar over UDP RPC,
-which needs a GUI instance running; this drives the EMBEDDED harness instead, so a matched
-Zelda3D-vs-OoT3D frame can be produced with nothing else launched.
+The visual half of the oracle A/B: drives the embedded harness, so a matched Zelda3D-vs-OoT3D
+frame can be produced with nothing else launched.
 
 WHY THIS EXISTS (the bug it fixes): the harness renders real frames — `snapshot <base>` writes
 `<base>.az.ppm` from a Vulkan readback of the actual 3DS output — but `OracleSession.boot()` reports
@@ -40,10 +39,10 @@ sys.path.insert(0, HERE)
 def _pos_of(h) -> str:
     """Gameplay probe: a non-empty reply proves the Player actor resolved.
 
-    Uses `az_linkanim`, NOT `az_playerpos`. az_playerpos answers "no Player actor" even when the
-    oracle is demonstrably in gameplay (it walks a different anchor and has never resolved in this
-    project's runs), whereas az_linkanim is the probe link_sweep drives its whole state matrix with.
-    Picking the wrong probe here makes a working oracle look broken.
+    Uses `az_linkanim` — the probe link_sweep drives its whole state matrix with, so a capture
+    and a sweep agree on what "in gameplay" means. (`az_playerpos` also resolves correctly once
+    boot_to_gameplay has run; it used to answer "no Player actor" only because callers were on
+    the title.)
     """
     r = (h.send("az_linkanim") or "").strip()
     return "" if (not r or not r.startswith("ok")) else r

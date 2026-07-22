@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
 """oracle_anim_id.py — identify, per oracle frame, which Zelda3D CSAB pose best matches it.
 
-Loads an oracle jointTable capture (oracle_link_pose.py CSV: per-bone LOCAL rotations) and, for each
+Loads an oracle jointTable capture (per-bone LOCAL-rotation CSV) and, for each
 captured frame, finds the (anim, frame) among a set of offline-sampled CSABs (nml_walk_free,
 nml_walk_endR_free, nml_walk_endL_free) whose per-bone leg pose is closest (mean geodesic angle).
 

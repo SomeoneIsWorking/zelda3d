@@ -6,7 +6,7 @@ childlink_v2 rig between:
   Zelda3D : REPL `skindump` CSV (cap,anim,frame,bone,m0..m11) — aw = animated bone-WORLD matrix.
           We orthonormalize each bone's 3x3 and derive its LOCAL rotation R_local = R_parentᵀ·R_bone
           using the rig parent map, so it is comparable to the oracle's local rotation.
-  oracle: tools/oracle_link_pose.py CSV (cap,t_ms,bone,r0..r8) — the live jointTable LOCAL rotation.
+  oracle: per-bone CSV (cap,t_ms,bone,r0..r8) — the live jointTable LOCAL rotation.
 
 Both rigs share the same childlink_v2 bind frame, so local rotations are directly comparable (no
 alignment needed). For each oracle frame we find the Zelda3D frame with the lowest mean per-bone geodesic
@@ -84,7 +84,7 @@ def load_soh_local(path, bones):
 
 
 def load_oracle_local(path, bones):
-    """oracle_link_pose -> {cap: {bone: R_local(3x3)}} (already local)."""
+    """oracle CSV -> {cap: {bone: R_local(3x3)}} (already local)."""
     out = {}
     with open(path) as f:
         for row in csv.reader(f):
