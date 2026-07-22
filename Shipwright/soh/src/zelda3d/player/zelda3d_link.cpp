@@ -60,7 +60,7 @@ static void Zelda3D_Mat3ToEuler(const float* m, float* outDeg) {
 }
 
 // --- OoT3D Link (player) replacement — proof-of-hook stage (see Zelda3D_TryDrawPlayer) ---
-int gZelda3dLinkOn = -1;  // sub-toggle (env ZELDA3D_LINK, default OFF — WIP) / REPL `link`
+int gZelda3dLinkOn = 1;  // OoT3D player body: ALWAYS ON. Dev A/B only via REPL `link`.
 float gZelda3dLinkScale = 0.011f; // world scale OoT3D-link-local -> N64 player units (REPL `linkscale`, calibrate live)
 float gZelda3dLinkRotX = 0.0f;   // rest->upright orientation correction (deg) (REPL `linkrot`)
 float gZelda3dLinkRotY = 0.0f;
@@ -105,11 +105,14 @@ int gZelda3dLinkAnimSrc = -1;
 // (`linkgrab`), and transform pin (`linkpin`) state moved into PlayerBehavior's composed subsystems
 // (midmask / jointDump / grab / pin) — see player.h.
 
+// The OoT3D player body is the DEFAULT and only shipped path — no env gate.
+//
+// It used to be off unless ZELDA3D_LINK=1, left over from when the hook was a
+// proof-of-concept bind pose. That stopped being true long ago (the on-foot port
+// sweeps at 22/25 states matching and mounted Link was verified at title), but the
+// gate stayed, so every normal run silently rendered N64 Link while every other
+// actor rendered from OoT3D — which is exactly what the Kokiri A/B caught.
 extern "C" int Zelda3D_LinkEnabled(void) {
-    if (gZelda3dLinkOn < 0) {
-        const char* v = getenv("ZELDA3D_LINK");
-        gZelda3dLinkOn = (v != NULL && v[0] == '1') ? 1 : 0; // default OFF (WIP)
-    }
     return gZelda3dLinkOn;
 }
 
@@ -840,7 +843,7 @@ int Zelda3D::PlayerBehavior::repl(PlayState* play, const char* cmd, const char* 
                         iv ? 1 : 0);
     } else if (strcmp(cmd, "link") == 0 && sscanf(line, "%*s %i", &iv) == 1) {
         gZelda3dLinkOn = iv ? 1 : 0;
-        Zelda3D_ReplReply(outPath, "link=%d (OoT3D player body replacement, proof-of-hook bind pose)",
+        Zelda3D_ReplReply(outPath, "link=%d (OoT3D player body replacement; 1 = the shipped default)",
                         gZelda3dLinkOn);
     } else if (strcmp(cmd, "linkscale") == 0 && sscanf(line, "%*s %f", &f1) == 1) {
         gZelda3dLinkScale = f1;
