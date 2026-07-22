@@ -92,7 +92,31 @@ renders correctly) is equally far from the 0.1 default. So a scale of 0.010 is n
 fault by itself. I do not currently know what actor 0x1C7 / object `sdn` IS, and without that I
 cannot say the render is wrong — a large festival parasol may be exactly right for that spot.
 
-Honest status: the cone is UNEXPLAINED. Ruled out so far: stale pending state (round 1), misplacement
+## RESOLVED (round 4) — it is the Gate-Blocking Soldier, and the scale IS too large
+
+Identification was the missing piece:
+
+    actor 0x1C7 = En_Stop_heishi  "Gate-Blocking Soldier"   (2ship/include/tables/actor_table.h:471)
+    object 0x1B6 = object_sdn                                (object_table.h:455)
+
+He stands at the South Clock Town gate — which is exactly the +Z direction Link faces at spawn, at
+z=680. MM's Clock Town soldiers wear a large CONICAL red-and-white helmet, so the "cone" is his hat.
+
+Confirmed live with `mscale 0x1B6 0.004`: the object shrinks into a recognisable soldier's helmet on
+a person-sized figure standing behind Link, instead of a giant floating cone. So the model is CORRECT
+and `worldScale=0.010` is simply too large for this rig — roughly 2.5x.
+
+**This vindicates round 2 and over-corrects round 3.** Round 3 was right that "a non-0.1 scale is not
+by itself evidence of a fault", but wrong to treat that as grounds for doubting the fault existed:
+once you know the actor is a SOLDIER, a hat that size is obviously wrong. The lesson is that the
+missing step was IDENTIFICATION, not another mechanism hypothesis.
+
+Fix direction (unchanged from round 2, now justified): the height/bone-length-sum auto-scale
+over-estimates for `sdn`. Compare its rig against the dog's (0.0075, renders correctly) to see which
+term diverges. `mscale 0x1B6 <s>` bisects the right value live; ~0.004 is in the right neighbourhood
+but was not tuned precisely — do NOT hardcode 0.004, fix the derivation.
+
+Superseded status: the cone is UNEXPLAINED. Ruled out so far: stale pending state (round 1), misplacement
 (round 2 — it is on the camera axis at ~1430 units, drawn at its correct world position), and now
 corrupt bind-pose verts (round 3 — groundOff is sane). Next step is identification, not fixing:
 determine what actor id 0x1C7 / object 0x1B6 `sdn` is in MM, and compare the 3DS model against its
