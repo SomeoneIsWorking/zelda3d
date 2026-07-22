@@ -1730,6 +1730,25 @@ void Fast::Zelda3DRenderer::DrawModel(int modelId, const float* mp16, const floa
         // exactly the surfaces measuring 0.62-0.88 of the oracle, while every single-texture
         // single-stage surface in the same frame is far closer. Fixing "Zora's water is dark and
         // desaturated" means emulating multi-texture + stages 1..5, NOT touching the lighting.
+        //
+        // CLOSED 2026-07-22 (later): multi-stage TEV landed, and the follow-on "Zora ground 0.79 /
+        // walls 0.86 scene-wide deficit" that survived it WAS NOT A RENDERER DEFECT AT ALL. It was a
+        // HI-RES TEXTURE PACK ASYMMETRY in the measurement: the oracle frames were captured by a
+        // harness predating 7a1dc7e0 (Azahar with no custom textures) while our side, launched from
+        // the repo root where textures/ lives, rendered Henriko's 4K pack — whose Zora rock/ground
+        // replacements are ~20% darker than the ROM texels. Controlled A/B at one matched camera,
+        // only the pack differing: near ground d11 0.811 -> 0.977, rock walls d3 0.853 -> 0.921; and
+        // over d3's EXCLUSIVE pixels (those no translucent draw overlays) 1.002. Every opaque scene
+        // surface at Zora is at parity vanilla-on-vanilla.
+        //   FALSIFIED, do not retry as causes of that deficit: (a) "a decal-layer draw we drop
+        //   entirely" — the oracle's 27 scene draws already map 1:1 onto our 21 room + 6 waterfall
+        //   groups, and the exclusive-pixel ratios are 0.99-1.00, so there is no missing layer;
+        //   (b) "ETC1 mip/LOD selection" and (c) "vertex-colour interpolation" — both would have to
+        //   act on the ground draw, which now measures 0.99. The "non-monotonic depth banding"
+        //   (0.92/0.69/0.83/0.77/...) that motivated all three was the pack's per-texture darkening
+        //   sampled at different distances, not a depth-dependent shading error.
+        // tools/tev_mask_ratio.py now HARD-FAILS on a pack asymmetry so this cannot recur.
+        // See debug_journal/2026-07-22-zora-ground-deficit-was-texpack-asymmetry.md.
         // OoT3D scene-vertex-lit path (task #16): feed uAmbient.xyz = sceneAmb * matAmb.
         // Per LIGHTDIAG at pinned title cursor=650: grass room groups have
         // matAmb=(1,1,1) matDif=(0,0,0), combScale=2. So the diffuse term contributes
