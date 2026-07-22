@@ -505,7 +505,23 @@ GAMEPLAY_STATE = REPO_ROOT / "scratch" / "gameplay_settled.state"
 
 # gSaveContext is a fixed .bss global (0x00587958, oot3d-decomp docs/ram_map.md);
 # dayTime is the u16 at +0x0C. Global, so it is writable at the title too.
-GSAVECONTEXT_DAYTIME_VA = 0x00587958 + 0x0C
+GSAVECONTEXT_VA = 0x00587958
+GSAVECONTEXT_DAYTIME_VA = GSAVECONTEXT_VA + 0x0C
+
+# skyboxTime — the clock the ENVIRONMENT actually reads. Writing dayTime alone
+# moves the game clock but leaves the sky and ambient lighting untouched, which
+# silently invalidates any lighting A/B (found 2026-07-22: the oracle rendered
+# dusk at dayTime=0x6000 while Zelda3D rendered morning). N64 keeps this at
+# SaveContext+0x141A; OoT3D moved it to +0x15A8, located by scanning gSaveContext
+# for the u16 mirroring dayTime.
+GSAVECONTEXT_SKYBOXTIME_VA = GSAVECONTEXT_VA + 0x15A8
+
+
+def set_time_of_day(h, daytime: int) -> None:
+    """Set BOTH clocks, so the render actually follows. See GSAVECONTEXT_SKYBOXTIME_VA."""
+    h.send(f"w16 0x{GSAVECONTEXT_DAYTIME_VA:08x} 0x{daytime:04x}")
+    h.send(f"w16 0x{GSAVECONTEXT_SKYBOXTIME_VA:08x} 0x{daytime:04x}")
+    h.send("run 120")
 
 
 def boot_to_gameplay(h: Harness, entrance: Optional[int] = None,
