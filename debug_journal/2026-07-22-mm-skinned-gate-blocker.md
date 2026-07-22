@@ -130,7 +130,24 @@ happens to look right when the 3DS model shares the N64 proportions (the dog) an
 does not (the soldier's oversized helmet). It also explains why the dog's 0.0075 "works" — it is just
 the N64 value, not a derived one.
 
-**Fix target:** find why the two sums coincide. Likely `Zelda3D_MM_SkelBoneLenSum` walks the CMB rig
+**CAUTION — two readings, and I cannot yet separate them.** Before "fix the no-op", note that
+`Zelda3D_MM_SkelBoneLenSum` genuinely walks the N64 `StandardLimb` tree (jointPos per limb, root
+skipped) and `Zelda3D_MM_ModelBoneLenSum` genuinely walks `cmb->bones()` translations. Neither is
+obviously reading the other's data. So:
+
+  (A) BUG — the two functions somehow observe the same data, ratio is meaninglessly 1.0.
+  (B) BY DESIGN — Grezzo preserved MM's skeleton proportions bone-for-bone in the 3DS rigs, so the
+      sums genuinely match and ratio 1.0 is CORRECT.
+
+(B) is very plausible for a faithful port, and if it holds then bone-length-sum scaling can NEVER fix
+the soldier: the rigs agree while the MESH differs (a 3DS helmet larger relative to its skeleton).
+The fix would then be mesh-extent based, not bone based — a different design, not a repair.
+
+Distinguish them by dumping the individual values, not the sums: print the first few N64 `jointPos`
+magnitudes beside the corresponding CMB bone translations for one actor. If they match element-wise,
+it is (B).
+
+**Fix target (conditional on (A)):** find why the two sums coincide. Likely `Zelda3D_MM_SkelBoneLenSum` walks the CMB rig
 (or a cached value keyed the same way) instead of the live N64 `SkeletonHeader` limb tree. Once they
 measure different things the ratio becomes meaningful and the soldier should land near the ~0.004 the
 `mscale` bisection indicated — WITHOUT hardcoding anything.
