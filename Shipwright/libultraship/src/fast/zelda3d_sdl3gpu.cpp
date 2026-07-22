@@ -191,6 +191,10 @@ const char* kVert =
     "layout(location=4) out float vFogDist;\n"
     "layout(location=5) out vec2 vUv1;\n"
     "layout(location=6) out vec2 vUv2;\n"
+    // PRIMARY_COLOR (PICA output register o1) — computed and SATURATED PER VERTEX, then
+    // interpolated. See the kFrag comment at the `vtxLit` branch for why this cannot live in
+    // the fragment shader.
+    "layout(location=7) out vec4 vPrim;\n"
     "layout(set=1, binding=0, std140) uniform UBO {\n" SG_UBO_COMMON_BODY "} ubo;\n"
     "layout(set=1, binding=1, std140) uniform UBOBones {\n" SG_UBO_BONES_BODY "} bones;\n"
     "void main() {\n"
@@ -222,6 +226,28 @@ const char* kVert =
     "    if (ubo.uLightDir.w > 0.5) c.z = c.w;\n" // skybox: pin to far plane
     "    gl_Position = c;\n"
     "    vNrmView = mat3(ubo.uMV) * nM;\n"
+    // --- PICA output register o1 (PRIMARY_COLOR), evaluated PER VERTEX ------------------------
+    // GROUND TRUTH (Azahar src/video_core/pica/output_vertex.cpp, OutputVertex ctor):
+    //   "The hardware takes the absolute and saturates vertex colors, *before* doing
+    //    interpolation"  ->  color[i] = min(|o1[i]|, 1.0)
+    // So the 3DS evaluates the CmbVShader lighting term at each VERTEX, saturates the RESULT,
+    // and the rasterizer interpolates the already-clamped value. Evaluating the same expression
+    // per FRAGMENT on an interpolated vColor is NOT equivalent: min() is concave, so
+    //   lerp(min(a,1), min(b,1))  <=  min(lerp(a,b), 1)
+    // and the per-fragment form is systematically BRIGHTER across every edge where one end
+    // saturates. At Kokiri noon the light sum is 1.42, so any vertex with baked colour above
+    // ~0.70 clamps — and the deficit is hue-shaped, because blue's light term (1.255) clamps at
+    // a higher vColor than red/green's (1.420). That is exactly the measured d8 signature
+    // (+24%/+23% on R/G, +8% on B). Do not move this back into the fragment shader.
+    "    vec3 nV = normalize(vNrmView);\n"
+    "    if (ubo.uAmbient.w > 0.0) {\n"
+    "        vec3 lit = ubo.uAmbient.xyz * ubo.uAmbient.w\n"
+    "                 + ubo.uLitDif1.rgb * max(dot(nV, -ubo.uLightDir.xyz), 0.0)\n"
+    "                 + ubo.uLitDif2.rgb * max(dot(nV, -ubo.uLightDir2.xyz), 0.0);\n"
+    "        vPrim = min(abs(vec4(lit * aColor.rgb, aColor.a)), vec4(1.0));\n"
+    "    } else {\n"
+    "        vPrim = min(abs(aColor), vec4(1.0));\n"
+    "    }\n"
     "    vWorld = (ubo.uMV * vec4(sp, 1.0)).xyz;\n"
     "    vUv = vec2(aUv.x + ubo.uExtra.y, 1.0 - aUv.y + ubo.uExtra.z);\n"
     // Coordinator-1 UV for the dual-texture detail mask. uSheen.w carries the coordinator-1
@@ -277,6 +303,7 @@ const char* kFrag =
     "layout(location=4) in float vFogDist;\n"
     "layout(location=5) in vec2 vUv1;\n"
     "layout(location=6) in vec2 vUv2;\n"
+    "layout(location=7) in vec4 vPrim;\n" // PICA o1, saturated per-vertex (see kVert)
     "layout(location=0) out vec4 frag;\n"
     "layout(set=3, binding=0, std140) uniform UBO {\n" SG_UBO_COMMON_BODY "} ubo;\n"
     "layout(set=2, binding=0) uniform sampler2D uTex;\n"
@@ -466,10 +493,6 @@ const char* kFrag =
     // legacy fast path and the generic TEV path so the lighting model has exactly ONE home.
     "    vec4 prim;\n"
     "    if (vtxLit) {\n"
-    "        vec3 n = normalize(vNrmView);\n"
-    "        vec3 lit = ubo.uAmbient.xyz * ubo.uAmbient.w\n"
-    "                 + ubo.uLitDif1.rgb * max(dot(n, -ubo.uLightDir.xyz), 0.0)\n"
-    "                 + ubo.uLitDif2.rgb * max(dot(n, -ubo.uLightDir2.xyz), 0.0);\n"
     // Clamp order is the PRODUCT, verified by A/B vs the oracle (2026-07-22): PICA clamps o1
     // when the output register is WRITTEN — i.e. clamp(Σ·vColor) — not the light sum first.
     // clamp(Σ)·vColor was tried and measured ~30% dark on near grass (settled Kokiri noon,
@@ -483,7 +506,12 @@ const char* kFrag =
     // and primary (77,77,69) -> (51,51,26) — ratios 0.662/0.662/0.377 vs the ambient's
     // 0.658/0.658/0.381. PRIMARY scales linearly with the ambient, so the clamp is on the
     // PRODUCT. Our own live lit term measures (1.4218,1.4218,1.2566) = 2 x the scene ambient.
-    "        prim = vec4(clamp(lit * vColor.rgb, 0.0, 1.0), vColor.a);\n"
+    // MOVED TO THE VERTEX SHADER 2026-07-23 (render.kokiri-near-terrain-overbright). The clamp
+    // ORDER above is still correct and unchanged — what was wrong was the clamp STAGE: PICA
+    // saturates o1 per VERTEX before interpolation (Azahar pica/output_vertex.cpp, hardware-
+    // tested), so evaluating clamp(lit*vColor) per FRAGMENT on interpolated inputs is brighter
+    // wherever a triangle straddles saturation. `vPrim` carries the per-vertex result.
+    "        prim = vPrim;\n"
     "    } else if (ubo.uParams.y > 0.5) {\n"
     "        prim = vec4(vColor.rgb * shade, vColor.a);\n"    // flat-tint fallback (vtxLit=0 draws)
     "    } else {\n"
