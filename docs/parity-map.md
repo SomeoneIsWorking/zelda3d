@@ -106,6 +106,22 @@ POSE column is noted. **Last swept 2026-07-15T12:36Z.**
 > a real MM3D A/B would upgrade it. It is closed only in the sense "the ported state = the decomp's
 > state"; the whole MM visual-parity surface is OPEN.
 
+### Gameplay scene parity (Kokiri Forest) — closed 2026-07-22
+
+| Item | Status | How verified | Verifying commit | Date |
+|---|---|---|---|---|
+| OoT3D env palette reaches GAMEPLAY (was title-only) | CLOSED-parity | oracle A/B frame mean 62.7 vs 72.6 after, from 29.8 | `15284de5` → `ea3f39ab` | 2026-07-22 |
+| ZSI env record layout (16B header + 28B records, amb @+0x0a) | CLOSED-parity | raw ZSI + oracle runtime list + live `LightAmbientColor` uniform, three ways | `ea3f39ab` / decomp `3b8e8f3` | 2026-07-22 |
+| Outdoor blend source (`Zelda3dEnvBlend`, not `unk_BD`) | CLOSED-parity | time response restored: night (51,79,160), noon (181,181,160) | `ea3f39ab` | 2026-07-22 |
+| 3DS PICA distance fog (fogNear/fogFar/zFar from ZSI) | CLOSED-parity | LUT solved from captured projection; node check byte-exact | `2389731c` | 2026-07-22 |
+| Actor light-DIRECTION sign (3DS stores travel dirs) | CLOSED-parity | oracle actor uniforms; matched-camera A/B | `2389731c` | 2026-07-22 |
+| 3DS camera values (all 66 settings; vertical FOV 52°) | CLOSED-parity | live Camera struct + captured projection; row alignment −17 → 0 | `381d1209` | 2026-07-22 |
+| En_Elf fairy (wings + glow transform + proximity fade) | CLOSED-parity | draw-list structural identity vs oracle handles; matched-camera A/B | `cd1f4f46` / decomp `46b03ce` | 2026-07-22 |
+| Kokiri Forest overall frame parity @0x6000 | CLOSED-parity | frame mean 72.4 vs oracle 72.6 (rows 60–420) | `cd1f4f46` | 2026-07-22 |
+
+**Scope note:** these were verified AT KOKIRI FOREST. The changes are global (102-scene palette,
+global camera table, global fog path); a multi-scene sweep is the outstanding check.
+
 ### Lighting / terrain — CLOSED **and OFF-LIMITS to tuning**
 
 | Item | Status | How verified | Verifying commit | Date |
