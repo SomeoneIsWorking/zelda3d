@@ -1097,10 +1097,45 @@ void SohBootInternal() {
     {
         char cwd[1024];
         if (getcwd(cwd, sizeof cwd)) {
+            const std::string repoRoot = cwd;   // the harness is launched from the repo root
             std::string sohCwd = std::string(cwd) + "/scratch/harness/soh_cwd";
             if (const char* ov = std::getenv("ZELDA3D_HARNESS_SOH_CWD")) sohCwd = ov;
             std::error_code ec;
             std::filesystem::create_directories(sohCwd, ec);
+
+            // The embedded SoH resolves its archives from the cwd and its extractor
+            // `assets/` from the executable's directory — neither of which exists in a
+            // freshly-created scratch cwd or a fresh build dir, so `soh_boot` failed
+            // outright on any new checkout until someone hand-made these symlinks.
+            // Link them here, repo-relatively, so the harness heals itself instead of
+            // depending on undocumented manual setup. Missing sources are skipped
+            // quietly: a harness used only as an OoT3D oracle never boots SoH at all.
+            {
+                const std::filesystem::path built = std::filesystem::path(repoRoot) /
+                                                    "Shipwright" / "build-cmake" / "soh";
+                auto link = [&](const std::filesystem::path& from,
+                                const std::filesystem::path& to) {
+                    std::error_code lec;
+                    if (!std::filesystem::exists(from, lec)) return;
+                    if (std::filesystem::exists(std::filesystem::symlink_status(to, lec))) return;
+                    std::filesystem::create_directories(to.parent_path(), lec);
+                    std::filesystem::create_symlink(from, to, lec);
+                    if (lec) {
+                        std::fprintf(stderr, "harness: WARNING could not link %s -> %s (%s)\n",
+                                     to.c_str(), from.c_str(), lec.message().c_str());
+                    }
+                };
+                link(built / "oot.o2r", std::filesystem::path(sohCwd) / "oot.o2r");
+                link(built / "soh.o2r", std::filesystem::path(sohCwd) / "soh.o2r");
+                // `assets/` is looked up next to the running binary, not in the cwd.
+                char exe[1024];
+                ssize_t n = readlink("/proc/self/exe", exe, sizeof exe - 1);
+                if (n > 0) {
+                    exe[n] = '\0';
+                    link(built / "assets", std::filesystem::path(exe).parent_path() / "assets");
+                }
+            }
+
             if (chdir(sohCwd.c_str()) == 0) {
                 std::fprintf(stderr, "harness: SoH cwd isolated -> %s\n", sohCwd.c_str());
             } else {
