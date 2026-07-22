@@ -49,12 +49,41 @@ def buttons_mask(names):
     return m
 
 
+class RpcUnavailable(RuntimeError):
+    """No Azahar RPC server is listening — raised eagerly instead of hanging.
+
+    This transport needs the STANDALONE Azahar frontend running with
+    enable_rpc_server=true. That frontend only builds with ENABLE_QT=ON and Qt6
+    is not installed here (no qmake6), so on this machine the RPC oracle cannot
+    be started at all. Every tool built on it used to spin through per-call
+    timeouts for a minute and then die with a bare socket TimeoutError, which
+    reads like a bug in the tool rather than a missing prerequisite.
+
+    The embedded-Azahar harness (tools/harness_ctl.py, built by
+    tools/soh3d_harness.sh) is the working oracle transport and needs no Qt.
+    """
+
+
 class Rpc:
-    def __init__(self, host=HOST, port=PORT, timeout=2.0):
+    def __init__(self, host=HOST, port=PORT, timeout=2.0, probe=True):
         self.addr = (host, port)
         self.sock = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
         self.sock.settimeout(timeout)
         self._id = 0
+        if probe:
+            self._preflight()
+
+    def _preflight(self):
+        """One cheap round-trip so an absent server fails now, with an explanation."""
+        try:
+            self._req(SETGETPROC, 0, 0)
+        except socket.timeout:
+            raise RpcUnavailable(
+                f"no Azahar RPC server on {self.addr[0]}:{self.addr[1]}. That transport needs "
+                "the standalone Azahar frontend (ENABLE_QT=ON; Qt6 is not installed on this "
+                "machine), so it cannot be started here. Use the embedded harness instead: "
+                "tools/harness_ctl.py (built by tools/soh3d_harness.sh)."
+            ) from None
 
     def _req(self, ptype, arg1=0, arg2=0, extra=b""):
         self._id += 1
