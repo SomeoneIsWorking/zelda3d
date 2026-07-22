@@ -347,10 +347,19 @@ tracking, so the node-pool fix and the collision port hold up outside Clock Town
 parsing MM3D's own, which was a deliberate choice, and nothing here has exercised it. I could not
 reach the sea on foot within a bounded walk.
 
-OBSERVATION worth following up, not a conclusion: Link's Y stayed EXACTLY 80.0 across that entire
-traverse (one +53 bump and back). A natural beach would normally vary. That is consistent with flat
-terrain, but it is ALSO what walking on a water surface would look like — so it should be checked
-before assuming water is fine.
+~~OBSERVATION worth following up~~ **RESOLVED (A/B, same session): the y=80 plateau is authentic
+terrain, NOT my collision port putting Link on a water surface.** Ran the identical warp + walk with
+`ZELDA3D_MM_COLLISION=0` (N64 collision, zero `MM3D-COL` lines) and the trajectory matches:
+
+    3DS col:  3261,80  2906,80  2610,80  2405,80  1956,80  1476,133  883,80  293,80  -269,80
+    N64 col:  3261,80  2908,80  2610,80  2395,80  1944,80  1452,133  855,80  227,80  -364,59
+
+Same plateau, and crucially the SAME +53 bump at the same x (~1450-1476). Spawn position is
+byte-identical too. Great Bay Coast's beach is simply flat at y=80 in both collision sources, so
+there is no water-surface artifact and no regression from the divert here.
+
+(Water BOXES are still untested — this rules out the specific "walking on water" worry, not the
+broader question of whether N64 water boxes behave correctly over a 3DS mesh.)
 
 Harness note (MM): after a warp Link is inert until nudged — a stick input activates him, and then
 walking works. `tp` did NOT move him in this scene at all, even while active, though it landed
