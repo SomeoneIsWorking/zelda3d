@@ -66,8 +66,7 @@ def capture(entrance: int, out_png: str, settle_frames: int, keep_ppm: bool,
     # Time-of-day must match the SoH3D side or a comparison is measuring the clock,
     # not the renderer. gSaveContext is a global, so this is a plain u16 write.
     if daytime is not None:
-        h.send(f"w16 0x{HC.GSAVECONTEXT_DAYTIME_VA:08x} 0x{daytime:04x}")
-        h.send("run 60")
+        HC.set_time_of_day(h, daytime)
     live = _pos_of(h) or "gameplay"
 
     base = os.path.splitext(out_png)[0]
