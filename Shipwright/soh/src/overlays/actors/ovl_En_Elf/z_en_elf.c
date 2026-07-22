@@ -338,6 +338,8 @@ void EnElf_Init(Actor* thisx, PlayState* play) {
     this->fairyFlags = 0;
     this->disappearTimer = 600;
     this->unk_2A4 = 0.0f;
+    // Zelda3D: 3DS EnElf_Init sets the glow master fade (+0x920/+0x924) to 1.0 (DAT_0018ac4c).
+    this->zelda3dGlowFade = 1.0f;
     colorConfig = 0;
 
     switch (thisx->params) {
@@ -691,6 +693,29 @@ void func_80A0353C(EnElf* this, PlayState* play) {
     }
 
     this->unk_2BC = Math_Atan2S(this->actor.velocity.z, this->actor.velocity.x);
+
+    // Zelda3D: OoT3D's Kokiri-fairy glow proximity fade — a Grezzo addition with no N64
+    // counterpart, RE'd from the 3DS Kokiri action fn @0x00129fac (this function's 3DS port;
+    // oot3d-decomp/docs/en_elf_navi.md). Scene-gated to Kokiri Forest + Lost Woods. Gameplay
+    // metric = actor.xzDistToPlayer (3DS actor +0x98, live-verified); in cutscene mode
+    // (play+0x22a0 byte, FUN_0037571c) the 3DS switches to dist3d(view.eye, world.pos) * 0.25.
+    // Sprite-glow target: 1 within 900 units, else 0 (pool const 0x44610000). Stepper is the
+    // 3DS's own SmoothStepToF @0x0036e168 == N64 Math_SmoothStepToF(0.3, 40/255, 1/255) (the
+    // 3DS applies its global 2/3 update-rate scale internally; at N64 update rate the plain
+    // call is the faithful equivalent — verified against the live ramp, step 0.156863 * 2/3).
+    // The 3DS also fades its glow POINT LIGHT with a second field (+0x920, threshold 720,
+    // consumer FUN_00341d5c intensity = fade*255); the N64 fairy light is a different
+    // mechanism (lightInfoGlow) and is NOT modulated here — see the decomp doc.
+    if (play->sceneNum == SCENE_KOKIRI_FOREST || play->sceneNum == SCENE_LOST_WOODS) {
+        f32 glowDist;
+        if (Play_InCsMode(play)) {
+            glowDist = Math_Vec3f_DistXYZ(&play->view.eye, &this->actor.world.pos) * 0.25f;
+        } else {
+            glowDist = this->actor.xzDistToPlayer;
+        }
+        Math_SmoothStepToF(&this->zelda3dGlowFade, (glowDist <= 900.0f) ? 1.0f : 0.0f, 0.3f,
+                           40.0f / 255.0f, 1.0f / 255.0f);
+    }
 }
 
 void func_80A03604(EnElf* this, PlayState* play) {
