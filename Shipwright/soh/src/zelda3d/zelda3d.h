@@ -114,15 +114,25 @@ int Zelda3D_TryDrawRoom(PlayState* play, Room* room);
 // path). #134.
 int Zelda3D_ShouldSuppressBgImageSkybox(PlayState* play);
 
-// #111: compute the OoT3D-palette world shade in parallel with z_kankyo's N64 envCtx ambient blend.
-// Called from the OUTDOOR time-of-day blend with the SAME slot indices + weights z_kankyo uses, so
-// no schedule logic is duplicated. No-op if the current scene has no OoT3D palette. Result feeds the
-// scene/room shade when REPL `worldshade 1` is set (vs the N64 flat tint). See docs #111.
+// #111: the exact env-light blend z_kankyo just performed this frame, captured at the blend site so
+// Zelda3D_SceneLightSettingsOverride can re-run the SAME indices + weights against the OoT3D rows —
+// no schedule logic is duplicated and no guessing which branch (outdoor time-of-day vs indoor
+// settings) ran. z_kankyo.c writes it in all three lightSettings branches.
+typedef struct {
+    unsigned char timeBased; // 1 = outdoor time-of-day path (colors only; sun/moon dirs stay computed)
+    unsigned char idx[4];    // settings-list indices: time path {cfgA.from, cfgA.to, cfgB.from, cfgB.to};
+                             // settings path {prev, cur, prev, cur} (wConfig = 0 collapses the 2nd pair)
+    float wTime;             // within-config time lerp (sp8C) / indoor blend weight (unk_D8)
+    float wConfig;           // cross-config lerp (sp88); 0 when no config transition
+} Zelda3dEnvBlend;
+extern Zelda3dEnvBlend gZelda3dEnvBlend;
+
 // Title-demo: override envCtx.lightSettings from the ported 3DS title
 // palette + time schedule (no-op outside the title demo). Called by
 // z_kankyo before the lightSettings -> lightCtx application.
 void Zelda3D_TitleLightSettingsOverride(PlayState* play);
-// Gameplay counterpart: OoT3D per-scene env palette -> envCtx.lightSettings (#111).
+// Gameplay counterpart: OoT3D per-scene env palette -> envCtx.lightSettings (#111),
+// re-running the gZelda3dEnvBlend record against the OoT3D rows.
 void Zelda3D_SceneLightSettingsOverride(PlayState* play);
 
 // Draw the OoT3D sky (BlueSky.zar tenkyu gradient dome) in place of the N64 normal-sky skybox.

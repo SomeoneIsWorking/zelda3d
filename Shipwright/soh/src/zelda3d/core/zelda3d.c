@@ -170,9 +170,10 @@ const char* Zelda3D_SceneName(PlayState* play);
 int gZelda3dScenePaletteN = 0;
 const Zelda3dLightSlot* gZelda3dScenePalette = 0;
 // spot99 title palette — converted on first use from the raw ZSI cmd-0x0F
-// entries the title-cs loader keeps (zelda3d_cutscene.cpp). Same emit shape
-// as the generated kZelda3dSceneLighting rows (ALL entries incl. metadata
-// entry 0, so the +1 slot bias applies identically).
+// entries the title-cs loader keeps (zelda3d_cutscene.cpp). NOTE: the title
+// lighting itself is driven by Zelda3D_TitleLightSettingsOverride (its own
+// raw data + blend); Zelda3D_SceneLightSettingsOverride skips while the
+// title is active, so the gameplay bias-free indexing does not apply there.
 // N64 object id -> OoT3D actor ZAR path (kZelda3dObjectZars). Generated, paths only.
 #include "../tables/zelda3d_object_zars.inc"
 // Per-character N64<->OoT3D bone correspondence + scale (kZelda3dBoneMaps). Generated offline by
@@ -570,46 +571,68 @@ void Zelda3D_TitleLightSettingsOverride(PlayState* play) {
 // frame — but until now NOTHING read it during gameplay. z_kankyo.c had exactly one
 // Zelda3D hook and it was title-only, so every gameplay scene was lit by N64 env data
 // while its geometry and actors came from OoT3D. Measured at Kokiri Forest 0x6000: the
-// oracle's scene mean RGB (89.5, 98.8, 29.6) vs ours (37.0, 40.5, 11.9), and Saria's
-// skin/tunic luma ratio 1.10 vs ours 2.07 — the contrast blowout of an ambient that is
-// gray 80 where OoT3D's is (160, 72, 72).
+// oracle's scene mean RGB (89.7, 99.0, 29.7) vs ours (30.4, 37.9, 11.5) — a ~2.7x world
+// darkness gap. After this override + the corrected palette parse: (79.3, 86.4, 23.7),
+// and the pushed ambient (0.710, 0.710, 0.627) equals the oracle's live CmbVShader
+// LightAmbientColor uniform (harness vsuni_log) exactly.
 //
-// This re-runs the SAME blend z_kankyo just performed (slots unk_BE -> unk_BD at weight
-// unk_D8) against the OoT3D rows, so the N64 time schedule keeps choosing WHEN to switch
-// and only the colour data changes. Fog is deliberately left to the N64 path (the 3DS fog
-// values are in eye units and are fed separately — same reasoning as the title override).
+// This re-runs the SAME blend z_kankyo just performed — captured in gZelda3dEnvBlend at the
+// blend site itself (outdoor time-of-day path AND both indoor settings branches) — against the
+// OoT3D rows, so the N64 schedule keeps choosing WHEN/WHAT to blend and only the colour data
+// changes. Capturing at the blend site matters: Kokiri Forest (and every outdoor scene) takes
+// the time-of-day path, where unk_BD/unk_BE are never driven — reading them there pinned the
+// palette to one fixed row at ALL times of day. Fog is deliberately left to the N64 path (the
+// 3DS fog values are in eye units and are fed separately — same reasoning as the title override).
 //
-// SLOT BIAS +1: the generated rows include ZSI metadata entry 0, which the runtime drops,
-// so runtime slot i is palette row i+1.
+// Light DIRS: only overridden on the settings path (where N64 also takes dirs from the
+// settings list). On the time-of-day path N64 computes sun/moon dirs from dayTime — OoT3D's
+// Environment_Update is a port of the same code, so the computed dirs stand.
+//
+// Palette row i == runtime slot i, NO bias: the old "+1 slot bias" compensated a 12-byte
+// phase error in the generator's ZSI parse (16-byte region header misread as a 28-byte
+// "metadata entry 0"); it re-aligned the color/dir fields by accident but corrupted amb.
+// Both the generator and this consumer are now bias-free (gen_oot3d_scene_lighting.py).
+Zelda3dEnvBlend gZelda3dEnvBlend;
+
 void Zelda3D_SceneLightSettingsOverride(PlayState* play) {
     EnvironmentContext* envCtx = &play->envCtx;
     const Zelda3dLightSlot* pal = gZelda3dScenePalette;
     s32 n = gZelda3dScenePaletteN;
-    s32 cur, prev, i;
-    f32 w;
+    const Zelda3dEnvBlend* b = &gZelda3dEnvBlend;
+    s32 a0, a1, b0, b1, i;
+    f32 wT, wC;
 
     // The title runs its own palette + schedule (Zelda3D_TitleLightSettingsOverride).
     if (pal == NULL || n <= 0 || Zelda3D_Title_IsActive()) {
         return;
     }
-    cur = (s32)envCtx->unk_BD + 1;
-    prev = (s32)envCtx->unk_BE + 1;
-    if (cur < 0 || cur >= n || prev < 0 || prev >= n) {
+    a0 = (s32)b->idx[0];
+    a1 = (s32)b->idx[1];
+    b0 = (s32)b->idx[2];
+    b1 = (s32)b->idx[3];
+    if (a0 >= n || a1 >= n || b0 >= n || b1 >= n) {
         return; // out-of-range slot: leave the N64 values rather than read past the palette
     }
-    w = envCtx->unk_D8;
-    if (w < 0.0f) {
-        w = 0.0f;
-    } else if (w > 1.0f) {
-        w = 1.0f;
-    }
+    wT = b->wTime;
+    wT = (wT < 0.0f) ? 0.0f : (wT > 1.0f) ? 1.0f : wT;
+    wC = b->wConfig;
+    wC = (wC < 0.0f) ? 0.0f : (wC > 1.0f) ? 1.0f : wC;
 
     for (i = 0; i < 3; i++) {
-        envCtx->lightSettings.ambientColor[i] = (u8)LERP(pal[prev].amb[i], pal[cur].amb[i], w);
-        envCtx->lightSettings.light1Color[i] = (u8)LERP(pal[prev].l0col[i], pal[cur].l0col[i], w);
-        envCtx->lightSettings.light2Color[i] = (u8)LERP(pal[prev].l1col[i], pal[cur].l1col[i], w);
-        envCtx->lightSettings.light1Dir[i] = (s8)LERP16(pal[prev].l0dir[i], pal[cur].l0dir[i], w);
-        envCtx->lightSettings.light2Dir[i] = (s8)LERP16(pal[prev].l1dir[i], pal[cur].l1dir[i], w);
+        f32 cfgA, cfgB;
+        cfgA = LERP(pal[a0].amb[i], pal[a1].amb[i], wT);
+        cfgB = LERP(pal[b0].amb[i], pal[b1].amb[i], wT);
+        envCtx->lightSettings.ambientColor[i] = (u8)LERP(cfgA, cfgB, wC);
+        cfgA = LERP(pal[a0].l0col[i], pal[a1].l0col[i], wT);
+        cfgB = LERP(pal[b0].l0col[i], pal[b1].l0col[i], wT);
+        envCtx->lightSettings.light1Color[i] = (u8)LERP(cfgA, cfgB, wC);
+        cfgA = LERP(pal[a0].l1col[i], pal[a1].l1col[i], wT);
+        cfgB = LERP(pal[b0].l1col[i], pal[b1].l1col[i], wT);
+        envCtx->lightSettings.light2Color[i] = (u8)LERP(cfgA, cfgB, wC);
+        if (!b->timeBased) {
+            envCtx->lightSettings.light1Dir[i] = (s8)LERP16(pal[a0].l0dir[i], pal[a1].l0dir[i], wT);
+            envCtx->lightSettings.light2Dir[i] = (s8)LERP16(pal[a0].l1dir[i], pal[a1].l1dir[i], wT);
+        }
     }
 }
 
