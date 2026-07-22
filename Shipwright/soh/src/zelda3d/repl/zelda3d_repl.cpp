@@ -118,7 +118,6 @@ void Zelda3D_DumpAnimBonesLocal(int modelId, const char* animName, float frame);
 void Zelda3D_RecordLastAuto(int modelId, const char* csab, float frame); // record live AUTO clip/frame (zelda3d_anim.cpp)
 int Zelda3D_PosedModelLocalAABB(int modelId, unsigned long long midMask, float* outMin, float* outMax);
 void Zelda3D_DumpBoneStats(int modelId);
-int Zelda3D_Hud_Available(void); // Vulkan/SDL3GPU backend gate (hud/zelda3d_hud.cpp)
 extern const float kZelda3dTitleEye[3]; // title-cs camera eye anchor (zelda3d.c)
 
 // Plain scalar/array REPL-tunable globals defined (non-static) in zelda3d.c's top-of-file
@@ -1633,43 +1632,6 @@ static void Zelda3D_ReplExec(PlayState* play, char* line, const char* outPath) {
                 Zelda3D_ReplReply(outPath, "atlas %s idx=%d: decode failed", path, idx);
             }
         }
-    } else if (strcmp(cmd, "pchud") == 0 && sscanf(line, "%*s %f", &f1) == 1) {
-        // Toggle the native Vulkan PC HUD (default on). 1 = PC HUD (Interface_Draw/HealthMeter_Draw
-        // gated off, zelda3d_hud_vk draws); 0 = the original N64 Fast3D HUD + hotbar.
-        gZelda3dPcHud = (f1 != 0.0f) ? 1 : 0;
-        Zelda3D_ReplReply(outPath, "pchud=%d (vkAvail=%d)", gZelda3dPcHud, Zelda3D_Hud_Available());
-    } else if (strcmp(cmd, "hotbaron") == 0 && sscanf(line, "%*s %f", &f1) == 1) {
-        // `hotbaron <0|1>` — toggle the PC hotbar as the sole item UI.
-        // 1 (default) = suppress N64 C-button/D-pad item cluster; 0 = show both.
-        gZelda3dHotbarOn = (f1 != 0.0f) ? 1 : 0;
-        Zelda3D_ReplReply(outPath, "hotbaron=%d", gZelda3dHotbarOn);
-    } else if (strcmp(cmd, "hotbar") == 0 && sscanf(line, "%*s %f", &f1) == 1) {
-        // Hotbar slot selection (headless test hook). `hotbar <0-5>` selects the active slot;
-        // in live play keys 1-6 select slots 0-5 via SDL input. The active slot's item is
-        // synced to buttonItems[0] (B) so the SoH use-item engine fires it normally.
-        int slot = (int)f1;
-        if (slot >= 0 && slot <= 5) {
-            gZelda3dHotbarActive = slot;
-            Zelda3D_ReplReply(outPath, "hotbar=%d item=0x%02X", slot, (unsigned)gZelda3dHotbarItems[slot]);
-        } else {
-            Zelda3D_ReplReply(outPath, "hotbar=err (need 0-5)");
-        }
-    } else if (strcmp(cmd, "hotbarset") == 0) {
-        // `hotbarset <slot> <itemid>` — assign an item to a slot for testing.
-        // E.g. `hotbarset 0 0x12` puts item 0x12 in slot 0.
-        float f2 = 0;
-        if (sscanf(line, "%*s %f %f", &f1, &f2) == 2) {
-            int slot = (int)f1;
-            int item = (int)f2;
-            if (slot >= 0 && slot <= 5 && item >= 0 && item <= 0xFF) {
-                gZelda3dHotbarItems[slot] = (u8)item;
-                Zelda3D_ReplReply(outPath, "hotbarset slot=%d item=0x%02X", slot, (unsigned)gZelda3dHotbarItems[slot]);
-            } else {
-                Zelda3D_ReplReply(outPath, "hotbarset=err");
-            }
-        } else {
-            Zelda3D_ReplReply(outPath, "hotbarset=err (need slot item)");
-        }
     } else if (strcmp(cmd, "key") == 0) {
         // #20 — inject a raw keyboard scancode through the real SDL->ControlDeck path so the
         // DEFAULT keyboard->N64-button mapping can be verified headless. `key <scancode> <0|1>`
@@ -2503,14 +2465,6 @@ void Zelda3D_ReplPoll(PlayState* play) {
     char* start;
     char* nl;
     ssize_t n;
-
-    // Hotbar sync: keep the active hotbar slot's item on B button each frame so the SoH use-item
-    // engine fires the right item when B is pressed.
-    if (play != NULL) Zelda3D_HotbarSync(play);
-
-    // PC HUD snapshot: copy gSaveContext HUD state into gZelda3dHudState so the native Vulkan HUD
-    // (drawn on the render thread from Gui::EndFrame, where there is no PlayState) can read it.
-    if (play != NULL) Zelda3D_HudUpdateFrame(play);
 
     // Force time-of-day (e.g. day instead of night). Applied every frame, before the
     // FIFO handling, so it holds regardless of whether the REPL is connected.

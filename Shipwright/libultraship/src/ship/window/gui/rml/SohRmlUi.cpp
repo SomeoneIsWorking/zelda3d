@@ -287,9 +287,8 @@ bool SohRmlUi::Init(void* sdlWindow, void* glContext, int width, int height, boo
     ApplyDensityRatio();
     // Mouse parity: clicking a <tab> switches to it (keyboard/D-pad Left/Right already do).
     AttachTabClickHandlers();
-    // mHudDocument: NOT loaded — the in-game HUD is native SoH Fast3D (Interface_Draw /
-    // HealthMeter_Draw).  RmlUi is for the ESC menu only.  The zelda3d_hud.rml file is kept on
-    // disk as a reference but is never loaded here.
+    // The in-game HUD is native SoH Fast3D (Interface_Draw / HealthMeter_Draw); RmlUi is for the
+    // ESC menu only.
 
     SPDLOG_INFO("[SohRmlUi] RmlUi initialised ({}x{}) — {} (SDL3 GPU)", mWidth, mHeight, docPath);
     mInitialised = true;
@@ -757,7 +756,6 @@ void SohRmlUi::Shutdown() {
         Rml::RemoveContext(mContext->GetName());
         mContext = nullptr;
         mDocument = nullptr;
-        mHudDocument = nullptr;
     }
     if (sRmlLibraryInitialised) {
         Rml::Shutdown(); // releases textures/geometry through the render interface; keep it alive here

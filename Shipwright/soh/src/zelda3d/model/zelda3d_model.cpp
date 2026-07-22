@@ -139,9 +139,8 @@ Zelda3D::CtrRom* rom() {
     return g_rom.get();
 }
 
-// PC HUD — decode an OoT3D standalone romfs .ctxb atlas (e.g. /menu/01_US_ENGLISH/hud_all00.ctxb,
-// icon_item_menu00.ctxb) to RGBA8 once, cached by romfs path. These are the real 3DS HUD textures
-// the native Vulkan HUD (zelda3d_hud_vk.cpp) draws sub-rects of, in place of the N64/SVG icons.
+// Decode an OoT3D standalone romfs .ctxb atlas (e.g. /menu/01_US_ENGLISH/hud_all00.ctxb,
+// icon_item_menu00.ctxb) to RGBA8 once, cached by romfs path — the real 3DS HUD/menu textures.
 // Returns the RGBA buffer (top row first) + dims, or NULL. Texel index `texIdx` selects the entry
 // (these menu files each carry a single atlas at index 0).
 struct OoT3dAtlas {
@@ -174,8 +173,8 @@ extern "C" const void* Zelda3D_OoT3dAtlas(const char* romfsPath, int texIdx, int
                 fprintf(stderr, "[Zelda3D] OoT3dAtlas: romfs file not found: %s\n", romfsPath);
             }
         }
-        // No Zelda3D_HudTexClaim here: this atlas feeds only the native Vulkan HUD (Zelda3D_Hud_Tex),
-        // never the Fast3D pointer-keyed texture cache, so it needs no eviction guard.
+        // No Zelda3D_HudTexClaim here: this atlas never enters the Fast3D pointer-keyed texture
+        // cache, so it needs no eviction guard.
         it = cache.emplace(std::move(key), std::move(a)).first;
     }
     if (it->second.rgba.empty()) {

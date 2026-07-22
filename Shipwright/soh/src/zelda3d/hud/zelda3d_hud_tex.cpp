@@ -8,6 +8,7 @@
 #include <cstdint>
 #include <cstring>
 #include <cmath>
+#include <cstdlib> // getenv
 #include <stb_image.h>
 #include "asset/texpack.h"     // Zelda3D::TexPackLookup (HD texture-pack atlas source)
 #include "../assets/xbox_glyphs_png.h"   // assets/zelda3d/xbox_{a,b,x,y}.svg (HUD button glyphs, #32)
@@ -200,49 +201,6 @@ const void* Zelda3D_KbdGlyphTex(char which, int* w, int* h) {
     return g[idx].rgba.data();
 }
 
-// Hotbar number-key glyphs 1-6 (keycap style, matching the approved keycap aesthetic).
-// Loaded lazily from num_glyphs_png.h; returns RGBA32 pointer + dims.
-// `which` = '1'..'6'. Returns nullptr on failure.
-#include "../assets/num_glyphs_png.h"
-
-const void* Zelda3D_NumGlyphTex(char which, int* w, int* h) {
-    struct Glyph { std::vector<uint8_t> rgba; int w = 0, hh = 0; };
-    static Glyph g[6];
-    static bool tried = false;
-    if (!tried) {
-        tried = true;
-        struct { const unsigned char* png; unsigned int len; } src[6] = {
-            { kNumGlyph_1Png, kNumGlyph_1PngLen },
-            { kNumGlyph_2Png, kNumGlyph_2PngLen },
-            { kNumGlyph_3Png, kNumGlyph_3PngLen },
-            { kNumGlyph_4Png, kNumGlyph_4PngLen },
-            { kNumGlyph_5Png, kNumGlyph_5PngLen },
-            { kNumGlyph_6Png, kNumGlyph_6PngLen },
-        };
-        for (int i = 0; i < 6; i++) {
-            int sw = 0, sh = 0, n = 0;
-            stbi_uc* px = stbi_load_from_memory(src[i].png, (int)src[i].len, &sw, &sh, &n, 4);
-            if (px) {
-                g[i].rgba.assign(px, px + (size_t)sw * sh * 4);
-                g[i].w = sw; g[i].hh = sh;
-                stbi_image_free(px);
-            } else {
-                fprintf(stderr, "[Zelda3D] num glyph %d: PNG decode failed\n", i + 1);
-            }
-        }
-        // Register with HudTexClaim so the GC doesn't free them.
-        for (int k = 0; k < 6; k++) {
-            if (!g[k].rgba.empty()) Zelda3D_HudTexClaim(g[k].rgba.data());
-        }
-    }
-    int idx = (int)(which - '1');
-    if (idx < 0 || idx > 5) { if (w) *w = 0; if (h) *h = 0; return nullptr; }
-    if (g[idx].rgba.empty()) { if (w) *w = 0; if (h) *h = 0; return nullptr; }
-    if (w) *w = g[idx].w;
-    if (h) *h = g[idx].hh;
-    return g[idx].rgba.data();
-}
-
 // #18 — derive the FULL / EMPTY HUD heart from the OoT3D item atlas (user approved 2026-06-20).
 // The clean red heart icon lives in the pack item atlas (hash CF461E58E637A97A, 4096x4096) at
 // x=2018..2338, y=3020..3352 (a red heart with a light rim). The lifemeter combine is
@@ -314,48 +272,6 @@ const void* Zelda3D_HeartTex(int kind, int* w, int* h) {
         for (int k = 0; k < 5; k++) {
             if (!t[k].rgba.empty()) Zelda3D_HudTexClaim(t[k].rgba.data());
         }
-    }
-    if (w) *w = t[kind].w;
-    if (h) *h = t[kind].hh;
-    return t[kind].rgba.data();
-}
-
-// Zelda3D PC HUD — colour-baked heart texture for the native Vulkan HUD path (zelda3d_hud_vk.cpp).
-// Zelda3D_HeartTex returns a GRAYSCALE intensity map (rgb = the PRIM<->ENV lerp factor, a = the heart
-// silhouette) meant to be tinted by the N64 Fast3D combiner. The PC HUD draws straight RGBA with no
-// combiner, so we bake the same lerp here: out.rgb = ENV + (PRIM-ENV) * intensity, out.a = silhouette.
-// Colours are OoT's life-meter PRIM/ENV (z64interface.h: HEARTS_PRIM = {255,70,50}, HEARTS_ENV =
-// {50,40,60}), kept in sync with z_lifemeter.c's normal (non-DD) heart draw. Cached per kind.
-const void* Zelda3D_HudHeartRGBA(int kind, int* w, int* h) {
-    struct Tex { std::vector<uint8_t> rgba; int w = 0, hh = 0; };
-    static Tex t[5];
-    static int tried = 0;
-    // OoT life-meter normal-heart colours (z64interface.h HEARTS_PRIM_* / HEARTS_ENV_*).
-    const int PRIM[3] = { 255, 70, 50 };
-    const int ENV[3] = { 50, 40, 60 };
-    if (!tried) {
-        tried = 1;
-        for (int k = 0; k < 5; k++) {
-            int gw = 0, gh = 0;
-            const uint8_t* gray = (const uint8_t*)Zelda3D_HeartTex(k, &gw, &gh);
-            if (!gray || gw <= 0 || gh <= 0) {
-                continue;
-            }
-            t[k].rgba.resize((size_t)gw * gh * 4);
-            for (size_t i = 0; i < (size_t)gw * gh; i++) {
-                int inten = gray[i * 4]; // rgb are equal (intensity); take r
-                int a = gray[i * 4 + 3]; // silhouette
-                for (int c = 0; c < 3; c++) {
-                    t[k].rgba[i * 4 + c] = (uint8_t)(ENV[c] + (PRIM[c] - ENV[c]) * inten / 255);
-                }
-                t[k].rgba[i * 4 + 3] = (uint8_t)a;
-            }
-            t[k].w = gw;
-            t[k].hh = gh;
-        }
-    }
-    if (kind < 0 || kind >= 5 || t[kind].rgba.empty()) {
-        if (w) *w = 0; if (h) *h = 0; return nullptr;
     }
     if (w) *w = t[kind].w;
     if (h) *h = t[kind].hh;
@@ -480,6 +396,18 @@ const void* Zelda3D_DigitTex(int glyph, int* w, int* h) {
     if (w) *w = t[glyph].w;
     if (h) *h = t[glyph].hh;
     return t[glyph].rgba.data();
+}
+
+// #31 — substitute crisp higher-res HUD textures (hearts, button disc, counter icons, digits) for the
+// blocky 16x16 N64 ones in the native Fast3D HUD. -1 = uninit (reads ZELDA3D_HUDTEX, default on).
+// z_lifemeter.c / z_parameter.c gate their texture/load-size/texcoord swap on this.
+int gZelda3dHudTex = -1;
+int Zelda3D_HudTexEnabled(void) {
+    if (gZelda3dHudTex < 0) {
+        const char* v = getenv("ZELDA3D_HUDTEX");
+        gZelda3dHudTex = (v != NULL && v[0] == '0') ? 0 : 1;
+    }
+    return gZelda3dHudTex;
 }
 
 } // extern "C"

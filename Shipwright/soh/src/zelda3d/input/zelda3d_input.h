@@ -1,6 +1,6 @@
 // Zelda3D input module — ONE home for the input-adjacent free functions/globals that used to be
 // scattered across zelda3d.c (locomotion/button-hold REPL harness, Xbox/keyboard glyph-device
-// state, hotbar sync) and zelda3d_model.cpp (headless keyboard-inject verification shim). Pure
+// state) and zelda3d_model.cpp (headless keyboard-inject verification shim). Pure
 // code-motion pass (Phase 1 reorg, debug_journal/2026-07-15-phase1-input-consolidation.md) — no
 // behavior change to any of the moved logic.
 //
@@ -51,13 +51,6 @@ int Zelda3D_XboxBtnEnabled(void);
 // #32 hotswap — last-used input device: 0=gamepad (Xbox glyphs), 1=keyboard (key labels). Updated
 // by the C++ LUS input layer (Controller.cpp) on every key/gamepad event. Moved from zelda3d.c.
 int Zelda3D_InputDevice(void);
-
-// Hotbar: 6-slot item hotbar drawn natively via Fast3D HUD injection. Zelda3D_HotbarSlot() returns
-// the active slot (0-5); Zelda3D_HotbarSync() (called each frame from Zelda3D_ReplPoll) mirrors the
-// active slot's item onto B (buttonItems[0]) and, when the gamepad chord path requested a fire
-// (gZelda3dHotbarFireB), injects a virtual B press. Moved from zelda3d.c.
-int  Zelda3D_HotbarSlot(void);
-void Zelda3D_HotbarSync(PlayState* play);
 
 // Consolidated input diagnostic gate (`log input 1`) — the single source of truth for "is the headed
 // keyboard-input diagnostic enabled" (debug_journal/2026-07-15-keyboard-headed-v2.md). Read once,

@@ -22,9 +22,6 @@
 // #32 hotswap — last-used input device signal, defined in zelda3d.c (C).
 extern "C" {
     extern int gZelda3dInputDevice;
-    // Gamepad hotbar: active slot selection + B-fire injection, defined in zelda3d.c.
-    extern int gZelda3dHotbarActive;
-    extern int gZelda3dHotbarFireB;
 }
 
 namespace LUS {
@@ -97,21 +94,11 @@ void Controller::ReadToOSContPad(OSContPad* pad) {
         button->UpdatePad(padToBuffer.button);
     }
 
-    // #32 button chords + hotbar gamepad routing:
+    // #32 button chords:
     //
-    // C-button chord (unchanged): RB + A/B/X/Y -> N64 C-Right/C-Left/C-Up/C-Down item slots.
-    // This wires RB as the "second layer" modifier for the engine's C-button equip slots (DpadEquips
-    // maps 4 more), giving full no-C-pad coverage. Gated by CVar gControllerChords (default on).
-    //
-    // Hotbar gamepad routing (new — #97):
-    //   Without chord: B = hotbar slot 1 (slot 0), Y = hotbar slot 2 (slot 1).
-    //     B is already N64 B, so the item fires via the existing SoH use-item path.
-    //     Y has no default N64 mapping — we set the active slot AND inject gZelda3dHotbarFireB=1 so
-    //     Zelda3D_HotbarSync injects a virtual B press this frame.
-    //   With RB chord: A/B/X/Y -> hotbar slots 3/4/5/6 (select + fire B).
-    //     The chord also fires C-button bits (from kDefaultChords above); those are now redundant
-    //     for the hotbar path and harmless (engine will try to use the C-slot item, but
-    //     gZelda3dHotbarFireB fires the hotbar item via B which takes priority in the item-use path).
+    // C-button chord: RB + A/B/X/Y -> N64 C-Right/C-Left/C-Up/C-Down item slots. This wires RB as the
+    // "second layer" modifier for the engine's C-button equip slots (DpadEquips maps 4 more), giving
+    // full no-C-pad coverage. Gated by CVar gControllerChords (default on).
     //
     // Physical state is real SDL for live play, OR the gChordPhysInject CVar for headless testing.
     auto cvars = Ship::Context::GetRawInstance()->GetConsoleVariables();
@@ -146,49 +133,6 @@ void Controller::ReadToOSContPad(OSContPad* pad) {
             // Live: C-button chord.
             if (phys != 0) {
                 padToBuffer.button = ApplyButtonChords(padToBuffer.button, phys);
-            }
-        }
-
-        // Hotbar gamepad routing (port 0 only).
-        // Without chord modifier: B selects slot 0, Y selects slot 1.
-        // With RB chord modifier: A->slot2, B->slot3, X->slot4, Y->slot5 (+ fire B).
-        // Log whenever we change the active slot (once per press, visible in run.log).
-        if (phys & CHORD_PHYS_MOD) {
-            // Chord path: map A/B/X/Y -> hotbar slots 3-6.
-            bool chordSlot = false;
-            int newSlot = -1;
-            if (phys & CHORD_PHYS_A) { newSlot = 2; chordSlot = true; }
-            else if (phys & CHORD_PHYS_B) { newSlot = 3; chordSlot = true; }
-            else if (phys & CHORD_PHYS_X) { newSlot = 4; chordSlot = true; }
-            else if (phys & CHORD_PHYS_Y) { newSlot = 5; chordSlot = true; }
-            if (chordSlot && newSlot != gZelda3dHotbarActive) {
-                printf("[HOTBAR] chord RB+phys=0x%02x -> slot %d (fire B)\n", phys, newSlot);
-                fflush(stdout);
-                gZelda3dHotbarActive = newSlot;
-                gZelda3dHotbarFireB = 1; // request B-fire from Zelda3D_HotbarSync this frame
-                gZelda3dInputDevice = 0; // gamepad active
-            } else if (chordSlot) {
-                // Same slot already selected, still fire B.
-                gZelda3dHotbarFireB = 1;
-                gZelda3dInputDevice = 0;
-            }
-        } else {
-            // No chord: B = slot 0 (B is already N64 B -> fires via existing path).
-            // Y = slot 1 (inject B fire since Y has no default N64 mapping).
-            if ((phys & CHORD_PHYS_B) && gZelda3dHotbarActive != 0) {
-                printf("[HOTBAR] B -> slot 0\n"); fflush(stdout);
-                gZelda3dHotbarActive = 0;
-                gZelda3dInputDevice = 0;
-                // N64 B is already set by the button mapping, no extra fire needed.
-            } else if (phys & CHORD_PHYS_B) {
-                gZelda3dInputDevice = 0; // B held, slot already 0
-            } else if (phys & CHORD_PHYS_Y) {
-                if (gZelda3dHotbarActive != 1) {
-                    printf("[HOTBAR] Y -> slot 1 (fire B)\n"); fflush(stdout);
-                    gZelda3dHotbarActive = 1;
-                }
-                gZelda3dHotbarFireB = 1; // Y has no default N64 mapping, inject B press
-                gZelda3dInputDevice = 0;
             }
         }
     }
