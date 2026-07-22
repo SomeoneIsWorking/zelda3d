@@ -599,3 +599,98 @@ oracle's room draws by vertex count.
    cadence) and the captured framebuffer trails the emulated GPU by ~2 frames. `drawskip` therefore
    has *zero* visible effect if you only run 1 or 2 frames with the latch set; it bites at 3+.
    `oracle_draw_isolate.py` uses warm=2, probe=4.
+
+# Azahar Patch 8 (2026-07-22, hi-res texture parity): CustomTexManager stats accessor
+
+## Why
+
+The harness now runs the **same hi-res texture pack on BOTH sides** so an oracle-vs-Zelda3D A/B is
+like-for-like (`ZELDA3D_HARNESS_TEXPACK=on|off`, see `main.cpp`'s `SetupTexPack`). "Hi-res is
+actually in effect on both sides" must be a *measurement*, not an assumption — our side already
+counts hits via `Zelda3D::TexPackGetStats()` (committed, `Shipwright/cmb3d/asset/texpack.h`), so
+Azahar needs the same read-only counter. Both are printed by the `texpack` REPL command.
+
+Read-only instrumentation: no behaviour change, no core logic touched.
+
+## The patch
+
+Two hunks, both in `src/video_core/custom_textures/`.
+
+### Hunk 1 — `custom_tex_manager.h`, public section (after `UseNewHash()`)
+
+```cpp
+    /// soh3d_harness parity instrumentation (tools/soh3d_harness/AZAHAR_PATCH.md
+    /// Patch 8). Read-only: lets the harness PROVE the hi-res pack is actually
+    /// in effect on the oracle side instead of assuming it.
+    struct Stats {
+        std::size_t files;     ///< custom texture files parsed out of the pack
+        std::size_t materials; ///< distinct 3DS texture hashes covered
+        u64 hits;              ///< lookups that found a replacement
+        u64 misses;            ///< lookups with no replacement in the pack
+    };
+    Stats GetStats() const noexcept {
+        return Stats{custom_textures.size(), material_map.size(), lookup_hits, lookup_misses};
+    }
+```
+
+and in the private data section, after `bool use_new_hash{true};`:
+
+```cpp
+    // soh3d_harness parity instrumentation (AZAHAR_PATCH.md Patch 8).
+    mutable u64 lookup_hits{0};
+    mutable u64 lookup_misses{0};
+```
+
+### Hunk 2 — `custom_tex_manager.cpp`, `CustomTexManager::GetMaterial`
+
+```cpp
+    const auto it = material_map.find(data_hash);
+    if (it == material_map.end()) {
+        lookup_misses++; // soh3d_harness instrumentation (AZAHAR_PATCH.md Patch 8)
+        LOG_WARNING(Render, "Unable to find replacement for surface with hash {:016X}", data_hash);
+        return nullptr;
+    }
+    lookup_hits++; // soh3d_harness instrumentation (AZAHAR_PATCH.md Patch 8)
+    return it->second.get();
+```
+
+## No other Azahar change is needed
+
+Everything else is harness-side and committed:
+
+* the pack is **not** copied into Azahar's user dir — `SetupTexPack()` creates a *symlink*
+  `<save_dir>/Azahar/load/textures -> <repo>/textures`, which is exactly where
+  `CustomTexManager::GetTextures()` looks (`{UserPath::LoadDir}textures/{TITLE_ID}/`);
+* `custom_textures` is answered through `RETRO_ENVIRONMENT_GET_VARIABLE`
+  (`citra_custom_textures`), because `retro_load_game -> UpdateSettings -> ParseCoreOptions`
+  re-reads it and would clobber a direct `Settings::values` assignment.
+
+## Two findings (do not re-derive)
+
+1. **`Settings::values.async_custom_loading = false` CRASHES this Azahar.** The synchronous
+   `CustomTexManager::Decode` path calls `upload()` inline from inside the rasterizer's surface
+   fill, which re-enters `MemorySystem::RasterizerMarkRegionCached` on an already-cached page and
+   aborts on `core/memory.cpp:1130: Unreachable code!` (100% reproducible ~3.5 s into a Kokiri
+   warp). Leave `async_custom_loading` at Azahar's default (`true`). Consequence: replacements
+   land at ≤8 uploads per rendered frame after a scene load, so step until the `texpack` hit
+   counter stops growing before capturing a frame.
+2. **Azahar's user dirs must be ABSOLUTE.** `g_system_dir`/`g_save_dir` used to be the relative
+   `scratch/harness/{system,save}`; `SohBootInternal()` then `chdir()`s into
+   `scratch/harness/soh_cwd`, so every Azahar file access issued after `soh_boot` resolved against
+   the wrong cwd. Symptom was `Render <Critical> ... Failed to open custom texture:
+   scratch/harness/save/Azahar/load/textures/...`, followed by a zero-extent `VkImage` and
+   `vk_texture_runtime.cpp:217: Unreachable code!`. Fixed harness-side in `main()`.
+
+## Verification signature
+
+```
+harness: texpack: ON on BOTH sides — root <repo>/textures (az load dir <repo>/scratch/harness/save/Azahar/load)
+> texpack
+ok texpack mode=on root=<repo>/textures az=2148/2143 az_hits=74/65 soh=2143 soh_hits=67/54
+```
+
+Kokiri Forest (entrance 0xEE, dayTime 0x6000, both engines at `sceneNum=0x0055`), hi-res vs
+vanilla at a matched schedule: oracle 98.3 % of pixels differ (mean |Δ| 13.8), Zelda3D 94.8 %
+(mean |Δ| 7.8) — the pack is demonstrably in effect on both. The az-vs-soh delta is *not* made
+worse by turning it on (mean |Δ| 37.98 both-hi-res vs 39.64 both-vanilla; cameras unmatched, so
+this is a sanity check, not a parity number).
