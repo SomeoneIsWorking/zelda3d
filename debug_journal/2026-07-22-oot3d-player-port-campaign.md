@@ -88,7 +88,24 @@ because in six months it would otherwise read as faithful porting.
   NO REGRESSION; it does NOT prove the buoyancy port improved fidelity — the sweep's tolerance may
   accommodate both constant sets. Proving improvement needs a frame-level velocity trace vs the
   oracle, not the sweep's pass/fail.
-- Full state-matrix sweep was running at the time of writing.
+- **FULL STATE MATRIX RE-MEASURED against the OoT3D oracle — no regressions from the 14 ports.**
+  All 25 states checked fresh this session and every one matches its pre-port baseline:
+
+      MATCH (21): model_render, backwalk, sidestep_l, sidestep_r, turn_in_place, jump, roll,
+                  attack, attack_combo, shield, item_bottle_use, pickup_carry, throw, climb_hang,
+                  climb_updown, swim_surface, swim_dive, mount_dismount, ztarget,
+                  damage_knockback, getitem_pose, death
+      DIVERGENT (1): idle          <- pre-existing, unchanged by the ports
+      UNREACHABLE (2): walk, run   <- pre-existing, unchanged by the ports
+
+  METHOD NOTE: the one-shot full sweep is unreliable — it was killed by a 30-minute timeout after
+  only 4 states, and `link_sweep.py list` then still showed the STALE baseline, which is an easy way
+  to report a verification that never ran. Run it in `--only` batches of ~8 (~24s/state) instead.
+
+  FLAKINESS NOTE, worth keeping: `ztarget` came back UNREACHABLE in a batch and MATCH when re-run
+  alone. That looked like a real regression — `Player_ActionHandler_13` is exactly the Z-target /
+  first-person entry path this session changed — so it was re-tested rather than written off. A
+  single UNREACHABLE from this harness is not evidence; confirm by re-running the state alone.
 - Individually unexercised: the audio deletions (confirm by ear), the Lens branch (needs a Lens
   pickup), the Iron-Boots vetoes, the dead-input gate.
 
