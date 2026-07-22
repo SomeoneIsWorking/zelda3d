@@ -399,12 +399,28 @@ below, not duplicated).
 - notes: this also retired an earlier wrong attribution — Kokiri's far-band residual was the missing fog COLOUR, not the missing sun-glare sprite (~2/255).
 
 ### lighting.per-draw-material — per-draw light slots + per-material ambient/diffuse
-- status: hack
+- status: re-verified
 - deps: lighting.pica-fog
-- evidence: oracle capture at Zora's Domain — 31/75 draws carry `matDif=(1,1,1)` and 5 take real light diffuse with `amb1=(0,0,0)`, while our room draws all report `matDif=0` and take ambient x2; `debug_journal/2026-07-22-lighting-parity-scene-sweep.md`
-- where: `Shipwright/libultraship/src/fast/backends/unified_shader.cpp` (`uParams0.y > 1.5` branch) + UBO fill in `zelda3d_sdl3gpu.cpp`
-- gap: **THE CURRENT LIGHTING FRONTIER.** Our renderer applies one global rule — both env lights always contribute ambient (x2) — derived from the title's night slots. The Zora's evidence says that is not universal: near UNFOGGED surfaces there are 14-33% dark while the equivalent band at Kokiri is ~15% BRIGHT, so no single multiplier explains both. Needs the real per-draw light-slot setup RE'd from the binary plus an oracle draw->material mapping. Explicitly NOT a tuning job.
-- notes: any candidate fix must move BOTH Zora's and Kokiri toward the oracle at matched cameras; improving one while worsening the other falsifies it.
+- evidence: `oot3d-decomp/docs/per_draw_light_setup.md`, `debug_journal/2026-07-22-per-draw-light-setup-re.md`, commit `96349eca` / decomp `1dfc0ee`; per-surface ratios inside each draw's own mask at a matched camera
+- where: `Shipwright/libultraship/src/fast/zelda3d_sdl3gpu.cpp` (already correct — comment-only edits)
+- gap: none — **this frontier did not exist.** OoT3D binds exactly two light-slot configurations (SCENE: both slots, dir world (0,-1,0), light diffuse (0,0,0) both, ambient twice; ACTOR: slot0 +sun/light2Col/sceneAmbient, slot1 -sun/light1Col/zero) and the renderer already switches on exactly that. Both driving claims were measurement artifacts: the "31 draws with matDif=(1,1,1)" are unlit 2D quads/room draws where a scene slot's light diffuse is zero so matDif is inert; and "our light dirs differ" was a SPACE error — the PICA direction registers are VIEW space and transform to exactly what we push.
+- notes: Kokiri measures 0.94-1.13 per surface — the "15% bright terrain band" was a frame-mean artifact. Frame means are too coarse for this class of question; use per-draw masks.
+
+### render.multi-stage-tev — multi-texture / multi-stage TEV emulation
+- status: hack
+- deps: lighting.per-draw-material
+- evidence: per-draw isolation at Zora's Domain — every worst offender (per-surface ratio 0.62-0.88) enables texture1/texture2 and runs TEV stages 1/2 with `color_op = MultiplyThenAdd`, while we render ONE texture through ONE stage; `debug_journal/2026-07-22-per-draw-light-setup-re.md`
+- where: `Shipwright/libultraship/src/fast/zelda3d_sdl3gpu.cpp` (`uExtra[3]` site carries the marker comment), `Shipwright/cmb3d/asset/cmb.cpp` (parses `comb_stage_count`, multi-stage already flagged a follow-up in `cmb.h`)
+- gap: **THE CURRENT RENDER FRONTIER.** This is the real "Zora's water is dark and desaturated" cause, now named rather than suspected. The CMB parse already captures per-material combiner op + RGB scale for stage 0 and knows the stage count; the renderer collapses everything to a single MODULATE stage.
+- notes: not a lighting problem — every lighting input at those draws matches the oracle exactly.
+
+### render.zora-ground-deficit — unexplained 0.79/0.86 ground+wall deficit at Zora's
+- status: blocked
+- deps: render.multi-stage-tev
+- evidence: per-draw masks, matched camera; per-band far->near 0.92, 0.69, 0.83, 0.77, 0.93, 0.92, 1.01, 0.97
+- where: unknown
+- gap: NOT lighting and NOT fog — every logged input and the shader expression match, and the deficit is spatially structured and non-monotonic in depth, so no gain or distance curve explains it. Candidates in priority order: (1) a decal-layer draw we drop entirely, (2) ETC1 mip/LOD selection, (3) vertex-colour interpolation.
+- notes: attack after `render.multi-stage-tev`, since that may repaint the same surfaces and change the measurement.
 
 ### lighting.fog-lut — fog LUT port
 - status: re-verified
