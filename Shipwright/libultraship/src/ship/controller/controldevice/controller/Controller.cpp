@@ -140,11 +140,6 @@ bool Controller::ProcessKeyboardEvent(KbEventType eventType, KbScancode scancode
         gZelda3dInputDevice = 1; // keyboard
     }
 
-    // zelda3d: removed the keyboard hotbar slot-selection handler. It tested `scancode >= 30 && <= 35`
-    // assuming SDL scancodes (keys 1-6), but `scancode` here is a LUS/DIK scancode where 30-35 are
-    // A, S, D, F, G, H — so the WASD movement keys silently moved the hotbar slot. There is no
-    // hotbar selection cursor (the gold highlight in z_parameter.c is removed), so nothing to select.
-
     return result;
 }
 

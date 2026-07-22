@@ -10,7 +10,7 @@
 #include "../behaviors/title/title_cloud_vortex.h" // Death Mountain cloud-vortex actor ring at title
 #include "../scene/zelda3d_collision.h" // C-ABI bridge for OoT3D scene collision (zelda3d_model.cpp)
 #include "../player/zelda3d_link.h"      // Link (player) replacement policy split out of this file
-#include "../input/zelda3d_input.h" // input harness (WalkInject/key-inject/xbox-glyph/hotbar) split out of this file
+#include "../input/zelda3d_input.h" // input harness (WalkInject/key-inject/xbox-glyph) split out of this file
 #include "../anim/zelda3d_anim_override.h" // skeletal-actor draw-override port (head/torso track, facial, DLs)
 #include "../behaviors/actor/actor_overrides.h" // En_Ko/En_Hy CSAB overrides + cucco wing-flap (phase-3 reorg)
 #include "overlays/actors/ovl_En_Ko/z_en_ko.h"   // EnKo ENKO_TYPE_* (shared-CMB head-variant select)
@@ -384,16 +384,13 @@ float gZelda3dSkyScale = 12.0f;
 // suspect backdrop group (e.g. the untextured "dome") can be identified by index live.
 int gZelda3dHlGroup = -1;
 
-// #32 Xbox face-button HUD glyphs, #32 hotswap input-device state, and the item hotbar
-// (gZelda3dXboxBtn/Zelda3D_XboxBtnEnabled, gZelda3dInputDevice/Zelda3D_InputDevice,
-// gZelda3dHotbarOn/Items/Active/FireB, Zelda3D_HotbarSlot/Sync) moved to
+// #32 Xbox face-button HUD glyphs + hotswap input-device state (gZelda3dXboxBtn/
+// Zelda3D_XboxBtnEnabled, gZelda3dInputDevice/Zelda3D_InputDevice) live in
 // zelda3d/input/zelda3d_input.cpp (Phase 1 input consolidation). Declared `extern` in zelda3d.h;
-// the "xboxui"/"inputdev"/"hotbaron"/"hotbar"/"hotbarset" REPL handlers below still write them
-// directly (unchanged — REPL command routing stays here, only the backing state/accessors moved).
+// the "xboxui"/"inputdev" REPL handlers write them directly (REPL command routing stays here).
 
-// --- PC HUD subsystem: EXTRACTED to zelda3d/hud/zelda3d_hud.cpp + zelda3d_hud_tex.cpp (Phase 2
-// codebase reorg). Zelda3D_PcHudEnabled/HudUpdateFrame/HudFrame/HudTexEnabled declared in
-// zelda3d.h; gZelda3dPcHud/gZelda3dHudState/gZelda3dHudTex now live in that .cpp. ---
+// --- HUD textures (crisp hearts/digits/button disc for the native Fast3D HUD, gZelda3dHudTex /
+// Zelda3D_HudTexEnabled): zelda3d/hud/zelda3d_hud_tex.cpp; declared in zelda3d.h. ---
 
 // #2 — press-to-skip for sequences that take camera control but are NOT scripted cutscenes
 // (scripted CS already skip on Start via z_demo.c csSkipButton). Onepoint cutscene cameras

@@ -23,7 +23,7 @@
 #include "soh/Enhancements/gameplaystats.h"
 #include "soh/ObjectExtension/ActorMaximumHealth.h"
 #include "zelda3d/zelda3d.h" // #32 — Xbox face-button HUD glyphs (Zelda3D_XboxBtnEnabled / Zelda3D_XboxGlyphTex)
-#include "zelda3d/input/zelda3d_input.h" // Zelda3D_XboxBtnEnabled / Zelda3D_InputDevice / Zelda3D_HotbarSlot
+#include "zelda3d/input/zelda3d_input.h" // Zelda3D_XboxBtnEnabled / Zelda3D_InputDevice
 
 #include "message_data_static.h"
 extern MessageTableEntry* sNesMessageEntryTablePtr;
@@ -1598,147 +1598,6 @@ static Gfx* Zelda3D_DrawHudBadges(Gfx* dl) {
             dl = Zelda3D_DrawXboxBtn(dl, sZelda3dHudBtns[i].glyph, bx, by, bw, bw, sZelda3dHudBtns[i].alpha);
         }
     }
-    return dl;
-}
-
-// ---- Zelda3D 6-slot hotbar (native Fast3D) --------------------------------------------------
-// A Minecraft-style horizontal bar of 6 item slots, drawn at the bottom-centre of the screen.
-// Each slot shows:
-//   - the real item icon texture (sourced from the SoH iconItemSegment, same as C-buttons)
-//   - a number-key keycap badge (keys 1-6) in the top-right corner (keyboard mode)
-//     OR nothing extra (gamepad mode — the slot number is shown by position)
-//   - a highlight box around the active slot (gZelda3dHotbarActive)
-// Layout: 6 slots × SLOT_SIZE px each, centred horizontally, SLOT_Y from bottom.
-// The N64 screen coordinate space is 320×240 (with OTR widescreen: ~426×240).
-// We use OTRGetDimensionFromLeftEdge / OTRGetDimensionFromRightEdge for widescreen parity.
-
-static Gfx* Zelda3D_DrawHotbar(PlayState* play, Gfx* dl) {
-    InterfaceContext* interfaceCtx = &play->interfaceCtx;
-    extern u8  gZelda3dHotbarItems[6];
-    // Zelda3D_InputDevice / Zelda3D_XboxBtnEnabled declared via zelda3d/input/zelda3d_input.h
-    // (included above).
-    extern const void* Zelda3D_NumGlyphTex(char which, int* w, int* h);
-    extern const void* Zelda3D_XboxGlyphTex(char which, int* w, int* h);
-
-    // Slot geometry — same visual weight as the C-buttons (~24 px in 240p).
-    const s16 SLOT_SIZE = 24;      // on-screen square size per slot (pixels)
-    const s16 SLOT_GAP  = 3;       // gap between slots
-    const s16 SLOT_Y    = 240 - SLOT_SIZE - 6; // near the bottom edge
-    const int NSLOTS    = 6;
-    const s16 BAR_W     = (s16)(NSLOTS * SLOT_SIZE + (NSLOTS - 1) * SLOT_GAP);
-    // Centre the bar on the logical 320px-wide N64 screen (widescreen extended left/right).
-    const s16 BAR_X     = (s16)((320 - BAR_W) / 2);
-
-    // Background: dark translucent panel behind the whole bar.
-    gDPPipeSync(dl++);
-    Gfx_SetupDL_39Overlay(play->state.gfxCtx); // MODULATEIA_PRIM, good for 2D overlay
-    gDPSetCombineMode(dl++, G_CC_PRIMITIVE, G_CC_PRIMITIVE);
-    gDPSetPrimColor(dl++, 0, 0, 0, 0, 0, 140); // semi-transparent black
-    gDPFillRectangle(dl++, BAR_X - 2, SLOT_Y - 2, BAR_X + BAR_W + 2, SLOT_Y + SLOT_SIZE + 2);
-    gDPPipeSync(dl++);
-
-    int i;
-    for (i = 0; i < NSLOTS; i++) {
-        s16 sx = (s16)(BAR_X + i * (SLOT_SIZE + SLOT_GAP));
-        s16 sy = SLOT_Y;
-        u8 itemId = gZelda3dHotbarItems[i];
-
-        // Draw slot background. zelda3d: no active-slot cursor — every slot renders the same dark bg
-        // (user: "there should be no hotbar cursor"). The old gold highlight tracked
-        // gZelda3dHotbarActive, which the (buggy, now-removed) keyboard handler moved via WASD.
-        gDPPipeSync(dl++);
-        gDPSetCombineMode(dl++, G_CC_PRIMITIVE, G_CC_PRIMITIVE);
-        gDPSetPrimColor(dl++, 0, 0, 40, 40, 40, 160); // dark slot bg (uniform, no highlight)
-        gDPFillRectangle(dl++, sx, sy, sx + SLOT_SIZE, sy + SLOT_SIZE);
-        gDPPipeSync(dl++);
-
-        // Draw item icon if slot is not empty. Use gItemIcons[itemId] — the same RGBA32
-        // texture pointer used by Interface_DrawItemIconTexture for C-buttons. This avoids
-        // DMA overhead and always gives the real item icon (incl. hi-res OTR replacements).
-        if (itemId != 0xFF && itemId != ITEM_NONE && itemId < 158) {
-            void* iconTex = gItemIcons[itemId];
-            if (iconTex != NULL) {
-                // Icon is RGBA32 32x32. Scale to fit the slot minus a 2px margin.
-                s16 icon_margin = 2;
-                s16 iw = SLOT_SIZE - 2 * icon_margin;
-                s16 ix = (s16)(sx + icon_margin);
-                s16 iy = (s16)(sy + icon_margin);
-                // dsdx/dtdy: map 32 texels onto iw pixels.
-                u16 dsdx = (u16)(((u32)32 << 10) / (u32)iw);
-                u16 dtdy = dsdx;
-                gDPPipeSync(dl++);
-                // Use full RGBA32 combine (colour = TEXEL0.rgb, alpha = TEXEL0.a).
-                gDPSetCombineLERP(dl++, 0,0,0,TEXEL0, 0,0,0,TEXEL0, 0,0,0,TEXEL0, 0,0,0,TEXEL0);
-                gDPLoadTextureBlock(dl++, iconTex, G_IM_FMT_RGBA, G_IM_SIZ_32b, 32, 32, 0,
-                                    G_TX_NOMIRROR|G_TX_WRAP, G_TX_NOMIRROR|G_TX_WRAP,
-                                    G_TX_NOMASK, G_TX_NOMASK, G_TX_NOLOD, G_TX_NOLOD);
-                gSPWideTextureRectangle(dl++, ix<<2, iy<<2, (ix+iw)<<2, (iy+iw)<<2,
-                                        G_TX_RENDERTILE, 0, 0, dsdx, dtdy);
-                gDPPipeSync(dl++);
-            }
-        }
-
-        // Slot-label badge — keyboard or gamepad mode.
-        if (Zelda3D_XboxBtnEnabled()) {
-            int devIsKeyboard = (Zelda3D_InputDevice() == 1);
-            if (devIsKeyboard) {
-                // Keyboard: number keycap 1-6 in top-right corner.
-                char numch = (char)('1' + i);
-                int gw = 0, gh = 0;
-                const void* numtex = Zelda3D_NumGlyphTex(numch, &gw, &gh);
-                if (numtex != NULL && gw > 0 && gh > 0) {
-                    s16 bw = 9;
-                    s16 bx = (s16)(sx + SLOT_SIZE - bw);
-                    s16 by = sy;
-                    gDPPipeSync(dl++);
-                    gDPSetCombineLERP(dl++, 0,0,0,TEXEL0, TEXEL0,0,PRIMITIVE,0,
-                                           0,0,0,TEXEL0, TEXEL0,0,PRIMITIVE,0);
-                    gDPSetPrimColor(dl++, 0, 0, 255, 255, 255, 255);
-                    gDPLoadTextureBlock(dl++, numtex, G_IM_FMT_RGBA, G_IM_SIZ_32b, gw, gh, 0,
-                                        G_TX_NOMIRROR|G_TX_WRAP, G_TX_NOMIRROR|G_TX_WRAP,
-                                        G_TX_NOMASK, G_TX_NOMASK, G_TX_NOLOD, G_TX_NOLOD);
-                    u16 dsdx = (u16)(((u32)gw << 10) / (u32)bw);
-                    u16 dtdy = (u16)(((u32)gh << 10) / (u32)bw);
-                    gSPWideTextureRectangle(dl++, bx<<2, by<<2, (bx+bw)<<2, (by+bw)<<2,
-                                            G_TX_RENDERTILE, 0, 0, dsdx, dtdy);
-                }
-            } else {
-                // Gamepad: Xbox face-button glyph.
-                // Slot 0=B, Slot 1=Y, Slot 2=chord+A, Slot 3=chord+B, Slot 4=chord+X, Slot 5=chord+Y
-                static const char kGamepadGlyphs[6] = { 'B', 'Y', 'A', 'B', 'X', 'Y' };
-                char glyphCh = kGamepadGlyphs[i];
-                int isChordSlot = (i >= 2); // slots 3-6 require RB chord
-                int gw = 0, gh = 0;
-                const void* gtex = Zelda3D_XboxGlyphTex(glyphCh, &gw, &gh);
-                if (gtex != NULL && gw > 0 && gh > 0) {
-                    // For chord slots, draw a small cyan stripe above the icon as chord indicator.
-                    if (isChordSlot) {
-                        gDPPipeSync(dl++);
-                        gDPSetCombineMode(dl++, G_CC_PRIMITIVE, G_CC_PRIMITIVE);
-                        gDPSetPrimColor(dl++, 0, 0, 80, 200, 255, 160); // cyan stripe
-                        gDPFillRectangle(dl++, sx, sy, sx + SLOT_SIZE, sy + 2);
-                        gDPPipeSync(dl++);
-                    }
-                    // Badge: 10px glyph in top-right (or top-left for chord slots to leave room).
-                    s16 bw = 10;
-                    s16 bx = isChordSlot ? (s16)(sx + 1) : (s16)(sx + SLOT_SIZE - bw);
-                    s16 by = (s16)(sy + (isChordSlot ? 3 : 0));
-                    gDPPipeSync(dl++);
-                    gDPSetCombineLERP(dl++, 0,0,0,TEXEL0, TEXEL0,0,PRIMITIVE,0,
-                                           0,0,0,TEXEL0, TEXEL0,0,PRIMITIVE,0);
-                    gDPSetPrimColor(dl++, 0, 0, 255, 255, 255, 255);
-                    gDPLoadTextureBlock(dl++, gtex, G_IM_FMT_RGBA, G_IM_SIZ_32b, gw, gh, 0,
-                                        G_TX_NOMIRROR|G_TX_WRAP, G_TX_NOMIRROR|G_TX_WRAP,
-                                        G_TX_NOMASK, G_TX_NOMASK, G_TX_NOLOD, G_TX_NOLOD);
-                    u16 dsdx = (u16)(((u32)gw << 10) / (u32)bw);
-                    u16 dtdy = (u16)(((u32)gh << 10) / (u32)bw);
-                    gSPWideTextureRectangle(dl++, bx<<2, by<<2, (bx+bw)<<2, (by+bw)<<2,
-                                            G_TX_RENDERTILE, 0, 0, dsdx, dtdy);
-                }
-            }
-        }
-    }
-
     return dl;
 }
 
@@ -4494,39 +4353,34 @@ void Interface_DrawItemButtons(PlayState* play) {
                                       BBtnScaled, BBtnScaled, BBtn_factor, BBtn_factor);
         Zelda3D_RecordHudBtn(0, PosX_BtnB, PosY_BtnB, BBtnScaled, interfaceCtx->bAlpha, 'B');
 
-        // C-Left / C-Down / C-Right button background discs — suppressed when the PC hotbar is
-        // the sole item UI (gZelda3dHotbarOn). B-button disc above is always drawn (it's the
-        // roll/action button, not an item slot and is retained in the PC HUD).
-        if (!gZelda3dHotbarOn) {
-            // C-Left Button Color & Texture
-            gDPPipeSync(OVERLAY_DISP++);
-            gDPSetPrimColor(OVERLAY_DISP++, 0, 0, cLeftButtonColor.r, cLeftButtonColor.g, cLeftButtonColor.b,
-                            interfaceCtx->cLeftAlpha);
-            gSPWideTextureRectangle(OVERLAY_DISP++, C_Left_BTN_Pos[0] << 2, C_Left_BTN_Pos[1] << 2,
-                                    (C_Left_BTN_Pos[0] + R_ITEM_BTN_WIDTH(1)) << 2,
-                                    (C_Left_BTN_Pos[1] + R_ITEM_BTN_WIDTH(1)) << 2, G_TX_RENDERTILE, 0, 0,
-                                    (R_ITEM_BTN_DD(1) << 1) * bgScale, (R_ITEM_BTN_DD(1) << 1) * bgScale);
-            Zelda3D_RecordHudBtn(1, C_Left_BTN_Pos[0], C_Left_BTN_Pos[1], R_ITEM_BTN_WIDTH(1), interfaceCtx->cLeftAlpha, 'X');
+        // C-Left Button Color & Texture
+        gDPPipeSync(OVERLAY_DISP++);
+        gDPSetPrimColor(OVERLAY_DISP++, 0, 0, cLeftButtonColor.r, cLeftButtonColor.g, cLeftButtonColor.b,
+                        interfaceCtx->cLeftAlpha);
+        gSPWideTextureRectangle(OVERLAY_DISP++, C_Left_BTN_Pos[0] << 2, C_Left_BTN_Pos[1] << 2,
+                                (C_Left_BTN_Pos[0] + R_ITEM_BTN_WIDTH(1)) << 2,
+                                (C_Left_BTN_Pos[1] + R_ITEM_BTN_WIDTH(1)) << 2, G_TX_RENDERTILE, 0, 0,
+                                (R_ITEM_BTN_DD(1) << 1) * bgScale, (R_ITEM_BTN_DD(1) << 1) * bgScale);
+        Zelda3D_RecordHudBtn(1, C_Left_BTN_Pos[0], C_Left_BTN_Pos[1], R_ITEM_BTN_WIDTH(1), interfaceCtx->cLeftAlpha, 'X');
 
-            // C-Down Button Color & Texture
-            gDPSetPrimColor(OVERLAY_DISP++, 0, 0, cDownButtonColor.r, cDownButtonColor.g, cDownButtonColor.b,
-                            interfaceCtx->cDownAlpha);
-            gSPWideTextureRectangle(OVERLAY_DISP++, C_Down_BTN_Pos[0] << 2, C_Down_BTN_Pos[1] << 2,
-                                    (C_Down_BTN_Pos[0] + R_ITEM_BTN_WIDTH(2)) << 2,
-                                    (C_Down_BTN_Pos[1] + R_ITEM_BTN_WIDTH(2)) << 2, G_TX_RENDERTILE, 0, 0,
-                                    (R_ITEM_BTN_DD(2) << 1) * bgScale, (R_ITEM_BTN_DD(2) << 1) * bgScale);
-            Zelda3D_RecordHudBtn(2, C_Down_BTN_Pos[0], C_Down_BTN_Pos[1], R_ITEM_BTN_WIDTH(2), interfaceCtx->cDownAlpha, 'Y');
+        // C-Down Button Color & Texture
+        gDPSetPrimColor(OVERLAY_DISP++, 0, 0, cDownButtonColor.r, cDownButtonColor.g, cDownButtonColor.b,
+                        interfaceCtx->cDownAlpha);
+        gSPWideTextureRectangle(OVERLAY_DISP++, C_Down_BTN_Pos[0] << 2, C_Down_BTN_Pos[1] << 2,
+                                (C_Down_BTN_Pos[0] + R_ITEM_BTN_WIDTH(2)) << 2,
+                                (C_Down_BTN_Pos[1] + R_ITEM_BTN_WIDTH(2)) << 2, G_TX_RENDERTILE, 0, 0,
+                                (R_ITEM_BTN_DD(2) << 1) * bgScale, (R_ITEM_BTN_DD(2) << 1) * bgScale);
+        Zelda3D_RecordHudBtn(2, C_Down_BTN_Pos[0], C_Down_BTN_Pos[1], R_ITEM_BTN_WIDTH(2), interfaceCtx->cDownAlpha, 'Y');
 
-            // C-Right Button Color & Texture
-            gDPSetPrimColor(OVERLAY_DISP++, 0, 0, cRightButtonColor.r, cRightButtonColor.g, cRightButtonColor.b,
-                            interfaceCtx->cRightAlpha);
-            gSPWideTextureRectangle(OVERLAY_DISP++, C_Right_BTN_Pos[0] << 2, C_Right_BTN_Pos[1] << 2,
-                                    (C_Right_BTN_Pos[0] + R_ITEM_BTN_WIDTH(3)) << 2,
-                                    (C_Right_BTN_Pos[1] + R_ITEM_BTN_WIDTH(3)) << 2, G_TX_RENDERTILE, 0, 0,
-                                    (R_ITEM_BTN_DD(3) << 1) * bgScale, (R_ITEM_BTN_DD(3) << 1) * bgScale);
-            Zelda3D_RecordHudBtn(3, C_Right_BTN_Pos[0], C_Right_BTN_Pos[1], R_ITEM_BTN_WIDTH(3), interfaceCtx->cRightAlpha,
-                               'A');
-        }
+        // C-Right Button Color & Texture
+        gDPSetPrimColor(OVERLAY_DISP++, 0, 0, cRightButtonColor.r, cRightButtonColor.g, cRightButtonColor.b,
+                        interfaceCtx->cRightAlpha);
+        gSPWideTextureRectangle(OVERLAY_DISP++, C_Right_BTN_Pos[0] << 2, C_Right_BTN_Pos[1] << 2,
+                                (C_Right_BTN_Pos[0] + R_ITEM_BTN_WIDTH(3)) << 2,
+                                (C_Right_BTN_Pos[1] + R_ITEM_BTN_WIDTH(3)) << 2, G_TX_RENDERTILE, 0, 0,
+                                (R_ITEM_BTN_DD(3) << 1) * bgScale, (R_ITEM_BTN_DD(3) << 1) * bgScale);
+        Zelda3D_RecordHudBtn(3, C_Right_BTN_Pos[0], C_Right_BTN_Pos[1], R_ITEM_BTN_WIDTH(3), interfaceCtx->cRightAlpha,
+                           'A');
     }
 
     if ((pauseCtx->state < 8) || (pauseCtx->state >= 18)) {
@@ -5472,16 +5326,6 @@ const char* digitTextures[] = { gCounterDigit0Tex, gCounterDigit1Tex, gCounterDi
                                 gCounterDigit6Tex, gCounterDigit7Tex, gCounterDigit8Tex };
 
 void Interface_Draw(PlayState* play) {
-    // Zelda3D PC HUD: when the native Vulkan PC HUD is active, suppress the entire N64 Fast3D HUD
-    // (hearts/magic/rupees/buttons AND the Zelda3D 6-slot hotbar drawn at the tail of this function)
-    // so the two don't stack. The PC HUD (zelda3d_hud_vk.cpp, driven by Zelda3D_HudFrame) draws them
-    // natively via Vulkan with the real HD textures. Env ZELDA3D_PCHUD=0 / REPL `pchud 0` reverts.
-    {
-        extern int Zelda3D_PcHudEnabled(void);
-        if (Zelda3D_PcHudEnabled()) {
-            return;
-        }
-    }
     // Zelda3D title-demo — Az's OoT3D title shows no HUD at all. Task #14.
     {
         extern int Zelda3D_Title_IsActive(void);
@@ -5932,51 +5776,44 @@ void Interface_Draw(PlayState* play) {
 
         gDPPipeSync(OVERLAY_DISP++);
 
-        // C-Left / C-Down / C-Right icon + ammo: suppressed when the PC hotbar is the sole item UI.
-        // The hotbar replaces the N64 top-right item cluster entirely; the C-button item-slot engine
-        // still runs (so items stay equippable via the pause menu) but these on-screen icons are
-        // hidden. Re-enable with REPL `hotbaron 0` for debugging.
-        if (!gZelda3dHotbarOn) {
-            // C-Left Button Icon & Ammo Count
-            if (gSaveContext.equips.buttonItems[1] < 0xF0) {
-                gDPSetPrimColor(OVERLAY_DISP++, 0, 0, 255, 255, 255, interfaceCtx->cLeftAlpha);
-                gDPSetCombineMode(OVERLAY_DISP++, G_CC_MODULATERGBA_PRIM, G_CC_MODULATERGBA_PRIM);
-                Interface_DrawItemIconTexture(play, gItemIcons[gSaveContext.equips.buttonItems[1]], 1);
-                gDPPipeSync(OVERLAY_DISP++);
-                gDPSetCombineLERP(OVERLAY_DISP++, PRIMITIVE, ENVIRONMENT, TEXEL0, ENVIRONMENT, TEXEL0, 0, PRIMITIVE, 0,
-                                  PRIMITIVE, ENVIRONMENT, TEXEL0, ENVIRONMENT, TEXEL0, 0, PRIMITIVE, 0);
-                Interface_DrawAmmoCount(play, 1, interfaceCtx->cLeftAlpha);
-            }
-
+        // C-Left Button Icon & Ammo Count
+        if (gSaveContext.equips.buttonItems[1] < 0xF0) {
+            gDPSetPrimColor(OVERLAY_DISP++, 0, 0, 255, 255, 255, interfaceCtx->cLeftAlpha);
+            gDPSetCombineMode(OVERLAY_DISP++, G_CC_MODULATERGBA_PRIM, G_CC_MODULATERGBA_PRIM);
+            Interface_DrawItemIconTexture(play, gItemIcons[gSaveContext.equips.buttonItems[1]], 1);
             gDPPipeSync(OVERLAY_DISP++);
+            gDPSetCombineLERP(OVERLAY_DISP++, PRIMITIVE, ENVIRONMENT, TEXEL0, ENVIRONMENT, TEXEL0, 0, PRIMITIVE, 0,
+                              PRIMITIVE, ENVIRONMENT, TEXEL0, ENVIRONMENT, TEXEL0, 0, PRIMITIVE, 0);
+            Interface_DrawAmmoCount(play, 1, interfaceCtx->cLeftAlpha);
+        }
 
-            // C-Down Button Icon & Ammo Count
-            if (gSaveContext.equips.buttonItems[2] < 0xF0) {
-                gDPSetPrimColor(OVERLAY_DISP++, 0, 0, 255, 255, 255, interfaceCtx->cDownAlpha);
-                gDPSetCombineMode(OVERLAY_DISP++, G_CC_MODULATERGBA_PRIM, G_CC_MODULATERGBA_PRIM);
-                Interface_DrawItemIconTexture(play, gItemIcons[gSaveContext.equips.buttonItems[2]], 2);
-                gDPPipeSync(OVERLAY_DISP++);
-                gDPSetCombineLERP(OVERLAY_DISP++, PRIMITIVE, ENVIRONMENT, TEXEL0, ENVIRONMENT, TEXEL0, 0, PRIMITIVE, 0,
-                                  PRIMITIVE, ENVIRONMENT, TEXEL0, ENVIRONMENT, TEXEL0, 0, PRIMITIVE, 0);
-                Interface_DrawAmmoCount(play, 2, interfaceCtx->cDownAlpha);
-            }
+        gDPPipeSync(OVERLAY_DISP++);
 
+        // C-Down Button Icon & Ammo Count
+        if (gSaveContext.equips.buttonItems[2] < 0xF0) {
+            gDPSetPrimColor(OVERLAY_DISP++, 0, 0, 255, 255, 255, interfaceCtx->cDownAlpha);
+            gDPSetCombineMode(OVERLAY_DISP++, G_CC_MODULATERGBA_PRIM, G_CC_MODULATERGBA_PRIM);
+            Interface_DrawItemIconTexture(play, gItemIcons[gSaveContext.equips.buttonItems[2]], 2);
             gDPPipeSync(OVERLAY_DISP++);
+            gDPSetCombineLERP(OVERLAY_DISP++, PRIMITIVE, ENVIRONMENT, TEXEL0, ENVIRONMENT, TEXEL0, 0, PRIMITIVE, 0,
+                              PRIMITIVE, ENVIRONMENT, TEXEL0, ENVIRONMENT, TEXEL0, 0, PRIMITIVE, 0);
+            Interface_DrawAmmoCount(play, 2, interfaceCtx->cDownAlpha);
+        }
 
-            // C-Right Button Icon & Ammo Count
-            if (gSaveContext.equips.buttonItems[3] < 0xF0) {
-                gDPSetPrimColor(OVERLAY_DISP++, 0, 0, 255, 255, 255, interfaceCtx->cRightAlpha);
-                gDPSetCombineMode(OVERLAY_DISP++, G_CC_MODULATERGBA_PRIM, G_CC_MODULATERGBA_PRIM);
-                Interface_DrawItemIconTexture(play, gItemIcons[gSaveContext.equips.buttonItems[3]], 3);
-                gDPPipeSync(OVERLAY_DISP++);
-                gDPSetCombineLERP(OVERLAY_DISP++, PRIMITIVE, ENVIRONMENT, TEXEL0, ENVIRONMENT, TEXEL0, 0, PRIMITIVE, 0,
-                                  PRIMITIVE, ENVIRONMENT, TEXEL0, ENVIRONMENT, TEXEL0, 0, PRIMITIVE, 0);
-                Interface_DrawAmmoCount(play, 3, interfaceCtx->cRightAlpha);
-            }
-        } // end !gZelda3dHotbarOn
+        gDPPipeSync(OVERLAY_DISP++);
 
-        // D-pad item equip icons: suppressed when the PC hotbar is the sole item UI.
-        if (CVarGetInteger(CVAR_ENHANCEMENT("DpadEquips"), 0) != 0 && !gZelda3dHotbarOn) {
+        // C-Right Button Icon & Ammo Count
+        if (gSaveContext.equips.buttonItems[3] < 0xF0) {
+            gDPSetPrimColor(OVERLAY_DISP++, 0, 0, 255, 255, 255, interfaceCtx->cRightAlpha);
+            gDPSetCombineMode(OVERLAY_DISP++, G_CC_MODULATERGBA_PRIM, G_CC_MODULATERGBA_PRIM);
+            Interface_DrawItemIconTexture(play, gItemIcons[gSaveContext.equips.buttonItems[3]], 3);
+            gDPPipeSync(OVERLAY_DISP++);
+            gDPSetCombineLERP(OVERLAY_DISP++, PRIMITIVE, ENVIRONMENT, TEXEL0, ENVIRONMENT, TEXEL0, 0, PRIMITIVE, 0,
+                              PRIMITIVE, ENVIRONMENT, TEXEL0, ENVIRONMENT, TEXEL0, 0, PRIMITIVE, 0);
+            Interface_DrawAmmoCount(play, 3, interfaceCtx->cRightAlpha);
+        }
+
+        if (CVarGetInteger(CVAR_ENHANCEMENT("DpadEquips"), 0) != 0) {
             // DPad is only greyed-out when all 4 DPad directions are too
             uint16_t dpadAlpha =
                 MAX(MAX(MAX(interfaceCtx->dpadUpAlpha, interfaceCtx->dpadDownAlpha), interfaceCtx->dpadLeftAlpha),
@@ -6796,10 +6633,6 @@ void Interface_Draw(PlayState* play) {
         gDPSetPrimColor(OVERLAY_DISP++, 0, 0, 0, 0, 0, interfaceCtx->unk_244);
         gDPFillRectangle(OVERLAY_DISP++, 0, 0, gScreenWidth - 1, gScreenHeight - 1);
     }
-
-    // Zelda3D hotbar: 6-slot native Fast3D item bar at bottom-centre.
-    // Drawn last so it's on top of all other HUD elements.
-    OVERLAY_DISP = Zelda3D_DrawHotbar(play, OVERLAY_DISP);
 
     CLOSE_DISPS(play->state.gfxCtx);
 }

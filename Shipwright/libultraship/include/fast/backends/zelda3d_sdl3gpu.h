@@ -1,12 +1,11 @@
-// Zelda3D SDL3 GPU renderer — the OoT3D skinned-model + shadow/AO renderer and the PC HUD, folded
-// into the SDL3 GPU backend (Fast::GfxRenderingAPISdl3Gpu) as MEMBER SUBSYSTEMS.
+// Zelda3D SDL3 GPU renderer — the OoT3D skinned-model + shadow/AO renderer, folded into the SDL3 GPU
+// backend (Fast::GfxRenderingAPISdl3Gpu) as a MEMBER SUBSYSTEM.
 //
-// Both classes used to be a pile of file-scope `g_*` globals + free functions in
-// zelda3d_sdl3gpu.cpp / zelda3d_hud_sdl3gpu.cpp; this header pulls that state into two classes
-// (Zelda3DRenderer + Zelda3DHudRenderer) owned by the backend. The member names are kept IDENTICAL to
-// the former globals so the large function bodies move over unchanged (member access is implicit
-// `this->`). The extern "C" C-ABI entry points (Zelda3D_Sg_* / Zelda3D_Hud_*) stay in their .cpp files
-// as thin shims that forward to the live instance via Fast::g_activeSdl3GpuApi.
+// The class used to be a pile of file-scope `g_*` globals + free functions in zelda3d_sdl3gpu.cpp;
+// this header pulls that state into Zelda3DRenderer, owned by the backend. The member names are kept
+// IDENTICAL to the former globals so the large function bodies move over unchanged (member access is
+// implicit `this->`). The extern "C" C-ABI entry points (Zelda3D_Sg_*) stay in the .cpp file as thin
+// shims that forward to the live instance via Fast::g_activeSdl3GpuApi.
 #pragma once
 #ifdef ENABLE_SDL3GPU
 
@@ -182,71 +181,6 @@ class Zelda3DRenderer {
     bool g_overlayDepthResReady = false;
     SDL_GPUShader* g_overlayDepthFrag = nullptr;
     SDL_GPUGraphicsPipeline* g_overlayDepthPipe = nullptr;
-};
-
-// ---- HUD record types (verbatim from zelda3d_hud_sdl3gpu.cpp) ----
-
-struct HudVert {
-    float x, y;
-    uint8_t r, g, b, a;
-    float u, v;
-};
-
-constexpr uint32_t kMaxQuadsPerFrame = 2048;
-constexpr uint32_t kVertsPerQuad = 6;
-constexpr uint32_t kRingFrames = 3;
-
-// One contiguous run of quads sharing a texture (a single SDL_DrawGPUPrimitives).
-struct DrawRun {
-    SDL_GPUTexture* tex;
-    uint32_t firstVert, vertCount;
-};
-
-struct HudSg {
-    SDL_GPUDevice* device = nullptr;
-    bool ready = false;
-    SDL_GPUShader* vs = nullptr;
-    SDL_GPUShader* fs = nullptr;
-    SDL_GPUGraphicsPipeline* pipeline = nullptr;
-    SDL_GPUSampler* sampler = nullptr;
-    SDL_GPUTexture* whiteTex = nullptr;
-
-    // Per-frame vertex ring (host transfer + device vertex buffer).
-    struct Ring {
-        SDL_GPUTransferBuffer* transfer = nullptr;
-        SDL_GPUBuffer* vbo = nullptr;
-    } rings[kRingFrames];
-    uint32_t ringIdx = 0;
-
-    std::unordered_map<const void*, SDL_GPUTexture*> texCache;
-
-    // Collected this frame.
-    bool active = false;
-    int w = 0, h = 0;
-    std::vector<HudVert> verts;
-    std::vector<DrawRun> runs;
-};
-
-// The PC HUD immediate-mode 2D textured-quad renderer. Its state is clearly independent of the model
-// renderer (separate pipeline/shaders/buffers), so it is a sibling member subsystem; folding it into
-// Zelda3DRenderer would clash on `ensureResources`. Members keep the former global names (`g`,
-// `g_idToTex`, `g_nextId`).
-class Zelda3DHudRenderer {
-  public:
-    int Available();
-    int Begin(int* outW, int* outH);
-    int Tex(const void* key, const void* rgba, int w, int h);
-    void Draw(int tex, float x, float y, float w, float h, float u0, float v0, float u1, float v1,
-              unsigned int tintRGBA);
-    void End();
-
-    SDL_GPUTexture* uploadTex(const void* rgba, int w, int h);
-    bool ensureResources();
-
-    HudSg g;
-    // The Draw ABI takes an int id; resolve the texture at Draw time from a per-frame id->tex table.
-    std::unordered_map<int, SDL_GPUTexture*> g_idToTex;
-    int g_nextId = 1;
 };
 
 } // namespace Fast

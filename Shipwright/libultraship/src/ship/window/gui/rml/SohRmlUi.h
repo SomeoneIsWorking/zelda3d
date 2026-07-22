@@ -138,7 +138,6 @@ class SohRmlUi {
     std::unique_ptr<SystemInterface_SDL> mSystemInterface;
     Rml::Context* mContext = nullptr;          // owned by RmlUi, freed by Rml::Shutdown()
     Rml::ElementDocument* mDocument = nullptr;  // ESC menu doc — owned by the context
-    Rml::ElementDocument* mHudDocument = nullptr; // unused — kept to avoid any lingering refs
     // Per-<tab> click listeners (own their lifetime; must outlive the document's elements).
     std::vector<std::unique_ptr<Rml::EventListener>> mTabClickListeners;
 };

@@ -396,13 +396,6 @@ s16 getHealthMeterYOffset() {
 }
 
 void HealthMeter_Draw(PlayState* play) {
-    // Zelda3D PC HUD replaces the N64 heart draw — suppress it when the native Vulkan PC HUD is active.
-    {
-        extern int Zelda3D_PcHudEnabled(void);
-        if (Zelda3D_PcHudEnabled()) {
-            return;
-        }
-    }
     s32 pad[5];
     void* heartBgImg;
     u32 curColorSet;

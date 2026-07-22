@@ -1,5 +1,5 @@
 // See zelda3d_input.h for the module's scope. Bodies below are moved verbatim from zelda3d.c
-// (Zelda3D_WalkInject + the walkhold/btnhold REPL bodies + the Xbox/input-device/hotbar globals
+// (Zelda3D_WalkInject + the walkhold/btnhold REPL bodies + the Xbox/input-device globals
 // and accessors) and zelda3d_model.cpp (Zelda3D_InjectKey) — pure code motion, no behavior change.
 #include "zelda3d_input.h"
 
@@ -63,47 +63,6 @@ int Zelda3D_InputDevice(void) {
         gZelda3dInputDevice = (v != NULL && v[0] == '0') ? 0 : 1;
     }
     return gZelda3dInputDevice;
-}
-
-// ---- Hotbar: 6-slot item hotbar drawn natively via Fast3D HUD injection ----------------------
-// gZelda3dHotbarItems[6]: item id (0xFF=ITEM_NONE) in each slot.
-// gZelda3dHotbarActive: currently selected slot (0-5).
-// Slots are set by REPL `hotbar <0-5>` (headless) and by SDL key press (keys 1-6, live).
-// When a slot is "selected" by pressing 1-6, the item in that slot is routed to B button
-// (buttonItems[0]) so the existing SoH use-item engine handles it without duplication.
-// gZelda3dHotbarOn: 1 = hotbar is the sole item UI; N64 C-button/D-pad cluster is suppressed.
-// Default on. REPL `hotbaron <0|1>` (zelda3d.c). All four declared `extern` in zelda3d.h.
-int gZelda3dHotbarOn = 1;
-
-u8 gZelda3dHotbarItems[6] = { 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF };
-int gZelda3dHotbarActive  = 0;   // 0-5
-// Set to 1 by the gamepad chord path (LUS Controller) when it wants to fire the newly-selected
-// slot this frame (i.e. inject a virtual B press). Consumed by Zelda3D_HotbarSync.
-int gZelda3dHotbarFireB   = 0;
-
-int Zelda3D_HotbarSlot(void) {
-    return gZelda3dHotbarActive;
-}
-
-// Called from Zelda3D_ReplPoll each frame: sync hotbar slot[active] <-> buttonItems[0] so pressing
-// the existing B-button use path fires the hotbar item.
-// For gamepad: when gZelda3dHotbarFireB is set (gamepad Y press or chord+ABXY), we also inject a
-// virtual B press via the engine's input so the item fires immediately.
-void Zelda3D_HotbarSync(PlayState* play) {
-    // Slot active's item must be on B (buttonItems[0]) for the SoH engine to use it.
-    // We write the hotbar item into B; if the user hasn't assigned slots, B is already ITEM_NONE.
-    u8 activeItem = gZelda3dHotbarItems[gZelda3dHotbarActive];
-    if (activeItem != (u8)gSaveContext.equips.buttonItems[0]) {
-        gSaveContext.equips.buttonItems[0] = activeItem;
-    }
-    // Gamepad chord path: fire the active slot's item this frame by injecting a B-button press.
-    // gZelda3dHotbarFireB is set by ReadToOSContPad (gamepad Y or chord+ABXY) and consumed here.
-    if (gZelda3dHotbarFireB && play != NULL) {
-        // Inject a press into the engine's input pad so B-button press handling runs this frame.
-        play->state.input[0].press.button  |= BTN_B;
-        play->state.input[0].cur.button    |= BTN_B;
-        gZelda3dHotbarFireB = 0;
-    }
 }
 
 // ---------------------------------------------------------------------------------------------

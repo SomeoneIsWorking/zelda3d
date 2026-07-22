@@ -254,11 +254,11 @@ were all applied; the final 70 undefined refs resolved as two link seams:
   NextColumn/Get|SetColumnWidth/GetContentRegionMax/GetItemRectSize/GetMousePos/GetTextLineHeight/
   InvisibleButton/IsItemClicked/IsWindowAppearing/IsWindowDocked/TextDisabled); `ImDrawList::AddImage`
   + 2-arg `ImDrawList::AddText` in `imgui_stub.cpp`. Shared lib but inert at runtime (RmlUi is live UI).
-- **6 SoH3D OoT3D-hotbar symbols** that shared libultraship references (Controller.cpp/Gui.cpp/
-  interpreter.cpp/soh3d_*.cpp) but only the `soh` exe defines → inert defs in `mm/2s2h/Z3DSohShim.c`
-  (all `int`: gSoH3dInputDevice/HotbarActive/HotbarFireB/HlGroup; `void SoH3D_HudFrame(void)`;
-  `void SoH3D_MeasureResult(int,float)`). Marked STOPGAP: proper fix = decouple libultraship from
-  app-defined HUD symbols (weak syms / callback registration).
+- **Zelda3D symbols** that shared libultraship references (Controller.cpp/interpreter.cpp/
+  zelda3d_*.cpp) but only the `soh` exe defines → inert defs in `2ship/2s2h/Z3DSohShim.c`
+  (`int gZelda3dInputDevice`, `int gZelda3dHlGroup`, `void Zelda3D_MeasureResult(int,float)`).
+  Marked STOPGAP: proper fix = decouple libultraship from app-defined symbols (weak syms /
+  callback registration).
 **N2.4 — MM asset extraction — DONE (2026-07-01).** GAME_STR is only referenced by ZAPD/OTRExporter
 (compile-time `GAME_MM` vs `GAME_OOT`, affecting the MM-specific exporters — TextMMExporter, keyframe
 anim, etc.), NOT by soh/mm/top-level. So the clean path is a SEPARATE build dir:

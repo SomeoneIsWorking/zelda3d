@@ -215,10 +215,6 @@ extern int gZelda3dXboxBtn;       // env ZELDA3D_XBOXUI / REPL `xboxui` gate (-1
 // Same 64x64 dims as Zelda3D_XboxGlyphTex. The draw path is identical; only the texture changes.
 const void* Zelda3D_KbdGlyphTex(char which, int* w, int* h);
 
-// Hotbar number keycap glyphs. `which` = '1'..'6'. 64x64 RGBA32, same keycap style as above.
-// Used to label each hotbar slot's number key (keyboard mode) or omitted (gamepad mode).
-const void* Zelda3D_NumGlyphTex(char which, int* w, int* h);
-
 // #32 hotswap — last-used input device. 0 = gamepad (Xbox glyphs), 1 = keyboard (key-label glyphs).
 // Updated from the C++ LUS input layer (Ship::Controller::ProcessKeyboardEvent for keyboard events,
 // LUS::Controller::ReadToOSContPad for gamepad events). The HUD reads this each frame to pick the
@@ -241,13 +237,9 @@ enum {
     ZELDA3D_HEART_EMPTY,
 };
 const void* Zelda3D_HeartTex(int kind, int* w, int* h);
-// PC HUD (zelda3d_hud_vk.cpp) variant: the same heart but colour-BAKED into straight RGBA (the OoT
-// life-meter PRIM/ENV lerp applied), since the native Vulkan HUD draws without the N64 combiner that
-// would otherwise tint the grayscale Zelda3D_HeartTex. `kind` is ZELDA3D_HEART_*. Cached; NULL on failure.
-const void* Zelda3D_HudHeartRGBA(int kind, int* w, int* h);
-// PC HUD — decode an OoT3D standalone romfs .ctxb atlas (the real 3DS HUD textures: hud_all00,
+// Decode an OoT3D standalone romfs .ctxb atlas (the real 3DS HUD textures: hud_all00,
 // icon_item_menu00, num_all00) to RGBA8, cached by path. texIdx selects the texture entry (these
-// menu files carry one atlas at index 0). NULL on failure. The native HUD draws sub-rects of these.
+// menu files carry one atlas at index 0). NULL on failure.
 const void* Zelda3D_OoT3dAtlas(const char* romfsPath, int texIdx, int* w, int* h);
 extern int gZelda3dHudTex;       // env ZELDA3D_HUDTEX / REPL `hudtex` gate (-1=uninit, 0/1)
 int Zelda3D_HudTexEnabled(void); // lazily resolves the env on first call; HUD draws gate on this
@@ -638,58 +630,6 @@ extern int gZelda3dLinkOn;
 extern int gZelda3dLinkAnimSrc;
 int Zelda3D_LinkEnabled(void);
 int Zelda3D_LinkAnimSrc(void);
-
-// gZelda3dHotbarOn: 1 = the PC hotbar is the SOLE item UI — suppress the N64 top-right C-button
-// item cluster (C-Left/C-Down/C-Right icon + background discs + D-pad item indicators) from
-// Interface_DrawItemButtons and Interface_Draw. Hearts, magic, rupees, minimap, and the A-button
-// do-action prompt are NOT suppressed. Default on (set in Zelda3D_ReplPoll). REPL `hotbaron <0|1>`.
-extern int gZelda3dHotbarOn;
-
-// ---- Hotbar: 6-slot native Fast3D item hotbar (native SoH HUD, NOT RmlUi) -----------------
-// Drawn via z_parameter.c's Fast3D overlay pass (same path as existing button icons).
-// Keys 1-6 select slot 0-5 via SDL input; the active slot item is mirrored onto buttonItems[0]
-// (B button) so the existing SoH use-item engine fires it without reimplementing item logic.
-// REPL `hotbar <0-5>` selects the active slot headless; `hotbarset <slot> <item>` assigns an item.
-extern u8  gZelda3dHotbarItems[6];  // item id per slot (0xFF=ITEM_NONE=empty)
-extern int gZelda3dHotbarActive;    // currently selected slot 0-5
-// gZelda3dHotbarFireB: set to 1 by the gamepad chord path (LUS Controller) when it wants to fire
-// the newly-selected slot this frame (i.e. inject a B press). Consumed by Zelda3D_HotbarSync.
-extern int gZelda3dHotbarFireB;
-// Zelda3D_HotbarSlot()/Zelda3D_HotbarSync() declared in input/zelda3d_input.h (moved there, Phase 1
-// input consolidation). HotbarSlot() returns gZelda3dHotbarActive; HotbarSync() runs each frame
-// from Zelda3D_ReplPoll.
-
-// ---- PC HUD (native Vulkan, replaces the N64 Fast3D HUD) -----------------------------------
-// User directive 2026-06-23: the in-game HUD is a MODERN PC HUD rendered DIRECTLY via Vulkan
-// (zelda3d_hud_vk.cpp), NOT the N64 Interface_Draw path and NOT RmlUi. When enabled, Interface_Draw
-// and HealthMeter_Draw are gated off; Zelda3D_HudFrame() draws hearts/magic/rupees/hotbar with the
-// real HD textures. Gate: 1 = PC HUD on (default); env ZELDA3D_PCHUD=0 / REPL `pchud 0` reverts to
-// the N64 HUD. The gate ALSO requires the Vulkan backend (Zelda3D_Hud_Available) — a GL build keeps
-// the native HUD as fallback.
-extern int gZelda3dPcHud;       // -1=uninit, 0=off, 1=on
-int Zelda3D_PcHudEnabled(void); // resolves env lazily; 1 only when on AND the VK HUD layer is live
-
-// Snapshot of game HUD state, filled once per frame by Zelda3D_HudUpdateFrame() (game thread, has
-// PlayState) and read by Zelda3D_HudFrame() (render thread, no PlayState). Pure POD.
-typedef struct {
-    int health;          // current health in quarter-hearts (gSaveContext.health)
-    int healthCapacity;  // max health in quarter-hearts
-    int magic;           // current magic 0..magicCapacity
-    int magicCapacity;   // max magic (0 if no magic)
-    int magicLevel;      // 0=none, 1=normal, 2=double
-    int rupees;          // current rupee count
-    int hotbarItems[6];  // item id per hotbar slot (0xFF=empty)
-    int hotbarActive;    // selected hotbar slot 0-5
-    int inputDevice;     // 0=gamepad, 1=keyboard
-    int valid;           // 1 once filled at least once
-} Zelda3dHudState;
-extern Zelda3dHudState gZelda3dHudState;
-
-// Snapshot game state into gZelda3dHudState (called from Zelda3D_ReplPoll). No-op when PC HUD off.
-void Zelda3D_HudUpdateFrame(PlayState* play);
-// Render the PC HUD this frame via the Vulkan HUD layer. Called from libultraship's Gui::EndFrame
-// (render thread). No-op when the PC HUD is disabled or no valid snapshot exists yet.
-void Zelda3D_HudFrame(void);
 
 #ifdef __cplusplus
 }

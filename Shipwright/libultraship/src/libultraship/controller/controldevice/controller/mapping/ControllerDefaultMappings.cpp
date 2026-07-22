@@ -61,12 +61,11 @@ void ControllerDefaultMappings::SetDefaultKeyboardKeyToButtonMappings(
     // Camera down     BTN_CDOWN  Arrow Down
     // Camera left     BTN_CLEFT  Arrow Left
     // Camera right    BTN_CRIGHT Arrow Right
-    // D-pad up        BTN_DUP    I              Item slot up (reserved — item hotbar separate pass)
+    // D-pad up        BTN_DUP    I              Item slot up
     // D-pad down      BTN_DDOWN  K              Item slot down
     // D-pad left      BTN_DLEFT  J              Item slot left
     // D-pad right     BTN_DRIGHT L              Item slot right
     //
-    // Keys 1-8 are reserved for the item hotbar (separate pass — do NOT wire here).
     // Mouse LMB→BTN_B and mouse-look→camera are deferred to the mouse-look pass.
     Ship::ControllerDefaultMappings::SetDefaultKeyboardKeyToButtonMappings({
         { BTN_A, { Ship::KbScancode::LUS_KB_SPACE } },
@@ -106,7 +105,7 @@ void ControllerDefaultMappings::SetDefaultSDLButtonToButtonMappings(
     // BTN_R     Right trigger (axis)   Shield/R (see axis→button defaults)
     // BTN_L     Left shoulder          L-button
     // BTN_START Start                  Pause/menu
-    // D-pad     D-pad                  Item slots (item hotbar separate pass)
+    // D-pad     D-pad                  Item slots
     Ship::ControllerDefaultMappings::SetDefaultSDLButtonToButtonMappings({
         { BTN_A, { SDL_GAMEPAD_BUTTON_SOUTH } },
         { BTN_B, { SDL_GAMEPAD_BUTTON_EAST } },
