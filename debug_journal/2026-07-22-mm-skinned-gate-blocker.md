@@ -35,9 +35,31 @@ the game's first scene. This is a concrete, one-screenshot repro rather than the
 playback verification" the gate previously carried — which is progress even though it is a negative
 result.
 
-## Next step
+## Investigation round 1 (2026-07-22)
 
-Identify the offending actor: log each skinned draw's actorId + world pos + the model id it resolved
-to, for one frame at the default spawn, and find the one whose draw position does not match its actor
-position. `csab not found: dk2_shiji` / `dk2_matsu` also appear in the log and may be related (a
-failed CSAB resolve leaving a model bound to a default).
+Actor dump at the default spawn shows **#0: id=0x010 obj=0x001 cat=7 at (-278.7, 38.1, -756.7)** —
+Link's exact XZ at head height, i.e. precisely where the cone renders. But `obj=0x001` is
+gameplay_keep, which is NOT one of the 7 skinned objects loaded (0x107 mm, 0x1CB pst, 0x223 lodmoon,
+0x0E2 an1, 0x1B6 sdn, 0x132 dog, 0x00C box). So that actor should never receive a 3DS model.
+
+That suggested a stale-pending leak, and **a real latent bug was found while checking it**:
+`Zelda3D_MM_AfterActorDraw()` exists solely to clear the deferred `{actor, modelId, scale,
+groundOffset}` slot, and it had **ZERO CALLERS**. `SetPending` fires in `mm3d_draw.c:161`; nothing
+ever cleared it, so the slot outlived its owner and the next actor reaching
+`Zelda3D_MM_SkelAnimeDrawRaw` could consume a stale entry.
+
+**Fixed** (clear now called in `z_actor.c` right after the actor's draw). **But this did NOT remove
+the cone** — it is still present in `scratch/screenshots/mm_skinned_fixed.png`. So the leak was a
+genuine bug worth fixing on its own merits, and the cone has a DIFFERENT cause. Do not re-attribute
+it to pending state.
+
+## Next step (cone still open)
+
+The offending draw evidently does not go through `Actor_Draw`'s pending path at all. Candidates to
+check next:
+- a model drawn from the PLAYER draw path (mm3d_player.c is a draw-only stub delegating to the
+  generic actor path) rather than from an actor's own Draw;
+- the two `csab not found: dk2_shiji` / `dk2_matsu` failures in the log — a failed CSAB resolve may
+  leave a model bound to a default rig/position;
+- instrument `Zelda3D_MM_EmitModelDraw` to log actorId + world pos + modelId for one frame and find
+  the draw whose position does not match its actor.
