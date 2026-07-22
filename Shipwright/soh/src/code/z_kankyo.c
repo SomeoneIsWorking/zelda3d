@@ -1000,6 +1000,7 @@ void Environment_Update(PlayState* play, EnvironmentContext* envCtx, LightContex
 
                         // SoH3D (#111): record the exact blend this frame so
                         // Zelda3D_SceneLightSettingsOverride re-runs it on the OoT3D rows.
+                        gZelda3dEnvBlend.valid = 1;
                         gZelda3dEnvBlend.timeBased = 1;
                         gZelda3dEnvBlend.idx[0] = TIME_ENTRY_1F.unk_04;
                         gZelda3dEnvBlend.idx[1] = TIME_ENTRY_1F.unk_05;
@@ -1096,6 +1097,7 @@ void Environment_Update(PlayState* play, EnvironmentContext* envCtx, LightContex
                     envCtx->unk_D8 = 1.0f;
 
                     // SoH3D (#111): settings path, no blend — current slot only.
+                    gZelda3dEnvBlend.valid = 1;
                     gZelda3dEnvBlend.timeBased = 0;
                     gZelda3dEnvBlend.idx[0] = gZelda3dEnvBlend.idx[2] = envCtx->unk_BD;
                     gZelda3dEnvBlend.idx[1] = gZelda3dEnvBlend.idx[3] = envCtx->unk_BD;
@@ -1147,6 +1149,7 @@ void Environment_Update(PlayState* play, EnvironmentContext* envCtx, LightContex
                                                           lightSettingsList[envCtx->unk_BD].fogFar, envCtx->unk_D8);
 
                     // SoH3D (#111): settings path with indoor blend prev -> cur at unk_D8.
+                    gZelda3dEnvBlend.valid = 1;
                     gZelda3dEnvBlend.timeBased = 0;
                     gZelda3dEnvBlend.idx[0] = gZelda3dEnvBlend.idx[2] = envCtx->unk_BE;
                     gZelda3dEnvBlend.idx[1] = gZelda3dEnvBlend.idx[3] = envCtx->unk_BD;

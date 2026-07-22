@@ -15,13 +15,21 @@ l0dir/l1col/l1dir (they repeat at stride 28) but left "amb" reading [trueAmbBlue
 — the constant G=B=72 across ALL scenes was dir bytes (0x48=72), not color. Record layout
 (verified byte-for-byte vs the runtime list, which is a straight copy of this region):
 
-    +0x00 f32 fogEnd   +0x04 f32 drawDist   +0x08 u16 ? (fog near/blend-rate shaped)
+    +0x00 f32 zFar     (projection far plane / draw distance; Kokiri 12000)
+    +0x04 f32 fogFar   (fog saturation distance, eye units; Kokiri 2400)
+    +0x08 u16 fogNear  (N64-style packed: low 10 bits = fogNear eye units, high 6 = blend rate;
+                        Kokiri day 0xff20 -> 800)
     +0x0a u8[3] ambient   +0x0d u8[3] ? (constant (72,72,72) outdoors / 0 in cs slots)
     +0x10 u8[3] light0Color  +0x13 s8[3] light0Dir
     +0x16 u8[3] light1Color  +0x19 s8[3] light1Dir
 
 Kokiri noon check: record 1 ambient=(181,181,160) == the live c82/c85 uniform
 (0.7098,0.7098,0.62745) exactly; l0col=(255,255,219) == the live actor dif1 uniform.
+Fog check: the live per-draw PICA fog LUT (harness `az_fog` + per-draw lutS) is 1.0 through
+entry 125, entry 126 = 1.0/-0.0215, entry 127 = 0.979/-0.9795; with the measured gameplay
+projection (camNear 7.0, zFar 12000: vsuni proj2 = (1.0006, 7.0041)) the eye-linear fog
+window (fogNear=800, fogFar=2400) reproduces those node values exactly:
+node(127/128): eye = b/(a-t) = 834 -> (2400-834)/(2400-800) = 0.979.
 
 Record i == runtime slot i (NO bias): the N64 z_kankyo schedule index selects the
 matching OoT3D record directly.
@@ -70,9 +78,12 @@ def parse_env(d):
             return list(d[o + off:o + off + n])
         def s(off, n):  # signed bytes
             return [b - 256 if b >= 128 else b for b in d[o + off:o + off + n]]
+        zfar, fogfar = struct.unpack_from("<ff", d, o)
+        fognear_raw = struct.unpack_from("<H", d, o + 0x08)[0]
         slots.append({
             "amb": u(0x0a, 3), "l0col": u(0x10, 3), "l0dir": s(0x13, 3),
             "l1col": u(0x16, 3), "l1dir": s(0x19, 3),
+            "zfar": zfar, "fogfar": fogfar, "fognear": fognear_raw & 0x3FF,
         })
     return slots
 
@@ -122,6 +133,7 @@ def main():
         o.write("typedef struct {\n")
         o.write("    unsigned char amb[3]; signed char l0dir[3]; unsigned char l0col[3];\n")
         o.write("    signed char l1dir[3]; unsigned char l1col[3];\n")
+        o.write("    unsigned short fogNear; float fogFar; float zFar; // eye units (3DS PICA fog window + far plane)\n")
         o.write("} Zelda3dLightSlot;\n")
         o.write("typedef struct { unsigned char numSlots; const Zelda3dLightSlot* slots; } Zelda3dSceneLight;\n\n")
 
@@ -134,8 +146,9 @@ def main():
             emitted[name] = sym
             o.write(f"static const Zelda3dLightSlot {sym}[] = {{ // {name}\n")
             for s in slots:
-                o.write("    {{%3d,%3d,%3d},{%4d,%4d,%4d},{%3d,%3d,%3d},{%4d,%4d,%4d},{%3d,%3d,%3d}},\n" % (
-                    *s["amb"], *s["l0dir"], *s["l0col"], *s["l1dir"], *s["l1col"]))
+                o.write("    {{%3d,%3d,%3d},{%4d,%4d,%4d},{%3d,%3d,%3d},{%4d,%4d,%4d},{%3d,%3d,%3d},%4d,%.0f,%.0f},\n" % (
+                    *s["amb"], *s["l0dir"], *s["l0col"], *s["l1dir"], *s["l1col"],
+                    s["fognear"], s["fogfar"], s["zfar"]))
             o.write("};\n")
         o.write("\nstatic const Zelda3dSceneLight kZelda3dSceneLighting[] = {\n")
         for i, (soh, enum, name) in enumerate(rows):
