@@ -92,7 +92,7 @@ std::optional<std::string> IncludeNoop(const std::string&) {
 // (@if(VERTEX_SHADER)/@else split). The combined per-draw UBO ("UnifiedCommon") is the SAME block
 // shared by both stages (matching the existing DRAW_MODEL op's push convention: identical bytes go
 // to vertex binding 0 AND fragment binding 0; bones are a separate block at vertex binding 1) —
-// BYTE-IDENTICAL to unified_ubo.h's UnifiedCommonUbo, sized to fit Zelda3DSg::kCommonBytes (368
+// // BYTE-IDENTICAL to unified_ubo.h's CommonUbo, sized to fit Zelda3DSg::kCommonBytes (static_assert-
 // bytes) exactly so the existing DRAW_MODEL Op/AppendZelda3DModelDraw/mSoh3dModelUbos plumbing needs
 // ZERO changes for a unified draw — see zelda3d_sdl3gpu.cpp/gfx_sdl3gpu.cpp's DrawModel/DrawTriangles
 // wiring.
@@ -121,7 +121,11 @@ const char* kUnifiedShaderTemplate = R"PRISM(@prism(type='fragment', name='Unifi
     vec4 uSphRot2; \
     vec4 uLitDif1; \
     vec4 uLitDif2; \
-    vec4 uLightDir2;
+    vec4 uLightDir2; \
+    uvec4 uTevStages[6]; \
+    uvec4 uTevConst[2]; \
+    vec4 uTex2Xf; \
+    vec4 uTevCtl;
 
 @if(VERTEX_SHADER)
     layout(location=0) in vec4 aPos;

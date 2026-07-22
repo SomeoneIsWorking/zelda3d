@@ -158,6 +158,12 @@ bool Cmb::parseMats() {
         m.tex1_idx = s16(b, bo1);
         m.wrap1_s = u16(b, bo1 + 8);
         m.wrap1_t = u16(b, bo1 + 0x0A);
+        // Texture binding 2 (third sampler, render.multi-stage-tev): Zora's water combines
+        // tex0+tex1+tex2 through a 3-stage chain (spot07_1 mat0-2).
+        uint32_t bo2 = o + 0x10 + 0x30;
+        m.tex2_idx = s16(b, bo2);
+        m.wrap2_s = u16(b, bo2 + 8);
+        m.wrap2_t = u16(b, bo2 + 0x0A);
         // Texture coordinators: 3 x 0x18-byte entries at +0x58 (scaleS/T @ +4/+8, transS/T @
         // +0xC/+0x10, rot @ +0x14; noclip readMatsChunk). Coordinator 0 feeds binding 0,
         // coordinator 1 feeds binding 1 (g_title.cmb's mableT detail mask has the baked
@@ -178,6 +184,15 @@ bool Cmb::parseMats() {
         // Coordinator-1 mapping method (noclip byte[2] of the coordinator entry): determines how
         // the second texture's UVs are generated. 3 = CameraSphereEnvMap (normal-derived UV).
         m.coord1_mapping = u8(b, co1 + 2);
+        // Coordinator 2 (feeds texture binding 2). Corpus-wide every coordinator sources
+        // texcoord0 (byte[1] == 0 for all 11172 materials — tools/tev_corpus_survey.py), so the
+        // renderer derives every unit's UV from the one baked UV set through these transforms.
+        uint32_t co2 = o + 0x58 + 0x30;
+        m.scale2_s = f32(b, co2 + 4);
+        m.scale2_t = f32(b, co2 + 8);
+        m.trans2_s = f32(b, co2 + 12);
+        m.trans2_t = f32(b, co2 + 16);
+        m.coord2_mapping = u8(b, co2 + 2);
         m.alpha_test = u8(b, o + 0x130) != 0;
         m.alpha_ref = u8(b, o + 0x131) / 255.0f;
         // Blend state (GL-ES enum values, used verbatim — see CmbMaterial). Offsets per
@@ -250,6 +265,26 @@ bool Cmb::parseMats() {
             uint16_t srcA = u16(b, co + 0x0C);
             uint16_t srcB = u16(b, co + 0x0E);
             uint16_t srcC = u16(b, co + 0x10);
+            // Full per-stage capture (render.multi-stage-tev). Field layout validated over the
+            // whole ROM corpus by tools/tev_corpus_survey.py (zero enum-domain violations):
+            // +0x00 rgbOp, +0x02 alphaOp, +0x04 rgbScale, +0x06 alphaScale, +0x08/+0x0A buffer
+            // inputs, +0x0C srcRGB[3], +0x12 modRGB[3], +0x18 srcA[3], +0x1E modA[3], +0x24 const.
+            CmbMaterial::CombStage& cs = m.comb_stages[s];
+            cs.rgb_op = op;
+            cs.a_op = u16(b, co + 0x02);
+            cs.rgb_scale = u16(b, co + 0x04);
+            cs.a_scale = u16(b, co + 0x06);
+            cs.buf_rgb = u16(b, co + 0x08);
+            cs.buf_a = u16(b, co + 0x0A);
+            for (int k = 0; k < 3; k++) {
+                cs.rgb_src[k] = u16(b, co + 0x0C + 2 * k);
+                cs.rgb_mod[k] = u16(b, co + 0x12 + 2 * k);
+                cs.a_src[k] = u16(b, co + 0x18 + 2 * k);
+                cs.a_mod[k] = u16(b, co + 0x1E + 2 * k);
+            }
+            cs.const_idx = (uint8_t)(u32(b, co + 0x24) & 0x07);
+            if (cs.const_idx > 5)
+                cs.const_idx = 0;
             if (s == 1) {
                 stage1Op = op;
                 stage1SrcA = srcA;
@@ -258,16 +293,19 @@ bool Cmb::parseMats() {
                 stage1Scale = u16(b, co + 0x04);
             }
             // Which of the three source slots the OP actually consumes. MODULATE / ADD /
-            // SUBTRACT / DOT3_RGB / DOT3_RGBA only look at A and B; INTERPOLATE (0x8574) and
-            // MULT_ADD (0x6401) and ADD_SIGNED (0x0400) look at all three; REPLACE (0x1E01)
-            // uses A only. This matters because scene materials commonly have srcC=CONSTANT as
-            // a leftover default while running MODULATE(A,B) — treating that C as an active
-            // CONSTANT reference would darken every mesh to black.
+            // SUBTRACT (0x84E7) / ADD_SIGNED (0x8574) / DOT3_RGB / DOT3_RGBA only look at A and
+            // B; INTERPOLATE (0x8575) / MULT_ADD (0x6401) / ADD_MULT (0x6402) look at all three;
+            // REPLACE (0x1E01) uses A only. This matters because scene materials commonly have
+            // srcC=CONSTANT as a leftover default while running MODULATE(A,B) — treating that C
+            // as an active CONSTANT reference would darken every mesh to black.
+            // (Corrected 2026-07-22: 0x8574 is ADD_SIGNED and 0x8575 INTERPOLATE — standard GL
+            // values, previously swapped here — and SUBTRACT is 0x84E7, not 0x8506.)
             int slotsUsed = 3; // default: assume all three (safe fail-open for unknown ops)
             switch (op) {
                 case 0x2100: // MODULATE
                 case 0x0104: // ADD
-                case 0x8506: // SUBTRACT
+                case 0x84E7: // SUBTRACT
+                case 0x8574: // ADD_SIGNED
                 case 0x86AE: // DOT3_RGB
                 case 0x86AF: // DOT3_RGBA
                     slotsUsed = 2;
@@ -350,6 +388,26 @@ bool Cmb::parseMats() {
             m.dual_tex_mode = CmbMaterial::kDualTexSelfSphereAdd;
             m.tex1_idx = m.tex0_idx; // self-reference: tex1 = tex0
             m.dual_tex_scale2 = 2.0f;
+        }
+        // Generic per-stage TEV routing (render.multi-stage-tev). The renderer's legacy fast
+        // path evaluates EXACTLY one shape: a single MODULATE(C(PRIMARY), C(TEXTURE0)) rgb
+        // stage with MODULATE(A(PRIMARY), A(TEXTURE0)) alpha at alpha-scale x1 (the rgb scale
+        // rides uExtra.w). That is 8232/11172 of the ROM's materials, including all of Kokiri's
+        // CLOSED terrain rows — those keep the legacy path bit-identically. The four
+        // byte-classified dual-texture title shapes (dual_tex_mode != 0, CLOSED title rows)
+        // also keep their verified legacy path. EVERYTHING else — multi-stage chains,
+        // non-MODULATE ops, CONST/PREVBUF/fragment-light sources, tex1/tex2 combines (Zora's
+        // water) — routes through the generic evaluator, which implements the real PICA
+        // semantics per stage.
+        if (m.comb_stage_count > 0 && m.dual_tex_mode == CmbMaterial::kDualTexNone) {
+            const CmbMaterial::CombStage& s0 = m.comb_stages[0];
+            bool trivialSingle =
+                m.comb_stage_count == 1 && s0.rgb_op == 0x2100 && s0.a_op == 0x2100 &&
+                s0.rgb_src[0] == 0x8577 && s0.rgb_src[1] == 0x84C0 &&
+                s0.rgb_mod[0] == 0x0300 && s0.rgb_mod[1] == 0x0300 &&
+                s0.a_src[0] == 0x8577 && s0.a_src[1] == 0x84C0 &&
+                s0.a_mod[0] == 0x0302 && s0.a_mod[1] == 0x0302 && s0.a_scale == 1;
+            m.tev_generic = !trivialSingle;
         }
         o += stride;
     }

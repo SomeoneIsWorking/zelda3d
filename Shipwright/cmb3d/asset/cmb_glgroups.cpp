@@ -20,6 +20,83 @@ static_assert(offsetof(CmbVertex, boneIds) == offsetof(Zelda3DGlVtx, boneIds), "
 static_assert(offsetof(CmbVertex, weights) == offsetof(Zelda3DGlVtx, weights), "weights offset mismatch");
 static_assert(offsetof(CmbVertex, color) == offsetof(Zelda3DGlVtx, color), "color offset mismatch");
 
+// --- Generic TEV packing (render.multi-stage-tev) -------------------------------------------
+// GL-DMP enum -> PICA hardware code translation, done once at group build so the shader decodes
+// small fixed-width fields. Enum domains validated over the whole ROM corpus
+// (tools/tev_corpus_survey.py, 2026-07-22: zero violations).
+static unsigned TevSrcCode(uint16_t gl) {
+    switch (gl) {
+        case 0x8577: return 0;  // PRIMARY_COLOR (vertex-lit output color)
+        case 0x6210: return 1;  // FRAGMENT_PRIMARY_COLOR_DMP (fragment lighting)
+        case 0x6211: return 2;  // FRAGMENT_SECONDARY_COLOR_DMP
+        case 0x84C0: return 3;  // TEXTURE0
+        case 0x84C1: return 4;  // TEXTURE1
+        case 0x84C2: return 5;  // TEXTURE2
+        case 0x84C3: return 6;  // TEXTURE3 (unsupported unit; shader falls back to TEXTURE0)
+        case 0x8579: return 13; // PREVIOUS_BUFFER_DMP
+        case 0x8576: return 14; // CONSTANT
+        case 0x8578: return 15; // PREVIOUS
+        default: return 0;
+    }
+}
+static unsigned TevColorModCode(uint16_t gl) {
+    switch (gl) {
+        case 0x0300: return 0;  // SRC_COLOR
+        case 0x0301: return 1;  // 1 - SRC_COLOR
+        case 0x0302: return 2;  // SRC_ALPHA
+        case 0x0303: return 3;  // 1 - SRC_ALPHA
+        case 0x8580: return 4;  // SRC_R
+        case 0x8581: return 5;  // 1 - SRC_R
+        case 0x8582: return 8;  // SRC_G
+        case 0x8583: return 9;  // 1 - SRC_G
+        case 0x8584: return 12; // SRC_B
+        case 0x8585: return 13; // 1 - SRC_B
+        default: return 0;
+    }
+}
+static unsigned TevAlphaModCode(uint16_t gl) {
+    switch (gl) {
+        case 0x0302: return 0; // SRC_ALPHA
+        case 0x0303: return 1; // 1 - SRC_ALPHA
+        case 0x8580: return 2; // SRC_R
+        case 0x8581: return 3;
+        case 0x8582: return 4; // SRC_G
+        case 0x8583: return 5;
+        case 0x8584: return 6; // SRC_B
+        case 0x8585: return 7;
+        default: return 0;     // 0x0300 SRC_COLOR is meaningless in the alpha chain -> alpha
+    }
+}
+static unsigned TevOpCode(uint16_t gl) {
+    switch (gl) {
+        case 0x1E01: return 0; // REPLACE
+        case 0x2100: return 1; // MODULATE
+        case 0x0104: return 2; // ADD
+        case 0x8574: return 3; // ADD_SIGNED
+        case 0x8575: return 4; // INTERPOLATE (Lerp)
+        case 0x84E7: return 5; // SUBTRACT
+        case 0x86AE: return 6; // DOT3_RGB
+        case 0x86AF: return 7; // DOT3_RGBA
+        case 0x6401: return 8; // MULT_ADD  ((a*b)+c)
+        case 0x6402: return 9; // ADD_MULT  (clamp(a+b)*c)
+        default: return 1;
+    }
+}
+static unsigned TevScaleLog2(uint16_t s) {
+    return s == 4 ? 2u : (s == 2 ? 1u : 0u);
+}
+static void PackTevStage(const CmbMaterial::CombStage& cs, unsigned out[3]) {
+    out[0] = TevSrcCode(cs.rgb_src[0]) | (TevSrcCode(cs.rgb_src[1]) << 4) |
+             (TevSrcCode(cs.rgb_src[2]) << 8) | (TevSrcCode(cs.a_src[0]) << 12) |
+             (TevSrcCode(cs.a_src[1]) << 16) | (TevSrcCode(cs.a_src[2]) << 20);
+    out[1] = TevColorModCode(cs.rgb_mod[0]) | (TevColorModCode(cs.rgb_mod[1]) << 4) |
+             (TevColorModCode(cs.rgb_mod[2]) << 8) | (TevAlphaModCode(cs.a_mod[0]) << 12) |
+             (TevAlphaModCode(cs.a_mod[1]) << 16) | (TevAlphaModCode(cs.a_mod[2]) << 20) |
+             ((unsigned)(cs.const_idx & 7) << 24);
+    out[2] = TevOpCode(cs.rgb_op) | (TevOpCode(cs.a_op) << 4) | (TevScaleLog2(cs.rgb_scale) << 8) |
+             (TevScaleLog2(cs.a_scale) << 10);
+}
+
 Zelda3DGlGroup MakeGlGroup(const Cmb& cmb, const CmbDrawGroup& g, const CmbVertex* srcVerts, int texBase) {
     const CmbMaterial* mat =
         (g.material_index >= 0 && g.material_index < (int)cmb.materials().size()) ? &cmb.materials()[g.material_index]
@@ -80,6 +157,23 @@ Zelda3DGlGroup MakeGlGroup(const Cmb& cmb, const CmbDrawGroup& g, const CmbVerte
     cg.uv1Trans[0] = mat ? mat->trans1_s : 0.0f;
     cg.uv1Trans[1] = mat ? mat->trans1_t : 0.0f;
     cg.coord1Mapping = mat ? mat->coord1_mapping : 1;
+    // Generic per-stage TEV chain (render.multi-stage-tev): packed shader words + the third
+    // texture binding / coordinator-2 transform. tev_generic and dual_tex_mode are mutually
+    // exclusive by construction (cmb.cpp parseMats).
+    cg.tevGeneric = (mat && mat->tev_generic) ? 1 : 0;
+    cg.tevStageCount = mat ? mat->comb_stage_count : 0;
+    if (cg.tevStageCount > 6)
+        cg.tevStageCount = 6;
+    for (int s = 0; s < cg.tevStageCount; s++)
+        PackTevStage(mat->comb_stages[s], cg.tevStagePack[s]);
+    cg.tex2Index = (mat && mat->tex2_idx >= 0) ? mat->tex2_idx + texBase : -1;
+    cg.wrap2S = mat ? mat->wrap2_s : 0x2901;
+    cg.wrap2T = mat ? mat->wrap2_t : 0x2901;
+    cg.uv2Scale[0] = mat ? mat->scale2_s : 1.0f;
+    cg.uv2Scale[1] = mat ? mat->scale2_t : 1.0f;
+    cg.uv2Trans[0] = mat ? mat->trans2_s : 0.0f;
+    cg.uv2Trans[1] = mat ? mat->trans2_t : 0.0f;
+    cg.coord2Mapping = mat ? mat->coord2_mapping : 1;
     if (getenv("ZELDA3D_DBG_MAT")) {
         fprintf(stderr, "[MAT] mi=%d vlit=%d comb=%.1f amb=(%.2f,%.2f,%.2f) dif=(%.2f,%.2f,%.2f) "
                         "constIdx=%d const%d=(%.2f,%.2f,%.2f,%.2f)\n",

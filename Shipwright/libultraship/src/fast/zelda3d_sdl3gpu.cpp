@@ -168,7 +168,11 @@ bool CompileGlsl(EShLanguage stage, const char* src, std::vector<uint32_t>& spv)
     "    vec4 uSphRot2;\n" \
     "    vec4 uLitDif1;\n" \
     "    vec4 uLitDif2;\n" \
-    "    vec4 uLightDir2;\n"
+    "    vec4 uLightDir2;\n" \
+    "    uvec4 uTevStages[6];\n" \
+    "    uvec4 uTevConst[2];\n" \
+    "    vec4 uTex2Xf;\n" \
+    "    vec4 uTevCtl;\n"
 #define SG_UBO_BONES_BODY \
     "    mat4 uBones[" SG_STR(ZELDA3D_GL_MAX_BONES) "];\n"
 
@@ -186,6 +190,7 @@ const char* kVert =
     "layout(location=3) out vec3 vWorld;\n"
     "layout(location=4) out float vFogDist;\n"
     "layout(location=5) out vec2 vUv1;\n"
+    "layout(location=6) out vec2 vUv2;\n"
     "layout(set=1, binding=0, std140) uniform UBO {\n" SG_UBO_COMMON_BODY "} ubo;\n"
     "layout(set=1, binding=1, std140) uniform UBOBones {\n" SG_UBO_BONES_BODY "} bones;\n"
     "void main() {\n"
@@ -230,10 +235,10 @@ const char* kVert =
     // the caller supplies the live camera's view-rotation rows in uSphRot0..2 (uSphRot0.w = gate)
     // and the normal is rotated into REAL view space — matching the 3DS, where these decorations
     // are composited through the live cs-camera's view matrix (title_logo_actor.md §6.1).
+    "    vec3 ns = (ubo.uSphRot0.w > 0.5)\n"
+    "        ? vec3(dot(ubo.uSphRot0.xyz, nM), dot(ubo.uSphRot1.xyz, nM), dot(ubo.uSphRot2.xyz, nM))\n"
+    "        : (mat3(ubo.uMV) * nM);\n"
     "    if (ubo.uSheen.w > 2.5) {\n"
-    "        vec3 ns = (ubo.uSphRot0.w > 0.5)\n"
-    "            ? vec3(dot(ubo.uSphRot0.xyz, nM), dot(ubo.uSphRot1.xyz, nM), dot(ubo.uSphRot2.xyz, nM))\n"
-    "            : (mat3(ubo.uMV) * nM);\n"
     // Same texture-space y-flip as the UV-coordinate path below (SoH uploads textures y-flipped
     // relative to PICA texture space, which is why the UvCoordinateMap branch samples 1-uv1.y);
     // the sphere-mapped UV must flip identically or it mirrors the sampled gradient vertically.
@@ -248,6 +253,19 @@ const char* kVert =
     "        vec2 uv1 = vec2((aUv.x - ubo.uTex1Xf.z) * ubo.uTex1Xf.x, (aUv.y - ubo.uTex1Xf.w) * ubo.uTex1Xf.y);\n"
     "        vUv1 = vec2(uv1.x, 1.0 - uv1.y);\n"
     "    }\n"
+    // Coordinator-2 UV for the third texture unit (generic TEV, render.multi-stage-tev). Every
+    // OoT3D coordinator sources texcoord0 (corpus-verified, tools/tev_corpus_survey.py), so uv2
+    // is the same baked UV through coordinator 2's scale/translate — or the sphere-mapped UV
+    // when coordinator 2 uses CameraSphereEnvMap (uTevCtl.z == 3), same convention as uv1.
+    "    if (ubo.uTevCtl.z > 2.5 && ubo.uTevCtl.z < 3.5) {\n"
+    "        vec3 nv2 = normalize(ns);\n"
+    "        vec2 suv2 = vec2((nv2.x * 0.5 + 0.5 - ubo.uTex2Xf.z) * ubo.uTex2Xf.x,\n"
+    "                         (nv2.y * 0.5 + 0.5 - ubo.uTex2Xf.w) * ubo.uTex2Xf.y);\n"
+    "        vUv2 = vec2(suv2.x, 1.0 - suv2.y);\n"
+    "    } else {\n"
+    "        vec2 uv2 = vec2((aUv.x - ubo.uTex2Xf.z) * ubo.uTex2Xf.x, (aUv.y - ubo.uTex2Xf.w) * ubo.uTex2Xf.y);\n"
+    "        vUv2 = vec2(uv2.x, 1.0 - uv2.y);\n"
+    "    }\n"
     "}\n";
 
 const char* kFrag =
@@ -258,15 +276,15 @@ const char* kFrag =
     "layout(location=3) in vec3 vWorld;\n"
     "layout(location=4) in float vFogDist;\n"
     "layout(location=5) in vec2 vUv1;\n"
+    "layout(location=6) in vec2 vUv2;\n"
     "layout(location=0) out vec4 frag;\n"
     "layout(set=3, binding=0, std140) uniform UBO {\n" SG_UBO_COMMON_BODY "} ubo;\n"
     "layout(set=2, binding=0) uniform sampler2D uTex;\n"
-    // set=2 binding=1 was the (removed) sun-shadow map; the slot stays declared-but-unused so the
-    // 3-sampler bind layout (uTex / dummy / uTex1) doesn't re-index every pipeline. The custom
-    // shadow-map + SSAO enhancements were REMOVED (user directive 2026-07-16: OoT3D lighting and
-    // shading only — no synthetic effects); their pass machinery had already been left unwired by
-    // the render split (kanban #72 "menu toggles do nothing" was this).
-    "layout(set=2, binding=1) uniform sampler2D uShadowMapUnused;\n"
+    // set=2 binding=1 was the (removed) sun-shadow map's slot; it now carries the THIRD texture
+    // unit (uTex2) for the generic TEV path (render.multi-stage-tev — Zora's water combines
+    // tex0+tex1+tex2). Bound to the dummy texture on draws without a third binding, so the
+    // 3-sampler bind layout is unchanged.
+    "layout(set=2, binding=1) uniform sampler2D uTex2;\n"
     "layout(set=2, binding=2) uniform sampler2D uTex1;\n"
     // RE'd 3DS fog LUT node value at t = i/128 (FogResUpdater FUN_002cdbfc, mode 0 linear —
     // oot3d-decomp title_env_lighting.md §13): eyeDist = b/(a - t) (inverse projection), then
@@ -276,6 +294,108 @@ const char* kFrag =
     "    if (d < ubo.uFog3d0.z) return 1.0;\n"
     "    if (d > ubo.uFog3d0.w) return 0.0;\n"
     "    return (ubo.uFog3d0.w - d) / (ubo.uFog3d0.w - ubo.uFog3d0.z);\n"
+    "}\n"
+    // --- Generic PICA TEV evaluator (render.multi-stage-tev) ---------------------------------
+    // Faithful per-stage emulation of the PICA200 texture-combiner chain, driven by the packed
+    // per-material words in uTevStages (packing: Zelda3DGlGroup::tevStagePack, zelda3d_gl.h).
+    // Semantics per Azahar's sw_rasterizer TevStageConfig (the same core the oracle runs):
+    // each stage combines up to three modified sources with its op, scales the result x1/x2/x4,
+    // and CLAMPS ON REGISTER WRITE (the same clamp-the-product rule as the lit path below).
+    // Source codes: 0 Primary (the vertex-lit output color), 1 FragPrimary, 2 FragSecondary,
+    // 3..5 Texture0..2, 6 Texture3 (no unit; falls back to tex0), 13 PreviousBuffer,
+    // 14 Constant (per-stage slot from uTevConst), 15 Previous.
+    // KNOWN APPROXIMATIONS (rare in corpus, none at Zora/Kokiri — tools/tev_corpus_survey.py):
+    //  - FragPrimary/FragSecondary (fragment lighting, 199+69 materials): mapped to the same
+    //    vertex-lit primary / (0,0,0,1) — fragment lighting itself is not emulated yet.
+    //  - PreviousBuffer (14 materials): the CMB buffer-input selector is 0x8579 corpus-wide
+    //    (buffer never latches PREVIOUS), so PREVBUF reads the initial combiner-buffer color,
+    //    a runtime register we don't yet capture; evaluated as vec4(0).
+    "vec4 tevSrc(uint code, vec4 prim, vec4 t0, vec4 t1, vec4 t2, vec4 prev, uint kidx) {\n"
+    "    if (code == 0u || code == 1u) return prim;\n"
+    "    if (code == 2u) return vec4(0.0, 0.0, 0.0, 1.0);\n"
+    "    if (code == 3u || code == 6u) return t0;\n"
+    "    if (code == 4u) return t1;\n"
+    "    if (code == 5u) return t2;\n"
+    "    if (code == 14u) return unpackUnorm4x8(ubo.uTevConst[kidx >> 2][kidx & 3u]);\n"
+    "    if (code == 15u) return prev;\n"
+    "    return vec4(0.0);\n" // 13 PreviousBuffer (see approximation note)
+    "}\n"
+    "vec3 tevColorMod(uint m, vec4 s) {\n"
+    "    if (m == 0u) return s.rgb;\n"
+    "    if (m == 1u) return 1.0 - s.rgb;\n"
+    "    if (m == 2u) return vec3(s.a);\n"
+    "    if (m == 3u) return vec3(1.0 - s.a);\n"
+    "    if (m == 4u) return vec3(s.r);\n"
+    "    if (m == 5u) return vec3(1.0 - s.r);\n"
+    "    if (m == 8u) return vec3(s.g);\n"
+    "    if (m == 9u) return vec3(1.0 - s.g);\n"
+    "    if (m == 12u) return vec3(s.b);\n"
+    "    if (m == 13u) return vec3(1.0 - s.b);\n"
+    "    return s.rgb;\n"
+    "}\n"
+    "float tevAlphaMod(uint m, vec4 s) {\n"
+    "    if (m == 0u) return s.a;\n"
+    "    if (m == 1u) return 1.0 - s.a;\n"
+    "    if (m == 2u) return s.r;\n"
+    "    if (m == 3u) return 1.0 - s.r;\n"
+    "    if (m == 4u) return s.g;\n"
+    "    if (m == 5u) return 1.0 - s.g;\n"
+    "    if (m == 6u) return s.b;\n"
+    "    if (m == 7u) return 1.0 - s.b;\n"
+    "    return s.a;\n"
+    "}\n"
+    "vec3 tevColorOp(uint op, vec3 a, vec3 b, vec3 c) {\n"
+    "    if (op == 0u) return a;\n"                                    // Replace
+    "    if (op == 1u) return a * b;\n"                                // Modulate
+    "    if (op == 2u) return a + b;\n"                                // Add
+    "    if (op == 3u) return a + b - 0.5;\n"                          // AddSigned
+    "    if (op == 4u) return mix(b, a, c);\n"                         // Lerp: a*c + b*(1-c)
+    "    if (op == 5u) return a - b;\n"                                // Subtract
+    "    if (op == 6u || op == 7u) return vec3(4.0 * dot(a - 0.5, b - 0.5));\n" // Dot3
+    "    if (op == 8u) return a * b + c;\n"                            // MultiplyThenAdd
+    "    return clamp(a + b, 0.0, 1.0) * c;\n"                         // 9 AddThenMultiply
+    "}\n"
+    "float tevAlphaOp(uint op, float a, float b, float c) {\n"
+    "    if (op == 0u) return a;\n"
+    "    if (op == 1u) return a * b;\n"
+    "    if (op == 2u) return a + b;\n"
+    "    if (op == 3u) return a + b - 0.5;\n"
+    "    if (op == 4u) return mix(b, a, c);\n"
+    "    if (op == 5u) return a - b;\n"
+    "    if (op == 8u) return a * b + c;\n"
+    "    if (op == 9u) return clamp(a + b, 0.0, 1.0) * c;\n"
+    "    return a;\n"
+    "}\n"
+    "vec4 tevRun(vec4 prim, vec4 t0, vec4 t1, vec4 t2) {\n"
+    "    vec4 prev = vec4(0.0);\n"
+    "    int n = int(ubo.uTevCtl.x + 0.5);\n"
+    "    for (int s = 0; s < n; s++) {\n"
+    "        uvec4 w = ubo.uTevStages[s];\n"
+    "        uint kidx = (w.y >> 24) & 7u;\n"
+    "        vec4 sa = tevSrc(w.x & 15u, prim, t0, t1, t2, prev, kidx);\n"
+    "        vec4 sb = tevSrc((w.x >> 4) & 15u, prim, t0, t1, t2, prev, kidx);\n"
+    "        vec4 sc = tevSrc((w.x >> 8) & 15u, prim, t0, t1, t2, prev, kidx);\n"
+    "        vec3 ca = tevColorMod(w.y & 15u, sa);\n"
+    "        vec3 cb = tevColorMod((w.y >> 4) & 15u, sb);\n"
+    "        vec3 cc = tevColorMod((w.y >> 8) & 15u, sc);\n"
+    "        vec3 rgb = tevColorOp(w.z & 15u, ca, cb, cc);\n"
+    "        rgb = clamp(rgb * float(1u << ((w.z >> 8) & 3u)), 0.0, 1.0);\n"
+    "        float alpha;\n"
+    "        if (((w.z >> 4) & 15u) == 7u) {\n" // Dot3_RGBA writes the dot product to alpha too
+    "            alpha = rgb.r;\n"
+    "        } else {\n"
+    "            vec4 aa = tevSrc((w.x >> 12) & 15u, prim, t0, t1, t2, prev, kidx);\n"
+    "            vec4 ab = tevSrc((w.x >> 16) & 15u, prim, t0, t1, t2, prev, kidx);\n"
+    "            vec4 ac = tevSrc((w.x >> 20) & 15u, prim, t0, t1, t2, prev, kidx);\n"
+    "            float fa = tevAlphaMod((w.y >> 12) & 15u, aa);\n"
+    "            float fb = tevAlphaMod((w.y >> 16) & 15u, ab);\n"
+    "            float fc = tevAlphaMod((w.y >> 20) & 15u, ac);\n"
+    "            alpha = tevAlphaOp((w.z >> 4) & 15u, fa, fb, fc);\n"
+    "        }\n"
+    "        alpha = clamp(alpha * float(1u << ((w.z >> 10) & 3u)), 0.0, 1.0);\n"
+    "        prev = vec4(rgb, alpha);\n"
+    "    }\n"
+    "    return prev;\n"
     "}\n"
     "void main() {\n"
     "    vec4 t = texture(uTex, vUv);\n"
@@ -303,7 +423,10 @@ const char* kFrag =
     "        vec3 t1 = texture(uTex1, vUv1).rgb;\n"
     "        t.rgb = clamp(t.rgb + t1, 0.0, 1.0) * t.rgb;\n"
     "    }\n"
-    "    if (t.a < ubo.uParams.z) discard;\n"
+    // Generic TEV draws (uTevCtl.x > 0): PICA's alpha test compares the FINAL combiner alpha,
+    // not the raw texel — their discard happens after tevRun below.
+    "    bool tevG = (ubo.uTevCtl.x > 0.5);\n"
+    "    if (!tevG && t.a < ubo.uParams.z) discard;\n"
     "    gl_FragDepth = gl_FragCoord.z + ubo.uParams.w;\n"
     // Flat modulator for non-vertex-lit draws: the N64-fallback scene tint or a caller-supplied
     // per-draw color. The former half-Lambert form term (0.55+0.45·hl — a synthetic, magic-constant
@@ -338,6 +461,10 @@ const char* kFrag =
     // N64-fallback scene tint or a caller-supplied flat modulator, not a lighting model).
     "    bool vtxLit = (ubo.uAmbient.w > 0.0);\n"
     "    vec3 rgb;\n"
+    "    float outA = t.a * vColor.a;\n"
+    // PRIMARY_COLOR — the vertex-lit output color the TEV chain modulates by. Shared by the
+    // legacy fast path and the generic TEV path so the lighting model has exactly ONE home.
+    "    vec4 prim;\n"
     "    if (vtxLit) {\n"
     "        vec3 n = normalize(vNrmView);\n"
     "        vec3 lit = ubo.uAmbient.xyz * ubo.uAmbient.w\n"
@@ -347,18 +474,33 @@ const char* kFrag =
     // when the output register is WRITTEN — i.e. clamp(Σ·vColor) — not the light sum first.
     // clamp(Σ)·vColor was tried and measured ~30% dark on near grass (settled Kokiri noon,
     // rows 0.85-0.97: (62,71) vs oracle (90,99); this form gives (88,101)). Do not re-flip.
-    "        rgb = t.rgb * clamp(lit * vColor.rgb, 0.0, 1.0);\n"
+    "        prim = vec4(clamp(lit * vColor.rgb, 0.0, 1.0), vColor.a);\n"
     "    } else if (ubo.uParams.y > 0.5) {\n"
-    "        rgb = t.rgb * vColor.rgb * shade;\n"             // flat-tint fallback (vtxLit=0 draws)
+    "        prim = vec4(vColor.rgb * shade, vColor.a);\n"    // flat-tint fallback (vtxLit=0 draws)
     "    } else {\n"
-    "        rgb = t.rgb * vColor.rgb;\n"                     // unlit scene
+    "        prim = vec4(vColor.rgb, vColor.a);\n"            // unlit scene
+    "    }\n"
+    // Generic per-stage TEV path (render.multi-stage-tev): evaluate the material's real
+    // combiner chain — multi-texture, multi-stage, per-stage ops/operands/scales/consts —
+    // instead of the single-MODULATE legacy compound below. This is what "Zora's water is dark
+    // and desaturated" was: tex1/tex2 + MultiplyThenAdd stages our fixed pipeline dropped.
+    "    if (tevG) {\n"
+    "        vec4 t1s = texture(uTex1, vUv1);\n"
+    "        vec4 t2s = texture(uTex2, vUv2);\n"
+    "        vec4 tev = tevRun(prim, t, t1s, t2s);\n"
+    "        if (tev.a < ubo.uParams.z) discard;\n" // PICA alpha test: FINAL combiner alpha
+    "        rgb = tev.rgb;\n"
+    "        outA = tev.a;\n"
+    "    } else {\n"
+    "        rgb = t.rgb * prim.rgb;\n"
     "    }\n"
     // PICA200 CONSTANT-color modulation (EnHy townsfolk body color, title fire-glow gold
     // flicker). uMatConst.a is both the apply flag AND the CONSTANT-stage's hardware RGB scale:
     // 0 = skip (materials that don't reference CONSTANT), 1/2/4 = multiply by uMatConst.rgb then
     // by the stage scale (PICA scales each stage's output AFTER the combine — g_title.cmb's
     // stage 1 is 2.0*(PREV*CONST0), the fire-glow "half brightness" factor, fireglow doc §3.2).
-    "    if (ubo.uMatConst.a >= 0.5) rgb = clamp(rgb * ubo.uMatConst.rgb * ubo.uMatConst.a, 0.0, 1.0);\n"
+    // (Legacy path only — the generic TEV path already applied each stage's real CONSTANT.)
+    "    if (!tevG && ubo.uMatConst.a >= 0.5) rgb = clamp(rgb * ubo.uMatConst.rgb * ubo.uMatConst.a, 0.0, 1.0);\n"
     // uAmbient.w carries the ENABLED-LIGHT COUNT for this draw (0 = ambient path inactive), not a
     // 0/1 gate: title_env_lighting.md §10/§11 disassembled OoT3D's real PICA vertex-lit program and
     // found `matAmbient*sceneAmbient` is summed once PER ENABLED light slot (2 for standard N64
@@ -369,7 +511,8 @@ const char* kFrag =
     // itself moved into the vtxLit light sum above; vertex-lit characters (uParams.y > 0.5 &&
     // vtxLit) take the scale too — their stage-0 combiner is the same MODULATE ×2 as scene
     // materials (offline CMB dump, #153) that the old half-Lambert branch never applied.
-    "    if (ubo.uParams.y < 0.5 || vtxLit) {\n"
+    // (Legacy path only — the generic TEV path applied each stage's own hardware scale.)
+    "    if (!tevG && (ubo.uParams.y < 0.5 || vtxLit)) {\n"
     "        rgb = clamp(rgb, 0.0, 1.0) * ubo.uExtra.w;\n"
     "    }\n"
     // OoT3D PICA distance fog (uFog.w == 2.0; title port — oot3d-decomp title_env_lighting.md
@@ -397,7 +540,7 @@ const char* kFrag =
     "        float f = clamp(vFogDist * ubo.uFog2.x + ubo.uFog2.y, 0.0, 255.0) * (1.0 / 255.0);\n"
     "        rgb = mix(rgb, ubo.uFog.xyz, f);\n"
     "    }\n"
-    "    frag = vec4(rgb, t.a * vColor.a * ubo.uExtra.x);\n"
+    "    frag = vec4(rgb, outA * ubo.uExtra.x);\n"
     "}\n";
 
 // SgUbo, kSgCommonBytes, kSgBonesBytes and the <=4096-byte push-block invariants live in
@@ -745,7 +888,8 @@ SgModel* Fast::Zelda3DRenderer::ensureUploaded(int modelId) {
         g.combUsesConst = groups[i].combUsesConst;
         g.combConstScaleRGB = (groups[i].combConstScaleRGB > 0.0f) ? groups[i].combConstScaleRGB : 1.0f;
         g.dualTexMode = groups[i].dualTexMode;
-        if (g.dualTexMode) {
+        g.tevGeneric = groups[i].tevGeneric;
+        if (g.dualTexMode || g.tevGeneric) {
             g.dualTexScale2 = groups[i].dualTexScale2;
             g.tex1Index = groups[i].tex1Index;
             g.wrap1S = groups[i].wrap1S;
@@ -755,6 +899,21 @@ SgModel* Fast::Zelda3DRenderer::ensureUploaded(int modelId) {
             g.uv1Trans[0] = groups[i].uv1Trans[0];
             g.uv1Trans[1] = groups[i].uv1Trans[1];
             g.coord1Mapping = groups[i].coord1Mapping;
+        }
+        // Generic per-stage TEV chain (render.multi-stage-tev).
+        if (g.tevGeneric) {
+            g.tevStageCount = groups[i].tevStageCount;
+            for (int s = 0; s < 6; s++)
+                for (int k = 0; k < 3; k++)
+                    g.tevStagePack[s][k] = groups[i].tevStagePack[s][k];
+            g.tex2Index = groups[i].tex2Index;
+            g.wrap2S = groups[i].wrap2S;
+            g.wrap2T = groups[i].wrap2T;
+            g.uv2Scale[0] = groups[i].uv2Scale[0];
+            g.uv2Scale[1] = groups[i].uv2Scale[1];
+            g.uv2Trans[0] = groups[i].uv2Trans[0];
+            g.uv2Trans[1] = groups[i].uv2Trans[1];
+            g.coord2Mapping = groups[i].coord2Mapping;
         }
         if (groups[i].vertCount > 0) {
             for (int k = 0; k < 4; k++)
@@ -1104,6 +1263,10 @@ struct DrawGroup {
     // path substitutes the dummy texture so fragment sampler slot 2 is always backed).
     SDL_GPUTexture* tex1 = nullptr;
     SDL_GPUSampler* samp1 = nullptr;
+    // Third texture binding (generic TEV, render.multi-stage-tev) — rides fragment sampler
+    // slot 1 (the ex-shadow-map slot). nullptr = dummy-backed.
+    SDL_GPUTexture* tex2 = nullptr;
+    SDL_GPUSampler* samp2 = nullptr;
     uint32_t first, count;
     std::array<uint8_t, sizeof(SgUbo)> ubo;
 };
@@ -1407,6 +1570,19 @@ void Fast::Zelda3DRenderer::DrawModel(int modelId, const float* mp16, const floa
                     grp.matConstant[3][0], grp.matConstant[3][1], grp.matConstant[3][2], grp.matConstant[3][3],
                     grp.matConstant[4][0], grp.matConstant[4][1], grp.matConstant[4][2], grp.matConstant[4][3],
                     grp.matConstant[5][0], grp.matConstant[5][1], grp.matConstant[5][2], grp.matConstant[5][3]);
+            // Generic TEV chain (render.multi-stage-tev): the packed per-stage words the shader
+            // will decode (packing documented at Zelda3DGlGroup::tevStagePack).
+            if (grp.tevGeneric) {
+                fprintf(stderr,
+                        "[SG_DUMP]  g%-2d tevGeneric=1 stages=%d tex2=%d coordMap=(%d,%d) "
+                        "uv2Xf=(%.2f,%.2f,%.2f,%.4f) pack=",
+                        gi, grp.tevStageCount, grp.tex2Index, grp.coord1Mapping, grp.coord2Mapping,
+                        grp.uv2Scale[0], grp.uv2Scale[1], grp.uv2Trans[0], grp.uv2Trans[1]);
+                for (int s = 0; s < grp.tevStageCount && s < 6; s++)
+                    fprintf(stderr, "%s%08x/%08x/%08x", s ? "," : "", grp.tevStagePack[s][0],
+                            grp.tevStagePack[s][1], grp.tevStagePack[s][2]);
+                fprintf(stderr, "\n");
+            }
         }
     }
 
@@ -1654,6 +1830,54 @@ void Fast::Zelda3DRenderer::DrawModel(int modelId, const float* mp16, const floa
             ubo.uExtra[2] = 0.0f;
         }
 
+        // Generic per-stage TEV chain (render.multi-stage-tev): everything that is neither the
+        // trivial single-MODULATE legacy shape nor a classified dual-texture title shape
+        // (cmb.cpp parseMats routing). uTevCtl.x > 0 switches the fragment shader to tevRun();
+        // the legacy combiner knobs (uExtra.w scale / uMatConst / uSheen.y) are bypassed there.
+        if (grp.tevGeneric && grp.tevStageCount > 0) {
+            ubo.uTevCtl[0] = (float)grp.tevStageCount;
+            ubo.uTevCtl[1] = (float)grp.coord1Mapping;
+            ubo.uTevCtl[2] = (float)grp.coord2Mapping;
+            for (int s = 0; s < grp.tevStageCount && s < 6; s++) {
+                ubo.uTevStages[s * 4 + 0] = grp.tevStagePack[s][0];
+                ubo.uTevStages[s * 4 + 1] = grp.tevStagePack[s][1];
+                ubo.uTevStages[s * 4 + 2] = grp.tevStagePack[s][2];
+                ubo.uTevStages[s * 4 + 3] = 0;
+            }
+            // Constant-color palette, quantized to RGBA8 (PICA's const registers are 8-bit),
+            // AFTER the per-actor override channel (EnHy townsfolk clothing colours patch a
+            // slot at draw time — same override data the legacy uMatConst path consumes).
+            float constSlots[6][4];
+            memcpy(constSlots, grp.matConstant, sizeof(constSlots));
+            if (matConstMap && grp.materialIndex >= 0) {
+                auto ov = matConstMap->find(grp.materialIndex);
+                if (ov != matConstMap->end() && ov->second.constIdx >= 0 && ov->second.constIdx < 6) {
+                    for (int k = 0; k < 4; k++)
+                        constSlots[ov->second.constIdx][k] = ov->second.rgba[k];
+                }
+            }
+            for (int s = 0; s < 6; s++) {
+                auto q = [](float v) {
+                    int i = (int)(v * 255.0f + 0.5f);
+                    return (uint32_t)(i < 0 ? 0 : (i > 255 ? 255 : i));
+                };
+                ubo.uTevConst[s] = q(constSlots[s][0]) | (q(constSlots[s][1]) << 8) |
+                                   (q(constSlots[s][2]) << 16) | (q(constSlots[s][3]) << 24);
+            }
+            // Coordinator-1/2 transforms for the extra units. The vertex shader's uv1 sphere
+            // path gates on uSheen.w > 2.5 (shared with the dual-tex title path); mapping 4
+            // (ProjectionMap) is not emulated and falls back to plain UV.
+            ubo.uSheen[3] = (grp.coord1Mapping == 3) ? 3.0f : 1.0f;
+            ubo.uTex1Xf[0] = grp.uv1Scale[0];
+            ubo.uTex1Xf[1] = grp.uv1Scale[1];
+            ubo.uTex1Xf[2] = grp.uv1Trans[0];
+            ubo.uTex1Xf[3] = grp.uv1Trans[1];
+            ubo.uTex2Xf[0] = grp.uv2Scale[0];
+            ubo.uTex2Xf[1] = grp.uv2Scale[1];
+            ubo.uTex2Xf[2] = grp.uv2Trans[0];
+            ubo.uTex2Xf[3] = grp.uv2Trans[1];
+        }
+
         // Facial material-anim override.
         int texIndex = grp.texIndex;
         if (matTexMap && grp.materialIndex >= 0) {
@@ -1668,14 +1892,22 @@ void Fast::Zelda3DRenderer::DrawModel(int modelId, const float* mp16, const floa
             tex = m->textures[texIndex];
             samp = getSampler(grp.wrapS, grp.wrapT, additive);
         }
-        // Second texture binding (dual-texture combine): only ever non-dummy when the group's
-        // dual-tex mode is on (uSheen.y gates the shader-side sample).
+        // Second texture binding: non-dummy when the group's dual-tex mode is on (uSheen.y gates
+        // the shader-side sample) or its generic TEV chain can source TEXTURE1. Third binding
+        // (uTex2, the repurposed ex-shadow sampler slot): generic TEV only.
         SDL_GPUTexture* tex1 = nullptr;
         SDL_GPUSampler* samp1 = nullptr;
-        if (grp.dualTexMode && grp.tex1Index >= 0 && grp.tex1Index < (int)m->textures.size() &&
-            m->textures[grp.tex1Index]) {
+        if ((grp.dualTexMode || grp.tevGeneric) && grp.tex1Index >= 0 &&
+            grp.tex1Index < (int)m->textures.size() && m->textures[grp.tex1Index]) {
             tex1 = m->textures[grp.tex1Index];
             samp1 = getSampler(grp.wrap1S, grp.wrap1T, additive);
+        }
+        SDL_GPUTexture* tex2 = nullptr;
+        SDL_GPUSampler* samp2 = nullptr;
+        if (grp.tevGeneric && grp.tex2Index >= 0 && grp.tex2Index < (int)m->textures.size() &&
+            m->textures[grp.tex2Index]) {
+            tex2 = m->textures[grp.tex2Index];
+            samp2 = getSampler(grp.wrap2S, grp.wrap2T, additive);
         }
 
         // Translucent draw over an opaque material: synthesize a standard alpha-over pipeline.
@@ -1695,6 +1927,8 @@ void Fast::Zelda3DRenderer::DrawModel(int modelId, const float* mp16, const floa
         dg.samp = samp;
         dg.tex1 = tex1;
         dg.samp1 = samp1;
+        dg.tex2 = tex2;
+        dg.samp2 = samp2;
         dg.first = grp.first;
         dg.count = grp.count;
         if (unified) {
@@ -1765,15 +1999,18 @@ void Fast::Zelda3DRenderer::DrawModel(int modelId, const float* mp16, const floa
     SDL_Rect sc{};
     api->GetZelda3DViewportScissor(vp, sc);
     SDL_GPUBuffer* vbo = unified ? um->unifiedVbo : m->vbo;
-    SDL_GPUTexture* shadowTex = Fast::g_activeSdl3GpuApi->DummyTexture();  // slot 1: ex-shadow-map, now dummy
-    SDL_GPUSampler* shadowSamp = Fast::g_activeSdl3GpuApi->DummySampler();
+    // Fragment sampler slot 1 (ex-shadow-map): now the generic-TEV third texture unit (uTex2);
+    // dummy-backed for draws without one.
+    SDL_GPUTexture* dummyTex = Fast::g_activeSdl3GpuApi->DummyTexture();
+    SDL_GPUSampler* dummySamp = Fast::g_activeSdl3GpuApi->DummySampler();
 
     // Append each group as a FIRST-CLASS OP_DRAW in the unified op-list (no callback indirection):
     // each interleaves with the N64 geometry in this fb's render pass and replays through the backend's
     // single fragment-sampler bind path, exactly like an N64 triangle draw. Group order is preserved by
     // sequential append (matters for translucency).
     for (const DrawGroup& g : dgs)
-        api->AppendZelda3DModelDraw(g.pipeline, vbo, g.first, g.count, g.ubo.data(), g.tex, g.samp, shadowTex, shadowSamp,
+        api->AppendZelda3DModelDraw(g.pipeline, vbo, g.first, g.count, g.ubo.data(), g.tex, g.samp,
+                                  g.tex2 ? g.tex2 : dummyTex, g.samp2 ? g.samp2 : dummySamp,
                                   g.tex1, g.samp1, vp, sc);
 }
 

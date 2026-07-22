@@ -71,6 +71,15 @@ struct SgGroup {
     float uv1Scale[2] = { 1.0f, 1.0f };
     float uv1Trans[2] = { 0.0f, 0.0f };
     int coord1Mapping = 1; // coordinator-1 mapping method: 1=UV, 3=SphereEnvMap
+    // Generic per-stage TEV chain (render.multi-stage-tev; see Zelda3DGlGroup::tevStagePack).
+    int tevGeneric = 0;
+    int tevStageCount = 0;
+    unsigned tevStagePack[6][3] = {};
+    int tex2Index = -1;
+    unsigned wrap2S = 0x2901, wrap2T = 0x2901;
+    float uv2Scale[2] = { 1.0f, 1.0f };
+    float uv2Trans[2] = { 0.0f, 0.0f };
+    int coord2Mapping = 1;
     float dbgColor0[4] = { -1, -1, -1, -1 }; // sample of vertex[first].color (sgdump diagnostics)
     float dbgUv0[2] = { 0, 0 }, dbgUv1[2] = { 0, 0 }, dbgUv2[2] = { 0, 0 }; // sample uvs (sgdump)
 };

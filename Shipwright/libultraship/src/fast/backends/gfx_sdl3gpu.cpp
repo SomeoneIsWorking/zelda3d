@@ -2565,8 +2565,8 @@ void GfxRenderingAPISdl3Gpu::GetZelda3DViewportScissor(SDL_GPUViewport& vp, SDL_
 
 void GfxRenderingAPISdl3Gpu::AppendZelda3DModelDraw(SDL_GPUGraphicsPipeline* pipeline, SDL_GPUBuffer* vbo, uint32_t first,
                                                   uint32_t count, const void* ubo, SDL_GPUTexture* tex,
-                                                  SDL_GPUSampler* samp, SDL_GPUTexture* shadowTex,
-                                                  SDL_GPUSampler* shadowSamp, SDL_GPUTexture* tex1,
+                                                  SDL_GPUSampler* samp, SDL_GPUTexture* tex2,
+                                                  SDL_GPUSampler* samp2, SDL_GPUTexture* tex1,
                                                   SDL_GPUSampler* samp1, const SDL_GPUViewport& vp,
                                                   const SDL_Rect& sc) {
     int idx = (int)mSoh3dModelUbos.size();
@@ -2583,11 +2583,13 @@ void GfxRenderingAPISdl3Gpu::AppendZelda3DModelDraw(SDL_GPUGraphicsPipeline* pip
     op.numVerts = count;
     op.viewport = vp;
     op.scissor = sc;
-    op.numSamplers = 3; // slot 0 = model texture, slot 1 = sun-shadow map, slot 2 = dual-tex mask
+    // slot 0 = model texture, slot 1 = third texture unit (generic TEV, ex-shadow slot),
+    // slot 2 = second texture unit (dual-tex mask / generic TEV texture1)
+    op.numSamplers = 3;
     op.samplers[0].texture = tex;
     op.samplers[0].sampler = samp;
-    op.samplers[1].texture = shadowTex;
-    op.samplers[1].sampler = shadowSamp;
+    op.samplers[1].texture = tex2;
+    op.samplers[1].sampler = samp2;
     // Slot 2 must always be backed (the pipeline layout declares 3 fragment samplers): fall back
     // to the dummies when the draw has no second texture — the shader only samples it when the
     // UBO's dual-tex flag (uSheen.y) is set.

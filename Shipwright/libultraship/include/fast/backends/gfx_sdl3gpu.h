@@ -146,8 +146,8 @@ class GfxRenderingAPISdl3Gpu : public GfxRenderingAPI {
     // slot 2 = the dual-texture detail mask (nullptr -> dummy; only sampled when the draw's
     // dual-tex flag is set in its UBO).
     void AppendZelda3DModelDraw(SDL_GPUGraphicsPipeline* pipeline, SDL_GPUBuffer* vbo, uint32_t first, uint32_t count,
-                              const void* ubo, SDL_GPUTexture* tex, SDL_GPUSampler* samp, SDL_GPUTexture* shadowTex,
-                              SDL_GPUSampler* shadowSamp, SDL_GPUTexture* tex1, SDL_GPUSampler* samp1,
+                              const void* ubo, SDL_GPUTexture* tex, SDL_GPUSampler* samp, SDL_GPUTexture* tex2,
+                              SDL_GPUSampler* samp2, SDL_GPUTexture* tex1, SDL_GPUSampler* samp1,
                               const SDL_GPUViewport& vp, const SDL_Rect& sc);
     // Append one coalesced HUD quad-run as a first-class OP_DRAW into fb 0 (on top of the N64 + model
     // content, in the same pass), through the same single fragment-sampler bind path. `vbo` is the HUD

@@ -407,12 +407,12 @@ below, not duplicated).
 - notes: Kokiri measures 0.94-1.13 per surface — the "15% bright terrain band" was a frame-mean artifact. Frame means are too coarse for this class of question; use per-draw masks.
 
 ### render.multi-stage-tev — multi-texture / multi-stage TEV emulation
-- status: hack
+- status: re-verified
 - deps: lighting.per-draw-material
-- evidence: per-draw isolation at Zora's Domain — every worst offender (per-surface ratio 0.62-0.88) enables texture1/texture2 and runs TEV stages 1/2 with `color_op = MultiplyThenAdd`, while we render ONE texture through ONE stage; `debug_journal/2026-07-22-per-draw-light-setup-re.md`
-- where: `Shipwright/libultraship/src/fast/zelda3d_sdl3gpu.cpp` (`uExtra[3]` site carries the marker comment), `Shipwright/cmb3d/asset/cmb.cpp` (parses `comb_stage_count`, multi-stage already flagged a follow-up in `cmb.h`)
-- gap: **THE CURRENT RENDER FRONTIER.** This is the real "Zora's water is dark and desaturated" cause, now named rather than suspected. The CMB parse already captures per-material combiner op + RGB scale for stage 0 and knows the stage count; the renderer collapses everything to a single MODULATE stage.
-- notes: not a lighting problem — every lighting input at those draws matches the oracle exactly.
+- evidence: `debug_journal/2026-07-22-multi-stage-tev-port.md` + `oot3d-decomp/docs/pica_tev_combiner.md` — full 0x28-byte combiner-entry layout validated over ALL 11172 materials in the ROM (`tools/tev_corpus_survey.py`, zero enum-domain violations), Zora water's static 3-stage chain byte-identical to the live oracle's TEV registers, and per-draw mask ratios (`tools/tev_mask_ratio.py`) at matched cameras: Zora multi-tex draws 0.64/0.73/0.74 -> 0.68/0.77/0.77 (now in the same band as the scene's single-tex surfaces), Kokiri gate held 0.93-1.10, Kokiri's multi-stage draw d68 0.561 -> 0.987
+- where: `Shipwright/cmb3d/asset/cmb.cpp` (full `CombStage[6]` + tex2/coord2 parse + `tev_generic` routing), `Shipwright/cmb3d/asset/cmb_glgroups.cpp` (`PackTevStage`), `Shipwright/libultraship/src/fast/zelda3d_sdl3gpu.cpp` (`tevRun()` generic evaluator, uTex2 on the ex-shadow sampler slot), `Shipwright/libultraship/include/fast/zelda3d_sg_ubo.h` (`uTevStages/uTevConst/uTex2Xf/uTevCtl`)
+- gap: documented approximations, all rare and none at Zora/Kokiri: FRAGMENT_PRIMARY/SECONDARY sources (fragment lighting, 199+69 materials) map to the vertex-lit primary / black; PREVIOUS_BUFFER (14 materials) reads 0 (the initial combiner-buffer color is an uncaptured runtime register); TEXTURE3 (1 material) falls back to tex0; coordinator ProjectionMap (mapping 4, 366 materials) falls back to plain UV. The four classified dual-tex TITLE shapes + the trivial single-MODULATE majority stay on their verified legacy paths (CLOSED rows untouched); migrating them into `tevRun()` is a cleanup follow-up, not an RE gap.
+- notes: with the per-material combiner gap closed, Zora's remaining deficit is ONE scene-wide cause — `render.zora-ground-deficit` now covers water too (all surfaces sit in the same 0.77-0.87 band).
 
 ### render.zora-ground-deficit — unexplained 0.79/0.86 ground+wall deficit at Zora's
 - status: todo
@@ -420,7 +420,7 @@ below, not duplicated).
 - evidence: per-draw masks, matched camera; per-band far->near 0.92, 0.69, 0.83, 0.77, 0.93, 0.92, 1.01, 0.97
 - where: unknown
 - gap: NOT lighting and NOT fog — every logged input and the shader expression match, and the deficit is spatially structured and non-monotonic in depth, so no gain or distance curve explains it. Candidates in priority order: (1) a decal-layer draw we drop entirely, (2) ETC1 mip/LOD selection, (3) vertex-colour interpolation.
-- notes: attack after `render.multi-stage-tev`, since that may repaint the same surfaces and change the measurement.
+- notes: **THE CURRENT RENDER FRONTIER** now that `render.multi-stage-tev` landed: with per-material combiners faithful, EVERY Zora surface (water included) sits in one 0.77-0.87 band vs the oracle at a matched camera — one scene-wide cause, not per-material. Re-measure with `tools/tev_mask_ratio.py` against `scratch/drawiso/zora_masks`.
 
 ### lighting.fog-lut — fog LUT port
 - status: re-verified
