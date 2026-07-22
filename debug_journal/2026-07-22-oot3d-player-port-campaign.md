@@ -194,6 +194,19 @@ because in six months it would otherwise read as faithful porting.
   live, correctly signed, and running the OoT3D values — the first port in this campaign confirmed by
   MEASUREMENT rather than by build-success plus anim-selection parity.
 
+  **ORACLE A/B ATTEMPTED — blocked, and worth knowing why.** Upgrading this from "the constants are
+  live" to a true parity claim needs the same trace on the OoT3D side. The oracle boots fine
+  (`LS.OracleSession().boot()` -> ok) and accepts `warp 0x0109`, but every subsequent
+  `az_playerpos` / `az_playerinfo` answers **"no Player actor"**, across 10 walk steps and ~500
+  frames. `warp 0xEE` (Kokiri) works in link_sweep's own use, so the failure is specific to warping
+  the ORACLE to Zora's Domain — plausibly an adult-only/flag-gated entrance that lands without a
+  populated player, or a transition state the actor-chain walk cannot resolve.
+
+  Also note the oracle has NO `tp`: placing its Link requires analog driving, which is why this is
+  harder than the SoH side. Next attempt should either pick a water scene the oracle can reach from
+  its existing save state, or capture a save state already in water and `loadstate` it directly —
+  rather than warping and hoping the player actor survives.
+
   METHOD NOTE: the one-shot full sweep is unreliable — it was killed by a 30-minute timeout after
   only 4 states, and `link_sweep.py list` then still showed the STALE baseline, which is an easy way
   to report a verification that never ran. Run it in `--only` batches of ~8 (~24s/state) instead.
