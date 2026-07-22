@@ -415,7 +415,7 @@ below, not duplicated).
 - notes: not a lighting problem — every lighting input at those draws matches the oracle exactly.
 
 ### render.zora-ground-deficit — unexplained 0.79/0.86 ground+wall deficit at Zora's
-- status: blocked
+- status: todo
 - deps: render.multi-stage-tev
 - evidence: per-draw masks, matched camera; per-band far->near 0.92, 0.69, 0.83, 0.77, 0.93, 0.92, 1.01, 0.97
 - where: unknown
