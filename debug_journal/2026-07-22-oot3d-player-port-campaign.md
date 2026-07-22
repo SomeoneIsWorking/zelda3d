@@ -114,10 +114,28 @@ because in six months it would otherwise read as faithful porting.
   - Same applies to the sword-trail trim (geometry), the plane epsilon (numeric), and the two
     camera SFX deletions (audio): none is observable through anim selection.
 
-  To actually verify buoyancy: `tools/motion_parity.py` diffs per-frame trajectories including posY
-  (zelda3d side `asample`, oracle side `oracle_motion_sample.py`). Blocker for a hand-driven run is
-  that the OoT REPL has no tp/warp to put Link in water; the sweep harness can reach swim states, so
-  the cheap path is to extend it to dump a posY/velocity trace rather than only an anim name.
+  **RECIPE for actually verifying buoyancy (worked out here; nothing blocking left but the doing).**
+  Three facts that cost time to establish — start from them:
+
+  1. **The sweep drives force-states UNDER FREEZE** (`link_sweep.py:723` -> `parity_state_sweep`
+     `linkstate <s>` under freeze). Frozen physics cannot express a velocity change, which is the
+     structural reason this harness is selection-only. A buoyancy trace must force the state and then
+     let frames run UNFROZEN.
+  2. **`linkstate` / `warp` are absent from the REPL unless the game is started with
+     `ZELDA3D_LINK=1`.** They are not in the model-REPL's own `cmds:` list, so a bare
+     `zelda3d_repl.py cmd linkstate` answers `? 'linkstate'` and looks like the command does not
+     exist. It does; the instance was just started without the env var.
+  3. **The oracle already exposes what is needed**: `az_playerpos` and `az_playerinfo` (plus
+     `az_run_until`, `az_ticks`) in `tools/soh3d_harness/main.cpp`. `az_linkanim` also returns
+     `speedXZ`, so the oracle side needs no new command for a vertical trace.
+
+  Procedure: start SoH with `ZELDA3D_LINK=1`; `linkstate swim` WITHOUT freeze; sample `posinfo`
+  per frame for ~60 frames to get posY(t); drive the oracle to the same state and sample
+  `az_playerpos` per tick; feed both to `tools/motion_parity.py` (it already compares posY).
+  Expected discriminator: the ported constants (rise accel 0.06666667, damping -0.2, sink bump
+  0.6666667) vs the N64 set (0.1, -0.3, 1.0) produce visibly different rise curves, so the trace
+  distinguishes them even before oracle comparison — that alone confirms the edit is live and
+  correctly signed.
 
   METHOD NOTE: the one-shot full sweep is unreliable — it was killed by a 30-minute timeout after
   only 4 states, and `link_sweep.py list` then still showed the STALE baseline, which is an easy way
