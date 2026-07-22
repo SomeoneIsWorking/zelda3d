@@ -336,6 +336,27 @@ Runtime collision confirmed too, not just scene load: walking Link with held sti
 (-2406, 68, -400) -> (-3040.9, 32.0, -400) — 635 units across with his ground height tracking 68 -> 32
 down the slope. So BgCheck is querying the MM3D mesh every frame correctly.
 
+### Great Bay Coast: collision port holds up in a big scene; WATER still untested
+
+`warp 0x6800` (Great Bay Coast) with the collision divert on loads fine — no hang —
+`[MM3D-COL] z2_30gyoson: 2960 verts, 4925 polys, 38 surface types (N64 was 923/1254)`, i.e. a mesh
+~4x denser than N64's. Link then walked from x=3261 to x=-269 (a long traverse) with correct ground
+tracking, so the node-pool fix and the collision port hold up outside Clock Town.
+
+**Water boxes remain UNTESTED.** The port carries the N64 header's water boxes over rather than
+parsing MM3D's own, which was a deliberate choice, and nothing here has exercised it. I could not
+reach the sea on foot within a bounded walk.
+
+OBSERVATION worth following up, not a conclusion: Link's Y stayed EXACTLY 80.0 across that entire
+traverse (one +53 bump and back). A natural beach would normally vary. That is consistent with flat
+terrain, but it is ALSO what walking on a water surface would look like — so it should be checked
+before assuming water is fine.
+
+Harness note (MM): after a warp Link is inert until nudged — a stick input activates him, and then
+walking works. `tp` did NOT move him in this scene at all, even while active, though it landed
+exactly in East Clock Town earlier. So MM `tp` is scene-dependent and cannot be relied on for
+placement; drive with `stick` instead.
+
 ### Exits: encoding CONFIRMED offline, live walk-through BLOCKED on harness control
 
 MM keeps the scene exit index in SurfaceType data0 bits 8..12 (`SURFACETYPE0`, z64bgcheck.h).
