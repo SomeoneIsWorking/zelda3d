@@ -53,7 +53,31 @@ the cone** — it is still present in `scratch/screenshots/mm_skinned_fixed.png`
 genuine bug worth fixing on its own merits, and the cone has a DIFFERENT cause. Do not re-attribute
 it to pending state.
 
-## Next step (cone still open)
+## CULPRIT FOUND (round 2) — it is a SCALE bug, not a placement bug
+
+Added `ZELDA3D_MM_DBG_SKIN=1` (one line per skinned emit: model, actorId, actor world pos, scale,
+groundOffset, csab). At the default spawn only TWO skinned actors emit:
+
+    [MM3D-SKIN] model=10 actorId=0x1C7 pos=(-280,0,680)   scale=0.010 groundOff=1.7 csab=sdn_lastwait
+    [MM3D-SKIN] model=11 actorId=0x0E2 pos=(-239,0,-315)  scale=0.008 groundOff=0.0 csab=dog_run
+
+Link is at (-278, 0, -752) with yaw=0, i.e. facing +Z — so actor 0x1C7 at z=680 is ~1430 units
+DIRECTLY AHEAD, which is exactly where the cone renders on screen. **It is not misplaced.** It is
+drawn at its correct world position and is simply far too BIG: `scale=0.010` where every other mapped
+MM actor in this scene uses `0.1000`. A model that reads as a huge parasol at 1400 units is a
+scale-derivation failure, not an attachment failure.
+
+So the earlier "attached to Link" reading was wrong — the object only LOOKED head-height because it
+sits on the camera axis at distance. Corrected here rather than left standing.
+
+Fix direction: `sdn`'s worldScale comes from the auto-scale path (`Zelda3D_MM_ModelBoneLenSum` /
+`Zelda3D_MM_OverridePending`, the HEIGHT-based derivation). Check why it lands on 0.010 for this
+model — a bone-length sum near zero, or a rig whose bind pose defeats the height heuristic, would
+produce exactly this. `mscale 0x1B6 <s>` can confirm the right value live before changing the
+derivation. Note the dog's 0.008 is also off the 0.1 norm yet looks correct, so the derivation is
+not uniformly wrong — compare the two.
+
+## Superseded next step (kept: the reasoning was sound, the conclusion was not)
 
 The offending draw evidently does not go through `Actor_Draw`'s pending path at all. Candidates to
 check next:
