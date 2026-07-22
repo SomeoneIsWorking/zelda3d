@@ -358,8 +358,20 @@ Same plateau, and crucially the SAME +53 bump at the same x (~1450-1476). Spawn 
 byte-identical too. Great Bay Coast's beach is simply flat at y=80 in both collision sources, so
 there is no water-surface artifact and no regression from the divert here.
 
-(Water BOXES are still untested — this rules out the specific "walking on water" worry, not the
-broader question of whether N64 water boxes behave correctly over a 3DS mesh.)
+**WATER BOXES: now exercised, and they WORK over the 3DS mesh (2026-07-22).** Walked Link seaward
+from the Great Bay Coast spawn with the divert ON. He descends off the beach (y 80 -> 11 -> -31) and
+then travels ~2000 units (x -1212 -> -3164) at a CONSTANT y ~= -32 with +-1.5 bobbing — floating on a
+surface, not walking terrain, which varies. Continuing further triggers a discontinuous return to
+land (y=80), i.e. the usual void-out for swimming out of bounds.
+
+So the deliberate choice to carry the N64 header's water boxes over rather than reinterpret MM3D's
+own is behaving correctly: swimming, the water surface height, and the out-of-bounds respawn all
+function with the denser 3DS collision installed underneath.
+
+CAVEAT on strength of evidence: this is inferred from the Y profile (constant level + bobbing +
+void-out), not from reading a swim state flag — the MM REPL exposes `posinfo` but no state readout I
+used here. A follow-up could confirm via the swim action func. The inference is strong but it is an
+inference.
 
 Harness note (MM): after a warp Link is inert until nudged — a stick input activates him, and then
 walking works. `tp` did NOT move him in this scene at all, even while active, though it landed
