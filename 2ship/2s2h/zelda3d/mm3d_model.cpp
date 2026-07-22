@@ -616,6 +616,25 @@ int Zelda3D_MM_SkelAnimeDrawRaw(struct PlayState* play, void** skeleton, void* j
     }
 
     mmUpdateAnimAuto(g_pending.modelId, csab, /*rate=*/1.0f, n64Cur, n64Len);
+    // ZELDA3D_MM_DBG_SKIN=1 — one line per skinned emit: which actor, where it actually is, and
+    // which model got drawn there. Added to chase a skinned model rendering on top of Link at the
+    // South Clock Town spawn; the answer is the emit whose actor position does NOT match where the
+    // model visibly appears. Gated because it is per-actor per-frame.
+    {
+        static int dbg = -1;
+        if (dbg < 0) {
+            const char* e = getenv("ZELDA3D_MM_DBG_SKIN");
+            dbg = (e != nullptr && e[0] != '\0' && e[0] != '0') ? 1 : 0;
+        }
+        if (dbg) {
+            Actor* a = static_cast<Actor*>(g_pending.actor);
+            fprintf(stderr, "[MM3D-SKIN] model=%d actorId=0x%03X obj=? pos=(%.0f,%.0f,%.0f) "
+                            "scale=%.3f groundOff=%.1f csab=%s\n",
+                    g_pending.modelId, a ? (unsigned)a->id : 0u,
+                    a ? a->world.pos.x : 0.0f, a ? a->world.pos.y : 0.0f, a ? a->world.pos.z : 0.0f,
+                    g_pending.scale, g_pending.groundOff, csab ? csab : "(none)");
+        }
+    }
     Zelda3D_MM_EmitModelDraw(play, g_pending.actor, g_pending.modelId, g_pending.scale,
                              g_pending.groundOff);
     // Drawn — clear so a second SkelAnime call inside this same actor draw doesn't re-emit.
