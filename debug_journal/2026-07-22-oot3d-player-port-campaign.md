@@ -98,6 +98,27 @@ because in six months it would otherwise read as faithful porting.
       DIVERGENT (1): idle          <- pre-existing, unchanged by the ports
       UNREACHABLE (2): walk, run   <- pre-existing, unchanged by the ports
 
+  **SCOPE CORRECTION — what this sweep actually measures (I overstated it earlier).** Every row's
+  metric is a *CSAB-family substring match* — i.e. WHICH ANIMATION the state selects — and every
+  row's `pose_verdict` is `N/A` ("no live pose oracle for this state (selection-only)"). It does not
+  measure motion, velocity, or physics at all. Concretely, `swim_surface` passes by comparing
+  `soh=sw_swim_wait` against `expect=sw_swim`.
+
+  Consequences, stated plainly:
+  - "All 25 states MATCH" means **no ANIM-SELECTION regressions** from the 14 ports. That is a real
+    and useful result, but it is narrower than it sounds.
+  - The buoyancy rescale is **invisible to this harness by construction**. It changes velocity
+    constants, and nothing here samples velocity. So the buoyancy port remains UNVERIFIED by any
+    measurement taken so far — the earlier "swim states still MATCH" observation was never capable
+    of confirming or refuting it.
+  - Same applies to the sword-trail trim (geometry), the plane epsilon (numeric), and the two
+    camera SFX deletions (audio): none is observable through anim selection.
+
+  To actually verify buoyancy: `tools/motion_parity.py` diffs per-frame trajectories including posY
+  (zelda3d side `asample`, oracle side `oracle_motion_sample.py`). Blocker for a hand-driven run is
+  that the OoT REPL has no tp/warp to put Link in water; the sweep harness can reach swim states, so
+  the cheap path is to extend it to dump a posY/velocity trace rather than only an anim name.
+
   METHOD NOTE: the one-shot full sweep is unreliable — it was killed by a 30-minute timeout after
   only 4 states, and `link_sweep.py list` then still showed the STALE baseline, which is an easy way
   to report a verification that never ran. Run it in `--only` batches of ~8 (~24s/state) instead.
