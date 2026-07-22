@@ -98,6 +98,28 @@ because in six months it would otherwise read as faithful porting.
       DIVERGENT (1): idle          <- pre-existing, unchanged by the ports
       UNREACHABLE (2): walk, run   <- pre-existing, unchanged by the ports
 
+  **SECOND, HARDER CORRECTION (2026-07-22, later): "MATCH the oracle" is WRONG — it is match vs
+  DECOMP.** Every forcestate row carries `gt="decomp"` and its metric is "CSAB-family substring match
+  vs oot3d-decomp action-func anim group". The expectation comes from the DECOMP CORPUS, not from
+  querying a live OoT3D. I described these as oracle comparisons many times this session; they are
+  not.
+
+  What exposed it: trying to capture an oracle screenshot. The embedded oracle boots,
+  `OracleSession.boot()` returns ok=True, `snapshot` succeeds — and the frame is OoT3D's TITLE SCREEN
+  (a sky gradient), with `az_linkanim` and `az_playerpos` both answering "no Player actor" even after
+  boot's warp to Kokiri and 240 settle frames. So the live oracle never reaches gameplay at all in
+  these runs, which is only possible *because* the sweep never asks it anything.
+
+  Consequences: the sweep is a regression check against a static expectation corpus — still useful,
+  and the no-regression result stands — but it is NOT evidence of parity with OoT3D. Any claim of
+  the form "verified against the oracle" in this session's earlier notes should be read as "verified
+  against the decomp expectation".
+
+  Open: why the oracle stalls on the title. boot()'s tap schedule (3x START + up to 40x A, checking
+  `poll_playstate`) reports populated, yet no Player actor materialises. `poll_playstate` returning ok
+  is evidently NOT sufficient evidence of gameplay — that is the same class of mistake as trusting
+  `link_sweep.py list` after a killed sweep.
+
   **SCOPE CORRECTION — what this sweep actually measures (I overstated it earlier).** Every row's
   metric is a *CSAB-family substring match* — i.e. WHICH ANIMATION the state selects — and every
   row's `pose_verdict` is `N/A` ("no live pose oracle for this state (selection-only)"). It does not
