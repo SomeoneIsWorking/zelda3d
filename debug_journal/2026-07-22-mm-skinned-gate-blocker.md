@@ -130,7 +130,31 @@ happens to look right when the 3DS model shares the N64 proportions (the dog) an
 does not (the soldier's oversized helmet). It also explains why the dog's 0.0075 "works" — it is just
 the N64 value, not a derived one.
 
-**CAUTION — two readings, and I cannot yet separate them.** Before "fix the no-op", note that
+## ANSWERED (round 6) — it is (B): the rigs are IDENTICAL, so ratio 1.0 is correct by design
+
+Element-wise dump ([MM3D-BONE-N64] vs [MM3D-BONE-CMB], model 10 = En_Stop_heishi):
+
+    limb=1 jointPos=(0.0,0.0,0.0)          bone=1 trans=(0.0,0.0,0.0)
+    limb=2 jointPos=(479.0,-81.0,417.0)    bone=2 trans=(479.0,-81.0,417.0)
+    limb=3 jointPos=(1152.0,0.0,0.0)       bone=3 trans=(1152.0,0.0,0.0)
+    limb=4 jointPos=(1534.0,0.0,0.0)       bone=4 trans=(1534.0,0.0,0.0)
+
+**Grezzo preserved MM's skeletons BONE-FOR-BONE in the 3DS rigs.** Both sum functions are correct and
+legitimately agree, so the ratio is always exactly 1.0 and `Zelda3D_MM_SkelBoneLenSum` must NOT be
+"fixed" — there is nothing wrong with it.
+
+### Consequences (these matter beyond this bug)
+
+1. **Stage-3 bone-length auto-scale is structurally inert for MM, by design of the assets.** It can
+   never produce a ratio other than 1.0, so `scale = actor->scale.x` always. It is dead machinery,
+   not a broken calculation. Either delete it or replace it with a MESH-EXTENT based derivation.
+2. **The soldier's oversized helmet is a MESH difference, not a rig difference** — identical
+   skeleton, larger 3DS geometry hanging off it. No bone-derived scale can correct that; only
+   comparing rendered extents (N64 display list vs CMB vertex bounds) can.
+3. It also explains why MM3D CSAB animations retarget cleanly onto N64 joint tables: the skeletons
+   are the same, which is a useful fact well beyond this defect.
+
+~~CAUTION — two readings, and I cannot yet separate them.~~ (resolved above; kept for the reasoning) Before "fix the no-op", note that
 `Zelda3D_MM_SkelBoneLenSum` genuinely walks the N64 `StandardLimb` tree (jointPos per limb, root
 skipped) and `Zelda3D_MM_ModelBoneLenSum` genuinely walks `cmb->bones()` translations. Neither is
 obviously reading the other's data. So:

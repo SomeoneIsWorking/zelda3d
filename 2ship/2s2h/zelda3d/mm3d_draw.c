@@ -137,6 +137,22 @@ int Zelda3D_MM_InterceptSkelAnime(PlayState* play, Actor* actor, void** skeleton
                         sT = (e != NULL && e[0] != '\0' && e[0] != '0') ? 1 : 0;
                     }
                     if (sT) {
+                        // DISTINGUISHER: sums matching could mean the two walks read the same data
+                        // (bug) OR that Grezzo kept MM's skeleton proportions bone-for-bone (by
+                        // design). Print the first few INDIVIDUAL N64 jointPos magnitudes; compare
+                        // against the CMB bone translations to tell those apart element-wise.
+                        static int sOnce = 0;
+                        if (!sOnce) {
+                            sOnce = 1;
+                            for (int li = 1; li < limbCount && li < 6; li++) {
+                                if (skeleton[li] == NULL) continue;
+                                StandardLimb* L = (StandardLimb*)Lib_SegmentedToVirtual(skeleton[li]);
+                                float x = L->jointPos.x, y = L->jointPos.y, z = L->jointPos.z;
+                                fprintf(stderr, "[MM3D-BONE-N64] model=%d limb=%d jointPos=(%.1f,%.1f,%.1f) |v|=%.2f\n",
+                                        mid, li, x, y, z, sqrtf(x*x + y*y + z*z));
+                            }
+                            Zelda3D_MM_DumpModelBones(mid, 5);
+                        }
                         fprintf(stderr, "[MM3D-SCALE-IN] model=%d actorId=0x%03X actorScale=%.5f "
                                         "n64Sum=%.2f cmbSum=%.2f ratio=%.4f limbs=%d -> %.5f\n",
                                 mid, (unsigned)actor->id, actor->scale.x, n64Sum, cmbSum,
