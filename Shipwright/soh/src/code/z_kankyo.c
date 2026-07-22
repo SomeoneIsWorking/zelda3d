@@ -998,6 +998,16 @@ void Environment_Update(PlayState* play, EnvironmentContext* envCtx, LightContex
                             }
                         }
 
+                        // SoH3D (#111): record the exact blend this frame so
+                        // Zelda3D_SceneLightSettingsOverride re-runs it on the OoT3D rows.
+                        gZelda3dEnvBlend.timeBased = 1;
+                        gZelda3dEnvBlend.idx[0] = TIME_ENTRY_1F.unk_04;
+                        gZelda3dEnvBlend.idx[1] = TIME_ENTRY_1F.unk_05;
+                        gZelda3dEnvBlend.idx[2] = TIME_ENTRY_20.unk_04;
+                        gZelda3dEnvBlend.idx[3] = TIME_ENTRY_20.unk_05;
+                        gZelda3dEnvBlend.wTime = sp8C;
+                        gZelda3dEnvBlend.wConfig = sp88;
+
                         for (j = 0; j < 3; j++) {
                             // blend ambient color
                             blend8[0] = LERP(lightSettingsList[TIME_ENTRY_1F.unk_04].ambientColor[j],
@@ -1084,6 +1094,13 @@ void Environment_Update(PlayState* play, EnvironmentContext* envCtx, LightContex
                     envCtx->lightSettings.fogNear = lightSettingsList[envCtx->unk_BD].fogNear & 0x3FF;
                     envCtx->lightSettings.fogFar = lightSettingsList[envCtx->unk_BD].fogFar;
                     envCtx->unk_D8 = 1.0f;
+
+                    // SoH3D (#111): settings path, no blend — current slot only.
+                    gZelda3dEnvBlend.timeBased = 0;
+                    gZelda3dEnvBlend.idx[0] = gZelda3dEnvBlend.idx[2] = envCtx->unk_BD;
+                    gZelda3dEnvBlend.idx[1] = gZelda3dEnvBlend.idx[3] = envCtx->unk_BD;
+                    gZelda3dEnvBlend.wTime = 1.0f;
+                    gZelda3dEnvBlend.wConfig = 0.0f;
                 } else {
                     u8 blendRate = (lightSettingsList[envCtx->unk_BD].fogNear >> 0xA) * 4;
 
@@ -1128,6 +1145,13 @@ void Environment_Update(PlayState* play, EnvironmentContext* envCtx, LightContex
                                lightSettingsList[envCtx->unk_BD].fogNear & 0x3FF, envCtx->unk_D8);
                     envCtx->lightSettings.fogFar = LERP16(lightSettingsList[envCtx->unk_BE].fogFar,
                                                           lightSettingsList[envCtx->unk_BD].fogFar, envCtx->unk_D8);
+
+                    // SoH3D (#111): settings path with indoor blend prev -> cur at unk_D8.
+                    gZelda3dEnvBlend.timeBased = 0;
+                    gZelda3dEnvBlend.idx[0] = gZelda3dEnvBlend.idx[2] = envCtx->unk_BE;
+                    gZelda3dEnvBlend.idx[1] = gZelda3dEnvBlend.idx[3] = envCtx->unk_BD;
+                    gZelda3dEnvBlend.wTime = envCtx->unk_D8;
+                    gZelda3dEnvBlend.wConfig = 0.0f;
                 }
 
                 if (envCtx->unk_BD >= envCtx->numLightSettings) {
