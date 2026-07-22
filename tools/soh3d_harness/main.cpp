@@ -563,7 +563,15 @@ bool     g_az_dirty = false;
 // retro_load_game; consumed right after load to bring up the frontend Vulkan
 // device and kick the core's context_reset. g_use_vulkan gates the whole path
 // — when false the harness falls back to the software VideoRefresh feed.
-bool g_use_vulkan = true;
+// SOH3D_HARNESS_SW=1 forces the SOFTWARE rasterizer. Needed because Azahar's
+// per-fragment TEV probe (`PIXEL`/`PIXELXY` lines, SOH3D_PIXEL_TEX) lives in
+// renderer_software/sw_rasterizer.cpp and has no HW-renderer equivalent: it is
+// the only way to read the oracle's real per-pixel texcol/PRIMARY_COLOR/combiner
+// output. Diagnostic only — every parity CAPTURE stays on Vulkan (2x res).
+bool g_use_vulkan = [] {
+    const char* v = std::getenv("SOH3D_HARNESS_SW");
+    return !(v && *v && v[0] != '0');
+}();
 retro_hw_render_callback g_hw_render{};
 const retro_hw_render_context_negotiation_interface_vulkan* g_vk_nego = nullptr;
 bool g_vk_ready = false;

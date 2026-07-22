@@ -1551,6 +1551,13 @@ static void Zelda3D_ReplExec(PlayState* play, char* line, const char* outPath) {
                             play->envCtx.skybox1Index, play->envCtx.skybox2Index,
                             play->envCtx.skyboxBlend, active, activeIdx, modelId);
         }
+    } else if (strcmp(cmd, "fog3d") == 0 && sscanf(line, "%*s %i", &iv) == 1) {
+        // A/B latch for the OoT3D PICA distance-fog port (uFog.w==2 path): `fog3d 0` forces it OFF
+        // for the rest of the run so one process can measure a fixed frame with and without the
+        // mechanism. Diagnostic only — game code never sets it.
+        extern int gZelda3dFog3dForceOff;
+        gZelda3dFog3dForceOff = (iv == 0) ? 1 : 0;
+        Zelda3D_ReplReply(outPath, "fog3d %s (forceOff=%d)", iv ? "on" : "OFF", gZelda3dFog3dForceOff);
     } else if (strcmp(cmd, "fog") == 0) {
         // N64/OoT3D F3DEX fog port. `fog <0|1>` toggles; `fog pos <near> [max]` overrides the F3DEX
         // fog position (0..1000 scale, exactly z_play.c's gSPFogPosition args; max defaults 1000);
