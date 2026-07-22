@@ -137,6 +137,32 @@ because in six months it would otherwise read as faithful porting.
   distinguishes them even before oracle comparison — that alone confirms the edit is live and
   correctly signed.
 
+  **ATTEMPTED THE RECIPE — BLOCKED ON HARNESS CONTROL (2026-07-22). Do not retry as-is.**
+  Corrections to my own earlier notes first, both of which were wrong:
+  - "The OoT REPL has no tp/warp" is FALSE. It has ~150 commands (authoritative list:
+    `grep -ohE 'strcmp\(cmd, "[a-z0-9_]+"\)' soh/src/zelda3d/repl/zelda3d_repl.cpp`). The short
+    `cmds:` list printed on an unknown command is only the model-REPL subset — do not infer from it.
+  - "`linkstate` needs ZELDA3D_LINK=1" is FALSE. It takes an ARGUMENT (`sscanf "%*s %63s" == 1`), so
+    a bare `linkstate` falls through to the unknown-command handler and looks missing. `linkstate
+    swim` works fine.
+
+  What actually blocks a buoyancy trace, all three verified today:
+  1. **Force-state does not put Link in water.** `linkstate swim` sets the swim animation + state
+     flags while he stands on land, so `func_8084B000` never runs — posY held at -79.0 across 24
+     samples in Kokiri. This is the documented "force hooks bypass the real entry gate" debt.
+  2. **`asample` cannot sample the player.** It streams `gZelda3dSelActor`, and `asel 0` replies
+     "no match (found 0 candidates)" — the player is not in the actor-scan candidate set. So the
+     motion-parity sampler, which is exactly the right tool, cannot target Link.
+  3. **`tp` does not move Link.** In Lake Hylia he stayed at (-1802,-1023,849) across six different
+     targets spanning the lake. Same symptom seen on the MM side this session. `warp` DOES work
+     (scene changed to 0x57 correctly), so the transport half is fine and the placement half is not.
+
+  Net: the harness currently cannot drive Link into water or sample his per-frame motion, so NO
+  physics change to the player is verifiable with today's tooling. Per the project rule that a fix
+  starts by proving the tooling can investigate it, the next step is TOOLING, not more porting:
+  make `asel` able to select the player (or add a player-specific `psample`), and fix `tp` so it
+  actually relocates Link. Both are small and unblock every future physics/motion port.
+
   METHOD NOTE: the one-shot full sweep is unreliable — it was killed by a 30-minute timeout after
   only 4 states, and `link_sweep.py list` then still showed the STALE baseline, which is an easy way
   to report a verification that never ran. Run it in `--only` batches of ~8 (~24s/state) instead.
