@@ -126,6 +126,23 @@ int Zelda3D_MM_InterceptSkelAnime(PlayState* play, Actor* actor, void** skeleton
             float minY   = Zelda3D_MM_ModelMinY(mid);
             if (n64Sum > 1e-3f && cmbSum > 1e-3f) {
                 float scale = actor->scale.x * (n64Sum / cmbSum);
+                // ZELDA3D_MM_SCALE_LOG prints the RESULT; print the three INPUT terms too, so a
+                // wrong scale can be attributed to actor->scale.x, the N64 skeleton sum or the CMB
+                // sum without re-deriving. Needed because En_Stop_heishi (object_sdn) comes out
+                // ~2.5x too large while the dog, using the same formula, is correct.
+                {
+                    static int sT = -1;
+                    if (sT < 0) {
+                        const char* e = getenv("ZELDA3D_MM_SCALE_LOG");
+                        sT = (e != NULL && e[0] != '\0' && e[0] != '0') ? 1 : 0;
+                    }
+                    if (sT) {
+                        fprintf(stderr, "[MM3D-SCALE-IN] model=%d actorId=0x%03X actorScale=%.5f "
+                                        "n64Sum=%.2f cmbSum=%.2f ratio=%.4f limbs=%d -> %.5f\n",
+                                mid, (unsigned)actor->id, actor->scale.x, n64Sum, cmbSum,
+                                n64Sum / cmbSum, limbCount, scale);
+                    }
+                }
                 Zelda3D_MM_OverridePending(scale, -minY);
             }
         }
