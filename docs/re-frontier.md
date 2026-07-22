@@ -363,7 +363,7 @@ below, not duplicated).
 - deps: 
 - evidence: memory `soh3d-envctx-pinned` — `play+0x3135`, `unk_BF` at `+0xA5`, stride `0x1C`; `Env_Update=FUN_0045dd30`
 - where: `Shipwright/soh/src/zelda3d/zelda3d_scene_lighting.inc`
-- gap: none — pinned, do not re-derive by memory-poking (per CLAUDE.md decomp-is-ground-truth rule, this WAS derived from the decomp, not a poke).
+- gap: none for the TITLE. **CORRECTED 2026-07-22: `envCtx+0xA5` (current slot) is a TITLE-only layout — it reads garbage (0xf2) in gameplay.** The oracle's runtime light list in gameplay is at `play+0x3230`. Outdoor gameplay scenes do not use `unk_BD`/`unk_BE` at all (z_kankyo takes the time-based path keyed on skyboxTime); the gameplay consumer replays `Zelda3dEnvBlend` instead.
 - notes: 
 
 ### lighting.worldshade-port — vertex-lighting / worldshade engine port
@@ -371,8 +371,40 @@ below, not duplicated).
 - deps: lighting.envctx-layout
 - evidence: memory `soh3d-lighting-port` (#111 RESOLVED), `soh3d-stop-microtuning-lighting`
 - where: worldshade toggle, opt-in default off
-- gap: none — explicitly: **do not reopen or tune further**, this is a closed arc per direct user instruction.
+- gap: none — the ENGINE is correct; do not tune coefficients (standing user instruction). **2026-07-22: the engine was never the problem — the ported DATA had never reached gameplay** (see `lighting.gameplay-palette-feed`). The no-tuning ban covers constants, not repairing a data path.
 - notes: 
+
+### lighting.gameplay-palette-feed — OoT3D env palette reaches GAMEPLAY
+- status: re-verified
+- deps: lighting.envctx-layout
+- evidence: `debug_journal/2026-07-22-lighting-parity-scene-sweep.md`; commits `15284de5` -> `ea3f39ab`; Kokiri frame mean 29.8 -> 62.7 vs oracle 72.6
+- where: `Zelda3D_SceneLightSettingsOverride` (`Shipwright/soh/src/zelda3d/core/zelda3d.c`), `Zelda3dEnvBlend` capture in `Shipwright/soh/src/code/z_kankyo.c`
+- gap: none — the palette was cached every frame and read by NOTHING in gameplay (z_kankyo had only a title hook). Outdoor scenes blend TIME_ENTRY configs by skyboxTime, so `unk_BD` is never driven there; the override replays the blend z_kankyo actually performed.
+- notes: three separate defects were found in this one code path in a day, each masking the next.
+
+### lighting.zsi-record-layout — ZSI cmd-0x0F env record layout
+- status: re-verified
+- deps: 
+- evidence: raw ZSI bytes, oracle runtime list at `play+0x3230`, and the oracle's live `LightAmbientColor`/`fog_color` uniforms — three independent ways; `oot3d-decomp/docs/ram_map.md`; commits `ea3f39ab`, `146b6d63`
+- where: `tools/gen_oot3d_scene_lighting.py` -> `Shipwright/soh/src/zelda3d/tables/zelda3d_scene_lighting.inc`
+- gap: none NOW, after three corrections: (1) the region is `[16-byte header][count x 28-byte records]`, not a 28-byte "metadata entry 0" — the old "+1 slot bias" masked a 12-byte phase shift; (2) `amb` is at `+0x0a`, so the "constant (160,72,72) ambient" seen in every scene was direction bytes; (3) the block at `+0x0a` is N64 `EnvLightSettings` byte-for-byte with **DIR BEFORE COLOUR**, so what was labelled `l1dir` was really `fogColor`. The `light2Dir = -light1Dir` invariant made `light1Dir` come out right BY ACCIDENT, hiding (3).
+- notes: if a future divergence smells like env data, suspect this record's field map before suspecting the renderer.
+
+### lighting.pica-fog — 3DS PICA distance fog (window + colour)
+- status: re-verified
+- deps: lighting.zsi-record-layout
+- evidence: LUT solved from the captured projection (camNear 7.0, zFar 12000 -> eye-linear window fogNear 800 / fogFar 2400), node check byte-exact; fog colour matches the oracle's live PICA `fog_color`; commits `2389731c`, `146b6d63`
+- where: `zelda3d_scene_lighting.inc` (fogNear/fogFar/zFar/fogCol per slot) -> the `uFog.w==2` LUT path
+- gap: none. NOT the F3DEX ramp disabled by #113 — `gZelda3dFogEnable` stays 0 and that hand-wired path stays dead. Fogged distant surfaces now match the oracle within ~2/255.
+- notes: this also retired an earlier wrong attribution — Kokiri's far-band residual was the missing fog COLOUR, not the missing sun-glare sprite (~2/255).
+
+### lighting.per-draw-material — per-draw light slots + per-material ambient/diffuse
+- status: hack
+- deps: lighting.pica-fog
+- evidence: oracle capture at Zora's Domain — 31/75 draws carry `matDif=(1,1,1)` and 5 take real light diffuse with `amb1=(0,0,0)`, while our room draws all report `matDif=0` and take ambient x2; `debug_journal/2026-07-22-lighting-parity-scene-sweep.md`
+- where: `Shipwright/libultraship/src/fast/backends/unified_shader.cpp` (`uParams0.y > 1.5` branch) + UBO fill in `zelda3d_sdl3gpu.cpp`
+- gap: **THE CURRENT LIGHTING FRONTIER.** Our renderer applies one global rule — both env lights always contribute ambient (x2) — derived from the title's night slots. The Zora's evidence says that is not universal: near UNFOGGED surfaces there are 14-33% dark while the equivalent band at Kokiri is ~15% BRIGHT, so no single multiplier explains both. Needs the real per-draw light-slot setup RE'd from the binary plus an oracle draw->material mapping. Explicitly NOT a tuning job.
+- notes: any candidate fix must move BOTH Zora's and Kokiri toward the oracle at matched cameras; improving one while worsening the other falsifies it.
 
 ### lighting.fog-lut — fog LUT port
 - status: re-verified
