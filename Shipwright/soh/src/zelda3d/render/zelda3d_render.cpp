@@ -557,7 +557,12 @@ int Zelda3D_EmitActorBillboard(PlayState* play, int modelId, Actor* actor,
     Matrix_Scale(scale, scale, scale, MTXMODE_APPLY);
     gSPMatrix(POLY_OPA_DISP++, MATRIX_NEWMTX(play->state.gfxCtx),
               G_MTX_MODELVIEW | G_MTX_LOAD);
-    gSPZelda3DDrawA(POLY_OPA_DISP++, modelId, a, r, g, b);
+    // High bit = the "lit" flag, which for a NON-vertex-lit draw selects the shader's flat-tint
+    // path (`rgb = tex * vColor * uTintSkin`) — the "caller-supplied per-draw color" modulator.
+    // Without it the caller's r/g/b is silently DROPPED (`rgb = tex * vColor`): that made every
+    // fairy glow render WHITE regardless of EnElf's per-fairy outerColor (found #140 follow-up,
+    // 2026-07-22 — the sun/moon billboards pass 255,255,255 so the drop was invisible there).
+    gSPZelda3DDrawA(POLY_OPA_DISP++, modelId | (int)0x80000000, a, r, g, b);
     CLOSE_DISPS(play->state.gfxCtx);
     return 1;
 }

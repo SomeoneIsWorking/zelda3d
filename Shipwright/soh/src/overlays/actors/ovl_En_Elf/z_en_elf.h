@@ -42,7 +42,12 @@ typedef struct EnElf {
     /* 0x02C7 */ u8 unk_2C7;
     /* 0x02C8 */ EnElfUnkFunc func_2C8;
     /* 0x02CC */ EnElfActionFunc actionFunc;
-} EnElf; // size = 0x02D0
+    // Zelda3D: OoT3D glow master fade (3DS EnElf +0x924, a Grezzo addition with no N64
+    // counterpart). Init = 1.0 (3DS Init). The 3DS Kokiri-fairy action fn (VA 0x00129fac)
+    // proximity-fades it 0..1 in Kokiri Forest / Lost Woods; EnElf's 3DS draw multiplies BOTH
+    // glow sprites' alpha by it. RE: oot3d-decomp/docs/en_elf_navi.md ("glow proximity fade").
+    f32 zelda3dGlowFade;
+} EnElf;
 
 typedef enum {
     /* 0x00 */ FAIRY_NAVI,

@@ -7,14 +7,20 @@
 // CSAB — a pure two-sprite additive effect.
 //
 // The port mirrors that shape: two camera-facing additive-glow sprites emitted at the
-// actor's world.pos + a small head-height lift, using the REAL OoT3D fairy sprites
+// actor's world.pos EXACTLY (== the 3DS sprite position source, see the sprite-position
+// note below), using the REAL OoT3D fairy sprites
 // (acto_navi_light1/2, below), coloured from `elf->outerColor` / `elf->innerColor`
 // with the N64 draw's own animated alphas, gated by the N64 draw's own visibility
 // conditions (both verified against the live oracle sprite handles, 2026-07-22).
 //
-// Remaining follow-up: the WINGS — /actor/zelda_keep.zar also carries
-// elf/model/elf_fly_mdl_info.cmb + elf/Anim/elf_fly_soft_anim_tbl_info.csab (the flapping
-// wing model the oracle renders on top of the glow). Not yet ported.
+// WINGS: the 3DS draw callback is sprite-only, but EnElf_Init (FUN_0018a8e0, decomp lines
+// 41-47) also binds a skeleton-model instance — FUN_00358ea8(handle, play, actor+0x1a4
+// /*shape*/, modelRes(10), actor+0x178, 0, ...) — which the engine's model manager draws at
+// the ACTOR's transform+scale: that is elf/model/elf_fly_mdl_info.cmb with its flap clip
+// elf/Anim/elf_fly_soft_anim_tbl_info.csab (both in /actor/zelda_keep.zar). Ported below via
+// the standard behavior-module seam (AutoModelId zar|cmb + UpdateAnimAuto + DrawActorModel),
+// at the actor's LIVE scale (z_en_elf.c animates it: 0.008 base, shrink on pickup/despawn),
+// phase-locked to the N64 skelAnime flap like En_Butte. See oot3d-decomp/docs/en_elf_navi.md.
 #include "z64.h"
 #include "src/overlays/actors/ovl_En_Elf/z_en_elf.h" // EnElf (timer, innerColor, outerColor, disappearTimer, fairyFlags)
 #include "en_elf.h"
@@ -24,6 +30,9 @@ int Zelda3D_AutoModelId(const char* zarPath);
 int Zelda3D_EmitActorBillboard(PlayState* play, int modelId, Actor* actor,
                                float xOff, float yOff, float zOff, float scale,
                                u8 r, u8 g, u8 b, u8 a);
+int Zelda3D_DrawActorModel(PlayState* play, int modelId, Actor* actor, float worldScale);
+void Zelda3D_UpdateAnimAuto(int modelId, const char* animName, float rate, float n64CurFrame,
+                            float n64AnimLength, float morphWeight);
 }
 
 // The REAL OoT3D fairy sprites, found 2026-07-22 in /actor/zelda_keep.zar under elf/:
@@ -31,20 +40,31 @@ int Zelda3D_EmitActorBillboard(PlayState* play, int modelId, Actor* actor,
 // two sprite handles EnElf_Draw submits (en_elf_navi.md). The earlier fine_sun stand-in
 // (the SUN's lens glare) is what made pulse-peak fairies read as giant gate orbs.
 // (elf/model/elf_fly_mdl_info.cmb + elf_fly_soft_anim_tbl_info.csab — the wings — live in
-// the same archive; wings port is a follow-up, see report.)
+// the same archive and are ported below.)
 // ~MIRROR: both ctxbs are QUADRANT-authored (bright corner; verified by offline decode
 // 2026-07-22) exactly like the moon's fine_moon1/2 — the loader mirror-expands them.
 #define ZELDA3D_NAVI_TEX_OUTER "BILLBOARDADD:/actor/zelda_keep.zar|elf/tex/acto_navi_light1.ctxb~MIRROR"
 #define ZELDA3D_NAVI_TEX_INNER "BILLBOARDADD:/actor/zelda_keep.zar|elf/tex/acto_navi_light2.ctxb~MIRROR"
+#define ZELDA3D_NAVI_WING_CMB "/actor/zelda_keep.zar|elf/model/elf_fly_mdl_info.cmb"
+#define ZELDA3D_NAVI_WING_CSAB "elf_fly_soft_anim_tbl_info"
 
-static constexpr float kNaviYLift = 12.0f;      // head-height lift over actor.world.pos
-// Sizes: the live oracle sprite handles at Kokiri read outer scale 15.0, inner 7.5 (2:1),
-// and the 3DS sprite quad is 1x1 world unit: the live scales match the measured on-screen
-// orb (Kokiri: ~15px at depth ~242 with the 52-deg projection = 7.4 world units = the
-// 7.5-scaled inner). Our billboard quad is 63u, so scale = size/63.
-static constexpr float kNaviOuterScale = 15.0f / 63.0f;
-static constexpr float kNaviInnerScale = 7.5f / 63.0f;
-static constexpr int kNaviFairyFlagBig = (1 << 9); // FAIRY_FLAG_BIG (z_en_elf.c-local)
+// Sprite position: NO offset. RE'd + live-verified 2026-07-22 (en_elf_navi.md): the 3DS sprite
+// handles' world pos (+0x3c) is copied from the actor's engine-computed world MATRIX translation
+// (row-major 3x4 @actor+0x148; translation column +0x154/+0x164/+0x174 == world.pos exactly),
+// the SAME matrix the wing skeleton-model instance is drawn at. Glow and wings share one origin.
+// FALSIFIED: an earlier kNaviYLift=12 "visual centering" offset — no such offset exists on the
+// 3DS; do not reintroduce a lift here.
+// Glow sizes — the EXACT 3DS formula (FUN_001d6ec4 with its pool constants resolved from
+// code.bin, en_elf_navi.md):
+//   outer = actor.scale.x * pulse(1 + sin*0.1) * 0.012 * 125 * 1000 * 1.3   [* 2 if BIG]
+//   inner = outer * 0.5
+// At the standard fairy scale 0.008 this is 15.6*pulse — matching the LIVE oracle handle
+// scale 15.003 byte-for-byte (the 3DS sprite quad is 1x1 world unit). Driving from
+// actor.scale.x (not a constant) carries the 3DS behavior for big/heal fairies and the
+// despawn shrink for free. Our billboard quad is 63u, hence the /63.
+static constexpr float kNaviGlowPerScale = 0.012f * 125.0f * 1000.0f * 1.3f; // = 1950 world units per scale unit
+static constexpr float kNaviQuadUnits = 63.0f;
+static constexpr int kNaviFairyFlagBig = (1 << 9); // 0x200 — same bit the 3DS draw tests at actor+0x9c4
 
 namespace Zelda3D {
 
@@ -86,11 +106,13 @@ bool EnElfBehavior::tryDrawModel(PlayState* play, Actor* actor) {
         if (alphaScale < 0.0f) alphaScale = 0.0f;
     }
 
-    // "Breathing" pulse — same curve N64 EnElf_OverrideLimbDraw applies to the body limb.
+    // "Breathing" pulse — sin(angle)*0.1 + 1, the same shape on both engines (3DS drives the
+    // angle from a global frame counter, N64 from the fairy timer; the N64-timer drive is the
+    // N64-faithful equivalent and keeps per-fairy phase).
     float wobble = Math_SinS(elf->timer * 4096) * 0.1f + 1.0f;
     float sizeMul = (elf->fairyFlags & kNaviFairyFlagBig) ? 2.0f : 1.0f;
-    float outerWorld = wobble * sizeMul * kNaviOuterScale;
-    float innerWorld = wobble * sizeMul * kNaviInnerScale;
+    float outerWorld = actor->scale.x * kNaviGlowPerScale * wobble * sizeMul / kNaviQuadUnits;
+    float innerWorld = outerWorld * 0.5f;
 
     // ALPHAS are the N64 draw's own, verified against the live oracle sprite handles
     // (Kokiri gameplay, 2026-07-22): the 3DS fairy sprites carry float RGBA whose alpha
@@ -104,12 +126,31 @@ bool EnElfBehavior::tryDrawModel(PlayState* play, Actor* actor) {
     }
 
     // Live actor colours drive the tint — matches OoT3D's Navi-following-Link colour flip
-    // (targetCtx.naviInner/naviOuter). alphaScale fades pickups.
-    u8 outA = (u8)((f32)envAlpha * alphaScale);
-    u8 inA = (u8)(elf->innerColor.a * alphaScale);
-    Zelda3D_EmitActorBillboard(play, sOuterId, actor, 0.0f, kNaviYLift, 0.0f, outerWorld,
+    // (targetCtx.naviInner/naviOuter). alphaScale fades pickups. zelda3dGlowFade is the 3DS
+    // glow master fade (+0x924): the 3DS draw computes outer.a = fade * envAlpha * fadeOut and
+    // inner.a = innerColor.a * fade * fadeOut (FUN_001d6ec4 lines 114-130) — distant Kokiri
+    // fairies show BARE WINGS with no glow, fading in within 900 units of the player.
+    float glowFade = elf->zelda3dGlowFade;
+    u8 outA = (u8)((f32)envAlpha * alphaScale * glowFade);
+    u8 inA = (u8)(elf->innerColor.a * alphaScale * glowFade);
+    // WINGS first (the additive glows draw over them, matching the 3DS layering: model
+    // instance in the normal pass, sprite effects after). Drawn at the actor's LIVE scale —
+    // the 3DS model instance is bound to actor+0x1a4 (shape: pos/rot/scale), and z_en_elf.c
+    // animates scale (0.008 base; pickup shrink; despawn shrink) which this follows for free.
+    // Flap phase-locked to the live N64 skelAnime (falls back to free-run if unlockable).
+    static int sWingId = 0;
+    if (sWingId == 0) {
+        sWingId = Zelda3D_AutoModelId(ZELDA3D_NAVI_WING_CMB);
+    }
+    if (sWingId > 0) {
+        Zelda3D_UpdateAnimAuto(sWingId, ZELDA3D_NAVI_WING_CSAB, 1.0f, elf->skelAnime.curFrame,
+                               elf->skelAnime.animLength, elf->skelAnime.morphWeight);
+        Zelda3D_DrawActorModel(play, sWingId, actor, actor->scale.x);
+    }
+
+    Zelda3D_EmitActorBillboard(play, sOuterId, actor, 0.0f, 0.0f, 0.0f, outerWorld,
                                (u8)elf->outerColor.r, (u8)elf->outerColor.g, (u8)elf->outerColor.b, outA);
-    Zelda3D_EmitActorBillboard(play, sInnerId, actor, 0.0f, kNaviYLift, 0.0f, innerWorld,
+    Zelda3D_EmitActorBillboard(play, sInnerId, actor, 0.0f, 0.0f, 0.0f, innerWorld,
                                (u8)elf->innerColor.r, (u8)elf->innerColor.g, (u8)elf->innerColor.b, inA);
     return true;
 }
