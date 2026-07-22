@@ -353,9 +353,13 @@ void Zelda3D_SceneTint(PlayState* play, u8 out[3]) {
         init = 1;
     }
     for (i = 0; i < 3; i++) {
-        float v = ((float)ls->ambientColor[i] +
-                   gZelda3dTintDiff * ((float)ls->light1Color[i] + (float)ls->light2Color[i])) *
-                  gZelda3dTintMul;
+        // This tint approximates the 3DS lit result for converted (unlit-dlist) OoT3D content, so
+        // it reads the OoT3D color blend when one is live (gZelda3dEnvColors — no longer routed
+        // through envCtx.lightSettings; see zelda3d.h). Fallback: title / no-palette scenes.
+        float amb = gZelda3dEnvColors.valid ? gZelda3dEnvColors.amb[i] * 255.0f : (float)ls->ambientColor[i];
+        float l1  = gZelda3dEnvColors.valid ? gZelda3dEnvColors.l1col[i] * 255.0f : (float)ls->light1Color[i];
+        float l2  = gZelda3dEnvColors.valid ? gZelda3dEnvColors.l2col[i] * 255.0f : (float)ls->light2Color[i];
+        float v = (amb + gZelda3dTintDiff * (l1 + l2)) * gZelda3dTintMul;
         out[i] = (v <= 0.0f) ? 0 : (v >= 255.0f) ? 255 : (u8)(v + 0.5f);
     }
 }
@@ -1738,11 +1742,23 @@ void Zelda3D_UpdateLight(PlayState* play) {
         // (toward-light: N64 consumers need that), so the gameplay feed NEGATES here. The title
         // palette dirs (tl1d/tl2d) are raw 3DS-native (light-travel) and pass through unnegated —
         // that pairing was oracle-verified (#153) and is what pinned the shader's convention.
+        // COLOR source (unified-shading decision, 2026-07-23 — Zelda3dEnvColors comment in
+        // zelda3d.h): during gameplay with an OoT3D palette, the blended OoT3D colors come from
+        // gZelda3dEnvColors (they are no longer routed through envCtx.lightSettings, which now
+        // keeps the N64 rows for the N64-format draw path). Fallback to envCtx.lightSettings
+        // covers the title (its own override writes there) and scenes with no OoT3D palette.
+        // DIRS still come from envCtx in both cases — shared world truth, unchanged plumbing.
         for (i = 0; i < 3; i++) {
-            ambient[i] = (float)(ls->ambientColor[i]) / 255.0f;
-            l1col[i]   = (float)(ls->light1Color[i])  / 255.0f;
-            l2dir[i]   = titleDirs ? (float)tl2d[i] : -(float)(ls->light2Dir[i]);
-            l2col[i]   = (float)(ls->light2Color[i])  / 255.0f;
+            if (gZelda3dEnvColors.valid) {
+                ambient[i] = gZelda3dEnvColors.amb[i];
+                l1col[i]   = gZelda3dEnvColors.l1col[i];
+                l2col[i]   = gZelda3dEnvColors.l2col[i];
+            } else {
+                ambient[i] = (float)(ls->ambientColor[i]) / 255.0f;
+                l1col[i]   = (float)(ls->light1Color[i])  / 255.0f;
+                l2col[i]   = (float)(ls->light2Color[i])  / 255.0f;
+            }
+            l2dir[i] = titleDirs ? (float)tl2d[i] : -(float)(ls->light2Dir[i]);
         }
         l2len = sqrtf(l2dir[0]*l2dir[0] + l2dir[1]*l2dir[1] + l2dir[2]*l2dir[2]);
         if (l2len > 0.5f) {

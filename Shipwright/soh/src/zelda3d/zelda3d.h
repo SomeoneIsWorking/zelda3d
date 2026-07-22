@@ -130,12 +130,44 @@ typedef struct {
 } Zelda3dEnvBlend;
 extern Zelda3dEnvBlend gZelda3dEnvBlend;
 
+// The OoT3D per-scene env COLOR blend for this frame (ambient + the two directional light
+// colors, 0..1), computed by Zelda3D_SceneLightSettingsOverride from the OoT3D ZSI rows under
+// the SAME schedule/indices/weights z_kankyo just used for the N64 rows (gZelda3dEnvBlend).
+//
+// WHY A SEPARATE SINK AND NOT envCtx.lightSettings (unified-shading decision, 2026-07-23):
+// both render paths evaluate the SAME per-vertex light equation — clamp(ambientSum +
+// Σ lightCol·max(0, N·L)) — the N64 F3DEX one on the CPU (interpreter.cpp gSPVertex) and the
+// PICA CmbVShader one on the GPU (zelda3d_sdl3gpu.cpp kVert). What differs is CALIBRATION:
+// the OoT3D env magnitudes are authored against CMB materials (matAmbient/matDiffuse
+// coefficients ~0.4/0.5 on characters, baked-AO vertex colours, double-ambient scene
+// binding), while N64 materials have an implicit matAmb=matDif=1 and vColor=shade, authored
+// against the N64 rows. Writing the OoT3D colors into envCtx.lightSettings (the pre-2026-07-23
+// design) fed 3DS-calibrated magnitudes into N64-calibrated materials: at Kokiri day the
+// N64 ambient rows were replaced by OoT3D's (181,181,160) and every lit N64-format draw
+// (N64 Link, doors) blew out toward saturation. FALSIFIED premise recorded: "one env feed for both paths" is
+// NOT unification — it mixes calibration spaces. The unified model is ONE env STATE (same
+// schedule, blend weights, light DIRECTIONS, fog) driving TWO calibration palettes, each
+// material corpus lit by the rows its assets were authored for. So: colors for CMB draws go
+// HERE (renderer feed), colors for N64 draws stay the N64 rows via the stock
+// lightSettings -> lightCtx path; dirs + fog (shared world truth) are still overridden.
+typedef struct {
+    unsigned char valid; // 1 = gameplay frame with an OoT3D palette applied; 0 = title / no
+                         // palette / no blend captured yet -> consumers fall back to
+                         // envCtx.lightSettings (which then carries the intended values)
+    float amb[3];        // scene ambient, 0..1
+    float l1col[3];      // light-slot-1 (sun/moon key) color, 0..1
+    float l2col[3];      // light-slot-2 (opposed fill) color, 0..1
+} Zelda3dEnvColors;
+extern Zelda3dEnvColors gZelda3dEnvColors;
+
 // Title-demo: override envCtx.lightSettings from the ported 3DS title
 // palette + time schedule (no-op outside the title demo). Called by
 // z_kankyo before the lightSettings -> lightCtx application.
 void Zelda3D_TitleLightSettingsOverride(PlayState* play);
-// Gameplay counterpart: OoT3D per-scene env palette -> envCtx.lightSettings (#111),
-// re-running the gZelda3dEnvBlend record against the OoT3D rows.
+// Gameplay counterpart (#111): re-runs the gZelda3dEnvBlend record against the OoT3D rows.
+// COLORS go to gZelda3dEnvColors (CMB renderer feed only — see its comment above); light
+// DIRS (settings path) + FOG color/window still go into envCtx.lightSettings, shared by
+// both render paths.
 void Zelda3D_SceneLightSettingsOverride(PlayState* play);
 
 // Draw the OoT3D sky (BlueSky.zar tenkyu gradient dome) in place of the N64 normal-sky skybox.

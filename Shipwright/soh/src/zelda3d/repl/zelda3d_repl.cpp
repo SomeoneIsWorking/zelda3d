@@ -1276,17 +1276,27 @@ static void Zelda3D_ReplExec(PlayState* play, char* line, const char* outPath) {
                             gZelda3dLightDirLast[2], gZelda3dLightDirOverride ? "(override)" : "(auto/live light1Dir)");
         }
     } else if (strcmp(cmd, "lightparams") == 0) {
-        // Print the current scene light parameters being pushed to the shader (from envCtx.lightSettings,
-        // updated every frame in Zelda3D_UpdateLight). Useful to verify the real values reach the GPU.
+        // Print the current scene light parameters being pushed to the shader (OoT3D blend from
+        // gZelda3dEnvColors when a palette is live, else envCtx.lightSettings — see
+        // Zelda3D_UpdateLight), PLUS the N64 rows still flowing envCtx.lightSettings -> lightCtx
+        // to the N64-format draw path (unified-shading split feed: one env state, two calibration
+        // palettes — Zelda3dEnvColors comment in zelda3d.h). Both sides on one line so a palette
+        // mixing regression is visible at a glance.
         extern float gZelda3dAmbient[3], gZelda3dLight1Col[3], gZelda3dLight2Dir[3], gZelda3dLight2Col[3];
+        EnvLightSettings* lsn = play != NULL ? &play->envCtx.lightSettings : NULL;
         Zelda3D_ReplReply(outPath,
             "lightparams: ambient=(%.3f,%.3f,%.3f) light1col=(%.3f,%.3f,%.3f) "
-            "light1dir=(%.3f,%.3f,%.3f) light2dir=(%.3f,%.3f,%.3f) light2col=(%.3f,%.3f,%.3f)",
+            "light1dir=(%.3f,%.3f,%.3f) light2dir=(%.3f,%.3f,%.3f) light2col=(%.3f,%.3f,%.3f) | "
+            "envColorsValid=%d | n64rows: amb=(%d,%d,%d) l1=(%d,%d,%d) l2=(%d,%d,%d)",
             gZelda3dAmbient[0], gZelda3dAmbient[1], gZelda3dAmbient[2],
             gZelda3dLight1Col[0], gZelda3dLight1Col[1], gZelda3dLight1Col[2],
             gZelda3dLightDirLast[0], gZelda3dLightDirLast[1], gZelda3dLightDirLast[2],
             gZelda3dLight2Dir[0], gZelda3dLight2Dir[1], gZelda3dLight2Dir[2],
-            gZelda3dLight2Col[0], gZelda3dLight2Col[1], gZelda3dLight2Col[2]);
+            gZelda3dLight2Col[0], gZelda3dLight2Col[1], gZelda3dLight2Col[2],
+            (int)gZelda3dEnvColors.valid,
+            lsn ? lsn->ambientColor[0] : -1, lsn ? lsn->ambientColor[1] : -1, lsn ? lsn->ambientColor[2] : -1,
+            lsn ? lsn->light1Color[0] : -1, lsn ? lsn->light1Color[1] : -1, lsn ? lsn->light1Color[2] : -1,
+            lsn ? lsn->light2Color[0] : -1, lsn ? lsn->light2Color[1] : -1, lsn ? lsn->light2Color[2] : -1);
     } else if (strcmp(cmd, "worldlit") == 0) {
         // OoT3D world (scene) vertex-lit combiner port (docs/oot3d_world_lighting_re.md).
         // `worldlit 0` = legacy texture*vColor*uTint; `worldlit 1` = real PICA vertex lighting
