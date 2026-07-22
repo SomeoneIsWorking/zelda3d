@@ -99,6 +99,25 @@ typedef struct Zelda3DGlGroup {
     float uv1Scale[2];        // coordinator-1 scale (S, T)
     float uv1Trans[2];        // coordinator-1 translate (S, T); uv1 = scale * (uv - trans)
     int   coord1Mapping;      // coordinator-1 mapping method (noclip): 1=UV, 3=SphereEnvMap
+    // Generic per-stage PICA TEV chain (render.multi-stage-tev). When tevGeneric is set the
+    // renderer ignores the legacy combiner approximations (combScaleRGB/uMatConst/dualTexMode
+    // are all 0/off for such materials by construction) and evaluates tevStageCount stages in
+    // the fragment shader from the packed words below. Packing (cmb_glgroups.cpp PackTevStage,
+    // PICA enum codes — sources: 0 Primary, 1 FragPrimary, 2 FragSecondary, 3..6 Texture0..3,
+    // 13 PrevBuffer, 14 Constant, 15 Previous; ops: 0 Replace, 1 Modulate, 2 Add, 3 AddSigned,
+    // 4 Lerp, 5 Subtract, 6 Dot3RGB, 7 Dot3RGBA, 8 MulThenAdd, 9 AddThenMul):
+    //   w0 = rgbSrc0|rgbSrc1<<4|rgbSrc2<<8 | aSrc0<<12|aSrc1<<16|aSrc2<<20
+    //   w1 = rgbMod0|rgbMod1<<4|rgbMod2<<8 | aMod0<<12|aMod1<<16|aMod2<<20 | constIdx<<24
+    //   w2 = rgbOp | aOp<<4 | log2(rgbScale)<<8 | log2(aScale)<<10
+    int      tevGeneric;      // 0 = legacy paths, 1 = generic per-stage TEV evaluator
+    int      tevStageCount;   // 1..6 when tevGeneric
+    unsigned tevStagePack[6][3];
+    // Third texture binding + coordinator-2 transform (Zora water: tex0+tex1+tex2).
+    int   tex2Index;          // -1 = none
+    unsigned wrap2S, wrap2T;
+    float uv2Scale[2];
+    float uv2Trans[2];
+    int   coord2Mapping;
 } Zelda3DGlGroup;
 
 // One decoded texture (RGBA8, w*h*4 bytes, row 0 = top).

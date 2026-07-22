@@ -59,7 +59,16 @@ TEST(Zelda3DUboLayout, CommonFieldOffsetsMatchStd140) {
     EXPECT_EQ(offsetof(SgUbo, uSphRot0), 400u);
     EXPECT_EQ(offsetof(SgUbo, uSphRot1), 416u);
     EXPECT_EQ(offsetof(SgUbo, uSphRot2), 432u);
-    EXPECT_EQ(offsetof(SgUbo, uBones), 448u);
+    EXPECT_EQ(offsetof(SgUbo, uLitDif1), 448u);
+    EXPECT_EQ(offsetof(SgUbo, uLitDif2), 464u);
+    EXPECT_EQ(offsetof(SgUbo, uLightDir2), 480u);
+    // Generic per-stage TEV (render.multi-stage-tev): uvec4[6] + uvec4[2] + vec4 + vec4.
+    // std140 array stride of uvec4 is 16 bytes, so the flat uint32_t arrays match exactly.
+    EXPECT_EQ(offsetof(SgUbo, uTevStages), 496u);
+    EXPECT_EQ(offsetof(SgUbo, uTevConst), 592u);
+    EXPECT_EQ(offsetof(SgUbo, uTex2Xf), 624u);
+    EXPECT_EQ(offsetof(SgUbo, uTevCtl), 640u);
+    EXPECT_EQ(offsetof(SgUbo, uBones), 656u);
 }
 
 // The skin-enable flag and shade tint live in uTintSkin (offset 160) — comfortably inside the COMMON

@@ -104,6 +104,21 @@ struct SgUbo {
     float uLitDif1[4];
     float uLitDif2[4];
     float uLightDir2[4];
+    // Generic per-stage PICA TEV chain (render.multi-stage-tev). Active when uTevCtl.x > 0
+    // (= stage count); the legacy combiner fields (uExtra.w scale, uMatConst, uSheen.y dual
+    // modes) are then bypassed — per-stage ops/sources/operands/scales/const-selects are
+    // decoded from the packed words instead (shader mirrors: uvec4 uTevStages[6],
+    // uvec4 uTevConst[2], vec4 uTex2Xf, vec4 uTevCtl).
+    //   uTevStages[s] = { w0 srcs, w1 mods+constIdx, w2 ops+scales, 0 } — packing documented
+    //     at Zelda3DGlGroup::tevStagePack (zelda3d_gl.h).
+    //   uTevConst = 6 RGBA8-packed constant-color slots (PICA's const registers are 8-bit) in
+    //     words [0..5], AFTER the per-actor override channel is applied.
+    //   uTex2Xf = coordinator-2 scale (xy) / translate (zw) for the third texture unit.
+    //   uTevCtl = { stageCount, coord1Mapping, coord2Mapping, 0 }.
+    uint32_t uTevStages[6 * 4];
+    uint32_t uTevConst[8];
+    float uTex2Xf[4];
+    float uTevCtl[4];
     float uBones[ZELDA3D_GL_MAX_BONES * 16]; // MUST stay last: pushed as its own <=4096 B block
 };
 

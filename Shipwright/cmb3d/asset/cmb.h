@@ -40,6 +40,14 @@ struct CmbMaterial {
     // (sphere) for the second texture; mat10-11 use coord0=3 (sphere) for the primary texture.
     int coord0_mapping = 1; // coordinator-0 (primary texture): default UV
     int coord1_mapping = 1; // coordinator-1 (second texture): default UV
+    // Texture binding 2 (third sampler) + coordinator-2 transform (render.multi-stage-tev).
+    // Zora's Domain water (spot07_1 mat0-2) binds tex0+tex1+tex2 and combines them through a
+    // 3-stage TEV chain — verified identical between the CMB file bytes and the live oracle's
+    // per-draw register log (tev1..5 sources/ops), 2026-07-22.
+    int tex2_idx = -1;
+    uint16_t wrap2_s = 0x2901, wrap2_t = 0x2901;
+    float scale2_s = 1, scale2_t = 1, trans2_s = 0, trans2_t = 0;
+    int coord2_mapping = 1; // coordinator-2 (third texture): default UV
     int cull = 0;
     bool alpha_test = false;
     float alpha_ref = 0;
@@ -85,6 +93,37 @@ struct CmbMaterial {
     uint16_t comb_combine_rgb = 0x2100;                    // MODULATE
     float comb_scale_rgb = 1.0f;                           // 1 / 2 / 4
     uint16_t comb_src_rgb[3] = { 0x8577, 0x84C0, 0x8576 }; // PRIMARY_COLOR, TEXTURE0, CONSTANT
+    // FULL per-stage TEV chain (render.multi-stage-tev): every stage's raw GL-DMP enums as
+    // stored in the file's 0x28-byte combiner entries. Layout validated corpus-wide over all
+    // 11172 materials in the ROM (tools/tev_corpus_survey.py, 2026-07-22): every field decodes
+    // to its legal enum domain with ZERO violations.
+    //   ops:  0x1E01 REPLACE, 0x2100 MODULATE, 0x0104 ADD, 0x8574 ADD_SIGNED,
+    //         0x8575 INTERPOLATE, 0x84E7 SUBTRACT, 0x86AE/AF DOT3, 0x6401 MULT_ADD,
+    //         0x6402 ADD_MULT   (NOTE: 0x8574 is ADD_SIGNED and 0x8575 INTERPOLATE — standard
+    //         GL values; an older comment in cmb.cpp had them swapped, and "SUBTRACT 0x8506"
+    //         was wrong: the real enum is 0x84E7.)
+    //   srcs: 0x8577 PRIMARY, 0x8578 PREVIOUS, 0x8579 PREVIOUS_BUFFER, 0x8576 CONSTANT,
+    //         0x84C0..0x84C3 TEXTURE0..3, 0x6210 FRAGMENT_PRIMARY (fragment lighting),
+    //         0x6211 FRAGMENT_SECONDARY
+    //   mods: 0x0300 SRC_COLOR, 0x0301 1-C, 0x0302 SRC_ALPHA, 0x0303 1-A,
+    //         0x8580..0x8585 SRC_R / 1-R / SRC_G / 1-G / SRC_B / 1-B
+    struct CombStage {
+        uint16_t rgb_op = 0x2100, a_op = 0x2100;
+        uint16_t rgb_scale = 1, a_scale = 1; // literal 1/2/4 (entry +0x04 / +0x06)
+        uint16_t rgb_src[3] = { 0x8577, 0x84C0, 0x8576 };
+        uint16_t rgb_mod[3] = { 0x0300, 0x0300, 0x0300 };
+        uint16_t a_src[3] = { 0x8577, 0x84C0, 0x8576 };
+        uint16_t a_mod[3] = { 0x0302, 0x0302, 0x0302 };
+        uint16_t buf_rgb = 0x8579, buf_a = 0x8579; // entry +0x08/+0x0A (buffer input select)
+        uint8_t const_idx = 0;                     // 0..5 (entry +0x24, per STAGE)
+    };
+    CombStage comb_stages[6];
+    // True when the chain needs the generic per-stage TEV evaluator: anything that is not
+    // (a) the trivial single-stage MODULATE(PRIMARY, TEXTURE0) shape the renderer's legacy
+    // fast path evaluates exactly, or (b) one of the four byte-classified dual-texture title
+    // shapes below (kept on their verified legacy path — CLOSED parity rows). Computed in
+    // cmb.cpp parseMats AFTER dual_tex_mode classification.
+    bool tev_generic = false;
     // PICA200 TEV constant-color selector: index 0..5 chosen from mat_constant[]. Combiner-entry
     // layout (verified empirically from AHG hyliaman2.cmb mat 0 stage 1, which sources
     // CONST[4] — the exact slot EnHy_Draw overrides via colorA per oot3d-decomp

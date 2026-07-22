@@ -6,8 +6,8 @@
 // Render-unification effort (kanban #131), Phase 2. CPU-side mirror of the combined UBO declared
 // in unified_shader.cpp's kCommonUboBody — MUST stay byte-identical (same field order/sizes; every
 // field is vec4/mat4/ivec4-sized so std140 offsets equal C offsets, same discipline as SgUbo in
-// zelda3d_sg_ubo.h). Deliberately sized to fit Zelda3DSg::kCommonBytes (368 bytes, since the
-// uSheen + uTex1Xf fields were added) exactly so a unified draw reuses the EXISTING
+// zelda3d_sg_ubo.h). Deliberately sized to fit Zelda3DSg::kCommonBytes (which grows as SgUbo gains fields; the
+// static_assert below enforces the match) exactly so a unified draw reuses the EXISTING
 // DRAW_MODEL Op / AppendZelda3DModelDraw / mSoh3dModelUbos plumbing (gfx_sdl3gpu.h/.cpp) unchanged
 // — see unified_shader.cpp's kCommonUboBody comment.
 namespace Zelda3DUnified {
@@ -53,6 +53,14 @@ struct CommonUbo {
     float uLitDif1[4];
     float uLitDif2[4];
     float uLightDir2[4];
+    // Mirror of SgUbo::uTevStages/uTevConst/uTex2Xf/uTevCtl (generic per-stage TEV,
+    // render.multi-stage-tev — zelda3d_sg_ubo.h). Size-parity padding today: the (default-off)
+    // unified path still runs its N64-mux combiner; wire these through
+    // UNIFIED_COMMON_UBO_BODY when the unified renderer takes over CMB draws.
+    uint32_t uTevStages[6 * 4];
+    uint32_t uTevConst[8];
+    float uTex2Xf[4];
+    float uTevCtl[4];
 };
 
 static_assert(sizeof(CommonUbo) == Zelda3DSg::kCommonBytes,
