@@ -88,6 +88,11 @@ int gZelda3dLastAutoModel = -1;
 void Zelda3D_EnsureModelProvider(void);
 void Zelda3D_GL_FrameBegin(void); // drop any Zelda3D draws left unrendered from a prior frame
 void Zelda3D_GL_SetLightDir(const float dirWorld[3]); // scene sun dir (world space) for the form term
+// OoT3D PICA distance fog feed (zelda3d_gl.cpp; consumed by the uFog.w==2 shader path).
+// Gameplay caller: Zelda3D_SceneLightSettingsOverride. Title feeds it separately.
+void Zelda3D_Fog3dSet(float camNear, float zFar, float fogNear, float fogFar,
+                      const float eyeWorld[3], const float fwdWorld[3]);
+void Zelda3D_Fog3dOff(void);
 // Push all four scene light parameters (ambient, key-light color, fill-light dir+color) from
 // envCtx.lightSettings so the shader runs the real N64 two-light diffuse equation. numEnabledLights
 // is the count of live directional light slots this frame (1 or 2) — see title_env_lighting.md
@@ -602,8 +607,12 @@ void Zelda3D_SceneLightSettingsOverride(PlayState* play) {
     s32 a0, a1, b0, b1, i;
     f32 wT, wC;
 
-    // The title runs its own palette + schedule (Zelda3D_TitleLightSettingsOverride).
-    if (pal == NULL || n <= 0 || Zelda3D_Title_IsActive()) {
+    // The title runs its own palette + schedule + fog (Zelda3D_TitleLightSettingsOverride).
+    if (Zelda3D_Title_IsActive()) {
+        return;
+    }
+    if (pal == NULL || n <= 0 || !b->valid) {
+        Zelda3D_Fog3dOff();
         return;
     }
     a0 = (s32)b->idx[0];
@@ -630,8 +639,46 @@ void Zelda3D_SceneLightSettingsOverride(PlayState* play) {
         cfgB = LERP(pal[b0].l1col[i], pal[b1].l1col[i], wT);
         envCtx->lightSettings.light2Color[i] = (u8)LERP(cfgA, cfgB, wC);
         if (!b->timeBased) {
-            envCtx->lightSettings.light1Dir[i] = (s8)LERP16(pal[a0].l0dir[i], pal[a1].l0dir[i], wT);
-            envCtx->lightSettings.light2Dir[i] = (s8)LERP16(pal[a0].l1dir[i], pal[a1].l1dir[i], wT);
+            // Palette dirs are 3DS-native (light-TRAVEL); envCtx keeps the N64 convention
+            // (toward-light) for N64 consumers, so negate here. Zelda3D_UpdateLight negates
+            // back at the GL seam (see its direction-convention comment).
+            envCtx->lightSettings.light1Dir[i] = (s8)-LERP16(pal[a0].l0dir[i], pal[a1].l0dir[i], wT);
+            envCtx->lightSettings.light2Dir[i] = (s8)-LERP16(pal[a0].l1dir[i], pal[a1].l1dir[i], wT);
+        }
+    }
+
+    // OoT3D PICA distance fog, gameplay feed. Ground truth (Kokiri gameplay, harness az_fog +
+    // per-draw vsuni): the 3DS renders every fog-enabled CMB material (fog_mode=5) through the
+    // hardware fog LUT with the scene's per-slot window — the LUT solves EXACTLY as the eye-linear
+    // window fogNear..fogFar under the 3DS projection (camNear 7.0, zFar = slot zFar; measured
+    // proj2 = (1.0006, 7.0041) -> near 7.0, far 12000): LUT entry 127 = (2400-834)/(2400-800) =
+    // 0.979, byte-exact vs the live dump. The renderer's uFog.w==2 path (RE'd for the title,
+    // title_env_lighting.md §13) replays that same curve; this feeds it the gameplay window,
+    // blended by the SAME schedule as the colors above. NOTE this is NOT the F3DEX fog ramp that
+    // #113 turned off (hand-wired N64 fog-space values, pale-wedge artifact) — it is the 3DS's own
+    // fog with the ROM's own per-scene values, part of the oracle's world render (distant-terrain
+    // A/B: oracle (172,169,93) vs un-fogged (80,77,33) at rows 0.14-0.20).
+    {
+        f32 cfgA, cfgB, fogNear, fogFar, zFar;
+        const f32 kGameplayCamNear3ds = 7.0f; // measured from the oracle's live projection (above)
+        f32 fwd[3];
+        f32 eye[3] = { play->view.eye.x, play->view.eye.y, play->view.eye.z };
+        cfgA = LERP((f32)pal[a0].fogNear, (f32)pal[a1].fogNear, wT);
+        cfgB = LERP((f32)pal[b0].fogNear, (f32)pal[b1].fogNear, wT);
+        fogNear = LERP(cfgA, cfgB, wC);
+        cfgA = LERP(pal[a0].fogFar, pal[a1].fogFar, wT);
+        cfgB = LERP(pal[b0].fogFar, pal[b1].fogFar, wT);
+        fogFar = LERP(cfgA, cfgB, wC);
+        cfgA = LERP(pal[a0].zFar, pal[a1].zFar, wT);
+        cfgB = LERP(pal[b0].zFar, pal[b1].zFar, wT);
+        zFar = LERP(cfgA, cfgB, wC);
+        fwd[0] = play->view.lookAt.x - play->view.eye.x;
+        fwd[1] = play->view.lookAt.y - play->view.eye.y;
+        fwd[2] = play->view.lookAt.z - play->view.eye.z;
+        if (fogFar > fogNear && zFar > kGameplayCamNear3ds) {
+            Zelda3D_Fog3dSet(kGameplayCamNear3ds, zFar, fogNear, fogFar, eye, fwd);
+        } else {
+            Zelda3D_Fog3dOff();
         }
     }
 }

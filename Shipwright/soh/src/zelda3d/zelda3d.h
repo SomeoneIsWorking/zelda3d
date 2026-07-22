@@ -119,6 +119,9 @@ int Zelda3D_ShouldSuppressBgImageSkybox(PlayState* play);
 // no schedule logic is duplicated and no guessing which branch (outdoor time-of-day vs indoor
 // settings) ran. z_kankyo.c writes it in all three lightSettings branches.
 typedef struct {
+    unsigned char valid;     // 1 once z_kankyo has captured a blend for the CURRENT scene's palette;
+                             // reset on palette switch (Zelda3D_UpdateLight) so a stale record from
+                             // the previous scene is never applied to the new scene's rows
     unsigned char timeBased; // 1 = outdoor time-of-day path (colors only; sun/moon dirs stay computed)
     unsigned char idx[4];    // settings-list indices: time path {cfgA.from, cfgA.to, cfgB.from, cfgB.to};
                              // settings path {prev, cur, prev, cur} (wConfig = 0 collapses the 2nd pair)

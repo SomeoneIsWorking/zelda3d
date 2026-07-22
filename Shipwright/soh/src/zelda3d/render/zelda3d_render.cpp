@@ -1687,6 +1687,16 @@ void Zelda3D_UpdateLight(PlayState* play) {
             gZelda3dScenePalette = 0;
             gZelda3dScenePaletteN = 0;
         }
+        // Palette switched (scene change): invalidate the captured env blend so the override
+        // never applies the PREVIOUS scene's slot indices/weights to the new scene's rows.
+        // z_kankyo re-captures on its first blend frame in the new scene.
+        {
+            static const Zelda3dLightSlot* sPrevPalette = 0;
+            if (gZelda3dScenePalette != sPrevPalette) {
+                gZelda3dEnvBlend.valid = 0;
+                sPrevPalette = gZelda3dScenePalette;
+            }
+        }
     }
     // Always push the real scene light colors + ambient so the shader lighting equation matches
     // OoT3D regardless of the lightdir override. All values live-interpolated by z_kankyo.c.
@@ -1709,10 +1719,20 @@ void Zelda3D_UpdateLight(PlayState* play) {
                 titleDirs = 1;
             }
         }
+        // DIRECTION CONVENTION at this seam (root cause of "Kokiri kids lit from below",
+        // 2026-07-22): the 3DS stores light-TRAVEL directions and its shader (CmbVShader §10;
+        // ours mirrors it) re-negates at the dot — its own sun trig is EXACTLY the negation of
+        // N64's (3DS: -sin(t)·120, N64: -sin(t-0x8000)·120 = +sin(t)·120), and the oracle's live
+        // gameplay actor uniforms confirm it: the sun-COLOR slot's stored dir at Kokiri noon is
+        // -(view·sunToward) (vsuni: dir=(−0.615,−0.751,+0.241), dif=(255,255,219)), so the shader
+        // lights sun-FACING normals. envCtx.lightSettings dirs are kept in N64 convention
+        // (toward-light: N64 consumers need that), so the gameplay feed NEGATES here. The title
+        // palette dirs (tl1d/tl2d) are raw 3DS-native (light-travel) and pass through unnegated —
+        // that pairing was oracle-verified (#153) and is what pinned the shader's convention.
         for (i = 0; i < 3; i++) {
             ambient[i] = (float)(ls->ambientColor[i]) / 255.0f;
             l1col[i]   = (float)(ls->light1Color[i])  / 255.0f;
-            l2dir[i]   = titleDirs ? (float)tl2d[i] : (float)(ls->light2Dir[i]);
+            l2dir[i]   = titleDirs ? (float)tl2d[i] : -(float)(ls->light2Dir[i]);
             l2col[i]   = (float)(ls->light2Color[i])  / 255.0f;
         }
         l2len = sqrtf(l2dir[0]*l2dir[0] + l2dir[1]*l2dir[1] + l2dir[2]*l2dir[2]);
@@ -1785,9 +1805,11 @@ void Zelda3D_UpdateLight(PlayState* play) {
         return; // light1Dir held by REPL `lightdir x y z`; colors + ambient updated above
     }
     // #153: title actor light1 dir = the palette blend (see the titleDirs comment above).
-    d[0] = titleDirs ? (float)tl1d[0] : (float)ls->light1Dir[0];
-    d[1] = titleDirs ? (float)tl1d[1] : (float)ls->light1Dir[1];
-    d[2] = titleDirs ? (float)tl1d[2] : (float)ls->light1Dir[2];
+    // Gameplay negates: envCtx is N64 toward-light, the shader wants 3DS light-travel
+    // (see the direction-convention comment at the l2dir fill above).
+    d[0] = titleDirs ? (float)tl1d[0] : -(float)ls->light1Dir[0];
+    d[1] = titleDirs ? (float)tl1d[1] : -(float)ls->light1Dir[1];
+    d[2] = titleDirs ? (float)tl1d[2] : -(float)ls->light1Dir[2];
     len = sqrtf(d[0] * d[0] + d[1] * d[1] + d[2] * d[2]);
     if (len < 1.0f) {
         if (titleDirs) {

@@ -343,6 +343,10 @@ const char* kFrag =
     "        vec3 lit = ubo.uAmbient.xyz * ubo.uAmbient.w\n"
     "                 + ubo.uLitDif1.rgb * max(dot(n, -ubo.uLightDir.xyz), 0.0)\n"
     "                 + ubo.uLitDif2.rgb * max(dot(n, -ubo.uLightDir2.xyz), 0.0);\n"
+    // Clamp order is the PRODUCT, verified by A/B vs the oracle (2026-07-22): PICA clamps o1
+    // when the output register is WRITTEN — i.e. clamp(Σ·vColor) — not the light sum first.
+    // clamp(Σ)·vColor was tried and measured ~30% dark on near grass (settled Kokiri noon,
+    // rows 0.85-0.97: (62,71) vs oracle (90,99); this form gives (88,101)). Do not re-flip.
     "        rgb = t.rgb * clamp(lit * vColor.rgb, 0.0, 1.0);\n"
     "    } else if (ubo.uParams.y > 0.5) {\n"
     "        rgb = t.rgb * vColor.rgb * shade;\n"             // flat-tint fallback (vtxLit=0 draws)

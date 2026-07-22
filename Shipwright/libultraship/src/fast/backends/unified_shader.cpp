@@ -181,8 +181,13 @@ const char* kUnifiedShaderTemplate = R"PRISM(@prism(type='fragment', name='Unifi
         // lightingMode 2 (3DS scene vertex-lit): baked here per-vertex, matching the existing
         // per-vertex NdotL approach (docs/oot3d_world_lighting_re.md), not in the fragment stage.
         if (ubo.uParams0.y > 1.5) {
-            float ndotl = max(dot(normalize(nM), normalize(ubo.uLightDir.xyz)), 0.0);
+            // -uLightDir: uLightDir is 3DS-native light-TRAVEL (see Zelda3D_UpdateLight's
+            // direction-convention comment); negate at the dot like CmbVShader / kFrag do.
+            float ndotl = max(dot(normalize(nM), -normalize(ubo.uLightDir.xyz)), 0.0);
             vec3 lit = ubo.uMatAmbient.xyz + ubo.uMatDiffuse.xyz * ndotl;
+            // Clamp order = the PRODUCT (PICA clamps o1 on register write). clamp(lit) first
+            // was tried 2026-07-22 and measured ~30% dark vs the oracle — see the kFrag
+            // comment in zelda3d_sdl3gpu.cpp. Do not re-flip.
             vColor0 = vec4(clamp(vColor0.rgb * lit, 0.0, 1.0), vColor0.a);
         }
     }
