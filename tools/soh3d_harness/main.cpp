@@ -2015,6 +2015,13 @@ std::optional<uint32_t> CurrentPlayState() {
 // stale post-Play read of the slot would fail either check.
 bool TitleActive() {
     auto& mem = Core::System::GetInstance().Memory();
+    // gPlayState nonzero == a REAL Play gamestate, never the title (the title keeps it 0 and
+    // parks its PlayState* at TITLE_PLAYSTATE_PTR_VA). This gate is required: scene 0x51 is
+    // ALSO Hyrule Field's scene number in Play (N64 spot00), so the (scene==0x51, active==1)
+    // pair alone false-positives there — every warp to Hyrule Field (0xCD etc.) was classified
+    // "title" and `gameplay` reported no from real gameplay (found 2026-07-22, scene sweep).
+    auto gp = mem.Read32OrNullopt(GPLAYSTATE_VA);
+    if (gp && *gp != 0) return false;
     auto scn = mem.Read32OrNullopt(TITLE_CTX_VA + TITLE_SCENE_OFF);
     auto act = mem.Read32OrNullopt(TITLE_CTX_VA + TITLE_ACTIVE_OFF);
     return scn && act && (*scn & 0xFFFF) == 0x51 && *act == 1;

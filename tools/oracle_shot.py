@@ -70,7 +70,10 @@ def capture(entrance: int, out_png: str, settle_frames: int, keep_ppm: bool,
     live = _pos_of(h) or "gameplay"
 
     base = os.path.splitext(out_png)[0]
-    reply = (h.send(f"snapshot {base}") or "").strip()
+    # `snapshot` is a STREAMING reply (ok snapshot / az line / soh line / ok end);
+    # send() would leave 3 lines in the pipe and desync any command sent after it.
+    lines = h.send_multiline(f"snapshot {base}")
+    reply = (lines[0] if lines else "").strip()
     ppm = base + ".az.ppm"
     if not reply.startswith("ok") or not os.path.exists(ppm):
         print(f"oracle_shot: snapshot failed: {reply}", file=sys.stderr)

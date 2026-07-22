@@ -200,18 +200,18 @@ const char* kVert =
     "        sp = acc.xyz;\n"
     "    } else { sp = aPos; nM = aNrm; }\n"
     "    vec4 c = ubo.uMP * vec4(sp, 1.0);\n"
-    // 3DS PICA fog (uFog.w == 2.0, title port): vFogDist carries the 3DS z-buffer DEPTH of this
-    // vertex, depth = a - b/d with d = the eye depth along the view axis (uMV maps model->WORLD
-    // for these draws — the camera lives in uMP — so d = dot(world, fwd) - dot(fwd, eye)).
-    // a - b/d is this world point's z/w under the 3DS projection, affine in screen space, so the
-    // plain varying interpolation reproduces the 3DS per-fragment depth exactly. N64 ramp mode
-    // keeps the existing NDC z/w.
-    "    if (ubo.uFog.w > 1.5) {\n"
-    "        float d = dot((ubo.uMV * vec4(sp, 1.0)).xyz, ubo.uFog3d1.xyz) - ubo.uFog3d1.w;\n"
-    "        vFogDist = ubo.uFog3d0.x - ubo.uFog3d0.y / max(d, 1e-3);\n"
-    "    } else {\n"
-    "        vFogDist = c.z / c.w;\n"
-    "    }\n"
+    // N64 fog ramp input: this vertex's NDC z/w. The 3DS PICA fog path (uFog.w == 2.0) does NOT
+    // use vFogDist — it derives the 3DS z-buffer depth per FRAGMENT from vWorld in kFrag.
+    // FALSIFIED APPROACHES for the 3DS path, do not retry (2026-07-22, Kokiri far-band residual):
+    //  - per-VERTEX depth a - b/d in vFogDist with default (perspective-correct) interpolation:
+    //    z/w is screen-affine, not world-affine, so mid-triangle values undershoot -> measurably
+    //    WEAKER fog than the 3DS on large distant triangles (~5-8/255 dark in the far band);
+    //  - the same with noperspective interpolation: exact for on-screen vertices, but a vertex
+    //    BEHIND the camera hits the max(d,1e-3) clamp and carries a huge negative depth; near-plane
+    //    clipping lerps that garbage into visible near triangles (Kokiri: pale fog wedge under
+    //    Link, near band +46/255). Per-fragment evaluation has neither failure mode: interpolated
+    //    vWorld is world-affine (exact), and post-clipping fragments are never behind the camera.
+    "    vFogDist = c.z / c.w;\n"
     "    c.y *= ubo.uParams.x;\n"
     "    c.z = (c.z + c.w) * 0.5;\n"          // GL clip z [-1,1] -> SDL3 GPU/Vulkan [0,1]
     "    if (ubo.uLightDir.w > 0.5) c.z = c.w;\n" // skybox: pin to far plane
@@ -373,15 +373,21 @@ const char* kFrag =
     "        rgb = clamp(rgb, 0.0, 1.0) * ubo.uExtra.w;\n"
     "    }\n"
     // OoT3D PICA distance fog (uFog.w == 2.0; title port — oot3d-decomp title_env_lighting.md
-    // §13). vFogDist = the 3DS z-buffer depth (see vertex shader). PICA samples a 128-entry LUT
-    // at index depth*128 and LERPs value->value+diff INSIDE the entry; with the scene's
-    // compressed depth range entry 127 spans eye ~873..zFar, so this piecewise-linear-in-DEPTH
-    // interpolation (not the underlying distance curve) is the visible haze. fog3dNode() is the
-    // RE'd FogResUpdater node value (linear mode 0): eyeDist(t) = b/(a-t), then the fogNear/
-    // fogFar linear window. (The 3DS's 11/13-bit LUT quantization is omitted: <=1/2048 in the
-    // factor, sub-LSB of the 8-bit output.) Never applied to sky (uLightDir.w).
+    // §13). The 3DS z-buffer depth of THIS FRAGMENT is derived from the interpolated world
+    // position (world-affine -> exact; see the vertex-shader note for the two falsified
+    // vertex-level variants): d = eye depth along the view axis, depth = a - b/d = the
+    // fragment's z/w under the 3DS projection — exactly the depth-buffer value PICA indexes
+    // its fog LUT with. PICA samples a 128-entry LUT at index depth*128 and LERPs
+    // value->value+diff INSIDE the entry; with the scene's compressed depth range entry 127
+    // spans eye ~873..zFar, so this piecewise-linear-in-DEPTH interpolation (not the
+    // underlying distance curve) is the visible haze. fog3dNode() is the RE'd FogResUpdater
+    // node value (linear mode 0): eyeDist(t) = b/(a-t), then the fogNear/fogFar linear
+    // window. (The 3DS's 11/13-bit LUT quantization is omitted: <=1/2048 in the factor,
+    // sub-LSB of the 8-bit output.) Never applied to sky (uLightDir.w).
     "    if (ubo.uFog.w > 1.5 && ubo.uLightDir.w < 0.5) {\n"
-    "        float x = clamp(vFogDist, 0.0, 1.0) * 128.0;\n"
+    "        float d3 = dot(vWorld, ubo.uFog3d1.xyz) - ubo.uFog3d1.w;\n"
+    "        float depth3ds = ubo.uFog3d0.x - ubo.uFog3d0.y / max(d3, 1e-3);\n"
+    "        float x = clamp(depth3ds, 0.0, 1.0) * 128.0;\n"
     "        float i0 = min(floor(x), 127.0);\n"
     "        float f0 = fog3dNode(i0 * (1.0 / 128.0));\n"
     "        float f1 = fog3dNode((i0 + 1.0) * (1.0 / 128.0));\n"
