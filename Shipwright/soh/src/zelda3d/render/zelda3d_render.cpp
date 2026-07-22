@@ -127,6 +127,10 @@ static void Zelda3D_TitleLightSlotsConvert(void) {
         // field order byte-for-byte. The prior offsets read l0col/l1col before
         // their dir (swapped, off-by-one) and produced degenerate (0,0,0) or
         // constant (-72,-72,-72) directions for ~15/17 spot99 slots.
+        // fogCol (the gameplay palette's +0x19 field, added 2026-07-22) is deliberately left at
+        // zero here: the title drives its own fog window through Zelda3D_TitleCsBlendedFog and
+        // never reads this field, and the title record's layout past the colour block has not
+        // been byte-verified. Do not "fill it in" without checking against the oracle.
         for (int j = 0; j < 3; j++) {
             o->amb[j]   = e[0x00 + j];
             o->l0dir[j] = (signed char)e[0x03 + j];

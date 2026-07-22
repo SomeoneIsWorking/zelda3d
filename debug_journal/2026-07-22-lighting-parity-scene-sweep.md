@@ -101,3 +101,137 @@ Link's House — which exercises the INDOOR blend path — and Graveyard), Hyrul
 by eye at both day and night, and Zora's Domain does not. Next session: re-run this sweep with
 MATCHED cameras (read the oracle's `az_camera` and pin ours via REPL `cam`, as the En_Elf work
 did) and HUD excluded, then root-cause Zora's Domain.
+
+---
+
+# 2026-07-22 (later) — Zora's Domain root-caused: the OoT3D FOG COLOUR was never extracted
+
+Follow-up session, working the one row the sweep flagged as a real divergence. Method fixed
+first: **matched camera** on both sides (oracle `az_camera` -> our REPL `cam`), both clocks
+0x6000 on both engines.
+
+## Re-baseline at a matched camera (entrance 0x109, 0x6000)
+
+`az_camera` reads the live gameplay camera basis in Play, not just at the title: eye
+(-1286.4,285.1,-159.0) fwd (0.985,-0.174,-0.006) -> our `cam -1286.4 285.1 -159.0 -1089.4
+250.3 -160.2`. Captures: `scratch/zora/oracle_zora.png`, `scratch/screenshots/z3d_zora.png`.
+Region means (oracle / ours-before):
+
+| region | oracle | before |
+|---|---|---|
+| near ground | (100.4,99.8,75.4) | (85.9,86.1,59.2) |
+| mid ground | (54.8,55.2,39.9) | (46.5,46.6,33.3) |
+| right rock wall | (33.3,34.5,27.8) | (27.7,29.0,22.7) |
+| **far cave wall** | **(76.9,109.5,143.3)** | **(23.2,83.1,84.9)** |
+| waterfall | (114.1,150.0,178.6) | (75.9,112.1,106.3) |
+
+The deficit is overwhelmingly on DISTANT surfaces, i.e. depth-dependent, i.e. fog.
+
+## Isolating the fog contribution without a rebuild
+
+`fog color 0 0 0` and `fog color 255 255 255` (existing REPL) give two frames that solve
+per-pixel for the fog factor and the unfogged image: out = mix(fogCol, rgb, f), so
+black->f*rgb and white->f*rgb+(1-f). Result: far cave wall f=0.337, unfogged (19.1,47.9,52.4);
+near ground f=1.000 (no fog at all). So our fog was converging distant geometry onto
+gZelda3dFogColor = the N64 scene's fogColor = **(25,100,100)**, a dark teal.
+
+## Ground truth: the oracle's live PICA fog colour
+
+`vsuni_log` (per-draw VS uniforms + per-draw fog regs) at 0x109/0x6000: every scene draw runs
+`fog=5/0(104,135,181)` — PICA fog mode 5, colour **(104,135,181)**, a light blue. (The
+end-of-frame `az_fog` dump says mode=0/(0,0,0) — that is the UI state at the END of the frame
+and is NOT usable as the scene's fog state. Use the per-draw log.)
+
+The same log confirms everything else already matched: amb0 = (0.42745,0.42745,0.48627) ==
+our `lightparams` ambient exactly; the terrain draws carry matDif=(0,0,0) as we do.
+
+## Root cause: a 3-byte field-map error in the ZSI env-record parse
+
+The cmd-0x0F record's byte block at +0x0A is **N64's EnvLightSettings byte-for-byte, dir
+BEFORE colour**:
+
+```
++0x0a u8[3] ambient
++0x0d s8[3] light1Dir   +0x10 u8[3] light1Color
++0x13 s8[3] light2Dir   +0x16 u8[3] light2Color
++0x19 u8[3] fogColor
+```
+
+`tools/gen_oot3d_scene_lighting.py` had colour BEFORE dir, shifting the block 3 bytes:
+"l0dir" was really light2Dir, "l1dir" was really the **fog colour**, and the fog colour was
+therefore never extracted — the renderer fell back to the N64 scene's own fogColor. Proof:
+the OLD table's spot07 row 1 `l1dir = (104,-121,-75)` reinterpreted unsigned is
+**(104,135,181)** — the oracle's live fog colour, sitting in the table under the wrong name.
+Independent confirmation of the correct order: the TITLE path
+(`zelda3d_render.cpp Zelda3D_TitleLightSlotsConvert`, derived from the decompiled
+Environment_Update consumer, title_env_lighting.md §6) already reads dir-before-colour.
+
+Because the ZSI always stores light2Dir = -light1Dir, the consumer's compensating negation
+("3DS stores light-TRAVEL dirs") made light1Dir come out right by accident; light2Dir was
+being set from the fog colour bytes. Both are fixed; the negation is gone (do-not-retry
+comment left in `Zelda3D_SceneLightSettingsOverride`).
+
+## The fix (working tree, NOT committed)
+
+- `tools/gen_oot3d_scene_lighting.py` — corrected offsets, added `fogCol`, docstring rewritten.
+- `Shipwright/soh/src/zelda3d/tables/zelda3d_scene_lighting.inc` — regenerated (struct gains
+  `unsigned char fogCol[3]`; 102/111 scenes).
+- `Shipwright/soh/src/zelda3d/core/zelda3d.c` — `Zelda3D_SceneLightSettingsOverride` blends
+  `fogCol` into `envCtx->lightSettings.fogColor` with the SAME schedule as the colours, and
+  copies the dirs through without negation. lightCtx->fogColor is derived from envCtx AFTER
+  this hook, so the whole engine (incl. the N64 skybox fog quad) now uses OoT3D's colour.
+- `Shipwright/soh/src/zelda3d/render/zelda3d_render.cpp` — comment only (title slots leave
+  fogCol zero on purpose; the title drives its own fog).
+
+## Verification (matched camera, both clocks 0x6000)
+
+Zora's Domain (`scratch/zora/zora_ab_fixed.png`):
+
+| region | oracle | before | after |
+|---|---|---|---|
+| far cave wall | (76.9,109.5,143.3) | (23.2,83.1,84.9) | **(76.7,107.7,140.5)** |
+| pillar | (51.6,59.8,62.2) | (30.2,43.1,36.6) | (44.0,51.2,52.9) |
+| waterfall | (114.1,150.0,178.6) | (75.9,112.1,106.3) | (98.8,123.1,131.2) |
+| full frame rows 60-420 luma | 84.5 | 60.5 | 69.8 |
+
+The far cave wall — the surface the whole divergence hung on — is now within 2/255 of the
+oracle on all three channels.
+
+Kokiri Forest 0xEE @0x6000, matched camera (`scratch/zora/kokiri_ab_fixed.png`) — the
+regression gate for a global table change, and it also closes the sweep's Finding-2 residual:
+oracle live fog colour there is (244,239,130), again byte-identical to the record's +0x19.
+
+| region | oracle | after |
+|---|---|---|
+| full frame 60-420 | (88.8,98.1,27.3) | (91.5,100.1,28.9) |
+| far band 60-120 | (144.0,140.6,72.5) | (140.6,137.3,70.7) |
+
+The far band was −15..−18 R/G before this session; it is now within 2.5%. **The "distant
+cliffs are too cool/dark" Kokiri residual was this same missing fog colour**, not the missing
+sun-glare sprite (the glare is worth ~2/255 and is still unported).
+
+## Residuals at Zora's Domain — NOT root-caused, do not bodge
+
+1. **Unfogged near surfaces are still 14-33% dark** (near ground 85.9 vs 100.4; ground mid
+   64.8 vs 98.5; right wall 23.7 vs 31.3). NOT a global gain error: at Kokiri the same
+   near-field band is 15% BRIGHT (83.9,101.7,14.4 vs 72.9,90.5,14.7), so this is
+   scene/material-specific. Concrete lead from `vsuni_log`: 31 of 75 oracle draws carry
+   matDif=(1,1,1), and 5 of those get real light diffuse (dif0=(5,79,130) blue,
+   dif1=(204,229,229) white, dir1=-dir0=( -0.121,-0.816,0.565)) with **amb1=(0,0,0)** — i.e.
+   ambient counted ONCE plus a genuine directional term, whereas our room draws all report
+   matDif=0 and take ambient x2. Our pushed light dirs (±0.702,±0.702,±0.117) also do not
+   match the oracle's (±0.121,±0.816,∓0.565) at this scene/time. Confirming this needs a
+   draw->material mapping on the oracle side (which oracle draw is which room material);
+   that is a multi-session RE arc: "port the per-draw light-slot enable/dir/colour setup and
+   per-material ambient/diffuse", not a tweak.
+2. **The water body is dark/desaturated**: pool near shore oracle (88.1,151.6,178.4) vs ours
+   (83.9,112.9,116.5). The prior finding stands — Zora's water IS baked into the room CMB and
+   IS being drawn (it is not missing); it is under-lit/under-saturated, plausibly the same
+   matDif/light-slot gap as (1). The CONSTANT_ALPHA blend lead from 2026-06-24 was NOT the
+   cause here: `sgdump 1003` shows the room's groups at src=0x0302 dst=0x0303 / dst=0x0001,
+   no 0x8003 material in the visible set, and the fog solve above accounts for the divergence
+   the user actually reported.
+
+Artifacts: `scratch/zora/` (oracle ppm/png, unfogged reconstruction, fog-factor map, A/Bs),
+`scratch/screenshots/z3d_zora{,_fix,_fogblack,_fogwhite}.png`, `scratch/screenshots/z3d_kokiri_fix.png`,
+`scratch/zora/zora_vsuni.log`, `scratch/zora/kokiri_vsuni.log`.
