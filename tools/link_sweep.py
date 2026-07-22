@@ -71,7 +71,7 @@ class OracleSession:
     executable target left in this fork — citra_cli/citra_meta are themselves gated behind
     ENABLE_QT). Qt6 is NOT installed on this machine (no qmake6, no Qt6 pkg-config modules) —
     a genuine, concrete infra blocker, not a workaround-able one from this session. The
-    embedded harness (`Azahar/build-libretro`, target `soh3d_harness`, driven by
+    embedded harness (`Azahar/build-harness`, target `soh3d_harness`, driven by
     `tools/harness_ctl.py`) was ALREADY built (2026-07-15, for the title-cs work) and embeds
     the same Azahar/OoT3D core — so it is a legitimate, already-blessed (see CLAUDE.md
     "Direction: build a direct harness that EMBEDS Azahar as a library") oracle transport. This

@@ -67,7 +67,7 @@ existing `memcpy` and `#ifdef ENABLE_GDBSTUB` block, insert:
    in the `Read<T>` block and one in the `Write<T>` block; edit the
    Write one).
 5. Rebuild the harness: `tools/soh3d_harness.sh` (which triggers
-   `ninja -C Azahar/build-libretro soh3d_harness`).
+   `ninja -C Azahar/build-harness soh3d_harness`).
 
 ## Related files
 
@@ -97,7 +97,7 @@ If the hook returns 0 hits despite Az reaching the wall, check:
 2. That the Azahar patch was applied to `memory.cpp` (grep for
    `Soh3d_OnMemoryWrite` in the file).
 3. That the harness rebuild picked up the patched `memory.cpp`
-   (`ninja -C Azahar/build-libretro citra_core` should show
+   (`ninja -C Azahar/build-harness citra_core` should show
    `memory.cpp.o` recompiling).
 
 # Azahar patch 2 — SW rasterizer draw log (task #16)
@@ -201,7 +201,7 @@ vertex color feeding the combiner?" for any composite-draw RE.
    globals from Hunk 1.
 4. Inside `ProcessTriangle`, just after the `vtxpos` initialisation
    and before the `cull_mode` switch, paste Hunk 2.
-5. Rebuild: `ninja -C Azahar/build-libretro soh3d_harness`.
+5. Rebuild: `ninja -C Azahar/build-harness soh3d_harness`.
 
 ## Verification
 

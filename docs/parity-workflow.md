@@ -140,7 +140,7 @@ Don't re-derive a Link state matrix or a fresh oracle transport — start here.
   (`Azahar/build/bin/Release/azahar`) — this fork only builds that frontend with
   `ENABLE_QT=ON`, and Qt6 is **not installed** on this machine (confirmed 2026-07-15; no
   `qmake6`, no `Qt6` pkg-config modules). `link_sweep.py`'s `OracleSession` instead drives
-  the ALREADY-BUILT embedded harness (`Azahar/build-libretro`, target `soh3d_harness`, via
+  the ALREADY-BUILT embedded harness (`Azahar/build-harness`, target `soh3d_harness`, via
   `harness_ctl.py`) — the CLAUDE.md-blessed direction anyway. It reads Link's selected
   animation through a new REPL command, **`az_linkanim`** (added to
   `tools/soh3d_harness/main.cpp` this session), at the same `PLAYER+0x254+0x30` offset

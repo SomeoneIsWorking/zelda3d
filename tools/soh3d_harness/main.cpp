@@ -2025,8 +2025,8 @@ bool TitleActive() {
 // CurrentPlayState() deliberately falls back to the title's PlayState* so that
 // scene/actor/camera introspection works at the title. That fallback makes it
 // USELESS as a "are we in gameplay yet?" test — and every driver that used it
-// as one (harness_ctl.poll_playstate, link_sweep.OracleSession.boot) silently
-// accepted the title and went on to warp/snapshot there. gPlayState @
+// as one silently accepted the title and went on to warp/snapshot there,
+// producing title-screen frames as "oracle screenshots". gPlayState @
 // GPLAYSTATE_VA is populated ONLY in the Play gamestate, so it is the honest
 // discriminator; TitleActive() is checked too so a stale slot can't pass.
 std::optional<uint32_t> GameplayPlayState() {
