@@ -661,6 +661,24 @@ float Zelda3D_MM_ModelBoneLenSum(int modelId) {
     return sum;
 }
 
+// Debug counterpart to the [MM3D-BONE-N64] dump: print the first `n` CMB bone translations so the
+// N64 skeleton and the 3DS rig can be compared ELEMENT-WISE, not just by their sums.
+void Zelda3D_MM_DumpModelBones(int modelId, int n) {
+    Loaded* lm = loadModel(modelId);
+    if (lm == nullptr || !lm->ok || !lm->cmb) return;
+    int i = 0;
+    for (const auto& bn : lm->cmb->bones()) {
+        if (i >= n) break;
+        if (bn.parent >= 0) {
+            const float len = std::sqrt(bn.trans[0] * bn.trans[0] + bn.trans[1] * bn.trans[1] +
+                                        bn.trans[2] * bn.trans[2]);
+            fprintf(stderr, "[MM3D-BONE-CMB] model=%d bone=%d trans=(%.1f,%.1f,%.1f) |v|=%.2f\n",
+                    modelId, i, bn.trans[0], bn.trans[1], bn.trans[2], len);
+        }
+        i++;
+    }
+}
+
 float Zelda3D_MM_ModelMinY(int modelId) {
     Loaded* lm = loadModel(modelId);
     if (lm == nullptr || !lm->ok) return 0.0f;

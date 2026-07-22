@@ -88,6 +88,8 @@ void Zelda3D_MM_AfterActorDraw(void);
 //                              intercept after the live N64 skeleton sum is known.
 float Zelda3D_MM_ModelBoneLenSum(int modelId);
 float Zelda3D_MM_ModelMinY(int modelId);
+// Debug: print the first n CMB bone translations (pairs with [MM3D-BONE-N64]).
+void Zelda3D_MM_DumpModelBones(int modelId, int n);
 void  Zelda3D_MM_OverridePending(float worldScale, float groundOffset);
 int   Zelda3D_MM_PendingModelId(void); // -1 if no pending replacement.
 
