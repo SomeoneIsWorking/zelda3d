@@ -639,12 +639,27 @@ void Zelda3D_SceneLightSettingsOverride(PlayState* play) {
         cfgB = LERP(pal[b0].l1col[i], pal[b1].l1col[i], wT);
         envCtx->lightSettings.light2Color[i] = (u8)LERP(cfgA, cfgB, wC);
         if (!b->timeBased) {
-            // Palette dirs are 3DS-native (light-TRAVEL); envCtx keeps the N64 convention
-            // (toward-light) for N64 consumers, so negate here. Zelda3D_UpdateLight negates
-            // back at the GL seam (see its direction-convention comment).
-            envCtx->lightSettings.light1Dir[i] = (s8)-LERP16(pal[a0].l0dir[i], pal[a1].l0dir[i], wT);
-            envCtx->lightSettings.light2Dir[i] = (s8)-LERP16(pal[a0].l1dir[i], pal[a1].l1dir[i], wT);
+            // The ZSI record's colour block is N64's EnvLightSettings byte-for-byte, so the dirs
+            // are ALREADY in the N64 (toward-light) convention — copy them straight through.
+            // FALSIFIED, do not reinstate: these used to be negated ("3DS stores light-TRAVEL
+            // dirs"). That compensated a 3-byte field-map error (l0dir was really light2Dir, and
+            // light2Dir == -light1Dir in every record, so the negation cancelled it); with the
+            // offsets corrected (gen_oot3d_scene_lighting.py docstring) a negation would flip
+            // both lights. Live check, Zora's Domain: record light1Dir = (72,72,72).
+            envCtx->lightSettings.light1Dir[i] = (s8)LERP16(pal[a0].l0dir[i], pal[a1].l0dir[i], wT);
+            envCtx->lightSettings.light2Dir[i] = (s8)LERP16(pal[a0].l1dir[i], pal[a1].l1dir[i], wT);
         }
+        // OoT3D's own per-scene FOG COLOUR (record +0x19), blended by the same schedule. The 3DS
+        // hazes every fog-enabled material toward this; SoH was hazing toward the N64 scene's
+        // fogColor, which is a different colour entirely in several scenes and is the whole of
+        // the Zora's Domain divergence (N64 (25,100,100) dark teal vs the oracle's live PICA
+        // fog_color (104,135,181) light blue — harness vsuni_log, entrance 0x109 @0x6000).
+        // Written into envCtx so the single existing feed in zelda3d_render.cpp (which converts
+        // lightSettings.fogColor -> gZelda3dFogColor -> the shader's uFog.xyz) picks it up; the
+        // N64 F3DEX ramp that also reads it is off (#113), so this only drives the 3DS LUT path.
+        cfgA = LERP(pal[a0].fogCol[i], pal[a1].fogCol[i], wT);
+        cfgB = LERP(pal[b0].fogCol[i], pal[b1].fogCol[i], wT);
+        envCtx->lightSettings.fogColor[i] = (u8)LERP(cfgA, cfgB, wC);
     }
 
     // OoT3D PICA distance fog, gameplay feed. Ground truth (Kokiri gameplay, harness az_fog +
