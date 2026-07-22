@@ -414,13 +414,29 @@ below, not duplicated).
 - gap: documented approximations, all rare and none at Zora/Kokiri: FRAGMENT_PRIMARY/SECONDARY sources (fragment lighting, 199+69 materials) map to the vertex-lit primary / black; PREVIOUS_BUFFER (14 materials) reads 0 (the initial combiner-buffer color is an uncaptured runtime register); TEXTURE3 (1 material) falls back to tex0; coordinator ProjectionMap (mapping 4, 366 materials) falls back to plain UV. The four classified dual-tex TITLE shapes + the trivial single-MODULATE majority stay on their verified legacy paths (CLOSED rows untouched); migrating them into `tevRun()` is a cleanup follow-up, not an RE gap.
 - notes: with the per-material combiner gap closed, Zora's remaining deficit is ONE scene-wide cause — `render.zora-ground-deficit` now covers water too (all surfaces sit in the same 0.77-0.87 band).
 
-### render.zora-ground-deficit — unexplained 0.79/0.86 ground+wall deficit at Zora's
-- status: todo
+### render.zora-ground-deficit — the 0.79/0.86 ground+wall deficit was a TEXTURE-PACK ASYMMETRY
+- status: re-verified
 - deps: render.multi-stage-tev
-- evidence: per-draw masks, matched camera; per-band far->near 0.92, 0.69, 0.83, 0.77, 0.93, 0.92, 1.01, 0.97
-- where: unknown
-- gap: NOT lighting and NOT fog — every logged input and the shader expression match, and the deficit is spatially structured and non-monotonic in depth, so no gain or distance curve explains it. Candidates in priority order: (1) a decal-layer draw we drop entirely, (2) ETC1 mip/LOD selection, (3) vertex-colour interpolation.
-- notes: **THE CURRENT RENDER FRONTIER** now that `render.multi-stage-tev` landed: with per-material combiners faithful, EVERY Zora surface (water included) sits in one 0.77-0.87 band vs the oracle at a matched camera — one scene-wide cause, not per-material. Re-measure with `tools/tev_mask_ratio.py` against `scratch/drawiso/zora_masks`.
+- evidence: `debug_journal/2026-07-22-zora-ground-deficit-was-texpack-asymmetry.md` — controlled A/B at one matched camera with ONLY the pack differing: near ground d11 0.811 -> **0.977**, rock walls d3 0.853 -> **0.921**; and over d3's EXCLUSIVE pixels (those no translucent draw overlays) **1.002/1.003/1.001**. Every opaque Zora scene surface is at parity vanilla-on-vanilla.
+- where: nothing to change in the renderer — `tools/tev_mask_ratio.py` + `tools/oracle_draw_isolate.py` (measurement), comment-only note at the `uExtra[3]` site in `Shipwright/libultraship/src/fast/zelda3d_sdl3gpu.cpp`
+- gap: none — **this frontier did not exist.** The oracle masks were captured by a harness predating `7a1dc7e0` (Azahar with no custom textures) while our side, launched from the repo root where `textures/` lives, rendered the 4K pack, whose Zora rock/ground art is ~20% darker than the ROM texels. A second, independent error compounded it: a draw's isolation mask is "pixels this draw changes", so a mask under a translucent layer inherits that layer's error — d3 read 0.88 over its whole mask and 1.00 over its exclusive pixels.
+- notes: **FALSIFIED, do not retry** as causes of this deficit — (1) "a decal-layer draw we drop entirely" (the 27 oracle scene draws already map 1:1 onto our 21 room + 6 waterfall groups, exclusive ratios 0.99-1.00), (2) "ETC1 mip/LOD selection", (3) "vertex-colour interpolation" (both would act on the ground draw, now 0.992). The "non-monotonic depth banding" 0.92/0.69/0.83/0.77/0.93/0.92/1.01/0.97 that motivated all three was the pack's per-texture darkening sampled at different distances — never a curve to explain. Tooling hardened so it cannot recur: `oracle_draw_isolate.py` records `texpack.txt` beside the masks and `tev_mask_ratio.py` HARD-FAILS on a pack asymmetry (also excludes our HUD by default — the oracle's lives on the 3DS bottom screen — and offers `--exclusive` pixel attribution).
+
+### render.zora-translucent-layers — blue-biased deficit on Zora's water/waterfall draws
+- status: todo
+- deps: render.zora-ground-deficit
+- evidence: vanilla-on-vanilla, matched camera, HUD excluded (`debug_journal/2026-07-22-zora-ground-deficit-was-texpack-asymmetry.md`): d54 water sheet (112,156,189)->(97,127,142) = 0.861/0.813/0.751; d9 (100,184,231)->(94,139,149) = 0.944/0.756/0.644; d49 = 0.936/0.748/0.638; d15 (tex0+1+2) = 0.810/0.659/0.569. Reproduced across two independent sessions (d9 0.757 and 0.772), so not animation-phase noise.
+- where: unknown — `Shipwright/libultraship/src/fast/zelda3d_sdl3gpu.cpp` (`tevRun`, blend state) / `Shipwright/cmb3d/asset/cmb.cpp`
+- gap: this is what is LEFT at Zora once the texpack confound and the mask-inheritance confound are removed. A flat gain does not fit — R is nearly right while B is 36% short — so it is a hue/compositing error, not brightness. Candidates: source-alpha / blend-factor for the translucent layers, the UV-scroll (CMAB) coordinate feeding tex1/tex2, or a per-stage operand on the water's MultiplyThenAdd chain. Measure with `tools/tev_mask_ratio.py <dir> <shot> --exclusive`.
+- notes: was previously lumped into `render.zora-ground-deficit`'s "one scene-wide cause"; with the opaque surfaces proven at parity it is its own, narrower problem confined to the translucent layers.
+
+### render.kokiri-near-terrain-overbright — near terrain +19% while far terrain is +1.8%
+- status: todo
+- deps: render.zora-ground-deficit
+- evidence: vanilla-on-vanilla, matched camera (entrance 0xEE, tod 0x6000, `cam -153.2 -22.0 1043.7 -90.2 -38.2 967.7`): d8 near terrain 1.169 full mask / **1.192** over 126682 exclusive px, while d9 far terrain — byte-identical draw configuration (same ambient, `tev0=srce300e30/mod000000/op1-1/sc2x1`, fog 5/0(244,239,130), 256x256 f12/ETC1, hasCol=1 vLit=1) — is 1.012. Nearly every other Kokiri draw is within +-3%.
+- where: unknown — candidates in `Shipwright/libultraship/src/fast/zelda3d_sdl3gpu.cpp` (mip generation at :641-690, sampler `max_lod=1000`)
+- gap: this divergence was HIDDEN by the same texpack asymmetry, which darkened our side and pulled Kokiri's overshoot back into the "0.93-1.10 gate band". It is genuinely distance-dependent (same shader path, opposite result near vs far), so unlike Zora's it IS the shape a mip/LOD error would take. LEAD, not a finding: we generate a synthetic mip chain for every CMB texture while the CMB format carries no baked mip levels at all (verified byte-for-byte, recorded at `getSampler`'s `noMip` comment), so PICA samples level 0 with no LOD wherever we sample a minified level; Azahar runs at `citra_resolution_factor=2` = 800x480, the same raster resolution as our capture, so this is not a resolution artifact.
+- notes: **CAVEAT that must be resolved before porting anything** — the sign of the sharpness looks wrong. In `scratch/drawiso/cmp_kokiri_d8.png` OUR near ground is *crisper* than the oracle's, the opposite of what "we mipmap, they don't" predicts. First experiment is one build: disable the CMB mip chain and re-measure d8/d9.
 
 ### lighting.fog-lut — fog LUT port
 - status: re-verified

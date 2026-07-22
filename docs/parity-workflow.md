@@ -146,6 +146,27 @@ get hi-res on one side and vanilla on the other**:
   frame; its synchronous path crashes, see `AZAHAR_PATCH.md` Patch 8), **step until the hit
   counters stop growing before capturing a frame**, or an early capture can show the oracle
   still vanilla while our side is already hi-res.
+- **The harness switch does NOT cover the standalone game.** `tools/zelda3d_game.sh` sets no
+  texpack env, so a game launched from the repo root (where `textures/` lives) is **hi-res** —
+  and comparing that against oracle artifacts captured vanilla is the trap below.
+
+### Worked example: an entire "renderer deficit" that was only this asymmetry
+
+`render.zora-ground-deficit` sat on the RE frontier as an unexplained scene-wide 0.79/0.86
+darkening of Zora's ground and walls, with three shading hypotheses queued behind it. It was
+none of them: the oracle masks had been captured by a harness predating the "both sides" switch
+(Azahar vanilla) while the comparison screenshots came from the standalone game (hi-res), and
+the pack's Zora rock/ground art is ~20% darker than the ROM texels. Vanilla on both sides the
+same draws measure 0.977 and 1.002. Two rules came out of it, both now enforced in code:
+
+- `tools/oracle_draw_isolate.py` writes `texpack.txt` beside the masks, and
+  `tools/tev_mask_ratio.py` **hard-fails on an asymmetry** (or on an unknown state) rather than
+  printing a ratio. It also excludes our HUD by default — OoT3D's HUD is on the 3DS **bottom**
+  screen, so the oracle's top-screen capture has none while ours is fully overlaid.
+- A draw's isolation mask is *"pixels this draw changes"*, so a mask lying under a translucent
+  layer **inherits that layer's error**. Zora's rock wall read 0.88 over its whole mask and
+  1.002 over the pixels no other draw touches. Attribute residuals with
+  `tev_mask_ratio.py … --exclusive` before believing a per-surface number.
 
 ## Link (on-foot) state-matrix sweep — `tools/link_sweep.py`
 

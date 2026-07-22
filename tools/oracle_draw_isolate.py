@@ -66,6 +66,18 @@ def main():
     open(os.path.join(outdir, 'camera.txt'), 'w').write(cam + '\n')
     print(cam)
 
+    # Record the HI-RES TEXTURE PACK state alongside the masks. This is not a
+    # nicety: on 2026-07-22 an entire "renderer deficit" (Zora's ground 0.79 /
+    # walls 0.86, the `render.zora-ground-deficit` frontier step) turned out to
+    # be nothing but these oracle frames having been captured VANILLA while our
+    # side rendered the 4K pack -- the pack's Zora rock/ground replacements are
+    # ~20% darker than the ROM texels. tools/tev_mask_ratio.py HARD-FAILS when
+    # this file disagrees with the pack state of the frame it is handed, so the
+    # asymmetry can never again be read as a shader bug.
+    tp = h.send('texpack')
+    open(os.path.join(outdir, 'texpack.txt'), 'w').write(tp + '\n')
+    print(tp)
+
     state = ap(os.path.join(outdir, 'probe.state'))
     print(h.send('savestate ' + state))
 
