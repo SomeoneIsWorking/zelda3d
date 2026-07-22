@@ -694,3 +694,33 @@ vanilla at a matched schedule: oracle 98.3 % of pixels differ (mean |Δ| 13.8), 
 (mean |Δ| 7.8) — the pack is demonstrably in effect on both. The az-vs-soh delta is *not* made
 worse by turning it on (mean |Δ| 37.98 both-hi-res vs 39.64 both-vanilla; cameras unmatched, so
 this is a sanity check, not a parity number).
+
+# Azahar Patch 9 (2026-07-22, per-fragment TEV over a WHOLE draw): PIXEL cap + depth
+
+Two one-line changes in the existing Patch-5 `PIXEL` block
+(`src/video_core/renderer_software/sw_rasterizer.cpp`), plus the harness-side
+`SOH3D_HARNESS_SW=1` switch in `tools/soh3d_harness/main.cpp` (committed) that
+forces `g_use_vulkan = false` — the `PIXEL`/`PIXELXY` probes exist only in the
+SOFTWARE rasterizer, so reading the oracle's real per-fragment
+texcol / PRIMARY_COLOR / combiner output requires that renderer.
+
+1. The 200-line cap now applies only to the hardcoded moon/fire addresses; the
+   generic `SOH3D_PIXEL_TEX` target gets `fc_cap = 4000000`, so a whole draw can
+   be dumped. 200 samples land on two scanlines and are not representative of a
+   surface — the Kokiri near-terrain RE needed the mean texcol/PRIMARY over the
+   draw.
+2. Each `PIXEL` line carries `depth=%.6f` (the same `depth` `PIXELXY` already
+   printed), so a reader can keep the NEAREST fragment per pixel instead of the
+   last-rasterized one.
+
+```
+PIXEL tex0=<pa> xy=(x,y) depth=<f> texcol=(r,g,b,a) primary=(r,g,b,a) combined=(r,g,b,a)
+```
+
+Verification signature: Kokiri `scratch/drawiso/kokiri/probe.state`, `SOH3D_PIXEL_TEX=180e3600`,
+`run 6` then `draw_log` + `run 2` yields ~113k `PIXEL` lines for the near-terrain draw, whose
+`combined` mean over d8's exclusive-pixel region lands within 0.4% of the captured frame's mean
+there. CAVEAT (unsolved): the framebuffer x/y in these lines could not be mapped per-pixel onto
+the captured image — the depth gradient fixes the orientation (`np.rot90(a, 1)`, far at the top)
+but every candidate transform correlates at only ~0.10, so treat the dump as a POPULATION of the
+draw's fragments, not as an image.

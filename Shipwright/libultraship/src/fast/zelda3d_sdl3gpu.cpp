@@ -474,6 +474,15 @@ const char* kFrag =
     // when the output register is WRITTEN — i.e. clamp(Σ·vColor) — not the light sum first.
     // clamp(Σ)·vColor was tried and measured ~30% dark on near grass (settled Kokiri noon,
     // rows 0.85-0.97: (62,71) vs oracle (90,99); this form gives (88,101)). Do not re-flip.
+    // RE-CONFIRMED 2026-07-22 from ORACLE GROUND TRUTH, not an A/B fit (which the texpack
+    // asymmetry could have flipped): Azahar's per-fragment probe (SOH3D_HARNESS_SW=1 +
+    // SOH3D_PIXEL_TEX, `PIXEL ... primary=`) reads the 3DS's real PRIMARY_COLOR. At Kokiri the
+    // scene's light sum is 2 x 0.7098 = 1.4196 (> 1), so clamp(sum) would pin o1 at vColor and
+    // make PRIMARY INDEPENDENT of the ambient. It is not: at the same fragment (329,52), moving
+    // dayTime 0x6000 -> 0x4000 moves amb0 (0.7098,0.7098,0.62745) -> (0.46667,0.46667,0.23922)
+    // and primary (77,77,69) -> (51,51,26) — ratios 0.662/0.662/0.377 vs the ambient's
+    // 0.658/0.658/0.381. PRIMARY scales linearly with the ambient, so the clamp is on the
+    // PRODUCT. Our own live lit term measures (1.4218,1.4218,1.2566) = 2 x the scene ambient.
     "        prim = vec4(clamp(lit * vColor.rgb, 0.0, 1.0), vColor.a);\n"
     "    } else if (ubo.uParams.y > 0.5) {\n"
     "        prim = vec4(vColor.rgb * shade, vColor.a);\n"    // flat-tint fallback (vtxLit=0 draws)
@@ -527,6 +536,11 @@ const char* kFrag =
     // node value (linear mode 0): eyeDist(t) = b/(a-t), then the fogNear/fogFar linear
     // window. (The 3DS's 11/13-bit LUT quantization is omitted: <=1/2048 in the factor,
     // sub-LSB of the 8-bit output.) Never applied to sky (uLightDir.w).
+    // FALSIFIED (2026-07-22): this fog was a suspect for Kokiri's near-terrain +18%. REPL `fog3d 0`
+    // (the gZelda3dFog3dForceOff latch) moves draw d8 only 1.184 -> 1.180, while it correctly drives
+    // the FAR draws hard (d9 1.033 -> 0.799, d7 0.979 -> 0.617). Our window is byte-identical to the
+    // oracle's anyway (a=1.000584 b=7.0041 near=800 far=2400, colour (244,239,130) — SG_DUMP vs the
+    // oracle's live LUT lutS=(1,1,1,0.979)). The near-terrain residual is upstream of fog.
     "    if (ubo.uFog.w > 1.5 && ubo.uLightDir.w < 0.5) {\n"
     "        float d3 = dot(vWorld, ubo.uFog3d1.xyz) - ubo.uFog3d1.w;\n"
     "        float depth3ds = ubo.uFog3d0.x - ubo.uFog3d0.y / max(d3, 1e-3);\n"
@@ -643,6 +657,12 @@ SDL_GPUTexture* Fast::Zelda3DRenderer::uploadTexture(int w, int h, const unsigne
     // max_lod=1000 (see getSampler), but with only 1 level present that has nothing to select.
     // COLOR_TARGET usage is needed alongside SAMPLER because SDL_GenerateMipmapsForGPUTexture
     // downsamples via blit passes, which write each level as a render target.
+    // FALSIFIED LEAD (2026-07-22, render.kokiri-near-terrain-overbright): the synthetic chain was
+    // the standing suspect for Kokiri's near-terrain +18% (a distance-dependent error with a
+    // distance-dependent mechanism). It is NOT. Built with the chain disabled (mipLevels=1 AND
+    // sampler max_lod=0 — max_lod=1000 over a single-level texture renders BLACK on this backend),
+    // vanilla-on-vanilla at the matched camera, draw d8 moved 1.184 -> 1.181 over its 126682
+    // exclusive pixels. Do not re-run this experiment.
     int mipLevels = 1;
     for (int m = (w > h ? w : h); m > 1; m >>= 1)
         mipLevels++;
@@ -703,13 +723,23 @@ bool Fast::Zelda3DRenderer::ensureResources() {
     if (!g_device)
         return false;
 
-    // ZELDA3D_SG_FRAGDBG=<1..4>: replace the combiner with an isolated stage so a black/missing draw is
-    // diagnosed by VALUE — 1=texture only, 2=vertex colour only, 3=solid white, 4=shade(lighting) only.
-    // Applied to EVERY Zelda3D draw unconditionally (unlike a per-draw uniform gate), so the readback is
-    // trustworthy. Measure the result with the REPL `region` tool, not by eye.
+    // ZELDA3D_SG_FRAGDBG=<1..5>: replace the combiner with an isolated stage so a black/missing draw is
+    // diagnosed by VALUE — 1=texture only, 2=raw vertex colour, 3=solid white, 4=shade(flat tint),
+    // 5=PRIMARY_COLOR (the vertex-lit o1 the TEV consumes; the direct counterpart of the oracle's
+    // `PIXEL ... primary=` probe). Applied to EVERY Zelda3D draw unconditionally (unlike a per-draw
+    // uniform gate), so the readback is trustworthy. Measure with the REPL `region` tool, not by eye.
+    // The anchor is the line that OPENS the combiner section: it must sit after `prim` is computed and
+    // before the TEV/CONSTANT/stage-scale/fog stages, so the probe is not repainted by fog. (It used to
+    // anchor on `vec3 rgb = t.rgb * vColor.rgb * shade;`, a line the lighting-port rewrite deleted —
+    // FRAGDBG had been silently INERT ever since; found 2026-07-22.)
     std::string fragSrc = kFrag;
     if (const char* dbg = getenv("ZELDA3D_SG_FRAGDBG")) {
-        const std::string anchor = "vec3 rgb = t.rgb * vColor.rgb * shade;\n";
+        // ALL taps sit AFTER the combiner block, so the material's real ALPHA TEST (the tevG
+        // path discards on the FINAL combiner alpha) still runs: an earlier anchor made
+        // alpha-tested foliage paint solid over the ground and silently corrupted every
+        // mask-restricted readback taken from a probe frame (found 2026-07-22, after a
+        // "our texture is 15% dark" reading that the fog A/B falsified).
+        const std::string anchor = "    if (!tevG && ubo.uMatConst.a >= 0.5)";
         const int mode = atoi(dbg);
         // Return IMMEDIATELY so the override bypasses the later combiner/ambient/FOG stages — otherwise
         // the fog mix (fog colour ~= the scene tan) repaints the probe and hides what we're isolating.
@@ -717,11 +747,21 @@ bool Fast::Zelda3DRenderer::ensureResources() {
                              : mode == 2 ? "frag = vec4(vColor.rgb, 1.0); return;\n"
                              : mode == 3 ? "frag = vec4(1.0); return;\n"
                              : mode == 4 ? "frag = vec4(shade, 1.0); return;\n"
+                             : mode == 5 ? "frag = vec4(prim.rgb, 1.0); return;\n"
                                          : "";
-        size_t p = fragSrc.find(anchor);
-        if (p != std::string::npos)
-            fragSrc.insert(p + anchor.size(), inject);
-        fprintf(stderr, "[Zelda3D_SG] FRAGDBG mode=%d active\n", mode);
+        // Mode 6 taps LATER: the combiner result before the CONSTANT/stage-scale/FOG stages —
+        // the direct counterpart of the oracle's `PIXEL ... combined=` field.
+        // Mode 7 taps after the CONSTANT + stage-scale stages, immediately BEFORE fog.
+        const std::string anchor7 = "    if (ubo.uFog.w > 1.5 && ubo.uLightDir.w < 0.5) {\n";
+        const std::string& anch = (mode == 7) ? anchor7 : anchor;
+        const char* inj = (mode == 6 || mode == 7) ? "    frag = vec4(rgb, 1.0); return;\n" : inject;
+        size_t p = fragSrc.find(anch);
+        if (p == std::string::npos) {
+            fprintf(stderr, "[Zelda3D_SG] FRAGDBG mode=%d: ANCHOR NOT FOUND — probe inert\n", mode);
+        } else {
+            fragSrc.insert(p, inj);
+            fprintf(stderr, "[Zelda3D_SG] FRAGDBG mode=%d active\n", mode);
+        }
     }
 
     std::vector<uint32_t> vsSpv, fsSpv;
@@ -1535,6 +1575,10 @@ void Fast::Zelda3DRenderer::DrawModel(int modelId, const float* mp16, const floa
                 modelId, m->groups.size(), lit, invertY, r8, g8, b8, a8, aspectAdj, sky, gZelda3dWorldLit,
                 gZelda3dWorldAmb, gZelda3dWorldAmbColor[0], gZelda3dWorldAmbColor[1], gZelda3dWorldAmbColor[2],
                 gZelda3dFogEnable);
+        fprintf(stderr,
+                "[SG_DUMP] model=%d fog3dOn=%d a=%.6f b=%.4f fogNear=%.1f fogFar=%.1f fogColor=(%.3f,%.3f,%.3f)\n",
+                modelId, gZelda3dFog3dOn, gZelda3dFog3d[0], gZelda3dFog3d[1], gZelda3dFog3d[2], gZelda3dFog3d[3],
+                gZelda3dFogColor[0], gZelda3dFogColor[1], gZelda3dFogColor[2]);
         int gi = -1;
         for (const SgGroup& grp : m->groups) {
             gi++;
