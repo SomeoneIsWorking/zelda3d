@@ -87,25 +87,19 @@ class OracleSession:
         self.fail_reason = None
 
     def boot(self):
+        """Boot to gameplay at Kokiri Forest.
+
+        Delegates to harness_ctl.boot_to_gameplay: loadstate the cached gameplay
+        state (or capture it once), then warp. The old inline schedule tapped
+        hold=30/release=60 and gated on `playstate`, which reports ok AT THE
+        TITLE — so it happily "succeeded" on the title screen and warped into a
+        context with no loaded save, where the warp is a no-op.
+        """
         try:
             self.h = HC.spawn(save_state=SAVE_STATE)
-            self.h.send("run 300")
-            schedule = ([HC.BTN_START] * 3) + ([HC.BTN_A] * 40)
-            populated = False
-            for btn in schedule:
-                HC.tap(self.h, btn, hold=30, release=60)
-                if HC.poll_playstate(self.h):
-                    populated = True
-                    break
-            if not populated:
-                self.fail_reason = "gPlayState never populated from title_settled.state taps"
+            if not HC.boot_to_gameplay(self.h, entrance=KOKIRI):
+                self.fail_reason = "oracle never reached gameplay (see harness_ctl output)"
                 return False
-            r = self.h.send(f"warp 0x{KOKIRI:x}")
-            if not r.startswith("ok"):
-                self.fail_reason = f"warp 0x{KOKIRI:x} failed: {r}"
-                return False
-            for _ in range(4):
-                self.h.send("run 60")
             self.ok = True
             return True
         except Exception as e:
