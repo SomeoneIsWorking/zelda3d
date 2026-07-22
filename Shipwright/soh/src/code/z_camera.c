@@ -38,6 +38,63 @@ s32 Camera_UpdateWater(Camera* camera);
 
 #include "z_camera_data.inc"
 
+// SoH3D camera-data port: OoT3D's sCameraSettings values (code.bin table @ [0x0023a348]),
+// byte-compatible with the N64 format — Grezzo retuned values in place (measured live:
+// Kokiri setting NORMAL0 fov 52 vs N64 60, Kakariko NORMAL1 fov 55 vs 60; harness
+// watchpoint on the oracle's Camera fov param traced the copy to this table). Applied
+// ONCE over the N64 table, gated per mode on an exact structure match (funcIdx,
+// valueCnt, and the full dataType sequence) so any layout drift skips instead of
+// corrupting. Mode arrays are compact (highest valid mode + 1) — iteration is gated on
+// validModes bits. See tools/gen_oot3d_camera_values.py for the derivation.
+#include "zelda3d/tables/zelda3d_camera_values.inc"
+
+static void Zelda3D_ApplyOoT3DCameraValues(void) {
+    static s32 sZ3dCamValuesApplied = 0;
+    s32 s, m, i;
+    s32 changed = 0, skipped = 0;
+
+    if (sZ3dCamValuesApplied) {
+        return;
+    }
+    sZ3dCamValuesApplied = 1;
+    for (s = 0; s < (s32)ARRAY_COUNT(sCameraSettings) && s < (s32)ARRAY_COUNT(kZelda3dCameraSettings); s++) {
+        const Zelda3dCamSetting* zs = &kZelda3dCameraSettings[s];
+        CameraSetting* ns = &sCameraSettings[s];
+        if (zs->modes == NULL || ns->cameraModes == NULL) {
+            continue;
+        }
+        for (m = 0; m < CAM_MODE_MAX; m++) {
+            const Zelda3dCamMode* zm;
+            CameraMode* nm;
+            if (!((ns->validModes >> m) & 1)) {
+                continue; // compact arrays: indexing an invalid mode reads past the end
+            }
+            zm = &zs->modes[m];
+            nm = &ns->cameraModes[m];
+            if (zm->valueCnt == 0 || nm->funcIdx != zm->funcIdx || nm->valueCnt != zm->valueCnt) {
+                skipped++;
+                continue;
+            }
+            for (i = 0; i < zm->valueCnt; i++) {
+                if (nm->values[i].dataType != zm->values[i].dataType) {
+                    break;
+                }
+            }
+            if (i != zm->valueCnt) {
+                skipped++;
+                continue;
+            }
+            for (i = 0; i < zm->valueCnt; i++) {
+                if (nm->values[i].val != zm->values[i].val) {
+                    nm->values[i].val = zm->values[i].val;
+                    changed++;
+                }
+            }
+        }
+    }
+    osSyncPrintf("Zelda3D camera-data port: %d values overwritten, %d modes structure-skipped\n", changed, skipped);
+}
+
 /*===============================================================*/
 
 /**
@@ -6975,6 +7032,7 @@ void Camera_Init(Camera* camera, View* view, CollisionContext* colCtx, PlayState
     s16 curUID;
     s16 j;
 
+    Zelda3D_ApplyOoT3DCameraValues(); // SoH3D: one-time OoT3D camera-data overwrite (see above)
     memset(camera, 0, sizeof(*camera));
     if (sInitRegs) {
         for (i = 0; i < sOREGInitCnt; i++) {
