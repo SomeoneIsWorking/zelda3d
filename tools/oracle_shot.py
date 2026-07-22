@@ -49,8 +49,7 @@ def _pos_of(h) -> str:
     return "" if (not r or not r.startswith("ok")) else r
 
 
-def capture(entrance: int, out_png: str, settle_frames: int, keep_ppm: bool,
-            attempts: int = 3) -> int:
+def capture(entrance: int, out_png: str, settle_frames: int, keep_ppm: bool) -> int:
     import harness_ctl as HC
     import link_sweep as LS  # for SAVE_STATE (the cold-boot title state)
 

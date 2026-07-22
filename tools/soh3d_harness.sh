@@ -1,7 +1,7 @@
 #!/usr/bin/env bash
 # soh3d_harness.sh — drive Azahar's libretro core headlessly for OoT3D.
 #
-# Configures Azahar/build-libretro/ with ENABLE_LIBRETRO=ON and CMake's
+# Configures Azahar/build-harness/ with ENABLE_LIBRETRO=ON and CMake's
 # CMAKE_PROJECT_citra_INCLUDE hook pointing at tools/soh3d_harness/wire_in.cmake,
 # which registers the soh3d_harness target inside Azahar's build without
 # needing to touch the vendored Azahar/src/CMakeLists.txt. Builds and runs.
@@ -36,7 +36,7 @@ set -euo pipefail
 
 repo_root="$(cd "$(dirname "$0")/.." && pwd)"
 azahar_root="${repo_root}/Azahar"
-build_dir="${azahar_root}/build-libretro"
+build_dir="${azahar_root}/build-harness"
 harness_bin="${build_dir}/bin/Release/soh3d_harness"
 wire_in="${repo_root}/tools/soh3d_harness/wire_in.cmake"
 
@@ -47,9 +47,23 @@ if [[ ! -f "${build_dir}/build.ninja" ]]; then
     cmake -S "${azahar_root}" -B "${build_dir}" -GNinja \
         -DCMAKE_BUILD_TYPE=Release \
         -DENABLE_LIBRETRO=ON \
-        -DCMAKE_PROJECT_citra_INCLUDE="${wire_in}"
+        -DCMAKE_PROJECT_citra_INCLUDE="${wire_in}" \
+        -DENABLE_QT=OFF -DENABLE_SDL2=OFF -DENABLE_CUBEB=OFF -DENABLE_OPENAL=OFF \
+        -DENABLE_TESTS=OFF -DENABLE_VULKAN=ON -DENABLE_OPENGL=ON \
+        -DENABLE_SOFTWARE_RENDERER=ON -DENABLE_LTO=OFF -DUSE_SYSTEM_GLSLANG=ON \
+        -DENABLE_BUILTIN_KEYBLOB=ON
 fi
 ninja -C "${build_dir}" soh3d_harness
+
+# The embedded SoH side (`soh_boot`) resolves its archives next to the binary.
+# Link them REPO-RELATIVELY — these used to be hand-made absolute symlinks and
+# every one of them dangled the moment the repo was renamed soh3d -> zelda3d.
+soh_build="${repo_root}/Shipwright/build-cmake/soh"
+for _a in oot.o2r soh.o2r assets; do
+    if [[ -e "${soh_build}/${_a}" ]]; then
+        ln -sfn "${soh_build}/${_a}" "${build_dir}/bin/Release/${_a}"
+    fi
+done
 
 # Headless: run on a private Xvfb display so neither the harness's SBS window
 # NOR the embedded SoH3D's Vulkan window shows up on the user's Wayland
