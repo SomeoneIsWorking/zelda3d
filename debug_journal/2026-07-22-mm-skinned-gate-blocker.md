@@ -70,7 +70,35 @@ scale-derivation failure, not an attachment failure.
 So the earlier "attached to Link" reading was wrong — the object only LOOKED head-height because it
 sits on the camera axis at distance. Corrected here rather than left standing.
 
-Fix direction: `sdn`'s worldScale comes from the auto-scale path (`Zelda3D_MM_ModelBoneLenSum` /
+**ROUND 3 — the STOPGAP for this exact rig is now STALE (my CMB fixes resolved it).**
+`Zelda3D_MM_OverridePending` carries a STOPGAP naming `sdn` explicitly: "two MM3D archives (sdn, cs)
+yield a minY of ~1e34+ CMB units — the BindPose vert data blends through weird bone matrices during
+buildDrawGroups and accumulates junk on those specific rigs."
+
+That 1e34 garbage-vertex signature is the SAME class of defect fixed earlier this session in
+`cmb.cpp` (the index-region offset producing ~1e38 positions, plus the version-gated mesh stride).
+Measured now with `ZELDA3D_MM_SCALE_LOG=1`:
+
+    [MM3D-SCALE] modelId=10 worldScale=0.01000 groundOff=1.689     <- sdn
+    [MM3D-SCALE] modelId=11 worldScale=0.00750 groundOff=-0.001    <- dog
+
+`groundOff=1.689` is a NORMAL value, not 1e34. So the STOPGAP's premise no longer holds for sdn and
+the clamp is now dead code guarding a bug that has been fixed. It should be removed once cs is
+checked the same way — but only after confirming, not on this one data point.
+
+**And this undercuts my own "scale bug" conclusion from round 2.** 0.010 is not an arbitrary number:
+it is the bone-length-sum RATIO the auto-scale is designed to produce, and the dog's 0.0075 (which
+renders correctly) is equally far from the 0.1 default. So a scale of 0.010 is not evidence of a
+fault by itself. I do not currently know what actor 0x1C7 / object `sdn` IS, and without that I
+cannot say the render is wrong — a large festival parasol may be exactly right for that spot.
+
+Honest status: the cone is UNEXPLAINED. Ruled out so far: stale pending state (round 1), misplacement
+(round 2 — it is on the camera axis at ~1430 units, drawn at its correct world position), and now
+corrupt bind-pose verts (round 3 — groundOff is sane). Next step is identification, not fixing:
+determine what actor id 0x1C7 / object 0x1B6 `sdn` is in MM, and compare the 3DS model against its
+N64 counterpart at the same spot.
+
+Superseded fix direction: `sdn`'s worldScale comes from the auto-scale path (`Zelda3D_MM_ModelBoneLenSum` /
 `Zelda3D_MM_OverridePending`, the HEIGHT-based derivation). Check why it lands on 0.010 for this
 model — a bone-length sum near zero, or a rig whose bind pose defeats the height heuristic, would
 produce exactly this. `mscale 0x1B6 <s>` can confirm the right value live before changing the
