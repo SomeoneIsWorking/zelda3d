@@ -146,22 +146,29 @@ because in six months it would otherwise read as faithful porting.
     a bare `linkstate` falls through to the unknown-command handler and looks missing. `linkstate
     swim` works fine.
 
-  What actually blocks a buoyancy trace, all three verified today:
-  1. **Force-state does not put Link in water.** `linkstate swim` sets the swim animation + state
-     flags while he stands on land, so `func_8084B000` never runs — posY held at -79.0 across 24
-     samples in Kokiri. This is the documented "force hooks bypass the real entry gate" debt.
-  2. **`asample` cannot sample the player.** It streams `gZelda3dSelActor`, and `asel 0` replies
-     "no match (found 0 candidates)" — the player is not in the actor-scan candidate set. So the
-     motion-parity sampler, which is exactly the right tool, cannot target Link.
-  3. **`tp` does not move Link.** In Lake Hylia he stayed at (-1802,-1023,849) across six different
-     targets spanning the lake. Same symptom seen on the MM side this session. `warp` DOES work
-     (scene changed to 0x57 correctly), so the transport half is fine and the placement half is not.
+  I claimed three blockers here. **TWO WERE MY OWN TESTING ERRORS** — corrected, because filing
+  false tooling bugs is worse than filing none:
+  - ~~`asample` cannot sample the player~~ — **FALSE.** `asel link` (or `asel player`) selects Link
+    explicitly; its own docstring says the player is "normally excluded" from the id scan. My
+    `asel 0` failed because id 0 is not in the scan set, not because the capability is missing.
+    `asel link` -> `pos=(-1802,-1023,860)`, and `asample` can then stream him.
+  - ~~`tp` does not move Link~~ — **FALSE.** Tested with small offsets from a known-good position:
+    +Z 60 moved him (z 860 -> 920), while +X 60 hit a wall and +Y 40 just fell back under gravity.
+    My six Lake Hylia targets were simply all invalid/blocked positions. `tp` then walked him
+    hundreds of units across the map fine.
 
-  Net: the harness currently cannot drive Link into water or sample his per-frame motion, so NO
-  physics change to the player is verifiable with today's tooling. Per the project rule that a fix
-  starts by proving the tooling can investigate it, the next step is TOOLING, not more porting:
-  make `asel` able to select the player (or add a player-specific `psample`), and fix `tp` so it
-  actually relocates Link. Both are small and unblock every future physics/motion port.
+  **The one REAL blocker stands:** `linkstate swim` sets the swim animation + state flags while Link
+  stands on land, so `func_8084B000` never runs — posY held at -79.0 across 24 samples. That is the
+  documented force-hook gate-bypass debt: it fakes the state instead of entering it.
+
+  Still-open practical problem (not a tooling defect): I could not find water in Lake Hylia. Link
+  descends smoothly to y=-1234 walking the basin with `st1` never showing PLAYER_STATE1_IN_WATER
+  (0x8000000), which is consistent with this debug save having the lake DRAINED. Next attempt should
+  either use a save/scene where water is guaranteed (Zora's Domain, or Lake Hylia with the water
+  restored) or query the water box directly rather than hunting coordinates.
+
+  So the buoyancy port remains unverified, but the tooling is in better shape than I claimed:
+  `asel link` + `asample` + `tp` all work, and only the force-state-to-real-water step is missing.
 
   METHOD NOTE: the one-shot full sweep is unreliable — it was killed by a 30-minute timeout after
   only 4 states, and `link_sweep.py list` then still showed the STALE baseline, which is an easy way
