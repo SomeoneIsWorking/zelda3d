@@ -19,7 +19,6 @@ Card format: `- [#N] <title> — <notes / evidence link>`  (N = simple increment
 
 ## in-progress
 
-- [#202] Remove the custom UI/HUD, restore the native HUD — user request 2026-07-23: "I'd rather have the old HUD back and modify it to taste rather than this". Deleting the custom PC/Vulkan HUD (`zelda3d_hud*.cpp`, the VK HUD layer, and the z_parameter/z_lifemeter suppression hooks that skip the native HUD). Keeping the keyboard/gamepad glyph work, which targets the native HUD.
 _(empty)_
 
 ## in-review
@@ -27,6 +26,8 @@ _(empty)_
 _(empty)_
 
 ## needs-confirmation
+
+- [#202] Remove the custom UI/HUD, restore the native HUD — DONE `c6daa4d4`, awaiting user confirmation. Custom PC/Vulkan HUD + the 6-slot hotbar deleted (the hotbar was suppressing the native C-button/D-pad cluster and clobbering `buttonItems[0]` every frame). Native HUD verified live: `scratch/screenshots/hud_verify2.png`. Keyboard/gamepad glyphs kept and still rendering.
 
 _(empty)_
 
