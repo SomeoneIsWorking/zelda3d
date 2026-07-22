@@ -27,7 +27,8 @@
 //         A=8,X=9,L=10,R=11,L2=12,R2=13,L3=14,R3=15)
 //
 // HIGH-LEVEL OoT3D ops (RE knowledge lives here, not in scripts):
-//   playstate            -> ok 0x<ptr>           (or err "not populated")
+//   playstate            -> ok 0x<ptr> mode=play|title (or err "not populated")
+//   gameplay             -> ok yes|no  (real gameplay scene, not the title demo)
 //   scene                -> ok 0x<sceneNum>      (or err)
 //   warp <entrance>      -> ok warp 0x<entrance> (writes nextEntranceIndex
 //                                                 + transitionTrigger=20)
@@ -2019,10 +2020,33 @@ bool TitleActive() {
     return scn && act && (*scn & 0xFFFF) == 0x51 && *act == 1;
 }
 
+// The PlayState of a REAL gameplay scene, never the title demo's.
+//
+// CurrentPlayState() deliberately falls back to the title's PlayState* so that
+// scene/actor/camera introspection works at the title. That fallback makes it
+// USELESS as a "are we in gameplay yet?" test — and every driver that used it
+// as one (harness_ctl.poll_playstate, link_sweep.OracleSession.boot) silently
+// accepted the title and went on to warp/snapshot there. gPlayState @
+// GPLAYSTATE_VA is populated ONLY in the Play gamestate, so it is the honest
+// discriminator; TitleActive() is checked too so a stale slot can't pass.
+std::optional<uint32_t> GameplayPlayState() {
+    auto& mem = Core::System::GetInstance().Memory();
+    auto v = mem.Read32OrNullopt(GPLAYSTATE_VA);
+    if (!v || *v == 0 || TitleActive()) return std::nullopt;
+    return *v;
+}
+
 void HandlePlayState(std::istringstream&) {
     auto ps = CurrentPlayState();
     if (!ps) { PrintErr("playstate: not populated (still in menu/title?)"); return; }
-    std::printf("ok 0x%08x\n", *ps);
+    std::printf("ok 0x%08x mode=%s\n", *ps, GameplayPlayState() ? "play" : "title");
+}
+
+// `gameplay` -> ok yes|no. The one call a driver should gate on before warping
+// or snapshotting. Cheap, unambiguous, and never reports the title as play.
+void HandleGameplay(std::istringstream&) {
+    auto ps = GameplayPlayState();
+    std::printf("ok %s\n", ps ? "yes" : "no");
 }
 
 // Dump title-demo pose entries. Reads the SkelAnime pose stream for one of
@@ -2080,8 +2104,17 @@ void HandleWarp(std::istringstream& toks) {
     if (!(toks >> ent_s)) { PrintErr("warp: usage: warp <entrance>"); return; }
     auto ent = ParseNum(ent_s);
     if (!ent) { PrintErr("warp: bad entrance"); return; }
-    auto ps = CurrentPlayState();
-    if (!ps) { PrintErr("warp: no playstate — run frames or loadstate first"); return; }
+    // MUST be the gameplay PlayState. Writing nextEntranceIndex/transitionTrigger
+    // into the TITLE PlayState reports success and does nothing: the title context
+    // has no loaded save to spawn into, so the transition driver never loads the
+    // scene. That false `ok` is exactly how title-screen frames got captured as
+    // "oracle screenshots". Fail loudly instead.
+    auto ps = GameplayPlayState();
+    if (!ps) {
+        PrintErr("warp: not in gameplay (title/menu) — warp only works from a loaded "
+                 "save. loadstate a gameplay state first, then warp.");
+        return;
+    }
     auto& mem = Core::System::GetInstance().Memory();
     mem.Write16(*ps + NEXT_ENTRANCE_OFF, static_cast<uint16_t>(*ent));
     mem.Write8(*ps + TRANSITION_TRIGGER_OFF, TRANS_TRIGGER_START);
@@ -3750,8 +3783,8 @@ void CompareTitleActorsImpl() {
 // ============================================================================
 
 void ForceWarpImpl(uint16_t entrance) {
-    // 3ds side
-    auto ps = CurrentPlayState();
+    // 3ds side — gameplay PlayState only; see HandleWarp for why the title one lies.
+    auto ps = GameplayPlayState();
     bool ok3ds = false;
     if (ps) {
         auto& mem = Core::System::GetInstance().Memory();
@@ -3898,7 +3931,9 @@ void PrintHelp() {
         "                       LEFT=6 RIGHT=7 A=8 X=9 L=10 R=11\n"
         "  loadstate <path>     load Azahar save state from file\n"
         "  savestate <path>     write Azahar save state to file\n"
-        "  playstate            print gPlayState pointer\n"
+        "  playstate            print PlayState pointer + mode=play|title\n"
+        "  gameplay             ok yes|no — TRUE only in a real gameplay scene;\n"
+        "                       gate warp/snapshot on this, not on playstate\n"
         "  scene                print current sceneNum\n"
         "  warp <entrance>      write nextEntranceIndex + trigger=20\n"
         "  actors               dump current-scene actor table\n"
@@ -4109,6 +4144,7 @@ void RunRepl() {
             std::printf("ok az_daytime daytime=0x%04x\n", dayTime);
         }
         else if (cmd == "playstate") HandlePlayState(toks);
+        else if (cmd == "gameplay") HandleGameplay(toks);
         else if (cmd == "titleactors") HandleTitleActors(toks);
         else if (cmd == "scene")     HandleScene(toks);
         else if (cmd == "warp")      HandleWarp(toks);

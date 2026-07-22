@@ -12,12 +12,15 @@ gameplay. Snapshotting there yields OoT3D's title screen, which is a plain sky g
 to mistake for "the harness cannot render" — it renders fine. Every capture here is therefore gated
 on a POSITIVE gameplay check, and the tool fails loudly rather than writing a title-screen frame.
 
-STATUS (2026-07-22): the verification half WORKS — it correctly refuses to emit a title frame. The
-drive-to-gameplay half does NOT yet: booting standalone, neither `az_playerpos` nor `az_linkanim`
-resolves, even though `link_sweep`'s own flow reaches gameplay reliably (it drove all 25 states this
-session). So the remaining work is to reuse link_sweep's EXACT working sequence rather than
-re-implementing boot+warp here — read how `OracleSession` + `parity_state_sweep.soh_reach` get a live
-Link, and call that, instead of hand-rolling taps. Do not conclude the harness cannot render.
+SOLVED (2026-07-22): two causes, both now fixed at the source rather than here.
+  1. `playstate` reports ok AT THE TITLE (it falls back to TITLE_PLAYSTATE_PTR_VA 0x00539F98), so
+     every driver that used it as a readiness check accepted the title. The harness now exposes
+     `gameplay` -> ok yes|no (gPlayState populated AND not TitleActive) — gate on that.
+  2. OoT3D's warp (nextEntranceIndex + transitionTrigger, identical to SoH's) cannot work from the
+     title: no save is loaded, so nothing spawns. `warp` used to write into the title PlayState and
+     print ok; it now errors. Reaching a loaded save is a ONE-TIME cost — harness_ctl.boot_to_gameplay
+     captures scratch/gameplay_settled.state on first run and every later session is loadstate+warp
+     with no input driving at all.
 
 Usage:
   tools/oracle_shot.py --entrance 0xEE --out scratch/screenshots/oracle_kokiri.png
@@ -49,35 +52,19 @@ def _pos_of(h) -> str:
 def capture(entrance: int, out_png: str, settle_frames: int, keep_ppm: bool,
             attempts: int = 3) -> int:
     import harness_ctl as HC
-    import link_sweep as LS
+    import link_sweep as LS  # for SAVE_STATE (the cold-boot title state)
 
-    o = LS.OracleSession()
-    o.boot()
-    if not o.ok:
-        print(f"oracle_shot: boot failed: {o.fail_reason}", file=sys.stderr)
-        return 2
-    h = o.h
-
-    # boot() only guarantees the core is up. Drive to real gameplay and PROVE it: the Player actor
-    # must resolve. Without this check a title-screen frame (a sky gradient) captures happily.
-    live = ""
-    for attempt in range(attempts):
-        h.send(f"warp 0x{entrance:x}")
-        for _ in range(max(1, settle_frames // 60)):
-            h.send("run 60")
-        live = _pos_of(h)
-        if live:
-            break
-        # Not in gameplay — the title/file-select is probably still up. Tap through and retry.
-        for btn in ([HC.BTN_START] * 3) + ([HC.BTN_A] * 20):
-            HC.tap(h, btn, hold=30, release=60)
-            if HC.poll_playstate(h):
-                break
-    if not live:
-        print("oracle_shot: never reached gameplay (probe never resolved) — refusing to write a "
-              "title-screen frame. See STATUS in this file's docstring: reuse link_sweep's drive "
-              "sequence rather than the tap loop below.", file=sys.stderr)
+    h = HC.spawn(save_state=LS.SAVE_STATE)
+    # Drive to REAL gameplay and warp — one shared, deterministic path
+    # (harness_ctl.boot_to_gameplay: loadstate the cached gameplay state, else
+    # capture it once, then warp). `warp` now fails loudly off the title instead
+    # of reporting ok, so a title frame can no longer be captured as an oracle
+    # screenshot.
+    if not HC.boot_to_gameplay(h, entrance=entrance, settle_frames=settle_frames):
+        print("oracle_shot: never reached gameplay — refusing to write a "
+              "title-screen frame.", file=sys.stderr)
         return 3
+    live = _pos_of(h) or "gameplay"
 
     base = os.path.splitext(out_png)[0]
     reply = (h.send(f"snapshot {base}") or "").strip()

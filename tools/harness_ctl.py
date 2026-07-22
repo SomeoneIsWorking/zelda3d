@@ -35,7 +35,15 @@ from typing import Iterable, Optional
 
 REPO_ROOT   = Path(__file__).resolve().parent.parent
 HARNESS_SH  = REPO_ROOT / "tools" / "soh3d_harness.sh"
-HARNESS_BIN = REPO_ROOT / "Azahar" / "build-libretro" / "bin" / "Release" / "soh3d_harness"
+# The build dir moved to build-harness when the repo was renamed soh3d -> zelda3d
+# (build-libretro had the old absolute source path baked into its CMake cache and
+# could no longer regenerate). build-libretro stays in the search order so an
+# un-migrated checkout still resolves.
+_HARNESS_BINS = [
+    REPO_ROOT / "Azahar" / "build-harness"  / "bin" / "Release" / "soh3d_harness",
+    REPO_ROOT / "Azahar" / "build-libretro" / "bin" / "Release" / "soh3d_harness",
+]
+HARNESS_BIN = next((p for p in _HARNESS_BINS if p.exists()), _HARNESS_BINS[0])
 
 # ---------------------------------------------------------------------------
 # OracleCache — persistent cache of deterministic embedded-Azahar output.
@@ -491,9 +499,99 @@ def tap(h: Harness, mask: int, hold: int = 30, release: int = 60) -> None:
 
 
 def poll_playstate(h: Harness) -> Optional[str]:
-    """Return the `playstate` response ONLY if it's ok (else None)."""
+    """Return the `playstate` response ONLY if it's ok (else None).
+
+    NOT a gameplay test — `playstate` resolves the TITLE PlayState too, so this
+    answers ok on the title screen. Gate drive-to-gameplay loops on
+    `in_gameplay()` instead; this stays for callers that just want a pointer.
+    """
     r = h.send("playstate")
     return r if r.startswith("ok") else None
+
+
+def in_gameplay(h: Harness) -> bool:
+    """True only in a real gameplay scene (harness `gameplay` command).
+
+    The honest replacement for `poll_playstate` as a readiness check: it reads
+    gPlayState and rejects the title demo, so a driver can no longer conclude
+    "we're in game" while sitting on the title and then warp/snapshot there.
+    """
+    r = (h.send("gameplay") or "").strip()
+    return r.startswith("ok") and r.split()[-1] == "yes"
+
+
+# ---------------------------------------------------------------------------
+# Drive to gameplay — the SoH-equivalent warp entry point
+# ---------------------------------------------------------------------------
+#
+# WHY THIS EXISTS. OoT3D's `warp` (nextEntranceIndex @ play+0x5c32 +
+# transitionTrigger @ play+0x5c2d = TRANS_TRIGGER_START, RE'd in
+# oot3d-decomp/docs/ram_map.md) is the same mechanism SoH warps with, and the
+# harness has always implemented it correctly. It cannot work from the TITLE:
+# no save file is loaded there, so the transition driver has nothing to spawn
+# into. Everything that looked like "the harness can't warp" was really "we
+# were still on the title and `playstate` said ok anyway".
+#
+# So warping like SoH = being in a loaded save first. That is a one-time cost:
+# drive the title once, snapshot the emulator, and every later session starts
+# with `loadstate` + `warp` and never touches the input path again.
+GAMEPLAY_STATE = REPO_ROOT / "scratch" / "gameplay_settled.state"
+
+
+def boot_to_gameplay(h: Harness, entrance: Optional[int] = None,
+                     settle_frames: int = 180) -> bool:
+    """Put the oracle in a real gameplay scene, then optionally warp there.
+
+    Fast path: `loadstate` the cached gameplay state (no input driving at all).
+    Cold path (state absent): drive the title with SHORT rapid taps — hold=4,
+    release=8. The long taps harness_ctl/link_sweep used (hold=30/release=60) do
+    not advance OoT3D's title/file-select at all. Once in gameplay the state is
+    saved so the cold path runs at most once per machine.
+
+    Returns True only if `gameplay` reports yes at the end.
+    """
+    if GAMEPLAY_STATE.exists():
+        h.send(f"loadstate {GAMEPLAY_STATE}")
+        h.send("run 60")
+        if not in_gameplay(h):
+            print(f"[harness_ctl] {GAMEPLAY_STATE.name} did not land in gameplay — "
+                  "delete it to force a re-capture", file=sys.stderr)
+            return False
+    else:
+        if not _drive_title_to_gameplay(h):
+            return False
+        GAMEPLAY_STATE.parent.mkdir(parents=True, exist_ok=True)
+        h.send(f"savestate {GAMEPLAY_STATE}")
+        print(f"[harness_ctl] captured {GAMEPLAY_STATE} — future boots skip the "
+              "title entirely", file=sys.stderr)
+
+    if entrance is not None:
+        r = (h.send(f"warp 0x{entrance:x}") or "").strip()
+        if not r.startswith("ok"):
+            print(f"[harness_ctl] warp 0x{entrance:x} failed: {r}", file=sys.stderr)
+            return False
+        for _ in range(max(1, settle_frames // 60)):
+            h.send("run 60")
+        if not in_gameplay(h):
+            print(f"[harness_ctl] warp 0x{entrance:x} left gameplay", file=sys.stderr)
+            return False
+    return True
+
+
+def _drive_title_to_gameplay(h: Harness, rounds: int = 6) -> bool:
+    """Cold path: mash through logo/title/file-select with short rapid taps."""
+    h.send("run 300")
+    if in_gameplay(h):
+        return True
+    for btn in (BTN_START, BTN_A):
+        for _ in range(rounds):
+            for _ in range(12):
+                tap(h, btn, hold=4, release=8)
+            h.send("run 60")
+            if in_gameplay(h):
+                return True
+    print("[harness_ctl] never reached gameplay from the title", file=sys.stderr)
+    return False
 
 
 # ---------------------------------------------------------------------------
