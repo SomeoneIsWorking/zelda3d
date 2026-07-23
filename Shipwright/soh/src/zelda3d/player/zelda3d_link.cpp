@@ -5,6 +5,7 @@
 // (Zelda3D_UpdateAnimN64*, Zelda3D_PosedGroundOffset, ...); this file CALLS them.
 #include "../zelda3d.h"
 #include "zelda3d_link.h"
+#include "zelda3d_link_face.h"
 #include "../core/zelda3d_log.h"
 #include "overlays/actors/ovl_En_Horse/z_en_horse.h" // EnHorse animationIdx/curFrame (LINKTRACE mounted extras)
 #include "../behaviors/actor/player.h" // PlayerBehavior — Link as a structured ActorBehavior class
@@ -70,6 +71,8 @@ float gZelda3dLinkScale = 0.01f;
 float gZelda3dLinkRotX = 0.0f;   // rest->upright orientation correction (deg) (REPL `linkrot`)
 float gZelda3dLinkRotY = 0.0f;
 float gZelda3dLinkRotZ = 0.0f;
+// REPL `linkframe <f>`: pin the forced clip's playhead (verification only; -1 = live phase-lock).
+float gZelda3dLinkForceFrame = -1.0f;
 char gZelda3dLinkForceCsab[64] = ""; // REPL `linkanim <csab>` pins a CSAB on Link (verify idle/walk/run
                                    // deterministically without real movement input); empty = live-resolve
 // Per-draw Link trace (`log link 1` / REPL `linktrace 1`): heldActor/carryWalk/lower+upper anim/
@@ -90,6 +93,12 @@ int gZelda3dFocusFix = 1;            // #16(b) keep actor.focus.pos at 3DS Link'
 // speed, so we free-run the CSAB at speedXZ * this gain. Calibrated live vs N64 (REPL `linkloco`).
 float gZelda3dLinkLocoGain = 0.30f;
 extern int gZelda3dLogicFrame; // zelda3d_anim.cpp: logic-frame clock for the walk-stop synthetic morph
+// zelda3d_anim.cpp / zelda3d_model.cpp — resolved-clip readback + facial track query (REPL `linkface`,
+// `linkframe`; the facial channel itself is driven from zelda3d_link_face.cpp).
+extern "C" void Zelda3D_RecordLastAuto(int modelId, const char* csab, float frame);
+extern "C" int Zelda3D_LastAutoAnim(int modelId, const char** outCsab, float* outFrame);
+extern "C" int Zelda3D_FacebSample(int modelId, const char* animName, float frame, int* outEye, int* outMouth);
+extern "C" int Zelda3D_FacialMaterialIndex(int modelId, int slot);
 // Player animation SOURCE (REPL `linksrc`, env ZELDA3D_LINK_SRC). Two independent, both-working modes:
 //   0 = 3DS own-CSAB: play the OoT3D link rig's own CSAB matching the named player anim (kPlayerAnimMap).
 //       Faithful for discrete states (idle fidgets, jumps, item use) but BLIND to walk/run — OoT blends
@@ -139,14 +148,25 @@ extern "C" int Zelda3D_LinkAnimSrc(void) {
 // live oracle vs live game at Kokiri 0xEE; oot3d-decomp/docs/player_port.md "#88", journal
 // debug_journal/2026-07-23-88-idle-fidget-premise-falsified.md).
 //
-// There IS no yawn animation. The decomp note that started this ("default idle table @0x53a5f8
+// The DEFAULT IDLE is not a yawn. The decomp note that started this ("default idle table @0x53a5f8
 // {0x50=yawn,...}") mis-read a raw table index: animId 0x50 is `nml_wait_free`, the neutral standing
-// idle, and a scan of all 582 player anim names finds no yawn/akubi/stretch clip at all. OoT3D's
+// idle, and no clip is NAMED yawn/akubi/stretch. OoT3D's
 // Player_GetIdleAnim table {0x50,0x58,0x58,0x119} = {nml_wait_free, nml_wait, nml_wait, ft_wait_long}
 // is byte-identical to N64's D_80853914[PLAYER_ANIMGROUP_wait]. So the idle path here needs no change:
 // we run the vendored N64 Player_ChooseNextIdleAnim and map its anim resource through kPlayerAnimMap,
 // and OoT3D's inlined twin (004ba538) is faithful to that N64 code for every reachable plain idle —
 // including the -6.0f LinkAnimation_Change morph, which N64 already does.
+//
+// CORRECTION (2026-07-23, #201d): the older wording here — "a scan of all 582 player anim names finds
+// no yawn/akubi/stretch clip AT ALL" — was wrong and sent the next session hunting a nonexistent bug.
+// The yawn/stretch fidget DOES exist: it is `wait_typeD_20f` / `waitF_typeD_20f`, N64
+// sFidgetAnimations FIDGET_STRETCH_1..3 — Grezzo simply did not put "yawn" in the filename, and its
+// yawning FACE lives in the sibling `wait_typeD_20f.faceb` (eye 7 = squeezed shut over frames 19..38,
+// mouth 3 = wide open over 36..78; see zelda3d_link_face.cpp). It is unreachable in Kokiri Forest
+// because the STRETCH fidget is only picked when `curRoom.behaviorType2 >= 4`, and a scan of all 724
+// OoT3D room .zsi (cmd 0x08, cmd2 & 0xFF) gives Kokiri Forest 0 (= FIDGET_LOOK_AROUND). Only 45 rooms
+// in the game (e.g. Market Entrance day = 4, Link's House = 5, Market Alley = 6) can produce it —
+// which is also why an idle-fidget capture there only ever sees look-around / tunic / tap-feet.
 //
 // Measured at matched state -- neither side had a weapon IN HAND at idle (the gate tests
 // rightHandType == RH_SHIELD, set only with the sword drawn; at a plain idle it is RH_OPEN on both
@@ -634,6 +654,10 @@ extern "C" int Zelda3D_PlayerDrawImpl(PlayState* play, Actor* actor) {
             } else {
                 Zelda3D_UpdateAnimAuto(modelId, csab, 0.0f, player->unk_868, 29.0f, 0.0f);
             }
+        } else if (gZelda3dLinkForceFrame >= 0.0f && gZelda3dLinkForceCsab[0] != '\0') {
+            // REPL `linkframe`: hold the forced clip at one playhead (deterministic pose/face capture).
+            Zelda3D_UpdateAnim(modelId, csab, gZelda3dLinkForceFrame);
+            Zelda3D_RecordLastAuto(modelId, csab, gZelda3dLinkForceFrame);
         } else {
             // Idle / one-shot anims: curFrame is valid here, so keep the N64-progress phase-lock.
             Zelda3D_UpdateAnimAuto(modelId, csab, gZelda3dAnimRate, player->skelAnime.curFrame,
@@ -642,6 +666,13 @@ extern "C" int Zelda3D_PlayerDrawImpl(PlayState* play, Actor* actor) {
     }
     // Pose-scan QA: sample the per-frame discontinuity now that lastSkin is set (once per drawn frame).
     P().poseScan.record(modelId, csab, player->skelAnime.curFrame);
+    // #201d FACE: bind this frame's eye/mouth from the clip's `.faceb` track. Must run AFTER the anim
+    // update — it samples the playhead that update resolved (zelda3d_link_face.cpp). Only on the 3DS
+    // own-CSAB path: the N64-retarget debug mode (`linksrc n64`) resolves no CSAB, so there is no clip
+    // to sample and the face would latch whatever was last bound.
+    if (Zelda3D_LinkAnimSrc() != 1 || gZelda3dLinkForceCsab[0] != '\0') {
+        Zelda3D_LinkFaceUpdate(modelId);
+    }
     // Select Link's live equipment / hand-pose variant subset (the childlink_v2 mesh bakes them
     // all on distinct mesh_ids). Must be set BEFORE EmitPose so it pairs with this draw item.
     unsigned long long midMask = P().midmask.compute(player);
@@ -1050,6 +1081,32 @@ int Zelda3D::PlayerBehavior::repl(PlayState* play, const char* cmd, const char* 
             gZelda3dLinkForceCsab[0] = '\0';
             Zelda3D_ReplReply(outPath, "linkanim OFF (live anim resolution restored)");
         }
+    } else if (strcmp(cmd, "linkframe") == 0) {
+        // `linkframe <f>` pins the CSAB playhead of the `linkanim`-forced clip so a facial/pose frame
+        // can be observed deterministically instead of waiting for the live phase to sweep past it.
+        // `linkframe off` / no-arg releases (live phase-lock).
+        char arg[32] = "";
+        if (sscanf(line, "%*s %31s", arg) == 1 && strcmp(arg, "off") != 0) {
+            gZelda3dLinkForceFrame = (float)atof(arg);
+        } else {
+            gZelda3dLinkForceFrame = -1.0f;
+        }
+        Zelda3D_ReplReply(outPath, "linkframe=%.2f (needs `linkanim <csab>`; -1 = live)",
+                          gZelda3dLinkForceFrame);
+    } else if (strcmp(cmd, "linkface") == 0) {
+        // #201d verification: report the live facial state — which clip+playhead the draw resolved,
+        // the `.faceb` indices sampled there, and the eye/mouth material slots being driven.
+        int modelId = Zelda3D_LinkModelId();
+        const char* csab = NULL;
+        float frame = 0.0f;
+        int have = Zelda3D_LastAutoAnim(modelId, &csab, &frame);
+        int eye = -1, mouth = -1;
+        int track = have ? Zelda3D_FacebSample(modelId, csab, frame, &eye, &mouth) : 0;
+        Zelda3D_ReplReply(outPath,
+                          "linkface model=%d csab=%s frame=%.2f faceb=%d eye=%d mouth=%d "
+                          "eyeMat=%d mouthMat=%d",
+                          modelId, (have && csab) ? csab : "(none)", frame, track, eye, mouth,
+                          Zelda3D_FacialMaterialIndex(modelId, 0), Zelda3D_FacialMaterialIndex(modelId, 1));
     } else if (strcmp(cmd, "linktwo") == 0) {
         // `linktwo <lowerCsab> <upperCsab>` — force the #85 carry-WALK two-source per-limb blend with
         // explicit CSABs (lower drives legs, upper drives arms via kLinkUpperBodyMask), so the blend

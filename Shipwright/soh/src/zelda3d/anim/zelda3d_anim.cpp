@@ -713,6 +713,19 @@ void Zelda3D_RecordLastAuto(int modelId, const char* csab, float frame) {
     if (csab && *csab) sLastAuto[modelId] = { std::string(csab), frame };
 }
 
+// The CSAB name + RESOLVED playhead the AUTO path last drove `modelId` with. The resolved frame is
+// the one the pose was actually sampled at (phase-locked or free-run), which is the only frame a
+// per-clip side channel — Link's `.faceb` facial track — may be sampled at, since sampling the raw
+// N64 curFrame would desync the face from the pose whenever the CSAB and the N64 clip differ in
+// length. Returns 0 if this model has never been driven by the auto path.
+extern "C" int Zelda3D_LastAutoAnim(int modelId, const char** outCsab, float* outFrame) {
+    auto it = sLastAuto.find(modelId);
+    if (it == sLastAuto.end()) return 0;
+    if (outCsab) *outCsab = it->second.first.c_str();
+    if (outFrame) *outFrame = it->second.second;
+    return 1;
+}
+
 // CORE: fill per-bone ANIMATED LOCAL rotation (radians, rX/rY/rZ) at the given clip+frame, using
 // the SAME sampling the renderer uses (Csab::localTransforms). With animName NULL, uses the clip+
 // frame the live AUTO draw path last resolved for this model (sLastAuto) — so a caller gets the

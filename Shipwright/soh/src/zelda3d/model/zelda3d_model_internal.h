@@ -8,6 +8,7 @@
 #include "asset/zar.h"
 #include "asset/cmb.h"
 #include "asset/csab.h"
+#include "asset/faceb.h"
 #include "fast/zelda3d_gl.h"
 #include <vector>
 #include <unordered_map>
@@ -26,6 +27,9 @@ struct LoadedModel {
     std::unique_ptr<Zelda3D::Zar> zar;               // resident archive (for CSAB lookup)
     std::unique_ptr<Zelda3D::Cmb> cmb;               // resident model (skeleton + bind matrices)
     std::unordered_map<std::string, std::unique_ptr<Zelda3D::Csab>> anims; // cached by full name
+    // Per-clip facial tracks (`<clip>.faceb`), cached by CSAB BASE name. A null value is a cached
+    // "this clip has no facial track" so the zar isn't rescanned every frame.
+    std::unordered_map<std::string, std::unique_ptr<Zelda3D::Faceb>> facebs;
     std::string defaultAnim; // chosen default (idle) CSAB base name, "" = none; computed lazily
     int defaultAnimDone = 0; // 0 = not yet scanned
     bool ok = false;

@@ -11,6 +11,7 @@
 #include "asset/cmb.h"
 #include "asset/ctxb.h"
 #include "asset/csab.h"
+#include "asset/faceb.h"
 #include "asset/mat4.h"
 #include "asset/pica_texture.h"
 #include "asset/cityhash.h"
@@ -247,6 +248,14 @@ static const FacialAsset kFacialAssets[] = {
     { "zelda_bji.zar", { { "hyliaoldman_eye.cmab", 3 }, { nullptr, -1 }, { nullptr, -1 } } },
     { "zelda_aob.zar", { { "hyliawoman1_eye.cmab", 1 }, { nullptr, -1 }, { nullptr, -1 } } },
     { "zelda_bob.zar", { { "hyliawoman3_eye.cmab", 1 }, { nullptr, -1 }, { nullptr, -1 } } },
+    // PLAYER (#201d). Same channel as every NPC above — Link's face is NOT special-cased on 3DS:
+    // one eye material + one mouth material, each fed by a TexturePalette cmab. Material slots are
+    // the cmab's OWN mmad material_index (tools/cmab.py: childlink_eye -> mat 14, childlink_mouth ->
+    // 15, link_eye -> 16, link_mouth -> 17), i.e. read from the asset, not guessed. Frame counts are
+    // 8 eye / 4 mouth on both rigs — identical to N64 sEyeTextures[8] / sMouthTextures[4]. Slot 0 is
+    // the EYE and slot 1 the MOUTH by convention (Zelda3D_FacialMaterialIndex relies on that order).
+    { "zelda_link_child_new.zar", { { "childlink_eye.cmab", 14 }, { "childlink_mouth.cmab", 15 }, { nullptr, -1 } } },
+    { "zelda_link_boy_new.zar",   { { "link_eye.cmab", 16 },      { "link_mouth.cmab", 17 },      { nullptr, -1 } } },
 };
 
 static bool strEndsWith(const std::string& s, const char* suf) {
@@ -1242,6 +1251,70 @@ int Zelda3D_FacialFrameTex(int modelId, int materialIndex, int frame) {
     if (frame < 0) return (int)it->second.size();
     if (frame >= (int)it->second.size()) return -1;
     return it->second[frame];
+}
+
+// The CMB material the model's Nth facial cmab drives (kFacialAssets column order); -1 if absent.
+// Keeps the per-ZAR material constants in ONE place (the table above) instead of duplicating them in
+// each behavior module. NOTE the column meaning is per-ZAR, not universal: for the two Link rigs it is
+// (0 = eye, 1 = mouth), but e.g. zelda_kw1 uses (0 = Fado's eye, 1 = the girls' eye). Only a caller
+// that knows its own ZAR's layout may use this — currently the Link facial driver.
+int Zelda3D_FacialMaterialIndex(int modelId, int slot) {
+    const char* zar = Zelda3D_AutoModelZar(modelId);
+    if (!zar || slot < 0 || slot >= 3) return -1;
+    std::string zp(zar);
+    for (const auto& a : kFacialAssets) {
+        if (!strEndsWith(zp, a.zarSuffix)) continue;
+        return a.cmabs[slot].cmabSuffix ? a.cmabs[slot].materialIndex : -1;
+    }
+    return -1;
+}
+
+// --- Per-animation facial track (`.faceb`) --------------------------------------------------------
+// Grezzo stores Link's per-clip eye/mouth indices in a sibling `<clip>.faceb` next to `<clip>.csab`
+// (see asset/faceb.h for the format + why this is the 3DS twin of N64's fake-limb-22 encoding).
+// Resolution mirrors getCsab(): "Anim/<base>.faceb", else any zar file ending "/<base>.faceb"
+// (the Link rig stores its clips under boy/anim/ for BOTH ages) — with the same "cl_" alias.
+// Parsed lazily and cached per model. Returns 1 when a track was found (out indices may still be
+// -1 = "clip does not drive this channel", the 0xFF hold), 0 when the clip has no facial track.
+static Zelda3D::Faceb* getFaceb(LoadedModel* lm, const char* animName) {
+    if (!lm || !lm->zar || !animName || !*animName) return nullptr;
+    std::string nm(animName);
+    if (nm.size() > 5 && nm.compare(nm.size() - 5, 5, ".csab") == 0) nm = nm.substr(0, nm.size() - 5);
+    if (nm.rfind("Anim/", 0) == 0) nm = nm.substr(5);
+    size_t slash = nm.rfind('/');
+    if (slash != std::string::npos) nm = nm.substr(slash + 1);
+
+    auto it = lm->facebs.find(nm);
+    if (it == lm->facebs.end()) {
+        const Zelda3D::ZarFile* af = nullptr;
+        const std::string suffixes[3] = { "Anim/" + nm + ".faceb", "/" + nm + ".faceb", "/cl_" + nm + ".faceb" };
+        for (const auto& suf : suffixes) {
+            for (const auto& f : lm->zar->files())
+                if (strEndsWith(f.name, suf.c_str())) { af = &f; break; }
+            if (af) break;
+        }
+        std::unique_ptr<Zelda3D::Faceb> fb;
+        if (af) {
+            fb = std::make_unique<Zelda3D::Faceb>(lm->zar->read(*af));
+            if (!fb->ok()) {
+                fprintf(stderr, "[Zelda3D] Faceb %s: %s\n", nm.c_str(), fb->error().c_str());
+                fb.reset();
+            }
+        }
+        it = lm->facebs.emplace(nm, std::move(fb)).first;
+    }
+    return it->second.get();
+}
+
+int Zelda3D_FacebSample(int modelId, const char* animName, float frame, int* outEye, int* outMouth) {
+    if (outEye) *outEye = -1;
+    if (outMouth) *outMouth = -1;
+    LoadedModel* lm = loadModel(modelId);
+    if (!lm || !lm->ok) return 0;
+    Zelda3D::Faceb* fb = getFaceb(lm, animName);
+    if (!fb) return 0;
+    fb->sample(frame, outEye, outMouth);
+    return 1;
 }
 
 // Sum of OoT3D bone lengths (|local translation| of every non-root bone) for a loaded model.
