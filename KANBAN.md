@@ -20,7 +20,6 @@ Card format: `- [#N] <title> — <notes / evidence link>`  (N = simple increment
 
 ## in-progress
 
-- [#204] Ladder climb: Link floats up on mount and warps down each anim cycle — user-reported 2026-07-23 WITH screenshot. REGRESSION EXPOSED BY `f6d73b98`: before it, climbs played an idle clip with no root motion; now the real climb clips play and their hip/root translation is double-counted (engine moves the actor up the rung AND our CSAB draw applies the clip's own translation), so he lifts off and snaps back on loop. This is the `player.draw-anchor` open residual ("anim-movement hip consumption not mirrored in the CSAB draw") — now unblocked because `tools/ladder_repro.py` gives the live repro it was waiting for.
 
 _(empty)_
 
@@ -29,6 +28,8 @@ _(empty)_
 _(empty)_
 
 ## needs-confirmation
+
+- [#204] Ladder climb: Link floats up on mount and warps down each anim cycle — FIXED `ff3d24df`, awaiting user confirmation. Root motion was applied twice (engine consumed the root delta into world.pos AND the CSAB draw sampled the same track). Now pinned per `movementFlags`, mirroring N64 `SkelAnime_UpdateTranslation`. Measured: clip-boundary jumps +21.7/+24.2/+22.8 world units -> ZERO, ascent monotonic. Clip: `scratch/screenshots/climb_after_fix.mp4`.
 
 - [#201 a/b/c] Link walk vibration + door-exit slide + climb warp-up — FIXED 2026-07-23 (uncommitted working tree), awaiting user confirmation. Root causes: (a)+(c) the per-frame min-vertex feet-grounding draw anchor (replaced by the RE'd age root-translation scale 0.64 + the missing `shape.yOffset*scale.y` draw term); (b) scripted auto-walk (door exit / entrance walk-in) drives the legs via unk_868 while the named anim stays idle — selection now follows the leg driver. Evidence: `scratch/screenshots/{walk_jitter_before,walk_jitter_after,door_exit_after}.mp4`; numbers in `debug_journal/2026-07-23-link-movement-three-bugs.md` (walk vertical noise 0.9→0.000 units, climb-clip teleport 16.7→0 units, door walk-out now plays nml_walk_free). Known residual: real ladder-grab climb not yet reproducible headless (frontier `player.draw-anchor` gaps).
 
