@@ -18,6 +18,12 @@ Each track: 0x00 type(u32: 0 const,1 linear,2 hermite) 0x04 nKf 0x08 tStart 0x0C
   hermite  keyframe: u32 time, f32 value, f32 tIn, f32 tOut (0x10 stride)
   (isRotationInt16 hermite: u16 time, 3x int16 — present in format, unused by ge1)
 
+GOTCHA (cost a session, 2026-07-23): `AnimNode.tracks` is keyed by track NAME —
+"tX","tY","tZ","rX","rY","rZ","sX","sY","sZ" — NOT by the integer slot index. A scan
+written as `node.tracks.get(0)` returns None for every clip and reports the false
+conclusion "no OoT3D player clip has any translation track". They all do: e.g.
+nml_Fclimb_upL bone1 tY runs 4772->6272 (the ladder rung's root motion).
+
 Rotation values are radians; the matrix convention (T·Rz·Ry·Rx·S) is IDENTICAL to
 cmb.py's bind-pose _compute_bone_matrices, so with NO animation applied the animated
 world matrices equal the bind matrices and skinMatrix = animWorld·bindInverse = I

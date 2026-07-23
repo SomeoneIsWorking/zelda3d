@@ -425,6 +425,34 @@ extern "C" int Zelda3D_PlayerDrawImpl(PlayState* play, Actor* actor) {
     Zelda3D_SetAnimTransScale(modelId, (LINK_AGE_IN_YEARS == YEARS_CHILD) ? 0.64f : 1.0f);
     // Player is Actor-first so the cast is valid (see z64player.h).
     player = (Player*)actor;
+    // ROOT-MOTION SPLIT — which components of the clip's root translation the ACTOR consumes and
+    // which stay in the drawn pose. Faithful mirror of SkelAnime_UpdateTranslation
+    // (z_skelanime.c:2025-2040): whenever anim-movement is running it overwrites the root joint
+    // with `baseTransl` — x/z unconditionally, y as well when ANIM_FLAG_UPDATEY is set — right
+    // after taking the delta into `actor.world.pos`. So those components must NOT be drawn from
+    // the clip. `movementFlags & ANIM_FLAG_ENABLE_MOVEMENT` is the exact condition under which the
+    // consumption runs every frame: Player_UpdateCommon queues AnimationContext_SetMoveActor on it
+    // (z_player.c:12600), and AnimationContext_Update flushes that queue before the draw.
+    // MEASURED (Kokiri ladder, child): nml_Fclimb_upL bone1 tY 4772->6272 and upR 6272->7772, i.e.
+    // +1500 local (+15 world) per rung — exactly what the engine also adds to world.pos.y — and the
+    // next upL restarts its track at 4772, a -30 world-unit snap. Drawn unpinned that is the
+    // user-reported "floats off the ladder and resets on clip loop".
+    {
+        // The Link rig carries its root motion on bone 1 (bone 0 is the skeleton root at the
+        // origin); same bone the mounted-seat anchor reads as the root joint
+        // (oot3d-decomp/docs/en_horse_rider_pos.md FUN_002b7fd0).
+        enum { kLinkRootMotionBone = 1 };
+        // z64animation.h names only UPDATEY/NOMOVE; z_player.c spells this one as a raw `& 8`.
+        enum { kAnimFlagEnableMovement = 1 << 3 };
+        unsigned pinMask = 0;
+        if (player->skelAnime.movementFlags & kAnimFlagEnableMovement) {
+            pinMask = (1u << 0) | (1u << 2); // x/z: reset unconditionally
+            if (player->skelAnime.movementFlags & ANIM_FLAG_UPDATEY) {
+                pinMask |= (1u << 1); // y: reset only when the actor consumes it
+            }
+        }
+        Zelda3D_SetAnimRootPin(modelId, kLinkRootMotionBone, pinMask);
+    }
     gZelda3dLogicFrame = (int)play->gameplayFrames; // logic-frame clock for the walk-stop synthetic morph
     // #16c: in FIRST-PERSON (C-up) the camera eye sits AT Link's head bone, so drawing the 3DS body
     // renders the head mesh around/in front of the camera — "you see inside his head". Vanilla OoT
