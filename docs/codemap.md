@@ -47,7 +47,7 @@ Shipwright/soh/src/          456,340 lines, 1381 files
 │  ├─ core/                       1,633 lines    3 files              # zelda3d.c (1,417 lines) + zelda3d_math.cpp/.h — Phase 3 done
 │  ├─ model/                      2,175 lines    6 files              # CMB/CSAB load + skinning + overlay2d — Phase 3 done
 │  ├─ anim/                       1,096 lines    3 files              # N64<->3DS anim retarget + skeletal override port — Phase 3 done
-│  ├─ player/                      1,267 lines    3 files              # Link draw/pose (+ link_mesh_id_map.md) — Phase 3 done
+│  ├─ player/                      1,267 lines    5 files              # Link draw/pose + FACIAL anim (+ link_mesh_id_map.md) — Phase 3 done
 │  ├─ cutscene/                    1,049 lines    3 files              # title-cs interpreter + opcode reference — Phase 3 done
 │  └─ behaviors/                  5,649 lines   73 files              # per-actor/camera/title modules, OOP registry-dispatched; actor_overrides.{h,cpp} added Phase 3
 ├─ overlays/                 308,952 lines  977 files   [.c .h]       # vendored N64 OoT decomp (actors/effects/gamestates/misc) — largely untouched, drives game logic
@@ -182,6 +182,7 @@ over an initialized local (legal in C, ill-formed once that code became a `.cpp`
 | Title cs dispatch / driver | `title_presentation.cpp` `TitlePresentation::update()`; ground truth `oot3d-decomp/docs/title_gamestate_driver.md`, `title_gamestate_v2.md`, `title_rider_cs_dispatch.md` |
 | Title rider (mounted Epona intro) | `behaviors/title/title_rider.cpp/.h`; `oot3d-decomp/docs/title_rider_driver.md`, `title_rider_port_spec.md` |
 | Link draw hook | `Shipwright/soh/src/zelda3d/player/zelda3d_link.cpp` (`Zelda3D_TryDrawPlayer`) |
+| Link facial animation (eye/mouth) | `Shipwright/soh/src/zelda3d/player/zelda3d_link_face.cpp` (`Zelda3D_LinkFaceUpdate`); format `Shipwright/cmb3d/asset/faceb.{h,cpp}`; RE in `docs/re-frontier.md` `player.facial-anim` + `debug_journal/2026-07-23-201d-link-facial-anim-faceb.md` |
 | Force-state layer (Link) | `Shipwright/soh/src/overlays/actors/ovl_player_actor/z_player.c` `Zelda3D_PlayerForce*` hooks (search that name); catalog of gaps in `docs/re_control_debug_backlog.md` |
 | Oracle transport (the only one) | `tools/soh3d_harness/main.cpp`, `soh_state.cpp`, `watchhook.cpp` |
 | Fog / lighting port | `Shipwright/soh/src/zelda3d/tables/zelda3d_scene_lighting.inc`; RE in `oot3d-decomp/docs/scene_lighting.md`, `env_context_layout.md` |
