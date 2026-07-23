@@ -651,6 +651,19 @@ static void Zelda3D_ReplExec(PlayState* play, char* line, const char* outPath) {
             p->upperLimbRot.x, p->upperLimbRot.y, p->upperLimbRot.z, p->headLimbRot.y,
             p->actor.shape.rot.y, p->yaw, p->actor.focus.rot.y, p->actor.speedXZ, p->stateFlags1,
             p->unk_870);
+    } else if (strcmp(cmd, "mptrace") == 0) {
+        // Render-side submit trace: log every Zelda3D_GL_Submit of one model (per rendered subframe)
+        // with interp step + world/clip anchor. `mptrace link` traces the player body; `mptrace -1`
+        // off; `mptrace <id>` any model. Output goes to stderr (run.log).
+        extern int gZelda3dTraceModelId;
+        char sub[16] = { 0 };
+        sscanf(line, "%*s %15s", sub);
+        if (strcmp(sub, "link") == 0) {
+            gZelda3dTraceModelId = Zelda3D_LinkModelId();
+        } else {
+            gZelda3dTraceModelId = atoi(sub);
+        }
+        Zelda3D_ReplReply(outPath, "mptrace modelId=%d", gZelda3dTraceModelId);
     } else if (strcmp(cmd, "posescan") == 0) {
         // Anim QA logger: records each DRAWN player frame's max per-bone rotation jump (+bone +resolved
         // csab) so a hard-cut / missing-morph pop shows as an isolated spike. Sampled in the draw path,

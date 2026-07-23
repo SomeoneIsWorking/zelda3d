@@ -270,6 +270,23 @@ extern "C" void Zelda3D_SetBoneRotDelta(int modelId, int boneId, float rx, float
     v[boneId * 3 + 2] = rz;
 }
 
+// Per-model anim-translation scale: rig-vs-clip translation-space ratio for ANIMATED translation
+// tracks (Csab::sampleLocalTRS animTransScale). The player path sets this to the N64 age root scale
+// (child 0.64, adult 1.0 — z_player_lib.c Player_OverrideLimbDrawGameplayDefault; Grezzo kept the
+// 0.64 literal on 3DS: FUN_002bc768 DAT_002bc8b8). Default 1.0 for every other model.
+static std::unordered_map<int, float>& animTransScales() {
+    static std::unordered_map<int, float> m;
+    return m;
+}
+extern "C" void Zelda3D_SetAnimTransScale(int modelId, float scale) {
+    if (scale == 1.0f) animTransScales().erase(modelId);
+    else animTransScales()[modelId] = scale;
+}
+static float getAnimTransScale(int modelId) {
+    auto it = animTransScales().find(modelId);
+    return it == animTransScales().end() ? 1.0f : it->second;
+}
+
 // Per-model per-bone POST-rotation matrix (row-major 3x3, 9 floats/bone) post-multiplied onto the
 // bone's animated local rotation by the CSAB skinner — the OoT3D actor OverrideLimbDraw MTXMODE_APPLY
 // channel (En_Ko/En_Sa head/torso tracking). Distinct from boneRotDeltas (euler pre-add, cucco flap):
@@ -624,10 +641,10 @@ void Zelda3D_UpdateAnim(int modelId, const char* animName, float frame) {
     const float* post = nullptr; int pcount = 0;
     getBoneRotDeltas(modelId, &drot, &dcount);
     getBonePostRots(modelId, &post, &pcount);
-    anim->skinMatrices(*lm->cmb, frame, sm, drot, dcount, post, pcount);
+    anim->skinMatrices(*lm->cmb, frame, sm, drot, dcount, post, pcount, getAnimTransScale(modelId));
     if (gSkinDumpFile && modelId == gSkinDumpModel) {
         std::vector<std::array<float, 16>> aw;
-        anim->animatedBoneWorld(*lm->cmb, frame, aw, drot, dcount, post, pcount);
+        anim->animatedBoneWorld(*lm->cmb, frame, aw, drot, dcount, post, pcount, getAnimTransScale(modelId));
         skinDumpWrite(modelId, animName, frame, aw);
     }
     uploadSkin(modelId, lm, sm);
@@ -651,14 +668,16 @@ static void Zelda3D_UpdateAnimMorph(int modelId, const char* inName, float fIn, 
     getBonePostRots(modelId, &post, &pcount);
     std::vector<std::array<float, 16>> sm;
     if (out) {
-        in->skinMatricesMorph(*lm->cmb, fIn, *out, fOut, weight, sm, drot, dcount, post, pcount);
+        in->skinMatricesMorph(*lm->cmb, fIn, *out, fOut, weight, sm, drot, dcount, post, pcount,
+                              getAnimTransScale(modelId));
     } else {
-        in->skinMatrices(*lm->cmb, fIn, sm, drot, dcount, post, pcount); // outgoing unresolved -> no blend
+        in->skinMatrices(*lm->cmb, fIn, sm, drot, dcount, post, pcount, getAnimTransScale(modelId)); // outgoing unresolved -> no blend
     }
     if (gSkinDumpFile && modelId == gSkinDumpModel) {
         std::vector<std::array<float, 16>> aw;
-        if (out) in->animatedBoneWorldMorph(*lm->cmb, fIn, *out, fOut, weight, aw, drot, dcount, post, pcount);
-        else in->animatedBoneWorld(*lm->cmb, fIn, aw, drot, dcount, post, pcount);
+        if (out) in->animatedBoneWorldMorph(*lm->cmb, fIn, *out, fOut, weight, aw, drot, dcount, post, pcount,
+                                            getAnimTransScale(modelId));
+        else in->animatedBoneWorld(*lm->cmb, fIn, aw, drot, dcount, post, pcount, getAnimTransScale(modelId));
         skinDumpWrite(modelId, inName, fIn, aw);
     }
     uploadSkin(modelId, lm, sm);
@@ -999,11 +1018,11 @@ void Zelda3D_UpdateAnimTwoSource(int modelId, const char* lowerAnim, float lower
     getBonePostRots(modelId, &post, &pcount);
     std::vector<std::array<float, 16>> sm;
     lower->skinMatricesTwoSource(*lm->cmb, fLower, *upper, fUpper, upperMask, maskCount, sm, drot,
-                                 dcount, post, pcount);
+                                 dcount, post, pcount, getAnimTransScale(modelId));
     if (gSkinDumpFile && modelId == gSkinDumpModel) {
         std::vector<std::array<float, 16>> aw;
         lower->animatedBoneWorldTwoSource(*lm->cmb, fLower, *upper, fUpper, upperMask, maskCount, aw,
-                                          drot, dcount, post, pcount);
+                                          drot, dcount, post, pcount, getAnimTransScale(modelId));
         skinDumpWrite(modelId, lowerAnim, fLower, aw);
     }
     uploadSkin(modelId, lm, sm);

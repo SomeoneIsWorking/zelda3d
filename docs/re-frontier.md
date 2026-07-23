@@ -246,6 +246,14 @@ below, not duplicated).
 - gap: none noted
 - notes: 
 
+### player.draw-anchor — world anchor: age root-translation scale + shape.yOffset (jitter/climb-warp/door-slide, #201 a/b/c)
+- status: re-partial
+- deps: player.draw-hook
+- evidence: **RE'd + fixed + measured 2026-07-23** (`debug_journal/2026-07-23-link-movement-three-bugs.md`). Mechanism: ALL Link CSABs (child dirs included) author the hip translation in BOY rig space (boy 3538 / child bind 2156; live oracle child jointTable carries raw boy values); the engine scales the ANIM root translation by the age factor **0.64** (N64 z_player_lib.c:1304; 3DS keeps the literal — FUN_002bc768 DAT_002bc8b8) and the actor base transform is `T(pos + (0,yOffset*scale.y,0))·R·S` (FUN_00408828). Ported: `Csab animTransScale` (animated-translation-tracks only) + yOffset term in the Link draw; per-frame min-vertex grounding + climb groundOff freeze DELETED (they WERE bugs (a)+(c): 0.9-unit/frame walk noise; 16.7-unit climb-clip teleports); link scale 0.011→0.01 (live oracle player+0x54). Door-exit slide (b) = separate cause: scripted auto-walk (Player_Action_80845CA4/func_80845964) drives legs via func_80841EE4/unk_868 while the NAMED anim stays wait_free — selection now substitutes walk/run when unk_868 advances. AFTER: walk anchor vertical band 0.000 (was 0.6), climb-clip anchor delta 0 (was 16.7), door walk-out plays nml_walk_free end-to-end. Gates: pose sweep idle 1.2/walk 1.3/run 1.9 PASS; selection curve intact.
+- where: `Shipwright/cmb3d/asset/csab.{h,cpp}` (animTransScale), `Shipwright/soh/src/zelda3d/anim/zelda3d_anim.cpp` (Zelda3D_SetAnimTransScale), `Shipwright/soh/src/zelda3d/player/zelda3d_link.cpp` (age scale, yOffset term, loco substitution), REPL `mptrace` (render-side anchor trace, zelda3d_gl.cpp)
+- gap: (1) the 3DS DRAW-side 0.64 site not pinned (undecompiled 0.64f pools VA 0x254ac4/0x279748/0x325a20; value double-sourced N64+3DS-root-motion literals); (2) anim-movement (movementFlags 0x9B) root-motion consumption not mirrored in the CSAB draw — possible hip-x/z double-apply during door-open/time-travel anims, needs a live EnDoor pass-through repro FIRST; (3) real ladder-grab climb never engaged headless (repro tooling gap — need wallFlags/yDistToLedge readout + deterministic ladder approach), so Fclimb selection + climb-entry jumps are NOT live-verified; (4) idle stands +0.94 units above actor.y (authentic per the 0.64 literal vs bind ratio 0.6095) — confirm with one matched-camera oracle A/B.
+- notes: REPL `tp` right after `warp` writes a stale PlayState (pos reverts) — tooling bug seen repeatedly while building the repro.
+
 ### player.anim-states — walk/stop/carry/pickup pose parity
 - status: re-partial
 - deps: player.draw-hook
