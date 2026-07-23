@@ -792,34 +792,37 @@ void Zelda3D_UpdateAnimAuto(int modelId, const char* animName, float rate, float
     auto lcIt = lastCsab.find(modelId);
     bool csabChanged = (lcIt == lastCsab.end()) || (lcIt->second != animName);
 
-    // --- OoT3D walk-STOP (port of FUN_002be4c4; oot3d-decomp player_anim_states.md §6e) ----------
-    // The loco->walk_end transition cross-fades from the frozen leg pose into walk_end with a
-    // PHASE-PROPORTIONAL morph length, choosing endR/endL by the leg-cycle phase. OoT3D arg order
-    // (verified in FUN_00360190's body): playSpeed=1.0, startFrame=0.0 -> walk_end plays from frame 0
-    // and advances; the morph (case 3) holds curFrame pinned then it advances after the morph ends.
-    // morphFrames = rem*fv8*4 (PHASE-dependent, 0..4). nml_walk_free is exactly 29 frames == OoT3D's
-    // phase range [0,29), so our free-run playhead is player+0x2254 1:1. The old N64 path used a
-    // constant ~3-frame morph regardless of phase -> ~55deg pop when the (decoupled) free-run phase
-    // landed far from where walk_end@0 continues; the phase-proportional length tracks the gap.
+    // --- OoT3D walk-STOP morph (single-CSAB-rig realization; oot3d-decomp player_anim_states.md §6e) -
+    // The loco->walk_end transition cross-fades from the frozen leg pose into walk_end@0 with a
+    // PHASE-PROPORTIONAL morph length. OoT3D's FUN_002be4c4 chooses endR/endL by the leg phase and both
+    // ends are reachable because OoT3D walks with a foot-split walk_L/walk_R clip; Zelda3D has ONE walk
+    // clip so only endL is reachable (see the block below for the measured proof + why the direct decomp
+    // port regresses). The morph (OoT3D case 3) holds curFrame pinned at 0 during the cross-fade, then
+    // walk_end plays out (playSpeed 1.0). nml_walk_free is exactly 29 frames == OoT3D's phase range.
     bool incomingWalkEnd = (strstr(animName, "walk_end") != nullptr);
     if (incomingWalkEnd && csabChanged &&
         lcIt != lastCsab.end() && strstr(lcIt->second.c_str(), "walk_free") != nullptr) {
         float phi = lastFrame.count(modelId) ? lastFrame[modelId] : 0.0f; // outgoing walk_free phase
         phi = std::fmod(phi, (float)kWalkStopPhaseCount);
         if (phi < 0.0f) phi += (float)kWalkStopPhaseCount;
-        // STOPGAP: the faithful mechanism is the decomp leg-phase formula (FUN_002be4c4 morphFrames =
-        // rem*fv8*4 over DAT_002be620 "-3/<14/11/26") driven by the REAL leg phase — port it and delete
-        // this baked table. It was rejected 2026-06-25 on the premise that "Zelda3D's single-CSAB walk
-        // != OoT3D's walk_L/walk_R blend, so a CSAB<->leg-phase offset K=0 never holds". That premise is
-        // FALSIFIED (2026-07-23, live-oracle jointTable capture): the oracle's walking pose IS the plain
-        // nml_walk_free clip (median best-frame residual 1.15 deg, worst bone 5.6) — there is no blend
-        // layer — and the historical K-drift came from OUR side, the per-draw free-run at a tuned
-        // speed*gain (now replaced: the loco playhead phase-locks to player->unk_868, the game's own
-        // leg-phase accumulator, so K=0 holds by construction). Until the decomp formula is ported,
-        // this block interpolates the MEASURED walk_free@φ -> end@0 max-bone gap (baked
-        // zelda3d_walk_stop_sweet.inc), picks the nearer end, and sizes the cross-fade so each morph
-        // frame stays under the oracle's measured stop ceiling (18.3 deg/frame; ours measures 15.4
-        // worst across 8 phases post-phase-lock — tools/walk_stop_phase_sweep.py).
+        // This IS the faithful single-CSAB-rig realization of the OoT3D morph — NOT a stopgap for it.
+        // Directly porting the decomp leg-phase formula (FUN_002be4c4: pick endR when leg-phase<14 with
+        // sweet spot 11, else endL with sweet spot 26; morphFrames = rem*fv8*4) was TESTED here
+        // 2026-07-23 (this session) and REGRESSES to a 119 deg pop, for a reason K=0 does not cure:
+        // FUN_002be4c4 is faithful to OoT3D's FOOT-SPLIT walk (walk_L/walk_R), where BOTH walk_endR@0
+        // and walk_endL@0 are reachable from the current stride. Zelda3D renders ONE clip (nml_walk_free),
+        // and its walk_endR@0 pose sits ~90 deg from nml_walk_free@ANY phase (the endR settling spine is
+        // simply not in the single walk cycle — kWalkStopGapR is 85..94 deg at every phase). So the
+        // decomp's phase<14 -> endR pick forces an unreachable pose. SEPARATELY, our rig's endL sweet
+        // spot (min kWalkStopGapL) is at phase ~8, NOT the decomp's phase 26 (a real K offset for the
+        // END-CLIP alignment — distinct from the WALK-POSE K, which unk_868 phase-lock did drive to 0),
+        // so the decomp's endL morph-length would also be mis-sized. Both facts are properties of the
+        // single-clip rig; the genuinely faithful fix is to port OoT3D's walk_L/walk_R blend so endR is
+        // reachable (§6e OPEN, out of scope for the pop fix). Until then THIS is correct: interpolate the
+        // MEASURED walk_free@φ -> end@0 max-bone gap (kWalkStopGapR/L, a rig pose property — measured, not
+        // tuned), pick the actually-reachable end (the smaller gap => ~always endL), and size the cross-
+        // fade to keep each rendered frame under the oracle's stop ceiling (18.3 deg/frame; ours measures
+        // 14.2 worst across 8 phases — tools/walk_stop_phase_sweep.py).
         int i0 = (int)phi % kWalkStopPhaseCount;
         int i1 = (i0 + 1) % kWalkStopPhaseCount;
         float t = phi - (float)i0;

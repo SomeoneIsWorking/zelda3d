@@ -499,11 +499,12 @@ extern "C" int Zelda3D_PlayerDrawImpl(PlayState* play, Actor* actor) {
             // Player's latched copy (av2.actionVar2), and the horse frame Link syncs to (z_player.c
             // ~14048/14081) — the title-demo riding-pose diagnosis needs exactly these three.
             EnHorse* rh = (EnHorse*)player->rideActor;
-            Z3D_LOG(LINK, "held=%d carryWalk=%d lin=%.2f spd=%.2f lower=%s(cf=%.1f/%.1f) upper=%s(cf=%.1f)"
-                    " horseAnimIdx=%d av2=%d horseCurFrame=%.1f -> csab=%s\n",
+            Z3D_LOG(LINK, "held=%d carryWalk=%d lin=%.2f spd=%.2f lower=%s(cf=%.1f/%.1f mw=%.3f mr=%.3f) upper=%s(cf=%.1f)"
+                    " unk868=%.2f horseAnimIdx=%d av2=%d horseCurFrame=%.1f -> csab=%s\n",
                     player->heldActor != NULL, carryWalk, player->linearVelocity, player->actor.speedXZ,
                     lob, player->skelAnime.curFrame, player->skelAnime.animLength,
-                    upb, player->upperSkelAnime.curFrame,
+                    player->skelAnime.morphWeight, player->skelAnime.morphRate,
+                    upb, player->upperSkelAnime.curFrame, player->unk_868,
                     rh ? (int)rh->animationIdx : -1, (int)player->av2.actionVar2,
                     rh ? rh->curFrame : -1.0f, csab);
         }
