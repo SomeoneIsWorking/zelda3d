@@ -20,6 +20,8 @@ Card format: `- [#N] <title> — <notes / evidence link>`  (N = simple increment
 
 ## in-progress
 
+- [#204] Ladder climb: Link floats up on mount and warps down each anim cycle — user-reported 2026-07-23 WITH screenshot. REGRESSION EXPOSED BY `f6d73b98`: before it, climbs played an idle clip with no root motion; now the real climb clips play and their hip/root translation is double-counted (engine moves the actor up the rung AND our CSAB draw applies the clip's own translation), so he lifts off and snaps back on loop. This is the `player.draw-anchor` open residual ("anim-movement hip consumption not mirrored in the CSAB draw") — now unblocked because `tools/ladder_repro.py` gives the live repro it was waiting for.
+
 _(empty)_
 
 ## in-review
