@@ -134,6 +134,42 @@ extern "C" int Zelda3D_LinkAnimSrc(void) {
 // childlink_v2 mesh_id idle fallback. See Zelda3D_TryDrawPlayer.
 #define ZELDA3D_LINK_IDLE_CSAB "nml_wait_typeA_20f"
 
+// #88 "weird yawn" / wrong idle fidget — PREMISE FALSIFIED, DO NOT RE-CHASE (measured 2026-07-23,
+// live oracle vs live game at Kokiri 0xEE; oot3d-decomp/docs/player_port.md "#88", journal
+// debug_journal/2026-07-23-88-idle-fidget-premise-falsified.md).
+//
+// There IS no yawn animation. The decomp note that started this ("default idle table @0x53a5f8
+// {0x50=yawn,...}") mis-read a raw table index: animId 0x50 is `nml_wait_free`, the neutral standing
+// idle, and a scan of all 582 player anim names finds no yawn/akubi/stretch clip at all. OoT3D's
+// Player_GetIdleAnim table {0x50,0x58,0x58,0x119} = {nml_wait_free, nml_wait, nml_wait, ft_wait_long}
+// is byte-identical to N64's D_80853914[PLAYER_ANIMGROUP_wait]. So the idle path here needs no change:
+// we run the vendored N64 Player_ChooseNextIdleAnim and map its anim resource through kPlayerAnimMap,
+// and OoT3D's inlined twin (004ba538) is faithful to that N64 code for every reachable plain idle —
+// including the -6.0f LinkAnimation_Change morph, which N64 already does.
+//
+// Measured at matched state -- neither side had a weapon IN HAND at idle (the gate tests
+// rightHandType == RH_SHIELD, set only with the sword drawn; at a plain idle it is RH_OPEN on both
+// sides regardless of inventory, so commonType 0/3 are rejected either way): default idle
+// nml_wait_free both sides; fidget set + distribution match the faithful N64 roll (ours n=26:
+// look-around 69% / tunic 15% / tap-feet 15%; oracle n=6: 67% / 33% / 0%; predicts 60/20/20); default<->fidget
+// alternation and the 2:1 fidget:default hold ratio match.
+//
+// SAMPLING TRAP (cost this session an hour): idle re-picks only fire on animDone, ~130-280 frames
+// apart. A short capture (n<=3 picks) shows ONLY the look-around fidget and reads as a hard divergence
+// ("OoT3D suppresses the tunic/tap-feet fidgets") — it is small-n noise. Any idle-distribution claim
+// needs >=20 fidget picks per side.
+//
+// Two genuine 3DS-only deltas exist in 004ba538 but are INERT at a reachable idle and are NOT this
+// symptom, so nothing is stubbed or faked for them here:
+//   (1) HOT-room bit `if (play[0x4c37]) fidgetType = FIDGET_HOT(3)` — authored per-room via
+//       SCENE_CMD_ROOM_BEHAVIOR; a faithful port needs that bit read from the ROM room header, and
+//       FIDGET_HOT shares its anims with FIDGET_WARM anyway.
+//   (2) `if ((focusActor==0) && (play[0x2130] != 0))` bypasses the common-fidget roll. play+0x2130 is
+//       the 3DS-only auto-aim head-track TARGET actor (pinned via 002b7fd0.c:556 ->
+//       func_0x002bf814(...)); porting this gate is BLOCKED on porting auto-aim 0x2bf814 itself.
+//       Measured 0 at Kokiri (the common fidgets do fire on the oracle). Do NOT approximate it with a
+//       "nearest actor" guess — that would fake an un-RE'd subsystem's output.
+
 // #117 walk/run SELECTION threshold (speedXZ). N64 OoT uses ONE run anim
 // (gPlayerAnim_link_normal_run_free) with speed-scaled playback for ALL ground movement, so Zelda3D's
 // N64-anim->CSAB map always yields nml_run_free. OoT3D/Grezzo instead SELECTS distinct walk/run CSABs
