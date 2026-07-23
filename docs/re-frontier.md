@@ -247,12 +247,12 @@ below, not duplicated).
 - notes: 
 
 ### player.anim-states — walk/stop/carry/pickup pose parity
-- status: re-verified
+- status: re-partial
 - deps: player.draw-hook
-- evidence: memory `soh3d-pose-parity` (#117 "anim parity COMPLETE"); `oot3d-decomp/docs/player_anim_states.md`, `link_bone_map.md`; `debug_journal/2026-07-15-link-pose-sweep.md`
-- where: `zelda3d_link_bonecorr.inc`, `zelda3d_player_animmap.inc`
-- gap: #115 render audit still open per memory — anim/pose correctness verified, full render pass not yet re-audited.
-- notes: 
+- evidence: **LIVE per-bone pose oracle (2026-07-23, `tools/parity_pose_sweep.py` rewired to the embedded harness — `az_linkjoints` vs `skindump`, geodesic LOCAL-rotation diff): idle 1.2° / walk 1.2° / run 1.7° median MATCH; walk-stop worst per-frame jump 15.4° across 8 stop phases vs oracle ceiling 18.3° (`tools/walk_stop_phase_sweep.py`).** The loco playhead now phase-locks to `player->unk_868` (the game's own leg-phase accumulator, byte-exact on 3DS) — the tuned per-draw free-run gain is gone for walk/run. Prior "re-verified" here rested on `link_sweep.py`, which is SELECTION-only (every row's pose_verdict was N/A) — that overstated the row; the live pose oracle now covers exactly idle/walk/run/stop.
+- where: `Shipwright/soh/src/zelda3d/player/zelda3d_link.cpp` (loco phase-lock), `anim/zelda3d_anim.cpp` (walk-stop), `tools/parity_pose_sweep.py`
+- gap: (1) states WITHOUT a live pose oracle (attack/jump/climb/swim/carry/damage — equipment-less oracle save can't reach them) remain selection+decomp-verified only, NOT pose-measured; (2) walk-stop still runs the baked measured-gap table (STOPGAP, marked in-code) — its blocking premise is falsified (oracle walk IS the plain clip; K=0 now holds via unk_868), so porting the decomp formula (FUN_002be4c4, morphFrames=rem*fv8*4 over DAT_002be620) is RE-ready; (3) carry-walk (nml_carryB_free) still free-runs at speed*gain — no evidence yet for its oracle phase source; (4) #115 render audit still open.
+- notes: idle-capture gotcha baked into the tool: nml_wait_free is an 89f breathing loop — a short burst on either side samples a phase sliver and reports a PHANTOM divergence (first 2026-07-23 measurement said "head 10° off"; full-cycle capture → 1.2° parity).
 
 ### player.force-state-sweep — force-hook coverage for driving/testing states
 - status: re-partial
@@ -325,6 +325,14 @@ below, not duplicated).
 - where: `soh_reach_death` in `tools/link_sweep.py`
 - gap: none in RE; only a tooling tightening (poll the transition instead of a fixed sleep) remains, tracked as tooling debt not RE debt.
 - notes: `func_8083D53C` explicitly ruled out as the death gate — do not re-chase it.
+
+### player.mesh-id-selection — OoT3D's real per-state mesh_id visibility (equipment/hand variants)
+- status: todo
+- deps: player.draw-hook
+- evidence: current implementation is a HAND-CURATED translation (`Zelda3D::LinkMidMask` in `zelda3d_link.cpp` + shared `link_midmask.cpp`) from N64 `leftHandType/rightHandType/sheathType/currentShield` to childlink_v2/link_v2 mesh_ids identified by texture/geometry sweeps (`link_mesh_id_map.md`). No ground truth yet on how OoT3D's own player draw selects mesh_ids — this class covers the "sword on back before owning it" bug family.
+- gap: RE the 3DS Player draw's mesh-visibility mechanism. Anchors: post-limb callback `FUN_004c1c90` (= Player_PostLimbDrawGameplay) sits in a fn-ptr literal @0x4bff48; its consumer (the Player_DrawImpl twin) is NOT yet decompiled/located — a 2026-07-23 Ghidra FindRangeRefs on 0x4bff40..60 found ZERO code refs, so the table is reached via base+offset (needs a data-flow or live-watchpoint locate, the known Ghidra ref gap). The equipment-less oracle save cannot A/B this live (no sword/shield to toggle); static RE or a save with equipment is required. MULTI-SESSION.
+- where: target = replace the guess tables in `Shipwright/soh/src/zelda3d/player/zelda3d_link.cpp` + `Shipwright/zelda3d_shared/player/link_midmask.cpp` with the RE'd selection.
+- notes: 
 
 
 ## skinned-actor-render

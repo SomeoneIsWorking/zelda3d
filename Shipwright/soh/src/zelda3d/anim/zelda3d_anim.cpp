@@ -807,15 +807,19 @@ void Zelda3D_UpdateAnimAuto(int modelId, const char* animName, float rate, float
         float phi = lastFrame.count(modelId) ? lastFrame[modelId] : 0.0f; // outgoing walk_free phase
         phi = std::fmod(phi, (float)kWalkStopPhaseCount);
         if (phi < 0.0f) phi += (float)kWalkStopPhaseCount;
-        // Interpolate the MEASURED walk_free@φ -> end@0 max-bone gap (deg) for each end (the baked
-        // zelda3d_walk_stop_sweet.inc), pick the nearer end, and size the cross-fade so each morph frame
-        // moves <= the oracle's measured walk-stop ceiling (~18 deg/frame) => oracle parity. This
-        // REPLACES the decomp leg-phase sweet-spot math (DAT_002be620.. "-3/<14/11/26"): that assumes a
-        // CSAB<->leg-phase offset K=0 which does NOT hold for Zelda3D's single-CSAB (non-blend) walk, so
-        // morphFrames collapsed to ~0 at the wrong φ -> the measured 119 deg arm snap. The gap here never
-        // approaches 0 (single-CSAB walk != OoT3D's walk_L/walk_R blend), so the morph is always a few
-        // frames -- consistent with OoT3D's own 0..4 morphFrames range, just never hitting 0. See
-        // oot3d-decomp docs/player_anim_states.md §6e STATUS and tools/walk_stop_phase_sweep.py.
+        // STOPGAP: the faithful mechanism is the decomp leg-phase formula (FUN_002be4c4 morphFrames =
+        // rem*fv8*4 over DAT_002be620 "-3/<14/11/26") driven by the REAL leg phase — port it and delete
+        // this baked table. It was rejected 2026-06-25 on the premise that "Zelda3D's single-CSAB walk
+        // != OoT3D's walk_L/walk_R blend, so a CSAB<->leg-phase offset K=0 never holds". That premise is
+        // FALSIFIED (2026-07-23, live-oracle jointTable capture): the oracle's walking pose IS the plain
+        // nml_walk_free clip (median best-frame residual 1.15 deg, worst bone 5.6) — there is no blend
+        // layer — and the historical K-drift came from OUR side, the per-draw free-run at a tuned
+        // speed*gain (now replaced: the loco playhead phase-locks to player->unk_868, the game's own
+        // leg-phase accumulator, so K=0 holds by construction). Until the decomp formula is ported,
+        // this block interpolates the MEASURED walk_free@φ -> end@0 max-bone gap (baked
+        // zelda3d_walk_stop_sweet.inc), picks the nearer end, and sizes the cross-fade so each morph
+        // frame stays under the oracle's measured stop ceiling (18.3 deg/frame; ours measures 15.4
+        // worst across 8 phases post-phase-lock — tools/walk_stop_phase_sweep.py).
         int i0 = (int)phi % kWalkStopPhaseCount;
         int i1 = (i0 + 1) % kWalkStopPhaseCount;
         float t = phi - (float)i0;

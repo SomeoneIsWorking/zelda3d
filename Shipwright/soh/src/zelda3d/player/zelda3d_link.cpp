@@ -546,8 +546,27 @@ extern "C" int Zelda3D_PlayerDrawImpl(PlayState* play, Actor* actor) {
             // A/B (posescan over a run): morphWeight live=1.0 -> mean per-frame leg jump 0.6 deg
             // (frozen/slide); morphWeight=0 -> 38.9 deg (legs cycle). The loco free-run is a continuous
             // speed-driven cycle, not a cross-fade, so a morph blend is semantically wrong here.
-            Zelda3D_UpdateAnimAuto(modelId, csab, player->actor.speedXZ * gZelda3dLinkLocoGain, 0.0f, 0.0f,
-                                 0.0f);
+            // FAITHFUL PHASE SOURCE (2026-07-23): OoT3D drives every ground-locomotion cycle from the
+            // player's own leg-phase accumulator `unk_868` in [0,29), advanced per logic frame by
+            // func_8084029C (speed-scaled, R_UPDATE_RATE-aware, footstep-SFX-synced) — byte-exact on
+            // 3DS (the whole ring-1..4 sweep found Grezzo did not rewrite Link). The anim frame IS
+            // that phase: walk = unk_868 (29f clip), run = unk_868*(20/29) (z_player.c:9270 — and
+            // nml_run_free is exactly 20 frames), side-walk = *(16/29). Passing unk_868/29.0f through
+            // the locked path of Zelda3D_UpdateAnimAuto reproduces this for ANY loco clip length
+            // (f = phase * clipDur). This replaces the per-DRAW free-run at speedXZ*gZelda3dLinkLocoGain,
+            // whose tuned gain was a decoupled approximation of this accumulator (and whose drift vs
+            // the game's own phase forced the walk-stop endR/endL pick to be re-derived from a baked
+            // gap table instead of the real leg phase). Measured 2026-07-23 (parity_pose_sweep +
+            // oracle vs plain-clip diff): the oracle's live walking jointTable IS nml_walk_free
+            // (median 1.15 deg), so phase = unk_868 is the complete mechanism — no blend layer.
+            // Carry-walk (nml_carryB_free, a Grezzo-authored 17f clip with no N64 twin) keeps the
+            // speed free-run: no evidence yet that OoT3D scales it from the same accumulator.
+            if (carryWalk && gZelda3dLinkForceCsab[0] == '\0') {
+                Zelda3D_UpdateAnimAuto(modelId, csab, player->actor.speedXZ * gZelda3dLinkLocoGain,
+                                     0.0f, 0.0f, 0.0f);
+            } else {
+                Zelda3D_UpdateAnimAuto(modelId, csab, 0.0f, player->unk_868, 29.0f, 0.0f);
+            }
         } else {
             // Idle / one-shot anims: curFrame is valid here, so keep the N64-progress phase-lock.
             Zelda3D_UpdateAnimAuto(modelId, csab, gZelda3dAnimRate, player->skelAnime.curFrame,
