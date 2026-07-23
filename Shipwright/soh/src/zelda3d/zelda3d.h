@@ -618,6 +618,10 @@ int Zelda3D_EmitActorBillboard(PlayState* play, int modelId, Actor* actor,
                                float xOff, float yOff, float zOff, float scale,
                                u8 r, u8 g, u8 b, u8 a);
 float Zelda3D_GScale(int slot, float def);                              // live REPL `gscale <slot>` or def
+// Per-model anim-translation scale for ANIMATED CSAB translation tracks (rig-vs-clip space ratio).
+// The player path sets the N64 age root scale (child 0.64 / adult 1.0, z_player_lib.c
+// Player_OverrideLimbDrawGameplayDefault; 3DS keeps the literal — FUN_002bc768 DAT_002bc8b8).
+void Zelda3D_SetAnimTransScale(int modelId, float scale);
 // Low-level retarget primitives (DEFINED in zelda3d_model.cpp); forwarded here so link.cpp sees them.
 void Zelda3D_SetTrackPosedMinY(int modelId, int enable);                  // per-frame posed-feet grounding
 float Zelda3D_PosedGroundOffset(int modelId, unsigned long long midMask); // model-local Y to ground feet

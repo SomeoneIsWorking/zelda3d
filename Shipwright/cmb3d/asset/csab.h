@@ -51,12 +51,14 @@ class Csab {
     // En_Ko/En_Sa head/torso tracking) on the OoT3D rig. Propagates to children via the hierarchy.
     void skinMatrices(const Cmb& model, float frame, std::vector<std::array<float, 16>>& out,
                       const float* boneRotDelta = nullptr, int deltaCount = 0,
-                      const float* bonePostRot = nullptr, int postCount = 0) const;
+                      const float* bonePostRot = nullptr, int postCount = 0,
+                      float animTransScale = 1.0f) const;
 
     // Per-bone-id animated world matrix at `frame` (rest TRS overridden by tracks).
     void animatedBoneWorld(const Cmb& model, float frame, std::vector<std::array<float, 16>>& out,
                            const float* boneRotDelta = nullptr, int deltaCount = 0,
-                           const float* bonePostRot = nullptr, int postCount = 0) const;
+                           const float* bonePostRot = nullptr, int postCount = 0,
+                           float animTransScale = 1.0f) const;
 
     // MORPH (anim-transition cross-fade, the N64 SkelAnime model — see docs/anim_system.md "THE
     // MORPH"). Blends this (INCOMING) clip at `frameIn` toward the OUTGOING clip's frozen pose at
@@ -67,11 +69,13 @@ class Csab {
     void skinMatricesMorph(const Cmb& model, float frameIn, const Csab& outgoing, float frameOut,
                            float weight, std::vector<std::array<float, 16>>& out,
                            const float* boneRotDelta = nullptr, int deltaCount = 0,
-                           const float* bonePostRot = nullptr, int postCount = 0) const;
+                           const float* bonePostRot = nullptr, int postCount = 0,
+                           float animTransScale = 1.0f) const;
     void animatedBoneWorldMorph(const Cmb& model, float frameIn, const Csab& outgoing, float frameOut,
                                 float weight, std::vector<std::array<float, 16>>& out,
                                 const float* boneRotDelta, int deltaCount,
-                                const float* bonePostRot, int postCount) const;
+                                const float* bonePostRot, int postCount,
+                                float animTransScale = 1.0f) const;
 
     // TWO-SOURCE per-limb blend (the N64 sUpperBodyLimbCopyMap model, z_player.c:397 — used for
     // carry-WALK: lower body plays the locomotion clip, upper body plays the carry pose). `this` is
@@ -85,19 +89,22 @@ class Csab {
                                const unsigned char* upperMask, int maskCount,
                                std::vector<std::array<float, 16>>& out,
                                const float* boneRotDelta = nullptr, int deltaCount = 0,
-                               const float* bonePostRot = nullptr, int postCount = 0) const;
+                               const float* bonePostRot = nullptr, int postCount = 0,
+                               float animTransScale = 1.0f) const;
     void animatedBoneWorldTwoSource(const Cmb& model, float frameLower, const Csab& upper,
                                     float frameUpper, const unsigned char* upperMask, int maskCount,
                                     std::vector<std::array<float, 16>>& out,
                                     const float* boneRotDelta = nullptr, int deltaCount = 0,
-                                    const float* bonePostRot = nullptr, int postCount = 0) const;
+                                    const float* bonePostRot = nullptr, int postCount = 0,
+                                    float animTransScale = 1.0f) const;
 
   private:
     // Sample a bone's animated LOCAL transform (TRS) at `fr` from this clip's tracks, falling back
     // to the rest TRS where a track is absent (or is a static non-root translation bake — see the
     // note in animatedBoneWorld). Shared by the single-clip and morph world builders.
     void sampleLocalTRS(int boneId, bool nonRoot, const float restT[3], const float restR[3],
-                        const float restS[3], float fr, float t[3], float r[3], float s[3]) const;
+                        const float restS[3], float fr, float t[3], float r[3], float s[3],
+                        float animTransScale = 1.0f) const;
 
     enum { CONSTANT = 0, LINEAR = 1, HERMITE = 2 };
     struct Keyframe { float time, value, tangentIn, tangentOut; };

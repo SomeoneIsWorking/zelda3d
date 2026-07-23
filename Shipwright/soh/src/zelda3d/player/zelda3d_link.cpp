@@ -61,7 +61,12 @@ static void Zelda3D_Mat3ToEuler(const float* m, float* outDeg) {
 
 // --- OoT3D Link (player) replacement — proof-of-hook stage (see Zelda3D_TryDrawPlayer) ---
 int gZelda3dLinkOn = 1;  // OoT3D player body: ALWAYS ON. Dev A/B only via REPL `link`.
-float gZelda3dLinkScale = 0.011f; // world scale OoT3D-link-local -> N64 player units (REPL `linkscale`, calibrate live)
+// World scale OoT3D-link-local -> world units (REPL `linkscale` can still override live). 0.01 is
+// the 3DS player actor scale read LIVE from the oracle (player+0x54 vec3 = (0.01,0.01,0.01), child
+// save, Kokiri 2026-07-23) — same as N64's Player actor scale. The old hand-tuned 0.011 compensated
+// for the (now removed) min-vertex grounding sink; with the faithful age root-translation scale the
+// authentic value renders at oracle size.
+float gZelda3dLinkScale = 0.01f;
 float gZelda3dLinkRotX = 0.0f;   // rest->upright orientation correction (deg) (REPL `linkrot`)
 float gZelda3dLinkRotY = 0.0f;
 float gZelda3dLinkRotZ = 0.0f;
@@ -75,10 +80,6 @@ char gZelda3dLinkForceCsab[64] = ""; // REPL `linkanim <csab>` pins a CSAB on Li
 // (carry hold). Empty = off. Also reusable for the future per-state Link parity sweep.
 char gZelda3dLinkForceTwoLower[64] = "";
 char gZelda3dLinkForceTwoUpper[64] = "";
-int gZelda3dClimbGroundFix = 0; // #79: freeze feet-grounding during climb poses (REPL `climbgroundfix`).
-                              // DEFAULT OFF: root cause confirmed (grounding swings wildly on climb
-                              // poses) but the freeze DIRECTION is not yet live-verified on a real
-                              // sustained climb (repro blocked — see #79). Off = current behavior.
 int gZelda3dHeldAttach = 1;          // #6 attach a carried actor (held cucco) to 3DS Link's posed hands
 int gZelda3dFocusFix = 1;            // #16(b) keep actor.focus.pos at 3DS Link's posed head (first-person cam)
                                    // (A/B toggle for before/after evidence; REPL `linkheldfix <0|1>`)
@@ -396,6 +397,12 @@ extern "C" int Zelda3D_PlayerDrawImpl(PlayState* play, Actor* actor) {
         return 0; // model unavailable -> fall back to the N64 body
     }
     P().modelId = modelId; // expose to the REPL pose-discontinuity scanner (Zelda3D_LinkModelId)
+    // N64 age root-translation scale, applied to the CSAB's ANIMATED translation tracks (the hip):
+    // all Link clips are authored in the BOY rig's translation space, and the engine scales the
+    // anim-provided root translation per age — z_player_lib.c Player_OverrideLimbDrawGameplayDefault
+    // (child *= 0.64f), literal kept on 3DS (FUN_002bc768 DAT_002bc8b8). Must be set BEFORE the
+    // Zelda3D_UpdateAnim* call below so THIS frame's pose uses it.
+    Zelda3D_SetAnimTransScale(modelId, (LINK_AGE_IN_YEARS == YEARS_CHILD) ? 0.64f : 1.0f);
     // Player is Actor-first so the cast is valid (see z64player.h).
     player = (Player*)actor;
     gZelda3dLogicFrame = (int)play->gameplayFrames; // logic-frame clock for the walk-stop synthetic morph
@@ -417,9 +424,10 @@ extern "C" int Zelda3D_PlayerDrawImpl(PlayState* play, Actor* actor) {
     OPEN_DISPS(play->state.gfxCtx);
     Gfx_SetupDL_25Opa(play->state.gfxCtx);
     Zelda3D_SceneTint(play, tint);
-    // Measure the posed feet this frame so we can ground them: the OoT3D Link CSABs lift the
-    // skeleton off the floor (boy-rig hip translation; #29b). The world matrix is built AFTER the
-    // pose + visible-mesh mask are known (below), so the ground offset can use the live pose.
+    // Keep posed-skin caching on for this model: Zelda3D_PosedBoneWorldPos (held-actor hand anchor,
+    // focus.pos head anchor, mounted seat root) and the REPL groundDiag all read the cached pose.
+    // (The old per-frame feet-GROUNDING consumer of this cache is gone — see the falsified-mechanism
+    // note above the world-matrix build below.)
     Zelda3D_SetTrackPosedMinY(modelId, 1);
     // linkjointdump capture: append this frame's live jointTable + phase, for offline retarget fitting.
     if (P().jointDump.file != NULL && P().jointDump.remaining > 0 &&
@@ -489,6 +497,28 @@ extern "C" int Zelda3D_PlayerDrawImpl(PlayState* play, Actor* actor) {
         csab = Zelda3D_ResolvePlayerCsab((const char*)player->skelAnime.animation);
         // #117 walk/run SELECTION parity (see Zelda3D_LinkWalkRunGate / ZELDA3D_LINK_WALKRUN_SPEED).
         csab = Zelda3D_LinkWalkRunGate(csab, player->actor.speedXZ);
+        // DOOR-EXIT / scripted auto-walk slide fix (user bug (b), 2026-07-23): during scripted
+        // forward moves — the door-exit walk-out and entrance walk-ins (Player_Action_80845CA4 /
+        // func_80845964) — N64 keeps skelAnime.animation on the IDLE header (wait_free) and drives
+        // the LEG CYCLE separately through func_80841EE4, the unk_868 leg-phase accumulator (same
+        // mechanism as normal ground locomotion, z_player.c:10703). Keying locomotion off the
+        // resolved anim NAME alone therefore froze the idle pose while the body glided forward at
+        // lin=2.0 (measured: 16 frames x 3 units of idle-pose slide on the market mask-shop door
+        // exit, warp 0x1D1). The engine signal that the ground-locomotion leg driver ran THIS
+        // frame is unk_868 advancing; when it does and the resolved clip is not already a
+        // locomotion clip, select walk/run by speed exactly like the walk/run gate above — the
+        // phase-locked loco path below then plays it at phase unk_868, which IS what N64 renders.
+        {
+            static float sPrevUnk868 = -1.0f;
+            static int sPrevUnk868Gf = -1;
+            int gf = (int)play->gameplayFrames;
+            int legDriverRan = (sPrevUnk868Gf >= 0 && gf != sPrevUnk868Gf && player->unk_868 != sPrevUnk868);
+            if (gf != sPrevUnk868Gf) { sPrevUnk868 = player->unk_868; sPrevUnk868Gf = gf; }
+            if (legDriverRan && player->actor.speedXZ > 0.5f && player->heldActor == NULL &&
+                csab != NULL && strstr(csab, "walk") == NULL && strstr(csab, "run") == NULL) {
+                csab = (player->actor.speedXZ > ZELDA3D_LINK_WALKRUN_SPEED) ? "nml_run_free" : "nml_walk_free";
+            }
+        }
         // #6/#85/#117 carry: OoT3D (oracle, GROUND TRUTH — tools/oracle_carry_id.py 2026-06-25) does
         // NOT layer carry onto locomotion via the N64 sUpperBodyLimbCopyMap. It plays a SINGLE unified
         // whole-body clip per carry state:
@@ -625,33 +655,23 @@ extern "C" int Zelda3D_PlayerDrawImpl(PlayState* play, Actor* actor) {
         }
     }
     Zelda3D_GL_SetMidMask(modelId, midMask);
-    // Build the world matrix now that the pose + visible-mesh mask are known. Do NOT inherit the
-    // actor matrix (it carries the N64 0.01 actor scale through which the OoT3D dlist renders
-    // nothing). groundOff (model-local, applied innermost/pre-scale like the auto path's
-    // groundOffset) lands the posed feet on the actor's world pos.y — fixes the #29b float.
-    float groundOff = Zelda3D_PosedGroundOffset(modelId, midMask);
-    // #79 fix: feet-grounding measures the LOWEST visible vertex, which is a planted foot only while
-    // grounded. The CLIMB poses (ladder/vine/forced-climb) raise a foot/knee/whole-body, so the
-    // lowest vertex (hence groundOff) swings by thousands of model-local units between frames
-    // (idle -1263 vs climb_up/upL/upR -1694/-2644/-4193, climb_startB -8443) and the whole body
-    // teleports vertically while climbing. N64 draws the climb pose at actor.world.pos.y with no
-    // grounding; reproduce that continuity by FREEZING groundOff to the last value measured on a
-    // non-climb pose (self-calibrating, no jump at climb entry). Gate on the climb CSAB name (the
-    // actual cause is the pose): "climb" also matches "Fclimb"; "hang" covers the ledge-hang holds.
-    // The N64-retarget path (linksrc 1, csab==NULL) is untouched (that's #8, a separate issue).
-    static float sLinkLastGroundedOff = 0.0f;
-    s32 climbPose = gZelda3dClimbGroundFix && csab != NULL &&
-                    (strstr(csab, "climb") != NULL || strstr(csab, "hang") != NULL);
-    // Mounted (horseback): actor.world.pos.y is ALREADY the correct seat height, set every frame
-    // by the native mount code (z_player.c Player_Action_8084CC98: world.pos.y = rideActor->
-    // actor.world.pos.y + rideActor->riderPos.y - 27.0f — Epona's back position, not the ground).
-    // The feet-grounding heuristic below assumes the pose's lowest visible vertex is a planted
-    // foot on the floor; for the riding pose that lowest vertex is a bent knee/stirrup nowhere
-    // near actor.world.pos.y, so applying it here shoves the whole body up/down by that offset —
-    // this IS the reported "Link floats detached above/behind Epona" bug. No grounding is correct
-    // (same as N64's own mounted draw, which never grounds either) — zero it outright rather than
-    // freeze-last (unlike climb, the seat height genuinely changes every frame as Epona moves over
-    // terrain, so a frozen offset would itself drift stale).
+    // FALSIFIED MECHANISM (2026-07-23, was "#29b feet-grounding"): this path used to measure the
+    // posed model's lowest visible vertex EVERY frame (Zelda3D_PosedGroundOffset) and shove the
+    // whole body so that vertex touched actor.world.pos.y. That per-frame min-vertex anchor was a
+    // stand-in for the real mechanism and was itself two of the user-reported bugs:
+    //   (a) WALK VIBRATION — during a walk cycle the lowest vertex alternates feet, so the anchor
+    //       carried per-frame noise (measured: groundOff std 16.8 local / p2p 81 local = 0.9 world
+    //       units of vertical shake at logic rate, scratch/logs/ground_walk40.txt);
+    //   (c) CLIMB WARP-UP — climb poses tuck the feet, so the anchor swung thousands of units
+    //       (climb_upL->upR jump = 1521 local = 15 world units in ONE frame, measured live).
+    // The REAL mechanism (RE'd 2026-07-23): every Link CSAB — including the child/anim clips —
+    // authors the hip (bone 1) translation in the BOY rig's space (hip rest 3538; live child
+    // jointTable reads the raw boy values, oracle), and the engine scales the ANIM root translation
+    // by the AGE factor at draw time: N64 Player_OverrideLimbDrawGameplayDefault (z_player_lib.c)
+    // child pos *= 0.64f; Grezzo kept the 0.64 literal on 3DS (FUN_002bc768 DAT_002bc8b8, the
+    // root-motion twin). With that scale applied (Zelda3D_SetAnimTransScale below) the posed feet
+    // land at the floor from the ANIMATION DATA itself — no per-frame grounding, no climb freeze.
+    // (The scale itself is set before the anim update, right after the model is resolved above.)
     s32 mountedPose = (player->stateFlags1 & PLAYER_STATE1_ON_HORSE) != 0;
     // #152 seat diagnostics (`log rider 1`): posed origins of the first rig bones while mounted —
     // identifies which bone carries the riding clip's root translation (the term the 3DS subtracts
@@ -669,7 +689,7 @@ extern "C" int Zelda3D_PlayerDrawImpl(PlayState* play, Actor* actor) {
     // OoT3D sets player.pos = seatAnchor - rootJoint*scale and draws the pose WITH its root, so
     // the pelvis lands exactly on the seat anchor. Our z_player port subtracts the N64's folded
     // constant 27 instead of the live root, and the 3DS riding clips carry a much larger root
-    // (uma_anim_*: bone-1 y=3538 * 0.011 = 38.9) — net: Link drew ~12 world units above the
+    // (uma_anim_*: bone-1 y=3538 * scale) — net: Link drew ~12 world units above the
     // saddle. Reproduce the 3DS algebra at draw time: cancel the pose's live root translation and
     // add back the 27 world units z_player already removed, so pelvis == horse.pos + riderPos.
     float mountRootFix[3] = { 0.0f, 0.0f, 0.0f };
@@ -681,28 +701,26 @@ extern "C" int Zelda3D_PlayerDrawImpl(PlayState* play, Actor* actor) {
             mountRootFix[2] = -rootL[2];
         }
     }
-    if (mountedPose) {
-        groundOff = 0.0f;
-    } else if (climbPose) {
-        groundOff = sLinkLastGroundedOff;
-    } else {
-        sLinkLastGroundedOff = groundOff;
-    }
-    if (gZelda3dAnimDebug) {
-        static int dbg = 0;
-        if ((dbg++ % 30) == 0) {
-            fprintf(stderr, "SOH3D LINK groundOff=%.1f (model-local)%s\n", groundOff,
-                   mountedPose ? " [mounted:zeroed]" : (climbPose ? " [climb:frozen]" : ""));
-            fflush(stdout);
-        }
-    }
-    Matrix_Translate(actor->world.pos.x, actor->world.pos.y, actor->world.pos.z, MTXMODE_NEW);
+    // Per-draw world-anchor trace (jitter/slide/climb measurement): every term that enters the draw
+    // translate, one line per logic frame.
+    Z3D_LOG(LINK, "GROUND gf=%d pos=(%.3f,%.3f,%.3f) yOff=%.3f drawY=%.3f spd=%.3f csab=%s%s\n",
+            (int)play->gameplayFrames, actor->world.pos.x, actor->world.pos.y, actor->world.pos.z,
+            actor->shape.yOffset,
+            actor->world.pos.y + actor->shape.yOffset * actor->scale.y, player->actor.speedXZ,
+            csab ? csab : "(n64)", mountedPose ? " [mounted]" : "");
+    // Faithful 3DS actor base transform: T(pos.x, pos.y + shape.yOffset*scale.y, pos.z) · R · S —
+    // RE'd from FUN_00408828 (oot3d-decomp/docs/en_horse_rider_pos.md), same as N64 Actor_Draw.
+    // The yOffset term is LOAD-BEARING for the ledge climb (#79): z_player.c hides the one-frame
+    // `world.pos.y += yDistToLedge` jump behind `shape.yOffset -= yDist*100` (z_player.c:5002-5005,
+    // decayed by Math_StepToF(&yOffset,0,150) at :10639). Omitting it here made the ledge mount a
+    // visible TELEPORT — the user-reported "climb warp-up".
+    Matrix_Translate(actor->world.pos.x, actor->world.pos.y + actor->shape.yOffset * actor->scale.y,
+                     actor->world.pos.z, MTXMODE_NEW);
     Matrix_RotateY(BINANG_TO_RAD(actor->shape.rot.y), MTXMODE_APPLY);
     Matrix_Scale(gZelda3dLinkScale, gZelda3dLinkScale, gZelda3dLinkScale, MTXMODE_APPLY);
     if (gZelda3dLinkRotX != 0.0f) Matrix_RotateX(gZelda3dLinkRotX * (3.14159265f / 180.0f), MTXMODE_APPLY);
     if (gZelda3dLinkRotY != 0.0f) Matrix_RotateY(gZelda3dLinkRotY * (3.14159265f / 180.0f), MTXMODE_APPLY);
     if (gZelda3dLinkRotZ != 0.0f) Matrix_RotateZ(gZelda3dLinkRotZ * (3.14159265f / 180.0f), MTXMODE_APPLY);
-    if (groundOff != 0.0f) Matrix_Translate(0.0f, groundOff, 0.0f, MTXMODE_APPLY);
     if (mountRootFix[0] != 0.0f || mountRootFix[1] != 0.0f || mountRootFix[2] != 0.0f) {
         Matrix_Translate(mountRootFix[0], mountRootFix[1], mountRootFix[2], MTXMODE_APPLY);
     }
@@ -1049,11 +1067,6 @@ int Zelda3D::PlayerBehavior::repl(PlayState* play, const char* cmd, const char* 
         } else {
             Zelda3D_ReplReply(outPath, "usage: linktwo <lowerCsab> <upperCsab> | off");
         }
-    } else if (strcmp(cmd, "climbgroundfix") == 0) {
-        // #79 A/B toggle: freeze feet-grounding during climb poses (default ON). `climbgroundfix 0`
-        // reverts to per-pose lowest-vertex grounding so the climb teleport reproduces for before/after.
-        if (sscanf(line, "%*s %i", &iv) == 1) gZelda3dClimbGroundFix = (iv != 0);
-        Zelda3D_ReplReply(outPath, "climbgroundfix=%d (freeze groundOff during climb poses)", gZelda3dClimbGroundFix);
     } else if (strcmp(cmd, "linkheldfix") == 0) {
         // #6 A/B toggle: attach the carried actor (held cucco) to 3DS Link's posed hands. Default on;
         // `linkheldfix 0` reverts to the engine's stale pickup-spot pos for before/after evidence.

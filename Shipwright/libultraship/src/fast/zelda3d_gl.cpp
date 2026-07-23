@@ -90,6 +90,13 @@ std::unordered_map<int, std::vector<ItemPose>> g_prevPoses; // last logic frame,
 // limbs interpolate to the render FPS like the N64 matrix stack does, instead of snapping at 20fps.
 extern "C" float gZelda3dInterpStep = 1.0f;
 
+// Per-subframe submit trace (REPL `mptrace <modelId|-1>`): logs every Zelda3D_GL_Submit of the given
+// model with the interpolation step, the (already frame-interpolated) model->world translation and
+// the clip-space MP translation. This is the RENDER-side counterpart of the logic-side GROUND trace
+// in zelda3d_link.cpp — it shows what anchor the model was actually DRAWN at, per rendered subframe,
+// so render-rate jitter (interpolation gaps, camera fights) is measurable instead of eyeballed.
+extern "C" int gZelda3dTraceModelId = -1;
+
 // GL state-leak detector toggle (REPL `statecheck` in zelda3d.c). The detector itself was part of the
 // removed direct-OpenGL render body (P4); the symbol is retained because zelda3d.c still writes it.
 extern "C" int gZelda3dStateCheck = -1;
@@ -619,6 +626,11 @@ extern "C" void Zelda3D_GL_Submit(int modelId, const float* mp16, const float* m
                                 unsigned char r, unsigned char g, unsigned char b, unsigned char a, float aspectAdj,
                                 int sky, float uvOffU, float uvOffV, int forceUnlit) {
     DrawItem it;
+    if (modelId == gZelda3dTraceModelId) {
+        fprintf(stderr, "[MPTRACE] model=%d step=%.4f mv=(%.4f,%.4f,%.4f) mp=(%.5f,%.5f,%.5f,%.5f)\n", modelId,
+                gZelda3dInterpStep, mv16 ? mv16[12] : 0.0f, mv16 ? mv16[13] : 0.0f, mv16 ? mv16[14] : 0.0f,
+                mp16[12], mp16[13], mp16[14], mp16[15]);
+    }
     it.modelId = modelId;
     memcpy(it.mp, mp16, sizeof(it.mp));
     memcpy(it.mv, mv16 ? mv16 : mp16, sizeof(it.mv));
