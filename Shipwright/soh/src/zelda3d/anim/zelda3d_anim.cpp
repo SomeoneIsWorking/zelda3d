@@ -274,17 +274,26 @@ extern "C" void Zelda3D_SetBoneRotDelta(int modelId, int boneId, float rx, float
 // tracks (Csab::sampleLocalTRS animTransScale). The player path sets this to the N64 age root scale
 // (child 0.64, adult 1.0 — z_player_lib.c Player_OverrideLimbDrawGameplayDefault; Grezzo kept the
 // 0.64 literal on 3DS: FUN_002bc768 DAT_002bc8b8). Default 1.0 for every other model.
-static std::unordered_map<int, float>& animTransScales() {
-    static std::unordered_map<int, float> m;
+static std::unordered_map<int, Zelda3D::RootMotion>& rootMotions() {
+    static std::unordered_map<int, Zelda3D::RootMotion> m;
     return m;
 }
 extern "C" void Zelda3D_SetAnimTransScale(int modelId, float scale) {
-    if (scale == 1.0f) animTransScales().erase(modelId);
-    else animTransScales()[modelId] = scale;
+    rootMotions()[modelId].transScale = scale;
 }
-static float getAnimTransScale(int modelId) {
-    auto it = animTransScales().find(modelId);
-    return it == animTransScales().end() ? 1.0f : it->second;
+// ROOT-MOTION PIN (Csab::RootMotion pinBone/pinMask): while the engine is consuming this model's
+// clip root translation into the actor position, the pinned components must be drawn from the
+// rig's REST translation, not the clip track — the mirror of N64
+// SkelAnime_UpdateTranslation writing `jointTable[0].c = baseTransl.c` (z_skelanime.c:2025-2040).
+// mask bit0/1/2 = x/y/z; bone < 0 or mask 0 clears the pin.
+extern "C" void Zelda3D_SetAnimRootPin(int modelId, int boneId, unsigned mask) {
+    auto& rm = rootMotions()[modelId];
+    rm.pinBone = (mask != 0) ? boneId : -1;
+    rm.pinMask = (boneId >= 0) ? mask : 0u;
+}
+static Zelda3D::RootMotion getAnimTransScale(int modelId) {
+    auto it = rootMotions().find(modelId);
+    return it == rootMotions().end() ? Zelda3D::RootMotion{} : it->second;
 }
 
 // Per-model per-bone POST-rotation matrix (row-major 3x3, 9 floats/bone) post-multiplied onto the

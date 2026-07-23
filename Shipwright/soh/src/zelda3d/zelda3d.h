@@ -622,6 +622,12 @@ float Zelda3D_GScale(int slot, float def);                              // live 
 // The player path sets the N64 age root scale (child 0.64 / adult 1.0, z_player_lib.c
 // Player_OverrideLimbDrawGameplayDefault; 3DS keeps the literal — FUN_002bc768 DAT_002bc8b8).
 void Zelda3D_SetAnimTransScale(int modelId, float scale);
+// Pin the root-motion bone's translation to the rig REST value for the components the ENGINE is
+// consuming into the actor position this frame (mask bit0/1/2 = x/y/z; mask 0 = no pin). Mirrors
+// N64 SkelAnime_UpdateTranslation's `jointTable[0].c = baseTransl.c` (z_skelanime.c:2025-2040):
+// without it a clip that moves its actor (ladder climb, ledge vault, door open) has its root
+// motion applied TWICE — once by the engine, once by the drawn pose.
+void Zelda3D_SetAnimRootPin(int modelId, int boneId, unsigned mask);
 // Low-level retarget primitives (DEFINED in zelda3d_model.cpp); forwarded here so link.cpp sees them.
 void Zelda3D_SetTrackPosedMinY(int modelId, int enable);                  // per-frame posed-feet grounding
 float Zelda3D_PosedGroundOffset(int modelId, unsigned long long midMask); // model-local Y to ground feet

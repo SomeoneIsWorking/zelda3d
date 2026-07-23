@@ -15,6 +15,32 @@ namespace Zelda3D {
 
 class Cmb;
 
+// How a clip's ROOT MOTION is shared between the actor and the drawn pose — the N64 SkelAnime
+// model (z_skelanime.c SkelAnime_UpdateTranslation, z_player.c Player_StartAnimMovement /
+// Player_ApplyAnimMovementScaledByAge; 3DS twin FUN_003603f8, identical struct layout).
+//
+// A clip that moves its actor (ladder climb, ledge vault, door open, time travel) authors that
+// motion as a translation track on the skeleton's root-motion bone. Each frame the engine takes
+// the DELTA of that track into `actor.world.pos` and then OVERWRITES the root joint with the
+// skeleton's BASE translation, so the drawn body does NOT also carry the motion. Draw the track
+// as-is while the engine is consuming it and the motion is applied TWICE: the body climbs away
+// from the ladder within a rung clip and snaps back when the next clip restarts its track.
+struct RootMotion {
+    // Age scale on GENUINELY ANIMATED translation tracks (N64 Player_OverrideLimbDrawGameplay-
+    // Default `pos *= 0.64f` for child; 3DS keeps the literal, FUN_002bc768 DAT_002bc8b8).
+    float transScale = 1.0f;
+    // Bone that carries the clip's root translation (-1 = none / nothing pinned).
+    int pinBone = -1;
+    // Per-component pin: bit0/1/2 = x/y/z. A pinned component ignores the clip's translation
+    // track and uses the RIG's rest translation for that bone — the analogue of N64 writing
+    // `jointTable[0].c = baseTransl.c` after consuming the delta into the actor.
+    unsigned pinMask = 0;
+
+    RootMotion() = default;
+    // Implicit from a bare scale so the many call sites that only need the age scale stay simple.
+    RootMotion(float scale) : transScale(scale) {}
+};
+
 class Csab {
   public:
     explicit Csab(std::vector<uint8_t> data);
@@ -52,13 +78,13 @@ class Csab {
     void skinMatrices(const Cmb& model, float frame, std::vector<std::array<float, 16>>& out,
                       const float* boneRotDelta = nullptr, int deltaCount = 0,
                       const float* bonePostRot = nullptr, int postCount = 0,
-                      float animTransScale = 1.0f) const;
+                      RootMotion rootMotion = {}) const;
 
     // Per-bone-id animated world matrix at `frame` (rest TRS overridden by tracks).
     void animatedBoneWorld(const Cmb& model, float frame, std::vector<std::array<float, 16>>& out,
                            const float* boneRotDelta = nullptr, int deltaCount = 0,
                            const float* bonePostRot = nullptr, int postCount = 0,
-                           float animTransScale = 1.0f) const;
+                           RootMotion rootMotion = {}) const;
 
     // MORPH (anim-transition cross-fade, the N64 SkelAnime model — see docs/anim_system.md "THE
     // MORPH"). Blends this (INCOMING) clip at `frameIn` toward the OUTGOING clip's frozen pose at
@@ -70,12 +96,12 @@ class Csab {
                            float weight, std::vector<std::array<float, 16>>& out,
                            const float* boneRotDelta = nullptr, int deltaCount = 0,
                            const float* bonePostRot = nullptr, int postCount = 0,
-                           float animTransScale = 1.0f) const;
+                           RootMotion rootMotion = {}) const;
     void animatedBoneWorldMorph(const Cmb& model, float frameIn, const Csab& outgoing, float frameOut,
                                 float weight, std::vector<std::array<float, 16>>& out,
                                 const float* boneRotDelta, int deltaCount,
                                 const float* bonePostRot, int postCount,
-                                float animTransScale = 1.0f) const;
+                                RootMotion rootMotion = {}) const;
 
     // TWO-SOURCE per-limb blend (the N64 sUpperBodyLimbCopyMap model, z_player.c:397 — used for
     // carry-WALK: lower body plays the locomotion clip, upper body plays the carry pose). `this` is
@@ -90,13 +116,13 @@ class Csab {
                                std::vector<std::array<float, 16>>& out,
                                const float* boneRotDelta = nullptr, int deltaCount = 0,
                                const float* bonePostRot = nullptr, int postCount = 0,
-                               float animTransScale = 1.0f) const;
+                               RootMotion rootMotion = {}) const;
     void animatedBoneWorldTwoSource(const Cmb& model, float frameLower, const Csab& upper,
                                     float frameUpper, const unsigned char* upperMask, int maskCount,
                                     std::vector<std::array<float, 16>>& out,
                                     const float* boneRotDelta = nullptr, int deltaCount = 0,
                                     const float* bonePostRot = nullptr, int postCount = 0,
-                                    float animTransScale = 1.0f) const;
+                                    RootMotion rootMotion = {}) const;
 
   private:
     // Sample a bone's animated LOCAL transform (TRS) at `fr` from this clip's tracks, falling back
@@ -104,7 +130,7 @@ class Csab {
     // note in animatedBoneWorld). Shared by the single-clip and morph world builders.
     void sampleLocalTRS(int boneId, bool nonRoot, const float restT[3], const float restR[3],
                         const float restS[3], float fr, float t[3], float r[3], float s[3],
-                        float animTransScale = 1.0f) const;
+                        RootMotion rootMotion = {}) const;
 
     enum { CONSTANT = 0, LINEAR = 1, HERMITE = 2 };
     struct Keyframe { float time, value, tangentIn, tangentOut; };

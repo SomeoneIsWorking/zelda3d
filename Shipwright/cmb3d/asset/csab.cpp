@@ -270,7 +270,7 @@ float Csab::sampleTrack(const Track& t, float frame, bool rotation) {
 
 void Csab::sampleLocalTRS(int boneId, bool nonRoot, const float restT[3], const float restR[3],
                          const float restS[3], float fr, float t[3], float r[3], float s[3],
-                         float animTransScale) const {
+                         RootMotion rootMotion) const {
     s[0] = restS[0]; s[1] = restS[1]; s[2] = restS[2];
     r[0] = restR[0]; r[1] = restR[1]; r[2] = restR[2];
     t[0] = restT[0]; t[1] = restT[1]; t[2] = restT[2];
@@ -293,24 +293,31 @@ void Csab::sampleLocalTRS(int boneId, bool nonRoot, const float restT[3], const 
     // for same-rig clips, where rest == the baked value). Genuinely ANIMATED translation
     // (varying track, e.g. the idle pelvis bob) is still applied — it is real motion, not a
     // skeletal offset. Root (parent<0) always keeps its translation (root placement/motion).
-    // animTransScale: rig-vs-clip translation-space ratio for GENUINELY ANIMATED translation
+    // rootMotion.transScale: rig-vs-clip translation-space ratio for GENUINELY ANIMATED translation
     // tracks. Link's CSABs (both boy/anim AND child/anim dirs) author the hip translation in the
     // BOY rig's space (hip rest 3538; measured: child walk clip hip ty 3441..3554), and the engine
     // scales the ANIM-provided root translation per age exactly like N64
     // Player_OverrideLimbDrawGameplayDefault (z_player_lib.c: child pos *= 0.64f) — Grezzo kept the
     // 0.64 literal on 3DS (FUN_002bc768's DAT_002bc8b8 root-motion scale, oot3d-decomp). Rest
     // fallbacks and static-track rest keeps are the RIG's own values and are never scaled.
-    if (node->tracks[0].present && !(nonRoot && node->tracks[0].constant))
-        t[0] = sampleTrack(node->tracks[0], fr, false) * animTransScale;
-    if (node->tracks[1].present && !(nonRoot && node->tracks[1].constant))
-        t[1] = sampleTrack(node->tracks[1], fr, false) * animTransScale;
-    if (node->tracks[2].present && !(nonRoot && node->tracks[2].constant))
-        t[2] = sampleTrack(node->tracks[2], fr, false) * animTransScale;
+    //
+    // rootMotion.pinMask: while the ENGINE is consuming this clip's root translation into the
+    // actor's world position (N64 anim-movement — see RootMotion in csab.h), the consumed
+    // components must NOT also appear in the pose: SkelAnime_UpdateTranslation writes
+    // `jointTable[0].c = baseTransl.c` immediately after taking the delta. Mirror that by keeping
+    // the rig's REST translation for the pinned components of the root-motion bone (rest is the
+    // rig's own value, so it is not age-scaled — same rule as the static-track keep above).
+    const bool pinned = (rootMotion.pinBone >= 0 && boneId == rootMotion.pinBone);
+    for (int c = 0; c < 3; c++) {
+        if (pinned && (rootMotion.pinMask & (1u << c))) continue; // rest kept = the base translation
+        if (node->tracks[c].present && !(nonRoot && node->tracks[c].constant))
+            t[c] = sampleTrack(node->tracks[c], fr, false) * rootMotion.transScale;
+    }
 }
 
 void Csab::animatedBoneWorld(const Cmb& model, float frame, std::vector<std::array<float, 16>>& out,
                              const float* boneRotDelta, int deltaCount, const float* bonePostRot,
-                             int postCount, float animTransScale) const {
+                             int postCount, RootMotion rootMotion) const {
     const auto& bones = model.bones();
     const auto& bind = model.boneMatrices();
     out.assign(bind.size(), matId());
@@ -325,7 +332,7 @@ void Csab::animatedBoneWorld(const Cmb& model, float frame, std::vector<std::arr
         if (done[id]) return out[id];
         const CmbBone* bn = byId[id];
         float s[3], r[3], t[3];
-        sampleLocalTRS(id, bn->parent >= 0, bn->trans, bn->rot, bn->scale, fr, t, r, s, animTransScale);
+        sampleLocalTRS(id, bn->parent >= 0, bn->trans, bn->rot, bn->scale, fr, t, r, s, rootMotion);
         // Procedural OverrideLimbDraw delta: add the extra LOCAL rotation (radians) for this bone
         // on top of the animated pose, in the SAME T·Rz·Ry·Rx·S frame the tracks use.
         if (boneRotDelta && id >= 0 && id < deltaCount) {
@@ -347,7 +354,7 @@ void Csab::animatedBoneWorldMorph(const Cmb& model, float frameIn, const Csab& o
                                   float frameOut, float weight,
                                   std::vector<std::array<float, 16>>& out, const float* boneRotDelta,
                                   int deltaCount, const float* bonePostRot, int postCount,
-                                  float animTransScale) const {
+                                  RootMotion rootMotion) const {
     const auto& bones = model.bones();
     const auto& bind = model.boneMatrices();
     out.assign(bind.size(), matId());
@@ -366,8 +373,8 @@ void Csab::animatedBoneWorldMorph(const Cmb& model, float frameIn, const Csab& o
         const CmbBone* bn = byId[id];
         bool nonRoot = bn->parent >= 0;
         float si[3], ri[3], ti[3], so[3], ro[3], to[3];
-        sampleLocalTRS(id, nonRoot, bn->trans, bn->rot, bn->scale, frIn, ti, ri, si, animTransScale);
-        outgoing.sampleLocalTRS(id, nonRoot, bn->trans, bn->rot, bn->scale, frOut, to, ro, so, animTransScale);
+        sampleLocalTRS(id, nonRoot, bn->trans, bn->rot, bn->scale, frIn, ti, ri, si, rootMotion);
+        outgoing.sampleLocalTRS(id, nonRoot, bn->trans, bn->rot, bn->scale, frOut, to, ro, so, rootMotion);
         // pose = lerp(incoming, outgoing, weight). weight=1 -> outgoing (frozen), weight=0 ->
         // incoming. Rotation blends along the geodesic (quaternion slerp of the two local rotation
         // matrices); translation/scale lerp linearly.
@@ -399,7 +406,7 @@ void Csab::animatedBoneWorldTwoSource(const Cmb& model, float frameLower, const 
                                       std::vector<std::array<float, 16>>& out,
                                       const float* boneRotDelta, int deltaCount,
                                       const float* bonePostRot, int postCount,
-                                      float animTransScale) const {
+                                      RootMotion rootMotion) const {
     const auto& bones = model.bones();
     const auto& bind = model.boneMatrices();
     out.assign(bind.size(), matId());
@@ -420,9 +427,9 @@ void Csab::animatedBoneWorldTwoSource(const Cmb& model, float frameLower, const 
         bool useUpper = (upperMask && id < maskCount && upperMask[id]);
         float s[3], r[3], t[3];
         if (useUpper)
-            upper.sampleLocalTRS(id, bn->parent >= 0, bn->trans, bn->rot, bn->scale, frUp, t, r, s, animTransScale);
+            upper.sampleLocalTRS(id, bn->parent >= 0, bn->trans, bn->rot, bn->scale, frUp, t, r, s, rootMotion);
         else
-            sampleLocalTRS(id, bn->parent >= 0, bn->trans, bn->rot, bn->scale, frLo, t, r, s, animTransScale);
+            sampleLocalTRS(id, bn->parent >= 0, bn->trans, bn->rot, bn->scale, frLo, t, r, s, rootMotion);
         if (boneRotDelta && id >= 0 && id < deltaCount) {
             r[0] += boneRotDelta[id * 3 + 0];
             r[1] += boneRotDelta[id * 3 + 1];
@@ -442,10 +449,10 @@ void Csab::skinMatricesTwoSource(const Cmb& model, float frameLower, const Csab&
                                  float frameUpper, const unsigned char* upperMask, int maskCount,
                                  std::vector<std::array<float, 16>>& out, const float* boneRotDelta,
                                  int deltaCount, const float* bonePostRot, int postCount,
-                                 float animTransScale) const {
+                                 RootMotion rootMotion) const {
     std::vector<std::array<float, 16>> aw;
     animatedBoneWorldTwoSource(model, frameLower, upper, frameUpper, upperMask, maskCount, aw,
-                               boneRotDelta, deltaCount, bonePostRot, postCount, animTransScale);
+                               boneRotDelta, deltaCount, bonePostRot, postCount, rootMotion);
     const auto& bind = model.boneMatrices();
     out.assign(bind.size(), matId());
     for (size_t id = 0; id < bind.size(); id++)
@@ -455,10 +462,10 @@ void Csab::skinMatricesTwoSource(const Cmb& model, float frameLower, const Csab&
 void Csab::skinMatricesMorph(const Cmb& model, float frameIn, const Csab& outgoing, float frameOut,
                              float weight, std::vector<std::array<float, 16>>& out,
                              const float* boneRotDelta, int deltaCount, const float* bonePostRot,
-                             int postCount, float animTransScale) const {
+                             int postCount, RootMotion rootMotion) const {
     std::vector<std::array<float, 16>> aw;
     animatedBoneWorldMorph(model, frameIn, outgoing, frameOut, weight, aw, boneRotDelta, deltaCount,
-                           bonePostRot, postCount, animTransScale);
+                           bonePostRot, postCount, rootMotion);
     const auto& bind = model.boneMatrices();
     out.assign(bind.size(), matId());
     for (size_t id = 0; id < bind.size(); id++)
@@ -483,9 +490,9 @@ void Csab::localTransforms(const Cmb& model, float frame, std::vector<BoneLocal>
 
 void Csab::skinMatrices(const Cmb& model, float frame, std::vector<std::array<float, 16>>& out,
                         const float* boneRotDelta, int deltaCount, const float* bonePostRot,
-                        int postCount, float animTransScale) const {
+                        int postCount, RootMotion rootMotion) const {
     std::vector<std::array<float, 16>> aw;
-    animatedBoneWorld(model, frame, aw, boneRotDelta, deltaCount, bonePostRot, postCount, animTransScale);
+    animatedBoneWorld(model, frame, aw, boneRotDelta, deltaCount, bonePostRot, postCount, rootMotion);
     const auto& bind = model.boneMatrices();
     out.assign(bind.size(), matId());
     for (size_t id = 0; id < bind.size(); id++)
