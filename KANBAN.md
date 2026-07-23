@@ -14,7 +14,8 @@ Card format: `- [#N] <title> — <notes / evidence link>`  (N = simple increment
 
 ## todo
 
-- [#201] Link has too many bugs to list — user report 2026-07-23, after the 3DS Link draw was made default-on (`5902dcb1`, was gated behind `ZELDA3D_LINK`). Needs a systematic pass, not a bug-by-bug chase: enumerate what is actually broken in normal play, decide whether the port is fit to be the default, and either fix or restore the N64 draw as default until it is.
+- [#201] Link bug list — USER-OBSERVED 2026-07-23, replaces "too many bugs to list". HIGH PRIORITY (disorienting): (a) **jittery/vibrating while walking**, (b) **door-exit slide**, (c) **climb warp-up**. All three are long-standing (NOT regressions from the 2026-07-23 phase-lock — user confirmed). Likely a shared position/movement-integration cause. Lower priority: (d) yawns when idle long but **face does not react** — Link facial texture-anim (mouth/eyes) appears unported; (e) **sword on his back before he has picked it up** = the hand-curated mesh_id midmask (`player.mesh-id-selection` frontier row).
+  NOTE: pose PLAYBACK measured at parity (idle/walk 1.2°, run 1.7° per bone) and the idle *picker* matches the oracle — so none of these are pose-selection bugs.
 - [#203] PC-native keyboard UI/UX — the thing #202's HUD was SUPPOSED to be — user request 2026-07-23: "I wanted like a keyboard UI/UX when playing on keyboard with more PC game like item mapping etc but none of it is wired". Needs its own focused effort: PC-style item mapping/binding surfaced in the UI, keyboard-first affordances. Build it on the NATIVE HUD (modify to taste), not a parallel HUD stack — that is what #202 removes. The existing keyboard/gamepad HUD glyph work (memory soh3d-hud-glyphs) is the right shape to extend.
 
 ## in-progress
