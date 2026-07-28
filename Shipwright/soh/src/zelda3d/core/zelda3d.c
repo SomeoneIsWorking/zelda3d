@@ -384,6 +384,13 @@ float gZelda3dSkyScale = 12.0f;
 // suspect backdrop group (e.g. the untextured "dome") can be identified by index live.
 int gZelda3dHlGroup = -1;
 
+// Draw-isolation probe (REPL `sgdrawonly <n|-1>` / `sgdrawlist`; see zelda3d_sdl3gpu.cpp for the full
+// rationale). Renders ONE Zelda3D group and suppresses the rest, so a draw whose pixels are entirely
+// overlapped by later layers — Zora's water d9 has zero exclusive pixels — can still be measured on
+// its own, and a FRAGDBG readback over it means the same thing as the oracle's per-fragment probe.
+int gZelda3dSgDrawOnly = -1;
+int gZelda3dSgDrawList = 0;
+
 // #32 Xbox face-button HUD glyphs + hotswap input-device state (gZelda3dXboxBtn/
 // Zelda3D_XboxBtnEnabled, gZelda3dInputDevice/Zelda3D_InputDevice) live in
 // zelda3d/input/zelda3d_input.cpp (Phase 1 input consolidation). Declared `extern` in zelda3d.h;

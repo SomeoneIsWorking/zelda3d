@@ -131,7 +131,8 @@ extern int gZelda3dEnabled, gZelda3dAnimLive, gZelda3dSwTilt, gZelda3dDoorBone, 
     gZelda3dHlGroup, gZelda3dSky, gZelda3dTerrainWarp, gZelda3dForceTime, gZelda3dCamOverride,
     gZelda3dCamLift, gZelda3dTitleCam, gZelda3dSelId, gZelda3dDbgBone, gZelda3dChickFlap,
     gZelda3dChickAxis, gZelda3dChickCenter, gZelda3dChickAmp, gZelda3dChickBone2Sign,
-    gZelda3dDoorHold, gZelda3dLastAutoModel, gZelda3dPauseTarget;
+    gZelda3dDoorHold, gZelda3dLastAutoModel, gZelda3dPauseTarget, gZelda3dSgDrawOnly,
+    gZelda3dSgDrawList;
 extern float gZelda3dTintDiff, gZelda3dTintMul, gZelda3dRotX, gZelda3dRotY, gZelda3dRotZ,
     gZelda3dDoorGain, gZelda3dGScale[32], gZelda3dSceneScale, gZelda3dSceneOffX, gZelda3dSceneOffY,
     gZelda3dSceneOffZ, gZelda3dSkyScale, gZelda3dCamEye[3], gZelda3dCamAt[3], gZelda3dCamLiftLast,
@@ -1557,6 +1558,20 @@ static void Zelda3D_ReplExec(PlayState* play, char* line, const char* outPath) {
         // #29: tint room draw-group N red live (-1 = off). Pair with ZELDA3D_DBG_ROOM dump.
         if (sscanf(line, "%*s %i", &iv) == 1) gZelda3dHlGroup = iv;
         Zelda3D_ReplReply(outPath, "hlroom=%d", gZelda3dHlGroup);
+    } else if (strcmp(cmd, "sgdrawonly") == 0) {
+        // Draw-isolation probe: render ONLY the n-th Zelda3D group of the frame (-1 = everything).
+        // The point is draws whose pixels are entirely overlapped by later layers — Zora's water d9
+        // has zero exclusive pixels, so no mask-restricted readback can attribute anything to it,
+        // and FRAGDBG alone gives a whole-frame composite. Isolate the group and the frame IS that
+        // draw's output, directly comparable with the oracle's per-fragment PIXEL probe.
+        // Indices are per-frame, in append order; get them from `sgdrawlist`.
+        if (sscanf(line, "%*s %i", &iv) == 1) gZelda3dSgDrawOnly = iv;
+        Zelda3D_ReplReply(outPath, "sgdrawonly=%d", gZelda3dSgDrawOnly);
+    } else if (strcmp(cmd, "sgdrawlist") == 0) {
+        // One-shot: dump the next frame's Zelda3D group list (index, model, vertex range, textures)
+        // to stderr, so `sgdrawonly` has an index to aim at.
+        gZelda3dSgDrawList = 1;
+        Zelda3D_ReplReply(outPath, "sgdrawlist armed (one frame, to stderr/run.log)");
     } else if (strcmp(cmd, "sky") == 0) {
         // `sky <0|1>` toggles the OoT3D sky dome (#28); `sky scale <f>` tunes the dome size.
         char sub[32];
