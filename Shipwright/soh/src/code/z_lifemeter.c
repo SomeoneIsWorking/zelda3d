@@ -459,8 +459,9 @@ static void Zelda3D_HeartQuad(InterfaceContext* interfaceCtx, const void* tex, i
         primRGB = envRGB;
         envRGB = t;
     }
-    Zelda3D_HudQuadLerp(tex, tw, th, (30.0f + offsetX) - side / 2.0f, (26.0f + offsetY) - side / 2.0f, side, side,
-                        (primRGB << 8) | (u32)(u8)interfaceCtx->healthAlpha, envRGB);
+    Zelda3D_HudQuadEx(tex, tw, th, 0, 0, tw, th, (30.0f + offsetX) - side / 2.0f,
+                      (26.0f + offsetY) - side / 2.0f, side, side,
+                      (primRGB << 8) | (u32)(u8)interfaceCtx->healthAlpha, envRGB, ZELDA3D_HUD_LERP);
 }
 
 void HealthMeter_Draw(PlayState* play) {

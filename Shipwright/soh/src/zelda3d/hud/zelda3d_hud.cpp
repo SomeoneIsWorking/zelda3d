@@ -81,45 +81,71 @@ void record(const void* tex, int texW, int texH, float u0, float v0, float u1, f
     sQuads.push_back({ pixels, texW, texH, u0, v0, u1, v1, x, y, w, h, prim, env, mode });
 }
 
-// Decode an IA4 (4bpp: 3 bits intensity + 1 bit alpha) texture to RGBA32.
-//
-// Cached by CONTENT hash rather than by source address: the do-action label rewrites the same
-// `doActionSegment` buffer whenever the prompt changes, so a pointer-keyed cache would pin whichever
-// label happened to be showing first. The set of distinct labels is small and bounded, and keeping
-// one buffer per hash also keeps the GPU-side upload cache correct — it keys on the buffer address,
-// so a changed label naturally becomes a new key instead of silently reusing a stale upload.
-const std::vector<uint8_t>* decodeIA4(const void* src, int w, int h) {
-    const size_t nibbles = (size_t)w * h;
-    const size_t bytes = (nibbles + 1) / 2;
-    const uint8_t* in = (const uint8_t*)src;
+} // namespace
 
-    uint64_t hash = 1469598103934665603ull; // FNV-1a over the encoded bytes plus the dims
+// See the header for the format list and for why I-formats decode opaque.
+extern "C" const void* Zelda3D_HudDecode(int fmt, const void* tex, int texW, int texH) {
+    if (tex == nullptr || texW <= 0 || texH <= 0) {
+        return nullptr;
+    }
+    const uint8_t* in = (const uint8_t*)resolveTex(tex);
+    if (in == nullptr) {
+        return nullptr;
+    }
+    const size_t texels = (size_t)texW * texH;
+    const size_t bytes = (fmt == ZELDA3D_HUD_FMT_IA4 || fmt == ZELDA3D_HUD_FMT_I4) ? (texels + 1) / 2
+                       : (fmt == ZELDA3D_HUD_FMT_IA8 || fmt == ZELDA3D_HUD_FMT_I8) ? texels
+                                                                                   : 0;
+    if (bytes == 0) {
+        return nullptr;
+    }
+
+    uint64_t hash = 1469598103934665603ull; // FNV-1a over the encoded bytes, the dims and the format
     for (size_t i = 0; i < bytes; i++) {
         hash = (hash ^ in[i]) * 1099511628211ull;
     }
-    hash = (hash ^ (uint64_t)w) * 1099511628211ull;
-    hash = (hash ^ (uint64_t)h) * 1099511628211ull;
+    hash = (hash ^ (uint64_t)texW) * 1099511628211ull;
+    hash = (hash ^ (uint64_t)texH) * 1099511628211ull;
+    hash = (hash ^ (uint64_t)fmt) * 1099511628211ull;
 
     static std::unordered_map<uint64_t, std::vector<uint8_t>> cache;
     auto it = cache.find(hash);
     if (it != cache.end()) {
-        return &it->second;
+        return it->second.data();
     }
 
-    std::vector<uint8_t> out(nibbles * 4);
-    for (size_t i = 0; i < nibbles; i++) {
-        const uint8_t byte = in[i >> 1];
-        const uint8_t v = (i & 1) ? (uint8_t)(byte & 0x0F) : (uint8_t)(byte >> 4);
-        const uint8_t intensity = (uint8_t)(((v >> 1) & 0x07) * 255 / 7);
+    std::vector<uint8_t> out(texels * 4);
+    for (size_t i = 0; i < texels; i++) {
+        uint8_t intensity, alpha;
+        switch (fmt) {
+            case ZELDA3D_HUD_FMT_IA4: {
+                const uint8_t v = (i & 1) ? (uint8_t)(in[i >> 1] & 0x0F) : (uint8_t)(in[i >> 1] >> 4);
+                intensity = (uint8_t)(((v >> 1) & 0x07) * 255 / 7);
+                alpha = (v & 1) ? 255 : 0;
+                break;
+            }
+            case ZELDA3D_HUD_FMT_IA8:
+                intensity = (uint8_t)((in[i] >> 4) * 255 / 15);
+                alpha = (uint8_t)((in[i] & 0x0F) * 255 / 15);
+                break;
+            case ZELDA3D_HUD_FMT_I4: {
+                const uint8_t v = (i & 1) ? (uint8_t)(in[i >> 1] & 0x0F) : (uint8_t)(in[i >> 1] >> 4);
+                intensity = (uint8_t)(v * 255 / 15);
+                alpha = 255;
+                break;
+            }
+            default:
+                intensity = in[i];
+                alpha = 255;
+                break;
+        }
         out[i * 4 + 0] = intensity;
         out[i * 4 + 1] = intensity;
         out[i * 4 + 2] = intensity;
-        out[i * 4 + 3] = (v & 1) ? 255 : 0;
+        out[i * 4 + 3] = alpha;
     }
-    return &cache.emplace(hash, std::move(out)).first->second;
+    return cache.emplace(hash, std::move(out)).first->second.data();
 }
-
-} // namespace
 
 extern "C" int Zelda3D_HudOwns(int element) {
     (void)element; // every converted group shares one gate; see zelda3d_hud.h
@@ -131,31 +157,14 @@ extern "C" void Zelda3D_HudQuad(const void* tex, int texW, int texH, float x, fl
     record(tex, texW, texH, 0.0f, 0.0f, 1.0f, 1.0f, x, y, w, h, primRGBA, 0u, 0);
 }
 
-extern "C" void Zelda3D_HudQuadUv(const void* tex, int texW, int texH, int sx, int sy, int sw, int sh, float x,
-                                  float y, float w, float h, unsigned int primRGBA) {
+extern "C" void Zelda3D_HudQuadEx(const void* tex, int texW, int texH, int sx, int sy, int sw, int sh, float x,
+                                  float y, float w, float h, unsigned int primRGBA, unsigned int envRGB,
+                                  int mode) {
     if (texW <= 0 || texH <= 0) {
         return;
     }
     record(tex, texW, texH, (float)sx / texW, (float)sy / texH, (float)(sx + sw) / texW,
-           (float)(sy + sh) / texH, x, y, w, h, primRGBA, 0u, 0);
-}
-
-extern "C" void Zelda3D_HudQuadIA4(const void* tex, int texW, int texH, float x, float y, float w, float h,
-                                   unsigned int primRGBA) {
-    if (!hudEnabled() || tex == nullptr || texW <= 0 || texH <= 0) {
-        return;
-    }
-    const void* pixels = resolveTex(tex);
-    if (pixels == nullptr) {
-        return;
-    }
-    const std::vector<uint8_t>* rgba = decodeIA4(pixels, texW, texH);
-    record(rgba->data(), texW, texH, 0.0f, 0.0f, 1.0f, 1.0f, x, y, w, h, primRGBA, 0u, 0);
-}
-
-extern "C" void Zelda3D_HudQuadLerp(const void* tex, int texW, int texH, float x, float y, float w, float h,
-                                    unsigned int primRGBA, unsigned int envRGB) {
-    record(tex, texW, texH, 0.0f, 0.0f, 1.0f, 1.0f, x, y, w, h, primRGBA, envRGB, 1);
+           (float)(sy + sh) / texH, x, y, w, h, primRGBA, envRGB, mode);
 }
 
 extern "C" void Zelda3D_HudFrame(void) {
