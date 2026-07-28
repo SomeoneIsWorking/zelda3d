@@ -90,6 +90,13 @@ void Zelda3D_ActorPostUpdate(PlayState* play, Actor* actor);
 // model (caller skips the N64 limbs).
 int Zelda3D_SkelAnimeDrawRaw(PlayState* play, void** skeleton, Vec3s* jointTable);
 
+// Set while a replaced actor's N64 limb walk is being re-run purely for its SIDE EFFECTS — the
+// per-limb postLimbDraw callback, which is the only writer of the collision spheres (#107/#108) and
+// of Player's shape.feetPos (#206, the missing feet shadow). While it is set the hooks above return
+// 0 so the real N64 walk runs instead of the OoT3D replacement; the caller rewinds polyOpa.p/polyXlu.p
+// afterwards so none of that walk's geometry reaches the screen.
+extern int gZelda3dColliderPass;
+
 // Record the live N64 animation pointer (an OTR path string in SoH) AND the live playhead
 // (curFrame / animLength) for the actor currently deferred for replacement, so the auto CSAB
 // resolver can map it to the matching OoT3D CSAB and the auto path can PHASE-LOCK the OoT3D CSAB to

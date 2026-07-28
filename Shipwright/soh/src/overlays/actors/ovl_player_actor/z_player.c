@@ -13031,6 +13031,24 @@ void Player_Draw(Actor* thisx, PlayState* play2) {
         // Zelda3D: draw the OoT3D Link body instead of the N64 one (gated ZELDA3D_LINK, default off).
         if (!Zelda3D_TryDrawPlayer(play, &this->actor)) {
             Player_DrawGameplay(play, this, lod, gCullBackDList, overrideLimbDraw);
+        } else {
+            // #206: the replaced draw skips the N64 limb walk, and that walk is the ONLY writer of
+            // shape.feetPos (Player_PostLimbDrawGameplay -> Actor_SetFeetPos, z_player_lib.c). Player's
+            // shadow is ActorShadow_DrawFeet, which places one shadow per foot from feetPos — with the
+            // walk skipped it has none, so Link cast no shadow at all. Re-run the walk purely for that
+            // side effect and rewind the gfx buffers so no N64 geometry renders. Same remedy as the
+            // collider fix (#107/#108, Zelda3D_UpdateSkelColliders in z_skelanime.c); gZelda3dColliderPass
+            // suppresses the OoT3D replacement so the real walk actually runs. Actor_Draw calls
+            // shadowDraw right after actor->draw, so feetPos is fresh for this frame's shadow.
+            Gfx* zelda3dOpaP = play->state.gfxCtx->polyOpa.p;
+            Gfx* zelda3dXluP = play->state.gfxCtx->polyXlu.p;
+            gZelda3dColliderPass = 1;
+            Player_DrawImpl(play, this->skelAnime.skeleton, this->skelAnime.jointTable, this->skelAnime.dListCount,
+                            lod, this->currentTunic, this->currentBoots, this->actor.shape.face, overrideLimbDraw,
+                            Player_PostLimbDrawGameplay, this);
+            gZelda3dColliderPass = 0;
+            play->state.gfxCtx->polyOpa.p = zelda3dOpaP;
+            play->state.gfxCtx->polyXlu.p = zelda3dXluP;
         }
 
         if (this->invincibilityTimer > 0) {
