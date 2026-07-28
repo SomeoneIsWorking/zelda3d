@@ -32,7 +32,7 @@
 // ============================================================================
 
 #include "fast/backends/gfx_sdl3gpu.h"
-#include "fast/backends/zelda3d_sdl3gpu.h" // Zelda3DRenderer member subsystem
+#include "fast/backends/zelda3d_sdl3gpu.h" // Zelda3DRenderer / Zelda3DHudRenderer member subsystems
 #include "fast/backends/gfx_sdl.h"
 #include "fast/backends/unified_shader.h" // render-unification Phase 1 dormant shader selftest
 #include "fast/backends/unified_n64_pack.h" // render-unification Phase 3: CCFeatures -> UnifiedMaterial
@@ -591,6 +591,7 @@ GfxRenderingAPISdl3Gpu::~GfxRenderingAPISdl3Gpu() {
     // Release the folded-in renderer subsystems while the device is still alive (their GPU resources
     // are owned by the device and freed at SDL_DestroyGPUDevice below — same as before the fold).
     mSoh3d.reset();
+    mHud.reset();
     if (mDevice == nullptr)
         return;
     if (mVtxMapped) {
@@ -695,6 +696,7 @@ void GfxRenderingAPISdl3Gpu::Init() {
     // Create the folded-in renderer subsystems now that the device is ready and g_activeSdl3GpuApi is
     // set (their lazy ensureResources() pulls the device through g_activeSdl3GpuApi on first use).
     mSoh3d = std::make_unique<Zelda3DRenderer>();
+    mHud = std::make_unique<Zelda3DHudRenderer>();
     SPDLOG_INFO("SDL3 GPU backend initialized (P2: N64 Fast3D world)");
 
     // Render-unification effort (kanban #131), Phase 1: the unified shader (unified_shader.h) is
@@ -897,7 +899,7 @@ void GfxRenderingAPISdl3Gpu::ReplayOps(SDL_GPUTexture* presentTex, uint32_t pres
                 SDL_SetGPUScissor(pass, &op.scissor);
                 // Only the uniform push + vertex source differ across the draw classes (the vertex
                 // layout is baked into op.pipeline). The single fragment-sampler bind path below and the
-                // draw are shared. altVbo != null selects the Zelda3D model buffer (offset 0); null
+                // draw are shared. altVbo != null selects the Zelda3D model / HUD buffer (offset 0); null
                 // falls back to the shared frame mVbo at vboOffset (N64). DRAW_FULLSCREEN binds no vbo.
                 bool bindVbo = true;
                 switch (op.drawClass) {
@@ -910,6 +912,9 @@ void GfxRenderingAPISdl3Gpu::ReplayOps(SDL_GPUTexture* presentTex, uint32_t pres
                         SDL_PushGPUVertexUniformData(mCmd, 1, u + Zelda3DSg::kCommonBytes, Zelda3DSg::kBonesBytes);
                         break;
                     }
+                    case Op::DRAW_HUD:
+                        SDL_PushGPUVertexUniformData(mCmd, 0, op.ubo, 16); // { vec2 viewport; vec2 pad; }
+                        break;
                     case Op::DRAW_FULLSCREEN:
                         SDL_PushGPUFragmentUniformData(mCmd, 0, op.ubo, op.uboLen);
                         bindVbo = false; // fullscreen triangle is generated from gl_VertexIndex
@@ -2523,7 +2528,7 @@ void GfxRenderingAPISdl3Gpu::SetCurrentPrimDepth(float depth) {
 }
 
 // ---------------------------------------------------------------------------
-// Zelda3D unified-op hooks (P3): the OoT3D model / RmlUi content appends its draws as ops into
+// Zelda3D unified-op hooks (P3): the OoT3D model / HUD / RmlUi content appends its draws as ops into
 // the SAME deferred op-list as the N64 triangles, replayed in ONE render pass in FinishRender. The
 // legacy BeginZelda3DPass live-command-buffer handshake is gone (the methods below are the only path).
 // ---------------------------------------------------------------------------
@@ -2591,6 +2596,28 @@ void GfxRenderingAPISdl3Gpu::AppendZelda3DModelDraw(SDL_GPUGraphicsPipeline* pip
     op.samplers[2].texture = tex1 ? tex1 : DummyTexture();
     op.samplers[2].sampler = samp1 ? samp1 : DummySampler();
     op.zelda3dDrawIdx = idx;
+    mOps.push_back(std::move(op));
+}
+
+void GfxRenderingAPISdl3Gpu::AppendZelda3DHudDraw(SDL_GPUGraphicsPipeline* pipeline, SDL_GPUBuffer* vbo, uint32_t first,
+                                                uint32_t count, SDL_GPUTexture* tex, SDL_GPUSampler* samp, float w,
+                                                float h) {
+    Op op{};
+    op.kind = OP_DRAW;
+    op.drawClass = Op::DRAW_HUD;
+    op.fb = 0; // HUD composites into fb 0 (the present blit / headless readback target)
+    op.pipeline = pipeline;
+    op.altVbo = vbo;
+    op.firstVertex = first;
+    op.numVerts = count;
+    op.viewport = SDL_GPUViewport{ 0.0f, 0.0f, w, h, 0.0f, 1.0f };
+    op.scissor = SDL_Rect{ 0, 0, (int)w, (int)h };
+    op.numSamplers = 1;
+    op.samplers[0].texture = tex;
+    op.samplers[0].sampler = samp;
+    // The vertex shader's UBO is { vec2 uViewport; vec2 pad; } — build it into op.ubo (vertex slot 0).
+    float vubo[4] = { w, h, 0.0f, 0.0f };
+    memcpy(op.ubo, vubo, sizeof(vubo));
     mOps.push_back(std::move(op));
 }
 

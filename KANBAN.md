@@ -19,8 +19,8 @@ Card format: `- [#N] <title> — <notes / evidence link>`  (N = simple increment
 
 ## in-progress
 
+- [#205] N64 HUD is drawn by the Fast3D INTERPRETER — move it to a NATIVE draw path — user request 2026-07-28 (screenshot: item-button discs rendering as black bars; explicit instruction NOT to fix the glitch but to change the architecture). **Pass 1 landed; the card stays here because the conversion is not complete.** Architecture in place: the N64 HUD keeps its LAYOUT and only its final texrect emission becomes a `Zelda3D_HudQuad*` record, drawn in `Gui::EndFrame` by the restored SDL3-GPU quad renderer (extended with a per-vertex ENV colour + combine mode for the heart `(PRIM-ENV)*TEXEL0+ENV` case). **Converted: the item-button cluster** (disc + item icon + ammo count + key badge) — the region in the photo; its black bars are gone, and the shared-resident-tile + `bgScale` coupling that caused them no longer exists on that path. Evidence `scratch/screenshots/hud_native_after{,_zoom}.png` vs `hud_before_native.png`. **Still on the interpreter (next passes):** health meter, magic bar, rupee/key counters, timers, do-action label, A button, C-Up/start (the residual bar stack left of the item buttons), minimap. Elements must convert as a GROUP — the native pass runs after the whole interpreter frame, so a half-converted element inverts its own layering. Writeup `debug_journal/2026-07-28-hud-off-the-interpreter.md`. NOTE on "you can also use 3DS HUD": taken as permission, not a mandate — OoT3D's HUD is a DUAL-SCREEN design, so transplanting its layout to one screen is a redesign; say the word if that is wanted.
 
-_(empty)_
 
 ## in-review
 
