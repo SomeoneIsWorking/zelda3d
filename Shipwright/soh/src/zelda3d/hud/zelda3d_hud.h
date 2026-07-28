@@ -20,10 +20,17 @@
 // C-button cluster and clobbered `gSaveContext.equips.buttonItems`. Keeping the engine's layout and
 // moving only the draw avoids repeating that, and cannot silently lose a HUD feature.
 //
-// ORDERING CONSEQUENCE, and why elements convert as a GROUP: the native pass runs after the whole
-// interpreter frame, so anything recorded here lands on top of everything the interpreter drew. An
-// element must therefore be converted with its whole stack (background, icon, counter, badge) or the
-// layering inverts. That is what Zelda3D_HudOwns() gates.
+// ORDERING, and why elements currently convert as a GROUP: anything recorded here lands on top of
+// everything the interpreter drew, so an element must be converted with its whole stack (background,
+// icon, counter, badge) or the layering inverts. That is what Zelda3D_HudOwns() gates.
+//
+// That is an ARTIFACT OF BATCHING, not a property of the renderer — worth knowing before designing
+// around it. The quads are appended as OP_DRAW records into the SDL3-GPU backend's SAME deferred op
+// list as the N64 triangles, and that list replays in order; they land on top only because
+// Zelda3D_HudFrame() collects the whole frame and flushes once, from Gui::EndFrame, after every other
+// draw has been recorded. Flushing at the point of RECORDING would interleave them correctly and
+// remove the group rule entirely. See docs/issues/0005-*: that is what the minimap needs, because its
+// compass arrows are 3D meshes that no quad can honestly represent.
 #ifndef ZELDA3D_HUD_ZELDA3D_HUD_H
 #define ZELDA3D_HUD_ZELDA3D_HUD_H
 

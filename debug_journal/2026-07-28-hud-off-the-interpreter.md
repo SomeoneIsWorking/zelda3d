@@ -206,3 +206,44 @@ the same setting) is ~250 changed pixels in the heart region from scene motion a
 against that, not against zero.
 
 Remaining on the interpreter: timers, the HBA score digits, the C-Up "Navi" label, the minimap.
+
+
+## Pass 5 — the minimap, and a correction to this document's own ordering rule
+
+Converted first: the C-Up/"Navi" prompt (its disc was a THIRD victim of the shared-resident-tile
+corruption), the event timer, and the HBA score digits. New primitive `navicall <0|1>` — the Navi
+prompt only appears when the game decides Navi has something to say, and a one-shot poke at
+`naviCalling` does not survive because `Interface_Update` clears it before the draw, so it is a
+persistent override re-applied at the top of `Interface_Draw`.
+
+That leaves the minimap, and it does not convert the way the others did.
+
+**The compass icons are 3D MESHES, not texrects.** `Minimap_DrawCompassIcons` draws the player-position
+and last-entrance arrows with `gSPDisplayList(gCompassArrowDL)` — an untextured OTR display list under
+a full transform (`Matrix_Scale` + `Matrix_RotateX(-1.6)` + `Matrix_RotateY(heading)`), with
+`G_CC_PRIMITIVE` for a solid colour. A textured quad cannot represent that. Substituting a rotated
+arrow SPRITE would look approximately right and would be exactly the thing this project bans: a clone
+standing in for the real mechanism, losing the arrow's actual geometry while looking finished.
+
+**And the group rule this document has been asserting is WRONG — or rather, it is an artifact, not a
+property.** Every pass so far has said "elements must convert as a group, because the native pass runs
+after the whole interpreter frame and lands on top of everything". The first half is true; the
+conclusion is not. The HUD quads are appended by `AppendZelda3DHudDraw` as `OP_DRAW` records into the
+SDL3-GPU backend's **same deferred op list as the N64 triangles**, replayed in order. They land on top
+only because `Zelda3D_HudFrame()` batches the whole frame's quads and flushes them once, from
+`Gui::EndFrame`, after everything else has been recorded.
+
+Flush at the point of RECORDING instead and the ops interleave in the correct place — which means:
+
+- elements convert INDIVIDUALLY, with no group rule at all;
+- the minimap's map image can go native while its 3D arrows stay on the interpreter and still draw
+  over it, with no approximation of the arrows anywhere.
+
+What that needs: `Begin`/`End` currently assume one cycle per frame — `End` uploads into
+`g.rings[ringIdx]` and advances, so with `kRingFrames == 3` only three flushes fit before wrapping
+onto a slot that may still be in flight. Multi-flush needs the ring to accumulate an offset within a
+frame (or to size itself to the frame's quad count) rather than one slot per flush.
+
+That is the next step, and it is worth doing before the minimap: it removes a constraint every future
+element would otherwise inherit, and it is why the minimap is NOT being converted with a sprite arrow
+in the meantime.
