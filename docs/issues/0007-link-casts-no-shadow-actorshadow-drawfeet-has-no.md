@@ -59,3 +59,29 @@ boxes do not cover identical geometry. The before/after/oracle ordering is solid
 not. Also note the oracle at daytime 0x4000 shows NO visible shadow under Link either
 (`scratch/screenshots/oracle_t0x4000_feet.png`), so the shadow is light-dependent on the 3DS as well.
 
+## The follow-up gap was a MEASUREMENT ARTIFACT — closed
+
+The "OoT3D's shadow is 4x the contrast" table above is WRONG, and the error was the comparison, not
+the renderer: the two frames were not lighting-matched. Shadow contrast, green(under-boots) /
+green(clean grass) measured inside the SAME frame:
+
+| frame                        | ratio |
+|------------------------------|-------|
+| ours, daytime 0x4000         | 0.862 |
+| ours, daytime 0x6000         | 0.868 |
+| ours, daytime 0xB000 (low sun)| 0.624 |
+| OoT3D oracle (`oracle_kday`) | 0.654 |
+
+The oracle frame matches our LOW-SUN frame, not our 0x6000 frame — so `oracle_shot.py --daytime
+0x6000` did not put the oracle at the same sun position our game was at. With the lighting matched,
+the two agree to within the placement error of the sample boxes.
+
+Visually the same: at 0xB000 our shadow is large, dark and elongated exactly like the oracle's
+(`scratch/screenshots/sh_0xB000.png`); at 0x4000 it is nearly absent (`sh_0x4000.png`). That is the
+shared `4.5f - light->l.dir[1] * 0.035f` stretch and the shared `min(1, w*5e-5) * shadowAlpha`
+darkening doing exactly what they should.
+
+Frontier row `player.shadow-strength` is closed as skip-by-design. **Lesson:** an oracle-vs-ours
+pixel comparison is meaningless unless time-of-day is verified equal on BOTH sides; passing
+`--daytime` to the oracle is not proof that it landed there.
+
