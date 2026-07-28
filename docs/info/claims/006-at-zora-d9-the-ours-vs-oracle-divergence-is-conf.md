@@ -1,9 +1,10 @@
 ---
 id: C006
 kind: claim
-status: holds
+status: falsified
 created: 2026-07-28
 tags: 
+falsified_on: 2026-07-28
 ---
 
 ## Claim
@@ -17,3 +18,9 @@ Draw-isolated (sgdrawonly 8 = oracle d9) FRAGDBG readback, inverse-sRGB'd to the
 ## What would falsify it
 
 A repeat with the colour-space conversion done the other way round (inverse-sRGB verified against a known ramp rather than assumed), or a per-fragment readback path on our side that does not go through the gamma-encoded framebuffer — either could change which channels look divergent. Also falsified if the isolation is shown to include a second group.
+
+## FALSIFIED 2026-07-28
+
+Rested on distrusted instrument I004 (an assumed sRGB conversion, disproved by the mode-8 ramp) AND on a second error: it read the FRAME VALUE at d9's pixels rather than d9's own contribution, so the additive background was included. Redone with a calibrated extraction — contribution = (isolated frame - same frame with our draw suppressed) / 0.4005, the scale measured from the known ramp — the picture inverts. texcol ours (57.6,58.3,43.5) vs oracle (59.7,65.4,50.0): ratio 0.96/0.89/0.87, essentially at parity. primary ours (2.7,99.0,113.7) vs oracle (0.2,69.7,84.5): RED IS ~ZERO ON BOTH SIDES, so there is no red divergence; instead G and B are 42% and 35% TOO HIGH on ours. combined ours (2.4,75.5,74.8) vs oracle (0.0,51.9,54.6): +45%/+37%. See the replacement claim.
+
+> Anything that cited this claim as proof must be re-checked. Grep the repo for it.

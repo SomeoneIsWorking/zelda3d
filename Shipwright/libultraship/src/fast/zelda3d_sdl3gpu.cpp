@@ -793,6 +793,14 @@ bool Fast::Zelda3DRenderer::ensureResources() {
                              : mode == 3 ? "frag = vec4(1.0); return;\n"
                              : mode == 4 ? "frag = vec4(shade, 1.0); return;\n"
                              : mode == 5 ? "frag = vec4(prim.rgb, 1.0); return;\n"
+                             // Mode 8 is the COLOUR-SPACE RAMP: known constants (0.25, 0.5, 0.75) out of
+                             // the shader, so a readback says what the path between here and the PNG does
+                             // to a value. It exists because every ours-vs-oracle number is compared
+                             // against Azaher's software rasterizer, whose PIXEL lines are raw linear
+                             // 8-bit — and an assumed-but-unvalidated sRGB conversion on our side would
+                             // silently reassign the divergence to the wrong channel. Linear passthrough
+                             // reads (64,128,191); sRGB encoding on write reads about (137,188,225).
+                             : mode == 8 ? "frag = vec4(0.25, 0.5, 0.75, 1.0); return;\n"
                                          : "";
         // Mode 6 taps LATER: the combiner result before the CONSTANT/stage-scale/FOG stages —
         // the direct counterpart of the oracle's `PIXEL ... combined=` field.

@@ -1,8 +1,9 @@
 ---
 id: I004
 kind: instrument
-status: trusted
+status: DISTRUSTED
 created: 2026-07-28
+distrusted_on: 2026-07-28
 ---
 
 ## Instrument
@@ -16,3 +17,9 @@ DO NOT COMPARE THESE TWO RAW — they are in different colour spaces, and the mi
 ## Known failure modes
 
 (none recorded yet)
+
+## DISTRUSTED 2026-07-28
+
+FALSIFIED 2026-07-28 by the ramp check it said was missing. A new FRAGDBG mode 8 emits the known constants (0.25,0.5,0.75); the recovered contribution is (25.38,51.14,76.9), whose channel RATIOS are 1:2.015:3.03 — the input ratios preserved exactly. A gamma encoding cannot do that (sRGB of 0.25/0.5/0.75 gives ratios 1:1.37:1.64). So our readback path is LINEAR, there is no sRGB encoding to undo, and the inverse-sRGB this entry recommended was wrong. What the ramp DID reveal is a uniform scale: contribution = frag * 0.4005 (per-channel 0.3982/0.4011/0.4021), because the additive blend's source factor is not the shader's frag.a. The correct extraction is therefore (on - bg) / 0.4005, not a colour-space conversion — see the replacement instrument.
+
+> Every result this instrument produced is suspect until it is re-validated.
