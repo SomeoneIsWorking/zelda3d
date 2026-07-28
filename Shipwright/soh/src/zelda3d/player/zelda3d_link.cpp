@@ -326,15 +326,41 @@ unsigned long long Zelda3D::LinkMidMask::compute(Player* player) const {
 
     // BACK (sheath + back shield), bone 21. Combine sheathType with currentShield. The sword-on-back
     // hilt (mid 11/14) and shield panel are baked together per combination, so this is one choice.
+    //
+    // #201 e — THE SWORD-NOT-YET-OWNED RULE. `sheathType` comes from the model GROUP, which is
+    // derived from what Link is holding and knows nothing about whether he owns a sword at all. Both
+    // N64 and OoT3D therefore apply a second, draw-time override that suppresses the back-worn sword
+    // when the child has no Kokiri sword on B — and without it a swordless child wears a sword he has
+    // never picked up. Ported from OoT3D `0x004c70c4` (oot3d-decomp/docs/player_draw_impl_located.md),
+    // whose fallback table at `0x0053c4b8` is byte-for-byte N64's two rows commented
+    // "(child, no sword)" in `sSheathWithSwordDLs` (z_player_lib.c:212-223) — `-1` there is the
+    // draw-nothing sentinel, and its Deku row's mesh id 13 is exactly our LINK_MID(13).
+    //
+    // N64 (z_player_lib.c:1420-1441) is TWO rules, not one:
+    //   * SHEATH_18/19 (shield on back): `dLists += currentShield * 4`, then if the child has no
+    //     Kokiri sword AND `currentShield < PLAYER_SHIELD_HYLIAN`, `dLists += PLAYER_SHIELD_MAX * 4`
+    //     — landing on the (child, no sword) row for NONE or DEKU. Hylian/Mirror are excluded, so a
+    //     child carrying one of those keeps his normal back geometry.
+    //   * SHEATH_16/17 (no shield on back): the base is replaced outright by the all-NULL row, i.e.
+    //     nothing on the back.
+    const bool noKokiriSword = (gSaveContext.equips.buttonItems[0] != ITEM_SWORD_KOKIRI);
     switch (player->sheathType) {
         case PLAYER_MODELTYPE_SHEATH_18: // sword sheathed AND shield on back
-            m |= deku ? LINK_MID(11) : (hylian ? LINK_MID(9) : LINK_MID(14));
+            if (noKokiriSword && player->currentShield < PLAYER_SHIELD_HYLIAN) {
+                m |= deku ? LINK_MID(13) : 0ull; // (child, no sword) row: Deku shield alone, else bare
+            } else {
+                m |= deku ? LINK_MID(11) : (hylian ? LINK_MID(9) : LINK_MID(14));
+            }
             break;
         case PLAYER_MODELTYPE_SHEATH_19: // shield on back, empty sheath (sword drawn)
-            m |= deku ? LINK_MID(13) : (hylian ? LINK_MID(10) : 0ull);
+            if (noKokiriSword && player->currentShield < PLAYER_SHIELD_HYLIAN) {
+                m |= deku ? LINK_MID(13) : 0ull;
+            } else {
+                m |= deku ? LINK_MID(13) : (hylian ? LINK_MID(10) : 0ull);
+            }
             break;
         case PLAYER_MODELTYPE_SHEATH_16: // sword on back, no shield
-            m |= LINK_MID(14);
+            m |= noKokiriSword ? 0ull : LINK_MID(14);
             break;
         case PLAYER_MODELTYPE_SHEATH_17: // empty sheath, no shield (sword drawn, no shield)
         default:
