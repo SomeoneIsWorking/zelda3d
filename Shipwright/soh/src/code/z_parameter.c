@@ -25,6 +25,7 @@
 #include "zelda3d/zelda3d.h" // #32 — Xbox face-button HUD glyphs (Zelda3D_XboxBtnEnabled / Zelda3D_XboxGlyphTex)
 #include "zelda3d/input/zelda3d_input.h" // Zelda3D_XboxBtnEnabled / Zelda3D_InputDevice
 #include "zelda3d/input/zelda3d_keymap.h"  // #203 — key label for the keyboard HUD badge
+#include "zelda3d/hud/zelda3d_hud.h"     // #205 — native HUD: record quads instead of texrects
 
 #include "message_data_static.h"
 extern MessageTableEntry* sNesMessageEntryTablePtr;
@@ -1589,7 +1590,61 @@ static void Zelda3D_RecordHudBtn(int i, s16 x, s16 y, s16 w, u8 alpha, char glyp
     sZelda3dHudBtns[i].n64Button = n64Button;
     sZelda3dHudBtns[i].active = 1;
 }
+// #205 — the interfaceCtx fade alpha for one item-button slot. The HUD's own draws take their alpha
+// from a gDPSetPrimColor the caller issued; the native path needs the same value explicitly.
+static u8 Zelda3D_HudButtonAlpha(InterfaceContext* interfaceCtx, s16 button) {
+    switch (button) {
+        case 0: return (u8)interfaceCtx->bAlpha;
+        case 1: return (u8)interfaceCtx->cLeftAlpha;
+        case 2: return (u8)interfaceCtx->cDownAlpha;
+        case 3: return (u8)interfaceCtx->cRightAlpha;
+        case 4: return (u8)interfaceCtx->dpadUpAlpha;
+        case 5: return (u8)interfaceCtx->dpadDownAlpha;
+        case 6: return (u8)interfaceCtx->dpadLeftAlpha;
+        default: return (u8)interfaceCtx->dpadRightAlpha;
+    }
+}
+
+// #205 — native-HUD badge pass: same geometry as the display-list one below, recorded as quads.
+static void Zelda3D_RecordHudBadges(void) {
+    const int useKbd = Zelda3D_XboxBtnEnabled() && (Zelda3D_InputDevice() == 1);
+    for (int i = 0; i < 4; i++) {
+        if (!sZelda3dHudBtns[i].active) {
+            continue;
+        }
+        sZelda3dHudBtns[i].active = 0; // consume; re-recorded each frame
+        if (!Zelda3D_XboxBtnEnabled()) {
+            continue;
+        }
+        s16 bw = (s16)(sZelda3dHudBtns[i].w * 9 / 16);
+        s16 bx = (s16)(sZelda3dHudBtns[i].x + sZelda3dHudBtns[i].w - bw);
+        const s16 by = sZelda3dHudBtns[i].y;
+        int gw = 0, gh = 0;
+        const void* tex;
+        if (useKbd) {
+            tex = Zelda3D_KeyCapTex(Zelda3D_KeyLabelForButton(sZelda3dHudBtns[i].n64Button), &gw, &gh);
+        } else {
+            tex = Zelda3D_XboxGlyphTex(sZelda3dHudBtns[i].glyph, &gw, &gh);
+        }
+        if (tex == NULL || gw <= 0 || gh <= 0) {
+            continue;
+        }
+        // A multi-character keycap is wider than tall (#203): widen the rect to the texture's aspect
+        // and keep its right edge against the button, exactly as the display-list path does.
+        s16 rw = bw;
+        if (gw > gh) {
+            rw = (s16)((bw * gw) / gh);
+            bx = (s16)(bx + bw - rw);
+        }
+        Zelda3D_HudQuad(tex, gw, gh, bx, by, rw, bw, 0xFFFFFF00u | (u32)sZelda3dHudBtns[i].alpha);
+    }
+}
+
 static Gfx* Zelda3D_DrawHudBadges(Gfx* dl) {
+    if (Zelda3D_HudOwns(ZELDA3D_HUD_ITEM_BUTTONS)) {
+        Zelda3D_RecordHudBadges();
+        return dl;
+    }
     // #32 hotswap: pick glyph set from last-used input device (Zelda3D_InputDevice(): 0=gamepad,
     // 1=keyboard). Both draw helpers share the Fast3D combine + dsdx/dtdy math; the keyboard one
     // additionally widens its rect for a multi-character keycap (#203), which is why the badge box
@@ -4365,40 +4420,58 @@ void Interface_DrawItemButtons(PlayState* play) {
     // role rather than a disc stacked under the icon). Record each button's screen rect + per-button
     // glyph (B->B, C-Left->X, C-Down->Y, C-Right->A) so the badge pass can place the glyph.
     {
-        OVERLAY_DISP = Gfx_TextureIA8(OVERLAY_DISP, gButtonBackgroundTex, BBtn_Size, BBtn_Size, PosX_BtnB, PosY_BtnB,
-                                      BBtnScaled, BBtnScaled, BBtn_factor, BBtn_factor);
-        Zelda3D_RecordHudBtn(0, PosX_BtnB, PosY_BtnB, BBtnScaled, interfaceCtx->bAlpha, 'B', BTN_B);
+        // #205 — the four item-button discs. On the native HUD path these are recorded as quads and
+        // drawn by our own renderer; the display-list emission below is the interpreter fallback.
+        //
+        // Note what disappears with the native path: the N64 route loads the disc ONCE (the B-button
+        // Gfx_TextureIA8 call) and the three C-button texrects REUSE that resident tile with a
+        // dsdx/dtdy fudge (`bgScale`) because the crisp disc is bigger than the 32x32 tile the
+        // texcoords were authored for. That shared-resident-tile coupling is what corrupts the discs
+        // into black bars when the tile state does not line up. A native quad carries its own texture
+        // and UVs, so neither the shared tile nor bgScale exists.
+        const struct {
+            s16 x, y, w;
+            u16 alpha;
+            Color_RGB8 color;
+            char glyph;
+            u16 n64Button;
+        } discs[4] = {
+            { PosX_BtnB, PosY_BtnB, BBtnScaled, interfaceCtx->bAlpha, bButtonColor, 'B', BTN_B },
+            { C_Left_BTN_Pos[0], C_Left_BTN_Pos[1], R_ITEM_BTN_WIDTH(1), interfaceCtx->cLeftAlpha,
+              cLeftButtonColor, 'X', BTN_CLEFT },
+            { C_Down_BTN_Pos[0], C_Down_BTN_Pos[1], R_ITEM_BTN_WIDTH(2), interfaceCtx->cDownAlpha,
+              cDownButtonColor, 'Y', BTN_CDOWN },
+            { C_Right_BTN_Pos[0], C_Right_BTN_Pos[1], R_ITEM_BTN_WIDTH(3), interfaceCtx->cRightAlpha,
+              cRightButtonColor, 'A', BTN_CRIGHT },
+        };
 
-        // C-Left Button Color & Texture
-        gDPPipeSync(OVERLAY_DISP++);
-        gDPSetPrimColor(OVERLAY_DISP++, 0, 0, cLeftButtonColor.r, cLeftButtonColor.g, cLeftButtonColor.b,
-                        interfaceCtx->cLeftAlpha);
-        gSPWideTextureRectangle(OVERLAY_DISP++, C_Left_BTN_Pos[0] << 2, C_Left_BTN_Pos[1] << 2,
-                                (C_Left_BTN_Pos[0] + R_ITEM_BTN_WIDTH(1)) << 2,
-                                (C_Left_BTN_Pos[1] + R_ITEM_BTN_WIDTH(1)) << 2, G_TX_RENDERTILE, 0, 0,
-                                (R_ITEM_BTN_DD(1) << 1) * bgScale, (R_ITEM_BTN_DD(1) << 1) * bgScale);
-        Zelda3D_RecordHudBtn(1, C_Left_BTN_Pos[0], C_Left_BTN_Pos[1], R_ITEM_BTN_WIDTH(1), interfaceCtx->cLeftAlpha, 'X',
-                             BTN_CLEFT);
-
-        // C-Down Button Color & Texture
-        gDPSetPrimColor(OVERLAY_DISP++, 0, 0, cDownButtonColor.r, cDownButtonColor.g, cDownButtonColor.b,
-                        interfaceCtx->cDownAlpha);
-        gSPWideTextureRectangle(OVERLAY_DISP++, C_Down_BTN_Pos[0] << 2, C_Down_BTN_Pos[1] << 2,
-                                (C_Down_BTN_Pos[0] + R_ITEM_BTN_WIDTH(2)) << 2,
-                                (C_Down_BTN_Pos[1] + R_ITEM_BTN_WIDTH(2)) << 2, G_TX_RENDERTILE, 0, 0,
-                                (R_ITEM_BTN_DD(2) << 1) * bgScale, (R_ITEM_BTN_DD(2) << 1) * bgScale);
-        Zelda3D_RecordHudBtn(2, C_Down_BTN_Pos[0], C_Down_BTN_Pos[1], R_ITEM_BTN_WIDTH(2), interfaceCtx->cDownAlpha, 'Y',
-                             BTN_CDOWN);
-
-        // C-Right Button Color & Texture
-        gDPSetPrimColor(OVERLAY_DISP++, 0, 0, cRightButtonColor.r, cRightButtonColor.g, cRightButtonColor.b,
-                        interfaceCtx->cRightAlpha);
-        gSPWideTextureRectangle(OVERLAY_DISP++, C_Right_BTN_Pos[0] << 2, C_Right_BTN_Pos[1] << 2,
-                                (C_Right_BTN_Pos[0] + R_ITEM_BTN_WIDTH(3)) << 2,
-                                (C_Right_BTN_Pos[1] + R_ITEM_BTN_WIDTH(3)) << 2, G_TX_RENDERTILE, 0, 0,
-                                (R_ITEM_BTN_DD(3) << 1) * bgScale, (R_ITEM_BTN_DD(3) << 1) * bgScale);
-        Zelda3D_RecordHudBtn(3, C_Right_BTN_Pos[0], C_Right_BTN_Pos[1], R_ITEM_BTN_WIDTH(3), interfaceCtx->cRightAlpha,
-                             'A', BTN_CRIGHT);
+        if (Zelda3D_HudOwns(ZELDA3D_HUD_ITEM_BUTTONS)) {
+            int dw = 0, dh = 0;
+            const void* disc = Zelda3D_ButtonBgTex(&dw, &dh);
+            for (int di = 0; di < 4; di++) {
+                // MODULATEIA_PRIM: the disc is grayscale-intensity + coverage alpha, so a straight
+                // modulate by the button's PRIM colour is the same result.
+                Zelda3D_HudQuad(disc, dw, dh, discs[di].x, discs[di].y, discs[di].w, discs[di].w,
+                                ((u32)discs[di].color.r << 24) | ((u32)discs[di].color.g << 16) |
+                                    ((u32)discs[di].color.b << 8) | (u32)discs[di].alpha);
+            }
+        } else {
+            OVERLAY_DISP = Gfx_TextureIA8(OVERLAY_DISP, gButtonBackgroundTex, BBtn_Size, BBtn_Size, PosX_BtnB,
+                                          PosY_BtnB, BBtnScaled, BBtnScaled, BBtn_factor, BBtn_factor);
+            for (int di = 1; di < 4; di++) {
+                gDPPipeSync(OVERLAY_DISP++);
+                gDPSetPrimColor(OVERLAY_DISP++, 0, 0, discs[di].color.r, discs[di].color.g, discs[di].color.b,
+                                discs[di].alpha);
+                gSPWideTextureRectangle(OVERLAY_DISP++, discs[di].x << 2, discs[di].y << 2,
+                                        (discs[di].x + discs[di].w) << 2, (discs[di].y + discs[di].w) << 2,
+                                        G_TX_RENDERTILE, 0, 0, (R_ITEM_BTN_DD(di) << 1) * bgScale,
+                                        (R_ITEM_BTN_DD(di) << 1) * bgScale);
+            }
+        }
+        for (int di = 0; di < 4; di++) {
+            Zelda3D_RecordHudBtn(di, discs[di].x, discs[di].y, discs[di].w, discs[di].alpha, discs[di].glyph,
+                                 discs[di].n64Button);
+        }
     }
 
     if ((pauseCtx->state < 8) || (pauseCtx->state >= 18)) {
@@ -4869,13 +4942,24 @@ void Interface_DrawItemIconTexture(PlayState* play, void* texture, s16 button) {
         ItemIconPos[3][1] = ItemIconPos_ori[3][1];
     }
 
-    gDPLoadTextureBlock(OVERLAY_DISP++, texture, G_IM_FMT_RGBA, G_IM_SIZ_32b, 32, 32, 0, G_TX_NOMIRROR | G_TX_WRAP,
-                        G_TX_NOMIRROR | G_TX_WRAP, G_TX_NOMASK, G_TX_NOMASK, G_TX_NOLOD, G_TX_NOLOD);
+    // #205 — the icon is already an RGBA32 32x32 texture, so the native HUD draws it as a plain
+    // modulate quad at the very rect the layout above produced. Alpha is the button's own fade.
+    // (One CLOSE_DISPS only: it closes the block OPEN_DISPS opened, so an early return past it
+    // would terminate the function's scope.)
+    if (Zelda3D_HudOwns(ZELDA3D_HUD_ITEM_BUTTONS)) {
+        Zelda3D_HudQuad(texture, 32, 32, ItemIconPos[button][0], ItemIconPos[button][1],
+                        gItemIconWidth[button], gItemIconWidth[button],
+                        0xFFFFFF00u | (u32)Zelda3D_HudButtonAlpha(interfaceCtx, button));
+    } else {
+        gDPLoadTextureBlock(OVERLAY_DISP++, texture, G_IM_FMT_RGBA, G_IM_SIZ_32b, 32, 32, 0,
+                            G_TX_NOMIRROR | G_TX_WRAP, G_TX_NOMIRROR | G_TX_WRAP, G_TX_NOMASK, G_TX_NOMASK,
+                            G_TX_NOLOD, G_TX_NOLOD);
 
-    gSPWideTextureRectangle(OVERLAY_DISP++, ItemIconPos[button][0] << 2, ItemIconPos[button][1] << 2,
-                            (ItemIconPos[button][0] + gItemIconWidth[button]) << 2,
-                            (ItemIconPos[button][1] + gItemIconWidth[button]) << 2, G_TX_RENDERTILE, 0, 0,
-                            gItemIconDD[button] << 1, gItemIconDD[button] << 1);
+        gSPWideTextureRectangle(OVERLAY_DISP++, ItemIconPos[button][0] << 2, ItemIconPos[button][1] << 2,
+                                (ItemIconPos[button][0] + gItemIconWidth[button]) << 2,
+                                (ItemIconPos[button][1] + gItemIconWidth[button]) << 2, G_TX_RENDERTILE, 0, 0,
+                                gItemIconDD[button] << 1, gItemIconDD[button] << 1);
+    }
 
     CLOSE_DISPS(play->state.gfxCtx);
 }
@@ -5133,6 +5217,11 @@ void Interface_DrawAmmoCount(PlayState* play, s16 button, s16 alpha) {
 
         ammo = AMMO(i);
 
+        // The digit colour: white by default, green at full capacity, grey at zero. The N64 path
+        // leaves "white" implicit (it is whatever PRIM the caller last set); the native path needs
+        // the value, so track it here and use it for both routes.
+        u32 digitRGB = 0xFFFFFFu;
+
         gDPPipeSync(OVERLAY_DISP++);
 
         if ((button == 0) && (gSaveContext.minigameState == 1)) {
@@ -5150,10 +5239,12 @@ void Interface_DrawAmmoCount(PlayState* play, s16 button, s16 alpha) {
                    ((i == ITEM_STICK) && (AMMO(i) == CUR_CAPACITY(UPG_STICKS))) ||
                    ((i == ITEM_NUT) && (AMMO(i) == CUR_CAPACITY(UPG_NUTS))) || ((i == ITEM_BOMBCHU) && (ammo == 50)) ||
                    ((i == ITEM_BEAN) && (ammo == 15)) || GameInteractor_Should(VB_COLOR_AMMO_GREEN, false, i)) {
+            digitRGB = 0x78FF00u;
             gDPSetPrimColor(OVERLAY_DISP++, 0, 0, 120, 255, 0, alpha);
         }
 
         if (ammo == 0) {
+            digitRGB = 0x646464u;
             gDPSetPrimColor(OVERLAY_DISP++, 0, 0, 100, 100, 100, alpha);
         }
 
@@ -5161,13 +5252,26 @@ void Interface_DrawAmmoCount(PlayState* play, s16 button, s16 alpha) {
             ammo -= 10;
         }
 
-        if (i != 0) {
-            OVERLAY_DISP = Gfx_TextureIA8(OVERLAY_DISP, (u8*)_gAmmoDigit0Tex[i], 8, 8, ItemIconPos[button][0],
+        // #205 — native HUD: the same two 8x8 digit cells, drawn from the crisp RGBA digit font
+        // instead of the N64 IA8 one, at the same rects.
+        if (Zelda3D_HudOwns(ZELDA3D_HUD_ITEM_BUTTONS)) {
+            const u32 digitPrim = (digitRGB << 8) | (u32)(u8)alpha;
+            int dw = 0, dh = 0;
+            if (i != 0) {
+                const void* dt = Zelda3D_DigitTex(i, &dw, &dh);
+                Zelda3D_HudQuad(dt, dw, dh, ItemIconPos[button][0], ItemIconPos[button][1], 8, 8, digitPrim);
+            }
+            const void* dt0 = Zelda3D_DigitTex(ammo, &dw, &dh);
+            Zelda3D_HudQuad(dt0, dw, dh, ItemIconPos[button][0] + 6, ItemIconPos[button][1], 8, 8, digitPrim);
+        } else {
+            if (i != 0) {
+                OVERLAY_DISP = Gfx_TextureIA8(OVERLAY_DISP, (u8*)_gAmmoDigit0Tex[i], 8, 8, ItemIconPos[button][0],
+                                              ItemIconPos[button][1], 8, 8, 1 << 10, 1 << 10);
+            }
+
+            OVERLAY_DISP = Gfx_TextureIA8(OVERLAY_DISP, (u8*)_gAmmoDigit0Tex[ammo], 8, 8, ItemIconPos[button][0] + 6,
                                           ItemIconPos[button][1], 8, 8, 1 << 10, 1 << 10);
         }
-
-        OVERLAY_DISP = Gfx_TextureIA8(OVERLAY_DISP, (u8*)_gAmmoDigit0Tex[ammo], 8, 8, ItemIconPos[button][0] + 6,
-                                      ItemIconPos[button][1], 8, 8, 1 << 10, 1 << 10);
     }
 
     CLOSE_DISPS(play->state.gfxCtx);

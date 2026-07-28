@@ -16,6 +16,11 @@
 #include "ship/window/gui/resource/GuiTextureFactory.h"
 #include "ship/window/gui/resource/GuiTexture.h"
 
+// Zelda3D native HUD render entry (defined in soh/src/zelda3d/hud/zelda3d_hud.cpp). C linkage;
+// called from Gui::EndFrame before the RmlUi menu so the HUD draws under an open ESC menu. No-op
+// when the HUD renderer is unavailable.
+extern "C" void Zelda3D_HudFrame(void);
+
 namespace Ship {
 #define TOGGLE_BTN ImGuiKey_F1
 #define TOGGLE_PAD_BTN ImGuiKey_GamepadBack
@@ -162,8 +167,9 @@ void Gui::StartFrame() {
 
 void Gui::EndFrame() {
     // ImGui removed: no Render / draw-data path. The game frame is composited natively by the
-    // interpreter onto fb 0 (HUD included, via the N64 Fast3D path); here we draw the RmlUi menu
-    // on top.
+    // interpreter onto fb 0; here we draw the Zelda3D HUD (its own quad renderer, NOT the Fast3D
+    // interpreter — kanban #205) and then the RmlUi menu on top.
+    Zelda3D_HudFrame();
     RenderRmlMenu();
 }
 

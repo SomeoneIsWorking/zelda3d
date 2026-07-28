@@ -19,10 +19,11 @@
 
 namespace Fast {
 
-// The OoT3D model renderer + PC HUD, folded into this backend as member subsystems (see
+// The OoT3D model renderer + HUD, folded into this backend as member subsystems (see
 // fast/backends/zelda3d_sdl3gpu.h). Forward-declared here so only gfx_sdl3gpu.cpp + the two zelda3d
 // .cpp files need the full definitions.
 class Zelda3DRenderer;
+class Zelda3DHudRenderer;
 
 // Forward declaration of the SDL window backend so the SDL3-GPU rendering API can pull the
 // SDL_Window out of it (to claim it for the GPU device). gfx_sdl2.cpp is the shared window
@@ -117,9 +118,9 @@ class GfxRenderingAPISdl3Gpu : public GfxRenderingAPI {
     explicit GfxRenderingAPISdl3Gpu(GfxWindowBackendSDL3* windowBackend);
     ~GfxRenderingAPISdl3Gpu() override;
 
-    // ---- Unified op model: the Zelda3D OoT3D content (CMB models, AO composite, RmlUi menu) records
+    // ---- Unified op model: the Zelda3D OoT3D content (CMB models, HUD, AO composite, RmlUi menu) records
     // its draws into the SAME deferred op-list as the N64 Fast3D triangles, replayed in ONE render pass
-    // in FinishRender. Every in-pass draw is a first-class OP_DRAW (AppendZelda3DModelDraw /
+    // in FinishRender. Every in-pass draw is a first-class OP_DRAW (AppendZelda3DModelDraw / HudDraw /
     // Fullscreen); only genuine offscreen passes use AppendZelda3DOwnPass. zelda3d_sdl3gpu.cpp owns its own
     // GPU resources (created via the device handle below).
     SDL_GPUDevice* GpuDevice() {
@@ -148,6 +149,11 @@ class GfxRenderingAPISdl3Gpu : public GfxRenderingAPI {
                               const void* ubo, SDL_GPUTexture* tex, SDL_GPUSampler* samp, SDL_GPUTexture* tex2,
                               SDL_GPUSampler* samp2, SDL_GPUTexture* tex1, SDL_GPUSampler* samp1,
                               const SDL_GPUViewport& vp, const SDL_Rect& sc);
+    // Append one coalesced HUD quad-run as a first-class OP_DRAW into fb 0 (on top of the N64 + model
+    // content, in the same pass), through the same single fragment-sampler bind path. `vbo` is the HUD
+    // ring vertex buffer; the vertex shader's viewport UBO is built from w/h.
+    void AppendZelda3DHudDraw(SDL_GPUGraphicsPipeline* pipeline, SDL_GPUBuffer* vbo, uint32_t first, uint32_t count,
+                            SDL_GPUTexture* tex, SDL_GPUSampler* samp, float w, float h);
     // Append a fullscreen-triangle post-process draw (the SSAO composite) as a first-class OP_DRAW into
     // the current fb pass, over the scene, through the same single bind path. No vertex buffer (the
     // vertex shader generates the triangle from gl_VertexIndex); `ubo`/`uboLen` is its fragment UBO and
@@ -173,11 +179,14 @@ class GfxRenderingAPISdl3Gpu : public GfxRenderingAPI {
         return mFrameAcquired;
     }
 
-    // The folded-in OoT3D model renderer member subsystem (created in Init, reset in the destructor
-    // before the device is destroyed). The Zelda3D_Sg_* C-ABI shims forward here via
-    // Fast::g_activeSdl3GpuApi.
+    // The folded-in OoT3D model renderer + PC HUD member subsystems (created in Init, reset in the
+    // destructor before the device is destroyed). The Zelda3D_Sg_* / Zelda3D_Hud_* C-ABI shims forward
+    // here via Fast::g_activeSdl3GpuApi.
     Zelda3DRenderer* Soh3d() {
         return mSoh3d.get();
+    }
+    Zelda3DHudRenderer* Hud() {
+        return mHud.get();
     }
 
     // Shared GPU resources the folded-in Zelda3D subsystems draw with, so there is ONE sampler cache
@@ -273,9 +282,10 @@ class GfxRenderingAPISdl3Gpu : public GfxRenderingAPI {
         // the vertex layout (baked into the pipeline) differ.
         //   DRAW_N64        : one fragment UBO (op.ubo) from mVbo.
         //   DRAW_MODEL      : skinned — the 3-block common+bones push from mSoh3dModelUbos[zelda3dDrawIdx].
+        //   DRAW_HUD        : one vertex UBO (op.ubo, the viewport) from altVbo.
         //   DRAW_FULLSCREEN : one fragment UBO (op.ubo, uboLen bytes), NO vertex buffer (the AO composite
         //                     generates a fullscreen triangle from gl_VertexIndex).
-        enum DrawClass : uint8_t { DRAW_N64, DRAW_MODEL, DRAW_FULLSCREEN } drawClass;
+        enum DrawClass : uint8_t { DRAW_N64, DRAW_MODEL, DRAW_HUD, DRAW_FULLSCREEN } drawClass;
         uint16_t uboLen; // fragment-UBO byte length for DRAW_FULLSCREEN (0 = use the class default)
         int zelda3dDrawIdx; // DRAW_MODEL: index into mSoh3dModelUbos for the oversized skinned payload
         std::function<void(SDL_GPUCommandBuffer*)> extOwn; // OP_EXT_OWN_PASS: runs with the main pass ended
@@ -377,6 +387,7 @@ class GfxRenderingAPISdl3Gpu : public GfxRenderingAPI {
 
     // Folded-in renderer subsystems (unique_ptr so the header only needs forward declarations).
     std::unique_ptr<Zelda3DRenderer> mSoh3d;
+    std::unique_ptr<Zelda3DHudRenderer> mHud;
 };
 
 // Set to the live SDL3-GPU backend in Init() (cleared in the destructor); null when another backend

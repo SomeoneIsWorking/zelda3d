@@ -1,5 +1,5 @@
 // Z3DSohShim.c — inert definitions for the Zelda3D (OoT3D) symbols that the SHARED libultraship
-// references (Controller.cpp, interpreter.cpp, zelda3d_sdl3gpu.cpp). Those symbols are defined by
+// references (Controller.cpp, Gui.cpp, interpreter.cpp, zelda3d_sdl3gpu.cpp). Those symbols are defined by
 // the `soh` executable (soh/src/zelda3d/...); the MM (2S2H) executable links the same libultraship
 // but has no OoT3D layer.
 //
@@ -9,6 +9,11 @@
 
 int gZelda3dInputDevice = 0;  // 0 = gamepad, 1 = keyboard (soh HUD glyph select)
 int gZelda3dHlGroup = -1;     // room-group highlight index (-1 = disabled)
+
+// The OoT-side native HUD (soh/src/zelda3d/hud/zelda3d_hud.cpp), called unconditionally from the
+// shared Gui::EndFrame. MM has no OoT3D HUD, so this is inert here.
+void Zelda3D_HudFrame(void) {
+}
 
 void Zelda3D_MeasureResult(int key, float height) {
     (void)key;
