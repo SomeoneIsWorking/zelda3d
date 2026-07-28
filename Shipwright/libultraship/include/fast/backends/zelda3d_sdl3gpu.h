@@ -208,7 +208,10 @@ struct HudVert {
 
 constexpr uint32_t kMaxQuadsPerFrame = 2048;
 constexpr uint32_t kVertsPerQuad = 6;
-constexpr uint32_t kRingFrames = 3;
+// One ring slot is consumed per FLUSH, not per frame: a converted HUD element flushes at its own
+// marker (#205), so a frame consumes as many slots as it has converted elements. Sized so a slot is
+// not reused while a frame that referenced it may still be in flight.
+constexpr uint32_t kRingFrames = 24;
 
 // One contiguous run of quads sharing a texture (a single SDL_DrawGPUPrimitives).
 // One contiguous run of quads sharing a texture AND a sampler. The sampler varies because most HUD
@@ -254,6 +257,9 @@ class Zelda3DHudRenderer {
   public:
     int Available();
     int Begin(int* outW, int* outH);
+    // Upload + append what has been collected so far and keep collecting. Called at a display-list
+    // flush marker so the ops land at that point of the interpreter's execution.
+    void Flush();
     int Tex(const void* key, const void* rgba, int w, int h);
     void Draw(int tex, float x, float y, float w, float h, float u0, float v0, float u1, float v1,
               unsigned int tintRGBA, unsigned int envRGB, int mode);

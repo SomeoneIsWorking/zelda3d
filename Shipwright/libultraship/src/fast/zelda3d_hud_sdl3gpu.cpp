@@ -334,14 +334,18 @@ void Zelda3DHudRenderer::Draw(int tex, float x, float y, float w, float h, float
 }
 
 void Zelda3DHudRenderer::End() {
-    GfxRenderingAPISdl3Gpu* api = g_activeSdl3GpuApi;
-    if (!g.active || !api) {
-        g.active = false;
-        return;
-    }
+    Flush();
     g.active = false;
     g_idToTex.clear();
     g_nextId = 1;
+}
+
+// Upload + append what is collected so far, then keep collecting. Every flush takes its own ring
+// slot, so a frame consumes one slot per converted element rather than one in total.
+void Zelda3DHudRenderer::Flush() {
+    GfxRenderingAPISdl3Gpu* api = g_activeSdl3GpuApi;
+    if (!g.active || !api)
+        return;
     if (g.verts.empty() || g.runs.empty())
         return;
 
@@ -371,6 +375,11 @@ void Zelda3DHudRenderer::End() {
     for (const DrawRun& r : g.runs)
         api->AppendZelda3DHudDraw(g.pipeline, ring.vbo, r.firstVert, r.vertCount, r.tex, r.sampler, (float)g.w,
                                 (float)g.h);
+
+    // This batch is now owned by the op list; start a fresh one. The id->tex table stays valid — a
+    // texture id handed out before a flush must still resolve for quads recorded after it.
+    g.verts.clear();
+    g.runs.clear();
 }
 
 } // namespace Fast
@@ -417,6 +426,11 @@ void Zelda3D_Hud_DrawEnv(int tex, float x, float y, float w, float h, float u0, 
 void Zelda3D_Hud_End(void) {
     if (auto* r = hudR())
         r->End();
+}
+
+void Zelda3D_Hud_Flush(void) {
+    if (auto* r = hudR())
+        r->Flush();
 }
 
 void Zelda3D_Hud_Shutdown(void) {
@@ -472,6 +486,8 @@ void Zelda3D_Hud_DrawEnv(int tex, float x, float y, float w, float h, float u0, 
     (void)mode;
 }
 void Zelda3D_Hud_End(void) {
+}
+void Zelda3D_Hud_Flush(void) {
 }
 void Zelda3D_Hud_Shutdown(void) {
 }

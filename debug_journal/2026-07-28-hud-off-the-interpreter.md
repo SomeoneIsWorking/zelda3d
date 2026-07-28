@@ -247,3 +247,39 @@ frame (or to size itself to the frame's quad count) rather than one slot per flu
 That is the next step, and it is worth doing before the minimap: it removes a constraint every future
 element would otherwise inherit, and it is why the minimap is NOT being converted with a sprite arrow
 in the meantime.
+
+
+## Pass 6 — the flush marker, and the minimap
+
+Built the mechanism the last two passes kept circling, then used it.
+
+**`G_ZELDA3D_HUDFLUSH` (0x4c) + `gSPZelda3DHudFlush`**, modelled on the existing
+`G_ZELDA3D_CLEARDEPTH`: no operands, handler calls `gfx->Flush()` then hands off. A converted element
+emits the marker where it would have drawn, and its quads composite AT THAT POINT of the interpreter's
+execution instead of after the whole frame. `Zelda3DHudRenderer::Flush()` split out of `End()` — each
+flush takes its own ring slot, so a frame consumes one per converted element (`kRingFrames` 3 -> 24).
+
+**The first attempt silently did nothing, and the verification caught it.** The marker fired, but
+`Flush()` early-returns unless `g.active`, and the batch was only opened inside `Zelda3D_HudFrame()`
+at end of frame — so every marker was a no-op and the minimap still composited last, burying the
+compass arrow. The A/B showed the map correct and the red arrow simply absent; without the
+`nativehud` toggle that would have read as "the arrow is broken" rather than "the marker did nothing".
+
+Fixed by pushing quads in INSTALMENTS: the module keeps a cursor into its recorded list, each marker
+pushes everything recorded up to it (opening the renderer batch lazily, since that needs a live frame
+recording that only exists once the interpreter is running), and `Zelda3D_HudFrame` pushes the
+remainder. Verified: red compass-arrow pixels 65 native / 65 interpreter, identical.
+
+**So the group rule is lifted** — elements can now convert alone, and the minimap image is native while
+its compass arrows stay where they belong.
+
+## Where #205 stands
+
+Native: item buttons, do-action/A button, heart row, magic meter, rupee + small-key counters, event
+timer, HBA score, C-Up/Navi, minimap image.
+
+Still interpreter-drawn, and correctly so: the minimap's compass/position arrows and the map-mark
+icons. These are not HUD texrects — `gCompassArrowDL` is untextured 3D geometry under a scale +
+RotateX + RotateY. Drawing them natively means a mesh path, not a quad path; substituting a rotated
+sprite would be a clone standing in for the real mechanism. They now layer correctly over the native
+map, so there is no visual debt — only a scope boundary worth stating plainly.

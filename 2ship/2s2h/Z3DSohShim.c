@@ -14,6 +14,8 @@ int gZelda3dHlGroup = -1;     // room-group highlight index (-1 = disabled)
 // shared Gui::EndFrame. MM has no OoT3D HUD, so this is inert here.
 void Zelda3D_HudFrame(void) {
 }
+void Zelda3D_HudFlushPoint(void) {
+}
 
 void Zelda3D_MeasureResult(int key, float height) {
     (void)key;

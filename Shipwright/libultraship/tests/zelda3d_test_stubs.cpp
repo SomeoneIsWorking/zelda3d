@@ -4,5 +4,6 @@
 // Provide inert definitions here to satisfy the linker; production links the real ones from soh.
 extern "C" {
 void Zelda3D_HudFrame(void) {}
+void Zelda3D_HudFlushPoint(void) {}
 int gZelda3dInputDevice = 0;
 }
