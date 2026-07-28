@@ -37,6 +37,15 @@ class KeyboardKeyToAnyMapping : virtual public ControllerInputMapping {
     /** @brief Returns the human-readable name of the bound key. */
     std::string GetPhysicalInputName() override;
 
+    /**
+     * @brief Returns the raw scan code this mapping is bound to.
+     *
+     * Needed by callers that must order or compare bindings rather than just print them — the HUD
+     * key badge (zelda3d/input/zelda3d_keymap.cpp) uses it to pick one deterministic key when a
+     * button has several keyboard bindings, since the mapping collection is unordered.
+     */
+    KbScancode GetKeyboardScancode() const;
+
   protected:
     KbScancode mKeyboardScancode;
     bool mKeyPressed;

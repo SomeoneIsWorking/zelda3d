@@ -52,7 +52,10 @@ ControlDeck::~ControlDeck() {
 // bindings are wiped and the new defaults are written — a one-time migration per user.
 // v2: BTN_START moved off Escape onto Enter, so Escape only opens the RmlUi menu (was opening the
 //     N64 pause/inventory AND the menu). Bumping re-migrates existing configs to the new defaults.
-static constexpr int kZelda3dInputSchemeVersion = 2;
+// v3: PC-native item bar (kanban #203) — the three C-button item slots moved off the arrow keys
+//     onto 1/2/3, and C-Up (first-person look / Navi, not an item slot) onto C. The arrow keys are
+//     now unbound, reserved for the camera in the mouse-look pass.
+static constexpr int kZelda3dInputSchemeVersion = 3;
 static constexpr const char* kZelda3dInputSchemeVersionCvar = "gZelda3dInputSchemeVersion";
 
 void ControlDeck::Init(uint8_t* controllerBits) {

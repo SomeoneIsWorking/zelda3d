@@ -1,5 +1,9 @@
 <?xml version="1.0" encoding="UTF-8"?>
-<!-- Keyboard-key glyph for N64 B button (default key: C). Keycap style. -->
+<!-- Blank keyboard keycap for the HUD button badges. The LABEL is NOT baked in: the badge text is
+     composited at runtime from the key actually bound to the N64 button (see
+     zelda3d/hud/zelda3d_hud_tex.cpp Zelda3D_KeyCapTex + input/zelda3d_keymap.cpp), so a rebind in
+     the input editor changes the HUD immediately. Cap face spans x 5..59, y 4..56 -> centre (32,30);
+     the runtime keeps the glyph run inside a 46px-wide inner box. -->
 <svg xmlns="http://www.w3.org/2000/svg" width="64" height="64" viewBox="0 0 64 64">
   <defs>
     <linearGradient id="cap" x1="0" y1="0" x2="0" y2="1">
@@ -15,7 +19,4 @@
         filter="url(#shadow)"/>
   <rect x="7" y="6" width="50" height="6" rx="6" ry="6"
         fill="#FFFFFF" fill-opacity="0.55"/>
-  <text x="32" y="34" text-anchor="middle" dominant-baseline="central"
-        font-family="DejaVu Sans, Arial, sans-serif" font-weight="bold" font-size="30"
-        fill="#222222">C</text>
 </svg>

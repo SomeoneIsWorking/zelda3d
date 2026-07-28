@@ -13,6 +13,7 @@
 #include "../scene/zelda3d_collision.h"
 #include "../player/zelda3d_link.h"
 #include "../input/zelda3d_input.h"
+#include "../input/zelda3d_keymap.h" // #203 — `keycap` REPL: live key labels for the HUD badges
 #include "../anim/zelda3d_anim_override.h"
 #include "overlays/actors/ovl_En_Ge1/z_en_ge1.h"
 #include "overlays/actors/ovl_En_Ko/z_en_ko.h"
@@ -247,7 +248,7 @@ static void Zelda3D_ReplExec(PlayState* play, char* line, const char* outPath) {
     // dereferencing a null PlayState. Keeps headless tooling (key injection, screenshots,
     // logging) alive across the title -> file-select -> ingame route.
     if (play == NULL) {
-        static const char* kPlayFree[] = { "key", "log", "fps", "dump", "inputdev", "menu", "help" };
+        static const char* kPlayFree[] = { "key", "log", "fps", "dump", "inputdev", "keycap", "menu", "help" };
         int ok = 0;
         for (size_t i = 0; i < sizeof(kPlayFree) / sizeof(kPlayFree[0]); i++) {
             if (strcmp(cmd, kPlayFree[i]) == 0) {
@@ -1636,6 +1637,32 @@ static void Zelda3D_ReplExec(PlayState* play, char* line, const char* outPath) {
         // gZelda3dHudTex every frame. 1 = crisp 64x64 hearts, 0 = the blocky N64 16x16 hearts.
         gZelda3dHudTex = (f1 != 0.0f) ? 1 : 0;
         Zelda3D_ReplReply(outPath, "hudtex=%d", gZelda3dHudTex);
+    } else if (strcmp(cmd, "keycap") == 0) {
+        // #203 — inspect the keyboard HUD badges without eyeballing a screenshot.
+        //   `keycap`          print the label each HUD item slot resolves to from the LIVE binding
+        //   `keycap <label>`  composite that label and dump raw RGBA to scratch/raw/keycap.rgba
+        // The second form is how the multi-character (widened) cap gets verified, since the default
+        // scheme binds only single-character keys to the four badged buttons.
+        char label[16] = { 0 };
+        if (sscanf(line, "%*s %15s", label) == 1) {
+            int cw = 0, ch = 0;
+            const void* rgba = Zelda3D_KeyCapTex(label, &cw, &ch);
+            if (rgba != NULL && cw > 0 && ch > 0) {
+                FILE* f = fopen("scratch/raw/keycap.rgba", "wb");
+                if (f != NULL) {
+                    fwrite(rgba, 1, (size_t)cw * ch * 4, f);
+                    fclose(f);
+                }
+                Zelda3D_ReplReply(outPath, "keycap '%s' -> %dx%d (scratch/raw/keycap.rgba)", label, cw, ch);
+            } else {
+                Zelda3D_ReplReply(outPath, "keycap '%s': composite failed", label);
+            }
+        } else {
+            Zelda3D_ReplReply(outPath, "B='%s' C-Left='%s' C-Down='%s' C-Right='%s' | C-Up='%s'",
+                            Zelda3D_KeyLabelForButton(BTN_B), Zelda3D_KeyLabelForButton(BTN_CLEFT),
+                            Zelda3D_KeyLabelForButton(BTN_CDOWN), Zelda3D_KeyLabelForButton(BTN_CRIGHT),
+                            Zelda3D_KeyLabelForButton(BTN_CUP));
+        }
     } else if (strcmp(cmd, "atlasdump") == 0) {
         // TEMP tooling: decode an OoT3D romfs .ctxb atlas and dump raw RGBA to scratch for offline
         // inspection (find the rupee / item-icon sub-rects). `atlasdump <romfsPath> [texIdx]`.
@@ -1662,7 +1689,8 @@ static void Zelda3D_ReplExec(PlayState* play, char* line, const char* outPath) {
         // or to hold a button. CURRENT PC-native default map (#96, verified 2026-07-17 vs
         // libultraship ControllerDefaultMappings.cpp — the PRE-#96 "A=X(45)/Start=SPACE(57)" values
         // this comment used to list are WRONG and misled menu-driving): A=SPACE(57) B=F(33) Z=Q(16)
-        // R=CTRL(29) L=SHIFT(42) Start=ENTER(28) C-up/dn/lt/rt=arrows(328/336/331/333)
+        // R=CTRL(29) L=SHIFT(42) Start=ENTER(28) C-up=C(46) C-left/down/right=1/2/3(2/3/4 — the
+        // PC-native item bar, #203; they were the arrow keys before scheme v3, which are now unbound)
         // D-up/dn/lt/rt=I/K/J/L(23/37/36/38) stick L/R/U/D=A/D/W/S(30/32/17/31). So a menu CONFIRM
         // is `key 57` (A=SPACE), pause/menu open is `key 28` (Start=ENTER). Pair with posinfo to observe.
         // Zelda3D_InjectKey declared via input/zelda3d_input.h (included above); moved from

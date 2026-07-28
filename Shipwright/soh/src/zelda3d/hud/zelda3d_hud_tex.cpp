@@ -148,57 +148,182 @@ const void* Zelda3D_XboxGlyphTex(char which, int* w, int* h) {
     return g[idx].rgba.data();
 }
 
-// #32 hotswap — keyboard-key HUD glyphs. One glyph per HUD slot (B, C-Left, C-Down, C-Right).
-// Gray disc + white key label, matching the default keyboard bindings (C / ← / ↓ / →).
-// Same 64x64 RGBA layout as Zelda3D_XboxGlyphTex — the draw path is identical, only the texture
-// changes. Decoded lazily once. See also gZelda3dInputDevice / Zelda3D_InputDevice().
-#include "../assets/kbd_glyphs_png.h"
+// #32/#203 hotswap — keyboard-key HUD badge, composited at RUNTIME from the live binding.
+//
+// This used to be four PNGs baked from assets/zelda3d/key_{b,cleft,cdown,cright}.svg with the key
+// LETTERS drawn into the SVGs. That is why the B-button badge still read "C" long after the default
+// binding became F, and why rebinding in the input editor changed nothing on screen (kanban #203).
+// Now the badge is a blank keycap plus glyphs blitted from a monospaced alphabet atlas, with the
+// label coming from Zelda3D_KeyLabelForButton — so it cannot drift from the binding again.
+//
+// Multi-character labels ("LSHFT", "SPACE") widen the cap instead of shrinking the text into
+// illegibility: the cap is 9-sliced horizontally, repeating one column of its uniform middle, which
+// keeps the rounded corners and the vertical gradient intact. The text only scales down once even a
+// 3x-wide cap can't hold it.
+#include "../assets/key_glyphs_png.h"
+#include <unordered_map>
 
-const void* Zelda3D_KbdGlyphTex(char which, int* w, int* h) {
-    // Slots: 0=B, 1=C-Left, 2=C-Down, 3=C-Right (mirrors Zelda3D_RecordHudBtn glyph chars)
-    struct Glyph { std::vector<uint8_t> rgba; int w = 0, hh = 0; };
-    static Glyph g[4];
-    static bool tried = false;
-    if (!tried) {
-        tried = true;
-        struct { const unsigned char* png; unsigned int len; } src[4] = {
-            { kKbdGlyph_BPng,      kKbdGlyph_BPngLen      },
-            { kKbdGlyph_CleftPng,  kKbdGlyph_CleftPngLen  },
-            { kKbdGlyph_CdownPng,  kKbdGlyph_CdownPngLen  },
-            { kKbdGlyph_CrightPng, kKbdGlyph_CrightPngLen },
-        };
-        for (int i = 0; i < 4; i++) {
-            int sw = 0, sh = 0, n = 0;
-            stbi_uc* px = stbi_load_from_memory(src[i].png, (int)src[i].len, &sw, &sh, &n, 4);
-            if (px) {
-                g[i].rgba.assign(px, px + (size_t)sw * sh * 4);
-                g[i].w = sw; g[i].hh = sh;
-                stbi_image_free(px);
+struct KeyCapArt {
+    std::vector<uint8_t> cap;    // kCapW x kCapH RGBA, blank
+    std::vector<uint8_t> atlas;  // (cells * kKeyGlyphCellW) x kKeyGlyphCellH RGBA
+    int atlasW = 0, atlasH = 0;
+    bool ok = false;
+};
+
+constexpr int kCapW = 64;         // blank cap dims (assets/zelda3d/key_cap.svg)
+constexpr int kCapH = 64;
+constexpr int kCapEdge = 24;      // 9-slice: columns [0,24) and [40,64) are corners, 32 is the seam
+constexpr int kCapInnerW = 46;    // usable label width on an un-widened cap
+constexpr int kCapMaxW = 192;     // 3x — past this a label scales down instead of widening further
+constexpr int kCapFaceCenterY = 30; // cap face spans y 4..56
+
+static const KeyCapArt& keyCapArt() {
+    static KeyCapArt art = [] {
+        KeyCapArt a;
+        int w = 0, h = 0, n = 0;
+        if (stbi_uc* px = stbi_load_from_memory(kKeyCapPng, (int)kKeyCapPngLen, &w, &h, &n, 4)) {
+            if (w == kCapW && h == kCapH) {
+                a.cap.assign(px, px + (size_t)w * h * 4);
             } else {
-                fprintf(stderr, "[Zelda3D] kbd glyph %d: PNG decode failed\n", i);
+                fprintf(stderr, "[Zelda3D] keycap: expected %dx%d, got %dx%d\n", kCapW, kCapH, w, h);
+            }
+            stbi_image_free(px);
+        }
+        if (stbi_uc* px = stbi_load_from_memory(kKeyGlyphAtlasPng, (int)kKeyGlyphAtlasPngLen, &w, &h, &n, 4)) {
+            a.atlas.assign(px, px + (size_t)w * h * 4);
+            a.atlasW = w;
+            a.atlasH = h;
+            stbi_image_free(px);
+        }
+        a.ok = !a.cap.empty() && !a.atlas.empty() && a.atlasH == kKeyGlyphCellH;
+        if (!a.ok) {
+            fprintf(stderr, "[Zelda3D] keycap art: decode failed (cap=%zu atlas=%dx%d)\n", a.cap.size(),
+                    a.atlasW, a.atlasH);
+        }
+        return a;
+    }();
+    return art;
+}
+
+// Atlas cell index for a label character, or -1 when the alphabet has no such glyph.
+static int glyphCell(char c) {
+    for (int i = 0; kKeyGlyphChars[i] != '\0'; i++) {
+        if (kKeyGlyphChars[i] == c) {
+            return i;
+        }
+    }
+    return -1;
+}
+
+// Source-over composite of one RGBA pixel onto another.
+static void blendPixel(uint8_t* dst, const uint8_t* src) {
+    const int sa = src[3];
+    if (sa == 0) {
+        return;
+    }
+    if (sa == 255) {
+        std::memcpy(dst, src, 4);
+        return;
+    }
+    for (int k = 0; k < 3; k++) {
+        dst[k] = (uint8_t)((src[k] * sa + dst[k] * (255 - sa)) / 255);
+    }
+    dst[3] = (uint8_t)(sa + dst[3] * (255 - sa) / 255);
+}
+
+// Widen the blank cap to `outW` by repeating its uniform middle column (9-slice, horizontal only —
+// the cap's gradient runs vertically and its top highlight is flat between the rounded corners, so
+// one column reproduces the middle exactly).
+static std::vector<uint8_t> stretchCap(const std::vector<uint8_t>& cap, int outW) {
+    std::vector<uint8_t> out((size_t)outW * kCapH * 4, 0);
+    for (int y = 0; y < kCapH; y++) {
+        for (int x = 0; x < outW; x++) {
+            int sx;
+            if (x < kCapEdge) {
+                sx = x;
+            } else if (x >= outW - kCapEdge) {
+                sx = kCapW - (outW - x);
+            } else {
+                sx = kCapW / 2; // the repeated seam column
+            }
+            std::memcpy(&out[((size_t)y * outW + x) * 4], &cap[((size_t)y * kCapW + sx) * 4], 4);
+        }
+    }
+    return out;
+}
+
+const void* Zelda3D_KeyCapTex(const char* label, int* w, int* h) {
+    if (label == nullptr || label[0] == '\0') {
+        if (w) *w = 0;
+        if (h) *h = 0;
+        return nullptr;
+    }
+    const KeyCapArt& art = keyCapArt();
+    if (!art.ok) {
+        if (w) *w = 0;
+        if (h) *h = 0;
+        return nullptr;
+    }
+
+    struct Tex { std::vector<uint8_t> rgba; int w = 0, hh = 0; };
+    static std::unordered_map<std::string, Tex> cache;
+    auto it = cache.find(label);
+    if (it == cache.end()) {
+        const int n = (int)std::strlen(label);
+        const int textW = n * kKeyGlyphCellW;
+        // Widen the cap just enough to hold the run at native glyph size, capped at kCapMaxW; only
+        // then fall back to scaling the glyphs down.
+        int outW = kCapW;
+        if (textW > kCapInnerW) {
+            outW = std::min(kCapMaxW, kCapW + (textW - kCapInnerW));
+        }
+        const int innerW = outW - (kCapW - kCapInnerW);
+        const float scale = textW > innerW ? (float)innerW / (float)textW : 1.0f;
+
+        Tex tex;
+        tex.rgba = stretchCap(art.cap, outW);
+        tex.w = outW;
+        tex.hh = kCapH;
+
+        const int drawW = (int)(textW * scale + 0.5f);
+        const int drawH = (int)(kKeyGlyphCellH * scale + 0.5f);
+        const int x0 = (outW - drawW) / 2;
+        const int y0 = kCapFaceCenterY - drawH / 2;
+        const int cellDrawW = drawW / (n > 0 ? n : 1);
+        for (int i = 0; i < n; i++) {
+            const int cell = glyphCell(label[i]);
+            if (cell < 0) {
+                continue; // sanitizer should have folded this away; skip rather than draw garbage
+            }
+            const int srcX0 = cell * kKeyGlyphCellW;
+            for (int dy = 0; dy < drawH; dy++) {
+                const int ty = y0 + dy;
+                if (ty < 0 || ty >= kCapH) {
+                    continue;
+                }
+                const int sy = dy * kKeyGlyphCellH / (drawH > 0 ? drawH : 1);
+                for (int dx = 0; dx < cellDrawW; dx++) {
+                    const int tx = x0 + i * cellDrawW + dx;
+                    if (tx < 0 || tx >= outW) {
+                        continue;
+                    }
+                    const int sx = srcX0 + dx * kKeyGlyphCellW / (cellDrawW > 0 ? cellDrawW : 1);
+                    blendPixel(&tex.rgba[((size_t)ty * outW + tx) * 4],
+                               &art.atlas[((size_t)sy * art.atlasW + sx) * 4]);
+                }
             }
         }
+        it = cache.emplace(label, std::move(tex)).first;
+        // #21: evict any stale prior-tenant Fast3D cache entry at this brand-new buffer's address.
+        Zelda3D_HudTexClaim(it->second.rgba.data());
     }
-    // 'B'=B slot, 'X'=C-Left, 'Y'=C-Down, 'A'=C-Right — matches the Zelda3D_RecordHudBtn calls
-    int idx;
-    switch (which) {
-        case 'B': case 'b': idx = 0; break;
-        case 'X': case 'x': idx = 1; break;
-        case 'Y': case 'y': idx = 2; break;
-        case 'A': case 'a': idx = 3; break;
-        default: if (w) *w = 0; if (h) *h = 0; return nullptr;
-    }
-    if (g[idx].rgba.empty()) { if (w) *w = 0; if (h) *h = 0; return nullptr; }
-    static bool reg = false;
-    if (!reg) {
-        reg = true;
-        for (int k = 0; k < 4; k++) {
-            if (!g[k].rgba.empty()) Zelda3D_HudTexClaim(g[k].rgba.data());
-        }
-    }
-    if (w) *w = g[idx].w;
-    if (h) *h = g[idx].hh;
-    return g[idx].rgba.data();
+    if (w) *w = it->second.w;
+    if (h) *h = it->second.hh;
+    return it->second.rgba.data();
+}
+
+const char* Zelda3D_KeyCapAlphabet(void) {
+    return kKeyGlyphChars;
 }
 
 // #18 — derive the FULL / EMPTY HUD heart from the OoT3D item atlas (user approved 2026-06-20).
