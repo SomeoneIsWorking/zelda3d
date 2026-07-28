@@ -517,11 +517,40 @@ GSAVECONTEXT_DAYTIME_VA = GSAVECONTEXT_VA + 0x0C
 GSAVECONTEXT_SKYBOXTIME_VA = GSAVECONTEXT_VA + 0x15A8
 
 
-def set_time_of_day(h, daytime: int) -> None:
-    """Set BOTH clocks, so the render actually follows. See GSAVECONTEXT_SKYBOXTIME_VA."""
+def read_time_of_day(h) -> tuple[int, int]:
+    """(dayTime, skyboxTime) as the oracle currently holds them."""
+    def rd(va: int) -> int:
+        resp = h.send(f"r16 0x{va:08x}")
+        for tok in reversed(resp.replace(",", " ").split()):
+            try:
+                return int(tok, 0) & 0xFFFF
+            except ValueError:
+                continue
+        raise RuntimeError(f"read_time_of_day: could not parse {resp!r}")
+    return rd(GSAVECONTEXT_DAYTIME_VA), rd(GSAVECONTEXT_SKYBOXTIME_VA)
+
+
+def set_time_of_day(h, daytime: int, settle: int = 8, tolerance: int = 0x180) -> None:
+    """Set BOTH clocks, so the render actually follows. See GSAVECONTEXT_SKYBOXTIME_VA.
+
+    THE CLOCK KEEPS RUNNING, and that is what makes this function easy to misuse. It used to
+    `run 120` after writing, and callers then ran hundreds more settle frames before capturing — so
+    the frame was taken at a sun position far from the one requested. That produced an ours-vs-oracle
+    shadow comparison at MISMATCHED lighting which was mistaken for a renderer defect and cost a
+    full investigation (instrument I001, 2026-07-28). Set the clock LAST, advance only enough frames
+    for the environment to pick it up, and VERIFY — a silent drift is indistinguishable from a
+    correctly-honoured request.
+    """
     h.send(f"w16 0x{GSAVECONTEXT_DAYTIME_VA:08x} 0x{daytime:04x}")
     h.send(f"w16 0x{GSAVECONTEXT_SKYBOXTIME_VA:08x} 0x{daytime:04x}")
-    h.send("run 120")
+    h.send(f"run {settle}")
+    day, sky = read_time_of_day(h)
+    drift = max(abs(day - daytime), abs(sky - daytime))
+    if drift > tolerance:
+        raise RuntimeError(
+            f"set_time_of_day({daytime:#06x}) did NOT hold: dayTime={day:#06x} skyboxTime={sky:#06x} "
+            f"(drift {drift:#x} > tolerance {tolerance:#x}). Any light-dependent comparison from this "
+            f"frame would be measuring the clock, not the renderer — see instrument I001.")
 
 
 def boot_to_gameplay(h: Harness, entrance: Optional[int] = None,
