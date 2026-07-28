@@ -8,6 +8,7 @@
 #include "soh/OTRGlobals.h"
 #include "soh/Enhancements/cosmetics/cosmeticsTypes.h"
 #include "soh/Enhancements/game-interactor/GameInteractor_Hooks.h"
+#include "zelda3d/hud/zelda3d_hud.h" // #205 — native HUD: the minimap image draws as a quad
 
 MapData* gMapData;
 
@@ -854,9 +855,24 @@ void Minimap_Draw(PlayState* play) {
                             sValue = 96 << 5;
                         }
 
-                        gSPWideTextureRectangle(OVERLAY_DISP++, dgnMiniMapX << 2, dgnMiniMapY << 2,
-                                                (dgnMiniMapX + 96) << 2, (dgnMiniMapY + 85) << 2, G_TX_RENDERTILE,
-                                                sValue, 0, 1 << 10, 1 << 10);
+                        // #205 — the dungeon map image as a native quad. Everything drawn after the
+                        // flush marker (entrance icons, the 3D compass arrows) still lands on top,
+                        // which is the whole point of the marker: this element converts ALONE.
+                        if (Zelda3D_HudOwns(ZELDA3D_HUD_MINIMAP)) {
+                            const int mirrored = CVarGetInteger(CVAR_ENHANCEMENT("MirroredWorld"), 0) != 0;
+                            Zelda3D_HudQuadEx(Zelda3D_HudDecode(ZELDA3D_HUD_FMT_I4, interfaceCtx->mapSegmentName[0],
+                                                                96, 85),
+                                              96, 85, mirrored ? 96 : 0, 0, mirrored ? -96 : 96, 85, dgnMiniMapX,
+                                              dgnMiniMapY, 96, 85,
+                                              ((u32)minimapColor.r << 24) | ((u32)minimapColor.g << 16) |
+                                                  ((u32)minimapColor.b << 8) | (u32)(u8)interfaceCtx->minimapAlpha,
+                                              0u, ZELDA3D_HUD_MODULATE);
+                            gSPZelda3DHudFlush(OVERLAY_DISP++);
+                        } else {
+                            gSPWideTextureRectangle(OVERLAY_DISP++, dgnMiniMapX << 2, dgnMiniMapY << 2,
+                                                    (dgnMiniMapX + 96) << 2, (dgnMiniMapY + 85) << 2, G_TX_RENDERTILE,
+                                                    sValue, 0, 1 << 10, 1 << 10);
+                        }
                     }
 
                     if (CHECK_DUNGEON_ITEM(DUNGEON_COMPASS, mapIndex)) {
@@ -942,10 +958,25 @@ void Minimap_Draw(PlayState* play) {
                         sValue = gMapData->owMinimapWidth[mapIndex] << 5;
                     }
 
-                    gSPWideTextureRectangle(OVERLAY_DISP++, oWMiniMapX << 2, oWMiniMapY << 2,
-                                            (oWMiniMapX + gMapData->owMinimapWidth[mapIndex]) << 2,
-                                            (oWMiniMapY + gMapData->owMinimapHeight[mapIndex]) << 2, G_TX_RENDERTILE,
-                                            sValue, 0, 1 << 10, 1 << 10);
+                    // #205 — see the dungeon branch above; same shape, IA4 source instead of I4.
+                    if (Zelda3D_HudOwns(ZELDA3D_HUD_MINIMAP)) {
+                        const s16 mw = gMapData->owMinimapWidth[mapIndex];
+                        const s16 mh = gMapData->owMinimapHeight[mapIndex];
+                        const int mirrored = CVarGetInteger(CVAR_ENHANCEMENT("MirroredWorld"), 0) != 0;
+                        Zelda3D_HudQuadEx(Zelda3D_HudDecode(ZELDA3D_HUD_FMT_IA4, interfaceCtx->mapSegmentName[0], mw,
+                                                            mh),
+                                          mw, mh, mirrored ? mw : 0, 0, mirrored ? -mw : mw, mh, oWMiniMapX,
+                                          oWMiniMapY, mw, mh,
+                                          ((u32)minimapColor.r << 24) | ((u32)minimapColor.g << 16) |
+                                              ((u32)minimapColor.b << 8) | (u32)(u8)interfaceCtx->minimapAlpha,
+                                          0u, ZELDA3D_HUD_MODULATE);
+                        gSPZelda3DHudFlush(OVERLAY_DISP++);
+                    } else {
+                        gSPWideTextureRectangle(OVERLAY_DISP++, oWMiniMapX << 2, oWMiniMapY << 2,
+                                                (oWMiniMapX + gMapData->owMinimapWidth[mapIndex]) << 2,
+                                                (oWMiniMapY + gMapData->owMinimapHeight[mapIndex]) << 2,
+                                                G_TX_RENDERTILE, sValue, 0, 1 << 10, 1 << 10);
+                    }
 
                     gDPSetPrimColor(OVERLAY_DISP++, 0, 0, minimapColor.r, minimapColor.g, minimapColor.b,
                                     interfaceCtx->minimapAlpha);

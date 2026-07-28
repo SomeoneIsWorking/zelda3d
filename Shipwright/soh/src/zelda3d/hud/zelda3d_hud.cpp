@@ -19,6 +19,7 @@ int Zelda3D_Hud_Tex(const void* key, const void* rgba, int w, int h);
 void Zelda3D_Hud_DrawEnv(int tex, float x, float y, float w, float h, float u0, float v0, float u1, float v1,
                          unsigned int tintRGBA, unsigned int envRGB, int mode);
 void Zelda3D_Hud_End(void);
+void Zelda3D_Hud_Flush(void);
 
 // SoH stores most HUD "textures" as OTR PATH STRINGS ("__OTR__textures/icon_item_static/...") and the
 // Fast3D interpreter resolves them to pixels when it executes gDPLoadTextureBlock. A native HUD gets
@@ -175,6 +176,59 @@ extern "C" void Zelda3D_HudQuadEx(const void* tex, int texW, int texH, int sx, i
            (float)(sy + sh) / texH, x, y, w, h, primRGBA, envRGB, mode);
 }
 
+namespace {
+
+// How many of sQuads have already been handed to the renderer this frame. Quads are RECORDED while
+// the display list is being built, but they must be COMPOSITED at the point of the interpreter's
+// execution where their element belongs — so they are pushed in instalments: each
+// gSPZelda3DHudFlush marker pushes everything recorded up to it, and Zelda3D_HudFrame pushes the
+// remainder at end of frame.
+size_t sPushed = 0;
+bool sBatchOpen = false;
+float sScale = 0.0f, sOriginX = 0.0f;
+
+// Push the quads recorded since the last push and composite them here. Opening the renderer batch is
+// lazy: it needs a live frame recording, which only exists once the interpreter is running.
+void pushPending() {
+    if (sPushed >= sQuads.size()) {
+        return;
+    }
+    if (!sBatchOpen) {
+        int W = 0, H = 0;
+        if (!Zelda3D_Hud_Begin(&W, &H) || W <= 0 || H <= 0) {
+            return;
+        }
+        // HUD virtual space -> framebuffer pixels. SoH keeps the N64 320x240 canvas and EXTENDS it
+        // horizontally for widescreen: the visible X range is [160 - 120*aspect, 160 + 120*aspect]
+        // while Y stays [0, 240]. One scale, one X origin.
+        sScale = (float)H / 240.0f;
+        sOriginX = 160.0f - 120.0f * ((float)W / (float)H);
+        sBatchOpen = true;
+    }
+    for (; sPushed < sQuads.size(); sPushed++) {
+        const HudQuad& q = sQuads[sPushed];
+        const int id = Zelda3D_Hud_Tex(q.tex, q.tex, q.texW, q.texH);
+        if (id == 0) {
+            continue;
+        }
+        Zelda3D_Hud_DrawEnv(id, (q.x - sOriginX) * sScale, q.y * sScale, q.w * sScale, q.h * sScale, q.u0, q.v0,
+                            q.u1, q.v1, q.prim, q.env, q.mode);
+    }
+    Zelda3D_Hud_Flush();
+}
+
+} // namespace
+
+// Called by the interpreter when it reaches a gSPZelda3DHudFlush marker in the display list. This is
+// what lets an element convert ALONE: its quads composite at the marker, so anything the interpreter
+// draws afterwards (the minimap's 3D compass arrows, for instance) still lands on top of it.
+extern "C" void Zelda3D_HudFlushPoint(void) {
+    if (Zelda3D_Title_IsActive()) {
+        return;
+    }
+    pushPending();
+}
+
 extern "C" void Zelda3D_HudFrame(void) {
     if (sQuads.empty()) {
         return;
@@ -183,30 +237,15 @@ extern "C" void Zelda3D_HudFrame(void) {
     // drawn (same rule Interface_Draw applies on the N64 path).
     if (Zelda3D_Title_IsActive()) {
         sQuads.clear();
+        sPushed = 0;
         return;
     }
-    int W = 0, H = 0;
-    if (!Zelda3D_Hud_Begin(&W, &H) || W <= 0 || H <= 0) {
-        sQuads.clear();
-        return;
+    // Everything not already composited at a marker goes now, on top of the finished frame.
+    pushPending();
+    if (sBatchOpen) {
+        Zelda3D_Hud_End();
+        sBatchOpen = false;
     }
-
-    // HUD virtual space -> framebuffer pixels. SoH keeps the N64 320x240 canvas and EXTENDS it
-    // horizontally for widescreen: OTRGetDimensionFromLeftEdge(v) = 160 - 120*aspect + v and
-    // OTRGetDimensionFromRightEdge(v) = 160 + 120*aspect - (320 - v), so the visible X range is
-    // [160 - 120*aspect, 160 + 120*aspect] while Y stays [0, 240]. One scale, one X origin.
-    const float aspect = (float)W / (float)H;
-    const float sc = (float)H / 240.0f;
-    const float originX = 160.0f - 120.0f * aspect;
-
-    for (const HudQuad& q : sQuads) {
-        const int id = Zelda3D_Hud_Tex(q.tex, q.tex, q.texW, q.texH);
-        if (id == 0) {
-            continue;
-        }
-        Zelda3D_Hud_DrawEnv(id, (q.x - originX) * sc, q.y * sc, q.w * sc, q.h * sc, q.u0, q.v0, q.u1, q.v1,
-                            q.prim, q.env, q.mode);
-    }
-    Zelda3D_Hud_End();
     sQuads.clear();
+    sPushed = 0;
 }

@@ -180,6 +180,7 @@
 #define G_ZELDA3D_DRAW 0x41
 #define G_ZELDA3D_MEASURE 0x4a
 #define G_ZELDA3D_CLEARDEPTH 0x4b
+#define G_ZELDA3D_HUDFLUSH 0x4c
 #define G_MOVEMEM_OTR 0x42
 #define G_LOADBLOCK_WIDE 0x47
 #define G_VTX_WIDE 0x48
@@ -2838,6 +2839,22 @@ typedef union Gfx {
         Gfx* _g = (Gfx*)(pkt);                              \
         _g->words.w0 = _SHIFTL(G_ZELDA3D_CLEARDEPTH, 24, 8); \
         _g->words.w1 = 0;                                   \
+    }
+
+// #205 — flush the Zelda3D native HUD's pending quads AT THIS POINT of the interpreter's execution.
+//
+// Without it the HUD can only be composited once, from Gui::EndFrame, after the interpreter has
+// finished — which puts every native element on top of everything the interpreter drew, so an
+// element has to be converted together with anything that overlaps it. The quads cannot simply be
+// flushed when they are RECORDED either: recording happens while the display list is being BUILT,
+// before the interpreter has appended a single op, so that would bury the HUD under the world.
+// A marker in the display list is the only thing that lands the ops in the right place, and it is
+// the same mechanism the OoT3D model draws already use (G_ZELDA3D_DRAW).
+#define gSPZelda3DHudFlush(pkt)                            \
+    {                                                      \
+        Gfx* _g = (Gfx*)(pkt);                             \
+        _g->words.w0 = _SHIFTL(G_ZELDA3D_HUDFLUSH, 24, 8); \
+        _g->words.w1 = 0;                                  \
     }
 
 #define gsSPSetFB(pkt, fb)                      \

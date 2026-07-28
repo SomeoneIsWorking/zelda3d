@@ -81,6 +81,10 @@ constexpr int8_t RDP_G_TRI1_WIDE = OPCODE(0x49);
 constexpr int8_t OTR_G_ZELDA3D_MEASURE = OPCODE(0x4a);
 // Zelda3D overlay depth-scope reset (#146 item B): no operands. See gSPZelda3DClearDepth (gbi.h).
 constexpr int8_t OTR_G_ZELDA3D_CLEARDEPTH = OPCODE(0x4b);
+// Zelda3D native-HUD flush point (#205): no operands. Composites the HUD quads recorded so far at
+// THIS point of the interpreter's execution, so a converted HUD element interleaves with the N64
+// draws instead of landing on top of the finished frame. See gSPZelda3DHudFlush (gbi.h).
+constexpr int8_t OTR_G_ZELDA3D_HUDFLUSH = OPCODE(0x4c);
 
 /*
  * The following commands are the "generated" RDP commands; the user

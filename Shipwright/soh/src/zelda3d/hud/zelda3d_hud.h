@@ -69,6 +69,11 @@ enum {
     ZELDA3D_HUD_C_UP = 5,
     // The event timer: clock icon + digits. And the Horseback-Archery score digits.
     ZELDA3D_HUD_TIMERS = 6,
+    // The minimap IMAGE only. Its compass/position arrows are 3D meshes (gCompassArrowDL under a
+    // scale + RotateX + RotateY) that no quad can honestly represent, so they stay on the
+    // interpreter — which works because the map emits a gSPZelda3DHudFlush marker straight after
+    // itself, compositing the map quad at that point so everything drawn later still lands on top.
+    ZELDA3D_HUD_MINIMAP = 7,
     // Passed by a Gfx_Texture* call site that has NOT been converted yet, so the shared helper keeps
     // emitting its display list for that caller while other callers of the same helper go native.
     ZELDA3D_HUD_NONE = -1,
@@ -132,6 +137,10 @@ const void* Zelda3D_HudDecode(int fmt, const void* tex, int texW, int texH);
 // because the scene behind the HUD moves between them. Defaults to on (env ZELDA3D_HUD=0 disables).
 void Zelda3D_HudSetEnabled(int on);
 int Zelda3D_HudGetEnabled(void);
+
+// Called by the interpreter at a gSPZelda3DHudFlush marker: composites the quads recorded up to that
+// point, so an element converts ALONE and anything drawn after it still lands on top.
+void Zelda3D_HudFlushPoint(void);
 
 // Draws (and clears) everything recorded this frame. Called from libultraship's Gui::EndFrame, i.e.
 // after the interpreter has composited the game frame and before the RmlUi menu, so the HUD sits
