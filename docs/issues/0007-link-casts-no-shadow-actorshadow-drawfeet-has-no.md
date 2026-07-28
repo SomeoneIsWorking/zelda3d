@@ -38,3 +38,24 @@ pos (-68,-79,941) and identical `acam 120 z` eye, settled frame in both):
   shadow206_before_zoom.png has bare grass.
 No double-draw / N64 leak: the frame shows a single Link (the rewind discards the walk's geometry).
 
+## Follow-up: the mechanism is back, the STRENGTH is not (new frontier row `player.shadow-strength`)
+
+Compared against the OoT3D oracle (embedded Azahar, entrance 0xEE Kokiri Forest, daytime 0x6000;
+`tools/oracle_shot.py --settle 400`). Shadow contrast, measured as green(under-boots) / green(clean
+grass in the same frame):
+
+| frame                       | ratio | reading            |
+|-----------------------------|-------|--------------------|
+| Zelda3D BEFORE the #206 fix | 1.01  | no shadow at all   |
+| Zelda3D AFTER the #206 fix  | 0.91  | shadow present, 9% |
+| OoT3D oracle                | 0.65  | 35% darkening      |
+
+So #206 is genuinely fixed — the ratio moves off 1.0 — but OoT3D's shadow is roughly four times the
+contrast and visibly larger and softer. That is a SEPARATE, un-RE'd gap, tracked as frontier row
+`player.shadow-strength`; do not close it by tuning shadowAlpha/shadowScale.
+
+Caveat on the numbers: the oracle and Zelda3D cameras/poses are not identical, so the two sample
+boxes do not cover identical geometry. The before/after/oracle ordering is solid; the exact ratio is
+not. Also note the oracle at daytime 0x4000 shows NO visible shadow under Link either
+(`scratch/screenshots/oracle_t0x4000_feet.png`), so the shadow is light-dependent on the 3DS as well.
+
