@@ -1558,6 +1558,17 @@ static void Zelda3D_ReplExec(PlayState* play, char* line, const char* outPath) {
         // #29: tint room draw-group N red live (-1 = off). Pair with ZELDA3D_DBG_ROOM dump.
         if (sscanf(line, "%*s %i", &iv) == 1) gZelda3dHlGroup = iv;
         Zelda3D_ReplReply(outPath, "hlroom=%d", gZelda3dHlGroup);
+    } else if (strcmp(cmd, "bitem") == 0) {
+        // `bitem [id]` — read or set gSaveContext.equips.buttonItems[0], the B-button item.
+        // Exists because #201 e's rule keys on exactly this field (a child with no Kokiri sword must
+        // not wear one on his back), and there was no way to drive it: the project rule is that a fix
+        // starts by proving the state can be reproduced on demand, not by editing and hoping.
+        // 0x3B = ITEM_SWORD_KOKIRI, 0x3C = master, 0x3D = biggoron, 0xFF = none.
+        if (sscanf(line, "%*s %i", &iv) == 1) {
+            gSaveContext.equips.buttonItems[0] = (uint8_t)iv;
+        }
+        Zelda3D_ReplReply(outPath, "bitem=0x%02x (0x3B=kokiri sword, 0xFF=none)",
+                          gSaveContext.equips.buttonItems[0]);
     } else if (strcmp(cmd, "sgdrawonly") == 0) {
         // Draw-isolation probe: render ONLY the n-th Zelda3D group of the frame (-1 = everything).
         // The point is draws whose pixels are entirely overlapped by later layers — Zora's water d9
