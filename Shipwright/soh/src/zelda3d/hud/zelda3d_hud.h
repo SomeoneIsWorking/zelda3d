@@ -44,6 +44,10 @@ enum {
     // disc rescales those baked coords by discW/32 — a ratio the N64 tile cannot express, so the
     // row stride breaks into horizontal bands.
     ZELDA3D_HUD_DO_ACTION = 1,
+    // The heart row. Also ortho-matrix quads rather than texrects, and the one element that needs
+    // the PRIM/ENV lerp combine (Zelda3D_HudQuadLerp) — that is what gives a heart its body/rim
+    // shading and its beating / low-health / double-defense colour sets.
+    ZELDA3D_HUD_HEALTH = 2,
 };
 int Zelda3D_HudOwns(int element);
 

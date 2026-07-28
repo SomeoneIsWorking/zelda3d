@@ -5,6 +5,7 @@
 #include "soh/Enhancements/cosmetics/cosmeticsTypes.h"
 #include "soh/Enhancements/game-interactor/GameInteractor_Hooks.h"
 #include "zelda3d/zelda3d.h" // #31 — crisp higher-res HUD heart textures (Zelda3D_HudTexEnabled / Zelda3D_HeartTex)
+#include "zelda3d/hud/zelda3d_hud.h" // #205 — native HUD: record quads instead of display lists
 
 // #31 — map an N64 heart texture symbol to a ZELDA3D_HEART_* kind, or -1 if it isn't a heart we
 // replace. The DD (double-defense) variants reuse the same crisp shapes (tint differs via PRIM/ENV).
@@ -395,6 +396,73 @@ s16 getHealthMeterYOffset() {
     }
 }
 
+// #205 — the heart row's PRIM/ENV pair for a given colour set, mirroring the eight
+// gDPSetPrimColor/gDPSetEnvColor branches in HealthMeter_Draw. The display-list path pushes those
+// straight into the RDP; the native path needs the values, and reading them back off one enum keeps
+// the two routes from drifting apart the way a second copy of the branch chain would.
+//   0/2 normal, 1 beating, 3 low-health, 4/6 double-defense, 5 DD beating, 7 DD low-health.
+static void Zelda3D_HeartColorSet(InterfaceContext* interfaceCtx, s32 set, u32* outPrimRGB, u32* outEnvRGB) {
+    s16 pr, pg, pb, er, eg, eb;
+    switch (set) {
+        case 1:
+            pr = interfaceCtx->beatingHeartPrim[0]; pg = interfaceCtx->beatingHeartPrim[1];
+            pb = interfaceCtx->beatingHeartPrim[2];
+            er = interfaceCtx->beatingHeartEnv[0]; eg = interfaceCtx->beatingHeartEnv[1];
+            eb = interfaceCtx->beatingHeartEnv[2];
+            break;
+        case 3:
+            pr = interfaceCtx->heartsPrimR[1]; pg = interfaceCtx->heartsPrimG[1]; pb = interfaceCtx->heartsPrimB[1];
+            er = interfaceCtx->heartsEnvR[1]; eg = interfaceCtx->heartsEnvG[1]; eb = interfaceCtx->heartsEnvB[1];
+            break;
+        case 4:
+        case 6:
+            pr = sHeartsDDPrim[0][0]; pg = sHeartsDDPrim[0][1]; pb = sHeartsDDPrim[0][2];
+            er = sHeartsDDEnv[0][0]; eg = sHeartsDDEnv[0][1]; eb = sHeartsDDEnv[0][2];
+            break;
+        case 5:
+            pr = sBeatingHeartsDDPrim[0]; pg = sBeatingHeartsDDPrim[1]; pb = sBeatingHeartsDDPrim[2];
+            er = sBeatingHeartsDDEnv[0]; eg = sBeatingHeartsDDEnv[1]; eb = sBeatingHeartsDDEnv[2];
+            break;
+        case 7:
+            pr = sHeartsDDPrim[1][0]; pg = sHeartsDDPrim[1][1]; pb = sHeartsDDPrim[1][2];
+            er = sHeartsDDEnv[1][0]; eg = sHeartsDDEnv[1][1]; eb = sHeartsDDEnv[1][2];
+            break;
+        default:
+            pr = interfaceCtx->heartsPrimR[0]; pg = interfaceCtx->heartsPrimG[0]; pb = interfaceCtx->heartsPrimB[0];
+            er = interfaceCtx->heartsEnvR[0]; eg = interfaceCtx->heartsEnvG[0]; eb = interfaceCtx->heartsEnvB[0];
+            break;
+    }
+    *outPrimRGB = ((u32)(u8)pr << 16) | ((u32)(u8)pg << 8) | (u32)(u8)pb;
+    *outEnvRGB = ((u32)(u8)er << 16) | ((u32)(u8)eg << 8) | (u32)(u8)eb;
+}
+
+// #205 — record one heart as a native quad.
+//
+// PLACEMENT: the heart matrix translates to ortho (-130 + offsetX, -(-94 + offsetY)) and the HUD
+// ortho maps ortho->virtual as (160 + ox, 120 - oy), so the centre is (30 + offsetX, 26 + offsetY) —
+// the same derivation the A button uses, and the quad (beatingHeartVtx spans +/-8) is 16 units
+// square before `scale`.
+//
+// COMBINE: normal hearts are (PRIM-ENV)*TEXEL0+ENV = mix(env, prim, t), which is Zelda3D_HudQuadLerp
+// directly. Double-defense hearts use the SWAPPED combine (ENV-PRIM)*TEXEL0+PRIM = mix(prim, env, t),
+// which is the same operation with the two colours exchanged — but the alpha combine is TEXEL0*PRIM
+// in BOTH cases, so the swap must carry the real PRIM alpha, not env's (env alpha is a constant 255
+// and would defeat the health-meter fade).
+static void Zelda3D_HeartQuad(InterfaceContext* interfaceCtx, const void* tex, int tw, int th, s32 colorSet,
+                              s32 swapped, f32 offsetX, f32 offsetY, f32 scale) {
+    u32 primRGB, envRGB;
+    f32 side;
+    Zelda3D_HeartColorSet(interfaceCtx, colorSet, &primRGB, &envRGB);
+    side = 16.0f * scale;
+    if (swapped) {
+        u32 t = primRGB;
+        primRGB = envRGB;
+        envRGB = t;
+    }
+    Zelda3D_HudQuadLerp(tex, tw, th, (30.0f + offsetX) - side / 2.0f, (26.0f + offsetY) - side / 2.0f, side, side,
+                        (primRGB << 8) | (u32)(u8)interfaceCtx->healthAlpha, envRGB);
+}
+
 void HealthMeter_Draw(PlayState* play) {
     s32 pad[5];
     void* heartBgImg;
@@ -417,6 +485,11 @@ void HealthMeter_Draw(PlayState* play) {
     f32 sp144 = interfaceCtx->unk_22A * 0.1f;
     s32 curCombineModeSet = 0;
     u8* curBgImgLoaded = NULL;
+    // #205 — the crisp RGBA heart resolved for the tile currently loaded, carried to the native quad
+    // path. NULL means the vanilla IA8 heart is in play, in which case the native path stands down
+    // (it draws RGBA only) and the display list keeps this element — see nativeHearts below.
+    const void* curHeartTex = NULL;
+    int curHeartTexW = 0, curHeartTexH = 0;
     s32 ddHeartCountMinusOne = gSaveContext.isDoubleDefenseAcquired ? totalHeartCount - 1 : -1;
     f32 HeartsScale = 0.7f;
     if (CVarGetInteger(CVAR_COSMETIC("HUD.HeartsCount.PosType"), 0) != ORIGINAL_LOCATION) {
@@ -445,6 +518,10 @@ void HealthMeter_Draw(PlayState* play) {
         sp154[1].v.tc[0] = sp154[3].v.tc[0] = farTcX; // far-x in vtx1 & vtx3
         sp154[2].v.tc[1] = sp154[3].v.tc[1] = farTcY; // far-y in vtx2 & vtx3
     }
+
+    // #205 — the native HUD draws the heart row when it owns the element AND the crisp RGBA hearts
+    // are available (the vanilla source is IA8, which the quad path does not decode).
+    const s32 nativeHearts = Zelda3D_HudOwns(ZELDA3D_HUD_HEALTH) && useSoh3dHearts;
 
     curColorSet = -1;
     /*
@@ -586,6 +663,9 @@ void HealthMeter_Draw(PlayState* play) {
                     s3 = Zelda3D_HeartTex(kind, &s3w, &s3h);
                 }
             }
+            curHeartTex = s3;
+            curHeartTexW = s3w;
+            curHeartTexH = s3h;
             if (s3 != NULL) {
                 gDPLoadTextureBlock(OVERLAY_DISP++, s3, G_IM_FMT_RGBA, G_IM_SIZ_32b, s3w, s3h, 0,
                                     G_TX_NOMIRROR | G_TX_WRAP, G_TX_NOMIRROR | G_TX_WRAP, G_TX_NOMASK, G_TX_NOMASK,
@@ -632,9 +712,14 @@ void HealthMeter_Draw(PlayState* play) {
                                          -130 + offsetX,       // Pos X
                                          (-94 + offsetY) * -1, // Pos Y
                                          0.0f);                // Pos Z
-            gSPMatrix(OVERLAY_DISP++, matrix, G_MTX_MODELVIEW | G_MTX_LOAD);
-            gSPVertex(OVERLAY_DISP++, sp154, 4, 0);
-            gSP1Quadrangle(OVERLAY_DISP++, 0, 2, 3, 1, 0);
+            if (nativeHearts) {
+                Zelda3D_HeartQuad(interfaceCtx, curHeartTex, curHeartTexW, curHeartTexH, curColorSet,
+                                  curCombineModeSet == 3, offsetX, offsetY, HeartsScale);
+            } else {
+                gSPMatrix(OVERLAY_DISP++, matrix, G_MTX_MODELVIEW | G_MTX_LOAD);
+                gSPVertex(OVERLAY_DISP++, sp154, 4, 0);
+                gSP1Quadrangle(OVERLAY_DISP++, 0, 2, 3, 1, 0);
+            }
         } else {
             if ((ddHeartCountMinusOne < 0) || (i > ddHeartCountMinusOne)) {
                 if (curCombineModeSet != 2) {
@@ -672,9 +757,19 @@ void HealthMeter_Draw(PlayState* play) {
                                                  0.0f);
                 }
 
-                gSPMatrix(OVERLAY_DISP++, matrix, G_MTX_MODELVIEW | G_MTX_LOAD);
-                gSPVertex(OVERLAY_DISP++, sp154, 4, 0);
-                gSP1Quadrangle(OVERLAY_DISP++, 0, 2, 3, 1, 0);
+                if (nativeHearts) {
+                    // The beating heart pulses via its matrix scale; the native quad takes the same
+                    // factor so the pulse is preserved rather than flattened to a static heart.
+                    f32 beatScale = CVarGetInteger(CVAR_ENHANCEMENT("NoHUDHeartAnimation"), 0)
+                                        ? HeartsScale
+                                        : HeartsScale + (HeartsScale / 3) - ((HeartsScale / 3) * sp144);
+                    Zelda3D_HeartQuad(interfaceCtx, curHeartTex, curHeartTexW, curHeartTexH, curColorSet,
+                                      curCombineModeSet == 4, offsetX, offsetY, beatScale);
+                } else {
+                    gSPMatrix(OVERLAY_DISP++, matrix, G_MTX_MODELVIEW | G_MTX_LOAD);
+                    gSPVertex(OVERLAY_DISP++, sp154, 4, 0);
+                    gSP1Quadrangle(OVERLAY_DISP++, 0, 2, 3, 1, 0);
+                }
             }
         }
 
