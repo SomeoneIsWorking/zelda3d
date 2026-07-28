@@ -14,6 +14,7 @@
 #include "../player/zelda3d_link.h"
 #include "../input/zelda3d_input.h"
 #include "../input/zelda3d_keymap.h" // #203 — `keycap` REPL: live key labels for the HUD badges
+#include "../hud/zelda3d_hud.h"        // #205 — `nativehud` REPL: A/B the native HUD vs the interpreter
 #include "../anim/zelda3d_anim_override.h"
 #include "overlays/actors/ovl_En_Ge1/z_en_ge1.h"
 #include "overlays/actors/ovl_En_Ko/z_en_ko.h"
@@ -1632,6 +1633,13 @@ static void Zelda3D_ReplExec(PlayState* play, char* line, const char* outPath) {
         // gZelda3dXboxBtn every frame). 1 = Xbox A/B/X/Y glyphs, 0 = the N64 colored circles.
         gZelda3dXboxBtn = (f1 != 0.0f) ? 1 : 0;
         Zelda3D_ReplReply(outPath, "xboxui=%d", gZelda3dXboxBtn);
+    } else if (strcmp(cmd, "nativehud") == 0 && sscanf(line, "%*s %f", &f1) == 1) {
+        // #205 — force the native HUD path on/off live. Off makes every converted element fall back
+        // to its Fast3D display list, so an element's native and interpreter renders can be captured
+        // in the SAME scene; comparing two separately-captured frames does not work, because the
+        // world behind the HUD moves between them and any colour mask picks up the difference.
+        Zelda3D_HudSetEnabled((int)f1);
+        Zelda3D_ReplReply(outPath, "nativehud=%d", Zelda3D_HudGetEnabled());
     } else if (strcmp(cmd, "hudtex") == 0 && sscanf(line, "%*s %f", &f1) == 1) {
         // #31 — toggle crisp higher-res HUD textures (hearts) live; z_lifemeter.c reads
         // gZelda3dHudTex every frame. 1 = crisp 64x64 hearts, 0 = the blocky N64 16x16 hearts.

@@ -1379,8 +1379,53 @@ void Interface_SetSceneRestrictions(PlayState* play) {
     } while (sRestrictionFlags[i].scene != 0xFF);
 }
 
-Gfx* Gfx_TextureIA8(Gfx* displayListHead, void* texture, s16 textureWidth, s16 textureHeight, s16 rectLeft, s16 rectTop,
-                    s16 rectWidth, s16 rectHeight, u16 dsdx, u16 dtdy) {
+// #205 — the shared HUD blitters take an `element` and the PRIM colour so a caller can move to the
+// native quad path individually: pass ZELDA3D_HUD_NONE and the helper keeps emitting its display
+// list. The colour is a parameter rather than a shadow of the RDP PRIM register because every call
+// site sets gDPSetPrimColor a line or two above its call — passing it cannot silently go stale the
+// way a mirrored register would if one write were ever missed.
+Gfx* Gfx_TextureIA8Ex(Gfx* displayListHead, void* texture, s16 textureWidth, s16 textureHeight, s16 rectLeft,
+                      s16 rectTop, s16 rectWidth, s16 rectHeight, u16 dsdx, u16 dtdy, int element, u32 prim) {
+    // The native branch draws whatever crisp RGBA replacement this texture has; without one there is
+    // nothing to draw as a quad (the vanilla source is IA8), so the display list keeps the element.
+    if (element != ZELDA3D_HUD_NONE && Zelda3D_HudOwns(element)) {
+        int gw = 0, gh = 0;
+        const void* gt = NULL;
+        if (Zelda3D_HudTexEnabled()) {
+            if (texture == (void*)gButtonBackgroundTex) {
+                gt = Zelda3D_ButtonBgTex(&gw, &gh);
+            } else if (texture == (void*)gRupeeCounterIconTex) {
+                gt = Zelda3D_CounterIconTex(ZELDA3D_CICON_RUPEE, &gw, &gh);
+            } else if (texture == (void*)gSmallKeyCounterIconTex) {
+                gt = Zelda3D_CounterIconTex(ZELDA3D_CICON_SMALLKEY, &gw, &gh);
+            } else if (texture == (void*)gClockIconTex) {
+                gt = Zelda3D_CounterIconTex(ZELDA3D_CICON_CLOCK, &gw, &gh);
+            }
+        }
+        if (gt == NULL) {
+            gt = Zelda3D_HudDecode(ZELDA3D_HUD_FMT_IA8, texture, textureWidth, textureHeight);
+            gw = textureWidth;
+            gh = textureHeight;
+        }
+        if (gt != NULL) {
+            // A 1:1 texrect samples one texel per pixel; anything else scales by dsdx/dtdy, where
+            // 1<<10 is 1:1. Recover the sampled source rect from that ratio so a stretched or tiled
+            // blit lands the same as it does on the N64 path.
+            //
+            // That rect is in the ORIGINAL texture's texel space, so it has to be rescaled into the
+            // replacement's resolution — `gt` is usually a higher-res substitute (a 16x16 N64 icon
+            // becomes a 64x64 crisp one). Skipping this drew the top-left QUARTER of the rupee gem's
+            // 64x64 texture, i.e. nothing, because the gem sits in the middle.
+            int srcW = (int)(((u32)rectWidth * dsdx) >> 10);
+            int srcH = (int)(((u32)rectHeight * dtdy) >> 10);
+            srcW = (srcW > 0 && textureWidth > 0) ? srcW * gw / textureWidth : gw;
+            srcH = (srcH > 0 && textureHeight > 0) ? srcH * gh / textureHeight : gh;
+            Zelda3D_HudQuadEx(gt, gw, gh, 0, 0, srcW, srcH, rectLeft, rectTop, rectWidth, rectHeight, prim, 0u,
+                              ZELDA3D_HUD_MODULATE);
+            return displayListHead;
+        }
+    }
+
     // #31 — substitute the crisp higher-res button-background disc for the blocky N64 32x32 IA8
     // gButtonBackgroundTex (the round circle behind the B / C / item buttons). The button combine
     // is G_CC_MODULATEIA_PRIM, so a grayscale RGBA32 disc (a=coverage) tints to the per-button PRIM
@@ -1440,6 +1485,14 @@ Gfx* Gfx_TextureIA8(Gfx* displayListHead, void* texture, s16 textureWidth, s16 t
     return displayListHead;
 }
 
+// The original entry point: unconverted HUD call sites keep using it and keep emitting display
+// lists. A site moves to the native path by calling Gfx_TextureIA8Ex with its element and PRIM.
+Gfx* Gfx_TextureIA8(Gfx* displayListHead, void* texture, s16 textureWidth, s16 textureHeight, s16 rectLeft, s16 rectTop,
+                    s16 rectWidth, s16 rectHeight, u16 dsdx, u16 dtdy) {
+    return Gfx_TextureIA8Ex(displayListHead, texture, textureWidth, textureHeight, rectLeft, rectTop, rectWidth,
+                            rectHeight, dsdx, dtdy, ZELDA3D_HUD_NONE, 0u);
+}
+
 // #31 — texcoord-step multiplier for the bare C-button texrects that REUSE the gButtonBackgroundTex
 // tile loaded once by the B-button Gfx_TextureIA8 call (z_parameter.c notes the tile is "reused by
 // other buttons afterwards"). Those texrects' dsdx/dtdy are tuned for the 32x32 N64 tile; when the
@@ -1474,8 +1527,34 @@ static int Zelda3D_DigitIndex(void* tex) {
     return -1;
 }
 
-Gfx* Gfx_TextureI8(Gfx* displayListHead, void* texture, s16 textureWidth, s16 textureHeight, s16 rectLeft, s16 rectTop,
-                   s16 rectWidth, s16 rectHeight, u16 dsdx, u16 dtdy) {
+// Same Ex/forwarder split as Gfx_TextureIA8 above — see the note there.
+//
+// The digit combine is colour = PRIMITIVE, alpha = TEXEL0, i.e. the glyph is pure coverage. Our
+// crisp digits are grayscale with coverage in alpha, so a plain modulate reproduces it: rgb is
+// PRIM * ~1 inside the glyph, and alpha is TEXEL0.a * PRIM.a.
+Gfx* Gfx_TextureI8Ex(Gfx* displayListHead, void* texture, s16 textureWidth, s16 textureHeight, s16 rectLeft,
+                     s16 rectTop, s16 rectWidth, s16 rectHeight, u16 dsdx, u16 dtdy, int element, u32 prim) {
+    if (element != ZELDA3D_HUD_NONE && Zelda3D_HudOwns(element)) {
+        int gw = 0, gh = 0;
+        const void* gt = NULL;
+        if (Zelda3D_HudTexEnabled()) {
+            int glyph = Zelda3D_DigitIndex(texture);
+            if (glyph >= 0) {
+                gt = Zelda3D_DigitTex(glyph, &gw, &gh);
+            }
+        }
+        if (gt == NULL) {
+            gt = Zelda3D_HudDecode(ZELDA3D_HUD_FMT_I8, texture, textureWidth, textureHeight);
+            gw = textureWidth;
+            gh = textureHeight;
+        }
+        if (gt != NULL) {
+            Zelda3D_HudQuadEx(gt, gw, gh, 0, 0, gw, gh, rectLeft, rectTop, rectWidth, rectHeight, prim, 0u,
+                              ZELDA3D_HUD_MODULATE);
+            return displayListHead;
+        }
+    }
+
     // #31 — substitute the crisp higher-res counter font for the blocky N64 8x16 I8 digit. The
     // caller's combine is colour=PRIMITIVE, alpha=TEXEL0, so a grayscale RGBA32 glyph (a=coverage)
     // reproduces the digit exactly; rescale dsdx/dtdy so the full glyph maps onto the same rect.
@@ -1505,6 +1584,12 @@ Gfx* Gfx_TextureI8(Gfx* displayListHead, void* texture, s16 textureWidth, s16 te
                             (rectTop + rectHeight) << 2, G_TX_RENDERTILE, 0, 0, dsdx, dtdy);
 
     return displayListHead;
+}
+
+Gfx* Gfx_TextureI8(Gfx* displayListHead, void* texture, s16 textureWidth, s16 textureHeight, s16 rectLeft, s16 rectTop,
+                   s16 rectWidth, s16 rectHeight, u16 dsdx, u16 dtdy) {
+    return Gfx_TextureI8Ex(displayListHead, texture, textureWidth, textureHeight, rectLeft, rectTop, rectWidth,
+                           rectHeight, dsdx, dtdy, ZELDA3D_HUD_NONE, 0u);
 }
 
 // #32 — draw one HUD button as a full-colour Xbox face-button glyph (RGBA32) at the given screen
@@ -5691,8 +5776,10 @@ void Interface_Draw(PlayState* play) {
                     PosX_RC = PosX_RC_ori;
                 }
                 gDPSetPrimColor(OVERLAY_DISP++, 0, 0, rColor.r, rColor.g, rColor.b, interfaceCtx->magicAlpha);
-                OVERLAY_DISP = Gfx_TextureIA8(OVERLAY_DISP, gRupeeCounterIconTex, 16, 16, PosX_RC, PosY_RC, 16, 16,
-                                              1 << 10, 1 << 10);
+                OVERLAY_DISP = Gfx_TextureIA8Ex(OVERLAY_DISP, gRupeeCounterIconTex, 16, 16, PosX_RC, PosY_RC, 16, 16,
+                                                1 << 10, 1 << 10, ZELDA3D_HUD_COUNTERS,
+                                                ((u32)rColor.r << 24) | ((u32)rColor.g << 16) |
+                                                    ((u32)rColor.b << 8) | (u32)(u8)interfaceCtx->magicAlpha);
             }
 
             if (GameInteractor_Should(VB_RENDER_KEY_COUNTER, true)) {
@@ -5757,8 +5844,11 @@ void Interface_Draw(PlayState* play) {
                                             interfaceCtx->magicAlpha);
                             gDPSetEnvColor(OVERLAY_DISP++, 0, 0, 20,
                                            255); // We reset this here so it match user color :)
-                            OVERLAY_DISP = Gfx_TextureIA8(OVERLAY_DISP, gSmallKeyCounterIconTex, 16, 16, PosX_SKC,
-                                                          PosY_SKC, 16, 16, 1 << 10, 1 << 10);
+                            OVERLAY_DISP = Gfx_TextureIA8Ex(
+                                OVERLAY_DISP, gSmallKeyCounterIconTex, 16, 16, PosX_SKC, PosY_SKC, 16, 16, 1 << 10,
+                                1 << 10, ZELDA3D_HUD_COUNTERS,
+                                ((u32)keyCountColor.r << 24) | ((u32)keyCountColor.g << 16) |
+                                    ((u32)keyCountColor.b << 8) | (u32)(u8)interfaceCtx->magicAlpha);
 
                             // Small Key Counter
                             gDPPipeSync(OVERLAY_DISP++);
@@ -5774,17 +5864,22 @@ void Interface_Draw(PlayState* play) {
                                 interfaceCtx->counterDigits[3] -= 10;
                             }
 
+                            const u32 keyDigitPrim = ((u32)keyCountColor.r << 24) | ((u32)keyCountColor.g << 16) |
+                                                     ((u32)keyCountColor.b << 8) |
+                                                     (u32)(u8)interfaceCtx->magicAlpha;
                             svar3 = 16;
                             if (interfaceCtx->counterDigits[2] != 0) {
-                                OVERLAY_DISP = Gfx_TextureI8(
+                                OVERLAY_DISP = Gfx_TextureI8Ex(
                                     OVERLAY_DISP, ((u8*)((u8*)digitTextures[interfaceCtx->counterDigits[2]])), 8, 16,
-                                    PosX_SKC + 16, PosY_SKC, 8, 16, 1 << 10, 1 << 10);
+                                    PosX_SKC + 16, PosY_SKC, 8, 16, 1 << 10, 1 << 10, ZELDA3D_HUD_COUNTERS,
+                                    keyDigitPrim);
                                 svar3 = 24;
                             }
 
-                            OVERLAY_DISP =
-                                Gfx_TextureI8(OVERLAY_DISP, ((u8*)digitTextures[interfaceCtx->counterDigits[3]]), 8, 16,
-                                              PosX_SKC + svar3, PosY_SKC, 8, 16, 1 << 10, 1 << 10);
+                            OVERLAY_DISP = Gfx_TextureI8Ex(
+                                OVERLAY_DISP, ((u8*)digitTextures[interfaceCtx->counterDigits[3]]), 8, 16,
+                                PosX_SKC + svar3, PosY_SKC, 8, 16, 1 << 10, 1 << 10, ZELDA3D_HUD_COUNTERS,
+                                keyDigitPrim);
                         }
                         break;
                     default:
@@ -5796,11 +5891,17 @@ void Interface_Draw(PlayState* play) {
                 // Rupee Counter
                 gDPPipeSync(OVERLAY_DISP++);
 
+                // Green at full wallet, white normally, grey at zero. #205: the native path needs
+                // the value, so track it alongside the RDP write instead of re-deriving it below.
+                u32 rupeeDigitRGB;
                 if (gSaveContext.rupees == CUR_CAPACITY(UPG_WALLET)) {
+                    rupeeDigitRGB = 0x78FF00u;
                     gDPSetPrimColor(OVERLAY_DISP++, 0, 0, 120, 255, 0, interfaceCtx->magicAlpha);
                 } else if (gSaveContext.rupees != 0) {
+                    rupeeDigitRGB = 0xFFFFFFu;
                     gDPSetPrimColor(OVERLAY_DISP++, 0, 0, 255, 255, 255, interfaceCtx->magicAlpha);
                 } else {
+                    rupeeDigitRGB = 0x646464u;
                     gDPSetPrimColor(OVERLAY_DISP++, 0, 0, 100, 100, 100, interfaceCtx->magicAlpha);
                 }
 
@@ -5828,8 +5929,10 @@ void Interface_Draw(PlayState* play) {
                 svar5 = rupeeDigitsCount[CUR_UPG_VALUE(UPG_WALLET)];
 
                 for (svar1 = 0, svar3 = 16; svar1 < svar5; svar1++, svar2++, svar3 += 8) {
-                    OVERLAY_DISP = Gfx_TextureI8(OVERLAY_DISP, ((u8*)digitTextures[interfaceCtx->counterDigits[svar2]]),
-                                                 8, 16, PosX_RC + svar3, PosY_RC, 8, 16, 1 << 10, 1 << 10);
+                    OVERLAY_DISP =
+                        Gfx_TextureI8Ex(OVERLAY_DISP, ((u8*)digitTextures[interfaceCtx->counterDigits[svar2]]), 8, 16,
+                                        PosX_RC + svar3, PosY_RC, 8, 16, 1 << 10, 1 << 10, ZELDA3D_HUD_COUNTERS,
+                                        (rupeeDigitRGB << 8) | (u32)(u8)interfaceCtx->magicAlpha);
                 }
             }
         } else {
