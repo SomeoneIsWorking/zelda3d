@@ -14,8 +14,6 @@ Card format: `- [#N] <title> — <notes / evidence link>`  (N = simple increment
 
 ## todo
 
-- [#201 e] Link: **sword on his back before he has picked it up** — hand-curated mesh_id midmask stands in for OoT3D's real per-state mesh visibility. Frontier row `player.mesh-id-selection`; blocked on locating the OoT3D Player_DrawImpl twin (the fn-ptr table @0x4bff48 is reached via base+offset, so Ghidra FindRangeRefs finds zero code refs — needs data-flow or a live watchpoint). MULTI-SESSION RE.
-  NOTE: pose PLAYBACK measured at parity (idle/walk 1.2°, run 1.7° per bone) and the idle *picker* matches the oracle — so this is not a pose-selection bug.
 
 ## in-progress
 
@@ -27,6 +25,8 @@ Card format: `- [#N] <title> — <notes / evidence link>`  (N = simple increment
 _(empty)_
 
 ## needs-confirmation
+
+- [#201 e] Link: **sword on his back before he has picked it up** — **FIXED** `df06e4a4`, awaiting user confirmation. Root cause was a MISSING STATE, not a wrong mesh id: `sheathType` comes from the model group (derived from what Link is holding) and knows nothing about whether he owns a sword, so both N64 and OoT3D apply a second draw-time override suppressing the back-worn sword when the child has no Kokiri sword on B. We had the first half and not the override. RE'd end to end from OoT3D `0x004c70c4` — its fallback table at `0x0053c4b8` is byte-for-byte N64's two `(child, no sword)` rows in `sSheathWithSwordDLs` (`z_player_lib.c:212-223`), with `-1` as the draw-nothing sentinel and its Deku row's mesh id 13 matching our `LINK_MID(13)`. Two rules: SHEATH_18/19 swap to the fallback row only when `currentShield < PLAYER_SHIELD_HYLIAN` (so a child with Hylian/Mirror keeps normal back geometry); SHEATH_16/17 draw nothing. **Evidence** (frozen logic+camera): control 21 px, test 696 px of which 524 is the B-button HUD icon and 160 is Link's body at x[353..393] y[117..194]; the gold sword hilt vanishes while the Deku shield stays (`scratch/screenshots/fz_sword.png` vs `fz_nosword.png`). New REPL primitive `bitem` (`ed84020a`) drives the state. Writeup `oot3d-decomp/docs/player_draw_impl_located.md`; frontier `player.mesh-id-selection`. NOTE: verified by forcing the B item; the stronger check is a real save from before the sword is collected.
 
 - [#206] Link has NO SHADOW — **FIXED** (`z_player.c` Player_Draw). Root cause: the replaced OoT3D draw skips the N64 limb walk, and that walk (`Player_PostLimbDrawGameplay` → `Actor_SetFeetPos`) is the ONLY writer of `shape.feetPos`, which `ActorShadow_DrawFeet` places the per-foot shadows from. Fix = the proven collider remedy (#107/#108): re-run `Player_DrawImpl` under `gZelda3dColliderPass` for its side effects, then rewind `polyOpa.p`/`polyXlu.p` so no N64 geometry renders. **Evidence** (like-for-like: same Link pos (-68,-79,941), same `acam 120 z` eye, settled frame): ground patch below the boots 370,288-440,302 went (85.0,102.9,29.9) → (74.2,87.5,24.9) — green −15%; visible contact shadow in `scratch/screenshots/shadow206_{before,after}_zoom.png`. Findings `docs/issues/0007`.
 
