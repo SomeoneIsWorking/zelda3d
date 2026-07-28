@@ -307,7 +307,7 @@ void SkelAnime_DrawLimbOpa(PlayState* play, s32 limbIndex, void** skeleton, Vec3
 // degenerate fixed pushback (enemies "zip away"; stalchildren are the vivid case, #107). Re-run the
 // N64 limb matrix walk purely for those side effects (gZelda3dColliderPass suppresses the OoT3D
 // replacement so the real walk runs), then rewind the gfx buffers so none of the N64 geometry renders.
-extern int gZelda3dColliderPass;
+// gZelda3dColliderPass is declared in zelda3d/zelda3d.h.
 static void Zelda3D_UpdateSkelColliders(PlayState* play, SkelAnime* skelAnime,
                                       OverrideLimbDrawOpa overrideLimbDraw, PostLimbDrawOpa postLimbDraw, void* arg) {
     Gfx* opaP = play->state.gfxCtx->polyOpa.p;
