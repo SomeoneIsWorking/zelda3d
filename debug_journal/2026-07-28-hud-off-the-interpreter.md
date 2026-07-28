@@ -75,8 +75,9 @@ Not done in this pass, and NOT hidden behind a "fixed" claim:
 
 - health meter (`z_lifemeter.c`) — the mode-1 lerp combine exists for it, it just is not converted;
 - magic bar, rupee/small-key counters, timers, the do-action label and A button;
-- **C-Up / Navi and the start button** — the residual black-bar stack still visible left of the item
-  buttons in the after shot is this, same shared-tile cause;
+- **the A button / do-action prompt** — this is the residual black-bar stack still visible left of the
+  item buttons. (An earlier revision of this note guessed "C-Up / Navi and the start button, same
+  shared-tile cause". Both halves were wrong; see the identification below.)
 - the minimap (`z_map_exp.c`).
 
 Each converts the same way: give the site a native branch, add its element to `Zelda3D_HudOwns`, and
@@ -90,3 +91,40 @@ transplanting its layout onto one screen is a redesign, not a port, and the curr
 layout is the one the user restored and verified in #202. 3DS art keeps being used where we already
 have it (the texture-pack disc and counter icons). If a 3DS-styled layout is wanted, that is a
 separate decision worth making explicitly.
+
+
+## Follow-up, same day — identifying the residual black bars (they are the A button)
+
+The user re-reported the bar stack and asked what it is. Guessing twice was not acceptable, so it was
+measured.
+
+**It is screen-anchored, not world geometry.** Orbiting the camera 0/60/120/180 degrees
+(`camorbit 60` x3) leaves the stack in exactly the same screen position while the whole world rotates
+behind it (`scratch/screenshots/orbit_sheet.png`, `cup_sheet.png`). My first instinct on seeing the
+user's crop — a ladder, because the crop shows bars over a tree trunk — was wrong.
+
+**It is the A button (the do-action prompt), and only with the HD disc.** Decisive A/B via the live
+REPL toggle `hudtex 0|1` (`scratch/screenshots/abtn_ab.png`): with the crisp HUD textures OFF the A
+button draws as a clean solid disc; with them ON the same spot is the bar stack, with the "PutAway"
+label over it.
+
+**Mechanism.** `Interface_DrawActionButton` is NOT a texrect — it is a flip-animated 3D quad
+(`Matrix_RotateX(interfaceCtx->unk_1F4 / 10000)`) over `interfaceCtx->actionVtx[0..3]` with texcoords
+baked for a 32-texel tile. The #31 HD substitution keeps that quad and rescales the baked s10.5
+texcoords by `gw/32`:
+
+    tcFarS = (1024 - 16) * sButW / 32
+
+With the OoT3D texture pack present (`[Zelda3D] texpack: 2143 textures indexed`) the disc is far
+larger than 32 texels, and that ratio-rescale is a magic-constant patch over a tile the N64 path
+cannot describe — the row stride comes out wrong and the quad samples repeating rows, which is why
+the corruption is HORIZONTAL banding specifically. Same family as the C-button shared-resident-tile
+bug, different path.
+
+**Fix is the same architectural one, and it is NOT a texcoord repair.** The A button converts to the
+native path as a group with the do-action label (they share the flip and the label draws over the
+disc, so converting one inverts the layering). Two things it needs that the texrect elements did not:
+the label is IA4 (`gDPLoadTextureBlock_4b`, 48x16 from `doActionSegment`) so it needs an IA4->RGBA
+decode, and both quads are placed through the HUD's ortho MATRIX stack rather than as screen rects,
+so their pixel rect has to be derived from that projection instead of read off the call. The X-flip
+reduces exactly to a vertical scale by `cos(unk_1F4 / 10000)` under an orthographic projection.
