@@ -63,10 +63,18 @@ def capture(entrance: int, out_png: str, settle_frames: int, keep_ppm: bool,
         print("oracle_shot: never reached gameplay — refusing to write a "
               "title-screen frame.", file=sys.stderr)
         return 3
-    # Time-of-day must match the SoH3D side or a comparison is measuring the clock,
-    # not the renderer. gSaveContext is a global, so this is a plain u16 write.
+    # Time-of-day must match the SoH3D side or a comparison is measuring the clock, not the renderer.
+    # Set it AFTER the settle, never before: the clock keeps running, so a request made ahead of
+    # several hundred settle frames lands at a completely different sun position. That is exactly how
+    # a --daytime 0x6000 capture came out as a low-sun frame and got compared against our midday one
+    # (instrument I001, 2026-07-28). set_time_of_day now verifies and raises rather than drifting
+    # silently, so a bad clock fails the capture instead of poisoning a measurement.
     if daytime is not None:
-        HC.set_time_of_day(h, daytime)
+        try:
+            HC.set_time_of_day(h, daytime)
+        except RuntimeError as e:
+            print(f"oracle_shot: {e}", file=sys.stderr)
+            return 4
     live = _pos_of(h) or "gameplay"
 
     base = os.path.splitext(out_png)[0]

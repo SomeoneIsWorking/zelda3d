@@ -125,6 +125,18 @@ def main():
         for m in raw.values():
             union += m
         sel = {k: (m & (union == 1)) for k, m in raw.items()}
+        # SAY SO when a draw has no exclusive pixels. --exclusive is inert for a fully-overlapped
+        # draw, and "no exclusive pixels" is indistinguishable from "nothing to report" unless the
+        # tool names it: at Zora, d9 has 12072 mask pixels and ZERO exclusive ones, so every
+        # --exclusive number for it was silently absent while the operator read the silence as
+        # agreement (instrument I002, 2026-07-28).
+        starved = [(k, int(raw[k].sum())) for k in keys if raw[k].any() and not sel[k].any()]
+        if starved:
+            print("NOTE: --exclusive has NO pixels for these draws (fully overlapped by later "
+                  "layers); they are omitted below, and any full-mask number for them is "
+                  "contaminated by whatever is drawn on top:")
+            for k, n in starved:
+                print(f"        {k}: {n} mask px, 0 exclusive")
     else:
         sel = raw
 

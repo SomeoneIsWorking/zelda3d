@@ -1,8 +1,9 @@
 ---
 id: I001
 kind: instrument
-status: trusted
+status: DISTRUSTED
 created: 2026-07-28
+distrusted_on: 2026-07-28
 ---
 
 ## Instrument
@@ -16,3 +17,9 @@ PARTIALLY trusted. The CAPTURE leg is validated: --settle 400 produces a real, v
 ## Known failure modes
 
 (none recorded yet)
+
+## DISTRUSTED 2026-07-28
+
+SUPERSEDED 2026-07-28 — the fix landed AND the stated cause was wrong. tools/harness_ctl.set_time_of_day now sets both clocks LAST, advances only 8 frames, reads dayTime and skyboxTime back, and RAISES if they drifted past tolerance; oracle_shot turns that into a failed capture (exit 4) instead of a poisoned measurement. Running it for real, the verification PASSES: a --daytime 0x6000 capture holds 0x6000, and the re-captured frame measures shadow contrast 0.664 against the old unverified frame's 0.654 — the same frame. So this entry's explanation ('the --daytime write does not take') is FALSIFIED. What remains true is the observation that started it: our game at nominal 0x6000 measures 0.868 while the oracle at verified 0x6000 measures 0.664. Same nominal clock, different sun. That is now a sharper and legitimately open question — what OoT3D's environment code does with dayTime versus what our forced-time path does — and it is an RE question about a mechanism, not a residual to narrow. See the replacement instrument for the tool's current, validated behaviour.
+
+> Every result this instrument produced is suspect until it is re-validated.
