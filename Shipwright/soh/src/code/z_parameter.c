@@ -24,6 +24,7 @@
 #include "soh/ObjectExtension/ActorMaximumHealth.h"
 #include "zelda3d/zelda3d.h" // #32 — Xbox face-button HUD glyphs (Zelda3D_XboxBtnEnabled / Zelda3D_XboxGlyphTex)
 #include "zelda3d/input/zelda3d_input.h" // Zelda3D_XboxBtnEnabled / Zelda3D_InputDevice
+#include "zelda3d/input/zelda3d_keymap.h"  // #203 — key label for the keyboard HUD badge
 
 #include "message_data_static.h"
 extern MessageTableEntry* sNesMessageEntryTablePtr;
@@ -1529,13 +1530,22 @@ static Gfx* Zelda3D_DrawXboxBtn(Gfx* dl, char which, s16 left, s16 top, s16 w, s
     return dl;
 }
 
-// #32 hotswap — keyboard-key glyph badge, parallel to Zelda3D_DrawXboxBtn but sourcing
-// Zelda3D_KbdGlyphTex. Same Fast3D combine + dsdx/dtdy logic; only the texture pointer differs.
-static Gfx* Zelda3D_DrawKbdBtn(Gfx* dl, char which, s16 left, s16 top, s16 w, s16 h, u8 alpha) {
+// #32/#203 hotswap — keyboard-key badge, parallel to Zelda3D_DrawXboxBtn but sourcing a keycap
+// composited from the key actually bound to `bitmask` (Zelda3D_KeyLabelForButton). Same Fast3D
+// combine + dsdx/dtdy logic; the one difference is that a multi-character label returns a WIDER
+// than tall texture, so the destination rect is widened to the texture's aspect and shifted left to
+// keep the badge's right edge against the button. `w`/`h` are the SQUARE badge box.
+static Gfx* Zelda3D_DrawKbdBtn(Gfx* dl, u16 bitmask, s16 left, s16 top, s16 w, s16 h, u8 alpha) {
     int gw = 0, gh = 0;
-    const void* tex = Zelda3D_KbdGlyphTex(which, &gw, &gh);
+    const char* label = Zelda3D_KeyLabelForButton(bitmask);
+    const void* tex = Zelda3D_KeyCapTex(label, &gw, &gh);
     if (tex == NULL || gw <= 0 || gh <= 0 || w <= 0 || h <= 0) {
         return dl;
+    }
+    if (gw > gh) {
+        s16 wide = (s16)((w * gw) / gh);
+        left = (s16)(left + w - wide);
+        w = wide;
     }
     gDPPipeSync(dl++);
     gDPSetCombineLERP(dl++, 0, 0, 0, TEXEL0, TEXEL0, 0, PRIMITIVE, 0, 0, 0, 0, TEXEL0, TEXEL0, 0, PRIMITIVE, 0);
@@ -1556,14 +1566,18 @@ static Gfx* Zelda3D_DrawKbdBtn(Gfx* dl, char which, s16 left, s16 top, s16 w, s1
 // face-button glyph badge is drawn in the corner AFTER all the item icons (Zelda3D_DrawHudBadges),
 // so the controller button is identified without obscuring the item. Indices: 0=B,1=C-Left,
 // 2=C-Down,3=C-Right.
+// `glyph` is the Xbox face-button letter for the gamepad badge; `n64Button` is the same slot's N64
+// bitmask, which the keyboard badge needs in order to look its key up (#203 — the keyboard badge is
+// no longer a fixed per-slot picture).
 typedef struct {
     s16 x, y, w;
     u8 alpha;
     char glyph;
+    u16 n64Button;
     u8 active;
 } Zelda3DHudBtnRect;
 static Zelda3DHudBtnRect sZelda3dHudBtns[4];
-static void Zelda3D_RecordHudBtn(int i, s16 x, s16 y, s16 w, u8 alpha, char glyph) {
+static void Zelda3D_RecordHudBtn(int i, s16 x, s16 y, s16 w, u8 alpha, char glyph, u16 n64Button) {
     if (i < 0 || i >= 4) {
         return;
     }
@@ -1572,12 +1586,14 @@ static void Zelda3D_RecordHudBtn(int i, s16 x, s16 y, s16 w, u8 alpha, char glyp
     sZelda3dHudBtns[i].w = w;
     sZelda3dHudBtns[i].alpha = alpha;
     sZelda3dHudBtns[i].glyph = glyph;
+    sZelda3dHudBtns[i].n64Button = n64Button;
     sZelda3dHudBtns[i].active = 1;
 }
 static Gfx* Zelda3D_DrawHudBadges(Gfx* dl) {
     // #32 hotswap: pick glyph set from last-used input device (Zelda3D_InputDevice(): 0=gamepad,
-    // 1=keyboard). Both draw helpers (Zelda3D_DrawXboxBtn / Zelda3D_DrawKbdBtn) are structurally
-    // identical — same Fast3D combine + dsdx/dtdy math — so the layout is device-invariant.
+    // 1=keyboard). Both draw helpers share the Fast3D combine + dsdx/dtdy math; the keyboard one
+    // additionally widens its rect for a multi-character keycap (#203), which is why the badge box
+    // below is passed as a square and the helper — not this loop — owns the final width.
     int useKbd = Zelda3D_XboxBtnEnabled() && (Zelda3D_InputDevice() == 1);
     int i;
     for (i = 0; i < 4; i++) {
@@ -1593,7 +1609,7 @@ static Gfx* Zelda3D_DrawHudBadges(Gfx* dl) {
         s16 bx = (s16)(sZelda3dHudBtns[i].x + sZelda3dHudBtns[i].w - bw);
         s16 by = sZelda3dHudBtns[i].y;
         if (useKbd) {
-            dl = Zelda3D_DrawKbdBtn(dl, sZelda3dHudBtns[i].glyph, bx, by, bw, bw, sZelda3dHudBtns[i].alpha);
+            dl = Zelda3D_DrawKbdBtn(dl, sZelda3dHudBtns[i].n64Button, bx, by, bw, bw, sZelda3dHudBtns[i].alpha);
         } else {
             dl = Zelda3D_DrawXboxBtn(dl, sZelda3dHudBtns[i].glyph, bx, by, bw, bw, sZelda3dHudBtns[i].alpha);
         }
@@ -4351,7 +4367,7 @@ void Interface_DrawItemButtons(PlayState* play) {
     {
         OVERLAY_DISP = Gfx_TextureIA8(OVERLAY_DISP, gButtonBackgroundTex, BBtn_Size, BBtn_Size, PosX_BtnB, PosY_BtnB,
                                       BBtnScaled, BBtnScaled, BBtn_factor, BBtn_factor);
-        Zelda3D_RecordHudBtn(0, PosX_BtnB, PosY_BtnB, BBtnScaled, interfaceCtx->bAlpha, 'B');
+        Zelda3D_RecordHudBtn(0, PosX_BtnB, PosY_BtnB, BBtnScaled, interfaceCtx->bAlpha, 'B', BTN_B);
 
         // C-Left Button Color & Texture
         gDPPipeSync(OVERLAY_DISP++);
@@ -4361,7 +4377,8 @@ void Interface_DrawItemButtons(PlayState* play) {
                                 (C_Left_BTN_Pos[0] + R_ITEM_BTN_WIDTH(1)) << 2,
                                 (C_Left_BTN_Pos[1] + R_ITEM_BTN_WIDTH(1)) << 2, G_TX_RENDERTILE, 0, 0,
                                 (R_ITEM_BTN_DD(1) << 1) * bgScale, (R_ITEM_BTN_DD(1) << 1) * bgScale);
-        Zelda3D_RecordHudBtn(1, C_Left_BTN_Pos[0], C_Left_BTN_Pos[1], R_ITEM_BTN_WIDTH(1), interfaceCtx->cLeftAlpha, 'X');
+        Zelda3D_RecordHudBtn(1, C_Left_BTN_Pos[0], C_Left_BTN_Pos[1], R_ITEM_BTN_WIDTH(1), interfaceCtx->cLeftAlpha, 'X',
+                             BTN_CLEFT);
 
         // C-Down Button Color & Texture
         gDPSetPrimColor(OVERLAY_DISP++, 0, 0, cDownButtonColor.r, cDownButtonColor.g, cDownButtonColor.b,
@@ -4370,7 +4387,8 @@ void Interface_DrawItemButtons(PlayState* play) {
                                 (C_Down_BTN_Pos[0] + R_ITEM_BTN_WIDTH(2)) << 2,
                                 (C_Down_BTN_Pos[1] + R_ITEM_BTN_WIDTH(2)) << 2, G_TX_RENDERTILE, 0, 0,
                                 (R_ITEM_BTN_DD(2) << 1) * bgScale, (R_ITEM_BTN_DD(2) << 1) * bgScale);
-        Zelda3D_RecordHudBtn(2, C_Down_BTN_Pos[0], C_Down_BTN_Pos[1], R_ITEM_BTN_WIDTH(2), interfaceCtx->cDownAlpha, 'Y');
+        Zelda3D_RecordHudBtn(2, C_Down_BTN_Pos[0], C_Down_BTN_Pos[1], R_ITEM_BTN_WIDTH(2), interfaceCtx->cDownAlpha, 'Y',
+                             BTN_CDOWN);
 
         // C-Right Button Color & Texture
         gDPSetPrimColor(OVERLAY_DISP++, 0, 0, cRightButtonColor.r, cRightButtonColor.g, cRightButtonColor.b,
@@ -4380,7 +4398,7 @@ void Interface_DrawItemButtons(PlayState* play) {
                                 (C_Right_BTN_Pos[1] + R_ITEM_BTN_WIDTH(3)) << 2, G_TX_RENDERTILE, 0, 0,
                                 (R_ITEM_BTN_DD(3) << 1) * bgScale, (R_ITEM_BTN_DD(3) << 1) * bgScale);
         Zelda3D_RecordHudBtn(3, C_Right_BTN_Pos[0], C_Right_BTN_Pos[1], R_ITEM_BTN_WIDTH(3), interfaceCtx->cRightAlpha,
-                           'A');
+                             'A', BTN_CRIGHT);
     }
 
     if ((pauseCtx->state < 8) || (pauseCtx->state >= 18)) {

@@ -9,7 +9,7 @@ Subcommands:
   ready                 wait until the instance has warped in and the REPL is live
   cmd "<text>"          send a raw REPL command, print the reply
   menu <button>...      drive a menu by button NAME (correct PC-native scancodes+timing):
-                        a=confirm(SPACE) start=open(ENTER) up/down/left/right=stick cup..=C dup..=D-pad
+                        a=confirm(SPACE) start=open(ENTER) up/down/left/right=stick cup=C cleft/cdown/cright=1/2/3 dup..=D-pad
                         e.g. `menu a` (confirm), `menu down a` (down+confirm)
                         (mul/diff/tint/enable/scale/spawn/dump/state)
   shot <name> [x0 y0 x1 y1]   dump the current frame -> scratch/screenshots/<name>.png
@@ -90,13 +90,15 @@ def send(cmd, timeout=3.0):
     return "(no reply)"
 
 
-# PC-native default keyboard->N64 button scancodes (#96; see memory soh3d-key-inject-menu-limit).
+# PC-native default keyboard->N64 button scancodes (#96/#203; see memory soh3d-key-inject-menu-limit).
 # Codified so headless menu-driving needn't re-derive them — the pre-#96 "A=X/Start=SPACE" values
 # baked into the `key` command's old doc misled multiple sessions (menu confirm silently pressed an
 # unmapped key). Menu CONFIRM = a (SPACE=57); pause/menu OPEN = start (ENTER=28).
+# Keep this table in sync with LUS::ControllerDefaultMappings (input-scheme v3): the three C-button
+# ITEM SLOTS are the number keys 1/2/3, C-Up (look/Navi) is C, and the arrow keys are unbound.
 MENU_KEYS = {
     "a": 57, "b": 33, "z": 16, "r": 29, "l": 42, "start": 28,
-    "cup": 328, "cdown": 336, "cleft": 331, "cright": 333,
+    "cup": 46, "cdown": 3, "cleft": 2, "cright": 4,  # C=look/Navi; item slots 1/2/3 (#203)
     "dup": 23, "ddown": 37, "dleft": 36, "dright": 38,
     "up": 17, "down": 31, "left": 30, "right": 32,  # left stick = WASD
 }
@@ -269,7 +271,7 @@ def main():
         print(send(sys.argv[2]))
     elif sub == "menu":
         # menu <button|scancode>...  — drive a menu by NAME with correct scancodes+timing.
-        # a=confirm(SPACE) start=open(ENTER) up/down/left/right=stick(WASD) cup..=arrows dup..=IJKL.
+        # a=confirm(SPACE) start=open(ENTER) up/down/left/right=stick(WASD) cup=C, item slots=1/2/3, dup..=IJKL.
         if len(sys.argv) < 3:
             sys.exit("usage: menu <button|scancode>...  (a b z r l start up down left right "
                      "cup cdown cleft cright dup ddown dleft dright); a=confirm, start=menu-open")

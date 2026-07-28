@@ -57,15 +57,21 @@ void ControllerDefaultMappings::SetDefaultKeyboardKeyToButtonMappings(
     // L-button        BTN_L      Left Shift     Walk-modifier / L in OoT
     // Pause/skip      BTN_START  Enter          Escape is reserved for the RmlUi menu (SohRmlUi
     //                                           toggles on ESC); Start on Enter keeps cutscene/dialog skip (#15)
-    // Camera up       BTN_CUP    Arrow Up       Arrow keys = camera fallback (mouse-look deferred)
-    // Camera down     BTN_CDOWN  Arrow Down
-    // Camera left     BTN_CLEFT  Arrow Left
-    // Camera right    BTN_CRIGHT Arrow Right
+    // Item slot 1     BTN_CLEFT  1              #203 — the C buttons ARE the item slots in OoT, so
+    // Item slot 2     BTN_CDOWN  2              they get the PC item-bar keys. They were on the
+    // Item slot 3     BTN_CRIGHT 3              arrow keys, which reads as "emulator with a keyboard"
+    //                                           rather than a PC game and made the HUD badges show
+    //                                           arrows on the item buttons.
+    // Look/Navi       BTN_CUP    C              C-Up is the first-person look / Navi call, NOT an
+    //                                           item slot, so it does not belong on the item bar.
     // D-pad up        BTN_DUP    I              Item slot up
     // D-pad down      BTN_DDOWN  K              Item slot down
     // D-pad left      BTN_DLEFT  J              Item slot left
     // D-pad right     BTN_DRIGHT L              Item slot right
     //
+    // The arrow keys are deliberately left UNBOUND — they are the obvious home for the camera once
+    // the mouse-look pass lands, and binding them to the item buttons in the meantime made the item
+    // bar ambiguous (see the badge tie-break in zelda3d/input/zelda3d_keymap.cpp).
     // Mouse LMB→BTN_B and mouse-look→camera are deferred to the mouse-look pass.
     Ship::ControllerDefaultMappings::SetDefaultKeyboardKeyToButtonMappings({
         { BTN_A, { Ship::KbScancode::LUS_KB_SPACE } },
@@ -74,10 +80,10 @@ void ControllerDefaultMappings::SetDefaultKeyboardKeyToButtonMappings(
         { BTN_R, { Ship::KbScancode::LUS_KB_CONTROL } },
         { BTN_L, { Ship::KbScancode::LUS_KB_SHIFT } },
         { BTN_START, { Ship::KbScancode::LUS_KB_ENTER } },
-        { BTN_CUP, { Ship::KbScancode::LUS_KB_ARROWKEY_UP } },
-        { BTN_CDOWN, { Ship::KbScancode::LUS_KB_ARROWKEY_DOWN } },
-        { BTN_CLEFT, { Ship::KbScancode::LUS_KB_ARROWKEY_LEFT } },
-        { BTN_CRIGHT, { Ship::KbScancode::LUS_KB_ARROWKEY_RIGHT } },
+        { BTN_CUP, { Ship::KbScancode::LUS_KB_C } },
+        { BTN_CDOWN, { Ship::KbScancode::LUS_KB_2 } },
+        { BTN_CLEFT, { Ship::KbScancode::LUS_KB_1 } },
+        { BTN_CRIGHT, { Ship::KbScancode::LUS_KB_3 } },
         { BTN_DUP, { Ship::KbScancode::LUS_KB_I } },
         { BTN_DDOWN, { Ship::KbScancode::LUS_KB_K } },
         { BTN_DLEFT, { Ship::KbScancode::LUS_KB_J } },

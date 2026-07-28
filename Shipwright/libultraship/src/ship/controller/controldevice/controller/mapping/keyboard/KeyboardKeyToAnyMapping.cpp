@@ -17,6 +17,10 @@ std::string KeyboardKeyToAnyMapping::GetPhysicalInputName() {
     return Context::GetRawInstance()->GetWindow()->GetKeyName(mKeyboardScancode);
 }
 
+KbScancode KeyboardKeyToAnyMapping::GetKeyboardScancode() const {
+    return mKeyboardScancode;
+}
+
 bool KeyboardKeyToAnyMapping::ProcessKeyboardEvent(KbEventType eventType, KbScancode scancode) {
     if (eventType == KbEventType::LUS_KB_EVENT_ALL_KEYS_UP) {
         mKeyPressed = false;

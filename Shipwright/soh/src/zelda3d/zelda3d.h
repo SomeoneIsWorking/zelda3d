@@ -242,10 +242,17 @@ extern int gZelda3dXboxBtn;       // env ZELDA3D_XBOXUI / REPL `xboxui` gate (-1
 // Zelda3D_XboxBtnEnabled() declared in input/zelda3d_input.h (moved there, Phase 1 input
 // consolidation); lazily resolves the env on first call, HUD draws gate on this.
 
-// #32 hotswap — keyboard-key HUD glyphs. Returns a persistent RGBA8888 buffer for the key glyph
-// for the given HUD slot: 'B'=B-button (C key), 'X'=C-Left (←), 'Y'=C-Down (↓), 'A'=C-Right (→).
-// Same 64x64 dims as Zelda3D_XboxGlyphTex. The draw path is identical; only the texture changes.
-const void* Zelda3D_KbdGlyphTex(char which, int* w, int* h);
+// #32/#203 hotswap — keyboard-key HUD badge. Composites a keycap carrying `label` (an uppercase
+// key name from Zelda3D_KeyLabelForButton, e.g. "1" or "LSHFT") and returns a persistent RGBA8888
+// buffer + its dims, or NULL on failure. Height is always 64; the WIDTH grows for multi-character
+// labels (the cap is 9-sliced horizontally), so callers must draw at the returned aspect rather
+// than assume a square — a wide label on a square rect would squash the text. Results are cached
+// per label string, so calling this every HUD frame costs a hash lookup.
+const void* Zelda3D_KeyCapTex(const char* label, int* w, int* h);
+
+// The character set Zelda3D_KeyCapTex can actually draw (the generated glyph atlas's alphabet).
+// input/zelda3d_keymap.cpp folds SDL key names against this rather than keeping a second copy.
+const char* Zelda3D_KeyCapAlphabet(void);
 
 // #32 hotswap — last-used input device. 0 = gamepad (Xbox glyphs), 1 = keyboard (key-label glyphs).
 // Updated from the C++ LUS input layer (Ship::Controller::ProcessKeyboardEvent for keyboard events,
