@@ -37,6 +37,13 @@ enum {
     // B / C-Left / C-Down / C-Right / D-pad: the button disc, the item icon, the ammo count and the
     // key-or-gamepad badge. This is the cluster the user photographed.
     ZELDA3D_HUD_ITEM_BUTTONS = 0,
+    // The do-action prompt: the A-button disc and its label ("Open" / "Speak" / "Put Away"). One
+    // group because they share the flip animation and the label draws over the disc. This is what
+    // the black-bar stack was (docs/issues/0004-*): unlike every other element these are not
+    // texrects but flip-animated quads whose texcoords are baked for a 32-texel tile, and the HD
+    // disc rescales those baked coords by discW/32 — a ratio the N64 tile cannot express, so the
+    // row stride breaks into horizontal bands.
+    ZELDA3D_HUD_DO_ACTION = 1,
 };
 int Zelda3D_HudOwns(int element);
 
@@ -50,6 +57,17 @@ void Zelda3D_HudQuad(const void* tex, int texW, int texH, float x, float y, floa
                      unsigned int primRGBA);
 void Zelda3D_HudQuadUv(const void* tex, int texW, int texH, int sx, int sy, int sw, int sh, float x,
                        float y, float w, float h, unsigned int primRGBA);
+// IA4 variant — the do-action label (`doActionSegment`) is a 4-bit intensity+alpha texture, the one
+// HUD source that is neither RGBA32 nor one of our own runtime buffers. Decoded to RGBA here (3 bits
+// intensity -> rgb, 1 bit alpha) and then drawn as an ordinary modulate quad, which reproduces its
+// N64 combine exactly: rgb = (PRIM-ENV)*TEXEL0 + ENV with ENV=0 is PRIM*intensity, and alpha is
+// TEXEL0.a * PRIM.a.
+//
+// The label's CONTENT changes while its buffer address stays the same ("Open" -> "Speak" -> ...), so
+// decodes are cached by content hash, not by pointer — caching by pointer would freeze the first
+// label that was ever shown.
+void Zelda3D_HudQuadIA4(const void* tex, int texW, int texH, float x, float y, float w, float h,
+                        unsigned int primRGBA);
 // PRIM/ENV lerp variant — the N64 `(PRIM - ENV) * TEXEL0 + ENV` combine that z_lifemeter.c's hearts
 // use. `tex` supplies the lerp factor in .r and the silhouette in .a.
 void Zelda3D_HudQuadLerp(const void* tex, int texW, int texH, float x, float y, float w, float h,
