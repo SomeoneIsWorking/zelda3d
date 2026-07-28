@@ -51,6 +51,11 @@ enum {
     // The magic meter: its IA8 frame (left cap, tiled middle, mirrored right cap) and its I4 fill.
     // The tiled middle is the reason the quad renderer grew a repeat sampler.
     ZELDA3D_HUD_MAGIC = 3,
+    // The rupee and small-key counters: their icon and their digits.
+    ZELDA3D_HUD_COUNTERS = 4,
+    // Passed by a Gfx_Texture* call site that has NOT been converted yet, so the shared helper keeps
+    // emitting its display list for that caller while other callers of the same helper go native.
+    ZELDA3D_HUD_NONE = -1,
 };
 int Zelda3D_HudOwns(int element);
 
@@ -104,6 +109,13 @@ enum {
 // carrying intensity into alpha would double-apply it as coverage. Anything that genuinely wants
 // intensity-as-alpha uses an IA format.
 const void* Zelda3D_HudDecode(int fmt, const void* tex, int texW, int texH);
+
+// Force the native HUD on (1) or off (0) at runtime — REPL `nativehud`. With it off every converted
+// site falls back to its display-list emission, which makes a same-frame A/B of the native and
+// interpreter renders possible; a colour mask over two separately-captured frames cannot do that,
+// because the scene behind the HUD moves between them. Defaults to on (env ZELDA3D_HUD=0 disables).
+void Zelda3D_HudSetEnabled(int on);
+int Zelda3D_HudGetEnabled(void);
 
 // Draws (and clears) everything recorded this frame. Called from libultraship's Gui::EndFrame, i.e.
 // after the interpreter has composited the game frame and before the RmlUi menu, so the HUD sits

@@ -147,6 +147,14 @@ extern "C" const void* Zelda3D_HudDecode(int fmt, const void* tex, int texW, int
     return cache.emplace(hash, std::move(out)).first->second.data();
 }
 
+extern "C" void Zelda3D_HudSetEnabled(int on) {
+    sEnabled = on ? 1 : 0;
+}
+
+extern "C" int Zelda3D_HudGetEnabled(void) {
+    return hudEnabled() ? 1 : 0;
+}
+
 extern "C" int Zelda3D_HudOwns(int element) {
     (void)element; // every converted group shares one gate; see zelda3d_hud.h
     return hudEnabled() ? 1 : 0;

@@ -168,3 +168,41 @@ passing the colour is cleaner than shadowing the N64 PRIM register.
 
 Remaining on the interpreter after this pass: health meter, magic bar, rupee/small-key counters,
 timers, the C-Up "Navi" label, and the minimap. None of them are corrupted today.
+
+
+## Pass 3 — health meter, magic meter, rupee/small-key counters
+
+Three more groups off the interpreter. Notes worth keeping:
+
+**The heart row** needed the PRIM/ENV lerp mode added in pass 1 (unused until now). Double-defense
+hearts use the SWAPPED combine `(ENV-PRIM)*TEXEL0+PRIM`, which is the same operation with the colours
+exchanged — but alpha is `TEXEL0*PRIM` in both cases, so the swap must carry the real PRIM alpha (env
+alpha is a constant 255 and would defeat the fade). The native path reads its colours back off
+`curColorSet` rather than duplicating the eight prim/env branches.
+
+**The magic meter** needed three new capabilities: IA8/I4 decoding (folded into one
+`Zelda3D_HudDecode` covering IA4/IA8/I4/I8), a repeat sampler for its tiled middle section, and a
+third combine mode whose alpha comes from PRIM alone.
+
+**THE SOURCE RECT IS THE THING TO GET RIGHT, and it bit twice.** An N64 texrect with dsdx/dtdy 1:1
+samples ONE TEXEL PER PIXEL rather than stretching its texture over the rect.
+1. The magic fill's 7-pixel-tall rect takes the first 7 of its texture's 16 rows; stretching all 16
+   into 7 rendered a thin green sliver over black.
+2. That recovered rect is in the ORIGINAL texture's texel space, so it must be rescaled into the
+   resolution of whatever crisp substitute is actually drawn. Without that, the rupee icon sampled a
+   16x16 window of a 64x64 replacement — the top-left quarter, which is empty, so the gem vanished
+   while its digits (which happen to pass a full-texture rect) looked fine.
+
+**New instrument: REPL `nativehud 0|1`.** Comparing two separately-captured frames does not work for
+this — the world behind the HUD moves between captures, and any colour mask picks that up (a mask
+over the rupee area reported a bogus mismatch that was grass). The toggle flips every converted
+element back to its display list in the SAME scene, so a real A/B is one command.
+
+Using it, the expected residual between the two paths is **edge-only**: a diff heatmap of the rupee
+counter shows thin outlines around the gem and each digit with identical interiors — the native
+linear sampler versus the texrect path's filtering. Solid interiors and unchanged bounding boxes are
+the pass criterion; anything filled-in means a real difference. Control measurement (two captures at
+the same setting) is ~250 changed pixels in the heart region from scene motion alone, so compare
+against that, not against zero.
+
+Remaining on the interpreter: timers, the HBA score digits, the C-Up "Navi" label, the minimap.
