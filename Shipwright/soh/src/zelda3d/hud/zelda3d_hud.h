@@ -24,13 +24,18 @@
 // everything the interpreter drew, so an element must be converted with its whole stack (background,
 // icon, counter, badge) or the layering inverts. That is what Zelda3D_HudOwns() gates.
 //
-// That is an ARTIFACT OF BATCHING, not a property of the renderer — worth knowing before designing
-// around it. The quads are appended as OP_DRAW records into the SDL3-GPU backend's SAME deferred op
-// list as the N64 triangles, and that list replays in order; they land on top only because
-// Zelda3D_HudFrame() collects the whole frame and flushes once, from Gui::EndFrame, after every other
-// draw has been recorded. Flushing at the point of RECORDING would interleave them correctly and
-// remove the group rule entirely. See docs/issues/0005-*: that is what the minimap needs, because its
-// compass arrows are 3D meshes that no quad can honestly represent.
+// The rule is liftable, but NOT the obvious way. The quads do go into the SDL3-GPU backend's SAME
+// deferred op list as the N64 triangles, and that list replays in order — but flushing them earlier
+// does not interleave them, it buries them: everything here is recorded while the DISPLAY LIST IS
+// BEING BUILT, and the interpreter does not execute (and so does not append its own ops) until
+// Graph_ProcessGfxCommands runs afterwards. A record-time flush would put the whole HUD UNDER the
+// world.
+//
+// Interleaving needs a custom Gfx OPCODE marker — the mechanism this codebase already uses for CMB
+// model draws (OTR_G_ZELDA3D_DRAW, lus_gbi.h): the call site emits a marker where it would have
+// drawn, and the interpreter flushes the pending HUD batch when it reaches it. See docs/issues/0005-*;
+// that is what the minimap needs, because its compass arrows are 3D meshes no quad can honestly
+// represent.
 #ifndef ZELDA3D_HUD_ZELDA3D_HUD_H
 #define ZELDA3D_HUD_ZELDA3D_HUD_H
 
