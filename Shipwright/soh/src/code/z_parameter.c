@@ -26,6 +26,7 @@
 #include "zelda3d/input/zelda3d_input.h" // Zelda3D_XboxBtnEnabled / Zelda3D_InputDevice
 #include "zelda3d/input/zelda3d_keymap.h"  // #203 — key label for the keyboard HUD badge
 #include "zelda3d/hud/zelda3d_hud.h"     // #205 — native HUD: record quads instead of texrects
+#include <math.h>                            // cosf — the do-action flip reduces to a vertical scale
 
 #include "message_data_static.h"
 extern MessageTableEntry* sNesMessageEntryTablePtr;
@@ -5277,8 +5278,40 @@ void Interface_DrawAmmoCount(PlayState* play, s16 button, s16 alpha) {
     CLOSE_DISPS(play->state.gfxCtx);
 }
 
-void Interface_DrawActionButton(PlayState* play, f32 x, f32 y) {
+void Interface_DrawActionButton(PlayState* play, f32 x, f32 y, Color_RGB8 prim) {
     InterfaceContext* interfaceCtx = &play->interfaceCtx;
+
+    // #205 — native HUD: this quad is the black-bar corruption the user reported (docs/issues/0004).
+    // The #31 HD-disc path below keeps the N64 flip quad and rescales its baked 32-texel texcoords by
+    // discW/32; with the OoT3D texture pack loaded the disc is far bigger than 32 texels and that
+    // ratio is a magic constant over a tile the N64 path cannot describe, so the row stride breaks
+    // into horizontal bands. The native branch draws the disc as a plain quad instead — no tile, no
+    // baked texcoords, no ratio. It needs neither the display list nor the matrix stack, so it runs
+    // before OPEN_DISPS (CLOSE_DISPS closes the block OPEN_DISPS opens; returning past it would end
+    // the function's scope early).
+    //
+    // PLACEMENT. The quad is placed through the HUD's ortho matrix stack rather than as a screen
+    // rect, so the rect has to be derived: the translate below puts the quad centre at ortho
+    // (-137 + x, 97 - y), and the HUD ortho maps ortho->virtual as (160 + ox, 120 - oy). That gives a
+    // centre of (x + 23, y + 23) in the same virtual space every other HUD element uses. Checked
+    // against a `hudtex 0` reference frame: predicted centre (249, 32), measured (247.5, 30).
+    //
+    // FLIP. Matrix_RotateX about the quad's own centre under an orthographic projection is exactly a
+    // vertical scale by cos(angle) — not an approximation — so the do-action flip animation survives.
+    if (Zelda3D_HudOwns(ZELDA3D_HUD_DO_ACTION)) {
+        int dW = 0, dH = 0;
+        const void* disc = Zelda3D_ButtonBgTex(&dW, &dH);
+        f32 flip = cosf(interfaceCtx->unk_1F4 / 10000.0f);
+        const f32 side = 29.0f; // actionVtx[0..3] span -15..+14 on both axes
+        if (flip < 0.0f) {
+            flip = -flip;
+        }
+        Zelda3D_HudQuad(disc, dW, dH, (x + 23.0f) - side / 2.0f, (y + 23.0f) - side * flip / 2.0f, side,
+                        side * flip,
+                        ((u32)prim.r << 24) | ((u32)prim.g << 16) | ((u32)prim.b << 8) |
+                            (u32)interfaceCtx->aAlpha);
+        return;
+    }
 
     OPEN_DISPS(play->state.gfxCtx);
 
@@ -6094,7 +6127,7 @@ void Interface_Draw(PlayState* play) {
         gDPSetCombineMode(OVERLAY_DISP++, G_CC_MODULATEIA_PRIM, G_CC_MODULATEIA_PRIM);
         gDPSetPrimColor(OVERLAY_DISP++, 0, 0, aButtonColor.r, aButtonColor.g, aButtonColor.b, interfaceCtx->aAlpha);
         if (fullUi) {
-            Interface_DrawActionButton(play, PosX_BtnA, PosY_BtnA);
+            Interface_DrawActionButton(play, PosX_BtnA, PosY_BtnA, aButtonColor);
         }
         gDPPipeSync(OVERLAY_DISP++);
         gSPSetGeometryMode(OVERLAY_DISP++, G_CULL_BACK);
@@ -6102,16 +6135,32 @@ void Interface_Draw(PlayState* play) {
                           PRIMITIVE, ENVIRONMENT, TEXEL0, ENVIRONMENT, TEXEL0, 0, PRIMITIVE, 0);
         gDPSetPrimColor(OVERLAY_DISP++, 0, 0, 255, 255, 255, interfaceCtx->aAlpha);
         gDPSetEnvColor(OVERLAY_DISP++, 0, 0, 0, 0);
-        Matrix_Translate(-138.0f + rAIconX, rAIconY, WREG(46 + languageOffset) / 10.0f, MTXMODE_NEW);
-        Matrix_Scale(1.0f, 1.0f, 1.0f, MTXMODE_APPLY);
-        Matrix_RotateX(interfaceCtx->unk_1F4 / 10000.0f, MTXMODE_APPLY);
-        gSPMatrix(OVERLAY_DISP++, MATRIX_NEWMTX(play->state.gfxCtx), G_MTX_MODELVIEW | G_MTX_LOAD);
-        gSPVertex(OVERLAY_DISP++, &interfaceCtx->actionVtx[4], 4, 0);
-
-        if ((interfaceCtx->unk_1EC < 2) || (interfaceCtx->unk_1EC == 3)) {
-            Interface_DrawActionLabel(play->state.gfxCtx, interfaceCtx->doActionSegment[0]);
+        // #205 — the do-action LABEL converts with the A-button disc, not separately: they share the
+        // flip and the label draws over the disc, so converting one alone inverts their layering.
+        // Same ortho->virtual derivation as the disc; this translate uses -138 (vanilla OoT authors
+        // the two one unit apart), so the centre is (rAIconX + 22, 120 - rAIconY). The quad is
+        // XREG(21)+1 by XREG(28) and samples the whole 48x16 IA4 label, whose combine — (PRIM-ENV)*
+        // TEXEL0+ENV with ENV=0, alpha TEXEL0*PRIM — is a plain modulate once decoded.
+        void* doActionTex = ((interfaceCtx->unk_1EC < 2) || (interfaceCtx->unk_1EC == 3))
+                                ? interfaceCtx->doActionSegment[0]
+                                : interfaceCtx->doActionSegment[1];
+        if (Zelda3D_HudOwns(ZELDA3D_HUD_DO_ACTION)) {
+            f32 labelFlip = cosf(interfaceCtx->unk_1F4 / 10000.0f);
+            if (labelFlip < 0.0f) {
+                labelFlip = -labelFlip;
+            }
+            const f32 lw = (f32)(XREG(21) + 1);
+            const f32 lh = (f32)XREG(28) * labelFlip;
+            Zelda3D_HudQuadIA4(doActionTex, DO_ACTION_TEX_WIDTH(), DO_ACTION_TEX_HEIGHT(),
+                               (rAIconX + 22.0f) - lw / 2.0f, (120.0f - rAIconY) - lh / 2.0f, lw, lh,
+                               0xFFFFFF00u | (u32)interfaceCtx->aAlpha);
         } else {
-            Interface_DrawActionLabel(play->state.gfxCtx, interfaceCtx->doActionSegment[1]);
+            Matrix_Translate(-138.0f + rAIconX, rAIconY, WREG(46 + languageOffset) / 10.0f, MTXMODE_NEW);
+            Matrix_Scale(1.0f, 1.0f, 1.0f, MTXMODE_APPLY);
+            Matrix_RotateX(interfaceCtx->unk_1F4 / 10000.0f, MTXMODE_APPLY);
+            gSPMatrix(OVERLAY_DISP++, MATRIX_NEWMTX(play->state.gfxCtx), G_MTX_MODELVIEW | G_MTX_LOAD);
+            gSPVertex(OVERLAY_DISP++, &interfaceCtx->actionVtx[4], 4, 0);
+            Interface_DrawActionLabel(play->state.gfxCtx, doActionTex);
         }
 
         gDPPipeSync(OVERLAY_DISP++);

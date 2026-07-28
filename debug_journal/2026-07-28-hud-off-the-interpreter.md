@@ -128,3 +128,43 @@ the label is IA4 (`gDPLoadTextureBlock_4b`, 48x16 from `doActionSegment`) so it 
 decode, and both quads are placed through the HUD's ortho MATRIX stack rather than as screen rects,
 so their pixel rect has to be derived from that projection instead of read off the call. The X-flip
 reduces exactly to a vertical scale by `cos(unk_1F4 / 10000)` under an orthographic projection.
+
+
+## Pass 2 — the A button + do-action label converted
+
+The group identified above is now on the native path, so the black bars are gone.
+
+**Placement had to be DERIVED, not read off the call.** Unlike every element in pass 1, these two are
+not texrects: they are quads placed through the HUD's ortho matrix stack. The translate puts the
+disc's centre at ortho `(-137 + x, 97 - y)` and the HUD ortho maps ortho->virtual as
+`(160 + ox, 120 - oy)`, giving a virtual centre of `(x + 23, y + 23)`. The label's translate uses
+`-138` (vanilla OoT authors the two one unit apart) and its Y is pre-flipped as `98 - R_A_ICON_Y`, so
+its centre is `(rAIconX + 22, 120 - rAIconY)` — one unit from the disc's, which is why the label sits
+concentric on the button.
+
+That derivation was checked against the game rather than trusted: predicted disc centre (249, 32);
+measured on a `hudtex 0` vanilla reference frame (247.5, 30.0) and on the native frame (248.8, 30.2).
+Native vs vanilla agree to 1.3 virtual units in X and 0.2 in Y — the residual is the HD disc art's
+ring versus the flat vanilla disc, since both numbers come from the same saturated-blue interior
+mask. `scratch/screenshots/abtn_native_ab.png`.
+
+**The flip animation survives exactly.** `Matrix_RotateX` about the quad's own centre under an
+orthographic projection is a vertical scale by `cos(angle)` — not an approximation — so the native
+quad just scales its height by `|cos(unk_1F4 / 10000)|` about the centre. A fully edge-on quad has
+zero height and is dropped by the `w <= 0 || h <= 0` guard in `record()`, which is the correct
+result.
+
+**IA4.** The label (`doActionSegment`, 48x16, `gDPLoadTextureBlock_4b`) is the one HUD source that is
+neither RGBA32 nor one of our own buffers, so the module decodes it (3 bits intensity -> rgb, 1 bit
+alpha). Its N64 combine — `(PRIM-ENV)*TEXEL0+ENV` with `ENV = 0`, alpha `TEXEL0*PRIM` — is then a
+plain modulate. The decode cache is keyed by **content hash, not by pointer**: the label rewrites the
+same buffer whenever the prompt changes, so a pointer-keyed cache would pin whichever label was shown
+first, and the GPU-side upload cache (which keys on the buffer address) would happily reuse a stale
+upload. One buffer per distinct hash fixes both. Verified live: the label reads "Drop" while carrying
+and updates as the prompt changes (`scratch/screenshots/label_native_zoom.png`).
+
+`Interface_DrawActionButton` gained a `Color_RGB8 prim` parameter — it is called exactly once, and
+passing the colour is cleaner than shadowing the N64 PRIM register.
+
+Remaining on the interpreter after this pass: health meter, magic bar, rupee/small-key counters,
+timers, the C-Up "Navi" label, and the minimap. None of them are corrupted today.
