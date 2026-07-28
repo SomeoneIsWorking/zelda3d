@@ -197,6 +197,8 @@ class Zelda3DRenderer {
 //   mode 1 — PRIM/ENV LERP: frag.rgb = mix(ENV, PRIM, TEXEL0.r), frag.a = TEXEL0.a * PRIM.a. This is
 //            z_lifemeter.c's heart combine ((PRIM-ENV)*TEXEL0+ENV), which is what gives a heart its
 //            body/rim shading and its beating/double-defense colour sets.
+//   mode 2 — as mode 1 but frag.a = PRIM.a, ignoring the texel. The magic-bar fill's combine takes
+//            its alpha from PRIMITIVE alone, so the texel's intensity must not modulate coverage.
 struct HudVert {
     float x, y;
     uint8_t r, g, b, a;
@@ -209,8 +211,12 @@ constexpr uint32_t kVertsPerQuad = 6;
 constexpr uint32_t kRingFrames = 3;
 
 // One contiguous run of quads sharing a texture (a single SDL_DrawGPUPrimitives).
+// One contiguous run of quads sharing a texture AND a sampler. The sampler varies because most HUD
+// quads clamp but a few TILE (the magic bar's middle section repeats a 24px strip across the whole
+// bar), and a clamped sampler would smear the last column instead of repeating.
 struct DrawRun {
     SDL_GPUTexture* tex;
+    SDL_GPUSampler* sampler;
     uint32_t firstVert, vertCount;
 };
 
@@ -220,7 +226,8 @@ struct HudSg {
     SDL_GPUShader* vs = nullptr;
     SDL_GPUShader* fs = nullptr;
     SDL_GPUGraphicsPipeline* pipeline = nullptr;
-    SDL_GPUSampler* sampler = nullptr;
+    SDL_GPUSampler* sampler = nullptr;       // clamp — the default
+    SDL_GPUSampler* samplerRepeat = nullptr; // repeat — used when a quad's UVs leave [0,1]
     SDL_GPUTexture* whiteTex = nullptr;
 
     // Per-frame vertex ring (host transfer + device vertex buffer).

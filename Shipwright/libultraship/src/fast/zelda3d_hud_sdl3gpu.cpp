@@ -58,7 +58,11 @@ layout(location=0) out vec4 frag;
 layout(set=2, binding=0) uniform sampler2D uTex;
 void main() {
     vec4 t = texture(uTex, vUv);
-    if (vEnvMode.a > 0.5) {
+    // vEnvMode.a carries the mode as 0 / 0.5 / 1 (0, 128, 255 as a normalised byte).
+    if (vEnvMode.a > 0.75) {
+        // Magic-bar fill: rgb lerps like the heart combine but alpha comes from PRIMITIVE alone.
+        frag = vec4(mix(vEnvMode.rgb, vCol.rgb, t.r), vCol.a);
+    } else if (vEnvMode.a > 0.25) {
         // z_lifemeter.c's heart combine: (PRIM - ENV) * TEXEL0 + ENV on rgb, TEXEL0.a * PRIM.a on
         // alpha. Our heart textures are grayscale-intensity + silhouette alpha, so .r is the factor.
         frag = vec4(mix(vEnvMode.rgb, vCol.rgb, t.r), t.a * vCol.a);
@@ -183,6 +187,8 @@ bool Zelda3DHudRenderer::ensureResources() {
     si.mipmap_mode = SDL_GPU_SAMPLERMIPMAPMODE_NEAREST;
     si.address_mode_u = si.address_mode_v = si.address_mode_w = SDL_GPU_SAMPLERADDRESSMODE_CLAMP_TO_EDGE;
     g.sampler = SDL_CreateGPUSampler(g.device, &si);
+    si.address_mode_u = si.address_mode_v = si.address_mode_w = SDL_GPU_SAMPLERADDRESSMODE_REPEAT;
+    g.samplerRepeat = SDL_CreateGPUSampler(g.device, &si);
 
     g.whiteTex = uploadTex(nullptr, 1, 1);
 
@@ -306,21 +312,24 @@ void Zelda3DHudRenderer::Draw(int tex, float x, float y, float w, float h, float
     const uint8_t er = (uint8_t)((envRGB >> 16) & 0xFF);
     const uint8_t eg = (uint8_t)((envRGB >> 8) & 0xFF);
     const uint8_t eb = (uint8_t)(envRGB & 0xFF);
-    const uint8_t md = (uint8_t)(mode ? 255 : 0);
+    const uint8_t md = (uint8_t)(mode >= 2 ? 255 : (mode == 1 ? 128 : 0));
     const float x0 = x, y0 = y, x1 = x + w, y1 = y + h;
     HudVert quad[6] = {
         { x0, y0, cr, cg, cb, ca, u0, v0, er, eg, eb, md }, { x1, y0, cr, cg, cb, ca, u1, v0, er, eg, eb, md },
         { x0, y1, cr, cg, cb, ca, u0, v1, er, eg, eb, md }, { x1, y0, cr, cg, cb, ca, u1, v0, er, eg, eb, md },
         { x1, y1, cr, cg, cb, ca, u1, v1, er, eg, eb, md }, { x0, y1, cr, cg, cb, ca, u0, v1, er, eg, eb, md },
     };
+    // A quad whose UVs leave [0,1] means to TILE its texture (the magic bar repeats a 24px strip
+    // across the whole bar), so it needs the repeat sampler; everything else clamps.
+    SDL_GPUSampler* samp = (u0 < 0.0f || v0 < 0.0f || u1 > 1.0f || v1 > 1.0f) ? g.samplerRepeat : g.sampler;
     uint32_t first = (uint32_t)g.verts.size();
     g.verts.insert(g.verts.end(), quad, quad + 6);
-    // Coalesce consecutive quads that share a texture into one draw run.
-    if (!g.runs.empty() && g.runs.back().tex == view &&
+    // Coalesce consecutive quads that share a texture and a sampler into one draw run.
+    if (!g.runs.empty() && g.runs.back().tex == view && g.runs.back().sampler == samp &&
         g.runs.back().firstVert + g.runs.back().vertCount == first) {
         g.runs.back().vertCount += kVertsPerQuad;
     } else {
-        g.runs.push_back({ view, first, kVertsPerQuad });
+        g.runs.push_back({ view, samp, first, kVertsPerQuad });
     }
 }
 
@@ -360,7 +369,7 @@ void Zelda3DHudRenderer::End() {
     // OoT3D model content in the unified pass, through the backend's single fragment-sampler bind path.
     // Run order is preserved by sequential append.
     for (const DrawRun& r : g.runs)
-        api->AppendZelda3DHudDraw(g.pipeline, ring.vbo, r.firstVert, r.vertCount, r.tex, g.sampler, (float)g.w,
+        api->AppendZelda3DHudDraw(g.pipeline, ring.vbo, r.firstVert, r.vertCount, r.tex, r.sampler, (float)g.w,
                                 (float)g.h);
 }
 

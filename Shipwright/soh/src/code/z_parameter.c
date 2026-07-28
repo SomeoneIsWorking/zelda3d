@@ -3805,25 +3805,71 @@ void Interface_DrawMagicBar(PlayState* play) {
         gDPSetPrimColor(OVERLAY_DISP++, 0, 0, sMagicBorder.r, sMagicBorder.g, sMagicBorder.b, interfaceCtx->magicAlpha);
         gDPSetEnvColor(OVERLAY_DISP++, 100, 50, 50, 255);
 
-        OVERLAY_DISP =
-            Gfx_TextureIA8(OVERLAY_DISP, gMagicMeterEndTex, 8, 16, PosX_Start, magicBarY, 8, 16, 1 << 10, 1 << 10);
+        // #205 — the magic-meter FRAME natively: left cap, a middle that TILES a 24px strip across
+        // the bar (hence the quad renderer's repeat sampler), and a right cap that the N64 path draws
+        // by re-loading the left cap with G_TX_MIRROR and a half-tile texcoord offset. A native quad
+        // mirrors by simply passing u1 < u0, which is the same image without the tile trickery.
+        const u32 magicFramePrim = ((u32)sMagicBorder.r << 24) | ((u32)sMagicBorder.g << 16) |
+                                   ((u32)sMagicBorder.b << 8) | (u32)(u8)interfaceCtx->magicAlpha;
+        if (Zelda3D_HudOwns(ZELDA3D_HUD_MAGIC)) {
+            const void* capTex = Zelda3D_HudDecode(ZELDA3D_HUD_FMT_IA8, gMagicMeterEndTex, 8, 16);
+            const void* midTex = Zelda3D_HudDecode(ZELDA3D_HUD_FMT_IA8, gMagicMeterMidTex, 24, 16);
+            Zelda3D_HudQuad(capTex, 8, 16, PosX_Start, magicBarY, 8, 16, magicFramePrim);
+            Zelda3D_HudQuadEx(midTex, 24, 16, 0, 0, gSaveContext.magicCapacity, 16, PosX_MidEnd, magicBarY,
+                              gSaveContext.magicCapacity, 16, magicFramePrim, 0u, ZELDA3D_HUD_MODULATE);
+            Zelda3D_HudQuadEx(capTex, 8, 16, 8, 0, -8, 16, (rMagicBarX + gSaveContext.magicCapacity) + 8,
+                              magicBarY, 8, 16, magicFramePrim, 0u, ZELDA3D_HUD_MODULATE);
+        } else {
+            OVERLAY_DISP =
+                Gfx_TextureIA8(OVERLAY_DISP, gMagicMeterEndTex, 8, 16, PosX_Start, magicBarY, 8, 16, 1 << 10, 1 << 10);
 
-        OVERLAY_DISP = Gfx_TextureIA8(OVERLAY_DISP, gMagicMeterMidTex, 24, 16, PosX_MidEnd, magicBarY,
-                                      gSaveContext.magicCapacity, 16, 1 << 10, 1 << 10);
+            OVERLAY_DISP = Gfx_TextureIA8(OVERLAY_DISP, gMagicMeterMidTex, 24, 16, PosX_MidEnd, magicBarY,
+                                          gSaveContext.magicCapacity, 16, 1 << 10, 1 << 10);
 
-        gDPLoadTextureBlock(OVERLAY_DISP++, gMagicMeterEndTex, G_IM_FMT_IA, G_IM_SIZ_8b, 8, 16, 0,
-                            G_TX_MIRROR | G_TX_WRAP, G_TX_NOMIRROR | G_TX_WRAP, 3, G_TX_NOMASK, G_TX_NOLOD, G_TX_NOLOD);
+            gDPLoadTextureBlock(OVERLAY_DISP++, gMagicMeterEndTex, G_IM_FMT_IA, G_IM_SIZ_8b, 8, 16, 0,
+                                G_TX_MIRROR | G_TX_WRAP, G_TX_NOMIRROR | G_TX_WRAP, 3, G_TX_NOMASK, G_TX_NOLOD,
+                                G_TX_NOLOD);
 
-        gSPWideTextureRectangle(OVERLAY_DISP++, ((rMagicBarX + gSaveContext.magicCapacity) + 8) << 2, magicBarY << 2,
-                                ((rMagicBarX + gSaveContext.magicCapacity) + 16) << 2, (magicBarY + 16) << 2,
-                                G_TX_RENDERTILE, 256, 0, 1 << 10, 1 << 10);
+            gSPWideTextureRectangle(OVERLAY_DISP++, ((rMagicBarX + gSaveContext.magicCapacity) + 8) << 2,
+                                    magicBarY << 2, ((rMagicBarX + gSaveContext.magicCapacity) + 16) << 2,
+                                    (magicBarY + 16) << 2, G_TX_RENDERTILE, 256, 0, 1 << 10, 1 << 10);
+        }
 
         gDPPipeSync(OVERLAY_DISP++);
         gDPSetCombineLERP(OVERLAY_DISP++, PRIMITIVE, ENVIRONMENT, TEXEL0, ENVIRONMENT, 0, 0, 0, PRIMITIVE, PRIMITIVE,
                           ENVIRONMENT, TEXEL0, ENVIRONMENT, 0, 0, 0, PRIMITIVE);
         gDPSetEnvColor(OVERLAY_DISP++, 0, 0, 0, 255);
 
-        if (gSaveContext.magicState == MAGIC_STATE_METER_FLASH_2) {
+        // The FILL. Its combine is (PRIM-ENV)*TEXEL0+ENV on rgb with ENV=0, and alpha = PRIMITIVE
+        // alone — the texel must not modulate coverage, which is the `opaque` lerp variant. During
+        // MAGIC_STATE_METER_FLASH_2 the bar is drawn twice: yellow out to the current magic, then
+        // the normal colour out to the target, so the yellow shows the amount about to be spent.
+        Color_RGB8 magicFillColor = Flags_GetRandomizerInf(RAND_INF_HAS_INFINITE_MAGIC_METER) ? magicbar_blue
+                                                                                              : magicbar_green;
+        if (Zelda3D_HudOwns(ZELDA3D_HUD_MAGIC)) {
+            const void* fillTex = Zelda3D_HudDecode(ZELDA3D_HUD_FMT_I4, gMagicMeterFillTex, 16, 16);
+            const u32 fillAlpha = (u32)(u8)interfaceCtx->magicAlpha;
+            // The N64 fill texrect is 1:1, so a `magic` x 7 rect samples a `magic` x 7 SOURCE rect —
+            // the first 7 of the texture's 16 rows, tiling horizontally once magic exceeds 16.
+            if (gSaveContext.magicState == MAGIC_STATE_METER_FLASH_2) {
+                Zelda3D_HudQuadEx(fillTex, 16, 16, 0, 0, gSaveContext.magic, 7, rMagicFillX, magicBarY + 3,
+                                  (f32)gSaveContext.magic, 7.0f,
+                                  ((u32)magicbar_yellow.r << 24) | ((u32)magicbar_yellow.g << 16) |
+                                      ((u32)magicbar_yellow.b << 8) | fillAlpha,
+                                  0u, ZELDA3D_HUD_LERP_OPAQUE);
+                Zelda3D_HudQuadEx(fillTex, 16, 16, 0, 0, gSaveContext.magicTarget, 7, rMagicFillX,
+                                  magicBarY + 3, (f32)gSaveContext.magicTarget, 7.0f,
+                                  ((u32)magicFillColor.r << 24) | ((u32)magicFillColor.g << 16) |
+                                      ((u32)magicFillColor.b << 8) | fillAlpha,
+                                  0u, ZELDA3D_HUD_LERP_OPAQUE);
+            } else {
+                Zelda3D_HudQuadEx(fillTex, 16, 16, 0, 0, gSaveContext.magic, 7, rMagicFillX, magicBarY + 3,
+                                  (f32)gSaveContext.magic, 7.0f,
+                                  ((u32)magicFillColor.r << 24) | ((u32)magicFillColor.g << 16) |
+                                      ((u32)magicFillColor.b << 8) | fillAlpha,
+                                  0u, ZELDA3D_HUD_LERP_OPAQUE);
+            }
+        } else if (gSaveContext.magicState == MAGIC_STATE_METER_FLASH_2) {
             // Yellow part of the bar indicating the amount of magic to be subtracted
             gDPSetPrimColor(OVERLAY_DISP++, 0, 0, magicbar_yellow.r, magicbar_yellow.g, magicbar_yellow.b,
                             interfaceCtx->magicAlpha);
@@ -3838,30 +3884,16 @@ void Interface_DrawMagicBar(PlayState* play) {
 
             // Fill the rest of the bar with the normal magic color
             gDPPipeSync(OVERLAY_DISP++);
-            if (Flags_GetRandomizerInf(RAND_INF_HAS_INFINITE_MAGIC_METER)) {
-                // Blue magic
-                gDPSetPrimColor(OVERLAY_DISP++, 0, 0, magicbar_blue.r, magicbar_blue.g, magicbar_blue.b,
-                                interfaceCtx->magicAlpha);
-            } else {
-                // Green magic (default)
-                gDPSetPrimColor(OVERLAY_DISP++, 0, 0, magicbar_green.r, magicbar_green.g, magicbar_green.b,
-                                interfaceCtx->magicAlpha);
-            }
+            gDPSetPrimColor(OVERLAY_DISP++, 0, 0, magicFillColor.r, magicFillColor.g, magicFillColor.b,
+                            interfaceCtx->magicAlpha);
 
             gSPWideTextureRectangle(OVERLAY_DISP++, rMagicFillX << 2, (magicBarY + 3) << 2,
                                     (rMagicFillX + gSaveContext.magicTarget) << 2, (magicBarY + 10) << 2,
                                     G_TX_RENDERTILE, 0, 0, 1 << 10, 1 << 10);
         } else {
             // Fill the whole bar with the normal magic color
-            if (Flags_GetRandomizerInf(RAND_INF_HAS_INFINITE_MAGIC_METER)) {
-                // Blue magic
-                gDPSetPrimColor(OVERLAY_DISP++, 0, 0, magicbar_blue.r, magicbar_blue.g, magicbar_blue.b,
-                                interfaceCtx->magicAlpha);
-            } else {
-                // Green magic (default)
-                gDPSetPrimColor(OVERLAY_DISP++, 0, 0, magicbar_green.r, magicbar_green.g, magicbar_green.b,
-                                interfaceCtx->magicAlpha);
-            }
+            gDPSetPrimColor(OVERLAY_DISP++, 0, 0, magicFillColor.r, magicFillColor.g, magicFillColor.b,
+                            interfaceCtx->magicAlpha);
 
             gDPLoadMultiBlock_4b(OVERLAY_DISP++, gMagicMeterFillTex, 0, G_TX_RENDERTILE, G_IM_FMT_I, 16, 16, 0,
                                  G_TX_NOMIRROR | G_TX_WRAP, G_TX_NOMIRROR | G_TX_WRAP, G_TX_NOMASK, G_TX_NOMASK,
@@ -6151,9 +6183,10 @@ void Interface_Draw(PlayState* play) {
             }
             const f32 lw = (f32)(XREG(21) + 1);
             const f32 lh = (f32)XREG(28) * labelFlip;
-            Zelda3D_HudQuadIA4(doActionTex, DO_ACTION_TEX_WIDTH(), DO_ACTION_TEX_HEIGHT(),
-                               (rAIconX + 22.0f) - lw / 2.0f, (120.0f - rAIconY) - lh / 2.0f, lw, lh,
-                               0xFFFFFF00u | (u32)interfaceCtx->aAlpha);
+            Zelda3D_HudQuad(Zelda3D_HudDecode(ZELDA3D_HUD_FMT_IA4, doActionTex, DO_ACTION_TEX_WIDTH(),
+                                              DO_ACTION_TEX_HEIGHT()),
+                            DO_ACTION_TEX_WIDTH(), DO_ACTION_TEX_HEIGHT(), (rAIconX + 22.0f) - lw / 2.0f,
+                            (120.0f - rAIconY) - lh / 2.0f, lw, lh, 0xFFFFFF00u | (u32)interfaceCtx->aAlpha);
         } else {
             Matrix_Translate(-138.0f + rAIconX, rAIconY, WREG(46 + languageOffset) / 10.0f, MTXMODE_NEW);
             Matrix_Scale(1.0f, 1.0f, 1.0f, MTXMODE_APPLY);

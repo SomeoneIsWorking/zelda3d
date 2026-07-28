@@ -48,34 +48,62 @@ enum {
     // the PRIM/ENV lerp combine (Zelda3D_HudQuadLerp) — that is what gives a heart its body/rim
     // shading and its beating / low-health / double-defense colour sets.
     ZELDA3D_HUD_HEALTH = 2,
+    // The magic meter: its IA8 frame (left cap, tiled middle, mirrored right cap) and its I4 fill.
+    // The tiled middle is the reason the quad renderer grew a repeat sampler.
+    ZELDA3D_HUD_MAGIC = 3,
 };
 int Zelda3D_HudOwns(int element);
+
+// Which N64 combine a quad reproduces.
+enum {
+    // TEXEL0 * PRIM. Item icons, digits, glyphs, keycaps — and the MODULATEIA_PRIM cases (button
+    // disc, counter icons, magic-bar frame), since an intensity-in-rgb texture modulates the same.
+    ZELDA3D_HUD_MODULATE = 0,
+    // (PRIM - ENV) * TEXEL0 + ENV on rgb, TEXEL0.a * PRIM.a on alpha. z_lifemeter.c's hearts.
+    ZELDA3D_HUD_LERP = 1,
+    // As LERP but alpha = PRIM.a, ignoring the texel. The magic-bar fill assigns PRIMITIVE straight
+    // to alpha, so its intensity must not double as coverage.
+    ZELDA3D_HUD_LERP_OPAQUE = 2,
+};
 
 // Record one HUD quad. `x`,`y`,`w`,`h` are in the N64 HUD virtual space the caller already works in
 // (Y down, height 240, X extended for widescreen — exactly what OTRGetDimensionFrom*Edge returns).
 // `tex` must be a persistent RGBA32 buffer; its address doubles as the upload cache key, so pass the
 // same pointer each frame. `primRGBA` is the N64 PRIM colour, alpha included (the interfaceCtx fade).
-//
-// The `Uv` variant takes a sub-rect of an atlas texture, in atlas pixels.
 void Zelda3D_HudQuad(const void* tex, int texW, int texH, float x, float y, float w, float h,
                      unsigned int primRGBA);
-void Zelda3D_HudQuadUv(const void* tex, int texW, int texH, int sx, int sy, int sw, int sh, float x,
-                       float y, float w, float h, unsigned int primRGBA);
-// IA4 variant — the do-action label (`doActionSegment`) is a 4-bit intensity+alpha texture, the one
-// HUD source that is neither RGBA32 nor one of our own runtime buffers. Decoded to RGBA here (3 bits
-// intensity -> rgb, 1 bit alpha) and then drawn as an ordinary modulate quad, which reproduces its
-// N64 combine exactly: rgb = (PRIM-ENV)*TEXEL0 + ENV with ENV=0 is PRIM*intensity, and alpha is
-// TEXEL0.a * PRIM.a.
+
+// The full form: a source sub-rect in texture pixels plus the combine.
 //
-// The label's CONTENT changes while its buffer address stays the same ("Open" -> "Speak" -> ...), so
-// decodes are cached by content hash, not by pointer — caching by pointer would freeze the first
-// label that was ever shown.
-void Zelda3D_HudQuadIA4(const void* tex, int texW, int texH, float x, float y, float w, float h,
-                        unsigned int primRGBA);
-// PRIM/ENV lerp variant — the N64 `(PRIM - ENV) * TEXEL0 + ENV` combine that z_lifemeter.c's hearts
-// use. `tex` supplies the lerp factor in .r and the silhouette in .a.
-void Zelda3D_HudQuadLerp(const void* tex, int texW, int texH, float x, float y, float w, float h,
-                         unsigned int primRGBA, unsigned int envRGB);
+// The source rect is what makes an N64 texrect translate faithfully. A texrect with dsdx/dtdy of
+// 1:1 samples ONE TEXEL PER PIXEL rather than stretching its texture over the rect — so the magic
+// bar's 7-pixel-tall fill takes the first 7 rows of a 16-row texture, and its middle section repeats
+// a 24px strip across the whole bar. Pass the rect the N64 call actually samples; a source rect
+// larger than the texture TILES it (the renderer switches to a repeat sampler when UVs leave [0,1]),
+// and sw or sh may be negative to mirror, which is how the bar's right cap is drawn.
+void Zelda3D_HudQuadEx(const void* tex, int texW, int texH, int sx, int sy, int sw, int sh, float x, float y,
+                       float w, float h, unsigned int primRGBA, unsigned int envRGB, int mode);
+
+// Decode an N64-format HUD texture to a persistent RGBA32 buffer the Quad* calls can draw, or NULL
+// if it cannot be decoded. Most HUD sources are neither RGBA32 nor one of our own runtime buffers:
+// the do-action label is IA4, the magic-bar frame IA8, its fill I4. OTR path strings are resolved
+// first, so call sites can pass the engine's symbol directly.
+//
+// Decodes are cached by CONTENT HASH, not by pointer. Several of these buffers are rewritten in
+// place — the do-action label changes from "Open" to "Speak" at the same address — so a
+// pointer-keyed cache would pin whichever content was decoded first, and the GPU-side upload cache
+// (which keys on the returned buffer's address) would go on reusing a stale upload.
+enum {
+    ZELDA3D_HUD_FMT_IA4 = 0, // 3 bits intensity + 1 bit alpha
+    ZELDA3D_HUD_FMT_IA8 = 1, // 4 bits intensity + 4 bits alpha
+    ZELDA3D_HUD_FMT_I4 = 2,  // 4 bits intensity, opaque (see below)
+    ZELDA3D_HUD_FMT_I8 = 3,  // 8 bits intensity, opaque
+};
+// I-format textures decode with alpha 255 rather than alpha = intensity. On N64 an I texel feeds
+// both channels, but every I-format HUD combiner here takes its alpha from PRIMITIVE instead, so
+// carrying intensity into alpha would double-apply it as coverage. Anything that genuinely wants
+// intensity-as-alpha uses an IA format.
+const void* Zelda3D_HudDecode(int fmt, const void* tex, int texW, int texH);
 
 // Draws (and clears) everything recorded this frame. Called from libultraship's Gui::EndFrame, i.e.
 // after the interpreter has composited the game frame and before the RmlUi menu, so the HUD sits
