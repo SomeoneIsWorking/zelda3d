@@ -94,6 +94,23 @@ static int g_sgDumpTexModel = []() {
 static bool g_sgDumpTexAll = (g_sgDumpTexModel == -2);
 static int g_sgDumpTexActual = g_sgDumpTexAll ? -1 : g_sgDumpTexModel;
 extern "C" int gZelda3dHlGroup;
+
+// DRAW ISOLATION — our counterpart of the oracle harness's `drawskip`, and the reason it exists:
+// ZELDA3D_SG_FRAGDBG isolates a COMBINER STAGE but applies it to every draw, so its readback is a
+// whole-frame composite. That is fine when the draw you care about owns its pixels, and useless when
+// it does not: Zora's water layer d9 has ZERO pixels that no other draw also covers, so neither
+// `tev_mask_ratio --exclusive` nor a FRAGDBG frame can attribute anything to it, and the oracle's
+// per-fragment `PIXEL ...` probe has no like-for-like counterpart on our side (instrument I002).
+// Rendering ONE group and nothing else closes that gap: the resulting frame IS that draw's own
+// output, so a FRAGDBG mode over it measures the same quantity the oracle's probe reports.
+//
+// `sgdrawonly <n>` (REPL) / ZELDA3D_SG_DRAWONLY=<n> renders only the n-th Zelda3D group of the frame;
+// `sgdrawlist` (REPL) / ZELDA3D_SG_DRAWLIST=1 dumps one frame's group list so you can find the n you
+// want. Indices are per-frame and sequential in append order — the same order that matters for
+// translucency — so they are stable for a frozen camera and meaningless across a moving one.
+extern "C" int gZelda3dSgDrawOnly; // -1 = draw everything (default)
+extern "C" int gZelda3dSgDrawList; // 1 = dump this frame's group list, then self-clears
+static int g_sgDrawIdx = 0;        // groups appended so far this frame
 // strength/bias the same way the Vulkan path does.
 
 static int sgFaceCullOn() {
@@ -1538,6 +1555,17 @@ void Fast::Zelda3DRenderer::ClearOverlayDepth() {
 
 void Fast::Zelda3DRenderer::BeginPass() {
     g_ctxValid = false;
+    g_sgDrawIdx = 0; // draw-isolation index is per-frame; reset here too in case EndPass was skipped
+    // Seed the draw-isolation probe from the environment once, so it can be armed at launch (before
+    // the REPL exists) as well as live. The REPL owns the globals afterwards.
+    static bool sgProbeSeeded = false;
+    if (!sgProbeSeeded) {
+        sgProbeSeeded = true;
+        if (const char* v = getenv("ZELDA3D_SG_DRAWONLY"))
+            gZelda3dSgDrawOnly = atoi(v);
+        if (const char* v = getenv("ZELDA3D_SG_DRAWLIST"))
+            gZelda3dSgDrawList = (v[0] != '0');
+    }
     // Publish the previous frame's geometry capture; start a fresh one for this frame's draws.
     g_geomLast.swap(g_geomCur);
     g_geomCur.clear();
@@ -2099,14 +2127,38 @@ void Fast::Zelda3DRenderer::DrawModel(int modelId, const float* mp16, const floa
     // each interleaves with the N64 geometry in this fb's render pass and replays through the backend's
     // single fragment-sampler bind path, exactly like an N64 triangle draw. Group order is preserved by
     // sequential append (matters for translucency).
-    for (const DrawGroup& g : dgs)
+    for (const DrawGroup& g : dgs) {
+        const int drawIdx = g_sgDrawIdx++;
+        if (gZelda3dSgDrawList) {
+            fprintf(stderr, "[Zelda3D_SG] draw %d model=%d first=%u count=%u tex=%p tex1=%p tex2=%p\n", drawIdx,
+                    modelId, g.first, g.count, (const void*)g.tex, (const void*)g.tex1, (const void*)g.tex2);
+        }
+        if (gZelda3dSgDrawOnly >= 0 && drawIdx != gZelda3dSgDrawOnly)
+            continue; // draw-isolation probe: everything except the selected group is suppressed
         api->AppendZelda3DModelDraw(g.pipeline, vbo, g.first, g.count, g.ubo.data(), g.tex, g.samp,
                                   g.tex2 ? g.tex2 : dummyTex, g.samp2 ? g.samp2 : dummySamp,
                                   g.tex1, g.samp1, vp, sc);
+    }
 }
 
 void Fast::Zelda3DRenderer::EndPass() {
     g_ctxValid = false;
+    // HARD-WARN rather than render an empty frame in silence. FRAGDBG spent weeks silently inert
+    // because its injection anchor had been deleted, and "the probe shows nothing" is
+    // indistinguishable from "the thing I am probing contributes nothing" — so an out-of-range
+    // selection must say so.
+    if (gZelda3dSgDrawOnly >= 0 && g_sgDrawIdx > 0 && gZelda3dSgDrawOnly >= g_sgDrawIdx) {
+        fprintf(stderr, "[Zelda3D_SG] DRAWONLY=%d but this frame appended only %d group(s) — probe inert\n",
+                gZelda3dSgDrawOnly, g_sgDrawIdx);
+    }
+    // One-shot, but only once it has something to SHOW: the first frames after launch append zero
+    // groups (the scene has not loaded), and an arm-at-launch that self-cleared on one of those
+    // printed an empty list and then went quiet — the same silent-inertness failure FRAGDBG had.
+    if (gZelda3dSgDrawList && g_sgDrawIdx > 0) {
+        fprintf(stderr, "[Zelda3D_SG] draw list end: %d group(s) this frame\n", g_sgDrawIdx);
+        gZelda3dSgDrawList = 0;
+    }
+    g_sgDrawIdx = 0;
 }
 
 #endif // ENABLE_SDL3GPU
