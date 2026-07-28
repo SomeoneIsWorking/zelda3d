@@ -53,6 +53,10 @@ enum {
     ZELDA3D_HUD_MAGIC = 3,
     // The rupee and small-key counters: their icon and their digits.
     ZELDA3D_HUD_COUNTERS = 4,
+    // The C-Up button and its "Navi" label (drawn together — the label overlaps the disc).
+    ZELDA3D_HUD_C_UP = 5,
+    // The event timer: clock icon + digits. And the Horseback-Archery score digits.
+    ZELDA3D_HUD_TIMERS = 6,
     // Passed by a Gfx_Texture* call site that has NOT been converted yet, so the shared helper keeps
     // emitting its display list for that caller while other callers of the same helper go native.
     ZELDA3D_HUD_NONE = -1,
