@@ -15,6 +15,7 @@
 #include "../input/zelda3d_input.h"
 #include "../input/zelda3d_keymap.h" // #203 — `keycap` REPL: live key labels for the HUD badges
 #include "../hud/zelda3d_hud.h"        // #205 — `nativehud` REPL: A/B the native HUD vs the interpreter
+extern int gZelda3dNaviCallForce;    // #205 — `navicall`: hold the C-Up Navi prompt on (z_parameter.c)
 #include "../anim/zelda3d_anim_override.h"
 #include "overlays/actors/ovl_En_Ge1/z_en_ge1.h"
 #include "overlays/actors/ovl_En_Ko/z_en_ko.h"
@@ -1633,6 +1634,14 @@ static void Zelda3D_ReplExec(PlayState* play, char* line, const char* outPath) {
         // gZelda3dXboxBtn every frame). 1 = Xbox A/B/X/Y glyphs, 0 = the N64 colored circles.
         gZelda3dXboxBtn = (f1 != 0.0f) ? 1 : 0;
         Zelda3D_ReplReply(outPath, "xboxui=%d", gZelda3dXboxBtn);
+    } else if (strcmp(cmd, "navicall") == 0 && sscanf(line, "%*s %f", &f1) == 1) {
+        // #205 verify — force the C-Up "Navi" prompt on/off. It normally appears only when the game
+        // decides Navi has something to say, which is not reproducible on demand; the C-Up button and
+        // its label cannot be A/B'd against the interpreter path without it.
+        // A one-shot write does not survive: Interface_Update clears the flag again before the HUD
+        // draws. So this sets a persistent override that Interface_Draw re-applies each frame.
+        gZelda3dNaviCallForce = (f1 != 0.0f) ? 1 : 0;
+        Zelda3D_ReplReply(outPath, "navicall=%d (forced each frame)", gZelda3dNaviCallForce);
     } else if (strcmp(cmd, "nativehud") == 0 && sscanf(line, "%*s %f", &f1) == 1) {
         // #205 — force the native HUD path on/off live. Off makes every converted element fall back
         // to its Fast3D display list, so an element's native and interpreter renders can be captured

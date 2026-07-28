@@ -4645,24 +4645,40 @@ void Interface_DrawItemButtons(PlayState* play) {
                 temp = interfaceCtx->healthAlpha;
             }
 
-            gDPSetPrimColor(OVERLAY_DISP++, 0, 0, cUpButtonColor.r, cUpButtonColor.g, cUpButtonColor.b, temp);
-            gDPSetCombineMode(OVERLAY_DISP++, G_CC_MODULATEIA_PRIM, G_CC_MODULATEIA_PRIM);
-            gSPWideTextureRectangle(OVERLAY_DISP++, C_Up_BTN_Pos[0] << 2, C_Up_BTN_Pos[1] << 2,
-                                    (C_Up_BTN_Pos[0] + 16) << 2, (C_Up_BTN_Pos[1] + 16) << 2, G_TX_RENDERTILE, 0, 0,
-                                    (2 << 10) * bgScale, (2 << 10) * bgScale);
-            gDPPipeSync(OVERLAY_DISP++);
-            gDPSetPrimColor(OVERLAY_DISP++, 0, 0, 255, 255, 255, temp);
-            gDPSetEnvColor(OVERLAY_DISP++, 0, 0, 0, 0);
-            gDPSetCombineLERP(OVERLAY_DISP++, PRIMITIVE, ENVIRONMENT, TEXEL0, ENVIRONMENT, TEXEL0, 0, PRIMITIVE, 0,
-                              PRIMITIVE, ENVIRONMENT, TEXEL0, ENVIRONMENT, TEXEL0, 0, PRIMITIVE, 0);
+            // #205 — the C-Up disc and its "Navi" label convert together: the label overlaps the
+            // disc, so taking only one of them native would invert their order. The disc is another
+            // of the texrects that REUSE the B button's resident tile (hence bgScale on the N64
+            // path); the native quad carries its own texture and needs no such fudge.
+            if (Zelda3D_HudOwns(ZELDA3D_HUD_C_UP)) {
+                int dW = 0, dH = 0;
+                const void* disc = Zelda3D_ButtonBgTex(&dW, &dH);
+                Zelda3D_HudQuad(disc, dW, dH, C_Up_BTN_Pos[0], C_Up_BTN_Pos[1], 16, 16,
+                                ((u32)cUpButtonColor.r << 24) | ((u32)cUpButtonColor.g << 16) |
+                                    ((u32)cUpButtonColor.b << 8) | (u32)(u8)temp);
+                Zelda3D_HudQuad(Zelda3D_HudDecode(ZELDA3D_HUD_FMT_IA4, cUpLabelTextures[gSaveContext.language], 32, 8),
+                                32, 8, C_Up_BTN_Pos[0] - LabelX_Navi, C_Up_BTN_Pos[1] + LabelY_Navi, 32, 8,
+                                0xFFFFFF00u | (u32)(u8)temp);
+            } else {
+                gDPSetPrimColor(OVERLAY_DISP++, 0, 0, cUpButtonColor.r, cUpButtonColor.g, cUpButtonColor.b, temp);
+                gDPSetCombineMode(OVERLAY_DISP++, G_CC_MODULATEIA_PRIM, G_CC_MODULATEIA_PRIM);
+                gSPWideTextureRectangle(OVERLAY_DISP++, C_Up_BTN_Pos[0] << 2, C_Up_BTN_Pos[1] << 2,
+                                        (C_Up_BTN_Pos[0] + 16) << 2, (C_Up_BTN_Pos[1] + 16) << 2, G_TX_RENDERTILE, 0,
+                                        0, (2 << 10) * bgScale, (2 << 10) * bgScale);
+                gDPPipeSync(OVERLAY_DISP++);
+                gDPSetPrimColor(OVERLAY_DISP++, 0, 0, 255, 255, 255, temp);
+                gDPSetEnvColor(OVERLAY_DISP++, 0, 0, 0, 0);
+                gDPSetCombineLERP(OVERLAY_DISP++, PRIMITIVE, ENVIRONMENT, TEXEL0, ENVIRONMENT, TEXEL0, 0, PRIMITIVE, 0,
+                                  PRIMITIVE, ENVIRONMENT, TEXEL0, ENVIRONMENT, TEXEL0, 0, PRIMITIVE, 0);
 
-            gDPLoadTextureBlock_4b(OVERLAY_DISP++, cUpLabelTextures[gSaveContext.language], G_IM_FMT_IA, 32, 8, 0,
-                                   G_TX_NOMIRROR | G_TX_WRAP, G_TX_NOMIRROR | G_TX_WRAP, G_TX_NOMASK, G_TX_NOMASK,
-                                   G_TX_NOLOD, G_TX_NOLOD);
+                gDPLoadTextureBlock_4b(OVERLAY_DISP++, cUpLabelTextures[gSaveContext.language], G_IM_FMT_IA, 32, 8, 0,
+                                       G_TX_NOMIRROR | G_TX_WRAP, G_TX_NOMIRROR | G_TX_WRAP, G_TX_NOMASK, G_TX_NOMASK,
+                                       G_TX_NOLOD, G_TX_NOLOD);
 
-            gSPWideTextureRectangle(OVERLAY_DISP++, C_Up_BTN_Pos[0] - LabelX_Navi << 2,
-                                    C_Up_BTN_Pos[1] + LabelY_Navi << 2, (C_Up_BTN_Pos[0] - LabelX_Navi + 32) << 2,
-                                    (C_Up_BTN_Pos[1] + LabelY_Navi + 8) << 2, G_TX_RENDERTILE, 0, 0, 1 << 10, 1 << 10);
+                gSPWideTextureRectangle(OVERLAY_DISP++, C_Up_BTN_Pos[0] - LabelX_Navi << 2,
+                                        C_Up_BTN_Pos[1] + LabelY_Navi << 2, (C_Up_BTN_Pos[0] - LabelX_Navi + 32) << 2,
+                                        (C_Up_BTN_Pos[1] + LabelY_Navi + 8) << 2, G_TX_RENDERTILE, 0, 0, 1 << 10,
+                                        1 << 10);
+            }
         }
 
         sCUpTimer--;
@@ -5597,7 +5613,15 @@ const char* digitTextures[] = { gCounterDigit0Tex, gCounterDigit1Tex, gCounterDi
                                 gCounterDigit2Tex, gCounterDigit3Tex, gCounterDigit4Tex, gCounterDigit5Tex,
                                 gCounterDigit6Tex, gCounterDigit7Tex, gCounterDigit8Tex };
 
+// #205 verify — hold the C-Up "Navi" prompt on so it can be A/B'd against the interpreter path.
+// The game raises naviCalling only when it decides Navi has something to say, and Interface_Update
+// clears it again, so a one-shot poke never survives to the draw. REPL `navicall <0|1>`.
+int gZelda3dNaviCallForce = 0;
+
 void Interface_Draw(PlayState* play) {
+    if (gZelda3dNaviCallForce) {
+        play->interfaceCtx.naviCalling = true;
+    }
     // Zelda3D title-demo — Az's OoT3D title shows no HUD at all. Task #14.
     {
         extern int Zelda3D_Title_IsActive(void);
@@ -6455,9 +6479,10 @@ void Interface_Draw(PlayState* play) {
 
                 for (svar1 = svar2 = 0; svar1 < 4; svar1++) {
                     if (sHBAScoreDigits[svar1] != 0 || (svar2 != 0) || (svar1 >= 3)) {
-                        OVERLAY_DISP =
-                            Gfx_TextureI8(OVERLAY_DISP, digitTextures[sHBAScoreDigits[svar1]], 8, 16, ArcheryPos_X,
-                                          (ArcheryPos_Y - 2), digitWidth[0], VREG(42), VREG(43) << 1, VREG(43) << 1);
+                        OVERLAY_DISP = Gfx_TextureI8Ex(OVERLAY_DISP, digitTextures[sHBAScoreDigits[svar1]], 8, 16,
+                                                       ArcheryPos_X, (ArcheryPos_Y - 2), digitWidth[0], VREG(42),
+                                                       VREG(43) << 1, VREG(43) << 1, ZELDA3D_HUD_TIMERS,
+                                                       0xFFFFFF00u | (u32)(u8)interfaceCtx->bAlpha);
                         ArcheryPos_X += 9;
                         svar2++;
                     }
@@ -6894,24 +6919,31 @@ void Interface_Draw(PlayState* play) {
                     }
                 }
 
-                OVERLAY_DISP =
-                    Gfx_TextureIA8(OVERLAY_DISP, gClockIconTex, 16, 16, svar5, svar2 + 2, 16, 16, 1 << 10, 1 << 10);
+                OVERLAY_DISP = Gfx_TextureIA8Ex(OVERLAY_DISP, gClockIconTex, 16, 16, svar5, svar2 + 2, 16, 16,
+                                                1 << 10, 1 << 10, ZELDA3D_HUD_TIMERS, 0xFFFFFFFFu);
 
                 // Timer Counter
                 gDPPipeSync(OVERLAY_DISP++);
                 gDPSetCombineLERP(OVERLAY_DISP++, 0, 0, 0, PRIMITIVE, TEXEL0, 0, PRIMITIVE, 0, 0, 0, 0, PRIMITIVE,
                                   TEXEL0, 0, PRIMITIVE, 0);
 
+                // Red under ten seconds; white for the main timer, yellow for the sub-timer. #205:
+                // tracked alongside the RDP write so the native path has the value.
+                u32 timerDigitRGB;
                 if (gSaveContext.timerState != TIMER_STATE_OFF) {
                     if ((gSaveContext.timerSeconds < 10) && (gSaveContext.timerState <= TIMER_STATE_STOP)) {
+                        timerDigitRGB = 0xFF3200u;
                         gDPSetPrimColor(OVERLAY_DISP++, 0, 0, 255, 50, 0, 255);
                     } else {
+                        timerDigitRGB = 0xFFFFFFu;
                         gDPSetPrimColor(OVERLAY_DISP++, 0, 0, 255, 255, 255, 255);
                     }
                 } else {
                     if ((gSaveContext.subTimerSeconds < 10) && (gSaveContext.subTimerState <= SUBTIMER_STATE_RESPAWN)) {
+                        timerDigitRGB = 0xFF3200u;
                         gDPSetPrimColor(OVERLAY_DISP++, 0, 0, 255, 50, 0, 255);
                     } else {
+                        timerDigitRGB = 0xFFFF00u;
                         gDPSetPrimColor(OVERLAY_DISP++, 0, 0, 255, 255, 0, 255);
                     }
                 }
@@ -6920,10 +6952,10 @@ void Interface_Draw(PlayState* play) {
                     // clang-format off
                     //svar5 = svar5 + 8;
                     //svar5 = OTRGetRectDimensionFromLeftEdge(gSaveContext.timerX[timerId]);
-                    OVERLAY_DISP = Gfx_TextureI8(OVERLAY_DISP, digitTextures[timerDigits[svar1]], 8, 16,
+                    OVERLAY_DISP = Gfx_TextureI8Ex(OVERLAY_DISP, digitTextures[timerDigits[svar1]], 8, 16,
                                       svar5 + timerDigitLeftPos[svar1],
                                       svar2, digitWidth[svar1], VREG(42), VREG(43) << 1,
-                                      VREG(43) << 1);
+                                      VREG(43) << 1, ZELDA3D_HUD_TIMERS, (timerDigitRGB << 8) | 0xFFu);
                     // clang-format on
                 }
             }
