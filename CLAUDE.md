@@ -193,6 +193,36 @@ CMake-`FetchContent` deps (rmlui/prism/dr_libs/monocypher/libgfxd-in-libultrashi
 their real upstreams. (User directive 2026-07-17: third-party code is a fork/upstream submodule, not
 flattened. The old flat copies were also purged from git history to shrink the repo.)
 
+## Context is a budget — spend it on answers, not on paging
+
+A long arc dies of context exhaustion long before it runs out of work, and the failure mode is not
+"I stopped": it is reaching for cheap probes that cannot distinguish the answers, and being confidently
+wrong. Three such errors landed in one session (2026-07-28) — two draw-order claims and a "the harness
+isn't built" that was a `find -maxdepth 3` failing to reach a depth-4 path. Rigor is the fix for those;
+these rules are how you keep enough budget to afford rigor.
+
+- **DELEGATE surveys to subagents.** "Find every call site of X and what colour it sets", "which of
+  these 12 files touches Y" — a subagent reads the 7,000-line file and hands back twenty lines. This
+  is the single biggest lever; use it before the others. (Standing authorization: [[soh3d-subagents-authorized]].)
+- **MEASURE instead of looking.** A screenshot costs about a hundred lines of source, and a pixel
+  measurement is usually the better evidence anyway: "960 green px at identical extents" and "349 vs
+  350 bright px in the same bbox" settled two HUD elements more convincingly than any render could,
+  and a colour mask over two separately-captured frames once produced a bogus mismatch that was
+  *grass moving between captures*. Read an image only when the question is genuinely visual and no
+  measurement can settle it — a layout judgement, a "does this look right" call, or evidence for the
+  user. This is the existing verify-quantitatively rule extended to its context cost.
+- **Ask `tools/codequery.py` for a SYMBOL, never `sed -n` for a line range.** `outline <file>` /
+  `slice <file> <fn>` / `def` / `callers` / `find` return what you asked for instead of a guessed
+  window that overshoots and gets re-issued. Guessing ranges in `z_parameter.c` (7,200 lines) was the
+  second-largest context sink of the HUD arc.
+- **Keep build/run output on a leash** — `| tail -3` plus a `grep -E "error:"`, never a raw dump.
+- **Start a big arc in a fresh session.** #205 grew from "port the HUD" into a renderer change, a new
+  Gfx opcode and a texture decoder; by pass 3 it wanted a clean session and would have been done
+  faster in one. If an arc has already spawned two sub-arcs, that is the signal.
+- **Durable state is what makes running out survivable, and it works** — commits, `docs/issues/`,
+  the frontier and the codemap carried every finding of that session across the thin patch. Write the
+  finding down when you get it, not when you have room.
+
 ## Hard rules
 
 - **Headless always:** this is a Wayland machine — never open a headed window.
