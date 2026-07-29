@@ -370,6 +370,15 @@ unsigned long long Zelda3D::LinkMidMask::compute(Player* player) const {
         default:
             break; // nothing on the back
     }
+
+    // GORON BRACELET, the child's counterpart of the adult gauntlet plates and previously in the same
+    // state: mesh 15 existed in the CMB and was never enabled, so a child with the bracelet showed
+    // nothing. OoT3D Player_DrawImpl's child arm is `else if (strengthUpgrade != 0) show(0xf)`, and
+    // N64 is `if (Player_GetStrength() > PLAYER_STR_NONE) gSPDisplayList(gLinkChildGoronBraceletDL)`
+    // — so the gate is >= 1 here, NOT the >= 2 the adult plates use (the bracelet IS upgrade 1).
+    if (CUR_UPG_VALUE(UPG_STRENGTH) > 0) {
+        m |= LINK_MID(15);
+    }
     return m;
 }
 #undef LINK_MID
