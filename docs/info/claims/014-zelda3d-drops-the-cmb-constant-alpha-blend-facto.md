@@ -4,6 +4,7 @@ kind: claim
 status: holds
 created: 2026-07-29
 tags: 
+reconfirmed: 2026-07-29
 ---
 
 ## Claim
@@ -17,3 +18,7 @@ Corpus sweep: 91 blend-enabled materials use GL_CONSTANT_ALPHA (0x8003); mapFact
 ## What would falsify it
 
 fixing it (SDL3 has BLENDFACTOR_CONSTANT_COLOR + SDL_SetGPUBlendConstants), or a measurement showing the affected water/waterfall surfaces already composite correctly
+
+## Re-confirmed 2026-07-29
+
+FIXED and verified: Water Temple draws a src=0x0300/dst=0x8003 material and the GPU receives (0.500,0.500,0.500,0.500) matching its ROM const.a. Zora's Domain draws NO constant-factor material, so the earlier ~1% shift there was launch-to-launch variance, not the fix.
