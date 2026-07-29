@@ -130,7 +130,7 @@ global camera table, global fog path); a multi-scene sweep is the outstanding ch
 
 | Item | Status | How verified | Verifying commit | Date |
 |---|---|---|---|---|
-| World lighting engine port (#111, worldshade opt-in default-off) | CLOSED-parity — **DO NOT TUNE** | memory `soh3d-lighting-port` (#111 RESOLVED), direct user instruction to stop tuning | — (pre-map) | — |
+| World lighting engine port (#111) | CLOSED-parity — **DO NOT TUNE** | memory `soh3d-lighting-port` (#111 RESOLVED), direct user instruction to stop tuning | — (pre-map) | — |
 | envCtx layout (play+0x3135, unk_BF +0xA5, stride 0x1C, Env_Update FUN_0045dd30) | CLOSED-parity | RE'd from decomp (not a memory poke) | — (pre-map) | — |
 | Fog LUT (world) | CLOSED-parity | investigated as suspected gap → FALSE ALARM, already ported 2026-07-10 | `ac47d649` (note correction) | 2026-07-14 |
 | Title terrain brightness (per-enabled-light ambient) | CLOSED-parity — **DO NOT TUNE** | see title arc `02181072`; terrain warmth residual is OFF-LIMITS | `02181072` | 2026-07-10 |
@@ -140,7 +140,6 @@ global camera table, global fog path); a multi-scene sweep is the outstanding ch
 | Item | Status | How verified | Verifying commit | Date |
 |---|---|---|---|---|
 | Texture pack (CMB by Citra CityHash64) | CLOSED | memory `soh3d-texpack` | — | — |
-| Dynamic sun-shadows + SSAO | CLOSED | memory `soh3d-shadows-ao` | — | — |
 | PC-native input scheme + keyboard/gamepad HUD glyph hotswap | CLOSED | memory `soh3d-input-scheme`, `soh3d-hud-glyphs` | — | — |
 | Keyboard game-input (in-game + title, ImGui ActiveId fix) | CLOSED | `65acc6c5` fixed dead keyboard input | `65acc6c5` | — |
 
