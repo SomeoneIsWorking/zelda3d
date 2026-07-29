@@ -590,6 +590,37 @@ static void Zelda3D_ReplExec(PlayState* play, char* line, const char* outPath) {
                             "usage: linkstate <roll|talk|idle|jump|swim|damage|shield|attack|attack2|"
                             "climb|dive|getitem|death|carry|throw|putdown|itemuse|backwalk|climbup|climbdown>");
         }
+    } else if (strcmp(cmd, "settle") == 0 && sscanf(line, "%*s %i", &iv) == 1) {
+        // `settle <N>` — hold the game at EXACTLY gameplayFrames == N, so a capture is reproducible
+        // across separate launches. Freezing after a wall-clock sleep is NOT reproducible: how many
+        // frames elapse between a scene load and the freeze depends on load timing, and any effect
+        // still settling (waterfall splash, water surface) lands in a different phase each run. At
+        // Zora's Domain that made two launches of the SAME BUILD differ by 5.9% of the frame, which
+        // is larger than most real rendering changes -- it silently swallowed a depth-state port and
+        // nearly validated an inert one (2026-07-29).
+        //
+        // Steps forward only. If the scene is already past N, it says so rather than pretending:
+        // there is no rewind, and a silently-missed target would reintroduce exactly the
+        // nondeterminism this exists to remove.
+        gZelda3dFreeze = 1;
+        s32 cur = play->gameplayFrames;
+        s32 want = iv;
+        if (want < cur) {
+            Zelda3D_ReplReply(outPath, "settle: MISSED — gameplayFrames=%d already past %d (raise the "
+                                       "target or settle earlier); state is NOT reproducible",
+                              cur, want);
+        } else {
+            s32 n = want - cur;
+            if (n > 4000) n = 4000; // sanity cap, same spirit as `step`
+            for (s32 i = 0; i < n; i++) {
+                Zelda3D_WalkInject(play);
+                Play_Update(play);
+            }
+            Zelda3D_ReplReply(outPath, "settle: gameplayFrames=%d (stepped %d, frozen)",
+                              play->gameplayFrames, n);
+        }
+    } else if (strcmp(cmd, "frames") == 0) {
+        Zelda3D_ReplReply(outPath, "gameplayFrames=%d freeze=%d", play->gameplayFrames, gZelda3dFreeze);
     } else if (strcmp(cmd, "freeze") == 0 && sscanf(line, "%*s %i", &iv) == 1) {
         // Frame-step harness: `freeze 1` holds the game logic still (Play_Update skipped) so a brief
         // transient can be captured frame-by-frame; `freeze 0` resumes. Use with `step`.
