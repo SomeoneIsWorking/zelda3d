@@ -1569,6 +1569,24 @@ static void Zelda3D_ReplExec(PlayState* play, char* line, const char* outPath) {
         }
         Zelda3D_ReplReply(outPath, "bitem=0x%02x (0x3B=kokiri sword, 0xFF=none)",
                           gSaveContext.equips.buttonItems[0]);
+    } else if (strcmp(cmd, "upg") == 0) {
+        // `upg <type> [value]` — read or set an inventory UPGRADE (UPG_STRENGTH is 2: 0 none,
+        // 1 Goron bracelet, 2 silver gauntlets, 3 gold). Same reason `bitem` exists: the gauntlet
+        // visibility rule keys on CUR_UPG_VALUE(UPG_STRENGTH) and there was no way to drive it, so
+        // any 'fix' would have been measured by something that could not see the state it changes.
+        {
+            int upgType = 0, upgVal = -1;
+            int n = sscanf(line, "%*s %i %i", &upgType, &upgVal);
+            if (n >= 1 && upgType >= 0 && upgType < 8) {
+                if (n == 2) {
+                    Inventory_ChangeUpgrade((s16)upgType, (s16)upgVal);
+                }
+                Zelda3D_ReplReply(outPath, "upg[%d]=%d (2=strength: 0 none,1 bracelet,2 silver,3 gold)",
+                                  upgType, CUR_UPG_VALUE(upgType));
+            } else {
+                Zelda3D_ReplReply(outPath, "usage: upg <0-7> [value]");
+            }
+        }
     } else if (strcmp(cmd, "sgdrawonly") == 0) {
         // Draw-isolation probe: render ONLY the n-th Zelda3D group of the frame (-1 = everything).
         // The point is draws whose pixels are entirely overlapped by later layers — Zora's water d9

@@ -61,6 +61,11 @@ struct LinkGear {
     LinkHandRight rightHand = LinkHandRight::Open;
     LinkSheath    sheath    = LinkSheath::EmptySheathNoShield;
     LinkShield    shield    = LinkShield::None;
+    // Strength upgrade, 0..3 (none / Goron bracelet / silver gauntlets / gold). The gauntlet PLATES
+    // are separate meshes gated on >= 2, so gear that omits this cannot draw them at all — which is
+    // exactly the bug this field was added for (debug_journal/2026-07-29-adult-gauntlet-plates-...).
+    // MM has its own strength upgrade in the same slot, so this stays game-agnostic.
+    int strengthUpgrade = 0;
 };
 
 // Which of the two rest-pose skeletons Link is using this frame. MM's HUMAN form

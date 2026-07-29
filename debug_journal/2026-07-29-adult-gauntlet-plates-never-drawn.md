@@ -54,3 +54,40 @@ builds and looks right, measured by something that cannot actually see it.
 Next: add a `upg` REPL primitive (or extend `bitem` into a general `gsc` field poke), implement the
 rule in `linkAdultMidMask`, and verify with the frozen-logic method that worked for #201 e — control
 capture first, then diff with the HUD region excluded by address rather than by eye.
+
+## FIXED 2026-07-29
+
+`LinkGear` gained `strengthUpgrade` (0..3, game-agnostic — MM uses the same slot); the OoT adapter
+fills it from `CUR_UPG_VALUE(UPG_STRENGTH)` so the shared policy file stays free of `gSaveContext`;
+and `linkAdultMidMask` gained the ported rule:
+
+```c
+if (gear.strengthUpgrade >= 2) {
+    m |= LINK_MID(4) | LINK_MID(17);                                  // plate 1, both arms
+    m |= (gear.leftHand  == LinkHandLeft::Open)  ? LINK_MID(5)  : LINK_MID(6);
+    m |= (gear.rightHand == LinkHandRight::Open) ? LINK_MID(18) : LINK_MID(19);
+}
+```
+
+New REPL primitive `upg <type> [value]` drives the state, for the same reason `bitem` exists.
+
+### Evidence (adult Link, frozen logic, control = 58 px)
+
+| test | changed px in the body band x300-470 |
+|---|---|
+| strength 0 vs 1 (Goron bracelet) | **14** — noise; the `>= 2` gate holds |
+| strength 0 vs 2 (silver) | **1415** — plates appear |
+| strength 2 vs 3 (silver vs gold) | **13** — identical geometry |
+| strength 0 vs 3 (gold) | **1414** |
+
+Silver and gold being geometrically identical is CORRECT and matches N64, which draws the same
+display lists for both and distinguishes them only by env colour (`sGauntletColors[upgrade - 2]`).
+Visually the silver plates and their red gem appear on the forearm where there was bare bracer.
+
+### Residual, deliberately not fixed here
+
+**Gold gauntlets render silver.** N64 sets an env colour per upgrade
+(`z_player_lib.c:1120-1130`, `sGauntletColors`); we apply none, which the 13-px silver-vs-gold delta
+proves — if colour were applied the plates would change hue and the delta would be large. That is a
+COLOUR path (material/env override), not mesh visibility, so it does not belong in the midmask and
+is left as a separate follow-up rather than bolted on here.
