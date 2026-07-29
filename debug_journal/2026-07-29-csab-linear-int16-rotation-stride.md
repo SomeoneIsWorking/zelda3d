@@ -90,3 +90,34 @@ mat=18, first=13704 count=60) but its isolated draw footprint is 0 px — it is 
 occluded from the spawn camera. Framing it needs the camera moved to the window, which `acam` cannot
 do (it frames ACTORS, and this is room geometry). A generic "frame this draw group" camera primitive
 would close this and every future case like it — that is the tooling gap, not a one-off.
+
+---
+
+# Mip-chain port: design decided, implementation deliberately deferred
+
+DECISION (made without the user, per "nothing awaiting my input", 2026-07-29):
+**hi-res pack > ROM authored mip chain > synthetic box filter.** This follows the same directive
+that settled the HUD and the Xbox glyphs — use HD when available; the objection was to AI-generated
+stand-ins, never to the pack. So a pack replacement keeps winning, and where there is no pack the
+ROM's authored levels are used instead of box-filtering our own.
+
+Groundwork landed: `CmbTexture::levels` / `levelBytes(l)` / `levelOffset(l)`, verified against real
+entries (trap_model 64x128 3 levels -> 4096+1024+256 = 5376 = data_len exactly).
+
+WHAT REMAINS, and why it was not rushed:
+1. `cmb_glgroups.cpp` decodes only the base level; it needs to decode all levels and hand back a
+   contiguous chain.
+2. `Zelda3DGlTex` carries one pointer + dims; it needs a level count.
+3. `uploadTexture` takes one buffer and calls `SDL_GenerateMipmapsForGPUTexture`. Uploading authored
+   levels means setting `num_levels` to the AUTHORED count (3-4), not a full chain to 1x1 — and
+   there is a recorded hazard right there: `max_lod=1000` over a SINGLE-level texture renders BLACK
+   on this backend. A 3-level texture should be fine, but that is an assumption, not a measurement,
+   and it needs checking before it ships.
+4. The pack path returns its own already-decoded image, so the two sources must not both try to
+   supply levels.
+
+That is four files across the provider ABI, decode and upload, with a known black-screen failure
+mode adjacent to it. The project's own rule — start a big arc in a fresh session, and an arc that
+has already spawned two sub-arcs is the signal — applies. Deferring is the engineering call, not
+avoidance: the design question is answered and written down, so the next session starts with the
+decision made.
