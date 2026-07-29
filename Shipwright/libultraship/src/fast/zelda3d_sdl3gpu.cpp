@@ -714,8 +714,55 @@ SDL_GPUBlendFactor mapFactor(unsigned f) {
         case 0x306: return SDL_GPU_BLENDFACTOR_DST_COLOR;
         case 0x307: return SDL_GPU_BLENDFACTOR_ONE_MINUS_DST_COLOR;
         case 0x308: return SDL_GPU_BLENDFACTOR_SRC_ALPHA_SATURATE;
-        default: return SDL_GPU_BLENDFACTOR_ONE; // constant-color factors unsupported (rare); ONE
+        // The four GL constant-blend factors. SDL3 GPU only exposes the *_CONSTANT_COLOR pair, so
+        // GL_CONSTANT_ALPHA / GL_ONE_MINUS_CONSTANT_ALPHA also map here — the alpha-broadcast is
+        // done on the CONSTANTS side by sgBlendConstants() below, which pushes (a,a,a,a) instead
+        // of (r,g,b,a). That is bit-exact: GL_CONSTANT_ALPHA's factor is (Ac,Ac,Ac,Ac).
+        case 0x8001: return SDL_GPU_BLENDFACTOR_CONSTANT_COLOR;            // GL_CONSTANT_COLOR
+        case 0x8002: return SDL_GPU_BLENDFACTOR_ONE_MINUS_CONSTANT_COLOR;  // GL_ONE_MINUS_CONSTANT_COLOR
+        case 0x8003: return SDL_GPU_BLENDFACTOR_CONSTANT_COLOR;            // GL_CONSTANT_ALPHA
+        case 0x8004: return SDL_GPU_BLENDFACTOR_ONE_MINUS_CONSTANT_COLOR;  // GL_ONE_MINUS_CONSTANT_ALPHA
+        default: return SDL_GPU_BLENDFACTOR_ONE;
     }
+}
+
+// True when any of the group's four blend factors is a constant factor; fills `out` with the
+// vector SDL_SetGPUBlendConstants must carry for this draw.
+//
+// GL's alpha-constant factors broadcast blend_color.a to all four channels, the colour-constant
+// ones use blend_color verbatim — but there is ONE blend-constant register per draw, so a
+// material that mixed the two forms would be unrepresentable. It cannot happen in the OoT3D
+// corpus: a full scan of all 11172 CMB materials (1511 blend-enabled) finds constant factors in
+// exactly 91, all of them dstRGB = GL_CONSTANT_ALPHA (srcRGB 0x300 x83 / 0x302 x8, srcA = ONE,
+// dstA = ZERO) — zero colour-form uses, zero mixed materials. The warning below exists so a
+// future asset that breaks that never fails silently.
+bool sgBlendConstants(const SgGroup& g, SDL_FColor& out) {
+    if (!g.blendEnable)
+        return false;
+    const unsigned f[4] = { g.bSrcRGB, g.bDstRGB, g.bSrcA, g.bDstA };
+    bool colorForm = false, alphaForm = false;
+    for (unsigned v : f) {
+        if (v == 0x8001 || v == 0x8002)
+            colorForm = true;
+        else if (v == 0x8003 || v == 0x8004)
+            alphaForm = true;
+    }
+    if (!colorForm && !alphaForm)
+        return false;
+    if (colorForm && alphaForm) {
+        static bool warned = false;
+        if (!warned) {
+            warned = true;
+            fprintf(stderr, "[Zelda3D_SG] material mixes GL_CONSTANT_COLOR and GL_CONSTANT_ALPHA blend "
+                            "factors; SDL3 GPU has one blend-constant register — using the alpha form\n");
+        }
+    }
+    const float a = g.blendColor[3];
+    if (alphaForm)
+        out = SDL_FColor{ a, a, a, a };
+    else
+        out = SDL_FColor{ g.blendColor[0], g.blendColor[1], g.blendColor[2], a };
+    return true;
 }
 SDL_GPUBlendOp mapEq(unsigned e) {
     switch (e) {
@@ -1051,6 +1098,8 @@ SgModel* Fast::Zelda3DRenderer::ensureUploaded(int modelId) {
         g.bSrcA = groups[i].blendSrcA;
         g.bDstA = groups[i].blendDstA;
         g.bEqA = groups[i].blendEqA;
+        for (int k = 0; k < 4; k++)
+            g.blendColor[k] = groups[i].blendColor[k];
         g.depthWrite = groups[i].depthWrite;
         g.polygonOffset = groups[i].polygonOffset;
         g.cull = groups[i].cull;
@@ -1451,6 +1500,10 @@ struct DrawGroup {
     SDL_GPUTexture* tex2 = nullptr;
     SDL_GPUSampler* samp2 = nullptr;
     uint32_t first, count;
+    // Blend constants (SDL_SetGPUBlendConstants) for a group whose pipeline uses a CONSTANT_COLOR
+    // factor. Render-pass state, not pipeline state — so it travels per-draw, next to the pipeline.
+    bool hasBlendConst = false;
+    SDL_FColor blendConst{ 0.0f, 0.0f, 0.0f, 1.0f };
     std::array<uint8_t, sizeof(SgUbo)> ubo;
 };
 
@@ -2148,6 +2201,7 @@ void Fast::Zelda3DRenderer::DrawModel(int modelId, const float* mp16, const floa
         dg.samp2 = samp2;
         dg.first = grp.first;
         dg.count = grp.count;
+        dg.hasBlendConst = sgBlendConstants(gb, dg.blendConst);
         if (unified) {
             bool hasTex = tex != Fast::g_activeSdl3GpuApi->DummyTexture();
             auto variant = VariantForGroup(gb, hasTex);
@@ -2235,7 +2289,7 @@ void Fast::Zelda3DRenderer::DrawModel(int modelId, const float* mp16, const floa
             continue; // draw-isolation probe: everything except the selected group is suppressed
         api->AppendZelda3DModelDraw(g.pipeline, vbo, g.first, g.count, g.ubo.data(), g.tex, g.samp,
                                   g.tex2 ? g.tex2 : dummyTex, g.samp2 ? g.samp2 : dummySamp,
-                                  g.tex1, g.samp1, vp, sc);
+                                  g.tex1, g.samp1, vp, sc, g.hasBlendConst, g.blendConst);
     }
 }
 
