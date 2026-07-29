@@ -287,6 +287,9 @@ const void* Zelda3D_HeartTex(int kind, int* w, int* h);
 // icon_item_menu00, num_all00) to RGBA8, cached by path. texIdx selects the texture entry (these
 // menu files carry one atlas at index 0). NULL on failure.
 const void* Zelda3D_OoT3dAtlas(const char* romfsPath, int texIdx, int* w, int* h);
+// Local AABB of one uploaded Zelda3D draw group; 1 on success. Room CMBs are world-space under
+// an identity matrix, so for scene geometry this is the WORLD box. Backs the REPL `camdraw`.
+int Zelda3D_Sg_GroupBounds(int modelId, int groupIdx, float* outMin, float* outMax);
 extern int gZelda3dHudTex;       // env ZELDA3D_HUDTEX / REPL `hudtex` gate (-1=uninit, 0/1)
 int Zelda3D_HudTexEnabled(void); // lazily resolves the env on first call; HUD draws gate on this
 

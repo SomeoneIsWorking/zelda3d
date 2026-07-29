@@ -1199,6 +1199,17 @@ SgModel* Fast::Zelda3DRenderer::ensureUploaded(int modelId) {
                 g.dbgUv2[k] = groups[i].verts[vc - 1].uv[k];
             }
         }
+        if (groups[i].vertCount > 0 && groups[i].verts != nullptr) {
+            for (int k = 0; k < 3; k++) g.gmin[k] = g.gmax[k] = groups[i].verts[0].pos[k];
+            for (int vi = 1; vi < groups[i].vertCount; vi++) {
+                for (int k = 0; k < 3; k++) {
+                    const float c = groups[i].verts[vi].pos[k];
+                    if (c < g.gmin[k]) g.gmin[k] = c;
+                    if (c > g.gmax[k]) g.gmax[k] = c;
+                }
+            }
+            g.hasGroupBounds = true;
+        }
         all.insert(all.end(), groups[i].verts, groups[i].verts + groups[i].vertCount);
         m.groups.push_back(g);
     }
@@ -1566,6 +1577,33 @@ inline Fast::Zelda3DRenderer* sgRenderer() {
     return Fast::g_activeSdl3GpuApi ? Fast::g_activeSdl3GpuApi->Soh3d() : nullptr;
 }
 } // namespace
+
+bool Fast::Zelda3DRenderer::groupBounds(int modelId, int groupIdx, float* outMin, float* outMax) const {
+    auto it = g_models.find(modelId);
+    if (it == g_models.end() || !it->second.uploaded)
+        return false;
+    if (groupIdx < 0 || groupIdx >= (int)it->second.groups.size())
+        return false;
+    const SgGroup& g = it->second.groups[(size_t)groupIdx];
+    if (!g.hasGroupBounds)
+        return false;
+    for (int k = 0; k < 3; k++) {
+        if (outMin) outMin[k] = g.gmin[k];
+        if (outMax) outMax[k] = g.gmax[k];
+    }
+    return true;
+}
+
+// Local-space AABB of one draw group. Scene room CMBs store WORLD-space vertices under an identity
+// model matrix, so for room geometry this IS the world AABB -- the case that matters, since actors
+// can already be framed with `acam`. 0 if the model is not uploaded or the group has no vertices.
+extern "C" int Zelda3D_Sg_GroupBounds(int modelId, int groupIdx, float* outMin, float* outMax) {
+    Fast::Zelda3DRenderer* r = sgRenderer();
+    if (r == nullptr)
+        return 0;
+    return r->groupBounds(modelId, groupIdx, outMin, outMax) ? 1 : 0;
+}
+
 
 extern "C" int Zelda3D_Sg_Active(void) {
     return Fast::g_activeSdl3GpuApi != nullptr ? 1 : 0;
