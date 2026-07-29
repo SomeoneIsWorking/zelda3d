@@ -4,6 +4,7 @@ kind: claim
 status: holds
 created: 2026-07-29
 tags: 
+reconfirmed: 2026-07-29
 ---
 
 ## Claim
@@ -17,3 +18,7 @@ All 10538 textures in the ROM are consistent with dlen == baseLevel * sum(1/4^i)
 ## What would falsify it
 
 a texture where the level-count model fails, or a format whose base size does not divide out to a legal bpp
+
+## Re-confirmed 2026-07-29
+
+Ported and verified: authored chains now uploaded. Pack off, 20/100 uploads take the authored path; signal 8.59% vs 0.35% control at Kokiri with mean RGB unchanged. No black-frame regression in either pack configuration.
