@@ -198,6 +198,14 @@ def main():
     coordmap_use = Counter()
     coordsrc_use = Counter()
     domain_bad = Counter()  # layout-validation failures
+    # PICA combiner-buffer latching. Reported because assuming it away cost a session:
+    # the shader documented "the buffer-input selector is 0x8579 corpus-wide (buffer never
+    # latches PREVIOUS)" and evaluated PREVBUF as vec4(0) on the strength of it. It is not
+    # corpus-wide — childlink_v2 mat26 (the Goron bracelet) latches at stage 1 and reads the
+    # buffer back at stage 2, which is why the bracelet rendered black. A field the emulation
+    # decides to ignore is exactly the field the survey has to keep counting.
+    buf_latch = Counter()   # per-stage buffer-input selector values
+    buf_readers = Counter() # materials whose chain SOURCES PREVBUF
 
     op_domain = set(OPS)
     src_domain = set(SRCS)
@@ -219,7 +227,7 @@ def main():
             stage_counts[len(stages)] += 1
             texs_consumed = set()
             chain = []
-            for st in stages:
+            for si, st in enumerate(stages):
                 # layout validation: every field must be in its legal domain
                 if st.rgb_op not in op_domain:
                     domain_bad[f"rgb_op={st.rgb_op:04x}"] += 1
@@ -244,6 +252,13 @@ def main():
                 sig = st.sig()
                 stage_sigs[sig] += 1
                 chain.append(sig)
+                buf_latch[f"rgb={st.buf_rgb:04x}"] += 1
+                buf_latch[f"a={st.buf_a:04x}"] += 1
+                if st.buf_rgb == 0x8578 or st.buf_a == 0x8578:
+                    buf_readers[f"LATCHES at stage{si}: {label} mat{mi}"] += 1
+                if 0x8579 in st.rgb_src[:slots_used(st.rgb_op)] or \
+                   0x8579 in st.a_src[:slots_used(st.a_op)]:
+                    buf_readers[f"READS PREVBUF at stage{si}: {label} mat{mi}"] += 1
                 for k in range(slots_used(st.rgb_op)):
                     if 0x84C0 <= st.rgb_src[k] <= 0x84C3:
                         texs_consumed.add(st.rgb_src[k] - 0x84C0)
@@ -275,6 +290,18 @@ def main():
         print(f"  {k}: {v}")
     if not domain_bad:
         print("  none — layout validated corpus-wide")
+    print("\n== combiner-buffer latching (0x8579 = keep buffer, 0x8578 = latch PREVIOUS) ==")
+    for k, v in buf_latch.most_common():
+        print(f"  {k}: {v}")
+    lat = [k for k in buf_readers if k.startswith("LATCHES")]
+    rd = [k for k in buf_readers if k.startswith("READS")]
+    print(f"  materials latching the buffer: {len(lat)}")
+    print(f"  materials reading PREVBUF:     {len(rd)}")
+    for k in sorted(lat)[:12]:
+        print(f"    {k}")
+    for k in sorted(rd)[:12]:
+        print(f"    {k}")
+
     print("\n== texture units consumed by combiners ==")
     for k, v in sorted(tex_use.items()):
         print(f"  {k}: {v}")

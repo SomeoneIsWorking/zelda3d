@@ -405,3 +405,73 @@ on meshes that are hidden in that same state. No collateral, no reset needed.
 
 Worth keeping in mind if the override mechanism is reused: this is safe because of a property of THIS
 material (single-owner), not because overrides clean up after themselves. They do not.
+
+## RESOLVED: the bracelet was black because we never implemented the PICA combiner buffer
+
+Decoding the two chains (new tool `tools/tev_decode.py`) against the known-good gauntlet control:
+
+```
+bracelet g27 (childlink_v2 mat26)        gauntlet g14 (control, renders correctly)
+ 0  rgb = 2 * (Primary * Tex0)            0  rgb = 2 * (Primary * Tex0)
+ 1  rgb = 2 * (Tex0.a * Tex1)             1  rgb = Tex0.a * Tex1 + Previous
+ 2  rgb = Previous + PrevBuffer           2  rgb = Previous * Constant
+ 3  rgb = Previous * Constant.a + Constant   3  (same)
+```
+
+This is the standard PICA diffuse-in-buffer idiom: stage 0 computes the diffuse and latches it into
+the combiner buffer, stage 1 REPLACES Previous with the env/spec term, and stage 2 adds the diffuse
+back from the buffer. Our shader evaluated PREVBUF as `vec4(0)`, so the diffuse was discarded and only
+the dark env term survived. The gauntlet escapes it because its stage 1 is MulThenAdd `+ Previous`,
+carrying the diffuse forward without ever touching the buffer — which is why it was a good control and
+a misleading one at the same time.
+
+The shader documented the assumption that made this invisible: *"the CMB buffer-input selector is
+0x8579 corpus-wide (buffer never latches PREVIOUS)"*. That is FALSE. Corpus-wide (survey now reports
+it): **1108 stages latch**, and **14 materials read PREVBUF** — childlink_v2 mat10/22/26, all seven
+Volvagia meshes (`zelda_fd/valbasia*`), and four Ganon's Tower scene materials.
+
+### The one-stage offset
+
+Azahar assigns `combiner_buffer <- next_combiner_buffer` AFTER computing the stage output and only
+then applies the latch (`sw_rasterizer.cpp` ~991 and `glsl_fs_shader_gen.cpp` ~476 agree), so a
+latched value first becomes visible two stages later. Separately, the CMB stores the latch flag one
+stage AHEAD of Azahar's 0-based mask bit: 3dbrew names the GPUREG_TEXENV_UPDATE_BUFFER bits "TEV
+stage 1..4" and Grezzo puts the flag on the stage the register names.
+
+Confirmed on data, not inferred: all 14 PREVBUF-reading materials latch at exactly `read - 1`,
+including the Ganon's Tower ones at 4/3 rather than 2/1 — so it is a relationship, not a fixed
+position. Under the other mapping every one of those latches would be inert and every buffer read
+would return a value nothing ever wrote, which is not a pattern anyone authors.
+
+The material's INITIAL buffer color (`tev_combiner_buffer_color`) is still not parsed and is taken as
+0. That is exact for this ROM: every PREVBUF read is preceded by a latch, so the initial value is
+never read. FALSIFIER: a material that reads PREVBUF with no preceding latch — the survey prints both
+columns so it would show up.
+
+### Measured A/B (the only leg that changed is the one that should have)
+
+Same build tree, one line differing (`tevSrc` code 13 returning `vec4(0)` vs the buffer). Child Link,
+`freeze 1`, identical camera/time, per-draw isolation differenced against a background baseline,
+restricted to the stable band y120:360 (HUD and bottom edge drift between captures):
+
+```
+                            PRE-FIX                    POST-FIX
+bracelet  (reads PREVBUF)    822 px  RGB(25,17,7)      840 px  RGB(136,101,11)
+control   (no PREVBUF)      7184 px  RGB(20,68,18)    7172 px  RGB(20,68,18)
+control repeat              7183 px                   7166 px
+```
+
+The control is unchanged to the integer in every channel. The bracelet keeps its footprint (±2%) and
+goes 5.4x brighter and orange — and `(136,101,11)` matches its own texture's mean `(144,94,4)`,
+measured independently earlier in this file, which is what restoring a discarded diffuse should do.
+
+### Tooling notes (both were needed to get here honestly)
+
+* `tools/tev_decode.py` — decodes/diffs packed TEV chains. Reading the hex by eye is how a wrong
+  stage gets blamed; validated on six hand-built cases before use.
+* The first three attempts at the A/B were invalid and said so only because a control was carried:
+  `sgdrawonly` isolates Zelda3D groups but NOT the N64 world, so the first measurement was the
+  background in both legs (381k px, identical). Then `afreeze` + `animlive 0` still left Link
+  animating — two consecutive captures of the SAME draw differed by 19969 px. Only `freeze 1`
+  (holds Play_Update) gave a reproducible frame, and even then the HUD and bottom edge drift.
+  A control re-captured in-run is what turns "the numbers moved" into evidence.

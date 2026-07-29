@@ -351,10 +351,12 @@ const char* kFrag =
     // KNOWN APPROXIMATIONS (rare in corpus, none at Zora/Kokiri — tools/tev_corpus_survey.py):
     //  - FragPrimary/FragSecondary (fragment lighting, 199+69 materials): mapped to the same
     //    vertex-lit primary / (0,0,0,1) — fragment lighting itself is not emulated yet.
-    //  - PreviousBuffer (14 materials): the CMB buffer-input selector is 0x8579 corpus-wide
-    //    (buffer never latches PREVIOUS), so PREVBUF reads the initial combiner-buffer color,
-    //    a runtime register we don't yet capture; evaluated as vec4(0).
-    "vec4 tevSrc(uint code, vec4 prim, vec4 t0, vec4 t1, vec4 t2, vec4 prev, uint kidx) {\n"
+    //  - the INITIAL combiner-buffer color (PICA tev_combiner_buffer_color) is not parsed from
+    //    the CMB and is taken as vec4(0). This is exact for every material in this ROM: all 14
+    //    that read PREVBUF latch exactly one stage before the read, so the read always returns a
+    //    latched stage output and never the initial value (tools/tev_corpus_survey.py reports
+    //    both columns). FALSIFIER: a material that reads PREVBUF with no preceding latch.
+    "vec4 tevSrc(uint code, vec4 prim, vec4 t0, vec4 t1, vec4 t2, vec4 prev, vec4 pbuf, uint kidx) {\n"
     "    if (code == 0u || code == 1u) return prim;\n"
     "    if (code == 2u) return vec4(0.0, 0.0, 0.0, 1.0);\n"
     "    if (code == 3u || code == 6u) return t0;\n"
@@ -362,7 +364,8 @@ const char* kFrag =
     "    if (code == 5u) return t2;\n"
     "    if (code == 14u) return unpackUnorm4x8(ubo.uTevConst[kidx >> 2][kidx & 3u]);\n"
     "    if (code == 15u) return prev;\n"
-    "    return vec4(0.0);\n" // 13 PreviousBuffer (see approximation note)
+    "    if (code == 13u) return pbuf;\n" // PreviousBuffer — the PICA combiner buffer
+    "    return vec4(0.0);\n"
     "}\n"
     "vec3 tevColorMod(uint m, vec4 s) {\n"
     "    if (m == 0u) return s.rgb;\n"
@@ -411,14 +414,26 @@ const char* kFrag =
     "    return a;\n"
     "}\n"
     "vec4 tevRun(vec4 prim, vec4 t0, vec4 t1, vec4 t2) {\n"
+    // PICA combiner buffer. `buf` is what PREVBUF reads; `nextbuf` is the pending value.
+    // Azahar assigns buf <- nextbuf AFTER the stage output is computed and only THEN applies the
+    // latch (sw_rasterizer.cpp ~991 and glsl_fs_shader_gen.cpp ~476 agree), so a latched value
+    // first becomes visible two stages later. The CMB stores the latch flag one stage AHEAD of
+    // Azahar's 0-based mask bit — 3dbrew names the GPUREG_TEXENV_UPDATE_BUFFER bits "TEV stage
+    // 1..4" and Grezzo puts the flag on the named stage — hence the stage s+1 lookup below.
+    // Confirmed on data: all 14 PREVBUF-reading materials in the ROM latch at exactly read-1,
+    // which is meaningful only under this mapping (childlink_v2 mat26, the Goron bracelet:
+    // stage 0 diffuse -> buffer, stage 1 replaces PREVIOUS with the env term, stage 2 adds the
+    // diffuse back from the buffer; without this the bracelet renders black).
     "    vec4 prev = vec4(0.0);\n"
+    "    vec4 buf = vec4(0.0);\n"
+    "    vec4 nextbuf = vec4(0.0);\n"
     "    int n = int(ubo.uTevCtl.x + 0.5);\n"
     "    for (int s = 0; s < n; s++) {\n"
     "        uvec4 w = ubo.uTevStages[s];\n"
     "        uint kidx = (w.y >> 24) & 7u;\n"
-    "        vec4 sa = tevSrc(w.x & 15u, prim, t0, t1, t2, prev, kidx);\n"
-    "        vec4 sb = tevSrc((w.x >> 4) & 15u, prim, t0, t1, t2, prev, kidx);\n"
-    "        vec4 sc = tevSrc((w.x >> 8) & 15u, prim, t0, t1, t2, prev, kidx);\n"
+    "        vec4 sa = tevSrc(w.x & 15u, prim, t0, t1, t2, prev, buf, kidx);\n"
+    "        vec4 sb = tevSrc((w.x >> 4) & 15u, prim, t0, t1, t2, prev, buf, kidx);\n"
+    "        vec4 sc = tevSrc((w.x >> 8) & 15u, prim, t0, t1, t2, prev, buf, kidx);\n"
     "        vec3 ca = tevColorMod(w.y & 15u, sa);\n"
     "        vec3 cb = tevColorMod((w.y >> 4) & 15u, sb);\n"
     "        vec3 cc = tevColorMod((w.y >> 8) & 15u, sc);\n"
@@ -428,9 +443,9 @@ const char* kFrag =
     "        if (((w.z >> 4) & 15u) == 7u) {\n" // Dot3_RGBA writes the dot product to alpha too
     "            alpha = rgb.r;\n"
     "        } else {\n"
-    "            vec4 aa = tevSrc((w.x >> 12) & 15u, prim, t0, t1, t2, prev, kidx);\n"
-    "            vec4 ab = tevSrc((w.x >> 16) & 15u, prim, t0, t1, t2, prev, kidx);\n"
-    "            vec4 ac = tevSrc((w.x >> 20) & 15u, prim, t0, t1, t2, prev, kidx);\n"
+    "            vec4 aa = tevSrc((w.x >> 12) & 15u, prim, t0, t1, t2, prev, buf, kidx);\n"
+    "            vec4 ab = tevSrc((w.x >> 16) & 15u, prim, t0, t1, t2, prev, buf, kidx);\n"
+    "            vec4 ac = tevSrc((w.x >> 20) & 15u, prim, t0, t1, t2, prev, buf, kidx);\n"
     "            float fa = tevAlphaMod((w.y >> 12) & 15u, aa);\n"
     "            float fb = tevAlphaMod((w.y >> 16) & 15u, ab);\n"
     "            float fc = tevAlphaMod((w.y >> 20) & 15u, ac);\n"
@@ -438,6 +453,10 @@ const char* kFrag =
     "        }\n"
     "        alpha = clamp(alpha * float(1u << ((w.z >> 10) & 3u)), 0.0, 1.0);\n"
     "        prev = vec4(rgb, alpha);\n"
+    "        buf = nextbuf;\n"
+    "        uint latch = (s + 1 < n) ? ubo.uTevStages[s + 1].z : 0u;\n"
+    "        if ((latch & 4096u) != 0u) nextbuf.rgb = prev.rgb;\n"
+    "        if ((latch & 8192u) != 0u) nextbuf.a = prev.a;\n"
     "    }\n"
     "    return prev;\n"
     "}\n"
