@@ -75,8 +75,12 @@ Reachable — loaded through the scene room-CMB path, which always runs for a ma
 NOT reachable today — these are actor CMBs, and the actor auto-replace table
 (`zelda3d_object_zars.inc`) does not contain them, so their CMB is never loaded and the N64 mesh is
 drawn instead:
-* `tectite.cmb` mat0 — confirmed empirically: spawning En_Tite (0x1B) in Kokiri and dumping every
-  drawn model produced NO group with `aTest=1 aRef=0.000`.
+* `tectite.cmb` mat0 — spawning En_Tite (0x1B) in Kokiri and dumping every drawn model produced NO
+  group with `aTest=1 aRef=0.000`. **CAUSE RETRACTED 2026-07-30:** I attributed that to the CMB
+  never loading because tectite is absent from the auto-replace table. Absence of that ONE material
+  does not prove the CMB never loaded, and a later audit disputes the table-absence explanation
+  specifically for tectite. The observation stands; the cause is unestablished. Do not chase the
+  table on this one (see 2026-07-30-audit-round2-unverified-findings.md finding 12).
 * `chain_model.cmb` (x2), `crashbox_model.cmb`, `m_Fbmfl_model_hahen.cmb` — zero references anywhere
   under `soh/src/zelda3d/`.
 * `wipe_makoto_alpha2.cmb` (LESS 255) — a screen-wipe asset, not on the CMB material path.
