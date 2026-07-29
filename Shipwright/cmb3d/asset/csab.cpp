@@ -1,4 +1,6 @@
 #include "csab.h"
+
+#include <cstdio>
 #include "cmb.h"
 #include "mat4.h"
 #include <cstring>
@@ -23,10 +25,38 @@ Csab::Track Csab::parseTrack(uint32_t o, bool isRotInt16) const {
     t.present = true;
     t.frames.reserve(nkf);
     if (t.type == LINEAR) {
-        for (uint32_t i = 0; i < nkf; i++) {
-            Keyframe k{ (float)u32(b, p), f32(b, p + 4), 0, 0 };
-            t.frames.push_back(k);
-            p += 8;
+        if (isRotInt16) {
+            // Quantized LINEAR rotation keyframes: u16 time + s16 fixed-point angle, the same
+            // 0x10000 = full circle scale the HERMITE int16 path below uses. This branch used to
+            // fall through to the float reader, which read {u32 time, f32 value} over a 4-byte
+            // record and so decoded pure garbage: times like 2147418112 and values that were
+            // either denormals (2.8e-45, i.e. ~0 rad, silently replacing real angles) or wild
+            // (1.77e22 rad, the ASCII of the following "anod" chunk read as a float). 2951 tracks
+            // are affected, 2932 of them in Link's own archives (zelda_link_boy_new 1500,
+            // zelda_link_child_new 1432) — e.g. boy/anim/sude_nwait.csab decodes to a clean
+            // 3.1415 / -3.1415 / -1.5556 once read this way.
+            //
+            // STRIDE IS UNVERIFIED: every one of the 2951 tracks in this ROM has nkf == 1, so no
+            // asset here can distinguish a 4-byte record from any other size. 4 is what the field
+            // layout implies and what the int16 HERMITE record (8 = u16 + 3*s16) is consistent
+            // with. FALSIFIER: an asset with nkf > 1 in this branch — assert rather than decode
+            // silently, because a wrong stride would corrupt frames 2..n the same invisible way.
+            const float kAngle = 3.14159265358979f / 32768.0f;
+            if (nkf > 1) {
+                fprintf(stderr, "[csab] quantized LINEAR track with nkf=%u — stride unverified for "
+                                "more than one keyframe; decoding at 4 bytes\n", nkf);
+            }
+            for (uint32_t i = 0; i < nkf; i++) {
+                Keyframe k{ (float)u16(b, p), s16(b, p + 2) * kAngle, 0, 0 };
+                t.frames.push_back(k);
+                p += 4;
+            }
+        } else {
+            for (uint32_t i = 0; i < nkf; i++) {
+                Keyframe k{ (float)u32(b, p), f32(b, p + 4), 0, 0 };
+                t.frames.push_back(k);
+                p += 8;
+            }
         }
     } else if (t.type == HERMITE) {
         if (isRotInt16) {
@@ -70,7 +100,8 @@ Csab::AnimNode Csab::parseAnod(uint32_t o) const {
     for (int i = 0; i < 9; i++) {
         uint16_t off = u16(b, o + 8 + 2 * i);
         // isRotInt16 applies only to the rotation slots (3,4,5 = rX/rY/rZ); translation/scale tracks
-        // stay float even in an int16 anod. (Translation is usually LINEAR float anyway.)
+        // stay float even in an int16 anod. It applies to BOTH curve types in those slots, not just
+        // HERMITE — the LINEAR branch ignoring it decoded 2951 of Link's rotation tracks as garbage.
         if (off) n.tracks[i] = parseTrack(o + off, n.isRotInt16 && (i >= 3 && i <= 5));
     }
     return n;
