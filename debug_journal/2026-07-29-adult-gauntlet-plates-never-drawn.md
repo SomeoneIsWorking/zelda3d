@@ -264,3 +264,24 @@ transform, so the view-space normal the sphere UV derives from may not be right 
 (`00e30e30/00000000/00000111, 00e1ff43/00000002/00000101, 00e1fedf/00000000/00000002,
 00e1feef/05000020/00000008`) against the packing documented at `Zelda3DGlGroup::tevStagePack`, and
 check the sphere UV a skinned mesh produces — the title path is the only one it has been validated on.
+
+## Mesh 47: leaving it out is CORRECT (2026-07-29)
+
+OoT3D's always-on adult set is `{45, 46, 47}` and ours is `{45, 46}`; I had guessed 47 was the
+far-LOD body and deliberately not added it. Rendered alone via `linkmid only <n>` on adult Link at
+`acam 110`, frozen, against an all-off frame:
+
+| mesh | changed px | reading |
+|---|---|---|
+| 45 | **16515** | the body |
+| 46 | **3676** | head / face |
+| 47 | **70** | — |
+| *control (same state twice)* | *51* | — |
+
+70 against a 51 px control is not a signal. Mesh 47 draws **nothing** at our LOD — and note it was
+rendered ALONE, so this is not occlusion by mesh 45.
+
+So omitting it is right, and now on evidence rather than on the guess. It is presumably the far-LOD
+variant, which we never select because we always render near LOD. Recorded so nobody "fixes" the
+discrepancy with OoT3D's table by adding a mesh that would at best do nothing and at worst
+double-draw the body.
