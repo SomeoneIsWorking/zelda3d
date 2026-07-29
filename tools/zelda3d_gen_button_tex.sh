@@ -16,7 +16,7 @@
 set -euo pipefail
 REPO="$(cd "$(dirname "$0")/.." && pwd)"
 OUTDIR="$REPO/scratch/svg"; mkdir -p "$OUTDIR"
-HDR="$REPO/Shipwright/soh/src/zelda3d/button_tex_png.h"
+HDR="$REPO/Shipwright/soh/src/zelda3d/assets/button_tex_png.h"
 # 64x64 (2x the N64 32x32): RGBA32 = 16KB, within the proven HUD-texture load envelope (the #31
 # hearts / #32 glyphs are 64x64). The disc is reused as a resident tile by several bare C-button
 # texrects whose dsdx is scaled by DIM/32 in z_parameter.c (Zelda3D_ButtonBgTexScale).

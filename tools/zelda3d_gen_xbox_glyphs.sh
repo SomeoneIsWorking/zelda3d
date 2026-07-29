@@ -9,7 +9,7 @@ set -euo pipefail
 REPO="$(cd "$(dirname "$0")/.." && pwd)"
 ASSETS="$REPO/Shipwright/soh/assets/zelda3d"
 OUTDIR="$REPO/scratch/svg"; mkdir -p "$OUTDIR"
-HDR="$REPO/Shipwright/soh/src/zelda3d/xbox_glyphs_png.h"
+HDR="$REPO/Shipwright/soh/src/zelda3d/assets/xbox_glyphs_png.h"
 
 RASTER=(magick); command -v magick >/dev/null 2>&1 || RASTER=(convert)
 

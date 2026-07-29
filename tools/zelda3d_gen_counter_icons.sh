@@ -17,7 +17,7 @@
 set -euo pipefail
 REPO="$(cd "$(dirname "$0")/.." && pwd)"
 OUTDIR="$REPO/scratch/svg"; mkdir -p "$OUTDIR"
-HDR="$REPO/Shipwright/soh/src/zelda3d/counter_icon_png.h"
+HDR="$REPO/Shipwright/soh/src/zelda3d/assets/counter_icon_png.h"
 # 64x64 (4x the N64 16x16): RGBA32 = 16KB, within the proven HUD-texture load envelope. These are
 # FULL-LOAD single draws (no shared-tile reuse like gButtonBackgroundTex), so no dsdx tuning gotcha.
 DIM=64
