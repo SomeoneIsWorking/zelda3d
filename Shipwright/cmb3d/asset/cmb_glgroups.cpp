@@ -113,6 +113,7 @@ Zelda3DGlGroup MakeGlGroup(const Cmb& cmb, const CmbDrawGroup& g, const CmbVerte
     cg.texIndex = cmb.materialTexture(g.material_index) + texBase;
     cg.alphaTest = mat && mat->alpha_test ? 1 : 0;
     cg.alphaRef = mat ? mat->alpha_ref : 0.0f;
+    cg.alphaFunc = mat ? mat->alpha_func : 0x0206;
     cg.wrapS = mat ? mat->wrap_s : 0x2901;
     cg.wrapT = mat ? mat->wrap_t : 0x2901;
     cg.blendEnable = mat && mat->blend_enable ? 1 : 0;

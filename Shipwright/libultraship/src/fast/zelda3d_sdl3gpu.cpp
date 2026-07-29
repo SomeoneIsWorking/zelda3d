@@ -370,6 +370,22 @@ float fog3dNode(float t) {
     //    that read PREVBUF latch exactly one stage before the read, so the read always returns a
     //    latched stage output and never the initial value (tools/tev_corpus_survey.py reports
     //    both columns). FALSIFIER: a material that reads PREVBUF with no preceding latch.
+// PICA alpha test. `f` is the GL compare enum minus 0x200 (0 NEVER .. 7 ALWAYS). The renderer used
+// to hardcode "pass when a >= ref" for every material, but 910 of the 913 alpha-test-enabled
+// materials in the ROM are GREATER. That only differs at a == ref -- which is exactly the ref==0
+// case, where GREATER cuts fully transparent texels and GEQUAL keeps them. Keeping them is visible:
+// hairal_niwa's courtyard windows write depth with blending off, so the kept cut-out renders opaque
+// and occludes what is behind it.
+bool alphaPass(float a, float ref, int f) {
+    if (f == 0) return false;
+    if (f == 1) return a <  ref;
+    if (f == 2) return a == ref;
+    if (f == 3) return a <= ref;
+    if (f == 4) return a >  ref;
+    if (f == 5) return a != ref;
+    if (f == 6) return a >= ref;
+    return true;
+}
 vec4 tevSrc(uint code, vec4 prim, vec4 t0, vec4 t1, vec4 t2, vec4 prev, vec4 pbuf, uint kidx) {
     if (code == 0u || code == 1u) return prim;
     if (code == 2u) return vec4(0.0, 0.0, 0.0, 1.0);
@@ -503,7 +519,8 @@ void main() {
     // Generic TEV draws (uTevCtl.x > 0): PICA's alpha test compares the FINAL combiner alpha,
     // not the raw texel — their discard happens after tevRun below.
     bool tevG = (ubo.uTevCtl.x > 0.5);
-    if (!tevG && t.a < ubo.uParams.z) discard;
+    int afn = int(ubo.uTevCtl.w + 0.5);
+    if (!tevG && afn > 0 && !alphaPass(t.a, ubo.uParams.z, afn - 1)) discard;
     gl_FragDepth = gl_FragCoord.z + ubo.uParams.w;
     // Flat modulator for non-vertex-lit draws: the N64-fallback scene tint or a caller-supplied
     // per-draw color. The former half-Lambert form term (0.55+0.45·hl — a synthetic, magic-constant
@@ -575,7 +592,8 @@ void main() {
         vec4 t1s = texture(uTex1, vUv1);
         vec4 t2s = texture(uTex2, vUv2);
         vec4 tev = tevRun(prim, t, t1s, t2s);
-        if (tev.a < ubo.uParams.z) discard;
+        int afn2 = int(ubo.uTevCtl.w + 0.5);
+        if (afn2 > 0 && !alphaPass(tev.a, ubo.uParams.z, afn2 - 1)) discard;
         rgb = tev.rgb;
         outA = tev.a;
     } else {
@@ -1110,6 +1128,7 @@ SgModel* Fast::Zelda3DRenderer::ensureUploaded(int modelId) {
         g.texIndex = groups[i].texIndex;
         g.alphaTest = groups[i].alphaTest;
         g.alphaRef = groups[i].alphaRef;
+        g.alphaFunc = groups[i].alphaFunc;
         g.wrapS = groups[i].wrapS;
         g.wrapT = groups[i].wrapT;
         g.blendEnable = groups[i].blendEnable;
@@ -1987,6 +2006,9 @@ void Fast::Zelda3DRenderer::DrawModel(int modelId, const float* mp16, const floa
         }
         ubo.uParams[2] = grp.alphaTest ? grp.alphaRef : 0.0f;
         ubo.uParams[3] = grp.polygonOffset;
+        // Alpha-test compare, encoded as (GL enum - 0x200) + 1 so 0 means DISABLED. Written
+        // unconditionally: uTevCtl[0..2] are only set on the generic-TEV path.
+        ubo.uTevCtl[3] = grp.alphaTest ? (float)((grp.alphaFunc & 7u) + 1u) : 0.0f;
         // OoT3D PICA distance fog (title port): per-DRAW enable = the frame-level 3DS-fog state
         // AND this material's CMB isFogEnabled byte (fog_mode=5 on the 3DS; the additive/effect
         // materials opt out). uFog.w == 2.0 selects the 3DS LUT path in the shader, overriding
