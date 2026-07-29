@@ -44,6 +44,11 @@ struct SgGroup {
     // composites at dst factor ONE, i.e. additively, instead of at that weight.
     float blendColor[4] = { 0.0f, 0.0f, 0.0f, 1.0f };
     int depthWrite = 1;
+    // Per-group local AABB, filled at upload alongside the model-wide one. Needed to AIM a
+    // camera at a specific draw group: `acam` frames ACTORS, so room geometry -- where most
+    // material defects live -- had no way to be brought on screen for verification.
+    float gmin[3] = { 0, 0, 0 }, gmax[3] = { 0, 0, 0 };
+    bool hasGroupBounds = false;
     unsigned alphaFunc = 0x0206;
     int depthTest = 1;
     unsigned depthFunc = 0x0201; // GL_LESS
@@ -155,6 +160,8 @@ class Zelda3DRenderer {
     SDL_GPUShader* makeShader(const char* glsl, EShLanguage stage, uint32_t numSamplers, uint32_t numUbo);
     SDL_GPUGraphicsPipeline* getDepthPipeline(bool doCull, int frontCW);
     bool ensureOverlayDepthResources(); // #146 item B
+    // Local AABB of one uploaded draw group (see Zelda3D_Sg_GroupBounds / REPL `camdraw`).
+    bool groupBounds(int modelId, int groupIdx, float* outMin, float* outMax) const;
 
     // ---- state (former module globals; names unchanged) ----
     std::unordered_map<int, SgModel> g_models;
