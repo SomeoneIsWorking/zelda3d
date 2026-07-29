@@ -12,6 +12,9 @@
 #include "fast/backends/gfx_sdl3gpu.h"
 #include "fast/backends/zelda3d_sdl3gpu.h" // Fast::Zelda3DRenderer (this module's state, folded into the backend)
 
+// inja — the GLSL shaders below are inja templates (see the CMake comment for why not fmt).
+#include <inja/inja.hpp>
+
 #include <glslang/Public/ShaderLang.h>
 #include <glslang/Public/ResourceLimits.h>
 #include <glslang/SPIRV/GlslangToSpv.h>
@@ -193,39 +196,50 @@ bool CompileGlsl(EShLanguage stage, const char* src, std::vector<uint32_t>& spv)
 #define SG_UBO_BONES_BODY \
     "    mat4 uBones[" SG_STR(ZELDA3D_GL_MAX_BONES) "];\n"
 
-const char* kVert =
-    "#version 450\n"
-    "layout(location=0) in vec3 aPos;\n"
-    "layout(location=1) in vec3 aNrm;\n"
-    "layout(location=2) in vec2 aUv;\n"
-    "layout(location=3) in vec4 aBoneId;\n"
-    "layout(location=4) in vec4 aBoneW;\n"
-    "layout(location=5) in vec4 aColor;\n"
-    "layout(location=0) out vec2 vUv;\n"
-    "layout(location=1) out vec4 vColor;\n"
-    "layout(location=2) out vec3 vNrmView;\n"
-    "layout(location=3) out vec3 vWorld;\n"
-    "layout(location=4) out float vFogDist;\n"
-    "layout(location=5) out vec2 vUv1;\n"
-    "layout(location=6) out vec2 vUv2;\n"
+// The varyings, declared ONCE. `{{ q }}` renders as `out` for the vertex stage and `in` for the
+// fragment stage; previously both lists were written by hand in both shaders, so a location added
+// on one side only was a silent drift hazard.
+constexpr const char* kVaryings = R"GLSL(layout(location=0) {{ q }} vec2 vUv;
+layout(location=1) {{ q }} vec4 vColor;
+layout(location=2) {{ q }} vec3 vNrmView;
+layout(location=3) {{ q }} vec3 vWorld;
+layout(location=4) {{ q }} float vFogDist;
+layout(location=5) {{ q }} vec2 vUv1;
+layout(location=6) {{ q }} vec2 vUv2;
     // PRIMARY_COLOR (PICA output register o1) — computed and SATURATED PER VERTEX, then
     // interpolated. See the kFrag comment at the `vtxLit` branch for why this cannot live in
     // the fragment shader.
-    "layout(location=7) out vec4 vPrim;\n"
-    "layout(set=1, binding=0, std140) uniform UBO {\n" SG_UBO_COMMON_BODY "} ubo;\n"
-    "layout(set=1, binding=1, std140) uniform UBOBones {\n" SG_UBO_BONES_BODY "} bones;\n"
-    "void main() {\n"
-    "    vColor = aColor;\n"
-    "    vec3 sp, nM;\n"
-    "    if (ubo.uTintSkin.w > 0.5) {\n"
-    "        vec4 acc = vec4(0.0); nM = vec3(0.0);\n"
-    "        for (int i = 0; i < 4; i++) {\n"
-    "            acc += aBoneW[i] * (bones.uBones[int(aBoneId[i])] * vec4(aPos, 1.0));\n"
-    "            nM  += aBoneW[i] * (mat3(bones.uBones[int(aBoneId[i])]) * aNrm);\n"
-    "        }\n"
-    "        sp = acc.xyz;\n"
-    "    } else { sp = aPos; nM = aNrm; }\n"
-    "    vec4 c = ubo.uMP * vec4(sp, 1.0);\n"
+layout(location=7) {{ q }} vec4 vPrim;
+)GLSL";
+
+// Vertex shader, as an inja template. `{{ ubo_body }}` / `{{ ubo_bones_body }}` splice the
+// SG_UBO_*_BODY macros so the UBO layout keeps its single source of truth shared with the C++ struct.
+constexpr const char* kVertTemplate = R"GLSL(#version 450
+layout(location=0) in vec3 aPos;
+layout(location=1) in vec3 aNrm;
+layout(location=2) in vec2 aUv;
+layout(location=3) in vec4 aBoneId;
+layout(location=4) in vec4 aBoneW;
+layout(location=5) in vec4 aColor;
+{{ varyings }}
+layout(set=1, binding=0, std140) uniform UBO {
+{{ ubo_body }}
+} ubo;
+layout(set=1, binding=1, std140) uniform UBOBones {
+{{ ubo_bones_body }}
+} bones;
+void main() {
+    vColor = aColor;
+    vec3 sp, nM;
+    if (ubo.uTintSkin.w > 0.5) {
+        vec4 acc = vec4(0.0); nM = vec3(0.0);
+        for (int i = 0; i < 4; i++) {
+            acc += aBoneW[i] * (bones.uBones[int(aBoneId[i])] * vec4(aPos, 1.0));
+            nM  += aBoneW[i] * (mat3(bones.uBones[int(aBoneId[i])]) * aNrm);
+        }
+        sp = acc.xyz;
+    } else { sp = aPos; nM = aNrm; }
+    vec4 c = ubo.uMP * vec4(sp, 1.0);
     // N64 fog ramp input: this vertex's NDC z/w. The 3DS PICA fog path (uFog.w == 2.0) does NOT
     // use vFogDist — it derives the 3DS z-buffer depth per FRAGMENT from vWorld in kFrag.
     // FALSIFIED APPROACHES for the 3DS path, do not retry (2026-07-22, Kokiri far-band residual):
@@ -237,12 +251,12 @@ const char* kVert =
     //    clipping lerps that garbage into visible near triangles (Kokiri: pale fog wedge under
     //    Link, near band +46/255). Per-fragment evaluation has neither failure mode: interpolated
     //    vWorld is world-affine (exact), and post-clipping fragments are never behind the camera.
-    "    vFogDist = c.z / c.w;\n"
-    "    c.y *= ubo.uParams.x;\n"
-    "    c.z = (c.z + c.w) * 0.5;\n"          // GL clip z [-1,1] -> SDL3 GPU/Vulkan [0,1]
-    "    if (ubo.uLightDir.w > 0.5) c.z = c.w;\n" // skybox: pin to far plane
-    "    gl_Position = c;\n"
-    "    vNrmView = mat3(ubo.uMV) * nM;\n"
+    vFogDist = c.z / c.w;
+    c.y *= ubo.uParams.x;
+    c.z = (c.z + c.w) * 0.5;
+    if (ubo.uLightDir.w > 0.5) c.z = c.w;
+    gl_Position = c;
+    vNrmView = mat3(ubo.uMV) * nM;
     // --- PICA output register o1 (PRIMARY_COLOR), evaluated PER VERTEX ------------------------
     // GROUND TRUTH (Azahar src/video_core/pica/output_vertex.cpp, OutputVertex ctor):
     //   "The hardware takes the absolute and saturates vertex colors, *before* doing
@@ -256,17 +270,17 @@ const char* kVert =
     // ~0.70 clamps — and the deficit is hue-shaped, because blue's light term (1.255) clamps at
     // a higher vColor than red/green's (1.420). That is exactly the measured d8 signature
     // (+24%/+23% on R/G, +8% on B). Do not move this back into the fragment shader.
-    "    vec3 nV = normalize(vNrmView);\n"
-    "    if (ubo.uAmbient.w > 0.0) {\n"
-    "        vec3 lit = ubo.uAmbient.xyz * ubo.uAmbient.w\n"
-    "                 + ubo.uLitDif1.rgb * max(dot(nV, -ubo.uLightDir.xyz), 0.0)\n"
-    "                 + ubo.uLitDif2.rgb * max(dot(nV, -ubo.uLightDir2.xyz), 0.0);\n"
-    "        vPrim = min(abs(vec4(lit * aColor.rgb, aColor.a)), vec4(1.0));\n"
-    "    } else {\n"
-    "        vPrim = min(abs(aColor), vec4(1.0));\n"
-    "    }\n"
-    "    vWorld = (ubo.uMV * vec4(sp, 1.0)).xyz;\n"
-    "    vUv = vec2(aUv.x + ubo.uExtra.y, 1.0 - aUv.y + ubo.uExtra.z);\n"
+    vec3 nV = normalize(vNrmView);
+    if (ubo.uAmbient.w > 0.0) {
+        vec3 lit = ubo.uAmbient.xyz * ubo.uAmbient.w
+                 + ubo.uLitDif1.rgb * max(dot(nV, -ubo.uLightDir.xyz), 0.0)
+                 + ubo.uLitDif2.rgb * max(dot(nV, -ubo.uLightDir2.xyz), 0.0);
+        vPrim = min(abs(vec4(lit * aColor.rgb, aColor.a)), vec4(1.0));
+    } else {
+        vPrim = min(abs(aColor), vec4(1.0));
+    }
+    vWorld = (ubo.uMV * vec4(sp, 1.0)).xyz;
+    vUv = vec2(aUv.x + ubo.uExtra.y, 1.0 - aUv.y + ubo.uExtra.z);
     // Coordinator-1 UV for the dual-texture detail mask. uSheen.w carries the coordinator-1
     // mapping method (noclip TextureCoordinatorMappingMethod): 1=UvCoordinateMap (scale*(uv-trans)),
     // 3=CameraSphereEnvMap (normal-derived UV: reflect the view vector about the normal, map to
@@ -278,67 +292,67 @@ const char* kVert =
     // the caller supplies the live camera's view-rotation rows in uSphRot0..2 (uSphRot0.w = gate)
     // and the normal is rotated into REAL view space — matching the 3DS, where these decorations
     // are composited through the live cs-camera's view matrix (title_logo_actor.md §6.1).
-    "    vec3 ns = (ubo.uSphRot0.w > 0.5)\n"
-    "        ? vec3(dot(ubo.uSphRot0.xyz, nM), dot(ubo.uSphRot1.xyz, nM), dot(ubo.uSphRot2.xyz, nM))\n"
-    "        : (mat3(ubo.uMV) * nM);\n"
-    "    if (ubo.uSheen.w > 2.5) {\n"
+    vec3 ns = (ubo.uSphRot0.w > 0.5)
+        ? vec3(dot(ubo.uSphRot0.xyz, nM), dot(ubo.uSphRot1.xyz, nM), dot(ubo.uSphRot2.xyz, nM))
+        : (mat3(ubo.uMV) * nM);
+    if (ubo.uSheen.w > 2.5) {
     // Same texture-space y-flip as the UV-coordinate path below (SoH uploads textures y-flipped
     // relative to PICA texture space, which is why the UvCoordinateMap branch samples 1-uv1.y);
     // the sphere-mapped UV must flip identically or it mirrors the sampled gradient vertically.
     // The coordinator's own scale/trans applies to the sphere-mapped UV too (noclip render.ts
     // CalcTextureCoordRaw: the sphere src is still multiplied by the coordinator texture matrix
     // before the final flip) — identity for every wordmark decoration except mat4 (scaleT=2).
-    "        vec3 nv = normalize(ns);\n"
-    "        vec2 suv = vec2((nv.x * 0.5 + 0.5 - ubo.uTex1Xf.z) * ubo.uTex1Xf.x,\n"
-    "                        (nv.y * 0.5 + 0.5 - ubo.uTex1Xf.w) * ubo.uTex1Xf.y);\n"
-    "        vUv1 = vec2(suv.x, 1.0 - suv.y);\n"
-    "    } else {\n"
-    "        vec2 uv1 = vec2((aUv.x - ubo.uTex1Xf.z) * ubo.uTex1Xf.x, (aUv.y - ubo.uTex1Xf.w) * ubo.uTex1Xf.y);\n"
-    "        vUv1 = vec2(uv1.x, 1.0 - uv1.y);\n"
-    "    }\n"
+        vec3 nv = normalize(ns);
+        vec2 suv = vec2((nv.x * 0.5 + 0.5 - ubo.uTex1Xf.z) * ubo.uTex1Xf.x,
+                        (nv.y * 0.5 + 0.5 - ubo.uTex1Xf.w) * ubo.uTex1Xf.y);
+        vUv1 = vec2(suv.x, 1.0 - suv.y);
+    } else {
+        vec2 uv1 = vec2((aUv.x - ubo.uTex1Xf.z) * ubo.uTex1Xf.x, (aUv.y - ubo.uTex1Xf.w) * ubo.uTex1Xf.y);
+        vUv1 = vec2(uv1.x, 1.0 - uv1.y);
+    }
     // Coordinator-2 UV for the third texture unit (generic TEV, render.multi-stage-tev). Every
     // OoT3D coordinator sources texcoord0 (corpus-verified, tools/tev_corpus_survey.py), so uv2
     // is the same baked UV through coordinator 2's scale/translate — or the sphere-mapped UV
     // when coordinator 2 uses CameraSphereEnvMap (uTevCtl.z == 3), same convention as uv1.
-    "    if (ubo.uTevCtl.z > 2.5 && ubo.uTevCtl.z < 3.5) {\n"
-    "        vec3 nv2 = normalize(ns);\n"
-    "        vec2 suv2 = vec2((nv2.x * 0.5 + 0.5 - ubo.uTex2Xf.z) * ubo.uTex2Xf.x,\n"
-    "                         (nv2.y * 0.5 + 0.5 - ubo.uTex2Xf.w) * ubo.uTex2Xf.y);\n"
-    "        vUv2 = vec2(suv2.x, 1.0 - suv2.y);\n"
-    "    } else {\n"
-    "        vec2 uv2 = vec2((aUv.x - ubo.uTex2Xf.z) * ubo.uTex2Xf.x, (aUv.y - ubo.uTex2Xf.w) * ubo.uTex2Xf.y);\n"
-    "        vUv2 = vec2(uv2.x, 1.0 - uv2.y);\n"
-    "    }\n"
-    "}\n";
+    if (ubo.uTevCtl.z > 2.5 && ubo.uTevCtl.z < 3.5) {
+        vec3 nv2 = normalize(ns);
+        vec2 suv2 = vec2((nv2.x * 0.5 + 0.5 - ubo.uTex2Xf.z) * ubo.uTex2Xf.x,
+                         (nv2.y * 0.5 + 0.5 - ubo.uTex2Xf.w) * ubo.uTex2Xf.y);
+        vUv2 = vec2(suv2.x, 1.0 - suv2.y);
+    } else {
+        vec2 uv2 = vec2((aUv.x - ubo.uTex2Xf.z) * ubo.uTex2Xf.x, (aUv.y - ubo.uTex2Xf.w) * ubo.uTex2Xf.y);
+        vUv2 = vec2(uv2.x, 1.0 - uv2.y);
+    }
+}
+)GLSL";
 
-const char* kFrag =
-    "#version 450\n"
-    "layout(location=0) in vec2 vUv;\n"
-    "layout(location=1) in vec4 vColor;\n"
-    "layout(location=2) in vec3 vNrmView;\n"
-    "layout(location=3) in vec3 vWorld;\n"
-    "layout(location=4) in float vFogDist;\n"
-    "layout(location=5) in vec2 vUv1;\n"
-    "layout(location=6) in vec2 vUv2;\n"
-    "layout(location=7) in vec4 vPrim;\n" // PICA o1, saturated per-vertex (see kVert)
-    "layout(location=0) out vec4 frag;\n"
-    "layout(set=3, binding=0, std140) uniform UBO {\n" SG_UBO_COMMON_BODY "} ubo;\n"
-    "layout(set=2, binding=0) uniform sampler2D uTex;\n"
+// Fragment shader, as an inja template. Besides the UBO and varyings, `{{ tap_combiner }}` and
+// `{{ tap_pre_fog }}` are the FRAGDBG probe insertion points. They used to be a runtime
+// fragSrc.find() on a source LINE, which silently went inert when a lighting rewrite deleted the
+// line it matched -- the probe reported nothing and looked like a clean result. A named hole cannot
+// drift out from under the code that fills it, and BuildShaderSource verifies the fill landed.
+constexpr const char* kFragTemplate = R"GLSL(#version 450
+{{ varyings }}
+layout(location=0) out vec4 frag;
+layout(set=3, binding=0, std140) uniform UBO {
+{{ ubo_body }}
+} ubo;
+layout(set=2, binding=0) uniform sampler2D uTex;
     // set=2 binding=1 was the (removed) sun-shadow map's slot; it now carries the THIRD texture
     // unit (uTex2) for the generic TEV path (render.multi-stage-tev — Zora's water combines
     // tex0+tex1+tex2). Bound to the dummy texture on draws without a third binding, so the
     // 3-sampler bind layout is unchanged.
-    "layout(set=2, binding=1) uniform sampler2D uTex2;\n"
-    "layout(set=2, binding=2) uniform sampler2D uTex1;\n"
+layout(set=2, binding=1) uniform sampler2D uTex2;
+layout(set=2, binding=2) uniform sampler2D uTex1;
     // RE'd 3DS fog LUT node value at t = i/128 (FogResUpdater FUN_002cdbfc, mode 0 linear —
     // oot3d-decomp title_env_lighting.md §13): eyeDist = b/(a - t) (inverse projection), then
     // the linear fogNear..fogFar window. uFog3d0 = (a, b, fogNear, fogFar).
-    "float fog3dNode(float t) {\n"
-    "    float d = ubo.uFog3d0.y / max(ubo.uFog3d0.x - t, 1e-6);\n"
-    "    if (d < ubo.uFog3d0.z) return 1.0;\n"
-    "    if (d > ubo.uFog3d0.w) return 0.0;\n"
-    "    return (ubo.uFog3d0.w - d) / (ubo.uFog3d0.w - ubo.uFog3d0.z);\n"
-    "}\n"
+float fog3dNode(float t) {
+    float d = ubo.uFog3d0.y / max(ubo.uFog3d0.x - t, 1e-6);
+    if (d < ubo.uFog3d0.z) return 1.0;
+    if (d > ubo.uFog3d0.w) return 0.0;
+    return (ubo.uFog3d0.w - d) / (ubo.uFog3d0.w - ubo.uFog3d0.z);
+}
     // --- Generic PICA TEV evaluator (render.multi-stage-tev) ---------------------------------
     // Faithful per-stage emulation of the PICA200 texture-combiner chain, driven by the packed
     // per-material words in uTevStages (packing: Zelda3DGlGroup::tevStagePack, zelda3d_gl.h).
@@ -356,64 +370,64 @@ const char* kFrag =
     //    that read PREVBUF latch exactly one stage before the read, so the read always returns a
     //    latched stage output and never the initial value (tools/tev_corpus_survey.py reports
     //    both columns). FALSIFIER: a material that reads PREVBUF with no preceding latch.
-    "vec4 tevSrc(uint code, vec4 prim, vec4 t0, vec4 t1, vec4 t2, vec4 prev, vec4 pbuf, uint kidx) {\n"
-    "    if (code == 0u || code == 1u) return prim;\n"
-    "    if (code == 2u) return vec4(0.0, 0.0, 0.0, 1.0);\n"
-    "    if (code == 3u || code == 6u) return t0;\n"
-    "    if (code == 4u) return t1;\n"
-    "    if (code == 5u) return t2;\n"
-    "    if (code == 14u) return unpackUnorm4x8(ubo.uTevConst[kidx >> 2][kidx & 3u]);\n"
-    "    if (code == 15u) return prev;\n"
-    "    if (code == 13u) return pbuf;\n" // PreviousBuffer — the PICA combiner buffer
-    "    return vec4(0.0);\n"
-    "}\n"
-    "vec3 tevColorMod(uint m, vec4 s) {\n"
-    "    if (m == 0u) return s.rgb;\n"
-    "    if (m == 1u) return 1.0 - s.rgb;\n"
-    "    if (m == 2u) return vec3(s.a);\n"
-    "    if (m == 3u) return vec3(1.0 - s.a);\n"
-    "    if (m == 4u) return vec3(s.r);\n"
-    "    if (m == 5u) return vec3(1.0 - s.r);\n"
-    "    if (m == 8u) return vec3(s.g);\n"
-    "    if (m == 9u) return vec3(1.0 - s.g);\n"
-    "    if (m == 12u) return vec3(s.b);\n"
-    "    if (m == 13u) return vec3(1.0 - s.b);\n"
-    "    return s.rgb;\n"
-    "}\n"
-    "float tevAlphaMod(uint m, vec4 s) {\n"
-    "    if (m == 0u) return s.a;\n"
-    "    if (m == 1u) return 1.0 - s.a;\n"
-    "    if (m == 2u) return s.r;\n"
-    "    if (m == 3u) return 1.0 - s.r;\n"
-    "    if (m == 4u) return s.g;\n"
-    "    if (m == 5u) return 1.0 - s.g;\n"
-    "    if (m == 6u) return s.b;\n"
-    "    if (m == 7u) return 1.0 - s.b;\n"
-    "    return s.a;\n"
-    "}\n"
-    "vec3 tevColorOp(uint op, vec3 a, vec3 b, vec3 c) {\n"
-    "    if (op == 0u) return a;\n"                                    // Replace
-    "    if (op == 1u) return a * b;\n"                                // Modulate
-    "    if (op == 2u) return a + b;\n"                                // Add
-    "    if (op == 3u) return a + b - 0.5;\n"                          // AddSigned
-    "    if (op == 4u) return mix(b, a, c);\n"                         // Lerp: a*c + b*(1-c)
-    "    if (op == 5u) return a - b;\n"                                // Subtract
-    "    if (op == 6u || op == 7u) return vec3(4.0 * dot(a - 0.5, b - 0.5));\n" // Dot3
-    "    if (op == 8u) return a * b + c;\n"                            // MultiplyThenAdd
-    "    return clamp(a + b, 0.0, 1.0) * c;\n"                         // 9 AddThenMultiply
-    "}\n"
-    "float tevAlphaOp(uint op, float a, float b, float c) {\n"
-    "    if (op == 0u) return a;\n"
-    "    if (op == 1u) return a * b;\n"
-    "    if (op == 2u) return a + b;\n"
-    "    if (op == 3u) return a + b - 0.5;\n"
-    "    if (op == 4u) return mix(b, a, c);\n"
-    "    if (op == 5u) return a - b;\n"
-    "    if (op == 8u) return a * b + c;\n"
-    "    if (op == 9u) return clamp(a + b, 0.0, 1.0) * c;\n"
-    "    return a;\n"
-    "}\n"
-    "vec4 tevRun(vec4 prim, vec4 t0, vec4 t1, vec4 t2) {\n"
+vec4 tevSrc(uint code, vec4 prim, vec4 t0, vec4 t1, vec4 t2, vec4 prev, vec4 pbuf, uint kidx) {
+    if (code == 0u || code == 1u) return prim;
+    if (code == 2u) return vec4(0.0, 0.0, 0.0, 1.0);
+    if (code == 3u || code == 6u) return t0;
+    if (code == 4u) return t1;
+    if (code == 5u) return t2;
+    if (code == 14u) return unpackUnorm4x8(ubo.uTevConst[kidx >> 2][kidx & 3u]);
+    if (code == 15u) return prev;
+    if (code == 13u) return pbuf;
+    return vec4(0.0);
+}
+vec3 tevColorMod(uint m, vec4 s) {
+    if (m == 0u) return s.rgb;
+    if (m == 1u) return 1.0 - s.rgb;
+    if (m == 2u) return vec3(s.a);
+    if (m == 3u) return vec3(1.0 - s.a);
+    if (m == 4u) return vec3(s.r);
+    if (m == 5u) return vec3(1.0 - s.r);
+    if (m == 8u) return vec3(s.g);
+    if (m == 9u) return vec3(1.0 - s.g);
+    if (m == 12u) return vec3(s.b);
+    if (m == 13u) return vec3(1.0 - s.b);
+    return s.rgb;
+}
+float tevAlphaMod(uint m, vec4 s) {
+    if (m == 0u) return s.a;
+    if (m == 1u) return 1.0 - s.a;
+    if (m == 2u) return s.r;
+    if (m == 3u) return 1.0 - s.r;
+    if (m == 4u) return s.g;
+    if (m == 5u) return 1.0 - s.g;
+    if (m == 6u) return s.b;
+    if (m == 7u) return 1.0 - s.b;
+    return s.a;
+}
+vec3 tevColorOp(uint op, vec3 a, vec3 b, vec3 c) {
+    if (op == 0u) return a;
+    if (op == 1u) return a * b;
+    if (op == 2u) return a + b;
+    if (op == 3u) return a + b - 0.5;
+    if (op == 4u) return mix(b, a, c);
+    if (op == 5u) return a - b;
+    if (op == 6u || op == 7u) return vec3(4.0 * dot(a - 0.5, b - 0.5));
+    if (op == 8u) return a * b + c;
+    return clamp(a + b, 0.0, 1.0) * c;
+}
+float tevAlphaOp(uint op, float a, float b, float c) {
+    if (op == 0u) return a;
+    if (op == 1u) return a * b;
+    if (op == 2u) return a + b;
+    if (op == 3u) return a + b - 0.5;
+    if (op == 4u) return mix(b, a, c);
+    if (op == 5u) return a - b;
+    if (op == 8u) return a * b + c;
+    if (op == 9u) return clamp(a + b, 0.0, 1.0) * c;
+    return a;
+}
+vec4 tevRun(vec4 prim, vec4 t0, vec4 t1, vec4 t2) {
     // PICA combiner buffer. `buf` is what PREVBUF reads; `nextbuf` is the pending value.
     // Azahar assigns buf <- nextbuf AFTER the stage output is computed and only THEN applies the
     // latch (sw_rasterizer.cpp ~991 and glsl_fs_shader_gen.cpp ~476 agree), so a latched value
@@ -424,44 +438,44 @@ const char* kFrag =
     // which is meaningful only under this mapping (childlink_v2 mat26, the Goron bracelet:
     // stage 0 diffuse -> buffer, stage 1 replaces PREVIOUS with the env term, stage 2 adds the
     // diffuse back from the buffer; without this the bracelet renders black).
-    "    vec4 prev = vec4(0.0);\n"
-    "    vec4 buf = vec4(0.0);\n"
-    "    vec4 nextbuf = vec4(0.0);\n"
-    "    int n = int(ubo.uTevCtl.x + 0.5);\n"
-    "    for (int s = 0; s < n; s++) {\n"
-    "        uvec4 w = ubo.uTevStages[s];\n"
-    "        uint kidx = (w.y >> 24) & 7u;\n"
-    "        vec4 sa = tevSrc(w.x & 15u, prim, t0, t1, t2, prev, buf, kidx);\n"
-    "        vec4 sb = tevSrc((w.x >> 4) & 15u, prim, t0, t1, t2, prev, buf, kidx);\n"
-    "        vec4 sc = tevSrc((w.x >> 8) & 15u, prim, t0, t1, t2, prev, buf, kidx);\n"
-    "        vec3 ca = tevColorMod(w.y & 15u, sa);\n"
-    "        vec3 cb = tevColorMod((w.y >> 4) & 15u, sb);\n"
-    "        vec3 cc = tevColorMod((w.y >> 8) & 15u, sc);\n"
-    "        vec3 rgb = tevColorOp(w.z & 15u, ca, cb, cc);\n"
-    "        rgb = clamp(rgb * float(1u << ((w.z >> 8) & 3u)), 0.0, 1.0);\n"
-    "        float alpha;\n"
-    "        if (((w.z >> 4) & 15u) == 7u) {\n" // Dot3_RGBA writes the dot product to alpha too
-    "            alpha = rgb.r;\n"
-    "        } else {\n"
-    "            vec4 aa = tevSrc((w.x >> 12) & 15u, prim, t0, t1, t2, prev, buf, kidx);\n"
-    "            vec4 ab = tevSrc((w.x >> 16) & 15u, prim, t0, t1, t2, prev, buf, kidx);\n"
-    "            vec4 ac = tevSrc((w.x >> 20) & 15u, prim, t0, t1, t2, prev, buf, kidx);\n"
-    "            float fa = tevAlphaMod((w.y >> 12) & 15u, aa);\n"
-    "            float fb = tevAlphaMod((w.y >> 16) & 15u, ab);\n"
-    "            float fc = tevAlphaMod((w.y >> 20) & 15u, ac);\n"
-    "            alpha = tevAlphaOp((w.z >> 4) & 15u, fa, fb, fc);\n"
-    "        }\n"
-    "        alpha = clamp(alpha * float(1u << ((w.z >> 10) & 3u)), 0.0, 1.0);\n"
-    "        prev = vec4(rgb, alpha);\n"
-    "        buf = nextbuf;\n"
-    "        uint latch = (s + 1 < n) ? ubo.uTevStages[s + 1].z : 0u;\n"
-    "        if ((latch & 4096u) != 0u) nextbuf.rgb = prev.rgb;\n"
-    "        if ((latch & 8192u) != 0u) nextbuf.a = prev.a;\n"
-    "    }\n"
-    "    return prev;\n"
-    "}\n"
-    "void main() {\n"
-    "    vec4 t = texture(uTex, vUv);\n"
+    vec4 prev = vec4(0.0);
+    vec4 buf = vec4(0.0);
+    vec4 nextbuf = vec4(0.0);
+    int n = int(ubo.uTevCtl.x + 0.5);
+    for (int s = 0; s < n; s++) {
+        uvec4 w = ubo.uTevStages[s];
+        uint kidx = (w.y >> 24) & 7u;
+        vec4 sa = tevSrc(w.x & 15u, prim, t0, t1, t2, prev, buf, kidx);
+        vec4 sb = tevSrc((w.x >> 4) & 15u, prim, t0, t1, t2, prev, buf, kidx);
+        vec4 sc = tevSrc((w.x >> 8) & 15u, prim, t0, t1, t2, prev, buf, kidx);
+        vec3 ca = tevColorMod(w.y & 15u, sa);
+        vec3 cb = tevColorMod((w.y >> 4) & 15u, sb);
+        vec3 cc = tevColorMod((w.y >> 8) & 15u, sc);
+        vec3 rgb = tevColorOp(w.z & 15u, ca, cb, cc);
+        rgb = clamp(rgb * float(1u << ((w.z >> 8) & 3u)), 0.0, 1.0);
+        float alpha;
+        if (((w.z >> 4) & 15u) == 7u) {
+            alpha = rgb.r;
+        } else {
+            vec4 aa = tevSrc((w.x >> 12) & 15u, prim, t0, t1, t2, prev, buf, kidx);
+            vec4 ab = tevSrc((w.x >> 16) & 15u, prim, t0, t1, t2, prev, buf, kidx);
+            vec4 ac = tevSrc((w.x >> 20) & 15u, prim, t0, t1, t2, prev, buf, kidx);
+            float fa = tevAlphaMod((w.y >> 12) & 15u, aa);
+            float fb = tevAlphaMod((w.y >> 16) & 15u, ab);
+            float fc = tevAlphaMod((w.y >> 20) & 15u, ac);
+            alpha = tevAlphaOp((w.z >> 4) & 15u, fa, fb, fc);
+        }
+        alpha = clamp(alpha * float(1u << ((w.z >> 10) & 3u)), 0.0, 1.0);
+        prev = vec4(rgb, alpha);
+        buf = nextbuf;
+        uint latch = (s + 1 < n) ? ubo.uTevStages[s + 1].z : 0u;
+        if ((latch & 4096u) != 0u) nextbuf.rgb = prev.rgb;
+        if ((latch & 8192u) != 0u) nextbuf.a = prev.a;
+    }
+    return prev;
+}
+void main() {
+    vec4 t = texture(uTex, vUv);
     // PICA TEV stage 0 dual-texture combine (ADD_MULT: (t0 + t1) * t0, saturating the sum per
     // stage — g_title.cmb fire-glow detail mask, title_logo_fireglow_cmab.md §3.1). The alpha
     // chain does NOT include TEXTURE1 (stage-0 alpha = primary.a * t0.a), so only .rgb changes.
@@ -470,31 +484,31 @@ const char* kFrag =
     // `rgb = t.rgb * vColor.rgb` compound below, so only the ADD+clamp happens here. Mode 3
     // (sword/shield detail mask, title_logo_us mat4/5/7): scale2*(PRIMARY*t0*t1) — same
     // deferred-PRIMARY trick, this stage does scale2*t0*t1.
-    "    if (ubo.uSheen.y > 1.5) {\n"
-    "        vec3 t1 = texture(uTex1, vUv1).rgb;\n"
-    "        if (ubo.uSheen.y > 3.5) {\n"
+    if (ubo.uSheen.y > 1.5) {
+        vec3 t1 = texture(uTex1, vUv1).rgb;
+        if (ubo.uSheen.y > 3.5) {
     // Mode 4 (mat10/11 self-sphere-add): coordinator-0 is also sphere-mapped, so re-sample
     // tex0 at the sphere UV. Result: 2*TEX0 + TEX1 = 3*TEX0 (tex1=tex0, same sphere UV).
-    "            vec3 t0s = texture(uTex, vUv1).rgb;\n"
-    "            t.rgb = clamp(t0s * ubo.uSheen.z + t1, 0.0, 1.0);\n"
-    "        } else if (ubo.uSheen.y > 2.5) {\n"
-    "            t.rgb = clamp(t.rgb * t1 * ubo.uSheen.z, 0.0, 1.0);\n"
-    "        } else {\n"
-    "            t.rgb = clamp(t.rgb + t1, 0.0, 1.0);\n"
-    "        }\n"
-    "    } else if (ubo.uSheen.y > 0.5) {\n"
-    "        vec3 t1 = texture(uTex1, vUv1).rgb;\n"
-    "        t.rgb = clamp(t.rgb + t1, 0.0, 1.0) * t.rgb;\n"
-    "    }\n"
+            vec3 t0s = texture(uTex, vUv1).rgb;
+            t.rgb = clamp(t0s * ubo.uSheen.z + t1, 0.0, 1.0);
+        } else if (ubo.uSheen.y > 2.5) {
+            t.rgb = clamp(t.rgb * t1 * ubo.uSheen.z, 0.0, 1.0);
+        } else {
+            t.rgb = clamp(t.rgb + t1, 0.0, 1.0);
+        }
+    } else if (ubo.uSheen.y > 0.5) {
+        vec3 t1 = texture(uTex1, vUv1).rgb;
+        t.rgb = clamp(t.rgb + t1, 0.0, 1.0) * t.rgb;
+    }
     // Generic TEV draws (uTevCtl.x > 0): PICA's alpha test compares the FINAL combiner alpha,
     // not the raw texel — their discard happens after tevRun below.
-    "    bool tevG = (ubo.uTevCtl.x > 0.5);\n"
-    "    if (!tevG && t.a < ubo.uParams.z) discard;\n"
-    "    gl_FragDepth = gl_FragCoord.z + ubo.uParams.w;\n"
+    bool tevG = (ubo.uTevCtl.x > 0.5);
+    if (!tevG && t.a < ubo.uParams.z) discard;
+    gl_FragDepth = gl_FragCoord.z + ubo.uParams.w;
     // Flat modulator for non-vertex-lit draws: the N64-fallback scene tint or a caller-supplied
     // per-draw color. The former half-Lambert form term (0.55+0.45·hl — a synthetic, magic-constant
     // shading model) was removed with the shadow/AO enhancements: OoT3D lighting only.
-    "    vec3 shade = ubo.uTintSkin.xyz;\n"
+    vec3 shade = ubo.uTintSkin.xyz;
     // Wordmark sheen (title_logo_actor.md §6.3/§6.6): CmbVShader's vertex-lit color term for the
     // wordmark's single enabled light, verified against the oracle's live c81/c82 uniforms:
     //   o1 = matAmb(1)*lightAmb(0.18) + max(0, dot(N, -L)) * matDif(1)*lightDif(1)
@@ -507,10 +521,10 @@ const char* kFrag =
     // uSheen.x carries the 0.18 ambient (also the >0 gate). PICA clamps the vertex color to [0,1]
     // before the TEV reads it. Only ever nonzero for the title wordmark's own draws
     // (zelda3d_gl.cpp's per-model light-dir override).
-    "    if (ubo.uSheen.x > 0.0) {\n"
-    "        float ndotl = max(dot(normalize(vNrmView), -normalize(ubo.uLightDir.xyz)), 0.0);\n"
-    "        shade *= clamp(ubo.uSheen.x + ndotl, 0.0, 1.0);\n"
-    "    }\n"
+    if (ubo.uSheen.x > 0.0) {
+        float ndotl = max(dot(normalize(vNrmView), -normalize(ubo.uLightDir.xyz)), 0.0);
+        shade *= clamp(ubo.uSheen.x + ndotl, 0.0, 1.0);
+    }
     // OoT3D CmbVShader vertex-lit path (#153/#111 — oot3d-decomp title_env_lighting.md §10):
     // for EVERY vertexLighting=1 material (scene rooms AND characters/props) the 3DS computes
     //   o1 = clamp(Σ_i matAmb·lightAmb_i + max(0, dot(N, -L_i))·matDif·lightDif_i, 0, 1) · vColor
@@ -522,13 +536,13 @@ const char* kFrag =
     // shadow-map receive, and SSAO were removed (user directive 2026-07-16: OoT3D lighting and
     // shading only). vertexLighting=0 draws take the flat-tint fallback below (uTintSkin is the
     // N64-fallback scene tint or a caller-supplied flat modulator, not a lighting model).
-    "    bool vtxLit = (ubo.uAmbient.w > 0.0);\n"
-    "    vec3 rgb;\n"
-    "    float outA = t.a * vColor.a;\n"
+    bool vtxLit = (ubo.uAmbient.w > 0.0);
+    vec3 rgb;
+    float outA = t.a * vColor.a;
     // PRIMARY_COLOR — the vertex-lit output color the TEV chain modulates by. Shared by the
     // legacy fast path and the generic TEV path so the lighting model has exactly ONE home.
-    "    vec4 prim;\n"
-    "    if (vtxLit) {\n"
+    vec4 prim;
+    if (vtxLit) {
     // Clamp order is the PRODUCT, verified by A/B vs the oracle (2026-07-22): PICA clamps o1
     // when the output register is WRITTEN — i.e. clamp(Σ·vColor) — not the light sum first.
     // clamp(Σ)·vColor was tried and measured ~30% dark on near grass (settled Kokiri noon,
@@ -547,33 +561,34 @@ const char* kFrag =
     // saturates o1 per VERTEX before interpolation (Azahar pica/output_vertex.cpp, hardware-
     // tested), so evaluating clamp(lit*vColor) per FRAGMENT on interpolated inputs is brighter
     // wherever a triangle straddles saturation. `vPrim` carries the per-vertex result.
-    "        prim = vPrim;\n"
-    "    } else if (ubo.uParams.y > 0.5) {\n"
-    "        prim = vec4(vColor.rgb * shade, vColor.a);\n"    // flat-tint fallback (vtxLit=0 draws)
-    "    } else {\n"
-    "        prim = vec4(vColor.rgb, vColor.a);\n"            // unlit scene
-    "    }\n"
+        prim = vPrim;
+    } else if (ubo.uParams.y > 0.5) {
+        prim = vec4(vColor.rgb * shade, vColor.a);
+    } else {
+        prim = vec4(vColor.rgb, vColor.a);
+    }
     // Generic per-stage TEV path (render.multi-stage-tev): evaluate the material's real
     // combiner chain — multi-texture, multi-stage, per-stage ops/operands/scales/consts —
     // instead of the single-MODULATE legacy compound below. This is what "Zora's water is dark
     // and desaturated" was: tex1/tex2 + MultiplyThenAdd stages our fixed pipeline dropped.
-    "    if (tevG) {\n"
-    "        vec4 t1s = texture(uTex1, vUv1);\n"
-    "        vec4 t2s = texture(uTex2, vUv2);\n"
-    "        vec4 tev = tevRun(prim, t, t1s, t2s);\n"
-    "        if (tev.a < ubo.uParams.z) discard;\n" // PICA alpha test: FINAL combiner alpha
-    "        rgb = tev.rgb;\n"
-    "        outA = tev.a;\n"
-    "    } else {\n"
-    "        rgb = t.rgb * prim.rgb;\n"
-    "    }\n"
+    if (tevG) {
+        vec4 t1s = texture(uTex1, vUv1);
+        vec4 t2s = texture(uTex2, vUv2);
+        vec4 tev = tevRun(prim, t, t1s, t2s);
+        if (tev.a < ubo.uParams.z) discard;
+        rgb = tev.rgb;
+        outA = tev.a;
+    } else {
+        rgb = t.rgb * prim.rgb;
+    }
     // PICA200 CONSTANT-color modulation (EnHy townsfolk body color, title fire-glow gold
     // flicker). uMatConst.a is both the apply flag AND the CONSTANT-stage's hardware RGB scale:
     // 0 = skip (materials that don't reference CONSTANT), 1/2/4 = multiply by uMatConst.rgb then
     // by the stage scale (PICA scales each stage's output AFTER the combine — g_title.cmb's
     // stage 1 is 2.0*(PREV*CONST0), the fire-glow "half brightness" factor, fireglow doc §3.2).
     // (Legacy path only — the generic TEV path already applied each stage's real CONSTANT.)
-    "    if (!tevG && ubo.uMatConst.a >= 0.5) rgb = clamp(rgb * ubo.uMatConst.rgb * ubo.uMatConst.a, 0.0, 1.0);\n"
+{{ tap_combiner }}
+    if (!tevG && ubo.uMatConst.a >= 0.5) rgb = clamp(rgb * ubo.uMatConst.rgb * ubo.uMatConst.a, 0.0, 1.0);
     // uAmbient.w carries the ENABLED-LIGHT COUNT for this draw (0 = ambient path inactive), not a
     // 0/1 gate: title_env_lighting.md §10/§11 disassembled OoT3D's real PICA vertex-lit program and
     // found `matAmbient*sceneAmbient` is summed once PER ENABLED light slot (2 for standard N64
@@ -585,9 +600,9 @@ const char* kFrag =
     // vtxLit) take the scale too — their stage-0 combiner is the same MODULATE ×2 as scene
     // materials (offline CMB dump, #153) that the old half-Lambert branch never applied.
     // (Legacy path only — the generic TEV path applied each stage's own hardware scale.)
-    "    if (!tevG && (ubo.uParams.y < 0.5 || vtxLit)) {\n"
-    "        rgb = clamp(rgb, 0.0, 1.0) * ubo.uExtra.w;\n"
-    "    }\n"
+    if (!tevG && (ubo.uParams.y < 0.5 || vtxLit)) {
+        rgb = clamp(rgb, 0.0, 1.0) * ubo.uExtra.w;
+    }
     // OoT3D PICA distance fog (uFog.w == 2.0; title port — oot3d-decomp title_env_lighting.md
     // §13). The 3DS z-buffer depth of THIS FRAGMENT is derived from the interpolated world
     // position (world-affine -> exact; see the vertex-shader note for the two falsified
@@ -605,21 +620,24 @@ const char* kFrag =
     // the FAR draws hard (d9 1.033 -> 0.799, d7 0.979 -> 0.617). Our window is byte-identical to the
     // oracle's anyway (a=1.000584 b=7.0041 near=800 far=2400, colour (244,239,130) — SG_DUMP vs the
     // oracle's live LUT lutS=(1,1,1,0.979)). The near-terrain residual is upstream of fog.
-    "    if (ubo.uFog.w > 1.5 && ubo.uLightDir.w < 0.5) {\n"
-    "        float d3 = dot(vWorld, ubo.uFog3d1.xyz) - ubo.uFog3d1.w;\n"
-    "        float depth3ds = ubo.uFog3d0.x - ubo.uFog3d0.y / max(d3, 1e-3);\n"
-    "        float x = clamp(depth3ds, 0.0, 1.0) * 128.0;\n"
-    "        float i0 = min(floor(x), 127.0);\n"
-    "        float f0 = fog3dNode(i0 * (1.0 / 128.0));\n"
-    "        float f1 = fog3dNode((i0 + 1.0) * (1.0 / 128.0));\n"
-    "        float factor = clamp(f0 + (f1 - f0) * (x - i0), 0.0, 1.0);\n"
-    "        rgb = mix(ubo.uFog.xyz, rgb, factor);\n"
-    "    } else if (ubo.uFog.w > 0.5 && ubo.uLightDir.w < 0.5) {\n"
-    "        float f = clamp(vFogDist * ubo.uFog2.x + ubo.uFog2.y, 0.0, 255.0) * (1.0 / 255.0);\n"
-    "        rgb = mix(rgb, ubo.uFog.xyz, f);\n"
-    "    }\n"
-    "    frag = vec4(rgb, outA * ubo.uExtra.x);\n"
-    "}\n";
+{{ tap_pre_fog }}
+    if (ubo.uFog.w > 1.5 && ubo.uLightDir.w < 0.5) {
+        float d3 = dot(vWorld, ubo.uFog3d1.xyz) - ubo.uFog3d1.w;
+        float depth3ds = ubo.uFog3d0.x - ubo.uFog3d0.y / max(d3, 1e-3);
+        float x = clamp(depth3ds, 0.0, 1.0) * 128.0;
+        float i0 = min(floor(x), 127.0);
+        float f0 = fog3dNode(i0 * (1.0 / 128.0));
+        float f1 = fog3dNode((i0 + 1.0) * (1.0 / 128.0));
+        float factor = clamp(f0 + (f1 - f0) * (x - i0), 0.0, 1.0);
+        rgb = mix(ubo.uFog.xyz, rgb, factor);
+    } else if (ubo.uFog.w > 0.5 && ubo.uLightDir.w < 0.5) {
+        float f = clamp(vFogDist * ubo.uFog2.x + ubo.uFog2.y, 0.0, 255.0) * (1.0 / 255.0);
+        rgb = mix(rgb, ubo.uFog.xyz, f);
+    }
+    frag = vec4(rgb, outA * ubo.uExtra.x);
+}
+)GLSL";
+
 
 // SgUbo, kSgCommonBytes, kSgBonesBytes and the <=4096-byte push-block invariants live in
 // fast/zelda3d_sg_ubo.h (single source of truth; unit-tested in tests/zelda3d_render_tests.cpp).
@@ -796,17 +814,24 @@ bool Fast::Zelda3DRenderer::ensureResources() {
     // before the TEV/CONSTANT/stage-scale/fog stages, so the probe is not repainted by fog. (It used to
     // anchor on `vec3 rgb = t.rgb * vColor.rgb * shade;`, a line the lighting-port rewrite deleted —
     // FRAGDBG had been silently INERT ever since; found 2026-07-22.)
-    std::string fragSrc = kFrag;
+    // FRAGDBG picks ONE of the template's named taps. The mode->snippet table below is unchanged;
+    // what changed is how it lands. This used to be fragSrc.find() on a literal source LINE, and when
+    // the lighting-port rewrite deleted the line it matched, the probe silently reported nothing and
+    // read as a clean result for weeks. A named hole cannot drift out from under its filler, and the
+    // fill is verified after rendering rather than assumed.
+    const char* tapCombiner = "";
+    const char* tapPreFog = "";
+    int fragdbgMode = 0;
     if (const char* dbg = getenv("ZELDA3D_SG_FRAGDBG")) {
+        fragdbgMode = atoi(dbg);
+        const int mode = fragdbgMode;
         // ALL taps sit AFTER the combiner block, so the material's real ALPHA TEST (the tevG
         // path discards on the FINAL combiner alpha) still runs: an earlier anchor made
         // alpha-tested foliage paint solid over the ground and silently corrupted every
         // mask-restricted readback taken from a probe frame (found 2026-07-22, after a
         // "our texture is 15% dark" reading that the fog A/B falsified).
-        const std::string anchor = "    if (!tevG && ubo.uMatConst.a >= 0.5)";
-        const int mode = atoi(dbg);
-        // Return IMMEDIATELY so the override bypasses the later combiner/ambient/FOG stages — otherwise
-        // the fog mix (fog colour ~= the scene tan) repaints the probe and hides what we're isolating.
+        // Each snippet returns IMMEDIATELY so the override bypasses the later combiner/ambient/FOG
+        // stages — otherwise the fog mix (fog colour ~= the scene tan) repaints the probe.
         const char* inject = mode == 1 ? "frag = vec4(t.rgb, 1.0); return;\n"
                              : mode == 2 ? "frag = vec4(vColor.rgb, 1.0); return;\n"
                              : mode == 3 ? "frag = vec4(1.0); return;\n"
@@ -815,29 +840,75 @@ bool Fast::Zelda3DRenderer::ensureResources() {
                              // Mode 8 is the COLOUR-SPACE RAMP: known constants (0.25, 0.5, 0.75) out of
                              // the shader, so a readback says what the path between here and the PNG does
                              // to a value. It exists because every ours-vs-oracle number is compared
-                             // against Azaher's software rasterizer, whose PIXEL lines are raw linear
+                             // against Azahar's software rasterizer, whose PIXEL lines are raw linear
                              // 8-bit — and an assumed-but-unvalidated sRGB conversion on our side would
                              // silently reassign the divergence to the wrong channel. Linear passthrough
                              // reads (64,128,191); sRGB encoding on write reads about (137,188,225).
                              : mode == 8 ? "frag = vec4(0.25, 0.5, 0.75, 1.0); return;\n"
                                          : "";
-        // Mode 6 taps LATER: the combiner result before the CONSTANT/stage-scale/FOG stages —
-        // the direct counterpart of the oracle's `PIXEL ... combined=` field.
-        // Mode 7 taps after the CONSTANT + stage-scale stages, immediately BEFORE fog.
-        const std::string anchor7 = "    if (ubo.uFog.w > 1.5 && ubo.uLightDir.w < 0.5) {\n";
-        const std::string& anch = (mode == 7) ? anchor7 : anchor;
-        const char* inj = (mode == 6 || mode == 7) ? "    frag = vec4(rgb, 1.0); return;\n" : inject;
-        size_t p = fragSrc.find(anch);
-        if (p == std::string::npos) {
-            fprintf(stderr, "[Zelda3D_SG] FRAGDBG mode=%d: ANCHOR NOT FOUND — probe inert\n", mode);
+        // Mode 6 taps the combiner result before the CONSTANT/stage-scale/FOG stages — the direct
+        // counterpart of the oracle's `PIXEL ... combined=` field. Mode 7 taps after the CONSTANT +
+        // stage-scale stages, immediately BEFORE fog.
+        if (mode == 7) {
+            tapPreFog = "    frag = vec4(rgb, 1.0); return;\n";
+        } else if (mode == 6) {
+            tapCombiner = "    frag = vec4(rgb, 1.0); return;\n";
         } else {
-            fragSrc.insert(p, inj);
-            fprintf(stderr, "[Zelda3D_SG] FRAGDBG mode=%d active\n", mode);
+            tapCombiner = inject;
         }
     }
 
+    inja::json data;
+    data["ubo_body"] = SG_UBO_COMMON_BODY;        // the macros stay the single source of truth for
+    data["ubo_bones_body"] = SG_UBO_BONES_BODY;   // the UBO layout shared with the C++ struct
+    data["tap_combiner"] = tapCombiner;
+    data["tap_pre_fog"] = tapPreFog;
+
+    std::string vertSrc, fragSrc;
+    try {
+        data["q"] = "out";
+        data["varyings"] = inja::render(kVaryings, data);
+        vertSrc = inja::render(kVertTemplate, data);
+        data["q"] = "in";
+        data["varyings"] = inja::render(kVaryings, data);
+        fragSrc = inja::render(kFragTemplate, data);
+    } catch (const std::exception& e) {
+        fprintf(stderr, "[Zelda3D_SG] shader template render FAILED: %s\n", e.what());
+        return false;
+    }
+
+    // Verify the tap actually landed. The whole point of moving off find(anchor) was that a probe
+    // which quietly injects nothing is indistinguishable from a probe that found no signal.
+    if (fragdbgMode != 0) {
+        const char* want = *tapPreFog ? tapPreFog : tapCombiner;
+        if (*want && fragSrc.find(want) == std::string::npos) {
+            fprintf(stderr, "[Zelda3D_SG] FRAGDBG mode=%d: TAP DID NOT LAND — probe inert\n", fragdbgMode);
+        } else {
+            fprintf(stderr, "[Zelda3D_SG] FRAGDBG mode=%d active\n", fragdbgMode);
+        }
+    }
+
+    // ZELDA3D_DUMP_SHADERS=<dir> writes the FINAL GLSL actually handed to the compiler. The shader
+    // is assembled from templates and then patched further by FRAGDBG, so "what the source file
+    // says" and "what the GPU ran" are not the same text — this dumps the latter, which is the only
+    // version worth diffing when a shader refactor has to prove it changed nothing.
+    if (const char* dumpDir = getenv("ZELDA3D_DUMP_SHADERS")) {
+        auto dump = [&](const char* name, const char* text) {
+            const std::string path = std::string(dumpDir) + "/" + name;
+            if (FILE* f = fopen(path.c_str(), "wb")) {
+                fwrite(text, 1, strlen(text), f);
+                fclose(f);
+                fprintf(stderr, "[Zelda3D_SG] dumped shader -> %s\n", path.c_str());
+            } else {
+                fprintf(stderr, "[Zelda3D_SG] CANNOT write shader dump %s\n", path.c_str());
+            }
+        };
+        dump("zelda3d_sg.vert", vertSrc.c_str());
+        dump("zelda3d_sg.frag", fragSrc.c_str());
+    }
+
     std::vector<uint32_t> vsSpv, fsSpv;
-    if (!CompileGlsl(EShLangVertex, kVert, vsSpv) || !CompileGlsl(EShLangFragment, fragSrc.c_str(), fsSpv))
+    if (!CompileGlsl(EShLangVertex, vertSrc.c_str(), vsSpv) || !CompileGlsl(EShLangFragment, fragSrc.c_str(), fsSpv))
         return false;
 
     SDL_GPUShaderCreateInfo vci{};
