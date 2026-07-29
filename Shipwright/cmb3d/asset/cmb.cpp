@@ -195,6 +195,7 @@ bool Cmb::parseMats() {
         m.coord2_mapping = u8(b, co2 + 2);
         m.alpha_test = u8(b, o + 0x130) != 0;
         m.alpha_ref = u8(b, o + 0x131) / 255.0f;
+        m.alpha_func = u16(b, o + 0x132);
         // Blend state (GL-ES enum values, used verbatim — see CmbMaterial). Offsets per
         // noclip readMatsChunk (Ocarina v6 layout); verified against real room materials.
         m.depth_test = u8(b, o + 0x134) != 0;

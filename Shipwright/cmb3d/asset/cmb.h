@@ -65,6 +65,13 @@ struct CmbMaterial {
     // unparsed until 2026-07-29 while the renderer hardcoded (enabled, LEQUAL) for every draw:
     // corpus-wide that is wrong for 11153 of 11172 materials. 11147 want LESS, 4 want ALWAYS,
     // and 77 disable the test entirely (sky domes, screen flashes, graveyard thunder).
+    // Alpha-test COMPARE FUNCTION (+0x132), GL enum. Unparsed until 2026-07-29 while the shader
+    // hardcoded 'pass when a >= ref' (GEQUAL) for every material. Corpus: of 913 alpha-test-
+    // enabled materials 910 are GREATER, plus one each GEQUAL/LESS/NEVER. Mostly a no-op
+    // difference, EXCEPT where ref==0 (GREATER cuts fully transparent texels, GEQUAL keeps
+    // them) -- e.g. hairal_niwa's courtyard windows, which also write depth with blending off,
+    // so the kept cut-out region renders opaque AND occludes.
+    uint16_t alpha_func = 0x0206;                            // GL_GEQUAL (the old hardcoded rule)
     bool depth_test = true;
     uint16_t depth_func = 0x0201;                            // GL_LESS
     // Decal depth bias. OoT3D flags coplanar detail surfaces (sand/symbol decals on the
