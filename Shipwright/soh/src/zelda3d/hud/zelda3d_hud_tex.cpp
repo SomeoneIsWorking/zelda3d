@@ -465,6 +465,20 @@ static bool Zelda3dRomSprite(const char* romfsPath, int sx, int sy, int sw, int 
     const void* atlas = Zelda3D_OoT3dAtlas(romfsPath, 0, &aw, &ah);
     if (atlas == nullptr || aw <= 0 || ah <= 0)
         return false;
+    // The atlas may be the ROM's own texels OR a hi-res pack replacement of the same image (the
+    // pack is optional and is preferred when present -- user directive 2026-07-29: "use HD textures
+    // when available"). Sprite rects are authored in ROM space, so scale them to whatever came
+    // back. Non-integer scales are fine; the crop is computed per axis and the sprite simply comes
+    // out at the pack's resolution.
+    int nw = 0, nh = 0;
+    Zelda3D_OoT3dAtlasNativeSize(romfsPath, 0, &nw, &nh);
+    if (nw > 0 && nh > 0 && (nw != aw || nh != ah)) {
+        const double fx = (double)aw / (double)nw, fy = (double)ah / (double)nh;
+        sx = (int)(sx * fx + 0.5);
+        sy = (int)(sy * fy + 0.5);
+        sw = (int)(sw * fx + 0.5);
+        sh = (int)(sh * fy + 0.5);
+    }
     if (sx < 0 || sy < 0 || sw <= 0 || sh <= 0 || sx + sw > aw || sy + sh > ah) {
         fprintf(stderr, "[Zelda3D] ROM sprite %s (%d,%d,%d,%d) out of bounds for %dx%d atlas\n",
                 romfsPath, sx, sy, sw, sh, aw, ah);

@@ -290,6 +290,9 @@ const void* Zelda3D_OoT3dAtlas(const char* romfsPath, int texIdx, int* w, int* h
 // Local AABB of one uploaded Zelda3D draw group; 1 on success. Room CMBs are world-space under
 // an identity matrix, so for scene geometry this is the WORLD box. Backs the REPL `camdraw`.
 int Zelda3D_Sg_GroupBounds(int modelId, int groupIdx, float* outMin, float* outMax);
+// ROM-authored dims of a CTXB atlas (sprite rects are in this space; the atlas itself may have
+// been replaced by a hi-res pack, so scale rects by atlasW/nativeW).
+void Zelda3D_OoT3dAtlasNativeSize(const char* romfsPath, int texIdx, int* w, int* h);
 extern int gZelda3dHudTex;       // env ZELDA3D_HUDTEX / REPL `hudtex` gate (-1=uninit, 0/1)
 int Zelda3D_HudTexEnabled(void); // lazily resolves the env on first call; HUD draws gate on this
 
