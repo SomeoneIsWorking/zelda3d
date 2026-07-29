@@ -357,7 +357,15 @@ bool Cmb::parseMats() {
         m.dual_tex_mode = CmbMaterial::kDualTexNone;
         if (m.tex1_idx >= 0 && m.comb0_dual_addmult) {
             m.dual_tex_mode = CmbMaterial::kDualTexAddMult; // (t0+t1)*t0, single stage
-        } else if (m.tex1_idx >= 0 && m.comb_stage_count >= 2) {
+        // STAGE-COUNT GUARD 2026-07-29. Modes 2 and 3 describe EXACTLY-2-stage chains, but this
+        // classified on stages 0-1 only and accepted `>= 2`, so any longer chain whose first two
+        // stages happened to match was routed to a 2-stage approximation and its remaining stages
+        // were silently discarded. 170 materials were affected -- 159 at 3 stages (including
+        // link_v2 mat15/mat28 and childlink_v2 mat18, i.e. LINK'S OWN BODY, losing a TEX2 modulate
+        // or a CONST tint stage), 3 at 4 stages, 8 title materials at 3.
+        // Requiring an exact match sends everything longer to the generic per-stage TEV evaluator,
+        // which runs the real chain.
+        } else if (m.tex1_idx >= 0 && m.comb_stage_count == 2) {
             uint16_t op0 = m.comb_combine_rgb;
             uint16_t a0 = m.comb_src_rgb[0], b0 = m.comb_src_rgb[1];
             bool stage0AddTex01 = (op0 == 0x0104 /*ADD*/ && a0 == 0x84C0 && b0 == 0x84C1);
