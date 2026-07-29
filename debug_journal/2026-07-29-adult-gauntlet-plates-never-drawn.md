@@ -339,3 +339,38 @@ path was missing. Only gold is wrong. A missing multiply is invisible wherever t
 be 1, which is a good argument for testing the non-default case of anything that looks like a tint.
 
 Full detail and the port target in `oot3d-decomp/docs/player_draw_impl_located.md`.
+
+## Bracelet: the material-constant hypothesis is FALSIFIED too (2026-07-29)
+
+The gold-gauntlet fix made a tempting hypothesis: `townsfolk.cpp` documents that a CMB's default
+`matConstant` of `(0,0,0,1)` feeding a `MODULATE(PREV, CONST)` stage renders the fragment BLACK, and
+the bracelet renders black. But the constant state is identical between the bracelet and a group that
+renders correctly:
+
+```
+g27 (bracelet, black)      combUsesConst=1 constIdx=5  const0..5 all (0.000,0.000,0.000,1.000)
+g44 (child body, correct)  combUsesConst=1 constIdx=5  const0..5 all (0.000,0.000,0.000,1.000)
+```
+
+So a zero constant is not sufficient to blacken a fragment here, and that explanation is dead.
+
+Running list of what the bracelet's darkness is NOT:
+* not the material/lighting inputs (matAmb, matDif, vColor0, combScale all match a good group)
+* not the texture (tex0 index 30 is a bright orange 32x32, mean (144, 94, 4), max 246)
+* not the sphere-map path (the gauntlets share `coordMap=(3,0)` + 4 stages and render correctly)
+* not the material constants (identical to a good group, above)
+
+What is left is the TEV CHAIN ITSELF. The packed stages differ between the two 4-stage materials:
+
+```
+bracelet g27:  00e30e30/00000000/00000111, 00e1ff43/00000002/00000101,
+               00e1fedf/00000000/00000002, 00e1feef/05000020/00000008
+gauntlet g14:  00e30e30/00000000/00000111, 00e1ff43/00000002/00000008,
+               00e1feef/04000000/00000001, 00e1feef/05000020/00000008
+```
+
+Stages 2 and 3 differ in both the operand word and the source word. **Next session** (not this one —
+decoding a TEV packing at the end of a long session is how confidently-wrong conclusions get made):
+decode both against the packing documented at `Zelda3DGlGroup::tevStagePack` and find which stage our
+shader mishandles. The gauntlet chain is a known-good control to diff against, which is the useful
+part of this finding.
