@@ -386,8 +386,41 @@ bool Cmb::parseMats() {
         // Verified from oracle draw_log at az=760/900 (92 triangles, tex0=tex1=180cba80).
         // coord1_mapping holds coordinator-0's mapping method here (coordinator-0 is the
         // primary coordinator, stored separately from coordinator-1's own mapping field).
+        //
+        // NARROWED 2026-07-29. The gate used to be (coord0_mapping==3 && tex1<0 && tex0>=0) alone,
+        // which catches 20 materials in FIVE different chain shapes -- only 4 of them the wordmark:
+        //     4  MODULATE[PRIM,TEX0]x1 | REPLACE[PREV] + CONST   title_logo_us/jpeu   <- wanted
+        //    12  ADD[C(PRIM),C(TEX0)]x1  (single stage)          Heart Containers + recovery hearts
+        //     3  MODULATE[PRIM,TEX0]x2   (single stage)          Zora/silver scale, Nayru spike
+        //     1  MODULATE[PRIM,TEX0]x2 | REPLACE + CONST         Nayru's Love core
+        // The 16 non-title materials were being rendered as a sphere-add they do not ask for; the
+        // hearts in particular are plainly ADDITIVE single-stage and are gameplay-visible. They now
+        // fall through to the generic per-stage TEV evaluator, which handles their real chains.
+        //
+        // The shape guard is byte-level, not a filename list: stage count == 2, stage 0 is
+        // MODULATE(PRIMARY, TEXTURE0) at rgb scale 1, and stage 1 sources CONSTANT. Scale 1 is what
+        // separates the wordmark from Nayru's Love core, whose otherwise-identical 2-stage chain is
+        // at scale 2.
+        //
+        // NOTE the justification above (tev[1]=MULT_ADD(PRIMARY,TEX1,PREV), stage 0 at x2) does NOT
+        // match the bytes: the wordmark's real chain has no MULT_ADD and stage 0 is x1. The
+        // self-tex1 sphere binding is a RUNTIME behaviour of the game's render object, so it is not
+        // visible in the chain either way -- keeping the title rows on their verified legacy path is
+        // why this stays, but the stated derivation should not be trusted as read.
+        bool titleWordmarkShape = false;
+        if (m.comb_stage_count == 2) {
+            const CmbMaterial::CombStage& s0 = m.comb_stages[0];
+            const CmbMaterial::CombStage& s1 = m.comb_stages[1];
+            const bool s0Modulate = (s0.rgb_op == 0x2100 && s0.rgb_src[0] == 0x8577 &&
+                                     s0.rgb_src[1] == 0x84C0 && s0.rgb_scale == 1);
+            bool s1UsesConst = false;
+            for (int k = 0; k < 3; k++)
+                if (s1.rgb_src[k] == 0x8576 || s1.a_src[k] == 0x8576)
+                    s1UsesConst = true;
+            titleWordmarkShape = s0Modulate && s1UsesConst;
+        }
         if (m.dual_tex_mode == CmbMaterial::kDualTexNone && m.coord0_mapping == 3 &&
-            m.tex1_idx < 0 && m.tex0_idx >= 0) {
+            m.tex1_idx < 0 && m.tex0_idx >= 0 && titleWordmarkShape) {
             m.dual_tex_mode = CmbMaterial::kDualTexSelfSphereAdd;
             m.tex1_idx = m.tex0_idx; // self-reference: tex1 = tex0
             m.dual_tex_scale2 = 2.0f;
