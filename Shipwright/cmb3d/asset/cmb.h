@@ -61,6 +61,12 @@ struct CmbMaterial {
     uint16_t blend_eq_rgb = 0x8006, blend_eq_a = 0x8006;     // GL_FUNC_ADD
     float blend_color[4] = { 0, 0, 0, 1 };                   // for CONSTANT_COLOR/ALPHA factors
     bool depth_write = true;                                 // translucent volumes usually disable this
+    // Depth TEST enable (+0x134) and compare FUNCTION (+0x136), GL enum verbatim. Both were
+    // unparsed until 2026-07-29 while the renderer hardcoded (enabled, LEQUAL) for every draw:
+    // corpus-wide that is wrong for 11153 of 11172 materials. 11147 want LESS, 4 want ALWAYS,
+    // and 77 disable the test entirely (sky domes, screen flashes, graveyard thunder).
+    bool depth_test = true;
+    uint16_t depth_func = 0x0201;                            // GL_LESS
     // Decal depth bias. OoT3D flags coplanar detail surfaces (sand/symbol decals on the
     // ground/walls) with a polygon offset that pulls them slightly toward the camera so
     // they win the depth test cleanly instead of z-fighting the base. Stored as a window-

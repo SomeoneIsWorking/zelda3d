@@ -123,6 +123,8 @@ Zelda3DGlGroup MakeGlGroup(const Cmb& cmb, const CmbDrawGroup& g, const CmbVerte
     cg.blendDstA = mat ? mat->blend_dst_a : 0x0000;
     cg.blendEqA = mat ? mat->blend_eq_a : 0x8006;
     cg.depthWrite = mat ? (mat->depth_write ? 1 : 0) : 1;
+    cg.depthTest = mat ? (mat->depth_test ? 1 : 0) : 1;
+    cg.depthFunc = mat ? mat->depth_func : 0x0201;
     cg.polygonOffset = mat ? mat->polygon_offset : 0.0f;
     // OoT3D backface culling: cull byte 1 = single-sided (cull back), 3 = double-sided.
     // Honor it so the renderer matches N64 G_CULL_BACK (don't show terrain undersides /

@@ -59,6 +59,8 @@ typedef struct Zelda3DGlGroup {
     unsigned blendSrcA, blendDstA, blendEqA;
     float blendColor[4];      // glBlendColor (for CONSTANT_COLOR/ALPHA factors)
     int depthWrite;           // 0/1 (translucent volumes disable depth write)
+    int depthTest;            // 0/1 — the CMB's own depth-TEST enable (+0x134)
+    unsigned depthFunc;       // GL compare enum (+0x136): 0x0200 NEVER .. 0x0207 ALWAYS
     float polygonOffset;      // window-depth bias for decals (gl_FragDepth += this); 0 = none
     int cull;                 // 1 = skip this group entirely (e.g. Link baked-equipment mesh hidden)
     // Backface culling, from the CMB material's cull byte (1 = single-sided/cull back,
