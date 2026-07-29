@@ -126,8 +126,11 @@ def decode(glformat:int, width:int, height:int, data:bytes)->bytearray:
             hi=d[i*2+1]; lo=d[i*2]; return (hi,lo,0xFF,0xFF)
         return _tiled(width,height,f)
     if name=="L8":
+        # Luminance-only: no stored alpha, so alpha is OPAQUE (matches the authoritative
+        # C++ decoder, Shipwright/cmb3d/asset/pica_texture.cpp GF_L8 — aliasing L into
+        # alpha was the title-screen star-brightness bug fixed there).
         def f(i):
-            L=d[i]; return (L,L,L,L)
+            L=d[i]; return (L,L,L,0xFF)
         return _tiled(width,height,f)
     if name=="A8":
         def f(i):
@@ -135,7 +138,8 @@ def decode(glformat:int, width:int, height:int, data:bytes)->bytearray:
         return _tiled(width,height,f)
     if name=="L4":
         def f(i):
-            p=d[i>>1]; n=(p>>4) if (i&1) else (p&0xF); L=e4(n); return (L,L,L,L)
+            # same luminance-only convention as L8: alpha opaque, not aliased to L.
+            p=d[i>>1]; n=(p>>4) if (i&1) else (p&0xF); L=e4(n); return (L,L,L,0xFF)
         return _tiled(width,height,f)
     if name=="A4":
         def f(i):

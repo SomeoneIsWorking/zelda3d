@@ -443,6 +443,52 @@ const void* Zelda3D_ButtonBgTex(int* w, int* h) {
     return rgba.data();
 }
 
+
+// ---------------------------------------------------------------------------------------------
+// #207 — the REAL OoT3D HUD sprites, cropped out of the 3DS ROM's own menu atlases instead of the
+// hand-drawn embedded PNGs. The art was always there; the HUD was simply never wired to it.
+//
+// WHERE IT LIVES (this cost a search — hud_all00.ctxb does NOT hold these despite the name; it has
+// the A/B button rings, the reticle and the localized action words):
+//   /menu/<LANG>/menu_top_parts00.ctxb  512x256 — rupee gem, small key, hearts, tokens
+//   /menu/<LANG>/num_all00.ctxb         256x128 — the counter digit font, four colour variants
+// Layout is identical across all nine language dirs, so US English is a safe default.
+//
+// GRAYSCALE, DELIBERATELY. These HUD elements draw MODULATEIA_PRIM: PRIM carries the colour and the
+// texture carries only shape. The rupee icon in particular is tinted by WALLET (z_parameter.c passes
+// rColor), so pasting the ROM's green gem in as-is would multiply green by green and freeze the
+// wallet colour. Taking luminance keeps the authentic artwork and leaves the tint behaviour exactly
+// as it was. The black outline in the digit font survives this (it is opaque black, luminance 0).
+static bool Zelda3dRomSprite(const char* romfsPath, int sx, int sy, int sw, int sh,
+                             std::vector<uint8_t>& out, int& ow, int& oh) {
+    int aw = 0, ah = 0;
+    const void* atlas = Zelda3D_OoT3dAtlas(romfsPath, 0, &aw, &ah);
+    if (atlas == nullptr || aw <= 0 || ah <= 0)
+        return false;
+    if (sx < 0 || sy < 0 || sw <= 0 || sh <= 0 || sx + sw > aw || sy + sh > ah) {
+        fprintf(stderr, "[Zelda3D] ROM sprite %s (%d,%d,%d,%d) out of bounds for %dx%d atlas\n",
+                romfsPath, sx, sy, sw, sh, aw, ah);
+        return false;
+    }
+    const uint8_t* src = (const uint8_t*)atlas;
+    out.assign((size_t)sw * sh * 4, 0);
+    for (int y = 0; y < sh; y++) {
+        for (int x = 0; x < sw; x++) {
+            const uint8_t* p = src + (((size_t)(sy + y) * aw) + (sx + x)) * 4;
+            uint8_t* q = out.data() + (((size_t)y * sw) + x) * 4;
+            // Rec.601 luminance; alpha is the sprite's own coverage.
+            const int L = (p[0] * 77 + p[1] * 150 + p[2] * 29) >> 8;
+            q[0] = q[1] = q[2] = (uint8_t)L;
+            q[3] = p[3];
+        }
+    }
+    ow = sw; oh = sh;
+    return true;
+}
+
+static const char* kOoT3dTopParts = "/menu/01_US_ENGLISH/menu_top_parts00.ctxb";
+static const char* kOoT3dNumAll   = "/menu/01_US_ENGLISH/num_all00.ctxb";
+
 // #31 — crisp HUD counter icons (0=rupee gem, 1=small key, 2=clock). Decode the embedded PNGs once
 // into persistent RGBA32 (grayscale, a=coverage). Returns the buffer + dims, or NULL on failure.
 // Rupee/key draw MODULATEIA_PRIM (PRIM tints the grayscale facet shading); the clock draws
@@ -455,7 +501,23 @@ const void* Zelda3D_CounterIconTex(int kind, int* w, int* h) {
         tried = 1;
         const unsigned char* png[3] = { kRupeeIconPng, kSmallKeyIconPng, kClockIconPng };
         unsigned int len[3] = { kRupeeIconPngLen, kSmallKeyIconPngLen, kClockIconPngLen };
+        // Rects verified against the decoded atlas before wiring (scratch/hudport/rects_check.png).
+        static const struct { int x, y, w, h; } kRomRect[3] = {
+            { 128, 96, 18, 18 }, // rupee gem
+            { 153, 96, 16, 18 }, // small key
+            { 0, 0, 0, 0 },      // clock: lives in hud_all00, not ported here
+        };
         for (int i = 0; i < 3; i++) {
+            if (kRomRect[i].w > 0 &&
+                Zelda3dRomSprite(kOoT3dTopParts, kRomRect[i].x, kRomRect[i].y, kRomRect[i].w,
+                                 kRomRect[i].h, t[i].rgba, t[i].w, t[i].hh)) {
+                continue;
+            }
+            if (kRomRect[i].w > 0) {
+                // Loud, not silent: falling back to the hand-drawn stand-in is the thing #207 exists
+                // to remove, so it must never look like success.
+                fprintf(stderr, "[Zelda3D] counter icon %d: ROM art unavailable, using embedded PNG\n", i);
+            }
             int sw = 0, sh = 0, n = 0;
             stbi_uc* px = stbi_load_from_memory(png[i], (int)len[i], &sw, &sh, &n, 4);
             if (px) {
@@ -497,6 +559,16 @@ const void* Zelda3D_DigitTex(int glyph, int* w, int* h) {
                                  kDigit5PngLen, kDigit6PngLen, kDigit7PngLen, kDigit8PngLen, kDigit9PngLen,
                                  kDigitColonPngLen };
         for (int i = 0; i < 11; i++) {
+            // num_all00's white digit row: 11x15 cells on a 12px pitch from x=1,y=63; the colon is
+            // its own 6x12 cell. (The '1' glyph is drawn narrower inside its cell, which is the
+            // font's own metric -- cropping the full cell keeps the digits on a common baseline.)
+            const int rx = (i < 10) ? (1 + 12 * i) : 121;
+            const int ry = (i < 10) ? 63 : 65;
+            const int rw = (i < 10) ? 11 : 6;
+            const int rh = (i < 10) ? 15 : 12;
+            if (Zelda3dRomSprite(kOoT3dNumAll, rx, ry, rw, rh, t[i].rgba, t[i].w, t[i].hh))
+                continue;
+            fprintf(stderr, "[Zelda3D] digit tex %d: ROM art unavailable, using embedded PNG\n", i);
             int sw = 0, sh = 0, n = 0;
             stbi_uc* px = stbi_load_from_memory(png[i], (int)len[i], &sw, &sh, &n, 4);
             if (px) {
