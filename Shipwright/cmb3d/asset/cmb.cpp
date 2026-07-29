@@ -455,6 +455,8 @@ bool Cmb::parseTex() {
     for (uint32_t i = 0; i < n; i++) {
         CmbTexture& t = mTextures[i];
         t.data_len = u32(b, o);
+        t.levels = (int)(u32(b, o + 4) & 0xFFFF);
+        if (t.levels < 1) t.levels = 1;
         t.etc1 = u8(b, o + 6) != 0;
         t.width = u16(b, o + 8);
         t.height = u16(b, o + 0x0A);

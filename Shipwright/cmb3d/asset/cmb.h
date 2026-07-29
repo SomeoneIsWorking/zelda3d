@@ -195,8 +195,41 @@ struct CmbTexture {
     int width = 0, height = 0;
     uint16_t fmt = 0, data_type = 0;
     bool etc1 = false;
-    uint32_t data_offset = 0, data_len = 0;
+    uint32_t data_offset = 0, data_len = 0; // data_len covers the WHOLE mip chain, not one level
+    // Baked mip level count, from the low u16 of the tex entry's +0x04 field. The renderer long
+    // assumed the format carried no mips (generalised from fine_star.cmb, which genuinely has one
+    // level) and box-filtered its own chain instead. It does carry them: across all 10538 textures
+    // in the ROM, data_len == baseLevelBytes * sum(1/4^i) for this count, with the derived base
+    // giving a legal bpp -- 0 exceptions. 7284 textures ship authored mips (3 levels x6730,
+    // 2 x544, 4 x10). See claim C018.
+    int levels = 1;
     uint32_t glFormat() const { return ((uint32_t)data_type << 16) | fmt; }
+    // Byte size of mip level `l` (0 = base). Each level halves both dimensions, floored at 1.
+    uint32_t levelBytes(int l) const {
+        if (levels <= 0 || data_len == 0)
+            return 0;
+        // Derive bits-per-pixel from the base level rather than a format table, so this stays
+        // correct for every encoding the decoder supports (including ETC1's 4bpp block form).
+        double denom = 0.0;
+        for (int i = 0; i < levels; i++)
+            denom += 1.0 / (double)(1u << (2 * i));
+        const double baseBytes = (double)data_len / denom;
+        int lw = width, lh = height;
+        for (int i = 0; i < l; i++) {
+            lw = lw > 1 ? lw / 2 : 1;
+            lh = lh > 1 ? lh / 2 : 1;
+        }
+        if (width <= 0 || height <= 0)
+            return 0;
+        return (uint32_t)(baseBytes * ((double)(lw * lh) / (double)(width * height)) + 0.5);
+    }
+    // Byte offset of mip level `l` within this texture's data block.
+    uint32_t levelOffset(int l) const {
+        uint32_t off = 0;
+        for (int i = 0; i < l; i++)
+            off += levelBytes(i);
+        return off;
+    }
 };
 
 // Interleaved render vertex: position (model space), normal, uv0, and skinning
