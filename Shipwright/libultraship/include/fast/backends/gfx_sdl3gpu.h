@@ -144,11 +144,14 @@ class GfxRenderingAPISdl3Gpu : public GfxRenderingAPI {
     // single fragment-sampler bind path. `ubo` points at a full Zelda3DSg::SgUbo (common + bones). Slot
     // 0 = the model texture, slot 1 = the sun-shadow map (or the dummies when shadow is off),
     // slot 2 = the dual-texture detail mask (nullptr -> dummy; only sampled when the draw's
-    // dual-tex flag is set in its UBO).
+    // dual-tex flag is set in its UBO). `hasBlendConst`/`blendConst` carry the CMB material's
+    // blend_color for pipelines built with a CONSTANT_COLOR blend factor: blend constants are
+    // render-pass state rather than pipeline state, so ReplayOps sets them per draw.
     void AppendZelda3DModelDraw(SDL_GPUGraphicsPipeline* pipeline, SDL_GPUBuffer* vbo, uint32_t first, uint32_t count,
                               const void* ubo, SDL_GPUTexture* tex, SDL_GPUSampler* samp, SDL_GPUTexture* tex2,
                               SDL_GPUSampler* samp2, SDL_GPUTexture* tex1, SDL_GPUSampler* samp1,
-                              const SDL_GPUViewport& vp, const SDL_Rect& sc);
+                              const SDL_GPUViewport& vp, const SDL_Rect& sc, bool hasBlendConst = false,
+                              SDL_FColor blendConst = SDL_FColor{ 0.0f, 0.0f, 0.0f, 1.0f });
     // Append one coalesced HUD quad-run as a first-class OP_DRAW into fb 0 (on top of the N64 + model
     // content, in the same pass), through the same single fragment-sampler bind path. `vbo` is the HUD
     // ring vertex buffer; the vertex shader's viewport UBO is built from w/h.
@@ -271,6 +274,12 @@ class GfxRenderingAPISdl3Gpu : public GfxRenderingAPI {
         SDL_GPUTextureSamplerBinding samplers[6];
         SDL_GPUViewport viewport;
         SDL_Rect scissor;
+        // Blend constants for a pipeline that uses SDL_GPU_BLENDFACTOR_[ONE_MINUS_]CONSTANT_COLOR
+        // (3DS CMB water/waterfall materials: dst = GL_CONSTANT_ALPHA). These are RENDER-PASS
+        // state, so ReplayOps issues SDL_SetGPUBlendConstants for the ops that need it (tracked
+        // against the pass's current value so unrelated draws cost nothing).
+        bool useBlendConstants;
+        SDL_FColor blendConstants;
         uint8_t ubo[64];        // std140 uniform payload: N64 = fragment SgUboData; HUD = vertex viewport UBO
         // Vertex source. altVbo != null binds that buffer (Zelda3D model's per-model vbo, or the HUD ring
         // vbo) at offset 0; null falls back to the shared frame mVbo at vboOffset (N64). numVerts +

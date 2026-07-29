@@ -38,6 +38,11 @@ struct SgGroup {
     int blendEnable = 0;
     unsigned bSrcRGB = 0x0302, bDstRGB = 0x0303, bEqRGB = 0x8006;
     unsigned bSrcA = 1, bDstA = 0, bEqA = 0x8006;
+    // CmbMaterial.blend_color — the operand of the GL_CONSTANT_COLOR/GL_CONSTANT_ALPHA (0x8001-
+    // 0x8004) blend factors. 91 corpus materials (all water/waterfall surfaces) blend with
+    // dstRGB = GL_CONSTANT_ALPHA and an authored weight in .a; without carrying it here the draw
+    // composites at dst factor ONE, i.e. additively, instead of at that weight.
+    float blendColor[4] = { 0.0f, 0.0f, 0.0f, 1.0f };
     int depthWrite = 1;
     float polygonOffset = 0.0f;
     int cull = 0;

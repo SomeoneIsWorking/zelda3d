@@ -790,6 +790,12 @@ void GfxRenderingAPISdl3Gpu::ReplayOps(SDL_GPUTexture* presentTex, uint32_t pres
     std::vector<uint8_t> pendClearColor(nfb, 0), pendClearDepth(nfb, 0);
     SDL_GPURenderPass* pass = nullptr;
     int curFb = -1;
+    // Blend constants are RENDER-PASS state (SDL_SetGPUBlendConstants), not pipeline state, and
+    // their value at the start of a pass is undefined — so track what this pass was last told and
+    // (re)issue only when a draw that actually reads them needs a different value. Ops that don't
+    // use a CONSTANT_COLOR blend factor never touch it: leftover constants are inert for them.
+    bool blendConstSet = false;
+    SDL_FColor curBlendConst{};
 
     auto endPass = [&]() {
         if (pass) {
@@ -819,6 +825,7 @@ void GfxRenderingAPISdl3Gpu::ReplayOps(SDL_GPUTexture* presentTex, uint32_t pres
         pendClearColor[fb] = 0;
         pendClearDepth[fb] = 0;
         curFb = fb;
+        blendConstSet = false; // new pass -> blend constants are undefined again
     };
 
 #if defined(__APPLE__)
@@ -895,6 +902,29 @@ void GfxRenderingAPISdl3Gpu::ReplayOps(SDL_GPUTexture* presentTex, uint32_t pres
                     fflush(stderr);
                 }
                 SDL_BindGPUGraphicsPipeline(pass, op.pipeline);
+                if (op.useBlendConstants &&
+                    (!blendConstSet || op.blendConstants.r != curBlendConst.r ||
+                     op.blendConstants.g != curBlendConst.g || op.blendConstants.b != curBlendConst.b ||
+                     op.blendConstants.a != curBlendConst.a)) {
+                    SDL_SetGPUBlendConstants(pass, op.blendConstants);
+                    curBlendConst = op.blendConstants;
+                    blendConstSet = true;
+                    // ZELDA3D_BLENDCONST_LOG=1 prints each constant vector actually pushed to the
+                    // GPU. It exists because "the constants never arrive" and "this scene draws no
+                    // constant-blend material" look identical from a screenshot: verifying this fix
+                    // at Zora's Domain produced a ~1% pixel shift that was pure launch-to-launch
+                    // variance, and only this log distinguished the two (Water Temple: 40 sets of
+                    // (0.5,0.5,0.5,0.5); Zora: zero, because nothing there uses a constant factor).
+                    if (getenv("ZELDA3D_BLENDCONST_LOG")) {
+                        static int n = 0;
+                        if (n < 40) {
+                            fprintf(stderr, "[Zelda3D_BLEND] set constants (%.3f,%.3f,%.3f,%.3f)\n",
+                                    op.blendConstants.r, op.blendConstants.g, op.blendConstants.b,
+                                    op.blendConstants.a);
+                            n++;
+                        }
+                    }
+                }
                 SDL_SetGPUViewport(pass, &op.viewport);
                 SDL_SetGPUScissor(pass, &op.scissor);
                 // Only the uniform push + vertex source differ across the draw classes (the vertex
@@ -2568,7 +2598,8 @@ void GfxRenderingAPISdl3Gpu::AppendZelda3DModelDraw(SDL_GPUGraphicsPipeline* pip
                                                   SDL_GPUSampler* samp, SDL_GPUTexture* tex2,
                                                   SDL_GPUSampler* samp2, SDL_GPUTexture* tex1,
                                                   SDL_GPUSampler* samp1, const SDL_GPUViewport& vp,
-                                                  const SDL_Rect& sc) {
+                                                  const SDL_Rect& sc, bool hasBlendConst,
+                                                  SDL_FColor blendConst) {
     int idx = (int)mSoh3dModelUbos.size();
     mSoh3dModelUbos.emplace_back();
     memcpy(mSoh3dModelUbos.back().data(), ubo, sizeof(Zelda3DSg::SgUbo));
@@ -2596,6 +2627,8 @@ void GfxRenderingAPISdl3Gpu::AppendZelda3DModelDraw(SDL_GPUGraphicsPipeline* pip
     op.samplers[2].texture = tex1 ? tex1 : DummyTexture();
     op.samplers[2].sampler = samp1 ? samp1 : DummySampler();
     op.zelda3dDrawIdx = idx;
+    op.useBlendConstants = hasBlendConst;
+    op.blendConstants = blendConst;
     mOps.push_back(std::move(op));
 }
 
