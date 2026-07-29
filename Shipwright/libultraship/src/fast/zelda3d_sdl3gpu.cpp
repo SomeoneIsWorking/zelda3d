@@ -697,10 +697,18 @@ SDL_GPUSampler* Fast::Zelda3DRenderer::getSampler(unsigned wrapS, unsigned wrapT
     // props/sky did not. max_lod=1000 lands in a distinct cache slot from the N64 samplers (max_lod=0).
     //
     // `noMip` (title star-brightness residual, debug_journal/2026-07-10): every CMB texture Zelda3D
-    // uploads gets a SYNTHETIC full mip chain generated at upload time (uploadTexture below) — the CMB
-    // format itself never carries baked mip levels (verified byte-for-byte: fine_star.cmb's texture
-    // entry data_len=4096 for a 64x64 L8 texture = exactly ONE level's worth of bytes, no room for a
-    // chain), so the PICA200 hardware/Citra always samples that single level, full detail, no LOD blur.
+    // uploads gets a SYNTHETIC full mip chain generated at upload time (uploadTexture below).
+    //
+    // CORRECTED 2026-07-29 — this comment used to assert that "the CMB format itself never carries
+    // baked mip levels", generalised from ONE texture (fine_star.cmb, data_len=4096 for a 64x64 L8 =
+    // exactly one level). That observation is right about fine_star and WRONG about the format:
+    // the tex entry's +0x04 field is (something<<16 | levelCount), and data_len is the length of the
+    // WHOLE chain. Across all 10538 textures in the ROM, data_len == baseLevel * sum(1/4^i) for that
+    // level count with a legal bpp falling out, 0 exceptions. 7284 textures ship AUTHORED mips
+    // (3 levels x6730, 2 x544, 4 x10); fine_star is simply one of the 3254 with a single level.
+    // So for most textures we currently discard the artist's chain and box-filter our own.
+    // Porting the real chain is pending (claim C018); the reasoning below about ADDITIVE VFX still
+    // holds either way, since those are overwhelmingly the single-level textures.
     // For opaque/modulate materials (terrain, walls) the synthetic chain is a deliberate, worthwhile
     // antialiasing enhancement over strict fidelity (grazing-angle shimmer, #134). But for a materially
     // different class — small ADDITIVE point-sprite-style VFX textures (stars, sparkles: blend
