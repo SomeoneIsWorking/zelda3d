@@ -91,3 +91,38 @@ Visually the silver plates and their red gem appear on the forearm where there w
 proves — if colour were applied the plates would change hue and the delta would be large. That is a
 COLOUR path (material/env override), not mesh visibility, so it does not belong in the midmask and
 is left as a separate follow-up rather than bolted on here.
+
+## Sibling findings: boots and the Goron bracelet are unmodelled too
+
+The same grep that found the gauntlets finds nothing for boots or the bracelet either. Both rules are
+already RE'd in `oot3d-decomp/docs/player_draw_impl_located.md`:
+
+* **Adult boots** — `if (boots != 0)` then two meshes from `sBootDListGroups[boots - 1]`; the 3DS
+  table at `0x0053c74c` gives iron -> meshes **35, 36** and hover -> **15, 22**. Not attempted yet:
+  it needs a REPL primitive to set `currentBoots`, which does not exist.
+* **Child Goron bracelet** — mesh **15** (`0xf`), gated on strength `>= 1` (NOT the `>= 2` the adult
+  plates use — the bracelet *is* upgrade 1).
+
+### Bracelet: written, builds, NOT verified — left uncommitted
+
+The rule is in `LinkMidMask::compute`'s child path and the build is clean, but the measurement does
+not support it, so it is not committed.
+
+What the measurement actually said, after two false starts:
+
+1. First attempt: control 0 px, test 0 px. Both frames were **black** — `freeze 1` landed during the
+   post-restart fade-in. That reads identically to "no change" and was nearly recorded as one.
+2. Second attempt on a usable frame (mean RGB 75.6/83.7/27.3): control **153** px, test **139** px.
+   The test is BELOW the control, i.e. no signal.
+
+Confirmed along the way that the code path is live — the on-screen Link is unmistakably the child
+(child proportions, Deku shield), so `compute`'s child branch is the one running.
+
+So either mesh 15 is not the bracelet in `childlink_v2.cmb`, or the bracelet sits on the left forearm
+which this side-profile camera occludes behind the body and shield. The child body meshes agreeing
+with OoT3D's always-on child set ({24,25,26} vs our {24,26} with 25 documented as far-LOD) argues the
+numbering IS shared, which favours the occlusion explanation.
+
+**Next:** re-measure from a front-facing camera where both forearms are unoccluded, with a settled
+control taken in the same session (the noise floor moved between 0, 21, 58 and 153 px across this
+evening's runs — a control from an earlier run is worthless). Recorded as instrument I009.
