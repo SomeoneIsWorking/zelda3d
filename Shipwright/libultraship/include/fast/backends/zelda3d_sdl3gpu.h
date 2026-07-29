@@ -44,6 +44,8 @@ struct SgGroup {
     // composites at dst factor ONE, i.e. additively, instead of at that weight.
     float blendColor[4] = { 0.0f, 0.0f, 0.0f, 1.0f };
     int depthWrite = 1;
+    int depthTest = 1;
+    unsigned depthFunc = 0x0201; // GL_LESS
     float polygonOffset = 0.0f;
     int cull = 0;
     int faceCull = 0;

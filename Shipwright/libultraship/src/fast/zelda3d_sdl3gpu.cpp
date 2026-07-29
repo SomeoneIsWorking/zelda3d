@@ -726,6 +726,26 @@ SDL_GPUBlendFactor mapFactor(unsigned f) {
     }
 }
 
+// GL depth compare enum (CMB mat+0x136) -> SDL3 GPU compare op. The renderer used to hardcode
+// LESS_OR_EQUAL for every CMB draw, which is wrong for 11153 of the ROM's 11172 materials: 11147
+// specify LESS, 4 ALWAYS, 2 GEQUAL, and only 19 actually want LEQUAL. LESS vs LEQUAL decides who
+// wins at EQUAL depth, so forcing LEQUAL lets coplanar fragments OoT3D rejects draw here -- the
+// file's own polygon_offset field is what kept that mostly latent. The overlay-depth pass
+// (ensureOverlayDepthResources) is NOT a material pipeline and deliberately keeps its own ALWAYS.
+SDL_GPUCompareOp mapDepthFunc(unsigned gl) {
+    switch (gl) {
+        case 0x0200: return SDL_GPU_COMPAREOP_NEVER;
+        case 0x0201: return SDL_GPU_COMPAREOP_LESS;
+        case 0x0202: return SDL_GPU_COMPAREOP_EQUAL;
+        case 0x0203: return SDL_GPU_COMPAREOP_LESS_OR_EQUAL;
+        case 0x0204: return SDL_GPU_COMPAREOP_GREATER;
+        case 0x0205: return SDL_GPU_COMPAREOP_NOT_EQUAL;
+        case 0x0206: return SDL_GPU_COMPAREOP_GREATER_OR_EQUAL;
+        case 0x0207: return SDL_GPU_COMPAREOP_ALWAYS;
+        default:     return SDL_GPU_COMPAREOP_LESS;
+    }
+}
+
 // True when any of the group's four blend factors is a constant factor; fills `out` with the
 // vector SDL_SetGPUBlendConstants must carry for this draw.
 //
@@ -998,6 +1018,7 @@ SDL_GPUGraphicsPipeline* Fast::Zelda3DRenderer::getPipeline(const SgGroup& g, in
     bool doCull = g.faceCull && sgFaceCullOn();
     PipeKey key;
     key.v = { (uint32_t)((g.blendEnable ? 1u : 0u) | (g.depthWrite ? 2u : 0u) | (doCull ? 4u : 0u) |
+                       (g.depthTest ? 8192u : 0u) | ((g.depthFunc & 7u) << 14) |
                          (doCull && frontCW ? 8u : 0u)),
               g.bSrcRGB, g.bDstRGB, g.bEqRGB, g.bSrcA, g.bDstA, g.bEqA, 0u };
     auto it = g_pipelines.find(key);
@@ -1036,9 +1057,9 @@ SDL_GPUGraphicsPipeline* Fast::Zelda3DRenderer::getPipeline(const SgGroup& g, in
 
     pci.multisample_state.sample_count = SDL_GPU_SAMPLECOUNT_1;
 
-    pci.depth_stencil_state.enable_depth_test = true;
+    pci.depth_stencil_state.enable_depth_test = g.depthTest != 0;
     pci.depth_stencil_state.enable_depth_write = g.depthWrite != 0;
-    pci.depth_stencil_state.compare_op = SDL_GPU_COMPAREOP_LESS_OR_EQUAL;
+    pci.depth_stencil_state.compare_op = mapDepthFunc(g.depthFunc);
     pci.depth_stencil_state.enable_stencil_test = false;
 
     SDL_GPUColorTargetDescription ct{};
@@ -1101,6 +1122,8 @@ SgModel* Fast::Zelda3DRenderer::ensureUploaded(int modelId) {
         for (int k = 0; k < 4; k++)
             g.blendColor[k] = groups[i].blendColor[k];
         g.depthWrite = groups[i].depthWrite;
+        g.depthTest = groups[i].depthTest;
+        g.depthFunc = groups[i].depthFunc;
         g.polygonOffset = groups[i].polygonOffset;
         g.cull = groups[i].cull;
         g.faceCull = groups[i].faceCull;
@@ -1373,6 +1396,7 @@ SDL_GPUGraphicsPipeline* Fast::Zelda3DRenderer::getUnifiedPipeline(const SgGroup
     bool doCull = g.faceCull && sgFaceCullOn();
     PipeKey key;
     key.v = { (uint32_t)((g.blendEnable ? 1u : 0u) | (g.depthWrite ? 2u : 0u) | (doCull ? 4u : 0u) |
+                       (g.depthTest ? 8192u : 0u) | ((g.depthFunc & 7u) << 14) |
                          (doCull && frontCW ? 8u : 0u)),
               g.bSrcRGB, g.bDstRGB, g.bEqRGB, g.bSrcA, g.bDstA, g.bEqA, (uint32_t)variant };
     auto it = g_uniPipelines.find(key);
@@ -1433,9 +1457,9 @@ SDL_GPUGraphicsPipeline* Fast::Zelda3DRenderer::getUnifiedPipeline(const SgGroup
 
     pci.multisample_state.sample_count = SDL_GPU_SAMPLECOUNT_1;
 
-    pci.depth_stencil_state.enable_depth_test = true;
+    pci.depth_stencil_state.enable_depth_test = g.depthTest != 0;
     pci.depth_stencil_state.enable_depth_write = g.depthWrite != 0;
-    pci.depth_stencil_state.compare_op = SDL_GPU_COMPAREOP_LESS_OR_EQUAL;
+    pci.depth_stencil_state.compare_op = mapDepthFunc(g.depthFunc);
     pci.depth_stencil_state.enable_stencil_test = false;
 
     SDL_GPUColorTargetDescription ct{};
