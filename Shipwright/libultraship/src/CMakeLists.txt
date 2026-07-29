@@ -112,6 +112,28 @@ target_link_libraries(libultraship PRIVATE libzip::zip)
 find_package(nlohmann_json REQUIRED)
 target_link_libraries(libultraship PUBLIC nlohmann_json::nlohmann_json)
 
+# inja — the template engine the Zelda3D GLSL shaders are written as (see
+# fast/zelda3d_sdl3gpu.cpp). Chosen over fmt, which is already available here but cannot
+# template GLSL: fmt treats { and } as its own delimiters, so every brace in ~400 lines of
+# shader body would need escaping as {{ }}. inja's delimiters are {{ }}, {% %} and {# #},
+# none of which occur anywhere in the generated shaders (verified: zero occurrences of all
+# four). Header-only; uses the nlohmann_json already linked above rather than its embedded copy.
+#
+# inja is header-only, so we take its headers and NOT its CMake: its install() rules reference a
+# bare `nlohmann_json` target, which does not exist here because we consume the imported
+# `nlohmann_json::nlohmann_json` above (configure fails outright otherwise). SOURCE_SUBDIR pointed
+# at a directory with no CMakeLists.txt is the standard way to fetch a header-only project without
+# adding it as a subproject.
+include(FetchContent)
+FetchContent_Declare(
+        inja
+        GIT_REPOSITORY https://github.com/pantor/inja.git
+        GIT_TAG v3.4.0
+        SOURCE_SUBDIR  no-cmake-please
+)
+FetchContent_MakeAvailable(inja)
+target_include_directories(libultraship PUBLIC ${inja_SOURCE_DIR}/single_include)
+
 find_package(tinyxml2 REQUIRED)
 target_link_libraries(libultraship PUBLIC tinyxml2::tinyxml2)
 
