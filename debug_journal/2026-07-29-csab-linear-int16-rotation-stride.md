@@ -55,3 +55,38 @@ Live: child and adult Link both render with correct natural idle poses, limbs at
 distortion (`scratch/screenshots/csabfix_child.png`, `csabfix_adult3.png`). A strict before/after
 pose diff was NOT run — it would need the pre-fix binary rebuilt — so the live check establishes
 "no regression", while the correctness direction rests on the data argument.
+
+---
+
+# Alpha-test compare function: which of the nine affected materials are actually REACHABLE
+
+The alpha-test port (commit: "honour the CMB alpha-test compare function") fixes nine materials whose
+GREATER/NEVER compare was being run as GEQUAL. Before hunting a camera to verify them visually, I
+checked whether they can be reached at all. Most cannot.
+
+Reachable — loaded through the scene room-CMB path, which always runs for a mapped scene
+(`zelda3d_scene_names.inc`):
+* `hairal_niwa_0_info.zsi` mat18 and `hairal_niwa_n_0_info.zsi` mat9 — the Castle Courtyard windows,
+  GREATER with ref==0, depthWrite=1, blend=0. This is the real user-visible case: the kept
+  fully-transparent texels render opaque AND occlude what is behind them.
+* `hiral_demo_0_info.zsi` mat0 — SCENE_CUTSCENE_MAP, mapped. Its func is NEVER, i.e. the material
+  should draw nothing at all and previously drew.
+
+NOT reachable today — these are actor CMBs, and the actor auto-replace table
+(`zelda3d_object_zars.inc`) does not contain them, so their CMB is never loaded and the N64 mesh is
+drawn instead:
+* `tectite.cmb` mat0 — confirmed empirically: spawning En_Tite (0x1B) in Kokiri and dumping every
+  drawn model produced NO group with `aTest=1 aRef=0.000`.
+* `chain_model.cmb` (x2), `crashbox_model.cmb`, `m_Fbmfl_model_hahen.cmb` — zero references anywhere
+  under `soh/src/zelda3d/`.
+* `wipe_makoto_alpha2.cmb` (LESS 255) — a screen-wipe asset, not on the CMB material path.
+
+So the port's live blast radius is 2-3 materials, not 9, and the courtyard windows are where it
+matters. NOTE this cuts both ways: it also means the fix is very low-risk, and it explains why the
+defect survived unnoticed.
+
+STILL UNVERIFIED VISUALLY: at entrance 0x7A the courtyard window group IS submitted (model 1001 g16,
+mat=18, first=13704 count=60) but its isolated draw footprint is 0 px — it is off-screen or fully
+occluded from the spawn camera. Framing it needs the camera moved to the window, which `acam` cannot
+do (it frames ACTORS, and this is room geometry). A generic "frame this draw group" camera primitive
+would close this and every future case like it — that is the tooling gap, not a one-off.
