@@ -72,6 +72,17 @@ unsigned long long linkAdultMidMask(const LinkGear& gear) {
         m |= (gear.leftHand  == LinkHandLeft::Open)  ? LINK_MID(5)  : LINK_MID(6);
         m |= (gear.rightHand == LinkHandRight::Open) ? LINK_MID(18) : LINK_MID(19);
     }
+
+    // BOOTS. Iron and hover each add a PAIR of meshes; normal boots add none, which is why N64 guards
+    // the whole thing on `boots != 0` and indexes `sBootDListGroups[boots - 1]`. The 3DS reads the
+    // same two entries per row from the table at 0x0053c74c (base + boots*8, read at -8 and -4), and
+    // that table has exactly two valid rows — iron and hover — matching N64's array length.
+    // Like the gauntlets, these meshes were previously never enabled at all.
+    if (gear.boots == 1) {
+        m |= LINK_MID(35) | LINK_MID(36); // iron
+    } else if (gear.boots == 2) {
+        m |= LINK_MID(15) | LINK_MID(22); // hover
+    }
     return m;
 }
 
