@@ -232,3 +232,35 @@ consistent with a bright texture rendering near-black.
 4-stage/coordMap-3 material may simply be outside what the shader currently handles.
 
 This is a RENDERER question, not a visibility one — the #201 e/gauntlet/boots work is unaffected.
+
+### Narrowed further: it is a SPHERE-ENV-MAPPED dual-texture material
+
+Full group state, bracelet vs a known-good body group:
+
+| | `g27` (mesh 15, bracelet) | `g44` (mesh 24, body) |
+|---|---|---|
+| tex0 | 30 — 32x32, mean (144.1, 94.5, 4.2), max 246 (bright orange) | 2 |
+| **tex1** | **31 — 16x16, mean (26.9, 19.1, 8.4), max 191 (dark)** | **-1 (none)** |
+| `coordMap` | **(3, 0)** | (0, 0) |
+| TEV stages | **4** | 2 |
+| wrap | **(0x8370 MIRRORED_REPEAT, 0x2901 REPEAT)** | (REPEAT, REPEAT) |
+| uv0 sample | (1.22, 0.03) — u > 1, needs the wrap | (0.32, 0.81) |
+
+`coordMap` prints `coord1Mapping` / `coord2Mapping` — the mappings for texture units 1 and 2, not
+unit 0. Value **3 is `CameraSphereEnvMap`** (`zelda3d_sdl3gpu.cpp:272`), i.e. a generated normal-derived
+UV, not a vertex attribute — which is consistent with it being out of range for the three texcoord
+sets the CMB vertex layout actually carries (`texCoord0/1/2`, `cmb.cpp:42`).
+
+So the bracelet is **tex0 (bright orange base) + tex1 (dark 16x16 highlight) sphere-mapped over it,
+through a 4-stage chain**. A dark second texture combined wrongly is exactly how a bright base ends up
+near-black.
+
+Sphere mapping is NOT missing — it is implemented and the shader recognises `uTevCtl.z == 3`. But the
+comments at `zelda3d_sdl3gpu.cpp:272-302` show it was developed for the TITLE WORDMARK's decorations,
+whose normals are flat `(0,0,1)`; a skinned character mesh has real varying normals and a per-bone
+transform, so the view-space normal the sphere UV derives from may not be right here.
+
+**Next:** decode `g27`'s 4-stage TEV pack
+(`00e30e30/00000000/00000111, 00e1ff43/00000002/00000101, 00e1fedf/00000000/00000002,
+00e1feef/05000020/00000008`) against the packing documented at `Zelda3DGlGroup::tevStagePack`, and
+check the sphere UV a skinned mesh produces — the title path is the only one it has been validated on.
