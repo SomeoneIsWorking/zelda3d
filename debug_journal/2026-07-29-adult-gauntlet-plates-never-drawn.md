@@ -300,9 +300,8 @@ N64's mechanism is the one to port. That was an assumption. Checked properly:
 * **The material's TEV consumes a constant, and names which one**:
   `g14 combUsesConst=1 constIdx=5`, with `const5 = (0.000, 0.000, 0.000, ...)` in our render.
 
-So the tint IS a per-upgrade colour as on N64, and the slot it goes in is **material constant 5**,
-which we currently leave at zero. That is the concrete next step: find where OoT3D writes constant 5
-for this material and port that, rather than bolting an N64-shaped env colour onto the midmask.
+So the tint IS a per-upgrade colour as on N64. **FOUND (see below): it is set in `Player_DrawImpl`
+after all**, from a two-row table at `0x0053ca1c` — silver `(1,1,1,1)`, gold `(0.996,0.812,0.059)`.
 
 ## This WEAKENS the bracelet sphere-map hypothesis
 
@@ -315,3 +314,28 @@ mesh" does NOT by itself explain the bracelet: a skinned mesh on the same code p
 remaining difference between them is the second texture — the bracelet has `tex1=31` (a dark 16x16),
 the gauntlets do not use that unit the same way. Whoever picks this up should start from that
 difference, not from the sphere-map path.
+
+
+## The tint was in `Player_DrawImpl` all along — and silver is right by accident
+
+I wrote above that `Player_DrawImpl` sets no gauntlet colour. Wrong: the call is in the gauntlet
+block immediately before the visibility calls and I skipped it as unrelated.
+
+```c
+iVar4 = 0x0053ca1c + strengthUpgrade * 0x10;
+func_0x0033dd8c(iVar4[-0x20], iVar4[-0x1c], iVar4[-0x18], iVar4[-0x14], player + 0x254, 0xe, 4, 0);
+```
+
+| upgrade | value | |
+|---|---|---|
+| 2 silver | `(1.0, 1.0, 1.0, 1.0)` | **white — identity, no tint** |
+| 3 gold | `(0.996, 0.812, 0.059, 1.0)` | RGB (254, 207, 15) |
+
+Exactly two rows, matching N64's `sGauntletColors` length; beyond them the bytes decode as garbage.
+
+**Why the verification screenshots gave no hint of this.** Silver's tint is the identity, so applying
+no tint is accidentally correct — the silver plates looked right and nothing suggested a whole colour
+path was missing. Only gold is wrong. A missing multiply is invisible wherever the factor happens to
+be 1, which is a good argument for testing the non-default case of anything that looks like a tint.
+
+Full detail and the port target in `oot3d-decomp/docs/player_draw_impl_located.md`.
