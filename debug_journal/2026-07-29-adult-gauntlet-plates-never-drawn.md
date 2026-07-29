@@ -201,3 +201,34 @@ Three equipment meshes were never enabled at all. All three are now drawn and ve
 * **Mesh 47** — in OoT3D's always-on adult set, absent from ours; plausibly far-LOD.
 * **The full reset-then-enable architecture** (claim C010) is still unported; our hand-curated map
   remains the mechanism, now with the three gaps above filled.
+
+## Bracelet darkness: narrowed to the TEXCOORD MAPPING, not the material (2026-07-29)
+
+My guess in the section above — "mesh 15 was never drawn, so its material has never been exercised"
+— is **wrong**. Data-level inspection via `sgdump 2000` and `ZELDA3D_SG_DUMPTEX=2000`:
+
+| | bracelet `g27` (meshId 15) | body `g44` (meshId 24, known-good) |
+|---|---|---|
+| texture | index 30, present | index 2, present |
+| `combScale` | 2.000 | 2.000 |
+| `vColor0` | (1,1,1,1) | (1,1,1,1) |
+| `matAmb` / `matDif` | (0.40,0.40,0.40) / (0.50,0.50,0.50) | identical |
+| blend / alpha test | 0 / 0 | 0 / 0 |
+| **`coordMap`** | **(3, 0)** | (0, 0) |
+| **TEV stages** | **4** | 2 |
+
+And texture 30 is not dark at all: 32x32, **mean RGB (144.1, 94.5, 4.2), max 246** — a bright
+orange/gold, exactly what a Goron bracelet should be.
+
+So the material, the lighting inputs and the texture are all fine, and the only structural difference
+from a group that renders correctly is the **texture-coordinate mapping (`coordMap` 3 rather than 0)
+combined with a 4-stage TEV**. If we do not supply the coordinate set that `coordMap=3` selects, the
+UVs are whatever that slot happens to hold and the sample lands somewhere unintended — which is
+consistent with a bright texture rendering near-black.
+
+**Next:** find what `coordMap` 3 selects in the CMB material (`Shipwright/cmb3d/asset/cmb.cpp`, the
+`textureCoordinator` fields) and whether the renderer binds that set. Note the existing
+`uv1Xf`/`uv2Xf` plumbing in the SG_DUMP line suggests up to three sets are modelled, so a
+4-stage/coordMap-3 material may simply be outside what the shader currently handles.
+
+This is a RENDERER question, not a visibility one — the #201 e/gauntlet/boots work is unaffected.
