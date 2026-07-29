@@ -374,3 +374,34 @@ decoding a TEV packing at the end of a long session is how confidently-wrong con
 decode both against the packing documented at `Zelda3DGlGroup::tevStagePack` and find which stage our
 shader mishandles. The gauntlet chain is a known-good control to diff against, which is the useful
 part of this finding.
+
+## Regression check on the gold tint: no state leak (2026-07-29)
+
+`Zelda3D_GL_SetMatConstOverride` writes into a slot that PERSISTS until it is written again, and the
+port only *calls* it when `strengthUpgrade >= 2`. That is two separate leak risks, both checked:
+
+**1. Gold -> silver.** Not a leak, because the silver branch writes the identity `(1,1,1,1)` rather
+than skipping. Measured on adult Link, frozen, `acam 60 z`, changed-pixel count in the forearm band
+`y80:200`:
+
+```
+silver -> gold        1118 px
+gold   -> silver      1118 px      (symmetric)
+silver(1) vs silver(2)   0 px      <- byte-identical; nonzero here would have meant a leak
+```
+
+**2. Strength dropped below 2.** The call is skipped entirely, so whatever was last written stays in
+material 14's constant slot. Harmless ONLY if material 14 is exclusive to the gauntlet plates —
+otherwise a stale gold value would discolour whatever else shares it. `sgdump 2014` settles it:
+
+```
+g14 meshId=4  tex=12 mat=14      g53 meshId=17 tex=12 mat=14
+g15 meshId=5  tex=12 mat=14      g54 meshId=18 tex=12 mat=14
+g17 meshId=6  tex=12 mat=14      g56 meshId=19 tex=12 mat=14
+```
+
+Exactly the six meshes the `>= 2` gate enables, and no others. A stale constant therefore lands only
+on meshes that are hidden in that same state. No collateral, no reset needed.
+
+Worth keeping in mind if the override mechanism is reused: this is safe because of a property of THIS
+material (single-owner), not because overrides clean up after themselves. They do not.
