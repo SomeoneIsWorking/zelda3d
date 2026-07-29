@@ -281,6 +281,10 @@ unsigned long long Zelda3D::LinkMidMask::boyMidMask(Player* player) const {
         case PLAYER_SHIELD_MIRROR: g.shield = LinkShield::Mirror; break;
         default:                   g.shield = LinkShield::None; break;
     }
+    // Gauntlet plates are gated on the strength upgrade (>= 2 = silver/gold). Reading it here rather
+    // than inside the shared policy keeps that file free of gSaveContext, the same way every other
+    // field is translated from Player-native state.
+    g.strengthUpgrade = CUR_UPG_VALUE(UPG_STRENGTH);
     return Zelda3D::linkAdultMidMask(g);
 }
 

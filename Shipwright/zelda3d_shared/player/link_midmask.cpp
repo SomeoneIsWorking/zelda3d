@@ -54,6 +54,24 @@ unsigned long long linkAdultMidMask(const LinkGear& gear) {
         default:
             break;
     }
+
+    // GAUNTLET PLATES, forearms. Silver/gold gauntlets add plate geometry that the Goron bracelet
+    // (upgrade 1) does not, so the gate is `>= 2` — the plates are their own meshes, and before this
+    // existed they were simply never drawn (debug_journal/2026-07-29-adult-gauntlet-plates-never-drawn.md).
+    //
+    // Ported from OoT3D `Player_DrawImpl` (0x004c11f4), which corresponds line-for-line with N64
+    // `z_player_lib.c:1114-1141`: plate 1 on both arms unconditionally, then an open/closed variant
+    // per hand. The 3DS selects the right-hand variant with `cfg[0x40] == 8`, and
+    // `PLAYER_MODELTYPE_RH_OPEN` IS 8 — the same `(hand == OPEN) ? plate2 : plate3` test N64 writes.
+    //
+    // Deliberately NOT copied from OoT3D's always-on set {45, 46, 47}: we start from {45, 46} and 47
+    // is unaccounted for — plausibly the far-LOD body, which we would double-draw since we always
+    // render near LOD. Adding it needs its own identification pass.
+    if (gear.strengthUpgrade >= 2) {
+        m |= LINK_MID(4) | LINK_MID(17);                                        // plate 1, both arms
+        m |= (gear.leftHand  == LinkHandLeft::Open)  ? LINK_MID(5)  : LINK_MID(6);
+        m |= (gear.rightHand == LinkHandRight::Open) ? LINK_MID(18) : LINK_MID(19);
+    }
     return m;
 }
 
