@@ -195,7 +195,7 @@ Zelda3DGlGroup MakeGlGroup(const Cmb& cmb, const CmbDrawGroup& g, const CmbVerte
 }
 
 int AppendCmbTextures(const Cmb& cmb, std::vector<std::vector<uint8_t>>& texRgba,
-                      std::vector<std::pair<int, int>>& dims) {
+                      std::vector<std::pair<int, int>>& dims, std::vector<int>& texLevels) {
     int base = (int)texRgba.size();
     const auto& texs = cmb.textures();
     for (const auto& t : texs) {
@@ -205,12 +205,36 @@ int AppendCmbTextures(const Cmb& cmb, std::vector<std::vector<uint8_t>>& texRgba
         // Look up a hi-res replacement by the texture's Citra legacy hash.
         auto lb = Zelda3D::PicaLegacyHashBytes(t.glFormat(), t.width, t.height, raw);
         uint64_t hash = lb.empty() ? 0 : Zelda3D::CityHash64(reinterpret_cast<const char*>(lb.data()), lb.size());
+        int levels = 1;
         if (hash == 0 || !Zelda3D::TexPackLookup(hash, w, h, rgba)) {
             w = t.width; h = t.height;
-            rgba = Zelda3D::PicaDecode(t.glFormat(), t.width, t.height, raw);
+            // Use the texture's AUTHORED mip chain when it has one (7284 of the ROM's 10538 do --
+            // claim C018). Decode each level and concatenate; the uploader hands them to the GPU
+            // instead of box-filtering its own. A pack replacement never gets here because the pack
+            // ships mip0 only, so those keep the synthetic chain.
+            rgba.clear();
+            int lw = t.width, lh = t.height;
+            for (int l = 0; l < t.levels; l++) {
+                const uint32_t off = t.levelOffset(l), len = t.levelBytes(l);
+                if (off + len > raw.size() || len == 0)
+                    break;
+                std::vector<uint8_t> lvl(raw.begin() + off, raw.begin() + off + len);
+                std::vector<uint8_t> dec = Zelda3D::PicaDecode(t.glFormat(), lw, lh, lvl);
+                if (dec.empty())
+                    break;
+                rgba.insert(rgba.end(), dec.begin(), dec.end());
+                levels = l + 1;
+                lw = lw > 1 ? lw / 2 : 1;
+                lh = lh > 1 ? lh / 2 : 1;
+            }
+            if (rgba.empty()) { // decode failed outright — fall back to the base level alone
+                rgba = Zelda3D::PicaDecode(t.glFormat(), t.width, t.height, raw);
+                levels = 1;
+            }
         }
         texRgba.push_back(std::move(rgba));
         dims.push_back({ w, h });
+        texLevels.push_back(levels);
     }
     return base;
 }

@@ -149,7 +149,7 @@ class Zelda3DRenderer {
 
     // ---- internal helpers (former anonymous-namespace functions) ----
     SDL_GPUSampler* getSampler(unsigned wrapS, unsigned wrapT, bool noMip = false);
-    SDL_GPUTexture* uploadTexture(int w, int h, const unsigned char* rgba);
+    SDL_GPUTexture* uploadTexture(int w, int h, const unsigned char* rgba, int srcLevels = 1);
     bool ensureResources();
     SDL_GPUGraphicsPipeline* getPipeline(const SgGroup& g, int frontCW);
     SgModel* ensureUploaded(int modelId);

@@ -253,9 +253,9 @@ static inline Zelda3DGlGroup makeCgroup(const Zelda3D::Cmb& cmb, const Zelda3D::
 // The load-bearing decode lives in the shared cmb3d converter; this wrapper keeps
 // the LoadedModel-owned `dims` scratch that the caller may pass as nullptr.
 static int appendTextures(LoadedModel* out, const Zelda3D::Cmb& cmb, std::vector<std::pair<int,int>>* dims = nullptr) {
-    if (dims) return Zelda3D::AppendCmbTextures(cmb, out->texRgba, *dims);
+    if (dims) return Zelda3D::AppendCmbTextures(cmb, out->texRgba, *dims, out->texLevels);
     std::vector<std::pair<int,int>> scratch;
-    return Zelda3D::AppendCmbTextures(cmb, out->texRgba, scratch);
+    return Zelda3D::AppendCmbTextures(cmb, out->texRgba, scratch, out->texLevels);
 }
 
 // --- Facial material-anim frame textures (keystone #3) -------------------------------------------
@@ -360,7 +360,8 @@ static void appendFacialFrames(LoadedModel* out, const std::string& zarPath) {
     // Re-point cTexs at (possibly reallocated) texRgba storage, including the new facial frames.
     out->cTexs.resize(out->texRgba.size());
     for (size_t i = 0; i < out->texRgba.size(); i++)
-        out->cTexs[i] = { out->texRgba[i].data(), dims[i].first, dims[i].second };
+        out->cTexs[i] = { out->texRgba[i].data(), dims[i].first, dims[i].second,
+                          i < out->texLevels.size() ? out->texLevels[i] : 1 };
 }
 
 // ============================================================================
@@ -433,7 +434,8 @@ static void buildFromCmb(LoadedModel* out, bool bakedVertexColor,
 
     out->cTexs.resize(out->texRgba.size());
     for (size_t i = 0; i < out->texRgba.size(); i++)
-        out->cTexs[i] = { out->texRgba[i].data(), dims[i].first, dims[i].second };
+        out->cTexs[i] = { out->texRgba[i].data(), dims[i].first, dims[i].second,
+                          i < out->texLevels.size() ? out->texLevels[i] : 1 };
 
     out->cGroups.reserve(out->groups.size());
     for (const auto& g : out->groups) {
@@ -475,7 +477,8 @@ static void buildFromCmbs(LoadedModel* out, std::vector<std::unique_ptr<Zelda3D:
     out->cTexs.reserve(out->texRgba.size());
     // dims were captured per-append (post hi-res substitution), parallel to texRgba.
     for (size_t ti = 0; ti < out->texRgba.size(); ti++)
-        out->cTexs.push_back({ out->texRgba[ti].data(), dims[ti].first, dims[ti].second });
+        out->cTexs.push_back({ out->texRgba[ti].data(), dims[ti].first, dims[ti].second,
+                               ti < out->texLevels.size() ? out->texLevels[ti] : 1 });
     out->cGroups.reserve(out->groups.size());
     for (const auto& s : srcs)
         out->cGroups.push_back(makeCgroup(*s.cmb, out->groups[s.gi], out->groups[s.gi].verts.data(), s.texBase));
@@ -710,7 +713,7 @@ static void loadBillboard(LoadedModel* out, const std::string& zarPath, const st
         tw = mw; th = mh;
     }
     out->texRgba.push_back(std::move(rgba));
-    out->cTexs.push_back({ out->texRgba[0].data(), tw, th });
+    out->cTexs.push_back({ out->texRgba[0].data(), tw, th, 1 });
 
     // One quad (two triangles) in the XY plane, matching the N64 sun/moon billboard vertices.
     // weights[0]=1, boneIds[0]=0 so with identity uBones the GPU-skin pass is a no-op (pos == model

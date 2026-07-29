@@ -824,7 +824,7 @@ SDL_GPUBlendOp mapEq(unsigned e) {
 } // namespace
 
 // Upload an RGBA8 texture (one-shot copy pass on a private command buffer).
-SDL_GPUTexture* Fast::Zelda3DRenderer::uploadTexture(int w, int h, const unsigned char* rgba) {
+SDL_GPUTexture* Fast::Zelda3DRenderer::uploadTexture(int w, int h, const unsigned char* rgba, int srcLevels) {
     if (w <= 0 || h <= 0)
         w = h = 1;
     // Full mip chain: without it, a repeating/detailed texture viewed at a grazing angle (e.g. a
@@ -838,9 +838,28 @@ SDL_GPUTexture* Fast::Zelda3DRenderer::uploadTexture(int w, int h, const unsigne
     // sampler max_lod=0 — max_lod=1000 over a single-level texture renders BLACK on this backend),
     // vanilla-on-vanilla at the matched camera, draw d8 moved 1.184 -> 1.181 over its 126682
     // exclusive pixels. Do not re-run this experiment.
-    int mipLevels = 1;
+    // Full chain length for this size (what the synthetic path needs).
+    int fullLevels = 1;
     for (int m = (w > h ? w : h); m > 1; m >>= 1)
-        mipLevels++;
+        fullLevels++;
+    // AUTHORED chain (claim C018): 7284 of the ROM's 10538 textures ship their own mips, and we used
+    // to discard them and box-filter our own. Use them when present. They are SHORT chains (3-4
+    // levels), not full ones -- so num_levels is the authored count, and the sampler's max_lod=1000
+    // clamps to it. That clamp is the risk: max_lod over a texture with ONE level renders BLACK on
+    // this backend (recorded in the noMip note below), so a short-but->1 chain is only safe because
+    // there is more than one level to select. srcLevels<=1 keeps the synthetic path unchanged.
+    const bool authored = (srcLevels > 1 && rgba != nullptr);
+    // Count both paths once so "the authored chain is in use" is a measurement, not an assumption.
+    if (getenv("ZELDA3D_MIP_LOG")) {
+        static int nAuth = 0, nSynth = 0;
+        (authored ? nAuth : nSynth)++;
+        if ((nAuth + nSynth) % 50 == 0 || nAuth + nSynth < 5)
+            fprintf(stderr, "[Zelda3D_MIP] authored=%d synthetic=%d (this one %dx%d levels=%d)\n",
+                    nAuth, nSynth, w, h, srcLevels);
+    }
+    int mipLevels = authored ? srcLevels : fullLevels;
+    if (authored && mipLevels > fullLevels)
+        mipLevels = fullLevels; // a chain longer than the size allows would be malformed
     SDL_GPUTextureCreateInfo ci{};
     ci.type = SDL_GPU_TEXTURETYPE_2D;
     ci.format = SDL_GPU_TEXTUREFORMAT_R8G8B8A8_UNORM;
@@ -853,7 +872,16 @@ SDL_GPUTexture* Fast::Zelda3DRenderer::uploadTexture(int w, int h, const unsigne
     if (!tex)
         fprintf(stderr, "[Zelda3D_SG] CreateGPUTexture %dx%d FAILED: %s\n", w, h, SDL_GetError());
 
-    const uint32_t size = (uint32_t)w * h * 4;
+    uint32_t size = (uint32_t)w * h * 4;
+    if (authored) {
+        size = 0;
+        int lw = w, lh = h;
+        for (int l = 0; l < mipLevels; l++) {
+            size += (uint32_t)lw * lh * 4;
+            lw = lw > 1 ? lw / 2 : 1;
+            lh = lh > 1 ? lh / 2 : 1;
+        }
+    }
     static const unsigned char white[4] = { 255, 255, 255, 255 };
     SDL_GPUTransferBufferCreateInfo tci{};
     tci.usage = SDL_GPU_TRANSFERBUFFERUSAGE_UPLOAD;
@@ -879,10 +907,29 @@ SDL_GPUTexture* Fast::Zelda3DRenderer::uploadTexture(int w, int h, const unsigne
     reg.w = (uint32_t)w;
     reg.h = (uint32_t)h;
     reg.d = 1;
-    SDL_UploadToGPUTexture(cp, &ti, &reg, false);
-    SDL_EndGPUCopyPass(cp);
-    if (mipLevels > 1)
-        SDL_GenerateMipmapsForGPUTexture(c, tex);
+    if (authored) {
+        // Walk the concatenated chain, largest first.
+        uint32_t off = 0;
+        int lw = w, lh = h;
+        for (int l = 0; l < mipLevels; l++) {
+            ti.offset = off;
+            ti.pixels_per_row = (uint32_t)lw;
+            ti.rows_per_layer = (uint32_t)lh;
+            reg.mip_level = (uint32_t)l;
+            reg.w = (uint32_t)lw;
+            reg.h = (uint32_t)lh;
+            SDL_UploadToGPUTexture(cp, &ti, &reg, false);
+            off += (uint32_t)lw * lh * 4;
+            lw = lw > 1 ? lw / 2 : 1;
+            lh = lh > 1 ? lh / 2 : 1;
+        }
+        SDL_EndGPUCopyPass(cp);
+    } else {
+        SDL_UploadToGPUTexture(cp, &ti, &reg, false);
+        SDL_EndGPUCopyPass(cp);
+        if (mipLevels > 1)
+            SDL_GenerateMipmapsForGPUTexture(c, tex);
+    }
     SDL_SubmitGPUCommandBuffer(c);
     SDL_ReleaseGPUTransferBuffer(g_device, tb);
     return tex;
@@ -1262,7 +1309,7 @@ SgModel* Fast::Zelda3DRenderer::ensureUploaded(int modelId) {
     }
 
     for (int i = 0; i < texCount; i++) {
-        m.textures.push_back(uploadTexture(texs[i].w, texs[i].h, texs[i].rgba));
+        m.textures.push_back(uploadTexture(texs[i].w, texs[i].h, texs[i].rgba, texs[i].levels));
         if (modelId == g_sgDumpModel || g_sgDumpTexActual == modelId || g_sgDumpTexAll) {
             if ((g_sgDumpTexActual == modelId || g_sgDumpTexAll) && texs[i].rgba) {
                 // One-off raw-pixel dump (PPM, no library needed) so the SOURCE texel data can be
