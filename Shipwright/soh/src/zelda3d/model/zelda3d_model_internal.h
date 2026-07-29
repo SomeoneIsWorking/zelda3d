@@ -23,6 +23,7 @@ struct LoadedModel {
     std::vector<Zelda3D::CmbDrawGroup> groups;       // interleaved verts (CmbVertex == Zelda3DGlVtx layout)
     std::vector<std::vector<uint8_t>> texRgba;     // decoded RGBA8 per CMB texture
     std::vector<Zelda3DGlGroup> cGroups;             // C-API view
+    std::vector<int> texLevels;                     // mip level count parallel to texRgba
     std::vector<Zelda3DGlTex> cTexs;                 // C-API view
     std::unique_ptr<Zelda3D::Zar> zar;               // resident archive (for CSAB lookup)
     std::unique_ptr<Zelda3D::Cmb> cmb;               // resident model (skeleton + bind matrices)

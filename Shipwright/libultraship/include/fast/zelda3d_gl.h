@@ -127,6 +127,10 @@ typedef struct Zelda3DGlGroup {
 typedef struct Zelda3DGlTex {
     const unsigned char* rgba;
     int w, h;
+    // Mip levels present in `rgba`, stored back-to-back largest first. 1 = base only, in which case
+    // the uploader synthesises a chain. >1 means the CMB shipped an AUTHORED chain (claim C018) and
+    // the uploader uses it verbatim.
+    int levels;
 } Zelda3DGlTex;
 
 // The game (soh) registers this to supply a model's CPU data ON DEMAND, the first

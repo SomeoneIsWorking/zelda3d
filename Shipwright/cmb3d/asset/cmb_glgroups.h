@@ -33,7 +33,9 @@ Zelda3DGlGroup MakeGlGroup(const Cmb& cmb, const CmbDrawGroup& g, const CmbVerte
 // hash) and APPEND to `texRgba`; the parallel `dims` gets each decoded texture's
 // (w,h) as uploaded (post-substitution). Returns the base index the CMB's textures
 // were appended at, so a group's material-texture index can be rebased via texBase.
+// `texLevels` receives each texture's mip level count (1 = base only). Levels are stored
+// back-to-back in the texRgba entry, largest first.
 int AppendCmbTextures(const Cmb& cmb, std::vector<std::vector<uint8_t>>& texRgba,
-                      std::vector<std::pair<int, int>>& dims);
+                      std::vector<std::pair<int, int>>& dims, std::vector<int>& texLevels);
 
 } // namespace Zelda3D
