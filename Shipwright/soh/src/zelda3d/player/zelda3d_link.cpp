@@ -246,6 +246,11 @@ static const unsigned char kLinkUpperBodyMask[25] = {
 // LinkGear POD. This function is the OoT-side ADAPTER — translates the live OoT Player fields into
 // LinkGear, hands off to the shared computation, then returns. Zero behavior change (the shared
 // code is a verbatim port); MM will add its own translator in Stage 2b when MmPlayerBehavior lands.
+// Declared here rather than pulled in via a header, matching how the other behavior modules
+// (townsfolk.cpp, en_mu.cpp, en_dog.cpp) reach this renderer entry point.
+extern "C" void Zelda3D_GL_SetMatConstOverride(int modelId, int materialIndex, int constIdx, float r,
+                                               float g, float b, float a);
+
 unsigned long long Zelda3D::LinkMidMask::boyMidMask(Player* player) const {
     Zelda3D::LinkGear g;
 
@@ -754,6 +759,24 @@ extern "C" int Zelda3D_PlayerDrawImpl(PlayState* play, Actor* actor) {
         }
     }
     Zelda3D_GL_SetMidMask(modelId, midMask);
+
+    // GAUNTLET TINT. OoT3D writes a per-upgrade colour before the gauntlet visibility calls
+    // (Player_DrawImpl, table at 0x0053ca1c indexed strengthUpgrade*0x10 read at -0x20 — see
+    // oot3d-decomp/docs/player_draw_impl_located.md): silver is (1,1,1,1), i.e. the IDENTITY, and
+    // gold is (0.996, 0.812, 0.059, 1). That is why silver already looked right with no tint at all
+    // and gave no sign a colour path was missing — a missing multiply is invisible where the factor
+    // is 1. Only gold is wrong today.
+    //
+    // All four adult gauntlet groups share material 14, whose TEV declares combUsesConst=1
+    // constIdx=5. NOTE this is a HYPOTHESIS about the seam: OoT3D's own call targets slot 0xe on
+    // player+0x254, which is a different numbering from the CMB material's constIdx, so the two are
+    // not known to be the same field. Verified by result, not by assumption — if gold does not
+    // appear, the slot is wrong rather than the colour.
+    if (LINK_AGE_IN_YEARS != YEARS_CHILD && CUR_UPG_VALUE(UPG_STRENGTH) >= 2) {
+        const bool gold = (CUR_UPG_VALUE(UPG_STRENGTH) >= 3);
+        Zelda3D_GL_SetMatConstOverride(modelId, 14, 5, gold ? 0.996f : 1.0f, gold ? 0.812f : 1.0f,
+                                       gold ? 0.059f : 1.0f, 1.0f);
+    }
     // FALSIFIED MECHANISM (2026-07-23, was "#29b feet-grounding"): this path used to measure the
     // posed model's lowest visible vertex EVERY frame (Zelda3D_PosedGroundOffset) and shove the
     // whole body so that vertex touched actor.world.pos.y. That per-frame min-vertex anchor was a
