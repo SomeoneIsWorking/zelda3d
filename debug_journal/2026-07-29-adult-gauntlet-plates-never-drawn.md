@@ -126,3 +126,38 @@ numbering IS shared, which favours the occlusion explanation.
 **Next:** re-measure from a front-facing camera where both forearms are unoccluded, with a settled
 control taken in the same session (the noise floor moved between 0, 21, 58 and 153 px across this
 evening's runs — a control from an earlier run is worthless). Recorded as instrument I009.
+
+## Bracelet: VERIFIED and committed (dd3205ea)
+
+The rule was right; three of my four measurements were not. Final evidence: forearm box
+x380-560 y60-200 at `acam 35`, **control 0 px, strength 0 vs 1 = 1610 px**, changed region bbox
+x[463..525] y[89..148] — a 62x59 forearm-cuff-sized area, with the cuff plainly visible in frame.
+
+What made the earlier attempts fail, in order:
+
+1. **Black frames.** `freeze 1` landed during the post-restart fade; control 0 px and test 0 px.
+   Identical in shape to a genuine null result.
+2. **Signal under the noise floor.** At `acam 100` the bracelet is a few dozen pixels and the scene
+   noise floor was 153 px. Test 139 px. Correctly read as "no signal", but the conclusion drawn from
+   it — that the mesh id might be wrong — was not warranted.
+3. **Wrong band attribution.** At `acam 35` I split the frame into "HUD band y0-160" and the rest,
+   found all 2468 changed pixels in y0-160 and none below, and nearly concluded the change was
+   entirely HUD. But at that distance Link's forearms ARE in y0-160 — his head is out of frame. The
+   band labels were carried over from the `acam 100` layout where they were true.
+
+The fix for all three is the same discipline: never split a frame by remembered coordinates, place
+the measurement box on the thing being measured in THIS camera, and take the control in the same
+session. Recorded as instrument I009.
+
+### Residual
+
+The bracelet renders very dark, close to black (see the frame). Geometry and gating are right; its
+material/texture is a separate question — mesh 15 was never drawn before, so its material has never
+been exercised and may not be wired the way the other child meshes are.
+
+### Still outstanding from this sweep
+
+* **Adult boots** — iron -> meshes 35, 36; hover -> 15, 22 (from the `0x0053c74c` table). Needs a
+  REPL primitive to set `currentBoots`; not attempted.
+* **Gold gauntlets render silver** — no per-upgrade env colour; a colour path, not visibility.
+* **Mesh 47** — in OoT3D's always-on adult set, absent from ours; plausibly far-LOD.
