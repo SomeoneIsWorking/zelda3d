@@ -121,3 +121,34 @@ mode adjacent to it. The project's own rule — start a big arc in a fresh sessi
 has already spawned two sub-arcs is the signal — applies. Deferring is the engineering call, not
 avoidance: the design question is answered and written down, so the next session starts with the
 decision made.
+
+---
+
+# Verifying the title after the dual-tex guard — and why the obvious measurement fails
+
+The dual-tex exact-stage-count guard moved 8 title_logo materials onto the generic TEV evaluator.
+Title parity is a CLOSED row, so this needed checking rather than reasoning.
+
+REACHING THE TITLE: `warp 0x614` (ENTR_TITLE_0) does NOT work — it renders sky only, because the
+title cutscene needs its own setup. The launcher already has the switch: `ZELDA3D_WARP=` (empty)
+boots the real Opening->title demo instead of jumping to an entrance.
+
+WHY THE WHOLE-FRAME A/B IS USELESS HERE: the title camera sweeps continuously and `settle` pins
+gameplayFrames, not the cutscene frame, so two launches of the SAME build differ by **52.61%** of the
+frame. Restricting to the wordmark's bounding box still leaves a 24% control, because the sweeping
+background shows through the box.
+
+WHAT WORKS: measure the wordmark's OWN pixels. The logo is screen-anchored — its bbox is byte-identical
+across launches (y171:333 x233:631) even though everything behind it moves — so a saturated-red mask
+intersected across the frames gives a stable 20536-pixel sample that is independent of the background.
+
+    pre   (249.56, 18.27, 16.43)
+    pre2  (249.59, 18.44, 16.59)   <- control, same build
+    post  (249.31, 18.04, 16.19)
+
+Per-pixel mean |delta|: control 0.40, signal 0.79. A ~0.1% per-channel shift on a 0-255 scale, i.e.
+visually identical. The CLOSED title row does not regress.
+
+GENERAL LESSON: when a scene animates and cannot be frozen to a reproducible frame, do not measure the
+frame — find the sub-object that is invariant under the animation and measure ITS pixels. Here that
+turned a 52% noise floor into a 0.4% one.
