@@ -14,6 +14,8 @@ Card format: `- [#N] <title> — <notes / evidence link>`  (N = simple increment
 
 ## todo
 
+- [#207] HUD has UNPORTED parts — the rupee counter icon is a custom AI-generated SVG that looks bad; user report 2026-07-29. "such as" implies OTHER elements are synthetic too, so the fix is not just the rupee: audit every HUD element for synthetic-vs-real-asset and port the real OoT3D artwork from the ROM for each. Per the project rule, an asset gap is not an excuse to keep a hand-drawn stand-in.
+
 
 ## in-progress
 
