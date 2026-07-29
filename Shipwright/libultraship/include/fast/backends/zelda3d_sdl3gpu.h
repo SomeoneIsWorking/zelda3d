@@ -102,6 +102,9 @@ struct SgModel {
     SDL_GPUBuffer* vbo = nullptr;
     std::vector<SgGroup> groups;
     std::vector<SDL_GPUTexture*> textures;
+    // Authored mip level count per texture (claim C018). 1 = the artist shipped no chain, which
+    // is the signal the noMip rule keys on -- see the getSampler note.
+    std::vector<int> texLevels;
     // Model-local AABB over all group vertices, computed once at upload. Used by the geomscan
     // bridge (Zelda3D_GeomScanDump) to flag misrendered geometry by VALUE for the #115/#120 audit.
     bool hasBounds = false;

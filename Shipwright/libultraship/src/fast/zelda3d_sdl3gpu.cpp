@@ -1310,6 +1310,7 @@ SgModel* Fast::Zelda3DRenderer::ensureUploaded(int modelId) {
 
     for (int i = 0; i < texCount; i++) {
         m.textures.push_back(uploadTexture(texs[i].w, texs[i].h, texs[i].rgba, texs[i].levels));
+        m.texLevels.push_back(texs[i].levels > 0 ? texs[i].levels : 1);
         if (modelId == g_sgDumpModel || g_sgDumpTexActual == modelId || g_sgDumpTexAll) {
             if ((g_sgDumpTexActual == modelId || g_sgDumpTexAll) && texs[i].rgba) {
                 // One-off raw-pixel dump (PPM, no library needed) so the SOURCE texel data can be
@@ -2296,7 +2297,24 @@ void Fast::Zelda3DRenderer::DrawModel(int modelId, const float* mp16, const floa
         }
         SDL_GPUTexture* tex = Fast::g_activeSdl3GpuApi->DummyTexture();
         SDL_GPUSampler* samp = Fast::g_activeSdl3GpuApi->DummySampler();
-        bool additive = isAdditiveBlendGroup(grp);
+        // noMip NARROWED 2026-07-29. The old rule denied mips to every additive-blend group, which
+        // is 790 materials -- but 529 of them are additive dungeon FLOORS and WALLS (Dodongo's
+        // Cavern dg_dod_03yuka at 2153x1965 world units on a 256x256 texture, Fire Temple
+        // dg05_yuka_06, the wtr_uvwater overlays), repeat-wrapped and viewed at grazing angles,
+        // i.e. exactly what mips exist to fix. The rule was argued entirely from small sparse
+        // sparkle sprites.
+        //
+        // The asset itself says which is which, and now that the authored chain is parsed (C018) we
+        // can ask it: a texture that ships ONE level is one the artist gave no mips, and
+        // synthesising one for it is what crushes the sparkle peak. A texture that ships 3-4 levels
+        // was authored WITH mips and should keep them. Among additive materials that splits
+        // 414 single-level (fine_star and friends -> no mips) from 361 multi-level (the floors and
+        // water overlays -> mips), which is the principled separator the size heuristic was groping
+        // for -- and it needs no threshold to tune.
+        int texLevels = 1;
+        if (texIndex >= 0 && texIndex < (int)m->texLevels.size())
+            texLevels = m->texLevels[texIndex];
+        bool additive = isAdditiveBlendGroup(grp) && texLevels <= 1;
         if (texIndex >= 0 && texIndex < (int)m->textures.size() && m->textures[texIndex]) {
             tex = m->textures[texIndex];
             samp = getSampler(grp.wrapS, grp.wrapT, additive);
