@@ -161,3 +161,43 @@ been exercised and may not be wired the way the other child meshes are.
   REPL primitive to set `currentBoots`; not attempted.
 * **Gold gauntlets render silver** — no per-upgrade env colour; a colour path, not visibility.
 * **Mesh 47** — in OoT3D's always-on adult set, absent from ours; plausibly far-LOD.
+
+## Boots: VERIFIED and committed (5bac44f0) — sweep complete
+
+Iron -> meshes 35, 36; hover -> 15, 22. Evidence at `acam 60`, adult, control **0 px**:
+kokiri vs iron **7681 px**, kokiri vs hover **8329 px**, iron vs hover **9198 px**, all confined to
+the feet (y 241-376). Iron renders as metallic caps over the leather, hover as the cream/yellow pair.
+
+### The `boots` primitive took three iterations, and the first two failed SILENTLY
+
+1. It printed the raw equip value, which is **1-based** (1 kokiri, 2 iron, 3 hover) while
+   `player->currentBoots` is 0-based — `Player_SetBootData` does
+   `currentBoots = CUR_EQUIP_VALUE(EQUIP_TYPE_BOOTS) - 1`. So the default save read "boots=1" and
+   looked like iron was already equipped.
+2. It wrote only the SAVE. `currentBoots` is refreshed by `Player_SetBootData`, which runs on real
+   equip events — a raw poke left the live player untouched while the command echoed the new value.
+   **A tool reporting success for a state change that never happened.** It now writes both and prints
+   both.
+
+That is the same shape as every other instrument failure this session: the tool is confident, the
+output is well-formed, and it is describing something other than what you asked about.
+
+## Sweep summary
+
+Three equipment meshes were never enabled at all. All three are now drawn and verified:
+
+| item | meshes | gate | commit |
+|---|---|---|---|
+| adult gauntlet plates | 4, 17 + 5\|6 + 18\|19 | strength >= 2 | `bd6fec71` |
+| child Goron bracelet | 15 | strength >= 1 | `dd3205ea` |
+| iron / hover boots | 35,36 / 15,22 | boots != 0 | `5bac44f0` |
+
+### Left open, all recorded rather than quietly dropped
+
+* **Gold gauntlets render silver** — no per-upgrade env colour (N64 `sGauntletColors`). A colour
+  path, not visibility.
+* **The Goron bracelet renders very dark**, near black. Mesh 15 had never been drawn, so its material
+  has never been exercised.
+* **Mesh 47** — in OoT3D's always-on adult set, absent from ours; plausibly far-LOD.
+* **The full reset-then-enable architecture** (claim C010) is still unported; our hand-curated map
+  remains the mechanism, now with the three gaps above filled.
