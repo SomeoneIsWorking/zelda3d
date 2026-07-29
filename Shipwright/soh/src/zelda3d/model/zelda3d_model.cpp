@@ -146,10 +146,13 @@ Zelda3D::CtrRom* rom() {
 // (these menu files each carry a single atlas at index 0).
 struct OoT3dAtlas {
     std::vector<uint8_t> rgba;
-    int w = 0, h = 0;
+    int w = 0, h = 0;             // dims of what we hand back (pack-replaced when available)
+    int nativeW = 0, nativeH = 0; // dims as authored in the ROM — the space sprite rects are in
 };
+static std::unordered_map<std::string, OoT3dAtlas> g_oot3dAtlasCache;
+
 extern "C" const void* Zelda3D_OoT3dAtlas(const char* romfsPath, int texIdx, int* w, int* h) {
-    static std::unordered_map<std::string, OoT3dAtlas> cache;
+    auto& cache = g_oot3dAtlasCache;
     if (romfsPath == nullptr) {
         if (w) *w = 0; if (h) *h = 0; return nullptr;
     }
@@ -163,9 +166,29 @@ extern "C" const void* Zelda3D_OoT3dAtlas(const char* romfsPath, int texIdx, int
             if (!bytes.empty()) {
                 Zelda3D::Ctxb ctxb(std::move(bytes));
                 if (ctxb.ok() && texIdx >= 0 && texIdx < (int)ctxb.textures().size()) {
-                    int tw = 0, th = 0;
-                    a.rgba = ctxb.decodeRGBA((size_t)texIdx, &tw, &th);
-                    a.w = tw; a.h = th;
+                    const Zelda3D::CtxbTexture& t = ctxb.textures()[(size_t)texIdx];
+                    a.nativeW = t.width; a.nativeH = t.height;
+                    // Prefer the hi-res texture pack, exactly as model textures do
+                    // (cmb_glgroups.cpp): Citra legacy hash over the de-tiled bytes -> CityHash64 ->
+                    // TexPackLookup. A pack is optional, so this silently falls through to the ROM's
+                    // own texels when absent or when this particular atlas has no replacement.
+                    std::vector<uint8_t> raw = ctxb.textureRaw(t);
+                    auto lb = Zelda3D::PicaLegacyHashBytes(t.glFormat(), t.width, t.height, raw);
+                    uint64_t hash =
+                        lb.empty() ? 0
+                                   : Zelda3D::CityHash64(reinterpret_cast<const char*>(lb.data()), lb.size());
+                    int pw = 0, ph = 0;
+                    std::vector<uint8_t> pk;
+                    if (hash != 0 && Zelda3D::TexPackLookup(hash, pw, ph, pk) && pw > 0 && ph > 0) {
+                        a.rgba.swap(pk);
+                        a.w = pw; a.h = ph;
+                        fprintf(stderr, "[Zelda3D] OoT3dAtlas %s: HD pack %dx%d (rom %dx%d)\n",
+                                romfsPath, pw, ph, t.width, t.height);
+                    } else {
+                        int tw = 0, th = 0;
+                        a.rgba = ctxb.decodeRGBA((size_t)texIdx, &tw, &th);
+                        a.w = tw; a.h = th;
+                    }
                 } else {
                     fprintf(stderr, "[Zelda3D] OoT3dAtlas %s: ctxb %s\n", romfsPath,
                             ctxb.ok() ? "texIdx OOR" : ctxb.error().c_str());
@@ -184,6 +207,22 @@ extern "C" const void* Zelda3D_OoT3dAtlas(const char* romfsPath, int texIdx, int
     if (w) *w = it->second.w;
     if (h) *h = it->second.h;
     return it->second.rgba.data();
+}
+
+// The ROM-authored dimensions of an atlas, regardless of whether a hi-res pack replaced it.
+// Sprite rects are authored in ROM space, so a caller scales by (atlasW / nativeW). Returns 0 if
+// the atlas could not be loaded.
+extern "C" void Zelda3D_OoT3dAtlasNativeSize(const char* romfsPath, int texIdx, int* w, int* h) {
+    int aw = 0, ah = 0;
+    if (Zelda3D_OoT3dAtlas(romfsPath, texIdx, &aw, &ah) == nullptr) {
+        if (w) *w = 0; if (h) *h = 0; return;
+    }
+    auto it = g_oot3dAtlasCache.find(std::string(romfsPath) + "#" + std::to_string(texIdx));
+    if (it == g_oot3dAtlasCache.end()) {
+        if (w) *w = 0; if (h) *h = 0; return;
+    }
+    if (w) *w = it->second.nativeW;
+    if (h) *h = it->second.nativeH;
 }
 
 // Decode an already-parsed CMB (out->cmb) into the renderer's CPU views: bind-pose
