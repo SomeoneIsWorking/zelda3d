@@ -14,7 +14,8 @@ Card format: `- [#N] <title> — <notes / evidence link>`  (N = simple increment
 
 ## todo
 
-- [#207] HUD has UNPORTED parts — the rupee counter icon is a custom AI-generated SVG that looks bad; user report 2026-07-29. "such as" implies OTHER elements are synthetic too, so the fix is not just the rupee: audit every HUD element for synthetic-vs-real-asset and port the real OoT3D artwork from the ROM for each. Per the project rule, an asset gap is not an excuse to keep a hand-drawn stand-in.
+- [#208] Xbox/gamepad button glyphs — user does not like the current ones (2026-07-29). These are PC-native AI-generated art BY DESIGN (the user asked for them; there is no 3DS original and none should be ported) — this is purely an art-QUALITY task: make better glyphs. Scope is the four kXboxGlyph{A,B,X,Y}Png assets. Send the user before/after renders; it is his call, not a measurement.
+- [#207] HUD has UNPORTED parts — the rupee counter icon is a custom AI-generated SVG that looks bad; user report 2026-07-29. "such as" implies OTHER elements are synthetic too, so the fix is not just the rupee: audit every HUD element for synthetic-vs-real-asset and port the real OoT3D artwork from the ROM for each. SCOPE EXCLUSION: the keyboard keycap/glyph atlas and the Xbox button glyphs are user-requested PC-native art with no 3DS original — they stay ours and are NOT part of this card (glyph quality is #208). Per the project rule, an asset gap is not an excuse to keep a hand-drawn stand-in.
 
 
 ## in-progress

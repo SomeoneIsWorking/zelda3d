@@ -8,7 +8,7 @@ REPO="$(cd "$(dirname "$0")/.." && pwd)"
 SVG="$REPO/Shipwright/soh/assets/zelda3d/stairs_stone.svg"
 OUTDIR="$REPO/scratch/svg"; mkdir -p "$OUTDIR"
 PNG="$OUTDIR/stairs_stone.png"
-HDR="$REPO/Shipwright/soh/src/zelda3d/stairs_stone_png.h"
+HDR="$REPO/Shipwright/soh/src/zelda3d/assets/stairs_stone_png.h"
 
 RASTER=(magick); command -v magick >/dev/null 2>&1 || RASTER=(convert)
 "${RASTER[@]}" -background none "$SVG" -resize 256x256\! "$PNG"

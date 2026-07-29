@@ -16,7 +16,7 @@
 set -euo pipefail
 REPO="$(cd "$(dirname "$0")/.." && pwd)"
 OUTDIR="$REPO/scratch/svg"; mkdir -p "$OUTDIR"
-HDR="$REPO/Shipwright/soh/src/zelda3d/heart_tex_png.h"
+HDR="$REPO/Shipwright/soh/src/zelda3d/assets/heart_tex_png.h"
 DIM=64
 
 RASTER=(magick); command -v magick >/dev/null 2>&1 || RASTER=(convert)

@@ -13,7 +13,7 @@
 set -euo pipefail
 REPO="$(cd "$(dirname "$0")/.." && pwd)"
 OUTDIR="$REPO/scratch/svg"; mkdir -p "$OUTDIR"
-HDR="$REPO/Shipwright/soh/src/zelda3d/digit_tex_png.h"
+HDR="$REPO/Shipwright/soh/src/zelda3d/assets/digit_tex_png.h"
 W=32; H=64
 FONT="${ZELDA3D_DIGIT_FONT:-Liberation-Sans-Bold}"
 
