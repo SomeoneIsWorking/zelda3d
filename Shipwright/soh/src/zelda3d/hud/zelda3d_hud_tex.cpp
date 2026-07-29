@@ -114,6 +114,24 @@ const void* Zelda3D_XboxGlyphTex(char which, int* w, int* h) {
             if (havePack) {
                 g[i].rgba = cropAndBoxDownsample(atlas, aw, ah, kDiscX[i], discY, discW, discH, kDst);
                 g[i].w = kDst; g[i].hh = kDst;
+                // The pack's A/B/X/Y come from a MONOCHROME CONTROLLER DIAGRAM -- grey stone discs
+                // with black letters -- so cropping them verbatim put four identical grey badges on
+                // the HUD where the face-button colours should be. The crop coordinates were always
+                // right; the source art simply is not coloured. Modulate by the button colour, the
+                // same greyscale-as-intensity trick the HD button-bg disc already uses, so the
+                // pack's resolution and shading are kept and only the hue is supplied. Keeping the
+                // pack (rather than falling back to our SVG) is the user's directive: use HD
+                // textures when available (2026-07-29).
+                static const uint8_t kBtn[4][3] = {
+                    { 0x4C, 0xAF, 0x3F }, // A green
+                    { 0xE5, 0x34, 0x2E }, // B red
+                    { 0x2C, 0x7F, 0xD4 }, // X blue
+                    { 0xF2, 0xB2, 0x1C }, // Y amber
+                };
+                for (size_t px = 0; px + 3 < g[i].rgba.size(); px += 4) {
+                    for (int c = 0; c < 3; c++)
+                        g[i].rgba[px + c] = (uint8_t)((g[i].rgba[px + c] * kBtn[i][c] + 127) / 255);
+                }
                 continue;
             }
             int sw = 0, sh = 0, n = 0;
