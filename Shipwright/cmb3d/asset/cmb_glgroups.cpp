@@ -94,7 +94,13 @@ static void PackTevStage(const CmbMaterial::CombStage& cs, unsigned out[3]) {
              (TevAlphaModCode(cs.a_mod[1]) << 16) | (TevAlphaModCode(cs.a_mod[2]) << 20) |
              ((unsigned)(cs.const_idx & 7) << 24);
     out[2] = TevOpCode(cs.rgb_op) | (TevOpCode(cs.a_op) << 4) | (TevScaleLog2(cs.rgb_scale) << 8) |
-             (TevScaleLog2(cs.a_scale) << 10);
+             (TevScaleLog2(cs.a_scale) << 10) |
+             // Combiner-buffer latch, bits 12/13. 0x8578 PREVIOUS = this stage latches; 0x8579
+             // PREVIOUS_BUFFER = leave the buffer alone. See the shift note in the shader's
+             // tevRun: the CMB flag sits on the stage the PICA register NAMES (3dbrew labels the
+             // GPUREG_TEXENV_UPDATE_BUFFER bits "TEV stage 1..4"), which is one AHEAD of Azahar's
+             // 0-based update-mask bit, so the evaluator applies it to stage-1.
+             ((cs.buf_rgb == 0x8578 ? 1u : 0u) << 12) | ((cs.buf_a == 0x8578 ? 1u : 0u) << 13);
 }
 
 Zelda3DGlGroup MakeGlGroup(const Cmb& cmb, const CmbDrawGroup& g, const CmbVertex* srcVerts, int texBase) {
