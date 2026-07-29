@@ -1569,6 +1569,25 @@ static void Zelda3D_ReplExec(PlayState* play, char* line, const char* outPath) {
         }
         Zelda3D_ReplReply(outPath, "bitem=0x%02x (0x3B=kokiri sword, 0xFF=none)",
                           gSaveContext.equips.buttonItems[0]);
+    } else if (strcmp(cmd, "boots") == 0) {
+// `boots [n]` — read or set the equipped boots. Boots add their own meshes, so like `bitem`
+        // and `upg` this exists so the visibility rule can be driven rather than assumed.
+        //
+        // MIND THE OFF-BY-ONE, it is in the game not here: the EQUIP value is 1-BASED (1 kokiri,
+        // 2 iron, 3 hover) while `player->currentBoots` is 0-based, because Player_SetBootData does
+        // `currentBoots = CUR_EQUIP_VALUE(EQUIP_TYPE_BOOTS) - 1`. The argument is the equip value;
+        // both are printed so a reader cannot mistake one for the other.
+        // Writing the SAVE alone is not enough and reports a misleading success: currentBoots is
+        // refreshed by Player_SetBootData, which only runs on real equip events, so a raw poke left
+        // the live player untouched while this command happily echoed the new equip value. Set both.
+        if (sscanf(line, "%*s %i", &iv) == 1) {
+            Inventory_ChangeEquipment(EQUIP_TYPE_BOOTS, (u16)iv);
+            if (gPlayState != NULL && GET_PLAYER(gPlayState) != NULL) {
+                GET_PLAYER(gPlayState)->currentBoots = (s8)(iv - 1);
+            }
+        }
+        Zelda3D_ReplReply(outPath, "boots equip=%d (1 kokiri, 2 iron, 3 hover) -> currentBoots=%d",
+                          CUR_EQUIP_VALUE(EQUIP_TYPE_BOOTS), GET_PLAYER(gPlayState)->currentBoots);
     } else if (strcmp(cmd, "upg") == 0) {
         // `upg <type> [value]` — read or set an inventory UPGRADE (UPG_STRENGTH is 2: 0 none,
         // 1 Goron bracelet, 2 silver gauntlets, 3 gold). Same reason `bitem` exists: the gauntlet

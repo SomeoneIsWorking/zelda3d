@@ -285,6 +285,7 @@ unsigned long long Zelda3D::LinkMidMask::boyMidMask(Player* player) const {
     // than inside the shared policy keeps that file free of gSaveContext, the same way every other
     // field is translated from Player-native state.
     g.strengthUpgrade = CUR_UPG_VALUE(UPG_STRENGTH);
+    g.boots = player->currentBoots; // iron/hover add their own mesh pair
     return Zelda3D::linkAdultMidMask(g);
 }
 

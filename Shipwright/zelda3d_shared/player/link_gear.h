@@ -66,6 +66,9 @@ struct LinkGear {
     // exactly the bug this field was added for (debug_journal/2026-07-29-adult-gauntlet-plates-...).
     // MM has its own strength upgrade in the same slot, so this stays game-agnostic.
     int strengthUpgrade = 0;
+    // Equipped boots: 0 normal, 1 iron, 2 hover. Iron and hover each add their own pair of meshes,
+    // so gear without this cannot draw them — the same gap the gauntlet plates had.
+    int boots = 0;
 };
 
 // Which of the two rest-pose skeletons Link is using this frame. MM's HUMAN form
