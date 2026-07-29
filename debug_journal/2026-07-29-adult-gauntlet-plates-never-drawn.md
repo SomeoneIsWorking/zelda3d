@@ -285,3 +285,33 @@ So omitting it is right, and now on evidence rather than on the guess. It is pre
 variant, which we never select because we always render near LOD. Recorded so nobody "fixes" the
 discrepancy with OoT3D's table by adding a mesh that would at best do nothing and at worst
 double-draw the body.
+
+## Gold vs silver: the tint slot is material CONSTANT 5 (2026-07-29)
+
+My earlier note said "N64 sets an env colour per upgrade and we apply none", which quietly implied
+N64's mechanism is the one to port. That was an assumption. Checked properly:
+
+* **`Player_DrawImpl` does not set any gauntlet colour.** Its tail is eye/mouth texture selection and
+  fade handling — read through to the end, nothing there.
+* **OoT3D does NOT swap textures per upgrade.** All four gauntlet meshes (4, 17, 5, 18) share
+  texture index **12** in `zelda_link_boy_new.zar`.
+* **That texture is designed to be tinted**: 128x256, mean RGB (73.8, 62.0, 57.6), mean channel
+  spread **17.3** — effectively greyscale — with max 255.
+* **The material's TEV consumes a constant, and names which one**:
+  `g14 combUsesConst=1 constIdx=5`, with `const5 = (0.000, 0.000, 0.000, ...)` in our render.
+
+So the tint IS a per-upgrade colour as on N64, and the slot it goes in is **material constant 5**,
+which we currently leave at zero. That is the concrete next step: find where OoT3D writes constant 5
+for this material and port that, rather than bolting an N64-shaped env colour onto the midmask.
+
+## This WEAKENS the bracelet sphere-map hypothesis
+
+The gauntlet group `g14` has **`coordMap=(3,0)` and `stages=4`** — the same sphere-env-map + 4-stage
+structure I flagged as the suspect for the bracelet's darkness. The gauntlets render correctly
+(bright metallic plates, see the verified screenshots).
+
+So "sphere mapping was developed for the title wordmark's flat normals and may not hold for a skinned
+mesh" does NOT by itself explain the bracelet: a skinned mesh on the same code path looks right. The
+remaining difference between them is the second texture — the bracelet has `tex1=31` (a dark 16x16),
+the gauntlets do not use that unit the same way. Whoever picks this up should start from that
+difference, not from the sphere-map path.
