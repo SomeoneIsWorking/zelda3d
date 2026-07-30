@@ -667,6 +667,14 @@ static Zelda3D_ActorForcedAutoSlot sActorForcedAuto[] = {
     // uncertain between syokudai_model.cmb and a variant; separate follow-up.
     { ACTOR_OBJ_SYOKUDAI, 0xF000, 0x2000, "syokudai_ki", {0} },
 };
+int Zelda3D_ForcedSlotCount(void) { return (int)ARRAY_COUNT(sActorForcedAuto); }
+const Zelda3D_AutoEntry* Zelda3D_ForcedSlotInfo(int i, short* outActorId, const char** outCmbSubstr) {
+    if (i < 0 || i >= (int)ARRAY_COUNT(sActorForcedAuto)) return NULL;
+    if (outActorId != NULL) *outActorId = sActorForcedAuto[i].actorId;
+    if (outCmbSubstr != NULL) *outCmbSubstr = sActorForcedAuto[i].cmbSubstr;
+    return &sActorForcedAuto[i].entry;
+}
+
 static Zelda3D_ActorForcedAutoSlot* Zelda3D_FindActorForcedSlot(s16 actorId, u16 params) {
     for (size_t i = 0; i < ARRAY_COUNT(sActorForcedAuto); i++) {
         Zelda3D_ActorForcedAutoSlot* s = &sActorForcedAuto[i];
@@ -690,6 +698,16 @@ static Zelda3D_ActorForcedAutoSlot* Zelda3D_FindActorForcedSlot(s16 actorId, u16
 #define ZELDA3D_MEASKEY_WELLARCH 0x40000 // > any object id; routes to sWellArchMeas, not sAuto[]
 #define ZELDA3D_MEASKEY_WINDMILL 0x40001 // > any object id; routes to sWindmillMeas, not sAuto[]
 #define ZELDA3D_MEASKEY_FIELDGRASS 0x40002 // > any object id; routes to sFieldGrassMeas, not sAuto[]
+// Forced-CMB slots need their own measure keys for the SAME reason the three sentinels above do:
+// the measure bracket is keyed, and Zelda3D_MeasureResult routes a plain object id into
+// sAuto[objId]. A forced slot works out of forced->entry, NOT sAuto[objId], so measuring under the
+// object id delivered the height to the wrong struct -- forced->entry.measuredH stayed 0, state
+// stayed 1, tries climbed to the 8-try cap and the slot went permanently state=3 (N64 fallback).
+// That made the whole forced-CMB path unusable for any NON-SKINNED entry (skinned entries skip the
+// measure pass entirely, deriving scale from bone lengths, which is why the EN_TG couple worked and
+// masked this): the wooden torch could never draw. One key per slot index, so this scales with the
+// table instead of needing a new hand-written sentinel per entry.
+#define ZELDA3D_MEASKEY_FORCED_BASE 0x41000 // + index into sActorForcedAuto
 typedef struct {
     float measuredH; // N64 world-space height from the measure pass (0 = none yet)
     float scale;     // derived worldScale (valid when state==2)
@@ -736,6 +754,11 @@ void Zelda3D_MeasureResult(int key, float height) {
     }
     if (key == ZELDA3D_MEASKEY_FIELDGRASS) {
         sFieldGrassMeas.measuredH = height;
+        return;
+    }
+    if (key >= ZELDA3D_MEASKEY_FORCED_BASE &&
+        key < ZELDA3D_MEASKEY_FORCED_BASE + (int)ARRAY_COUNT(sActorForcedAuto)) {
+        sActorForcedAuto[key - ZELDA3D_MEASKEY_FORCED_BASE].entry.measuredH = height;
         return;
     }
     if (key >= 0 && key < (int)ARRAY_COUNT(sAuto)) {
@@ -797,10 +820,12 @@ static int Zelda3D_TryAuto(PlayState* play, Actor* actor) {
     Zelda3D_ActorForcedAutoSlot* forced = Zelda3D_FindActorForcedSlot(actor->id, (u16)actor->params);
     char forcedKeyBuf[256];
     const char* modelKey = zar;
+    int measKey = objId; // which slot Zelda3D_MeasureResult must deliver the height to
     if (forced != NULL) {
         e = &forced->entry;
         snprintf(forcedKeyBuf, sizeof forcedKeyBuf, "%s|%s", zar, forced->cmbSubstr);
         modelKey = forcedKeyBuf;
+        measKey = ZELDA3D_MEASKEY_FORCED_BASE + (int)(forced - sActorForcedAuto);
     } else {
         e = &sAuto[objId];
     }
@@ -863,8 +888,12 @@ static int Zelda3D_TryAuto(PlayState* play, Actor* actor) {
             e->scale = e->measuredH / modelH;
             e->state = 2;
             if (Zelda3D_AutoMode() >= 1) {
-                fprintf(stderr, "SOH3D AUTO: obj 0x%x %s -> scale=%.5f (n64h=%.1f modelh=%.1f)%s\n", objId, zar, e->scale,
-                       e->measuredH, modelH, e->skinned ? " [n64anim]" : "");
+                // Log modelKey, not zar: for a forced-CMB slot the key carries the "|<cmb>" suffix
+                // that says WHICH mesh was picked. Printing the bare zar made a forced slot and the
+                // default per-object slot log identically, so the log could not show that a forced
+                // entry had resolved at all.
+                fprintf(stderr, "SOH3D AUTO: obj 0x%x %s -> scale=%.5f (n64h=%.1f modelh=%.1f)%s\n", objId, modelKey,
+                       e->scale, e->measuredH, modelH, e->skinned ? " [n64anim]" : "");
                 fflush(stdout);
             }
             if (e->skinned) {
@@ -889,8 +918,8 @@ static int Zelda3D_TryAuto(PlayState* play, Actor* actor) {
     }
     e->tries++;
     e->state = 1;
-    Zelda3D_EmitMeasure(play, objId, /*begin=*/1);
-    sPendingMeasureKey = objId;
+    Zelda3D_EmitMeasure(play, measKey, /*begin=*/1);
+    sPendingMeasureKey = measKey;
     return 0; // let the N64 model draw so it can be measured
 }
 

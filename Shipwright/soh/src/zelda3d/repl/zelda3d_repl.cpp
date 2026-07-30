@@ -1033,6 +1033,18 @@ static void Zelda3D_ReplExec(PlayState* play, char* line, const char* outPath) {
                 shown++;
             }
         }
+        // Forced-CMB slots live outside sAuto[] (several actors share one object bank slot), so dump
+        // them too -- otherwise a forced slot that never resolves is invisible here.
+        for (k = 0; k < Zelda3D_ForcedSlotCount(); k++) {
+            short aid = 0;
+            const char* cmb = NULL;
+            const Zelda3D_AutoEntry* fe = Zelda3D_ForcedSlotInfo(k, &aid, &cmb);
+            if (fe == NULL) continue;
+            Zelda3D_ReplReply(outPath, "forced[%d] actor=0x%x |%s state=%d scale=%.5f n64h=%.1f model=%d tries=%d", k,
+                            (unsigned)(u16)aid, cmb ? cmb : "?", fe->state, fe->scale, fe->measuredH, fe->modelId,
+                            (int)fe->tries);
+            shown++;
+        }
         if (!shown) {
             Zelda3D_ReplReply(outPath, "autostate: no auto-replaced objects seen yet (auto=%d)", Zelda3D_AutoMode());
         }

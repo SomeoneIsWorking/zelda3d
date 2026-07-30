@@ -117,6 +117,12 @@ typedef struct {
 // changed to bound on ARRAY_COUNT(kZelda3dObjectZars) directly (same value, same table).
 extern Zelda3D_ModelEntry sModelTable[4];
 extern Zelda3D_AutoEntry sAuto[];
+// Per-actor forced-CMB slots (multi-CMB ZARs). Exposed so the REPL `autostate` dump covers them:
+// they are NOT in sAuto[], so a forced slot stuck at state=1 (or given up at state=3) was
+// completely invisible to introspection -- which is how the broken measure-key routing survived.
+int Zelda3D_ForcedSlotCount(void);
+// Report slot `i`: its actor id, the "<zar>|<cmb>" model key, and its live auto entry.
+const Zelda3D_AutoEntry* Zelda3D_ForcedSlotInfo(int i, short* outActorId, const char** outCmbSubstr);
 
 // N64-anim identification mask override (REPL `enkomask`), read by Zelda3D_AutoActorMidMask
 // (zelda3d.c, called from Zelda3D_DoRetarget).
