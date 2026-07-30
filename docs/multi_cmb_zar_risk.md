@@ -588,3 +588,38 @@ A floor switch is flush with the ground, so hiding it may change nothing visible
 structurally unable to confirm it, which is inconclusive rather than passing. That joins the two limits
 from Pass 17 (flat props give only two ratios; skinned actors produce no bbox measure). The missing piece
 for this row is a verification route that can see a flush floor prop, not more analysis.
+
+## Pass 20 (2026-07-30) — full routing audit by SUBMISSION count: clean bill of health
+
+Re-checked every routing with the new `submitted` counter, which answers "did the renderer draw it?"
+independently of visibility. This was necessary because 0-pixel readings had already caused THREE reverts
+of working code.
+
+| routing | state | submissions | verdict |
+|---|---|---|---|
+| `ddanh_jd` | 2 | 7992 | drawing |
+| `l_elevator` | 2 | 1581 | drawing |
+| `l_bigst` | 2 | 879 | drawing |
+| `ddanh_kaidan` | 2 | 792 | drawing |
+| `l_idomizu` | 2 | 699 | drawing — the FLAT well water, enabled by the footprint measure |
+| `syokudai_ki` | 2 | 141 | drawing |
+| `m_WFloat00W` | 2 | 9222 | drawing |
+| `m_Wsea00` | 2 | 4857 | drawing |
+| `m_Wshutter1` | 2 | 4584 | drawing (0 px was a false negative) |
+| `bdan_switch_b` | 2 | 708 | drawing (0 px was a false negative) |
+| `ddanh_ago` | **4** | 0 | consistent — state 4 means we are NOT drawing it, the N64 is |
+
+**No slot anywhere shows `state=2` with `submits=0`**, which is the only real-failure signature. Every
+resolved routing draws; every zero is either an unresolved slot (inert, N64 in control) or a visibility
+artefact.
+
+### The reading rule
+| state | submits | meaning |
+|---|---|---|
+| 2 | > 0 | we draw it — the routing works (says nothing about mesh CORRECTNESS) |
+| 2 | 0 | **real failure** — resolved but never submitted |
+| 0 or 4 | 0 | inert; the N64 draw is in control, so nothing can be broken |
+
+`ddanh_ago` sitting at state 4 with 0 submissions is the benign case, and it is exactly what I earlier
+(correctly) called inconclusive from pixels alone. The counter makes that unambiguous rather than a
+judgement call.
