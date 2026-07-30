@@ -67,9 +67,28 @@ operator. Treat as leads. Numbers are the agent's own.
 ## HUD / input area
 
 9. **`hud/zelda3d_hud.cpp:205` — the virtual->pixel mapping derived from framebuffer 0's size alone**
-   (user-visible). Claimed wrong X and horizontal size for anyone using Advanced Resolution with a
-   forced aspect, or Low Res "N64 Mode"; right-anchored elements run off-screen. Suggested fix: take
-   the aspect from `OTRGetAspectRatio()` instead of re-deriving it.
+   (user-visible). Claimed wrong X and horizontal size under Advanced Resolution with a forced aspect,
+   or Low Res "N64 Mode"; right-anchored elements run off-screen.
+
+   **OPERATOR PROGRESS 2026-07-30 — mechanism narrowed, still UNVERIFIED.**
+   * The chain is real: `zelda3d_hud.cpp:205` computes `sOriginX = 160 - 120*(W/H)` from
+     `Zelda3D_Hud_Begin`, which returns `GfxRenderingAPISdl3Gpu::MainFbSize` =
+     `mFramebuffers[0]` (backend fb 0 — the render target that gets blitted to the swapchain,
+     `gfx_sdl3gpu.cpp:1010`). The interpreter's own aspect is `mCurDimensions.width/height`
+     (`interpreter.cpp:5295`), i.e. the GAME CANVAS. Those are two different sources, which is
+     precisely the finding's premise. Advanced Resolution DOES exist in this fork
+     (`soh/soh/SohGui/ResolutionEditor.cpp`) with `gAdvancedResolution.AspectRatioX/Y`.
+   * What is NOT established: whether backend fb 0's aspect actually diverges from the canvas
+     aspect when a ratio is forced. If fb 0 is resized to the forced aspect, the two agree and the
+     finding is moot.
+   * **Reproduction attempt FAILED — do not repeat it as-is.** `cvari gAdvancedResolution.Enabled 1`
+     + `AspectRatioX 4` + `AspectRatioY 3` on a running 800x480 instance produced NO letterboxing
+     (non-black column range stayed x[0:799] before and after). The CVars are read at framebuffer
+     setup and nothing re-applied them, so the condition never engaged. Next attempt must either
+     trigger the framebuffer resize path (a window resize / `UpdateFramebufferParameters`) or set the
+     CVars in the config BEFORE launch.
+   * NOTE `cvari` PERSISTS to config. I set and then reverted these three to 0 — check them if the
+     launcher ever behaves oddly.
 10. **`hud/zelda3d_hud.cpp:229` — the `gSPZelda3DHudFlush` marker composites "at that point"**.
     Claimed the minimap image renders nothing once internal resolution is raised, MSAA is on, or on
     macOS — the interpreter-drawn compass arrows then float over an empty patch.
