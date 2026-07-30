@@ -951,6 +951,43 @@ static Zelda3D_ActorForcedAutoSlot sActorForcedAuto[] = {
     { ACTOR_BG_SPOT18_SHUTTER, 0, 0, "obj_186",     0, {0} },
     { ACTOR_BG_SPOT18_OBJ, 0x000F, 0x0000, "obj_s18zou",  0, {0} },
     { ACTOR_BG_SPOT18_OBJ, 0x000F, 0x0001, "obj_s18yari", /*noBaseAnchor=*/1, {0} },
+    // Bottom of the Well. zelda_hakach_objects.zar holds EIGHT CMBs against EXACTLY EIGHT gBotw*
+    // display lists, and all eight map with an independent geometric signature backing each name:
+    //   gBotwCoffinLidDL          -> m_Hkhuta            (huta = lid; a 500 x 118 x 1200 slab)
+    //   gBotwBombSpotDL           -> m_HkotuBomb00       (name-exact)
+    //   gBotwWaterFallDL          -> m_Hwat00_FO_modelT  (FO = fall; the one water mesh WITH height)
+    //   gBotwWaterRingDL          -> m_Hwat00_Down_modelT(flat 22000 x 0 x 19600 surface)
+    //   gBotwBloodSplatterDL      -> m_Hsec00_modelT     (the only remaining modelT: a flat 6-vert
+    //                                                     decal sitting at y=20)
+    //   gBotwFakeWallsAndFloorsDL -> m_Hsec00            (3 groups, height 2000 -- walls need it)
+    //   gBotwThreeFakeFloorsDL    -> m_Hsec03            (flat, 54 verts: three floor planes)
+    //   gBotwHoleTrap2DL          -> m_Hinv05            (bbox lies ENTIRELY BELOW the origin,
+    //                                                     y[-2400..0] -- a pit, which is what a hole
+    //                                                     trap is)
+    //
+    // ONLY TWO OF THE EIGHT ARE ROUTED. The mapping is not the blocker; the mechanism is, in three
+    // distinct ways, and each is recorded here so the next pass does not re-derive the mapping to
+    // discover the same walls:
+    //
+    // (1) A FORCED SLOT REPLACES THE ACTOR'S WHOLE DRAW. Zelda3D_TryAuto returns 1 and the caller
+    //     skips the N64 draw entirely, so an actor that emits MORE THAN ONE display list loses every
+    //     list but the one we substitute. That rules out Bg_Haka_Water (gBotwWaterRingDL plus
+    //     gBotwWaterFallDL, the latter at its own Matrix_Translate(0,92,-1680) + Scale(0.1)) and
+    //     Bg_Haka_Megane params 0, which draws sDLists[0] AND gBotwBloodSplatterDL. Routing either
+    //     would delete geometry that currently renders -- a regression, not a partial win.
+    // (2) THE ZAR COMES FROM THE ACTOR'S OBJECT BANK SLOT, NOT FROM WHERE ITS GEOMETRY LIVES.
+    //     Bg_Haka_Zou's ActorInit declares OBJECT_GAMEPLAY_KEEP and it fetches HAKACH or HAKA at
+    //     runtime into a private index, so Zelda3D_ActorObjectId reports GAMEPLAY_KEEP and the lookup
+    //     can never reach this ZAR. Its params-2 entry (gBotwBombSpotDL -> m_HkotuBomb00) is
+    //     therefore unreachable despite being name-exact.
+    // (3) Bg_Haka_Megane params >= 3 uses OBJECT_HAKA_OBJECTS instead, so only params 0/1/2 are
+    //     candidates here at all.
+    //
+    // What is left is params 1 and 2. params 1 (m_Hsec03) is FLAT (y extent 0), so the height measure
+    // cannot size it and it depends on the footprint fallback -- the same position l_idomizu is in.
+    { ACTOR_BG_HAKA_HUTA,   0, 0, "m_Hkhuta", 0, {0} },
+    { ACTOR_BG_HAKA_MEGANE, 0x00FF, 0x0001, "m_Hsec03", 0, {0} },
+    { ACTOR_BG_HAKA_MEGANE, 0x00FF, 0x0002, "m_Hinv05", 0, {0} },
 };
 // Two DIFFERENT reasons an auto slot stops trying, which used to share state 3 and therefore shared
 // its permanence:
