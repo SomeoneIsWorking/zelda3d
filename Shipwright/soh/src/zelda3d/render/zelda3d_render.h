@@ -101,6 +101,9 @@ typedef struct {
 
 typedef struct {
     float measuredH;
+    // World-space FOOTPRINT of the measured N64 draw. A flat prop (water plane, floor web) has a
+    // height extent of ~0, so measuredH can never scale it; its footprint is matched instead.
+    float measFootX, measFootZ;
     float scale;
     float groundOff;
     int modelId;

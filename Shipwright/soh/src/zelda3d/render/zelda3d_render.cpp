@@ -834,6 +834,7 @@ static Zelda3D_ActorForcedAutoSlot* Zelda3D_FindActorForcedSlot(s16 actorId, u16
 // table instead of needing a new hand-written sentinel per entry.
 #define ZELDA3D_MEASKEY_FORCED_BASE 0x41000 // + index into sActorForcedAuto
 typedef struct {
+    float measFootX, measFootZ; // world-space footprint; used when the prop is too FLAT to have height
     float measuredH; // N64 world-space height from the measure pass (0 = none yet)
     float scale;     // derived worldScale (valid when state==2)
     int modelId;     // forced-CMB GL model id (resolved lazily)
@@ -988,6 +989,10 @@ static int Zelda3D_DrawVariant(PlayState* play, Actor* actor) {
 }
 
 void Zelda3D_MeasureResult(int key, float height) {
+    // The interpreter publishes the footprint alongside the height (it owns these globals because
+    // libultraship is shared with mm and a callback signature change would risk that link).
+    extern float gZelda3dMeasFootX, gZelda3dMeasFootZ;
+    const float fx = gZelda3dMeasFootX, fz = gZelda3dMeasFootZ;
     if (key == ZELDA3D_MEASKEY_WELLARCH) {
         sWellArchMeas.measuredH = height;
         return;
@@ -1003,15 +1008,21 @@ void Zelda3D_MeasureResult(int key, float height) {
     if (key >= ZELDA3D_MEASKEY_VARIANT_BASE &&
         key < ZELDA3D_MEASKEY_VARIANT_BASE + (int)ARRAY_COUNT(sVariantMeas)) {
         sVariantMeas[key - ZELDA3D_MEASKEY_VARIANT_BASE].meas.measuredH = height;
+        sVariantMeas[key - ZELDA3D_MEASKEY_VARIANT_BASE].meas.measFootX = fx;
+        sVariantMeas[key - ZELDA3D_MEASKEY_VARIANT_BASE].meas.measFootZ = fz;
         return;
     }
     if (key >= ZELDA3D_MEASKEY_FORCED_BASE &&
         key < ZELDA3D_MEASKEY_FORCED_BASE + (int)ARRAY_COUNT(sActorForcedAuto)) {
         sActorForcedAuto[key - ZELDA3D_MEASKEY_FORCED_BASE].entry.measuredH = height;
+        sActorForcedAuto[key - ZELDA3D_MEASKEY_FORCED_BASE].entry.measFootX = fx;
+        sActorForcedAuto[key - ZELDA3D_MEASKEY_FORCED_BASE].entry.measFootZ = fz;
         return;
     }
     if (key >= 0 && key < (int)ARRAY_COUNT(sAuto)) {
         sAuto[key].measuredH = height;
+        sAuto[key].measFootX = fx;
+        sAuto[key].measFootZ = fz;
     }
 }
 
@@ -1143,9 +1154,55 @@ static int Zelda3D_TryAuto(PlayState* play, Actor* actor) {
         return 1;
     }
     // state 0 or 1: derive scale if the measurement has arrived, else (re)measure.
-    if (e->measuredH > 0.0f) {
+    // FLAT props are admitted here too: a horizontal plane (water surface, floor web) measures a
+    // height of ~0, so gating on measuredH alone left them re-measuring until the try budget ran out
+    // and then giving up permanently. Their FOOTPRINT is the usable signal.
+    if (e->measuredH > 0.0f || e->measFootX > 0.0f || e->measFootZ > 0.0f) {
         float modelH = Zelda3D_AutoModelHeight(e->modelId);
-        if (modelH > 1e-3f) {
+        if (modelH <= 1e-3f || e->measuredH <= 1e-3f) {
+            // Too flat to scale by height: match the FOOTPRINT instead, on whichever axis is better
+            // determined. Same principle as Bg_Spot01_Idomizu's well water, which needed a bespoke
+            // path before this existed.
+            float mx = 0.0f, mz = 0.0f;
+            if (Zelda3D_AutoModelExtentXZ(e->modelId, &mx, &mz)) {
+                float s = 0.0f;
+                float sx = 0.0f, sz = 0.0f;
+                if (mx > 1e-3f && e->measFootX > 1e-3f && mz > 1e-3f && e->measFootZ > 1e-3f) {
+                    sx = e->measFootX / mx;
+                    sz = e->measFootZ / mz;
+                    s = 0.5f * (sx + sz);
+                } else if (mx > 1e-3f && e->measFootX > 1e-3f) {
+                    s = e->measFootX / mx;
+                } else if (mz > 1e-3f && e->measFootZ > 1e-3f) {
+                    s = e->measFootZ / mz;
+                }
+                if (s > 1e-6f) {
+                    e->scale = s;
+                    e->state = 2;
+                    if (Zelda3D_AutoMode() >= 1) {
+                        // AXIS AGREEMENT is the quality signal for a footprint match: the X and Z
+                        // ratios are two INDEPENDENT estimates of the same scale, so a large spread
+                        // means the N64 footprint and the CMB footprint are not the same shape and the
+                        // averaged scale is a guess. Measured examples: the Forest Temple well water
+                        // agrees to 0.6% (trustworthy), while zelda_mamenoki disagrees by ~14% (its
+                        // N64 footprint reads square at 60x60 against a 1044x1192 model, so something
+                        // other than the plane was measured). Flag it rather than hide it in an average.
+                        const float spread = (sx > 1e-6f && sz > 1e-6f)
+                                               ? (sx > sz ? sx / sz : sz / sx) - 1.0f
+                                               : 0.0f;
+                        fprintf(stderr,
+                                "SOH3D AUTO: obj 0x%x %s -> scale=%.5f FROM FOOTPRINT "
+                                "(n64 %.1fx%.1f model %.1fx%.1f, height was %.2f, axis spread %.1f%%%s)\n",
+                                objId, modelKey, e->scale, e->measFootX, e->measFootZ, mx, mz,
+                                e->measuredH, 100.0f * spread,
+                                (spread > 0.08f) ? " *** AXES DISAGREE, scale is a guess ***" : "");
+                        fflush(stderr);
+                    }
+                    return 0; // draw next frame, now that a scale exists
+                }
+            }
+        }
+        if (modelH > 1e-3f && e->measuredH > 1e-3f) {
             e->scale = e->measuredH / modelH;
             e->state = 2;
             if (Zelda3D_AutoMode() >= 1) {

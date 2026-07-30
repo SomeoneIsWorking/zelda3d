@@ -59,6 +59,15 @@ std::stack<std::string> currentDir;
 static bool s_zelda3dMeasuring = false;
 static int s_zelda3dMeasureKey = 0;
 static float s_zelda3dMeasHMin, s_zelda3dMeasHMax;
+// FOOTPRINT of the measured actor, in world X and Z (same eye-space projection trick as the height,
+// using the modelview's world-X and world-Z basis rows instead of world-up). A FLAT prop -- a water
+// plane, a floor web -- has ~zero height, so height/height can never scale it; its footprint has to be
+// matched instead. Owned HERE rather than passed through Zelda3D_MeasureResult because that callback is
+// defined in the game layer and libultraship is shared with the mm target: adding a parameter would
+// risk the same cross-layer link break that gZelda3dSgDrawOnly caused. The game layer externs these.
+static float s_zelda3dMeasXMin, s_zelda3dMeasXMax, s_zelda3dMeasZMin, s_zelda3dMeasZMax;
+extern "C" float gZelda3dMeasFootX = 0.0f; // world-X extent of the last completed measure
+extern "C" float gZelda3dMeasFootZ = 0.0f; // world-Z extent of the last completed measure
 extern "C" void Zelda3D_MeasureResult(int key, float height); // implemented in soh/src/zelda3d/core/zelda3d.c
 
 // charcompare: measure the MODEL-SPACE (modelview-transformed) vertex bbox over a frame, so the tool
@@ -1690,6 +1699,22 @@ void Interpreter::GfxSpVertex(size_t n_vertices, size_t dest_index, const F3DVtx
                 float h = ex * ux + ey * uy + ez * uz; // signed height along world up (eye space)
                 if (h < s_zelda3dMeasHMin) s_zelda3dMeasHMin = h;
                 if (h > s_zelda3dMeasHMax) s_zelda3dMeasHMax = h;
+                // Same projection against the world-X and world-Z bases, giving the footprint. Needed
+                // for flat props, whose height extent is ~0 and cannot yield a scale.
+                float sx = mv[0][0], sy = mv[0][1], sz = mv[0][2];
+                float slen = sqrtf(sx * sx + sy * sy + sz * sz);
+                if (slen > 1e-6f) {
+                    float px = (ex * sx + ey * sy + ez * sz) / slen;
+                    if (px < s_zelda3dMeasXMin) s_zelda3dMeasXMin = px;
+                    if (px > s_zelda3dMeasXMax) s_zelda3dMeasXMax = px;
+                }
+                float tx = mv[2][0], ty = mv[2][1], tz = mv[2][2];
+                float tlen = sqrtf(tx * tx + ty * ty + tz * tz);
+                if (tlen > 1e-6f) {
+                    float pz = (ex * tx + ey * ty + ez * tz) / tlen;
+                    if (pz < s_zelda3dMeasZMin) s_zelda3dMeasZMin = pz;
+                    if (pz > s_zelda3dMeasZMax) s_zelda3dMeasZMax = pz;
+                }
             }
         }
 
@@ -4426,6 +4451,8 @@ bool gfx_zelda3d_measure_handler_custom(F3DGfx** cmd0) {
         s_zelda3dMeasureKey = key;
         s_zelda3dMeasHMin = 1e30f;
         s_zelda3dMeasHMax = -1e30f;
+        s_zelda3dMeasXMin = s_zelda3dMeasZMin = 1e30f;
+        s_zelda3dMeasXMax = s_zelda3dMeasZMax = -1e30f;
     } else if (s_zelda3dMeasuring) {
         s_zelda3dMeasuring = false;
         // Report ONLY if the session actually saw geometry. An EMPTY bracket used to report height 0,
@@ -4434,6 +4461,12 @@ bool gfx_zelda3d_measure_handler_custom(F3DGfx** cmd0) {
         // the opaque and translucent lists (an actor draws into one of them, so the other session is
         // always empty by design). Silence is the correct answer for "measured nothing".
         if (s_zelda3dMeasHMin <= s_zelda3dMeasHMax) {
+            // Publish the footprint BEFORE the callback, so the game layer can read it as part of
+            // handling this measurement rather than racing a later one.
+            gZelda3dMeasFootX =
+                (s_zelda3dMeasXMin <= s_zelda3dMeasXMax) ? (s_zelda3dMeasXMax - s_zelda3dMeasXMin) : 0.0f;
+            gZelda3dMeasFootZ =
+                (s_zelda3dMeasZMin <= s_zelda3dMeasZMax) ? (s_zelda3dMeasZMax - s_zelda3dMeasZMin) : 0.0f;
             Zelda3D_MeasureResult(key, s_zelda3dMeasHMax - s_zelda3dMeasHMin);
         }
     }
