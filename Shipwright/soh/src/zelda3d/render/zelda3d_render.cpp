@@ -812,6 +812,22 @@ static Zelda3D_ActorForcedAutoSlot sActorForcedAuto[] = {
     //           see it at all.
     { ACTOR_BG_MIZU_MOVEBG,  0, 0, "m_WFloat00W", 0, {0} },
     { ACTOR_BG_MIZU_WATER,   0, 0, "m_Wsea00",    0, {0} },
+    // Jabu-Jabu floor switches -- NOT ROUTED. Investigated fully; the evidence does not reach the bar.
+    // Bg_Bdan_Switch selects on `params & 0xFF` (its header: 0 BLUE, 1 YELLOW_HEAVY, 2 YELLOW,
+    // 3 YELLOW_TALL_1, 4 YELLOW_TALL_2) and the archive has bdan_switch_b_model / bdan_switch_y_model,
+    // which the N64 DL names (gJabuBlueFloorSwitchDL / gJabuYellowFloorSwitchDL) corroborate.
+    //
+    // Three reasons it stays on N64:
+    //  1. GEOMETRY CANNOT PICK between them -- the two CMBs are identical in shape (921 x 191 x 921,
+    //     300 verts each) and differ only in TEXTURE, so the three-axis test cannot discriminate.
+    //  2. It DOES reject the tall variants: type 4 measures h=39.8 foot=37x37, a narrow PILLAR, against
+    //     this wide flat pad -- a 5.2x gap. Type 0 BLUE is a plausible 1.35x (re-authoring), but that is
+    //     the weakest kind of positive evidence.
+    //  3. NO PIXEL CONTRIBUTION was found across 6 instances at elevation with the slot at state=2. A
+    //     FLOOR switch sits flush with the floor, so the check may be structurally unable to see it --
+    //     which makes this inconclusive rather than passing, and an unverified routing on a gameplay
+    //     switch is not worth shipping.
+    // A verification route that can see a flush floor prop is the missing piece here, not more analysis.
     { ACTOR_EN_FLOORMAS, 0, 0, "floormaster", 0, {0} },
     { ACTOR_EN_WALLMAS,  0, 0, "fallmaster",  0, {0} },
     // King Dodongo's ZAR also holds his fire breath. AUTO picked kingdodongo.cmb (137216 bytes), so
