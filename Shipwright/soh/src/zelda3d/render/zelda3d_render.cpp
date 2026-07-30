@@ -731,27 +731,28 @@ static Zelda3D_ActorForcedAutoSlot sActorForcedAuto[] = {
     // SAME SIZE (26496 bytes each) -- so "largest CMB" is a coin flip between them and En_Wallmas was
     // getting the Floormaster mesh. Both routed explicitly, because a tie-break by file order is not
     // something to leave load-bearing. ("fallmaster" is Grezzo's spelling of Wallmaster.)
-    // Bg_Ydan_Sp (Deku Tree web) is NOT routed. ROOT CAUSE FOUND: it is BACK-FACE CULLED.
-    // Measured at runtime with the `facecull` knob, routing temporarily enabled:
-    //     default (cull on, flip=0)     ->    0 px   invisible
-    //     cull OFF                      -> 3750 px   draws
-    //     cull ON, winding FLIPPED      -> 3750 px   draws
-    // So its triangles wind opposite to our assumed front-face convention. It stays unrouted because
-    // the fix is NOT to disable culling, and flipping the GLOBAL convention is not safe on this
-    // evidence alone -- see the warning below.
+    // Deku Tree WALL web. Selector is params & 0xF == 1 -- Bg_Ydan_Sp's Init rewrites params to the
+    // type, so match the LIVE value, not the packed 0xF000 field (z_bg_ydan_sp.c:100; WEB_FLOOR=0,
+    // WEB_WALL=1). CMB names agree: spkabe (kabe = wall) / spyuka (yuka = floor).
     //
-    // Why my earlier "culling is fine, all six working models are cull=1 too" reasoning was WRONG:
-    // those six are closed 3D VOLUMES (elevator 100x160x100, ddanh_jd 1198x7998x1198). A volume is
-    // insensitive to the winding convention -- flip it and you still get pixels, just the inside
-    // faces. This web is a FLAT single-sided quad (bbox size 2800 x 2888 x ZERO), and for a plane
-    // culling is all-or-nothing. I compared planes against volumes and drew a false conclusion.
+    // THIS WAS REVERTED TWICE ON A BAD MEASUREMENT, so the reasoning is recorded here. The web is a
+    // FLAT single-sided plane (bbox 2800 x 2888 x ZERO) and its material is cull=1, so it is visible
+    // only from its front hemisphere -- which is CORRECT, and matches what OoT3D itself does. My
+    // `ahide` pixel check used one camera angle that happened to sit on its BACK, read 0 px, and I
+    // called it a regression. An orbit sweep settles it:
+    //     azimuth   0 /  45 /  90 / 135  ->     0 px   (behind the plane: correctly culled)
+    //     azimuth 180 / 225 / 270 / 315  -> 13589 / 19865 / 20478 / 11919 px   (visible)
+    // The N64 mesh draws from both sides, which is why the N64 web appeared from the angle where ours
+    // does not. Matching OoT3D is the goal, so single-sided is right.
     //
-    // *** WARNING, worth more than this one prop: our global front-face convention
-    // (gZelda3dFaceCullFlip = 0) may be WRONG, and the way it was validated cannot detect that. ***
-    // A pixel-contribution test on a closed volume passes under EITHER convention, so "the props all
-    // render" is not evidence for flip=0. If flip=1 is actually correct we have been drawing the
-    // INSIDE faces of every replaced prop. Deciding it needs a test that can see the difference on a
-    // volume -- surface shading / normal orientation against the oracle, not a pixel count.
+    // Also confirmed offline, against the same three volumes used as controls: this web winds 100%
+    // CCW-from-normal, exactly like every other model (l_elevator 576/576, ddanh_jd 56/56,
+    // floormaster 484/484). So the asset is NOT mis-wound and the global front-face convention is not
+    // implicated -- an earlier note claiming otherwise was wrong and is retracted.
+    //
+    // The FLOOR web stays unrouted for an unrelated reason: it is horizontal, so its model height is
+    // ~0 and the bbox-height measure cannot derive a scale. Flat props need Zelda3D_AutoModelExtentXZ
+    // footprint sizing, as Bg_Spot01_Idomizu's well water already does.
     { ACTOR_EN_FLOORMAS, 0, 0, "floormaster", 0, {0} },
     { ACTOR_EN_WALLMAS,  0, 0, "fallmaster",  0, {0} },
     // King Dodongo's ZAR also holds his fire breath. AUTO picked kingdodongo.cmb (137216 bytes), so

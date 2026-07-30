@@ -1,9 +1,10 @@
 ---
 id: C039
 kind: claim
-status: holds
+status: falsified
 created: 2026-07-30
 tags: 
+falsified_on: 2026-07-30
 ---
 
 ## Claim
@@ -17,3 +18,9 @@ Runtime discriminator via the facecull REPL knob with the web routed: default (c
 ## What would falsify it
 
 A shading/normal-orientation comparison against the oracle shows flip=0 is correct for volumes, or shows flip=1 is correct and the global default must change
+
+## FALSIFIED 2026-07-30
+
+Wrong on the mechanism and wrong that there was a fault. The web winds 100% CCW-from-normal, identical to the control volumes (l_elevator 576/576, ddanh_jd 56/56, floormaster 484/484) -- so it is NOT wound opposite and the global front-face convention is NOT implicated. It is simply a FLAT single-sided plane, correctly culled from behind: an orbit sweep gives 0 px at azimuth 0/45/90/135 and 13589/19865/20478/11919 px at 180/225/270/315. My original ahide check used a single camera angle sitting on its back side and I read that as a regression, reverting a correct change twice. Superseded by C040.
+
+> Anything that cited this claim as proof must be re-checked. Grep the repo for it.
