@@ -800,15 +800,17 @@ static Zelda3D_ActorForcedAutoSlot sActorForcedAuto[] = {
     //   movebg  n64 h=85 foot=120x120  -> m_WFloat00W_model (1200 x 853 x 1200): ratios 0.0996/0.1/0.1,
     //           spread 1.00x. Note this also DISCRIMINATES against its sibling m_WFloat00S (1200x800x1200)
     //           which is 6% off on height -- the three-axis test separates even near-identical variants.
-    //   shutter n64 h=160 foot=160x0   -> m_Wshutter1_model, on NAME only. The measurement CANNOT decide
-    //           this one: a flat plane yields just TWO usable ratios, and m_WFloat01/m_Wbomb00E/
-    //           m_Wbomb0eE/m_Wbomb0eW all share the same 1200x1200 X/Y and tie at spread 1.00x. Flagged
-    //           rather than presented as measured.
+    //   shutter NOT ROUTED. Measurement could not decide it -- a flat plane yields only TWO usable ratios
+    //           (n64 h=160 foot=160x0) and m_WFloat01/m_Wbomb00E/m_Wbomb0eE/m_Wbomb0eW all share the same
+    //           1200x1200 X/Y, tying at spread 1.00x. m_Wshutter1 was tried on NAME alone and showed NO
+    //           pixel contribution across 5 instances, 2 distances, 2 elevations and 4 azimuths while its
+    //           slot sat at state=2. Either the mesh is wrong or a closed shutter is flush inside its wall
+    //           and never visible; with only a name behind it and a DOOR at stake, it stays on the N64
+    //           draw until something better than a name identifies it.
     //   bwall   NOT ROUTED. Its model resolves as SKINNED, so it takes the bone-length scale path and
     //           never produces a bbox measurement (n64h=0 foot=0x0) -- this identification method cannot
     //           see it at all.
     { ACTOR_BG_MIZU_MOVEBG,  0, 0, "m_WFloat00W", 0, {0} },
-    { ACTOR_BG_MIZU_SHUTTER, 0, 0, "m_Wshutter1", 0, {0} },
     { ACTOR_BG_MIZU_WATER,   0, 0, "m_Wsea00",    0, {0} },
     { ACTOR_EN_FLOORMAS, 0, 0, "floormaster", 0, {0} },
     { ACTOR_EN_WALLMAS,  0, 0, "fallmaster",  0, {0} },

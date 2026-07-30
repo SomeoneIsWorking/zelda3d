@@ -22,7 +22,7 @@ The top entries are unambiguous regardless: 16 Fire Temple actors cannot all be 
 | OBJECT_HIDAN_OBJECTS | 0x002C | 16 | 31 | `zelda_hidan_objects.zar` | m_Fbmfl_model.cmb, m_Fbmwall1_model.cmb, m_Fbmwall2_model.cmb, m_Fdalm_model.cmb … |
 | OBJECT_JYA_OBJ | 0x00F1 | 10 | 38 | `zelda_jya_obj.zar` | l_j_1Flift_model.cmb, l_j_anahikari_model.cmb, l_j_anahikari_modelT.cmb, l_j_bigkagami_model.cmb … |
 | OBJECT_HAKA_OBJECTS | 0x0069 | 8 | 32 | `zelda_haka_objects.zar` | m_HADcoinshutter1_model.cmb, m_HADinv0b_model.cmb, m_HADinv0f_model.cmb, m_HADinv03_model.cmb … |
-| ~~OBJECT_MIZU_OBJECTS~~ **3 of 5 DONE** | 0x0059 | 8 | 18 | `zelda_mizu_objects.zar` | m_Wbomb00E_model.cmb, m_Wbomb0eE_model.cmb, m_Wbomb0eW_model.cmb, m_Wbomb03_model.cmb … |
+| ~~OBJECT_MIZU_OBJECTS~~ **2 of 5 DONE** | 0x0059 | 8 | 18 | `zelda_mizu_objects.zar` | m_Wbomb00E_model.cmb, m_Wbomb0eE_model.cmb, m_Wbomb0eW_model.cmb, m_Wbomb03_model.cmb … |
 | OBJECT_DEMO_KEKKAI | 0x0179 | 8 | 16 | `zelda_demo_kekkai.zar` | l_g_door_model.cmb, l_g_hikari_modelT.cmb, l_g_hikarijimen_model.cmb, l_g_icebrock_modelT.cmb … |
 | ~~OBJECT_MORI_OBJECTS~~ **DONE** | 0x0072 | 7 | 9 | `zelda_mori_objects.zar` | l_4hasira_model.cmb, l_bigst_model.cmb, l_elevator_model.cmb, l_hasigo_model.cmb … |
 | OBJECT_ICE_OBJECTS | 0x006B | 6 | 8 | `zelda_ice_objects.zar` | ice_brick_model.cmb, ice_ice3_modelT.cmb, ice_ice_modelT.cmb, ice_tobira_model.cmb … |
@@ -533,3 +533,25 @@ spread 1.00x. The method is strictly weaker for flat geometry. Kept on the name 
 `bg_mizu_bwall`'s model resolves as skinned, so it takes the bone-length scale path and never produces a
 bbox measurement (`n64h=0 foot=0x0`). Any skinned actor in this queue is outside this method's reach and
 needs a different identification route.
+
+## Pass 18 (2026-07-30) — Water Temple closes at 2 of 5; the shutter is reverted
+
+Verified the three Pass-17 routings by pixel contribution. Two draw, one does not:
+
+| actor | evidence | outcome |
+|---|---|---|
+| `bg_mizu_water` | 210734 / 212109 px from elevated views | **CONFIRMED** |
+| `bg_mizu_movebg` | 47032 px on **instance 2** (0 px on instances 0,1,3,4) | **CONFIRMED** |
+| `bg_mizu_shutter` | 0 px across 5 instances x 2 distances x 2 elevations x 4 azimuths | **REVERTED** |
+
+The shutter was the one routing identified on NAME alone — measurement could not decide it (a flat plane
+gives only two ratios and four candidates tie). It then showed no contribution anywhere while its slot sat
+at `state=2`, meaning we were drawing it and nothing appeared. Either the mesh is wrong, or a closed
+shutter is flush inside its wall and never visible. With only a name behind it and a DOOR at stake, it
+goes back to the N64 draw. Weakest evidence, first to be cut.
+
+### `movebg` is why the checker had to change
+Instances 0, 1, 3 and 4 all read **0 px**; only instance 2 contributed. With 16 instances live, hiding one
+routinely reads zero because that instance is occluded or off-screen — so a single-instance test condemns
+correct routings. `tools/ahide_check.sh` now sweeps instances, accepts an elevation for flat props, and
+prints its own precondition. This is the same failure that reverted a WORKING web routing twice.
