@@ -851,7 +851,15 @@ void GfxRenderingAPISdl3Gpu::ReplayOps(SDL_GPUTexture* presentTex, uint32_t pres
                     beginPass(op.fb);
                 break;
             }
-            case OP_COPY: {
+            case OP_COPY:
+                if (getenv("ZELDA3D_OPORDER")) {
+                    static int shownC = 0;
+                    if (shownC < 60) {
+                        fprintf(stderr, "[OPORDER]     COPY -> fb=%d (src %d)\n", op.fb, op.srcFb);
+                        shownC++;
+                    }
+                }
+ {
                 endPass();
                 if (op.srcFb < 0 || (size_t)op.srcFb >= nfb)
                     break;
@@ -900,6 +908,21 @@ void GfxRenderingAPISdl3Gpu::ReplayOps(SDL_GPUTexture* presentTex, uint32_t pres
                                 (void*)op.samplers[si].sampler);
                     fprintf(stderr, "\n");
                     fflush(stderr);
+                }
+                if (getenv("ZELDA3D_OPORDER")) {
+                    // SEPARATE counters per target. A single shared cap is useless here: at MSAA 4
+                    // the model draws (fb=1) exhaust it before any HUD draw (fb=0) can print, which
+                    // reads as "the HUD never draws" when it simply never got logged.
+                    static int nFb0 = 0, nOther = 0;
+                    if (op.fb == 0) {
+                        if (nFb0 < 20)
+                            fprintf(stderr, "[OPORDER] HUDDRAW fb=0 #%d\n", nFb0);
+                        nFb0++;
+                    } else {
+                        nOther++;
+                    }
+                    if (((nFb0 + nOther) % 500) == 0)
+                        fprintf(stderr, "[OPORDER] totals: fb0=%d other=%d\n", nFb0, nOther);
                 }
                 SDL_BindGPUGraphicsPipeline(pass, op.pipeline);
                 if (op.useBlendConstants &&
