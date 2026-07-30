@@ -697,7 +697,18 @@ static Zelda3D_ActorForcedAutoSlot sActorForcedAuto[] = {
     // default AUTO pick (syokudai_gn_model.cmb — largest CMB, correct default). Timed torches
     // (params >> 12 == 1) still fall through to AUTO for now — their OoT3D CMB match is
     // uncertain between syokudai_model.cmb and a variant; separate follow-up.
-    { ACTOR_OBJ_SYOKUDAI, 0xF000, 0x2000, "syokudai_ki", 0, {0} },
+    // WITHDRAWN 2026-07-30 -- this routing DELETED THE FLAME and shipped that way.
+    // ObjSyokudai_Draw emits the torch stand AND, whenever litTimer != 0, gEffFire1DL at its own
+    // billboarded matrix -- two display lists in ONE draw. A forced slot replaces the actor's whole
+    // draw (`if (!Zelda3D_TryDrawActor(...)) actor->draw(...)` in z_actor.c), so substituting the
+    // stand silently dropped the fire from every lit wooden torch. A lit torch with no flame is a
+    // broken game object; an N64-shaped torch is not, so the faithful draw wins until the mechanism
+    // can do better.
+    // THE PROPER FIX is per-DISPLAY-LIST routing (substitute the stand, let the actor's remaining
+    // lists through) or a supplementary-draw hook. Both are real mechanism work, not a table edit --
+    // note that simply drawing ours AND running actor->draw double-draws the stand, so that shortcut
+    // is not available. Restore this entry only together with one of those.
+    // { ACTOR_OBJ_SYOKUDAI, 0xF000, 0x2000, "syokudai_ki", 0, {0} },
     // Deku Tree mouth. zelda_spo04_objects.zar (note: "spo04", OoT3D drops the t) holds ELEVEN CMBs
     // -- the mouth plus a set of Y_*/ousei_* cutscene models -- so AUTO's largest-CMB pick would give
     // Bg_Treemouth a cutscene mesh. Route it explicitly. "kuchi" is Japanese for mouth.
@@ -714,7 +725,14 @@ static Zelda3D_ActorForcedAutoSlot sActorForcedAuto[] = {
     { ACTOR_BG_MORI_BIGST,      0, 0, "l_bigst",    0, {0} },
     { ACTOR_BG_MORI_HASHIRA4,   0, 0, "l_4hasira",  0, {0} },
     { ACTOR_BG_MORI_ELEVATOR,   0, 0, "l_elevator", 0, {0} },
-    { ACTOR_BG_MORI_HASHIGO,    0, 0, "l_hasigo",   0, {0} },
+    // Bg_Mori_Hashigo is TWO props, not one: BgMoriHashigo_Draw switches on params between
+    // gMoriHashigoClaspDL (HASHIGO_CLASP = -1, i.e. 0xFFFF as u16) and gMoriHashigoLadderDL
+    // (HASHIGO_LADDER = 0). A params-agnostic slot gave the CLASP the ladder mesh. The clasp's CMB
+    // was sitting in this same ZAR the whole time, listed below as an unrouted "ladder variant/stop":
+    // l_hasigotome -- "tome" is the Japanese for catch/clasp -- and its geometry settles it, a 20 x 46
+    // x 40 bracket against the ladder's 32 x 227 x 2 rail.
+    { ACTOR_BG_MORI_HASHIGO, 0xFFFF, 0xFFFF, "l_hasigotome", 0, {0} },
+    { ACTOR_BG_MORI_HASHIGO, 0xFFFF, 0x0000, "l_hasigo",     0, {0} },
     // INERT BY CONSTRUCTION, kept for intent. l_idomizu is the Forest Temple well WATER: bbox
     // 2763 x 0 x 289, i.e. a horizontal plane with EXACTLY ZERO height. The bbox-height measure can
     // never derive a scale for it (the modelH > 1e-3 guard fails), so this slot parks at
@@ -854,9 +872,11 @@ static Zelda3D_ActorForcedAutoSlot sActorForcedAuto[] = {
     { ACTOR_BG_DDAN_KD,  0, 0, "ddanh_kaidan", 0, {0} },
     { ACTOR_BG_DODOAGO,  0, 0, "ddanh_ago",    0, {0} },
     { ACTOR_BG_DDAN_JD,  0, 0, "ddanh_jd",     0, {0} },
-    // Unrouted leftovers in that ZAR: l_hasigotome_model (a ladder variant/stop) and
-    // l_tikaori_model. No actor name matches either, so they are deliberately left alone rather than
-    // guessed onto an actor.
+    // Unrouted leftover in that ZAR: l_tikaori_model. No actor name matches it, so it is deliberately
+    // left alone rather than guessed onto an actor. (l_hasigotome_model was on this list until
+    // 2026-07-30, described as "a ladder variant/stop" -- it is the Bg_Mori_Hashigo CLASP and is now
+    // routed above. The lesson: a leftover is a lead, not a dead end. Reading the actor's DL SWITCH
+    // found its owner where reading CMB names alone had not.)
     //
     // Ice Cavern props. SIX actors reach OBJECT_ICE_OBJECTS and zelda_ice_objects.zar holds EIGHT
     // CMBs, so AUTO's largest-CMB pick handed every one of them ice_wall_modelT (1614 verts, the
@@ -1293,6 +1313,25 @@ static int Zelda3D_TryAuto(PlayState* play, Actor* actor) {
     // static N64 height to derive a scale from here. Render the faithful N64 door instead of a
     // blown-up OoT3D one; a proper OoT3D door port needs the door actor's real scale from the decomp.
     if (actor->category == ACTORCAT_DOOR) {
+        return 0;
+    }
+    // MULTI-DISPLAY-LIST ACTORS STAY ON N64. This path substitutes ONE mesh for the actor's ENTIRE
+    // draw -- z_actor.c does `if (!Zelda3D_TryDrawActor(...)) actor->draw(...)` -- so an actor whose
+    // Draw emits more than one display list in a single call loses every list except the one we
+    // replace. That is not a cosmetic difference; it deletes geometry the game is still drawing.
+    //
+    // Obj_Syokudai is the found case: ObjSyokudai_Draw emits the torch stand and then, whenever
+    // litTimer != 0, gEffFire1DL at its own billboarded matrix. Replacing it drops the FLAME from
+    // every lit torch, and via the generic per-object AUTO slot that applied to all torch variants,
+    // not just the routed wooden one.
+    //
+    // HONESTY NOTE ON THE EVIDENCE: the two steps are each read directly from source (the double
+    // emission above; the call site that skips actor->draw), but the flame loss itself has NOT been
+    // observed in game -- every torch found so far is unlit, so `auto 0` vs `auto 1` renders
+    // identically and cannot discriminate. THE TEST is a LIT torch (light one with Din's Fire, or
+    // find a scene that spawns them lit) A/B'd on `auto`. The skip is correct either way, because an
+    // actor that draws several lists cannot be faithfully replaced by a one-mesh substitution.
+    if (actor->id == ACTOR_OBJ_SYOKUDAI) {
         return 0;
     }
     // Per-actor forced-CMB routing (sActorForcedAuto): actors sharing a multi-CMB ZAR must
