@@ -734,3 +734,28 @@ separate hand findings into one port), the waist premise, and this model-type pr
 one session. It works because Grezzo largely kept N64's data layout, so the N64 source doubles as a
 Rosetta stone: search for a distinctive row's bytes, require the neighbours to land at the right
 stride, and the assignment is pinned without any Ghidra or guesswork.
+
+### Next work source: the multi-CMB ZAR risk set (60 objects), now that forced-CMB routing works
+
+With the audit closed I checked the RE frontier. Three of its four RE-ready rows are not actionable:
+`camera.normal0-and-others` says outright that Normal0 is DEAD CODE with nothing to port and that other
+modes must NOT be ported speculatively; `render.zora-translucent-layers` is deprioritised by user
+directive and must not be re-opened as a measure-and-narrow loop; `camera.calc-at-default-ybias` still
+has four unresolved deep-RE deps. `mm.action-func-naming` is genuinely ready but is 83 independent
+function REs — OoT's own side is still mostly address-named, so there is no named set to match against,
+and a wrong name is worse than a number.
+
+So I swept for bounded work that this session's fixes unlock, and quantified something that was
+previously hand-waved as "104 static multi-candidate ZARs": **60 mapped objects whose ZAR holds more
+than one CMB AND which more than one actor loads.** AUTO picks one CMB per ZAR, so every sharing actor
+gets the same model. That is precisely the `zelda_mu.zar` couple/marketpeople and torch-style bug class,
+and `sActorForcedAuto` is the fix — which only became usable for non-skinned props once today's
+forced-slot measure-key bug was fixed. Ranked inventory in `docs/multi_cmb_zar_risk.md`.
+
+Worst offenders: `OBJECT_HIDAN_OBJECTS` (31 CMBs, 16 Fire Temple actors), `OBJECT_JYA_OBJ` (38 CMBs, 10),
+`OBJECT_MIZU_OBJECTS` (18, 8), `OBJECT_HAKA_OBJECTS` (32, 8).
+
+The inventory states its own upper-bound caveat: the actor list is a grep for `OBJECT_*` in actor
+sources, which over-counts, because generic actors (`door_shutter`, `demo_*`) legitimately reuse
+whichever dungeon object is resident. Per the kanban rule this is NOT filed as a card — it is
+sweep-discovered, so it lives here and in the doc, and gets worked in-session.
