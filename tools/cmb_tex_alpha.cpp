@@ -59,6 +59,34 @@ int main(int argc, char** argv) {
                        (mn[0]+mx[0])/2, (mn[1]+mx[1])/2, (mn[2]+mx[2])/2,
                        mx[0]-mn[0], mx[1]-mn[1], mx[2]-mn[2]);
             } else printf("  geom: NO VERTS\n");
+            // WINDING vs NORMALS. For each triangle compare the winding-derived geometric normal
+            // (right-hand rule over v0,v1,v2) against the average stored vertex normal. If they agree,
+            // the asset winds its FRONT faces counter-clockwise as seen from outside -- which is what
+            // the renderer's front-face convention assumes. This is decidable OFFLINE and, unlike a
+            // pixel count, it can tell a correctly-wound model from an inside-out one: a closed volume
+            // renders under EITHER convention, so pixels prove nothing here.
+            long agree = 0, disagree = 0, degen = 0;
+            for (const auto& g : gs) {
+                for (size_t k = 0; k + 2 < g.verts.size(); k += 3) {
+                    const auto& a = g.verts[k]; const auto& b = g.verts[k + 1]; const auto& c = g.verts[k + 2];
+                    float e1[3] = { b.pos[0]-a.pos[0], b.pos[1]-a.pos[1], b.pos[2]-a.pos[2] };
+                    float e2[3] = { c.pos[0]-a.pos[0], c.pos[1]-a.pos[1], c.pos[2]-a.pos[2] };
+                    float gn[3] = { e1[1]*e2[2]-e1[2]*e2[1], e1[2]*e2[0]-e1[0]*e2[2], e1[0]*e2[1]-e1[1]*e2[0] };
+                    float vn[3] = { (a.nrm[0]+b.nrm[0]+c.nrm[0])/3, (a.nrm[1]+b.nrm[1]+c.nrm[1])/3,
+                                    (a.nrm[2]+b.nrm[2]+c.nrm[2])/3 };
+                    float d = gn[0]*vn[0] + gn[1]*vn[1] + gn[2]*vn[2];
+                    float m = gn[0]*gn[0]+gn[1]*gn[1]+gn[2]*gn[2];
+                    float mv = vn[0]*vn[0]+vn[1]*vn[1]+vn[2]*vn[2];
+                    if (m < 1e-9f || mv < 1e-9f) { degen++; continue; }
+                    if (d > 0) agree++; else disagree++;
+                }
+            }
+            long tot = agree + disagree;
+            printf("  winding: CCW-from-normal %ld/%ld (%.1f%%)  opposite %ld  degenerate %ld  -> %s\n",
+                   agree, tot, tot ? 100.0*(double)agree/(double)tot : 0.0, disagree, degen,
+                   tot == 0 ? "no usable normals"
+                            : (agree > disagree * 4 ? "consistent with the assumed convention"
+                                                   : (disagree > agree * 4 ? "*** WOUND OPPOSITE ***" : "MIXED")));
         }
         for (size_t i = 0; i < cmb.textures().size(); i++) {
             const auto& t = cmb.textures()[i];

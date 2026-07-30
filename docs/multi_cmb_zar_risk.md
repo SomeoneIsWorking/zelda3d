@@ -22,7 +22,7 @@ The top entries are unambiguous regardless: 16 Fire Temple actors cannot all be 
 | OBJECT_HIDAN_OBJECTS | 0x002C | 16 | 31 | `zelda_hidan_objects.zar` | m_Fbmfl_model.cmb, m_Fbmwall1_model.cmb, m_Fbmwall2_model.cmb, m_Fdalm_model.cmb … |
 | OBJECT_JYA_OBJ | 0x00F1 | 10 | 38 | `zelda_jya_obj.zar` | l_j_1Flift_model.cmb, l_j_anahikari_model.cmb, l_j_anahikari_modelT.cmb, l_j_bigkagami_model.cmb … |
 | OBJECT_HAKA_OBJECTS | 0x0069 | 8 | 32 | `zelda_haka_objects.zar` | m_HADcoinshutter1_model.cmb, m_HADinv0b_model.cmb, m_HADinv0f_model.cmb, m_HADinv03_model.cmb … |
-| OBJECT_MIZU_OBJECTS | 0x0059 | 8 | 18 | `zelda_mizu_objects.zar` | m_Wbomb00E_model.cmb, m_Wbomb0eE_model.cmb, m_Wbomb0eW_model.cmb, m_Wbomb03_model.cmb … |
+| ~~OBJECT_MIZU_OBJECTS~~ **3 of 5 DONE** | 0x0059 | 8 | 18 | `zelda_mizu_objects.zar` | m_Wbomb00E_model.cmb, m_Wbomb0eE_model.cmb, m_Wbomb0eW_model.cmb, m_Wbomb03_model.cmb … |
 | OBJECT_DEMO_KEKKAI | 0x0179 | 8 | 16 | `zelda_demo_kekkai.zar` | l_g_door_model.cmb, l_g_hikari_modelT.cmb, l_g_hikarijimen_model.cmb, l_g_icebrock_modelT.cmb … |
 | ~~OBJECT_MORI_OBJECTS~~ **DONE** | 0x0072 | 7 | 9 | `zelda_mori_objects.zar` | l_4hasira_model.cmb, l_bigst_model.cmb, l_elevator_model.cmb, l_hasigo_model.cmb … |
 | OBJECT_ICE_OBJECTS | 0x006B | 6 | 8 | `zelda_ice_objects.zar` | ice_brick_model.cmb, ice_ice3_modelT.cmb, ice_ice_modelT.cmb, ice_tobira_model.cmb … |
@@ -507,3 +507,29 @@ worth running rather than quoting the cheap number.
 Each of those is a per-actor identification job of the kind Pass 13 did for one actor: measure the N64
 draw, then keep the candidate whose height/X/Z ratios agree. The method works and is mechanical, but it
 is one measurement per actor in the scene that holds it — there is no shortcut left to find.
+
+## Pass 17 (2026-07-30) — Water Temple worked by measurement, and TWO limits of the method found
+
+`OBJECT_MIZU_OBJECTS`: 3 of 5 actors routed, each by measuring its N64 draw.
+
+| actor | N64 measured | chosen CMB | evidence |
+|---|---|---|---|
+| `bg_mizu_water` | h=0, foot=1920x1900 | `m_Wsea00_Mov_modelT` | both axes to 0.4%, scale 1.00407 |
+| `bg_mizu_movebg` | h=85, foot=120x120 | `m_WFloat00W_model` | 0.0996/0.100/0.100, spread 1.00x |
+| `bg_mizu_shutter` | h=160, foot=160x0 | `m_Wshutter1_model` | **NAME ONLY — see limit 1** |
+| `bg_mizu_bwall` | h=0, foot=0x0 | not routed | **skinned — see limit 2** |
+| `bg_mizu_uzu` | — | not routed | draws no display list |
+
+The movebg result is the method at its best: it not only picked a mesh but **discriminated against the
+near-identical sibling** `m_WFloat00S` (1200x800x1200 vs 1200x853x1200), which is 6% off on height. Name
+matching could never separate those two.
+
+### Limit 1 — a FLAT prop yields only two ratios, so it may not discriminate
+`bg_mizu_shutter` is a flat plane (`foot=160x0`). With Z unusable there are only two ratios, and
+`m_WFloat01`, `m_Wbomb00E`, `m_Wbomb0eE` and `m_Wbomb0eW` all share the same 1200x1200 X/Y and tie at
+spread 1.00x. The method is strictly weaker for flat geometry. Kept on the name and FLAGGED as such.
+
+### Limit 2 — the method cannot see SKINNED actors at all
+`bg_mizu_bwall`'s model resolves as skinned, so it takes the bone-length scale path and never produces a
+bbox measurement (`n64h=0 foot=0x0`). Any skinned actor in this queue is outside this method's reach and
+needs a different identification route.
