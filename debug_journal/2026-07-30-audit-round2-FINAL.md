@@ -633,3 +633,38 @@ cost one printf and refuted a claim I had already published.
 **Residual unknown, honestly labelled:** why a queued warp fails to complete even when frames are
 stepped afterwards. Headless frame throttling is the obvious suspect and is untested. C033's falsifier
 covers it.
+
+### RESOLVED: every "warp did nothing" in this session was `settle` freezing the game
+
+`settle` sets `gZelda3dFreeze = 1`, and `z_play.c` skips `Play_Update` while frozen — so a transition
+queued after settling never executes. It runs the instant you `freeze 0`. Demonstrated cleanly: warp
+accepted with `trigger(was)=0`, still in Kokiri 22 s later; issued `freeze 0` and the warp completed
+immediately (Kokiri marker actors 0, `spot00_objects` 2).
+
+That single fact explains the whole chain of confusion:
+* the "warp only works once per restart" claim (C032, falsified) — the successful 85→81→85 run simply
+  had no `settle` between calls, while every failure was preceded by one;
+* the earlier "warp after a `tp` produced a byte-identical frame", which I had attributed to Link
+  having no floor;
+* and the `trigger != OFF` condition in C033, which is the downstream *symptom* of having been frozen
+  rather than an independent rule.
+
+`warp` now warns about the freeze FIRST, because it is the actionable cause. Three attempts at this
+diagnostic, each wrong in an instructive way: version 1 always said "warp -> entrance …" (no failure
+signal at all); version 2 keyed on `transitionMode`, which reads OFF during the failure and so printed
+ACCEPTED on it; version 3 keys on `transitionTrigger`, which is right but reports a symptom. Only
+version 4 names the cause. The thing that kept the investigation honest at every step was printing an
+independent observable (`from scene`, then actor identity) rather than trusting the verdict.
+
+### VERIFIED: the auto-cache scene-change retry (completes the previous tick's partial result)
+Kokiri Forest accumulated 2 state-4 give-ups (`zelda_gi_heart` 0xb7, `zelda_mamenoki` 0x11e) with 0
+state-3. Transitioning to Hyrule Field — confirmed by actor identity, not by the warp's own reply —
+removed both from `autostate` entirely and logged:
+
+```
+SOH3D AUTO: scene 81 -- retrying 2 slot(s) that never got a measurement
+```
+
+The count matches exactly, and Hyrule Field then produced 1 new state-4 slot of its own, which is the
+intended per-scene behaviour. So an actor that is merely off-screen when first encountered is no longer
+written off for the whole session.
