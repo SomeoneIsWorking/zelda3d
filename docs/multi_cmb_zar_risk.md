@@ -24,7 +24,7 @@ The top entries are unambiguous regardless: 16 Fire Temple actors cannot all be 
 | OBJECT_HAKA_OBJECTS | 0x0069 | 8 | 32 | `zelda_haka_objects.zar` | m_HADcoinshutter1_model.cmb, m_HADinv0b_model.cmb, m_HADinv0f_model.cmb, m_HADinv03_model.cmb … |
 | OBJECT_MIZU_OBJECTS | 0x0059 | 8 | 18 | `zelda_mizu_objects.zar` | m_Wbomb00E_model.cmb, m_Wbomb0eE_model.cmb, m_Wbomb0eW_model.cmb, m_Wbomb03_model.cmb … |
 | OBJECT_DEMO_KEKKAI | 0x0179 | 8 | 16 | `zelda_demo_kekkai.zar` | l_g_door_model.cmb, l_g_hikari_modelT.cmb, l_g_hikarijimen_model.cmb, l_g_icebrock_modelT.cmb … |
-| OBJECT_MORI_OBJECTS | 0x0072 | 7 | 9 | `zelda_mori_objects.zar` | l_4hasira_model.cmb, l_bigst_model.cmb, l_elevator_model.cmb, l_hasigo_model.cmb … |
+| ~~OBJECT_MORI_OBJECTS~~ **DONE** | 0x0072 | 7 | 9 | `zelda_mori_objects.zar` | l_4hasira_model.cmb, l_bigst_model.cmb, l_elevator_model.cmb, l_hasigo_model.cmb … |
 | OBJECT_ICE_OBJECTS | 0x006B | 6 | 8 | `zelda_ice_objects.zar` | ice_brick_model.cmb, ice_ice3_modelT.cmb, ice_ice_modelT.cmb, ice_tobira_model.cmb … |
 | OBJECT_OF1D_MAP | 0x00C9 | 6 | 4 | `zelda_oF1d.zar` | goronpeople.cmb, go_smoke_model.cmb, oF1d_iwa2_model.cmb, oF1d_iwa_model.cmb |
 | OBJECT_GANON | 0x00E1 | 5 | 24 | `zelda_ganon.zar` | efc_ganon_floor_modelT.cmb, ganon_tyuka_ue_model.cmb, ganondorf.cmb, efc_fg_thunder1_modelT.cmb … |
