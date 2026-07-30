@@ -390,3 +390,31 @@ Tooling now in place for it:
 
 So the per-row procedure is now mechanical: get the N64 extents from `autostate`, list the archive's
 candidate CMB bboxes, and pick the one with three consistent ratios. No name matching, no guessing.
+
+## Pass 13 (2026-07-30) — the method's first routing, and two suspect scales it exposed
+
+`Bg_Ydan_Maruta` -> `ydan_t_hasigo`, identified by MEASUREMENT:
+
+| candidate | bbox | h ratio | x ratio | z ratio | verdict |
+|---|---|---|---|---|---|
+| `ydan_t_hasigo` | 323 x 1360 x 20 | 0.0993 | 0.0991 | 0.100 | **all three agree** |
+| `ydan_maruta` | 4000 x 1243 x 3900 | 0.109 | 0.008 | 0.0005 | inconsistent |
+| `ydan_ytoge` | 4816 x 440 x 414 | 0.307 | 0.0066 | 0.0048 | inconsistent |
+
+(N64 draw measured h=135, foot=32x2. The actor branches on params: 0 = rolling spiked log, non-zero =
+falling ladder; all Deku Tree instances are params=1.)
+
+Name matching would have picked `ydan_maruta` — *maruta* means log and the trap IS a spiked log — and
+been **wrong by 200x on Z**. It had also already assigned `ydan_t_hasigo` to `Bg_Ydan_Hasi`, which draws
+the water plane. Two rounds of name reasoning, both wrong; one measurement, settled.
+
+Verified: scale 0.09926, zero cross-check warnings for this archive, draws 6799 px.
+
+### Two pre-existing suspect scales the cross-check immediately found
+* **`zelda_syokudai` (0xa4)** — height scale 0.99363 disagrees with the footprint by 1.36x/1.37x. This is
+  the wooden-torch routing shipped earlier the same day from a height-only derivation. It renders the
+  right MESH, so this is a scale error rather than a misidentification, and it should be re-derived from
+  the footprint.
+* **`zelda_d_lift` (0x11d)** — 2.08x/2.25x off.
+
+Neither was visible before the cross-check existed.
