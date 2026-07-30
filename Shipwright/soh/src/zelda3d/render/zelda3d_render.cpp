@@ -660,17 +660,30 @@ typedef struct {
     u16 paramMask;            // 0 = match any params; else params & mask must == paramValue
     u16 paramValue;
     const char* cmbSubstr;    // ZAR-internal CMB name substring (matches Zelda3D_AutoModelId's "|" suffix)
+    // 1 = draw at the actor's origin with NO base anchor. The static-prop path normally applies
+    // goff = -AutoModelMinY so a centre-origin prop's bottom sits on the actor's ground Y. That is
+    // wrong for a model authored in the SAME actor-local space as the N64 display list it replaces:
+    // anchoring lifts it by its own height. The tell that a CMB is in that class is the measured
+    // scale coming out at exactly 1.0 (N64 draw height == CMB height), i.e. Grezzo re-authored the
+    // asset in place rather than re-originating it.
+    int noBaseAnchor;
     Zelda3D_AutoEntry entry;  // parallel state slot (does not collide with sAuto[objId])
 } Zelda3D_ActorForcedAutoSlot;
 static Zelda3D_ActorForcedAutoSlot sActorForcedAuto[] = {
     // Dancing couple (peer EN_MU keeps marketpeople.cmb via default AUTO).
-    { ACTOR_EN_TG, 0, 0, "couple", {0} },
+    { ACTOR_EN_TG, 0, 0, "couple", 0, {0} },
     // Wooden torch — Obj_Syokudai draws gWoodenTorchDL when (params >> 12) == 2. Route to
     // syokudai_ki_model.cmb ("ki" = wood, JP). Golden torches (params >> 12 == 0) keep the
     // default AUTO pick (syokudai_gn_model.cmb — largest CMB, correct default). Timed torches
     // (params >> 12 == 1) still fall through to AUTO for now — their OoT3D CMB match is
     // uncertain between syokudai_model.cmb and a variant; separate follow-up.
-    { ACTOR_OBJ_SYOKUDAI, 0xF000, 0x2000, "syokudai_ki", {0} },
+    { ACTOR_OBJ_SYOKUDAI, 0xF000, 0x2000, "syokudai_ki", 0, {0} },
+    // Deku Tree mouth. zelda_spo04_objects.zar (note: "spo04", OoT3D drops the t) holds ELEVEN CMBs
+    // -- the mouth plus a set of Y_*/ousei_* cutscene models -- so AUTO's largest-CMB pick would give
+    // Bg_Treemouth a cutscene mesh. Route it explicitly. "kuchi" is Japanese for mouth.
+    // This is a non-skinned entry, so it depends on the forced-slot measure-key fix: before that,
+    // non-skinned forced entries could never complete a measurement and always fell back to N64.
+    { ACTOR_BG_TREEMOUTH, 0, 0, "spot04_kuchi", /*noBaseAnchor=*/1, {0} },
 };
 int Zelda3D_ForcedSlotCount(void) { return (int)ARRAY_COUNT(sActorForcedAuto); }
 const Zelda3D_AutoEntry* Zelda3D_ForcedSlotInfo(int i, short* outActorId, const char** outCmbSubstr) {
@@ -1006,7 +1019,9 @@ static int Zelda3D_TryAuto(PlayState* play, Actor* actor) {
         // (the Kokiri sword-maze rolling boulder) is sphere-center-origin and was buried to its
         // equator. REPL `autoyoff <f>` adds a live global nudge on top for tuning.
         extern float gZelda3dAutoYoffNudge;
-        float goff = -Zelda3D_AutoModelMinY(e->modelId) + gZelda3dAutoYoffNudge;
+        float goff = (forced != NULL && forced->noBaseAnchor)
+                       ? gZelda3dAutoYoffNudge
+                       : -Zelda3D_AutoModelMinY(e->modelId) + gZelda3dAutoYoffNudge;
         Zelda3D_DrawModelGL(play, e->modelId, actor, e->scale, NULL, goff, NULL, NULL);
         return 1;
     }

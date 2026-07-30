@@ -54,6 +54,13 @@ ALIAS = {
     "lightbox": "dk_lightbox",  # En_Lightbox (Forest Temple light box) (dk_lightbox/lightbox4_model.cmb)
     "shop_dungen": "shop_tana",  # En_Tana shop shelves (shop_tana01/02/03_model.cmb) — #115
     "gol": "kogoma",            # En_Goma baby-Gohma larva (uses gObjectGolSkel egg-hatch) (kogoma/childgoma.cmb)
+    # OoT3D drops the "t": zelda_spo04_objects.zar, not zelda_spot04_objects.zar. Holds
+    # spot04_kuchi_model.cmb -- "kuchi" is Japanese for MOUTH -- which is Bg_Treemouth's model, the
+    # Deku Tree's mouth in Kokiri Forest. It had been rendering the N64 mesh in an otherwise-3DS
+    # scene purely because of the one-character name difference. NOTE: this archive holds 11 CMBs
+    # (Y_*/ousei_* cutscene models too), so AUTO's largest-CMB heuristic cannot be trusted to pick
+    # the mouth -- Bg_Treemouth is routed to it explicitly via sActorForcedAuto in zelda3d_render.cpp.
+    "spot04_objects": "spo04_objects",
 }
 
 # Alias values are OoT3D zar BASENAMES. Resolve to a real /actor path, trying the common
