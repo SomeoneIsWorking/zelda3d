@@ -156,7 +156,27 @@ operator. Treat as leads. Numbers are the agent's own.
     So the finding's mechanism ("the marker composites at that point") is not the issue — op ordering
     within the list is fine. The issue is a LATER full-target blit erasing everything already in fb 0.
 
-    ROOT CAUSE, now MEASURED rather than read (op-order dump, `ZELDA3D_OPORDER=1`):
+    **CAUSE UNRESOLVED — and my earlier confident claim here was premature. Read this whole entry
+    before acting on it.** Three hypotheses have now been tried and TWO are eliminated:
+
+      H1 "a later resolve blit overwrites the HUD in fb 0" — ELIMINATED. A frame-scoped op-sequence
+         probe shows the COPY(fb0<-fb1) executing at op 74/168/203 with `first fb0 draw = -1`, i.e.
+         NO fb-0 draw has run yet at that point. The HUD draws come AFTER the copy, so they land on
+         top and cannot be erased by it.
+      H2 "the HUD is never recorded/appended at MSAA 4" — ELIMINATED. 19376 fb-0 draws execute per
+         frame at MSAA 4 (vs 519000 at MSAA 1 where scene+HUD share fb 0), `Begin` succeeds
+         identically (`api=1 recording=1 fb0=800x480`), and there are no SDL/pipeline errors.
+      H3 remaining: something between "the ops executed into fb 0" and "the PNG" loses them —
+         e.g. capture timing, or a clear/blit I have not found. **Which means the user-visible claim
+         itself is now in doubt: the screenshot definitely lacks the HUD, but whether a player on a
+         headed display sees the same thing is UNVERIFIED, and this machine is headless-only.**
+
+    What is solidly established: at MSAA 4 the frame is restructured (scene -> fb 1 plus one
+    COPY -> fb 0 per frame; at MSAA 1 everything renders straight into fb 0 with no copy), and the
+    HUD's `op.fb = 0` hardcode (`gfx_sdl3gpu.cpp:2641`) is a real coupling to that structure. That is
+    worth fixing on its own terms, but it is not yet shown to be THIS symptom's cause.
+
+    Superseded measurement notes follow (kept because the numbers are still valid):
 
         MSAA 1 :  draws -> fb 0 = 519000   draws -> fb 1 =      0   copies into fb 0 =  0
         MSAA 4 :  draws -> fb 0 =  19376   draws -> fb 1 = 478624   copies into fb 0 = 1/frame
