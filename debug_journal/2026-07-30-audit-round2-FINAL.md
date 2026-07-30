@@ -695,3 +695,42 @@ table's `LhOpen`/`LhClosed` values were already correct and unchanged by the por
 which model TYPE the game selects during locomotion, i.e. the `PLAYER_MODELGROUP_*` selection path,
 which is a different mechanism from everything else this session touched. Fixing it means working out
 what OoT3D selects while running, not correcting a constant.
+
+### link.cpp:311 (hands flat-open while running) — PREMISE FALSIFIED. Audit round 2 is now fully resolved.
+
+Not a bug. OoT3D's `gPlayerModelTypes` — the `modelGroup -> {animType, leftHand, rightHand, sheath,
+waist}` table that decides WHICH model type is selected — is **byte-identical to N64's**.
+
+Located at **VA 0x0053a558**, 16 rows x 5 bytes, by searching `code.bin` for distinctive N64 row
+signatures and requiring them to land at the correct consecutive 5-byte offsets:
+
+```
+ 0 MODELGROUP_0          02 00 0a 10 14   LH_OPEN      RH_SHIELD
+ 1 CHILD_HYLIAN_SHIELD   01 02 09 13 14   LH_SWORD     RH_CLOSED
+ 2 SWORD_AND_SHIELD      01 02 0a 11 14   LH_SWORD     RH_SHIELD
+ 3 DEFAULT               00 00 08 12 14   LH_OPEN      RH_OPEN     <- locomotion / idle
+ 4 (unused, = DEFAULT)   00 00 08 12 14   LH_OPEN      RH_OPEN
+ 5 BGS                   03 04 09 13 14   LH_BGS       RH_CLOSED
+ 6 BOW_SLINGSHOT         04 01 0b 12 14   LH_CLOSED    RH_BOW
+ ...
+15 SWORD                 00 02 08 13 14   LH_SWORD     RH_OPEN
+```
+
+Every row matches `gPlayerModelTypes` in `z_player_lib.c`. The locomotion group is `DEFAULT`, and it
+selects `LH_OPEN` + `RH_OPEN` on **both** platforms — so open hands while running is what OoT3D does,
+and our port already reproduces it. There is no selection divergence to fix, and the "unused, same as
+DEFAULT" group 4 being identical here is a bonus consistency check on the row alignment.
+
+## AUDIT ROUND 2 — CLOSED. 22 of 22 findings resolved.
+
+Every confirmed finding is now either fixed or premise-falsified with the evidence recorded. Three of
+the 22 turned out to be **wrong premises rather than defects** (this one, the bow waist piece, and the
+false far-LOD rationale, which was a wrong reason for correct code) — worth noting, because acting on
+any of them would have introduced a regression while appearing to fix something.
+
+**The method that closed the most findings, by a wide margin: find the table in `code.bin` and compare
+it byte-exact.** It settled the sheath rows, the whole `sPlayerDLists` family (which collapsed ~7
+separate hand findings into one port), the waist premise, and this model-type premise — four times in
+one session. It works because Grezzo largely kept N64's data layout, so the N64 source doubles as a
+Rosetta stone: search for a distinctive row's bytes, require the neighbours to land at the right
+stride, and the assignment is pinned without any Ghidra or guesswork.
