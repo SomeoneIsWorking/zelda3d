@@ -262,3 +262,32 @@ Everything else is inert and safe as it stands:
 **So there are no unverified risks outstanding from these routings.** The standing rule is what matters
 going forward: when a slot first reaches `state=2`, it needs the `ahide` pixel check before its routing
 can be trusted — and a zero only counts against it when the slot is `state=2` AND the actor is in frame.
+
+## Pass 8 (2026-07-30) — the web routing was CORRECT; my check was one-sided. Verification standard amended.
+
+`Bg_Ydan_Sp` -> `ydan_spkabe` is now SHIPPED. It was reverted twice on a bad measurement, and the
+correction matters more than the prop:
+
+The web is a **flat single-sided plane** (bbox 2800 x 2888 x **0**) with `cull=1`, so it is visible only
+from its front hemisphere. My `ahide` check used ONE camera angle, which happened to sit on its back,
+read 0 px, and I called it a regression. An orbit sweep settles it:
+
+| azimuth | 0 | 45 | 90 | 135 | 180 | 225 | 270 | 315 |
+|---|---|---|---|---|---|---|---|---|
+| px | 0 | 0 | 0 | 0 | 13589 | 19865 | 20478 | 11919 |
+
+That is exactly correct culling, and it matches OoT3D — whose own material culls back faces. The N64
+mesh draws from both sides, which is why the N64 web appeared from an angle where ours does not;
+matching OoT3D is the goal, so single-sided is right.
+
+Also settled offline: the web winds **100% CCW-from-normal**, identical to the control volumes
+(`l_elevator` 576/576, `ddanh_jd` 56/56, `floormaster` 484/484). So the asset is not mis-wound and the
+global front-face convention is NOT in question — an earlier warning to the contrary is retracted.
+
+### AMENDED VERIFICATION STANDARD
+* **Closed volumes:** a single-angle `ahide` pixel check is sound — some front face always faces the
+  camera.
+* **Flat / single-sided props:** a single angle is INVALID. Orbit the camera (`camorbit 45` x8) and
+  require non-zero contribution from *some* azimuth. Zero from one angle proves nothing.
+* Tell the two apart with `scratch/bin/cmb_tex_alpha`, which now reports the geometry bbox: any axis of
+  size ~0 means flat.
