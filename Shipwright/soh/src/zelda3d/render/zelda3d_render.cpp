@@ -813,6 +813,18 @@ static Zelda3D_ActorForcedAutoSlot sActorForcedAuto[] = {
     { ACTOR_BG_MIZU_MOVEBG,  0, 0, "m_WFloat00W", 0, {0} },
     { ACTOR_BG_MIZU_WATER,   0, 0, "m_Wsea00",    0, {0} },
     { ACTOR_BG_BDAN_SWITCH, 0x00FF, 0x0000, "bdan_switch_b", 0, {0} },
+    // Jabu-Jabu platforms + water. The cleanest row so far: z_bg_bdan_objects.c has an EXPLICIT DL table
+    // indexed straight by params (Init masks params to 0xFF), and every entry is corroborated by the CMB
+    // name, so there is no guessing at any step:
+    //     params 0 -> gJabuObjectsLargeRotatingSpikePlatformDL -> bdan_toge   (toge = spike)
+    //     params 1 -> gJabuElevatorPlatformDL                  -> bdan_ere    (erebeeta = elevator)
+    //     params 2 -> gJabuWaterDL            (drawn XLU)      -> bdan_bmizu  (mizu = water; the CMB's
+    //                                                            "modelT" suffix agrees it is translucent)
+    //     params 3 -> gJabuFallingPlatformDL                   -> bdan_fdai   (dai = platform/stand)
+    { ACTOR_BG_BDAN_OBJECTS, 0x00FF, 0x0000, "bdan_toge",  0, {0} },
+    { ACTOR_BG_BDAN_OBJECTS, 0x00FF, 0x0001, "bdan_ere",   0, {0} },
+    { ACTOR_BG_BDAN_OBJECTS, 0x00FF, 0x0002, "bdan_bmizu", 0, {0} },
+    { ACTOR_BG_BDAN_OBJECTS, 0x00FF, 0x0003, "bdan_fdai",  0, {0} },
     { ACTOR_BG_MIZU_SHUTTER, 0, 0, "m_Wshutter1", 0, {0} },
     // Jabu-Jabu BLUE floor switch. Bg_Bdan_Switch selects on `params & 0xFF` (its header: 0 BLUE,
     // 1 YELLOW_HEAVY, 2 YELLOW, 3 YELLOW_TALL_1, 4 YELLOW_TALL_2), and the CMB names are corroborated by
