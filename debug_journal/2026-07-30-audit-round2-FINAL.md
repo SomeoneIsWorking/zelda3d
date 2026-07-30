@@ -311,7 +311,9 @@ So the two obvious routes are both dead, and adding a `dk_`-style alias — whic
 note about "3 missing dk_ ZAR aliases" implied for this — cannot work here. (The eight real `dk_`
 archives are `board, floater, lightbox, pu_box, spia, stonebridge, trap, vase`; none is a tree mouth.)
 
-**The live hypothesis, NOT yet checked:** OoT3D bakes the tree mouth into the spot04 ROOM mesh
+**The live hypothesis, NOT yet checked:** *(REFUTED later the same session — see "I GOT THIS WRONG"
+below. The mouth mesh MOVES, so it cannot be baked into a static room mesh, and draw suppression is
+NOT the fix. Do not act on this paragraph.)* OoT3D bakes the tree mouth into the spot04 ROOM mesh
 (room CMBs live in the `.zsi`, one per room) rather than shipping it as an actor. If that is true the
 fix is to SUPPRESS the N64 `Bg_Treemouth` draw, not to find a CMB for it — and getting that wrong
 leaves a hole in the world, so it must be confirmed by inspecting the room mesh first, not assumed.
