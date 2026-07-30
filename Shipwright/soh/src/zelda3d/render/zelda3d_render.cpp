@@ -685,6 +685,20 @@ static Zelda3D_ActorForcedAutoSlot sActorForcedAuto[] = {
     // non-skinned forced entries could never complete a measurement and always fell back to N64.
     { ACTOR_BG_TREEMOUTH, 0, 0, "spot04_kuchi", /*noBaseAnchor=*/1, {0} },
 };
+// Two DIFFERENT reasons an auto slot stops trying, which used to share state 3 and therefore shared
+// its permanence:
+//   state 3 = STRUCTURALLY unreplaceable (no ZAR, no such CMB, model has no geometry, skinned with
+//             n64anim off). Nothing about another scene changes this, so it is correctly permanent.
+//   state 4 = NEVER GOT A MEASUREMENT. The bbox measure needs the actor's N64 draw to actually
+//             happen; if the actor is culled or off-screen every frame we look at it, the measure
+//             bracket never closes. `tries` therefore counts FRAMES WAITED, not failures -- an actor
+//             that happens to be off-screen for its first 8 frames was marked unreplaceable FOR THE
+//             WHOLE PROCESS, including in later scenes where it stands in plain view. sAuto is never
+//             cleared, so nothing ever undid it.
+// Splitting them lets the second kind expire at a scene change, which is the natural scope: the
+// evidence ("never drawn while we watched") was gathered in one scene and says nothing about another.
+#define ZELDA3D_AUTO_NOMEAS 4
+
 int Zelda3D_ForcedSlotCount(void) { return (int)ARRAY_COUNT(sActorForcedAuto); }
 const Zelda3D_AutoEntry* Zelda3D_ForcedSlotInfo(int i, short* outActorId, const char** outCmbSubstr) {
     if (i < 0 || i >= (int)ARRAY_COUNT(sActorForcedAuto)) return NULL;
@@ -853,7 +867,7 @@ static int Zelda3D_DrawVariant(PlayState* play, Actor* actor) {
                         fflush(stderr);
                     }
                 }
-            } else if (m->state != 3) {
+            } else if (m->state != 3 && m->state != ZELDA3D_AUTO_NOMEAS) {
                 // Many instances of these props draw per frame, so a single measure bracket often
                 // loses the race to a culled sibling -- same reason the field-grass slot needs a
                 // generous try budget rather than the 8 used for one-off props.
@@ -864,7 +878,7 @@ static int Zelda3D_DrawVariant(PlayState* play, Actor* actor) {
                     sPendingMeasureKey = (int)(ZELDA3D_MEASKEY_VARIANT_BASE + i);
                     return 0; // let the N64 prop draw so it can be measured
                 }
-                m->state = 3; // never measured -> keep the seed scale below, do NOT fall back to N64
+                m->state = ZELDA3D_AUTO_NOMEAS; // keep the seed scale below; retried next scene
             }
         }
         float scale = (m->state == 2) ? m->scale : v->fallbackScale;
@@ -971,7 +985,7 @@ static int Zelda3D_TryAuto(PlayState* play, Actor* actor) {
     } else {
         e = &sAuto[objId];
     }
-    if (e->state == 3) {
+    if (e->state == 3 || e->state == ZELDA3D_AUTO_NOMEAS) {
         return 0; // known-unreplaceable -> N64
     }
     if (e->modelId == 0) {
@@ -1057,7 +1071,7 @@ static int Zelda3D_TryAuto(PlayState* play, Actor* actor) {
     }
     // Need a measurement: bracket this actor's N64 draw (begin here, end in AfterActorDraw).
     if (e->tries >= 8) {
-        e->state = 3; // never produced a measurement (always culled / off-screen) -> give up
+        e->state = ZELDA3D_AUTO_NOMEAS; // never drawn while we watched -> retried next scene
         return 0;
     }
     e->tries++;
@@ -1067,11 +1081,47 @@ static int Zelda3D_TryAuto(PlayState* play, Actor* actor) {
     return 0; // let the N64 model draw so it can be measured
 }
 
+// Clear the measurement-give-ups when the scene changes. Deliberately does NOT touch state 3.
+static void Zelda3D_AutoRetryOnSceneChange(PlayState* play) {
+    static s16 sLastScene = -1;
+    const s16 cur = (s16)play->sceneNum;
+    if (cur == sLastScene) {
+        return;
+    }
+    sLastScene = cur;
+    int revived = 0;
+    for (size_t i = 0; i < ARRAY_COUNT(sAuto); i++) {
+        if (sAuto[i].state == ZELDA3D_AUTO_NOMEAS) {
+            sAuto[i].state = 0; sAuto[i].tries = 0; sAuto[i].measuredH = 0.0f; revived++;
+        }
+    }
+    for (size_t i = 0; i < ARRAY_COUNT(sActorForcedAuto); i++) {
+        Zelda3D_AutoEntry* e = &sActorForcedAuto[i].entry;
+        if (e->state == ZELDA3D_AUTO_NOMEAS) { e->state = 0; e->tries = 0; e->measuredH = 0.0f; revived++; }
+    }
+    for (size_t i = 0; i < ARRAY_COUNT(sVariantMeas); i++) {
+        Zelda3D_ForcedMeas* m = &sVariantMeas[i].meas;
+        if (m->state == ZELDA3D_AUTO_NOMEAS) { m->state = 0; m->tries = 0; m->measuredH = 0.0f; revived++; }
+    }
+    Zelda3D_ForcedMeas* fm[] = { &sWellArchMeas, &sWindmillMeas, &sFieldGrassMeas };
+    for (size_t i = 0; i < ARRAY_COUNT(fm); i++) {
+        if (fm[i]->state == ZELDA3D_AUTO_NOMEAS) { fm[i]->state = 0; fm[i]->tries = 0; fm[i]->measuredH = 0.0f; revived++; }
+    }
+    if (revived > 0 && Zelda3D_AutoMode() >= 1) {
+        fprintf(stderr, "SOH3D AUTO: scene %d -- retrying %d slot(s) that never got a measurement\n",
+                (int)cur, revived);
+        fflush(stderr);
+    }
+}
+
 int Zelda3D_TryDrawActor(PlayState* play, Actor* actor) {
     s32 i;
     if (!Zelda3D_Enabled()) {
         return 0;
     }
+    // Self-contained scene-change detection: this is the one entry point every actor passes through,
+    // so no new call site (and no coupling into z_play) is needed to notice a transition.
+    Zelda3D_AutoRetryOnSceneChange(play);
     // REPL `ahide`: claim the draw and emit nothing. Returning 1 means "handled, skip the N64 draw",
     // so this hides the actor without killing it (collision and scene state intact) and without
     // freezing it (freezing does not stop a draw). Placed before every other branch so it hides
@@ -1124,7 +1174,7 @@ int Zelda3D_TryDrawActor(PlayState* play, Actor* actor) {
                 Zelda3D_DrawModelGL(play, fg->modelId, actor, fg->scale, NULL, 0.0f, NULL, NULL);
                 return 1;
             }
-            if (fg->state != 3) {
+            if (fg->state != 3 && fg->state != ZELDA3D_AUTO_NOMEAS) {
                 if (fg->measuredH > 0.0f) {
                     float modelH = Zelda3D_AutoModelHeight(fg->modelId);
                     if (modelH > 1e-3f) {
@@ -1155,7 +1205,7 @@ int Zelda3D_TryDrawActor(PlayState* play, Actor* actor) {
                     sPendingMeasureKey = ZELDA3D_MEASKEY_FIELDGRASS;
                     return 0; // let the N64 tuft draw so it can be measured this frame
                 }
-                fg->state = 3; // never measured (always culled) -> give up, stay N64
+                fg->state = ZELDA3D_AUTO_NOMEAS; // never measured -> stay N64, retried next scene
             }
             return 0;
         }
@@ -1191,7 +1241,7 @@ int Zelda3D_TryDrawActor(PlayState* play, Actor* actor) {
                 wscale = gZelda3dGScale[7]; // live REPL override wins, skip calibration
             } else if (wm->state == 2) {
                 wscale = wm->scale; // calibrated
-            } else if (wm->state != 3) {
+            } else if (wm->state != 3 && wm->state != ZELDA3D_AUTO_NOMEAS) {
                 // Derive once the N64 height has arrived; else (re)measure the N64 draw this frame.
                 if (wm->measuredH > 0.0f) {
                     float modelH = Zelda3D_AutoModelHeight(wm->modelId);
@@ -1215,7 +1265,7 @@ int Zelda3D_TryDrawActor(PlayState* play, Actor* actor) {
                     sPendingMeasureKey = ZELDA3D_MEASKEY_WINDMILL;
                     return 0; // let the N64 windmill draw so it can be measured this frame
                 } else {
-                    wm->state = 3; // never measured (always culled) -> fall back to shared scale
+                    wm->state = ZELDA3D_AUTO_NOMEAS; // fall back to shared scale; retried next scene
                     wscale = ZELDA3D_SPOT01_WORLD_SCALE;
                 }
             } else {
@@ -1245,7 +1295,7 @@ int Zelda3D_TryDrawActor(PlayState* play, Actor* actor) {
                 wscale = gZelda3dGScale[8]; // live REPL override wins, skip calibration
             } else if (wa->state == 2) {
                 wscale = wa->scale; // calibrated
-            } else if (wa->state != 3) {
+            } else if (wa->state != 3 && wa->state != ZELDA3D_AUTO_NOMEAS) {
                 // Derive once the N64 height has arrived; else (re)measure the N64 draw this frame.
                 if (wa->measuredH > 0.0f) {
                     float modelH = Zelda3D_AutoModelHeight(wa->modelId);
@@ -1269,7 +1319,7 @@ int Zelda3D_TryDrawActor(PlayState* play, Actor* actor) {
                     sPendingMeasureKey = ZELDA3D_MEASKEY_WELLARCH;
                     return 0; // let the N64 arch draw so it can be measured this frame
                 } else {
-                    wa->state = 3; // never measured (always culled) -> fall back to shared scale
+                    wa->state = ZELDA3D_AUTO_NOMEAS; // fall back to shared scale; retried next scene
                     wscale = ZELDA3D_SPOT01_WORLD_SCALE;
                 }
             } else {
