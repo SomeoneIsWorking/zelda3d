@@ -760,6 +760,22 @@ static Zelda3D_ActorForcedAutoSlot sActorForcedAuto[] = {
     // The FLOOR web stays unrouted for an unrelated reason: it is horizontal, so its model height is
     // ~0 and the bbox-height measure cannot derive a scale. Flat props need Zelda3D_AutoModelExtentXZ
     // footprint sizing, as Bg_Spot01_Idomizu's well water already does.
+    // Deku Tree webs and water. All three are FLAT or near-flat, which is why they only became
+    // routable once the measure bracket started reporting a FOOTPRINT as well as a height.
+    //   WEB_WALL  (params & 0xF == 1) -> ydan_spkabe (kabe = wall)
+    //   WEB_FLOOR (params & 0xF == 0) -> ydan_spyuka (yuka = floor)
+    // Match the LIVE params: Bg_Ydan_Sp's Init rewrites actor->params to the type nibble
+    // (z_bg_ydan_sp.c:100), so the packed 0xF000 field is wrong here.
+    // Both webs are cull=1 single-sided planes -- verify them with an ORBIT sweep, never one camera
+    // angle. A single angle on the back of a plane reads 0 px and looks exactly like a broken routing;
+    // that mistake cost two spurious reverts of this very entry.
+    { ACTOR_BG_YDAN_SP, 0x000F, 0x0001, "ydan_spkabe", 0, {0} },
+    { ACTOR_BG_YDAN_SP, 0x000F, 0x0000, "ydan_spyuka", 0, {0} },
+    //   Bg_Ydan_Hasi -> ydan_mizu (mizu = water). Its N64 draw is gDTWaterPlaneDL, the WATER PLANE, not
+    //   a bridge: "hasi" (bridge) and "hasigo" (ladder) are different words that a substring matcher
+    //   conflates, which is why the actor's draw code decides the mapping and the CMB name only
+    //   suggests it. cull=3 here (double-sided), so any camera angle is valid for this one.
+    { ACTOR_BG_YDAN_HASI, 0, 0, "ydan_mizu", 0, {0} },
     { ACTOR_EN_FLOORMAS, 0, 0, "floormaster", 0, {0} },
     { ACTOR_EN_WALLMAS,  0, 0, "fallmaster",  0, {0} },
     // King Dodongo's ZAR also holds his fire breath. AUTO picked kingdodongo.cmb (137216 bytes), so
@@ -1159,7 +1175,14 @@ static int Zelda3D_TryAuto(PlayState* play, Actor* actor) {
     // and then giving up permanently. Their FOOTPRINT is the usable signal.
     if (e->measuredH > 0.0f || e->measFootX > 0.0f || e->measFootZ > 0.0f) {
         float modelH = Zelda3D_AutoModelHeight(e->modelId);
-        if (modelH <= 1e-3f || e->measuredH <= 1e-3f) {
+        // "Flat" is RELATIVE, not absolute. The Deku Tree FLOOR web measured a height of 10.0 against a
+        // footprint of thousands of units: that passes an absolute `height > 0` test and yields a scale
+        // divided by a near-noise number, which is fragile. Prefer the footprint whenever the height is
+        // a tiny fraction of the footprint, and keep the absolute test for a true zero.
+        const float foot = (e->measFootX > e->measFootZ) ? e->measFootX : e->measFootZ;
+        const int tooFlat = (modelH <= 1e-3f) || (e->measuredH <= 1e-3f) ||
+                          (foot > 1e-3f && e->measuredH < 0.05f * foot);
+        if (tooFlat) {
             // Too flat to scale by height: match the FOOTPRINT instead, on whichever axis is better
             // determined. Same principle as Bg_Spot01_Idomizu's well water, which needed a bespoke
             // path before this existed.
