@@ -1057,6 +1057,16 @@ int Zelda3D_TryDrawActor(PlayState* play, Actor* actor) {
     if (!Zelda3D_Enabled()) {
         return 0;
     }
+    // REPL `ahide`: claim the draw and emit nothing. Returning 1 means "handled, skip the N64 draw",
+    // so this hides the actor without killing it (collision and scene state intact) and without
+    // freezing it (freezing does not stop a draw). Placed before every other branch so it hides
+    // N64-drawn and 3DS-replaced actors alike -- an N64-only actor is exactly the case it is for.
+    // LIMITATION, measured: this does NOT hide Link. The Player draws through the Player_Draw hook,
+    // not through here, so `asel link; ahide 1` changes only 574 scattered px (moving grass) and is
+    // NOT a valid positive control for this primitive. Pick a scene actor when validating it.
+    if (gZelda3dHideActor != NULL && actor == gZelda3dHideActor) {
+        return 1;
+    }
     // Per-actor reset of the live-anim capture: this is the single entry consulted once for every
     // actor, before its own Draw runs the SkelAnime choke points that record the current anim.
     gZelda3dPendingAnimOtr = NULL;

@@ -259,6 +259,13 @@ float gZelda3dPendingMorphWeight = 0.0f;
 // Generic actor-control debug surface (any actor). gZelda3dSelActor is driven each frame by
 // Zelda3D_ActorPostUpdate; see zelda3d.h for the REPL surface (asel/afreeze/apos/arot/aparams/acam).
 Actor* gZelda3dSelActor = NULL;
+// REPL `ahide`: suppress the selected actor's DRAW while leaving it updating and collidable.
+// Exists to answer a question that keeps recurring in this port -- is a piece of world geometry
+// baked into the 3DS room mesh, or drawn by an N64 actor sitting on top of it? Hiding the actor for
+// one frame and re-capturing the same view answers it directly; before this there was no way to ask.
+// A hidden actor is NOT frozen or killed: killing it would also remove collision and could change
+// scene state, and freezing it does not stop it drawing.
+Actor* gZelda3dHideActor = NULL;
 s32 gZelda3dSelId = -1;
 s32 gZelda3dActorFreeze = 0;
 
