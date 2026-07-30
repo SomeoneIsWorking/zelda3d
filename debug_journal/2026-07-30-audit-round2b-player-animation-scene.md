@@ -191,3 +191,39 @@ the obvious neighbour and is clearly NOT it. Remapping on a guess would swap one
 another, and drawing the ocarina there is the pre-existing behaviour rather than a new regression.
 Identifying it needs a sweep of the remaining child hand mids (bones 19/20) against the slingshot's
 actual silhouette.
+
+## Slingshot mesh NOT FOUND after a 12-mid sweep — it may not be in the Link CMB at all
+
+Swept child mids 6, 7, 8, 9, 10, 12, 18, 19, 20, 21, 22, 23 with `linkmid only <n>` (child Link,
+frozen, `acam 110 z`). Renders: `scratch/screenshots/child_hand_ids.png`, `slingshot_check.png`,
+`child_sweep.png`. Identified:
+
+    6   hand + orange stick        -> Deku stick
+    7   small fist
+    8   grey/white bottle
+    9   Hylian shield + sword hilt on back
+    10  Hylian shield + sword hilt on back  (near-identical to 9)
+    12  DEKU shield (round, wooden) + sword hilt on back
+    18  hand + blue instrument with finger holes -> OCARINA  (confirmed above)
+    19  hand + straight brown shaft with red ends -> NOT a forked slingshot
+    20  forearm with a red grip at the wrist
+    21  sword hilt only on back
+    22  renders nothing
+    23  tall thin brown pole
+
+**No forked slingshot frame appears in any of them.** Two possibilities, and I am not guessing
+between them:
+1. it is in a child mid outside this set, or
+2. **the slingshot is a SEPARATE object, not baked into childlink_v2.cmb** — which is exactly what
+   the adult code already assumes for the hookshot ("adult hookshot model drawn separately -> empty
+   hand"). If so, "the slingshot never appears" is a bug in drawing that separate model, NOT a
+   mesh-id mapping bug, and remapping any mid would be the wrong fix entirely.
+
+Deciding this needs the OoT3D decomp checked for how `PLAYER_MODELTYPE_RH_BOW_SLINGSHOT` sources its
+geometry — i.e. whether the 3DS player draw pulls a second model for it. That is RE work, not a
+sweep, and it is the correct next step rather than more isolation captures.
+
+Useful side effect: the ids above are FIRST-HAND identifications and can be used to check
+`link_mesh_id_map.md` per-label instead of trusting it. Note 9 and 10 look near-identical here, which
+matches the map's own "9 = Hylian shield + sword on back / 10 = Hylian shield on back" only loosely —
+the difference is not visible at this camera.
