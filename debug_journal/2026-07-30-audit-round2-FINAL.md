@@ -566,3 +566,38 @@ indistinguishable from a real zero, and `grep` exits quietly either way.
 `mm3d_model.cpp:352` — the gate really is default-off. What does NOT survive is the claim that the
 scene had no skinned candidates: three of its objects (`dnt` 27 bones, `dog` 12, `pst` 2) are
 skinned-capable, which I later proved independently from the ROM.
+
+### MM3D CSAB — live evidence obtained, one gap left open honestly
+
+Ran Clock Town South with `ZELDA3D_MM_SKINNED=1 ZELDA3D_MM_DBG_SKIN=1`. What is now established:
+
+**Solid — the decode fix itself:** 585/617 MM3D clips produce motion through the real C++ parser, where
+0/109 did before, with the OoT3D control unregressed at 183/189. This is the measurement that directly
+tests the changed code.
+
+**Solid — the live path runs and selects real clips:** 7 skinned MM3D archives accepted, 6200
+per-emit `[MM3D-SKIN]` lines, and the CSAB selection is behaviour-responsive rather than stuck on a
+default — the dog cycles `dog_run` (2338 emits), `dog_bark` (749), `dog_wait` (12), plus
+`sdn_lastwait` and `pst_model`. An unmapped anim would have logged `[MM3D-ANIM]`; none did, so every
+N64 anim in the scene resolved to a CSAB.
+
+**Solid — the capture method is sound:** with the camera held, a background control region measured
+**0** changed pixels between two frames while the framed region changed 7071. So a zero here would be
+a real zero.
+
+**NOT established, and I am not claiming it:** pixel-level proof that the MM3D rig's BONES move,
+isolated from two confounds. First, the dog translates through the world (its logged position changes
+between emits), so a pixel diff on it is dominated by movement rather than pose. Second, I framed the
+camera on Link — and Link's own idle animation fully explains the 7071 px, so that number is NOT
+evidence about the MM3D actor. Measuring the framed region and then realising Link was the thing in it
+is the same class of error as the mask/background mistakes earlier today.
+
+To close it properly: frame an actor from the skinned set whose logged position is CONSTANT across
+emits (actor 0x1F2 / `pst_model` qualifies, though at 2 bones it may barely deform — `sdn` at 16 bones
+would be better), with Link moved out of frame, then diff. The inventory in
+`docs/mm3d_skinned_objects.txt` gives bone counts to choose a good candidate.
+
+I am leaving the finding FIXED on the strength of the offline measurement, which tests the changed code
+directly and at scale, while recording that the live pose observation is incomplete. That is a
+deliberate call, not an oversight: the offline harness is built against the same parser the game links,
+and the live run confirms that parser is being fed real clips.
