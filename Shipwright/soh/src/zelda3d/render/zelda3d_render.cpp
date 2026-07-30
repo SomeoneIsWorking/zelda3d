@@ -77,6 +77,8 @@ int Zelda3D_AutoModelExtentXZ(int modelId, float* outX, float* outZ); // local X
 void Zelda3D_SetTrackPosedMinY(int modelId, int enable); // per-frame posed-feet grounding (#29b player float)
 float Zelda3D_PosedGroundOffset(int modelId, unsigned long long midMask); // model-local Y to ground the feet
 int Zelda3D_AutoModelSkinned(int modelId);
+// 1 = EVERY draw group is blended, so the model is wholly translucent -> emit into POLY_XLU.
+int Zelda3D_AutoModelAllBlended(int modelId);
 int Zelda3D_AutoModelBoneCount(int modelId);
 const char* Zelda3D_AutoModelZar(int modelId); // ZAR path the model was allocated from (stable id)
 float Zelda3D_AutoModelBoneLenSum(int modelId, int boneCap); // Σ|trans| of non-root OoT3D bones with id<boneCap (skeleton size; cap excludes uncorresponded dress bones, #13)
@@ -473,7 +475,14 @@ void Zelda3D_EmitModelDraw(PlayState* play, int modelId, Actor* actor, float wor
     // High bit of the handle = "lit": apply the half-Lambert FORM term. Characters/props carry no
     // baked vertex lighting, so without this they render flat; scene rooms (other emit site) keep
     // their bit clear so their baked vColor AO isn't double-shaded.
-    gSPZelda3DDraw(POLY_OPA_DISP++, modelId | (int)0x80000000, tint[0], tint[1], tint[2]);
+    // A wholly-translucent model (web, water plane, light shaft) goes into the TRANSLUCENT list so it
+    // sorts after opaque geometry and blends against a complete frame. Everything else keeps POLY_OPA
+    // exactly as before -- see Zelda3D_AutoModelAllBlended for why MIXED models are not moved.
+    if (Zelda3D_AutoModelAllBlended(modelId)) {
+        gSPZelda3DDraw(POLY_XLU_DISP++, modelId | (int)0x80000000, tint[0], tint[1], tint[2]);
+    } else {
+        gSPZelda3DDraw(POLY_OPA_DISP++, modelId | (int)0x80000000, tint[0], tint[1], tint[2]);
+    }
     CLOSE_DISPS(play->state.gfxCtx);
 }
 
