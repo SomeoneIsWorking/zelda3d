@@ -606,8 +606,13 @@ Zelda3D_ModelEntry sModelTable[4] = {
 // via the same direct-GL path. The world scale is NOT a magic constant: it is MEASURED
 // per object. The first time such an actor is seen, we let its N64 model draw and bracket
 // that draw with the OTR_G_ZELDA3D_MEASURE opcode; the interpreter accumulates the actor's
-// eye-space (== world-space) bbox and reports its diagonal back via Zelda3D_MeasureResult.
-// scale = measured_N64_world_diag / OoT3D_model_local_diag. The next frame the OoT3D
+// eye-space (== world-space) bbox and reports its HEIGHT back via Zelda3D_MeasureResult.
+// scale = measured_N64_world_height / OoT3D_model_local_height (Zelda3D_AutoModelHeight, the
+// bind-pose local Y extent). NOT a diagonal: the interpreter deliberately projects onto the view-up
+// axis and takes the range, because height is what the manual scales were calibrated against and a
+// diagonal carries an aspect-ratio bias (see the opcode in libultraship interpreter.cpp). This
+// comment previously said "diagonal" on both sides, which is a ~1.5-2x systematic error in the
+// reader's head even though the code was always right. The next frame the OoT3D
 // model draws at that scale. Explicit sModelTable entries always win (they carry
 // calibrated scale + anim resolvers) unless ZELDA3D_AUTO=2 (validation: route ALL through
 // the auto path so the derived scale can be checked against the hand-tuned values).
@@ -743,6 +748,125 @@ static Zelda3D_ForcedMeas sFieldGrassMeas;
 // Interpreter callback (libultraship): the measure bracket closed for `key` (object id)
 // with the actor's measured world-space bbox diagonal. Store it; the scale is derived
 // lazily in Zelda3D_TryDrawActor next frame (needs the OoT3D model diagonal, loaded there).
+// Param-keyed VARIANT measure slots. Obj_Hana and En_Ishi each serve several differently-sized
+// props out of ONE object bank slot (zelda_field_keep.zar), selected by params -- so they cannot use
+// sAuto[objId] (one slot per object id) and were instead drawn with hand-written world-scale macros.
+// Two of those macros were literally commented UNCALIBRATED and had been copied from the small-rock
+// value, which is why En_Ishi's large/silver boulder rendered at the liftable rock's size and the
+// field flower rendered far oversized. A borrowed constant is not a calibration.
+//
+// Fix: self-calibrate each variant from its OWN N64 draw, scale = n64H / OoT3D-CMB-H -- the same
+// principle the auto path and the well-arch slot already use. fallbackScale is only a seed: it is
+// what we draw with until a measurement lands, and what we keep if the variant can never be measured
+// (always culled), so a give-up degrades to today's behavior rather than dropping back to N64.
+#define ZELDA3D_MEASKEY_VARIANT_BASE 0x42000 // + index into sVariantMeas
+typedef struct {
+    s16 actorId;
+    u16 paramMask;
+    u16 paramValue;
+    int glModelId;        // field-keep model id (kModels in zelda3d_model.cpp)
+    float fallbackScale;  // seed / never-measured fallback
+    int selfCalibrate;    // 1 = derive scale by measurement; 0 = the seed is a VERIFIED calibration
+    Zelda3D_ForcedMeas meas;
+} Zelda3D_VariantMeas;
+// selfCalibrate is 0 where the seed is a value someone actually calibrated against the N64 prop, and
+// 1 only where the seed was a GUESS (the two macros commented UNCALIBRATED, both copied from the
+// small-rock value). This split is deliberate and measured, not caution: with measurement enabled for
+// all five, the two CALIBRATED controls came out 17% and 31% away from their tuned values
+// (rock 0.09998 vs 0.12000, bush 0.65595 vs 0.50000) in Hyrule Field. The mechanism is
+// self-consistent -- the two independent small-rock slots measured 0.09998 identically -- and it is
+// height/height, so the units are right. But "self-consistent" is not "correct", and I have NOT
+// established which of the two disagrees with reality, so overwriting a verified calibration with it
+// would be trading a checked value for an unchecked one. Replace guesses with measurements; leave
+// calibrations alone until the discrepancy itself is explained.
+static Zelda3D_VariantMeas sVariantMeas[] = {
+    // Obj_Hana (params & 3): 2 = cuttable bush, 1 = rock debris, 0 = flower.
+    { ACTOR_OBJ_HANA, 3, 2, 2, ZELDA3D_HANABUSH_WORLD_SCALE,   0, {0} }, // tuned vs N64 Obj_Hana bush
+    { ACTOR_OBJ_HANA, 3, 1, 4, ZELDA3D_ROCK_SMALL_WORLD_SCALE, 0, {0} }, // calibrated in Kokiri Forest
+    { ACTOR_OBJ_HANA, 3, 0, 6, ZELDA3D_FLOWER_WORLD_SCALE,     1, {0} }, // was UNCALIBRATED
+    // En_Ishi (params & 1): 0 = small liftable rock, 1 = large/silver rock.
+    { ACTOR_EN_ISHI,  1, 0, 4, ZELDA3D_ROCK_SMALL_WORLD_SCALE, 0, {0} }, // calibrated in Kokiri Forest
+    { ACTOR_EN_ISHI,  1, 1, 5, ZELDA3D_ROCK_LARGE_WORLD_SCALE, 1, {0} }, // was UNCALIBRATED
+};
+int Zelda3D_VariantSlotCount(void) { return (int)ARRAY_COUNT(sVariantMeas); }
+// Flattened accessor so the REPL does not need the Zelda3D_ForcedMeas layout.
+const struct Zelda3D_ForcedMeasT* Zelda3D_VariantSlotInfoRaw(int i, short* outActorId,
+                                                           unsigned short* outParamValue, int* outModelId,
+                                                           float* outFallback, float* outScale,
+                                                           float* outMeasuredH, int* outState, int* outTries) {
+    if (i < 0 || i >= (int)ARRAY_COUNT(sVariantMeas)) return NULL;
+    Zelda3D_VariantMeas* v = &sVariantMeas[i];
+    if (outActorId != NULL) *outActorId = v->actorId;
+    if (outParamValue != NULL) *outParamValue = v->paramValue;
+    if (outModelId != NULL) *outModelId = v->glModelId;
+    if (outFallback != NULL) *outFallback = v->fallbackScale;
+    if (outScale != NULL) *outScale = v->meas.scale;
+    if (outMeasuredH != NULL) *outMeasuredH = v->meas.measuredH;
+    if (outState != NULL) *outState = v->meas.state;
+    if (outTries != NULL) *outTries = v->meas.tries;
+    return (const struct Zelda3D_ForcedMeasT*)1; // non-NULL = slot exists
+}
+const Zelda3D_ForcedMeas* Zelda3D_VariantSlotInfo(int i, short* outActorId, unsigned short* outParamValue,
+                                                int* outModelId, float* outFallback) {
+    if (i < 0 || i >= (int)ARRAY_COUNT(sVariantMeas)) return NULL;
+    Zelda3D_VariantMeas* v = &sVariantMeas[i];
+    if (outActorId != NULL) *outActorId = v->actorId;
+    if (outParamValue != NULL) *outParamValue = v->paramValue;
+    if (outModelId != NULL) *outModelId = v->glModelId;
+    if (outFallback != NULL) *outFallback = v->fallbackScale;
+    return &v->meas;
+}
+
+// Draw a param-keyed variant, self-calibrating its scale on first sight. Returns 1 if we drew the
+// OoT3D model, 0 if the N64 model must draw this frame (so it can be measured).
+static int Zelda3D_DrawVariant(PlayState* play, Actor* actor) {
+    for (size_t i = 0; i < ARRAY_COUNT(sVariantMeas); i++) {
+        Zelda3D_VariantMeas* v = &sVariantMeas[i];
+        if (v->actorId != actor->id) continue;
+        if (((u16)actor->params & v->paramMask) != v->paramValue) continue;
+        Zelda3D_ForcedMeas* m = &v->meas;
+        if (m->state != 2 && v->selfCalibrate) {
+            if (m->measuredH > 0.0f) {
+                float modelH = Zelda3D_AutoModelHeight(v->glModelId);
+                if (modelH > 1e-3f) {
+                    m->scale = m->measuredH / modelH;
+                    m->state = 2;
+                    if (Zelda3D_AutoMode() >= 1) {
+                        fprintf(stderr,
+                                "SOH3D VARIANT: actor 0x%x params&0x%x==0x%x model %d -> scale=%.5f "
+                                "(n64h=%.1f modelh=%.1f, seed was %.5f)\n",
+                                (unsigned)actor->id, v->paramMask, v->paramValue, v->glModelId, m->scale,
+                                m->measuredH, modelH, v->fallbackScale);
+                        fflush(stderr);
+                    }
+                }
+            } else if (m->state != 3) {
+                // Many instances of these props draw per frame, so a single measure bracket often
+                // loses the race to a culled sibling -- same reason the field-grass slot needs a
+                // generous try budget rather than the 8 used for one-off props.
+                if (m->tries < 64) {
+                    m->tries++;
+                    m->state = 1;
+                    Zelda3D_EmitMeasure(play, (int)(ZELDA3D_MEASKEY_VARIANT_BASE + i), /*begin=*/1);
+                    sPendingMeasureKey = (int)(ZELDA3D_MEASKEY_VARIANT_BASE + i);
+                    return 0; // let the N64 prop draw so it can be measured
+                }
+                m->state = 3; // never measured -> keep the seed scale below, do NOT fall back to N64
+            }
+        }
+        float scale = (m->state == 2) ? m->scale : v->fallbackScale;
+        // Base-anchor to the actor's world Y exactly like the ready-static-prop auto path. These
+        // variants passed groundOffset 0, so a centre-origin CMB sat half-buried -- the rock debris
+        // and En_Ishi rocks were measurably sunk into the ground.
+        extern float gZelda3dAutoYoffNudge;
+        float goff = -Zelda3D_AutoModelMinY(v->glModelId) + gZelda3dAutoYoffNudge;
+        Zelda3D_DrawModelGL(play, v->glModelId, actor, ZELDA3D_GSCALE(v->glModelId, scale), NULL, goff, NULL,
+                          NULL);
+        return 1;
+    }
+    return -1; // not a variant actor
+}
+
 void Zelda3D_MeasureResult(int key, float height) {
     if (key == ZELDA3D_MEASKEY_WELLARCH) {
         sWellArchMeas.measuredH = height;
@@ -754,6 +878,11 @@ void Zelda3D_MeasureResult(int key, float height) {
     }
     if (key == ZELDA3D_MEASKEY_FIELDGRASS) {
         sFieldGrassMeas.measuredH = height;
+        return;
+    }
+    if (key >= ZELDA3D_MEASKEY_VARIANT_BASE &&
+        key < ZELDA3D_MEASKEY_VARIANT_BASE + (int)ARRAY_COUNT(sVariantMeas)) {
+        sVariantMeas[key - ZELDA3D_MEASKEY_VARIANT_BASE].meas.measuredH = height;
         return;
     }
     if (key >= ZELDA3D_MEASKEY_FORCED_BASE &&
@@ -1005,16 +1134,12 @@ int Zelda3D_TryDrawActor(PlayState* play, Actor* actor) {
             }
             return 0;
         }
-        if (actor->id == ACTOR_OBJ_HANA) {
-            int v = actor->params & 3;
-            if (v == 2) { Zelda3D_DrawModelGL(play, 2, actor, ZELDA3D_GSCALE(2, ZELDA3D_HANABUSH_WORLD_SCALE), NULL, 0.0f, NULL, NULL); return 1; }
-            if (v == 1) { Zelda3D_DrawModelGL(play, 4, actor, ZELDA3D_GSCALE(4, ZELDA3D_ROCK_SMALL_WORLD_SCALE), NULL, 0.0f, NULL, NULL); return 1; }
-            if (v == 0) { Zelda3D_DrawModelGL(play, 6, actor, ZELDA3D_GSCALE(6, ZELDA3D_FLOWER_WORLD_SCALE), NULL, 0.0f, NULL, NULL); return 1; }
-        }
-        // En_Ishi (params & 1): 0 = small liftable rock, 1 = large/silver rock.
-        if (actor->id == ACTOR_EN_ISHI) {
-            if ((actor->params & 1) == 0) { Zelda3D_DrawModelGL(play, 4, actor, ZELDA3D_GSCALE(4, ZELDA3D_ROCK_SMALL_WORLD_SCALE), NULL, 0.0f, NULL, NULL); return 1; }
-            Zelda3D_DrawModelGL(play, 5, actor, ZELDA3D_GSCALE(5, ZELDA3D_ROCK_LARGE_WORLD_SCALE), NULL, 0.0f, NULL, NULL); return 1;
+        // Obj_Hana / En_Ishi: several differently-sized props share one object slot, keyed by params.
+        // Each variant self-calibrates its own scale from its own N64 draw (sVariantMeas above), so
+        // the large rock and the flower stop borrowing the small rock's constant.
+        if (actor->id == ACTOR_OBJ_HANA || actor->id == ACTOR_EN_ISHI) {
+            int drew = Zelda3D_DrawVariant(play, actor);
+            if (drew >= 0) return drew;
         }
         // Kakariko well/windmill: Bg_Spot01_Fusya (windmill), _Idohashira (well pillar/ladder) and
         // _Idomizu (well water) all share OBJECT_SPOT01_OBJECTS, so the auto "largest CMB" pick gave

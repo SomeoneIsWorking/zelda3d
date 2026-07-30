@@ -121,6 +121,13 @@ extern Zelda3D_AutoEntry sAuto[];
 // they are NOT in sAuto[], so a forced slot stuck at state=1 (or given up at state=3) was
 // completely invisible to introspection -- which is how the broken measure-key routing survived.
 int Zelda3D_ForcedSlotCount(void);
+// Param-keyed variant slots (Obj_Hana / En_Ishi), likewise outside sAuto[] and likewise dumped by
+// `autostate` -- a self-calibrating slot that never measures must be VISIBLE, not silently seeded.
+int Zelda3D_VariantSlotCount(void);
+const struct Zelda3D_ForcedMeasT* Zelda3D_VariantSlotInfoRaw(int i, short* outActorId,
+                                                           unsigned short* outParamValue, int* outModelId,
+                                                           float* outFallback, float* outScale,
+                                                           float* outMeasuredH, int* outState, int* outTries);
 // Report slot `i`: its actor id, the "<zar>|<cmb>" model key, and its live auto entry.
 const Zelda3D_AutoEntry* Zelda3D_ForcedSlotInfo(int i, short* outActorId, const char** outCmbSubstr);
 
