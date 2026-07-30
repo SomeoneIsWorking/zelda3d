@@ -440,3 +440,32 @@ tempted by two ticks ago would have broken exactly that.
 *valbasia* (Volvagia) models, so that alias would draw the boss's body for the rubble actor, and
 `zelda_nw.zar` is cucco geometry that `niw` already aliases to. Name proximity is not evidence — the
 spot04 one was applied because a CMB inside it is literally named "mouth".
+
+### Swept the whole object table with the CMB-name technique — mostly a NEGATIVE, which is the result
+
+Applied the search shape that found the Deku Tree mouth to all 67 NULL object rows. Worth recording
+the negative properly, with its denominator, because "there must be more missing models" is an easy
+assumption:
+
+* Of 67 NULL rows, almost all are **correctly** NULL: `OA1`-`OA11`, `OB1`-`OB4`, `OE1`-`OE12`,
+  `O_ANIME`/`OE_ANIME`/`OS_ANIME`/`ZL2_ANIME*`/`GANON_ANIME*` are animation-only objects with no
+  models at all; `GAMEPLAY_KEEP`/`FIELD_KEEP`/`DANGEON_KEEP` and `LINK_BOY`/`LINK_CHILD` are reached
+  by other paths; `MJIN_*` (6), `MORI_TEX`, `MEDAL`, `B_HEART`, `FIRE`, `WARP2` are texture- or
+  effect-only.
+* 348 `/actor/` archives exist, 313 are referenced by the table, so only **35** are unreferenced — and
+  most of those are legitimately non-object (`zelda_link_*` ×5, `zelda_keep*` ×2, `gi_*` ×11,
+  `zelda_hintstone` is a 3DS-only Sheikah Stone with no N64 object).
+* Intersecting those two sets leaves exactly **three** real candidates: VASE, TRAP, PU_BOX.
+
+So the object table was already in much better shape than the Deku Tree case suggested. That one was
+not the tip of an iceberg; it was a single one-character naming accident.
+
+Two mapped (VASE verified in game, TRAP structurally confirmed but NOT verified — its N64 draw never
+rendered from a bare `spawn`, so the measure pass never ran). PU_BOX deliberately left alone: its
+three CMBs are size variants and two actors share the object, so mapping it would recreate the
+En_Ishi bug on puzzle geometry.
+
+**Also checked and rejected two tempting one-character matches** (`OBJECT_FD2` -> `zelda_fd.zar`,
+`OBJECT_NWC` -> `zelda_nw.zar`). The first holds *valbasia* (Volvagia) models — that alias would draw
+the boss's body for the rubble actor. The second is cucco geometry already aliased from `niw`. Name
+proximity is not evidence; the spot04 alias earned it by containing a CMB literally named "mouth".
