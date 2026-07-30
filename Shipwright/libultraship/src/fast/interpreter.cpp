@@ -4428,8 +4428,14 @@ bool gfx_zelda3d_measure_handler_custom(F3DGfx** cmd0) {
         s_zelda3dMeasHMax = -1e30f;
     } else if (s_zelda3dMeasuring) {
         s_zelda3dMeasuring = false;
-        float height = (s_zelda3dMeasHMin <= s_zelda3dMeasHMax) ? (s_zelda3dMeasHMax - s_zelda3dMeasHMin) : 0.0f;
-        Zelda3D_MeasureResult(key, height);
+        // Report ONLY if the session actually saw geometry. An EMPTY bracket used to report height 0,
+        // which Zelda3D_MeasureResult writes straight into the slot -- overwriting a real height with
+        // zero. That is latent today and becomes load-bearing now that the bracket is emitted into BOTH
+        // the opaque and translucent lists (an actor draws into one of them, so the other session is
+        // always empty by design). Silence is the correct answer for "measured nothing".
+        if (s_zelda3dMeasHMin <= s_zelda3dMeasHMax) {
+            Zelda3D_MeasureResult(key, s_zelda3dMeasHMax - s_zelda3dMeasHMin);
+        }
     }
     return false;
 }

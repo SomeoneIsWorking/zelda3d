@@ -996,7 +996,17 @@ void Zelda3D_MeasureResult(int key, float height) {
 // Emit a measure bracket opcode (begin/end) into POLY_OPA around an actor's N64 draw.
 void Zelda3D_EmitMeasure(PlayState* play, int key, int begin) {
     OPEN_DISPS(play->state.gfxCtx);
+    // Bracket BOTH display lists. An actor draws its geometry into one of them -- opaque props into
+    // POLY_OPA, translucent ones (spider webs, water planes, light shafts) into POLY_XLU -- and
+    // bracketing only POLY_OPA meant a translucent actor's draw fell outside the bracket entirely, so
+    // it never measured and its auto-scale slot sat at "never measured" forever.
+    //
+    // The two lists are interpreted in sequence, so this yields two bracket sessions per measure, one
+    // of which is always empty. That is safe ONLY because the interpreter now suppresses a session
+    // that accumulated no geometry; without that guard the empty session's height of 0 would overwrite
+    // the real one. See gfx_zelda3d_measure_handler_custom.
     gSPZelda3DMeasure(POLY_OPA_DISP++, key, begin);
+    gSPZelda3DMeasure(POLY_XLU_DISP++, key, begin);
     CLOSE_DISPS(play->state.gfxCtx);
 }
 
