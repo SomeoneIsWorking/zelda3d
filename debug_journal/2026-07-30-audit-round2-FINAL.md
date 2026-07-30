@@ -319,7 +319,47 @@ leaves a hole in the world, so it must be confirmed by inspecting the room mesh 
 Next step is therefore a specific question with a specific answer: does the spot04 room CMB already
 contain the tree-mouth geometry? Do not attempt a mesh hunt or an alias before answering it.
 
+**PARTIALLY ANSWERED (2026-07-30, later the same session) — see the addendum at the end.**
+
 ### Tooling fix found while doing this
 `tools/zelda3d_skel_export.py:39` read `Shipwright/soh/src/zelda3d/zelda3d_object_zars.inc`, a path
 that no longer exists — the table moved into `tables/`. Same class of stale-path breakage as the six
 generators fixed earlier in this session. Repointed at the real location.
+
+### Deku Tree mouth, addendum — the area IS 3DS geometry, and the actor IS N64
+
+Confirmed both halves, and built the observation recipe that was missing.
+
+`actorsnear 4000` at the site reports `id=0x3E p=0xFFFF cat=1 d=133 --N64--`, so `Bg_Treemouth` is
+definitively drawing the N64 mesh. And the framed shot (`scratch/screenshots/tm_pair.png`, top panel)
+shows the surrounding Deku Tree — trunk, roots, bark, the arched mouth region — rendering as detailed
+3DS room geometry. So this is a genuine single-N64-actor island in a 3DS scene, exactly as reported.
+
+**THE OBSERVATION RECIPE, which is the reusable part.** Three attempts failed before one worked, and
+the failures are worth recording because each produced a confident-looking but worthless frame:
+
+1. `roomwarp 1` (force-load the room holding the actor) — `asel 0x3E` succeeds, but the camera ends up
+   *inside* geometry and every frame is flat yellow. The actor being selectable made this look like a
+   working setup.
+2. `warp 0xee` (Kokiri Forest) then `tp` to the actor's coordinates — Link lands outside the resident
+   room with no floor under him; the whole frame is flat yellow with Link and his shadow floating in
+   it, and `asel 0x3E` finds nothing.
+3. `warp 0x209` *after* that `tp` — the transition never completes (Link has no floor), so the frame
+   is byte-identical to the previous one. A warp that silently does nothing is the worst of the three,
+   because the screenshot looks like a real answer.
+4. **WORKS:** restart the game, then `warp 0x209` (`ENTR_KOKIRI_FOREST_OUTSIDE_DEKU_TREE`, spawn 1) as
+   the FIRST action. Room 1 loads properly, `asel 0x3E` resolves, and the frame has real content.
+
+Cheap validity check that catches all three failure modes at once: the luminance standard deviation of
+the frame. The flat-yellow void reads near zero; the good frame read 33.8. Worth applying to any
+"warp somewhere and screenshot" step, because all three bad frames were superficially plausible.
+
+**STILL OPEN — the actual fix.** The area is 3DS and the actor is N64, but that alone does not say
+whether the room mesh already contains the mouth (making the N64 actor redundant and the fix a draw
+suppression) or whether the mouth is genuinely absent from the room mesh and the actor is filling a
+real hole. Deciding that needs the actor's draw hidden for one frame and the same view captured — a
+small addition, since there is currently no REPL primitive to suppress a single selected actor's draw.
+That primitive is the next step, and it is generic enough to be worth having anyway.
+
+Do NOT "fix" this by pointing the object at some plausible ZAR: there is no actor archive and no CMB
+in the scene archive (ruled out above), so any mapping would be invented.
