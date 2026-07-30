@@ -68,6 +68,12 @@ struct Loaded {
     std::unique_ptr<Zelda3D::Cmb> cmb;
     std::vector<Zelda3D::CmbDrawGroup> groups; // owns verts (cGroups alias into these)
     std::vector<std::vector<uint8_t>> texRgba;
+    // Per-texture mip level count, as required by AppendCmbTextures. MM only uploads the BASE level,
+    // which is the front of each texRgba entry (levels are stored largest-first, back-to-back), so a
+    // multi-level entry is correctly read as its base image and the extra bytes are simply unused.
+    // Kept as a real field rather than a throwaway local so wiring MM's uploader to the mip chain
+    // later is a one-line change instead of a signature change.
+    std::vector<int> texLevels;
     std::vector<Zelda3DGlGroup> cGroups;
     std::vector<Zelda3DGlTex> cTexs;
     bool ok = false;
@@ -150,7 +156,7 @@ static void loadSceneRoom(int modelId, Loaded* out) {
     }
     out->groups = out->cmb->buildDrawGroups();
     std::vector<std::pair<int, int>> dims;
-    Zelda3D::AppendCmbTextures(*out->cmb, out->texRgba, dims);
+    Zelda3D::AppendCmbTextures(*out->cmb, out->texRgba, dims, out->texLevels);
     out->cTexs.resize(out->texRgba.size());
     for (size_t i = 0; i < out->texRgba.size(); i++) {
         out->cTexs[i] = { out->texRgba[i].data(), dims[i].first, dims[i].second };
@@ -226,7 +232,7 @@ Loaded* loadModel(int modelId) {
         }
     }
     std::vector<std::pair<int, int>> dims;
-    Zelda3D::AppendCmbTextures(*out->cmb, out->texRgba, dims);
+    Zelda3D::AppendCmbTextures(*out->cmb, out->texRgba, dims, out->texLevels);
     out->cTexs.resize(out->texRgba.size());
     for (size_t i = 0; i < out->texRgba.size(); i++) {
         out->cTexs[i] = { out->texRgba[i].data(), dims[i].first, dims[i].second };

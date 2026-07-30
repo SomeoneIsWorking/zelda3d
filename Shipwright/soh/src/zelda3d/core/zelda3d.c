@@ -395,8 +395,11 @@ int gZelda3dHlGroup = -1;
 // rationale). Renders ONE Zelda3D group and suppresses the rest, so a draw whose pixels are entirely
 // overlapped by later layers — Zora's water d9 has zero exclusive pixels — can still be measured on
 // its own, and a FRAGDBG readback over it means the same thing as the oracle's per-fragment probe.
-int gZelda3dSgDrawOnly = -1;
-int gZelda3dSgDrawList = 0;
+// DEFINED IN libultraship (zelda3d_sdl3gpu.cpp), which is the layer that uses them and is shared with
+// the mm target -- defining them here broke the mm link. Declared, not defined, so the REPL can still
+// drive them.
+extern int gZelda3dSgDrawOnly;
+extern int gZelda3dSgDrawList;
 
 // #32 Xbox face-button HUD glyphs + hotswap input-device state (gZelda3dXboxBtn/
 // Zelda3D_XboxBtnEnabled, gZelda3dInputDevice/Zelda3D_InputDevice) live in
