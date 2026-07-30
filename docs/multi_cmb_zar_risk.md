@@ -828,3 +828,60 @@ consecutive rows where the pixel check could not confirm what the counter did �
 documented limits (flat props, occlusion, off-screen instances), but worth stating plainly: for
 dungeon interior props the pixel check is currently the weakest of the three instruments, and the
 submit counter plus the three-axis ratio are carrying the verification.
+
+## Pass 25 (2026-07-30) — AUDIT of every shipped routing against the multi-DL limit
+
+Pass 24 found that a forced slot replaces the actor's **whole** draw, so an actor emitting more than
+one display list loses all but the substituted one. That limit had been latent since the first row, so
+this pass re-checked **all 44 routed actors** rather than only the new ones. Denominator stated because
+the first attempt at this audit resolved 0 of 44 (a name-mangling bug) and printed `FILE_NOT_FOUND`
+per row — which is the only reason it was not mistaken for a clean result.
+
+**44 of 44 resolved.** 13 had more than one DL reference; skinned actors are exempt by construction
+(the skinned branch returns 0 and defers to the actor's own Draw), leaving 10 to read:
+
+| actor | verdict |
+|---|---|
+| `Bg_Ice_Shelter`, `Bg_Haka_Sgami`, `Bg_Bdan_Objects`, `En_Kusa`, `Bg_Ydan_Maruta`, `Bg_Ydan_Hasi`, `Bg_Mori_Hashigo` | alternative branches — SAFE |
+| `En_Ishi` | two separate Draw *functions*, one list each — SAFE |
+| `Bg_Ydan_Sp` | one list normally; the *breaking* animation adds 8x `gDTUnknownWebDL` — transient loss only |
+| **`Obj_Syokudai`** | **SIMULTANEOUS — stand + `gEffFire1DL` whenever `litTimer != 0`** |
+
+### Defect 1: routed torches lost their flame (shipped)
+
+`ObjSyokudai_Draw` emits the stand and then the flame at its own billboarded matrix. Both the forced
+wooden-torch entry **and the generic per-object AUTO slot** replaced the whole draw, so this applied to
+every torch variant, not just the routed one. Withdrawing the forced entry alone was not enough — that
+only demotes wooden torches to the generic AUTO pick, which suppresses the draw just the same. Fixed by
+skipping `ACTOR_OBJ_SYOKUDAI` in `Zelda3D_TryAuto` next to the existing `OBJECT_KANBAN` /
+`ACTORCAT_DOOR` skips. Confirmed: `autostate` now reports **zero** syokudai slots.
+
+**Evidence honesty.** The two steps are each read directly from source — the double emission, and the
+`if (!Zelda3D_TryDrawActor(...)) actor->draw(...)` call site — but *the flame loss itself was never
+observed*. Every torch found is unlit, so `auto 0` vs `auto 1` renders identically and cannot
+discriminate; the A/B produced 2733 changed px that are the torch MESH swapping, not fire. THE TEST
+is a LIT torch A/B'd on `auto`. The skip is correct regardless, because a multi-list actor cannot be
+faithfully replaced by a one-mesh substitution — but the causal claim stays untested and is filed that way.
+
+### Defect 2: the Forest Temple ladder CLASP was rendering as a ladder
+
+`Bg_Mori_Hashigo` is two props: `BgMoriHashigo_Draw` switches on params between `gMoriHashigoClaspDL`
+(`HASHIGO_CLASP = -1`, i.e. 0xFFFF as u16) and `gMoriHashigoLadderDL` (`HASHIGO_LADDER = 0`). The slot
+was params-agnostic, so the clasp got the ladder mesh. Split into two entries.
+
+The clasp's CMB had been sitting in the same ZAR the whole time, on this document's own
+"unrouted leftovers" list described as *"a ladder variant/stop"*: `l_hasigotome` — **"tome" is Japanese
+for catch/clasp** — and the geometry settles it, a 20 x 46 x 40 bracket against the ladder's
+32 x 227 x 2 rail. **A leftover is a lead, not a dead end.** Reading the actor's DL *switch* found its
+owner where reading CMB names alone had not; the remaining leftover (`l_tikaori`) deserves the same
+treatment before being written off.
+
+Not verified live: no `Bg_Mori_Hashigo` instance spawned in any of the 21 Forest Temple rooms swept
+(60 actors listed, zero of id 0xE2), so the split is a code-level correction only. It is strictly
+better than a params-agnostic slot that provably gave the clasp the wrong mesh.
+
+### The rule this adds to the row checklist
+
+Before routing an actor, read its Draw for a SECOND display list, not just for which list it picks.
+`grep -c "gSPDisplayList\|Gfx_DrawDList"` over the actor's file is the cheap screen; a count above 1
+needs eyes on the code to tell alternative branches from simultaneous emission.
