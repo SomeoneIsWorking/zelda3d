@@ -244,3 +244,39 @@ gauntlet plates (link_v2); child 18 is the OCARINA (childlink_v2), verified visu
 they do not conflict. `link_mesh_id_map.md` has separate adult and child sections for exactly this
 reason, and any cross-referencing between a decomp fragment and a mid must first establish which rig
 the fragment is drawing.
+
+---
+
+# CONFIRMED + FIXED: the short-way unwrap was applied to FLOAT hermite rotation (finding 2)
+
+Real, but **9 clips, not the 103 claimed** — an ~11x overstatement.
+
+`sampleLocalTRS` passed `rotation=true` to `sampleTrack` for every rotation track, so the unwrap
+`p1 = p0 + (fmod(p1-p0+PI+TAU, TAU) - PI)` forced |delta| <= pi on float tracks too. Its own comment
+justifies it for int16 values "wrapped to [-pi,pi)", which floats are not.
+
+Swept the whole OoT3D corpus (151 zar with csab, 2465 clips):
+
+    float hermite rotation segments examined : 597120
+    segments with |delta| > pi               :     10
+    clips affected                           :      9
+
+**That distribution is itself the proof floats are not wrapped.** If they were, any bone rotating past
++-pi would produce a straddling pair, and |delta|>pi segments would be everywhere. Ten out of 597120,
+with two of them EXACTLY +-2pi, means the tracks are continuous and those ten are authored large turns:
+
+    fire_dancer_jump      rX -6.283  (exactly -2pi -> collapsed to NO motion)
+    gnf_lonlyTSUKI02      rY +6.283  (exactly +2pi -> collapsed to NO motion)
+    vba_tyokkai           rX  5.078  (291 deg -> reversed to -69 deg)
+    vba_hit               rZ -4.621  (264 deg -> reversed to +95 deg)
+    vba_hit               rX  4.053
+    gnf_Ddamage           rX  3.932
+
+Affected actors: Ganondorf (gnf), the Flare Dancer, Barinade (vba) — boss animations, which is why
+"boss intros/deaths" was in the original report even though the count was wrong.
+
+FIX: gate the unwrap on `node->isRotInt16` instead of applying it unconditionally.
+
+NO REGRESSION RISK to Link, and this was checked rather than assumed: his rotation tracks are 100%
+int16 (2171 adult / 2210 child, ZERO float), so the unwrap that originally fixed his spinning
+head/back-shield/arms is fully preserved. Verified live at Kokiri — correct pose, no spinning bones.

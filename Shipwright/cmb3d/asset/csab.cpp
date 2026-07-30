@@ -311,9 +311,19 @@ void Csab::sampleLocalTRS(int boneId, bool nonRoot, const float restT[3], const 
     if (node->tracks[6].present) s[0] = sampleTrack(node->tracks[6], fr, false);
     if (node->tracks[7].present) s[1] = sampleTrack(node->tracks[7], fr, false);
     if (node->tracks[8].present) s[2] = sampleTrack(node->tracks[8], fr, false);
-    if (node->tracks[3].present) r[0] = sampleTrack(node->tracks[3], fr, true);
-    if (node->tracks[4].present) r[1] = sampleTrack(node->tracks[4], fr, true);
-    if (node->tracks[5].present) r[2] = sampleTrack(node->tracks[5], fr, true);
+    // The short-way unwrap below is only valid for INT16-quantized rotation, whose values really are
+    // wrapped to [-pi,pi). Float rotation tracks are authored CONTINUOUS, so unwrapping them destroys
+    // any turn wider than 180 deg. Measured over the whole ROM: of 597120 float hermite rotation
+    // segments only TEN exceed pi -- if floats were wrapped, straddling pairs would be common, so that
+    // distribution is itself the proof they are not. Two of the ten are exactly +-2pi (a full turn
+    // collapsed to NO motion: fire_dancer_jump rX -6.283, gnf_lonlyTSUKI02 rY +6.283) and the rest
+    // reverse direction (vba_hit rZ -4.621 -> +1.66). 9 clips affected, on Ganondorf, the Flare Dancer
+    // and Barinade. Link is unaffected either way: his rotation tracks are 100% int16 (2171 adult /
+    // 2210 child, zero float), so the unwrap that fixed his spinning bones is fully preserved.
+    const bool rotWrapped = node->isRotInt16;
+    if (node->tracks[3].present) r[0] = sampleTrack(node->tracks[3], fr, rotWrapped);
+    if (node->tracks[4].present) r[1] = sampleTrack(node->tracks[4], fr, rotWrapped);
+    if (node->tracks[5].present) r[2] = sampleTrack(node->tracks[5], fr, rotWrapped);
     // Bone OFFSETS belong to the SKELETON, not the clip. CSABs authored for one rig (the
     // boy/adult Link clips) bake that rig's bone translations into per-bone translation tracks
     // as STATIC (constant-valued) tracks. When such a clip drives a DIFFERENT-proportioned rig
