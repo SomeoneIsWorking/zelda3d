@@ -57,12 +57,22 @@ unsigned long long linkAdultMidMask(const LinkGear& gear) {
             m |= hylian ? LINK_MID(0) : (mirror ? LINK_MID(2) : LINK_MID(31));
             break;
         case LinkSheath::ShieldOnBackSwordDrawn:
-            m |= hylian ? LINK_MID(1) : (mirror ? LINK_MID(3) : 0ull);
+            // No shield equipped still draws the EMPTY SHEATH (mid 42), it is not nothing.
+            // sSheathWithoutSwordDLs @0x0053c4d8, 8-byte stride, (adult,child) as s16 at +0/+4,
+            // read straight out of code.bin: NONE=(42,21) DEKU=(42,12) HYLIAN=(1,10) MIRROR=(3,21).
+            m |= hylian ? LINK_MID(1) : (mirror ? LINK_MID(3) : LINK_MID(42));
             break;
         case LinkSheath::SwordOnBackNoShield:
             m |= LINK_MID(31);
             break;
         case LinkSheath::EmptySheathNoShield:
+            // SHEATH_17 is NOT "draws nothing": sSheathDLs @0x0053c5e8 = (adult 42, child 21).
+            // Adult 42 is the empty sheath strap -- confirmed visually by isolating it in game
+            // (`linkmid only 42`), which renders the slim diagonal strap on Link's back, alongside
+            // mid 1 (Hylian shield + sheath) and mid 3 (Mirror shield + sheath).
+            // So with the sword drawn and no shield, Link's sheath used to vanish off his back.
+            m |= LINK_MID(42);
+            break;
         default:
             break;
     }
