@@ -340,3 +340,27 @@ the eye across a floor plane's face.
   a web in the "hidden" frame — a different instance. The pixel delta is attributable to the selected
   actor, but the VISUAL is not a clean before/after for a multi-instance prop. Check `params` on the
   selection before interpreting either.
+
+## Pass 11 (2026-07-30) — Bg_Menkuri_Nisekabe: selector known, mapping still AMBIGUOUS. Not routed.
+
+Ground truth from `z_bg_menkuri_nisekabe.c`:
+* selector is `params & 0xFF`, indexing `sDLists[] = { gGTGFakeWallDL, gGTGFakeCeilingDL }` — so 0 is a
+  fake WALL and 1 a fake CEILING (Gerudo Training Ground; *menkuri* = GTG, *nisekabe* = fake wall).
+* the DRAW PASS is runtime-dependent: `Gfx_DrawDListXlu` when the actor has `ACTOR_FLAG_REACT_TO_LENS`,
+  otherwise `Gfx_DrawDListOpa`. Worth noting because our routing picks a pass from the MODEL's material,
+  which cannot follow a per-actor runtime flag.
+
+But the two candidate CMBs do not map onto wall/ceiling by any evidence I have:
+
+| CMB | bbox size | reads as |
+|---|---|---|
+| `l_m_nisekabe1_model` | 1200 x 1200 x 400 | a wall slab |
+| `l_m_nisekabe2_model` | 1240 x 800 x 1200 | neither clearly — 800 tall, not a flat ceiling |
+
+Both are volumes, both fully opaque (alpha 255 throughout), and neither is the flat horizontal slab a
+"fake ceiling" would be. The numeric suffixes suggest 1 -> index 0 and 2 -> index 1, but that is a
+naming convention, not evidence, and a wrong pick renders the wrong geometry in a puzzle room.
+
+NOT ROUTED. To settle it, compare each CMB against what `gGTGFakeWallDL` / `gGTGFakeCeilingDL` actually
+draw (vertex extents from the N64 display lists), or observe a known instance of each params value in
+GTG. The selector is the easy half and it is done; the mesh identity is the open half.
