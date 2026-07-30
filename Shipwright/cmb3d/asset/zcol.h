@@ -18,7 +18,9 @@
 //   +0x1c u16 nVtx, +0x1e u16 nPoly, +0x28 u32 vtxList, +0x2c u32 polyList,
 //   +0x30 surfaceTypeList, +0x34 camData, +0x38 waterBox.
 //   Internal data pointers are NOT plain offsets: vertex data = vtxList + 0x10; the
-//   polygon array is anchored at polyList - 2 (stable across every scene tested).
+//   polygon array is anchored at polyList - 2. NOTE the original "stable across every scene
+//   tested" claim was derived on SIX scenes; the anchor holds, but the COUNT field is a LAST
+//   INDEX, not a count (nPoly+1 polygons) — see zcol.cpp, verified over all 114 scenes.
 // Vertex: Vec3s (s16 x,y,z), stride 6, from vtxList+0x10.
 // CollisionPoly: 20 bytes from polyList-2: +0 vA, +2 vB, +4 vC (u16, &0x1FFF; top 3 = flags),
 //   +6 u16 flags, +8 s16 nx/+0xa ny/+0xc nz (normal /32767), +0xe f32 dist (n.p == -dist),
