@@ -885,3 +885,62 @@ better than a params-agnostic slot that provably gave the clasp the wrong mesh.
 Before routing an actor, read its Draw for a SECOND display list, not just for which list it picks.
 `grep -c "gSPDisplayList\|Gfx_DrawDList"` over the actor's file is the cheap screen; a count above 1
 needs eyes on the code to tell alternative branches from simultaneous emission.
+
+## Pass 26 (2026-07-30) — Shadow Temple: the multi-DL screen pays for itself, and a name loses to a measurement
+
+`OBJECT_HAKA_OBJECTS` — 32 CMBs, 8 actors, the third-largest archive in the queue. Entered from the
+opposite end than usual: the crossed-white-planes object flagged at the end of Pass 25 turned out not to
+be a separate bug but *this row*, with AUTO handing every actor the same largest CMB.
+
+### The multi-DL screen FIRST, which is what Pass 25 added to the checklist
+
+| actor | lists per draw | routable? |
+|---|---|---|
+| `Bg_Haka_Trap` | 1 (`sDLists[params]`) | **yes — the only clean one** |
+| `Bg_Haka_Gate` | gate + `gEffFire1DL` for SKULL; **two** halves for FLOOR | only STATUE / GATE |
+| `Bg_Haka_Ship` | params 0 draws hull **+ two oars**; params != 0 single | only params != 0 |
+| `Bg_Haka_Tubo` | pot **+** `BgHakaTubo_DrawFlameCircle` | **no** |
+| `Bg_Haka_Megane`, `Bg_Haka_MeganeBG` | alternatives | yes in principle |
+| `Bg_Haka_Sgami` | alternatives (ice variant already routed) | — |
+| `Bg_Haka_Zou` | 1, but object comes from `GAMEPLAY_KEEP` | unreachable (Pass 24) |
+
+**Most of this archive is structurally out of reach**, and knowing that before doing 32 identifications
+is the entire value of running the screen first. `Bg_Haka_Tubo` would have deleted a flame circle
+exactly as `Obj_Syokudai` deleted its flame.
+
+### Then the measurement overruled the names — twice
+
+The first pass picked three "obvious" mappings from Japanese alone. The three-axis check rejected two:
+
+| trap | name-based pick | measured | verdict |
+|---|---|---|---|
+| SPIKED_BOX | `m_Hkenzan` (kenzan = spike bed) | 0.0938 / 0.100 / 0.100 | **agrees — routed** |
+| PROPELLER | `m_Hsyarin` (syarin = wheel) | 0.0200 / 0.0218 / **0.0033** | **REJECTED** |
+| GUILLOTINE_SLOW | `m_Hgiro` (giro = guillotine) | **0.0300** / 0.100 / 0.107 | right mesh, **withdrawn** |
+
+**PROPELLER was simply the wrong mesh.** A 6x spread is the wrong-mesh signature, not a re-authoring
+gap. The N64 propeller measures 53 x 58 x 16 — about 530 x 580 x 160 at the usual 0.1 — and the ZAR
+mesh with that shape is `m_Hfofo` (576 x 537 x 193), which measures 0.099 / 0.101 / 0.083 and now
+derives a sane scale of 0.09875 against `m_Hsyarin`'s absurd 0.01996. The clincher is unfixable by
+scaling: `m_Hsyarin`'s LONG axis is Z, while the N64 list's SHORTEST axis is Z. A name that reads
+perfectly ("wheel" for a propeller) lost to three numbers.
+
+**GUILLOTINE_SLOW is the right mesh that cannot be drawn correctly yet.** X and Z hit 0.100 and 0.107
+exactly, so `m_Hgiro` is certainly it — but height gives 0.0300, because the OoT3D mesh is 13555 tall
+against a 407-tall N64 list. Since the derived scale comes from HEIGHT, routing it renders the blade
+3.3x TOO NARROW, which is worse than the faithful N64 draw. Withdrawn rather than shipped wrong.
+
+### Height-primary is now 3 for 3 as the wrong choice when the axes disagree
+
+King Zora's ice block, the Bottom of the Well coffin lid, and now the guillotine: every time two
+footprint axes agree exactly and height dissents, height is the outlier and the height-derived scale is
+the visibly wrong one. That is no longer an observation, it is a pattern with three independent
+instances, and it makes **per-axis scale (or at minimum footprint-preferred scale when X and Z agree
+and Y does not)** the highest-value mechanism change left in this arc — it would unblock the guillotine,
+fix the coffin lid's 15% and King Zora's 1.5x, and cost nothing where all three axes already agree.
+
+Routed this pass: SPIKED_BOX -> `m_Hkenzan` (submits=3066), PROPELLER -> `m_Hfofo` (submits=3528).
+Left alone: SPIKED_WALL / SPIKED_WALL_2, whose candidates `m_HhasamiN` / `m_HhasamiS` are MIRROR IMAGES
+(identical extents, mirrored Z) — perfect confirmation that the pair belongs to the paired closing-walls
+trap, and useless for deciding which is which. The discriminator is a live instance's yaw or world Z
+compared against the N/S suffix.

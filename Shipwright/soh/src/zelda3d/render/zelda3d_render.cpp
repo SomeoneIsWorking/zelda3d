@@ -1005,6 +1005,59 @@ static Zelda3D_ActorForcedAutoSlot sActorForcedAuto[] = {
     //
     // What is left is params 1 and 2. params 1 (m_Hsec03) is FLAT (y extent 0), so the height measure
     // cannot size it and it depends on the footprint fallback -- the same position l_idomizu is in.
+    // Shadow Temple traps. zelda_haka_objects.zar is the third-largest archive in the queue (32 CMBs,
+    // 8 actors) and MOST of it is unreachable -- see the multi-DL screen in docs/multi_cmb_zar_risk.md.
+    // Bg_Haka_Trap is the one actor there that draws exactly one list, `sDLists[params]`, so it is the
+    // only one that can be routed without deleting geometry.
+    //
+    // ONLY ONE of the five is routed, and the other four are a lesson in trusting the MEASUREMENT over
+    // the name. The initial pass picked all three "obvious" ones from Japanese alone; the three-axis
+    // check then rejected two of them:
+    //
+    //   1 SPIKED_BOX      -> m_Hkenzan (kenzan = spike bed, a 2000 x 6121 x 2000 tower). Measured
+    //                        0.0938 / 0.100 / 0.100 -- agrees, and it is routed.
+    //
+    //   4 PROPELLER       -> NOT m_Hsyarin. "syarin" = wheel and it looked perfect, but the measure
+    //                        reads 0.0200 / 0.0218 / 0.0033 -- a 6x spread, which is the wrong-mesh
+    //                        signature rather than a re-authoring gap. The N64 propeller measures
+    //                        53 x 58 x 16, i.e. ~530 x 580 x 160 at scale 0.1, and the ZAR mesh with
+    //                        that shape is m_Hfofo (576 x 537 x 193) -- 0.099 / 0.101 / 0.083, which
+    //                        agrees. m_Hsyarin's long axis is Z (4828) while the N64 list's SHORTEST
+    //                        axis is Z; no amount of scaling reconciles that.
+    //
+    //   0 GUILLOTINE_SLOW -> m_Hgiro is the right mesh but CANNOT BE DRAWN CORRECTLY YET, so it is
+    //                        withdrawn. X and Z hit 0.100 and 0.107 exactly, so the identification is
+    //                        sound, but height gives 0.0300 -- the OoT3D mesh is 13555 tall against a
+    //                        407-tall N64 list. Since the derived scale comes from HEIGHT, routing it
+    //                        renders the blade at 0.03 and therefore 3.3x TOO NARROW, which is worse
+    //                        than the faithful N64 draw. This is the third row where height-primary
+    //                        produces a visibly wrong scale while two footprint axes agree exactly
+    //                        (after the King Zora block and the Bottom of the Well coffin lid).
+    //
+    // params 2 and 3 (SPIKED_WALL, SPIKED_WALL_2) are LEFT UNROUTED ON PURPOSE. Their two candidates,
+    // m_HhasamiN and m_HhasamiS (hasami = scissors), are MIRROR IMAGES -- identical 3563 x 1233 x 1014
+    // extents with mirrored Z (z[-594..420] vs z[-420..594]) -- which is a lovely confirmation that the
+    // pair belongs to the paired closing-walls trap, and useless for deciding WHICH wall is which. A
+    // coin flip here renders a mirrored trap. THE DISCRIMINATOR is a live instance: compare a params-2
+    // actor's shape.rot.y / world Z against a params-3 one and match the sign to the N/S suffix. That
+    // needs an instance in the Shadow Temple, which this pass did not reach.
+    //
+    // m_Hsyarin gets noBaseAnchor because it is authored CENTRE-origin (y[-1328..1328]) about the hub
+    // it spins on, exactly as its N64 list is, and Gfx_DrawDListOpa draws that list straight at the
+    // actor matrix with no offset. The generic -minY anchor would shove the propeller 1328 units up.
+    // (The other two have minY == 0, where the anchor is a no-op either way.) NOTE this refines the
+    // minY-sign rule from the Goron City pass: minY < 0 means centre-origin, but whether to anchor
+    // still depends on whether the ACTOR's Y is the prop's base or its hub -- a rolling boulder wants
+    // the anchor, a propeller does not.
+    // { ACTOR_BG_HAKA_TRAP, 0x00FF, 0x0000, "m_Hgiro", 0, {0} },  // withdrawn -- see above
+    { ACTOR_BG_HAKA_TRAP, 0x00FF, 0x0001, "m_Hkenzan", 0, {0} },
+    // m_Hfofo is authored centre-origin (y[-222..315]) about the hub it spins on, exactly as its N64
+    // list is, and Gfx_DrawDListOpa draws that list straight at the actor matrix with no offset. The
+    // generic -minY anchor would shove the propeller up by its own half-height. NOTE this refines the
+    // minY-sign rule from the Goron City pass: minY < 0 means centre-origin, but whether to anchor
+    // still depends on whether the ACTOR's Y is the prop's base or its hub -- a rolling boulder wants
+    // the anchor, a propeller does not.
+    { ACTOR_BG_HAKA_TRAP, 0x00FF, 0x0004, "m_Hfofo", /*noBaseAnchor=*/1, {0} },
     { ACTOR_BG_HAKA_HUTA,   0, 0, "m_Hkhuta", 0, {0} },
     { ACTOR_BG_HAKA_MEGANE, 0x00FF, 0x0001, "m_Hsec03", 0, {0} },
     { ACTOR_BG_HAKA_MEGANE, 0x00FF, 0x0002, "m_Hinv05", 0, {0} },
