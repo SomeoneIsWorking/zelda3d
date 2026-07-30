@@ -328,7 +328,12 @@ static void Zelda3D_ReplExec(PlayState* play, char* line, const char* outPath) {
         play->nextEntranceIndex = iv;
         play->transitionTrigger = TRANS_TRIGGER_START;
         play->transitionType = TRANS_TYPE_FADE_BLACK;
-        // The field that actually matters is transitionTrigger, NOT transitionMode. A previous warp
+        // ROOT CAUSE of every "warp did nothing" in this session: `settle` sets gZelda3dFreeze = 1,
+        // and a transition queued while the game is FROZEN never executes -- it runs the moment you
+        // `freeze 0`. The trigger-still-pending case below is usually just the downstream symptom of
+        // having been frozen. Warn about the freeze first, because it is the actionable one.
+        //
+        // The field that actually matters otherwise is transitionTrigger, NOT transitionMode. A previous warp
         // whose trigger has not been consumed yet (trigger == TRANS_TRIGGER_START, 20) means a
         // transition is already queued; overwriting it here loses one of the two warps and the scene
         // does not end up where the caller asked. Measured: with trigger already 20, the scene did not
@@ -337,10 +342,14 @@ static void Zelda3D_ReplExec(PlayState* play, char* line, const char* outPath) {
         Zelda3D_ReplReply(outPath,
                         "warp -> entrance 0x%x (%d) from scene %d | trigger(was)=%d mode=%d%s",
                         iv, iv, (int)prevScene, (int)prevTrig, (int)prevMode,
-                        (prevTrig == TRANS_TRIGGER_OFF)
-                            ? " QUEUED (let frames run, then confirm the scene actually changed)"
-                            : " *** A WARP WAS ALREADY PENDING (trigger != OFF) -- this one may be "
-                              "lost; wait for the previous transition to complete first ***");
+                        (gZelda3dFreeze != 0)
+                            ? " *** GAME IS FROZEN (settle/freeze 1) -- this warp is QUEUED BUT WILL "
+                              "NOT RUN until `freeze 0`. This is the #1 cause of a warp appearing to "
+                              "do nothing. ***"
+                            : (prevTrig == TRANS_TRIGGER_OFF)
+                                  ? " QUEUED (let frames run, then confirm the scene by actor identity)"
+                                  : " *** A WARP WAS ALREADY PENDING (trigger != OFF) -- usually means "
+                                    "the game is/was frozen; resume and let it complete ***");
     } else if (strcmp(cmd, "cswarp") == 0 && sscanf(line, "%*s %i %i", &iv, &iv2) == 2) {
         // Warp to an entrance WITH a chosen cutscene-setup index (both decimal or 0x-hex). Needed
         // for CUTSCENE-ONLY scenes (e.g. Chamber of the Sages 0x6B): a plain `warp` lands there with
