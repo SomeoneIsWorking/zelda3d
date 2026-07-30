@@ -30,13 +30,13 @@ some findings carry only ONE refuter vote (0/1) rather than two — weaker, and 
 
 ### [PARTLY FIXED] * `Shipwright/zelda3d_shared/player/link_midmask.cpp:53` — user-visible, affected 4, refuted 0/2
   With the sword drawn and no shield on the back, Link's empty sheath/strap disappears instead of staying on his back. Child with the Deku shield and sword drawn loses the sheath ring. Child holding the Mirror shield shows a HYLIAN shield on his back (line 308 lumps MIRROR into `hylian`; the table's child MIRROR row is 14 = sword only).
-### [CONFIRMED] * `Shipwright/zelda3d_shared/player/link_midmask.cpp:36` — user-visible, affected 3, refuted 0/1
+### [FIXED] * `Shipwright/zelda3d_shared/player/link_midmask.cpp:36` — user-visible, affected 3, refuted 0/1
   Adult Link holding the hookshot/longshot shows a flat open palm with the chain emerging from nothing; playing the Ocarina of Time shows an open palm instead of the ocarina grip. PLAYER_MODELTYPE_RH_OOT (0x0E) is not even in the switch, so it takes the same default.
 ### [FIXED] * `Shipwright/zelda3d_shared/player/link_midmask.cpp:32` — user-visible, affected 2, refuted 0/2
   Adult Link raising the Mirror Shield displays a HYLIAN shield (wrong texture, wrong silhouette) — the Mirror Shield is visually absent from the whole game. Separately, adult Link in a shield-holding pose with no shield equipped shows an open palm instead of a fist.
 ### [CONFIRMED] * `Shipwright/soh/src/zelda3d/player/zelda3d_link.cpp:326` — user-visible, affected 2, refuted 0/1
   Child Link carrying the Hylian or Mirror shield and raising it shows a DEKU shield strapped to his arm. With no shield equipped he shows an open palm where OoT3D (and N64) show a fist.
-### [CONFIRMED] * `Shipwright/zelda3d_shared/player/link_midmask.cpp:23` — user-visible, affected 2, refuted 0/1
+### [FIXED] * `Shipwright/zelda3d_shared/player/link_midmask.cpp:23` — user-visible, affected 2, refuted 0/1
   Adult Link swinging the Megaton Hammer holds nothing — the hammer is entirely missing. Bottle-holding uses a clenched fist rather than the cupped hand the bottle model is posed against.
 ### [CONFIRMED] * `Shipwright/soh/src/zelda3d/player/zelda3d_link.cpp:311` — user-visible, affected 2, refuted 0/1
   Link's hands stay flat-open whenever he runs — in every locomotion state, both ages, which is the most-seen pose in the game.
@@ -50,7 +50,7 @@ some findings carry only ONE refuter vote (0/1) rather than two — weaker, and 
   Child Link aiming/firing the slingshot holds an Ocarina of Time in his right hand; the slingshot never appears.
 ### [CONFIRMED] * `Shipwright/soh/src/zelda3d/player/zelda3d_link.cpp:315` — user-visible, affected 1, refuted 0/1
   Child Link holding the boomerang shows an object OoT3D never draws (and the real fist+boomerang mesh never appears).
-### [CONFIRMED] * `Shipwright/zelda3d_shared/player/link_midmask.cpp:34` — user-visible, affected 1, refuted 0/2
+### [FIXED] * `Shipwright/zelda3d_shared/player/link_midmask.cpp:34` — user-visible, affected 1, refuted 0/2
   Adult Link with the bow drawn in third person renders the first-person bow-arm mesh instead of the third-person one (different arm/bow geometry, authored to be seen only from the camera-inside-the-arm angle).
 ### [CONFIRMED] * `Shipwright/soh/src/zelda3d/player/zelda3d_link.cpp:754` — internal, affected 1, refuted 1/2
   No player impact; a workflow/consistency defect in the file most likely to be instrumented next.
@@ -197,3 +197,33 @@ I did NOT resolve this, so self-calibration is scoped to the two variants whose 
 The cheap next experiment: measure the small rock in Kokiri Forest. Reproducing 0.12 there means the
 measurement is scene/instance-dependent (a real limitation of the mechanism); reproducing 0.09998
 means the hand value was simply wrong and the calibrated slots should switch over too.
+
+### link_midmask.cpp:23, :34, :36 — FIXED by porting the table instead of the three cases
+
+All three were the same root cause: hand-written mesh-id cases. Rather than patch them individually
+I found and ported the OoT3D table they were all guessing at — `sPlayerDLists[21]` @0x0053c698
+(claim C027, full decode in `oot3d-decomp/docs/player_dl_tables.md`). See the commit for the five
+corrected values and the per-mid isolation measurements.
+
+Two things worth carrying forward:
+
+**The Ghidra dead end was a wrong diagnosis, not a hard limit.** The received explanation for
+Ghidra's zero xrefs was ARM `movw`/`movt` immediates it doesn't materialize. That is false: the whole
+4.6 MB binary holds only 3 ARM and 49 Thumb-2 MOVW encodings — nowhere near enough to be how
+addresses are formed. Scanning for 4-byte-aligned words whose value equals a known table VA (I017)
+found the master pointer table and the reading function's literal pool in one pass, no Ghidra at all.
+When a tool reports nothing, check the denominator of the negative before accepting the explanation
+for it.
+
+**Independent agreement is what made these safe to ship.** The audit read the code and said the
+third-person bow renders the first-person arm mesh; the ROM table says 29 where we had 30. Neither
+input knew about the other. Same pattern as the rock/flower scales earlier today. Where I could not
+get that agreement — what the three shield-variant groups distinguish — I left it unclaimed and left
+the verified shield/sheath code alone rather than "completing" the port on a guess.
+
+### Unrelated observation, not investigated
+The regression screenshot (`scratch/screenshots/dl_normal.png`, Kokiri Forest, adult Link) shows a
+large magenta/purple blob in the upper right near a wooden sign. It cannot be caused by this change
+(which only alters Link's hand mesh ids), and Link himself renders correctly, so it did not block the
+commit — but it looks like a real artifact rather than an intended effect and is worth a look. Noting
+it rather than silently ignoring it; NOT filed as a card since no user reported it.
