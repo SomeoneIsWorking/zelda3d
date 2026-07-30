@@ -1,9 +1,10 @@
 ---
 id: C032
 kind: claim
-status: holds
+status: falsified
 created: 2026-07-30
 tags: 
+falsified_on: 2026-07-30
 ---
 
 ## Claim
@@ -17,3 +18,9 @@ Measured twice in one session. From Kokiri Forest, 'warp 0xcd' (Hyrule Field) le
 ## What would falsify it
 
 A second in-session warp is observed to change scene (verify via actorsnear, not via a screenshot), or warp is fixed to re-arm the transition
+
+## FALSIFIED 2026-07-30
+
+Overstated and wrong on mechanism. Instrumenting the warp command to report play->sceneNum showed the scene DOES change on repeated in-session warps: 85 -> 81 -> 85 across three consecutive warps (Kokiri=85, Hyrule Field=81), each confirmed by actor identity. So it is not 'only the first warp after a restart works'. The real rule: a warp is lost when a PREVIOUS transition trigger is still unconsumed (transitionTrigger == TRANS_TRIGGER_START == 20 at the time of the call) -- measured, and in that case the scene did not change even after settling 200 frames. transitionMode was TRANS_MODE_OFF in exactly that failing case, so keying on mode reports success on the failure. Corrected by C033.
+
+> Anything that cited this claim as proof must be re-checked. Grep the repo for it.

@@ -316,10 +316,31 @@ static void Zelda3D_ReplExec(PlayState* play, char* line, const char* outPath) {
         // Trigger an in-game scene transition to an entrance index (decimal or 0x-hex), so
         // the live instance can hop scenes without a relaunch (e.g. `warp 0xee` = Kokiri
         // Forest). Same mechanism actors use to send Link through a loading zone.
+        // Report the state we are writing INTO, not just the request. z_play.c:786 only accepts a
+        // trigger when transitionMode == TRANS_MODE_OFF, so a warp issued while a transition is still
+        // in progress is DISCARDED -- and the old reply said "warp -> entrance ..." either way, which
+        // made a silently-ignored second warp indistinguishable from a successful one. That cost real
+        // time: a warp that did nothing produced a frame identical to the previous one and was read as
+        // evidence about the scene.
+        const s16 prevMode = play->transitionMode;
+        const s16 prevTrig = play->transitionTrigger;
+        const s16 prevScene = play->sceneNum;
         play->nextEntranceIndex = iv;
         play->transitionTrigger = TRANS_TRIGGER_START;
         play->transitionType = TRANS_TYPE_FADE_BLACK;
-        Zelda3D_ReplReply(outPath, "warp -> entrance 0x%x (%d)", iv, iv);
+        // The field that actually matters is transitionTrigger, NOT transitionMode. A previous warp
+        // whose trigger has not been consumed yet (trigger == TRANS_TRIGGER_START, 20) means a
+        // transition is already queued; overwriting it here loses one of the two warps and the scene
+        // does not end up where the caller asked. Measured: with trigger already 20, the scene did not
+        // change even after settling 200 frames. transitionMode was 0 (OFF) in exactly that case, so
+        // keying the warning on mode -- which is what I did first -- reports ACCEPTED on the failure.
+        Zelda3D_ReplReply(outPath,
+                        "warp -> entrance 0x%x (%d) from scene %d | trigger(was)=%d mode=%d%s",
+                        iv, iv, (int)prevScene, (int)prevTrig, (int)prevMode,
+                        (prevTrig == TRANS_TRIGGER_OFF)
+                            ? " QUEUED (let frames run, then confirm the scene actually changed)"
+                            : " *** A WARP WAS ALREADY PENDING (trigger != OFF) -- this one may be "
+                              "lost; wait for the previous transition to complete first ***");
     } else if (strcmp(cmd, "cswarp") == 0 && sscanf(line, "%*s %i %i", &iv, &iv2) == 2) {
         // Warp to an entrance WITH a chosen cutscene-setup index (both decimal or 0x-hex). Needed
         // for CUTSCENE-ONLY scenes (e.g. Chamber of the Sages 0x6B): a plain `warp` lands there with
