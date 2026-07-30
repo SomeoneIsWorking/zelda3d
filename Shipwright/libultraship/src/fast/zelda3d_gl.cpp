@@ -622,9 +622,23 @@ extern "C" void Zelda3D_GL_Draw(int modelId, const float* mp16, int invertY, uns
     (void)aspectAdj;
 }
 
+// Per-model SUBMIT counter, for answering "did the renderer submit geometry for this model at all?"
+// independently of whether the result is VISIBLE. The pixel-contribution check (tools/ahide_check.sh)
+// cannot answer that for three whole prop classes measured this session: a flat single-sided plane seen
+// edge-on, a prop flush with the floor (a Jabu-Jabu floor switch), and one instance of a many-instance
+// prop that happens to be occluded. In all three a correct routing reads 0 px, which twice caused a
+// WORKING routing to be reverted. Counting submissions separates "we never drew it" (a real routing
+// failure) from "we drew it and it is hidden" (fine).
+#include <map>
+static std::map<int, long> g_zelda3dSubmitCount;
+extern "C" long Zelda3D_GL_SubmitCount(int modelId) {
+    auto it = g_zelda3dSubmitCount.find(modelId);
+    return (it == g_zelda3dSubmitCount.end()) ? 0 : it->second;
+}
 extern "C" void Zelda3D_GL_Submit(int modelId, const float* mp16, const float* mv16, int lit, int invertY,
                                 unsigned char r, unsigned char g, unsigned char b, unsigned char a, float aspectAdj,
                                 int sky, float uvOffU, float uvOffV, int forceUnlit) {
+    g_zelda3dSubmitCount[modelId]++;
     DrawItem it;
     if (modelId == gZelda3dTraceModelId) {
         fprintf(stderr, "[MPTRACE] model=%d step=%.4f mv=(%.4f,%.4f,%.4f) mp=(%.5f,%.5f,%.5f,%.5f)\n", modelId,

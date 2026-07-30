@@ -145,6 +145,10 @@ extern Actor* gZelda3dZTargetActor;
 // does (REPL `autostate`/`auto`/`enkomask` inspect it directly).
 #include "../tables/zelda3d_object_zars.inc"
 
+// Per-model SUBMIT counter from the renderer (libultraship). Answers "did we draw it at all?"
+// independently of visibility -- see the `submitted` command below.
+extern "C" long Zelda3D_GL_SubmitCount(int modelId);
+
 // ===========================================================================
 // Zelda3D REPL — interactive control of a long-lived headless instance.
 //
@@ -1050,6 +1054,32 @@ static void Zelda3D_ReplExec(PlayState* play, char* line, const char* outPath) {
             gZelda3dForceCsab[0] = '\0';
             Zelda3D_ReplReply(outPath, "animforce OFF (auto-resolve restored)");
         }
+    } else if (strcmp(cmd, "submitted") == 0) {
+        // How many times the renderer has SUBMITTED each auto/forced model's geometry. Answers "did we
+        // draw it at all?" independently of whether the result is VISIBLE -- which the pixel-contribution
+        // check cannot do for a flat plane seen edge-on, a prop flush with the floor, or an occluded
+        // instance of a many-instance prop. A slot at state=2 with ZERO submissions is a real failure; a
+        // slot with submissions but no pixels is drawn-and-hidden, which is fine.
+        s32 k;
+        int shown = 0;
+        for (k = 0; k < (s32)ARRAY_COUNT(kZelda3dObjectZars); k++) {
+            if (sAuto[k].modelId > 0) {
+                Zelda3D_ReplReply(outPath, "auto[0x%x] model=%d submits=%ld", k, sAuto[k].modelId,
+                                Zelda3D_GL_SubmitCount(sAuto[k].modelId));
+                shown++;
+            }
+        }
+        for (k = 0; k < Zelda3D_ForcedSlotCount(); k++) {
+            short aid = 0;
+            const char* cmb = NULL;
+            const Zelda3D_AutoEntry* fe = Zelda3D_ForcedSlotInfo(k, &aid, &cmb);
+            if (fe == NULL || fe->modelId <= 0) continue;
+            Zelda3D_ReplReply(outPath, "forced[%d] actor=0x%x |%s state=%d model=%d submits=%ld", k,
+                            (unsigned)(u16)aid, cmb ? cmb : "?", fe->state, fe->modelId,
+                            Zelda3D_GL_SubmitCount(fe->modelId));
+            shown++;
+        }
+        if (!shown) Zelda3D_ReplReply(outPath, "submitted: no models resolved yet");
     } else if (strcmp(cmd, "autostate") == 0) {
         // Dump every object that the auto path has touched: state + derived scale, so the
         // measured scale can be checked against the hand-tuned values (pot/crate/bush/...).

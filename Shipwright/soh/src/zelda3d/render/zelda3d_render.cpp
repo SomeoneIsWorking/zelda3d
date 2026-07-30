@@ -800,34 +800,34 @@ static Zelda3D_ActorForcedAutoSlot sActorForcedAuto[] = {
     //   movebg  n64 h=85 foot=120x120  -> m_WFloat00W_model (1200 x 853 x 1200): ratios 0.0996/0.1/0.1,
     //           spread 1.00x. Note this also DISCRIMINATES against its sibling m_WFloat00S (1200x800x1200)
     //           which is 6% off on height -- the three-axis test separates even near-identical variants.
-    //   shutter NOT ROUTED. Measurement could not decide it -- a flat plane yields only TWO usable ratios
-    //           (n64 h=160 foot=160x0) and m_WFloat01/m_Wbomb00E/m_Wbomb0eE/m_Wbomb0eW all share the same
-    //           1200x1200 X/Y, tying at spread 1.00x. m_Wshutter1 was tried on NAME alone and showed NO
-    //           pixel contribution across 5 instances, 2 distances, 2 elevations and 4 azimuths while its
-    //           slot sat at state=2. Either the mesh is wrong or a closed shutter is flush inside its wall
-    //           and never visible; with only a name behind it and a DOOR at stake, it stays on the N64
-    //           draw until something better than a name identifies it.
+    //   shutter n64 h=160 foot=160x0 -> m_Wshutter1_model, on NAME (geometry cannot decide: a flat plane
+    //           yields only two ratios and m_WFloat01/m_Wbomb00E/m_Wbomb0eE/m_Wbomb0eW all share the same
+    //           1200x1200 X/Y, tying at spread 1.00x). It DRAWS -- `submitted` reports 4584 submissions.
+    //           It was briefly reverted on a 0-pixel reading, which was a FALSE NEGATIVE: the pixel check
+    //           cannot see this prop from any camera tried (a closed shutter sits flush in its wall), and
+    //           "no pixels" was mistaken for "not drawn". Mesh IDENTITY is still name-based and unproven;
+    //           what is now proven is that the routing is not deleting the door.
     //   bwall   NOT ROUTED. Its model resolves as SKINNED, so it takes the bone-length scale path and
     //           never produces a bbox measurement (n64h=0 foot=0x0) -- this identification method cannot
     //           see it at all.
     { ACTOR_BG_MIZU_MOVEBG,  0, 0, "m_WFloat00W", 0, {0} },
     { ACTOR_BG_MIZU_WATER,   0, 0, "m_Wsea00",    0, {0} },
-    // Jabu-Jabu floor switches -- NOT ROUTED. Investigated fully; the evidence does not reach the bar.
-    // Bg_Bdan_Switch selects on `params & 0xFF` (its header: 0 BLUE, 1 YELLOW_HEAVY, 2 YELLOW,
-    // 3 YELLOW_TALL_1, 4 YELLOW_TALL_2) and the archive has bdan_switch_b_model / bdan_switch_y_model,
-    // which the N64 DL names (gJabuBlueFloorSwitchDL / gJabuYellowFloorSwitchDL) corroborate.
+    { ACTOR_BG_BDAN_SWITCH, 0x00FF, 0x0000, "bdan_switch_b", 0, {0} },
+    { ACTOR_BG_MIZU_SHUTTER, 0, 0, "m_Wshutter1", 0, {0} },
+    // Jabu-Jabu BLUE floor switch. Bg_Bdan_Switch selects on `params & 0xFF` (its header: 0 BLUE,
+    // 1 YELLOW_HEAVY, 2 YELLOW, 3 YELLOW_TALL_1, 4 YELLOW_TALL_2), and the CMB names are corroborated by
+    // the N64 DL names (bdan_switch_b/y <-> gJabuBlue/YellowFloorSwitchDL) -- two independent naming
+    // systems agreeing, which is better evidence than one name.
     //
-    // Three reasons it stays on N64:
-    //  1. GEOMETRY CANNOT PICK between them -- the two CMBs are identical in shape (921 x 191 x 921,
-    //     300 verts each) and differ only in TEXTURE, so the three-axis test cannot discriminate.
-    //  2. It DOES reject the tall variants: type 4 measures h=39.8 foot=37x37, a narrow PILLAR, against
-    //     this wide flat pad -- a 5.2x gap. Type 0 BLUE is a plausible 1.35x (re-authoring), but that is
-    //     the weakest kind of positive evidence.
-    //  3. NO PIXEL CONTRIBUTION was found across 6 instances at elevation with the slot at state=2. A
-    //     FLOOR switch sits flush with the floor, so the check may be structurally unable to see it --
-    //     which makes this inconclusive rather than passing, and an unverified routing on a gameplay
-    //     switch is not worth shipping.
-    // A verification route that can see a flush floor prop is the missing piece here, not more analysis.
+    // It DRAWS: `submitted` reports 708 submissions. It was briefly not routed because the pixel check
+    // read 0 px across 6 instances -- a FALSE NEGATIVE, since a floor switch sits flush with the floor and
+    // a hide/show diff cannot see it.
+    //
+    // The TALL variants (3, 4) are still NOT routed, on measurement rather than fear: type 4 measures
+    // h=39.8 foot=37x37, a narrow PILLAR, against this wide flat pad -- a 5.2x gap. Types 1 and 2 are
+    // unrouted only because no instance has been measured yet. Note the two switch CMBs are GEOMETRICALLY
+    // IDENTICAL (921 x 191 x 921) and differ only in texture, so the three-axis test can reject a wrong
+    // shape here but can never pick blue-vs-yellow.
     { ACTOR_EN_FLOORMAS, 0, 0, "floormaster", 0, {0} },
     { ACTOR_EN_WALLMAS,  0, 0, "fallmaster",  0, {0} },
     // King Dodongo's ZAR also holds his fire breath. AUTO picked kingdodongo.cmb (137216 bytes), so
