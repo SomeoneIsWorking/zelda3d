@@ -227,3 +227,20 @@ Useful side effect: the ids above are FIRST-HAND identifications and can be used
 `link_mesh_id_map.md` per-label instead of trusting it. Note 9 and 10 look near-identical here, which
 matches the map's own "9 = Hylian shield + sword on back / 10 = Hylian shield on back" only loosely —
 the difference is not visible at this camera.
+
+## Decomp check for the slingshot's geometry — the available fragment does not cover it
+
+Checked `oot3d-decomp/build/decomp/004c11f4.c` (Player_DrawImpl) for a second model draw that would
+mean the slingshot is a separate object. It does not answer the question: the `SetMeshVisible` calls in
+that fragment are ids 4, 0x11(17), 5|6, 0x12(18)|0x13(19), 0xf(15), plus two table-driven ones — i.e.
+the GAUNTLET-plate and sword/shield-table portion (the same pattern already ported: plate 1 on both
+arms, then an open/closed variant per hand). There is no held-item/slingshot branch in it.
+
+So the slingshot question is still open, and answering it needs the CHILD model-type -> mesh table
+located in code.bin — not this fragment.
+
+CAUTION worth recording, because I nearly tripped on it: **mesh ids are PER-RIG.** Adult 18/19 are
+gauntlet plates (link_v2); child 18 is the OCARINA (childlink_v2), verified visually. Both are true and
+they do not conflict. `link_mesh_id_map.md` has separate adult and child sections for exactly this
+reason, and any cross-referencing between a decomp fragment and a mid must first establish which rig
+the fragment is drawing.
