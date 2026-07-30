@@ -174,3 +174,28 @@ height, so the height measure cannot scale it regardless of pass (`Bg_Ydan_Sp` F
 
 So the translucent class needs, in order: (1) an XLU-aware measure bracket with empty-session
 suppression, (2) footprint sizing for flat props. Neither is a routing-table problem.
+
+## Pass 6 (2026-07-30) — VERIFICATION STANDARD: prove the routed CMB actually DRAWS
+
+Routing `Bg_Ydan_Sp` -> `ydan_spkabe` **deleted the Deku Tree web**. The slot looked perfect (state=2,
+scale=0.10000, n64h=288.8, distinct model id) and the replacement contributed ZERO pixels. Reverted.
+
+**Why an invisible replacement is worse than no routing:** a successful route makes
+`Zelda3D_TryDrawActor` return "handled", which skips the N64 draw. There is no fallback. So the object
+disappears — and here it was gameplay-critical (the web must be burned to progress).
+
+**The required check, from now on:**
+```
+asel <actorId>            # select it
+acam <dist> z             # frame it
+shot before               # capture
+ahide 1                   # suppress just this actor's draw
+shot after                # capture
+# diff before/after: a routing that works contributes NON-ZERO pixels
+```
+`state=2` plus a sane scale proves only that the MEASURE ran. It does not prove anything renders.
+
+**Earlier routings in this doc were verified to the weaker standard** (distinct model ids + measured
+scales), with visual confirmation only for two mori props and one ddan prop. `OBJECT_MORI_OBJECTS`,
+`OBJECT_DDAN_OBJECTS`, `OBJECT_WALLMASTER`, `OBJECT_KINGDODONGO` and `OBJECT_SPOT12_OBJ` should each get
+the `ahide` check above; any that contribute zero pixels must be reverted the same way.
