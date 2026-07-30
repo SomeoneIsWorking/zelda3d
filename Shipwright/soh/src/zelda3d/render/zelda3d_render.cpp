@@ -1244,9 +1244,20 @@ static int Zelda3D_TryAuto(PlayState* play, Actor* actor) {
             e->state = 2;
             // CROSS-CHECK the height-derived scale against the FOOTPRINT. Height, X and Z are three
             // INDEPENDENT estimates of the same scale, so agreement is strong evidence the CMB is the
-            // right mesh for this actor and disagreement means it probably is not -- which is exactly
-            // the identification problem the multi-CMB routing table faces. Worked example:
-            // l_bigst's CMB is 300x90x300 against a measured h=90 foot=300x300, all three ratios 1.0.
+            // right mesh for this actor. Worked example: l_bigst's CMB is 300x90x300 against a measured
+            // h=90 foot=300x300, all three ratios 1.0.
+            //
+            // BUT DISAGREEMENT IS NOT PROOF OF A WRONG MESH, and the first case this check flagged shows
+            // why. It assumes Grezzo RE-AUTHORED the asset at the N64 proportions, which is often true
+            // but need not be. Obj_Syokudai's wooden torch measures h=58 foot=16x16 on N64, while
+            // syokudai_ki_model ("ki" = wood) is 20x61x21 -- so the ratios disagree ~20%, and
+            // syokudai_isi_model ("isi" = STONE) at 16x58x16 matches 1.000/1.000/1.000 exactly. Routing
+            // the wooden torch to the stone mesh to satisfy the numbers would be chasing an N64 shape
+            // instead of porting the OoT3D asset, which is backwards for this project. The 3DS wooden
+            // torch is simply chunkier than the N64 one.
+            // So: treat a disagreement as "check this pairing", not as "this pairing is wrong". A
+            // MISIDENTIFICATION shows up as a gross mismatch (Bg_Ydan_Maruta's wrong candidate was off
+            // by 200x on Z); a re-authoring shows up as a modest, CONSISTENT one across both axes.
             if (Zelda3D_AutoMode() >= 1) {
                 float mx = 0.0f, mz = 0.0f;
                 if (Zelda3D_AutoModelExtentXZ(e->modelId, &mx, &mz) && mx > 1e-3f && mz > 1e-3f &&
@@ -1257,9 +1268,9 @@ static int Zelda3D_TryAuto(PlayState* play, Actor* actor) {
                     const float wz = rz > 1.0f ? rz : 1.0f / rz;
                     if (wx > 1.25f || wz > 1.25f) {
                         fprintf(stderr,
-                                "SOH3D AUTO: obj 0x%x %s -- height scale %.5f DISAGREES with the "
-                                "footprint (x %.2fx, z %.2fx off); this CMB may be the wrong mesh for "
-                                "this actor\n",
+                                "SOH3D AUTO: obj 0x%x %s -- height scale %.5f differs from the footprint "
+                                "(x %.2fx, z %.2fx). CHECK the pairing: a gross mismatch means the wrong "
+                                "mesh, a modest consistent one may just be a Grezzo re-authoring\n",
                                 objId, modelKey, e->scale, wx, wz);
                         fflush(stderr);
                     }
