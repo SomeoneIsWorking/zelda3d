@@ -731,36 +731,27 @@ static Zelda3D_ActorForcedAutoSlot sActorForcedAuto[] = {
     // SAME SIZE (26496 bytes each) -- so "largest CMB" is a coin flip between them and En_Wallmas was
     // getting the Floormaster mesh. Both routed explicitly, because a tie-break by file order is not
     // something to leave load-bearing. ("fallmaster" is Grezzo's spelling of Wallmaster.)
-    // Bg_Ydan_Sp (Deku Tree web) is NOT routed. Three attempts, and the diagnosis is now much
-    // narrower than it was -- but the cause is still open, so it stays unrouted because a resolved
-    // route suppresses the N64 draw and would DELETE this gameplay-critical object.
+    // Bg_Ydan_Sp (Deku Tree web) is NOT routed. ROOT CAUSE FOUND: it is BACK-FACE CULLED.
+    // Measured at runtime with the `facecull` knob, routing temporarily enabled:
+    //     default (cull on, flip=0)     ->    0 px   invisible
+    //     cull OFF                      -> 3750 px   draws
+    //     cull ON, winding FLIPPED      -> 3750 px   draws
+    // So its triangles wind opposite to our assumed front-face convention. It stays unrouted because
+    // the fix is NOT to disable culling, and flipping the GLOBAL convention is not safe on this
+    // evidence alone -- see the warning below.
     //
-    // Symptom: slot resolves fine (state=2, scale 0.10000, n64h 288.8), actor demonstrably in frame
-    // (the N64 web contributes 712 px from the identical camera), our replacement contributes 0 px.
+    // Why my earlier "culling is fine, all six working models are cull=1 too" reasoning was WRONG:
+    // those six are closed 3D VOLUMES (elevator 100x160x100, ddanh_jd 1198x7998x1198). A volume is
+    // insensitive to the winding convention -- flip it and you still get pixels, just the inside
+    // faces. This web is a FLAT single-sided quad (bbox size 2800 x 2888 x ZERO), and for a plane
+    // culling is all-or-nothing. I compared planes against volumes and drew a false conclusion.
     //
-    // RULED OUT, each with evidence:
-    //   * THE DISPLAY LIST / PASS. Forcing the model into POLY_OPA with ZELDA3D_XLU=0 still gives 0 px.
-    //     So POLY_XLU is NOT the problem -- which also means the two earlier attempts were chasing the
-    //     wrong thing. The model does not draw from EITHER list.
-    //   * per-draw alpha: gSPZelda3DDraw forwards alpha 255 (it is a wrapper over gSPZelda3DDrawA).
-    //   * blend state: the CMB material is ordinary SRC_ALPHA / 1-SRC_ALPHA, FUNC_ADD, srcA=ONE.
-    //   * back-face culling: all six confirmed-drawing routed models are cull=1 exactly like this one.
-    //   * empty geometry: the model has a real bbox (modelh 2888 was derived from it), so groups exist.
-    //
-    //   * polygon offset / decal depth bias: ruled out. polyOffsetEnable is 0 with rawUnit 0 on the web
-    //     AND on both working controls, and depthFunc is GL_LESS (0x0201) on all three. So the web is
-    //     not being depth-rejected by a missing decal bias.
-    //
-    // AFTER ALL THAT, exactly TWO material fields separate the web from the six models that draw:
-    // blendEnable (1 vs 0) and depthWrite (0 vs 1). depthWrite=0 alone cannot hide geometry -- it only
-    // declines to write depth -- which leaves the blended path.
-    //
-    // NEXT CHECK, stated concretely so it is not re-derived: with blend SRC_ALPHA / 1-SRC_ALPHA and a
-    // per-draw alpha of 255, the fragment's alpha must come from the TEXTURE and the VERTEX colour. If
-    // either decodes to alpha 0 for this material the draw is mathematically invisible in any pass,
-    // which fits the exact-zero result. Dump the decoded texture's alpha channel and the group's vertex
-    // colour alpha for ydan_spkabe and compare against a working blended material elsewhere in the ROM.
-    // Do NOT go back to the emission site or the display list -- both are now excluded by measurement.
+    // *** WARNING, worth more than this one prop: our global front-face convention
+    // (gZelda3dFaceCullFlip = 0) may be WRONG, and the way it was validated cannot detect that. ***
+    // A pixel-contribution test on a closed volume passes under EITHER convention, so "the props all
+    // render" is not evidence for flip=0. If flip=1 is actually correct we have been drawing the
+    // INSIDE faces of every replaced prop. Deciding it needs a test that can see the difference on a
+    // volume -- surface shading / normal orientation against the oracle, not a pixel count.
     { ACTOR_EN_FLOORMAS, 0, 0, "floormaster", 0, {0} },
     { ACTOR_EN_WALLMAS,  0, 0, "fallmaster",  0, {0} },
     // King Dodongo's ZAR also holds his fire breath. AUTO picked kingdodongo.cmb (137216 bytes), so
