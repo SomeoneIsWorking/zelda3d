@@ -1057,9 +1057,15 @@ static void Zelda3D_ReplExec(PlayState* play, char* line, const char* outPath) {
         int shown = 0;
         for (k = 0; k < (s32)ARRAY_COUNT(kZelda3dObjectZars); k++) { // sAuto is sized to this table (render.h)
             if (sAuto[k].state != 0 || sAuto[k].measuredH > 0.0f) {
-                Zelda3D_ReplReply(outPath, "auto[0x%x] %s state=%d scale=%.5f n64h=%.1f model=%d", k,
+                // Report the measured FOOTPRINT alongside the height. These are the N64 draw's real
+                // world-space extents, which is the evidence needed to identify WHICH OoT3D CMB an
+                // actor corresponds to when several share its archive -- the open blocker on most of
+                // the multi-CMB queue. Without it the only clue is the CMB's name, which has already
+                // mismatched once (hasi/hasigo).
+                Zelda3D_ReplReply(outPath,
+                                "auto[0x%x] %s state=%d scale=%.5f n64h=%.1f n64foot=%.0fx%.0f model=%d", k,
                                 kZelda3dObjectZars[k] ? kZelda3dObjectZars[k] : "?", sAuto[k].state, sAuto[k].scale,
-                                sAuto[k].measuredH, sAuto[k].modelId);
+                                sAuto[k].measuredH, sAuto[k].measFootX, sAuto[k].measFootZ, sAuto[k].modelId);
                 shown++;
             }
         }
@@ -1070,9 +1076,10 @@ static void Zelda3D_ReplExec(PlayState* play, char* line, const char* outPath) {
             const char* cmb = NULL;
             const Zelda3D_AutoEntry* fe = Zelda3D_ForcedSlotInfo(k, &aid, &cmb);
             if (fe == NULL) continue;
-            Zelda3D_ReplReply(outPath, "forced[%d] actor=0x%x |%s state=%d scale=%.5f n64h=%.1f model=%d tries=%d", k,
-                            (unsigned)(u16)aid, cmb ? cmb : "?", fe->state, fe->scale, fe->measuredH, fe->modelId,
-                            (int)fe->tries);
+            Zelda3D_ReplReply(outPath,
+                            "forced[%d] actor=0x%x |%s state=%d scale=%.5f n64h=%.1f n64foot=%.0fx%.0f model=%d tries=%d",
+                            k, (unsigned)(u16)aid, cmb ? cmb : "?", fe->state, fe->scale, fe->measuredH,
+                            fe->measFootX, fe->measFootZ, fe->modelId, (int)fe->tries);
             shown++;
         }
         for (k = 0; k < Zelda3D_VariantSlotCount(); k++) {
