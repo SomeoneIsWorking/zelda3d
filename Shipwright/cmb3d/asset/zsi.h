@@ -33,14 +33,6 @@ struct ZsiCommand {
     uint32_t offset = 0;
 };
 
-struct ZsiEnvSetting {
-    uint8_t ambient[3] = { 0, 0, 0 };       // scene ambient (shared by both lights as light[i].ambient)
-    float light0Dir[3] = { 0, 0, 0 };       // primary directional light (normalized-ish, [-1,1])
-    uint8_t light0Col[3] = { 0, 0, 0 };     // primary diffuse colour
-    float light1Dir[3] = { 0, 0, 0 };       // secondary directional light
-    uint8_t light1Col[3] = { 0, 0, 0 };     // secondary diffuse colour
-    uint8_t fogColor[3] = { 0, 0, 0 };
-};
 
 class Zsi {
   public:
@@ -68,11 +60,6 @@ class Zsi {
     // Raw file bytes, so callers can decode a command's data array at its offset.
     const std::vector<uint8_t>& raw() const { return mData; }
 
-    // OoT3D scene environment-lighting settings (header command 0x0F), in file order. Empty for
-    // room files / scenes without the command. These are the time-of-day variants OoT3D selects
-    // among to light the world; Zelda3D drives its world lighting from them for graphical parity.
-    const std::vector<ZsiEnvSetting>& envSettings() const { return mEnvSettings; }
-
   private:
     bool mOk = false;
     std::string mErr;
@@ -81,7 +68,6 @@ class Zsi {
     bool mHasMesh = false;
     int mCmbOff = -1;
     uint32_t mCmbSize = 0;
-    std::vector<ZsiEnvSetting> mEnvSettings;
     std::vector<ZsiCommand> mCommands;
 };
 

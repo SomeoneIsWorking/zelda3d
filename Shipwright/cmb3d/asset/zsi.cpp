@@ -9,7 +9,6 @@ static uint32_t u32le(const uint8_t* b, size_t o) {
 
 static const uint8_t CMD_END = 0x14;
 static const uint8_t CMD_MESH = 0x0A;
-static const uint8_t CMD_ENV = 0x0F; // EnvironmentSettings (scene-header lighting variants)
 
 Zsi::Zsi(std::vector<uint8_t> data) : mData(std::move(data)) {
     const uint8_t* b = mData.data();
@@ -26,27 +25,6 @@ Zsi::Zsi(std::vector<uint8_t> data) : mData(std::move(data)) {
     for (size_t off = 16; off + 8 <= n;) {
         uint8_t ctype = b[off];
         if (ctype == CMD_MESH) mHasMesh = true;
-        else if (ctype == CMD_ENV) {
-            // Environment-lighting variants (OoT3D's own scene lighting; cmd0x0F). count = byte1,
-            // data array at the LE offset in cmd2. Per-setting stride 0x1C (non-Majora); layout
-            // per noclip zsi.ts readEnvironmentSettings (see docs/oot3d_world_lighting_re.md).
-            uint8_t count = b[off + 1];
-            uint32_t eo = u32le(b, off + 4);
-            for (uint8_t i = 0; i < count; i++) {
-                size_t o = (size_t)eo + (size_t)i * 0x1C;
-                if (o + 0x1C > n) break;
-                ZsiEnvSetting e;
-                for (int k = 0; k < 3; k++) {
-                    e.ambient[k]  = b[o + 0x0A + k];
-                    e.light0Dir[k] = (float)((int8_t)b[o + 0x0D + k]) / 127.0f;
-                    e.light0Col[k] = b[o + 0x10 + k];
-                    e.light1Dir[k] = (float)((int8_t)b[o + 0x13 + k]) / 127.0f;
-                    e.light1Col[k] = b[o + 0x16 + k];
-                    e.fogColor[k]  = b[o + 0x19 + k];
-                }
-                mEnvSettings.push_back(e);
-            }
-        }
         {
             // Keep every command's raw header. Cheap, and it is the only way to answer "what else is
             // in this file" (actor lists, spawns, collision) without reopening the parser each time.

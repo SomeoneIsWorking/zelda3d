@@ -603,7 +603,7 @@ extern "C" int Zelda3D_PlayerDrawImpl(PlayState* play, Actor* actor) {
             if ((dbg++ % 30) == 0) {
                 fprintf(stderr, "SOH3D LINK: src=N64 jointTable limbCount=%d (live blended pose, per-bone corr)\n",
                        player->skelAnime.limbCount);
-                fflush(stdout);
+                fflush(stderr); // these lines go to stderr; flushing stdout never flushed them
             }
         }
         P().retarget.ensure();
@@ -706,13 +706,21 @@ extern "C" int Zelda3D_PlayerDrawImpl(PlayState* play, Actor* actor) {
                     rh ? rh->curFrame : -1.0f, csab);
         }
         if (gZelda3dAnimDebug) {
-            static int dbg = 0;
-            if ((dbg++ % 30) == 0) {
-                const char* otr = (const char*)player->skelAnime.animation;
+            // Log on CHANGE (plus the first time), not every 30th frame. The interesting event here is
+            // the CLIP SELECTION changing; a fixed 1-in-30 sample can miss a switch entirely and then
+            // reads as "it never changed", which is the failure mode where a diagnostic quietly
+            // becomes evidence for the wrong conclusion. Frame/speed still advance every frame and are
+            // not worth a line each.
+            static const char* sLastOtr = nullptr;
+            static const char* sLastCsab = nullptr;
+            const char* otr = (const char*)player->skelAnime.animation;
+            if (otr != sLastOtr || csab != sLastCsab) {
+                sLastOtr = otr;
+                sLastCsab = csab;
                 fprintf(stderr, "SOH3D LINK: src=3DS n64=%s -> csab=%s frame=%.1f/%.1f speedXZ=%.2f\n",
                        otr ? otr : "(none)", csab, player->skelAnime.curFrame,
                        player->skelAnime.animLength, player->actor.speedXZ);
-                fflush(stdout);
+                fflush(stderr);
             }
         }
         // carry-WALK rides the same speed-driven loco free-run as walk/run (nml_carryB_free has no
@@ -788,12 +796,17 @@ extern "C" int Zelda3D_PlayerDrawImpl(PlayState* play, Actor* actor) {
     // all on distinct mesh_ids). Must be set BEFORE EmitPose so it pairs with this draw item.
     unsigned long long midMask = P().midmask.compute(player);
     if (gZelda3dAnimDebug) {
-        static int dbg = 0;
-        if ((dbg++ % 30) == 0) {
+        // Log on CHANGE, for the same reason as the clip line above: the whole point of this line is
+        // to catch the mesh mask changing, and a 1-in-30 frame sample can step straight over the
+        // transition that matters. Now it prints every distinct mask exactly once, which is both
+        // quieter AND strictly more informative.
+        static unsigned long long sLastMask = ~0ull;
+        if (midMask != sLastMask) {
+            sLastMask = midMask;
             fprintf(stderr, "SOH3D LINK mids: LH=%d RH=%d sheath=%d shield=%d -> mask=0x%llx\n",
                    player->leftHandType, player->rightHandType, player->sheathType,
                    player->currentShield, midMask);
-            fflush(stdout);
+            fflush(stderr);
         }
     }
     Zelda3D_GL_SetMidMask(modelId, midMask);
@@ -948,7 +961,7 @@ extern "C" int Zelda3D_PlayerDrawImpl(PlayState* play, Actor* actor) {
                 fprintf(stderr, "SOH3D FOCUS dbg b9=(%.0f,%.0f,%.0f) b10=(%.0f,%.0f,%.0f) b11=(%.0f,%.0f,%.0f) world=(%.0f,%.0f,%.0f)\n",
                        w9.x,w9.y,w9.z, w10.x,w10.y,w10.z, w11.x,w11.y,w11.z,
                        actor->world.pos.x, actor->world.pos.y, actor->world.pos.z);
-                fflush(stdout);
+                fflush(stderr); // these lines go to stderr; flushing stdout never flushed them
             }
         }
     }
