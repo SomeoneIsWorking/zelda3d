@@ -698,6 +698,18 @@ static Zelda3D_ActorForcedAutoSlot sActorForcedAuto[] = {
     { ACTOR_BG_MORI_IDOMIZU,    0, 0, "l_idomizu",  0, {0} },
     { ACTOR_BG_MORI_KAITENKABE, 0, 0, "l_kaiten",   0, {0} },
     { ACTOR_BG_MORI_RAKKATENJO, 0, 0, "l_tenjyou",  0, {0} },
+    // Dodongo's Cavern props. THREE actors declare OBJECT_DDAN_OBJECTS and the ZAR holds five CMBs,
+    // so AUTO's largest-CMB pick gave all three ddanh_kaidan_model (56832 bytes, the staircase) --
+    // two of the three were rendering a staircase. The Japanese resolves every one of them:
+    //   kd       = KAIDAN, staircase          -> ddanh_kaidan  (this is the one AUTO already picked,
+    //                                            i.e. correct only by accident; routed to make it
+    //                                            explicit so a future CMB-size change cannot silently
+    //                                            move it)
+    //   dodoago  = Dodongo + AGO, jaw         -> ddanh_ago     (was the staircase)
+    //   jd                                    -> ddanh_jd      (was the staircase; exact name match)
+    { ACTOR_BG_DDAN_KD,  0, 0, "ddanh_kaidan", 0, {0} },
+    { ACTOR_BG_DODOAGO,  0, 0, "ddanh_ago",    0, {0} },
+    { ACTOR_BG_DDAN_JD,  0, 0, "ddanh_jd",     0, {0} },
     // Unrouted leftovers in that ZAR: l_hasigotome_model (a ladder variant/stop) and
     // l_tikaori_model. No actor name matches either, so they are deliberately left alone rather than
     // guessed onto an actor.
