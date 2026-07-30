@@ -601,3 +601,35 @@ I am leaving the finding FIXED on the strength of the offline measurement, which
 directly and at scale, while recording that the live pose observation is incomplete. That is a
 deliberate call, not an oversight: the offline harness is built against the same parser the game links,
 and the live run confirms that parser is being fed real clips.
+
+
+### CORRECTION — my "warp only works once per restart" claim was wrong (C032 falsified -> C033)
+
+Last tick I concluded from two failed warps that the REPL `warp` only takes effect as the first action
+after a restart, and I recorded it as a claim and cited it in a commit message. **It is wrong.**
+
+Instrumenting `warp` to report `play->sceneNum` showed the scene changes fine on repeated in-session
+warps: **85 -> 81 -> 85** across three consecutive calls (Kokiri Forest = 85, Hyrule Field = 81), each
+independently confirmed by actor identity (Saria + `zelda_km1` for Kokiri, `spot00_objects` for Hyrule
+Field). Repeated warps work.
+
+The real rule is narrower: a warp is lost when a **previous transition trigger has not been consumed
+yet** — `transitionTrigger == TRANS_TRIGGER_START` (20) at the time of the call. Measured: in that
+state the scene did not change even after `settle 200`. My earlier failures were both of this shape;
+I had spaced the calls by wall-clock sleep, which does not guarantee the transition ran.
+
+**The subtle part, and why the first instrument I wrote was still wrong:** I initially keyed the
+warning on `transitionMode`, because `z_play.c:786` gates on `transitionMode == TRANS_MODE_OFF`. But in
+the actual failing case `transitionMode` reads 0 (OFF) while `transitionTrigger` is 20 — so the
+mode-based check printed **ACCEPTED on the failure**. I built a diagnostic, ran it, and it lied in the
+same direction as my hypothesis. What caught it was that the reply also printed `from scene`, a field
+I added for context rather than as the test: the scene numbers walking 85 -> 81 -> 85 contradicted the
+"only the first works" story outright.
+
+Lesson: when adding a diagnostic to test a hypothesis, print an INDEPENDENT fact alongside the
+verdict. The verdict can share the hypothesis's error; a raw observable usually cannot. `from scene`
+cost one printf and refuted a claim I had already published.
+
+**Residual unknown, honestly labelled:** why a queued warp fails to complete even when frames are
+stepped afterwards. Headless frame throttling is the obvious suspect and is untested. C033's falsifier
+covers it.
