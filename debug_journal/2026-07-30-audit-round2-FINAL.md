@@ -34,7 +34,7 @@ some findings carry only ONE refuter vote (0/1) rather than two — weaker, and 
   Adult Link holding the hookshot/longshot shows a flat open palm with the chain emerging from nothing; playing the Ocarina of Time shows an open palm instead of the ocarina grip. PLAYER_MODELTYPE_RH_OOT (0x0E) is not even in the switch, so it takes the same default.
 ### [FIXED] * `Shipwright/zelda3d_shared/player/link_midmask.cpp:32` — user-visible, affected 2, refuted 0/2
   Adult Link raising the Mirror Shield displays a HYLIAN shield (wrong texture, wrong silhouette) — the Mirror Shield is visually absent from the whole game. Separately, adult Link in a shield-holding pose with no shield equipped shows an open palm instead of a fist.
-### [CONFIRMED] * `Shipwright/soh/src/zelda3d/player/zelda3d_link.cpp:326` — user-visible, affected 2, refuted 0/1
+### [FIXED] * `Shipwright/soh/src/zelda3d/player/zelda3d_link.cpp:326` — user-visible, affected 2, refuted 0/1
   Child Link carrying the Hylian or Mirror shield and raising it shows a DEKU shield strapped to his arm. With no shield equipped he shows an open palm where OoT3D (and N64) show a fist.
 ### [FIXED] * `Shipwright/zelda3d_shared/player/link_midmask.cpp:23` — user-visible, affected 2, refuted 0/1
   Adult Link swinging the Megaton Hammer holds nothing — the hammer is entirely missing. Bottle-holding uses a clenched fist rather than the cupped hand the bottle model is posed against.
@@ -44,11 +44,11 @@ some findings carry only ONE refuter vote (0/1) rather than two — weaker, and 
   Drawing the bow/slingshot does not bring up its waist piece (adult mid 43, p_tex26 on bone 23; child mid 22, p_tex27 on bone 23). Small, but it is on screen for the whole of every bow shot.
 ### [CONFIRMED] * `Shipwright/zelda3d_shared/player/link_midmask.cpp:12` — internal, affected 2, refuted 0/1
   Effectively none, which is the useful half of this result: I compared posed vertex sets and mid 47 contributes only 2 positions not already in mid 46 (6 of its 8 unique points coincide), and child mid 25 shares 80 of its 97 unique points with mid 24 — both are co-located low-poly overlays that would z-fight rather than add silhouette. Do NOT spend a session "fixing" this; do fix the false rationale in the comment/doc, because it is the sort of guess that gets reused.
-### [DISPUTED] * `Shipwright/soh/src/zelda3d/player/zelda3d_link.cpp:314` — user-visible, affected 1, refuted 0/2
+### [FIXED — DISPUTE RESOLVED] * `Shipwright/soh/src/zelda3d/player/zelda3d_link.cpp:314` — user-visible, affected 1, refuted 0/2
   Child Link's Kokiri sword renders as the adult-length Master Sword — a blade nearly as long as he is tall, in every child sword swing, block and idle-with-sword-drawn.
 ### [FIXED] * `Shipwright/soh/src/zelda3d/player/zelda3d_link.cpp:329` — user-visible, affected 1, refuted 0/1
   Child Link aiming/firing the slingshot holds an Ocarina of Time in his right hand; the slingshot never appears.
-### [CONFIRMED] * `Shipwright/soh/src/zelda3d/player/zelda3d_link.cpp:315` — user-visible, affected 1, refuted 0/1
+### [FIXED] * `Shipwright/soh/src/zelda3d/player/zelda3d_link.cpp:315` — user-visible, affected 1, refuted 0/1
   Child Link holding the boomerang shows an object OoT3D never draws (and the real fist+boomerang mesh never appears).
 ### [FIXED] * `Shipwright/zelda3d_shared/player/link_midmask.cpp:34` — user-visible, affected 1, refuted 0/2
   Adult Link with the bow drawn in third person renders the first-person bow-arm mesh instead of the third-person one (different arm/bow geometry, authored to be seen only from the camera-inside-the-arm angle).
@@ -227,3 +227,37 @@ large magenta/purple blob in the upper right near a wooden sign. It cannot be ca
 (which only alters Link's hand mesh ids), and Link himself renders correctly, so it did not block the
 commit — but it looks like a real artifact rather than an intended effect and is worth a look. Noting
 it rather than silently ignoring it; NOT filed as a card since no user reported it.
+
+### zelda3d_link.cpp:314 — the DISPUTE is resolved, and the audit was right
+
+Child Link's Kokiri sword really did render as the adult-length Master Sword. Two refuters failed to
+confirm it and I recorded it DISPUTED with "do not act", because my own visual read of the proportions
+looked fine. The ROM table settles it without needing either judgement: `LhSword`'s child value is 2
+and `LhBgs`'s is 16, they are separate meshes, and we were using 16 for both. Isolating them shows 2
+is a short blade and 16 a long blue-hilted one.
+
+**What to take from this:** the DISPUTED verdict came from three subjective looks at a rendered pose
+(two refuters plus me), and all three were wrong in the same direction. Proportion judgements on a
+posed character are a weak instrument. The finding was resolved the moment a data source with an
+independent origin was available. When a dispute is between two eyeball readings, the answer is to go
+find data, not to hold a tie-breaker vote.
+
+### The ocarina work from the earlier session was VINDICATED, not overturned
+That session isolated mid 18, saw "a hand holding a BLUE instrument with finger holes", and concluded
+the mesh map's "slingshot" label was wrong. Both halves were right — 18 is an ocarina, and specifically
+the Ocarina of TIME (blue), which is exactly `RhOot`'s child value. It was simply being used for every
+right-hand item. That session also left the slingshot pointing at 18 on the grounds that mid 19
+"renders a straight brown shaft with red ends, not a forked slingshot frame"; 19 is the slingshot and
+the red is its elastic. A careful negative observation ("19 is not a slingshot") was the one thing that
+turned out wrong, and it was wrong because recognising an unfamiliar object from a small isolated crop
+is harder than it feels.
+
+### Measurement note — why this commit quotes no pixel counts
+I isolated each child mesh id and differenced against an empty-mask frame, as with the adult sheath.
+This time the numbers were garbage: every mid produced a nearly identical bounding box
+(`x[279:432]`, y from 70) because particles/Navi keep moving through `afreeze` + `animlive 0`, so the
+diff was dominated by background. The tell was the bboxes agreeing across meshes that plainly differ.
+The visual crops answered the actual question, so those are the evidence and the counts were dropped
+rather than reported. Same class of error as the four mask/background mistakes earlier in this
+session — the method is only sound when the reference frame is genuinely static, and in this scene it
+is not.
