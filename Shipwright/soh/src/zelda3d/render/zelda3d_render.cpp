@@ -776,6 +776,20 @@ static Zelda3D_ActorForcedAutoSlot sActorForcedAuto[] = {
     //   conflates, which is why the actor's draw code decides the mapping and the CMB name only
     //   suggests it. cull=3 here (double-sided), so any camera angle is valid for this one.
     { ACTOR_BG_YDAN_HASI, 0, 0, "ydan_mizu", 0, {0} },
+    // Bg_Ydan_Maruta. Its draw branches on params: 0 = gDTRollingSpikeTrapDL, non-zero =
+    // gDTFallingLadderDL (z_bg_ydan_maruta.c:203). The Deku Tree instances are all params=1, i.e. the
+    // FALLING LADDER, and the mesh was identified by MEASUREMENT rather than by name:
+    //     N64 draw measured h=135  foot=32x2
+    //     ydan_t_hasigo  323 x 1360 x 20  -> ratios h 0.0993, x 0.0991, z 0.100   ALL THREE AGREE
+    //     ydan_maruta   4000 x 1243 x 3900 -> 0.109 / 0.008 / 0.0005              inconsistent
+    //     ydan_ytoge    4816 x  440 x  414 -> 0.307 / 0.0066 / 0.0048             inconsistent
+    // Name matching would have picked ydan_maruta ("maruta" = log) and been wrong by 200x on Z. It
+    // would also have handed ydan_t_hasigo to Bg_Ydan_Hasi, which actually draws the WATER PLANE.
+    //
+    // params=0 (the rolling spiked log) is NOT routed: no params=0 instance exists in the rooms swept,
+    // so there is no measurement for it. ydan_maruta_model at 4000x1243x3900 is the plausible candidate
+    // on both name and bulk, but plausible is what this method exists to replace.
+    { ACTOR_BG_YDAN_MARUTA, 0x00FF, 0x0001, "ydan_t_hasigo", 0, {0} },
     { ACTOR_EN_FLOORMAS, 0, 0, "floormaster", 0, {0} },
     { ACTOR_EN_WALLMAS,  0, 0, "fallmaster",  0, {0} },
     // King Dodongo's ZAR also holds his fire breath. AUTO picked kingdodongo.cmb (137216 bytes), so
