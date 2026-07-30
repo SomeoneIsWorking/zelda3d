@@ -759,3 +759,25 @@ The inventory states its own upper-bound caveat: the actor list is a grep for `O
 sources, which over-counts, because generic actors (`door_shutter`, `demo_*`) legitimately reuse
 whichever dungeon object is resident. Per the kanban rule this is NOT filed as a card — it is
 sweep-discovered, so it lives here and in the doc, and gets worked in-session.
+
+### Multi-CMB queue is now BLOCKED on a missing XLU draw path (not on mesh identification)
+
+Worked three passes of the queue (mori 7, ddan 3, wallmaster/dodongo/spot12 6 — see commits), then hit
+a real architectural limit on the fourth.
+
+Every Zelda3D draw emission targets `POLY_OPA_DISP`; there is no translucent emission in
+`zelda3d_render.cpp` at all. The next queue rows are translucent actors — `Bg_Ydan_Sp` (spider web) and
+`Bg_Ydan_Hasi` (water plane) both draw into `POLY_XLU_DISP` — so routing them would render an opaque
+web and an opaque water plane in the opaque pass. That is a worse regression than the shared-mesh bug,
+so I stopped rather than shipping it.
+
+**39 of 60 sampled `bg_`/`obj_` actors use `POLY_XLU_DISP`**, concentrated in the queue's
+"unidentified" bucket. So the remaining ~42 rows are gated on adding an XLU emission to the Zelda3D
+draw path, which is now the highest-value next task for this line of work — it unblocks a large
+fraction of the queue at once rather than one prop at a time.
+
+Also recorded, in `docs/multi_cmb_zar_risk.md`, a concrete demonstration that name matching is
+insufficient: the matcher proposed `Bg_Ydan_Hasi -> ydan_t_hasigo_model` because *hasi* and *hasigo*
+share a stem, but the actor draws `gDTWaterPlaneDL`, so the right mesh is `ydan_mizu`. *hasi* (bridge)
+and *hasigo* (ladder) are different words. Every routing needs its draw code read; the CMB name is a
+hypothesis, not evidence.

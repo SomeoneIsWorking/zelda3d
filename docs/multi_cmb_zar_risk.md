@@ -119,3 +119,35 @@ existing handling before adding a row.
 
 So the remaining 42 rows are genuinely harder work, in two distinct shapes. Anyone continuing should
 pick a shape and build for it, rather than expecting more name lookups.
+
+## Pass 4 (2026-07-30) — STOP: the forced-CMB path cannot draw TRANSLUCENT actors
+
+Attempted the params-variant class starting with `Bg_Ydan_Sp` (the Deku Tree web) and hit a hard
+architectural blocker, not a mapping problem.
+
+**Every Zelda3D draw emission goes into `POLY_OPA_DISP`** (`gSPZelda3DDraw`, `gSPZelda3DDrawA`,
+`gSPZelda3DMeasure` — verified, there is no XLU emission anywhere in `zelda3d_render.cpp`). But
+`Bg_Ydan_Sp` draws `gDTWebWallDL`/`gDTWebFloorDL` into `POLY_XLU_DISP`, and `Bg_Ydan_Hasi` draws
+`gDTWaterPlaneDL` into `POLY_XLU_DISP`. Routing either would render it OPAQUE and in the opaque pass —
+wrong blending and wrong draw order. An opaque spider web or water plane is a worse regression than the
+shared-mesh bug it would be fixing, so these are deliberately NOT routed.
+
+This re-scopes the queue: **39 of 60 sampled `bg_`/`obj_` actors use `POLY_XLU_DISP`**, and the
+translucent ones are concentrated in the "unidentified" bucket (webs, water, mirrors, whirlpools).
+So the remaining work is gated on giving the Zelda3D draw path an XLU emission, not on identifying more
+meshes. That is the next real task for this queue.
+
+### Ground truth derived before hitting the blocker — recorded so it is not re-derived
+* `Bg_Ydan_Sp` — variant selector is `(params >> 0xC) & 0xF` (`z_bg_ydan_sp.c:100`), enum
+  `WEB_FLOOR = 0`, `WEB_WALL = 1`. So mask `0xF000`: value `0x0000` -> `ydan_spyuka` (*yuka* = floor),
+  `0x1000` -> `ydan_spkabe` (*kabe* = wall). N64 DL names and the Japanese CMB names agree independently.
+* `Bg_Ydan_Hasi` -> `ydan_mizu` (*mizu* = water). It draws `gDTWaterPlaneDL`, i.e. the WATER PLANE.
+* `Bg_Ydan_Maruta` — draws `gDTRollingSpikeTrapDL` **or** `gDTFallingLadderDL`, so it is a two-variant
+  actor with three plausible CMBs (`maruta_model`, `ydan_maruta_model`, `ydan_ytoge_model`; *toge* =
+  spike, *maruta* = log — the trap is a spiked log). Left AMBIGUOUS; needs the selector read.
+
+### Why the name matcher is not sufficient — a concrete case
+The matcher proposed `Bg_Ydan_Hasi` -> `ydan_t_hasigo_model`, on the reasonable-looking grounds that
+*hasi*/*hasigo* share a stem. The actor's draw code shows it renders the WATER PLANE, so the correct
+mesh is `ydan_mizu`. *hasi* (bridge) and *hasigo* (ladder) are different words that a substring match
+conflates. **Read the actor's draw code for every routing; the CMB name alone is a hypothesis.**
