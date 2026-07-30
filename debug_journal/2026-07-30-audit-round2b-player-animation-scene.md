@@ -101,3 +101,36 @@ the OoT3D track encoding to MM data, so the fix is a format port, not an offset 
 squarely on the 2ship3d branch, which the codemap describes as early/native, so it may not be
 blocking anything today; what matters is that it fails SILENTLY and would be read as "MM animation
 isn't wired up yet" rather than "the parser is wrong".
+
+---
+
+# CONFIRMED + FIXED: tools/csab.py diverged from the C++ sampler — and I caused it
+
+Finding 4 is real, and the cause is my own incomplete fix from earlier the same session.
+
+On 2026-07-29 I fixed `cmb3d/asset/csab.cpp` to decode LINEAR rotation tracks inside an int16 anod at
+the quantized `{u16 time, s16 angle}` layout instead of `{u32 time, f32 value}` (2951 tracks, 2932 of
+them Link's). I did NOT mirror it into `tools/csab.py`. So from that commit until now the two
+decoders disagreed on exactly the tracks the parity work targets, and every offline consumer —
+`csab_render.py`, `csab_xcheck.py`, `link_sweep.py`, `model_match.py`, the pose-parity A/B — was
+reading denormals (~1e-45 standing in for real angles) and outliers like 1.77e22 rad while the game
+drew the correct pose. An offline "match" could have certified a wrong pose, and an offline-vs-runtime
+gap would have been read as a runtime bug.
+
+Fixed by porting the same branch. Verified: `boy/anim/sude_nwait.csab` now decodes through python to
+
+    bone  5 rY  0.0948      bone 11 rX  3.1415      bone 11 rY -3.1415
+    bone 15 rX -0.0453      bone 16 rY  0.1521      bone 16 rZ -1.5556
+    bone 19 rX  0.0455      bone 20 rY -0.1176
+
+which is value-for-value what the C++ fix produced when it was measured on 2026-07-29 (±pi and
+-pi/2 land exactly).
+
+SCOPE LIMIT: this closes ONE concrete divergence — the one I introduced. The finding asserted a
+general "not a faithful twin", and I have not proven the two are now equivalent across every path
+(hermite tangents, the wrap/unwrap rules, the static-translation rule at csab.cpp:344 which is itself
+finding 3). A real equivalence check would sample both decoders over the whole CSAB corpus and diff;
+`tools/csab_anim_check.cpp` now gives the C++ side of that harness.
+
+LESSON worth keeping: a fix applied to one of two parallel implementations SILENTLY creates an
+instrument that disagrees with the runtime. The twin is not documentation, it is a measuring device.

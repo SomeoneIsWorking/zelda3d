@@ -73,8 +73,21 @@ def _parse_track(b, o, is_rot_int16):
     p = o + 0x10
     frames = []
     if typ == LINEAR:
-        for _ in range(nkf):
-            frames.append((_u32(b, p), _f32(b, p + 4))); p += 8
+        if is_rot_int16:
+            # Quantized LINEAR rotation: u16 time + s16 fixed-point angle, the same 0x10000 = full
+            # circle scale the HERMITE int16 path below uses. MUST mirror the C++ authority
+            # (cmb3d/asset/csab.cpp) -- this branch was missing here while the C++ had it fixed, so
+            # every offline consumer (csab_render, csab_xcheck, link_sweep, model_match, the
+            # pose-parity A/B) decoded 2951 of Link's rotation tracks as garbage: denormals ~1e-45
+            # standing in for real angles, plus outliers like 1.77e22 rad from reading the following
+            # "anod" chunk's ASCII as a float. Verified against the fix: boy/anim/sude_nwait decodes
+            # to clean 3.1415 / -3.1415 / -1.5556 once read this way.
+            ANG_L = math.pi / 32768.0
+            for _ in range(nkf):
+                frames.append((_u16(b, p), _i16(b, p + 2) * ANG_L)); p += 4
+        else:
+            for _ in range(nkf):
+                frames.append((_u32(b, p), _f32(b, p + 4))); p += 8
     elif typ == HERMITE:
         if is_rot_int16:
             # Quantized rotation: u16 time + s16 value/in-tangent/out-tangent as fixed-point ANGLES
