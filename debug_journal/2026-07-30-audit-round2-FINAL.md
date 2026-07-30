@@ -506,3 +506,36 @@ is what makes that judgement possible at all.
   for a moment. The caveat is now at the top of the file: check `archives=` against the paths you
   passed before believing any other column. This is the third silent-zero instrument this session
   (after the shared-cap op dump and the misaligned LOD grid).
+
+### MM3D CSAB — verification status, and a CORRECTION to the finding's severity
+
+The decode fix is verified **offline at scale, through the real C++ parser** (`tools/csab_anim_check`,
+built against `cmb3d/asset/csab.cpp`, not a python twin): MM3D 585/617 clips animate where 0/109 did
+before, with the OoT3D control unregressed at 183/189. That is solid evidence the record layout is
+right — the parser now produces motion from data it previously discarded entirely.
+
+It is **NOT yet verified on the live path**, and I am not marking it done on the offline result alone.
+Attempting that surfaced two things:
+
+**1. The mm target did not build at all** (fixed, separate commit) — a pre-existing libultraship
+layering violation plus my own `AppendCmbTextures` signature regression. So the offline harness was the
+only thing that could have caught this defect, and it did.
+
+**2. SEVERITY CORRECTION: the skinned MM3D draw path is behind `ZELDA3D_MM_SKINNED`, default OFF**
+(`mm3d_model.cpp:352`). The audit described this as "every skinned actor that plays its own 3DS CSAB
+(live and wired)" rendering as a frozen statue. With the gate off — the shipped default — no skinned
+MM archive is accepted at all; they fall through to N64. So the user-visible impact was smaller than
+the finding stated: the bug was real and total *within* the gated path, not across the shipped game.
+The finding's affected-count of 2443 clips is a count of DATA, not of live actors.
+
+Worth noting the gate itself sits awkwardly against the project's no-opt-out-gates rule. It reads as a
+deliberate staging flag for in-progress work rather than an N64-original toggle, so I have left it
+alone, but it should not survive the skinned path being finished.
+
+**What live verification needs, concretely:** a scene containing an actor whose object maps to a GAR
+with a skinned CMB, run with `ZELDA3D_MM_SKINNED=1`. Clock Town South (scene 111) is not one — with
+the gate ON it produced no `[MM3D] skinned obj=` and no `[MM3D] skip ... skinned` lines at all, i.e.
+no skinned archive was even probed; its six mapped models are all static props (clock tower, doors,
+steps, turret). The instruments to watch once in the right scene are those two log lines plus
+`[MM3D-ANIM]` (emitted once per unmapped N64 anim OTR) and `ZELDA3D_MM_DBG_SKIN=1` (one line per
+skinned emit).
