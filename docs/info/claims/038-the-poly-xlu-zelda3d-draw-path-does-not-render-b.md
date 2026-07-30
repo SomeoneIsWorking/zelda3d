@@ -1,9 +1,10 @@
 ---
 id: C038
 kind: claim
-status: holds
+status: falsified
 created: 2026-07-30
 tags: 
+falsified_on: 2026-07-30
 ---
 
 ## Claim
@@ -17,3 +18,9 @@ Deku Tree web (ydan_spkabe): slot state=2 scale=0.10000 n64h=288.8, actor in fra
 ## What would falsify it
 
 A G_ZELDA3D_DRAW op is shown executing from the POLY_XLU segment, or the cause is found elsewhere (e.g. the SG renderer capturing its op list before the XLU segment is appended)
+
+## FALSIFIED 2026-07-30
+
+The XLU pass is NOT the cause. Added ZELDA3D_XLU=0 to force wholly-translucent models into POLY_OPA; with the web routed and forced opaque it still contributes 0 px (slot state=2, actor in frame). So the model draws from NEITHER display list and the pass was a red herring for two ticks. Also ruled out this pass: per-draw alpha (gSPZelda3DDraw forwards 255) and polygon offset (polyOffsetEnable=0/rawUnit=0/depthFunc=GL_LESS on the web AND both working controls). Remaining difference from the six drawing models is blendEnable (1 vs 0) plus depthWrite (0 vs 1); the open question is why the blended fragment alpha is zero -- texture or vertex-colour alpha.
+
+> Anything that cited this claim as proof must be re-checked. Grep the repo for it.
