@@ -4,6 +4,7 @@ kind: claim
 status: holds
 created: 2026-07-30
 tags: 
+reconfirmed: 2026-07-30
 ---
 
 ## Claim
@@ -17,3 +18,7 @@ sSheathDLs @VA 0x0053c5e8 = (42,21) and sSheathWithoutSwordDLs @0x0053c4d8 NONE=
 ## What would falsify it
 
 A different table is shown to drive the 3DS sheath draw, or the (adult,child) s16-at-+0/+4 stride is disproven, or adult mid 42 turns out to be something other than the sheath strap
+
+## Re-confirmed 2026-07-30
+
+Values re-verified and the LAYOUT CORRECTED by a full dump of 0x0053c380-0x0053c680: entries are s32 (adult +0, child +4) and the logical stride is 0x10, not 0x8 -- every (adult,child) pair is stored twice. The committed sheath values are unaffected because they were sampled 0x10 apart, but the earlier 's16 at +0/+4, stride 8' description was wrong. Also found sSheathWithoutSwordDLs has 8 rows not 4. Full decode in oot3d-decomp/docs/player_dl_tables.md.
