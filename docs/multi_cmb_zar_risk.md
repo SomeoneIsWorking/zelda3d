@@ -199,3 +199,35 @@ shot after                # capture
 scales), with visual confirmation only for two mori props and one ddan prop. `OBJECT_MORI_OBJECTS`,
 `OBJECT_DDAN_OBJECTS`, `OBJECT_WALLMASTER`, `OBJECT_KINGDODONGO` and `OBJECT_SPOT12_OBJ` should each get
 the `ahide` check above; any that contribute zero pixels must be reverted the same way.
+
+## Pass 7 (2026-07-30) — audit of the earlier routings, and a false positive in the check itself
+
+Ran the `ahide` pixel-contribution check over the routings that had only been verified by model-id +
+measured-scale. Results:
+
+| routing | pixels contributed | verdict |
+|---|---|---|
+| En_Wallmas -> fallmaster | 13512 | **draws** |
+| En_Floormas -> floormaster | 24295 | **draws** |
+| Bg_Mori_Bigst -> l_bigst | 5374 | **draws** |
+| Bg_Mori_Elevator -> l_elevator | 32763 | **draws** |
+| Bg_Ddan_Kd -> ddanh_kaidan | 43142 | **draws** |
+| Bg_Ddan_Jd -> ddanh_jd | 23764 | **draws** |
+| Bg_Dodoago -> ddanh_ago | 0 | **INCONCLUSIVE, not broken** — see below |
+| mori kaiten / tenjyou / hasigo / hasira4 / idomizu | — | not in the loaded room; pending |
+| Boss_Dodongo, En_Bdfire | — | boss room not visited; pending |
+| Bg_Spot12_Gate / _Saku | — | slots never resolved in a Gerudo Valley sweep; pending |
+
+**The `Bg_Dodoago` zero was a false positive from the check script, not a bad routing.** Its slot is
+`state=4` (never measured), so the replacement is NOT being drawn — the N64 draw is still in control —
+and `actorsnear r=4000` does not even list the actor while `asel` finds it, i.e. it is beyond that
+radius and not meaningfully on screen. A zero there says nothing about the CMB.
+
+So the check has a precondition that was missing: **a zero is only evidence of a broken routing when
+`autostate` shows that slot at `state=2` AND the actor is genuinely in frame.** Otherwise it is
+inconclusive. `scratch/bin/ahide_check.sh` now says so instead of printing "REVERT". This is the same
+mistake shape as the session's other silent-zero instruments — a tool that cannot tell "contributed
+nothing" from "was not applicable".
+
+Six routings are now positively confirmed to draw. The Deku Tree web remains the only confirmed
+failure (its slot WAS state=2, it WAS in frame, and it contributed zero).
