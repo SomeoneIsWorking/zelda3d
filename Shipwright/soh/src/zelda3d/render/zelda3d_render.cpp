@@ -466,7 +466,15 @@ void Zelda3D_EmitModelDraw(PlayState* play, int modelId, Actor* actor, float wor
     // at interpret time the XLU draw used whatever model matrix the XLU list happened to be carrying,
     // never ours, so the geometry landed somewhere off screen. Decide the target list ONCE, here, and
     // use it for the matrix, the pose and the draw.
-    const int xluPass = Zelda3D_AutoModelAllBlended(modelId);
+    // ZELDA3D_XLU=0 forces wholly-translucent models back into POLY_OPA. This exists as a
+    // DISCRIMINATOR: if a translucent model draws with the override on and vanishes with it off, the
+    // model and its material are fine and the fault is in the XLU segment itself. Default is on (1).
+    static int sXluEnable = -1;
+    if (sXluEnable < 0) {
+        const char* v = getenv("ZELDA3D_XLU");
+        sXluEnable = (v != NULL && v[0] == '0') ? 0 : 1;
+    }
+    const int xluPass = sXluEnable ? Zelda3D_AutoModelAllBlended(modelId) : 0;
     gSPMatrix(xluPass ? POLY_XLU_DISP++ : POLY_OPA_DISP++, MATRIX_NEWMTX(play->state.gfxCtx),
               G_MTX_MODELVIEW | G_MTX_LOAD);
     Zelda3D_SceneTint(play, tint);
@@ -723,22 +731,36 @@ static Zelda3D_ActorForcedAutoSlot sActorForcedAuto[] = {
     // SAME SIZE (26496 bytes each) -- so "largest CMB" is a coin flip between them and En_Wallmas was
     // getting the Floormaster mesh. Both routed explicitly, because a tie-break by file order is not
     // something to leave load-bearing. ("fallmaster" is Grezzo's spelling of Wallmaster.)
-    // Bg_Ydan_Sp (Deku Tree web) is NOT routed -- REVERTED TWICE, and the second attempt narrowed the
-    // cause without solving it. The POLY_XLU draw path DOES NOT RENDER: with the slot at state=2
-    // (scale 0.10000, n64h 288.8) and the actor demonstrably in frame (the N64 web contributes 712 px
-    // from the same camera), our replacement contributes ZERO pixels. Since a resolved route suppresses
-    // the N64 draw, that DELETES the web -- which is gameplay-critical.
+    // Bg_Ydan_Sp (Deku Tree web) is NOT routed. Three attempts, and the diagnosis is now much
+    // narrower than it was -- but the cause is still open, so it stays unrouted because a resolved
+    // route suppresses the N64 draw and would DELETE this gameplay-critical object.
     //
-    // RULED OUT so far, each with evidence:
-    //   * blend state -- the material is ordinary alpha blending (SRC_ALPHA / 1-SRC_ALPHA, FUNC_ADD),
-    //     not a degenerate combination.
-    //   * back-face culling -- all SIX confirmed-drawing routed models are cull=1 exactly like this
-    //     one, so single-sided culling works. The only field that differs is blendEnable.
-    //   * the model matrix landing in the wrong display list -- that was real and is now fixed (the
-    //     matrix follows the draw's list), but the web still draws nothing, so it was not the cause.
-    // REMAINING: the Zelda3D draw op appears not to be honoured when it sits in POLY_XLU at all.
-    // Next step is to confirm at the interpreter/SG-renderer level that a G_ZELDA3D_DRAW op reaching
-    // the XLU segment is executed, rather than assuming the emission site is the problem.
+    // Symptom: slot resolves fine (state=2, scale 0.10000, n64h 288.8), actor demonstrably in frame
+    // (the N64 web contributes 712 px from the identical camera), our replacement contributes 0 px.
+    //
+    // RULED OUT, each with evidence:
+    //   * THE DISPLAY LIST / PASS. Forcing the model into POLY_OPA with ZELDA3D_XLU=0 still gives 0 px.
+    //     So POLY_XLU is NOT the problem -- which also means the two earlier attempts were chasing the
+    //     wrong thing. The model does not draw from EITHER list.
+    //   * per-draw alpha: gSPZelda3DDraw forwards alpha 255 (it is a wrapper over gSPZelda3DDrawA).
+    //   * blend state: the CMB material is ordinary SRC_ALPHA / 1-SRC_ALPHA, FUNC_ADD, srcA=ONE.
+    //   * back-face culling: all six confirmed-drawing routed models are cull=1 exactly like this one.
+    //   * empty geometry: the model has a real bbox (modelh 2888 was derived from it), so groups exist.
+    //
+    //   * polygon offset / decal depth bias: ruled out. polyOffsetEnable is 0 with rawUnit 0 on the web
+    //     AND on both working controls, and depthFunc is GL_LESS (0x0201) on all three. So the web is
+    //     not being depth-rejected by a missing decal bias.
+    //
+    // AFTER ALL THAT, exactly TWO material fields separate the web from the six models that draw:
+    // blendEnable (1 vs 0) and depthWrite (0 vs 1). depthWrite=0 alone cannot hide geometry -- it only
+    // declines to write depth -- which leaves the blended path.
+    //
+    // NEXT CHECK, stated concretely so it is not re-derived: with blend SRC_ALPHA / 1-SRC_ALPHA and a
+    // per-draw alpha of 255, the fragment's alpha must come from the TEXTURE and the VERTEX colour. If
+    // either decodes to alpha 0 for this material the draw is mathematically invisible in any pass,
+    // which fits the exact-zero result. Dump the decoded texture's alpha channel and the group's vertex
+    // colour alpha for ydan_spkabe and compare against a working blended material elsewhere in the ROM.
+    // Do NOT go back to the emission site or the display list -- both are now excluded by measurement.
     { ACTOR_EN_FLOORMAS, 0, 0, "floormaster", 0, {0} },
     { ACTOR_EN_WALLMAS,  0, 0, "fallmaster",  0, {0} },
     // King Dodongo's ZAR also holds his fire breath. AUTO picked kingdodongo.cmb (137216 bytes), so
