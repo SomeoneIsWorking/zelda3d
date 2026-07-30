@@ -555,3 +555,36 @@ Instances 0, 1, 3 and 4 all read **0 px**; only instance 2 contributed. With 16 
 routinely reads zero because that instance is occluded or off-screen — so a single-instance test condemns
 correct routings. `tools/ahide_check.sh` now sweeps instances, accepts an elevation for flat props, and
 prints its own precondition. This is the same failure that reverted a WORKING web routing twice.
+
+## Pass 19 (2026-07-30) — Jabu-Jabu: full ground truth derived, NOTHING routed, and that is correct
+
+`OBJECT_BDAN_OBJECTS` (15 real meshes, 2 actors). The mapping is now fully understood and still nothing
+ships, because the evidence does not reach the bar.
+
+**Ground truth (durable — do not re-derive).** Both actors select on `params & 0xFF`, and the CMB names
+line up with the N64 display lists — the one case so far where TWO INDEPENDENT naming systems agree:
+
+| N64 display list | CMB | note |
+|---|---|---|
+| `gJabuBlueFloorSwitchDL` | `bdan_switch_b_model` | b = blue |
+| `gJabuYellowFloorSwitchDL` | `bdan_switch_y_model` | y = yellow |
+| `gJabuElevatorPlatformDL` | `bdan_ere_model` | *erebeeta* = elevator |
+| `gJabuFallingPlatformDL` | `bdan_fdai_model` | *dai* = stand/platform |
+| `gJabuObjectsLargeRotatingSpikePlatformDL` | `bdan_toge_model` | *toge* = spike |
+| `gJabuWaterDL` | `bdan_bmizu_modelT` | *mizu* = water |
+
+`Bg_Bdan_Switch` types: 0 BLUE, 1 YELLOW_HEAVY, 2 YELLOW, 3 YELLOW_TALL_1, 4 YELLOW_TALL_2.
+
+**Why nothing is routed.**
+1. The two switch CMBs are **geometrically identical** (921 x 191 x 921, 300 verts) and differ only in
+   TEXTURE, so the three-axis test cannot discriminate between them at all.
+2. It can still REJECT: type 4 measures h=39.8 foot=37x37 — a narrow PILLAR — against this wide flat pad,
+   a 5.2x gap. So the TALL variants are definitely not this mesh. Type 0 BLUE is a plausible 1.35x, which
+   is re-authoring-shaped but is the weakest kind of positive evidence.
+3. **No pixel contribution** across 6 instances at elevation with the slot at `state=2`.
+
+### A THIRD limit of the pixel check: props flush with the floor
+A floor switch is flush with the ground, so hiding it may change nothing visible — the check is
+structurally unable to confirm it, which is inconclusive rather than passing. That joins the two limits
+from Pass 17 (flat props give only two ratios; skinned actors produce no bbox measure). The missing piece
+for this row is a verification route that can see a flush floor prop, not more analysis.
