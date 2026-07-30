@@ -25,7 +25,7 @@ The top entries are unambiguous regardless: 16 Fire Temple actors cannot all be 
 | ~~OBJECT_MIZU_OBJECTS~~ **2 of 5 DONE** | 0x0059 | 8 | 18 | `zelda_mizu_objects.zar` | m_Wbomb00E_model.cmb, m_Wbomb0eE_model.cmb, m_Wbomb0eW_model.cmb, m_Wbomb03_model.cmb … |
 | OBJECT_DEMO_KEKKAI | 0x0179 | 8 | 16 | `zelda_demo_kekkai.zar` | l_g_door_model.cmb, l_g_hikari_modelT.cmb, l_g_hikarijimen_model.cmb, l_g_icebrock_modelT.cmb … |
 | ~~OBJECT_MORI_OBJECTS~~ **DONE** | 0x0072 | 7 | 9 | `zelda_mori_objects.zar` | l_4hasira_model.cmb, l_bigst_model.cmb, l_elevator_model.cmb, l_hasigo_model.cmb … |
-| OBJECT_ICE_OBJECTS | 0x006B | 6 | 8 | `zelda_ice_objects.zar` | ice_brick_model.cmb, ice_ice3_modelT.cmb, ice_ice_modelT.cmb, ice_tobira_model.cmb … |
+| ~~OBJECT_ICE_OBJECTS~~ **DONE (5 verified, 4 inert)** | 0x006B | 6 | 8 | `zelda_ice_objects.zar` | ice_brick_model.cmb, ice_ice3_modelT.cmb, ice_ice_modelT.cmb, ice_tobira_model.cmb … |
 | OBJECT_OF1D_MAP | 0x00C9 | 6 | 4 | `zelda_oF1d.zar` | goronpeople.cmb, go_smoke_model.cmb, oF1d_iwa2_model.cmb, oF1d_iwa_model.cmb |
 | OBJECT_GANON | 0x00E1 | 5 | 24 | `zelda_ganon.zar` | efc_ganon_floor_modelT.cmb, ganon_tyuka_ue_model.cmb, ganondorf.cmb, efc_fg_thunder1_modelT.cmb … |
 | OBJECT_YDAN_OBJECTS | 0x0036 | 4 | 12 | `zelda_ydan_objects.zar` | maruta_model.cmb, ydan_maruta_model.cmb, ydan_kumohen_modelT.cmb, ydan_ytoge_model.cmb … |
@@ -643,3 +643,72 @@ false negative, or a falsified claim. What changed is not the method but the ins
 actor's own DL table, corroborate with the CMB name, verify it DRAWS with `submitted`, cross-check the
 scale on three axes, and know the documented limits of each. A row is now routine rather than an
 investigation.
+
+## Pass 22 (2026-07-30) — Ice Cavern: the per-slot scale limit, and a diagnostic that was lying
+
+`OBJECT_ICE_OBJECTS` finished. Six actors reach the ZAR and it holds eight CMBs against exactly eight
+N64 display lists, so the split is readable straight off each actor's draw:
+
+| actor | N64 DL | CMB | verified |
+|---|---|---|---|
+| `Bg_Ice_Turara` | `DL_0023D0` | `ice_turara` (tsurara = icicle) | **0.07936, submits=40326** |
+| `Bg_Ice_Objects` | `DL_000190` | `ice_brick` | **0.09999, submits=738** |
+| `Bg_Ice_Shutter` | `DL_002740` | `ice_wall2` | **0.08962, submits=3633** |
+| `Bg_Haka_Sgami` (params 2) | `DL_0021F0` | `ice_trap` | no instance in the rooms swept |
+| `Bg_Ice_Shelter` | `gRedIce{Block,Platform,Wall}DL` | see below | 2 of 4 verified |
+| `Door_Shutter` | `DL_001D10` | `ice_tobira` | already routed (`door_shutter.cpp`) |
+
+AUTO's largest-CMB pick was `ice_wall_modelT`, so five of the six were rendering a sheet of red ice.
+
+`Bg_Ice_Shelter`'s three DLs are all `POLY_XLU`, and the ZAR holds **exactly three `modelT` meshes**
+while every other CMB is a plain `model` — the translucent set and the XLU draw set have the same size
+and membership, which is the corroboration. Within the set, shape separates them: `ice_ice` is
+near-cubic (950 x 1005 x 945) like the block, `ice_ice3` is wide and 3-group (1499 x 1027 x 1507) like
+the "complex structure that can be climbed", `ice_wall` is the sheet.
+
+### The new finding: ONE SLOT CANNOT SERVE AN ACTOR THAT SCALES ITSELF PER TYPE
+
+A slot stores one derived scale, and that scale is measured off the N64 draw **including the actor's
+own scale** — `Zelda3D_DrawModelGL` applies `worldScale` alone and never multiplies `actor->scale`.
+`Bg_Ice_Shelter` sets `sRedIceScales[] = { 0.1, 0.06, 0.1, 0.1, 0.25 }`, so a single slot for
+LARGE/SMALL/KING_ZORA would have rendered all three at whichever size was measured first — a **4.2x**
+error between the extremes. Split into one slot per type, and the measurements prove the mechanism:
+
+| type | derived scale | n64h | foot | three-axis |
+|---|---|---|---|---|
+| LARGE | 0.09999 | 100.5 | 94 x 89 | 0.0999 / 0.0989 / 0.0942 — agree |
+| SMALL | 0.06000 | 60.3 | 56 x 54 | 0.0600 / 0.0589 / 0.0571 — agree |
+
+SMALL landing on **exactly** `sRedIceScales[RED_ICE_SMALL]` against a 1005-unit-tall CMB also proves
+the CMB is dimensionally 1:1 with the N64 display list — everything in that number is actor scale.
+
+KING_ZORA is routed but **knowingly imperfect**: it is the one type with a non-uniform scale
+(`kzIceScale = { 0.18, 0.27, 0.24 }`), which a single `worldScale` cannot express, so it comes out
+~1.5x too wide in X. Routed anyway because unrouted means AUTO's wall mesh — right mesh at a wrong
+aspect beats the wrong mesh. The proper fix is per-axis scale, and the data already exists: the
+measure reports `n64h`, `measFootX` and `measFootZ` as three independent numbers, and only the draw
+path is uniform. Not done here because it would change the transform of all ten verified routings at once.
+
+### The `submitted` counter had a false-failure mode, and this row found it
+
+`ice_wall_modelT` reported `state=2 ... submits=0` — the exact signature Pass 20 defined as the ONLY
+real failure. It is not one. `ice_wall_modelT` is a **skinned** CMB, and `Zelda3D_TryAuto` sends any
+skinned model straight to state 2 with no measurement, deferring to the SkelAnime hook for scale and
+draw. `Bg_Ice_Shelter` is a static `Bg_` actor with no SkelAnime, so the hook never fires and the N64
+wall keeps drawing — benign, and indistinguishable from a real failure in the old output.
+
+Fixed by printing the discriminator instead of reasoning about it: `autostate` and `submitted` now
+carry a `skin=` column. The corrected rule:
+
+| state | skin | submits | meaning |
+|---|---|---|---|
+| 2 | 0 | > 0 | we draw it — routing works (says nothing about mesh CORRECTNESS) |
+| 2 | 0 | 0 | **real failure** — resolved, unskinned, never submitted |
+| 2 | 1 | 0 | deferred to the SkelAnime hook; if the actor has no skeleton, N64 stays. Benign |
+| 0 or 4 | — | 0 | inert; the N64 draw is in control |
+
+This is the second time an instrument in this arc could not show the other answer, and the second time
+the fix was to print the denominator rather than to think harder about the output.
+
+Inert-but-kept: `ice_ice3_modelT` (RED_ICE_PLATFORM is MQ-only, no vanilla instance), `ice_wall_modelT`
+(skinned, above), `ice_trap` (no Sgami instance in the rooms swept), KING_ZORA (not an Ice Cavern actor).

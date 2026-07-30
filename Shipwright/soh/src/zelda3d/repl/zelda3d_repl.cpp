@@ -1074,8 +1074,11 @@ static void Zelda3D_ReplExec(PlayState* play, char* line, const char* outPath) {
             const char* cmb = NULL;
             const Zelda3D_AutoEntry* fe = Zelda3D_ForcedSlotInfo(k, &aid, &cmb);
             if (fe == NULL || fe->modelId <= 0) continue;
-            Zelda3D_ReplReply(outPath, "forced[%d] actor=0x%x |%s state=%d model=%d submits=%ld", k,
-                            (unsigned)(u16)aid, cmb ? cmb : "?", fe->state, fe->modelId,
+            // skin=1 with submits=0 is NOT the real-failure signature -- see the note on the same
+            // column in `autostate`. Only an UNSKINNED state=2 slot at 0 submissions is a failure.
+            // The count is per MODEL, so two slots pointing at the same CMB report the same total.
+            Zelda3D_ReplReply(outPath, "forced[%d] actor=0x%x |%s state=%d skin=%d model=%d submits=%ld", k,
+                            (unsigned)(u16)aid, cmb ? cmb : "?", fe->state, (int)fe->skinned, fe->modelId,
                             Zelda3D_GL_SubmitCount(fe->modelId));
             shown++;
         }
@@ -1107,9 +1110,17 @@ static void Zelda3D_ReplExec(PlayState* play, char* line, const char* outPath) {
             const Zelda3D_AutoEntry* fe = Zelda3D_ForcedSlotInfo(k, &aid, &cmb);
             if (fe == NULL) continue;
             Zelda3D_ReplReply(outPath,
-                            "forced[%d] actor=0x%x |%s state=%d scale=%.5f n64h=%.1f n64foot=%.0fx%.0f model=%d tries=%d",
-                            k, (unsigned)(u16)aid, cmb ? cmb : "?", fe->state, fe->scale, fe->measuredH,
-                            fe->measFootX, fe->measFootZ, fe->modelId, (int)fe->tries);
+                            // `skin` is what disambiguates the two very different meanings of
+                            // "state=2 with no measurement". A SKINNED model jumps straight to state 2
+                            // and defers to the SkelAnime hook, which derives its own scale -- so
+                            // scale=0/n64h=0/tries=0 is EXPECTED there, and if the actor has no
+                            // SkelAnime (a static Bg_ prop) the hook never fires and the N64 draw stays.
+                            // Without this column that reads identically to the one real-failure
+                            // signature (unskinned, resolved, never submitted).
+                            "forced[%d] actor=0x%x |%s state=%d skin=%d scale=%.5f n64h=%.1f "
+                            "n64foot=%.0fx%.0f model=%d tries=%d",
+                            k, (unsigned)(u16)aid, cmb ? cmb : "?", fe->state, (int)fe->skinned, fe->scale,
+                            fe->measuredH, fe->measFootX, fe->measFootZ, fe->modelId, (int)fe->tries);
             shown++;
         }
         for (k = 0; k < Zelda3D_VariantSlotCount(); k++) {
