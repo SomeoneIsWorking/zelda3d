@@ -1,17 +1,51 @@
 <?xml version="1.0" encoding="UTF-8"?>
-<!-- Xbox face-button glyph: A (green). Subtle-depth variant: flat base + a low-opacity top
-     sheen and a faint bottom inner shadow. Still no stroke on the letter. -->
+<!-- Xbox face-button glyph: A (green). SLIGHTLY-3D variant (user request 2026-07-30: "subtle looks
+     fine but make it slightly 3d"). Depth comes from four cues, all kept clear of the letter so
+     legibility survives at HUD size: a radial dome gradient lit from upper-left, a darker rim with a
+     brighter bevel ring inside it, a soft inner shadow along the BOTTOM edge (ambient occlusion), and a
+     TIGHT specular ellipse high on the face. The rejected "glossy" candidate used a broad sheen that
+     crossed the letter and washed it out at 20px - deliberately not repeated here. The letter also
+     carries a soft dark shadow below for a slight emboss. -->
 <svg xmlns="http://www.w3.org/2000/svg" width="64" height="64" viewBox="0 0 64 64">
   <defs>
-    <linearGradient id="sheen" x1="0" y1="0" x2="0" y2="1">
-      <stop offset="0%"   stop-color="#FFFFFF" stop-opacity="0.28"/>
-      <stop offset="45%"  stop-color="#FFFFFF" stop-opacity="0.06"/>
-      <stop offset="100%" stop-color="#000000" stop-opacity="0.18"/>
-    </linearGradient>
+    <radialGradient id="dome" cx="38%" cy="30%" r="72%">
+      <stop offset="0%"   stop-color="#8FE07E"/>
+      <stop offset="55%"  stop-color="#4CAF3F"/>
+      <stop offset="100%" stop-color="#1F5A19"/>
+    </radialGradient>
+    <radialGradient id="occ" cx="50%" cy="96%" r="62%">
+      <stop offset="0%"   stop-color="#000000" stop-opacity="0.42"/>
+      <stop offset="55%"  stop-color="#000000" stop-opacity="0.12"/>
+      <stop offset="100%" stop-color="#000000" stop-opacity="0"/>
+    </radialGradient>
+    <radialGradient id="spec" cx="50%" cy="50%" r="50%">
+      <stop offset="0%"   stop-color="#FFFFFF" stop-opacity="0.62"/>
+      <stop offset="70%"  stop-color="#FFFFFF" stop-opacity="0.14"/>
+      <stop offset="100%" stop-color="#FFFFFF" stop-opacity="0"/>
+    </radialGradient>
+    <filter id="soft" x="-30%" y="-30%" width="160%" height="160%">
+      <feGaussianBlur stdDeviation="1.1"/>
+    </filter>
+    <filter id="tshadow" x="-30%" y="-30%" width="160%" height="160%">
+      <feGaussianBlur stdDeviation="0.9"/>
+    </filter>
   </defs>
-  <circle cx="32" cy="32" r="29" fill="#4CAF3F"/>
-  <circle cx="32" cy="32" r="29" fill="url(#sheen)"/>
-  <circle cx="32" cy="32" r="29" fill="none" stroke="#2E7D28" stroke-width="2" opacity="0.6"/>
+  <!-- drop shadow: lifts the button off the HUD -->
+  <ellipse cx="32" cy="34.2" rx="29" ry="29" fill="#000000" opacity="0.34" filter="url(#soft)"/>
+  <!-- rim, then a brighter bevel ring inside it -->
+  <circle cx="32" cy="32" r="29"   fill="#25661F"/>
+  <circle cx="32" cy="32" r="27.2" fill="#1F5A19"/>
+  <!-- domed face -->
+  <circle cx="32" cy="32" r="26"   fill="url(#dome)"/>
+  <!-- ambient occlusion along the bottom inside edge -->
+  <circle cx="32" cy="32" r="26"   fill="url(#occ)"/>
+  <!-- tight specular, high on the face and clear of the letter -->
+  <ellipse cx="32" cy="15.5" rx="12.5" ry="5.2" fill="url(#spec)" filter="url(#soft)"/>
+  <!-- letter: soft dark shadow below, then the solid white face -->
+  <text x="32" y="33.4" text-anchor="middle" dominant-baseline="central" filter="url(#tshadow)"
+        font-family="Liberation Sans, Nimbus Sans, DejaVu Sans, Arial, sans-serif" font-weight="bold"
+        font-size="42" fill="#000000" opacity="0.45">A</text>
   <text x="32" y="32" text-anchor="middle" dominant-baseline="central"
-        font-family="Liberation Sans, Nimbus Sans, DejaVu Sans, Arial, sans-serif" font-weight="bold" font-size="42" fill="#FFFFFF">A</text>
+        font-family="Liberation Sans, Nimbus Sans, DejaVu Sans, Arial, sans-serif" font-weight="bold"
+        font-size="42" fill="#FFFFFF">A</text>
 </svg>
