@@ -418,3 +418,28 @@ Verified: scale 0.09926, zero cross-check warnings for this archive, draws 6799 
 * **`zelda_d_lift` (0x11d)** — 2.08x/2.25x off.
 
 Neither was visible before the cross-check existed.
+
+## Pass 14 (2026-07-30) — d_lift investigated: NO ACTION, and that is the finding
+
+The cross-check flagged `zelda_d_lift` (obj 0x11d, Obj_Lift's collapsing platform) at 2.08x/2.25x.
+Investigated; there is nothing to change.
+
+Derived from the warning: measured N64 draw h~36, foot~254x275. The archive has exactly two candidates:
+
+| candidate | bbox | h ratio | x ratio | z ratio |
+|---|---|---|---|---|
+| `lift_l_model` (AUTO's pick, largest) | 1205 x 355 x 1205 | 0.101 | 0.211 | 0.228 |
+| `lift_l_model_h` | 570 x 355 x 527 | 0.101 | 0.446 | 0.522 |
+
+Neither is three-axis consistent, and the alternative is WORSE (4.4x/5.2x off versus 2.08x/2.25x), so
+AUTO's existing pick is already the better of the two. There is no third candidate.
+
+The two footprint axes agree closely with each other (2.08 vs 2.25, 8% apart), which by the calibration
+in Pass 13/14 points at a proportional re-authoring rather than a misidentification — the 3DS lift is
+relatively wider for its height than the N64 one. A partial measurement is the other possibility (a
+COLLAPSING platform may be measured mid-collapse, when only some of it draws).
+
+**Recorded as a deliberate non-action.** The check did its job by raising it; the correct response to a
+flag is to investigate and then to leave things alone when investigation says so. Two of the first three
+flags (torch, lift) turned out to need no change, which is itself worth knowing before someone treats
+every warning as a defect queue.
