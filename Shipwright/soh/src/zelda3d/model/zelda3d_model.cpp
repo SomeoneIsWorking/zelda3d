@@ -4,6 +4,7 @@
 // .3ds the first time it's drawn (on the render thread, GL current), and serves the
 // renderer's provider callback with the CPU data to upload. No baked-in C arrays;
 // the .3ds path comes from env ZELDA3D_OOT3D_ROM (never hardcoded — repo rule).
+#include "soh/ResourceManagerHelpers.h" // ResourceMgr_IsGameMasterQuest (MQ room/collision selection)
 #include "asset/ctr_rom.h"
 #include "asset/zar.h"
 #include "asset/zsi.h"
@@ -1127,13 +1128,34 @@ float Zelda3D_ModelScaleById(int modelId) {
     return kModels[modelId].worldScale;
 }
 
+// Master Quest room/collision selection. OoT3D ships a COMPLETE parallel MQ asset set: 232
+// `*_dd_info.zsi` files, and all 232 differ byte-for-byte from their vanilla twin (md5 compared over
+// the whole ROM). zelda3d had no MQ branch at all, so in an MQ dungeon it rendered AND collided the
+// VANILLA 3DS geometry while the N64 side ran MQ rooms and actors — wrong walls, wrong floors, and
+// silent: MQ room counts equal vanilla's in 232/232 cases, so nothing errored or logged.
+//
+// This PROBES for the `_dd` twin and falls back. Only the 12 MQ dungeons have one, so applying the
+// suffix unconditionally under MQ would break every overworld scene with a file-not-found.
+static std::string sceneZsiPath(const char* sceneName, int roomNum) {
+    std::string base = "/scene/" + std::string(sceneName);
+    if (roomNum >= 0)
+        base += "_" + std::to_string(roomNum);
+    if (ResourceMgr_IsGameMasterQuest()) {
+        const std::string mq = base + "_dd_info.zsi";
+        Zelda3D::CtrRom* r = rom();
+        if (r != nullptr && r->get(mq) != nullptr)
+            return mq;
+    }
+    return base + "_info.zsi";
+}
+
 // Get-or-allocate a stable model id for a scene room, keyed by its ZSI path
 // (/scene/<name>_<R>_info.zsi). The geometry loads lazily on first draw via the
 // provider. Returns -1 if sceneName is null/empty. The game calls this from its
 // room-draw hook with the OoT3D scene name (kZelda3dSceneNames) + room number.
 int Zelda3D_RoomModelId(const char* sceneName, int roomNum) {
     if (!sceneName || !*sceneName || roomNum < 0) return -1;
-    std::string path = "/scene/" + std::string(sceneName) + "_" + std::to_string(roomNum) + "_info.zsi";
+    std::string path = sceneZsiPath(sceneName, roomNum);
     auto it = g_sceneRoomIds.find(path);
     if (it != g_sceneRoomIds.end()) return it->second;
     int id = kSceneModelBase + (int)g_sceneRoomPaths.size();
@@ -1597,7 +1619,7 @@ extern "C" int Zelda3D_LoadSceneCollisionRaw(const char* sceneName, Zelda3D_RawC
     memset(out, 0, sizeof(*out));
     Zelda3D::CtrRom* r = rom();
     if (!r) return 0;
-    std::string path = "/scene/" + std::string(sceneName) + "_info.zsi";
+    std::string path = sceneZsiPath(sceneName, -1);
     auto bytes = r->read(path);
     if (bytes.empty()) { fprintf(stderr, "[Zelda3D] collision zsi not found: %s\n", path.c_str()); return 0; }
     Zelda3D::OoT3DCollision col(bytes);
@@ -1673,7 +1695,7 @@ extern "C" int Zelda3D_CollectSceneStairTreads(const char* sceneName,
     std::vector<int> tris;    // 3 vertex indices per triangle
 
     for (int room = 0; room < 64; room++) {
-        std::string path = "/scene/" + std::string(sceneName) + "_" + std::to_string(room) + "_info.zsi";
+        std::string path = sceneZsiPath(sceneName, room);
         auto bytes = r->read(path);
         if (bytes.empty()) break; // rooms are contiguous 0..n-1
         Zelda3D::Zsi zsi(std::move(bytes));
