@@ -157,7 +157,11 @@ class Csab {
     std::vector<AnimNode> mNodes;
 
     Track parseTrack(uint32_t o, bool isRotInt16) const;
+    // MM3D (subversion 5) tracks use a COMPLETELY different record from OoT3D's, so they get their
+    // own reader rather than a flag on the shared one. See parseTrackMm3d for the layout.
+    Track parseTrackMm3d(uint32_t o) const;
     AnimNode parseAnod(uint32_t o) const;
+    int mSubversion = 3;
 
     const AnimNode* nodeForBone(int boneId) const;
     static float sampleTrack(const Track& t, float frame, bool rotation);
