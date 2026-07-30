@@ -57,7 +57,7 @@ some findings carry only ONE refuter vote (0/1) rather than two — weaker, and 
 
 ## BEHAVIORS
 
-### [CONFIRMED] * `Shipwright/soh/src/zelda3d/tables/zelda3d_object_zars.inc:49` — user-visible, affected 4, refuted 0/1
+### [FIXED] * `Shipwright/soh/src/zelda3d/tables/zelda3d_object_zars.inc:49` — user-visible, affected 4, refuted 0/1
   The Deku Tree's mouth — one of the most-looked-at objects in the early game — renders the N64 mesh in an otherwise-3DS Kokiri Forest, and cannot be fixed by the generator alone.
 ### [FIXED] * `Shipwright/soh/src/zelda3d/render/zelda3d_render.cpp:454` — user-visible, affected 3, refuted 0/1
   Same-object actors that differ in size all render at one size: large Hyrule Field/Kakariko bushes and trees render at the small variant's size; En_Ishi's silver boulder renders at the liftable rock's scale; the En_Ishi rocks and Obj_Hana rock-debris sit 5.8 and 32 world units too low (sunk into the ground).
@@ -398,3 +398,45 @@ redundant" from "this geometry is somewhere else right now". I had the right ins
 configuration of a two-configuration mechanism. The cheap guard I skipped was reading the actor's
 update function before interpreting a screenshot of it — the lerp is four lines long and would have
 told me my capture was of an endpoint, not of the general case.
+
+### Deku Tree mouth — FIXED. The blocker was a ONE-CHARACTER name difference.
+
+`OBJECT_SPOT04_OBJECTS` mapped to NULL because OoT3D drops the "t": the archive is
+`zelda_spo04_objects.zar`, and it holds `spot04_kuchi_model.cmb` — *kuchi* (口) is Japanese for MOUTH.
+
+**How I missed it twice, which is the transferable part.** I had enumerated all 461 ROM `.zar` files —
+correctly — and then grepped that list for the substring `"spot04"`. `spo04` does not contain `spot04`,
+so the search returned only `/scene/spot04.zar` and I concluded no actor archive existed. The
+enumeration was sound; the question I asked of it was not. What actually found it was sweeping every
+CMB NAME in the ROM (1387 across 461 archives) and grepping those for `kuchi`/`mouth`/`deku` — i.e.
+searching for the THING rather than for a guessed container name. Prefer that shape of search: an
+asset's own name is chosen by the artist and survives, while an archive name is a naming convention
+you are guessing at.
+
+Also worth noting: this is the second time in this session that a stated dead end turned out to be a
+wrong diagnosis rather than a real limit (the first was Ghidra's "movw/movt" explanation). Both times
+the fix was to check the denominator or re-ask the question, not to accept the negative.
+
+Two further pieces were needed:
+* **Explicit CMB routing** — the archive holds ELEVEN CMBs (mouth + `Y_*`/`ousei_*` cutscene models),
+  so AUTO's largest-CMB pick would hand Bg_Treemouth a cutscene mesh. And because Bg_Treemouth is
+  non-skinned, this only works at all thanks to this session's forced-slot measure-key fix.
+* **`noBaseAnchor`** — with the usual `goff = -AutoModelMinY` the mouth rendered as a huge bark slab
+  covering the entrance, lifted by its own height. The tell for that class is a measured scale of
+  exactly 1.0 (n64h 415.0 / modelh 415.0): Grezzo re-authored the asset in place rather than
+  re-originating it, so it belongs at the actor origin. Recorded as claim C030.
+
+**Checked that it DRAWS rather than silently vanishing** — a mesh drawing nothing would look fine in
+this open-mouth view and would quietly reintroduce exactly the regression the earlier analysis warned
+about. new vs actor-hidden 9337 px; new vs N64 8331 px; actor-hidden vs N64 9257 px. The 3DS footprint
+(9337) matches the N64 one (9257), i.e. same footprint, different appearance.
+
+And it resolves C029's worry the right way round: because the mesh is REPLACED and not suppressed, it
+still moves with the closed->open lerp, so the closed mouth keeps its geometry. The suppression I was
+tempted by two ticks ago would have broken exactly that.
+
+**Two similar name matches deliberately NOT applied.** The same sweep flagged `OBJECT_FD2` ->
+`zelda_fd.zar` and `OBJECT_NWC` -> `zelda_nw.zar` as one-character differences. `zelda_fd.zar` holds
+*valbasia* (Volvagia) models, so that alias would draw the boss's body for the rubble actor, and
+`zelda_nw.zar` is cucco geometry that `niw` already aliases to. Name proximity is not evidence — the
+spot04 one was applied because a CMB inside it is literally named "mouth".
