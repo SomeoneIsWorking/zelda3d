@@ -134,3 +134,30 @@ finding 3). A real equivalence check would sample both decoders over the whole C
 
 LESSON worth keeping: a fix applied to one of two parallel implementations SILENTLY creates an
 instrument that disagrees with the runtime. The twin is not documentation, it is a measuring device.
+
+---
+
+# Child mid 16 ("Kokiri sword renders as the adult Master Sword") — NOT CONFIRMED
+
+Checked with `linkmid only <n>` on child Link (REPL mesh-id isolation), frozen, `acam 120 z`:
+
+* **mid 24** renders the child body (tunic, boots) — matches the map.
+* **mid 16** renders a SWORD mesh, correctly positioned at the left hand, with a blue/purple hilt,
+  at a blade length that looks proportionate for the child. Render:
+  `scratch/screenshots/mid_compare.png`.
+
+The finding claimed "a blade nearly as long as he is tall". That is NOT what the render shows. The
+mesh is a plausible child sword. Distinguishing Kokiri from Master conclusively would need a
+proportional comparison against the adult rig's blade or a texture identification — neither of which
+I did — so this is "not confirmed and looks doubtful", not "refuted".
+
+MEASUREMENT NOTE: my first attempt measured pixel extents by differencing each isolated-mesh frame
+against a `linkmid only 63` "empty" frame. Different meshes came back with IDENTICAL widths (682,
+682 and 551, 551), which is the tell that the difference was scene content, not the mesh — mask 63 is
+not empty. The VISUAL is the evidence here; the pixel numbers from that pass are worthless and are
+not quoted.
+
+Consequence for the rest of the player cluster: those findings all descend from
+`link_mesh_id_map.md`'s labels, and one spot-check already fails to reproduce. They should be treated
+as individually unverified rather than as a block, and the nine "wrong labels" claim needs its own
+per-label check before anyone rewrites the policy against it.
