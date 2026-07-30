@@ -308,22 +308,39 @@ unsigned long long Zelda3D::LinkMidMask::compute(Player* player) const {
     hylian = (player->currentShield == PLAYER_SHIELD_HYLIAN || player->currentShield == PLAYER_SHIELD_MIRROR);
 
     // LEFT hand (the sword hand). childlink left-hand variants on bones 15/16.
+    // Child mesh ids from the PORTED OoT3D table (sPlayerDLists child column, link_dl_table.h,
+    // claim C027). These four cases were hand-written and three were wrong:
+    //   LH_SWORD  16 -> 2 : 16 is the row for the child MASTER sword (LH_BGS). Drawing it for the
+    //                       ordinary Kokiri sword is why child Link swung a blade nearly as long as
+    //                       he is tall. The audit reported this and two refuters could not confirm
+    //                       it, so it was recorded DISPUTED -- the ROM table settles it: LhSword's
+    //                       child value is 2 and LhBgs's is 16, they are different meshes.
+    //   LH_BOOMERANG 8 -> 6 : 8 is not the boomerang row at all.
+    //   LH_BOTTLE    1 -> 7 : fell through to the plain closed fist.
+    // LH_OPEN 0 and LH_HAMMER 0 were already right (OoT3D really does give the child hammer an
+    // empty hand -- LhHammer's child value IS 0), so they are unchanged.
     switch (player->leftHandType) {
         case PLAYER_MODELTYPE_LH_SWORD:
-        case PLAYER_MODELTYPE_LH_SWORD_2:
-        case PLAYER_MODELTYPE_LH_BGS:      m |= LINK_MID(16); break; // sword in hand
-        case PLAYER_MODELTYPE_LH_BOOMERANG: m |= LINK_MID(8); break; // boomerang
-        case PLAYER_MODELTYPE_LH_CLOSED:
-        case PLAYER_MODELTYPE_LH_BOTTLE:   m |= LINK_MID(1); break;  // closed (bottle drawn separately)
+        case PLAYER_MODELTYPE_LH_SWORD_2:  m |= LINK_MID(2); break;  // Kokiri sword in hand
+        case PLAYER_MODELTYPE_LH_BGS:      m |= LINK_MID(16); break; // child Master Sword
+        case PLAYER_MODELTYPE_LH_BOOMERANG: m |= LINK_MID(6); break; // boomerang
+        case PLAYER_MODELTYPE_LH_BOTTLE:   m |= LINK_MID(7); break;  // cupped hand for the bottle
+        case PLAYER_MODELTYPE_LH_CLOSED:   m |= LINK_MID(1); break;  // closed fist
         case PLAYER_MODELTYPE_LH_OPEN:
-        case PLAYER_MODELTYPE_LH_HAMMER:   /* child hammer = empty */
+        case PLAYER_MODELTYPE_LH_HAMMER:   /* child hammer = empty, per the table */
         default:                           m |= LINK_MID(0); break;  // open empty hand
     }
 
     // RIGHT hand (the shield hand). childlink right-hand variants on bones 19/20.
     switch (player->rightHandType) {
         case PLAYER_MODELTYPE_RH_SHIELD:
-            m |= (deku || hylian) ? LINK_MID(5) : LINK_MID(3); // shield on arm only if one is equipped
+            // RhShield is the base of the 12-row shield-variant run; its first group's child column
+            // is NONE=4 DEKU=5 HYLIAN=4 MIRROR=4. So ONLY the Deku shield gets its own arm mesh on
+            // the child, and every other case -- including no shield at all -- is the plain fist 4.
+            // This was `(deku || hylian) ? 5 : 3`, which strapped a DEKU shield to the child's arm
+            // whenever he carried a Hylian or Mirror shield, and showed an OPEN PALM (3) rather than
+            // a fist when he carried none.
+            m |= deku ? LINK_MID(5) : LINK_MID(4);
             break;
         // mid 18 is the OCARINA, not the slingshot. Verified by isolating it in game
         // (`linkmid only 18` on child Link): it renders a hand holding a blue instrument with
@@ -337,8 +354,14 @@ unsigned long long Zelda3D::LinkMidMask::compute(Player* player) const {
         // ocarina for the slingshot is the PRE-EXISTING behaviour, not a new regression -- see
         // debug_journal/2026-07-30-audit-round2b-player-animation-scene.md.
         case PLAYER_MODELTYPE_RH_BOW_SLINGSHOT:
-        case PLAYER_MODELTYPE_RH_BOW_SLINGSHOT_2: m |= LINK_MID(18); break; // TODO: real slingshot mid
-        case PLAYER_MODELTYPE_RH_OCARINA:  m |= LINK_MID(18); break;  // ocarina (verified mesh)
+        case PLAYER_MODELTYPE_RH_BOW_SLINGSHOT_2: m |= LINK_MID(19); break; // Fairy Slingshot
+        // The table resolves the ocarina/slingshot tangle above, and CONFIRMS the earlier visual
+        // finding rather than contradicting it: RhOot's child value is 18 and mid 18 was isolated in
+        // game as "a hand holding a BLUE instrument with finger holes" -- the Ocarina of Time is the
+        // blue one. So 18 was always an ocarina, just the wrong ocarina to use for everything.
+        // RhOcarina's child value is 17 (the Fairy Ocarina) and RhBowSlingshot's is 19.
+        case PLAYER_MODELTYPE_RH_OCARINA:  m |= LINK_MID(17); break;  // Fairy Ocarina
+        case PLAYER_MODELTYPE_RH_OOT:      m |= LINK_MID(18); break;  // Ocarina of Time
         case PLAYER_MODELTYPE_RH_CLOSED:   m |= LINK_MID(4); break;  // closed
         case PLAYER_MODELTYPE_RH_OPEN:
         case PLAYER_MODELTYPE_RH_HOOKSHOT: /* child hookshot = empty */
