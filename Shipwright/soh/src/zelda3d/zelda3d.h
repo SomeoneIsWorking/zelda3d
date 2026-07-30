@@ -351,9 +351,16 @@ void Zelda3D_SkipControlTakers(PlayState* play);
 // World scales for the field-keep props (En_Ishi rocks, Obj_Hana flower) reused from
 // zelda_field_keep.zar. Starting estimates against the N64 actor scale (rock 0.1/0.4,
 // flower 0.01); fine-tune live with REPL `scale rock_s|rock_l|flower`.
+// Only the SMALL rock value is a real calibration. The other two were copies of it, and both were
+// badly wrong -- they are now SEEDS ONLY: sVariantMeas in zelda3d_render.cpp measures those two
+// variants from their own N64 draw and overrides these (selfCalibrate=1). Measured live by spawning
+// each variant in Hyrule Field:
+//   large rock: 0.38139 (n64h 89.6) -- this 0.12 seed drew it at 0.315x, i.e. a third of its size
+//   flower:     0.00952 (n64h  8.2) -- the CMB is ~861 local units tall, so this 0.12 seed drew it
+//                                      103 world units tall, taller than Link (~60)
 #define ZELDA3D_ROCK_SMALL_WORLD_SCALE 0.12f  // calibrated vs N64 in Kokiri Forest
-#define ZELDA3D_ROCK_LARGE_WORLD_SCALE 0.12f  // UNCALIBRATED: no silver rocks in Kokiri Forest yet
-#define ZELDA3D_FLOWER_WORLD_SCALE 0.12f      // UNCALIBRATED: no field flowers in Kokiri Forest yet
+#define ZELDA3D_ROCK_LARGE_WORLD_SCALE 0.12f  // seed only -- measured at runtime (was 3.2x too small)
+#define ZELDA3D_FLOWER_WORLD_SCALE 0.12f      // seed only -- measured at runtime (was 12.6x too big)
 
 // Kakariko well + windmill (Bg_Spot01_Fusya / _Idohashira / _Idomizu), all from one shared ZAR
 // coordinate space (zelda_spot01_objects.zar). Seeded from the auto-derived per-object scale

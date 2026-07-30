@@ -1045,6 +1045,20 @@ static void Zelda3D_ReplExec(PlayState* play, char* line, const char* outPath) {
                             (int)fe->tries);
             shown++;
         }
+        for (k = 0; k < Zelda3D_VariantSlotCount(); k++) {
+            short aid = 0;
+            unsigned short pv = 0;
+            int mid = 0, st = 0, tr = 0;
+            float fb = 0.0f, sc = 0.0f, mh = 0.0f;
+            if (Zelda3D_VariantSlotInfoRaw(k, &aid, &pv, &mid, &fb, &sc, &mh, &st, &tr) == NULL) continue;
+            // Print the SEED alongside the measured scale: the whole point of self-calibration is
+            // that the two can differ, so showing only one hides whether calibration happened.
+            Zelda3D_ReplReply(outPath,
+                            "variant[%d] actor=0x%x params==0x%x model=%d state=%d scale=%.5f "
+                            "seed=%.5f n64h=%.1f tries=%d",
+                            k, (unsigned)(u16)aid, (unsigned)pv, mid, st, sc, fb, mh, tr);
+            shown++;
+        }
         if (!shown) {
             Zelda3D_ReplReply(outPath, "autostate: no auto-replaced objects seen yet (auto=%d)", Zelda3D_AutoMode());
         }
