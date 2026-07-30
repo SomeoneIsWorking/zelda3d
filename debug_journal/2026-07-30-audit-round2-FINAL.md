@@ -28,7 +28,7 @@ some findings carry only ONE refuter vote (0/1) rather than two — weaker, and 
 
 ## PLAYER
 
-### [CONFIRMED] * `Shipwright/zelda3d_shared/player/link_midmask.cpp:53` — user-visible, affected 4, refuted 0/2
+### [PARTLY FIXED] * `Shipwright/zelda3d_shared/player/link_midmask.cpp:53` — user-visible, affected 4, refuted 0/2
   With the sword drawn and no shield on the back, Link's empty sheath/strap disappears instead of staying on his back. Child with the Deku shield and sword drawn loses the sheath ring. Child holding the Mirror shield shows a HYLIAN shield on his back (line 308 lumps MIRROR into `hylian`; the table's child MIRROR row is 14 = sword only).
 ### [CONFIRMED] * `Shipwright/zelda3d_shared/player/link_midmask.cpp:36` — user-visible, affected 3, refuted 0/1
   Adult Link holding the hookshot/longshot shows a flat open palm with the chain emerging from nothing; playing the Ocarina of Time shows an open palm instead of the ocarina grip. PLAYER_MODELTYPE_RH_OOT (0x0E) is not even in the switch, so it takes the same default.
@@ -63,7 +63,7 @@ some findings carry only ONE refuter vote (0/1) rather than two — weaker, and 
   Same-object actors that differ in size all render at one size: large Hyrule Field/Kakariko bushes and trees render at the small variant's size; En_Ishi's silver boulder renders at the liftable rock's scale; the En_Ishi rocks and Obj_Hana rock-debris sit 5.8 and 32 world units too low (sunk into the ground).
 ### [CONFIRMED] * `Shipwright/soh/src/zelda3d/zelda3d.h:355` — user-visible, affected 2, refuted 0/1
   En_Ishi's silver/large rock renders roughly a third of its correct size; the Hyrule Field flower (Obj_Hana type 0) renders far oversized — plausibly taller than Link.
-### [CONFIRMED] * `Shipwright/soh/src/zelda3d/render/zelda3d_render.cpp:892` — user-visible, affected 1, refuted 0/2
+### [FIXED] * `Shipwright/soh/src/zelda3d/render/zelda3d_render.cpp:892` — user-visible, affected 1, refuted 0/2
   The forced-CMB path is unusable for any static prop: the wooden-torch entry can never draw (Obj_Syokudai params>>12==2 silently falls back to the N64 model), and any future non-skinned forced entry will silently do the same. This is the mechanism that would otherwise fix finding #1, so it matters more than the one torch.
 ### [CONFIRMED] * `Shipwright/soh/src/zelda3d/render/zelda3d_render.cpp:610` — internal, affected 0, refuted 0/2
   None at runtime. Costs the next reader a wrong mental model of the scale derivation (a diagonal/height mix-up is exactly the sort of ~1.5-2x systematic scale error that would be hunted for elsewhere).
@@ -119,3 +119,45 @@ Do NOT act on this one until it is settled — a proportional measurement agains
 texture ID (Kokiri vs Master use different blade textures), would decide it. Recording the conflict is
 the point: an agent verdict and an operator observation disagreeing is information, not something to
 resolve by picking whichever is more convenient.
+
+---
+
+## Session addendum (2026-07-30) — two findings closed, and what the closures taught
+
+### link_midmask.cpp:53 — PARTLY FIXED (adult half)
+Adult `EmptySheathNoShield` and `ShieldOnBackSwordDrawn`-with-no-shield now draw mid 42, the empty
+sheath strap. Both previously drew NOTHING, so with the sword out and no shield Link's sheath simply
+vanished off his back. Tables read byte-exact out of `code.bin` rather than trusted from the report —
+see claim C023 for the addresses and the visual confirmation of mid 42.
+
+**The CHILD half is deliberately still open.** The table says child SHEATH_17 = 21, and the audit
+called child 21 "the empty sheath guard/ring" — but an earlier isolation sweep of mine read child mid
+21 as "sword hilt only on back". Those disagree and a sheath ring could plausibly look like a hilt at
+that camera distance. Wiring it on either reading would be a guess; it needs its own identification
+pass. Recorded here so the next session does not assume the whole finding was closed.
+
+### render/zelda3d_render.cpp:892 — FIXED, and it was an INSTRUMENT failure as much as a code one
+The forced-CMB path could never complete a measurement for a non-skinned entry: the measure bracket
+is keyed, `Zelda3D_MeasureResult` routes a bare object id into `sAuto[objId]`, but a forced slot works
+out of `forced->entry`. So `measuredH` was **unreachable by construction** — state stuck at 1, tries
+climbing to the 8-try cap, then permanent state=3 / N64 fallback. Fixed with a reserved key range
+(`ZELDA3D_MEASKEY_FORCED_BASE + slot index`) instead of a fourth hand-written sentinel.
+
+Two reasons this survived so long, both worth remembering because they are general:
+1. **Skinned entries mask it.** They skip the measure pass entirely (scale comes from bone lengths),
+   so the EN_TG couple worked fine and the table looked healthy. A bug that only affects the code
+   path your one working example does not take is nearly invisible.
+2. **Neither instrument could have shown it.** `autostate` dumped only `sAuto[]`, so forced slots were
+   not merely wrong in the dump — they were absent from it. And the AUTO resolution log printed the
+   bare zar, so a forced slot and the default per-object slot logged *identically*. Both are now
+   fixed (I014, I015) and both were validated by showing the other answer, not just the expected one.
+
+The lesson matching the "can the instrument show the OTHER answer" rule: introspection that silently
+omits a whole table is worse than introspection that prints a wrong number, because the wrong number
+prompts a question and the omission reads as "nothing to see".
+
+### Note on this session's two agent losses
+Both delegated investigations (the player DL table family, and the same-rig constant-translation
+measurement) died on API/stream errors rather than on the work, and were relaunched. No findings
+were lost, but nothing from them is recorded here yet — do not read their absence as a negative
+result.
