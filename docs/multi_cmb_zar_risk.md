@@ -291,3 +291,29 @@ global front-face convention is NOT in question — an earlier warning to the co
   require non-zero contribution from *some* azimuth. Zero from one angle proves nothing.
 * Tell the two apart with `scratch/bin/cmb_tex_alpha`, which now reports the geometry bbox: any axis of
   size ~0 means flat.
+
+## Pass 9 (2026-07-30) — bbox classification of every pending routing
+
+Ran `scratch/bin/cmb_tex_alpha`'s geometry-bbox report over the routings that had not yet been
+confirmed, to sort them by verification method and to find any that can NEVER resolve:
+
+| routed CMB | bbox size (x,y,z) | shape | consequence |
+|---|---|---|---|
+| `l_kaiten` | 1034 x 306 x 1034 | volume | single-angle check is valid |
+| `l_4hasira` | 460 x 170 x 460 | volume | single-angle check is valid |
+| `l_tenjyou` | 400 x 24 x 1360 | thin slab | has real height; measures fine |
+| `l_hasigo` | 32 x 227 x 2 | near-flat | **needs an orbit sweep** |
+| `s12gate` | 3998 x 2628 x 294 | volume | single-angle check is valid |
+| `s12saku` | 1704 x 1070 x 100 | volume | single-angle check is valid |
+| `g_ddg2_fire` | 79 x 78 x 95 | volume | single-angle check is valid |
+| `l_idomizu` | 2763 x **0** x 289 | FLAT | **can never resolve — see below** |
+
+**`l_idomizu` is inert by construction.** It is the Forest Temple well water: a horizontal plane with
+exactly zero height, so the bbox-height measure can never derive a scale (`modelH > 1e-3` fails) and the
+slot parks at `ZELDA3D_AUTO_NOMEAS` permanently, leaving the N64 draw in place. Its `state=4` in
+`autostate` is therefore structural, not a transient miss. Annotated in the table itself so nobody reads
+that row as working. Making it real needs `Zelda3D_AutoModelExtentXZ` footprint sizing, which needs an
+XZ measure — the bracket currently reports height only.
+
+This is the same blocker as `Bg_Ydan_Sp`'s FLOOR web and `Bg_Ydan_Hasi`'s water plane, so a single XZ
+measure would unlock all three. That is the highest-value renderer follow-up for this queue.

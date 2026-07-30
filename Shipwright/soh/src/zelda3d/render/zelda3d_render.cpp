@@ -715,6 +715,13 @@ static Zelda3D_ActorForcedAutoSlot sActorForcedAuto[] = {
     { ACTOR_BG_MORI_HASHIRA4,   0, 0, "l_4hasira",  0, {0} },
     { ACTOR_BG_MORI_ELEVATOR,   0, 0, "l_elevator", 0, {0} },
     { ACTOR_BG_MORI_HASHIGO,    0, 0, "l_hasigo",   0, {0} },
+    // INERT BY CONSTRUCTION, kept for intent. l_idomizu is the Forest Temple well WATER: bbox
+    // 2763 x 0 x 289, i.e. a horizontal plane with EXACTLY ZERO height. The bbox-height measure can
+    // never derive a scale for it (the modelH > 1e-3 guard fails), so this slot parks at
+    // ZELDA3D_AUTO_NOMEAS forever and the N64 draw stays -- which is why it reads state=4 in autostate
+    // rather than that being a transient miss. Making it real needs footprint sizing via
+    // Zelda3D_AutoModelExtentXZ (the path Bg_Spot01_Idomizu's well water already uses), which in turn
+    // needs an XZ measure since the bracket only reports height.
     { ACTOR_BG_MORI_IDOMIZU,    0, 0, "l_idomizu",  0, {0} },
     { ACTOR_BG_MORI_KAITENKABE, 0, 0, "l_kaiten",   0, {0} },
     { ACTOR_BG_MORI_RAKKATENJO, 0, 0, "l_tenjyou",  0, {0} },
