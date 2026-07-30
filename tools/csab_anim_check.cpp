@@ -13,9 +13,20 @@
 // animation, so 0/109 is a real result and not a broken harness. MM CSABs parse "successfully" with
 // a plausible duration and silently yield no motion at all.
 //
+// FIXED 2026-07-30 by giving MM3D its own track reader (Csab::parseTrackMm3d). Re-measured at scale:
+//     MM3D  (subver 5): 617 clips  ANIMATES=585  FROZEN=32  unparsed=0    (was 0 animating)
+//     OoT3D (subver 3): 189 clips  ANIMATES=183  FROZEN=6    unparsed=0   <- control, unregressed
+// The residual frozen clips are in the same ~3-5% band on BOTH branches, which is what genuinely
+// static single-pose clips look like -- not a remaining parse failure.
+//
+// CAVEAT ON THIS HARNESS: it reports `archives=0 clips=0 ANIMATES=0 FROZEN=0` cleanly when none of
+// the paths resolve, which is indistinguishable from "nothing animates". I hit exactly that with an
+// empty argument list and briefly read it as a regression. Always check the `archives=` count
+// against the number of paths you passed before believing any of the other columns.
+//
 // Build (no cmake needed):
 //   A=Shipwright/cmb3d
-//   g++ -std=c++20 -O1 -I$A -I$A/asset -o /tmp/csab_anim_check tools/csab_anim_check.cpp \
+//   g++ -std=c++20 -O1 -I$A -I$A/asset -o scratch/bin/csab_anim_check tools/csab_anim_check.cpp \
 //       $A/asset/{csab,cmb,gar,lzs,zar,ctr_rom,pica_texture,cityhash}.cpp
 // Run (env var NAME, then archive paths):
 //   ./csab_anim_check ZELDA3D_MM3D_ROM /actors/zelda2_ah.gar.lzs ...

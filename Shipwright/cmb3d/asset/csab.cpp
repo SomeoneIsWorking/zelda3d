@@ -92,6 +92,60 @@ Csab::Track Csab::parseTrack(uint32_t o, bool isRotInt16) const {
     return t;
 }
 
+// MM3D (subversion 5) track record. Derived by measurement over the whole MM3D ROM
+// (460 /actors/ GARs, 3237 csab clips, 168803 tracks) -- see oot3d-decomp/docs/ / the journal entry:
+//
+//   +0x0  u8  flags        1 exactly when sampleCount == 1 (18767 tracks, counts matched exactly)
+//   +0x1  u8  type         1 in ALL 168803 tracks -- uniformly-sampled quantized curve
+//   +0x2  u16 sampleCount  1..720, a smooth plausible distribution
+//   +0x4  f32 scale        e.g. 0.00153398 == pi/2048 for rotation tracks
+//   +0x8  f32 offset       bias added after scaling
+//   +0xC  s16 samples[sampleCount]     ONE PER FRAME -- there is no per-keyframe time field
+//         (the record is padded to 4-byte alignment)
+//
+//   value[i] = offset + scale * samples[i]
+//
+// The record size was solved from the byte gap to the next track in the same anod: the gaps run
+// 16,16,20,20,24,24,28,28 for sampleCount 1..8, i.e. +4 bytes per TWO samples, which fits
+// align4(12 + 2*n) exactly and nothing else.
+//
+// Two consequences worth knowing:
+//  * Because the scale lives IN THE DATA, MM3D needs no isRotInt16 guessing -- rotation and
+//    translation tracks are dequantized by the same code with their own scales. That flag is an
+//    OoT3D-only concern.
+//  * Samples are per-frame, so the times are simply 0..n-1 and LINEAR interpolation between them
+//    reproduces the authored curve.
+Csab::Track Csab::parseTrackMm3d(uint32_t o) const {
+    const uint8_t* b = mData.data();
+    Track t;
+    const uint8_t type = b[o + 1];
+    const uint32_t n = u16(b, o + 2);
+    if (type != 1 || n == 0) {
+        // Do NOT fall through silently -- silence here is what hid this bug. Every track in the
+        // shipped ROM is type 1, so anything else is a real unknown and must be visible.
+        fprintf(stderr, "[csab] MM3D track: unhandled type %u (sampleCount %u) -- discarded\n", type, n);
+        t.present = false;
+        return t;
+    }
+    const float scale = f32(b, o + 4);
+    const float offset = f32(b, o + 8);
+    t.type = LINEAR;
+    t.timeStart = 0;
+    t.timeEnd = (int)n; // one sample per frame
+    t.present = true;
+    t.frames.reserve(n);
+    for (uint32_t i = 0; i < n; i++) {
+        Keyframe k{ (float)i, offset + scale * (float)s16(b, o + 0xC + 2 * i), 0, 0 };
+        t.frames.push_back(k);
+    }
+    if (!t.frames.empty()) {
+        t.constant = true;
+        for (const auto& k : t.frames)
+            if (std::fabs(k.value - t.frames[0].value) > 1e-4f) { t.constant = false; break; }
+    }
+    return t;
+}
+
 Csab::AnimNode Csab::parseAnod(uint32_t o) const {
     const uint8_t* b = mData.data();
     AnimNode n;
@@ -102,7 +156,10 @@ Csab::AnimNode Csab::parseAnod(uint32_t o) const {
         // isRotInt16 applies only to the rotation slots (3,4,5 = rX/rY/rZ); translation/scale tracks
         // stay float even in an int16 anod. It applies to BOTH curve types in those slots, not just
         // HERMITE — the LINEAR branch ignoring it decoded 2951 of Link's rotation tracks as garbage.
-        if (off) n.tracks[i] = parseTrack(o + off, n.isRotInt16 && (i >= 3 && i <= 5));
+        if (!off) continue;
+        // MM3D carries its dequantization scale per track, so isRotInt16 does not apply there.
+        n.tracks[i] = (mSubversion == 5) ? parseTrackMm3d(o + off)
+                                       : parseTrack(o + off, n.isRotInt16 && (i >= 3 && i <= 5));
     }
     return n;
 }
@@ -111,9 +168,15 @@ Csab::Csab(std::vector<uint8_t> data) : mData(std::move(data)) {
     const uint8_t* b = mData.data();
     if (mData.size() < 0x38 || memcmp(b, "csab", 4) != 0) { mErr = "not a CSAB"; return; }
     // CSAB has two header layouts (noclip OcarinaOfTime3D/csab.ts): Ocarina/OoT3D = subversion 3,
-    // Majora/MM3D = subversion 5. Only the header field offsets + the anod-table base differ; the
-    // 'anod' node layout and the track encoding are identical, so the rest of the parser is shared.
+    // Majora/MM3D = subversion 5. The header field offsets and anod-table base differ, AND SO DOES
+    // THE TRACK RECORD -- see parseTrackMm3d. This comment used to claim the track encoding was
+    // "identical, so the rest of the parser is shared", which was false and silently discarded
+    // 100% of MM3D's tracks (168803 of them across 3237 clips): MM3D's type byte does not sit where
+    // OoT3D's u32 type does, so every track fell into the CONSTANT/unknown branch and every skinned
+    // MM actor stood in its bind pose forever while the playhead advanced. The anod node layout
+    // itself IS shared (verified: 0 magic mismatches across all 58474 MM3D anods).
     uint32_t subver = u32(b, 0x08);
+    mSubversion = (int)subver;
     uint32_t anodBase, durOff, anodCountOff, boneCountOff, boneTableOff;
     if (subver == 0x03) {
         anodBase = 0x18; durOff = 0x28; anodCountOff = 0x30; boneCountOff = 0x34; boneTableOff = 0x38;
