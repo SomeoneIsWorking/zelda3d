@@ -684,6 +684,23 @@ static Zelda3D_ActorForcedAutoSlot sActorForcedAuto[] = {
     // This is a non-skinned entry, so it depends on the forced-slot measure-key fix: before that,
     // non-skinned forced entries could never complete a measurement and always fell back to N64.
     { ACTOR_BG_TREEMOUTH, 0, 0, "spot04_kuchi", /*noBaseAnchor=*/1, {0} },
+    // Forest Temple props. SEVEN actors declare OBJECT_MORI_OBJECTS (confirmed from each one's
+    // ActorInit, not just a mention), and zelda_mori_objects.zar holds nine CMBs -- so AUTO's
+    // largest-CMB pick handed ALL of them l_elevator_model.cmb (41216 bytes, the biggest). Six of the
+    // seven therefore rendered as the elevator platform.
+    // The mapping is name-exact once the Japanese is read: bigst = big stone, hasira = pillar (4 of
+    // them), hasigo = ladder, idomizu = well water, kaiten = rotating (wall), tenjyou = ceiling
+    // (rakka = falling, i.e. the falling-ceiling trap). Every actor gets its own mesh:
+    { ACTOR_BG_MORI_BIGST,      0, 0, "l_bigst",    0, {0} },
+    { ACTOR_BG_MORI_HASHIRA4,   0, 0, "l_4hasira",  0, {0} },
+    { ACTOR_BG_MORI_ELEVATOR,   0, 0, "l_elevator", 0, {0} },
+    { ACTOR_BG_MORI_HASHIGO,    0, 0, "l_hasigo",   0, {0} },
+    { ACTOR_BG_MORI_IDOMIZU,    0, 0, "l_idomizu",  0, {0} },
+    { ACTOR_BG_MORI_KAITENKABE, 0, 0, "l_kaiten",   0, {0} },
+    { ACTOR_BG_MORI_RAKKATENJO, 0, 0, "l_tenjyou",  0, {0} },
+    // Unrouted leftovers in that ZAR: l_hasigotome_model (a ladder variant/stop) and
+    // l_tikaori_model. No actor name matches either, so they are deliberately left alone rather than
+    // guessed onto an actor.
 };
 // Two DIFFERENT reasons an auto slot stops trying, which used to share state 3 and therefore shared
 // its permanence:
