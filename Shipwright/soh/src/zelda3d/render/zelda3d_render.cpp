@@ -790,6 +790,26 @@ static Zelda3D_ActorForcedAutoSlot sActorForcedAuto[] = {
     // so there is no measurement for it. ydan_maruta_model at 4000x1243x3900 is the plausible candidate
     // on both name and bulk, but plausible is what this method exists to replace.
     { ACTOR_BG_YDAN_MARUTA, 0x00FF, 0x0001, "ydan_t_hasigo", 0, {0} },
+    // Water Temple props. Four of the five OBJECT_MIZU_OBJECTS actors draw exactly one display list
+    // (gObjectMizuObjects{Bwall,Movebg,Shutter,Water}DL; bg_mizu_uzu draws none) against 18 CMBs in the
+    // archive, so each was identified by MEASURING its N64 draw and keeping the candidate whose
+    // height/X/Z ratios agree.
+    //
+    //   water   n64 h=0 foot=1920x1900 -> m_Wsea00_Mov_modelT (1925 x 0 x 1880): both axes agree to
+    //           0.4% (scale 1.00407). Flat water surface, so footprint-derived. CONFIRMED.
+    //   movebg  n64 h=85 foot=120x120  -> m_WFloat00W_model (1200 x 853 x 1200): ratios 0.0996/0.1/0.1,
+    //           spread 1.00x. Note this also DISCRIMINATES against its sibling m_WFloat00S (1200x800x1200)
+    //           which is 6% off on height -- the three-axis test separates even near-identical variants.
+    //   shutter n64 h=160 foot=160x0   -> m_Wshutter1_model, on NAME only. The measurement CANNOT decide
+    //           this one: a flat plane yields just TWO usable ratios, and m_WFloat01/m_Wbomb00E/
+    //           m_Wbomb0eE/m_Wbomb0eW all share the same 1200x1200 X/Y and tie at spread 1.00x. Flagged
+    //           rather than presented as measured.
+    //   bwall   NOT ROUTED. Its model resolves as SKINNED, so it takes the bone-length scale path and
+    //           never produces a bbox measurement (n64h=0 foot=0x0) -- this identification method cannot
+    //           see it at all.
+    { ACTOR_BG_MIZU_MOVEBG,  0, 0, "m_WFloat00W", 0, {0} },
+    { ACTOR_BG_MIZU_SHUTTER, 0, 0, "m_Wshutter1", 0, {0} },
+    { ACTOR_BG_MIZU_WATER,   0, 0, "m_Wsea00",    0, {0} },
     { ACTOR_EN_FLOORMAS, 0, 0, "floormaster", 0, {0} },
     { ACTOR_EN_WALLMAS,  0, 0, "fallmaster",  0, {0} },
     // King Dodongo's ZAR also holds his fire breath. AUTO picked kingdodongo.cmb (137216 bytes), so
