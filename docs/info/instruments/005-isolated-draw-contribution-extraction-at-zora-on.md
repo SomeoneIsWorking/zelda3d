@@ -1,8 +1,9 @@
 ---
 id: I005
 kind: instrument
-status: trusted
+status: DISTRUSTED
 created: 2026-07-28
+distrusted_on: 2026-07-30
 ---
 
 ## Instrument
@@ -16,3 +17,9 @@ VALIDATED 2026-07-28 by a known ramp, and it REPLACES instrument I004's colour-s
 ## Known failure modes
 
 (none recorded yet)
+
+## DISTRUSTED 2026-07-30
+
+placeholder
+
+> Every result this instrument produced is suspect until it is re-validated.
