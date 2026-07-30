@@ -61,7 +61,16 @@ OoT3DCollision::OoT3DCollision(const std::vector<uint8_t>& data) {
     const bool mm3d = (d[3] == 0x09);
     const size_t cnt = hdr + (mm3d ? 0x1e : 0x1c);
     uint16_t nVtx = u16le(d, cnt);
-    uint16_t nPoly = u16le(d, cnt + 2);
+    // The header field at +0x1c/+0x1e (+2) is a LAST INDEX, not a count: there are nPoly+1
+    // polygons. Verified over ALL 114 scene .zsi files by the plane + vertex-index invariant
+    // (|n|==1, n.p == -dist for all three verts, indices < nVtx):
+    //     record[nPoly-1] passes 114/114   (the last one the old count read)
+    //     record[nPoly]   passes 114/114   <- one real polygon per scene was being DROPPED
+    //     record[nPoly+1] passes   0/114   } controls: the invariant can say no,
+    //     record[nPoly+2] passes   0/114   } so the 114/114 above is not a loose test
+    // The original "stable across every scene tested" note (zcol.h) was derived on SIX scenes.
+    // Dropped triangles were 82 walls, 25 floors, 7 ceilings game-wide.
+    uint16_t nPoly = (uint16_t)(u16le(d, cnt + 2) + 1);
     uint16_t nSurf = u16le(d, cnt + 4);
     uint32_t pVtx = u32le(d, hdr + 0x28);
     uint32_t pPoly = u32le(d, hdr + 0x2c);
