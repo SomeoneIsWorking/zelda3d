@@ -317,3 +317,26 @@ XZ measure — the bracket currently reports height only.
 
 This is the same blocker as `Bg_Ydan_Sp`'s FLOOR web and `Bg_Ydan_Hasi`'s water plane, so a single XZ
 measure would unlock all three. That is the highest-value renderer follow-up for this queue.
+
+## Pass 10 (2026-07-30) — both Deku Tree webs VERIFIED; two instrument caveats
+
+`ydan_spkabe` (wall) and `ydan_spyuka` (floor) both draw. Each needed a different method, because the
+geometry decides which method can even see it:
+
+| prop | shape | method | result |
+|---|---|---|---|
+| `ydan_spkabe` | vertical plane, cull=1 | orbit sweep | 0 px at azimuth 0-135; 13589-20478 px at 180-315 |
+| `ydan_spyuka` | horizontal plane, cull=1 | **elevated** view | 47792 px at elev 55; 50514 px at elev 75 |
+
+`acam` gained an `elevDeg` third argument for the second case — a side profile is structurally blind to a
+horizontal plane (edge-on = no pixels) and `camorbit` cannot fix it, since azimuth rotation never carries
+the eye across a floor plane's face.
+
+### Two caveats that invalidate naive checks
+* **`acam <dist> z` never parsed the "z".** The axis is read with `%d`, so a letter leaves it 0 (+X).
+  Framings that passed "z" were +X side profiles, not +Z.
+* **`ahide` hides ONE actor; props have MULTIPLE instances.** `asel 0xF <n>` finds six Bg_Ydan_Sp here:
+  n=0/4/5 are wall webs (params=1), n=1/2/3 are floor webs (params=0). So a before/after pair still shows
+  a web in the "hidden" frame — a different instance. The pixel delta is attributable to the selected
+  actor, but the VISUAL is not a clean before/after for a multi-instance prop. Check `params` on the
+  selection before interpreting either.
