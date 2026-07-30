@@ -857,6 +857,69 @@ static Zelda3D_ActorForcedAutoSlot sActorForcedAuto[] = {
     // Unrouted leftovers in that ZAR: l_hasigotome_model (a ladder variant/stop) and
     // l_tikaori_model. No actor name matches either, so they are deliberately left alone rather than
     // guessed onto an actor.
+    //
+    // Ice Cavern props. SIX actors reach OBJECT_ICE_OBJECTS and zelda_ice_objects.zar holds EIGHT
+    // CMBs, so AUTO's largest-CMB pick handed every one of them ice_wall_modelT (1614 verts, the
+    // biggest) -- five actors rendering a sheet of red ice. The N64 side has exactly eight display
+    // lists in that object, and the split is readable from each actor's own draw:
+    //
+    //   Bg_Ice_Turara   -> DL_0023D0                  -> ice_turara  (tsurara = icicle; name-exact)
+    //   Bg_Ice_Objects  -> DL_000190                  -> ice_brick   (the pushable block)
+    //   Bg_Ice_Shutter  -> DL_002740                  -> ice_wall2   (opaque 1746 x 2008 x 77 slab)
+    //   Bg_Haka_Sgami   -> DL_0021F0 (params != 0)    -> ice_trap    (the scythe trap; 6254 wide arm)
+    //   Bg_Ice_Shelter  -> gRedIce{Block,Platform,Wall}DL, by (params >> 8) & 7
+    //   Door_Shutter    -> DL_001D10                  -> ice_tobira  (already routed in
+    //                                                    behaviors/actor/door_shutter.cpp)
+    //
+    // Bg_Ice_Shelter is the only param-split one. Its three DLs all go to POLY_XLU (red ice is
+    // translucent), and the ZAR holds EXACTLY THREE `modelT` meshes -- ice_ice_modelT,
+    // ice_ice3_modelT, ice_wall_modelT -- while every other CMB here is a plain `model`. That the
+    // translucent set and the XLU draw set have the same size and membership is the corroboration;
+    // within the set, block-vs-platform is separated by shape: ice_ice is near-cubic
+    // (950 x 1005 x 945) like the block, ice_ice3 is wide and 3-group (1499 x 1027 x 1507) like the
+    // "complex structure that can be climbed", and ice_wall is the sheet.
+    //
+    // THE BLOCK MESH NEEDS THREE SLOTS, NOT ONE, and this row is where that mechanism limit first
+    // bites. A slot stores ONE derived scale, and that scale is measured off the N64 draw *including
+    // the actor's own scale* -- Zelda3D_DrawModelGL applies `worldScale` alone and never multiplies
+    // actor->scale. Bg_Ice_Shelter scales itself per type (`sRedIceScales[] = { 0.1, 0.06, 0.1, 0.1,
+    // 0.25 }`), so LARGE/SMALL/KING_ZORA sharing one slot would render at whichever size happened to
+    // be measured first -- a 4.2x error between the extremes. Measured proof that the scale really is
+    // the actor's and not a re-authoring ratio: a SMALL instance derives scale 0.06000 against a CMB
+    // 1005 units tall, i.e. exactly sRedIceScales[RED_ICE_SMALL], so the CMB is dimensionally 1:1 with
+    // the N64 display list and everything else is actor scale.
+    //
+    // KING_ZORA is routed but is KNOWN IMPERFECT: it is the one type with a NON-UNIFORM scale
+    // (kzIceScale = { 0.18, 0.27, 0.24 }), and a single `worldScale` cannot express that. Its height
+    // measure yields 0.27, so the block comes out ~1.5x too wide in X. It is still routed because the
+    // alternative is worse, not because it is right: unrouted it falls to AUTO's largest-CMB pick,
+    // which is ice_wall_modelT -- a sheet of wall instead of a block. Right mesh at a wrong aspect
+    // beats the wrong mesh. THE PROPER FIX is per-axis scale: the measure already reports three
+    // independent numbers (n64h, measFootX, measFootZ) that the three-axis cross-check consumes, so
+    // the data is there and only the draw path is uniform. Not done here because it would change the
+    // transform of all ten already-verified routings at once.
+    //
+    // Order matters: Zelda3D_FindActorForcedSlot takes the FIRST match. Every entry here is fully
+    // specified on 0x0700 so order is not load-bearing, but do not add a catch-all above them.
+    { ACTOR_BG_ICE_SHELTER, 0x0700, 0x0000, "ice_ice_modelT",  0, {0} }, // RED_ICE_LARGE     (0.1)
+    { ACTOR_BG_ICE_SHELTER, 0x0700, 0x0100, "ice_ice_modelT",  0, {0} }, // RED_ICE_SMALL     (0.06)
+    { ACTOR_BG_ICE_SHELTER, 0x0700, 0x0200, "ice_ice3_modelT", 0, {0} }, // RED_ICE_PLATFORM  (0.1)
+    // INERT BY CONSTRUCTION, kept for intent (same class as l_idomizu above, different reason).
+    // ice_wall_modelT is a SKINNED CMB (`autostate` reports skin=1 for this slot), so Zelda3D_TryAuto
+    // jumps it straight to state 2 and defers to the SkelAnime hook to derive the scale and draw.
+    // Bg_Ice_Shelter is a static Bg_ actor with no SkelAnime, so that hook never fires and the N64
+    // wall keeps drawing. It reads `state=2 skin=1 submits=0`, which the skin column now separates
+    // from the one real-failure signature (state=2 skin=0 submits=0). Making it real needs the auto
+    // path to draw a skinned CMB in bind pose for actors that have no skeleton to drive it.
+    { ACTOR_BG_ICE_SHELTER, 0x0700, 0x0300, "ice_wall_modelT", 0, {0} }, // RED_ICE_WALL      (0.1)
+    { ACTOR_BG_ICE_SHELTER, 0x0700, 0x0400, "ice_ice_modelT",  0, {0} }, // RED_ICE_KING_ZORA (non-uniform)
+    { ACTOR_BG_ICE_TURARA,  0, 0, "ice_turara", 0, {0} },
+    { ACTOR_BG_ICE_OBJECTS, 0, 0, "ice_brick",  0, {0} },
+    { ACTOR_BG_ICE_SHUTTER, 0, 0, "ice_wall2",  0, {0} },
+    // params 0 is the Shadow Temple scythe, which loads OBJECT_HAKA_OBJECTS instead and draws a
+    // different DL entirely -- so this must NOT match it. params 1 (Shadow Temple INVISIBLE) does
+    // take the ice-objects branch in Init but draws nothing, so routing it is harmless.
+    { ACTOR_BG_HAKA_SGAMI,  0x00FF, 0x0002, "ice_trap", 0, {0} },
 };
 // Two DIFFERENT reasons an auto slot stops trying, which used to share state 3 and therefore shared
 // its permanence:
