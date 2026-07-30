@@ -2158,12 +2158,18 @@ static void Zelda3D_ReplExec(PlayState* play, char* line, const char* outPath) {
             Zelda3D_ReplReply(outPath, "aparams=%d", gZelda3dSelActor ? gZelda3dSelActor->params : 0);
         }
     } else if (strcmp(cmd, "acam") == 0) {
-        // GENERIC: frame the selected actor as a side profile. `acam [dist] [axis]` (axis 0=+X,1=+Z;
-        // dist default 110). Looks slightly above the actor origin. Combine with afreeze for a stable
-        // A/B view of any actor.
-        float dist = 110.0f;
+        // GENERIC: frame the selected actor. `acam [dist] [axis] [elevDeg]` (axis 0=+X,1=+Z; dist
+        // default 110; elevation default 0 = the original side profile, so existing uses are unchanged).
+        //
+        // ELEVATION exists because a side profile is structurally BLIND to a horizontal prop: a floor
+        // web or a water surface is a zero-thickness plane, so viewed edge-on it covers no pixels, and
+        // `camorbit` cannot help either -- rotating the azimuth never carries the eye across a floor
+        // plane's face. Verifying that class needs looking DOWN at it, e.g. `acam 200 0 60`.
+        float dist = 110.0f, elev = 0.0f;
         int axis = 0;
-        (void)sscanf(line, "%*s %f %d", &dist, &axis);
+        (void)sscanf(line, "%*s %f %d %f", &dist, &axis, &elev);
+        if (elev > 89.0f) elev = 89.0f;
+        if (elev < -89.0f) elev = -89.0f;
         if (gZelda3dSelActor == NULL) {
             Zelda3D_ReplReply(outPath, "acam: no selection (asel first)");
         } else {
@@ -2172,12 +2178,19 @@ static void Zelda3D_ReplExec(PlayState* play, char* line, const char* outPath) {
             gZelda3dCamAt[0] = cx;
             gZelda3dCamAt[1] = cy;
             gZelda3dCamAt[2] = cz;
-            gZelda3dCamEye[0] = cx + (axis == 0 ? dist : 0.0f);
-            gZelda3dCamEye[1] = cy + 14.0f;
-            gZelda3dCamEye[2] = cz + (axis == 0 ? 0.0f : dist);
+            // Elevate by rotating the eye offset up in the vertical plane containing the chosen axis,
+            // keeping the same distance so framing scale does not change with elevation.
+            const float er = elev * 3.14159265f / 180.0f;
+            const float horiz = dist * cosf(er);
+            const float vert = dist * sinf(er);
+            gZelda3dCamEye[0] = cx + (axis == 0 ? horiz : 0.0f);
+            gZelda3dCamEye[1] = cy + 14.0f + vert;
+            gZelda3dCamEye[2] = cz + (axis == 0 ? 0.0f : horiz);
             gZelda3dCamOverride = 1;
-            Zelda3D_ReplReply(outPath, "acam at=(%.0f,%.0f,%.0f) dist=%.0f axis=%d eye=(%.0f,%.0f,%.0f)",
-                            cx, cy, cz, dist, axis, gZelda3dCamEye[0], gZelda3dCamEye[1], gZelda3dCamEye[2]);
+            Zelda3D_ReplReply(outPath,
+                            "acam at=(%.0f,%.0f,%.0f) dist=%.0f axis=%d elev=%.0f eye=(%.0f,%.0f,%.0f)",
+                            cx, cy, cz, dist, axis, elev, gZelda3dCamEye[0], gZelda3dCamEye[1],
+                            gZelda3dCamEye[2]);
         }
     } else if (strcmp(cmd, "aaim") == 0 || strcmp(cmd, "aorbit") == 0) {
         // GENERIC draw-position-aware framing: aim at where the selected actor's OoT3D MODEL actually
