@@ -688,6 +688,7 @@ void Zelda3D_WalkN64Skeleton(void** skeleton, int limbCap, Zelda3D_LimbCb cb, vo
 
 // Non-Link globals referenced by the moved Link code.
 extern Actor* gZelda3dSelActor;   // generic actor-control selection (asel)
+extern Actor* gZelda3dHideActor; // REPL `ahide`: skip this actor's draw (baked-vs-actor geometry test)
 extern s32 gZelda3dActorFreeze;   // generic actor pin mode (afreeze)
 extern float gZelda3dAnimRate;    // shared CSAB playback speed
 extern float gZelda3dAnimFrame;   // free-running CSAB scrub frame

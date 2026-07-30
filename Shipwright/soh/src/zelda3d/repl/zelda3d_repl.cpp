@@ -2062,6 +2062,22 @@ static void Zelda3D_ReplExec(PlayState* play, char* line, const char* outPath) {
         Zelda3D_ReplReply(outPath, "idleStance=%d variant=%d(%s) focusActor=0x%X st1=0x%x",
                         idleStance, variant, kVariantName[(variant >= 0 && variant <= 3) ? variant : 0],
                         ztp->focusActor ? ztp->focusActor->id : 0, ztp->stateFlags1);
+    } else if (strcmp(cmd, "ahide") == 0) {
+        // GENERIC: `ahide <0|1>` suppresses the SELECTED actor's draw (asel first). The actor keeps
+        // updating and colliding -- this is a rendering question, not a state change. Use it to tell
+        // baked room geometry from an actor drawn on top of it: capture the view, ahide 1, capture
+        // again. Anything still present is in the room mesh.
+        if (sscanf(line, "%*s %i", &iv) == 1) {
+            if (iv && gZelda3dSelActor == NULL) {
+                Zelda3D_ReplReply(outPath, "ahide: no selection (asel first)");
+            } else {
+                gZelda3dHideActor = iv ? gZelda3dSelActor : NULL;
+                Zelda3D_ReplReply(outPath, "ahide=%d actor=%s", iv ? 1 : 0,
+                                gZelda3dHideActor ? "selected" : "none");
+            }
+        } else {
+            Zelda3D_ReplReply(outPath, "ahide=%d (usage: ahide <0|1>)", gZelda3dHideActor ? 1 : 0);
+        }
     } else if (strcmp(cmd, "afreeze") == 0) {
         // GENERIC: pin the selected actor's transform every frame. 0=off, 1=pin pos+rot,
         // 2=pin position only (rotation free — e.g. so a held cucco's body shake stays visible).
