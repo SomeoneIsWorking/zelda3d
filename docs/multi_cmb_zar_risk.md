@@ -151,3 +151,26 @@ The matcher proposed `Bg_Ydan_Hasi` -> `ydan_t_hasigo_model`, on the reasonable-
 *hasi*/*hasigo* share a stem. The actor's draw code shows it renders the WATER PLANE, so the correct
 mesh is `ydan_mizu`. *hasi* (bridge) and *hasigo* (ladder) are different words that a substring match
 conflates. **Read the actor's draw code for every routing; the CMB name alone is a hypothesis.**
+
+## Pass 5 (2026-07-30) — translucent routing is gated on the MEASURE pass, not the draw pass
+
+The XLU *draw* path now exists (`Zelda3D_AutoModelAllBlended` -> `POLY_XLU_DISP`). Routing the first
+translucent prop (`Bg_Ydan_Sp` wall web -> `ydan_spkabe`) exposed the next blocker one level down:
+
+**`Zelda3D_EmitMeasure` emits its bracket into `POLY_OPA_DISP`, but a translucent actor draws into
+`POLY_XLU_DISP`.** The bracket wraps nothing, no height is reported, and the slot sits at state 4
+(never measured) forever. Every translucent row in this queue hits this.
+
+The naive fix is WRONG and the reason is worth keeping: emitting the bracket into both lists produces
+two sequential bracket sessions at interpret time (all of OPA, then all of XLU), and the second
+overwrites the first through `Zelda3D_MeasureResult`. A purely-opaque actor would have its real height
+replaced by the empty XLU session's zero — breaking every measurement that currently works. The safe
+version needs the interpreter to suppress a bracket that accumulated no geometry.
+
+Also note two ORTHOGONAL blockers for flat props, already known: a horizontal plane has ~zero model
+height, so the height measure cannot scale it regardless of pass (`Bg_Ydan_Sp` FLOOR web,
+`Bg_Ydan_Hasi` water plane). Those need `Zelda3D_AutoModelExtentXZ` footprint sizing, the path
+`Bg_Spot01_Idomizu` already uses.
+
+So the translucent class needs, in order: (1) an XLU-aware measure bracket with empty-session
+suppression, (2) footprint sizing for flat props. Neither is a routing-table problem.
