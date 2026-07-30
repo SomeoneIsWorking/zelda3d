@@ -30,7 +30,7 @@ The top entries are unambiguous regardless: 16 Fire Temple actors cannot all be 
 | OBJECT_GANON | 0x00E1 | 5 | 24 | `zelda_ganon.zar` | efc_ganon_floor_modelT.cmb, ganon_tyuka_ue_model.cmb, ganondorf.cmb, efc_fg_thunder1_modelT.cmb … |
 | OBJECT_YDAN_OBJECTS | 0x0036 | 4 | 12 | `zelda_ydan_objects.zar` | maruta_model.cmb, ydan_maruta_model.cmb, ydan_kumohen_modelT.cmb, ydan_ytoge_model.cmb … |
 | OBJECT_TOKI_OBJECTS | 0x005E | 4 | 11 | `zelda_toki_objects.zar` | demo_tt_triforce2_0_model.cmb, demo_tt_triforce2_1_model.cmb, demo_tt_triforce_modelT.cmb, left_model.cmb … |
-| OBJECT_HAKACH_OBJECTS | 0x008D | 4 | 8 | `zelda_hakach_objects.zar` | m_Hinv05_model.cmb, m_Hkhuta_model.cmb, m_HkotuBomb00_model.cmb, m_Hsec00_model.cmb … |
+| ~~OBJECT_HAKACH_OBJECTS~~ **PARTIAL: 2 of 8 (6 blocked by mechanism)** | 0x008D | 4 | 8 | `zelda_hakach_objects.zar` | m_Hinv05_model.cmb, m_Hkhuta_model.cmb, m_HkotuBomb00_model.cmb, m_Hsec00_model.cmb … |
 | ~~OBJECT_DDAN_OBJECTS~~ **DONE** | 0x002B | 4 | 5 | `zelda_ddan_objects.zar` | ddan_tdoor_model.cmb, ddan_tdoor_yari_model.cmb, ddanh_ago_model.cmb, ddanh_jd_model.cmb … |
 | OBJECT_MENKURI_OBJECTS | 0x004D | 4 | 5 | `zelda_menkuri_objects.zar` | l_m_door_model.cmb, l_m_nisekabe1_model.cmb, l_m_nisekabe2_model.cmb, l_sekizoume_modelT.cmb … |
 | ~~OBJECT_SPOT18_OBJ~~ **DONE (5 routed, no visual)** | 0x00AF | 4 | 5 | `zelda_spot18_obj.zar` | obj_185_model.cmb, obj_186_model.cmb, obj_s18tubo_model.cmb, obj_s18yari_model.cmb … |
@@ -765,3 +765,66 @@ invisible in the diff, and it said INCONCLUSIVE where my hand-rolled version sai
 That is the same failure this arc keeps producing, in a new place: not a broken tool this time, but a
 GOOD tool bypassed. The rule earns a sharper form — when a wrapper exists for a check, the wrapper's
 refusals are the point of it.
+
+## Pass 24 (2026-07-30) — Bottom of the Well: a complete mapping the MECHANISM cannot mostly use
+
+`OBJECT_HAKACH_OBJECTS`: eight CMBs against exactly eight `gBotw*` display lists, and all eight map,
+each name backed by an independent geometric signature:
+
+| N64 DL | CMB | signature |
+|---|---|---|
+| `gBotwCoffinLidDL` | `m_Hkhuta` | huta = lid; a 500 x 118 x 1200 slab |
+| `gBotwBombSpotDL` | `m_HkotuBomb00` | name-exact |
+| `gBotwWaterFallDL` | `m_Hwat00_FO_modelT` | FO = fall; the one water mesh WITH height |
+| `gBotwWaterRingDL` | `m_Hwat00_Down_modelT` | flat 22000 x 0 x 19600 surface |
+| `gBotwBloodSplatterDL` | `m_Hsec00_modelT` | the only remaining `modelT`: a flat 6-vert decal at y=20 |
+| `gBotwFakeWallsAndFloorsDL` | `m_Hsec00` | 3 groups, height 2000 — walls need it |
+| `gBotwThreeFakeFloorsDL` | `m_Hsec03` | flat, 54 verts: three floor planes |
+| `gBotwHoleTrap2DL` | `m_Hinv05` | bbox lies ENTIRELY BELOW the origin, y[-2400..0] — a pit |
+
+**Only two of the eight are routed, and the mapping is not what blocks the other six.** Three distinct
+mechanism limits do, and they are recorded here so the next pass does not re-derive this mapping only
+to hit the same walls:
+
+1. **A forced slot replaces the actor's WHOLE draw.** `Zelda3D_TryAuto` returns 1 and the caller skips
+   the N64 draw entirely, so an actor emitting more than one display list loses every list but the
+   substituted one. That rules out `Bg_Haka_Water` (ring **plus** fall, the latter at its own
+   `Matrix_Translate(0,92,-1680)` + `Scale(0.1)`) and `Bg_Haka_Megane` params 0, which draws
+   `sDLists[0]` **and** `gBotwBloodSplatterDL`. Routing either would delete geometry that currently
+   renders — a regression, not a partial win. This limit has been latent all along; every prior row
+   happened to use single-DL actors.
+2. **The ZAR comes from the actor's object BANK slot, not from where its geometry lives.**
+   `Bg_Haka_Zou`'s `ActorInit` declares `OBJECT_GAMEPLAY_KEEP` and it fetches HAKACH or HAKA at runtime
+   into a private index, so `Zelda3D_ActorObjectId` reports GAMEPLAY_KEEP and the lookup can never
+   reach this ZAR — its name-exact `gBotwBombSpotDL -> m_HkotuBomb00` is unreachable.
+3. `Bg_Haka_Megane` params >= 3 uses `OBJECT_HAKA_OBJECTS`, so only params 0/1/2 were ever candidates.
+
+### The two that landed
+
+| slot | scale | n64h | foot | reading |
+|---|---|---|---|---|
+| `m_Hkhuta` | 0.08463 | 10.0 | 50 x 120 | submits=5340 |
+| `m_Hsec03` | 0.09999 | **0.0** | 340 x 400 | submits=885 |
+
+`m_Hsec03` is the **footprint fallback working exactly as designed**: the mesh is flat (y extent 0) so
+the height measure yields nothing, and X and Z independently give 340/3400 = 0.100 and 400/4000 = 0.100.
+This is the path `l_idomizu` needs; `l_idomizu`'s problem was never getting measured at all, not the
+flatness per se.
+
+`m_Hkhuta` is the clearest case yet of the **height-primary choice being the worse estimate**: X and Z
+agree at *exactly* 0.100 (50/500, 120/1200) while height dissents at 0.0847, i.e. Grezzo authored the
+lid 18% thicker. Two axes agreeing exactly against one outlier still passes the identity test — a wrong
+mesh disagrees on all three — but it means the lid renders ~15% small in plan. Noted, not acted on: the
+same single-`worldScale` limitation as Pass 22's King Zora block, and changing the scale source would
+move every verified routing at once.
+
+`m_Hinv05` (params 2, the hole trap) never resolved — no instance in the rooms swept. Inert.
+
+### The visual leg is now 0 for 2 on dungeon props
+
+`ahide_check.sh` returned INCONCLUSIVE for the coffin lid (elev 25, all instances) as it did for the
+Goron City pot. Both rows rest on submission counts and three-axis agreement instead. That is two
+consecutive rows where the pixel check could not confirm what the counter did — consistent with its
+documented limits (flat props, occlusion, off-screen instances), but worth stating plainly: for
+dungeon interior props the pixel check is currently the weakest of the three instruments, and the
+submit counter plus the three-axis ratio are carrying the verification.
