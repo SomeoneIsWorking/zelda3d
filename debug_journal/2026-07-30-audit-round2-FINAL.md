@@ -23,7 +23,7 @@ some findings carry only ONE refuter vote (0/1) rather than two — weaker, and 
 
 ## ANIMATION
 
-### [CONFIRMED] * `Shipwright/cmb3d/asset/csab.cpp:115` — user-visible, affected 2443, refuted 0/1
+### [FIXED] * `Shipwright/cmb3d/asset/csab.cpp:115` — user-visible, affected 2443, refuted 0/1
   On the 2ship3d/MM3D branch every skinned actor that plays its own 3DS CSAB (mm3d_model.cpp 'STAGE 4 — CSAB anim', live and wired) renders in the bind pose forever: 100% of 138820 tracks in 2443 clips are silently discarded, with no error log and a correct-looking duration. Actors are frozen statues while the N64 playhead advances.
 
 ## PLAYER
@@ -469,3 +469,40 @@ En_Ishi bug on puzzle geometry.
 `OBJECT_NWC` -> `zelda_nw.zar`). The first holds *valbasia* (Volvagia) models — that alias would draw
 the boss's body for the rubble actor. The second is cucco geometry already aliased from `niw`. Name
 proximity is not evidence; the spot04 alias earned it by containing a CMB literally named "mouth".
+
+### csab.cpp:115 — FIXED. The largest defect in the audit, and it was a comment asserting a shared layout.
+
+MM3D animation was 100% dead: every skinned 2ship3d actor stood in bind pose while the playhead
+advanced. The cause was the claim in the code that OoT3D (subversion 3) and MM3D (subversion 5) differ
+only in header offsets and share the anod/track layout. Half of that is true — the anod layout IS
+shared, verified with 0 magic mismatches across all 58474 MM3D anods — but the track RECORD is
+completely different, so MM3D's type byte does not land where OoT3D's `u32` type does and every one of
+168803 tracks fell into the CONSTANT/unknown branch.
+
+Full layout, claim C029... see C031 and the commit. Derived by measurement over the whole ROM, not by
+guessing: `u8` flags / `u8` type / `u16` sampleCount / `f32` scale / `f32` offset / `s16` samples one
+per frame, `align4(12 + 2n)`.
+
+**The step worth reusing: solving a record size from inter-field gaps.** I did not have to guess the
+stride. Taking the byte gap from each track to the next track in the same anod and bucketing by
+sampleCount gave 16,16,20,20,24,24,28,28 for n=1..8 — +4 bytes per TWO samples — which fits
+`align4(12 + 2n)` and nothing else. That turns a guess into an arithmetic identity, and it is
+applicable to any packed table where sibling offsets are available.
+
+Result, measured through the real C++ parser (`tools/csab_anim_check`, not a python twin):
+```
+MM3D  617 clips  ANIMATES=585  FROZEN=32  unparsed=0    (was 0/109)
+OoT3D 189 clips  ANIMATES=183  FROZEN=6   unparsed=0    <- control, unregressed
+```
+The residual frozen fraction is the same ~3-5% on BOTH branches, which is what genuinely static
+single-pose clips look like rather than a lingering parse failure. Having the control in the same units
+is what makes that judgement possible at all.
+
+**Two instrument problems found and fixed in the harness itself:**
+* Its documented build recipe wrote the binary to `/tmp`, which is a small RAM tmpfs here. Now
+  `scratch/bin`.
+* It prints `archives=0 clips=0 ANIMATES=0 FROZEN=0` cleanly when no path resolves — indistinguishable
+  from "nothing animates". I hit exactly that with an empty argument list and read it as a regression
+  for a moment. The caveat is now at the top of the file: check `archives=` against the paths you
+  passed before believing any other column. This is the third silent-zero instrument this session
+  (after the shared-cap op dump and the misaligned LOD grid).
