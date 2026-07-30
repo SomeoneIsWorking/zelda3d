@@ -73,3 +73,31 @@ below are downstream of it.
   doc. Latent trap, no current effect.
 * `tools/gen_scene_names.py` writes to a stale path and would drop the SCENE_TITLE/spot99 row if a
   session moved its output into place.
+
+---
+
+# CONFIRMED: MM3D CSABs are 100% frozen (operator verification, 2026-07-30)
+
+Finding 1 above is real. Verified with a purpose-built harness compiled against the AUTHORITATIVE
+C++ parser — deliberately not `tools/csab.py`, which finding 4 says diverges from the runtime
+sampler and would therefore answer the wrong question. New tool: `tools/csab_anim_check.cpp`.
+
+Method: sample `Csab::localTransforms` at frame 0 and mid-clip; if no bone's local rotation or
+translation moves, every track was discarded and the actor is frozen in bind pose.
+
+    MM3D  (subversion 5): 12 archives, 109 clips ->  ANIMATES=0   FROZEN=109  unparsed=0
+    OoT3D (subversion 3):  6 archives,  61 clips ->  ANIMATES=60  FROZEN=1    unparsed=0  <- CONTROL
+
+The OoT3D row is what makes the MM3D row meaningful: the check demonstrably detects animation, so
+0/109 is a real result rather than a dead harness. Note `unparsed=0` on both — MM CSABs report
+`ok()`, carry a plausible duration, and silently produce no motion. Nothing logs.
+
+So `csab.cpp:115`'s "only the header field offsets + the anod-table base differ; the anod node layout
+and the track encoding are identical" is FALSE for subversion 5. The header offsets it switches on are
+evidently right enough to parse a node count and duration, but the per-node track layout is not.
+
+NOT FIXED. This needs the MM3D anod/track layout reverse-engineered — the parser currently applies
+the OoT3D track encoding to MM data, so the fix is a format port, not an offset tweak. It is also
+squarely on the 2ship3d branch, which the codemap describes as early/native, so it may not be
+blocking anything today; what matters is that it fails SILENTLY and would be read as "MM animation
+isn't wired up yet" rather than "the parser is wrong".
