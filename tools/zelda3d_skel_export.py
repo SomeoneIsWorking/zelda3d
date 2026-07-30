@@ -36,7 +36,7 @@ def oot3d_skeleton(rom, zarname):
 
 def main():
     rom = CtrRom(os.environ["ZELDA3D_OOT3D_ROM"])
-    inc = open(os.path.join(REPO, 'Shipwright/soh/src/zelda3d/zelda3d_object_zars.inc')).read()
+    inc = open(os.path.join(REPO, 'Shipwright/soh/src/zelda3d/tables/zelda3d_object_zars.inc')).read()
     zars = sorted(set(re.findall(r'"(/actor/[a-zA-Z0-9_]+\.zar)"', inc)))  # case-insensitive: catch oF1d etc.
     skels = {}
     for z in zars:

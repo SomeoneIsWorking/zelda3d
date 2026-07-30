@@ -292,3 +292,34 @@ coincide); child 25 likewise shares 80 of 97 unique points with 24. Corrected in
 the wrong guess visible and labelled rather than silently deleting it — a plausible-sounding rationale
 is exactly the kind of thing that gets reused, and the correction also records that there is nothing
 to gain from an identification pass here.
+
+### object_zars.inc:49 (Deku Tree mouth renders N64) — TWO ROUTES RULED OUT, still open
+
+Established what the object actually is and why the generator cannot fix it:
+
+* `Bg_Treemouth` uses **`OBJECT_SPOT04_OBJECTS`**, which is entry `0x002A` in
+  `zelda3d_object_zars.inc` and is `NULL` — hence the N64 fallback. Confirmed from
+  `z_bg_treemouth.c`'s init struct, not guessed.
+* **There is no `/actor/zelda_spot04_objects.zar`.** Enumerated all 461 `.zar` files in the ROM: the
+  only spot04 archive is `/scene/spot04.zar`, and the generator only searches `/actor/`. That is
+  exactly why the audit said this "cannot be fixed by the generator alone" — no alias can help,
+  because the actor archive does not exist.
+* **`/scene/spot04.zar` contains NO CMB.** All 13 entries are one `cmab`, a `qdb`, and eleven `ctxb`
+  textures. So the mouth geometry is not there either.
+
+So the two obvious routes are both dead, and adding a `dk_`-style alias — which is what the earlier
+note about "3 missing dk_ ZAR aliases" implied for this — cannot work here. (The eight real `dk_`
+archives are `board, floater, lightbox, pu_box, spia, stonebridge, trap, vase`; none is a tree mouth.)
+
+**The live hypothesis, NOT yet checked:** OoT3D bakes the tree mouth into the spot04 ROOM mesh
+(room CMBs live in the `.zsi`, one per room) rather than shipping it as an actor. If that is true the
+fix is to SUPPRESS the N64 `Bg_Treemouth` draw, not to find a CMB for it — and getting that wrong
+leaves a hole in the world, so it must be confirmed by inspecting the room mesh first, not assumed.
+
+Next step is therefore a specific question with a specific answer: does the spot04 room CMB already
+contain the tree-mouth geometry? Do not attempt a mesh hunt or an alias before answering it.
+
+### Tooling fix found while doing this
+`tools/zelda3d_skel_export.py:39` read `Shipwright/soh/src/zelda3d/zelda3d_object_zars.inc`, a path
+that no longer exists — the table moved into `tables/`. Same class of stale-path breakage as the six
+generators fixed earlier in this session. Repointed at the real location.
