@@ -82,7 +82,9 @@ start() {
 
 case "${1:-}" in
     start)   shift; start "${1:-}" ;;
-    restart) shift; cmake --build "$REPO/Shipwright/build-cmake" --target mm -j"$(nproc)" && start "${1:-}" ;;
+    # Cap parallelism: this machine has ~15GB RAM and a full-core link of mm/soh OOMs. Override with
+    # ZELDA3D_BUILD_JOBS if you know you have headroom.
+    restart) shift; cmake --build "$REPO/Shipwright/build-cmake" --target mm -j"${ZELDA3D_BUILD_JOBS:-4}" && start "${1:-}" ;;
     stop)    stop ;;
     status)
         n=$(mm_pids | wc -l); echo "mm.elf instances: $n"; mm_pids

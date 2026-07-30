@@ -111,8 +111,13 @@ extern "C" int gZelda3dHlGroup;
 // `sgdrawlist` (REPL) / ZELDA3D_SG_DRAWLIST=1 dumps one frame's group list so you can find the n you
 // want. Indices are per-frame and sequential in append order — the same order that matters for
 // translucency — so they are stable for a frozen camera and meaningless across a moving one.
-extern "C" int gZelda3dSgDrawOnly; // -1 = draw everything (default)
-extern "C" int gZelda3dSgDrawList; // 1 = dump this frame's group list, then self-clears
+// DEFINED HERE, not in the game layer. These two are read and written by this file, which lives in
+// libultraship -- shared by BOTH soh and mm. They used to be defined in soh/src/zelda3d/core/zelda3d.c,
+// so linking the mm target failed with "undefined reference to gZelda3dSgDrawList/Only": mm links the
+// same libultraship but has no soh globals to satisfy it. A diagnostic owned by the renderer belongs
+// to the renderer; the game layers now just extern-declare it for their REPLs.
+extern "C" int gZelda3dSgDrawOnly = -1; // -1 = draw everything (default)
+extern "C" int gZelda3dSgDrawList = 0;  // 1 = dump this frame's group list, then self-clears
 static int g_sgDrawIdx = 0;        // groups appended so far this frame
 // strength/bias the same way the Vulkan path does.
 
