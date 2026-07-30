@@ -36,7 +36,7 @@ The top entries are unambiguous regardless: 16 Fire Temple actors cannot all be 
 | OBJECT_SPOT18_OBJ | 0x00AF | 4 | 5 | `zelda_spot18_obj.zar` | obj_185_model.cmb, obj_186_model.cmb, obj_s18tubo_model.cmb, obj_s18yari_model.cmb … |
 | OBJECT_NIW | 0x0013 | 4 | 2 | `zelda_nw.zar` | chicken.cmb, nw_hane_model.cmb |
 | OBJECT_SD | 0x0097 | 4 | 2 | `zelda_sd.zar` | soldier.cmb, soldier2.cmb |
-| OBJECT_BDAN_OBJECTS | 0x0096 | 3 | 17 | `zelda_bdan_objects.zar` | a_by_door0_model.cmb, a_by_door1_model.cmb, a_by_door2_model.cmb, a_by_door3_model.cmb … |
+| ~~OBJECT_BDAN_OBJECTS~~ **DONE (2 verified, 2 inert)** | 0x0096 | 3 | 17 | `zelda_bdan_objects.zar` | a_by_door0_model.cmb, a_by_door1_model.cmb, a_by_door2_model.cmb, a_by_door3_model.cmb … |
 | OBJECT_FD | 0x009C | 3 | 11 | `zelda_fd.zar` | m_FBRsizumi_model.cmb, valbasiabody.cmb, valbasiagnd.cmb, valbasiahead.cmb … |
 | OBJECT_EFC_STAR_FIELD | 0x0092 | 3 | 7 | `zelda_efc_star_field.zar` | demo_rock_model1.cmb, demo_rock_model2.cmb, fire_rock_model1.cmb, fire_rock_model2.cmb … |
 | OBJECT_FHG | 0x005A | 3 | 6 | `zelda_fantomHG.zar` | ganonhorse.cmb, f_ganon_efc_modelT.cmb, gnf_bakuhatsu_modelT.cmb, gnf_inazuma_modelT.cmb … |
@@ -623,3 +623,23 @@ artefact.
 `ddanh_ago` sitting at state 4 with 0 submissions is the benign case, and it is exactly what I earlier
 (correctly) called inconclusive from pixels alone. The counter makes that unambiguous rather than a
 judgement call.
+
+## Pass 21 (2026-07-30) — Jabu-Jabu platforms: the toolchain runs clean
+
+`OBJECT_BDAN_OBJECTS` finished. `z_bg_bdan_objects.c` carries an explicit DL table indexed by params, and
+each entry is corroborated by its CMB name:
+
+| params | N64 display list | CMB | verified |
+|---|---|---|---|
+| 0 | `LargeRotatingSpikePlatform` | `bdan_toge` | inert (no instance swept) |
+| 1 | `ElevatorPlatform` | `bdan_ere` | **scale 0.09999, submits=993** |
+| 2 | `Water` (XLU) | `bdan_bmizu_modelT` | inert (no instance swept) |
+| 3 | `FallingPlatform` | `bdan_fdai` | **scale 0.10007, submits=993** |
+
+Plus `Bg_Bdan_Switch` type 0 -> `bdan_switch_b` (submits=708, 1.35x re-authoring gap).
+
+**This is the first row that went through without a correction.** Every earlier row produced a revert, a
+false negative, or a falsified claim. What changed is not the method but the instruments: identify from the
+actor's own DL table, corroborate with the CMB name, verify it DRAWS with `submitted`, cross-check the
+scale on three axes, and know the documented limits of each. A row is now routine rather than an
+investigation.
