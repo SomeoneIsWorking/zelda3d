@@ -364,3 +364,29 @@ naming convention, not evidence, and a wrong pick renders the wrong geometry in 
 NOT ROUTED. To settle it, compare each CMB against what `gGTGFakeWallDL` / `gGTGFakeCeilingDL` actually
 draw (vertex extents from the N64 display lists), or observe a known instance of each params value in
 GTG. The selector is the easy half and it is done; the mesh identity is the open half.
+
+## Pass 12 (2026-07-30) — THE IDENTIFICATION METHOD: three-axis ratio agreement
+
+The remaining queue rows are blocked on identifying WHICH CMB an actor draws. Names are not evidence
+(the `hasi`/`hasigo` mismatch) and shapes alone were not enough (the nisekabe pair). This is:
+
+**Measure the actor's N64 draw, then keep the candidate CMB whose HEIGHT, X and Z ratios all agree.**
+
+Height, X and Z are three independent estimates of the same scale. The correct mesh makes them agree;
+a wrong one will not. Worked example, measured live:
+
+| | N64 measured | `l_bigst` CMB | ratio |
+|---|---|---|---|
+| height | 90 | 90 | 1.00 |
+| X | 300 | 300 | 1.00 |
+| Z | 300 | 300 | 1.00 |
+
+Tooling now in place for it:
+* `autostate` prints `n64foot=WxH` per slot — the measured N64 extents.
+* `scratch/bin/cmb_tex_alpha <ROM_ENV> <archive> <substr>` prints each candidate CMB's geometry bbox
+  (and its decoded texture alpha).
+* The renderer logs a warning when a height-derived scale disagrees with the footprint past 25% on
+  either axis, and an axis-spread warning past 8% for footprint-derived scales.
+
+So the per-row procedure is now mechanical: get the N64 extents from `autostate`, list the archive's
+candidate CMB bboxes, and pick the one with three consistent ratios. No name matching, no guessing.
