@@ -1228,6 +1228,29 @@ static int Zelda3D_TryAuto(PlayState* play, Actor* actor) {
         if (modelH > 1e-3f && e->measuredH > 1e-3f) {
             e->scale = e->measuredH / modelH;
             e->state = 2;
+            // CROSS-CHECK the height-derived scale against the FOOTPRINT. Height, X and Z are three
+            // INDEPENDENT estimates of the same scale, so agreement is strong evidence the CMB is the
+            // right mesh for this actor and disagreement means it probably is not -- which is exactly
+            // the identification problem the multi-CMB routing table faces. Worked example:
+            // l_bigst's CMB is 300x90x300 against a measured h=90 foot=300x300, all three ratios 1.0.
+            if (Zelda3D_AutoMode() >= 1) {
+                float mx = 0.0f, mz = 0.0f;
+                if (Zelda3D_AutoModelExtentXZ(e->modelId, &mx, &mz) && mx > 1e-3f && mz > 1e-3f &&
+                    e->measFootX > 1e-3f && e->measFootZ > 1e-3f) {
+                    const float rx = (e->measFootX / mx) / e->scale;
+                    const float rz = (e->measFootZ / mz) / e->scale;
+                    const float wx = rx > 1.0f ? rx : 1.0f / rx;
+                    const float wz = rz > 1.0f ? rz : 1.0f / rz;
+                    if (wx > 1.25f || wz > 1.25f) {
+                        fprintf(stderr,
+                                "SOH3D AUTO: obj 0x%x %s -- height scale %.5f DISAGREES with the "
+                                "footprint (x %.2fx, z %.2fx off); this CMB may be the wrong mesh for "
+                                "this actor\n",
+                                objId, modelKey, e->scale, wx, wz);
+                        fflush(stderr);
+                    }
+                }
+            }
             if (Zelda3D_AutoMode() >= 1) {
                 // Log modelKey, not zar: for a forced-CMB slot the key carries the "|<cmb>" suffix
                 // that says WHICH mesh was picked. Printing the bare zar made a forced slot and the
