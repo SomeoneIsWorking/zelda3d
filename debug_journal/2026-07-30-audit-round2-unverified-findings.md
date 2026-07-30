@@ -60,7 +60,28 @@ operator. Treat as leads. Numbers are the agent's own.
 6. **`render/zelda3d_render.cpp:892` — the `sActorForcedAuto` per-actor forced-CMB slot**. Wooden-torch
    Obj_Syokudai stays N64; the shared-ZAR mechanism is broken for static props generally.
 7. **`tables/zelda3d_object_zars.inc:5` — "312/402 mapped means the other 90 have no OoT3D archive"**.
-   Push blocks, En_Vase and shopkeepers have shipped assets and stay N64.
+   **OPERATOR VERIFIED 2026-07-30 — partly right, cause identified, and smaller than claimed.**
+
+   Swept all 68 unmapped `OBJECT_*` entries against every `/actor/*.zar` in the ROM. Only **5** have a
+   plausible unused archive by name, and 2 of those are `OBJECT_LINK_BOY` / `OBJECT_LINK_CHILD`, which
+   are deliberately excluded (Link goes through the dedicated player path, not auto-replace). So the
+   real gap is **three** objects, not the sweeping "90 have no archive":
+
+       OBJECT_PU_BOX   -> /actor/dk_pu_box.zar   [pu_box1/2/4_model.cmb]  -- 3 variants
+       OBJECT_TRAP     -> /actor/dk_trap.zar     [trap_model, trap2_center_model] -- 2 variants
+       OBJECT_VASE     -> /actor/dk_vase.zar     [vase1_obj_o2.cmb]       -- SINGLE model
+
+   CAUSE: `tools/gen_object_zars.py` resolves `zelda_<base>.zar` then bare `<base>.zar`
+   (gen_object_zars.py:62). OoT3D groups dungeon props under a `dk_` prefix, which the generator
+   handles ONLY through explicit `ALIAS` entries — it already has `dk_lightbox`, `shop_tana`,
+   `kogoma` — and these three simply have no entry. So the header's "no OoT3D ZAR" is an inference
+   from a failed name lookup, not a fact about the ROM.
+
+   NOT enabled here, deliberately. `dk_vase` is a clean single-CMB candidate, but `dk_pu_box` and
+   `dk_trap` are multi-variant COLLECTIONS and would walk straight into finding 1's pick ambiguity
+   (one picked mesh served to every instance). And enabling a 3DS model without seeing it in game is
+   the "looks finished but isn't" failure this project explicitly guards against. The safe increment
+   is `OBJECT_VASE` alone, once someone can frame an En_Vase and confirm it.
 8. **`core/zelda3d.c:757` — `Zelda3D_ActorHasReplacement` "mirrors the lookups in TryDrawActor/TryAuto"**
    (internal). Mapped-object doors keep drawing AND updating past the vanilla cull distance.
 
