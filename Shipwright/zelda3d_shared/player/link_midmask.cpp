@@ -3,10 +3,37 @@
 // from the OoT behavior here is a regression: this file's rules are what the mesh_id
 // identification sweep already validated against link_v2.cmb.
 #include "link_midmask.h"
+#include "link_dl_table.h"
 
 namespace Zelda3D {
 
 #define LINK_MID(n) (1ull << (n))
+
+// Gear enum -> PLAYER_MODELTYPE_*. Pure naming: no mesh ids live here, so a wrong value cannot be
+// introduced by editing this function -- only a wrong model type, which is far easier to eyeball.
+static LinkModelType leftHandModelType(LinkHandLeft h) {
+    switch (h) {
+        case LinkHandLeft::Closed:       return LinkModelType::LhClosed;
+        case LinkHandLeft::SwordOneHand: return LinkModelType::LhSword;
+        case LinkHandLeft::SwordTwoHand: return LinkModelType::LhBgs;
+        case LinkHandLeft::Bottle:       return LinkModelType::LhBottle;
+        case LinkHandLeft::Hammer:       return LinkModelType::LhHammer;
+        case LinkHandLeft::Boomerang:    return LinkModelType::LhBoomerang;
+        case LinkHandLeft::Open:
+        default:                         return LinkModelType::LhOpen;
+    }
+}
+
+static LinkModelType rightHandModelType(LinkHandRight h) {
+    switch (h) {
+        case LinkHandRight::Closed:   return LinkModelType::RhClosed;
+        case LinkHandRight::Bow:      return LinkModelType::RhBowSlingshot;
+        case LinkHandRight::Hookshot: return LinkModelType::RhHookshot;
+        case LinkHandRight::Ocarina:  return LinkModelType::RhOcarina;
+        case LinkHandRight::Open:
+        default:                      return LinkModelType::RhOpen;
+    }
+}
 
 unsigned long long linkAdultMidMask(const LinkGear& gear) {
     unsigned long long m = LINK_MID(45) | LINK_MID(46); // full body + head/face always
@@ -14,19 +41,20 @@ unsigned long long linkAdultMidMask(const LinkGear& gear) {
     bool mirror = (gear.shield == LinkShield::Mirror);
     bool haveShield = hylian || mirror;
 
-    // LEFT hand (sword hand), bones 15/16.
-    switch (gear.leftHand) {
-        case LinkHandLeft::SwordOneHand: m |= LINK_MID(16); break; // Master sword in hand
-        case LinkHandLeft::SwordTwoHand: m |= LINK_MID(37); break; // Biggoron / giant knife blade
-        case LinkHandLeft::Closed:
-        case LinkHandLeft::Bottle:
-        case LinkHandLeft::Hammer:       m |= LINK_MID(14); break; // closed fist
-        case LinkHandLeft::Open:
-        case LinkHandLeft::Boomerang:
-        default:                         m |= LINK_MID(13); break; // open empty hand (idle)
-    }
+    // LEFT and RIGHT hand mesh ids now come from the PORTED OoT3D table (sPlayerDLists, see
+    // link_dl_table.h) instead of hand-written cases. Every hand divergence the audit found was a
+    // guessed constant here: the hammer and the bottle both fell through to the plain fist (14), so
+    // the Megaton Hammer was entirely absent from the game and the bottle was gripped by a closed
+    // fist rather than the cupped hand the bottle model is posed against; the hookshot and the
+    // ocarina both fell through to the open palm (20), so the hookshot chain emerged from nothing
+    // and the Ocarina of Time was played with an open hand; PLAYER_MODELTYPE_RH_OOT was not
+    // represented at all; and the bow used 29's FIRST-person arm mesh 30 in third person.
+    // The mapping below only translates our gear enums to model types -- the VALUES are the ROM's.
+    m |= LINK_MID(linkDlMesh(leftHandModelType(gear.leftHand), LinkAge::Adult));
 
-    // RIGHT hand (shield / bow hand), bones 19/20.
+    // RIGHT hand (shield / bow hand), bones 19/20. The shield case is NOT a plain table row: it is
+    // the base of a 12-row shield-variant run, and its per-shield selection below was derived by
+    // hand and then independently CONFIRMED by that run, so it stays as it is.
     switch (gear.rightHand) {
         case LinkHandRight::Shield:
             // Mirror shield has its OWN forearm mesh (39); 23 is the HYLIAN one. This used to be
@@ -43,12 +71,9 @@ unsigned long long linkAdultMidMask(const LinkGear& gear) {
                 m |= haveShield ? LINK_MID(23) : LINK_MID(20);
             }
             break;
-        case LinkHandRight::Bow:      m |= LINK_MID(30); break; // bow drawn
-        case LinkHandRight::Closed:   m |= LINK_MID(21); break; // closed fist
-        case LinkHandRight::Open:
-        case LinkHandRight::Hookshot: // adult hookshot model drawn separately -> empty hand
-        case LinkHandRight::Ocarina:
-        default:                      m |= LINK_MID(20); break; // open empty hand
+        default:
+            m |= LINK_MID(linkDlMesh(rightHandModelType(gear.rightHand), LinkAge::Adult));
+            break;
     }
 
     // BACK (shield panel + sheath), bone 21. Combine sheath state with equipped shield.
