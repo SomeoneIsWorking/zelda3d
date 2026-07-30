@@ -156,9 +156,28 @@ operator. Treat as leads. Numbers are the agent's own.
     So the finding's mechanism ("the marker composites at that point") is not the issue — op ordering
     within the list is fine. The issue is a LATER full-target blit erasing everything already in fb 0.
 
-    NOT FIXED here. The fix is frame-ordering (append HUD ops after the resolve, or target the
-    resolved buffer) and touches the composite path for every backend, which wants its own change
-    with a before/after on all three. Recording the diagnosis so that change starts from the cause.
+    ROOT CAUSE, now MEASURED rather than read (op-order dump, `ZELDA3D_OPORDER=1`):
+
+        MSAA 1 :  draws -> fb 0 = 519000   draws -> fb 1 =      0   copies into fb 0 =  0
+        MSAA 4 :  draws -> fb 0 =  19376   draws -> fb 1 = 478624   copies into fb 0 = 1/frame
+
+    At MSAA 1 everything — scene AND HUD — renders straight into fb 0, and there is no copy. At
+    MSAA 4 the scene renders into fb 1 (mGameFb) and a single `COPY fb1 -> fb0` runs at frame end.
+    The HUD ops DO execute (19376 of them into fb 0, `op.fb = 0` hardcoded at
+    `gfx_sdl3gpu.cpp:2641`) — and then that full-target copy overwrites them. So it is an OVERWRITE,
+    and the HUD is drawn but erased.
+
+    **I got this wrong in the middle and the error is worth recording.** An intermediate measurement
+    said "ZERO HUD draws at MSAA 4", which I briefly read as the HUD never being recorded at all.
+    That was MY OWN diagnostic lying: the dump used a single `shown < 400` cap shared across every
+    DRAW op, and at MSAA 4 the 478k model draws (fb 1) exhausted it before a single HUD draw (fb 0)
+    could print. Absence in the log was absence of logging, not absence of draws. Fixed by counting
+    per target — the general lesson being that a shared cap on a filtered dump silently biases toward
+    whatever is most numerous.
+
+    NOT FIXED here. The fix is frame ordering: the HUD ops have to land after the resolve/composite,
+    or target whatever framebuffer the scene actually used rather than hardcoding fb 0. That touches
+    the composite path for every backend and wants its own change with a before/after on each.
     Note the user has said the HUD looks fine — which it does, at the DEFAULT MSAA 1.
 11. **`z_parameter.c:5084` — hardcoded HUD source-texture dimensions** (6). Wrong crop with an
     alt-assets/HD pack; invisible without one.
