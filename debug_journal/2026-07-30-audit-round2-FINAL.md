@@ -533,9 +533,36 @@ deliberate staging flag for in-progress work rather than an N64-original toggle,
 alone, but it should not survive the skinned path being finished.
 
 **What live verification needs, concretely:** a scene containing an actor whose object maps to a GAR
-with a skinned CMB, run with `ZELDA3D_MM_SKINNED=1`. Clock Town South (scene 111) is not one — with
-the gate ON it produced no `[MM3D] skinned obj=` and no `[MM3D] skip ... skinned` lines at all, i.e.
-no skinned archive was even probed; its six mapped models are all static props (clock tower, doors,
-steps, turret). The instruments to watch once in the right scene are those two log lines plus
-`[MM3D-ANIM]` (emitted once per unmapped N64 anim OTR) and `ZELDA3D_MM_DBG_SKIN=1` (one line per
-skinned emit).
+with a skinned CMB, run with `ZELDA3D_MM_SKINNED=1`. **Clock Town South (scene 111) IS such a scene** —
+with the gate ON it accepts six skinned MM3D archives:
+
+```
+[MM3D] skinned obj=0x00C (box):  3 bones (3DS CSAB-animated draw)
+[MM3D] skinned obj=0x0E2 (an1): 20 bones
+[MM3D] skinned obj=0x107 (mm):  15 bones
+[MM3D] skinned obj=0x132 (dog): 12 bones
+[MM3D] skinned obj=0x1B6 (sdn): 16 bones
+[MM3D] skinned obj=0x1CB (pst):  2 bones
+```
+
+Instruments: those two log lines, plus `[MM3D-ANIM]` (once per UNMAPPED N64 anim OTR — none appeared,
+so every anim in this scene resolved to a CSAB) and `ZELDA3D_MM_DBG_SKIN=1` (one line per skinned emit).
+
+#### CORRECTION — the paragraph above previously said the opposite, and it was MY instrument error
+I first wrote that Clock Town South produced no `[MM3D]` lines and therefore probed no skinned archive.
+That was wrong. I had been grepping `scratch/logs/run_mm.log`; the real path is
+`scratch/logs/mm_n2/run_mm.log`. **The file I grepped did not exist**, so every grep returned empty and
+I read the emptiness as data — then built a conclusion on it and committed it. The actual log holds 31
+`[MM3D]` lines and shows six skinned archives accepted.
+
+This is the FOURTH silent-zero instrument of this session (after the shared-cap op dump, the
+misaligned LOD grid, and `csab_anim_check`'s archives=0), and the only one I acted on before catching.
+The others announced themselves because a *positive* control disagreed. What would have caught this one
+in seconds: `ls` the file, or grep for a pattern that MUST match (`[MM3D]` at all, or even `.`) before
+trusting a specific pattern's absence. A `grep -c` of zero on a path that does not exist is
+indistinguishable from a real zero, and `grep` exits quietly either way.
+
+**What survives the correction:** the severity note above stands, because it came from reading
+`mm3d_model.cpp:352` — the gate really is default-off. What does NOT survive is the claim that the
+scene had no skinned candidates: three of its objects (`dnt` 27 bones, `dog` 12, `pst` 2) are
+skinned-capable, which I later proved independently from the ROM.
