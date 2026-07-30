@@ -325,12 +325,23 @@ unsigned long long Zelda3D::LinkMidMask::compute(Player* player) const {
         case PLAYER_MODELTYPE_RH_SHIELD:
             m |= (deku || hylian) ? LINK_MID(5) : LINK_MID(3); // shield on arm only if one is equipped
             break;
+        // mid 18 is the OCARINA, not the slingshot. Verified by isolating it in game
+        // (`linkmid only 18` on child Link): it renders a hand holding a blue instrument with
+        // finger holes. The mesh map labels it "SLINGSHOT, p_tex04", which is what this policy was
+        // written against -- and mid 18 is why RH_OCARINA previously drew an OPEN HAND while the
+        // real ocarina mesh sat unused.
+        //
+        // The slingshot's own mesh is NOT yet identified and is deliberately left pointing at 18:
+        // mid 19 (the obvious neighbour) renders a straight brown shaft with red ends, not a forked
+        // slingshot frame, so remapping to it would swap one wrong item for another. Drawing the
+        // ocarina for the slingshot is the PRE-EXISTING behaviour, not a new regression -- see
+        // debug_journal/2026-07-30-audit-round2b-player-animation-scene.md.
         case PLAYER_MODELTYPE_RH_BOW_SLINGSHOT:
-        case PLAYER_MODELTYPE_RH_BOW_SLINGSHOT_2: m |= LINK_MID(18); break; // slingshot
+        case PLAYER_MODELTYPE_RH_BOW_SLINGSHOT_2: m |= LINK_MID(18); break; // TODO: real slingshot mid
+        case PLAYER_MODELTYPE_RH_OCARINA:  m |= LINK_MID(18); break;  // ocarina (verified mesh)
         case PLAYER_MODELTYPE_RH_CLOSED:   m |= LINK_MID(4); break;  // closed
         case PLAYER_MODELTYPE_RH_OPEN:
         case PLAYER_MODELTYPE_RH_HOOKSHOT: /* child hookshot = empty */
-        case PLAYER_MODELTYPE_RH_OCARINA:
         default:                           m |= LINK_MID(3); break;  // open empty hand
     }
 

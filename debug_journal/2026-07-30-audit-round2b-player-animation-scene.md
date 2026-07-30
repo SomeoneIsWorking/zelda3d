@@ -161,3 +161,33 @@ Consequence for the rest of the player cluster: those findings all descend from
 `link_mesh_id_map.md`'s labels, and one spot-check already fails to reproduce. They should be treated
 as individually unverified rather than as a block, and the nine "wrong labels" claim needs its own
 per-label check before anyone rewrites the policy against it.
+
+---
+
+# CONFIRMED: child mid 18 is the OCARINA, not the slingshot (2026-07-30)
+
+Second of the nine claimed mislabels independently confirmed, after the Mirror Shield one.
+
+Isolated child hand meshes in game (`linkmid only <n>`, child Link, frozen, `acam 110 z`) —
+renders in `scratch/screenshots/child_hand_ids.png` and `slingshot_check.png`:
+
+    mid 18  hand holding a BLUE instrument with finger holes   -> OCARINA OF TIME
+    mid 19  hand holding a straight brown shaft with red ends  -> NOT a forked slingshot
+    mid 22  nothing renders
+    mid  8  a grey/white bottle
+    mid  6  hand holding an orange stick  -> Deku stick
+
+The mesh map calls 18 "SLINGSHOT, p_tex04". It is not. Consequences of that one label:
+* `RH_BOW_SLINGSHOT -> mid 18` draws the OCARINA when Link aims the slingshot (the reported bug,
+  CONFIRMED), and
+* `RH_OCARINA` fell through to the default `mid 3` = OPEN HAND, so playing the ocarina showed an
+  empty palm **while the correct mesh sat unused**. The audit reported that as a separate finding;
+  both are the same mislabel.
+
+FIXED the half that is certain: `RH_OCARINA -> mid 18`.
+
+NOT fixed, deliberately: the slingshot still points at 18. Its real mesh is unidentified — mid 19 is
+the obvious neighbour and is clearly NOT it. Remapping on a guess would swap one wrong item for
+another, and drawing the ocarina there is the pre-existing behaviour rather than a new regression.
+Identifying it needs a sweep of the remaining child hand mids (bones 19/20) against the slingshot's
+actual silhouette.
