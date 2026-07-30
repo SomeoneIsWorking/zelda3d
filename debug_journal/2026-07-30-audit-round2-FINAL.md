@@ -18,7 +18,7 @@ some findings carry only ONE refuter vote (0/1) rather than two — weaker, and 
   In any Master Quest dungeon, zelda3d renders AND collides the vanilla 3DS room geometry while the N64 side runs MQ rooms/actors — wrong walls, wrong floors, missing/extra rooms, silently. The correct selection is a `_dd` suffix on both the room path and the collision path when ResourceMgr_IsGameMasterQuest(). Caveat on user-visibility: only reachable for a player who supplies an MQ ROM and enters an MQ dungeon; I did not run the game to confirm the build exposes MQ.
 ### [FIXED] * `Shipwright/cmb3d/asset/zcol.cpp:70` — user-visible, affected 114, refuted 0/2
   Gameplay collision (default ON, zelda3d_collision.cpp builds SoH's CollisionHeader from this). Two effects: (1) the LAST real polygon of EVERY scene is never loaded — 114 missing triangles game-wide: 82 walls, 25 floors, 7 ceilings (scratch/audit2/impact.py). (2) The parser fabricates a record 0 out of vertex-array tail bytes; zcol.cpp:110's index check rejects it in 107 scenes but ACCEPTS it in 7 — ganontika, ganontika_dd, hakaana2, hylia_labo, k_home4, kakusiana, spot18 — yielding a phantom triangle over real scene vertices with a non-unit normal (|n| = 128..1659 instead of 32767, so ny ~ 0.
-### [CONFIRMED] * `Shipwright/cmb3d/asset/zsi.cpp:36` — internal, affected 114, refuted 0/1
+### [FIXED] * `Shipwright/cmb3d/asset/zsi.cpp:36` — internal, affected 114, refuted 0/1
   NOT user-visible today: `Zsi::envSettings()` has ZERO consumers anywhere in Shipwright/soh, cmb3d or libultraship (grep for envSettings/ZsiEnvSetting hits only zsi.cpp/zsi.h) — runtime lighting comes from the generated .inc, which is correct. It is a latent trap (dead parser whose header comments contradict the correct doc, ready to be believed by the next session) plus the array-bounds check at zsi.cpp:37 silently truncates. Either delete it (no-tombstones) or re-point it at offset+0x10 with the .inc's record layout. Note: world lighting is a CLOSED parity-map row, so this is a parser/doc cor
 
 ## ANIMATION
@@ -52,7 +52,7 @@ some findings carry only ONE refuter vote (0/1) rather than two — weaker, and 
   Child Link holding the boomerang shows an object OoT3D never draws (and the real fist+boomerang mesh never appears).
 ### [FIXED] * `Shipwright/zelda3d_shared/player/link_midmask.cpp:34` — user-visible, affected 1, refuted 0/2
   Adult Link with the bow drawn in third person renders the first-person bow-arm mesh instead of the third-person one (different arm/bow geometry, authored to be seen only from the camera-inside-the-arm angle).
-### [CONFIRMED] * `Shipwright/soh/src/zelda3d/player/zelda3d_link.cpp:754` — internal, affected 1, refuted 1/2
+### [FIXED] * `Shipwright/soh/src/zelda3d/player/zelda3d_link.cpp:754` — internal, affected 1, refuted 1/2
   No player impact; a workflow/consistency defect in the file most likely to be instrumented next.
 
 ## BEHAVIORS
@@ -668,3 +668,30 @@ SOH3D AUTO: scene 81 -- retrying 2 slot(s) that never got a measurement
 The count matches exactly, and Hyrule Field then produced 1 new state-4 slot of its own, which is the
 intended per-scene behaviour. So an actor that is merely off-screen when first encountered is no longer
 written off for the whole session.
+
+### zsi.cpp:36 and link.cpp:754 — both FIXED. That leaves ONE finding open.
+
+`zsi.cpp:36`: deleted the dead `envSettings()` parser outright (no-tombstones) after verifying zero
+consumers tree-wide. Its comment claimed Zelda3D drove world lighting from it, which was false — a
+trap for the next reader. Built BOTH soh and mm, since `zsi.cpp` is in cmb3d which mm links; that is
+the lesson from the mm-target breakage earlier today.
+
+`link.cpp:754`: the four debug logs used `if ((n++ % 30) == 0)`, and the throttle was the defect, not
+the print. Sampling one frame in thirty makes a state change landing between samples invisible, and
+the log then reads as "it never changed" — the boring case was capped instead of the interesting one.
+The two state-bearing logs now fire on CHANGE plus first occurrence. Validated both ways: 1 line for
+500 idle frames (old code: ~17 identical), and 3 lines with 3 distinct masks when changes were forced.
+Also fixed two `fflush(stdout)` calls following `fprintf(stderr, ...)`.
+
+## Audit round 2 — final state
+
+Of the 22 confirmed findings, **21 are resolved**: fixed, or premise-falsified with the evidence
+recorded. The one still open:
+
+* `zelda3d_link.cpp:311` — Link's hands stay flat-open in every locomotion state, both ages.
+
+It is deliberately last. Unlike the other hand findings, this one is NOT a wrong mesh id — the DL
+table's `LhOpen`/`LhClosed` values were already correct and unchanged by the port. The defect is in
+which model TYPE the game selects during locomotion, i.e. the `PLAYER_MODELGROUP_*` selection path,
+which is a different mechanism from everything else this session touched. Fixing it means working out
+what OoT3D selects while running, not correcting a constant.
