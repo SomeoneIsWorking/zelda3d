@@ -133,8 +133,33 @@ operator. Treat as leads. Numbers are the agent's own.
    * NOTE `cvari` PERSISTS to config. I set and then reverted these three to 0 — check them if the
      launcher ever behaves oddly.
 10. **`hud/zelda3d_hud.cpp:229` — the `gSPZelda3DHudFlush` marker composites "at that point"**.
-    Claimed the minimap image renders nothing once internal resolution is raised, MSAA is on, or on
-    macOS — the interpreter-drawn compass arrows then float over an empty patch.
+    **OPERATOR CONFIRMED 2026-07-30, AND IT IS WORSE THAN REPORTED — the whole native HUD vanishes
+    under MSAA, not just the minimap.**
+
+    Measured at Kokiri, `settle 1500`, identical camera, only `gSettings.MSAAValue` changed:
+
+        MSAA 1 :  hearts 2064 px | rupee+digits 218 px | minimap 4700 px
+        MSAA 4 :  hearts    1 px | rupee+digits   0 px | minimap    0 px
+
+    Frame mean stays ~(89,96,32) — the SCENE renders fine. Visually confirmed
+    (`scratch/screenshots/msaa_hud_ab.png`): no hearts, no magic bar, no item buttons, no rupee
+    counter, no minimap. Only the D-pad glyph survives, which is drawn by a different path.
+
+    ROOT CAUSE. The SDL3 GPU backend does not implement MSAA at all — `UpdateFramebufferParameters`
+    discards the level (`gfx_sdl3gpu.cpp:2325`, literally `(void)msaaLevel;`) and
+    `ResolveMSAAColorBuffer` is a "full-image nearest blit" (:2381-2389). HUD quads are appended as
+    OP_DRAWs **into fb 0** (`zelda3d_hud_sdl3gpu.cpp:372-377`). With MSAA enabled the frame gains a
+    resolve blit whose destination is fb 0, and it lands AFTER the HUD ops have drawn there, so it
+    overwrites them. With MSAA off there is no resolve and the HUD survives. That also explains the
+    finding's macOS remark: the Vulkan/Metal composite paths blit mGameFb onto fb 0 the same way.
+
+    So the finding's mechanism ("the marker composites at that point") is not the issue — op ordering
+    within the list is fine. The issue is a LATER full-target blit erasing everything already in fb 0.
+
+    NOT FIXED here. The fix is frame-ordering (append HUD ops after the resolve, or target the
+    resolved buffer) and touches the composite path for every backend, which wants its own change
+    with a before/after on all three. Recording the diagnosis so that change starts from the cause.
+    Note the user has said the HUD looks fine — which it does, at the DEFAULT MSAA 1.
 11. **`z_parameter.c:5084` — hardcoded HUD source-texture dimensions** (6). Wrong crop with an
     alt-assets/HD pack; invisible without one.
 
