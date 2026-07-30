@@ -17,10 +17,35 @@ operator. Treat as leads. Numbers are the agent's own.
 ## Auto-replace / actor model selection (behaviours area)
 
 1. **`model/zelda3d_model.cpp:918` — "largest non-debris, non-flat CMB identifies the object a mapped
-   ZAR stands for"** (78 affected, user-visible). A ZAR can pack variants or a whole collection, so
-   one pick cannot serve it. Claimed consequence: ReDeads rendering as Gibdos, Lizalfos as Dinolfos,
-   ordinary Skulltulas as Gold Skulltulas, Kotake as Koume, Moblins as the big Moblin, dungeon
-   mechanisms all as one mesh. **Highest-value lead here.**
+   ZAR stands for"**. **RE-SCOPED BY THE OPERATOR 2026-07-30 — premise confirmed, headline examples
+   REFUTED, and the real case is different from the one reported.**
+
+   The premise is right: ZARs do pack multiple models. Confirmed on the ROM — `zelda_rd` holds
+   `redead.cmb` + `gibud.cmb`, `zelda_st` holds `staltula` + `staltula_gold`, `zelda_mb` holds
+   `molblin` + `bossblin`.
+
+   But the reported consequence does NOT follow. Every one of those models is SKINNED (bones 17, 11,
+   16), and `loadAutoModel` sets `out->skinned = bones().size() > 1`, after which the auto path SKIPS
+   the actor and leaves the N64 model. So "ReDeads as Gibdos / Skulltulas as Gold Skulltulas /
+   Moblins as the big Moblin" cannot happen — those actors are not auto-replaced at all. An
+   adversarial refuter would have caught this; none ran (all died on 529).
+
+   Measured partition over all 312 mapped ZARs:
+       147  have >= 2 non-debris CMB candidates
+        23  ALL candidates skinned  -> auto path skips, renders N64, no wrong model
+       104  have >= 2 STATIC candidates -> the pick CAN render a wrong mesh
+
+   And the 104 are dominated by OBJECT COLLECTIONS rather than variant pairs:
+   `zelda_bdan_objects` alone packs 16 distinct Water Temple props (six door variants, two switches,
+   spikes, a pedestal, water); `zelda_demo_kekkai` packs 16; `zelda_ddan_objects` 5. One object id
+   maps to the whole collection, so a single pick is served to every actor that shares that object.
+   THAT is the real defect, and it is the "dungeon mechanisms all as one mesh" half of the original
+   claim — not the character half.
+
+   STILL OPEN: how many of the 104 actually reach the screen. The auto path also needs the MEASURE
+   opcode to fire and a scale to resolve, and finding 3 claims 13 object ids can never render at all,
+   so some of the 104 fall back to N64 for unrelated reasons. Counting the ones that genuinely render
+   a wrong mesh in game is the next step.
 2. **`render/zelda3d_render.cpp:454` — "one auto-derived world scale per object id is right for every
    instance"** (131 affected). Params-sized props render at one frozen size.
 3. **`core/zelda3d.c:1105` — "bracketing an actor's N64 draw with MEASURE measures that actor"**
