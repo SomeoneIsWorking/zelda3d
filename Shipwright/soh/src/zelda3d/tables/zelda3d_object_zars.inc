@@ -2,7 +2,7 @@
 // N64 object id (ObjectID enum, == object_table.h row index) -> OoT3D actor
 // model archive /actor/zelda_<name>.zar (NULL = no OoT3D ZAR; N64 fallback).
 // Paths only; no ROM-derived asset bytes. Used by the ZELDA3D_AUTO actor path.
-// 313/402 object ids mapped to a ZAR.
+// 315/402 object ids mapped to a ZAR.
 static const char* const kZelda3dObjectZars[] = {
     /* 0x0000 (unset)                              */ NULL,
     /* 0x0001 OBJECT_GAMEPLAY_KEEP                 */ NULL,
@@ -137,8 +137,8 @@ static const char* const kZelda3dObjectZars[] = {
     /* 0x0082 OBJECT_PU_BOX                        */ NULL,
     /* 0x0083 (unset)                              */ NULL,
     /* 0x0084 (unset)                              */ NULL,
-    /* 0x0085 OBJECT_TRAP                          */ NULL,
-    /* 0x0086 OBJECT_VASE                          */ NULL,
+    /* 0x0085 OBJECT_TRAP                          */ "/actor/dk_trap.zar",
+    /* 0x0086 OBJECT_VASE                          */ "/actor/dk_vase.zar",
     /* 0x0087 OBJECT_IM                            */ "/actor/zelda_im.zar",
     /* 0x0088 OBJECT_TA                            */ "/actor/zelda_ta.zar",
     /* 0x0089 OBJECT_TK                            */ "/actor/zelda_tk.zar",
