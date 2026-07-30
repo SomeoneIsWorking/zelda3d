@@ -920,6 +920,37 @@ static Zelda3D_ActorForcedAutoSlot sActorForcedAuto[] = {
     // different DL entirely -- so this must NOT match it. params 1 (Shadow Temple INVISIBLE) does
     // take the ice-objects branch in Init but draws nothing, so routing it is harmless.
     { ACTOR_BG_HAKA_SGAMI,  0x00FF, 0x0002, "ice_trap", 0, {0} },
+    // Goron City props. FOUR actors, FIVE CMBs, five N64 display lists -- and this is the row where
+    // both naming systems agree on every single entry, which is the strongest corroboration this
+    // method produces. Each actor names its own DL, and the Japanese in the CMB name says the same
+    // thing:
+    //   Bg_Spot18_Basket  -> gGoronCityVaseDL       -> obj_s18tubo (tsubo = pot; 972 verts, the big one)
+    //   Bg_Spot18_Futa    -> gGoronCityVaseLidDL    -> obj_185     (futa = lid, and the mesh is a flat
+    //                                                   713 x 84 x 713 disc authored at y=2041, i.e.
+    //                                                   sitting on top of the 2153-tall vase)
+    //   Bg_Spot18_Shutter -> gGoronCityDoorDL       -> obj_186     (12 verts, 1226 x 1636 x 165 slab)
+    //   Bg_Spot18_Obj     -> sDlists[params & 0xF]:
+    //       0 -> gGoronCityStatueDL      -> obj_s18zou  (zou = statue)
+    //       1 -> gGoronCityStatueSpearDL -> obj_s18yari (yari = spear)
+    // None of the four is ACTORCAT_DOOR, so none is short-circuited by the articulated-door skip.
+    //
+    // TWO of these need noBaseAnchor, and the tell is the CMB's own minY. The generic anchor applies
+    // goff = -AutoModelMinY to stand a prop's base on the actor's ground Y, so it is a NO-OP whenever
+    // minY == 0 and only ever moves a model when minY != 0 -- which splits cleanly by sign:
+    //   minY < 0  -> centre-origin prop (En_Goroiwa's sphere). The anchor is what stops it sinking.
+    //   minY > 0  -> authored ABOVE its actor's origin ON PURPOSE, in the same space as the N64
+    //                display list it replaces. Anchoring drags it back down to the origin.
+    // obj_185 is the extreme case at minY = 2041, and it is MEASURED rather than reasoned: the lid
+    // actor and the vase actor occupy the SAME position, pos=(3,-3,20) for both, so the lid's entire
+    // height comes from the display list being authored at the vase's rim. Base-anchoring would drop
+    // it 2041 * 0.0937 ~= 191 units, i.e. onto the floor inside the vase's base. obj_s18yari is the
+    // same class, smaller: minY = 162 and its whole bbox is off-origin (x[189..361] z[111..1026])
+    // because the spear is authored in the STATUE's space, exactly as its N64 DL is.
+    { ACTOR_BG_SPOT18_BASKET,  0, 0, "obj_s18tubo", 0, {0} },
+    { ACTOR_BG_SPOT18_FUTA,    0, 0, "obj_185",     /*noBaseAnchor=*/1, {0} },
+    { ACTOR_BG_SPOT18_SHUTTER, 0, 0, "obj_186",     0, {0} },
+    { ACTOR_BG_SPOT18_OBJ, 0x000F, 0x0000, "obj_s18zou",  0, {0} },
+    { ACTOR_BG_SPOT18_OBJ, 0x000F, 0x0001, "obj_s18yari", /*noBaseAnchor=*/1, {0} },
 };
 // Two DIFFERENT reasons an auto slot stops trying, which used to share state 3 and therefore shared
 // its permanence:

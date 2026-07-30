@@ -33,7 +33,7 @@ The top entries are unambiguous regardless: 16 Fire Temple actors cannot all be 
 | OBJECT_HAKACH_OBJECTS | 0x008D | 4 | 8 | `zelda_hakach_objects.zar` | m_Hinv05_model.cmb, m_Hkhuta_model.cmb, m_HkotuBomb00_model.cmb, m_Hsec00_model.cmb … |
 | ~~OBJECT_DDAN_OBJECTS~~ **DONE** | 0x002B | 4 | 5 | `zelda_ddan_objects.zar` | ddan_tdoor_model.cmb, ddan_tdoor_yari_model.cmb, ddanh_ago_model.cmb, ddanh_jd_model.cmb … |
 | OBJECT_MENKURI_OBJECTS | 0x004D | 4 | 5 | `zelda_menkuri_objects.zar` | l_m_door_model.cmb, l_m_nisekabe1_model.cmb, l_m_nisekabe2_model.cmb, l_sekizoume_modelT.cmb … |
-| OBJECT_SPOT18_OBJ | 0x00AF | 4 | 5 | `zelda_spot18_obj.zar` | obj_185_model.cmb, obj_186_model.cmb, obj_s18tubo_model.cmb, obj_s18yari_model.cmb … |
+| ~~OBJECT_SPOT18_OBJ~~ **DONE (5 routed, no visual)** | 0x00AF | 4 | 5 | `zelda_spot18_obj.zar` | obj_185_model.cmb, obj_186_model.cmb, obj_s18tubo_model.cmb, obj_s18yari_model.cmb … |
 | OBJECT_NIW | 0x0013 | 4 | 2 | `zelda_nw.zar` | chicken.cmb, nw_hane_model.cmb |
 | OBJECT_SD | 0x0097 | 4 | 2 | `zelda_sd.zar` | soldier.cmb, soldier2.cmb |
 | ~~OBJECT_BDAN_OBJECTS~~ **DONE (2 verified, 2 inert)** | 0x0096 | 3 | 17 | `zelda_bdan_objects.zar` | a_by_door0_model.cmb, a_by_door1_model.cmb, a_by_door2_model.cmb, a_by_door3_model.cmb … |
@@ -712,3 +712,56 @@ the fix was to print the denominator rather than to think harder about the outpu
 
 Inert-but-kept: `ice_ice3_modelT` (RED_ICE_PLATFORM is MQ-only, no vanilla instance), `ice_wall_modelT`
 (skinned, above), `ice_trap` (no Sgami instance in the rooms swept), KING_ZORA (not an Ice Cavern actor).
+
+## Pass 23 (2026-07-30) — Goron City: every name agrees, and a reminder to use the tool
+
+`OBJECT_SPOT18_OBJ` finished. Four actors, five CMBs, five N64 display lists, and this is the row where
+**both naming systems agree on every single entry** — the strongest corroboration this method produces:
+
+| actor | N64 DL | CMB | derived scale | three-axis |
+|---|---|---|---|---|
+| `Bg_Spot18_Basket` | `gGoronCityVaseDL` | `obj_s18tubo` (tsubo = pot) | 0.10009 | 0.1001 / 0.1008 / 0.1015 — agree |
+| `Bg_Spot18_Futa` | `gGoronCityVaseLidDL` | `obj_185` (flat 713 x 84 disc) | 0.09374 | 0.0937 / 0.0898 / 0.0785 — flat-prop spread |
+| `Bg_Spot18_Shutter` | `gGoronCityDoorDL` | `obj_186` (12 verts, slab) | 0.09999 | 0.0999 / 0.1003 / 0.0970 — agree |
+| `Bg_Spot18_Obj` params 0 | `gGoronCityStatueDL` | `obj_s18zou` (zou = statue) | 0.11157 | 0.1116 / 0.0973 / 0.1066 — 15% spread |
+| `Bg_Spot18_Obj` params 1 | `gGoronCityStatueSpearDL` | `obj_s18yari` (yari = spear) | 0.10050 | 0.1006 / 0.0581 / 0.0930 — thin prop |
+
+All five read `state=2 skin=0` with submissions (1146 / 525), so all five draw.
+
+### minY SIGN decides base-anchoring, and it is measurable
+
+Two of these need `noBaseAnchor`. The generic anchor applies `goff = -AutoModelMinY`, so it is a
+**no-op whenever minY == 0** and only ever moves a model when minY != 0 — which splits by sign:
+
+* `minY < 0` → centre-origin prop (En_Goroiwa's sphere). The anchor is what stops it sinking.
+* `minY > 0` → authored ABOVE its actor's origin on purpose, in the same space as the N64 display
+  list it replaces. Anchoring drags it back down to the origin.
+
+`obj_185` is the extreme case at minY = 2041, and it was settled by MEASUREMENT rather than reasoning:
+the lid actor and the vase actor occupy the **same position**, `pos=(3,-3,20)` for both, so the lid's
+entire height comes from its display list being authored at the vase's rim. Anchoring would have
+dropped it ~191 units onto the floor inside the vase. `obj_s18yari` is the same class at minY = 162,
+with its whole bbox off-origin (`x[189..361] z[111..1026]`) because the spear is authored in the
+STATUE's space exactly as its N64 DL is.
+
+This is stated as a rule about *this row's two entries*, not as a global change — the sign test looks
+general, but every existing routing has minY == 0 or a verified anchor, so nothing was re-derived from it.
+
+### NO visual confirmation was obtained for this row, and that is recorded rather than papered over
+
+The Goron City pot could not be got on screen from the entrances tried (`0x14D`, plus a teleport to
+the actor's own coordinates): the actor exists and measures, but its room does not render from there.
+`tools/ahide_check.sh 0x15c 450` correctly returns **INCONCLUSIVE**. The row rests on the submission
+counts, the three-axis agreement, the dual-name corroboration and the position measurement — not on pixels.
+
+### Use `ahide_check.sh`; do not hand-roll `ahide` + `isolate`
+
+Before running the tool I hand-rolled the same pair and got four confident-looking numbers — 221 px,
+158 px, 906 px, 57 px, each with a plausible bbox — **for an object that was not in the frame at all**.
+Only opening the screenshot revealed an empty room. The raw pair cannot distinguish "hiding it changed
+nothing" from "it was never on screen"; `ahide_check.sh` exists precisely because that distinction is
+invisible in the diff, and it said INCONCLUSIVE where my hand-rolled version said 906.
+
+That is the same failure this arc keeps producing, in a new place: not a broken tool this time, but a
+GOOD tool bypassed. The rule earns a sharper form — when a wrapper exists for a check, the wrapper's
+refusals are the point of it.
