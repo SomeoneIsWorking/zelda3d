@@ -470,7 +470,40 @@ and the feather stays N64. Nothing to fix.
   `door_shutter` merely *mention* dungeon objects).
 * At least **3** more drop out as effect-only: `OBJECT_NIW`, `OBJECT_SKJ`, `OBJECT_SHOPNUTS`.
 
-That last number is a FLOOR, not the answer. It came from a file-SIZE proxy (<4KB), which is weak:
-`kd_hinoko_modelT` has two textures and is not small in bytes despite having three vertices. A proper
-sweep needs per-CMB VERT COUNTS — `scratch/bin/cmb_tex_alpha` already prints them, so it is a loop over
-archives rather than new tooling. Expect the real count of effect-only rows to be higher.
+That last number came from a file-SIZE proxy (<4KB) and was WRONG in both directions — see Pass 16, which
+ran the proper vert-count sweep. `SKJ` and `SHOPNUTS` do NOT drop out under the real test.
+
+## Pass 16 (2026-07-30) — the proper sweep: the effect-billboard category does NOT re-scope the queue
+
+Ran per-CMB vert counts + flatness over all 46 risk archives (369 CMBs), classifying a CMB as an effect
+billboard when it has <= 12 verts AND a zero-thickness axis.
+
+| | count |
+|---|---|
+| risk rows examined | 46 |
+| CMBs classified as effect billboards | **35 of 369** |
+| rows that DROP OUT (<= 1 real mesh) | **1** |
+| rows genuinely still at risk | **45** |
+
+**My hypothesis that this category would materially shrink the queue is FALSIFIED.** The category is
+real — 35 CMBs are effect billboards and cannot be routed per-actor — but they are spread thinly across
+archives, so removing them almost never leaves a row with only one real mesh. Only `OBJECT_NIW` qualifies.
+
+It also corrects Pass 15: `OBJECT_SKJ` and `OBJECT_SHOPNUTS` dropped out under the file-size proxy but do
+NOT under the vert-count test. The proxy was wrong in both directions, which is why the stricter test was
+worth running rather than quoting the cheap number.
+
+### So the real remaining shape of this queue
+45 rows, and the largest are dungeon prop archives where many actors share many meshes:
+
+| object | real meshes | actors |
+|---|---|---|
+| `OBJECT_JYA_OBJ` | 38 | 10 |
+| `OBJECT_HAKA_OBJECTS` | 30 | 5 |
+| `OBJECT_HIDAN_OBJECTS` | 28 | 13 |
+| `OBJECT_GANON` | 19 | 3 |
+| `OBJECT_MIZU_OBJECTS` | 18 | 5 |
+
+Each of those is a per-actor identification job of the kind Pass 13 did for one actor: measure the N64
+draw, then keep the candidate whose height/X/Z ratios agree. The method works and is mechanical, but it
+is one measurement per actor in the scene that holds it — there is no shortcut left to find.
