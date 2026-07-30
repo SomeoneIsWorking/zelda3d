@@ -29,7 +29,19 @@ unsigned long long linkAdultMidMask(const LinkGear& gear) {
     // RIGHT hand (shield / bow hand), bones 19/20.
     switch (gear.rightHand) {
         case LinkHandRight::Shield:
-            m |= haveShield ? LINK_MID(23) : LINK_MID(20); // shield on forearm
+            // Mirror shield has its OWN forearm mesh (39); 23 is the HYLIAN one. This used to be
+            // `haveShield ? 23 : 20` for both, so an adult raising the Mirror Shield displayed a
+            // Hylian shield and the Mirror Shield never appeared on the arm anywhere in the game.
+            // Verified from the CMB: link_v2's Hylian shield texture p_tex02 (tex 37) is used by
+            // mesh ids 0,1,10,11,23 and the Mirror texture p_tex03 (tex 31) by 2,3,7,8,39. Isolating
+            // them in game (`linkmid only <n>`) puts 23 and 39 at the SAME forearm position and
+            // orientation, while 7/8 are back-worn — so 39 is 23's Mirror counterpart. The back rows
+            // below already distinguished the two shields (0/1 vs 2/3); only the forearm did not.
+            if (mirror) {
+                m |= LINK_MID(39);
+            } else {
+                m |= haveShield ? LINK_MID(23) : LINK_MID(20);
+            }
             break;
         case LinkHandRight::Bow:      m |= LINK_MID(30); break; // bow drawn
         case LinkHandRight::Closed:   m |= LINK_MID(21); break; // closed fist
