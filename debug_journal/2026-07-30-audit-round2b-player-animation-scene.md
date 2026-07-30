@@ -4,7 +4,7 @@ Re-ran via workflow resume. These areas produced NO results in the first attempt
 crashed), so nothing here was in the earlier write-up. **Verify phase was still running when this was
 recorded — treat everything as UNVERIFIED leads, not results.** Numbers are the agent's own.
 
-## Scene / collision — the one to look at first
+## Scene / collision — CONFIRMED, and my first fix for it was WRONG (see the correction below)
 
 **`cmb3d/asset/zcol.cpp:70` — "the polygon array is anchored at `polyList - 2` (stable across every
 scene tested)"** (zcol.h:21, derived on SIX scenes). Claimed consequences, and this is GAMEPLAY
@@ -280,3 +280,35 @@ FIX: gate the unwrap on `node->isRotInt16` instead of applying it unconditionall
 NO REGRESSION RISK to Link, and this was checked rather than assumed: his rotation tracks are 100%
 int16 (2171 adult / 2210 child, ZERO float), so the unwrap that originally fixed his spinning
 head/back-shield/arms is fully preserved. Verified live at Kokiri — correct pose, no spinning bones.
+
+
+---
+
+# Correction: the collision defect was the ANCHOR, not the count
+
+I fixed this twice. The first attempt was a bandaid and this records why, because the reasoning error is
+more useful than the fix.
+
+My test asked: "is there a valid polygon record PAST the end of the parsed range?" Answer: yes, in
+114/114 scenes. I concluded the count field must be a last-index and read nPoly+1 records. That made the
+symptom go away — the missing polygon came back — but it never asked whether the array STARTS in the
+right place. It does not: `pPoly - 2` is exactly one 20-byte record early, so my change produced a
+superset: all the real polygons PLUS a phantom record 0 fabricated from vertex-array tail bytes.
+
+The audit agent brute-forced anchor x layout instead of testing one hypothesis, which is what found it:
+
+    pPoly + 18 : 170175/170175 valid (100.000%)   index -1 valid in 0 scenes, index nPoly in 0
+    pPoly -  2 : 170061/170175 valid ( 99.933%)   index -1 valid in 0 scenes, index nPoly in 114
+
+Reproduced independently before changing anything. The tell I missed is in the second column: at the
+right anchor NOTHING valid exists on either side of the array. A fix that leaves a valid record hanging
+just past the end is not done.
+
+Also fixed by the correct anchor, which my version left broken: 107 out-of-bounds vertex indices and 7
+non-unit normals that the bounds check was silently absorbing — one of them classified as a WALL in 7
+scenes, and in Gerudo Valley a `dist` of 7.66e34 that `zelda3d_collision.cpp:441` casts to s16
+(undefined behaviour).
+
+LESSON: "the symptom is gone" is not "the cause is found" — the project's own no-bandaids rule, and I
+broke it. A single-hypothesis test confirms the hypothesis; a SWEEP over the parameter space finds the
+truth. Sweeping anchor x layout cost the agent one script and settled it at 100.000%.
