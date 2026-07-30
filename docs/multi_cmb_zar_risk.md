@@ -443,3 +443,34 @@ COLLAPSING platform may be measured mid-collapse, when only some of it draws).
 flag is to investigate and then to leave things alone when investigation says so. Two of the first three
 flags (torch, lift) turned out to need no change, which is itself worth knowing before someone treats
 every warning as a defect queue.
+
+## Pass 15 (2026-07-30) — a whole CATEGORY of false risk: EFFECT BILLBOARDS
+
+Not every extra CMB in an archive corresponds to another actor. Some are effect billboards drawn by
+effect code *inside* an actor, which the per-actor routing mechanism can never target — so counting them
+as multi-CMB risk overstates this queue.
+
+Measured signature: **very few vertices and a zero-thickness axis.**
+
+| CMB | verts | bbox | what it is |
+|---|---|---|---|
+| `nw_hane_model` | 3 | 800 x 655 x **0** | cucco feather effect |
+| `kd_hinoko_modelT` | 3 | 1000 x 900 x **0** | King Dodongo ember (*hinoko* = spark) |
+| `ddanh_bomy_model` | 6 | 1600 x **0** x 1600 | flat floor decal |
+
+**`OBJECT_NIW` is therefore NOT a routing problem.** Three actors own it (`en_niw`,
+`en_syateki_niw`, `en_attack_niw`) and the archive holds `chicken.cmb` plus `nw_hane_model`. But the
+feather is not a separate actor's model — `en_niw` draws it ITSELF via `gCuccoEffectFeatherModelDL`
+alongside its own skinned body. One actor, two draws: our per-actor routing replaces the body (correct)
+and the feather stays N64. Nothing to fix.
+
+### Row count, honestly
+* 60 rows when ownership is a grep for `OBJECT_*` in actor sources.
+* **46** once ownership comes from each actor's `ActorInit` (the grep over-counted; generic actors like
+  `door_shutter` merely *mention* dungeon objects).
+* At least **3** more drop out as effect-only: `OBJECT_NIW`, `OBJECT_SKJ`, `OBJECT_SHOPNUTS`.
+
+That last number is a FLOOR, not the answer. It came from a file-SIZE proxy (<4KB), which is weak:
+`kd_hinoko_modelT` has two textures and is not small in bytes despite having three vertices. A proper
+sweep needs per-CMB VERT COUNTS — `scratch/bin/cmb_tex_alpha` already prints them, so it is a loop over
+archives rather than new tooling. Expect the real count of effect-only rows to be higher.
