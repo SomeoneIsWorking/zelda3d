@@ -61,22 +61,32 @@ OoT3DCollision::OoT3DCollision(const std::vector<uint8_t>& data) {
     const bool mm3d = (d[3] == 0x09);
     const size_t cnt = hdr + (mm3d ? 0x1e : 0x1c);
     uint16_t nVtx = u16le(d, cnt);
-    // The header field at +0x1c/+0x1e (+2) is a LAST INDEX, not a count: there are nPoly+1
-    // polygons. Verified over ALL 114 scene .zsi files by the plane + vertex-index invariant
-    // (|n|==1, n.p == -dist for all three verts, indices < nVtx):
-    //     record[nPoly-1] passes 114/114   (the last one the old count read)
-    //     record[nPoly]   passes 114/114   <- one real polygon per scene was being DROPPED
-    //     record[nPoly+1] passes   0/114   } controls: the invariant can say no,
-    //     record[nPoly+2] passes   0/114   } so the 114/114 above is not a loose test
-    // The original "stable across every scene tested" note (zcol.h) was derived on SIX scenes.
-    // Dropped triangles were 82 walls, 25 floors, 7 ceilings game-wide.
-    uint16_t nPoly = (uint16_t)(u16le(d, cnt + 2) + 1);
+uint16_t nPoly = u16le(d, cnt + 2);
     uint16_t nSurf = u16le(d, cnt + 4);
     uint32_t pVtx = u32le(d, hdr + 0x28);
     uint32_t pPoly = u32le(d, hdr + 0x2c);
     uint32_t pSurf = u32le(d, hdr + 0x30);
     size_t vbase = (size_t)pVtx + 0x10;
-    size_t pbase = (size_t)pPoly - 2;
+    // Polygon array anchor. CORRECTED 2026-07-30: it is pPoly + 18, not pPoly - 2 — the shipped
+    // value was exactly ONE 20-byte record early, so the array was read shifted by one: a phantom
+    // record 0 fabricated from vertex-array tail bytes, and the last real polygon of every scene
+    // dropped.
+    //
+    // Brute-forced anchor x record-layout over ALL 114 scene headers / 170175 polygons, scoring on
+    // vertex indices < nVtx AND |normal| ~= 32767 AND |n.vA + dist| <= 1.5:
+    //     pPoly + 18 : 170175/170175 valid (100.000%)   index -1 valid in 0 scenes, index nPoly in 0
+    //     pPoly -  2 : 170061/170175 valid ( 99.933%)   index -1 valid in 0 scenes, index nPoly in 114
+    // At +18 the array is bounded EXACTLY on both sides — nothing valid before it, nothing after —
+    // which is what an anchor being right looks like. Corroborated by exact list tiling in 114/114
+    // scenes: vtxList+0x10 + 6*nVtx == polyList+0x10, polyList+0x10 + 20*nPoly ==
+    // surfaceTypeList+0x10, surfaceTypeList+0x10 + 8*nSurf == camData+0x10.
+    //
+    // The stale -2 also produced the 107 out-of-bounds indices and 7 non-unit normals that the
+    // bounds check at the loop below was silently absorbing; with the right anchor those are zero.
+    // (An earlier attempt at this bug read nPoly+1 records from the OLD anchor. That recovered the
+    // dropped polygon but KEPT the phantom record 0 — a superset, not a fix. Fixing the anchor is
+    // the actual correction.)
+    size_t pbase = (size_t)pPoly + 18;
     size_t sbase = (size_t)pSurf + 0x10; // surfaceType list (8 bytes/entry), same +0x10 as vtx
     if (vbase + (size_t)nVtx * 6 > n || pbase + (size_t)nPoly * 20 > n ||
         sbase + (size_t)nSurf * 8 > n) {
