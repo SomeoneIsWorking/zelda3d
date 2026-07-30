@@ -54,9 +54,31 @@ operator. Treat as leads. Numbers are the agent's own.
 4. **`model/zelda3d_model.cpp:916` — "skipping flat/debris CMBs is enough for 'most vertices' to
    select the in-world model"** (8). Temple of Time pedestal/sword and some get-item models.
 5. **`render/zelda3d_render.cpp:634` — "the auto cache is a per-object memo safe to retain for the
-   process lifetime"**. Claimed: non-deterministic session-long loss of a replacement depending on
-   how many instances were on screen when the object was first seen — the same scene can differ
-   between runs. If true this also undermines any A/B measurement of auto-replaced actors.
+   process lifetime"**. **OPERATOR CONFIRMED 2026-07-30 (mechanism, by code path).**
+
+   Two facts combine:
+   * `sPendingMeasureKey` is a SINGLE slot (`zelda3d_render.cpp:635`) and is assigned with **no
+     guard** — `Zelda3D_TryAuto` does `e->tries++; e->state = 1; Zelda3D_EmitMeasure(...);
+     sPendingMeasureKey = objId;` unconditionally (~:886-893). If a second object needs measuring in
+     the same draw pass it overwrites the first's key, orphaning the first's bracket: its measurement
+     is lost, but its `tries` was already spent.
+   * `if (e->tries >= 8) { e->state = 3; }` (~:886) and `state == 3` returns N64 forever
+     (~:807) — there is no reset, no per-scene invalidation, nothing that clears it.
+
+   So an object first encountered in a frame that also introduces other new objects can burn all
+   eight attempts losing the slot and then render as N64 **for the rest of the process**. Whether
+   that happens depends on what else appeared alongside it, which is why it is non-deterministic.
+
+   NOT measured: how often this actually fires at runtime. The mechanism is certain from the code;
+   the frequency is not, and a crowded-scene test would be needed to quantify it.
+
+   METHODOLOGY CONSEQUENCE, and I checked my own work against it: an A/B capture of an
+   AUTO-REPLACED actor is unreliable across launches for this reason alone. This session's
+   measurements are mostly unaffected because they targeted Link (dedicated player path, not auto),
+   scene room CMBs (water, courtyard window — not auto) and HUD sprites. The one exception is the
+   Heart Container A/B, where I spawned `Item_B_Heart` and saw no change; I attributed that to
+   testing the wrong asset (the 12 affected materials are the GET-ITEM models), and that reading
+   still holds — but this cache is a second possible explanation for a null result there.
 6. **`render/zelda3d_render.cpp:892` — the `sActorForcedAuto` per-actor forced-CMB slot**. Wooden-torch
    Obj_Syokudai stays N64; the shared-ZAR mechanism is broken for static props generally.
 7. **`tables/zelda3d_object_zars.inc:5` — "312/402 mapped means the other 90 have no OoT3D archive"**.
