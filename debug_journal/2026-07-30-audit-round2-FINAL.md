@@ -59,13 +59,13 @@ some findings carry only ONE refuter vote (0/1) rather than two — weaker, and 
 
 ### [CONFIRMED] * `Shipwright/soh/src/zelda3d/tables/zelda3d_object_zars.inc:49` — user-visible, affected 4, refuted 0/1
   The Deku Tree's mouth — one of the most-looked-at objects in the early game — renders the N64 mesh in an otherwise-3DS Kokiri Forest, and cannot be fixed by the generator alone.
-### [CONFIRMED] * `Shipwright/soh/src/zelda3d/render/zelda3d_render.cpp:454` — user-visible, affected 3, refuted 0/1
+### [FIXED] * `Shipwright/soh/src/zelda3d/render/zelda3d_render.cpp:454` — user-visible, affected 3, refuted 0/1
   Same-object actors that differ in size all render at one size: large Hyrule Field/Kakariko bushes and trees render at the small variant's size; En_Ishi's silver boulder renders at the liftable rock's scale; the En_Ishi rocks and Obj_Hana rock-debris sit 5.8 and 32 world units too low (sunk into the ground).
-### [CONFIRMED] * `Shipwright/soh/src/zelda3d/zelda3d.h:355` — user-visible, affected 2, refuted 0/1
+### [FIXED] * `Shipwright/soh/src/zelda3d/zelda3d.h:355` — user-visible, affected 2, refuted 0/1
   En_Ishi's silver/large rock renders roughly a third of its correct size; the Hyrule Field flower (Obj_Hana type 0) renders far oversized — plausibly taller than Link.
 ### [FIXED] * `Shipwright/soh/src/zelda3d/render/zelda3d_render.cpp:892` — user-visible, affected 1, refuted 0/2
   The forced-CMB path is unusable for any static prop: the wooden-torch entry can never draw (Obj_Syokudai params>>12==2 silently falls back to the N64 model), and any future non-skinned forced entry will silently do the same. This is the mechanism that would otherwise fix finding #1, so it matters more than the one torch.
-### [CONFIRMED] * `Shipwright/soh/src/zelda3d/render/zelda3d_render.cpp:610` — internal, affected 0, refuted 0/2
+### [FIXED] * `Shipwright/soh/src/zelda3d/render/zelda3d_render.cpp:610` — internal, affected 0, refuted 0/2
   None at runtime. Costs the next reader a wrong mental model of the scale derivation (a diagonal/height mix-up is exactly the sort of ~1.5-2x systematic scale error that would be hunted for elsewhere).
 
 ## UNVERIFIED (refuters died — NOT dismissed)
@@ -161,3 +161,39 @@ Both delegated investigations (the player DL table family, and the same-rig cons
 measurement) died on API/stream errors rather than on the work, and were relaunched. No findings
 were lost, but nothing from them is recorded here yet — do not read their absence as a negative
 result.
+
+### render.cpp:454 + zelda3d.h:355 + render.cpp:610 — all three FIXED in one change
+
+They were one root cause: Obj_Hana and En_Ishi serve several differently-sized props from ONE object
+slot keyed by params, so they cannot use `sAuto[objId]` and were drawn with hand-written macros —
+two of which were commented UNCALIBRATED and copied verbatim from the small-rock value. Now
+self-calibrated per variant (measured 0.38139 for the silver rock, 0.00952 for the flower; see C025).
+They also passed `groundOffset 0`, which is the "sunk into the ground" half of the report — now
+base-anchored with `-AutoModelMinY()` like the auto path.
+
+**The audit's prediction and my measurement agree, by different methods.** The audit reasoned from
+the code that the rock was "roughly a third of its correct size" and the flower "far oversized,
+plausibly taller than Link". I measured 0.12/0.38139 = 0.315 (a third) and a flower CMB ~861 local
+units tall, which at 0.12 renders 103 world units against Link's ~60 (taller than Link). Two
+independent routes to the same numbers is why these are trustworthy rather than merely plausible.
+
+render.cpp:610 fell out of the same work: the comment claimed the interpreter reports a bbox DIAGONAL
+and that scale divides by a model diagonal. It reports HEIGHT, and the code divides by
+`Zelda3D_AutoModelHeight` — the opcode in libultraship `interpreter.cpp` says so explicitly and
+explains why (a diagonal carries an aspect-ratio bias). The code was always right. I had to settle
+this before I could trust my own measurement, which is exactly the cost the audit predicted: a wrong
+comment about a ~1.5-2x systematic error is expensive even when the code is correct.
+
+### NEW OPEN QUESTION — do not treat the measurement as fully validated (C026)
+With self-calibration on for all five variants, the two genuinely CALIBRATED controls measured 17%
+and 31% off their tuned values (rock 0.09998 vs 0.12000; bush 0.65595 vs 0.50000). The mechanism is
+self-consistent (the two independent small-rock slots measured 0.09998 identically) and dimensionally
+sound (height/height). So EITHER the hand calibrations were eyeballed wrong, OR the measurement
+mis-scopes something — per-instance `actor->scale` is the obvious suspect, since one measured value
+then cannot serve every instance, and the small rock was originally calibrated in Kokiri Forest while
+I measured in Hyrule Field.
+
+I did NOT resolve this, so self-calibration is scoped to the two variants whose seeds were guesses.
+The cheap next experiment: measure the small rock in Kokiri Forest. Reproducing 0.12 there means the
+measurement is scene/instance-dependent (a real limitation of the mechanism); reproducing 0.09998
+means the hand value was simply wrong and the calibrated slots should switch over too.
