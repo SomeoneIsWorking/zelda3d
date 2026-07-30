@@ -1276,6 +1276,26 @@ int Zelda3D_ModelGroupCentroid(int modelId, int materialIndex, float out[3]) {
 // 1 if a loaded auto model is skinned (articulated skeleton -> the auto path leaves it to
 // N64 to avoid a frozen T-pose), else 0. Loads the model lazily; treats a load failure as
 // "skinned" (==skip) so a bad model never auto-replaces.
+// 1 if EVERY draw group of this model is blended, i.e. the model is wholly translucent (a spider web,
+// a water plane, a light shaft). Such a model belongs in the TRANSLUCENT display list, not the opaque
+// one: emitted into POLY_OPA it draws before all N64 translucent geometry and blends against an
+// incomplete frame, which is why a routed water plane would look opaque and mis-sorted.
+//
+// Deliberately ALL groups and not ANY: a mixed model (some opaque, some blended groups) still goes to
+// POLY_OPA, exactly as today, because moving it wholesale would put its opaque half in the wrong pass.
+// Splitting a mixed model properly needs a per-group pass filter in the interpreter (the draw handle
+// has bit 27 free for it, and Zelda3DGlGroup already carries blendEnable per group) -- a bigger change
+// that this does not attempt. So this strictly improves wholly-translucent models and changes nothing
+// else.
+int Zelda3D_AutoModelAllBlended(int modelId) {
+    LoadedModel* lm = loadModel(modelId);
+    if (!lm || !lm->ok || lm->cGroups.empty()) return 0;
+    for (const auto& g : lm->cGroups) {
+        if (g.blendEnable == 0) return 0;
+    }
+    return 1;
+}
+
 int Zelda3D_AutoModelSkinned(int modelId) {
     LoadedModel* lm = loadModel(modelId);
     if (!lm || !lm->ok) return 1;
