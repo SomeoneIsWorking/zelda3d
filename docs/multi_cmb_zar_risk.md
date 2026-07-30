@@ -40,7 +40,7 @@ The top entries are unambiguous regardless: 16 Fire Temple actors cannot all be 
 | OBJECT_FD | 0x009C | 3 | 11 | `zelda_fd.zar` | m_FBRsizumi_model.cmb, valbasiabody.cmb, valbasiagnd.cmb, valbasiahead.cmb … |
 | OBJECT_EFC_STAR_FIELD | 0x0092 | 3 | 7 | `zelda_efc_star_field.zar` | demo_rock_model1.cmb, demo_rock_model2.cmb, fire_rock_model1.cmb, fire_rock_model2.cmb … |
 | OBJECT_FHG | 0x005A | 3 | 6 | `zelda_fantomHG.zar` | ganonhorse.cmb, f_ganon_efc_modelT.cmb, gnf_bakuhatsu_modelT.cmb, gnf_inazuma_modelT.cmb … |
-| OBJECT_KINGDODONGO | 0x0019 | 3 | 4 | `zelda_kdodongo.zar` | ddanh_bomy_model.cmb, g_ddg2_fire_model.cmb, kingdodongo.cmb, kd_hinoko_modelT.cmb |
+| ~~OBJECT_KINGDODONGO~~ **DONE** | 0x0019 | 3 | 4 | `zelda_kdodongo.zar` | ddanh_bomy_model.cmb, g_ddg2_fire_model.cmb, kingdodongo.cmb, kd_hinoko_modelT.cmb |
 | OBJECT_ST | 0x0024 | 3 | 4 | `zelda_st.zar` | staltula.cmb, staltula_gold.cmb, gi_sutaru_coin_model.cmb, gi_sutaru_coin_modelT.cmb |
 | OBJECT_SPOT01_OBJECTS | 0x00F9 | 3 | 3 | `zelda_spot01_objects.zar` | c_s01fusya_model.cmb, c_s01idohashira_model.cmb, c_s01idomizu_modelT.cmb |
 | OBJECT_HINTNUTS | 0x0164 | 3 | 3 | `zelda_hintnuts.zar` | dekunuts.cmb, dnh_ball_model.cmb, dekunuts_plant.cmb |
@@ -60,7 +60,7 @@ The top entries are unambiguous regardless: 16 Fire Temple actors cannot all be 
 | OBJECT_PO_FIELD | 0x006D | 2 | 4 | `zelda_po_field.zar` | bigpoh.cmb, kantera_big.cmb, kantera_field.cmb, soul.cmb |
 | OBJECT_FW | 0x009E | 2 | 4 | `zelda_fw.zar` | flaredancer.cmb, flamewalker.cmb, fw_smoke_model.cmb, fw_hinoko_modelT.cmb |
 | OBJECT_DY_OBJ | 0x000A | 2 | 3 | `zelda_dy_obj.zar` | fairy.cmb, yousei_eff_modelT.cmb, efc_g_fairly_modelT.cmb |
-| OBJECT_WALLMASTER | 0x000B | 2 | 3 | `zelda_wm2.zar` | floormaster.cmb, fallmaster.cmb, shadow_f_model.cmb |
+| ~~OBJECT_WALLMASTER~~ **DONE** | 0x000B | 2 | 3 | `zelda_wm2.zar` | floormaster.cmb, fallmaster.cmb, shadow_f_model.cmb |
 | OBJECT_DEKUNUTS | 0x004A | 2 | 3 | `zelda_dekunuts.zar` | okorinuts.cmb, dn_ball_model.cmb, okorinuts_plant.cmb |
 | OBJECT_SPOT08_OBJ | 0x0074 | 2 | 3 | `zelda_spot08_obj.zar` | obj_bigice_model.cmb, obj_iceblock_model.cmb, obj_s08wall_model.cmb |
 | OBJECT_DH | 0x00A6 | 2 | 3 | `zelda_dh.zar` | deadarm.cmb, deadhand.cmb, dh_dust_modelT.cmb |
@@ -74,7 +74,7 @@ The top entries are unambiguous regardless: 16 Fire Temple actors cannot all be 
 | OBJECT_SPOT15_OBJ | 0x00F0 | 2 | 2 | `zelda_spot15_obj.zar` | spot15_box_model.cmb, spot15_saku_modelT.cmb |
 | OBJECT_SKJ | 0x010A | 2 | 2 | `zelda_skj.zar` | stalkid.cmb, blow_arrow_model.cmb |
 | OBJECT_TSUBO | 0x012C | 2 | 2 | `zelda_tsubo.zar` | tubo2_hahen_model.cmb, tubo2_model.cmb |
-| OBJECT_SPOT12_OBJ | 0x0162 | 2 | 2 | `zelda_spot12_obj.zar` | s12gate_model.cmb, s12saku_model.cmb |
+| ~~OBJECT_SPOT12_OBJ~~ **DONE** | 0x0162 | 2 | 2 | `zelda_spot12_obj.zar` | s12gate_model.cmb, s12saku_model.cmb |
 | OBJECT_SPOT11_OBJ | 0x016F | 2 | 2 | `zelda_spot11_obj.zar` | obj_112_modelT.cmb, obj_s11wall_model.cmb |
 | OBJECT_BOWL | 0x0178 | 2 | 2 | `zelda_bowl.zar` | bowling_p1_model.cmb, bowling_p2_model.cmb |
 | OBJECT_SPOT01_MATOYAB | 0x0181 | 2 | 2 | `zelda_spot01_matoyab.zar` | c_matoate_before_model.cmb, c_s01tomegate_model.cmb |
@@ -98,3 +98,24 @@ The top entries are unambiguous regardless: 16 Fire Temple actors cannot all be 
 So the remaining queue is NOT more of the same work. Rows where each actor owns exactly one mesh are the
 cheap ones; the rest split into param-variant routing and genuine per-actor identification. Check which
 kind a row is before committing to it.
+
+## Pass 3 (2026-07-30) — the queue is now classified, and the cheap class is EXHAUSTED
+
+All 60 rows were classified by whether each owning actor maps to exactly one distinct mesh:
+
+| class | count | what it needs |
+|---|---|---|
+| cheap (1 mesh per actor) | 4 | a `sActorForcedAuto` row each — **all now done or excluded** |
+| params-keyed variants | 10 | per-variant routing via `sVariantMeas`, like `pu_box`/`En_Ishi` |
+| unidentified | 32 | read the actor's N64 draw code or DL name to identify its mesh |
+
+Done: `OBJECT_MORI_OBJECTS`, `OBJECT_DDAN_OBJECTS`, `OBJECT_WALLMASTER`, `OBJECT_KINGDODONGO`,
+`OBJECT_SPOT12_OBJ`. Excluded: `OBJECT_SPOT01_OBJECTS` — already handled by dedicated per-actor
+branches (`sWindmillMeas`, `sWellArchMeas`); routing it would create two competing routes.
+
+**The classifier flags candidates, not instructions.** It cannot see hand-written per-actor branches,
+which is exactly how `OBJECT_SPOT01_OBJECTS` came back "cheap" when it was already solved. Check for
+existing handling before adding a row.
+
+So the remaining 42 rows are genuinely harder work, in two distinct shapes. Anyone continuing should
+pick a shape and build for it, rather than expecting more name lookups.
