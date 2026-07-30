@@ -461,7 +461,14 @@ void Zelda3D_EmitModelDraw(PlayState* play, int modelId, Actor* actor, float wor
     // worldScale and brings the model's feet onto the actor's ground pos. A faithful draw-space
     // transform (dsHave) REPLACES this generic anchor — the OoT3D draw places the model itself.
     if (!dsHave && groundOffset != 0.0f) Matrix_Translate(0.0f, groundOffset, 0.0f, MTXMODE_APPLY);
-    gSPMatrix(POLY_OPA_DISP++, MATRIX_NEWMTX(play->state.gfxCtx), G_MTX_MODELVIEW | G_MTX_LOAD);
+    // The MATRIX MUST GO INTO THE SAME DISPLAY LIST AS THE DRAW. Emitting the matrix into POLY_OPA
+    // while the draw went into POLY_XLU is what made the routed Deku Tree web contribute ZERO pixels:
+    // at interpret time the XLU draw used whatever model matrix the XLU list happened to be carrying,
+    // never ours, so the geometry landed somewhere off screen. Decide the target list ONCE, here, and
+    // use it for the matrix, the pose and the draw.
+    const int xluPass = Zelda3D_AutoModelAllBlended(modelId);
+    gSPMatrix(xluPass ? POLY_XLU_DISP++ : POLY_OPA_DISP++, MATRIX_NEWMTX(play->state.gfxCtx),
+              G_MTX_MODELVIEW | G_MTX_LOAD);
     Zelda3D_SceneTint(play, tint);
     if (sZelda3dDrawTintHas) {
         tint[0] = (u8)((tint[0] * sZelda3dDrawTint[0]) / 255);
@@ -475,14 +482,10 @@ void Zelda3D_EmitModelDraw(PlayState* play, int modelId, Actor* actor, float wor
     // High bit of the handle = "lit": apply the half-Lambert FORM term. Characters/props carry no
     // baked vertex lighting, so without this they render flat; scene rooms (other emit site) keep
     // their bit clear so their baked vColor AO isn't double-shaded.
-    // A wholly-translucent model (web, water plane, light shaft) goes into the TRANSLUCENT list so it
-    // sorts after opaque geometry and blends against a complete frame. Everything else keeps POLY_OPA
-    // exactly as before -- see Zelda3D_AutoModelAllBlended for why MIXED models are not moved.
-    if (Zelda3D_AutoModelAllBlended(modelId)) {
-        gSPZelda3DDraw(POLY_XLU_DISP++, modelId | (int)0x80000000, tint[0], tint[1], tint[2]);
-    } else {
-        gSPZelda3DDraw(POLY_OPA_DISP++, modelId | (int)0x80000000, tint[0], tint[1], tint[2]);
-    }
+    // Same list as the matrix above (xluPass): a wholly-translucent model sorts after opaque geometry
+    // and blends against a complete frame; everything else keeps POLY_OPA exactly as before.
+    gSPZelda3DDraw(xluPass ? POLY_XLU_DISP++ : POLY_OPA_DISP++, modelId | (int)0x80000000, tint[0],
+                 tint[1], tint[2]);
     CLOSE_DISPS(play->state.gfxCtx);
 }
 
@@ -720,17 +723,22 @@ static Zelda3D_ActorForcedAutoSlot sActorForcedAuto[] = {
     // SAME SIZE (26496 bytes each) -- so "largest CMB" is a coin flip between them and En_Wallmas was
     // getting the Floormaster mesh. Both routed explicitly, because a tie-break by file order is not
     // something to leave load-bearing. ("fallmaster" is Grezzo's spelling of Wallmaster.)
-    // Bg_Ydan_Sp (Deku Tree web) is NOT routed. REVERTED 2026-07-30 after it regressed: routing it to
-    // ydan_spkabe made the web VANISH. The slot measured fine (state=2 scale=0.10000 n64h=288.8) but the
-    // replacement CMB contributed ZERO pixels -- verified with `ahide` on the actor, which produced a
-    // byte-identical frame, so our draw adds nothing. Because a successful route makes us return
-    // "handled" and skip the N64 draw, an invisible replacement DELETES the object, and this one is
-    // gameplay-critical (the web must be burned to progress).
-    // Root cause NOT yet identified. The measure now works for translucent actors (dual-list bracket),
-    // so this is a DRAW-side problem: candidates are the model not classifying all-blended and landing
-    // in POLY_OPA behind geometry, back-face culling on a single-sided plane, or a blend state that
-    // resolves to fully transparent. Diagnose before re-routing -- and re-test with `ahide`, which is
-    // what caught this.
+    // Bg_Ydan_Sp (Deku Tree web) is NOT routed -- REVERTED TWICE, and the second attempt narrowed the
+    // cause without solving it. The POLY_XLU draw path DOES NOT RENDER: with the slot at state=2
+    // (scale 0.10000, n64h 288.8) and the actor demonstrably in frame (the N64 web contributes 712 px
+    // from the same camera), our replacement contributes ZERO pixels. Since a resolved route suppresses
+    // the N64 draw, that DELETES the web -- which is gameplay-critical.
+    //
+    // RULED OUT so far, each with evidence:
+    //   * blend state -- the material is ordinary alpha blending (SRC_ALPHA / 1-SRC_ALPHA, FUNC_ADD),
+    //     not a degenerate combination.
+    //   * back-face culling -- all SIX confirmed-drawing routed models are cull=1 exactly like this
+    //     one, so single-sided culling works. The only field that differs is blendEnable.
+    //   * the model matrix landing in the wrong display list -- that was real and is now fixed (the
+    //     matrix follows the draw's list), but the web still draws nothing, so it was not the cause.
+    // REMAINING: the Zelda3D draw op appears not to be honoured when it sits in POLY_XLU at all.
+    // Next step is to confirm at the interpreter/SG-renderer level that a G_ZELDA3D_DRAW op reaching
+    // the XLU segment is executed, rather than assuming the emission site is the problem.
     { ACTOR_EN_FLOORMAS, 0, 0, "floormaster", 0, {0} },
     { ACTOR_EN_WALLMAS,  0, 0, "fallmaster",  0, {0} },
     // King Dodongo's ZAR also holds his fire breath. AUTO picked kingdodongo.cmb (137216 bytes), so
