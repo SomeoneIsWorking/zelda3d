@@ -363,3 +363,36 @@ That primitive is the next step, and it is generic enough to be worth having any
 
 Do NOT "fix" this by pointing the object at some plausible ZAR: there is no actor archive and no CMB
 in the scene archive (ruled out above), so any mapping would be invented.
+
+### Deku Tree mouth — I GOT THIS WRONG LAST TICK. Corrected. (C028 falsified -> C029)
+
+Last tick I concluded from the `ahide` capture that OoT3D bakes the mouth into the room mesh and the
+N64 actor draws a redundant lip, so the fix was probably draw suppression. **The observation was
+right and the inference was wrong.**
+
+Reading `z_bg_treemouth.c` settles it without another experiment:
+
+* `BgTreemouth_Draw` emits exactly ONE display list, `gDekuTreeMouthDL`, in every state. Only an
+  env-colour alpha varies. So there is no separate closed-mouth mesh, and my `ahide` capture did show
+  this actor's complete visual contribution.
+* Lines 226-228 drive the actor's position as a LERP: closed `(4029, 136, -1255)` -> open
+  `(3869, -263, -1163)`. The open endpoint is EXACTLY the position I measured with `asel`. So I
+  observed the mouth fully OPEN, in the one configuration where the room mesh happens to cover the
+  area the actor occupies.
+
+A mesh that MOVES between two positions cannot be baked into a static room mesh in both states.
+Suppressing the draw would therefore make the CLOSED mouth invisible and leave the entrance looking
+open before Link is allowed in — the exact regression I flagged as the claim's falsifier, and it fired
+one tick later.
+
+**What this means for the fix:** OoT3D must ship this geometry somewhere; my ZAR/CMB search simply has
+not found it. The searches that came up empty (`/actor/zelda_spot04_objects.zar` absent, no CMB in
+`/scene/spot04.zar`) remain valid but no longer support the "baked" conclusion. The next place to look
+is the spot04 ROOM CMB's own mesh list — a room CMB can hold several meshes, and OoT3D could keep the
+mouth as one of them and move it, which would satisfy both "no separate archive" and "it moves".
+
+**The lesson worth keeping:** a single-state observation cannot distinguish "this geometry is
+redundant" from "this geometry is somewhere else right now". I had the right instrument and read one
+configuration of a two-configuration mechanism. The cheap guard I skipped was reading the actor's
+update function before interpreting a screenshot of it — the lerp is four lines long and would have
+told me my capture was of an endpoint, not of the general case.
