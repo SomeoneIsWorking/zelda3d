@@ -707,6 +707,21 @@ static Zelda3D_ActorForcedAutoSlot sActorForcedAuto[] = {
     //                                            move it)
     //   dodoago  = Dodongo + AGO, jaw         -> ddanh_ago     (was the staircase)
     //   jd                                    -> ddanh_jd      (was the staircase; exact name match)
+    // Wallmaster / Floormaster share zelda_wm2.zar, and floormaster.cmb and fallmaster.cmb are the
+    // SAME SIZE (26496 bytes each) -- so "largest CMB" is a coin flip between them and En_Wallmas was
+    // getting the Floormaster mesh. Both routed explicitly, because a tie-break by file order is not
+    // something to leave load-bearing. ("fallmaster" is Grezzo's spelling of Wallmaster.)
+    { ACTOR_EN_FLOORMAS, 0, 0, "floormaster", 0, {0} },
+    { ACTOR_EN_WALLMAS,  0, 0, "fallmaster",  0, {0} },
+    // King Dodongo's ZAR also holds his fire breath. AUTO picked kingdodongo.cmb (137216 bytes), so
+    // En_Bdfire -- the fire -- was rendering the entire boss body. Boss_Dodongo routed too: it was
+    // correct only because it happens to be the largest.
+    { ACTOR_BOSS_DODONGO, 0, 0, "kingdodongo",       0, {0} },
+    { ACTOR_EN_BDFIRE,    0, 0, "g_ddg2_fire_model", 0, {0} },
+    // Gerudo Valley gate + fence (saku = fence). AUTO picked s12saku_model (49408 > 37120), so the
+    // GATE was rendering as the fence.
+    { ACTOR_BG_SPOT12_SAKU, 0, 0, "s12saku", 0, {0} },
+    { ACTOR_BG_SPOT12_GATE, 0, 0, "s12gate", 0, {0} },
     { ACTOR_BG_DDAN_KD,  0, 0, "ddanh_kaidan", 0, {0} },
     { ACTOR_BG_DODOAGO,  0, 0, "ddanh_ago",    0, {0} },
     { ACTOR_BG_DDAN_JD,  0, 0, "ddanh_jd",     0, {0} },
