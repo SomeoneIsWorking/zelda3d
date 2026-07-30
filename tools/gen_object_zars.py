@@ -61,6 +61,16 @@ ALIAS = {
     # (Y_*/ousei_* cutscene models too), so AUTO's largest-CMB heuristic cannot be trusted to pick
     # the mouth -- Bg_Treemouth is routed to it explicitly via sActorForcedAuto in zelda3d_render.cpp.
     "spot04_objects": "spo04_objects",
+    # Dungeon props whose archives use the bare dk_ prefix. Each confirmed twice: the archive name
+    # matches the object, AND the actor that loads the object draws a single model of that name.
+    "vase": "dk_vase",   # En_Vase (z_en_vase.c)  -- dk_vase/vase1_obj_o2.cmb, the archive's ONLY cmb
+    "trap": "dk_trap",   # En_Trap (z_en_trap.c)  -- dk_trap/trap_model.cmb (+ trap2_center_model)
+    # DELIBERATELY NOT ADDED: "pu_box": "dk_pu_box". The archive holds pu_box1/pu_box2/pu_box4_model,
+    # which are SIZE VARIANTS, and Bg_Pushbox + En_Pu_box share the object. Mapping it would hand
+    # every push block whichever CMB is largest -- precisely the En_Ishi/Obj_Hana bug fixed earlier
+    # (differently-sized props all rendering at one size), and push blocks are puzzle geometry where
+    # a wrong size is a gameplay error, not just a cosmetic one. Needs per-variant routing first;
+    # the CMB names above are the whole remaining input to that.
 }
 
 # Alias values are OoT3D zar BASENAMES. Resolve to a real /actor path, trying the common
