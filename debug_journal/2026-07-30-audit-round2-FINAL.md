@@ -40,9 +40,9 @@ some findings carry only ONE refuter vote (0/1) rather than two — weaker, and 
   Adult Link swinging the Megaton Hammer holds nothing — the hammer is entirely missing. Bottle-holding uses a clenched fist rather than the cupped hand the bottle model is posed against.
 ### [CONFIRMED] * `Shipwright/soh/src/zelda3d/player/zelda3d_link.cpp:311` — user-visible, affected 2, refuted 0/1
   Link's hands stay flat-open whenever he runs — in every locomotion state, both ages, which is the most-seen pose in the game.
-### [CONFIRMED] * `Shipwright/soh/src/zelda3d/player/zelda3d_link.cpp:306` — user-visible, affected 2, refuted 0/2
+### [PREMISE FALSIFIED — NOT ACTIONABLE] * `Shipwright/soh/src/zelda3d/player/zelda3d_link.cpp:306` — user-visible, affected 2, refuted 0/2
   Drawing the bow/slingshot does not bring up its waist piece (adult mid 43, p_tex26 on bone 23; child mid 22, p_tex27 on bone 23). Small, but it is on screen for the whole of every bow shot.
-### [CONFIRMED] * `Shipwright/zelda3d_shared/player/link_midmask.cpp:12` — internal, affected 2, refuted 0/1
+### [FIXED] * `Shipwright/zelda3d_shared/player/link_midmask.cpp:12` — internal, affected 2, refuted 0/1
   Effectively none, which is the useful half of this result: I compared posed vertex sets and mid 47 contributes only 2 positions not already in mid 46 (6 of its 8 unique points coincide), and child mid 25 shares 80 of its 97 unique points with mid 24 — both are co-located low-poly overlays that would z-fight rather than add silhouette. Do NOT spend a session "fixing" this; do fix the false rationale in the comment/doc, because it is the sort of guess that gets reused.
 ### [FIXED — DISPUTE RESOLVED] * `Shipwright/soh/src/zelda3d/player/zelda3d_link.cpp:314` — user-visible, affected 1, refuted 0/2
   Child Link's Kokiri sword renders as the adult-length Master Sword — a blade nearly as long as he is tall, in every child sword swing, block and idle-with-sword-drawn.
@@ -261,3 +261,34 @@ The visual crops answered the actual question, so those are the evidence and the
 rather than reported. Same class of error as the four mask/background mistakes earlier in this
 session — the method is only sound when the reference frame is genuinely static, and in this scene it
 is not.
+
+### zelda3d_link.cpp:306 (bow waist piece) — PREMISE FALSIFIED, do not "fix" this
+
+The finding says drawing the bow should bring up a waist piece, naming adult mid 43 (p_tex26, bone 23)
+and child mid 22 (p_tex27, bone 23). Those mesh ids came from our own `link_mesh_id_map.md`, which
+the audit itself lists under UNVERIFIED.
+
+Two results kill the premise:
+
+1. `PLAYER_MODELTYPE_WAIST` (slot 0x14 of `sPlayerDLists`, table @0x0053c608) is **(-1, -1)** —
+   OoT3D's waist model type draws NOTHING. On N64 `sPlayerWaistDLs` holds real display lists, so this
+   is a genuine 3DS divergence, not a mis-read slot.
+2. No table anywhere in the binary pairs adult 43 with child 22. Scanned all 1,141,756 4-byte-aligned
+   positions in the 4.6 MB image for a row shaped `(43, 22, 43, 22)` and for the bare pair `(43, 22)`:
+   **zero** of each. **Control:** the identical search for `(42, 21, 42, 21)` — the known sheath rows —
+   returns 2, so the search fires and the zero is a real absence rather than a broken instrument.
+
+What this does NOT prove: that OoT3D has no bow quiver at all. It could be baked into the body or back
+geometry, or driven by something other than `sPlayerDLists`. What it does prove is that the specific
+fix implied by this finding — map the waist model type to 43/22 — has no support in the ROM, and
+implementing it would be inventing a mapping. Left alone deliberately. If someone wants to pursue the
+quiver, the question to answer first is "does OoT3D draw one at all", not "which mesh id is it".
+
+### link_midmask.cpp:12 — FIXED (the rationale, which was the actual defect)
+The always-on set omits mid 47, which is correct, but the comment justified it with "plausibly the
+far-LOD body, which we would double-draw". That is wrong: 47 is a co-located low-poly OVERLAY of 46,
+contributing only two posed vertex positions not already in 46 (six of its eight unique points
+coincide); child 25 likewise shares 80 of 97 unique points with 24. Corrected in both files, keeping
+the wrong guess visible and labelled rather than silently deleting it — a plausible-sounding rationale
+is exactly the kind of thing that gets reused, and the correction also records that there is nothing
+to gain from an identification pass here.

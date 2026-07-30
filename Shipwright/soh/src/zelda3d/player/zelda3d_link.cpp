@@ -303,7 +303,11 @@ unsigned long long Zelda3D::LinkMidMask::compute(Player* player) const {
     if (LINK_AGE_IN_YEARS != YEARS_CHILD) {
         return boyMidMask(player); // adult uses link_v2.cmb's own mesh_id layout
     }
-    m = LINK_MID(24) | LINK_MID(26); // body + head/face always (25 = far-LOD, never)
+    // body + head/face always. 25 is omitted, but it is NOT a far-LOD as this line used to claim:
+    // it is a co-located low-poly overlay of 24, sharing 80 of its 97 unique posed vertex positions,
+    // so drawing it would z-fight rather than add silhouette. See the matching note in
+    // zelda3d_shared/player/link_midmask.cpp for the adult 46/47 pair.
+    m = LINK_MID(24) | LINK_MID(26);
     deku = (player->currentShield == PLAYER_SHIELD_DEKU);
     hylian = (player->currentShield == PLAYER_SHIELD_HYLIAN || player->currentShield == PLAYER_SHIELD_MIRROR);
 

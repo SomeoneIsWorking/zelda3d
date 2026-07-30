@@ -111,9 +111,19 @@ unsigned long long linkAdultMidMask(const LinkGear& gear) {
     // per hand. The 3DS selects the right-hand variant with `cfg[0x40] == 8`, and
     // `PLAYER_MODELTYPE_RH_OPEN` IS 8 — the same `(hand == OPEN) ? plate2 : plate3` test N64 writes.
     //
-    // Deliberately NOT copied from OoT3D's always-on set {45, 46, 47}: we start from {45, 46} and 47
-    // is unaccounted for — plausibly the far-LOD body, which we would double-draw since we always
-    // render near LOD. Adding it needs its own identification pass.
+    // Deliberately NOT copied from OoT3D's always-on set {45, 46, 47}: we start from {45, 46}.
+    //
+    // The "47 is plausibly the far-LOD body, which we would double-draw" guess that used to sit here
+    // was WRONG, and it is worth saying so rather than deleting it, because it is the sort of
+    // plausible rationale that gets reused. Mid 47 is a co-located low-poly OVERLAY of 46, not a
+    // separate LOD: comparing posed vertex sets, 47 contributes only TWO positions not already in 46
+    // (six of its eight unique points coincide exactly). The child pair is the same shape -- mid 25
+    // shares 80 of its 97 unique points with 24. Drawing either would z-fight its partner rather than
+    // add any silhouette.
+    //
+    // So omitting 47 is correct, but NOT for the stated reason, and the real reason also means there
+    // is nothing to gain from an identification pass here. Do not spend a session "fixing" this.
+    // (Same applies to the `25 = far-LOD` note on the child body line in zelda3d_link.cpp.)
     if (gear.strengthUpgrade >= 2) {
         m |= LINK_MID(4) | LINK_MID(17);                                        // plate 1, both arms
         m |= (gear.leftHand  == LinkHandLeft::Open)  ? LINK_MID(5)  : LINK_MID(6);
