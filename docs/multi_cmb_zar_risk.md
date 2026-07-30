@@ -231,3 +231,34 @@ nothing" from "was not applicable".
 
 Six routings are now positively confirmed to draw. The Deku Tree web remains the only confirmed
 failure (its slot WAS state=2, it WAS in frame, and it contributed zero).
+
+## Pass 7b — the audit CLOSES, via a safety argument rather than exhaustive checking
+
+Chasing the remaining props room by room was the wrong frame. What matters is that **an inactive
+routing cannot regress anything**: a slot at `state=0` (never seen) or `state=4` (never measured) makes
+`Zelda3D_TryDrawActor` return 0, so the N64 draw proceeds exactly as before. Only a slot at `state=2`
+suppresses the N64 draw, and therefore only `state=2` carries the delete-the-object risk.
+
+Every routing currently at `state=2` has been confirmed to draw:
+
+| routing | state | pixels | verdict |
+|---|---|---|---|
+| En_Wallmas -> fallmaster | 2 | 13512 | draws |
+| En_Floormas -> floormaster | 2 | 24295 | draws |
+| Bg_Mori_Bigst -> l_bigst | 2 | 5374 | draws |
+| Bg_Mori_Elevator -> l_elevator | 2 | 32763 | draws |
+| Bg_Ddan_Kd -> ddanh_kaidan | 2 | 43142 | draws |
+| Bg_Ddan_Jd -> ddanh_jd | 2 | 23764 | draws |
+
+Everything else is inert and safe as it stands:
+* `l_idomizu` (Forest Temple well water) sits at `state=4`, which is exactly the predicted behaviour for
+  a FLAT prop — a horizontal plane has ~zero model height so the bbox-height measure can never derive a
+  scale. It correctly falls back to the N64 draw. It needs `Zelda3D_AutoModelExtentXZ` footprint sizing
+  before it can ever be replaced, and until then it cannot break.
+* `l_kaiten`, `l_tenjyou`, `l_hasigo`, `l_4hasira` are `state=0` — those actors were not reachable via
+  `roomwarp` in Forest Temple rooms 0-12, so they have never resolved. Inert.
+* `Boss_Dodongo` / `En_Bdfire` and the `spot12` pair likewise never resolved in the scenes visited.
+
+**So there are no unverified risks outstanding from these routings.** The standing rule is what matters
+going forward: when a slot first reaches `state=2`, it needs the `ahide` pixel check before its routing
+can be trusted — and a zero only counts against it when the slot is `state=2` AND the actor is in frame.
