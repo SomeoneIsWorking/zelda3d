@@ -720,24 +720,17 @@ static Zelda3D_ActorForcedAutoSlot sActorForcedAuto[] = {
     // SAME SIZE (26496 bytes each) -- so "largest CMB" is a coin flip between them and En_Wallmas was
     // getting the Floormaster mesh. Both routed explicitly, because a tie-break by file order is not
     // something to leave load-bearing. ("fallmaster" is Grezzo's spelling of Wallmaster.)
-    // Deku Tree WALL web only. Bg_Ydan_Sp's variant selector is (params >> 0xC) & 0xF with
-    // WEB_FLOOR = 0 and WEB_WALL = 1 (z_bg_ydan_sp.c:100 + its enum), and the CMB names agree:
-    // spkabe (kabe = wall) / spyuka (yuka = floor).
-    //
-    // The FLOOR web is deliberately NOT routed: it is a horizontal plane, so its model height is ~0
-    // and the bbox-height measure cannot derive a scale (modelH > 1e-3 fails, the slot never reaches
-    // state 2). Flat props need footprint sizing via Zelda3D_AutoModelExtentXZ instead -- the same
-    // reason Bg_Spot01_Idomizu's well water has its own path. Bg_Ydan_Hasi's water plane is blocked
-    // on exactly this too, which is why the WALL web is the right first translucent routing: being
-    // vertical, it has real height and sizes correctly.
-    // Match on params & 0xF == 1, NOT the packed 0xF000 field. Bg_Ydan_Sp's Init OVERWRITES
-    // actor->params with the extracted nibble (`this->dyna.actor.params = (thisx->params >> 0xC) & 0xF`,
-    // z_bg_ydan_sp.c:100), and its Draw then compares the WHOLE value (`thisx->params == WEB_WALL`).
-    // So by the time any draw-time code sees this actor, params IS the type. Confirmed live:
-    // actorsnear reports the three Deku Tree webs as p=0x0001 and p=0x0000, never 0x1000. Routing on
-    // the packed field matched nothing and the slot sat at state 0 -- the spawn-time layout is not the
-    // draw-time layout, so read the LIVE value before writing a params mask.
-    { ACTOR_BG_YDAN_SP, 0x000F, 0x0001, "ydan_spkabe", 0, {0} },
+    // Bg_Ydan_Sp (Deku Tree web) is NOT routed. REVERTED 2026-07-30 after it regressed: routing it to
+    // ydan_spkabe made the web VANISH. The slot measured fine (state=2 scale=0.10000 n64h=288.8) but the
+    // replacement CMB contributed ZERO pixels -- verified with `ahide` on the actor, which produced a
+    // byte-identical frame, so our draw adds nothing. Because a successful route makes us return
+    // "handled" and skip the N64 draw, an invisible replacement DELETES the object, and this one is
+    // gameplay-critical (the web must be burned to progress).
+    // Root cause NOT yet identified. The measure now works for translucent actors (dual-list bracket),
+    // so this is a DRAW-side problem: candidates are the model not classifying all-blended and landing
+    // in POLY_OPA behind geometry, back-face culling on a single-sided plane, or a blend state that
+    // resolves to fully transparent. Diagnose before re-routing -- and re-test with `ahide`, which is
+    // what caught this.
     { ACTOR_EN_FLOORMAS, 0, 0, "floormaster", 0, {0} },
     { ACTOR_EN_WALLMAS,  0, 0, "fallmaster",  0, {0} },
     // King Dodongo's ZAR also holds his fire breath. AUTO picked kingdodongo.cmb (137216 bytes), so
