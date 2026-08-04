@@ -1101,11 +1101,22 @@ IS the `dlists[]` index.
 160 wide and **no mesh in the archive is 1200 × 1600**: `m_Fbmwall2` (1600 × 1400) matches only on X,
 `m_Fbmwall3` (990 × 1200) only on height.
 
-The likely cause is a real limitation of the measure rather than a missing mesh: **`measFootX` /
-`measFootZ` are WORLD-space while the CMB extents are LOCAL**, so for a rotated flat wall the two do not
-correspond axis-to-axis at all. Every prop identified up to now has been effectively axis-aligned, which
-is why this never bit before. Folding `shape.rot.y` into the footprint comparison is the fix; until then
-**a vertical wall's footprint is not evidence**, and that is the highest-value mechanism change left.
+> **CORRECTION (2026-08-04, same day): the world-vs-local explanation offered here was WRONG.** It was
+> implemented — rotate the model footprint by `shape.rot.y` before comparing — and then falsified by the
+> interpreter source and by a rotated prop. `fast/interpreter.cpp` does not measure world X/Z: it
+> projects each eye-space vertex onto `mv[0]` and `mv[2]`, the columns of the live MODELVIEW matrix,
+> which are the **model's own** X and Z axes. The yaw is already divided out, so `measFootX`/`measFootZ`
+> are directly comparable to the CMB's LOCAL extents and no correction is needed. The proof is
+> `zelda_gs`, which measures at yaw=90°: uncorrected it compares h=0.10033 x=0.10791 z=0.09462 against an
+> actor scale of 0.1 (14% spread), and rotating by that same 90° swaps its axes to x=0.15408 z=0.06627 —
+> a 2.3× spread. The correction was reverted. It had changed no shipped scale (confirmed routings are
+> overwhelmingly yaw=0) but would have mis-scaled any future rotated prop. Claim **C049**.
+
+So LARGE_BOMBABLE_WALL is withdrawn with **no explanation yet** — that is the honest position. Its slot
+measures 120 × 160 in the actor's own frame and no mesh in the archive is 1200 × 1600. The remaining
+candidates are that the actor draws a mesh from a different archive, that AUTO's measure caught a
+partially-culled draw, or that the wall is one of the meshes with a *different* aspect than its N64
+counterpart. Re-open it with a fresh measurement, not with the theory above.
 
 Params 1 shows the method working in the small: `m_Fbmwall2` was the first guess and the measurement
 rejected it (0.0375 / 0.0714 against an actor scale of 0.1); the mesh that is 0.1 on both is

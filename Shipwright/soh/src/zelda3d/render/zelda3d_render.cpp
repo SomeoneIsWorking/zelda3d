@@ -1191,6 +1191,8 @@ static Zelda3D_ActorForcedAutoSlot* Zelda3D_FindActorForcedSlot(s16 actorId, u16
 typedef struct {
     float measFootX, measFootZ; // world-space footprint; used when the prop is too FLAT to have height
     float measuredH; // N64 world-space height from the measure pass (0 = none yet)
+    short measYaw;   // shape.rot.y of the instance the footprint was measured from -- the footprint is
+                     // world-space, so it is only comparable to a model footprint rotated by THIS angle
     float scale;     // derived worldScale (valid when state==2)
     int modelId;     // forced-CMB GL model id (resolved lazily)
     signed char state;   // 0 unseen, 1 measuring, 2 ready, 3 failed
@@ -1430,7 +1432,7 @@ static int Zelda3D_RatioMatches(float ratio, float actorScale) {
     return (r > 1.0f - ZELDA3D_1TO1_TOL) && (r < 1.0f + ZELDA3D_1TO1_TOL);
 }
 static void Zelda3D_Report1to1(int objId, const char* modelKey, Actor* actor, float rh, float rx,
-                               float rz, float derived, const char* source) {
+                               float rz, float derived, const char* source, short measYaw) {
     if (Zelda3D_AutoMode() < 1 || actor == NULL) return;
     // A ratio of 0 means "that axis had no usable measurement", which is NOT a mismatch -- say which.
     const int hv = (rh > 1e-6f), xv = (rx > 1e-6f), zv = (rz > 1e-6f);
@@ -1452,12 +1454,16 @@ static void Zelda3D_Report1to1(int objId, const char* modelKey, Actor* actor, fl
     } else {
         verdict = "NO AXIS MATCHES actor->scale -- CMB is RE-AUTHORED, keep the derived scale";
     }
+    // yaw is printed because the X/Z ratios are only meaningful once the model's footprint has been
+    // rotated to match the world-space N64 measure. A non-zero yaw here is the case that used to be
+    // silently wrong, so it must be visible on the line that reports the verdict.
+    const float yawDeg = measYaw * (360.0f / 65536.0f);
     fprintf(stderr,
-            "SOH3D 1TO1: obj 0x%x %s src=%s derived=%.5f | actor->scale=(%.5f,%.5f,%.5f) "
+            "SOH3D 1TO1: obj 0x%x %s src=%s derived=%.5f | actor->scale=(%.5f,%.5f,%.5f) yaw=%.1fdeg "
             "ratios h=%.5f%c x=%.5f%c z=%.5f%c | %d/%d -> %s\n",
             objId, modelKey ? modelKey : "?", source, derived, actor->scale.x, actor->scale.y,
-            actor->scale.z, rh, hv ? (hm ? '=' : '!') : '-', rx, xv ? (xm ? '=' : '!') : '-', rz,
-            zv ? (zm ? '=' : '!') : '-', nMatch, nValid, verdict);
+            actor->scale.z, yawDeg, rh, hv ? (hm ? '=' : '!') : '-', rx, xv ? (xm ? '=' : '!') : '-',
+            rz, zv ? (zm ? '=' : '!') : '-', nMatch, nValid, verdict);
     fflush(stderr);
 }
 
@@ -1634,6 +1640,7 @@ static int Zelda3D_TryAuto(PlayState* play, Actor* actor) {
         // number. If neither axis confirms, control falls through to the footprint path unchanged.
         if (actor != NULL) {
             float cmx = 0.0f, cmz = 0.0f;
+            // NO rotation correction: the measure is already in the actor's own frame (see measYaw).
             const int haveXZ = Zelda3D_AutoModelExtentXZ(e->modelId, &cmx, &cmz);
             const float r[3] = {
                 (modelH > 1e-3f && e->measuredH > 1e-3f) ? (e->measuredH / modelH) : 0.0f,
@@ -1656,7 +1663,7 @@ static int Zelda3D_TryAuto(PlayState* play, Actor* actor) {
                                           ? (e->measuredH / modelH) : 0.0f;
                 e->scale = sx; // the engine's own number, exactly -- not a measured approximation
                 e->state = 2;
-                Zelda3D_Report1to1(objId, modelKey, actor, r[0], r[1], r[2], e->scale, "actor-scale");
+                Zelda3D_Report1to1(objId, modelKey, actor, r[0], r[1], r[2], e->scale, "actor-scale", e->measYaw);
                 if (Zelda3D_AutoMode() >= 1) {
                     fprintf(stderr,
                             "SOH3D AUTO: obj 0x%x %s -> scale=%.5f FROM actor->scale, CONFIRMED 1:1 on "
@@ -1699,7 +1706,7 @@ static int Zelda3D_TryAuto(PlayState* play, Actor* actor) {
                     e->state = 2;
                     Zelda3D_Report1to1(objId, modelKey, actor,
                                        (modelH > 1e-3f) ? (e->measuredH / modelH) : 0.0f, sx, sz,
-                                       e->scale, "footprint");
+                                       e->scale, "footprint", e->measYaw);
                     if (Zelda3D_AutoMode() >= 1) {
                         // AXIS AGREEMENT is the quality signal for a footprint match: the X and Z
                         // ratios are two INDEPENDENT estimates of the same scale, so a large spread
@@ -1732,7 +1739,7 @@ static int Zelda3D_TryAuto(PlayState* play, Actor* actor) {
                 Zelda3D_Report1to1(objId, modelKey, actor, e->scale,
                                    (haveXZ && qx > 1e-3f) ? (e->measFootX / qx) : 0.0f,
                                    (haveXZ && qz > 1e-3f) ? (e->measFootZ / qz) : 0.0f, e->scale,
-                                   "height");
+                                   "height", e->measYaw);
             }
             // CROSS-CHECK the height-derived scale against the FOOTPRINT. Height, X and Z are three
             // INDEPENDENT estimates of the same scale, so agreement is strong evidence the CMB is the
@@ -1799,6 +1806,9 @@ static int Zelda3D_TryAuto(PlayState* play, Actor* actor) {
     }
     e->tries++;
     e->state = 1;
+    // Recorded only so the 1TO1 diagnostic can show the measured instance's orientation. It is NOT a
+    // correction input -- see the measYaw comment in zelda3d_render.h for why none is needed.
+    e->measYaw = actor->shape.rot.y;
     Zelda3D_EmitMeasure(play, measKey, /*begin=*/1);
     sPendingMeasureKey = measKey;
     return 0; // let the N64 model draw so it can be measured
