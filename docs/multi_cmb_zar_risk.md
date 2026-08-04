@@ -754,6 +754,14 @@ the actor's own coordinates): the actor exists and measures, but its room does n
 `tools/ahide_check.sh 0x15c 450` correctly returns **INCONCLUSIVE**. The row rests on the submission
 counts, the three-axis agreement, the dual-name corroboration and the position measurement — not on pixels.
 
+> **CORRECTION (2026-08-04): "correctly returns INCONCLUSIVE" is VOID.** `ahide_check.sh` was broken
+> for this entire window — it cd'd to the repo's *parent*, so every REPL call failed silently and it
+> printed INCONCLUSIVE for **every** input, including inputs that do draw. It was not testing anything
+> here. The row's other evidence (submission counts, three-axis agreement, position measurement) is
+> unaffected and still stands; only the sentence about the pixel check is withdrawn. See instrument
+> I022. Any `ahide_check` result recorded between 2026-07-30 and 2026-08-04 must be re-run before it
+> is believed.
+
 ### Use `ahide_check.sh`; do not hand-roll `ahide` + `isolate`
 
 Before running the tool I hand-rolled the same pair and got four confident-looking numbers — 221 px,
@@ -821,6 +829,14 @@ move every verified routing at once.
 `m_Hinv05` (params 2, the hole trap) never resolved — no instance in the rooms swept. Inert.
 
 ### The visual leg is now 0 for 2 on dungeon props
+
+> **CORRECTION (2026-08-04): this whole section's premise was an artefact of a BROKEN TOOL.** The
+> "visual leg is 0 for 2" was not a property of dungeon props at all — `ahide_check.sh` cd'd to the
+> repo's parent and returned INCONCLUSIVE for *every* input in this window, so both data points are
+> void and the pattern they suggested never existed. After the fix the tool returns DRAWS (1333 px)
+> on a live routed prop. The reasoning below about flat props, occlusion and off-screen instances
+> remains sound as a description of the check's real limits — it just was not what happened here.
+> See instrument I022.
 
 `ahide_check.sh` returned INCONCLUSIVE for the coffin lid (elev 25, all instances) as it did for the
 Goron City pot. Both rows rest on submission counts and three-axis agreement instead. That is two
@@ -939,55 +955,72 @@ instances, and it makes **per-axis scale (or at minimum footprint-preferred scal
 and Y does not)** the highest-value mechanism change left in this arc — it would unblock the guillotine,
 fix the coffin lid's 15% and King Zora's 1.5x, and cost nothing where all three axes already agree.
 
-## Pass 27 — AXIS CONSENSUS replaces height-primary (2026-08-04)
+## Pass 27 — the scale comes from `actor->scale`, confirmed by measurement (2026-08-04)
 
-Done, and it was the right call: the two cases it was designed for are both fixed, and it found a third
-defect nobody was looking for.
+Height-primary is gone. The replacement went through a **wrong intermediate that the audit caught**,
+which is the more useful half of this entry.
 
-Height, X and Z are three INDEPENDENT estimates of the same number. The derive now takes the **largest
-cluster of axes agreeing within 2%** (>=2 axes), and failing that rejects a **single gross outlier
-(>1.5x)** when the surviving pair agrees within 10%. Neither gate is a heuristic knob: two independent
-measurements landing within 2% of each other is not a coincidence, and a 3.3x dissent is a measurement
-failure by any standard. Where no consensus exists the old behaviour is untouched — which is the point,
-because a genuinely RE-AUTHORED mesh (Obj_Syokudai's chunkier wooden torch) must keep rendering at its
-own proportions rather than be bent toward an N64 shape.
+### The root cause
 
-Verified live, both motivating cases:
+`Zelda3D_EmitModelDraw` applies `worldScale` uniformly and **never multiplies `actor->scale`**, so every
+auto-routed prop has had to recover the actor's scale from pixels: `scale = measured N64 extent / CMB
+extent`. That inference is only necessary when Grezzo RE-AUTHORED the mesh at different proportions.
+When the CMB is dimensionally 1:1 with the N64 display list, the ratio simply **is** `actor->scale` — a
+number the engine holds exactly, per-axis, with no measurement noise. So the measurement's job is to
+**confirm the 1:1**, not to produce the number. Any axis whose ratio lands on `actor->scale` has done so.
 
-| routing | height-primary | axis consensus | change |
-|---|---|---|---|
-| `m_Hgiro` guillotine (Shadow Temple) | 0.03004 | **0.09999** (x=z agree exactly) | **+232.9%** — row RESTORED, submits=17289 |
-| `m_Hkhuta` coffin lid (Bottom of the Well) | 0.08463 | **0.09999** | **+18.1%** |
-| `m_Hkenzan` spiked box — **shipped last pass** | 0.09379 | **0.09999** | **+6.6%, silently wrong** |
+### The wrong intermediate: axis consensus (filed as C046, falsified the same day)
 
-`m_Hkenzan` is the one nobody was looking for: it shipped in Pass 26 with three-axis agreement recorded
-as "agrees", but its height was 6.6% under the coherent X/Z pair and it was rendering that much small.
+The first cut took "the largest cluster of axes agreeing within 2%", on the reasoning that two
+independent measurements landing within 2% is not a coincidence. **They are not independent.** For a
+prop with a SQUARE OR ROUND FOOTPRINT, X and Z are one measurement taken twice — they agree
+automatically, *including* when the mesh is genuinely re-authored chunkier in plan. The full audit
+caught it moving four props it had no business touching:
 
-**Regression check** — the same 10-scene sweep before and after (`scratch/1to1_data.txt`): 21 derives,
-10 take no consensus at all, and 9 of the 11 that do move by <=0.6%. Only two move materially, and both
-are arguable improvements rather than regressions: `zelda_spot09_obj` +2.4% (x=z=1.00000 exactly against
-h=0.97662) and `zelda_bdan_objects` -10.1% (x=z=0.01004 exactly against h=0.01116).
+| prop | h / x / z | actor scale | consensus did | correct |
+|---|---|---|---|---|
+| `zelda_syokudai` torch | 0.994 / 0.733 / 0.725 | 1.0 | **−26.6%** | height is the 1:1 axis |
+| `zelda_d_lift` | 0.101 / 0.210 / 0.228 | 0.1 | **+116.2%** | height is the 1:1 axis |
+| `zelda_hidan_objects` | 0.025 / 0.150 / 0.150 | 0.1 | **+500.1%** | nothing matches — leave alone |
+| `zelda_jya_iron` | 0.075 / 0.145 / 0.153 | 0.1 | **+98.8%** | nothing matches — leave alone |
 
-**The measure itself is sound**: running the identical sweep twice gave BIT-IDENTICAL h/x/z ratios for
-19 of 20 objects (claim C047). The single exception is `zelda_bombf` (the bomb flower), whose ratios
-swung 34x on X across three runs — its N64 draw genuinely changes shape, so under height-primary its
-rendered scale was luck of the frame. Consensus refuses it in 2 of 3 runs. That actor needs its own
-investigation and is NOT claimed fixed here.
+The torch is the whole argument in one row: it is the documented re-authored asset, its square footprint
+makes X and Z agree by construction, and bending it to the N64 plan size is exactly the parity-diff
+chasing this project forbids. `d_lift` had even been investigated and deliberately left alone in an
+earlier pass (`007a0fc7`). **Axis agreement is not evidence; agreement with a known ground-truth
+quantity is.**
 
-**King Zora's ice block is still NOT fixed, and consensus cannot fix it** — it is a different root
-cause. Its actor scale is genuinely non-uniform (`kzIceScale = {0.18, 0.27, 0.24}`) and a single
-`worldScale` cannot express that at any consensus. That needs per-axis scale in the draw path, which is
-deliberately NOT done here because this pass measured a counterexample to the obvious implementation:
-`zelda_bdan_objects` has `actor->scale = (0.05, 0.20, 0.05)`, yet its measured height ratio is 11% off
-the uniform pair rather than the 4x that scale implies — so **`actor->scale` is not reliably the
-transform an actor's Draw actually applies**, and per-axis scale sourced from it would be wrong. Per-axis
-remains open, and now needs its evidence gathered before it is built rather than after.
+### What shipped
 
-The new `SOH3D 1TO1` derive log is what settles that next step: it prints the three ratios against
-`actor->scale` on every derive, including an explicit negative when no axis matches.
+Any axis whose ratio is within 2% of the corresponding `actor->scale` component confirms the 1:1, and
+the scale becomes `actor->scale` exactly. No confirming axis → nothing changes. A **non-uniform**
+`actor->scale` is refused out loud rather than averaged away — that is King Zora's red ice
+(`kzIceScale = {0.18, 0.27, 0.24}`), which still needs a per-axis draw path.
 
-Routed this pass: SPIKED_BOX -> `m_Hkenzan` (submits=3066), PROPELLER -> `m_Hfofo` (submits=3528).
-Left alone: SPIKED_WALL / SPIKED_WALL_2, whose candidates `m_HhasamiN` / `m_HhasamiS` are MIRROR IMAGES
-(identical extents, mirrored Z) — perfect confirmation that the pair belongs to the paired closing-walls
-trap, and useless for deciding which is which. The discriminator is a live instance's yaw or world Z
-compared against the N/S suffix.
+**Audit: all 13 routed scenes, every room swept. 35 of 36 forced slots resolved, 28 confirmed 1:1, and
+only 7 move by more than 2%.**
+
+| routing | was | now | axes | note |
+|---|---|---|---|---|
+| `m_Hgiro` guillotine | 0.03004 | **0.10000** | xz | **+232.9%** — row RESTORED, submits=17289 |
+| `m_Hkhuta` coffin lid | 0.08463 | **0.10000** | xz | +18.2% |
+| `zelda_bwall` | 0.11665 | **0.10000** | x | −14.3% — **single-axis confirmation** |
+| `m_Hkenzan` spiked box | 0.09379 | **0.10000** | xz | +6.6% — shipped silently small in Pass 26 |
+| `bdan_toge` | 0.09528 | **0.10000** | xz | +5.0% |
+| `zelda_bombiwa` | 0.09583 | **0.10000** | z | +4.3% — **single-axis confirmation** |
+| `zelda_spot09_obj` | 0.97662 | **1.00000** | xz | +2.4% |
+
+`m_Hkenzan` is the find nobody was looking for: it shipped last pass with its three axes recorded as
+"agrees", while height sat 6.6% under the true scale. The two **single-axis** rows are the weakest
+evidence in the set and are named as such in claim C048's falsifier — one confirming axis is a real
+signal (landing within 2% of the actor's exact scale by chance is unlikely) but it is one signal.
+
+Not fixed and not claimed fixed: `zelda_hidan_objects`, `zelda_jya_iron`, `zelda_bdan_objects` and
+`bdan_switch_b` confirm on **no** axis, so they keep the old derive. That is the honest outcome — these
+are AUTO's largest-CMB pick out of large shared archives, i.e. near-certainly the wrong mesh for whatever
+actor measured them, and `OBJECT_HIDAN_OBJECTS` / `OBJECT_JYA_OBJ` are still the top two unrouted rows in
+this queue. `zelda_bombf` swings 34x on X between identical runs (C047) and is excluded by the same gate.
+
+Slot 29 (`ddanh_ago`) was never reached by any entrance tried and is therefore **not audited** — that is
+a gap in the evidence, not a clean bill of health.
+
