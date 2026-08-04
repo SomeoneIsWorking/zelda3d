@@ -101,9 +101,26 @@ typedef struct {
 
 typedef struct {
     float measuredH;
-    // World-space FOOTPRINT of the measured N64 draw. A flat prop (water plane, floor web) has a
-    // height extent of ~0, so measuredH can never scale it; its footprint is matched instead.
+    // FOOTPRINT of the measured N64 draw, in the ACTOR'S OWN frame (not world — see measYaw below;
+    // the comment here said "world-space" until 2026-08-04 and that was the wrong reading). A flat
+    // prop (water plane, floor web) has a height extent of ~0, so measuredH can never scale it; its
+    // footprint is matched instead.
     float measFootX, measFootZ;
+    // shape.rot.y of the INSTANCE the footprint above was measured from. DIAGNOSTIC ONLY.
+    //
+    // It is here because the obvious reading of measFootX/measFootZ -- "world-space, so a rotated prop
+    // needs its model footprint rotated to match" -- is WRONG, and was implemented and reverted on
+    // 2026-08-04. The interpreter does not measure world X/Z: it projects each eye-space vertex onto
+    // mv[0] and mv[2], the columns of the live MODELVIEW matrix, which are the MODEL's own X and Z axes
+    // (fast/interpreter.cpp, GfxSpVertex). For an orthogonal modelview that projection returns the
+    // vertex's LOCAL x and z times the uniform scale, so the actor's yaw is already divided out and the
+    // footprint is directly comparable to the CMB's LOCAL extents.
+    //
+    // The proof is a rotated prop: zelda_gs measures at yaw=90 and compares as h=0.10033 x=0.10791
+    // z=0.09462 against an actor scale of 0.1 (a 14% spread). Rotating the model footprint by that same
+    // 90 degrees swaps its axes and gives x=0.15408 z=0.06627 -- a 2.3x spread. The uncorrected
+    // comparison is the correct one. DO NOT add a rotation correction here.
+    short measYaw;
     float scale;
     float groundOff;
     int modelId;
