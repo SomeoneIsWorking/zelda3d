@@ -1527,95 +1527,79 @@ static int Zelda3D_TryAuto(PlayState* play, Actor* actor) {
         const int tooFlat = (modelH <= 1e-3f) || (e->measuredH <= 1e-3f) ||
                           (foot > 1e-3f && e->measuredH < 0.05f * foot);
 
-        // --- AXIS CONSENSUS: height is one estimate of the scale, not the privileged one ----------
-        // Height, X and Z are three INDEPENDENT estimates of the SAME number whenever the CMB is
-        // dimensionally proportional to the N64 display list. The old order (height, else footprint)
-        // made height win even when the other two agreed with each other and it dissented -- and
-        // height was the WRONG choice every time that happened: King Zora's ice block, the Bottom of
-        // the Well coffin lid (x=z=0.100 exactly, h=0.0847, so the lid rendered 15% small in plan) and
-        // the Shadow Temple guillotine (x=0.100 z=0.107 against h=0.030, a 3.3x error that was bad
-        // enough to withdraw the routing rather than ship it).
+        // --- 1:1 CONFIRMATION: don't infer a number the engine already holds --------------------
+        // Zelda3D_EmitModelDraw applies `worldScale` uniformly and NEVER multiplies actor->scale, so
+        // every auto-routed prop has had to recover the actor's scale from pixels: scale = measured
+        // N64 extent / CMB extent. That inference is only needed when Grezzo RE-AUTHORED the mesh at
+        // different proportions. When the CMB is dimensionally 1:1 with the N64 display list, the
+        // ratio IS actor->scale -- a number the engine holds EXACTLY, with no measurement noise.
+        // So the measurement's job here is not to PRODUCE the scale but to CONFIRM the 1:1, and any
+        // axis whose ratio lands on actor->scale has done exactly that.
         //
-        // NOT a majority vote over all inputs, which would be a heuristic. Two GATES, each one strong
-        // evidence on its own, measured against every derive in the sweep (scratch/1to1_data.txt):
-        //   (1) a CLUSTER of >=2 axes agreeing within 2%. Two independent measurements of the same
-        //       quantity landing within 2% is not a coincidence; the dissenter is a bad measure.
-        //   (2) failing that, ONE axis that is a GROSS outlier (>1.5x) from the other two while those
-        //       two agree within 10%. A 3.3x dissent is a measurement failure by any standard.
-        // Everything else keeps the existing behaviour untouched. That matters: of the 20 derives in
-        // the sweep, this leaves 18 within 0.7% of what they already produce (the 3-of-3 agreements
-        // reduce to the same number) and deliberately does NOT fire on the genuinely re-authored
-        // meshes -- Obj_Syokudai's chunkier wooden torch, zelda_bombf (axes spread 25% with no tight
-        // pair), zelda_d_hsblock (0.040/0.080/0.016, no two axes near each other) -- where no
-        // consensus exists and inventing one would be exactly the parity-diff chasing this project
-        // forbids. A re-authored asset must keep rendering at ITS OWN proportions.
-        if (!tooFlat) {
+        // This replaces a height-primary derive that was wrong whenever height was the bad axis:
+        // the Bottom of the Well coffin lid (h=0.0847 against x=z=0.09999 and an actor scale of 0.1,
+        // rendering 15% small in plan), the Shadow Temple guillotine (h=0.0300, a 3.3x error big
+        // enough that the row was WITHDRAWN as unshippable) and m_Hkenzan, which shipped 6.6% small
+        // with its axes recorded as "agrees".
+        //
+        // IT IS ANCHORED ON actor->scale AND NOT ON AXES AGREEING WITH EACH OTHER, because axis
+        // agreement is not the evidence it looks like. A first cut of this gate accepted "two axes
+        // within 2% of each other" and it MOVED TWO PROPS IT SHOULD NOT HAVE: Obj_Syokudai's torch
+        // (h=0.99363 x=0.73296 z=0.72523, actor scale 1.0) and zelda_d_lift (h=0.10129 x=0.21038
+        // z=0.22751, actor scale 0.1) -- both by >25%. The reason is structural: X and Z are NOT
+        // independent for a prop with a SQUARE OR ROUND FOOTPRINT. They are one measurement taken
+        // twice, so they agree automatically, including when the mesh is genuinely re-authored
+        // chunkier in plan -- which is precisely what the 3DS wooden torch is. Height matching the
+        // actor's own scale while the footprint does not is the signature of a re-authored asset,
+        // and such an asset must keep rendering at ITS OWN proportions rather than be bent toward an
+        // N64 shape ([[soh3d-re-and-port-not-fix-diffs]]).
+        //
+        // A non-uniform actor->scale is REFUSED rather than approximated: a single worldScale cannot
+        // express it. That is King Zora's red ice (kzIceScale = {0.18, 0.27, 0.24}) and it stays an
+        // open row for a per-axis draw path, not something to average away here.
+        if (!tooFlat && actor != NULL) {
             float cmx = 0.0f, cmz = 0.0f;
             const int haveXZ = Zelda3D_AutoModelExtentXZ(e->modelId, &cmx, &cmz);
-            float r[3] = { (modelH > 1e-3f && e->measuredH > 1e-3f) ? (e->measuredH / modelH) : 0.0f,
-                           (haveXZ && cmx > 1e-3f && e->measFootX > 1e-3f) ? (e->measFootX / cmx) : 0.0f,
-                           (haveXZ && cmz > 1e-3f && e->measFootZ > 1e-3f) ? (e->measFootZ / cmz) : 0.0f };
-            const char* axisName[3] = { "h", "x", "z" };
-            float consensus = 0.0f;
-            const char* how = NULL;
-            char members[8] = { 0 };
-            // (1) largest mutually-agreeing cluster at 2%.
-            int bestN = 0;
-            float bestSum = 0.0f;
-            char bestMembers[8];
-            for (int seed = 0; seed < 3; ++seed) {
-                if (!(r[seed] > 1e-6f)) continue;
-                int n = 0, m = 0;
-                float sum = 0.0f;
-                char mem[8];
-                for (int i = 0; i < 3; ++i) {
-                    if (!(r[i] > 1e-6f)) continue;
-                    const float q = r[i] / r[seed];
-                    if (q > 1.0f - 0.02f && q < 1.0f + 0.02f) {
-                        ++n; sum += r[i];
-                        mem[m++] = axisName[i][0];
-                    }
-                }
-                mem[m] = '\0';
-                if (n > bestN) { bestN = n; bestSum = sum; memcpy(bestMembers, mem, sizeof mem); }
+            const float r[3] = {
+                (modelH > 1e-3f && e->measuredH > 1e-3f) ? (e->measuredH / modelH) : 0.0f,
+                (haveXZ && cmx > 1e-3f && e->measFootX > 1e-3f) ? (e->measFootX / cmx) : 0.0f,
+                (haveXZ && cmz > 1e-3f && e->measFootZ > 1e-3f) ? (e->measFootZ / cmz) : 0.0f
+            };
+            const float as[3] = { actor->scale.y, actor->scale.x, actor->scale.z }; // parallel to r
+            const char* axisName = "hxz";
+            const float sx = actor->scale.x, sy = actor->scale.y, sz = actor->scale.z;
+            const int uniform = (sx > 1e-6f) && (fabsf(sy - sx) < 1e-3f * sx) &&
+                                (fabsf(sz - sx) < 1e-3f * sx);
+            char members[8];
+            int m = 0;
+            for (int i = 0; i < 3; ++i) {
+                if (Zelda3D_RatioMatches(r[i], as[i])) members[m++] = axisName[i];
             }
-            if (bestN >= 2) {
-                consensus = bestSum / (float)bestN;
-                how = "cluster<=2%";
-                memcpy(members, bestMembers, sizeof members);
-            } else {
-                // (2) reject a single gross outlier when the surviving pair is coherent.
-                for (int out = 0; out < 3 && how == NULL; ++out) {
-                    const int a = (out + 1) % 3, b = (out + 2) % 3;
-                    if (!(r[out] > 1e-6f) || !(r[a] > 1e-6f) || !(r[b] > 1e-6f)) continue;
-                    const float pair = 0.5f * (r[a] + r[b]);
-                    const float grossA = (r[out] > r[a]) ? r[out] / r[a] : r[a] / r[out];
-                    const float grossB = (r[out] > r[b]) ? r[out] / r[b] : r[b] / r[out];
-                    const float pairSpread = (r[a] > r[b]) ? r[a] / r[b] : r[b] / r[a];
-                    if (grossA > 1.5f && grossB > 1.5f && pairSpread < 1.10f) {
-                        consensus = pair;
-                        how = "gross-outlier-rejected";
-                        members[0] = axisName[a][0];
-                        members[1] = axisName[b][0];
-                        members[2] = '\0';
-                    }
-                }
-            }
-            if (how != NULL && consensus > 1e-6f) {
+            members[m] = '\0';
+            if (m >= 1 && uniform) {
                 const float wasHeight = (modelH > 1e-3f && e->measuredH > 1e-3f)
                                           ? (e->measuredH / modelH) : 0.0f;
-                e->scale = consensus;
+                e->scale = sx; // the engine's own number, exactly -- not a measured approximation
                 e->state = 2;
-                Zelda3D_Report1to1(objId, modelKey, actor, r[0], r[1], r[2], e->scale, "consensus");
+                Zelda3D_Report1to1(objId, modelKey, actor, r[0], r[1], r[2], e->scale, "actor-scale");
                 if (Zelda3D_AutoMode() >= 1) {
                     fprintf(stderr,
-                            "SOH3D AUTO: obj 0x%x %s -> scale=%.5f FROM AXIS CONSENSUS [%s] via %s "
-                            "(h=%.5f x=%.5f z=%.5f; height-primary would have given %.5f, %+.1f%%)\n",
-                            objId, modelKey, e->scale, members, how, r[0], r[1], r[2], wasHeight,
+                            "SOH3D AUTO: obj 0x%x %s -> scale=%.5f FROM actor->scale, CONFIRMED 1:1 on "
+                            "[%s] (h=%.5f x=%.5f z=%.5f; height-primary would have given %.5f, %+.1f%%)\n",
+                            objId, modelKey, e->scale, members, r[0], r[1], r[2], wasHeight,
                             (wasHeight > 1e-6f) ? 100.0f * (e->scale / wasHeight - 1.0f) : 0.0f);
                     fflush(stderr);
                 }
                 return 0; // draw next frame, now that a scale exists
+            }
+            if (m >= 1 && !uniform && Zelda3D_AutoMode() >= 1) {
+                // Say it out loud rather than silently falling through: this is the King Zora class.
+                fprintf(stderr,
+                        "SOH3D AUTO: obj 0x%x %s CONFIRMED 1:1 on [%s] but actor->scale is NON-UNIFORM "
+                        "(%.5f,%.5f,%.5f) -- a single worldScale cannot express it, so the derived "
+                        "scale is used and the prop renders at a WRONG ASPECT. Needs per-axis scale.\n",
+                        objId, modelKey, members, sx, sy, sz);
+                fflush(stderr);
             }
         }
         if (tooFlat) {
