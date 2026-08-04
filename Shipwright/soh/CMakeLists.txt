@@ -621,6 +621,27 @@ if(NOT CMAKE_SYSTEM_NAME MATCHES "NintendoSwitch|CafeOS")
     #    COMMAND ${VS_COPY_ASSETS_CMD}
     )
 endif()
+
+# The RmlUi assets above are copied POST_BUILD on the soh target, which only runs when soh actually
+# relinks. Editing ONLY a .rml/.rcss therefore leaves ninja with nothing to do, the copy never fires,
+# and the game keeps running the OLD document -- the edit silently appears to do nothing. That cost a
+# debugging cycle on the launcher (a style change measured as byte-identical output) and would cost
+# one every time anybody touches the menu markup.
+#
+# So make the deployed copy a real build output that DEPENDS on the sources: touching any asset in
+# libultraship/assets/rml re-runs the copy on the next build, with no relink needed.
+file(GLOB_RECURSE ZELDA3D_RML_ASSETS CONFIGURE_DEPENDS ${CMAKE_SOURCE_DIR}/libultraship/assets/rml/*)
+add_custom_command(
+    OUTPUT ${CMAKE_BINARY_DIR}/soh/assets/rml/.stamp
+    COMMENT "Deploying RmlUi assets (menu + launcher)..."
+    COMMAND ${CMAKE_COMMAND} -E copy_directory_if_different
+            ${CMAKE_SOURCE_DIR}/libultraship/assets/rml ${CMAKE_BINARY_DIR}/soh/assets/rml
+    COMMAND ${CMAKE_COMMAND} -E touch ${CMAKE_BINARY_DIR}/soh/assets/rml/.stamp
+    DEPENDS ${ZELDA3D_RML_ASSETS}
+    VERBATIM
+)
+add_custom_target(zelda3d_rml_assets ALL DEPENDS ${CMAKE_BINARY_DIR}/soh/assets/rml/.stamp)
+add_dependencies(${PROJECT_NAME} zelda3d_rml_assets)
 ################################################################################
 # Dependencies
 ################################################################################

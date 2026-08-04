@@ -98,6 +98,8 @@ class SohRmlUi {
     void ShowLauncher(bool show);
     // Register the font families the launcher stylesheet names (RmlUi has no @font-face).
     void LoadLauncherFonts();
+    // Move the `selected` highlight onto whichever game's half currently holds focus.
+    void RefreshLauncherSelection();
     bool IsLauncherVisible() const {
         return mLauncherVisible;
     }

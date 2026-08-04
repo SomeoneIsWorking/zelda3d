@@ -92,6 +92,12 @@ status() {
 # (project hard rule) — so headless is opt-OUT here: set ZELDA3D_HEADLESS=0 for a headed run
 # (the user's own headed path is ./run.sh, which is unaffected).
 setup_headless() {
+    # The OoT/MM launcher is the DEFAULT entry point for a person, but this manager exists to boot
+    # straight into gameplay for harnesses, sweeps and screenshots -- a launcher sitting there
+    # waiting for a keypress would hang every one of them. So agent tooling opts out by default.
+    # Set ZELDA3D_LAUNCHER=1 explicitly to bring it up under this manager (that is how it is
+    # captured headlessly). ./run.sh, the user's own path, is untouched and gets the launcher.
+    export ZELDA3D_LAUNCHER="${ZELDA3D_LAUNCHER:-0}"
     [ "${ZELDA3D_HEADLESS:-1}" = "1" ] || return 0
     local disp="${ZELDA3D_HEADLESS_DISPLAY:-$DEFDISP}"
     if ! DISPLAY="$disp" xdpyinfo >/dev/null 2>&1; then

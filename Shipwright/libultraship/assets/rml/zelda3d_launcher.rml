@@ -11,6 +11,11 @@
 		/* Chiaro, the original heading face, is not shipped — no licence for it exists upstream
 		   (ATTRIBUTION.md). Fall back to Lato so headings render rather than disappearing. */
 		h1, h3, .subtitle-title__disclaimer { font-family: LatoLatin; }
+		/* The titles must not be focusable -- only the rows are -- but `disabled` also drops them to
+		   opacity 0.5, which halves the selected/unselected contrast that tells you which game Enter
+		   will start. Take the focus removal without the dimming: tab-index none here, full opacity,
+		   and the [selected] colour rule in recomp.rcss then reads at full strength. */
+		.subtitle-title { tab-index: none; opacity: 1; }
 	</style>
 </head>
 <body>
@@ -21,13 +26,13 @@
 			     This is that half filled in. -->
 			<div class="launcher__vertical-split">
 				<div class="launcher__title-quadrant">
-					<button class="subtitle-title" disabled>
+					<button id="title-oot" class="subtitle-title">
 						<div><h3>Zelda3D</h3></div>
 						<div><h1>Ocarina of Time</h1></div>
 					</button>
 				</div>
 				<div class="launcher__content-quadrant">
-					<button action="start_oot" class="menu-list-item" tabindex="auto" autofocus>
+					<button action="start_oot" half="oot" class="menu-list-item" tabindex="auto" autofocus>
 						<div class="menu-list-item__bullet">&#8226;</div>
 						<div class="menu-list-item__label">Start game</div>
 					</button>
@@ -40,17 +45,17 @@
 					<svg src="mm-clipped.svg" class="launcher__background-mm" />
 				</div>
 				<div class="launcher__title-quadrant launcher__title-quadrant--right">
-					<button class="subtitle-title subtitle-title--right" disabled>
+					<button id="title-mm" class="subtitle-title subtitle-title--right">
 						<div><h3>Zelda3D</h3></div>
 						<div><h1>Majora's Mask</h1></div>
 					</button>
 				</div>
 				<div class="launcher__content-quadrant">
-					<button action="start_mm" class="menu-list-item menu-list-item--right" tabindex="auto">
+					<button action="start_mm" half="mm" class="menu-list-item menu-list-item--right" tabindex="auto">
 						<div class="menu-list-item__bullet">&#8226;</div>
 						<div class="menu-list-item__label">Start game</div>
 					</button>
-					<button action="quit" class="menu-list-item menu-list-item--right" tabindex="auto">
+					<button action="quit" half="mm" class="menu-list-item menu-list-item--right" tabindex="auto">
 						<div class="menu-list-item__bullet">&#8226;</div>
 						<div class="menu-list-item__label">Exit</div>
 					</button>
@@ -58,9 +63,10 @@
 			</div>
 
 			<div class="bottom-left">
-				<label id="launcher-hint">&#8597; move &#183; Enter / A select</label>
+				<label id="launcher-hint">Up / Down to move &#183; Enter or A to select</label>
 			</div>
 		</div>
 	</div>
 </body>
 </rml>
+

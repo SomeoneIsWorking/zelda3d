@@ -319,10 +319,14 @@ bool SohRmlUi::Init(void* sdlWindow, void* glContext, int width, int height, boo
     if (const char* e = std::getenv("ZELDA3D_RMLUI_OPEN"); e && e[0] == '1') {
         SetVisible(true);
     }
-    // Same deal for the launcher: ZELDA3D_LAUNCHER=1 brings it up at startup so it can be captured
-    // headlessly with no input injection. This is the DEBUG entry point; the real one is the
-    // zelda3d layer showing it before the game is under way.
-    if (const char* e = std::getenv("ZELDA3D_LAUNCHER"); e && e[0] == '1') {
+    // The launcher is the ENTRY POINT: it comes up by default, before the player is in a game.
+    //
+    // ZELDA3D_LAUNCHER=0 opts out, and every headless tool sets it -- tools/zelda3d_game.sh boots
+    // straight to gameplay and a launcher waiting for a keypress would hang every harness run,
+    // sweep and screenshot in the repo. Defaulting ON with the tooling opting OUT (rather than the
+    // reverse) is what makes it the real entry point for a person while leaving all automation
+    // byte-identical in behaviour.
+    if (const char* e = std::getenv("ZELDA3D_LAUNCHER"); !(e && e[0] == '0')) {
         ShowLauncher(true);
     }
     return true;
@@ -391,6 +395,43 @@ extern "C" int Zelda3D_LauncherIsVisible(void) {
     return (sLiveRmlUi && sLiveRmlUi->IsLauncherVisible()) ? 1 : 0;
 }
 
+// Brighten the half that currently has focus. In Zelda64Recomp's original the chosen game's title
+// carries `selected`; here focus moves between the two halves, so the title has to follow it, or
+// both games sit dimmed and nothing indicates which one Enter will start.
+void SohRmlUi::RefreshLauncherSelection() {
+    if (!mLauncherDoc || !mContext) {
+        return;
+    }
+    Rml::Element* focus = mContext->GetFocusElement();
+    // `half` is carried by the ROWS, not the titles -- the titles are disabled and never focusable.
+    const Rml::String half = focus ? focus->GetAttribute<Rml::String>("half", "") : Rml::String();
+    if (half.empty()) {
+        return; // focus is not on a launcher row; leave the last selection standing
+    }
+    struct HalfTitle {
+        const char* id;
+        const char* name;
+    };
+    static const HalfTitle kTitles[] = { { "title-oot", "oot" }, { "title-mm", "mm" } };
+    for (const HalfTitle& t : kTitles) {
+        Rml::Element* el = mLauncherDoc->GetElementById(t.id);
+        if (el == nullptr) {
+            continue;
+        }
+        // `selected` is an ATTRIBUTE selector in their sheet (`.subtitle-title[selected]` -> full
+        // text colour), not a class -- SetClass here changes nothing at all, which is exactly how
+        // this first read as "the highlight does not work". The titles keep `disabled` because that
+        // is what holds them out of the focus order (the sheet gives every non-disabled
+        // subtitle-title a tab-index); its opacity applies to both halves equally, so the colour
+        // difference still reads.
+        if (half == t.name) {
+            el->SetAttribute("selected", "");
+        } else {
+            el->RemoveAttribute("selected");
+        }
+    }
+}
+
 void SohRmlUi::ShowLauncher(bool show) {
     if (!mInitialised || !mContext || mLauncherDoc == nullptr || show == mLauncherVisible) {
         return;
@@ -424,6 +465,7 @@ void SohRmlUi::ShowLauncher(bool show) {
     } else {
         mLauncherDoc->Hide();
     }
+    RefreshLauncherSelection();
 }
 
 void SohRmlUi::SetVisible(bool visible) {
@@ -863,6 +905,11 @@ void SohRmlUi::Resize(int width, int height) {
 void SohRmlUi::UpdateAndRender() {
     if (!mInitialised || !mContext || (!mVisible && !mLauncherVisible)) {
         return;
+    }
+    if (mLauncherVisible) {
+        // Cheap (two GetElementById + SetClass); keeping it per-frame means the highlight cannot
+        // drift out of sync with focus however focus was moved -- keyboard, controller or mouse.
+        RefreshLauncherSelection();
     }
 
     // Track the live window size so the context + render target follow window resizes. The RmlUi
