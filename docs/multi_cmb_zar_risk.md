@@ -916,7 +916,7 @@ The first pass picked three "obvious" mappings from Japanese alone. The three-ax
 |---|---|---|---|
 | SPIKED_BOX | `m_Hkenzan` (kenzan = spike bed) | 0.0938 / 0.100 / 0.100 | **agrees — routed** |
 | PROPELLER | `m_Hsyarin` (syarin = wheel) | 0.0200 / 0.0218 / **0.0033** | **REJECTED** |
-| GUILLOTINE_SLOW | `m_Hgiro` (giro = guillotine) | **0.0300** / 0.100 / 0.107 | right mesh, **withdrawn** |
+| GUILLOTINE_SLOW | `m_Hgiro` (giro = guillotine) | **0.0300** / 0.100 / 0.107 | right mesh, withdrawn here — **RESTORED in Pass 27** |
 
 **PROPELLER was simply the wrong mesh.** A 6x spread is the wrong-mesh signature, not a re-authoring
 gap. The N64 propeller measures 53 x 58 x 16 — about 530 x 580 x 160 at the usual 0.1 — and the ZAR
@@ -938,6 +938,53 @@ the visibly wrong one. That is no longer an observation, it is a pattern with th
 instances, and it makes **per-axis scale (or at minimum footprint-preferred scale when X and Z agree
 and Y does not)** the highest-value mechanism change left in this arc — it would unblock the guillotine,
 fix the coffin lid's 15% and King Zora's 1.5x, and cost nothing where all three axes already agree.
+
+## Pass 27 — AXIS CONSENSUS replaces height-primary (2026-08-04)
+
+Done, and it was the right call: the two cases it was designed for are both fixed, and it found a third
+defect nobody was looking for.
+
+Height, X and Z are three INDEPENDENT estimates of the same number. The derive now takes the **largest
+cluster of axes agreeing within 2%** (>=2 axes), and failing that rejects a **single gross outlier
+(>1.5x)** when the surviving pair agrees within 10%. Neither gate is a heuristic knob: two independent
+measurements landing within 2% of each other is not a coincidence, and a 3.3x dissent is a measurement
+failure by any standard. Where no consensus exists the old behaviour is untouched — which is the point,
+because a genuinely RE-AUTHORED mesh (Obj_Syokudai's chunkier wooden torch) must keep rendering at its
+own proportions rather than be bent toward an N64 shape.
+
+Verified live, both motivating cases:
+
+| routing | height-primary | axis consensus | change |
+|---|---|---|---|
+| `m_Hgiro` guillotine (Shadow Temple) | 0.03004 | **0.09999** (x=z agree exactly) | **+232.9%** — row RESTORED, submits=17289 |
+| `m_Hkhuta` coffin lid (Bottom of the Well) | 0.08463 | **0.09999** | **+18.1%** |
+| `m_Hkenzan` spiked box — **shipped last pass** | 0.09379 | **0.09999** | **+6.6%, silently wrong** |
+
+`m_Hkenzan` is the one nobody was looking for: it shipped in Pass 26 with three-axis agreement recorded
+as "agrees", but its height was 6.6% under the coherent X/Z pair and it was rendering that much small.
+
+**Regression check** — the same 10-scene sweep before and after (`scratch/1to1_data.txt`): 21 derives,
+10 take no consensus at all, and 9 of the 11 that do move by <=0.6%. Only two move materially, and both
+are arguable improvements rather than regressions: `zelda_spot09_obj` +2.4% (x=z=1.00000 exactly against
+h=0.97662) and `zelda_bdan_objects` -10.1% (x=z=0.01004 exactly against h=0.01116).
+
+**The measure itself is sound**: running the identical sweep twice gave BIT-IDENTICAL h/x/z ratios for
+19 of 20 objects (claim C047). The single exception is `zelda_bombf` (the bomb flower), whose ratios
+swung 34x on X across three runs — its N64 draw genuinely changes shape, so under height-primary its
+rendered scale was luck of the frame. Consensus refuses it in 2 of 3 runs. That actor needs its own
+investigation and is NOT claimed fixed here.
+
+**King Zora's ice block is still NOT fixed, and consensus cannot fix it** — it is a different root
+cause. Its actor scale is genuinely non-uniform (`kzIceScale = {0.18, 0.27, 0.24}`) and a single
+`worldScale` cannot express that at any consensus. That needs per-axis scale in the draw path, which is
+deliberately NOT done here because this pass measured a counterexample to the obvious implementation:
+`zelda_bdan_objects` has `actor->scale = (0.05, 0.20, 0.05)`, yet its measured height ratio is 11% off
+the uniform pair rather than the 4x that scale implies — so **`actor->scale` is not reliably the
+transform an actor's Draw actually applies**, and per-axis scale sourced from it would be wrong. Per-axis
+remains open, and now needs its evidence gathered before it is built rather than after.
+
+The new `SOH3D 1TO1` derive log is what settles that next step: it prints the three ratios against
+`actor->scale` on every derive, including an explicit negative when no axis matches.
 
 Routed this pass: SPIKED_BOX -> `m_Hkenzan` (submits=3066), PROPELLER -> `m_Hfofo` (submits=3528).
 Left alone: SPIKED_WALL / SPIKED_WALL_2, whose candidates `m_HhasamiN` / `m_HhasamiS` are MIRROR IMAGES

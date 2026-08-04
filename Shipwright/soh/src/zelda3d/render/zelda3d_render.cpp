@@ -1025,14 +1025,16 @@ static Zelda3D_ActorForcedAutoSlot sActorForcedAuto[] = {
     //                        agrees. m_Hsyarin's long axis is Z (4828) while the N64 list's SHORTEST
     //                        axis is Z; no amount of scaling reconciles that.
     //
-    //   0 GUILLOTINE_SLOW -> m_Hgiro is the right mesh but CANNOT BE DRAWN CORRECTLY YET, so it is
-    //                        withdrawn. X and Z hit 0.100 and 0.107 exactly, so the identification is
-    //                        sound, but height gives 0.0300 -- the OoT3D mesh is 13555 tall against a
-    //                        407-tall N64 list. Since the derived scale comes from HEIGHT, routing it
-    //                        renders the blade at 0.03 and therefore 3.3x TOO NARROW, which is worse
-    //                        than the faithful N64 draw. This is the third row where height-primary
-    //                        produces a visibly wrong scale while two footprint axes agree exactly
-    //                        (after the King Zora block and the Bottom of the Well coffin lid).
+    //   0 GUILLOTINE_SLOW -> m_Hgiro. WITHDRAWN on the pass that identified it, RESTORED 2026-08-04
+    //                        once the scale no longer came from height alone. X and Z hit 0.100 and
+    //                        0.107 so the identification was never in doubt; what blocked it was that
+    //                        height gives 0.0300 (a 13555-tall OoT3D mesh against a 407-tall N64 list)
+    //                        and the derived scale was height-primary, so the blade would have
+    //                        rendered 3.3x too narrow -- worse than the faithful N64 draw. This was
+    //                        the third row where height dissented while two footprint axes agreed
+    //                        (after the King Zora block and the Bottom of the Well coffin lid), and it
+    //                        is what motivated the AXIS CONSENSUS derive. That mechanism rejects the
+    //                        3.3x height outlier and takes the coherent X/Z pair, so the row can ship.
     //
     // params 2 and 3 (SPIKED_WALL, SPIKED_WALL_2) are LEFT UNROUTED ON PURPOSE. Their two candidates,
     // m_HhasamiN and m_HhasamiS (hasami = scissors), are MIRROR IMAGES -- identical 3563 x 1233 x 1014
@@ -1049,7 +1051,7 @@ static Zelda3D_ActorForcedAutoSlot sActorForcedAuto[] = {
     // minY-sign rule from the Goron City pass: minY < 0 means centre-origin, but whether to anchor
     // still depends on whether the ACTOR's Y is the prop's base or its hub -- a rolling boulder wants
     // the anchor, a propeller does not.
-    // { ACTOR_BG_HAKA_TRAP, 0x00FF, 0x0000, "m_Hgiro", 0, {0} },  // withdrawn -- see above
+    { ACTOR_BG_HAKA_TRAP, 0x00FF, 0x0000, "m_Hgiro", 0, {0} },  // restored by axis consensus -- see above
     { ACTOR_BG_HAKA_TRAP, 0x00FF, 0x0001, "m_Hkenzan", 0, {0} },
     // m_Hfofo is authored centre-origin (y[-222..315]) about the hub it spins on, exactly as its N64
     // list is, and Gfx_DrawDListOpa draws that list straight at the actor matrix with no offset. The
@@ -1336,6 +1338,60 @@ int Zelda3D_ActorObjectId(PlayState* play, Actor* actor) {
     return play->objectCtx.status[idx].id;
 }
 
+// --- The 1:1 check: is the "derived scale" really just the ACTOR'S OWN scale? ------------------
+// Zelda3D_EmitModelDraw applies `worldScale` uniformly and never multiplies actor->scale, so every
+// auto-routed prop has to recover the actor's scale from pixels: scale = measured-N64-extent /
+// CMB-extent. That inference is only necessary when Grezzo RE-AUTHORED the mesh at different
+// proportions. When the CMB is dimensionally 1:1 with the N64 display list -- which the Ice Cavern
+// row already proved happens (a RED_ICE_SMALL instance derived exactly 0.06000 = sRedIceScales[SMALL]
+// against a 1005-unit CMB) -- the ratio IS actor->scale, a number the engine holds EXACTLY and
+// per-axis. Three height-primary misfires (King Zora's block, the Bottom of the Well coffin lid, the
+// Shadow Temple guillotine) are all cases where one measured axis dissents from a value the actor
+// already knows.
+//
+// This reports the comparison so the mechanism change can be decided on data instead of on the three
+// anecdotes. It prints on EVERY derive, including when nothing matches -- a silent "no hits" here
+// would be indistinguishable from "the check never ran", and the re-authored case (Obj_Syokudai's
+// chunkier wooden torch, where no axis should match) is exactly the case that must stay visible.
+#define ZELDA3D_1TO1_TOL 0.02f // 2%: tight enough that 0.0847-vs-0.100 dissents, loose enough for
+                               // measure quantisation (the agreeing axes land within ~0.5%)
+static int Zelda3D_RatioMatches(float ratio, float actorScale) {
+    if (!(ratio > 1e-6f) || !(actorScale > 1e-6f)) return 0;
+    const float r = ratio / actorScale;
+    return (r > 1.0f - ZELDA3D_1TO1_TOL) && (r < 1.0f + ZELDA3D_1TO1_TOL);
+}
+static void Zelda3D_Report1to1(int objId, const char* modelKey, Actor* actor, float rh, float rx,
+                               float rz, float derived, const char* source) {
+    if (Zelda3D_AutoMode() < 1 || actor == NULL) return;
+    // A ratio of 0 means "that axis had no usable measurement", which is NOT a mismatch -- say which.
+    const int hv = (rh > 1e-6f), xv = (rx > 1e-6f), zv = (rz > 1e-6f);
+    const int hm = hv && Zelda3D_RatioMatches(rh, actor->scale.y);
+    const int xm = xv && Zelda3D_RatioMatches(rx, actor->scale.x);
+    const int zm = zv && Zelda3D_RatioMatches(rz, actor->scale.z);
+    const int nMatch = hm + xm + zm, nValid = hv + xv + zv;
+    const char* verdict;
+    if (nValid == 0) {
+        verdict = "NO AXIS MEASURED -- this check could not run";
+    } else if (nMatch == nValid && nValid == 3) {
+        verdict = "1:1 ON ALL THREE AXES -- actor->scale is exact, measurement is redundant";
+    } else if (nMatch == nValid) {
+        verdict = "1:1 on every MEASURED axis (some axes had no measurement)";
+    } else if (nMatch >= 2) {
+        verdict = "1:1 on 2 of 3 -- the dissenting axis is a BAD MEASURE, not a re-authoring";
+    } else if (nMatch == 1) {
+        verdict = "only ONE axis matches -- ambiguous, do not trust actor->scale here";
+    } else {
+        verdict = "NO AXIS MATCHES actor->scale -- CMB is RE-AUTHORED, keep the derived scale";
+    }
+    fprintf(stderr,
+            "SOH3D 1TO1: obj 0x%x %s src=%s derived=%.5f | actor->scale=(%.5f,%.5f,%.5f) "
+            "ratios h=%.5f%c x=%.5f%c z=%.5f%c | %d/%d -> %s\n",
+            objId, modelKey ? modelKey : "?", source, derived, actor->scale.x, actor->scale.y,
+            actor->scale.z, rh, hv ? (hm ? '=' : '!') : '-', rx, xv ? (xm ? '=' : '!') : '-', rz,
+            zv ? (zm ? '=' : '!') : '-', nMatch, nValid, verdict);
+    fflush(stderr);
+}
+
 // Try the ZELDA3D_AUTO path for an actor with no explicit sModelTable entry. Returns 1 if
 // it drew the OoT3D model (caller skips N64), 0 to let the N64 model draw (possibly while
 // measuring it this frame). mode is Zelda3D_AutoMode() (>=1).
@@ -1390,6 +1446,7 @@ static int Zelda3D_TryAuto(PlayState* play, Actor* actor) {
     // Per-actor forced-CMB routing (sActorForcedAuto): actors sharing a multi-CMB ZAR must
     // route through their OWN slot with a "<zar>|<cmb>" key so AUTO loads the right mesh
     // (see decl above). NULL slot -> default per-object cache.
+    // (the 1:1 check below is emitted from the derive branches; see Zelda3D_Report1to1.)
     Zelda3D_ActorForcedAutoSlot* forced = Zelda3D_FindActorForcedSlot(actor->id, (u16)actor->params);
     char forcedKeyBuf[256];
     const char* modelKey = zar;
@@ -1469,6 +1526,98 @@ static int Zelda3D_TryAuto(PlayState* play, Actor* actor) {
         const float foot = (e->measFootX > e->measFootZ) ? e->measFootX : e->measFootZ;
         const int tooFlat = (modelH <= 1e-3f) || (e->measuredH <= 1e-3f) ||
                           (foot > 1e-3f && e->measuredH < 0.05f * foot);
+
+        // --- AXIS CONSENSUS: height is one estimate of the scale, not the privileged one ----------
+        // Height, X and Z are three INDEPENDENT estimates of the SAME number whenever the CMB is
+        // dimensionally proportional to the N64 display list. The old order (height, else footprint)
+        // made height win even when the other two agreed with each other and it dissented -- and
+        // height was the WRONG choice every time that happened: King Zora's ice block, the Bottom of
+        // the Well coffin lid (x=z=0.100 exactly, h=0.0847, so the lid rendered 15% small in plan) and
+        // the Shadow Temple guillotine (x=0.100 z=0.107 against h=0.030, a 3.3x error that was bad
+        // enough to withdraw the routing rather than ship it).
+        //
+        // NOT a majority vote over all inputs, which would be a heuristic. Two GATES, each one strong
+        // evidence on its own, measured against every derive in the sweep (scratch/1to1_data.txt):
+        //   (1) a CLUSTER of >=2 axes agreeing within 2%. Two independent measurements of the same
+        //       quantity landing within 2% is not a coincidence; the dissenter is a bad measure.
+        //   (2) failing that, ONE axis that is a GROSS outlier (>1.5x) from the other two while those
+        //       two agree within 10%. A 3.3x dissent is a measurement failure by any standard.
+        // Everything else keeps the existing behaviour untouched. That matters: of the 20 derives in
+        // the sweep, this leaves 18 within 0.7% of what they already produce (the 3-of-3 agreements
+        // reduce to the same number) and deliberately does NOT fire on the genuinely re-authored
+        // meshes -- Obj_Syokudai's chunkier wooden torch, zelda_bombf (axes spread 25% with no tight
+        // pair), zelda_d_hsblock (0.040/0.080/0.016, no two axes near each other) -- where no
+        // consensus exists and inventing one would be exactly the parity-diff chasing this project
+        // forbids. A re-authored asset must keep rendering at ITS OWN proportions.
+        if (!tooFlat) {
+            float cmx = 0.0f, cmz = 0.0f;
+            const int haveXZ = Zelda3D_AutoModelExtentXZ(e->modelId, &cmx, &cmz);
+            float r[3] = { (modelH > 1e-3f && e->measuredH > 1e-3f) ? (e->measuredH / modelH) : 0.0f,
+                           (haveXZ && cmx > 1e-3f && e->measFootX > 1e-3f) ? (e->measFootX / cmx) : 0.0f,
+                           (haveXZ && cmz > 1e-3f && e->measFootZ > 1e-3f) ? (e->measFootZ / cmz) : 0.0f };
+            const char* axisName[3] = { "h", "x", "z" };
+            float consensus = 0.0f;
+            const char* how = NULL;
+            char members[8] = { 0 };
+            // (1) largest mutually-agreeing cluster at 2%.
+            int bestN = 0;
+            float bestSum = 0.0f;
+            char bestMembers[8];
+            for (int seed = 0; seed < 3; ++seed) {
+                if (!(r[seed] > 1e-6f)) continue;
+                int n = 0, m = 0;
+                float sum = 0.0f;
+                char mem[8];
+                for (int i = 0; i < 3; ++i) {
+                    if (!(r[i] > 1e-6f)) continue;
+                    const float q = r[i] / r[seed];
+                    if (q > 1.0f - 0.02f && q < 1.0f + 0.02f) {
+                        ++n; sum += r[i];
+                        mem[m++] = axisName[i][0];
+                    }
+                }
+                mem[m] = '\0';
+                if (n > bestN) { bestN = n; bestSum = sum; memcpy(bestMembers, mem, sizeof mem); }
+            }
+            if (bestN >= 2) {
+                consensus = bestSum / (float)bestN;
+                how = "cluster<=2%";
+                memcpy(members, bestMembers, sizeof members);
+            } else {
+                // (2) reject a single gross outlier when the surviving pair is coherent.
+                for (int out = 0; out < 3 && how == NULL; ++out) {
+                    const int a = (out + 1) % 3, b = (out + 2) % 3;
+                    if (!(r[out] > 1e-6f) || !(r[a] > 1e-6f) || !(r[b] > 1e-6f)) continue;
+                    const float pair = 0.5f * (r[a] + r[b]);
+                    const float grossA = (r[out] > r[a]) ? r[out] / r[a] : r[a] / r[out];
+                    const float grossB = (r[out] > r[b]) ? r[out] / r[b] : r[b] / r[out];
+                    const float pairSpread = (r[a] > r[b]) ? r[a] / r[b] : r[b] / r[a];
+                    if (grossA > 1.5f && grossB > 1.5f && pairSpread < 1.10f) {
+                        consensus = pair;
+                        how = "gross-outlier-rejected";
+                        members[0] = axisName[a][0];
+                        members[1] = axisName[b][0];
+                        members[2] = '\0';
+                    }
+                }
+            }
+            if (how != NULL && consensus > 1e-6f) {
+                const float wasHeight = (modelH > 1e-3f && e->measuredH > 1e-3f)
+                                          ? (e->measuredH / modelH) : 0.0f;
+                e->scale = consensus;
+                e->state = 2;
+                Zelda3D_Report1to1(objId, modelKey, actor, r[0], r[1], r[2], e->scale, "consensus");
+                if (Zelda3D_AutoMode() >= 1) {
+                    fprintf(stderr,
+                            "SOH3D AUTO: obj 0x%x %s -> scale=%.5f FROM AXIS CONSENSUS [%s] via %s "
+                            "(h=%.5f x=%.5f z=%.5f; height-primary would have given %.5f, %+.1f%%)\n",
+                            objId, modelKey, e->scale, members, how, r[0], r[1], r[2], wasHeight,
+                            (wasHeight > 1e-6f) ? 100.0f * (e->scale / wasHeight - 1.0f) : 0.0f);
+                    fflush(stderr);
+                }
+                return 0; // draw next frame, now that a scale exists
+            }
+        }
         if (tooFlat) {
             // Too flat to scale by height: match the FOOTPRINT instead, on whichever axis is better
             // determined. Same principle as Bg_Spot01_Idomizu's well water, which needed a bespoke
@@ -1489,6 +1638,9 @@ static int Zelda3D_TryAuto(PlayState* play, Actor* actor) {
                 if (s > 1e-6f) {
                     e->scale = s;
                     e->state = 2;
+                    Zelda3D_Report1to1(objId, modelKey, actor,
+                                       (modelH > 1e-3f) ? (e->measuredH / modelH) : 0.0f, sx, sz,
+                                       e->scale, "footprint");
                     if (Zelda3D_AutoMode() >= 1) {
                         // AXIS AGREEMENT is the quality signal for a footprint match: the X and Z
                         // ratios are two INDEPENDENT estimates of the same scale, so a large spread
@@ -1515,6 +1667,14 @@ static int Zelda3D_TryAuto(PlayState* play, Actor* actor) {
         if (modelH > 1e-3f && e->measuredH > 1e-3f) {
             e->scale = e->measuredH / modelH;
             e->state = 2;
+            {
+                float qx = 0.0f, qz = 0.0f;
+                const int haveXZ = Zelda3D_AutoModelExtentXZ(e->modelId, &qx, &qz);
+                Zelda3D_Report1to1(objId, modelKey, actor, e->scale,
+                                   (haveXZ && qx > 1e-3f) ? (e->measFootX / qx) : 0.0f,
+                                   (haveXZ && qz > 1e-3f) ? (e->measFootZ / qz) : 0.0f, e->scale,
+                                   "height");
+            }
             // CROSS-CHECK the height-derived scale against the FOOTPRINT. Height, X and Z are three
             // INDEPENDENT estimates of the same scale, so agreement is strong evidence the CMB is the
             // right mesh for this actor. Worked example: l_bigst's CMB is 300x90x300 against a measured
