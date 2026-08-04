@@ -19,7 +19,7 @@ The top entries are unambiguous regardless: 16 Fire Temple actors cannot all be 
 
 | object | id | actors | cmb | ZAR | first CMB names |
 |---|---|---|---|---|---|
-| OBJECT_HIDAN_OBJECTS | 0x002C | 16 | 31 | `zelda_hidan_objects.zar` | m_Fbmfl_model.cmb, m_Fbmwall1_model.cmb, m_Fbmwall2_model.cmb, m_Fdalm_model.cmb … |
+| ~~OBJECT_HIDAN_OBJECTS~~ **14 routed, 1 withdrawn, 6 excluded** | 0x002C | 16 | 31 | `zelda_hidan_objects.zar` | m_Fbmfl_model.cmb, m_Fbmwall1_model.cmb, m_Fbmwall2_model.cmb, m_Fdalm_model.cmb … |
 | OBJECT_JYA_OBJ | 0x00F1 | 10 | 38 | `zelda_jya_obj.zar` | l_j_1Flift_model.cmb, l_j_anahikari_model.cmb, l_j_anahikari_modelT.cmb, l_j_bigkagami_model.cmb … |
 | OBJECT_HAKA_OBJECTS | 0x0069 | 8 | 32 | `zelda_haka_objects.zar` | m_HADcoinshutter1_model.cmb, m_HADinv0b_model.cmb, m_HADinv0f_model.cmb, m_HADinv03_model.cmb … |
 | ~~OBJECT_MIZU_OBJECTS~~ **2 of 5 DONE** | 0x0059 | 8 | 18 | `zelda_mizu_objects.zar` | m_Wbomb00E_model.cmb, m_Wbomb0eE_model.cmb, m_Wbomb0eW_model.cmb, m_Wbomb03_model.cmb … |
@@ -1036,3 +1036,77 @@ this queue. `zelda_bombf` swings 34x on X between identical runs (C047) and is e
 Slot 29 (`ddanh_ago`) was never reached by any entrance tried and is therefore **not audited** — that is
 a gap in the evidence, not a clean bill of health.
 
+
+## Pass 28 — OBJECT_HIDAN_OBJECTS, the biggest row in the queue (2026-08-04)
+
+31 CMBs and, after the declaration check, **13 actors** rather than the 16 a grep reports —
+`Door_Shutter`, `Door_Killer` and `En_Door` reach this archive only through a per-scene secondary-object
+table and declare `GAMEPLAY_KEEP` / `DOOR_KILLER` themselves. **14 routed, 1 withdrawn, 6 excluded.**
+
+### The multi-DL screen, run first as usual
+
+Four of the thirteen draw more than one list and can never be routed to a single mesh:
+
+| actor | DLs | why |
+|---|---|---|
+| `Bg_Hidan_Rock` | 1 or 2 | base block + a conditional vertical flame (`unk_16C`) |
+| `Bg_Hidan_Sima` | 1 to 5 | platform + a fireball burst loop |
+| `Bg_Hidan_Sekizou` | 1 to 9 | statue + per-direction flame timers |
+| `Bg_Hidan_Rsekizou` | **9 always** | spinning flamethrower + 8 fireballs |
+
+**Two more are excluded for a reason the screen does not catch** — both are the `zelda_bombf` failure
+mode, an actor whose measured extents are not a constant:
+
+- `Bg_Hidan_Firewall` — the mesh is certain (`m_Ffirewall_modelT` is the only firewall mesh and it draws
+  one list), but its scale is **non-uniform and animated**: x=z=0.12 fixed while y sweeps 0.01→0.1 every
+  cycle. A single `worldScale` cannot express it, and the bbox measure would sample whichever y the
+  animation happened to be at, so the derived scale would be luck of the frame. Same class as King
+  Zora's ice — it wants a per-axis draw path, not a routing.
+- `Bg_Hidan_Kousi` 1 and 2 — `m_Fkousi2` and `m_Fkousi3` have **identical extents** (1597.4 × 1199.2 ×
+  44.6), so the three-axis test cannot separate them. Routed anyway, unlike the mirrored `m_HhasamiN/S`
+  spike walls: these are same-size gratings so a swap is at worst a mirrored fence, whereas leaving them
+  unrouted hands them AUTO's largest-CMB pick, which in this archive is `m_FOtiBFhead` — a 26154-unit
+  pillar. A wrong grating beats a tower.
+
+### Identification: 12 of 14 confirmed 1:1 on first attempt
+
+`tools/zar_extents.py` gave the candidate table and the live sweep gave the verdicts. Every routed slot
+resolves, draws, and confirms against `actor->scale`:
+
+| actor / params | CMB | axes confirmed |
+|---|---|---|
+| Fwbig (any) | `m_FfirewallBIG` | 2/2 (z unmeasurable) |
+| Fslift (any) | `m_Fhocklift` — "hocklift" = hookshot elevator | **3/3** |
+| Hrock 0 | `m_FOtiBFhead` — 26154 tall, by far the tallest mesh, = "TallestPillarAboveRoomBeforeBoss" | **3/3** |
+| Hrock 1, 2 | `m_FOtiMINI` (both params select the SAME N64 DL) | **3/3** |
+| Kowarerukabe 0 | `m_Fbmfl` — the only horizontal slab (1601 × 72 × 1700) = cracked stone FLOOR | 1/3 |
+| Kowarerukabe 1 | `m_Fbmwall1` | 2/2 |
+| Kousi 0, 1, 2 | `m_Fkousi1` / `2` / `3` | 2/2 each |
+| Dalm 0 / nonzero | `m_Fdalm_model` / `m_FdalmHEAD` | **3/3** each |
+| Hamstep 0 / nonzero | `m_FhamSTEP_model` / `m_FhamSTEP_1` | **3/3** each |
+| Syoku (no params) | `m_Fmboss` | **3/3** |
+
+`m_Fmboss` is the satisfying one: `Bg_Hidan_Syoku` draws `gFireTempleFlareDancerPlatformDL`, the Flare
+Dancer is the Fire Temple **mini-boss**, and `m_Fmboss` is the only mesh named for one. That was a pure
+name argument — the kind this arc has watched lose twice — and the measurement confirmed it 3/3.
+
+Two params traps, both read from source rather than assumed: `Bg_Hidan_Dalm`'s Init does `params &= 0xFF`
+after lifting a switch flag out of the high byte, and `Bg_Hidan_Hrock`'s Init does
+`params = (params >> 8) & 0xFF`, so at DRAW time — which is when a forced slot matches — Hrock's params
+IS the `dlists[]` index.
+
+### The one withdrawal, and the limitation it exposed
+
+`Kowarerukabe` params 2 (LARGE_BOMBABLE_WALL) is **withdrawn**. Its slot measures an N64 draw 120 tall ×
+160 wide and **no mesh in the archive is 1200 × 1600**: `m_Fbmwall2` (1600 × 1400) matches only on X,
+`m_Fbmwall3` (990 × 1200) only on height.
+
+The likely cause is a real limitation of the measure rather than a missing mesh: **`measFootX` /
+`measFootZ` are WORLD-space while the CMB extents are LOCAL**, so for a rotated flat wall the two do not
+correspond axis-to-axis at all. Every prop identified up to now has been effectively axis-aligned, which
+is why this never bit before. Folding `shape.rot.y` into the footprint comparison is the fix; until then
+**a vertical wall's footprint is not evidence**, and that is the highest-value mechanism change left.
+
+Params 1 shows the method working in the small: `m_Fbmwall2` was the first guess and the measurement
+rejected it (0.0375 / 0.0714 against an actor scale of 0.1); the mesh that is 0.1 on both is
+`m_Fbmwall1` (600 × 1000), corrected by arithmetic and then re-measured to 2/2.

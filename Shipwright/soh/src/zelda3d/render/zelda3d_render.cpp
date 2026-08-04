@@ -1063,6 +1063,75 @@ static Zelda3D_ActorForcedAutoSlot sActorForcedAuto[] = {
     { ACTOR_BG_HAKA_HUTA,   0, 0, "m_Hkhuta", 0, {0} },
     { ACTOR_BG_HAKA_MEGANE, 0x00FF, 0x0001, "m_Hsec03", 0, {0} },
     { ACTOR_BG_HAKA_MEGANE, 0x00FF, 0x0002, "m_Hinv05", 0, {0} },
+
+    // --- OBJECT_HIDAN_OBJECTS (Fire Temple) -- the largest row in the queue: 31 CMBs, and 13 actors
+    // that ACTUALLY declare it (a grep says 16; Door_Shutter, Door_Killer and En_Door only reach it
+    // through a per-scene secondary-object table and declare GAMEPLAY_KEEP / DOOR_KILLER themselves).
+    //
+    // MULTI-DL SCREEN FIRST, per the rule Pass 25 added. Four of the thirteen draw more than one list
+    // and are therefore NOT routable to a single mesh at any params -- routing them would DELETE
+    // geometry exactly as Obj_Syokudai would have deleted its flame:
+    //   Bg_Hidan_Rock      1 or 2  (base block + a conditional vertical flame, gated on unk_16C)
+    //   Bg_Hidan_Sima      1 to 5  (platform + a fireball burst loop)
+    //   Bg_Hidan_Sekizou   1 to 9  (statue + per-direction flame timers)
+    //   Bg_Hidan_Rsekizou  9 ALWAYS (spinning flamethrower + 8 fireballs)
+    //
+    // TWO MORE are excluded for a reason the screen does not catch, and both are the zelda_bombf
+    // failure mode -- an actor whose measured extents are not a constant:
+    //   Bg_Hidan_Firewall  the mesh is certain (m_Ffirewall_modelT is the only firewall mesh and the
+    //                      actor draws one list) but its scale is NON-UNIFORM AND ANIMATED -- x=z=0.12
+    //                      fixed while y sweeps 0.01..0.1 every cycle. A single worldScale cannot
+    //                      express it, and the bbox measure would sample whichever y the animation
+    //                      happened to be at, so the derived scale would be luck of the frame. Same
+    //                      class as King Zora's ice: it needs a per-axis draw path, not a routing.
+    //   Bg_Hidan_Kousi 1,2 m_Fkousi2 and m_Fkousi3 have IDENTICAL extents (1597.4 x 1199.2 x 44.6), so
+    //                      the three-axis test cannot tell them apart -- the m_HhasamiN/S situation.
+    //                      Routed anyway (see below) because unlike the mirrored spike walls these two
+    //                      are same-size gratings, so a swap is at worst a mirrored fence, whereas
+    //                      leaving them unrouted hands them AUTO's largest-CMB pick, which in THIS
+    //                      archive is m_FOtiBFhead -- a 26154-unit pillar. Wrong grating beats a tower.
+    //
+    // Params mappings are read from each actor's Draw, NOT guessed. Note two traps: Bg_Hidan_Dalm's
+    // Init does `params &= 0xFF` after lifting the switch flag out of the high byte, and
+    // Bg_Hidan_Hrock's Init does `params = (params >> 8) & 0xFF`, so at DRAW time (which is when a
+    // forced slot is matched) Hrock's params IS the dlists[] index. Both were verified in source.
+    { ACTOR_BG_HIDAN_FWBIG,  0, 0, "m_FfirewallBIG", 0, {0} },   // one DL always, one candidate mesh
+    { ACTOR_BG_HIDAN_FSLIFT, 0, 0, "m_Fhocklift", 0, {0} },      // "hocklift" = hookshot elevator
+    // dlists[0] is gFireTempleTallestPillarAboveRoomBeforeBossDL and m_FOtiBFhead is 26154 units tall
+    // -- by far the tallest mesh in the archive, which is the identification. 1 and 2 select the SAME
+    // N64 DL (PillarInsertedInGround), so they share the mesh too.
+    { ACTOR_BG_HIDAN_HROCK,  0x00FF, 0x0000, "m_FOtiBFhead", 0, {0} },
+    { ACTOR_BG_HIDAN_HROCK,  0x00FF, 0x0001, "m_FOtiMINI", 0, {0} },
+    { ACTOR_BG_HIDAN_HROCK,  0x00FF, 0x0002, "m_FOtiMINI", 0, {0} },
+    // params 0 = CRACKED_STONE_FLOOR, and m_Fbmfl ("bomb floor") is the only HORIZONTAL slab in the
+    // set (1601 x 72 x 1700); every other bm* mesh is a zero-thickness vertical wall.
+    { ACTOR_BG_HIDAN_KOWARERUKABE, 0x00FF, 0x0000, "m_Fbmfl_model", 0, {0} },
+    // params 1 = BOMBABLE_WALL. m_Fbmwall2 was the first guess (largest plausible wall) and the
+    // measurement REJECTED it: the slot measures an N64 draw 100 tall x 60 wide, which against
+    // m_Fbmwall2's 1600 x 1400 gives 0.0375 / 0.0714 -- neither near the actor's 0.1. The mesh that
+    // IS 0.1 on both is m_Fbmwall1 (600 x 1000). Corrected by arithmetic, then re-measured.
+    { ACTOR_BG_HIDAN_KOWARERUKABE, 0x00FF, 0x0001, "m_Fbmwall1", 0, {0} },
+    // params 2 = LARGE_BOMBABLE_WALL is WITHDRAWN, not shipped on a guess. Its slot measures 120 tall
+    // x 160 wide, and NO mesh in the archive is 1200 x 1600: m_Fbmwall2 (1600 x 1400) matches only on
+    // X, m_Fbmwall3 (990 x 1200) only on height. The likely reason it cannot be pinned this way is a
+    // real limitation of the measure rather than a missing mesh -- measFootX/measFootZ are WORLD-space
+    // while the CMB extents are LOCAL, so for a rotated flat wall the two do not correspond axis to
+    // axis at all. Every prop identified so far has been effectively axis-aligned, which is why this
+    // has not bitten before. Fixing it means folding shape.rot.y into the footprint comparison; until
+    // then a vertical wall's footprint is not evidence.
+    // { ACTOR_BG_HIDAN_KOWARERUKABE, 0x00FF, 0x0002, "m_Fbmwall4", 0, {0} },  // withdrawn -- see above
+    { ACTOR_BG_HIDAN_KOUSI,  0x00FF, 0x0000, "m_Fkousi1", 0, {0} },
+    { ACTOR_BG_HIDAN_KOUSI,  0x00FF, 0x0001, "m_Fkousi2", 0, {0} },
+    { ACTOR_BG_HIDAN_KOUSI,  0x00FF, 0x0002, "m_Fkousi3", 0, {0} },
+    // params 0 -> body, ANY nonzero -> head, so the catch-all MUST follow the 0 row (first match wins).
+    { ACTOR_BG_HIDAN_DALM,   0x00FF, 0x0000, "m_Fdalm_model", 0, {0} },
+    { ACTOR_BG_HIDAN_DALM,   0, 0, "m_FdalmHEAD", 0, {0} },
+    { ACTOR_BG_HIDAN_HAMSTEP, 0x00FF, 0x0000, "m_FhamSTEP_model", 0, {0} },
+    { ACTOR_BG_HIDAN_HAMSTEP, 0, 0, "m_FhamSTEP_1", 0, {0} },
+    // Bg_Hidan_Syoku draws gFireTempleFlareDancerPlatformDL and takes no params. The Flare Dancer is
+    // the Fire Temple MINI-BOSS, and m_Fmboss ("mboss") is the only mesh named for one. That is a name
+    // argument, which this arc has seen lose twice, so it is provisional until the ratios confirm it.
+    { ACTOR_BG_HIDAN_SYOKU,  0, 0, "m_Fmboss", 0, {0} },
 };
 // Two DIFFERENT reasons an auto slot stops trying, which used to share state 3 and therefore shared
 // its permanence:
@@ -1557,7 +1626,13 @@ static int Zelda3D_TryAuto(PlayState* play, Actor* actor) {
         // A non-uniform actor->scale is REFUSED rather than approximated: a single worldScale cannot
         // express it. That is King Zora's red ice (kzIceScale = {0.18, 0.27, 0.24}) and it stays an
         // open row for a per-axis draw path, not something to average away here.
-        if (!tooFlat && actor != NULL) {
+        // FLAT props run this too. A zero-thickness mesh has no usable height ratio, so r[0] comes out
+        // 0 and is skipped as "not measured" -- but its two FOOTPRINT axes are exactly as good a
+        // confirmation as any, and taking actor->scale beats averaging two noisy ratios. This matters
+        // for a whole class: the Fire Temple breakable walls (m_Fbmwall1..4) and every other
+        // zero-Z-extent mesh would otherwise fall to the footprint average and never get the exact
+        // number. If neither axis confirms, control falls through to the footprint path unchanged.
+        if (actor != NULL) {
             float cmx = 0.0f, cmz = 0.0f;
             const int haveXZ = Zelda3D_AutoModelExtentXZ(e->modelId, &cmx, &cmz);
             const float r[3] = {
