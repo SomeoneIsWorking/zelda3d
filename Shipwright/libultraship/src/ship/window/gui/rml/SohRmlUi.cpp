@@ -6,6 +6,8 @@
 #include "RmlRenderInterfaceSdl3Gpu.h"
 #endif
 
+#include <fstream>
+#include <iterator>
 #include <RmlUi/Core.h>
 #include <RmlUi/Core/Input.h>
 #include <RmlUi/Core/EventListener.h>
@@ -36,6 +38,10 @@ extern "C" int gZelda3dMenuWarp = -1;
 // Debug-menu restart request: a row with `restart="1"` sets this to 1; zelda3d.c's per-frame
 // Zelda3D_ReplPoll consumes it (it has the PlayState) and returns to the title screen.
 extern "C" int gZelda3dMenuRestart = 0;
+// Launcher choice, consumed by the zelda3d layer (which owns process control -- this layer must not
+// exec anything). 0 = nothing chosen yet, 1 = Ocarina of Time, 2 = Majora's Mask, 3 = quit.
+// Set from the launcher document's `action="..."` rows exactly as the warp/restart rows above work.
+extern "C" int gZelda3dLauncherAction = 0;
 
 // Link render/anim mode, cycled by the `linkmode` row: 0 = N64 model + N64 anim, 1 = 3DS model +
 // N64-retarget anim, 2 = 3DS model + 3DS-own CSAB anim. zelda3d.c's Zelda3D_ReplPoll applies it to
@@ -265,6 +271,7 @@ bool SohRmlUi::Init(void* sdlWindow, void* glContext, int width, int height, boo
     if (!Rml::LoadFontFace(fontPath, true)) {
         SPDLOG_ERROR("[SohRmlUi] Failed to load font face: {}", fontPath);
     }
+    LoadLauncherFonts();
 
     mContext = Rml::CreateContext("zelda3d", Rml::Vector2i(mWidth, mHeight));
     if (!mContext) {
@@ -283,6 +290,14 @@ bool SohRmlUi::Init(void* sdlWindow, void* glContext, int width, int height, boo
     // Start hidden; the menu is shown on demand via ToggleVisible() (Phase 2). The document stays
     // loaded either way — we gate update/render + input on mVisible.
     mDocument->Show();
+    // The OoT/MM launcher is a SECOND document in the same context. It is loaded here and left
+    // hidden; ShowLauncher() swaps which of the two is up. Failing to load it is NOT fatal -- the
+    // game must still boot without a launcher -- so this warns and continues.
+    const std::string launcherPath = Context::GetPathRelativeToAppBundle("assets/rml/zelda3d_launcher.rml");
+    mLauncherDoc = mContext->LoadDocument(launcherPath);
+    if (!mLauncherDoc) {
+        SPDLOG_WARN("[SohRmlUi] Failed to load launcher document: {} (game still boots)", launcherPath);
+    }
     // Scale the dp-authored sheet to this display's content scale (HiDPI).
     ApplyDensityRatio();
     // Mouse parity: clicking a <tab> switches to it (keyboard/D-pad Left/Right already do).
@@ -297,7 +312,100 @@ bool SohRmlUi::Init(void* sdlWindow, void* glContext, int width, int height, boo
     if (const char* e = std::getenv("ZELDA3D_RMLUI_OPEN"); e && e[0] == '1') {
         SetVisible(true);
     }
+    // Same deal for the launcher: ZELDA3D_LAUNCHER=1 brings it up at startup so it can be captured
+    // headlessly with no input injection. This is the DEBUG entry point; the real one is the
+    // zelda3d layer showing it before the game is under way.
+    if (const char* e = std::getenv("ZELDA3D_LAUNCHER"); e && e[0] == '1') {
+        ShowLauncher(true);
+    }
     return true;
+}
+
+// Fonts the launcher stylesheet asks for by family name. RmlUi has no @font-face, so every family
+// used in RCSS must be registered here first or the element silently renders nothing but a warning.
+//
+// The interesting one is `chiaro`. That is Zelda64Recomp's heading face and recomp.rcss asks for it
+// in a dozen places (headings, menu row labels, the version label). We do not ship it -- no licence
+// for it exists upstream, see ATTRIBUTION.md -- so rather than editing a GENERATED stylesheet in a
+// dozen places (which regenerating the Sass would silently undo), Lato is registered UNDER THE NAME
+// `chiaro`. Every `font-family: chiaro` then resolves to a real face and the sheet stays pristine.
+// Dropping the licensed ChiaroNormal/ChiaroBold.otf into assets/rml/ and pointing these two calls at
+// them is the whole change needed to restore the original look.
+void SohRmlUi::LoadLauncherFonts() {
+    struct FaceSpec {
+        const char* file;
+        const char* family; // nullptr = use the font's own family name
+        Rml::Style::FontWeight weight;
+    };
+    static const FaceSpec kFaces[] = {
+        { "assets/rml/LatoLatin-Bold.ttf", nullptr, Rml::Style::FontWeight::Bold },
+        // Chiaro stand-ins (see above).
+        { "assets/rml/LatoLatin-Regular.ttf", "chiaro", Rml::Style::FontWeight::Normal },
+        { "assets/rml/LatoLatin-Bold.ttf", "chiaro", Rml::Style::FontWeight::Bold },
+        // Controller/prompt glyphs, SIL OFL 1.1 and shipped with its licence.
+        { "assets/rml/promptfont/promptfont.ttf", "promptfont", Rml::Style::FontWeight::Normal },
+    };
+    for (const FaceSpec& f : kFaces) {
+        const std::string path = Context::GetPathRelativeToAppBundle(f.file);
+        bool ok;
+        if (f.family == nullptr) {
+            ok = Rml::LoadFontFace(path, false, f.weight);
+        } else {
+            // The family-override overload takes a byte span, so the file is read here -- and the
+            // buffer MUST OUTLIVE RmlUi. Its contract is explicit ("the pointed to 'data' must
+            // remain available until after the call to Rml::Shutdown"): FreeType keeps a pointer
+            // into it rather than copying. A local vector here crashes the process moments later,
+            // which is exactly what it did before this was a static.
+            static std::vector<std::vector<Rml::byte>> sFontBuffers;
+            std::ifstream in(path, std::ios::binary);
+            sFontBuffers.emplace_back((std::istreambuf_iterator<char>(in)), std::istreambuf_iterator<char>());
+            const std::vector<Rml::byte>& data = sFontBuffers.back();
+            ok = !data.empty() &&
+                 Rml::LoadFontFace(Rml::Span<const Rml::byte>(data.data(), data.size()), f.family,
+                                   Rml::Style::FontStyle::Normal, f.weight, false);
+        }
+        // A missing face is reported, never swallowed: the symptom otherwise is text that simply
+        // does not draw, with the cause buried in an RmlUi warning per element per frame.
+        if (!ok) {
+            SPDLOG_ERROR("[SohRmlUi] launcher font FAILED to load: {} (family {})", path,
+                         f.family ? f.family : "<own>");
+        }
+    }
+}
+
+void SohRmlUi::ShowLauncher(bool show) {
+    if (!mInitialised || !mContext || mLauncherDoc == nullptr || show == mLauncherVisible) {
+        return;
+    }
+    mLauncherVisible = show;
+    // Same input block the ESC menu uses -- the game is running behind the launcher and must not
+    // see the keys that are driving it.
+    if (auto ctx = Ship::Context::GetRawInstance(); ctx && ctx->GetControlDeck()) {
+        if (show) {
+            ctx->GetControlDeck()->BlockGameInput(ZELDA3D_RML_MENU_BLOCK_ID);
+        } else {
+            ctx->GetControlDeck()->UnblockGameInput(ZELDA3D_RML_MENU_BLOCK_ID);
+        }
+    }
+    if (show) {
+        if (mDocument) {
+            mDocument->Hide(); // never both at once
+        }
+        mLauncherDoc->Show();
+        mContext->Update();
+        // Focus the first focusable row so a controller/keyboard can drive it immediately, matching
+        // how the ESC menu focuses its first row on open.
+        Rml::ElementList rows;
+        mLauncherDoc->GetElementsByTagName(rows, "button");
+        for (Rml::Element* r : rows) {
+            if (!r->GetAttribute<Rml::String>("action", "").empty()) {
+                r->Focus();
+                break;
+            }
+        }
+    } else {
+        mLauncherDoc->Hide();
+    }
 }
 
 void SohRmlUi::SetVisible(bool visible) {
@@ -364,6 +472,27 @@ void SohRmlUi::ActivateFocused() {
     // toggle the control it wraps; otherwise activate the focused element directly. This lets a
     // controller "A"/Enter flip a checkbox while focus rests on the readable row, not the tiny box.
     // Debug warp rows: `warp="<entrance>"` requests a scene transition (level select / boss fight).
+    // Launcher rows: `action="start_oot|start_mm|quit"`. Recorded for the zelda3d layer and the
+    // launcher is dismissed; the actual game start / process swap happens there, not here.
+    {
+        const Rml::String action = focus->GetAttribute<Rml::String>("action", "");
+        if (!action.empty()) {
+            if (action == "start_oot") {
+                gZelda3dLauncherAction = 1;
+            } else if (action == "start_mm") {
+                gZelda3dLauncherAction = 2;
+            } else if (action == "quit") {
+                gZelda3dLauncherAction = 3;
+            } else {
+                // An unknown action is a TYPO IN THE DOCUMENT, not a no-op to swallow silently --
+                // it would read as "the button does nothing" and send someone into the C++.
+                SPDLOG_ERROR("[SohRmlUi] launcher row has unknown action=\"{}\" -- ignored", action);
+                return;
+            }
+            ShowLauncher(false);
+            return;
+        }
+    }
     const Rml::String warp = focus->GetAttribute<Rml::String>("warp", "");
     if (!warp.empty()) {
         gZelda3dMenuWarp = std::atoi(warp.c_str());
@@ -593,7 +722,7 @@ bool SohRmlUi::ProcessSdlEvent(void* sdlEvent) {
         return true;
     }
 
-    if (!mVisible) {
+    if (!mVisible && !mLauncherVisible) {
         return false;
     }
 
@@ -714,7 +843,7 @@ void SohRmlUi::Resize(int width, int height) {
 
 
 void SohRmlUi::UpdateAndRender() {
-    if (!mInitialised || !mContext || !mVisible) {
+    if (!mInitialised || !mContext || (!mVisible && !mLauncherVisible)) {
         return;
     }
 

@@ -1,0 +1,66 @@
+<rml>
+<head>
+	<title>Zelda3D</title>
+	<!-- rml.rcss is RmlUi's stock element sheet; recomp.rcss is Zelda64Recomp's compiled style
+	     sheet (GPL-3.0, see ATTRIBUTION.md). recomp.rcss is a Dart Sass ARTEFACT — edit
+	     scss/styles/components/Launcher.scss and regenerate, never the .rcss directly. -->
+	<link type="text/rcss" href="rml.rcss"/>
+	<link type="text/rcss" href="recomp.rcss"/>
+	<style>
+		body { width: 100%; height: 100%; }
+		/* Chiaro, the original heading face, is not shipped — no licence for it exists upstream
+		   (ATTRIBUTION.md). Fall back to Lato so headings render rather than disappearing. */
+		h1, h3, .subtitle-title__disclaimer { font-family: LatoLatin; }
+	</style>
+</head>
+<body>
+	<div id="window">
+		<div class="launcher">
+			<!-- LEFT: Ocarina of Time. Zelda64Recomp's own launcher has this quadrant as a
+			     disabled "Coming Soon™" button — they framed both games and shipped only MM.
+			     This is that half filled in. -->
+			<div class="launcher__vertical-split">
+				<div class="launcher__title-quadrant">
+					<button class="subtitle-title" disabled>
+						<div><h3>Zelda3D</h3></div>
+						<div><h1>Ocarina of Time</h1></div>
+					</button>
+				</div>
+				<div class="launcher__content-quadrant">
+					<button action="start_oot" class="menu-list-item" tabindex="auto" autofocus>
+						<div class="menu-list-item__bullet">&#8226;</div>
+						<div class="menu-list-item__label">Start game</div>
+					</button>
+				</div>
+			</div>
+
+			<!-- RIGHT: Majora's Mask. -->
+			<div class="launcher__vertical-split launcher__vertical-split--right">
+				<div class="launcher__background-wrapper">
+					<svg src="mm-clipped.svg" class="launcher__background-mm" />
+				</div>
+				<div class="launcher__title-quadrant launcher__title-quadrant--right">
+					<button class="subtitle-title subtitle-title--right" disabled>
+						<div><h3>Zelda3D</h3></div>
+						<div><h1>Majora's Mask</h1></div>
+					</button>
+				</div>
+				<div class="launcher__content-quadrant">
+					<button action="start_mm" class="menu-list-item menu-list-item--right" tabindex="auto">
+						<div class="menu-list-item__bullet">&#8226;</div>
+						<div class="menu-list-item__label">Start game</div>
+					</button>
+					<button action="quit" class="menu-list-item menu-list-item--right" tabindex="auto">
+						<div class="menu-list-item__bullet">&#8226;</div>
+						<div class="menu-list-item__label">Exit</div>
+					</button>
+				</div>
+			</div>
+
+			<div class="bottom-left">
+				<label id="launcher-hint">&#8597; move &#183; Enter / A select</label>
+			</div>
+		</div>
+	</div>
+</body>
+</rml>
