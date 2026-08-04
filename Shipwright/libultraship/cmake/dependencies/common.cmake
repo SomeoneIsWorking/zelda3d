@@ -30,6 +30,22 @@ list(APPEND ADDITIONAL_LIB_INCLUDES
 set(RMLUI_SAMPLES OFF)
 set(RMLUI_FONT_ENGINE "freetype")
 set(RMLUI_LUA_BINDINGS OFF)
+# The <svg> element. RmlUi 6.x ships an SVG plugin compiled into rmlui_core when this is ON; it is
+# backed by lunasvg, which RmlUi's own CMake resolves (vcpkg/find_package, else FetchContent).
+# Needed by the OoT/MM launcher document, whose per-game background art is vector — see
+# ATTRIBUTION.md. Nothing else in the tree uses <svg>, so if lunasvg ever becomes a problem on a
+# platform, the fallback is to rasterise the art to PNG and use <img> instead.
+set(RMLUI_SVG_PLUGIN ON)
+# RmlUi 6.2 does NOT vendor or fetch lunasvg -- it only find_package()s it and hard-errors if the
+# lunasvg::lunasvg target is absent. So fetch it here, BEFORE RmlUi is made available, which leaves
+# the target defined in the same directory scope for RmlUi's check to find. Pinned to the 2.x line
+# because RmlUi 6.2 calls Document::boundingBox(), which is the 3.x API (2.x named it box()).
+FetchContent_Declare(
+    lunasvg
+    GIT_REPOSITORY https://github.com/sammycage/lunasvg.git
+    GIT_TAG v3.3.0
+)
+FetchContent_MakeAvailable(lunasvg)
 # Force RmlUi's sub-targets static regardless of the parent's BUILD_SHARED_LIBS.
 set(rmlui_saved_build_shared_libs "${BUILD_SHARED_LIBS}")
 set(BUILD_SHARED_LIBS OFF)
