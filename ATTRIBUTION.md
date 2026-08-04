@@ -34,8 +34,16 @@ Ship of Harkinian and 2S2H instead, which is a different approach entirely.
 
 - **Lato** (`LatoLatin-*.ttf`) — SIL Open Font License 1.1. Licence text ships alongside the font at
   `Shipwright/libultraship/assets/rml/LatoLatin-LICENSE.txt`.
-- **Chiaro**, **NotoEmoji**, **promptfont** — used by Zelda64Recomp's UI; each carries its own terms
-  upstream. **Unverified here** — confirm before shipping any that get pulled in.
+- **promptfont** (`promptfont/`) — SIL Open Font License 1.1, verified from the `LICENSE.txt` that
+  ships with it. Provides the controller/prompt glyphs.
+- **NotoEmoji** — SIL Open Font License 1.1 upstream. **Unverified here** (no licence file travelled
+  with the font); confirm before distribution.
+- **Chiaro** — **DELIBERATELY NOT INCLUDED.** It is the heading font of Zelda64Recomp's launcher
+  (`font-family: chiaro` in `recomp.rcss`), but no licence for it exists anywhere in their repository
+  and it does not appear to be an open font. Shipping it on that basis would repeat exactly the
+  mistake this file was written to fix, so the launcher falls back to Lato for headings instead. If
+  its licence can be established, adding the two `.otf` files restores the original look with no
+  other change.
 
 ## Vendored engine components
 
@@ -60,6 +68,9 @@ dropped the upstream repo roots. Both are believed MIT upstream; confirm before 
 - **StormLib** — our fork of <https://github.com/ladislav-zezula/StormLib> (submodule).
 - **RmlUi**, **prism**, **dr_libs**, **monocypher**, **libgfxd**, **tinyxml2** — pulled by CMake
   FetchContent or vendored inside ZAPDTR, each under its own upstream licence.
+- **lunasvg** + **plutovg** (<https://github.com/sammycage/lunasvg>, MIT) — fetched at v3.3.0 to back
+  RmlUi's optional SVG plugin, which the launcher needs for its per-game background art. RmlUi 6.2
+  does not vendor it and hard-errors without it.
 
 ## Game assets
 
