@@ -87,6 +87,20 @@ class SohRmlUi {
     bool IsVisible() const {
         return mVisible;
     }
+
+    /**
+     * @brief Show/hide the OoT/MM launcher document (a second document in the same context).
+     *
+     * Mutually exclusive with the ESC menu. Choosing a row sets gZelda3dLauncherAction and hides
+     * the launcher; the zelda3d layer consumes that and owns what actually happens, because
+     * starting a game / swapping process is not this layer's business.
+     */
+    void ShowLauncher(bool show);
+    // Register the font families the launcher stylesheet names (RmlUi has no @font-face).
+    void LoadLauncherFonts();
+    bool IsLauncherVisible() const {
+        return mLauncherVisible;
+    }
     void SetVisible(bool visible);
     void ToggleVisible() {
         SetVisible(!mVisible);
@@ -138,6 +152,8 @@ class SohRmlUi {
     std::unique_ptr<SystemInterface_SDL> mSystemInterface;
     Rml::Context* mContext = nullptr;          // owned by RmlUi, freed by Rml::Shutdown()
     Rml::ElementDocument* mDocument = nullptr;  // ESC menu doc — owned by the context
+    Rml::ElementDocument* mLauncherDoc = nullptr; // OoT/MM launcher doc — owned by the context
+    bool mLauncherVisible = false;
     // Per-<tab> click listeners (own their lifetime; must outlive the document's elements).
     std::vector<std::unique_ptr<Rml::EventListener>> mTabClickListeners;
 };
