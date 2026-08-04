@@ -1840,6 +1840,42 @@ static void Zelda3D_ReplExec(PlayState* play, char* line, const char* outPath) {
         // draws. So this sets a persistent override that Interface_Draw re-applies each frame.
         gZelda3dNaviCallForce = (f1 != 0.0f) ? 1 : 0;
         Zelda3D_ReplReply(outPath, "navicall=%d (forced each frame)", gZelda3dNaviCallForce);
+    } else if (strcmp(cmd, "launcher") == 0) {
+        // Drive the OoT/MM launcher without input injection -- the launcher runs on RmlUi's own SDL
+        // event path, which the `key` command (which fills the N64 pad) cannot reach, so there was no
+        // way to exercise it headlessly at all.
+        //   launcher            report state
+        //   launcher 1 | 0      show / hide
+        //   launcher pick oot|mm|quit    take the choice, exactly as activating the row does
+        // `pick mm` is the end-to-end test: it execs mm.elf over this process, so the SAME pid comes
+        // back as a different binary (readlink /proc/<pid>/exe).
+        char arg[32] = { 0 }, arg2[32] = { 0 };
+        const int n = sscanf(line, "%*s %31s %31s", arg, arg2);
+        extern int gZelda3dLauncherAction;
+        extern void Zelda3D_LauncherShow(int show);
+        extern int Zelda3D_LauncherIsVisible(void);
+        if (n <= 0) {
+            Zelda3D_ReplReply(outPath, "launcher visible=%d (usage: launcher 0|1 | launcher pick oot|mm|quit)",
+                              Zelda3D_LauncherIsVisible());
+        } else if (strcmp(arg, "pick") == 0) {
+            const int which = (n >= 2 && strcmp(arg2, "oot") == 0)    ? 1
+                              : (n >= 2 && strcmp(arg2, "mm") == 0)   ? 2
+                              : (n >= 2 && strcmp(arg2, "quit") == 0) ? 3
+                                                                      : 0;
+            if (which == 0) {
+                // Refuse an unrecognised pick rather than silently doing nothing, which would read
+                // as "the launcher is broken".
+                Zelda3D_ReplReply(outPath, "launcher pick: expected oot|mm|quit, got '%s' -- NOTHING DONE",
+                                  n >= 2 ? arg2 : "(nothing)");
+            } else {
+                gZelda3dLauncherAction = which;
+                Zelda3D_ReplReply(outPath, "launcher pick %s -> action %d queued", arg2, which);
+            }
+        } else {
+            const int want = atoi(arg);
+            Zelda3D_LauncherShow(want);
+            Zelda3D_ReplReply(outPath, "launcher visible=%d", Zelda3D_LauncherIsVisible());
+        }
     } else if (strcmp(cmd, "nativehud") == 0 && sscanf(line, "%*s %f", &f1) == 1) {
         // #205 — force the native HUD path on/off live. Off makes every converted element fall back
         // to its Fast3D display list, so an element's native and interpreter renders can be captured

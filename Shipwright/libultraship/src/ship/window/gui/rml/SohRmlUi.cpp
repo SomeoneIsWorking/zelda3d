@@ -42,6 +42,12 @@ extern "C" int gZelda3dMenuRestart = 0;
 // exec anything). 0 = nothing chosen yet, 1 = Ocarina of Time, 2 = Majora's Mask, 3 = quit.
 // Set from the launcher document's `action="..."` rows exactly as the warp/restart rows above work.
 extern "C" int gZelda3dLauncherAction = 0;
+// The live SohRmlUi (there is exactly one, owned by Fast3dGui), so the C shims at the bottom of this
+// file can drive the launcher from the zelda3d REPL without exposing RmlUi types.
+namespace Ship {
+class SohRmlUi;
+}
+static Ship::SohRmlUi* sLiveRmlUi = nullptr;
 
 // Link render/anim mode, cycled by the `linkmode` row: 0 = N64 model + N64 anim, 1 = 3DS model +
 // N64-retarget anim, 2 = 3DS model + 3DS-own CSAB anim. zelda3d.c's Zelda3D_ReplPoll applies it to
@@ -307,6 +313,7 @@ bool SohRmlUi::Init(void* sdlWindow, void* glContext, int width, int height, boo
 
     SPDLOG_INFO("[SohRmlUi] RmlUi initialised ({}x{}) — {} (SDL3 GPU)", mWidth, mHeight, docPath);
     mInitialised = true;
+    sLiveRmlUi = this; // reachable from the C REPL shims above
     // Debug: open the menu at startup (deterministic verification via the screenshot harness, no
     // input injection needed). Normal use opens it with ESC / the Start button.
     if (const char* e = std::getenv("ZELDA3D_RMLUI_OPEN"); e && e[0] == '1') {
@@ -371,6 +378,17 @@ void SohRmlUi::LoadLauncherFonts() {
                          f.family ? f.family : "<own>");
         }
     }
+}
+
+// C shims: the zelda3d REPL drives the launcher but must not include RmlUi headers. A file-static
+// pointer to the live instance is enough -- there is exactly one, owned by Fast3dGui.
+extern "C" void Zelda3D_LauncherShow(int show) {
+    if (sLiveRmlUi) {
+        sLiveRmlUi->ShowLauncher(show != 0);
+    }
+}
+extern "C" int Zelda3D_LauncherIsVisible(void) {
+    return (sLiveRmlUi && sLiveRmlUi->IsLauncherVisible()) ? 1 : 0;
 }
 
 void SohRmlUi::ShowLauncher(bool show) {
