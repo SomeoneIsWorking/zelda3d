@@ -372,6 +372,18 @@ The remaining queue rows are blocked on identifying WHICH CMB an actor draws. Na
 
 **Measure the actor's N64 draw, then keep the candidate CMB whose HEIGHT, X and Z ratios all agree.**
 
+> **The candidate-side half of this is now one command** (`tools/zar_extents.py`, added 2026-08-04),
+> instead of being re-derived by hand every row:
+> ```
+> tools/zar_extents.py zelda_hidan_objects                 # every CMB with its local bbox + minY
+> tools/zar_extents.py zelda_haka_objects --n64 407.2,120,6  # rank candidates against an N64 draw
+> ```
+> Feed it the `n64h` / `n64foot` that `autostate` reports for the slot. It ranks by three-axis spread
+> and flags "all three agree" (<1.05x) versus "modest — possible re-authoring" (<1.30x). Validated by
+> reproducing every number earlier passes derived by hand: `m_Hgiro` 0.03004/0.10000/0.10714,
+> `m_Hfofo` 576.1 x 536.7 x 193.1, `m_Hsyarin` minY −1327.7. It exits non-zero on a missing ROM or an
+> unknown ZAR rather than printing an empty table.
+
 Height, X and Z are three independent estimates of the same scale. The correct mesh makes them agree;
 a wrong one will not. Worked example, measured live:
 
