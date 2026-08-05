@@ -244,8 +244,17 @@ list(FILTER SOH_LIB_FILES EXCLUDE REGEX "src/code/exe_entry\\.c$")
 add_library(soh_lib STATIC ${SOH_LIB_FILES})
 target_link_libraries(soh_lib PUBLIC soh_settings)
 
+# OoT as a loadable game core: the same soh_lib objects as a shared object the launcher dlopen's
+# with RTLD_LOCAL, so OoT's and MM's 6,616 colliding decomp symbols stay private (claim C050).
+# TARGET_OBJECTS, not a link against soh_lib: a static archive contributes only the objects the
+# linker finds REFERENCED, and almost nothing here is reachable from the one exported entry point —
+# the decomp reaches its actors and overlays through tables. Whole-archive semantics are mandatory,
+# not an optimisation.
+add_library(soh_core SHARED $<TARGET_OBJECTS:soh_lib>)
+target_link_libraries(soh_core PRIVATE soh_settings)
+
 # The soh.elf executable is now a thin wrapper — just the entry point in
-# src/code/exe_entry.c, which delegates to Main() in soh_lib.
+# src/code/exe_entry.c, which delegates to Zelda3D_CoreRun in soh_lib.
 add_executable(${PROJECT_NAME} src/code/exe_entry.c)
 target_link_libraries(${PROJECT_NAME} PRIVATE soh_lib)
 

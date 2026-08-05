@@ -104,6 +104,23 @@ class Context {
     static std::string GetAppBundlePath();
 
     /**
+     * @brief Point the bundle path at the running game's own directory, overriding the executable's.
+     *
+     * This path answers "where does the running game's data live" -- fonts, the RmlUi assets, the
+     * extractor's assets/ folder. Deriving it from the EXECUTABLE is correct only while the game IS
+     * the executable. Under the launcher (zelda3d_app) the executable is a shell that dlopens a core
+     * from another directory, and the unset default resolves to the launcher's own directory, where
+     * none of that data exists.
+     *
+     * The launcher sets this from dladdr() on the loaded core, so the value describes where the game
+     * code actually came from rather than being assembled from guesses. Unset means "use the
+     * executable's directory", which is exactly right for soh.elf and mm.elf run directly.
+     *
+     * @param path Absolute directory of the running game, or empty to fall back to the executable's.
+     */
+    static void SetAppBundlePath(const std::string& path);
+
+    /**
      * @brief Returns the platform-specific directory where the application stores its data.
      * @param appName Override the application name used to build the path; defaults to the current app name.
      * @return Absolute path string.

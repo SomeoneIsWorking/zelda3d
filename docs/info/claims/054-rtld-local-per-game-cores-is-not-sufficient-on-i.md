@@ -28,3 +28,7 @@ Falsifier exercised and did NOT fire. libultraship now builds as SHARED (libultr
 ## Re-confirmed 2026-08-05
 
 See prior confirmation; recording depends so staleness is detectable.
+
+## Re-confirmed 2026-08-05
+
+Its remaining falsifier is now exercised: 'loading two game cores as RTLD_LOCAL .so files into ONE process', recorded here as untested, is done and measured -- see C056. Both cores load simultaneously and their colliding symbols stay private, and static-initialisation order across the dlopen boundary did not break. C054's design conclusion stands unchanged: the shared libultraship.so is what makes it work, because each core links it rather than carrying a copy.

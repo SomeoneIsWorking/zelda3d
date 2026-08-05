@@ -99,9 +99,31 @@ This question does NOT block N1/N2 — faithful-first means "get native MM booti
 > path; `soh.elf` 96M→36M and `mm.elf` 100M→43M. Both games run: OoT reaches gameplay with Link
 > animating, MM reaches Clock Town loading MM3D models.
 >
-> **STILL TO DO for one binary:** the above is two separate processes sharing an engine. Loading two
-> game cores as `RTLD_LOCAL` `.so`s into ONE process is the remaining step, and static-initialisation
-> order across that boundary is untested.
+> **DONE (2026-08-05 — claim C056). One process now loads both cores, and both games run from it.**
+> Each game builds as a shared object exporting one symbol (`Zelda3D_CoreEntry`, `ship/zelda3d_core.h`),
+> and `Shipwright/zelda3d_app` is a launcher binary holding no game code that dlopens one with
+> `RTLD_NOW | RTLD_LOCAL`. `zelda3d --probe-cores` loads BOTH into a single process and reports
+> `loaded 2/2`, with `Play_Init`, `Actor_Draw` and `Actor_Kill` resolving to different addresses per
+> core — the 6,616-symbol collision measured above, dissolved rather than renamed. The feared
+> static-initialisation order across the dlopen boundary did not bite.
+>
+> Verified on the full path, not just the load: `zelda3d oot` reaches Kokiri Forest with OoT3D models
+> and the complete HUD (`scratch/screenshots/launcher_oot.png`), `zelda3d mm` reaches Clock Town
+> loading MM3D models (`scratch/screenshots/launcher_mm.png`).
+>
+> **One real defect this exposed, and its fix.** libultraship derived its app-bundle path — fonts,
+> RmlUi assets, the extractor's `assets/` — from `/proc/self/exe`, which is correct only while the
+> game IS the executable. Under the launcher it resolved to the launcher's own directory and OoT
+> aborted at startup with `assetsExist=false`. `Context::SetAppBundlePath` now lets the launcher
+> supply it from `dladdr()` on the loaded core, so the path describes where the game code actually
+> came from; unset keeps the old behaviour, which is right for `soh.elf`/`mm.elf` run directly.
+> (Archives were unaffected — they resolve from the CWD, which the launcher sets to the core's dir.)
+>
+> **STILL TO DO:** switching games WITHOUT restarting the process. The launcher picks a core before
+> any engine exists, which is why it needs no teardown; the in-game chooser
+> (`soh/src/zelda3d/launcher/`) still `exec`s `mm.elf`, because by then a live `Ship::Context`,
+> window and renderer would have to be torn down and rebuilt. That Context handover is the remaining
+> half of this milestone, and it is what would let the RmlUi chooser move into the launcher process.
 
 - **N3 — Unify the shell / launcher.** One app entry that runs OoT (existing soh3d) or MM sharing
   one libultraship + renderer. Resolve `Ship::Context` ownership + per-game ResourceManager
