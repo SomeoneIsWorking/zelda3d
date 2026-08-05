@@ -53,6 +53,7 @@
 
 #if not defined(__SWITCH__) && not defined(__WIIU__)
 #include "extractor/Extract.h"
+#include "soh/Enhancements/Presets/Presets.h"
 #endif
 
 #include <fast/interpreter.h>
@@ -1709,6 +1710,11 @@ extern "C" void InitOTR(int argc, char* argv[]) {
     SohGui::SetupGuiElements();
     SohGui::SetupMenuElements();
 
+    // Preset loading, given a real boot call site. It used to ride along inside a Dear ImGui menu
+    // registration (Presets.cpp RegisterPresetsWidgets), which made a user-facing feature depend on
+    // a menu that is never drawn.
+    Presets_LoadAtBoot();
+
     AudioCollection::Instance = new AudioCollection();
     ActorDB::Instance = new ActorDB();
 #ifdef __APPLE__
@@ -2760,7 +2766,6 @@ bool SoH_HandleConfigDrop(char* filePath) {
             ->ClearBindings();
 
         Rando::Settings::GetInstance()->UpdateAllOptions();
-        SohGui::MarkRandomizerMenusDirty();
         gui->SaveConsoleVariablesNextFrame();
         ShipInit::Init("*");
 

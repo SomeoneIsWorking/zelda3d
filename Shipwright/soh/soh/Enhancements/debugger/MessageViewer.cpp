@@ -64,7 +64,6 @@ void MessageViewer::DrawElement() {
         memset(mTextIdBuf, 0, sizeof(char) * MAX_STRING_SIZE);
     }
     PopStyleCheckbox();
-    SohGui::SohMenu::UpdateLanguageMap(SohGui::languages);
     UIWidgets::Combobox("Language", &mLanguage, SohGui::languages,
                         UIWidgets::ComboboxOptions()
                             .Color(THEME_COLOR)

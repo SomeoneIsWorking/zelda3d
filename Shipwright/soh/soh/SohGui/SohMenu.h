@@ -26,9 +26,6 @@ static std::map<int32_t, const char*> languages = {
     { LANGUAGE_FRA, "French" },
     { LANGUAGE_JPN, "Japanese" },
 };
-void UpdateMenuTricks();
-void UpdateMenuLocations();
-void MarkRandomizerMenusDirty();
 
 class SohMenu : public Ship::Menu {
   public:
@@ -42,12 +39,6 @@ class SohMenu : public Ship::Menu {
     void AddSidebarEntry(std::string sectionName, std::string sidbarName, uint32_t columnCount);
     WidgetInfo& AddWidget(WidgetPath& pathInfo, std::string widgetName, WidgetType widgetType);
     void AddMenuElements();
-    void AddMenuSettings();
-    void AddMenuEnhancements();
-    void AddMenuDevTools();
-    void AddMenuRandomizer();
-    void AddMenuNetwork();
-    static void UpdateLanguageMap(std::map<int32_t, const char*>& languageMap);
 
   private:
     char mGitCommitHashTruncated[8];

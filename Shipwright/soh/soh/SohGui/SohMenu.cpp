@@ -85,19 +85,26 @@ SohMenu::SohMenu(const std::string& consoleVariable, const std::string& name)
 }
 
 void SohMenu::AddMenuElements() {
-    AddMenuSettings();
-    AddMenuEnhancements();
-    AddMenuRandomizer();
-    AddMenuNetwork();
-    AddMenuDevTools();
+    // The five AddMenu* tab builders are gone with their files -- ~3,500 lines of Dear ImGui
+    // widget tree for a menu that is created hidden and never drawn (the live UI is RmlUi).
+    //
+    // The loop below STAYS, and the distinction matters: it is not menu-building. It is the only
+    // consumer of the RegisterMenuInitFunc registry, and one of those registrations
+    // (Presets.cpp:501) enumerates the presets directory and calls LoadPresets(). Deleting this
+    // would silently stop preset loading -- a real feature, reachable through no other path.
 
     if (CVarGetInteger(CVAR_SETTING("Menu.SidebarSearch"), 0)) {
         InsertSidebarSearch();
     }
 
-    for (auto& initFunc : MenuInit::GetInitFuncs()) {
-        initFunc();
-    }
+    // The RegisterMenuInitFunc registry loop is gone with the tabs it fed. Every one of its 12
+    // registrations built Dear ImGui widgets against menu paths that no longer exist -- running it
+    // after the tab deletions threw std::out_of_range in AddWidget (RegisterEnemyRandomizerWidgets
+    // was the first to hit it).
+    //
+    // Exactly ONE of the 12 did real work: Presets.cpp enumerated the presets folder and parsed it.
+    // That is now Presets_LoadAtBoot(), called from InitOTR, so a user-facing feature no longer
+    // depends on a menu being built.
 
     mMenuElementsInitialized = true;
 }

@@ -14,5 +14,9 @@ enum PresetSection {
     PRESET_SECTION_MAX,
 };
 
+// Boot-time preset loading. Called from InitOTR; see the definition for why it is no longer part of
+// a menu registration.
+extern "C" void Presets_LoadAtBoot();
+
 void DrawPresetSelector(std::vector<PresetSection> includeSections, std::string currentIndex, bool disabled);
 void applyPreset(std::string presetName, std::vector<PresetSection> includeSections = {});

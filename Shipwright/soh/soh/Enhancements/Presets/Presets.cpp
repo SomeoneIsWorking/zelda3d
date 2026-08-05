@@ -151,8 +151,9 @@ void applyPreset(std::string presetName, std::vector<PresetSection> includeSecti
             }
             if (i == PRESET_SECTION_RANDOMIZER) {
                 Rando::Settings::GetInstance()->UpdateAllOptions();
-                SohGui::UpdateMenuTricks();
-                SohGui::UpdateMenuLocations();
+                // The two SohGui::UpdateMenu* calls that were here rebuilt the Dear ImGui
+                // randomizer tricks/locations widget trees, and went with SohMenuRandomizer.cpp.
+                // UpdateAllOptions above is the part that touches real settings state.
             }
         }
     }
@@ -493,15 +494,15 @@ void PresetsCustomWidget(WidgetInfo& info) {
     UIWidgets::PopStyleTabs();
 }
 
-void RegisterPresetsWidgets() {
-    SohGui::mSohMenu->AddSidebarEntry("Settings", "Presets", 1);
-    WidgetPath path = { "Settings", "Presets", SECTION_COLUMN_1 };
-    SohGui::mSohMenu->AddWidget(path, "PresetsWidget", WIDGET_CUSTOM)
-        .CustomFunction(PresetsCustomWidget)
-        .HideInSearch(true);
+// Presets are LOADED here, not drawn here. These three lines used to sit at the end of a function
+// whose other half added a Dear ImGui sidebar entry and widget -- so the only thing that enumerated
+// the presets folder and parsed its files was reachable solely through the menu-init registry. That
+// coupling is why deleting the menu tree would have silently switched preset loading off.
+//
+// Now it is a plain boot-time initializer, called from InitOTR alongside the other real startup
+// work, and it no longer depends on any menu existing.
+extern "C" void Presets_LoadAtBoot() {
     presetFolder = Ship::Context::GetRawInstance()->GetPathRelativeToAppDirectory("presets");
     std::fill_n(saveSection, PRESET_SECTION_MAX, true);
     LoadPresets();
 }
-
-static RegisterMenuInitFunc menuInitFunc(RegisterPresetsWidgets);
