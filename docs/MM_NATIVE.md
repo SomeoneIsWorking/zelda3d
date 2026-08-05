@@ -248,9 +248,35 @@ This question does NOT block N1/N2 — faithful-first means "get native MM booti
 >   across games is exactly what one `libultraship.so` is for.
 > - **per-game, and must NOT be** — ResourceManager/archives, config file path, app name.
 >
-> Splitting those two inside Context is the actual remaining work, and the silent "returning existing"
-> is the first thing that has to go: a second core inheriting the wrong archives should be an error,
-> not a debug log. (Not yet measured: exactly which of the two crashes first once that is fixed.)
+> Splitting those two inside Context is the actual remaining work. The silent "returning existing" is
+> already gone — it is an ERROR naming both games as of `49867cec`, verified to fire on
+> `--run-sequence mm,oot` and to stay silent on a normal boot. (Not yet measured: exactly which half
+> crashes first once the split is made.)
+>
+> **Every `Ship::Context` member, classified (from Context.h) — the refactor's work list.** The three
+> groups are deliberate: the third is where the design decisions actually are, and calling those
+> members "engine" or "per-game" without deciding is how a refactor quietly breaks input or audio.
+>
+> | Member | Lifetime | Why |
+> |---|---|---|
+> | `mLogger`, `mLogThreadPool` | **engine** | process-level; already outlives everything |
+> | `mWindow` | **engine** | the render window + GPU device — destroying it is what crashes (C057) |
+> | `mCrashHandler` | **engine** | process-level signal handlers |
+> | `mFileDropMgr`, `mEventSystem` | **engine** | OS/window plumbing, no game content |
+> | `mResourceManager` | **per-game** | the archive set. The definitive one: OoT reading MM's `.o2r` is the bug |
+> | `mConfig`, `mConfigFilePath` | **per-game** | `shipofharkinian.json` vs `2ship2harkinian.json` |
+> | `mMainPath`, `mPatchesPath` | **per-game** | archive + mods paths |
+> | `mName`, `mShortName` | **per-game** | "Ship of Harkinian" vs "2 Ship 2 Harkinian" — what the new error compares |
+> | `mConsoleVariables` | **per-game (probable)** | CVars persist into the per-game config, so they travel with it — but confirm nothing engine-side reads a CVar it needs across a switch |
+> | `mControlDeck` | **SPLIT — decide** | device enumeration is engine (physical pads don't change per game); button mappings come from per-game config. Cannot be wholly either |
+> | `mAudio` | **SPLIT — decide** | the audio device/backend is engine; the sequence player and its state are per-game |
+> | `mConsole` | **SPLIT — decide** | the console object is engine; registered commands are per-game and must be cleared on switch |
+> | `mScriptLoader`, `mKeystore` | **engine (probable)** | scripting/signing infrastructure, not game content — unverified, `ENABLE_SCRIPTING` is off in this build |
+>
+> Suggested shape, given the above: keep `Ship::Context` as the ENGINE object created once by the
+> launcher, and move the per-game rows into a `GameSession` a core creates and destroys. The three
+> SPLIT rows each need their engine half left in Context and their per-game half moved — those are
+> the only ones requiring real design work; the rest are mechanical.
 >
 > Which is the boundary below, arrived at by measurement rather than by preference:
 >
