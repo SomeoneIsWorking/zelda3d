@@ -27,7 +27,6 @@
 #include "Enhancements/Trackers//TimeSplits/Timesplits.h"
 #include "Enhancements/Trackers/TimeSplits/TimesplitsSettings.h"
 #include "BenMenu.h"
-#include "BenMenuBar.h"
 #include "DeveloperTools/HookDebugger.h"
 #include "DeveloperTools/SaveEditor.h"
 #include "DeveloperTools/ActorViewer.h"
@@ -39,7 +38,6 @@
 namespace BenGui {
 // MARK: - Delegates
 
-std::shared_ptr<BenMenuBar> mBenMenuBar;
 
 std::shared_ptr<Ship::GuiWindow> mConsoleWindow;
 std::shared_ptr<Ship::GuiWindow> mStatsWindow;
@@ -66,8 +64,6 @@ std::shared_ptr<ItemTrackerSettingsWindow> mItemTrackerSettingsWindow;
 std::shared_ptr<DisplayOverlayWindow> mDisplayOverlayWindow;
 std::shared_ptr<TimesplitsWindow> mTimesplitsWindow;
 std::shared_ptr<TimesplitsSettingsWindow> mTimesplitsSettingsWindow;
-std::shared_ptr<InputViewer> mInputViewer;
-std::shared_ptr<InputViewerSettingsWindow> mInputViewerSettings;
 std::shared_ptr<BenModalWindow> mModalWindow;
 
 UIWidgets::Colors GetMenuThemeColor() {
@@ -177,18 +173,12 @@ void SetupGuiElements() {
         "gWindows.CheckTrackerSettings", "Check Tracker Settings");
     gui->AddGuiWindow(mRandoCheckTrackerSettingsWindow);
 
-    mInputViewer = std::make_shared<InputViewer>("gWindows.InputViewer", "Input Viewer");
-    gui->AddGuiWindow(mInputViewer);
-    mInputViewerSettings = std::make_shared<InputViewerSettingsWindow>("gWindows.InputViewerSettings",
-                                                                       "Input Viewer Settings", ImVec2(500, 525));
-    gui->AddGuiWindow(mInputViewerSettings);
 }
 
 void Destroy() {
     auto gui = Ship::Context::GetRawInstance()->GetWindow()->GetGui();
 
     gui->RemoveAllGuiWindows();
-    mBenMenuBar = nullptr;
     mBenMenu = nullptr;
     mModalWindow = nullptr;
     mStatsWindow = nullptr;
@@ -212,8 +202,6 @@ void Destroy() {
     mModMenuWindow = nullptr;
     mItemTrackerWindow = nullptr;
     mItemTrackerSettingsWindow = nullptr;
-    mInputViewer = nullptr;
-    mInputViewerSettings = nullptr;
 }
 
 void RegisterPopup(std::string title, std::string message, std::string button1, std::string button2,
