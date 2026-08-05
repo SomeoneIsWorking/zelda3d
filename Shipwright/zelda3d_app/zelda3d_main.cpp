@@ -305,8 +305,18 @@ int main(int argc, char* argv[]) {
     fflush(stderr);
 
     // The core owns the process from here: InitOTR, the frame loop and teardown, exactly as when it
-    // is run as a standalone binary. No dlclose afterwards -- unloading a core whose static
-    // destructors and background threads have already run is a way to crash on the way out, and the
-    // process is exiting regardless.
-    return core->run(gameArgc, gameArgv);
+    // is run as a standalone binary.
+    const int rc = core->run(gameArgc, gameArgv);
+
+    // Printed because reaching this line is the OBSERVATION, not a status message. A core that
+    // called exit() internally produces the same process exit code as one that unwound and returned,
+    // so the exit code cannot tell the two apart -- only a line that can ONLY be reached after run()
+    // returns can. Handing control back is the precondition for ever loading a second core, so it
+    // has to be visible rather than assumed.
+    fprintf(stderr, "ZELDA3D LAUNCHER: %s core returned %d -- control is back in the launcher\n", core->id, rc);
+    fflush(stderr);
+
+    // No dlclose: unloading a core whose static destructors and background threads have already run
+    // is a way to crash on the way out, and the process is exiting regardless.
+    return rc;
 }

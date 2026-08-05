@@ -140,12 +140,32 @@ This question does NOT block N1/N2 — faithful-first means "get native MM booti
 >    `exit()` — `Zelda3D_LauncherExit` currently calls `exit(0)`, which under the launcher would kill
 >    the process it is supposed to hand back to).
 >
-> **The experiment that settles the hard question**, once (2) exists: have the launcher run core A,
-> let it return, then load and run core B in the same process. What is genuinely unknown is whether
-> libultraship state survives `DeinitOTR` in a reusable condition — the accessor-hidden singletons
-> and 59 function-local statics C054 counted are exactly what a second `Context` init would trip
-> over. Note C056's falsifier: nothing has yet run a second core AFTER a first has run, so no
-> evidence either way exists today.
+> **MEASURED 2026-08-05, and it reframes the whole remaining milestone (claim C057).** `RequestExit`
+> was built, and the answer to "does a core hand control back" is **no, and not by accident**.
+>
+> With a launcher line placed where only a returning `run()` could reach it, `zelda3d oot` +
+> REPL `quit` exits the process **without ever printing it**. The process exit code is 0 either way,
+> so the exit code cannot tell an unwind from an internal `exit()` — only that line can, and it is
+> what caught this.
+>
+> The cause is a deliberate, well-argued decision in `DeinitOTR` (`soh/OTRGlobals.cpp`): it ends in
+> `_exit(0)` and explicitly does NOT run the GUI/renderer/window destructors, because that teardown
+> crashes inside code we don't own — RADV/Wayland `wsi_wl_swapchain_destroy` double-free,
+> lavapipe/X11 `xcb_present` buffer overflow, RmlUi's static `StyleSheetFactory` double-free. Its
+> reasoning ends "object-graph teardown only matters for swapchain RECREATE (resize), never for
+> shutdown" — **true when the process always dies, and made false by in-process game switching.**
+>
+> So the remaining work is NOT "wire up a switch". libultraship has never been torn down, by design;
+> asking a second core to initialise after a first would require exactly the teardown that was
+> removed for crashing. That is why C056's falsifier could not be settled by trying harder.
+>
+> **The design this points at (a hypothesis, not yet tested): don't tear the engine down at all.**
+> The window, GPU device and renderer are game-AGNOSTIC and already shared — that is the whole point
+> of one `libultraship.so`. What is per-game is the ResourceManager's archive set and the game heaps.
+> So the split to aim for is: the LAUNCHER owns window/renderer for the process lifetime, and a core
+> owns only its archives and heaps. Today `InitOTR` inside each core owns both, which is what forces
+> the choice between a crashing teardown and `_exit`. Untested, and it needs the per-game/per-engine
+> boundary drawn precisely before anyone writes code against it.
 
 - **N3 — Unify the shell / launcher.** One app entry that runs OoT (existing soh3d) or MM sharing
   one libultraship + renderer. Resolve `Ship::Context` ownership + per-game ResourceManager

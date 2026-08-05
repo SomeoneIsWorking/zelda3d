@@ -28,6 +28,8 @@
 #include <stdlib.h>
 #include <string.h>
 #include <errno.h>
+
+#include <ship/Context.h>
 #if defined(__linux__) || defined(__APPLE__)
 #include <unistd.h>
 #include <libgen.h>
@@ -105,12 +107,17 @@ void Zelda3D_LaunchMM(void) {
 #endif
 }
 
-// Quit from the launcher. exit() rather than a graceful window teardown would skip the config save
-// and race the render thread, so ask the window to close and let the normal shutdown path run.
+// Quit from the launcher. A bare exit(0) skipped the config save and raced the render thread, so
+// this asks the frame loop to end and takes the normal window-close shutdown instead: Main_Shutdown
+// stops the audio thread, then DeinitOTR persists window layout and config.
+//
+// The process still ends here rather than returning -- DeinitOTR finishes with a deliberate
+// _exit(0). That is orderly, not graceful, and the distinction matters for the in-process game
+// switch this file's header describes: see docs/MM_NATIVE.md N3.
 void Zelda3D_LauncherExit(void) {
     fprintf(stderr, "SOH3D LAUNCHER: exit requested\n");
     fflush(stderr);
-    exit(0);
+    Ship::Context::RequestExit();
 }
 
 } // extern "C"
