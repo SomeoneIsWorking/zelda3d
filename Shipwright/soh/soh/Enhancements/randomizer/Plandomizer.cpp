@@ -42,7 +42,7 @@ int32_t temporaryItemIndex = -1;
 RandomizerCheckArea selectedArea = RCAREA_INVALID;
 
 ImVec4 itemColor = ImVec4(1.0f, 1.0f, 1.0f, 1.0f);
-ImTextureID textureID;
+void* textureID;
 ImVec2 imageSize = ImVec2(32.0f, 32.0f);
 float imagePadding = 2.0f;
 ImVec2 textureUV0 = ImVec2(0, 0);

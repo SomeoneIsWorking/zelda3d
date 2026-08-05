@@ -20,7 +20,7 @@ uint64_t GetUnixTimestamp();
 
 float fontScale = 1.0f;
 std::string timeDisplayTime = "";
-ImTextureID textureDisplay = 0;
+void* textureDisplay = 0;
 ImVec4 windowBG = ImVec4(0, 0, 0, 0.5f);
 ImVec4 textColor = ImVec4(1.0f, 1.0f, 1.0f, 1.0f);
 

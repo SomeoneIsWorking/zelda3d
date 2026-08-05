@@ -21,7 +21,7 @@ typedef enum {
 } ItemTrackerVisibilityMode;
 
 typedef struct {
-    ImTextureID textureId;
+    void* textureId;
     ImVec4 textureColor;
     ImVec2 textureDimensions;
 } TrackerImageObject;

@@ -77,7 +77,12 @@ class GfxRenderingAPI {
     virtual void SetTextureFilter(FilteringMode mode) = 0;
     virtual FilteringMode GetTextureFilter() = 0;
     virtual void SetSrgbMode() = 0;
-    virtual ImTextureID GetTextureById(int id) = 0;
+    // void*, not ImTextureID. This is the SHARED renderer interface both games implement, and an
+    // ImGui typedef has no business in it. void* is the SAME type: imconfig.h:144 does
+    // `#define ImTextureID void*`, overriding imgui.h's default ImU64 -- so this is a rename, not a
+    // conversion, and no call site needs a cast. (I reached for uint64_t first, having read the
+    // default typedef and missed the override.)
+    virtual void* GetTextureById(int id) = 0;
     virtual void SetCurrentPrimDepth(float depth) = 0;
 
   protected:

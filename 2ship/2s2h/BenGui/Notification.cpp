@@ -95,13 +95,13 @@ void Window::Draw() {
             ImGui::SameLine();
         }
         if (!notification.prefix.empty()) {
-            ImGui::TextColored(notification.prefixColor, "%s", notification.prefix.c_str());
+            ImGui::TextColored(ImVec4(notification.prefixColor.r, notification.prefixColor.g, notification.prefixColor.b, notification.prefixColor.a), "%s", notification.prefix.c_str());
             ImGui::SameLine();
         }
-        ImGui::TextColored(notification.messageColor, "%s", notification.message.c_str());
+        ImGui::TextColored(ImVec4(notification.messageColor.r, notification.messageColor.g, notification.messageColor.b, notification.messageColor.a), "%s", notification.message.c_str());
         if (!notification.suffix.empty()) {
             ImGui::SameLine();
-            ImGui::TextColored(notification.suffixColor, "%s", notification.suffix.c_str());
+            ImGui::TextColored(ImVec4(notification.suffixColor.r, notification.suffixColor.g, notification.suffixColor.b, notification.suffixColor.a), "%s", notification.suffix.c_str());
         }
 
         ImGui::End();

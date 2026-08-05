@@ -2573,8 +2573,8 @@ FilteringMode GfxRenderingAPISdl3Gpu::GetTextureFilter() {
 void GfxRenderingAPISdl3Gpu::SetSrgbMode() {
     mSrgbMode = true;
 }
-ImTextureID GfxRenderingAPISdl3Gpu::GetTextureById(int id) {
-    return reinterpret_cast<ImTextureID>((uintptr_t)id);
+void* GfxRenderingAPISdl3Gpu::GetTextureById(int id) {
+    return reinterpret_cast<void*>((uintptr_t)id);
 }
 void GfxRenderingAPISdl3Gpu::SetCurrentPrimDepth(float depth) {
     mCurrentPrimDepth = depth;

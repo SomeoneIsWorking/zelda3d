@@ -123,9 +123,9 @@ class Fast3dGui : public Ship::Gui {
     /**
      * @brief Returns the ImGui texture handle for the given cache key.
      * @param name Texture cache key.
-     * @return ImTextureID suitable for ImGui::Image(), or nullptr if not found.
+     * @return opaque backend texture handle (0 if not found).
      */
-    ImTextureID GetTextureByName(const std::string& name);
+    void* GetTextureByName(const std::string& name);
 
     /**
      * @brief Returns the pixel dimensions of the cached texture.
@@ -180,11 +180,11 @@ class Fast3dGui : public Ship::Gui {
     void DrawGame() override;
 
     /**
-     * @brief Returns the ImTextureID for a texture identified by its integer ID.
+     * @brief Returns the opaque backend texture handle for a texture identified by its integer ID.
      * @param id Internal texture registry ID.
-     * @return ImTextureID for use with ImGui::Image().
+     * @return opaque backend texture handle.
      */
-    ImTextureID GetTextureById(int32_t id);
+    void* GetTextureById(int32_t id);
 
     std::weak_ptr<Interpreter> mInterpreter; ///< Weak reference to the Fast3D scripting interpreter.
     GuiWindowInitData mImpl;                 ///< Backend-specific window/context handles passed to Init().
