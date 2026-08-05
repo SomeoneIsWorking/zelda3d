@@ -52,7 +52,7 @@
 #include <fast/debug/GfxDebugger.h>
 
 #if not defined(__SWITCH__) && not defined(__WIIU__)
-#include "Extractor/Extract.h"
+#include "extractor/Extract.h"
 #endif
 
 #include <fast/interpreter.h>

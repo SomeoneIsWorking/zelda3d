@@ -31,7 +31,7 @@
 #include <fast/backends/gfx_rendering_api.h>
 
 #include <SDL3/SDL_scancode.h>
-#include "Extractor/Extract.h"
+#include "extractor/Extract.h"
 // OTRTODO
 // #include <functions.h>
 #include "2s2h/Enhancements/FrameInterpolation/FrameInterpolation.h"
