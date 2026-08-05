@@ -191,11 +191,30 @@ This question does NOT block N1/N2 — faithful-first means "get native MM booti
 >   engine object) at lower severity — GUI windows, not the render window and GPU device. Recorded
 >   as a pattern to fix when that area is touched, not churned now.
 >
-> **OPEN, and NOT to be assumed either way:** MM's shutdown destroys the Context outright
-> (`OTRGlobals::Instance->context = nullptr` in BenPort.cpp), where OoT `_exit(0)`s before reaching
-> the equivalent. That would mean MM already runs the teardown that crashes OoT. Every MM run so far
-> was killed with `-9`, so there is NO evidence either way — it needs a clean MM exit and a
-> backtrace before anyone concludes MM is immune or equally affected.
+> **MEASURED on MM too (2026-08-05), and it SPLITS the question — this is the most useful result.**
+> Added `WindowRequestExit`/`WindowRequestExitWithFullTeardown` (C bridges beside `WindowIsRunning`,
+> since both graph loops are C) and `quit`/`quitteardown` to MM's FIFO REPL. Then let MM exit:
+>
+> - **MM's core HANDS CONTROL BACK.** `ZELDA3D LAUNCHER: mm core returned 0 -- control is back in
+>   the launcher`. MM has no `_exit(0)` in its shutdown, so `run()` simply returns. **The handoff
+>   mechanism is therefore SOUND and is not what blocks in-process switching** — only the engine
+>   teardown is. OoT alone could never have shown this, because its `_exit(0)` hid it.
+> - **The process still dies:** `MM_EXIT=134` (SIGABRT), *after* the launcher regained control.
+>   gdb: `~unique_ptr<Ship::Context>` (the STATIC `mContext`, at process exit) → `~Context` →
+>   `~Fast3dWindow` → `Gui::ShutDownImGui` → `~SohRmlUi` → `Rml::Shutdown` →
+>   `StyleSheetFactory::~StyleSheetFactory` → heap double-free abort.
+>
+> That is the **RmlUi StyleSheetFactory double-free**, the THIRD crash named in `DeinitOTR`'s own
+> comment. So **two of its three cited crashes are confirmed live on current code**: the SDL3 GPU
+> `VULKAN_DestroyDevice` SIGSEGV (OoT) and this RmlUi abort (MM). Both are inside `~Fast3dWindow`,
+> at different sub-steps — MM aborts in the ImGui/RmlUi shutdown *before* reaching the GPU device
+> destroy that kills OoT.
+>
+> **Side effect worth knowing: MM's ordinary quit has ALWAYS aborted at process exit.** It went
+> unseen only because every prior MM run was killed with `-9` instead of allowed to exit.
+>
+> Both faults live exclusively in `~Context`, which is what makes the design below the answer rather
+> than a preference: an engine that is never torn down encounters neither.
 >
 > **The design this points at — now the surviving option rather than one of two:**
 > The window, GPU device and renderer are game-AGNOSTIC and already shared — that is the whole point

@@ -7,6 +7,7 @@
 #include "global.h" // gPlayState, GET_PLAYER, PlayState, Player, Actor, ACTORCAT_MAX
 #include "2s2h/zelda3d/mm3d_model.h" // Zelda3D_SetObjectScale (per-object calibration)
 #include "2s2h/zelda3d/mm3d_player_force.h" // Zelda3D_PlayerForce{Idle,Walk,Run}
+#include <libultraship/bridge/windowbridge.h> // `quit` / `quitteardown` — stop the frame loop
 
 // `cam` framing state (below). Non-static because Z3D_Repl_Tick needs to
 // apply it every frame (post-update) to override the game camera drift.
@@ -267,6 +268,18 @@ static void Z3D_Repl_Exec(PlayState* play, char* line) {
         } else {
             Z3D_Repl_Reply("usage: turn <deg>");
         }
+    } else if (strncmp(line, "quitteardown", 12) == 0) {
+        // MM's half of the C057 experiment. MM is the interesting side: unlike OoT, its shutdown
+        // already destroys the Context outright, so this measures whether MM has been running the
+        // teardown that crashes OoT all along -- unknown, because every MM run so far was killed
+        // with -9 rather than allowed to exit.
+        Z3D_Repl_Reply("quitteardown: exit requested WITH full engine teardown (C057 falsifier)");
+        WindowRequestExitWithFullTeardown();
+    } else if (strncmp(line, "quit", 4) == 0) {
+        // Stop the frame loop and take the normal window-close shutdown. First headless way to
+        // reach MM's exit path at all.
+        Z3D_Repl_Reply("quit: exit requested; taking the orderly window-close shutdown");
+        WindowRequestExit();
     } else if (strncmp(line, "roomwarp", 8) == 0) {
         // `roomwarp <n>` — force-load room n so its actors spawn, WITHOUT moving Link.
         // Pair with `tp` to reach an unloaded-room actor for A/B framing. Mirrors OoT
