@@ -4,8 +4,8 @@
 #include <shlwapi.h>
 #pragma comment(lib, "Shlwapi.lib")
 #endif
-#include "Extract.h"
-#include "portable-file-dialogs.h"
+#include "extractor/Extract.h"
+#include "thirdparty/portable-file-dialogs.h"
 #include <ship/utils/binarytools/BitConverter.h>
 #include "build.h"
 

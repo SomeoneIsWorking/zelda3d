@@ -15,7 +15,9 @@ file(GLOB_RECURSE zelda3d_shared_sources CONFIGURE_DEPENDS
 
 add_library(zelda3d_shared STATIC ${zelda3d_shared_sources})
 
-# Consumers `#include "zelda3d_shared/player/link_gear.h"` etc.
+# Consumers include RELATIVE TO THIS DIR -- `#include "player/link_gear.h"`, `#include
+# "extractor/Extract.h"`. (This comment used to claim a `zelda3d_shared/` prefix, which never
+# worked: the include root below is this directory, not its parent.)
 target_include_directories(zelda3d_shared PUBLIC ${CMAKE_CURRENT_SOURCE_DIR})
 
 # dr_libs: PUBLIC so both games keep resolving <dr_wav.h> for the declarations, while the
@@ -25,5 +27,15 @@ target_include_directories(zelda3d_shared PUBLIC ${dr_libs_SOURCE_DIR})
 # Upstream third-party code; its warnings are not ours to fix and would drown the build.
 set_source_files_properties(${CMAKE_CURRENT_SOURCE_DIR}/audio/dr_libs_impl.cpp
     PROPERTIES COMPILE_OPTIONS "${WARNING_OVERRIDE}")
+
+# thirdparty/ and extractor/ are header-only, so they add no sources — they exist so that code
+# BYTE-IDENTICAL in both games has exactly one copy. portable-file-dialogs.h (1,770 lines) and
+# Extract.h were each vendored twice, and a duplicate is not a neutral cost: it is two files to
+# patch, two to audit, and two that can silently drift apart. Consumers include them as
+# "zelda3d_shared/thirdparty/portable-file-dialogs.h" via the PUBLIC include dir above.
+#
+# Note this library's header comment says nothing here may see a game-specific type. These honour
+# that for free: pfd is upstream third-party, and Extract.h is ROM-extraction I/O that names no
+# Player/Actor/PlayState.
 
 set_target_properties(zelda3d_shared PROPERTIES POSITION_INDEPENDENT_CODE ON)
