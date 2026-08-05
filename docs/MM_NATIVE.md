@@ -230,9 +230,29 @@ This question does NOT block N1/N2 — faithful-first means "get native MM booti
 > context, so the second core dereferenced dead engine state. C054's prediction and this failure are
 > the same fact seen from two directions.
 >
-> **So the blocker is not loading, not symbol privacy, and not the handoff — all three work. It is
-> that a core TEARS DOWN engine state its successor needs.** Which is the boundary below, arrived at
-> by measurement rather than by preference:
+> **So the blocker is not loading, not symbol privacy, and not the handoff — all three work.**
+>
+> **REFINED by reading the code the crash pointed at, and it is sharper than "a core tears down state
+> its successor needs".** `Context::CreateUninitializedInstance` (Context.cpp) guards on
+> `if (mContext == nullptr)` and otherwise logs *"Trying to create an uninitialized context when it
+> already exists. Returning existing."* — a definite code fact, not an inference. Both games call it
+> from their `InitOTR`. So the second core does not get a Context of its own: **it silently inherits
+> the first core's**, complete with that game's ResourceManager, archive set, config file and app
+> name, and then initialises on top of GUI state the first core had already partly released
+> (`BenGui::Destroy` → `RemoveAllGuiWindows`). It does not fail loudly; it "succeeds" with the wrong
+> engine state and dies later, in `CreateFontWithSize`.
+>
+> That reframes the split. It is NOT "launcher owns Context, cores don't" — it is that **`Ship::Context`
+> conflates two different lifetimes**:
+> - **engine-lifetime, and SHOULD be shared** — window, renderer, ImGui, control deck. Reusing these
+>   across games is exactly what one `libultraship.so` is for.
+> - **per-game, and must NOT be** — ResourceManager/archives, config file path, app name.
+>
+> Splitting those two inside Context is the actual remaining work, and the silent "returning existing"
+> is the first thing that has to go: a second core inheriting the wrong archives should be an error,
+> not a debug log. (Not yet measured: exactly which of the two crashes first once that is fixed.)
+>
+> Which is the boundary below, arrived at by measurement rather than by preference:
 >
 > **The design this points at — now the surviving option rather than one of two:**
 > The window, GPU device and renderer are game-AGNOSTIC and already shared — that is the whole point
