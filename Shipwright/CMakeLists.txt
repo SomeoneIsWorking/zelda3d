@@ -187,6 +187,19 @@ set(INCLUDE_MPQ_SUPPORT ON)
 add_compile_definitions(CONTROLLERBUTTONS_T=uint32_t)
 
 ################################################################################
+# Position-independent code EVERYWHERE.
+#
+# Required because libultraship is a SHARED library. One binary running both Ocarina of Time and
+# Majora's Mask needs each game core dlopen'd with RTLD_LOCAL so their colliding decomp symbols stay
+# private (claim C050) -- but RTLD_LOCAL alone would also give each core its own copy of every
+# libultraship global, i.e. two windows and two renderers (claim C054). A single shared
+# libultraship is what makes the engine state single-instance, and a shared object can only link
+# static dependencies that were compiled -fPIC. Without this the link fails on StormLib:
+#   relocation R_X86_64_32S against `.rodata' can not be used when making a shared object
+################################################################################
+set(CMAKE_POSITION_INDEPENDENT_CODE ON)
+
+################################################################################
 # dr_libs — single-header audio decoders (wav/mp3/flac), used by BOTH games.
 #
 # Declared here, once, because zelda3d_shared now compiles the one and only copy of their
