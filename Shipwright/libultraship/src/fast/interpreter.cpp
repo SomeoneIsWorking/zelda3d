@@ -68,7 +68,7 @@ static float s_zelda3dMeasHMin, s_zelda3dMeasHMax;
 static float s_zelda3dMeasXMin, s_zelda3dMeasXMax, s_zelda3dMeasZMin, s_zelda3dMeasZMax;
 extern "C" float gZelda3dMeasFootX = 0.0f; // world-X extent of the last completed measure
 extern "C" float gZelda3dMeasFootZ = 0.0f; // world-Z extent of the last completed measure
-extern "C" void Zelda3D_MeasureResult(int key, float height); // implemented in soh/src/zelda3d/core/zelda3d.c
+#include "ship/zelda3d_hostiface.h" // Zelda3D_HostMeasureResult / Zelda3D_HostHudFlushPoint
 
 // charcompare: measure the MODEL-SPACE (modelview-transformed) vertex bbox over a frame, so the tool
 // can frame the model — especially the DEPTH axis — by its true geometry extent. The modelview is the
@@ -4467,7 +4467,7 @@ bool gfx_zelda3d_measure_handler_custom(F3DGfx** cmd0) {
                 (s_zelda3dMeasXMin <= s_zelda3dMeasXMax) ? (s_zelda3dMeasXMax - s_zelda3dMeasXMin) : 0.0f;
             gZelda3dMeasFootZ =
                 (s_zelda3dMeasZMin <= s_zelda3dMeasZMax) ? (s_zelda3dMeasZMax - s_zelda3dMeasZMin) : 0.0f;
-            Zelda3D_MeasureResult(key, s_zelda3dMeasHMax - s_zelda3dMeasHMin);
+            Zelda3D_HostMeasureResult(key, s_zelda3dMeasHMax - s_zelda3dMeasHMin);
         }
     }
     return false;
@@ -4491,12 +4491,11 @@ bool gfx_zelda3d_cleardepth_handler_custom(F3DGfx** cmd0) {
 // #205 — composite the native HUD's pending quads here. Same shape as the cleardepth handler above:
 // flush the interpreter's own batched geometry first so the HUD ops land AFTER it in the op list,
 // then hand off. Declared extern "C" so the interpreter keeps no direct Zelda3D_Hud_* dependency.
-extern "C" void Zelda3D_HudFlushPoint(void);
 bool gfx_zelda3d_hudflush_handler_custom(F3DGfx** cmd0) {
     Interpreter* gfx = mInstance.lock().get();
     (void)cmd0;
     gfx->Flush();
-    Zelda3D_HudFlushPoint();
+    Zelda3D_HostHudFlushPoint();
     return false;
 }
 

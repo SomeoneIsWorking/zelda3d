@@ -54,7 +54,10 @@ int Zelda3D_XboxBtnEnabled(void) {
 // glyph draw (Zelda3D_DrawHudBadges) reads this each frame and picks the glyph set. -1 = default
 // (read ZELDA3D_INPUTDEV env; if absent, default to keyboard). REPL `inputdev <0|1>` overrides for
 // testing (zelda3d.c). Declared `extern` in zelda3d.h.
-int gZelda3dInputDevice = -1;
+//
+// DEFINED IN libultraship (ship/zelda3d_hostiface.cpp): the input layer that WRITES it is the
+// shared engine, and a game core dlopen'd RTLD_LOCAL is invisible to that layer. -1 is preserved
+// there as the sentinel this getter depends on.
 int Zelda3D_InputDevice(void) {
     if (gZelda3dInputDevice < 0) {
         const char* v = getenv("ZELDA3D_INPUTDEV");

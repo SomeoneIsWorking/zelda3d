@@ -22,9 +22,9 @@ namespace LUS {
 // Shipwright/soh/src/zelda3d/input/zelda3d_input.cpp (Zelda3D_DbgInputEnabled) — see that file's
 // comment and the matching forward-decl in ship/controller/controldeck/ControlDeck.cpp for why
 // this is a local extern "C" decl rather than a soh header include.
-extern "C" int Zelda3D_DbgInputEnabled(void);
+#include "ship/zelda3d_hostiface.h"
 static bool Zelda3dDbgInputEnabled() {
-    return Zelda3D_DbgInputEnabled() != 0;
+    return Zelda3D_HostDbgInputEnabled() != 0;
 }
 ControlDeck::ControlDeck(std::vector<CONTROLLERBUTTONS_T> additionalBitmasks,
                          std::shared_ptr<Ship::ControllerDefaultMappings> controllerDefaultMappings,
