@@ -30,10 +30,10 @@
 extern "C" {
 #endif
 
-// Last-used input device: 0 = gamepad (Xbox glyphs), 1 = keyboard (key-label glyphs), -1 = not yet
-// resolved. Written by the input layer here on real device events; the game's HUD reads it each
-// frame to pick a glyph set. -1 rather than 0 is deliberate -- soh's Zelda3D_InputDevice() treats it
-// as "ask the environment (ZELDA3D_INPUTDEV) once", which a hard 0 would silently defeat.
+// Last-used input device: 0 = gamepad (Xbox glyphs), 1 = keyboard (key-label glyphs). Always one of
+// those two -- there is no "unset" state. Written by the input layer here on real device events; the
+// game's HUD reads it each frame to pick a glyph set. A core that wants to seed it from
+// configuration does so explicitly at startup, before any event can arrive.
 extern int gZelda3dInputDevice;
 
 // Room-group highlight index for the renderer, -1 = disabled (REPL `hlroom`).

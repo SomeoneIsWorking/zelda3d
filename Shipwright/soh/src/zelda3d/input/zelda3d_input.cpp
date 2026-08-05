@@ -56,15 +56,21 @@ int Zelda3D_XboxBtnEnabled(void) {
 // testing (zelda3d.c). Declared `extern` in zelda3d.h.
 //
 // DEFINED IN libultraship (ship/zelda3d_hostiface.cpp): the input layer that WRITES it is the
-// shared engine, and a game core dlopen'd RTLD_LOCAL is invisible to that layer. -1 is preserved
-// there as the sentinel this getter depends on.
+// shared engine, and a game core dlopen'd RTLD_LOCAL is invisible to that layer.
+//
+// Seed it from the environment ONCE, at startup, from Zelda3D_RegisterHostHooks. This used to be
+// lazy -- the getter resolved the env on first call, while the value was still the sentinel -1 --
+// which meant a device event arriving before the first HUD draw moved it off -1 and the env was
+// never read. ZELDA3D_INPUTDEV silently lost that race. Resolving it at a known point removes the
+// race and the sentinel together.
+void Zelda3D_InputDeviceInit(void) {
+    const char* v = getenv("ZELDA3D_INPUTDEV");
+    // Default to keyboard (1) when no env set so the headless game shows keyboard glyphs without
+    // requiring a connected gamepad. (A real gamepad event flips it to 0 instantly.)
+    gZelda3dInputDevice = (v != NULL && v[0] == '0') ? 0 : 1;
+}
+
 int Zelda3D_InputDevice(void) {
-    if (gZelda3dInputDevice < 0) {
-        const char* v = getenv("ZELDA3D_INPUTDEV");
-        // Default to keyboard (1) when no env set so the headless game shows keyboard glyphs
-        // without requiring a connected gamepad. (A real gamepad event flips it to 0 instantly.)
-        gZelda3dInputDevice = (v != NULL && v[0] == '0') ? 0 : 1;
-    }
     return gZelda3dInputDevice;
 }
 

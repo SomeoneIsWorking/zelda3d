@@ -264,11 +264,11 @@ const char* Zelda3D_KeyCapAlphabet(void);
 // #32 hotswap — last-used input device. 0 = gamepad (Xbox glyphs), 1 = keyboard (key-label glyphs).
 // Updated from the C++ LUS input layer (Ship::Controller::ProcessKeyboardEvent for keyboard events,
 // LUS::Controller::ReadToOSContPad for gamepad events). The HUD reads this each frame to pick the
-// glyph set. -1 = uninitialized (lazily resolved from ZELDA3D_INPUTDEV env on first call).
-// REPL `inputdev <0|1>` overrides for testing. Zelda3D_InputDevice() is the lazily-initialized getter.
+// glyph set. Always 0 or 1 -- there is no unset state; ZELDA3D_INPUTDEV seeds it once at startup via
+// Zelda3D_InputDeviceInit. REPL `inputdev <0|1>` overrides for testing.
 extern int gZelda3dInputDevice;
 // Zelda3D_InputDevice() declared in input/zelda3d_input.h (moved there, Phase 1 input
-// consolidation) — the lazily-initialized getter for gZelda3dInputDevice above.
+// consolidation) — a plain read of gZelda3dInputDevice above.
 
 // #31 — crisp higher-res HUD textures (hearts first). Returns a persistent RGBA8888
 // (G_IM_FMT_RGBA/32b) buffer for a heart kind + its dims, or NULL on failure. The buffer is

@@ -18,6 +18,11 @@
 #include "zelda3d/render/zelda3d_render.h"
 
 extern "C" void Zelda3D_RegisterHostHooks(void) {
+    // Seed engine-owned state from this core's configuration before anything can write it. Doing it
+    // here rather than lazily on first read is what keeps ZELDA3D_INPUTDEV from losing a race with
+    // an early device event -- see Zelda3D_InputDeviceInit.
+    Zelda3D_InputDeviceInit();
+
     const Zelda3DGameHooks hooks = {
         /* dbgInputEnabled */ Zelda3D_DbgInputEnabled,
         /* hudFrame        */ Zelda3D_HudFrame,
