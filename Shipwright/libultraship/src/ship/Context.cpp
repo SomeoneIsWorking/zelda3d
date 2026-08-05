@@ -491,7 +491,22 @@ std::string Context::GetShortName() const {
     return mShortName;
 }
 
+// Set by the launcher to the directory of the game core it loaded; empty means "derive from the
+// executable", which is what a directly-run soh.elf / mm.elf wants. See SetAppBundlePath.
+static std::string sAppBundlePathOverride;
+
+void Context::SetAppBundlePath(const std::string& path) {
+    sAppBundlePathOverride = path;
+}
+
 std::string Context::GetAppBundlePath() {
+    // Checked before every platform branch: when a core has been loaded from elsewhere, its own
+    // directory is the answer on every platform, and falling through to a platform default would
+    // silently reintroduce the executable's directory.
+    if (!sAppBundlePathOverride.empty()) {
+        return sAppBundlePathOverride;
+    }
+
 #if defined(__ANDROID__)
     // SDL3-MIGRATION: SDL_AndroidGetExternalStoragePath -> SDL_GetAndroidExternalStoragePath (Android-only; not built on Linux)
     const char* externaldir = SDL_GetAndroidExternalStoragePath();

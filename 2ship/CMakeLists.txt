@@ -84,7 +84,29 @@ set(ALL_FILES
 ################################################################################
 # Target
 ################################################################################
-add_executable(${PROJECT_NAME} ${ALL_FILES})
+# INTERFACE target carrying "how to compile MM source" — includes, definitions, options, PCH and
+# library deps. Mirrors soh_settings, and for the same reason: the sources now feed three targets
+# (the static lib, the loadable core, the exe) and the configuration must not be duplicated per
+# target for them to stay identical.
+add_library(mm_settings INTERFACE)
+
+# The game engine. Everything except the process entry point, so the core shared object below can
+# carry no int main() of its own.
+set(MM_LIB_FILES ${ALL_FILES})
+list(FILTER MM_LIB_FILES EXCLUDE REGEX "src/code/exe_entry\\.c$")
+add_library(mm_lib STATIC ${MM_LIB_FILES})
+target_link_libraries(mm_lib PUBLIC mm_settings)
+
+# MM as a loadable game core: the same objects as a shared object the launcher dlopen's with
+# RTLD_LOCAL, keeping MM's and OoT's colliding decomp symbols private (claim C050). TARGET_OBJECTS
+# rather than a link against mm_lib, because a static archive contributes only what the linker finds
+# REFERENCED and the decomp reaches its actors and overlays through tables, not from the entry point.
+add_library(mm_core SHARED $<TARGET_OBJECTS:mm_lib>)
+target_link_libraries(mm_core PRIVATE mm_settings)
+
+# mm.elf — MM started directly, without the launcher.
+add_executable(${PROJECT_NAME} src/code/exe_entry.c)
+target_link_libraries(${PROJECT_NAME} PRIVATE mm_lib)
 
 if (CMAKE_SYSTEM_NAME STREQUAL "Darwin")
     set_target_properties(${PROJECT_NAME} PROPERTIES
@@ -99,14 +121,16 @@ endif()
 # PadMgr_ThreadEntry called with &gPadMgr). zelda3d globally forces C23, which
 # reinterprets `()` as zero-args and breaks such calls. Build mm's C at C17 —
 # the standard 2S2H was validated against — rather than patching call sites.
-set_target_properties(${PROJECT_NAME} PROPERTIES C_STANDARD 17 C_EXTENSIONS ON)
+# C_STANDARD is a target property, not an interface one, so it cannot live on mm_settings and is
+# set on each target that compiles C.
+set_target_properties(mm_lib ${PROJECT_NAME} PROPERTIES C_STANDARD 17 C_EXTENSIONS ON)
 
 ################################################################################
 # Include directories
 ################################################################################
 find_package(SDL3 REQUIRED)
 
-target_include_directories(${PROJECT_NAME} PRIVATE assets
+target_include_directories(mm_settings INTERFACE assets
     ${CMAKE_CURRENT_SOURCE_DIR}/include/
     ${CMAKE_CURRENT_SOURCE_DIR}/include/PR
     ${CMAKE_CURRENT_SOURCE_DIR}/src/
@@ -123,7 +147,7 @@ target_include_directories(${PROJECT_NAME} PRIVATE assets
 ################################################################################
 # Compile definitions (GNU/Clang/AppleClang — the PC toolchains)
 ################################################################################
-target_compile_definitions(${PROJECT_NAME} PRIVATE
+target_compile_definitions(mm_settings INTERFACE
     "$<$<CONFIG:Debug>:_DEBUG;>"
     "$<$<CONFIG:Release>:NDEBUG;>"
     "F3DEX_GBI_2;"
@@ -145,7 +169,7 @@ if(CMAKE_SYSTEM_PROCESSOR MATCHES "x86_64")
     set(CPU_OPTION -msse2 -mfpmath=sse)
 endif()
 
-target_compile_options(${PROJECT_NAME} PRIVATE
+target_compile_options(mm_settings INTERFACE
     -Wall -Wextra -Wno-error
     -Wno-unused-parameter
     -Wno-unused-function
@@ -172,7 +196,7 @@ target_compile_options(${PROJECT_NAME} PRIVATE
     ${CPU_OPTION}
 )
 
-target_link_options(${PROJECT_NAME} PRIVATE
+target_link_options(mm_settings INTERFACE
     -pthread
     -Wl,-export-dynamic
 )
@@ -191,7 +215,7 @@ set_source_files_properties(2s2h/mixer.c PROPERTIES COMPILE_FLAGS "-O2")
 # their include guards first, making the later include a no-op. soh (OoT) doesn't
 # need this; the MM tree was written against it, so it's a per-target PCH.
 ################################################################################
-target_precompile_headers(${PROJECT_NAME} PRIVATE
+target_precompile_headers(mm_settings INTERFACE
     "$<$<COMPILE_LANGUAGE:CXX>:<libultraship/bridge/consolevariablebridge.h$<ANGLE-R>>"
     "$<$<COMPILE_LANGUAGE:CXX>:<ship/Context.h$<ANGLE-R>>"
     "$<$<COMPILE_LANGUAGE:CXX>:<ship/resource/ResourceManager.h$<ANGLE-R>>"
@@ -222,7 +246,7 @@ target_precompile_headers(${PROJECT_NAME} PRIVATE
 ################################################################################
 # Dependencies + link
 ################################################################################
-add_dependencies(${PROJECT_NAME} libultraship ZAPDLib)
+add_dependencies(mm_lib libultraship ZAPDLib)
 
 set(THREADS_PREFER_PTHREAD_FLAG ON)
 find_package(Threads REQUIRED)
@@ -248,7 +272,7 @@ set(ADDITIONAL_LIBRARY_DEPENDENCIES
     Threads::Threads
 )
 
-target_link_libraries(${PROJECT_NAME} PRIVATE "${ADDITIONAL_LIBRARY_DEPENDENCIES}")
+target_link_libraries(mm_settings INTERFACE "${ADDITIONAL_LIBRARY_DEPENDENCIES}")
 
 ################################################################################
 # Post-build: stage the asset xmls + RmlUi assets next to the executable

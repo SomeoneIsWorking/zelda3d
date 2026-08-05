@@ -4,12 +4,22 @@
 // chosen in gZelda3dLauncherAction. It deliberately knows nothing about processes. This module is
 // the other half: turning "Majora's Mask" into a running MM.
 //
-// WHY EXEC AND NOT ONE PROCESS. OoT is this executable (soh.elf); MM is a separate native 2S2H
-// build (mm.elf) with its own Ship::Context, ResourceManager and archive set. Running both in one
-// process is milestone N3 in docs/MM_NATIVE.md and needs context ownership, per-game resource
-// registries and .otr/.o2r multiplexing untangled first. Replacing this process with mm.elf gets a
-// working chooser now without pretending that work is done, and it keeps the launcher as the single
-// entry point rather than spawning a second window.
+// WHY THIS STILL EXECS. One process running both games is no longer hypothetical: Shipwright/
+// zelda3d_app is a launcher binary that dlopens either game core with RTLD_LOCAL, and both OoT and
+// MM have been verified reaching gameplay that way. What this module does is the OTHER entry path
+// -- soh.elf started directly, with OoT already booted and its chooser presented as a gamestate.
+//
+// Switching games from HERE cannot be a core swap, because this process is the OoT core: handing
+// control to MM would mean tearing down a live Ship::Context, window and renderer mid-frame and
+// rebuilding them for another game. That teardown is the unfinished half of N3 in
+// docs/MM_NATIVE.md, and exec sidesteps it by letting the kernel do the cleanup.
+//
+// So there are deliberately two paths, and the difference is which one the user started:
+//   zelda3d (the launcher)  -- picks a core BEFORE any engine exists, no teardown needed
+//   soh.elf (this)          -- OoT is already running, so the chooser can only exec
+// The right end state is the RmlUi document moving into the launcher process, at which point this
+// file goes away. Until the Context handover exists, deleting it would remove a working chooser and
+// replace it with nothing.
 //
 // The exec'd process INHERITS this one's environment, so ZELDA3D_MM_ROM / headless settings / the
 // display carry over with no extra plumbing.

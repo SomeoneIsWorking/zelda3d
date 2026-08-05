@@ -15,6 +15,7 @@
 #include "stackcheck.h"
 #include "BenPort.h"
 #include <libultraship/bridge/crashhandlerbridge.h>
+#include <ship/zelda3d_core.h>
 
 // Variables are put before most headers as a hacky way to bypass bss reordering
 OSMesgQueue sSerialEventQueue;
@@ -49,11 +50,16 @@ size_t gSystemHeapSize = 0;
 
 void InitOTR(int argc, char* argv[]);
 void Heaps_Free(void);
-#ifdef __GNUC__
-#define SDL_main main
-#endif
 
-int SDL_main(int argc, char* argv[] /* void* arg*/) {
+// MM as a loadable game core. This was int main(); it is now the core's run function, because the
+// game has two callers -- mm.elf (src/code/exe_entry.c) and the launcher, which dlopen's this same
+// code as libmm_core.so and calls it through Zelda3D_CoreEntry. One body, so the dlopen'd path
+// cannot drift from the standalone one.
+//
+// The body stayed in THIS file rather than moving beside the descriptor, unlike OoT's core_entry.c:
+// the globals at the top of this TU are deliberately placed before the headers to control BSS
+// ordering, so splitting the file would disturb the layout that comment is protecting.
+int Zelda3D_CoreRun(int argc, char* argv[] /* void* arg*/) {
     intptr_t fb;
     intptr_t sysHeap;
     s32 exit;
@@ -151,4 +157,17 @@ int SDL_main(int argc, char* argv[] /* void* arg*/) {
     FreeConsole();
 #endif
     Heaps_Free();
+    // Fell off the end of int main() before; now it is the core's exit code and a caller reads it.
+    return 0;
+}
+
+static const Zelda3DCore sCore = {
+    .abi = ZELDA3D_CORE_ABI,
+    .id = "mm",
+    .title = "The Legend of Zelda: Majora's Mask",
+    .run = Zelda3D_CoreRun,
+};
+
+const Zelda3DCore* Zelda3D_CoreEntry(void) {
+    return &sCore;
 }

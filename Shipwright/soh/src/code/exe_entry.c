@@ -1,17 +1,17 @@
-// Executable entry point for the soh.elf binary. Kept in a separate TU
-// so a direct-harness binary (see tools/soh3d_harness/) can link soh_lib
-// without pulling in a competing int main() — the harness supplies its
-// own driver that alternates SoH3D frames (Main_Init + RunFrame +
-// Main_Shutdown, all in soh_lib) with Azahar frames.
+// Executable entry point for the soh.elf binary — OoT started directly, without the launcher.
+//
+// The game itself lives in src/code/core_entry.c (Zelda3D_CoreRun), which the launcher reaches by
+// dlopen instead. This TU is only the process-level shell: the platform entry symbol and, on
+// Windows, the console the extractor needs. Kept in its own TU so a binary supplying its own driver
+// — the direct harness in tools/soh3d_harness/, which alternates SoH3D frames with Azahar frames —
+// can link soh_lib without pulling in a competing int main().
 #ifdef _WIN32
 #include <Windows.h>
+#include <stdio.h>
 #include <locale.h>
 #endif
 
-#include "global.h"
-#include <soh/Enhancements/bootcommands.h>
-#include "soh/OTRGlobals.h"
-#include "soh/CrashHandlerExt.h"
+int Zelda3D_CoreRun(int argc, char* argv[]);
 
 #ifdef _WIN32
 // SDL3-MIGRATION: SDL2main (which provided the WinMain shim that calls SDL_main) was removed in SDL3.
@@ -32,15 +32,5 @@ int SDL_main(int argc, char* argv[]) {
 #else //_WIN32
 int main(int argc, char* argv[]) {
 #endif
-    GameConsole_Init();
-    InitOTR(argc, argv);
-    // TODO: Was moved to below InitOTR because it requires window to be setup. But will be late to catch crashes.
-    CrashHandlerRegisterCallback(CrashHandler_PrintSohData);
-    BootCommands_Init();
-
-    Heaps_Alloc();
-    Main(0);
-    DeinitOTR();
-    Heaps_Free();
-    return 0;
+    return Zelda3D_CoreRun(argc, argv);
 }

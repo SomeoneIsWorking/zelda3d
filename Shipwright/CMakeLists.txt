@@ -237,6 +237,10 @@ add_subdirectory(soh)
 # libultraship. Out-of-tree source, binary dir kept as `mm` so the build output stays build/mm/.
 add_subdirectory(${CMAKE_SOURCE_DIR}/../2ship ${CMAKE_BINARY_DIR}/mm)
 
+# The launcher: one binary that dlopens either game's core. Must come after both games, since it
+# depends on their core targets. Holds no game code itself — see zelda3d_app/zelda3d_main.cpp.
+add_subdirectory(zelda3d_app ${CMAKE_BINARY_DIR}/zelda3d)
+
 set_property(TARGET soh PROPERTY APPIMAGE_DESKTOP_FILE_TERMINAL YES)
 set_property(TARGET soh PROPERTY APPIMAGE_DESKTOP_FILE "${CMAKE_SOURCE_DIR}/scripts/linux/appimage/soh.desktop")
 set_property(TARGET soh PROPERTY APPIMAGE_ICON_FILE "${CMAKE_BINARY_DIR}/sohIcon.png")
