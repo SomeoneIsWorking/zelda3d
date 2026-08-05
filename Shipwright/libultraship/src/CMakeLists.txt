@@ -1,6 +1,6 @@
 include(${CMAKE_CURRENT_SOURCE_DIR}/../cmake/cvars.cmake)
 
-add_library(libultraship STATIC)
+add_library(libultraship SHARED)
 set_target_properties(libultraship PROPERTIES PREFIX "")
 set_property(TARGET libultraship PROPERTY CXX_STANDARD 20)
 # Need to set C11 for libgfxd (_Alignas)
@@ -107,7 +107,12 @@ if (GFX_DEBUG_DISASSEMBLER)
 endif()
 
 find_package(libzip REQUIRED)
-target_link_libraries(libultraship PRIVATE libzip::zip)
+# PUBLIC, not PRIVATE. As a STATIC library the distinction did not matter -- PRIVATE deps still
+# reached the final executable link. As a SHARED library it does: soh.elf then failed with
+#   libultraship.so: undefined reference to symbol 'zip_file_add'
+#   /usr/lib64/libzip.so.5: DSO missing from command line
+# because ld will not resolve a DSO's reference through a library the consumer never names.
+target_link_libraries(libultraship PUBLIC libzip::zip)
 
 find_package(nlohmann_json REQUIRED)
 target_link_libraries(libultraship PUBLIC nlohmann_json::nlohmann_json)

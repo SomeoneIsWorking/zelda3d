@@ -79,6 +79,29 @@ This question does NOT block N1/N2 — faithful-first means "get native MM booti
 > Known risk to check first (C050's falsifier): any DATA that must genuinely be SHARED across the
 > dlopen boundary — a single libultraship-owned global written by both cores — is not solved by
 > RTLD_LOCAL and needs an explicit owner.
+>
+> **MEASURED, then FIXED (2026-08-05 — claims C054, C050 amended).** `tools/shared_state_probe.py`:
+> both cores reference 444 libultraship FUNCTIONS (harmless — duplicate code behaves identically)
+> and only **2 DATA** objects, `GImGui` and `Fast::g_exec_stack`. That 2 is a floor, not the answer:
+> `nm` finds **59 function-local statics** in `libultraship.a`, and accessor-hidden singletons
+> (`Context::GetInstance()` over a file-static) are how this codebase actually writes its state, so a
+> direct-data probe cannot see them by construction.
+>
+> Their count does not matter, because it does not change the fix: **libultraship is now ONE SHARED
+> object** (`libultraship.so`) that both games link against, which makes every copy question moot at
+> once — hidden or not. So RTLD_LOCAL privatises the colliding *game* symbols and a shared
+> libultraship unifies the *engine* state; **neither works without the other**, and C050 as written
+> only had half of it.
+>
+> Landed and verified: `CMAKE_POSITION_INDEPENDENT_CODE ON` at the root (the two link failures were
+> both build config — StormLib not `-fPIC`, libzip linked `PRIVATE`, which a static lib forgives and
+> a shared one does not). `ldd` on `soh.elf` and `mm.elf` resolves `libultraship.so` to the SAME
+> path; `soh.elf` 96M→36M and `mm.elf` 100M→43M. Both games run: OoT reaches gameplay with Link
+> animating, MM reaches Clock Town loading MM3D models.
+>
+> **STILL TO DO for one binary:** the above is two separate processes sharing an engine. Loading two
+> game cores as `RTLD_LOCAL` `.so`s into ONE process is the remaining step, and static-initialisation
+> order across that boundary is untested.
 
 - **N3 — Unify the shell / launcher.** One app entry that runs OoT (existing soh3d) or MM sharing
   one libultraship + renderer. Resolve `Ship::Context` ownership + per-game ResourceManager
