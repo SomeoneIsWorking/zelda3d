@@ -4,6 +4,7 @@
 // render-owned symbols this file pokes (sModelTable/sAuto, the generic actor-pin/aim/motion-sample
 // debug surface, cam-lift/terrain-warp/fog/sky diagnostics, etc).
 #include "../zelda3d.h"
+#include <ship/Context.h> // `quit` — Context::RequestExit, the clean frame-loop stop
 #include "../render/zelda3d_render.h"
 #include "../core/zelda3d_log.h"
 #include "zelda3d_repl.h"
@@ -2782,6 +2783,14 @@ static void Zelda3D_ReplExec(PlayState* play, char* line, const char* outPath) {
         gSoh3dDumpPath[sizeof(gSoh3dDumpPath) - 1] = '\0';
         gSoh3dDumpPending = 1;
         Zelda3D_ReplReply(outPath, "dump -> %s (pending)", gSoh3dDumpPath);
+    } else if (strcmp(cmd, "quit") == 0) {
+        // End the frame loop and take the normal window-close shutdown: Main_Shutdown (audio thread
+        // stopped first), then DeinitOTR, which stops threads and saves window layout + config.
+        // The only headless way to exercise that path -- previously it needed a real window close.
+        // NOT a handoff: DeinitOTR ends in _exit(0) by design, so the process dies here rather than
+        // returning to any caller. See Context::RequestExit.
+        Zelda3D_ReplReply(outPath, "quit: exit requested; taking the orderly window-close shutdown");
+        Ship::Context::RequestExit();
     } else if (strcmp(cmd, "state") == 0) {
         u8 tint[3];
         char scales[256];

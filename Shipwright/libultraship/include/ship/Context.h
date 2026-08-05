@@ -104,6 +104,26 @@ class Context {
     static std::string GetAppBundlePath();
 
     /**
+     * @brief Ask the running game to end its frame loop and return, instead of killing the process.
+     *
+     * Both games' graph loops are `while (WindowIsRunning()) RunFrame();`, so this is honoured at
+     * the one seam they share, and what follows is exactly the ordinary window-close path:
+     * Main_Shutdown stops the audio thread, then DeinitOTR persists window layout and config.
+     *
+     * MEASURED, so nobody assumes more than this does: the process still does NOT return to its
+     * caller. DeinitOTR ends in a deliberate `_exit(0)` (see its comment in OTRGlobals.cpp) to skip
+     * GUI/renderer/window destructors that crash inside driver code. So this gives a game the
+     * ORDERLY shutdown -- threads stopped, config saved -- where a bare exit() skipped it, and
+     * nothing more. It is not yet a handoff, and a launcher must not expect control back.
+     */
+    static void RequestExit();
+
+    /**
+     * @brief Has RequestExit been called? Consulted by WindowIsRunning.
+     */
+    static bool IsExitRequested();
+
+    /**
      * @brief Point the bundle path at the running game's own directory, overriding the executable's.
      *
      * This path answers "where does the running game's data live" -- fonts, the RmlUi assets, the

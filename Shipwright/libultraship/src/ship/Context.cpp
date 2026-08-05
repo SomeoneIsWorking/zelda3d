@@ -1,5 +1,6 @@
 #include "ship/Context.h"
 #include "ship/controller/controldevice/controller/mapping/keyboard/KeyboardScancodes.h"
+#include <atomic>
 #include <cstring>
 #include <iostream>
 #include <spdlog/sinks/rotating_file_sink.h>
@@ -494,6 +495,17 @@ std::string Context::GetShortName() const {
 // Set by the launcher to the directory of the game core it loaded; empty means "derive from the
 // executable", which is what a directly-run soh.elf / mm.elf wants. See SetAppBundlePath.
 static std::string sAppBundlePathOverride;
+
+// Written from the game thread, read by the graph loop each frame. See RequestExit.
+static std::atomic<bool> sExitRequested{ false };
+
+void Context::RequestExit() {
+    sExitRequested = true;
+}
+
+bool Context::IsExitRequested() {
+    return sExitRequested;
+}
 
 void Context::SetAppBundlePath(const std::string& path) {
     sAppBundlePathOverride = path;

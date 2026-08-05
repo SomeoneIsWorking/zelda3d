@@ -17,6 +17,13 @@ float WindowGetAspectRatio() {
 }
 
 bool WindowIsRunning() {
+    // Checked BEFORE the backend, and deliberately at this bridge rather than inside a window
+    // backend: both games' graph loops are `while (WindowIsRunning()) RunFrame();`, so one check
+    // here reaches OoT and MM without either backend or either decomp knowing about it. An exit
+    // request then unwinds through the same path a closed window takes.
+    if (Ship::Context::IsExitRequested()) {
+        return false;
+    }
     return Ship::Context::GetRawInstance()->GetWindow()->IsRunning();
 }
 
