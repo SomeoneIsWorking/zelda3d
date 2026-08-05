@@ -273,7 +273,18 @@ typedef struct {
     uint16_t patch;
 } OTRVersion;
 
-std::shared_ptr<Fast::Fast3dWindow> sohFast3dWindow;
+// NON-OWNING. The window belongs to Ship::Context; this is only a cached handle for the per-frame
+// calls below, so it must not extend the window's lifetime.
+//
+// It used to be a shared_ptr, and that co-ownership crashed the process. A game core is a shared
+// object with process-lifetime statics: ~Context dropped the ENGINE's reference, this static kept
+// the window alive past it, and at exit() the core's static destructor dropped the last reference
+// -- destroying the GPU device after everything around it was already gone, which aborted inside
+// SDL3's VULKAN_DestroyDevice with a heap double-free. Backtrace and analysis in claim C057.
+//
+// The rule the crash teaches: a game core may USE engine objects and must never OWN them. Under the
+// launcher the engine outlives every core by design, and a core-held owning reference inverts that.
+Fast::Fast3dWindow* sohFast3dWindow = nullptr;
 static OTRVersion DetectOTRVersion(std::string path, bool isMq);
 static bool VerifyArchiveVersion(OTRVersion version);
 std::string portArchivePath = "";
@@ -319,9 +330,11 @@ OTRGlobals::OTRGlobals() {
 
     auto sohInputEditorWindow =
         std::make_shared<SohInputEditorWindow>(CVAR_WINDOW("ControllerConfiguration"), "Configure Controller");
-    sohFast3dWindow =
+    // The Context takes ownership; we keep only a raw observer (see sohFast3dWindow's comment).
+    auto fast3dWindow =
         std::make_shared<Fast::Fast3dWindow>(std::vector<std::shared_ptr<Ship::GuiWindow>>({ sohInputEditorWindow }));
-    context->InitWindow(sohFast3dWindow);
+    context->InitWindow(fast3dWindow);
+    sohFast3dWindow = fast3dWindow.get();
 
     SohGui::SetupMenu();
     ZELDA3D_BOOT("ctor: SetupMenu done; sohArchiveVersionMatch={}", sohArchiveVersionMatch);
@@ -1786,6 +1799,28 @@ extern "C" void DeinitOTR() {
         if (auto config = ctx->GetConfig()) {
             config->Save();
         }
+    }
+
+    // 3a. EXPERIMENT (claim C057's falsifier): run the teardown this function exists to avoid, and
+    // see whether it still crashes. Every crash cited above is from the Vulkan era; SDL3 GPU is now
+    // the only backend, so "it crashes" is an inherited belief rather than a current measurement.
+    // ~Context destroys audio/window/console/controldeck/resources in a defined order and saves the
+    // config itself, so this is the engine's own teardown, not a hand-rolled one.
+    //
+    // Surviving this is what in-process game switching needs. If it does survive, the _exit(0)
+    // below and this branch both go away; if it crashes, the answer is to stop tearing down at all
+    // (launcher owns window+renderer, cores own archives+heaps). Only reachable on explicit request.
+    if (Ship::Context::IsFullTeardownRequested()) {
+        SPDLOG_INFO("DeinitOTR: FULL TEARDOWN requested -- running the destructors _exit(0) skips");
+        if (auto logger = spdlog::default_logger()) {
+            logger->flush();
+        }
+        Ship::Context::DestroyInstance();
+        // Reached only if the destructors did not crash. OTRGlobals::Instance->context now dangles,
+        // which is acceptable because the caller is unwinding out of the game for good.
+        fprintf(stderr, "ZELDA3D TEARDOWN: Context destroyed WITHOUT crashing; returning to caller\n");
+        fflush(stderr);
+        return;
     }
 
     // 3. Flush the log and exit, skipping the fragile GUI/GPU/window teardown (see header comment).

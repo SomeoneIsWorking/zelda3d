@@ -4,7 +4,9 @@ kind: claim
 status: holds
 created: 2026-08-05
 tags: n3,teardown,launcher
-depends: Shipwright/soh/soh/OTRGlobals.cpp, Shipwright/libultraship/src/libultraship/bridge/windowbridge.cpp
+depends: Shipwright/soh/soh/OTRGlobals.cpp
+reconfirmed: 2026-08-05
+verified_at: 2026-08-05
 ---
 
 ## Claim
@@ -18,3 +20,7 @@ Built Context::RequestExit (honoured in WindowIsRunning, the one seam both games
 ## What would falsify it
 
 If someone runs the GUI/renderer/window destructors on current drivers and they DO NOT crash, the premise for _exit(0) is gone and a normal unwind becomes possible. The cited crashes are from the Vulkan era and this project has since moved to SDL3 GPU as its only backend -- so they should be RE-TESTED rather than assumed to still hold. Equally, a launcher-owned window/renderer with per-game archives+heaps would sidestep teardown entirely, making the whole question moot.
+
+## Re-confirmed 2026-08-05
+
+Falsifier RUN, and it did NOT fire -- the teardown still crashes on the CURRENT SDL3 GPU backend, so the _exit(0) rationale is a live measurement rather than an inherited Vulkan-era belief. Built Context::RequestExitWithFullTeardown + REPL 'quitteardown', which makes DeinitOTR call Ship::Context::DestroyInstance() instead of _exit(0). gdb backtrace: main -> Zelda3D_CoreRun -> DeinitOTR -> Context::DestroyInstance -> ~Context -> ~Fast3dWindow -> ~GfxRenderingAPISdl3Gpu -> SDL3 VULKAN_DestroyDevice -> SIGSEGV, with frame #0 at ?? (a freed or corrupted pointer). SDL3 GPU's Vulkan backend reproduces the same class of fault the old Vulkan path did. ALONG THE WAY, a genuine ownership inversion was found and fixed, and it is what made the first run misleading: soh/OTRGlobals.cpp held the window in a process-lifetime global std::shared_ptr<Fast::Fast3dWindow> sohFast3dWindow, so ~Context dropped only the ENGINE's reference and the window survived it; the first run therefore printed 'Context destroyed WITHOUT crashing' AND 'core returned 0' AND still died 139, because the core's static destructor destroyed the GPU device at exit() (backtrace frame #13 std::shared_ptr<Fast3dWindow>::~shared_ptr from libsoh_core.so, under __run_exit_handlers). Made non-owning (raw observer; Context is sole owner), after which the crash relocates INTO DestroyInstance where it honestly belongs. That fix is correct on its own terms -- a game core must never own an engine object, since under the launcher the engine outlives every core -- but it does NOT avoid the crash.

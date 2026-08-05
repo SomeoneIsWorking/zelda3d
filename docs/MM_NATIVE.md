@@ -159,7 +159,26 @@ This question does NOT block N1/N2 — faithful-first means "get native MM booti
 > asking a second core to initialise after a first would require exactly the teardown that was
 > removed for crashing. That is why C056's falsifier could not be settled by trying harder.
 >
-> **The design this points at (a hypothesis, not yet tested): don't tear the engine down at all.**
+> **FALSIFIER RUN 2026-08-05, and it did NOT fire — the teardown still crashes.** `RequestExitWithFullTeardown`
+> + REPL `quitteardown` make `DeinitOTR` call `Context::DestroyInstance()` instead of `_exit(0)`.
+> gdb: `main → Zelda3D_CoreRun → DeinitOTR → DestroyInstance → ~Context → ~Fast3dWindow →
+> ~GfxRenderingAPISdl3Gpu → SDL3 VULKAN_DestroyDevice → SIGSEGV` (frame #0 at `??`, a freed pointer).
+> SDL3 GPU's Vulkan backend reproduces the same fault class as the old Vulkan path, so the `_exit(0)`
+> is justified by CURRENT measurement, not by an inherited belief. **Do not re-litigate this without
+> new drivers or a new backend.**
+>
+> **A real ownership bug was found on the way, and it is why the first run read as a success.**
+> `soh/OTRGlobals.cpp` held the window in a process-lifetime global `shared_ptr<Fast3dWindow>`
+> (`sohFast3dWindow`), so `~Context` dropped only the ENGINE's reference and the window outlived it.
+> The run printed `Context destroyed WITHOUT crashing` AND `core returned 0` AND still exited 139,
+> because the CORE's static destructor destroyed the GPU device at `exit()` (frame
+> `shared_ptr<Fast3dWindow>::~shared_ptr` from `libsoh_core.so`, under `__run_exit_handlers`). Now a
+> non-owning raw observer with the Context as sole owner, which relocates the crash into
+> `DestroyInstance` where it belongs. **That fix is right on its own terms and does NOT fix the
+> crash.** The rule it establishes is the important part: **a game core may USE engine objects and
+> must never OWN them** — under the launcher the engine outlives every core by design.
+>
+> **The design this points at — now the surviving option rather than one of two:**
 > The window, GPU device and renderer are game-AGNOSTIC and already shared — that is the whole point
 > of one `libultraship.so`. What is per-game is the ResourceManager's archive set and the game heaps.
 > So the split to aim for is: the LAUNCHER owns window/renderer for the process lifetime, and a core
