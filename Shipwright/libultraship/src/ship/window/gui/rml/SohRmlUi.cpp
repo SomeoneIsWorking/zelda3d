@@ -216,6 +216,25 @@ class TabClickListener : public Rml::EventListener {
     int mIndex;
 };
 
+// Launcher rows respond to the MOUSE as well as keyboard/controller. Without this the rows were
+// keyboard-only: the `action=` dispatch lives in ActivateFocused, which nothing but Enter/A reached,
+// so clicking a row did nothing at all. Focus-then-activate reuses that one dispatch path rather
+// than duplicating it, so mouse and keyboard cannot drift apart.
+class LauncherRowClickListener : public Rml::EventListener {
+  public:
+    LauncherRowClickListener(SohRmlUi* ui, Rml::Element* el) : mUi(ui), mEl(el) {}
+    void ProcessEvent(Rml::Event& /*event*/) override {
+        if (mEl) {
+            mEl->Focus();
+        }
+        mUi->ActivateFocused();
+    }
+
+  private:
+    SohRmlUi* mUi;
+    Rml::Element* mEl;
+};
+
 SohRmlUi::SohRmlUi() = default;
 
 SohRmlUi::~SohRmlUi() {
@@ -303,6 +322,8 @@ bool SohRmlUi::Init(void* sdlWindow, void* glContext, int width, int height, boo
     mLauncherDoc = mContext->LoadDocument(launcherPath);
     if (!mLauncherDoc) {
         SPDLOG_WARN("[SohRmlUi] Failed to load launcher document: {} (game still boots)", launcherPath);
+    } else {
+        AttachLauncherClickHandlers();
     }
     // Scale the dp-authored sheet to this display's content scale (HiDPI).
     ApplyDensityRatio();
@@ -726,6 +747,24 @@ void SohRmlUi::SetActiveTab(int index) {
     RefreshToggleRows();
     mContext->Update();
     FocusFirstInActivePane();
+}
+
+void SohRmlUi::AttachLauncherClickHandlers() {
+    if (!mLauncherDoc) {
+        return;
+    }
+    Rml::ElementList rows;
+    mLauncherDoc->GetElementsByTagName(rows, "button");
+    mLauncherClickListeners.clear();
+    for (Rml::Element* el : rows) {
+        // Only actionable rows; the two title buttons and the disabled Mods row carry no action.
+        if (el->GetAttribute<Rml::String>("action", "").empty()) {
+            continue;
+        }
+        auto listener = std::make_unique<LauncherRowClickListener>(this, el);
+        el->AddEventListener("click", listener.get());
+        mLauncherClickListeners.push_back(std::move(listener));
+    }
 }
 
 void SohRmlUi::AttachTabClickHandlers() {

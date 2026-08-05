@@ -80,4 +80,12 @@ void Zelda3D_LaunchMM(void) {
 #endif
 }
 
+// Quit from the launcher. exit() rather than a graceful window teardown would skip the config save
+// and race the render thread, so ask the window to close and let the normal shutdown path run.
+void Zelda3D_LauncherExit(void) {
+    fprintf(stderr, "SOH3D LAUNCHER: exit requested\n");
+    fflush(stderr);
+    exit(0);
+}
+
 } // extern "C"
