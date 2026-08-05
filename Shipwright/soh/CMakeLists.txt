@@ -235,6 +235,29 @@ set(ALL_FILES
 # game-engine STATIC library (soh_lib, below) and the exe.
 add_library(soh_settings INTERFACE)
 
+# -fno-gnu-unique: the ONE symbol class RTLD_LOCAL does not privatise.
+#
+# The launcher dlopen's each game core RTLD_LOCAL so OoT's and MM's 6,616 colliding decomp symbols
+# stay private (claim C050). That works for every ordinary symbol -- and not at all for STB_GNU_UNIQUE
+# ones, whose defining property is that the dynamic linker binds them to a SINGLE instance
+# process-wide regardless of scope. GCC gives that binding to function-local statics inside inline
+# functions, which is exactly how both games write their header-defined registries.
+#
+# Measured on the built cores, not inferred: soh_core exports 1,575 unique symbols, mm_core 925, and
+# 322 collide. Two of them are game state and one of those crashed a real run -- global-namespace
+# `MenuInit::GetInitFuncs()` holds `static std::vector<std::function<void()>> menuInitFuncs` in BOTH
+# games, so with MM loaded first, OoT's SohMenu::AddMenuElements iterated MM's list and called
+# BenGui::RegisterResolutionWidgets in libmm_core.so. `ShipInit::GetAll` is the same shape.
+#
+# This is a LINKAGE-MODEL flag, not a warning suppression -- it does not hide a diagnostic or relax a
+# conformance rule, it makes the compiler emit the symbol binding this design requires. Renaming the
+# two registries into per-game namespaces would fix today's two; this fixes the class, including the
+# next registry someone adds. Residual worth knowing: the 322 also include std/nlohmann statics that
+# were harmlessly shared (read-only tables, RTTI tags) and are now per-core.
+if (CMAKE_CXX_COMPILER_ID STREQUAL "GNU")
+    target_compile_options(soh_settings INTERFACE $<$<COMPILE_LANGUAGE:CXX>:-fno-gnu-unique>)
+endif()
+
 # Game engine as a static library. Everything the SoH3D runtime needs —
 # N64 subsystem, boot chain, hooks, RunFrame, Main_Init/Main_Shutdown, all
 # the zelda3d/ port code — lives here so a harness binary can link the
