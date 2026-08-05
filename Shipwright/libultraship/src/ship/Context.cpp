@@ -119,7 +119,27 @@ Context* Context::CreateUninitializedInstance(const std::string& name, const std
         return mContext.get();
     }
 
-    SPDLOG_DEBUG("Trying to create an uninitialized context when it already exists. Returning existing.");
+    // Reaching here means a SECOND game core called InitOTR while a first core's Context was still
+    // alive -- the launcher running cores back to back (`zelda3d --run-sequence`). The caller asked
+    // for its own Context and is silently handed someone else's, complete with the OTHER game's
+    // ResourceManager, archive set, config file and app name. It does not fail here; it fails much
+    // later and somewhere unrelated (measured: OoT after MM dies in CreateFontWithSize).
+    //
+    // So this is an ERROR, not a debug note. It was SPDLOG_DEBUG, which is invisible in a normal
+    // run, and that silence is the whole problem: a wrong-game Context looked exactly like success.
+    // Still returns the existing instance rather than nullptr -- every caller assumes non-null and
+    // would crash sooner and less clearly -- but the log now names both games, so the mismatch is
+    // identifiable at the point it happens instead of at the eventual crash.
+    //
+    // The real fix is splitting Ship::Context's engine-lifetime state (window, renderer, ImGui)
+    // from its per-game state (archives, config, name); see docs/MM_NATIVE.md N3.
+    if (mContext->GetName() != name) {
+        SPDLOG_ERROR("Context already exists for \"{}\"; \"{}\" is being handed that one instead of its own. "
+                     "Its archives, config and app name will be the WRONG GAME's. See docs/MM_NATIVE.md N3.",
+                     mContext->GetName(), name);
+    } else {
+        SPDLOG_WARN("Context for \"{}\" already exists; returning it rather than creating a second.", name);
+    }
 
     return GetRawInstance();
 }
