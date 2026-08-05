@@ -434,13 +434,65 @@ This question does NOT block N1/N2 — faithful-first means "get native MM booti
 > drops without noticing. It errors out rather than reporting "no collisions" when a core binary is
 > missing.
 >
-> **NEXT BOUNDARY (2026-08-06, measured, not yet fixed): a departing core shuts down ENGINE state.**
-> With the symbols privatised, OoT gets past the menu to `RegisterImGuiItemIcons` and dies in
-> `Fast3dGui::LoadGuiTexture` → `GfxRenderingAPISdl3Gpu::UploadTexture` → SDL3 → lavapipe. MM's
-> shutdown ran `Gui::ShutDownImGui`, which tears down the GUI/GPU backend — engine state the window it
-> left standing still depends on. Same shape as every boundary before it, one level lower: the fix is
-> that a core's shutdown must release only its OWN things, and engine teardown must belong to whoever
-> owns the engine (the launcher), not to whichever game happens to be leaving.
+> **THE SEQUENCE NOW PASSES END TO END (2026-08-06): `--run-sequence mm,oot` runs BOTH GAMES IN ONE
+> PROCESS.** MM boots Clock Town and returns control to the launcher; OoT then attaches, installs all
+> four of its own per-game subsystems, reaches its frame loop and loads its 3DS title scene
+> (`loaded scene-room model 1000 (/scene/spot99_0_info.zsi): 29 groups, 30 textures`, 88 live engine
+> lines after the attach), then leaves through its own intentional `_exit(0)` — which is the expected
+> end state under C057, not a full unwind. Verdict: 4/4 fresh, 0 inherited, no crash.
+>
+> **AND MY DIAGNOSIS OF THE LAST CRASH WAS WRONG — the measurement says so.** I recorded it as "a
+> departing core shuts down ENGINE state", reasoning from the `UploadTexture` → SDL3 → lavapipe stack
+> that MM's shutdown had torn down the GPU backend. **It had not. Nothing in the renderer teardown path
+> runs at all.** Twelve teardown entry points were watched under gdb across the whole two-core run —
+> `SDL_Quit`, `SDL_QuitSubSystem`, `SDL_DestroyGPUDevice`, `SDL_ReleaseWindowFromGPUDevice`,
+> `SDL_DestroyWindow`, `SDL_DestroyRenderer`, `SDL_GL_DestroyContext`, `GfxWindowBackendSDL3::Destroy`,
+> `Fast::Interpreter::Destroy`, `~Fast3dWindow`, `~GfxRenderingAPISdl3Gpu`, `~Window` — all twelve
+> resolved to real addresses (proven by dumping `info breakpoints` AFTER the run, so "0 hits" cannot
+> mean "never armed") and **all twelve fired zero times**. The GPU device is the same pointer on the
+> same thread for both games: `SDL_CreateGPUDevice` hit once, `SDL_ClaimWindowForGPUDevice` once, and a
+> change-detector over 821 `SDL_AcquireGPUCommandBuffer` calls fired exactly once, at the first.
+>
+> **The real cause was heap corruption, and it is a regression from `bad027cd`.** `Gui::AddGuiWindow`
+> used to call `guiWindow->Init()`; that commit ("remove Dear ImGui library; replace with no-op header
+> shim") deleted the call, because `InitElement`/`DrawElement` are ImGui scaffolding. But
+> `GuiElement::Init()` is the ONLY caller of `InitElement()`, and two windows —
+> `2ship/2s2h/DeveloperTools/MessageViewer.h` and `Shipwright/soh/soh/Enhancements/debugger/MessageViewer.h`
+> — declare `char*` members with **no initializer**, `calloc` them in `InitElement`, and `free` them in
+> their destructor. So the acquiring half stopped running and the releasing half did not: the destructor
+> (reached from `BenGui::Destroy` → `DeinitOTR`) handed glibc two live, foreign pointers. glibc accepted
+> them, and from then on the free lists described memory other subsystems still owned. SDL's
+> `VulkanCommandBuffer` structs — malloc'd during MM's run, still live because the device is never
+> destroyed — were later overwritten by OoT's allocations, and `VULKAN_AcquireCommandBuffer` reset a
+> garbage `VkCommandBuffer` (faulting arg `0xc1c10ad16cb81ead`: overwritten data, not a stale pointer).
+>
+> Proved three ways: `MALLOC_PERTURB_=165` makes glibc abort with `free(): invalid pointer` inside
+> `~MessageViewerWindow` **before OoT even starts**; a gdb breakpoint that zeroes just those two words
+> before the frees, with no rebuild and nothing else changed, makes the SIGSEGV vanish and OoT walk
+> through `RegisterImGuiItemIcons`; and in-class `= nullptr` initializers fix it permanently. Restoring
+> `Init()` was deliberately NOT the fix — it would revive 62 `InitElement` bodies that `bad027cd`
+> intentionally killed, to solve a two-line memory bug. A destructor that releases what no constructor
+> acquired is wrong C++ regardless, which is what `ConsoleWindow` (already `= nullptr`) gets right.
+>
+> **Second bug, found only because the first was fixed: `sExitRequested` was latched across cores.**
+> `Context::RequestExit` sets an engine-lifetime static that nothing cleared, so MM's `quit` was still
+> set when OoT's graph loop read it on frame 1 — OoT shut down before drawing anything, and the run
+> exited 0. That is the failure mode most easily mistaken for success. Cleared in `BeginGameSession`,
+> where a different game attaches.
+>
+> **A THIRD FINDING, NOT FIXED, AND IT IS BIGGER THAN THE CRASH.** A survey classified all **62**
+> `InitElement()` definitions in the repo: 2 were this memory hazard, 1 already safe, 27 are genuine
+> no-ops — and **32 are FUNCTIONAL GAPS** where non-ImGui work silently stopped happening when
+> `bad027cd` removed the `Init()` call. Several are severe: `SaveManager` sections for gameplay stats
+> and both trackers are never registered; cosmetics are never hydrated at boot; `BenMenu` has no other
+> call site, so the entire 2ship menu tree is never built; `disabledMap` stays empty in front of ~75
+> `.at()` calls that would throw. This is separate, larger work and is recorded here rather than fixed.
+>
+> **Still open on MM's own shutdown:** solo `zelda3d mm` still aborts at process exit with
+> `double free or corruption (!prev)` in `Rml::StyleSheetFactory::~StyleSheetFactory`. That is a
+> SECOND, unrelated heap defect on the `~Fast3dWindow` → `Gui::ShutDownImGui` → `Rml::Shutdown` path —
+> the full-teardown path the sequence never enters, which independently re-confirms `~Fast3dWindow`
+> does not run there. So "MM's shutdown is clean" is true only of the sequence path.
 >
 > Still unsplit and still inherited, named so a clean log is not read as a complete answer: **Audio**
 > and **Console** (device/object are engine, sequence player and registered commands are per-game).

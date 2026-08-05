@@ -43,13 +43,18 @@ class MessageViewer final : public Ship::GuiWindow {
     static constexpr uint16_t MAX_STRING_SIZE = 1024;
     static constexpr int HEXADECIMAL = 0;
     static constexpr int DECIMAL = 1;
-    char* mTableIdBuf;
+    // Allocated by InitElement, released by ~MessageViewer -- but Gui::AddGuiWindow no longer calls
+    // Init() (ImGui was removed), so InitElement NEVER runs and the destructor is the only half of
+    // that pair that executes. Left uninitialised, it free()d three stale words: a valid free() of
+    // memory this object never owned, which corrupts the C heap for everything after it. nullptr
+    // keeps the destructor correct whether or not InitElement is ever restored.
+    char* mTableIdBuf = nullptr;
     std::string mTableId;
-    char* mTextIdBuf;
-    uint16_t mTextId;
+    char* mTextIdBuf = nullptr;
+    uint16_t mTextId = 0;
     int mTextIdBase = HEXADECIMAL;
     int32_t mLanguage = LANGUAGE_ENG;
-    char* mCustomMessageBuf;
+    char* mCustomMessageBuf = nullptr;
     std::string mCustomMessageString;
     bool mDisplayExistingMessageClicked = false;
     bool mDisplayCustomMessageClicked = false;
