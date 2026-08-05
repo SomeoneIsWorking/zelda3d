@@ -23,17 +23,7 @@ endif()
 
 set(BUILD_SHARED_LIBS OFF CACHE STRING "install/link shared instead of static libs")
 
-################################################################################
-# dr_libs (audio sample decoding — used by 2s2h/resource/importer/AudioSampleFactory.cpp)
-# FetchContent is global; if `soh` already declared dr_libs the second declare is a no-op.
-################################################################################
 include(FetchContent)
-FetchContent_Declare(
-    dr_libs
-    GIT_REPOSITORY https://github.com/mackron/dr_libs.git
-    GIT_TAG da35f9d6c7374a95353fd1df1d394d44ab66cf01
-)
-FetchContent_MakeAvailable(dr_libs)
 
 ################################################################################
 # Shared sub-projects. The root CMakeLists already add_subdirectory'd these, so

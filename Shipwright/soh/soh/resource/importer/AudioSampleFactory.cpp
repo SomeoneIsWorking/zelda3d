@@ -7,13 +7,10 @@
 #include <ship/Context.h>
 #include <ship/resource/archive/Archive.h>
 #include <ship/resource/ResourceManager.h>
-#define DR_WAV_IMPLEMENTATION
+// Declarations only. The dr_libs implementation is compiled once, for both games, in
+// zelda3d_shared/audio/dr_libs_impl.cpp — it is third-party decoder code, not game code.
 #include <dr_wav.h>
-
-#define DR_MP3_IMPLEMENTATION
 #include <dr_mp3.h>
-
-#define DR_FLAC_IMPLEMENTATION
 #include <dr_flac.h>
 
 #include <ogg/ogg.h>

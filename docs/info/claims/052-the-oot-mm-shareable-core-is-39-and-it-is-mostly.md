@@ -1,9 +1,10 @@
 ---
 id: C052
 kind: claim
-status: holds
+status: falsified
 created: 2026-08-05
 tags: 
+falsified_on: 2026-08-05
 ---
 
 ## Claim
@@ -17,3 +18,9 @@ tools/core_overlap.py disassembles both game-code object trees and compares each
 ## What would falsify it
 
 an attempt to actually hoist one of the shared subsystems, which would reveal how much of the 39% is entangled with per-game headers/structs and therefore not liftable in practice
+
+## FALSIFIED 2026-08-05
+
+Measured over a FILESYSTEM WALK of build-cmake/soh, which swept in 1196 orphaned objects predating the soh_lib split (dated 2026-07-02; only 1 of soh.dir's 1197 objects is still linked). It also counted dr_wav/dr_mp3/dr_flac -- 158 third-party decoder functions compiled into both game cores -- as game code. Re-measured over the objects ninja actually links, after hoisting dr_libs into zelda3d_shared: 3501 colliding functions, 1272 SAME = 36.3%, not 39.1%. The qualitative conclusion survives and is restated as C053.
+
+> Anything that cited this claim as proof must be re-checked. Grep the repo for it.

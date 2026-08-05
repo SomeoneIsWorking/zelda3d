@@ -7,16 +7,13 @@
 #include <tinyxml2.h>
 #include <thread>
 
-#define DR_WAV_IMPLEMENTATION
+// Declarations only. The dr_libs implementation is compiled once, for both games, in
+// zelda3d_shared/audio/dr_libs_impl.cpp — it is third-party decoder code, not game code.
 #include <dr_wav.h>
-
-#define DR_MP3_IMPLEMENTATION
 #include <dr_mp3.h>
-
-#define DR_FLAC_IMPLEMENTATION
-#include <ship/resource/ResourceManager.h>
-
 #include <dr_flac.h>
+
+#include <ship/resource/ResourceManager.h>
 
 #include <ogg/ogg.h>
 #include <vorbis/codec.h>

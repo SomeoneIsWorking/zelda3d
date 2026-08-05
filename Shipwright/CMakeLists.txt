@@ -187,6 +187,21 @@ set(INCLUDE_MPQ_SUPPORT ON)
 add_compile_definitions(CONTROLLERBUTTONS_T=uint32_t)
 
 ################################################################################
+# dr_libs — single-header audio decoders (wav/mp3/flac), used by BOTH games.
+#
+# Declared here, once, because zelda3d_shared now compiles the one and only copy of their
+# implementation (zelda3d_shared/audio/dr_libs_impl.cpp). It used to be declared separately by soh
+# and by 2ship, each of which then baked its own private copy into its game core.
+################################################################################
+include(FetchContent)
+FetchContent_Declare(
+    dr_libs
+    GIT_REPOSITORY https://github.com/mackron/dr_libs.git
+    GIT_TAG da35f9d6c7374a95353fd1df1d394d44ab66cf01
+)
+FetchContent_MakeAvailable(dr_libs)
+
+################################################################################
 # Sub-projects
 ################################################################################
 add_subdirectory(libultraship ${CMAKE_BINARY_DIR}/libultraship)
