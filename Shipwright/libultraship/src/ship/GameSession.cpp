@@ -31,6 +31,14 @@ void GameSession::End() {
     }
 }
 
+void GameSession::NoteInstalled(const std::string& subsystem) {
+    mInstalled.insert(subsystem);
+}
+
+bool GameSession::WasInstalledByThisSession(const std::string& subsystem) const {
+    return mInstalled.count(subsystem) != 0;
+}
+
 const std::string& GameSession::GetName() const {
     return mName;
 }

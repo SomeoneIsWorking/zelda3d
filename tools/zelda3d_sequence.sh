@@ -15,10 +15,11 @@
 #   usage: tools/zelda3d_sequence.sh [mm,oot]
 #
 # Output: scratch/logs/sequence/run.log, plus a verdict on stdout. The verdict reads the log for the
-# two classes libultraship now distinguishes -- an ENGINE subsystem shared with the previous game
-# (correct, that is what one libultraship.so is for) and a PER-GAME one inherited (the bug the split
-# exists to remove) -- and says which of each it saw. It prints the denominators either way: "no
-# per-game inheritance" is only meaningful next to "and here is what the second core did install".
+# classes libultraship distinguishes -- ENGINE state shared with the previous game (correct, that is
+# what one libultraship.so is for), PER-GAME state inherited (the bug the split exists to remove),
+# and SPLIT-PENDING state inherited because Audio/Console are genuinely not divided yet (unfinished,
+# not a regression). It prints the denominators either way: "no per-game inheritance" is only
+# meaningful next to "and here is what the second core did install".
 set -u
 REPO="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
 SEQ="${1:-mm,oot}"
@@ -91,10 +92,15 @@ echo "-- second core ATTACHED as a different game?"
 grep -E "different game is attaching|Ending game session" "$LOG" || echo "   (none -- no second game attached; the split was never exercised)"
 echo "-- PER-GAME state it installed for ITSELF (want: all four):"
 grep -E "installed a FRESH" "$LOG" || echo "   (none)"
+# The UNFINISHED (Audio/Console) message also says "INHERITED the previous game", so it is excluded
+# here and reported in its own category below -- otherwise known unfinished work would read as a
+# regression every run, and a category that always fires is one nobody reads.
 echo "-- PER-GAME state it INHERITED (want: none; each line is the bug):"
-grep -E "INHERITED the previous game" "$LOG" || echo "   (none)"
+grep -E "INHERITED the previous game" "$LOG" | grep -v "UNFINISHED" || echo "   (none)"
 echo "-- ENGINE state shared with the previous game (expected, this is the design):"
 grep -E "SHARED with the previous game" "$LOG" || echo "   (none)"
+echo "-- UNFINISHED: subsystems inherited because they are not split yet (Audio, Console):"
+grep -E "Not a bug in the split, but UNFINISHED" "$LOG" || echo "   (none reported)"
 echo "-- crashes:"
 grep -iE "segmentation|SIGSEGV|SIGABRT|dumped core|terminate called|double free" "$LOG" || echo "   (none in the log; check the exit code above)"
 exit "$RC"

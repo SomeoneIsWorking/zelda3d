@@ -174,10 +174,22 @@ OTRGlobals::OTRGlobals() {
     context->InitConsole();
 
     auto benInputEditorWindow = std::make_shared<BenInputEditorWindow>("gWindows.BenInputEditor", "2S2H Input Editor");
-    // The Context takes ownership; we keep only a raw observer (see benFast3dWindow's comment).
-    auto fast3dWindow =
-        std::make_shared<Fast::Fast3dWindow>(std::vector<std::shared_ptr<Ship::GuiWindow>>({ benInputEditorWindow }));
-    context->InitWindow(fast3dWindow);
+    // ADOPT the engine's window if one is already up; construct one only when there is none. This is
+    // OoT's fix applied to MM's identical call site -- the window-ownership bug was a CLASS and MM
+    // had it too, so this one is fixed on the same terms rather than waiting for a run that reaches
+    // it. (It cannot be exercised today: OoT's DeinitOTR ends in _exit(0), so OoT can only run LAST
+    // in a sequence and MM is never the second core. Left correct rather than left wrong.)
+    // See OTRGlobals.cpp for the measured failure this prevents, and docs/MM_NATIVE.md N3.
+    auto fast3dWindow = std::dynamic_pointer_cast<Fast::Fast3dWindow>(context->GetWindow());
+    if (fast3dWindow == nullptr) {
+        // The Context takes ownership; we keep only a raw observer (see benFast3dWindow's comment).
+        fast3dWindow = std::make_shared<Fast::Fast3dWindow>(
+            std::vector<std::shared_ptr<Ship::GuiWindow>>({ benInputEditorWindow }));
+        context->InitWindow(fast3dWindow);
+    } else {
+        SPDLOG_INFO("Adopting the engine's existing window rather than constructing a second one.");
+        fast3dWindow->GetGui()->AddGuiWindow(benInputEditorWindow);
+    }
     benFast3dWindow = fast3dWindow.get();
 
     BenGui::SetupMenu();
