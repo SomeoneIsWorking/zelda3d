@@ -216,6 +216,24 @@ This question does NOT block N1/N2 — faithful-first means "get native MM booti
 > Both faults live exclusively in `~Context`, which is what makes the design below the answer rather
 > than a preference: an engine that is never torn down encounters neither.
 >
+> **A SECOND CORE NOW ACTUALLY RUNS (2026-08-05) — and where it dies names the real boundary.**
+> `zelda3d --run-sequence mm,oot` runs cores back to back in one process (order matters: OoT's
+> `_exit(0)` means it can only go last). Output: `mm RETURNED 0 -- the process survived this core`,
+> then `oot starting (core 2 of 2)`. So a second core loads AND begins initialising after a first
+> has run — the thing C056 recorded as never attempted.
+>
+> It then SIGSEGVs, and the location is the payoff. OoT got through `InitOTR`/`new OTRGlobals()`,
+> 31 forced enhancements, `SetupMenu`, `LoadFont` PressStart2P + Fipps, `CreateFontWithSize`
+> Inconsolata ×4 and Montserrat ×3 — then died in `OTRGlobals::CreateFontWithSize`. That is ImGui
+> font-atlas work, and **`GImGui` is one of exactly TWO shared DATA globals C054 measured across the
+> cores.** MM's shutdown (`BenGui::Destroy` + Context teardown) had already destroyed the ImGui
+> context, so the second core dereferenced dead engine state. C054's prediction and this failure are
+> the same fact seen from two directions.
+>
+> **So the blocker is not loading, not symbol privacy, and not the handoff — all three work. It is
+> that a core TEARS DOWN engine state its successor needs.** Which is the boundary below, arrived at
+> by measurement rather than by preference:
+>
 > **The design this points at — now the surviving option rather than one of two:**
 > The window, GPU device and renderer are game-AGNOSTIC and already shared — that is the whole point
 > of one `libultraship.so`. What is per-game is the ResourceManager's archive set and the game heaps.

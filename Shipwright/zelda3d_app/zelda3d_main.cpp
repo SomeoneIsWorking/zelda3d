@@ -23,6 +23,7 @@
 #include <cstdlib>
 #include <cstring>
 #include <string>
+#include <vector>
 
 #include <dlfcn.h>
 #include <libgen.h>
@@ -221,10 +222,71 @@ int ProbeCores() {
     return shared == 0 ? 0 : 1;
 }
 
+// Diagnostic: run cores back to back in ONE process, to find out what a SECOND core's InitOTR hits
+// when the engine is already up. This is C056's outstanding falsifier -- until MM was shown to
+// return from run() (C057), nothing could run a second core at all, so no evidence existed.
+//
+// Order matters and is the caller's problem: a core that never returns ends the sequence, and OoT's
+// DeinitOTR still _exit(0)s, so "mm,oot" makes progress where "oot,mm" cannot. Each step reports
+// whether it returned, and the summary states how many of the requested cores actually ran -- a
+// sequence that stopped early must not read like one that completed.
+int RunSequence(const std::string& spec) {
+    std::vector<std::string> ids;
+    for (size_t pos = 0; pos <= spec.size();) {
+        const size_t comma = spec.find(',', pos);
+        const size_t end = comma == std::string::npos ? spec.size() : comma;
+        if (end > pos) {
+            ids.push_back(spec.substr(pos, end - pos));
+        }
+        if (comma == std::string::npos) {
+            break;
+        }
+        pos = comma + 1;
+    }
+    if (ids.empty()) {
+        fprintf(stderr, "ZELDA3D LAUNCHER: --run-sequence needs a comma-separated list, e.g. mm,oot\n");
+        return 2;
+    }
+
+    printf("zelda3d: running %zu core(s) back to back in ONE process\n", ids.size());
+    size_t ran = 0;
+    for (const std::string& id : ids) {
+        const CoreSpec* spec2 = FindSpec(id);
+        if (spec2 == nullptr) {
+            printf("  %-4s SKIPPED -- unknown game id\n", id.c_str());
+            continue;
+        }
+        void* handle = nullptr;
+        const Zelda3DCore* core = LoadCore(*spec2, &handle);
+        if (core == nullptr) {
+            printf("  %-4s FAILED to load (see above); sequence stops here\n", id.c_str());
+            break;
+        }
+        if (Dl_info info; dladdr(reinterpret_cast<void*>(core->run), &info) != 0 && info.dli_fname != nullptr) {
+            std::string dir = info.dli_fname;
+            char* buf = dir.data();
+            Ship::Context::SetAppBundlePath(dirname(buf));
+            if (chdir(Ship::Context::GetAppBundlePath().c_str()) != 0) {
+                printf("  %-4s FAILED to enter its asset directory; sequence stops here\n", id.c_str());
+                break;
+            }
+        }
+        printf("  %-4s starting (core %zu of %zu)\n", id.c_str(), ran + 1, ids.size());
+        fflush(stdout);
+        const int rc = core->run(0, nullptr);
+        ++ran;
+        printf("  %-4s RETURNED %d -- the process survived this core\n", id.c_str(), rc);
+        fflush(stdout);
+    }
+    printf("zelda3d: %zu/%zu cores ran to completion in one process\n", ran, ids.size());
+    return ran == ids.size() ? 0 : 1;
+}
+
 void Usage() {
     fprintf(stderr,
             "usage: zelda3d [oot|mm] [game args...]\n"
             "       zelda3d --probe-cores    load every core into one process and report\n"
+            "       zelda3d --run-sequence mm,oot   run cores back to back in one process\n"
             "\n"
             "The game may also be set with ZELDA3D_GAME. Default: oot.\n");
 }
@@ -234,6 +296,9 @@ void Usage() {
 int main(int argc, char* argv[]) {
     if (argc > 1 && strcmp(argv[1], "--probe-cores") == 0) {
         return ProbeCores();
+    }
+    if (argc > 2 && strcmp(argv[1], "--run-sequence") == 0) {
+        return RunSequence(argv[2]);
     }
     if (argc > 1 && (strcmp(argv[1], "-h") == 0 || strcmp(argv[1], "--help") == 0)) {
         Usage();
