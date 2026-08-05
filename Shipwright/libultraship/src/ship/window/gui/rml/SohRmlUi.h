@@ -42,6 +42,7 @@ class SohRmlUi {
     SohRmlUi& operator=(const SohRmlUi&) = delete;
 
     friend class TabClickListener;
+    friend class LauncherRowClickListener;
 
     /**
      * @brief Initialises RmlUi against the already-current SDL/GL context.
@@ -125,6 +126,9 @@ class SohRmlUi {
     // Attach a click handler to each <tab> so a mouse click switches to that tab (built once
     // after the document loads; the listeners are owned by mTabClickListeners).
     void AttachTabClickHandlers();
+    // Mouse-click handlers for the launcher's action rows (keyboard/controller go via
+    // ActivateFocused; these focus the clicked row and call into the same path).
+    void AttachLauncherClickHandlers();
     // Focus the first focusable row of the active pane (default focus on open / after a tab switch).
     void FocusFirstInActivePane();
     // Curated CVar toggle rows: reflect each `toggle="<id>"` row's live value into its <value> text
@@ -158,6 +162,7 @@ class SohRmlUi {
     bool mLauncherVisible = false;
     // Per-<tab> click listeners (own their lifetime; must outlive the document's elements).
     std::vector<std::unique_ptr<Rml::EventListener>> mTabClickListeners;
+    std::vector<std::unique_ptr<Rml::EventListener>> mLauncherClickListeners;
 };
 
 } // namespace Ship

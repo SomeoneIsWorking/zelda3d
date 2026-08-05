@@ -328,6 +328,17 @@ extern int gZelda3dSkip;
 // the REPL + Play_Draw keep running (so dumped frames stay stable). REPL `step [n]` advances exactly n
 // logic ticks on demand, letting `dumpframe` capture every single game frame of a brief transient.
 extern int gZelda3dFreeze;
+
+// --- OoT/MM launcher ---------------------------------------------------------------------------
+// The launcher is a GAMESTATE (zelda3d/launcher/zelda3d_launcher_state.c), entered before any game
+// exists rather than drawn over a running one. Registered in gGameStateOverlayTable.
+void Launcher_Init(GameState* gameState);
+void Launcher_Main(GameState* gameState);
+void Launcher_Destroy(GameState* gameState);
+void Zelda3D_LauncherShow(int show);      // SohRmlUi.cpp -- show/hide the launcher document
+int Zelda3D_LauncherIsVisible(void);
+void Zelda3D_LaunchMM(void);              // zelda3d/launcher/zelda3d_launcher.cpp -- STOPGAP, see N3
+void Zelda3D_LauncherExit(void);
 int Zelda3D_SkipEnabled(void);
 void Zelda3D_SkipControlTakers(PlayState* play);
 

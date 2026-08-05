@@ -3035,31 +3035,10 @@ void Zelda3D_ReplPoll(PlayState* play) {
         }
     }
 
-    // OoT/MM launcher choice. The RmlUi layer records WHICH game was picked and knows nothing about
-    // processes; acting on it belongs here, in the zelda3d layer.
-    //
-    // Two binaries, not one process: OoT is this executable (soh.elf) and MM is a separate native
-    // 2S2H build (mm.elf) with its own Ship::Context, ResourceManager and archives. Genuinely
-    // unifying them is milestone N3 in docs/MM_NATIVE.md and is a substantial piece of work; until
-    // then "start MM" REPLACES this process with mm.elf via execv. That is deliberate and cheap:
-    // no second window, no dual-context ownership problem, and the launcher stays the one entry
-    // point. Picking OoT simply dismisses the launcher, since this process is already OoT.
-    {
-        extern int gZelda3dLauncherAction; // SohRmlUi.cpp; 1 = OoT, 2 = MM, 3 = quit
-        extern void Zelda3D_LaunchMM(void);  // zelda3d/launcher/zelda3d_launcher.cpp
-        if (gZelda3dLauncherAction != 0) {
-            const int choice = gZelda3dLauncherAction;
-            gZelda3dLauncherAction = 0;
-            if (choice == 2) {
-                Zelda3D_LaunchMM();
-            } else if (choice == 3) {
-                fprintf(stderr, "SOH3D LAUNCHER: exit requested\n");
-                fflush(stderr);
-                exit(0);
-            }
-            // choice == 1 (OoT): nothing to do, the launcher already hid itself.
-        }
-    }
+    // NOTE: the launcher choice is consumed by Launcher_Main (the launcher GAMESTATE), not here.
+    // A copy of that logic used to live in this poll, from when the launcher was an overlay on the
+    // running game -- it swallowed the action before the gamestate could see it, so picking Ocarina
+    // of Time did nothing at all. One consumer only.
 
     // RmlUi Debug-menu "Restart → Title Screen": return to the title gamestate (same teardown the
     // debug Select menu uses in Select_LoadTitle). Done here because the menu has no PlayState.
