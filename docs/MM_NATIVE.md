@@ -278,6 +278,33 @@ This question does NOT block N1/N2 — faithful-first means "get native MM booti
 > SPLIT rows each need their engine half left in Context and their per-game half moved — those are
 > the only ones requiring real design work; the rest are mechanical.
 >
+> **THE MECHANISM, found while resolving the `mControlDeck` row (2026-08-05) — this is the sharpest
+> statement of the blocker.** All **13** `Context::Init*` methods carry the identical guard:
+>
+> ```cpp
+> bool Context::InitResourceManager(...) { if (GetResourceManager() != nullptr) return true; ... }
+> bool Context::InitControlDeck(std::shared_ptr<ControlDeck> cd) { if (GetControlDeck() != nullptr) return true; ... }
+> // ...and 11 more, identically
+> ```
+>
+> For ONE game that is harmless idempotence. For a second core it is silent wrong state, and note it
+> returns **`true`** — so `Context::Init`'s aggregate `&&` chain reports complete success while
+> **none of the second game's own subsystems were installed**. The second core is told everything
+> initialised, and keeps the first game's archives, config, audio, console, window and input.
+>
+> `mControlDeck` makes it concrete: each game constructs its OWN `LUS::ControlDeck` with a
+> game-specific `CONTROLLERBUTTONS_T` list (`OTRGlobals.cpp:315`, `BenPort.cpp:160`), and the guard
+> throws the second one away — so after a switch, one game runs on the other's button set.
+>
+> **Consequence for the refactor:** splitting the state is necessary but NOT sufficient. Each `Init*`
+> must additionally distinguish "already initialised for THIS session" (fine, return true) from
+> "initialised for a DIFFERENT game" (must not silently succeed). Fixing ownership while leaving 13
+> guards that quietly report success would just move where the wrong state comes from.
+>
+> This also resolves the `mControlDeck` SPLIT row: the ControlDeck OBJECT is per-game (its button set
+> is), so it belongs in `GameSession`; the physical-device layer beneath it is what must stay engine-
+> shared, or every switch re-enumerates and re-opens the pads.
+>
 > Which is the boundary below, arrived at by measurement rather than by preference:
 >
 > **The design this points at — now the surviving option rather than one of two:**
