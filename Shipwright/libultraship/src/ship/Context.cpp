@@ -41,47 +41,74 @@ std::unique_ptr<Context> Context::mContext;
 // return value was the trap: returning true makes Context::Init's aggregate && chain report complete
 // success while none of the second game's own subsystems were installed.
 //
-// That is no longer true of the per-game half. `BeginGameSession` now replaces the whole GameSession
-// when a different game attaches, so the per-game guards below see nullptr and genuinely install the
-// incoming game's Config, CVars, ResourceManager and ControlDeck. The guards that still fire are the
-// ENGINE ones -- window, console, audio, crash handler -- and those are shared on purpose.
+// That is no longer true of the per-game half. `BeginGameSession` replaces the whole GameSession when
+// a different game attaches, so the per-game guards below see nullptr and genuinely install the
+// incoming game's Config, CVars, ResourceManager and ControlDeck.
 //
-// Hence the two classes below rather than one message. An engine skip is the design working; a
-// per-game skip after a session swap would mean the split failed, and it must not be reported in the
-// same voice as the thing that is supposed to happen.
+// The three classes below exist because "skipped" alone says nothing about whether that is right:
+//   Engine       -- window, logger, crash handler. Shared on purpose; a skip is the design working.
+//   PerGame      -- the four GameSession rows. A skip is either idempotence or the split failing, and
+//                   which one is decided by GameSession's record of what IT installed, not by a label.
+//   SplitPending -- Audio and Console. Genuinely part per-game, genuinely not divided yet. Reported
+//                   separately so unfinished work is never filed under "the design".
 //
-// A blanket warning here was WRONG, and a normal single-game boot proved it: `zelda3d oot` alone
-// trips InitConfiguration and InitConsoleVariables, which really are called twice during one game's
-// startup. So these guards serve two purposes at once -- genuine idempotence within a game, and the
-// cross-game hazard -- and only the second is a problem. The discriminator is therefore not "was this
-// skipped" but "is a DIFFERENT game attached", which CreateUninitializedInstance detects by app name.
+// Everything here stays silent until a SECOND game attaches, because a blanket warning was wrong and
+// a normal boot proved it: `zelda3d oot` alone trips InitConfiguration and InitConsoleVariables,
+// which really are called twice during one game's startup.
 static std::atomic<bool> sForeignCoreAttached{ false };
 
 enum class SubsystemLifetime {
-    Engine,  // shared across games for the process lifetime -- inheriting it is correct
-    PerGame, // belongs to one game; lives in GameSession and must be reinstalled per game
+    Engine,      // shared across games for the process lifetime -- inheriting it is correct
+    PerGame,     // belongs to one game; lives in GameSession and is reinstalled per game
+    SplitPending // per-game in part, but NOT yet divided -- a second game still inherits it
 };
 
-static bool AlreadyInitialised(const char* subsystem, SubsystemLifetime lifetime) {
+// A skip is reported against a FACT, not against the label above: `session` records which subsystems
+// IT installed, so "skipped and this session installed it" is ordinary idempotence while "skipped and
+// it did not" is a core running on the previous game's state.
+//
+// That distinction is not theoretical. The first version of this check trusted the label alone and
+// reported two INHERITED errors -- InitConfiguration and InitConsoleVariables -- on a run where the
+// split had worked perfectly, because those two really are called twice during one game's startup.
+static bool AlreadyInitialised(const GameSession* session, const char* subsystem, SubsystemLifetime lifetime) {
     if (!sForeignCoreAttached) {
-        return true; // ordinary idempotence within one game
+        return true; // only one game has run in this process; nothing here can be cross-game
     }
-    if (lifetime == SubsystemLifetime::Engine) {
-        SPDLOG_INFO("Context::Init{} skipped -- SHARED with the previous game. That is the design: one "
-                    "libultraship.so, one window and renderer for the process lifetime.",
-                    subsystem);
-    } else {
-        SPDLOG_ERROR("Context::Init{} skipped -- this core INHERITED the previous game's {}, which the "
-                     "GameSession split is supposed to prevent. See docs/MM_NATIVE.md N3.",
-                     subsystem, subsystem);
+    switch (lifetime) {
+        case SubsystemLifetime::Engine:
+            SPDLOG_INFO("Context::Init{} skipped -- SHARED with the previous game. That is the design: one "
+                        "libultraship.so, one window and renderer for the process lifetime.",
+                        subsystem);
+            break;
+        case SubsystemLifetime::SplitPending:
+            SPDLOG_WARN("Context::Init{} skipped -- this core INHERITED the previous game's {}. Not a bug in "
+                        "the split, but UNFINISHED work: {} is part engine and part per-game and has not "
+                        "been divided. See docs/MM_NATIVE.md N3.",
+                        subsystem, subsystem, subsystem);
+            break;
+        case SubsystemLifetime::PerGame:
+            if (session != nullptr && session->WasInstalledByThisSession(subsystem)) {
+                SPDLOG_INFO("Context::Init{} skipped -- already installed by THIS game's session "
+                            "(ordinary idempotence; both games call it twice during startup).",
+                            subsystem);
+            } else {
+                SPDLOG_ERROR("Context::Init{} skipped -- this core INHERITED the previous game's {}, which the "
+                             "GameSession split is supposed to prevent. See docs/MM_NATIVE.md N3.",
+                             subsystem, subsystem);
+            }
+            break;
     }
     return true;
 }
 
 // The positive half of the same instrument, and it exists because the guard above can only ever
 // report a skip: with no counterpart, a run in which the split worked perfectly and a run in which
-// these Inits were never reached would print exactly the same nothing.
-static void InstalledForThisGame(const char* subsystem) {
+// these Inits were never reached would print exactly the same nothing. It also feeds the record the
+// guard reads, so the two halves cannot drift apart.
+static void InstalledForThisGame(GameSession* session, const char* subsystem) {
+    if (session != nullptr) {
+        session->NoteInstalled(subsystem);
+    }
     if (!sForeignCoreAttached) {
         return; // a first core installing its own subsystems is unremarkable
     }
@@ -222,7 +249,7 @@ bool Context::Init(const std::vector<std::string>& archivePaths, const std::unor
 bool Context::InitLogging(spdlog::level::level_enum debugBuildLogLevel,
                           spdlog::level::level_enum releaseBuildLogLevel) {
     if (GetLogger() != nullptr) {
-        return AlreadyInitialised("Logging", SubsystemLifetime::Engine);
+        return AlreadyInitialised(mSession.get(), "Logging", SubsystemLifetime::Engine);
     }
 
     try {
@@ -298,7 +325,7 @@ bool Context::InitLogging(spdlog::level::level_enum debugBuildLogLevel,
 
 bool Context::InitConfiguration() {
     if (GetConfig() != nullptr) {
-        return AlreadyInitialised("Configuration", SubsystemLifetime::PerGame);
+        return AlreadyInitialised(mSession.get(), "Configuration", SubsystemLifetime::PerGame);
     }
 
     mSession->mConfig = std::make_shared<Config>(GetPathRelativeToAppDirectory(mSession->GetConfigFilePath()));
@@ -308,13 +335,13 @@ bool Context::InitConfiguration() {
         return false;
     }
 
-    InstalledForThisGame("Configuration");
+    InstalledForThisGame(mSession.get(), "Configuration");
     return true;
 }
 
 bool Context::InitConsoleVariables() {
     if (GetConsoleVariables() != nullptr) {
-        return AlreadyInitialised("ConsoleVariables", SubsystemLifetime::PerGame);
+        return AlreadyInitialised(mSession.get(), "ConsoleVariables", SubsystemLifetime::PerGame);
     }
 
     mSession->mConsoleVariables = std::make_shared<ConsoleVariable>();
@@ -324,7 +351,7 @@ bool Context::InitConsoleVariables() {
         return false;
     }
 
-    InstalledForThisGame("ConsoleVariables");
+    InstalledForThisGame(mSession.get(), "ConsoleVariables");
     return true;
 }
 
@@ -332,7 +359,7 @@ bool Context::InitResourceManager(const std::vector<std::string>& archivePaths,
                                   const std::unordered_set<uint32_t>& validHashes, uint32_t reservedThreadCount,
                                   const bool allowEmptyPaths) {
     if (GetResourceManager() != nullptr) {
-        return AlreadyInitialised("ResourceManager", SubsystemLifetime::PerGame);
+        return AlreadyInitialised(mSession.get(), "ResourceManager", SubsystemLifetime::PerGame);
     }
 
 #ifdef ENABLE_SCRIPTING
@@ -376,13 +403,13 @@ bool Context::InitResourceManager(const std::vector<std::string>& archivePaths,
         GetWindow()->GetGui()->RegisterResourceFactories();
     }
 
-    InstalledForThisGame("ResourceManager");
+    InstalledForThisGame(mSession.get(), "ResourceManager");
     return true;
 }
 
 bool Context::InitControlDeck(std::shared_ptr<ControlDeck> controlDeck) {
     if (GetControlDeck() != nullptr) {
-        return AlreadyInitialised("ControlDeck", SubsystemLifetime::PerGame);
+        return AlreadyInitialised(mSession.get(), "ControlDeck", SubsystemLifetime::PerGame);
     }
 
     mSession->mControlDeck = controlDeck;
@@ -398,13 +425,13 @@ bool Context::InitControlDeck(std::shared_ptr<ControlDeck> controlDeck) {
     // unless SHIP_SCRIPTED_FIFO is set, so live OoT and normal MM runs are untouched.
     Ship_ScriptedInputFifo_StartFromEnv();
 
-    InstalledForThisGame("ControlDeck");
+    InstalledForThisGame(mSession.get(), "ControlDeck");
     return true;
 }
 
 bool Context::InitCrashHandler() {
     if (GetCrashHandler() != nullptr) {
-        return AlreadyInitialised("CrashHandler", SubsystemLifetime::Engine);
+        return AlreadyInitialised(mSession.get(), "CrashHandler", SubsystemLifetime::Engine);
     }
 
     mCrashHandler = std::make_shared<CrashHandler>();
@@ -419,7 +446,7 @@ bool Context::InitCrashHandler() {
 
 bool Context::InitAudio(AudioSettings settings) {
     if (GetAudio() != nullptr) {
-        return AlreadyInitialised("Audio", SubsystemLifetime::Engine);
+        return AlreadyInitialised(mSession.get(), "Audio", SubsystemLifetime::SplitPending);
     }
 
     mAudio = std::make_shared<Audio>(settings);
@@ -435,7 +462,7 @@ bool Context::InitAudio(AudioSettings settings) {
 
 bool Context::InitConsole() {
     if (GetConsole() != nullptr) {
-        return AlreadyInitialised("Console", SubsystemLifetime::Engine);
+        return AlreadyInitialised(mSession.get(), "Console", SubsystemLifetime::SplitPending);
     }
 
     mConsole = std::make_shared<Console>();
@@ -452,7 +479,7 @@ bool Context::InitConsole() {
 
 bool Context::InitWindow(std::shared_ptr<Window> window) {
     if (GetWindow() != nullptr) {
-        return AlreadyInitialised("Window", SubsystemLifetime::Engine);
+        return AlreadyInitialised(mSession.get(), "Window", SubsystemLifetime::Engine);
     }
 
     mWindow = window;
@@ -469,7 +496,7 @@ bool Context::InitWindow(std::shared_ptr<Window> window) {
 
 bool Context::InitFileDropMgr() {
     if (GetFileDropMgr() != nullptr) {
-        return AlreadyInitialised("FileDropMgr", SubsystemLifetime::Engine);
+        return AlreadyInitialised(mSession.get(), "FileDropMgr", SubsystemLifetime::Engine);
     }
 
     mFileDropMgr = std::make_shared<FileDropMgr>();
@@ -482,7 +509,7 @@ bool Context::InitFileDropMgr() {
 
 bool Context::InitEventSystem() {
     if (GetEventSystem() != nullptr) {
-        return AlreadyInitialised("EventSystem", SubsystemLifetime::Engine);
+        return AlreadyInitialised(mSession.get(), "EventSystem", SubsystemLifetime::Engine);
     }
 
     mEventSystem = std::make_shared<EventSystem>();
@@ -498,7 +525,7 @@ bool Context::InitScriptLoader(std::unordered_map<std::string, std::string> comp
                                std::string buildOptions, std::vector<std::string> includePaths,
                                std::vector<std::string> libraryPaths, std::vector<std::string> libraries) {
     if (GetScriptLoader() != nullptr) {
-        return AlreadyInitialised("ScriptLoader", SubsystemLifetime::Engine);
+        return AlreadyInitialised(mSession.get(), "ScriptLoader", SubsystemLifetime::Engine);
     }
 
     mScriptLoader = std::make_shared<ScriptLoader>(compileDefines, codeVersion, buildOptions, includePaths,
@@ -512,7 +539,7 @@ bool Context::InitScriptLoader(std::unordered_map<std::string, std::string> comp
 
 bool Context::InitKeystore() {
     if (GetKeystore() != nullptr) {
-        return AlreadyInitialised("Keystore", SubsystemLifetime::Engine);
+        return AlreadyInitialised(mSession.get(), "Keystore", SubsystemLifetime::Engine);
     }
 
     mKeystore = std::make_shared<Keystore>();
@@ -591,6 +618,16 @@ void Context::BeginGameSession(const std::string& name, const std::string& short
         mSession->End();
     }
     mSession = std::make_unique<GameSession>(name, shortName, configFilePath);
+
+    // The Gui is engine-lifetime but its GuiWindow LIST is not: those are the departing game's menus
+    // and editors (SohGui's for OoT, BenGui's for MM), whose vtables live in that game's .so. Same
+    // class of problem as the resource factories re-registered in InitResourceManager -- per-game
+    // state parked on an engine object -- and the incoming game installs its own when it adopts the
+    // window. Clearing here rather than in either game keeps it from depending on which core
+    // remembered to tidy up.
+    if (GetWindow() != nullptr && GetWindow()->GetGui() != nullptr) {
+        GetWindow()->GetGui()->RemoveAllGuiWindows();
+    }
 }
 
 std::string Context::GetName() const {

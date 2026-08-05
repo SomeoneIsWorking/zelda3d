@@ -330,10 +330,28 @@ OTRGlobals::OTRGlobals() {
 
     auto sohInputEditorWindow =
         std::make_shared<SohInputEditorWindow>(CVAR_WINDOW("ControllerConfiguration"), "Configure Controller");
-    // The Context takes ownership; we keep only a raw observer (see sohFast3dWindow's comment).
-    auto fast3dWindow =
-        std::make_shared<Fast::Fast3dWindow>(std::vector<std::shared_ptr<Ship::GuiWindow>>({ sohInputEditorWindow }));
-    context->InitWindow(fast3dWindow);
+    // ADOPT the engine's window if one is already up; construct one only when there is none.
+    //
+    // A core must not construct engine objects that already exist, and this is the call site that
+    // proved why. Under the launcher running two games back to back, InitWindow correctly SKIPS
+    // (the window is engine-lifetime and shared on purpose) -- so the Context never took ownership,
+    // this local shared_ptr became the sole owner, and destroying it at end of scope ran
+    // ~Fast3dWindow -> Fast::Interpreter::Destroy on the process-global renderer state. Measured:
+    // SIGSEGV immediately after "OTRGlobals constructor complete".
+    //
+    // What is per-game here is not the window but its GuiWindow list, so the adopt path installs
+    // THIS game's windows into the existing Gui (Context::BeginGameSession cleared the previous
+    // game's). See docs/MM_NATIVE.md N3.
+    auto fast3dWindow = std::dynamic_pointer_cast<Fast::Fast3dWindow>(context->GetWindow());
+    if (fast3dWindow == nullptr) {
+        // The Context takes ownership; we keep only a raw observer (see sohFast3dWindow's comment).
+        fast3dWindow = std::make_shared<Fast::Fast3dWindow>(
+            std::vector<std::shared_ptr<Ship::GuiWindow>>({ sohInputEditorWindow }));
+        context->InitWindow(fast3dWindow);
+    } else {
+        SPDLOG_INFO("Adopting the engine's existing window rather than constructing a second one.");
+        fast3dWindow->GetGui()->AddGuiWindow(sohInputEditorWindow);
+    }
     sohFast3dWindow = fast3dWindow.get();
 
     SohGui::SetupMenu();

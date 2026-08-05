@@ -1,6 +1,7 @@
 #pragma once
 
 #include <memory>
+#include <set>
 #include <string>
 
 namespace Ship {
@@ -51,6 +52,22 @@ class GameSession {
      */
     void End();
 
+    /**
+     * @brief Record that a per-game subsystem was installed BY THIS SESSION, and ask afterwards.
+     *
+     * This exists so the "did a core inherit the previous game's state" check tests a fact instead of
+     * a hand-written label. A guard that simply sees a non-null member cannot tell the two apart:
+     * within one game's startup `InitConfiguration` and `InitConsoleVariables` are genuinely called
+     * twice, and the second call is ordinary idempotence -- while the SAME non-null member for a
+     * second core would be the bug. The first version of this check could not distinguish them and
+     * duly reported two false INHERITED errors on a run where the split had worked correctly.
+     *
+     * With the installing session recorded, the two are separable: skipped AND this session installed
+     * it is idempotence; skipped AND it did NOT is inheritance.
+     */
+    void NoteInstalled(const std::string& subsystem);
+    bool WasInstalledByThisSession(const std::string& subsystem) const;
+
     const std::string& GetName() const;
     const std::string& GetShortName() const;
     const std::string& GetConfigFilePath() const;
@@ -67,6 +84,7 @@ class GameSession {
     std::string mName;
     std::string mShortName;
     std::string mConfigFilePath;
+    std::set<std::string> mInstalled;
 };
 
 } // namespace Ship
