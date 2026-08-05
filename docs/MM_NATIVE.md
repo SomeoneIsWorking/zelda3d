@@ -178,6 +178,25 @@ This question does NOT block N1/N2 — faithful-first means "get native MM booti
 > crash.** The rule it establishes is the important part: **a game core may USE engine objects and
 > must never OWN them** — under the launcher the engine outlives every core by design.
 >
+> **AUDITED 2026-08-05 — the ownership bug was a CLASS, and MM had it too.** Scanned the game cores
+> (4,334 files, 1,081 smart-pointer lines) for file-scope OWNING references to engine objects: 61
+> found. Blind spots, stated because a clean-looking sweep should carry them: function-local statics,
+> owning members of file-scope objects, and containers of engine pointers are all invisible to it.
+> - `2ship/2s2h/BenPort.cpp` held `shared_ptr<Fast3dWindow> benFast3dWindow` — MM's exact twin of
+>   OoT's bug. Fixed the same way. MM had already FELT it and patched the symptom: it explicitly
+>   nulls the pointer at shutdown, with a comment blaming "shared ptrs to LUS objects which output
+>   to SPDLOG which is destroyed before these shared ptrs" — the same static-destruction-order
+>   problem. Not co-owning is the fix; the manual null was the workaround.
+> - The other 59 are `Ship::GuiWindow` subclasses in `SohGui`/`BenGui`. Same class (a core owning an
+>   engine object) at lower severity — GUI windows, not the render window and GPU device. Recorded
+>   as a pattern to fix when that area is touched, not churned now.
+>
+> **OPEN, and NOT to be assumed either way:** MM's shutdown destroys the Context outright
+> (`OTRGlobals::Instance->context = nullptr` in BenPort.cpp), where OoT `_exit(0)`s before reaching
+> the equivalent. That would mean MM already runs the teardown that crashes OoT. Every MM run so far
+> was killed with `-9`, so there is NO evidence either way — it needs a clean MM exit and a
+> backtrace before anyone concludes MM is immune or equally affected.
+>
 > **The design this points at — now the surviving option rather than one of two:**
 > The window, GPU device and renderer are game-AGNOSTIC and already shared — that is the whole point
 > of one `libultraship.so`. What is per-game is the ResourceManager's archive set and the game heaps.

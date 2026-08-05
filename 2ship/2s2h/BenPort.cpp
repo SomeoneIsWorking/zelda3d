@@ -131,7 +131,15 @@ typedef struct {
     uint16_t patch;
 } ArchiveVersion;
 
-std::shared_ptr<Fast::Fast3dWindow> benFast3dWindow;
+// NON-OWNING. The window belongs to Ship::Context; this is only a cached handle for the per-frame
+// calls, so it must not extend the window's lifetime. Same rule and same fix as OoT's
+// sohFast3dWindow: a game core may USE engine objects and must never OWN them, because under the
+// launcher the engine outlives every core (claim C057).
+//
+// MM had already felt this as static-destruction-order pain -- hence the explicit
+// `benFast3dWindow = nullptr` at shutdown, whose comment blames shared ptrs outliving SPDLOG. That
+// was the workaround; not co-owning is the fix, and the Context now releases the window itself.
+Fast::Fast3dWindow* benFast3dWindow = nullptr;
 static ArchiveVersion DetectArchiveVersion(std::string path, bool isO2rType);
 static bool VerifyArchiveVersion(ArchiveVersion version);
 std::string portArchivePath = "";
@@ -166,9 +174,11 @@ OTRGlobals::OTRGlobals() {
     context->InitConsole();
 
     auto benInputEditorWindow = std::make_shared<BenInputEditorWindow>("gWindows.BenInputEditor", "2S2H Input Editor");
-    benFast3dWindow =
+    // The Context takes ownership; we keep only a raw observer (see benFast3dWindow's comment).
+    auto fast3dWindow =
         std::make_shared<Fast::Fast3dWindow>(std::vector<std::shared_ptr<Ship::GuiWindow>>({ benInputEditorWindow }));
-    context->InitWindow(benFast3dWindow);
+    context->InitWindow(fast3dWindow);
+    benFast3dWindow = fast3dWindow.get();
 
     BenGui::SetupMenu();
 
@@ -1040,6 +1050,8 @@ extern "C" void DeinitOTR() {
     // Destroying gui here because we have shared ptrs to LUS objects which output to SPDLOG which is destroyed before
     // these shared ptrs.
     BenGui::Destroy();
+    // Just drops the observer; the Context below owns the window and releases it. Kept so the
+    // handle cannot dangle past the Context for the rest of this function.
     benFast3dWindow = nullptr;
 
     OTRGlobals::Instance->context = nullptr;
