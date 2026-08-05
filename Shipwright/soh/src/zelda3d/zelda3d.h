@@ -335,6 +335,8 @@ extern int gZelda3dFreeze;
 void Launcher_Init(GameState* gameState);
 void Launcher_Main(GameState* gameState);
 void Launcher_Destroy(GameState* gameState);
+int Zelda3D_LauncherEnabled(void);        // zelda3d/launcher/zelda3d_launcher.cpp -- the ONE gate;
+                                          // graph.c asks it whether to enter the launcher gamestate
 void Zelda3D_LauncherShow(int show);      // SohRmlUi.cpp -- show/hide the launcher document
 int Zelda3D_LauncherIsVisible(void);
 void Zelda3D_LaunchMM(void);              // zelda3d/launcher/zelda3d_launcher.cpp -- STOPGAP, see N3

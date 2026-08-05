@@ -340,16 +340,12 @@ bool SohRmlUi::Init(void* sdlWindow, void* glContext, int width, int height, boo
     if (const char* e = std::getenv("ZELDA3D_RMLUI_OPEN"); e && e[0] == '1') {
         SetVisible(true);
     }
-    // The launcher is the ENTRY POINT: it comes up by default, before the player is in a game.
-    //
-    // ZELDA3D_LAUNCHER=0 opts out, and every headless tool sets it -- tools/zelda3d_game.sh boots
-    // straight to gameplay and a launcher waiting for a keypress would hang every harness run,
-    // sweep and screenshot in the repo. Defaulting ON with the tooling opting OUT (rather than the
-    // reverse) is what makes it the real entry point for a person while leaving all automation
-    // byte-identical in behaviour.
-    if (const char* e = std::getenv("ZELDA3D_LAUNCHER"); !(e && e[0] == '0')) {
-        ShowLauncher(true);
-    }
+    // The launcher is NOT shown from here. It used to be, and that was the bug: showing the
+    // document at RmlUi init put it on screen while the boot chain carried on behind it, so
+    // Ocarina of Time was booting and running underneath the chooser. Visibility is owned by the
+    // launcher GAMESTATE (soh's zelda3d/launcher/zelda3d_launcher_state.c), which shows it in its
+    // Init and hides it in its Destroy — so the document is up exactly when no game exists, which
+    // is the only correct answer and cannot drift from the boot path.
     return true;
 }
 
