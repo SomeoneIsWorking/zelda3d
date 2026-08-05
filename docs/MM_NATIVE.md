@@ -401,6 +401,47 @@ This question does NOT block N1/N2 — faithful-first means "get native MM booti
 >    BenGui set — the 59 owning-GuiWindow references the audit above found). So the second core must
 >    adopt the existing window AND install its own GUI windows into it.
 >
+> **THE ONE SYMBOL CLASS `RTLD_LOCAL` CANNOT PRIVATISE — measured, and it was silently corrupting
+> both games (2026-08-06).** With the window fixed, OoT got as far as `SohGui::SohMenu::AddMenuElements`
+> and jumped into `BenGui::RegisterResolutionWidgets` **in `libmm_core.so`**. Not a symbolisation
+> artifact: the whole design rests on RTLD_LOCAL keeping a core's symbols private, and there is exactly
+> one binding it does not apply to.
+>
+> **STB_GNU_UNIQUE.** Its defining property is that the dynamic linker binds it to a SINGLE instance
+> process-wide *regardless of scope*, and GCC gives that binding to function-local statics inside
+> inline functions — which is exactly how both games write their header-defined registries. `nm -D`
+> shows it as symbol type `u`.
+>
+> The numbers, from the built cores rather than from reading: **soh_core 1,575** unique symbols,
+> **mm_core 925**, **322 shared — 303 of them core-owned**. `MenuInit::GetInitFuncs` (a `static
+> std::vector<std::function<void()>>` of menu init callbacks, global namespace, identical name in both
+> games) is the one that crashed. The larger find is `GameInteractor::HooksToUnregister<Hook>::hooks`
+> and friends: **the entire hook registry was one shared object across both games**, which had been
+> true since the day two cores first coexisted and had never been visible.
+>
+> **Fix: build both cores `-fno-gnu-unique`** (`Shipwright/soh/CMakeLists.txt`, `2ship/CMakeLists.txt`).
+> Both or neither — a unique symbol binds to whichever core loaded first, so fixing one side only moves
+> which game wins. This is a LINKAGE-MODEL flag, not a warning suppression: it hides no diagnostic and
+> relaxes no conformance rule, it makes the compiler emit the binding this design requires. Namespacing
+> the two registries would have fixed today's two; this fixes the class, including the next registry
+> someone adds. Result: **0 unique symbols in either core, 0 shared.** Residual worth knowing — the 322
+> also included std/nlohmann statics that were harmlessly shared (read-only tables, RTTI tags) and are
+> now per-core.
+>
+> **`tools/unique_symbol_collisions.py`** is the durable check, and it was validated against BOTH
+> classes rather than reasoned about: run on the pre-fix binaries it reported 303 core-owned collisions
+> and exited 1; on the post-fix binaries, 0 and exit 0. A build-system flag is exactly what a refactor
+> drops without noticing. It errors out rather than reporting "no collisions" when a core binary is
+> missing.
+>
+> **NEXT BOUNDARY (2026-08-06, measured, not yet fixed): a departing core shuts down ENGINE state.**
+> With the symbols privatised, OoT gets past the menu to `RegisterImGuiItemIcons` and dies in
+> `Fast3dGui::LoadGuiTexture` → `GfxRenderingAPISdl3Gpu::UploadTexture` → SDL3 → lavapipe. MM's
+> shutdown ran `Gui::ShutDownImGui`, which tears down the GUI/GPU backend — engine state the window it
+> left standing still depends on. Same shape as every boundary before it, one level lower: the fix is
+> that a core's shutdown must release only its OWN things, and engine teardown must belong to whoever
+> owns the engine (the launcher), not to whichever game happens to be leaving.
+>
 > Still unsplit and still inherited, named so a clean log is not read as a complete answer: **Audio**
 > and **Console** (device/object are engine, sequence player and registered commands are per-game).
 

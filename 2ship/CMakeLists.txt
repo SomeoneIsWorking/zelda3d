@@ -90,6 +90,14 @@ set(ALL_FILES
 # target for them to stay identical.
 add_library(mm_settings INTERFACE)
 
+# -fno-gnu-unique: the ONE symbol class RTLD_LOCAL does not privatise. Both cores need it or neither
+# is protected -- a unique symbol binds process-wide to whichever core loaded FIRST, so leaving it off
+# here would simply move which game wins. See the matching block in Shipwright/soh/CMakeLists.txt for
+# the measurement (322 colliding unique symbols) and the crash that found it.
+if (CMAKE_CXX_COMPILER_ID STREQUAL "GNU")
+    target_compile_options(mm_settings INTERFACE $<$<COMPILE_LANGUAGE:CXX>:-fno-gnu-unique>)
+endif()
+
 # The game engine. Everything except the process entry point, so the core shared object below can
 # carry no int main() of its own.
 set(MM_LIB_FILES ${ALL_FILES})
