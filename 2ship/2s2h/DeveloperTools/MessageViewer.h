@@ -46,10 +46,15 @@ class MessageViewerWindow : public Ship::GuiWindow {
     static constexpr int HEXADECIMAL = 0;
     static constexpr int DECIMAL = 1;
 
-    char* mTextIdBuf;
-    uint16_t mTextId;
+    // Allocated by InitElement, released by ~MessageViewerWindow -- but Gui::AddGuiWindow no longer
+    // calls Init() (ImGui was removed), so InitElement NEVER runs and the destructor is the only half
+    // of that pair that executes. Left uninitialised, it free()d two stale stack/heap words: a valid
+    // free() of memory this object never owned, which corrupted the C heap for everything after it.
+    // nullptr keeps the destructor correct whether or not InitElement is ever restored.
+    char* mTextIdBuf = nullptr;
+    uint16_t mTextId = 0;
     int mTextIdBase = HEXADECIMAL;
-    char* mCustomMessageBuf;
+    char* mCustomMessageBuf = nullptr;
     std::string mCustomMessageString;
     bool mDisplayExistingMessageClicked = false;
     bool mDisplayCustomMessageClicked = false;

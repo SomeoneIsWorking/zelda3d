@@ -57,6 +57,10 @@ std::unique_ptr<Context> Context::mContext;
 // which really are called twice during one game's startup.
 static std::atomic<bool> sForeignCoreAttached{ false };
 
+// Written from the game thread, read by the graph loop each frame. See RequestExit.
+static std::atomic<bool> sExitRequested{ false };
+static std::atomic<bool> sFullTeardownRequested{ false };
+
 enum class SubsystemLifetime {
     Engine,      // shared across games for the process lifetime -- inheriting it is correct
     PerGame,     // belongs to one game; lives in GameSession and is reinstalled per game
@@ -619,6 +623,13 @@ void Context::BeginGameSession(const std::string& name, const std::string& short
     }
     mSession = std::make_unique<GameSession>(name, shortName, configFilePath);
 
+    // The exit request belongs to the game that made it, not to the process. Both flags are
+    // engine-lifetime statics, so without this the previous game's `quit` is still latched when the
+    // next core's graph loop reads it on its first frame: the second game shuts down before it has
+    // drawn anything, and the run looks like a clean exit rather than a game that never started.
+    sExitRequested = false;
+    sFullTeardownRequested = false;
+
     // The Gui is engine-lifetime but its GuiWindow LIST is not: those are the departing game's menus
     // and editors (SohGui's for OoT, BenGui's for MM), whose vtables live in that game's .so. Same
     // class of problem as the resource factories re-registered in InitResourceManager -- per-game
@@ -641,10 +652,6 @@ std::string Context::GetShortName() const {
 // Set by the launcher to the directory of the game core it loaded; empty means "derive from the
 // executable", which is what a directly-run soh.elf / mm.elf wants. See SetAppBundlePath.
 static std::string sAppBundlePathOverride;
-
-// Written from the game thread, read by the graph loop each frame. See RequestExit.
-static std::atomic<bool> sExitRequested{ false };
-static std::atomic<bool> sFullTeardownRequested{ false };
 
 void Context::RequestExit() {
     sExitRequested = true;
