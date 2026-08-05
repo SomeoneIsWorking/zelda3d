@@ -16,6 +16,14 @@ float WindowGetAspectRatio() {
     return Ship::Context::GetRawInstance()->GetWindow()->GetCurrentAspectRatio();
 }
 
+void WindowRequestExit() {
+    Ship::Context::RequestExit();
+}
+
+void WindowRequestExitWithFullTeardown() {
+    Ship::Context::RequestExitWithFullTeardown();
+}
+
 bool WindowIsRunning() {
     // Checked BEFORE the backend, and deliberately at this bridge rather than inside a window
     // backend: both games' graph loops are `while (WindowIsRunning()) RunFrame();`, so one check
