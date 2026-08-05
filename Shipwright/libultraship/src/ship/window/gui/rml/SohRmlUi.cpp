@@ -543,6 +543,13 @@ void SohRmlUi::ActivateFocused() {
                 gZelda3dLauncherAction = 2;
             } else if (action == "quit") {
                 gZelda3dLauncherAction = 3;
+            } else if (action == "open_menu") {
+                // Their launcher's Setup controls / Settings rows opened dedicated config pages we
+                // do not have. Rather than leave the rows dead, they open the RmlUi menu that DOES
+                // exist (Settings / Graphics / Audio / Debug tabs). Closing it returns here.
+                ShowLauncher(false);
+                SetVisible(true);
+                return;
             } else {
                 // An unknown action is a TYPO IN THE DOCUMENT, not a no-op to swallow silently --
                 // it would read as "the button does nothing" and send someone into the C++.
@@ -905,6 +912,17 @@ void SohRmlUi::Resize(int width, int height) {
 void SohRmlUi::UpdateAndRender() {
     if (!mInitialised || !mContext || (!mVisible && !mLauncherVisible)) {
         return;
+    }
+    // Track the WINDOW size. SohRmlUi::Resize existed but had ZERO callers, so the context stayed at
+    // whatever the window happened to be during backend init -- 800x480 here -- for the entire run,
+    // and every RmlUi document was then laid out for that and stretched to the real window. That is
+    // why the UI looked coarse and cramped at any real resolution; it affected the ESC menu just as
+    // much as the launcher. Polling here is cheap: Resize early-outs unless the size actually
+    // changed, so the steady-state cost is two getters and a comparison.
+    if (auto ctx = Ship::Context::GetRawInstance()) {
+        if (auto wnd = ctx->GetWindow()) {
+            Resize((int)wnd->GetWidth(), (int)wnd->GetHeight());
+        }
     }
     if (mLauncherVisible) {
         // Cheap (two GetElementById + SetClass); keeping it per-frame means the highlight cannot

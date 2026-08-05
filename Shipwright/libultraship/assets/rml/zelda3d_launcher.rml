@@ -1,72 +1,78 @@
 <rml>
-<head>
-	<title>Zelda3D</title>
-	<!-- rml.rcss is RmlUi's stock element sheet; recomp.rcss is Zelda64Recomp's compiled style
-	     sheet (GPL-3.0, see ATTRIBUTION.md). recomp.rcss is a Dart Sass ARTEFACT — edit
-	     scss/styles/components/Launcher.scss and regenerate, never the .rcss directly. -->
-	<link type="text/rcss" href="rml.rcss"/>
-	<link type="text/rcss" href="recomp.rcss"/>
-	<style>
-		body { width: 100%; height: 100%; }
-		/* Chiaro, the original heading face, is not shipped — no licence for it exists upstream
-		   (ATTRIBUTION.md). Fall back to Lato so headings render rather than disappearing. */
-		h1, h3, .subtitle-title__disclaimer { font-family: LatoLatin; }
-		/* The titles must not be focusable -- only the rows are -- but `disabled` also drops them to
-		   opacity 0.5, which halves the selected/unselected contrast that tells you which game Enter
-		   will start. Take the focus removal without the dimming: tab-index none here, full opacity,
-		   and the [selected] colour rule in recomp.rcss then reads at full strength. */
-		.subtitle-title { tab-index: none; opacity: 1; }
-	</style>
-</head>
-<body>
-	<div id="window">
-		<div class="launcher">
-			<!-- LEFT: Ocarina of Time. Zelda64Recomp's own launcher has this quadrant as a
-			     disabled "Coming Soon™" button — they framed both games and shipped only MM.
-			     This is that half filled in. -->
-			<div class="launcher__vertical-split">
-				<div class="launcher__title-quadrant">
-					<button id="title-oot" class="subtitle-title">
-						<div><h3>Zelda3D</h3></div>
-						<div><h1>Ocarina of Time</h1></div>
-					</button>
+	<head>
+		<title>Launcher</title>
+		<link type="text/rcss" href="rml.rcss"/>
+		<link type="text/rcss" href="recomp.rcss"/>
+		<style>
+			body
+			{
+				width: 100%;
+				height: 100%;
+			}
+			/* Chiaro is FOT-Chiaro Std B, (c) Fontworks Japan, "All Rights Reserved" -- proprietary
+			   and not redistributable, so it is NOT shipped (ATTRIBUTION.md). Lato stands in. */
+			h1, h3, .subtitle-title__disclaimer, .menu-list-item__label, .bottom-left label
+			{
+				font-family: LatoLatin;
+			}
+			/* Titles show which game is selected but must not take focus -- only the rows do. */
+			.subtitle-title { tab-index: none; opacity: 1; }
+		</style>
+	</head>
+	<body>
+		<div id="window">
+			<div class="launcher">
+				<div class="launcher__vertical-split">
+					<div class="launcher__title-quadrant">
+						<button id="title-oot" class="subtitle-title">
+							<div><h3>Zelda3D</h3></div>
+							<div><h1>Ocarina of Time</h1></div>
+						</button>
+					</div>
+					<div class="launcher__content-quadrant">
+						<button action="start_oot" half="oot" class="menu-list-item" tabindex="auto" autofocus>
+							<div class="menu-list-item__bullet">•</div>
+							<div class="menu-list-item__label">Start game</div>
+						</button>
+					</div>
 				</div>
-				<div class="launcher__content-quadrant">
-					<button action="start_oot" half="oot" class="menu-list-item" tabindex="auto" autofocus>
-						<div class="menu-list-item__bullet">&#8226;</div>
-						<div class="menu-list-item__label">Start game</div>
-					</button>
+				<div class="launcher__vertical-split launcher__vertical-split--right">
+					<div class="launcher__background-wrapper">
+						<svg src="mm-clipped.svg" class="launcher__background-mm" />
+					</div>
+					<div class="launcher__title-quadrant launcher__title-quadrant--right">
+						<button id="title-mm" class="subtitle-title subtitle-title--right">
+							<div><h3>Zelda3D</h3></div>
+							<div><h1>Majora's Mask</h1></div>
+						</button>
+					</div>
+					<div class="launcher__content-quadrant">
+						<button action="start_mm" half="mm" class="menu-list-item menu-list-item--right" tabindex="auto">
+							<div class="menu-list-item__bullet">•</div>
+							<div class="menu-list-item__label">Start game</div>
+						</button>
+						<button action="open_menu" half="mm" class="menu-list-item menu-list-item--right" tabindex="auto">
+							<div class="menu-list-item__bullet">•</div>
+							<div class="menu-list-item__label">Setup controls</div>
+						</button>
+						<button action="open_menu" half="mm" class="menu-list-item menu-list-item--right" tabindex="auto">
+							<div class="menu-list-item__bullet">•</div>
+							<div class="menu-list-item__label">Settings</div>
+						</button>
+						<button class="menu-list-item menu-list-item--right" disabled>
+							<div class="menu-list-item__bullet">•</div>
+							<div class="menu-list-item__label">Mods</div>
+						</button>
+						<button action="quit" half="mm" class="menu-list-item menu-list-item--right" tabindex="auto">
+							<div class="menu-list-item__bullet">•</div>
+							<div class="menu-list-item__label">Exit</div>
+						</button>
+					</div>
 				</div>
-			</div>
-
-			<!-- RIGHT: Majora's Mask. -->
-			<div class="launcher__vertical-split launcher__vertical-split--right">
-				<div class="launcher__background-wrapper">
-					<svg src="mm-clipped.svg" class="launcher__background-mm" />
+				<div class="bottom-left">
+					<label>Up / Down to move &#183; Enter or A to select</label>
 				</div>
-				<div class="launcher__title-quadrant launcher__title-quadrant--right">
-					<button id="title-mm" class="subtitle-title subtitle-title--right">
-						<div><h3>Zelda3D</h3></div>
-						<div><h1>Majora's Mask</h1></div>
-					</button>
-				</div>
-				<div class="launcher__content-quadrant">
-					<button action="start_mm" half="mm" class="menu-list-item menu-list-item--right" tabindex="auto">
-						<div class="menu-list-item__bullet">&#8226;</div>
-						<div class="menu-list-item__label">Start game</div>
-					</button>
-					<button action="quit" half="mm" class="menu-list-item menu-list-item--right" tabindex="auto">
-						<div class="menu-list-item__bullet">&#8226;</div>
-						<div class="menu-list-item__label">Exit</div>
-					</button>
-				</div>
-			</div>
-
-			<div class="bottom-left">
-				<label id="launcher-hint">Up / Down to move &#183; Enter or A to select</label>
 			</div>
 		</div>
-	</div>
-</body>
+	</body>
 </rml>
-
