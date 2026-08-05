@@ -34,6 +34,41 @@
 namespace Ship {
 std::unique_ptr<Context> Context::mContext;
 
+// Every Context::Init* below opens with "if this subsystem already exists, return true". For ONE
+// game that is harmless idempotence. For a SECOND game core it is silent wrong state, and the return
+// value is the trap: returning true makes Context::Init's aggregate && chain report complete success
+// while none of the second game's own subsystems were installed -- it keeps the first game's
+// archives, config, audio, console, window and input. InitControlDeck is the sharpest case, since
+// each game passes a ControlDeck built with its OWN button list and the second one is dropped.
+//
+// Behaviour is deliberately unchanged (still true): callers assume success and would fail sooner and
+// less clearly otherwise. What changes is that the skip becomes VISIBLE -- but ONLY when it is
+// actually dangerous, which is the part that had to be measured rather than assumed.
+//
+// A blanket warning here was WRONG, and a normal single-game boot proved it: `zelda3d oot` alone
+// trips InitConfiguration and InitConsoleVariables, which really are called twice during one game's
+// startup. So these guards serve two purposes at once -- genuine idempotence within a game, and the
+// cross-game hazard -- and only the second is a problem.
+//
+// The discriminator is therefore not "was this skipped" but "is a DIFFERENT game attached".
+// CreateUninitializedInstance already detects that by app name; it raises the flag below, and only
+// then does a skip mean a core inherited another game's subsystem. Fires exactly in the dangerous
+// case, silent in the normal one.
+//
+// The real fix is the per-game/engine split in docs/MM_NATIVE.md N3, where each Init must
+// distinguish "already initialised for THIS session" from "initialised for a DIFFERENT game".
+static std::atomic<bool> sForeignCoreAttached{ false };
+
+static bool AlreadyInitialised(const char* subsystem) {
+    if (!sForeignCoreAttached) {
+        return true; // ordinary idempotence within one game
+    }
+    SPDLOG_ERROR("Context::Init{} skipped -- this core has INHERITED the previous game's {}. "
+                 "See docs/MM_NATIVE.md N3.",
+                 subsystem, subsystem);
+    return true;
+}
+
 Context* Context::GetRawInstance() {
     return mContext.get();
 }
@@ -137,6 +172,9 @@ Context* Context::CreateUninitializedInstance(const std::string& name, const std
         SPDLOG_ERROR("Context already exists for \"{}\"; \"{}\" is being handed that one instead of its own. "
                      "Its archives, config and app name will be the WRONG GAME's. See docs/MM_NATIVE.md N3.",
                      mContext->GetName(), name);
+        // From here every Init* skip means this core inherited the other game's subsystem, so the
+        // guards start reporting. Before this point they are ordinary idempotence and stay quiet.
+        sForeignCoreAttached = true;
     } else {
         SPDLOG_WARN("Context for \"{}\" already exists; returning it rather than creating a second.", name);
     }
@@ -164,7 +202,7 @@ bool Context::Init(const std::vector<std::string>& archivePaths, const std::unor
 bool Context::InitLogging(spdlog::level::level_enum debugBuildLogLevel,
                           spdlog::level::level_enum releaseBuildLogLevel) {
     if (GetLogger() != nullptr) {
-        return true;
+        return AlreadyInitialised("Logging");
     }
 
     try {
@@ -240,7 +278,7 @@ bool Context::InitLogging(spdlog::level::level_enum debugBuildLogLevel,
 
 bool Context::InitConfiguration() {
     if (GetConfig() != nullptr) {
-        return true;
+        return AlreadyInitialised("Configuration");
     }
 
     mConfig = std::make_shared<Config>(GetPathRelativeToAppDirectory(mConfigFilePath));
@@ -255,7 +293,7 @@ bool Context::InitConfiguration() {
 
 bool Context::InitConsoleVariables() {
     if (GetConsoleVariables() != nullptr) {
-        return true;
+        return AlreadyInitialised("ConsoleVariables");
     }
 
     mConsoleVariables = std::make_shared<ConsoleVariable>();
@@ -272,7 +310,7 @@ bool Context::InitResourceManager(const std::vector<std::string>& archivePaths,
                                   const std::unordered_set<uint32_t>& validHashes, uint32_t reservedThreadCount,
                                   const bool allowEmptyPaths) {
     if (GetResourceManager() != nullptr) {
-        return true;
+        return AlreadyInitialised("ResourceManager");
     }
 
 #ifdef ENABLE_SCRIPTING
@@ -309,7 +347,7 @@ bool Context::InitResourceManager(const std::vector<std::string>& archivePaths,
 
 bool Context::InitControlDeck(std::shared_ptr<ControlDeck> controlDeck) {
     if (GetControlDeck() != nullptr) {
-        return true;
+        return AlreadyInitialised("ControlDeck");
     }
 
     mControlDeck = controlDeck;
@@ -330,7 +368,7 @@ bool Context::InitControlDeck(std::shared_ptr<ControlDeck> controlDeck) {
 
 bool Context::InitCrashHandler() {
     if (GetCrashHandler() != nullptr) {
-        return true;
+        return AlreadyInitialised("CrashHandler");
     }
 
     mCrashHandler = std::make_shared<CrashHandler>();
@@ -345,7 +383,7 @@ bool Context::InitCrashHandler() {
 
 bool Context::InitAudio(AudioSettings settings) {
     if (GetAudio() != nullptr) {
-        return true;
+        return AlreadyInitialised("Audio");
     }
 
     mAudio = std::make_shared<Audio>(settings);
@@ -361,7 +399,7 @@ bool Context::InitAudio(AudioSettings settings) {
 
 bool Context::InitConsole() {
     if (GetConsole() != nullptr) {
-        return true;
+        return AlreadyInitialised("Console");
     }
 
     mConsole = std::make_shared<Console>();
@@ -378,7 +416,7 @@ bool Context::InitConsole() {
 
 bool Context::InitWindow(std::shared_ptr<Window> window) {
     if (GetWindow() != nullptr) {
-        return true;
+        return AlreadyInitialised("Window");
     }
 
     mWindow = window;
@@ -395,7 +433,7 @@ bool Context::InitWindow(std::shared_ptr<Window> window) {
 
 bool Context::InitFileDropMgr() {
     if (GetFileDropMgr() != nullptr) {
-        return true;
+        return AlreadyInitialised("FileDropMgr");
     }
 
     mFileDropMgr = std::make_shared<FileDropMgr>();
@@ -408,7 +446,7 @@ bool Context::InitFileDropMgr() {
 
 bool Context::InitEventSystem() {
     if (GetEventSystem() != nullptr) {
-        return true;
+        return AlreadyInitialised("EventSystem");
     }
 
     mEventSystem = std::make_shared<EventSystem>();
@@ -424,7 +462,7 @@ bool Context::InitScriptLoader(std::unordered_map<std::string, std::string> comp
                                std::string buildOptions, std::vector<std::string> includePaths,
                                std::vector<std::string> libraryPaths, std::vector<std::string> libraries) {
     if (GetScriptLoader() != nullptr) {
-        return true;
+        return AlreadyInitialised("ScriptLoader");
     }
 
     mScriptLoader = std::make_shared<ScriptLoader>(compileDefines, codeVersion, buildOptions, includePaths,
@@ -438,7 +476,7 @@ bool Context::InitScriptLoader(std::unordered_map<std::string, std::string> comp
 
 bool Context::InitKeystore() {
     if (GetKeystore() != nullptr) {
-        return true;
+        return AlreadyInitialised("Keystore");
     }
 
     mKeystore = std::make_shared<Keystore>();

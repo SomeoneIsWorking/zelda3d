@@ -301,6 +301,26 @@ This question does NOT block N1/N2 — faithful-first means "get native MM booti
 > "initialised for a DIFFERENT game" (must not silently succeed). Fixing ownership while leaving 13
 > guards that quietly report success would just move where the wrong state comes from.
 >
+> **CORRECTION (same session): "all 13 guards are the problem" was too broad.** Making them all warn
+> put 2 warnings into a NORMAL single-game boot — `InitConfiguration` and `InitConsoleVariables` are
+> legitimately called twice during one game's startup. The guards serve two purposes at once, real
+> idempotence and the cross-game hazard, and only the second is a defect. The discriminator is not
+> "was a subsystem skipped" but "is a DIFFERENT game attached", which
+> `CreateUninitializedInstance` already knows by app name; it now raises a flag and only then do the
+> guards report. Verified silent on a normal boot (0) and firing on a sequence.
+>
+> **The measured inventory** — `--run-sequence mm,oot`, what OoT inherited from MM before it crashed
+> (the crash truncates the list; these are not necessarily all 13):
+>
+> | Inherited | Classified | Correct to share? |
+> |---|---|---|
+> | `InitWindow`, `InitConsole` | engine | **yes** — that is the intended design |
+> | `InitResourceManager`, `InitConfiguration`, `InitConsoleVariables`, `InitControlDeck` | per-game | **no** — these are the bug |
+>
+> Four of the six are exactly the per-game rows classified above, so the table is confirmed by
+> observation and not just by reading. This is the concrete acceptance test for the `GameSession`
+> split: after it, the engine rows should still be inherited and the per-game rows must not appear.
+>
 > This also resolves the `mControlDeck` SPLIT row: the ControlDeck OBJECT is per-game (its button set
 > is), so it belongs in `GameSession`; the physical-device layer beneath it is what must stay engine-
 > shared, or every switch re-enumerates and re-opens the pads.
