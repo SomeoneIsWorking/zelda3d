@@ -63,6 +63,23 @@ This question does NOT block N1/N2 — faithful-first means "get native MM booti
   building against soh3d's (in-tree) libultraship. Drop the 2S2H app shell (BenGui/BenPort main/
   Extractor menu). Verify: MM boots under our build, N64 models, headless/Xvfb + screenshot.
   **Concrete approach + effort scouted 2026-07-01 — see "N2 scouting" below.**
+> **N3 UNBLOCKED / SIZED (2026-08-05, measured — claim C050).** The "symbol collision" that made one
+> binary look impossible is now a number instead of an assertion. `nm` over the built object trees:
+> soh defines **27,275** globals outside libultraship/shared deps, mm defines **26,372**, and
+> **6,616 collide** — **3,809 of them unmangled C**, i.e. the decomp game code itself (`Actor_Draw`,
+> `Play_Init`, `aADPCMdecImpl`, …). Renaming that many is not viable and would wreck each tree's
+> correspondence to its upstream decomp.
+>
+> **The fix is a linking model, not a rename:** build each game core as a **shared object** and
+> `dlopen` it with **`RTLD_LOCAL`**. Under RTLD_LOCAL two `.so`s may each define `Play_Init` with no
+> conflict, because neither is exported into the global namespace. The launcher process itself holds
+> no game symbols and activates one core at a time — which is exactly the "per-game modules" this
+> milestone already called for, now with the reason quantified.
+>
+> Known risk to check first (C050's falsifier): any DATA that must genuinely be SHARED across the
+> dlopen boundary — a single libultraship-owned global written by both cores — is not solved by
+> RTLD_LOCAL and needs an explicit owner.
+
 - **N3 — Unify the shell / launcher.** One app entry that runs OoT (existing soh3d) or MM sharing
   one libultraship + renderer. Resolve `Ship::Context` ownership + per-game ResourceManager
   registries + `.otr`/`.o2r` archive multiplexing (or settle on per-game process). This is where
