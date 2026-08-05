@@ -56,6 +56,10 @@ int Zelda3D_InputDevice(void);
 // keyboard-input diagnostic enabled" (debug_journal/2026-07-15-keyboard-headed-v2.md). Read once,
 // cached. libultraship's two ControlDeck.cpp files (Ship:: event-time, LUS:: poll-time) each
 // forward-declare this locally and call it instead of keeping their own private copy.
+// Seed gZelda3dInputDevice from ZELDA3D_INPUTDEV. Called once from Zelda3D_RegisterHostHooks at
+// startup, before any device event can write it.
+void Zelda3D_InputDeviceInit(void);
+
 int Zelda3D_DbgInputEnabled(void);
 
 #ifdef __cplusplus

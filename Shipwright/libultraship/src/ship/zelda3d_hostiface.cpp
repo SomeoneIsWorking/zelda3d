@@ -8,7 +8,13 @@
 extern "C" {
 
 // Owned here now rather than by whichever game happened to be the executable.
-int gZelda3dInputDevice = -1;
+//
+// 1 (keyboard) is a real default, not a sentinel. This used to be -1 meaning "unresolved", with a
+// getter that read ZELDA3D_INPUTDEV on first call -- but the input layer below WRITES this variable
+// directly on device events, so any keypress arriving before the first HUD draw moved it off -1 and
+// the environment variable was then never consulted at all. The override silently lost a race. A
+// core resolves the environment once, explicitly, at startup instead (Zelda3D_InputDeviceInit).
+int gZelda3dInputDevice = 1;
 int gZelda3dHlGroup = -1;
 
 } // extern "C"
