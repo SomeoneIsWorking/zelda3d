@@ -200,7 +200,7 @@ void Rando::MiscBehavior::OnFileCreate(s16 fileNum) {
             Audio_PlaySfx(NA_SE_SY_QUIZ_INCORRECT);
             Notification::Emit({
                 .prefix = "Seed Failure:",
-                .prefixColor = ImVec4(1.0f, 0.2f, 0.2f, 1.0f),
+                .prefixColor = Ship::Color4f(1.0f, 0.2f, 0.2f, 1.0f),
                 .message = e.what(),
             });
             gSaveContext.save.shipSaveInfo.saveType = SAVETYPE_VANILLA;

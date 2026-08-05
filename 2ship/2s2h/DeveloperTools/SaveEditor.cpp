@@ -770,7 +770,7 @@ void DrawSlot(InventorySlot slot) {
     }
     ImGui::PushStyleVar(ImGuiStyleVar_FrameBorderSize, 2.0f);
 
-    ImTextureID textureId = std::dynamic_pointer_cast<Fast::Fast3dGui>(Ship::Context::GetRawInstance()->GetWindow()->GetGui())->GetTextureByName(
+    void* textureId = std::dynamic_pointer_cast<Fast::Fast3dGui>(Ship::Context::GetRawInstance()->GetWindow()->GetGui())->GetTextureByName(
         (const char*)gItemIcons[safeItemsForInventorySlot[slot][0]]);
 
     if (currentItemId != ITEM_NONE) {
@@ -1177,7 +1177,7 @@ void DrawQuestSlot(QuestItem slot) {
     ImGui::SetCursorPos(
         ImVec2(x * INV_GRID_WIDTH + INV_GRID_PADDING, y * INV_GRID_HEIGHT + INV_GRID_TOP_MARGIN + INV_GRID_PADDING));
 
-    ImTextureID textureId = std::dynamic_pointer_cast<Fast::Fast3dGui>(Ship::Context::GetRawInstance()->GetWindow()->GetGui())->GetTextureByName(
+    void* textureId = std::dynamic_pointer_cast<Fast::Fast3dGui>(Ship::Context::GetRawInstance()->GetWindow()->GetGui())->GetTextureByName(
         (const char*)gItemIcons[questToItemMap[slot]]);
     if (ImGui::ImageButton(std::to_string(slot).c_str(), textureId, ImVec2(INV_GRID_ICON_SIZE, INV_GRID_ICON_SIZE),
                            ImVec2(0, 0), ImVec2(1, 1), ImVec4(0, 0, 0, 0),
@@ -1273,7 +1273,7 @@ void DrawQuestStatusTab() {
     drawSongRange(QUEST_SONG_SONATA, QUEST_SONG_SARIA);
     ImGui::SeparatorText("Equipment");
     if (GET_PLAYER_FORM == PLAYER_FORM_FIERCE_DEITY) {
-        ImTextureID swordTextureId = std::dynamic_pointer_cast<Fast::Fast3dGui>(Ship::Context::GetRawInstance()->GetWindow()->GetGui())->GetTextureByName(
+        void* swordTextureId = std::dynamic_pointer_cast<Fast::Fast3dGui>(Ship::Context::GetRawInstance()->GetWindow()->GetGui())->GetTextureByName(
             (const char*)gItemIcons[ITEM_SWORD_DEITY]);
         ImGui::ImageButton(std::to_string(ITEM_SWORD_DEITY).c_str(), swordTextureId,
                            ImVec2(INV_GRID_ICON_SIZE, INV_GRID_ICON_SIZE), ImVec2(0, 0), ImVec2(1, 1),
@@ -1283,7 +1283,7 @@ void DrawQuestStatusTab() {
         if (swordValue == EQUIP_VALUE_SWORD_NONE) {
             swordValue = EQUIP_VALUE_SWORD_KOKIRI;
         }
-        ImTextureID swordTextureId = std::dynamic_pointer_cast<Fast::Fast3dGui>(Ship::Context::GetRawInstance()->GetWindow()->GetGui())->GetTextureByName(
+        void* swordTextureId = std::dynamic_pointer_cast<Fast::Fast3dGui>(Ship::Context::GetRawInstance()->GetWindow()->GetGui())->GetTextureByName(
             (const char*)gItemIcons[ITEM_SWORD_KOKIRI + swordValue - EQUIP_VALUE_SWORD_KOKIRI]);
 
         if (ImGui::ImageButton(std::to_string(ITEM_SWORD_KOKIRI).c_str(), swordTextureId,
@@ -1297,7 +1297,7 @@ void DrawQuestStatusTab() {
     if (shieldValue == EQUIP_VALUE_SHIELD_NONE) {
         shieldValue = EQUIP_VALUE_SHIELD_HERO;
     }
-    ImTextureID shieldTextureId = std::dynamic_pointer_cast<Fast::Fast3dGui>(Ship::Context::GetRawInstance()->GetWindow()->GetGui())->GetTextureByName(
+    void* shieldTextureId = std::dynamic_pointer_cast<Fast::Fast3dGui>(Ship::Context::GetRawInstance()->GetWindow()->GetGui())->GetTextureByName(
         (const char*)gItemIcons[ITEM_SHIELD_HERO + shieldValue - EQUIP_VALUE_SHIELD_HERO]);
 
     if (ImGui::ImageButton(std::to_string(ITEM_SHIELD_HERO).c_str(), shieldTextureId,
@@ -1306,7 +1306,7 @@ void DrawQuestStatusTab() {
         NextQuestInSlot(QUEST_SHIELD);
     }
     ImGui::SameLine();
-    ImTextureID textureId = std::dynamic_pointer_cast<Fast::Fast3dGui>(Ship::Context::GetRawInstance()->GetWindow()->GetGui())->GetTextureByName(
+    void* textureId = std::dynamic_pointer_cast<Fast::Fast3dGui>(Ship::Context::GetRawInstance()->GetWindow()->GetGui())->GetTextureByName(
         (const char*)gItemIcons[ITEM_BOMBERS_NOTEBOOK]);
     if (ImGui::ImageButton(std::to_string(ITEM_BOMBERS_NOTEBOOK).c_str(), textureId,
                            ImVec2(INV_GRID_ICON_SIZE, INV_GRID_ICON_SIZE), ImVec2(0, 0), ImVec2(1, 1),

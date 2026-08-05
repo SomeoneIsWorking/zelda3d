@@ -17,11 +17,11 @@ std::vector<std::string> bankDepositMessages = {
 static void EmitDepositNotification(s16 newBalance) {
     Notification::Options notif = {};
     notif.prefix = bankDepositMessages[rand() % bankDepositMessages.size()];
-    notif.prefixColor = ImVec4(0.4f, 0.7f, 1.0f, 1.0f);
+    notif.prefixColor = Ship::Color4f(0.4f, 0.7f, 1.0f, 1.0f);
     notif.message = "Bank Balance:";
-    notif.messageColor = ImVec4(0.9f, 0.9f, 0.9f, 1.0f);
+    notif.messageColor = Ship::Color4f(0.9f, 0.9f, 0.9f, 1.0f);
     notif.suffix = std::to_string(newBalance);
-    notif.suffixColor = ImVec4(0.3f, 1.0f, 0.3f, 1.0f);
+    notif.suffixColor = Ship::Color4f(0.3f, 1.0f, 0.3f, 1.0f);
     notif.remainingTime = 6.0f;
     Notification::Emit(notif);
 }

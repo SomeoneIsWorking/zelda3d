@@ -439,7 +439,7 @@ int16_t Fast3dGui::GetIntegerScaleFactor() {
     }
 }
 
-ImTextureID Fast3dGui::GetTextureById(int32_t id) {
+void* Fast3dGui::GetTextureById(int32_t id) {
     GfxRenderingAPI* api = mInterpreter.lock()->GetCurrentRenderingAPI();
     return api->GetTextureById(id);
 }
@@ -448,7 +448,7 @@ bool Fast3dGui::HasTextureByName(const std::string& name) {
     return mGuiTextures.contains(name);
 }
 
-ImTextureID Fast3dGui::GetTextureByName(const std::string& name) {
+void* Fast3dGui::GetTextureByName(const std::string& name) {
     if (!HasTextureByName(name)) {
         return nullptr;
     }

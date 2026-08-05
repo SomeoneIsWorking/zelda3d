@@ -5,17 +5,18 @@
 #include <string>
 #include <cstdint>
 #include <ship/window/gui/GuiWindow.h>
+#include <ship/utils/Color4f.h>
 namespace Notification {
 
 struct Options {
     uint32_t id = 0;
     const char* itemIcon = nullptr;
     std::string prefix = "";
-    ImVec4 prefixColor = ImVec4(0.5f, 0.5f, 1.0f, 1.0f);
+    Ship::Color4f prefixColor = { 0.5f, 0.5f, 1.0f, 1.0f };
     std::string message = "";
-    ImVec4 messageColor = ImVec4(0.7f, 0.7f, 0.7f, 1.0f);
+    Ship::Color4f messageColor = { 0.7f, 0.7f, 0.7f, 1.0f };
     std::string suffix = "";
-    ImVec4 suffixColor = ImVec4(1.0f, 0.5f, 0.5f, 1.0f);
+    Ship::Color4f suffixColor = { 1.0f, 0.5f, 0.5f, 1.0f };
     float remainingTime = 0.0f; // Seconds
     bool mute = false;
 };

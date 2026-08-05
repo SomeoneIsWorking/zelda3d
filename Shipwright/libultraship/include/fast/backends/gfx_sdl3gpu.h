@@ -244,7 +244,7 @@ class GfxRenderingAPISdl3Gpu : public GfxRenderingAPI {
     void SetTextureFilter(FilteringMode mode) override;
     FilteringMode GetTextureFilter() override;
     void SetSrgbMode() override;
-    ImTextureID GetTextureById(int id) override;
+    void* GetTextureById(int id) override;
     void SetCurrentPrimDepth(float depth) override;
 
   private:
