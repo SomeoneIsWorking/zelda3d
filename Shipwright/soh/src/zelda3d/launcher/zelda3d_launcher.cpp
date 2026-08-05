@@ -25,6 +25,21 @@
 
 extern "C" {
 
+// Should the launcher gamestate run at all? This is the ONE place that decides, and graph.c is its
+// only caller.
+//
+// It has to exist because the launcher waits for a human. Every headless tool in the repo --
+// harness runs, parity sweeps, screenshot capture -- boots with no one at the keyboard, and a
+// chooser that waits for a click would hang all of them. tools/zelda3d_game.sh sets
+// ZELDA3D_LAUNCHER=0 for exactly that reason.
+//
+// Default ON, tooling opts OUT, rather than the reverse: that is what makes the launcher the real
+// entry point for a person while leaving automation behaving as it did before it existed.
+int Zelda3D_LauncherEnabled(void) {
+    const char* e = getenv("ZELDA3D_LAUNCHER");
+    return !(e != nullptr && e[0] == '0');
+}
+
 // Resolve mm.elf next to this executable, which is where the build puts it (build-cmake/mm/mm.elf
 // beside build-cmake/soh/soh.elf), unless ZELDA3D_MM overrides it — the same override tools/mm_game.sh
 // already honours, so a sibling build dir keeps working.

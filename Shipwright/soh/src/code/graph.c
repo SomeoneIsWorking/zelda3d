@@ -144,6 +144,9 @@ GameStateOverlay* Graph_GetNextGameState(GameState* gameState) {
     if (gameStateInitFunc == FileChoose_Init) {
         return &gGameStateOverlayTable[5];
     }
+    if (gameStateInitFunc == Launcher_Init) {
+        return &gGameStateOverlayTable[6];
+    }
 
     LOG_ADDRESS("game_init_func", gameStateInitFunc);
     return NULL;
@@ -471,10 +474,16 @@ void RunFrame(void) {
             goto nextFrame;
     }
 
-    runFrameContext.nextOvl = &gGameStateOverlayTable[0];
+    // Zelda3D: the LAUNCHER is the first gamestate. Booting into TitleSetup here is what put a
+    // running Ocarina of Time underneath the launcher document — the chooser has to come before
+    // any game exists, not on top of one. Picking a game sets the next gamestate from there.
+    runFrameContext.nextOvl =
+        Zelda3D_LauncherEnabled() ? &gGameStateOverlayTable[6]  // Launcher_Init
+                                  : &gGameStateOverlayTable[0]; // TitleSetup_Init
 
-    // Zelda3D: boot straight into the debug Select overlay so the auto-warp can
-    // reach an in-game scene headlessly (see Zelda3D_AutoWarp* in zelda3d).
+    // Auto-warp is the headless tooling path: it drives straight to a scene with no human at the
+    // keyboard, so it must not stop at a chooser nobody can click. It already bypassed TitleSetup
+    // for the same reason.
     if (Zelda3D_AutoWarpEnabled()) {
         runFrameContext.nextOvl = &gGameStateOverlayTable[1]; // Select_Init
     }

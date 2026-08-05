@@ -255,7 +255,13 @@ static void Zelda3D_ReplExec(PlayState* play, char* line, const char* outPath) {
     // dereferencing a null PlayState. Keeps headless tooling (key injection, screenshots,
     // logging) alive across the title -> file-select -> ingame route.
     if (play == NULL) {
-        static const char* kPlayFree[] = { "key", "log", "fps", "dump", "inputdev", "keycap", "menu", "help" };
+        // `launcher` MUST be here. The launcher gamestate has no PlayState by construction -- that
+        // is the entire point of it, no game exists yet -- so gating `launcher` on one made the
+        // launcher the one screen its own control command could not drive. A command that cannot
+        // run in the state it exists to control is not a gate, it is a bug.
+        // (Screenshots already work here: they go through `dump`, which is play-free.)
+        static const char* kPlayFree[] = { "key",    "log",  "fps",  "dump",    "inputdev",
+                                           "keycap", "menu", "help", "launcher" };
         int ok = 0;
         for (size_t i = 0; i < sizeof(kPlayFree) / sizeof(kPlayFree[0]); i++) {
             if (strcmp(cmd, kPlayFree[i]) == 0) {
