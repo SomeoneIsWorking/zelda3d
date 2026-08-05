@@ -117,6 +117,62 @@ def main():
               "file-static) is invisible here, and that is how most singletons in this codebase are "
               "actually written. A zero here does NOT mean there is no shared state.")
 
+    report_upcalls()
+
+
+def report_upcalls():
+    """Which GAME symbols does libultraship itself need? The RTLD_LOCAL blocker list.
+
+    This is the direction that actually blocks one-binary-both-games, and it is the opposite of
+    everything above. A core dlopen'd with RTLD_LOCAL is INVISIBLE to the rest of the process by
+    definition -- that is the property that lets two cores each define Play_Init. So any symbol
+    libultraship names and expects the game to define cannot be resolved that way, no matter how the
+    cores are built. Each one has to become a registration (the core hands libultraship a pointer at
+    init) rather than a link-time name.
+    """
+    lus_so = os.path.join(BUILD, "libultraship", "src", "libultraship.so")
+    if not os.path.isfile(lus_so):
+        print("\n[upcalls] libultraship.so not found -- SKIPPED, and this section reported NOTHING. "
+              "It only works once libultraship is built SHARED.")
+        return
+
+    def dynsyms(path, undefined):
+        flag = "--undefined-only" if undefined else "--defined-only"
+        r = subprocess.run(["nm", "-D", flag, path], capture_output=True, text=True, timeout=120)
+        out = set()
+        for line in r.stdout.splitlines():
+            p = line.split()
+            if undefined and len(p) >= 2:
+                out.add(p[-1])
+            elif not undefined and len(p) == 3 and p[1] in "TWDBRV":
+                out.add(p[2])
+        return out
+
+    need = dynsyms(lus_so, True)
+    # Versioned glibc/libstdc++ imports are the C runtime, not game code; they carry an @ tag.
+    need = {s for s in need if "@" not in s}
+    if not need:
+        sys.exit("libultraship.so reports NO undefined symbols -- implausible, this probe is broken.")
+
+    print(f"\n=== upcalls: symbols libultraship NEEDS FROM the game (the RTLD_LOCAL blocker list) ===")
+    print(f"libultraship.so undefined symbols, C runtime excluded: {len(need)}")
+    found_any = False
+    for label, elf in (("soh", "soh/soh.elf"), ("mm", "mm/mm.elf")):
+        p = os.path.join(BUILD, elf)
+        if not os.path.isfile(p):
+            print(f"  {label}: {p} MISSING -- this side was NOT checked.")
+            continue
+        hits = sorted(need & dynsyms(p, False))
+        found_any = found_any or bool(hits)
+        print(f"  {label}: {len(hits)} of them are defined by the game core"
+              + (":" if hits else " -- nothing to unpick on this side."))
+        for h in hits:
+            print(f"      {h}")
+    if not found_any:
+        print("\n  None. Nothing in libultraship names a game symbol, so RTLD_LOCAL cores have no")
+        print("  upcall problem. (Blind spot: this sees LINK-TIME names only. A dlsym() by string")
+        print("  literal at runtime would not appear here and would fail exactly the same way.)")
+
 
 if __name__ == "__main__":
     main()
