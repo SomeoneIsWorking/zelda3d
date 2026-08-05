@@ -25,3 +25,14 @@ Fixed with in-class `= nullptr` on both classes. Restoring `Init()` was delibera
 ## Still open, and bigger than this bug
 
 A survey of all 62 `InitElement()` definitions: 2 were this memory hazard, 1 already safe, 27 genuine no-ops, and **32 are FUNCTIONAL GAPS** where non-ImGui work silently stopped. Severe ones: SaveManager sections for gameplay stats and both trackers never registered; cosmetics never hydrated at boot; `BenMenu` has no other call site so the entire 2ship menu tree is never built; `disabledMap` stays empty in front of ~75 `.at()` calls that would throw. See claim C061.
+
+### Note (2026-08-06)
+FOLLOW-UP (2026-08-06): the 32 functional gaps are now PARTLY closed, and the split is not where I first guessed.
+
+RESTORED `guiWindow->Init()` in `Gui::AddGuiWindow` — bad027cd's premise ('InitElement/DrawElement are ImGui scaffolding') is false for InitElement. Verified positively with a control in the same run: a save file carrying both a `sohStats` section and a deliberately-unregistered `zelda3dBogusControlSection`, loaded via the REPL `savecycle`. The control warns 'contains unloadable section zelda3dBogusControlSection'; `sohStats` does NOT — its load handler is registered again. Without that control the negative would have been unfalsifiable.
+
+DID NOT restore Init() for `SetMenu`/`SetMenuBar`, and I tried to. That is the Dear ImGui MENU TREE, genuinely replaced by RmlUi. Enabling it threw immediately: gdb `catch throw` gives
+  BenGui::SetupMenu -> GuiElement::Init -> BenMenu::InitElement -> Ship::Menu::UpdateWindowBackendObjects -> std::out_of_range: unordered_map::at
+MM's boot died before reaching gameplay (live-engine lines 20 -> 5). This is the `disabledMap`/.at() hazard the original survey warned about — the survey was right and my broader hypothesis was wrong.
+
+So the real line is WINDOW vs MENU TREE: a registered window's InitElement carries non-UI work that must run; the menu tree is dead UI that must not be built. That is the distinction bad027cd should have drawn instead of dropping all three call sites.

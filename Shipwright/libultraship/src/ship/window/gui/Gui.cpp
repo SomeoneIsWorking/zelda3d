@@ -233,9 +233,25 @@ void Gui::AddGuiWindow(std::shared_ptr<GuiWindow> guiWindow) {
     }
 
     mGuiWindows[guiWindow->GetName()] = guiWindow;
-    // NOTE: ImGui removed — windows are kept registered (so GetGuiWindow lookups still resolve) but
-    // are NOT Init()'d or ticked; their InitElement/DrawElement are ImGui scaffolding that no longer
-    // runs. Do not call guiWindow->Init() here.
+
+    // Init() IS called, and the comment that used to say otherwise was working from a premise that
+    // measurement disproved. It read "their InitElement/DrawElement are ImGui scaffolding that no
+    // longer runs" and dropped this call when ImGui was removed (bad027cd). DrawElement really is
+    // ImGui scaffolding. InitElement is NOT: of the 62 InitElement bodies in this repo, 32 do work
+    // that has nothing to do with ImGui, and dropping the only caller silently switched it all off.
+    //
+    // What that cost, concretely: GameplayStatsWindow::InitElement is the sole registration site for
+    // the whole `sohStats` save section -- its save, load AND init functions -- so stats stopped
+    // being recorded and an existing save's stats were dropped on the next write.
+    // CosmeticsEditorWindow::InitElement holds the ONLY call to ApplyAuthenticGfxPatches(), so the
+    // arrow-tip / deku-stick / freezard / iron-knuckle texture-overflow fixes were never applied.
+    // Neither failure produced a single log line.
+    //
+    // Running these bodies without ImGui is safe by the shim's own design contract
+    // (imgui_shim/imgui_stub.cpp): pointer-returning stubs hand back zeroed static storage and are
+    // never null, "so any stray dereference reads zero instead of faulting". Verified, not assumed --
+    // see the commit that restored this.
+    guiWindow->Init();
 }
 
 void Gui::RemoveGuiWindow(std::shared_ptr<GuiWindow> guiWindow) {
@@ -264,12 +280,17 @@ std::shared_ptr<GameOverlay> Gui::GetGameOverlay() {
 
 void Gui::SetMenuBar(std::shared_ptr<GuiMenuBar> menuBar) {
     mMenuBar = menuBar;
-    // ImGui removed: menu bar is inert scaffolding; do not Init() (would run ImGui InitElement).
+    // NOT Init()'d, unlike AddGuiWindow above -- and the line between them is the one bad027cd
+    // should have drawn. A registered WINDOW's InitElement often carries non-UI work (save-section
+    // registration, gfx patches) that must run. The MENU TREE is different: it is the Dear ImGui
+    // menu, wholly replaced by RmlUi, so building it buys nothing and actively throws. Measured:
+    // enabling it here put MM's boot into std::out_of_range at
+    // BenMenu::InitElement -> Ship::Menu::UpdateWindowBackendObjects -> unordered_map::at.
 }
 
 void Gui::SetMenu(std::shared_ptr<GuiWindow> menu) {
     mMenu = menu;
-    // ImGui removed: menu is inert scaffolding; do not Init() (would run ImGui InitElement).
+    // NOT Init()'d -- see SetMenuBar above for the measured reason. This is the site that threw.
 }
 
 std::shared_ptr<GuiMenuBar> Gui::GetMenuBar() {
