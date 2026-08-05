@@ -389,7 +389,9 @@ float gZelda3dSkyScale = 12.0f;
 
 // #29 diagnostic: tint room-mesh draw group N bright red (REPL `hlroom <n>`, -1 = off) so a
 // suspect backdrop group (e.g. the untextured "dome") can be identified by index live.
-int gZelda3dHlGroup = -1;
+// DEFINED IN libultraship (ship/zelda3d_hostiface.cpp), like the sgdrawonly probes just below:
+// the renderer that reads it is the shared layer, and a game core dlopen'd RTLD_LOCAL is invisible
+// to that layer, so the definition has to sit on the engine side. See the header for the full why.
 
 // Draw-isolation probe (REPL `sgdrawonly <n|-1>` / `sgdrawlist`; see zelda3d_sdl3gpu.cpp for the full
 // rationale). Renders ONE Zelda3D group and suppresses the rest, so a draw whose pixels are entirely

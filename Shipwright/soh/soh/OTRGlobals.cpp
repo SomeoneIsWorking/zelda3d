@@ -1645,7 +1645,14 @@ bool VerifyArchiveVersion(OTRVersion version) {
     return version.major != INT16_MAX && version.major != gBuildVersionMajor;
 }
 
+// Declared here rather than via zelda3d.h, which this TU does not include and which would pull in
+// the whole N64 global header. Implemented in zelda3d/core/zelda3d_hostreg.cpp.
+extern "C" void Zelda3D_RegisterHostHooks(void);
+
 extern "C" void InitOTR(int argc, char* argv[]) {
+    // Before anything renders or reads input: give libultraship this core's hooks. It can no longer
+    // call them by name -- see zelda3d/core/zelda3d_hostreg.cpp.
+    Zelda3D_RegisterHostHooks();
     ZELDA3D_BOOT("InitOTR: new OTRGlobals()");
     OTRGlobals::Instance = new OTRGlobals();
     ZELDA3D_BOOT("InitOTR: RunExtract()");

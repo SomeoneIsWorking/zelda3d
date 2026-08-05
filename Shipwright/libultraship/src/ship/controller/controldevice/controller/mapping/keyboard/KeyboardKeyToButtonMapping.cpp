@@ -23,9 +23,9 @@ KeyboardKeyToButtonMapping::KeyboardKeyToButtonMapping(uint8_t portIndex, CONTRO
 // press actually survived to the next WriteToOSContPad poll (ruling in/out a poll-time-only drop
 // the event-time log can't see, e.g. a block flag that flips true between the keydown event and
 // the next poll).
-extern "C" int Zelda3D_DbgInputEnabled(void);
+#include "ship/zelda3d_hostiface.h"
 static void Zelda3dDbgInputLogPoll(KbScancode scancode, bool keyPressed, bool blocked, bool applied) {
-    if (Zelda3D_DbgInputEnabled() == 0) {
+    if (Zelda3D_HostDbgInputEnabled() == 0) {
         return;
     }
     struct State { bool keyPressed = false; bool blocked = false; bool applied = false; bool seen = false; };

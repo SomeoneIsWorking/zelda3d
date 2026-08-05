@@ -335,6 +335,10 @@ extern int gZelda3dFreeze;
 void Launcher_Init(GameState* gameState);
 void Launcher_Main(GameState* gameState);
 void Launcher_Destroy(GameState* gameState);
+// Install this core's hooks into the shared engine (zelda3d/core/zelda3d_hostreg.cpp). Called from
+// InitOTR before the first frame; libultraship cannot reach a dlopen'd core by symbol name.
+void Zelda3D_RegisterHostHooks(void);
+
 int Zelda3D_LauncherEnabled(void);        // zelda3d/launcher/zelda3d_launcher.cpp -- the ONE gate;
                                           // graph.c asks it whether to enter the launcher gamestate
 void Zelda3D_LauncherShow(int show);      // SohRmlUi.cpp -- show/hide the launcher document

@@ -963,7 +963,13 @@ bool VerifyArchiveVersion(ArchiveVersion version) {
     return version.major != INT16_MAX && version.major != gBuildVersionMajor;
 }
 
+// Implemented in 2s2h/zelda3d/mm3d_hostreg.c.
+extern "C" void Mm3d_RegisterHostHooks(void);
+
 extern "C" void InitOTR(int argc, char* argv[]) {
+    // Before anything renders or reads input: give libultraship this core's hooks. It can no longer
+    // call them by name -- see 2s2h/zelda3d/mm3d_hostreg.c.
+    Mm3d_RegisterHostHooks();
     OTRGlobals::Instance = new OTRGlobals();
     OTRGlobals::Instance->RunExtract(argc, argv);
 

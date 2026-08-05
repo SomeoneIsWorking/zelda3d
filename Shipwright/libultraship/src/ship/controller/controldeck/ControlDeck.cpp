@@ -28,9 +28,9 @@ namespace Ship {
 // rather than including a soh header: libultraship is a lower layer that soh links against, not
 // the reverse (same one-directional pattern as Zelda3D_MeasureResult / Gui.cpp's native-HUD entry
 // point).
-extern "C" int Zelda3D_DbgInputEnabled(void);
+#include "ship/zelda3d_hostiface.h"
 static bool Zelda3dDbgInputEnabled() {
-    return Zelda3D_DbgInputEnabled() != 0;
+    return Zelda3D_HostDbgInputEnabled() != 0;
 }
 
 ControlDeck::ControlDeck(std::vector<CONTROLLERBUTTONS_T> additionalBitmasks,
