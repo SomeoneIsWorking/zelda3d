@@ -64,17 +64,24 @@ void Gui::Init() {
     // valid (they no-op against the zeroed flags).
     mImGuiIo = &ImGui::GetIO();
 
+    RegisterResourceFactories();
+
+    ImGuiWMInit();
+    ImGuiBackendInit(); // Fast3dGui override stands up the RmlUi menu here.
+}
+
+void Gui::RegisterResourceFactories() {
+    // Both of these register into the RUNNING GAME's ResourceLoader, which is why this is a separate
+    // method rather than part of Init: the Gui outlives a game, the loader does not. See the header.
+    auto loader = Context::GetRawInstance()->GetResourceManager()->GetResourceLoader();
+
     // The GUI textures resource factory is still needed (RmlUi/native paths load textures through it).
-    Context::GetRawInstance()->GetResourceManager()->GetResourceLoader()->RegisterResourceFactory(
-        std::make_shared<ResourceFactoryBinaryGuiTextureV0>(), RESOURCE_FORMAT_BINARY, "GuiTexture",
-        static_cast<uint32_t>(RESOURCE_TYPE_GUI_TEXTURE), 0);
+    loader->RegisterResourceFactory(std::make_shared<ResourceFactoryBinaryGuiTextureV0>(), RESOURCE_FORMAT_BINARY,
+                                    "GuiTexture", static_cast<uint32_t>(RESOURCE_TYPE_GUI_TEXTURE), 0);
 
     // GameOverlay::Init only registers the FONT resource factory (no ImGui) — the native HUD and
     // OTRGlobals font creation depend on it, so it must still run.
     GetGameOverlay()->Init();
-
-    ImGuiWMInit();
-    ImGuiBackendInit(); // Fast3dGui override stands up the RmlUi menu here.
 }
 
 void Gui::ImGuiWMInit() {
