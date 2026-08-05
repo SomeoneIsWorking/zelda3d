@@ -306,17 +306,7 @@ if (CMAKE_SYSTEM_NAME STREQUAL "Windows")
     endif()
     set_target_properties(${PROJECT_NAME} PROPERTIES MSVC_RUNTIME_LIBRARY ${MSVC_RUNTIME_LIBRARY_STR})
 endif()
-################################################################################
-# Find/download Dr Libs (For custom audio)
-################################################################################
 include(FetchContent)
-
-FetchContent_Declare(
-        dr_libs
-        GIT_REPOSITORY https://github.com/mackron/dr_libs.git
-        GIT_TAG da35f9d6c7374a95353fd1df1d394d44ab66cf01
-)
-FetchContent_MakeAvailable(dr_libs)
 
 # SDL3-MIGRATION: project migrated SDL2 -> SDL3 (system SDL3 3.4.10).
 find_package(SDL3 REQUIRED)

@@ -31,21 +31,44 @@ import sys
 REPO = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 BUILD = os.path.join(REPO, "Shipwright", "build-cmake")
 # Objects belonging to the shared engine layer are not game code and are excluded on both sides.
-SHARED = re.compile(r"libultraship|_deps|/ship/|/fast/", re.I)
+# zelda3d_shared and cmb3d are shared by construction; their paths never appear under soh/ or mm/,
+# but they are listed so that a future layout change cannot quietly let them count as game code.
+SHARED = re.compile(r"libultraship|_deps|/ship/|/fast/|zelda3d_shared|cmb3d", re.I)
 
 FUNC_RE = re.compile(r"^[0-9a-f]+ <(.+)>:$")
 INSN_RE = re.compile(r"^\s+[0-9a-f]+:\s+(?:[0-9a-f]{2} )+\s*\t([a-z][a-z0-9.]*)")
 
 
-def objects(root):
-    out = []
-    for dirpath, _, files in os.walk(root):
-        for f in files:
-            if f.endswith(".o"):
-                p = os.path.join(dirpath, f)
-                if not SHARED.search(p):
-                    out.append(p)
-    return out
+def objects(target, prefix):
+    """The objects the build ACTUALLY links into `target`, per ninja.
+
+    Walking the build tree for *.o was wrong and produced a wrong answer once already. build-cmake
+    accumulates orphaned objects from earlier target layouts: when soh gained the soh_lib split, the
+    1197 objects under soh.dir stopped being linked, but they stayed on disk and a filesystem walk
+    happily fed month-old code into the comparison. Exactly ONE of them is still an input.
+
+    `ninja -t inputs` answers the question the comparison actually asks -- what is in the shipped
+    binary -- so a stale object cannot influence the result no matter how long it lingers.
+    """
+    try:
+        out = subprocess.run(["ninja", "-t", "inputs", target], cwd=BUILD,
+                             capture_output=True, text=True, timeout=300)
+    except FileNotFoundError:
+        sys.exit("ninja not found -- cannot determine which objects are actually linked. REFUSING "
+                 "to fall back to a filesystem walk, which silently includes stale objects.")
+    if out.returncode != 0:
+        sys.exit(f"`ninja -t inputs {target}` failed in {BUILD}: {out.stderr.strip()}\n"
+                 f"Build both targets first; a stale or missing build.ninja cannot be compared.")
+    live = [ln.strip() for ln in out.stdout.splitlines() if ln.strip().endswith(".o")]
+    if not live:
+        sys.exit(f"ninja reported NO object inputs for {target} -- SEARCHED NOTHING.")
+    # Game code only: everything under the target's own source tree, minus the shared engine layer.
+    game = [os.path.join(BUILD, p) for p in live
+            if p.startswith(prefix + "/") and not SHARED.search(p)]
+    dropped = len(live) - len(game)
+    print(f"  {target}: {len(live)} linked objects, {len(game)} are {prefix} game code "
+          f"({dropped} shared-layer/third-party dropped)", file=sys.stderr)
+    return game
 
 
 def disassemble(objs, label):
@@ -84,12 +107,10 @@ def disassemble(objs, label):
 
 
 def main():
-    soh_root = os.path.join(BUILD, "soh")
-    mm_root = os.path.join(BUILD, "mm")
-    for r in (soh_root, mm_root):
-        if not os.path.isdir(r):
-            sys.exit(f"{r} does not exist -- SEARCHED NOTHING. Build both targets first.")
-    soh_objs, mm_objs = objects(soh_root), objects(mm_root)
+    if not os.path.isfile(os.path.join(BUILD, "build.ninja")):
+        sys.exit(f"{BUILD}/build.ninja does not exist -- SEARCHED NOTHING. Configure and build "
+                 f"both targets first.")
+    soh_objs, mm_objs = objects("soh/soh.elf", "soh"), objects("mm/mm.elf", "mm")
     if not soh_objs or not mm_objs:
         sys.exit(f"no game-code objects found (soh={len(soh_objs)}, mm={len(mm_objs)}) -- SEARCHED NOTHING")
     print(f"soh objects {len(soh_objs)}, mm objects {len(mm_objs)}", file=sys.stderr)

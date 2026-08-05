@@ -1,9 +1,10 @@
 ---
 id: C051
 kind: claim
-status: holds
+status: falsified
 created: 2026-08-05
 tags: 
+falsified_on: 2026-08-05
 ---
 
 ## Claim
@@ -17,3 +18,9 @@ Measured over the built object trees. Of 6,616 colliding core globals, 3,649 are
 ## What would falsify it
 
 a byte-level comparison of the 1,556 identical-size functions -- if a large fraction of those differ in content, the shareable portion is smaller than 43% and unification is even less attractive
+
+## FALSIFIED 2026-08-05
+
+Superseded by C053, and measured over the same poisoned object set: the size comparison also swept build-cmake/soh's 1196 orphaned pre-soh_lib-split objects, and also counted third-party dr_libs as game code. Its own stated expiry -- 'comparing the actual bytes of the identical-size set would settle it and has NOT been done' -- has now been done, over the objects ninja actually links: 36.3%, not 42.6%. The direction it pointed (shared engine, divergent game) was right and is preserved in C053.
+
+> Anything that cited this claim as proof must be re-checked. Grep the repo for it.
