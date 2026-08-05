@@ -334,6 +334,75 @@ This question does NOT block N1/N2 — faithful-first means "get native MM booti
 > owns only its archives and heaps. Today `InitOTR` inside each core owns both, which is what forces
 > the choice between a crashing teardown and `_exit`. Untested, and it needs the per-game/per-engine
 > boundary drawn precisely before anyone writes code against it.
+>
+> **THE SPLIT IS LANDED AND THE ACCEPTANCE TEST PASSES (2026-08-05).** `Ship::GameSession`
+> (`libultraship/include/ship/GameSession.h`) now owns the four per-game rows — Config +
+> config path, ConsoleVariables, ResourceManager + archive/mods paths, ControlDeck — plus the app
+> name it is all keyed by. `Context` holds exactly one and every accessor forwards to it, so **no call
+> site changed**: `GetResourceManager()` still answers "the running game's", it just now has a defined
+> answer to *which* game. `Context::BeginGameSession` ends the previous one and installs a fresh one,
+> and `CreateUninitializedInstance` calls it on an app-name mismatch instead of handing over the wrong
+> game's Context. The engine half — window, GPU device, renderer, crash handler, logger — is untouched
+> and deliberately reused, because destroying the window is the teardown that crashes in driver code
+> (C057).
+>
+> The acceptance test this section asked for, run and passed. `tools/zelda3d_sequence.sh mm,oot`
+> (new — see below) on `--run-sequence mm,oot`:
+>
+> | | Before the split | After |
+> |---|---|---|
+> | `InitConfiguration`, `InitConsoleVariables`, `InitResourceManager`, `InitControlDeck` | INHERITED from MM | **all four installed FRESH for OoT** |
+> | `InitWindow`, `InitConsole` | inherited | still shared — the intended design |
+> | OoT's boot | died in `CreateFontWithSize` | **runs to `OTRGlobals constructor complete`** |
+>
+> Regression gates, both run: solo `zelda3d oot` exits **0** with **zero** cross-game diagnostics (the
+> new messages are silent unless a different game attaches); solo `zelda3d mm` still aborts at process
+> exit in `Rml::StyleSheetFactory::~StyleSheetFactory`, which is the pre-existing behaviour recorded
+> above, on the identical backtrace.
+>
+> **The instrument was built with its negative first.** The guards previously could only report a
+> SKIP, so a run where the split worked perfectly and a run where those Inits were never reached would
+> print the same nothing. There is now a positive counterpart (`installed a FRESH X for this game`)
+> and the skip message is split by lifetime — an ENGINE skip is logged as the design working, a
+> PER-GAME skip as an error, because after the split the latter must not happen. The verdict block in
+> `zelda3d_sequence.sh` prints all four categories every run, including the empty ones.
+>
+> **TOOLING: `tools/zelda3d_sequence.sh`.** The sequence run had been hand-assembled twice, and both
+> times the hard part was not the launch. A core only returns when its frame loop ends, and the only
+> headless way to end it is the per-game REPL's `quit` — so a run without both FIFOs wired looks like
+> a hang and gets killed. (It also starts its own Xvfb unconditionally: the first attempt this session
+> reused `pgrep -x Xvfb`, found another agent's server on a different display, and the missing X server
+> surfaced as `SDL window is null at Init()` — a renderer error for an environment fault.)
+>
+> **TWO NEW BOUNDARIES the split exposed, both measured, neither yet fixed.**
+>
+> 1. **Engine subsystems register themselves into PER-GAME state — FIXED.** `Gui::Init` registers the
+>    `GuiTexture` and `Font` resource factories into the ResourceLoader, which belongs to the
+>    ResourceManager, which is per-game. The Gui runs `Init` once, for the first game. So OoT's every
+>    `fonts/*.ttf` load reported *"failed to find an import factory for resource of type FONT"* and it
+>    then dereferenced the null font. Extracted as `Gui::RegisterResourceFactories()`, called by
+>    `Gui::Init` for the first game and by `Context::InitResourceManager` for every game after — the
+>    registrations now follow the session rather than the window. The generalisation is the part worth
+>    keeping: **anything engine-lifetime that caches a handle into per-game state must re-install on a
+>    session change**, and a factory table is unlikely to be the only one.
+>
+> 2. **NEXT: a second core CONSTRUCTS an engine object the Context then refuses, and destroying it
+>    damages the shared engine.** With the fonts fixed, OoT reaches the end of its `OTRGlobals`
+>    constructor and dies there:
+>    `~shared_ptr<Fast3dWindow>` → `~Fast3dWindow` → `Fast::Interpreter::Destroy` → SIGSEGV.
+>    `InitOTR` builds its own `Fast::Fast3dWindow` and passes it to `InitWindow`, which SKIPS (window
+>    is engine, correctly shared) — so the Context never takes ownership, the local `shared_ptr` is the
+>    sole owner, and it destroys the window at end of scope. `~Fast3dWindow` tears down the Fast3d
+>    **Interpreter**, which is process-global shared engine state.
+>    The fix is not to make that destructor defensive; it is that **a core must not construct engine
+>    objects that already exist**. It needs care rather than a one-liner, because `Window` is itself a
+>    SPLIT object on the same axis as Context was: the SDL window, GPU device and Fast3d interpreter are
+>    engine, while the `GuiWindow` list it carries is per-game (OoT's `SohInputEditorWindow` vs MM's
+>    BenGui set — the 59 owning-GuiWindow references the audit above found). So the second core must
+>    adopt the existing window AND install its own GUI windows into it.
+>
+> Still unsplit and still inherited, named so a clean log is not read as a complete answer: **Audio**
+> and **Console** (device/object are engine, sequence player and registered commands are per-game).
 
 - **N3 — Unify the shell / launcher.** One app entry that runs OoT (existing soh3d) or MM sharing
   one libultraship + renderer. Resolve `Ship::Context` ownership + per-game ResourceManager

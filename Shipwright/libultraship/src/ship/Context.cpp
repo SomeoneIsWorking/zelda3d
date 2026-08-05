@@ -12,6 +12,8 @@
 #include "ship/controller/scripted/ScriptedInputFifo.h"
 #include "ship/debug/CrashHandler.h"
 #include "ship/window/FileDropMgr.h"
+#include "ship/window/Window.h"
+#include "ship/window/gui/Gui.h"
 #include "ship/events/EventSystem.h"
 #ifdef ENABLE_SCRIPTING
 #include "ship/scripting/ScriptLoader.h"
@@ -35,38 +37,55 @@ namespace Ship {
 std::unique_ptr<Context> Context::mContext;
 
 // Every Context::Init* below opens with "if this subsystem already exists, return true". For ONE
-// game that is harmless idempotence. For a SECOND game core it is silent wrong state, and the return
-// value is the trap: returning true makes Context::Init's aggregate && chain report complete success
-// while none of the second game's own subsystems were installed -- it keeps the first game's
-// archives, config, audio, console, window and input. InitControlDeck is the sharpest case, since
-// each game passes a ControlDeck built with its OWN button list and the second one is dropped.
+// game that is harmless idempotence. For a SECOND game core it used to be silent wrong state, and the
+// return value was the trap: returning true makes Context::Init's aggregate && chain report complete
+// success while none of the second game's own subsystems were installed.
 //
-// Behaviour is deliberately unchanged (still true): callers assume success and would fail sooner and
-// less clearly otherwise. What changes is that the skip becomes VISIBLE -- but ONLY when it is
-// actually dangerous, which is the part that had to be measured rather than assumed.
+// That is no longer true of the per-game half. `BeginGameSession` now replaces the whole GameSession
+// when a different game attaches, so the per-game guards below see nullptr and genuinely install the
+// incoming game's Config, CVars, ResourceManager and ControlDeck. The guards that still fire are the
+// ENGINE ones -- window, console, audio, crash handler -- and those are shared on purpose.
+//
+// Hence the two classes below rather than one message. An engine skip is the design working; a
+// per-game skip after a session swap would mean the split failed, and it must not be reported in the
+// same voice as the thing that is supposed to happen.
 //
 // A blanket warning here was WRONG, and a normal single-game boot proved it: `zelda3d oot` alone
 // trips InitConfiguration and InitConsoleVariables, which really are called twice during one game's
 // startup. So these guards serve two purposes at once -- genuine idempotence within a game, and the
-// cross-game hazard -- and only the second is a problem.
-//
-// The discriminator is therefore not "was this skipped" but "is a DIFFERENT game attached".
-// CreateUninitializedInstance already detects that by app name; it raises the flag below, and only
-// then does a skip mean a core inherited another game's subsystem. Fires exactly in the dangerous
-// case, silent in the normal one.
-//
-// The real fix is the per-game/engine split in docs/MM_NATIVE.md N3, where each Init must
-// distinguish "already initialised for THIS session" from "initialised for a DIFFERENT game".
+// cross-game hazard -- and only the second is a problem. The discriminator is therefore not "was this
+// skipped" but "is a DIFFERENT game attached", which CreateUninitializedInstance detects by app name.
 static std::atomic<bool> sForeignCoreAttached{ false };
 
-static bool AlreadyInitialised(const char* subsystem) {
+enum class SubsystemLifetime {
+    Engine,  // shared across games for the process lifetime -- inheriting it is correct
+    PerGame, // belongs to one game; lives in GameSession and must be reinstalled per game
+};
+
+static bool AlreadyInitialised(const char* subsystem, SubsystemLifetime lifetime) {
     if (!sForeignCoreAttached) {
         return true; // ordinary idempotence within one game
     }
-    SPDLOG_ERROR("Context::Init{} skipped -- this core has INHERITED the previous game's {}. "
-                 "See docs/MM_NATIVE.md N3.",
-                 subsystem, subsystem);
+    if (lifetime == SubsystemLifetime::Engine) {
+        SPDLOG_INFO("Context::Init{} skipped -- SHARED with the previous game. That is the design: one "
+                    "libultraship.so, one window and renderer for the process lifetime.",
+                    subsystem);
+    } else {
+        SPDLOG_ERROR("Context::Init{} skipped -- this core INHERITED the previous game's {}, which the "
+                     "GameSession split is supposed to prevent. See docs/MM_NATIVE.md N3.",
+                     subsystem, subsystem);
+    }
     return true;
+}
+
+// The positive half of the same instrument, and it exists because the guard above can only ever
+// report a skip: with no counterpart, a run in which the split worked perfectly and a run in which
+// these Inits were never reached would print exactly the same nothing.
+static void InstalledForThisGame(const char* subsystem) {
+    if (!sForeignCoreAttached) {
+        return; // a first core installing its own subsystems is unremarkable
+    }
+    SPDLOG_INFO("Context::Init{} installed a FRESH {} for this game -- not inherited.", subsystem, subsystem);
 }
 
 Context* Context::GetRawInstance() {
@@ -87,9 +106,6 @@ Context::~Context() {
     mWindow = nullptr;
     mConsole = nullptr;
     mCrashHandler = nullptr;
-    mControlDeck = nullptr;
-    mResourceManager = nullptr;
-    mConsoleVariables = nullptr;
     mEventSystem = nullptr;
 #ifdef ENABLE_SCRIPTING
     if (mScriptLoader) {
@@ -98,8 +114,10 @@ Context::~Context() {
     mScriptLoader = nullptr;
     mKeystore = nullptr;
 #endif
-    GetConfig()->Save();
-    mConfig = nullptr;
+    // The per-game half tears itself down in its own established order (input, archives, CVars,
+    // then Config saved last) -- see GameSession::End. It stays after the engine members above for
+    // the same reason it always did: they write into Config on the way down.
+    mSession = nullptr;
     mLogger->flush();
     mLogger = nullptr;
 #ifndef _DEBUG
@@ -155,26 +173,28 @@ Context* Context::CreateUninitializedInstance(const std::string& name, const std
     }
 
     // Reaching here means a SECOND game core called InitOTR while a first core's Context was still
-    // alive -- the launcher running cores back to back (`zelda3d --run-sequence`). The caller asked
-    // for its own Context and is silently handed someone else's, complete with the OTHER game's
-    // ResourceManager, archive set, config file and app name. It does not fail here; it fails much
-    // later and somewhere unrelated (measured: OoT after MM dies in CreateFontWithSize).
+    // alive -- the launcher running cores back to back (`zelda3d --run-sequence`). It used to be handed
+    // someone else's Context wholesale, complete with the OTHER game's ResourceManager, archive set,
+    // config file and app name; it did not fail here, it failed much later and somewhere unrelated
+    // (measured: OoT after MM died in CreateFontWithSize).
     //
-    // So this is an ERROR, not a debug note. It was SPDLOG_DEBUG, which is invisible in a normal
-    // run, and that silence is the whole problem: a wrong-game Context looked exactly like success.
-    // Still returns the existing instance rather than nullptr -- every caller assumes non-null and
-    // would crash sooner and less clearly -- but the log now names both games, so the mismatch is
-    // identifiable at the point it happens instead of at the eventual crash.
+    // Now the Context is REUSED for its engine half and its per-game half is REPLACED. That is the
+    // whole point of the split: the window, GPU device, renderer and crash handler are game-agnostic
+    // and must survive -- destroying the window is the teardown that crashes in driver code (claim
+    // C057) -- while archives, config, CVars, button set and app name belong to the incoming game.
     //
-    // The real fix is splitting Ship::Context's engine-lifetime state (window, renderer, ImGui)
-    // from its per-game state (archives, config, name); see docs/MM_NATIVE.md N3.
+    // Note what this does NOT yet cover, so nobody reads a clean log as a complete answer: Audio and
+    // Console are still whole-Context and therefore still inherited. Both are SPLIT rows in the
+    // classification in docs/MM_NATIVE.md N3 -- device and console object are engine, sequence player
+    // and registered commands are per-game -- and neither has been divided.
     if (mContext->GetName() != name) {
-        SPDLOG_ERROR("Context already exists for \"{}\"; \"{}\" is being handed that one instead of its own. "
-                     "Its archives, config and app name will be the WRONG GAME's. See docs/MM_NATIVE.md N3.",
-                     mContext->GetName(), name);
-        // From here every Init* skip means this core inherited the other game's subsystem, so the
-        // guards start reporting. Before this point they are ordinary idempotence and stay quiet.
+        SPDLOG_WARN("A different game is attaching: \"{}\" replaces \"{}\". Engine state (window, renderer, "
+                    "crash handler) is kept; the previous game's session is ended.",
+                    name, mContext->GetName());
+        // From here an Init* skip is worth reporting: for an engine subsystem it confirms sharing, and
+        // for a per-game one it would mean the session swap below failed to take.
         sForeignCoreAttached = true;
+        mContext->BeginGameSession(name, shortName, configFilePath);
     } else {
         SPDLOG_WARN("Context for \"{}\" already exists; returning it rather than creating a second.", name);
     }
@@ -183,7 +203,7 @@ Context* Context::CreateUninitializedInstance(const std::string& name, const std
 }
 
 Context::Context(std::string name, std::string shortName, std::string configFilePath)
-    : mConfigFilePath(std::move(configFilePath)), mName(std::move(name)), mShortName(std::move(shortName)) {
+    : mSession(std::make_unique<GameSession>(std::move(name), std::move(shortName), std::move(configFilePath))) {
 }
 
 bool Context::Init(const std::vector<std::string>& archivePaths, const std::unordered_set<uint32_t>& validHashes,
@@ -202,7 +222,7 @@ bool Context::Init(const std::vector<std::string>& archivePaths, const std::unor
 bool Context::InitLogging(spdlog::level::level_enum debugBuildLogLevel,
                           spdlog::level::level_enum releaseBuildLogLevel) {
     if (GetLogger() != nullptr) {
-        return AlreadyInitialised("Logging");
+        return AlreadyInitialised("Logging", SubsystemLifetime::Engine);
     }
 
     try {
@@ -278,31 +298,33 @@ bool Context::InitLogging(spdlog::level::level_enum debugBuildLogLevel,
 
 bool Context::InitConfiguration() {
     if (GetConfig() != nullptr) {
-        return AlreadyInitialised("Configuration");
+        return AlreadyInitialised("Configuration", SubsystemLifetime::PerGame);
     }
 
-    mConfig = std::make_shared<Config>(GetPathRelativeToAppDirectory(mConfigFilePath));
+    mSession->mConfig = std::make_shared<Config>(GetPathRelativeToAppDirectory(mSession->GetConfigFilePath()));
 
     if (GetConfig() == nullptr) {
         SPDLOG_ERROR("Failed to initialize config");
         return false;
     }
 
+    InstalledForThisGame("Configuration");
     return true;
 }
 
 bool Context::InitConsoleVariables() {
     if (GetConsoleVariables() != nullptr) {
-        return AlreadyInitialised("ConsoleVariables");
+        return AlreadyInitialised("ConsoleVariables", SubsystemLifetime::PerGame);
     }
 
-    mConsoleVariables = std::make_shared<ConsoleVariable>();
+    mSession->mConsoleVariables = std::make_shared<ConsoleVariable>();
 
     if (GetConsoleVariables() == nullptr) {
         SPDLOG_ERROR("Failed to initialize console variables");
         return false;
     }
 
+    InstalledForThisGame("ConsoleVariables");
     return true;
 }
 
@@ -310,24 +332,24 @@ bool Context::InitResourceManager(const std::vector<std::string>& archivePaths,
                                   const std::unordered_set<uint32_t>& validHashes, uint32_t reservedThreadCount,
                                   const bool allowEmptyPaths) {
     if (GetResourceManager() != nullptr) {
-        return AlreadyInitialised("ResourceManager");
+        return AlreadyInitialised("ResourceManager", SubsystemLifetime::PerGame);
     }
 
 #ifdef ENABLE_SCRIPTING
     InitKeystore();
 #endif
 
-    mMainPath = GetConfig()->GetString("Game.Main Archive", GetAppDirectoryPath());
-    mPatchesPath = GetConfig()->GetString("Game.Patches Archive", GetAppDirectoryPath() + "/mods");
+    mSession->mMainPath = GetConfig()->GetString("Game.Main Archive", GetAppDirectoryPath());
+    mSession->mPatchesPath = GetConfig()->GetString("Game.Patches Archive", GetAppDirectoryPath() + "/mods");
     if (archivePaths.empty()) {
         std::vector<std::string> paths = std::vector<std::string>();
-        paths.push_back(mMainPath);
-        paths.push_back(mPatchesPath);
+        paths.push_back(mSession->mMainPath);
+        paths.push_back(mSession->mPatchesPath);
 
-        mResourceManager = std::make_unique<ResourceManager>();
+        mSession->mResourceManager = std::make_unique<ResourceManager>();
         GetResourceManager()->Init(paths, validHashes, reservedThreadCount);
     } else {
-        mResourceManager = std::make_unique<ResourceManager>();
+        mSession->mResourceManager = std::make_unique<ResourceManager>();
         GetResourceManager()->Init(archivePaths, validHashes, reservedThreadCount);
     }
 
@@ -342,15 +364,28 @@ bool Context::InitResourceManager(const std::vector<std::string>& archivePaths,
         return false;
     }
 
+    // A fresh ResourceLoader has none of the ENGINE's own resource factories in it, because those are
+    // registered by Gui::Init -- which runs once, for the first game, and never again. For a first
+    // game there is no Window yet and this is a no-op; for every game after, it is the difference
+    // between working fonts and a null-font crash. (Measured: the first OoT-after-MM run with the
+    // session split logged "failed to find an import factory for resource of type FONT" for every
+    // fonts/*.ttf and then SIGSEGV'd in OTRGlobals::CreateFontWithSize.)
+    if (GetWindow() != nullptr && GetWindow()->GetGui() != nullptr) {
+        SPDLOG_INFO("Re-registering the engine's resource factories into this game's ResourceLoader "
+                    "(the Gui outlives a game; its factory registrations do not).");
+        GetWindow()->GetGui()->RegisterResourceFactories();
+    }
+
+    InstalledForThisGame("ResourceManager");
     return true;
 }
 
 bool Context::InitControlDeck(std::shared_ptr<ControlDeck> controlDeck) {
     if (GetControlDeck() != nullptr) {
-        return AlreadyInitialised("ControlDeck");
+        return AlreadyInitialised("ControlDeck", SubsystemLifetime::PerGame);
     }
 
-    mControlDeck = controlDeck;
+    mSession->mControlDeck = controlDeck;
 
     if (GetControlDeck() == nullptr) {
         SPDLOG_ERROR("Failed to initialize control deck");
@@ -363,12 +398,13 @@ bool Context::InitControlDeck(std::shared_ptr<ControlDeck> controlDeck) {
     // unless SHIP_SCRIPTED_FIFO is set, so live OoT and normal MM runs are untouched.
     Ship_ScriptedInputFifo_StartFromEnv();
 
+    InstalledForThisGame("ControlDeck");
     return true;
 }
 
 bool Context::InitCrashHandler() {
     if (GetCrashHandler() != nullptr) {
-        return AlreadyInitialised("CrashHandler");
+        return AlreadyInitialised("CrashHandler", SubsystemLifetime::Engine);
     }
 
     mCrashHandler = std::make_shared<CrashHandler>();
@@ -383,7 +419,7 @@ bool Context::InitCrashHandler() {
 
 bool Context::InitAudio(AudioSettings settings) {
     if (GetAudio() != nullptr) {
-        return AlreadyInitialised("Audio");
+        return AlreadyInitialised("Audio", SubsystemLifetime::Engine);
     }
 
     mAudio = std::make_shared<Audio>(settings);
@@ -399,7 +435,7 @@ bool Context::InitAudio(AudioSettings settings) {
 
 bool Context::InitConsole() {
     if (GetConsole() != nullptr) {
-        return AlreadyInitialised("Console");
+        return AlreadyInitialised("Console", SubsystemLifetime::Engine);
     }
 
     mConsole = std::make_shared<Console>();
@@ -416,7 +452,7 @@ bool Context::InitConsole() {
 
 bool Context::InitWindow(std::shared_ptr<Window> window) {
     if (GetWindow() != nullptr) {
-        return AlreadyInitialised("Window");
+        return AlreadyInitialised("Window", SubsystemLifetime::Engine);
     }
 
     mWindow = window;
@@ -433,7 +469,7 @@ bool Context::InitWindow(std::shared_ptr<Window> window) {
 
 bool Context::InitFileDropMgr() {
     if (GetFileDropMgr() != nullptr) {
-        return AlreadyInitialised("FileDropMgr");
+        return AlreadyInitialised("FileDropMgr", SubsystemLifetime::Engine);
     }
 
     mFileDropMgr = std::make_shared<FileDropMgr>();
@@ -446,7 +482,7 @@ bool Context::InitFileDropMgr() {
 
 bool Context::InitEventSystem() {
     if (GetEventSystem() != nullptr) {
-        return AlreadyInitialised("EventSystem");
+        return AlreadyInitialised("EventSystem", SubsystemLifetime::Engine);
     }
 
     mEventSystem = std::make_shared<EventSystem>();
@@ -462,7 +498,7 @@ bool Context::InitScriptLoader(std::unordered_map<std::string, std::string> comp
                                std::string buildOptions, std::vector<std::string> includePaths,
                                std::vector<std::string> libraryPaths, std::vector<std::string> libraries) {
     if (GetScriptLoader() != nullptr) {
-        return AlreadyInitialised("ScriptLoader");
+        return AlreadyInitialised("ScriptLoader", SubsystemLifetime::Engine);
     }
 
     mScriptLoader = std::make_shared<ScriptLoader>(compileDefines, codeVersion, buildOptions, includePaths,
@@ -476,7 +512,7 @@ bool Context::InitScriptLoader(std::unordered_map<std::string, std::string> comp
 
 bool Context::InitKeystore() {
     if (GetKeystore() != nullptr) {
-        return AlreadyInitialised("Keystore");
+        return AlreadyInitialised("Keystore", SubsystemLifetime::Engine);
     }
 
     mKeystore = std::make_shared<Keystore>();
@@ -489,7 +525,7 @@ bool Context::InitKeystore() {
 #endif // ENABLE_SCRIPTING
 
 std::shared_ptr<ConsoleVariable> Context::GetConsoleVariables() const {
-    return mConsoleVariables;
+    return mSession->mConsoleVariables;
 }
 
 std::shared_ptr<spdlog::logger> Context::GetLogger() const {
@@ -497,15 +533,15 @@ std::shared_ptr<spdlog::logger> Context::GetLogger() const {
 }
 
 std::shared_ptr<Config> Context::GetConfig() const {
-    return mConfig;
+    return mSession->mConfig;
 }
 
 std::shared_ptr<ResourceManager> Context::GetResourceManager() const {
-    return mResourceManager;
+    return mSession->mResourceManager;
 }
 
 std::shared_ptr<ControlDeck> Context::GetControlDeck() const {
-    return mControlDeck;
+    return mSession->mControlDeck;
 }
 
 std::shared_ptr<CrashHandler> Context::GetCrashHandler() const {
@@ -542,12 +578,27 @@ std::shared_ptr<Keystore> Context::GetKeystore() const {
 }
 #endif
 
+GameSession* Context::GetGameSession() const {
+    return mSession.get();
+}
+
+void Context::BeginGameSession(const std::string& name, const std::string& shortName,
+                               const std::string& configFilePath) {
+    if (mSession != nullptr) {
+        SPDLOG_INFO("Ending game session \"{}\" -- its archives, config, CVars and button set go with it. "
+                    "The window, renderer and crash handler stay up.",
+                    mSession->GetName());
+        mSession->End();
+    }
+    mSession = std::make_unique<GameSession>(name, shortName, configFilePath);
+}
+
 std::string Context::GetName() const {
-    return mName;
+    return mSession->GetName();
 }
 
 std::string Context::GetShortName() const {
-    return mShortName;
+    return mSession->GetShortName();
 }
 
 // Set by the launcher to the directory of the game core it loaded; empty means "derive from the
@@ -690,7 +741,9 @@ std::string Context::GetAppDirectoryPath(const std::string& appName) {
 #endif
 
 #ifdef NON_PORTABLE
-    const std::string& effectiveAppName = appName.empty() ? GetInstance()->mShortName : appName;
+    // (This NON_PORTABLE branch is not built here; it already named a GetInstance() that does not
+    // exist. Kept compiling against the public accessor rather than a member that has moved.)
+    const std::string effectiveAppName = appName.empty() ? GetRawInstance()->GetShortName() : appName;
     char* prefpath = SDL_GetPrefPath(NULL, effectiveAppName.c_str());
     if (prefpath != NULL) {
         std::string ret(prefpath);

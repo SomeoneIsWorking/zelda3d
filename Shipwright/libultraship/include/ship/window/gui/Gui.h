@@ -48,6 +48,21 @@ class Gui {
     void Init();
 
     /**
+     * @brief Install the engine's own resource factories into the CURRENT game's ResourceLoader.
+     *
+     * The Gui is engine-lifetime but these registrations are not: they live in the ResourceLoader,
+     * which belongs to the ResourceManager, which is per-game (Ship::GameSession). So when a second
+     * game attaches and gets its own ResourceManager, the engine's factories are simply not there --
+     * measured, and it is precisely how the OoT-after-MM run failed: every "fonts/*.ttf" load
+     * reported "failed to find an import factory for resource of type FONT" and OTRGlobals then
+     * dereferenced the null font.
+     *
+     * Called by Init() for the first game and by Context::InitResourceManager for every game after,
+     * so the registrations follow the session rather than the window.
+     */
+    void RegisterResourceFactories();
+
+    /**
      * @brief Begins a new ImGui frame.
      *
      * Must be called once per frame before any ImGui draw calls. Calls

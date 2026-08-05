@@ -7,6 +7,7 @@
 #include <unordered_map>
 #include <spdlog/async.h>
 #include "ship/audio/Audio.h"
+#include "ship/GameSession.h"
 
 namespace spdlog {
 class logger;
@@ -251,6 +252,29 @@ class Context {
     std::shared_ptr<Keystore> GetKeystore() const;
 #endif
 
+    /**
+     * @brief End the current game's session and begin a fresh one, keeping the engine alive.
+     *
+     * This is the seam that lets a second game core initialise in a process where a first has already
+     * run. Before it existed, `CreateUninitializedInstance` handed the second core the first's whole
+     * Context and every per-game `Init*` then skipped -- returning true -- so the second game ran on
+     * the first's archives, config, CVars and button set (measured with `zelda3d --run-sequence
+     * mm,oot`; docs/MM_NATIVE.md N3).
+     *
+     * What it deliberately does NOT touch is the engine half: window, GPU device, renderer, crash
+     * handler, logger. Those are shared across games by design -- that is what one libultraship.so is
+     * for -- and destroying the window is exactly the teardown that crashes in driver code (claim
+     * C057). So this reuses rather than rebuilds them.
+     *
+     * @param name           Human-readable application name of the incoming game.
+     * @param shortName      Short application identifier of the incoming game.
+     * @param configFilePath Path to the incoming game's JSON configuration file.
+     */
+    void BeginGameSession(const std::string& name, const std::string& shortName, const std::string& configFilePath);
+
+    /** @brief The state belonging to the game currently attached. Never null. */
+    GameSession* GetGameSession() const;
+
     /** @brief Returns the human-readable application name. */
     std::string GetName() const;
     /** @brief Returns the short application identifier. */
@@ -346,10 +370,12 @@ class Context {
 #ifndef _DEBUG
     std::shared_ptr<spdlog::details::thread_pool> mLogThreadPool;
 #endif
-    std::shared_ptr<Config> mConfig;
-    std::shared_ptr<ConsoleVariable> mConsoleVariables;
-    std::shared_ptr<ResourceManager> mResourceManager;
-    std::shared_ptr<ControlDeck> mControlDeck;
+    // The per-game half. Config, CVars, the archive set, the button set and the app name all belong
+    // to ONE game and are replaced wholesale when a different core attaches -- see GameSession.h and
+    // BeginGameSession. Everything below this line is engine-lifetime and is shared across games on
+    // purpose. Never null while a Context exists: the constructor opens the first session.
+    std::unique_ptr<GameSession> mSession;
+
     std::shared_ptr<CrashHandler> mCrashHandler;
     std::shared_ptr<Window> mWindow;
     std::shared_ptr<Console> mConsole;
@@ -361,11 +387,5 @@ class Context {
     std::shared_ptr<Keystore> mKeystore;
 #endif
 
-    std::string mConfigFilePath;
-    std::string mMainPath;
-    std::string mPatchesPath;
-
-    std::string mName;
-    std::string mShortName;
 };
 } // namespace Ship
