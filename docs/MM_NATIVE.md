@@ -124,6 +124,28 @@ This question does NOT block N1/N2 — faithful-first means "get native MM booti
 > (`soh/src/zelda3d/launcher/`) still `exec`s `mm.elf`, because by then a live `Ship::Context`,
 > window and renderer would have to be torn down and rebuilt. That Context handover is the remaining
 > half of this milestone, and it is what would let the RmlUi chooser move into the launcher process.
+>
+> **Scouted 2026-08-05 — don't re-derive.** Two findings that change the shape of that work:
+>
+> 1. **A core returning from `run()` is an EXISTING path, not something to build.** `Main()`
+>    (`soh/src/code/main.c`) is `Main_Init` → `Graph_ThreadEntry` → `Main_Shutdown`, and
+>    `Graph_ThreadEntry` returns on window close; `Main_Shutdown` already stops the audio thread
+>    FIRST specifically so it cannot touch `Context::GetRawInstance()` during teardown, then
+>    `Zelda3D_CoreRun` calls `DeinitOTR()` + `Heaps_Free()`. So the clean-shutdown sequence is
+>    written and exercised every time a window is closed.
+> 2. **There is no headless way to trigger it** — no `ZELDA3D_EXIT_AFTER`, no REPL quit (grepped).
+>    That matters because it is the SAME missing piece as game-switching: "ask the running game to
+>    end its frame loop and return" is exactly what a chooser needs. Building it is the mechanism,
+>    not a test scaffold, so it should be built as one (a request the graph loop observes, not an
+>    `exit()` — `Zelda3D_LauncherExit` currently calls `exit(0)`, which under the launcher would kill
+>    the process it is supposed to hand back to).
+>
+> **The experiment that settles the hard question**, once (2) exists: have the launcher run core A,
+> let it return, then load and run core B in the same process. What is genuinely unknown is whether
+> libultraship state survives `DeinitOTR` in a reusable condition — the accessor-hidden singletons
+> and 59 function-local statics C054 counted are exactly what a second `Context` init would trip
+> over. Note C056's falsifier: nothing has yet run a second core AFTER a first has run, so no
+> evidence either way exists today.
 
 - **N3 — Unify the shell / launcher.** One app entry that runs OoT (existing soh3d) or MM sharing
   one libultraship + renderer. Resolve `Ship::Context` ownership + per-game ResourceManager
