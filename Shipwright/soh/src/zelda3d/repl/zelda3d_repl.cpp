@@ -2783,6 +2783,12 @@ static void Zelda3D_ReplExec(PlayState* play, char* line, const char* outPath) {
         gSoh3dDumpPath[sizeof(gSoh3dDumpPath) - 1] = '\0';
         gSoh3dDumpPending = 1;
         Zelda3D_ReplReply(outPath, "dump -> %s (pending)", gSoh3dDumpPath);
+    } else if (strcmp(cmd, "quitteardown") == 0) {
+        // Claim C057's falsifier, on demand: exit AND run the engine destructors DeinitOTR skips,
+        // to find out whether they still crash now that SDL3 GPU is the only backend. Watch for
+        // "ZELDA3D TEARDOWN: Context destroyed WITHOUT crashing" (survived) versus a signal death.
+        Zelda3D_ReplReply(outPath, "quitteardown: exit requested WITH full engine teardown (C057 falsifier)");
+        Ship::Context::RequestExitWithFullTeardown();
     } else if (strcmp(cmd, "quit") == 0) {
         // End the frame loop and take the normal window-close shutdown: Main_Shutdown (audio thread
         // stopped first), then DeinitOTR, which stops threads and saves window layout + config.

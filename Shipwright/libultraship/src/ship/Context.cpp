@@ -498,6 +498,7 @@ static std::string sAppBundlePathOverride;
 
 // Written from the game thread, read by the graph loop each frame. See RequestExit.
 static std::atomic<bool> sExitRequested{ false };
+static std::atomic<bool> sFullTeardownRequested{ false };
 
 void Context::RequestExit() {
     sExitRequested = true;
@@ -505,6 +506,18 @@ void Context::RequestExit() {
 
 bool Context::IsExitRequested() {
     return sExitRequested;
+}
+
+void Context::RequestExitWithFullTeardown() {
+    // Order matters: the teardown flag must be visible before the loop can stop, or DeinitOTR could
+    // read it while still false and take the _exit path, making the experiment silently measure the
+    // ordinary shutdown instead.
+    sFullTeardownRequested = true;
+    sExitRequested = true;
+}
+
+bool Context::IsFullTeardownRequested() {
+    return sFullTeardownRequested;
 }
 
 void Context::SetAppBundlePath(const std::string& path) {

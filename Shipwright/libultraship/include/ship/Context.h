@@ -124,6 +124,31 @@ class Context {
     static bool IsExitRequested();
 
     /**
+     * @brief Exit, and additionally run the REAL engine teardown instead of DeinitOTR's _exit(0).
+     *
+     * This exists to answer one question, and it is the falsifier recorded on claim C057. DeinitOTR
+     * skips the GUI/renderer/window destructors because they crashed in driver code -- RADV/Wayland
+     * `wsi_wl_swapchain_destroy` double-free, lavapipe/X11 `xcb_present` overflow, RmlUi's static
+     * StyleSheetFactory. Every one of those is from the VULKAN era, and this project has since moved
+     * to SDL3 GPU as its only backend, so whether they still reproduce is unknown rather than known.
+     *
+     * It matters because in-process game switching needs exactly that teardown. If this path
+     * survives, the blocker is gone and the `_exit(0)` can go with it; if it crashes, C057's
+     * rationale holds on current drivers and the answer is to stop tearing down at all -- give the
+     * launcher the window and renderer for the process lifetime and leave cores only their archives
+     * and heaps.
+     *
+     * Reaching the launcher's "core returned" line is the POSITIVE result. A crash is the negative,
+     * and both are informative; what would tell us nothing is never running it.
+     */
+    static void RequestExitWithFullTeardown();
+
+    /**
+     * @brief Should DeinitOTR run the real teardown rather than _exit? See RequestExitWithFullTeardown.
+     */
+    static bool IsFullTeardownRequested();
+
+    /**
      * @brief Point the bundle path at the running game's own directory, overriding the executable's.
      *
      * This path answers "where does the running game's data live" -- fonts, the RmlUi assets, the
