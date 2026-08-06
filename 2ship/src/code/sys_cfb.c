@@ -3,7 +3,7 @@
 #include "regs.h"
 #include "functions.h"
 #include "macros.h"
-#include "2s2h/framebuffer_effects.h"
+#include "framebuffer_effects.h"
 #include "BenPort.h"
 #include <libultraship/bridge/gfxbridge.h>
 

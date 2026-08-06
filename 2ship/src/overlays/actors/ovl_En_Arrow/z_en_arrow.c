@@ -9,7 +9,7 @@
 #include "overlays/effects/ovl_Effect_Ss_Sbn/z_eff_ss_sbn.h"
 #include "objects/gameplay_keep/gameplay_keep.h"
 
-#include "2s2h/framebuffer_effects.h"
+#include "framebuffer_effects.h"
 
 #define FLAGS (ACTOR_FLAG_UPDATE_CULLING_DISABLED | ACTOR_FLAG_DRAW_CULLING_DISABLED)
 

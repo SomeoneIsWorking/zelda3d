@@ -15,7 +15,7 @@
 #include "soh/OTRGlobals.h"
 #include "soh/ResourceManagerHelpers.h"
 #include "soh/SaveManager.h"
-#include "soh/framebuffer_effects.h"
+#include "framebuffer_effects.h"
 
 #include <libultraship/libultraship.h>
 

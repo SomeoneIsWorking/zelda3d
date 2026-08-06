@@ -47,7 +47,7 @@ u8 sMotionBlurStatus;
 #include "2s2h/Enhancements/FrameInterpolation/FrameInterpolation.h"
 #include "2s2h/Enhancements/Graphics/Graphics.h"
 #include "2s2h/DeveloperTools/CollisionViewer.h"
-#include "2s2h/framebuffer_effects.h"
+#include "framebuffer_effects.h"
 #include <string.h>
 
 s32 gDbgCamEnabled = false;

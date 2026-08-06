@@ -14,7 +14,7 @@
 #include "z64visfbuf.h"
 #include "sys_cfb.h"
 #include <string.h>
-#include "2s2h/framebuffer_effects.h"
+#include "framebuffer_effects.h"
 #include <libultraship/bridge/gfxbridge.h>
 #include "BenPort.h"
 

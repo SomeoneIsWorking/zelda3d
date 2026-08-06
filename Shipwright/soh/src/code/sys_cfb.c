@@ -1,6 +1,6 @@
 #include "global.h"
 #include <stdlib.h>
-#include "soh/framebuffer_effects.h"
+#include "framebuffer_effects.h"
 
 uintptr_t sSysCfbFbPtr[2];
 uintptr_t sSysCfbEnd;
