@@ -17,8 +17,9 @@
 # Output: scratch/logs/sequence/run.log, plus a verdict on stdout. The verdict reads the log for the
 # classes libultraship distinguishes -- ENGINE state shared with the previous game (correct, that is
 # what one libultraship.so is for), PER-GAME state inherited (the bug the split exists to remove),
-# and SPLIT-PENDING state inherited because Audio/Console are genuinely not divided yet (unfinished,
-# not a regression). It prints the denominators either way: "no per-game inheritance" is only
+# and SPLIT-PENDING state inherited because a subsystem is genuinely not divided yet (unfinished, not
+# a regression) -- a category that is now EMPTY, Audio and Console having been its last two members.
+# It prints the denominators either way: "no per-game inheritance" is only
 # meaningful next to "and here is what the second core did install".
 set -u
 REPO="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
@@ -99,7 +100,7 @@ echo "-- PER-GAME state it INHERITED (want: none; each line is the bug):"
 grep -E "INHERITED the previous game" "$LOG" | grep -v "UNFINISHED" || echo "   (none)"
 echo "-- ENGINE state shared with the previous game (expected, this is the design):"
 grep -E "SHARED with the previous game" "$LOG" || echo "   (none)"
-echo "-- UNFINISHED: subsystems inherited because they are not split yet (Audio, Console):"
+echo "-- UNFINISHED: subsystems inherited because they are not split yet (should be none):"
 grep -E "Not a bug in the split, but UNFINISHED" "$LOG" || echo "   (none reported)"
 echo "-- crashes:"
 grep -iE "segmentation|SIGSEGV|SIGABRT|dumped core|terminate called|double free" "$LOG" || echo "   (none in the log; check the exit code above)"
