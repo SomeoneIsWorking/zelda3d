@@ -3,7 +3,6 @@
 #include "BenGui.hpp"
 #include "UIWidgets.hpp"
 #include "BenPort.h"
-#include "BenInputEditorWindow.h"
 #include "DeveloperTools/SaveEditor.h"
 #include "DeveloperTools/CollisionViewer.h"
 #include "2s2h/Enhancements/Enhancements.h"

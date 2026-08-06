@@ -42,7 +42,6 @@ namespace BenGui {
 std::shared_ptr<Ship::GuiWindow> mConsoleWindow;
 std::shared_ptr<Ship::GuiWindow> mStatsWindow;
 std::shared_ptr<Ship::GuiWindow> mGfxDebuggerWindow;
-std::shared_ptr<Ship::GuiWindow> mInputEditorWindow;
 
 std::shared_ptr<HookDebuggerWindow> mHookDebuggerWindow;
 std::shared_ptr<SaveEditorWindow> mSaveEditorWindow;
@@ -101,11 +100,6 @@ void SetupGuiElements() {
     mGfxDebuggerWindow = gui->GetGuiWindow("GfxDebuggerWindow");
     if (mGfxDebuggerWindow == nullptr) {
         SPDLOG_ERROR("Could not find input GfxDebuggerWindow");
-    }
-
-    mInputEditorWindow = gui->GetGuiWindow("2S2H Input Editor");
-    if (mInputEditorWindow == nullptr) {
-        SPDLOG_ERROR("Could not find input editor window");
     }
 
     mHookDebuggerWindow =
@@ -184,7 +178,6 @@ void Destroy() {
     mStatsWindow = nullptr;
     mConsoleWindow = nullptr;
     mGfxDebuggerWindow = nullptr;
-    mInputEditorWindow = nullptr;
     mCollisionViewerWindow = nullptr;
     mEventLogWindow = nullptr;
     mNotificationWindow = nullptr;
