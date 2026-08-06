@@ -13,6 +13,23 @@ set(SPDLOG_LEVEL_TRACE 0)
 set(SPDLOG_LEVEL_OFF 6)
 set(SPDLOG_MIN_CUTOFF SPDLOG_LEVEL_TRACE CACHE STRING "cutoff at trace")
 
+# AddressSanitizer, off by default. Built in rather than hand-patched because locating a heap
+# corruption here has no cheaper instrument: valgrind is not installed, glibc malloc checking does
+# not move the detection point, and the release build is -O2/-DNDEBUG with no line info, so
+# addr2line resolves to "??:?" and a backtrace cannot name the writer. See docs/issues/0009.
+#
+#   cmake -S Shipwright -B scratch/build-asan -G Ninja -DZELDA3D_SANITIZE=address
+#
+# -fno-omit-frame-pointer keeps the stacks readable; -O1 keeps it from taking all day. Applied to
+# both compile and link (ASAN needs its runtime on the link line) and to every target in the tree,
+# because the corruption is not known to live in any one of them.
+set(ZELDA3D_SANITIZE "" CACHE STRING "Sanitizer to build with (e.g. address, undefined); empty = none")
+if(NOT ZELDA3D_SANITIZE STREQUAL "")
+    message(STATUS "Building with -fsanitize=${ZELDA3D_SANITIZE}")
+    add_compile_options(-fsanitize=${ZELDA3D_SANITIZE} -fno-omit-frame-pointer -g -O1)
+    add_link_options(-fsanitize=${ZELDA3D_SANITIZE})
+endif()
+
 option(SUPPRESS_WARNINGS "Suppress warnings in LUS and src (decomp)" ON)
 if(SUPPRESS_WARNINGS)
     MESSAGE("Suppressing warnings in LUS and src")
