@@ -125,6 +125,18 @@
 #include "soh/config/ConfigUpdaters.h"
 #include "soh/ShipInit.hpp"
 
+// Check this game's definitions against the SHARED port ABI.
+//
+// port/zelda3d_port_api.h is included by the port-shell header inside `#ifndef __cplusplus`, so
+// this C++ file -- where the functions are actually DEFINED -- would otherwise never see those
+// declarations, and a definition could drift from them silently. Pulling it in here under
+// extern "C" gives every definition below a prototype to be checked against, which is the point of
+// having one declaration site at all.
+extern "C" {
+#include "port/zelda3d_port_api.h"
+}
+
+
 #ifdef __WIIU__
 const uint32_t defaultImGuiScale = 3;
 #else
