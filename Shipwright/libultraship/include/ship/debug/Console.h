@@ -59,9 +59,13 @@ class Console {
     ~Console();
 
     /**
-     * @brief Registers built-in commands.
+     * @brief Hook for per-Console setup. Currently does nothing.
      *
      * Called automatically by Context::InitConsole(); do not call manually.
+     *
+     * This used to be documented as "registers built-in commands", which was never true -- the body
+     * is empty. The engine's own commands (set/get/help/clear/bind/...) are registered by
+     * ConsoleWindow::RegisterCommands, and each game adds its own on top.
      */
     void Init();
 

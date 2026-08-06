@@ -301,6 +301,12 @@ void ConsoleWindow::InitElement() {
     mFilterBuffer = new char[gMaxBufferSize];
     strcpy(mFilterBuffer, "");
 
+    RegisterCommands();
+}
+
+// Separate from InitElement so a game attaching to an already-running engine can get these into ITS
+// console. InitElement runs once, for whichever game booted first; the command registry is per-game.
+void ConsoleWindow::RegisterCommands() {
     Context::GetRawInstance()->GetConsole()->AddCommand(
         "set", { SetCommand,
                  "Sets a console variable.",

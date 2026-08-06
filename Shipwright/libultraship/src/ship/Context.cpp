@@ -14,6 +14,7 @@
 #include "ship/window/FileDropMgr.h"
 #include "ship/window/Window.h"
 #include "ship/window/gui/Gui.h"
+#include "ship/window/gui/ConsoleWindow.h"
 #include "ship/events/EventSystem.h"
 #ifdef ENABLE_SCRIPTING
 #include "ship/scripting/ScriptLoader.h"
@@ -135,7 +136,7 @@ Context::~Context() {
     // Explicitly destructing everything so that logging is done last.
     mAudio = nullptr;
     mWindow = nullptr;
-    mConsole = nullptr;
+    // Console is per-game now and goes with the session, not from here.
     mCrashHandler = nullptr;
     mEventSystem = nullptr;
 #ifdef ENABLE_SCRIPTING
@@ -479,10 +480,10 @@ bool Context::InitAudio(AudioSettings settings) {
 
 bool Context::InitConsole() {
     if (GetConsole() != nullptr) {
-        return AlreadyInitialised(mSession.get(), "Console", SubsystemLifetime::SplitPending);
+        return AlreadyInitialised(mSession.get(), "Console", SubsystemLifetime::PerGame);
     }
 
-    mConsole = std::make_shared<Console>();
+    mSession->mConsole = std::make_shared<Console>();
 
     if (GetConsole() == nullptr) {
         SPDLOG_ERROR("Failed to initialize console");
@@ -491,6 +492,40 @@ bool Context::InitConsole() {
 
     GetConsole()->Init();
 
+    // Put the engine's own windows back first. The session that just ended took them with it (see
+    // EndGameSession), and by here the incoming game's ConsoleVariables are installed, so
+    // GuiWindow's constructor can read its CVar. For the FIRST game there is no window yet -- it is
+    // created after this -- and the Gui constructor adds them instead.
+    if (mWindow != nullptr && mWindow->GetGui() != nullptr) {
+        mWindow->GetGui()->AddDefaultGuiWindows();
+    }
+
+    // Re-register the ENGINE's own commands (set/get/help/clear/bind/...) into this game's registry.
+    //
+    // They are owned by ConsoleWindow, which is engine-lifetime and registers them from InitElement
+    // -- run once, for whichever game booted first. For the FIRST game there is no Gui yet at this
+    // point (InitConsole runs before InitWindow), so InitElement still does it. For a SECOND game
+    // the window is already up and will not re-init, so without this its fresh Console would have
+    // the game's commands but none of the engine's.
+    if (mWindow != nullptr && mWindow->GetGui() != nullptr) {
+        auto consoleWindow =
+            std::dynamic_pointer_cast<ConsoleWindow>(mWindow->GetGui()->GetGuiWindow("Console"));
+        if (consoleWindow != nullptr) {
+            consoleWindow->RegisterCommands();
+        }
+    }
+
+    // Say the count out loud. The command registry is per-game while the window that owns the
+    // engine's commands is not, so "this game's console came up with only its own commands" is a
+    // silent failure otherwise -- nothing downstream would report it until someone typed `help`.
+    const bool consoleWindowUp = mWindow != nullptr && mWindow->GetGui() != nullptr &&
+                                 mWindow->GetGui()->GetGuiWindow("Console") != nullptr;
+    SPDLOG_INFO("Console: {} engine command(s) registered for \"{}\" ({})", GetConsole()->GetCommands().size(),
+                GetName(),
+                consoleWindowUp ? "console window was already up, so they were re-registered here"
+                                : "no console window yet -- it is created after this and registers them itself");
+
+    InstalledForThisGame(mSession.get(), "Console");
     return true;
 }
 
@@ -597,7 +632,7 @@ std::shared_ptr<Window> Context::GetWindow() const {
 }
 
 std::shared_ptr<Console> Context::GetConsole() const {
-    return mConsole;
+    return mSession != nullptr ? mSession->mConsole : nullptr;
 }
 
 std::shared_ptr<Audio> Context::GetAudio() const {
@@ -651,6 +686,10 @@ void Context::BeginGameSession(const std::string& name, const std::string& short
     // remembered to tidy up.
     if (GetWindow() != nullptr && GetWindow()->GetGui() != nullptr) {
         GetWindow()->GetGui()->RemoveAllGuiWindows();
+        // The ENGINE's own windows go too, and are put back by InitConsole once the incoming game's
+        // ConsoleVariables exist. Not here: GuiWindow's constructor reads its "is open" CVar, and at
+        // this point the departing session's ConsoleVariables are gone and the new one's are not
+        // installed yet -- doing it here segfaults in ConsoleVariable::Get.
     }
 }
 

@@ -378,7 +378,6 @@ class Context {
 
     std::shared_ptr<CrashHandler> mCrashHandler;
     std::shared_ptr<Window> mWindow;
-    std::shared_ptr<Console> mConsole;
     std::shared_ptr<Audio> mAudio;
     std::shared_ptr<FileDropMgr> mFileDropMgr;
     std::shared_ptr<EventSystem> mEventSystem;
