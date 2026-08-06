@@ -154,8 +154,12 @@ bool ControllerButton::AddOrEditButtonMappingFromRawPress(CONTROLLERBUTTONS_T bi
         mapping = std::make_shared<KeyboardKeyToButtonMapping>(mPortIndex, bitmask, mKeyboardScancodeForNewMapping);
     }
 
-    else if (!Context::GetRawInstance()->GetWindow()->GetGui()->IsMouseOverAnyGuiItem() &&
-             Context::GetRawInstance()->GetWindow()->GetGui()->IsMouseOverActivePopup()) {
+    // Was: !IsMouseOverAnyGuiItem() && IsMouseOverActivePopup() -- i.e. "the click landed in the
+    // mapping popup, not in the game". Both predicates were ImGui, and against the no-op shim
+    // they evaluate to `!false && false` = false, so a mouse button could NEVER be bound to a
+    // controller input. IsInteractiveMenuOpen() is the same intent expressed against the menu
+    // that is actually live (Fast3dGui overrides it to report SohRmlUi::IsVisible()).
+    else if (Context::GetRawInstance()->GetWindow()->GetGui()->IsInteractiveMenuOpen()) {
         if (mMouseButtonForNewMapping != LUS_MOUSE_BTN_UNKNOWN) {
             mapping = std::make_shared<MouseButtonToButtonMapping>(mPortIndex, bitmask, mMouseButtonForNewMapping);
         } else {
