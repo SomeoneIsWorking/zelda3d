@@ -124,6 +124,12 @@ percentage-common put the two worst candidates at the top.
 | Port shell (`OTRGlobals.cpp` ↔ `BenPort.cpp`) | 2.8k / 2.4k | same class name, same `InitOTR`/`DeinitOTR` skeleton, different filename and per-game singletons | **structural, highest leverage.** Needs an interface split (shared lifecycle + per-game hooks), not a copy-merge |
 | `resource/` importers + types | 8.4k / 7.4k | 156 matching names, 28 identical `.cpp` — but only **3** also have an identical header (claim C066) | **poor target.** Tops the similarity ranking and is nearly all header-driven per-game divergence |
 | `mixer.c` | 822 | per-game audio DMEM base address (claim C065) | **do not share** until parameterised and both games' audio verified end to end |
+| `CrashHandlerExt.cpp` | 94 / 79 | OoT walks `ActorDB` + `scene_table.h` + `ACTORCAT_MAX`; MM uses `GetActorCategoryName` and a different list-head field | **do not share** — only the outer scaffolding is common; the bodies are two different actor systems |
+
+Already done: `gu_pc.c` and `mixer.h` (→ `port/`, shared source), `ObjectExtension` (→ the static
+lib, since it names no game type). When picking up `framebuffer_effects`, note that its identity-matrix
+seam is safe — OoT's `gMtxClear` and MM's `gIdentityMtx` are the *same* matrix despite the names, the
+former hardcoding the packed N64 fixed-point words (claim C067).
 
 `Enhancements/` game logic is genuinely per-game (mostly <50% common) and should stay forked. So are
 `src/overlays/` and `src/code/` — two different decomps with **zero** byte-identical files despite
