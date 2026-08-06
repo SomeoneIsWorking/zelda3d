@@ -62,9 +62,12 @@ void Fast3dGui::HandleWindowEvents(Fast::WindowEvent event) {
     if (mRml && mRml->ProcessSdlEvent(const_cast<SDL_Event*>(static_cast<const SDL_Event*>(event.Sdl.Event)))) {
         return;
     }
-    ImGui_ImplSDL3_ProcessEvent(static_cast<const SDL_Event*>(event.Sdl.Event));
+    // The ImGui SDL3 platform backend used to see every event here. It is a no-op shim and the
+    // live consumers are RmlUi (above, which consumes what it handles) and the game's own input
+    // path, so nothing is left to forward to.
 #if defined(__ANDROID__) || defined(__IOS__)
-    Ship::Mobile::ImGuiProcessEvent(ImGui::GetIO().WantTextInput);
+    // Mobile soft-keyboard: no ImGui text widget can want input any more, so this is unconditional.
+    Ship::Mobile::ImGuiProcessEvent(false);
 #endif
 }
 
@@ -73,14 +76,11 @@ void Fast3dGui::ImGuiWMInit() {
     if (Ship::Context::GetRawInstance()->GetConsoleVariables()->GetInteger(CVAR_ALLOW_BACKGROUND_INPUTS, 1)) {
         SDL_SetHint(SDL_HINT_JOYSTICK_ALLOW_BACKGROUND_EVENTS, "1");
     }
-    // SDL3 GPU is the only backend. The ImGui SDL3-GPU *renderer* backend is not stood up (the
-    // dev-overlay draw data is produced but not rendered); only the SDL3 platform backend is needed.
-    // The SDL_Window is carried in the (legacy-named) Vulkan window-impl member; see gfx_sdl2.cpp.
-    ImGui_ImplSDL3_InitForSDLGPU(static_cast<SDL_Window*>(mImpl.Vulkan.Window));
+    // No ImGui platform backend is stood up. RmlUi owns event handling and rendering; the SDL hints
+    // above are the only thing this function still exists for.
 }
 
 void Fast3dGui::ImGuiWMShutdown() {
-    ImGui_ImplSDL3_Shutdown();
 }
 
 void Fast3dGui::ImGuiBackendInit() {
@@ -109,7 +109,6 @@ void Fast3dGui::ImGuiBackendNewFrame() {
 }
 
 void Fast3dGui::ImGuiWMNewFrame() {
-    ImGui_ImplSDL3_NewFrame();
     UpdateSdlTextInput();
 }
 
@@ -123,7 +122,11 @@ void Fast3dGui::UpdateSdlTextInput() {
     if (mRml && mRml->IsVisible()) {
         return;
     }
-    const bool want = ImGui::GetIO().WantTextInput;
+    // Was `ImGui::GetIO().WantTextInput`. No ImGui text widget exists any more, so that query is a
+    // constant false -- which happens to be the RIGHT answer rather than a broken one: RmlUi starts
+    // and stops SDL text input itself on field focus (handled by the early return above), and
+    // nothing else in this build accepts typed text. So text input stays off here, deliberately.
+    const bool want = false;
     if (want == mTextInputActive) {
         return;
     }
@@ -252,27 +255,10 @@ extern "C" void Zelda3D_RmlMenuClick(int x, int y) {
 }
 
 void Fast3dGui::DrawFloatingWindows() {
-    if (!(ImGui::GetIO().ConfigFlags & ImGuiConfigFlags_ViewportsEnable)) {
-        return;
-    }
-
-    // OpenGL requires extra platform handling for the GL context
-    if (mImpl.Backend == WindowBackend::FAST3D_SDL_OPENGL && mImpl.Opengl.Context != nullptr) {
-        // Backup window and context before calling RenderPlatformWindowsDefault
-        SDL_Window* backupCurrentWindow = SDL_GL_GetCurrentWindow();
-        SDL_GLContext backupCurrentContext = SDL_GL_GetCurrentContext();
-
-        ImGui::UpdatePlatformWindows();
-        ImGui::RenderPlatformWindowsDefault();
-
-        // Restore GL context for next frame
-        SDL_GL_MakeCurrent(backupCurrentWindow, backupCurrentContext);
-    } else {
-        // SDL3 GPU (the sole renderer) needs no per-backend floating-window setup; the removed Metal
-        // backend's SetupFloatingFrame()/GfxRenderingAPIMetal are gone with it.
-        ImGui::UpdatePlatformWindows();
-        ImGui::RenderPlatformWindowsDefault();
-    }
+    // ImGui multi-viewport support. The body was gated on
+    // `ImGui::GetIO().ConfigFlags & ImGuiConfigFlags_ViewportsEnable`, which is zero against the
+    // shim, so it early-returned on every frame and the UpdatePlatformWindows/RenderPlatformWindows
+    // calls below it never executed. Nothing replaces it: RmlUi renders into the one window.
 }
 
 void Fast3dGui::CalculateGameViewport() {
