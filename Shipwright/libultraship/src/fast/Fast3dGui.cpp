@@ -149,6 +149,26 @@ void Fast3dGui::ImGuiBackendNewFrame() {
     if (!EnsureImGuiRenderer()) {
         return;
     }
+
+    // Rebuild the font atlas when a game has added fonts to it since it was last built.
+    //
+    // The atlas is ENGINE lifetime but every game registers its own fonts into it (OoT's
+    // OTRGlobals::CreateFontWithSize, MM's equivalent in BenPort), and adding a font marks the atlas
+    // not-built. The SDL3-GPU backend, though, only builds the font texture when it has none
+    // (imgui_impl_sdlgpu3.cpp: `if (!bd->FontTexture) CreateFontsTexture()`), so once the FIRST game
+    // has built it, a later game's fonts are never rasterised.
+    //
+    // ImGui::NewFrame does assert on this -- `IO.Fonts->IsBuilt() && "Font Atlas not built!"` -- but
+    // asserts are compiled out under NDEBUG, so instead of a clear message it walked unbuilt fonts
+    // and died dereferencing one in SetCurrentFont. That is how OoT-after-MM crashed on its first
+    // drawn frame (docs/issues/0010).
+    ImGuiIO& io = ImGui::GetIO();
+    if (io.Fonts != nullptr && !io.Fonts->IsBuilt()) {
+        SPDLOG_INFO("Fast3dGui: font atlas has unbuilt fonts (a game registered its own); "
+                    "dropping the font texture so the backend rebuilds it.");
+        ImGui_ImplSDLGPU3_DestroyFontsTexture();
+    }
+
     ImGui_ImplSDLGPU3_NewFrame();
 }
 

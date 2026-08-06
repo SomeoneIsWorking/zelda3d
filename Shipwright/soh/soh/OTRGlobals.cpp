@@ -2168,11 +2168,33 @@ ImFont* OTRGlobals::CreateFontWithSize(float size, std::string fontPath, bool is
         initData->Path = fontPath;
         std::shared_ptr<Ship::Font> fontData = std::static_pointer_cast<Ship::Font>(
             Ship::Context::GetRawInstance()->GetResourceManager()->LoadResource(fontPath, false, initData));
+        if (fontData == nullptr) {
+            // Said out loud rather than dereferenced. The old code went straight into
+            // fontData->Data, so a missing font was a SIGSEGV with no message.
+            SPDLOG_ERROR("CreateFontWithSize: could not load \"{}\"; falling back to the built-in font", fontPath);
+            ImFontConfig fallbackCfg = ImFontConfig();
+            fallbackCfg.SizePixels = size;
+            return mImGuiIo->Fonts->AddFontDefault(&fallbackCfg);
+        }
+
+        // Give ImGui its OWN copy of the TTF bytes.
+        //
+        // This used to pass the resource's buffer with FontDataOwnedByAtlas = false, i.e. the atlas
+        // held a raw pointer into memory owned by the ResourceManager. The atlas is ENGINE lifetime
+        // and the ResourceManager is PER-GAME, so as soon as a second game attached, every font this
+        // game had registered pointed at freed memory -- and the next ImFontAtlas::Build() walks the
+        // ConfigData of ALL fonts, including the dead ones. Measured: MM's ResourceManager destructs,
+        // OoT then adds its own fonts to the same atlas 40ms later, and OoT dies on its first frame
+        // in ImGui::NewFrame -> SetCurrentFont.
+        //
+        // IM_ALLOC specifically, not new/malloc: with FontDataOwnedByAtlas left at its default (true)
+        // the atlas frees this with IM_FREE, and the two must be paired.
         ImFontConfig fontConf;
-        fontConf.FontDataOwnedByAtlas = false;
         const ImWchar* glyph_ranges = isJapaneseFont ? mImGuiIo->Fonts->GetGlyphRangesJapanese() : nullptr;
-        font = mImGuiIo->Fonts->AddFontFromMemoryTTF(fontData->Data, static_cast<int>(fontData->DataSize), size,
-                                                     &fontConf, glyph_ranges);
+        void* ownedTtf = IM_ALLOC(fontData->DataSize);
+        memcpy(ownedTtf, fontData->Data, fontData->DataSize);
+        font = mImGuiIo->Fonts->AddFontFromMemoryTTF(ownedTtf, static_cast<int>(fontData->DataSize), size, &fontConf,
+                                                     glyph_ranges);
     }
     // FontAwesome fonts need to have their sizes reduced by 2.0f/3.0f in order to align correctly
     float iconFontSize = size * 2.0f / 3.0f;
