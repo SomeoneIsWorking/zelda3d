@@ -1,6 +1,6 @@
 #include <libultraship/libultra.h>
 #include "global.h"
-#include "soh/mixer.h"
+#include "mixer.h" // shared: Shipwright/zelda3d_shared/port/
 
 #include "soh/Enhancements/audio/AudioEditor.h"
 

@@ -52,9 +52,9 @@ shared     Shipwright/zelda3d_shared  static lib (no game types)  +  port/ (shar
 engine     Shipwright/libultraship (libultraship.so, ONE copy)  ·  Shipwright/cmb3d
 ```
 
-Before 2026-08-06 the configure root was `Shipwright/CMakeLists.txt` — OoT's own directory — which
-made MM a guest of OoT's build and let `2ship/CMakeLists.txt` reach the engine's assets through
-`${CMAKE_SOURCE_DIR}`. Paths are now named variables set by the root (`ZELDA3D_ENGINE_DIR`,
+Before 2026-08-06 the configure root was OoT's own directory, which made MM a guest of OoT's build
+and let `2ship/CMakeLists.txt` reach the engine's assets through `${CMAKE_SOURCE_DIR}`. Paths are
+now named variables set by the root (`ZELDA3D_ENGINE_DIR`,
 `ZELDA3D_OOT_DIR`, `ZELDA3D_MM_DIR`, `ZELDA3D_ENGINE_ASSETS_DIR`, `ZELDA3D_SHARED_DIR`), each with a
 standalone-configure fallback in the game that uses it. ccache is wired in as the compiler launcher
 when present (`-DZELDA3D_CCACHE=OFF` to opt out).

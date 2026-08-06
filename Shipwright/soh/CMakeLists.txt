@@ -113,6 +113,15 @@ endif()
 if (NOT DEFINED ZELDA3D_ENGINE_ASSETS_DIR)
     set(ZELDA3D_ENGINE_ASSETS_DIR "${ZELDA3D_ENGINE_DIR}/assets")
 endif()
+if (NOT DEFINED ZELDA3D_SHARED_DIR)
+    set(ZELDA3D_SHARED_DIR "${CMAKE_CURRENT_SOURCE_DIR}/../zelda3d_shared")
+endif()
+
+# Port glue shared with the other game as SOURCE rather than as a library: identical in both games,
+# but it includes this game's headers (gu_pc.c includes "z64.h", which is a different file in each
+# tree), so it must be compiled once per game. See zelda3d_shared/port/README.md and claim C064.
+file(GLOB ZELDA3D_SHARED_PORT_SOURCES CONFIGURE_DEPENDS
+    "${ZELDA3D_SHARED_DIR}/port/*.c" "${ZELDA3D_SHARED_DIR}/port/*.cpp" "${ZELDA3D_SHARED_DIR}/port/*.h")
 
 ################################################################################
 # Sub-projects
@@ -241,6 +250,7 @@ set(ALL_FILES
     ${soh__}
     ${soh__Extractor}
     ${src__}
+    ${ZELDA3D_SHARED_PORT_SOURCES}
 )
 
 ################################################################################
@@ -374,6 +384,7 @@ endif()
 ################################################################################
 
 target_include_directories(soh_settings INTERFACE assets
+    ${ZELDA3D_SHARED_DIR}/port
     ${CMAKE_CURRENT_SOURCE_DIR}/include/
     ${CMAKE_CURRENT_SOURCE_DIR}/src/
     ${CMAKE_CURRENT_SOURCE_DIR}/../libultraship/include
