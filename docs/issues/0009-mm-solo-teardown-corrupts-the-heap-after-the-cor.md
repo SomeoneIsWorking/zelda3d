@@ -60,6 +60,12 @@ shortcut in `~GfxRenderingAPISdl3Gpu` — `mSoh3d`/`mHud` are reset with the com
 resources are owned by the device and freed at SDL_DestroyGPUDevice below". It is a genuine leak
 worth closing, but a leak does not corrupt the C heap.
 
+## INTERMITTENT -- do not trust a single green run
+
+After Dear ImGui was restored as a real library, `solo mm` exited 0 twice and 134 once, all three
+runs with the same "corrupted size vs. prev_size". Restoring ImGui changed the heap layout; it did
+not fix the corruption. Any future "this is fixed" claim needs several consecutive runs, not one.
+
 ## Next step
 
 Build with `-fsanitize=address`. Nothing cheaper has located the writer: valgrind is not installed

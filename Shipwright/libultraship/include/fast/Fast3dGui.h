@@ -196,6 +196,17 @@ class Fast3dGui : public Ship::Gui {
     /// change. Init'd false to match SohRmlUi::Init having cleared SDL's startup default-on state.
     bool mTextInputActive = false;
 
+    /** @brief True once ImGui's SDL3-GPU renderer backend has been initialised.
+     *
+     * Not set in ImGuiBackendInit: Gui::Init runs BEFORE the Fast3D rendering API exists, so
+     * g_activeSdl3GpuApi is still null there and ImGui_ImplSDLGPU3_Init cannot be called yet.
+     * EnsureImGuiRenderer() retries per frame until it can. */
+    bool mImGuiRendererReady = false;
+
+    /** @brief Initialise ImGui's SDL3-GPU renderer backend if it is not up yet.
+     *  @return true if the backend is ready to render this frame. */
+    bool EnsureImGuiRenderer();
+
   private:
     /** @brief Syncs SDL text input to whether an ImGui text widget wants keyboard text, so the
      *         IME stays off during gameplay yet ImGui InputText fields still get characters.
