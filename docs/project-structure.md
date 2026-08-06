@@ -118,7 +118,6 @@ percentage-common put the two worst candidates at the top.
 
 | Candidate | Size | The real seam | Verdict |
 |---|---|---|---|
-| Extractor (`Extract.cpp`, `FastCrc32C.c`) | ~800/side | 153 lines, **all** per-game ROM CRC tables and version names | **tractable refactor**: share the extraction logic, let each game supply a `RomVersionTable`. Gates a fresh install booting — verify by running a real extraction, not by compiling |
 | GUI framework (`UIWidgets`, `Menu`, `MenuTypes`, `Notification`) | ~3.9k/side | the two games use **different CVar keys for the same setting** — `gSettings.Notifications.Position` vs `gNotifications.Position` (claim C068) | **gated on a config migration, not a refactor.** MM has no `cvar_prefixes.h` and uses raw literals; adopting the macros changes persisted keys and silently resets users' settings. Do the `ConfigVersionNUpdater` migration FIRST, then merge widget-by-widget |
 | Port shell (`OTRGlobals.cpp` ↔ `BenPort.cpp`) | 2.8k / 2.4k | the ABI half is **done** (`port/zelda3d_port_api.h`). The BODY's 28 textually-identical lines each name a per-game type — `class OTRGlobals` exists in both games with different members (claim C069) | **ABI done; body: do NOT extract.** Hooking it would cost ~7 function pointers to share a Christmas-date check and `srand` |
 | `resource/` importers + types | 8.4k / 7.4k | 156 matching names, 28 identical `.cpp` — but only **3** also have an identical header (claim C066) | **poor target.** Tops the similarity ranking and is nearly all header-driven per-game divergence |
@@ -126,10 +125,48 @@ percentage-common put the two worst candidates at the top.
 | `CrashHandlerExt.cpp` | 94 / 79 | OoT walks `ActorDB` + `scene_table.h` + `ACTORCAT_MAX`; MM uses `GetActorCategoryName` and a different list-head field | **do not share** — only the outer scaffolding is common; the bodies are two different actor systems |
 
 Already done: `gu_pc.c`, `mixer.h` and `framebuffer_effects.{c,h}` (→ `port/`, shared source),
-`ObjectExtension` (→ the static lib, since it names no game type), and the 29-function **port ABI**
-(`port/zelda3d_port_api.h`). Per-game names that shared port code needs are parameterised by
+`ObjectExtension` (→ the static lib, since it names no game type), the 29-function **port ABI**
+(`port/zelda3d_port_api.h`), and the **Extractor** (→ `extractor/`, shared source; see below).
+Per-game names that shared port code needs are parameterised by
 the build: `ZELDA3D_IDENTITY_MTX` is `gMtxClear` for OoT and `gIdentityMtx` for MM — the same matrix
 under two names (claim C067).
+
+### The Extractor: the per-game half was DATA, and splitting it out found three defects
+
+`Extract.cpp` and `FastCrc32C.c` are now one source under `zelda3d_shared/extractor/`, compiled per
+game like `port/`. Every difference between the two copies turned out to be either a value (now a
+row in a `RomVersionTable` each game supplies from its own `Extractor/RomVersions.cpp`) or one side
+being simply older than the other. The shared object's only per-game link deps are
+`Zelda3D_GetRomVersionTable`, `zapd_report` and the three `gBuildVersion*` symbols.
+
+Sharing it was worth doing for what the diff exposed, more than for the ~700 lines:
+
+- **OoT could not extract an NTSC MQ US or JP rom.** Its version-name map had two rows written
+  against the NON-MQ constants (`OOT_NTSC_US_GC`/`OOT_NTSC_JP_GC`, already mapped two rows above),
+  so as duplicate keys they were dropped and the two MQ header CRCs appeared in the map not at all —
+  despite both having a ZAPD config and a known-good whole-rom CRC. One row per version makes that
+  typo unrepresentable. `PAL Debug 2` had the mirror-image problem: named in the map, present in
+  neither switch, so scanning one reached an `UNREACHABLE`. It now says it cannot be extracted.
+- **OoT's unix `GetRoms` found nothing whenever the search path was not the working directory** — it
+  `opendir`'d `mSearchPath` but `stat`'d the bare `d_name`, and returned bare names callers could
+  not open. Callers point it at the install dir and then the data dir, so this is the normal case,
+  masked only when the game runs from its install dir. MM's copy already had it right. Measured
+  against both copies at gnu++20 (the dialect that defines `unix`, so the dirent branch is the one
+  under test): HEAD found 0, the merge found 1 with an openable absolute path.
+- **MM's `goodCrcs` was `std::array<const uint32_t, 10>` around two entries**, so it carried eight
+  trailing zeroes and a rom whose CRC32C came out `0x00000000` would have validated. The count is
+  now derived from the initialiser.
+
+`FastCrc32C.c` had no per-game seam at all — the diff was pure version skew, OoT's copy having
+gained Windows-ARM64 support and x86 gating that MM's predates. OoT's is the one kept.
+
+**Verified by a real extraction, not a compile:** OoT's `oot.o2r` was deleted and regenerated from
+the retail N64 rom through this code, and the game boots and runs on the archive it produced.
+MM's in-app extract path could not serve as the same gate — it hangs headless waiting on a popup and
+produces no archive, **and does so identically at HEAD** (A/B'd by stashing this change and
+rebuilding), so it is pre-existing and not a regression. MM's `mm.o2r` comes from the offline
+`build-mm-extract` pipeline instead. What is verified for MM is that the real MM rom passes
+validation against its new table and reaches ZAPD exactly as it does at HEAD.
 
 `Enhancements/` game logic is genuinely per-game (mostly <50% common) and should stay forked. So are
 `src/overlays/` and `src/code/` — two different decomps with **zero** byte-identical files despite
