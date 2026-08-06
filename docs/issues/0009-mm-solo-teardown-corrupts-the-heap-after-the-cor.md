@@ -82,8 +82,9 @@ mismatches on the MM shutdown path (`BenGui::Destroy` → `DeinitOTR`), not for 
 
 ## Why this matters
 
-It is the last known blocker to a core unwinding all the way to process exit, which is the premise of
-"one app, both games". It does **not** currently block N3's acceptance test: `tools/zelda3d_sequence.sh
-mm,oot` exits 0 with no crashes, because OoT runs last and `_exit(0)`s before teardown. That masking
-is exactly why the bug survived this long — do not let a green sequence run stand in for a clean
-teardown.
+It is a blocker to a core unwinding all the way to process exit, which is the premise of "one app,
+both games". Note that the sequence gate cannot see it: OoT runs last and `_exit(0)`s before
+teardown, so `tools/zelda3d_sequence.sh mm,oot` never exercises this path at all. That masking is
+exactly why the bug survived this long — do not let a green sequence run stand in for a clean
+teardown. (The sequence gate has its own separate failure now; see
+[issue 0010](0010-oot-after-mm-crashes-in-imgui-newframe-setcurren.md).)
