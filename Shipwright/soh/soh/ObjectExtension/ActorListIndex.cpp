@@ -1,5 +1,5 @@
 #include "ActorListIndex.h"
-#include "soh/ObjectExtension/ObjectExtension.h"
+#include "object/ObjectExtension.h"
 
 struct ActorListIndex {
     s16 index = -1;

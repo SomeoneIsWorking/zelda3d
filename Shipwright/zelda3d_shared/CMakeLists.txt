@@ -11,6 +11,8 @@
 file(GLOB_RECURSE zelda3d_shared_sources CONFIGURE_DEPENDS
     "${CMAKE_CURRENT_SOURCE_DIR}/player/*.cpp"
     "${CMAKE_CURRENT_SOURCE_DIR}/player/*.h"
+    "${CMAKE_CURRENT_SOURCE_DIR}/object/*.cpp"
+    "${CMAKE_CURRENT_SOURCE_DIR}/object/*.h"
     "${CMAKE_CURRENT_SOURCE_DIR}/audio/*.cpp")
 
 add_library(zelda3d_shared STATIC ${zelda3d_shared_sources})
@@ -27,6 +29,14 @@ target_include_directories(zelda3d_shared PUBLIC ${dr_libs_SOURCE_DIR})
 # Upstream third-party code; its warnings are not ours to fix and would drown the build.
 set_source_files_properties(${CMAKE_CURRENT_SOURCE_DIR}/audio/dr_libs_impl.cpp
     PROPERTIES COMPILE_OPTIONS "${WARNING_OVERRIDE}")
+
+# object/ — ObjectExtension, which attaches arbitrary typed data to a pointer. It honours this
+# library's contract for free: it names no game type at all, keying off `const void*` and storing
+# std::any, so it compiles once here rather than once per game. Both games had a copy, and the two
+# had drifted: SoH's declared the C entry point under `#else // __cplusplus`, so C++ callers never
+# saw `ObjectExtension_Free` declared, and it used `assert` while relying on <libultraship/
+# libultraship.h> to drag in <cassert>. MM's copy was correct on both counts and is the one kept.
+# Consumers include it as "object/ObjectExtension.h" via the PUBLIC include dir above.
 
 # thirdparty/ and extractor/ are header-only, so they add no sources — they exist so that code
 # BYTE-IDENTICAL in both games has exactly one copy. portable-file-dialogs.h (1,770 lines) and

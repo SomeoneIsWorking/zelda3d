@@ -1,4 +1,4 @@
-#include "2s2h/ObjectExtension/ObjectExtension.h"
+#include "object/ObjectExtension.h"
 #include "2s2h/GameInteractor/GameInteractor.h"
 #include "2s2h/Enhancements/FrameInterpolation/FrameInterpolation.h"
 #include "2s2h/ShipInit.hpp"

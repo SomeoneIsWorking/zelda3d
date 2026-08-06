@@ -3,7 +3,7 @@
 #include <libultraship/libultraship.h>
 #include "soh/OTRGlobals.h"
 #include "soh/Enhancements/nametag.h"
-#include "soh/ObjectExtension/ObjectExtension.h"
+#include "object/ObjectExtension.h"
 #include "soh/Enhancements/randomizer/randomizer.h"
 
 extern "C" {

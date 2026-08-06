@@ -1,6 +1,6 @@
 #include "ActorBehavior.h"
 #include <libultraship/bridge/consolevariablebridge.h>
-#include "2s2h/ObjectExtension/ObjectExtension.h"
+#include "object/ObjectExtension.h"
 
 extern "C" {
 #include "variables.h"
