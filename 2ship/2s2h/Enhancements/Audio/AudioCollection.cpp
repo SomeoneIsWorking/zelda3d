@@ -1,5 +1,6 @@
 #include "AudioCollection.h"
 #include "sequence.h"
+#include "2s2h/cvar_prefixes.h"
 #include <ship/utils/StringHelper.h>
 #include <libultraship/bridge/consolevariablebridge.h>
 #include <ship/window/Window.h>
@@ -226,7 +227,6 @@ AudioCollection::AudioCollection() {
         }
     }
 }
-#define CVAR_AUDIO(var) CVAR_PREFIX_AUDIO "." var
 std::string AudioCollection::GetCvarKey(std::string sfxKey) {
     auto prefix = CVAR_AUDIO("ReplacedSequences.");
     return prefix + sfxKey + ".value";

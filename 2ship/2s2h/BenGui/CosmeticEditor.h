@@ -58,8 +58,7 @@ typedef enum {
     COSMETICS_GROUP_MAX,
 } CosmeticGroup;
 
-#define CVAR_PREFIX_COSMETIC "gCosmetic"
-#define CVAR_COSMETIC(var) CVAR_PREFIX_COSMETIC "." var
+#include "2s2h/cvar_prefixes.h"
 #define COSMETIC_ID(id) id
 #define CVAR_COSMETIC_COLOR(id) CVAR_COSMETIC(id ".Color")
 #define CVAR_COSMETIC_RAINBOW(id) CVAR_COSMETIC(id ".Rainbow")
