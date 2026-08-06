@@ -158,14 +158,14 @@ void SetupMenuElements() {
 void SetupGuiElements() {
     auto gui = Ship::Context::GetRawInstance()->GetWindow()->GetGui();
 
-    mConsoleWindow = std::make_shared<SohConsoleWindow>(CVAR_WINDOW("SohConsole"), "Console##SoH", ImVec2(820, 630));
+    mConsoleWindow = std::make_shared<SohConsoleWindow>(CVAR_WINDOW("SohConsole"), "Console##SoH", Ship::Size2f(820, 630));
     gui->AddGuiWindow(mConsoleWindow);
 
     mGfxDebuggerWindow =
-        std::make_shared<SohGfxDebuggerWindow>(CVAR_WINDOW("SohGfxDebugger"), "GfxDebugger##SoH", ImVec2(820, 630));
+        std::make_shared<SohGfxDebuggerWindow>(CVAR_WINDOW("SohGfxDebugger"), "GfxDebugger##SoH", Ship::Size2f(820, 630));
     gui->AddGuiWindow(mGfxDebuggerWindow);
 
-    mStatsWindow = std::make_shared<SohStatsWindow>(CVAR_WINDOW("SohStats"), "Stats##Soh", ImVec2(400, 100));
+    mStatsWindow = std::make_shared<SohStatsWindow>(CVAR_WINDOW("SohStats"), "Stats##Soh", Ship::Size2f(400, 100));
     gui->AddGuiWindow(mStatsWindow);
 
     /*mInputEditorWindow = gui->GetGuiWindow("Controller Configuration");
@@ -173,63 +173,63 @@ void SetupGuiElements() {
         SPDLOG_ERROR("Could not find input editor window");
     }*/
 
-    mModMenuWindow = std::make_shared<ModMenuWindow>(CVAR_WINDOW("ModMenu"), "Mod Menu", ImVec2(820, 630));
+    mModMenuWindow = std::make_shared<ModMenuWindow>(CVAR_WINDOW("ModMenu"), "Mod Menu", Ship::Size2f(820, 630));
     gui->AddGuiWindow(mModMenuWindow);
-    mAudioEditorWindow = std::make_shared<AudioEditor>(CVAR_WINDOW("AudioEditor"), "Audio Editor", ImVec2(820, 630));
+    mAudioEditorWindow = std::make_shared<AudioEditor>(CVAR_WINDOW("AudioEditor"), "Audio Editor", Ship::Size2f(820, 630));
     gui->AddGuiWindow(mAudioEditorWindow);
     mInputViewer = std::make_shared<InputViewer>(CVAR_WINDOW("InputViewer"), "Input Viewer");
     gui->AddGuiWindow(mInputViewer);
     mInputViewerSettings = std::make_shared<InputViewerSettingsWindow>(CVAR_WINDOW("InputViewerSettings"),
-                                                                       "Input Viewer Settings", ImVec2(500, 525));
+                                                                       "Input Viewer Settings", Ship::Size2f(500, 525));
     gui->AddGuiWindow(mInputViewerSettings);
     mCosmeticsEditorWindow =
-        std::make_shared<CosmeticsEditorWindow>(CVAR_WINDOW("CosmeticsEditor"), "Cosmetics Editor", ImVec2(550, 520));
+        std::make_shared<CosmeticsEditorWindow>(CVAR_WINDOW("CosmeticsEditor"), "Cosmetics Editor", Ship::Size2f(550, 520));
     gui->AddGuiWindow(mCosmeticsEditorWindow);
     mActorViewerWindow =
-        std::make_shared<ActorViewerWindow>(CVAR_WINDOW("ActorViewer"), "Actor Viewer", ImVec2(520, 600));
+        std::make_shared<ActorViewerWindow>(CVAR_WINDOW("ActorViewer"), "Actor Viewer", Ship::Size2f(520, 600));
     gui->AddGuiWindow(mActorViewerWindow);
     mColViewerWindow =
-        std::make_shared<ColViewerWindow>(CVAR_WINDOW("CollisionViewer"), "Collision Viewer", ImVec2(520, 600));
+        std::make_shared<ColViewerWindow>(CVAR_WINDOW("CollisionViewer"), "Collision Viewer", Ship::Size2f(520, 600));
     gui->AddGuiWindow(mColViewerWindow);
-    mSaveEditorWindow = std::make_shared<SaveEditorWindow>(CVAR_WINDOW("SaveEditor"), "Save Editor", ImVec2(520, 600));
+    mSaveEditorWindow = std::make_shared<SaveEditorWindow>(CVAR_WINDOW("SaveEditor"), "Save Editor", Ship::Size2f(520, 600));
     gui->AddGuiWindow(mSaveEditorWindow);
     mHookDebuggerWindow =
-        std::make_shared<HookDebuggerWindow>(CVAR_WINDOW("HookDebugger"), "Hook Debugger", ImVec2(1250, 850));
+        std::make_shared<HookDebuggerWindow>(CVAR_WINDOW("HookDebugger"), "Hook Debugger", Ship::Size2f(1250, 850));
     gui->AddGuiWindow(mHookDebuggerWindow);
     mDLViewerWindow =
-        std::make_shared<DLViewerWindow>(CVAR_WINDOW("DisplayListViewer"), "Display List Viewer", ImVec2(520, 600));
+        std::make_shared<DLViewerWindow>(CVAR_WINDOW("DisplayListViewer"), "Display List Viewer", Ship::Size2f(520, 600));
     gui->AddGuiWindow(mDLViewerWindow);
     mValueViewerWindow =
-        std::make_shared<ValueViewerWindow>(CVAR_WINDOW("ValueViewer"), "Value Viewer", ImVec2(520, 600));
+        std::make_shared<ValueViewerWindow>(CVAR_WINDOW("ValueViewer"), "Value Viewer", Ship::Size2f(520, 600));
     gui->AddGuiWindow(mValueViewerWindow);
     mMessageViewerWindow =
-        std::make_shared<MessageViewer>(CVAR_WINDOW("MessageViewer"), "Message Viewer", ImVec2(520, 600));
+        std::make_shared<MessageViewer>(CVAR_WINDOW("MessageViewer"), "Message Viewer", Ship::Size2f(520, 600));
     gui->AddGuiWindow(mMessageViewerWindow);
     mGameplayStatsWindow =
-        std::make_shared<GameplayStatsWindow>(CVAR_WINDOW("GameplayStats"), "Gameplay Stats", ImVec2(480, 550));
+        std::make_shared<GameplayStatsWindow>(CVAR_WINDOW("GameplayStats"), "Gameplay Stats", Ship::Size2f(480, 550));
     gui->AddGuiWindow(mGameplayStatsWindow);
     mCheckTrackerWindow = std::make_shared<CheckTracker::CheckTrackerWindow>(CVAR_WINDOW("CheckTracker"),
-                                                                             "Check Tracker", ImVec2(400, 540));
+                                                                             "Check Tracker", Ship::Size2f(400, 540));
     gui->AddGuiWindow(mCheckTrackerWindow);
     mCheckTrackerSettingsWindow = std::make_shared<CheckTracker::CheckTrackerSettingsWindow>(
-        CVAR_WINDOW("CheckTrackerSettings"), "Check Tracker Settings", ImVec2(600, 375));
+        CVAR_WINDOW("CheckTrackerSettings"), "Check Tracker Settings", Ship::Size2f(600, 375));
     gui->AddGuiWindow(mCheckTrackerSettingsWindow);
     mEntranceTrackerWindow = std::make_shared<EntranceTracker::EntranceTrackerWindow>(
-        CVAR_WINDOW("EntranceTracker"), "Entrance Tracker", ImVec2(500, 750));
+        CVAR_WINDOW("EntranceTracker"), "Entrance Tracker", Ship::Size2f(500, 750));
     gui->AddGuiWindow(mEntranceTrackerWindow);
     mEntranceTrackerSettingsWindow = std::make_shared<EntranceTracker::EntranceTrackerSettingsWindow>(
-        CVAR_WINDOW("EntranceTrackerSettings"), "Entrance Tracker Settings", ImVec2(600, 375));
+        CVAR_WINDOW("EntranceTrackerSettings"), "Entrance Tracker Settings", Ship::Size2f(600, 375));
     gui->AddGuiWindow(mEntranceTrackerSettingsWindow);
     mItemTrackerWindow =
-        std::make_shared<ItemTrackerWindow>(CVAR_WINDOW("ItemTracker"), "Item Tracker", ImVec2(350, 600));
+        std::make_shared<ItemTrackerWindow>(CVAR_WINDOW("ItemTracker"), "Item Tracker", Ship::Size2f(350, 600));
     gui->AddGuiWindow(mItemTrackerWindow);
     mItemTrackerSettingsWindow = std::make_shared<ItemTrackerSettingsWindow>(CVAR_WINDOW("ItemTrackerSettings"),
-                                                                             "Item Tracker Settings", ImVec2(733, 472));
+                                                                             "Item Tracker Settings", Ship::Size2f(733, 472));
     gui->AddGuiWindow(mItemTrackerSettingsWindow);
-    mTimeSplitWindow = std::make_shared<TimeSplitWindow>(CVAR_WINDOW("TimeSplits"), "Time Splits", ImVec2(450, 660));
+    mTimeSplitWindow = std::make_shared<TimeSplitWindow>(CVAR_WINDOW("TimeSplits"), "Time Splits", Ship::Size2f(450, 660));
     gui->AddGuiWindow(mTimeSplitWindow);
     mPlandomizerWindow =
-        std::make_shared<PlandomizerWindow>(CVAR_WINDOW("PlandomizerEditor"), "Plandomizer Editor", ImVec2(850, 760));
+        std::make_shared<PlandomizerWindow>(CVAR_WINDOW("PlandomizerEditor"), "Plandomizer Editor", Ship::Size2f(850, 760));
     gui->AddGuiWindow(mPlandomizerWindow);
     mNotificationWindow = std::make_shared<Notification::Window>(CVAR_WINDOW("Notifications"), "Notifications Window");
     gui->AddGuiWindow(mNotificationWindow);

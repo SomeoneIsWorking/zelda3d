@@ -5,7 +5,7 @@
 #include "ship/window/gui/Gui.h"
 
 namespace Ship {
-GuiWindow::GuiWindow(const std::string& consoleVariable, bool isVisible, const std::string& name, ImVec2 originalSize,
+GuiWindow::GuiWindow(const std::string& consoleVariable, bool isVisible, const std::string& name, Ship::Size2f originalSize,
                      uint32_t windowFlags)
     : GuiElement(isVisible), mName(name), mVisibilityConsoleVariable(consoleVariable), mOriginalSize(originalSize),
       mWindowFlags(windowFlags) {
@@ -16,25 +16,25 @@ GuiWindow::GuiWindow(const std::string& consoleVariable, bool isVisible, const s
     }
 }
 
-GuiWindow::GuiWindow(const std::string& consoleVariable, bool isVisible, const std::string& name, ImVec2 originalSize)
+GuiWindow::GuiWindow(const std::string& consoleVariable, bool isVisible, const std::string& name, Ship::Size2f originalSize)
     : GuiWindow(consoleVariable, isVisible, name, originalSize, ImGuiWindowFlags_None) {
 }
 
 GuiWindow::GuiWindow(const std::string& consoleVariable, bool isVisible, const std::string& name)
-    : GuiWindow(consoleVariable, isVisible, name, ImVec2{ -1, -1 }, ImGuiWindowFlags_None) {
+    : GuiWindow(consoleVariable, isVisible, name, Ship::Size2f{ -1, -1 }, ImGuiWindowFlags_None) {
 }
 
-GuiWindow::GuiWindow(const std::string& consoleVariable, const std::string& name, ImVec2 originalSize,
+GuiWindow::GuiWindow(const std::string& consoleVariable, const std::string& name, Ship::Size2f originalSize,
                      uint32_t windowFlags)
     : GuiWindow(consoleVariable, false, name, originalSize, windowFlags) {
 }
 
-GuiWindow::GuiWindow(const std::string& consoleVariable, const std::string& name, ImVec2 originalSize)
+GuiWindow::GuiWindow(const std::string& consoleVariable, const std::string& name, Ship::Size2f originalSize)
     : GuiWindow(consoleVariable, false, name, originalSize, ImGuiWindowFlags_None) {
 }
 
 GuiWindow::GuiWindow(const std::string& consoleVariable, const std::string& name)
-    : GuiWindow(consoleVariable, false, name, ImVec2{ -1, -1 }, ImGuiWindowFlags_None) {
+    : GuiWindow(consoleVariable, false, name, Ship::Size2f{ -1, -1 }, ImGuiWindowFlags_None) {
 }
 
 void GuiWindow::SetVisibility(bool visible) {
@@ -66,8 +66,8 @@ void GuiWindow::Draw() {
     if (!IsVisible()) {
         return;
     }
-    if (mOriginalSize != ImVec2{ -1, -1 }) {
-        ImGui::SetNextWindowSize(mOriginalSize, ImGuiCond_FirstUseEver);
+    if (mOriginalSize.x != -1.0f || mOriginalSize.y != -1.0f) {
+        ImGui::SetNextWindowSize(ImVec2(mOriginalSize.x, mOriginalSize.y), ImGuiCond_FirstUseEver);
     }
     if (!ImGui::Begin(mName.c_str(), &mIsVisible, mWindowFlags)) {
         ImGui::End();
