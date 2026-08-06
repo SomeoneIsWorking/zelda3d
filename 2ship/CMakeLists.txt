@@ -117,6 +117,19 @@ set(ALL_FILES
 # target for them to stay identical.
 add_library(mm_settings INTERFACE)
 
+# ZELDA3D_IDENTITY_MTX -- the N64 identity matrix, whose decomp SYMBOL NAME differs per game.
+#
+# Shared port code under zelda3d_shared/port/ needs it (framebuffer_effects.c loads it as the
+# modelview before drawing a full-screen quad), but OoT's decomp calls it gMtxClear and MM's calls it
+# gIdentityMtx. They are the SAME matrix -- gMtxClear's raw words {65536,0,1,0, 0,65536,0,1, 0,...}
+# unpack, in the N64 Mtx layout, to the identity with zero fractional part, which is what MM's
+# gdSPDefMtx(1,0,0,0, ...) builds. Verified as claim C067; the OoT name is simply misleading.
+#
+# Parameterised here rather than #ifdef'd in the shared source: the difference is a name, and the
+# build is where per-game names belong.
+target_compile_definitions(mm_settings INTERFACE ZELDA3D_IDENTITY_MTX=gIdentityMtx)
+
+
 # -fno-gnu-unique: the ONE symbol class RTLD_LOCAL does not privatise. Both cores need it or neither
 # is protected -- a unique symbol binds process-wide to whichever core loaded FIRST, so leaving it off
 # here would simply move which game wins. See the matching block in Shipwright/soh/CMakeLists.txt for

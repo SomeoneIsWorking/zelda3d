@@ -12,7 +12,7 @@
 
 #include <string.h> // memset
 #include <assert.h>
-#include "soh/framebuffer_effects.h"
+#include "framebuffer_effects.h"
 
 // Upstream TODO: Replace these ones they are served from other headers
 #define ASSERT(cond, msg, file, line) assert(cond)

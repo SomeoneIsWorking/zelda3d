@@ -1,6 +1,9 @@
 #include "framebuffer_effects.h"
 #include "global.h"
-#include "OTRGlobals.h"
+// The port ABI, not either game's shell header -- this file is compiled once per game and OoT's
+// shell is OTRGlobals.h while MM's is BenPort.h. Everything it needs (OTRGetGameRenderWidth/Height,
+// OTRGetAspectRatio, the HUD rect helpers) is in the shared declaration site.
+#include "port/zelda3d_port_api.h"
 
 int gfx_create_framebuffer(uint32_t width, uint32_t height, uint32_t native_width, uint32_t native_height,
                            uint8_t resize);
@@ -43,7 +46,7 @@ void FB_CreateFramebuffers(void) {
 void FB_CopyToFramebuffer(Gfx** gfxp, s32 fb_src, s32 fb_dest, u8 oncePerFrame, u8* hasCopied) {
     Gfx* gfx = *gfxp;
 
-    gSPMatrix(gfx++, &gMtxClear, G_MTX_NOPUSH | G_MTX_LOAD | G_MTX_MODELVIEW);
+    gSPMatrix(gfx++, &ZELDA3D_IDENTITY_MTX, G_MTX_NOPUSH | G_MTX_LOAD | G_MTX_MODELVIEW);
 
     gDPSetOtherMode(gfx++,
                     G_AD_DISABLE | G_CD_DISABLE | G_CK_NONE | G_TC_FILT | G_TF_POINT | G_TT_NONE | G_TL_TILE |
@@ -118,7 +121,7 @@ void FB_WriteFramebufferSliceToCPU(Gfx** gfxp, void* buffer, u8 byteSwap) {
 void FB_DrawFromFramebuffer(Gfx** gfxp, s32 fb, u8 alpha) {
     Gfx* gfx = *gfxp;
 
-    gSPMatrix(gfx++, &gMtxClear, G_MTX_NOPUSH | G_MTX_LOAD | G_MTX_MODELVIEW);
+    gSPMatrix(gfx++, &ZELDA3D_IDENTITY_MTX, G_MTX_NOPUSH | G_MTX_LOAD | G_MTX_MODELVIEW);
 
     gDPSetEnvColor(gfx++, 255, 255, 255, alpha);
 

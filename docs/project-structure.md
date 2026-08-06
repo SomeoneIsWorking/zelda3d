@@ -118,7 +118,6 @@ percentage-common put the two worst candidates at the top.
 
 | Candidate | Size | The real seam | Verdict |
 |---|---|---|---|
-| `framebuffer_effects.{c,h}` | 177 | two: the port-shell include (`OTRGlobals.h` / `BenPort.h`) and the identity-matrix symbol (`gMtxClear` / `gIdentityMtx`) | **ready** — but the first seam is really the port-shell split below; do them together |
 | Extractor (`Extract.cpp`, `FastCrc32C.c`) | ~800/side | 153 lines, **all** per-game ROM CRC tables and version names | **tractable refactor**: share the extraction logic, let each game supply a `RomVersionTable`. Gates a fresh install booting — verify by running a real extraction, not by compiling |
 | GUI framework (`UIWidgets`, `Menu`, `MenuTypes`, `Notification`) | ~3.9k/side | the two games use **different CVar keys for the same setting** — `gSettings.Notifications.Position` vs `gNotifications.Position` (claim C068) | **gated on a config migration, not a refactor.** MM has no `cvar_prefixes.h` and uses raw literals; adopting the macros changes persisted keys and silently resets users' settings. Do the `ConfigVersionNUpdater` migration FIRST, then merge widget-by-widget |
 | Port shell (`OTRGlobals.cpp` ↔ `BenPort.cpp`) | 2.8k / 2.4k | same class name, same `InitOTR`/`DeinitOTR` skeleton, different filename and per-game singletons | **started.** The ABI half is done — `port/zelda3d_port_api.h` holds the 29 functions both games implement, and a drifting definition is a build error. What remains is the *body*: `InitOTR`/`DeinitOTR` share a skeleton (host hooks → god object → extract → archives → config updaters → GUI → singletons → `ShipInit::InitAll`) with per-game steps between, so the split is a shared lifecycle calling per-game hooks |
@@ -126,10 +125,11 @@ percentage-common put the two worst candidates at the top.
 | `mixer.c` | 822 | per-game audio DMEM base address (claim C065) | **do not share** until parameterised and both games' audio verified end to end |
 | `CrashHandlerExt.cpp` | 94 / 79 | OoT walks `ActorDB` + `scene_table.h` + `ACTORCAT_MAX`; MM uses `GetActorCategoryName` and a different list-head field | **do not share** — only the outer scaffolding is common; the bodies are two different actor systems |
 
-Already done: `gu_pc.c` and `mixer.h` (→ `port/`, shared source), `ObjectExtension` (→ the static
-lib, since it names no game type), and the 29-function **port ABI** (`port/zelda3d_port_api.h`). When picking up `framebuffer_effects`, note that its identity-matrix
-seam is safe — OoT's `gMtxClear` and MM's `gIdentityMtx` are the *same* matrix despite the names, the
-former hardcoding the packed N64 fixed-point words (claim C067).
+Already done: `gu_pc.c`, `mixer.h` and `framebuffer_effects.{c,h}` (→ `port/`, shared source),
+`ObjectExtension` (→ the static lib, since it names no game type), and the 29-function **port ABI**
+(`port/zelda3d_port_api.h`). Per-game names that shared port code needs are parameterised by
+the build: `ZELDA3D_IDENTITY_MTX` is `gMtxClear` for OoT and `gIdentityMtx` for MM — the same matrix
+under two names (claim C067).
 
 `Enhancements/` game logic is genuinely per-game (mostly <50% common) and should stay forked. So are
 `src/overlays/` and `src/code/` — two different decomps with **zero** byte-identical files despite
