@@ -50,8 +50,11 @@ std::unique_ptr<Context> Context::mContext;
 //   Engine       -- window, logger, crash handler. Shared on purpose; a skip is the design working.
 //   PerGame      -- the four GameSession rows. A skip is either idempotence or the split failing, and
 //                   which one is decided by GameSession's record of what IT installed, not by a label.
-//   SplitPending -- Audio and Console. Genuinely part per-game, genuinely not divided yet. Reported
-//                   separately so unfinished work is never filed under "the design".
+//   SplitPending -- part per-game, genuinely not divided yet. Reported separately so unfinished work
+//                   is never filed under "the design". CURRENTLY EMPTY: Audio and Console were its
+//                   last two members and both are now split (Audio turned out to be engine state
+//                   with a stale Config capture; Console moved to GameSession). Kept because the
+//                   category is what makes "none pending" a measured result rather than an absence.
 //
 // Everything here stays silent until a SECOND game attaches, because a blanket warning was wrong and
 // a normal boot proved it: `zelda3d oot` alone trips InitConfiguration and InitConsoleVariables,
