@@ -21,8 +21,7 @@ extern "C" s8 gSfxDefaultReverb;
 
 using namespace UIWidgets;
 
-#define CVAR_PREFIX_AUDIO "gAudioEditor"
-#define CVAR_AUDIO(var) CVAR_PREFIX_AUDIO "." var
+#include "2s2h/cvar_prefixes.h"
 
 static WidgetInfo lowHpAlarm;
 static WidgetInfo muteCarpenterSfx;

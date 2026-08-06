@@ -286,6 +286,15 @@ add_library(soh_settings INTERFACE)
 # build is where per-game names belong.
 target_compile_definitions(soh_settings INTERFACE ZELDA3D_IDENTITY_MTX=gMtxClear)
 
+# OoT's CVar namespace macros (CVAR_PREFIX_SETTING="gSettings", ...), from
+# Shipwright/CMake/soh-cvars.cmake. Scoped to THIS game because the namespaces are this game's: MM
+# has its own, and while these were global they collided with them. Standalone-configure fallback
+# for when the root CMakeLists has not run.
+if (NOT DEFINED SOH_CVAR_PREFIX_DEFINITIONS)
+    include(${CMAKE_CURRENT_SOURCE_DIR}/../CMake/soh-cvars.cmake)
+endif()
+target_compile_definitions(soh_settings INTERFACE ${SOH_CVAR_PREFIX_DEFINITIONS})
+
 
 # -fno-gnu-unique: the ONE symbol class RTLD_LOCAL does not privatise.
 #
