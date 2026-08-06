@@ -3,8 +3,6 @@
 #
 # Run from a terminal in your graphical session (DISPLAY/XAUTHORITY are inherited):
 #   ./run.sh              # the game
-#   ./run.sh tool         # the N64-vs-3DS character compare tool (charcompare)
-#   ./run.sh tool /actor/zelda_zl4.zar   # ...starting on a specific character
 #
 # The decrypted OoT3D .3ds is provided via env ZELDA3D_OOT3D_ROM (never hardcoded — repo
 # rule). Either export it, drop a `.env` next to this script setting it, or just drop
@@ -102,16 +100,6 @@ if [ "$(uname)" = "Linux" ] && [ -z "${DISPLAY:-}" ]; then
     [ -z "${XAUTHORITY:-}" ] && for x in /run/user/$(id -u)/xauth_*; do
         [ -f "$x" ] && export XAUTHORITY="$x" && break
     done
-fi
-
-# Subcommand: `./run.sh tool [args]` -> the charcompare character-compare tool.
-if [ "${1:-}" = "tool" ]; then
-    shift
-    CC="$SOH/charcompare/charcompare"
-    ensure_built charcompare "$CC"
-    ensure_soh_o2r          # tool warns (GUI font / GL shaders) without it
-    cd "$SOH"
-    exec ./charcompare/charcompare "$@"
 fi
 
 ensure_built soh "$SOH/$SOH_BIN"

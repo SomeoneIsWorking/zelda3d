@@ -278,6 +278,11 @@ int RunSequence(const std::string& spec) {
         printf("  %-4s RETURNED %d -- the process survived this core\n", id.c_str(), rc);
         fflush(stdout);
     }
+    // After the LAST core, not per-iteration: a second core attaching reuses the live Context via
+    // BeginGameSession, so destroying it between cores would defeat the sequence. See the
+    // single-game path for why this cannot be left to __cxa_finalize.
+    Ship::Context::DestroyInstance();
+
     printf("zelda3d: %zu/%zu cores ran to completion in one process\n", ran, ids.size());
     return ran == ids.size() ? 0 : 1;
 }
@@ -380,6 +385,20 @@ int main(int argc, char* argv[]) {
     // has to be visible rather than assumed.
     fprintf(stderr, "ZELDA3D LAUNCHER: %s core returned %d -- control is back in the launcher\n", core->id, rc);
     fflush(stderr);
+
+    // Tear the engine down HERE, deterministically, rather than leaving Context's static
+    // unique_ptr to be released by __cxa_finalize on the way out.
+    //
+    // This is not tidiness. Ship::Context owns the window, which owns the Gui, which owns SohRmlUi,
+    // whose destructor calls Rml::Shutdown(). Running that during static destruction aborted the
+    // process with "double free or corruption (!prev)" inside Rml::StyleSheetFactory's destructor:
+    // by then RmlUi's own statics are being finalised concurrently with the teardown that is trying
+    // to use them. OoT never showed it because DeinitOTR calls _exit(0) from inside the core, so
+    // static destructors never run at all; MM unwinds and returns, and hit it every time.
+    //
+    // Handing control back to the launcher is the whole point of this build, so the teardown that
+    // only ever ran under _exit() has to become a real, ordered teardown.
+    Ship::Context::DestroyInstance();
 
     // No dlclose: unloading a core whose static destructors and background threads have already run
     // is a way to crash on the way out, and the process is exiting regardless.

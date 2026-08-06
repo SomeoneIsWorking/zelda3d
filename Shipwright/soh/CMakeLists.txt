@@ -828,11 +828,3 @@ wut_create_wuhb(${PROJECT_NAME}
 INSTALL(FILES ${CMAKE_CURRENT_BINARY_DIR}/soh.rpx ${CMAKE_CURRENT_BINARY_DIR}/soh.wuhb DESTINATION . COMPONENT ship)
 
 endif()
-
-################################################################################
-# charcompare — standalone N64-vs-3DS character comparison tool (dev tool).
-# Added last so the SDL2 / Threads imported targets above are already defined.
-################################################################################
-if(NOT CMAKE_SYSTEM_NAME MATCHES "NintendoSwitch|CafeOS")
-    add_subdirectory(charcompare)
-endif()
