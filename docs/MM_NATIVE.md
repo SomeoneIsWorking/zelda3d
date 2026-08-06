@@ -1000,6 +1000,31 @@ This directly advances the project goal (memory `mm-renderer-topology`: one libu
 Phase-1 debug-warp above does NOT depend on this. Was mid-scoping the ControlDeck seam when work
 moved home to soh3d; resume there.
 
+## N3 subsystem split — COMPLETE (2026-08-06)
+
+Every `Ship::Context` subsystem is now classified **Engine** or **PerGame**; the `SplitPending`
+category ("part per-game, not divided yet") has **no members left**, and the sequence gate's
+UNFINISHED block reads `(none reported)`.
+
+The last two both turned out to be bugs rather than missing work:
+
+- **Audio** was never per-game at all — it is the output device. What made it look undivided was
+  `Audio::Init` caching a `shared_ptr` to whichever game started FIRST, so a second game read and
+  `Save()`d its audio settings into the departed game's config file (issue 0011, commit `88b038c0`).
+  Fixed by resolving the config per use; reclassified Engine, with `ApplySavedSettings()` re-run when
+  a game attaches so its saved backend/channels reach the running device.
+- **Console** genuinely is per-game (a command registry both games populate) and moved to
+  `GameSession`. Splitting it exposed a larger one: `EndGameSession`'s `RemoveAllGuiWindows()` also
+  removed the ENGINE's default windows, which were only ever created in `Gui`'s constructor — so the
+  second game in a process had had **no console window at all** since the launcher was written.
+  `Gui::AddDefaultGuiWindows()` is now re-run for the incoming game, from `InitConsole` (doing it in
+  `EndGameSession` segfaults: `GuiWindow`'s constructor reads a CVar, and neither session's
+  ConsoleVariables exist at that moment).
+
+`InitConsole` logs its command count and why it is what it is, because "this game's console came up
+with only its own commands" is otherwise silent until someone types `help` — and that log is what
+caught the missing-window bug instead of shipping it.
+
 ## N3 log (2026-07-01 — stabilization)
 
 **N3.1 — exit-path config-save crash — FIXED (soh3d `20d81c2`).** On shutdown `Config::Save()` opened
