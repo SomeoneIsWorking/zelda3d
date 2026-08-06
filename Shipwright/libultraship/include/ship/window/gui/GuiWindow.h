@@ -1,5 +1,7 @@
 #pragma once
 
+#include "ship/utils/Color4f.h"
+
 #include <string>
 #include <imgui.h>
 #include <imgui_internal.h>
@@ -43,7 +45,7 @@ class GuiWindow : public GuiElement {
      * @param originalSize     Default size of the window on first open.
      * @param windowFlags      ImGui window flags (e.g. ImGuiWindowFlags_NoResize).
      */
-    GuiWindow(const std::string& consoleVariable, bool isVisible, const std::string& name, ImVec2 originalSize,
+    GuiWindow(const std::string& consoleVariable, bool isVisible, const std::string& name, Ship::Size2f originalSize,
               uint32_t windowFlags);
 
     /**
@@ -53,7 +55,7 @@ class GuiWindow : public GuiElement {
      * @param name            Window title.
      * @param originalSize    Default window size.
      */
-    GuiWindow(const std::string& consoleVariable, bool isVisible, const std::string& name, ImVec2 originalSize);
+    GuiWindow(const std::string& consoleVariable, bool isVisible, const std::string& name, Ship::Size2f originalSize);
 
     /**
      * @brief Minimal constructor using default size and flags.
@@ -70,7 +72,7 @@ class GuiWindow : public GuiElement {
      * @param originalSize    Default window size.
      * @param windowFlags     ImGui window flags.
      */
-    GuiWindow(const std::string& consoleVariable, const std::string& name, ImVec2 originalSize, uint32_t windowFlags);
+    GuiWindow(const std::string& consoleVariable, const std::string& name, Ship::Size2f originalSize, uint32_t windowFlags);
 
     /**
      * @brief Constructor deriving visibility from CVar, with default flags.
@@ -78,7 +80,7 @@ class GuiWindow : public GuiElement {
      * @param name            Window title.
      * @param originalSize    Default window size.
      */
-    GuiWindow(const std::string& consoleVariable, const std::string& name, ImVec2 originalSize);
+    GuiWindow(const std::string& consoleVariable, const std::string& name, Ship::Size2f originalSize);
 
     /**
      * @brief Minimal constructor deriving visibility from CVar.
@@ -124,7 +126,7 @@ class GuiWindow : public GuiElement {
     std::string mName;
     std::string mVisibilityConsoleVariable;
     ImVector<ImRect> mGroupPanelLabelStack;
-    ImVec2 mOriginalSize;
+    Ship::Size2f mOriginalSize;
     uint32_t mWindowFlags;
 };
 } // namespace Ship

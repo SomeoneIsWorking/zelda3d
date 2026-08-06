@@ -43,7 +43,7 @@ Gui::Gui(std::vector<std::shared_ptr<GuiWindow>> guiWindows) : mNeedsConsoleVari
     }
 
     if (GetGuiWindow("Console") == nullptr) {
-        AddGuiWindow(std::make_shared<ConsoleWindow>(CVAR_CONSOLE_WINDOW_OPEN, "Console", ImVec2(520, 600),
+        AddGuiWindow(std::make_shared<ConsoleWindow>(CVAR_CONSOLE_WINDOW_OPEN, "Console", Ship::Size2f(520, 600),
                                                      ImGuiWindowFlags_NoFocusOnAppearing));
     }
 }

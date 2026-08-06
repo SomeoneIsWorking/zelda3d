@@ -109,46 +109,46 @@ void SetupGuiElements() {
     }
 
     mHookDebuggerWindow =
-        std::make_shared<HookDebuggerWindow>("gWindows.HookDebugger", "Hook Debugger", ImVec2(480, 600));
+        std::make_shared<HookDebuggerWindow>("gWindows.HookDebugger", "Hook Debugger", Ship::Size2f(480, 600));
     gui->AddGuiWindow(mHookDebuggerWindow);
 
-    mSaveEditorWindow = std::make_shared<SaveEditorWindow>("gWindows.SaveEditor", "Save Editor", ImVec2(480, 600));
+    mSaveEditorWindow = std::make_shared<SaveEditorWindow>("gWindows.SaveEditor", "Save Editor", Ship::Size2f(480, 600));
     gui->AddGuiWindow(mSaveEditorWindow);
 
-    mHudEditorWindow = std::make_shared<HudEditorWindow>("gWindows.HudEditor", "HUD Editor", ImVec2(480, 600));
+    mHudEditorWindow = std::make_shared<HudEditorWindow>("gWindows.HudEditor", "HUD Editor", Ship::Size2f(480, 600));
     gui->AddGuiWindow(mHudEditorWindow);
 
     mCosmeticEditorWindow =
-        std::make_shared<CosmeticEditorWindow>("gWindows.CosmeticEditor", "Cosmetic Editor", ImVec2(480, 600));
+        std::make_shared<CosmeticEditorWindow>("gWindows.CosmeticEditor", "Cosmetic Editor", Ship::Size2f(480, 600));
     gui->AddGuiWindow(mCosmeticEditorWindow);
 
-    mActorViewerWindow = std::make_shared<ActorViewerWindow>("gWindows.ActorViewer", "Actor Viewer", ImVec2(520, 600));
+    mActorViewerWindow = std::make_shared<ActorViewerWindow>("gWindows.ActorViewer", "Actor Viewer", Ship::Size2f(520, 600));
     gui->AddGuiWindow(mActorViewerWindow);
 
     mCollisionViewerWindow =
-        std::make_shared<CollisionViewerWindow>("gWindows.CollisionViewer", "Collision Viewer", ImVec2(390, 475));
+        std::make_shared<CollisionViewerWindow>("gWindows.CollisionViewer", "Collision Viewer", Ship::Size2f(390, 475));
     gui->AddGuiWindow(mCollisionViewerWindow);
 
-    mEventLogWindow = std::make_shared<EventLogWindow>("gWindows.EventLog", "Event Log", ImVec2(520, 600));
+    mEventLogWindow = std::make_shared<EventLogWindow>("gWindows.EventLog", "Event Log", Ship::Size2f(520, 600));
     gui->AddGuiWindow(mEventLogWindow);
 
-    mDLViewerWindow = std::make_shared<DLViewerWindow>("gWindows.DLViewer", "DL Viewer", ImVec2(520, 600));
+    mDLViewerWindow = std::make_shared<DLViewerWindow>("gWindows.DLViewer", "DL Viewer", Ship::Size2f(520, 600));
     gui->AddGuiWindow(mDLViewerWindow);
     mMessageViewerWindow =
-        std::make_shared<MessageViewerWindow>("gWindows.MessageViewer", "Message Viewer", ImVec2(520, 600));
+        std::make_shared<MessageViewerWindow>("gWindows.MessageViewer", "Message Viewer", Ship::Size2f(520, 600));
     gui->AddGuiWindow(mMessageViewerWindow);
 
-    mAudioEditorWindow = std::make_shared<AudioEditor>("gWindows.AudioEditor", "Audio Editor", ImVec2(520, 600));
+    mAudioEditorWindow = std::make_shared<AudioEditor>("gWindows.AudioEditor", "Audio Editor", Ship::Size2f(520, 600));
     gui->AddGuiWindow(mAudioEditorWindow);
 
-    mModMenuWindow = std::make_shared<ModMenuWindow>("gWindows.ModMenu", "Mod Menu", ImVec2(820, 630));
+    mModMenuWindow = std::make_shared<ModMenuWindow>("gWindows.ModMenu", "Mod Menu", Ship::Size2f(820, 630));
     gui->AddGuiWindow(mModMenuWindow);
 
     mItemTrackerWindow = std::make_shared<ItemTrackerWindow>("gWindows.ItemTracker", "Item Tracker");
     gui->AddGuiWindow(mItemTrackerWindow);
 
     mItemTrackerSettingsWindow = std::make_shared<ItemTrackerSettingsWindow>("gWindows.ItemTrackerSettings",
-                                                                             "Item Tracker Settings", ImVec2(800, 400));
+                                                                             "Item Tracker Settings", Ship::Size2f(800, 400));
     gui->AddGuiWindow(mItemTrackerSettingsWindow);
 
     mDisplayOverlayWindow = std::make_shared<DisplayOverlayWindow>("gWindows.DisplayOverlay", "Display Overlay");
@@ -158,7 +158,7 @@ void SetupGuiElements() {
     gui->AddGuiWindow(mTimesplitsWindow);
 
     mTimesplitsSettingsWindow = std::make_shared<TimesplitsSettingsWindow>(
-        "gWindows.Timesplits.Settings", "Time Splits Settings Window", ImVec2(567, 97));
+        "gWindows.Timesplits.Settings", "Time Splits Settings Window", Ship::Size2f(567, 97));
     gui->AddGuiWindow(mTimesplitsSettingsWindow);
 
     mNotificationWindow = std::make_shared<Notification::Window>("gWindows.Notifications", "Notifications Window");
@@ -166,7 +166,7 @@ void SetupGuiElements() {
     mNotificationWindow->Show();
 
     mRandoCheckTrackerWindow = std::make_shared<Rando::CheckTracker::CheckTrackerWindow>(
-        "gWindows.CheckTracker", "Check Tracker", ImVec2(375, 460));
+        "gWindows.CheckTracker", "Check Tracker", Ship::Size2f(375, 460));
     gui->AddGuiWindow(mRandoCheckTrackerWindow);
 
     mRandoCheckTrackerSettingsWindow = std::make_shared<Rando::CheckTracker::SettingsWindow>(
