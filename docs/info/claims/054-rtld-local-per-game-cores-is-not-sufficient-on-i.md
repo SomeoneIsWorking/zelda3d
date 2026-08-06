@@ -6,7 +6,7 @@ created: 2026-08-05
 tags: 
 reconfirmed: 2026-08-05
 verified_at: 2026-08-05
-depends: Shipwright/libultraship/src/CMakeLists.txt, Shipwright/CMakeLists.txt
+depends: Shipwright/libultraship/src/CMakeLists.txt, CMakeLists.txt
 ---
 
 ## Claim

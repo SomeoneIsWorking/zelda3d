@@ -98,10 +98,27 @@ include(CMake/GlobalSettingsInclude.cmake OPTIONAL)
 set_property(GLOBAL PROPERTY USE_FOLDERS ON)
 
 ################################################################################
+# Where this game and the engine live.
+#
+# The root CMakeLists (../../CMakeLists.txt) sets these; the fallbacks are for configuring this
+# game standalone. Everything below refers to them rather than to ${CMAKE_SOURCE_DIR}, which used
+# to mean "Shipwright/" only because OoT's own directory was the configure root.
+################################################################################
+if (NOT DEFINED ZELDA3D_OOT_DIR)
+    set(ZELDA3D_OOT_DIR "${CMAKE_CURRENT_SOURCE_DIR}")
+endif()
+if (NOT DEFINED ZELDA3D_ENGINE_DIR)
+    set(ZELDA3D_ENGINE_DIR "${CMAKE_CURRENT_SOURCE_DIR}/../libultraship")
+endif()
+if (NOT DEFINED ZELDA3D_ENGINE_ASSETS_DIR)
+    set(ZELDA3D_ENGINE_ASSETS_DIR "${ZELDA3D_ENGINE_DIR}/assets")
+endif()
+
+################################################################################
 # Sub-projects
 ################################################################################
 if (NOT TARGET libultraship)
-    add_subdirectory(${CMAKE_CURRENT_SOURCE_DIR}/../libultraship ${CMAKE_BINARY_DIR}/libultraship)
+    add_subdirectory(${ZELDA3D_ENGINE_DIR} ${CMAKE_BINARY_DIR}/libultraship)
 endif()
 
 if (NOT TARGET ZAPDLib)
@@ -624,9 +641,9 @@ if (CMAKE_GENERATOR MATCHES "Visual Studio")
     add_custom_command(
     TARGET ${PROJECT_NAME}
     POST_BUILD
-    COMMAND ${CMAKE_COMMAND} -E copy_directory_if_different ${CMAKE_SOURCE_DIR}/soh/assets/extractor ${CMAKE_BINARY_DIR}/soh/assets
-    COMMAND ${CMAKE_COMMAND} -E copy_directory_if_different ${CMAKE_SOURCE_DIR}/soh/assets/xml ${CMAKE_BINARY_DIR}/soh/assets/xml
-    COMMAND ${CMAKE_COMMAND} -E copy_directory_if_different ${CMAKE_SOURCE_DIR}/libultraship/assets/rml ${CMAKE_BINARY_DIR}/soh/assets/rml
+    COMMAND ${CMAKE_COMMAND} -E copy_directory_if_different ${ZELDA3D_OOT_DIR}/assets/extractor ${CMAKE_BINARY_DIR}/soh/assets
+    COMMAND ${CMAKE_COMMAND} -E copy_directory_if_different ${ZELDA3D_OOT_DIR}/assets/xml ${CMAKE_BINARY_DIR}/soh/assets/xml
+    COMMAND ${CMAKE_COMMAND} -E copy_directory_if_different ${ZELDA3D_ENGINE_ASSETS_DIR}/rml ${CMAKE_BINARY_DIR}/soh/assets/rml
     )
 endif()
 if(NOT CMAKE_SYSTEM_NAME MATCHES "NintendoSwitch|CafeOS")
@@ -634,12 +651,12 @@ if(NOT CMAKE_SYSTEM_NAME MATCHES "NintendoSwitch|CafeOS")
         TARGET ${PROJECT_NAME}
         POST_BUILD
         COMMENT "Copying asset xmls..."
-        COMMAND ${CMAKE_COMMAND} -E copy_directory_if_different ${CMAKE_SOURCE_DIR}/soh/assets/extractor $<TARGET_FILE_DIR:soh>/assets
-        COMMAND ${CMAKE_COMMAND} -E copy_directory_if_different ${CMAKE_SOURCE_DIR}/soh/assets/xml $<TARGET_FILE_DIR:soh>/assets/xml
+        COMMAND ${CMAKE_COMMAND} -E copy_directory_if_different ${ZELDA3D_OOT_DIR}/assets/extractor $<TARGET_FILE_DIR:soh>/assets
+        COMMAND ${CMAKE_COMMAND} -E copy_directory_if_different ${ZELDA3D_OOT_DIR}/assets/xml $<TARGET_FILE_DIR:soh>/assets/xml
         COMMAND ${CMAKE_COMMAND} -E make_directory $<TARGET_FILE_DIR:soh>/assets/symbols
         # RmlUi menu assets (.rml/.rcss/font) live alongside the executable, loaded at runtime
         # via Context::GetPathRelativeToAppBundle("assets/rml/...").
-        COMMAND ${CMAKE_COMMAND} -E copy_directory_if_different ${CMAKE_SOURCE_DIR}/libultraship/assets/rml $<TARGET_FILE_DIR:soh>/assets/rml
+        COMMAND ${CMAKE_COMMAND} -E copy_directory_if_different ${ZELDA3D_ENGINE_ASSETS_DIR}/rml $<TARGET_FILE_DIR:soh>/assets/rml
     #    COMMAND ${VS_COPY_ASSETS_CMD}
     )
 endif()
@@ -652,12 +669,12 @@ endif()
 #
 # So make the deployed copy a real build output that DEPENDS on the sources: touching any asset in
 # libultraship/assets/rml re-runs the copy on the next build, with no relink needed.
-file(GLOB_RECURSE ZELDA3D_RML_ASSETS CONFIGURE_DEPENDS ${CMAKE_SOURCE_DIR}/libultraship/assets/rml/*)
+file(GLOB_RECURSE ZELDA3D_RML_ASSETS CONFIGURE_DEPENDS ${ZELDA3D_ENGINE_ASSETS_DIR}/rml/*)
 add_custom_command(
     OUTPUT ${CMAKE_BINARY_DIR}/soh/assets/rml/.stamp
     COMMENT "Deploying RmlUi assets (menu + launcher)..."
     COMMAND ${CMAKE_COMMAND} -E copy_directory_if_different
-            ${CMAKE_SOURCE_DIR}/libultraship/assets/rml ${CMAKE_BINARY_DIR}/soh/assets/rml
+            ${ZELDA3D_ENGINE_ASSETS_DIR}/rml ${CMAKE_BINARY_DIR}/soh/assets/rml
     COMMAND ${CMAKE_COMMAND} -E touch ${CMAKE_BINARY_DIR}/soh/assets/rml/.stamp
     DEPENDS ${ZELDA3D_RML_ASSETS}
     VERBATIM

@@ -26,11 +26,26 @@ set(BUILD_SHARED_LIBS OFF CACHE STRING "install/link shared instead of static li
 include(FetchContent)
 
 ################################################################################
+# Where the engine lives.
+#
+# The root CMakeLists (../CMakeLists.txt) sets these; the fallbacks are for configuring this game
+# standalone. They exist because MM used to locate the engine's assets as
+# "${CMAKE_SOURCE_DIR}/libultraship/assets" — which only resolved while OoT's directory happened to
+# be the configure root, i.e. MM silently depended on being built as OoT's guest.
+################################################################################
+if (NOT DEFINED ZELDA3D_ENGINE_DIR)
+    set(ZELDA3D_ENGINE_DIR "${CMAKE_CURRENT_SOURCE_DIR}/../Shipwright/libultraship")
+endif()
+if (NOT DEFINED ZELDA3D_ENGINE_ASSETS_DIR)
+    set(ZELDA3D_ENGINE_ASSETS_DIR "${ZELDA3D_ENGINE_DIR}/assets")
+endif()
+
+################################################################################
 # Shared sub-projects. The root CMakeLists already add_subdirectory'd these, so
 # the NOT TARGET guards make this a no-op — mm links the same static libs as soh.
 ################################################################################
 if (NOT TARGET libultraship)
-    add_subdirectory(${CMAKE_CURRENT_SOURCE_DIR}/../Shipwright/libultraship ${CMAKE_BINARY_DIR}/libultraship)
+    add_subdirectory(${ZELDA3D_ENGINE_DIR} ${CMAKE_BINARY_DIR}/libultraship)
 endif()
 if (NOT TARGET ZAPDLib)
     add_subdirectory(${CMAKE_CURRENT_SOURCE_DIR}/../Shipwright/ZAPDTR/ZAPD ${CMAKE_BINARY_DIR}/ZAPD)
@@ -292,5 +307,5 @@ add_custom_command(
     COMMAND ${CMAKE_COMMAND} -E copy_directory_if_different ${CMAKE_CURRENT_SOURCE_DIR}/assets/extractor $<TARGET_FILE_DIR:${PROJECT_NAME}>/assets
     COMMAND ${CMAKE_COMMAND} -E copy_directory_if_different ${CMAKE_CURRENT_SOURCE_DIR}/assets/xml $<TARGET_FILE_DIR:${PROJECT_NAME}>/assets/xml
     COMMAND ${CMAKE_COMMAND} -E make_directory $<TARGET_FILE_DIR:${PROJECT_NAME}>/assets/symbols
-    COMMAND ${CMAKE_COMMAND} -E copy_directory_if_different ${CMAKE_SOURCE_DIR}/libultraship/assets/rml $<TARGET_FILE_DIR:${PROJECT_NAME}>/assets/rml
+    COMMAND ${CMAKE_COMMAND} -E copy_directory_if_different ${ZELDA3D_ENGINE_ASSETS_DIR}/rml $<TARGET_FILE_DIR:${PROJECT_NAME}>/assets/rml
 )

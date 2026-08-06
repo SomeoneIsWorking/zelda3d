@@ -35,10 +35,10 @@ NPROC="$(nproc 2>/dev/null || sysctl -n hw.ncpu 2>/dev/null || echo 4)"
 # to its pin. Reports each decision; never hard-resets, so local engine work is preserved.
 # The engine sources are vendored in-tree (see above) — just verify they're present.
 ensure_sources() {
-    if [ -f "$REPO/Shipwright/CMakeLists.txt" ] && [ -f "$REPO/Shipwright/libultraship/CMakeLists.txt" ]; then
+    if [ -f "$REPO/CMakeLists.txt" ] && [ -f "$REPO/Shipwright/libultraship/CMakeLists.txt" ]; then
         return 0
     fi
-    echo "error: vendored engine sources missing under $REPO/Shipwright — is the checkout complete?" >&2
+    echo "error: engine sources or the root CMakeLists are missing — is the checkout complete?" >&2
     exit 1
 }
 
@@ -58,7 +58,7 @@ ensure_built() {
         else
             echo "configuring build dir (first run)…" >&2
         fi
-        cmake -S "$REPO/Shipwright" -B "$BUILD" -G Ninja -DCMAKE_BUILD_TYPE=Release >&2 || {
+        cmake -S "$REPO" -B "$BUILD" -G Ninja -DCMAKE_BUILD_TYPE=Release >&2 || {
             echo "error: cmake configure failed" >&2; exit 1; }
     fi
     echo "building '$target' (this can take a while the first time)…" >&2
