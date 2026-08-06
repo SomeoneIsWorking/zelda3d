@@ -312,7 +312,10 @@ ImVec4 plandomizerGetItemColor(Rando::Item randoItem) {
         uint32_t questID = Rando::Logic::RandoGetToQuestItem[randoItem.GetRandomizerGet()];
         textureID = std::dynamic_pointer_cast<Fast::Fast3dGui>(Ship::Context::GetRawInstance()->GetWindow()->GetGui())
                         ->GetTextureByName(songMapping.at((QuestItem)questID).name);
-        itemColor = songMapping.at((QuestItem)questID).color;
+        // SongMapEntry::color is the engine's Ship::Color4f now; itemColor stays ImVec4 because
+        // everything downstream of it here is ImGui draw code that goes when this file goes.
+        const Ship::Color4f& songColor = songMapping.at((QuestItem)questID).color;
+        itemColor = ImVec4(songColor.r, songColor.g, songColor.b, songColor.a);
         imageSize = ImVec2(24.0f, 32.0f);
         imagePadding = 6.0f;
         return itemColor;
@@ -1187,25 +1190,25 @@ void PlandomizerWindow::DrawElement() {
 
 void PlandomizerWindow::InitElement() {
     std::dynamic_pointer_cast<Fast::Fast3dGui>(Ship::Context::GetRawInstance()->GetWindow()->GetGui())
-        ->LoadGuiTexture("ITEM_RUPEE_GRAYSCALE", gRupeeCounterIconTex, ImVec4(1, 1, 1, 1));
+        ->LoadGuiTexture("ITEM_RUPEE_GRAYSCALE", gRupeeCounterIconTex, Ship::Color4f(1, 1, 1, 1));
     std::dynamic_pointer_cast<Fast::Fast3dGui>(Ship::Context::GetRawInstance()->GetWindow()->GetGui())
-        ->LoadGuiTexture("ITEM_HEART_GRAYSCALE", gHeartFullTex, ImVec4(0.87f, 0.10f, 0.10f, 1));
+        ->LoadGuiTexture("ITEM_HEART_GRAYSCALE", gHeartFullTex, Ship::Color4f(0.87f, 0.10f, 0.10f, 1));
     std::dynamic_pointer_cast<Fast::Fast3dGui>(Ship::Context::GetRawInstance()->GetWindow()->GetGui())
-        ->LoadGuiTexture("ITEM_SEEDS", gItemIconDekuSeedsTex, ImVec4(1, 1, 1, 1));
+        ->LoadGuiTexture("ITEM_SEEDS", gItemIconDekuSeedsTex, Ship::Color4f(1, 1, 1, 1));
     std::dynamic_pointer_cast<Fast::Fast3dGui>(Ship::Context::GetRawInstance()->GetWindow()->GetGui())
-        ->LoadGuiTexture("ITEM_ARROWS_SMALL", gDropArrows1Tex, ImVec4(1, 1, 1, 1));
+        ->LoadGuiTexture("ITEM_ARROWS_SMALL", gDropArrows1Tex, Ship::Color4f(1, 1, 1, 1));
     std::dynamic_pointer_cast<Fast::Fast3dGui>(Ship::Context::GetRawInstance()->GetWindow()->GetGui())
-        ->LoadGuiTexture("ITEM_ARROWS_MEDIUM", gDropArrows2Tex, ImVec4(1, 1, 1, 1));
+        ->LoadGuiTexture("ITEM_ARROWS_MEDIUM", gDropArrows2Tex, Ship::Color4f(1, 1, 1, 1));
     std::dynamic_pointer_cast<Fast::Fast3dGui>(Ship::Context::GetRawInstance()->GetWindow()->GetGui())
-        ->LoadGuiTexture("ITEM_ARROWS_LARGE", gDropArrows3Tex, ImVec4(1, 1, 1, 1));
+        ->LoadGuiTexture("ITEM_ARROWS_LARGE", gDropArrows3Tex, Ship::Color4f(1, 1, 1, 1));
     std::dynamic_pointer_cast<Fast::Fast3dGui>(Ship::Context::GetRawInstance()->GetWindow()->GetGui())
-        ->LoadGuiTexture("ITEM_ICE_TRAP", gMagicArrowEquipEffectTex, ImVec4(1, 1, 1, 1));
+        ->LoadGuiTexture("ITEM_ICE_TRAP", gMagicArrowEquipEffectTex, Ship::Color4f(1, 1, 1, 1));
     std::dynamic_pointer_cast<Fast::Fast3dGui>(Ship::Context::GetRawInstance()->GetWindow()->GetGui())
-        ->LoadGuiTexture("HASH_ARROW_UP", gEmptyCDownArrowTex, ImVec4(1, 1, 1, 1));
+        ->LoadGuiTexture("HASH_ARROW_UP", gEmptyCDownArrowTex, Ship::Color4f(1, 1, 1, 1));
     std::dynamic_pointer_cast<Fast::Fast3dGui>(Ship::Context::GetRawInstance()->GetWindow()->GetGui())
-        ->LoadGuiTexture("HASH_ARROW_DWN", gEmptyCDownArrowTex, ImVec4(1, 1, 1, 1));
+        ->LoadGuiTexture("HASH_ARROW_DWN", gEmptyCDownArrowTex, Ship::Color4f(1, 1, 1, 1));
     std::dynamic_pointer_cast<Fast::Fast3dGui>(Ship::Context::GetRawInstance()->GetWindow()->GetGui())
-        ->LoadGuiTexture("BOSS_SOUL", gBossSoulTex, ImVec4(1, 1, 1, 1));
+        ->LoadGuiTexture("BOSS_SOUL", gBossSoulTex, Ship::Color4f(1, 1, 1, 1));
     std::dynamic_pointer_cast<Fast::Fast3dGui>(Ship::Context::GetRawInstance()->GetWindow()->GetGui())
-        ->LoadGuiTexture("TRIFORCE_PIECE", gTriforcePieceTex, ImVec4(1, 1, 1, 1));
+        ->LoadGuiTexture("TRIFORCE_PIECE", gTriforcePieceTex, Ship::Color4f(1, 1, 1, 1));
 }

@@ -354,21 +354,21 @@ void LoadGuiTextures() {
     }
     for (const TexturePtr entry : gItemIcons) {
         auto path = static_cast<const char*>(entry);
-        gui->LoadGuiTexture(path, path, ImVec4(1, 1, 1, 1));
+        gui->LoadGuiTexture(path, path, Ship::Color4f(1, 1, 1, 1));
     }
     for (const TexturePtr entry : gQuestIcons) {
         auto path = static_cast<const char*>(entry);
-        gui->LoadGuiTexture(path, path, ImVec4(1, 1, 1, 1));
+        gui->LoadGuiTexture(path, path, Ship::Color4f(1, 1, 1, 1));
     }
     for (const TexturePtr entry : gBombersNotebookPhotos) {
         auto path = static_cast<const char*>(entry);
-        gui->LoadGuiTexture(path, path, ImVec4(1, 1, 1, 1));
+        gui->LoadGuiTexture(path, path, Ship::Color4f(1, 1, 1, 1));
     }
     for (const auto entry : miscellaneousTextures) {
-        gui->LoadGuiTexture(entry, entry, ImVec4(1, 1, 1, 1));
+        gui->LoadGuiTexture(entry, entry, Ship::Color4f(1, 1, 1, 1));
     }
     for (const auto entry : digitList) {
-        gui->LoadGuiTexture(entry, entry, ImVec4(1, 1, 1, 1));
+        gui->LoadGuiTexture(entry, entry, Ship::Color4f(1, 1, 1, 1));
     }
 }
 
