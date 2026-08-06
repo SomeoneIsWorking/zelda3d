@@ -251,7 +251,6 @@ class Gui {
     void CheckSaveCvars();
 
     /** @brief Updates mouse capture state based on window focus and UI interaction. */
-    void HandleMouseCapture();
 
     ImVec2 mTemporaryWindowPos; ///< Scratchpad position used when repositioning windows.
     ImGuiIO* mImGuiIo;          ///< Pointer to the active ImGuiIO context.

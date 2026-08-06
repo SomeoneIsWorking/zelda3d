@@ -167,13 +167,14 @@ bool ControlDeck::KeyboardGameInputBlocked() {
 }
 
 bool ControlDeck::MouseGameInputBlocked() {
-    // block mouse input when user interacting with gui
-    ImGuiWindow* window = ImGui::GetCurrentContext()->HoveredWindow;
-    if (window == NULL) {
-        return true;
-    }
-    return AllGameInputBlocked() ||
-           (window->ID != Context::GetRawInstance()->GetWindow()->GetGui()->GetMainGameWindowID());
+    // Same treatment the keyboard path above already got, and for the same reason -- plus this one
+    // was an outright BUG. `ImGui::GetCurrentContext()` returns the shim's zeroed storage (never
+    // null, by design), so HoveredWindow was always NULL and this returned true unconditionally:
+    // mouse game input has been blocked in every frame since ImGui was removed.
+    //
+    // AllGameInputBlocked() is the correct and sufficient gate; SohRmlUi::SetVisible() registers and
+    // clears ZELDA3D_RML_MENU_BLOCK_ID exactly while the menu is open.
+    return AllGameInputBlocked();
 }
 
 std::shared_ptr<Controller> ControlDeck::GetControllerByPort(uint8_t port) {

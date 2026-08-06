@@ -153,20 +153,6 @@ void Gui::DrawMenu() {
     // registered GuiWindows are inert scaffolding (see AddGuiWindow). Nothing to do here.
 }
 
-void Gui::HandleMouseCapture() {
-    ImGuiWindowFlags flags = ImGuiWindowFlags_NoMouseInputs;
-    for (auto windowIter : ImGui::GetCurrentContext()->WindowsById.Data) {
-        if (windowIter.key != GetMainGameWindowID() && windowIter.key != GetGameOverlay()->GetID()) {
-            ImGuiWindow* window = (ImGuiWindow*)windowIter.val_p;
-            if (Context::GetRawInstance()->GetWindow()->IsMouseCaptured()) {
-                window->Flags |= flags;
-            } else {
-                window->Flags &= ~(flags);
-            }
-        }
-    }
-}
-
 void Gui::StartFrame() {
     // ImGui removed: no NewFrame / backend new-frame. Frame compositing is the interpreter's native
     // path; the menu is RmlUi (rendered in EndFrame).
