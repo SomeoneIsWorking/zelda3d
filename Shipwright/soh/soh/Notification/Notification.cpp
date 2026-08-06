@@ -5,8 +5,6 @@
 
 #include <fast/Fast3dGui.h>
 
-#include <fast/Fast3dGui.h>
-
 extern "C" {
 #include "functions.h"
 #include "macros.h"
