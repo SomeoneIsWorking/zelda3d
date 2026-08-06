@@ -4,7 +4,8 @@
 #include <memory>
 
 #include "ship/debug/Console.h"
-#include <imgui.h>
+#include "ship/utils/Color4f.h"
+#include "ship/window/gui/resource/Font.h"
 #include <unordered_map>
 #include "ship/resource/ResourceManager.h"
 
@@ -30,7 +31,9 @@ struct Overlay {
 /**
  * @brief Renders on-screen timed notification messages.
  *
- * GameOverlay draws directly into the "game" ImGui viewport using a custom font
+ * GameOverlay HOLDS on-screen text and timed notifications. It no longer draws them: the Dear
+ * ImGui rendering was removed with ImGui itself, so the queue is maintained and aged but nothing
+ * puts it on screen until a renderer (RmlUi or the native Zelda3D HUD path) reads it
  * loaded from the archive. It is owned by Gui and is accessible via
  * Gui::GetGameOverlay().
  *
@@ -38,6 +41,8 @@ struct Overlay {
  * drawn at an arbitrary screen position with TextDraw(), or posted as a timed
  * notification with TextDrawNotification().
  */
+using Color4f = Ship::Color4f;
+
 class GameOverlay {
   public:
     GameOverlay();
@@ -71,25 +76,8 @@ class GameOverlay {
     /** @brief Renders all active overlays for the current frame. Called by Gui::DrawGame(). */
     void Draw();
 
-    /** @brief Renders the overlay settings panel (font selector, position, etc.) in ImGui. */
-    void DrawSettings();
 
-    /**
-     * @brief Returns the pixel width of @p text using the currently selected font.
-     * @param text Null-terminated string to measure.
-     */
-    float GetStringWidth(const char* text);
 
-    /**
-     * @brief Calculates the bounding box of the given text.
-     * @param text        Text to measure.
-     * @param textEnd     Optional end pointer (nullptr = measure until null terminator).
-     * @param shortenText If true, the text may be clipped to @p wrapWidth.
-     * @param wrapWidth   Maximum width before wrapping (-1 = no wrap).
-     * @return Bounding size in pixels.
-     */
-    ImVec2 CalculateTextSize(const char* text, const char* textEnd = NULL, bool shortenText = false,
-                             float wrapWidth = -1.0f);
 
     /**
      * @brief Draws @p text at the given screen position, optionally with a drop shadow.
@@ -99,7 +87,7 @@ class GameOverlay {
      * @param color  RGBA colour of the text.
      * @param text   printf-style format string.
      */
-    void TextDraw(float x, float y, bool shadow, ImVec4 color, const char* text, ...);
+    void TextDraw(float x, float y, bool shadow, Color4f color, const char* text, ...);
 
     /**
      * @brief Posts a timed notification message that fades out automatically.
@@ -109,24 +97,14 @@ class GameOverlay {
      */
     void TextDrawNotification(float duration, bool shadow, const char* fmt, ...);
 
-    /** @brief Immediately removes all active notification overlays. */
-    void ClearNotifications();
 
-    /**
-     * @brief Returns the ImGui ID of the overlay's invisible host window.
-     *
-     * Useful for docking or focus management.
-     */
-    ImGuiID GetID();
 
   protected:
-    /** @brief Returns the current game viewport width in pixels. */
-    float GetScreenWidth();
-    /** @brief Returns the current game viewport height in pixels. */
-    float GetScreenHeight();
 
   private:
-    std::unordered_map<std::string, ImFont*> mFonts;
+    // Was std::unordered_map<std::string, ImFont*>. Nothing renders, so an ImGui font handle
+    // carried no information; the loaded Font RESOURCE does, and is what a real renderer needs.
+    std::unordered_map<std::string, std::shared_ptr<Font>> mFonts;
     std::unordered_map<std::string, Overlay> mRegisteredOverlays;
     std::string mCurrentFont = "Default";
     bool mNeedsCleanup = false;
