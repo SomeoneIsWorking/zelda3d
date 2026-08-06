@@ -72,6 +72,20 @@ directory being the build root. Paths are now named (`ZELDA3D_ENGINE_DIR`, `ZELD
 has to know which directory the build was configured from. Each game also carries a fallback for
 those variables so it still configures standalone.
 
+### Still structurally wrong: the game chooser lives inside one of the games
+
+`Shipwright/zelda3d_app/zelda3d_main.cpp` holds no game code — but the **RmlUi chooser it should be
+presenting still runs as an OoT gamestate inside the soh core** (`soh/src/zelda3d/launcher/`). So
+picking a game requires OoT to have booted first, which is the same "OoT is the host" inversion the
+build root had, one layer up. The launcher currently chooses from argv/env instead, which is what the
+headless tooling needs anyway.
+
+Moving it means owning a `Ship::Context` before any core is loaded and handing it over — the
+"Ship::Context ownership" half of N3 in `docs/MM_NATIVE.md`. Dusklight's model for exactly this is
+`launchUILoop()` (`src/m_Do/m_Do_main.cpp:158`): a second, simpler frame loop — events →
+`aurora_begin_frame` → `ui::update()` → `aurora_end_frame` — with **no game executing at all**, used
+for its prelaunch/disc-picker screen. That is the shape to copy.
+
 ### Sharing code between the two games — TWO mechanisms, and the choice is forced
 
 `zelda3d_shared/` offers two, because port code splits cleanly by whether it names a game type:
@@ -96,6 +110,24 @@ into its own source list.
 > MM** — the two games' microcode memory layouts — plus MM's `ROUND_DOWN_16` on the DMA length.
 > Merging on the strength of "99% identical" would have silently mis-addressed every audio buffer in
 > one of the two games. Read the diff before believing the percentage.
+
+### What is left to share — measured by SEAM, not by similarity
+
+Ranked by value over risk. Each row states the *actual* divergence, because ranking these by
+percentage-common put the two worst candidates at the top.
+
+| Candidate | Size | The real seam | Verdict |
+|---|---|---|---|
+| `framebuffer_effects.{c,h}` | 177 | two: the port-shell include (`OTRGlobals.h` / `BenPort.h`) and the identity-matrix symbol (`gMtxClear` / `gIdentityMtx`) | **ready** — but the first seam is really the port-shell split below; do them together |
+| Extractor (`Extract.cpp`, `FastCrc32C.c`) | ~800/side | 153 lines, **all** per-game ROM CRC tables and version names | **tractable refactor**: share the extraction logic, let each game supply a `RomVersionTable`. Gates a fresh install booting — verify by running a real extraction, not by compiling |
+| GUI framework (`UIWidgets`, `Menu`, `MenuTypes`, `Notification`) | ~3.9k/side | 76–90% common; the residue is per-game widget sets and CVar names | **largest genuine win left.** Do it widget-by-widget, not in one merge |
+| Port shell (`OTRGlobals.cpp` ↔ `BenPort.cpp`) | 2.8k / 2.4k | same class name, same `InitOTR`/`DeinitOTR` skeleton, different filename and per-game singletons | **structural, highest leverage.** Needs an interface split (shared lifecycle + per-game hooks), not a copy-merge |
+| `resource/` importers + types | 8.4k / 7.4k | 156 matching names, 28 identical `.cpp` — but only **3** also have an identical header (claim C066) | **poor target.** Tops the similarity ranking and is nearly all header-driven per-game divergence |
+| `mixer.c` | 822 | per-game audio DMEM base address (claim C065) | **do not share** until parameterised and both games' audio verified end to end |
+
+`Enhancements/` game logic is genuinely per-game (mostly <50% common) and should stay forked. So are
+`src/overlays/` and `src/code/` — two different decomps with **zero** byte-identical files despite
+618 shared basenames.
 
 ## Naming conventions (canonical human-facing name ↔ embedded code name)
 
