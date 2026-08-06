@@ -39,6 +39,26 @@ sequence in depth, but full-scene visual parity (lighting, water, skinned-actor 
 the MM player port are still open; see the per-subsystem table below for what's actually
 verified vs partial vs stub.
 
+## Build layering (configure root = the REPO ROOT)
+
+`cmake -S . -B Shipwright/build-cmake -G Ninja`. The root `CMakeLists.txt` is the project root and
+the two games are **peers** under it; see `docs/project-structure.md` for the full picture and for
+the two mechanisms available for sharing code between them.
+
+```
+launcher   Shipwright/zelda3d_app     zelda3d — dlopens a game core (RTLD_LOCAL), holds no game code
+games      Shipwright/soh (OoT)  ·  2ship (MM)          ← peers, neither hosts the other
+shared     Shipwright/zelda3d_shared  static lib (no game types)  +  port/ (shared source, built per game)
+engine     Shipwright/libultraship (libultraship.so, ONE copy)  ·  Shipwright/cmb3d
+```
+
+Before 2026-08-06 the configure root was `Shipwright/CMakeLists.txt` — OoT's own directory — which
+made MM a guest of OoT's build and let `2ship/CMakeLists.txt` reach the engine's assets through
+`${CMAKE_SOURCE_DIR}`. Paths are now named variables set by the root (`ZELDA3D_ENGINE_DIR`,
+`ZELDA3D_OOT_DIR`, `ZELDA3D_MM_DIR`, `ZELDA3D_ENGINE_ASSETS_DIR`, `ZELDA3D_SHARED_DIR`), each with a
+standalone-configure fallback in the game that uses it. ccache is wired in as the compiler launcher
+when present (`-DZELDA3D_CCACHE=OFF` to opt out).
+
 ## Source tree (top level, `tools/codemap.py tree`)
 
 ```

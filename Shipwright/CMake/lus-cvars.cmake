@@ -17,4 +17,6 @@ set(CVAR_GAME_OVERLAY_FONT "${CVAR_PREFIX_SETTING}.OverlayFont" CACHE STRING "")
 set(CVAR_MENU_BAR_OPEN "${CVAR_PREFIX_SETTING}.OpenMenuBar" CACHE STRING "")
 set(CVAR_PREFIX_CONTROLLERS "${CVAR_PREFIX_SETTING}.Controllers" CACHE STRING "")
 set(CVAR_PREFIX_ADVANCED_RESOLUTION "${CVAR_PREFIX_SETTING}.AdvancedResolution" CACHE STRING "")
-include("libultraship/cmake/cvars.cmake")
+# Absolute, via the engine path the root CMakeLists defines. This used to be the relative
+# "libultraship/cmake/cvars.cmake", which resolved only while the configure root was Shipwright/.
+include("${ZELDA3D_ENGINE_DIR}/cmake/cvars.cmake")

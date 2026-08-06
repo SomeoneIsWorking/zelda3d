@@ -42,6 +42,61 @@ zelda   (base: N64-asset PC ports)          zelda3d  (our layer: 3DS-asset rende
 Build targets: `soh` (→ `Shipwright/build-cmake/soh/soh.elf`) and `mm`
 (→ `Shipwright/build-cmake/mm/mm.elf`). Run via `tools/zelda3d_game.sh` (soh) / `tools/mm_game.sh` (mm).
 
+## The build layering — one runtime, one engine, two peer games
+
+The configure root is the **repo root** (`/CMakeLists.txt`). Configure with `cmake -S . -B
+Shipwright/build-cmake -G Ninja`.
+
+```
+launcher   Shipwright/zelda3d_app     one binary; dlopens a game core, holds no game code
+             │
+games      Shipwright/soh   (OoT)  ── peers. Neither hosts the other.
+           2ship            (MM)
+             │
+shared     Shipwright/zelda3d_shared  port code common to both games (two mechanisms — see below)
+             │
+engine     Shipwright/libultraship    window/renderer/input/resources — knows no game
+           Shipwright/cmb3d           3DS asset formats (CMB/CSAB/ZAR/ZSI/…)
+```
+
+This mirrors Dusklight's `aurora` (engine) / `borealis` (app services) / `dusk` (port layer) /
+decomp split — see `docs/dusklight-adoption.md`. The layer Dusklight has no need for is **shared**:
+it hosts one game, we host two.
+
+**Until 2026-08-06 the configure root was `Shipwright/CMakeLists.txt` — OoT's own directory** — and
+it reached out of its tree with `add_subdirectory(${CMAKE_SOURCE_DIR}/../2ship)`. That was not just
+untidy: because `CMAKE_SOURCE_DIR` *was* `Shipwright/`, `2ship/CMakeLists.txt` located the engine's
+RmlUi assets as `${CMAKE_SOURCE_DIR}/libultraship/assets/rml`, i.e. MM silently depended on OoT's
+directory being the build root. Paths are now named (`ZELDA3D_ENGINE_DIR`, `ZELDA3D_OOT_DIR`,
+`ZELDA3D_MM_DIR`, `ZELDA3D_ENGINE_ASSETS_DIR`, set in the root `CMakeLists.txt`), so no component
+has to know which directory the build was configured from. Each game also carries a fallback for
+those variables so it still configures standalone.
+
+### Sharing code between the two games — TWO mechanisms, and the choice is forced
+
+`zelda3d_shared/` offers two, because port code splits cleanly by whether it names a game type:
+
+| | **`zelda3d_shared` STATIC LIB** | **`zelda3d_shared/port/` SHARED SOURCE** |
+|---|---|---|
+| Contract | sees **no** game-specific type — everything crosses as plain enums/PODs | may include `z64.h`, `Actor`, `PlayState` … |
+| Compiled | **once**, linked by both games | **once per game**, into each game's own target |
+| Copies of the code | one binary, one source | two binaries, **one source** |
+| Use for | asset/format/policy code (`cmb3d`, Link mesh-mask, the extractor's I/O) | the N64↔PC port glue the decomp calls into |
+
+**Why the second mechanism has to exist.** `gu_pc.c` is *byte-identical* in both games — and it
+includes `"z64.h"`, which is OoT's 2,354-line decomp master header in one tree and MM's 108-line one
+in the other. Identical source, different compile context. A static library is compiled once against
+one include path, so it physically cannot hold that file; the only honest way to have one copy is
+one *source* file pulled into both targets. Each game's CMakeLists globs `${ZELDA3D_SHARED_DIR}/port/`
+into its own source list.
+
+> **A similarity percentage is text, not code — the same trap as a grep count.** `mixer.c` measures
+> ~99% common between the two games (21 differing lines in 822) and reads like pure copy-paste. It
+> is not shareable: among those 21 lines is the audio DMEM base address, **0x3C0 in OoT vs 0x0330 in
+> MM** — the two games' microcode memory layouts — plus MM's `ROUND_DOWN_16` on the DMA length.
+> Merging on the strength of "99% identical" would have silently mis-addressed every audio buffer in
+> one of the two games. Read the diff before believing the percentage.
+
 ## Naming conventions (canonical human-facing name ↔ embedded code name)
 
 The clean 6-term taxonomy is the human-facing vocabulary. Some of it is an **alias** over an embedded

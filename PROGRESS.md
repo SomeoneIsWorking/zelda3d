@@ -1388,7 +1388,7 @@ be culled). It already debunked the bogus "128x128 upload" bug (RESOLVED section
   pointers `<= 0x0FFFFFFF` (assumed unresolved N64 segment addrs); in a small standalone
   binary the static texture sits at ~6 MB and is falsely rejected, so the harness mmap's
   the texture to a HIGH address to mimic the in-game (PIE, high-addr) condition.
-- Build/run: `cmake -S Shipwright -B Shipwright/build-cmake -DLUS_BUILD_DLIST_HARNESS=ON`
+- Build/run: `cmake -S . -B Shipwright/build-cmake -DLUS_BUILD_DLIST_HARNESS=ON`
   then `cmake --build ... --target soh3d_dlist_harness`; run the resulting binary.
 
 ### TOOLING — dlist harness `--gl` mode: REAL rendered pixels (2026-06-15, session 6)
