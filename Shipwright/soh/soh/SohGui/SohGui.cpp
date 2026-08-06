@@ -59,7 +59,6 @@ std::string GetWindowButtonText(const char* text, bool menuOpen) {
 
 std::shared_ptr<Ship::GuiWindow> mConsoleWindow;
 std::shared_ptr<SohStatsWindow> mStatsWindow;
-std::shared_ptr<Ship::GuiWindow> mGfxDebuggerWindow;
 
 std::shared_ptr<SohMenu> mSohMenu;
 std::shared_ptr<ModMenuWindow> mModMenuWindow;
@@ -161,9 +160,6 @@ void SetupGuiElements() {
     mConsoleWindow = std::make_shared<SohConsoleWindow>(CVAR_WINDOW("SohConsole"), "Console##SoH", Ship::Size2f(820, 630));
     gui->AddGuiWindow(mConsoleWindow);
 
-    mGfxDebuggerWindow =
-        std::make_shared<SohGfxDebuggerWindow>(CVAR_WINDOW("SohGfxDebugger"), "GfxDebugger##SoH", Ship::Size2f(820, 630));
-    gui->AddGuiWindow(mGfxDebuggerWindow);
 
     mStatsWindow = std::make_shared<SohStatsWindow>(CVAR_WINDOW("SohStats"), "Stats##Soh", Ship::Size2f(400, 100));
     gui->AddGuiWindow(mStatsWindow);
@@ -265,7 +261,6 @@ void Destroy() {
     mAudioEditorWindow = nullptr;
     mStatsWindow = nullptr;
     mConsoleWindow = nullptr;
-    mGfxDebuggerWindow = nullptr;
     mInputViewer = nullptr;
     mInputViewerSettings = nullptr;
     mTimeSplitWindow = nullptr;

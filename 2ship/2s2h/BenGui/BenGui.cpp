@@ -40,8 +40,6 @@ namespace BenGui {
 
 
 std::shared_ptr<Ship::GuiWindow> mConsoleWindow;
-std::shared_ptr<Ship::GuiWindow> mStatsWindow;
-std::shared_ptr<Ship::GuiWindow> mGfxDebuggerWindow;
 
 std::shared_ptr<HookDebuggerWindow> mHookDebuggerWindow;
 std::shared_ptr<SaveEditorWindow> mSaveEditorWindow;
@@ -87,19 +85,9 @@ void SetupMenu() {
 void SetupGuiElements() {
     auto gui = Ship::Context::GetRawInstance()->GetWindow()->GetGui();
 
-    mStatsWindow = gui->GetGuiWindow("Stats");
-    if (mStatsWindow == nullptr) {
-        SPDLOG_ERROR("Could not find stats window");
-    }
-
     mConsoleWindow = gui->GetGuiWindow("Console");
     if (mConsoleWindow == nullptr) {
         SPDLOG_ERROR("Could not find console window");
-    }
-
-    mGfxDebuggerWindow = gui->GetGuiWindow("GfxDebuggerWindow");
-    if (mGfxDebuggerWindow == nullptr) {
-        SPDLOG_ERROR("Could not find input GfxDebuggerWindow");
     }
 
     mHookDebuggerWindow =
@@ -175,9 +163,7 @@ void Destroy() {
     gui->RemoveAllGuiWindows();
     mBenMenu = nullptr;
     mModalWindow = nullptr;
-    mStatsWindow = nullptr;
     mConsoleWindow = nullptr;
-    mGfxDebuggerWindow = nullptr;
     mCollisionViewerWindow = nullptr;
     mEventLogWindow = nullptr;
     mNotificationWindow = nullptr;

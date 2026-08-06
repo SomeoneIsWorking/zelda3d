@@ -19,7 +19,6 @@
 #include "soh/Enhancements/debugger/hookDebugger.h"
 #include "soh/Enhancements/debugger/dlViewer.h"
 #include "soh/Enhancements/debugger/SohConsoleWindow.h"
-#include "soh/Enhancements/debugger/SohGfxDebuggerWindow.h"
 #include "soh/Enhancements/debugger/SohStatsWindow.h"
 #include "soh/Enhancements/debugger/valueViewer.h"
 #include "soh/Enhancements/gameplaystatswindow.h"

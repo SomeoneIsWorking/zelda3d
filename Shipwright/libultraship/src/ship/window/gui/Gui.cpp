@@ -33,10 +33,6 @@ Gui::Gui(std::vector<std::shared_ptr<GuiWindow>> guiWindows) : mNeedsConsoleVari
     }
 
     // Add default windows if we don't already have one by the name
-    if (GetGuiWindow("Stats") == nullptr) {
-        AddGuiWindow(std::make_shared<StatsWindow>(CVAR_STATS_WINDOW_OPEN, "Stats"));
-    }
-
     if (GetGuiWindow("SDLAddRemoveDeviceEventHandler") == nullptr) {
         AddGuiWindow(std::make_shared<SDLAddRemoveDeviceEventHandler>("gOpenWindows.SDLAddRemoveDeviceEventHandler",
                                                                       "SDLAddRemoveDeviceEventHandler"));
@@ -197,6 +193,16 @@ void Gui::SaveConsoleVariablesNextFrame() {
 }
 
 void Gui::AddGuiWindow(std::shared_ptr<GuiWindow> guiWindow) {
+    if (guiWindow == nullptr) {
+        // Says which of the two it is, because a caller that forgot to construct the window and a
+        // caller that deliberately passes null are different mistakes. Previously this dereferenced
+        // straight through and gave a bare SIGSEGV in GuiWindow::GetName with no message -- which is
+        // exactly how a stale registration left behind by a deletion presents.
+        SPDLOG_ERROR("Gui::AddGuiWindow: refusing a null window -- the caller constructed nothing, "
+                     "or is registering a window whose class was removed.");
+        return;
+    }
+
     if (mGuiWindows.contains(guiWindow->GetName())) {
         SPDLOG_ERROR("Gui::AddGuiWindow: Attempting to add duplicate window name {}", guiWindow->GetName());
         return;
