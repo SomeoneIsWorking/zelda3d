@@ -118,7 +118,7 @@ percentage-common put the two worst candidates at the top.
 
 | Candidate | Size | The real seam | Verdict |
 |---|---|---|---|
-| GUI framework (`UIWidgets`, `Menu`, `MenuTypes`, `Notification`) | ~3.9k/side | the two games use **different CVar keys for the same setting** — `gSettings.Notifications.Position` vs `gNotifications.Position` (claim C068) | **gated on a config migration, not a refactor.** MM has no `cvar_prefixes.h` and uses raw literals; adopting the macros changes persisted keys and silently resets users' settings. Do the `ConfigVersionNUpdater` migration FIRST, then merge widget-by-widget |
+| GUI framework (`UIWidgets`, `Menu`, `MenuTypes`, `Notification`) | ~3.9k/side | the two games use **different CVar keys for the same setting** — `gSettings.Notifications.Position` vs `gNotifications.Position` (claim C068) | **still gated on a config migration, not a refactor**, but the groundwork is done: each game now OWNS its namespaces (C072), and MM has a `2s2h/cvar_prefixes.h`. Next is MM's `ConfigVersion2Updater`, then merge widget-by-widget. See below for the measured size |
 | Port shell (`OTRGlobals.cpp` ↔ `BenPort.cpp`) | 2.8k / 2.4k | the ABI half is **done** (`port/zelda3d_port_api.h`). The BODY's 28 textually-identical lines each name a per-game type — `class OTRGlobals` exists in both games with different members (claim C069) | **ABI done; body: do NOT extract.** Hooking it would cost ~7 function pointers to share a Christmas-date check and `srand` |
 | `resource/` importers + types | 8.4k / 7.4k | 156 matching names, 28 identical `.cpp` — but only **3** also have an identical header (claim C066) | **poor target.** Tops the similarity ranking and is nearly all header-driven per-game divergence |
 | `mixer.c` | 822 | per-game audio DMEM base address (claim C065) | **do not share** until parameterised and both games' audio verified end to end |
@@ -171,6 +171,42 @@ validation against its new table and reaches ZAPD exactly as it does at HEAD.
 `Enhancements/` game logic is genuinely per-game (mostly <50% common) and should stay forked. So are
 `src/overlays/` and `src/code/` — two different decomps with **zero** byte-identical files despite
 618 shared basenames.
+
+### The CVar migration that gates the GUI merge — sized against the BINARY, not a grep
+
+Each game now owns its CVar namespaces: OoT's `CVAR_PREFIX_*` are scoped to `soh_settings` instead of
+being `add_compile_definitions`'d at the build root, where they reached MM too and collided with its
+own (claim C072). MM's are in `2ship/2s2h/cvar_prefixes.h`. The engine's keys stay shared and global
+— `lus-cvars.cmake` builds `gSettings.VsyncEnabled` / `gOpenWindows.Console` from the same prefix
+variables, and both games do want those.
+
+What remains, in ascending cost:
+
+1. **Mechanical, no persisted-key change.** MM's `gEnhancements` / `gCheats` / `gDeveloperTools` /
+   `gAudioEditor` literals already equal OoT's strings, so swapping them for macros is a rename of
+   source text only. This is the bulk.
+2. **Real renames needing a `ConfigVersion2Updater`** (MM is on version 1; OoT is on 6 and did this
+   exact migration once with a ~1,400-row table in `soh/config/ConfigUpdaters.cpp` — that is the
+   template). Roughly 60–80 keys: `gWindows.*`→`gOpenWindows.*`, the audio volumes (`Audio.XVolume`
+   → `Volume.X`, with irregular stems and a units question), `gSettings.ItemTracker.*`→`gTrackers.*`,
+   the live bare globals, `gNotifications.*`, and MM's own `gCosmetic`/`gCosmetics` split. Each needs
+   a human decision that the two settings really are the same one.
+3. **Must NOT be merged.** `gRando.*` (two different randomizers), `gCollisionViewer.*`,
+   `gEventLog.*`, `gModes.*`, `gFixes.*` — MM-only, and unifying the namespace would corrupt both
+   games' configs.
+
+**Size it against `strings mm.elf`, not against a source grep** (claim C073). Five of the ten "bare
+globals needing migration" are dead code inside `BenPort.cpp`'s `#if 0` and never reach the binary —
+the whole `gLed*` family, plus `gA11yTTS` and `gCrowdControl` — as are the three
+`gCosmetics.Link_*Tunic.Value` literals, so the binary holds 3 `gCosmetics.*` strings where the
+source shows 6.
+
+Two known defects to fold in rather than carry forward: MM's cosmetics are split across
+`gCosmetic.*` and `gCosmetics.*`, and the `gCollisionViewer.*Color` keys are registered both as a
+scalar and as the parent of `.Value`, which already trips `Config::Save`'s "dropping mis-registered
+scalar CVar" path. **User presets are outside `ConfigVersion`'s reach** — `PresetManager` copies the
+user's config into a presets folder, so renamed keys silently stop applying unless the same table is
+run over loaded presets too.
 
 ## Naming conventions (canonical human-facing name ↔ embedded code name)
 
