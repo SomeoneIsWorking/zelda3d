@@ -1,6 +1,6 @@
 #include "global.h"
 #include <libultraship/bridge/resourcebridge.h>
-#include "2s2h/mixer.h"
+#include "mixer.h" // shared: Shipwright/zelda3d_shared/port/
 #include <libultraship/bridge/consolevariablebridge.h>
 
 // DMEM Addresses for the RSP

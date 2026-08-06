@@ -1,6 +1,6 @@
 #include <libultraship/libultra.h>
 #include "global.h"
-#include "soh/mixer.h"
+#include "mixer.h" // shared: Shipwright/zelda3d_shared/port/
 
 #define DEFAULT_LEN_1CH 0x1A0
 #define DEFAULT_LEN_2CH 0x340

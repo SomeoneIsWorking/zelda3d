@@ -4,8 +4,9 @@
 # `libultraship` STATIC lib. Mirrors soh/CMakeLists.txt but with the MM decomp layout:
 #   mm/2s2h  = the port shell (BenPort/GameInteractor/Enhancements/BenGui/... — analogous to soh/soh)
 #   mm/src   = the MM decomp game core (analogous to soh/src)
-# Globs + libultra prune follow 2 Ship 2 Harkinian's mm build (exclude ALL src/libultra;
-# the PC replacements gu_pc.c / mixer.c / framebuffer_effects.c live in 2s2h). SDL3 + link
+# Globs + libultra prune follow 2 Ship 2 Harkinian's mm build (exclude ALL src/libultra; the PC
+# replacements mixer.c / framebuffer_effects.c live in 2s2h, and gu_pc.c is shared with OoT from
+# Shipwright/zelda3d_shared/port/). SDL3 + link
 # environment follow zelda3d. Windows/Switch/CafeOS branches are intentionally dropped — this
 # is a PC (Linux/macOS) port.
 
@@ -39,6 +40,15 @@ endif()
 if (NOT DEFINED ZELDA3D_ENGINE_ASSETS_DIR)
     set(ZELDA3D_ENGINE_ASSETS_DIR "${ZELDA3D_ENGINE_DIR}/assets")
 endif()
+if (NOT DEFINED ZELDA3D_SHARED_DIR)
+    set(ZELDA3D_SHARED_DIR "${CMAKE_CURRENT_SOURCE_DIR}/../Shipwright/zelda3d_shared")
+endif()
+
+# Port glue shared with the other game as SOURCE rather than as a library: identical in both games,
+# but it includes this game's headers (gu_pc.c includes "z64.h", which is a different file in each
+# tree), so it must be compiled once per game. See zelda3d_shared/port/README.md and claim C064.
+file(GLOB ZELDA3D_SHARED_PORT_SOURCES CONFIGURE_DEPENDS
+    "${ZELDA3D_SHARED_DIR}/port/*.c" "${ZELDA3D_SHARED_DIR}/port/*.cpp" "${ZELDA3D_SHARED_DIR}/port/*.h")
 
 ################################################################################
 # Shared sub-projects. The root CMakeLists already add_subdirectory'd these, so
@@ -76,14 +86,15 @@ file(GLOB_RECURSE ship__ RELATIVE ${CMAKE_CURRENT_SOURCE_DIR} CONFIGURE_DEPENDS
 # Trackers) to shrink the port, but the "shell" is woven into the game CORE and kept
 # enhancements (z_kaleido_mask.c calls HudEditor_*, enhancements call UIWidgets::*/Rando::*,
 # SaveManager calls Notification::Emit) — excluding it left 563 undefined references.
-# So we compile the WHOLE tree; the ImGui menu is inert at runtime (zelda3d's ImGui is a
-# no-op shim; live UI is RmlUi) but its symbols are defined, so the link resolves. The
-# only real work is the API-drift fixes (Fast::Fast3dGui casts, Fast:: includes).
+# So we compile the WHOLE tree. (This used to add that the ImGui menu was inert because zelda3d's
+# ImGui was a no-op shim — no longer true: real Dear ImGui is back as the developer-overlay stack,
+# with RmlUi as the shipped game-facing UI. See docs/dusklight-adoption.md.)
 
 file(GLOB_RECURSE libultra_headers RELATIVE ${CMAKE_CURRENT_SOURCE_DIR} "include/PR/*.h")
 
 # MM decomp game core. Drop dmadata/elf_message and the ENTIRE libultra tree — the PC
-# replacements live in 2s2h (gu_pc.c / mixer.c / framebuffer_effects.c) + libultraship.
+# replacements live in 2s2h (mixer.c / framebuffer_effects.c), in zelda3d_shared/port/ (gu_pc.c,
+# shared with OoT) and in libultraship.
 file(GLOB_RECURSE src__ RELATIVE ${CMAKE_CURRENT_SOURCE_DIR} CONFIGURE_DEPENDS "src/*.c" "src/*.h")
 list(FILTER src__ EXCLUDE REGEX "src/dmadata/")
 list(FILTER src__ EXCLUDE REGEX "src/elf_message/")
@@ -94,6 +105,7 @@ set(ALL_FILES
     ${ship__}
     ${libultra_headers}
     ${src__}
+    ${ZELDA3D_SHARED_PORT_SOURCES}
 )
 
 ################################################################################
@@ -154,6 +166,7 @@ set_target_properties(mm_lib ${PROJECT_NAME} PROPERTIES C_STANDARD 17 C_EXTENSIO
 find_package(SDL3 REQUIRED)
 
 target_include_directories(mm_settings INTERFACE assets
+    ${ZELDA3D_SHARED_DIR}/port
     ${CMAKE_CURRENT_SOURCE_DIR}/include/
     ${CMAKE_CURRENT_SOURCE_DIR}/include/PR
     ${CMAKE_CURRENT_SOURCE_DIR}/src/
