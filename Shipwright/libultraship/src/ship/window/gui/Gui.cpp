@@ -59,10 +59,8 @@ void Gui::Init() {
     // ImGui has been removed from the build (replaced by a no-op header shim; the ImGui dev-tool /
     // menu code is kept only as inert scaffolding to migrate to RmlUi). So the framework no longer
     // creates an ImGui context, builds a font atlas, or ticks/draws ImGui windows — the live UI is
-    // RmlUi (stood up in ImGuiBackendInit) plus the native Zelda3D HUD. mImGuiIo points at the shim's
-    // zeroed IO purely so the legacy GamepadNavigation accessors that read mImGuiIo->ConfigFlags stay
-    // valid (they no-op against the zeroed flags).
-    mImGuiIo = &ImGui::GetIO();
+    // RmlUi (stood up in ImGuiBackendInit) plus the native Zelda3D HUD. The gamepad-navigation flag
+    // is now a plain bool member rather than a bit in ImGui's IO ConfigFlags.
 
     RegisterResourceFactories();
 
@@ -97,7 +95,6 @@ void Gui::ShutDownImGui(Ship::Window* window) {
     mShutDown = true;
     ImGuiWMShutdown();
     ImGuiBackendShutdown();
-    ImGui::DestroyContext();
 }
 
 void Gui::ImGuiWMShutdown() {
@@ -114,31 +111,18 @@ bool Gui::SupportsViewports() {
 }
 
 bool Gui::GamepadNavigationEnabled() {
-    return mImGuiIo->ConfigFlags & ImGuiConfigFlags_NavEnableGamepad;
+    return mGamepadNavigationEnabled;
 }
 
 void Gui::BlockGamepadNavigation() {
-    mImGuiIo->ConfigFlags &= ~ImGuiConfigFlags_NavEnableGamepad;
+    mGamepadNavigationEnabled = false;
 }
 
 void Gui::UnblockGamepadNavigation() {
     if (Ship::Context::GetRawInstance()->GetConsoleVariables()->GetInteger(CVAR_IMGUI_CONTROLLER_NAV, 0) &&
         GetMenuOrMenubarVisible()) {
-        mImGuiIo->ConfigFlags |= ImGuiConfigFlags_NavEnableGamepad;
+        mGamepadNavigationEnabled = true;
     }
-}
-
-ImGuiID Gui::GetMainGameWindowID() {
-    static ImGuiID windowID = 0;
-    if (windowID != 0) {
-        return windowID;
-    }
-    ImGuiWindow* window = ImGui::FindWindowByName("Main Game");
-    if (window == NULL) {
-        return 0;
-    }
-    windowID = window->ID;
-    return windowID;
 }
 
 void Gui::ImGuiBackendNewFrame() {
@@ -214,7 +198,7 @@ void Gui::SaveConsoleVariablesNextFrame() {
 
 void Gui::AddGuiWindow(std::shared_ptr<GuiWindow> guiWindow) {
     if (mGuiWindows.contains(guiWindow->GetName())) {
-        SPDLOG_ERROR("ImGui::AddGuiWindow: Attempting to add duplicate window name {}", guiWindow->GetName());
+        SPDLOG_ERROR("Gui::AddGuiWindow: Attempting to add duplicate window name {}", guiWindow->GetName());
         return;
     }
 
@@ -290,22 +274,6 @@ bool Gui::GetMenuOrMenubarVisible() {
 bool Gui::IsInteractiveMenuOpen() {
     // Base Gui has no menu of its own; Fast3dGui overrides this to report the RmlUi menu.
     return false;
-}
-
-bool Gui::IsMouseOverAnyGuiItem() {
-    return ImGui::IsAnyItemHovered();
-}
-
-bool Gui::IsMouseOverActivePopup() {
-    ImGuiContext* ctx = ImGui::GetCurrentContext();
-    if (ctx->OpenPopupStack.Size == 0 || ctx->HoveredWindow == NULL) {
-        return false;
-    }
-    ImGuiPopupData data = ctx->OpenPopupStack.back();
-    if (data.Window == NULL) {
-        return false;
-    }
-    return (ctx->HoveredWindow->ID == data.Window->ID);
 }
 
 std::shared_ptr<GuiWindow> Gui::GetMenu() {

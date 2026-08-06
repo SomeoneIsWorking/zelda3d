@@ -281,8 +281,8 @@ bool ControllerStick::AddOrEditAxisDirectionMappingFromRawPress(Direction direct
     if (mKeyboardScancodeForNewMapping != LUS_KB_UNKNOWN) {
         mapping = std::make_shared<KeyboardKeyToAxisDirectionMapping>(mPortIndex, mStickIndex, direction,
                                                                       mKeyboardScancodeForNewMapping);
-    } else if (!Context::GetRawInstance()->GetWindow()->GetGui()->IsMouseOverAnyGuiItem() &&
-               Context::GetRawInstance()->GetWindow()->GetGui()->IsMouseOverActivePopup()) {
+    // See ControllerButton::AddOrEditButtonMappingFromRawPress for why this changed.
+    } else if (Context::GetRawInstance()->GetWindow()->GetGui()->IsInteractiveMenuOpen()) {
         if (mMouseButtonForNewMapping != LUS_MOUSE_BTN_UNKNOWN) {
             mapping = std::make_shared<MouseButtonToAxisDirectionMapping>(mPortIndex, mStickIndex, direction,
                                                                           mMouseButtonForNewMapping);

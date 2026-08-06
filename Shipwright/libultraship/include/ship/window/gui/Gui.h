@@ -93,12 +93,6 @@ class Gui {
      */
     virtual bool SupportsViewports();
 
-    /**
-     * @brief Returns the ImGui ID of the main game viewport window.
-     *
-     * Useful for docking other windows relative to the game view.
-     */
-    ImGuiID GetMainGameWindowID();
 
     /**
      * @brief Adds a GuiWindow to the draw loop.
@@ -164,19 +158,13 @@ class Gui {
      */
     virtual bool IsInteractiveMenuOpen();
 
-    /** @brief Returns true if the mouse cursor is currently over any ImGui item. */
-    bool IsMouseOverAnyGuiItem();
-
-    /** @brief Returns true if the mouse cursor is over an active ImGui popup. */
-    bool IsMouseOverActivePopup();
-
-    /** @brief Returns true if ImGui gamepad navigation is enabled. */
+    /** @brief Returns true if gamepad navigation is enabled. */
     bool GamepadNavigationEnabled();
 
-    /** @brief Disables ImGui gamepad navigation (allows the game to use gamepad input). */
+    /** @brief Disables gamepad navigation (allows the game to use gamepad input). */
     void BlockGamepadNavigation();
 
-    /** @brief Re-enables ImGui gamepad navigation. */
+    /** @brief Re-enables gamepad navigation. */
     void UnblockGamepadNavigation();
 
     /**
@@ -253,7 +241,7 @@ class Gui {
     /** @brief Updates mouse capture state based on window focus and UI interaction. */
 
     ImVec2 mTemporaryWindowPos; ///< Scratchpad position used when repositioning windows.
-    ImGuiIO* mImGuiIo;          ///< Pointer to the active ImGuiIO context.
+    bool mGamepadNavigationEnabled = false; ///< Was a bit in ImGui IO ConfigFlags; ImGui is going away.
     std::map<std::string, std::shared_ptr<GuiWindow>> mGuiWindows; ///< Registered window map (name → window).
 
   private:
