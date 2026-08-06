@@ -108,7 +108,6 @@ CrowdControl* CrowdControl::Instance;
 #include <ship/window/FileDropMgr.h>
 #include <ship/window/gui/resource/FontFactory.h>
 #include "2s2h/Enhancements/Audio/AudioCollection.h"
-#include "BenGui/BenInputEditorWindow.h"
 
 OTRGlobals* OTRGlobals::Instance;
 GameInteractor* GameInteractor::Instance;
@@ -173,7 +172,6 @@ OTRGlobals::OTRGlobals() {
     context->InitResourceManager({ portArchivePath }, {}, 3, true);
     context->InitConsole();
 
-    auto benInputEditorWindow = std::make_shared<BenInputEditorWindow>("gWindows.BenInputEditor", "2S2H Input Editor");
     // ADOPT the engine's window if one is already up; construct one only when there is none. This is
     // OoT's fix applied to MM's identical call site -- the window-ownership bug was a CLASS and MM
     // had it too, so this one is fixed on the same terms rather than waiting for a run that reaches
@@ -184,11 +182,10 @@ OTRGlobals::OTRGlobals() {
     if (fast3dWindow == nullptr) {
         // The Context takes ownership; we keep only a raw observer (see benFast3dWindow's comment).
         fast3dWindow = std::make_shared<Fast::Fast3dWindow>(
-            std::vector<std::shared_ptr<Ship::GuiWindow>>({ benInputEditorWindow }));
+            std::vector<std::shared_ptr<Ship::GuiWindow>>({}));
         context->InitWindow(fast3dWindow);
     } else {
         SPDLOG_INFO("Adopting the engine's existing window rather than constructing a second one.");
-        fast3dWindow->GetGui()->AddGuiWindow(benInputEditorWindow);
     }
     benFast3dWindow = fast3dWindow.get();
 
@@ -2132,16 +2129,8 @@ extern "C" void OTRControllerCallback(uint8_t rumble) {
     Ship::Context::GetRawInstance()->GetControlDeck()->GetControllerByPort(0)->GetLED()->SetLEDColor(
         GetColorForControllerLED());
 
-    static std::shared_ptr<BenInputEditorWindow> controllerConfigWindow = nullptr;
-    if (controllerConfigWindow == nullptr) {
-        controllerConfigWindow = std::dynamic_pointer_cast<BenInputEditorWindow>(
-            Ship::Context::GetRawInstance()->GetWindow()->GetGui()->GetGuiWindow("2S2H Input Editor"));
-        // note: the current implementation may not be desired in LUS, as "true" rumble support
-        //    using osMotor calls is planned: https://github.com/Kenix3/libultraship/issues/9
-    }
-    if (controllerConfigWindow->TestingRumble()) {
-        return;
-    }
+    // See OTRGlobals.cpp for why the TestingRumble() gate is gone. MM's copy was worse: it had no
+    // else-guard, so it ran on the FIRST call too rather than from the second onward.
 
     // TODO: other ports?
     if (rumble) {

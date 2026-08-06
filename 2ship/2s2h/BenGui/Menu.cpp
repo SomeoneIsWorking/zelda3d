@@ -2,7 +2,6 @@
 #include "Menu.h"
 #include "UIWidgets.hpp"
 #include "BenPort.h"
-#include "BenInputEditorWindow.h"
 #include <ship/window/gui/GuiElement.h>
 #include "BenModals.h"
 #include "Notification.h"

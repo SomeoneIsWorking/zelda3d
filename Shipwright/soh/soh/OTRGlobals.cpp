@@ -25,7 +25,6 @@
 #endif
 #include <ship/audio/AudioPlayer.h>
 #include "Enhancements/speechsynthesizer/SpeechSynthesizer.h"
-#include "Enhancements/controls/SohInputEditorWindow.h"
 #include "Enhancements/audio/AudioCollection.h"
 #include "Enhancements/debugconsole.h"
 #include "Enhancements/randomizer/randomizer.h"
@@ -329,8 +328,6 @@ OTRGlobals::OTRGlobals() {
     context->InitResourceManager({ portArchivePath }, {}, 3, true);
     context->InitConsole();
 
-    auto sohInputEditorWindow =
-        std::make_shared<SohInputEditorWindow>(CVAR_WINDOW("ControllerConfiguration"), "Configure Controller");
     // ADOPT the engine's window if one is already up; construct one only when there is none.
     //
     // A core must not construct engine objects that already exist, and this is the call site that
@@ -347,11 +344,10 @@ OTRGlobals::OTRGlobals() {
     if (fast3dWindow == nullptr) {
         // The Context takes ownership; we keep only a raw observer (see sohFast3dWindow's comment).
         fast3dWindow = std::make_shared<Fast::Fast3dWindow>(
-            std::vector<std::shared_ptr<Ship::GuiWindow>>({ sohInputEditorWindow }));
+            std::vector<std::shared_ptr<Ship::GuiWindow>>({}));
         context->InitWindow(fast3dWindow);
     } else {
         SPDLOG_INFO("Adopting the engine's existing window rather than constructing a second one.");
-        fast3dWindow->GetGui()->AddGuiWindow(sohInputEditorWindow);
     }
     sohFast3dWindow = fast3dWindow.get();
 
@@ -2435,14 +2431,11 @@ extern "C" void OTRControllerCallback(uint8_t rumble) {
     Ship::Context::GetRawInstance()->GetControlDeck()->GetControllerByPort(0)->GetLED()->SetLEDColor(
         GetColorForControllerLED());
 
-    static std::shared_ptr<SohInputEditorWindow> controllerConfigWindow = nullptr;
-    if (controllerConfigWindow == nullptr) {
-        controllerConfigWindow = std::dynamic_pointer_cast<SohInputEditorWindow>(
-            std::dynamic_pointer_cast<Fast::Fast3dGui>(Ship::Context::GetRawInstance()->GetWindow()->GetGui())
-                ->GetGuiWindow("Controller Configuration"));
-    } else if (controllerConfigWindow->TestingRumble()) {
-        return;
-    }
+    // The `TestingRumble()` gate that was here suppressed rumble while the user was testing a
+    // rumble mapping in the Dear ImGui input editor. That editor is gone, so nothing can start a
+    // rumble test and the gate could only ever be false -- except it wasn't: mRumbleTimer had no
+    // initialiser and InitElement had lost its caller, so it read garbage and silently suppressed
+    // rumble outright (claim C063).
 
     if (rumble) {
         Ship::Context::GetRawInstance()->GetControlDeck()->GetControllerByPort(0)->GetRumble()->StartRumble();
