@@ -1,7 +1,7 @@
 ---
 id: 10
 title: OoT-after-MM crashes in ImGui::NewFrame -> SetCurrentFont (regression from restoring real ImGui)
-status: open
+status: resolved
 symptom: `tools/zelda3d_sequence.sh mm,oot` runs MM, returns 0, attaches OoT with all four per-game subsystems fresh -- then OoT dies on its first drawn frame in ImGui::SetCurrentFont, called from ImGui::NewFrame <- Ship::Gui::StartDraw.
 tags: n3,imgui,launcher,regression
 created: 2026-08-06
@@ -50,3 +50,6 @@ at `NewFrame` is bad by the time OoT draws.
   once, with the same "corrupted size vs. prev_size". Restoring ImGui changed the heap layout; it did
   not fix the corruption. Do not read a green `solo mm` as evidence 0009 is closed -- run it several
   times.
+
+### Resolution (2026-08-06)
+ROOT CAUSE: the ImGui font atlas is ENGINE lifetime but every game registers its own fonts into it, and adding a font marks the atlas not-built. The SDL3-GPU backend only builds the font texture when it has none (imgui_impl_sdlgpu3.cpp: 'if (!bd->FontTexture) CreateFontsTexture()'), so once MM had built it, OoT's fonts were never rasterised; ImGui::NewFrame's 'Font Atlas not built!' assert is compiled out under NDEBUG, so instead of a message it walked an unbuilt font and died in SetCurrentFont. Compounding it, OTRGlobals/BenPort passed the ResourceManager's TTF buffer with FontDataOwnedByAtlas=false -- a raw pointer into PER-GAME memory held by an ENGINE-lifetime atlas, dangling the moment the outgoing game's ResourceManager destructed. FIX: Fast3dGui::ImGuiBackendNewFrame drops the font texture when io.Fonts is not built so the backend rebuilds it; both games now copy the TTF bytes with IM_ALLOC and leave FontDataOwnedByAtlas at its default. VERIFIED: tools/zelda3d_sequence.sh mm,oot exits 0 with no crash markers; log shows 'font atlas has unbuilt fonts ... dropping the font texture so the backend rebuilds it' followed by OoT drawing real frames (sgDraw #19/#20, uma_anim_fastrun / hl_anim_fastrun2_30) and an orderly shutdown.

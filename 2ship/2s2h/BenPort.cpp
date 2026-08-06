@@ -1916,9 +1916,25 @@ ImFont* OTRGlobals::CreateFontWithSize(float size, std::string fontPath) {
         initData->Path = fontPath;
         std::shared_ptr<Ship::Font> fontData = std::static_pointer_cast<Ship::Font>(
             Ship::Context::GetRawInstance()->GetResourceManager()->LoadResource(fontPath, false, initData));
+        if (fontData == nullptr) {
+            // Said out loud rather than dereferenced -- the old code went straight into
+            // fontData->Data, so a missing font was a SIGSEGV with no message.
+            SPDLOG_ERROR("CreateFontWithSize: could not load \"{}\"; falling back to the built-in font", fontPath);
+            ImFontConfig fallbackCfg = ImFontConfig();
+            fallbackCfg.SizePixels = size;
+            return mImGuiIo->Fonts->AddFontDefault(&fallbackCfg);
+        }
+
+        // Give ImGui its OWN copy of the TTF bytes. The atlas is ENGINE lifetime and the
+        // ResourceManager is PER-GAME, so holding the resource's buffer (FontDataOwnedByAtlas =
+        // false, as this used to) leaves every font registered by this game pointing at freed memory
+        // the moment a second game attaches -- and ImFontAtlas::Build() walks the ConfigData of ALL
+        // fonts, dead ones included. IM_ALLOC pairs with the atlas's IM_FREE. Same fix as OoT's
+        // OTRGlobals::CreateFontWithSize; see docs/issues/0010.
         ImFontConfig fontConf;
-        fontConf.FontDataOwnedByAtlas = false;
-        font = mImGuiIo->Fonts->AddFontFromMemoryTTF(fontData->Data, fontData->DataSize, size, &fontConf, nullptr);
+        void* ownedTtf = IM_ALLOC(fontData->DataSize);
+        memcpy(ownedTtf, fontData->Data, fontData->DataSize);
+        font = mImGuiIo->Fonts->AddFontFromMemoryTTF(ownedTtf, fontData->DataSize, size, &fontConf, nullptr);
     }
     // FontAwesome fonts need to have their sizes reduced by 2.0f/3.0f in order to align correctly
     float iconFontSize = size * 2.0f / 3.0f;
