@@ -79,33 +79,13 @@ class OTRGlobals {
 #endif
 
 #ifndef __cplusplus
-void InitOTR(int argc, char* argv[]);
-void DeinitOTR(void);
+/* The port ABI both games implement. One declaration site, so the compiler catches a
+ * game whose definition drifts from it. Included HERE, inside the C-only guard, to keep
+ * these exactly as C-visible as they were. */
+#include "port/zelda3d_port_api.h"
 void OTRAudio_Exit(void); // idempotent — safe to call before DeinitOTR
-void OTRMessage_Init();
-void Graph_StartFrame();
-void Graph_ProcessGfxCommands(Gfx* commands);
-void OTRGfxPrint(const char* str, void* printer, void (*printImpl)(void*, char));
-void OTRGetPixelDepthPrepare(float x, float y);
-uint16_t OTRGetPixelDepth(float x, float y);
 
-void Ctx_ReadSaveFile(uintptr_t addr, void* dramAddr, size_t size);
-void Ctx_WriteSaveFile(uintptr_t addr, void* dramAddr, size_t size);
 
-uint64_t GetPerfCounter();
-uint64_t osGetTime(void);
-uint32_t osGetCount(void);
-float OTRGetAspectRatio(void);
-float OTRGetDimensionFromLeftEdge(float v);
-float OTRGetDimensionFromRightEdge(float v);
-int16_t OTRGetRectDimensionFromLeftEdge(float v);
-int16_t OTRGetRectDimensionFromRightEdge(float v);
-uint32_t OTRGetGameRenderWidth();
-uint32_t OTRGetGameRenderHeight();
-int AudioPlayer_GetDesiredBuffered(void);
-void AudioPlayer_Play(const uint8_t* buf, uint32_t len);
-void AudioMgr_CreateNextAudioBuffer(s16* samples, u32 num_samples);
-int Controller_ShouldRumble(size_t slot);
 size_t GetEquipNowMessage(char* buffer, char* src, const size_t maxBufferSize);
 u32 SpoilerFileExists(const char* spoilerFileName);
 Sprite* GetSeedTexture(uint8_t index);
@@ -128,16 +108,11 @@ GetItemEntry ItemTable_Retrieve(int16_t getItemID);
 GetItemEntry ItemTable_RetrieveEntry(s16 modIndex, s16 getItemID);
 void EntranceTracker_SetCurrentGrottoID(s16 entranceIndex);
 void EntranceTracker_SetLastEntranceOverride(s16 entranceIndex);
-void Gfx_RegisterBlendedTexture(const char* name, u8* mask, u8* replacement);
-void Gfx_UnregisterBlendedTexture(const char* name);
-void Gfx_TextureCacheDelete(const uint8_t* addr);
 void SaveManager_ThreadPoolWait();
 
 GetItemID RetrieveGetItemIDFromItemID(ItemID itemID);
 RandomizerGet RetrieveRandomizerGetFromItemID(ItemID itemID);
-void Messagebox_ShowErrorBox(char* title, char* body);
 
-uint32_t Ship_GetInterpolationFrameCount();
 #endif
 
 #ifdef __cplusplus
