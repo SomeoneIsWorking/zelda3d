@@ -38,14 +38,15 @@ set_source_files_properties(${CMAKE_CURRENT_SOURCE_DIR}/audio/dr_libs_impl.cpp
 # libultraship.h> to drag in <cassert>. MM's copy was correct on both counts and is the one kept.
 # Consumers include it as "object/ObjectExtension.h" via the PUBLIC include dir above.
 
-# thirdparty/ and extractor/ are header-only, so they add no sources — they exist so that code
-# BYTE-IDENTICAL in both games has exactly one copy. portable-file-dialogs.h (1,770 lines) and
-# Extract.h were each vendored twice, and a duplicate is not a neutral cost: it is two files to
-# patch, two to audit, and two that can silently drift apart. Consumers include them as
-# "zelda3d_shared/thirdparty/portable-file-dialogs.h" via the PUBLIC include dir above.
+# thirdparty/ adds no sources — it exists so that code BYTE-IDENTICAL in both games has exactly one
+# copy. portable-file-dialogs.h (1,770 lines) was vendored twice, and a duplicate is not a neutral
+# cost: it is two files to patch, two to audit, and two that can silently drift apart. Consumers
+# include it as "thirdparty/portable-file-dialogs.h" via the PUBLIC include dir above.
 #
-# Note this library's header comment says nothing here may see a game-specific type. These honour
-# that for free: pfd is upstream third-party, and Extract.h is ROM-extraction I/O that names no
-# Player/Actor/PlayState.
+# extractor/ holds Extract.h AND Extract.cpp / FastCrc32C.c, but adds no sources HERE: those two are
+# globbed into each game's own target instead, the same mechanism port/ uses. They name no
+# game-specific type, so this library's contract would allow them — but they call the game's ZAPD
+# entry point and read its gBuildVersion* symbols, which this library does not link. The per-game
+# half is a RomVersionTable each game supplies from its own Extractor/RomVersions.cpp. Claim C070.
 
 set_target_properties(zelda3d_shared PROPERTIES POSITION_INDEPENDENT_CODE ON)

@@ -196,6 +196,11 @@ endif()
 # soh/Extractor {{{
 list(FILTER ship__ EXCLUDE REGEX "soh/Extractor/*")
 
+# The extraction LOGIC is one source shared with MM (zelda3d_shared/extractor/), compiled per game
+# for the same reason port/ is: it names no game type, but it calls this game's ZAPD entry point and
+# reads its build version, so it cannot live in the zelda3d_shared static library. What stays here
+# is OoT's ROM version table, RomVersions.cpp. Consoles get headers only, as before — they have no
+# in-app extract flow.
 if(NOT CMAKE_SYSTEM_NAME MATCHES "NintendoSwitch|CafeOS")
     file(GLOB_RECURSE soh__Extractor RELATIVE ${CMAKE_CURRENT_SOURCE_DIR} CONFIGURE_DEPENDS
         "soh/Extractor/*.c"
@@ -203,11 +208,17 @@ if(NOT CMAKE_SYSTEM_NAME MATCHES "NintendoSwitch|CafeOS")
         "soh/Extractor/*.h"
         "soh/Extractor/*.hpp"
     )
+    file(GLOB ZELDA3D_SHARED_EXTRACTOR_SOURCES CONFIGURE_DEPENDS
+        "${ZELDA3D_SHARED_DIR}/extractor/*.c"
+        "${ZELDA3D_SHARED_DIR}/extractor/*.cpp"
+        "${ZELDA3D_SHARED_DIR}/extractor/*.h"
+    )
 else()
     file(GLOB_RECURSE soh__Extractor RELATIVE ${CMAKE_CURRENT_SOURCE_DIR} CONFIGURE_DEPENDS
         "soh/Extractor/*.h"
         "soh/Extractor/*.hpp"
     )
+    set(ZELDA3D_SHARED_EXTRACTOR_SOURCES "")
 endif()
 # }}}
 
@@ -251,6 +262,7 @@ set(ALL_FILES
     ${soh__Extractor}
     ${src__}
     ${ZELDA3D_SHARED_PORT_SOURCES}
+    ${ZELDA3D_SHARED_EXTRACTOR_SOURCES}
 )
 
 ################################################################################

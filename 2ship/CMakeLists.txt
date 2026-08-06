@@ -50,6 +50,15 @@ endif()
 file(GLOB ZELDA3D_SHARED_PORT_SOURCES CONFIGURE_DEPENDS
     "${ZELDA3D_SHARED_DIR}/port/*.c" "${ZELDA3D_SHARED_DIR}/port/*.cpp" "${ZELDA3D_SHARED_DIR}/port/*.h")
 
+# The ROM extractor, shared the same way and for the same reason: one source, compiled per game.
+# Extract.cpp names no game type, but it calls this game's ZAPD entry point and reads its build
+# version, so it belongs in the game target rather than the zelda3d_shared static library. The
+# per-game half is the ROM version table in 2s2h/Extractor/RomVersions.cpp, which the 2s2h glob
+# below already picks up.
+file(GLOB ZELDA3D_SHARED_EXTRACTOR_SOURCES CONFIGURE_DEPENDS
+    "${ZELDA3D_SHARED_DIR}/extractor/*.c" "${ZELDA3D_SHARED_DIR}/extractor/*.cpp"
+    "${ZELDA3D_SHARED_DIR}/extractor/*.h")
+
 ################################################################################
 # Shared sub-projects. The root CMakeLists already add_subdirectory'd these, so
 # the NOT TARGET guards make this a no-op — mm links the same static libs as soh.
@@ -106,6 +115,7 @@ set(ALL_FILES
     ${libultra_headers}
     ${src__}
     ${ZELDA3D_SHARED_PORT_SOURCES}
+    ${ZELDA3D_SHARED_EXTRACTOR_SOURCES}
 )
 
 ################################################################################
