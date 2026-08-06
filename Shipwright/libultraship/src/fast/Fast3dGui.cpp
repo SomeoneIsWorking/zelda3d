@@ -21,6 +21,8 @@
 
 // The ImGui SDL3 platform backend drives the windowing path; SDL3 GPU is the only backend (P4).
 #include <imgui_impl_sdl3.h>
+#include <imgui_impl_sdlgpu3.h>
+#include "fast/backends/gfx_sdl3gpu.h"
 
 namespace Fast {
 
@@ -62,12 +64,12 @@ void Fast3dGui::HandleWindowEvents(Fast::WindowEvent event) {
     if (mRml && mRml->ProcessSdlEvent(const_cast<SDL_Event*>(static_cast<const SDL_Event*>(event.Sdl.Event)))) {
         return;
     }
-    // The ImGui SDL3 platform backend used to see every event here. It is a no-op shim and the
-    // live consumers are RmlUi (above, which consumes what it handles) and the game's own input
-    // path, so nothing is left to forward to.
+    // Then the ImGui dev overlays. Second, not first: RmlUi is the shipped menu and owns input
+    // while it is open, and it returns true only for what it actually consumed.
+    ImGui_ImplSDL3_ProcessEvent(static_cast<const SDL_Event*>(event.Sdl.Event));
 #if defined(__ANDROID__) || defined(__IOS__)
-    // Mobile soft-keyboard: no ImGui text widget can want input any more, so this is unconditional.
-    Ship::Mobile::ImGuiProcessEvent(false);
+    // Mobile soft-keyboard: raise it when an ImGui text widget wants input.
+    Ship::Mobile::ImGuiProcessEvent(ImGui::GetCurrentContext() != nullptr && ImGui::GetIO().WantTextInput);
 #endif
 }
 
@@ -76,18 +78,30 @@ void Fast3dGui::ImGuiWMInit() {
     if (Ship::Context::GetRawInstance()->GetConsoleVariables()->GetInteger(CVAR_ALLOW_BACKGROUND_INPUTS, 1)) {
         SDL_SetHint(SDL_HINT_JOYSTICK_ALLOW_BACKGROUND_EVENTS, "1");
     }
-    // No ImGui platform backend is stood up. RmlUi owns event handling and rendering; the SDL hints
-    // above are the only thing this function still exists for.
+    // SDL3 platform backend: keyboard/mouse/gamepad state and timing for the dev overlays.
+    // InitForOther, not InitForSDLRenderer/InitForVulkan -- rendering goes through our own SDL3-GPU
+    // op stream (see ImGuiRenderDrawData), so the platform backend must not assume a renderer.
+    if (mImpl.Vulkan.Window != nullptr) {
+        ImGui_ImplSDL3_InitForOther(static_cast<SDL_Window*>(mImpl.Vulkan.Window));
+    }
 }
 
 void Fast3dGui::ImGuiWMShutdown() {
+    ImGui_ImplSDL3_Shutdown();
 }
 
 void Fast3dGui::ImGuiBackendInit() {
     auto window = Ship::Context::GetRawInstance()->GetWindow();
     mInterpreter = std::dynamic_pointer_cast<Fast3dWindow>(window)->GetInterpreterWeak();
-    // No ImGui SDL3-GPU renderer backend; the RmlUi menu has its own SDL3 GPU render interface
-    // (appends ops into the Fast3D SDL3 GPU unified op-list), so stand it up here.
+
+    // ImGui's SDL3-GPU renderer backend is NOT initialised here, deliberately: Gui::Init runs before
+    // the Fast3D rendering API is created, so g_activeSdl3GpuApi is still null at this point and
+    // ImGui_ImplSDLGPU3_Init has no device to bind. Calling it anyway left the backend's data null
+    // and the first ImGui_ImplSDLGPU3_NewFrame() dereferenced it -- OoT crashed on frame one.
+    // EnsureImGuiRenderer() does it on the first frame where the API exists.
+
+    // The RmlUi menu has its own SDL3 GPU render interface (appends ops into the Fast3D SDL3 GPU
+    // unified op-list), so stand it up here too. Separate stack, separate interface, on purpose.
     auto wnd = Ship::Context::GetRawInstance()->GetWindow();
     mRml = std::make_unique<Ship::SohRmlUi>();
     if (!mRml->Init(mImpl.Vulkan.Window, nullptr, (int)wnd->GetWidth(), (int)wnd->GetHeight(),
@@ -97,19 +111,50 @@ void Fast3dGui::ImGuiBackendInit() {
     }
 }
 
+bool Fast3dGui::EnsureImGuiRenderer() {
+    if (mImGuiRendererReady) {
+        return true;
+    }
+    Fast::GfxRenderingAPISdl3Gpu* api = Fast::g_activeSdl3GpuApi;
+    if (api == nullptr || api->GpuDevice() == nullptr) {
+        return false; // renderer not up yet; try again next frame
+    }
+    ImGui_ImplSDLGPU3_InitInfo info{};
+    info.Device = api->GpuDevice();
+    info.ColorTargetFormat = api->GpuColorFormat();
+    info.MSAASamples = SDL_GPU_SAMPLECOUNT_1;
+    if (!ImGui_ImplSDLGPU3_Init(&info)) {
+        // Logged once, not per frame: mark ready so the failed backend is not retried forever, and
+        // say plainly that overlays are dead rather than leaving silence to be read as "fine".
+        SPDLOG_ERROR("Fast3dGui: ImGui SDL3-GPU backend init failed; dev overlays will not render");
+        mImGuiRendererReady = true;
+        return false;
+    }
+    SPDLOG_INFO("Fast3dGui: ImGui SDL3-GPU renderer backend up on the Fast3D device");
+    mImGuiRendererReady = true;
+    return true;
+}
+
 void Fast3dGui::ImGuiBackendShutdown() {
-    // SDL3 GPU backend: the RmlUi menu owns the only renderer-side resources. (No ImGui SDL3-GPU
-    // renderer backend was stood up, so there is nothing else to shut down here.)
+    // Both renderer-side stacks, while the GPU device is still alive -- Fast3dWindow calls
+    // ShutDownImGui before `delete mRenderingApi` precisely so this ordering holds.
+    if (mImGuiRendererReady) {
+        ImGui_ImplSDLGPU3_Shutdown();
+        mImGuiRendererReady = false;
+    }
     mRml.reset();
 }
 
 void Fast3dGui::ImGuiBackendNewFrame() {
-    // ImGui removed: no font atlas / new-frame work (this is no longer called; the frame path is
-    // native + RmlUi).
+    if (!EnsureImGuiRenderer()) {
+        return;
+    }
+    ImGui_ImplSDLGPU3_NewFrame();
 }
 
 void Fast3dGui::ImGuiWMNewFrame() {
     UpdateSdlTextInput();
+    ImGui_ImplSDL3_NewFrame();
 }
 
 void Fast3dGui::UpdateSdlTextInput() {
@@ -122,11 +167,11 @@ void Fast3dGui::UpdateSdlTextInput() {
     if (mRml && mRml->IsVisible()) {
         return;
     }
-    // Was `ImGui::GetIO().WantTextInput`. No ImGui text widget exists any more, so that query is a
-    // constant false -- which happens to be the RIGHT answer rather than a broken one: RmlUi starts
-    // and stops SDL text input itself on field focus (handled by the early return above), and
-    // nothing else in this build accepts typed text. So text input stays off here, deliberately.
-    const bool want = false;
+    // Back to asking ImGui, now that ImGui is real. While it was a no-op shim this read as a
+    // constant false, and that was defensible only because no ImGui text widget could exist; the
+    // dev-tool console's InputText exists again, so a hardcoded false would silently swallow every
+    // character typed into it.
+    const bool want = ImGui::GetCurrentContext() != nullptr && ImGui::GetIO().WantTextInput;
     if (want == mTextInputActive) {
         return;
     }
@@ -143,10 +188,39 @@ void Fast3dGui::UpdateSdlTextInput() {
 }
 
 void Fast3dGui::ImGuiRenderDrawData(ImDrawData* data) {
-    // No ImGui SDL3-GPU *renderer* backend is stood up (P4): the ImGui dev-overlay draw data is
-    // produced but not rendered. The in-game UI (HUD + ESC menu) renders via the Zelda3D HUD and the
-    // RmlUi SDL3 GPU interface instead.
-    (void)data;
+    // The renderer is a single unified op stream, so ImGui does not open a pass against the
+    // swapchain itself -- it appends one, exactly as the RmlUi interface does. AppendZelda3DOwnPass
+    // runs the lambda during op replay, inside this same frame's command buffer.
+    if (!mImGuiRendererReady || data == nullptr || data->CmdListsCount == 0) {
+        return;
+    }
+    Fast::GfxRenderingAPISdl3Gpu* api = Fast::g_activeSdl3GpuApi;
+    if (api == nullptr || !api->FrameRecording()) {
+        return;
+    }
+    SDL_GPUTexture* fbColor = api->MainFbColorTexture();
+    if (fbColor == nullptr) {
+        return;
+    }
+
+    api->AppendZelda3DOwnPass([data, fbColor](SDL_GPUCommandBuffer* cmd) {
+        // Uploads ImGui's vertex/index data. Must run on the command buffer BEFORE the render pass
+        // is begun -- it records a copy pass, which cannot be nested inside a render pass.
+        // Spelled with a lowercase 'g': upstream v1.91.9b-docking declares it as
+        // Imgui_ImplSDLGPU3_PrepareDrawData. That is an upstream typo, fixed in a later release --
+        // so this is the line to change when ImGui is next bumped.
+        Imgui_ImplSDLGPU3_PrepareDrawData(data, cmd);
+
+        SDL_GPUColorTargetInfo ct{};
+        ct.texture = fbColor;
+        ct.load_op = SDL_GPU_LOADOP_LOAD; // composite over the game + HUD + menu
+        ct.store_op = SDL_GPU_STOREOP_STORE;
+        SDL_GPURenderPass* pass = SDL_BeginGPURenderPass(cmd, &ct, 1, nullptr);
+        if (pass != nullptr) {
+            ImGui_ImplSDLGPU3_RenderDrawData(data, cmd, pass);
+            SDL_EndGPURenderPass(pass);
+        }
+    });
 }
 
 void Fast3dGui::RenderRmlMenu() {

@@ -149,10 +149,10 @@ class Gui {
     /**
      * @brief Returns true if this fork's real interactive menu (the RmlUi ESC menu) is open.
      *
-     * ImGui is stubbed out at runtime in this fork (imgui_shim/imgui_stub.cpp) — the legacy
-     * GetMenuOrMenubarVisible()/mMenu/mMenuBar path above is inert dead code (mMenu is never set
-     * for the RmlUi menu). This is the reliable equivalent: base Gui has no menu concept of its
-     * own (false); Fast::Fast3dGui overrides it to report SohRmlUi::IsVisible(). Used by the
+     * Distinct from GetMenuOrMenubarVisible() above, which reports the ImGui menu/menu-bar. ImGui
+     * is the DEVELOPER-OVERLAY stack here and never hosts the game-facing menu, so mMenu is not set
+     * for the RmlUi menu and that predicate cannot answer this question. Base Gui has no menu of
+     * its own (false); Fast::Fast3dGui overrides it to report SohRmlUi::IsVisible(). Used by the
      * keyboard/diagnostic input path so blocking logic depends on the menu that's actually live.
      */
     virtual bool IsInteractiveMenuOpen();
@@ -173,6 +173,9 @@ class Gui {
     void ShutDownImGui(Ship::Window* window);
 
   protected:
+    /** @brief Pushes the gamepad-navigation flag into ImGui's IO. No-op with no context. */
+    void ApplyGamepadNavigationFlag();
+
     /** @brief Calls ImGui::NewFrame() after processing backend-specific input. */
     void StartFrame();
 

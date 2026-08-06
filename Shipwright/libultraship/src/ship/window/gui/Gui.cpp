@@ -52,16 +52,72 @@ Gui::~Gui() {
 }
 
 void Gui::Init() {
-    // ImGui has been removed from the build (replaced by a no-op header shim; the ImGui dev-tool /
-    // menu code is kept only as inert scaffolding to migrate to RmlUi). So the framework no longer
-    // creates an ImGui context, builds a font atlas, or ticks/draws ImGui windows — the live UI is
-    // RmlUi (stood up in ImGuiBackendInit) plus the native Zelda3D HUD. The gamepad-navigation flag
-    // is now a plain bool member rather than a bit in ImGui's IO ConfigFlags.
+    // Dear ImGui is a real library again, and it drives the DEVELOPER OVERLAYS only. The shipped,
+    // game-facing UI is RmlUi (stood up in ImGuiBackendInit) plus the native Zelda3D HUD. Two
+    // stacks on purpose -- see docs/dusklight-adoption.md.
+    //
+    // Note what is NOT restored: the old "Main - Deck" dock that hosted the game framebuffer as an
+    // ImGui::Image. The game frame is composited natively now, so ImGui windows float over it
+    // instead of containing it. DrawMenu below reflects that.
+    // The ImGui context is ENGINE lifetime, not per-game -- the same split Ship::Context draws for
+    // the window and renderer. Gui::Init runs again when a second game attaches, and creating a
+    // second context there orphaned the first: the font atlas the live backend was bound to went
+    // with it, and OoT-after-MM died on its first frame in ImGui::NewFrame -> SetCurrentFont.
+    //
+    // Only the resource factories below are per-game, and they are re-registered every time
+    // (Context::InitResourceManager calls RegisterResourceFactories directly for exactly that).
+    if (ImGui::GetCurrentContext() != nullptr) {
+        SPDLOG_INFO("Gui::Init: reusing the existing ImGui context -- it is engine state, and this "
+                    "is a second game attaching. Re-registering this game's resource factories only.");
+        RegisterResourceFactories();
+        return;
+    }
+
+    ImGuiContext* ctx = ImGui::CreateContext();
+    ImGui::SetCurrentContext(ctx);
+    ImGuiIO& io = ImGui::GetIO();
+    // Docking lets the dev-tool windows be arranged against each other. NoMouseCursorChange leaves
+    // the cursor to the game/SDL rather than ImGui.
+    io.ConfigFlags |= ImGuiConfigFlags_DockingEnable | ImGuiConfigFlags_NoMouseCursorChange;
+
+    // Font Awesome merged into the default font, so ICON_FA_* glyphs resolve in dev-tool labels.
+    io.Fonts->AddFontDefault();
+    const float baseFontSize = 13.0f; // must match the default font size
+    const float iconFontSize = baseFontSize * 2.0f / 3.0f; // FA needs 2/3 to sit on the baseline
+    static const ImWchar sIconsRanges[] = { ICON_MIN_FA, ICON_MAX_16_FA, 0 };
+    ImFontConfig iconsConfig;
+    iconsConfig.MergeMode = true;
+    iconsConfig.PixelSnapH = true;
+    iconsConfig.GlyphMinAdvanceX = iconFontSize;
+    io.Fonts->AddFontFromMemoryCompressedBase85TTF(fontawesome_compressed_data_base85, iconFontSize, &iconsConfig,
+                                                   sIconsRanges);
+
+    mImGuiIniPath = Context::GetPathRelativeToAppDirectory("imgui.ini");
+    mImGuiLogPath = Context::GetPathRelativeToAppDirectory("imgui_log.txt");
+    io.IniFilename = mImGuiIniPath.c_str();
+    io.LogFilename = mImGuiLogPath.c_str();
+
+    ApplyGamepadNavigationFlag();
 
     RegisterResourceFactories();
 
     ImGuiWMInit();
-    ImGuiBackendInit(); // Fast3dGui override stands up the RmlUi menu here.
+    ImGuiBackendInit(); // Fast3dGui override stands up the RmlUi menu and the ImGui renderer backend.
+}
+
+// Push mGamepadNavigationEnabled into ImGui's IO. Kept as a member rather than reading the IO flag
+// back out because the engine asks "is the pad driving the UI?" in paths that must answer the same
+// way whether or not an ImGui context exists.
+void Gui::ApplyGamepadNavigationFlag() {
+    if (ImGui::GetCurrentContext() == nullptr) {
+        return;
+    }
+    ImGuiIO& io = ImGui::GetIO();
+    if (mGamepadNavigationEnabled) {
+        io.ConfigFlags |= ImGuiConfigFlags_NavEnableGamepad;
+    } else {
+        io.ConfigFlags &= ~ImGuiConfigFlags_NavEnableGamepad;
+    }
 }
 
 void Gui::RegisterResourceFactories() {
@@ -91,6 +147,9 @@ void Gui::ShutDownImGui(Ship::Window* window) {
     mShutDown = true;
     ImGuiWMShutdown();
     ImGuiBackendShutdown();
+    if (ImGui::GetCurrentContext() != nullptr) {
+        ImGui::DestroyContext();
+    }
 }
 
 void Gui::ImGuiWMShutdown() {
@@ -112,6 +171,7 @@ bool Gui::GamepadNavigationEnabled() {
 
 void Gui::BlockGamepadNavigation() {
     mGamepadNavigationEnabled = false;
+    ApplyGamepadNavigationFlag();
 }
 
 void Gui::UnblockGamepadNavigation() {
@@ -119,6 +179,7 @@ void Gui::UnblockGamepadNavigation() {
         GetMenuOrMenubarVisible()) {
         mGamepadNavigationEnabled = true;
     }
+    ApplyGamepadNavigationFlag();
 }
 
 void Gui::ImGuiBackendNewFrame() {
@@ -128,22 +189,53 @@ void Gui::ImGuiWMNewFrame() {
 }
 
 void Gui::DrawMenu() {
-    // ImGui removed: the old ImGui dock ("Main - Deck"), the dev-tool/menu window tick loop, and the
-    // ImGui menu/reset hotkeys are gone. The live menu is RmlUi (driven from Fast3dGui), and the
-    // registered GuiWindows are inert scaffolding (see AddGuiWindow). Nothing to do here.
+    // Developer overlays only: tick and draw each registered GuiWindow as a free-floating ImGui
+    // window over the natively-composited game frame.
+    //
+    // Deliberately NOT restored from the pre-shim version: the full-screen "Main - Deck" host
+    // window, its DockBuilder layout, the ImGui::Image of the game framebuffer, and the Esc/F1
+    // menu hotkeys. The game is no longer composited through ImGui, and Esc belongs to the RmlUi
+    // menu -- binding it here too would open both at once.
+    if (ImGui::GetCurrentContext() == nullptr) {
+        return;
+    }
+
+    if (GetMenuBar()) {
+        GetMenuBar()->Update();
+        GetMenuBar()->Draw();
+    }
+    if (GetMenu()) {
+        GetMenu()->Update();
+        GetMenu()->Draw();
+    }
+    for (auto& windowIter : mGuiWindows) {
+        windowIter.second->Update();
+        windowIter.second->Draw();
+    }
 }
 
 void Gui::StartFrame() {
-    // ImGui removed: no NewFrame / backend new-frame. Frame compositing is the interpreter's native
-    // path; the menu is RmlUi (rendered in EndFrame).
+    if (ImGui::GetCurrentContext() == nullptr) {
+        return;
+    }
+    ImGuiBackendNewFrame();
+    ImGuiWMNewFrame();
+    ImGui::NewFrame();
 }
 
 void Gui::EndFrame() {
-    // ImGui removed: no Render / draw-data path. The game frame is composited natively by the
-    // interpreter onto fb 0; here we draw the Zelda3D HUD (its own quad renderer, NOT the Fast3D
-    // interpreter — kanban #205) and then the RmlUi menu on top.
+    if (ImGui::GetCurrentContext() == nullptr) {
+        return;
+    }
+    ImGui::Render();
+
+    // Layering, bottom to top: the game frame (composited natively by the interpreter onto fb 0),
+    // then the Zelda3D HUD (its own quad renderer, NOT the Fast3D interpreter -- kanban #205), then
+    // the RmlUi menu, then the ImGui dev overlays. Dev tools go last so they are visible over an
+    // open ESC menu, which is the whole point of a debug overlay.
     Zelda3D_HostHudFrame();
     RenderRmlMenu();
+    ImGuiRenderDrawData(ImGui::GetDrawData());
 }
 
 void Gui::CalculateGameViewport() {

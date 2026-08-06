@@ -79,14 +79,11 @@ if(INCLUDE_MPQ_SUPPORT)
     endif()
 endif()
 
-# Dear ImGui is now a header-only no-op shim (see cmake/dependencies/common.cmake): the SoH ImGui
-# UI code is kept in-tree as inert scaffolding and must still link, so we compile a stub that
-# provides every referenced ImGui symbol as a no-op. SDL3 was formerly carried transitively by the
-# (removed) ImGui target; link it directly now.
-target_sources(libultraship PRIVATE ${CMAKE_CURRENT_SOURCE_DIR}/../imgui_shim/imgui_stub.cpp)
-
+# Dear ImGui is a real library again (see cmake/dependencies/common.cmake), so the no-op stub that
+# stood in for it is gone. PUBLIC because the games' own dev-tool windows include imgui.h and must
+# inherit both the include dirs and IMGUI_USER_CONFIG.
 target_link_libraries(libultraship
-    PUBLIC SDL3::SDL3
+    PUBLIC SDL3::SDL3 ImGui
 )
 
 # OpenGL was formerly linked transitively via the (removed) ImGui target; a couple of renderer

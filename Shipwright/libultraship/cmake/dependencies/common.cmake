@@ -2,17 +2,57 @@ include(FetchContent)
 
 find_package(OpenGL QUIET)
 
-#=================== ImGui (no-op shim) ===================
-# The real Dear ImGui library has been removed from the build. The SoH ImGui dev-tool / menu code is
-# kept in-tree as inert scaffolding to migrate to RmlUi later, so it must still COMPILE and LINK — it
-# is just never rendered (the RmlUi menu is the live UI). To that end we vendor only the ImGui *headers*
-# (imgui_shim/, the patched v1.91.9b headers) and link a no-op stub (imgui_stub.cpp, added to the
-# libultraship target in src/CMakeLists.txt) that provides every referenced ImGui symbol as a no-op.
-# Nothing from upstream imgui (imgui.cpp/draw/tables/widgets/demo or the impl_* backends) is compiled.
+#=================== Dear ImGui ===================
+# ImGui is the DEVELOPER-OVERLAY stack: console, save editor, heap/camera/process overlays, actor
+# spawner. The shipped, game-facing UI is RmlUi (below). Two stacks on purpose -- see
+# docs/dusklight-adoption.md; Dusklight, a mature port of the same shape, made the same split.
+#
+# This replaces a no-op header shim. The shim vendored these exact headers and linked a stub whose
+# every function did nothing, which was fine under a dev-tool window and actively harmful anywhere a
+# LIVE predicate read ImGui state: the stubs returned zeroed, never-null storage, so the predicate
+# silently became a constant. Four shipped bugs had that one shape (mouse input blocked every frame,
+# mouse buttons unbindable, rumble suppressed, floating windows never drawn) and none of them logged
+# anything.
+#
+# The DOCKING branch, not master: SoH's dev UI is built around DockSpace()/viewports, and the master
+# headers have neither. The tag below was verified byte-identical to the headers the shim vendored,
+# so this is a fetch rather than a port -- nothing in-tree was compiled against a patched ImGui.
+FetchContent_Declare(
+    imgui
+    GIT_REPOSITORY https://github.com/ocornut/imgui.git
+    GIT_TAG v1.91.9b-docking
+    GIT_SHALLOW TRUE
+)
+FetchContent_MakeAvailable(imgui)
+
+# Upstream ships no CMakeLists, so the target is ours. Core + the C++ std::string helpers, plus the
+# two backends matching this build: SDL3 for platform/input and SDL3-GPU for rendering, which is the
+# only rendering backend this port has. imgui_demo.cpp is deliberately omitted.
+add_library(ImGui STATIC
+    ${imgui_SOURCE_DIR}/imgui.cpp
+    ${imgui_SOURCE_DIR}/imgui_draw.cpp
+    ${imgui_SOURCE_DIR}/imgui_tables.cpp
+    ${imgui_SOURCE_DIR}/imgui_widgets.cpp
+    ${imgui_SOURCE_DIR}/misc/cpp/imgui_stdlib.cpp
+    ${imgui_SOURCE_DIR}/backends/imgui_impl_sdl3.cpp
+    ${imgui_SOURCE_DIR}/backends/imgui_impl_sdlgpu3.cpp
+)
+target_include_directories(ImGui PUBLIC
+    ${imgui_SOURCE_DIR}
+    ${imgui_SOURCE_DIR}/backends
+    ${imgui_SOURCE_DIR}/misc/cpp
+    ${CMAKE_CURRENT_SOURCE_DIR}/imgui_config
+)
+# PUBLIC: every translation unit that includes imgui.h must see the same ImTextureID, or the ODR
+# violation shows up as a link error in whichever file happened to be compiled differently.
+target_compile_definitions(ImGui PUBLIC IMGUI_USER_CONFIG="zelda3d_imconfig.h")
+target_link_libraries(ImGui PUBLIC SDL3::SDL3)
+
 list(APPEND ADDITIONAL_LIB_INCLUDES
-    ${CMAKE_CURRENT_SOURCE_DIR}/imgui_shim
-    ${CMAKE_CURRENT_SOURCE_DIR}/imgui_shim/backends
-    ${CMAKE_CURRENT_SOURCE_DIR}/imgui_shim/misc/cpp
+    ${imgui_SOURCE_DIR}
+    ${imgui_SOURCE_DIR}/backends
+    ${imgui_SOURCE_DIR}/misc/cpp
+    ${CMAKE_CURRENT_SOURCE_DIR}/imgui_config
 )
 
 #=================== RmlUi ===================
