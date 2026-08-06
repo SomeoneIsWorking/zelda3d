@@ -1,4 +1,6 @@
 #pragma once
+
+#include "ship/utils/Color4f.h"
 // SDL3-MIGRATION: SDL2 -> SDL3 single-header include.
 #include <SDL3/SDL.h>
 
@@ -98,7 +100,7 @@ class Fast3dGui : public Ship::Gui {
      * @param path Virtual resource path of the source image.
      * @param tint RGBA tint multiplied over the image (use ImVec4(1,1,1,1) for no tint).
      */
-    void LoadGuiTexture(const std::string& name, const std::string& path, const ImVec4& tint);
+    void LoadGuiTexture(const std::string& name, const std::string& path, const Ship::Color4f& tint);
 
     /**
      * @brief Returns true if a texture with the given name is already cached.
@@ -112,7 +114,7 @@ class Fast3dGui : public Ship::Gui {
      * @param tex  Source texture data.
      * @param tint RGBA tint.
      */
-    void LoadGuiTexture(const std::string& name, const Fast::Texture& tex, const ImVec4& tint);
+    void LoadGuiTexture(const std::string& name, const Fast::Texture& tex, const Ship::Color4f& tint);
 
     /**
      * @brief Removes the texture with the given name from the cache and frees GPU resources.
@@ -132,7 +134,7 @@ class Fast3dGui : public Ship::Gui {
      * @param name Texture cache key.
      * @return ImVec2 with the texture's width and height, or (0, 0) if not found.
      */
-    ImVec2 GetTextureSize(const std::string& name);
+    Ship::Size2f GetTextureSize(const std::string& name);
 
     /**
      * @brief Loads a raw image file from the filesystem (not the archive) and caches it.

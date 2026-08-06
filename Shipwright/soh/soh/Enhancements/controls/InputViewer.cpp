@@ -168,7 +168,7 @@ void InputViewer::DrawElement() {
             CVarGetInteger(CVAR_INPUT_VIEWER("ButtonOutlineMode"), BUTTON_OUTLINE_NOT_PRESSED);
         const bool useGlobalOutlineMode = CVarGetInteger(CVAR_INPUT_VIEWER("UseGlobalButtonOutlineMode"), 1);
 
-        ImVec2 bgSize =
+        Ship::Size2f bgSize =
             std::dynamic_pointer_cast<Fast::Fast3dGui>(Ship::Context::GetRawInstance()->GetWindow()->GetGui())
                 ->GetTextureSize("Input-Viewer-Background");
         ImVec2 scaledBGSize = ImVec2(bgSize.x * scale, bgSize.y * scale);

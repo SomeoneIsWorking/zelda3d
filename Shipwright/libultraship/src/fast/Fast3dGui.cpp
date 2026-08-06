@@ -441,11 +441,11 @@ void* Fast3dGui::GetTextureByName(const std::string& name) {
     return GetTextureById(mGuiTextures[name].RendererTextureId);
 }
 
-ImVec2 Fast3dGui::GetTextureSize(const std::string& name) {
+Ship::Size2f Fast3dGui::GetTextureSize(const std::string& name) {
     if (!HasTextureByName(name)) {
-        return ImVec2(0, 0);
+        return Ship::Size2f(0, 0);
     }
-    return ImVec2(mGuiTextures[name].Width, mGuiTextures[name].Height);
+    return Ship::Size2f((float)mGuiTextures[name].Width, (float)mGuiTextures[name].Height);
 }
 
 void Fast3dGui::LoadTextureFromRawImage(const std::string& name, const std::string& path) {
@@ -472,7 +472,7 @@ void Fast3dGui::LoadTextureFromResource(const std::string& name, std::shared_ptr
     mGuiTextures[name] = texture->Metadata;
 }
 
-void Fast3dGui::LoadGuiTexture(const std::string& name, const Fast::Texture& res, const ImVec4& tint) {
+void Fast3dGui::LoadGuiTexture(const std::string& name, const Fast::Texture& res, const Ship::Color4f& tint) {
     GfxRenderingAPI* api = mInterpreter.lock()->GetCurrentRenderingAPI();
     std::vector<uint8_t> texBuffer;
     texBuffer.reserve(res.Width * res.Height * 4);
@@ -588,10 +588,10 @@ void Fast3dGui::LoadGuiTexture(const std::string& name, const Fast::Texture& res
     }
 
     for (size_t pixel = 0; pixel < texBuffer.size() / 4; pixel++) {
-        texBuffer[pixel * 4 + 0] *= tint.x;
-        texBuffer[pixel * 4 + 1] *= tint.y;
-        texBuffer[pixel * 4 + 2] *= tint.z;
-        texBuffer[pixel * 4 + 3] *= tint.w;
+        texBuffer[pixel * 4 + 0] *= tint.r;
+        texBuffer[pixel * 4 + 1] *= tint.g;
+        texBuffer[pixel * 4 + 2] *= tint.b;
+        texBuffer[pixel * 4 + 3] *= tint.a;
     }
 
     Ship::GuiTextureMetadata asset;
@@ -606,7 +606,7 @@ void Fast3dGui::LoadGuiTexture(const std::string& name, const Fast::Texture& res
     mGuiTextures[name] = asset;
 }
 
-void Fast3dGui::LoadGuiTexture(const std::string& name, const std::string& path, const ImVec4& tint) {
+void Fast3dGui::LoadGuiTexture(const std::string& name, const std::string& path, const Ship::Color4f& tint) {
     const auto res = static_cast<Fast::Texture*>(
         Ship::Context::GetRawInstance()->GetResourceManager()->LoadResource(path, true).get());
 

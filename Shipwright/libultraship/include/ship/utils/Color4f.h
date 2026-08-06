@@ -27,4 +27,23 @@ struct Color4f {
     }
 };
 
+/**
+ * @brief A plain 2D size/offset in pixels.
+ *
+ * Same reason as Color4f: `ImVec2` was appearing in engine signatures that describe geometry, not
+ * GUI. Fields are named x/y to match ImVec2 so call sites reading `.x`/`.y` are untouched.
+ *
+ * Named Size2f rather than the obvious Vec2f because OoT's z64math.h already defines a `Vec2f`, and
+ * a game TU that does `using namespace Ship;` before including it then fails to parse the game's own
+ * typedef. A short, generic name in a shared namespace is a collision waiting to happen.
+ */
+struct Size2f {
+    float x = 0.0f;
+    float y = 0.0f;
+
+    constexpr Size2f() = default;
+    constexpr Size2f(float xIn, float yIn) : x(xIn), y(yIn) {
+    }
+};
+
 } // namespace Ship

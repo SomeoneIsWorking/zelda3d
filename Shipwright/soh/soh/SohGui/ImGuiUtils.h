@@ -3,6 +3,8 @@
 
 #pragma once
 
+#include "ship/utils/Color4f.h"
+
 #include <imgui.h>
 #include <array>
 #include <map>
@@ -57,13 +59,13 @@ typedef struct {
     uint32_t id;
     std::string name;
     std::string nameFaded;
-    ImVec4 color;
+    Ship::Color4f color;
 } SongMapEntry;
 
 #define SONG_MAP_ENTRY(id, r, g, b)                                                 \
     {                                                                               \
         id, {                                                                       \
-            id, #id, #id "_Faded", ImVec4(r / 255.0f, g / 255.0f, b / 255.0f, 1.0f) \
+            id, #id, #id "_Faded", Ship::Color4f(r / 255.0f, g / 255.0f, b / 255.0f, 1.0f) \
         }                                                                           \
     }
 
@@ -71,7 +73,7 @@ typedef struct {
 extern std::map<QuestItem, SongMapEntry> songMapping;
 
 #define VANILLA_SONG_MAP_ENTRY(id, r, g, b) \
-    { id, #id "_Vanilla", #id "_Vanilla_Faded", ImVec4(r / 255.0f, g / 255.0f, b / 255.0f, 1.0f) }
+    { id, #id "_Vanilla", #id "_Vanilla_Faded", Ship::Color4f(r / 255.0f, g / 255.0f, b / 255.0f, 1.0f) }
 
 // Maps song ids to info for use in ImGui
 extern std::array<SongMapEntry, 12> vanillaSongMapping;
