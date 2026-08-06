@@ -13,7 +13,6 @@
 #include "ship/controller/physicaldevice/SDLAddRemoveDeviceEventHandler.h"
 #include "ship/window/gui/IconsFontAwesome4.h"
 #include "ship/window/gui/GameOverlay.h"
-#include "ship/window/gui/StatsWindow.h"
 #include "ship/window/gui/GuiWindow.h"
 #include "ship/window/gui/GuiMenuBar.h"
 
