@@ -188,7 +188,8 @@ assets/      generated *_png.h texture blobs (527 KB) — Phase 0 DONE
 
 **Phase 3 also fixed the accumulated Phase-2b build breakage** (the reorg's single end-to-end build,
 run once at the very end per the stated plan) — see commit `1689dc30` for the full list: broken
-relative includes after these moves, a stale `charcompare/CMakeLists.txt` hardcoded path, ~25
+relative includes after these moves, a hardcoded path in the since-deleted charcompare tool's
+CMakeLists, ~25
 REPL-tunable globals + the `ZELDA3D_GSCALE` macro + `Play_Update` missing from
 `render/zelda3d_render.h`'s documented shared-symbol contract, a `char*`/`const char*` mismatch,
 missing `extern "C"` declarations for symbols crossing the C/C++ boundary, and a `goto` that jumped
