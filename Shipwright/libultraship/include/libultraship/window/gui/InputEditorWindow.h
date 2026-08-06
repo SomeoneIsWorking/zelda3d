@@ -1,5 +1,7 @@
 #pragma once
 
+#include <climits>
+
 #include "stdint.h"
 #include "ship/window/gui/GuiWindow.h"
 #include <imgui.h>
@@ -185,9 +187,14 @@ class InputEditorWindow : public Ship::GuiWindow {
      */
     void DrawAddGyroMappingButton(uint8_t port);
 
-    int32_t mGameInputBlockTimer;
-    int32_t mMappingInputBlockTimer;
-    int32_t mRumbleTimer;
+    int32_t mGameInputBlockTimer = INT32_MAX;
+    int32_t mMappingInputBlockTimer = INT32_MAX;
+    // In-class initialisers, because these were set ONLY by InitElement -- and between bad027cd
+    // (which dropped the Init() call) and its restoration, InitElement never ran. mRumbleTimer was
+    // therefore uninitialised garbage, and TestingRumble() returns `mRumbleTimer != INT32_MAX`,
+    // which OTRGlobals uses to EARLY-RETURN out of the rumble path. Garbage there silently
+    // suppressed rumble entirely. A class must not depend on a method that may not be called.
+    int32_t mRumbleTimer = INT32_MAX;
     std::shared_ptr<Ship::ControllerRumbleMapping> mRumbleMappingToTest;
 
     // mBitmaskToMappingIds[port][bitmask] = { id0, id1, ... }
@@ -227,7 +234,7 @@ class InputEditorWindow : public Ship::GuiWindow {
 
     std::set<CONTROLLERBUTTONS_T> mButtonsBitmasks;
     std::set<CONTROLLERBUTTONS_T> mDpadBitmasks;
-    bool mInputEditorPopupOpen;
+    bool mInputEditorPopupOpen = false;
 
     /**
      * @brief Draws the "Set Defaults" button that restores default mappings for a port.
