@@ -1,6 +1,6 @@
 #include <soh/OTRGlobals.h>
 #include "static_data.h"
-#include "soh/ObjectExtension/ObjectExtension.h"
+#include "object/ObjectExtension.h"
 #include "soh/Enhancements/randomizer/randomizer.h"
 #include "soh/Enhancements/randomizer/RCToRandInf.h"
 

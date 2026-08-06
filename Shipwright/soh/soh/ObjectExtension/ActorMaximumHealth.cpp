@@ -1,5 +1,5 @@
 #include "ActorMaximumHealth.h"
-#include "soh/ObjectExtension/ObjectExtension.h"
+#include "object/ObjectExtension.h"
 #include "soh/ShipInit.hpp"
 #include "soh/Enhancements/game-interactor/GameInteractor.h"
 

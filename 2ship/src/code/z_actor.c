@@ -30,7 +30,7 @@
 #include "2s2h/zelda3d/mm3d_model.h" // Zelda3D_MM_AfterActorDraw — clears the deferred skinned slot
 #include "2s2h/BenPort.h"
 #include "2s2h/ShipUtils.h"
-#include "2s2h/ObjectExtension/ObjectExtension.h"
+#include "object/ObjectExtension.h"
 #include "2s2h/ObjectExtension/ActorListIndex.h"
 #include <libultraship/bridge/consolevariablebridge.h>
 

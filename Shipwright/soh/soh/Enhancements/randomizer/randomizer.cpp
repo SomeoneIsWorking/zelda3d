@@ -27,7 +27,7 @@
 #include "soh/util.h"
 #include "randomizerTypes.h"
 #include "soh/Notification/Notification.h"
-#include "soh/ObjectExtension/ObjectExtension.h"
+#include "object/ObjectExtension.h"
 #include "soh/Enhancements/randomizer/RCToRandInf.h"
 
 extern "C" {

@@ -7,7 +7,7 @@
 #include "objects/gameplay_keep/gameplay_keep.h"
 #include "objects/gameplay_dangeon_keep/gameplay_dangeon_keep.h"
 #include "objects/object_bdoor/object_bdoor.h"
-#include "soh/ObjectExtension/ObjectExtension.h"
+#include "object/ObjectExtension.h"
 #include "soh/ObjectExtension/ActorListIndex.h"
 #include "zelda3d/zelda3d.h"
 #include "soh/frame_interpolation.h"

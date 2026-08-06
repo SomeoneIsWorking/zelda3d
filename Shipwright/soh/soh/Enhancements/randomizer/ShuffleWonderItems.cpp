@@ -1,7 +1,7 @@
 #include <soh/OTRGlobals.h>
 #include <soh/GameVersions.h>
 #include "soh/ResourceManagerHelpers.h"
-#include "soh/ObjectExtension/ObjectExtension.h"
+#include "object/ObjectExtension.h"
 #include "soh/ObjectExtension/ActorListIndex.h"
 #include "item_category_adj.h"
 #include "particle_cmc.h"

@@ -1,7 +1,7 @@
 #include <soh/OTRGlobals.h>
 #include "soh_assets.h"
 #include "static_data.h"
-#include "soh/ObjectExtension/ObjectExtension.h"
+#include "object/ObjectExtension.h"
 #include "item_category_adj.h"
 #include "soh/Enhancements/randomizer/randomizer.h"
 #include "soh/Enhancements/randomizer/RCToRandInf.h"
