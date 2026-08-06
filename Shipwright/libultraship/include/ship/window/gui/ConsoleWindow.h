@@ -29,6 +29,14 @@ namespace Ship {
  */
 class ConsoleWindow : public GuiWindow {
   public:
+    /**
+     * @brief Registers the engine's own console commands (set/get/help/clear/bind/...).
+     *
+     * Called by InitElement, and again by Context::InitConsole when a different game
+     * attaches: the command registry is PER-GAME but this window is engine-lifetime, so a
+     * second game's fresh Console would otherwise hold only that game's own commands.
+     */
+    void RegisterCommands();
     using GuiWindow::GuiWindow;
     virtual ~ConsoleWindow();
 
@@ -107,6 +115,7 @@ class ConsoleWindow : public GuiWindow {
 
     /** @brief Registers built-in console commands (clear, help, bind, set, get, …). */
     void InitElement() override;
+
 
     /** @brief Processes key bindings and clears expired auto-complete state. */
     void UpdateElement() override;

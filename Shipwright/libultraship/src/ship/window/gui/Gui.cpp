@@ -32,7 +32,20 @@ Gui::Gui(std::vector<std::shared_ptr<GuiWindow>> guiWindows) : mNeedsConsoleVari
         AddGuiWindow(guiWindow);
     }
 
-    // Add default windows if we don't already have one by the name
+    AddDefaultGuiWindows();
+}
+
+// The ENGINE's own windows, as opposed to a game's menus and editors.
+//
+// Called from the constructor and again after RemoveAllGuiWindows(), which runs when a game session
+// ends. That clear has to take the departing game's windows -- their vtables live in that game's .so
+// -- but it used to take these with them, and nothing put them back, so the second game in a process
+// ran with no console window at all. These are safe to keep across games (their vtables are in
+// libultraship.so); they are only cleared because the clear could not tell the two apart.
+//
+// Each is added only if absent, so this is idempotent and a game that supplied its own window under
+// the same name keeps it.
+void Gui::AddDefaultGuiWindows() {
     if (GetGuiWindow("SDLAddRemoveDeviceEventHandler") == nullptr) {
         AddGuiWindow(std::make_shared<SDLAddRemoveDeviceEventHandler>("gOpenWindows.SDLAddRemoveDeviceEventHandler",
                                                                       "SDLAddRemoveDeviceEventHandler"));

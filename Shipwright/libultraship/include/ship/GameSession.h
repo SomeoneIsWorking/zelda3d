@@ -7,6 +7,7 @@
 namespace Ship {
 
 class Config;
+class Console;
 class ConsoleVariable;
 class ControlDeck;
 class ResourceManager;
@@ -73,6 +74,7 @@ class GameSession {
     const std::string& GetConfigFilePath() const;
 
     std::shared_ptr<Config> mConfig;
+    std::shared_ptr<Console> mConsole;
     std::shared_ptr<ConsoleVariable> mConsoleVariables;
     std::shared_ptr<ResourceManager> mResourceManager;
     std::shared_ptr<ControlDeck> mControlDeck;

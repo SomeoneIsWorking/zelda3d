@@ -120,6 +120,15 @@ class Gui {
     /** @brief Removes all registered GuiWindows from the draw loop. */
     void RemoveAllGuiWindows();
 
+    /**
+     * @brief (Re)creates the engine's own windows -- the console and the SDL device handler.
+     *
+     * Idempotent: each is added only if no window of that name exists. Called by the constructor and
+     * again after RemoveAllGuiWindows(), so a second game attaching to a running engine still has
+     * them.
+     */
+    void AddDefaultGuiWindows();
+
     /** @brief Returns the GameOverlay instance used for on-screen text and notifications. */
     std::shared_ptr<GameOverlay> GetGameOverlay();
 
