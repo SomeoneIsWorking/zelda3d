@@ -5279,9 +5279,21 @@ void Interpreter::Init(class GfxWindowBackend* wapi, class GfxRenderingAPI* rapi
 }
 
 void Interpreter::Destroy() {
-    // TODO: should also destroy rapi, and any other resources acquired in fast3d
     free(mTexUploadBuffer);
-    mWapi->Destroy();
+
+    // The window backend is deliberately NOT destroyed here, though this function used to do it.
+    // GfxWindowBackendSDL3::Destroy() ends in SDL_Quit(), which unloads the Vulkan library -- and
+    // Fast3dWindow's only call to this function runs BEFORE `delete mRenderingApi`, so the SDL3-GPU
+    // device was being destroyed after its driver had been unmapped. SDL_DestroyGPUDevice then
+    // called through a dangling pointer inside VULKAN_DestroyDevice: SIGSEGV, or heap corruption
+    // ("double free or corruption (!prev)") depending on what had been remapped over the address.
+    //
+    // It stayed invisible for the project's whole life because OoT's DeinitOTR calls _exit(0), so
+    // this destructor never ran; MM unwinds and returns through the launcher, and hit it every time.
+    //
+    // Teardown order is a window-lifetime decision, not an interpreter one, so Fast3dWindow now owns
+    // it: render API first (it still needs a live window for SDL_ReleaseWindowFromGPUDevice), then
+    // the window backend.
 
     // Texture cache and loaded textures store references to Resources which need to be unreferenced.
     TextureCacheClear();

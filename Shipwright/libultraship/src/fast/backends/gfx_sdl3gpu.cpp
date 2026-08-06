@@ -586,11 +586,30 @@ GfxRenderingAPISdl3Gpu::GfxRenderingAPISdl3Gpu(GfxWindowBackendSDL3* windowBacke
 }
 
 GfxRenderingAPISdl3Gpu::~GfxRenderingAPISdl3Gpu() {
+    // Step trace for teardown, gated on the backend's existing debug flag. This destructor spent the
+    // project's whole life unreachable -- OoT's DeinitOTR calls _exit(0), so static destructors never
+    // ran -- and the first time a core unwound and returned (MM, through the launcher) it aborted with
+    // a glibc "double free or corruption (!prev)" somewhere inside these ~15 release loops. A bare
+    // backtrace cannot name which one: the binary is -O2/NDEBUG with no line info and the system SDL3
+    // exports a single symbol, so both addr2line and nm resolve to nothing. Each step names itself
+    // BEFORE the call it is about to make, so the last line printed is the one that died.
+    const bool trace = [] {
+        const char* e = getenv("ZELDA3D_SDL3GPU_DEBUG");
+        return e != nullptr && e[0] == '1';
+    }();
+    const auto step = [trace](const char* what) {
+        if (trace) {
+            SPDLOG_INFO("~GfxRenderingAPISdl3Gpu: {}", what);
+        }
+    };
+    step("begin");
     if (g_activeSdl3GpuApi == this)
         g_activeSdl3GpuApi = nullptr;
     // Release the folded-in renderer subsystems while the device is still alive (their GPU resources
     // are owned by the device and freed at SDL_DestroyGPUDevice below — same as before the fold).
+    step("mSoh3d.reset");
     mSoh3d.reset();
+    step("mHud.reset");
     mHud.reset();
     if (mDevice == nullptr)
         return;
@@ -602,14 +621,19 @@ GfxRenderingAPISdl3Gpu::~GfxRenderingAPISdl3Gpu() {
         SDL_CancelGPUCommandBuffer(mCmd);
         mCmd = nullptr;
     }
+    step("WaitForGPUIdle");
     SDL_WaitForGPUIdle(mDevice);
+    step("FlushPendingTexReleases");
     FlushPendingTexReleases(); // GPU idle: release any textures deferred from the last frame
+    step("framebuffers");
     for (auto& fb : mFramebuffers)
         DestroyFbResources(fb);
     mFramebuffers.clear();
+    step("pipelines");
     for (auto& kv : mPipelineCache)
         SDL_ReleaseGPUGraphicsPipeline(mDevice, kv.second);
     mPipelineCache.clear();
+    step("shaders");
     for (auto& kv : mShaderProgramPool) {
         if (kv.second.vert)
             SDL_ReleaseGPUShader(mDevice, kv.second.vert);
@@ -617,25 +641,32 @@ GfxRenderingAPISdl3Gpu::~GfxRenderingAPISdl3Gpu() {
             SDL_ReleaseGPUShader(mDevice, kv.second.frag);
     }
     mShaderProgramPool.clear();
+    step("samplers");
     for (auto& kv : mSamplerCache)
         SDL_ReleaseGPUSampler(mDevice, kv.second);
     mSamplerCache.clear();
+    step("textures");
     for (auto& t : mTextures) {
         if (!t.isFbAlias && t.tex)
             SDL_ReleaseGPUTexture(mDevice, t.tex);
     }
     mTextures.clear();
+    step("dummy tex/sampler");
     if (mDummyTex)
         SDL_ReleaseGPUTexture(mDevice, mDummyTex);
     if (mDummySampler)
         SDL_ReleaseGPUSampler(mDevice, mDummySampler);
+    step("vbo/transfer");
     if (mVbo)
         SDL_ReleaseGPUBuffer(mDevice, mVbo);
     if (mVtxTransfer)
         SDL_ReleaseGPUTransferBuffer(mDevice, mVtxTransfer);
+    step("release window from device");
     if (mWindow)
         SDL_ReleaseWindowFromGPUDevice(mDevice, mWindow);
+    step("DestroyGPUDevice");
     SDL_DestroyGPUDevice(mDevice);
+    step("done");
     mDevice = nullptr;
 }
 

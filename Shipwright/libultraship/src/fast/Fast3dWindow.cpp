@@ -53,7 +53,19 @@ Fast3dWindow::~Fast3dWindow() {
         gui->ShutDownImGui(this);
     }
     mInterpreter->Destroy();
+
+    // Order matters, and it is the reverse of creation:
+    //  - the rendering API goes first, while the SDL window and the Vulkan library are both still
+    //    alive: ~GfxRenderingAPISdl3Gpu calls SDL_ReleaseWindowFromGPUDevice(mDevice, mWindow) and
+    //    then SDL_DestroyGPUDevice, and both need a live window and a loaded driver;
+    //  - the window backend goes second, because its Destroy() is what calls SDL_DestroyWindow and
+    //    SDL_Quit (the latter unloads the Vulkan library).
+    // Doing it the other way round -- which is what Interpreter::Destroy() used to do implicitly --
+    // destroys the GPU device after its driver has been unmapped. See interpreter.cpp for the crash.
     delete mRenderingApi;
+    if (mWindowManagerApi != nullptr) {
+        mWindowManagerApi->Destroy();
+    }
     delete mWindowManagerApi;
 }
 
