@@ -450,7 +450,20 @@ bool Context::InitCrashHandler() {
 
 bool Context::InitAudio(AudioSettings settings) {
     if (GetAudio() != nullptr) {
-        return AlreadyInitialised(mSession.get(), "Audio", SubsystemLifetime::SplitPending);
+        // Engine lifetime, like the window and renderer: one output device for the process. What is
+        // per-game is the SETTINGS that configure it, so an attaching game gets its own saved
+        // backend and channel layout applied to the device that is already running.
+        //
+        // This used to be classified SplitPending -- "part engine, part per-game, not yet divided".
+        // The part that genuinely was per-game turned out to be a bug rather than missing work:
+        // Audio::Init cached a shared_ptr to whichever game started FIRST and kept it for the
+        // process lifetime, so a second game read and Save()d its audio settings into the departed
+        // game's config file. Audio now resolves the live config per use, which leaves nothing
+        // per-game in the object itself.
+        if (sForeignCoreAttached) {
+            GetAudio()->ApplySavedSettings();
+        }
+        return AlreadyInitialised(mSession.get(), "Audio", SubsystemLifetime::Engine);
     }
 
     mAudio = std::make_shared<Audio>(settings);

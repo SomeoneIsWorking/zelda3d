@@ -68,6 +68,16 @@ class Audio {
      */
     AudioChannelsSetting GetAudioChannels() const;
 
+    /**
+     * @brief Applies the CURRENT game's saved backend and channel layout to the live device.
+     *
+     * Called by Init(), and again whenever a different game attaches to the running engine. The
+     * device is engine-lifetime (one output for the process) but the settings that configure it are
+     * per-game, so a second game's saved audio preferences would otherwise be ignored for as long
+     * as the process lived.
+     */
+    void ApplySavedSettings();
+
   protected:
     /** @brief (Re)initialises the AudioPlayer for the current backend and channel settings. */
     void InitAudioPlayer();
@@ -94,6 +104,16 @@ class Audio {
     AudioBackend mAudioBackend;
     AudioSettings mAudioSettings;
     std::shared_ptr<std::vector<AudioBackend>> mAvailableAudioBackends;
-    std::shared_ptr<Config> mConfig;
+
+    /**
+     * @brief The CURRENT game's config, resolved on each use.
+     *
+     * Deliberately not cached in a member. Audio is engine-lifetime -- one output device for the
+     * process -- but Config is PER-GAME (Context::GetConfig returns the GameSession's, and a second
+     * game installs a fresh one at its own file). Init() used to bind a shared_ptr to whichever
+     * game happened to start first and hold it forever, so once a second game attached, every audio
+     * setting was read from, and Save()d into, the DEPARTED game's config file.
+     */
+    static std::shared_ptr<Config> CurrentConfig();
 };
 } // namespace Ship

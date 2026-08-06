@@ -41,8 +41,11 @@ void Audio::InitAudioPlayer() {
     }
 }
 
+std::shared_ptr<Config> Audio::CurrentConfig() {
+    return Context::GetRawInstance()->GetConfig();
+}
+
 void Audio::Init() {
-    mConfig = Context::GetRawInstance()->GetConfig();
 
     mAvailableAudioBackends = std::make_shared<std::vector<AudioBackend>>();
 #ifdef _WIN32
@@ -54,6 +57,10 @@ void Audio::Init() {
     mAvailableAudioBackends->push_back(AudioBackend::SDL);
     mAvailableAudioBackends->push_back(AudioBackend::NUL);
 
+    ApplySavedSettings();
+}
+
+void Audio::ApplySavedSettings() {
     SetCurrentAudioBackend(GetSavedAudioBackend());
     SetAudioChannels(GetSavedAudioChannelsSetting());
 }
@@ -67,15 +74,15 @@ AudioBackend Audio::GetCurrentAudioBackend() {
 }
 
 AudioBackend Audio::GetSavedAudioBackend() {
-    std::string backendName = mConfig->GetString("Window.AudioBackend");
+    std::string backendName = CurrentConfig()->GetString("Window.AudioBackend");
     if (backendName == "wasapi") {
         return AudioBackend::WASAPI;
     }
 
     // Migrate pulse player in config to sdl
     if (backendName == "pulse") {
-        mConfig->SetString("Window.AudioBackend", "sdl");
-        mConfig->Save();
+        CurrentConfig()->SetString("Window.AudioBackend", "sdl");
+        CurrentConfig()->Save();
         return AudioBackend::SDL;
     }
 
@@ -109,21 +116,21 @@ void Audio::SetCurrentAudioBackend(AudioBackend backend) {
 
     switch (backend) {
         case AudioBackend::WASAPI:
-            mConfig->SetString("Window.AudioBackend", "wasapi");
+            CurrentConfig()->SetString("Window.AudioBackend", "wasapi");
             break;
         case AudioBackend::COREAUDIO:
-            mConfig->SetString("Window.AudioBackend", "coreaudio");
+            CurrentConfig()->SetString("Window.AudioBackend", "coreaudio");
             break;
         case AudioBackend::SDL:
-            mConfig->SetString("Window.AudioBackend", "sdl");
+            CurrentConfig()->SetString("Window.AudioBackend", "sdl");
             break;
         case AudioBackend::NUL:
-            mConfig->SetString("Window.AudioBackend", "null");
+            CurrentConfig()->SetString("Window.AudioBackend", "null");
             break;
         default:
-            mConfig->SetString("Window.AudioBackend", "");
+            CurrentConfig()->SetString("Window.AudioBackend", "");
     }
-    mConfig->Save();
+    CurrentConfig()->Save();
 
     InitAudioPlayer();
 }
@@ -148,7 +155,7 @@ AudioChannelsSetting Audio::GetAudioChannels() const {
 
 AudioChannelsSetting Audio::GetSavedAudioChannelsSetting() {
     int32_t channelsSetting =
-        mConfig->GetInt("CVars." CVAR_AUDIO_CHANNELS_SETTING, static_cast<int32_t>(AudioChannelsSetting::audioMax));
+        CurrentConfig()->GetInt("CVars." CVAR_AUDIO_CHANNELS_SETTING, static_cast<int32_t>(AudioChannelsSetting::audioMax));
     switch (channelsSetting) {
         case AudioChannelsSetting::audioMatrix51:
             return AudioChannelsSetting::audioMatrix51;
