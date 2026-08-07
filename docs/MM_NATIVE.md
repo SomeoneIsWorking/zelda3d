@@ -119,8 +119,10 @@ This question does NOT block N1/N2 — faithful-first means "get native MM booti
 > came from; unset keeps the old behaviour, which is right for `soh.elf`/`mm.elf` run directly.
 > (Archives were unaffected — they resolve from the CWD, which the launcher sets to the core's dir.)
 >
-> **STILL TO DO:** switching games WITHOUT restarting the process. The launcher picks a core before
-> any engine exists, which is why it needs no teardown; the in-game chooser
+> **STILL TO DO** *(as of 2026-08-05 — DONE 2026-08-07, see "N3 in-process game switch" below;
+> `soh.elf`/`mm.elf` no longer exist, and the answer was to never tear the engine down rather than
+> to make teardown work)*: switching games WITHOUT restarting the process. The launcher picks a core
+> before any engine exists, which is why it needs no teardown; the in-game chooser
 > (`soh/src/zelda3d/launcher/`) still `exec`s `mm.elf`, because by then a live `Ship::Context`,
 > window and renderer would have to be torn down and rebuilt. That Context handover is the remaining
 > half of this milestone, and it is what would let the RmlUi chooser move into the launcher process.
