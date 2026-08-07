@@ -201,12 +201,15 @@ the whole `gLed*` family, plus `gA11yTTS` and `gCrowdControl` — as are the thr
 `gCosmetics.Link_*Tunic.Value` literals, so the binary holds 3 `gCosmetics.*` strings where the
 source shows 6.
 
-Two known defects to fold in rather than carry forward: MM's cosmetics are split across
-`gCosmetic.*` and `gCosmetics.*`, and the `gCollisionViewer.*Color` keys are registered both as a
-scalar and as the parent of `.Value`, which already trips `Config::Save`'s "dropping mis-registered
-scalar CVar" path. **User presets are outside `ConfigVersion`'s reach** — `PresetManager` copies the
-user's config into a presets folder, so renamed keys silently stop applying unless the same table is
-run over loaded presets too.
+The `gCollisionViewer.*Color` scalar-vs-parent shape is **fixed** (issue 0014) — it turned out to be
+a live defect rather than migration debt: the picker wrote `<key>.Value`, the renderer read `<key>`,
+and every collision-viewer colour was inert. With the bare parent gone there is no scalar/parent pair
+left to carry into a new namespace.
+
+Still to fold in: MM's cosmetics are split across `gCosmetic.*` and `gCosmetics.*`. And **user
+presets are outside `ConfigVersion`'s reach** — `PresetManager` copies the user's config into a
+presets folder, so renamed keys silently stop applying unless the same table is run over loaded
+presets too.
 
 ## Naming conventions (canonical human-facing name ↔ embedded code name)
 
