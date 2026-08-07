@@ -214,7 +214,12 @@ cmake --build build-cmake --target GenerateSohOtr
 # Add `--config Release` if you're packaging
 cmake --build build-cmake
 
-# Now you can run the executable in ./build-cmake/soh/soh.elf
+# Now you can run the executable in ./build-cmake/zelda3d/zelda3d
+#   zelda3d oot   -- Ocarina of Time      zelda3d mm   -- Majora's Mask
+# (no argument = the chooser). There is ONE executable: the games are shared objects
+# (libsoh_core.so / libmm_core.so) that it loads, which is what lets both decomps -- whose
+# symbols collide -- live in one process. Run it from the game's asset directory
+# (./build-cmake/soh or ./build-cmake/mm), or use ../../run.sh, which does that for you.
 # To develop the project open the repository in VSCode (or your preferred editor)
 ```
 
@@ -313,7 +318,9 @@ cmake --build build-cmake --target ExtractAssets
 # Setup cmake project for building for Switch
 cmake -H. -Bbuild-switch -GNinja -DCMAKE_TOOLCHAIN_FILE=/opt/devkitpro/cmake/Switch.cmake
 # Build project and generate nro
-cmake --build build-switch --target soh_nro
+cmake --build build-switch --target zelda3d_app   # NOTE: console packaging (.nro/.rpx/.wuhb) was
+                                                  # removed -- it bundled a game executable, and
+                                                  # this tree builds only the launcher + cores.
 
 # Now you can run the executable in ./build-switch/soh/soh.nro
 # To develop the project open the repository in VSCode (or your preferred editor)
@@ -334,7 +341,7 @@ cmake --build build-cmake --target ExtractAssets
 # Setup cmake project for building for Wii U
 cmake -H. -Bbuild-wiiu -GNinja -DCMAKE_TOOLCHAIN_FILE=/opt/devkitpro/cmake/WiiU.cmake # -DCMAKE_BUILD_TYPE:STRING=Release (if you're packaging)
 # Build project and generate rpx
-cmake --build build-wiiu --target soh # --target soh_wuhb (for building .wuhb)
+cmake --build build-wiiu --target zelda3d_app     # NOTE: see the Switch note above -- no .wuhb.
 
 # Now you can run the executable in ./build-wiiu/soh/soh.rpx or the Wii U Homebrew Bundle in ./build-wiiu/soh/soh.wuhb
 # To develop the project open the repository in VSCode (or your preferred editor)

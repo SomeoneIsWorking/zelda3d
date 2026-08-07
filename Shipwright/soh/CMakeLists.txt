@@ -871,32 +871,11 @@ else()
     target_link_libraries(soh_settings INTERFACE "${ADDITIONAL_LIBRARY_DEPENDENCIES}")
 endif()
 
-if(CMAKE_SYSTEM_NAME MATCHES "NintendoSwitch")
-
-nx_generate_nacp(Ship.nacp
-   NAME "Ship of Harkinian"
-   AUTHOR "${PROJECT_TEAM}"
-   VERSION "${PROJECT_VERSION_MAJOR}.${PROJECT_VERSION_MINOR}.${PROJECT_VERSION_PATCH}"
-)
-
-nx_create_nro(soh_core
-    NACP Ship.nacp
-    ICON ${CMAKE_CURRENT_SOURCE_DIR}/icon.jpg
-)
-
-INSTALL(FILES ${CMAKE_CURRENT_BINARY_DIR}/soh.nro DESTINATION . COMPONENT ship)
-
-elseif(CMAKE_SYSTEM_NAME MATCHES "CafeOS")
-
-wut_create_rpx(${PROJECT_NAME})
-
-wut_create_wuhb(${PROJECT_NAME}
-    NAME       "Ship of Harkinian"
-    SHORTNAME  "SoH"
-    AUTHOR     "${PROJECT_TEAM}"
-    ICON       ${CMAKE_CURRENT_SOURCE_DIR}/icon.jpg
-)
-
-INSTALL(FILES ${CMAKE_CURRENT_BINARY_DIR}/soh.rpx ${CMAKE_CURRENT_BINARY_DIR}/soh.wuhb DESTINATION . COMPONENT ship)
-
-endif()
+# The inherited Switch (.nro) and Wii U (.rpx/.wuhb) packaging blocks were DELETED here rather than
+# retargeted. Both wrap a game EXECUTABLE into a console bundle, and this tree no longer builds one:
+# the only executable is the zelda3d launcher, which selects a game by dlopen'ing a core. Pointing
+# nx_create_nro / wut_create_rpx at soh_core would package a shared library as if it were a program
+# and fail somewhere downstream instead of here.
+#
+# Reviving console support means giving the launcher a console entry path, not restoring these
+# lines; leaving them in place would have claimed a capability the build cannot deliver.
