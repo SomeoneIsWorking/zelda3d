@@ -462,6 +462,19 @@ extern void ProcessSaveStateRequests(void);
 // state — the coroutine-style resume via `state`/`goto nextFrame` still
 // works across external calls because each RunFrame() call is one game
 // frame in isolation.
+// Hand runFrameContext to the core's run lifecycle. It is a file-static holding, among other
+// things, the RESUME POINT: RunFrame returns once per frame with `state = 1` and re-enters through
+// a goto into the middle of its frame loop. That is fine within a run and wrong across two -- a
+// second run's first RunFrame call jumped straight back into the loop and evaluated
+// GameState_IsRunning(gGameState) on a gGameState the new run had not created yet (SIGSEGV in the
+// OoT -> MM -> OoT round trip).
+//
+// Same rule as gPlayState and gGameState: state whose validity ends with the run does not get to
+// live in something that outlives the run. See zelda3d/core/zelda3d_core_lifecycle.c.
+void Graph_ResetRunState(void) {
+    memset(&runFrameContext, 0, sizeof(runFrameContext));
+}
+
 void RunFrame(void) {
     u32 size;
     char faultMsg[0x50];
@@ -518,7 +531,11 @@ void RunFrame(void) {
 
         uint64_t freq = GetFrequency();
 
-        while (GameState_IsRunning(gGameState)) {
+        // An exit request ends the frame loop here, so RunFrame falls through to its own destroy
+        // path below instead of the gamestate being abandoned mid-life. Only half the fix: this
+        // code is unreachable unless Graph_ThreadEntry keeps calling RunFrame after the request --
+        // see the loop condition there.
+        while (GameState_IsRunning(gGameState) && WindowIsRunning()) {
             // uint64_t ticksA, ticksB;
             // ticksA = GetPerfCounter();
 
@@ -546,6 +563,10 @@ void RunFrame(void) {
         runFrameContext.nextOvl = Graph_GetNextGameState(gGameState);
         GameState_Destroy(gGameState);
         SYSTEM_ARENA_FREE_DEBUG(gGameState);
+        // Cleared, not just freed: gGameState is how anything outside this file can ask whether a
+        // gamestate is still live, and a pointer into the freed arena answers that question wrong.
+        // Graph_ThreadEntry's loop condition and the core's end-of-run check both read it.
+        gGameState = NULL;
         Overlay_FreeGameState(runFrameContext.ovl);
     }
     Graph_Destroy(&runFrameContext.gfxCtx);
@@ -565,7 +586,20 @@ void RunFrame(void) {
 }
 
 void Graph_ThreadEntry(void* arg0) {
-    while (WindowIsRunning()) {
+    // `WindowIsRunning()` alone is the wrong condition for STOPPING, and the difference only shows
+    // up in a process that outlives the game. RunFrame returns once per frame and resumes through a
+    // goto, so the moment an exit was requested this loop simply stopped calling it -- leaving a
+    // live, initialised gGameState that nothing ever destroyed. Play_Destroy therefore never ran,
+    // and gPlayState was left pointing into a heap that Heaps_Free was about to release.
+    //
+    // Which is fatal exactly once the launcher runs a second game in this process: the OoT core
+    // SIGSEGV'd inside its NEXT InitOTR, in a ShipInit function guarded only by
+    // `if (gPlayState != nullptr)`, walking the previous run's actor lists through freed memory.
+    //
+    // So the exit request stops the FRAME loop (see RunFrame), and this loop keeps pumping until
+    // the gamestate machine has finished unwinding -- which is what makes teardown happen where the
+    // decomp already does it, with the engine still up, rather than in a bespoke path afterwards.
+    while (WindowIsRunning() || gGameState != NULL) {
         RunFrame();
     }
 }

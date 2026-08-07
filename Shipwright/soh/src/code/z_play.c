@@ -74,7 +74,9 @@ void Zelda3D_SkipInit(void) {
 
 Input* D_8012D1F8 = NULL;
 
-PlayState* gPlayState;
+// gPlayState is DEFINED in zelda3d/core/zelda3d_core_lifecycle.c, which owns the state whose
+// lifetime is one core run and resets it at the start of each. Play_Init/Play_Destroy still
+// set and clear it; what moved is who guarantees it is NULL when a run begins.
 s16 firstInit = 0;
 s16 gEnPartnerId;
 

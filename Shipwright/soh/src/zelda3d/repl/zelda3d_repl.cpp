@@ -269,7 +269,8 @@ static void Zelda3D_ReplExec(PlayState* play, char* line, const char* outPath) {
         // `menuclick` / `menuhit` for the same reason: they exist to test the launcher, which by
         // construction runs without a PlayState.
         static const char* kPlayFree[] = { "key",  "log",       "fps",  "dump",      "inputdev", "keycap",
-                                           "menu", "menuclick", "help", "launcher",  "menuhit" };
+                                           "menu", "menuclick", "help", "launcher",  "menuhit",
+                                           "switchgame" };
         int ok = 0;
         for (size_t i = 0; i < sizeof(kPlayFree) / sizeof(kPlayFree[0]); i++) {
             if (strcmp(cmd, kPlayFree[i]) == 0) {
@@ -323,6 +324,13 @@ static void Zelda3D_ReplExec(PlayState* play, char* line, const char* outPath) {
         // Inject a menu mouse click at window pixel (x, y) through the real input path.
         Zelda3D_RmlMenuClick((int)f1, (int)f2);
         Zelda3D_ReplReply(outPath, "menuclick (%d,%d)", (int)f1, (int)f2);
+    } else if (strcmp(cmd, "switchgame") == 0 && sscanf(line, "%*s %63s", arg) == 1) {
+        // Headless equivalent of the menu's "Return to Launcher" row: end this game and have the
+        // launcher start `arg`. The row itself cannot be driven from here (it is one of many in a
+        // scrolling pane), and a feature whose only trigger is a mouse click cannot be regression
+        // tested -- so the mechanism gets a command and the row and the command share one path.
+        Zelda3D_ReplReply(outPath, "switchgame %s: ending this game; the launcher takes it from here", arg);
+        WindowRequestGameSwitch(arg);
     } else if (strcmp(cmd, "menuhit") == 0) {
         char report[4096];
         report[0] = '\0';

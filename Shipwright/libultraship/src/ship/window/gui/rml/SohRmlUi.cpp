@@ -696,6 +696,27 @@ void SohRmlUi::ActivateFocused() {
         SetVisible(false);
         return;
     }
+    // Return-to-launcher row: `switchgame="<id>"` ends the running game and asks the launcher to
+    // start that one instead. NO DOCUMENT USES IT YET -- see the note in zelda3d_test.rml: the
+    // switch works, but a core is not re-runnable, so the game it lands on crashes. Kept because it
+    // is the row's mechanism and is exercised by REPL `switchgame`, which is how that is measured.
+    //
+    // Unlike every row above it, this needs NO game-side consumer -- no gZelda3dMenu* global, no
+    // per-frame poll holding a PlayState. That is what makes it work in BOTH games from this one
+    // place: the whole mechanism lives in libultraship, which OoT and MM share, so Majora's Mask
+    // gets a way back to the chooser without a line of MM code. (The warp and restart rows above
+    // cannot do that -- they are consumed in soh's zelda3d.c, so they are OoT-only by construction.)
+    //
+    // "oot" is how you reach the CHOOSER, not just Ocarina of Time: the OoT core boots into the
+    // launcher gamestate unless ZELDA3D_LAUNCHER=0, so restarting it puts the picker back on screen.
+    // From MM that is a real core switch; from OoT it is the same core reloaded.
+    if (const Rml::String game = focus->GetAttribute<Rml::String>("switchgame", ""); !game.empty()) {
+        SPDLOG_INFO("[SohRmlUi] menu requested a switch to game \"{}\"", game);
+        Context::RequestGameSwitch(game);
+        Context::RequestExit();
+        SetVisible(false);
+        return;
+    }
     // Curated multi-state cycle rows (e.g. Link render/anim mode, warp time-of-day): step to the
     // next state in place rather than "clicking" a row.
     {
