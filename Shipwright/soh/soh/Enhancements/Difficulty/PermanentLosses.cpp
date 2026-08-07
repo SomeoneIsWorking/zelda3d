@@ -2,7 +2,7 @@
 #include "soh/Enhancements/randomizer/randomizer.h"
 #include "soh/OTRGlobals.h"
 #include "soh/SaveManager.h"
-#include "soh/ShipInit.hpp"
+#include "init/ShipInit.hpp"
 
 extern "C" {
 #include "functions.h"

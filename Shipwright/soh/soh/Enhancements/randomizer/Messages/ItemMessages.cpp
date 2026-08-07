@@ -11,7 +11,7 @@
 #include "soh/Enhancements/randomizer/Traps.h"
 #include "soh/Enhancements/randomizer/item.h"
 #include "soh/Enhancements/randomizer/randomizer.h"
-#include "soh/ShipInit.hpp"
+#include "init/ShipInit.hpp"
 #include <soh/ResourceManagerHelpers.h>
 
 #include <cstdarg>

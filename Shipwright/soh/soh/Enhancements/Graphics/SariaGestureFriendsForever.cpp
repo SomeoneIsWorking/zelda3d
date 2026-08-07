@@ -1,5 +1,5 @@
 #include "soh/Enhancements/game-interactor/GameInteractor.h"
-#include "soh/ShipInit.hpp"
+#include "init/ShipInit.hpp"
 
 extern "C" {
 #include "src/overlays/actors/ovl_En_Sa/z_en_sa.h"

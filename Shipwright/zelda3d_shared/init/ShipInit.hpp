@@ -1,3 +1,16 @@
+/**
+ * The boot/update init-function registry, shared by both games.
+ *
+ * Both games had their own copy of this file -- soh/ShipInit.hpp and 2s2h/ShipInit.hpp -- and the two
+ * were CODE-IDENTICAL: the only differences were the order of two #includes and the doc comment
+ * below, which only OoT carried. That comment is kept.
+ *
+ * It names no game type and needs no game header, so unlike port/ this is a plain shared header with
+ * nothing to compile. Note the registry lives in a function-local static inside GetAll(): each game
+ * core gets its OWN registry, which is what you want and what already happened, because both games
+ * build with -fno-gnu-unique (claim C059). Sharing the text changes nothing about that.
+ */
+
 #ifndef SHIP_INIT_HPP
 #define SHIP_INIT_HPP
 

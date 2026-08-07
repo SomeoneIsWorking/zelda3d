@@ -5,7 +5,7 @@
 #include "Rando/MiscBehavior/ClockShuffle.h"
 #include "Rando/Spoiler/Spoiler.h"
 #include "Rando/CheckTracker/CheckTracker.h"
-#include "2s2h/ShipInit.hpp"
+#include "init/ShipInit.hpp"
 #include <ship/window/FileDropMgr.h>
 #include <ship/Context.h>
 

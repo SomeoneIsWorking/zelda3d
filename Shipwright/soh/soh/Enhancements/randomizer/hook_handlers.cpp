@@ -11,7 +11,7 @@
 #include "soh/SohGui/ImGuiUtils.h"
 #include "gui/Notification.h"
 #include "soh/SaveManager.h"
-#include "soh/ShipInit.hpp"
+#include "init/ShipInit.hpp"
 #include "object/ObjectExtension.h"
 #include "item_category_adj.h"
 #include "soh/Enhancements/randomizer/randomizer.h"

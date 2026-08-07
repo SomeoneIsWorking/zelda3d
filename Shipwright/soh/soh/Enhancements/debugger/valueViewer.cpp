@@ -2,7 +2,7 @@
 #include "soh/SohGui/UIWidgets.hpp"
 #include "soh/SohGui/SohGui.hpp"
 #include "soh/OTRGlobals.h"
-#include "soh/ShipInit.hpp"
+#include "init/ShipInit.hpp"
 #include "soh/Enhancements/game-interactor/GameInteractor.h"
 
 extern "C" {

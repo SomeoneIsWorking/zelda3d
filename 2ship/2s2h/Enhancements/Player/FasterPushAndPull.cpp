@@ -1,6 +1,6 @@
 #include <libultraship/bridge/consolevariablebridge.h>
 #include "2s2h/GameInteractor/GameInteractor.h"
-#include "2s2h/ShipInit.hpp"
+#include "init/ShipInit.hpp"
 
 extern "C" {
 #include "overlays/actors/ovl_Bg_Dblue_Movebg/z_bg_dblue_movebg.h"

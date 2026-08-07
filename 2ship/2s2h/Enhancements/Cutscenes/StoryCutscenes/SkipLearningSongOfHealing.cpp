@@ -3,7 +3,7 @@
 #include "2s2h/Rando/Rando.h"
 #include "2s2h/CustomMessage/CustomMessage.h"
 #include "2s2h/CustomItem/CustomItem.h"
-#include "2s2h/ShipInit.hpp"
+#include "init/ShipInit.hpp"
 #include <spdlog/spdlog.h>
 
 extern "C" {

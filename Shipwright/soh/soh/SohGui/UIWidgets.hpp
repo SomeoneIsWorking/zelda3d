@@ -9,7 +9,7 @@
 #include <imgui.h>
 #include <libultraship/libultraship.h>
 #include "soh/ShipUtils.h"
-#include "soh/ShipInit.hpp"
+#include "init/ShipInit.hpp"
 
 #include "gui/ui_colors.h"
 #include "gui/ui_theming.h"

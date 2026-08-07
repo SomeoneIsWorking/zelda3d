@@ -1,7 +1,7 @@
 #include "2s2h/BenGui/UIWidgets.hpp"
 #include "2s2h/BenGui/BenGui.hpp"
 #include "CosmeticEditor.h"
-#include "2s2h/ShipInit.hpp"
+#include "init/ShipInit.hpp"
 #include "2s2h/GameInteractor/GameInteractor.h"
 
 extern "C" {

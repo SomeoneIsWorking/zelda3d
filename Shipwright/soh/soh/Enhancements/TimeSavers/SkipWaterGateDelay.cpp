@@ -1,5 +1,5 @@
 #include "soh/Enhancements/game-interactor/GameInteractor_Hooks.h"
-#include "soh/ShipInit.hpp"
+#include "init/ShipInit.hpp"
 
 extern "C" {
 #include "src/overlays/actors/ovl_Bg_Spot06_Objects/z_bg_spot06_objects.h"

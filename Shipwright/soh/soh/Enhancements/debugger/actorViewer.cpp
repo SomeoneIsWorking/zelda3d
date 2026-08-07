@@ -5,7 +5,7 @@
 #include "soh/ActorDB.h"
 #include "soh/Enhancements/game-interactor/GameInteractor.h"
 #include "soh/Enhancements/nametag.h"
-#include "soh/ShipInit.hpp"
+#include "init/ShipInit.hpp"
 
 #include <algorithm>
 #include <array>

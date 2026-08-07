@@ -250,10 +250,13 @@ So the remaining widgets are gated on reconciling those structs — which is the
 decision* as `MenuTypes`, not a mechanical merge. Nothing further comes out of `UIWidgets` until
 someone decides what the shared widget-options API should be.
 
-**Separately — a real duplicate, but not this blocker:** the two games' `ShipInit.hpp` are
-**code-identical**, differing only in include order and a doc comment OoT carries. That is a genuine
-de-duplication worth doing on its own; note it has **383 includers** between the two games, so it is a
-mechanical sweep rather than a small edit.
+**Separately — a real duplicate, and now done:** the two games' `ShipInit.hpp` were **code-identical**,
+differing only in include order and a doc comment OoT carried. Now `zelda3d_shared/init/ShipInit.hpp`,
+with all 383 includers repointed and both per-game copies deleted. It names no game type and needs no
+game header, so it is a plain shared header with nothing to compile — unlike `port/`. The registry
+still lives in a function-local `static` inside `GetAll()`, so each game core keeps its **own**
+registry; that was already true and is unchanged, because both games build with `-fno-gnu-unique`
+(claim C059).
 
 The genuine prerequisite for `MenuTypes`/`Menu` is deciding three things that have nothing to do with
 CVars — the callback ABI (`std::function` vs function pointer: capturing menu code in OoT, or no heap

@@ -8,7 +8,7 @@
 #include "2s2h/BenGui/BenMenu.h"
 #include "2s2h/BenGui/BenGui.hpp"
 #include "2s2h/Rando/Logic/Logic.h"
-#include "2s2h/ShipInit.hpp"
+#include "init/ShipInit.hpp"
 
 extern "C" {
 #include "overlays/actors/ovl_En_Sth/z_en_sth.h"

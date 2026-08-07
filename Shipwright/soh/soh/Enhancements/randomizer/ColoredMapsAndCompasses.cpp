@@ -1,6 +1,6 @@
 #include <libultraship/bridge.h>
 #include "soh/ResourceManagerHelpers.h"
-#include "soh/ShipInit.hpp"
+#include "init/ShipInit.hpp"
 #include "z64save.h"
 #include "objects/object_gi_compass/object_gi_compass.h"
 #include "objects/object_gi_map/object_gi_map.h"

@@ -1,6 +1,6 @@
 #include "ActorMaximumHealth.h"
 #include "object/ObjectExtension.h"
-#include "soh/ShipInit.hpp"
+#include "init/ShipInit.hpp"
 #include "soh/Enhancements/game-interactor/GameInteractor.h"
 
 struct ActorMaximumHealth {

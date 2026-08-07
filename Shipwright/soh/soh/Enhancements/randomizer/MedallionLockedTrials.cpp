@@ -1,5 +1,5 @@
 #include "soh/OTRGlobals.h"
-#include "soh/ShipInit.hpp"
+#include "init/ShipInit.hpp"
 #include "soh/Enhancements/randomizer/SeedContext.h"
 
 extern "C" {

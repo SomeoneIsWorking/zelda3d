@@ -1,5 +1,5 @@
 #include <libultraship/bridge.h>
-#include "soh/ShipInit.hpp"
+#include "init/ShipInit.hpp"
 #include "functions.h"
 #include "macros.h"
 #include "variables.h"

@@ -2,7 +2,7 @@
 #include "Rando/ActorBehavior/Souls.h"
 #include "Rando/MiscBehavior/ClockShuffle.h"
 #include "2s2h/ShipUtils.h"
-#include "2s2h/ShipInit.hpp"
+#include "init/ShipInit.hpp"
 #include <cassert>
 
 // Copied from z_player.c, we could instead move this to a header file, idk

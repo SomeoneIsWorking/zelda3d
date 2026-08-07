@@ -1,7 +1,7 @@
 #include <libultraship/bridge/consolevariablebridge.h>
 #include "gui/Notification.h"
 #include "2s2h/GameInteractor/GameInteractor.h"
-#include "2s2h/ShipInit.hpp"
+#include "init/ShipInit.hpp"
 
 #define CVAR_NAME "gEnhancements.Dialogue.SkipBottlePickupMessages"
 #define CVAR CVarGetInteger(CVAR_NAME, 0)

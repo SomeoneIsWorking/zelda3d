@@ -1,4 +1,4 @@
-#include "2s2h/ShipInit.hpp"
+#include "init/ShipInit.hpp"
 
 extern "C" {
 #include "overlays/actors/ovl_Obj_Bombiwa/z_obj_bombiwa.h"

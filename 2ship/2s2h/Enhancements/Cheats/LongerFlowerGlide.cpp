@@ -1,5 +1,5 @@
 #include <libultraship/bridge/consolevariablebridge.h>
-#include "2s2h/ShipInit.hpp"
+#include "init/ShipInit.hpp"
 
 extern "C" {
 #include "variables.h"

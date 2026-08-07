@@ -1,7 +1,7 @@
 #include <libultraship/bridge/consolevariablebridge.h>
 #include "2s2h/GameInteractor/GameInteractor.h"
 #include "2s2h/Enhancements/Enhancements.h"
-#include "2s2h/ShipInit.hpp"
+#include "init/ShipInit.hpp"
 #include <stdarg.h>
 
 #define CVAR_NAME "gEnhancements.DifficultyOptions.GibdoTradeSequence"

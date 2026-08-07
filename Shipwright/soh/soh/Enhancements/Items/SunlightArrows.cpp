@@ -1,6 +1,6 @@
 #include "soh/Enhancements/game-interactor/GameInteractor_Hooks.h"
 #include "soh/Enhancements/randomizer/SeedContext.h"
-#include "soh/ShipInit.hpp"
+#include "init/ShipInit.hpp"
 #include "object/ObjectExtension.h"
 
 extern "C" {
