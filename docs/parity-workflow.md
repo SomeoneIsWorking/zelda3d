@@ -79,7 +79,8 @@ file is the failure mode; a single owner with one per-frame resolved state is th
   builds OOM, orphan their `cc1plus` children, and cascade-kill each other. Cap `-j4`; check
   `free -h` first; clear orphans with the safe-kill skill if starved. Do NOT give each fix its
   own isolated cold-build worktree — **consolidate fixes into one build**. `tools/zelda3d_game.sh`
-  honors `ZELDA3D_SOH=<dir>/soh.elf` so one build serves all verification.
+  honors `ZELDA3D_SOH=<dir>/zelda3d` (the single launcher binary, run as `zelda3d oot`) so one build
+  serves all verification.
 - **Keep a perpetual decomp stream running** (RE → port to `oot3d-decomp`) alongside the parity
   loop — it advances a primary goal and never touches the build queue.
 - **Headless always**: `ZELDA3D_HEADLESS=1 tools/zelda3d_game.sh` (NOT the stale `SOH3D_HEADLESS`,

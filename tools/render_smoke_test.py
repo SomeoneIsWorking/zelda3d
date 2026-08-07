@@ -13,7 +13,12 @@ Usage: tools/render_smoke_test.py [entrance] [time] [min_draws]
 import os, re, subprocess, sys, time, signal, pathlib
 
 REPO = pathlib.Path(__file__).resolve().parent.parent
-SOH = REPO / "Shipwright/build-cmake/soh/soh.elf"
+# ONE program binary now runs both games; this test always runs OoT (`zelda3d oot`). SOH_DIR is
+# the OoT core's own asset directory -- the launcher resolves it as its build-tree sibling, same as
+# tools/zelda3d_game.sh, so ROM provisioning (done client-side here, not by the launcher) targets
+# the right place. We still cd there before exec, matching the other launch scripts' convention.
+ZELDA3D_BIN = pathlib.Path(os.environ.get("ZELDA3D_SOH", str(REPO / "Shipwright/build-cmake/zelda3d/zelda3d")))
+SOH_DIR = REPO / "Shipwright/build-cmake/soh"
 FIFO = REPO / "scratch/zelda3d.ctl"
 REPL = REPO / "tools/zelda3d_repl.py"
 
@@ -35,7 +40,7 @@ def provision_roms():
     -> drop-in ROM), via the shared rom_provision.sh. Without the 3DS ROM the model provider has
     no OoT3D assets to hand the renderer, so EVERY model fails to load and geomscan reports 0
     draws — i.e. the harness would manufacture the very failure it is meant to detect."""
-    sohdir = str(SOH.parent)
+    sohdir = str(SOH_DIR)
     script = (f'. "{REPO}/tools/rom_provision.sh"; '
               f'zelda3d_provision_roms "{REPO}" "{sohdir}"; '
               f'printf "%s\\n%s\\n" "${{ZELDA3D_OOT3D_ROM:-}}" "${{ZELDA3D_OOT_ROM:-}}"')
@@ -63,7 +68,8 @@ def main():
            "ZELDA3D_REPL": str(FIFO), **roms}
     env.pop("WAYLAND_DISPLAY", None)
     log = open(REPO / "scratch/logs/render_smoke.log", "w")
-    proc = subprocess.Popen([str(SOH)], env=env, stdout=log, stderr=log, start_new_session=True)
+    proc = subprocess.Popen([str(ZELDA3D_BIN), "oot"], env=env, stdout=log, stderr=log,
+                            cwd=str(SOH_DIR), start_new_session=True)
     try:
         outp = pathlib.Path(str(FIFO) + ".out")
         for _ in range(40):

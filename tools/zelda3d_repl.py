@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
 """zelda3d_repl.py — driver for the live Zelda3D REPL (see zelda3d.c Zelda3D_ReplPoll).
 
-Talks to a long-lived headless soh.elf (launched via tools/zelda3d_repl_launch.sh)
+Talks to a long-lived headless zelda3d instance (launched via tools/zelda3d_repl_launch.sh)
 over a control FIFO, so tint/scale/model experiments cost seconds instead of a
 rebuild + 7-min headless render. Tooling-first: never hand-run xvfb again.
 
@@ -61,7 +61,7 @@ def send(cmd, timeout=3.0):
     pre = _out_size()
     # Non-blocking open so a DEAD instance fails fast (ENXIO) instead of blocking
     # forever on the FIFO write — a blocking open(FIFO,"w") hangs with no reader,
-    # which silently wedges interactive REPL iteration when soh.elf has crashed.
+    # which silently wedges interactive REPL iteration when the instance has crashed.
     try:
         fd = os.open(FIFO, os.O_WRONLY | os.O_NONBLOCK)
     except OSError as e:

@@ -1,6 +1,7 @@
 #include "ship/Context.h"
 #include "ship/controller/controldevice/controller/mapping/keyboard/KeyboardScancodes.h"
 #include <atomic>
+#include <mutex>
 #include <cstring>
 #include <iostream>
 #include <spdlog/sinks/rotating_file_sink.h>
@@ -726,6 +727,24 @@ void Context::RequestExitWithFullTeardown() {
 
 bool Context::IsFullTeardownRequested() {
     return sFullTeardownRequested;
+}
+
+// Which game did the running core ask the launcher to run next? It lives here rather than in either
+// binary because the core and the launcher share exactly one thing: this library. See
+// RequestGameSwitch.
+static std::mutex sRequestedGameMutex;
+static std::string sRequestedGame;
+
+void Context::RequestGameSwitch(const std::string& gameId) {
+    std::lock_guard lock(sRequestedGameMutex);
+    sRequestedGame = gameId;
+}
+
+std::string Context::TakeRequestedGameSwitch() {
+    std::lock_guard lock(sRequestedGameMutex);
+    std::string taken;
+    taken.swap(sRequestedGame);
+    return taken;
 }
 
 void Context::SetAppBundlePath(const std::string& path) {

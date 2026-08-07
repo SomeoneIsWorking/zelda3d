@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
 """mm_control.py — driver for native-MM (2s2h) headless control (see docs/MM_NATIVE.md N3.4 2b).
 
-Talks to a long-lived headless mm.elf (launched via tools/mm_game.sh) over TWO FIFOs:
+Talks to a long-lived headless "zelda3d mm" instance (launched via tools/mm_game.sh) over TWO FIFOs:
   - INPUT  ($SHIP_SCRIPTED_FIFO)  the SHARED libultraship scripted-input seam — synthetic pad
   - QUERY  ($ZELDA3D_MM_REPL)     the MM per-game REPL — PlayState-only queries
 

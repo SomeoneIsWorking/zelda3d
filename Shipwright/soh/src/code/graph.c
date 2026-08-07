@@ -551,16 +551,17 @@ void RunFrame(void) {
     Graph_Destroy(&runFrameContext.gfxCtx);
     osSyncPrintf("グラフィックスレッド実行終了\n"); // "End of graphic thread execution"
 
-    // Graph_Update(gfxCtxTest, gameStateTest);
-    // This exit(0) (reached when the game's overlay state machine fully ends) terminates the
-    // process directly, bypassing main()'s post-Main() DeinitOTR(). Run the clean shutdown
-    // explicitly first: OTRAudio_Exit() stops+joins the audio thread BEFORE exit()'s static
-    // destructors tear down the Context, otherwise the still-running audio thread dereferences the
-    // freed AudioPlayer (SIGSEGV). It also tears down the GUI/window/rendering API in order.
-    // (The window-close path instead returns through Graph_ThreadEntry -> Main() -> main()'s
-    // DeinitOTR(); the audio-thread teardown race on THAT path is tracked separately.)
-    DeinitOTR();
-    exit(0);
+    // Reached when the game's overlay state machine fully ends. This used to call DeinitOTR() and
+    // exit(0) here, which was the ONE exit path that skipped Main_Shutdown() -- so the audio thread
+    // was stopped late, from inside DeinitOTR, instead of before it. That is survivable when the
+    // next thing is process death; it is not when the next thing is another game booting on the
+    // same engine, which is what the launcher does with the core once run() returns.
+    //
+    // So request the exit and return, joining the ordinary window-close path:
+    // Graph_ThreadEntry's `while (WindowIsRunning())` now stops rather than re-entering RunFrame and
+    // rebuilding the gamestate we just tore down, and unwinds through Main() -> Main_Shutdown() ->
+    // Zelda3D_CoreRun's DeinitOTR() -> Heaps_Free() -> back to the launcher.
+    WindowRequestExit();
 }
 
 void Graph_ThreadEntry(void* arg0) {

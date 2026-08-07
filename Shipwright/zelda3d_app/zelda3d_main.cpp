@@ -16,8 +16,13 @@
 // NOT YET MOVED HERE: the RmlUi chooser, which still runs as an OoT gamestate inside the soh core
 // (src/zelda3d/launcher/). Presenting it from this process means owning a Ship::Context before any
 // core is loaded and handing it over -- the "Ship::Context ownership" half of N3 in
-// docs/MM_NATIVE.md. Until then this launcher chooses from argv/env, which is what the headless
-// tooling needs anyway.
+// docs/MM_NATIVE.md.
+//
+// What this process DOES do is act on the chooser's answer. A core that wants a different game
+// calls Context::RequestGameSwitch and ends itself; when its run() returns, RunGame below loads the
+// requested core into this same process. The chooser still lives in the OoT core, but choosing
+// "Majora's Mask" no longer replaces the process -- and it no longer has to, because the engine the
+// next game needs is this process's, not the departing core's.
 
 #include <cstdio>
 #include <cstdlib>
@@ -332,59 +337,89 @@ int main(int argc, char* argv[]) {
         return 2;
     }
 
-    // The engine resolves archives and config relative to the CURRENT DIRECTORY (Context's app
-    // directory falls through to "."), which is why run.sh cds into the build dir before launching
-    // a game binary. The launcher inherits that contract rather than changing it: move to the
-    // core's own directory, where its .o2r/.otr and assets are staged.
-    const std::string corePath = ResolveCorePath(*spec);
-    {
-        std::string dir = corePath;
-        char* buf = dir.data();
-        if (chdir(dirname(buf)) != 0) {
-            fprintf(stderr, "ZELDA3D LAUNCHER: cannot enter the %s core's asset directory (%s).\n", spec->id,
-                    corePath.c_str());
-            return 3;
+    // Each game the user asks for, in turn. The loop body is what used to be a single run: a core
+    // that wants a different game records the request and returns, and the next iteration loads THAT
+    // core into this same process -- one window, one renderer, one engine, from the first game to
+    // the last. `rc` is the last core's, so an exit code still reports how the session ended.
+    int rc = 0;
+    int gamesRun = 0;
+    for (;;) {
+        // The engine resolves archives and config relative to the CURRENT DIRECTORY (Context's app
+        // directory falls through to "."), which is why run.sh cds into the build dir before
+        // launching a game binary. The launcher inherits that contract rather than changing it: move
+        // to the core's own directory, where its .o2r/.otr and assets are staged. Re-done per game,
+        // since the second game's assets live in ITS directory, not the departing game's.
+        const std::string corePath = ResolveCorePath(*spec);
+        {
+            std::string dir = corePath;
+            char* buf = dir.data();
+            if (chdir(dirname(buf)) != 0) {
+                fprintf(stderr, "ZELDA3D LAUNCHER: cannot enter the %s core's asset directory (%s).\n", spec->id,
+                        corePath.c_str());
+                return 3;
+            }
         }
+
+        void* handle = nullptr;
+        const Zelda3DCore* core = LoadCore(*spec, &handle);
+        if (core == nullptr) {
+            return gamesRun == 0 ? 4 : rc;
+        }
+
+        // Tell the engine where the running game's data lives. libultraship otherwise derives this
+        // from the EXECUTABLE, which is this launcher -- and the launcher's directory holds no fonts,
+        // no RmlUi assets and no extractor assets/ folder, so OoT aborted at startup reporting them
+        // missing. dladdr on the entry point reports where the core was ACTUALLY loaded from,
+        // following whatever ld.so resolved, rather than re-deriving a path that could disagree.
+        if (Dl_info info; dladdr(reinterpret_cast<void*>(core->run), &info) != 0 && info.dli_fname != nullptr) {
+            std::string dir = info.dli_fname;
+            char* buf = dir.data();
+            Ship::Context::SetAppBundlePath(dirname(buf));
+        } else {
+            // Leaving it unset would send the engine to the launcher's directory and fail obscurely
+            // much later, at the first asset it could not find.
+            fprintf(stderr, "ZELDA3D LAUNCHER: cannot locate the loaded %s core on disk (dladdr failed); "
+                            "its assets would be looked for beside this launcher.\n",
+                    spec->id);
+            return 5;
+        }
+
+        fprintf(stderr, "ZELDA3D LAUNCHER: starting %s (%s)\n", core->title, core->id);
+        fflush(stderr);
+
+        // The core owns the frame loop from here: InitOTR, the game, and its own teardown, exactly
+        // as when it is run as a standalone binary.
+        rc = core->run(gameArgc, gameArgv);
+        ++gamesRun;
+
+        // Printed because reaching this line is the OBSERVATION, not a status message. A core that
+        // called exit() internally produces the same process exit code as one that unwound and
+        // returned, so the exit code cannot tell the two apart -- only a line that can ONLY be
+        // reached after run() returns can. Handing control back is the precondition for loading a
+        // second core, so it has to be visible rather than assumed.
+        fprintf(stderr, "ZELDA3D LAUNCHER: %s core returned %d -- control is back in the launcher\n", core->id, rc);
+        fflush(stderr);
+
+        // Read-and-clear, so a request cannot be acted on twice and loop this process forever.
+        const std::string next = Ship::Context::TakeRequestedGameSwitch();
+        if (next.empty()) {
+            break; // the game ended because the user quit, not to make room for another
+        }
+        const CoreSpec* nextSpec = FindSpec(next);
+        if (nextSpec == nullptr) {
+            // Naming the id matters: an unknown game here means a core asked for something this
+            // launcher has never heard of, which is a code mismatch, not a user error.
+            fprintf(stderr, "ZELDA3D LAUNCHER: %s asked to switch to unknown game \"%s\" -- ignoring and exiting\n",
+                    spec->id, next.c_str());
+            break;
+        }
+        fprintf(stderr, "ZELDA3D LAUNCHER: switching %s -> %s in this process (game %d)\n", spec->id, nextSpec->id,
+                gamesRun + 1);
+        fflush(stderr);
+        spec = nextSpec;
+        // No dlclose of the departing core: its static destructors and threads have already run, and
+        // unloading it is a way to crash on the way out. It simply stops being called.
     }
-
-    void* handle = nullptr;
-    const Zelda3DCore* core = LoadCore(*spec, &handle);
-    if (core == nullptr) {
-        return 4;
-    }
-
-    // Tell the engine where the running game's data lives. libultraship otherwise derives this from
-    // the EXECUTABLE, which is this launcher -- and the launcher's directory holds no fonts, no
-    // RmlUi assets and no extractor assets/ folder, so OoT aborted at startup reporting them
-    // missing. dladdr on the entry point reports where the core was ACTUALLY loaded from, following
-    // whatever ld.so resolved, rather than re-deriving a path that could disagree with it.
-    if (Dl_info info; dladdr(reinterpret_cast<void*>(core->run), &info) != 0 && info.dli_fname != nullptr) {
-        std::string dir = info.dli_fname;
-        char* buf = dir.data();
-        Ship::Context::SetAppBundlePath(dirname(buf));
-    } else {
-        // Leaving it unset would send the engine to the launcher's directory and fail obscurely much
-        // later, at the first asset it could not find.
-        fprintf(stderr, "ZELDA3D LAUNCHER: cannot locate the loaded %s core on disk (dladdr failed); "
-                        "its assets would be looked for beside this launcher.\n",
-                spec->id);
-        return 5;
-    }
-
-    fprintf(stderr, "ZELDA3D LAUNCHER: starting %s (%s)\n", core->title, core->id);
-    fflush(stderr);
-
-    // The core owns the process from here: InitOTR, the frame loop and teardown, exactly as when it
-    // is run as a standalone binary.
-    const int rc = core->run(gameArgc, gameArgv);
-
-    // Printed because reaching this line is the OBSERVATION, not a status message. A core that
-    // called exit() internally produces the same process exit code as one that unwound and returned,
-    // so the exit code cannot tell the two apart -- only a line that can ONLY be reached after run()
-    // returns can. Handing control back is the precondition for ever loading a second core, so it
-    // has to be visible rather than assumed.
-    fprintf(stderr, "ZELDA3D LAUNCHER: %s core returned %d -- control is back in the launcher\n", core->id, rc);
-    fflush(stderr);
 
     // Tear the engine down HERE, deterministically, rather than leaving Context's static
     // unique_ptr to be released by __cxa_finalize on the way out.

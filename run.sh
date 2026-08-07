@@ -17,11 +17,14 @@ set -eu
 REPO="$(cd "$(dirname "$0")" && pwd)"
 BUILD="$REPO/Shipwright/build-cmake"
 SOH="$BUILD/soh"
-# The soh target's output name is set per-platform in soh/CMakeLists.txt.
-case "$(uname)" in
-    Darwin) SOH_BIN="soh-macos" ;;
-    *)      SOH_BIN="soh.elf" ;;
-esac
+# The ONE binary. `zelda3d` (Shipwright/zelda3d_app) holds no game code: it dlopens whichever game
+# was chosen as a core (libsoh_core.so / libmm_core.so) with RTLD_LOCAL, which is what keeps OoT's
+# and MM's 6,616 colliding decomp symbols apart. Picking "Majora's Mask" in the chooser therefore
+# switches games inside THIS process -- there is no second program to start.
+LAUNCH_TARGET="zelda3d_app"
+LAUNCH_DIR="$BUILD/zelda3d"
+LAUNCH_BIN="zelda3d"
+
 # Parallel job count — nproc is GNU-only (absent on macOS); fall back to sysctl, then 4.
 NPROC="$(nproc 2>/dev/null || sysctl -n hw.ncpu 2>/dev/null || echo 4)"
 
@@ -102,7 +105,7 @@ if [ "$(uname)" = "Linux" ] && [ -z "${DISPLAY:-}" ]; then
     done
 fi
 
-ensure_built soh "$SOH/$SOH_BIN"
+ensure_built "$LAUNCH_TARGET" "$LAUNCH_DIR/$LAUNCH_BIN"
 ensure_soh_o2r              # game hard-exits with a "Missing soh.o2r" dialog without it
 
 export SOH3D=1                                  # render OoT3D assets
@@ -122,5 +125,8 @@ export ZELDA3D_VULKAN="${ZELDA3D_VULKAN:-1}"         # 1 = single Vulkan Fast3D 
 # render pass then logs (stderr) any GL state it failed to restore. Off by default (per-frame glGet).
 export ZELDA3D_GL_STATECHECK="${ZELDA3D_GL_STATECHECK:-}"
 
+# Still cd into the OoT app dir: the engine resolves archives and config relative to the CURRENT
+# directory, and that is where soh.o2r and the extracted assets are. The launcher re-chdirs per game
+# to whichever core it loads, so this only has to be right for the FIRST one.
 cd "$SOH"
-exec "./$SOH_BIN" "$@"
+exec "$LAUNCH_DIR/$LAUNCH_BIN" "$@"

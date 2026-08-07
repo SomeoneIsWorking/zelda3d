@@ -17,7 +17,7 @@
 // Declared here rather than in a widely-included header: touching functions.h rebuilds the whole
 // tree, and these three are only needed by this file.
 void Zelda3D_LauncherShow(int show); // SohRmlUi.cpp
-void Zelda3D_LaunchMM(void);         // zelda3d_launcher.cpp -- STOPGAP process hand-off, see N3
+int Zelda3D_LaunchMM(void);          // zelda3d_launcher.cpp; 1 = MM is starting, 0 = it could not
 void Zelda3D_LauncherExit(void);
 extern int gZelda3dLauncherAction;   // SohRmlUi.cpp; 1 = OoT, 2 = MM, 3 = quit
 
@@ -42,19 +42,17 @@ void Launcher_Main(GameState* gameState) {
         gameState->running = false;
         SET_NEXT_GAMESTATE(gameState, TitleSetup_Init, GameState);
     } else if (choice == 2) {
-        // Majora's Mask. ONE BINARY RUNNING BOTH GAMES IS NOT DONE -- it is milestone N3 in
-        // docs/MM_NATIVE.md, and it is not a small thing: MM is a separate N64 decomp whose symbols
-        // (Play_Init, Actor_Init, gSaveContext, ...) collide with OoT's, which is precisely why the
-        // two are separate targets today. Their own design note calls for per-game MODULES (separate
-        // binary or shared object) rather than one link unit. Until that exists this hands off by
-        // replacing the process, which is application switching and is explicitly NOT what was
-        // asked for -- it is a stopgap, and it is labelled as one rather than passed off as done.
-        // STOPGAP: run MM in-process via per-game modules (N3) because both cores cannot be linked
-        // into one binary without namespacing one of the two decomps.
-        Zelda3D_LaunchMM();
-        // Only reached if the hand-off failed; stay on the launcher rather than booting the wrong
-        // game, and Zelda3D_LaunchMM has already said why on stderr.
-        Zelda3D_LauncherShow(1);
+        // Majora's Mask: a handover inside this one process. Zelda3D_LaunchMM records the request
+        // and ends this game; ending it is THIS function's job to finish -- clearing `running` with
+        // no next gamestate is what drains RunFrame's overlay loop and gets the core's run() to
+        // return to the launcher, which then loads the MM core. A 0 means MM did not start, so stay
+        // on the launcher rather than booting the wrong game (it has already said why on stderr).
+        if (!Zelda3D_LaunchMM()) {
+            Zelda3D_LauncherShow(1);
+        } else {
+            Zelda3D_LauncherShow(0);
+            gameState->running = false; // no SET_NEXT_GAMESTATE: this core is finished
+        }
     } else if (choice == 3) {
         gameState->running = false;
         Zelda3D_LauncherExit();

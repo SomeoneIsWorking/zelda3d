@@ -343,7 +343,7 @@ int Zelda3D_LauncherEnabled(void);        // zelda3d/launcher/zelda3d_launcher.c
                                           // graph.c asks it whether to enter the launcher gamestate
 void Zelda3D_LauncherShow(int show);      // SohRmlUi.cpp -- show/hide the launcher document
 int Zelda3D_LauncherIsVisible(void);
-void Zelda3D_LaunchMM(void);              // zelda3d/launcher/zelda3d_launcher.cpp -- STOPGAP, see N3
+int Zelda3D_LaunchMM(void);               // zelda3d/launcher/zelda3d_launcher.cpp; 1 = MM starting
 void Zelda3D_LauncherExit(void);
 int Zelda3D_SkipEnabled(void);
 void Zelda3D_SkipControlTakers(PlayState* play);

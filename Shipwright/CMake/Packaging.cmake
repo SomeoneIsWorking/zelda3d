@@ -76,9 +76,10 @@ execute_process(
     ${LINUXDEPLOY_EXECUTABLE}
     --appimage-extract-and-run
     --appdir=${CPACK_TEMPORARY_DIRECTORY}
-    --executable=$<TARGET_FILE:soh>
-    $<$<BOOL:$<TARGET_PROPERTY:soh,APPIMAGE_DESKTOP_FILE>>:--desktop-file=$<TARGET_PROPERTY:soh,APPIMAGE_DESKTOP_FILE>>
-    $<$<BOOL:$<TARGET_PROPERTY:soh,APPIMAGE_ICON_FILE>>:--icon-file=$<TARGET_PROPERTY:soh,APPIMAGE_ICON_FILE>>
+    # The launcher, which is the only executable the build produces: the games are cores it loads.
+    --executable=$<TARGET_FILE:zelda3d_app>
+    $<$<BOOL:$<TARGET_PROPERTY:zelda3d_app,APPIMAGE_DESKTOP_FILE>>:--desktop-file=$<TARGET_PROPERTY:zelda3d_app,APPIMAGE_DESKTOP_FILE>>
+    $<$<BOOL:$<TARGET_PROPERTY:zelda3d_app,APPIMAGE_ICON_FILE>>:--icon-file=$<TARGET_PROPERTY:zelda3d_app,APPIMAGE_ICON_FILE>>
     --output=appimage
     # --verbosity=2
 )

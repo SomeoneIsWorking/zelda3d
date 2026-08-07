@@ -1961,6 +1961,7 @@ scrollbarhorizontal sliderbar {
 .launcher__background-wrapper {
   display: flex;
   position: absolute;
+  pointer-events: none;
   top: -55vw;
   right: -100%;
   bottom: -50vw;
