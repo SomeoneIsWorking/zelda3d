@@ -194,13 +194,26 @@ What actually blocks the merge is plain divergence, and it is the harder kind:
 | `UIWidgets.cpp` | 471 / ~1300 | 45 of 64 function bodies ARE identical; the ~20 that differ include `GetRandomValue`, whose signature differs so the two have different determinism contracts |
 | `Menu.cpp` | 302 / ~950 | OoT-only race mode and search navigation; `Fast::WindowBackend` vs `int32_t` backends |
 
-**Done:** `zelda3d_shared/gui/Notification.h` (the interface; the .cpp stays per-game) and
-`zelda3d_shared/gui/ui_colors.h` (the `Colors` enum + `ColorValues` table, which were byte-identical).
+**Done, and the method that made it possible — share FUNCTIONS, not files:**
 
-**The tractable next step is function-level, not file-level:** the `PushStyle*`/`PopStyle*` theming
-family in `UIWidgets.cpp` is among the 45 identical functions and could move to a shared TU without
-reconciling the widget APIs. The genuine prerequisite for `MenuTypes`/`Menu` is deciding three things
-that have nothing to do with CVars — the callback ABI, the enum contents, and the backend
+- `zelda3d_shared/gui/Notification.h` — the interface; the `.cpp` stays per-game.
+- `zelda3d_shared/gui/ui_colors.h` — the `Colors` enum + `ColorValues` table, byte-identical.
+- `zelda3d_shared/gui/ui_theming.{h,cpp}` — the 26 `PushStyle*`/`PopStyle*` functions. 25 of 26 had
+  byte-identical bodies and all 26 declarations matched, defaults included. The 26th differs by one
+  number: `PushStyleInput`'s vertical frame padding is `6.0f` in OoT and `8.0f` in MM. Both are
+  preserved via `ZELDA3D_UI_INPUT_FRAME_PADDING_Y`, defined per game in CMake — it is a visible
+  difference and nothing establishes which is intended. That define is also the only reason the file
+  is compiled per game rather than living in the static library; remove the difference and it becomes
+  static-library-eligible.
+
+This is the pattern to continue with. `UIWidgets.cpp` cannot be merged as a file — 471 differing
+lines, and among them `GetRandomValue`, whose signature differs so the two games have different
+determinism contracts — but **45 of its 64 function bodies are identical**, and each is extractable on
+its own evidence. The theming family was 26 of those 45; ~19 remain.
+
+The genuine prerequisite for `MenuTypes`/`Menu` is deciding three things that have nothing to do with
+CVars — the callback ABI (`std::function` vs function pointer: capturing menu code in OoT, or no heap
+allocation per widget in MM — you cannot have both), the enum contents, and the backend
 representation.
 
 ### The MM CVar migration — sized against the BINARY, not a grep

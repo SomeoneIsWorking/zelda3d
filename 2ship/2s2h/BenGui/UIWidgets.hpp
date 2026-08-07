@@ -18,6 +18,7 @@
 #include <ship/window/Window.h>
 
 #include "gui/ui_colors.h"
+#include "gui/ui_theming.h"
 
 namespace UIWidgets {
 
@@ -562,45 +563,21 @@ struct InputOptions : WidgetOptions {
     }
 };
 
-void PushStyleMenu(const ImVec4& color);
-void PushStyleMenu(Colors color = Colors::LightBlue);
-void PopStyleMenu();
 bool BeginMenu(const char* label, Colors color = Colors::LightBlue);
 
-void PushStyleMenuItem(const ImVec4& color);
-void PushStyleMenuItem(Colors color = Colors::LightBlue);
-void PopStyleMenuItem();
 bool MenuItem(const char* label, const char* shortcut = NULL, Colors color = Colors::LightBlue);
 
-void PushStyleButton(const ImVec4& color, ImVec2 padding = ImVec2(10.0f, 8.0f));
-void PushStyleButton(Colors color = Colors::Gray, ImVec2 padding = ImVec2(10.0f, 8.0f));
-void PopStyleButton();
 bool Button(const char* label, const ButtonOptions& options = {});
 bool WindowButton(const char* label, const char* cvarName, std::shared_ptr<Ship::GuiWindow> windowPtr,
                   const WindowButtonOptions& options = {});
 
-void PushStyleCheckbox(const ImVec4& color, ImVec2 padding = ImVec2(10.0f, 6.0f));
-void PushStyleCheckbox(Colors color = Colors::LightBlue, ImVec2 padding = ImVec2(10.0f, 6.0f));
-void PopStyleCheckbox();
 void RenderText(ImVec2 pos, const char* text, const char* text_end, bool hide_text_after_hash);
 bool Checkbox(const char* label, bool* v, const CheckboxOptions& options = {});
 bool CVarCheckbox(const char* label, const char* cvarName, const CheckboxOptions& options = {});
 
-void PushStyleCombobox(const ImVec4& color);
-void PushStyleCombobox(Colors color = Colors::LightBlue);
-void PopStyleCombobox();
 
-void PushStyleTabs(const ImVec4& color);
-void PushStyleTabs(Colors color = Colors::LightBlue);
-void PopStyleTabs();
 
-void PushStyleInput(const ImVec4& color);
-void PushStyleInput(Colors color = Colors::LightBlue);
-void PopStyleInput();
 
-void PushStyleHeader(const ImVec4& color);
-void PushStyleHeader(Colors color = Colors::LightBlue);
-void PopStyleHeader();
 
 void Spacer(float height = 0.0f);
 void Separator(bool padTop = true, bool padBottom = true, float extraVerticalTopPadding = 0.0f,
@@ -1124,8 +1101,6 @@ bool CVarCombobox(const char* label, const char* cvarName, const char* (&comboAr
     return dirty;
 }
 
-void PushStyleSlider(Colors color = Colors::LightBlue);
-void PopStyleSlider();
 bool SliderInt(const char* label, int32_t* value, const IntSliderOptions& options = {});
 bool CVarSliderInt(const char* label, const char* cvarName, const IntSliderOptions& options = {});
 bool SliderFloat(const char* label, float* value, const FloatSliderOptions& options = {});
