@@ -123,6 +123,11 @@ endif()
 file(GLOB ZELDA3D_SHARED_PORT_SOURCES CONFIGURE_DEPENDS
     "${ZELDA3D_SHARED_DIR}/port/*.c" "${ZELDA3D_SHARED_DIR}/port/*.cpp" "${ZELDA3D_SHARED_DIR}/port/*.h")
 
+# Shared GUI code. Compiled per game like port/ above -- see zelda3d_shared/gui/ui_theming.cpp for
+# the one per-game value that keeps it out of the static library.
+file(GLOB ZELDA3D_SHARED_GUI_SOURCES CONFIGURE_DEPENDS
+    "${ZELDA3D_SHARED_DIR}/gui/*.cpp" "${ZELDA3D_SHARED_DIR}/gui/*.h")
+
 ################################################################################
 # Sub-projects
 ################################################################################
@@ -263,6 +268,7 @@ set(ALL_FILES
     ${src__}
     ${ZELDA3D_SHARED_PORT_SOURCES}
     ${ZELDA3D_SHARED_EXTRACTOR_SOURCES}
+    ${ZELDA3D_SHARED_GUI_SOURCES}
 )
 
 ################################################################################
@@ -285,6 +291,12 @@ add_library(soh_settings INTERFACE)
 # Parameterised here rather than #ifdef'd in the shared source: the difference is a name, and the
 # build is where per-game names belong.
 target_compile_definitions(soh_settings INTERFACE ZELDA3D_IDENTITY_MTX=gMtxClear)
+
+# ZELDA3D_UI_INPUT_FRAME_PADDING_Y -- the ONE value that differs among the 26 shared ImGui theming
+# functions in zelda3d_shared/gui/ui_theming.cpp. OoT's input fields use 6.0f of vertical frame
+# padding and MM's use 8.0f. Both are preserved rather than one being picked, because it is a visible
+# difference and nothing establishes which is intended.
+target_compile_definitions(soh_settings INTERFACE ZELDA3D_UI_INPUT_FRAME_PADDING_Y=6.0f)
 
 # OoT's CVar namespace macros (CVAR_PREFIX_SETTING="gSettings", ...), from
 # Shipwright/CMake/soh-cvars.cmake. Scoped to THIS game because the namespaces are this game's: MM

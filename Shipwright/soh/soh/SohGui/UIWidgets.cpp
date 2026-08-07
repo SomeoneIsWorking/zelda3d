@@ -65,24 +65,6 @@ void Tooltip(std::string text) {
     }
 }
 
-void PushStyleMenu(const ImVec4& color) {
-    ImGui::PushStyleColor(ImGuiCol_Header, ImVec4(color.x, color.y, color.z, 0.5f));
-    ImGui::PushStyleColor(ImGuiCol_HeaderHovered, ImVec4(color.x, color.y, color.z, 1.0f));
-    ImGui::PushStyleColor(ImGuiCol_PopupBg, ColorValues.at(Colors::DarkGray));
-    ImGui::PushStyleColor(ImGuiCol_Border, ColorValues.at(Colors::DarkGray));
-    ImGui::PushStyleVar(ImGuiStyleVar_ItemSpacing, ImVec2(8.0f, 15.0f));
-    ImGui::PushStyleVar(ImGuiStyleVar_PopupBorderSize, 3.0f);
-}
-
-void PushStyleMenu(Colors color) {
-    PushStyleMenu(ColorValues.at(color));
-}
-
-void PopStyleMenu() {
-    ImGui::PopStyleVar(2);
-    ImGui::PopStyleColor(4);
-}
-
 bool BeginMenu(const char* label, Colors color) {
     bool dirty = false;
     PushStyleMenu(color);
@@ -94,20 +76,6 @@ bool BeginMenu(const char* label, Colors color) {
     return dirty;
 }
 
-void PushStyleMenuItem(const ImVec4& color) {
-    ImGui::PushStyleColor(ImGuiCol_HeaderHovered, color);
-    ImGui::PushStyleVar(ImGuiStyleVar_ItemSpacing, ImVec2(20.0f, 15.0f));
-}
-
-void PushStyleMenuItem(Colors color) {
-    PushStyleMenuItem(ColorValues.at(color));
-}
-
-void PopStyleMenuItem() {
-    ImGui::PopStyleVar(1);
-    ImGui::PopStyleColor(1);
-}
-
 bool MenuItem(const char* label, const char* shortcut, Colors color) {
     bool dirty = false;
     PushStyleMenuItem(color);
@@ -116,61 +84,6 @@ bool MenuItem(const char* label, const char* shortcut, Colors color) {
     }
     PopStyleMenuItem();
     return dirty;
-}
-
-void PushStyleButton(const ImVec4& color, const ImVec2 padding) {
-    ImGui::PushStyleColor(ImGuiCol_Button, ImVec4(color.x, color.y, color.z, 1.0f));
-    ImGui::PushStyleColor(ImGuiCol_ButtonHovered, ImVec4(color.x, color.y, color.z, 0.8f));
-    ImGui::PushStyleColor(ImGuiCol_ButtonActive, ImVec4(color.x, color.y, color.z, 0.6f));
-    ImGui::PushStyleColor(ImGuiCol_Border, ImVec4(0.0f, 0.0f, 0.0f, 0.3f));
-    ImGui::PushStyleVar(ImGuiStyleVar_FrameRounding, 3.0f);
-    ImGui::PushStyleVar(ImGuiStyleVar_FramePadding, padding);
-    ImGui::PushStyleVar(ImGuiStyleVar_FrameBorderSize, 5.0f);
-}
-
-void PushStyleButton(Colors color, ImVec2 padding) {
-    PushStyleButton(ColorValues.at(color), padding);
-}
-
-void PopStyleButton() {
-    ImGui::PopStyleVar(3);
-    ImGui::PopStyleColor(4);
-}
-
-void PushStyleInput(const ImVec4& color) {
-    ImGui::PushStyleColor(ImGuiCol_Button, ImVec4(color.x, color.y, color.z, 1.0f));
-    ImGui::PushStyleColor(ImGuiCol_ButtonHovered, ImVec4(color.x, color.y, color.z, 0.8f));
-    ImGui::PushStyleColor(ImGuiCol_ButtonActive, ImVec4(color.x, color.y, color.z, 0.6f));
-    ImGui::PushStyleColor(ImGuiCol_FrameBg, ImVec4(color.x, color.y, color.z, 1.0f));
-    ImGui::PushStyleColor(ImGuiCol_FrameBgHovered, ImVec4(color.x, color.y, color.z, 0.8f));
-    ImGui::PushStyleColor(ImGuiCol_FrameBgActive, ImVec4(color.x, color.y, color.z, 0.6f));
-    ImGui::PushStyleColor(ImGuiCol_Border, ImVec4(0.0f, 0.0f, 0.0f, 0.3f));
-    ImGui::PushStyleVar(ImGuiStyleVar_FrameRounding, 3.0f);
-    ImGui::PushStyleVar(ImGuiStyleVar_FramePadding, ImVec2(10.0f, 6.0f));
-    ImGui::PushStyleVar(ImGuiStyleVar_FrameBorderSize, 5.0f);
-}
-
-void PushStyleInput(Colors color) {
-    PushStyleInput(ColorValues.at(color));
-}
-
-void PopStyleInput() {
-    ImGui::PopStyleVar(3);
-    ImGui::PopStyleColor(7);
-}
-
-void PushStyleHeader(const ImVec4& color) {
-    ImGui::PushStyleColor(ImGuiCol_Header, ImVec4(color.x, color.y, color.z, 1.0f));
-    ImGui::PushStyleColor(ImGuiCol_HeaderHovered, ImVec4(color.x, color.y, color.z, 0.8f));
-    ImGui::PushStyleColor(ImGuiCol_HeaderActive, ImVec4(color.x, color.y, color.z, 0.6f));
-}
-
-void PushStyleHeader(Colors color) {
-    PushStyleHeader(ColorValues.at(color));
-}
-
-void PopStyleHeader() {
-    ImGui::PopStyleColor(3);
 }
 
 bool Button(const char* label, const ButtonOptions& options) {
@@ -207,26 +120,6 @@ bool WindowButton(const char* label, const char* cvarName, std::shared_ptr<Ship:
     }
     ImGui::PopStyleVar();
     return dirty;
-}
-
-void PushStyleCheckbox(const ImVec4& color, ImVec2 padding) {
-    ImGui::PushStyleColor(ImGuiCol_FrameBg, ImVec4(color.x, color.y, color.z, 1.0f));
-    ImGui::PushStyleColor(ImGuiCol_FrameBgHovered, ImVec4(color.x, color.y, color.z, 0.8f));
-    ImGui::PushStyleColor(ImGuiCol_FrameBgActive, ImVec4(color.x, color.y, color.z, 0.6f));
-    ImGui::PushStyleColor(ImGuiCol_Border, ImVec4(0.0f, 0.0f, 0.0f, 0.3f));
-    ImGui::PushStyleColor(ImGuiCol_CheckMark, ImVec4(1.0f, 1.0f, 1.0f, 0.7f));
-    ImGui::PushStyleVar(ImGuiStyleVar_FrameRounding, 3.0f);
-    ImGui::PushStyleVar(ImGuiStyleVar_FramePadding, padding);
-    ImGui::PushStyleVar(ImGuiStyleVar_FrameBorderSize, 5.0f);
-}
-
-void PushStyleCheckbox(Colors color, ImVec2 padding) {
-    PushStyleCheckbox(ColorValues.at(color), padding);
-}
-
-void PopStyleCheckbox() {
-    ImGui::PopStyleVar(3);
-    ImGui::PopStyleColor(5);
 }
 
 void Spacer(float height) {
@@ -452,72 +345,6 @@ float CalcComboWidth(const char* preview_value, ImGuiComboFlags flags) {
     const float preview_width = ImGui::CalcTextSize(preview_value, NULL, true).x;
     float w = arrow_size + preview_width + (style.FramePadding.x * 2.0f);
     return w;
-}
-
-void PushStyleCombobox(const ImVec4& color) {
-    ImGui::PushStyleColor(ImGuiCol_FrameBg, ImVec4(color.x, color.y, color.z, 0.8f));
-    ImGui::PushStyleColor(ImGuiCol_FrameBgHovered, ImVec4(color.x, color.y, color.z, 0.6f));
-    ImGui::PushStyleColor(ImGuiCol_FrameBgActive, ImVec4(color.x, color.y, color.z, 0.6f));
-    ImGui::PushStyleColor(ImGuiCol_Button, ImVec4(color.x, color.y, color.z, 1.0f));
-    ImGui::PushStyleColor(ImGuiCol_ButtonHovered, ImVec4(color.x, color.y, color.z, 0.8f));
-    ImGui::PushStyleColor(ImGuiCol_ButtonActive, ImVec4(color.x, color.y, color.z, 1.0f));
-    ImGui::PushStyleColor(ImGuiCol_Header, ImVec4(color.x, color.y, color.z, 0.5f));
-    ImGui::PushStyleColor(ImGuiCol_HeaderHovered, ImVec4(color.x, color.y, color.z, 0.6f));
-    ImGui::PushStyleColor(ImGuiCol_HeaderActive, ImVec4(color.x, color.y, color.z, 0.6f));
-    ImGui::PushStyleVar(ImGuiStyleVar_FrameRounding, 3.0f);
-    ImGui::PushStyleVar(ImGuiStyleVar_PopupRounding, 3.0f);
-    ImGui::PushStyleVar(ImGuiStyleVar_PopupBorderSize, 0.0f);
-    ImGui::PushStyleVar(ImGuiStyleVar_FramePadding, ImVec2(10.0f, 6.0f));
-}
-
-void PushStyleCombobox(Colors color) {
-    PushStyleCombobox(ColorValues.at(color));
-}
-
-void PopStyleCombobox() {
-    ImGui::PopStyleVar(4);
-    ImGui::PopStyleColor(9);
-}
-
-void PushStyleTabs(const ImVec4& color) {
-    ImGui::PushStyleColor(ImGuiCol_Tab, ImVec4(color.x, color.y, color.z, 0.8f));
-    ImGui::PushStyleColor(ImGuiCol_TabHovered, ImVec4(color.x, color.y, color.z, 0.6f));
-    ImGui::PushStyleColor(ImGuiCol_TabActive, ImVec4(color.x, color.y, color.z, 0.6f));
-    ImGui::PushStyleColor(ImGuiCol_Header, ImVec4(color.x, color.y, color.z, 0.5f));
-    ImGui::PushStyleColor(ImGuiCol_HeaderHovered, ImVec4(color.x, color.y, color.z, 0.6f));
-    ImGui::PushStyleColor(ImGuiCol_HeaderActive, ImVec4(color.x, color.y, color.z, 0.6f));
-    ImGui::PushStyleVar(ImGuiStyleVar_FrameRounding, 3.0f);
-    ImGui::PushStyleVar(ImGuiStyleVar_PopupRounding, 3.0f);
-    ImGui::PushStyleVar(ImGuiStyleVar_PopupBorderSize, 0.0f);
-    ImGui::PushStyleVar(ImGuiStyleVar_FramePadding, ImVec2(10.0f, 6.0f));
-}
-
-void PushStyleTabs(Colors color) {
-    PushStyleTabs(ColorValues.at(color));
-}
-
-void PopStyleTabs() {
-    ImGui::PopStyleColor(6);
-    ImGui::PopStyleVar(4);
-}
-
-void PushStyleSlider(Colors color_) {
-    const ImVec4& color = ColorValues.at(color_);
-    ImGui::PushStyleColor(ImGuiCol_FrameBg, ImVec4(color.x, color.y, color.z, 1.0f));
-    ImGui::PushStyleColor(ImGuiCol_FrameBgHovered, ImVec4(color.x, color.y, color.z, 1.0f));
-    ImGui::PushStyleColor(ImGuiCol_FrameBgActive, ImVec4(color.x, color.y, color.z, 1.0f));
-    ImGui::PushStyleColor(ImGuiCol_Border, ImVec4(color.x, color.y, color.z, 1.0f));
-    ImGui::PushStyleColor(ImGuiCol_SliderGrab, ImVec4(1.0, 1.0, 1.0, 0.4f));
-    ImGui::PushStyleColor(ImGuiCol_SliderGrabActive, ImVec4(1.0, 1.0, 1.0, 0.5f));
-    ImGui::PushStyleVar(ImGuiStyleVar_GrabRounding, 3.0f);
-    ImGui::PushStyleVar(ImGuiStyleVar_FrameRounding, 3.0f);
-    ImGui::PushStyleVar(ImGuiStyleVar_FramePadding, ImVec2(10.0f, 8.0f));
-    ImGui::PushStyleVar(ImGuiStyleVar_FrameBorderSize, 0.0f);
-}
-
-void PopStyleSlider() {
-    ImGui::PopStyleVar(4);
-    ImGui::PopStyleColor(6);
 }
 
 bool SliderInt(const char* label, int32_t* value, const IntSliderOptions& options) {

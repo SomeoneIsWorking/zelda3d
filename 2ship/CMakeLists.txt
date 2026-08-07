@@ -59,6 +59,11 @@ file(GLOB ZELDA3D_SHARED_EXTRACTOR_SOURCES CONFIGURE_DEPENDS
     "${ZELDA3D_SHARED_DIR}/extractor/*.c" "${ZELDA3D_SHARED_DIR}/extractor/*.cpp"
     "${ZELDA3D_SHARED_DIR}/extractor/*.h")
 
+# Shared GUI code. Compiled per game like port/ above -- see zelda3d_shared/gui/ui_theming.cpp for
+# the one per-game value that keeps it out of the static library.
+file(GLOB ZELDA3D_SHARED_GUI_SOURCES CONFIGURE_DEPENDS
+    "${ZELDA3D_SHARED_DIR}/gui/*.cpp" "${ZELDA3D_SHARED_DIR}/gui/*.h")
+
 ################################################################################
 # Shared sub-projects. The root CMakeLists already add_subdirectory'd these, so
 # the NOT TARGET guards make this a no-op — mm links the same static libs as soh.
@@ -116,6 +121,7 @@ set(ALL_FILES
     ${src__}
     ${ZELDA3D_SHARED_PORT_SOURCES}
     ${ZELDA3D_SHARED_EXTRACTOR_SOURCES}
+    ${ZELDA3D_SHARED_GUI_SOURCES}
 )
 
 ################################################################################
@@ -138,6 +144,11 @@ add_library(mm_settings INTERFACE)
 # Parameterised here rather than #ifdef'd in the shared source: the difference is a name, and the
 # build is where per-game names belong.
 target_compile_definitions(mm_settings INTERFACE ZELDA3D_IDENTITY_MTX=gIdentityMtx)
+
+# ZELDA3D_UI_INPUT_FRAME_PADDING_Y -- see the matching block in Shipwright/soh/CMakeLists.txt. MM's
+# input fields use 8.0f of vertical frame padding where OoT's use 6.0f; that is the ONLY difference
+# among the 26 shared ImGui theming functions, and both are preserved.
+target_compile_definitions(mm_settings INTERFACE ZELDA3D_UI_INPUT_FRAME_PADDING_Y=8.0f)
 
 
 # -fno-gnu-unique: the ONE symbol class RTLD_LOCAL does not privatise. Both cores need it or neither
