@@ -21,7 +21,8 @@ FaultClient sGameFaultClient;
 u16 sLastButtonPressed;
 
 // #region SOH [General] Making gGameState available
-GameState* gGameState;
+// gGameState is DEFINED in zelda3d/core/zelda3d_core_lifecycle.c -- see the note on gPlayState
+// in z_play.c. RunFrame sets and clears it; the core guarantees it starts NULL.
 // #endregion
 
 // Forward declared, because this in a C++ header.

@@ -24,6 +24,14 @@ void WindowRequestExitWithFullTeardown() {
     Ship::Context::RequestExitWithFullTeardown();
 }
 
+void WindowRequestGameSwitch(const char* gameId) {
+    if (gameId == nullptr || gameId[0] == '\0') {
+        return;
+    }
+    Ship::Context::RequestGameSwitch(gameId);
+    Ship::Context::RequestExit();
+}
+
 bool WindowIsRunning() {
     // Checked BEFORE the backend, and deliberately at this bridge rather than inside a window
     // backend: both games' graph loops are `while (WindowIsRunning()) RunFrame();`, so one check

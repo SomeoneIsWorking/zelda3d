@@ -268,6 +268,22 @@ static void Z3D_Repl_Exec(PlayState* play, char* line) {
         } else {
             Z3D_Repl_Reply("usage: turn <deg>");
         }
+    } else if (strncmp(line, "switchgame", 10) == 0) {
+        // MM's way back. Until this existed MM was a one-way trip: the chooser lives in the OoT
+        // core, so nothing in MM could reach it. "oot" restarts that core, which boots into the
+        // chooser, so this is also how you get the picker back.
+        const char* id = line + 10;
+        while (*id == ' ') id++;
+        char* nl = strpbrk(id, "\r\n");
+        if (nl != NULL) *nl = '\0';
+        if (*id == '\0') {
+            Z3D_Repl_Reply("switchgame: needs a game id (oot|mm) -- NOTHING DONE");
+        } else {
+            char out[128];
+            snprintf(out, sizeof(out), "switchgame %s: ending MM; the launcher takes it from here", id);
+            Z3D_Repl_Reply(out);
+            WindowRequestGameSwitch(id);
+        }
     } else if (strncmp(line, "quitteardown", 12) == 0) {
         // MM's half of the C057 experiment. MM is the interesting side: unlike OoT, its shutdown
         // already destroys the Context outright, so this measures whether MM has been running the

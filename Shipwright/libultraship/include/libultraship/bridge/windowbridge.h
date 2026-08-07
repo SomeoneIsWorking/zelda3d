@@ -22,6 +22,15 @@ API_EXPORT void WindowRequestExit();
  */
 API_EXPORT void WindowRequestExitWithFullTeardown();
 
+/**
+ * @brief End this game and ask the launcher to start `gameId` ("oot" / "mm") instead.
+ *
+ * Both halves in one call, because neither is any use alone: the request names the next game, and
+ * ending this one is what returns control to the launcher so it can act. Lives at this bridge for
+ * the same reason WindowRequestExit does -- both games' REPLs are C and must not see Ship:: types.
+ */
+API_EXPORT void WindowRequestGameSwitch(const char* gameId);
+
 /** @brief Returns the current width of the game window in pixels. */
 API_EXPORT uint32_t WindowGetWidth();
 

@@ -344,6 +344,12 @@ int Zelda3D_LauncherEnabled(void);        // zelda3d/launcher/zelda3d_launcher.c
 void Zelda3D_LauncherShow(int show);      // SohRmlUi.cpp -- show/hide the launcher document
 int Zelda3D_LauncherIsVisible(void);
 int Zelda3D_LaunchMM(void);               // zelda3d/launcher/zelda3d_launcher.cpp; 1 = MM starting
+// The core's run lifecycle (zelda3d/core/zelda3d_core_lifecycle.c, which also DEFINES the state).
+// Begin resets everything whose lifetime is one run, so a run cannot inherit the previous game's;
+// End reports anything the teardown left set, which is how a teardown that stopped running gets
+// noticed instead of being silently papered over by the next Begin.
+void Zelda3D_CoreRunBegin(void);
+int Zelda3D_CoreRunEnd(void);
 void Zelda3D_LauncherExit(void);
 int Zelda3D_SkipEnabled(void);
 void Zelda3D_SkipControlTakers(PlayState* play);

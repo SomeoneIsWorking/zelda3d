@@ -59,7 +59,20 @@ CollisionHeader* getGraveyardCollisionHeader() {
 }
 
 void ApplyGraveyardGeometryPatches() {
-    static CollisionHeader* graveyardColHeader = getGraveyardCollisionHeader();
+    // NOT `static`. It was, and the initialiser then ran once per dlopen of this core rather than
+    // once per run -- caching a pointer into a scene resource owned by the ResourceManager of
+    // whichever run happened to be first. Under the launcher a core is run more than once, and
+    // starting a different game in between destroys that ResourceManager, so the third run
+    // dereferenced freed memory here (OoT -> MM -> OoT SIGSEGV'd in this function, inside InitOTR).
+    //
+    // A same-game restart hid it, which is worth knowing before trusting a green oot,oot run: that
+    // path reuses the existing GameSession, so the resource -- and the stale pointer -- stayed
+    // valid by accident.
+    //
+    // Re-resolving costs nothing worth caching: LoadResource hits the ResourceManager's own cache.
+    // The rule this follows is the general one -- anything whose validity ends with the run must not
+    // be held anywhere that outlives the run (see zelda3d/core/zelda3d_core_lifecycle.c).
+    CollisionHeader* graveyardColHeader = getGraveyardCollisionHeader();
     for (auto& mappingPatch : graveyardGeometryPatches) {
         for (int i = mappingPatch.first.first; i <= mappingPatch.first.second; i++) {
             CollisionPoly* poly = &graveyardColHeader->polyList[i];

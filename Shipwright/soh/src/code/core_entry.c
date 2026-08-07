@@ -15,8 +15,12 @@
 #include "soh/OTRGlobals.h"
 #include "soh/CrashHandlerExt.h"
 #include <ship/zelda3d_core.h>
+#include "zelda3d/zelda3d.h"
 
 int Zelda3D_CoreRun(int argc, char* argv[]) {
+    // FIRST, before anything can read it. The launcher may have run a game in this process already,
+    // and InitOTR below is exactly where a stale pointer from that run got dereferenced.
+    Zelda3D_CoreRunBegin();
     GameConsole_Init();
     InitOTR(argc, argv);
     // TODO: Was moved to below InitOTR because it requires window to be setup. But will be late to catch crashes.
@@ -26,6 +30,10 @@ int Zelda3D_CoreRun(int argc, char* argv[]) {
     Heaps_Alloc();
     Main(0);
     DeinitOTR();
+    // Before the heaps go: check this run left nothing pointing into them. The launcher may start
+    // another game in this process, and a core that hands back dangling globals hands the next game
+    // a crash it has no way to diagnose. See zelda3d/core/zelda3d_core_lifecycle.c.
+    Zelda3D_CoreRunEnd();
     Heaps_Free();
     return 0;
 }
