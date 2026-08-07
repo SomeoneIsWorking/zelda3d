@@ -206,10 +206,34 @@ What actually blocks the merge is plain divergence, and it is the harder kind:
   is compiled per game rather than living in the static library; remove the difference and it becomes
   static-library-eligible.
 
-This is the pattern to continue with. `UIWidgets.cpp` cannot be merged as a file — 471 differing
-lines, and among them `GetRandomValue`, whose signature differs so the two games have different
-determinism contracts — but **45 of its 64 function bodies are identical**, and each is extractable on
-its own evidence. The theming family was 26 of those 45; ~19 remain.
+- `zelda3d_shared/gui/ui_primitives.{h,cpp}` — 7 more: `PaddedSeparator`, `Separator`, `Spacer`,
+  `BeginMenu`, `MenuItem`, `RenderText`, `CalcComboWidth`.
+
+`UIWidgets.cpp` cannot be merged as a file — 471 differing lines, and among them `GetRandomValue`,
+whose signature differs so the two games have different determinism contracts — but its function
+bodies can be, one at a time.
+
+**The gate is three rules, not one** (claim C076). Identical bodies alone give wrong answers:
+
+1. body byte-identical in both games;
+2. the header **declarations** identical too — defaults *and* the whole overload set;
+3. no parameter type from the divergent part of `UIWidgets.hpp`.
+
+Rule 2 exists because of `Tooltip`: its `const char*` body is byte-identical, but OoT declares only a
+`std::string` overload and MM only a `const char*` one, so extracting on body equality would have
+changed OoT's public API. Rule 3 exists because of `RadioButton` and `StateButton`, which take
+`RadioButtonsOptions`/`ButtonOptions` — per-game structs living in the very header that would have to
+include the shared one.
+
+Of the 18 identical-body functions left after the theming batch, **7 passed**. The rest, with reasons
+recorded in `ui_primitives.h` so nobody re-derives them: `Tooltip` (rule 2), `RadioButton` and
+`StateButton` (rule 3), `WrappedText` (`currentLineLength` is `unsigned int` in OoT and `int` in MM —
+picking one is a deliberate change, not an extraction), `ClampFloat` (declared in neither header).
+
+**The clearest next unit** is the five `CVar*` widgets — `CVarCheckbox`, `CVarInputInt`,
+`CVarInputString`, `CVarSliderFloat`, `CVarSliderInt`. Bodies identical; the only thing stopping them
+is `ShipInit::Init`, which each game supplies from its own header (`soh/ShipInit.hpp` vs
+`2s2h/ShipInit.hpp`). Declare that seam once, the way `port/zelda3d_port_api.h` did, and they move.
 
 The genuine prerequisite for `MenuTypes`/`Menu` is deciding three things that have nothing to do with
 CVars — the callback ABI (`std::function` vs function pointer: capturing menu code in OoT, or no heap
