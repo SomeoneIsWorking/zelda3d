@@ -6,7 +6,7 @@
 
 #include "BenJsonConversions.hpp"
 #include "BenPort.h"
-#include "2s2h/BenGui/Notification.h"
+#include "gui/Notification.h"
 #include <ship/window/Window.h>
 
 extern "C" {

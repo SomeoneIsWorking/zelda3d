@@ -26,7 +26,7 @@
 #include "settings.h"
 #include "soh/util.h"
 #include "randomizerTypes.h"
-#include "soh/Notification/Notification.h"
+#include "gui/Notification.h"
 #include "object/ObjectExtension.h"
 #include "soh/Enhancements/randomizer/RCToRandInf.h"
 

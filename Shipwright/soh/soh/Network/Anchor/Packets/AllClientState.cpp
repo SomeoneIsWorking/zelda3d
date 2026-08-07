@@ -3,7 +3,7 @@
 #include <nlohmann/json.hpp>
 #include <libultraship/libultraship.h>
 #include "soh/OTRGlobals.h"
-#include "soh/Notification/Notification.h"
+#include "gui/Notification.h"
 
 /**
  * ALL_CLIENT_STATE

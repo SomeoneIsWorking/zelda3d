@@ -1,6 +1,6 @@
 #include <fast/Fast3dGui.h>
 
-#include "Notification.h"
+#include "gui/Notification.h"
 #include <libultraship/libultraship.h>
 
 extern "C" {

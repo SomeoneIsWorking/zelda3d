@@ -1,6 +1,6 @@
 #include <libultraship/bridge.h>
 #include "soh/Enhancements/game-interactor/GameInteractor.h"
-#include "soh/Notification/Notification.h"
+#include "gui/Notification.h"
 #include "soh/ShipInit.hpp"
 #include "soh/SaveManager.h"
 

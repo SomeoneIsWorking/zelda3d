@@ -5,7 +5,7 @@
 #include <set>
 #include "2s2h/BenPort.h"
 #include "2s2h/BenGui/UIWidgets.hpp"
-#include "2s2h/BenGui/Notification.h"
+#include "gui/Notification.h"
 #include <ship/window/FileDropMgr.h>
 
 std::unordered_map<std::string, std::string> tagMap = {

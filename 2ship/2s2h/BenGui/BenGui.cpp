@@ -8,7 +8,7 @@
 #include "2s2h/Enhancements/Audio/AudioEditor.h"
 #include "2s2h/Enhancements/ModMenu/ModMenu.h"
 #include "CosmeticEditor.h"
-#include "Notification.h"
+#include "gui/Notification.h"
 #include "2s2h/Rando/CheckTracker/CheckTracker.h"
 
 #ifdef __APPLE__
