@@ -1855,11 +1855,20 @@ extern "C" void DeinitOTR() {
         return;
     }
 
-    // 3. Flush the log and exit, skipping the fragile GUI/GPU/window teardown (see header comment).
+    // 3. Return to the caller. `_exit(0)` used to live here to skip GUI/renderer/window destructors
+    // that crash inside driver code -- and it still would, if this function ended the program. It
+    // does not: the only program is the zelda3d launcher, which dlopen'd this core and is waiting
+    // for run() to return so it can load whichever game the user picked next. Exiting here would
+    // kill the host, not the game.
+    //
+    // Returning is not a weaker shutdown. Steps 1 and 2 above already stopped every background
+    // thread and persisted window layout and config, and the caller still has Heaps_Free() to run.
+    // What is deliberately NOT done is Context::DestroyInstance() -- that is the teardown measured
+    // as crashing (see Context::RequestExitWithFullTeardown and docs/MM_NATIVE.md), and it belongs
+    // to the launcher, once, at process exit. The engine stays up between games by design.
     if (auto logger = spdlog::default_logger()) {
         logger->flush();
     }
-    _exit(0);
 }
 
 #ifdef _WIN32

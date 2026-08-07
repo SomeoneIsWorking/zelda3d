@@ -235,6 +235,11 @@ void Zelda3D_ReplReply(const char* outPath, const char* fmt, ...) {
 // drive the menu through the real input path for deterministic, headless nav verification.
 void Zelda3D_RmlMenuKey(int action);
 void Zelda3D_RmlMenuClick(int x, int y); // synthesize a menu mouse click at window pixel (x, y)
+// Hit-test every actionable launcher row and report which element RmlUi actually returns at its
+// centre. `menuclick` alone cannot distinguish "the row is covered by an invisible sibling" from
+// "the click path is broken" from "I clicked the wrong pixel" -- all three look like nothing
+// happening. This names the element that is really there.
+void Zelda3D_LauncherHitReport(char* out, int outSize);
 
 static void Zelda3D_ReplExec(PlayState* play, char* line, const char* outPath) {
     char cmd[32];
@@ -261,8 +266,10 @@ static void Zelda3D_ReplExec(PlayState* play, char* line, const char* outPath) {
         // launcher the one screen its own control command could not drive. A command that cannot
         // run in the state it exists to control is not a gate, it is a bug.
         // (Screenshots already work here: they go through `dump`, which is play-free.)
-        static const char* kPlayFree[] = { "key",    "log",  "fps",  "dump",    "inputdev",
-                                           "keycap", "menu", "help", "launcher" };
+        // `menuclick` / `menuhit` for the same reason: they exist to test the launcher, which by
+        // construction runs without a PlayState.
+        static const char* kPlayFree[] = { "key",  "log",       "fps",  "dump",      "inputdev", "keycap",
+                                           "menu", "menuclick", "help", "launcher",  "menuhit" };
         int ok = 0;
         for (size_t i = 0; i < sizeof(kPlayFree) / sizeof(kPlayFree[0]); i++) {
             if (strcmp(cmd, kPlayFree[i]) == 0) {
@@ -316,6 +323,11 @@ static void Zelda3D_ReplExec(PlayState* play, char* line, const char* outPath) {
         // Inject a menu mouse click at window pixel (x, y) through the real input path.
         Zelda3D_RmlMenuClick((int)f1, (int)f2);
         Zelda3D_ReplReply(outPath, "menuclick (%d,%d)", (int)f1, (int)f2);
+    } else if (strcmp(cmd, "menuhit") == 0) {
+        char report[4096];
+        report[0] = '\0';
+        Zelda3D_LauncherHitReport(report, (int)sizeof report);
+        Zelda3D_ReplReply(outPath, "%s", report);
     } else if (strcmp(cmd, "tp") == 0 && sscanf(line, "%*s %f %f %f", &f1, &f2, &f3) == 3) {
         Player* p = GET_PLAYER(play);
         p->actor.world.pos.x = f1;

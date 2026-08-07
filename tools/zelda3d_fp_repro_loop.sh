@@ -10,6 +10,8 @@
 # Defaults: entrance 389 (Hyrule Field wooded exit), 20 attempts, 12s each.
 set -u
 REPO="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
+. "$REPO/tools/zelda3d_proc.sh"
+ZELDA3D_BIN="${ZELDA3D_SOH:-$REPO/Shipwright/build-cmake/zelda3d/zelda3d}"
 ENTR="${1:-389}"
 ATTEMPTS="${2:-20}"
 SECS="${3:-12}"
@@ -24,11 +26,11 @@ SIG='SOH3D MTX-NULL|SOH3D ARENA-CORRUPT|guMtxF2L|Matrix_ToMtx'
 
 for i in $(seq 1 "$ATTEMPTS"); do
     LOG="$RUN/attempt_$(printf '%02d' "$i").log"
-    pkill -9 -f soh.elf 2>/dev/null
+    for pid in $(zelda3d_pids "$ZELDA3D_BIN" oot); do kill -9 "$pid" 2>/dev/null; done
     sleep 1
     ZELDA3D_FP_REPRO=1 timeout "$SECS" "$REPO/tools/zelda3d_gpu_launch.sh" "$ENTR" >"$LOG" 2>&1
     rc=$?
-    pkill -9 -f soh.elf 2>/dev/null
+    for pid in $(zelda3d_pids "$ZELDA3D_BIN" oot); do kill -9 "$pid" 2>/dev/null; done
     sky=$(grep -c 'SKYBUG' "$LOG"); sky=${sky:-0}
     eng=$(grep -c 'FP_REPRO: first-person ENGAGED' "$LOG"); eng=${eng:-0}
     started=$(grep -c 'FP_REPRO: start injecting' "$LOG"); started=${started:-0}

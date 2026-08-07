@@ -7,14 +7,20 @@
 # Use via the agent's background runner (run_in_background) so it survives across calls:
 #   tools/zelda3d_gpu_launch.sh [entrance]
 # Auto-detects DISPLAY/XAUTHORITY (KDE Wayland XWayland) and the ROM (env / .env /
-# ./oot3d.3ds). Kills stale soh.elf first; a trap tears everything down on exit so no
+# ./oot3d.3ds). Kills a stale OoT instance first; a trap tears everything down on exit so no
 # instance is left on the user's desktop. Log -> scratch/logs/gpu.log (line-buffered).
+#
+# ONE program binary now runs both games (`zelda3d oot` / `zelda3d mm`); this script always runs
+# the OoT side. Cleanup discriminates by argv (tools/zelda3d_proc.sh) so it can never kill a
+# concurrently-running MM instance or a parallel agent's OoT instance.
 set -u
 REPO="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
+. "$REPO/tools/zelda3d_proc.sh"
 SOH="$REPO/Shipwright/build-cmake/soh"
+ZELDA3D_BIN="${ZELDA3D_SOH:-$REPO/Shipwright/build-cmake/zelda3d/zelda3d}"
 ENTR="${1:-${ZELDA3D_ENTRANCE:-219}}" # default Kakariko Village front gate
 
-cleanup() { pkill -9 -f "$SOH/soh.elf" 2>/dev/null; pkill -9 -f "soh.elf" 2>/dev/null; }
+cleanup() { local pid; for pid in $(zelda3d_pids "$ZELDA3D_BIN" oot); do kill -9 "$pid" 2>/dev/null; done; }
 trap cleanup EXIT INT TERM
 cleanup; sleep 1 # clear any stale instance before we start
 
@@ -42,4 +48,4 @@ rm -f "$ZELDA3D_REPL" "$ZELDA3D_REPL.out"
 echo "zelda3d_gpu_launch: DISPLAY=$DISPLAY XAUTHORITY=${XAUTHORITY:-<none>} entrance=$ENTR time=$ZELDA3D_TIME fifo=$ZELDA3D_REPL"
 cd "$SOH"
 # stdbuf line-buffers so the log (and any crash dump) survives even on a hard exit.
-exec stdbuf -oL -eL ./soh.elf
+exec stdbuf -oL -eL "$ZELDA3D_BIN" oot

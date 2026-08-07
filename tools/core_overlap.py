@@ -110,7 +110,10 @@ def main():
     if not os.path.isfile(os.path.join(BUILD, "build.ninja")):
         sys.exit(f"{BUILD}/build.ninja does not exist -- SEARCHED NOTHING. Configure and build "
                  f"both targets first.")
-    soh_objs, mm_objs = objects("soh/soh.elf", "soh"), objects("mm/mm.elf", "mm")
+    # ONE program binary (zelda3d_app, the launcher) now runs both games, dlopen'ing each game's
+    # code as its own shared object -- soh_core (libsoh_core.so) / mm_core (libmm_core.so). Those
+    # cores, not soh.elf/mm.elf (no longer build targets), are where each game's code lives.
+    soh_objs, mm_objs = objects("soh_core", "soh"), objects("mm_core", "mm")
     if not soh_objs or not mm_objs:
         sys.exit(f"no game-code objects found (soh={len(soh_objs)}, mm={len(mm_objs)}) -- SEARCHED NOTHING")
     print(f"soh objects {len(soh_objs)}, mm objects {len(mm_objs)}", file=sys.stderr)

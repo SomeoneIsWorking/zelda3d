@@ -32,7 +32,12 @@ Usage: tools/gpu_validation_test.py [entrance] [time]
 import os, re, subprocess, sys, time, signal, pathlib
 
 REPO = pathlib.Path(__file__).resolve().parent.parent
-SOH = REPO / "Shipwright/build-cmake/soh/soh.elf"
+# ONE program binary now runs both games; this test always runs OoT (`zelda3d oot`). SOH_DIR is
+# the OoT core's own asset directory -- the launcher resolves it as its build-tree sibling, same as
+# tools/zelda3d_game.sh, so ROM provisioning (done client-side here, not by the launcher) targets
+# the right place. We still cd there before exec, matching the other launch scripts' convention.
+ZELDA3D_BIN = pathlib.Path(os.environ.get("ZELDA3D_SOH", str(REPO / "Shipwright/build-cmake/zelda3d/zelda3d")))
+SOH_DIR = REPO / "Shipwright/build-cmake/soh"
 FIFO = REPO / "scratch/zelda3d.ctl"
 REPL = REPO / "tools/zelda3d_repl.py"
 LOGDIR = REPO / "scratch/logs"
@@ -64,7 +69,7 @@ def ensure_xvfb():
 def provision_roms():
     """Resolve ZELDA3D_OOT3D_ROM / ZELDA3D_OOT_ROM via the shared rom_provision.sh (env -> .env -> drop-in),
     exactly like tools/zelda3d_game.sh. Without the 3DS ROM no OoT3D model loads -> no skinned draw."""
-    sohdir = str(SOH.parent)
+    sohdir = str(SOH_DIR)
     script = (f'. "{REPO}/tools/rom_provision.sh"; '
               f'zelda3d_provision_roms "{REPO}" "{sohdir}"; '
               f'printf "%s\\n%s\\n" "${{ZELDA3D_OOT3D_ROM:-}}" "${{ZELDA3D_OOT_ROM:-}}"')
@@ -97,7 +102,8 @@ def launch(roms, extra_env, logname):
     env.pop("WAYLAND_DISPLAY", None)
     LOGDIR.mkdir(parents=True, exist_ok=True)
     log = open(LOGDIR / logname, "w")
-    proc = subprocess.Popen([str(SOH)], env=env, stdout=log, stderr=log, start_new_session=True)
+    proc = subprocess.Popen([str(ZELDA3D_BIN), "oot"], env=env, stdout=log, stderr=log,
+                            cwd=str(SOH_DIR), start_new_session=True)
     return proc, log
 
 

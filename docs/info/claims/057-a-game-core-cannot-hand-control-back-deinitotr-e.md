@@ -1,12 +1,13 @@
 ---
 id: C057
 kind: claim
-status: holds
+status: falsified
 created: 2026-08-05
 tags: n3,teardown,launcher
 depends: 2ship/2s2h/BenPort.cpp
 reconfirmed: 2026-08-05
 verified_at: 2026-08-05
+falsified_on: 2026-08-07
 ---
 
 ## Claim
@@ -28,3 +29,9 @@ Falsifier RUN, and it did NOT fire -- the teardown still crashes on the CURRENT 
 ## Re-confirmed 2026-08-05
 
 MM measured too, and it splits the question in a way OoT alone could not. MM's core DOES hand control back -- 'ZELDA3D LAUNCHER: mm core returned 0 -- control is back in the launcher' -- because MM has no _exit(0) in its shutdown, unlike OoT. So the HANDOFF MECHANISM IS SOUND and is not what blocks in-process switching; only the engine teardown is. The process still dies: MM_EXIT=134 (SIGABRT), after the launcher regained control. gdb: std::unique_ptr<Ship::Context>::~unique_ptr (the STATIC mContext, at process exit) -> ~Context -> ~Fast3dWindow -> Ship::Gui::ShutDownImGui -> Fast3dGui::ImGuiBackendShutdown -> ~SohRmlUi -> Rml::Shutdown -> StyleSheetFactory::Shutdown -> ~StyleSheetFactory -> heap double-free abort. That is the RmlUi StyleSheetFactory double-free named as the THIRD crash in DeinitOTR's own comment, so TWO of its three cited crashes are now confirmed live on current code: the SDL3 GPU VULKAN_DestroyDevice SIGSEGV (OoT) and this RmlUi abort (MM). Both occur inside ~Fast3dWindow, at different sub-steps -- MM aborts in the ImGui/RmlUi shutdown BEFORE reaching the GPU device destroy that kills OoT. Note this also means MM's ordinary quit has ALWAYS aborted at process exit; it went unseen because every prior MM run was killed with -9 rather than allowed to exit. Reinforces the design conclusion: since both faults live exclusively in ~Context, an engine that is NEVER torn down avoids both.
+
+## FALSIFIED 2026-08-07
+
+The first half is now false BY CONSTRUCTION: DeinitOTR's _exit(0) and graph.c's DeinitOTR()+exit(0) tail were both DELETED on 2026-08-07, and OoT's core now returns to the launcher (evidence: 'oot core returned 0 -- control is back in the launcher', from tools/zelda3d_sequence.sh oot,mm, a direction that could not run at all before). The second half -- 'in-process switching needs the exact teardown that was removed for crashing' -- was the actual error, and it is what the work disproves: switching needs NO teardown. The engine is never destroyed between games; BeginGameSession replaces only the per-game half while window/renderer/crash-handler stay up, which is the design C057's own re-confirmations kept pointing at. What REMAINS TRUE and is NOT falsified: ~Context still crashes on current drivers (SDL3 GPU VULKAN_DestroyDevice SIGSEGV for OoT, RmlUi StyleSheetFactory abort for MM), so Context::DestroyInstance stays the launcher's to run once at process exit and must not be run between games. Superseded by C078.
+
+> Anything that cited this claim as proof must be re-checked. Grep the repo for it.

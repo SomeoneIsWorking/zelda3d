@@ -111,11 +111,10 @@ class Context {
      * the one seam they share, and what follows is exactly the ordinary window-close path:
      * Main_Shutdown stops the audio thread, then DeinitOTR persists window layout and config.
      *
-     * MEASURED, so nobody assumes more than this does: the process still does NOT return to its
-     * caller. DeinitOTR ends in a deliberate `_exit(0)` (see its comment in OTRGlobals.cpp) to skip
-     * GUI/renderer/window destructors that crash inside driver code. So this gives a game the
-     * ORDERLY shutdown -- threads stopped, config saved -- where a bare exit() skipped it, and
-     * nothing more. It is not yet a handoff, and a launcher must not expect control back.
+     * This IS a handoff: the core unwinds all the way out and its run() returns to the launcher,
+     * which then either loads the game named by RequestGameSwitch or ends the process. What it does
+     * NOT do is tear the engine down -- window and renderer belong to the launcher and stay up for
+     * its lifetime (see RequestExitWithFullTeardown for the measurement that settled that).
      */
     static void RequestExit();
 
@@ -148,6 +147,27 @@ class Context {
      * @brief Should DeinitOTR run the real teardown rather than _exit? See RequestExitWithFullTeardown.
      */
     static bool IsFullTeardownRequested();
+
+    /**
+     * @brief Ask the host launcher to run a different game once this core returns.
+     *
+     * The chooser lives inside a game core, and the core it wants to start is one the core cannot
+     * see -- RTLD_LOCAL is the whole design. So the request travels through libultraship, the one
+     * library both the core and the launcher link, as a game id ("oot", "mm") matching
+     * Zelda3DCore::id. This does NOT start anything by itself; the caller must still end its own
+     * game (RequestExit), and the launcher acts on the request only after run() has returned.
+     *
+     * @param gameId  stable game id, or empty to cancel a pending request.
+     */
+    static void RequestGameSwitch(const std::string& gameId);
+
+    /**
+     * @brief Take the pending game-switch request, clearing it.
+     *
+     * Read-and-clear rather than a plain getter: a request that survived being acted on would make
+     * the launcher loop forever on the same game. Returns an empty string when none is pending.
+     */
+    static std::string TakeRequestedGameSwitch();
 
     /**
      * @brief Point the bundle path at the running game's own directory, overriding the executable's.

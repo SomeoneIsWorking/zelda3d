@@ -1,7 +1,7 @@
 #!/usr/bin/env bash
 # Launch a long-lived headless Zelda3D instance with the interactive REPL enabled.
 # Poke it with tools/zelda3d_repl.py (set tint/scale, spawn, dump frames) without a
-# rebuild/restart. Runs until killed; the zelda3d_render.sh trap tears down Xvfb+soh.
+# rebuild/restart. Runs until killed; the zelda3d_render.sh trap tears down Xvfb+the game process.
 #
 # Run it in the background, e.g.:
 #   tools/zelda3d_repl_launch.sh &            (or via the agent's background runner)

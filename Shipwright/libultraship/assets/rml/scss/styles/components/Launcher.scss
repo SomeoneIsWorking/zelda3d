@@ -48,9 +48,15 @@
 	}
 }
 
+// Decoration only, and DELIBERATELY oversized: the art bleeds far past its half (left: -70vw)
+// so the slide-in reads. RmlUi hit-tests irrespective of background and opacity, so without
+// pointer-events:none this 10%-opacity artwork sits on top of Ocarina's "Start game" row and
+// eats the click -- the row highlighted on hover, activated from the keyboard, and did nothing
+// when clicked. Nothing in this wrapper is interactive, so nothing here should take a pointer.
 .launcher__background-wrapper {
     display: flex;
     position: absolute;
+    pointer-events: none;
     top: -55vw;
     right: -100%;
     bottom: -50vw;

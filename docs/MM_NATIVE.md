@@ -1000,6 +1000,50 @@ This directly advances the project goal (memory `mm-renderer-topology`: one libu
 Phase-1 debug-warp above does NOT depend on this. Was mid-scoping the ControlDeck seam when work
 moved home to soh3d; resume there.
 
+## N3 in-process game switch — COMPLETE (2026-08-07), and there is now ONE binary
+
+Picking "Majora's Mask" in the chooser switches games **inside one process**. The build produces
+exactly one program, `zelda3d` (`zelda3d_app`); `soh.elf` and `mm.elf` — targets, `exe_entry.c`
+files and all — are gone, and the games exist only as the cores the launcher dlopens.
+
+Removing those two executables is what removed the problem. The chooser used to `exec` mm.elf
+because the process it ran in *was* OoT; with one program the process belongs to the launcher, which
+is still on the stack waiting for `run()` to return.
+
+**Mechanism.** `Context::RequestGameSwitch(id)` / `TakeRequestedGameSwitch()` live in libultraship —
+the only library a core and the launcher both link, RTLD_LOCAL keeping everything else invisible. The
+core records the game it wants, ends its own game, and `main()`'s loop loads that core next.
+
+Two OoT exits had to go, and the second was not obvious:
+
+- `DeinitOTR`'s `_exit(0)`. It was correct while this function ended the *program*; it does not, so
+  exiting there killed the host rather than the game.
+- `graph.c` `RunFrame`'s `DeinitOTR(); exit(0);` tail. This one mattered for a different reason: it
+  was the ONE exit path that skipped `Main_Shutdown()`, so the audio thread stopped late, from
+  inside `DeinitOTR`. Survivable when the next thing is process death; not when the next thing is
+  another game booting on the same engine. It now requests the exit and returns, joining the
+  ordinary window-close path.
+
+**Nothing is torn down between games.** `Context::DestroyInstance()` is still the crashing path
+measured in the falsifier below, and it stays the launcher's to run once, at process exit.
+`BeginGameSession` replaces only the per-game half. This is the "launcher owns window and renderer,
+cores own archives and heaps" design the section below kept arriving at — reached by never tearing
+down, rather than by making teardown work.
+
+**Evidence.** `tools/zelda3d_sequence.sh oot,mm` — the direction that could not run before, since OoT
+always `_exit`ed — reports both cores returning 0, MM attaching with all five per-game subsystems
+FRESH, INHERITED `(none)`, UNFINISHED `(none reported)`, no crashes. And the real chooser path was
+driven end to end: `launcher pick mm` leaves the **pid unchanged**, `/proc/<pid>/exe` still the
+launcher, MM's REPL live. The pid is the discriminator — an exec produces a near-identical log.
+
+Claim **C057** ("a game core cannot hand control back... and in-process switching needs the exact
+teardown that was removed for crashing") is FALSIFIED and superseded by **C078**. What survives from
+it, unchanged: `~Context` still crashes on current drivers, in both games, for two different reasons.
+
+**REMAINING:** the chooser is still an OoT gamestate, so MM cannot switch back to OoT. Moving the
+RmlUi document into the launcher process is what closes that, and it is now the only piece of N3's
+"one app, both games" left.
+
 ## N3 subsystem split — COMPLETE (2026-08-06)
 
 Every `Ship::Context` subsystem is now classified **Engine** or **PerGame**; the `SplitPending`

@@ -101,6 +101,22 @@ class SohRmlUi {
     void LoadLauncherFonts();
     // Move the `selected` highlight onto whichever game's half currently holds focus.
     void RefreshLauncherSelection();
+    /**
+     * @brief Hit-test report for the launcher: for EVERY actionable row, its screen box and which
+     *        element RmlUi actually returns at that row's centre.
+     *
+     * The question this exists to answer is "why did clicking that row do nothing", and the only
+     * honest answer names what IS under the cursor — an invisible sibling that overlaps the row
+     * hit-tests exactly like a working row until something reports the element by name. So the
+     * report always states its denominator (rows examined) and, for each row, whether the element
+     * at its centre is the row itself, a descendant of it (still a hit), or something else (the
+     * occluder, named). A launcher that is not up says so rather than returning an empty report
+     * that reads like "no problem found".
+     *
+     * @param out      buffer to fill with the human-readable report (always NUL-terminated)
+     * @param outSize  size of @p out
+     */
+    void DescribeLauncherHits(char* out, int outSize);
     bool IsLauncherVisible() const {
         return mLauncherVisible;
     }

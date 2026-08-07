@@ -1,22 +1,33 @@
 #!/usr/bin/env bash
 # Single-instance native-MM (2s2h) headless game manager — the MM counterpart to zelda3d_game.sh.
-# Boots mm.elf under a private Xvfb with the debug-warp gate AND both control FIFOs wired:
+# Boots MM under a private Xvfb with the debug-warp gate AND both control FIFOs wired:
 #   - shared scripted-input FIFO ($SHIP_SCRIPTED_FIFO, libultraship ScriptedInputFifo) for input
 #   - MM per-game REPL FIFO      ($ZELDA3D_MM_REPL, mm/2s2h/Z3DRepl.c) for PlayState queries
 # Drive it with tools/mm_control.py. Detaches via setsid+nohup so the instance survives across
 # agent tool calls. See docs/MM_NATIVE.md (N3.4 phase 2b).
 #
+# ONE program binary now runs both games: `zelda3d mm ...` / `zelda3d oot ...` (see
+# tools/zelda3d_game.sh for the OoT side). Because both games are the SAME executable, exe-path
+# alone no longer identifies an instance -- see tools/zelda3d_proc.sh, which this sources.
+#
 # Subcommands:
 #   start [entrance]   kill all, clear FIFOs, launch ONE detached instance, wait for gameplay
-#   restart [entrance] build the mm target, then start
-#   stop               kill ALL mm.elf (incl. "(deleted)") + this instance's Xvfb + FIFOs
-#   status             list running mm.elf pids; non-zero exit if != 1 instance
+#   restart [entrance] build the zelda3d_app target, then start
+#   stop               kill ALL "zelda3d mm" instances (incl. "(deleted)") + this instance's Xvfb +
+#                       FIFOs -- never an OoT instance, even one on the same exe
+#   status             list running "zelda3d mm" pids; non-zero exit if != 1 instance
 #   shot <name>        capture the current frame -> scratch/screenshots/<name>.png
 #   log [-f]           tail the run log
 set -u
 REPO="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
-MM="${ZELDA3D_MM:-$REPO/Shipwright/build-cmake/mm/mm.elf}"
-GAMEDIR="$(dirname "$MM")"
+. "$REPO/tools/zelda3d_proc.sh"
+# Binary path: the one zelda3d launcher, run as `zelda3d mm`. Override with ZELDA3D_MM to run a
+# launcher built into a different dir. GAMEDIR derives the MM core's own asset directory as the
+# launcher's build-tree sibling ".../<build>/mm" -- the launcher resolves that same sibling
+# internally, so ROM provisioning (which the launcher does not do) targets exactly where the core
+# will look.
+MM="${ZELDA3D_MM:-$REPO/Shipwright/build-cmake/zelda3d/zelda3d}"
+GAMEDIR="$(dirname "$(dirname "$MM")")/mm"
 DISP="${ZELDA3D_MM_DISPLAY:-:94}"
 LOGDIR="$REPO/scratch/logs/mm_n2"
 LOG="$LOGDIR/run_mm.log"
@@ -26,16 +37,11 @@ export SHIP_SCRIPTED_FIFO="${SHIP_SCRIPTED_FIFO:-$LOGDIR/mm_input.fifo}"
 export ZELDA3D_MM_REPL="${ZELDA3D_MM_REPL:-$LOGDIR/mm_repl.fifo}"
 mkdir -p "$LOGDIR" "$SHOTDIR"
 
-# List pids of every running mm.elf — matches the path with OR without a trailing " (deleted)".
-mm_pids() {
-    local p t pid
-    for p in /proc/*/exe; do
-        t="$(readlink "$p" 2>/dev/null)" || continue
-        case "$t" in
-            "$MM"|"$MM ("*) pid="${p#/proc/}"; echo "${pid%/exe}" ;;
-        esac
-    done
-}
+# List pids of every running "zelda3d mm" instance (see tools/zelda3d_proc.sh). Matches the exe
+# path with OR without a trailing " (deleted)" (a rebuilt-over binary) AND requires argv[1]=="mm",
+# since the SAME binary also runs OoT -- exe-path alone would match a concurrently-running OoT
+# instance too, and this manager must never touch that.
+mm_pids() { zelda3d_pids "$MM" mm; }
 
 stop() {
     local pids; pids="$(mm_pids)"
@@ -64,7 +70,7 @@ start() {
         ${ZELDA3D_MM_ROM:+ZELDA3D_MM_ROM="$ZELDA3D_MM_ROM"} \
         ${ZELDA3D_MM3D_ROM:+ZELDA3D_MM3D_ROM="$ZELDA3D_MM3D_ROM"} \
         SHIP_SCRIPTED_FIFO="$SHIP_SCRIPTED_FIFO" ZELDA3D_MM_REPL="$ZELDA3D_MM_REPL" \
-        ./mm.elf >"$LOG" 2>&1 & echo $! >"$PIDFILE" )
+        "$MM" mm >"$LOG" 2>&1 & echo $! >"$PIDFILE" )
     echo "mm pid=$(cat "$PIDFILE") disp=$DISP entrance=${entr:-default}"
     echo "input_fifo=$SHIP_SCRIPTED_FIFO repl_fifo=$ZELDA3D_MM_REPL"
     # Wait for gameplay: poll the REPL posinfo until Link exists.
@@ -84,10 +90,12 @@ case "${1:-}" in
     start)   shift; start "${1:-}" ;;
     # Cap parallelism: this machine has ~15GB RAM and a full-core link of mm/soh OOMs. Override with
     # ZELDA3D_BUILD_JOBS if you know you have headroom.
-    restart) shift; cmake --build "$REPO/Shipwright/build-cmake" --target mm -j"${ZELDA3D_BUILD_JOBS:-4}" && start "${1:-}" ;;
+    restart) shift; cmake --build "$REPO/Shipwright/build-cmake" --target zelda3d_app -j"${ZELDA3D_BUILD_JOBS:-4}" && start "${1:-}" ;;
     stop)    stop ;;
     status)
-        n=$(mm_pids | wc -l); echo "mm.elf instances: $n"; mm_pids
+        n=$(mm_pids | wc -l)
+        if [ "$n" -eq 0 ]; then echo "zelda3d mm instances: 0 (searched exe=$MM[ (deleted)] argv[1]=mm)"
+        else echo "zelda3d mm instances: $n"; mm_pids; fi
         [ "$n" -eq 1 ] || exit 1 ;;
     shot)
         DISPLAY="$DISP" import -window root "$SHOTDIR/${2:?name}.png" && echo "shot -> ${2}.png" ;;

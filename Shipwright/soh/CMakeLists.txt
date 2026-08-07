@@ -139,8 +139,6 @@ if (NOT TARGET ZAPDLib)
     add_subdirectory(${CMAKE_CURRENT_SOURCE_DIR}/../ZAPDTR/ZAPD ${CMAKE_BINARY_DIR}/ZAPD)
 endif()
 
-set(PROJECT_NAME soh)
-
 ################################################################################
 # Sources
 ################################################################################
@@ -332,12 +330,11 @@ if (CMAKE_CXX_COMPILER_ID STREQUAL "GNU")
 endif()
 
 # Game engine as a static library. Everything the SoH3D runtime needs —
-# N64 subsystem, boot chain, hooks, RunFrame, Main_Init/Main_Shutdown, all
-# the zelda3d/ port code — lives here so a harness binary can link the
-# same code and drive its own frame loop (see tools/soh3d_harness/).
-set(SOH_LIB_FILES ${ALL_FILES})
-list(FILTER SOH_LIB_FILES EXCLUDE REGEX "src/code/exe_entry\\.c$")
-add_library(soh_lib STATIC ${SOH_LIB_FILES})
+# N64 subsystem, boot chain, hooks, RunFrame, Main_Init/Main_Shutdown, all the zelda3d/ port code.
+# A separate static lib rather than sources on the core directly, because the RE harness
+# (tools/soh3d_harness/) links this same code and drives its own frame loop — it supplies its own
+# main(), which is why nothing here may define one.
+add_library(soh_lib STATIC ${ALL_FILES})
 target_link_libraries(soh_lib PUBLIC soh_settings)
 
 # OoT as a loadable game core: the same soh_lib objects as a shared object the launcher dlopen's
@@ -349,10 +346,16 @@ target_link_libraries(soh_lib PUBLIC soh_settings)
 add_library(soh_core SHARED $<TARGET_OBJECTS:soh_lib>)
 target_link_libraries(soh_core PRIVATE soh_settings)
 
-# The soh.elf executable is now a thin wrapper — just the entry point in
-# src/code/exe_entry.c, which delegates to Zelda3D_CoreRun in soh_lib.
-add_executable(${PROJECT_NAME} src/code/exe_entry.c)
-target_link_libraries(${PROJECT_NAME} PRIVATE soh_lib)
+# There is NO soh executable. OoT ships only as the core above, because the project builds exactly
+# one program: the zelda3d launcher, which dlopens whichever game the user picked. A second
+# executable that ran OoT directly would be a second way to start the game, with its own entry
+# point, its own asset lookup and its own answer to "what happens when you choose Majora's Mask"
+# (it had to exec a third binary) -- three programs to keep in agreement instead of one.
+#
+# ${PROJECT_NAME} below therefore names the CORE, not an executable: everything that used to attach
+# to soh.elf -- compiler properties, asset deployment, link dependencies -- belongs to the thing
+# that actually contains the game.
+set(PROJECT_NAME soh_core)
 
 if (CMAKE_SYSTEM_NAME STREQUAL "Windows")
 use_props(${PROJECT_NAME} "${CMAKE_CONFIGURATION_TYPES}" "${DEFAULT_CXX_PROPS}")
@@ -376,11 +379,6 @@ if (CMAKE_SYSTEM_NAME STREQUAL "Windows")
 elseif(CMAKE_SYSTEM_NAME STREQUAL "Darwin")
     set_target_properties(${PROJECT_NAME} PROPERTIES
         XCODE_ATTRIBUTE_CLANG_ENABLE_OBJC_ARC YES
-        OUTPUT_NAME "soh-macos"
-    )
-elseif(CMAKE_SYSTEM_NAME STREQUAL "Linux")
-    set_target_properties(${PROJECT_NAME} PROPERTIES
-    OUTPUT_NAME "soh.elf"
     )
 endif()
 ################################################################################
@@ -708,12 +706,12 @@ if(NOT CMAKE_SYSTEM_NAME MATCHES "NintendoSwitch|CafeOS")
         TARGET ${PROJECT_NAME}
         POST_BUILD
         COMMENT "Copying asset xmls..."
-        COMMAND ${CMAKE_COMMAND} -E copy_directory_if_different ${ZELDA3D_OOT_DIR}/assets/extractor $<TARGET_FILE_DIR:soh>/assets
-        COMMAND ${CMAKE_COMMAND} -E copy_directory_if_different ${ZELDA3D_OOT_DIR}/assets/xml $<TARGET_FILE_DIR:soh>/assets/xml
-        COMMAND ${CMAKE_COMMAND} -E make_directory $<TARGET_FILE_DIR:soh>/assets/symbols
+        COMMAND ${CMAKE_COMMAND} -E copy_directory_if_different ${ZELDA3D_OOT_DIR}/assets/extractor $<TARGET_FILE_DIR:soh_core>/assets
+        COMMAND ${CMAKE_COMMAND} -E copy_directory_if_different ${ZELDA3D_OOT_DIR}/assets/xml $<TARGET_FILE_DIR:soh_core>/assets/xml
+        COMMAND ${CMAKE_COMMAND} -E make_directory $<TARGET_FILE_DIR:soh_core>/assets/symbols
         # RmlUi menu assets (.rml/.rcss/font) live alongside the executable, loaded at runtime
         # via Context::GetPathRelativeToAppBundle("assets/rml/...").
-        COMMAND ${CMAKE_COMMAND} -E copy_directory_if_different ${ZELDA3D_ENGINE_ASSETS_DIR}/rml $<TARGET_FILE_DIR:soh>/assets/rml
+        COMMAND ${CMAKE_COMMAND} -E copy_directory_if_different ${ZELDA3D_ENGINE_ASSETS_DIR}/rml $<TARGET_FILE_DIR:soh_core>/assets/rml
     #    COMMAND ${VS_COPY_ASSETS_CMD}
     )
 endif()
@@ -844,11 +842,11 @@ else()
 endif()
 
 if(NOT CMAKE_SYSTEM_NAME MATCHES "Darwin|NintendoSwitch|CafeOS")
-INSTALL(TARGETS soh DESTINATION . COMPONENT ship)
+INSTALL(TARGETS soh_core DESTINATION . COMPONENT ship)
 endif()
 
 if (CMAKE_SYSTEM_NAME STREQUAL "Windows")
-INSTALL(FILES $<TARGET_PDB_FILE:soh> DESTINATION ./debug COMPONENT ship)
+INSTALL(FILES $<TARGET_PDB_FILE:soh_core> DESTINATION ./debug COMPONENT ship)
 INSTALL(FILES ${CMAKE_BINARY_DIR}/soh/soh.o2r DESTINATION . COMPONENT ship)
 endif()
 
@@ -857,7 +855,7 @@ execute_process(COMMAND ${CURL} -sSfL https://raw.githubusercontent.com/mdqinc/S
 
 if("${CMAKE_SYSTEM_NAME}" STREQUAL "Darwin")
 configure_file( ${CMAKE_CURRENT_SOURCE_DIR}/macosx/Info.plist.in ${CMAKE_BINARY_DIR}/macosx/Info.plist @ONLY)
-INSTALL(TARGETS soh DESTINATION ../MacOS COMPONENT ship)
+INSTALL(TARGETS soh_core DESTINATION ../MacOS COMPONENT ship)
 INSTALL(FILES ${CMAKE_BINARY_DIR}/gamecontrollerdb.txt DESTINATION ../MacOS COMPONENT ship)
 INSTALL(FILES ${CMAKE_BINARY_DIR}/soh/soh.o2r DESTINATION ../Resources COMPONENT ship)
 elseif(NOT "${CMAKE_SYSTEM_NAME}" MATCHES "NintendoSwitch|CafeOS")
@@ -881,7 +879,7 @@ nx_generate_nacp(Ship.nacp
    VERSION "${PROJECT_VERSION_MAJOR}.${PROJECT_VERSION_MINOR}.${PROJECT_VERSION_PATCH}"
 )
 
-nx_create_nro(soh
+nx_create_nro(soh_core
     NACP Ship.nacp
     ICON ${CMAKE_CURRENT_SOURCE_DIR}/icon.jpg
 )

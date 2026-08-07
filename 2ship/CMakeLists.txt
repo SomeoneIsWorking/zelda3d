@@ -75,8 +75,6 @@ if (NOT TARGET ZAPDLib)
     add_subdirectory(${CMAKE_CURRENT_SOURCE_DIR}/../Shipwright/ZAPDTR/ZAPD ${CMAKE_BINARY_DIR}/ZAPD)
 endif()
 
-set(PROJECT_NAME mm)
-
 ################################################################################
 # Sources
 ################################################################################
@@ -159,11 +157,9 @@ if (CMAKE_CXX_COMPILER_ID STREQUAL "GNU")
     target_compile_options(mm_settings INTERFACE $<$<COMPILE_LANGUAGE:CXX>:-fno-gnu-unique>)
 endif()
 
-# The game engine. Everything except the process entry point, so the core shared object below can
-# carry no int main() of its own.
-set(MM_LIB_FILES ${ALL_FILES})
-list(FILTER MM_LIB_FILES EXCLUDE REGEX "src/code/exe_entry\\.c$")
-add_library(mm_lib STATIC ${MM_LIB_FILES})
+# The game engine. It carries no int main(): the process entry point belongs to the launcher, and
+# MM is only ever loaded as the core below.
+add_library(mm_lib STATIC ${ALL_FILES})
 target_link_libraries(mm_lib PUBLIC mm_settings)
 
 # MM as a loadable game core: the same objects as a shared object the launcher dlopen's with
@@ -173,17 +169,15 @@ target_link_libraries(mm_lib PUBLIC mm_settings)
 add_library(mm_core SHARED $<TARGET_OBJECTS:mm_lib>)
 target_link_libraries(mm_core PRIVATE mm_settings)
 
-# mm.elf — MM started directly, without the launcher.
-add_executable(${PROJECT_NAME} src/code/exe_entry.c)
-target_link_libraries(${PROJECT_NAME} PRIVATE mm_lib)
+# There is NO mm executable, for the same reason OoT has none: the project builds exactly one
+# program, the zelda3d launcher, which dlopens whichever game was chosen. MM ships as the core
+# above. ${PROJECT_NAME} from here on names that CORE.
+set(PROJECT_NAME mm_core)
 
 if (CMAKE_SYSTEM_NAME STREQUAL "Darwin")
     set_target_properties(${PROJECT_NAME} PROPERTIES
         XCODE_ATTRIBUTE_CLANG_ENABLE_OBJC_ARC YES
-        OUTPUT_NAME "mm-macos"
     )
-else()
-    set_target_properties(${PROJECT_NAME} PROPERTIES OUTPUT_NAME "mm.elf")
 endif()
 
 # The MM decomp is pre-C23 C, where `void f()` means "unspecified args" (e.g.

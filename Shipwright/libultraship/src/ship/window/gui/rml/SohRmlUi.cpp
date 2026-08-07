@@ -449,6 +449,112 @@ void SohRmlUi::RefreshLauncherSelection() {
     }
 }
 
+// A one-line identity for an element, for the hit report. Tag plus whatever distinguishes it:
+// #id, .class, action="..." — enough to point at a specific line of zelda3d_launcher.rml.
+static Rml::String DescribeElement(Rml::Element* el) {
+    if (el == nullptr) {
+        return "(none)";
+    }
+    Rml::String s = el->GetTagName();
+    const Rml::String id = el->GetId();
+    if (!id.empty()) {
+        s += "#" + id;
+    }
+    const Rml::String cls = el->GetAttribute<Rml::String>("class", "");
+    if (!cls.empty()) {
+        s += " class=\"" + cls + "\"";
+    }
+    const Rml::String action = el->GetAttribute<Rml::String>("action", "");
+    if (!action.empty()) {
+        s += " action=\"" + action + "\"";
+    }
+    return s;
+}
+
+void SohRmlUi::DescribeLauncherHits(char* out, int outSize) {
+    if (out == nullptr || outSize <= 0) {
+        return;
+    }
+    // Refusing beats returning an empty report: "0 rows occluded" out of a launcher that was never
+    // shown is indistinguishable from a clean bill of health, and this is the exact instrument
+    // someone would trust to say the click path is fine.
+    if (!mInitialised || mContext == nullptr || mLauncherDoc == nullptr) {
+        snprintf(out, outSize, "launcher hit-test UNAVAILABLE: initialised=%d context=%d doc=%d -- NOTHING was tested",
+                 mInitialised ? 1 : 0, mContext != nullptr ? 1 : 0, mLauncherDoc != nullptr ? 1 : 0);
+        return;
+    }
+    if (!mLauncherVisible) {
+        snprintf(out, outSize,
+                 "launcher hit-test UNAVAILABLE: the launcher document is HIDDEN, so every row would "
+                 "miss for that reason alone -- NOTHING was tested (show it first: `launcher 1`)");
+        return;
+    }
+
+    mContext->Update(); // boxes are only valid after a layout pass
+
+    Rml::ElementList rows;
+    mLauncherDoc->GetElementsByTagName(rows, "button");
+
+    Rml::String report;
+    int examined = 0;
+    int reachable = 0;
+    for (Rml::Element* row : rows) {
+        const Rml::String action = row->GetAttribute<Rml::String>("action", "");
+        if (action.empty()) {
+            continue; // titles and the disabled Mods row are not meant to be clickable
+        }
+        ++examined;
+        const Rml::Vector2f pos = row->GetAbsoluteOffset(Rml::BoxArea::Border);
+        const Rml::Vector2f size = row->GetBox().GetSize(Rml::BoxArea::Border);
+        const Rml::Vector2f centre = pos + size * 0.5f;
+        Rml::Element* hit = mContext->GetElementAtPoint(centre);
+
+        // A hit on a CHILD of the row still clicks the row: RmlUi bubbles the click event up, and
+        // the listener sits on the row. Only an element outside the row's subtree is an occluder.
+        bool inSubtree = false;
+        for (Rml::Element* e = hit; e != nullptr; e = e->GetParentNode()) {
+            if (e == row) {
+                inSubtree = true;
+                break;
+            }
+        }
+        reachable += inSubtree ? 1 : 0;
+        report += Rml::CreateString("  %-24s box=(%.0f,%.0f %.0fx%.0f) centre=(%.0f,%.0f) -> %s  %s\n",
+                                    action.c_str(), pos.x, pos.y, size.x, size.y, centre.x, centre.y,
+                                    inSubtree ? "REACHABLE" : "OCCLUDED by", DescribeElement(hit).c_str());
+    }
+
+    if (examined == 0) {
+        snprintf(out, outSize,
+                 "launcher hit-test: the document has %zu <button> element(s) but NONE carries an "
+                 "action= attribute, so there was nothing to test -- this is a markup problem, not a pass",
+                 rows.size());
+        return;
+    }
+
+    // The CONTEXT's own dimensions, not the cached mWidth/mHeight: every coordinate above is in
+    // context space, so quoting a different number would invite comparing boxes against a size they
+    // were not measured in.
+    const Rml::Vector2i dims = mContext->GetDimensions();
+    const Rml::String header =
+        Rml::CreateString("launcher hit-test: %d actionable row(s), %d reachable by mouse, %d OCCLUDED "
+                          "(context %dx%d, dp ratio %.2f)\n",
+                          examined, reachable, examined - reachable, dims.x, dims.y, mDpRatio);
+    snprintf(out, outSize, "%s%s", header.c_str(), report.c_str());
+}
+
+// C shim for the REPL, which must not see RmlUi types.
+extern "C" void Zelda3D_LauncherHitReport(char* out, int outSize) {
+    if (out == nullptr || outSize <= 0) {
+        return;
+    }
+    if (sLiveRmlUi == nullptr) {
+        snprintf(out, outSize, "launcher hit-test UNAVAILABLE: no live RmlUi instance -- NOTHING was tested");
+        return;
+    }
+    sLiveRmlUi->DescribeLauncherHits(out, outSize);
+}
+
 void SohRmlUi::ShowLauncher(bool show) {
     if (!mInitialised || !mContext || mLauncherDoc == nullptr || show == mLauncherVisible) {
         return;

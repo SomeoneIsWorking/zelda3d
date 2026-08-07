@@ -325,13 +325,16 @@ add_subdirectory(${ZELDA3D_SHIPWRIGHT_DIR}/zelda3d_app ${CMAKE_BINARY_DIR}/zelda
 ################################################################################
 # Packaging and asset extraction.
 #
-# Still OoT-only: these targets build soh.o2r / oot.o2r and the SoH AppImage. They are the shipped
-# artifact's rules, which is why they sit at the root rather than in the game — but they describe
-# ONE game, and a second set for MM does not exist yet.
+# The AppImage packages the LAUNCHER, because that is the program: zelda3d_app is the only
+# executable the build produces, and it is what a user runs to reach either game.
+#
+# The asset rules below are still OoT-only — they build soh.o2r / oot.o2r, and no MM equivalent
+# exists yet, so an AppImage built from here ships a launcher whose Majora's Mask row will not find
+# its archives. Said plainly rather than left to be discovered from a broken package.
 ################################################################################
-set_property(TARGET soh PROPERTY APPIMAGE_DESKTOP_FILE_TERMINAL YES)
-set_property(TARGET soh PROPERTY APPIMAGE_DESKTOP_FILE "${ZELDA3D_SHIPWRIGHT_DIR}/scripts/linux/appimage/soh.desktop")
-set_property(TARGET soh PROPERTY APPIMAGE_ICON_FILE "${CMAKE_BINARY_DIR}/sohIcon.png")
+set_property(TARGET zelda3d_app PROPERTY APPIMAGE_DESKTOP_FILE_TERMINAL YES)
+set_property(TARGET zelda3d_app PROPERTY APPIMAGE_DESKTOP_FILE "${ZELDA3D_SHIPWRIGHT_DIR}/scripts/linux/appimage/soh.desktop")
+set_property(TARGET zelda3d_app PROPERTY APPIMAGE_ICON_FILE "${CMAKE_BINARY_DIR}/sohIcon.png")
 
 if("${CMAKE_SYSTEM_NAME}" STREQUAL "Linux")
 install(FILES "${CMAKE_BINARY_DIR}/soh/soh.o2r" DESTINATION . COMPONENT ship)

@@ -75,11 +75,15 @@ def main():
     if not os.path.isfile(os.path.join(BUILD, "build.ninja")):
         sys.exit(f"{BUILD}/build.ninja missing -- SEARCHED NOTHING. Configure and build first.")
 
-    lus = ninja_objects("soh/soh.elf", keep_prefix="libultraship/")
+    # There is now ONE program binary (zelda3d_app, the launcher) that dlopens either game's code as
+    # a separate shared object -- soh_core (libsoh_core.so) / mm_core (libmm_core.so). Those cores,
+    # not soh.elf/mm.elf (which no longer exist as build targets), are where each game's code
+    # actually lives, so they are what this probe must compare.
+    lus = ninja_objects("soh_core", keep_prefix="libultraship/")
     if not lus:
-        sys.exit("no libultraship objects among soh.elf's inputs -- SEARCHED NOTHING.")
-    soh = ninja_objects("soh/soh.elf", keep_prefix="soh/")
-    mm = ninja_objects("mm/mm.elf", keep_prefix="mm/")
+        sys.exit("no libultraship objects among soh_core's inputs -- SEARCHED NOTHING.")
+    soh = ninja_objects("soh_core", keep_prefix="soh/")
+    mm = ninja_objects("mm_core", keep_prefix="mm/")
     if not soh or not mm:
         sys.exit(f"missing game-core objects (soh={len(soh)}, mm={len(mm)}) -- SEARCHED NOTHING.")
 
@@ -157,8 +161,8 @@ def report_upcalls():
     print(f"\n=== upcalls: symbols libultraship NEEDS FROM the game (the RTLD_LOCAL blocker list) ===")
     print(f"libultraship.so undefined symbols, C runtime excluded: {len(need)}")
     found_any = False
-    for label, elf in (("soh", "soh/soh.elf"), ("mm", "mm/mm.elf")):
-        p = os.path.join(BUILD, elf)
+    for label, core_so in (("soh", "soh/libsoh_core.so"), ("mm", "mm/libmm_core.so")):
+        p = os.path.join(BUILD, core_so)
         if not os.path.isfile(p):
             print(f"  {label}: {p} MISSING -- this side was NOT checked.")
             continue
