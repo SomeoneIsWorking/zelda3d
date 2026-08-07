@@ -50,17 +50,17 @@ void CollisionViewerWindow::DrawElement() {
     ImGui::SameLine();
 
     if (UIWidgets::Button("Reset Colors")) {
-        CVarClear("gCollisionViewer.SceneCollisionColor");
-        CVarClear("gCollisionViewer.VoidCollisionColor");
-        CVarClear("gCollisionViewer.EntranceCollisionColor");
-        CVarClear("gCollisionViewer.SlopeCollisionColor");
-        CVarClear("gCollisionViewer.HookshotCollisionColor");
-        CVarClear("gCollisionViewer.WaterboxCollisionColor");
-        CVarClear("gCollisionViewer.OCollisionColor");
-        CVarClear("gCollisionViewer.ACollisionColor");
-        CVarClear("gCollisionViewer.ATCollisionColor");
-        CVarClear("gCollisionViewer.SpecialSurfaceColor");
-        CVarClear("gCollisionViewer.InteractableColor");
+        CVarClear("gCollisionViewer.SceneCollisionColor.Value");
+        CVarClear("gCollisionViewer.VoidCollisionColor.Value");
+        CVarClear("gCollisionViewer.EntranceCollisionColor.Value");
+        CVarClear("gCollisionViewer.SlopeCollisionColor.Value");
+        CVarClear("gCollisionViewer.HookshotCollisionColor.Value");
+        CVarClear("gCollisionViewer.WaterboxCollisionColor.Value");
+        CVarClear("gCollisionViewer.OCollisionColor.Value");
+        CVarClear("gCollisionViewer.ACollisionColor.Value");
+        CVarClear("gCollisionViewer.ATCollisionColor.Value");
+        CVarClear("gCollisionViewer.SpecialSurfaceColor.Value");
+        CVarClear("gCollisionViewer.InteractableColor.Value");
         Ship::Context::GetRawInstance()->GetWindow()->GetGui()->SaveConsoleVariablesNextFrame();
     }
 
@@ -338,14 +338,14 @@ void InitGfx(std::vector<Gfx>& gfx, ColRenderSetting setting) {
 
 // Draws a dynapoly structure (scenes or Bg Actors)
 void DrawDynapoly(std::vector<Gfx>& dl, CollisionHeader* col, int32_t bgId) {
-    Color_RGBA8 sceneCollisionColor = CVarGetColor("gCollisionViewer.SceneCollisionColor", { 255, 255, 255, 255 });
-    Color_RGBA8 voidCollisionColor = CVarGetColor("gCollisionViewer.VoidCollisionColor", { 255, 0, 0, 255 });
-    Color_RGBA8 entranceCollisionColor = CVarGetColor("gCollisionViewer.EntranceCollisionColor", { 0, 255, 0, 255 });
-    Color_RGBA8 slopeCollisionColor = CVarGetColor("gCollisionViewer.SlopeCollisionColor", { 255, 255, 128, 255 });
+    Color_RGBA8 sceneCollisionColor = CVarGetColor("gCollisionViewer.SceneCollisionColor.Value", { 255, 255, 255, 255 });
+    Color_RGBA8 voidCollisionColor = CVarGetColor("gCollisionViewer.VoidCollisionColor.Value", { 255, 0, 0, 255 });
+    Color_RGBA8 entranceCollisionColor = CVarGetColor("gCollisionViewer.EntranceCollisionColor.Value", { 0, 255, 0, 255 });
+    Color_RGBA8 slopeCollisionColor = CVarGetColor("gCollisionViewer.SlopeCollisionColor.Value", { 255, 255, 128, 255 });
     Color_RGBA8 hookshotCollisionColor =
-        CVarGetColor("gCollisionViewer.HookshotCollisionColor", { 128, 128, 255, 255 });
-    Color_RGBA8 specialSurfaceColor = CVarGetColor("gCollisionViewer.SpecialSurfaceColor", { 192, 255, 192, 255 });
-    Color_RGBA8 interactableColor = CVarGetColor("gCollisionViewer.InteractableColor", { 192, 0, 192, 255 });
+        CVarGetColor("gCollisionViewer.HookshotCollisionColor.Value", { 128, 128, 255, 255 });
+    Color_RGBA8 specialSurfaceColor = CVarGetColor("gCollisionViewer.SpecialSurfaceColor.Value", { 192, 255, 192, 255 });
+    Color_RGBA8 interactableColor = CVarGetColor("gCollisionViewer.InteractableColor.Value", { 192, 0, 192, 255 });
     uint32_t colorR = sceneCollisionColor.r;
     uint32_t colorG = sceneCollisionColor.g;
     uint32_t colorB = sceneCollisionColor.b;
@@ -583,9 +583,9 @@ void DrawColCheckList(std::vector<Gfx>& dl, Collider** objects, int32_t count) {
 
 // Draws all Col Check objects
 void DrawColCheckCollision() {
-    Color_RGBA8 oCollisionColor = CVarGetColor("gCollisionViewer.OCollisionColor", { 255, 255, 255, 255 });
-    Color_RGBA8 aCollisionColor = CVarGetColor("gCollisionViewer.ACollisionColor", { 0, 0, 255, 255 });
-    Color_RGBA8 aTCollisionColor = CVarGetColor("gCollisionViewer.ATCollisionColor", { 255, 0, 0, 255 });
+    Color_RGBA8 oCollisionColor = CVarGetColor("gCollisionViewer.OCollisionColor.Value", { 255, 255, 255, 255 });
+    Color_RGBA8 aCollisionColor = CVarGetColor("gCollisionViewer.ACollisionColor.Value", { 0, 0, 255, 255 });
+    Color_RGBA8 aTCollisionColor = CVarGetColor("gCollisionViewer.ATCollisionColor.Value", { 255, 0, 0, 255 });
     ColRenderSetting showColCheckSetting = (ColRenderSetting)CVarGetInteger("gCollisionViewer.ColCheckCollisionMode",
                                                                             (uint32_t)ColRenderSetting::Disabled);
     if (showColCheckSetting == ColRenderSetting::Disabled) {
@@ -634,7 +634,7 @@ void DrawWaterbox(std::vector<Gfx>& dl, WaterBox* water, float water_max_depth =
 
 // Draws all waterboxes
 void DrawWaterboxList() {
-    Color_RGBA8 waterboxCollisionColor = CVarGetColor("gCollisionViewer.WaterboxCollisionColor", { 0, 0, 255, 255 });
+    Color_RGBA8 waterboxCollisionColor = CVarGetColor("gCollisionViewer.WaterboxCollisionColor.Value", { 0, 0, 255, 255 });
     ColRenderSetting showWaterboxSetting = (ColRenderSetting)CVarGetInteger("gCollisionViewer.WaterboxCollisionMode",
                                                                             (uint32_t)ColRenderSetting::Disabled);
     if (showWaterboxSetting == ColRenderSetting::Disabled) {
