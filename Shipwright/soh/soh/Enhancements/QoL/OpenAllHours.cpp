@@ -1,7 +1,7 @@
 #include "soh/Enhancements/game-interactor/GameInteractor_Hooks.h"
 #include "soh/Enhancements/randomizer/randomizer.h"
 #include "soh/OTRGlobals.h"
-#include "soh/ShipInit.hpp"
+#include "init/ShipInit.hpp"
 
 extern "C" {
 #include "src/overlays/actors/ovl_En_Door/z_en_door.h"

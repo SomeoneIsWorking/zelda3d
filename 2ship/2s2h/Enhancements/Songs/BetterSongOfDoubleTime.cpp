@@ -2,7 +2,7 @@
 #include "2s2h/BenGui/HudEditor.h"
 #include "2s2h/Enhancements/FrameInterpolation/FrameInterpolation.h"
 #include "2s2h/GameInteractor/GameInteractor.h"
-#include "2s2h/ShipInit.hpp"
+#include "init/ShipInit.hpp"
 #include "2s2h/Rando/MiscBehavior/ClockShuffle.h"
 #include "2s2h/CustomMessage/CustomMessage.h"
 

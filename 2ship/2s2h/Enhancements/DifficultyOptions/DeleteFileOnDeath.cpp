@@ -3,7 +3,7 @@
 #include <ship/Context.h>
 #include <ship/window/Window.h>
 #include "2s2h/GameInteractor/GameInteractor.h"
-#include "2s2h/ShipInit.hpp"
+#include "init/ShipInit.hpp"
 
 extern "C" {
 #include "variables.h"

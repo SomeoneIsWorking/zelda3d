@@ -1,5 +1,5 @@
 #include "soh/Enhancements/game-interactor/GameInteractor_Hooks.h"
-#include "soh/ShipInit.hpp"
+#include "init/ShipInit.hpp"
 #include "AudioCollection.h"
 #include "gui/Notification.h"
 #include <soh/SohGui/ImGuiUtils.h>

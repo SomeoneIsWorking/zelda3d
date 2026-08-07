@@ -14,7 +14,7 @@
 #include "variables.h"
 #include "src/overlays/gamestates/ovl_file_choose/file_choose.h"
 #include "soh/Enhancements/game-interactor/GameInteractor_Hooks.h"
-#include "soh/ShipInit.hpp"
+#include "init/ShipInit.hpp"
 #include "assets/textures/title_static/title_static.h"
 
 /*

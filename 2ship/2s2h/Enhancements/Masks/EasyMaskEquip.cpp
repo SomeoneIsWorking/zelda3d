@@ -1,5 +1,5 @@
 #include "2s2h/Enhancements/FrameInterpolation/FrameInterpolation.h"
-#include "2s2h/ShipInit.hpp"
+#include "init/ShipInit.hpp"
 
 extern "C" {
 #include "assets/interface/parameter_static/parameter_static.h"

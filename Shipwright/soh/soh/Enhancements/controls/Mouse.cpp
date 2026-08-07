@@ -4,7 +4,7 @@
 #include "global.h"
 #include <ship/window/Window.h>
 #include "soh/Enhancements/game-interactor/GameInteractor_Hooks.h"
-#include "soh/ShipInit.hpp"
+#include "init/ShipInit.hpp"
 
 static Ship::Coords mouseCoord = {};
 static Ship::Coords mouseCoordRel = {};

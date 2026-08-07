@@ -1,6 +1,6 @@
 #include <libultraship/bridge/consolevariablebridge.h>
 #include "soh/Enhancements/game-interactor/GameInteractor.h"
-#include "soh/ShipInit.hpp"
+#include "init/ShipInit.hpp"
 
 #include <vector>
 #include <spdlog/spdlog.h>

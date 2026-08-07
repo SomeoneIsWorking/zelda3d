@@ -1,5 +1,5 @@
 #include "soh/Enhancements/game-interactor/GameInteractor.h"
-#include "soh/ShipInit.hpp"
+#include "init/ShipInit.hpp"
 
 void RegisterDisableKokiriDrawDistance() {
     COND_VB_SHOULD(VB_FADE_KOKIRI, CVarGetInteger(CVAR_ENHANCEMENT("DisableKokiriDrawDistance"), 0),

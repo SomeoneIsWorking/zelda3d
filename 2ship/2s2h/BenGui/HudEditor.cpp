@@ -1,6 +1,6 @@
 #include "HudEditor.h"
 #include "macros.h"
-#include "2s2h/ShipInit.hpp"
+#include "init/ShipInit.hpp"
 
 extern "C" int16_t OTRGetRectDimensionFromLeftEdge(float v);
 extern "C" int16_t OTRGetRectDimensionFromRightEdge(float v);

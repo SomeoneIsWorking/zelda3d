@@ -1,6 +1,6 @@
 #include "soh/Enhancements/game-interactor/GameInteractor_Hooks.h"
 #include "soh/ObjectExtension/ActorMaximumHealth.h"
-#include "soh/ShipInit.hpp"
+#include "init/ShipInit.hpp"
 #include "soh/ShipUtils.h"
 
 extern "C" {

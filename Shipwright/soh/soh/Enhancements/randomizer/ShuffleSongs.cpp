@@ -1,4 +1,4 @@
-#include "soh/ShipInit.hpp"
+#include "init/ShipInit.hpp"
 #include "location.h"
 #include "static_data.h"
 

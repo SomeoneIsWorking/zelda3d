@@ -1,6 +1,6 @@
 #include "soh/Enhancements/game-interactor/GameInteractor_Hooks.h"
 #include "soh/Enhancements/randomizer/randomizer.h"
-#include "soh/ShipInit.hpp"
+#include "init/ShipInit.hpp"
 #include "soh/OTRGlobals.h"
 #include "soh/ResourceManagerHelpers.h"
 #include "objects/object_link_boy/object_link_boy.h"

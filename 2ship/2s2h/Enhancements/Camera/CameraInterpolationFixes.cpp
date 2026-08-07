@@ -1,5 +1,5 @@
 #include "2s2h/GameInteractor/GameInteractor.h"
-#include "2s2h/ShipInit.hpp"
+#include "init/ShipInit.hpp"
 #include "CameraUtils.h"
 #include "2s2h/Enhancements/FrameInterpolation/FrameInterpolation.h"
 

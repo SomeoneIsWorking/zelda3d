@@ -2,7 +2,7 @@
 #include <libultraship/bridge/consolevariablebridge.h>
 #include "2s2h/Enhancements/FrameInterpolation/FrameInterpolation.h"
 #include "2s2h/Rando/StaticData/StaticData.h"
-#include "2s2h/ShipInit.hpp"
+#include "init/ShipInit.hpp"
 #include "assets/2s2h_assets.h"
 
 extern "C" {

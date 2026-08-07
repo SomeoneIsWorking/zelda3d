@@ -60,7 +60,7 @@ CrowdControl* CrowdControl::Instance;
 #include "2s2h/CustomItem/CustomItem.h"
 #include "gui/Notification.h"
 #include "2s2h/ShipUtils.h"
-#include "2s2h/ShipInit.hpp"
+#include "init/ShipInit.hpp"
 #include "2s2h/PresetManager/PresetManager.h"
 #include "2s2h/config/ConfigUpdaters.h"
 

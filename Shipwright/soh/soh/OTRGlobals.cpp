@@ -123,7 +123,7 @@
 #include "soh/resource/importer/BackgroundFactory.h"
 
 #include "soh/config/ConfigUpdaters.h"
-#include "soh/ShipInit.hpp"
+#include "init/ShipInit.hpp"
 
 // Check this game's definitions against the SHARED port ABI.
 //

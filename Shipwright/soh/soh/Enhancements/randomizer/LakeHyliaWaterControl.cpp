@@ -1,7 +1,7 @@
 #include <libultraship/libultraship.h>
 #include "soh/OTRGlobals.h"
 #include "soh/Enhancements/game-interactor/GameInteractor_Hooks.h"
-#include "soh/ShipInit.hpp"
+#include "init/ShipInit.hpp"
 #include "soh/Enhancements/custom-message/CustomMessageTypes.h"
 
 extern "C" {

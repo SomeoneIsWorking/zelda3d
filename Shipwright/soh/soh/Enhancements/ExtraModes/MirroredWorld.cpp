@@ -4,7 +4,7 @@
 #include "soh/Enhancements/randomizer/SeedContext.h"
 #include "soh/Enhancements/enhancementTypes.h"
 #include "soh/ResourceManagerHelpers.h"
-#include "soh/ShipInit.hpp"
+#include "init/ShipInit.hpp"
 
 extern "C" {
 extern SaveContext gSaveContext;

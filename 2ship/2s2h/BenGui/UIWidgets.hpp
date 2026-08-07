@@ -10,7 +10,7 @@
 #include <unordered_map>
 #include <memory>
 #include "2s2h/ShipUtils.h"
-#include "2s2h/ShipInit.hpp"
+#include "init/ShipInit.hpp"
 #include "DeveloperTools/SaveEditor.h"
 #include <ship/window/gui/GuiWindow.h>
 #include <ship/Context.h>

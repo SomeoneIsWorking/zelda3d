@@ -1,6 +1,6 @@
 #include <libultraship/bridge.h>
 #include "soh/Enhancements/game-interactor/GameInteractor_Hooks.h"
-#include "soh/ShipInit.hpp"
+#include "init/ShipInit.hpp"
 
 // Dying or using Din's Fire in the Outside Temple of Time area crashes the game.
 // In vanilla this can never happen, but with CrowdControl, Sail, Unrestricted Items

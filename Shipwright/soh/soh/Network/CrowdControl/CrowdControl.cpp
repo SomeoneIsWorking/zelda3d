@@ -5,7 +5,7 @@
 #include <nlohmann/json.hpp>
 #include <spdlog/spdlog.h>
 #include <spdlog/fmt/fmt.h>
-#include "soh/ShipInit.hpp"
+#include "init/ShipInit.hpp"
 
 extern "C" {
 #include <z64.h>

@@ -1,7 +1,7 @@
 #include <libultraship/bridge/consolevariablebridge.h>
 #include "2s2h/GameInteractor/GameInteractor.h"
 #include "2s2h/Enhancements/FrameInterpolation/FrameInterpolation.h"
-#include "2s2h/ShipInit.hpp"
+#include "init/ShipInit.hpp"
 
 extern "C" {
 #include "overlays/actors/ovl_En_Syateki_Okuta/z_en_syateki_okuta.h"

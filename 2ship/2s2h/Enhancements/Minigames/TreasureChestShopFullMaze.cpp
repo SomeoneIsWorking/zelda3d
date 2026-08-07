@@ -1,6 +1,6 @@
 #include <libultraship/bridge/consolevariablebridge.h>
 #include "2s2h/GameInteractor/GameInteractor.h"
-#include "2s2h/ShipInit.hpp"
+#include "init/ShipInit.hpp"
 
 // Re-definitions to avoid modifying source headers
 #define TAKARAYA_WALL_ROWS 11

@@ -1,6 +1,6 @@
 #include "soh/Enhancements/game-interactor/GameInteractor.h"
 #include "soh/Enhancements/randomizer/randomizer_entrance.h"
-#include "soh/ShipInit.hpp"
+#include "init/ShipInit.hpp"
 #include <cassert>
 
 extern "C" {

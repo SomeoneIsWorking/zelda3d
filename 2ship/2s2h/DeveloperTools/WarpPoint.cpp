@@ -3,7 +3,7 @@
 #include <ship/window/gui/IconsFontAwesome4.h>
 #include "2s2h/GameInteractor/GameInteractor.h"
 #include "2s2h/DeveloperTools/DeveloperTools.h"
-#include "2s2h/ShipInit.hpp"
+#include "init/ShipInit.hpp"
 #include "2s2h/BenGui/BenGui.hpp"
 #include "BenJsonConversions.hpp"
 

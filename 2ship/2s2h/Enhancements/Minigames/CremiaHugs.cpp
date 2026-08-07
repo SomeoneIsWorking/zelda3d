@@ -1,7 +1,7 @@
 #include <libultraship/bridge/consolevariablebridge.h>
 #include "2s2h/GameInteractor/GameInteractor.h"
 #include "2s2h/Enhancements/Enhancements.h"
-#include "2s2h/ShipInit.hpp"
+#include "init/ShipInit.hpp"
 
 #define CVAR_NAME "gEnhancements.Minigames.CremiaHugs"
 #define CVAR CVarGetInteger(CVAR_NAME, CREMIA_REWARD_RANDOM)

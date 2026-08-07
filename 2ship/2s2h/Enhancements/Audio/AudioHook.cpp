@@ -1,5 +1,5 @@
 #include "2s2h/GameInteractor/GameInteractor.h"
-#include "2s2h/ShipInit.hpp"
+#include "init/ShipInit.hpp"
 #include "2s2h/BenPort.h"
 #include "2s2h/BenGui/BenMenu.h"
 #include "2s2h/Enhancements/Audio/AudioCollection.h"

@@ -3,7 +3,7 @@
 #include "2s2h/BenGui/UIWidgets.hpp"
 #include "ShipUtils.h"
 #include "ship/config/Config.h"
-#include "2s2h/ShipInit.hpp"
+#include "init/ShipInit.hpp"
 #include "2s2h/BenPort.h"
 
 namespace BenGui {

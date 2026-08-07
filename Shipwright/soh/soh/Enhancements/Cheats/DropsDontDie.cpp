@@ -1,5 +1,5 @@
 #include "soh/Enhancements/game-interactor/GameInteractor.h"
-#include "soh/ShipInit.hpp"
+#include "init/ShipInit.hpp"
 
 static void RegisterDropsDontDie() {
     COND_VB_SHOULD(VB_ITEM00_TIMER_TICK, CVarGetInteger(CVAR_CHEAT("DropsDontDie"), 0), {
