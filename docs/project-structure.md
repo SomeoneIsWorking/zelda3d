@@ -230,10 +230,30 @@ recorded in `ui_primitives.h` so nobody re-derives them: `Tooltip` (rule 2), `Ra
 `StateButton` (rule 3), `WrappedText` (`currentLineLength` is `unsigned int` in OoT and `int` in MM —
 picking one is a deliberate change, not an extraction), `ClampFloat` (declared in neither header).
 
-**The clearest next unit** is the five `CVar*` widgets — `CVarCheckbox`, `CVarInputInt`,
-`CVarInputString`, `CVarSliderFloat`, `CVarSliderInt`. Bodies identical; the only thing stopping them
-is `ShipInit::Init`, which each game supplies from its own header (`soh/ShipInit.hpp` vs
-`2s2h/ShipInit.hpp`). Declare that seam once, the way `port/zelda3d_port_api.h` did, and they move.
+**This extraction is now COMPLETE at 33 functions, and the limit is rule 3** (claim C077). An earlier
+note here named `ShipInit::Init` as the blocker for the five `CVar*` widgets. That was wrong. They
+pass rules 1 and 2 — bodies *and* declarations identical — but every one of them takes a widget
+option struct, and **all eight of those structs differ between the games**:
+
+| struct | divergence |
+|---|---|
+| `RadioButtonsOptions` | ~3 of 25 lines |
+| `ButtonOptions` | ~7 of 29/25 |
+| `InputOptions` | ~7 of 73 |
+| `CheckboxOptions` | ~8 of 42 |
+| `WidgetOptions` | ~24 of 20/26 |
+| `ComboboxOptions` | ~45 of 38/49 |
+| `FloatSliderOptions` | ~55 of 83/88 |
+| `IntSliderOptions` | ~79 of 74/80 |
+
+So the remaining widgets are gated on reconciling those structs — which is the *same class of
+decision* as `MenuTypes`, not a mechanical merge. Nothing further comes out of `UIWidgets` until
+someone decides what the shared widget-options API should be.
+
+**Separately — a real duplicate, but not this blocker:** the two games' `ShipInit.hpp` are
+**code-identical**, differing only in include order and a doc comment OoT carries. That is a genuine
+de-duplication worth doing on its own; note it has **383 includers** between the two games, so it is a
+mechanical sweep rather than a small edit.
 
 The genuine prerequisite for `MenuTypes`/`Menu` is deciding three things that have nothing to do with
 CVars — the callback ABI (`std::function` vs function pointer: capturing menu code in OoT, or no heap
