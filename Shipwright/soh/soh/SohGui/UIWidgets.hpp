@@ -11,6 +11,8 @@
 #include "soh/ShipUtils.h"
 #include "soh/ShipInit.hpp"
 
+#include "gui/ui_colors.h"
+
 namespace UIWidgets {
 
 using SectionFunc = void (*)();
@@ -46,47 +48,6 @@ typedef enum ColorPickerModifiers {
 } ColorPickerModifiers;
 
 // mostly in order for colors usable by the menu without custom text color
-enum Colors {
-    Red,
-    DarkRed,
-    Orange,
-    Green,
-    DarkGreen,
-    LightBlue,
-    Blue,
-    DarkBlue,
-    Indigo,
-    Violet,
-    Purple,
-    Brown,
-    Gray,
-    DarkGray,
-    // not suitable for menu theme use
-    Pink,
-    Yellow,
-    Cyan,
-    Black,
-    LightGray,
-    White,
-    NoColor
-};
-
-enum InputTypes { String, Scalar };
-
-const std::unordered_map<Colors, ImVec4> ColorValues = {
-    { Colors::Pink, ImVec4(0.87f, 0.3f, 0.87f, 1.0f) },     { Colors::Red, ImVec4(0.55f, 0.0f, 0.0f, 1.0f) },
-    { Colors::DarkRed, ImVec4(0.3f, 0.0f, 0.0f, 1.0f) },    { Colors::Orange, ImVec4(0.85f, 0.55f, 0.0f, 1.0f) },
-    { Colors::Yellow, ImVec4(0.95f, 0.95f, 0.0f, 1.0f) },   { Colors::Green, ImVec4(0.0f, 0.55f, 0.0f, 1.0f) },
-    { Colors::DarkGreen, ImVec4(0.0f, 0.3f, 0.0f, 1.0f) },  { Colors::Cyan, ImVec4(0.0f, 0.9f, 0.9f, 1.0f) },
-    { Colors::LightBlue, ImVec4(0.0f, 0.24f, 0.8f, 1.0f) }, { Colors::Blue, ImVec4(0.08f, 0.03f, 0.65f, 1.0f) },
-    { Colors::DarkBlue, ImVec4(0.03f, 0.0f, 0.5f, 1.0f) },  { Colors::Indigo, ImVec4(0.35f, 0.0f, 0.87f, 1.0f) },
-    { Colors::Violet, ImVec4(0.5f, 0.0f, 0.9f, 1.0f) },     { Colors::Purple, ImVec4(0.31f, 0.0f, 0.67f, 1.0f) },
-    { Colors::Brown, ImVec4(0.37f, 0.18f, 0.0f, 1.0f) },    { Colors::LightGray, ImVec4(0.75f, 0.75f, 0.75f, 1.0f) },
-    { Colors::Gray, ImVec4(0.45f, 0.45f, 0.45f, 1.0f) },    { Colors::DarkGray, ImVec4(0.15f, 0.15f, 0.15f, 1.0f) },
-    { Colors::Black, ImVec4(0.0f, 0.0f, 0.0f, 1.0f) },      { Colors::White, ImVec4(1.0f, 1.0f, 1.0f, 1.0f) },
-    { Colors::NoColor, ImVec4(0.0f, 0.0f, 0.0f, 0.0f) },
-};
-
 namespace Sizes {
 const ImVec2 Inline = ImVec2(0.0f, 0.0f);
 const ImVec2 Fill = ImVec2(-1.0f, 0.0f);

@@ -1,5 +1,5 @@
 #include <libultraship/bridge/consolevariablebridge.h>
-#include "2s2h/BenGui/Notification.h"
+#include "gui/Notification.h"
 #include "2s2h/GameInteractor/GameInteractor.h"
 #include "2s2h/ShipInit.hpp"
 

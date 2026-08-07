@@ -6,7 +6,7 @@
 #include <libultraship/bridge/consolevariablebridge.h>
 #include "ClockShuffle.h"
 #include <spdlog/spdlog.h>
-#include "2s2h/BenGui/Notification.h"
+#include "gui/Notification.h"
 
 extern "C" {
 #include "functions.h"

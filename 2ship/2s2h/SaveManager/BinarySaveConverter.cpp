@@ -2,7 +2,7 @@
 #include <filesystem>
 #include <nlohmann/json.hpp>
 
-#include "2s2h/BenGui/Notification.h"
+#include "gui/Notification.h"
 #include "2s2h/SaveManager/SaveManager.h"
 #include <ship/utils/binarytools/BinaryReader.h>
 #include <string>

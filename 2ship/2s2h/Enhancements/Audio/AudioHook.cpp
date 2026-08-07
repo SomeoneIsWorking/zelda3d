@@ -3,7 +3,7 @@
 #include "2s2h/BenPort.h"
 #include "2s2h/BenGui/BenMenu.h"
 #include "2s2h/Enhancements/Audio/AudioCollection.h"
-#include <2s2h/BenGui/Notification.h>
+#include "gui/Notification.h"
 
 extern "C" {
 #include "variables.h"

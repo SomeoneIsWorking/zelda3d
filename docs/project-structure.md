@@ -118,7 +118,7 @@ percentage-common put the two worst candidates at the top.
 
 | Candidate | Size | The real seam | Verdict |
 |---|---|---|---|
-| GUI framework (`UIWidgets`, `Menu`, `MenuTypes`, `Notification`) | ~3.9k/side | the two games use **different CVar keys for the same setting** — `gSettings.Notifications.Position` vs `gNotifications.Position` (claim C068) | **still gated on a config migration, not a refactor**, but the groundwork is done: each game now OWNS its namespaces (C072), and MM has a `2s2h/cvar_prefixes.h`. Next is MM's `ConfigVersion2Updater`, then merge widget-by-widget. See below for the measured size |
+| GUI framework (`UIWidgets`, `Menu`, `MenuTypes`, `Notification`) | ~3.9k/side | **NOT the CVar keys** — that was C068 overreaching, corrected by C074. The blocker is ordinary behavioural divergence: divergent widget APIs, a `std::function`-vs-function-pointer callback ABI, and per-game backend tables | **harder than a migration, not easier.** `Notification.h` and the colour palette are shared (done); `Notification.cpp` is the one genuinely CVar-blocked file. See below |
 | Port shell (`OTRGlobals.cpp` ↔ `BenPort.cpp`) | 2.8k / 2.4k | the ABI half is **done** (`port/zelda3d_port_api.h`). The BODY's 28 textually-identical lines each name a per-game type — `class OTRGlobals` exists in both games with different members (claim C069) | **ABI done; body: do NOT extract.** Hooking it would cost ~7 function pointers to share a Christmas-date check and `srand` |
 | `resource/` importers + types | 8.4k / 7.4k | 156 matching names, 28 identical `.cpp` — but only **3** also have an identical header (claim C066) | **poor target.** Tops the similarity ranking and is nearly all header-driven per-game divergence |
 | `mixer.c` | 822 | per-game audio DMEM base address (claim C065) | **do not share** until parameterised and both games' audio verified end to end |
@@ -172,7 +172,41 @@ validation against its new table and reaches ZAPD exactly as it does at HEAD.
 `src/overlays/` and `src/code/` — two different decomps with **zero** byte-identical files despite
 618 shared basenames.
 
-### The CVar migration that gates the GUI merge — sized against the BINARY, not a grep
+### The GUI framework is NOT blocked by the CVar migration (claim C074)
+
+The premise this section was written under was wrong, and it is worth stating plainly because it
+changes what to work on. Only **`Notification.cpp`** is genuinely CVar-blocked
+(`gSettings.Notifications.*` vs `gNotifications.*`, plus a Mute setting MM lacks and different audio
+APIs). Everything else:
+
+- **`Menu.cpp`'s keys are already byte-identical.** OoT's ten `CVAR_SETTING("Menu.…")` expansions and
+  MM's ten literals are the same strings, because `gSettings.` / `gOpenWindows.` is a namespace the
+  two games share by design — `lus-cvars.cmake` builds the engine's key names from those prefixes for
+  both. OoT has one extra key, `gSettings.DisableChanges`.
+- **`UIWidgets` hardcodes no keys at all** — every key is caller-supplied, so it is migration-neutral.
+
+What actually blocks the merge is plain divergence, and it is the harder kind:
+
+| pair | differing lines | the real blocker |
+|---|---|---|
+| `MenuTypes.h` | 146 / 337 | `VoidFunc`/`WidgetFunc` are `std::function` in OoT and raw function pointers in MM (OoT's menu code captures, MM's cannot); `WidgetType` and `DisableOption` have different members; **`windowBackendsMap` lists SDL3-GPU only for OoT vs DX11/OpenGL/Metal for MM** — a C065-class trap sitting inside an otherwise-matching file |
+| `UIWidgets.hpp` | 570 / ~1100 | divergent widget APIs (OoT-only colour-picker options, MM-only card layout) |
+| `UIWidgets.cpp` | 471 / ~1300 | 45 of 64 function bodies ARE identical; the ~20 that differ include `GetRandomValue`, whose signature differs so the two have different determinism contracts |
+| `Menu.cpp` | 302 / ~950 | OoT-only race mode and search navigation; `Fast::WindowBackend` vs `int32_t` backends |
+
+**Done:** `zelda3d_shared/gui/Notification.h` (the interface; the .cpp stays per-game) and
+`zelda3d_shared/gui/ui_colors.h` (the `Colors` enum + `ColorValues` table, which were byte-identical).
+
+**The tractable next step is function-level, not file-level:** the `PushStyle*`/`PopStyle*` theming
+family in `UIWidgets.cpp` is among the 45 identical functions and could move to a shared TU without
+reconciling the widget APIs. The genuine prerequisite for `MenuTypes`/`Menu` is deciding three things
+that have nothing to do with CVars — the callback ABI, the enum contents, and the backend
+representation.
+
+### The MM CVar migration — sized against the BINARY, not a grep
+
+Still worth doing on its own merits (one namespace per game, one place to rename), but it is **not**
+what unblocks the GUI framework.
 
 Each game now owns its CVar namespaces: OoT's `CVAR_PREFIX_*` are scoped to `soh_settings` instead of
 being `add_compile_definitions`'d at the build root, where they reached MM too and collided with its

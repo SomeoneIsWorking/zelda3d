@@ -18,7 +18,7 @@
 #include "include/global.h"
 
 #include "soh/Enhancements/debugger/MessageViewer.h"
-#include "soh/Notification/Notification.h"
+#include "gui/Notification.h"
 #include "soh/Enhancements/TimeDisplay/TimeDisplay.h"
 #include "soh/Enhancements/mod_menu.h"
 #include "soh/Network/Anchor/Anchor.h"

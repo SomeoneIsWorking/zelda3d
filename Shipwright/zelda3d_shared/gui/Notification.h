@@ -1,11 +1,25 @@
+/**
+ * The notification widget's interface, shared by both games.
+ *
+ * The two games' copies differed by four lines: OoT pulled the whole of <libultraship/libultraship.h>
+ * where MM names the two things it actually needs, OoT marked the window `final`, and OoT carried a
+ * comment. MM's includes and OoT's `final` are both kept -- `final` is safe because nothing
+ * subclasses Notification::Window in either tree.
+ *
+ * Only the INTERFACE is shared. Notification.cpp is NOT: it is the one file in the GUI framework
+ * that the CVar-key divergence genuinely blocks (OoT reads gSettings.Notifications.*, MM reads
+ * gNotifications.*), and beyond the keys OoT honours a Mute setting MM lacks, the two size the icon
+ * differently, and they call different audio APIs. See claim C068.
+ */
+
 #ifndef NOTIFICATION_H
 #define NOTIFICATION_H
 #ifdef __cplusplus
 
 #include <string>
-#include <libultraship/libultraship.h>
+#include <cstdint>
+#include <ship/window/gui/GuiWindow.h>
 #include <ship/utils/Color4f.h>
-
 namespace Notification {
 
 struct Options {

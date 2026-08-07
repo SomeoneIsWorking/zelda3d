@@ -6,7 +6,7 @@
 #include "BenPort.h"
 #include <libultraship/bridge/consolevariablebridge.h>
 #include <ship/window/Window.h>
-#include "2s2h/BenGui/Notification.h"
+#include "gui/Notification.h"
 
 extern "C" {
 #include "sfx.h"

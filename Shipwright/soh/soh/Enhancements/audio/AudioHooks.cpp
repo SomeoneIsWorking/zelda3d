@@ -1,7 +1,7 @@
 #include "soh/Enhancements/game-interactor/GameInteractor_Hooks.h"
 #include "soh/ShipInit.hpp"
 #include "AudioCollection.h"
-#include <soh/Notification/Notification.h>
+#include "gui/Notification.h"
 #include <soh/SohGui/ImGuiUtils.h>
 
 extern "C" {

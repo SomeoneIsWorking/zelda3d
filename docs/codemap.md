@@ -48,7 +48,7 @@ the two mechanisms available for sharing code between them.
 ```
 launcher   Shipwright/zelda3d_app     zelda3d — dlopens a game core (RTLD_LOCAL), holds no game code
 games      Shipwright/soh (OoT)  ·  2ship (MM)          ← peers, neither hosts the other
-shared     Shipwright/zelda3d_shared  static lib (no game types)  +  port/ and extractor/ (shared source, built per game)
+shared     Shipwright/zelda3d_shared  static lib (no game types) + gui/ (headers)  +  port/ and extractor/ (shared source, built per game)
 engine     Shipwright/libultraship (libultraship.so, ONE copy)  ·  Shipwright/cmb3d
 ```
 

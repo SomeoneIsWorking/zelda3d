@@ -9,6 +9,10 @@ depends: Shipwright/soh/soh/Notification/Notification.cpp, 2ship/2s2h/BenGui/Not
 
 ## Claim
 
+> **NARROWED by C074 (2026-08-07).** The evidence below is about Notification.cpp and holds for it.
+> The generalisation to "the GUI framework" does NOT: Menu.cpp's keys are already byte-identical
+> across the games and UIWidgets hardcodes none. Read C074 before planning work around this.
+
 The GUI framework (UIWidgets/Menu/MenuTypes/Notification) is NOT a mechanical de-duplication despite 76-90% similarity: the two games use DIFFERENT CVar keys for the same setting, so merging them silently changes persisted user config.
 
 ## Evidence

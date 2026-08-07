@@ -1,5 +1,5 @@
 
-#include "Notification.h"
+#include "gui/Notification.h"
 #include <libultraship/libultraship.h>
 #include "soh/OTRGlobals.h"
 

@@ -9,7 +9,7 @@
 #include "soh/Enhancements/game-interactor/GameInteractor.h"
 #include "soh/Enhancements/game-interactor/GameInteractor_Hooks.h"
 #include "soh/SohGui/ImGuiUtils.h"
-#include "soh/Notification/Notification.h"
+#include "gui/Notification.h"
 #include "soh/SaveManager.h"
 #include "soh/ShipInit.hpp"
 #include "object/ObjectExtension.h"

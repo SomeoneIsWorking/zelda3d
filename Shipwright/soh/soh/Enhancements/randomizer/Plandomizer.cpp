@@ -3,7 +3,7 @@
 #include "soh/SohGui/UIWidgets.hpp"
 #include "soh/util.h"
 #include <vector>
-#include "soh/Notification/Notification.h"
+#include "gui/Notification.h"
 #include <soh_assets.h>
 #include "soh/Enhancements/randomizer/3drando/hints.hpp"
 

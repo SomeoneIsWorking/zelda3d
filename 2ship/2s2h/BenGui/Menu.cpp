@@ -4,7 +4,7 @@
 #include "BenPort.h"
 #include <ship/window/gui/GuiElement.h>
 #include "BenModals.h"
-#include "Notification.h"
+#include "gui/Notification.h"
 #include <variant>
 #include <spdlog/fmt/fmt.h>
 #include "variables.h"

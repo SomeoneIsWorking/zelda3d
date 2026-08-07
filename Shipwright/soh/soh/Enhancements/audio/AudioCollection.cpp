@@ -1,8 +1,12 @@
 #include "AudioCollection.h"
 #include "sequence.h"
 #include "sfx.h"
+// s32 and friends. This used to arrive by accident, via Notification.h pulling in the whole of
+// <libultraship/libultraship.h>; the shared Notification.h names only what it needs, so this file
+// has to name what IT needs.
+#include <libultraship/libultra/types.h>
 #include "soh/cvar_prefixes.h"
-#include "soh/Notification/Notification.h"
+#include "gui/Notification.h"
 #include <vector>
 #include <ship/utils/StringHelper.h>
 #include <libultraship/bridge.h>
