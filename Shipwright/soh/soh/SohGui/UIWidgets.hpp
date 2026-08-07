@@ -13,6 +13,7 @@
 
 #include "gui/ui_colors.h"
 #include "gui/ui_theming.h"
+#include "gui/ui_primitives.h"
 
 namespace UIWidgets {
 
@@ -37,8 +38,6 @@ struct TextFilters {
 
 std::string WrappedText(const char* text, unsigned int charactersPerLine = 80);
 std::string WrappedText(const std::string& text, unsigned int charactersPerLine = 80);
-void PaddedSeparator(bool padTop = true, bool padBottom = true, float extraVerticalTopPadding = 0.0f,
-                     float extraVerticalBottomPadding = 0.0f);
 void Tooltip(std::string text);
 
 typedef enum ColorPickerModifiers {
@@ -596,15 +595,12 @@ struct InputOptions : WidgetOptions {
     }
 };
 
-bool BeginMenu(const char* label, Colors color = Colors::LightBlue);
 
-bool MenuItem(const char* label, const char* shortcut = NULL, Colors color = Colors::LightBlue);
 
 bool Button(const char* label, const ButtonOptions& options = {});
 bool WindowButton(const char* label, const char* cvarName, std::shared_ptr<Ship::GuiWindow> windowPtr,
                   const WindowButtonOptions& options = {});
 
-void RenderText(ImVec2 pos, const char* text, const char* text_end, bool hide_text_after_hash);
 bool Checkbox(const char* label, bool* v, const CheckboxOptions& options = {});
 bool CVarCheckbox(const char* label, const char* cvarName, const CheckboxOptions& options = {});
 
@@ -612,11 +608,7 @@ bool CVarCheckbox(const char* label, const char* cvarName, const CheckboxOptions
 
 
 
-void Spacer(float height = 0.0f);
-void Separator(bool padTop = true, bool padBottom = true, float extraVerticalTopPadding = 0.0f,
-               float extraVerticalBottomPadding = 0.0f);
 
-float CalcComboWidth(const char* preview_value, ImGuiComboFlags flags);
 
 template <typename T>
 bool Combobox(std::string label, T* value, const std::map<T, const char*>& comboMap,
