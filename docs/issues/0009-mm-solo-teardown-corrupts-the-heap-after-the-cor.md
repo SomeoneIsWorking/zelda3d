@@ -66,6 +66,19 @@ After Dear ImGui was restored as a real library, `solo mm` exited 0 twice and 13
 runs with the same "corrupted size vs. prev_size". Restoring ImGui changed the heap layout; it did
 not fix the corruption. Any future "this is fixed" claim needs several consecutive runs, not one.
 
+## A hole in fix (1), found 2026-08-11 by the ASAN build
+
+Fix (1) above -- "teardown ran at `__cxa_finalize`, fixed by calling `DestroyInstance()` explicitly
+from the launcher" -- only covers cores that RETURN. MM's `RunExtract` calls `exit(0)` directly
+(`BenPort.cpp:583`), so the launcher never regains control and `Context` is destroyed at
+`__cxa_finalize` after all, where `~Context()` logs through an spdlog registry the exit handlers have
+already freed. Reproduced 3/3 under ASAN; written up as
+[issue 0017](0017-context-destructor-logs-through-a-freed-spdlog-r.md).
+
+**That is a different path from this bug** (this one fires on a normal quit, in `Config::Save`), so
+0017 is not a fix for 0009 -- but it does mean the stated invariant here is too weak. It is not "the
+launcher destroys the Context"; it is "no path may leave the Context to static destruction".
+
 ## Next step
 
 Build with `-fsanitize=address`. Nothing cheaper has located the writer: valgrind is not installed
