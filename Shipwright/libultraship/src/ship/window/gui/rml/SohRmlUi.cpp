@@ -471,6 +471,78 @@ static Rml::String DescribeElement(Rml::Element* el) {
     return s;
 }
 
+static Rml::String LowercaseAscii(const Rml::String& in) {
+    Rml::String out = in;
+    for (char& c : out) {
+        if (c >= 'A' && c <= 'Z') {
+            c = (char)(c - 'A' + 'a');
+        }
+    }
+    return out;
+}
+
+void SohRmlUi::ActivateRowByLabel(const char* needle, char* out, int outSize) {
+    if (out == nullptr || outSize <= 0) {
+        return;
+    }
+    if (needle == nullptr || needle[0] == '\0') {
+        snprintf(out, outSize, "menurow: no row name given -- NOTHING activated");
+        return;
+    }
+    // Same refusal as DescribeLauncherHits, for the same reason: "no such row" out of a menu that
+    // was never opened would read as "that row does not exist".
+    if (!mInitialised || mContext == nullptr || mDocument == nullptr) {
+        snprintf(out, outSize, "menurow UNAVAILABLE: initialised=%d context=%d doc=%d -- NOTHING activated",
+                 mInitialised ? 1 : 0, mContext != nullptr ? 1 : 0, mDocument != nullptr ? 1 : 0);
+        return;
+    }
+    if (!mVisible) {
+        snprintf(out, outSize, "menurow UNAVAILABLE: the ESC menu is CLOSED -- NOTHING activated (open it: `menu 1`)");
+        return;
+    }
+
+    mContext->Update();
+
+    Rml::ElementList rows;
+    mDocument->GetElementsByTagName(rows, "select-button");
+
+    const Rml::String want = LowercaseAscii(needle);
+    Rml::String seen;
+    int scanned = 0;
+    for (Rml::Element* row : rows) {
+        const Rml::String label = row->GetInnerRML();
+        const Rml::String text = row->GetAttribute<Rml::String>("key", "") + label;
+        scanned++;
+        if (scanned <= 6) {
+            if (!seen.empty()) {
+                seen += " | ";
+            }
+            seen += label.substr(0, 40);
+        }
+        if (LowercaseAscii(text).find(want) == Rml::String::npos) {
+            continue;
+        }
+        row->Focus();
+        // Focus() does NOT always take -- a row in a pane that is not the active tab is not
+        // focusable, and ActivateFocused would then fire whatever WAS focused. Activating a
+        // different row than the one asked for, and reporting success, is worse than doing nothing.
+        if (mContext->GetFocusElement() != row) {
+            snprintf(out, outSize,
+                     "menurow: found \"%s\" (row %d of %d) but FOCUS DID NOT TAKE -- its tab is "
+                     "probably not the active one. NOTHING activated.",
+                     label.substr(0, 60).c_str(), scanned, (int)rows.size());
+            return;
+        }
+        ActivateFocused();
+        snprintf(out, outSize, "menurow: activated row %d of %d -- \"%s\"", scanned, (int)rows.size(),
+                 label.substr(0, 80).c_str());
+        return;
+    }
+
+    snprintf(out, outSize, "menurow: NO ROW matched \"%s\" -- scanned %d select-button row(s); first few: %s", needle,
+             scanned, seen.empty() ? "(none at all)" : seen.c_str());
+}
+
 void SohRmlUi::DescribeLauncherHits(char* out, int outSize) {
     if (out == nullptr || outSize <= 0) {
         return;
@@ -553,6 +625,18 @@ extern "C" void Zelda3D_LauncherHitReport(char* out, int outSize) {
         return;
     }
     sLiveRmlUi->DescribeLauncherHits(out, outSize);
+}
+
+// C shim for the REPL's `menurow <text>`.
+extern "C" void Zelda3D_MenuActivateRow(const char* needle, char* out, int outSize) {
+    if (out == nullptr || outSize <= 0) {
+        return;
+    }
+    if (sLiveRmlUi == nullptr) {
+        snprintf(out, outSize, "menurow UNAVAILABLE: no live RmlUi instance -- NOTHING activated");
+        return;
+    }
+    sLiveRmlUi->ActivateRowByLabel(needle, out, outSize);
 }
 
 void SohRmlUi::ShowLauncher(bool show) {
@@ -697,9 +781,9 @@ void SohRmlUi::ActivateFocused() {
         return;
     }
     // Return-to-launcher row: `switchgame="<id>"` ends the running game and asks the launcher to
-    // start that one instead. NO DOCUMENT USES IT YET -- see the note in zelda3d_test.rml: the
-    // switch works, but a core is not re-runnable, so the game it lands on crashes. Kept because it
-    // is the row's mechanism and is exercised by REPL `switchgame`, which is how that is measured.
+    // start that one instead. The ESC menu's "Return to Launcher" row uses it; it was held back
+    // until 2026-08-11 because its destination is a SECOND run of a core, which crashed
+    // (docs/issues/0016).
     //
     // Unlike every row above it, this needs NO game-side consumer -- no gZelda3dMenu* global, no
     // per-frame poll holding a PlayState. That is what makes it work in BOTH games from this one

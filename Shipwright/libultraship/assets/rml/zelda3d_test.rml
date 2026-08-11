@@ -51,12 +51,15 @@
 				     scene transition (SohRmlUi -> gZelda3dMenuWarp -> zelda3d.c Zelda3D_ReplPoll). -->
 				<div class="section-heading">Game</div>
 				<select-button tabindex="auto" restart="1"><key>Restart &#8594; Title Screen</key><value>&#8635;</value></select-button>
-				<!-- A "Return to Launcher" row belongs here and is deliberately ABSENT. The
-				     mechanism works (switchgame="<id>" in SohRmlUi, and REPL `switchgame`), but its
-				     destination is a SECOND run of the OoT core, and a core is not re-runnable yet:
-				     the decomp's global state assumes one run per process, so run 3 crashes in
-				     whatever subsystem has not been made run-scoped yet. Offering the row would be
-				     offering a button that kills the game. See docs/issues/0016. -->
+				<!-- `switchgame="oot"` ends this game and asks the launcher to start that one --
+				     and starting "oot" is how you reach the CHOOSER, because the OoT core boots into
+				     the launcher gamestate. Handled entirely in SohRmlUi, so this same row works from
+				     Majora's Mask with no MM code.
+
+				     Absent until 2026-08-11: its destination is a SECOND run of a core, which used to
+				     crash (docs/issues/0016). Gated by tools/zelda3d_switch_test.sh, whose third
+				     assertion drives exactly this: chooser -> MM -> back to the chooser, one pid. -->
+				<select-button tabindex="auto" switchgame="oot"><key>Return to Launcher</key><value>&#8617;</value></select-button>
 				<!-- Time-of-day applied to the NEXT warp below: Default (clock runs) / Day / Night. -->
 				<select-button tabindex="auto" cycle="warptime"><key>Warp Time-of-Day</key><value>Default</value></select-button>
 				<!-- Past/future variant of the warp target: sets linkAge so Play_Init loads the

@@ -675,12 +675,10 @@ void Context::BeginGameSession(const std::string& name, const std::string& short
     }
     mSession = std::make_unique<GameSession>(name, shortName, configFilePath);
 
-    // The exit request belongs to the game that made it, not to the process. Both flags are
-    // engine-lifetime statics, so without this the previous game's `quit` is still latched when the
-    // next core's graph loop reads it on its first frame: the second game shuts down before it has
-    // drawn anything, and the run looks like a clean exit rather than a game that never started.
-    sExitRequested = false;
-    sFullTeardownRequested = false;
+    // (The exit-request reset that used to be here moved to Context::BeginRun, which the launcher
+    // calls before EVERY run. Here it only fired when the game NAME changed, so a game returning to
+    // the chooser -- oot -> oot, the same session reused -- inherited its own latched `quit` and
+    // shut down before drawing a frame. See BeginRun.)
 
     // The Gui is engine-lifetime but its GuiWindow LIST is not: those are the departing game's menus
     // and editors (SohGui's for OoT, BenGui's for MM), whose vtables live in that game's .so. Same
@@ -708,6 +706,24 @@ std::string Context::GetShortName() const {
 // Set by the launcher to the directory of the game core it loaded; empty means "derive from the
 // executable", which is what a directly-run soh.elf / mm.elf wants. See SetAppBundlePath.
 static std::string sAppBundlePathOverride;
+
+// Called by the launcher immediately before each core's run(). The exit request belongs to a RUN,
+// not to the process and not to a game session: both flags are engine-lifetime statics, so a run
+// that ends by requesting exit leaves the request latched for whoever runs next.
+//
+// This lived in BeginGameSession, which only fires when a DIFFERENT game attaches -- so it covered
+// oot -> mm and missed oot -> oot entirely. That is exactly the ESC menu's "Return to Launcher"
+// path: the OoT core ended with `quit` latched, the launcher loaded the OoT core again, and its
+// graph loop read the flag on its first frame and unwound. Every observable said success -- the row
+// activated, the core returned 0, the launcher started the next one -- and the chooser never
+// appeared, because the run that was meant to show it lasted about a second.
+//
+// The launcher owns this rather than either core: it is the one place that knows a run is starting,
+// and it is the same place for both games (2ship has no run-lifecycle hook of its own).
+void Context::BeginRun() {
+    sExitRequested = false;
+    sFullTeardownRequested = false;
+}
 
 void Context::RequestExit() {
     sExitRequested = true;

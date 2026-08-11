@@ -235,6 +235,7 @@ void Zelda3D_ReplReply(const char* outPath, const char* fmt, ...) {
 // drive the menu through the real input path for deterministic, headless nav verification.
 void Zelda3D_RmlMenuKey(int action);
 void Zelda3D_RmlMenuClick(int x, int y); // synthesize a menu mouse click at window pixel (x, y)
+void Zelda3D_MenuActivateRow(const char* needle, char* out, int outSize); // activate an ESC-menu row BY NAME
 // Hit-test every actionable launcher row and report which element RmlUi actually returns at its
 // centre. `menuclick` alone cannot distinguish "the row is covered by an invisible sibling" from
 // "the click path is broken" from "I clicked the wrong pixel" -- all three look like nothing
@@ -269,7 +270,7 @@ static void Zelda3D_ReplExec(PlayState* play, char* line, const char* outPath) {
         // `menuclick` / `menuhit` for the same reason: they exist to test the launcher, which by
         // construction runs without a PlayState.
         static const char* kPlayFree[] = { "key",  "log",       "fps",  "dump",      "inputdev", "keycap",
-                                           "menu", "menuclick", "help", "launcher",  "menuhit",
+                                           "menu", "menuclick", "help", "launcher",  "menuhit", "menurow",
                                            "switchgame" };
         int ok = 0;
         for (size_t i = 0; i < sizeof(kPlayFree) / sizeof(kPlayFree[0]); i++) {
@@ -331,6 +332,15 @@ static void Zelda3D_ReplExec(PlayState* play, char* line, const char* outPath) {
         // tested -- so the mechanism gets a command and the row and the command share one path.
         Zelda3D_ReplReply(outPath, "switchgame %s: ending this game; the launcher takes it from here", arg);
         WindowRequestGameSwitch(arg);
+    } else if (strcmp(cmd, "menurow") == 0) {
+        // Activate an ESC-menu row by its label rather than by guessed pixels: `menuclick <x> <y>`
+        // needs coordinates read off the layout, and a click that lands on the wrong row still
+        // reports success. The reply names the row it activated, or says how many rows it scanned.
+        const char* arg = strchr(line, ' ');
+        char report[512];
+        report[0] = '\0';
+        Zelda3D_MenuActivateRow(arg != NULL ? arg + 1 : "", report, (int)sizeof report);
+        Zelda3D_ReplReply(outPath, "%s", report);
     } else if (strcmp(cmd, "menuhit") == 0) {
         char report[4096];
         report[0] = '\0';
@@ -1874,8 +1884,8 @@ static void Zelda3D_ReplExec(PlayState* play, char* line, const char* outPath) {
         //   launcher            report state
         //   launcher 1 | 0      show / hide
         //   launcher pick oot|mm|quit    take the choice, exactly as activating the row does
-        // `pick mm` is the end-to-end test: it execs mm.elf over this process, so the SAME pid comes
-        // back as a different binary (readlink /proc/<pid>/exe).
+        // `pick mm` is the end-to-end test: the OoT core ends and the launcher loads the MM core into
+        // the SAME process, so the pid is unchanged and /proc/<pid>/exe still reads `zelda3d`.
         char arg[32] = { 0 }, arg2[32] = { 0 };
         const int n = sscanf(line, "%*s %31s %31s", arg, arg2);
         extern int gZelda3dLauncherAction;
@@ -2867,10 +2877,32 @@ static double Zelda3D_ReplLogicFps(void) {
 
 int gZelda3dReplPolledThisFrame = 0; // set by the Play-side poll; graph.c's fallback checks+clears
 
+// The REPL's connection to the outside world, and it belongs to a RUN.
+//
+// `sReplFd` was a function-local static seeded to -2 ("not opened yet"), so the mkfifo+open below
+// happened once per PROCESS. Under the launcher a second run inherited a descriptor onto the
+// previous run's FIFO -- and never re-created the path, so anything watching for the FIFO to
+// reappear waited forever while the game was in fact running fine. That is how the round-trip gate
+// first failed: the OoT core re-ran, reached the chooser, and had no REPL.
+//
+// Hoisted to file scope so Zelda3D_ReplResetRunState can close it; the reset is on
+// Zelda3D_CoreRunBegin's list rather than being a Zelda3DOnce latch because there is something to
+// RELEASE, which is the line between the two mechanisms.
+static int sReplFd = -2; // -2 uninit, -1 disabled
+static char sReplOutPath[1100];
+
+void Zelda3D_ReplResetRunState(void) {
+    if (sReplFd >= 0) {
+        close(sReplFd);
+    }
+    sReplFd = -2;
+    sReplOutPath[0] = '\0';
+}
+
 void Zelda3D_ReplPoll(PlayState* play) {
     if (play != NULL) gZelda3dReplPolledThisFrame = 1;
-    static int fd = -2; // -2 uninit, -1 disabled
-    static char outPath[1100];
+    int& fd = sReplFd;
+    char* const outPath = sReplOutPath;
     Zelda3D_ReplFpsTick();
     static char buf[8192];
     static int buflen = 0;
@@ -3103,7 +3135,7 @@ void Zelda3D_ReplPoll(PlayState* play) {
         } else {
             mkfifo(p, 0666); // ignore EEXIST
             fd = open(p, O_RDWR | O_NONBLOCK); // O_RDWR: we keep a writer so reads never EOF
-            snprintf(outPath, sizeof(outPath), "%s.out", p);
+            snprintf(outPath, sizeof(sReplOutPath), "%s.out", p);
             if (fd >= 0) {
                 FILE* f = fopen(outPath, "w");
                 if (f != NULL) {

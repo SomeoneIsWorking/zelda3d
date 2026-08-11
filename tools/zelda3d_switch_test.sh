@@ -8,7 +8,7 @@
 # regression that made the Majora's Mask row exec a process again would leave it perfectly green.
 # This drives the row a user actually clicks.
 #
-# The two things it asserts, and why each alone is not enough:
+# The four things it asserts, and why each alone is not enough:
 #   PID UNCHANGED   -- an exec produces a nearly identical log: same "starting Majora's Mask" line,
 #                      same MM boot, same everything except the process. The pid is the only
 #                      observable that separates a handover from a process swap, so it is checked
@@ -19,6 +19,15 @@
 #                      id. It must NOT accept any non-empty reply: MM answers
 #                      `posinfo scene=-1 (no PlayState)` while booting, and the first version of
 #                      this gate passed green while printing exactly that.
+#   IT COMES BACK   -- returning to the chooser runs the OoT core a SECOND time in this process,
+#                      which is the half that was impossible until 2026-08-11 (docs/issues/0016).
+#                      Alive is not enough: the core could re-run straight into the game, so the
+#                      pass condition is the chooser DOCUMENT being visible.
+#   THE ROW WORKS   -- assertion 3 drives the MECHANISM (REPL `switchgame`). A row that is mis-spelt,
+#                      in the wrong pane, or missing from the shipped document would leave that
+#                      green while the user has no way to reach it, so the ESC menu's "Return to
+#                      Launcher" row is activated BY NAME and then checked for landing at the
+#                      chooser.
 #
 # Every failure says which assertion failed and what was observed. A run that could not get as far
 # as the chooser reports THAT, rather than a bare non-zero that reads like "the switch is broken".
@@ -126,12 +135,141 @@ else
     fi
 fi
 
+# --- assertion 3: the way BACK --------------------------------------------------------------------
+# The round trip is the half that was impossible until a core became re-runnable: returning to the
+# chooser means running the OoT core a SECOND time in this process. It is asserted here rather than
+# assumed from `oot,oot` passing, because that sequence is driven by --run-sequence and never sees
+# the chooser -- the same reason assertion 2 exists next to the sequence gate.
+#
+# Skipped, loudly, if MM never came up: "the way back works" measured from a game that never started
+# is the kind of green that means nothing.
+if [ ! -p "$ZELDA3D_MM_REPL" ]; then
+    echo "SWITCH: SKIPPED (return) -- MM never started, so the round trip could not be attempted."
+    echo "        This is NOT a pass: nothing about returning to the chooser was measured."
+    FAIL=1
+else
+    echo "SWITCH: asking MM to return to the chooser (switchgame oot)"
+    rm -f "$ZELDA3D_REPL" "$ZELDA3D_REPL.out"
+    printf 'switchgame oot\n' > "$ZELDA3D_MM_REPL"
+
+    # OoT's REPL reappearing is the observable that the OoT core ran again.
+    for _ in $(seq 1 120); do sleep 1; [ -p "$ZELDA3D_REPL" ] && break; done
+
+    if [ -z "$(readlink "/proc/$PID/exe" 2>/dev/null)" ]; then
+        echo "SWITCH: FAIL (return) -- pid $PID died on the way back. Returning to the chooser is a"
+        echo "        SECOND run of the OoT core; if that crashes, the ESC menu's row cannot exist."
+        tail -8 "$LOG" | sed 's/^/          /'
+        FAIL=1
+    elif [ ! -p "$ZELDA3D_REPL" ]; then
+        echo "SWITCH: FAIL (return) -- the OoT core never opened its REPL again within 120s, so it did"
+        echo "        not get back to a frame loop. Launcher lines:"
+        grep -E "LAUNCHER" "$LOG" | tail -5 | sed 's/^/          /'
+        FAIL=1
+    else
+        # Being alive is not being AT THE CHOOSER -- the core could have booted into the game
+        # instead. `launcher` reports the document's own visibility, which is the thing a user sees.
+        VIS=""
+        for _ in $(seq 1 30); do
+            rm -f "$ZELDA3D_REPL.out"
+            printf 'launcher\n' > "$ZELDA3D_REPL"
+            sleep 1
+            VIS="$(cat "$ZELDA3D_REPL.out" 2>/dev/null)"
+            case "$VIS" in *"visible=1"*) break ;; esac
+        done
+        case "$VIS" in
+            *"visible=1"*)
+                echo "SWITCH: ok (return) -- back in one process, chooser on screen: $VIS" ;;
+            *)
+                echo "SWITCH: FAIL (return) -- the OoT core re-ran and is answering, but the chooser is not"
+                echo "        visible. last launcher reply: ${VIS:-(none)}"
+                FAIL=1 ;;
+        esac
+    fi
+fi
+
+# --- assertion 4: the ROW a user clicks ------------------------------------------------------------
+# Assertion 3 drove the mechanism (REPL `switchgame`). This drives the ESC menu's "Return to
+# Launcher" row itself, because a working mechanism behind a row that is mis-spelt, in the wrong
+# pane, or not in the shipped document is still a feature the user cannot reach.
+#
+# `menurow <label>` activates by NAME and refuses if focus does not land on the row it matched, so a
+# pass here cannot be a click that hit something else.
+if [ ! -p "$ZELDA3D_REPL" ]; then
+    echo "SWITCH: SKIPPED (row) -- no OoT REPL, so the menu row was never driven. NOT a pass."
+    FAIL=1
+else
+    echo "SWITCH: starting Ocarina of Time to drive its ESC menu row"
+    printf 'launcher pick oot\n' > "$ZELDA3D_REPL"
+    SCENE=""
+    for _ in $(seq 1 90); do
+        rm -f "$ZELDA3D_REPL.out"
+        printf 'posinfo\n' > "$ZELDA3D_REPL" 2>/dev/null
+        sleep 1
+        SCENE="$(cat "$ZELDA3D_REPL.out" 2>/dev/null)"
+        case "$SCENE" in *"scene=-1"*|"") continue ;; *"scene="*) break ;; esac
+    done
+    case "$SCENE" in
+        *"scene="*) case "$SCENE" in *"scene=-1"*) SCENE="" ;; esac ;;
+        *) SCENE="" ;;
+    esac
+    if [ -z "$SCENE" ]; then
+        echo "SWITCH: FAIL (row) -- OoT never reached a scene, so its ESC menu could not be opened."
+        echo "        last posinfo reply: $(cat "$ZELDA3D_REPL.out" 2>/dev/null || echo "(none)")"
+        FAIL=1
+    else
+        printf 'menu toggle\n' > "$ZELDA3D_REPL"; sleep 2
+        rm -f "$ZELDA3D_REPL.out"
+        printf 'menurow Return to Launcher\n' > "$ZELDA3D_REPL"
+        # Read the reply FAST. Activating this row ends the run, and the run that replaces it writes
+        # its own "SOH3D REPL ready" greeting into the same .out file -- so a leisurely read finds the
+        # greeting where the reply was and reports the row as dead when it in fact worked. That is
+        # exactly what happened the first time this assertion ran. Sampling in a tight loop keeps the
+        # reply, and the greeting is treated as what it actually is: proof the run restarted.
+        ROW=""
+        for _ in $(seq 1 40); do
+            sleep 0.2
+            ROW="$(cat "$ZELDA3D_REPL.out" 2>/dev/null)"
+            [ -n "$ROW" ] && break
+        done
+        case "$ROW" in
+            *"activated"* | *"REPL ready"*)
+                echo "SWITCH: ok (row)   -- $ROW"
+                # And it must actually land back at the chooser, not merely be clickable.
+                rm -f "$ZELDA3D_REPL"
+                for _ in $(seq 1 120); do sleep 1; [ -p "$ZELDA3D_REPL" ] && break; done
+                VIS2=""
+                for _ in $(seq 1 30); do
+                    rm -f "$ZELDA3D_REPL.out"
+                    printf 'launcher\n' > "$ZELDA3D_REPL" 2>/dev/null
+                    sleep 1
+                    VIS2="$(cat "$ZELDA3D_REPL.out" 2>/dev/null)"
+                    case "$VIS2" in *"visible=1"*) break ;; esac
+                done
+                case "$VIS2" in
+                    *"visible=1"*) echo "SWITCH: ok (row)   -- the row landed back at the chooser: $VIS2" ;;
+                    *) echo "SWITCH: FAIL (row) -- the row activated but the chooser never came back."
+                       echo "        last launcher reply: ${VIS2:-(none)}"
+                       FAIL=1 ;;
+                esac ;;
+            *)
+                echo "SWITCH: FAIL (row) -- the ESC menu's Return to Launcher row could not be activated."
+                echo "        menurow said: ${ROW:-(no reply)}"
+                echo "        (menurow names the row it matched, or says how many it scanned, so this"
+                echo "         line distinguishes a missing row from a menu that was never open.)"
+                FAIL=1 ;;
+        esac
+    fi
+fi
+
 echo
 echo "=== SWITCH VERDICT (exit $FAIL) ==="
 grep -E "LAUNCHER: (handing back|.* core returned|switching|starting)" "$LOG" | sed 's/^/  /'
 grep -E "different game is attaching" "$LOG" | sed 's/^/  /'
-[ "$FAIL" = 0 ] && echo "  -> the chooser switched games INSIDE one process, and the second game is playing"
+[ "$FAIL" = 0 ] && echo "  -> the chooser switched games INSIDE one process, the second game played, and it came BACK"
 
-[ -p "$ZELDA3D_MM_REPL" ] && printf 'quit\n' > "$ZELDA3D_MM_REPL"
+# Quit whichever core is up at the end -- after the round trip that is OoT, not MM.
+for f in "$ZELDA3D_REPL" "$ZELDA3D_MM_REPL"; do
+    [ -p "$f" ] && timeout 10 sh -c 'printf "quit\n" > "$1"' _ "$f" 2>/dev/null
+done
 sleep 4
 exit "$FAIL"

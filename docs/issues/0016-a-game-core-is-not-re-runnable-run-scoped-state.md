@@ -33,7 +33,13 @@ It is not one bug. Four distinct instances turned up in a row, each hidden behin
 - **`oot -> mm -> oot` works.** All three cores `RETURNED 0`, on two consecutive runs; run 3 boots
   through `Play_Init` into the title scene (`spot99`, scene 0x6e). It used to SIGSEGV three times over
   on the way.
-- `oot` alone: exit 0. `oot,mm`, `oot,oot`: all cores return 0.
+- `oot` alone: exit 0. `oot,mm`: both cores return 0.
+- **`oot,oot` genuinely runs two games** (after instance 9): each core answers `posinfo` with a real
+  scene, at DIFFERENT title-demo positions -- two independent runs, not one echoed. Any earlier
+  green on this row was hollow; see instance 9.
+- **The full round trip works**, gated by `tools/zelda3d_switch_test.sh` (4 assertions, exit 0):
+  chooser -> MM in a live scene (111) -> back to the chooser -> start OoT -> its ESC menu's
+  "Return to Launcher" row -> back at the chooser. Four core runs, one pid.
 - **A process-exit crash remains** and is NOT one of these instances. After every core has returned,
   `Context::DestroyInstance` faults tearing down the last session. It is **intermittent**: the two
   `oot,mm,oot` runs above exited 0 and 134 with identical binaries and identical per-core results.
@@ -61,9 +67,9 @@ an init-once latch that meant once per PROCESS when it should have meant once pe
 | 5 | `hasInitialized` | function-local `static`, `AudioMgr_Init` | Guarded `Audio_Init` -> `AudioLoad_Init`, i.e. ALL audio engine init. Run 2+ skipped it entirely, which is why (4) was never repaired by the new run |
 | 6 | `s{Nes,Ger,Fra,Jpn,Staff}MessageEntryTablePtr` | globals, `z_message_PAL.c`, built in `z_message_OTR.cpp` | `OTRMessage_Init` rebuilds only `if (ptr == NULL)`. Every entry's `segment` is `msg.c_str()` into a `SOH::Text` owned by the previous session's ResourceManager: `memcpy` from freed memory in `Font_LoadOrderedFontNTSC` during `Play_Init` |
 
-All three are now reset by `Zelda3D_CoreRunBegin`, through a reset function in the file that owns the
-state (`AudioMgr_ResetRunState`, `Zelda3D_ResetAudioContext`, `Zelda3D_MessageResetRunState`) --
-the same shape as `Graph_ResetRunState`.
+(5) became a `Zelda3DOnce` latch; (4) and (6) are reset by `Zelda3D_CoreRunBegin` through a function
+in the file that owns the state (`Zelda3D_ResetAudioContext`, `Zelda3D_MessageResetRunState`) -- the
+same shape as `Graph_ResetRunState`.
 
 Two things fell out that are worth keeping:
 
@@ -126,6 +132,44 @@ heap `Heaps_Free` then took back, so run 2+ skipped it. The 2026-08-07 fix hoist
 out of that function and walked straight past the static three lines below it. It is now file-scope
 and cleared by `Graph_ResetRunState`, which is the argument for one reset point per file rather than
 a per-symbol memory.
+
+## Instance 8: the REPL's own FIFO, found by the round trip
+
+`Zelda3D_ReplPoll` held its descriptor in a function-local `static int fd = -2` and did the
+`mkfifo` + `open` once per PROCESS. A second run therefore inherited a descriptor onto the previous
+run's FIFO and never re-created the path. Nothing crashed -- it fails by looking like a hang: the
+extended switch gate reported "the OoT core never opened its REPL again", while the log showed that
+same core running, reaching the chooser, and answering nothing because its FIFO did not exist. The
+descriptor and its `.out` path are now file-scope with a `Zelda3D_ReplResetRunState` on
+`CoreRunBegin`'s list -- a reset rather than a `Zelda3DOnce`, because there is a descriptor to
+CLOSE, which is the line between the two mechanisms.
+
+Worth noting how it was found: only the ROUND TRIP exercises it. Every sequence gate passes
+`--run-sequence`, where each core gets a distinct `ZELDA3D_REPL` path, so the stale descriptor never
+collides. It took returning to the chooser -- the same core, the same path, twice.
+
+## Instance 9: the exit request, latched across a run -- and the false green it produced
+
+`Context::RequestExit` sets an engine-lifetime static. It was cleared in `BeginGameSession`, whose
+own comment names this exact failure ("the second game shuts down before it has drawn anything, and
+the run looks like a clean exit rather than a game that never started"). The reset was simply in a
+place a same-game re-run never reaches: `BeginGameSession` fires only when the game NAME changes.
+
+So `oot -> oot` inherited its own latched `quit`, and the next run's graph loop read it on its first
+frame and unwound. **Every observable said success**: the row activated, the core returned 0, the
+launcher started the next one, `2/2 cores ran to completion`. The run just lasted about a second and
+drew nothing.
+
+Two consequences worth stating plainly:
+
+- **The `oot,oot` result recorded earlier on this page was hollow.** "Both cores returned 0" was
+  true and meant nothing -- the second core never ran a game. It was believed because the sequence
+  gate had no assertion that a core reached a scene; only the switch gate did. A sequence gate that
+  cannot tell "ran" from "returned immediately" is the instrument defect underneath the wrong claim.
+- It is fixed by moving the reset to `Context::BeginRun()`, called by the **launcher** immediately
+  before each `core->run()`. The launcher owns it because it is the one place that knows a run is
+  starting and the same place for both games -- 2ship has no run-lifecycle hook of its own, so a
+  core-side reset would have covered OoT and quietly missed MM.
 
 ## The audit (2026-08-11): what a systematic sweep found, and what it could not see
 
