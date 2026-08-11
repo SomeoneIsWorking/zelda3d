@@ -133,10 +133,24 @@ void Context::DestroyInstance() {
 }
 
 Context::~Context() {
-    SPDLOG_TRACE("destruct context");
+    // NO LOGGING AT THE TOP OF THIS DESTRUCTOR, and specifically not through spdlog's DEFAULT logger.
+    //
+    // This used to open with SPDLOG_TRACE("destruct context"), which is a heap-use-after-free on any
+    // path where the Context is destroyed at static-teardown time. EarlyLogToStderr registers
+    // "ship_pre_init" with stderr_color_mt and makes it the default logger while keeping NO owning
+    // reference -- the registry is its only owner. So when a core calls exit() (MM's RunExtract
+    // does), the exit handlers run spdlog's registry destructor and free that logger, and this line
+    // then reads it. ASAN names it; without ASAN the read lands in freed-but-mapped memory and says
+    // nothing. See docs/issues/0017.
+    //
+    // mLogger->flush() further down is a different matter and is safe: that one is a Context MEMBER,
+    // so its shared_ptr keeps the object alive whatever the registry does.
+    //
     // Stop the scripted-input FIFO poller (no-op if it was never started) before tearing down.
     Ship_ScriptedInputFifo_Stop();
-    GetWindow()->SaveWindowToConfig();
+    if (GetWindow() != nullptr) {
+        GetWindow()->SaveWindowToConfig();
+    }
     // Explicitly destructing everything so that logging is done last.
     mAudio = nullptr;
     mWindow = nullptr;
@@ -154,7 +168,14 @@ Context::~Context() {
     // then Config saved last) -- see GameSession::End. It stays after the engine members above for
     // the same reason it always did: they write into Config on the way down.
     mSession = nullptr;
-    mLogger->flush();
+    // Guarded because this destructor runs on PARTIALLY CONSTRUCTED Contexts too. A core that calls
+    // exit() during early boot (every extraction-failure popup does) tears down a Context whose
+    // InitLogging never ran, so mLogger is null and the unguarded flush() was a null dereference --
+    // ASAN reports it as a SEGV on the zero page one line after the use-after-free above. Anything
+    // this destructor touches has to be treated as "may never have been created".
+    if (mLogger != nullptr) {
+        mLogger->flush();
+    }
     mLogger = nullptr;
 #ifndef _DEBUG
     mLogThreadPool = nullptr;
@@ -187,6 +208,22 @@ void Context::EarlyLogToStderr() {
     try {
         auto _early = spdlog::stderr_color_mt("ship_pre_init");
         spdlog::set_default_logger(_early);
+        // DELIBERATELY LEAKED, and this is the fix for a whole class of teardown crashes.
+        //
+        // stderr_color_mt registers the logger and set_default_logger parks it in spdlog's registry.
+        // Keeping no owning reference of our own makes the REGISTRY its only owner -- so whatever
+        // destroys the registry frees the object, and every subsequent log through the default
+        // logger is a use-after-free. That is not hypothetical: `exit()` runs the registry's
+        // destructor via the exit handlers, and the destructors that run afterwards keep logging.
+        // ASAN named ~Context() first; removing that one line only moved it to ~ControlDeck(), which
+        // is how you know the defect is the OWNERSHIP and not any particular log statement.
+        //
+        // Cores call exit() from a dozen places (every extraction-failure popup in both games), so
+        // "never exit() from a core" is the right rule but not one this can depend on. An owning
+        // reference that is never released is: it costs one logger for the process lifetime and
+        // makes the default logger outlive every destructor that might use it, on every path.
+        static auto* sKeepAlive = new std::shared_ptr<spdlog::logger>(_early);
+        (void)sKeepAlive;
     } catch (const spdlog::spdlog_ex&) {
         // Registry already has it or is locked; nothing to do.
     }
