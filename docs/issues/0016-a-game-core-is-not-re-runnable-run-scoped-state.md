@@ -360,3 +360,38 @@ one read four lines apart in straight-line code -- a run-2 read-before-write is 
 `Actor_FreeOverlay` calls when the last instance unloads. `sMorphaCore`, A8's headline example, is
 already fixed by `BossMo_Reset`. So A8's real discriminator is not "read under a non-NULL test" but
 "which overlay's reset omits the static it should clear" -- finite and checkable.
+
+
+## Next: `mm,oot,mm` (found 2026-08-12, NOT fixed)
+
+With the MM lifecycle in and the model-provider latch removed, five configurations pass --
+`mm`, `mm,mm`, `mm,oot`, `oot,mm`, `oot,oot`, plus the switch test. The sixth does not.
+
+`tools/zelda3d_sequence.sh mm,oot,mm`: cores 1 and 2 run and return 0; core 3 boots, reaches
+gameplay (its `Cutscene_HandleConditionalTriggers` fires twice, so it drew frames) and then SIGSEGVs:
+
+```
+SkelAnime_DrawFlexLod  <- Player_DrawImpl <- Player_DrawGameplay <- Player_Draw
+                       <- Actor_Draw <- Actor_DrawAll <- Play_DrawMain <- Play_Main
+```
+
+**It is not a regression from the provider change** -- that change was verified against all five
+passing configurations afterwards, and `mm,oot,mm` had simply never been run before. It is the next
+link in the same chain.
+
+What makes it distinct from everything above: `mm,mm` passes, so this is not MM inheriting from
+ITSELF. Something about OoT running IN BETWEEN breaks MM's third run, which points at state in the
+shared libultraship or at a heap layout only that ordering produces. Two candidates worth checking
+first, in order:
+
+1. **`g_models` in `fast/zelda3d_gl.cpp`** -- the model store the provider feeds is process-wide and
+   keyed by model id, but each CORE has its own id space. `Zelda3D_GL_SetBones(modelId, ...)` from
+   two different games therefore indexes one array with two meanings. Removing the provider latch
+   fixed which provider is consulted; it did not give the store per-core id spaces.
+2. **`mm3d_model.cpp:464` `g_animState`** -- an `unordered_map` keyed by `skelAnime->jointTable`,
+   i.e. by ZeldaArena addresses, never cleared, whose values hold `skelAnime->animation`. A recycled
+   address returns a stale entry, and the stored pointer goes straight into `strcmp`. `mm,mm` passing
+   does not clear it: an OoT run in between is exactly what changes which addresses get recycled.
+
+The crash being in `SkelAnime_DrawFlexLod` under the REPLACED player draw rather than in the zelda3d
+model path is the fact to explain, not to explain away.
