@@ -1,7 +1,7 @@
 ---
 id: 17
 title: "~Context() logs through a freed spdlog registry when a core calls exit() -- heap-use-after-free"
-status: open
+status: fixed
 symptom: AddressSanitizer reports a heap-use-after-free in spdlog::logger::should_log, read from Ship::Context::~Context() running at __cxa_finalize. Reproduced 3/3. Off the sanitizer it is silent -- the read lands in freed-but-mapped memory.
 tags: n3,launcher,teardown,lifetime,asan,spdlog
 created: 2026-08-12
@@ -78,6 +78,30 @@ a use-after-free during teardown is exactly the kind of write that leaves a dama
 later `free()` to trip over -- but nothing here demonstrates that, and 0009 should not be marked
 fixed on the strength of it.
 
+## FIXED 2026-08-12 -- and the first two attempts are the reason the third is right
+
+Three defects on one path, each exposed by fixing the one before it. That progression IS the
+evidence for where the real fix belongs:
+
+1. **Removed `SPDLOG_TRACE` from `~Context()`.** ASAN promptly reported the identical
+   use-after-free from `Ship::ControlDeck::~ControlDeck()` (`ControlDeck.cpp:46`). That is what
+   proved the defect is the OWNERSHIP of the default logger and not any particular log statement --
+   patching destructors one at a time is unbounded, exactly like the run-scoped-state arc in 0016.
+2. **Gave the default logger an owner that never releases it** (`EarlyLogToStderr`). `stderr_color_mt`
+   + `set_default_logger` left the REGISTRY as sole owner, so anything that destroys the registry
+   frees it and every later log dangles. A deliberately leaked `shared_ptr` costs one logger for the
+   process lifetime and makes the default logger outlive every destructor that might use it, on every
+   path -- without depending on "no core ever calls `exit()`", which a dozen extraction-failure
+   popups in both games already violate.
+3. **Guarded `~Context()` against PARTIAL construction.** With the UAF gone, ASAN reported a plain
+   null dereference one line later: `mLogger->flush()` where `InitLogging` had never run, because
+   this path tears down a Context that never finished being built. `mLogger` and `GetWindow()` are
+   both guarded now; anything else this destructor touches deserves the same reading.
+
+**Evidence:** the repro below reported the use-after-free on 3/3 runs before, and **0/3 after** (plus
+the two intermediate reports above, each of which named the next defect). Verified on the release
+build too via `tools/zelda3d_switch_test.sh`, since `Context.cpp` is shared by both games.
+
 ## Candidate fixes, in order of how well they match the defect
 
 1. **Do not log from `~Context()`.** The narrow fix: the destructor of a static object cannot rely on
@@ -87,9 +111,11 @@ fixed on the strength of it.
    removals in the one-binary consolidation, and it fixes the class rather than this instance.
 3. Both. (1) is defensive and cheap; (2) is the actual design rule.
 
-Not implemented here: each verify cycle is a ~10 minute ASAN boot, and picking (2) changes MM's
-extraction-abort behaviour, which deserves its own before/after rather than being folded into a
-sanitizer session.
+What shipped is a fourth option that neither of the above named: fix the LOGGER'S OWNERSHIP so the
+default logger cannot be freed while destructors still run. Option 2 ("do not `exit()` from inside a
+core") remains the right design rule and is still worth doing -- an `exit()` mid-run also skips
+`GameSession::End`, so config and save state are lost on those paths -- but it is a behaviour change
+across a dozen call sites in both games, and it is no longer load-bearing for this crash.
 
 ## Instrument notes (so the next session does not re-lose the time)
 
