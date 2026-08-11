@@ -236,6 +236,16 @@ Most sites only COMPARE (`actor != gZelda3dSelActor`), which a stale pointer sur
 owning file. This layer's lifecycle header argues that a pointer outliving its run is the defect, so
 it should not have been the layer still doing it.
 
+**A6 (`LakeHyliaWaterControl`) -- covered, by something this arc fixed.** `sLock` is dereferenced
+under a `!= nullptr` test, the dangerous pattern exactly. But the file already clears all three
+pointers on `OnPlayDestroy`, and the reason that is now trustworthy is instance 1's fix: until
+`Graph_ThreadEntry` was made to pump `RunFrame` until the gamestate machine unwound, **`Play_Destroy`
+never ran on any quit**, so this clear never fired on the way out. It does now. And the coverage is
+self-checking rather than assumed: `Zelda3D_CoreRunEnd` already reports a non-NULL `gPlayState`,
+which is precisely "Play_Destroy did not run" -- so a regression that silently stopped this clear
+cannot happen without the run-end check naming it. No new entry on the reset list; the existing one
+subsumes it.
+
 Still open, and deliberately not touched: **A8**, the stale `Actor*` file-statics across the boss and
 fishing overlays (`sMorphaCore`, `sFishingMain`, …). Most are re-assigned by the actor's `Init`
 before any read, and the audit itself declined to call them proven. Fixing ~15 decomp files on a
