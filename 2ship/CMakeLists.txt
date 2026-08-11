@@ -266,7 +266,14 @@ target_link_options(mm_settings INTERFACE
 )
 
 # mixer.c has SIMD helpers that are far slower unoptimized.
-set_source_files_properties(2s2h/mixer.c PROPERTIES COMPILE_FLAGS "-O2")
+#
+# SKIP_PRECOMPILE_HEADERS with it: this is the one file in the target whose OPTIMIZATION LEVEL is set
+# per-source, and clang refuses a PCH whose level differs from the consuming TU ("OptimizationLevel
+# differs in precompiled file"). That costs nothing in the default build, where the target is also
+# -O2 and the levels happen to agree -- and it is a hard build failure the moment they do not, which
+# is exactly what a sanitizer build does (-fsanitize=address forces -O1 tree-wide). A file that opts
+# out of the target's optimization level has opted out of its precompiled header too.
+set_source_files_properties(2s2h/mixer.c PROPERTIES COMPILE_FLAGS "-O2" SKIP_PRECOMPILE_HEADERS ON)
 
 ################################################################################
 # Precompiled headers.

@@ -59,7 +59,14 @@ set(SPDLOG_MIN_CUTOFF SPDLOG_LEVEL_TRACE CACHE STRING "cutoff at trace")
 # not move the detection point, and the release build is -O2/-DNDEBUG with no line info, so
 # addr2line resolves to "??:?" and a backtrace cannot name the writer. See docs/issues/0009.
 #
-#   cmake -S . -B scratch/build-asan -G Ninja -DZELDA3D_SANITIZE=address
+#   cmake -S . -B scratch/build-asan -G Ninja -DZELDA3D_SANITIZE=address \
+#         -DCMAKE_C_COMPILER=clang -DCMAKE_CXX_COMPILER=clang++
+#
+# The clang override is not required, but it is the tested path here. If a gcc ASAN link ever fails
+# with "cannot find /usr/lib64/libasan.so.<v>", the libasan RUNTIME package is missing rather than
+# anything being wrong with the tree -- gcc ships the driver support without it. (That happened on
+# this machine on 2026-08-11 and was fixed by installing it.) Worth knowing because the failure
+# arrives at LINK time, after the whole tree has compiled, and reads like a code fault.
 #
 # -fno-omit-frame-pointer keeps the stacks readable; -O1 keeps it from taking all day. Applied to
 # both compile and link (ASAN needs its runtime on the link line) and to every target in the tree,
