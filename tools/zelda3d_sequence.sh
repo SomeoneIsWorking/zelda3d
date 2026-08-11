@@ -146,6 +146,26 @@ else
     echo "   NO -- at least one core returned without running a game; scroll up for which one."
     RC=1
 fi
+# GPU handle ownership. SDL3's Vulkan backend QUEUES a released resource instead of destroying it, so
+# releasing one handle twice is silent at the call site and aborts much later, wherever the queue
+# happens to be flushed -- issue 0009 collected four different innocent abort sites before the check
+# that names the offender was written. It lives at the release now, and this is the gate for it.
+#
+# The missing-line case is failed deliberately: "0 released twice" and "the renderer never tore down"
+# print identically if you only grep for the number.
+echo "-- GPU handles released more than once (want: 0):"
+DUPLINE="$(grep -E "released [0-9]+ handle\(s\) this process" "$LOG" | tail -1)"
+if [ -z "$DUPLINE" ]; then
+    echo "   UNKNOWN -- the renderer never printed its release accounting, so it did not tear down."
+    echo "   That is a failure, not a pass: this check cannot distinguish 'no duplicates' from 'never ran'."
+    RC=1
+elif echo "$DUPLINE" | grep -qE ", 0 of them released more than once"; then
+    echo "   ${DUPLINE#*] }"
+else
+    echo "   FAIL -- ${DUPLINE#*] }"
+    grep -E "DOUBLE RELEASE" "$LOG" || echo "   (no DOUBLE RELEASE line found, which should be impossible)"
+    RC=1
+fi
 echo "-- crashes:"
 grep -iE "segmentation|SIGSEGV|SIGABRT|dumped core|terminate called|double free" "$LOG" || echo "   (none in the log; check the exit code above)"
 exit "$RC"
