@@ -119,6 +119,16 @@ class Context {
     static void RequestExit();
 
     /**
+     * @brief Clear the exit request. Called by the launcher before each core's run().
+     *
+     * The request belongs to a RUN. It used to be cleared in BeginGameSession, which only fires
+     * when a different game attaches -- so returning to the chooser (oot -> oot, same session) left
+     * the previous run's `quit` latched and the next run unwound on its first frame while every
+     * observable reported success.
+     */
+    static void BeginRun();
+
+    /**
      * @brief Has RequestExit been called? Consulted by WindowIsRunning.
      */
     static bool IsExitRequested();

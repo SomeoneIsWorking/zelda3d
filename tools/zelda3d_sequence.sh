@@ -57,6 +57,7 @@ echo "SEQUENCE: launcher pid=$SEQPID seq=$SEQ disp=$DISP log=$LOG"
 # Quit each core in turn. A core is ready to be quit once its REPL FIFO exists; sending before that
 # writes into nothing. Anything unquit after its budget leaves the process hanging, which the final
 # kill covers -- but the log then says which core never came up, instead of the run just timing out.
+RAN_FAIL=0
 IFS=',' read -r -a CORES <<<"$SEQ"
 for id in "${CORES[@]}"; do
     fifo="$ZELDA3D_REPL"; [ "$id" = "mm" ] && fifo="$ZELDA3D_MM_REPL"
@@ -70,9 +71,33 @@ for id in "${CORES[@]}"; do
         echo "SEQUENCE: core '$id' never opened its REPL ($fifo) -- it did not reach its frame loop"
         break
     fi
-    # Give it a few seconds of real frames before asking it to leave, so the run exercises a booted
-    # game rather than a half-initialised one.
-    sleep 10
+    # A FIFO is not a running game, and on a same-game sequence (oot,oot) it is not even evidence
+    # that THIS core opened one -- the path is shared, so the previous core's FIFO satisfies the wait
+    # above instantly. That is how this gate certified `oot,oot` while the second core was unwinding
+    # on its first frame from an inherited exit request (docs/issues/0016 instance 9): both cores
+    # "returned 0" and the run had never happened.
+    #
+    # So each core must ANSWER, with a real scene. `posinfo scene=-1 (no PlayState)` is the reply
+    # while booting and must not be accepted -- the same trap the switch gate documents.
+    SCENE=""
+    for _ in $(seq 1 60); do
+        rm -f "$fifo.out"
+        timeout 5 sh -c 'printf "posinfo\n" > "$1"' _ "$fifo" 2>/dev/null || break
+        sleep 1
+        SCENE="$(cat "$fifo.out" 2>/dev/null)"
+        case "$SCENE" in "" | *"scene=-1"*) continue ;; *"scene="*) break ;; esac
+    done
+    case "$SCENE" in
+        *"scene="*) case "$SCENE" in *"scene=-1"*) SCENE="" ;; esac ;;
+        *) SCENE="" ;;
+    esac
+    if [ -z "$SCENE" ]; then
+        echo "SEQUENCE: core '$id' NEVER REACHED A SCENE -- it opened a REPL (or inherited one) but did"
+        echo "          not run a game. last posinfo reply: $(cat "$fifo.out" 2>/dev/null || echo "(none)")"
+        RAN_FAIL=1
+    else
+        echo "SEQUENCE: core '$id' is live: $SCENE"
+    fi
     echo "SEQUENCE: asking '$id' to quit"
     # Bounded, because opening a FIFO for writing BLOCKS until a reader opens it -- and on a
     # same-game sequence (oot,oot) both cores share one $ZELDA3D_REPL path, so the file can still be
@@ -109,6 +134,13 @@ echo "-- ENGINE state shared with the previous game (expected, this is the desig
 grep -E "SHARED with the previous game" "$LOG" || echo "   (none)"
 echo "-- UNFINISHED: subsystems inherited because they are not split yet (should be none):"
 grep -E "Not a bug in the split, but UNFINISHED" "$LOG" || echo "   (none reported)"
+echo "-- did each core actually RUN a game (not just return)?:"
+if [ "$RAN_FAIL" = 0 ]; then
+    echo "   yes -- every core answered posinfo with a real scene (see the per-core lines above)"
+else
+    echo "   NO -- at least one core returned without running a game; scroll up for which one."
+    RC=1
+fi
 echo "-- crashes:"
 grep -iE "segmentation|SIGSEGV|SIGABRT|dumped core|terminate called|double free" "$LOG" || echo "   (none in the log; check the exit code above)"
 exit "$RC"

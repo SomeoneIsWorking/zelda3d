@@ -278,6 +278,7 @@ int RunSequence(const std::string& spec) {
         }
         printf("  %-4s starting (core %zu of %zu)\n", id.c_str(), ran + 1, ids.size());
         fflush(stdout);
+        Ship::Context::BeginRun();
         const int rc = core->run(0, nullptr);
         ++ran;
         printf("  %-4s RETURNED %d -- the process survived this core\n", id.c_str(), rc);
@@ -388,7 +389,9 @@ int main(int argc, char* argv[]) {
         fflush(stderr);
 
         // The core owns the frame loop from here: InitOTR, the game, and its own teardown, exactly
-        // as when it is run as a standalone binary.
+        // as when it is run as a standalone binary. BeginRun first: the exit request is run-scoped,
+        // and a game that ended by asking to quit would otherwise hand that request to the next run.
+        Ship::Context::BeginRun();
         rc = core->run(gameArgc, gameArgv);
         ++gamesRun;
 

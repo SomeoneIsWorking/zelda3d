@@ -124,6 +124,19 @@ class SohRmlUi {
     void ToggleVisible() {
         SetVisible(!mVisible);
     }
+    /**
+     * Activate the ESC menu row whose label contains `needle` (case-insensitive), through the same
+     * focus + ActivateFocused path a controller "A" takes.
+     *
+     * Exists because the alternative for driving a row headlessly is `menuclick <x> <y>` with
+     * coordinates guessed from the layout -- and a guessed click that lands on the wrong row, or on
+     * nothing, still "works". Naming the row is what makes the test say what it tested.
+     *
+     * Writes a one-line result into `out` either way, and a MISS carries its denominator: how many
+     * rows were scanned and what the first few of them were. "no such row" and "the menu was not
+     * open" have to be distinguishable, or a green run means nothing.
+     */
+    void ActivateRowByLabel(const char* needle, char* out, int outSize);
 
   private:
     // Move keyboard/controller focus through the document's focusable elements (RmlUi Tab order).
