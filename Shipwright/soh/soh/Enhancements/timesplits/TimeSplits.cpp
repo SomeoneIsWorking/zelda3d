@@ -958,8 +958,6 @@ void TimeSplitWindow::Draw() {
     ImGui::PopStyleColor();
 }
 
-static bool initialized = false;
-
 void TimeSplitWindow::DrawElement() {
     ImGui::SetWindowFontScale(timeSplitsWindowSize);
 
