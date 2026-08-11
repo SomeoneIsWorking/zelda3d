@@ -40,6 +40,7 @@
 #include "fast/unified_ubo.h"
 #include "fast/interpreter.h"
 #include "ship/Context.h"
+#include <unordered_map>
 #include <prism/processor.h>
 
 #include <glslang/Public/ShaderLang.h>
@@ -585,6 +586,45 @@ GfxRenderingAPISdl3Gpu* g_activeSdl3GpuApi = nullptr;
 GfxRenderingAPISdl3Gpu::GfxRenderingAPISdl3Gpu(GfxWindowBackendSDL3* windowBackend) : mWindowBackend(windowBackend) {
 }
 
+// Duplicate-release detection for GPU handles.
+//
+// SDL3's Vulkan backend does not destroy a released resource immediately: it queues it and frees it
+// later from VULKAN_INTERNAL_PerformPendingDestroys. So releasing the same handle twice is silent at
+// the call site and surfaces, much later and somewhere else entirely, as a double free inside
+// SDL_ReleaseWindowFromGPUDevice -> VULKAN_Wait -> PerformPendingDestroys. That is precisely the
+// abort this project spent two issues chasing: the reported site named the teardown call that
+// happened to flush the queue, never the release that queued the handle twice.
+//
+// So the accounting lives HERE, at the release, where the offender is still on the stack. It reports
+// pass or fail with the denominator -- "released N handles, 0 released twice" is the only form of
+// "no duplicates" that can be distinguished from an instrument that looked at nothing.
+static std::unordered_map<const void*, const char*> sGpuReleasedHandles;
+static size_t sGpuReleaseCount = 0;
+static size_t sGpuDoubleReleaseCount = 0;
+
+// Returns true if this is the FIRST release of `handle`, i.e. if it is safe to release now.
+static bool NoteGpuRelease(const void* handle, const char* what) {
+    if (handle == nullptr)
+        return false;
+    sGpuReleaseCount++;
+    auto it = sGpuReleasedHandles.find(handle);
+    if (it != sGpuReleasedHandles.end()) {
+        sGpuDoubleReleaseCount++;
+        SPDLOG_ERROR("SDL3 GPU: DOUBLE RELEASE of {} handle {} -- already released as '{}'. Skipping;"
+                     " this is the release that would have double-freed inside SDL's deferred destroy.",
+                     what, handle, it->second);
+        return false;
+    }
+    sGpuReleasedHandles.emplace(handle, what);
+    return true;
+}
+
+// Claim/release accounting for the window<->GPU-device attachment. Process-wide rather than
+// per-object on purpose: the launcher runs several game cores in one process against one engine, so
+// "did anyone else already claim this window" is a question no single renderer instance can answer.
+static int sGpuWindowClaims = 0;
+static int sGpuWindowReleases = 0;
+
 GfxRenderingAPISdl3Gpu::~GfxRenderingAPISdl3Gpu() {
     // Step trace for teardown, gated on the backend's existing debug flag. This destructor spent the
     // project's whole life unreachable -- OoT's DeinitOTR calls _exit(0), so static destructors never
@@ -631,39 +671,60 @@ GfxRenderingAPISdl3Gpu::~GfxRenderingAPISdl3Gpu() {
     mFramebuffers.clear();
     step("pipelines");
     for (auto& kv : mPipelineCache)
-        SDL_ReleaseGPUGraphicsPipeline(mDevice, kv.second);
+        if (NoteGpuRelease(kv.second, "graphics pipeline"))
+            SDL_ReleaseGPUGraphicsPipeline(mDevice, kv.second);
     mPipelineCache.clear();
     step("shaders");
     for (auto& kv : mShaderProgramPool) {
-        if (kv.second.vert)
+        if (NoteGpuRelease(kv.second.vert, "vertex shader"))
             SDL_ReleaseGPUShader(mDevice, kv.second.vert);
-        if (kv.second.frag)
+        if (NoteGpuRelease(kv.second.frag, "fragment shader"))
             SDL_ReleaseGPUShader(mDevice, kv.second.frag);
     }
     mShaderProgramPool.clear();
     step("samplers");
     for (auto& kv : mSamplerCache)
-        SDL_ReleaseGPUSampler(mDevice, kv.second);
+        if (NoteGpuRelease(kv.second, "sampler"))
+            SDL_ReleaseGPUSampler(mDevice, kv.second);
     mSamplerCache.clear();
     step("textures");
     for (auto& t : mTextures) {
-        if (!t.isFbAlias && t.tex)
+        if (!t.isFbAlias && NoteGpuRelease(t.tex, "texture"))
             SDL_ReleaseGPUTexture(mDevice, t.tex);
     }
     mTextures.clear();
     step("dummy tex/sampler");
-    if (mDummyTex)
+    // mDummyTex is created here (SDL_CreateGPUTexture in GetOrCreateDummyTexture), so it is ours.
+    if (NoteGpuRelease(mDummyTex, "dummy texture"))
         SDL_ReleaseGPUTexture(mDevice, mDummyTex);
-    if (mDummySampler)
-        SDL_ReleaseGPUSampler(mDevice, mDummySampler);
+    // mDummySampler is NOT. It is `GetOrCreateSampler(false, CLAMP, CLAMP)` -- a BORROWED pointer to
+    // a sampler the cache above owns and has already released. Releasing it here was the second
+    // release of one handle, and it is what aborted every clean quit: SDL's Vulkan backend queues a
+    // released resource instead of destroying it, so the duplicate sat in the pending-destroy list
+    // until VULKAN_ReleaseWindow flushed it and freed the same 16 bytes twice. The abort therefore
+    // pointed at SDL_ReleaseWindowFromGPUDevice -- or, once the heap was damaged, at whatever freed
+    // next (Config::Save's json, SDL_DestroyWindow's X11 reply) -- and never at this line.
+    mDummySampler = nullptr;
     step("vbo/transfer");
-    if (mVbo)
+    if (NoteGpuRelease(mVbo, "vertex buffer"))
         SDL_ReleaseGPUBuffer(mDevice, mVbo);
-    if (mVtxTransfer)
+    if (NoteGpuRelease(mVtxTransfer, "vertex transfer buffer"))
         SDL_ReleaseGPUTransferBuffer(mDevice, mVtxTransfer);
     step("release window from device");
-    if (mWindow)
+    // Printed unconditionally, with both counts, because the question this answers -- is the window
+    // claimed exactly once for this device? -- has a wrong answer that is otherwise invisible: SDL
+    // frees one 16-byte block twice inside this single call (ASAN: attempting double-free, both
+    // stacks identical and both ending here), and a claim/release imbalance is the only explanation
+    // that lives on our side of the boundary. A silent "released it" line could not distinguish
+    // "claimed once" from "claimed twice".
+    SPDLOG_INFO("~GfxRenderingAPISdl3Gpu: releasing window {} from device {} -- claims={} releases={}",
+                (void*)mWindow, (void*)mDevice, sGpuWindowClaims, sGpuWindowReleases);
+    if (mWindow) {
+        sGpuWindowReleases++;
         SDL_ReleaseWindowFromGPUDevice(mDevice, mWindow);
+    }
+    SPDLOG_INFO("SDL3 GPU: released {} handle(s) this process, {} of them released more than once.",
+                sGpuReleaseCount, sGpuDoubleReleaseCount);
     step("DestroyGPUDevice");
     SDL_DestroyGPUDevice(mDevice);
     step("done");
@@ -690,6 +751,9 @@ void GfxRenderingAPISdl3Gpu::CreateDeviceAndClaim() {
         SPDLOG_ERROR("SDL_ClaimWindowForGPUDevice failed: {}", SDL_GetError());
         abort();
     }
+    sGpuWindowClaims++;
+    SPDLOG_INFO("SDL3 GPU backend: claimed window {} for device {} -- claims={} releases={}",
+                (void*)mWindow, (void*)mDevice, sGpuWindowClaims, sGpuWindowReleases);
     SDL_SetGPUAllowedFramesInFlight(mDevice, 2);
     const char* drv = SDL_GetGPUDeviceDriver(mDevice);
     SPDLOG_INFO("SDL3 GPU backend: device driver = {}", drv ? drv : "(unknown)");
@@ -2007,7 +2071,7 @@ void GfxRenderingAPISdl3Gpu::DeferReleaseTexture(SDL_GPUTexture* tex) {
         return;
     if (mFrameAcquired)
         mPendingTexRelease.push_back(tex);
-    else
+    else if (NoteGpuRelease(tex, "texture (immediate)"))
         SDL_ReleaseGPUTexture(mDevice, tex);
 }
 
@@ -2015,7 +2079,8 @@ void GfxRenderingAPISdl3Gpu::DeferReleaseTexture(SDL_GPUTexture* tex) {
 // frame. Called only at points where the ops that referenced them have been submitted to the GPU.
 void GfxRenderingAPISdl3Gpu::FlushPendingTexReleases() {
     for (SDL_GPUTexture* tex : mPendingTexRelease)
-        SDL_ReleaseGPUTexture(mDevice, tex);
+        if (NoteGpuRelease(tex, "deferred texture"))
+            SDL_ReleaseGPUTexture(mDevice, tex);
     mPendingTexRelease.clear();
 }
 
@@ -2353,14 +2418,14 @@ void GfxRenderingAPISdl3Gpu::CreateFbResources(FramebufferSDL3& fb, uint32_t wid
 }
 
 void GfxRenderingAPISdl3Gpu::DestroyFbResources(FramebufferSDL3& fb) {
-    if (fb.color) {
+    if (NoteGpuRelease(fb.color, "framebuffer color")) {
         SDL_ReleaseGPUTexture(mDevice, fb.color);
-        fb.color = nullptr;
     }
-    if (fb.depth) {
+    fb.color = nullptr;
+    if (NoteGpuRelease(fb.depth, "framebuffer depth")) {
         SDL_ReleaseGPUTexture(mDevice, fb.depth);
-        fb.depth = nullptr;
     }
+    fb.depth = nullptr;
     if (fb.colorTexId != 0 && fb.colorTexId < mTextures.size()) {
         mTextures[fb.colorTexId].tex = nullptr;
         mTextures[fb.colorTexId].uploaded = false;

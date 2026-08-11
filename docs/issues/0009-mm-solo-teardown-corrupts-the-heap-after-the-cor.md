@@ -1,11 +1,11 @@
 ---
 id: 9
 title: MM solo teardown corrupts the heap after the core returns -- "corrupted size vs. prev_size"
-status: open
+status: fixed
 symptom: `zelda3d mm` boots Clock Town, quits cleanly, the core returns 0 to the launcher, and the process then aborts (exit 134) with "corrupted size vs. prev_size" during engine teardown. OoT is unaffected because DeinitOTR calls _exit(0) and never tears down.
 tags: n3,heap,teardown,sdl3gpu
 created: 2026-08-06
-updated: 2026-08-06
+updated: 2026-08-12
 ---
 
 ## What is already fixed (commit 88db228e) and is NOT this bug
@@ -45,9 +45,15 @@ An earlier version of this investigation concluded "lavapipe bug on device destr
 
 ## Ruled out
 
-- **Double release in `~GfxRenderingAPISdl3Gpu`.** Step-traced under `ZELDA3D_SDL3GPU_DEBUG=1`
+- ~~**Double release in `~GfxRenderingAPISdl3Gpu`.** Step-traced under `ZELDA3D_SDL3GPU_DEBUG=1`
   (the trace is committed); every release loop completes, and the deferred-release path clears
-  `mTextures[i]` at defer time (`t = TextureSDL3{}`), so no handle is released twice.
+  `mTextures[i]` at defer time (`t = TextureSDL3{}`), so no handle is released twice.~~
+  **WRONG -- this WAS the bug.** See the fix below. The reasoning failed in a way worth naming: it
+  checked the paths that release a handle the object *created*, and the duplicate was a handle the
+  object had merely *borrowed*. A step trace proves each loop RAN; it cannot prove two loops did not
+  touch the same pointer, and "every release loop completes" was read as if it could. Note also that
+  the loops did complete, every time -- the abort was always somewhere else -- which is exactly how
+  a step trace comes to certify the code it is standing in.
 - **`RmlRenderInterfaceSdl3Gpu::Shutdown()` destroying the borrowed device.** It does not — it only
   releases its own objects and nulls `mDevice`.
 - **Double `Rml::Shutdown()`.** Guarded by `sRmlLibraryInitialised`.
@@ -110,3 +116,64 @@ reproduces it while `oot` alone exits 0. The old warning still holds in its gene
 a green sequence run stand in for a clean teardown — here it means the sequence EXIT CODE is not a
 gate, and the per-core "ran a game and returned 0" lines are. (The sequence gate has its own separate failure now; see
 [issue 0010](0010-oot-after-mm-crashes-in-imgui-newframe-setcurren.md).)
+
+**Correction 2026-08-12: the sequence exit code IS a gate again**, now that the bug it could not
+survive is fixed -- `mm`, `mm,oot` and the switch test all exit 0 consistently. Keep the per-core
+"ran a game" lines regardless: they are what caught a run where both cores returned 0 without either
+playing (issue 0016 instance 9), which no exit code can see.
+
+
+## FIXED 2026-08-12 -- one handle released twice, four different abort sites
+
+`mDummySampler` is `GetOrCreateSampler(false, CLAMP, CLAMP)` -- a **borrowed** pointer to a sampler
+that `mSamplerCache` owns. `~GfxRenderingAPISdl3Gpu` released the whole cache and then released
+`mDummySampler` again. One handle, two releases, out of ~300 per run.
+
+Why that produced a corruption with no fixed address: SDL3's Vulkan backend does not destroy a
+released resource, it **queues** it (`VULKAN_INTERNAL_PerformPendingDestroys`). The duplicate sat in
+the pending-destroy list until something flushed it, and the flush happened during
+`SDL_ReleaseWindowFromGPUDevice` -> `VULKAN_Wait`. So every abort site this issue collected was a
+victim: `Config::Save`'s nlohmann destroy, `SDL_DestroyGPUDevice` on llvmpipe, `SDL_DestroyWindow`'s
+X11 reply buffer. The site moved when anything changed the heap layout, which is what "INTERMITTENT"
+above really was -- not a race.
+
+**Evidence.** Before: `tools/zelda3d_sequence.sh mm` aborted 3/3 (exit 134) once the config
+use-after-free below was out of the way. After: **3/3 exit 0**, each run reaching Clock Town
+(`posinfo scene=111`) and returning 0, with `released 299-343 handle(s) this process, 0 of them
+released more than once`. `mm,oot` exits 0 (845 handles, 0 duplicates) and
+`tools/zelda3d_switch_test.sh` passes all four assertions.
+
+### What actually found it, and what did not
+
+Three instruments, in the order they were tried:
+
+1. **The abort backtrace** -- pointed at four different innocent frees. Useless by construction here.
+2. **The step trace** (`ZELDA3D_SDL3GPU_DEBUG=1`) -- reported the destructor running to `done` and
+   the abort landing *after* it, which is how this issue came to rule the destructor out. It was
+   answering "did each loop run", never "did two loops release the same handle".
+3. **A duplicate-release check at the release itself** -- named the handle, its type, and the tag it
+   was first released under, in one run. It is committed (`NoteGpuRelease` in `gfx_sdl3gpu.cpp`) and
+   prints its denominator every teardown, pass or fail, so "no duplicates" stays distinguishable
+   from "nobody looked". It also skips the second release, so a future ownership mistake of this
+   shape becomes a logged ERROR naming the offender instead of a corrupted heap and a false lead.
+
+The generalisable point: SDL3's deferred destroy means a release-side ownership bug has **no**
+symptom at the release site. Any check that watches the destroy has already lost the offender's
+stack. Watch the release.
+
+### The config use-after-free that was hiding underneath
+
+Before this was reachable, ASAN reported a heap-use-after-free in
+`Ben::HasDisplayOverlayModeInConfig` (`2ship/2s2h/config/ConfigUpdaters.cpp`), during `InitOTR`:
+
+```cpp
+const auto& cvars = conf->GetNestedJson()["CVars"];   // temporary destroyed at the semicolon
+return cvars.contains("gDisplayOverlay") && ...;      // reads freed memory
+```
+
+`Config::GetNestedJson()` returns **by value**, and lifetime extension does not apply to a reference
+bound to a *subobject* of a temporary. Fixed by holding the value, which also drops a second full
+rebuild of the nested config. Every other caller in the tree already took it by value; this was the
+only site. Worth stating that it was NOT this issue's corruption -- a read of freed memory does not
+damage a chunk -- but it was in the same library as one of the victims, which is exactly the kind of
+coincidence that costs a session if the two are not separated deliberately.
