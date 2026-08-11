@@ -26,11 +26,21 @@ static const Migration version1Migrations[] = {
 };
 
 static bool HasDisplayOverlayModeInConfig(Ship::Config* conf) {
-    if (!conf->GetNestedJson().contains("CVars")) {
+    // Config::GetNestedJson() returns BY VALUE. Binding `const auto&` to a SUBOBJECT of that
+    // temporary -- `conf->GetNestedJson()["CVars"]` -- extends nothing: lifetime extension applies
+    // only to a reference bound directly to the temporary, not to something reached through
+    // operator[]. So the whole nested config was destroyed at the semicolon and every use of `cvars`
+    // below read freed memory. ASAN reported it as a heap-use-after-free during InitOTR, with the
+    // free and the read two lines apart in this function. Silent without a sanitizer.
+    //
+    // Holding the value fixes it, and drops a second full GetNestedJson() build besides -- it was
+    // constructing the entire nested config twice to answer one question.
+    const nlohmann::json nested = conf->GetNestedJson();
+    if (!nested.contains("CVars")) {
         return false;
     }
 
-    const auto& cvars = conf->GetNestedJson()["CVars"];
+    const auto& cvars = nested["CVars"];
     return cvars.contains("gDisplayOverlay") && cvars["gDisplayOverlay"].is_object() &&
            cvars["gDisplayOverlay"].contains("Mode");
 }
