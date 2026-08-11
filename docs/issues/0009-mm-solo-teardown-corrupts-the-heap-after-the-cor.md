@@ -66,6 +66,31 @@ shortcut in `~GfxRenderingAPISdl3Gpu` — `mSoh3d`/`mHud` are reset with the com
 resources are owned by the device and freed at SDL_DestroyGPUDevice below". It is a genuine leak
 worth closing, but a leak does not corrupt the C heap.
 
+**Measured 2026-08-12 — and the first measurement was wrong by 40x.** The count as printed is
+**10**: 5 `VkImage`, 5 `VkBuffer`. That is not the leak, it is the validation layer's
+`duplicate_message_limit`, which defaults to 10 *per VUID* and says so in a line easy to read past
+("this will be the last time reporting it"). Lifted, the real figure is **409 objects**: 362
+`VkImageView`, 41 `VkImage`, 3 `VkPipeline`, 2 `VkShaderModule`, 1 `VkBuffer`.
+
+```sh
+mkdir -p scratch/vklayer
+printf 'khronos_validation.duplicate_message_limit = 0\n' > scratch/vklayer/vk_layer_settings.txt
+VK_LAYER_SETTINGS_PATH=$PWD/scratch/vklayer/vk_layer_settings.txt ZELDA3D_SDL3GPU_DEBUG=1 \
+    tools/zelda3d_sequence.sh mm
+```
+
+Owner: the `g_*` file statics in `fast/zelda3d_sdl3gpu.cpp` and `fast/zelda3d_hud_sdl3gpu.cpp`
+(shaders, pipelines, samplers, per-model VBOs, the texture cache) — none of which is released.
+
+**Deliberately NOT fixed here, and the reason matters.** The GPU device is created exactly once per
+process, so at teardown these are leaked into a process that is exiting: the OS reclaims them and
+nothing observable follows. The real hazard is not the leak, it is that those statics are
+ENGINE-lifetime handles into a device that ~GfxRenderingAPISdl3Gpu destroys — the same shape as
+[issue 0016](0016-a-game-core-is-not-re-runnable-run-scoped-state.md)'s run-scoped globals, one level
+up. The day anything recreates the device (a renderer restart, a backend switch), every one of them
+dangles. So this is a lifetime bug waiting on a second device, not a leak worth chasing today, and
+whoever adds device recreation must fix it first.
+
 ## INTERMITTENT -- do not trust a single green run
 
 After Dear ImGui was restored as a real library, `solo mm` exited 0 twice and 134 once, all three
@@ -91,6 +116,19 @@ Build with `-fsanitize=address`. Nothing cheaper has located the writer: valgrin
 on this machine, glibc malloc checking does not move the detection point, and the release binary is
 `-O2 -DNDEBUG` with no line info (`addr2line` resolves to `??:?`, and the system SDL3 exports a
 single symbol so `nm` is useless too). ASAN is the instrument that names the writing store.
+
+**Correction 2026-08-12: the system SDL3 IS symbolizable, via debuginfod.** This note's claim that
+`addr2line` resolves to `??:?` and `nm` is useless (SDL3 exports one symbol, `SDL_DYNAPI_entry`) is
+true of the local files and was taken to mean the SDL frames could not be read at all. They can:
+
+```sh
+DEBUGINFOD_URLS=https://debuginfod.fedoraproject.org/ eu-addr2line -f -C -e /lib64/libSDL3.so.0 0x23a8b7
+```
+
+turns three anonymous `libSDL3.so.0+0x...` frames into `VULKAN_ReleaseWindow` -> `VULKAN_Wait` ->
+`VULKAN_INTERNAL_PerformPendingDestroys`, which is what identified SDL's DEFERRED destroy queue and
+therefore why the abort site had nothing to do with the offending release. Fedora ships debuginfod
+enabled; it was available for this bug's entire history.
 
 **Correction 2026-08-11: the sanitizer option now EXISTS** — this note used to say one had to be
 added. `cmake -S . -B scratch/build-asan -G Ninja -DZELDA3D_SANITIZE=address` (see the block at the
