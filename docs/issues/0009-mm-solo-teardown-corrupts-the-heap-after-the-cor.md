@@ -215,3 +215,23 @@ rebuild of the nested config. Every other caller in the tree already took it by 
 only site. Worth stating that it was NOT this issue's corruption -- a read of freed memory does not
 damage a chunk -- but it was in the same library as one of the victims, which is exactly the kind of
 coincidence that costs a session if the two are not separated deliberately.
+
+
+## The switch gate was certifying a process that never tore down
+
+Found 2026-08-12 while adding the duplicate-release assertion to
+`tools/zelda3d_switch_test.sh`: it reported UNKNOWN, because the renderer's accounting line was
+absent -- the teardown had not run at all.
+
+The gate ended by sending `quit` to whichever core FIFO existed and letting its EXIT trap `kill -9`
+the process. But after the round trip the app sits at the CHOOSER, where `quit` is play-gated; every
+green run's log ended `quit: no playstate (non-Play gamestate; play-gated command)`. So the app was
+killed, not exited, on every run -- and a gate that kills the process cannot observe a teardown bug
+of any kind, including this one.
+
+It now quits through `launcher pick quit` (the chooser's own Quit action) and asserts the process
+**exit code**, so the abort this issue is about would fail it. After four core runs in one process:
+exit 0, `released 1801 handle(s) this process, 0 of them released more than once`.
+
+Worth generalising: `kill -9` in a gate's cleanup is fine as a backstop, but when it is also the
+normal path, everything after the last assertion is untested by construction.
