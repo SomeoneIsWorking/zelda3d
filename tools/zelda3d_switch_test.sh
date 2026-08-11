@@ -267,9 +267,51 @@ grep -E "LAUNCHER: (handing back|.* core returned|switching|starting)" "$LOG" | 
 grep -E "different game is attaching" "$LOG" | sed 's/^/  /'
 [ "$FAIL" = 0 ] && echo "  -> the chooser switched games INSIDE one process, the second game played, and it came BACK"
 
-# Quit whichever core is up at the end -- after the round trip that is OoT, not MM.
+# Shut the app down THROUGH THE APP, and check that it actually exits.
+#
+# This used to send `quit` to whichever core's FIFO existed and then let the EXIT trap `kill -9` the
+# process. It never worked: after the round trip the app is sitting at the CHOOSER, and `quit` is
+# play-gated -- the log's last line was "quit: no playstate (non-Play gamestate; play-gated command)"
+# on every green run. So the gate ended by killing the app, which means it could not have seen a
+# teardown failure of any kind; the process it certified never tore down at all. The chooser's own
+# exit is `launcher pick quit`, the same action the chooser's Quit row takes.
+echo "SWITCH: asking the chooser to quit (launcher pick quit)"
 for f in "$ZELDA3D_REPL" "$ZELDA3D_MM_REPL"; do
-    [ -p "$f" ] && timeout 10 sh -c 'printf "quit\n" > "$1"' _ "$f" 2>/dev/null
+    [ -p "$f" ] && timeout 10 sh -c 'printf "launcher pick quit\n" > "$1"' _ "$f" 2>/dev/null
 done
-sleep 4
+EXITED=0
+for _ in $(seq 1 30); do sleep 1; kill -0 "$PID" 2>/dev/null || { EXITED=1; break; }; done
+if [ "$EXITED" = 1 ]; then
+    wait "$PID" 2>/dev/null; APPRC=$?
+    if [ "$APPRC" = 0 ]; then
+        echo "SWITCH: ok (exit)  -- the app exited 0 on its own after four core runs"
+    else
+        echo "SWITCH: FAIL (exit) -- the app exited $APPRC after four core runs (128+n means a signal;"
+        echo "        134 is the abort that issue 0009 tracked)."
+        FAIL=1
+    fi
+else
+    echo "SWITCH: FAIL (exit) -- the app was still alive 30s after 'launcher pick quit'; the EXIT trap"
+    echo "        will kill it, so nothing below saw a real teardown."
+    FAIL=1
+fi
+
+
+# The teardown that follows that quit is the one issue 0009 aborted in, and this run reaches it after
+# FOUR core runs rather than one -- so it is the widest exercise of GPU handle ownership there is.
+# Checked here as well as in the sequence gate because the two drive different paths to it.
+echo "-- GPU handles released more than once (want: 0):"
+DUPLINE="$(grep -E "released [0-9]+ handle\(s\) this process" "$LOG" | tail -1)"
+if [ -z "$DUPLINE" ]; then
+    echo "   UNKNOWN -- the renderer never printed its release accounting, so it did not tear down."
+    echo "   Failed rather than passed: this cannot tell 'no duplicates' from 'never ran'."
+    FAIL=1
+elif echo "$DUPLINE" | grep -qE ", 0 of them released more than once"; then
+    echo "   ${DUPLINE#*] }"
+else
+    echo "   FAIL -- ${DUPLINE#*] }"
+    grep -E "DOUBLE RELEASE" "$LOG"
+    FAIL=1
+fi
+
 exit "$FAIL"
