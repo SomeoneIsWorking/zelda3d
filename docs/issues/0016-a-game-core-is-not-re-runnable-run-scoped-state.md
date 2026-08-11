@@ -209,11 +209,37 @@ correct as written); `sObjectFirstUpdateSkippedForScene` (reset per scene, stric
 process-lifetime `locationTable`, so benign *unless* `Rando::Context::CreateInstance` clears it per
 run -- worth one check); one-shot log suppressors and counters.
 
-**Open question the audit could not settle:** ~36 `static unordered_map<int, …>` caches in
-`src/zelda3d/anim/`, `zelda3d_model.cpp` and `zelda3d_hud_tex.cpp`, keyed by a `modelId` from a
-process-lifetime id space. Whether that is correct depends on whether the zelda3d asset layer is
-engine-scoped or run-scoped -- a question nothing in the code answers. If run-scoped, that is ~40
-more instances; if engine-scoped, zero. Not guessed either way.
+### Audit follow-up (same day): three settled, one corrected
+
+- **`randomizer/draw.cpp`** -- fixed, as part of the `Zelda3DOnce` conversion: the nine latches now
+  re-run `SkelAnime_Init` per run, which also re-fetches the two chest display lists.
+- **`DisableFixedCamera.cpp` -- REAL, fixed.** The reset DROPS the backups instead of restoring
+  them, and that distinction is the whole point: `RestoreAllCameraData` would write a dead pointer
+  through a dead header, and a recycled address matching a stale key would hand a new run another
+  game's camera table. A backup only means "this run swapped a scene's camera data", and that run is
+  over.
+- **`authenticGfxPatches.cpp` -- FALSE POSITIVE, do not re-file it.** The audit read the null check
+  as guarding the patch. It does not: `ResourceMgr_PatchGfxByName` runs on EVERY call, and only the
+  `malloc`+copy of four vertices is guarded. The copy is taken from the same asset every run, so its
+  contents are identical. Nothing is stale.
+- **`ovl_kaleido_scope` map buffers** -- self-heal: `KaleidoScope_LoadDungeonMap` frees them at its
+  head, and they are plain `malloc` (not resource-owned), so a second run frees a valid pointer. Left
+  alone.
+
+**Open question, now SETTLED -- the zelda3d asset caches are engine-scoped and correct as written.**
+`Zelda3D_AutoModelId` maps a ZAR PATH to an id through a process-lifetime table, so the same asset
+gets the same id in every run; the caches hold OWNED data (vectors, not pointers into a
+ResourceManager). A hit in run 2 is a hit on exactly the same asset -- nothing dangles, nothing
+collides, and keeping them is the cache working rather than a leak being tolerated. The split runs
+along asset-vs-pose: `lastSkin` and `posePrev` hold last frame's skin matrices, and BECAUSE the id
+space is stable they would have been found under the same key in run 2 and blended a first frame
+from a pose belonging to a finished game. Those two now reset per run
+(`Zelda3D_AnimResetRunState`); `boneRotDeltas`, `bonePostRots`, `rootMotions`, `trackMinYFlags` and
+the model/atlas caches deliberately do not.
+
+(The audit left this as "if run-scoped, ~40 more instances; if engine-scoped, zero. Not guessed
+either way." Reading `Zelda3D_AutoModelId` and the cache value types answered it: engine-scoped,
+except the two pose maps.)
 
 ## The remaining arc
 

@@ -502,6 +502,28 @@ static std::unordered_map<int, std::vector<std::array<float, 16>>>& posePrev() {
     static std::unordered_map<int, std::vector<std::array<float, 16>>> m;
     return m;
 }
+// Run-scoped reset for the zelda3d anim layer, called from Zelda3D_CoreRunBegin.
+//
+// THE DISTINCTION THIS ENCODES, because the audit of docs/issues/0016 could not settle it by reading
+// and it decides ~40 caches either way: the zelda3d caches keyed by modelId split into two kinds,
+// and only one of them belongs to a run.
+//
+//   ASSET-derived, and correctly ENGINE-scoped: boneRotDeltas, bonePostRots, rootMotions,
+//   trackMinYFlags, the model/atlas caches. They hold OWNED data (vectors, not pointers into a
+//   ResourceManager), and Zelda3D_AutoModelId maps a ZAR PATH to an id through a process-lifetime
+//   table -- so the same asset gets the same id in every run and a cache hit in run 2 is a hit on
+//   exactly the same asset. Nothing dangles and nothing collides. Keeping them across runs is not a
+//   leak being tolerated; it is the cache working.
+//
+//   PER-FRAME POSE, and run-scoped: lastSkin and posePrev are last frame's skin matrices. Because
+//   the id space IS stable, run 2 would find run 1's final pose under the same key and blend its
+//   first frame from a pose belonging to a game that has ended. Not a crash -- one frame of wrong
+//   interpolation, which is precisely the kind of thing nobody would trace back here.
+extern "C" void Zelda3D_AnimResetRunState(void) {
+    lastSkin().clear();
+    posePrev().clear();
+}
+
 static void orthoRows(const float* M, float r[3][3]) {
     // row-major 4x4 rotation rows (v' = M*v): r0..r2; Gram-Schmidt to a pure rotation.
     float a[3] = { M[0], M[1], M[2] }, b[3] = { M[4], M[5], M[6] }, c[3] = { M[8], M[9], M[10] };
