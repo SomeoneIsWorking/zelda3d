@@ -10,6 +10,7 @@
 extern "C" {
 #include "z64.h"
 #include "macros.h"
+#include "zelda3d/zelda3d.h"
 #include "functions.h"
 #include "variables.h"
 #include "dungeon.h"
@@ -527,14 +528,13 @@ extern "C" s32 OverrideLimbDrawGohma(PlayState* play, s32 limbIndex, Gfx** dList
 
 #define LIMB_COUNT_GOHMA 86
 extern "C" void DrawGohma(PlayState* play) {
-    static bool initialized = false;
+    static Zelda3DOnce initialized;
     static SkelAnime skelAnime;
     static Vec3s jointTable[LIMB_COUNT_GOHMA];
     static Vec3s otherTable[LIMB_COUNT_GOHMA];
     static u32 lastUpdate = 0;
 
-    if (!initialized) {
-        initialized = true;
+    if (Zelda3D_Once(&initialized)) {
         SkelAnime_Init(play, &skelAnime, (SkeletonHeader*)&gGohmaSkel, (AnimationHeader*)&gGohmaIdleCrouchedAnim,
                        jointTable, otherTable, LIMB_COUNT_GOHMA);
     }
@@ -558,14 +558,13 @@ extern "C" void DrawGohma(PlayState* play) {
 
 #define LIMB_COUNT_KING_DODONGO 49
 extern "C" void DrawKingDodongo(PlayState* play) {
-    static bool initialized = false;
+    static Zelda3DOnce initialized;
     static SkelAnime skelAnime;
     static Vec3s jointTable[LIMB_COUNT_KING_DODONGO];
     static Vec3s otherTable[LIMB_COUNT_KING_DODONGO];
     static u32 lastUpdate = 0;
 
-    if (!initialized) {
-        initialized = true;
+    if (Zelda3D_Once(&initialized)) {
         SkelAnime_Init(play, &skelAnime, (SkeletonHeader*)&object_kingdodongo_Skel_01B310,
                        (AnimationHeader*)&object_kingdodongo_Anim_00F0D8, jointTable, otherTable,
                        LIMB_COUNT_KING_DODONGO);
@@ -650,14 +649,13 @@ extern "C" void PostLimbDrawBarinade(PlayState* play, s32 limbIndex, Gfx** dList
 
 #define LIMB_COUNT_BARINADE 64
 extern "C" void DrawBarinade(PlayState* play) {
-    static bool initialized = false;
+    static Zelda3DOnce initialized;
     static SkelAnime skelAnime;
     static Vec3s jointTable[LIMB_COUNT_BARINADE];
     static Vec3s otherTable[LIMB_COUNT_BARINADE];
     static u32 lastUpdate = 0;
 
-    if (!initialized) {
-        initialized = true;
+    if (Zelda3D_Once(&initialized)) {
         SkelAnime_Init(play, &skelAnime, (SkeletonHeader*)&gBarinadeBodySkel, (AnimationHeader*)&gBarinadeBodyAnim,
                        jointTable, otherTable, LIMB_COUNT_BARINADE);
 
@@ -693,14 +691,13 @@ extern "C" void DrawBarinade(PlayState* play) {
 
 #define LIMB_COUNT_PHANTOM_GANON 26
 extern "C" void DrawPhantomGanon(PlayState* play) {
-    static bool initialized = false;
+    static Zelda3DOnce initialized;
     static SkelAnime skelAnime;
     static Vec3s jointTable[LIMB_COUNT_PHANTOM_GANON];
     static Vec3s otherTable[LIMB_COUNT_PHANTOM_GANON];
     static u32 lastUpdate = 0;
 
-    if (!initialized) {
-        initialized = true;
+    if (Zelda3D_Once(&initialized)) {
         SkelAnime_Init(play, &skelAnime, (SkeletonHeader*)&gPhantomGanonSkel,
                        (AnimationHeader*)&gPhantomGanonNeutralAnim, jointTable, otherTable, LIMB_COUNT_PHANTOM_GANON);
     }
@@ -726,14 +723,13 @@ extern "C" void DrawPhantomGanon(PlayState* play) {
 
 #define LIMB_COUNT_VOLVAGIA 7
 extern "C" void DrawVolvagia(PlayState* play) {
-    static bool initialized = false;
+    static Zelda3DOnce initialized;
     static SkelAnime skelAnime;
     static Vec3s jointTable[LIMB_COUNT_VOLVAGIA];
     static Vec3s otherTable[LIMB_COUNT_VOLVAGIA];
     static u32 lastUpdate = 0;
 
-    if (!initialized) {
-        initialized = true;
+    if (Zelda3D_Once(&initialized)) {
         SkelAnime_Init(play, &skelAnime, (SkeletonHeader*)&gVolvagiaHeadSkel,
                        (AnimationHeader*)&gVolvagiaHeadEmergeAnim, jointTable, otherTable, LIMB_COUNT_VOLVAGIA);
     }
@@ -799,14 +795,13 @@ extern "C" void DrawMorpha(PlayState* play) {
 
 #define LIMB_COUNT_BONGO_BONGO 27
 extern "C" void DrawBongoBongo(PlayState* play) {
-    static bool initialized = false;
+    static Zelda3DOnce initialized;
     static SkelAnime skelAnime;
     static Vec3s jointTable[LIMB_COUNT_BONGO_BONGO];
     static Vec3s otherTable[LIMB_COUNT_BONGO_BONGO];
     static u32 lastUpdate = 0;
 
-    if (!initialized) {
-        initialized = true;
+    if (Zelda3D_Once(&initialized)) {
         SkelAnime_InitFlex(play, &skelAnime, (FlexSkeletonHeader*)&gBongoLeftHandSkel,
                            (AnimationHeader*)&gBongoLeftHandIdleAnim, jointTable, otherTable, LIMB_COUNT_BONGO_BONGO);
     }
@@ -853,14 +848,13 @@ extern "C" void PostLimbDrawKotake(PlayState* play, s32 limbIndex, Gfx** dList, 
 
 #define LIMB_COUNT_KOTAKE 27
 extern "C" void DrawKotake(PlayState* play) {
-    static bool initialized = false;
+    static Zelda3DOnce initialized;
     static SkelAnime skelAnime;
     static Vec3s jointTable[LIMB_COUNT_KOTAKE];
     static Vec3s otherTable[LIMB_COUNT_KOTAKE];
     static u32 lastUpdate = 0;
 
-    if (!initialized) {
-        initialized = true;
+    if (Zelda3D_Once(&initialized)) {
         SkelAnime_InitFlex(play, &skelAnime, (FlexSkeletonHeader*)&gTwinrovaKotakeSkel,
                            (AnimationHeader*)&gTwinrovaKotakeKoumeFlyAnim, jointTable, otherTable, LIMB_COUNT_KOTAKE);
     }
@@ -906,14 +900,13 @@ extern "C" s32 OverrideLimbDrawGanon(PlayState* play, s32 limbIndex, Gfx** dList
 
 #define LIMB_COUNT_GANON 47
 extern "C" void DrawGanon(PlayState* play) {
-    static bool initialized = false;
+    static Zelda3DOnce initialized;
     static SkelAnime skelAnime;
     static Vec3s jointTable[LIMB_COUNT_GANON];
     static Vec3s otherTable[LIMB_COUNT_GANON];
     static u32 lastUpdate = 0;
 
-    if (!initialized) {
-        initialized = true;
+    if (Zelda3D_Once(&initialized)) {
         SkelAnime_InitFlex(play, &skelAnime, (FlexSkeletonHeader*)&gGanonSkel, (AnimationHeader*)&gGanonGuardIdleAnim,
                            jointTable, otherTable, LIMB_COUNT_GANON);
     }
@@ -1244,14 +1237,13 @@ extern "C" void EnBox_PostLimbDrawOverride(PlayState* play, s32 limbIndex, Gfx**
 extern "C" Gfx* EnBox_EmptyDList(GraphicsContext* gfxCtx);
 #define LIMB_COUNT_CHEST 5
 extern "C" void Randomizer_DrawOpenChest(PlayState* play, GetItemEntry* getItemEntry) {
-    static bool initialized = false;
+    static Zelda3DOnce initialized;
     static SkelAnime skelAnime;
     static Vec3s jointTable[LIMB_COUNT_CHEST];
     static Vec3s otherTable[LIMB_COUNT_CHEST];
     static u32 lastUpdate = 0;
 
-    if (!initialized) {
-        initialized = true;
+    if (Zelda3D_Once(&initialized)) {
         boxBodyDL = ResourceMgr_LoadGfxByName((const char*)gTreasureChestChestFrontDL);
         boxLidDL = ResourceMgr_LoadGfxByName((const char*)gTreasureChestChestSideAndLidDL);
         SkelAnime_Init(play, &skelAnime, (SkeletonHeader*)&gTreasureChestSkel,

@@ -74,7 +74,14 @@ for id in "${CORES[@]}"; do
     # game rather than a half-initialised one.
     sleep 10
     echo "SEQUENCE: asking '$id' to quit"
-    printf 'quit\n' >"$fifo" 2>/dev/null || true
+    # Bounded, because opening a FIFO for writing BLOCKS until a reader opens it -- and on a
+    # same-game sequence (oot,oot) both cores share one $ZELDA3D_REPL path, so the file can still be
+    # there with nobody reading it. That hung a whole `oot,oot` run at its second quit: both cores
+    # had actually run to completion in the log, and the script sat in the write until its outer
+    # timeout, printing no verdict at all. A hang that produces no verdict reads as a failed run.
+    if ! timeout 15 sh -c 'printf "quit\n" > "$1"' _ "$fifo" 2>/dev/null; then
+        echo "SEQUENCE: '$id' did not accept 'quit' within 15s (no reader on $fifo) -- moving on"
+    fi
     for _ in $(seq 1 30); do sleep 1; [ -p "$fifo" ] || break; kill -0 "$SEQPID" 2>/dev/null || break; done
 done
 

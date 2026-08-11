@@ -1206,7 +1206,7 @@ void OTRAudio_Thread() {
     };
 
     // Self-pump cadence. The gfx thread wakes us once per rendered frame
-    // (Graph_ProcessGfxCommands sets audio.processing), but a single long
+    // (Graph_ProcessGfxCommands sets gAudioControl.processing), but a single long
     // frame leave us asleep while the backend's queue drains to silence.
     // So we also wake on a short timeout, independent of the gfx frame rate.
     // Doing so is in fact closer to the console, where the audio task ran
@@ -1217,30 +1217,30 @@ void OTRAudio_Thread() {
     // loop, to avoid accessing uninitialized variables.
     bool primed = false;
 
-    while (audio.running) {
+    while (gAudioControl.running) {
         {
-            std::unique_lock<std::mutex> Lock(audio.mutex);
+            std::unique_lock<std::mutex> Lock(gAudioControl.mutex);
             if (!primed) {
                 // Pre-init: block until the gfx thread drives the first buffer
                 // (engine guaranteed ready by then), exactly as before.
-                while (!audio.processing && audio.running) {
-                    audio.cv_to_thread.wait(Lock);
+                while (!gAudioControl.processing && gAudioControl.running) {
+                    gAudioControl.cv_to_thread.wait(Lock);
                 }
                 primed = true;
-            } else if (!audio.processing && audio.running) {
+            } else if (!gAudioControl.processing && gAudioControl.running) {
                 // Primed: wait for the next gfx wake, but no longer than
                 // kSelfPumpInterval so a stalled gfx thread can't starve the
                 // backend queue. A pending wake falls straight through.
-                audio.cv_to_thread.wait_for(Lock, kSelfPumpInterval);
+                gAudioControl.cv_to_thread.wait_for(Lock, kSelfPumpInterval);
             }
 
-            if (!audio.running) {
+            if (!gAudioControl.running) {
                 break;
             }
         }
 
         {
-            std::unique_lock<std::mutex> Lock(audio.mutex);
+            std::unique_lock<std::mutex> Lock(gAudioControl.mutex);
             int samples_left = AudioPlayer_Buffered();
             u32 num_audio_samples = samples_left < AudioPlayer_GetDesiredBuffered() ? SAMPLES_HIGH : SAMPLES_LOW;
 
@@ -1250,10 +1250,10 @@ void OTRAudio_Thread() {
             // audible as a click. The pre-buffer loop below will catch up once
             // the backend drains enough.
             if (AudioPlayer_Buffered() + SAMPLES_LOW * AUDIO_FRAMES_PER_UPDATE > AudioPlayer_GetDesiredBuffered()) {
-                audio.processing = false;
+                gAudioControl.processing = false;
             } else {
                 produce_and_play(num_audio_samples);
-                audio.processing = false;
+                gAudioControl.processing = false;
             }
         }
 
@@ -1262,7 +1262,7 @@ void OTRAudio_Thread() {
         // Safe for BGM — the N64 sequencer advances independently of gameplay.
         // The producer guard (same as above) prevents advancing the audio engine
         // when the backend ring is already at capacity.
-        while (audio.running && AudioPlayer_Buffered() < AudioPlayer_GetDesiredBuffered()) {
+        while (gAudioControl.running && AudioPlayer_Buffered() < AudioPlayer_GetDesiredBuffered()) {
             if (AudioPlayer_Buffered() + SAMPLES_LOW * AUDIO_FRAMES_PER_UPDATE > AudioPlayer_GetDesiredBuffered()) {
                 break;
             }
@@ -1273,13 +1273,57 @@ void OTRAudio_Thread() {
     }
 }
 
+// The one definition of the audio control block (declared extern in OTRAudio.h).
+Zelda3DAudioControl gAudioControl;
+
+// Run-scoped reset, called from Zelda3D_CoreRunBegin before InitOTR. See
+// zelda3d/core/zelda3d_core_lifecycle.c for why run-scoped state is reset at the START of a run
+// rather than trusted to a teardown.
+//
+// This covers the THREAD's own state only; the audio ENGINE state it operates on (gAudioContext) is
+// reset next to it in the lifecycle file, which is C and can see the type.
+//
+// `processing` is the handshake the gfx thread uses to wake the audio thread once per rendered
+// frame, and the thread also uses it as its priming gate. `running` and `thread` decide whether
+// OTRAudio_Init starts a thread at all -- inherit `running` set with no thread alive and the next
+// run has NO audio thread and never says so.
+extern "C" void Zelda3D_AudioResetRunState(void) {
+    const bool inheritedRunning = gAudioControl.running;
+    const bool inheritedProcessing = gAudioControl.processing;
+    const bool inheritedThread = gAudioControl.thread.joinable();
+
+    // A live thread here means the previous run never called OTRAudio_Exit -- a teardown that did
+    // not run, not merely a flag left set. Stopping it is this function's job precisely because the
+    // run that owned it is already over and nothing else is going to.
+    if (inheritedThread) {
+        {
+            std::unique_lock<std::mutex> Lock(gAudioControl.mutex);
+            gAudioControl.running = false;
+        }
+        gAudioControl.cv_to_thread.notify_all();
+        gAudioControl.thread.join();
+    }
+
+    gAudioControl.running = false;
+    gAudioControl.processing = false;
+
+    // Always printed, with what was actually looked at: "nothing inherited" is only meaningful next
+    // to the list of things that could have been.
+    fprintf(stderr, "ZELDA3D CORE: audio run state reset -- inherited running=%d processing=%d thread=%s.\n",
+            (int)inheritedRunning, (int)inheritedProcessing, inheritedThread ? "ALIVE (joined here)" : "none");
+    if (inheritedThread) {
+        fprintf(stderr, "  A live audio thread means OTRAudio_Exit did NOT run for the previous run.\n");
+    }
+    fflush(stderr);
+}
+
 void OTRAudio_Init() {
     // Precache all our samples, sequences, etc...
     ResourceMgr_LoadDirectory("audio");
 
-    if (!audio.running) {
-        audio.running = true;
-        audio.thread = std::thread(OTRAudio_Thread);
+    if (!gAudioControl.running) {
+        gAudioControl.running = true;
+        gAudioControl.thread = std::thread(OTRAudio_Thread);
     }
 }
 
@@ -1294,17 +1338,17 @@ extern "C" void OTRAudio_Exit() {
     // Tell the audio thread to stop. Guard with joinable() so this is idempotent
     // — called early (right after Graph_ThreadEntry returns on window-close) AND
     // again from DeinitOTR; the second call is a no-op.
-    if (!audio.thread.joinable()) {
+    if (!gAudioControl.thread.joinable()) {
         return;
     }
     {
-        std::unique_lock<std::mutex> Lock(audio.mutex);
-        audio.running = false;
+        std::unique_lock<std::mutex> Lock(gAudioControl.mutex);
+        gAudioControl.running = false;
     }
-    audio.cv_to_thread.notify_all();
+    gAudioControl.cv_to_thread.notify_all();
 
     // Wait until the audio thread quit
-    audio.thread.join();
+    gAudioControl.thread.join();
 #if 0
     for (size_t i = 0; i < sequenceMapSize; i++) {
         free(sequenceMap[i]);
@@ -2068,11 +2112,11 @@ void RunCommands(Gfx* Commands, const std::vector<std::unordered_map<Mtx*, MtxF>
 // C->C++ Bridge
 extern "C" void Graph_ProcessGfxCommands(Gfx* commands) {
     {
-        std::unique_lock<std::mutex> Lock(audio.mutex);
-        audio.processing = true;
+        std::unique_lock<std::mutex> Lock(gAudioControl.mutex);
+        gAudioControl.processing = true;
     }
 
-    audio.cv_to_thread.notify_one();
+    gAudioControl.cv_to_thread.notify_one();
     std::vector<std::unordered_map<Mtx*, MtxF>> mtx_replacements;
     // Render-unification differential gate (kanban #131): the subframe interpolation phase below
     // (`time`) is a static counter advanced every render call regardless of gZelda3dFreeze (it only

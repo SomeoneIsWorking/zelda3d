@@ -13,7 +13,7 @@ extern "C" MessageTableEntry* sGerMessageEntryTablePtr;
 extern "C" MessageTableEntry* sFraMessageEntryTablePtr;
 extern "C" MessageTableEntry* sJpnMessageEntryTablePtr;
 extern "C" MessageTableEntry* sStaffMessageEntryTablePtr;
-// extern "C" MessageTableEntry* _message_0xFFFC_nes;
+extern "C" char* _message_0xFFFC_nes;
 
 static void SetMessageEntry(MessageTableEntry& entry, const SOH::MessageEntry& msgEntry) {
     entry.textId = msgEntry.id;
@@ -68,6 +68,40 @@ MessageTableEntry* OTRMessage_LoadTable(const std::string& filePath, bool isNES)
     assert(table[0].textId == 0x0001);
 
     return table;
+}
+
+// Run-scoped reset, called from Zelda3D_CoreRunBegin. See zelda3d/core/zelda3d_core_lifecycle.c.
+//
+// The NULL checks below are what make these tables process-lifetime: build them once and every
+// later call is a no-op. That was written to avoid re-malloc'ing a table in one game's lifetime,
+// and under the launcher it means a SECOND RUN KEEPS THE FIRST RUN'S TABLES. Every `segment` in
+// them is `msg.c_str()` -- a pointer into a SOH::Text resource owned by the ResourceManager that
+// the previous game's session took down. Font_LoadOrderedFontNTSC then memcpy'd from freed memory
+// during Play_Init.
+//
+// So the tables are freed here, at the start of a run, and OTRMessage_Init rebuilds them against
+// THIS run's ResourceManager. Only the table arrays are ours to free; the strings they point at
+// belong to the resources.
+extern "C" void Zelda3D_MessageResetRunState(void) {
+    MessageTableEntry** tables[] = {
+        &sNesMessageEntryTablePtr, &sGerMessageEntryTablePtr,   &sFraMessageEntryTablePtr,
+        &sJpnMessageEntryTablePtr, &sStaffMessageEntryTablePtr,
+    };
+    const int total = (int)(sizeof tables / sizeof tables[0]);
+    int inherited = 0;
+
+    for (int i = 0; i < total; i++) {
+        if (*tables[i] != NULL) {
+            inherited++;
+            free(*tables[i]);
+            *tables[i] = NULL;
+        }
+    }
+    _message_0xFFFC_nes = NULL;
+
+    fprintf(stderr, "ZELDA3D CORE: message tables reset -- %d of %d inherited from a previous run and freed.\n",
+            inherited, total);
+    fflush(stderr);
 }
 
 extern "C" void OTRMessage_Init() {
