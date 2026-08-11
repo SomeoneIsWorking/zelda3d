@@ -368,6 +368,14 @@ static struct RunFrameContext {
     int state;
 } runFrameContext;
 
+// Reset the frame loop's resume point. runFrameContext is FILE-STATIC, which is the right scope for
+// it; what it must not be is longer-lived than a run. `state` is the field that matters: RunFrame
+// returns mid-loop and resumes through `goto nextFrame`, so a second run inheriting state==1 jumps
+// straight into the previous run's freed gamestate. Called from Zelda3D_CoreRunBegin.
+void Graph_ResetRunState(void) {
+    memset(&runFrameContext, 0, sizeof(runFrameContext));
+}
+
 void RunFrame() {
     GraphicsContext gfxCtx;
     GameStateOverlay* nextOvl = &gGameStateOverlayTable[0];
@@ -400,7 +408,12 @@ void RunFrame() {
 
         uint64_t freq = GetFrequency();
 
-        while (GameState_IsRunning(runFrameContext.gameState)) {
+        // An exit request ends the frame loop HERE, so RunFrame falls through to its own destroy
+        // path below (GameState_Destroy -> Play_Destroy) instead of the gamestate being abandoned
+        // mid-life. Only half the fix, and the half that is useless alone: this code is unreachable
+        // unless Graph_ThreadEntry keeps calling RunFrame after the request -- see the loop
+        // condition there. Porting one without the other turns the crash into a hang.
+        while (GameState_IsRunning(runFrameContext.gameState) && WindowIsRunning()) {
 
             Graph_StartFrame();
 
@@ -427,7 +440,19 @@ void RunFrame() {
 }
 
 void Graph_ThreadEntry(void* arg0) {
-    while (WindowIsRunning()) {
+    // `WindowIsRunning()` alone is the wrong condition for STOPPING. RunFrame returns once per frame
+    // and resumes through a goto, so the moment an exit was requested this loop simply stopped
+    // calling it -- leaving a live, initialised gGameState that nothing ever destroyed. Play_Destroy
+    // therefore never ran ON ANY QUIT -- no Actor_CleanupContext, no ZeldaArena_Cleanup, and no
+    // GameInteractor_ExecuteOnPlayDestroy, which is the only place several 2s2h subsystems free
+    // their per-run state. It also left gPlayState pointing into a heap Heaps_Free was about to
+    // release, which is what SIGSEGV'd the second MM run inside RegisterDebugMode's
+    // `if (gPlayState != NULL)`.
+    //
+    // So the exit request stops the FRAME loop, and this loop keeps pumping until the gamestate
+    // machine has finished unwinding -- teardown happening where the decomp already does it, with
+    // the engine still up. Ported from soh's graph.c, which fixed the identical line.
+    while (WindowIsRunning() || gGameState != NULL) {
         RunFrame();
     }
 }

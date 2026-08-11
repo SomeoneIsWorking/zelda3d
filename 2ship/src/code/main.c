@@ -48,6 +48,8 @@ s32 gScreenWidth = SCREEN_WIDTH;
 s32 gScreenHeight = SCREEN_HEIGHT;
 size_t gSystemHeapSize = 0;
 
+#include "zelda3d/mm3d_core_lifecycle.h"
+
 void InitOTR(int argc, char* argv[]);
 void Heaps_Free(void);
 
@@ -78,6 +80,9 @@ int Zelda3D_CoreRun(int argc, char* argv[] /* void* arg*/) {
     setlocale(LC_ALL, ".UTF8");
 #endif // _WIN32
 
+    // FIRST, before anything can read it. The launcher may have run a game in this process already,
+    // and InitOTR below is exactly where a stale pointer from that run got dereferenced.
+    Zelda3D_CoreRunBegin();
     InitOTR(argc, argv);
     CrashHandlerRegisterCallback(CrashHandler_PrintExt);
     Heaps_Alloc();
@@ -156,6 +161,10 @@ int Zelda3D_CoreRun(int argc, char* argv[] /* void* arg*/) {
 #ifdef _WIN32
     FreeConsole();
 #endif
+    // Before the heaps go: check this run left nothing pointing into them. A core that hands back
+    // dangling globals hands the next game a crash it has no way to diagnose.
+    // See 2s2h/zelda3d/mm3d_core_lifecycle.c.
+    Zelda3D_CoreRunEnd();
     Heaps_Free();
     // Fell off the end of int main() before; now it is the core's exit code and a caller reads it.
     return 0;
