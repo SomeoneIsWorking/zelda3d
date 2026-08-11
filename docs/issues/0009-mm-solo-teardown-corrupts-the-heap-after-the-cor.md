@@ -71,9 +71,12 @@ not fix the corruption. Any future "this is fixed" claim needs several consecuti
 Build with `-fsanitize=address`. Nothing cheaper has located the writer: valgrind is not installed
 on this machine, glibc malloc checking does not move the detection point, and the release binary is
 `-O2 -DNDEBUG` with no line info (`addr2line` resolves to `??:?`, and the system SDL3 exports a
-single symbol so `nm` is useless too). ASAN is the instrument that names the writing store; the
-build system currently has no sanitizer option, so one has to be added (a separate build dir — the
-machine's ~15 GB RAM allows only one build at a time, `-j4`).
+single symbol so `nm` is useless too). ASAN is the instrument that names the writing store.
+
+**Correction 2026-08-11: the sanitizer option now EXISTS** — this note used to say one had to be
+added. `cmake -S . -B scratch/build-asan -G Ninja -DZELDA3D_SANITIZE=address` (see the block at the
+top of the root `CMakeLists.txt`). Separate build dir; the machine's ~15 GB allows one build at a
+time.
 
 Strong prior on where to look, from [issue 0008](0008-second-game-core-sigsegvs-in-sdl-acquiregpucomma.md):
 that bug was the same family — a destructor `free()`ing members no constructor had `calloc()`ed,
@@ -83,8 +86,14 @@ mismatches on the MM shutdown path (`BenGui::Destroy` → `DeinitOTR`), not for 
 ## Why this matters
 
 It is a blocker to a core unwinding all the way to process exit, which is the premise of "one app,
-both games". Note that the sequence gate cannot see it: OoT runs last and `_exit(0)`s before
-teardown, so `tools/zelda3d_sequence.sh mm,oot` never exercises this path at all. That masking is
-exactly why the bug survived this long — do not let a green sequence run stand in for a clean
-teardown. (The sequence gate has its own separate failure now; see
+both games".
+
+**Correction 2026-08-11: the masking described below is GONE, and the gate now sees this bug.** This
+paragraph used to read "the sequence gate cannot see it: OoT runs last and `_exit(0)`s before
+teardown". That `_exit(0)` was removed in the one-binary consolidation, so every core now unwinds and
+the process reaches teardown on every sequence. `oot,mm,oot` accordingly exits 134 *intermittently*
+(observed 0 and 134 from identical binaries with identical per-core results), and `mm` alone still
+reproduces it while `oot` alone exits 0. The old warning still holds in its general form: do not let
+a green sequence run stand in for a clean teardown — here it means the sequence EXIT CODE is not a
+gate, and the per-core "ran a game and returned 0" lines are. (The sequence gate has its own separate failure now; see
 [issue 0010](0010-oot-after-mm-crashes-in-imgui-newframe-setcurren.md).)
