@@ -887,7 +887,7 @@ SaveStateReturn SaveStateMgr::AddRequest(const SaveStateRequest request) {
 }
 
 void SaveState::Save(void) {
-    std::unique_lock<std::mutex> Lock(audio.mutex);
+    std::unique_lock<std::mutex> Lock(gAudioControl.mutex);
     memcpy(&info->sysHeapCopy, gSystemHeap, SYSTEM_HEAP_SIZE /* sizeof(gSystemHeap) */);
     memcpy(&info->audioHeapCopy, gAudioHeap, AUDIO_HEAP_SIZE /* sizeof(gAudioContext) */);
 
@@ -922,7 +922,7 @@ void SaveState::Save(void) {
 }
 
 void SaveState::Load(void) {
-    std::unique_lock<std::mutex> Lock(audio.mutex);
+    std::unique_lock<std::mutex> Lock(gAudioControl.mutex);
     memcpy(gSystemHeap, &info->sysHeapCopy, SYSTEM_HEAP_SIZE);
     memcpy(gAudioHeap, &info->audioHeapCopy, AUDIO_HEAP_SIZE);
 

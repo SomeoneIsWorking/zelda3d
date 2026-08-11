@@ -478,7 +478,6 @@ void Graph_ResetRunState(void) {
 void RunFrame(void) {
     u32 size;
     char faultMsg[0x50];
-    static bool hasSetupSkybox = false;
 
     switch (runFrameContext.state) {
         case 0:
@@ -523,10 +522,15 @@ void RunFrame(void) {
 
         // Setup the normal skybox once before entering any game states to avoid the 0xabababab crash.
         // The crash is due to certain skyboxes not loading all the data they need from Skybox_Setup.
-        if (!hasSetupSkybox) {
+        // Once per RUN, not once per process: the skybox context it sets up belongs to a gamestate in
+        // a heap that Heaps_Free took back. As a plain `static bool` this was skipped on every run
+        // after the first -- skipping the setup that exists to avoid the 0xabababab crash. It sat
+        // three lines below runFrameContext when that was hoisted into Graph_ResetRunState and was
+        // missed, which is the case for a latch carrying its own run stamp.
+        static Zelda3DOnce sSkyboxSetup;
+        if (Zelda3D_Once(&sSkyboxSetup)) {
             PlayState* play = (PlayState*)gGameState;
             Skybox_Setup(play, &play->skyboxCtx, SKYBOX_NORMAL_SKY);
-            hasSetupSkybox = true;
         }
 
         uint64_t freq = GetFrequency();

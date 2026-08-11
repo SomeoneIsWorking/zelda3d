@@ -350,6 +350,30 @@ int Zelda3D_LaunchMM(void);               // zelda3d/launcher/zelda3d_launcher.c
 // noticed instead of being silently papered over by the next Begin.
 void Zelda3D_CoreRunBegin(void);
 int Zelda3D_CoreRunEnd(void);
+
+// "Do this once per RUN" -- the idiom for the `static bool initialized` latch.
+//
+// Three of the crashes in this arc were a plain function-local `static bool`: written to mean "once",
+// which in a program that runs one game and exits is the same thing as "once per run", and under the
+// launcher is not. The setup they guarded (audio engine init, the skybox setup that exists to avoid
+// the 0xabababab crash, SkelAnime_Init against ResourceManager-owned skeletons) then never happened
+// again, and the next run used the previous one's.
+//
+// Central reset lists are the right answer for STATE -- a pointer, a struct -- because the reset also
+// has to say what to free. They are the wrong answer for a latch: the list is somewhere else, and the
+// skybox latch proved the failure mode by sitting three lines below a static that WAS hoisted into
+// one. So a latch carries its own run stamp instead:
+//
+//     static Zelda3DOnce sOnce;
+//     if (Zelda3D_Once(&sOnce)) { ...setup that belongs to this run... }
+//
+// Zero-initialised, so the first run is the first call. Nothing to register, nothing to remember.
+typedef struct {
+    unsigned int epoch;
+} Zelda3DOnce;
+
+// Returns 1 the first time it is called in a given run for this latch, 0 afterwards.
+int Zelda3D_Once(Zelda3DOnce* once);
 void Zelda3D_LauncherExit(void);
 int Zelda3D_SkipEnabled(void);
 void Zelda3D_SkipControlTakers(PlayState* play);

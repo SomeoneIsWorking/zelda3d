@@ -1,6 +1,7 @@
 #include "global.h"
 #include <string.h>
 #include "soh/OTRGlobals.h"
+#include "zelda3d/zelda3d.h"
 
 void func_800C3C80(AudioMgr* audioMgr) {
     AudioTask* task;
@@ -83,6 +84,13 @@ void AudioMgr_Unlock(AudioMgr* audioMgr) {
     osRecvMesg(&audioMgr->unk_C8, NULL, OS_MESG_BLOCK);
 }
 
+// Guards the one-time part of AudioMgr_Init below. It was a plain function-local `static`, which
+// under the launcher means once per PROCESS -- and the work it guards (Audio_Init -> AudioLoad_Init)
+// is what points gAudioContext at gAudioHeap, which Heaps_Free/Heaps_Alloc replace on every run. So
+// a second run skipped audio init entirely and kept playing through the first run's freed heap.
+// Once per RUN is what it always meant, and Zelda3DOnce is how a latch says so.
+static Zelda3DOnce sAudioEngineInit;
+
 void AudioMgr_Init(AudioMgr* audioMgr, void* stack, OSPri pri, OSId id, SchedContext* sched, IrqMgr* irqMgr) {
     // AudioPlayer_Init();
 
@@ -98,9 +106,7 @@ void AudioMgr_Init(AudioMgr* audioMgr, void* stack, OSPri pri, OSId id, SchedCon
 
     osSendMesgPtr(&audioMgr->unk_AC, NULL, OS_MESG_BLOCK);
 
-    static bool hasInitialized = false;
-
-    if (!hasInitialized) {
+    if (Zelda3D_Once(&sAudioEngineInit)) {
         IrqMgrClient irqClient;
 
         osSyncPrintf("オーディオマネージャスレッド実行開始\n"); // "Start running audio manager thread"
@@ -117,7 +123,6 @@ void AudioMgr_Init(AudioMgr* audioMgr, void* stack, OSPri pri, OSId id, SchedCon
 
         // Removed due to crash
         // IrqMgr_AddClient(audioMgr->irqMgr, &irqClient, &audioMgr->unk_74);
-        hasInitialized = true;
     }
 
     // osCreateThread(&audioMgr->unk_E8, id, AudioMgr_ThreadEntry, audioMgr, stack, pri);

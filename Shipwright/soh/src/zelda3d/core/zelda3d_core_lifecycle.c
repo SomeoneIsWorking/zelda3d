@@ -18,6 +18,15 @@
 // line in Zelda3D_CoreRunBegin, in the file whose whole subject is this question -- not a global
 // dropped in whichever .c first needed it, with its cleanup left to be discovered by the next crash.
 //
+// TWO MECHANISMS, AND WHICH ONE YOU WANT. A central reset list is right for STATE, because the reset
+// is also where you say what has to be freed first: gPlayState, gAudioContext and the message tables
+// are all here for that reason. It is the wrong shape for a LATCH -- a `static bool initialized`
+// guarding setup that belongs to a run -- because the flag would sit in one file and its reset in
+// another, and someone editing the first has no reason to look at the second. That failure already
+// happened: the skybox latch sat three lines below runFrameContext when runFrameContext was hoisted
+// into Graph_ResetRunState, and was missed. So latches carry their own run stamp instead --
+// `static Zelda3DOnce x; if (Zelda3D_Once(&x))` -- and appear on no list at all.
+//
 // WHY THE SYMBOL NAMES STAY. `gPlayState` and `gGameState` are externed by name from dozens of
 // decomp and enhancement files. Renaming them into `gCore.play` would touch every one of those and
 // buy nothing this does not already give: the ownership, not the spelling, was the defect. They are
@@ -25,9 +34,22 @@
 
 #include "global.h"
 #include "z64.h"
+#include "variables.h"
+#include "zelda3d/zelda3d.h"
 #include <stdio.h>
+#include <stdlib.h>
+#include <string.h>
 
-void Graph_ResetRunState(void); // graph.c
+void Graph_ResetRunState(void);        // graph.c
+void Zelda3D_AudioResetRunState(void);   // OTRGlobals.cpp -- the audio THREAD's control block
+void Zelda3D_MessageResetRunState(void); // z_message_OTR.cpp -- the message tables
+
+// The name tables AudioLoad_Init builds for this run, so they can be released before it builds the
+// next run's. Declared here rather than in a header because this file is where their lifetime is.
+extern char** sequenceMap;
+extern size_t sequenceMapSize;
+extern char** fontMap;
+extern size_t fontMapSize;
 
 // ---------------------------------------------------------------------------------------------
 // The state itself. These definitions used to live in z_play.c and game.c.
@@ -44,6 +66,91 @@ PlayState* gPlayState;
 GameState* gGameState;
 
 // ---------------------------------------------------------------------------------------------
+// Once-per-run latches
+// ---------------------------------------------------------------------------------------------
+
+// Counts runs. Starts at 0, so a zero-initialised Zelda3DOnce has never fired: the first run is
+// epoch 1 and every latch is stale against it by construction, which is what makes the idiom need no
+// registration. See the comment on Zelda3D_Once in zelda3d.h for why latches are not on the reset
+// list below.
+static unsigned int sRunEpoch = 0;
+
+int Zelda3D_Once(Zelda3DOnce* once) {
+    if (once->epoch == sRunEpoch) {
+        return 0;
+    }
+    once->epoch = sRunEpoch;
+    return 1;
+}
+
+// ---------------------------------------------------------------------------------------------
+// The audio engine's run-scoped state
+// ---------------------------------------------------------------------------------------------
+
+// gAudioContext is the whole N64 audio engine's state: the note array, the sequence players, the
+// soundfont/sample tables and the pointers into the audio heap they all index. Every one of those
+// belongs to a run, and the struct is a plain global, so a second run inherits the first one's.
+//
+// That is what crashed the third core of an oot -> mm -> oot sequence, and the shape of it is worth
+// stating because it is not the obvious one. The audio thread is started by OTRAudio_Init inside
+// InitOTR, LONG before Main reaches AudioMgr_Init -- so between those two points the thread is live
+// against an audio engine that has not been initialised for this run. It is held off by a priming
+// gate (it waits for the gfx thread's first frame), but boot renders frames, so the gate opens
+// there too. On run 1 that is harmless for one reason only: the struct is in BSS, so `numNotes` is
+// 0 and Audio_ProcessNotes walks nothing. On run 3 it held run 1's note count and note pointers,
+// aimed at an audio heap the MM session had since taken back -- SIGSEGV in Audio_ProcessNotes, on
+// the audio thread, nowhere near the code responsible.
+//
+// So the fix is not to widen the gate; it is to give the run-1 condition to every run. Zeroing here
+// IS what BSS did for the first one.
+//
+// (An earlier theory -- that the gate itself was inherited open via the thread-control flags -- was
+// wrong, and the report below is what falsified it: run 3 inherited running=0 processing=0. Kept
+// because a check that can only print the answer you expect is not a check.)
+void Zelda3D_ResetAudioContext(void) {
+    const s32 inheritedNotes = gAudioContext.numNotes;
+    const void* inheritedNotePtr = (const void*)gAudioContext.notes;
+    size_t freedNames = 0;
+
+    // AudioLoad_Init strdup()s a name per sequence and per soundfont into these tables and allocates
+    // the two load-status arrays. Nothing ever released them, which did not show while a process ran
+    // one game; a second run simply calloc'd new tables over the top. Released here because this is
+    // the last moment their pointers still exist -- the memset below is what forgets them.
+    if (sequenceMap != NULL) {
+        for (size_t i = 0; i < sequenceMapSize + 0xF; i++) {
+            if (sequenceMap[i] != NULL) {
+                free(sequenceMap[i]);
+                freedNames++;
+            }
+        }
+        free(sequenceMap);
+        sequenceMap = NULL;
+        sequenceMapSize = 0;
+    }
+    if (fontMap != NULL) {
+        for (size_t i = 0; i < fontMapSize; i++) {
+            if (fontMap[i] != NULL) {
+                free(fontMap[i]);
+                freedNames++;
+            }
+        }
+        free(fontMap);
+        fontMap = NULL;
+        fontMapSize = 0;
+    }
+    free(gAudioContext.seqLoadStatus);
+    free(gAudioContext.fontLoadStatus);
+
+    memset(&gAudioContext, 0, sizeof(gAudioContext));
+
+    fprintf(stderr,
+            "ZELDA3D CORE: gAudioContext reset (%zu bytes) -- inherited numNotes=%d notes=%p, freed %zu"
+            " sequence/soundfont name(s).\n",
+            sizeof(gAudioContext), (int)inheritedNotes, inheritedNotePtr, freedNames);
+    fflush(stderr);
+}
+
+// ---------------------------------------------------------------------------------------------
 // The lifecycle
 // ---------------------------------------------------------------------------------------------
 
@@ -52,12 +159,20 @@ GameState* gGameState;
 // cannot inherit the last one regardless of how it ended (a clean quit, a crash-triggered exit, a
 // game switch mid-frame).
 void Zelda3D_CoreRunBegin(void) {
+    // First, so that everything below runs in the new epoch: every Zelda3DOnce in the process is now
+    // stale, without any of them having to be listed here.
+    sRunEpoch++;
+
     gPlayState = NULL;
     gGameState = NULL;
     // graph.c's runFrameContext -- the frame loop's resume point and gfx context. Reset through a
     // function because it is file-static there, which is the right scope for it; what it must not
     // be is longer-lived than a run.
     Graph_ResetRunState();
+    Zelda3D_AudioResetRunState();
+    Zelda3D_ResetAudioContext();
+    // The message tables: malloc'd arrays whose entries point into ResourceManager-owned text.
+    Zelda3D_MessageResetRunState();
 }
 
 // Called after the frame loop has finished and before the heaps are freed.

@@ -5,7 +5,7 @@ status: open
 symptom: Running the same core twice in one launcher process crashes. The crash MOVES with each fix -- InitOTR (gPlayState), RunFrame (runFrameContext resume state), InitOTR again (a cached CollisionHeader), then OoT's audio on a third run -- because each is a separate piece of state that outlived the run that owned it.
 tags: n3,launcher,lifetime,globals,re-runnable
 created: 2026-08-07
-updated: 2026-08-07
+updated: 2026-08-11
 ---
 
 ## The class of bug
@@ -28,15 +28,148 @@ It is not one bug. Four distinct instances turned up in a row, each hidden behin
 - `Graph_ThreadEntry` now keeps pumping `RunFrame` until the gamestate machine has unwound (`WindowIsRunning() || gGameState != NULL`). Before, an exit request simply stopped calling `RunFrame`, abandoning a live gamestate — so **`Play_Destroy` never ran on ANY quit**, which is a real bug independent of game switching (no actor destroy callbacks, no save flush on that path).
 - Instance 3 fixed by dropping the `static`.
 
-## What works now, and what does not
+## What works now, and what does not (2026-08-11)
 
-- **`oot,mm` works** (verified: both cores return 0, MM attaches with all per-game subsystems fresh, chooser switch keeps the same pid, MM reaches scene 111).
-- **`oot,oot` works** (previously an immediate SIGSEGV).
-- **`oot -> mm -> oot` does NOT.** Instance 4: OoT's audio state on the third run.
+- **`oot -> mm -> oot` works.** All three cores `RETURNED 0`, on two consecutive runs; run 3 boots
+  through `Play_Init` into the title scene (`spot99`, scene 0x6e). It used to SIGSEGV three times over
+  on the way.
+- `oot` alone: exit 0. `oot,mm`, `oot,oot`: all cores return 0.
+- **A process-exit crash remains** and is NOT one of these instances. After every core has returned,
+  `Context::DestroyInstance` faults tearing down the last session. It is **intermittent**: the two
+  `oot,mm,oot` runs above exited 0 and 134 with identical binaries and identical per-core results.
+  `mm` ALONE reproduces it (exit 134, `double free or corruption (!prev)` inside the SDL3 GPU
+  destructor) while `oot` alone exits 0 -- so it is the pre-existing MM teardown heap corruption of
+  issue #9. The site moves with allocation layout (SIGSEGV in `zip_close` under `O2rArchive::Close`
+  in one run), which is the ordinary signature of corruption rather than a second bug.
+  **Consequently: the sequence exit code is not a gate for this work.** Judge it on the per-core
+  `RETURNED 0` lines, which are stable; a green process exit proves nothing here, and one was
+  briefly mistaken for the teardown bug being fixed.
 
 ## Why a same-game restart hid instance 3
 
 `Context::CreateUninitializedInstance` only calls `BeginGameSession` when the game NAME differs. So `oot,oot` reuses the existing session and its ResourceManager, and the stale cached pointer stayed valid by accident. **Do not treat a green `oot,oot` as evidence that cross-game re-running works** — only a sequence with a different game in between exercises session replacement.
+
+## Instances 4-6 (2026-08-11): the audio engine and the message tables
+
+Continuing `oot -> mm -> oot` turned up three more, and the crash moved once per fix exactly as
+before. Worth reading as a set, because two of them are the *same* defect wearing different clothes:
+an init-once latch that meant once per PROCESS when it should have meant once per RUN.
+
+| # | State | Where it lived | How it failed |
+|---|---|---|---|
+| 4 | `gAudioContext` | global, `audio_init_params.c` | The audio engine's whole state, including note pointers into `gAudioHeap` -- which `Heaps_Free`/`Heaps_Alloc` replace every run. Run 3 synthesised through run 1's freed heap: SIGSEGV in `Audio_ProcessNotes`, on the audio thread |
+| 5 | `hasInitialized` | function-local `static`, `AudioMgr_Init` | Guarded `Audio_Init` -> `AudioLoad_Init`, i.e. ALL audio engine init. Run 2+ skipped it entirely, which is why (4) was never repaired by the new run |
+| 6 | `s{Nes,Ger,Fra,Jpn,Staff}MessageEntryTablePtr` | globals, `z_message_PAL.c`, built in `z_message_OTR.cpp` | `OTRMessage_Init` rebuilds only `if (ptr == NULL)`. Every entry's `segment` is `msg.c_str()` into a `SOH::Text` owned by the previous session's ResourceManager: `memcpy` from freed memory in `Font_LoadOrderedFontNTSC` during `Play_Init` |
+
+All three are now reset by `Zelda3D_CoreRunBegin`, through a reset function in the file that owns the
+state (`AudioMgr_ResetRunState`, `Zelda3D_ResetAudioContext`, `Zelda3D_MessageResetRunState`) --
+the same shape as `Graph_ResetRunState`.
+
+Two things fell out that are worth keeping:
+
+- **A per-run leak, now closed.** `AudioLoad_Init` `strdup`s a name per sequence and per soundfont
+  into `sequenceMap`/`fontMap` and mallocs the two load-status arrays; nothing ever freed them. Run 3
+  reports **148 names freed** where run 1 reports 0 -- which is also the cheapest proof that run 3 is
+  genuinely re-initialising the audio engine rather than reusing run 1's.
+- **The message tables' NULL checks carry an `OTRTODO` saying the implementation should not be
+  malloc'ing tables at all.** That comment describes exactly the defect; the guard was the workaround.
+
+### A wrong theory, and the instrument that killed it
+
+The first hypothesis for (4) was that `audio.processing` -- which is both the gfx->audio wake
+handshake and the audio thread's priming gate -- was inherited SET, opening the gate before the
+engine was up. It is a good story and it is false. The reset function reports what it inherited, and
+run 3 printed `running=0 processing=0 thread=none`. The gate was closed; boot simply renders frames,
+so it opens legitimately before `Main` reaches `AudioMgr_Init`. The real fault was that the state on
+the other side of the gate was run 1's.
+
+Design the negative first: a reset that printed nothing when it found nothing would have left the
+wrong theory standing, and the "fix" would have shipped as a coincidence.
+
+### Also fixed here: `audio` was two objects
+
+`OTRAudio.h` declared the audio control block as a **`static` object in a header**, so every
+including TU got a private copy. Two include it: `OTRGlobals.cpp`, which owns the thread, and
+`savestates.cpp`, which locks `audio.mutex` around a save/load precisely to exclude that thread.
+They were locking different mutexes, so that exclusion never existed. It is now one `extern` object,
+renamed `gAudioControl` -- `audio` at namespace scope collides at link time with a global of the
+same name in ZAPD's `Main.cpp`, which the `static` had been hiding.
+
+## The latch idiom: `Zelda3DOnce` (2026-08-11)
+
+Three of the seven instances were the same two lines: `static bool initialized = false;` guarding
+setup that belongs to a run. A central reset list is the right answer for STATE -- the reset is also
+where you say what has to be freed first -- and the wrong answer for a latch, because the flag lives
+in one file and its reset in another, and someone editing the first has no reason to open the second.
+That is not hypothetical: instance 7 sat three lines below `runFrameContext` when `runFrameContext`
+was hoisted into `Graph_ResetRunState`, and was missed anyway.
+
+So a latch now carries its own run stamp and appears on no list:
+
+```c
+static Zelda3DOnce sSkyboxSetup;
+if (Zelda3D_Once(&sSkyboxSetup)) { ... }
+```
+
+`Zelda3D_CoreRunBegin` increments a run epoch first thing; `Zelda3D_Once` fires when a latch's stamp
+is not the current epoch. Zero-initialised means "never fired", so the first run is the first call
+and nothing has to be registered. Converted so far: `AudioMgr_Init`'s audio-engine init, `RunFrame`'s
+skybox setup, and the nine `SkelAnime_Init` latches in `randomizer/draw.cpp` (which also gate the two
+`ResourceMgr_LoadGfxByName` chest display lists -- run 2+ drew through run 1's freed skeletons).
+
+## Instance 7: `hasSetupSkybox`, in the same function as instance 2
+
+`RunFrame` had a second run-scoped `static` besides `runFrameContext`: `hasSetupSkybox`, latching
+"the normal skybox has been set up" -- a setup whose own comment says it exists to avoid the
+`0xabababab` crash from skyboxes that do not load all their data. It latched against a gamestate in a
+heap `Heaps_Free` then took back, so run 2+ skipped it. The 2026-08-07 fix hoisted `runFrameContext`
+out of that function and walked straight past the static three lines below it. It is now file-scope
+and cleared by `Graph_ResetRunState`, which is the argument for one reset point per file rather than
+a per-symbol memory.
+
+## The audit (2026-08-11): what a systematic sweep found, and what it could not see
+
+A search over `Shipwright/soh` for this class. **Denominator: 4,479 non-const `static` declarations**
+(911 in `soh/`, 3,911 in `src/`), narrowed by five targeted passes -- pointer-typed statics (49),
+init-latch names (47), `static <int> x = false|0` (~70), dynamic initialisers (15), C++ container
+statics (~90) -- with every hit in the first, second and fourth read.
+
+**Could NOT see, and these gaps are real:** statics born inside macros (`ICHAIN_*`, `COND_HOOK`,
+`RegisterShipInitFunc` -- ~200 call sites, and whether ShipInit functions re-run per run was not
+established); multi-line C++ function-local statics of class type; `inline static` class members in
+headers; non-`static` file-scope globals generally. Nothing below was confirmed at runtime.
+
+Highest-confidence remaining candidates, none yet fixed:
+
+- **`soh/Enhancements/randomizer/draw.cpp`** -- nine `static SkelAnime` + `static bool initialized`
+  pairs (:530, 561, 653, 696, 729, 802, 856, 909, 1247), plus `static Gfx* boxLidDL/boxBodyDL` from
+  `ResourceMgr_LoadGfxByName`. Structurally identical to the already-fixed `graveyardColHeader`, nine
+  times over: the latch prevents re-init, so run 3 draws through run 1's freed skeletons.
+- **`soh/Enhancements/Graphics/DisableFixedCamera.cpp:60`** -- `unordered_map<CollisionHeader*, …>`
+  keyed by scene pointers, cleared only on a CVar path. A recycled address matching a stale key would
+  restore another game's camera table silently.
+- **`soh/Enhancements/cosmetics/authenticGfxPatches.cpp:309,357`** -- the buffer survives, so the
+  re-seed is skipped and run 3's display list never gets patched. Fails silently, no crash.
+- **`ovl_kaleido_scope`** map buffers sized to the previous game's asset; `sPreRenderCvg` never freed
+  on a run boundary.
+- **`InputViewer.cpp:79`**, **`TimeSplits.cpp:961`** -- latches over Gui registrations that
+  `BeginGameSession` clears via `RemoveAllGuiWindows`.
+- Stale `Actor*` file-statics across the boss/fishing overlays and `src/zelda3d` (`sMorphaCore`,
+  `sFishingMain`, `gZelda3d*Actor`, …). Most are re-assigned by the actor's `Init` before any read;
+  the dangerous subset is the ones read under a non-NULL test, which is precisely the failure mode
+  `gPlayState` documented.
+
+**Explicitly excluded, so nobody re-derives them:** `getenv` caches (environment is process-constant,
+correct as written); `sObjectFirstUpdateSkippedForScene` (reset per scene, stricter than per run);
+`Lang.cpp` (holds JSON by value); the ~15 randomizer `Register*Locations` latches (agree with a
+process-lifetime `locationTable`, so benign *unless* `Rando::Context::CreateInstance` clears it per
+run -- worth one check); one-shot log suppressors and counters.
+
+**Open question the audit could not settle:** ~36 `static unordered_map<int, …>` caches in
+`src/zelda3d/anim/`, `zelda3d_model.cpp` and `zelda3d_hud_tex.cpp`, keyed by a `modelId` from a
+process-lifetime id space. Whether that is correct depends on whether the zelda3d asset layer is
+engine-scoped or run-scoped -- a question nothing in the code answers. If run-scoped, that is ~40
+more instances; if engine-scoped, zero. Not guessed either way.
 
 ## The remaining arc
 
