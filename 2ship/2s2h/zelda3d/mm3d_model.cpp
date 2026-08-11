@@ -260,17 +260,25 @@ int provider(int modelId, const Zelda3DGlGroup** groups, int* groupCount, const 
     return 1;
 }
 
-bool g_registered = false;
 
 } // namespace
 
 extern "C" {
 
+// The provider slot lives in libultraship (`Zelda3D_GL_SetModelProvider` -> one `g_provider`), which
+// both game cores SHARE, while this latch is a file static inside ONE core. So the latch was making
+// a claim it had no standing to make: "the provider is already mine" was only ever "I set it once".
+//
+// On `mm -> oot -> mm` that is wrong by the third run. MM registers on run 1; OoT overwrites the
+// shared slot on run 2; MM's latch is still set on run 3, so it never re-registers and every MM
+// model lookup resolves through OoT's provider and OoT's id space. The failure is silent -- wrong
+// or missing geometry, not a crash -- which is the kind this codebase has learned to distrust most.
+//
+// Fixed by deleting the latch rather than making it run-scoped: a run stamp would also work today,
+// but only because exactly one core runs at a time, and the store is two pointer writes. "Ensure"
+// now means ensure.
 void Zelda3D_EnsureModelProvider(void) {
-    if (!g_registered) {
-        Zelda3D_GL_SetModelProvider(provider);
-        g_registered = true;
-    }
+    Zelda3D_GL_SetModelProvider(provider);
 }
 
 
