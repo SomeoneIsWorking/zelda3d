@@ -913,6 +913,12 @@ extern "C" void OTRAudio_Exit() {
 
     // Wait until the audio thread quit
     audio.thread.join();
+    // ...and forget it ran. `processing` is the gate that holds the audio thread off until the gfx
+    // thread has presented a frame; left set, the NEXT run's thread -- started by OTRAudio_Init
+    // inside InitOTR, long before AudioMgr_Init -- is live against an audio engine that has not been
+    // initialised for that run.
+    audio.processing = false;
+
     for (size_t i = 0; i < gSequenceMapSize; i++) {
         free(gSequenceMap[i]);
     }
@@ -924,6 +930,17 @@ extern "C" void OTRAudio_Exit() {
     free(gFontMap);
     free(gAudioCtx.seqLoadStatus);
     free(gAudioCtx.fontLoadStatus);
+
+    // Freeing without forgetting is what made this survivable-looking. Under one game per process
+    // the dangling pointers and non-zero sizes were never read again; under the launcher the next
+    // run's AudioLoad_Init reads them, and a size that outlives its array is worse than either a
+    // live one or a NULL. Nulled HERE, at the free, so the two can never drift apart.
+    gSequenceMap = NULL;
+    gSequenceMapSize = 0;
+    gFontMap = NULL;
+    gFontMapSize = 0;
+    gAudioCtx.seqLoadStatus = NULL;
+    gAudioCtx.fontLoadStatus = NULL;
 }
 
 extern "C" void OTRExtScanner() {

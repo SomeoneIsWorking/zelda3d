@@ -297,3 +297,66 @@ except the two pose maps.)
 Making a core genuinely re-runnable means auditing the decomp + enhancement layer for state that must not outlive a run, and moving it under `Zelda3D_CoreRunBegin`. Each instance is individually small; the SIZE OF THE TAIL IS UNKNOWN and was not estimated. The reproduction is cheap and the diagnosis is fast (the crash names the subsystem), so this is grindable but should not be grinded blind — a sweep for `static` caches of per-run pointers in `soh/Enhancements/` would probably find several at once.
 
 Consequence for the UI, **now resolved (2026-08-12)**: the ESC menu's "Return to Launcher" row used to be deliberately absent, because returning to the chooser is a second run of the OoT core and the row would have been a button that crashed the game. It SHIPS now, and `tools/zelda3d_switch_test.sh` asserts it by name -- the row activates, the chooser comes back, and OoT then runs a fourth time in the same process. Leaving that paragraph as written would have told the next session the row was still unsafe to add.
+
+
+## The MM core had NO run lifecycle at all -- fixed 2026-08-12
+
+Everything above is the OoT core. A survey of the MM side found the gap is not "MM has a few more
+instances", it is that **MM had no mechanism**: no `Zelda3D_CoreRunBegin`, no `CoreRunEnd`, no
+`Zelda3DOnce`. `2ship/src/code/main.c` went straight from the core entry to `InitOTR`. And it could
+not have borrowed OoT's -- the cores are `dlopen`'d `RTLD_LOCAL`, so `zelda3d_core_lifecycle.c`
+compiled into `libsoh_core.so` is invisible to `libmm_core.so`. The mechanism had to be ported, not
+shared; it now lives in `2ship/2s2h/zelda3d/mm3d_core_lifecycle.{c,h}`.
+
+The close-test was `tools/zelda3d_sequence.sh mm,mm`, which had never been run. It SIGSEGV'd, and
+each fix named the next defect exactly as this issue predicted:
+
+1. **`RegisterDebugMode` (`2s2h/DeveloperTools/DeveloperTools.cpp`)**, from `InitOTR`, on
+   `if (gPlayState != NULL) { gPlayState->frameAdvCtx.enabled = false; }` -- character for character
+   the OoT crash this issue was opened for. Fixed by resetting `gPlayState`/`gGameState` in
+   `CoreRunBegin`.
+2. **Run 1 never ended.** `2ship/src/code/graph.c`'s `Graph_ThreadEntry` looped on
+   `WindowIsRunning()` alone, where soh's had long since become
+   `while (WindowIsRunning() || gGameState != NULL)`. **This is MM's own bug, not a re-run bug:**
+   `Play_Destroy` never ran on ANY MM quit, so `Actor_CleanupContext`, `ZeldaArena_Cleanup` and
+   `GameInteractor_ExecuteOnPlayDestroy` never ran either -- and OnPlayDestroy is the only place
+   several 2s2h subsystems free their per-run state. (It is NOT a save bug; there is no save in
+   `Play_Destroy`. An earlier draft of this note said there was.) Porting the outer loop alone turned
+   the crash into a HANG: the inner `while (GameState_IsRunning(...))` needs `&& WindowIsRunning()`
+   too, and either half without the other is worse than neither.
+3. **`AudioHeap_ResetLoadStatus`** <- `AudioHeap_Init` <- `AudioLoad_Init`, writing through run 1's
+   `seqLoadStatus` into a released audio heap. Same as OoT instance 4: `gAudioCtx` is a plain global
+   whose run-1 safety comes only from being in BSS. Fixed by zeroing it in `CoreRunBegin`; and
+   `OTRAudio_Exit` now NULLs what it frees (it was leaving `gSequenceMap`/`gFontMap` dangling with
+   non-zero sizes) and clears `audio.processing`. The reset reports what it inherited, which is how
+   run 2 was confirmed to be carrying `numNotes=24` and a live note pointer.
+4. **`SkeletonPatcher::UpdateSkeletons`** on run 2's first drawn frame. The registry holds raw
+   `SkelAnime*` into gamestate memory; soh's `GameState_Destroy` has cleared it since the actor-heap
+   corruption it caused there, and MM simply never had the call. Fixed by adding
+   `ResourceMgr_ClearSkeletons()` to MM's `GameState_Destroy`.
+
+**Evidence:** `mm,mm` went from SIGSEGV to exit 0, both runs reaching Clock Town (`scene=111`), both
+reporting `checked 2 run-scoped pointer(s), 0 still set`, no `FATAL signal` in the log, and
+`704 handle(s) released, 0 of them released more than once`. No regression: `mm`, `mm,oot`, `oot,mm`,
+`oot,oot` and `tools/zelda3d_switch_test.sh` all still exit 0.
+
+### Still open on the MM side
+
+A read-only survey (denominators: 2,458 files, 5,059 non-const statics, 299 pointer-typed, 283
+`RegisterShipInitFunc` sites) found more, none of it confirmed at runtime -- `mm,mm` reaching a scene
+twice does not exercise much of the game. Ranked, highest first: the 50 `SETUP_DRAW`/`SETUP_DRAW_TYPE`
+macro expansions in `2s2h/Rando/DrawFuncs.cpp` (each a `static bool initialized` + `static SkelAnime`
+whose `skeleton` is ResourceManager-owned -- OoT's already-fixed `randomizer/draw.cpp` instance x50,
+and a MACRO, which is the blind spot this issue named); `mm3d_model.cpp:464` `g_animState` keyed by
+ZeldaArena addresses; `mm3d_model.cpp:263` `g_registered` latching a process-wide model-provider slot
+(cross-CORE, not just cross-run); `AuthenticGfxPatches.cpp:348` baking a resource pointer into a
+static `Gfx` list; `ovl_Dm_Char08`'s NULL-latched collision data; and `GameInteractor`'s
+`functionsForPtr` maps, keyed by raw `Actor*` and process-lifetime, which must be fixed together with
+`nextHookId` (resetting either alone is worse than neither).
+
+The survey also corrected two things on this page: **`sPreRenderCvg` is a non-issue** (one write and
+one read four lines apart in straight-line code -- a run-2 read-before-write is impossible), and
+**A8 is already covered for 34 of 428 overlays** by `ActorInit`'s optional `ActorResetFunc`, which
+`Actor_FreeOverlay` calls when the last instance unloads. `sMorphaCore`, A8's headline example, is
+already fixed by `BossMo_Reset`. So A8's real discriminator is not "read under a non-NULL test" but
+"which overlay's reset omits the static it should clear" -- finite and checkable.

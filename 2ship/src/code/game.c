@@ -1,4 +1,5 @@
 #include "global.h"
+#include "2s2h/BenPort.h"
 #include "audiomgr.h"
 #include "idle.h"
 #include "sys_cfb.h"
@@ -273,6 +274,17 @@ void GameState_Destroy(GameState* gameState) {
     ViMode_Destroy(&sGameViMode);
     THA_Destroy(&gameState->tha);
     GameAlloc_Cleanup(&gameState->alloc);
+
+    // The skeleton-patching registry holds raw SkelAnime* into memory this gamestate owns, so it
+    // must not outlive it. soh's GameState_Destroy has cleared it since the actor-heap corruption it
+    // caused there ("Performing clear skeletons before unload resources fixes an actor heap
+    // corruption crash"); MM never had the call. Under one game per process the difference is
+    // invisible -- the stale entries are simply never walked again. Under the launcher the NEXT run's
+    // first Graph_ProcessGfxCommands walks them: SkeletonPatcher::UpdateSkeletons assigns through
+    // every registered skelAnime, and run 1's are freed. SIGSEGV in UpdateSkeletons, on run 2's first
+    // drawn frame.
+    ResourceMgr_ClearSkeletons();
+
     gGameState = NULL;
 }
 

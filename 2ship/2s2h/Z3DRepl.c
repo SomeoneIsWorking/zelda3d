@@ -70,6 +70,19 @@ static char sOutPath[512];
 static char sBuf[1024];
 static int sBufLen = 0;
 
+// The FIFO belongs to a RUN: this run must create and open its own. Inherited, sFd is either a
+// descriptor onto the previous run's FIFO or the -1 that means "already tried and failed", and in
+// both cases the new run's REPL answers nothing -- which makes a second MM run unobservable by the
+// one instrument that could diagnose it. Called from Zelda3D_CoreRunBegin.
+void Zelda3D_ReplResetRunState(void) {
+    if (sFd >= 0) {
+        close(sFd);
+    }
+    sFd = -2;
+    sOutPath[0] = '\0';
+    sBufLen = 0;
+}
+
 static void Z3D_Repl_Reply(const char* line);
 
 // Line sink adapter for Zelda3D_ListModels — matches the (line, user) shape.
