@@ -226,6 +226,31 @@ run -- worth one check); one-shot log suppressors and counters.
   head, and they are plain `malloc` (not resource-owned), so a second run frees a valid pointer. Left
   alone.
 
+### The macro blind spot, settled: ShipInit functions DO re-run per run
+
+The audit could not see inside `RegisterShipInitFunc` (~200 call sites) and said so, noting that
+several bucket-B severities depended on the answer. It is: **registrations happen once, at `dlopen`
+(namespace-scope static constructors, into a process-lifetime map in `ShipInit::GetAll`), and
+`ShipInit::InitAll()` runs from `InitOTR` -- so every registered function runs again on every run.**
+The registry does not grow; the functions re-execute. That is the HIGH case: a latch *inside* one of
+those functions is a genuine instance, because the function re-runs and its flag says "already
+done".
+
+With that settled, the three bucket-B entries it left uncertain resolve -- and two of them would have
+been made WORSE by the obvious fix:
+
+- **`InputViewer.cpp` -- benign, and converting it would introduce a leak.** `LoadTextureFromRawImage`
+  uploads to the GPU and stores only METADATA (a renderer texture id and dims) in `Fast3dGui`'s
+  engine-lifetime registry -- no pointer into the resource. The upload survives the run, so the latch
+  is correct; re-running it would leak one GPU texture per run per button (the code's own TODO notes
+  nothing ever unloads them).
+- **`TimeSplits.cpp:961` -- dead.** `static bool initialized` is declared and never read anywhere in
+  the file. Deleted rather than converted.
+- **The ~15 randomizer `Register*Locations` latches -- benign, confirmed.** They assign BY INDEX into
+  a process-lifetime `locationTable` of value types, and nothing anywhere clears or resizes it, so
+  latch and table stay in agreement. (The audit flagged `Rando::Context::CreateInstance` as worth one
+  check; it does not touch the table.)
+
 **Open question, now SETTLED -- the zelda3d asset caches are engine-scoped and correct as written.**
 `Zelda3D_AutoModelId` maps a ZAR PATH to an id through a process-lifetime table, so the same asset
 gets the same id in every run; the caches hold OWNED data (vectors, not pointers into a
