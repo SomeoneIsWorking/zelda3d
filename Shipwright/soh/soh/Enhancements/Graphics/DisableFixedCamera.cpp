@@ -82,6 +82,24 @@ static void DisableFixedCamera_RestoreAllCameraData() {
     sCamDataBackups.clear();
 }
 
+// Run-scoped reset, called from Zelda3D_CoreRunBegin (see zelda3d/core/zelda3d_core_lifecycle.c).
+//
+// This DROPS the backups; it deliberately does not restore them, and the difference matters. Every
+// key is a CollisionHeader* from a scene the previous run owned and every `original` points into
+// that scene's collision resource -- both gone with the run. RestoreAllCameraData would write a
+// dead pointer through a dead header. Worse, allocators reuse addresses: a new run's header landing
+// on a recycled address would MATCH a stale key and silently take another game's camera table.
+//
+// So the entries are freed and forgotten. Nothing is lost -- a backup only means "this run swapped a
+// scene's camera data", and that run is over.
+extern "C" void Zelda3D_DisableFixedCameraResetRunState(void) {
+    for (auto& [colHeader, backup] : sCamDataBackups) {
+        delete[] backup.copy;
+    }
+    sCamDataBackups.clear();
+    DisableFixedCamera_ResetState();
+}
+
 // Helper to check if a camera type is a fixed camera
 static bool IsFixedCameraType(s16 type) {
     return type == CAM_SET_PREREND_FIXED || type == CAM_SET_PREREND_PIVOT || type == CAM_SET_PIVOT_FROM_SIDE ||

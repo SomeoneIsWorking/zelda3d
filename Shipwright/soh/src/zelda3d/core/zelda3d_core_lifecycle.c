@@ -44,6 +44,8 @@ void Graph_ResetRunState(void);        // graph.c
 void Zelda3D_AudioResetRunState(void);   // OTRGlobals.cpp -- the audio THREAD's control block
 void Zelda3D_MessageResetRunState(void); // z_message_OTR.cpp -- the message tables
 void Zelda3D_ReplResetRunState(void);    // zelda3d_repl.cpp -- the REPL FIFO descriptor
+void Zelda3D_AnimResetRunState(void);    // zelda3d_anim.cpp -- last frame's pose, NOT the asset caches
+void Zelda3D_DisableFixedCameraResetRunState(void); // DisableFixedCamera.cpp -- scene camera backups
 
 // The name tables AudioLoad_Init builds for this run, so they can be released before it builds the
 // next run's. Declared here rather than in a header because this file is where their lifetime is.
@@ -176,6 +178,11 @@ void Zelda3D_CoreRunBegin(void) {
     Zelda3D_MessageResetRunState();
     // The REPL FIFO: an open descriptor onto a path this run has to create for itself.
     Zelda3D_ReplResetRunState();
+    // Last frame's skin matrices. The asset-derived caches beside them deliberately do NOT reset --
+    // see the comment on Zelda3D_AnimResetRunState for which zelda3d caches are run-scoped and why.
+    Zelda3D_AnimResetRunState();
+    // Camera-data backups keyed by a previous run's CollisionHeader addresses.
+    Zelda3D_DisableFixedCameraResetRunState();
 }
 
 // Called after the frame loop has finished and before the heaps are freed.
