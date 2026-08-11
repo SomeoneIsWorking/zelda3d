@@ -1267,6 +1267,20 @@ int gZelda3dGCam = 0; // #25 force game camera behind Link (drive locomotion hea
 // must be per-frame, not one-shot: autoLockOnActor is a one-frame latch by design). NULL = inactive.
 Actor* gZelda3dZTargetActor = NULL;
 
+// Run-scoped reset for every Actor* this layer parks in a global, called from Zelda3D_CoreRunBegin.
+//
+// These are debug/REPL selection handles, which is why they were easy to overlook -- but they point
+// into the play heap that Heaps_Free takes back, and they are not all read defensively. Most sites
+// only COMPARE (`actor != gZelda3dSelActor`), which a stale pointer survives; gZelda3dPendingActor is
+// DEREFERENCED for its scale. This layer's own lifecycle file argues that a pointer outliving its run
+// is the defect, so it should not be the layer still doing it.
+void Zelda3D_ActorRefsResetRunState(void) {
+    gZelda3dPendingActor = NULL;
+    gZelda3dSelActor = NULL;
+    gZelda3dHideActor = NULL;
+    gZelda3dZTargetActor = NULL;
+}
+
 // #71 `pause` REPL: generic, reusable pause-menu navigation primitive. Drives the REAL kaleido
 // input path (no state poking) so the menu opens/switches pages exactly as a player would, which is
 // what makes the observed render faithful. Target page: PAUSE_ITEM/MAP/QUEST/EQUIP (0..3), or -2 to

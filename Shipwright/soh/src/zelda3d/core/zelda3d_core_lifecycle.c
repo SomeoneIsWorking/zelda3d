@@ -46,6 +46,9 @@ void Zelda3D_MessageResetRunState(void); // z_message_OTR.cpp -- the message tab
 void Zelda3D_ReplResetRunState(void);    // zelda3d_repl.cpp -- the REPL FIFO descriptor
 void Zelda3D_AnimResetRunState(void);    // zelda3d_anim.cpp -- last frame's pose, NOT the asset caches
 void Zelda3D_DisableFixedCameraResetRunState(void); // DisableFixedCamera.cpp -- scene camera backups
+void Zelda3D_ActorRefsResetRunState(void);   // zelda3d.c        -- REPL/debug actor selections
+void Zelda3D_RenderRefsResetRunState(void); // zelda3d_render.cpp
+void Zelda3D_HorseRefsResetRunState(void);  // behaviors/actor/en_horse.cpp
 
 // The name tables AudioLoad_Init builds for this run, so they can be released before it builds the
 // next run's. Declared here rather than in a header because this file is where their lifetime is.
@@ -183,6 +186,11 @@ void Zelda3D_CoreRunBegin(void) {
     Zelda3D_AnimResetRunState();
     // Camera-data backups keyed by a previous run's CollisionHeader addresses.
     Zelda3D_DisableFixedCameraResetRunState();
+    // Actor pointers this layer parks in globals. They point into the play heap, so they are exactly
+    // the shape this file's header argues against; most are only compared, one is dereferenced.
+    Zelda3D_ActorRefsResetRunState();
+    Zelda3D_RenderRefsResetRunState();
+    Zelda3D_HorseRefsResetRunState();
 }
 
 // Called after the frame loop has finished and before the heaps are freed.

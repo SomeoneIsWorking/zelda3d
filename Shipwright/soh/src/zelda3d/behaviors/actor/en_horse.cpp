@@ -48,6 +48,13 @@ float Zelda3D_RenderYOffsetAtXZ(PlayState* play, Actor* actor, float x, float z)
 // Zelda3D_EmitModelDraw via Zelda3D_EnHorse_RecordDraw; read by Zelda3D_HorseSaddleOffset.
 static Actor* sHorseDrawActor = nullptr;
 static int    sHorseDrawModel = -1;
+
+// Run-scoped reset (Zelda3D_CoreRunBegin): the actor belongs to the previous run's heap, and the
+// model id is only meaningful paired with it.
+extern "C" void Zelda3D_HorseRefsResetRunState(void) {
+    sHorseDrawActor = nullptr;
+    sHorseDrawModel = -1;
+}
 static float  sHorseDrawScale = 0.0f;
 static float  sHorseDrawGroundOff = 0.0f;
 
