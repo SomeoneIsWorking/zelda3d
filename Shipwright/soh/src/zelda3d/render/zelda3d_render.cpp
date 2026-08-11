@@ -173,6 +173,15 @@ s32 sZelda3dMotionFrame = 0;
 
 PlayState* sWarpPlay = NULL; // current PlayState for the floor callback (set per draw)
 
+// Run-scoped reset (Zelda3D_CoreRunBegin). sWarpPlay is rewritten immediately before each use, so it
+// is safe in practice; it is cleared anyway because "safe because every current caller happens to
+// write it first" is a property of the callers, not of the pointer, and the next caller is free to
+// break it. sZelda3dMotionActor is pinned across frames and has no such guard.
+extern "C" void Zelda3D_RenderRefsResetRunState(void) {
+    sZelda3dMotionActor = NULL;
+    sWarpPlay = NULL;
+}
+
 void Zelda3D_InitForceTime(void) {
     static int done = 0;
     const char* v;

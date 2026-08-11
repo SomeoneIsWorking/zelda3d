@@ -226,6 +226,22 @@ run -- worth one check); one-shot log suppressors and counters.
   head, and they are plain `malloc` (not resource-owned), so a second run frees a valid pointer. Left
   alone.
 
+### The zelda3d layer's own Actor globals -- fixed
+
+The audit's A9: `sZelda3dMotionActor`, `sWarpPlay`, `gZelda3dPending/Sel/Hide/ZTargetActor`,
+`sHorseDrawActor`. They are debug/REPL selection handles, which is why they were easy to overlook,
+but they point into the play heap `Heaps_Free` takes back -- and they are not all read defensively.
+Most sites only COMPARE (`actor != gZelda3dSelActor`), which a stale pointer survives;
+`gZelda3dPendingActor` is DEREFERENCED for its scale. Reset per run now, through a function in each
+owning file. This layer's lifecycle header argues that a pointer outliving its run is the defect, so
+it should not have been the layer still doing it.
+
+Still open, and deliberately not touched: **A8**, the stale `Actor*` file-statics across the boss and
+fishing overlays (`sMorphaCore`, `sFishingMain`, …). Most are re-assigned by the actor's `Init`
+before any read, and the audit itself declined to call them proven. Fixing ~15 decomp files on a
+"probably" is churn against upstream; the subset worth doing is the ones read under a non-NULL test,
+and identifying those needs a read of each call path rather than a sweep.
+
 ### The macro blind spot, settled: ShipInit functions DO re-run per run
 
 The audit could not see inside `RegisterShipInitFunc` (~200 call sites) and said so, noting that
