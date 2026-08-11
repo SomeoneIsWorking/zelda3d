@@ -117,6 +117,28 @@ core") remains the right design rule and is still worth doing -- an `exit()` mid
 `GameSession::End`, so config and save state are lost on those paths -- but it is a behaviour change
 across a dozen call sites in both games, and it is no longer load-bearing for this crash.
 
+## Sizing for "do not `exit()` from inside a core" (measured 2026-08-12, NOT done)
+
+Option 2 above is still the right design rule, and here is what it actually costs, so the next
+session does not start by counting.
+
+**30 call sites**, and they are not scattered: 15 in `Shipwright/soh/soh/OTRGlobals.cpp` and 15 in
+`2ship/2s2h/BenPort.cpp`, mirroring each other nearly line for line (both games' `InitOTR` share an
+ancestor). Every one is an asset-setup failure -- no ROM found, wrong ROM, extraction failed,
+user declined -- raised either directly or from an "OK" popup callback.
+
+**They all fire BEFORE the frame loop exists**, inside `InitOTR`, which is why option 2 as written
+("request exit and let the frame loop unwind to `run()`") does not fit them: there is no loop to
+unwind. The right shape is for the core's entry point to RETURN A FAILURE to the launcher, which
+already knows how to regain control, so a game that cannot start puts the user back at the chooser
+instead of killing the whole application. That is a signature change on the core entry plus a
+launcher-side branch -- bounded, but a real behaviour change in two games.
+
+**Practical impact today is low**, which is why it stays deferred: these paths only run when the
+`.o2r` archives are missing or unreadable, so a normal launch never reaches them. What they cost is
+paid on a bad install -- the launcher dies instead of reporting -- and, per this issue, they are the
+one remaining way to leave `Context` to static destruction.
+
 ## Instrument notes (so the next session does not re-lose the time)
 
 - ASAN aborts at startup on an **odr-violation for StormLib's `DistBits`**, which is linked into both
