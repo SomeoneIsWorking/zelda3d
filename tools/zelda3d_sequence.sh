@@ -26,6 +26,11 @@ REPO="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
 SEQ="${1:-mm,oot}"
 LAUNCHER="${ZELDA3D_LAUNCHER_BIN:-$REPO/Shipwright/build-cmake/zelda3d/zelda3d}"
 DISP="${ZELDA3D_SEQ_DISPLAY:-:98}"
+# Seconds to wait for a core to open its REPL, i.e. to reach its frame loop. 120 is plenty for a
+# release build and nowhere near enough for a sanitizer one: an ASAN build on llvmpipe spent >120s
+# between "SDL3 GPU backend initialized" and its first frame, and the gate reported that as "it did
+# not reach its frame loop" -- a boot budget being read as a broken core.
+BOOTWAIT="${ZELDA3D_SEQ_BOOT_WAIT:-120}"
 LOGDIR="$REPO/scratch/logs/sequence"
 LOG="$LOGDIR/run.log"
 # Each core reads its own REPL path from its own env var; both are wired so either can be quit.
@@ -62,7 +67,7 @@ IFS=',' read -r -a CORES <<<"$SEQ"
 for id in "${CORES[@]}"; do
     fifo="$ZELDA3D_REPL"; [ "$id" = "mm" ] && fifo="$ZELDA3D_MM_REPL"
     ready=0
-    for _ in $(seq 1 120); do
+    for _ in $(seq 1 "$BOOTWAIT"); do
         sleep 1
         [ -p "$fifo" ] && { ready=1; break; }
         kill -0 "$SEQPID" 2>/dev/null || break
