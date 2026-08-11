@@ -301,7 +301,7 @@ fi
 # FOUR core runs rather than one -- so it is the widest exercise of GPU handle ownership there is.
 # Checked here as well as in the sequence gate because the two drive different paths to it.
 echo "-- GPU handles released more than once (want: 0):"
-DUPLINE="$(grep -E "released [0-9]+ handle\(s\) this process" "$LOG" | tail -1)"
+DUPLINE="$(grep -E "released [0-9]+ handle\(s\) tearing down" "$LOG" | tail -1)"
 if [ -z "$DUPLINE" ]; then
     echo "   UNKNOWN -- the renderer never printed its release accounting, so it did not tear down."
     echo "   Failed rather than passed: this cannot tell 'no duplicates' from 'never ran'."

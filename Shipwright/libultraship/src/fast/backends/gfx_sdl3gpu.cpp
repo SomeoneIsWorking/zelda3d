@@ -602,10 +602,34 @@ static std::unordered_map<const void*, const char*> sGpuReleasedHandles;
 static size_t sGpuReleaseCount = 0;
 static size_t sGpuDoubleReleaseCount = 0;
 
-// Returns true if this is the FIRST release of `handle`, i.e. if it is safe to release now.
+// TEARDOWN ONLY, and that is a correctness boundary rather than a shortcut.
+//
+// The tracking is pointer identity, and mid-run pointer identity does not mean what it looks like:
+// SDL frees a released resource lazily and a later SDL_CreateGPU* readily hands back the SAME
+// address, so a live, freshly-created handle can equal one released earlier. Recording releases
+// across a whole run therefore reported four "double releases" that were nothing of the kind -- a
+// recycled texture address, still live, which the check would then have refused to release.
+//
+// Hooking all 25 creation sites to un-record a reused address would fix that, but the window where
+// the bug this exists for actually lives is teardown, and in that window nothing is created at all,
+// so identity is exact. So the map is cleared and tracking switched on at the top of the
+// destructor: full precision where it means something, silence where it would lie.
+static bool sGpuTrackReleases = false;
+
+static void BeginGpuReleaseTracking(void) {
+    sGpuReleasedHandles.clear();
+    sGpuReleaseCount = 0;
+    sGpuDoubleReleaseCount = 0;
+    sGpuTrackReleases = true;
+}
+
+// Returns true if it is safe to release `handle` now -- i.e. it is not a handle this teardown has
+// already released. Outside teardown it always returns true and records nothing.
 static bool NoteGpuRelease(const void* handle, const char* what) {
     if (handle == nullptr)
         return false;
+    if (!sGpuTrackReleases)
+        return true;
     sGpuReleaseCount++;
     auto it = sGpuReleasedHandles.find(handle);
     if (it != sGpuReleasedHandles.end()) {
@@ -643,6 +667,7 @@ GfxRenderingAPISdl3Gpu::~GfxRenderingAPISdl3Gpu() {
         }
     };
     step("begin");
+    BeginGpuReleaseTracking();
     if (g_activeSdl3GpuApi == this)
         g_activeSdl3GpuApi = nullptr;
     // Release the folded-in renderer subsystems while the device is still alive (their GPU resources
@@ -723,7 +748,7 @@ GfxRenderingAPISdl3Gpu::~GfxRenderingAPISdl3Gpu() {
         sGpuWindowReleases++;
         SDL_ReleaseWindowFromGPUDevice(mDevice, mWindow);
     }
-    SPDLOG_INFO("SDL3 GPU: released {} handle(s) this process, {} of them released more than once.",
+    SPDLOG_INFO("SDL3 GPU: released {} handle(s) tearing down, {} of them released more than once.",
                 sGpuReleaseCount, sGpuDoubleReleaseCount);
     step("DestroyGPUDevice");
     SDL_DestroyGPUDevice(mDevice);
