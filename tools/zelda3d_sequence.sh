@@ -154,7 +154,7 @@ fi
 # The missing-line case is failed deliberately: "0 released twice" and "the renderer never tore down"
 # print identically if you only grep for the number.
 echo "-- GPU handles released more than once (want: 0):"
-DUPLINE="$(grep -E "released [0-9]+ handle\(s\) this process" "$LOG" | tail -1)"
+DUPLINE="$(grep -E "released [0-9]+ handle\(s\) tearing down" "$LOG" | tail -1)"
 if [ -z "$DUPLINE" ]; then
     echo "   UNKNOWN -- the renderer never printed its release accounting, so it did not tear down."
     echo "   That is a failure, not a pass: this check cannot distinguish 'no duplicates' from 'never ran'."

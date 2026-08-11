@@ -1,4 +1,5 @@
 #include "DrawFuncs.h"
+#include "2s2h/zelda3d/mm3d_core_lifecycle.h"
 #include "2s2h/Enhancements/FrameInterpolation/FrameInterpolation.h"
 #include "BenPort.h"
 
@@ -85,8 +86,16 @@ void ObjTokeidai_RotateOnHourChange(ObjTokeidai* thisx, PlayState* play);
 // clang-format on
 }
 
+// `initialized` is a RUN latch, not a process latch. Zelda3DOnce carries its own run stamp, so all
+// 53 expansions of this macro re-initialise on a second run without any of them being listed
+// anywhere. As a plain `static bool` they did not: SkelAnime_Init was skipped, leaving skelAnime
+// holding the previous run's skeleton -- ResourceManager-owned memory, freed with that run -- and,
+// since SkelAnime_Init is also what registers the skelAnime with the skeleton patcher (whose
+// registry is now cleared per gamestate), leaving it unregistered as well. This is OoT's
+// already-fixed randomizer/draw.cpp instance, x53, hidden inside a macro: issue 0016 named
+// macro-generated statics as its blind spot, and this is what was in it.
 #define SETUP_DRAW(LIMB_MAX)           \
-    static bool initialized = false;   \
+    static Zelda3DOnce initialized;    \
     static SkelAnime skelAnime;        \
     static Vec3s jointTable[LIMB_MAX]; \
     static Vec3s morphTable[LIMB_MAX]; \
@@ -94,8 +103,7 @@ void ObjTokeidai_RotateOnHourChange(ObjTokeidai* thisx, PlayState* play);
     OPEN_DISPS(gPlayState->state.gfxCtx);
 
 #define SETUP_DRAW_TYPE(LIMB_MAX, SKEL_HEADER, ANIM_HEADER, INIT_TYPE, HEADER_TYPE)                               \
-    if (!initialized) {                                                                                           \
-        initialized = true;                                                                                       \
+    if (Zelda3D_Once(&initialized)) {                                                                             \
         INIT_TYPE(gPlayState, &skelAnime, (HEADER_TYPE*)&SKEL_HEADER, (AnimationHeader*)&ANIM_HEADER, jointTable, \
                   morphTable, LIMB_MAX);                                                                          \
     }                                                                                                             \
@@ -948,8 +956,9 @@ extern void DrawRedead() {
     Matrix_Scale(0.01f, 0.01f, 0.01f, MTXMODE_APPLY);
     Matrix_Translate(0, -2900.0f, 0, MTXMODE_APPLY);
 
-    if (!initialized) {
-        initialized = true;
+    // Hand-written rather than via SETUP_SKEL because this one picks its animation below, but the
+    // latch is the same run latch as the macro's.
+    if (Zelda3D_Once(&initialized)) {
         SkelAnime_InitFlex(gPlayState, &skelAnime, (FlexSkeletonHeader*)&gRedeadSkel,
                            (AnimationHeader*)gGibdoRedeadPirouetteAnim, jointTable, morphTable, REDEAD_LIMB_MAX);
     }
