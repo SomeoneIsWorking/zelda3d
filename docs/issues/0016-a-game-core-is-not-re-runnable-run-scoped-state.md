@@ -393,5 +393,10 @@ first, in order:
    address returns a stale entry, and the stored pointer goes straight into `strcmp`. `mm,mm` passing
    does not clear it: an OoT run in between is exactly what changes which addresses get recycled.
 
-The crash being in `SkelAnime_DrawFlexLod` under the REPLACED player draw rather than in the zelda3d
-model path is the fact to explain, not to explain away.
+One thing already ruled out, so the next session does not start there: **the zelda3d player path is
+not involved.** `Zelda3D_TryDrawPlayer` returns 0 immediately unless `MM_ZELDA3D_LINK` is set, and
+neither the sequence gate nor the environment sets it. So the crash is in MM's STOCK N64 player draw
+with a bad `skelAnime->skeleton` or limb table -- which makes candidate 2 above less likely than it
+first looked, and puts the skeleton-patching registry (whose whole job is to overwrite
+`skelAnime->skeleton` every `Graph_ProcessGfxCommands`) back at the top of the list, despite it now
+being cleared per gamestate.
