@@ -235,3 +235,34 @@ exit 0, `released 1801 handle(s) this process, 0 of them released more than once
 
 Worth generalising: `kill -9` in a gate's cleanup is fine as a backstop, but when it is also the
 normal path, everything after the last assertion is untested by construction.
+
+
+## FIXED 2026-08-12 — the renderer's own GPU objects are now released before the device
+
+The destructor said these objects "are owned by the device and freed at `SDL_DestroyGPUDevice`". The
+validation layer disagreed, and it was right: `Fast::Zelda3DRenderer` holds the per-model textures and
+vertex buffers, the pipeline caches, and the shader set as plain members, and nothing ever released
+them. `mSoh3d.reset()` destroyed the C++ object and left every SDL/Vulkan handle behind.
+
+`Zelda3DRenderer::releaseGpuResources(note)` now hands them all back, called from
+`~GfxRenderingAPISdl3Gpu` while the device is still alive. It takes the backend's duplicate-release
+accounting as a parameter (that function is file-static in the other translation unit), so a borrowed
+pointer -- the shared dummy texture, say -- cannot be freed twice: `note()` returns false for anything
+already released, and the gate asserts that count is zero.
+
+### Measured in BOTH directions, same command, same scene
+
+    pre-fix   968 x VUID-vkDestroyDevice-device-   (850 VkImageView, 96 VkImage, 48 VkShaderModule,
+                                                    10 VkBuffer, 8 VkPipeline)
+    post-fix    0 x VUID-vkDestroyDevice-device-
+
+The pre-fix figure was obtained by stashing the change and rebuilding, rather than trusting the
+earlier note -- which is also how the count is now known to be 968 rather than the 409 recorded
+above; that older number came from a different sequence. The only VUIDs left in a post-fix run are 44
+`VUID-VkShaderModuleCreateInfo-pCode-` shader-code warnings, unrelated to object lifetime.
+
+Handle accounting corroborates it and shows nothing was freed twice:
+
+    oot,oot     1024 -> 1142 handles released, 0 duplicates
+    mm,oot,mm   1205 -> 1373 handles released, 0 duplicates
+    switch_test 1829 -> 1948 handles released, 0 duplicates
