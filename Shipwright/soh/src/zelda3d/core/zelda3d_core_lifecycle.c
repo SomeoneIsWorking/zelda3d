@@ -157,6 +157,42 @@ void Zelda3D_ResetAudioContext(void) {
 }
 
 // ---------------------------------------------------------------------------------------------
+// The save context
+// ---------------------------------------------------------------------------------------------
+
+// gSaveContext is the whole game's save + session state: the save file itself, the current entrance,
+// cutscene indices, link age, scene setup, time of day, event flags. It is a plain global, so run 2
+// inherits every field run 1 left set -- and unlike most of the state on this list, that is not a
+// dangling-pointer hazard but a WRONG-STATE one, which is worse to diagnose because nothing crashes.
+//
+// How it showed: a second OoT run in one process reached the same scene at a completely different
+// position (link=(-56,1,2117) on run 1, link=(-5586,144,5273) on run 2), and ran ~30x as many player
+// animation loads -- 26 resolutions against 747. Nothing reported an error; the run was simply
+// somewhere else. Persisted save data is written to disk by SaveManager, so nothing legitimately
+// needs to survive a run in this struct; run 1's safety comes only from BSS, exactly as with
+// gAudioContext.
+void Zelda3D_ResetSaveContext(void) {
+    const unsigned char* bytes = (const unsigned char*)&gSaveContext;
+    size_t inheritedNonZero = 0;
+
+    for (size_t i = 0; i < sizeof(gSaveContext); i++) {
+        if (bytes[i] != 0) {
+            inheritedNonZero++;
+        }
+    }
+
+    memset(&gSaveContext, 0, sizeof(gSaveContext));
+
+    // Reported as a COUNT with its denominator rather than as "reset ok": on run 1 this must say 0,
+    // and a line that cannot say anything else could not tell run 1 from a run that inherited a full
+    // save. Naming individual fields would have been worse -- whichever field the next regression
+    // uses would be the one not printed.
+    fprintf(stderr, "ZELDA3D CORE: gSaveContext reset -- inherited %zu non-zero byte(s) of %zu.\n",
+            inheritedNonZero, sizeof(gSaveContext));
+    fflush(stderr);
+}
+
+// ---------------------------------------------------------------------------------------------
 // The lifecycle
 // ---------------------------------------------------------------------------------------------
 
@@ -177,6 +213,9 @@ void Zelda3D_CoreRunBegin(void) {
     Graph_ResetRunState();
     Zelda3D_AudioResetRunState();
     Zelda3D_ResetAudioContext();
+    // The save + session state. Not a lifetime hazard -- a WRONG-STATE one: run 2 otherwise starts
+    // inside run 1's save, silently.
+    Zelda3D_ResetSaveContext();
     // The message tables: malloc'd arrays whose entries point into ResourceManager-owned text.
     Zelda3D_MessageResetRunState();
     // The REPL FIFO: an open descriptor onto a path this run has to create for itself.

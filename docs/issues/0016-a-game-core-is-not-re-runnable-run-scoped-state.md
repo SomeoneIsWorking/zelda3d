@@ -413,3 +413,27 @@ second logger-ownership instance ([0017](0017-context-destructor-logs-through-a-
 Under ASAN the run now dies in core 2 on 0018's remaining alt-assets path, which is EARLIER than the
 release build's failure (core 3, `SkelAnime_DrawFlexLod`) -- so the release-build crash still has no
 sanitizer evidence at all, and nothing here should be read as characterising it.
+
+
+## Instance: `gSaveContext` (found and fixed 2026-08-12)
+
+`gSaveContext` -- the whole save + session state: the save file, current entrance, cutscene indices,
+link age, scene setup, time of day, event flags -- is a plain global in `z_common_data.c` and was
+never on the reset list. **Run 2 inherited 16,634 non-zero bytes of 138,360**, measured by the reset's
+own report.
+
+It is a different hazard from most of this page's entries: not a dangling pointer but WRONG STATE,
+which is harder to notice because nothing crashes. Persisted save data is written to disk by
+SaveManager, so nothing in this struct legitimately needs to survive a run; run 1's correctness comes
+from BSS alone, exactly as with `gAudioContext`. Now zeroed in `Zelda3D_CoreRunBegin`.
+
+The report counts non-zero bytes against the struct size rather than naming fields, deliberately:
+whichever field the next regression depends on would be the one not printed.
+
+**Honest note on how it was found, because the reasoning was wrong.** It came from noticing that a
+second OoT run reported a different position in the same scene (`link=(-56,1,2117)` vs
+`(-5586,144,5273)`) and resolved ~30x as many player animations (26 vs 747). I inferred carried-over
+save state. `gSaveContext` WAS being inherited -- that part is confirmed by the byte count -- but
+**fixing it did not change the position**, so it was not the cause of the observation that led to it.
+The title demo is simply a moving target: where it has got to depends on when the gate polls. The
+position difference is not evidence of anything and should not be cited as such.

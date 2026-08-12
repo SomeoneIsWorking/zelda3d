@@ -530,6 +530,31 @@ extern "C" int ResourceMgr_OTRSigCheck(char* imgData) {
 // Load animation with explicit alt asset path checking.
 // When Alt Assets is OFF: use original path directly (O2R or vanilla)
 // When Alt Assets is ON: try alt/ prefix first, fall back to regular path if not found or invalid
+// Report what a Link-animation path actually resolved to, gated on ZELDA3D_ANIMTYPE_LOG=1.
+//
+// Comparative on purpose, like the one in AnimationFactory: `oot` alone is ASAN-clean and
+// `mm,oot,mm` is not (issue 0018), so the only useful output is one that prints for EVERY
+// resolution in both runs. It reports the resource TYPE, because the suspicion is that this
+// function's unchecked `(AnimationHeaderCommon*)` cast is being handed something that is not an
+// animation header at all -- and it reports the returned pointer and the `segment` read out of it,
+// which is the value ASAN says lands in a freed file buffer. A line that printed only "resolved ok"
+// could not distinguish any of those cases.
+static void Zelda3D_LogAnimResolution(const char* path, const char* branch, const void* result) {
+    static const bool kLog = getenv("ZELDA3D_ANIMTYPE_LOG") != nullptr;
+    if (!kLog) {
+        return;
+    }
+    long type = -1;
+    auto res = Ship::Context::GetRawInstance()->GetResourceManager()->LoadResource(path);
+    if (res != nullptr && res->GetInitData() != nullptr) {
+        type = (long)res->GetInitData()->Type;
+    }
+    const void* segment =
+        (result != nullptr) ? (const void*)((const LinkAnimationHeader*)result)->segment : nullptr;
+    SPDLOG_INFO("ANIMRESOLVE path=\"{}\" branch={} type={} result={} segment={}", path, branch, type, result,
+                segment);
+}
+
 extern "C" AnimationHeaderCommon* ResourceMgr_LoadAnimByName(const char* path) {
     bool isAlt = ResourceMgr_IsAltAssetsEnabled();
 
@@ -557,6 +582,7 @@ extern "C" AnimationHeaderCommon* ResourceMgr_LoadAnimByName(const char* path) {
 
                 // Valid if Normal animation has frameData OR Link animation has segment
                 if (normalAnim->frameData != NULL || linkAnim->segment != NULL) {
+                    Zelda3D_LogAnimResolution(pathStr.c_str(), "alt", animHeader);
                     return animHeader;
                 }
             }
@@ -564,11 +590,19 @@ extern "C" AnimationHeaderCommon* ResourceMgr_LoadAnimByName(const char* path) {
         }
 
         // Fall back to original path
-        return (AnimationHeaderCommon*)ResourceGetDataByName(path);
+        {
+            auto* fallback = (AnimationHeaderCommon*)ResourceGetDataByName(path);
+            Zelda3D_LogAnimResolution(path, "alt-fallback", fallback);
+            return fallback;
+        }
     }
 
     // Alt OFF: use original path directly
-    return (AnimationHeaderCommon*)ResourceGetDataByName(path);
+    {
+        auto* direct = (AnimationHeaderCommon*)ResourceGetDataByName(path);
+        Zelda3D_LogAnimResolution(path, "direct", direct);
+        return direct;
+    }
 }
 
 extern "C" SkeletonHeader* ResourceMgr_LoadSkeletonByName(const char* path, SkelAnime* skelAnime) {
