@@ -403,3 +403,13 @@ being cleared per gamestate.
 
 
 See [issue 0018](0018-animation-resources-point-into-a-resource-file-b.md): running `mm,oot,mm` under ASAN died earlier, in core 2, on an unrelated resource-lifetime use-after-free.
+
+
+### `mm,oot,mm` status after the 2026-08-12 fixes
+
+Still failing. Two real bugs were found and fixed on the way there and neither was it: the
+`PlayerAnimation`-cast bug ([0018](0018-animation-resources-point-into-a-resource-file-b.md)) and a
+second logger-ownership instance ([0017](0017-context-destructor-logs-through-a-freed-spdlog-r.md)).
+Under ASAN the run now dies in core 2 on 0018's remaining alt-assets path, which is EARLIER than the
+release build's failure (core 3, `SkelAnime_DrawFlexLod`) -- so the release-build crash still has no
+sanitizer evidence at all, and nothing here should be read as characterising it.
