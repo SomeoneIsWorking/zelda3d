@@ -636,3 +636,98 @@ consequences were chased down in the same session rather than left as a surprise
 
 The general point: a fix that makes previously-dead code run is a change in blast radius, not just a
 repair, and the things it wakes up are the author's problem in the same session.
+
+
+## Sweep pass 3: the remaining survey items (2026-08-12)
+
+The read-only survey's leftovers, worked in one pass. Each entry names the mechanism it was fixed
+with, because the choice between them is the whole design of this issue: a **reset list** for STATE
+(something the next run must not see), a **`Zelda3DOnce` run-epoch latch** for LATCHES (something
+that must happen once per run rather than once per process), and an **`ActorResetFunc`** for state an
+overlay owns, which fires when its last instance unloads and so matches N64 overlay-reload semantics
+exactly.
+
+### `ovl_Fishing` -- ~110 statics restored on overlay unload (ActorResetFunc)
+
+`Fishing_Reset` existed but reset exactly two fields (`sSubCamId`, `sFishingPlayerCinematicState`),
+added for a specific crash. The other ~110 are the overlay's BSS and data: on console the loader
+re-zeroes/re-copies them every time the overlay loads, so leaving the pond genuinely wiped them.
+SoH compiles the overlay in, so instead they live for the life of the PROCESS -- across pond
+re-entries within a run *and* across runs. Restoring the declared initializers reproduces console
+behavior rather than approximating it; the values `Fishing_Init` re-derives from `HIGH_SCORE(HS_FISHING)`
+are cleared too, since Init overwrites them before any read. The lookup tables (`sJntSphInit`,
+`sPondPropInits`, `sFishInits`, `sInitChain`) and the three unmarked constants (`sZeroVec`,
+`sUnusedVec`, `sFishMouthOffset`) are deliberately left alone, and the code says so.
+
+### `ovl_Boss_Dodongo` lava textures -- a leak AND a renderer-side dangle (ActorResetFunc)
+
+`sLavaFloorModifiedTexRaw` / `sLavaWavyTexRaw` are plain `malloc`, so unlike most of this issue's list
+they stayed *valid* -- nothing dangled through them. They leak: they are rebuilt only while the boss
+scene is loaded, so a run that ends in that room never gives them back (multiple MB per run under an
+HD texture pack, in a process the launcher keeps alive).
+
+The sharper half is the ordering. `sLavaWavyTexRaw` is also handed to the renderer as a
+blended-texture *replacement* pointer, so a reset that freed it without unregistering would convert a
+leak into a use-after-free on the drawing path. `BossDodongo_Reset` unregisters first, then frees.
+
+### `Interpreter::mMaskedTextures` -- blended-texture registrations outlive their core (reset, in `Context::BeginRun`)
+
+Same shape one layer down, and it is why the Dodongo ordering matters generally. The `Interpreter` is
+engine-lifetime; each entry holds a `mask` pointer into the departing core and a `replacement` pointer
+into either that core's heap or its per-game `ResourceManager`. Nothing unregisters at run end --
+`UnregisterBlendedTexture` is called only when an actor deliberately swaps a texture back -- so a run
+ending with a blended texture live left the next run's renderer drawing from freed memory, far from
+anything naming the departed game. Cleared in `BeginRun`, which reports the inherited count (0 on
+run 1, so a non-zero count on run 2 reads as inheritance rather than as the line never having run).
+
+### `GameInteractor::State` -- 20 cheat/crowd-control toggles (reset list)
+
+Plain scalars, so nothing dangles; the failure is silent wrong behavior. End a run with pacifist mode
+or a gravity effect active and the next run starts inside it, with no UI showing it because the
+enhancement that set it is gone. The dirty count is measured against the **declarations**, not against
+zero: `MovementSpeedMultiplier`'s clean value is `1.0f` and `GravityLevel`'s is a named enumerator, so
+a zero-check would call two of them dirty on a run that never touched them.
+
+### `nametag.cpp` -- raw `Actor*` plus a mirror of the hook registry (reset list)
+
+Two failures, both silent. `nameTags` holds raw `Actor*` and is emptied by the `OnPlayDestroy` hook,
+so a run ending any other way leaves entries pointing into a freed arena -- and the next run's actors
+land at the same addresses, so `DrawNameTag`'s `actor->isDrawn` check reads a live-looking stranger
+instead of failing.
+
+Worse, `sRegisteredHooks` is a *mirror* of the registry that the fix above now clears every run, and
+`NameTag_RegisterHooks` opens with `if ((nameTags.size() > 0) == sRegisteredHooks) return;`. With
+tags still in the vector and the flag still true, it early-returns forever: nametags never work again
+for the life of the process. The four `HOOK_ID`s and the flag were function-local statics; they are
+hoisted to file scope, because a mirror of shared state that only one function can see is a mirror
+nothing can keep honest.
+
+### `ExtraTraps.cpp` -- a trap left armed (reset list)
+
+A trap is armed and fires some frames later, so ending a run in that window left it armed for the
+next one: the next run's Link takes an ice/burn/kill/void hit he never earned, or gets teleported on
+the first frame the timers tick.
+
+### MM `CutsceneManager` -- a scene cutscene list plus a `PlayState*` and an `Actor*` (reset list)
+
+`sSceneCutsceneList` is written only by `CutsceneManager_Init`, from the scene's cutscene-list
+command, so a scene without one keeps the previous scene's list. **Within a run that is authentic** --
+on console this is main-code BSS and behaves identically, and it would have been a mistake to "fix"
+it there. Across runs it is not sticky but dangling: the list points into the previous run's freed
+scene segment while `sSceneCutsceneCount` still says how many entries to read, and `sCutsceneMgr`
+holds a `PlayState*` and an `Actor*` from a heap that no longer exists.
+
+### `Warping.cpp` and `valueViewer.cpp` -- `static bool loadedConfig` (Zelda3DOnce)
+
+Both guard a `LoadConfig()` that belongs to a run, with a latch that belongs to the process. Since the
+GuiWindow list is rebuilt per run, `InitElement` now runs per run -- and only the FIRST run ever read
+its saved config; every run after it opened the window empty. This is the third and fourth instance of
+the same conversion, which is the argument for the latch type existing at all.
+
+### Looked at and deliberately NOT changed
+
+- **`actorViewer.cpp`'s bare `RegisterGameHook` calls in `InitElement`** -- they capture `this`, and
+  both the window list and the hook registry are now per-run, so lifetime and registration already
+  move together. No change would make it more correct.
+- **`actorViewer.cpp`'s `actorSpecificData`** -- an `!empty()` latch over a table of capture-less
+  lambdas. Identical every run, captures nothing, dangles through nothing.

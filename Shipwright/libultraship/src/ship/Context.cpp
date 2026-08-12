@@ -15,6 +15,7 @@
 #include "ship/window/FileDropMgr.h"
 #include "ship/window/Window.h"
 #include "ship/window/gui/Gui.h"
+#include "fast/Fast3dWindow.h"
 #include "ship/window/gui/ConsoleWindow.h"
 #include "ship/events/EventSystem.h"
 #ifdef ENABLE_SCRIPTING
@@ -807,6 +808,31 @@ void Context::BeginRun() {
     Context* context = GetRawInstance();
     if (context != nullptr && context->GetWindow() != nullptr && context->GetWindow()->GetGui() != nullptr) {
         context->GetWindow()->GetGui()->RemoveAllGuiWindows();
+    }
+
+    // Blended-texture registrations are the same shape of problem one layer down: the Interpreter is
+    // engine-lifetime, but each entry holds a mask pointer into the departing core and a replacement
+    // pointer into either that core's heap or its ResourceManager. Nothing unregisters them at run
+    // end -- an actor only unregisters when it deliberately swaps a texture back -- so they have to
+    // be dropped here, before the incoming run can draw with them.
+    //
+    // Every branch reports, including the ones that do nothing. On the FIRST run there is no Context
+    // and no renderer yet, so the check cannot run at all -- and a version that simply stayed quiet
+    // there would be indistinguishable from one that ran and found nothing, which is the one reading
+    // that would matter on run 2.
+    std::shared_ptr<Fast::Interpreter> interpreter;
+    if (context != nullptr) {
+        if (auto window = std::dynamic_pointer_cast<Fast::Fast3dWindow>(context->GetWindow())) {
+            interpreter = window->GetInterpreterWeak().lock();
+        }
+    }
+
+    if (interpreter != nullptr) {
+        const size_t inherited = interpreter->ClearBlendedTextures();
+        SPDLOG_INFO("Run start: dropped {} blended-texture registration(s) left by the previous run.", inherited);
+    } else {
+        SPDLOG_INFO("Run start: no renderer yet, so no blended-texture registrations could exist to drop "
+                    "(expected on the first run only).");
     }
 }
 

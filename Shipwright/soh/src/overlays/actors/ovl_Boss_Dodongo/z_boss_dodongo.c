@@ -23,6 +23,7 @@ void BossDodongo_Init(Actor* thisx, PlayState* play);
 void BossDodongo_Destroy(Actor* thisx, PlayState* play);
 void BossDodongo_Update(Actor* thisx, PlayState* play);
 void BossDodongo_Draw(Actor* thisx, PlayState* play);
+void BossDodongo_Reset(void);
 
 void BossDodongo_SetupIntroCutscene(BossDodongo* this, PlayState* play);
 void BossDodongo_IntroCutscene(BossDodongo* this, PlayState* play);
@@ -57,7 +58,7 @@ const ActorInit Boss_Dodongo_InitVars = {
     (ActorFunc)BossDodongo_Destroy,
     (ActorFunc)BossDodongo_Update,
     (ActorFunc)BossDodongo_Draw,
-    NULL,
+    (ActorResetFunc)BossDodongo_Reset,
 };
 
 #include "z_boss_dodongo_data.c"
@@ -72,6 +73,31 @@ static u8 sMaskTexLava[LAVA_TEX_WIDTH * LAVA_TEX_HEIGHT] = { { 0 } };
 
 static u32* sLavaFloorModifiedTexRaw = NULL;
 static u32* sLavaWavyTexRaw = NULL;
+
+// These are plain malloc'd buffers, so unlike most statics on issue 0016's list they stay VALID
+// across runs -- nothing dangles. What they do is leak: they are freed and rebuilt only by
+// BossDodongo_RegisterBlendedLavaTextureUpdate, and only while the Dodongo boss scene is loaded, so a
+// run that ends in that room never gives them back. Under an HD texture pack that is multiple MB per
+// run, in a process the launcher keeps alive across runs.
+//
+// Registered as the overlay's ActorResetFunc, which Actor_FreeOverlay calls when the last instance
+// unloads -- the same mechanism 34 other OoT overlays use, and the point at which the textures are
+// genuinely finished with (they are rebuilt on re-entry).
+void BossDodongo_Reset(void) {
+    // Order matters: the renderer holds sLavaWavyTexRaw as a blended-texture REPLACEMENT pointer, so
+    // freeing it while that registration stands would leave the Interpreter drawing from freed memory
+    // for as long as the process lives. Hand it back first.
+    Gfx_UnregisterBlendedTexture(gDodongosCavernBossLavaFloorTex);
+
+    if (sLavaFloorModifiedTexRaw != NULL) {
+        free(sLavaFloorModifiedTexRaw);
+        sLavaFloorModifiedTexRaw = NULL;
+    }
+    if (sLavaWavyTexRaw != NULL) {
+        free(sLavaWavyTexRaw);
+        sLavaWavyTexRaw = NULL;
+    }
+}
 static u16 sLavaFloorModifiedTex[LAVA_TEX_SIZE];
 static u16 sLavaWavyTex[LAVA_TEX_SIZE];
 

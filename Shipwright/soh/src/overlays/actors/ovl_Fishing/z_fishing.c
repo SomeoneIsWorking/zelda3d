@@ -10,6 +10,8 @@
 #include "objects/object_fish/object_fish.h"
 #include "vt.h"
 
+#include <string.h> // memset
+
 #include "soh/frame_interpolation.h"
 #include "soh/Enhancements/game-interactor/GameInteractor_Hooks.h"
 
@@ -5954,8 +5956,130 @@ void Fishing_DrawOwner(Actor* thisx, PlayState* play) {
 }
 
 void Fishing_Reset(void) {
-    // Reset static variables for fishing camera and cinematic state to prevent crashing when dying
-    // or re-entering the scene while the fishing rod was cast
-    sSubCamId = 0;
+    // On N64 every one of these lives in the overlay's BSS/data, which the loader re-zeroes (or
+    // re-copies) each time the overlay is loaded -- so leaving the pond genuinely wiped them. SoH
+    // compiles the overlay in, so instead they persist for the life of the PROCESS: across pond
+    // re-entries within a run, and now (since the launcher keeps the process alive) across runs.
+    // Restoring the declared initializers here, on the ActorResetFunc that fires when the last
+    // instance unloads, reproduces the console behavior exactly rather than approximating it.
+    //
+    // The values Fishing_Init re-derives from HIGH_SCORE(HS_FISHING) -- record length, game number,
+    // fishes caught -- are cleared too, on purpose: Init overwrites them before anything reads them,
+    // so clearing costs nothing and stops a stale value being visible in the window where it doesn't.
+    //
+    // Deliberately NOT reset: sJntSphInit / sJntSphElementsInit / sPondPropInits / sFishInits /
+    // sInitChain and the other lookup tables, which are read-only templates the actor copies FROM;
+    // and sZeroVec / sUnusedVec / sFishMouthOffset, which are constants that happen to lack `const`.
+    sStormStrength = 0.0f;
+    sStormStrengthTarget = 0;
+    sFishingStormShade = 0.0f;
+    sFishingStormSfxPos = (Vec3f){ 0.0f, 0.0f, 0.0f };
+    sStormSfxFreqScale = 0.0f;
+    sSinkingLureLocation = 0;
+    sFishOnHandLength = 0.0f;
+    sIsRodVisible = true;
+    sFishLengthToWeigh = 0;
+    sFishingCaughtTextDelay = 0;
+    sFishingTimePlayed = 0;
+    sOwnerTheftTimer = 0;
+    sOwnerHair = FS_OWNER_BALD;
+    sIsOwnersHatHooked = false;
+    sIsOwnersHatSunk = false;
+    sRodCastState = 0;
+    D_80B7A6A4 = 0;
+    sRodBendRotY = 0.0f;
+    D_80B7A6AC = 0.0f;
+    D_80B7A6B0 = 0.0f;
+    D_80B7A6B4 = 0.0f;
+    D_80B7A6B8 = 0.0f;
+    D_80B7A6BC = 0.0f;
+    D_80B7A6C0 = 0.0f;
+    sStickAdjXPrev = 0;
+    sStickAdjYPrev = 0;
     sFishingPlayerCinematicState = 0;
+    sFishingCinematicTimer = 0;
+    sSinkingLureFound = false;
+    sFishGroupVar = 0.0f;
+    sFishingMain = NULL;
+    sReelLock = 0;
+    sLinkAge = 0;
+    sFishingFoggy = 0;
+    sStormChanceTimer = 0;
+    sFishingRecordLength = 0.0f;
+    sFishOnHandIsLoach = 0;
+    sFishGameNumber = 0;
+    sLureCaughtWith = 0;
+    sFishFightTime = 0;
+    sPondOwnerTextIdIndex = 0;
+    sFishesCaught = 0;
+    sFishingCaughtTextId = 0;
+    sLureCameraZoomLevel = 0;
+    sOwnerHeadPos = (Vec3f){ 0.0f, 0.0f, 0.0f };
+    sEffOwnersHatRot = (Vec3s){ 0, 0, 0 };
+    sLureMoveDelay = 0;
+    sRumbleDelay = 0;
+    sFishingMusicDelay = 0;
+    sFishingHookedFish = NULL;
+    sFishingPlayingState = 0;
+    sLureTimer = 0;
+    D_80B7E0B0 = 0;
+    D_80B7E0B2 = 0;
+    sRodCastTimer = 0;
+    sLureEquipped = 0;
+    sLurePos = (Vec3f){ 0.0f, 0.0f, 0.0f };
+    sLureDrawPos = (Vec3f){ 0.0f, 0.0f, 0.0f };
+    sLureRot = (Vec3f){ 0.0f, 0.0f, 0.0f };
+    sLurePosDelta = (Vec3f){ 0.0f, 0.0f, 0.0f };
+    sLureCastDelta = (Vec3f){ 0.0f, 0.0f, 0.0f };
+    sLure1Rotate = 0.0f;
+    sLurePosZOffset = 0.0f;
+    sLureRotXTarget = 0.0f;
+    sLureRotXStep = 0.0f;
+    D_80B7E114 = 0;
+    sRodPullback = 0;
+    D_80B7E118 = 0;
+    sRodReelingSpeed = 0.0f;
+    sWiggleAttraction = 0;
+    sLureBitTimer = 0;
+    sLineHooked = 0;
+    sLureLineSegPosDelta = (Vec3f){ 0.0f, 0.0f, 0.0f };
+    sLureWiggleRotYTarget = 0.0f;
+    sLureWigglePosY = 0.0f;
+    sLureWiggleRotY = 0;
+    sLureWiggleSign = 0.0f;
+    sRodLineSpooled = 0.0f;
+    D_80B7E148 = 0.0f;
+    sFishingLineScale = 0.0f;
+    D_80B7E150 = 0;
+    sReelLinePosStep = 0.0f;
+    sRodTipPos = (Vec3f){ 0.0f, 0.0f, 0.0f };
+    sRodHitTimer = 0;
+    sSinkingLureSegmentIndex = 0;
+    sProjectedW = 0.0f;
+    sCameraEye = (Vec3f){ 0.0f, 0.0f, 0.0f };
+    sCameraAt = (Vec3f){ 0.0f, 0.0f, 0.0f };
+    sSubCamId = 0;
+    sCatchCamX = 0.0f;
+    sSubCamVelFactor = 0.0f;
+    D_80B7FED0 = 0.0f;
+    sSinkingLureBasePos = (Vec3f){ 0.0f, 0.0f, 0.0f };
+    sSinkingLureHeldY = 0.0f;
+    sRandSeed0 = 0;
+    sRandSeed1 = 0;
+    sRandSeed2 = 0;
+    sFishGroupAngle1 = 0.0f;
+    sFishGroupAngle2 = 0.0f;
+    sFishGroupAngle3 = 0.0f;
+    sStreamSoundProjectedPos = (Vec3f){ 0.0f, 0.0f, 0.0f };
+    sFishOnHandParams = 0;
+
+    memset(sReelLinePos, 0, sizeof(sReelLinePos));
+    memset(sReelLineRot, 0, sizeof(sReelLineRot));
+    memset(sReelLineUnk, 0, sizeof(sReelLineUnk));
+    memset(sLureHookRefPos, 0, sizeof(sLureHookRefPos));
+    memset(sLureHookRotY, 0, sizeof(sLureHookRotY));
+    memset(sSinkingLurePos, 0, sizeof(sSinkingLurePos));
+    memset(sPondProps, 0, sizeof(sPondProps));
+    memset(sGroupFishes, 0, sizeof(sGroupFishes));
+    memset(sFishingEffects, 0, sizeof(sFishingEffects));
 }

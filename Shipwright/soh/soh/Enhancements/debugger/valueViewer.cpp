@@ -12,6 +12,7 @@ extern "C" {
 #include "functions.h"
 #include "macros.h"
 #include "soh/cvar_prefixes.h"
+#include "zelda3d/zelda3d.h"
 #include "overlays/actors/ovl_Door_Warp1/z_door_warp1.h"
 
 extern PlayState* gPlayState;
@@ -332,9 +333,12 @@ void ValueViewerWindow::DrawElement() {
 }
 
 void ValueViewerWindow::InitElement() {
-    static bool loadedConfig = false;
-    if (!loadedConfig) {
+    // Run-scoped, not process-scoped. InitElement runs once per run (the GuiWindow list is now rebuilt
+    // per run), and a plain `static bool` meant only the FIRST run ever read the saved value list --
+    // every run after it opened the window empty. Zelda3DOnce stamps the run epoch, so it still
+    // latches within a run but re-arms across runs.
+    static Zelda3DOnce loadedConfig;
+    if (Zelda3D_Once(&loadedConfig)) {
         LoadValueConfig();
-        loadedConfig = true;
     }
 }

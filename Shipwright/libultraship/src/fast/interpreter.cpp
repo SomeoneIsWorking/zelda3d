@@ -5750,6 +5750,21 @@ void Interpreter::UnregisterBlendedTexture(const char* name) {
     mMaskedTextures.erase(name);
 }
 
+// The Interpreter is engine-lifetime; these entries are not.
+//
+// Each value holds two raw pointers: `mask`, which is usually a static texture inside the GAME CORE's
+// .so, and `replacement`, which is either a malloc'd buffer the actor owns (Boss Dodongo's lava) or
+// `Texture::ImageData` belonging to a resource in the PER-GAME ResourceManager. All three lifetimes
+// end with the run; the map does not. Nothing unregisters them either -- UnregisterBlendedTexture is
+// called only when an actor deliberately swaps a texture back -- so a run that ends with a blended
+// texture live leaves the next run's renderer dereferencing freed memory on the drawing path, at a
+// point far from anything that names the departed game.
+size_t Interpreter::ClearBlendedTextures() {
+    const size_t inherited = mMaskedTextures.size();
+    mMaskedTextures.clear();
+    return inherited;
+}
+
 // New getters and setters
 void Interpreter::SetNativeDimensions(float width, float height) {
     mNativeDimensions.width = width;
