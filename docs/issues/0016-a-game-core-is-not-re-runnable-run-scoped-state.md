@@ -405,6 +405,46 @@ being cleared per gamestate.
 See [issue 0018](0018-animation-resources-point-into-a-resource-file-b.md): running `mm,oot,mm` under ASAN died earlier, in core 2, on an unrelated resource-lifetime use-after-free.
 
 
+### `mm,oot,mm` -- TWO different problems, finally separated
+
+Everything before this conflated them, and every ASAN run stopped on the first without ever reaching
+the second.
+
+**Problem A -- OoT core 2 reads one animation frame out of bounds.** ASAN: a
+heap-buffer-overflow READ of 134 bytes, 536 bytes past a 3,216-byte
+`PlayerAnimation::limbRotData` vector, in `AnimationContext_SetLoadFrame`. A permanent check at that
+memcpy (committed, reports and does not repair) names it exactly: **frame 28 requested from an
+animation whose header says 24 frames, limbCount 22.** It fires ONCE and is completely silent in the
+release build -- it has presumably been happening for a long time.
+
+The frame tables are not the problem: every animation measured is exactly 134 bytes per frame for its
+stated frameCount (24/3216, 29/3886, 33/4422, 89/11926). So the header the player is using and the
+data `segment` points at belong to DIFFERENT animations.
+
+Discriminators, all measured:
+- `oot` alone: **0** occurrences.
+- `oot,oot`: **0** occurrences -- so it is not "OoT running second".
+- `mm,oot,mm`: 1 occurrence. **MM having run first is the variable.**
+- Archive sets are correct per core (`soh.o2r`+`oot.o2r` for OoT, `2ship.o2r`+`mm.o2r` for MM), so a
+  mixed-asset explanation is ruled out. That was the leading hypothesis; it is wrong.
+
+**Problem B -- MM core 3 SIGSEGVs in `SkelAnime_DrawFlexLod`** under `Player_DrawImpl`. This is the
+release-build crash, and it has NEVER been reached under ASAN because Problem A aborts the sanitizer
+run first. Its own discriminators:
+- `mm,mm`: passes. So it is not simply MM's second run.
+- `oot,mm`: passes. So it is not simply MM after OoT.
+- `mm,oot,mm`: fails. **It needs MM's second run WITH OoT in between.**
+
+That combination is the fact to explain. Nothing in MM's own per-run state can distinguish those
+cases -- MM's first run is identical in both -- so the difference is either shared libultraship state
+that OoT's session mutates, or heap layout that only OoT's allocation churn produces. Note the fixes
+already applied (`gSaveContext`, `gAudioCtx`, the skeleton registry, the model provider) did NOT
+change it.
+
+To get ASAN onto Problem B, Problem A has to stop aborting the run first -- either by fixing it, or
+by building with `-fsanitize-recover=address` and `ASAN_OPTIONS=halt_on_error=0`. The recover flag is
+NOT currently set, which is why `halt_on_error=0` would not work as-is.
+
 ### `mm,oot,mm` status after the 2026-08-12 fixes
 
 Still failing. Two real bugs were found and fixed on the way there and neither was it: the

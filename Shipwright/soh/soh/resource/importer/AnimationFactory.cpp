@@ -151,9 +151,20 @@ ResourceFactoryBinaryAnimationV0::ReadResource(std::shared_ptr<Ship::File> file,
                 const auto typeOf = [](const std::shared_ptr<Ship::IResource>& r) -> long {
                     return (r != nullptr && r->GetInitData() != nullptr) ? (long)r->GetInitData()->Type : -1;
                 };
-                SPDLOG_INFO("ANIMTYPE path=\"{}\" firstLoad={} (type={}) altTried={} altResolved={} -> using {}",
+                // frameCount vs the size of the buffer that has to satisfy it. ASAN caught the
+                // consumer reading frame 28 out of a 24-frame buffer
+                // (`memcpy(ram, animData + (sizeof(Vec3s)*limbCount + 2) * frame, ...)`), so the
+                // header and the data it points at disagree -- and neither value is visible at the
+                // crash site. Both are printed for EVERY animation, not just suspicious ones,
+                // because the useful comparison is between the clean run and the failing one.
+                // limbCount is not known here, so bytes-per-frame cannot be derived; the raw pair is
+                // what makes a mismatch legible.
+                const size_t dataBytes = (playerAnimData != nullptr) ? playerAnimData->limbRotData.size() * 2 : 0;
+                SPDLOG_INFO("ANIMTYPE path=\"{}\" firstLoad={} (type={}) altTried={} altResolved={} -> using {}"
+                            " frameCount={} dataBytes={}",
                             path, animResource != nullptr ? "hit" : "MISS", typeOf(animResource),
-                            triedAltPath ? "yes" : "no", animData != nullptr ? "yes" : "no", branch);
+                            triedAltPath ? "yes" : "no", animData != nullptr ? "yes" : "no", branch,
+                            (int)animation->animationData.linkAnimationHeader.common.frameCount, dataBytes);
             }
         }
 
