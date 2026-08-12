@@ -117,12 +117,23 @@ infinite `camera->eyeNext` is the bug.
 
 ## Now hunting the producer
 
-A second probe brackets the camera mode function inside `Camera_Update` — the only thing between the
-two samples — and reports three distinguishable outcomes rather than one: *clean on entry, produced
-by the mode function this frame*; *already bad on entry* (it survived from an earlier frame, so the
-search moves earlier); or *bad on entry, cleaned*. It prints `setting`, `mode`, `funcIdx`, all three
-camera vectors, `dist` and the scene, capped at 8 reports. The "clean on entry" case is the one that
-would otherwise be silent, and silence is what a wrong conclusion gets built on.
+A second probe bracketed the camera mode function inside `Camera_Update` and **printed nothing**,
+which is itself the finding rather than a dud. Everything was finite on entry every frame, including
+the crashing one — because the corruption and the crash are inside the SAME `Camera_Normal1` call
+(`Camera_Vec3fVecSphGeoAdd(eyeNext, …)` at z_camera.c:1837, then `func_80046E20` →
+`func_80045508` → `Camera_BGCheckInfo` seven lines below), so the "after" sample is never reached.
+**"It arrived infinite from an earlier frame" is ruled out.** Kept the probe: it is cheap and it now
+carries that negative result.
+
+A third probe sits between the write and the use, on line 1837's result: if `eyeNext` comes out
+non-finite it logs `at`, the whole `eyeAdjustment` (r/pitch/yaw), `camera->dist`, `distMin`,
+`distMax`, `atEyeNextGeo.r` and `yawUpdateRateInv`. `at` is finite in the failing run, so the
+infinity has to arrive through `eyeAdjustment.r` — which is `camera->dist`, assigned four lines
+earlier straight out of `Camera_ClampDist`. That probe names the input.
+
+**Reproduction note:** targeted single-core runs keep surviving (four attempts now); only the full
+`tools/zelda3d_deep_check.sh` has reproduced it, twice out of two attempts that got far enough. Drive
+it with the deep check, not with a hand-built sequence.
 
 ## Still intermittent
 
