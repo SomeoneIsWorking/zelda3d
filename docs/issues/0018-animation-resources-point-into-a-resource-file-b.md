@@ -61,10 +61,19 @@ likely enough to matter -- which is why it surfaced now rather than being introd
 - Whether this is the cause of the `mm,oot,mm` release-build SIGSEGV (`SkelAnime_DrawFlexLod` under
   MM's stock player draw, core 3). Same family, different game, and the ASAN run died earlier -- in
   core 2 -- so it never reached the release build's failure point. Do not assume one fix closes both.
-- Whether `animData->GetPointer()` returns a pointer into the File buffer directly or into something
-  the resource owns. The ASAN evidence says the freed block IS an `O2rArchive::LoadFile` vector, so
-  something in that chain exposes file memory; exactly which resource type does it is the next thing
-  to read.
+- **How file memory gets into `segment` at all -- the obvious reading is already ruled out.**
+  `Animation::GetPointer()` returns `&animationData`, a member of the `Animation` resource object,
+  NOT the File buffer (`soh/resource/type/Animation.h:73,77`). Yet ASAN says the read lands 168 bytes
+  into a 3,284-byte block allocated by `O2rArchive::LoadFile`, and ASAN only reports use-after-free
+  while a region is still in quarantine -- so it is genuinely freed file memory, not an `Animation`
+  reallocated at the same address. Something between the nested `LoadResourceProcess` and
+  `linkAnimationHeader.segment` is therefore handing back file-backed memory, and finding what is the
+  next step. Candidates: the nested load resolving to a factory OTHER than the animation one (the
+  `static_pointer_cast<Animation>` at `AnimationFactory.cpp:89` is unchecked, so a different resource
+  type would be reinterpreted silently), or a factory in that chain that stores `file->Buffer`.
+  The consumer is `memcpy(ram, animData + (sizeof(Vec3s)*limbCount + 2) * frame, ...)`
+  (`z_skelanime.c:1035`) -- so `animData` is treated as a flat frame table, which is what a raw file
+  blob looks like.
 - Whether other factories have the same shape. `LoadResourceProcess` returning while its File dies is
   a general hazard, so a sweep of the factories for retained pointers is worth more than a point fix.
 
