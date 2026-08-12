@@ -54,7 +54,9 @@ echo
 if [ "$fail" -eq 0 ]; then
     echo "=== DEEP VERDICT (exit 0) === every sequence ran clean under the sanitizer with ${DWELL}s dwell."
     echo "    COVERED: each core held ${DWELL}s in-game, so this DOES say something past the first frame."
-    echo "    NOT covered: detect_leaks=0, so nothing here is about leaks; no randomizer seed is"
+    echo "    NOT covered: leaks. detect_leaks=0 here -- and turning it on would not help much, because"
+    echo "    LSAN only reports UNREACHABLE memory and this project's leaks stay reachable from their"
+    echo "    X::Instance globals (validated both ways, docs/info/instruments/035). No randomizer seed is"
     echo "    generated, so the rando ownership paths are not exercised; and dwell sits wherever the"
     echo "    core spawns -- it is time in-game, not coverage of the game."
 else
