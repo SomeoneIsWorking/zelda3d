@@ -973,3 +973,27 @@ Three other plain `static bool initialized` latches were examined and deliberate
 state they guard holds no per-run pointer: `DrawFuncs.cpp`'s `DrawLikeLike` (float/Vec3s segment
 data), `CosmeticEditor.cpp` (label strings from a static table), and soh's `location_access.cpp`
 (an array of enum values). Named here so the next sweep does not re-derive them.
+
+### MM's message tables: the last of the per-run leak (2026-08-12)
+
+soh's message tables were fixed early in this arc (rebuilt only `if (ptr == NULL)`, entries `c_str()`
+into a departed session). MM's are a different bug in the same file position: `OTRMessage_Init`
+mallocs both tables **unconditionally** and overwrites the globals without freeing what was there, so
+every run leaked the previous run's copy.
+
+The malloc in `OTRMessage_LoadTable` carries the comment *"Should not be malloc'ing here. It's fine
+for now since we check elsewhere that the message table is already null."* Nothing nulls it and
+nothing checks — that stopped being true the moment a core could run twice.
+
+Freeing needs a length the C globals do not carry, so the entry counts are now kept beside them. The
+two tables are freed differently, and getting that wrong would be a double free rather than a leak:
+the NES table owns a malloc'd `segment` per entry and needs a walk; the credits table's segments are
+`c_str()` into the resource's own `std::string`s, so **only the array itself is ours**.
+
+Measured with the `use_globals=0` differential:
+
+    before   mm 28,356,180 / 9,210 allocs   mm,mm 28,898,481 / 13,969   -> 542,301 per run
+    after    mm 28,356,180 / 9,210 allocs   mm,mm 28,361,453 /  9,379   ->   5,273 per run
+
+Run 1 reports `freed 0 NES and 0 credits`, run 2 `freed 4588 NES and 46 credits` — both directions on
+real data. MM's per-run leak is now the same order as OoT's 3,505 bytes.
