@@ -400,3 +400,6 @@ with a bad `skelAnime->skeleton` or limb table -- which makes candidate 2 above 
 first looked, and puts the skeleton-patching registry (whose whole job is to overwrite
 `skelAnime->skeleton` every `Graph_ProcessGfxCommands`) back at the top of the list, despite it now
 being cleared per gamestate.
+
+
+See [issue 0018](0018-animation-resources-point-into-a-resource-file-b.md): running `mm,oot,mm` under ASAN died earlier, in core 2, on an unrelated resource-lifetime use-after-free.
