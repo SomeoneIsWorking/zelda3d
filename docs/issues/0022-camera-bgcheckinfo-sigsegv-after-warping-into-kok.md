@@ -2,7 +2,7 @@
 
 status: ROOT-CAUSED AND FIXED 2026-08-12 — see "Root cause" below (verification pending a clean deep run)
 found by: `tools/zelda3d_deep_check.sh` after issue 0021 made the warp tour land where it was aimed
-severity: crashes the core; currently makes the deep check RED
+severity: crashed the core and made the deep check RED; fixed 2026-08-12, deep check oot,oot now exits 0
 
 ## What happens
 
