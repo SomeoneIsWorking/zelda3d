@@ -1,7 +1,7 @@
 ---
 id: 18
 title: Animation resources point into a resource File buffer the ResourceManager frees when the load returns
-status: investigating
+status: fixed
 symptom: ASAN reports a heap-use-after-free READ of 134 bytes in AnimationContext_SetLoadFrame during ordinary OoT gameplay: the animation's linkAnimationHeader.segment points into a Ship::File buffer that LoadResourceProcess destroyed when the nested load in AnimationFactory returned. Silent off the sanitizer.
 tags: asan,resources,lifetime,animation,launcher
 created: 2026-08-12
@@ -275,3 +275,45 @@ consistent), and the player asks for frame 28. That is a PLAYBACK overrun -- `cu
 **The gate lesson is the durable part**: an acceptance gate that stops at the first playable frame
 reports "clean" for everything that happens afterwards, and three separate conclusions in this issue
 were built on exactly that silence.
+
+
+## FIXED 2026-08-12 -- a frame index taken from another actor, with no bound
+
+`z_player.c:14189`, the horse-riding action:
+
+```c
+this->skelAnime.curFrame = rideActor->curFrame;   // the HORSE's playhead
+LinkAnimation_AnimateFrame(play, &this->skelAnime);
+```
+
+Link's riding pose is frame-locked to the horse's animation, and the horse's animation can be longer
+than Link's. Two lines above, `this->skelAnime.animation` is assigned directly out of `D_80854944`
+rather than through `LinkAnimation_Change`, so nothing ever tells that skelAnime how long its new
+animation is -- and the frame index then comes from a different actor entirely. Nothing in that path
+compares the two.
+
+On N64 the animation data was one contiguous segment, so overrunning it quietly read the neighbouring
+animation and nobody noticed. Here each animation is its own heap allocation, so it is a
+heap-buffer-overflow: 134 bytes read from 670 past the end of a 3,216-byte buffer.
+
+Fixed by clamping to Link's own last frame -- the bound that was missing, not a workaround for a
+symptom: frame N of an animation with fewer than N frames has no correct value. The visible effect is
+that Link's pose holds on its final frame for the few frames the horse's animation runs longer, which
+is what the data can actually express.
+
+**Evidence:** `ZELDA3D_SEQ_DWELL=60 tools/zelda3d_sequence.sh oot` reported the over-read 1/1 before
+and **0** after. `oot`, `oot,oot`, `mm,oot,mm` and the switch test all exit 0. The permanent check in
+`AnimationContext_SetLoadFrame` stays -- it is what will catch the next one, and it reports rather
+than clamps precisely so a mismatch elsewhere cannot hide behind a plausible pose.
+
+### What this issue got wrong three times, kept as the record
+
+1. **"Animation resources point into a resource File buffer"** (the title) -- no. Nothing pointed into
+   a File.
+2. **"An unchecked `static_pointer_cast<Animation>` in AnimationFactory"** -- a real bug, found and
+   fixed (3 animations per run were reading garbage), but not this one.
+3. **"Requires MM to have run first"** -- an artifact of the gate quitting at the first playable
+   frame. `oot` alone reproduces it once allowed to run 60s longer.
+
+Each was killed by an instrument rather than by argument, and each instrument was built only after
+the previous conclusion had already been written down as fact.
