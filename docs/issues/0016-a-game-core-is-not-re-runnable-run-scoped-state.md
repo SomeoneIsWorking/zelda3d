@@ -775,3 +775,40 @@ reported 33 unreset files. MM registers its resets **without the cast** (`/**/ D
 every MM overlay that already had one came back as a finding. Re-run against the actual definition
 (`^\w+_Reset\(void\)`) it drops to 26. The false-positive direction is the survivable one; a
 discriminator checked in only one direction would have been believed either way.
+
+
+## A core must RETURN, not exit() — the boot path now does (2026-08-12)
+
+Sized and deferred earlier in this arc; done now. Upstream SoH/2S2H call `exit()` when an asset is
+missing or an archive is invalid, from a time when the game WAS the process. Under the launcher that
+turns "Ocarina's archive is missing" into "the application vanished", taking the chooser and the other
+game's session with it and telling the user nothing about which game failed.
+
+**Mechanism, and why it is an exception rather than a longjmp:** the core entry is C
+(`core_entry.c` / `main.c`) and `InitOTR` is `extern "C"` but implemented in C++. Unwinding through a
+C frame is undefined, so the throw has to be caught before it can reach one — inside `InitOTR`, which
+is the outermost C++ frame on the boot path. Every destructor between the failure and the catch still
+runs, and that path is full of RAII (shared_ptr resources, archive readers, file handles), which a
+`longjmp` would have leaked. `InitOTR` returns `int` now, in the shared `zelda3d_port_api.h` so both
+cores changed together, and each entry returns non-zero without running the frame loop.
+
+**Converted:** the two hard-failure sites per core — no archive and no ROM to extract one from, and
+an invalid OTR/O2R. **Deliberately not converted:** the interactive extraction popups, whose `exit()`
+calls live in lambdas the GUI invokes later; this build auto-answers those prompts so they are
+unreachable here, and throwing out of an ImGui callback is a different problem with a different
+answer.
+
+**Proven to fire, in the shipping artifact.** The real trigger needs a missing or corrupt asset, which
+no gate can arrange without moving the user's ROMs around — so the cores carry a
+`ZELDA3D_BOOTFAIL_TEST=1` hook that throws the same `CoreBootError` the asset checks throw, and
+`tools/zelda3d_bootfail_test.sh` drives it for both. It asserts on the launcher's own
+"control is back in the launcher" line rather than on the exit code, because a core that called
+`exit(1)` and a core that returned 1 produce the identical code — which is the entire bug being
+guarded against. Both games: exit 1, control back in the launcher, reason reported. The negative
+direction is the existing sequence and switch gates, still green.
+
+**Left open, and stated rather than quietly narrowed:** when a game picked FROM the chooser fails to
+boot, the launcher still ends the process instead of going back to the chooser. The chooser lives
+inside the OoT core (it is an OoT gamestate), so recovering means re-running OoT, which is a policy
+decision about what should happen on failure rather than a missing mechanism. The mechanism — a core
+returns instead of killing the process — is what this change delivers.

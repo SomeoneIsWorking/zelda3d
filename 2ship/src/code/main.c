@@ -50,7 +50,7 @@ size_t gSystemHeapSize = 0;
 
 #include "zelda3d/mm3d_core_lifecycle.h"
 
-void InitOTR(int argc, char* argv[]);
+int InitOTR(int argc, char* argv[]);
 void Heaps_Free(void);
 
 // MM as a loadable game core. This was int main(); it is now the core's run function, because the
@@ -83,7 +83,13 @@ int Zelda3D_CoreRun(int argc, char* argv[] /* void* arg*/) {
     // FIRST, before anything can read it. The launcher may have run a game in this process already,
     // and InitOTR below is exactly where a stale pointer from that run got dereferenced.
     Zelda3D_CoreRunBegin();
-    InitOTR(argc, argv);
+    // A boot failure RETURNS now, it does not exit() the process. The launcher is still holding this
+    // core's dlopen handle and still owns the chooser and, in a switch sequence, the other game's
+    // session. Nothing after this point may run: InitOTR unwound partway through.
+    if (InitOTR(argc, argv) != 0) {
+        Zelda3D_CoreRunEnd();
+        return 1;
+    }
     CrashHandlerRegisterCallback(CrashHandler_PrintExt);
     Heaps_Alloc();
 

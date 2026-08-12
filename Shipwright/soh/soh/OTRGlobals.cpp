@@ -1,5 +1,7 @@
 #include "OTRGlobals.h"
 #include "OTRAudio.h"
+#include "port/core_boot_error.h"
+#include <cstdlib>
 #include <algorithm>
 #include <atomic>
 #include <filesystem>
@@ -534,12 +536,8 @@ void OTRGlobals::RunExtract(int argc, char* argv[]) {
         !std::filesystem::exists(Ship::Context::LocateFileAcrossAppDirs("oot-mq.o2r", appShortName))) {
         ZELDA3D_BOOT("RunExtract: oot.o2r missing — auto-extracting from ROM (no prompts)");
         if (!Zelda3D_AutoExtractVanilla()) {
-            SPDLOG_ERROR("[zelda3d] No oot.o2r and no usable OoT N64 ROM (.z64/.n64/.v64) found near the binary "
-                         "or repo root to extract from. Drop a valid OoT ROM there and relaunch.");
-            if (auto _lg = spdlog::default_logger()) {
-                _lg->flush();
-            }
-            exit(1);
+            throw Zelda3D::CoreBootError("no oot.o2r, and no usable OoT N64 ROM (.z64/.n64/.v64) near the "
+                                         "binary or repo root to extract one from");
         }
         ZELDA3D_BOOT("RunExtract: auto-extract complete; continuing");
     }
@@ -1111,7 +1109,7 @@ void OTRGlobals::Initialize() {
                                      "Attempted to load an invalid OTR file. Try regenerating.", nullptr);
             SPDLOG_ERROR("Invalid OTR File!");
 #endif
-            exit(1);
+            throw Zelda3D::CoreBootError("the game archive is not a valid OTR/O2R file; try regenerating it");
         }
         switch (version) {
             case OOT_PAL_MQ:
@@ -1733,108 +1731,130 @@ bool VerifyArchiveVersion(OTRVersion version) {
 // the whole N64 global header. Implemented in zelda3d/core/zelda3d_hostreg.cpp.
 extern "C" void Zelda3D_RegisterHostHooks(void);
 
-extern "C" void InitOTR(int argc, char* argv[]) {
-    // Before anything renders or reads input: give libultraship this core's hooks. It can no longer
-    // call them by name -- see zelda3d/core/zelda3d_hostreg.cpp.
-    Zelda3D_RegisterHostHooks();
-    ZELDA3D_BOOT("InitOTR: new OTRGlobals()");
-    OTRGlobals::Instance = new OTRGlobals();
-    ZELDA3D_BOOT("InitOTR: RunExtract()");
-    OTRGlobals::Instance->RunExtract(argc, argv);
+extern "C" int InitOTR(int argc, char* argv[]) {
+    // Returns 0 on success and non-zero when the core cannot boot. See core_boot_error.h:
+    // this is the outermost C++ frame on the boot path, and the caller is C, so the throw has
+    // to be caught HERE -- an exception unwinding into a C frame is undefined.
+    try {
+        // Self-test for the boot-failure path (see port/core_boot_error.h). This path only runs when
+        // an asset is missing or corrupt, which is exactly the case a gate cannot arrange without
+        // moving the user's ROMs around -- so without this hook the return-instead-of-exit contract
+        // would ship untested, which is how it silently reverts to exit() the next time someone
+        // touches the boot chain. tools/zelda3d_sequence.sh --bootfail drives it.
+        if (const char* e = std::getenv("ZELDA3D_BOOTFAIL_TEST"); e != nullptr && e[0] == '1') {
+            throw Zelda3D::CoreBootError("ZELDA3D_BOOTFAIL_TEST=1 -- deliberate failure, exercising the "
+                                         "return-to-launcher path");
+        }
+        // Before anything renders or reads input: give libultraship this core's hooks. It can no longer
+        // call them by name -- see zelda3d/core/zelda3d_hostreg.cpp.
+        Zelda3D_RegisterHostHooks();
+        ZELDA3D_BOOT("InitOTR: new OTRGlobals()");
+        OTRGlobals::Instance = new OTRGlobals();
+        ZELDA3D_BOOT("InitOTR: RunExtract()");
+        OTRGlobals::Instance->RunExtract(argc, argv);
 
-    ZELDA3D_BOOT("InitOTR: Initialize() (loads oot.o2r)");
-    OTRGlobals::Instance->Initialize();
-    ZELDA3D_BOOT("InitOTR: Initialize() done; managers/audio next");
-    CustomMessageManager::Instance = new CustomMessageManager();
-    ItemTableManager::Instance = new ItemTableManager();
-    GameInteractor::Instance = new GameInteractor();
-    SaveManager::Instance = new SaveManager();
+        ZELDA3D_BOOT("InitOTR: Initialize() (loads oot.o2r)");
+        OTRGlobals::Instance->Initialize();
+        ZELDA3D_BOOT("InitOTR: Initialize() done; managers/audio next");
+        CustomMessageManager::Instance = new CustomMessageManager();
+        ItemTableManager::Instance = new ItemTableManager();
+        GameInteractor::Instance = new GameInteractor();
+        SaveManager::Instance = new SaveManager();
 
-    std::shared_ptr<Ship::Config> conf = OTRGlobals::Instance->context->GetConfig();
-    conf->RegisterVersionUpdater(std::make_shared<SOH::ConfigVersion1Updater>());
-    conf->RegisterVersionUpdater(std::make_shared<SOH::ConfigVersion2Updater>());
-    conf->RegisterVersionUpdater(std::make_shared<SOH::ConfigVersion3Updater>());
-    conf->RegisterVersionUpdater(std::make_shared<SOH::ConfigVersion4Updater>());
-    conf->RegisterVersionUpdater(std::make_shared<SOH::ConfigVersion5Updater>());
-    conf->RegisterVersionUpdater(std::make_shared<SOH::ConfigVersion6Updater>());
-    conf->RunVersionUpdates();
+        std::shared_ptr<Ship::Config> conf = OTRGlobals::Instance->context->GetConfig();
+        conf->RegisterVersionUpdater(std::make_shared<SOH::ConfigVersion1Updater>());
+        conf->RegisterVersionUpdater(std::make_shared<SOH::ConfigVersion2Updater>());
+        conf->RegisterVersionUpdater(std::make_shared<SOH::ConfigVersion3Updater>());
+        conf->RegisterVersionUpdater(std::make_shared<SOH::ConfigVersion4Updater>());
+        conf->RegisterVersionUpdater(std::make_shared<SOH::ConfigVersion5Updater>());
+        conf->RegisterVersionUpdater(std::make_shared<SOH::ConfigVersion6Updater>());
+        conf->RunVersionUpdates();
 
-    SohGui::SetupGuiElements();
-    SohGui::SetupMenuElements();
+        SohGui::SetupGuiElements();
+        SohGui::SetupMenuElements();
 
-    // Preset loading, given a real boot call site. It used to ride along inside a Dear ImGui menu
-    // registration (Presets.cpp RegisterPresetsWidgets), which made a user-facing feature depend on
-    // a menu that is never drawn.
-    Presets_LoadAtBoot();
+        // Preset loading, given a real boot call site. It used to ride along inside a Dear ImGui menu
+        // registration (Presets.cpp RegisterPresetsWidgets), which made a user-facing feature depend on
+        // a menu that is never drawn.
+        Presets_LoadAtBoot();
 
-    AudioCollection::Instance = new AudioCollection();
-    ActorDB::Instance = new ActorDB();
-#ifdef __APPLE__
-    SpeechSynthesizer::Instance = new DarwinSpeechSynthesizer();
-#elif defined(_WIN32)
-    SpeechSynthesizer::Instance = new SAPISpeechSynthesizer();
-#elif ESPEAK
-    SpeechSynthesizer::Instance = new ESpeakSpeechSynthesizer();
-#else
-    SpeechSynthesizer::Instance = new SpeechLogger();
-#endif
-    SpeechSynthesizer::Instance->Init();
+        AudioCollection::Instance = new AudioCollection();
+        ActorDB::Instance = new ActorDB();
+    #ifdef __APPLE__
+        SpeechSynthesizer::Instance = new DarwinSpeechSynthesizer();
+    #elif defined(_WIN32)
+        SpeechSynthesizer::Instance = new SAPISpeechSynthesizer();
+    #elif ESPEAK
+        SpeechSynthesizer::Instance = new ESpeakSpeechSynthesizer();
+    #else
+        SpeechSynthesizer::Instance = new SpeechLogger();
+    #endif
+        SpeechSynthesizer::Instance->Init();
 
-    CrowdControl::Instance = new CrowdControl();
-    Sail::Instance = new Sail();
-    Anchor::Instance = new Anchor();
+        CrowdControl::Instance = new CrowdControl();
+        Sail::Instance = new Sail();
+        Anchor::Instance = new Anchor();
 
-    OTRMessage_Init();
-    OTRAudio_Init();
-    OTRExtScanner();
-    VanillaItemTable_Init();
-    DebugConsole_Init();
+        OTRMessage_Init();
+        OTRAudio_Init();
+        OTRExtScanner();
+        VanillaItemTable_Init();
+        DebugConsole_Init();
 
-    ActorDB::AddBuiltInCustomActors();
-    // #region SOH [Randomizer] TODO: Remove these and refactor spoiler file handling for randomizer
-    CVarClear(CVAR_GENERAL("RandomizerNewFileDropped"));
-    CVarClear(CVAR_GENERAL("RandomizerDroppedFile"));
-    // #endregion
+        ActorDB::AddBuiltInCustomActors();
+        // #region SOH [Randomizer] TODO: Remove these and refactor spoiler file handling for randomizer
+        CVarClear(CVAR_GENERAL("RandomizerNewFileDropped"));
+        CVarClear(CVAR_GENERAL("RandomizerDroppedFile"));
+        // #endregion
 
-    Ship::Context::GetRawInstance()->GetFileDropMgr()->RegisterDropHandler(SoH_HandleConfigDrop);
+        Ship::Context::GetRawInstance()->GetFileDropMgr()->RegisterDropHandler(SoH_HandleConfigDrop);
 
-    RegisterImGuiItemIcons();
+        RegisterImGuiItemIcons();
 
-    time_t now = time(NULL);
-    tm* tm_now = localtime(&now);
-    if (tm_now->tm_mon == 11 && tm_now->tm_mday >= 24 && tm_now->tm_mday <= 25) {
-        CVarRegisterInteger(CVAR_GENERAL("LetItSnow"), 1);
-    } else {
-        CVarClear(CVAR_GENERAL("LetItSnow"));
+        time_t now = time(NULL);
+        tm* tm_now = localtime(&now);
+        if (tm_now->tm_mon == 11 && tm_now->tm_mday >= 24 && tm_now->tm_mday <= 25) {
+            CVarRegisterInteger(CVAR_GENERAL("LetItSnow"), 1);
+        } else {
+            CVarClear(CVAR_GENERAL("LetItSnow"));
+        }
+
+        // Zelda3D display/range defaults: applied ONCE (persisted), so the user can still change them
+        // in-menu afterward. Match the monitor refresh rate (smooth high-FPS interpolation), extend
+        // actor draw distance well past the N64 cull, and stop culling actors at the widescreen
+        // edges. Aspect ratio already follows the window when unset, so it needs no override. Gated
+        // on SOH3D mode (set by run.sh) so a plain SoH build is untouched.
+        if (getenv("SOH3D") != nullptr && CVarGetInteger(CVAR_GENERAL("Zelda3DDefaults"), 0) < 1) {
+            CVarSetInteger(CVAR_SETTING("MatchRefreshRate"), 1);          // FPS follows monitor refresh
+            CVarSetInteger(CVAR_ENHANCEMENT("DisableDrawDistance"), 20);  // 20x actor forward draw/cull range
+            CVarSetInteger(CVAR_ENHANCEMENT("WidescreenActorCulling"), 1); // don't cull at widescreen X edges
+            CVarSetInteger(CVAR_GENERAL("Zelda3DDefaults"), 1);
+            CVarSave();
+        }
+
+        srand(static_cast<unsigned int>(now));
+        SDLNet_Init();
+        if (CVarGetInteger(CVAR_REMOTE_CROWD_CONTROL("Enabled"), 0)) {
+            CrowdControl::Instance->Enable();
+        }
+        if (CVarGetInteger(CVAR_REMOTE_SAIL("Enabled"), 0)) {
+            Sail::Instance->Enable();
+        }
+        if (CVarGetInteger(CVAR_REMOTE_ANCHOR("Enabled"), 0)) {
+            Anchor::Instance->Enable();
+        }
+        ShipInit::InitAll();
+        Rando::StaticData::InitHashMaps();
+        OTRGlobals::Instance->gRandoContext->AddExcludedOptions();
+    } catch (const Zelda3D::CoreBootError& e) {
+        SPDLOG_ERROR("[soh] cannot boot: {}", e.what());
+        if (auto lg = spdlog::default_logger()) {
+            lg->flush();
+        }
+        return 1;
     }
 
-    // Zelda3D display/range defaults: applied ONCE (persisted), so the user can still change them
-    // in-menu afterward. Match the monitor refresh rate (smooth high-FPS interpolation), extend
-    // actor draw distance well past the N64 cull, and stop culling actors at the widescreen
-    // edges. Aspect ratio already follows the window when unset, so it needs no override. Gated
-    // on SOH3D mode (set by run.sh) so a plain SoH build is untouched.
-    if (getenv("SOH3D") != nullptr && CVarGetInteger(CVAR_GENERAL("Zelda3DDefaults"), 0) < 1) {
-        CVarSetInteger(CVAR_SETTING("MatchRefreshRate"), 1);          // FPS follows monitor refresh
-        CVarSetInteger(CVAR_ENHANCEMENT("DisableDrawDistance"), 20);  // 20x actor forward draw/cull range
-        CVarSetInteger(CVAR_ENHANCEMENT("WidescreenActorCulling"), 1); // don't cull at widescreen X edges
-        CVarSetInteger(CVAR_GENERAL("Zelda3DDefaults"), 1);
-        CVarSave();
-    }
-
-    srand(static_cast<unsigned int>(now));
-    SDLNet_Init();
-    if (CVarGetInteger(CVAR_REMOTE_CROWD_CONTROL("Enabled"), 0)) {
-        CrowdControl::Instance->Enable();
-    }
-    if (CVarGetInteger(CVAR_REMOTE_SAIL("Enabled"), 0)) {
-        Sail::Instance->Enable();
-    }
-    if (CVarGetInteger(CVAR_REMOTE_ANCHOR("Enabled"), 0)) {
-        Anchor::Instance->Enable();
-    }
-    ShipInit::InitAll();
-    Rando::StaticData::InitHashMaps();
-    OTRGlobals::Instance->gRandoContext->AddExcludedOptions();
+    return 0;
 }
 
 extern "C" void SaveManager_ThreadPoolWait() {

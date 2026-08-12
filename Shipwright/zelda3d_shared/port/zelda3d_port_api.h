@@ -41,7 +41,9 @@
 #define ZELDA3D_PORT_API_H
 
 /* Lifecycle ------------------------------------------------------------------------------------ */
-void InitOTR(int argc, char* argv[]);
+/* Returns 0 on success, non-zero when the core cannot boot. A core must never exit() the process --
+ * the launcher is still holding its dlopen handle and the chooser. See port/core_boot_error.h. */
+int InitOTR(int argc, char* argv[]);
 void DeinitOTR(void);
 void OTRMessage_Init();
 
