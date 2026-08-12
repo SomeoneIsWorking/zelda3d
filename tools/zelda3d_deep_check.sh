@@ -40,11 +40,13 @@ for seq in $SEQS; do
     ZELDA3D_SEQ_BOOT_WAIT="${ZELDA3D_SEQ_BOOT_WAIT:-900}" \
     ZELDA3D_SEQ_SCENE_WAIT="${ZELDA3D_SEQ_SCENE_WAIT:-400}" \
     ZELDA3D_SEQ_DWELL="$DWELL" \
+    ZELDA3D_SEQ_CMDS="${ZELDA3D_DEEP_CMDS:-randogen}" \
+    ZELDA3D_SEQ_CMD_WAIT="${ZELDA3D_SEQ_CMD_WAIT:-900}" \
     ASAN_OPTIONS="detect_leaks=0:halt_on_error=0:detect_odr_violation=0:log_path=$d/asan" \
         "$REPO/tools/zelda3d_sequence.sh" "$seq" > "$d/seq.out" 2>&1
     rc=$?
     reports=$(ls "$d" 2>/dev/null | grep -c '^asan\.' || true)
-    grep -E "RETURNED|NEVER REACHED" "$d/seq.out" | sed 's/^/DEEP:   /'
+    grep -E "RETURNED|NEVER REACHED|cmd " "$d/seq.out" | sed 's/^/DEEP:   /'
     echo "DEEP:   sequence exit $rc, ASAN reports: $reports  (log: $d/seq.out)"
     [ "$rc" -ne 0 ] && fail=1
     [ "$reports" -ne 0 ] && { fail=1; head -20 "$d"/asan.* | sed 's/^/DEEP:   /'; }
@@ -56,9 +58,12 @@ if [ "$fail" -eq 0 ]; then
     echo "    COVERED: each core held ${DWELL}s in-game, so this DOES say something past the first frame."
     echo "    NOT covered: leaks. detect_leaks=0 here -- and turning it on would not help much, because"
     echo "    LSAN only reports UNREACHABLE memory and this project's leaks stay reachable from their"
-    echo "    X::Instance globals (validated both ways, docs/info/instruments/035). No randomizer seed is"
-    echo "    generated, so the rando ownership paths are not exercised; and dwell sits wherever the"
-    echo "    core spawns -- it is time in-game, not coverage of the game."
+    echo "    X::Instance globals (validated both ways, docs/info/instruments/035)."
+    echo "    A randomizer seed IS generated per core now (REPL randogen, echoed above with its hash), so"
+    echo "    the rando ownership paths are exercised -- but only through a COMPLETED generation: the"
+    echo "    command blocks, so a generation still in flight when the game ends is not covered. MM"
+    echo "    answers randogen with unknown-command, which is correct and not a failure."
+    echo "    Dwell sits wherever the core spawns -- it is time in-game, not coverage of the game."
 else
     echo "=== DEEP VERDICT (exit 1) === see the lines above."
 fi

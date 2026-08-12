@@ -116,6 +116,28 @@ for id in "${CORES[@]}"; do
     else
         echo "SEQUENCE: core '$id' is live: $SCENE"
     fi
+    # Optional extra REPL commands, run in each core once it is live. This is how a sequence exercises
+    # a code path the boot does not reach on its own -- the first user is `randogen`, because the deep
+    # check's own verdict says the randomizer ownership paths go unexercised, and those are paths this
+    # arc changed. Replies are ECHOED, not swallowed: a command that silently did nothing would
+    # otherwise make the sequence look like it covered more than it did.
+    if [ -n "${ZELDA3D_SEQ_CMDS:-}" ]; then
+        echo "$ZELDA3D_SEQ_CMDS" | tr ';' '\n' | while IFS= read -r c; do
+            [ -n "$c" ] || continue
+            rm -f "$fifo.out"
+            if timeout "${ZELDA3D_SEQ_CMD_WAIT:-300}" sh -c 'printf "%s\n" "$2" > "$1"' _ "$fifo" "$c"; then
+                # The reply file appears when the command finishes, which for a blocking command
+                # (seed generation) is much later than the write returning.
+                for _ in $(seq 1 "${ZELDA3D_SEQ_CMD_WAIT:-300}"); do
+                    [ -s "$fifo.out" ] && break
+                    sleep 1
+                done
+                echo "SEQUENCE: '$id' cmd '$c' -> $(cat "$fifo.out" 2>/dev/null || echo "(NO REPLY -- it did not answer)")"
+            else
+                echo "SEQUENCE: '$id' cmd '$c' -> NOT ACCEPTED (no reader on $fifo)"
+            fi
+        done
+    fi
     # Optional dwell: keep the core alive after it has reached a scene, so the run exercises more
     # than the first playable frame. Added because a bug was only reachable deeper into the title
     # demo than this gate had ever run -- `oot` alone loaded 3 player animations where a longer run
