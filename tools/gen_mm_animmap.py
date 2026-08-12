@@ -487,6 +487,43 @@ def _score(sym_toks: List[str], clip_toks: List[str]) -> Tuple[float, str]:
 ACCEPT = 0.90
 TIE_MARGIN = 0.05
 
+# ---------------------------------------------- externally VERIFIED mappings (evidence required)
+# Mappings established by measurement rather than by a rule that generalises. Each entry must cite
+# the evidence, and `--verify-overrides` re-derives it from the ROM so a stale entry FAILS instead
+# of quietly persisting. This is the sanctioned way to carry a proven fact -- hand-editing the
+# generated .inc is not, because the next regeneration silently drops it.
+#
+# gameplay_keep doors. Closed system: exactly 8 N64 door symbols, exactly 8 door clips in
+# zelda2_keep (door/anim/). Resolved by two INDEPENDENT chains, neither of which is frame counts
+# alone -- durations 66 and 85 each recur across forms, so bipartite matching on duration admits
+# many assignments and settles nothing by itself:
+#
+#   1. FORM, from archive directory names. zelda2_link_new.gar.lzs files the same door animations
+#      under form-named directories: child/anim/clink_demo_door*, goron/anim/pg_door*,
+#      nuts/anim/pn_door*, zora/anim/pz_door*. So clink=Human(child), pg=Goron, pn=Deku(nuts),
+#      pz=Zora -- named, not inferred. zelda2_keep has NO pz and instead has `link`, and the one
+#      N64 symbol covering two adult-height forms is FierceDeityZora: the door needs 4 height
+#      classes where the player rig needs 5. Hence link = FierceDeityZora.
+#   2. SIDE, from exact duration equality WITHIN each already-pinned form, where the two clips
+#      always differ (measured N64 frameCount u16@0x44 vs MM3D csab duration u32@0x34):
+#         Human  L 88 / R 85   clink_demo_doorA 88 / B 85
+#         FD+Zora L 66 / R 74  link_demo_doorA  66 / B 74
+#         Goron  L 66 / R 85   pg_doorA 66 / pg_doorB 85
+#         Deku   L 81 / R 85   pn_doorA 81 / pn_doorB 85
+#      Four independent confirmations of the single bit A=Left, B=Right.
+VERIFIED_OVERRIDES: Dict[str, Dict[str, str]] = {
+    "gameplay_keep": {
+        "gDoorHumanOpenLeftAnim":            "clink_demo_doorA_door",
+        "gDoorHumanOpenRightAnim":           "clink_demo_doorB_door",
+        "gDoorFierceDeityZoraOpenLeftAnim":  "link_demo_doorA_door",
+        "gDoorFierceDeityZoraOpenRightAnim": "link_demo_doorB_door",
+        "gDoorGoronOpenLeftAnim":            "pg_doorA",
+        "gDoorGoronOpenRightAnim":           "pg_doorB",
+        "gDoorDekuOpenLeftAnim":             "pn_doorA",
+        "gDoorDekuOpenRightAnim":            "pn_doorB",
+    },
+}
+
 
 
 # ---------------------------------------------- authoritative XML "Original name" annotations
@@ -502,10 +539,42 @@ XML_DIRS = ("N64_US", "GC_US")
 # (its model comes from some object), and that overlay->object association is not recorded
 # in the XML, so scanning them would only produce unresolvable entries.
 XML_SUBDIRS = ("objects",)
-_ANIM_ORIG_RE = re.compile(
-    r'<Animation\s+Name="([A-Za-z0-9_]+)"[^>]*/>\s*<!--[^>]*?Original name is\s+"([^"]+)"')
+# One entry = the self-closing <Animation/> tag plus EVERY trailing comment on its line. Scanning
+# only the FIRST comment (the previous shape of this regex) silently dropped 16 symbols whose
+# annotation sits in a second comment, and there is no signal that it dropped them -- the symbol
+# just fell through to fuzzy matching. Classification of the comment blob happens in Python below,
+# because there are four annotation dialects and encoding them as four regexes made the precedence
+# between them invisible.
+_ANIM_ENTRY_RE = re.compile(
+    r'<Animation\s+Name="([A-Za-z0-9_]+)"[^>]*/>((?:[ \t]*<!--(?:(?!-->).)*?-->)*)')
+
+# The MM3D-side name, when the annotator recorded it directly. This OUTRANKS "Original name is":
+# it names the clip in the MM3D GAR, which is the thing being matched, whereas "Original name"
+# names the N64 asset and only usually coincides. e.g.
+#     <!-- MM3D name is "dance_roll", but it was probably renamed. Might have originally been ... -->
+# Under the old single-dialect regex these entries carried NO annotation at all and were matched
+# by guesswork.
+# BOTH alternatives are anchored on "MM3D". An unanchored /Named "X"/ also matches the SPECULATIVE
+# phrasing "might have been originally named \"jmp_stop13\"", which is a guess about the N64 name in
+# an entry that says the animation is NOT in MM3D at all -- widening it that far made
+# gOdolwaJumpDanceAnim fall through to the heuristics and steal dance_jump from the symbol actually
+# annotated with it.
+_MM3D_NAME_RE = re.compile(
+    r'(?:MM3D name is\s+["\']([A-Za-z0-9_]+)'
+    r'|Named\s+["\']([A-Za-z0-9_]+)["\']\s+in MM3D)', re.I)
+# "Or\w*nal" and not "Original": the corpus contains "Orignal" and "Orginal". The value is read as a
+# maximal identifier rather than as everything-between-quotes, because several annotations close the
+# quote in the wrong place ("gg_odoroki (surprise)").
+_ORIG_NAME_RE = re.compile(r'Or\w*nal name is\s+["\']([A-Za-z0-9_]+)')
+# A NEGATIVE annotation: the annotator checked and the clip is gone. This never adds a mapping; it
+# only stops the heuristics from inventing one, which is the failure it exists to prevent -- these
+# symbols were previously free to claim whatever clip scored best.
+_ABSENT_RE = re.compile(r'Not present in MM3D|removed in MM3D', re.I)
 
 _ANIM_ANY_RE = re.compile(r'<Animation\s+Name="([A-Za-z0-9_]+)"')
+# <TextureAnimation> is a UV/material track, not a skeletal clip -- it can never match a CSAB and
+# its symbol does not always carry a "tex"/"uv" token, so token-based exclusion misses some.
+_TEXANIM_RE = re.compile(r'<TextureAnimation\s+Name="([A-Za-z0-9_]+)"')
 
 def xml_anim_symbols(repo: str = REPO) -> Dict[str, List[str]]:
     r"""{object_name: [animation symbol...]} declared in the 2ship asset XMLs.
@@ -535,9 +604,29 @@ def xml_anim_symbols(repo: str = REPO) -> Dict[str, List[str]]:
     return out
 
 
-def xml_original_names(repo: str = REPO) -> Dict[str, Dict[str, str]]:
-    """{object_name: {n64_symbol: original_clip_name}} from the 2ship asset XMLs."""
-    out: Dict[str, Dict[str, str]] = {}
+def _classify_annotation(comments: str) -> Optional[Optional[str]]:
+    """The annotated clip name, None for 'annotated as ABSENT', or missing (return ()) for no
+    annotation at all. Precedence: MM3D-side name > N64 original name > absent."""
+    m = _MM3D_NAME_RE.search(comments)
+    if m:
+        return m.group(1) or m.group(2)
+    # ABSENT outranks "Original name is": when an entry carries both ('Original name is "ka_dance"
+    # (this animation was removed in MM3D)') the annotator is telling us the clip is gone, and the
+    # N64 name is history rather than a lookup key.
+    if _ABSENT_RE.search(comments):
+        return None
+    m = _ORIG_NAME_RE.search(comments)
+    if m:
+        return m.group(1)
+    return ()  # sentinel: no annotation of any dialect
+
+
+def xml_original_names(repo: str = REPO) -> Dict[str, Dict[str, Optional[str]]]:
+    """{object_name: {n64_symbol: annotated_clip_name_or_None}}, from the 2ship asset XMLs.
+
+    A value of None means the annotator recorded that the animation is ABSENT from MM3D. That is
+    information, not a gap: it must suppress fuzzy matching rather than leave the symbol open."""
+    out: Dict[str, Dict[str, Optional[str]]] = {}
     for d in XML_DIRS:
       for sub in XML_SUBDIRS:
         base = os.path.join(repo, "2ship", "assets", "xml", d, sub)
@@ -551,14 +640,40 @@ def xml_original_names(repo: str = REPO) -> Dict[str, Dict[str, str]]:
                 txt = open(os.path.join(base, fn), encoding="utf-8", errors="ignore").read()
             except OSError:
                 continue
-            for sym, orig in _ANIM_ORIG_RE.findall(txt):
+            for sym, comments in _ANIM_ENTRY_RE.findall(txt):
+                if not comments:
+                    continue
+                val = _classify_annotation(comments)
+                if val == ():
+                    continue
                 # first XML dir wins; don't let a later variant overwrite a known name
-                out.setdefault(obj, {}).setdefault(sym, orig)
+                out.setdefault(obj, {}).setdefault(sym, val)
+    return out
+
+
+def xml_texture_anims(repo: str = REPO) -> Dict[str, set]:
+    """{object_name: {symbol,...}} declared as <TextureAnimation> -- never skeletal."""
+    out: Dict[str, set] = {}
+    for d in XML_DIRS:
+      for sub in XML_SUBDIRS:
+        base = os.path.join(repo, "2ship", "assets", "xml", d, sub)
+        if not os.path.isdir(base):
+            continue
+        for fn in sorted(os.listdir(base)):
+            if not fn.endswith(".xml"):
+                continue
+            try:
+                txt = open(os.path.join(base, fn), encoding="utf-8", errors="ignore").read()
+            except OSError:
+                continue
+            for sym in _TEXANIM_RE.findall(txt):
+                out.setdefault(fn[:-4], set()).add(sym)
     return out
 
 
 def match_anims(symbols: List[str], clip_names: List[str], object_name: str = "",
-                accept: float = ACCEPT, orig: Optional[Dict[str, str]] = None) -> List[Match]:
+                accept: float = ACCEPT, orig: Optional[Dict[str, Optional[str]]] = None,
+                texanims: Optional[set] = None) -> List[Match]:
     """Match each N64 animation symbol to at most one CSAB clip; ambiguous/weak => unmatched.
 
     `orig` = {symbol: original_clip_name} from the decomp XML annotations. When the annotated name
@@ -577,14 +692,47 @@ def match_anims(symbols: List[str], clip_names: List[str], object_name: str = ""
     clip_num = [n for _t, n in raw_clip]
 
     orig = orig or {}
+    texanims = texanims or set()
     clipset = set(clip_names)
     out: List[Match] = []
     for s, toks in zip(symbols, sym_toks):
-        # AUTHORITATIVE: the decomp XML's "Original name is ..." annotation, when that clip exists.
-        o = orig.get(symbol_of(s))
-        if o and o in clipset:
-            out.append(Match(s, o, 1.0, "xml original-name annotation"))
+        sym = symbol_of(s)
+        ov = VERIFIED_OVERRIDES.get(object_name, {}).get(sym)
+        if ov:
+            # Refuse rather than silently fall through: an override naming a clip this GAR does not
+            # have means the evidence behind it no longer describes the asset.
+            if ov not in clipset:
+                raise SystemExit(
+                    "VERIFIED_OVERRIDES[%r][%r] names %r, which is not a clip in this GAR (%d "
+                    "clips). The recorded evidence no longer holds -- re-derive it, do not delete "
+                    "the guard." % (object_name, sym, ov, len(clip_names)))
+            out.append(Match(s, ov, 1.0, "verified override (see VERIFIED_OVERRIDES)"))
             continue
+        if sym in texanims:
+            out.append(Match(s, None, 0.0, "non-skeletal: declared <TextureAnimation> in the XML"))
+            continue
+        # AUTHORITATIVE: the decomp XML's annotation, when it names a clip this GAR actually has.
+        if sym in orig:
+            o = orig[sym]
+            if o is None:
+                # The annotator checked and said it is gone. Without this the heuristics were free
+                # to hand the symbol whatever clip scored best, which is a fabricated mapping.
+                out.append(Match(s, None, 0.0, "XML annotates this animation as absent from MM3D"))
+                continue
+            if o in clipset:
+                out.append(Match(s, o, 1.0, "xml annotation names an existing clip"))
+                continue
+            # The annotated name is absent but exactly one numbered clip extends it (last_dam ->
+            # last_dam01). Gated on the exact name being absent AND the variant being unique; with
+            # either guard dropped this rule starts stealing clips from their real owners.
+            vs = sorted(c for c in clip_names
+                        if re.fullmatch(re.escape(o) + r"\d{1,2}", c))
+            if len(vs) == 1:
+                out.append(Match(s, vs[0], 0.95,
+                                 "xml annotation %r + its unique numeric variant" % o))
+                continue
+            # Otherwise fall through to the heuristics: an annotation naming no clip here is a
+            # dead end, not evidence of absence (that is what the negative dialect is for).
         if any(t in NON_SKEL_TOKENS for t in toks):
             out.append(Match(s, None, 0.0, "non-skeletal symbol (%s)" % "+".join(toks)))
             continue
@@ -648,13 +796,15 @@ def build(only: Optional[str] = None, accept: float = ACCEPT) -> Tuple[List[Acto
     actors = Mm3dActors()
     known = set(actors.actors)
     orig_all = xml_original_names()
+    texanim_all = xml_texture_anims()
     results: List[ActorResult] = []
     for obj in sorted(anims):
         cands = object_to_gar(obj, known)
         gar = cands[0] if cands else None
         clips = actors.clips(gar) if gar else []
         clips = clips or []
-        matches = match_anims(anims[obj], clips, obj, accept, orig_all.get(obj)) if clips else [
+        matches = match_anims(anims[obj], clips, obj, accept, orig_all.get(obj),
+                              texanim_all.get(obj)) if clips else [
             Match(s, None, 0.0, "no GAR" if not gar else "GAR has no CSAB clips")
             for s in anims[obj]]
         hint = _alt_gar_hint(obj, gar, actors) if (gar and not clips) else None
@@ -709,6 +859,17 @@ def _reason_bucket(why: str) -> str:
     return why
 
 
+# tag -> the substring of Match.why that identifies it. Kept next to the report so adding a rule
+# without reporting its firing count is an obvious omission rather than an invisible one.
+_RULE_TAGS = {
+    "XML annotation naming an existing clip": "names an existing clip",
+    "XML annotation + unique numeric variant": "unique numeric variant",
+    "verified override (measured, cited)": "verified override",
+    "annotated ABSENT from MM3D (suppresses guessing)": "absent from MM3D",
+    "<TextureAnimation> exclusion": "<TextureAnimation>",
+}
+
+
 def build_report(results: List[ActorResult], meta: dict) -> Tuple[str, dict]:
     tot_sym = sum(len(r.matches) for r in results)
     tot_ok = sum(1 for r in results for m in r.matches if m.clip)
@@ -720,11 +881,28 @@ def build_report(results: List[ActorResult], meta: dict) -> Tuple[str, dict]:
             if not m.clip:
                 reasons[_reason_bucket(m.why)] = reasons.get(_reason_bucket(m.why), 0) + 1
 
+    # Per-RULE firing counts, with the denominator. A matching rule that quietly stops firing --
+    # because a regex broke, or because the upstream decomp XML changed dialect -- looks exactly
+    # like "there was nothing to match", and the totals above cannot tell those apart. Two of these
+    # rules measure ZERO today and that is worth SEEING rather than assuming: they are guards
+    # against annotations the decomp has not written yet, not coverage this table already has.
+    rules: Dict[str, int] = {k: 0 for k in _RULE_TAGS}
+    for r in results:
+        for m in r.matches:
+            for tag, key in _RULE_TAGS.items():
+                if key in m.why:
+                    rules[tag] += 1
+    # Residual, not a substring probe: everything matched that no annotation rule claimed. Derived
+    # this way so it cannot silently read 0 when the tag string drifts -- which it just did.
+    rules["token/synonym heuristic"] = tot_ok - sum(
+        rules[t] for t in _RULE_TAGS if t.startswith(("XML annotation", "verified override")))
+
     js = {
         "meta": dict(meta, symbols_total=tot_sym, symbols_matched=tot_ok,
                      symbols_unmatched=tot_sym - tot_ok,
                      objects_with_gar=len(with_gar), objects_without_gar=len(no_gar)),
         "unmatched_reasons": reasons,
+        "rule_firings": rules,
         "actors": [{
             "object": r.obj, "gar": r.gar, "clips": len(r.clips),
             # The clip NAMES, not just how many. Without these the unmatched list is unactionable:
@@ -760,7 +938,14 @@ def build_report(results: List[ActorResult], meta: dict) -> Tuple[str, dict]:
           "| symbols matched (conf >= %.2f) | %d (%.1f%%) |"
           % (meta["min_confidence"], tot_ok, 100.0 * tot_ok / max(1, tot_sym)),
           "| symbols unmatched | %d |" % (tot_sym - tot_ok), "",
-          "## Unmatched reasons", "", "| reason | count |", "| --- | --- |"]
+          "## Rule firings (of %d symbols)" % tot_sym, "",
+          "A rule measuring 0 is not the same as a rule that had nothing to do -- it means this",
+          "run produced no evidence about it. Both zeroes below are deliberate guards against",
+          "annotation dialects the upstream decomp XML does not use yet.", "",
+          "| rule | fired |", "| --- | --- |"]
+    for k in rules:
+        md.append("| %s | %d |" % (k, rules[k]))
+    md += ["", "## Unmatched reasons", "", "| reason | count |", "| --- | --- |"]
     for k, v in sorted(reasons.items(), key=lambda kv: -kv[1]):
         md.append("| %s | %d |" % (k, v))
     md += ["", "## Per actor", "", "| object | GAR | clips | symbols | matched | unmatched |",
@@ -821,6 +1006,62 @@ def build_report(results: List[ActorResult], meta: dict) -> Tuple[str, dict]:
     return "\n".join(md) + "\n", js
 
 
+def verify_overrides(o2r_path: Optional[str] = None) -> int:
+    """Re-derive VERIFIED_OVERRIDES from the assets. Exits non-zero if it cannot check, rather
+    than reporting a pass it did not earn.
+
+    The check is duration equality: N64 animation frameCount (u16 @ 0x44 of the o2r resource)
+    against MM3D csab duration (u32 @ 0x34). Both sides are read fresh; nothing is taken from the
+    comment above the table."""
+    import zipfile
+    o2r = o2r_path or os.path.join(REPO, "2ship", "mm.o2r")
+    if not os.path.exists(o2r):
+        print("VERIFY: REFUSING -- no N64 archive at %s, so the N64 side of every override is "
+              "UNCHECKED. Build 2ship/mm.o2r first. Checked 0 of %d overrides."
+              % (o2r, sum(len(v) for v in VERIFIED_OVERRIDES.values())))
+        return 2
+    z = zipfile.ZipFile(o2r)
+    actors = Mm3dActors()
+    bad = checked = 0
+    for obj, table in sorted(VERIFIED_OVERRIDES.items()):
+        gar = (object_to_gar(obj, set(actors.actors)) or [None])[0]
+        durations = _csab_durations(actors, gar) if gar else {}
+        if not durations:
+            print("VERIFY: REFUSING -- no csab durations for %s (gar=%s); %d overrides UNCHECKED."
+                  % (obj, gar, len(table)))
+            return 2
+        for sym, clip in sorted(table.items()):
+            key = "objects/%s/%s" % (obj, sym)
+            try:
+                fc = struct.unpack_from("<H", z.read(key), 0x44)[0]
+            except (KeyError, struct.error) as e:
+                print("VERIFY: FAIL %s -- cannot read N64 frameCount (%s)" % (key, e))
+                bad += 1
+                continue
+            got = durations.get(clip)
+            checked += 1
+            if got != fc:
+                print("VERIFY: FAIL %s -> %s: N64 frameCount %s != csab duration %s"
+                      % (sym, clip, fc, got))
+                bad += 1
+            else:
+                print("VERIFY: ok   %-36s -> %-24s %d frames both sides" % (sym, clip, fc))
+    print("VERIFY: checked %d override(s), %d failed." % (checked, bad))
+    return 1 if bad else 0
+
+
+def _csab_durations(actors: "Mm3dActors", gar: str) -> Dict[str, int]:
+    fe = actors.actors.get(gar)
+    if fe is None:
+        return {}
+    out: Dict[str, int] = {}
+    for e in Gar(actors.rom.read(fe)).entries:
+        p = (e.path or e.name or "").replace("\\", "/")
+        if p.endswith(".csab") and len(e.data) >= 0x38:
+            out[p.split("/")[-1][:-5]] = struct.unpack_from("<I", e.data, 0x34)[0]
+    return out
+
+
 def main(argv=None) -> int:
     _load_env()
     ap = argparse.ArgumentParser(description=__doc__,
@@ -832,7 +1073,12 @@ def main(argv=None) -> int:
                     help="C entries output (default scratch/mm_animmap.inc)")
     ap.add_argument("--report", default=os.path.join("scratch", "mm_animmap_report"),
                     help="report path stem; writes <stem>.md and <stem>.json")
+    ap.add_argument("--verify-overrides", action="store_true",
+                    help="re-derive VERIFIED_OVERRIDES from the assets and exit")
     args = ap.parse_args(argv)
+
+    if args.verify_overrides:
+        return verify_overrides()
 
     results, meta = build(args.only, args.min_confidence)
     inc = emit_inc(results, meta)
