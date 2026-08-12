@@ -9,10 +9,11 @@
 # attempt in this session was lost.
 #
 # So each core gets its REPL FIFO passed in, and this script sends `quit` to whichever core is
-# currently up. Order matters: OoT's DeinitOTR ends in a deliberate `_exit(0)` (claim C057), so OoT
-# can only ever be LAST -- put it first and the process dies before the second core starts.
+# currently up. Any order works, including a core twice: the `_exit(0)` at the end of OoT's DeinitOTR
+# that once made OoT last-only (claim C057) was deleted, and `oot,oot` has since been run and measured
+# here. The default is mm,oot only because that is the pairing the split was built for.
 #
-#   usage: tools/zelda3d_sequence.sh [mm,oot]
+#   usage: tools/zelda3d_sequence.sh [mm,oot]   (also: oot,oot / mm,mm -- used for leak differentials)
 #
 # Output: scratch/logs/sequence/run.log, plus a verdict on stdout. The verdict reads the log for the
 # classes libultraship distinguishes -- ENGINE state shared with the previous game (correct, that is
