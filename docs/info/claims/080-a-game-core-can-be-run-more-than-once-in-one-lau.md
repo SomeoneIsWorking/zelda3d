@@ -49,3 +49,20 @@ row of zeroes: MM's new cutscene-manager reset printed `0-entry` on run 1 and **
 of `mm,oot,mm` -- a live `ActorCutscene*` into run 1's freed scene segment, with a count still saying
 how many entries to read. That is the discriminator exercised in BOTH directions on real data, which
 is what the rest of these lines are still waiting for.
+
+## Deepest evidence to date (2026-08-12, end of the run-scoped-state arc)
+
+`tools/zelda3d_deep_check.sh 60` — the sanitizer build, **60 seconds in-game per core**, across
+`oot,oot`, `mm,mm` and `mm,oot,mm`: **seven core runs, every one returning 0, zero ASAN reports, zero
+crashes.**
+
+This supersedes every earlier "green" on this claim, because those all came from a gate that quits a
+core the moment it reaches a scene. That distinction is not academic: `oot,oot` passed the fast gate
+continuously while run 2 was taking SIGSEGV in `TitleRider::releaseMount`, and the only reason it was
+ever seen is that a sanitizer build is slow enough to stay in the title cutscene long enough to reach
+the call.
+
+**Still not covered, and the script says so in its own verdict:** `detect_leaks=0`, so this is not
+evidence about leaks; no randomizer seed is generated, so the rando ownership paths fixed in this arc
+are exercised only structurally; and dwell is time spent wherever the core happens to spawn — it is
+time in-game, not coverage of the game.
