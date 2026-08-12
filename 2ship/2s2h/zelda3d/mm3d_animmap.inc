@@ -451,7 +451,7 @@
     { "objects/object_delf/object_delf_Anim_004FF4", "elf_attack_1a" },
     { "objects/object_delf/object_delf_Anim_0053A4", "elf_attack_1b" },
     { "objects/object_delf/object_delf_Anim_005B68", "elf_attack_2a" },
-    { "objects/object_delf/object_delf_Anim_006328", "elf_attack_1b" },
+    { "objects/object_delf/object_delf_Anim_006328", "elf_attack_2b" },
     { "objects/object_delf/object_delf_Anim_006614", "elf_bata_wait" },
     { "objects/object_delf/object_delf_Anim_006B28", "elf_boo" },
     { "objects/object_delf/object_delf_Anim_006D74", "elf_guru1" },
