@@ -94,6 +94,34 @@ void Zelda3D_ResetAudioContext(void) {
 }
 
 // ---------------------------------------------------------------------------------------------
+// The save context
+// ---------------------------------------------------------------------------------------------
+
+// gSaveContext is the whole game's save + session state. Same argument as the soh side's copy: a
+// plain global, so run 2 starts inside run 1's save, and persisted data goes to disk via SaveManager
+// rather than living here across runs. Not a dangling-pointer hazard but a WRONG-STATE one, which is
+// harder to notice because nothing crashes -- on OoT the equivalent was carrying 16,634 non-zero
+// bytes into run 2 with no symptom that named it.
+void Zelda3D_ResetSaveContext(void) {
+    const unsigned char* bytes = (const unsigned char*)&gSaveContext;
+    size_t inheritedNonZero = 0;
+
+    for (size_t i = 0; i < sizeof(gSaveContext); i++) {
+        if (bytes[i] != 0) {
+            inheritedNonZero++;
+        }
+    }
+
+    memset(&gSaveContext, 0, sizeof(gSaveContext));
+
+    // A COUNT with its denominator, not "reset ok": run 1 must report 0, and a line that cannot
+    // report anything else could not tell run 1 from a run inheriting a full save.
+    fprintf(stderr, "MM3D CORE: gSaveContext reset -- inherited %zu non-zero byte(s) of %zu.\n",
+            inheritedNonZero, sizeof(gSaveContext));
+    fflush(stderr);
+}
+
+// ---------------------------------------------------------------------------------------------
 // The lifecycle
 // ---------------------------------------------------------------------------------------------
 
@@ -115,6 +143,8 @@ void Zelda3D_CoreRunBegin(void) {
     Graph_ResetRunState();
     // The N64 audio engine's state, including pointers into an audio heap the last run gave back.
     Zelda3D_ResetAudioContext();
+    // The save + session state: wrong-state, not dangling-pointer, and silent either way.
+    Zelda3D_ResetSaveContext();
     // The REPL FIFO: an open descriptor onto a path this run must create for itself.
     Zelda3D_ReplResetRunState();
 }

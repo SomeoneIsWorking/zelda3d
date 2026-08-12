@@ -430,6 +430,11 @@ from BSS alone, exactly as with `gAudioContext`. Now zeroed in `Zelda3D_CoreRunB
 The report counts non-zero bytes against the struct size rather than naming fields, deliberately:
 whichever field the next regression depends on would be the one not printed.
 
+**MM had it too, and it was smaller but real: 320 non-zero bytes of 47,608** on a second MM run.
+Fixed the same way in `mm3d_core_lifecycle.c`. Worth noting the sizes differ by 3x (138,360 vs
+47,608) -- these are two independent structs in two independently-loaded cores, which is the whole
+reason the mechanism had to be duplicated rather than shared.
+
 **Honest note on how it was found, because the reasoning was wrong.** It came from noticing that a
 second OoT run reported a different position in the same scene (`link=(-56,1,2117)` vs
 `(-5586,144,5273)`) and resolved ~30x as many player animations (26 vs 747). I inferred carried-over
