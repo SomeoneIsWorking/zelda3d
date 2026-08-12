@@ -40,12 +40,52 @@ extern "C" s32 Object_Spawn(ObjectContext* objectCtx, s16 objectId);
 extern "C" RomFile sNaviMsgFiles[];
 s32 OTRScene_ExecuteCommands(PlayState* play, SOH::Scene* scene);
 
+// Length of the entrance list the CURRENT header installed. Scoped to one scene load: set by
+// Scene_CommandEntranceList, read by Scene_CommandSpawnList a few commands later, and reset by
+// OTRScene_ExecuteCommands so a scene whose header has no entrance list cannot inherit the previous
+// scene's count. PlayState carries `setupEntranceList` but no length, which is the whole reason an
+// out-of-range entrance index surfaced as a null-deref two functions later instead of as a bad index.
+static uint32_t sNumSetupEntrances = 0;
+
+// Called by OTRPlay_InitScene at the same point it nulls `setupEntranceList`, so the pointer and its
+// length are forgotten together. Separate function rather than a shared extern variable because the
+// two files are C++ and the pairing is the thing worth naming.
+void Scene_ForgetEntranceListLength() {
+    sNumSetupEntrances = 0;
+}
+
 bool Scene_CommandSpawnList(PlayState* play, SOH::ISceneCommand* cmd) {
     // SOH::SetStartPositionList* cmdStartPos = std::static_pointer_cast<SOH::SetStartPositionList>(cmd);
     SOH::SetStartPositionList* cmdStartPos = (SOH::SetStartPositionList*)cmd;
     ActorEntry* entries = (ActorEntry*)cmdStartPos->GetRawPointer();
 
-    play->linkActorEntry = &entries[play->setupEntranceList[play->curSpawn].spawn];
+    // Two array reads, neither previously checked, and both indexed by save/entrance state:
+    // `curSpawn` selects an entry in the scene's ENTRANCE list, and that entry's `spawn` selects the
+    // start position. Getting either wrong leaves `linkActorEntry` pointing at nothing that spawns a
+    // Player, and the failure surfaces two functions later as a null-deref of an empty PLAYER actor
+    // list in func_8002C0C0 -- which names neither the scene nor the index. Report the denominators
+    // HERE, where they are known.
+    if (play->setupEntranceList == NULL) {
+        SPDLOG_ERROR("Scene {} spawn list ran with NO entrance list set (curSpawn={}). Link cannot be "
+                     "placed; the scene header ordered SPAWN_LIST before ENTRANCE_LIST.",
+                     play->sceneNum, play->curSpawn);
+        return false;
+    }
+    if ((uint32_t)play->curSpawn >= sNumSetupEntrances) {
+        SPDLOG_ERROR("Scene {} asks for entrance {} but this scene's header lists only {}. The spawn "
+                     "index would be read out of range; using entrance 0 instead.",
+                     play->sceneNum, play->curSpawn, sNumSetupEntrances);
+        play->curSpawn = 0;
+    }
+    const uint32_t startPos = play->setupEntranceList[play->curSpawn].spawn;
+    if (startPos >= cmdStartPos->numStartPositions) {
+        SPDLOG_ERROR("Scene {} entrance {} asks for start position {} but the scene has only {}. Link "
+                     "would be spawned from out-of-range data; using start position 0 instead.",
+                     play->sceneNum, play->curSpawn, startPos, cmdStartPos->numStartPositions);
+        play->linkActorEntry = &entries[0];
+    } else {
+        play->linkActorEntry = &entries[startPos];
+    }
     play->linkAgeOnLoad = ((void)0, gSaveContext.linkAge);
     s16 linkObjectId = gLinkObjectIds[((void)0, gSaveContext.linkAge)];
 
@@ -109,6 +149,11 @@ bool Scene_CommandEntranceList(PlayState* play, SOH::ISceneCommand* cmd) {
     // SOH::SetEntranceList* otrEntrance = std::static_pointer_cast<SOH::SetEntranceList>(cmd);
     SOH::SetEntranceList* otrEntrance = (SOH::SetEntranceList*)cmd;
     play->setupEntranceList = (EntranceEntry*)otrEntrance->GetRawPointer();
+    // Kept so the spawn-list command can bound-check `curSpawn` against it. PlayState carries the
+    // pointer but not the length, which is why an out-of-range entrance read as a crash three
+    // functions away instead of as a bad index.
+    sNumSetupEntrances = otrEntrance->numEntrances;
+    SPDLOG_DEBUG("Scene {} entrance list: {} entries", play->sceneNum, sNumSetupEntrances);
 
     return false;
 }
@@ -354,9 +399,27 @@ bool Scene_CommandAlternateHeaderList(PlayState* play, SOH::ISceneCommand* cmd) 
     // osSyncPrintf("\n[ZU]sceneset time   =[%X]", ((void)0, gSaveContext.cutsceneIndex));
     // osSyncPrintf("\n[ZU]sceneset counter=[%X]", ((void)0, gSaveContext.sceneSetupIndex));
 
+    // Bounds-checked, because the port changed what "no data" looks like. On N64 this indexes a raw
+    // pointer array authored in the ROM and the missing case is a NULL ENTRY, which the code below
+    // already handles. Here `headers` is a std::vector whose length is whatever the extractor
+    // produced, and the index comes from save state -- `sceneSetupIndex` is derived from
+    // `cutsceneIndex`, so a conditional cutscene trigger can ask for a header the scene does not
+    // have. `operator[]` past the end is UB, and it crashed: warping to entrance 0x109 (Zora's
+    // Domain), whose Cutscene_HandleConditionalTriggers sets cutsceneIndex 0xfff3, SIGSEGV'd here
+    // inside Play_Init. Out of range is therefore mapped onto the SAME "there is no specified data"
+    // path as a NULL entry, which is the faithful translation rather than a new behaviour.
+    const auto headerAt = [cmdHeaders](size_t i) -> SOH::Scene* {
+        if (i >= cmdHeaders->headers.size()) {
+            SPDLOG_WARN("Scene alternate-header {} requested but this scene has only {} -- treating it as "
+                        "absent, the same as a null entry (sceneSetupIndex={}, cutsceneIndex=0x{:x}).",
+                        i, cmdHeaders->headers.size(), gSaveContext.sceneSetupIndex, gSaveContext.cutsceneIndex);
+            return nullptr;
+        }
+        return std::static_pointer_cast<SOH::Scene>(cmdHeaders->headers[i]).get();
+    };
+
     if (gSaveContext.sceneSetupIndex != 0) {
-        SOH::Scene* desiredHeader =
-            std::static_pointer_cast<SOH::Scene>(cmdHeaders->headers[gSaveContext.sceneSetupIndex - 1]).get();
+        SOH::Scene* desiredHeader = headerAt(gSaveContext.sceneSetupIndex - 1);
 
         if (desiredHeader != nullptr) {
             OTRScene_ExecuteCommands(play, desiredHeader);
@@ -366,8 +429,7 @@ bool Scene_CommandAlternateHeaderList(PlayState* play, SOH::ISceneCommand* cmd) 
             osSyncPrintf("\nげぼはっ！ 指定されたデータがないでええっす！");
 
             if (gSaveContext.sceneSetupIndex == 3) {
-                SOH::Scene* desiredHeader =
-                    std::static_pointer_cast<SOH::Scene>(cmdHeaders->headers[gSaveContext.sceneSetupIndex - 2]).get();
+                SOH::Scene* desiredHeader = headerAt(gSaveContext.sceneSetupIndex - 2);
 
                 // "Using adult day data there!"
                 osSyncPrintf("\nそこで、大人の昼データを使用するでええっす！！");

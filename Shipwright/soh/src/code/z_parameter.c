@@ -3932,23 +3932,31 @@ void Interface_DrawMagicBar(PlayState* play) {
         Color_RGB8 magicFillColor = Flags_GetRandomizerInf(RAND_INF_HAS_INFINITE_MAGIC_METER) ? magicbar_blue
                                                                                               : magicbar_green;
         if (Zelda3D_HudOwns(ZELDA3D_HUD_MAGIC)) {
-            const void* fillTex = Zelda3D_HudDecode(ZELDA3D_HUD_FMT_I4, gMagicMeterFillTex, 16, 16);
+            // 16x8, not the 16x16 the display list below declares. The ROM asset is 64 bytes
+            // (parameter_static.xml: 8x8 ia8 at 0x3AC0), which as the I4 the DL actually samples is
+            // 16 texels wide by EIGHT rows. `gDPLoadMultiBlock_4b(..., 16, 16, ...)` asks the RSP for
+            // 128 bytes and gets 64 of texture plus 64 of whatever follows -- harmless there because
+            // only the first 7 rows are ever sampled, and NOT harmless here, where the decoder walks
+            // every byte it is told exists. AddressSanitizer caught it as a heap-buffer-overflow READ
+            // at the last byte of that 64-byte resource, from Interface_DrawMagicBar, on every frame
+            // the bar was drawn. 8 rows covers all 7 that are sampled and reads exactly the asset.
+            const void* fillTex = Zelda3D_HudDecode(ZELDA3D_HUD_FMT_I4, gMagicMeterFillTex, 16, 8);
             const u32 fillAlpha = (u32)(u8)interfaceCtx->magicAlpha;
             // The N64 fill texrect is 1:1, so a `magic` x 7 rect samples a `magic` x 7 SOURCE rect —
-            // the first 7 of the texture's 16 rows, tiling horizontally once magic exceeds 16.
+            // the first 7 of the texture's 8 rows, tiling horizontally once magic exceeds 16.
             if (gSaveContext.magicState == MAGIC_STATE_METER_FLASH_2) {
-                Zelda3D_HudQuadEx(fillTex, 16, 16, 0, 0, gSaveContext.magic, 7, rMagicFillX, magicBarY + 3,
+                Zelda3D_HudQuadEx(fillTex, 16, 8, 0, 0, gSaveContext.magic, 7, rMagicFillX, magicBarY + 3,
                                   (f32)gSaveContext.magic, 7.0f,
                                   ((u32)magicbar_yellow.r << 24) | ((u32)magicbar_yellow.g << 16) |
                                       ((u32)magicbar_yellow.b << 8) | fillAlpha,
                                   0u, ZELDA3D_HUD_LERP_OPAQUE);
-                Zelda3D_HudQuadEx(fillTex, 16, 16, 0, 0, gSaveContext.magicTarget, 7, rMagicFillX,
+                Zelda3D_HudQuadEx(fillTex, 16, 8, 0, 0, gSaveContext.magicTarget, 7, rMagicFillX,
                                   magicBarY + 3, (f32)gSaveContext.magicTarget, 7.0f,
                                   ((u32)magicFillColor.r << 24) | ((u32)magicFillColor.g << 16) |
                                       ((u32)magicFillColor.b << 8) | fillAlpha,
                                   0u, ZELDA3D_HUD_LERP_OPAQUE);
             } else {
-                Zelda3D_HudQuadEx(fillTex, 16, 16, 0, 0, gSaveContext.magic, 7, rMagicFillX, magicBarY + 3,
+                Zelda3D_HudQuadEx(fillTex, 16, 8, 0, 0, gSaveContext.magic, 7, rMagicFillX, magicBarY + 3,
                                   (f32)gSaveContext.magic, 7.0f,
                                   ((u32)magicFillColor.r << 24) | ((u32)magicFillColor.g << 16) |
                                       ((u32)magicFillColor.b << 8) | fillAlpha,

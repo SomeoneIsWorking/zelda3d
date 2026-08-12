@@ -378,6 +378,37 @@ static void Zelda3D_ReplExec(PlayState* play, char* line, const char* outPath) {
         const s16 prevMode = play->transitionMode;
         const s16 prevTrig = play->transitionTrigger;
         const s16 prevScene = play->sceneNum;
+        const u16 prevCs = gSaveContext.cutsceneIndex;
+        const s32 prevMode2 = gSaveContext.gameMode;
+        // A PLAIN warp must land with NO cutscene layer selected, and saying so is not the same as it
+        // being true. `cutsceneIndex` is save state that persists across the transition, and the
+        // headless boot arrives here from the title attract demo, which sets it to 0xFFF3
+        // (z_opening.c:18). z_play.c:515 then reads >= 0xFFF0 and picks setup layer
+        // 4 + (0xFFF3 & 0xF) = 7 for whatever entrance we asked for -- a scene's 4th CUTSCENE layer,
+        // which the entrance's spawn index is not valid for. That is a state the real game never has,
+        // because leaving the title goes through Sram_OpenSave, which sets cutsceneIndex itself.
+        //
+        // It crashed two ordinary destinations: `warp 0x109` (Zora's Domain) SIGSEGV'd in
+        // Scene_CommandAlternateHeaderList reading past the scene's header list, and `warp 0x209`
+        // (Kokiri Forest) in func_8002C0C0 on an empty PLAYER actor list, because the cutscene layer
+        // it selected spawns no Link. Both read as game bugs; both were this command.
+        //
+        // nextCutsceneIndex, not cutsceneIndex: z_play.c:488 copies one to the other on scene load,
+        // which is the same door `cswarp` and `introcs` use to REQUEST a layer. This is that door with
+        // "none" written on it.
+        gSaveContext.nextCutsceneIndex = 0;
+        // Same reason, second field. z_play.c:515 reads `gameMode != GAMEMODE_NORMAL` OR
+        // `cutsceneIndex >= 0xFFF0` -- either one selects a cutscene setup layer -- and the headless
+        // boot arrives from the opening gamestate, which sets GAMEMODE_TITLE_SCREEN
+        // (z_opening.c:12). Clearing only cutsceneIndex left layer 4 + 0, and
+        // `gEntranceTable[0x209 + 4]` is a DIFFERENT entrance (spawn 2 rather than 1) in a scene
+        // whose header lists 2 entrances -- so `warp 0x209` (Kokiri Forest) still crashed, now with
+        // an out-of-range entrance instead of an out-of-range header.
+        //
+        // Not novel: SoH's own warp paths already do this. `Warping.cpp` Warp() and
+        // debugconsole.cpp's LoadSceneHandler both set GAMEMODE_NORMAL for exactly this reason; the
+        // REPL warp was the one entry point that did not.
+        gSaveContext.gameMode = GAMEMODE_NORMAL;
         play->nextEntranceIndex = iv;
         play->transitionTrigger = TRANS_TRIGGER_START;
         play->transitionType = TRANS_TYPE_FADE_BLACK;
@@ -393,8 +424,10 @@ static void Zelda3D_ReplExec(PlayState* play, char* line, const char* outPath) {
         // change even after settling 200 frames. transitionMode was 0 (OFF) in exactly that case, so
         // keying the warning on mode -- which is what I did first -- reports ACCEPTED on the failure.
         Zelda3D_ReplReply(outPath,
-                        "warp -> entrance 0x%x (%d) from scene %d | trigger(was)=%d mode=%d%s",
-                        iv, iv, (int)prevScene, (int)prevTrig, (int)prevMode,
+                        "warp -> entrance 0x%x (%d) from scene %d | trigger(was)=%d mode=%d "
+                        "cutsceneIndex(was)=0x%x->0 gameMode(was)=%d->NORMAL (plain warp; "
+                        "use cswarp for a cutscene layer)%s",
+                        iv, iv, (int)prevScene, (int)prevTrig, (int)prevMode, (unsigned)prevCs, (int)prevMode2,
                         (gZelda3dFreeze != 0)
                             ? " *** GAME IS FROZEN (settle/freeze 1) -- this warp is QUEUED BUT WILL "
                               "NOT RUN until `freeze 0`. This is the #1 cause of a warp appearing to "

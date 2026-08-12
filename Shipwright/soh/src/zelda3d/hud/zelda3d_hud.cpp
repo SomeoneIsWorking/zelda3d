@@ -6,6 +6,7 @@
 
 #include <cstdint>
 #include <cstdlib>
+#include <spdlog/spdlog.h>
 #include <unordered_map>
 #include <vector>
 
@@ -27,6 +28,12 @@ void Zelda3D_Hud_Flush(void);
 // out blank: the recorded pointer was the path, not the image.
 int ResourceMgr_OTRSigCheck(char* imgData);
 char* ResourceMgr_GetResourceDataByNameHandlingMQ(const char* path);
+// How many bytes that resource actually has. Needed because the decoder below derives a byte count
+// from (format, width, height) supplied by the CALL SITE, and a call site that disagrees with the
+// asset reads off the end -- which is what happened with the magic-meter fill.
+size_t ResourceGetTexSizeByName(const char* name);
+uint16_t ResourceGetTexWidthByName(const char* name);
+uint16_t ResourceGetTexHeightByName(const char* name);
 }
 
 namespace {
@@ -67,6 +74,16 @@ const void* resolveTex(const void* tex) {
     return tex;
 }
 
+// The resolved buffer's size in bytes, or 0 when it is not a resource we can measure (our own
+// runtime-built HUD textures are raw buffers the caller owns). 0 means "unknown", never "empty" --
+// the caller must not treat it as a zero-length buffer.
+size_t resolvedTexBytes(const void* tex) {
+    if (tex != nullptr && ResourceMgr_OTRSigCheck((char*)tex)) {
+        return ResourceGetTexSizeByName((const char*)tex);
+    }
+    return 0;
+}
+
 void record(const void* tex, int texW, int texH, float u0, float v0, float u1, float v1, float x, float y,
             float w, float h, unsigned int prim, unsigned int env, int mode) {
     if (!hudEnabled() || tex == nullptr || texW <= 0 || texH <= 0 || w <= 0.0f || h <= 0.0f) {
@@ -98,6 +115,23 @@ extern "C" const void* Zelda3D_HudDecode(int fmt, const void* tex, int texW, int
                        : (fmt == ZELDA3D_HUD_FMT_IA8 || fmt == ZELDA3D_HUD_FMT_I8) ? texels
                                                                                    : 0;
     if (bytes == 0) {
+        return nullptr;
+    }
+    // The call site supplies the format and the dimensions; the asset supplies the bytes. When they
+    // disagree the loop below walks off the end of the resource -- AddressSanitizer caught exactly
+    // that on the magic meter (`heap-buffer-overflow READ` at the last byte of a 144-byte resource,
+    // from Interface_DrawMagicBar). Refuse and NAME both sides rather than decode garbage: a HUD
+    // element that vanishes with a log line is debuggable, an out-of-bounds read is not.
+    const size_t have = resolvedTexBytes(tex);
+    if (have != 0 && bytes > have) {
+        static std::unordered_map<const void*, bool> reported; // once per texture, not once per frame
+        if (!reported[tex]) {
+            reported[tex] = true;
+            SPDLOG_ERROR("HUD texture {}: call site says fmt {} {}x{} = {} bytes, but the resource has {} "
+                         "({}x{} per its own header). Not decoding it.",
+                         (const char*)tex, fmt, texW, texH, bytes, have,
+                         ResourceGetTexWidthByName((const char*)tex), ResourceGetTexHeightByName((const char*)tex));
+        }
         return nullptr;
     }
 

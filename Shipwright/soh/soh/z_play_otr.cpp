@@ -11,6 +11,7 @@ extern "C" void Play_InitScene(PlayState* play, s32 spawn);
 extern "C" void Play_InitEnvironment(PlayState* play, s16 skyboxId);
 void OTRPlay_InitScene(PlayState* play, s32 spawn);
 s32 OTRScene_ExecuteCommands(PlayState* play, SOH::Scene* scene);
+void Scene_ForgetEntranceListLength();
 
 // LUS::OTRResource* OTRPlay_LoadFile(PlayState* play, RomFile* file) {
 Ship::IResource* OTRPlay_LoadFile(PlayState* play, const char* fileName) {
@@ -77,6 +78,7 @@ void OTRPlay_InitScene(PlayState* play, s32 spawn) {
     play->linkActorEntry = nullptr;
     play->unk_11DFC = nullptr;
     play->setupEntranceList = nullptr;
+    Scene_ForgetEntranceListLength(); // pairs with setupEntranceList = nullptr above
     play->setupExitList = nullptr;
     play->cUpElfMsgs = nullptr;
     play->setupPathList = nullptr;
