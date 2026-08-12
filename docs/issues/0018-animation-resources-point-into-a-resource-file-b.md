@@ -1,7 +1,7 @@
 ---
 id: 18
 title: Animation resources point into a resource File buffer the ResourceManager frees when the load returns
-status: fixed
+status: investigating
 symptom: ASAN reports a heap-use-after-free READ of 134 bytes in AnimationContext_SetLoadFrame during ordinary OoT gameplay: the animation's linkAnimationHeader.segment points into a Ship::File buffer that LoadResourceProcess destroyed when the nested load in AnimationFactory returned. Silent off the sanitizer.
 tags: asan,resources,lifetime,animation,launcher
 created: 2026-08-12
@@ -139,3 +139,36 @@ all exit 0.
 The same shape appears elsewhere in the resource helpers (e.g.
 `ResourceMgr_LoadPlayerAnimByName` itself), and each is a silent reinterpret if the asset type ever
 differs from the assumption. A sweep is worth more than this point fix.
+
+
+## REOPENED the same day -- the fix closed one path, not the bug
+
+Marking this fixed was premature. `oot` alone is genuinely clean (0 mismatches, 0 missing segments,
+and an ASAN run with no report file). But `mm,oot,mm` reproduces the SAME read -- byte-identical
+symptom, 134 bytes at +168 of a 3,284-byte block -- with the free now attributed to
+**`AnimationFactory.cpp:102`, the ALT-ASSETS branch**, rather than line 90:
+
+```
+Ship::File::~File()  <- ResourceManager::LoadResourceProcess:191  <- :106  <- :195
+                     <- ResourceFactoryBinaryAnimationV0::ReadResource  AnimationFactory.cpp:102
+```
+
+Facts, separated from guesses:
+
+- **Fact.** The wrong-type cast at line 90 was real and is fixed: measured 3 mismatches per OoT run
+  before, 0 after, and those three animations now get real frame data instead of a bogus pointer.
+  That stands on its own regardless of what follows.
+- **Fact.** OoT's `InitOTR` enables alt assets unconditionally
+  (`CVarGetInteger(CVAR_SETTING("AltAssets"), 1)`), so the alt branch is live on every OoT run, not
+  just when a user turns something on.
+- **Fact.** The read target is a `Ship::File` buffer, freed when the nested load returns -- so
+  something still puts file-backed memory into `linkAnimationHeader.segment` on this path. The
+  `PlayerAnimation` route cannot be it: `limbRotData` is a copied `std::vector<int16_t>`.
+- **Not established.** Why `oot` alone does not hit it while `oot` as the second core does. MM
+  running first is the only variable, and MM's own `InitOTR`/ResourceManager is torn down before
+  OoT's starts, so the mechanism is not obvious. Do not assume it is heap luck without checking --
+  that assumption is what made the first version of this issue blame file lifetime.
+
+The next step is an instrument, not more reading: log the resolved resource TYPE and the branch taken
+at both `AnimationFactory.cpp:90` and `:102`, then run `mm,oot,mm`. The `oot`-alone run already
+provides the negative control, which is what makes that comparison worth anything.
