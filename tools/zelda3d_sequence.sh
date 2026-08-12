@@ -71,6 +71,23 @@ env -u WAYLAND_DISPLAY DISPLAY="$DISP" XAUTHORITY=/dev/null \
 SEQPID=$!
 echo "SEQUENCE: launcher pid=$SEQPID seq=$SEQ disp=$DISP log=$LOG"
 
+# Reap the launcher if THIS script dies before its own cleanup runs -- interrupted, timed out, or
+# killed by whatever started it. Without this the launcher outlives the run, and because every
+# sequence uses the SAME REPL FIFO paths, the orphan then answers the NEXT run's commands: a live
+# `posinfo` came back with a scene the current core had never been in, which reads as inherited game
+# state rather than as two processes on one pipe. Kill BY PID, never by name -- other agents and the
+# user run this same binary. See CLAUDE.md, "Never pkill a shared binary name".
+cleanup_launcher() {
+    kill "$SEQPID" 2>/dev/null
+    # Give it a moment to unwind, then insist. A sanitizer build can sit in its leak scan.
+    for _ in 1 2 3 4 5 6 7 8 9 10; do
+        kill -0 "$SEQPID" 2>/dev/null || return 0
+        sleep 1
+    done
+    kill -9 "$SEQPID" 2>/dev/null
+}
+trap 'cleanup_launcher; exit 130' INT TERM HUP
+
 # Quit each core in turn. A core is ready to be quit once its REPL FIFO exists; sending before that
 # writes into nothing. Anything unquit after its budget leaves the process hanging, which the final
 # kill covers -- but the log then says which core never came up, instead of the run just timing out.
