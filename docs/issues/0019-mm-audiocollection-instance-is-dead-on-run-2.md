@@ -50,9 +50,9 @@ sequences through all of this:
     new OTRGlobals at 0x268550b0
     InitOTR: after new OTRGlobals                                    20     <- HERE
 
-**`new OTRGlobals()` on run 2 is what corrupts it**, and the allocation does not overlap: the new
-OTRGlobals is at 0x268550b0 while AudioCollection sits at 0x24021420. So the constructor path writes
-through something into the AudioCollection object rather than reusing its memory.
+At the time, that read as "**`new OTRGlobals()` corrupts it**", and the allocation does not overlap
+(the new OTRGlobals is at 0x268550b0 while AudioCollection sits at 0x24021420). **That localisation
+was wrong, and the next section says why.**
 
 Two hypotheses were tested and **rejected**, not assumed:
 
@@ -67,13 +67,35 @@ in both runs, so 20 is not some legitimate smaller state. And the earlier findin
 those 20 entries' `std::string`s segfaults, so the node pointers inside the object are garbage too.
 This is a WRITE over a live object, i.e. heap corruption in MM's second-run boot path.
 
+## printf bisection does not work on this bug, and nearly produced a wrong answer
+
+Bisecting further inside the constructor gave, in order: `ctor entry` 128, `after
+CreateUninitializedInstance` 128, `after LocateFileAcrossAppDirs` 128, **`after DetectArchiveVersion`
+20**. `DetectArchiveVersion` → `ReadPortVersionFromArchive` opens a temporary `O2rArchive` and reads
+`portVersion`, which looked like a plausible culprit.
+
+Then probes were added *inside* `ReadPortVersionFromArchive` — and on that build the corruption
+**moved**: run 2's very first probe, `RPV: entry`, already read 20, before the function did anything.
+An intermediate build showed 128 all the way through instead. The observable moment tracks the heap
+LAYOUT, which every added probe changes.
+
+So `DetectArchiveVersion` is **not** established as the corrupter, and neither is `new OTRGlobals()`;
+both were artefacts of where the allocations happened to land in one particular build. Recorded
+because the wrong version of this note nearly shipped: an inconclusive bisection reads exactly like a
+conclusive one when only its final step is written down.
+
+What IS established, and is layout-independent:
+
+- The object is intact through all of run 1's teardown, including after `Heaps_Free`.
+- It is not freed before run 2's `InitOTR` (`MALLOC_PERTURB_=165`).
+- It holds 128 sequences when freshly constructed, in both runs.
+- It reads a nonsense count and segfaults on node traversal somewhere inside run 2's boot.
+
 ## Next step
 
-ASAN build of MM, run as `mm,mm`, `detect_leaks=0`, `halt_on_error=0`: the write into the
-AudioCollection object during run 2's `OTRGlobals` constructor will name itself and its stack. The
-suspect region is what that constructor touches — `Ship::Context::CreateUninitializedInstance`,
-`InitConfiguration` / `InitConsoleVariables`, `InitControlDeck`, `InitResourceManager` — on a run where
-the previous session's Context has already been destroyed, i.e. a stale pointer from run 1 being
-written through.
+ASAN build of MM, run as `mm,mm`, `detect_leaks=0`, `halt_on_error=0`. This is the right tool and the
+bisection above is not: ASAN reports the offending write at the instruction that makes it, with the
+allocation's stack, and does not depend on guessing which statement to bracket. Do not spend more
+passes on printf bisection.
 
 Do NOT re-add the delete until this is answered.
