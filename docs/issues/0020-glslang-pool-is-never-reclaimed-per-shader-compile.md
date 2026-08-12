@@ -33,7 +33,34 @@ so each compile's ~200 KB stays for the life of the process. 24 compiles ≈ 5 M
 OoT shows ~0 because its second run happens to reach no new combiner variants, not because it behaves
 differently.
 
-## Candidate fix (not applied)
+## The obvious fix is NOT AVAILABLE in this build — tried, does not compile
+
+Attempted, so the next session does not spend the same pass on it:
+
+    glslang::TPoolAllocator* prev = &glslang::GetThreadPoolAllocator();
+    glslang::TPoolAllocator local;                 // <- error: incomplete type
+    glslang::SetThreadPoolAllocator(&local);       // <- error: not a member of 'glslang'
+
+Fedora's `glslang-devel` installs `glslang/Public/ShaderLang.h`, which **forward-declares**
+`class TPoolAllocator` (line 420) and exposes nothing to construct or swap one. `PoolAlloc.h` lives in
+`glslang/MachineIndependent/` upstream and is not shipped — the installed
+`/usr/include/glslang/MachineIndependent/` contains only `Versions.h`.
+
+The entire public pool-related surface is:
+
+    GLSLANG_EXPORT bool InitializeProcess();   // "exactly once per process"
+    GLSLANG_EXPORT void FinalizeProcess();     // "once per process to tear down everything"
+
+So the per-compile bracketing needs either a vendored glslang with its internal headers, or a
+different backend. What CAN be done with the public API, and their costs:
+
+- **`FinalizeProcess()` at engine shutdown.** Correct hygiene, reclaims the builtin tables once, and
+  does nothing about the per-compile growth this issue is about.
+- **`Finalize`/`Initialize` around each compile.** Would reclaim everything — and would rebuild the
+  builtin symbol table on every compile, which is precisely the 5 MB of tables being measured. That
+  trades a bounded leak for a large per-compile CPU cost on the rendering path. Not worth it.
+
+## Superseded: the fix as originally written (kept for the record)
 
 Bracket each compile with its own pool:
 
@@ -44,12 +71,12 @@ Bracket each compile with its own pool:
     glslang::SetThreadPoolAllocator(prev);
 
 `outSpirv` is a `std::vector<uint32_t>` on the default allocator, so the SPIR-V survives the pool.
-Not applied here because it changes shader compilation at the tail of a long session and wants its own
-verification pass — the gates render and reach scenes, so they would catch gross breakage, but "the
-shaders still compile" is not the same as "every combiner still renders correctly".
+Not applied — it does not compile here, per the section above. The verification approach WAS set up
+before that was discovered and is worth reusing when this is retried: `tools/zelda3d_repl.py shot`
+captures a frame and `isolate <a> <b>` diffs two, so a pixel-exact before/after across a couple of
+frozen scenes settles "every combiner still renders correctly", which the sequence gates cannot.
 
-`glslang::FinalizeProcess()` at engine shutdown is a smaller, separate improvement: it reclaims the
-builtin tables once, but does nothing about the per-compile growth.
+
 
 ## Instrument added
 
