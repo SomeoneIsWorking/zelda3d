@@ -178,8 +178,10 @@ class Context {
     uint8_t GetBombchuCapacity();
     void HandleGetBombchuBag();
 
-  private:
+    // Public so the run-lifecycle reset can clear it; see Zelda3D_RandoContextResetRunState.
     static std::weak_ptr<Context> mContext;
+
+  private:
     std::array<Hint, RH_MAX> hintTable = {};
     std::array<ItemLocation, RC_MAX> itemLocationTable = {};
     std::array<OptionValue, RSK_MAX> mOptions;

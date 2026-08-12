@@ -50,6 +50,7 @@ void Zelda3D_ActorRefsResetRunState(void);   // zelda3d.c        -- REPL/debug a
 void Zelda3D_RenderRefsResetRunState(void); // zelda3d_render.cpp
 void Zelda3D_HorseRefsResetRunState(void);  // behaviors/actor/en_horse.cpp
 void ObjectExtension_ResetRunState(void); // zelda3d_shared/object -- keyed by Actor*, one instance per core
+void Zelda3D_RandoContextResetRunState(void); // randomizer/SeedContext.cpp -- kept alive by a leaked OTRGlobals
 
 // The name tables AudioLoad_Init builds for this run, so they can be released before it builds the
 // next run's. Declared here rather than in a header because this file is where their lifetime is.
@@ -234,6 +235,9 @@ void Zelda3D_CoreRunBegin(void) {
     // Object extensions, keyed by actor pointer. zelda3d_shared is a static library linked into
     // BOTH cores, so this instance is this core's own.
     ObjectExtension_ResetRunState();
+    // The randomizer context. Its only strong reference is a leaked OTRGlobals, so without this a
+    // second run reuses the first run's seed, placements and options.
+    Zelda3D_RandoContextResetRunState();
 }
 
 // Called after the frame loop has finished and before the heaps are freed.
