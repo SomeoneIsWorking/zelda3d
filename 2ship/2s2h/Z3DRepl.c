@@ -129,6 +129,19 @@ static void Z3D_Repl_Warp(PlayState* play, const char* arg) {
         return;
     }
     s32 entrance = (s32)strtol(arg, NULL, 0);
+    // Validate BEFORE arming the transition. An entrance index that names no entrance used to be
+    // accepted here and crashed several frames later inside Play_UpdateTransition ->
+    // Entrance_GetTableEntry, far from the command that caused it -- and because the reply had
+    // already said "ok", a sweep issuing many warps read as "the warp worked, the game died".
+    // 22 of the 110 scene slots are SCENE_ENTRANCE_NONE(), so bad indices are common, not exotic.
+    if (!Entrance_IsValid((u16)entrance)) {
+        char bad[128];
+        snprintf(bad, sizeof(bad), "warp REFUSED entrance=0x%X -- no such entrance (scene slot %d, "
+                                   "sub %d); nothing was changed",
+                 entrance, (entrance >> 9) & 0x7F, (entrance >> 4) & 0x1F);
+        Z3D_Repl_Reply(bad);
+        return;
+    }
     // Same live scene-transition path MM uses for a void-out (z_play.c func_80169EFC).
     play->nextEntrance = (u16)entrance;
     play->transitionTrigger = TRANS_TRIGGER_START;
