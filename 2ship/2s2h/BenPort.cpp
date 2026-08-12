@@ -1311,7 +1311,13 @@ extern "C" void Graph_ProcessGfxCommands(Gfx* commands) {
         }
     }
 
-    bool curAltAssets = CVarGetInteger("gEnhancements.Mods.AlternateAssets", 0);
+    // The DEFAULT must match InitOTR's read of the same CVar (which passes 1). It did not: init
+    // seeded prevAltAssets with default 1 and this read defaulted to 0, so with the CVar unset the
+    // two never agreed and this "did alt-assets change?" block ran on the FIRST FRAME OF EVERY RUN --
+    // disabling the alt assets init had just enabled, clearing the texture cache, re-patching the
+    // player flipbooks and rebuilding every registered skeleton, none of which anything asked for.
+    // soh's equivalent passes 1 in both places; only MM disagreed with itself.
+    bool curAltAssets = CVarGetInteger("gEnhancements.Mods.AlternateAssets", 1);
     if (prevAltAssets != curAltAssets) {
         prevAltAssets = curAltAssets;
         Ship::Context::GetRawInstance()->GetResourceManager()->SetAltAssetsEnabled(curAltAssets);
