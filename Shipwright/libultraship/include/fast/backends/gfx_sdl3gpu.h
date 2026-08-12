@@ -19,6 +19,11 @@
 
 namespace Fast {
 
+// Cumulative shader compiles this process. Printed per run by Ship::Context::BeginRun; the delta
+// between runs is what says whether the shader cache survives a run boundary.
+size_t Sdl3GpuShaderCompileCount();
+
+
 // The OoT3D model renderer + HUD, folded into this backend as member subsystems (see
 // fast/backends/zelda3d_sdl3gpu.h). Forward-declared here so only gfx_sdl3gpu.cpp + the two zelda3d
 // .cpp files need the full definitions.
