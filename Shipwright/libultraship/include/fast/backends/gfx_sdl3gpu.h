@@ -23,6 +23,9 @@ namespace Fast {
 // between runs is what says whether the shader cache survives a run boundary.
 size_t Sdl3GpuShaderCompileCount();
 
+// Release glslang's process-wide pools. Call ONCE, at engine shutdown, after the last shader compile.
+void Sdl3GpuFinalizeShaderCompiler();
+
 
 // The OoT3D model renderer + HUD, folded into this backend as member subsystems (see
 // fast/backends/zelda3d_sdl3gpu.h). Forward-declared here so only gfx_sdl3gpu.cpp + the two zelda3d

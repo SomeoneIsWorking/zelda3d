@@ -132,6 +132,13 @@ Context* Context::GetRawInstance() {
 
 void Context::DestroyInstance() {
     mContext = nullptr;
+
+    // Last, after the window and renderer are gone so no further shader compiles can happen. glslang
+    // keeps its builtin symbol tables in process-wide pools reclaimed only by FinalizeProcess; see
+    // issue 0020 for why the finer per-compile fix is not available against this build's headers.
+    // No-ops if nothing was ever compiled, and says so.
+    Fast::Sdl3GpuFinalizeShaderCompiler();
+
 }
 
 Context::~Context() {

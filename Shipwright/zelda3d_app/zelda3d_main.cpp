@@ -289,6 +289,7 @@ int RunSequence(const std::string& spec) {
     // single-game path for why this cannot be left to __cxa_finalize.
     Ship::Context::DestroyInstance();
 
+
     printf("zelda3d: %zu/%zu cores ran to completion in one process\n", ran, ids.size());
     return ran == ids.size() ? 0 : 1;
 }
