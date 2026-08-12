@@ -33,8 +33,29 @@ Sanitizer build, `oot,oot`, tour = `randogen; warp 0xEE; …; warp 0x209; …`. 
   async-signal-safe backtrace above is all there is. That is worth fixing before this is chased --
   the report would probably name the cause outright.
 
+## Progress 2026-08-12
+
+**The crash handler no longer pre-empts the sanitizer.** `CrashHandler`'s constructor now skips
+SIGILL/SIGABRT/SIGFPE/SIGSEGV when the translation unit was built with AddressSanitizer
+(`__SANITIZE_ADDRESS__` / `__has_feature(address_sanitizer)`), so a fault becomes an ASAN report
+instead of a symbol-only backtrace and an `_exit`. It says so on stderr at startup, because a
+sanitizer run with no crash-handler output would otherwise look like the handler failing. Release
+builds are unchanged — this is a compile-time branch on a build that exists to be diagnosed, not a
+runtime toggle. **Not yet observed doing its job**: no fault has occurred since, so "ASAN now reports
+it" is a design claim, not a measurement, until 0022 next fires.
+
+**It is INTERMITTENT.** Two targeted reproductions failed to trigger it on the sanitizer build:
+
+    sleep:30; warp 0x209; sleep:60; posinfo                                    -> survived
+    sleep:30; randogen; warp 0xEE; sleep:30; posinfo; warp 0x209; sleep:45     -> survived
+
+The second is the deep check's own tour up to and past the point it died, on the same build, with the
+same ASAN options. So the trigger is not simply "reach Kokiri Forest spawn 2 and wait" — either it
+needs something later in the tour (the `warp 0x109` step, or the dwell), or it is timing-dependent.
+Anyone chasing this should NOT conclude from a single clean run that it is fixed.
+
 ## Next step
 
-Reproduce with the crash handler out of the way (so ASAN reports), on both builds, with the same
-dwell. Then read `Camera_BGCheckInfo` for what it dereferences that can be NULL at that spawn --
-`RAX = 0` suggests a null collision/bgcheck pointer rather than a wild one.
+Run the full `tools/zelda3d_deep_check.sh` and let it fire on its own; the sanitizer report will now
+survive. Then read `Camera_BGCheckInfo` for what it dereferences that can be NULL --  `RAX = 0`
+suggests a null collision/bgcheck pointer rather than a wild one.

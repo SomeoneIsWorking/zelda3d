@@ -463,6 +463,17 @@ extern "C" LONG WINAPI seh_filter(PEXCEPTION_POINTERS ex) {
 
 #endif
 
+// True when this translation unit was built with AddressSanitizer. GCC defines the macro; clang
+// answers through __has_feature. Both are compile-time, so a release build is byte-identical to
+// before.
+#if defined(__SANITIZE_ADDRESS__)
+#define ZELDA3D_BUILT_WITH_ASAN 1
+#elif defined(__has_feature)
+#if __has_feature(address_sanitizer)
+#define ZELDA3D_BUILT_WITH_ASAN 1
+#endif
+#endif
+
 CrashHandler::CrashHandler() : mOutBuffer(std::make_unique<char[]>(gMaxBufferSize)) {
 #if (defined(__linux__) && !defined(__ANDROID__)) || defined(__APPLE__)
     struct sigaction action = { 0 };
@@ -471,10 +482,24 @@ CrashHandler::CrashHandler() : mOutBuffer(std::make_unique<char[]>(gMaxBufferSiz
     action.sa_flags = SA_SIGINFO;
     action.sa_sigaction = ErrorHandler;
 
+#if defined(ZELDA3D_BUILT_WITH_ASAN)
+    // Do NOT take the fault signals on a sanitizer build. AddressSanitizer installs its own SIGSEGV
+    // handler and turns a fault into a report that names the address, the allocation it belongs to
+    // and the shadow state around it. Ours gets there first, prints a symbol-only backtrace and
+    // _exit()s, so the sanitizer report is never produced -- which is how issue 0022 came back with
+    // nothing but ten frame addresses on the one build that could have explained it.
+    //
+    // This is a compile-time choice on a build that exists to be diagnosed, not a runtime toggle:
+    // the release build installs exactly what it always did. Said out loud at startup, because a
+    // sanitizer run with no crash-handler output would otherwise look like the handler failing.
+    fprintf(stderr, "[zelda3d] CrashHandler: sanitizer build -- leaving SIGILL/SIGABRT/SIGFPE/SIGSEGV to "
+                    "AddressSanitizer so its report is not pre-empted. Shutdown signals still handled.\n");
+#else
     sigaction(SIGILL, &action, nullptr);
     sigaction(SIGABRT, &action, nullptr);
     sigaction(SIGFPE, &action, nullptr);
     sigaction(SIGSEGV, &action, nullptr);
+#endif
 
     shutdownAction.sa_flags = SA_SIGINFO;
     shutdownAction.sa_sigaction = ShutdownHandler;
