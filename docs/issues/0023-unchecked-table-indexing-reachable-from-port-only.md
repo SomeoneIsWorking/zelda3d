@@ -1,6 +1,6 @@
 # 0023 — unchecked table indexing reachable from port-only callers (audit)
 
-status: OPEN — 2 of 22 fixed 2026-08-12; the rest catalogued here, unfixed
+status: OPEN — 4 of 22 fixed 2026-08-12; the rest catalogued here, unfixed
 found by: a 33-agent audit run after the SAME bug was found twice in one day by accident
 
 ## The category
@@ -40,6 +40,18 @@ zelda3d-layer 42, libultraship 28.
   Guarded in the engine and again at the REPL; a second, unreachable copy of the handler deleted.
   Verified on all four boundaries: 224 and -1 refused, 0x40 and 223 still work.
 - `Entrance_GetTableEntry` / REPL `warp` (commit 050942b1, see above).
+- `Actor_LoadOverlay` (`2ship/src/code/z_actor.c`) — `&gActorOverlayTable[index]` with a raw s16.
+  The bound existed as `ACTOR_ID_MAX` (0x2B2) all along and was read only by the fault handler —
+  the `tableCount` shape again. Reachable from the developer console `spawn` (std::stoi, catching
+  only std::invalid_argument) and from ActorViewer's unclamped s16 ImGui field.
+- `Actor_Spawn` (`Shipwright/soh/src/code/z_actor.c`) — **the audit overstated this one and the
+  correction matters.** `ActorDB::RetrieveEntry` DOES bound-check and returns a default-constructed
+  `invalid` entry, so there is no wild read. The real defect is that the guard was
+  `assert(dbEntry->valid)` and this build defines `NDEBUG`, so it compiled to nothing: an invalid id
+  proceeded into a zero-`instanceSize` arena allocation and a null init call. Replaced with a
+  runtime check. Verified live on both classes: `spawn 0x00B` still OK, `spawn 20000` and
+  `spawn -1` refused with the log line `z_actor.c:3380 Actor_Spawn: actor id N is not a valid
+  ActorDB entry -- REFUSED` proving the new check is what fired, process alive throughout.
 
 ### Confirmed, NOT yet fixed
 

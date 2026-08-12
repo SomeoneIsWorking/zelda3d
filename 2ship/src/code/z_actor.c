@@ -12,6 +12,7 @@
 #include "loadfragment.h"
 #include "z64horse.h"
 #include "z64malloc.h"
+#include <libultraship/log/luslog.h>
 #include "z64quake.h"
 #include "z64rumble.h"
 
@@ -3699,7 +3700,22 @@ Actor* Actor_Spawn(ActorContext* actorCtx, PlayState* play, s16 actorId, f32 pos
 
 ActorProfile* Actor_LoadOverlay(ActorContext* actorCtx, s16 index) {
     size_t overlaySize;
-    ActorOverlay* overlayEntry = &gActorOverlayTable[index];
+    ActorOverlay* overlayEntry;
+
+    // The retail game only ever passes a compile-time ACTOR_* constant or `actorEntry->id & 0x1FFF`
+    // read from its own scene data, so this index was never checked. This port has callers that do
+    // not: the developer console's `spawn` command parses its id with std::stoi (catching only
+    // std::invalid_argument, so any numeric text passes), and ActorViewer spawns a raw s16 from an
+    // unclamped ImGui field. A bad id was a wild read of gActorOverlayTable followed by a deref of
+    // whatever `profile` happened to contain, and a write to `overlayEntry->numLoaded`.
+    // Audited 2026-08-12 (docs/issues/0023); the bound existed as ACTOR_ID_MAX all along.
+    if ((index < 0) || (index >= ACTOR_ID_MAX)) {
+        LUSLOG_ERROR("Actor_LoadOverlay: actor id %d is out of range (valid 0..%d) -- REFUSED",
+                     index, ACTOR_ID_MAX - 1);
+        return NULL;
+    }
+
+    overlayEntry = &gActorOverlayTable[index];
     ActorProfile* profile;
 
     overlaySize = (uintptr_t)overlayEntry->vramEnd - (uintptr_t)overlayEntry->vramStart;
