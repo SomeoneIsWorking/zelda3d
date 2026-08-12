@@ -239,6 +239,16 @@ SohRmlUi::SohRmlUi() = default;
 
 SohRmlUi::~SohRmlUi() {
     Shutdown();
+
+    // sLiveRmlUi is how the C REPL shims (launcher show/hit-test/activate-row) reach the live
+    // instance, and Init sets it to `this` with nothing ever clearing it. Destroying the instance
+    // therefore left those shims holding a freed object -- reachable from outside the process via
+    // the REPL, which is exactly how the switch gate drives the chooser. Guarded on identity rather
+    // than cleared unconditionally: if a newer instance has already claimed the slot, an older one
+    // being destroyed must not steal it back to null.
+    if (sLiveRmlUi == this) {
+        sLiveRmlUi = nullptr;
+    }
 }
 
 bool SohRmlUi::Init(void* sdlWindow, void* glContext, int width, int height, bool vulkan, bool sdl3gpu) {

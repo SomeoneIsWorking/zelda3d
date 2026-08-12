@@ -731,3 +731,47 @@ the same conversion, which is the argument for the latch type existing at all.
   move together. No change would make it more correct.
 - **`actorViewer.cpp`'s `actorSpecificData`** -- an `!empty()` latch over a table of capture-less
   lambdas. Identical every run, captures nothing, dangles through nothing.
+
+
+## Closing the survey's blind spot, with a denominator (2026-08-12)
+
+The earlier sweeps were driven by a read-only survey whose own write-up listed what it could not see:
+macro-generated statics, multi-line declarations, class members, and `zelda3d_shared/`. Rather than
+grep those one pattern at a time, the question was narrowed to the one that produces CRASHES rather
+than wrong behavior: **file-scope mutable statics that hold a pointer.**
+
+A brace-depth-aware scan of `Shipwright/soh/{soh,src}`, `2ship/{2s2h,src}` and
+`Shipwright/libultraship/src` finds **63** of them. Five files were already covered by an
+`ActorResetFunc`; of the rest, most are assigned unconditionally in the actor's `Init` and are
+therefore rebuilt every run (`gOceff5VtxData`, `sCrystalSwitchAnimatedMat`, the various `Vtx*`
+caches) -- valid, not a finding. The ones that matter are the **latched** ones, `if (p == NULL) p = ...`,
+because the latch is exactly what stops run 2 from rebuilding a pointer run 1 left dead.
+
+Three latched cases, and only one was a live defect:
+
+- **`Obj_Iceblock`'s `sCubeSublimatingAirTexMat`** (MM) -- FIXED. Captured once from a
+  `Lib_SegmentedToVirtual` over the ice-block object, so it points into whichever object bank was
+  loaded for the first ice block the PROCESS ever initialised, and `ObjIceblock_Draw` dereferences it
+  unconditionally. Dropped on overlay unload.
+- **`Dm_Char08`'s turtle collision** (MM) -- already correct. It latches, mutates the resource's
+  `vtxList`/`polyList`, and `DmChar08_Reset` restores both and frees the copies.
+- **`LakeHyliaWaterControl`'s `sSwitchMain`** -- cleared on `OnPlayDestroy`, which now runs on every
+  quit (that was fixed earlier in this arc), and it is rando-gated on top.
+
+One more, found by the same scan but not latched: **`SohRmlUi::sLiveRmlUi`** -- FIXED. `Init` sets it
+to `this` and nothing ever cleared it, so destroying the instance left the C REPL shims
+(`launcher show`, the hit-test, `menurow`) holding a freed object -- reachable from OUTSIDE the
+process, which is precisely how the switch gate drives the chooser. Cleared in the destructor, guarded
+on `== this` so an older instance being destroyed cannot steal the slot from a newer one.
+
+**`zelda3d_shared/` has none.** Its only mutable static is `ShipInit`'s registry of function
+pointers, which is process-lifetime by design. Stated rather than omitted: a subsystem that produced
+no findings and a subsystem nobody looked at read identically otherwise.
+
+### The classifier was wrong first, in the direction that hides work
+
+The first pass looked for the string `ActorResetFunc` to decide whether a file had a reset, and
+reported 33 unreset files. MM registers its resets **without the cast** (`/**/ DmChar08_Reset,`), so
+every MM overlay that already had one came back as a finding. Re-run against the actual definition
+(`^\w+_Reset\(void\)`) it drops to 26. The false-positive direction is the survivable one; a
+discriminator checked in only one direction would have been believed either way.

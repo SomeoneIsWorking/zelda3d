@@ -38,3 +38,14 @@ anything about the rest of the game.
 **Not covered:** `detect_leaks=0` in both runs, so this says nothing about leaks -- and there is a
 known one (409 Vulkan child objects at `vkDestroyDevice`, issue 0009). It also exercises only what the
 title demo and Clock Town spawn reach in 60 seconds.
+
+## Re-verified after sweep pass 3 (2026-08-12)
+
+`oot`, `oot,oot`, `mm,oot,mm` and `tools/zelda3d_switch_test.sh` (four core runs, oot→mm→oot→oot)
+all exit 0 after the pass-3 fixes, with 1,829 GPU handles released and 0 duplicates.
+
+The pass also produced the first *positive* reading from one of these reset reporters rather than a
+row of zeroes: MM's new cutscene-manager reset printed `0-entry` on run 1 and **`20-entry` on run 3**
+of `mm,oot,mm` -- a live `ActorCutscene*` into run 1's freed scene segment, with a count still saying
+how many entries to read. That is the discriminator exercised in BOTH directions on real data, which
+is what the rest of these lines are still waiting for.
