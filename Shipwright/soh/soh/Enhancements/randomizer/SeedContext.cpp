@@ -83,10 +83,14 @@ std::shared_ptr<Context> Context::GetInstance() {
 // run silently reuses run 1's itemLocationTable, options, trick options and EntranceShuffler. A
 // vanilla run started after a randomizer run would play on the randomizer's placements.
 //
-// Clearing the weak_ptr is the fix for THAT invariant: it does not free anything (run 1's context is
-// still held by the leaked OTRGlobals), it makes the next CreateInstance build a context for the run
-// that asked for one. The leak itself is a separate defect -- one OTRGlobals per run, never
-// released -- and is not addressed here.
+// Clearing the weak_ptr is the fix for THAT invariant: it makes the next CreateInstance build a
+// context for the run that asked for one.
+//
+// UPDATE 2026-08-12: the leak itself is fixed too -- Zelda3D_CoreRunBegin now frees the previous
+// run's OTRGlobals, and does it BEFORE this reset precisely so that this line runs against released
+// state. So `expired()` is expected to be true here on every run now, and this reset has become the
+// CHECK on that rather than the workaround for it: a "STILL LIVE" reading means something other than
+// OTRGlobals has taken a strong reference to a run's context, which is a new bug and not this one.
 extern "C" void Zelda3D_RandoContextResetRunState(void) {
     const bool inherited = !Context::mContext.expired();
 
@@ -95,8 +99,12 @@ extern "C" void Zelda3D_RandoContextResetRunState(void) {
     // Reported either way, because "reset" alone cannot distinguish the first run (nothing to
     // inherit) from a run that was about to be handed the previous run's seed -- and the second is
     // the entire reason this exists.
+    // "absent" no longer means "first run" -- since the owners above are dropped first, a second run
+    // reaches here with the previous context already destroyed, which is the whole point. Saying
+    // "(first run)" would now misreport the success case as a trivial one.
     fprintf(stderr, "ZELDA3D CORE: rando context reset -- previous run's context was %s.\n",
-            inherited ? "STILL LIVE and would have been reused" : "absent (first run)");
+            inherited ? "STILL LIVE and would have been reused (an owner was missed)"
+                      : "already released by the owner resets above, or never created");
     fflush(stderr);
 }
 

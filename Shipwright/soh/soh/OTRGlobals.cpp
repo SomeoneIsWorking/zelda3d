@@ -1731,6 +1731,22 @@ bool VerifyArchiveVersion(OTRVersion version) {
 // the whole N64 global header. Implemented in zelda3d/core/zelda3d_hostreg.cpp.
 extern "C" void Zelda3D_RegisterHostHooks(void);
 
+// C-callable, so Zelda3D_CoreRunBegin (which is C) can free it FIRST, before any of the other run
+// resets look at the state it owns. See the call site for why the order matters.
+extern "C" void Zelda3D_FreePreviousOTRGlobals(void) {
+    if (OTRGlobals::Instance == nullptr) {
+        // Said out loud: on run 1 there is nothing to free, and a silent no-op here would be
+        // indistinguishable from this never being called at all.
+        SPDLOG_INFO("Run start: no previous OTRGlobals to free (first run of this core).");
+        return;
+    }
+
+    SPDLOG_INFO("Run start: freeing the previous run's OTRGlobals (it used to leak, with its "
+                "save-state, randomizer and rando-context references inside it).");
+    delete OTRGlobals::Instance;
+    OTRGlobals::Instance = nullptr;
+}
+
 extern "C" int InitOTR(int argc, char* argv[]) {
     // Returns 0 on success and non-zero when the core cannot boot. See core_boot_error.h:
     // this is the outermost C++ frame on the boot path, and the caller is C, so the throw has
@@ -1749,21 +1765,6 @@ extern "C" int InitOTR(int argc, char* argv[]) {
         // call them by name -- see zelda3d/core/zelda3d_hostreg.cpp.
         Zelda3D_RegisterHostHooks();
         ZELDA3D_BOOT("InitOTR: new OTRGlobals()");
-        // The PREVIOUS run's instance, if there is one. This is allocated per run and was never
-        // freed, so it leaked the object and -- more to the point -- kept its shared_ptr members
-        // (SaveStateMgr, Randomizer, Rando::Context) alive for the life of the process, which is why
-        // the rando context needed a reset of its own rather than simply dying with its run.
-        //
-        // Freed HERE rather than at run end: the departing run's teardown still reads Instance
-        // (DeinitOTR, the save flush, the run-end checks), and by this line that run is provably
-        // over. The destructor is empty, so this releases the members and nothing else; `context` is
-        // a raw pointer to the shared engine Context, which OTRGlobals does not own.
-        if (OTRGlobals::Instance != nullptr) {
-            SPDLOG_INFO("Run start: freeing the previous run's OTRGlobals (it used to leak, with its "
-                        "save-state, randomizer and rando-context references inside it).");
-            delete OTRGlobals::Instance;
-            OTRGlobals::Instance = nullptr;
-        }
         OTRGlobals::Instance = new OTRGlobals();
         ZELDA3D_BOOT("InitOTR: RunExtract()");
         OTRGlobals::Instance->RunExtract(argc, argv);
