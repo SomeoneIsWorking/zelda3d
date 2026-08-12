@@ -1,3 +1,4 @@
+#include <cstdio>
 #include "entrance.h"
 
 #include "3drando/fill.hpp"
@@ -1740,6 +1741,25 @@ extern "C" EntranceOverride* Randomizer_GetEntranceOverrides() {
 
 static SceneID backedUpScene = (SceneID)0xFF;
 static Camera backupCamera;
+
+// Both belong to a RUN. `backupCamera` is a whole Camera struct -- it holds `play`, `player`,
+// `targetActor` and `CollisionPoly*` among others -- and it is memcpy'd back OVER the live camera
+// whenever `backedUpScene` matches the current scene number. Scene numbers repeat across runs, so a
+// second run entering the same scene would have the previous run's pointers written into its active
+// camera. Resetting the sentinel is what disables the restore; the struct is zeroed too so a future
+// reader cannot find a plausible-looking stale camera in it.
+extern "C" void Zelda3D_EntranceCameraBackupResetRunState(void) {
+    const int hadBackup = (backedUpScene != (SceneID)0xFF) ? 1 : 0;
+
+    backedUpScene = (SceneID)0xFF;
+    memset(&backupCamera, 0, sizeof(backupCamera));
+
+    // Reported either way: "reset" alone cannot distinguish a first run from one that was holding a
+    // camera full of the previous run's pointers, and only the second is a bug.
+    fprintf(stderr, "ZELDA3D CORE: entrance camera backup reset -- previous run left %s.\n",
+            hadBackup ? "a backup that would have been restored on a scene match" : "none");
+    fflush(stderr);
+}
 
 void RegisterEntranceShuffleHooks() {
     COND_VB_SHOULD(VB_SHOULD_LOAD_BG_IMAGE, IS_RANDO && RAND_GET_OPTION(RSK_SHUFFLE_ENTRANCES), {
