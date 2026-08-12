@@ -87,7 +87,7 @@ int Zelda3D_CoreRun(int argc, char* argv[] /* void* arg*/) {
     // core's dlopen handle and still owns the chooser and, in a switch sequence, the other game's
     // session. Nothing after this point may run: InitOTR unwound partway through.
     if (InitOTR(argc, argv) != 0) {
-        Zelda3D_CoreRunEnd();
+    Zelda3D_CoreRunEnd();
         return 1;
     }
     CrashHandlerRegisterCallback(CrashHandler_PrintExt);

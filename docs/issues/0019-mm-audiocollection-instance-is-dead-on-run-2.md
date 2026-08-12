@@ -37,11 +37,43 @@ The delete is NOT applied to MM's `AudioCollection` (soh's is fine; MM's `GameIn
 `OTRGlobals` are fine and are freed). Deleting before the cause is known would only move the crash
 from a later read to the destructor. The code says so at the site.
 
+## Narrowed to a single statement (2026-08-12, same day)
+
+Probes were walked forward through run 1's teardown and run 2's startup, printing
+`AudioCollection::Instance` and `GetAllSequences().size()` at each step. The object stays at **128**
+sequences through all of this:
+
+    DeinitOTR enter / after OTRAudio_Exit / after BenGui::Destroy   128
+    main: after DeinitOTR / after Heaps_Free                        128     <- run 1 ends intact
+    CoreRunBegin: entry / after OTRGlobals free / exit              128
+    InitOTR: entry / after Mm3d_RegisterHostHooks                   128
+    new OTRGlobals at 0x268550b0
+    InitOTR: after new OTRGlobals                                    20     <- HERE
+
+**`new OTRGlobals()` on run 2 is what corrupts it**, and the allocation does not overlap: the new
+OTRGlobals is at 0x268550b0 while AudioCollection sits at 0x24021420. So the constructor path writes
+through something into the AudioCollection object rather than reusing its memory.
+
+Two hypotheses were tested and **rejected**, not assumed:
+
+- *`Heaps_Free`'s `munmap`s unmap it.* No: the object is at 0x24021420 while the heaps are at
+  0x7f4e7c400000 / 0x7f4e7e47e000, and it still reads 128 after `Heaps_Free`.
+- *It is freed during teardown and later reused.* No: re-run under `MALLOC_PERTURB_=165`, which fills
+  freed blocks at free time, and it still reads 128 at every probe up to `InitOTR: entry`. A freed
+  block would have read garbage there.
+
+Also confirmed in the falsifying direction: a **freshly constructed** AudioCollection reports **128**
+in both runs, so 20 is not some legitimate smaller state. And the earlier finding stands — walking
+those 20 entries' `std::string`s segfaults, so the node pointers inside the object are garbage too.
+This is a WRITE over a live object, i.e. heap corruption in MM's second-run boot path.
+
 ## Next step
 
-Find what invalidates it. The measurement that would settle it is an ASAN build of MM run as `mm,mm`
-with `detect_leaks=0` — the free that kills the map's nodes will name itself and its stack. Cheaper
-first checks: whether `mSequenceMap`'s node allocations come from an allocator that MM's teardown
-resets, and whether anything memsets or reuses the region across `Heaps_Free`/`Heaps_Alloc`.
+ASAN build of MM, run as `mm,mm`, `detect_leaks=0`, `halt_on_error=0`: the write into the
+AudioCollection object during run 2's `OTRGlobals` constructor will name itself and its stack. The
+suspect region is what that constructor touches — `Ship::Context::CreateUninitializedInstance`,
+`InitConfiguration` / `InitConsoleVariables`, `InitControlDeck`, `InitResourceManager` — on a run where
+the previous session's Context has already been destroyed, i.e. a stale pointer from run 1 being
+written through.
 
 Do NOT re-add the delete until this is answered.
