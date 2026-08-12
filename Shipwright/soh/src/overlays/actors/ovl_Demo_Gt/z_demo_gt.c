@@ -696,11 +696,30 @@ void func_8097F904_Init1(DemoGt* this, PlayState* play) {
     func_8097EE44(this, play, 1, 2, &gTowerCollapseCsCollapsedStructureInnerCol);
 }
 
+// Cloud rings the Ganon's Tower collapse cutscene spawns once and then repositions.
+//
+// These were function-local `static Actor*`, which under the launcher is a pointer into a previous
+// run's actor heap: the only write is inside `if (ptr == NULL)`, so a stale non-NULL value makes the
+// cutscene skip the spawn and take the ELSE branch, writing three floats through freed memory. A
+// run-2 read-before-write is unavoidable here -- there is no path that refreshes the pointer first.
+//
+// Hoisted to file scope so DemoGt_Reset can clear them, which is the mechanism ActorInit already
+// provides (Actor_FreeOverlay calls it when the last instance unloads) and which 34 other overlays
+// already use.
+static Actor* sCloudRingUpper = NULL;
+static Actor* sCloudRingMid = NULL;
+static Actor* sCloudRingLower = NULL;
+
+void DemoGt_Reset(void) {
+    sCloudRingUpper = NULL;
+    sCloudRingMid = NULL;
+    sCloudRingLower = NULL;
+}
+
 void func_8097F960(DemoGt* this, PlayState* play) {
 }
 
 void func_8097F96C(DemoGt* this, PlayState* play) {
-    static Actor* cloudRing = NULL;
     s32 pad[4];
     Vec3f pos;
     Actor* actor;
@@ -711,10 +730,10 @@ void func_8097F96C(DemoGt* this, PlayState* play) {
         pos.y = this->dyna.actor.world.pos.y + 612.0f;
         pos.z = this->dyna.actor.world.pos.z;
 
-        if (cloudRing == NULL) {
-            cloudRing = DemoGt_SpawnCloudRing(play, &pos, 2);
+        if (sCloudRingUpper == NULL) {
+            sCloudRingUpper = DemoGt_SpawnCloudRing(play, &pos, 2);
         } else {
-            actor = cloudRing;
+            actor = sCloudRingUpper;
             actor->world.pos.x = pos.x;
             actor->world.pos.y = pos.y;
             actor->world.pos.z = pos.z;
@@ -881,7 +900,6 @@ void func_80980178(DemoGt* this, PlayState* play) {
 }
 
 void func_80980184(DemoGt* this, PlayState* play) {
-    static Actor* cloudRing = NULL;
     s32 pad[4];
     Vec3f pos;
     Actor* actor;
@@ -891,10 +909,10 @@ void func_80980184(DemoGt* this, PlayState* play) {
         pos.y = this->dyna.actor.world.pos.y + 247.0f;
         pos.z = this->dyna.actor.world.pos.z;
 
-        if (cloudRing == NULL) {
-            cloudRing = DemoGt_SpawnCloudRing(play, &pos, 3);
+        if (sCloudRingMid == NULL) {
+            sCloudRingMid = DemoGt_SpawnCloudRing(play, &pos, 3);
         } else {
-            actor = cloudRing;
+            actor = sCloudRingMid;
             actor->world.pos.x = pos.x;
             actor->world.pos.y = pos.y;
             actor->world.pos.z = pos.z;
@@ -903,7 +921,6 @@ void func_80980184(DemoGt* this, PlayState* play) {
 }
 
 void func_80980218(DemoGt* this, PlayState* play) {
-    static Actor* cloudRing = NULL;
     s32 pad[4];
     Vec3f pos;
     Actor* actor;
@@ -913,10 +930,10 @@ void func_80980218(DemoGt* this, PlayState* play) {
         pos.y = this->dyna.actor.home.pos.y + 38.0f;
         pos.z = this->dyna.actor.home.pos.z;
 
-        if (cloudRing == NULL) {
-            cloudRing = DemoGt_SpawnCloudRing(play, &pos, 4);
+        if (sCloudRingLower == NULL) {
+            sCloudRingLower = DemoGt_SpawnCloudRing(play, &pos, 4);
         } else {
-            actor = cloudRing;
+            actor = sCloudRingLower;
             actor->world.pos.x = pos.x;
             actor->world.pos.y = pos.y;
             actor->world.pos.z = pos.z;
@@ -1777,5 +1794,5 @@ const ActorInit Demo_Gt_InitVars = {
     (ActorFunc)DemoGt_Destroy,
     (ActorFunc)DemoGt_Update,
     (ActorFunc)DemoGt_Draw,
-    NULL,
+    (ActorResetFunc)DemoGt_Reset,
 };
