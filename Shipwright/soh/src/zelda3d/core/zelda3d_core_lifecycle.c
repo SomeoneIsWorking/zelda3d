@@ -51,6 +51,7 @@ void Zelda3D_RenderRefsResetRunState(void); // zelda3d_render.cpp
 void Zelda3D_HorseRefsResetRunState(void);  // behaviors/actor/en_horse.cpp
 void ObjectExtension_ResetRunState(void); // zelda3d_shared/object -- keyed by Actor*, one instance per core
 void Zelda3D_RandoContextResetRunState(void); // randomizer/SeedContext.cpp -- kept alive by a leaked OTRGlobals
+void Zelda3D_EntranceTableResetRunState(void); // randomizer/randomizer_entrance.c -- gEntranceTable is .data
 
 // The name tables AudioLoad_Init builds for this run, so they can be released before it builds the
 // next run's. Declared here rather than in a header because this file is where their lifetime is.
@@ -238,6 +239,8 @@ void Zelda3D_CoreRunBegin(void) {
     // The randomizer context. Its only strong reference is a leaked OTRGlobals, so without this a
     // second run reuses the first run's seed, placements and options.
     Zelda3D_RandoContextResetRunState();
+    // gEntranceTable, which a randomizer run shuffles in place and only restores on its own paths.
+    Zelda3D_EntranceTableResetRunState();
 }
 
 // Called after the frame loop has finished and before the heaps are freed.

@@ -8,6 +8,7 @@
  * A modified dynamicExitList is manually included since we can't read it from addressing like 3ds rando.
  */
 
+#include <stdio.h>
 #include "randomizer_entrance.h"
 #include "randomizer_grotto.h"
 #include "soh/OTRGlobals.h"
@@ -139,6 +140,26 @@ void Entrance_ResetEntranceTable(void) {
         memcpy(gEntranceTable, originalEntranceTable, sizeof(EntranceInfo) * ENTRANCE_TABLE_SIZE);
         hasModifiedEntranceTable = false;
     }
+}
+
+// gEntranceTable is a plain .data global inside this core, so a shuffle applied by one run is still
+// applied when the next run starts: the table is only restored on ENTR_LOAD_OPENING or save-and-quit,
+// and the handler that does it is registered only in the randomizer branch. A VANILLA run started
+// after a randomizer run therefore played on the randomizer's shuffled entrances.
+//
+// The restore mechanism already exists and is correct -- it just never ran at a run boundary. Called
+// from Zelda3D_CoreRunBegin.
+void Zelda3D_EntranceTableResetRunState(void) {
+    const int wasModified = hasModifiedEntranceTable ? 1 : 0;
+    const int haveOriginal = hasCopiedEntranceTable ? 1 : 0;
+
+    Entrance_ResetEntranceTable();
+
+    // Both flags reported, because they fail differently: "modified but no pristine copy" would mean
+    // the restore silently did nothing, which is the one outcome a bare "reset" line could not show.
+    fprintf(stderr, "ZELDA3D CORE: entrance table -- previous run left it %s, pristine copy %s.\n",
+            wasModified ? "SHUFFLED" : "unmodified", haveOriginal ? "available" : "NOT TAKEN YET");
+    fflush(stderr);
 }
 
 void Entrance_Init(void) {
