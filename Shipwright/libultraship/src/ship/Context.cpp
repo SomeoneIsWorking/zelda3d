@@ -362,6 +362,30 @@ bool Context::InitLogging(spdlog::level::level_enum debugBuildLogLevel,
 
         spdlog::register_logger(GetLogger());
         spdlog::set_default_logger(GetLogger());
+
+        // Deliberately leaked owners, for the same reason EarlyLogToStderr leaks one (issue 0017):
+        // otherwise this logger is owned by spdlog's registry and by Context, BOTH of which are gone
+        // before static destructors run -- and objects that log from their destructors are ordinary
+        // here. ASAN caught InputViewerSettingsWindow::~InputViewerSettingsWindow doing exactly that
+        // at __run_exit_handlers, reading a freed logger. 0017 fixed the early logger only; every
+        // later log statement was still dangling, and patching destructors one at a time is
+        // unbounded (that arc already learned this once, when removing one SPDLOG_TRACE moved the
+        // crash to the next destructor).
+        //
+        // The THREAD POOL has to be kept alive too, not just the logger. In release builds mLogger is
+        // an async_logger holding mLogThreadPool, which is a Context member: keeping only the logger
+        // would leave it alive while the pool it posts to had been joined and destroyed -- the same
+        // use-after-free one indirection further out.
+        {
+            static auto* sLoggingKeepAlive = new std::vector<std::shared_ptr<void>>();
+            sLoggingKeepAlive->push_back(GetLogger());
+#ifndef _DEBUG
+            // Only the release build's async_logger has a pool; the debug build uses a plain logger.
+            if (mLogThreadPool != nullptr) {
+                sLoggingKeepAlive->push_back(mLogThreadPool);
+            }
+#endif
+        }
         return true;
     } catch (const spdlog::spdlog_ex& ex) {
         std::cout << "Log initialization failed: " << ex.what() << std::endl;
