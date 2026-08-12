@@ -1,4 +1,6 @@
 #include "BenPort.h"
+#include "port/core_boot_error.h"
+#include <cstdlib>
 #include <iostream>
 #include <algorithm>
 #include <filesystem>
@@ -764,7 +766,7 @@ void OTRGlobals::Initialize() {
                                      "Attempted to load an invalid O2R file. Try regenerating.", nullptr);
             SPDLOG_ERROR("Invalid O2R File!");
 #endif
-            exit(1);
+            throw Zelda3D::CoreBootError("the game archive is not a valid OTR/O2R file; try regenerating it");
         }
     }
 }
@@ -1014,63 +1016,85 @@ bool VerifyArchiveVersion(ArchiveVersion version) {
 // Implemented in 2s2h/zelda3d/mm3d_hostreg.c.
 extern "C" void Mm3d_RegisterHostHooks(void);
 
-extern "C" void InitOTR(int argc, char* argv[]) {
-    // Before anything renders or reads input: give libultraship this core's hooks. It can no longer
-    // call them by name -- see 2s2h/zelda3d/mm3d_hostreg.c.
-    Mm3d_RegisterHostHooks();
-    OTRGlobals::Instance = new OTRGlobals();
-    OTRGlobals::Instance->RunExtract(argc, argv);
+extern "C" int InitOTR(int argc, char* argv[]) {
+    // Returns 0 on success and non-zero when the core cannot boot. See core_boot_error.h: this is
+    // the outermost C++ frame on the boot path and the caller (main.c) is C, so the throw has to be
+    // caught HERE -- an exception unwinding into a C frame is undefined.
+    try {
+        // Self-test for the boot-failure path (see port/core_boot_error.h). This path only runs when
+        // an asset is missing or corrupt, which is exactly the case a gate cannot arrange without
+        // moving the user's ROMs around -- so without this hook the return-instead-of-exit contract
+        // would ship untested, which is how it silently reverts to exit() the next time someone
+        // touches the boot chain. tools/zelda3d_sequence.sh --bootfail drives it.
+        if (const char* e = std::getenv("ZELDA3D_BOOTFAIL_TEST"); e != nullptr && e[0] == '1') {
+            throw Zelda3D::CoreBootError("ZELDA3D_BOOTFAIL_TEST=1 -- deliberate failure, exercising the "
+                                         "return-to-launcher path");
+        }
+        // Before anything renders or reads input: give libultraship this core's hooks. It can no longer
+        // call them by name -- see 2s2h/zelda3d/mm3d_hostreg.c.
+        Mm3d_RegisterHostHooks();
+        OTRGlobals::Instance = new OTRGlobals();
+        OTRGlobals::Instance->RunExtract(argc, argv);
 
-    OTRGlobals::Instance->Initialize();
+        OTRGlobals::Instance->Initialize();
 
-    std::shared_ptr<Ship::Config> conf = OTRGlobals::Instance->context->GetConfig();
-    conf->RegisterVersionUpdater(std::make_shared<Ben::ConfigVersion1Updater>());
-    conf->RunVersionUpdates();
-    Ship::Context::GetRawInstance()->GetConsoleVariables()->Save();
+        std::shared_ptr<Ship::Config> conf = OTRGlobals::Instance->context->GetConfig();
+        conf->RegisterVersionUpdater(std::make_shared<Ben::ConfigVersion1Updater>());
+        conf->RunVersionUpdates();
+        Ship::Context::GetRawInstance()->GetConsoleVariables()->Save();
 
-    GameInteractor::Instance = new GameInteractor();
-    AudioCollection::Instance = new AudioCollection();
-    LoadGuiTextures();
-    BenGui::SetupGuiElements();
-    ShipInit::InitAll();
-    Rando::Init();
-    GfxPatcher_ApplyNecessaryAuthenticPatches();
-    DebugConsole_Init();
-    GameInteractor::Instance->RegisterOwnHooks();
-    CustomItem::RegisterHooks();
-    CustomMessage::RegisterHooks();
-    Rando::StaticData::PopulateCheckNames();
+        GameInteractor::Instance = new GameInteractor();
+        AudioCollection::Instance = new AudioCollection();
+        LoadGuiTextures();
+        BenGui::SetupGuiElements();
+        ShipInit::InitAll();
+        Rando::Init();
+        GfxPatcher_ApplyNecessaryAuthenticPatches();
+        DebugConsole_Init();
+        GameInteractor::Instance->RegisterOwnHooks();
+        CustomItem::RegisterHooks();
+        CustomMessage::RegisterHooks();
+        Rando::StaticData::PopulateCheckNames();
 
-    OTRMessage_Init();
-    OTRAudio_Init();
-    OTRExtScanner();
-    PlayerCustomFlipbooks_Patch();
+        OTRMessage_Init();
+        OTRAudio_Init();
+        OTRExtScanner();
+        PlayerCustomFlipbooks_Patch();
 
-    // Just came up with arbitrary numbers that seemed to work, this is
-    // usually set once(?) in currently stubbed out areas of code.
-    gIrqMgrRetraceTime = Ship_Random(700000, 850000);
+        // Just came up with arbitrary numbers that seemed to work, this is
+        // usually set once(?) in currently stubbed out areas of code.
+        gIrqMgrRetraceTime = Ship_Random(700000, 850000);
 
-    time_t now = time(NULL);
-    tm* tm_now = localtime(&now);
-    if (tm_now->tm_mon == 11 && tm_now->tm_mday >= 24 && tm_now->tm_mday <= 25) {
-        CVarRegisterInteger("gLetItSnow", 1);
-    } else {
-        CVarClear("gLetItSnow");
+        time_t now = time(NULL);
+        tm* tm_now = localtime(&now);
+        if (tm_now->tm_mon == 11 && tm_now->tm_mday >= 24 && tm_now->tm_mday <= 25) {
+            CVarRegisterInteger("gLetItSnow", 1);
+        } else {
+            CVarClear("gLetItSnow");
+        }
+
+        srand(now);
+    #ifdef ENABLE_CROWD_CONTROL
+        CrowdControl::Instance = new CrowdControl();
+        CrowdControl::Instance->Init();
+        if (CVarGetInteger("gCrowdControl", 0)) {
+            CrowdControl::Instance->Enable();
+        } else {
+            CrowdControl::Instance->Disable();
+        }
+    #endif
+
+        Ship::Context::GetRawInstance()->GetFileDropMgr()->RegisterDropHandler(BinarySaveConverter_HandleFileDropped);
+        Ship::Context::GetRawInstance()->GetFileDropMgr()->RegisterDropHandler(SaveManager_HandleFileDropped);
+    } catch (const Zelda3D::CoreBootError& e) {
+        SPDLOG_ERROR("[2ship] cannot boot: {}", e.what());
+        if (auto lg = spdlog::default_logger()) {
+            lg->flush();
+        }
+        return 1;
     }
 
-    srand(now);
-#ifdef ENABLE_CROWD_CONTROL
-    CrowdControl::Instance = new CrowdControl();
-    CrowdControl::Instance->Init();
-    if (CVarGetInteger("gCrowdControl", 0)) {
-        CrowdControl::Instance->Enable();
-    } else {
-        CrowdControl::Instance->Disable();
-    }
-#endif
-
-    Ship::Context::GetRawInstance()->GetFileDropMgr()->RegisterDropHandler(BinarySaveConverter_HandleFileDropped);
-    Ship::Context::GetRawInstance()->GetFileDropMgr()->RegisterDropHandler(SaveManager_HandleFileDropped);
+    return 0;
 }
 
 extern "C" void SaveManager_ThreadPoolWait() {

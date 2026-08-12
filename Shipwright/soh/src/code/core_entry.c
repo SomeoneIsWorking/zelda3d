@@ -22,7 +22,16 @@ int Zelda3D_CoreRun(int argc, char* argv[]) {
     // and InitOTR below is exactly where a stale pointer from that run got dereferenced.
     Zelda3D_CoreRunBegin();
     GameConsole_Init();
-    InitOTR(argc, argv);
+
+    // A boot failure RETURNS now, it does not exit() the process. The launcher is still holding this
+    // core's dlopen handle and still owns the chooser and (in a switch sequence) another game's
+    // session -- taking the process down would take those with it and tell the user nothing about
+    // which game failed. Nothing after this point may run: InitOTR unwound partway through, so the
+    // resource manager, the heaps and the audio engine are all in whatever state it reached.
+    if (InitOTR(argc, argv) != 0) {
+        Zelda3D_CoreRunEnd();
+        return 1;
+    }
     // TODO: Was moved to below InitOTR because it requires window to be setup. But will be late to catch crashes.
     CrashHandlerRegisterCallback(CrashHandler_PrintSohData);
     BootCommands_Init();
