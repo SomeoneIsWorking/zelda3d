@@ -561,3 +561,40 @@ is finite and checkable rather than open-ended.
 compiled into both cores) is now cleared per run, and reports **0 dropped on every run** of `mm,mm`
 and `oot,oot`, including with `ZELDA3D_SEQ_DWELL=45`. It was not leaking. Kept as a reported number
 rather than an assumption.
+
+
+## The GuiWindow list was game-NAME-scoped, not run-scoped (fixed 2026-08-12)
+
+The same distinction the `RequestExit` flag had to learn, in the same file, one field over.
+
+`Context::EndGameSession` clears the GuiWindow list -- but it only runs when the INCOMING game
+differs from the outgoing one. So `oot -> oot`, and any core re-run through the chooser, kept the
+previous run's windows. Measured on `oot,oot`: **27** rejections of
+`Gui::AddGuiWindow: Attempting to add duplicate window name`, one per window, each meaning the
+incoming run's window was never added and **its `Init()` never ran**.
+
+That is not cosmetic:
+
+- A window's `Init` is where several subsystems register per-run state. `gameplaystats.cpp`'s
+  `InitElement` is the sole registration site for the entire `sohStats` save section, and
+  `SaveManager::Instance` IS rebuilt per run -- so the second run recorded no stats and dropped them
+  from the save. `MessageViewer` has the same shape.
+- The windows that survived belong to the PREVIOUS run, holding its pointers and its registered
+  hooks. `actorViewer.cpp` registers `OnActorSpawn`/`OnActorDestroy`/`OnSceneInit` with lambdas
+  capturing `this` and never unregisters them.
+
+Fixed by clearing the list in `Context::BeginRun()`, which the launcher calls before every
+`core->run()` and is the one place that knows a run is starting. Deliberately there rather than in
+either game, and deliberately not moved out of `EndGameSession`: at `BeginRun` the previous session's
+ConsoleVariables are still installed, so the departing windows' destructors can still read the CVars
+they were constructed from -- which is exactly why the ENGINE's own windows are left to `InitConsole`
+in the EndGameSession path.
+
+**Evidence:** 27 duplicate-window rejections -> **0**, with both cores still reaching a scene. Full
+sweep `oot`, `mm`, `mm,mm`, `mm,oot`, `oot,mm`, `mm,oot,mm` and the switch test all exit 0 (1,829 GPU
+handles, 0 duplicates).
+
+This closes the root cause of three separate survey findings at once, which is worth noting as a
+method point: two of them (`gameplaystats`, `MessageViewer`) would have been "fix the latch" patches
+at the leaf, and the third (`actorViewer`'s hooks) is a real defect that this makes far less
+reachable without fixing it.
