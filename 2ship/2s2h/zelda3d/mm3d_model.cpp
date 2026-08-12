@@ -480,6 +480,19 @@ struct MMAnimState {
 };
 std::unordered_map<void*, MMAnimState> g_animState;
 
+struct MMAnimKeyState {
+    float frame = 0.0f;        // free-run playhead
+    bool hasFrame = false;
+    std::string lastCsab;      // clip this actor was driven with
+    float lastFrame = 0.0f;    // and at what frame
+    std::string morphOut;      // frozen OUTGOING clip during a morph ("" = none)
+    float morphOutFrame = 0.0f;
+};
+// Per-ACTOR, and RUN-scoped: keyed by a ZeldaArena address the next run reuses, exactly like
+// g_animState. Cleared in Zelda3D_MM_ModelResetRunState alongside it.
+std::unordered_map<const void*, MMAnimKeyState> g_animKey;
+
+
 // Both of these are RUN-scoped, and neither says so by its type.
 //
 // g_animState is keyed by `jointTable`, a ZeldaArena address, and its values hold `animOtr` --
@@ -496,7 +509,8 @@ std::unordered_map<void*, MMAnimState> g_animState;
 // describing -- a stuck playhead prints "f 5.00..5.00 over 240 samples", which no amount of log
 // volume would have made obvious. Dumped once at run-state reset, so it costs nothing per frame
 // beyond two comparisons.
-struct MMPhaseStat { float lo = 1e30f, hi = -1e30f; long n = 0; float dur = 0.0f; bool locked = false; };
+struct MMPhaseStat { float lo = 1e30f, hi = -1e30f; long n = 0; float dur = 0.0f; bool locked = false;
+                     long morphN = 0; float morphMax = 0.0f; };
 std::map<std::pair<int, std::string>, MMPhaseStat> g_phaseStats;
 static void mmDumpPhaseStats(void);
 static bool mmPhaseReport() {
@@ -524,10 +538,16 @@ static void mmDumpPhaseStats(void) {
         const bool moved = (st.hi - st.lo) > 1e-3f;
         const char* verdict = st.n < 2 ? "1-SAMP" : (moved ? "MOVED" : "STUCK");
         if (!moved && st.n >= 2) stuck++;
-        fprintf(stderr, "[MM3D-PHASE] %-6s model=%d %-28s f %.2f..%.2f dur=%.0f n=%ld %s\n",
+        fprintf(stderr, "[MM3D-PHASE] %-6s model=%d %-28s f %.2f..%.2f dur=%.0f n=%ld %s morph=%ld/%.2f\n",
                 verdict, kv.first.first, kv.first.second.c_str(),
-                st.lo, st.hi, st.dur, st.n, st.locked ? "phase-locked" : "free-run");
+                st.lo, st.hi, st.dur, st.n, st.locked ? "phase-locked" : "free-run",
+                st.morphN, st.morphMax);
     }
+    long morphTotal = 0;
+    for (const auto& kv : g_phaseStats) morphTotal += kv.second.morphN;
+    fprintf(stderr, "[MM3D-PHASE] morph path fired on %ld sample(s) across all pairs.%s\n", morphTotal,
+            morphTotal == 0 ? "  Either no transition happened while this was watching, or MM never"
+                              " reports a nonzero morphWeight -- do NOT read 0 as 'morph works'." : "");
     fprintf(stderr, "[MM3D-PHASE] %d of %zu pair(s) with >=2 samples never advanced.%s\n", stuck, g_phaseStats.size(),
             g_phaseStats.empty() ? "  NOTE: zero pairs sampled -- this run measured NOTHING, which is"
                                    " NOT the same as 'nothing was stuck'." : "");
@@ -537,16 +557,20 @@ static void mmDumpPhaseStats(void) {
 
 extern "C" void Zelda3D_MM_ModelResetRunState(void) {
     const size_t droppedAnimStates = g_animState.size();
+    const size_t droppedAnimKeys = g_animKey.size();
     const bool hadPending = g_pending.actor != nullptr;
 
     g_animState.clear();
+    g_animKey.clear();
     g_pending = MMPending{};
 
     // Printed with the count, pass or fail: "cleared" alone cannot distinguish a first run (nothing
     // to drop) from a run that inherited a full table, and the count IS the evidence that the table
     // was surviving runs at all.
-    fprintf(stderr, "MM3D CORE: model run-state reset -- dropped %zu stale anim-state entr%s, pending actor: %s.\n",
-            droppedAnimStates, droppedAnimStates == 1 ? "y" : "ies", hadPending ? "yes" : "none");
+    fprintf(stderr, "MM3D CORE: model run-state reset -- dropped %zu stale anim-state entr%s, %zu "
+            "anim-key entr%s, pending actor: %s.\n",
+            droppedAnimStates, droppedAnimStates == 1 ? "y" : "ies",
+            droppedAnimKeys, droppedAnimKeys == 1 ? "y" : "ies", hadPending ? "yes" : "none");
     mmDumpPhaseStats();
     fflush(stderr);
 }
@@ -654,13 +678,46 @@ static void mmUpdateAnim(int modelId, const char* name, float frame) {
     Zelda3D_GL_SetBones(modelId, sm.empty() ? nullptr : sm.front().data(), (int)sm.size());
 }
 
+// MORPH variant of mmUpdateAnim: cross-fade the INCOMING clip (inName@fIn) toward the frozen
+// OUTGOING clip (outName@fOut) by `weight` (= the live N64 skelAnime->morphWeight, 1 -> 0 across the
+// transition). Ported from OoT's Zelda3D_UpdateAnimMorph and using the SAME shared primitive
+// (Csab::skinMatricesMorph) -- MM's SkelAnime morph model is the same one, so this is a port rather
+// than a second implementation. If the outgoing CSAB cannot be resolved we sample the incoming clip
+// plainly instead of dropping the pose: a hard cut is worse than no morph, but both beat a T-pose.
+static void mmUpdateAnimMorph(int modelId, const char* inName, float fIn, const char* outName,
+                              float fOut, float weight) {
+    Loaded* lm = loadModel(modelId);
+    if (lm == nullptr || !lm->ok || !lm->cmb) { Zelda3D_GL_SetBones(modelId, nullptr, 0); return; }
+    if (inName == nullptr || inName[0] == '\0') { Zelda3D_GL_SetBones(modelId, nullptr, 0); return; }
+    Zelda3D::Csab* in = getCsabMM(lm, inName);
+    if (in == nullptr) { Zelda3D_GL_SetBones(modelId, nullptr, 0); return; }
+    Zelda3D::Csab* out = (outName != nullptr && outName[0] != '\0') ? getCsabMM(lm, outName) : nullptr;
+    std::vector<std::array<float, 16>> sm;
+    if (out != nullptr) in->skinMatricesMorph(*lm->cmb, fIn, *out, fOut, weight, sm);
+    else in->skinMatrices(*lm->cmb, fIn, sm);
+    const auto& bind = lm->cmb->boneMatrices();
+    Zelda3D_GL_SetBoneBind(modelId, bind.empty() ? nullptr : bind.front().data(), (int)bind.size());
+    Zelda3D_GL_SetBones(modelId, sm.empty() ? nullptr : sm.front().data(), (int)sm.size());
+}
+
 // Drive the model's CSAB `name`, phase-locked to the live N64 anim: play the 3DS clip at the SAME
 // fractional progress as the N64 animation (csab_frame = (n64Cur/n64Len) * csab_duration). When the
 // N64 length is unusable (short idle stub / not yet known) free-run at `rate` frames/draw so the
 // clip still animates. Mirrors OoT's Zelda3D_UpdateAnimAuto core (minus the morph polish, added later).
-static void mmUpdateAnimAuto(int modelId, const char* name, float rate, float n64Cur, float n64Len) {
-    static std::unordered_map<int, float> frames; // free-run playhead per model
-    if (name == nullptr || name[0] == '\0') { frames.erase(modelId); mmUpdateAnim(modelId, nullptr, 0); return; }
+static void mmUpdateAnimAuto(int modelId, const void* key, const char* name, float rate,
+                             float n64Cur, float n64Len, float morphWeight) {
+    // Keyed by the ACTOR (its jointTable), not by modelId. MM shares one model across many actors --
+    // model 18 drew 26451 kamome_fly samples in one tour, i.e. a whole flock of seagulls -- so
+    // per-model bookkeeping thrashes between instances: actor B draws with a different clip, that
+    // reads as a "transition" for actor A, and A then cross-fades toward B's pose. The playhead has
+    // the same problem: one free-run counter shared by every instance of a model. jointTable is the
+    // identity g_animState already uses, so morph state and anim state now agree on what an actor is.
+    if (name == nullptr || name[0] == '\0') {
+        g_animKey.erase(key);
+        mmUpdateAnim(modelId, nullptr, 0);
+        return;
+    }
+    MMAnimKeyState& ks = g_animKey[key];
     Loaded* lm = loadModel(modelId);
     float dur = 0.0f;
     if (lm != nullptr && lm->ok && lm->cmb) {
@@ -670,16 +727,16 @@ static void mmUpdateAnimAuto(int modelId, const char* name, float rate, float n6
     float f;
     if (n64Len > 4.0f && n64Cur >= 0.0f && dur > 0.0f) {
         f = (n64Cur / n64Len) * dur; // phase-lock
-        frames[modelId] = f;
+        ks.frame = f; ks.hasFrame = true;
     } else {
         // Free-run, WRAPPED. Left unwrapped this is a counter that only ever grows: measured live,
         // pst_model reached f=3198 on a 31-frame clip in under two minutes. Csab::animFrame wraps
         // with `while (frame > last) frame -= last`, so the cost of every sample grows linearly with
         // how long the process has been running -- ~103 iterations at 3198, and unbounded after an
         // hour of play. Wrapping here keeps the playhead in range and leaves that loop a no-op.
-        f = frames.count(modelId) ? frames[modelId] + rate : 0.0f;
+        f = ks.hasFrame ? ks.frame + rate : 0.0f;
         if (dur > 0.0f && f > dur) f = std::fmod(f, dur);
-        frames[modelId] = f;
+        ks.frame = f; ks.hasFrame = true;
     }
     if (mmPhaseReport()) {
         MMPhaseStat& st = g_phaseStats[{ modelId, std::string(name) }];
@@ -688,8 +745,34 @@ static void mmUpdateAnimAuto(int modelId, const char* name, float rate, float n6
         st.dur = dur;
         st.locked = (n64Len > 4.0f && n64Cur >= 0.0f && dur > 0.0f);
         st.n++;
+        // Whether the MORPH path actually fires. New code that never runs is worse than no code:
+        // it looks like a feature. If MM's SkelAnime never reports a nonzero morphWeight, every
+        // pair below reads morph=0 and the port is inert -- which is a finding, not a pass.
+        if (morphWeight > 0.0f) { st.morphN++; st.morphMax = std::max(st.morphMax, morphWeight); }
     }
-    mmUpdateAnim(modelId, name, f);
+    // MORPH bookkeeping, ported from OoT's Zelda3D_UpdateAnimAuto. On a real transition (the
+    // resolved clip changed while the N64 side is mid-morph) freeze the clip we are LEAVING at its
+    // last frame, then cross-fade the incoming clip toward that frozen pose while morphWeight > 0.
+    // Without it every transition hard-cuts, which reads as a one-frame limb pop.
+    const bool hadLast = !ks.lastCsab.empty();
+    const bool csabChanged = !hadLast || ks.lastCsab != name;
+    if (csabChanged) {
+        if (morphWeight > 0.0f && hadLast) {
+            ks.morphOut = ks.lastCsab;       // the clip THIS actor is leaving
+            ks.morphOutFrame = ks.lastFrame;
+        } else {
+            ks.morphOut.clear();             // hard cut / first anim
+        }
+    }
+    if (morphWeight <= 0.0f) ks.morphOut.clear();
+    ks.lastCsab = name;
+    ks.lastFrame = f;
+
+    if (!ks.morphOut.empty() && morphWeight > 0.0f) {
+        mmUpdateAnimMorph(modelId, name, f, ks.morphOut.c_str(), ks.morphOutFrame, morphWeight);
+    } else {
+        mmUpdateAnim(modelId, name, f);
+    }
 }
 
 // Forward-declared C bridge implemented in mm3d_draw.c (has access to POLY_OPA_DISP
@@ -720,12 +803,13 @@ int Zelda3D_MM_SkelAnimeDrawRaw(struct PlayState* play, void** skeleton, void* j
 
     // Recover this actor's live N64 anim state (captured in SkelAnime_Update, keyed by jointTable).
     const char* animOtr = nullptr;
-    float n64Cur = -1.0f, n64Len = 0.0f;
+    float n64Cur = -1.0f, n64Len = 0.0f, n64Morph = 0.0f;
     auto asIt = g_animState.find(jointTableV);
     if (asIt != g_animState.end()) {
         animOtr = asIt->second.animOtr;
         n64Cur = asIt->second.curFrame;
         n64Len = asIt->second.animLength;
+        n64Morph = asIt->second.morphWeight; // captured since the start; only now consumed
     }
 
     // Select the 3DS CSAB from the live N64 animation; unmapped -> the model's default idle so the
@@ -743,7 +827,7 @@ int Zelda3D_MM_SkelAnimeDrawRaw(struct PlayState* play, void** skeleton, void* j
         }
     }
 
-    mmUpdateAnimAuto(g_pending.modelId, csab, /*rate=*/1.0f, n64Cur, n64Len);
+    mmUpdateAnimAuto(g_pending.modelId, jointTableV, csab, /*rate=*/1.0f, n64Cur, n64Len, n64Morph);
     // ZELDA3D_MM_DBG_SKIN=1 — one line per skinned emit: which actor, where it actually is, and
     // which model got drawn there. Added to chase a skinned model rendering on top of Link at the
     // South Clock Town spawn; the answer is the emit whose actor position does NOT match where the
