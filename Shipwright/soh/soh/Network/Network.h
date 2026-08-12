@@ -20,8 +20,12 @@ class Network {
     void HandleRemoteJson(std::string payload);
 
   public:
-    bool isEnabled;
-    bool isConnected;
+    // Initialised, because nothing else does. There is no Network constructor and no subclass sets
+    // these, so `new CrowdControl()` left both indeterminate -- and they gate `Enable()`'s early
+    // return, the menu's Enable/Disable label, and `Disable()`'s `receiveThread.join()`. A garbage
+    // `true` there joins a thread that was never started, which is std::terminate, not a leak.
+    bool isEnabled = false;
+    bool isConnected = false;
 
     void Enable(const char* host, uint16_t port);
     void Disable();

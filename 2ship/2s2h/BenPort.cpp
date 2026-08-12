@@ -127,9 +127,7 @@ OTRGlobals* OTRGlobals::Instance;
 GameInteractor* GameInteractor::Instance;
 AudioCollection* AudioCollection::Instance;
 
-extern "C" char** cameraStrings;
 bool prevAltAssets = false;
-std::vector<std::shared_ptr<std::string>> cameraStdStrings;
 
 Color_RGB8 kokiriColor = { 0x1E, 0x69, 0x1B };
 Color_RGB8 goronColor = { 0x64, 0x14, 0x00 };

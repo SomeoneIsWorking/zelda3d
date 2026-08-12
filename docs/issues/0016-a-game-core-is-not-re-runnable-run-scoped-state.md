@@ -1044,3 +1044,69 @@ separately into `zelda3d`, `libultraship.so`, `libsoh_core.so` and `libmm_core.s
 the MPQ code and its globals in one process, resolved to whichever the loader binds first. Not
 touched here: it is a link-topology change, not a leak, and doing it mid-arc would have put the
 measurement above on a differently-linked binary.
+
+## OoT's turn: the camera strings, three network singletons, and a tool to find them (2026-08-12)
+
+MM reaching zero left OoT's 3,505 bytes as the only per-run leak, and "attribute it" had already gone
+wrong once this arc by reading a deep-stack ASAN run whose options changed the accounting. So the
+attribution got a tool instead: **`tools/leak_diff.py`** buckets every leak record in two LSAN reports
+by its stack — function names only, so two processes' ASLR'd addresses collapse onto one key — and
+prints the sites whose bytes or objects differ. It states its denominators (records parsed, buckets
+compared) and refuses a missing file rather than printing "(no differences)", and running it with the
+same file on both sides must print `0 differing` out of a non-zero bucket count, which is its
+self-test.
+
+Two sites of ours came out of it, and nothing else:
+
+**`cameraStrings`, 74 strdups plus the array, 1,753 bytes.** `db_camera` writes into these strings
+(digits, cursor arrows), so `OTRGlobals::Initialize` copies them from `.rodata` onto the heap. Its
+comment said *"this is a place that will only ever be run once at the beginning of startup"* and the
+loop body said *"OTRTODO: never deallocated..."* — both true right up until a core could run twice.
+Now freed by `FreeCameraStrings()`, which nulls in the same statement, called from both ends: before
+the copy is remade, and at `DeinitOTR`. Remaking the copy per run also fixes a second-order bug
+nobody had reported yet — run 2 would have inherited run 1's overwritten text.
+
+**`CrowdControl` / `Sail` / `Anchor`, 3 objects, 600 bytes.** These were on this issue's own
+*"NOT freed here, and each for a specific reason"* list: *"each owns a network thread. DeinitOTR calls
+Disable() on them, but that is not documented to join."* Reading the code settles it —
+`Network::Disable()` ends in `receiveThread.join()`, and the receive thread calls `OnDisconnected()`
+on its way out, which is where `CrowdControl` joins its second thread. The reason was a guess that had
+hardened into a documented exception. All three now go through `ReplacePerRunSingleton`.
+
+Two defects fell out of reading that path:
+
+- `DeinitOTR` called `Disable()` only when the remote's CVar was set. `Network::Disable()` already
+  early-returns when it is not enabled, so the test bought nothing and cost the case that matters: a
+  remote switched on and then switched back off left its receive thread running into a game that had
+  ended. Now unconditional — which is also what makes the delete at the next run safe.
+- `Network::isEnabled` and `isConnected` were **uninitialised**. No `Network` constructor exists and
+  no subclass sets them, so `new CrowdControl()` left both indeterminate, gating `Enable()`'s early
+  return, the menu's Enable/Disable label, and `Disable()`'s `join()`. A garbage `true` there joins a
+  thread that was never started, which is `std::terminate`, not a leak. Given default initialisers.
+
+Measured, same options both sides (`use_globals=0`, default stack depth):
+
+    oot     before  29,405,856 / 6,292   vs  oot,oot  29,409,361 / 6,374  -> 3,505 per run
+    oot     after   29,404,103 / 6,217   vs  oot,oot  29,404,103 / 6,217  ->     0 per run
+    mm      after   28,350,907 / 9,041   vs  mm,mm    28,350,907 / 9,041  ->     0 per run
+
+**Both cores now leak nothing per run.** Byte-for-byte and allocation-for-allocation identical
+between one run and two, which is a stronger statement than a small delta and the one this issue was
+opened to reach. The gates confirm the frees happen on real runs: `switch_test` logs "freeing the
+previous run's CrowdControl / Sail / Anchor" at each of its four core starts.
+
+Also settled in passing: `oot,oot` runs. Claim C057 ("OoT can only ever be last, its DeinitOTR ends in
+`_exit(0)`") describes code that is gone — `tools/zelda3d_sequence.sh` still carries the warning in
+its header comment and should lose it.
+
+### StormLib is one copy now, not four
+
+Getting these runs at all had needed `detect_odr_violation=0`, because ASAN reported
+`global 'DistBits' at extern/StormLib/src/pklib/explode.c:34`. The cause was a one-word link
+attribute: libultraship linked StormLib `PUBLIC`, and since StormLib is a static library and
+libultraship a shared one, every consumer whole-archived its own copy of the MPQ code and its globals
+— `libultraship.so`, `libsoh_core.so`, `libmm_core.so` and the `zelda3d` launcher, four in one
+process, with the loader picking one. Nothing outside libultraship references StormLib (`SFile*` and
+`StormLib.h` appear only in `ship/resource/archive/OtrArchive.cpp`; OTRExporter fetches its own), so
+`PRIVATE` is correct. `nm` counts 1/0/0/0 after, and the measurements above ran with ODR detection
+back ON and reported nothing.

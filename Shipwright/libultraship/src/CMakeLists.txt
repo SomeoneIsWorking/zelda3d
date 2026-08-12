@@ -71,11 +71,19 @@ target_include_directories(libultraship
 )
 
 #=================== Linking ===================
+# PRIVATE, not PUBLIC. StormLib is a static library and libultraship is a SHARED one, so a PUBLIC
+# link whole-archived a separate copy of the MPQ code -- and of its globals -- into every consumer:
+# libultraship.so, libsoh_core.so, libmm_core.so and the zelda3d launcher, four in one process.
+# AddressSanitizer calls that what it is (`odr-violation: global 'DistBits' at pklib/explode.c:34`),
+# and which copy the loader binds is not something the four agree on. Nothing outside libultraship
+# references StormLib: `SFile*` and `StormLib.h` appear only in ship/resource/archive/OtrArchive.cpp
+# (OTRExporter is a separate tool that fetches its own). Same shape as the dr_libs fix in the root
+# CMakeLists -- a dependency used by one target had been declared where both games picked it up.
 if(INCLUDE_MPQ_SUPPORT)
     if (NOT CMAKE_SYSTEM_NAME STREQUAL "Windows" AND NOT CMAKE_SYSTEM_NAME STREQUAL "iOS")
-        target_link_libraries(libultraship PUBLIC "$<LINK_LIBRARY:WHOLE_ARCHIVE,storm>")
+        target_link_libraries(libultraship PRIVATE "$<LINK_LIBRARY:WHOLE_ARCHIVE,storm>")
     else()
-        target_link_libraries(libultraship PUBLIC storm)
+        target_link_libraries(libultraship PRIVATE storm)
     endif()
 endif()
 
