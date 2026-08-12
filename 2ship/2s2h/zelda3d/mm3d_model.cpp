@@ -471,6 +471,30 @@ struct MMAnimState {
 };
 std::unordered_map<void*, MMAnimState> g_animState;
 
+// Both of these are RUN-scoped, and neither says so by its type.
+//
+// g_animState is keyed by `jointTable`, a ZeldaArena address, and its values hold `animOtr` --
+// `skelAnime->animation`, which is memory this run owns. The arena is rebuilt per run, so run 2
+// allocates jointTables at the SAME addresses run 1 used: a lookup then HITS on a stale entry and
+// hands back run 1's animation pointer, which the caller compares with strcmp. Nothing about that
+// failure looks like a stale cache -- it looks like the wrong animation being selected.
+//
+// g_pending holds a raw MM Actor*, parked between the divert point and the draw.
+extern "C" void Zelda3D_MM_ModelResetRunState(void) {
+    const size_t droppedAnimStates = g_animState.size();
+    const bool hadPending = g_pending.actor != nullptr;
+
+    g_animState.clear();
+    g_pending = MMPending{};
+
+    // Printed with the count, pass or fail: "cleared" alone cannot distinguish a first run (nothing
+    // to drop) from a run that inherited a full table, and the count IS the evidence that the table
+    // was surviving runs at all.
+    fprintf(stderr, "MM3D CORE: model run-state reset -- dropped %zu stale anim-state entr%s, pending actor: %s.\n",
+            droppedAnimStates, droppedAnimStates == 1 ? "y" : "ies", hadPending ? "yes" : "none");
+    fflush(stderr);
+}
+
 // --- N64 animation OTR -> 3DS CSAB base-name map. Seeded small and grown, exactly as OoT's
 // kZelda3dAnimMaps did. An unmapped anim falls back to the model's default idle (below), so a
 // skinned actor always stands rather than freezing at bind pose. The [MM3D-ANIM] log (emitted
