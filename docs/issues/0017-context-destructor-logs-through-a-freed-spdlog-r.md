@@ -173,6 +173,16 @@ that registry is destroyed.
 
 So the invariant stated above ("no code path may leave `Context` to static destruction") is still too
 narrow. The general form is: **no logger may be owned solely by spdlog's registry if anything logs
-from a destructor**, and the durable fix is to give every logger the same never-released owner, not
-to keep finding destructors. Not done here -- recorded so the next session starts from the class
-rather than from `InputViewer.cpp:462`.
+from a destructor**.
+
+**FIXED the same day, at the class rather than the instance.** `InitLogging` now pushes its logger
+into a deliberately leaked keep-alive list, exactly as `EarlyLogToStderr` does. One subtlety that
+would have made a narrower fix wrong: in RELEASE builds `mLogger` is an `async_logger` holding
+`mLogThreadPool`, which is a **Context member** -- keeping only the logger alive would have left it
+posting to a pool that had been joined and destroyed, the same use-after-free one indirection
+further out. Both are kept. (The pool exists only in non-`_DEBUG` builds, which the sanitizer build
+is not -- the first attempt failed to compile there, and the ASAN run that followed silently used a
+stale binary. Its "clean" result was discarded rather than reported.)
+
+**Evidence:** the ASAN `oot` run that reported this now exits 0 with **no report file at all**.
+`oot`, `mm`, `mm,mm`, `mm,oot` and the switch test all exit 0 on the release build.
