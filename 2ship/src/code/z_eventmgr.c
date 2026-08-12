@@ -7,6 +7,7 @@
 #include "global.h"
 #include "z64shrink_window.h"
 #include "libc/string.h"
+#include <stdio.h>
 #include "2s2h/GameInteractor/GameInteractor.h"
 
 ActorCutscene sGlobalCutsceneList[] = {
@@ -64,6 +65,33 @@ u8 sWaitingCutsceneList[16];
 static s32 sBssPad;
 u8 sNextCutsceneList[16];
 static s32 sBssPad2;
+
+// Give the cutscene manager back the state its declarations describe.
+//
+// Within a run this state is deliberately sticky: sSceneCutsceneList is written only by
+// CutsceneManager_Init, which runs from the scene's cutscene-list command, so a scene that has no
+// such command keeps the previous scene's list -- authentic, since on console this is main-code BSS
+// and behaves the same way. Across RUNS it is not sticky, it is dangling: the list points into the
+// previous run's freed scene segment while sSceneCutsceneCount still says how many entries to read,
+// and sCutsceneMgr holds a PlayState* and an Actor* from a heap that no longer exists.
+void CutsceneManager_ResetRunState(void) {
+    const CutsceneManager clean = {
+        CS_ID_NONE, 0, CS_ID_NONE, SUB_CAM_ID_DONE, NULL, CS_START_0, NULL, CAM_ID_MAIN, false,
+    };
+    // Reported rather than assumed: the pointer being non-NULL here is exactly the inherited-state
+    // case, and run 1 must print 0 entries for this line to mean anything on run 2.
+    const s16 inherited = (sSceneCutsceneList != NULL) ? sSceneCutsceneCount : 0;
+
+    sCutsceneMgr = clean;
+    sSceneCutsceneList = NULL;
+    sSceneCutsceneCount = 0;
+    bzero(sWaitingCutsceneList, sizeof(sWaitingCutsceneList));
+    bzero(sNextCutsceneList, sizeof(sNextCutsceneList));
+
+    fprintf(stderr, "ZELDA3D CORE: cutscene manager reset -- previous run left a %d-entry scene cutscene list.\n",
+            inherited);
+    fflush(stderr);
+}
 
 s16 CutsceneManager_SetHudVisibility(s16 csHudVisibility) {
     u16 hudVisibility;

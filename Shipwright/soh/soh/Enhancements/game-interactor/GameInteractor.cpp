@@ -163,6 +163,8 @@ extern "C" void Zelda3D_GameInteractorResetRunState(void) {
             " registered hook type(s).\n",
             entries, types);
     fflush(stderr);
+
+    GameInteractor::State::ResetRunState();
 }
 
 void GameInteractor::ResetRunState() {

@@ -9,6 +9,7 @@
 extern "C" {
 #include "z64.h"
 #include "global.h"
+#include "zelda3d/zelda3d.h"
 #include "soh/Enhancements/enhancementTypes.h"
 void Sram_InitDebugSave(void);
 void Select_LoadGame(SelectContext* selectContext, s32 entranceIndex);
@@ -177,10 +178,12 @@ void WarpPointsWidget(WidgetInfo& info) {
 }
 
 void RegisterWarping() {
-    static bool loadedConfig = false;
-    if (!loadedConfig) {
+    // Run-scoped, not process-scoped: RegisterWarping runs once per run, and a plain `static bool`
+    // meant the second run never loaded its warp config at all. Zelda3DOnce stamps the current run
+    // epoch, so it latches within a run and re-arms across runs without being on any reset list.
+    static Zelda3DOnce loadedConfig;
+    if (Zelda3D_Once(&loadedConfig)) {
         LoadConfig();
-        loadedConfig = true;
     }
 
     COND_HOOK(OnZTitleUpdate, CVAR_BOOTSEQUENCE_VALUE == BOOTSEQUENCE_DEBUGWARPSCREEN, [](void* gameState) {

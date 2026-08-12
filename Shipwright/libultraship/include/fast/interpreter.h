@@ -401,6 +401,9 @@ class Interpreter {
     uint16_t GetPixelDepth(float x, float y);
     void RegisterBlendedTexture(const char* name, uint8_t* mask, uint8_t* replacement);
     void UnregisterBlendedTexture(const char* name);
+    // Drop every blended-texture registration. Returns how many there were, so a caller can report
+    // the inherited count rather than assert it was zero. See the definition for why a RUN owns them.
+    size_t ClearBlendedTextures();
 
     // Register a CPU address as a mirror of a GPU framebuffer texture.
     // When ImportTexture encounters this address, it uses SelectTextureFb instead

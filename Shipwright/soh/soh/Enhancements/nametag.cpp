@@ -2,6 +2,7 @@
 #include <libultraship/bridge.h>
 #include <vector>
 #include <algorithm>
+#include <cstdio>
 #include "soh/frame_interpolation.h"
 #include "soh/Enhancements/custom-message/CustomMessageInterfaceAddon.h"
 #include "soh/Enhancements/game-interactor/GameInteractor.h"
@@ -314,13 +315,16 @@ void RemoveAllNameTags() {
     NameTag_RegisterHooks();
 }
 
-void NameTag_RegisterHooks() {
-    static HOOK_ID gameStatUpdateHookID = 0;
-    static HOOK_ID drawHookID = 0;
-    static HOOK_ID playDestroyHookID = 0;
-    static HOOK_ID actorDestroyHookID = 0;
-    static bool sRegisteredHooks = false;
+// Hoisted out of NameTag_RegisterHooks so the run reset can reach them. They mirror the state of the
+// game-interactor registry, and that registry is now cleared between runs -- so a copy of it that only
+// the function itself could see was a copy nothing could keep honest.
+static HOOK_ID gameStatUpdateHookID = 0;
+static HOOK_ID drawHookID = 0;
+static HOOK_ID playDestroyHookID = 0;
+static HOOK_ID actorDestroyHookID = 0;
+static bool sRegisteredHooks = false;
 
+void NameTag_RegisterHooks() {
     // Hooks already (un)registered based on nametags
     if ((nameTags.size() > 0) == sRegisteredHooks) {
         return;
@@ -355,4 +359,39 @@ void NameTag_RegisterHooks() {
     // Remove all name tags for actor on destroy
     actorDestroyHookID = GameInteractor::Instance->RegisterGameHook<GameInteractor::OnActorDestroy>(
         [](void* actor) { NameTag_RemoveAllForActor((Actor*)actor); });
+}
+
+// Drop everything the previous run left behind.
+//
+// Two distinct failures, both silent. `nameTags` holds raw `Actor*`: it is emptied by the
+// OnPlayDestroy hook, so a run that ends any other way (the launcher quitting mid-scene, a crash
+// path, the window closing) leaves entries pointing at a freed arena -- and the next run allocates
+// actors at the same addresses, so DrawNameTag's `actor->isDrawn` check reads a live-looking
+// stranger instead of failing.
+//
+// And `sRegisteredHooks` is a mirror of the game-interactor registry, which the run reset clears.
+// Leaving it true across that clear is worse than a leak: NameTag_RegisterHooks' first line is
+// `if ((nameTags.size() > 0) == sRegisteredHooks) return;`, so with tags still in the vector it
+// early-returns forever and nametags never work again for the life of the process.
+extern "C" void Zelda3D_NameTagResetRunState(void) {
+    const size_t leftover = nameTags.size();
+
+    for (auto& nameTag : nameTags) {
+        FreeNameTag(&nameTag);
+    }
+    nameTags.clear();
+    nameTagDl.clear();
+    sMirrorWorldActive = false;
+
+    // The hooks themselves are already gone (the registry clear took them); this only stops us
+    // holding ids that now name nothing, and re-arms the guard above.
+    gameStatUpdateHookID = 0;
+    drawHookID = 0;
+    playDestroyHookID = 0;
+    actorDestroyHookID = 0;
+    sRegisteredHooks = false;
+
+    fprintf(stderr, "SOH3D: name tags reset -- %zu tag(s) left by the previous run, hook mirror re-armed.\n",
+            leftover);
+    fflush(stderr);
 }

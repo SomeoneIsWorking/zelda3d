@@ -46,6 +46,7 @@ void Graph_ResetRunState(void);       // src/code/graph.c -- the frame loop's re
 void Zelda3D_ReplResetRunState(void);  // 2s2h/Z3DRepl.c        -- the REPL FIFO descriptor
 void Zelda3D_MM_ModelResetRunState(void); // 2s2h/zelda3d/mm3d_model.cpp -- anim state keyed by arena addresses
 void ObjectExtension_ResetRunState(void); // zelda3d_shared/object -- keyed by Actor*, one instance per core
+void CutsceneManager_ResetRunState(void); // src/code/z_eventmgr.c -- a scene cutscene list plus PlayState*/Actor*
 
 // ---------------------------------------------------------------------------------------------
 // Once-per-run latches
@@ -155,6 +156,10 @@ void Zelda3D_CoreRunBegin(void) {
     // Object extensions, keyed by actor pointer. zelda3d_shared is a static library linked into
     // BOTH cores, so this instance is this core's own.
     ObjectExtension_ResetRunState();
+
+    // The cutscene manager keeps a pointer into the scene segment and one into the actor heap, both
+    // of which the previous run freed.
+    CutsceneManager_ResetRunState();
 }
 
 // Called after the frame loop has finished and before the heaps are freed.

@@ -1,5 +1,7 @@
 #include "GameInteractor.h"
 
+#include <cstdio>
+
 // MARK: - State Definitions
 
 bool GameInteractor::State::NoUIActive = 0;
@@ -22,6 +24,45 @@ uint8_t GameInteractor::State::SlipperyFloorActive = 0;
 uint8_t GameInteractor::State::SecondCollisionUpdate = 0;
 uint8_t GameInteractor::State::TriforceHuntPieceGiven = 0;
 uint8_t GameInteractor::State::TriforceHuntCreditsWarpActive = 0;
+
+void GameInteractor::State::ResetRunState() {
+    // Counted against the definitions above, not against "is it zero" -- MovementSpeedMultiplier's
+    // clean value is 1.0f and GravityLevel's is a named enumerator, so a zero-check would call two of
+    // these dirty on a run that never touched them and would miss nothing in exchange.
+    size_t dirty = 0;
+    dirty += (NoUIActive != false) + (LinkSize != GI_LINK_SIZE_NORMAL) + (InvisibleLinkActive != false) +
+             (OneHitKOActive != false) + (PacifistModeActive != false) + (DisableZTargetingActive != false) +
+             (ReverseControlsActive != false) + (DefenseModifier != 0) + (MovementSpeedMultiplier != 1.0f) +
+             (GravityLevel != GI_GRAVITY_LEVEL_NORMAL) + (EmulatedButtons != 0) + (RandomBombFuseTimerActive != 0) +
+             (DisableLedgeGrabsActive != 0) + (RandomWindActive != 0) + (RandomWindSecondsSinceLastDirectionChange != 0) +
+             (RandomBonksActive != 0) + (SlipperyFloorActive != 0) + (SecondCollisionUpdate != 0) +
+             (TriforceHuntPieceGiven != 0) + (TriforceHuntCreditsWarpActive != 0);
+
+    NoUIActive = false;
+    LinkSize = GI_LINK_SIZE_NORMAL;
+    InvisibleLinkActive = false;
+    OneHitKOActive = false;
+    PacifistModeActive = false;
+    DisableZTargetingActive = false;
+    ReverseControlsActive = false;
+    DefenseModifier = 0;
+    MovementSpeedMultiplier = 1.0f;
+    GravityLevel = GI_GRAVITY_LEVEL_NORMAL;
+    EmulatedButtons = 0;
+    RandomBombFuseTimerActive = 0;
+    DisableLedgeGrabsActive = 0;
+    RandomWindActive = 0;
+    RandomWindSecondsSinceLastDirectionChange = 0;
+    RandomBonksActive = 0;
+    SlipperyFloorActive = 0;
+    SecondCollisionUpdate = 0;
+    TriforceHuntPieceGiven = 0;
+    TriforceHuntCreditsWarpActive = 0;
+
+    fprintf(stderr, "SOH3D: game-interactor state reset -- %zu of 20 field(s) were left non-default by the previous run.\n",
+            dirty);
+    fflush(stderr);
+}
 
 void GameInteractor::State::SetPacifistMode(bool active) {
     PacifistModeActive = active;

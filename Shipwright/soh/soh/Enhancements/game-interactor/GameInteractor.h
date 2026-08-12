@@ -207,6 +207,15 @@ class GameInteractor {
         static uint8_t TriforceHuntCreditsWarpActive;
 
         static void SetPacifistMode(bool active);
+
+        // Put every field back to the value its definition gives it.
+        //
+        // All of these are cheat/crowd-control toggles a run can leave switched on: end a run while
+        // pacifist mode or a gravity effect is active and the next run starts inside it, with no UI
+        // showing it because the enhancement that set it is gone. They are plain scalars, so nothing
+        // dangles -- the failure is silent wrong behavior, which is why it needs an explicit reset
+        // rather than a pointer walk. Reports what it found so run 1 can be told from run 2.
+        static void ResetRunState();
     };
 
     // Effects

@@ -1,5 +1,6 @@
 #include "soh/Enhancements/game-interactor/GameInteractor_Hooks.h"
 #include "init/ShipInit.hpp"
+#include <cstdio>
 #include "soh/Enhancements/randomizer/SeedContext.h"
 #include "gui/Notification.h"
 
@@ -33,6 +34,23 @@ static AltTrapType roll = ADD_TRAP_MAX;
 static int statusTimer = -1;
 static int eventTimer = -1;
 static EntranceIndex teleportRoll = ENTR_MAX;
+
+// A trap is armed here and fires some frames later, so ending a run between those two moments leaves
+// it armed for the next one -- the next run's Link takes an ice/burn/kill/void hit he never earned,
+// or gets teleported at the first frame the timers tick. ADD_TRAP_MAX / ENTR_MAX / -1 are the
+// "nothing pending" values the declarations already use.
+extern "C" void Zelda3D_ExtraTrapsResetRunState(void) {
+    const bool armed = (roll != ADD_TRAP_MAX) || (teleportRoll != ENTR_MAX) || (statusTimer != -1) || (eventTimer != -1);
+
+    roll = ADD_TRAP_MAX;
+    statusTimer = -1;
+    eventTimer = -1;
+    teleportRoll = ENTR_MAX;
+
+    fprintf(stderr, "SOH3D: extra traps reset -- previous run left %s.\n",
+            armed ? "a trap ARMED or mid-countdown" : "nothing pending");
+    fflush(stderr);
+}
 
 const char* altTrapTypeCvars[] = {
     CVAR_ENHANCEMENT("ExtraTraps.Ice"),   CVAR_ENHANCEMENT("ExtraTraps.Burn"),
