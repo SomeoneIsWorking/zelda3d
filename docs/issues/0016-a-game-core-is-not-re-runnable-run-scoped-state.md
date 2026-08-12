@@ -524,3 +524,40 @@ sweep -- `oot`, `mm`, `mm,mm`, `mm,oot`, `oot,mm`, `oot,oot`, `mm,oot,mm` -- all
 
 Problem A (OoT core 2's one-frame animation over-read) is **still open** and is unaffected by this;
 it remains silent in release builds and is caught by the permanent check in `AnimationContext_SetLoadFrame`.
+
+
+## Survey follow-ups worked 2026-08-12, including one FALSE POSITIVE
+
+Fixed:
+
+- **`2s2h/Enhancements/GfxPatcher/AuthenticGfxPatches.cpp`** -- `static char* grassTexture =
+  ResourceMgr_LoadTexOrDListByName(...)` plus a `static Gfx` array that BAKES that pointer into a
+  `gsDPLoadMultiBlock` at first initialisation. Both process-lifetime; the ResourceManager that owns
+  the texture is destroyed with each game session. The array must stay static (the patch stores a
+  `gsSPDisplayList` pointing at it) so only its CONTENTS are rebuilt, once per run, from the
+  freshly-resolved pointer -- with a `static_assert` on the two initialisers' sizes so a macro change
+  cannot make them drift apart silently.
+- **`CosmeticsEditor.cpp`** x2 -- `static Player* player = GET_PLAYER(gPlayState);`. Broken within a
+  single run: a function-local static with a dynamic initialiser runs once per PROCESS, so it
+  captured one scene's Player and wrote through it forever.
+- **`ovl_Demo_Gt`** -- three function-local `static Actor* cloudRing`, now file-scope and cleared by a
+  `DemoGt_Reset` registered as the `ActorResetFunc`.
+- **`mm3d_model.cpp`** -- `g_animState` (keyed by ZeldaArena addresses) and `g_pending`, now reset per
+  run. Measured: run 2 dropped a stale entry.
+
+**FALSE POSITIVE, and worth recording so nobody re-opens it: `ovl_Dm_Char08` is already correct.**
+The survey flagged its six NULL-latched `ResourceMgr_Load*` statics as HIGH. `DmChar08_Reset` already
+frees the three managed allocations, restores the resource's original `polyList`/`vtxList`, and nulls
+all six -- and it is genuinely reached: both games call `entry->profile->reset()` /
+`dbEntry->reset()` from `Actor_FreeOverlay` (`2ship/src/code/z_actor.c:3673`,
+`soh/src/code/z_actor.c:3345`). The latch is fine because something clears it.
+
+Denominators for the `ActorResetFunc` mechanism, which is the real discriminator for this class:
+**OoT 34 of 428 overlays, MM 45 of 574.** Neither number is a defect count -- most overlays hold no
+run-scoped statics at all -- but the gap is where the remaining instances of this class live, and it
+is finite and checkable rather than open-ended.
+
+**A guard that measured zero:** `ObjectExtension::Data` (keyed by `Actor*`, in `zelda3d_shared`,
+compiled into both cores) is now cleared per run, and reports **0 dropped on every run** of `mm,mm`
+and `oot,oot`, including with `ZELDA3D_SEQ_DWELL=45`. It was not leaking. Kept as a reported number
+rather than an assumption.

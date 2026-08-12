@@ -345,13 +345,34 @@ void GfxPatcher_ApplyTransitionWipePatch() {
 }
 
 void GfxPatcher_ApplyFierceDeityGIPatch() {
-    static char* grassTexture = ResourceMgr_LoadTexOrDListByName("scenes/nonmq/Z2_SOUGEN/Z2_SOUGENTex_0063D0");
+    // The texture pointer is RUN-scoped and the display list below BAKES it, so neither may be a
+    // process-lifetime static -- which both were. ResourceMgr_LoadTexOrDListByName returns memory
+    // the ResourceManager owns, and the launcher destroys that ResourceManager when a game session
+    // ends; a `static` initialised on run 1 therefore held a freed pointer for every later run, and
+    // the `static Gfx` array had already baked it into a gsDPLoadMultiBlock at first initialisation,
+    // where nothing would ever look at it again.
+    //
+    // The ARRAY still has to be static: ResourceMgr_PatchGfxByName stores a gsSPDisplayList pointing
+    // AT it, so its address must outlive this call. Only its contents are per-run. This function is
+    // called from GfxPatcher_ApplyNecessaryAuthenticPatches in InitOTR, i.e. once per run, so
+    // rebuilding here is exactly once per run.
     static Gfx loadGrassDL[] = {
+        gsDPPipeSync(),
+        gsDPLoadMultiBlock(NULL, 0x0080, 1, G_IM_FMT_RGBA, G_IM_SIZ_16b, 32, 32, 0, G_TX_NOMIRROR | G_TX_WRAP,
+                           G_TX_NOMIRROR | G_TX_WRAP, 5, 5, G_TX_NOLOD, 15),
+        gsSPEndDisplayList(),
+    };
+
+    char* grassTexture = ResourceMgr_LoadTexOrDListByName("scenes/nonmq/Z2_SOUGEN/Z2_SOUGENTex_0063D0");
+    const Gfx rebuilt[] = {
         gsDPPipeSync(),
         gsDPLoadMultiBlock(grassTexture, 0x0080, 1, G_IM_FMT_RGBA, G_IM_SIZ_16b, 32, 32, 0, G_TX_NOMIRROR | G_TX_WRAP,
                            G_TX_NOMIRROR | G_TX_WRAP, 5, 5, G_TX_NOLOD, 15),
         gsSPEndDisplayList(),
     };
+    // Same initialiser shape, so the sizes cannot drift apart silently if the macro expansion changes.
+    static_assert(sizeof(rebuilt) == sizeof(loadGrassDL), "grass load DL size mismatch");
+    memcpy(loadGrassDL, rebuilt, sizeof(loadGrassDL));
     // The original DL uses TEXEL1 here, but doesn't actually load anything there. This happens to be a grass texture on
     // the moon where this item would normally be drawn. We could patch the TEXEL1 to be TEXEL0 as an alternative "fix",
     // but we're just opting to instead load the grass texture as it would have on the moon.
