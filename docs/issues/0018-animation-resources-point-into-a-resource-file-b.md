@@ -211,3 +211,35 @@ and was not on the list until the instrument eliminated the factory.
 
 The comparative form is what made this worth running -- a log that only fired on the failing case
 would have shown the same four lines and proved nothing.
+
+
+## Where the trail stands (end of 2026-08-12 session)
+
+Traced the second resolution path end to end:
+
+```
+AnimationContext_SetLoadFrame                   z_skelanime.c:1021
+  ResourceMgr_LoadAnimByName(path)              ResourceManagerHelpers.cpp:533
+    ResourceGetDataByName                       resourcebridge.cpp:44
+      ResourceManager::GetResourceRawPointer    ResourceManager.cpp:508
+        IResource::GetRawPointer()              -> for Animation, &animationData (OWNED)
+```
+
+`ResourceMgr_LoadAnimByName` casts that `void*` to `AnimationHeaderCommon*` **with no type check at
+all** -- `return (AnimationHeaderCommon*)ResourceGetDataByName(path);` -- and then reads
+`animHeader->frameCount` and `linkAnim->segment` through it. That is the same unchecked-reinterpret
+pattern as the `static_pointer_cast<Animation>` bug confirmed and fixed above, one layer down, and it
+is the strongest remaining candidate. If those paths resolve to a `PlayerAnimation`, `GetRawPointer()`
+returns `limbRotData.data()` and `->segment` is two `int16_t`s of animation data read as a pointer.
+
+**What that does not yet explain**, and the reason this is recorded as a candidate rather than a
+conclusion: ASAN says the memcpy SOURCE is a real heap address inside a known 3,284-byte
+`O2rArchive::LoadFile` block, at a consistent +168, which is not what reinterpreted `int16_t` payload
+would usually produce. Either the reinterpretation happens to land on a plausible pointer, or there
+is a third mechanism. Do not write the fix until a run shows which -- this issue has already had two
+confident wrong readings (file lifetime, then the factory branch), both killed by instruments.
+
+**Next step, concretely:** log inside `AnimationContext_SetLoadFrame` whether `ResourceMgr_OTRSigCheck`
+fired, the path, and the resolved resource's `GetInitData()->Type`, then diff `oot` against
+`mm,oot,mm` -- the same comparative shape that eliminated the factory. The negative control already
+exists: `oot` alone is ASAN-clean.
