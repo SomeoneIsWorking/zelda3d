@@ -91,11 +91,32 @@ What IS established, and is layout-independent:
 - It holds 128 sequences when freshly constructed, in both runs.
 - It reads a nonsense count and segfaults on node traversal somewhere inside run 2's boot.
 
+## ASAN ran and found NOTHING — and that is a result, not a dead end
+
+`mm,mm` under the sanitizer build (`scratch/build-asan`, `ZELDA3D_SANITIZE=address`) with
+`detect_leaks=0:halt_on_error=0:detect_odr_violation=0`: both cores reached a scene, both returned 0,
+and **no report was produced**.
+
+That negative is only worth anything with its denominator, so the instrument was validated rather
+than assumed: re-run with `verbosity=1`, the log carries **465** AddressSanitizer lines including the
+runtime's own init messages, and the binary exports `__asan_report*` (22 in `libmm_core.so`, 174
+`__asan*` in the launcher). ASAN was live and silent.
+
+**What that rules out:** an out-of-bounds write, and a use-after-free of the AudioCollection or its
+nodes. ASAN sees both of those.
+
+**What it leaves, and it fits every observation:** a write through a pointer that is stale but now
+points into a block the allocator has legitimately handed to something else. To ASAN that is an
+ordinary write to a live allocation — there is nothing to report. It also explains why the observable
+moment moves with layout: which stale pointer lands on the AudioCollection depends entirely on where
+the allocator puts things.
+
 ## Next step
 
-ASAN build of MM, run as `mm,mm`, `detect_leaks=0`, `halt_on_error=0`. This is the right tool and the
-bisection above is not: ASAN reports the offending write at the instruction that makes it, with the
-allocation's stack, and does not depend on guessing which statement to bracket. Do not spend more
-passes on printf bisection.
+A hardware watchpoint, not a sanitizer. Under the Debug/ASAN build in gdb: break at the return of
+`AudioCollection::AudioCollection`, record `this`, `watch -l` the map's node-count word, then let run
+1 quit and run 2 boot. The watchpoint fires at the instruction that writes, which is the one thing
+neither printf bisection nor ASAN can give here. Driving it needs the sequence harness's REPL FIFOs
+to quit run 1, so the launcher has to be wrapped rather than replaced.
 
 Do NOT re-add the delete until this is answered.
