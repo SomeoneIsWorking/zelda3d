@@ -1,4 +1,5 @@
 #include "Rando/Rando.h"
+#include "2s2h/zelda3d/mm3d_core_lifecycle.h"
 #include "2s2h/Enhancements/FrameInterpolation/FrameInterpolation.h"
 #include "init/ShipInit.hpp"
 #include "2s2h/Rando/DrawFuncs.h"
@@ -61,12 +62,16 @@ void DrawStrayFairy(RandoItemId randoItemId) {
     // together, but worse is that the more there are the faster their animation will play (because of the
     // SkelAnime_Update below). This is still better than the previous solution which hand drew the fairy with DL
     // calls...
-    static bool initialized = false;
+    // Run latch, not a process latch. skelAnime.skeleton points into the PER-GAME ResourceManager,
+    // which is destroyed with its run -- so a plain `static bool` meant run 2 skipped the init and
+    // SkelAnime_DrawFlex below walked a skeleton belonging to a session that no longer exists. Same
+    // shape as the PlayAsKafei crash (docs/issues/0016). Every other SETUP_DRAW latch in DrawFuncs.cpp
+    // was converted; this one is in a different file and was missed.
+    static Zelda3DOnce initialized;
     static SkelAnime skelAnime;
     static Vec3s jointTable[STRAY_FAIRY_LIMB_MAX];
     static u32 lastUpdate = 0;
-    if (!initialized) {
-        initialized = true;
+    if (Zelda3D_Once(&initialized)) {
         SkelAnime_InitFlex(gPlayState, &skelAnime, (FlexSkeletonHeader*)&gStrayFairySkel,
                            (AnimationHeader*)&gStrayFairyFlyingAnim, jointTable, jointTable, STRAY_FAIRY_LIMB_MAX);
     }
