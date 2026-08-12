@@ -1,3 +1,4 @@
+#include <stdlib.h>
 #include "global.h"
 #include "BenPort.h"
 #include <string.h>
@@ -214,6 +215,50 @@ void SkelAnime_DrawFlexLod(PlayState* play, void** skeleton, Vec3s* jointTable, 
 
     if (skeleton == NULL) {
         return;
+    }
+
+    // What this function was actually handed, gated on ZELDA3D_SKELLOG=1.
+    //
+    // MM's third core in `mm,oot,mm` SIGSEGVs two lines below, dereferencing rootLimb. The crash
+    // handler's register dump showed RDI = 0x0000010100000103 -- packed data, not a pointer -- so
+    // `skeleton` is not a limb table at all, and nothing at the crash site says where it came from.
+    //
+    // Logged for the FIRST few calls in every run rather than only when something looks wrong,
+    // because the useful comparison is `mm,mm` (which passes) against `mm,oot,mm` (which does not):
+    // a check that only fires on the bad run cannot show what the good one does instead. skeleton[0]
+    // is read here rather than after Lib_SegmentedToVirtual so the raw stored value is visible --
+    // that is the value that is wrong.
+    {
+        // Capped by NOVELTY, not by count. The first version of this printed the first 8 calls and
+        // showed eight identical, perfectly healthy lines -- because Player_DrawFlexLod runs every
+        // frame and the interesting call is whichever one FIRST differs, thousands of frames in. A
+        // count cap reports the boring case and hides the only case worth seeing.
+        static int sSkelCalls = 0;
+        static int sSkelPrints = 0;
+        static void* sLastSkel = NULL;
+        static void* sLastRoot = NULL;
+        static s32 sLastCount = -1;
+        static const char* sSkelLog = NULL;
+        if (sSkelLog == NULL) {
+            sSkelLog = getenv("ZELDA3D_SKELLOG") ? "1" : "0";
+        }
+        sSkelCalls++;
+        if (sSkelLog[0] == '1') {
+            const int changed =
+                ((void*)skeleton != sLastSkel) || ((void*)skeleton[0] != sLastRoot) || (dListCount != sLastCount);
+            if (changed) {
+                sLastSkel = (void*)skeleton;
+                sLastRoot = (void*)skeleton[0];
+                sLastCount = dListCount;
+                sSkelPrints++;
+                // The call number is printed so the gap since the last change is visible: a value
+                // that changes once at call 3 and one that changes every frame are different bugs.
+                fprintf(stderr,
+                        "MM3D SKEL: call %d (change %d) -- skeleton=%p skeleton[0]=%p dListCount=%d lod=%d\n",
+                        sSkelCalls, sSkelPrints, (void*)skeleton, (void*)skeleton[0], (int)dListCount, (int)lod);
+                fflush(stderr);
+            }
+        }
     }
 
     OPEN_DISPS(play->state.gfxCtx);

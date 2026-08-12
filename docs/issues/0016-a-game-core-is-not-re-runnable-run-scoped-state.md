@@ -482,3 +482,45 @@ save state. `gSaveContext` WAS being inherited -- that part is confirmed by the 
 **fixing it did not change the position**, so it was not the cause of the observation that led to it.
 The title demo is simply a moving target: where it has got to depends on when the gate polls. The
 position difference is not evidence of anything and should not be cited as such.
+
+
+## `mm,oot,mm` FIXED 2026-08-12 -- a process latch guarding a captured POINTER
+
+Problem B is closed. `2s2h/Enhancements/Modes/PlayAsKafei.cpp` keeps two
+`static SkeletonHeader` backups and captures them in `RegisterPlayAsKafei`, guarded by a
+`static bool initialized`. That function is a `RegisterShipInitFunc`, so it **re-runs every run** --
+and a `SkeletonHeader` contains the limb-table POINTER.
+
+So run 1 captured run 1's pointer; every later run hit the latch and skipped re-capturing, while
+`UpdatePlayAsKafei()` still ran and `memcpy`'d that stale backup over the freshly loaded skeleton,
+replacing a valid `segment` with a dangling one. The player was then drawn through it.
+
+**The evidence that named it, and why the earlier attempts could not.** A per-call log in
+`SkelAnime_DrawFlexLod` capped by NOVELTY rather than by count -- printing every change of
+`skeleton`/`skeleton[0]`/`dListCount` instead of the first N calls:
+
+```
+MM3D SKEL: call 1  (change 1) -- skeleton=0x7fc960013690 skeleton[0]=0x7fc96000e7e0 dListCount=18
+MM3D SKEL: call 25 (change 2) -- skeleton=0x7fc950023970 skeleton[0]=0x7fc950009e60 dListCount=18
+MM3D SKEL: call 26 (change 3) -- skeleton=0x7fc960013690 skeleton[0]=0x626d6f6220656854 dListCount=18
+```
+
+Call 26 goes back to **run 1's** skeleton pointer, and `0x626d6f6220656854` is ASCII `"The bomb"` --
+OoT's message text, sitting in the memory MM's first run had used. The first version of that log
+printed the first 8 calls and showed eight healthy lines, because the interesting call is the
+twenty-sixth. That is CLAUDE.md's "cap the boring case, not the interesting one", made concrete.
+
+**Why `mm,mm` passed and `mm,oot,mm` did not**, which is the part worth remembering: the bug was
+present in both. Without OoT in between, nothing had reused that address yet, so MM drew through
+freed memory that still happened to contain a valid skeleton. `mm,mm` passing was never evidence of
+correctness -- it was evidence that nothing had overwritten the corpse yet.
+
+Fixed by making the latch a `Zelda3DOnce`, which preserves the original comment's intent exactly (one
+execution per `InitAll` storm) while giving each run its own backups.
+
+**Evidence:** `mm,oot,mm` went from SIGSEGV to exit 0 with all three cores reaching a scene. The full
+sweep -- `oot`, `mm`, `mm,mm`, `mm,oot`, `oot,mm`, `oot,oot`, `mm,oot,mm` -- all exit 0, and
+`tools/zelda3d_switch_test.sh` passes with 1,800 GPU handles released and 0 duplicates.
+
+Problem A (OoT core 2's one-frame animation over-read) is **still open** and is unaffected by this;
+it remains silent in release builds and is caught by the permanent check in `AnimationContext_SetLoadFrame`.

@@ -8,6 +8,7 @@ extern "C" {
 #include "variables.h"
 #include "objects/object_link_child/object_link_child.h"
 #include "objects/object_test3/object_test3.h"
+#include "2s2h/zelda3d/mm3d_core_lifecycle.h"
 
 void ResourceMgr_PatchGfxByName(const char* path, const char* patchName, int index, Gfx instruction);
 void ResourceMgr_UnpatchGfxByName(const char* path, const char* patchName);
@@ -71,11 +72,26 @@ void UpdatePlayAsKafei() {
 void RegisterPlayAsKafei() {
     // Even though this isn't run when a cvar is changed, it can still run if ShipInit::InitAll(); is called again,
     // likely in the case of setting a preset or something. So we need to make sure this only runs once.
-    static bool initialized = false;
-    if (initialized) {
+    //
+    // ONCE PER RUN, not once per PROCESS -- and the difference crashed the game. The backups below
+    // are `SkeletonHeader` structs, and a SkeletonHeader contains the limb-table POINTER. Under the
+    // launcher a core is loaded once and run several times, so a process-lifetime latch meant run 1
+    // captured run 1's pointer and every later run SKIPPED re-capturing -- while UpdatePlayAsKafei()
+    // still ran and memcpy'd that stale backup over the freshly loaded skeleton, replacing a valid
+    // segment with a dangling one.
+    //
+    // Measured: in `mm,oot,mm`, MM's third run drew the player through `skeleton[0] =
+    // 0x626d6f6220656854` -- ASCII "The bomb", OoT's message text sitting in the memory MM's first
+    // run had used. SIGSEGV in SkelAnime_DrawFlexLod. `mm,mm` did NOT reproduce it, because without
+    // OoT in between nothing had reused that address yet: the same bug, silently drawing through
+    // freed memory that still happened to contain a skeleton.
+    //
+    // Zelda3DOnce carries a run stamp, so it preserves this comment's original intent exactly -- one
+    // execution per InitAll storm -- while making each run capture its own backups.
+    static Zelda3DOnce initialized;
+    if (!Zelda3D_Once(&initialized)) {
         return;
     }
-    initialized = true;
 
     auto gLinkHumanSkelResource = Ship::Context::GetRawInstance()->GetResourceManager()->LoadResource(gLinkHumanSkel);
     auto gKafeiSkelResource = Ship::Context::GetRawInstance()->GetResourceManager()->LoadResource(gKafeiSkel);
