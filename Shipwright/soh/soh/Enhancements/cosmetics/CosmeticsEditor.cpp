@@ -1503,7 +1503,13 @@ void ApplyOrResetCustomGfxPatches(bool manualChange) {
 
     if (gPlayState != nullptr) {
         if (CVarGetInteger(CVAR_COSMETIC("Link.BodySize.Changed"), 0)) {
-            static Player* player = GET_PLAYER(gPlayState);
+            // NOT static. A function-local static with a dynamic initialiser is evaluated exactly
+            // once for the lifetime of the PROCESS, so this captured the Player of whichever scene
+            // happened to be loaded the first time the option was ticked -- and then wrote three
+            // floats through that pointer on every frame afterwards. Player is reallocated on every
+            // scene load, so it dangled within a single run, never mind across two. GET_PLAYER is a
+            // field read; there was nothing to cache.
+            Player* player = GET_PLAYER(gPlayState);
             float scale = CVarGetFloat(CVAR_COSMETIC("Link.BodySize.Value"), 0.01f);
             player->actor.scale.x = scale;
             player->actor.scale.y = scale;
@@ -1916,7 +1922,9 @@ void DrawSillyTab() {
         CVarClear(CVAR_COSMETIC("Link.BodySize.Value"));
         CVarClear(CVAR_COSMETIC("Link.BodySize.Changed"));
         if (gPlayState != nullptr) {
-            static Player* player = GET_PLAYER(gPlayState);
+            // Not static, for the reason given at the other site: once per process, written through
+            // forever after.
+            Player* player = GET_PLAYER(gPlayState);
             player->actor.scale.x = 0.01f;
             player->actor.scale.y = 0.01f;
             player->actor.scale.z = 0.01f;
