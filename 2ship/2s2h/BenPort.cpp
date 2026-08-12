@@ -1158,7 +1158,13 @@ extern "C" void DeinitOTR() {
     benFast3dWindow = nullptr;
 
     OTRGlobals::Instance->context = nullptr;
+
+    // Deleted AND nulled. It was only deleted, and that dangling pointer is issue 0019: every read of
+    // AudioCollection::Instance on run 2+ (AudioEditor, sequence replacement) went to freed memory,
+    // and adding a per-run "free the previous instance" made it a double free that crashed in the
+    // destructor. Nulling is the whole fix -- the next run's InitOTR allocates a fresh one.
     delete AudioCollection::Instance;
+    AudioCollection::Instance = nullptr;
 }
 
 #ifdef _WIN32
