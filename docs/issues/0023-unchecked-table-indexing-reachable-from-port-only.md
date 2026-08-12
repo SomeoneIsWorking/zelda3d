@@ -1,6 +1,6 @@
 # 0023 — unchecked table indexing reachable from port-only callers (audit)
 
-status: OPEN — 4 of 22 fixed 2026-08-12; the rest catalogued here, unfixed
+status: OPEN — 7 of 22 fixed 2026-08-12; the rest catalogued here, unfixed
 found by: a 33-agent audit run after the SAME bug was found twice in one day by accident
 
 ## The category
@@ -52,6 +52,20 @@ zelda3d-layer 42, libultraship 28.
   runtime check. Verified live on both classes: `spawn 0x00B` still OK, `spawn 20000` and
   `spawn -1` refused with the log line `z_actor.c:3380 Actor_Spawn: actor id N is not a valid
   ActorDB entry -- REFUSED` proving the new check is what fired, process alive throughout.
+- OoT REPL `warp` — the counterpart of the MM entrance crash. `gEntranceTable` is read UNBOUNDED at
+  `z_play.c:880` (`[nextEntranceIndex + sceneLayer]`) and `z_play.c:546`
+  (`[entranceIndex + sceneSetupIndex]`). The handler's long comment fixed the STATE a warp is issued
+  in (cutsceneIndex, gameMode) but never the index. Bounded on the SUM with 19 frames of headroom,
+  because sceneSetupIndex reaches `4 + (cutsceneIndex & 0xF)`.
+- REPL `boots` — `currentBoots` indexes `sBootData[PLAYER_BOOTS_MAX][17]`, and Player_SetBootData
+  copies eight s16 from that row into REG(19)/REG(30)/REG(32)/REG(34..38): Link's speed, friction and
+  jump regs. `boots 100` read row 99 and fed garbage into his movement — it does not crash and does
+  not look like a bad command, it looks like a PHYSICS BUG. Bounded to the three EQUIPPABLE boots
+  (1..3), deliberately NOT to PLAYER_BOOTS_MAX (6): rows 3..5 are internal states Player_SetBootData
+  selects itself, so bounding to 6 would be memory-safe and still wrong.
+- REPL `wingmap` — each source axis is used as `dd[src]` in Zelda3D_ApplyProcOverride, which tested
+  only `src >= 0`. A value of 3+ read past the three-float source and the result went into a bone
+  rotation: silently wrong, not a crash.
 
 ### Confirmed, NOT yet fixed
 

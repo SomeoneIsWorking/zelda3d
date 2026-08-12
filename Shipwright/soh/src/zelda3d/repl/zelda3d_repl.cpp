@@ -408,6 +408,23 @@ static void Zelda3D_ReplExec(PlayState* play, char* line, const char* outPath) {
         // Not novel: SoH's own warp paths already do this. `Warping.cpp` Warp() and
         // debugconsole.cpp's LoadSceneHandler both set GAMEMODE_NORMAL for exactly this reason; the
         // REPL warp was the one entry point that did not.
+        // Range-check the index itself. Everything above fixes the STATE the warp is issued in;
+        // none of it validated the index, and gEntranceTable is read UNBOUNDED in two places once
+        // the transition lands -- z_play.c:880 `gEntranceTable[nextEntranceIndex + sceneLayer]` and
+        // z_play.c:546 `gEntranceTable[entranceIndex + sceneSetupIndex]`. The OoT counterpart of
+        // the MM Entrance_GetTableEntry crash fixed the same day (docs/issues/0023).
+        //
+        // The bound is on the SUM, not the index: both reads add a setup/layer offset, and
+        // sceneSetupIndex reaches 4 + (cutsceneIndex & 0xF) = 19. Leaving that headroom means a
+        // valid-looking index near the end of the table cannot walk off it during setup selection.
+        if (iv < 0 || iv + 19 >= ENTR_MAX) {
+            Zelda3D_ReplReply(outPath,
+                              "warp REFUSED 0x%x -- entrance index out of range (valid 0..%d, "
+                              "gEntranceTable is ENTR_MAX=%d and Play_Init indexes it at "
+                              "entranceIndex + sceneSetupIndex); nothing was changed",
+                              iv, ENTR_MAX - 20, ENTR_MAX);
+            return;
+        }
         gSaveContext.gameMode = GAMEMODE_NORMAL;
         play->nextEntranceIndex = iv;
         play->transitionTrigger = TRANS_TRIGGER_START;
@@ -1717,6 +1734,17 @@ static void Zelda3D_ReplExec(PlayState* play, char* line, const char* outPath) {
         if (sscanf(line, "%*s %15s", sub) == 1 && strcmp(sub, "off") == 0) {
             gZelda3dWingMapSrc[0] = gZelda3dWingMapSrc[1] = gZelda3dWingMapSrc[2] = -1;
         } else if (sscanf(line, "%*s %d %d %d %d %d %d", &sx, &sy, &sz, &gx, &gy, &gz) == 6) {
+            // Each src selects an N64 axis 0..2 (or -1 = none) and is used as `dd[src]` in
+            // Zelda3D_ApplyProcOverride, which only tested `src >= 0`. A value of 3+ read past the
+            // three-float source and wrote the result into a bone rotation -- silently wrong, not a
+            // crash. Audited 2026-08-12, docs/issues/0023.
+            if (sx > 2 || sy > 2 || sz > 2 || sx < -1 || sy < -1 || sz < -1) {
+                Zelda3D_ReplReply(outPath,
+                                  "wingmap REFUSED src=(%d,%d,%d) -- each source axis must be "
+                                  "-1 (none), 0 (x), 1 (y) or 2 (z); nothing was changed",
+                                  sx, sy, sz);
+                return;
+            }
             gZelda3dWingMapSrc[0] = sx; gZelda3dWingMapSrc[1] = sy; gZelda3dWingMapSrc[2] = sz;
             gZelda3dWingMapSign[0] = gx; gZelda3dWingMapSign[1] = gy; gZelda3dWingMapSign[2] = gz;
         }
@@ -1808,7 +1836,22 @@ static void Zelda3D_ReplExec(PlayState* play, char* line, const char* outPath) {
         // Writing the SAVE alone is not enough and reports a misleading success: currentBoots is
         // refreshed by Player_SetBootData, which only runs on real equip events, so a raw poke left
         // the live player untouched while this command happily echoed the new equip value. Set both.
+        // Range-check: currentBoots indexes sBootData[PLAYER_BOOTS_MAX][17], and Player_SetBootData
+        // copies eight s16 out of that row into REG(19)/REG(30)/REG(32)/REG(34..38) -- Link's speed,
+        // friction and jump regs. `boots 100` read row 99 and fed garbage into his movement, which
+        // does not crash and does not look like a bad command: it looks like a physics bug.
+        // Audited 2026-08-12, docs/issues/0023.
         if (sscanf(line, "%*s %i", &iv) == 1) {
+            // Bound to the three EQUIPPABLE boots, not to PLAYER_BOOTS_MAX (6). sBootData has six
+            // rows, but 3..5 (INDOOR, IRON_UNDERWATER, KOKIRI_CHILD) are internal states that
+            // Player_SetBootData selects itself and are not equip values -- bounding to 6 here would
+            // be memory-safe and still wrong, letting the command set an equip the game never sets.
+            if (iv < 1 || iv > PLAYER_BOOTS_HOVER + 1) {
+                Zelda3D_ReplReply(outPath,
+                                  "boots REFUSED %d -- equip value out of range (valid 1..3: "
+                                  "1 kokiri, 2 iron, 3 hover); nothing was changed", iv);
+                return;
+            }
             Inventory_ChangeEquipment(EQUIP_TYPE_BOOTS, (u16)iv);
             if (gPlayState != NULL && GET_PLAYER(gPlayState) != NULL) {
                 GET_PLAYER(gPlayState)->currentBoots = (s8)(iv - 1);
