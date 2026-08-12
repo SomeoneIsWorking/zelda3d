@@ -40,6 +40,19 @@ namespace Zelda3D {
 
 class TitleRider {
 public:
+    // Drop the actor pointers this rider captured, without touching the actors themselves.
+    //
+    // mHorseActor and mPlayerActor are raw Actor* into the ZeldaArena, which a run's teardown frees.
+    // The rider lives inside TitlePresentation, which is a process-lifetime Meyers singleton, so it
+    // carries them into the NEXT run -- where releaseMount() writes through mPlayerActor and takes
+    // SIGSEGV. Measured on run 2 of `oot,oot`: SIGSEGV in TitleRider::releaseMount via
+    // TitlePresentation::update. Deliberately does NOT go through releaseMount(): by the time this
+    // runs, the actors are gone and there is nothing to hand back.
+    void forgetActorsForNewRun() {
+        mHorseActor = nullptr;
+        mPlayerActor = nullptr;
+    }
+
     // Integrate one frame from the title cs actor cues (op-0x0a records). No-op (holds pose) if
     // the cs has no cue covering `csFrame`.
     //

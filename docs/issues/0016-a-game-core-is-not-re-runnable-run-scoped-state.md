@@ -906,3 +906,42 @@ needs no reasoning about what else might still read it.
 **Evidence:** run 2 of `oot,oot` frees exactly seven — ActorDB, AudioCollection,
 CustomMessageManager, GameInteractor, ItemTableManager, SaveManager, OTRGlobals — one each, and every
 gate stays green.
+
+
+## The blind spot finally bit: a per-run pointer held as a MEMBER (2026-08-12)
+
+Every sweep in this issue scanned for file-scope statics. The write-up named "class/instance members
+holding per-run pointers" as a blind spot and left it. It was a real one.
+
+`Zelda3D::TitlePresentation::Instance()` is a function-local static — constructed once per PROCESS —
+and it owns a `TitleRider` whose `mHorseActor` / `mPlayerActor` are raw `Actor*` into the ZeldaArena.
+A run's teardown frees that arena; the singleton carries the pointers into the next run, and
+`TitleRider::releaseMount` writes `player->rideActor = nullptr` through a `Player` that no longer
+exists.
+
+**Measured:** run 2 of `oot,oot` under the sanitizer build, SIGSEGV in
+`TitleRider::releaseMount` ← `TitlePresentation::update` ← `Zelda3D_ReplPoll` ← `Graph_Update`. No
+ASAN report accompanied it, for the same reason as issue 0019: the arena is not ASAN-tracked memory,
+so writing into it is invisible to the sanitizer. The crash handler caught it, not ASAN.
+
+Fixed with `Zelda3D_TitlePresentationResetRunState` on the reset list, which clears `mActive`, the
+frame snapshot, the entry latch and the rider's two actor pointers. It deliberately does not route
+through `releaseMount()`: by the time it runs the actors are gone and there is nothing to hand back.
+Run 1 reports "inactive", run 2 reports "ACTIVE (its rider still held that run's actors)" — the
+discriminator exercised in both directions on real data.
+
+### Why the release build never caught it
+
+`oot,oot` passes in the release build and has all along. The gate quits each core as soon as it
+reaches a scene, and in a release build that happens before the title sequence gets far enough to
+call `releaseMount`. The sanitizer build is slow enough that run 2 stayed in the title cs — so this
+was found by the ASAN run being SLOWER, not by ASAN detecting anything. Worth remembering: "the gate
+is green" and "the code is right" came apart here purely on timing.
+
+### A gate defect found on the way
+
+`tools/zelda3d_sequence.sh` polled 60 times for a core to reach a scene, hardcoded, sitting directly
+next to a `ZELDA3D_SEQ_BOOT_WAIT` that exists *because* a fixed budget had already misread a slow
+sanitizer boot as a broken core. The same trap, one budget further along. It is now
+`ZELDA3D_SEQ_SCENE_WAIT` (default 60), and the failure message names the budget and the variable so
+the next person does not have to read the script to find out what timed out.

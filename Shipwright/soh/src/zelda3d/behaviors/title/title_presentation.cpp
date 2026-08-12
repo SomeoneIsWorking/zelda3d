@@ -3,6 +3,7 @@
 // live at the ORIGINAL comments in zelda3d.c's git history / debug_journal — not re-derived or
 // re-verified here, this is a pure code-motion pass).
 #include <cmath>
+#include <cstdio>
 
 #include "global.h"
 #include "title_presentation.h"
@@ -36,6 +37,35 @@ namespace Zelda3D {
 TitlePresentation& TitlePresentation::Instance() {
     static TitlePresentation instance;
     return instance;
+}
+
+// The title presentation belongs to a RUN; the singleton holding it does not.
+//
+// `Instance()` is a function-local static, so it is constructed once per PROCESS and survives every
+// run -- including mActive, the entry-edge latch, and (the part that crashes) the rider's raw Actor*
+// into the ZeldaArena the previous run freed. Measured: run 2 of `oot,oot` under the sanitizer build
+// takes SIGSEGV in TitleRider::releaseMount via TitlePresentation::update, writing
+// `player->rideActor = nullptr` through a Player that no longer exists.
+//
+// This is the class the run-scoped-state audit named as a blind spot and did not cover: a per-run
+// pointer held as a MEMBER of a long-lived object, which no scan for file-scope statics can see.
+void TitlePresentation::resetRunState() {
+    const bool inherited = mActive || (mEnterLatched != 0);
+
+    mActive = false;
+    mFrame = TitleFrameState{};
+    mRider.forgetActorsForNewRun();
+    mEnterLatched = 0;
+
+    // Reported either way: on run 1 there is nothing to inherit, and a silent reset could not tell
+    // that apart from a run that was about to resume the previous run's title sequence.
+    fprintf(stderr, "ZELDA3D CORE: title presentation reset -- previous run left it %s.\n",
+            inherited ? "ACTIVE (its rider still held that run's actors)" : "inactive");
+    fflush(stderr);
+}
+
+extern "C" void Zelda3D_TitlePresentationResetRunState(void) {
+    TitlePresentation::Instance().resetRunState();
 }
 
 bool TitlePresentation::shouldBeActive(PlayState* play) const {

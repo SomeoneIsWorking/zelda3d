@@ -31,6 +31,12 @@ DISP="${ZELDA3D_SEQ_DISPLAY:-:98}"
 # between "SDL3 GPU backend initialized" and its first frame, and the gate reported that as "it did
 # not reach its frame loop" -- a boot budget being read as a broken core.
 BOOTWAIT="${ZELDA3D_SEQ_BOOT_WAIT:-120}"
+# Seconds to wait for a core that HAS opened its REPL to reach a real scene. Separate from BOOTWAIT
+# and configurable for the same reason BOOTWAIT is: this was hardcoded at 60, which is generous for a
+# release build and not enough for a sanitizer one, and the gate then reported "NEVER REACHED A SCENE"
+# for a core that was merely slow. That is the failure BOOTWAIT's own comment describes, one budget
+# further along -- a fixed limit sitting next to a configurable one is a bug waiting for a slow build.
+SCENEWAIT="${ZELDA3D_SEQ_SCENE_WAIT:-60}"
 LOGDIR="$REPO/scratch/logs/sequence"
 LOG="$LOGDIR/run.log"
 # Each core reads its own REPL path from its own env var; both are wired so either can be quit.
@@ -85,7 +91,7 @@ for id in "${CORES[@]}"; do
     # So each core must ANSWER, with a real scene. `posinfo scene=-1 (no PlayState)` is the reply
     # while booting and must not be accepted -- the same trap the switch gate documents.
     SCENE=""
-    for _ in $(seq 1 60); do
+    for _ in $(seq 1 "$SCENEWAIT"); do
         rm -f "$fifo.out"
         timeout 5 sh -c 'printf "posinfo\n" > "$1"' _ "$fifo" 2>/dev/null || break
         sleep 1
@@ -97,7 +103,8 @@ for id in "${CORES[@]}"; do
         *) SCENE="" ;;
     esac
     if [ -z "$SCENE" ]; then
-        echo "SEQUENCE: core '$id' NEVER REACHED A SCENE -- it opened a REPL (or inherited one) but did"
+        echo "SEQUENCE: core '$id' NEVER REACHED A SCENE within ${SCENEWAIT}s (ZELDA3D_SEQ_SCENE_WAIT)"
+        echo "SEQUENCE: -- it opened a REPL (or inherited one) but did"
         echo "          not run a game. last posinfo reply: $(cat "$fifo.out" 2>/dev/null || echo "(none)")"
         RAN_FAIL=1
     else
