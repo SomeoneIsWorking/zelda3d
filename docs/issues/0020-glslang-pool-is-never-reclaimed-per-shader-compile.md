@@ -1,6 +1,6 @@
 # 0020 — every shader compile leaks ~200 KB into glslang's pool allocator
 
-status: open — cause identified and measured; fix not applied
+status: partly addressed 2026-08-12 — reclaimed at shutdown; per-compile growth DURING a session remains
 found: 2026-08-12, measuring the per-run leak left after issue 0016
 severity: ~5 MB per MM run, ~0 per OoT run after the first; bounded, not a crash
 
@@ -84,3 +84,27 @@ frozen scenes settles "every combiner still renders correctly", which the sequen
 `"Run start: N shader(s) compiled so far this process."` The cumulative form is deliberate: the
 DELTA between consecutive runs is the answer, and a per-run counter reset at run start could not
 distinguish "compiled nothing" from "the counter was reset".
+
+
+## Partly addressed: `FinalizeProcess()` at engine shutdown (2026-08-12)
+
+`Fast::Sdl3GpuFinalizeShaderCompiler()` is now called at the end of `Ship::Context::DestroyInstance()`
+— last, after the window and renderer are gone so no further compile can happen. It is guarded on the
+shader-compile counter rather than a separate flag: `FinalizeProcess` without a preceding
+`InitializeProcess` is undefined, and the counter is incremented in the very function that does the
+`call_once` init, so a non-zero count is proof the process was initialized. It logs which branch it
+took, so "nothing to finalize" cannot be confused with "never ran".
+
+Measured with the same differential (`use_globals=0`):
+
+    before   mm 42,224,894 / 18,295 allocs   mm,mm 47,356,003 / 25,928   -> 5,131,109 per run
+    after    mm 28,356,180 /  9,210 allocs   mm,mm 28,898,481 / 13,969   ->   542,301 per run
+
+**What that does and does not mean.** These numbers are memory alive at process EXIT, so what improved
+is the leak at shutdown: glslang's pools — the builtin tables and every compile's ~200 KB — are now
+given back, about 14 MB off the baseline and a 10x cut in the per-run figure.
+
+**The thing this issue is actually about is unchanged:** during a session, each compile still adds
+~200 KB of live memory that nothing reclaims until the process ends. A long session that reaches many
+colour-combiner variants still grows. Fixing THAT still needs the per-compile pool bracketing, which
+still needs glslang headers this build does not ship.

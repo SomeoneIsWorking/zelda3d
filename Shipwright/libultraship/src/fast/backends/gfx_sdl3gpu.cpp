@@ -595,6 +595,25 @@ size_t Sdl3GpuShaderCompileCount() {
     return sSgShaderCompileCount;
 }
 
+// Release glslang's process-wide pools once, at engine shutdown.
+//
+// glslang's public API is InitializeProcess/FinalizeProcess and nothing finer (issue 0020: the
+// per-compile TPoolAllocator bracketing that would fix the per-compile growth needs internal headers
+// this build does not ship). So this reclaims the builtin symbol tables at exit -- several MB -- and
+// does NOT address the per-compile growth, which is the honest scope.
+//
+// Guarded on the compile counter rather than a separate flag: FinalizeProcess without a preceding
+// InitializeProcess is undefined, and the counter is incremented in exactly the function that does
+// the call_once init, so a non-zero count is proof the process was initialized.
+void Sdl3GpuFinalizeShaderCompiler() {
+    if (sSgShaderCompileCount == 0) {
+        SPDLOG_INFO("Shutdown: glslang was never initialized (0 shaders compiled); nothing to finalize.");
+        return;
+    }
+    SPDLOG_INFO("Shutdown: finalizing glslang after {} shader compile(s).", sSgShaderCompileCount);
+    glslang::FinalizeProcess();
+}
+
 GfxRenderingAPISdl3Gpu* g_activeSdl3GpuApi = nullptr;
 
 GfxRenderingAPISdl3Gpu::GfxRenderingAPISdl3Gpu(GfxWindowBackendSDL3* windowBackend) : mWindowBackend(windowBackend) {
