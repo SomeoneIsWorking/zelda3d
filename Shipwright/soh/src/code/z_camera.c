@@ -1835,6 +1835,29 @@ s32 Camera_Normal1(Camera* camera) {
     }
 
     Camera_Vec3fVecSphGeoAdd(eyeNext, at, &eyeAdjustment);
+    // Zelda3D diagnostic for docs/issues/0022. THIS is the write that puts the infinity into
+    // camera->eyeNext: `at` is finite and sane in the failing run, so a non-finite result here means
+    // eyeAdjustment carried it in -- and eyeAdjustment.r is camera->dist, straight out of
+    // Camera_ClampDist a few lines up.
+    //
+    // The previous probe bracketed the whole mode function and printed NOTHING, which was itself the
+    // finding: the corruption and the crash happen inside the SAME Camera_Normal1 call (this line,
+    // then func_80046E20 -> func_80045508 -> Camera_BGCheckInfo four lines below), so the "after"
+    // sample was never reached and "already bad on entry" is ruled out. Sampling has to happen here,
+    // between the write and the use.
+    if (!isfinite(eyeNext->x) || !isfinite(eyeNext->y) || !isfinite(eyeNext->z)) {
+        static s32 sBadEyeNext = 0;
+        if (sBadEyeNext < 6) {
+            sBadEyeNext++;
+            LUSLOG_ERROR("[0022] Camera_Normal1 wrote a NON-FINITE eyeNext (%d): eyeNext=(%f,%f,%f) "
+                         "at=(%f,%f,%f) eyeAdjustment=(r=%f pitch=%d yaw=%d) camera->dist=%f "
+                         "distMin=%f distMax=%f atEyeNextGeo.r=%f yawUpdateRateInv=%f scene=%d",
+                         sBadEyeNext, eyeNext->x, eyeNext->y, eyeNext->z, at->x, at->y, at->z,
+                         eyeAdjustment.r, eyeAdjustment.pitch, eyeAdjustment.yaw, camera->dist,
+                         norm1->distMin, norm1->distMax, atEyeNextGeo.r, camera->yawUpdateRateInv,
+                         camera->play->sceneNum);
+        }
+    }
     if ((camera->status == CAM_STAT_ACTIVE) && (!(norm1->interfaceFlags & 0x10))) {
         anim->swingYawTarget = BINANG_ROT180(camera->playerPosRot.rot.y);
         if (anim->startSwingTimer <= 0) {

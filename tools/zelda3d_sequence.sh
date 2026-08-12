@@ -158,6 +158,16 @@ for id in "${CORES[@]}"; do
                     continue
                     ;;
             esac
+            # A dead launcher is not a slow one. Opening a FIFO for writing BLOCKS until a reader
+            # opens it, so once the core has crashed every remaining command sits for the full
+            # CMD_WAIT -- a tour of six commands turned a crash into a 90-minute stall three times
+            # today, and the run looks like a hang rather than the crash it is. Check first and say
+            # which it was.
+            if ! kill -0 "$SEQPID" 2>/dev/null; then
+                echo "SEQUENCE: '$id' cmd '$c' -> SKIPPED, the launcher (pid $SEQPID) is GONE -- it died"
+                echo "          earlier in this tour. Check $LOG for a crash and the run's ASAN_OPTIONS log_path for a report."
+                break
+            fi
             rm -f "$fifo.out"
             if timeout "${ZELDA3D_SEQ_CMD_WAIT:-300}" sh -c 'printf "%s\n" "$2" > "$1"' _ "$fifo" "$c"; then
                 # The reply file appears when the command finishes, which for a blocking command
