@@ -3370,7 +3370,16 @@ Actor* Actor_Spawn(ActorContext* actorCtx, PlayState* play, s16 actorId, f32 pos
 
     ActorDBEntry* dbEntry = ActorDB_Retrieve(actorId);
 
-    assert(dbEntry->valid);
+    // A RUNTIME check, not the assert that used to stand alone here: this build defines NDEBUG, so
+    // that assert compiles to nothing and an invalid id proceeded silently. ActorDB::RetrieveEntry
+    // does bound-check and hands back a default-constructed `invalid` entry rather than a wild
+    // pointer -- so this is not an OOB read -- but that entry has instanceSize 0 and a null init,
+    // which turns into a zero-size arena allocation and a null call further down. The REPL `spawn`
+    // command takes its id from user text. Audited 2026-08-12, docs/issues/0023.
+    if (!dbEntry->valid) {
+        LUSLOG_ERROR("Actor_Spawn: actor id %d is not a valid ActorDB entry -- REFUSED", actorId);
+        return NULL;
+    }
 
     if (HREG(20) != 0) {
         // "Actor class addition [%d:%s]"
