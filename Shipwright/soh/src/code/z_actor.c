@@ -4970,7 +4970,23 @@ void func_80035B18(PlayState* play, Actor* actor, u16 textId) {
 /**
  * Tests if "eventChkInf" flag is set.
  */
+// eventChkInf is u16[14], so only flags 0..223 exist. The retail game never passes anything else --
+// the largest EVENTCHKINF_* constant is 0xC9 -- which is why these three functions were written
+// unchecked. This port has callers the retail game does not: the REPL `eventflag` command parses
+// its argument with %i straight from FIFO text, and the randomizer computes flags. `eventflag 224`
+// writes past the array and `eventflag -1` writes BELOW it, because >> on a negative s32 is an
+// arithmetic shift (-1 >> 4 == -1). Either one corrupts SaveContext silently, which is worse than a
+// crash: every measurement taken afterwards in that session is quietly wrong.
+// Audited 2026-08-12; same class as the Entrance_GetTableEntry and sInitRegs bugs found that day.
+#define EVENTCHKINF_FLAG_VALID(flag) \
+    ((u32)(flag) < (u32)(ARRAY_COUNT(gSaveContext.eventChkInf) * 16))
+
 s32 Flags_GetEventChkInf(s32 flag) {
+    if (!EVENTCHKINF_FLAG_VALID(flag)) {
+        LUSLOG_ERROR("Flags_GetEventChkInf: flag %#x is out of range (valid 0..%d) -- returning 0",
+                     flag, (s32)(ARRAY_COUNT(gSaveContext.eventChkInf) * 16) - 1);
+        return 0;
+    }
     return gSaveContext.eventChkInf[flag >> 4] & (1 << (flag & 0xF));
 }
 
@@ -4978,6 +4994,12 @@ s32 Flags_GetEventChkInf(s32 flag) {
  * Sets "eventChkInf" flag.
  */
 void Flags_SetEventChkInf(s32 flag) {
+    if (!EVENTCHKINF_FLAG_VALID(flag)) {
+        LUSLOG_ERROR("Flags_SetEventChkInf: flag %#x is out of range (valid 0..%d) -- REFUSED, "
+                     "nothing was written", flag,
+                     (s32)(ARRAY_COUNT(gSaveContext.eventChkInf) * 16) - 1);
+        return;
+    }
     u8 previouslyOff = !Flags_GetEventChkInf(flag);
     gSaveContext.eventChkInf[flag >> 4] |= (1 << (flag & 0xF));
     if (previouslyOff) {
@@ -4990,6 +5012,12 @@ void Flags_SetEventChkInf(s32 flag) {
  * Unsets "eventChkInf" flag.
  */
 void Flags_UnsetEventChkInf(s32 flag) {
+    if (!EVENTCHKINF_FLAG_VALID(flag)) {
+        LUSLOG_ERROR("Flags_UnsetEventChkInf: flag %#x is out of range (valid 0..%d) -- REFUSED, "
+                     "nothing was written", flag,
+                     (s32)(ARRAY_COUNT(gSaveContext.eventChkInf) * 16) - 1);
+        return;
+    }
     u8 previouslyOn = Flags_GetEventChkInf(flag);
     gSaveContext.eventChkInf[flag >> 4] &= ~(1 << (flag & 0xF));
     if (previouslyOn) {
