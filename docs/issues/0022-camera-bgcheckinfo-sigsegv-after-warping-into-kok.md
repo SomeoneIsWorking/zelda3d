@@ -93,12 +93,36 @@ fail to fire, it fails *open*. `to->pos` comes from camera math a few frames aft
 target at the same point, which is exactly the state a freshly-loaded scene can present for a frame —
 is the usual way a normalize produces one.
 
-**This is not yet measured.** The next step is to instrument line 298: when `floorPoly == NULL` and
-the guard does *not* return, log `to->pos` and `floorPolyY`. That distinguishes NaN from a genuine
--32000 in one run, and it is the difference between fixing the camera math and fixing the guard.
+**Measured 2026-08-12 — and the NaN guess was wrong in the specific.** The instrumented run fired on
+its first attempt:
 
-Note this is authentic decomp code — N64 would deref the same NULL. So whatever produces the bad
-`to->pos` is the bug, and a null check at 312 would be papering over it. Find the NaN first.
+    [0022] Camera_BGCheckInfo: no floor poly and the guard FAILED OPEN (1) --
+      to->pos=(inf,-inf,-inf) floorPolyY=-32000.000000  y-isnan=0
+      from=(3944.399414,-35.141968,-1119.740845)
+
+Not a NaN — an **infinity**. `to->pos.y` is `-inf`, so `(-inf) - (-32000)` is `-inf`, and
+`-inf > 5.0f` is false. The guard fails open for the same *reason* the NaN theory predicted (a
+non-finite value makes the comparison false) but the value is different, and `y-isnan=0` says so
+outright. Recording that because "NaN" was written down as the candidate and acting on it without
+this run would have sent the fix at the wrong arithmetic.
+
+`from` is `camera->at` and is finite and sane (Kokiri Forest). **`to->pos` is `camera->eyeNext`** —
+`func_80045508` assigns `eyeChk->pos = camera->eyeNext` (z_camera.c:916) and passes it straight to
+`Camera_BGCheckInfo` (:920). So the camera's own state had already gone non-finite before collision
+was ever consulted: **`Camera_BGCheckInfo` is the victim, not the cause**, and a null check at line
+312 would hide an infinite camera rather than fix it.
+
+Note this is authentic decomp code — N64 would deref the same NULL. So whatever produces the
+infinite `camera->eyeNext` is the bug.
+
+## Now hunting the producer
+
+A second probe brackets the camera mode function inside `Camera_Update` — the only thing between the
+two samples — and reports three distinguishable outcomes rather than one: *clean on entry, produced
+by the mode function this frame*; *already bad on entry* (it survived from an earlier frame, so the
+search moves earlier); or *bad on entry, cleaned*. It prints `setting`, `mode`, `funcIdx`, all three
+camera vectors, `dist` and the scene, capped at 8 reports. The "clean on entry" case is the one that
+would otherwise be silent, and silence is what a wrong conclusion gets built on.
 
 ## Still intermittent
 

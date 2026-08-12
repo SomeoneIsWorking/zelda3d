@@ -295,6 +295,37 @@ s32 Camera_BGCheckInfo(Camera* camera, Vec3f* from, CamColChk* to) {
         toNewPos.y += 5.0f;
         floorPolyY = BgCheck_CameraRaycastFloor2(colCtx, &floorPoly, &floorBgId, &toNewPos);
 
+        // Zelda3D diagnostic for docs/issues/0022. This guard is the ONLY thing standing between a
+        // floor-less raycast and the NULL deref at the end of this function: BgCheck_RaycastFloorImpl
+        // nulls its outPoly and returns BGCHECK_Y_MIN, and the comparison below is what turns that
+        // into an early return. So when floorPoly is NULL and the comparison is FALSE, something has
+        // made the guard fail OPEN, and the next three lines dereference NULL.
+        //
+        // The negative is what this has to print. `to->pos.y` at about -32000 means the raycast
+        // legitimately found nothing far below; a NaN means the comparison is false for the reason
+        // every comparison against a NaN is false, and the bug is upstream in the camera math that
+        // produced it. Those two are indistinguishable from the crash alone, which is why this logs
+        // the value rather than just the fact. Both branches report, capped, so "the guard held" is
+        // distinguishable from "this code never ran".
+        if (floorPoly == NULL) {
+            static s32 sNullFloorHeld = 0;
+            static s32 sNullFloorOpen = 0;
+            if ((to->pos.y - floorPolyY) > 5.0f) {
+                if (sNullFloorHeld < 4) {
+                    sNullFloorHeld++;
+                    LUSLOG_INFO("[0022] Camera_BGCheckInfo: no floor poly, guard HELD (%d) -- "
+                                "to->pos=(%f,%f,%f) floorPolyY=%f",
+                                sNullFloorHeld, to->pos.x, to->pos.y, to->pos.z, floorPolyY);
+                }
+            } else {
+                sNullFloorOpen++;
+                LUSLOG_ERROR("[0022] Camera_BGCheckInfo: no floor poly and the guard FAILED OPEN (%d) -- "
+                             "to->pos=(%f,%f,%f) floorPolyY=%f  y-isnan=%d  from=(%f,%f,%f). "
+                             "to->poly is about to be dereferenced NULL.",
+                             sNullFloorOpen, to->pos.x, to->pos.y, to->pos.z, floorPolyY,
+                             (to->pos.y != to->pos.y), from->x, from->y, from->z);
+            }
+        }
         if ((to->pos.y - floorPolyY) > 5.0f) {
             // if the y distance from the check point to the floor is more than 5 units
             // the point is not colliding with any collision.
@@ -7663,11 +7694,48 @@ Vec3s Camera_Update(Camera* camera) {
                      sCameraSettings[camera->setting].cameraModes[camera->mode].funcIdx, camera->unk_14C);
     }
 
-    if (sOOBTimer < 200) {
-        sCameraFunctions[sCameraSettings[camera->setting].cameraModes[camera->mode].funcIdx](camera);
-    } else if (camera->player != NULL) {
-        OLib_Vec3fDiffToVecSphGeo(&eyeAtAngle, &camera->at, &camera->eye);
-        Camera_CalcAtDefault(camera, &eyeAtAngle, 0.0f, 0);
+    // Zelda3D diagnostic for docs/issues/0022. The crash there is a NULL poly deref in
+    // Camera_BGCheckInfo, and the instrumented run showed WHY the guard that should have prevented it
+    // failed: `to->pos` was (inf,-inf,-inf), and every comparison against an infinity of the wrong
+    // sign is false, so the guard failed OPEN. `to->pos` is assigned `camera->eyeNext` by
+    // func_80045508, so the camera's own state had already gone non-finite -- the collision code is
+    // the victim, not the cause.
+    //
+    // This brackets the mode function, which is the only thing between the two samples. Finite going
+    // in and non-finite coming out names it as the producer; non-finite ALREADY on entry says it
+    // survived from a previous frame and the search moves earlier. Both are reported -- "clean on
+    // entry" is the case that would otherwise be silent, and silence here is what a wrong conclusion
+    // would be built on. Capped, because a camera that has gone non-finite tends to stay that way.
+    {
+        static s32 sNonFiniteReports = 0;
+        s32 badIn = !isfinite(camera->eyeNext.x) || !isfinite(camera->eyeNext.y) || !isfinite(camera->eyeNext.z) ||
+                    !isfinite(camera->eye.x) || !isfinite(camera->eye.y) || !isfinite(camera->eye.z) ||
+                    !isfinite(camera->at.x) || !isfinite(camera->at.y) || !isfinite(camera->at.z);
+        s32 funcIdx = sCameraSettings[camera->setting].cameraModes[camera->mode].funcIdx;
+
+        if (sOOBTimer < 200) {
+            sCameraFunctions[funcIdx](camera);
+        } else if (camera->player != NULL) {
+            OLib_Vec3fDiffToVecSphGeo(&eyeAtAngle, &camera->at, &camera->eye);
+            Camera_CalcAtDefault(camera, &eyeAtAngle, 0.0f, 0);
+        }
+
+        s32 badOut = !isfinite(camera->eyeNext.x) || !isfinite(camera->eyeNext.y) ||
+                     !isfinite(camera->eyeNext.z) || !isfinite(camera->eye.x) || !isfinite(camera->eye.y) ||
+                     !isfinite(camera->eye.z) || !isfinite(camera->at.x) || !isfinite(camera->at.y) ||
+                     !isfinite(camera->at.z);
+        if ((badIn || badOut) && sNonFiniteReports < 8) {
+            sNonFiniteReports++;
+            LUSLOG_ERROR("[0022] camera %d NON-FINITE (%d): %s -- setting=%d mode=%d funcIdx=%d "
+                         "eyeNext=(%f,%f,%f) eye=(%f,%f,%f) at=(%f,%f,%f) dist=%f scene=%d",
+                         camera->thisIdx, sNonFiniteReports,
+                         badIn ? (badOut ? "ALREADY BAD ON ENTRY (produced on an earlier frame)"
+                                         : "bad on entry, CLEANED by the mode function")
+                               : "clean on entry, PRODUCED BY THE MODE FUNCTION this frame",
+                         camera->setting, camera->mode, funcIdx, camera->eyeNext.x, camera->eyeNext.y,
+                         camera->eyeNext.z, camera->eye.x, camera->eye.y, camera->eye.z, camera->at.x,
+                         camera->at.y, camera->at.z, camera->dist, camera->play->sceneNum);
+        }
     }
 
     if (camera->status == CAM_STAT_ACTIVE) {
