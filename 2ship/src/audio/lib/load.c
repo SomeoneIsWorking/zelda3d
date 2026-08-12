@@ -1256,7 +1256,12 @@ void AudioLoad_Init(void* heap, size_t heapSize) {
     char** seqList = ResourceMgr_ListFiles("audio/sequences*", &seqListSize);
     char** customSeqList = ResourceMgr_ListFiles("custom/music/*", &customSeqListSize);
     gSequenceMapSize = (size_t)(seqListSize + customSeqListSize);
-    gSequenceMap = malloc(gSequenceMapSize * sizeof(char*));
+    // calloc, not malloc: sequence numbers are sparse (vanilla 0x7A is absent, and custom ones skip
+    // any seqNum AudioCollection already owns), so slots go unassigned. They are read by the guard in
+    // AudioLoad_SyncInitSeqPlayerInternal and, at teardown, free()d one by one in OTRAudio_Exit --
+    // malloc left both reading uninitialised pointers. The 0xF of slack mirrors the OoT side: seqNum
+    // may run past the entry count when it steps over collection-occupied numbers.
+    gSequenceMap = calloc(gSequenceMapSize + 0xF, sizeof(char*));
     gAudioCtx.seqLoadStatus = calloc(gSequenceMapSize, sizeof(u8));
 
     memset(&gAudioCtx.seqLoadStatus[seqListSize], LOAD_STATUS_PERMANENT, customSeqListSize);
@@ -1266,6 +1271,11 @@ void AudioLoad_Init(void* heap, size_t heapSize) {
         seqCachePolicyMap[sDat.seqNumber] = sDat.cachePolicy;
     }
 
+    // ResourceMgr_ListFiles hands back an array of malloc'd strings; gSequenceMap keeps its own
+    // strdup, so the originals are ours to release. Freeing only the array leaked every name.
+    for (int i = 0; i < seqListSize; i++) {
+        free(seqList[i]);
+    }
     free(seqList);
 
     // 2S2H [Streamed Audio] We need to load the custom songs after the fonts because streamed songs will use a hash to
@@ -1282,6 +1292,9 @@ void AudioLoad_Init(void* heap, size_t heapSize) {
         gFontMap[sf->fntIndex] = strdup(fntList[i]);
     }
 
+    for (int i = 0; i < fntListSize; i++) {
+        free(fntList[i]);
+    }
     free(fntList);
 
     int customFontStart = fntListSize;
@@ -1289,6 +1302,9 @@ void AudioLoad_Init(void* heap, size_t heapSize) {
         SoundFont* sf = ResourceMgr_LoadAudioSoundFontByName(customFntList[i - customFontStart]);
         sf->fntIndex = i;
         gFontMap[i] = strdup(customFntList[i - customFontStart]);
+    }
+    for (int i = 0; i < customFntListSize; i++) {
+        free(customFntList[i]);
     }
     free(customFntList);
 
@@ -1344,6 +1360,9 @@ void AudioLoad_Init(void* heap, size_t heapSize) {
         seqNum++;
     }
 
+    for (int i = 0; i < customSeqListSize; i++) {
+        free(customSeqList[i]);
+    }
     free(customSeqList);
 
     numFonts = fntListSize;
