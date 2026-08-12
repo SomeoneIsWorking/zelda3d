@@ -1,8 +1,8 @@
 # 0019 — MM's `AudioCollection::Instance` is already a dead object on run 2
 
-status: open — root cause NOT identified
+status: FIXED 2026-08-12 — root cause found by ASAN, one missing line
 found: 2026-08-12, while adding the per-run singleton frees of issue 0016
-severity: live bug in MM today, independent of any change made here
+severity: was a live use-after-free in MM on every run after the first
 
 ## The finding
 
@@ -111,7 +111,55 @@ ordinary write to a live allocation — there is nothing to report. It also expl
 moment moves with layout: which stale pointer lands on the AudioCollection depends entirely on where
 the allocator puts things.
 
-## Next step
+## ROOT CAUSE — `DeinitOTR` deleted it and never nulled it
+
+    delete AudioCollection::Instance;      // 2ship/2s2h/BenPort.cpp, end of DeinitOTR
+                                           // ...and that was the whole function.
+
+MM **already freed** the AudioCollection at run end. It just left `AudioCollection::Instance`
+pointing at the freed block, so every run after the first started with a dangling singleton. The fix
+is one line: `AudioCollection::Instance = nullptr;`.
+
+Everything else follows from that:
+
+- The object "reading 20 sequences" was freed memory being reused, not corruption.
+- The observable moment moved with every probe because it depended on when the allocator handed that
+  block out again.
+- ASAN's first run was silent because nothing in that build ever *read* the dangling pointer; a
+  legitimate reallocation and write is not an error.
+- The per-run `ReplacePerRunSingleton(AudioCollection::Instance, ...)` from issue 0016 crashed in the
+  destructor because it was a **double free**, not because the delete was unsafe.
+
+### How it was actually caught, after two wrong tools
+
+`ASAN_OPTIONS=log_path=…` plus **one temporary read** of `AudioCollection::Instance` early in run 2's
+`InitOTR`. That converts the silent dangle into a `heap-use-after-free`, and ASAN then prints the
+free stack, which is the thing that was wanted all along:
+
+    freed by thread T0 here:
+      operator delete(void*, unsigned long)
+      Zelda3D_CoreRun  2ship/src/code/main.c:165   <- DeinitOTR()
+    previously allocated by thread T0 here:
+      operator new(unsigned long)
+      InitOTR  2ship/2s2h/BenPort.cpp:1095
+
+The lesson worth keeping: a sanitizer cannot report a dangling pointer nobody dereferences. Adding a
+deliberate read is what made the bug expressible to the tool.
+
+### And a scan of mine was wrong in the direction that hides work
+
+The audit in issue 0016 that concluded "allocated 1x, deleted 0x" for these singletons only grepped
+`Shipwright/soh` — it never looked in `2ship`. MM's delete was there the whole time. A second grep
+across **both** trees now shows all three `delete X::Instance` sites, and all three null afterwards.
+
+## Verification
+
+- Pre-fix, ASAN names the free stack above (`scratch/logs/asan0019b/`).
+- Post-fix, `AudioCollection::Instance` reads `0x0` at the start of BOTH runs of `mm,mm` — measured
+  with a temporary probe, then removed.
+- `mm,mm`, `mm,oot,mm` and `zelda3d_switch_test.sh` exit 0; ASAN `mm,mm` produces no report.
+
+## Superseded next step (kept for the record)
 
 A hardware watchpoint, not a sanitizer. Under the Debug/ASAN build in gdb: break at the return of
 `AudioCollection::AudioCollection`, record `this`, `watch -l` the map's node-count word, then let run
@@ -119,4 +167,6 @@ A hardware watchpoint, not a sanitizer. Under the Debug/ASAN build in gdb: break
 neither printf bisection nor ASAN can give here. Driving it needs the sequence harness's REPL FIFOs
 to quit run 1, so the launcher has to be wrapped rather than replaced.
 
-Do NOT re-add the delete until this is answered.
+(The watchpoint DID fire and showed the block being handed to ImGui's font atlas — which was the
+clue that it had been freed rather than overwritten. Conditional breakpoints on every `free` were
+then too slow to finish a run, which is what sent this back to ASAN.)
