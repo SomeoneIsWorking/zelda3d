@@ -151,6 +151,18 @@ class Zelda3DRenderer {
     void ClearOverlayDepth(); // #146 item B — fullscreen depth-only reset, in-pass, no color write.
 
     // ---- internal helpers (former anonymous-namespace functions) ----
+    // Hand every GPU object this renderer OWNS back to the device, before the device is destroyed.
+    //
+    // Called from ~GfxRenderingAPISdl3Gpu. Until now nothing did: the destructor's comment said these
+    // "are owned by the device and freed at SDL_DestroyGPUDevice", and the Vulkan validation layer
+    // disagreed -- 409 objects still alive at vkDestroyDevice, 362 of them VkImageView, which is this
+    // renderer's per-model textures (docs/issues/0009).
+    //
+    // `note` is the backend's duplicate-release accounting, passed in because it is file-static over
+    // there: it returns false for a handle already released, so a borrowed pointer (the shared dummy
+    // texture, say) cannot be freed twice. The gate asserts that count is zero.
+    void releaseGpuResources(bool (*note)(const void* handle, const char* what));
+
     SDL_GPUSampler* getSampler(unsigned wrapS, unsigned wrapT, bool noMip = false);
     SDL_GPUTexture* uploadTexture(int w, int h, const unsigned char* rgba, int srcLevels = 1);
     bool ensureResources();

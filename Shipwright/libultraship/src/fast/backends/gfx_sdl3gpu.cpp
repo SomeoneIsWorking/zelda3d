@@ -686,6 +686,13 @@ GfxRenderingAPISdl3Gpu::~GfxRenderingAPISdl3Gpu() {
         g_activeSdl3GpuApi = nullptr;
     // Release the folded-in renderer subsystems while the device is still alive (their GPU resources
     // are owned by the device and freed at SDL_DestroyGPUDevice below — same as before the fold).
+    // Hand back what the model renderer owns FIRST, while the device is still alive. The comment
+    // above used to claim SDL_DestroyGPUDevice would take care of it; the validation layer counted 409
+    // objects still alive at vkDestroyDevice and said otherwise (docs/issues/0009).
+    step("mSoh3d.releaseGpuResources");
+    if (mSoh3d) {
+        mSoh3d->releaseGpuResources(&NoteGpuRelease);
+    }
     step("mSoh3d.reset");
     mSoh3d.reset();
     step("mHud.reset");
