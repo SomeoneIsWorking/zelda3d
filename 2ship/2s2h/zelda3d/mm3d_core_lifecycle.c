@@ -43,7 +43,8 @@
 #include <string.h>
 
 void Graph_ResetRunState(void);       // src/code/graph.c -- the frame loop's resume point
-void Zelda3D_ReplResetRunState(void); // 2s2h/Z3DRepl.c   -- the REPL FIFO descriptor
+void Zelda3D_ReplResetRunState(void);  // 2s2h/Z3DRepl.c        -- the REPL FIFO descriptor
+void Zelda3D_MM_ModelResetRunState(void); // 2s2h/zelda3d/mm3d_model.cpp -- anim state keyed by arena addresses
 
 // ---------------------------------------------------------------------------------------------
 // Once-per-run latches
@@ -147,6 +148,9 @@ void Zelda3D_CoreRunBegin(void) {
     Zelda3D_ResetSaveContext();
     // The REPL FIFO: an open descriptor onto a path this run must create for itself.
     Zelda3D_ReplResetRunState();
+    // The zelda3d layer's per-run caches: anim state keyed by ZeldaArena addresses (which the next
+    // run reuses) and a parked Actor*.
+    Zelda3D_MM_ModelResetRunState();
 }
 
 // Called after the frame loop has finished and before the heaps are freed.
