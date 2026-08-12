@@ -174,6 +174,18 @@ else
     grep -E "DOUBLE RELEASE" "$LOG" || echo "   (no DOUBLE RELEASE line found, which should be impossible)"
     RC=1
 fi
+# How much of the game this run actually exercised. Stated because a clean verdict otherwise reads as
+# "the game is fine" when it means "the first playable frame is fine": with no dwell, `oot` loads 3
+# player animations and quits, and an out-of-bounds read in the title demo's horse segment went
+# unseen for the whole of issue 0018 -- attributed to the launcher three times -- purely because the
+# gate never ran that far. A blind spot that is not printed is one nobody remembers.
+echo "-- how much was exercised:"
+if [ "${ZELDA3D_SEQ_DWELL:-0}" = "0" ]; then
+    echo "   each core was quit as soon as it reached a scene (no dwell). This gate says NOTHING about"
+    echo "   anything past the first playable frame; use ZELDA3D_SEQ_DWELL=<seconds> to go further."
+else
+    echo "   each core was held ${ZELDA3D_SEQ_DWELL}s after reaching a scene before being quit."
+fi
 echo "-- crashes:"
 grep -iE "segmentation|SIGSEGV|SIGABRT|dumped core|terminate called|double free" "$LOG" || echo "   (none in the log; check the exit code above)"
 exit "$RC"
