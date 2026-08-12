@@ -121,9 +121,26 @@ for id in "${CORES[@]}"; do
     # check's own verdict says the randomizer ownership paths go unexercised, and those are paths this
     # arc changed. Replies are ECHOED, not swallowed: a command that silently did nothing would
     # otherwise make the sequence look like it covered more than it did.
-    if [ -n "${ZELDA3D_SEQ_CMDS:-}" ]; then
-        echo "$ZELDA3D_SEQ_CMDS" | tr ';' '\n' | while IFS= read -r c; do
+    #
+    # Per-core override: ZELDA3D_SEQ_CMDS_OOT / ZELDA3D_SEQ_CMDS_MM take precedence over the shared
+    # ZELDA3D_SEQ_CMDS. Needed the moment the commands stop being game-agnostic -- `warp` exists in
+    # both REPLs but entrance indices are per-game, so one shared list would send OoT's Kokiri Forest
+    # to MM and quietly land somewhere else (or nowhere).
+    #
+    # `sleep:<n>` is a pseudo-command handled here rather than sent: after a warp the reply returns
+    # immediately while the load takes seconds, and neither REPL has a game-agnostic settle.
+    eval "CMDS=\${ZELDA3D_SEQ_CMDS_$(echo "$id" | tr '[:lower:]' '[:upper:]'):-\${ZELDA3D_SEQ_CMDS:-}}"
+    if [ -n "$CMDS" ]; then
+        echo "$CMDS" | tr ';' '\n' | while IFS= read -r c; do
+            c="$(printf '%s' "$c" | sed 's/^ *//; s/ *$//')"
             [ -n "$c" ] || continue
+            case "$c" in
+                sleep:*)
+                    echo "SEQUENCE: '$id' waiting ${c#sleep:}s (load/settle)"
+                    sleep "${c#sleep:}"
+                    continue
+                    ;;
+            esac
             rm -f "$fifo.out"
             if timeout "${ZELDA3D_SEQ_CMD_WAIT:-300}" sh -c 'printf "%s\n" "$2" > "$1"' _ "$fifo" "$c"; then
                 # The reply file appears when the command finishes, which for a blocking command

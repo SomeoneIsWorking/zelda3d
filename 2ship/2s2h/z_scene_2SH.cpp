@@ -376,8 +376,20 @@ void Scene_CommandAltHeaderList(PlayState* play, SOH::ISceneCommand* cmd) {
     SOH::SetAlternateHeaders* headers = (SOH::SetAlternateHeaders*)cmd;
 
     if (gSaveContext.sceneLayer != 0) {
-        SOH::Scene* desiredHeader =
-            std::static_pointer_cast<SOH::Scene>(headers->headers[gSaveContext.sceneLayer - 1]).get();
+        // Bounds-checked for the reason the OoT copy is (soh/z_scene_otr.cpp): on N64 this indexes a
+        // ROM-authored pointer array where "absent" is a NULL entry, but here `headers` is a
+        // std::vector sized by the extractor and the index comes from save state, so a scene layer
+        // the scene does not have is an out-of-range std::vector read, not a null pointer. OoT's copy
+        // crashed exactly that way on a conditional-cutscene entrance; MM's had never been driven
+        // into it, which is not the same as being safe.
+        const size_t want = (size_t)gSaveContext.sceneLayer - 1;
+        if (want >= headers->headers.size()) {
+            SPDLOG_WARN("Scene alternate-header {} requested but this scene has only {} -- treating it as "
+                        "absent (sceneLayer={}).",
+                        want, headers->headers.size(), gSaveContext.sceneLayer);
+            return;
+        }
+        SOH::Scene* desiredHeader = std::static_pointer_cast<SOH::Scene>(headers->headers[want]).get();
 
         if (desiredHeader != nullptr) {
             OTRScene_ExecuteCommands(play, desiredHeader);

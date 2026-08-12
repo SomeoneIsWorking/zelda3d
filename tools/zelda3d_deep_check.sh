@@ -32,6 +32,19 @@ if [ ! -x "$ASAN_BIN" ]; then
 fi
 
 rm -rf "$OUT"; mkdir -p "$OUT"
+# What each core is driven through once it is live. Dwell alone sits wherever the core spawned, which
+# the verdict has always said -- and "time in-game" is not coverage: the first tour run found three
+# crashes in half an hour, none of which the dwell had ever reached. Scene loads and teardowns are
+# where this project's allocation bugs live, so the tour is warps.
+#
+# Per-game because entrance indices are: OoT 0xEE / 0x209 are two different Kokiri Forest spawns
+# (0x209 is the one that exposed the entrance-index bug) and 0x109 is Zora's River; MM 0x5400 is
+# Termina Field and 0x6800 Great Bay Coast. `sleep:N` waits for the load -- 30s because a sanitizer
+# build on llvmpipe is slow, and a posinfo taken too early reports the OLD scene, which would read as
+# a warp that did nothing. Every reply is echoed, so a warp that lands nowhere is visible.
+OOT_TOUR="${ZELDA3D_DEEP_CMDS_OOT:-randogen; warp 0xEE; sleep:30; posinfo; warp 0x209; sleep:30; posinfo; warp 0x109; sleep:30; posinfo}"
+MM_TOUR="${ZELDA3D_DEEP_CMDS_MM:-warp 0x5400; sleep:30; posinfo; warp 0x6800; sleep:30; posinfo}"
+
 fail=0
 for seq in $SEQS; do
     d="$OUT/$(echo "$seq" | tr ',' '_')"; mkdir -p "$d"
@@ -40,7 +53,9 @@ for seq in $SEQS; do
     ZELDA3D_SEQ_BOOT_WAIT="${ZELDA3D_SEQ_BOOT_WAIT:-900}" \
     ZELDA3D_SEQ_SCENE_WAIT="${ZELDA3D_SEQ_SCENE_WAIT:-400}" \
     ZELDA3D_SEQ_DWELL="$DWELL" \
-    ZELDA3D_SEQ_CMDS="${ZELDA3D_DEEP_CMDS:-randogen}" \
+    ZELDA3D_SEQ_CMDS="${ZELDA3D_DEEP_CMDS:-}" \
+    ZELDA3D_SEQ_CMDS_OOT="${ZELDA3D_DEEP_CMDS:-$OOT_TOUR}" \
+    ZELDA3D_SEQ_CMDS_MM="${ZELDA3D_DEEP_CMDS:-$MM_TOUR}" \
     ZELDA3D_SEQ_CMD_WAIT="${ZELDA3D_SEQ_CMD_WAIT:-900}" \
     ASAN_OPTIONS="detect_leaks=0:halt_on_error=0:detect_odr_violation=0:log_path=$d/asan" \
         "$REPO/tools/zelda3d_sequence.sh" "$seq" > "$d/seq.out" 2>&1
@@ -59,6 +74,9 @@ if [ "$fail" -eq 0 ]; then
     echo "    NOT covered: leaks. detect_leaks=0 here -- and turning it on would not help much, because"
     echo "    LSAN only reports UNREACHABLE memory and this project's leaks stay reachable from their"
     echo "    X::Instance globals (validated both ways, docs/info/instruments/035)."
+    echo "    Each core is also driven through a warp TOUR (echoed above): two Kokiri Forest spawns and"
+    echo "    Zora'"'"'s River for OoT, Termina Field and Great Bay Coast for MM. Scene load/teardown is where"
+    echo "    this project'"'"'s bugs have been, and dwell alone never left the spawn point."
     echo "    A randomizer seed IS generated per core now (REPL randogen, echoed above with its hash), so"
     echo "    the rando ownership paths are exercised -- but only through a COMPLETED generation, because"
     echo "    the command blocks. For the IN-FLIGHT case (a generation still running as the game ends,"
