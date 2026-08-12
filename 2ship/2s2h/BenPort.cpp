@@ -1033,6 +1033,21 @@ extern "C" int InitOTR(int argc, char* argv[]) {
         // Before anything renders or reads input: give libultraship this core's hooks. It can no longer
         // call them by name -- see 2s2h/zelda3d/mm3d_hostreg.c.
         Mm3d_RegisterHostHooks();
+        // The PREVIOUS run's instance, if there is one. This is allocated per run and was never
+        // freed, so it leaked the object and -- more to the point -- kept its shared_ptr members
+        // (SaveStateMgr, Randomizer, Rando::Context) alive for the life of the process, which is why
+        // the rando context needed a reset of its own rather than simply dying with its run.
+        //
+        // Freed HERE rather than at run end: the departing run's teardown still reads Instance
+        // (DeinitOTR, the save flush, the run-end checks), and by this line that run is provably
+        // over. The destructor is empty, so this releases the members and nothing else; `context` is
+        // a raw pointer to the shared engine Context, which OTRGlobals does not own.
+        if (OTRGlobals::Instance != nullptr) {
+            SPDLOG_INFO("Run start: freeing the previous run's OTRGlobals (it used to leak, with its "
+                        "save-state, randomizer and rando-context references inside it).");
+            delete OTRGlobals::Instance;
+            OTRGlobals::Instance = nullptr;
+        }
         OTRGlobals::Instance = new OTRGlobals();
         OTRGlobals::Instance->RunExtract(argc, argv);
 

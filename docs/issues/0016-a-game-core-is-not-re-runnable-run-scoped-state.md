@@ -812,3 +812,27 @@ boot, the launcher still ends the process instead of going back to the chooser. 
 inside the OoT core (it is an OoT gamestate), so recovering means re-running OoT, which is a policy
 decision about what should happen on failure rather than a missing mechanism. The mechanism — a core
 returns instead of killing the process — is what this change delivers.
+
+
+## The per-run `OTRGlobals` leak (2026-08-12)
+
+`InitOTR` does `OTRGlobals::Instance = new OTRGlobals()` every run and nothing ever deleted it. The
+object itself is small; what it held is not. Its `shared_ptr` members — `SaveStateMgr`, `Randomizer`,
+`Rando::Context` — stayed alive for the life of the process, which is the reason the rando context
+needed a reset of its own earlier in this arc instead of simply dying with its run. That was treating
+the symptom: the context outlived its run because its OWNER did.
+
+Freed at the top of `InitOTR`, immediately before the new allocation, rather than at run end. The
+departing run's teardown still reads `Instance` (DeinitOTR, the save flush, the run-end checks), and
+by that line the previous run is provably over. The destructor is empty, so this releases the members
+and nothing else; `context` is a raw pointer to the shared engine `Context`, which OTRGlobals does not
+own and does not destroy.
+
+### The free count is per CORE, and reading it as per RUN is a mistake I made first
+
+`oot,oot` frees once, on run 2. `mm,oot,mm` also frees **once**, not twice — and that is correct.
+`OTRGlobals::Instance` is a symbol inside each core's `.so`, and the cores are loaded `RTLD_LOCAL`, so
+OoT's `Instance` and MM's are different objects that never see each other. Run 1 (mm) finds MM's null,
+run 2 (oot) finds OoT's null, run 3 (mm) finds and frees the one run 1 left. Anything counting these
+lines as "one per run after the first" would read the correct number as a missed free — the same
+per-core/per-process distinction that made MM need its own lifecycle module rather than sharing OoT's.
