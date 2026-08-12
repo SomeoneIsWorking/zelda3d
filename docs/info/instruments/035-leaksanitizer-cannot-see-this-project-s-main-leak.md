@@ -42,3 +42,25 @@ why they print a count rather than a bare "cleared".
 Any "ASAN found no leaks" statement about zelda3d means "no UNREACHABLE leaks". It is not evidence
 that a run cleans up after itself. `tools/zelda3d_deep_check.sh` states this in its verdict rather
 than leaving the reader to assume the stronger reading.
+
+## The workaround that makes it usable: `LSAN_OPTIONS=use_globals=0`
+
+LSAN stops treating globals as GC roots, so an object reachable only from `X::Instance` becomes
+"unreachable" and IS reported. Validated on the same two-allocation control: with `use_globals=0` it
+reports the reachable 11,111-byte block as well as the unreachable 22,222.
+
+The absolute number this produces is meaningless on its own — ~80 MB across ~36,800 allocations for
+one OoT run, nearly all of it engine state that is legitimately alive at exit. **The number that
+means something is the DIFFERENCE between run counts**, because a per-run leak is exactly what grows
+with the run count:
+
+    oot        80,711,147 bytes / 36,803 allocations
+    oot,oot    81,329,052 bytes / 36,887 allocations     -> +617,905 bytes per extra run
+
+Two gotchas, both of which cost a run before being noticed:
+
+- **`log_path` must be ABSOLUTE.** It resolves against the launcher's CWD, which the sequence harness
+  changes; a relative path produced `ERROR: Can't open file …` inside the log and zero report files,
+  which reads identically to "no leaks found".
+- **The harness must let the process exit.** ASAN's leak scan runs after `main` returns, and
+  `zelda3d_sequence.sh` killed the launcher after a hardcoded 30s. Now `ZELDA3D_SEQ_EXIT_WAIT`.

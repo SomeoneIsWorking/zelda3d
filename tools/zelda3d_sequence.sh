@@ -37,6 +37,11 @@ BOOTWAIT="${ZELDA3D_SEQ_BOOT_WAIT:-120}"
 # for a core that was merely slow. That is the failure BOOTWAIT's own comment describes, one budget
 # further along -- a fixed limit sitting next to a configurable one is a bug waiting for a slow build.
 SCENEWAIT="${ZELDA3D_SEQ_SCENE_WAIT:-60}"
+# Seconds to let the launcher exit on its own after the last core is quit. Third budget in this file
+# to need a knob for the same reason: 30 is fine for a release build and not enough under a sanitizer,
+# where AddressSanitizer's at-exit leak scan runs AFTER main returns. Killing during that scan loses
+# the leak report entirely and looks identical to "there were no leaks".
+EXITWAIT="${ZELDA3D_SEQ_EXIT_WAIT:-30}"
 LOGDIR="$REPO/scratch/logs/sequence"
 LOG="$LOGDIR/run.log"
 # Each core reads its own REPL path from its own env var; both are wired so either can be quit.
@@ -130,9 +135,9 @@ for id in "${CORES[@]}"; do
     for _ in $(seq 1 30); do sleep 1; [ -p "$fifo" ] || break; kill -0 "$SEQPID" 2>/dev/null || break; done
 done
 
-for _ in $(seq 1 30); do sleep 1; kill -0 "$SEQPID" 2>/dev/null || break; done
+for _ in $(seq 1 "$EXITWAIT"); do sleep 1; kill -0 "$SEQPID" 2>/dev/null || break; done
 if kill -0 "$SEQPID" 2>/dev/null; then
-    echo "SEQUENCE: launcher still alive after the sequence -- killing pid $SEQPID"
+    echo "SEQUENCE: launcher still alive ${EXITWAIT}s after the sequence (ZELDA3D_SEQ_EXIT_WAIT) -- killing pid $SEQPID"
     kill -9 "$SEQPID" 2>/dev/null
 fi
 wait "$SEQPID" 2>/dev/null; RC=$?

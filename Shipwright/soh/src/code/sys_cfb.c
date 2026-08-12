@@ -5,6 +5,8 @@
 uintptr_t sSysCfbFbPtr[2];
 uintptr_t sSysCfbEnd;
 
+void SysCfb_Reset(void); // defined below; SysCfb_Init calls it to release the previous run's buffers
+
 void SysCfb_Init(s32 n64dd) {
     u32 screenSize;
     uintptr_t tmpFbEnd;
@@ -36,6 +38,14 @@ void SysCfb_Init(s32 n64dd) {
     osSyncPrintf("システムが使用する最終アドレスは %08x です\n", sSysCfbEnd);
     // sSysCfbFbPtr[0] = sSysCfbEnd - (screenSize * 4);
     // sSysCfbFbPtr[1] = sSysCfbEnd - (screenSize * 2);
+    // Give back the PREVIOUS run's framebuffers first. SysCfb_Init runs once per run from Main_Init
+    // and these two callocs were never freed by anything: measured at 614,400 bytes -- the whole
+    // per-run leak after the rest of issue 0016's fixes was essentially this and nothing else.
+    //
+    // Freed here rather than at run end, on the same argument as the per-run singletons: at this
+    // exact point the old buffers are dead by definition, because the next two lines replace them.
+    SysCfb_Reset();
+
     sSysCfbFbPtr[0] = (uintptr_t)calloc(screenSize, 4);
     sSysCfbFbPtr[1] = (uintptr_t)calloc(screenSize, 4);
 
@@ -46,7 +56,12 @@ void SysCfb_Init(s32 n64dd) {
     FB_CreateFramebuffers();
 }
 
+// Frees the framebuffers as well as clearing the pointers. It only cleared them before -- which made
+// it a reset that leaked 600KB every time it was called, except that nothing ever called it. Now it
+// is called by SysCfb_Init above, so there is exactly one implementation and one call site.
 void SysCfb_Reset() {
+    free((void*)sSysCfbFbPtr[0]);
+    free((void*)sSysCfbFbPtr[1]);
     sSysCfbFbPtr[0] = 0;
     sSysCfbFbPtr[1] = 0;
     sSysCfbEnd = 0;
