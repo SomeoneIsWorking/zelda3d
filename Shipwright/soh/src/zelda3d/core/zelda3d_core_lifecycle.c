@@ -58,6 +58,7 @@ void Zelda3D_EntranceTableResetRunState(void); // randomizer/randomizer_entrance
 void Zelda3D_GameInteractorResetRunState(void); // game-interactor -- inline static hook maps, process lifetime
 void Zelda3D_EntranceCameraBackupResetRunState(void); // randomizer/entrance.cpp -- a Camera full of pointers
 void Zelda3D_NameTagResetRunState(void); // Enhancements/nametag.cpp -- raw Actor* plus a mirror of the hook registry
+void Zelda3D_TitlePresentationResetRunState(void); // behaviors/title -- a process-lifetime singleton holding run Actor*
 void Zelda3D_ExtraTrapsResetRunState(void); // Enhancements/ExtraTraps.cpp -- an armed trap and its timers
 
 // The name tables AudioLoad_Init builds for this run, so they can be released before it builds the
@@ -272,6 +273,7 @@ void Zelda3D_CoreRunBegin(void) {
     // Enhancement state that outlives its run: name tags hold raw Actor* and mirror the hook registry
     // cleared just above, and a trap left armed fires on the next run's Link.
     Zelda3D_NameTagResetRunState();
+    Zelda3D_TitlePresentationResetRunState();
     Zelda3D_ExtraTrapsResetRunState();
 }
 

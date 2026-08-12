@@ -105,6 +105,9 @@ public:
     // mPlayerActor) that those calls mutate, unlike the read-only TitleFrameState snapshot above.
     TitleRider& mutableRider() { return mRider; }
 
+    // Put the singleton back to its declared state for a new run. See the definition in the .cpp.
+    void resetRunState();
+
 private:
     bool mActive = false;
     TitleFrameState mFrame{};
