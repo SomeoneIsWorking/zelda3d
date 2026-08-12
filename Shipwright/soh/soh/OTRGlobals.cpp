@@ -281,6 +281,23 @@ const char* constCameraStrings[] = {
     GFXP_KATAKANA "ｷ-     /   ",
 };
 
+#define ARRAY_COUNT_CAMERA_STRINGS (sizeof(constCameraStrings) / sizeof(constCameraStrings[0]))
+
+// Releases the heap copy db_camera writes into, and forgets it in the same statement -- a freed
+// `cameraStrings` left non-NULL is worse than a leak, because db_camera indexes it unconditionally.
+// Called from both ends: before the copy is remade (so a boot that never reached DeinitOTR still
+// cannot double up) and at DeinitOTR (so the last run of the process leaves nothing behind).
+static void FreeCameraStrings() {
+    if (cameraStrings == nullptr) {
+        return;
+    }
+    for (size_t i = 0; i < ARRAY_COUNT_CAMERA_STRINGS; i++) {
+        free(cameraStrings[i]);
+    }
+    free(cameraStrings);
+    cameraStrings = nullptr;
+}
+
 typedef struct {
     uint16_t major;
     uint16_t minor;
@@ -1086,13 +1103,14 @@ void OTRGlobals::Initialize() {
 
     hasMasterQuest = hasOriginal = false;
 
-    // Move the camera strings from read only memory onto the heap (writable memory)
-    // This is in OTRGlobals right now because this is a place that will only ever be run once at the beginning of
-    // startup. We should probably find some code in db_camera that does initialization and only run once, and then
-    // dealloc on deinitialization.
+    // Move the camera strings from read only memory onto the heap, because db_camera writes into
+    // them (digits, cursor arrows). "a place that will only ever be run once at the beginning of
+    // startup" is what this used to be; a core can run twice now, so the copy is remade per run --
+    // which is also the fix for the second-order bug, that run 2 would otherwise inherit run 1's
+    // overwritten text. Freed first: 74 strdups plus the array, the whole of OoT's per-run leak.
+    FreeCameraStrings();
     cameraStrings = (char**)malloc(sizeof(constCameraStrings));
-    for (size_t i = 0; i < sizeof(constCameraStrings) / sizeof(char*); i++) {
-        // OTRTODO: never deallocated...
+    for (size_t i = 0; i < ARRAY_COUNT_CAMERA_STRINGS; i++) {
         cameraStrings[i] = strdup(constCameraStrings[i]);
     }
 
@@ -1741,10 +1759,11 @@ extern "C" void Zelda3D_RegisterHostHooks(void);
 // run leaked a full copy of the message tables, the item tables, the actor DB, the audio collection,
 // the save manager's registered sections and the game-interactor instance.
 //
-// NOT freed here, and each for a specific reason rather than caution:
-//   - CrowdControl / Sail / Anchor: each owns a network thread. DeinitOTR calls Disable() on them, but
-//     that is not documented to join, and destroying an object out from under a running thread trades
-//     a leak for a race.
+// CrowdControl / Sail / Anchor were held back from this list on the grounds that each owns a network
+// thread and `Disable()` "is not documented to join". Reading it settles that: Network::Disable()
+// ends with `receiveThread.join()`, and the receive thread calls OnDisconnected() on its way out,
+// which is where CrowdControl joins its second thread. DeinitOTR now calls Disable() unconditionally,
+// so by the time the next run reaches here both threads are finished and the delete is a delete.
 template <typename T> static void ReplacePerRunSingleton(T*& instance, const char* what) {
     if (instance == nullptr) {
         return;
@@ -1838,8 +1857,11 @@ extern "C" int InitOTR(int argc, char* argv[]) {
     #endif
         SpeechSynthesizer::Instance->Init();
 
+        ReplacePerRunSingleton(CrowdControl::Instance, "CrowdControl");
         CrowdControl::Instance = new CrowdControl();
+        ReplacePerRunSingleton(Sail::Instance, "Sail");
         Sail::Instance = new Sail();
+        ReplacePerRunSingleton(Anchor::Instance, "Anchor");
         Anchor::Instance = new Anchor();
 
         OTRMessage_Init();
@@ -1923,16 +1945,16 @@ extern "C" void DeinitOTR() {
     // 1. Stop every background thread, so nothing touches the engine, files or network as we exit.
     OTRAudio_Exit();              // stop + join the audio thread (idempotent; main.c stops it first)
     SaveManager_ThreadPoolWait(); // let any in-flight save finish writing to disk
-    if (CVarGetInteger(CVAR_REMOTE_CROWD_CONTROL("Enabled"), 0)) {
-        CrowdControl::Instance->Disable();
-    }
-    if (CVarGetInteger(CVAR_REMOTE_SAIL("Enabled"), 0)) {
-        Sail::Instance->Disable();
-    }
-    if (CVarGetInteger(CVAR_REMOTE_ANCHOR("Enabled"), 0)) {
-        Anchor::Instance->Disable();
-    }
+    // Unconditionally, not behind the CVar that was read at Enable() time. Network::Disable() already
+    // early-returns when it is not enabled, so the CVar test bought nothing and cost the case that
+    // matters: a remote switched on, then its CVar switched back off, left the receive thread running
+    // into a game that had ended. Disable() joins that thread (and CrowdControl's second thread, via
+    // OnDisconnected on the way out), which is what makes deleting these three at the next run safe.
+    CrowdControl::Instance->Disable();
+    Sail::Instance->Disable();
+    Anchor::Instance->Disable();
     SDLNet_Quit();
+    FreeCameraStrings();
 
     // 2. Persist the only state ~Context would have written: window layout and the config file.
     if (Ship::Context* ctx = OTRGlobals::Instance->context) {
