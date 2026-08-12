@@ -10,6 +10,7 @@
 #include <cstdio>
 #include <cstdlib>
 #include <cstring>
+#include <map>
 #include <memory>
 #include <string>
 #include <unordered_map>
@@ -488,6 +489,52 @@ std::unordered_map<void*, MMAnimState> g_animState;
 // failure looks like a stale cache -- it looks like the wrong animation being selected.
 //
 // g_pending holds a raw MM Actor*, parked between the divert point and the draw.
+// ZELDA3D_MM_PHASE_REPORT=1 -- per (model, clip), the RANGE the sampled CSAB frame actually took.
+// The live question the offline checks cannot answer is not "which clip" but "did the playhead
+// MOVE": a correct clip sampled at a frozen phase renders exactly like a broken decoder. Recorded
+// as min/max/samples rather than a per-frame line so the negative is unmistakable and self-
+// describing -- a stuck playhead prints "f 5.00..5.00 over 240 samples", which no amount of log
+// volume would have made obvious. Dumped once at run-state reset, so it costs nothing per frame
+// beyond two comparisons.
+struct MMPhaseStat { float lo = 1e30f, hi = -1e30f; long n = 0; float dur = 0.0f; bool locked = false; };
+std::map<std::pair<int, std::string>, MMPhaseStat> g_phaseStats;
+static void mmDumpPhaseStats(void);
+static bool mmPhaseReport() {
+    static int on = -1;
+    if (on < 0) {
+        const char* e = getenv("ZELDA3D_MM_PHASE_REPORT");
+        on = (e && e[0] && e[0] != '0') ? 1 : 0;
+        // atexit as well as the run-state reset. The reset runs at RunBEGIN, tidying the PREVIOUS
+        // run -- so a single-run session would have reached teardown having printed nothing, and a
+        // report that cannot print on the commonest way of running the game is not a report.
+        if (on == 1) atexit(mmDumpPhaseStats);
+    }
+    return on == 1;
+}
+
+static void mmDumpPhaseStats(void) {
+    if (!mmPhaseReport()) return;
+    // Denominator first: "no stuck clips" says nothing without how many were sampled at all.
+    fprintf(stderr, "[MM3D-PHASE] %zu (model,clip) pair(s) sampled\n", g_phaseStats.size());
+    int stuck = 0;
+    for (const auto& kv : g_phaseStats) {
+        const MMPhaseStat& st = kv.second;
+        // n<2 is NOT "stuck": one sample cannot show movement. Reporting it as stuck is the same
+        // class of error this whole report exists to catch -- a verdict its evidence cannot support.
+        const bool moved = (st.hi - st.lo) > 1e-3f;
+        const char* verdict = st.n < 2 ? "1-SAMP" : (moved ? "MOVED" : "STUCK");
+        if (!moved && st.n >= 2) stuck++;
+        fprintf(stderr, "[MM3D-PHASE] %-6s model=%d %-28s f %.2f..%.2f dur=%.0f n=%ld %s\n",
+                verdict, kv.first.first, kv.first.second.c_str(),
+                st.lo, st.hi, st.dur, st.n, st.locked ? "phase-locked" : "free-run");
+    }
+    fprintf(stderr, "[MM3D-PHASE] %d of %zu pair(s) with >=2 samples never advanced.%s\n", stuck, g_phaseStats.size(),
+            g_phaseStats.empty() ? "  NOTE: zero pairs sampled -- this run measured NOTHING, which is"
+                                   " NOT the same as 'nothing was stuck'." : "");
+    g_phaseStats.clear();
+    fflush(stderr);
+}
+
 extern "C" void Zelda3D_MM_ModelResetRunState(void) {
     const size_t droppedAnimStates = g_animState.size();
     const bool hadPending = g_pending.actor != nullptr;
@@ -500,6 +547,7 @@ extern "C" void Zelda3D_MM_ModelResetRunState(void) {
     // was surviving runs at all.
     fprintf(stderr, "MM3D CORE: model run-state reset -- dropped %zu stale anim-state entr%s, pending actor: %s.\n",
             droppedAnimStates, droppedAnimStates == 1 ? "y" : "ies", hadPending ? "yes" : "none");
+    mmDumpPhaseStats();
     fflush(stderr);
 }
 
@@ -624,8 +672,22 @@ static void mmUpdateAnimAuto(int modelId, const char* name, float rate, float n6
         f = (n64Cur / n64Len) * dur; // phase-lock
         frames[modelId] = f;
     } else {
-        f = frames.count(modelId) ? frames[modelId] + rate : 0.0f; // free-run
+        // Free-run, WRAPPED. Left unwrapped this is a counter that only ever grows: measured live,
+        // pst_model reached f=3198 on a 31-frame clip in under two minutes. Csab::animFrame wraps
+        // with `while (frame > last) frame -= last`, so the cost of every sample grows linearly with
+        // how long the process has been running -- ~103 iterations at 3198, and unbounded after an
+        // hour of play. Wrapping here keeps the playhead in range and leaves that loop a no-op.
+        f = frames.count(modelId) ? frames[modelId] + rate : 0.0f;
+        if (dur > 0.0f && f > dur) f = std::fmod(f, dur);
         frames[modelId] = f;
+    }
+    if (mmPhaseReport()) {
+        MMPhaseStat& st = g_phaseStats[{ modelId, std::string(name) }];
+        st.lo = std::min(st.lo, f);
+        st.hi = std::max(st.hi, f);
+        st.dur = dur;
+        st.locked = (n64Len > 4.0f && n64Cur >= 0.0f && dur > 0.0f);
+        st.n++;
     }
     mmUpdateAnim(modelId, name, f);
 }

@@ -212,6 +212,10 @@ const Csab::AnimNode* Csab::nodeForBone(int boneId) const {
 
 float Csab::animFrame(float frame) const {
     float last = (float)mDuration;
+    // A zero/negative duration would make the REPEAT loop below subtract nothing forever. mDuration
+    // is duration+1 and so should never be <= 0, but the cost of being wrong here is a HANG in the
+    // render path rather than a wrong pose, which is not a trade worth leaving open.
+    if (!(last > 0.0f)) return 0.0f;
     while (frame > last) frame -= last; // REPEAT
     return frame;
 }
