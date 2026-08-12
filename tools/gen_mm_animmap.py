@@ -727,6 +727,9 @@ def build_report(results: List[ActorResult], meta: dict) -> Tuple[str, dict]:
         "unmatched_reasons": reasons,
         "actors": [{
             "object": r.obj, "gar": r.gar, "clips": len(r.clips),
+            # The clip NAMES, not just how many. Without these the unmatched list is unactionable:
+            # you can see that a symbol failed to match but not what it could have matched against.
+            "clip_names": sorted(r.clips),
             "alt_gar_hint": r.alt_gar_hint,
             "symbols": len(r.matches),
             "matched": [{"n64otr": m.symbol, "csab": m.clip, "confidence": m.confidence,
