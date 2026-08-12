@@ -784,6 +784,30 @@ static std::string sAppBundlePathOverride;
 void Context::BeginRun() {
     sExitRequested = false;
     sFullTeardownRequested = false;
+
+    // The GuiWindow list belongs to a RUN, not to a game NAME -- the same distinction the exit flag
+    // above had to learn. EndGameSession clears it, but EndGameSession only fires when the incoming
+    // game differs from the outgoing one, so `oot -> oot` (and any core re-run through the chooser)
+    // kept the previous run's windows: measured, 27 of them, each rejected by AddGuiWindow with
+    // "Attempting to add duplicate window name" so the incoming run's window was never added and its
+    // Init() never ran.
+    //
+    // That is not cosmetic. A window's Init is where several subsystems register per-run state --
+    // the sohStats save section among them -- so the second run silently recorded no stats and
+    // dropped them from the save; and the windows that DID survive belong to the previous run,
+    // holding its pointers and its hooks.
+    //
+    // Cleared here rather than in either game because this is the one place that knows a run is
+    // starting, and at this point the previous session's ConsoleVariables are still installed, so
+    // the departing windows' destructors can still read the CVars they were constructed from. (Doing
+    // it in EndGameSession is why the ENGINE's own windows are deliberately left to InitConsole --
+    // see the comment there.)
+    // BeginRun is static and the launcher calls it before the FIRST core has built a Context, so
+    // every step here is conditional rather than assumed.
+    Context* context = GetRawInstance();
+    if (context != nullptr && context->GetWindow() != nullptr && context->GetWindow()->GetGui() != nullptr) {
+        context->GetWindow()->GetGui()->RemoveAllGuiWindows();
+    }
 }
 
 void Context::RequestExit() {
