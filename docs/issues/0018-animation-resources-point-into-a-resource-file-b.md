@@ -172,3 +172,42 @@ Facts, separated from guesses:
 The next step is an instrument, not more reading: log the resolved resource TYPE and the branch taken
 at both `AnimationFactory.cpp:90` and `:102`, then run `mm,oot,mm`. The `oot`-alone run already
 provides the negative control, which is what makes that comparison worth anything.
+
+
+## The instrument ran, and it RULES OUT the AnimationFactory Link branch
+
+`ZELDA3D_ANIMTYPE_LOG=1` (committed, gated, in `AnimationFactory.cpp`) prints branch and resolved
+resource Type for EVERY Link animation, so the good and bad runs can be compared rather than only
+the bad one inspected. Result:
+
+| run | resolutions | line |
+|---|---|---|
+| `oot` (clean under ASAN) | 3 | `firstLoad=hit (type=1330659661) altTried=yes altResolved=no -> using PlayerAnimation` |
+| `mm,oot,mm` (reproduces) | 4 | **identical** |
+
+Every Link animation in both runs resolves the same way, to a `PlayerAnimation` whose
+`limbRotData` is an owned `std::vector<int16_t>`. The extra fourth line in the longer run is one more
+animation being reached, not a different outcome.
+
+**So the freed pointer does not come from this branch.** ASAN's allocation stack in the failing run
+is unambiguous -- `O2rArchive::LoadFile` -> `make_shared<std::vector<char>>`, a resource FILE buffer,
+not a `limbRotData` vector -- and the only three writers of `linkAnimationHeader.segment` in the tree
+are the three lines in this factory (`:83` nullptr, `:161` `Animation::GetPointer()`, `:166`
+`limbRotData.data()`). None of them can produce file memory on the observed path.
+
+That leaves the pointer arriving through `AnimationContext_SetLoadFrame`'s OWN resolution:
+
+```c
+if (ResourceMgr_OTRSigCheck(animation) != 0)
+    animation = ResourceMgr_LoadAnimByName(animation);   // path string -> resource data
+s16* animData = animation->segment;
+```
+
+`ResourceMgr_LoadAnimByName` returns `ResourceGetDataByName(...)`, i.e. some resource's data pointer,
+and with alt assets ON (OoT enables them unconditionally) it tries an `alt/`-prefixed path first.
+**That is where to look next**: which resource type `ResourceGetDataByName` returns for these paths,
+and whether that type's data pointer is file-backed. It is a different mechanism from the factory
+and was not on the list until the instrument eliminated the factory.
+
+The comparative form is what made this worth running -- a log that only fired on the failing case
+would have shown the same four lines and proved nothing.
