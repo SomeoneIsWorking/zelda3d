@@ -14,6 +14,7 @@ void ObjIceblock_Init(Actor* thisx, PlayState* play);
 void ObjIceblock_Destroy(Actor* thisx, PlayState* play);
 void ObjIceblock_Update(Actor* thisx, PlayState* play);
 void ObjIceblock_Draw(Actor* thisx, PlayState* play);
+void ObjIceblock_Reset(void);
 
 void ObjIceBlock_SetupAttemptSpawnCutscene(ObjIceblock* this);
 void ObjIceBlock_AttemptSpawnCutscene(ObjIceblock* this, PlayState* play);
@@ -54,6 +55,7 @@ ActorProfile Obj_Iceblock_Profile = {
     /**/ ObjIceblock_Destroy,
     /**/ ObjIceblock_Update,
     /**/ ObjIceblock_Draw,
+    /**/ ObjIceblock_Reset,
 };
 
 static ColliderCylinderInit sCylinderInit = {
@@ -77,6 +79,15 @@ static ColliderCylinderInit sCylinderInit = {
 };
 
 static AnimatedMaterial* sCubeSublimatingAirTexMat = NULL;
+
+// Captured once and never released, from a Lib_SegmentedToVirtual over the ice-block object -- so it
+// points into whichever object bank happened to be loaded for the FIRST ice block the process ever
+// initialised, and ObjIceblock_Draw dereferences it unconditionally. Across runs that bank belongs to
+// a destroyed ResourceManager. Dropped on overlay unload, which is where the capture stops being
+// valid, so the next load re-resolves it against the object actually loaded then.
+void ObjIceblock_Reset(void) {
+    sCubeSublimatingAirTexMat = NULL;
+}
 
 s16 func_80A23090(s16 arg0, s16 arg1, s16 arg2) {
     if (arg0 >= 0) {
