@@ -1,3 +1,4 @@
+#include <cstdio>
 #include "SeedContext.h"
 #include "static_data.h"
 #include "soh/OTRGlobals.h"
@@ -72,6 +73,31 @@ std::shared_ptr<Context> Context::CreateInstance() {
 
 std::shared_ptr<Context> Context::GetInstance() {
     return mContext.lock();
+}
+
+// The rando context belongs to a RUN, and its lifetime was tied to a leak instead.
+//
+// CreateInstance() only builds a new Context when `mContext.expired()`. The only strong reference is
+// OTRGlobals::Instance->gRandoContext, and OTRGlobals::Instance is `new`ed on every run and never
+// deleted -- so run 1's context stays alive forever, `expired()` is never true again, and every later
+// run silently reuses run 1's itemLocationTable, options, trick options and EntranceShuffler. A
+// vanilla run started after a randomizer run would play on the randomizer's placements.
+//
+// Clearing the weak_ptr is the fix for THAT invariant: it does not free anything (run 1's context is
+// still held by the leaked OTRGlobals), it makes the next CreateInstance build a context for the run
+// that asked for one. The leak itself is a separate defect -- one OTRGlobals per run, never
+// released -- and is not addressed here.
+extern "C" void Zelda3D_RandoContextResetRunState(void) {
+    const bool inherited = !Context::mContext.expired();
+
+    Context::mContext.reset();
+
+    // Reported either way, because "reset" alone cannot distinguish the first run (nothing to
+    // inherit) from a run that was about to be handed the previous run's seed -- and the second is
+    // the entire reason this exists.
+    fprintf(stderr, "ZELDA3D CORE: rando context reset -- previous run's context was %s.\n",
+            inherited ? "STILL LIVE and would have been reused" : "absent (first run)");
+    fflush(stderr);
 }
 
 Hint* Context::GetHint(const RandomizerHint hintKey) {
