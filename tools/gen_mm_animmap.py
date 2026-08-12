@@ -522,6 +522,20 @@ VERIFIED_OVERRIDES: Dict[str, Dict[str, str]] = {
         "gDoorDekuOpenLeftAnim":             "pn_doorA",
         "gDoorDekuOpenRightAnim":            "pn_doorB",
     },
+    # object_delf: the decomp XML annotates TWO symbols with the same original name, which is an
+    # upstream copy-paste error rather than a genuine alias -- and it produced a real wrong mapping,
+    # two N64 animations sharing one clip while elf_attack_2b went unclaimed.
+    #   0x4FF4 elf_attack_1a   0x53A4 elf_attack_1b   0x5B68 elf_attack_2a   0x6328 "elf_attack_1b"
+    # MEASURED, not argued from the offset ordering (which an adversarial pass rejected as a general
+    # corroborator, 8 of 141 objects being non-monotone): the N64 frameCounts are 24, 24, 56, 56 and
+    # the GAR durations are elf_attack_1a 23, 1b 23, 2a 55, 2b 55. Symbol 0x6328 is 56 frames, so it
+    # belongs to the 2-series and is 33 frames away from the elf_attack_1b it is annotated with.
+    # Within that series 2a is already claimed by its own correctly-annotated symbol and 2b is the
+    # only unclaimed clip, so the assignment is forced. The duration evidence establishes the SERIES;
+    # it cannot separate 2a from 2b on its own, since both are 55.
+    "object_delf": {
+        "object_delf_Anim_006328": "elf_attack_2b",
+    },
 }
 
 
@@ -1107,12 +1121,19 @@ def verify_overrides(o2r_path: Optional[str] = None) -> int:
                 continue
             got = durations.get(clip)
             checked += 1
-            if got != fc:
-                print("VERIFY: FAIL %s -> %s: N64 frameCount %s != csab duration %s"
-                      % (sym, clip, fc, got))
+            # TOLERANCE 1, and it is measured rather than assumed. The gameplay_keep doors match
+            # EXACTLY (88 vs 88); object_delf runs fc = duration + 1 across every pair in the actor
+            # (24/23, 24/23, 56/55, 56/55). So the two sides do not share one frame-count convention,
+            # and an equality check would fail a correct override. What the check must catch is a
+            # mapping to the WRONG animation, and those are not off by one: the annotation this
+            # override corrects pointed at a clip 33 frames away.
+            if got is None or abs(got - fc) > 1:
+                print("VERIFY: FAIL %s -> %s: N64 frameCount %s vs csab duration %s (delta %s)"
+                      % (sym, clip, fc, got, "n/a" if got is None else abs(got - fc)))
                 bad += 1
             else:
-                print("VERIFY: ok   %-36s -> %-24s %d frames both sides" % (sym, clip, fc))
+                print("VERIFY: ok   %-36s -> %-24s fc=%d dur=%d (delta %d)"
+                      % (sym, clip, fc, got, abs(got - fc)))
     print("VERIFY: checked %d override(s), %d failed." % (checked, bad))
     return 1 if bad else 0
 
