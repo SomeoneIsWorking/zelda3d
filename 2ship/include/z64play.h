@@ -124,7 +124,14 @@ typedef struct PlayState {
     /* 0x18E64 */ void* unk_18E64;
     /* 0x18E68 */ void* unk_18E68; // framebuffer related to Lens of Truth
     /* 0x18E6C */ char unk_18E6C[0x3EC];
-} PlayState; // size = 0x19258
+    // 2S2H [Port] APPENDED, past the N64 struct, so no documented offset above shifts.
+    // The scene's path-list LENGTH. SetPathwaysMM carries `numPaths` and Scene_CommandPathList threw
+    // it away, keeping only the pointer -- so SubS_GetPathByIndex had nothing to bound against and
+    // indexed setupPathList with a value derived from actor params. Third instance of the same shape
+    // in one audit (ACTOR_ID_MAX, tableCount, numPaths): the bound existed and was simply not kept.
+    // docs/issues/0023.
+    u32 setupPathCount;
+} PlayState; // size = 0x19258 + zelda3d appendix
 
 typedef enum PictoPhotoState {
     /* 0 */ PICTO_PHOTO_STATE_OFF,

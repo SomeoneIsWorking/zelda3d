@@ -6,6 +6,7 @@
 #include "global.h"
 #include "overlays/actors/ovl_En_Door/z_en_door.h"
 #include "BenPort.h"
+#include <libultraship/log/luslog.h>
 
 s16 sPathDayFlags[] = { 0x40, 0x20, 0x10, 8, 4, 2, 1, 0 };
 
@@ -1120,7 +1121,35 @@ s32 SubS_AngleDiffLessEqual(s16 angleA, s16 threshold, s16 angleB) {
 }
 
 Path* SubS_GetPathByIndex(PlayState* play, s16 pathIndex, s16 pathIndexNone) {
-    return (pathIndex != pathIndexNone) ? &play->setupPathList[pathIndex] : NULL;
+    if (pathIndex == pathIndexNone) {
+        return NULL;
+    }
+
+    // Two guards, and BOTH are load-bearing.
+    //
+    // The NULL test is not redundant with the caller's. play->setupPathList is nullptr in every
+    // scene that declares no path list (set explicitly in z_play_2SH.cpp), and `&NULL[pathIndex]`
+    // is a small NON-NULL address -- so it sails through SubS_CopyPointFromPath's `path == NULL`
+    // check and gets dereferenced as a Path. The caller's guard cannot catch what this returns.
+    //
+    // The bound uses setupPathCount, which Scene_CommandPathList now keeps from the resource's
+    // numPaths; before that there was no length recorded anywhere in PlayState and nothing to check
+    // against. ~40 overlay call sites reach here with pathIndex taken from actor params -- e.g.
+    // BOMB_SHOP_LADY_GET_PATH_INDEX is (params & 0x3F00) >> 8, whose "none" sentinel excludes
+    // exactly one of 64 reachable values -- and in this port actor params come from user text via
+    // the developer console and ActorViewer. Audited 2026-08-12, docs/issues/0023.
+    if (play->setupPathList == NULL) {
+        LUSLOG_ERROR("SubS_GetPathByIndex: path %d requested but this scene has NO path list",
+                     pathIndex);
+        return NULL;
+    }
+    if ((pathIndex < 0) || ((u32)pathIndex >= play->setupPathCount)) {
+        LUSLOG_ERROR("SubS_GetPathByIndex: path %d is out of range (scene has %u) -- REFUSED",
+                     pathIndex, play->setupPathCount);
+        return NULL;
+    }
+
+    return &play->setupPathList[pathIndex];
 }
 
 s32 SubS_CopyPointFromPath(Path* path, s32 pointIndex, Vec3f* dst) {

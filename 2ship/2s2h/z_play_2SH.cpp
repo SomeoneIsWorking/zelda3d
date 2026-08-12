@@ -24,6 +24,7 @@ extern "C" void OTRPlay_InitScene(PlayState* play, s32 spawn) {
     play->setupExitList = nullptr;
     play->naviQuestHints = nullptr;
     play->setupPathList = nullptr;
+    play->setupPathCount = 0;
     play->sceneMaterialAnims = nullptr;
     play->roomCtx.unk74 = nullptr;
     play->numSetupActors = 0;
