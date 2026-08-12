@@ -1151,11 +1151,29 @@ Also fixed on the way in, both in the generation path:
   "finished", not "started" — the one case it must handle, a generation still in flight, was the one
   it skipped. Now gated on `joinable()`.
 
-**Stated honestly:** removing the `DeinitOTR` join and re-running `oot,oot` with `randogen` in both
-runs still exited 0 — the un-joined thread does NOT reach `std::terminate` here, because `randogen`
-blocks until generation finishes and the next run's `GenerateRandomizer` joins the previous thread on
-its way in. So the join is correctness for the in-flight case (which the blocking command cannot
-produce) and it belongs in a function whose step 1 is "stop every background thread", but it is not a
-crash this measured. The `delete`/`free` mismatch, by contrast, was measured before and after.
+### The join IS load-bearing — measured, after a first answer that said it was not
+
+First attempt at the negative direction: remove the `DeinitOTR` join, re-run `oot,oot` with
+`randogen` in both runs — and it exited 0. The honest reading at that point was that the join was
+correctness for a case the test could not produce, not a crash. That reading was right about the test
+and wrong about the join, and the reason is exactly the blind spot the verdict had just been made to
+name: **`randogen` blocks**, so generation was always finished before the game ended. The experiment
+could not fail.
+
+So the command grew an `async` form, which starts generation and returns, and
+`JoinRandoGenerationThread` grew a line saying WHICH case it is handling — `RandoGenerating` is 1 for
+the duration of the thread body, so the log distinguishes "joining an in-flight generation" from
+"joining one that already finished" from the silence of never being called at all. With the join in
+place, both runs log `joining the generation thread (IN FLIGHT -- waiting for it to finish)` and the
+sequence exits 0 with 0 ASAN reports.
+
+Without it, `oot,oot` **fails**: run 1 returns 0, and run 2 never reaches a scene at all — its log
+stops after the build banner, 400 s of `posinfo` go unanswered, and the renderer never prints its
+teardown accounting. Run 1's generation thread is still running through `Zelda3D_FreePreviousOTRGlobals`
+and run 2's re-init. Note there is **no ASAN report** on that run: it is a hang during boot, not a
+memory error the sanitizer can name, which is why it needs a gate that requires each core to ANSWER
+rather than one that only watches for crashes.
+
+The `delete`/`free` mismatch was likewise measured before and after.
 
 Deep check after: all three sequences exit 0, 0 ASAN reports, a seed generated in every OoT core.
