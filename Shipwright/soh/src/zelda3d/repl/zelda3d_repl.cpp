@@ -466,12 +466,23 @@ static void Zelda3D_ReplExec(PlayState* play, char* line, const char* outPath) {
         // spawn on a flag in Init (e.g. En_Sa is Actor_Kill'd in the Sacred Forest Meadow
         // unless EVENTCHKINF_OBTAINED_ZELDAS_LETTER=0x40 is set), so combine with a `warp`
         // to that scene to make the actor appear. Default (one arg) = set; second arg 0=clear.
-        if (iv2 == 0) {
-            Flags_UnsetEventChkInf(iv);
+        // eventChkInf is u16[14] -> flags 0..223 only. Validate HERE too, not just in the engine:
+        // the reply below would otherwise read back 0 from a refused write and report it as though
+        // the flag were simply clear, which is a command silently doing nothing while looking like
+        // it worked. (A second, unreachable copy of this handler used to sit further down the same
+        // else-if chain; the 2026-08-12 audit found it and it is deleted.)
+        if (iv < 0 || iv > 223) {
+            Zelda3D_ReplReply(outPath,
+                              "eventflag REFUSED 0x%x -- out of range (valid 0..223, eventChkInf is "
+                              "u16[14]); nothing was written", iv);
         } else {
-            Flags_SetEventChkInf(iv);
+            if (iv2 == 0) {
+                Flags_UnsetEventChkInf(iv);
+            } else {
+                Flags_SetEventChkInf(iv);
+            }
+            Zelda3D_ReplReply(outPath, "eventflag 0x%x -> %d", iv, Flags_GetEventChkInf(iv) ? 1 : 0);
         }
-        Zelda3D_ReplReply(outPath, "eventflag 0x%x -> %d", iv, Flags_GetEventChkInf(iv) ? 1 : 0);
     } else if (strcmp(cmd, "age") == 0 && sscanf(line, "%*s %i", &iv) == 1) {
         // Toggle Link's age (0=adult, 1=child) so we can test the boy/adult equipment path.
         // Player_InitImpl copies play->linkAgeOnLoad -> gSaveContext.linkAge on (re)load
@@ -2074,20 +2085,6 @@ static void Zelda3D_ReplExec(PlayState* play, char* line, const char* outPath) {
                         play->csCtx.state, play->csCtx.frames, gSaveContext.cutsceneIndex,
                         Player_InCsMode(play), p->csAction, (p->stateFlags1 & PLAYER_STATE1_IN_CUTSCENE) ? 1 : 0,
                         p->stateFlags1, play->activeCamera, subcams);
-    } else if (strcmp(cmd, "eventflag") == 0 && sscanf(line, "%*s %i", &iv) >= 1) {
-        // #15 repro tooling — get/set an EVENTCHKINF event flag. Entrance establishing-pan
-        // cutscenes are gated by `!Flags_GetEventChkInf(flag)` (z_demo Cutscene_HandleEntranceTriggers),
-        // so they only play the FIRST time. `eventflag <hex>` reads; `eventflag <hex> 0|1` sets, so a
-        // pan can be REPLAYED on demand (clear its flag, then `warp` to its entrance). E.g. Hyrule
-        // Field intro = flag 0xA0; clear it then `warp 0x185`.
-        int val = -1;
-        if (sscanf(line, "%*s %*i %i", &val) == 1) {
-            if (val)
-                Flags_SetEventChkInf(iv);
-            else
-                Flags_UnsetEventChkInf(iv);
-        }
-        Zelda3D_ReplReply(outPath, "eventflag 0x%x = %d", iv, Flags_GetEventChkInf(iv) ? 1 : 0);
     } else if (strcmp(cmd, "skiptest") == 0 && sscanf(line, "%*s %i %i", &iv, &iv2) == 2) {
         // #2 verify — start a onepoint cutscene camera (csId=iv, timer=iv2 frames) anchored on
         // Link, to confirm press-to-skip ends it. Returns the created subcam index.

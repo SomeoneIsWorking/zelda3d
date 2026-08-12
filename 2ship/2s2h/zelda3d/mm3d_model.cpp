@@ -510,7 +510,12 @@ std::unordered_map<const void*, MMAnimKeyState> g_animKey;
 // volume would have made obvious. Dumped once at run-state reset, so it costs nothing per frame
 // beyond two comparisons.
 struct MMPhaseStat { float lo = 1e30f, hi = -1e30f; long n = 0; float dur = 0.0f; bool locked = false;
-                     long morphN = 0; float morphMax = 0.0f; };
+                     long morphN = 0; float morphMax = 0.0f;
+                     // Distinct ACTORS contributing. Without it this report can manufacture a false
+                     // STUCK: stats are keyed by (model,clip) but the playhead is per-actor, so four
+                     // Gerudos each drawn once all start at f=0 and aggregate to "n=4, range
+                     // 0.00..0.00" -- indistinguishable from one actor frozen for four frames.
+                     std::set<const void*> actors; };
 std::map<std::pair<int, std::string>, MMPhaseStat> g_phaseStats;
 static void mmDumpPhaseStats(void);
 static bool mmPhaseReport() {
@@ -536,19 +541,24 @@ static void mmDumpPhaseStats(void) {
         // n<2 is NOT "stuck": one sample cannot show movement. Reporting it as stuck is the same
         // class of error this whole report exists to catch -- a verdict its evidence cannot support.
         const bool moved = (st.hi - st.lo) > 1e-3f;
-        const char* verdict = st.n < 2 ? "1-SAMP" : (moved ? "MOVED" : "STUCK");
-        if (!moved && st.n >= 2) stuck++;
-        fprintf(stderr, "[MM3D-PHASE] %-6s model=%d %-28s f %.2f..%.2f dur=%.0f n=%ld %s morph=%ld/%.2f\n",
+        // Samples per ACTOR is the only figure that can support a stuck verdict. n/actors <= 1 means
+        // no single actor was observed twice, so nothing could have advanced by construction.
+        const size_t nActors = st.actors.empty() ? 1 : st.actors.size();
+        const bool enough = st.n >= 2 && (size_t)st.n >= nActors * 2;
+        const char* verdict = !enough ? "THIN" : (moved ? "MOVED" : "STUCK");
+        if (!moved && enough) stuck++;
+        fprintf(stderr, "[MM3D-PHASE] %-6s model=%d %-28s f %.2f..%.2f dur=%.0f n=%ld %s morph=%ld/%.2f actors=%lu\n",
                 verdict, kv.first.first, kv.first.second.c_str(),
                 st.lo, st.hi, st.dur, st.n, st.locked ? "phase-locked" : "free-run",
-                st.morphN, st.morphMax);
+                st.morphN, st.morphMax, (unsigned long)nActors);
     }
     long morphTotal = 0;
     for (const auto& kv : g_phaseStats) morphTotal += kv.second.morphN;
     fprintf(stderr, "[MM3D-PHASE] morph path fired on %ld sample(s) across all pairs.%s\n", morphTotal,
             morphTotal == 0 ? "  Either no transition happened while this was watching, or MM never"
                               " reports a nonzero morphWeight -- do NOT read 0 as 'morph works'." : "");
-    fprintf(stderr, "[MM3D-PHASE] %d of %zu pair(s) with >=2 samples never advanced.%s\n", stuck, g_phaseStats.size(),
+    fprintf(stderr, "[MM3D-PHASE] %d of %zu pair(s) with >=2 samples PER ACTOR never advanced."
+            "  (THIN = too few samples per actor to say either way.)%s\n", stuck, g_phaseStats.size(),
             g_phaseStats.empty() ? "  NOTE: zero pairs sampled -- this run measured NOTHING, which is"
                                    " NOT the same as 'nothing was stuck'." : "");
     g_phaseStats.clear();
@@ -749,6 +759,7 @@ static void mmUpdateAnimAuto(int modelId, const void* key, const char* name, flo
         // it looks like a feature. If MM's SkelAnime never reports a nonzero morphWeight, every
         // pair below reads morph=0 and the port is inert -- which is a finding, not a pass.
         if (morphWeight > 0.0f) { st.morphN++; st.morphMax = std::max(st.morphMax, morphWeight); }
+        st.actors.insert(key);
     }
     // MORPH bookkeeping, ported from OoT's Zelda3D_UpdateAnimAuto. On a real transition (the
     // resolved clip changed while the N64 side is mid-morph) freeze the clip we are LEAVING at its
