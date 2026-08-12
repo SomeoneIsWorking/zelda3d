@@ -5,6 +5,8 @@ status: holds
 created: 2026-08-12
 tags: camera,run-scoped,issue-0022
 depends: Shipwright/soh/src/code/z_camera.c
+reconfirmed: 2026-08-12
+verified_at: 2026-08-12 17:14:10
 ---
 
 ## Claim
@@ -18,3 +20,7 @@ OREG(r) expands to gGameInfo->data[...], and func_800636C0 (z_debug.c) mallocs a
 ## What would falsify it
 
 The verification is the POSITIVE per-run log line, not the absence of a crash -- absence alone cannot distinguish 'fixed' from 'the run did not get that far', which is exactly how four earlier targeted repros produced false negatives. This claim fails if that line ever appears fewer times than the number of cores in a sequence, or if OREG(6) is logged as 0.
+
+## Re-confirmed 2026-08-12
+
+FULL deep check 2026-08-12 (all three sequences, sanitizer build, 60s dwell + warp tour): oot,oot / mm,mm / mm,oot,mm each exit 0 with 0 ASAN reports; DEEP VERDICT exit 0. The positive latch line '[camera] register table initialised for this run' appears exactly once per OOT core and never for MM -- 2 in oot,oot, 1 in mm,oot,mm, 0 in mm,mm. That per-sequence count is itself a check on the instrument: it tracks the number of OoT cores rather than the number of runs, which is what it should measure since MM does not use OoT's Camera_Init.
