@@ -349,6 +349,12 @@ void Scene_CommandLightList(PlayState* play, SceneCmd* cmd) {
 // SceneTableEntry Header Command 0x0D: Path List
 void Scene_CommandPathList(PlayState* play, SceneCmd* cmd) {
     play->setupPathList = Lib_SegmentedToVirtual(cmd->pathList.segment);
+    // DEAD in this port -- scene commands are dispatched through OTRScene_ExecuteCommands
+    // (z_scene_2SH.cpp), whose Scene_CommandPathList keeps the resource's numPaths. Zeroed anyway so
+    // that if this path is ever revived it FAILS SAFE: SubS_GetPathByIndex refuses every lookup
+    // (paths visibly stop working) instead of bounding against a count left over from the previous
+    // scene, which would read out of bounds silently. docs/issues/0023.
+    play->setupPathCount = 0;
 }
 
 // SceneTableEntry Header Command 0x0E: Transition Actor List

@@ -1,6 +1,6 @@
 # 0023 — unchecked table indexing reachable from port-only callers (audit)
 
-status: OPEN — 7 of 22 fixed 2026-08-12; the rest catalogued here, unfixed
+status: OPEN — 8 of 22 fixed 2026-08-12; the rest catalogued here, unfixed
 found by: a 33-agent audit run after the SAME bug was found twice in one day by accident
 
 ## The category
@@ -66,6 +66,20 @@ zelda3d-layer 42, libultraship 28.
 - REPL `wingmap` — each source axis is used as `dd[src]` in Zelda3D_ApplyProcOverride, which tested
   only `src >= 0`. A value of 3+ read past the three-float source and the result went into a bone
   rotation: silently wrong, not a crash.
+- `SubS_GetPathByIndex` (`2ship/src/code/z_sub_s.c`) — the ROOT of five separate overlay findings
+  (`EnIk_Draw`, `EnPst_FollowSchedule`, `EnGirlA_InitObjIndex`, `BgCtowerRot_Draw`, `EnBoom_Draw`),
+  since ~40 callers reach it with `pathIndex` from actor params. Two guards, both load-bearing:
+  `play->setupPathList` is `nullptr` in any scene with no path list, and `&NULL[pathIndex]` is a
+  small NON-NULL address that passes the caller's own `path == NULL` test and is then dereferenced
+  as a `Path`. The bound needed a length that PlayState did not record — `SetPathwaysMM` carries
+  `numPaths` and `Scene_CommandPathList` kept only the pointer. `setupPathCount` is now appended
+  PAST the N64 struct so no documented offset shifts, and the dead N64 handler zeroes it so a revival
+  FAILS SAFE (paths visibly stop working) rather than bounding against a stale count.
+  **Verification is partial and that is stated deliberately:** two scenes of normal play (Clock Town,
+  Termina Field) produce ZERO refusals, so the bound is not too tight and path NPCs still work — but
+  the refusing branch has NOT been observed firing, because MM's REPL has no `spawn` command and the
+  developer-console path is ImGui-only. Someone should drive a bad params value through it before
+  treating this guard as proven.
 
 ### Confirmed, NOT yet fixed
 

@@ -265,6 +265,8 @@ void Scene_CommandPathList(PlayState* play, SOH::ISceneCommand* cmd) {
     SOH::SetPathwaysMM* paths = (SOH::SetPathwaysMM*)cmd;
 
     play->setupPathList = (Path*)paths->GetPointer()[0];
+    // Keep the LENGTH, not just the pointer -- SubS_GetPathByIndex needs something to bound against.
+    play->setupPathCount = paths->numPaths;
 }
 
 void Scene_CommandTransiActorList(PlayState* play, SOH::ISceneCommand* cmd) {
