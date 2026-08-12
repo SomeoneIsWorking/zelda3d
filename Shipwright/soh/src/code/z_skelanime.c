@@ -1023,6 +1023,38 @@ void AnimationContext_SetLoadFrame(PlayState* play, LinkAnimationHeader* animati
         Vec3s* ram = frameTable;
 
         s16* animData = animation->segment;
+
+        // Does the frame being asked for exist in this animation? ASAN caught this memcpy reading
+        // frame 28 out of a buffer holding exactly 24 -- 536 bytes past the end of a
+        // PlayerAnimation limbRotData vector. The frame tables themselves are internally consistent
+        // (measured: every one is exactly 134 bytes per frame for its stated frameCount), so the
+        // header being used and the data `segment` points at belong to DIFFERENT animations, and
+        // neither the header nor the frame index is visible at the crash site.
+        //
+        // Reports, does not repair. Clamping the frame would hide a mismatched header behind a
+        // plausible pose, which is the failure mode this codebase keeps paying for. The cap is on
+        // the BORING case: the first few are printed in full, and the total is printed with them so
+        // "3 reported" can never be mistaken for "3 happened".
+        {
+            const s32 frameCount = animation->common.frameCount;
+            if (frame >= frameCount) {
+                static int sReported = 0;
+                static int sTotal = 0;
+                sTotal++;
+                if (sReported < 8) {
+                    sReported++;
+                    // NOT rate-limited by frame identity: a mismatch that repeats every frame and one
+                    // that happens once are different bugs, which is what the total distinguishes.
+                    fprintf(stderr,
+                            "ZELDA3D ANIM: frame %d requested from an animation whose header says %d frame(s)"
+                            " -- header %p, data %p, limbCount %d. Reading %d bytes past what this table can"
+                            " hold. (%d occurrence(s) so far; first 8 printed.)\n",
+                            (int)frame, (int)frameCount, (void*)animation, (void*)animData, (int)limbCount,
+                            (int)((sizeof(Vec3s) * limbCount + 2) * (frame - frameCount + 1)), sTotal);
+                    fflush(stderr);
+                }
+            }
+        }
         // SOH [Port] sometimes a HESS can set a negative frame value from a negative playback speed. When converted to
         // a signed value this will cause a crash due to copying way much data.
         if (frame < 0) {
