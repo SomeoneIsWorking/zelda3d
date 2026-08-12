@@ -945,3 +945,31 @@ next to a `ZELDA3D_SEQ_BOOT_WAIT` that exists *because* a fixed budget had alrea
 sanitizer boot as a broken core. The same trap, one budget further along. It is now
 `ZELDA3D_SEQ_SCENE_WAIT` (default 60), and the failure message names the budget and the variable so
 the next person does not have to read the script to find out what timed out.
+
+### Scanning the blind spot properly — and catching the scan lying first
+
+After the `TitlePresentation` crash, the obvious move was to scan the rest of that class: long-lived
+objects (function-local `static` instances) with per-run pointer members. The first version of that
+scan reported **0 of 46** — a clean bill of health.
+
+It was wrong. Run against the KNOWN positive it had just been written to generalise, it reported 0
+pointer members for `TitleRider`, which has two `Actor*` right there in the header. The regex was
+anchored to a `grep -A` prefix shape that never matches context lines, so it silently examined
+nothing. A negative from a scan that has not been shown to produce a positive is not a result.
+
+Rewritten to parse class bodies directly and to follow NESTED members (which is how
+`TitlePresentation` holds its pointers at all — via `mRider`), it validates on the known positive and
+finds **2 of 46**:
+
+- `TitlePresentation` — the crash above.
+- `SkelAnime`, reached through the `static SkelAnime` instances in the rando draw functions. soh's
+  nine in `draw.cpp` are already behind `Zelda3DOnce` and re-initialise per run. MM's
+  **`Rando/DrawItem.cpp`** was not: a plain `static bool initialized` meant run 2 skipped
+  `SkelAnime_InitFlex` and `SkelAnime_DrawFlex` then walked a skeleton belonging to the destroyed
+  session's ResourceManager. Converted. The 53 latches in `DrawFuncs.cpp` were converted in an earlier
+  pass; this one is in a different file and was missed.
+
+Three other plain `static bool initialized` latches were examined and deliberately left, because the
+state they guard holds no per-run pointer: `DrawFuncs.cpp`'s `DrawLikeLike` (float/Vec3s segment
+data), `CosmeticEditor.cpp` (label strings from a static table), and soh's `location_access.cpp`
+(an array of enum values). Named here so the next sweep does not re-derive them.
