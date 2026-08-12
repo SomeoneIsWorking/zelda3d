@@ -241,6 +241,12 @@ void Zelda3D_MenuActivateRow(const char* needle, char* out, int outSize); // act
 // "the click path is broken" from "I clicked the wrong pixel" -- all three look like nothing
 // happening. This names the element that is really there.
 void Zelda3D_LauncherHitReport(char* out, int outSize);
+// Generate a randomizer seed and WAIT for it. Generation runs on its own thread with no headless
+// trigger, which is why `tools/zelda3d_deep_check.sh` has said "no randomizer seed is generated, so
+// the rando ownership paths are not exercised" ever since it was written -- and the rando context
+// has three owners this arc had to untangle, so that blind spot sits over code that was changed.
+// The reply carries the generated flag and the seed hash, so a failure cannot read as a pass.
+void Zelda3D_RandoGenerateBlocking(const char* seed, char* out, int outSize);
 
 static void Zelda3D_ReplExec(PlayState* play, char* line, const char* outPath) {
     char cmd[32];
@@ -340,6 +346,12 @@ static void Zelda3D_ReplExec(PlayState* play, char* line, const char* outPath) {
         char report[512];
         report[0] = '\0';
         Zelda3D_MenuActivateRow(arg != NULL ? arg + 1 : "", report, (int)sizeof report);
+        Zelda3D_ReplReply(outPath, "%s", report);
+    } else if (strcmp(cmd, "randogen") == 0) {
+        const char* sp = strchr(line, ' ');
+        char report[1024];
+        report[0] = '\0';
+        Zelda3D_RandoGenerateBlocking(sp != NULL ? sp + 1 : "", report, (int)sizeof report);
         Zelda3D_ReplReply(outPath, "%s", report);
     } else if (strcmp(cmd, "menuhit") == 0) {
         char report[4096];

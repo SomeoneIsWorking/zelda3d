@@ -2581,8 +2581,12 @@ void Logic::InitSaveContext() {
 }
 
 void Logic::NewSaveContext() {
+    // `delete`, matching the `new` two lines down. `free()` on a `new`ed pointer is undefined even
+    // for a POD, and AddressSanitizer names it: alloc-dealloc-mismatch (operator new vs free), one
+    // per AssumedFill round of a seed generation. The `!= &gSaveContext` guard stays -- the logic can
+    // be pointed at the real save, which is a global and belongs to nobody here.
     if (mSaveContext != nullptr && mSaveContext != &gSaveContext) {
-        free(mSaveContext);
+        delete mSaveContext;
     }
     mSaveContext = new SaveContext();
     InitSaveContext();

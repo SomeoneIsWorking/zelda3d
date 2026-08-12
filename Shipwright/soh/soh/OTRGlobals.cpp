@@ -1945,6 +1945,10 @@ extern "C" void DeinitOTR() {
     // 1. Stop every background thread, so nothing touches the engine, files or network as we exit.
     OTRAudio_Exit();              // stop + join the audio thread (idempotent; main.c stops it first)
     SaveManager_ThreadPoolWait(); // let any in-flight save finish writing to disk
+    // Seed generation runs on its own thread and nothing ever joined it -- the helper for that was
+    // written, declared, and never called. Joined here, BEFORE anything frees the Rando::Context that
+    // an in-flight generation is writing into.
+    JoinRandoGenerationThread();
     // Unconditionally, not behind the CVar that was read at Enable() time. Network::Disable() already
     // early-returns when it is not enabled, so the CVar test bought nothing and cost the case that
     // matters: a remote switched on, then its CVar switched back off, left the receive thread running

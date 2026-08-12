@@ -1110,3 +1110,52 @@ process, with the loader picking one. Nothing outside libultraship references St
 `StormLib.h` appear only in `ship/resource/archive/OtrArchive.cpp`; OTRExporter fetches its own), so
 `PRIVATE` is correct. `nm` counts 1/0/0/0 after, and the measurements above ran with ODR detection
 back ON and reported nothing.
+
+## Closing the deep check's own stated blind spot — which was hiding a real bug (2026-08-12)
+
+`tools/zelda3d_deep_check.sh` had ended every verdict with *"No randomizer seed is generated, so the
+rando ownership paths are not exercised"* — a blind spot sitting directly over code this arc changed
+(the Rando context's three owners). It was printed honestly and it was never closed, because seed
+generation's only trigger was an ImGui button.
+
+Two pieces of tooling close it, and both are generic rather than rando-specific:
+
+- **REPL `randogen [seed]`** — starts generation and WAITS, replying with the generated flag, the hash
+  and the seed string. Numbers, not "ok": a generator that returned immediately having done nothing
+  would otherwise read identically.
+- **`ZELDA3D_SEQ_CMDS="a;b"`** on `zelda3d_sequence.sh` — REPL commands run in each core once it is
+  live, with each reply ECHOED. The echo is the point: MM answers `randogen` with `unknown-command`
+  (correct — rando is OoT-only), and a swallowed reply would have made the sequence look like it
+  covered both games.
+
+The deep check now sends `randogen` per core by default. **The first run found a bug**, in both
+sequences that generate a seed:
+
+    AddressSanitizer: alloc-dealloc-mismatch (operator new vs free)
+      free
+      Rando::Logic::NewSaveContext()  logic.cpp:2585
+      Rando::Logic::Reset(bool)       logic.cpp:2928
+      AssumedFill(...)                3drando/fill.cpp:889
+
+`NewSaveContext` allocates with `new SaveContext()` two lines below and releases with `free()` —
+undefined even for a POD, once per `AssumedFill` round. Fixed to `delete`. The `!= &gSaveContext`
+guard stays: the logic can be pointed at the real save, which is a global and belongs to nobody here.
+
+Also fixed on the way in, both in the generation path:
+
+- `randoThread` is a file-scope `std::thread` and **`JoinRandoGenerationThread()` was written,
+  declared, and never called** — a generated seed left it joinable for the life of the process.
+  `DeinitOTR` calls it now, alongside the other thread stops, and before anything frees the
+  `Rando::Context` an in-flight generation writes into.
+- That helper gated on `generated`, which is set at the END of the thread body, so it means
+  "finished", not "started" — the one case it must handle, a generation still in flight, was the one
+  it skipped. Now gated on `joinable()`.
+
+**Stated honestly:** removing the `DeinitOTR` join and re-running `oot,oot` with `randogen` in both
+runs still exited 0 — the un-joined thread does NOT reach `std::terminate` here, because `randogen`
+blocks until generation finishes and the next run's `GenerateRandomizer` joins the previous thread on
+its way in. So the join is correctness for the in-flight case (which the blocking command cannot
+produce) and it belongs in a function whose step 1 is "stop every background thread", but it is not a
+crash this measured. The `delete`/`free` mismatch, by contrast, was measured before and after.
+
+Deep check after: all three sequences exit 0, 0 ASAN reports, a seed generated in every OoT core.

@@ -986,10 +986,7 @@ void GenerateRandomizerImgui(std::string seed = "") {
 }
 
 bool GenerateRandomizer(std::string seed /*= ""*/) {
-    if (generated) {
-        generated = false;
-        randoThread.join();
-    }
+    JoinRandoGenerationThread();
     if (CVarGetInteger(CVAR_GENERAL("RandoGenerating"), 0) == 0) {
         randoThread = std::thread(&GenerateRandomizerImgui, seed);
         return true;
@@ -997,14 +994,46 @@ bool GenerateRandomizer(std::string seed /*= ""*/) {
     return false;
 }
 
+// Headless entry point for seed generation: start it and WAIT, so a caller with no frame loop and no
+// mouse can exercise the path. `tools/zelda3d_deep_check.sh` states in its own verdict that the rando
+// ownership paths go unexercised because no seed is generated -- the only trigger was an ImGui button.
+//
+// The report is written whether it worked or not, and carries the two facts that distinguish the
+// outcomes: whether generation was accepted at all (it declines while one is already running), and
+// whether the context says a seed EXISTS afterwards. "randogen: ok" with no numbers would be
+// indistinguishable from a generator that returned immediately having done nothing.
+extern "C" void Zelda3D_RandoGenerateBlocking(const char* seed, char* out, int outSize) {
+    const std::string seedStr = (seed != nullptr) ? seed : "";
+    if (!GenerateRandomizer(seedStr)) {
+        snprintf(out, outSize, "randogen: DECLINED -- a generation is already running (RandoGenerating=%d)",
+                 CVarGetInteger(CVAR_GENERAL("RandoGenerating"), 0));
+        return;
+    }
+    JoinRandoGenerationThread();
+    auto ctx = Rando::Context::GetInstance();
+    snprintf(out, outSize, "randogen: seed='%s' generated=%d hash='%s' seedString='%s'",
+             seedStr.empty() ? "(random)" : seedStr.c_str(), ctx->IsSeedGenerated() ? 1 : 0, ctx->GetHash().c_str(),
+             ctx->GetSeedString().c_str());
+}
+
 static bool locationsTabOpen = false;
 static bool tricksTabOpen = false;
 
+// Gated on joinable(), NOT on `generated`. `generated` is set at the END of the generation thread's
+// body, so it means "finished", not "started" -- and a generation still IN FLIGHT is precisely the
+// case that must not be left running. Both call sites had the `generated` test; on a seed that was
+// still generating, one would have started a second thread over a joinable member (std::terminate)
+// and the other would have returned with the thread alive.
+//
+// It also has to be CALLED, which it never was: `randoThread` is a file-scope std::thread, so a
+// generated seed left it joinable for the life of the process, and ~thread on a joinable thread is
+// std::terminate. Under one game per process, ending in _exit(0), nothing ever reached that
+// destructor. DeinitOTR calls this now, alongside the other thread stops.
 void JoinRandoGenerationThread() {
-    if (generated) {
-        generated = false;
+    if (randoThread.joinable()) {
         randoThread.join();
     }
+    generated = false;
 }
 
 class ExtendedVanillaTableInvalidItemIdException : public std::exception {
