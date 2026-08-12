@@ -1066,7 +1066,6 @@ extern "C" int InitOTR(int argc, char* argv[]) {
         Mm3d_RegisterHostHooks();
         OTRGlobals::Instance = new OTRGlobals();
         OTRGlobals::Instance->RunExtract(argc, argv);
-
         OTRGlobals::Instance->Initialize();
 
         std::shared_ptr<Ship::Config> conf = OTRGlobals::Instance->context->GetConfig();
