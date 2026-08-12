@@ -151,3 +151,28 @@ one remaining way to leave `Context` to static destruction.
   whole time.
 - The sequence gate's boot budget is `ZELDA3D_SEQ_BOOT_WAIT` (default 120s, nowhere near enough for
   a sanitizer build).
+
+
+## A SECOND instance, found 2026-08-12 -- the fix covered one logger, not all of them
+
+ASAN on an `oot` sequence run (once [issue 0018](0018-animation-resources-point-into-a-resource-file-b.md)
+stopped killing the run earlier):
+
+```
+spdlog::logger::should_log                                    /usr/include/spdlog/logger.h:263
+InputViewerSettingsWindow::~InputViewerSettingsWindow         soh/Enhancements/controls/InputViewer.cpp:462
+std::_Sp_counted_base<...>::_M_release                        (a static shared_ptr to the window)
+__run_exit_handlers  <-  exit
+```
+
+Same shape as the original: a destructor running at static-teardown time logs through a logger the
+exit handlers have already freed. The fix recorded above gave the **early stderr logger** an owner
+that never releases it, which is why `~Context()` and `~ControlDeck()` are safe. This is a different
+logger -- the one `InitLogging` installs -- still owned solely by spdlog's registry and freed when
+that registry is destroyed.
+
+So the invariant stated above ("no code path may leave `Context` to static destruction") is still too
+narrow. The general form is: **no logger may be owned solely by spdlog's registry if anything logs
+from a destructor**, and the durable fix is to give every logger the same never-released owner, not
+to keep finding destructors. Not done here -- recorded so the next session starts from the class
+rather than from `InputViewer.cpp:462`.
