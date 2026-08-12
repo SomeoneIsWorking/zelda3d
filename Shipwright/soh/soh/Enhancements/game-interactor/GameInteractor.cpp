@@ -9,6 +9,7 @@ If these checks need to happen wherever GameInteractor functions are needed, the
 GameInteractor functions can be called directly.
 */
 
+#include <cstdio>
 #include "GameInteractor.h"
 #include <libultraship/bridge.h>
 
@@ -136,4 +137,34 @@ bool GameInteractor::CanAddOrTakeAmmo(int16_t amount, int16_t item) {
         }
         return true;
     }
+}
+
+// Clear every hook registry this process has instantiated, so a new run starts with none.
+//
+// Called from Zelda3D_CoreRunBegin BEFORE InitOTR rebuilds the GameInteractor instance, which is
+// what keeps the ids and the maps in agreement: the fresh instance starts at nextHookId = 1 and the
+// maps it allocates into are empty. Doing only one of the two is worse than doing neither -- ids
+// restarting into populated maps means UnregisterGameHookForID erases somebody else's hook.
+extern "C" void Zelda3D_GameInteractorResetRunState(void) {
+    size_t types = 0;
+    size_t entries = 0;
+
+    for (auto& clearer : GameInteractor::HookClearers()) {
+        entries += clearer();
+        types++;
+    }
+
+    // The count is the denominator: it says how many hook TYPES had ever been registered and are
+    // therefore covered. A type nothing has registered has nothing to clear, but a silent line here
+    // could not distinguish that from a clearer list that failed to populate at all -- which is the
+    // one way this could quietly do nothing.
+    fprintf(stderr,
+            "ZELDA3D CORE: game-interactor hooks reset -- %zu hook(s) left by the previous run, across %zu"
+            " registered hook type(s).\n",
+            entries, types);
+    fflush(stderr);
+}
+
+void GameInteractor::ResetRunState() {
+    Zelda3D_GameInteractorResetRunState();
 }

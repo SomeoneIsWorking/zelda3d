@@ -52,6 +52,7 @@ void Zelda3D_HorseRefsResetRunState(void);  // behaviors/actor/en_horse.cpp
 void ObjectExtension_ResetRunState(void); // zelda3d_shared/object -- keyed by Actor*, one instance per core
 void Zelda3D_RandoContextResetRunState(void); // randomizer/SeedContext.cpp -- kept alive by a leaked OTRGlobals
 void Zelda3D_EntranceTableResetRunState(void); // randomizer/randomizer_entrance.c -- gEntranceTable is .data
+void Zelda3D_GameInteractorResetRunState(void); // game-interactor -- inline static hook maps, process lifetime
 
 // The name tables AudioLoad_Init builds for this run, so they can be released before it builds the
 // next run's. Declared here rather than in a header because this file is where their lifetime is.
@@ -241,6 +242,10 @@ void Zelda3D_CoreRunBegin(void) {
     Zelda3D_RandoContextResetRunState();
     // gEntranceTable, which a randomizer run shuffles in place and only restores on its own paths.
     Zelda3D_EntranceTableResetRunState();
+    // The game-interactor hook registries. They are inline static template members, so the
+    // per-run GameInteractor instance does NOT clear them -- and its nextHookId restarts at 1, so
+    // the two have to be reset together or ids collide with the previous run's entries.
+    Zelda3D_GameInteractorResetRunState();
 }
 
 // Called after the frame loop has finished and before the heaps are freed.

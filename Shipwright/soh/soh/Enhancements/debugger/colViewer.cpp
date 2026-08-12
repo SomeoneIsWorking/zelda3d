@@ -171,6 +171,18 @@ void CalcTriNorm(const Vec3f& v1, const Vec3f& v2, const Vec3f& v3, Vec3f& norm)
 
 void CreateCylinderData() {
     constexpr int32_t CYL_DIVS = 12;
+    // Cleared, not just reserved. These are file statics and this function only ever appended to
+    // them, so a second InitElement doubled both vectors: `reserve` is a no-op once the capacity is
+    // already there, the extra push_backs then exceeded it, and the reallocation left the
+    // `gsSPVertex((uintptr_t)cylinderVtx.data(), ...)` baked into cylinderGfx pointing at freed
+    // memory -- while the mid-list gsSPEndDisplayList meant the stale half was the half that ran.
+    //
+    // A second InitElement used to be impossible in practice: the GuiWindow list survived a re-run,
+    // so AddGuiWindow rejected the incoming window and never called Init. Clearing the window list
+    // per run (Context::BeginRun) makes Init run again by design, which turns this from latent into
+    // live -- so it is fixed in the same session as that change rather than left as a surprise.
+    cylinderGfx.clear();
+    cylinderVtx.clear();
     cylinderGfx.reserve(5 + CYL_DIVS * 2);
     cylinderVtx.reserve(2 + CYL_DIVS * 2);
 
@@ -260,6 +272,13 @@ void CreateSphereFace(std::vector<std::tuple<size_t, size_t, size_t>>& faces, in
 // http://blog.andreaskahler.com/2009/06/creating-icosphere-mesh-in-code.html Spcifically, create a icosahedron by
 // realizing that the points can be placed on 3 rectangles that are on each unit plane. Then, subdividing each face.
 void CreateSphereData() {
+    // Same reasoning as CreateCylinderData: file statics that this function only appends to, and
+    // InitElement now genuinely runs once per run. Note this one is worse if left -- it indexes
+    // sphereVtx by face index while pushing to it, so a table that already had a previous run's
+    // vertices in it would build faces out of the wrong ones as well as reallocating.
+    sphereGfx.clear();
+    sphereVtx.clear();
+
     std::vector<Vec3f> base;
 
     float d = (1.0f + sqrtf(5.0f)) / 2.0f;
