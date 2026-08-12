@@ -103,6 +103,14 @@ for id in "${CORES[@]}"; do
     else
         echo "SEQUENCE: core '$id' is live: $SCENE"
     fi
+    # Optional dwell: keep the core alive after it has reached a scene, so the run exercises more
+    # than the first playable frame. Added because a bug was only reachable deeper into the title
+    # demo than this gate had ever run -- `oot` alone loaded 3 player animations where a longer run
+    # loads more, and "the gate is clean" meant "the gate stopped early".
+    if [ "${ZELDA3D_SEQ_DWELL:-0}" != "0" ]; then
+        echo "SEQUENCE: dwelling ${ZELDA3D_SEQ_DWELL}s in '$id' before quitting"
+        sleep "$ZELDA3D_SEQ_DWELL"
+    fi
     echo "SEQUENCE: asking '$id' to quit"
     # Bounded, because opening a FIFO for writing BLOCKS until a reader opens it -- and on a
     # same-game sequence (oot,oot) both cores share one $ZELDA3D_REPL path, so the file can still be
