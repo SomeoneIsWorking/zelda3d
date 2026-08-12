@@ -52,11 +52,15 @@ UNK_TYPE D_8012D1F4 = 0; // unused
 // chest-open animation (FastChests). It deliberately injects NO input, so a stray SPACE keeps its
 // normal BTN_START meaning (open the pause menu) and nothing is double-triggered.
 void Zelda3D_SkipInit(void) {
-    static s32 sForced = 0;
-    if (sForced) {
+    // Once per RUN, not per process. What this guards is CVar writes, and CVars are per-run: the
+    // launcher gives each game session a fresh ConsoleVariables (GameSession::End drops the old
+    // one). A process-lifetime latch therefore said "already forced" for a run whose CVars had never
+    // been touched, and the enhancements this exists to enable stayed off for every run after the
+    // first.
+    static Zelda3DOnce sForced;
+    if (!Zelda3D_Once(&sForced)) {
         return;
     }
-    sForced = 1;
 
     // #24: skip the En_Box chest-open animation (VB_PLAY_SLOW_CHEST_CS in timesaver_hook_handlers.cpp).
     if (CVarGetInteger(CVAR_ENHANCEMENT("FastChests"), 0) == 0) {
