@@ -220,6 +220,38 @@ class GameInteractor {
     // If two operations must happen in a specific order, they should be placed in the same hook.
     HOOK_ID nextHookId = 1;
 
+    // Clearing every hook registry at once.
+    //
+    // The registries below are `inline static` members of a TEMPLATE, so there is one set per hook
+    // type and no list of them anywhere -- nothing could walk them. They are also process-lifetime,
+    // while `nextHookId` is an instance member on a GameInteractor that is rebuilt every run: ids
+    // therefore restart at 1 while the maps still hold the previous run's entries under those ids,
+    // so UnregisterGameHookForID would erase an unrelated hook. The two MUST be reset together;
+    // resetting either alone is worse than resetting neither.
+    //
+    // Each instantiation registers a clearer for itself the first time a hook of that type is
+    // registered (see the `(void)sClearerRegistered` in RegisterGameHook). The list is a
+    // function-local static so it cannot lose a registration to static-initialisation order.
+    // Each clearer returns how many registered entries it dropped, not just that it ran: "77 hook
+    // types cleared" is structural and would print identically whether the previous run left 0 hooks
+    // or 400. The entry count is the one that says whether hooks are accumulating across runs.
+    static std::vector<std::function<std::size_t()>>& HookClearers() {
+        static std::vector<std::function<std::size_t()>> clearers;
+        return clearers;
+    }
+
+    static bool RegisterHookClearer(std::function<std::size_t()> clearer) {
+        HookClearers().push_back(std::move(clearer));
+        return true;
+    }
+
+    // Called from Zelda3D_CoreRunBegin, before InitOTR rebuilds the GameInteractor instance.
+    static void ResetRunState();
+
+    // Forward-declared so RegisteredGameHooks' clearer can reach its pending-unregister lists; the
+    // definition follows immediately below.
+    template <typename H> struct HooksToUnregister;
+
     template <typename H> struct RegisteredGameHooks {
         inline static std::unordered_map<HOOK_ID, typename H::fn> functions;
         inline static std::unordered_map<int32_t, std::unordered_map<HOOK_ID, typename H::fn>> functionsForID;
@@ -228,6 +260,28 @@ class GameInteractor {
 
         // Used for the hook debugger
         inline static std::map<HOOK_ID, HookInfo> hookData;
+
+        // ODR-used from RegisterGameHook so this actually gets initialised; see HookClearers().
+        inline static const bool sClearerRegistered = GameInteractor::RegisterHookClearer([]() -> std::size_t {
+            std::size_t dropped = functions.size() + functionsForFilter.size();
+            for (const auto& [id, fns] : functionsForID) {
+                dropped += fns.size();
+            }
+            for (const auto& [ptr, fns] : functionsForPtr) {
+                dropped += fns.size();
+            }
+
+            functions.clear();
+            functionsForID.clear();
+            functionsForPtr.clear();
+            functionsForFilter.clear();
+            hookData.clear();
+            HooksToUnregister<H>::hooks.clear();
+            HooksToUnregister<H>::hooksForID.clear();
+            HooksToUnregister<H>::hooksForPtr.clear();
+            HooksToUnregister<H>::hooksForFilter.clear();
+            return dropped;
+        });
     };
 
     template <typename H> struct HooksToUnregister {
@@ -248,6 +302,12 @@ class GameInteractor {
 #else
     HOOK_ID RegisterGameHook(typename H::fn h) {
 #endif
+        // ODR-uses the flag so this hook type's clearer is registered. Done here rather than at
+        // static-init time because a template member is only instantiated when something touches it,
+        // and "the registries that were never cleared" would be exactly the hook types nothing had
+        // touched -- an invisible partial reset is worse than none.
+        (void)RegisteredGameHooks<H>::sClearerRegistered;
+
         if (this->nextHookId == 0 || this->nextHookId >= UINT32_MAX)
             this->nextHookId = 1;
         while (RegisteredGameHooks<H>::functions.find(this->nextHookId) != RegisteredGameHooks<H>::functions.end()) {

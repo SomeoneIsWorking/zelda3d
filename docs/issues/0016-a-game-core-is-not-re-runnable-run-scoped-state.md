@@ -598,3 +598,41 @@ This closes the root cause of three separate survey findings at once, which is w
 method point: two of them (`gameplaystats`, `MessageViewer`) would have been "fix the latch" patches
 at the leaf, and the third (`actorViewer`'s hooks) is a real defect that this makes far less
 reachable without fixing it.
+
+
+## The game-interactor hook registries: 178 hooks inherited per run (fixed 2026-08-12)
+
+`RegisteredGameHooks<H>`'s maps are `inline static` members of a TEMPLATE -- one set per hook type,
+process lifetime, and **no list of them anywhere**, so nothing could walk them to reset them.
+Meanwhile `nextHookId` is an instance member on a `GameInteractor` that IS rebuilt every run. So ids
+restart at 1 while the maps still hold the previous run's entries under those ids, and
+`UnregisterGameHookForID` erases an unrelated hook. The two must be reset together; resetting either
+alone is worse than resetting neither.
+
+**Measured: run 2 of `oot,oot` inherited 178 hooks across 77 registered hook types.** Now 0.
+
+Each instantiation registers a clearer for itself into a function-local static list (so no
+static-initialisation-order dependency), and `RegisterGameHook` ODR-uses the flag so a hook type that
+is used gets a clearer -- a partial reset that silently missed the types nothing had touched would be
+worse than none.
+
+The report counts ENTRIES, not types. The first version printed "cleared 77 registered hook type(s)",
+which is structural: it prints identically whether the previous run left 0 hooks or 400, and it was
+the number that mattered.
+
+### Sequencing note: this was made urgent by the GuiWindow fix above
+
+Clearing the window list per run means every `InitElement` now runs per run *by design* -- and
+`InitElement` is where windows register their hooks. So a fix that closed three findings also turned
+hook accumulation from "whatever registered outside InitElement" into "everything, every run". Two
+consequences were chased down in the same session rather than left as a surprise:
+
+- **`colViewer.cpp`** built its cylinder/sphere geometry by `reserve` + `push_back` into file-static
+  vectors with no `clear()`. A second `InitElement` doubled them; the reallocation left the
+  `gsSPVertex((uintptr_t)cylinderVtx.data(), ...)` already baked into the Gfx list pointing at freed
+  memory, and the mid-list `gsSPEndDisplayList` meant the stale half was the half that executed. The
+  sphere builder is worse if left -- it indexes `sphereVtx` by face index *while pushing to it*.
+- **The hook registries**, above.
+
+The general point: a fix that makes previously-dead code run is a change in blast radius, not just a
+repair, and the things it wakes up are the author's problem in the same session.
