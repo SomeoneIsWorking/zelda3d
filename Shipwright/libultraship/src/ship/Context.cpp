@@ -16,6 +16,7 @@
 #include "ship/window/Window.h"
 #include "ship/window/gui/Gui.h"
 #include "fast/Fast3dWindow.h"
+#include "fast/backends/gfx_sdl3gpu.h"
 #include "ship/window/gui/ConsoleWindow.h"
 #include "ship/events/EventSystem.h"
 #ifdef ENABLE_SCRIPTING
@@ -826,6 +827,11 @@ void Context::BeginRun() {
             interpreter = window->GetInterpreterWeak().lock();
         }
     }
+
+    // Cumulative shader compiles, printed per run so the DELTA is readable. A second run that
+    // recompiles the whole set is a cache that is not surviving the run boundary; a delta of ~0 says
+    // the cache works and any per-run growth inside glslang is the library's own.
+    SPDLOG_INFO("Run start: {} shader(s) compiled so far this process.", Fast::Sdl3GpuShaderCompileCount());
 
     if (interpreter != nullptr) {
         const size_t inherited = interpreter->ClearBlendedTextures();

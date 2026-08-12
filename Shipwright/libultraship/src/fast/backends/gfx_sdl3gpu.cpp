@@ -93,9 +93,17 @@ namespace {
 // once per process.
 std::once_flag gSgGlslangOnce;
 
+// Cumulative shader compiles for the life of the process. Reported once per run (see
+// Ship::Context::BeginRun), so the DELTA between runs answers a question nothing else here could:
+// whether a second run recompiles shaders or reuses the engine-lifetime cache. It exists because
+// `mm,mm` was measured leaking 5.1 MB on its second run, essentially all of it inside glslang's pool
+// allocator, and there was no way to tell a cache miss from a library that simply never frees.
+static size_t sSgShaderCompileCount = 0;
+
 bool CompileGlslToSpirv(EShLanguage stage, const std::string& src, std::vector<uint32_t>& outSpirv,
                         std::string& outLog) {
     std::call_once(gSgGlslangOnce, []() { glslang::InitializeProcess(); });
+    ++sSgShaderCompileCount;
 
     glslang::TShader shader(stage);
     const char* str = src.c_str();
@@ -580,6 +588,12 @@ struct SgUboData {
 } // namespace
 
 namespace Fast {
+
+// Defined here rather than beside the counter: that lives in this file's anonymous namespace, so a
+// definition there would have internal linkage and could not satisfy the declaration in the header.
+size_t Sdl3GpuShaderCompileCount() {
+    return sSgShaderCompileCount;
+}
 
 GfxRenderingAPISdl3Gpu* g_activeSdl3GpuApi = nullptr;
 
