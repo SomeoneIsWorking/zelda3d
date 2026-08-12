@@ -1,6 +1,6 @@
 # 0022 — `Camera_BGCheckInfo` SIGSEGVs a few seconds after warping into Kokiri Forest spawn 2
 
-status: ROOT-CAUSED AND FIXED 2026-08-12 — see "Root cause" below (verification pending a clean deep run)
+status: CLOSED 2026-08-12 — root-caused and fixed; verified by a full clean deep check (see "Verification")
 found by: `tools/zelda3d_deep_check.sh` after issue 0021 made the warp tour land where it was aimed
 severity: crashed the core and made the deep check RED; fixed 2026-08-12, deep check oot,oot now exits 0
 
@@ -211,3 +211,23 @@ core printed nothing there. "No crash" alone could not distinguish fixed from no
    which ZERO cores started: `RAN_FAIL` can only be set inside the per-core loop, so a launcher that
    dies before the loop leaves it 0 and the check is vacuously true over an empty set. It now counts
    cores that reached a scene and compares against the number requested.
+
+
+## Verification (full deep check, 2026-08-12)
+
+All three sequences, sanitizer build, 60 s dwell plus the warp tour:
+
+| sequence     | exit | ASAN reports | run.log |
+| ---          | ---  | ---          | ---     |
+| `oot,oot`    | 0    | 0            | 4.3 MB  |
+| `mm,mm`      | 0    | 0            | 21 MB   |
+| `mm,oot,mm`  | 0    | 0            | 25 MB   |
+
+`DEEP VERDICT (exit 0)`.
+
+The evidence is the POSITIVE line, not the missing crash. `[camera] register table initialised for
+this run` appears **2** times in `oot,oot`, **1** in `mm,oot,mm`, **0** in `mm,mm` — i.e. exactly once
+per **OoT** core and never for MM, which is correct because MM does not go through OoT's
+`Camera_Init`. That the count tracks OoT cores rather than runs is a check on the instrument itself:
+a latch that fired once per process, or once per run regardless of game, would have produced
+different numbers here.
