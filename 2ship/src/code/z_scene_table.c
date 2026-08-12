@@ -2690,8 +2690,44 @@ SceneEntranceTableEntry sSceneEntranceTable[] = {
 /**
  * Returns a pointer to an entrance table from a given entrance index.
  */
+s32 Entrance_IsValid(u16 entrance) {
+    u32 sceneIdx = (u32)entrance >> 9;
+    u32 subIdx = ((u32)entrance >> 4) & 0x1F;
+
+    if (sceneIdx >= ARRAY_COUNT(sSceneEntranceTable)) {
+        return false;
+    }
+    // A SCENE_ENTRANCE_NONE() slot is { 0, NULL, NULL } -- 22 of the 110 scene slots are unset.
+    if (sSceneEntranceTable[sceneIdx].table == NULL) {
+        return false;
+    }
+    if (subIdx >= sSceneEntranceTable[sceneIdx].tableCount) {
+        return false;
+    }
+    return sSceneEntranceTable[sceneIdx].table[subIdx] != NULL;
+}
+
+/**
+ * Returns a pointer to an entrance table from a given entrance index, or NULL when the index does
+ * not name a real entrance.
+ *
+ * The unchecked original is fine on a console running retail data: the game only ever passes an
+ * entrance it built itself. It is NOT fine here. `warp 0x1000` from the REPL sent this straight
+ * through `Play_UpdateTransition` -> `Entrance_GetTransitionFlags`, and scene slot 8 is
+ * SCENE_ENTRANCE_NONE() -- a NULL table -- so it dereferenced NULL and took the process down
+ * (found by the 2026-08-12 MM skinned sweep). Three separate ways to leave the data exist and all
+ * three are checked: the scene index can exceed the table (entrance >> 9 reaches 127, the table has
+ * 110 entries), the scene's table pointer can be NULL, and the sub-index can exceed that scene's
+ * own tableCount -- a field the header calls "unused" but which SCENE_ENTRANCE() has always
+ * populated with ARRAY_COUNT.
+ */
 EntranceTableEntry* Entrance_GetTableEntry(u16 entrance) {
     u32 entranceIndex = entrance;
+
+    if (!Entrance_IsValid(entrance)) {
+        return NULL;
+    }
+
     EntranceTableEntry** tableEntryP = sSceneEntranceTable[entranceIndex >> 9].table;
     EntranceTableEntry* tableEntry = tableEntryP[(entranceIndex >> 4) & 0x1F];
 
@@ -2704,7 +2740,10 @@ EntranceTableEntry* Entrance_GetTableEntry(u16 entrance) {
 s32 Entrance_GetSceneId(u16 entrance) {
     EntranceTableEntry* tableEntry = Entrance_GetTableEntry(entrance);
 
-    return tableEntry->sceneId;
+    // SCENE_MAX, not -1: the entrance table legitimately CONTAINS negative scene ids (that is why
+    // Entrance_GetSceneIdAbsolute exists), so a negative sentinel would be indistinguishable from
+    // real data. SCENE_MAX is outside the valid range and matches no scene comparison.
+    return (tableEntry != NULL) ? tableEntry->sceneId : SCENE_MAX;
 }
 
 /**
@@ -2713,7 +2752,7 @@ s32 Entrance_GetSceneId(u16 entrance) {
 s32 Entrance_GetSceneIdAbsolute(u16 entrance) {
     EntranceTableEntry* tableEntry = Entrance_GetTableEntry(entrance);
 
-    return ABS_ALT(tableEntry->sceneId);
+    return (tableEntry != NULL) ? ABS_ALT(tableEntry->sceneId) : SCENE_MAX;
 }
 
 /**
@@ -2722,7 +2761,7 @@ s32 Entrance_GetSceneIdAbsolute(u16 entrance) {
 s32 Entrance_GetSpawnNum(u16 entrance) {
     EntranceTableEntry* tableEntry = Entrance_GetTableEntry(entrance);
 
-    return tableEntry->spawnNum;
+    return (tableEntry != NULL) ? tableEntry->spawnNum : 0;
 }
 
 /**
@@ -2731,5 +2770,5 @@ s32 Entrance_GetSpawnNum(u16 entrance) {
 s32 Entrance_GetTransitionFlags(u16 entrance) {
     EntranceTableEntry* tableEntry = Entrance_GetTableEntry(entrance);
 
-    return tableEntry->flags;
+    return (tableEntry != NULL) ? tableEntry->flags : 0;
 }

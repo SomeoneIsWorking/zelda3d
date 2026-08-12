@@ -995,6 +995,8 @@ void Scene_SetCullFlag(struct PlayState* play, s32 index, u32 flags);
 void Scene_DrawConfig5(struct PlayState* play);
 void Scene_DrawConfigMatAnimManualStep(struct PlayState* play);
 void Scene_DrawConfigGreatBayTemple(struct PlayState* play);
+s32 Entrance_IsValid(u16 entrance);
+// Returns NULL when `entrance` does not name a real entrance -- callers must check.
 EntranceTableEntry* Entrance_GetTableEntry(u16 entrance);
 s32 Entrance_GetSceneId(u16 entrance);
 s32 Entrance_GetSceneIdAbsolute(u16 entrance);
