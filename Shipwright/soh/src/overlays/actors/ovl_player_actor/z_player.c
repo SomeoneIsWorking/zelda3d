@@ -14185,7 +14185,25 @@ void Player_Action_8084CC98(Player* this, PlayState* play) {
             Player_ProcessAnimSfxList(this, D_808549A4);
         }
     } else {
-        this->skelAnime.curFrame = rideActor->curFrame;
+        // Link's riding pose is frame-locked to the HORSE's animation playhead, and the horse's
+        // animation can be longer than Link's. Two lines above, `this->skelAnime.animation` is
+        // assigned directly from D_80854944 rather than through LinkAnimation_Change, so nothing
+        // ever tells this skelAnime how long its new animation is -- and the frame index is then
+        // taken from a different actor entirely.
+        //
+        // Unclamped that is an out-of-bounds read, and a measured one: the title demo asks for frame
+        // 28 of gPlayerAnim_link_uma_anim_fastrun, whose header says 24 frames and whose data is
+        // exactly 24 frames (3,216 bytes at 134 per frame). AnimationContext_SetLoadFrame then
+        // memcpy's 134 bytes from 670 past the end of the buffer. On N64 the animation data was one
+        // contiguous segment, so overrunning it quietly read the neighbouring animation and nobody
+        // noticed; here each animation is its own heap allocation and ASAN reports a
+        // heap-buffer-overflow.
+        //
+        // Clamping to Link's own last frame is the bound that was missing, not a workaround for a
+        // symptom: reading frame N of an animation that has fewer than N frames has no correct
+        // result. The visible effect is that Link's pose holds on its final frame for the few frames
+        // the horse's animation runs longer, which is what the data can actually express.
+        this->skelAnime.curFrame = CLAMP_MAX(rideActor->curFrame, Animation_GetLastFrame(this->skelAnime.animation));
         LinkAnimation_AnimateFrame(play, &this->skelAnime);
     }
 
