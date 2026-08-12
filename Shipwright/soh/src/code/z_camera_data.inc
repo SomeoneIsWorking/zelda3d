@@ -2220,7 +2220,6 @@ s32 (*sCameraFunctions[])(Camera*) = {
     Camera_Special9,
 };
 
-s32 sInitRegs = 1;
 
 s32 gDbgCamEnabled = 0;
 s32 sDbgModeIdx = -1;

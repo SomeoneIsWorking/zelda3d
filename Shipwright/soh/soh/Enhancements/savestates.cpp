@@ -64,7 +64,10 @@ typedef struct SaveStateInfo {
     // Static Data
 
     // Camera data
-    int32_t sInitRegs_copy;
+    // (no sInitRegs_copy: the camera register table is initialised once per RUN via a
+    //  Zelda3DOnce latch in Camera_Init, not once per process behind a saveable flag. There is
+    //  nothing left for a savestate to carry -- by the time one can be taken the table is filled,
+    //  and a re-fill on the next Camera_Init would be identical anyway.)
     int32_t gDbgCamEnabled_copy;
     int32_t sDbgModeIdx_copy;
     int16_t sNextUID_copy;
@@ -417,7 +420,6 @@ void SaveState::LoadSeqScriptState(void) {
 }
 
 void SaveState::BackupCameraData(void) {
-    info->sInitRegs_copy = sInitRegs;
     info->gDbgCamEnabled_copy = gDbgCamEnabled;
     info->sNextUID_copy = sNextUID;
     info->sCameraInterfaceFlags_copy = sCameraInterfaceFlags;
@@ -444,7 +446,6 @@ void SaveState::BackupCameraData(void) {
 }
 
 void SaveState::LoadCameraData(void) {
-    sInitRegs = info->sInitRegs_copy;
     gDbgCamEnabled = info->gDbgCamEnabled_copy;
     sDbgModeIdx = info->sDbgModeIdx_copy;
     sNextUID = info->sNextUID_copy;

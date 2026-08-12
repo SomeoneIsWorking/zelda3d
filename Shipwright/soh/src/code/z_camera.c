@@ -1,6 +1,7 @@
 #include <libultraship/libultra.h>
 #include "global.h"
 #include "vt.h"
+#include "zelda3d/zelda3d.h" // Zelda3D_Once -- the camera register table is run-scoped
 
 #include <string.h>
 
@@ -7080,6 +7081,12 @@ void Camera_Destroy(Camera* camera) {
     }
 }
 
+// See the comment at its use below: the camera register table is run-scoped state, and the N64
+// `sInitRegs` static that used to gate it is process-scoped. Deleted rather than left in place,
+// because a dead flag next to a live latch is exactly what makes the next reader gate on the wrong
+// one.
+static Zelda3DOnce sCameraRegsInit;
+
 void Camera_Init(Camera* camera, View* view, CollisionContext* colCtx, PlayState* play) {
     Camera* camP;
     s32 i;
@@ -7088,7 +7095,17 @@ void Camera_Init(Camera* camera, View* view, CollisionContext* colCtx, PlayState
 
     Zelda3D_ApplyOoT3DCameraValues(); // SoH3D: one-time OoT3D camera-data overwrite (see above)
     memset(camera, 0, sizeof(*camera));
-    if (sInitRegs) {
+    // Run-scoped, NOT process-scoped. The N64 original gates this on a plain `sInitRegs` static,
+    // which is correct on a console that runs one game per boot -- but the registers it fills live
+    // in `gGameInfo->data[]`, which func_800636C0 mallocs fresh AND explicitly zeroes on every run.
+    // So on a second core run in one process the static was already false, the fill was skipped,
+    // and the whole OREG/R_CAM_DATA table stayed zero. That is not a cosmetic default: OREG(6) is
+    // the camera's rUpdateRateInv seed and target, and Camera_ClampDist ends in
+    // `Camera_LERPCeilF(distTarget, camera->dist, 1.0f / camera->rUpdateRateInv, 0.0f)` -- so a zero
+    // register makes the step scale +inf, camera->dist -inf, and eyeNext non-finite. Camera_BGCheckInfo
+    // then raycasts from an infinite point, gets no floor poly back, and dereferences NULL.
+    // That was the intermittent `oot,oot` SIGSEGV in docs/issues/0022.
+    if (Zelda3D_Once(&sCameraRegsInit)) {
         for (i = 0; i < sOREGInitCnt; i++) {
             OREG(i) = sOREGInit[i];
         }
@@ -7098,8 +7115,12 @@ void Camera_Init(Camera* camera, View* view, CollisionContext* colCtx, PlayState
         }
 
         DbCamera_Reset(camera, &D_8015BD80);
-        sInitRegs = false;
         PREG(88) = -1;
+        // One line per RUN, and it is the positive evidence for the fix above: before it, a second
+        // core run never reached here, so OREG stayed zero. A silent absence of the crash would not
+        // have distinguished "fixed" from "did not get that far this time" -- this does.
+        LUSLOG_INFO("[camera] register table initialised for this run: OREG(6)=%d (0 would make "
+                    "Camera_ClampDist divide by zero)", OREG(6));
     }
     camera->play = D_8015BD7C = play;
     DbCamera_Init(&D_8015BD80, camera);

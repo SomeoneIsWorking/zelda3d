@@ -5,7 +5,6 @@ extern "C" s16 sWarpTimerTarget;
 extern "C" MapMarkData** sLoadedMarkDataTable;
 
 //Camera static data
-extern "C" int32_t sInitRegs;
 extern "C" int32_t gDbgCamEnabled;
 extern "C" int32_t sDbgModeIdx;
 extern "C" int16_t sNextUID;
