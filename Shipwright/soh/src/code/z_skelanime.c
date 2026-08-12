@@ -1017,6 +1017,11 @@ void AnimationContext_SetLoadFrame(PlayState* play, LinkAnimationHeader* animati
 
     if (GameInteractor_Should(VB_LOAD_PLAYER_ANIMATION_FRAME, entry != NULL, entry, animation, frame, limbCount,
                               frameTable)) {
+        // Captured BEFORE resolution, because resolution is what destroys the evidence: once the
+        // path string has been swapped for the resource it points at, nothing on the stack says
+        // which animation this was. The out-of-bounds report below is the only consumer.
+        const char* animPath = (ResourceMgr_OTRSigCheck(animation) != 0) ? (const char*)animation : NULL;
+
         if (ResourceMgr_OTRSigCheck(animation) != 0)
             animation = ResourceMgr_LoadAnimByName(animation);
 
@@ -1047,9 +1052,10 @@ void AnimationContext_SetLoadFrame(PlayState* play, LinkAnimationHeader* animati
                     // that happens once are different bugs, which is what the total distinguishes.
                     fprintf(stderr,
                             "ZELDA3D ANIM: frame %d requested from an animation whose header says %d frame(s)"
-                            " -- header %p, data %p, limbCount %d. Reading %d bytes past what this table can"
-                            " hold. (%d occurrence(s) so far; first 8 printed.)\n",
-                            (int)frame, (int)frameCount, (void*)animation, (void*)animData, (int)limbCount,
+                            " -- path \"%s\", header %p, data %p, limbCount %d. Reading %d bytes past what this"
+                            " table can hold. (%d occurrence(s) so far; first 8 printed.)\n",
+                            (int)frame, (int)frameCount, animPath != NULL ? animPath : "(not a path -- direct pointer)",
+                            (void*)animation, (void*)animData, (int)limbCount,
                             (int)((sizeof(Vec3s) * limbCount + 2) * (frame - frameCount + 1)), sTotal);
                     fflush(stderr);
                 }

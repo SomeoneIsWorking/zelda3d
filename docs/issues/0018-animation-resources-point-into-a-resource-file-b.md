@@ -243,3 +243,35 @@ confident wrong readings (file lifetime, then the factory branch), both killed b
 fired, the path, and the resolved resource's `GetInitData()->Type`, then diff `oot` against
 `mm,oot,mm` -- the same comparative shape that eliminated the factory. The negative control already
 exists: `oot` alone is ASAN-clean.
+
+
+## CORRECTION 2026-08-12: it is not a launcher bug at all
+
+Everything above that treats "MM having run first" as the variable is **wrong**, and the error is
+instructive: the gate was quitting before the demo reached the animation.
+
+`tools/zelda3d_sequence.sh` quit each core as soon as it answered `posinfo` with a scene. `oot` alone
+therefore ran a few seconds of the title demo and loaded **3** player animations; the longer
+`mm,oot,mm` run happened to reach a fourth. Adding a dwell (`ZELDA3D_SEQ_DWELL=60`, committed)
+reproduces the identical over-read in **`oot` ALONE**:
+
+```
+ZELDA3D ANIM: frame 28 requested from an animation whose header says 24 frame(s)
+  -- path "__OTR__objects/gameplay_keep/gPlayerAnim_link_uma_anim_fastrun", limbCount 22.
+     Reading 670 bytes past what this table can hold.
+```
+
+So: a plain OoT gameplay bug, in the title demo's horse-riding segment, reachable in a single run
+with no launcher involved. Every "requires MM first" discriminator recorded above measured **how long
+the gate let the run last**, not what the run did. `oot,oot` showing 0 occurrences said the same
+thing.
+
+The remaining question is unchanged and is now much better posed: `gPlayerAnim_link_uma_anim_fastrun`
+has a 24-frame header and exactly 24 frames of data (3,216 bytes at 134 bytes/frame -- internally
+consistent), and the player asks for frame 28. That is a PLAYBACK overrun -- `curFrame` past the end
+-- not an asset or resource-resolution problem, so both of this issue's earlier titles are wrong.
+`Player_Action_8084CC98` (`z_player.c:14189`) is the horse-riding action that requests it.
+
+**The gate lesson is the durable part**: an acceptance gate that stops at the first playable frame
+reports "clean" for everything that happens afterwards, and three separate conclusions in this issue
+were built on exactly that silence.
