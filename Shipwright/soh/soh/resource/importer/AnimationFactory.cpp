@@ -2,6 +2,7 @@
 #include "soh/resource/type/Animation.h"
 #include <ship/resource/ResourceManager.h>
 #include "spdlog/spdlog.h"
+#include "soh/resource/type/PlayerAnimation.h"
 #include <ship/Context.h>
 
 namespace SOH {
@@ -86,8 +87,40 @@ ResourceFactoryBinaryAnimationV0::ReadResource(std::shared_ptr<Ship::File> file,
 
         // Read the segment pointer (always 32 bit, doesn't adjust for system pointer size)
         std::string path = reader->ReadString();
-        auto animData = std::static_pointer_cast<Animation>(
-            Ship::Context::GetRawInstance()->GetResourceManager()->LoadResourceProcess(path.c_str()));
+        // CHECKED cast. This was `static_pointer_cast<Animation>`, which asserts a type rather than
+        // testing one: if that path resolves to any other resource (PlayerAnimation is the obvious
+        // candidate -- a different class, in the same subsystem, for the same kind of data), the
+        // object is silently reinterpreted with Animation's layout and `GetPointer()` hands back an
+        // address computed from the wrong offsets. Nothing downstream can tell.
+        //
+        // Wanted while chasing issue 0018 (ASAN: heap-use-after-free reading animation frame data
+        // out of a freed resource FILE buffer). It does not yet explain that read -- `GetPointer()`
+        // returns `&animationData`, inside the resource, which the strong resource cache keeps alive
+        // -- so this is not being claimed as the fix. It closes the one way this line could produce a
+        // pointer nobody could account for, and if the type IS wrong the next run says so by name
+        // instead of computing a bad address in silence.
+        auto animResource = Ship::Context::GetRawInstance()->GetResourceManager()->LoadResourceProcess(path.c_str());
+        auto animData = std::dynamic_pointer_cast<Animation>(animResource);
+
+        // A Link animation's frame data is a PlayerAnimation resource, not an Animation one --
+        // `misc/link_animetion/gPlayerAnimData_*`, the same resources ResourceMgr_LoadPlayerAnimByName
+        // loads. This line used to `static_pointer_cast<Animation>` the result, which asserts a type
+        // rather than testing one: the PlayerAnimation object was reinterpreted with Animation's
+        // layout, and `GetPointer()` returned `&animationData` computed from the wrong offsets --
+        // an address the object does not own. Nothing downstream could tell, and
+        // AnimationContext_SetLoadFrame then memcpy'd frame data out of it every time the animation
+        // played. Measured on one ordinary OoT run: THREE animations per run.
+        //
+        // Handled rather than merely refused, because refusing would leave those three unanimated.
+        std::shared_ptr<PlayerAnimation> playerAnimData;
+        if (animData == nullptr) {
+            playerAnimData = std::dynamic_pointer_cast<PlayerAnimation>(animResource);
+        }
+        if (animResource != nullptr && animData == nullptr && playerAnimData == nullptr) {
+            SPDLOG_ERROR("Link animation data at \"{}\" is neither an Animation nor a PlayerAnimation"
+                         " resource -- refusing to reinterpret it, so its segment stays null.",
+                         path);
+        }
 
         // If direct load failed and alt assets are enabled, try with alt/ prefix
         if (animData == nullptr && Ship::Context::GetRawInstance()->GetResourceManager()->IsAltAssetsEnabled()) {
@@ -96,12 +129,17 @@ ResourceFactoryBinaryAnimationV0::ReadResource(std::shared_ptr<Ship::File> file,
                 altPath = altPath.substr(7); // Strip __OTR__
             }
             altPath = "alt/" + altPath;
-            animData = std::static_pointer_cast<Animation>(
+            animData = std::dynamic_pointer_cast<Animation>(
                 Ship::Context::GetRawInstance()->GetResourceManager()->LoadResourceProcess(altPath.c_str()));
         }
 
         if (animData != nullptr) {
             animation->animationData.linkAnimationHeader.segment = animData->GetPointer();
+        } else if (playerAnimData != nullptr && !playerAnimData->limbRotData.empty()) {
+            // The resource is cached with a STRONG shared_ptr for as long as the ResourceManager
+            // lives, so a pointer into its vector is valid for the whole game session -- the same
+            // guarantee ResourceMgr_LoadPlayerAnimByName already relies on.
+            animation->animationData.linkAnimationHeader.segment = playerAnimData->limbRotData.data();
         } else {
             SPDLOG_WARN("Animation data segment not found: {}", path);
         }

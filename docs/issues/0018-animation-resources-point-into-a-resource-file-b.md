@@ -1,7 +1,7 @@
 ---
 id: 18
 title: Animation resources point into a resource File buffer the ResourceManager frees when the load returns
-status: open
+status: fixed
 symptom: ASAN reports a heap-use-after-free READ of 134 bytes in AnimationContext_SetLoadFrame during ordinary OoT gameplay: the animation's linkAnimationHeader.segment points into a Ship::File buffer that LoadResourceProcess destroyed when the nested load in AnimationFactory returned. Silent off the sanitizer.
 tags: asan,resources,lifetime,animation,launcher
 created: 2026-08-12
@@ -88,3 +88,54 @@ ASAN_OPTIONS="detect_odr_violation=0:log_path=$PWD/scratch/logs/asan/asan:detect
 ZELDA3D_LAUNCHER_BIN=$PWD/scratch/build-asan/zelda3d/zelda3d ZELDA3D_SEQ_BOOT_WAIT=900 \
     tools/zelda3d_sequence.sh mm,oot,mm
 ```
+
+
+## FIXED 2026-08-12 -- an unchecked cast, not a file-lifetime bug
+
+The title of this issue is wrong and is kept for searchability. Nothing was pointing into a `File`
+buffer. The line ASAN named was reinterpreting one resource class as another:
+
+```cpp
+auto animData = std::static_pointer_cast<Animation>(...LoadResourceProcess(path));  // ASSERTS a type
+...
+animation->animationData.linkAnimationHeader.segment = animData->GetPointer();
+```
+
+A Link animation's frame data is a **`PlayerAnimation`** resource -- `misc/link_animetion/
+gPlayerAnimData_*`, the same resources `ResourceMgr_LoadPlayerAnimByName` loads -- and
+`static_pointer_cast` does not test anything. The `PlayerAnimation` object was reinterpreted with
+`Animation`'s layout, so `Animation::GetPointer()` returned `&animationData` computed from the wrong
+offsets: an address inside or past an object that does not own it. `AnimationContext_SetLoadFrame`
+then `memcpy`'d 134 bytes out of it every time one of those animations played, which is why the read
+landed in an unrelated freed heap block and looked like a file-lifetime bug.
+
+**Measured, not assumed:** replacing the cast with a checked `dynamic_pointer_cast` and logging the
+failure reported **3 mismatches on one ordinary OoT run**, naming the three paths. Loading them as
+`PlayerAnimation` and taking `limbRotData.data()` gives 0 mismatches and 0 "segment not found" --
+i.e. all three now get real frame data, where before they got a bogus pointer. That is a rendering
+fix as much as a memory-safety one: those three animations were reading garbage every run, silently.
+
+Handling the type rather than merely refusing it matters -- refusing would have left them
+unanimated, trading a silent corruption for a silent omission.
+
+**Evidence:** the ASAN run that produced this issue's report now reaches gameplay with the
+`AnimationContext_SetLoadFrame` use-after-free GONE. `oot`, `oot,oot`, `mm,oot` and the switch test
+all exit 0.
+
+### The two things this did NOT settle
+
+1. **The `mm,oot,mm` crash is still there** (issue 0016) -- MM core 3, `SkelAnime_DrawFlexLod`. As
+   warned above, one fix did not close both.
+2. **ASAN now reports a DIFFERENT use-after-free**, previously masked because the run died here
+   first: `InputViewerSettingsWindow::~InputViewerSettingsWindow` (`InputViewer.cpp:462`) logging
+   through a freed spdlog logger, from `__run_exit_handlers`. That is
+   [issue 0017](0017-context-destructor-logs-through-a-freed-spdlog-r.md)'s class exactly -- 0017's
+   fix gave the EARLY logger an owner that never releases it, and this is a different logger, still
+   registry-owned and freed before static destructors run. Recorded there.
+
+### Still worth doing
+
+`static_pointer_cast` on a `LoadResourceProcess` result is the general hazard, not this one line.
+The same shape appears elsewhere in the resource helpers (e.g.
+`ResourceMgr_LoadPlayerAnimByName` itself), and each is a silent reinterpret if the asset type ever
+differs from the assumption. A sweep is worth more than this point fix.
