@@ -54,8 +54,53 @@ same ASAN options. So the trigger is not simply "reach Kokiri Forest spawn 2 and
 needs something later in the tour (the `warp 0x109` step, or the dwell), or it is timing-dependent.
 Anyone chasing this should NOT conclude from a single clean run that it is fixed.
 
-## Next step
+## It fired again, and this time the report survived (2026-08-12)
 
-Run the full `tools/zelda3d_deep_check.sh` and let it fire on its own; the sanitizer report will now
-survive. Then read `Camera_BGCheckInfo` for what it dereferences that can be NULL --  `RAX = 0`
-suggests a null collision/bgcheck pointer rather than a wild one.
+The next full `tools/zelda3d_deep_check.sh` run reproduced it, and because the crash handler now
+stands aside on a sanitizer build, AddressSanitizer produced the report the previous occurrence could
+not. That closes the design claim above: the change works, observed rather than argued.
+
+    AddressSanitizer: SEGV on unknown address 0x000000000008 ... READ
+    Hint: address points to the zero page.
+      #0 Camera_BGCheckInfo   z_camera.c:312:54
+      #1 func_80045508        z_camera.c:889:17
+      #2 func_80046E20        z_camera.c:1388:15
+      #3 Camera_Normal1       z_camera.c:1813:9
+      #4 Camera_Update        z_camera.c:7667:9
+
+Copy kept at `scratch/logs/issue0022_report/asan.890427`.
+
+**Address 8 is `to->poly->normal.x` with `to->poly == NULL`** — line 312 is the first of three
+`COLPOLY_GET_NORMAL(to->poly->normal.*)` reads.
+
+## The mechanism, as far as the code shows
+
+`Camera_BGCheckInfo` reaches line 312 by one of two routes, and only one of them can leave `poly`
+null:
+
+1. `BgCheck_CameraLineTest1` returned true — it set `to->poly` to the poly it hit. Not null.
+2. It returned false, and the block above ran: `BgCheck_CameraRaycastFloor2` fills `floorPoly`, and
+   `to->poly = floorPoly` at line 307.
+
+Route 2 is guarded. `BgCheck_RaycastFloorImpl` sets `*outPoly = NULL` and returns `BGCHECK_Y_MIN`
+(-32000) when it finds no floor, and line 298 then takes `(to->pos.y - floorPolyY) > 5.0f` and
+returns 0 before ever dereferencing. So for a NULL to reach line 312, **that comparison has to be
+false while `floorPoly` is NULL** — which needs `to->pos.y` to be either ≤ about -31995, or **NaN**.
+
+NaN is the strong candidate, because a NaN makes every `>` comparison false: the guard does not just
+fail to fire, it fails *open*. `to->pos` comes from camera math a few frames after a scene load
+(`OLib_Vec3fDiffToVecSphGeo` / `Camera_Vec3fVecSphGeoAdd`), and a degenerate input — camera eye and
+target at the same point, which is exactly the state a freshly-loaded scene can present for a frame —
+is the usual way a normalize produces one.
+
+**This is not yet measured.** The next step is to instrument line 298: when `floorPoly == NULL` and
+the guard does *not* return, log `to->pos` and `floorPolyY`. That distinguishes NaN from a genuine
+-32000 in one run, and it is the difference between fixing the camera math and fixing the guard.
+
+Note this is authentic decomp code — N64 would deref the same NULL. So whatever produces the bad
+`to->pos` is the bug, and a null check at 312 would be papering over it. Find the NaN first.
+
+## Still intermittent
+
+Two targeted repros (above) did not trigger it; the full deep check did, twice out of two attempts
+that got that far. Whatever the trigger is, it is not "reach Kokiri Forest spawn 2 and wait".
