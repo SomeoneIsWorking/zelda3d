@@ -63,6 +63,7 @@ fail=0
 for seq in $SEQS; do
     d="$OUT/$(echo "$seq" | tr ',' '_')"; mkdir -p "$d"
     echo "DEEP: === $seq (dwell ${DWELL}s per core) ==="
+    ZELDA3D_SEQ_LOGDIR="$d/seq" \
     ZELDA3D_LAUNCHER_BIN="$ASAN_BIN" \
     ZELDA3D_SEQ_BOOT_WAIT="${ZELDA3D_SEQ_BOOT_WAIT:-900}" \
     ZELDA3D_SEQ_SCENE_WAIT="${ZELDA3D_SEQ_SCENE_WAIT:-400}" \
@@ -78,6 +79,16 @@ for seq in $SEQS; do
     rc=$?
     SEQ_CHILD=""
     reports=$(ls "$d" 2>/dev/null | grep -c '^asan\.' || true)
+    # The game-side log lives with its sequence, not at a shared path the next run deletes. Report
+    # its size: an empty or missing run.log means the diagnostics for anything below are ABSENT,
+    # not that nothing was diagnosed.
+    rl="$d/seq/run.log"
+    if [ -s "$rl" ]; then
+        echo "DEEP:   run.log $(wc -c < "$rl") bytes at $rl"
+        grep -aoE "\[[0-9]{4}\] .{0,160}" "$rl" 2>/dev/null | sort -u | head -20 | sed 's/^/DEEP:   /'
+    else
+        echo "DEEP:   NO run.log at $rl -- every game-side diagnostic for this sequence is MISSING."
+    fi
     grep -E "RETURNED|NEVER REACHED|cmd " "$d/seq.out" | sed 's/^/DEEP:   /'
     echo "DEEP:   sequence exit $rc, ASAN reports: $reports  (log: $d/seq.out)"
     [ "$rc" -ne 0 ] && fail=1
@@ -92,8 +103,8 @@ if [ "$fail" -eq 0 ]; then
     echo "    LSAN only reports UNREACHABLE memory and this project's leaks stay reachable from their"
     echo "    X::Instance globals (validated both ways, docs/info/instruments/035)."
     echo "    Each core is also driven through a warp TOUR (echoed above): two Kokiri Forest spawns and"
-    echo "    Zora'"'"'s River for OoT, Termina Field and Great Bay Coast for MM. Scene load/teardown is where"
-    echo "    this project'"'"'s bugs have been, and dwell alone never left the spawn point."
+    echo "    Zora's River for OoT, Termina Field and Great Bay Coast for MM. Scene load/teardown is where"
+    echo "    this project's bugs have been, and dwell alone never left the spawn point."
     echo "    A randomizer seed IS generated per core now (REPL randogen, echoed above with its hash), so"
     echo "    the rando ownership paths are exercised -- but only through a COMPLETED generation, because"
     echo "    the command blocks. For the IN-FLIGHT case (a generation still running as the game ends,"

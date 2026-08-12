@@ -1,6 +1,6 @@
 # 0022 — `Camera_BGCheckInfo` SIGSEGVs a few seconds after warping into Kokiri Forest spawn 2
 
-status: OPEN — found 2026-08-12, not yet diagnosed
+status: ROOT-CAUSED AND FIXED 2026-08-12 — see "Root cause" below (verification pending a clean deep run)
 found by: `tools/zelda3d_deep_check.sh` after issue 0021 made the warp tour land where it was aimed
 severity: crashes the core; currently makes the deep check RED
 
@@ -139,3 +139,75 @@ it with the deep check, not with a hand-built sequence.
 
 Two targeted repros (above) did not trigger it; the full deep check did, twice out of two attempts
 that got that far. Whatever the trigger is, it is not "reach Kokiri Forest spawn 2 and wait".
+
+
+## Root cause — the camera register table is run-scoped state behind a process-scoped flag
+
+`OREG(r)` is not a static array. It expands to `gGameInfo->data[2 * REG_PER_GROUP + r]`, and
+`func_800636C0` (z_debug.c) mallocs a fresh `gGameInfo` **and explicitly zeroes every entry of
+`data[]`** on each run. The table that fills it lives in `Camera_Init`:
+
+    if (sInitRegs) {                       // z_camera_data.inc: s32 sInitRegs = 1;
+        for (i = 0; i < sOREGInitCnt; i++) OREG(i) = sOREGInit[i];
+        for (i = 0; i < sCamDataRegsInitCount; i++) R_CAM_DATA(i) = sCamDataRegsInit[i];
+        ...
+        sInitRegs = false;
+    }
+
+`sInitRegs` is a plain static, which on a console is correct — one game per boot, so once-per-process
+and once-per-run are the same thing. In this launcher they are not. On the SECOND core run the static
+is already `false`, the fill is skipped, and the freshly-zeroed register table stays zero.
+
+That is not a cosmetic default. `OREG(6)` is the seed AND the LERP target for `camera->rUpdateRateInv`,
+and both `Camera_ClampDist` and its sibling end with:
+
+    return Camera_LERPCeilF(distTarget, camera->dist, 1.0f / camera->rUpdateRateInv, 0.0f);
+
+With the register at 0, `rUpdateRateInv` LERPs to 0 (`|diff| < minDiff`, so it returns the target
+unchanged), the step scale becomes `1.0f / 0.0f` = +inf, and `camera->dist` goes infinite. From there:
+`eyeAdjustment.r = camera->dist` -> `Camera_Vec3fVecSphGeoAdd` writes a non-finite `eyeNext` ->
+`Camera_BGCheckInfo` raycasts from an infinite point -> `BgCheck_CameraLineTest1` finds no floor ->
+the NULL `floorPoly` is dereferenced at z_camera.c:343.
+
+Every measured value falls out of this and none had to be assumed:
+
+    [0022] Camera_Normal1 wrote a NON-FINITE eyeNext (1): eyeNext=(inf,-inf,-inf)
+           at=(3944.399414,-35.141968,-1119.740845) eyeAdjustment=(r=-inf pitch=5640 yaw=-3278)
+           camera->dist=-inf distMin=136.000000 distMax=204.000000 atEyeNextGeo.r=627.684753
+           yawUpdateRateInv=0.000000 scene=85
+
+`at` finite and `atEyeNextGeo.r` finite rule out an inherited-from-an-earlier-frame infinity;
+`camera->dist=-inf` names the carrier; and `yawUpdateRateInv=0.000000` is the same disease in a
+neighbouring field (it LERPs toward its own now-zero OREG), which is what turned "dist is wrong" into
+"the whole register table is zero".
+
+This also explains the intermittency that four targeted single-core repros failed to reproduce: a
+single run always initialises the table, so the bug is **structurally impossible on run 1** and only
+appears from run 2 onward.
+
+## Fix
+
+`Camera_Init` now gates the fill on a run-epoch latch instead:
+
+    static Zelda3DOnce sCameraRegsInit;
+    ...
+    if (Zelda3D_Once(&sCameraRegsInit)) { ...fill OREG / R_CAM_DATA, DbCamera_Reset, PREG(88) = -1... }
+
+`sInitRegs` is DELETED rather than left beside the latch — including its `extern` and its
+save/restore in `savestates.cpp`, where the field no longer tracks anything (by the time a savestate
+can be taken the table is filled, and a re-fill on the next `Camera_Init` is identical).
+
+Verification is a POSITIVE line, not the absence of a crash: the latch logs
+`[camera] register table initialised for this run: OREG(6)=<n>` once per run. Before the fix a second
+core printed nothing there. "No crash" alone could not distinguish fixed from not-run-that-long.
+
+## Tooling defects this exposed
+
+1. `zelda3d_sequence.sh` wrote its game log to a FIXED path and `rm -f`'d it at startup, so the log
+   holding the probe output for a captured crash was destroyed by the next run. The ASAN report was
+   preserved per-sequence; the log that explained it was not. Now `ZELDA3D_SEQ_LOGDIR`, set
+   per-sequence by the deep check, which also prints the log's size (or says the log is MISSING).
+2. The sequence verdict reported "yes -- every core answered posinfo with a real scene" for a run in
+   which ZERO cores started: `RAN_FAIL` can only be set inside the per-core loop, so a launcher that
+   dies before the loop leaves it 0 and the check is vacuously true over an empty set. It now counts
+   cores that reached a scene and compares against the number requested.

@@ -43,7 +43,11 @@ SCENEWAIT="${ZELDA3D_SEQ_SCENE_WAIT:-60}"
 # where AddressSanitizer's at-exit leak scan runs AFTER main returns. Killing during that scan loses
 # the leak report entirely and looks identical to "there were no leaks".
 EXITWAIT="${ZELDA3D_SEQ_EXIT_WAIT:-30}"
-LOGDIR="$REPO/scratch/logs/sequence"
+# Overridable so a caller running several sequences can keep each one's log. It is a FIXED path by
+# default, and `rm -f "$LOG"` below means the next run destroys the previous one's -- which lost the
+# game-side diagnostics for a captured crash (docs/issues/0022): the ASAN report was preserved
+# per-sequence but the log holding the probe output that would have explained it was already gone.
+LOGDIR="${ZELDA3D_SEQ_LOGDIR:-$REPO/scratch/logs/sequence}"
 LOG="$LOGDIR/run.log"
 # Each core reads its own REPL path from its own env var; both are wired so either can be quit.
 export ZELDA3D_REPL="${ZELDA3D_SEQ_OOT_REPL:-$LOGDIR/oot_repl.fifo}"
@@ -92,6 +96,11 @@ trap 'cleanup_launcher; exit 130' INT TERM HUP
 # writes into nothing. Anything unquit after its budget leaves the process hanging, which the final
 # kill covers -- but the log then says which core never came up, instead of the run just timing out.
 RAN_FAIL=0
+# Counted, not a boolean. RAN_FAIL can only be set INSIDE the per-core loop, so a launcher that
+# dies before the loop runs leaves it 0 and the verdict below said "yes -- every core answered
+# posinfo" for a run in which ZERO cores started. A count carries its own denominator and cannot
+# be vacuously true over an empty set.
+RAN_OK=0
 IFS=',' read -r -a CORES <<<"$SEQ"
 for id in "${CORES[@]}"; do
     fifo="$ZELDA3D_REPL"; [ "$id" = "mm" ] && fifo="$ZELDA3D_MM_REPL"
@@ -132,6 +141,7 @@ for id in "${CORES[@]}"; do
         RAN_FAIL=1
     else
         echo "SEQUENCE: core '$id' is live: $SCENE"
+        RAN_OK=$((RAN_OK + 1))
     fi
     # Optional extra REPL commands, run in each core once it is live. This is how a sequence exercises
     # a code path the boot does not reach on its own -- the first user is `randogen`, because the deep
@@ -227,10 +237,10 @@ grep -E "SHARED with the previous game" "$LOG" || echo "   (none)"
 echo "-- UNFINISHED: subsystems inherited because they are not split yet (should be none):"
 grep -E "Not a bug in the split, but UNFINISHED" "$LOG" || echo "   (none reported)"
 echo "-- did each core actually RUN a game (not just return)?:"
-if [ "$RAN_FAIL" = 0 ]; then
-    echo "   yes -- every core answered posinfo with a real scene (see the per-core lines above)"
+if [ "$RAN_FAIL" = 0 ] && [ "$RAN_OK" -eq "${#CORES[@]}" ]; then
+    echo "   yes -- $RAN_OK of ${#CORES[@]} cores answered posinfo with a real scene (per-core lines above)"
 else
-    echo "   NO -- at least one core returned without running a game; scroll up for which one."
+    echo "   NO -- only $RAN_OK of ${#CORES[@]} cores ran a game; scroll up for which one."
     RC=1
 fi
 # GPU handle ownership. SDL3's Vulkan backend QUEUES a released resource instead of destroying it, so
