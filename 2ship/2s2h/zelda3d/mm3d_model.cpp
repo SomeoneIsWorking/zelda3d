@@ -503,9 +503,12 @@ struct MMAnimMap { const char* n64otr; const char* csab; };
 static const MMAnimMap kMMAnimMaps[] = {
 // Generated table: N64 animation OTR -> MM3D CSAB clip, produced by
 // tools/gen_mm_animmap.py (regenerate after asset/ROM changes; do not hand-edit the .inc).
-// Primary signal is the 2ship asset XMLs' "Original name is ..." annotation, which is the
-// decomp authors' record of the asset's ORIGINAL (romaji) name and is exactly what the MM3D
-// GAR calls the clip -- the only thing that crosses the English<->Japanese naming gap.
+// Primary signal is the 2ship asset XMLs' annotations, which record the asset's ORIGINAL (romaji)
+// name and are the only thing that crosses the English<->Japanese naming gap. Four dialects are
+// read, in this precedence: an explicit MM3D-side name ("MM3D name is X" / 'Named "X" in MM3D'),
+// then "Not present in MM3D" as a NEGATIVE that suppresses guessing, then "Original name is X".
+// A handful of mappings that no rule generalises to live in the generator's VERIFIED_OVERRIDES
+// table with their evidence; `gen_mm_animmap.py --verify-overrides` re-derives them from the ROM.
 // Unmapped animations still fall back to the model's default idle CSAB.
 #include "mm3d_animmap.inc"
 };

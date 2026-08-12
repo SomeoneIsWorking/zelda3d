@@ -3,13 +3,21 @@
 // Source: 2ship/assets/objects/*/ + the MM3D ROM's /actors/zelda*_*.gar[.lzs]
 // Accepted at confidence >= 0.90; ambiguous/weak matches are intentionally omitted so
 // the actor falls back to its default idle CSAB rather than playing a wrong animation.
-// 1386 entries across 147 actors.
+// 1411 entries across 147 actors.
 // ---- gameplay_field_keep (zelda2_field_keep: 1/1 anims, 1 clips) ----
     { "objects/gameplay_field_keep/gameplay_field_keep_Anim_001D20", "butterfly_fly" },
-// ---- gameplay_keep (zelda2_keep: 3/27 anims, 23 clips) ----
-    { "objects/gameplay_keep/gDekuFlowerBounceAnim", "dnp_boyoyon" },
-    { "objects/gameplay_keep/gDekuFlowerRustleAnim", "dnp_zawa" },
-    { "objects/gameplay_keep/gStrayFairyFlyingAnim", "ys_fly01" },
+// ---- gameplay_keep (zelda2_keep: 11/27 anims, 23 clips) ----
+    { "objects/gameplay_keep/gDekuFlowerBounceAnim",             "dnp_boyoyon" },
+    { "objects/gameplay_keep/gDekuFlowerRustleAnim",             "dnp_zawa" },
+    { "objects/gameplay_keep/gDoorDekuOpenLeftAnim",             "pn_doorA" },
+    { "objects/gameplay_keep/gDoorDekuOpenRightAnim",            "pn_doorB" },
+    { "objects/gameplay_keep/gDoorFierceDeityZoraOpenLeftAnim",  "link_demo_doorA_door" },
+    { "objects/gameplay_keep/gDoorFierceDeityZoraOpenRightAnim", "link_demo_doorB_door" },
+    { "objects/gameplay_keep/gDoorGoronOpenLeftAnim",            "pg_doorA" },
+    { "objects/gameplay_keep/gDoorGoronOpenRightAnim",           "pg_doorB" },
+    { "objects/gameplay_keep/gDoorHumanOpenLeftAnim",            "clink_demo_doorA_door" },
+    { "objects/gameplay_keep/gDoorHumanOpenRightAnim",           "clink_demo_doorB_door" },
+    { "objects/gameplay_keep/gStrayFairyFlyingAnim",             "ys_fly01" },
 // ---- object_ah (zelda2_ah: 4/4 anims, 4 clips) ----
     { "objects/object_ah/object_ah_Anim_000968", "ah_deteike" },
     { "objects/object_ah/object_ah_Anim_000DDC", "ah_suwari" },
@@ -26,9 +34,10 @@
     { "objects/object_am/gArmosHopAnim",        "am_jump" },
     { "objects/object_am/gArmosPushedBackAnim", "am_mamori" },
     { "objects/object_am/gArmosTakeDamageAnim", "am_yarare" },
-// ---- object_an1 (zelda2_an1: 12/14 anims, 37 clips) ----
+// ---- object_an1 (zelda2_an1: 13/14 anims, 37 clips) ----
     { "objects/object_an1/gAnju1BowAnim",                "an_ojigit" },
     { "objects/object_an1/gAnju1CookAnim",               "an_ryouri" },
+    { "objects/object_an1/gAnju1HoldHandsAnim",          "anj_tetunagu_loop" },
     { "objects/object_an1/gAnju1IdleAnim",               "an_wait" },
     { "objects/object_an1/gAnju1LookUpRelievedAnim",     "an_aogu" },
     { "objects/object_an1/gAnju1SitAnim",                "an_suwaru" },
@@ -136,7 +145,7 @@
     { "objects/object_bigpo/gBigPoeFloatAnim",           "pog_fly" },
     { "objects/object_bigpo/gBigPoeShockAnim",           "pog_damage" },
     { "objects/object_bigpo/gBigPoeSwingLampAttackAnim", "pog_atack" },
-// ---- object_bigslime (zelda2_bigslime: 26/30 anims, 28 clips) ----
+// ---- object_bigslime (zelda2_bigslime: 27/30 anims, 28 clips) ----
     { "objects/object_bigslime/gGekkoBoxingStanceAnim",  "bsl_waitA" },
     { "objects/object_bigslime/gGekkoCallAnim",          "bsl_callDEMO" },
     { "objects/object_bigslime/gGekkoCrawlAnim",         "bsl_clim" },
@@ -148,6 +157,7 @@
     { "objects/object_bigslime/gGekkoHookPunchAnim",     "bsl_strertA" },
     { "objects/object_bigslime/gGekkoJabPunchAnim",      "bsl_jabA" },
     { "objects/object_bigslime/gGekkoJumpForwardAnim",   "bsl_jump" },
+    { "objects/object_bigslime/gGekkoJumpOnSnapperAnim", "bsl_ridefuse" },
     { "objects/object_bigslime/gGekkoJumpUpAnim",        "bsl_flyjump" },
     { "objects/object_bigslime/gGekkoKickAnim",          "bsl_kickA" },
     { "objects/object_bigslime/gGekkoKnockbackAnim",     "bsl_standdamage" },
@@ -201,7 +211,7 @@
     { "objects/object_boj/object_boj_Anim_011F84", "scm_teburarun" },
     { "objects/object_boj/object_boj_Anim_0128F4", "scm_teburawait" },
     { "objects/object_boj/object_boj_Anim_012E84", "scm_yarare" },
-// ---- object_boss01 (zelda2_boss01: 25/32 anims, 50 clips) ----
+// ---- object_boss01 (zelda2_boss01: 29/32 anims, 50 clips) ----
     { "objects/object_boss01/gOdolwaArmSwingDanceAnim",   "jmp_stop07" },
     { "objects/object_boss01/gOdolwaAtAttentionAnim",     "jmp_base" },
     { "objects/object_boss01/gOdolwaBugCrawlAnim",        "mbug_wait" },
@@ -211,11 +221,12 @@
     { "objects/object_boss01/gOdolwaDeathAnim",           "jmp_down" },
     { "objects/object_boss01/gOdolwaDoubleSlashAnim",     "jmp_stop09" },
     { "objects/object_boss01/gOdolwaFallingSlashAnim",    "jmp_jmp03" },
+    { "objects/object_boss01/gOdolwaHipShakeDanceAnim",   "dance_moth" },
     { "objects/object_boss01/gOdolwaHorizontalSlashAnim", "jmp_at02" },
     { "objects/object_boss01/gOdolwaIntroSlashAnim",      "jmp_stop02" },
     { "objects/object_boss01/gOdolwaJumpAnim",            "jmp_jmp02" },
-    { "objects/object_boss01/gOdolwaJumpDanceAnim",       "dance_jump" },
     { "objects/object_boss01/gOdolwaKickAnim",            "jmp_kick" },
+    { "objects/object_boss01/gOdolwaMothSummonDanceAnim", "dance_bug" },
     { "objects/object_boss01/gOdolwaReadyAnim",           "jmp_stop" },
     { "objects/object_boss01/gOdolwaRunAnim",             "jmp_run" },
     { "objects/object_boss01/gOdolwaShieldBashAnim",      "jmp_punch" },
@@ -223,9 +234,12 @@
     { "objects/object_boss01/gOdolwaSideToSideHopAnim",   "jmp_stop10" },
     { "objects/object_boss01/gOdolwaSpinAttackAnim",      "jmp_spin" },
     { "objects/object_boss01/gOdolwaSpinDanceAnim",       "jmp_stop12" },
+    { "objects/object_boss01/gOdolwaSpinSwordAnim",       "dance_roll" },
     { "objects/object_boss01/gOdolwaStunAnim",            "jmp_piyo" },
     { "objects/object_boss01/gOdolwaSwordGuardAnim",      "jmp_def02" },
     { "objects/object_boss01/gOdolwaThurstAttackAnim",    "jmp_stop08" },
+    { "objects/object_boss01/gOdolwaUpAndDownDanceAnim",  "dance_fire" },
+    { "objects/object_boss01/gOdolwaVerticalHopAnim",     "dance_jump" },
     { "objects/object_boss01/gOdolwaVerticalSlashAnim",   "jmp_at01" },
 // ---- object_boss03 (zelda2_boss03: 7/12 anims, 52 clips) ----
     { "objects/object_boss03/gGyorgBackingUpAnim",     "bus_stop" },
@@ -245,7 +259,8 @@
     { "objects/object_boss05/gBioDekuBabaHeadSpotAnim",       "wdb_hakkenH" },
     { "objects/object_boss05/gBioDekuBabaHeadTransformAnim",  "wdb_startH" },
     { "objects/object_boss05/gBioDekuBabaHeadWalkAnim",       "wdb_walkH" },
-// ---- object_boss07 (zelda2_boss07: 43/45 anims, 49 clips) ----
+// ---- object_boss07 (zelda2_boss07: 44/45 anims, 49 clips) ----
+    { "objects/object_boss07/gMajorasIncarnationDamagedAnim",          "last2_dam01" },
     { "objects/object_boss07/gMajorasIncarnationEnergyBallAttackAnim", "last2_beam02" },
     { "objects/object_boss07/gMajorasIncarnationFallOverLoopAnim",     "last2_koke2" },
     { "objects/object_boss07/gMajorasIncarnationFallOverStartAnim",    "last2_koke" },
@@ -740,8 +755,9 @@
     { "objects/object_giant/gGiantStruggleLoopAnim",    "kyo_tukisasae_loop" },
     { "objects/object_giant/gGiantStruggleStartAnim",   "kyo_tukisasae" },
     { "objects/object_giant/gGiantWalkingAnim",         "kyo_walk" },
-// ---- object_gk (zelda2_gk: 12/13 anims, 13 clips) ----
+// ---- object_gk (zelda2_gk: 13/13 anims, 13 clips) ----
     { "objects/object_gk/object_gk_Anim_005EDC", "gk_furafura" },
+    { "objects/object_gk/object_gk_Anim_00787C", "gk_naki" },
     { "objects/object_gk/object_gk_Anim_007DC4", "gk_sleep" },
     { "objects/object_gk/object_gk_Anim_008774", "gk_stand_wait" },
     { "objects/object_gk/object_gk_Anim_0092C0", "gk_talk" },
@@ -824,7 +840,7 @@
     { "objects/object_ik/gIronKnuckleRunAnim",                   "ironknack_run" },
     { "objects/object_ik/gIronKnuckleVerticalAttackAnim",        "ironknack_attackA" },
     { "objects/object_ik/gIronKnuckleWalkAnim",                  "ironknack_walk" },
-// ---- object_ikn_demo (zelda2_ikn_demo: 32/33 anims, 33 clips) ----
+// ---- object_ikn_demo (zelda2_ikn_demo: 33/33 anims, 33 clips) ----
     { "objects/object_ikn_demo/object_ikn_demo_Anim_0000B8", "osk_default" },
     { "objects/object_ikn_demo/object_ikn_demo_Anim_003CAC", "osk_hanasu_loop" },
     { "objects/object_ikn_demo/object_ikn_demo_Anim_004208", "osk_hanasu_wait" },
@@ -857,6 +873,7 @@
     { "objects/object_ikn_demo/object_ikn_demo_Anim_00C804", "sk2_nani" },
     { "objects/object_ikn_demo/object_ikn_demo_Anim_00CA74", "sk2_nani_loop" },
     { "objects/object_ikn_demo/object_ikn_demo_Anim_00CD28", "sk2_odoroku" },
+    { "objects/object_ikn_demo/object_ikn_demo_Anim_00D044", "sk2_odoroku_loop" },
 // ---- object_in (zelda2_in: 19/19 anims, 28 clips) ----
     { "objects/object_in/object_in_Anim_0003B4", "in2_fusagu" },
     { "objects/object_in/object_in_Anim_000CB0", "in2_kachi" },
@@ -1115,22 +1132,30 @@
     { "objects/object_ob/gMoonChildSittingAnim",   "mjk_suwariloop" },
     { "objects/object_ob/gMoonChildStandingAnim",  "mjk_wait" },
     { "objects/object_ob/gMoonChildWalkingAnim",   "mjk_run" },
-// ---- object_osn (zelda2_osn: 15/24 anims, 28 clips) ----
-    { "objects/object_osn/gDekuMaskFallOverAnim",                  "rakka" },
-    { "objects/object_osn/gHappyMaskSalesmanArmsOutAnim",          "om_gozonji" },
-    { "objects/object_osn/gHappyMaskSalesmanBowingAnim",           "om_hajime" },
-    { "objects/object_osn/gHappyMaskSalesmanChokeAnim",            "om_kubisime_loop" },
-    { "objects/object_osn/gHappyMaskSalesmanFastBowsAnim",         "om_onegai_loop" },
-    { "objects/object_osn/gHappyMaskSalesmanHandOutAnim",          "om_tewodasu_loop" },
-    { "objects/object_osn/gHappyMaskSalesmanIdleAnim",             "osn_wait" },
-    { "objects/object_osn/gHappyMaskSalesmanMaskLookAtAnim",       "om_ommotu_loop" },
-    { "objects/object_osn/gHappyMaskSalesmanMaskLookFromLoopAnim", "om_omfurim_loop" },
-    { "objects/object_osn/gHappyMaskSalesmanOrganPlayAnim",        "om_ensou" },
-    { "objects/object_osn/gHappyMaskSalesmanOrganTalkAnim",        "om_ensou_taiki" },
-    { "objects/object_osn/gHappyMaskSalesmanShakeAnim",            "om_yusaburu" },
-    { "objects/object_osn/gHappyMaskSalesmanTurnAroundLoopAnim",   "om_furimuki_loop" },
-    { "objects/object_osn/gHappyMaskSalesmanTurnAroundStartAnim",  "om_furimuki" },
-    { "objects/object_osn/gHappyMaskSalesmanWalkAwayAnim",         "om_saru" },
+// ---- object_osn (zelda2_osn: 23/24 anims, 28 clips) ----
+    { "objects/object_osn/gDekuMaskFallOverAnim",                   "rakka" },
+    { "objects/object_osn/gHappyMaskSalesmanArmsOutAnim",           "om_gozonji" },
+    { "objects/object_osn/gHappyMaskSalesmanBelieveAnim",           "om_sinjina" },
+    { "objects/object_osn/gHappyMaskSalesmanBowingAnim",            "om_hajime" },
+    { "objects/object_osn/gHappyMaskSalesmanChokeAnim",             "om_kubisime_loop" },
+    { "objects/object_osn/gHappyMaskSalesmanDespairAnim",           "om_noo_loop" },
+    { "objects/object_osn/gHappyMaskSalesmanFastBowsAnim",          "om_onegai_loop" },
+    { "objects/object_osn/gHappyMaskSalesmanHandOutAnim",           "om_tewodasu_loop" },
+    { "objects/object_osn/gHappyMaskSalesmanHandsClaspedAnim",      "om_niginigi" },
+    { "objects/object_osn/gHappyMaskSalesmanIdleAnim",              "osn_wait" },
+    { "objects/object_osn/gHappyMaskSalesmanLyingDownAnim",         "om_downpose" },
+    { "objects/object_osn/gHappyMaskSalesmanMaskLookAtAnim",        "om_ommotu_loop" },
+    { "objects/object_osn/gHappyMaskSalesmanMaskLookFromLoopAnim",  "om_omfurim_loop" },
+    { "objects/object_osn/gHappyMaskSalesmanMaskLookFromStartAnim", "om_omfurim" },
+    { "objects/object_osn/gHappyMaskSalesmanOrganPlayAnim",         "om_ensou" },
+    { "objects/object_osn/gHappyMaskSalesmanOrganTalkAnim",         "om_ensou_taiki" },
+    { "objects/object_osn/gHappyMaskSalesmanReminisceAnim",         "om_nanto" },
+    { "objects/object_osn/gHappyMaskSalesmanShakeAnim",             "om_yusaburu" },
+    { "objects/object_osn/gHappyMaskSalesmanShakeHeadAnim",         "om_watasi" },
+    { "objects/object_osn/gHappyMaskSalesmanThinkAnim",             "om_souieba" },
+    { "objects/object_osn/gHappyMaskSalesmanTurnAroundLoopAnim",    "om_furimuki_loop" },
+    { "objects/object_osn/gHappyMaskSalesmanTurnAroundStartAnim",   "om_furimuki" },
+    { "objects/object_osn/gHappyMaskSalesmanWalkAwayAnim",          "om_saru" },
 // ---- object_ot (zelda2_ot: 3/3 anims, 3 clips) ----
     { "objects/object_ot/object_ot_Anim_000420", "ot_kissing" },
     { "objects/object_ot/object_ot_Anim_0008D8", "ot_swim" },
