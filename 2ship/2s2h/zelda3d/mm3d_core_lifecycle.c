@@ -45,6 +45,7 @@
 void Graph_ResetRunState(void);       // src/code/graph.c -- the frame loop's resume point
 void Zelda3D_ReplResetRunState(void);  // 2s2h/Z3DRepl.c        -- the REPL FIFO descriptor
 void Zelda3D_MM_ModelResetRunState(void); // 2s2h/zelda3d/mm3d_model.cpp -- anim state keyed by arena addresses
+void ObjectExtension_ResetRunState(void); // zelda3d_shared/object -- keyed by Actor*, one instance per core
 
 // ---------------------------------------------------------------------------------------------
 // Once-per-run latches
@@ -151,6 +152,9 @@ void Zelda3D_CoreRunBegin(void) {
     // The zelda3d layer's per-run caches: anim state keyed by ZeldaArena addresses (which the next
     // run reuses) and a parked Actor*.
     Zelda3D_MM_ModelResetRunState();
+    // Object extensions, keyed by actor pointer. zelda3d_shared is a static library linked into
+    // BOTH cores, so this instance is this core's own.
+    ObjectExtension_ResetRunState();
 }
 
 // Called after the frame loop has finished and before the heaps are freed.
