@@ -123,7 +123,9 @@ ResourceFactoryBinaryAnimationV0::ReadResource(std::shared_ptr<Ship::File> file,
         }
 
         // If direct load failed and alt assets are enabled, try with alt/ prefix
+        bool triedAltPath = false;
         if (animData == nullptr && Ship::Context::GetRawInstance()->GetResourceManager()->IsAltAssetsEnabled()) {
+            triedAltPath = true;
             std::string altPath = path;
             if (altPath.find("__OTR__") == 0) {
                 altPath = altPath.substr(7); // Strip __OTR__
@@ -131,6 +133,28 @@ ResourceFactoryBinaryAnimationV0::ReadResource(std::shared_ptr<Ship::File> file,
             altPath = "alt/" + altPath;
             animData = std::dynamic_pointer_cast<Animation>(
                 Ship::Context::GetRawInstance()->GetResourceManager()->LoadResourceProcess(altPath.c_str()));
+        }
+
+        // WHICH BRANCH AND WHICH TYPE, for every Link animation, gated on ZELDA3D_ANIMTYPE_LOG=1.
+        //
+        // Written this way because the question is comparative: `oot` alone resolves these cleanly
+        // while `oot` as the second core of `mm,oot,mm` does not (issue 0018), and no report that
+        // only fires on the bad case can establish what differs. So it prints on EVERY resolution,
+        // names the branch taken and the resource Type actually returned, and says explicitly when a
+        // load returned nothing -- a silent line here would be indistinguishable from "never asked".
+        {
+            static const bool kLog = getenv("ZELDA3D_ANIMTYPE_LOG") != nullptr;
+            if (kLog) {
+                const char* branch = animData != nullptr             ? "Animation"
+                                     : playerAnimData != nullptr     ? "PlayerAnimation"
+                                                                     : "NONE";
+                const auto typeOf = [](const std::shared_ptr<Ship::IResource>& r) -> long {
+                    return (r != nullptr && r->GetInitData() != nullptr) ? (long)r->GetInitData()->Type : -1;
+                };
+                SPDLOG_INFO("ANIMTYPE path=\"{}\" firstLoad={} (type={}) altTried={} altResolved={} -> using {}",
+                            path, animResource != nullptr ? "hit" : "MISS", typeOf(animResource),
+                            triedAltPath ? "yes" : "no", animData != nullptr ? "yes" : "no", branch);
+            }
         }
 
         if (animData != nullptr) {
