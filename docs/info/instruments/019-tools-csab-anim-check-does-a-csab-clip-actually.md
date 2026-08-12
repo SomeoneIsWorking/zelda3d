@@ -1,8 +1,9 @@
 ---
 id: I019
 kind: instrument
-status: trusted
+status: DISTRUSTED
 created: 2026-07-30
+distrusted_on: 2026-08-12
 ---
 
 ## Instrument
@@ -16,3 +17,9 @@ Run against BOTH classes: MM3D 585/617 animating after the track-reader fix vs 0
 ## Known failure modes
 
 (none recorded yet)
+
+## DISTRUSTED 2026-08-12
+
+Tested every clip in an archive against the FIRST cmb; binding is by bone ID, so in a shared archive a clip belonging to another model matched no ids and reported FROZEN. All 8 gameplay_keep door clips (real animations, claim C083) read as frozen. FIXED 2026-08-12 -- see the re-validation entry.
+
+> Every result this instrument produced is suspect until it is re-validated.

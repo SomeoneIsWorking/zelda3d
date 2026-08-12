@@ -79,21 +79,45 @@ int main(int argc, char** argv) {
             Zar z(std::move(raw)); if (!z.ok()) continue;
             for (const auto& f : z.files()) members.push_back({ f.name, z.read(f) });
         }
-        // first cmb = the model
-        std::vector<uint8_t> mdl;
-        for (auto& m : members)
-            if (m.first.size() > 4 && m.first.rfind(".cmb") == m.first.size() - 4) { mdl = m.second; break; }
-        if (mdl.empty()) continue;
-        Cmb model(std::move(mdl));
-        if (!model.ok()) continue;
+        // Collect EVERY model, not just the first. A shared archive holds several: zelda2_keep has
+        // door/model/, goron_zo/model/, nuts_zo/model/ ... and clips live beside their own model
+        // under the same top-level directory. Binding is by BONE ID (Csab::localTransforms walks
+        // the model's bones and looks each id up in the clip), so a door clip tested against a
+        // fairy's skeleton matches no ids, falls back to rest, and reads as FROZEN. That is a
+        // wrong-model artifact, not a decoder failure -- and it made all 8 gameplay_keep door
+        // clips, which are demonstrably real animations, report frozen.
+        std::vector<std::pair<std::string, Cmb>> models;
+        for (auto& m : members) {
+            if (!(m.first.size() > 4 && m.first.rfind(".cmb") == m.first.size() - 4)) continue;
+            Cmb c(std::vector<uint8_t>(m.second));
+            if (c.ok()) models.emplace_back(m.first, std::move(c));
+        }
+        if (models.empty()) continue;
         arch++;
         for (auto& m : members) {
             if (!(m.first.size() > 5 && m.first.rfind(".csab") == m.first.size() - 5)) continue;
             Csab c(std::move(m.second));
             clips++;
             if (!c.ok()) { bad++; continue; }
-            int a = animates(model, c);
+            // Pick the model sharing this clip's top-level directory; fall back to the first.
+            const Cmb* model = &models[0].second;
+            size_t sl = m.first.find('/');
+            if (sl != std::string::npos) {
+                std::string dir = m.first.substr(0, sl + 1);
+                for (auto& mm : models)
+                    if (mm.first.compare(0, dir.size(), dir) == 0) { model = &mm.second; break; }
+            }
+            int a = animates(*model, c);
             if (a == 1) anim++; else if (a == 0) frozen++; else bad++;
+            // Per-clip detail, opt-in. The summary counts alone cannot tell you WHICH clips are
+            // frozen, which is the question you have the moment the count is non-zero -- and
+            // guessing at it from a duration field read outside this parser is how you end up
+            // comparing two different conventions (Csab::duration() is raw+1).
+            if (getenv("CSAB_ANIM_CHECK_PER_CLIP") != nullptr) {
+                printf("  %-8s %-28s %-30s dur=%d bones=%d nodes=%d\n",
+                       a == 1 ? "ANIMATES" : (a == 0 ? "FROZEN" : "UNPARSED"),
+                       p.c_str(), m.first.c_str(), c.duration(), c.boneCount(), c.animNodeCount());
+            }
         }
     }
     printf("%s: archives=%d clips=%d  ANIMATES=%d  FROZEN=%d  unparsed=%d\n", argv[1], arch, clips, anim, frozen, bad);
