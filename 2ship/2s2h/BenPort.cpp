@@ -1492,7 +1492,8 @@ static void ResourceMgr_UnloadOriginalWhenAltExists(const char* resName) {
 }
 
 // OTRTODO: There is probably a more elegant way to go about this...
-// Kenix: This is definitely leaking memory when it's called.
+// Caller must free each string and the array itself when done. (Was marked "definitely leaking
+// memory when it's called" upstream; the leak was in the callers, which freed only the array.)
 extern "C" char** ResourceMgr_ListFiles(const char* searchMask, int* resultSize) {
     auto lst = Ship::Context::GetRawInstance()->GetResourceManager()->GetArchiveManager()->ListFiles(searchMask);
     char** result = (char**)malloc(lst->size() * sizeof(char*));

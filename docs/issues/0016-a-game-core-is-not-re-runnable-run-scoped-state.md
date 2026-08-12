@@ -997,3 +997,50 @@ Measured with the `use_globals=0` differential:
 
 Run 1 reports `freed 0 NES and 0 credits`, run 2 `freed 4588 NES and 46 credits` — both directions on
 real data. MM's per-run leak is now the same order as OoT's 3,505 bytes.
+
+## The last of MM's per-run leak: a list whose strings nobody owned (2026-08-12)
+
+The 5,273 bytes left after the message tables had one cause, not the "spread thin across many small
+sites" I had asserted without measuring. `ResourceMgr_ListFiles` returns a malloc'd array of malloc'd
+strings, and MM's `AudioLoad_Init` — its only caller — freed the array four times and the strings
+never. Upstream knew: the function carried the comment *"Kenix: This is definitely leaking memory
+when it's called."* That comment blamed the wrong side. The function's contract is fine; the callers
+were not, and the OoT copy of the same function had already been given both the corrected comment and
+the four `for (i…) free(list[i])` loops. MM never got them.
+
+Fixed by porting those loops into `2ship/src/audio/lib/load.c` and replacing the misleading comment in
+`BenPort.cpp` with the ownership contract OoT's copy states.
+
+The same read found a second defect one line up. `gSequenceMap` was `malloc`'d, and sequence numbers
+are **sparse** — vanilla 0x7A is absent, and custom sequences skip any number `AudioCollection`
+already owns. The unassigned slots therefore held uninitialised pointers, which two places read: the
+guard in `AudioLoad_SyncInitSeqPlayerInternal`, and — since this arc added it — the
+`for (i < gSequenceMapSize) free(gSequenceMap[i])` loop in `OTRAudio_Exit`. That second reader turned
+a latent garbage read into a free of a garbage pointer on every teardown. `calloc`, plus the 0xF of
+slack OoT allocates for the same reason (a `seqNum` stepping over collection-occupied numbers can run
+past the entry count).
+
+Measured with the `use_globals=0` differential, same options both sides:
+
+    before   mm 28,356,180 / 9,210 allocs   mm,mm 28,361,453 / 9,379   -> 5,273 per run (169 allocs)
+    after    mm 28,350,907 / 9,041 allocs   mm,mm 28,350,907 / 9,041   ->     0 per run (0 allocs)
+
+Run 1 dropped by exactly the per-run figure and the second run now adds nothing at all — the two
+numbers agreeing is what identifies this as the whole of it rather than a piece. **MM's per-run leak
+is now zero.** The instrument has shown both answers on this codebase (5,273 before, 0 after), so the
+zero is a measurement and not a silence.
+
+Correction to the note this arc left earlier: a deep-stack differential
+(`malloc_context_size=30:fast_unwind_on_malloc=0`) had attributed the residual mostly to X11/SDL
+locale data with `ResourceMgr_ListFiles` as one ~4 KB site among several. That was wrong about the
+proportions — those options change allocator accounting, and the X11 quark allocations are not
+per-run. The default-options differential above is the one to believe.
+
+### Noticed, not fixed: StormLib is linked into four binaries
+
+Turning off `detect_odr_violation` was needed to get these runs at all, because ASAN reports
+`global 'DistBits' at extern/StormLib/src/pklib/explode.c:34`. StormLib is a static library linked
+separately into `zelda3d`, `libultraship.so`, `libsoh_core.so` and `libmm_core.so` — four copies of
+the MPQ code and its globals in one process, resolved to whichever the loader binds first. Not
+touched here: it is a link-topology change, not a leak, and doing it mid-arc would have put the
+measurement above on a differently-linked binary.
