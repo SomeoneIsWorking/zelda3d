@@ -1742,9 +1742,6 @@ extern "C" void Zelda3D_RegisterHostHooks(void);
 // the save manager's registered sections and the game-interactor instance.
 //
 // NOT freed here, and each for a specific reason rather than caution:
-//   - SpeechSynthesizer: allocated as a DERIVED type through a base pointer, and the base declares no
-//     destructor at all, not even a virtual one. `delete` through it is undefined behaviour; giving
-//     the base a virtual destructor is the actual fix and is a separate change.
 //   - CrowdControl / Sail / Anchor: each owns a network thread. DeinitOTR calls Disable() on them, but
 //     that is not documented to join, and destroying an object out from under a running thread trades
 //     a leak for a race.
@@ -1827,12 +1824,16 @@ extern "C" int InitOTR(int argc, char* argv[]) {
         ReplacePerRunSingleton(ActorDB::Instance, "ActorDB");
         ActorDB::Instance = new ActorDB();
     #ifdef __APPLE__
+        ReplacePerRunSingleton(SpeechSynthesizer::Instance, "SpeechSynthesizer");
         SpeechSynthesizer::Instance = new DarwinSpeechSynthesizer();
     #elif defined(_WIN32)
+        ReplacePerRunSingleton(SpeechSynthesizer::Instance, "SpeechSynthesizer");
         SpeechSynthesizer::Instance = new SAPISpeechSynthesizer();
     #elif ESPEAK
+        ReplacePerRunSingleton(SpeechSynthesizer::Instance, "SpeechSynthesizer");
         SpeechSynthesizer::Instance = new ESpeakSpeechSynthesizer();
     #else
+        ReplacePerRunSingleton(SpeechSynthesizer::Instance, "SpeechSynthesizer");
         SpeechSynthesizer::Instance = new SpeechLogger();
     #endif
         SpeechSynthesizer::Instance->Init();
