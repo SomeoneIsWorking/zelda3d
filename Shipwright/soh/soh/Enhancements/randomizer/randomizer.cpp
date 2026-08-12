@@ -1002,11 +1002,30 @@ bool GenerateRandomizer(std::string seed /*= ""*/) {
 // outcomes: whether generation was accepted at all (it declines while one is already running), and
 // whether the context says a seed EXISTS afterwards. "randogen: ok" with no numbers would be
 // indistinguishable from a generator that returned immediately having done nothing.
+//
+// `async` as the first word starts generation and returns immediately. That is the ONLY way to reach
+// the case DeinitOTR's join exists for -- a generation still in flight when the game ends -- because
+// the blocking form finishes it first. The reply says which form ran, so a run cannot be read as
+// covering the race when it covered the completed path.
 extern "C" void Zelda3D_RandoGenerateBlocking(const char* seed, char* out, int outSize) {
-    const std::string seedStr = (seed != nullptr) ? seed : "";
+    std::string seedStr = (seed != nullptr) ? seed : "";
+    bool wait = true;
+    if (seedStr.rfind("async", 0) == 0) {
+        wait = false;
+        seedStr = seedStr.substr(5);
+        while (!seedStr.empty() && seedStr.front() == ' ') {
+            seedStr.erase(seedStr.begin());
+        }
+    }
     if (!GenerateRandomizer(seedStr)) {
         snprintf(out, outSize, "randogen: DECLINED -- a generation is already running (RandoGenerating=%d)",
                  CVarGetInteger(CVAR_GENERAL("RandoGenerating"), 0));
+        return;
+    }
+    if (!wait) {
+        snprintf(out, outSize, "randogen: ASYNC started, seed='%s' -- NOT waited for; this run covers the "
+                               "in-flight case, not a completed seed",
+                 seedStr.empty() ? "(random)" : seedStr.c_str());
         return;
     }
     JoinRandoGenerationThread();
@@ -1030,9 +1049,20 @@ static bool tricksTabOpen = false;
 // std::terminate. Under one game per process, ending in _exit(0), nothing ever reached that
 // destructor. DeinitOTR calls this now, alongside the other thread stops.
 void JoinRandoGenerationThread() {
-    if (randoThread.joinable()) {
-        randoThread.join();
+    if (!randoThread.joinable()) {
+        // Said out loud. "Nothing to join" and "I was never called" are the same silence otherwise,
+        // and this function spent its whole life being the second one.
+        SPDLOG_INFO("JoinRandoGenerationThread: no generation thread to join.");
+        generated = false;
+        return;
     }
+    // RandoGenerating is 1 for the duration of the thread body, so this distinguishes the case the
+    // join exists for -- a generation still RUNNING as the game ends -- from joining one that already
+    // finished. Without it, a clean async run cannot show which of the two it actually covered.
+    const bool inFlight = CVarGetInteger(CVAR_GENERAL("RandoGenerating"), 0) != 0;
+    SPDLOG_INFO("JoinRandoGenerationThread: joining the generation thread ({}).",
+                inFlight ? "IN FLIGHT -- waiting for it to finish" : "already finished");
+    randoThread.join();
     generated = false;
 }
 
