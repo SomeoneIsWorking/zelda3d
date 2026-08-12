@@ -49,6 +49,7 @@ void Zelda3D_DisableFixedCameraResetRunState(void); // DisableFixedCamera.cpp --
 void Zelda3D_ActorRefsResetRunState(void);   // zelda3d.c        -- REPL/debug actor selections
 void Zelda3D_RenderRefsResetRunState(void); // zelda3d_render.cpp
 void Zelda3D_HorseRefsResetRunState(void);  // behaviors/actor/en_horse.cpp
+void ObjectExtension_ResetRunState(void); // zelda3d_shared/object -- keyed by Actor*, one instance per core
 
 // The name tables AudioLoad_Init builds for this run, so they can be released before it builds the
 // next run's. Declared here rather than in a header because this file is where their lifetime is.
@@ -230,6 +231,9 @@ void Zelda3D_CoreRunBegin(void) {
     Zelda3D_ActorRefsResetRunState();
     Zelda3D_RenderRefsResetRunState();
     Zelda3D_HorseRefsResetRunState();
+    // Object extensions, keyed by actor pointer. zelda3d_shared is a static library linked into
+    // BOTH cores, so this instance is this core's own.
+    ObjectExtension_ResetRunState();
 }
 
 // Called after the frame loop has finished and before the heaps are freed.

@@ -43,6 +43,9 @@ class ObjectExtension {
     // Gets the singleton ObjectExtension instance
     static ObjectExtension& GetInstance();
 
+    // Drop every extension, returning how many there were. See ObjectExtension_ResetRunState.
+    std::size_t ClearAll();
+
     // Gets the data of type T associated with an object, or nullptr if no such data has been attached
     template <typename T> T* Get(const void* object) {
         assert(ObjectExtension::Register<T>::Id != InvalidId);
@@ -111,6 +114,9 @@ extern "C" {
 #endif // __cplusplus
 
 void ObjectExtension_Free(const void* object);
+// Called from each core's Zelda3D_CoreRunBegin. This file is compiled into BOTH cores (a static
+// library, linked twice), so each has its own instance and each must reset its own.
+void ObjectExtension_ResetRunState(void);
 #ifdef __cplusplus
 }
 #endif
