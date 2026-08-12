@@ -836,3 +836,48 @@ OoT's `Instance` and MM's are different objects that never see each other. Run 1
 run 2 (oot) finds OoT's null, run 3 (mm) finds and frees the one run 1 left. Anything counting these
 lines as "one per run after the first" would read the correct number as a missed free — the same
 per-core/per-process distinction that made MM need its own lifecycle module rather than sharing OoT's.
+
+
+## The rando context: three owners, found only by making the reset a CHECK (2026-08-12)
+
+`Zelda3D_RandoContextResetRunState` was added earlier in this arc as a workaround: clear the
+`weak_ptr` so the next run builds its own seed context, with a comment saying the real defect was the
+leaked `OTRGlobals` that owned it. Freeing that leak (above) should therefore have made this reset
+redundant. It did not — and the sequence in which that became visible is the useful part.
+
+**Ordering the free FIRST is what turned the workaround into a check.** `Zelda3D_CoreRunBegin` now
+frees the previous `OTRGlobals` before any other reset runs, so by the time the context reset looks,
+the supposed only owner is gone. It still reported `STILL LIVE`. That reading is only available
+because of the order; run the reset first and it reports "still live" every time, about an object
+whose owner is freed two lines later, and the real owner stays hidden. It had stayed hidden for three
+passes.
+
+Three owners, each found by the previous one failing to explain the reading:
+
+1. **`OTRGlobals::Instance->gRandoContext`** — the one the original comment named. Freed, still live.
+2. **A reference CYCLE, `Context -> Logic -> Context`.** `Context` holds `std::shared_ptr<Logic> mLogic`,
+   and `Context::CreateInstance` does `GetLogic()->SetContext(GetInstance())` into a
+   `std::shared_ptr<Context>` member. Neither object could ever be destroyed. `Logic::ctx` is now a
+   raw non-owning back-pointer: `Logic` is a sub-object of its `Context` and cannot outlive it, the
+   106 `ctx->` sites are on the fill algorithm's hot path, and a `weak_ptr` would have made "this
+   Logic outlived its Context" silently survivable rather than a bug. Broken, still live.
+3. **`Rando::Settings::mInstance`** — a process-lifetime `static std::shared_ptr<Settings>` whose
+   `mContext` member is a strong reference to whichever run last called `AssignContext`. THIS was the
+   holder. The whole `Settings` object is dropped per run, not just the pointer: it holds the seed's
+   options, trick options and excluded locations, which belong to the run that generated them.
+
+Also cleared: `location_access.cpp`'s file-scope `Rando::Context* ctx` and
+`std::shared_ptr<Rando::Logic> logic`, the pair `RegionTable_Init` builds the region table from. They
+reported "nothing" in these runs (no seed was generated, so Init never ran) — recorded as measured,
+not as proven harmless.
+
+**Evidence, run 2 of `oot,oot`:** `rando settings reset -- previous run left settings=yes
+context=YES (its seed would have been reused)`, and then `rando context reset -- previous run's
+context was already released`. The second line is the one that matters: the context is now genuinely
+destroyed at run end for the first time, rather than orphaned and leaked. Its message was reworded in
+the same change — it used to print "absent (first run)", which after this fix would have reported the
+success case as a trivial one.
+
+**Not covered:** no gate generates a randomizer seed, so this exercises the OWNERSHIP, not a rando
+playthrough across runs. The failure it removes — a vanilla run started after a randomizer run playing
+on the randomizer's placements — remains untested end to end.

@@ -180,7 +180,20 @@ class Logic {
     bool StatueRoomMQKeyLogic();
 
   private:
-    std::shared_ptr<Context> ctx;
+    // NON-OWNING back-pointer to the Context that owns this Logic.
+    //
+    // It was a shared_ptr, and Context holds `std::shared_ptr<Logic> mLogic`, so Context -> Logic ->
+    // Context was a reference CYCLE: neither object could ever be destroyed. That is why freeing
+    // OTRGlobals (which holds the only other strong reference to the Context) did not release it, and
+    // why every run's rando context leaked permanently -- item location table, options, trick options
+    // and EntranceShuffler included.
+    //
+    // A raw pointer rather than a weak_ptr on purpose: Logic is a sub-object of its Context and
+    // cannot outlive it, the 106 `ctx->` call sites are on the fill algorithm's hot path, and a
+    // weak_ptr would have made "this Logic outlived its Context" silently survivable instead of a
+    // bug. See Zelda3D_RandoLogicRefsResetRunState in location_access.cpp for the globals that used
+    // to make that scenario reachable.
+    Context* ctx = nullptr;
     bool inLogic[LOGIC_MAX];
 }; // class Logic
 } // namespace Rando

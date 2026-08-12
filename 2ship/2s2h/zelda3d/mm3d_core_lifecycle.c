@@ -42,6 +42,7 @@
 #include <stdio.h>
 #include <string.h>
 
+void Zelda3D_FreePreviousOTRGlobals(void); // OTRGlobals.cpp / BenPort.cpp -- the previous run's owner object
 void Graph_ResetRunState(void);       // src/code/graph.c -- the frame loop's resume point
 void Zelda3D_ReplResetRunState(void);  // 2s2h/Z3DRepl.c        -- the REPL FIFO descriptor
 void Zelda3D_MM_ModelResetRunState(void); // 2s2h/zelda3d/mm3d_model.cpp -- anim state keyed by arena addresses
@@ -143,6 +144,13 @@ void Zelda3D_CoreRunBegin(void) {
     // graph.c's runFrameContext -- the frame loop's RESUME POINT plus its gfx context. Left alone,
     // run 2's first RunFrame sees state==1, jumps to nextFrame, and evaluates GameState_IsRunning
     // on the previous run's freed gamestate.
+    // FIRST of all the resets. This frees the PREVIOUS run's OTRGlobals, which owns the only strong
+    // references to the save-state manager, the randomizer and the rando context -- so every reset
+    // below it sees state that has actually been released rather than state still held by a leak.
+    // Ordering it after them would leave each one reporting "still live" about an object whose owner
+    // is about to be freed two lines later, which is a reading that cannot be acted on.
+    Zelda3D_FreePreviousOTRGlobals();
+
     Graph_ResetRunState();
     // The N64 audio engine's state, including pointers into an audio heap the last run gave back.
     Zelda3D_ResetAudioContext();

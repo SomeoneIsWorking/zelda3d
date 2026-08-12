@@ -1,4 +1,5 @@
 #include "location_access.h"
+#include <cstdio>
 
 #include "soh/Enhancements/randomizer/static_data.h"
 #include "soh/Enhancements/randomizer/SeedContext.h"
@@ -955,6 +956,26 @@ bool AdultCanAccess(const RandomizerRegion region) {
 
 Rando::Context* ctx;
 std::shared_ptr<Rando::Logic> logic;
+
+// Both belong to a RUN and outlived it. `logic` is a strong reference, so it kept the previous run's
+// Logic -- and, until the Context <-> Logic cycle was broken in logic.h, the whole rando Context with
+// it -- alive for the process. `ctx` is a raw pointer into that Context, so once the Context does get
+// destroyed it dangles, and the region table is built from it.
+//
+// Cleared at run start rather than at RegionTable_Init: Init only runs when a seed is generated, so a
+// run that never touches the randomizer would leave the previous run's pair in place indefinitely.
+extern "C" void Zelda3D_RandoLogicRefsResetRunState(void) {
+    const bool inherited = (ctx != nullptr) || (logic != nullptr);
+
+    ctx = nullptr;
+    logic = nullptr;
+
+    // Reported either way: "cleared" alone cannot tell the first run from a run that was about to
+    // build its region table against the previous run's Logic, and the second is the reason for this.
+    fprintf(stderr, "ZELDA3D CORE: rando logic refs reset -- previous run left %s.\n",
+            inherited ? "a Context/Logic pair behind" : "nothing");
+    fflush(stderr);
+}
 
 void RegionTable_Init() {
     using namespace Rando;

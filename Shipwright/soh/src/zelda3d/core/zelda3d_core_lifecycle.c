@@ -40,6 +40,7 @@
 #include <stdlib.h>
 #include <string.h>
 
+void Zelda3D_FreePreviousOTRGlobals(void); // OTRGlobals.cpp / BenPort.cpp -- the previous run's owner object
 void Graph_ResetRunState(void);        // graph.c
 void Zelda3D_AudioResetRunState(void);   // OTRGlobals.cpp -- the audio THREAD's control block
 void Zelda3D_MessageResetRunState(void); // z_message_OTR.cpp -- the message tables
@@ -50,7 +51,9 @@ void Zelda3D_ActorRefsResetRunState(void);   // zelda3d.c        -- REPL/debug a
 void Zelda3D_RenderRefsResetRunState(void); // zelda3d_render.cpp
 void Zelda3D_HorseRefsResetRunState(void);  // behaviors/actor/en_horse.cpp
 void ObjectExtension_ResetRunState(void); // zelda3d_shared/object -- keyed by Actor*, one instance per core
-void Zelda3D_RandoContextResetRunState(void); // randomizer/SeedContext.cpp -- kept alive by a leaked OTRGlobals
+void Zelda3D_RandoContextResetRunState(void); // randomizer/SeedContext.cpp -- the per-run seed context
+void Zelda3D_RandoLogicRefsResetRunState(void); // randomizer/location_access.cpp -- Context*/Logic the region table builds from
+void Zelda3D_RandoSettingsResetRunState(void);  // randomizer/settings.cpp -- the static Settings singleton that OWNED the seed context
 void Zelda3D_EntranceTableResetRunState(void); // randomizer/randomizer_entrance.c -- gEntranceTable is .data
 void Zelda3D_GameInteractorResetRunState(void); // game-interactor -- inline static hook maps, process lifetime
 void Zelda3D_EntranceCameraBackupResetRunState(void); // randomizer/entrance.cpp -- a Camera full of pointers
@@ -217,6 +220,13 @@ void Zelda3D_CoreRunBegin(void) {
     // graph.c's runFrameContext -- the frame loop's resume point and gfx context. Reset through a
     // function because it is file-static there, which is the right scope for it; what it must not
     // be is longer-lived than a run.
+    // FIRST of all the resets. This frees the PREVIOUS run's OTRGlobals, which owns the only strong
+    // references to the save-state manager, the randomizer and the rando context -- so every reset
+    // below it sees state that has actually been released rather than state still held by a leak.
+    // Ordering it after them would leave each one reporting "still live" about an object whose owner
+    // is about to be freed two lines later, which is a reading that cannot be acted on.
+    Zelda3D_FreePreviousOTRGlobals();
+
     Graph_ResetRunState();
     Zelda3D_AudioResetRunState();
     Zelda3D_ResetAudioContext();
@@ -242,6 +252,12 @@ void Zelda3D_CoreRunBegin(void) {
     ObjectExtension_ResetRunState();
     // The randomizer context. Its only strong reference is a leaked OTRGlobals, so without this a
     // second run reuses the first run's seed, placements and options.
+    // Order matters and is the point: the two OWNERS go first (the static Settings singleton, and the
+    // region table's Context*/Logic pair), so Zelda3D_RandoContextResetRunState below runs against
+    // state that has actually been released. Run it first instead and it reports "STILL LIVE" every
+    // time, which is how the real owner stayed hidden for three passes.
+    Zelda3D_RandoSettingsResetRunState();
+    Zelda3D_RandoLogicRefsResetRunState();
     Zelda3D_RandoContextResetRunState();
     // gEntranceTable, which a randomizer run shuffles in place and only restores on its own paths.
     Zelda3D_EntranceTableResetRunState();

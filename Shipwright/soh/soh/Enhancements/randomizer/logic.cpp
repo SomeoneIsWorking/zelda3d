@@ -2762,7 +2762,10 @@ void Logic::SetAmmo(uint32_t item, uint8_t count) {
 }
 
 void Logic::SetContext(std::shared_ptr<Context> _ctx) {
-    ctx = _ctx;
+    // Deliberately stores the raw pointer: see the member's declaration for the cycle this breaks.
+    // The parameter stays a shared_ptr so the one caller (Context::CreateInstance) is unchanged and
+    // so it is obvious at the call site that the Context is alive at the moment it is handed over.
+    ctx = _ctx.get();
 }
 
 bool Logic::Get(LogicVal logicVal) {

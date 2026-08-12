@@ -1,4 +1,5 @@
 #include "settings.h"
+#include <cstdio>
 #include "trial.h"
 #include "dungeon.h"
 #include "soh/Enhancements/randomizer/randomizerTypes.h"
@@ -2986,5 +2987,34 @@ std::shared_ptr<Settings> Settings::GetInstance() {
         mInstance = std::make_shared<Settings>();
     }
     return mInstance;
+}
+
+// THE holder that kept every run's rando Context alive.
+//
+// `mInstance` is a process-lifetime static and `mContext` is a strong reference to the Context of
+// whichever run last called AssignContext -- so the seed context could not die no matter what else
+// released it. This was found by ordering the OTRGlobals free BEFORE the rando-context reset, which
+// turned that reset from a workaround into a check: it kept reporting "STILL LIVE" after its supposed
+// only owner had been freed, and after the Context <-> Logic cycle was broken as well.
+//
+// The whole Settings object is dropped, not just mContext: it holds the seed's options, trick options
+// and excluded locations, all of which belong to the run that generated them. GetInstance rebuilds it
+// on demand, and OTRGlobals::Initialize re-assigns the context every run.
+void Settings::ResetRunState() {
+    const bool inheritedSettings = (mInstance != nullptr);
+    const bool inheritedContext = inheritedSettings && (mInstance->mContext != nullptr);
+
+    mInstance.reset();
+
+    // Both flags printed, because they fail differently: settings without a context is a run that
+    // opened the rando menu, and settings WITH one is a run that was about to be handed the previous
+    // run's seed.
+    fprintf(stderr, "ZELDA3D CORE: rando settings reset -- previous run left settings=%s context=%s.\n",
+            inheritedSettings ? "yes" : "no", inheritedContext ? "YES (its seed would have been reused)" : "no");
+    fflush(stderr);
+}
+
+extern "C" void Zelda3D_RandoSettingsResetRunState(void) {
+    Settings::ResetRunState();
 }
 } // namespace Rando

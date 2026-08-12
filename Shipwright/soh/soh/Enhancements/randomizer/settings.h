@@ -128,6 +128,10 @@ class Settings {
      * @param ctx
      */
     void AssignContext(std::shared_ptr<Context> ctx);
+
+    // Drop the process-lifetime singleton so the next run builds its own. See the definition: this
+    // static was the last thing keeping every run's rando Context alive.
+    static void ResetRunState();
     void ClearContext();
 
     /**
