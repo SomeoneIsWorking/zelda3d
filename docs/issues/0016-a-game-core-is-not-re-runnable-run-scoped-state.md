@@ -881,3 +881,28 @@ success case as a trivial one.
 **Not covered:** no gate generates a randomizer seed, so this exercises the OWNERSHIP, not a rando
 playthrough across runs. The failure it removes — a vanilla run started after a randomizer run playing
 on the randomizer's placements — remains untested end to end.
+
+
+## Six more per-run singletons that were never freed (2026-08-12)
+
+`OTRGlobals` was not special. `InitOTR` `new`s ten singletons per RUN and upstream deletes none of
+them, so every run leaked a full copy of the message tables, the item tables, the actor DB, the audio
+collection, the save manager's registered sections and the game-interactor instance.
+
+Freed immediately before each is re-allocated, via a `ReplacePerRunSingleton` helper, rather than from
+a central teardown: at that exact point the old value is dead by definition on the next line, which
+needs no reasoning about what else might still read it.
+
+**Four are deliberately still leaked, each for a specific reason and not out of caution:**
+
+- **`SpeechSynthesizer`** — allocated as a DERIVED type (`ESpeakSpeechSynthesizer` and friends)
+  through a base pointer, and the base declares no destructor at all, not even a virtual one.
+  `delete` through that pointer is undefined behaviour. Giving the base a virtual destructor is the
+  real fix and belongs in its own change.
+- **`CrowdControl` / `Sail` / `Anchor`** — each owns a network thread. `DeinitOTR` calls `Disable()`,
+  but that is not documented to join, and destroying an object out from under a running thread trades
+  a leak for a race.
+
+**Evidence:** run 2 of `oot,oot` frees exactly seven — ActorDB, AudioCollection,
+CustomMessageManager, GameInteractor, ItemTableManager, SaveManager, OTRGlobals — one each, and every
+gate stays green.

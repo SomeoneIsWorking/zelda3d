@@ -1733,6 +1733,30 @@ extern "C" void Zelda3D_RegisterHostHooks(void);
 
 // C-callable, so Zelda3D_CoreRunBegin (which is C) can free it FIRST, before any of the other run
 // resets look at the state it owns. See the call site for why the order matters.
+// Delete the previous run's instance of a per-run singleton, immediately before the new one replaces
+// it. Provably safe at that exact point -- the old value is dead by definition on the next line -- and
+// safer than a central teardown, which would have to reason about what still reads each of them.
+//
+// These are `new`ed inside InitOTR, i.e. once per RUN, and upstream never deleted any of them: each
+// run leaked a full copy of the message tables, the item tables, the actor DB, the audio collection,
+// the save manager's registered sections and the game-interactor instance.
+//
+// NOT freed here, and each for a specific reason rather than caution:
+//   - SpeechSynthesizer: allocated as a DERIVED type through a base pointer, and the base declares no
+//     destructor at all, not even a virtual one. `delete` through it is undefined behaviour; giving
+//     the base a virtual destructor is the actual fix and is a separate change.
+//   - CrowdControl / Sail / Anchor: each owns a network thread. DeinitOTR calls Disable() on them, but
+//     that is not documented to join, and destroying an object out from under a running thread trades
+//     a leak for a race.
+template <typename T> static void ReplacePerRunSingleton(T*& instance, const char* what) {
+    if (instance == nullptr) {
+        return;
+    }
+    SPDLOG_INFO("Run start: freeing the previous run's {} (it used to leak, once per run).", what);
+    delete instance;
+    instance = nullptr;
+}
+
 extern "C" void Zelda3D_FreePreviousOTRGlobals(void) {
     if (OTRGlobals::Instance == nullptr) {
         // Said out loud: on run 1 there is nothing to free, and a silent no-op here would be
@@ -1772,9 +1796,13 @@ extern "C" int InitOTR(int argc, char* argv[]) {
         ZELDA3D_BOOT("InitOTR: Initialize() (loads oot.o2r)");
         OTRGlobals::Instance->Initialize();
         ZELDA3D_BOOT("InitOTR: Initialize() done; managers/audio next");
+        ReplacePerRunSingleton(CustomMessageManager::Instance, "CustomMessageManager");
         CustomMessageManager::Instance = new CustomMessageManager();
+        ReplacePerRunSingleton(ItemTableManager::Instance, "ItemTableManager");
         ItemTableManager::Instance = new ItemTableManager();
+        ReplacePerRunSingleton(GameInteractor::Instance, "GameInteractor");
         GameInteractor::Instance = new GameInteractor();
+        ReplacePerRunSingleton(SaveManager::Instance, "SaveManager");
         SaveManager::Instance = new SaveManager();
 
         std::shared_ptr<Ship::Config> conf = OTRGlobals::Instance->context->GetConfig();
@@ -1794,7 +1822,9 @@ extern "C" int InitOTR(int argc, char* argv[]) {
         // a menu that is never drawn.
         Presets_LoadAtBoot();
 
+        ReplacePerRunSingleton(AudioCollection::Instance, "AudioCollection");
         AudioCollection::Instance = new AudioCollection();
+        ReplacePerRunSingleton(ActorDB::Instance, "ActorDB");
         ActorDB::Instance = new ActorDB();
     #ifdef __APPLE__
         SpeechSynthesizer::Instance = new DarwinSpeechSynthesizer();
