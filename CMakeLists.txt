@@ -71,11 +71,24 @@ set(SPDLOG_MIN_CUTOFF SPDLOG_LEVEL_TRACE CACHE STRING "cutoff at trace")
 # -fno-omit-frame-pointer keeps the stacks readable; -O1 keeps it from taking all day. Applied to
 # both compile and link (ASAN needs its runtime on the link line) and to every target in the tree,
 # because the corruption is not known to live in any one of them.
+#
+# -fsanitize-recover is on because a sanitizer that halts on the FIRST error can only ever show you
+# the first bug. Chasing `mm,oot,mm` cost several full ASAN runs to learn this: an out-of-bounds
+# animation read in the SECOND game core aborted every run, and the crash actually being investigated
+# -- in the THIRD core -- was never reached even once. With recovery compiled in, a run can be told
+# to keep going and report everything:
+#
+#   ASAN_OPTIONS="halt_on_error=0:detect_odr_violation=0:log_path=<dir>/asan" ...
+#
+# halt_on_error=0 does NOT work without this flag; it is silently ignored, which reads as "there was
+# only one error". Default behaviour is unchanged: without halt_on_error the run still stops at the
+# first report.
 set(ZELDA3D_SANITIZE "" CACHE STRING "Sanitizer to build with (e.g. address, undefined); empty = none")
 if(NOT ZELDA3D_SANITIZE STREQUAL "")
-    message(STATUS "Building with -fsanitize=${ZELDA3D_SANITIZE}")
-    add_compile_options(-fsanitize=${ZELDA3D_SANITIZE} -fno-omit-frame-pointer -g -O1)
-    add_link_options(-fsanitize=${ZELDA3D_SANITIZE})
+    message(STATUS "Building with -fsanitize=${ZELDA3D_SANITIZE} (recoverable)")
+    add_compile_options(-fsanitize=${ZELDA3D_SANITIZE} -fsanitize-recover=${ZELDA3D_SANITIZE}
+                        -fno-omit-frame-pointer -g -O1)
+    add_link_options(-fsanitize=${ZELDA3D_SANITIZE} -fsanitize-recover=${ZELDA3D_SANITIZE})
 endif()
 
 ################################################################################
