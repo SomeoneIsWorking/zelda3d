@@ -85,6 +85,8 @@ struct Loaded {
     // standing rather than freezing at bind pose. Resolved once from the GAR's file list.
     std::string defaultAnim;
     bool defaultAnimResolved = false;
+    // GAR basename ("zelda2_dog"), the key of the generated default-idle table.
+    std::string garName;
 };
 std::unordered_map<int, std::unique_ptr<Loaded>> g_loaded;
 
@@ -193,6 +195,12 @@ Loaded* loadModel(int modelId) {
     Zelda3D::CtrRom* r = rom();
     if (r == nullptr) {
         return out;
+    }
+    {   // "/actors/zelda2_dog.gar.lzs" -> "zelda2_dog"
+        size_t slash = spec.garPath.find_last_of('/');
+        std::string base = slash == std::string::npos ? spec.garPath : spec.garPath.substr(slash + 1);
+        size_t dot = base.find('.');
+        out->garName = dot == std::string::npos ? base : base.substr(0, dot);
     }
     std::vector<uint8_t> garBytes = r->read(spec.garPath);
     if (garBytes.empty()) {
@@ -524,11 +532,28 @@ static const char* resolveAutoCsab(const char* animOtr) {
     return nullptr;
 }
 
-// Resolve (once) the model's default idle CSAB from the GAR file list: prefer a "*wait*" clip
-// (MM convention: dog_wait, an_wait), else the first CSAB. Data-driven — no per-actor hardcoding.
+// GAR basename -> the clip to play when the live N64 animation has no kMMAnimMaps entry.
+// Generated, because choosing it needs the N64<->3DS mapping: the "*wait*" substring below cannot
+// see a JAPANESE-named idle (zf2_matsu, hs_matsu — matsu is literally "wait"), and for those actors
+// the runtime was falling through to "first CSAB in the archive", which is GAR ordering rather than
+// evidence. It picked zf2_aruku ("walk") for Dinolfos and pr_damage for object_pr.
+struct MMDefaultAnim { const char* gar; const char* csab; };
+static const MMDefaultAnim kMMDefaultAnims[] = {
+#include "mm3d_defaultanim.inc"
+};
+
+// Resolve (once) the model's default idle CSAB: the generated table first, then a "*wait*" clip
+// (MM convention: dog_wait, an_wait), then the first CSAB. Data-driven — no per-actor hardcoding.
+// The last step is a KNOWN GAP for the ~25 actors the generator could not determine an idle for --
+// it is arbitrary, and the generator names them rather than letting the table imply they are solved.
 static const char* defaultAnimFor(Loaded* lm) {
     if (lm->defaultAnimResolved) return lm->defaultAnim.empty() ? nullptr : lm->defaultAnim.c_str();
     lm->defaultAnimResolved = true;
+    if (!lm->garName.empty()) {
+        for (const auto& d : kMMDefaultAnims) {
+            if (lm->garName == d.gar) { lm->defaultAnim = d.csab; return lm->defaultAnim.c_str(); }
+        }
+    }
     if (lm->gar) {
         const Zelda3D::GarFile* first = nullptr;
         for (const auto& f : lm->gar->files()) {
