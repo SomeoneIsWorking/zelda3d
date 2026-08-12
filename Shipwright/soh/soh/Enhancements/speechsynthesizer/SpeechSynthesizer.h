@@ -15,6 +15,12 @@ class SpeechSynthesizer {
     static SpeechSynthesizer* Instance;
     SpeechSynthesizer();
 
+    // Polymorphic base (Speak and DoInit are pure virtual) with no virtual destructor: `delete` through
+    // a SpeechSynthesizer* -- which is the only pointer anything holds, since Instance is allocated as
+    // ESpeak/SAPI/Darwin/SpeechLogger -- was undefined behaviour. That is why the per-run free of the
+    // other singletons deliberately skipped this one; with the destructor here it is safe to delete.
+    virtual ~SpeechSynthesizer() = default;
+
     bool Init(void);
     void Uninitialize(void);
     virtual void Speak(const char* text, const char* language) = 0;

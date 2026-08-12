@@ -1018,6 +1018,21 @@ extern "C" void Mm3d_RegisterHostHooks(void);
 
 // C-callable, so Zelda3D_CoreRunBegin (which is C) can free it FIRST, before any of the other run
 // resets look at the state it owns. See the call site for why the order matters.
+// See the twin in soh's OTRGlobals.cpp. These are `new`ed once per RUN inside InitOTR and upstream
+// never deleted them, so every run leaked one of each. Freed immediately before the replacement, where
+// the old value is dead by definition rather than by argument.
+//
+// NOT freed: CrowdControl, which owns a network thread that DeinitOTR only Disable()s -- destroying an
+// object out from under a running thread trades a leak for a race.
+template <typename T> static void ReplacePerRunSingleton(T*& instance, const char* what) {
+    if (instance == nullptr) {
+        return;
+    }
+    SPDLOG_INFO("Run start: freeing the previous run's {} (it used to leak, once per run).", what);
+    delete instance;
+    instance = nullptr;
+}
+
 extern "C" void Zelda3D_FreePreviousOTRGlobals(void) {
     if (OTRGlobals::Instance == nullptr) {
         // Said out loud: on run 1 there is nothing to free, and a silent no-op here would be
@@ -1059,7 +1074,19 @@ extern "C" int InitOTR(int argc, char* argv[]) {
         conf->RunVersionUpdates();
         Ship::Context::GetRawInstance()->GetConsoleVariables()->Save();
 
+        ReplacePerRunSingleton(GameInteractor::Instance, "GameInteractor");
         GameInteractor::Instance = new GameInteractor();
+        // AudioCollection is deliberately NOT freed here, and the reason is a finding rather than
+        // caution: on run 2 `AudioCollection::Instance` no longer refers to a valid AudioCollection at
+        // all. Measured -- it reports 20 sequences where the static map has 129, and walking those 20
+        // entries' std::strings segfaults, while the pointer itself is nowhere near the two heaps
+        // Heaps_Free munmaps. So the object is already dead by the time a second run starts, and the
+        // leak was the only thing keeping the address readable. Freeing it turns that into a crash in
+        // the destructor, which is where this was first seen.
+        //
+        // That means every read of AudioCollection::Instance on run 2+ (AudioEditor, sequence
+        // replacement) is reading a dead object TODAY. Diagnosing what invalidates it is the next
+        // step; deleting it before then would only move the crash.
         AudioCollection::Instance = new AudioCollection();
         LoadGuiTextures();
         BenGui::SetupGuiElements();
@@ -1071,7 +1098,6 @@ extern "C" int InitOTR(int argc, char* argv[]) {
         CustomItem::RegisterHooks();
         CustomMessage::RegisterHooks();
         Rando::StaticData::PopulateCheckNames();
-
         OTRMessage_Init();
         OTRAudio_Init();
         OTRExtScanner();
