@@ -28,6 +28,9 @@ struct Zelda3DBoneMap;
 // --- Actor-draw dispatch (explicit render-function list) ---------------------------------------
 int Zelda3D_TryDrawActor(PlayState* play, Actor* actor);          // also declared in zelda3d.h
 int Zelda3D_DrawActorModel(PlayState* play, int modelId, Actor* actor, float worldScale); // also in zelda3d.h
+int Zelda3D_DrawModelTransform(PlayState* play, int modelId, const Vec3f* pos,
+                              const Vec3f* rotYXZ, const Vec3f* scale,
+                              float postRotX); // multipart actor pieces
 int Zelda3D_EmitActorBillboard(PlayState* play, int modelId, Actor* actor,
                              float xOff, float yOff, float zOff, float scale,
                              u8 r, u8 g, u8 b, u8 a); // also in zelda3d.h

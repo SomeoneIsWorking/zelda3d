@@ -28,6 +28,7 @@
 #include "actor/push_block.h"
 #include "actor/en_tana.h"
 #include "actor/boss_goma.h"
+#include "actor/boss_fd2.h"
 #include "asset/mat4.h"
 
 extern "C" {
@@ -124,7 +125,10 @@ ActorBehavior* findActorBehavior(s16 actorId) {
     static ObjOshihikiBehavior sObjOshihiki;
     static EnTanaBehavior sEnTana;
     static BossGomaBehavior sBossGoma;
+    static BossFd2Behavior sBossFd2;
     switch (actorId) {
+        case ACTOR_BOSS_FD2:
+            return &sBossFd2;
         case ACTOR_BOSS_GOMA:
             return &sBossGoma;
         case ACTOR_EN_DOOR:
@@ -197,6 +201,13 @@ extern "C" int Zelda3D_TryActorModelDraw(PlayState* play, Actor* actor) {
         if (b->tryDrawModel(play, actor)) {
             return 1;
         }
+    }
+    return 0;
+}
+
+extern "C" int Zelda3D_TryActorDeferredDraw(PlayState* play, Actor* actor) {
+    if (Zelda3D::ActorBehavior* b = Zelda3D::findActorBehavior(actor->id)) {
+        return b->prepareDeferredDraw(play, actor) ? 1 : 0;
     }
     return 0;
 }

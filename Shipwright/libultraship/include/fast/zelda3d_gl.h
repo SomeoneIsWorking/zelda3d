@@ -42,6 +42,11 @@ typedef struct Zelda3DMatConstOv {
     float rgba[4];    // RGBA float (matches Model_SetMaterialConstantColor's replace-RGB semantics)
 } Zelda3DMatConstOv;
 
+typedef struct Zelda3DMatUvOv {
+    float u;
+    float v;
+} Zelda3DMatUvOv;
+
 // One per-material draw batch (triangle list).
 typedef struct Zelda3DGlGroup {
     const Zelda3DGlVtx* verts;
@@ -283,6 +288,8 @@ void Zelda3D_GL_SetMidMask(int modelId, unsigned long long mask);
 // drawOne/the Vulkan group draw redirect grp.texIndex -> the override for matching materialIndex.
 void Zelda3D_GL_SetMatTexOverride(int modelId, int materialIndex, int texIndex);
 void Zelda3D_GL_ClearMatTexOverrides(int modelId);
+void Zelda3D_GL_SetMatUvOverride(int modelId, int materialIndex, float u, float v);
+void Zelda3D_GL_ClearMatUvOverrides(int modelId);
 
 #ifdef __cplusplus
 }

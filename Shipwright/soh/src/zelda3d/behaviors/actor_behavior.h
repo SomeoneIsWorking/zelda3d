@@ -40,6 +40,14 @@ public:
     // Zelda3D_TryDrawActor (via the Zelda3D_TryActorModelDraw C bridge) before the auto/table path.
     virtual bool tryDrawModel(PlayState* play, Actor* actor) { return false; }
 
+    // Deferred skeletal replacement: select an OoT3D model, then let the actor's own Draw reach the
+    // SkelAnime choke point so the live N64 animation/playhead can drive the authored CSAB. Return
+    // true after preparing the global pending draw; the dispatcher still returns false to Actor_Draw
+    // so the actor draw runs. This is distinct from tryDrawModel(), which draws immediately and
+    // suppresses the actor draw entirely. Boss_Fd2 needs this because its body is skeletal while its
+    // three fire-hair chains are a second multipart submission later in the same Draw.
+    virtual bool prepareDeferredDraw(PlayState* play, Actor* actor) { return false; }
+
     // Faithful draw-space transform offset for an actor whose own Draw applies translate(s) the
     // generic world.pos anchor path omits. OoT3D Actor_Draw lifts the model matrix by
     // shape.yOffset*scale.y in WORLD Y; some actors' Draw then post-multiplies a LOCAL

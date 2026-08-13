@@ -562,6 +562,37 @@ int Zelda3D_DrawActorModel(PlayState* play, int modelId, Actor* actor, float wor
     return 1;
 }
 
+// Draw one model instance at an explicit world transform. Multipart actors use this when their
+// secondary CMBs do not share the actor root transform (Boss_Fd2's 27 independently-simulated
+// fire-hair segments). The matrix and draw are emitted into the same pass, matching
+// Zelda3D_EmitModelDraw's ordering and avoiding a fake temporary Actor or lossy uniform scale.
+int Zelda3D_DrawModelTransform(PlayState* play, int modelId, const Vec3f* pos,
+                              const Vec3f* rotYXZ, const Vec3f* scale, float postRotX) {
+    if (play == NULL || modelId < 0 || pos == NULL || rotYXZ == NULL || scale == NULL) {
+        return 0;
+    }
+    u8 tint[3];
+    OPEN_DISPS(play->state.gfxCtx);
+    Gfx_SetupDL_25Opa(play->state.gfxCtx);
+    Matrix_Translate(pos->x, pos->y, pos->z, MTXMODE_NEW);
+    Matrix_RotateY(rotYXZ->y, MTXMODE_APPLY);
+    Matrix_RotateX(rotYXZ->x, MTXMODE_APPLY);
+    Matrix_RotateZ(rotYXZ->z, MTXMODE_APPLY);
+    Matrix_Scale(scale->x, scale->y, scale->z, MTXMODE_APPLY);
+    if (postRotX != 0.0f) {
+        Matrix_RotateX(postRotX, MTXMODE_APPLY);
+    }
+    const int xluPass = Zelda3D_AutoModelAllBlended(modelId);
+    gSPMatrix(xluPass ? POLY_XLU_DISP++ : POLY_OPA_DISP++, MATRIX_NEWMTX(play->state.gfxCtx),
+              G_MTX_MODELVIEW | G_MTX_LOAD);
+    Zelda3D_SceneTint(play, tint);
+    Zelda3D_GL_EmitPose(modelId);
+    gSPZelda3DDraw(xluPass ? POLY_XLU_DISP++ : POLY_OPA_DISP++, modelId | (int)0x80000000,
+                   tint[0], tint[1], tint[2]);
+    CLOSE_DISPS(play->state.gfxCtx);
+    return 1;
+}
+
 // Draw with an explicit material colour modulating the scene tint (see sZelda3dDrawTint). For
 // state-coloured props such as the crystal switch. The override is scoped to this single draw.
 int Zelda3D_DrawActorModelTinted(PlayState* play, int modelId, Actor* actor, float worldScale,
@@ -1882,6 +1913,14 @@ int Zelda3D_TryDrawActor(PlayState* play, Actor* actor) {
     gZelda3dPendingN64CurFrame = 0.0f;
     gZelda3dPendingN64AnimLength = 0.0f;
     gZelda3dPendingMorphWeight = 0.0f; // reset per actor (raw-only path has no SkelAnime -> no morph)
+    // Boss_Fd is not one skinned model: both games assemble the flying dragon from separate body,
+    // head, arm, and mane models. The generic object->largest-CMB path picks valbasiagnd (the
+    // Boss_Fd2 hole form), then consumes Boss_Fd's arm skeleton and scale, producing giant white
+    // strips. Keep the faithful N64 multipart draw until Boss_Fd gets its own dedicated multipart
+    // behavior; Boss_Fd2 is handled separately by behaviors/actor/boss_fd2.cpp.
+    if (actor->id == ACTOR_BOSS_FD) {
+        return 0;
+    }
     // Param-keyed field-keep actors: one keep object shared across param variants, so the model
     // depends on (actor, params) — can't live in the actorId-only sModelTable. The OoT3D models
     // come from zelda_field_keep.zar (glModelIds 2,4,5,6; see kModels in zelda3d_model.cpp).
@@ -2127,6 +2166,13 @@ int Zelda3D_TryDrawActor(PlayState* play, Actor* actor) {
         // inline forced-CMB branches above into modules; this is the structured home for new ones.
         if (Zelda3D_TryActorModelDraw(play, actor)) {
             return 1;
+        }
+        // Structured skeletal-replacement behaviors prepare the pending model, then deliberately
+        // fall through so the actor's own Draw reaches the SkelAnime choke point. Boss_Fd2 uses
+        // this split: its body is the deferred valbasiagnd skeleton, while its later mane call is
+        // replaced separately by the same behavior module.
+        if (Zelda3D_TryActorDeferredDraw(play, actor)) {
+            return 0;
         }
     }
     // Explicit table wins (calibrated scale + anim resolvers), unless validation mode (=2)

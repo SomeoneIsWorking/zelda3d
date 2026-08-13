@@ -679,6 +679,7 @@ float Zelda3D_AutoModelMinY(int modelId);                                // bind
 int Zelda3D_ModelGroupCentroid(int modelId, int materialIndex, float out[3]); // centroid of one material's groups
 // Bridges for the structured model-REPLACEMENT behaviors (behaviors/actor/<actor>.cpp):
 int Zelda3D_TryActorModelDraw(PlayState* play, Actor* actor);            // dispatch actor->behavior->tryDrawModel
+int Zelda3D_TryActorDeferredDraw(PlayState* play, Actor* actor);         // prepare skeletal replacement, keep actor Draw
 int Zelda3D_ActorDrawSpaceTransform(void* actor, float* outLiftY, float* outLocalOff); // faithful draw-space offset
 int Zelda3D_ActorHasBehaviorModule(s16 actorId); // 1 if a behaviors/actor/<x>.cpp module is registered for this id
 // Boss_Goma climb-state tooling (REPL `gohmaclimb`, #123): drive Gohma into her REAL wall-climb so the
@@ -687,6 +688,16 @@ int Zelda3D_BossGomaForceClimb(Actor* actor, float climbY, int hold); // enter t
 void Zelda3D_BossGomaClimbTick(Actor* actor);                         // per-frame hold (self-gated)
 int Zelda3D_BossGomaClimbHeld(void);                                  // 1 if the hold is active
 int Zelda3D_DrawActorModel(PlayState* play, int modelId, Actor* actor, float worldScale); // draw OoT3D CMB at actor xform
+int Zelda3D_DrawModelTransform(PlayState* play, int modelId, const Vec3f* pos,
+                               const Vec3f* rotYXZ, const Vec3f* scale,
+                               float postRotX); // arbitrary multipart transform
+int Zelda3D_BossFd2DrawManeSegment(PlayState* play, Actor* actor, int chain, int segment,
+                                  const Vec3f* pos, const Vec3f* rot, const Vec3f* scale);
+int Zelda3D_BossFd2ForceGround(Actor* actor);
+int Zelda3D_BossFd2ForceIdle(PlayState* play, Actor* actor, int hold);
+void Zelda3D_BossFd2IdleTick(PlayState* play, Actor* actor);
+int Zelda3D_BossFd2ResolveAnim(PlayState* play, Actor* actor, const char* fallbackCsab,
+                              const char** outCsab, float* outFrame);
 // Camera-facing sprite emit at (actor.world.pos + off); uses sun/moon billboardMtxF path.
 int Zelda3D_EmitActorBillboard(PlayState* play, int modelId, Actor* actor,
                                float xOff, float yOff, float zOff, float scale,

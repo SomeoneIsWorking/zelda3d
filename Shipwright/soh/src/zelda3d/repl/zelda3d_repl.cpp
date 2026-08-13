@@ -133,7 +133,7 @@ extern int gZelda3dEnabled, gZelda3dAnimLive, gZelda3dSwTilt, gZelda3dDoorBone, 
     gZelda3dCamLift, gZelda3dTitleCam, gZelda3dSelId, gZelda3dDbgBone, gZelda3dChickFlap,
     gZelda3dChickAxis, gZelda3dChickCenter, gZelda3dChickAmp, gZelda3dChickBone2Sign,
     gZelda3dDoorHold, gZelda3dLastAutoModel, gZelda3dPauseTarget, gZelda3dSgDrawOnly,
-    gZelda3dSgDrawList;
+    gZelda3dSgDrawList, gZelda3dSgModelOnly;
 extern float gZelda3dTintDiff, gZelda3dTintMul, gZelda3dRotX, gZelda3dRotY, gZelda3dRotZ,
     gZelda3dDoorGain, gZelda3dGScale[32], gZelda3dSceneScale, gZelda3dSceneOffX, gZelda3dSceneOffY,
     gZelda3dSceneOffZ, gZelda3dSkyScale, gZelda3dCamEye[3], gZelda3dCamAt[3], gZelda3dCamLiftLast,
@@ -1886,6 +1886,11 @@ static void Zelda3D_ReplExec(PlayState* play, char* line, const char* outPath) {
         // Indices are per-frame, in append order; get them from `sgdrawlist`.
         if (sscanf(line, "%*s %i", &iv) == 1) gZelda3dSgDrawOnly = iv;
         Zelda3D_ReplReply(outPath, "sgdrawonly=%d", gZelda3dSgDrawOnly);
+    } else if (strcmp(cmd, "sgmodelonly") == 0) {
+        // Stable counterpart to sgdrawonly: model ids do not shift when unrelated transient draws
+        // enter/leave the frame, so multi-frame shader probes remain attached to their target.
+        if (sscanf(line, "%*s %i", &iv) == 1) gZelda3dSgModelOnly = iv;
+        Zelda3D_ReplReply(outPath, "sgmodelonly=%d", gZelda3dSgModelOnly);
     } else if (strcmp(cmd, "sgdrawlist") == 0) {
         // One-shot: dump the next frame's Zelda3D group list (index, model, vertex range, textures)
         // to stderr, so `sgdrawonly` has an index to aim at.
@@ -2313,6 +2318,23 @@ static void Zelda3D_ReplExec(PlayState* play, char* line, const char* outPath) {
             }
         } else {
             Zelda3D_ReplReply(outPath, "ahide=%d (usage: ahide <0|1>)", gZelda3dHideActor ? 1 : 0);
+        }
+    } else if (strcmp(cmd, "fd2ground") == 0) {
+        // Volvagia investigation control: use the real typed parent->child handoff, never a raw
+        // struct-offset poke. The negative reports whether a selection was actually inspectable.
+        if (Zelda3D_BossFd2ForceGround(gZelda3dSelActor)) {
+            Zelda3D_ReplReply(outPath, "fd2ground: signaled selected Boss_Fd2 through its Boss_Fd parent");
+        } else {
+            Zelda3D_ReplReply(outPath,
+                              "fd2ground: scanned selected actor; need Boss_Fd2 (0xA2) with live Boss_Fd parent");
+        }
+    } else if (strcmp(cmd, "fd2idle") == 0) {
+        int hold = 1;
+        (void)sscanf(line, "%*s %i", &hold);
+        if (Zelda3D_BossFd2ForceIdle(play, gZelda3dSelActor, hold)) {
+            Zelda3D_ReplReply(outPath, "fd2idle: entered real BossFd2_SetupIdle state; hold=%d", hold != 0);
+        } else {
+            Zelda3D_ReplReply(outPath, "fd2idle: scanned selection; need live Boss_Fd2 (0xA2)");
         }
     } else if (strcmp(cmd, "afreeze") == 0) {
         // GENERIC: pin the selected actor's transform every frame. 0=off, 1=pin pos+rot,

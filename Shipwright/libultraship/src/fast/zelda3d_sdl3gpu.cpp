@@ -117,6 +117,7 @@ extern "C" int gZelda3dHlGroup;
 // same libultraship but has no soh globals to satisfy it. A diagnostic owned by the renderer belongs
 // to the renderer; the game layers now just extern-declare it for their REPLs.
 extern "C" int gZelda3dSgDrawOnly = -1; // -1 = draw everything (default)
+extern "C" int gZelda3dSgModelOnly = -1; // -1 = all models; otherwise stable model-id isolation
 extern "C" int gZelda3dSgDrawList = 0;  // 1 = dump this frame's group list, then self-clears
 static int g_sgDrawIdx = 0;        // groups appended so far this frame
 // strength/bias the same way the Vulkan path does.
@@ -1049,6 +1050,13 @@ bool Fast::Zelda3DRenderer::ensureResources() {
                              // silently reassign the divergence to the wrong channel. Linear passthrough
                              // reads (64,128,191); sRGB encoding on write reads about (137,188,225).
                              : mode == 8 ? "frag = vec4(0.25, 0.5, 0.75, 1.0); return;\n"
+                             // Modes 9/10 expose the actual GPU-visible TEV constant slots. They
+                             // distinguish CPU-side override success from a UBO packing/readback bug.
+                             : mode == 9 ? "frag = unpackUnorm4x8(ubo.uTevConst[0][1]); return;\n"
+                             : mode == 10 ? "frag = unpackUnorm4x8(ubo.uTevConst[0][2]); return;\n"
+                             : mode == 11 ? "uint w=ubo.uTevStages[0].x; frag=vec4(float(w&15u)/15.0,float((w>>4)&15u)/15.0,float((w>>8)&15u)/15.0,1); return;\n"
+                             : mode == 12 ? "uint w=ubo.uTevStages[1].x; frag=vec4(float(w&15u)/15.0,float((w>>4)&15u)/15.0,float((w>>8)&15u)/15.0,1); return;\n"
+                             : mode == 13 ? "frag=vec4(ubo.uTevCtl.x/6.0,ubo.uTevCtl.y/4.0,ubo.uTevCtl.z/4.0,1); return;\n"
                                          : "";
         // Mode 6 taps the combiner result before the CONSTANT/stage-scale/FOG stages — the direct
         // counterpart of the oracle's `PIXEL ... combined=` field. Mode 7 taps after the CONSTANT +
@@ -1750,7 +1758,7 @@ extern "C" void Zelda3D_Sg_DrawModel(int modelId, const float* mp16, const float
                                    unsigned char r8, unsigned char g8, unsigned char b8, unsigned char a8,
                                    float aspectAdj, const float* boneData, int boneCnt, unsigned long long midMask,
                                    int sky, float uvOffU, float uvOffV, const void* matTex,
-                                   const void* matConst, int forceUnlit, const float* lightDirOv,
+                                   const void* matConst, const void* matUv, int forceUnlit, const float* lightDirOv,
                                    const float* sphRotOv) {
     // Zelda3D #140 render-side probe: log every DrawModel for the sun-billboard model id (2002 in
     // typical runs). Non-sky submits are the Navi emit (sun/moon are sky=1). Serves as the runtime
@@ -1772,7 +1780,7 @@ extern "C" void Zelda3D_Sg_DrawModel(int modelId, const float* mp16, const float
     }
     if (auto* r = sgRenderer())
         r->DrawModel(modelId, mp16, mv16, lit, invertY, r8, g8, b8, a8, aspectAdj, boneData, boneCnt, midMask, sky,
-                     uvOffU, uvOffV, matTex, matConst, forceUnlit, lightDirOv, sphRotOv);
+                     uvOffU, uvOffV, matTex, matConst, matUv, forceUnlit, lightDirOv, sphRotOv);
 }
 extern "C" void Zelda3D_Sg_EndPass(void) {
     if (auto* r = sgRenderer())
@@ -1915,6 +1923,8 @@ void Fast::Zelda3DRenderer::BeginPass() {
         sgProbeSeeded = true;
         if (const char* v = getenv("ZELDA3D_SG_DRAWONLY"))
             gZelda3dSgDrawOnly = atoi(v);
+        if (const char* v = getenv("ZELDA3D_SG_MODELONLY"))
+            gZelda3dSgModelOnly = atoi(v);
         if (const char* v = getenv("ZELDA3D_SG_DRAWLIST"))
             gZelda3dSgDrawList = (v[0] != '0');
     }
@@ -1933,11 +1943,13 @@ void Fast::Zelda3DRenderer::DrawModel(int modelId, const float* mp16, const floa
                                     unsigned char r8, unsigned char g8, unsigned char b8, unsigned char a8,
                                     float aspectAdj, const float* boneData, int boneCnt, unsigned long long midMask,
                                     int sky, float uvOffU, float uvOffV, const void* matTex,
-                                    const void* matConst, int forceUnlit, const float* lightDirOv,
+                                    const void* matConst, const void* matUv, int forceUnlit, const float* lightDirOv,
                                     const float* sphRotOv) {
     const std::unordered_map<int, int>* matTexMap = static_cast<const std::unordered_map<int, int>*>(matTex);
     const std::unordered_map<int, Zelda3DMatConstOv>* matConstMap =
         static_cast<const std::unordered_map<int, Zelda3DMatConstOv>*>(matConst);
+    const std::unordered_map<int, Zelda3DMatUvOv>* matUvMap =
+        static_cast<const std::unordered_map<int, Zelda3DMatUvOv>*>(matUv);
     if (!g_ctxValid)
         return;
     SgModel* m = ensureUploaded(modelId);
@@ -1975,7 +1987,8 @@ void Fast::Zelda3DRenderer::DrawModel(int modelId, const float* mp16, const floa
     // RenderDoc-style per-draw inspection (REPL `sgdump <modelId>`): one-shot dump of every material
     // group's render state for one model, so a missing/invisible group is diagnosed by VALUE (which
     // state — alpha test, blend, cull, texture binding — kills it) instead of eyeballing the frame.
-    if (modelId == g_sgDumpModel) {
+    const bool sgDumpThisDraw = modelId == g_sgDumpModel;
+    if (sgDumpThisDraw) {
         g_sgDumpModel = -1; // one-shot
         fprintf(stderr,
                 "[SG_DUMP] model=%d groups=%zu lit=%d invertY=%d tint=(%u,%u,%u) a=%u aspectAdj=%.4f "
@@ -2157,6 +2170,17 @@ void Fast::Zelda3DRenderer::DrawModel(int modelId, const float* mp16, const floa
             continue;
 
         SgUbo ubo = base;
+        float groupUvU = uvOffU;
+        float groupUvV = uvOffV;
+        if (matUvMap) {
+            auto uvIt = matUvMap->find(grp.materialIndex);
+            if (uvIt != matUvMap->end()) {
+                groupUvU += uvIt->second.u;
+                groupUvV += uvIt->second.v;
+            }
+        }
+        ubo.uExtra[1] = groupUvU;
+        ubo.uExtra[2] = groupUvV;
         if (roomHl && gIdx == gZelda3dHlGroup) {
             ubo.uTintSkin[0] = 1.0f;
             ubo.uTintSkin[1] = 0.0f;
@@ -2277,7 +2301,7 @@ void Fast::Zelda3DRenderer::DrawModel(int modelId, const float* mp16, const floa
             // per-stage scale (fire-glow ×2) rides the same seam.
             ubo.uMatConst[3] = (grp.combUsesConst && !constBlack) ? grp.combConstScaleRGB : 0.0f;
             if (matConstMap && grp.materialIndex >= 0) {
-                auto ov = matConstMap->find(grp.materialIndex);
+                auto ov = matConstMap->find(grp.materialIndex * 6 + ci);
                 if (ov != matConstMap->end() && ov->second.constIdx == ci) {
                     ubo.uMatConst[0] = ov->second.rgba[0];
                     ubo.uMatConst[1] = ov->second.rgba[1];
@@ -2298,8 +2322,8 @@ void Fast::Zelda3DRenderer::DrawModel(int modelId, const float* mp16, const floa
             ubo.uSheen[3] = (grp.dualTexMode == 4) ? 3.0f : (float)grp.coord1Mapping;
             ubo.uTex1Xf[0] = grp.uv1Scale[0];
             ubo.uTex1Xf[1] = grp.uv1Scale[1];
-            ubo.uTex1Xf[2] = grp.uv1Trans[0] + uvOffU;
-            ubo.uTex1Xf[3] = grp.uv1Trans[1] + uvOffV;
+            ubo.uTex1Xf[2] = grp.uv1Trans[0] + groupUvU;
+            ubo.uTex1Xf[3] = grp.uv1Trans[1] + groupUvV;
             ubo.uExtra[1] = 0.0f;
             ubo.uExtra[2] = 0.0f;
         }
@@ -2324,10 +2348,12 @@ void Fast::Zelda3DRenderer::DrawModel(int modelId, const float* mp16, const floa
             float constSlots[6][4];
             memcpy(constSlots, grp.matConstant, sizeof(constSlots));
             if (matConstMap && grp.materialIndex >= 0) {
-                auto ov = matConstMap->find(grp.materialIndex);
-                if (ov != matConstMap->end() && ov->second.constIdx >= 0 && ov->second.constIdx < 6) {
-                    for (int k = 0; k < 4; k++)
-                        constSlots[ov->second.constIdx][k] = ov->second.rgba[k];
+                for (int slot = 0; slot < 6; ++slot) {
+                    auto ov = matConstMap->find(grp.materialIndex * 6 + slot);
+                    if (ov != matConstMap->end() && ov->second.constIdx == slot) {
+                        for (int k = 0; k < 4; k++)
+                            constSlots[slot][k] = ov->second.rgba[k];
+                    }
                 }
             }
             for (int s = 0; s < 6; s++) {
@@ -2337,6 +2363,14 @@ void Fast::Zelda3DRenderer::DrawModel(int modelId, const float* mp16, const floa
                 };
                 ubo.uTevConst[s] = q(constSlots[s][0]) | (q(constSlots[s][1]) << 8) |
                                    (q(constSlots[s][2]) << 16) | (q(constSlots[s][3]) << 24);
+            }
+            if (sgDumpThisDraw) {
+                fprintf(stderr,
+                        "[SG_DUMP]  g%d appliedConst1=(%.3f,%.3f,%.3f,%.3f) "
+                        "appliedConst2=(%.3f,%.3f,%.3f,%.3f) overrides=%zu\n",
+                        grp.materialIndex, constSlots[1][0], constSlots[1][1], constSlots[1][2], constSlots[1][3],
+                        constSlots[2][0], constSlots[2][1], constSlots[2][2], constSlots[2][3],
+                        matConstMap ? matConstMap->size() : 0u);
             }
             // Coordinator-1/2 transforms for the extra units. The vertex shader's uv1 sphere
             // path gates on uSheen.w > 2.5 (shared with the dual-tex title path); mapping 4
@@ -2506,7 +2540,8 @@ void Fast::Zelda3DRenderer::DrawModel(int modelId, const float* mp16, const floa
             fprintf(stderr, "[Zelda3D_SG] draw %d model=%d first=%u count=%u tex=%p tex1=%p tex2=%p\n", drawIdx,
                     modelId, g.first, g.count, (const void*)g.tex, (const void*)g.tex1, (const void*)g.tex2);
         }
-        if (gZelda3dSgDrawOnly >= 0 && drawIdx != gZelda3dSgDrawOnly)
+        if ((gZelda3dSgModelOnly >= 0 && modelId != gZelda3dSgModelOnly) ||
+            (gZelda3dSgDrawOnly >= 0 && drawIdx != gZelda3dSgDrawOnly))
             continue; // draw-isolation probe: everything except the selected group is suppressed
         api->AppendZelda3DModelDraw(g.pipeline, vbo, g.first, g.count, g.ubo.data(), g.tex, g.samp,
                                   g.tex2 ? g.tex2 : dummyTex, g.samp2 ? g.samp2 : dummySamp,

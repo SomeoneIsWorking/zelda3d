@@ -39,6 +39,10 @@ int Zelda3D_CmabLoopMode(void* handle);  // 0 = Once (hold last keyframe past du
 // *outV if a matching Translation entry with a populated V track exists, else 0 (untouched).
 int Zelda3D_CmabSampleTranslationV(void* handle, int materialIndex, int channelIndex, float frame,
                                     float* outV);
+int Zelda3D_CmabSampleTranslationUV(void* handle, int materialIndex, int channelIndex, float frame,
+                                    float* outU, float* outV);
+int Zelda3D_CmabSampleTexturePalette(void* handle, int materialIndex, int channelIndex, float frame,
+                                     int* outIndex);
 
 // Sample the (materialIndex, channelIndex) ConstColor entry's R/G/B tracks at `frame` (same
 // clamping as above). Absent tracks fall back per-channel to the CMAB format's own default (0 —
@@ -47,6 +51,8 @@ int Zelda3D_CmabSampleTranslationV(void* handle, int materialIndex, int channelI
 // writes rgb3[0..2] if a matching ConstColor entry exists, else 0.
 int Zelda3D_CmabSampleConstColorRGB(void* handle, int materialIndex, int channelIndex, float frame,
                                      float* rgb3);
+int Zelda3D_CmabSampleConstColorRGBA(void* handle, int materialIndex, int channelIndex, float frame,
+                                     float* rgba4);
 
 #ifdef __cplusplus
 }

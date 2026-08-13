@@ -41,7 +41,7 @@ This doc **organizes and links to** the existing RE corpus rather than duplicati
 
 ### title.oot3d-not-play — OoT3D title is scripted playback, not Play/PlayState
 - status: re-verified
-- deps: 
+- deps:
 - evidence: `oot3d-decomp/docs/title_gamestate.md`, `title_gamestate_v2.md`, `title_gamestate_driver.md`; memory `soh3d-oot3d-title-not-play`
 - where: `Shipwright/soh/src/zelda3d/behaviors/title/title_presentation.cpp` (`TitlePresentation` class, ported scripted-playback owner)
 - gap: none — foundational finding, do not re-derive
@@ -527,3 +527,13 @@ This doc **organizes and links to** the existing RE corpus rather than duplicati
 - gap: None. The shadow formula is shared (0x0033e450 IS N64's ActorShadow_DrawFoot — see oot3d-decomp/docs/actor_shadow.md), and with the lighting matched the rendered contrast agrees to within the placement error of the sample boxes (0.624 vs 0.654). The only genuinely 3DS-specific pieces are the draw target (cached model object, asset 0x51, instead of gFootShadowDL) and a Matrix_Translate(0,1.5,0) z-fight guard; neither is a visible divergence. REOPEN ONLY on a fresh user report or a LIGHTING-MATCHED measurement. Lesson worth keeping: an oracle-vs-ours pixel comparison is meaningless unless time-of-day is verified equal on both sides — tools/oracle_shot.py --daytime does not guarantee the oracle landed on the same sun position our game did.
 - notes: 
 
+
+## render
+
+### render.boss-fd2-multipart — Boss_Fd2 Volvagia hole-form multipart render
+- status: in-progress
+- deps:
+- evidence: oot3d-decomp/docs/boss_fd2.md; embedded-oracle 281-sample `vba_up`→`vba_search` controller trace and live actor matrix; headless natural-camera `scratch/screenshots/fd2_controller_proc_f88.png`; SKELSCALE model 2005 ratio=1.000 scale=0.007
+- where: Shipwright/soh/src/zelda3d/behaviors/actor/boss_fd2.{h,cpp}; Shipwright/soh/src/overlays/actors/ovl_Boss_Fd2/z_boss_fd2.c; Shipwright/soh/src/zelda3d/model/zelda3d_cmab.{h,cpp}
+- gap: Decompile and port every non-emergence Boss_Fd2 action controller, replacing the marked independent-playhead STOPGAP; then close-test each visible state against the embedded oracle. Boss_Fd flying form is a separate multipart actor and currently retains the N64 draw rather than the invalid largest-CMB auto replacement.
+- notes: 2026-08-13 live discriminator caught and fixed forced-CMB ZAR-qualified animation resolution. Typed REPL fd2ground drives the real parent handoff and refuses invalid selections. 2026-08-14: emergence now uses the ported OoT3D `vba_up` controller, typed `shape.yOffset*scale.y` draw lift, and decompiled bone-10/13/14/15 procedural rotations; no N64 joints or clip phase reach the 3DS object.
