@@ -62,7 +62,11 @@ start() {
     # (needed by the mm3d asset provider) come from .env when the caller shell hasn't
     # already exported them.
     [ -f "$REPO/.env" ] && . "$REPO/.env"
-    Xvfb "$DISP" -screen 0 1280x960x24 >"$LOGDIR/xvfb_mm.log" 2>&1 &
+    # The game is detached below, so its private display server must be detached too.  A plain
+    # background Xvfb remains a child of this manager shell and receives SIGHUP when a wrapper
+    # (such as gpuguard) returns; the game then loses its display mid-run and any phase report
+    # contains zero samples.  Keep the pair alive together until `stop` reaps their exact PIDs.
+    setsid nohup Xvfb "$DISP" -screen 0 1280x960x24 >"$LOGDIR/xvfb_mm.log" 2>&1 &
     sleep 2
     ( cd "$GAMEDIR" && setsid nohup env -u WAYLAND_DISPLAY DISPLAY="$DISP" \
         SDL_VIDEODRIVER=x11 SDL_AUDIODRIVER=dummy LIBGL_ALWAYS_SOFTWARE=1 GALLIUM_DRIVER=llvmpipe \
