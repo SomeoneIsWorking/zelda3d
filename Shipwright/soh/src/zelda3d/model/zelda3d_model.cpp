@@ -296,6 +296,9 @@ static const FacialAsset kFacialAssets[] = {
     // the EYE and slot 1 the MOUTH by convention (Zelda3D_FacialMaterialIndex relies on that order).
     { "zelda_link_child_new.zar", { { "childlink_eye.cmab", 14 }, { "childlink_mouth.cmab", 15 }, { nullptr, -1 } } },
     { "zelda_link_boy_new.zar",   { { "link_eye.cmab", 16 },      { "link_mouth.cmab", 17 },      { nullptr, -1 } } },
+    // Boss_Fd2 shares zelda_fd.zar with the flying multipart Boss_Fd. Qualify the forced CMB key so
+    // the eye frames are decoded only against valbasiagnd's material 3/base texture.
+    { "zelda_fd.zar|valbasiagnd", { { "valbasia_eye.cmab", 3 }, { nullptr, -1 }, { nullptr, -1 } } },
 };
 
 static bool strEndsWith(const std::string& s, const char* suf) {
@@ -845,6 +848,7 @@ static void loadAutoModel(int modelId, LoadedModel* out) {
             out->cmb = std::move(cmb);
             out->skinned = out->cmb->bones().size() > 1;
             buildFromCmb(out, /*bakedVertexColor=*/sky);
+            appendFacialFrames(out, key);
             if (sky) {
                 for (auto& grp : out->cGroups) grp.depthWrite = 0; // never occlude the world
             }
@@ -935,7 +939,7 @@ static void loadAutoModel(int modelId, LoadedModel* out) {
     // own draw group (buildDrawGroups now splits by mesh_id) and let the player path pick the
     // visible subset per frame via Zelda3D_GL_SetMidMask. So NO build-time cull here.
     buildFromCmb(out, /*bakedVertexColor=*/false);
-    appendFacialFrames(out, zarPath); // eye/mouth .cmab frames (keystone #3)
+    appendFacialFrames(out, key); // eye/mouth .cmab frames (keystone #3); key preserves forced-CMB selector
     // Note: `skinned` on its own doesn't mean the model is skipped — with the
     // default N64ANIM path (ZELDA3D_N64ANIM=1, gZelda3dAnimLive=1) skinned
     // characters render as their OoT3D model driven by the live N64

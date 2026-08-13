@@ -250,6 +250,19 @@ static const Zelda3DAnimMap kZelda3dAnimMaps[] = {
     ZELDA3D_ANIMMAP("objects/object_fd/gVolvagiaRightArmEmergeAnim", "vb_RarmONLY"),
     ZELDA3D_ANIMMAP("objects/object_fd/gVolvagiaHeadEmergeAnim", "vb_headONLY"),
     ZELDA3D_ANIMMAP("objects/object_fd/gVolvagiaBodyStaticAnim", "vb_FWDtest"),
+    // OoT3D folds N64 object_fd2 (the hole form) into zelda_fd.zar. These are the
+    // decomp-confirmed contiguous CSAB slots 4..14; see oot3d-decomp/docs/boss_fd2.md.
+    ZELDA3D_ANIMMAP_Z("objects/object_fd2/gHoleVolvagiaBreatheFireAnim", "vba_atack", "/actor/zelda_fd.zar"),
+    ZELDA3D_ANIMMAP_Z("objects/object_fd2/gHoleVolvagiaHitAnim", "vba_beforedamage", "/actor/zelda_fd.zar"),
+    ZELDA3D_ANIMMAP_Z("objects/object_fd2/gHoleVolvagiaDamagedAnim", "vba_damage", "/actor/zelda_fd.zar"),
+    ZELDA3D_ANIMMAP_Z("objects/object_fd2/gHoleVolvagiaBurrowAnim", "vba_down", "/actor/zelda_fd.zar"),
+    ZELDA3D_ANIMMAP_Z("objects/object_fd2/gHoleVolvagiaKnockoutAnim", "vba_hit", "/actor/zelda_fd.zar"),
+    ZELDA3D_ANIMMAP_Z("objects/object_fd2/gHoleVolvagiaVulnerableAnim", "vba_pikupiku", "/actor/zelda_fd.zar"),
+    ZELDA3D_ANIMMAP_Z("objects/object_fd2/gHoleVolvagiaTurnAnim", "vba_search", "/actor/zelda_fd.zar"),
+    ZELDA3D_ANIMMAP_Z("objects/object_fd2/gHoleVolvagiaClawSwipeAnim", "vba_tyokkai", "/actor/zelda_fd.zar"),
+    ZELDA3D_ANIMMAP_Z("objects/object_fd2/gHoleVolvagiaEmergeAnim", "vba_up", "/actor/zelda_fd.zar"),
+    ZELDA3D_ANIMMAP_Z("objects/object_fd2/gHoleVolvagiaAnim_00CDAC", "vba_wait02", "/actor/zelda_fd.zar"),
+    ZELDA3D_ANIMMAP_Z("objects/object_fd2/gHoleVolvagiaIdleAnim", "vba_wait", "/actor/zelda_fd.zar"),
     // ---- /actor/zelda_ff.zar (object_firefly) ----
     ZELDA3D_ANIMMAP("objects/object_firefly/gKeeseFlyAnim", "firefly_foot_fly"),
     // ---- /actor/zelda_fr.zar (object_fr) ----

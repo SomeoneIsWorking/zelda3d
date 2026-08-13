@@ -224,7 +224,12 @@ static const char* Zelda3D_ResolveAutoCsab(const char* n64AnimOtr, const char* m
             if (generic == NULL) {
                 generic = kZelda3dAnimMaps[i].csab;
             }
-        } else if (modelZar != NULL && strcmp(z, modelZar) == 0) {
+        } else if (modelZar != NULL &&
+                   (strcmp(z, modelZar) == 0 ||
+                    (strncmp(z, modelZar, strlen(z)) == 0 && modelZar[strlen(z)] == '|'))) {
+            // Forced-CMB auto-model keys are "<zar>|<cmb selector>". The selector chooses a model
+            // inside the archive; it does not change the archive identity used to disambiguate
+            // shared animation banks.
             return kZelda3dAnimMaps[i].csab; // model-specific match wins
         }
     }
@@ -335,6 +340,7 @@ void Zelda3D_ActorPostUpdate(PlayState* play, Actor* actor) {
     // regardless of selection/freeze, BEFORE the generic transform pin below (the pin would otherwise
     // freeze her shape.rot and stop the climb tilt evolving).
     Zelda3D_BossGomaClimbTick(actor);
+    Zelda3D_BossFd2IdleTick(play, actor);
     if (actor == NULL || actor != gZelda3dSelActor || !gZelda3dActorFreeze) {
         return;
     }
@@ -1037,8 +1043,17 @@ static int Zelda3D_DoRetarget(PlayState* play, void** skeleton, Vec3s* jointTabl
         // post-rotation channel. Reads the live interactInfo the faithful actor logic computed.
         Zelda3D_ApplyActorOverrides(gZelda3dPendingModel, gZelda3dPendingActor);
         Zelda3D_SetLimbOverride(NULL, NULL, 0); // consumed; the next actor's choke point sets it afresh
-        Zelda3D_UpdateAnimAuto(gZelda3dPendingModel, csab, gZelda3dAnimRate, gZelda3dPendingN64CurFrame,
-                             gZelda3dPendingN64AnimLength, gZelda3dPendingMorphWeight);
+        const char* actorCsab = NULL;
+        float actorCsabFrame = 0.0f;
+        if (Zelda3D_BossFd2ResolveAnim(play, gZelda3dPendingActor, csab, &actorCsab, &actorCsabFrame)) {
+            // Boss_Fd2 is controlled by its ported OoT3D action/CSAB controller. Never feed the 3DS
+            // object N64 joints, N64 clip phase, or N64 morph state.
+            Zelda3D_UpdateAnim(gZelda3dPendingModel, actorCsab, actorCsabFrame);
+            Zelda3D_RecordLastAuto(gZelda3dPendingModel, actorCsab, actorCsabFrame);
+        } else {
+            Zelda3D_UpdateAnimAuto(gZelda3dPendingModel, csab, gZelda3dAnimRate, gZelda3dPendingN64CurFrame,
+                                 gZelda3dPendingN64AnimLength, gZelda3dPendingMorphWeight);
+        }
         // Shared multi-variant CMBs (En_Ko Kokiri kids) bake several heads on distinct mesh_ids;
         // select the one this actor's ENKO_TYPE wants. Set BEFORE EmitModelDraw's EmitPose so the
         // mask pairs with this draw item (the GL pass snapshots pendingMidMask at emit time).
@@ -1540,4 +1555,3 @@ void Zelda3D_DebugDrawKibako(PlayState* play) {
         spawned = 1;
     }
 }
-

@@ -41,12 +41,12 @@ struct GlModel {
     // Per-frame material->CONSTANT-color override (EnHy townsfolk body colours, port of
     // Model_SetMaterialConstantColor via TownsfolkBehavior::applyDrawOverrides). Same snapshot
     // discipline as pendingMatTex: set before EmitPose, snapshot into ItemPose::matConst, applied
-    // by the render pass to uMatConst.rgb for the group whose materialIndex matches. The .constIdx
-    // must match the group's parsed combConstIdx (final-stage CONSTANT selector) — asserted at
-    // apply time so a stale write ends up as a diagnostic, not a mysterious wrong-slot tint.
+    // by the render pass to uMatConst.rgb for the group whose materialIndex matches. Keys encode
+    // materialIndex * 6 + constIdx so one material can animate multiple PICA constant slots.
     // Zelda3DMatConstOv is defined in fast/zelda3d_gl.h (POD; shared with the render backend
     // so the void*-typed map pointer that Zelda3D_Sg_DrawModel receives is well-typed).
-    std::unordered_map<int, Zelda3DMatConstOv> pendingMatConst; // materialIndex -> override
+    std::unordered_map<int, Zelda3DMatConstOv> pendingMatConst; // materialIndex*6+constIdx -> override
+    std::unordered_map<int, Zelda3DMatUvOv> pendingMatUv; // materialIndex -> animated UV translation
 
     // Per-draw light-DIRECTION override (title wordmark sheen, title_logo_actor.md §6.3). Unlike
     // the fields above, this is read DIRECTLY at Submit time rather than snapshotted through
@@ -80,6 +80,7 @@ struct ItemPose {
     // material->CONSTANT-color override for this emit (EnHy townsfolk body colours). Snapshotted
     // from GlModel::pendingMatConst at EmitPose so it pairs with the deferred draw.
     std::unordered_map<int, Zelda3DMatConstOv> matConst;
+    std::unordered_map<int, Zelda3DMatUvOv> matUv;
 };
 std::unordered_map<int, std::vector<ItemPose>> g_curPoses;  // this logic frame, per modelId
 std::unordered_map<int, std::vector<ItemPose>> g_prevPoses; // last logic frame, per modelId
@@ -474,6 +475,7 @@ extern "C" void Zelda3D_GL_ClearMatTexOverrides(int modelId) {
 // TownsfolkBehavior::applyDrawOverrides + oot3d-decomp/build/decomp/001b4944.c (EnHy_Draw).
 extern "C" void Zelda3D_GL_SetMatConstOverride(int modelId, int materialIndex, int constIdx,
                                              float r, float g, float b, float a) {
+    if (materialIndex < 0 || constIdx < 0 || constIdx >= 6) return;
     auto& pm = g_models[modelId].pendingMatConst;
     Zelda3DMatConstOv ov{};
     ov.constIdx = constIdx;
@@ -481,7 +483,7 @@ extern "C" void Zelda3D_GL_SetMatConstOverride(int modelId, int materialIndex, i
     ov.rgba[1] = g;
     ov.rgba[2] = b;
     ov.rgba[3] = a;
-    pm[materialIndex] = ov;
+    pm[materialIndex * 6 + constIdx] = ov;
     static int sDbg = -1;
     if (sDbg < 0) {
         const char* v = std::getenv("ZELDA3D_DBG_MATCONST");
@@ -495,6 +497,13 @@ extern "C" void Zelda3D_GL_SetMatConstOverride(int modelId, int materialIndex, i
 extern "C" void Zelda3D_GL_ClearMatConstOverrides(int modelId) {
     auto it = g_models.find(modelId);
     if (it != g_models.end()) it->second.pendingMatConst.clear();
+}
+extern "C" void Zelda3D_GL_SetMatUvOverride(int modelId, int materialIndex, float u, float v) {
+    g_models[modelId].pendingMatUv[materialIndex] = { u, v };
+}
+extern "C" void Zelda3D_GL_ClearMatUvOverrides(int modelId) {
+    auto it = g_models.find(modelId);
+    if (it != g_models.end()) it->second.pendingMatUv.clear();
 }
 
 // See the GlModel::hasLightDirOv comment: direct (unpaired) state, read straight from g_models at
@@ -537,6 +546,7 @@ extern "C" void Zelda3D_GL_EmitPose(int modelId) {
         p.midMask = it->second.pendingMidMask;
         p.matTex = it->second.pendingMatTex;
         p.matConst = it->second.pendingMatConst;
+        p.matUv = it->second.pendingMatUv;
     }
     g_curPoses[modelId].push_back(std::move(p));
 }
@@ -590,6 +600,7 @@ struct DrawItem {
     // Per-actor CONSTANT-color override (EnHy townsfolk). Same shape as matTex but per-material
     // rgba + constIdx; passed to Zelda3D_Sg_DrawModel and consumed inside the render pass.
     std::unordered_map<int, Zelda3DMatConstOv> matConst;
+    std::unordered_map<int, Zelda3DMatUvOv> matUv;
     // Per-draw light-direction override (title wordmark sheen, see GlModel::hasLightDirOv).
     bool hasLightDirOv = false;
     float lightDirOv[3] = { 0.0f, 0.0f, 1.0f };
@@ -670,6 +681,7 @@ extern "C" void Zelda3D_GL_Submit(int modelId, const float* mp16, const float* m
         it.midMask = cit->second[k].midMask;
         it.matTex = cit->second[k].matTex;
         it.matConst = cit->second[k].matConst;
+        it.matUv = cit->second[k].matUv;
     }
     if (cit != g_curPoses.end() && k < cit->second.size() && !cit->second[k].bones.empty()) {
         it.bones = cit->second[k].bones;
@@ -719,6 +731,7 @@ extern "C" void Zelda3D_GL_Submit(int modelId, const float* mp16, const float* m
         }
         Zelda3D_Sg_DrawModel(it.modelId, it.mp, it.mv, it.lit, it.invertY, it.r, it.g, it.b, it.a, it.aspectAdj, pose,
                            it.boneCount, it.midMask, it.sky, it.uvOffU, it.uvOffV, &it.matTex, &it.matConst,
+                           &it.matUv,
                            it.forceUnlit, it.hasLightDirOv ? it.lightDirOv : nullptr,
                            it.hasSphRotOv ? it.sphRotOv : nullptr);
     }
@@ -760,4 +773,3 @@ extern "C" void Zelda3D_GL_FrameBegin(void) {
     g_prevPoses = std::move(g_curPoses);
     g_curPoses.clear();
 }
-

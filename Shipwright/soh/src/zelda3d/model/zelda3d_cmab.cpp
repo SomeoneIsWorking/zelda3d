@@ -230,6 +230,28 @@ extern "C" int Zelda3D_CmabSampleTranslationV(void* handle, int materialIndex, i
     return 1;
 }
 
+extern "C" int Zelda3D_CmabSampleTranslationUV(void* handle, int materialIndex, int channelIndex,
+                                                float frame, float* outU, float* outV) {
+    Cmab* c = reinterpret_cast<Cmab*>(handle);
+    if (!c || (!outU && !outV)) return 0;
+    const AnimEntry* e = findEntry(*c, kAnimTranslation, materialIndex, channelIndex);
+    if (!e) return 0;
+    float f = clampFrame(*c, frame);
+    if (outU) *outU = e->trackPresent[0] ? e->tracks[0].sample(f) : 0.0f;
+    if (outV) *outV = e->trackPresent[1] ? e->tracks[1].sample(f) : 0.0f;
+    return 1;
+}
+
+extern "C" int Zelda3D_CmabSampleTexturePalette(void* handle, int materialIndex, int channelIndex,
+                                                  float frame, int* outIndex) {
+    Cmab* c = reinterpret_cast<Cmab*>(handle);
+    if (!c || !outIndex) return 0;
+    const AnimEntry* e = findEntry(*c, kAnimTexturePalette, materialIndex, channelIndex);
+    if (!e || !e->trackPresent[0]) return 0;
+    *outIndex = static_cast<int>(e->tracks[0].sample(clampFrame(*c, frame)));
+    return 1;
+}
+
 extern "C" int Zelda3D_CmabSampleConstColorRGB(void* handle, int materialIndex, int channelIndex,
                                                 float frame, float* rgb3) {
     Cmab* c = reinterpret_cast<Cmab*>(handle);
@@ -238,5 +260,16 @@ extern "C" int Zelda3D_CmabSampleConstColorRGB(void* handle, int materialIndex, 
     if (!e) return 0;
     float f = clampFrame(*c, frame);
     for (int i = 0; i < 3; i++) rgb3[i] = e->trackPresent[i] ? e->tracks[i].sample(f) : 0.0f;
+    return 1;
+}
+
+extern "C" int Zelda3D_CmabSampleConstColorRGBA(void* handle, int materialIndex, int channelIndex,
+                                                 float frame, float* rgba4) {
+    Cmab* c = reinterpret_cast<Cmab*>(handle);
+    if (!c || !rgba4) return 0;
+    const AnimEntry* e = findEntry(*c, kAnimConstColor, materialIndex, channelIndex);
+    if (!e) return 0;
+    float f = clampFrame(*c, frame);
+    for (int i = 0; i < 4; i++) rgba4[i] = e->trackPresent[i] ? e->tracks[i].sample(f) : 0.0f;
     return 1;
 }
