@@ -27,3 +27,9 @@ Launch the private Xvfb through `setsid nohup` as well. The next guarded Termina
 alive after the manager returned: `posinfo` reported scene 45, the game process and Xvfb were both
 present after an additional 12 seconds, and the log had no X-disconnect line. That particular scene
 only loaded rigid archives, so it proves transport lifetime rather than skinned-animation coverage.
+
+The repaired path was then exercised through one orderly, in-process three-scene tour: South Clock
+Town → Termina Field → Great Bay Coast, followed by REPL `quitteardown` so the report flushed. It
+sampled 9 `(model, clip)` pairs; all 7 pairs with at least two samples moved, and morph fired on
+1218 samples (including `kamome_fly` at max weight 0.93). This validates the control transport and
+the existing limited live coverage. It is not a claim of whole-game skinned-render parity.
