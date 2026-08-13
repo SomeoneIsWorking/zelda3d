@@ -6,6 +6,7 @@
 
 #include "z_en_ik.h"
 #include "z64rumble.h"
+#include "libultraship/log/luslog.h"
 #include "overlays/actors/ovl_En_Clear_Tag/z_en_clear_tag.h"
 
 #define FLAGS (ACTOR_FLAG_ATTENTION_ENABLED | ACTOR_FLAG_HOSTILE | ACTOR_FLAG_HOOKSHOT_PULLS_PLAYER)
@@ -268,7 +269,19 @@ static EffectBlureInit2 sBlureInit = {
 void EnIk_Init(Actor* thisx, PlayState* play) {
     static s32 sDisplayListDesegmented = false;
     s32 i;
+    s16 armorType;
     EnIk* this = (EnIk*)thisx;
+
+    // Scene data uses armor types 1..3, then the draw table uses the corresponding 0..2 row.
+    // ActorViewer and the developer-console spawn command can supply arbitrary params, so preserve
+    // that mapping only for valid scene values instead of decrementing an invalid value into a
+    // gIronKnuckleArmorType out-of-bounds index in EnIk_Draw.
+    armorType = IK_GET_ARMOR_TYPE(&this->actor);
+    if ((armorType < IK_TYPE_SILVER) || (armorType > IK_TYPE_WHITE)) {
+        LUSLOG_ERROR("EnIk_Init: armor type %d is out of range (valid 1..3) -- REFUSED", armorType);
+        Actor_Kill(&this->actor);
+        return;
+    }
 
     Actor_ProcessInitChain(&this->actor, sInitChain);
     SkelAnime_InitFlex(play, &this->skelAnime, &gIronKnuckleSkel, &gIronKnuckleWalkAnim, this->jointTable,
@@ -278,8 +291,7 @@ void EnIk_Init(Actor* thisx, PlayState* play) {
     Collider_InitAndSetTris(play, &this->colliderTris, &this->actor, &sTrisInit, this->shieldColliderElements);
     Collider_InitAndSetQuad(play, &this->colliderQuad, &this->actor, &sQuadInit);
     CollisionCheck_SetInfo(&this->actor.colChkInfo, &sDamageTableArmor, &sColChkInfoInit);
-    this->actor.params = IK_GET_ARMOR_TYPE(&this->actor);
-    this->actor.params--;
+    this->actor.params = armorType - IK_TYPE_SILVER;
 
     Effect_Add(play, &this->effectIndex, EFFECT_BLURE2, 0, 0, &sBlureInit);
     if (!sDisplayListDesegmented) {

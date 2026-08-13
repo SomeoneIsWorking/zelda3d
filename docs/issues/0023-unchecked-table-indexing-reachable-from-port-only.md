@@ -1,6 +1,6 @@
 # 0023 — unchecked table indexing reachable from port-only callers (audit)
 
-status: OPEN — 8 of 22 fixed 2026-08-12; the rest catalogued here, unfixed
+status: OPEN — 9 of 22 fixed 2026-08-13; the rest catalogued here, unfixed
 found by: a 33-agent audit run after the SAME bug was found twice in one day by accident
 
 ## The category
@@ -80,18 +80,16 @@ zelda3d-layer 42, libultraship 28.
   the refusing branch has NOT been observed firing, because MM's REPL has no `spawn` command and the
   developer-console path is ImGui-only. Someone should drive a bad params value through it before
   treating this guard as proven.
+- `EnIk_Draw` (`2ship/src/overlays/actors/ovl_En_Ik/z_en_ik.c`) — scene data encodes Iron Knuckle
+  armor as 1..3, which init converts to the 0..2 row in `sIronKnuckleArmorType`. A port-only spawn
+  can supply any params: zero became -1 and any low byte above 3 became an out-of-range draw-table
+  index. Init now refuses invalid armor types before setting up actor state; valid scene values retain
+  their exact old mapping.
 
 ### Confirmed, NOT yet fixed
 
 | site | symbol | severity | confidence | reachability |
 | --- | --- | --- | --- | --- |
-| `2ship/src/code/z_actor.c:3702` | Actor_LoadOverlay (and its only caller Actor_SpawnAsChildA | crash | high | Two port-only callers pass user-typed values with no validation of their own. (1) 2ship/2s2h/DeveloperTools/DebugConsole.cpp:47 `actorId = std::stoi(args[1]);` — the only try/catch is for std::invalid |
-| `2ship/src/code/z_sub_s.c:1123` | SubS_GetPathByIndex (same defect at SubS_GetAdditionalPath | crash | high | Every one of the ~40 overlay callers derives pathIndex from the actor's own params — e.g. z_en_baba.c:743 `SubS_GetPathByIndex(play, BOMB_SHOP_LADY_GET_PATH_INDEX(&this->actor), ...)`, z_en_bba_01.c:2 |
-| `Shipwright/soh/src/code/z_actor.c:4982` | Flags_SetEventChkInf / Flags_UnsetEventChkInf / Flags_GetE | corruption | high | REPL `eventflag` handler, Shipwright/soh/src/zelda3d/repl/zelda3d_repl.cpp:463-474 (and a second copy at :2079-2090). Both parse the flag with `sscanf(line, "%*s %i", &iv)` — decimal or hex, entirely  |
-| `Shipwright/soh/src/code/z_actor.c:3373` | Actor_Spawn | crash | high | REPL `spawn` / `spawnp`, Shipwright/soh/src/zelda3d/repl/zelda3d_repl.cpp:1404-1417. The documented contract is 'a raw actor id (0x14, 20, ...) — raw lets ANY actor (not just table entries) be spawned |
-| `Shipwright/soh/src/code/z_play.c:880` | Play_Main (TRANS_MODE_SETUP block) | crash | medium | REPL `warp`, zelda3d_repl.cpp:368 / 412: `sscanf(line, "%*s %i", &iv)` then `play->nextEntranceIndex = iv;` with no bound test at all (the handler's long comment fixes cutsceneIndex and gameMode, but  |
-| `Shipwright/soh/src/code/z_play.c:546` | Play_Init | crash | high | Same REPL `warp` value: z_play.c:993 / :1047 / :1089 / :1137 copy play->nextEntranceIndex into gSaveContext.entranceIndex when the transition completes, and Play_Init then reads gEntranceTable at it.  |
-| `2ship/src/overlays/actors/ovl_En_Ik/z_en_ik.c:1149` | EnIk_Draw | crash | high | ActorViewer.cpp:350-351 + 388 (or DebugConsole `spawn`) spawning ACTOR_EN_IK with Params=0 yields index -1 immediately; any Params>3 yields a far positive index. Needs a scene with OBJECT_IK resident. |
 | `2ship/src/overlays/actors/ovl_En_Pst/z_en_pst.c:643` | EnPst_FollowSchedule | crash | high | ActorViewer / DebugConsole `spawn` of ACTOR_EN_PST with any Params outside 0..4. |
 | `2ship/src/overlays/actors/ovl_En_GirlA/z_en_girla.c:166` | EnGirlA_InitObjIndex | crash | high | ActorViewer / DebugConsole `spawn` of ACTOR_EN_GIRLA with arbitrary Params; also any shop-actor param supplied by a mod or hand-edited scene. |
 | `2ship/src/overlays/actors/ovl_Bg_Ctower_Rot/z_bg_ctower_rot.c:145` | BgCtowerRot_Draw | crash | high | ActorViewer / DebugConsole `spawn` of ACTOR_BG_CTOWER_ROT with Params>=3 in the Clock Tower scene. |
