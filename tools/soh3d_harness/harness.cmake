@@ -7,6 +7,17 @@
 # main.cpp for the milestone and the direction this scaffold serves.
 set(_libretro_root ${CMAKE_SOURCE_DIR}/src/citra_libretro)
 set(_harness_root  ${CMAKE_CURRENT_LIST_DIR})
+set(_zelda3d_root  ${_harness_root}/../..)
+set(_soh_core      ${_zelda3d_root}/Shipwright/build-cmake/soh/libsoh_core.so)
+set(_lus_core      ${_zelda3d_root}/Shipwright/build-cmake/libultraship/src/libultraship.so)
+if(NOT EXISTS ${_soh_core} OR NOT EXISTS ${_lus_core})
+    message(FATAL_ERROR "soh3d_harness needs the shipping OoT build; run cmake --build Shipwright/build-cmake --target zelda3d_app -j4 first")
+endif()
+add_library(zelda3d_harness_soh_core SHARED IMPORTED)
+set_target_properties(zelda3d_harness_soh_core PROPERTIES IMPORTED_LOCATION ${_soh_core})
+add_library(zelda3d_harness_lus_core SHARED IMPORTED)
+set_target_properties(zelda3d_harness_lus_core PROPERTIES IMPORTED_LOCATION ${_lus_core})
+find_package(SDL3 REQUIRED)
 
 add_executable(soh3d_harness
     ${_harness_root}/main.cpp
@@ -18,11 +29,9 @@ add_executable(soh3d_harness
     $<TARGET_OBJECTS:azahar_libretro_common>
 )
 
-# soh_state.cpp includes SoH's z64.h / z64actor.h so it can read struct
-# fields through the 64-bit C++ layout (raw offsets from the N64 header
-# comments are wrong on a 64-bit build). It needs soh_settings' compile
-# flags — inherited transitively from soh_lib PRIVATE (soh_settings is
-# linked PUBLIC to soh_lib), so no extra wiring needed here.
+# soh_state.cpp includes SoH's z64.h / z64actor.h so it can read fields through
+# the 64-bit C++ layout (raw offsets from N64 header comments are wrong there).
+# Direct include roots and ABI definitions below must match the shipping core.
 
 # These -D switches gate the renderer surface in common/settings.h and
 # citra_libretro.cpp. Azahar adds them via add_compile_definitions() in
@@ -44,7 +53,17 @@ target_compile_definitions(soh3d_harness PRIVATE
     # off the field Player_Update reads, and Link never sees any injection.
     CONTROLLERBUTTONS_T=uint32_t
 )
-target_include_directories(soh3d_harness PRIVATE ${CMAKE_SOURCE_DIR}/src)
+target_include_directories(soh3d_harness PRIVATE
+    ${CMAKE_SOURCE_DIR}/src
+    # The harness directly includes asset/texpack.h. Linking cmb3d does not propagate its include
+    # directory in the Azahar superbuild because the imported Shipwright target is consumed across
+    # the deferred top-level boundary, so declare the direct source dependency explicitly here.
+    ${_harness_root}/../../Shipwright/cmb3d
+    ${_harness_root}/../../Shipwright/soh
+    ${_harness_root}/../../Shipwright/soh/include
+    ${_harness_root}/../../Shipwright/soh/src
+    ${_harness_root}/../../Shipwright/libultraship/include
+)
 
 # -rdynamic so backtrace(3) can resolve our function names in the watchdog
 # stack dump. Cheap; only affects the harness executable's symbol table.
@@ -54,26 +73,9 @@ target_link_libraries(soh3d_harness PRIVATE
     citra_common citra_core
     Boost::boost dds-ktx libretro tsl::robin_map
     ${PLATFORM_LIBRARIES} Threads::Threads
-    soh_lib
-    # main.cpp's `texpack` REPL command reads Zelda3D::TexPackGetStats() so the
-    # hi-res-pack A/B can be measured on OUR side (the oracle side comes from
-    # CustomTexManager::GetStats, AZAHAR_PATCH.md Patch 8). soh_lib links cmb3d
-    # PRIVATEly, so its PUBLIC include dir does not propagate — name it here.
-    cmb3d
+    zelda3d_harness_soh_core zelda3d_harness_lus_core SDL3::SDL3
 )
 
-# soh_lib pulls in the whole Shipwright side (ZAPDLib, libultraship,
-# OTRExporter, cmb3d, zelda3d_shared, ...). OTRExporter is added via
-# `-Wl,--whole-archive OTRExporter --no-whole-archive` from ZAPDLib's
-# PUBLIC deps: those .o files reference ::BinaryWriter::Write DEFINED in
-# ZAPDLib but placed EARLIER in the link line. Single-pass ld.bfd can't
-# resolve into archives that came before.
-#
-# Fix: force ZAPDLib ALSO to be whole-archived, so all its .o (including
-# BinaryWriter.cpp.o) are unconditionally present before OTRExporter's
-# whole-archive .o files land.
-target_link_libraries(soh3d_harness PRIVATE
-    "$<LINK_LIBRARY:WHOLE_ARCHIVE,ZAPDLib>")
 if(ENABLE_VULKAN)
     target_link_libraries(soh3d_harness PRIVATE sirit vulkan-headers vma)
     # harness_vk.cpp is a real libretro Vulkan HW-render FRONTEND: it creates

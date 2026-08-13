@@ -37,6 +37,32 @@ REPO_ROOT   = Path(__file__).resolve().parent.parent
 HARNESS_SH  = REPO_ROOT / "tools" / "soh3d_harness.sh"
 HARNESS_BIN = REPO_ROOT / "Azahar" / "build-harness" / "bin" / "Release" / "soh3d_harness"
 
+
+def _provision_rom_environment() -> None:
+    """Apply the launcher's env -> repo .env -> drop-in ROM contract."""
+    script = REPO_ROOT / "tools" / "rom_provision.sh"
+    command = (
+        'source "$1"; zelda3d_provision_roms "$2"; '
+        'printf "%s\\0%s\\0" "${ZELDA3D_OOT3D_ROM-}" "${ZELDA3D_OOT_ROM-}"'
+    )
+    result = subprocess.run(
+        ["bash", "-c", command, "harness-rom-provision", str(script), str(REPO_ROOT)],
+        check=True, stdout=subprocess.PIPE,
+    )
+    values = result.stdout.split(b"\0")
+    for name, value in zip(("ZELDA3D_OOT3D_ROM", "ZELDA3D_OOT_ROM"), values):
+        if value:
+            os.environ[name] = os.fsdecode(value)
+
+    rom = os.environ.get("ZELDA3D_OOT3D_ROM")
+    if not rom:
+        raise RuntimeError(
+            "OoT3D ROM provisioning scanned the process environment, repo .env, "
+            "and repo-root *.3ds files; matched 0"
+        )
+    if not Path(rom).is_file():
+        raise RuntimeError(f"provisioned OoT3D ROM does not exist: {rom}")
+
 # ---------------------------------------------------------------------------
 # OracleCache — persistent cache of deterministic embedded-Azahar output.
 # ---------------------------------------------------------------------------
@@ -442,6 +468,7 @@ def _ensure_scalable_malloc() -> None:
 def spawn(save_state: Optional[str] = None) -> Harness:
     if not HARNESS_BIN.exists() and not HARNESS_SH.exists():
         raise RuntimeError(f"soh3d_harness not found; expected {HARNESS_BIN} or {HARNESS_SH}")
+    _provision_rom_environment()
     _ensure_headless_env()
     _ensure_scalable_malloc()
     cmd = [str(HARNESS_BIN)] if HARNESS_BIN.exists() else [str(HARNESS_SH)]

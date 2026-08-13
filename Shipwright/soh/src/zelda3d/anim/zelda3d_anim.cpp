@@ -714,6 +714,11 @@ static void Zelda3D_UpdateAnimMorph(int modelId, const char* inName, float fIn, 
     uploadSkin(modelId, lm, sm);
 }
 
+extern "C" void Zelda3D_UpdateAnimAuthoredMorph(int modelId, const char* inName, float inFrame,
+                                                  const char* outName, float outFrame, float weight) {
+    Zelda3D_UpdateAnimMorph(modelId, inName, inFrame, outName, outFrame, weight);
+}
+
 // Drive an auto-replaced model by its OWN OoT3D CSAB (animName). Two playhead modes:
 //   PHASE-LOCK (n64AnimLength>4): the OoT3D CSAB is driven at the SAME fractional progress as the
 //     actor's live N64 animation (csab_frame = (n64CurFrame/n64AnimLength) * csab_duration). This
