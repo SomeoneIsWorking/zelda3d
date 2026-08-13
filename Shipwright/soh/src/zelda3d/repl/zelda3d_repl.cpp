@@ -2336,6 +2336,20 @@ static void Zelda3D_ReplExec(PlayState* play, char* line, const char* outPath) {
         } else {
             Zelda3D_ReplReply(outPath, "fd2idle: scanned selection; need live Boss_Fd2 (0xA2)");
         }
+    } else if (strcmp(cmd, "fd2state") == 0) {
+        char stateName[24] = {};
+        int state = -1;
+        if (sscanf(line, "%*s %23s", stateName) == 1) {
+            if (strcmp(stateName, "vulnerable") == 0) state = 0;
+            else if (strcmp(stateName, "damaged") == 0) state = 1;
+            else if (strcmp(stateName, "death") == 0) state = 2;
+        }
+        if (state >= 0 && Zelda3D_BossFd2ForceDamageState(play, gZelda3dSelActor, state)) {
+            Zelda3D_ReplReply(outPath, "fd2state: entered real %s setup", stateName);
+        } else {
+            Zelda3D_ReplReply(outPath,
+                              "fd2state: scanned selection; usage fd2state <vulnerable|damaged|death> on live Boss_Fd2");
+        }
     } else if (strcmp(cmd, "afreeze") == 0) {
         // GENERIC: pin the selected actor's transform every frame. 0=off, 1=pin pos+rot,
         // 2=pin position only (rotation free — e.g. so a held cucco's body shake stays visible).

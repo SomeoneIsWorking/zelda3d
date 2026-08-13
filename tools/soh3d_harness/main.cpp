@@ -1,7 +1,7 @@
 // soh3d_harness — headless libretro-frontend host that drives Azahar's
-// libretro core in-process (no dlopen, no .so). Azahar's citra_libretro
-// source files are linked directly into this executable (see the sibling
-// harness.cmake), so the retro_* entry points are just normal C symbols.
+// libretro core in-process. Azahar's citra_libretro source files are linked
+// directly into this executable; the SoH side uses the already-built shipping
+// shared core rather than compiling a private duplicate game.
 //
 // This is the C++ side of the "direct harness" direction laid out in
 // soh3d/CLAUDE.md ("Direction: build a direct harness that EMBEDS Azahar

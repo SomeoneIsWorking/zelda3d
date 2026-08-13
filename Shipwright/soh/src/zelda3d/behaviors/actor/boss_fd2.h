@@ -33,10 +33,15 @@ int Zelda3D_BossFd2DrawManeSegment(PlayState* play, Actor* actor, int chain, int
 // consumed by BossFd2_Wait. Returns 1 only for a live Boss_Fd2 with its Boss_Fd parent attached.
 int Zelda3D_BossFd2ForceGround(Actor* actor);
 
+// Diagnostic control: enter a real collision-result setup state on a selected Boss_Fd2.
+// state: 0=knockout/vulnerable, 1=nonlethal damage, 2=death.
+int Zelda3D_BossFd2ForceDamageState(PlayState* play, Actor* actor, int state);
+
 // Resolve the OoT3D-authored CSAB and its independent OoT3D playhead for the hole-form actor.
 // Returns 1 for Boss_Fd2; the generic N64 phase-lock path must not run when this succeeds.
-int Zelda3D_BossFd2ResolveAnim(PlayState* play, Actor* actor, const char* fallbackCsab,
-                              const char** outCsab, float* outFrame);
+int Zelda3D_BossFd2ResolveAnim(PlayState* play, Actor* actor, const char** outCsab,
+                              float* outFrame, const char** outMorphCsab, float* outMorphFrame,
+                              float* outMorphWeight);
 
 #ifdef __cplusplus
 }

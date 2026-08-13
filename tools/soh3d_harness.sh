@@ -40,6 +40,15 @@ build_dir="${azahar_root}/build-harness"
 harness_bin="${build_dir}/bin/Release/soh3d_harness"
 wire_in="${repo_root}/tools/soh3d_harness/wire_in.cmake"
 
+# Match every other Zelda3D launcher: explicit environment first, then the
+# gitignored repo .env, then a drop-in ROM at the repo root.
+source "${repo_root}/tools/rom_provision.sh"
+zelda3d_provision_roms "${repo_root}"
+if [[ $# -eq 0 && -z "${ZELDA3D_OOT3D_ROM:-}" ]]; then
+    echo "harness: ROM provisioning scanned the process environment, repo .env, and repo-root *.3ds files; matched 0" >&2
+    exit 1
+fi
+
 mkdir -p "${repo_root}/scratch/harness/system" "${repo_root}/scratch/harness/save" \
          "${repo_root}/scratch/logs"
 
@@ -53,7 +62,7 @@ if [[ ! -f "${build_dir}/build.ninja" ]]; then
         -DENABLE_SOFTWARE_RENDERER=ON -DENABLE_LTO=OFF -DUSE_SYSTEM_GLSLANG=ON \
         -DENABLE_BUILTIN_KEYBLOB=ON
 fi
-ninja -C "${build_dir}" soh3d_harness
+ninja -C "${build_dir}" -j"${ZELDA3D_BUILD_JOBS:-4}" soh3d_harness
 
 # The embedded SoH side (`soh_boot`) resolves its archives next to the binary.
 # Link them REPO-RELATIVELY — these used to be hand-made absolute symlinks and

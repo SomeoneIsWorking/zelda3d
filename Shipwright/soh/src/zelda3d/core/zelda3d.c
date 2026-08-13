@@ -1045,10 +1045,19 @@ static int Zelda3D_DoRetarget(PlayState* play, void** skeleton, Vec3s* jointTabl
         Zelda3D_SetLimbOverride(NULL, NULL, 0); // consumed; the next actor's choke point sets it afresh
         const char* actorCsab = NULL;
         float actorCsabFrame = 0.0f;
-        if (Zelda3D_BossFd2ResolveAnim(play, gZelda3dPendingActor, csab, &actorCsab, &actorCsabFrame)) {
+        const char* actorMorphCsab = NULL;
+        float actorMorphFrame = 0.0f;
+        float actorMorphWeight = 0.0f;
+        if (Zelda3D_BossFd2ResolveAnim(play, gZelda3dPendingActor, &actorCsab, &actorCsabFrame,
+                                      &actorMorphCsab, &actorMorphFrame, &actorMorphWeight)) {
             // Boss_Fd2 is controlled by its ported OoT3D action/CSAB controller. Never feed the 3DS
             // object N64 joints, N64 clip phase, or N64 morph state.
-            Zelda3D_UpdateAnim(gZelda3dPendingModel, actorCsab, actorCsabFrame);
+            if (actorMorphCsab != NULL && actorMorphWeight > 0.0f) {
+                Zelda3D_UpdateAnimAuthoredMorph(gZelda3dPendingModel, actorCsab, actorCsabFrame,
+                                                actorMorphCsab, actorMorphFrame, actorMorphWeight);
+            } else {
+                Zelda3D_UpdateAnim(gZelda3dPendingModel, actorCsab, actorCsabFrame);
+            }
             Zelda3D_RecordLastAuto(gZelda3dPendingModel, actorCsab, actorCsabFrame);
         } else {
             Zelda3D_UpdateAnimAuto(gZelda3dPendingModel, csab, gZelda3dAnimRate, gZelda3dPendingN64CurFrame,

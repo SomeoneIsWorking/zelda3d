@@ -41,7 +41,14 @@ _zelda3d_have_n64_assets() {
 zelda3d_provision_roms() {
     local repo="$1" sohdir="${2:-}"
 
+    # Preserve caller-provided values across `.env`; explicit process state is
+    # the highest-priority source promised by this helper's contract.
+    local caller_oot3d="${ZELDA3D_OOT3D_ROM-}" caller_oot="${ZELDA3D_OOT_ROM-}"
+
     [ -f "$repo/.env" ] && . "$repo/.env"
+
+    [ -n "$caller_oot3d" ] && ZELDA3D_OOT3D_ROM="$caller_oot3d"
+    [ -n "$caller_oot" ] && ZELDA3D_OOT_ROM="$caller_oot"
 
     if [ -z "${ZELDA3D_OOT3D_ROM:-}" ]; then
         ZELDA3D_OOT3D_ROM="$(_zelda3d_first_file "$repo/oot3d.3ds" "$repo"/*.3ds || true)"
