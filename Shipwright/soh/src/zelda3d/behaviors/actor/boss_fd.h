@@ -18,6 +18,7 @@ public:
 extern "C" {
 #endif
 int Zelda3D_BossFdForceFly(Actor* actor);
+int Zelda3D_BossFdForceDeath(Actor* actor, int liveSegments, int actionState);
 int Zelda3D_BossFdHistoryInfo(Actor* actor, int* bodyLead, int* maneLead, Vec3f* minPos,
                              Vec3f* maxPos);
 #ifdef __cplusplus
