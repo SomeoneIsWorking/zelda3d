@@ -40,6 +40,7 @@ add_executable(soh3d_harness
 # so we must add the same -Ds explicitly.
 target_compile_definitions(soh3d_harness PRIVATE
     HAVE_LIBRETRO
+    ZELDA3D_HARNESS_REPO_ROOT="${_zelda3d_root}"
     $<$<BOOL:${ENABLE_SOFTWARE_RENDERER}>:ENABLE_SOFTWARE_RENDERER>
     $<$<BOOL:${ENABLE_OPENGL}>:ENABLE_OPENGL>
     $<$<BOOL:${ENABLE_VULKAN}>:ENABLE_VULKAN>

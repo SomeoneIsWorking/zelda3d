@@ -16,7 +16,7 @@ namespace Fast::Unified {
 
 // The plan calls for "~3-6 statically compiled shader variants keyed on structural features only
 // (texture count, alpha-on/off, fog, grayscale)" rather than one variant per combiner permutation
-// (hundreds) or one fully generic uber-shader (correct but slower on simple draws). These six cover
+// (hundreds) or one fully generic uber-shader (correct but slower on simple draws). These buckets cover
 // the structural buckets seen in the Phase 0 corpus sweep (scratch/render_unify/cc_corpus.log):
 enum class Variant {
     kUntextured,        // vertex-color-only draws (solid UI fills, debug wireframes)
@@ -25,6 +25,7 @@ enum class Variant {
     kDualTex,            // 2 textures / 2-cycle combine, no fog
     kDualTexFog,         // 2 textures / 2-cycle combine, with fog blend
     kGrayscale,          // N64 grayscale-filter combiner mode (opt_grayscale)
+    kGenericTev,         // 3DS PICA TEV chain (up to 3 textures / 6 stages)
     kCount
 };
 
@@ -33,7 +34,7 @@ const char* VariantName(Variant v);
 // Returns the GLSL source for one stage of one variant. The combiner arithmetic itself is NOT
 // baked per-variant text (that's the old per-permutation-compiled approach this replaces) — it's a
 // runtime switch over UnifiedMaterial.combMux's SHADER_* operand codes, shared verbatim across all
-// six variants. Only structural feature (texture count / alpha test / fog / grayscale) differs.
+// variants. Only structural feature (texture count / alpha test / fog / grayscale / PICA TEV) differs.
 std::string BuildVertexSource(Variant v);
 std::string BuildFragmentSource(Variant v);
 

@@ -1,0 +1,63 @@
+# En_Vb_Ball graphics and the unified generic-TEV gap
+
+## Ground truth
+
+OoT3D actor-table entry `0xAD` resolves to profile `0x0052FDB4` (object `0x9C`,
+`zelda_fd.zar`). `oot3d-decomp/docs/boss_fd2.md` records the recovered init/update/draw functions:
+
+- init loads model index 8 (`valbasia_death_body.cmb`) and index 7
+  (`valbasia_attack_stone.cmb`);
+- params `>= 200` draw the detached death body, lower params draw the attack stone;
+- params `100` additionally draw keep model index `0x53`,
+  `shadow/model/shadow_model.cmb`, at `(actor.x, 100, actor.z)`;
+- the shadow scale is `actorScale * 68 * fade`, with fade `.1 + .025/draw` clamped to 1, and
+  material-0 constant slot 4 supplies black plus the recovered alpha.
+
+The port lives in `behaviors/actor/en_vb_ball.cpp`. It consumes typed native actor transform,
+timer, shadow-size, and shadow-opacity fields. It never consumes an N64 display list, animation
+identity/phase, joint table, morph state, or procedural history.
+
+## False diagnosis and discriminator
+
+Early screenshots showed black radial spokes around the attack stone. The source CMB parser and the
+shipping CMB parser both reported bounded geometry (attack stone: 68 triangles, maximum world extent
+about 113; shadow: exactly 6 vertices). Two contaminated tests made the problem look geometric:
+
+1. params-101 was called "no shadow", but older frozen params-100 actors were still alive and drawing
+   their shadows;
+2. immediate captures after teleporting a diagnostic actor from `(5000,*,5000)` retained the previous
+   transform in the frame interpolator.
+
+The decisive A/B held one settled params-100 actor and toggled only `unified 0/1`. Legacy rendered
+cleanly; unified turned the bounded keep shadow into a large textured quad. `sgdump 2025` showed why:
+the shadow material is a blended, depth-write-off, three-stage generic PICA TEV material with a
+per-draw constant override, while the unified CMB route reduced every textured group to its one-stage
+N64-style combiner and left the mirrored TEV UBO fields unused.
+
+## Root fix and evidence
+
+The unified renderer now has a structural `kGenericTev` variant. It receives the already-verified
+legacy CMB material packer's six stage words, RGBA8 constants after per-actor overrides, all three
+texture bindings, coordinator-1/2 transforms, combiner-buffer latch semantics, stage scales, and
+final-alpha comparison. The TEV evaluator itself is injected from the shared
+`zelda3d_tev_glsl.h` source into both legacy and unified shader templates, so the new route does not
+carry a second implementation that can drift. No model-name or Volvagia special case exists.
+
+The first shared-source build failed the all-variant self-test because the unified Prism template
+used the legacy Inja insertion delimiter (`{{ ... }}`), leaving literal braces in its final GLSL.
+Changing that boundary to Prism's `@{...}` insertion made every unified variant compile; switching
+live to `unified 0` then compiled and rendered the legacy template from the same shared evaluator
+without a shader/template error.
+
+Evidence:
+
+- `ZELDA3D_UNIFIED_SHADER_SELFTEST=1`: every variant, including GenericTev, compiles to SPIR-V;
+- live unified screenshot: `scratch/screenshots/boss_fd_attack_shadow_unified_tev_fixed.png`;
+- live detached rib: `scratch/screenshots/boss_fd_detached_bone_settled_final.png`;
+- attack-stone and shadow geomscan: extents 113 and 46 respectively, with no En_Vb_Ball huge/NaN draw;
+- isolated shadow-on/off masks: unified mean darkening `31.709`, legacy `31.702`, mask IoU `0.9904`
+  (`23,954` intersecting pixels / `24,186` union).
+
+Negative-design lesson: actor diagnostics that can leave prior instances alive must not use
+"params X has no branch Y" as a discriminator without first proving the scene contains exactly one
+matching actor. A first-frame capture after an explicit teleport is also not settled evidence.

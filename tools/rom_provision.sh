@@ -39,13 +39,13 @@ _zelda3d_have_n64_assets() {
 }
 
 zelda3d_provision_roms() {
-    local repo="$1" sohdir="${2:-}"
+    local repo="$1" sohdir="${2:-}" env_loaded="${3:-0}"
 
     # Preserve caller-provided values across `.env`; explicit process state is
     # the highest-priority source promised by this helper's contract.
     local caller_oot3d="${ZELDA3D_OOT3D_ROM-}" caller_oot="${ZELDA3D_OOT_ROM-}"
 
-    [ -f "$repo/.env" ] && . "$repo/.env"
+    [ "$env_loaded" = 1 ] || { [ ! -f "$repo/.env" ] || . "$repo/.env"; }
 
     [ -n "$caller_oot3d" ] && ZELDA3D_OOT3D_ROM="$caller_oot3d"
     [ -n "$caller_oot" ] && ZELDA3D_OOT_ROM="$caller_oot"

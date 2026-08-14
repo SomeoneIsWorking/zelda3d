@@ -30,6 +30,7 @@
 #include "actor/boss_goma.h"
 #include "actor/boss_fd2.h"
 #include "actor/boss_fd.h"
+#include "actor/en_vb_ball.h"
 #include "asset/mat4.h"
 
 extern "C" {
@@ -128,11 +129,14 @@ ActorBehavior* findActorBehavior(s16 actorId) {
     static BossGomaBehavior sBossGoma;
     static BossFd2Behavior sBossFd2;
     static BossFdBehavior sBossFd;
+    static EnVbBallBehavior sEnVbBall;
     switch (actorId) {
         case ACTOR_BOSS_FD:
             return &sBossFd;
         case ACTOR_BOSS_FD2:
             return &sBossFd2;
+        case ACTOR_EN_VB_BALL:
+            return &sEnVbBall;
         case ACTOR_BOSS_GOMA:
             return &sBossGoma;
         case ACTOR_EN_DOOR:

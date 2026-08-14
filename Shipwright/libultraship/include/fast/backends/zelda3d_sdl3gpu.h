@@ -197,8 +197,8 @@ class Zelda3DRenderer {
     // compiled, one vertex+fragment pair per Fast::Unified::Variant) and the pipeline cache built
     // from them — kept separate from g_vert/g_frag/g_pipelines (the old fixed-shader path) so
     // gUnifiedRenderer==0 never even touches this state.
-    SDL_GPUShader* g_uniVert[6] = {};
-    SDL_GPUShader* g_uniFrag[6] = {};
+    SDL_GPUShader* g_uniVert[(int)Fast::Unified::Variant::kCount] = {};
+    SDL_GPUShader* g_uniFrag[(int)Fast::Unified::Variant::kCount] = {};
     std::map<PipeKey, SDL_GPUGraphicsPipeline*> g_uniPipelines;
 
     // Deferred model eviction (mirror of the GL/VK path).

@@ -699,6 +699,7 @@ int Zelda3D_BossFd2ForceGround(Actor* actor);
 int Zelda3D_BossFdForceFly(Actor* actor);
 int Zelda3D_BossFdForceDeath(Actor* actor, int liveSegments, int actionState);
 int Zelda3D_BossFdForceEffects(Actor* actor, int type3ds, int count);
+Actor* Zelda3D_EnVbBallSpawnDiagnostic(PlayState* play, Actor* parent, int params);
 int Zelda3D_BossFdHistoryInfo(Actor* actor, int* bodyLead, int* maneLead, Vec3f* minPos,
                              Vec3f* maxPos);
 int Zelda3D_BossFd2ForceIdle(PlayState* play, Actor* actor, int hold);
