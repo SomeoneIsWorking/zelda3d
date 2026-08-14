@@ -3,16 +3,21 @@
 #include "global.h"
 #include "en_vb_ball.h"
 #include "fast/zelda3d_gl.h"
+#include "overlays/actors/ovl_Boss_Fd/z_boss_fd.h"
 #include "overlays/actors/ovl_En_Vb_Ball/z_en_vb_ball.h"
+#include "zelda3d/zelda3d.h"
 
 #include <algorithm>
 
 extern "C" {
 int Zelda3D_AutoModelId(const char* zarPath);
-int Zelda3D_DrawModelTransform(PlayState* play, int modelId, const Vec3f* pos,
-                              const Vec3f* rotYXZ, const Vec3f* scale, float postRotX);
-void Zelda3D_GL_SetMatConstOverride(int modelId, int materialIndex, int constIdx,
-                                   float r, float g, float b, float a);
+int Zelda3D_DrawModelTransform(PlayState* play, int modelId, const Vec3f* pos, const Vec3f* rotYXZ, const Vec3f* scale,
+                               float postRotX);
+void Zelda3D_GL_SetMatConstOverride(int modelId, int materialIndex, int constIdx, float r, float g, float b, float a);
+void EnVbBall_SpawnDebris(PlayState* play, BossFdEffect* effects, Vec3f* position, Vec3f* velocity, Vec3f* acceleration,
+                          float scale);
+void EnVbBall_SpawnDust(PlayState* play, BossFdEffect* effects, Vec3f* position, Vec3f* velocity, Vec3f* acceleration,
+                        float scale);
 }
 
 namespace {
@@ -29,19 +34,15 @@ struct Models {
 Models& models() {
     static Models m;
     if (m.stone == 0) {
-        m.stone = Zelda3D_AutoModelId(
-            "/actor/zelda_fd.zar|Model/valbasia_attack_stone.cmb");
-        m.bone = Zelda3D_AutoModelId(
-            "/actor/zelda_fd.zar|Model/valbasia_death_body.cmb");
-        m.shadow = Zelda3D_AutoModelId(
-            "/actor/zelda_keep.zar|shadow/model/shadow_model.cmb");
+        m.stone = Zelda3D_AutoModelId("/actor/zelda_fd.zar|Model/valbasia_attack_stone.cmb");
+        m.bone = Zelda3D_AutoModelId("/actor/zelda_fd.zar|Model/valbasia_death_body.cmb");
+        m.shadow = Zelda3D_AutoModelId("/actor/zelda_keep.zar|shadow/model/shadow_model.cmb");
     }
     return m;
 }
 
 Vec3f actorRotation(const Actor& actor) {
-    return { actor.shape.rot.x * kBinangToRad, actor.shape.rot.y * kBinangToRad,
-             actor.shape.rot.z * kBinangToRad };
+    return { actor.shape.rot.x * kBinangToRad, actor.shape.rot.y * kBinangToRad, actor.shape.rot.z * kBinangToRad };
 }
 
 void drawLargeRockShadow(PlayState* play, const EnVbBall& ball, int modelId) {
@@ -57,35 +58,122 @@ void drawLargeRockShadow(PlayState* play, const EnVbBall& ball, int modelId) {
     Zelda3D_DrawModelTransform(play, modelId, &pos, &rot, &scale, 0.0f);
 }
 
+EnVbBall* liveBall(Actor* actor) {
+    if (!Zelda3D_Enabled() || actor == nullptr || actor->id != ACTOR_EN_VB_BALL)
+        return nullptr;
+    return reinterpret_cast<EnVbBall*>(actor);
+}
+
+BossFd* liveParent(EnVbBall& ball) {
+    Actor* parent = ball.actor.parent;
+    if (parent == nullptr || parent->id != ACTOR_BOSS_FD)
+        return nullptr;
+    return reinterpret_cast<BossFd*>(parent);
+}
+
+void spawnDebris(PlayState* play, BossFd* boss, EnVbBall& ball, int count, float velocityXZ, float velocityYRange,
+                 float velocityYBase, float positionRange, float scaleRange, float scaleBase) {
+    for (int i = 0; i < count; ++i) {
+        Vec3f velocity = { Rand_CenteredFloat(velocityXZ), Rand_ZeroFloat(velocityYRange) + velocityYBase,
+                           Rand_CenteredFloat(velocityXZ) };
+        Vec3f acceleration = { 0.0f, -1.0f, 0.0f };
+        Vec3f position = { ball.actor.world.pos.x + Rand_CenteredFloat(positionRange),
+                           ball.actor.world.pos.y + Rand_CenteredFloat(positionRange),
+                           ball.actor.world.pos.z + Rand_CenteredFloat(positionRange) };
+        EnVbBall_SpawnDebris(play, boss->effects, &position, &velocity, &acceleration,
+                             Rand_ZeroFloat(scaleRange) + scaleBase);
+    }
+}
+
+void spawnSmoke(PlayState* play, BossFd* boss, EnVbBall& ball, int count, float positionRange, float positionY,
+                bool fixedY, float scaleRange, float scaleBase) {
+    for (int i = 0; i < count; ++i) {
+        Vec3f velocity = { Rand_CenteredFloat(8.0f), Rand_ZeroFloat(1.0f), Rand_CenteredFloat(8.0f) };
+        Vec3f acceleration = { 0.0f, fixedY ? 0.3f : 0.5f, 0.0f };
+        Vec3f position = { ball.actor.world.pos.x + Rand_CenteredFloat(positionRange),
+                           fixedY ? positionY : ball.actor.world.pos.y + Rand_CenteredFloat(positionRange),
+                           ball.actor.world.pos.z + Rand_CenteredFloat(positionRange) };
+        EnVbBall_SpawnDust(play, boss->effects, &position, &velocity, &acceleration,
+                           Rand_ZeroFloat(scaleRange) + scaleBase);
+    }
+}
+
 } // namespace
 
 namespace Zelda3D {
 
-s16 EnVbBallBehavior::actorId() const { return ACTOR_EN_VB_BALL; }
+s16 EnVbBallBehavior::actorId() const {
+    return ACTOR_EN_VB_BALL;
+}
 
 bool EnVbBallBehavior::tryDrawModel(PlayState* play, Actor* actor) {
-    if (play == nullptr || actor == nullptr || actor->id != ACTOR_EN_VB_BALL) return false;
+    if (play == nullptr || actor == nullptr || actor->id != ACTOR_EN_VB_BALL)
+        return false;
     Models& m = models();
-    if (m.stone <= 0 || m.bone <= 0 || m.shadow <= 0) return false;
+    if (m.stone <= 0 || m.bone <= 0 || m.shadow <= 0)
+        return false;
 
     const EnVbBall& ball = *reinterpret_cast<const EnVbBall*>(actor);
     const int modelId = actor->params >= 200 ? m.bone : m.stone;
     const Vec3f rot = actorRotation(*actor);
     Zelda3D_DrawModelTransform(play, modelId, &actor->world.pos, &rot, &actor->scale, 0.0f);
-    if (actor->params == 100) drawLargeRockShadow(play, ball, m.shadow);
+    if (actor->params == 100)
+        drawLargeRockShadow(play, ball, m.shadow);
     return true;
 }
 
 } // namespace Zelda3D
+
+extern "C" int Zelda3D_EnVbBallUpdateShadow(Actor* actor) {
+    EnVbBall* ball = liveBall(actor);
+    if (ball == nullptr || actor->params >= 200)
+        return 0;
+    // FUN_0024E700 approaches +0x1BC to 255 at 40/frame. The 3DS shadow material uses
+    // 1-value/255, so this is a full fade-out; N64's 175 target leaves a permanent dark remnant.
+    Math_ApproachF(&ball->shadowOpacity, 255.0f, 1.0f, 40.0f);
+    return 1;
+}
+
+extern "C" int Zelda3D_EnVbBallPrepareBoneBounce(Actor* actor) {
+    EnVbBall* ball = liveBall(actor);
+    if (ball == nullptr || actor->params < 200)
+        return 0;
+    // FUN_0024E700 uses float range 50 for both post-impact angular velocities. The N64 update's
+    // 0x4000 range is a different visual trajectory and makes the 3DS rib tumble hundreds of times faster.
+    ball->xRotVel = Rand_CenteredFloat(50.0f);
+    ball->yRotVel = Rand_CenteredFloat(50.0f);
+    return 1;
+}
+
+extern "C" int Zelda3D_EnVbBallSpawnImpactEffects(PlayState* play, Actor* actor) {
+    EnVbBall* ball = liveBall(actor);
+    if (play == nullptr || ball == nullptr)
+        return 0;
+    BossFd* boss = liveParent(*ball);
+    if (boss == nullptr)
+        return 0;
+
+    if (actor->params >= 200) {
+        // Detached rib bounce: four type-3 smoke records, floor-anchored, scale 400..600.
+        spawnSmoke(play, boss, *ball, 4, 20.0f, actor->floorHeight + 10.0f, true, 200.0f, 400.0f);
+    } else if (actor->params == 100 || actor->params == 101) {
+        // Large-rock split: six type-1 debris records and four type-3 smoke records.
+        spawnDebris(play, boss, *ball, 6, 12.0f, 5.0f, 8.0f, 10.0f, 30.0f, 15.0f);
+        spawnSmoke(play, boss, *ball, 4, 30.0f, 0.0f, false, 200.0f, 600.0f);
+    } else {
+        // Ordinary attack-stone impact: two type-1 debris records.
+        spawnDebris(play, boss, *ball, 2, 10.0f, 3.0f, 3.0f, 5.0f, 12.0f, 15.0f);
+    }
+    return 1;
+}
 
 extern "C" Actor* Zelda3D_EnVbBallSpawnDiagnostic(PlayState* play, Actor* parent, int params) {
     if (play == nullptr || parent == nullptr || parent->id != ACTOR_BOSS_FD ||
         !((params >= 100 && params <= 102) || (params >= 200 && params <= 217))) {
         return nullptr;
     }
-    Actor* child = Actor_SpawnAsChild(&play->actorCtx, parent, play, ACTOR_EN_VB_BALL,
-                                      parent->world.pos.x, 500.0f, parent->world.pos.z,
-                                      0, 0, 150, params);
+    Actor* child = Actor_SpawnAsChild(&play->actorCtx, parent, play, ACTOR_EN_VB_BALL, parent->world.pos.x, 500.0f,
+                                      parent->world.pos.z, 0, 0, 150, params);
     if (child != nullptr && params >= 200) {
         child->scale = { 0.01f, 0.01f, 0.01f };
     }

@@ -61,3 +61,25 @@ Evidence:
 Negative-design lesson: actor diagnostics that can leave prior instances alive must not use
 "params X has no branch Y" as a discriminator without first proving the scene contains exactly one
 matching actor. A first-frame capture after an explicit teleport is also not settled evidence.
+
+## Collision-producer completion
+
+The “unrecovered attack-impact effects” were not another asset. Ghidra had removed most of
+En_Vb_Ball's params-100/101 collision branch as unreachable after misclassifying the ordinary
+`Actor_Kill` call as terminating. Direct ARM disassembly recovered the continuation and two producer
+callees: type-1 debris (`FUN_00335814`) and type-3 smoke (`FUN_0036442C`), both rendered by the
+already-ported `vb_particle_group.cmb`. `FUN_0036FCA8` is only camera quake setup.
+
+The En_Vb_Ball module now supplies the exact 3DS producer state while the N64 overlay retains its
+gameplay collision/child-spawn path: ordinary stones emit 2 debris, params 100/101 emit 6 debris + 4
+smoke, detached ribs emit 4 smoke and use centered range 50 for post-bounce angular velocity, and the
+params-100 shadow approaches 255 so `1-shadow/255` reaches zero. No N64 animation identity, phase,
+joints, morph, or history enters any branch.
+
+Live frozen-step discriminators on the shipping update path:
+
+- large split: `debris=6 smoke=4`;
+- ordinary impact: `debris=2 smoke=0`; same path with Zelda3D disabled: N64 control `debris=5`;
+- rib bounce: `debris=0 smoke=4`, `rotVel=(-14.51,-22.65)` (inside recovered ±50);
+- seven held updates of params 100: `shadow=255.0`;
+- screenshot: `scratch/screenshots/boss_fd_rib_impact_3ds.png`.
