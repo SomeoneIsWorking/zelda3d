@@ -8,6 +8,7 @@
 #include "objects/object_fd/object_fd.h"
 #include "objects/gameplay_keep/gameplay_keep.h"
 #include "overlays/actors/ovl_Boss_Fd/z_boss_fd.h"
+#include "zelda3d/zelda3d.h"
 
 #define FLAGS (ACTOR_FLAG_UPDATE_CULLING_DISABLED | ACTOR_FLAG_DRAW_CULLING_DISABLED)
 
@@ -129,8 +130,10 @@ void EnVbBall_UpdateBones(EnVbBall* this, PlayState* play) {
 
     Actor_UpdateBgCheckInfo(play, &this->actor, 50.0f, 50.0f, 100.0f, 4);
     if ((this->actor.bgCheckFlags & 1) && (this->actor.velocity.y <= 0.0f)) {
-        this->xRotVel = Rand_CenteredFloat((f32)0x4000);
-        this->yRotVel = Rand_CenteredFloat((f32)0x4000);
+        if (!Zelda3D_EnVbBallPrepareBoneBounce(&this->actor)) {
+            this->xRotVel = Rand_CenteredFloat((f32)0x4000);
+            this->yRotVel = Rand_CenteredFloat((f32)0x4000);
+        }
         angle = Math_FAtan2F(this->actor.world.pos.x, this->actor.world.pos.z);
         this->actor.velocity.x = sinf(angle) * 10.0f;
         this->actor.velocity.z = cosf(angle) * 10.0f;
@@ -139,22 +142,24 @@ void EnVbBall_UpdateBones(EnVbBall* this, PlayState* play) {
             Audio_PlaySoundGeneral(NA_SE_EN_VALVAISA_LAND, &this->actor.projectedPos, 4, &gSfxDefaultFreqAndVolScale,
                                    &gSfxDefaultFreqAndVolScale, &gSfxDefaultReverb);
         }
-        for (i = 0; i < 10; i++) {
-            Vec3f dustVel = { 0.0f, 0.0f, 0.0f };
-            Vec3f dustAcc = { 0.0f, 0.0f, 0.0f };
-            Vec3f dustPos;
+        if (!Zelda3D_EnVbBallSpawnImpactEffects(play, &this->actor)) {
+            for (i = 0; i < 10; i++) {
+                Vec3f dustVel = { 0.0f, 0.0f, 0.0f };
+                Vec3f dustAcc = { 0.0f, 0.0f, 0.0f };
+                Vec3f dustPos;
 
-            dustVel.x = Rand_CenteredFloat(8.0f);
-            dustVel.y = Rand_ZeroFloat(1.0f);
-            dustVel.z = Rand_CenteredFloat(8.0f);
+                dustVel.x = Rand_CenteredFloat(8.0f);
+                dustVel.y = Rand_ZeroFloat(1.0f);
+                dustVel.z = Rand_CenteredFloat(8.0f);
 
-            dustAcc.y = 0.3f;
+                dustAcc.y = 0.3f;
 
-            dustPos.x = Rand_CenteredFloat(20.0f) + this->actor.world.pos.x;
-            dustPos.y = this->actor.floorHeight + 10.0f;
-            dustPos.z = Rand_CenteredFloat(20.0f) + this->actor.world.pos.z;
+                dustPos.x = Rand_CenteredFloat(20.0f) + this->actor.world.pos.x;
+                dustPos.y = this->actor.floorHeight + 10.0f;
+                dustPos.z = Rand_CenteredFloat(20.0f) + this->actor.world.pos.z;
 
-            EnVbBall_SpawnDust(play, bossFd->effects, &dustPos, &dustVel, &dustAcc, Rand_ZeroFloat(80.0f) + 200.0f);
+                EnVbBall_SpawnDust(play, bossFd->effects, &dustPos, &dustVel, &dustAcc, Rand_ZeroFloat(80.0f) + 200.0f);
+            }
         }
     }
     if (this->actor.world.pos.y < 50.0f) {
@@ -183,7 +188,9 @@ void EnVbBall_Update(Actor* thisx, PlayState* play2) {
     if (this->actor.params >= 200) {
         EnVbBall_UpdateBones(this, play);
     } else {
-        Math_ApproachF(&this->shadowOpacity, 175.0f, 1.0f, 40.0f);
+        if (!Zelda3D_EnVbBallUpdateShadow(&this->actor)) {
+            Math_ApproachF(&this->shadowOpacity, 175.0f, 1.0f, 40.0f);
+        }
         radius = this->actor.scale.y * 1700.0f;
         this->actor.world.pos.y -= radius;
         Actor_UpdateBgCheckInfo(play, &this->actor, 50.0f, 50.0f, 100.0f, 4);
@@ -232,56 +239,60 @@ void EnVbBall_Update(Actor* thisx, PlayState* play2) {
                         newActor->shadowOpacity = 200.0f;
                     }
                 }
-                for (i = 0; i < 15; i++) {
-                    Vec3f debrisVel1 = { 0.0f, 0.0f, 0.0f };
-                    Vec3f debrisAcc1 = { 0.0f, -1.0f, 0.0f };
-                    Vec3f debrisPos1;
+                if (!Zelda3D_EnVbBallSpawnImpactEffects(play, &this->actor)) {
+                    for (i = 0; i < 15; i++) {
+                        Vec3f debrisVel1 = { 0.0f, 0.0f, 0.0f };
+                        Vec3f debrisAcc1 = { 0.0f, -1.0f, 0.0f };
+                        Vec3f debrisPos1;
 
-                    debrisVel1.x = Rand_CenteredFloat(25.0f);
-                    debrisVel1.y = Rand_ZeroFloat(5.0f) + 8;
-                    debrisVel1.z = Rand_CenteredFloat(25.0f);
+                        debrisVel1.x = Rand_CenteredFloat(25.0f);
+                        debrisVel1.y = Rand_ZeroFloat(5.0f) + 8;
+                        debrisVel1.z = Rand_CenteredFloat(25.0f);
 
-                    debrisPos1.x = Rand_CenteredFloat(10.0f) + this->actor.world.pos.x;
-                    debrisPos1.y = Rand_CenteredFloat(10.0f) + this->actor.world.pos.y;
-                    debrisPos1.z = Rand_CenteredFloat(10.0f) + this->actor.world.pos.z;
+                        debrisPos1.x = Rand_CenteredFloat(10.0f) + this->actor.world.pos.x;
+                        debrisPos1.y = Rand_CenteredFloat(10.0f) + this->actor.world.pos.y;
+                        debrisPos1.z = Rand_CenteredFloat(10.0f) + this->actor.world.pos.z;
 
-                    EnVbBall_SpawnDebris(play, bossFd->effects, &debrisPos1, &debrisVel1, &debrisAcc1,
-                                         (s16)Rand_ZeroFloat(12.0f) + 15);
-                }
-                for (i = 0; i < 10; i++) {
-                    Vec3f dustVel = { 0.0f, 0.0f, 0.0f };
-                    Vec3f dustAcc = { 0.0f, 0.0f, 0.0f };
-                    Vec3f dustPos;
+                        EnVbBall_SpawnDebris(play, bossFd->effects, &debrisPos1, &debrisVel1, &debrisAcc1,
+                                             (s16)Rand_ZeroFloat(12.0f) + 15);
+                    }
+                    for (i = 0; i < 10; i++) {
+                        Vec3f dustVel = { 0.0f, 0.0f, 0.0f };
+                        Vec3f dustAcc = { 0.0f, 0.0f, 0.0f };
+                        Vec3f dustPos;
 
-                    dustVel.x = Rand_CenteredFloat(8.0f);
-                    dustVel.y = Rand_ZeroFloat(1.0f);
-                    dustVel.z = Rand_CenteredFloat(8.0f);
+                        dustVel.x = Rand_CenteredFloat(8.0f);
+                        dustVel.y = Rand_ZeroFloat(1.0f);
+                        dustVel.z = Rand_CenteredFloat(8.0f);
 
-                    dustAcc.y = 1.0f / 2;
+                        dustAcc.y = 1.0f / 2;
 
-                    dustPos.x = Rand_CenteredFloat(30.0f) + this->actor.world.pos.x;
-                    dustPos.y = Rand_CenteredFloat(30.0f) + this->actor.world.pos.y;
-                    dustPos.z = Rand_CenteredFloat(30.0f) + this->actor.world.pos.z;
+                        dustPos.x = Rand_CenteredFloat(30.0f) + this->actor.world.pos.x;
+                        dustPos.y = Rand_CenteredFloat(30.0f) + this->actor.world.pos.y;
+                        dustPos.z = Rand_CenteredFloat(30.0f) + this->actor.world.pos.z;
 
-                    EnVbBall_SpawnDust(play, bossFd->effects, &dustPos, &dustVel, &dustAcc,
-                                       Rand_ZeroFloat(100.0f) + 350.0f);
+                        EnVbBall_SpawnDust(play, bossFd->effects, &dustPos, &dustVel, &dustAcc,
+                                           Rand_ZeroFloat(100.0f) + 350.0f);
+                    }
                 }
             } else {
-                for (i = 0; i < 5; i++) {
-                    Vec3f debrisVel2 = { 0.0f, 0.0f, 0.0f };
-                    Vec3f debrisAcc2 = { 0.0f, -1.0f, 0.0f };
-                    Vec3f debrisPos2;
+                if (!Zelda3D_EnVbBallSpawnImpactEffects(play, &this->actor)) {
+                    for (i = 0; i < 5; i++) {
+                        Vec3f debrisVel2 = { 0.0f, 0.0f, 0.0f };
+                        Vec3f debrisAcc2 = { 0.0f, -1.0f, 0.0f };
+                        Vec3f debrisPos2;
 
-                    debrisVel2.x = Rand_CenteredFloat(10.0f);
-                    debrisVel2.y = Rand_ZeroFloat(3.0f) + 3.0f;
-                    debrisVel2.z = Rand_CenteredFloat(10.0f);
+                        debrisVel2.x = Rand_CenteredFloat(10.0f);
+                        debrisVel2.y = Rand_ZeroFloat(3.0f) + 3.0f;
+                        debrisVel2.z = Rand_CenteredFloat(10.0f);
 
-                    debrisPos2.x = Rand_CenteredFloat(5.0f) + this->actor.world.pos.x;
-                    debrisPos2.y = Rand_CenteredFloat(5.0f) + this->actor.world.pos.y;
-                    debrisPos2.z = Rand_CenteredFloat(5.0f) + this->actor.world.pos.z;
+                        debrisPos2.x = Rand_CenteredFloat(5.0f) + this->actor.world.pos.x;
+                        debrisPos2.y = Rand_CenteredFloat(5.0f) + this->actor.world.pos.y;
+                        debrisPos2.z = Rand_CenteredFloat(5.0f) + this->actor.world.pos.z;
 
-                    EnVbBall_SpawnDebris(play, bossFd->effects, &debrisPos2, &debrisVel2, &debrisAcc2,
-                                         (s16)Rand_ZeroFloat(12.0f) + 15);
+                        EnVbBall_SpawnDebris(play, bossFd->effects, &debrisPos2, &debrisVel2, &debrisAcc2,
+                                             (s16)Rand_ZeroFloat(12.0f) + 15);
+                    }
                 }
                 Actor_Kill(&this->actor);
             }

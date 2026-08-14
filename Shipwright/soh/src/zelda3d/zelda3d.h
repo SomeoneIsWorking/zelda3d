@@ -700,6 +700,13 @@ int Zelda3D_BossFdForceFly(Actor* actor);
 int Zelda3D_BossFdForceDeath(Actor* actor, int liveSegments, int actionState);
 int Zelda3D_BossFdForceEffects(Actor* actor, int type3ds, int count);
 Actor* Zelda3D_EnVbBallSpawnDiagnostic(PlayState* play, Actor* parent, int params);
+// OoT3D En_Vb_Ball update seams. Each returns 1 only for a valid live En_Vb_Ball while Zelda3D is
+// enabled; the N64 overlay retains its original path when they return 0. These port the 3DS shadow
+// fade, detached-rib bounce rotation, and collision particle producers without moving the behavior
+// into the monolithic core or reading any N64 animation state.
+int Zelda3D_EnVbBallUpdateShadow(Actor* actor);
+int Zelda3D_EnVbBallPrepareBoneBounce(Actor* actor);
+int Zelda3D_EnVbBallSpawnImpactEffects(PlayState* play, Actor* actor);
 int Zelda3D_BossFdHistoryInfo(Actor* actor, int* bodyLead, int* maneLead, Vec3f* minPos,
                              Vec3f* maxPos);
 int Zelda3D_BossFd2ForceIdle(PlayState* play, Actor* actor, int hold);

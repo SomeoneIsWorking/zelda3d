@@ -24,6 +24,7 @@ extern int gZelda3dNaviCallForce;    // #205 — `navicall`: hold the C-Up Navi 
 #include "overlays/actors/ovl_En_Door/z_en_door.h"
 #include "overlays/actors/ovl_En_Horse/z_en_horse.h"
 #include "overlays/actors/ovl_Boss_Fd/z_boss_fd.h"
+#include "overlays/actors/ovl_En_Vb_Ball/z_en_vb_ball.h"
 #include "objects/object_ge1/object_ge1.h"
 #include "soh/SaveManager.h" // Save_LoadFile (`savecycle`)
 #include "soh/ActorDB.h"     // ActorDBEntry struct (spawn: actor->object lookup for isolated testing)
@@ -2378,6 +2379,18 @@ static void Zelda3D_ReplExec(PlayState* play, char* line, const char* outPath) {
             Zelda3D_ReplReply(outPath,
                               "vbball: scanned selected actor and params; need Boss_Fd (0x96) parent and params 100..102 or 200..217; spawned 0/1");
         }
+    } else if (strcmp(cmd, "vbinfo") == 0) {
+        if (gZelda3dSelActor == NULL || gZelda3dSelActor->id != ACTOR_EN_VB_BALL) {
+            Zelda3D_ReplReply(outPath,
+                              "vbinfo: scanned selected actor; need En_Vb_Ball (0xAD), inspected 0/1 typed actor");
+        } else {
+            EnVbBall* ball = reinterpret_cast<EnVbBall*>(gZelda3dSelActor);
+            Zelda3D_ReplReply(outPath,
+                              "vbinfo: inspected=1/1 params=%d shadow=%.1f size=%.3f rotVel=(%.2f,%.2f) bg=0x%x velY=%.2f floor=%.1f",
+                              ball->actor.params, ball->shadowOpacity, ball->shadowSize, ball->xRotVel,
+                              ball->yRotVel, ball->actor.bgCheckFlags, ball->actor.velocity.y,
+                              ball->actor.floorHeight);
+        }
     } else if (strcmp(cmd, "fdinfo") == 0) {
         // Typed flying-parent diagnostic. Its negative names the searched corpus so silence can
         // never masquerade as "no bad transforms".
@@ -2388,11 +2401,18 @@ static void Zelda3D_ReplExec(PlayState* play, char* line, const char* outPath) {
             BossFd* fd = reinterpret_cast<BossFd*>(gZelda3dSelActor);
             Vec3f mn = {}, mx = {};
             int lead = 0, maneLead = 0;
+            int liveFx = 0, debrisFx = 0, smokeFx = 0;
+            for (const BossFdEffect& effect : fd->effects) {
+                if (effect.type != BFD_FX_NONE) ++liveFx;
+                if (effect.type == BFD_FX_DEBRIS) ++debrisFx;
+                if (effect.type == BFD_FX_DUST) ++smokeFx;
+            }
             Zelda3D_BossFdHistoryInfo(gZelda3dSelActor, &lead, &maneLead, &mn, &mx);
             Zelda3D_ReplReply(outPath,
-                              "fdinfo: inspected3ds=150 bodyLead=%d maneLead=%d skin=%d action=%d posRange=(%.1f..%.1f,%.1f..%.1f,%.1f..%.1f)",
-                              lead, maneLead, fd->skinSegments, fd->work[BFD_ACTION_STATE], mn.x,
-                              mx.x, mn.y, mx.y, mn.z, mx.z);
+                              "fdinfo: inspected3ds=150 bodyLead=%d maneLead=%d skin=%d action=%d fx=%d/%d debris=%d smoke=%d posRange=(%.1f..%.1f,%.1f..%.1f,%.1f..%.1f)",
+                              lead, maneLead, fd->skinSegments, fd->work[BFD_ACTION_STATE], liveFx,
+                              BOSSFD_EFFECT_COUNT, debrisFx, smokeFx, mn.x, mx.x, mn.y, mx.y, mn.z,
+                              mx.z);
         }
     } else if (strcmp(cmd, "fd2idle") == 0) {
         int hold = 1;
