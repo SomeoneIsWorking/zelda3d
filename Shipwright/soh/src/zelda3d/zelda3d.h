@@ -691,11 +691,14 @@ int Zelda3D_DrawActorModel(PlayState* play, int modelId, Actor* actor, float wor
 int Zelda3D_DrawModelTransform(PlayState* play, int modelId, const Vec3f* pos,
                                const Vec3f* rotYXZ, const Vec3f* scale,
                                float postRotX); // arbitrary multipart transform
+int Zelda3D_DrawModelBillboard(PlayState* play, int modelId, const Vec3f* pos,
+                               const Vec3f* scale); // arbitrary effect-pool sprite
 int Zelda3D_BossFd2DrawManeSegment(PlayState* play, Actor* actor, int chain, int segment,
                                   const Vec3f* pos, const Vec3f* rot, const Vec3f* scale);
 int Zelda3D_BossFd2ForceGround(Actor* actor);
 int Zelda3D_BossFdForceFly(Actor* actor);
 int Zelda3D_BossFdForceDeath(Actor* actor, int liveSegments, int actionState);
+int Zelda3D_BossFdForceEffects(Actor* actor, int type3ds, int count);
 int Zelda3D_BossFdHistoryInfo(Actor* actor, int* bodyLead, int* maneLead, Vec3f* minPos,
                              Vec3f* maxPos);
 int Zelda3D_BossFd2ForceIdle(PlayState* play, Actor* actor, int hold);

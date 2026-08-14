@@ -2346,6 +2346,23 @@ static void Zelda3D_ReplExec(PlayState* play, char* line, const char* outPath) {
             Zelda3D_ReplReply(outPath,
                               "fddeath: scanned selected actor; need Boss_Fd (0x96), live 0..18, action 200..205");
         }
+    } else if (strcmp(cmd, "fdfx") == 0) {
+        int type3ds = -1;
+        int count = 5;
+        (void)sscanf(line, "%*s %i %i", &type3ds, &count);
+        const int staged = Zelda3D_BossFdForceEffects(gZelda3dSelActor, type3ds, count);
+        if (staged > 0) {
+            static const char* kName[] = { "off", "debris", "skull", "smoke", "fire", "ember" };
+            if (type3ds == 0) {
+                Zelda3D_ReplReply(outPath, "fdfx: disabled; cleared controlled records");
+            } else {
+                Zelda3D_ReplReply(outPath, "fdfx: 3dsType=%d(%s) staged=%d/110 controlled records",
+                                  type3ds, kName[type3ds], staged);
+            }
+        } else {
+            Zelda3D_ReplReply(outPath,
+                              "fdfx: scanned selected actor and arguments; need Boss_Fd (0x96), 3DS type 0..5, count 1..12; staged 0/110");
+        }
     } else if (strcmp(cmd, "fdinfo") == 0) {
         // Typed flying-parent diagnostic. Its negative names the searched corpus so silence can
         // never masquerade as "no bad transforms".
