@@ -40,8 +40,22 @@ build_dir="${azahar_root}/build-harness"
 harness_bin="${build_dir}/bin/Release/soh3d_harness"
 wire_in="${repo_root}/tools/soh3d_harness/wire_in.cmake"
 
-# Match every other Zelda3D launcher: explicit environment first, then the
-# gitignored repo .env, then a drop-in ROM at the repo root.
+# Read the complete repo environment, including plain NAME=value entries.  The
+# provisioning helper below resolves ROM fallbacks, but the harness also has
+# renderer/debug settings of its own that must reach the binary.
+if [[ -f "${repo_root}/.env" ]]; then
+    caller_exports="$(export -p)"
+    set -a
+    source "${repo_root}/.env"
+    set +a
+    # `export -p` emits shell-quoted declarations.  Restoring that snapshot
+    # keeps explicit caller values above .env while retaining new .env keys.
+    eval "${caller_exports}"
+    unset caller_exports
+fi
+
+# Match every other Zelda3D launcher: environment first, then a drop-in ROM at
+# the repo root.
 source "${repo_root}/tools/rom_provision.sh"
 zelda3d_provision_roms "${repo_root}"
 if [[ $# -eq 0 && -z "${ZELDA3D_OOT3D_ROM:-}" ]]; then
