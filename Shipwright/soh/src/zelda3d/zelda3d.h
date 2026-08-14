@@ -694,6 +694,9 @@ int Zelda3D_DrawModelTransform(PlayState* play, int modelId, const Vec3f* pos,
 int Zelda3D_BossFd2DrawManeSegment(PlayState* play, Actor* actor, int chain, int segment,
                                   const Vec3f* pos, const Vec3f* rot, const Vec3f* scale);
 int Zelda3D_BossFd2ForceGround(Actor* actor);
+int Zelda3D_BossFdForceFly(Actor* actor);
+int Zelda3D_BossFdHistoryInfo(Actor* actor, int* bodyLead, int* maneLead, Vec3f* minPos,
+                             Vec3f* maxPos);
 int Zelda3D_BossFd2ForceIdle(PlayState* play, Actor* actor, int hold);
 int Zelda3D_BossFd2ForceDamageState(PlayState* play, Actor* actor, int state);
 void Zelda3D_BossFd2IdleTick(PlayState* play, Actor* actor);
@@ -735,6 +738,11 @@ int Zelda3D_HoofDustWorldPos(PlayState* play, Actor* horseActor, float* ioPos);
 // falls back to the native N64 Skin_GetLimbPos path). Defined in behaviors/actor/en_horse.cpp.
 int Zelda3D_HorseSaddleOffset(Actor* horseActor, float out[3]);
 void Zelda3D_UpdateAnim(int modelId, const char* animName, float frame);
+// Sample an authored CSAB, then replace a contiguous range of animated bone-world matrices with
+// explicit 3x4 row-major matrices before skinning. Boss_Fd's OoT3D draw callback uses this for its
+// 18 procedural body-history bones; no N64 animation identity or joint table enters this path.
+void Zelda3D_UpdateAnimWorldBones(int modelId, const char* animName, float frame, int firstBone,
+                                 const float* worldMatrices3x4, int matrixCount);
 void Zelda3D_SkinDumpArm(int modelId, const char* path, int frames); // #117 resolved-pose capture
 void Zelda3D_UpdateAnimAuto(int modelId, const char* animName, float rate, float n64CurFrame,
                           float n64AnimLength, float morphWeight);

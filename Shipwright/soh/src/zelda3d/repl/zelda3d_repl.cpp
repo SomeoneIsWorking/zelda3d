@@ -23,6 +23,7 @@ extern int gZelda3dNaviCallForce;    // #205 — `navicall`: hold the C-Up Navi 
 #include "overlays/actors/ovl_En_Ex_Ruppy/z_en_ex_ruppy.h"
 #include "overlays/actors/ovl_En_Door/z_en_door.h"
 #include "overlays/actors/ovl_En_Horse/z_en_horse.h"
+#include "overlays/actors/ovl_Boss_Fd/z_boss_fd.h"
 #include "objects/object_ge1/object_ge1.h"
 #include "soh/SaveManager.h" // Save_LoadFile (`savecycle`)
 #include "soh/ActorDB.h"     // ActorDBEntry struct (spawn: actor->object lookup for isolated testing)
@@ -2327,6 +2328,28 @@ static void Zelda3D_ReplExec(PlayState* play, char* line, const char* outPath) {
         } else {
             Zelda3D_ReplReply(outPath,
                               "fd2ground: scanned selected actor; need Boss_Fd2 (0xA2) with live Boss_Fd parent");
+        }
+    } else if (strcmp(cmd, "fdfly") == 0) {
+        if (Zelda3D_BossFdForceFly(gZelda3dSelActor)) {
+            Zelda3D_ReplReply(outPath, "fdfly: entered real BossFd_SetupFly action with controlled target");
+        } else {
+            Zelda3D_ReplReply(outPath, "fdfly: scanned selected actor; need Boss_Fd (0x96)");
+        }
+    } else if (strcmp(cmd, "fdinfo") == 0) {
+        // Typed flying-parent diagnostic. Its negative names the searched corpus so silence can
+        // never masquerade as "no bad transforms".
+        if (gZelda3dSelActor == NULL || gZelda3dSelActor->id != ACTOR_BOSS_FD) {
+            Zelda3D_ReplReply(outPath,
+                              "fdinfo: scanned selected actor; need Boss_Fd (0x96), inspected 0/150 3DS body history samples");
+        } else {
+            BossFd* fd = reinterpret_cast<BossFd*>(gZelda3dSelActor);
+            Vec3f mn = {}, mx = {};
+            int lead = 0, maneLead = 0;
+            Zelda3D_BossFdHistoryInfo(gZelda3dSelActor, &lead, &maneLead, &mn, &mx);
+            Zelda3D_ReplReply(outPath,
+                              "fdinfo: inspected3ds=150 bodyLead=%d maneLead=%d skin=%d action=%d posRange=(%.1f..%.1f,%.1f..%.1f,%.1f..%.1f)",
+                              lead, maneLead, fd->skinSegments, fd->work[BFD_ACTION_STATE], mn.x,
+                              mx.x, mn.y, mx.y, mn.z, mx.z);
         }
     } else if (strcmp(cmd, "fd2idle") == 0) {
         int hold = 1;

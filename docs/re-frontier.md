@@ -156,7 +156,7 @@ This doc **organizes and links to** the existing RE corpus rather than duplicati
 
 ### enhorse.render-gap — general En_Horse/Epona render divergence
 - status: re-verified
-- deps: 
+- deps:
 - evidence: `oot3d-decomp/docs/en_horse_epona_render_gap.md`; `debug_journal/2026-07-15-epona-en-horse-3ds-render.md`
 - where: no dedicated module — see gap
 - gap: RE'd and journal-fixed in-session (2026-07-15) but landed as journal-only pokes, not a `behaviors/actor/en_horse.cpp` module — **structural debt**, not an RE debt (the CLAUDE.md OOP-module rule flags this explicitly).
@@ -191,7 +191,7 @@ This doc **organizes and links to** the existing RE corpus rather than duplicati
 
 ### camera.dispatch-map — Camera_Update per-mode function dispatch table understood
 - status: re-verified
-- deps: 
+- deps:
 - evidence: `Shipwright/soh/src/zelda3d/behaviors/camera_behavior.h` header comment (cites SoH z_camera.c:7470, OoT3D FUN_002d84c4); `oot3d-decomp/docs/camera_calc_at_default.md`, `camera_math_helpers.md`
 - where: `behaviors/camera_behavior.h/.cpp` (registry), legacy `sCameraFunctions[...]` table in vendored `z_camera.c`
 - gap: none — the dispatch mechanism itself is fully understood; only individual mode functions remain to be ported (see below).
@@ -535,5 +535,13 @@ This doc **organizes and links to** the existing RE corpus rather than duplicati
 - deps:
 - evidence: oot3d-decomp/docs/boss_fd2.md; embedded-oracle 600-sample emergence→idle→fire trace (`scanned=600`, five controller transitions) and live actor matrix; headless natural-camera `scratch/screenshots/fd2_controller_proc_f88.png`; SKELSCALE model 2005 ratio=1.000 scale=0.007; shipping `zelda3d_app` build passes
 - where: Shipwright/soh/src/zelda3d/behaviors/actor/boss_fd2.{h,cpp}; Shipwright/soh/src/overlays/actors/ovl_Boss_Fd2/z_boss_fd2.c; Shipwright/soh/src/zelda3d/model/zelda3d_cmab.{h,cpp}
-- gap: Ground-form emergence, idle/turn, fire/claw, burrow, hit→vulnerable, damage, and death CSAB transitions are recovered and ported with independent authored playheads plus OoT3D's five-frame crossfades. Live headless controls verified `vba_hit→vba_pikupiku→vba_down`, `vba_beforedamage→vba_damage`, and death holding `vba_damage`; the discriminator also fixed an emergence controller that outlived its action and a duplicate skinned-model key with no provider. Boss_Fd flying form is a separate multipart actor and currently retains the N64 draw rather than the invalid largest-CMB auto replacement.
+- gap: Ground-form emergence, idle/turn, fire/claw, burrow, hit→vulnerable, damage, and death CSAB transitions are recovered and ported with independent authored playheads plus OoT3D five-frame crossfades. Live controls verified the collision-driven transitions. Flying Boss_Fd is tracked separately by render.boss-fd-flying.
 - notes: 2026-08-13 live discriminator caught and fixed forced-CMB ZAR-qualified animation resolution. Typed REPL fd2ground drives the real parent handoff and refuses invalid selections. 2026-08-14: emergence now uses the ported OoT3D `vba_up` controller, typed `shape.yOffset*scale.y` draw lift, and decompiled bone-10/13/14/15 procedural rotations; no N64 joints or clip phase reach the 3DS object.
+
+### render.boss-fd-flying — Boss_Fd flying Volvagia multipart render
+- status: in-progress
+- deps:
+- evidence: oot3d-decomp/docs/boss_fd2.md and decomp functions 003B4308/00209588/00316DC0/003C724C; live fdinfo positive/negative discriminator; scratch/screenshots/boss_fd_flying_3ds_history_flight.png; soh_core build passes
+- where: Shipwright/soh/src/zelda3d/behaviors/actor/boss_fd.{h,cpp}; Shipwright/soh/src/zelda3d/anim/zelda3d_anim.cpp
+- gap: Ordinary flight has independent authored body/head/arm CSAB playheads, recovered 150-entry body and 45-entry mane histories, eighteen procedural body bones, separate head/arms, and three mane chains. No N64 animation state or history enters the 3DS objects. OoT3D particle-group effects, death body/head variants, non-mane CMAB channels, and oracle A/B remain open.
+- notes: Typed fdfly enters the real action and resets only the 3DS-owned histories; fdinfo scans 150 3DS body samples and refuses non-Boss_Fd selections.
