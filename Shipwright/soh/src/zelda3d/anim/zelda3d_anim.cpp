@@ -8,6 +8,7 @@
 #include "asset/csab.h"
 #include "asset/mat4.h"
 #include "fast/zelda3d_gl.h"
+#include <algorithm>
 #include <array>
 #include <cmath>
 #include <cstdio>
@@ -679,6 +680,49 @@ void Zelda3D_UpdateAnim(int modelId, const char* animName, float frame) {
         skinDumpWrite(modelId, animName, frame, aw);
     }
     uploadSkin(modelId, lm, sm);
+}
+
+extern "C" void Zelda3D_UpdateAnimWorldBones(int modelId, const char* animName, float frame,
+                                               int firstBone, const float* worldMatrices3x4,
+                                               int matrixCount) {
+    if (!animName || !*animName || !worldMatrices3x4 || matrixCount <= 0 || firstBone < 0) {
+        Zelda3D_GL_SetBones(modelId, nullptr, 0);
+        return;
+    }
+    LoadedModel* lm = loadModel(modelId);
+    if (!lm || !lm->ok || !lm->cmb || !lm->zar) return;
+    Zelda3D::Csab* anim = getCsab(lm, animName);
+    if (!anim) {
+        Zelda3D_GL_SetBones(modelId, nullptr, 0);
+        return;
+    }
+
+    const float* drot = nullptr;
+    const float* post = nullptr;
+    int dcount = 0;
+    int pcount = 0;
+    getBoneRotDeltas(modelId, &drot, &dcount);
+    getBonePostRots(modelId, &post, &pcount);
+
+    std::vector<std::array<float, 16>> world;
+    anim->animatedBoneWorld(*lm->cmb, frame, world, drot, dcount, post, pcount,
+                            getAnimTransScale(modelId));
+    const int endBone = std::min(firstBone + matrixCount, static_cast<int>(world.size()));
+    for (int bone = firstBone; bone < endBone; ++bone) {
+        const float* src = worldMatrices3x4 + (bone - firstBone) * 12;
+        auto& dst = world[bone];
+        dst = { src[0], src[1], src[2], src[3],
+                src[4], src[5], src[6], src[7],
+                src[8], src[9], src[10], src[11],
+                0.0f, 0.0f, 0.0f, 1.0f };
+    }
+
+    const auto& bind = lm->cmb->boneMatrices();
+    std::vector<std::array<float, 16>> skin(bind.size(), Zelda3D::matId());
+    for (size_t bone = 0; bone < bind.size() && bone < world.size(); ++bone) {
+        skin[bone] = Zelda3D::matMul(world[bone], Zelda3D::matInverse(bind[bone]));
+    }
+    uploadSkin(modelId, lm, skin);
 }
 
 // MORPH variant of Zelda3D_UpdateAnim: cross-fade the INCOMING clip (inName@fIn) toward the frozen

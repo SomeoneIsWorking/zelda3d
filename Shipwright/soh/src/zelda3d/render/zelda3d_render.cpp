@@ -1913,14 +1913,8 @@ int Zelda3D_TryDrawActor(PlayState* play, Actor* actor) {
     gZelda3dPendingN64CurFrame = 0.0f;
     gZelda3dPendingN64AnimLength = 0.0f;
     gZelda3dPendingMorphWeight = 0.0f; // reset per actor (raw-only path has no SkelAnime -> no morph)
-    // Boss_Fd is not one skinned model: both games assemble the flying dragon from separate body,
-    // head, arm, and mane models. The generic object->largest-CMB path picks valbasiagnd (the
-    // Boss_Fd2 hole form), then consumes Boss_Fd's arm skeleton and scale, producing giant white
-    // strips. Keep the faithful N64 multipart draw until Boss_Fd gets its own dedicated multipart
-    // behavior; Boss_Fd2 is handled separately by behaviors/actor/boss_fd2.cpp.
-    if (actor->id == ACTOR_BOSS_FD) {
-        return 0;
-    }
+    // Boss_Fd and Boss_Fd2 are both registered multipart behaviors. They are dispatched above,
+    // before the generic object->largest-CMB path can mistake valbasiagnd for the flying body.
     // Param-keyed field-keep actors: one keep object shared across param variants, so the model
     // depends on (actor, params) — can't live in the actorId-only sModelTable. The OoT3D models
     // come from zelda_field_keep.zar (glModelIds 2,4,5,6; see kModels in zelda3d_model.cpp).
