@@ -303,6 +303,10 @@ int Zelda3D_PosedModelLocalAABB(int modelId, unsigned long long midMask, float* 
 // killed selection simply stops matching (no dangling deref).
 // Palette lerp helpers (defined with the #111 world-shade blend below).
 void Zelda3D_ActorPostUpdate(PlayState* play, Actor* actor) {
+    // OoT3D-authored controllers and procedural histories advance on actor-update cadence. The
+    // behavior owns the typed state; this shared hook supplies the lifecycle without coupling the
+    // C actor loop to any one actor module.
+    Zelda3D_ActorBehaviorPostUpdate(play, actor);
     Zelda3D_LinkApplyPin(play, actor); // #8 linkpin (pins the player transform; defined in zelda3d_link.cpp)
     // Title-demo rider: the ported OoT3D title-cs actor cues own Epona's transform (state
     // integrated by Zelda3D::TitleRider inside TitlePresentation::update(), zelda3d/behaviors/

@@ -225,6 +225,7 @@ extern "C" {
     void BootCommands_Init(void);
     void Heaps_Alloc(void);
     void Heaps_Free(void);
+    void Zelda3D_CoreRunBegin(void);
     void Main_Init(void* arg);
     void Main_Shutdown(void);
     void RunFrame(void);
@@ -1160,6 +1161,11 @@ void SohBootInternal() {
     // is what our capture path downloads) still happens normally.
     setenv("SOH_HEADLESS", "1", 1);
     setenv("SOH3D_HEADLESS", "1", 1);
+    // The desktop executable owns the cross-game picker. The embedded harness links the OoT core
+    // directly and must enter its title/play gamestates; otherwise the first RunFrame sits forever
+    // in Zelda3DLauncher_Main waiting for a UI choice and the frame watchdog correctly kills it.
+    // This is the launcher's documented embedding escape hatch (zelda3d_launcher.cpp).
+    setenv("ZELDA3D_LAUNCHER", "0", 1);
 
     // Texture pack: whatever SetupTexPack() decided for the ORACLE, force the
     // embedded SoH to match — the two sides are never allowed to diverge here
@@ -1197,6 +1203,11 @@ void SohBootInternal() {
     EnsureHarnessWindow();
     static char argv0[] = "soh3d_harness";
     static char* argv[] = { argv0, nullptr };
+    // This is the library-embedding equivalent of Zelda3D_CoreRun(). It must be first: among the
+    // state it establishes is run epoch 1, which makes AudioMgr_Init's Zelda3D_Once latch fire.
+    // Without it, the zero-initialized latch compares equal to epoch 0, Audio_ResetSounds never
+    // seeds the bank sentinels, and TitleSetup teardown loops forever over bank entry zero.
+    Zelda3D_CoreRunBegin();
     GameConsole_Init();
     InitOTR(1, argv);
     CrashHandlerRegisterCallback(&CrashHandler_PrintSohData);

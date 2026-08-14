@@ -507,6 +507,15 @@ void tickAuthoredHistory(PlayState* play, BossFd* boss, AuthoredPlayheads& state
         Zelda3D::matApplyPos(head, anchors[chain], out);
         state.manePos[chain][state.maneLead] = { out[0], out[1], out[2] };
     }
+
+    // OoT3D's model controllers and procedural rings advance from the actor update, not from
+    // submission. Advancing these in tryDrawModel() collapsed the intro body under deterministic
+    // multi-step control (60 gameplay updates followed by one draw recorded only one history
+    // sample) and made ordinary play depend on render rate/visibility.
+    state.body = std::fmod(state.body + 1.0f, 101.0f);
+    state.head = std::fmod(state.head + 1.0f, 3.0f);
+    state.leftArm = std::fmod(state.leftArm + 1.0f, 3.0f);
+    state.rightArm = std::fmod(state.rightArm + 1.0f, 31.0f);
 }
 
 } // namespace
@@ -514,6 +523,12 @@ void tickAuthoredHistory(PlayState* play, BossFd* boss, AuthoredPlayheads& state
 namespace Zelda3D {
 
 s16 BossFdBehavior::actorId() const { return ACTOR_BOSS_FD; }
+
+void BossFdBehavior::postUpdate(PlayState* play, Actor* actor) {
+    if (!play || !actor || actor->id != ACTOR_BOSS_FD) return;
+    BossFd* boss = reinterpret_cast<BossFd*>(actor);
+    tickAuthoredHistory(play, boss, playheads(actor));
+}
 
 bool BossFdBehavior::tryDrawModel(PlayState* play, Actor* actor) {
     if (!play || !actor || actor->id != ACTOR_BOSS_FD) return false;
@@ -525,7 +540,6 @@ bool BossFdBehavior::tryDrawModel(PlayState* play, Actor* actor) {
     }
 
     AuthoredPlayheads& p = playheads(actor);
-    tickAuthoredHistory(play, boss, p);
     const int armHistory = wrapIndex(p.bodyLead + kBodyHistoryOffset[2], 150);
     applyArmCmab(play, m.rightArm, false);
     drawSkeletonPiece(play, boss, p, m.rightArm, "vb_RarmONLY", p.rightArm, armHistory, -13.0f, 0.0f, 0.0f);
@@ -551,10 +565,6 @@ bool BossFdBehavior::tryDrawModel(PlayState* play, Actor* actor) {
     applyParticleControl(boss);
     drawParticles(play, boss, m.particles);
 
-    p.body = std::fmod(p.body + 1.0f, 101.0f);
-    p.head = std::fmod(p.head + 1.0f, 3.0f);
-    p.leftArm = std::fmod(p.leftArm + 1.0f, 3.0f);
-    p.rightArm = std::fmod(p.rightArm + 1.0f, 31.0f);
     return true;
 }
 

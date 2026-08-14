@@ -83,3 +83,33 @@ Live frozen-step discriminators on the shipping update path:
 - rib bounce: `debris=0 smoke=4`, `rotVel=(-14.51,-22.65)` (inside recovered ±50);
 - seven held updates of params 100: `shadow=255.0`;
 - screenshot: `scratch/screenshots/boss_fd_rib_impact_3ds.png`.
+
+## Flying-body cadence A/B
+
+The natural OoT3D Fire Temple intro (`entrance 0x305`) exposed a separate ordinary-flight defect:
+the oracle title-card flight has a long, populated body trail, while the native port compressed the
+body around the head and fire mane. The controlling discriminator was state, not a subjective image
+judgement: native `fdinfo` advanced `bodyLead` by only one after `step 60`.
+
+The cause was ownership of time. `BossFdBehavior::tryDrawModel()` both sampled the recovered
+150-entry body / 45-entry mane histories and incremented the four authored CSAB playheads. OoT3D's
+recovered producer `FUN_003C724C` runs from the actor update tail. Consequently, visibility, render
+cadence, and deterministic multi-step control changed the 3DS object's procedural history and clip
+phase even though no N64 history or animation state entered it.
+
+`ActorBehavior::postUpdate()` is now the generic typed update-cadence seam, dispatched from
+`Zelda3D_ActorPostUpdate`. Boss_Fd records history and advances its four 3DS-owned playheads there;
+draw only consumes the resulting state. The negative/positive discriminator is exact: baseline
+`bodyLead=118`, then `step 120`, produced `bodyLead=88`, equal to `(118 + 120) % 150` rather than the
+old draw-count result. Natural shipping captures now show the long articulated body during the same
+intro sequence (`scratch/screenshots/volvagia_native_updatecadence_live.png` and
+`volvagia_native_updatecadence_montage.png`); the oracle reference is
+`scratch/screenshots/volvagia_oracle_cutscene360.png`.
+
+The embedded paired harness initially could not take the follow-up capture: its first `soh_step 1`
+stalled in `Audio_StopSfxByBank`. An all-thread watchdog stack proved pacing was not involved.
+`SohBootInternal()` had bypassed `Zelda3D_CoreRunBegin`, leaving the run epoch at zero; audio's
+zero-initialized once-per-run latch therefore skipped `Audio_InitSound`, and the sound-bank sentinel
+lists remained unseeded. The harness now enters the same lifecycle as `Zelda3D_CoreRun`, disables the
+desktop-only game picker, and passes `soh_boot` plus `soh_step 1` under the default five-second
+watchdog. That run also exercised ROM provisioning through the repository `.env` wrapper.
