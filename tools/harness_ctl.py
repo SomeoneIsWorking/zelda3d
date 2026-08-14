@@ -38,8 +38,34 @@ HARNESS_SH  = REPO_ROOT / "tools" / "soh3d_harness.sh"
 HARNESS_BIN = REPO_ROOT / "Azahar" / "build-harness" / "bin" / "Release" / "soh3d_harness"
 
 
+def _load_repo_environment() -> None:
+    """Load every repo ``.env`` setting without overriding the caller."""
+    env_file = REPO_ROOT / ".env"
+    if not env_file.is_file():
+        return
+
+    # Let bash parse the same shell syntax accepted by the launch scripts.  `set
+    # -a` makes plain NAME=value entries visible to the harness too; requiring
+    # every local setting to spell `export` made harness_ctl silently ignore
+    # otherwise valid .env configuration.  Merge instead of replacing so an
+    # explicit process environment remains the highest-priority source.
+    result = subprocess.run(
+        ["bash", "-c", 'set -a; source "$1"; env -0',
+         "harness-env", str(env_file)],
+        check=True, stdout=subprocess.PIPE,
+    )
+    for entry in result.stdout.split(b"\0"):
+        if not entry or b"=" not in entry:
+            continue
+        raw_name, raw_value = entry.split(b"=", 1)
+        name = os.fsdecode(raw_name)
+        if name not in os.environ:
+            os.environ[name] = os.fsdecode(raw_value)
+
+
 def _provision_rom_environment() -> None:
     """Apply the launcher's env -> repo .env -> drop-in ROM contract."""
+    _load_repo_environment()
     script = REPO_ROOT / "tools" / "rom_provision.sh"
     command = (
         'source "$1"; zelda3d_provision_roms "$2"; '
