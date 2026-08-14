@@ -1,13 +1,17 @@
 // OoT3D Boss_Fd flying multipart draw port.
-// Ground truth: oot3d-decomp FUN_001A62C4, FUN_003B4308, FUN_00209588 and FUN_00316DC0.
+// Ground truth: oot3d-decomp FUN_001A62C4, FUN_003B4308, FUN_00209588, FUN_00316DC0,
+// and mesh-visibility helper FUN_0036932C.
 #include "global.h"
 #include "boss_fd.h"
+#include "../../model/zelda3d_cmab.h"
 #include "asset/mat4.h"
+#include "fast/zelda3d_gl.h"
 #include "overlays/actors/ovl_Boss_Fd/z_boss_fd.h"
 
 #include <algorithm>
 #include <array>
 #include <cmath>
+#include <cstdlib>
 
 extern "C" {
 int Zelda3D_AutoModelId(const char* zarPath);
@@ -16,6 +20,11 @@ int Zelda3D_DrawModelTransform(PlayState* play, int modelId, const Vec3f* pos,
 void Zelda3D_UpdateAnim(int modelId, const char* animName, float frame);
 void Zelda3D_UpdateAnimWorldBones(int modelId, const char* animName, float frame, int firstBone,
                                  const float* worldMatrices3x4, int matrixCount);
+void Zelda3D_GL_SetMidMask(int modelId, unsigned long long mask);
+void Zelda3D_GL_SetMatConstOverride(int modelId, int materialIndex, int constIdx, float r, float g,
+                                   float b, float a);
+uint8_t* Zelda3D_AutoModelReadZarFile(int modelId, const char* suffix, size_t* outSize);
+int Zelda3D_FacialFrameTex(int modelId, int materialIndex, int frame);
 void BossFd_SetupFly(BossFd* boss, PlayState* play);
 }
 
@@ -39,6 +48,8 @@ struct FlyingModels {
     int leftArm = 0;
     int rightArm = 0;
     int fireHair = 0;
+    int deathBody = 0;
+    int deathHead = 0;
 };
 
 FlyingModels& models() {
@@ -49,8 +60,92 @@ FlyingModels& models() {
         m.leftArm = Zelda3D_AutoModelId("/actor/zelda_fd.zar|Model/valbasialarm.cmb");
         m.rightArm = Zelda3D_AutoModelId("/actor/zelda_fd.zar|Model/valbasiararm.cmb");
         m.fireHair = Zelda3D_AutoModelId("/actor/zelda_fd.zar|Model/valbasia_firehair.cmb");
+        m.deathBody = Zelda3D_AutoModelId("/actor/zelda_fd.zar|Model/valbasia_death_body.cmb");
+        m.deathHead = Zelda3D_AutoModelId("/actor/zelda_fd.zar|Model/valbasia_death_head.cmb");
     }
     return m;
+}
+
+void* loadCmabOnce(int modelId, const char* suffix, void*& handle, bool& tried) {
+    if (handle != nullptr || tried) return handle;
+    tried = true;
+    size_t size = 0;
+    uint8_t* bytes = Zelda3D_AutoModelReadZarFile(modelId, suffix, &size);
+    if (bytes != nullptr) {
+        handle = Zelda3D_CmabParse(bytes, size);
+        free(bytes);
+    }
+    return handle;
+}
+
+void applyScrollCmab(PlayState* play, int modelId, const char* suffix, int material,
+                     void*& handle, bool& tried) {
+    loadCmabOnce(modelId, suffix, handle, tried);
+    if (handle == nullptr) return;
+    const float frame = static_cast<float>(play->state.frames % Zelda3D_CmabDuration(handle));
+    float u = 0.0f;
+    float v = 0.0f;
+    if (Zelda3D_CmabSampleTranslationUV(handle, material, 1, frame, &u, &v)) {
+        Zelda3D_GL_SetMatUvOverride(modelId, material, u, v);
+    }
+}
+
+void applyBodyCmab(PlayState* play, int modelId) {
+    static void* handle = nullptr;
+    static bool tried = false;
+    applyScrollCmab(play, modelId, "valbasiabody.cmab", 0, handle, tried);
+}
+
+void applyArmCmab(PlayState* play, int modelId, bool left) {
+    static void* leftHandle = nullptr;
+    static void* rightHandle = nullptr;
+    static bool leftTried = false;
+    static bool rightTried = false;
+    if (left) {
+        applyScrollCmab(play, modelId, "valbasialarm.cmab", 0, leftHandle, leftTried);
+    } else {
+        applyScrollCmab(play, modelId, "valbasiararm.cmab", 0, rightHandle, rightTried);
+    }
+}
+
+void applyHeadCmabs(PlayState* play, int modelId, const BossFd* boss) {
+    static void* scroll = nullptr;
+    static void* eye = nullptr;
+    static void* exposed = nullptr;
+    static bool scrollTried = false;
+    static bool eyeTried = false;
+    static bool exposedTried = false;
+    applyScrollCmab(play, modelId, "valbasiahead.cmab", 2, scroll, scrollTried);
+    loadCmabOnce(modelId, "valbasiahead_eye.cmab", eye, eyeTried);
+    loadCmabOnce(modelId, "valbasiahead2.cmab", exposed, exposedTried);
+
+    int palette = 0;
+    if (boss->skinSegments != 0 && eye != nullptr &&
+        Zelda3D_CmabSampleTexturePalette(eye, 0, 0, static_cast<float>(boss->eyeState), &palette)) {
+        Zelda3D_GL_SetMatTexOverride(modelId, 0, Zelda3D_FacialFrameTex(modelId, 0, palette));
+    }
+
+    float rgba[4] = { 1.0f, 1.0f, 1.0f, 1.0f };
+    if (boss->faceExposed && exposed != nullptr) {
+        const float frame = static_cast<float>(play->state.frames % Zelda3D_CmabDuration(exposed));
+        (void)Zelda3D_CmabSampleConstColorRGBA(exposed, 1, 4, frame, rgba);
+    }
+    Zelda3D_GL_SetMatConstOverride(modelId, 1, 4, rgba[0], rgba[1], rgba[2], rgba[3]);
+}
+
+void applyFireHairCmab(PlayState* play, int modelId) {
+    static void* handle = nullptr;
+    static bool tried = false;
+    loadCmabOnce(modelId, "valbasia_firehair.cmab", handle, tried);
+    if (handle == nullptr) return;
+    const float frame = static_cast<float>(play->state.frames % Zelda3D_CmabDuration(handle));
+    float rgba[4];
+    if (Zelda3D_CmabSampleConstColorRGBA(handle, 0, 1, frame, rgba)) {
+        Zelda3D_GL_SetMatConstOverride(modelId, 0, 1, rgba[0], rgba[1], rgba[2], rgba[3]);
+    }
+    if (Zelda3D_CmabSampleConstColorRGBA(handle, 0, 2, frame, rgba)) {
+        Zelda3D_GL_SetMatConstOverride(modelId, 0, 2, rgba[0], rgba[1], rgba[2], rgba[3]);
+    }
 }
 
 struct AuthoredPlayheads {
@@ -107,7 +202,10 @@ void write3x4(const Zelda3D::Mat4& matrix, float* out) {
     }
 }
 
-void drawBody(PlayState* play, BossFd* boss, const AuthoredPlayheads& state, int modelId, float frame) {
+Vec3f rotateYX(const Vec3f& vector, const Vec3f& rot);
+
+void drawBody(PlayState* play, BossFd* boss, const AuthoredPlayheads& state, int modelId, float frame,
+              int liveSegments) {
     std::array<float, kBodySegments * 12> world = {};
     const int lead = state.bodyLead;
     for (int segment = 0; segment < kBodySegments; ++segment) {
@@ -121,9 +219,42 @@ void drawBody(PlayState* play, BossFd* boss, const AuthoredPlayheads& state, int
     }
     Zelda3D_UpdateAnimWorldBones(modelId, "vb_FWDtest", frame, kBodyFirstBone, world.data(),
                                  kBodySegments);
+    const unsigned long long liveMask = liveSegments == 0 ? 0 : ((1ULL << liveSegments) - 1ULL);
+    Zelda3D_GL_SetMidMask(modelId, liveMask);
     const Vec3f zero = { 0.0f, 0.0f, 0.0f };
     const Vec3f one = { 1.0f, 1.0f, 1.0f };
     Zelda3D_DrawModelTransform(play, modelId, &zero, &zero, &one, 0.0f);
+}
+
+void drawDeathSegments(PlayState* play, BossFd* boss, const AuthoredPlayheads& state, int modelId,
+                       int liveSegments) {
+    for (int segment = liveSegments; segment < kBodySegments; ++segment) {
+        if (boss->bodyFallApart[segment] >= 2) continue;
+
+        const int history = wrapIndex(state.bodyLead + kBodyHistoryOffset[segment + 1], 150);
+        const int previousSegment = segment == 0 ? 0 : segment - 1;
+        const int previous = wrapIndex(state.bodyLead + kBodyHistoryOffset[previousSegment + 1], 150);
+        const Vec3f& sourcePos = state.bodyPos[history];
+        const Vec3f& sourceRot = state.bodyRot[history];
+        const Vec3f& previousPos = state.bodyPos[previous];
+        const float dx = sourcePos.x - previousPos.x;
+        const float dy = sourcePos.y - previousPos.y;
+        const float dz = sourcePos.z - previousPos.z;
+        const float segmentLength = std::sqrt(dx * dx + dy * dy + dz * dz);
+
+        // FUN_003B4308 translates along the segment's local -Z by the measured distance to the
+        // preceding history sample, then rotates by -pi. Fold that exact matrix into the explicit
+        // transform API; Ry(y)*Rx(-x)*Ry(-pi) == Ry(y-pi)*Rx(x).
+        const Vec3f localOffset = { 0.0f, 0.0f, -segmentLength * boss->actor.scale.z };
+        const Vec3f worldOffset = rotateYX(localOffset, sourceRot);
+        Vec3f pos = { sourcePos.x + worldOffset.x, sourcePos.y + worldOffset.y,
+                      sourcePos.z + worldOffset.z };
+        Vec3f rot = { sourceRot.x, sourceRot.y - kPi, 0.0f };
+        const float taper = segment >= 14 ? 1.0f - (segment - 14) * 0.2f : 1.0f;
+        Vec3f scale = { boss->actor.scale.x * 0.1f * taper,
+                        boss->actor.scale.y * 0.1f * taper, boss->actor.scale.z * 0.1f };
+        Zelda3D_DrawModelTransform(play, modelId, &pos, &rot, &scale, 0.0f);
+    }
 }
 
 void drawSkeletonPiece(PlayState* play, BossFd* boss, const AuthoredPlayheads& state, int modelId,
@@ -237,23 +368,32 @@ bool BossFdBehavior::tryDrawModel(PlayState* play, Actor* actor) {
     if (!play || !actor || actor->id != ACTOR_BOSS_FD) return false;
     BossFd* boss = reinterpret_cast<BossFd*>(actor);
     FlyingModels& m = models();
-    if (m.body <= 0 || m.head <= 0 || m.leftArm <= 0 || m.rightArm <= 0 || m.fireHair <= 0) {
+    if (m.body <= 0 || m.head <= 0 || m.leftArm <= 0 || m.rightArm <= 0 || m.fireHair <= 0 ||
+        m.deathBody <= 0 || m.deathHead <= 0) {
         return false;
     }
 
     AuthoredPlayheads& p = playheads(actor);
     tickAuthoredHistory(play, boss, p);
     const int armHistory = wrapIndex(p.bodyLead + kBodyHistoryOffset[2], 150);
+    applyArmCmab(play, m.rightArm, false);
     drawSkeletonPiece(play, boss, p, m.rightArm, "vb_RarmONLY", p.rightArm, armHistory, -13.0f, 0.0f, 0.0f);
+    applyArmCmab(play, m.leftArm, true);
     drawSkeletonPiece(play, boss, p, m.leftArm, "vb_LarmONLY", p.leftArm, armHistory, 13.0f, 0.0f, 0.0f);
-    drawBody(play, boss, p, m.body, p.body);
+    applyBodyCmab(play, m.body);
+    const int liveSegments = std::clamp<int>(boss->skinSegments, 0, kBodySegments);
+    drawBody(play, boss, p, m.body, p.body, liveSegments);
+    drawDeathSegments(play, boss, p, m.deathBody, liveSegments);
 
     const int headHistory = wrapIndex(p.bodyLead + kBodyHistoryOffset[0], 150);
     const float headOffset = boss->work[BFD_ACTION_STATE] >= BOSSFD_SKULL_FALL
                                  ? -20.0f
                                  : -10.0f - ((actor->speedXZ - 5.0f) * 10.0f);
-    drawSkeletonPiece(play, boss, p, m.head, "vb_headONLY", p.head, headHistory, 0.0f, headOffset,
+    const int headModel = boss->work[BFD_ACTION_STATE] < BOSSFD_SKULL_FALL ? m.head : m.deathHead;
+    if (headModel == m.head) applyHeadCmabs(play, headModel, boss);
+    drawSkeletonPiece(play, boss, p, headModel, "vb_headONLY", p.head, headHistory, 0.0f, headOffset,
                       actor->shape.rot.z * kBinangToRad);
+    applyFireHairCmab(play, m.fireHair);
     drawManeChain(play, boss, p, m.fireHair, 0);
     drawManeChain(play, boss, p, m.fireHair, 1);
     drawManeChain(play, boss, p, m.fireHair, 2);
@@ -282,6 +422,20 @@ extern "C" int Zelda3D_BossFdForceFly(Actor* actor) {
     AuthoredPlayheads& state = playheads(actor);
     state.actor = nullptr;
     (void)playheads(actor);
+    return 1;
+}
+
+extern "C" int Zelda3D_BossFdForceDeath(Actor* actor, int liveSegments, int actionState) {
+    if (!actor || actor->id != ACTOR_BOSS_FD || liveSegments < 0 || liveSegments > kBodySegments ||
+        actionState < BOSSFD_DEATH_START || actionState > BOSSFD_SKULL_BURN) {
+        return 0;
+    }
+    BossFd* boss = reinterpret_cast<BossFd*>(actor);
+    boss->work[BFD_ACTION_STATE] = actionState;
+    boss->skinSegments = liveSegments;
+    boss->timers[0] = 30000;
+    boss->timers[1] = 30000;
+    for (s16& state : boss->bodyFallApart) state = 0;
     return 1;
 }
 

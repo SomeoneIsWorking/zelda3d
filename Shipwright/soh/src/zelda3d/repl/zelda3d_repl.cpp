@@ -2335,6 +2335,17 @@ static void Zelda3D_ReplExec(PlayState* play, char* line, const char* outPath) {
         } else {
             Zelda3D_ReplReply(outPath, "fdfly: scanned selected actor; need Boss_Fd (0x96)");
         }
+    } else if (strcmp(cmd, "fddeath") == 0) {
+        int liveSegments = 9;
+        int actionState = BOSSFD_SKIN_BURN;
+        (void)sscanf(line, "%*s %i %i", &liveSegments, &actionState);
+        if (Zelda3D_BossFdForceDeath(gZelda3dSelActor, liveSegments, actionState)) {
+            Zelda3D_ReplReply(outPath, "fddeath: live3ds=%d death3ds=%d action=%d", liveSegments,
+                              18 - liveSegments, actionState);
+        } else {
+            Zelda3D_ReplReply(outPath,
+                              "fddeath: scanned selected actor; need Boss_Fd (0x96), live 0..18, action 200..205");
+        }
     } else if (strcmp(cmd, "fdinfo") == 0) {
         // Typed flying-parent diagnostic. Its negative names the searched corpus so silence can
         // never masquerade as "no bad transforms".

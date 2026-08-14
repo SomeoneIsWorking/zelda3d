@@ -695,6 +695,7 @@ int Zelda3D_BossFd2DrawManeSegment(PlayState* play, Actor* actor, int chain, int
                                   const Vec3f* pos, const Vec3f* rot, const Vec3f* scale);
 int Zelda3D_BossFd2ForceGround(Actor* actor);
 int Zelda3D_BossFdForceFly(Actor* actor);
+int Zelda3D_BossFdForceDeath(Actor* actor, int liveSegments, int actionState);
 int Zelda3D_BossFdHistoryInfo(Actor* actor, int* bodyLead, int* maneLead, Vec3f* minPos,
                              Vec3f* maxPos);
 int Zelda3D_BossFd2ForceIdle(PlayState* play, Actor* actor, int hold);
