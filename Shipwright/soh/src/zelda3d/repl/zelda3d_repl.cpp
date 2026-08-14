@@ -2363,6 +2363,21 @@ static void Zelda3D_ReplExec(PlayState* play, char* line, const char* outPath) {
             Zelda3D_ReplReply(outPath,
                               "fdfx: scanned selected actor and arguments; need Boss_Fd (0x96), 3DS type 0..5, count 1..12; staged 0/110");
         }
+    } else if (strcmp(cmd, "vbball") == 0) {
+        int params = -1;
+        (void)sscanf(line, "%*s %i", &params);
+        Actor* child = Zelda3D_EnVbBallSpawnDiagnostic(play, gZelda3dSelActor, params);
+        if (child != nullptr) {
+            gZelda3dSelActor = child;
+            gZelda3dActorFreeze = 1;
+            sZelda3dActorPinPos = child->world.pos;
+            sZelda3dActorPinRot = child->world.rot;
+            Zelda3D_ReplReply(outPath, "vbball: params=%d branch=%s spawned=1/1 selected+frozen",
+                              params, params >= 200 ? "death-body" : "attack-stone");
+        } else {
+            Zelda3D_ReplReply(outPath,
+                              "vbball: scanned selected actor and params; need Boss_Fd (0x96) parent and params 100..102 or 200..217; spawned 0/1");
+        }
     } else if (strcmp(cmd, "fdinfo") == 0) {
         // Typed flying-parent diagnostic. Its negative names the searched corpus so silence can
         // never masquerade as "no bad transforms".

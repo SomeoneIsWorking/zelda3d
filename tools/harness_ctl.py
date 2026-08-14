@@ -61,6 +61,7 @@ def _load_repo_environment() -> None:
         name = os.fsdecode(raw_name)
         if name not in os.environ:
             os.environ[name] = os.fsdecode(raw_value)
+    os.environ["ZELDA3D_HARNESS_ENV_LOADED"] = "1"
 
 
 def _provision_rom_environment() -> None:
@@ -68,7 +69,7 @@ def _provision_rom_environment() -> None:
     _load_repo_environment()
     script = REPO_ROOT / "tools" / "rom_provision.sh"
     command = (
-        'source "$1"; zelda3d_provision_roms "$2"; '
+        'source "$1"; zelda3d_provision_roms "$2" "" 1; '
         'printf "%s\\0%s\\0" "${ZELDA3D_OOT3D_ROM-}" "${ZELDA3D_OOT_ROM-}"'
     )
     result = subprocess.run(

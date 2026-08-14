@@ -11,6 +11,7 @@
 #include "fast/zelda3d_sdl3gpu.h"
 #include "fast/backends/gfx_sdl3gpu.h"
 #include "fast/backends/zelda3d_sdl3gpu.h" // Fast::Zelda3DRenderer (this module's state, folded into the backend)
+#include "fast/backends/zelda3d_tev_glsl.h" // one generic-PICA evaluator shared with unified_shader.cpp
 
 // inja — the GLSL shaders below are inja templates (see the CMake comment for why not fmt).
 #include <inja/inja.hpp>
@@ -376,126 +377,7 @@ float fog3dNode(float t) {
     //    that read PREVBUF latch exactly one stage before the read, so the read always returns a
     //    latched stage output and never the initial value (tools/tev_corpus_survey.py reports
     //    both columns). FALSIFIER: a material that reads PREVBUF with no preceding latch.
-// PICA alpha test. `f` is the GL compare enum minus 0x200 (0 NEVER .. 7 ALWAYS). The renderer used
-// to hardcode "pass when a >= ref" for every material, but 910 of the 913 alpha-test-enabled
-// materials in the ROM are GREATER. That only differs at a == ref -- which is exactly the ref==0
-// case, where GREATER cuts fully transparent texels and GEQUAL keeps them. Keeping them is visible:
-// hairal_niwa's courtyard windows write depth with blending off, so the kept cut-out renders opaque
-// and occludes what is behind it.
-bool alphaPass(float a, float ref, int f) {
-    if (f == 0) return false;
-    if (f == 1) return a <  ref;
-    if (f == 2) return a == ref;
-    if (f == 3) return a <= ref;
-    if (f == 4) return a >  ref;
-    if (f == 5) return a != ref;
-    if (f == 6) return a >= ref;
-    return true;
-}
-vec4 tevSrc(uint code, vec4 prim, vec4 t0, vec4 t1, vec4 t2, vec4 prev, vec4 pbuf, uint kidx) {
-    if (code == 0u || code == 1u) return prim;
-    if (code == 2u) return vec4(0.0, 0.0, 0.0, 1.0);
-    if (code == 3u || code == 6u) return t0;
-    if (code == 4u) return t1;
-    if (code == 5u) return t2;
-    if (code == 14u) return unpackUnorm4x8(ubo.uTevConst[kidx >> 2][kidx & 3u]);
-    if (code == 15u) return prev;
-    if (code == 13u) return pbuf;
-    return vec4(0.0);
-}
-vec3 tevColorMod(uint m, vec4 s) {
-    if (m == 0u) return s.rgb;
-    if (m == 1u) return 1.0 - s.rgb;
-    if (m == 2u) return vec3(s.a);
-    if (m == 3u) return vec3(1.0 - s.a);
-    if (m == 4u) return vec3(s.r);
-    if (m == 5u) return vec3(1.0 - s.r);
-    if (m == 8u) return vec3(s.g);
-    if (m == 9u) return vec3(1.0 - s.g);
-    if (m == 12u) return vec3(s.b);
-    if (m == 13u) return vec3(1.0 - s.b);
-    return s.rgb;
-}
-float tevAlphaMod(uint m, vec4 s) {
-    if (m == 0u) return s.a;
-    if (m == 1u) return 1.0 - s.a;
-    if (m == 2u) return s.r;
-    if (m == 3u) return 1.0 - s.r;
-    if (m == 4u) return s.g;
-    if (m == 5u) return 1.0 - s.g;
-    if (m == 6u) return s.b;
-    if (m == 7u) return 1.0 - s.b;
-    return s.a;
-}
-vec3 tevColorOp(uint op, vec3 a, vec3 b, vec3 c) {
-    if (op == 0u) return a;
-    if (op == 1u) return a * b;
-    if (op == 2u) return a + b;
-    if (op == 3u) return a + b - 0.5;
-    if (op == 4u) return mix(b, a, c);
-    if (op == 5u) return a - b;
-    if (op == 6u || op == 7u) return vec3(4.0 * dot(a - 0.5, b - 0.5));
-    if (op == 8u) return a * b + c;
-    return clamp(a + b, 0.0, 1.0) * c;
-}
-float tevAlphaOp(uint op, float a, float b, float c) {
-    if (op == 0u) return a;
-    if (op == 1u) return a * b;
-    if (op == 2u) return a + b;
-    if (op == 3u) return a + b - 0.5;
-    if (op == 4u) return mix(b, a, c);
-    if (op == 5u) return a - b;
-    if (op == 8u) return a * b + c;
-    if (op == 9u) return clamp(a + b, 0.0, 1.0) * c;
-    return a;
-}
-vec4 tevRun(vec4 prim, vec4 t0, vec4 t1, vec4 t2) {
-    // PICA combiner buffer. `buf` is what PREVBUF reads; `nextbuf` is the pending value.
-    // Azahar assigns buf <- nextbuf AFTER the stage output is computed and only THEN applies the
-    // latch (sw_rasterizer.cpp ~991 and glsl_fs_shader_gen.cpp ~476 agree), so a latched value
-    // first becomes visible two stages later. The CMB stores the latch flag one stage AHEAD of
-    // Azahar's 0-based mask bit — 3dbrew names the GPUREG_TEXENV_UPDATE_BUFFER bits "TEV stage
-    // 1..4" and Grezzo puts the flag on the named stage — hence the stage s+1 lookup below.
-    // Confirmed on data: all 14 PREVBUF-reading materials in the ROM latch at exactly read-1,
-    // which is meaningful only under this mapping (childlink_v2 mat26, the Goron bracelet:
-    // stage 0 diffuse -> buffer, stage 1 replaces PREVIOUS with the env term, stage 2 adds the
-    // diffuse back from the buffer; without this the bracelet renders black).
-    vec4 prev = vec4(0.0);
-    vec4 buf = vec4(0.0);
-    vec4 nextbuf = vec4(0.0);
-    int n = int(ubo.uTevCtl.x + 0.5);
-    for (int s = 0; s < n; s++) {
-        uvec4 w = ubo.uTevStages[s];
-        uint kidx = (w.y >> 24) & 7u;
-        vec4 sa = tevSrc(w.x & 15u, prim, t0, t1, t2, prev, buf, kidx);
-        vec4 sb = tevSrc((w.x >> 4) & 15u, prim, t0, t1, t2, prev, buf, kidx);
-        vec4 sc = tevSrc((w.x >> 8) & 15u, prim, t0, t1, t2, prev, buf, kidx);
-        vec3 ca = tevColorMod(w.y & 15u, sa);
-        vec3 cb = tevColorMod((w.y >> 4) & 15u, sb);
-        vec3 cc = tevColorMod((w.y >> 8) & 15u, sc);
-        vec3 rgb = tevColorOp(w.z & 15u, ca, cb, cc);
-        rgb = clamp(rgb * float(1u << ((w.z >> 8) & 3u)), 0.0, 1.0);
-        float alpha;
-        if (((w.z >> 4) & 15u) == 7u) {
-            alpha = rgb.r;
-        } else {
-            vec4 aa = tevSrc((w.x >> 12) & 15u, prim, t0, t1, t2, prev, buf, kidx);
-            vec4 ab = tevSrc((w.x >> 16) & 15u, prim, t0, t1, t2, prev, buf, kidx);
-            vec4 ac = tevSrc((w.x >> 20) & 15u, prim, t0, t1, t2, prev, buf, kidx);
-            float fa = tevAlphaMod((w.y >> 12) & 15u, aa);
-            float fb = tevAlphaMod((w.y >> 16) & 15u, ab);
-            float fc = tevAlphaMod((w.y >> 20) & 15u, ac);
-            alpha = tevAlphaOp((w.z >> 4) & 15u, fa, fb, fc);
-        }
-        alpha = clamp(alpha * float(1u << ((w.z >> 10) & 3u)), 0.0, 1.0);
-        prev = vec4(rgb, alpha);
-        buf = nextbuf;
-        uint latch = (s + 1 < n) ? ubo.uTevStages[s + 1].z : 0u;
-        if ((latch & 4096u) != 0u) nextbuf.rgb = prev.rgb;
-        if ((latch & 8192u) != 0u) nextbuf.a = prev.a;
-    }
-    return prev;
-}
+{{ generic_tev_functions }}
 void main() {
     vec4 t = texture(uTex, vUv);
     // PICA TEV stage 0 dual-texture combine (ADD_MULT: (t0 + t1) * t0, saturating the sum per
@@ -733,16 +615,18 @@ void Fast::Zelda3DRenderer::releaseGpuResources(bool (*note)(const void* handle,
     }
     g_uniPipelines.clear();
 
-    SDL_GPUShader* shaders[] = { g_vert,        g_frag,        g_uniVert[0], g_uniVert[1], g_uniVert[2],
-                                 g_uniVert[3],  g_uniVert[4],  g_uniVert[5], g_uniFrag[0], g_uniFrag[1],
-                                 g_uniFrag[2],  g_uniFrag[3],  g_uniFrag[4], g_uniFrag[5], g_overlayDepthFrag };
+    SDL_GPUShader* shaders[] = { g_vert, g_frag, g_overlayDepthFrag };
     for (SDL_GPUShader* sh : shaders) {
         if (sh != nullptr && note(sh, "zelda3d shader")) {
             SDL_ReleaseGPUShader(g_device, sh);
         }
     }
     g_vert = g_frag = g_overlayDepthFrag = nullptr;
-    for (int i = 0; i < 6; ++i) {
+    for (int i = 0; i < (int)Fast::Unified::Variant::kCount; ++i) {
+        if (g_uniVert[i] != nullptr && note(g_uniVert[i], "zelda3d unified vertex shader"))
+            SDL_ReleaseGPUShader(g_device, g_uniVert[i]);
+        if (g_uniFrag[i] != nullptr && note(g_uniFrag[i], "zelda3d unified fragment shader"))
+            SDL_ReleaseGPUShader(g_device, g_uniFrag[i]);
         g_uniVert[i] = nullptr;
         g_uniFrag[i] = nullptr;
     }
@@ -1073,6 +957,7 @@ bool Fast::Zelda3DRenderer::ensureResources() {
     inja::json data;
     data["ubo_body"] = SG_UBO_COMMON_BODY;        // the macros stay the single source of truth for
     data["ubo_bones_body"] = SG_UBO_BONES_BODY;   // the UBO layout shared with the C++ struct
+    data["generic_tev_functions"] = Fast::Zelda3DTev::kGenericFunctions;
     data["tap_combiner"] = tapCombiner;
     data["tap_pre_fog"] = tapPreFog;
 
@@ -1485,6 +1370,8 @@ UnifiedVtx PackUnifiedVtx(const Zelda3DGlVtx& v, float combScaleRGB) {
 Fast::Unified::Variant VariantForGroup(const SgGroup& g, bool hasTex) {
     if (!hasTex)
         return Fast::Unified::Variant::kUntextured;
+    if (g.tevGeneric)
+        return Fast::Unified::Variant::kGenericTev;
     return g.alphaTest ? Fast::Unified::Variant::kSingleTexAlphaTest : Fast::Unified::Variant::kSingleTex;
 }
 
@@ -1569,7 +1456,9 @@ SDL_GPUGraphicsPipeline* Fast::Zelda3DRenderer::getUnifiedPipeline(const SgGroup
         // 1 UBO (UnifiedCommon) + 1 UBO (bones) for vertex; 1 sampler (untextured variant needs 0)
         // + 1 UBO (UnifiedCommon) for fragment — mirrors makeShader's existing (numSamplers, numUbo)
         // convention for the old fixed CMB shader.
-        uint32_t numSamplers = (variant == (int)Fast::Unified::Variant::kUntextured) ? 0 : 1;
+        uint32_t numSamplers = variant == (int)Fast::Unified::Variant::kUntextured
+                                   ? 0
+                                   : (variant == (int)Fast::Unified::Variant::kGenericTev ? 3 : 1);
         g_uniVert[variant] = makeShader(vsrc.c_str(), EShLangVertex, 0, 2);
         g_uniFrag[variant] = makeShader(fsrc.c_str(), EShLangFragment, numSamplers, 1);
         if (!g_uniVert[variant] || !g_uniFrag[variant])
@@ -2508,6 +2397,25 @@ void Fast::Zelda3DRenderer::DrawModel(int modelId, const float* mp16, const floa
             uu.common.uMatDiffuse[1] = grp.matDiffuse[1] * gZelda3dLight1Col[1];
             uu.common.uMatDiffuse[2] = grp.matDiffuse[2] * gZelda3dLight1Col[2];
             uu.common.uMatDiffuse[3] = 0.0f;
+            // The legacy CMB UBO above is the authoritative material packer. Carry its complete
+            // PICA state into the unified layout so generic-TEV materials execute the same staged
+            // combiner, per-actor constant overrides, coordinator transforms, and alpha compare.
+            // These fields are byte-compatible vec4/uvec4 blocks by construction (unified_ubo.h).
+            memcpy(uu.common.uMatConst, ubo.uMatConst, sizeof(uu.common.uMatConst));
+            memcpy(uu.common.uSheen, ubo.uSheen, sizeof(uu.common.uSheen));
+            memcpy(uu.common.uTex1Xf, ubo.uTex1Xf, sizeof(uu.common.uTex1Xf));
+            memcpy(uu.common.uFog3d0, ubo.uFog3d0, sizeof(uu.common.uFog3d0));
+            memcpy(uu.common.uFog3d1, ubo.uFog3d1, sizeof(uu.common.uFog3d1));
+            memcpy(uu.common.uSphRot0, ubo.uSphRot0, sizeof(uu.common.uSphRot0));
+            memcpy(uu.common.uSphRot1, ubo.uSphRot1, sizeof(uu.common.uSphRot1));
+            memcpy(uu.common.uSphRot2, ubo.uSphRot2, sizeof(uu.common.uSphRot2));
+            memcpy(uu.common.uLitDif1, ubo.uLitDif1, sizeof(uu.common.uLitDif1));
+            memcpy(uu.common.uLitDif2, ubo.uLitDif2, sizeof(uu.common.uLitDif2));
+            memcpy(uu.common.uLightDir2, ubo.uLightDir2, sizeof(uu.common.uLightDir2));
+            memcpy(uu.common.uTevStages, ubo.uTevStages, sizeof(uu.common.uTevStages));
+            memcpy(uu.common.uTevConst, ubo.uTevConst, sizeof(uu.common.uTevConst));
+            memcpy(uu.common.uTex2Xf, ubo.uTex2Xf, sizeof(uu.common.uTex2Xf));
+            memcpy(uu.common.uTevCtl, ubo.uTevCtl, sizeof(uu.common.uTevCtl));
             memcpy(uu.bones, base.uBones, sizeof(uu.bones));
             static_assert(sizeof(uu) == sizeof(SgUbo), "UnifiedDrawUbo must match DrawGroup::ubo's byte size");
             memcpy(dg.ubo.data(), &uu, sizeof(uu));

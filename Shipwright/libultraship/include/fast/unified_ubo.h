@@ -24,16 +24,12 @@ struct CommonUbo {
     float uParams1[4]; // x=noise_scale, y=polygonOffset, z=hasSkin, w=alreadyTransformed (N64)
     float uMatAmbient[4];
     float uMatDiffuse[4];
-    // Mirror of SgUbo::uMatConst so sizeof(UnifiedDrawUbo) stays == sizeof(SgUbo); the unified
-    // shader currently ignores it, but the size parity is enforced by static_assert and is what
-    // lets the unified path reuse the existing DRAW_MODEL push-block plumbing unchanged.
+    // PICA constant-color fallback plus a byte-identical mirror of SgUbo::uMatConst. Generic-TEV
+    // draws use the full palette below; simple unified CMB draws retain this selected-slot value.
     float uMatConst[4];
-    // Mirror of SgUbo::uSheen (title wordmark sheen, title_logo_actor.md §6.3). The unified
-    // renderer (gUnifiedRenderer, off by default) doesn't draw the title overlay today — this is
-    // pure size-parity padding, same rationale as uMatConst above.
+    // Mirror of SgUbo::uSheen. Generic-TEV draws use .w for coordinator-1 mapping.
     float uSheen[4];
-    // Mirror of SgUbo::uTex1Xf (dual-texture coordinator-1 transform, fire-glow). Size-parity
-    // padding for the unified path, same rationale as uMatConst/uSheen above.
+    // Mirror of SgUbo::uTex1Xf (coordinator-1 transform), live on generic-TEV draws.
     float uTex1Xf[4];
     // Mirror of SgUbo::uFog3d0/uFog3d1 (OoT3D PICA distance fog, title port — zelda3d_sg_ubo.h).
     // Size-parity padding today: the (default-off) unified path doesn't apply the 3DS fog yet;
@@ -54,9 +50,7 @@ struct CommonUbo {
     float uLitDif2[4];
     float uLightDir2[4];
     // Mirror of SgUbo::uTevStages/uTevConst/uTex2Xf/uTevCtl (generic per-stage TEV,
-    // render.multi-stage-tev — zelda3d_sg_ubo.h). Size-parity padding today: the (default-off)
-    // unified path still runs its N64-mux combiner; wire these through
-    // UNIFIED_COMMON_UBO_BODY when the unified renderer takes over CMB draws.
+    // render.multi-stage-tev — zelda3d_sg_ubo.h). Live on kGenericTev CMB draws.
     uint32_t uTevStages[6 * 4];
     uint32_t uTevConst[8];
     float uTex2Xf[4];

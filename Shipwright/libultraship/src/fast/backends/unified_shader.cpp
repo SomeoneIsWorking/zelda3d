@@ -1,4 +1,5 @@
 #include "fast/backends/unified_shader.h"
+#include "fast/backends/zelda3d_tev_glsl.h"
 #include "fast/unified_vtx.h"      // UnifiedVtx — not yet referenced by any draw path (Phase 2/3)
 #include "fast/unified_material.h" // UnifiedMaterial — ditto
 #include "fast/unified_ubo.h"      // CommonUbo/UnifiedDrawUbo — static_assert-checked against kCommonUboBody here
@@ -13,7 +14,7 @@
 #include <mutex>
 
 // See unified_shader.h for the design rationale. This file has ONE job right now: produce valid
-// GLSL for the six structural variants, sharing one combiner-evaluation function (evalInput /
+// GLSL for the structural variants, sharing one combiner-evaluation function (evalInput /
 // evalCycle) that reads UnifiedMaterial.combMux's SHADER_* operand codes at RUNTIME via a switch,
 // instead of the old approach of baking a different GLSL expression per combiner permutation
 // (gfx_sdl3gpu.cpp's sg_shader_item_to_str/sg_append_formula, invoked once per unique
@@ -69,17 +70,18 @@ bool CompileGlslToSpirv(EShLanguage stage, const std::string& src, std::vector<u
 }
 
 struct VariantFeatures {
-    bool hasTex0, hasTex1, alphaTest, fog, grayscale;
+    bool hasTex0, hasTex1, hasTex2, alphaTest, fog, grayscale, genericTev;
 };
 
 VariantFeatures FeaturesFor(Variant v) {
     switch (v) {
-        case Variant::kUntextured:        return { false, false, false, false, false };
-        case Variant::kSingleTex:         return { true, false, false, false, false };
-        case Variant::kSingleTexAlphaTest:return { true, false, true, false, false };
-        case Variant::kDualTex:           return { true, true, false, false, false };
-        case Variant::kDualTexFog:        return { true, true, false, true, false };
-        case Variant::kGrayscale:         return { true, false, false, false, true };
+        case Variant::kUntextured:         return { false, false, false, false, false, false, false };
+        case Variant::kSingleTex:          return { true, false, false, false, false, false, false };
+        case Variant::kSingleTexAlphaTest: return { true, false, false, true, false, false, false };
+        case Variant::kDualTex:            return { true, true, false, false, false, false, false };
+        case Variant::kDualTexFog:         return { true, true, false, false, true, false, false };
+        case Variant::kGrayscale:          return { true, false, false, false, false, true, false };
+        case Variant::kGenericTev:         return { true, true, true, false, false, false, true };
         default:                          return {};
     }
 }
@@ -150,6 +152,7 @@ const char* kUnifiedShaderTemplate = R"PRISM(@prism(type='fragment', name='Unifi
     layout(location=6) out vec4 vColor3;
     layout(location=7) out vec2 vFog;
     layout(location=8) out vec3 vNrmView;
+    layout(location=9) out vec2 vUv2;
 
     layout(set=1, binding=0, std140) uniform UnifiedCommon { UNIFIED_COMMON_UBO_BODY } ubo;
     layout(set=1, binding=1, std140) uniform UnifiedBones { mat4 uBones[@{ZELDA3D_GL_MAX_BONES}]; } bones;
@@ -174,8 +177,34 @@ const char* kUnifiedShaderTemplate = R"PRISM(@prism(type='fragment', name='Unifi
         // clobber w=1). Otherwise (3DS): GPU-transform model-space pos via uMvp as before.
         gl_Position = (ubo.uParams1.w > 0.5) ? aPos : (ubo.uMvp * vec4(sp, 1.0));
         vNrmView = mat3(ubo.uMv) * nM;
-        vUv0 = aUv0;
-        vUv1 = aUv1;
+        @if(o_genericTev)
+            vUv0 = vec2(aUv0.x, 1.0 - aUv0.y);
+            vec3 ns = mat3(ubo.uMv) * nM;
+            if (ubo.uSheen.w > 2.5) {
+                vec3 nv = normalize(ns);
+                vec2 suv = vec2((nv.x * 0.5 + 0.5 - ubo.uTex1Xf.z) * ubo.uTex1Xf.x,
+                                (nv.y * 0.5 + 0.5 - ubo.uTex1Xf.w) * ubo.uTex1Xf.y);
+                vUv1 = vec2(suv.x, 1.0 - suv.y);
+            } else {
+                vec2 uv1 = vec2((aUv0.x - ubo.uTex1Xf.z) * ubo.uTex1Xf.x,
+                                (aUv0.y - ubo.uTex1Xf.w) * ubo.uTex1Xf.y);
+                vUv1 = vec2(uv1.x, 1.0 - uv1.y);
+            }
+            if (ubo.uTevCtl.z > 2.5 && ubo.uTevCtl.z < 3.5) {
+                vec3 nv2 = normalize(ns);
+                vec2 suv2 = vec2((nv2.x * 0.5 + 0.5 - ubo.uTex2Xf.z) * ubo.uTex2Xf.x,
+                                 (nv2.y * 0.5 + 0.5 - ubo.uTex2Xf.w) * ubo.uTex2Xf.y);
+                vUv2 = vec2(suv2.x, 1.0 - suv2.y);
+            } else {
+                vec2 uv2 = vec2((aUv0.x - ubo.uTex2Xf.z) * ubo.uTex2Xf.x,
+                                (aUv0.y - ubo.uTex2Xf.w) * ubo.uTex2Xf.y);
+                vUv2 = vec2(uv2.x, 1.0 - uv2.y);
+            }
+        @else
+            vUv0 = aUv0;
+            vUv1 = aUv1;
+            vUv2 = vec2(0.0);
+        @end
         vTexClamp = aTexClamp;
         vColor0 = aColor0;
         vColor1 = aColor1;
@@ -205,10 +234,16 @@ const char* kUnifiedShaderTemplate = R"PRISM(@prism(type='fragment', name='Unifi
     layout(location=6) in vec4 vColor3;
     layout(location=7) in vec2 vFog;
     layout(location=8) in vec3 vNrmView;
+    layout(location=9) in vec2 vUv2;
     layout(location=0) out vec4 fragColor;
 
     @if(o_tex0) layout(set=2, binding=0) uniform sampler2D uTex0;
-    @if(o_tex1) layout(set=2, binding=1) uniform sampler2D uTex1;
+    @if(o_tex2) layout(set=2, binding=1) uniform sampler2D uTex2;
+    @if(o_tex2)
+        layout(set=2, binding=2) uniform sampler2D uTex1;
+    @else
+        @if(o_tex1) layout(set=2, binding=1) uniform sampler2D uTex1;
+    @end
 
     layout(set=3, binding=0, std140) uniform UnifiedCommon { UNIFIED_COMMON_UBO_BODY } ubo;
 
@@ -246,6 +281,11 @@ const char* kUnifiedShaderTemplate = R"PRISM(@prism(type='fragment', name='Unifi
             return vec4(1.0);
         @end
     }
+    @if(o_genericTev)
+    vec4 texel2() { return texture(uTex2, vUv2); }
+
+    @{generic_tev_functions}
+    @end
 
     // One generic evaluator for both cycles/both RGB+alpha — replaces the old per-permutation
     // sg_shader_item_to_str/sg_append_formula text generation with a runtime switch. "single" /
@@ -284,8 +324,14 @@ const char* kUnifiedShaderTemplate = R"PRISM(@prism(type='fragment', name='Unifi
     }
 
     void main() {
-        vec4 texel = evalCycle(0, vec4(0.0));
-        if (ubo.uParams0.z > 1.5) texel = evalCycle(1, texel); // cycleCount==2
+        @if(o_genericTev)
+            vec4 texel = tevRun(vColor0, texel0(), texel1(), texel2());
+            int afn = int(ubo.uTevCtl.w + 0.5);
+            if (afn > 0 && !alphaPass(texel.a, ubo.uParams0.x, afn - 1)) discard;
+        @else
+            vec4 texel = evalCycle(0, vec4(0.0));
+            if (ubo.uParams0.z > 1.5) texel = evalCycle(1, texel); // cycleCount==2
+        @end
 
         // lightingMode 1 (3DS character half-Lambert): applied HERE, not baked into vColor0 like
         // mode 2, because the combiner's SHADER_INPUT_1 must stay the raw per-vertex tint (matching
@@ -326,9 +372,12 @@ std::string BuildSource(Variant v, bool vertex) {
         { "VERTEX_SHADER", vertex },
         { "o_tex0", f.hasTex0 },
         { "o_tex1", f.hasTex1 },
+        { "o_tex2", f.hasTex2 },
         { "o_alphaTest", f.alphaTest },
         { "o_fog", f.fog },
         { "o_grayscale", f.grayscale },
+        { "o_genericTev", f.genericTev },
+        { "generic_tev_functions", Fast::Zelda3DTev::kGenericFunctions },
         { "ZELDA3D_GL_MAX_BONES", ZELDA3D_GL_MAX_BONES },
     };
     processor.populate(ctx);
@@ -347,6 +396,7 @@ const char* VariantName(Variant v) {
         case Variant::kDualTex: return "DualTex";
         case Variant::kDualTexFog: return "DualTexFog";
         case Variant::kGrayscale: return "Grayscale";
+        case Variant::kGenericTev: return "GenericTev";
         default: return "?";
     }
 }

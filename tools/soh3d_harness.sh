@@ -53,11 +53,12 @@ if [[ -f "${repo_root}/.env" ]]; then
     eval "${caller_exports}"
     unset caller_exports
 fi
+export ZELDA3D_HARNESS_ENV_LOADED=1
 
 # Match every other Zelda3D launcher: environment first, then a drop-in ROM at
 # the repo root.
 source "${repo_root}/tools/rom_provision.sh"
-zelda3d_provision_roms "${repo_root}"
+zelda3d_provision_roms "${repo_root}" "" 1
 if [[ $# -eq 0 && -z "${ZELDA3D_OOT3D_ROM:-}" ]]; then
     echo "harness: ROM provisioning scanned the process environment, repo .env, and repo-root *.3ds files; matched 0" >&2
     exit 1

@@ -68,4 +68,6 @@ _(empty)_
 
 ## done
 
+- [#211] Embedded harness reads the repo `.env` — user request 2026-08-14. The executable now loads the repo-root shell environment even when invoked directly from another working directory, imports plain assignments, and preserves explicit process overrides. Shell/Python launchers hand off a loaded marker and ROM provisioning accepts an already-loaded flag, so the executable does not evaluate executable `.env` syntax a second time. Evidence: direct-binary discriminator loaded 4 absent keys from the real repo `.env`; a synthetic `.env` selected its ROM path, while an explicit caller ROM won the A/B; the launcher/provisioning discriminator reported exactly `env_evaluations=1`; harness build, `bash -n`, Python compile, and codemap gate pass.
+
 _(empty)_
