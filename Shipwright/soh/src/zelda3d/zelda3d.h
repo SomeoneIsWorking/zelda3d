@@ -680,6 +680,7 @@ int Zelda3D_ModelGroupCentroid(int modelId, int materialIndex, float out[3]); //
 // Bridges for the structured model-REPLACEMENT behaviors (behaviors/actor/<actor>.cpp):
 int Zelda3D_TryActorModelDraw(PlayState* play, Actor* actor);            // dispatch actor->behavior->tryDrawModel
 int Zelda3D_TryActorDeferredDraw(PlayState* play, Actor* actor);         // prepare skeletal replacement, keep actor Draw
+void Zelda3D_ActorBehaviorPostUpdate(PlayState* play, Actor* actor);     // advance behavior-owned 3DS update state
 int Zelda3D_ActorDrawSpaceTransform(void* actor, float* outLiftY, float* outLocalOff); // faithful draw-space offset
 int Zelda3D_ActorHasBehaviorModule(s16 actorId); // 1 if a behaviors/actor/<x>.cpp module is registered for this id
 // Boss_Goma climb-state tooling (REPL `gohmaclimb`, #123): drive Gohma into her REAL wall-climb so the

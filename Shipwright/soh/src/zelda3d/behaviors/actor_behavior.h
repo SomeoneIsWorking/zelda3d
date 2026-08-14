@@ -32,6 +32,13 @@ public:
     // Default no-op: a model-REPLACEMENT behavior (tryDrawModel) need not layer per-draw overrides.
     virtual void applyDrawOverrides(int modelId, Actor* actor, bool track, bool facial) {}
 
+    // Advance actor-owned 3DS state after the underlying gameplay actor has updated. This is the
+    // update-cadence seam for authored controllers and procedural histories that OoT3D advances in
+    // Update, independently of whether the actor is visible or drawn that frame. Keeping this out of
+    // tryDrawModel() prevents occlusion, manual stepping, or a variable render rate from changing
+    // animation/history state.
+    virtual void postUpdate(PlayState* play, Actor* actor) {}
+
     // Model-REPLACEMENT path: fully DRAW this actor's OoT3D replacement model (choosing the CMB,
     // scale and transform itself) and return true to SUPPRESS the N64 draw. Default false = this
     // behavior does not replace the model (it only layers overrides via applyDrawOverrides above).

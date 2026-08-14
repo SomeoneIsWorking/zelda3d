@@ -9,6 +9,7 @@ namespace Zelda3D {
 class BossFdBehavior : public ActorBehavior {
 public:
     s16 actorId() const override;
+    void postUpdate(PlayState* play, Actor* actor) override;
     bool tryDrawModel(PlayState* play, Actor* actor) override;
 };
 

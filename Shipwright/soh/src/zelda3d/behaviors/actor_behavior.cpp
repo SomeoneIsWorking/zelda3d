@@ -220,6 +220,17 @@ extern "C" int Zelda3D_TryActorDeferredDraw(PlayState* play, Actor* actor) {
     return 0;
 }
 
+// C bridge for Zelda3D_ActorPostUpdate: advance behavior-owned 3DS state on gameplay-update
+// cadence, never on draw cadence. Most behaviors have no such state and inherit the no-op.
+extern "C" void Zelda3D_ActorBehaviorPostUpdate(PlayState* play, Actor* actor) {
+    if (play == nullptr || actor == nullptr) {
+        return;
+    }
+    if (Zelda3D::ActorBehavior* b = Zelda3D::findActorBehavior(actor->id)) {
+        b->postUpdate(play, actor);
+    }
+}
+
 // Coverage-audit bridge (REPL `actorsnear`): does this actor id have a ported behavior module?
 // Used only at the audit's --N64-- fallthrough — i.e. after the object->ZAR table/auto checks have
 // already failed — so a registered behavior there is necessarily a model-REPLACEMENT (door, fish,
