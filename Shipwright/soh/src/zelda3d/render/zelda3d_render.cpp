@@ -593,6 +593,31 @@ int Zelda3D_DrawModelTransform(PlayState* play, int modelId, const Vec3f* pos,
     return 1;
 }
 
+// Draw one camera-facing CMB instance at an arbitrary world position. Effect pools own positions,
+// not Actors, so this is the typed counterpart to Zelda3D_EmitActorBillboard. Mesh/material state
+// is snapshotted before the opcode, allowing many differently-masked instances of one CMB.
+int Zelda3D_DrawModelBillboard(PlayState* play, int modelId, const Vec3f* pos,
+                              const Vec3f* scale) {
+    if (play == NULL || modelId < 0 || pos == NULL || scale == NULL) {
+        return 0;
+    }
+    u8 tint[3];
+    OPEN_DISPS(play->state.gfxCtx);
+    Gfx_SetupDL_25Opa(play->state.gfxCtx);
+    Matrix_Translate(pos->x, pos->y, pos->z, MTXMODE_NEW);
+    Matrix_Mult(&play->billboardMtxF, MTXMODE_APPLY);
+    Matrix_Scale(scale->x, scale->y, scale->z, MTXMODE_APPLY);
+    const int xluPass = Zelda3D_AutoModelAllBlended(modelId);
+    gSPMatrix(xluPass ? POLY_XLU_DISP++ : POLY_OPA_DISP++, MATRIX_NEWMTX(play->state.gfxCtx),
+              G_MTX_MODELVIEW | G_MTX_LOAD);
+    Zelda3D_SceneTint(play, tint);
+    Zelda3D_GL_EmitPose(modelId);
+    gSPZelda3DDraw(xluPass ? POLY_XLU_DISP++ : POLY_OPA_DISP++, modelId | (int)0x80000000,
+                   tint[0], tint[1], tint[2]);
+    CLOSE_DISPS(play->state.gfxCtx);
+    return 1;
+}
+
 // Draw with an explicit material colour modulating the scene tint (see sZelda3dDrawTint). For
 // state-coloured props such as the crystal switch. The override is scoped to this single draw.
 int Zelda3D_DrawActorModelTinted(PlayState* play, int modelId, Actor* actor, float worldScale,

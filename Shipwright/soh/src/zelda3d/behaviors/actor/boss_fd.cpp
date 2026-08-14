@@ -17,12 +17,15 @@ extern "C" {
 int Zelda3D_AutoModelId(const char* zarPath);
 int Zelda3D_DrawModelTransform(PlayState* play, int modelId, const Vec3f* pos,
                               const Vec3f* rotYXZ, const Vec3f* scale, float postRotX);
+int Zelda3D_DrawModelBillboard(PlayState* play, int modelId, const Vec3f* pos,
+                              const Vec3f* scale);
 void Zelda3D_UpdateAnim(int modelId, const char* animName, float frame);
 void Zelda3D_UpdateAnimWorldBones(int modelId, const char* animName, float frame, int firstBone,
                                  const float* worldMatrices3x4, int matrixCount);
 void Zelda3D_GL_SetMidMask(int modelId, unsigned long long mask);
 void Zelda3D_GL_SetMatConstOverride(int modelId, int materialIndex, int constIdx, float r, float g,
                                    float b, float a);
+void Zelda3D_GL_SetMatUvOverride(int modelId, int materialIndex, float u, float v);
 uint8_t* Zelda3D_AutoModelReadZarFile(int modelId, const char* suffix, size_t* outSize);
 int Zelda3D_FacialFrameTex(int modelId, int materialIndex, int frame);
 void BossFd_SetupFly(BossFd* boss, PlayState* play);
@@ -50,6 +53,7 @@ struct FlyingModels {
     int fireHair = 0;
     int deathBody = 0;
     int deathHead = 0;
+    int particles = 0;
 };
 
 FlyingModels& models() {
@@ -62,6 +66,7 @@ FlyingModels& models() {
         m.fireHair = Zelda3D_AutoModelId("/actor/zelda_fd.zar|Model/valbasia_firehair.cmb");
         m.deathBody = Zelda3D_AutoModelId("/actor/zelda_fd.zar|Model/valbasia_death_body.cmb");
         m.deathHead = Zelda3D_AutoModelId("/actor/zelda_fd.zar|Model/valbasia_death_head.cmb");
+        m.particles = Zelda3D_AutoModelId("/actor/zelda_fd.zar|Model/vb_particle_group.cmb");
     }
     return m;
 }
@@ -145,6 +150,152 @@ void applyFireHairCmab(PlayState* play, int modelId) {
     }
     if (Zelda3D_CmabSampleConstColorRGBA(handle, 0, 2, frame, rgba)) {
         Zelda3D_GL_SetMatConstOverride(modelId, 0, 2, rgba[0], rgba[1], rgba[2], rgba[3]);
+    }
+}
+
+struct ParticleCmabs {
+    void* ember = nullptr;
+    void* fire = nullptr;
+    void* smoke = nullptr;
+    bool emberTried = false;
+    bool fireTried = false;
+    bool smokeTried = false;
+};
+
+ParticleCmabs& particleCmabs(int modelId) {
+    static ParticleCmabs cmabs;
+    loadCmabOnce(modelId, "vb_hinoko.cmab", cmabs.ember, cmabs.emberTried);
+    loadCmabOnce(modelId, "vb_fire.cmab", cmabs.fire, cmabs.fireTried);
+    loadCmabOnce(modelId, "vb_smoke.cmab", cmabs.smoke, cmabs.smokeTried);
+    return cmabs;
+}
+
+void applyParticleCmab(int modelId, u8 type, float frame) {
+    ParticleCmabs& cmabs = particleCmabs(modelId);
+    void* cmab = nullptr;
+    int material = -1;
+    int channel = 0;
+    if (type == BFD_FX_EMBER) {
+        cmab = cmabs.ember;
+        material = 2;
+        channel = 1;
+    } else if (type == BFD_FX_FIRE_BREATH) {
+        cmab = cmabs.fire;
+        material = 4;
+        channel = 1;
+    } else if (type == BFD_FX_DUST) {
+        cmab = cmabs.smoke;
+        material = 3;
+        channel = 0;
+    }
+    if (cmab == nullptr || material < 0) return;
+    const int duration = Zelda3D_CmabDuration(cmab);
+    const float cmabFrame = duration > 0 ? std::fmod(frame, static_cast<float>(duration)) : 0.0f;
+    float u = 0.0f;
+    float v = 0.0f;
+    if (Zelda3D_CmabSampleTranslationUV(cmab, material, channel, cmabFrame, &u, &v)) {
+        Zelda3D_GL_SetMatUvOverride(modelId, material, u, v);
+    }
+    float rgba[4];
+    if (Zelda3D_CmabSampleConstColorRGBA(cmab, material, 0, cmabFrame, rgba)) {
+        Zelda3D_GL_SetMatConstOverride(modelId, material, 0, rgba[0], rgba[1], rgba[2], rgba[3]);
+    }
+}
+
+struct ParticleStyle {
+    int mesh;
+    int material;
+    bool billboard;
+    float scale;
+    u8 r;
+    u8 g;
+    u8 b;
+    u8 a;
+};
+
+struct ParticleControl {
+    Actor* actor = nullptr;
+    int type3ds = 0;
+    int count = 0;
+};
+
+ParticleControl sParticleControl;
+
+u8 n64EffectTypeFor3ds(int type3ds) {
+    static constexpr u8 kTypes[] = { BFD_FX_NONE, BFD_FX_DEBRIS, BFD_FX_SKULL_PIECE,
+                                     BFD_FX_DUST, BFD_FX_FIRE_BREATH, BFD_FX_EMBER };
+    return type3ds >= 1 && type3ds <= 5 ? kTypes[type3ds] : BFD_FX_NONE;
+}
+
+void applyParticleControl(BossFd* boss) {
+    if (sParticleControl.actor != &boss->actor || sParticleControl.type3ds == 0) return;
+    for (BossFdEffect& effect : boss->effects) effect.type = BFD_FX_NONE;
+    const u8 type = n64EffectTypeFor3ds(sParticleControl.type3ds);
+    for (int i = 0; i < sParticleControl.count; ++i) {
+        BossFdEffect& effect = boss->effects[i];
+        effect = {};
+        effect.type = type;
+        effect.pos = { boss->actor.world.pos.x + (i - (sParticleControl.count - 1) * 0.5f) * 45.0f,
+                       boss->actor.world.pos.y + 80.0f,
+                       boss->actor.world.pos.z };
+        effect.alpha = 255;
+        effect.color = { 255, static_cast<u8>((i & 1) ? 64 : 180), 0 };
+        effect.timer1 = static_cast<u8>(i * 3 + 1);
+        effect.vFdFxRotX = i * 0.55f;
+        effect.vFdFxRotY = i * 0.3f;
+        static constexpr float kScale[] = { 0.0f, 0.025f, 0.025f, 0.75f, 1.0f, 0.012f };
+        effect.scale = kScale[sParticleControl.type3ds];
+        ++effect.epoch;
+    }
+}
+
+ParticleStyle particleStyle(const BossFdEffect& effect) {
+    const int alpha = std::clamp<int>(effect.alpha, 0, 255);
+    switch (effect.type) {
+        case BFD_FX_EMBER:
+            return { 1, 2, true, effect.scale, effect.color.r, effect.color.g, effect.color.b,
+                     static_cast<u8>(alpha) };
+        case BFD_FX_DEBRIS:
+            return { 3, 0, false, effect.scale, 255, 255, 255, 255 };
+        case BFD_FX_DUST:
+            return { 4, 3, true, effect.scale, 0, 0, 0, 255 };
+        case BFD_FX_FIRE_BREATH:
+            return { 0, 4, true, effect.scale, 255, 255, 0, static_cast<u8>(alpha) };
+        case BFD_FX_SKULL_PIECE:
+            // The 3DS producer's measured scale constant is 0.002; the base gameplay record was
+            // authored with the N64 0.001 convention. Convert units, not animation state.
+            return { 2, 1, false, effect.scale * 2.0f, 255, 255, 255, 255 };
+        default:
+            return { -1, -1, false, 0.0f, 0, 0, 0, 0 };
+    }
+}
+
+void drawParticles(PlayState* play, BossFd* boss, int modelId) {
+    // FUN_0014690C's five passes. The N64 gameplay pool uses different numeric identities, so this
+    // table translates typed effects to the recovered 3DS pass order without reading animation.
+    static constexpr u8 kOrder[] = { BFD_FX_FIRE_BREATH, BFD_FX_SKULL_PIECE,
+                                     BFD_FX_DEBRIS, BFD_FX_DUST, BFD_FX_EMBER };
+    int submitted = 0;
+    for (u8 type : kOrder) {
+        for (int i = 0; i < BOSSFD_EFFECT_COUNT && submitted < 110; ++i) {
+            const BossFdEffect& effect = boss->effects[i];
+            if (effect.type != type) continue;
+            const ParticleStyle style = particleStyle(effect);
+            if (style.mesh < 0) continue;
+            applyParticleCmab(modelId, type, static_cast<float>(effect.timer1));
+            Zelda3D_GL_SetMidMask(modelId, 1ULL << style.mesh);
+            Zelda3D_GL_SetMatConstOverride(modelId, style.material, 4,
+                                           style.r / 255.0f, style.g / 255.0f,
+                                           style.b / 255.0f, style.a / 255.0f);
+            Vec3f scale = { style.scale, style.scale, style.scale };
+            if (style.billboard) {
+                Zelda3D_DrawModelBillboard(play, modelId, &effect.pos, &scale);
+            } else {
+                Vec3f rot = { effect.vFdFxRotX, effect.vFdFxRotY, 0.0f };
+                Zelda3D_DrawModelTransform(play, modelId, &effect.pos, &rot, &scale, 0.0f);
+            }
+            ++submitted;
+        }
     }
 }
 
@@ -369,7 +520,7 @@ bool BossFdBehavior::tryDrawModel(PlayState* play, Actor* actor) {
     BossFd* boss = reinterpret_cast<BossFd*>(actor);
     FlyingModels& m = models();
     if (m.body <= 0 || m.head <= 0 || m.leftArm <= 0 || m.rightArm <= 0 || m.fireHair <= 0 ||
-        m.deathBody <= 0 || m.deathHead <= 0) {
+        m.deathBody <= 0 || m.deathHead <= 0 || m.particles <= 0) {
         return false;
     }
 
@@ -397,6 +548,8 @@ bool BossFdBehavior::tryDrawModel(PlayState* play, Actor* actor) {
     drawManeChain(play, boss, p, m.fireHair, 0);
     drawManeChain(play, boss, p, m.fireHair, 1);
     drawManeChain(play, boss, p, m.fireHair, 2);
+    applyParticleControl(boss);
+    drawParticles(play, boss, m.particles);
 
     p.body = std::fmod(p.body + 1.0f, 101.0f);
     p.head = std::fmod(p.head + 1.0f, 3.0f);
@@ -437,6 +590,21 @@ extern "C" int Zelda3D_BossFdForceDeath(Actor* actor, int liveSegments, int acti
     boss->timers[1] = 30000;
     for (s16& state : boss->bodyFallApart) state = 0;
     return 1;
+}
+
+extern "C" int Zelda3D_BossFdForceEffects(Actor* actor, int type3ds, int count) {
+    if (!actor || actor->id != ACTOR_BOSS_FD || type3ds < 0 || type3ds > 5 || count < 1 ||
+        count > 12) {
+        return 0;
+    }
+    sParticleControl.actor = actor;
+    sParticleControl.type3ds = type3ds;
+    sParticleControl.count = count;
+    if (type3ds == 0) {
+        BossFd* boss = reinterpret_cast<BossFd*>(actor);
+        for (BossFdEffect& effect : boss->effects) effect.type = BFD_FX_NONE;
+    }
+    return type3ds == 0 ? 1 : count;
 }
 
 extern "C" int Zelda3D_BossFdHistoryInfo(Actor* actor, int* bodyLead, int* maneLead,
