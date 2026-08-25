@@ -10,7 +10,7 @@
 namespace Zelda3D {
 
 class DoorShutterBehavior : public ActorBehavior {
-public:
+  public:
     s16 actorId() const override;
     // Draws the per-scene OoT3D shutter/boss door CMB at the actor's world.pos + shape.rot.y,
     // suppressing the N64 door. Returns false when the scene has no mapped CMB (fall through).

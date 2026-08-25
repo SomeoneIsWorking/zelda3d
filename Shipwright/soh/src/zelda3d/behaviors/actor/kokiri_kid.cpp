@@ -18,6 +18,7 @@
 #include "z64.h"
 #include "src/overlays/actors/ovl_En_Ko/z_en_ko.h"
 #include "kokiri_kid.h"
+#include "npc_draw.h"
 
 #include <cstring>
 
@@ -59,3 +60,34 @@ void KokiriKidBehavior::applyDrawOverrides(int modelId, Actor* actor, bool track
 }
 
 } // namespace Zelda3D
+
+// The running 3DS game selects several En_Ko idle poses by actor type rather than by the N64
+// animation pointer. Keeping this resolver with the rest of En_Ko's draw policy prevents the
+// shared retarget path from becoming a second authority for Kokiri pose selection.
+extern "C" const char* Zelda3D_EnKoCsabOverride(int modelId, Actor* actor) {
+    (void)modelId;
+    if (actor == nullptr || actor->id != ACTOR_EN_KO) {
+        return nullptr;
+    }
+
+    switch (actor->params & 0xFF) {
+        case ENKO_TYPE_CHILD_0:
+            return "km1_ishi_wait"; // oracle 19f; lifting-rock wait
+        case ENKO_TYPE_CHILD_2:
+            return "km1_ijiiji"; // oracle 20f; impatient boy
+        case ENKO_TYPE_CHILD_3:
+            return "km1_out_in_pose3"; // oracle 14f; unique-duration match
+        case ENKO_TYPE_CHILD_4:
+            return "km1_kusakari"; // oracle 19f; grass cutting
+        case ENKO_TYPE_CHILD_1:
+            return "kw1_out_in_pose1"; // oracle 25f; first girl standby pose
+        case ENKO_TYPE_CHILD_5:
+            return "kw1_out_in_pose2"; // oracle 21f; unique-duration match
+        case ENKO_TYPE_CHILD_6:
+            return "kw1_out_in_pose3"; // oracle 25f; distinct girl standby pose
+        case ENKO_TYPE_CHILD_FADO:
+            return "fad_n_wait"; // oracle 40f; Fado idle
+        default:
+            return nullptr;
+    }
+}

@@ -4,7 +4,8 @@
  * Vanilla/MQ hints when collecting Maps, Ice Trap messages,
  * etc.
  */
-#include <soh/OTRGlobals.h>
+
+#include "soh/OTRGlobals.h"
 #include "soh/Enhancements/game-interactor/GameInteractor.h"
 #include "soh/Enhancements/game-interactor/GameInteractor_Hooks.h"
 #include "soh/Enhancements/custom-message/CustomMessageTypes.h"

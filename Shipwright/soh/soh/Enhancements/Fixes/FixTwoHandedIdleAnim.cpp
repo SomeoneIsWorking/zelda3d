@@ -3,7 +3,7 @@
 
 extern "C" {
 #include "macros.h"
-#include "functions.h"
+#include "functions/player.h"
 }
 
 #define FIDGET_SWORD_SWING 9

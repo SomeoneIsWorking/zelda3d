@@ -1,7 +1,5 @@
 #include "global.h"
 #include "vt.h"
-#include "zelda3d/zelda3d.h"
-#include "zelda3d/behaviors/title/title_presentation.h"
 #include "zelda3d/input/zelda3d_input.h" // Zelda3D_WalkInject (Phase 1 input consolidation)
 
 #include <string.h>
@@ -12,7 +10,7 @@
 #include <overlays/misc/ovl_kaleido_scope/z_kaleido_scope.h>
 #include "soh/Enhancements/enhancementTypes.h"
 #include "soh/Enhancements/game-interactor/GameInteractor_Hooks.h"
-#include "soh/OTRGlobals.h"
+
 #include "soh/ResourceManagerHelpers.h"
 #include "soh/SaveManager.h"
 #include "framebuffer_effects.h"

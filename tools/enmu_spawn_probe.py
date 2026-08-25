@@ -28,8 +28,9 @@ TARGET_ID = 0x1AD
 
 def probe(ent, day="0x8001"):
     subprocess.run(
-        f"ZELDA3D_HEADLESS=1 tools/zelda3d_game.sh restart {ent} {day}",
-        shell=True, cwd=REPO, capture_output=True, text=True, timeout=90,
+        [sys.executable, "tools/zelda3d_game.py", "restart", str(ent), str(day)],
+        env={**os.environ, "ZELDA3D_HEADLESS": "1"},
+        cwd=REPO, capture_output=True, text=True, timeout=90,
     )
     time.sleep(4)
     r = subprocess.run(

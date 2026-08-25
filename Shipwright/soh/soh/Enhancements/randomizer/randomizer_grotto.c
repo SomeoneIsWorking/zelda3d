@@ -3,8 +3,9 @@
  * It's been adapted for SoH to use our gPlayState vs their gGlobalContext and slightly different named properties.
  */
 
+#include "soh/host/item_randomizer_bridge.h"
 #include "randomizer_grotto.h"
-#include "soh/OTRGlobals.h"
+
 
 #include "global.h"
 

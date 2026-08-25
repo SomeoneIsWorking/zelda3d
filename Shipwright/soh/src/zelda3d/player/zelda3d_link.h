@@ -1,8 +1,6 @@
-// Zelda3D — OoT3D Link (player) replacement POLICY. Owns the player draw, the equipment mesh-id mask,
-// the per-bone retarget correction table + hand-weave state, the pose-freeze, linkpin, the cucco-grab
-// repro driver, and all the `link*` REPL commands. The LOW-LEVEL CMB skeleton forward-kinematics
-// retarget primitives (Zelda3D_UpdateAnimN64*, Zelda3D_PosedGroundOffset, ...) stay in zelda3d_model.cpp;
-// this file CALLS them. Split out of zelda3d.c (pure refactor). C-ABI so zelda3d.c can call in.
+// Stable C ABI for Link replacement hooks and retarget primitives. Implementations live in the
+// responsibility-named player modules; this header remains the compatibility contract for existing
+// engine call sites.
 #ifndef ZELDA3D_LINK_H
 #define ZELDA3D_LINK_H
 
@@ -26,14 +24,14 @@ typedef struct {
 // Retarget the OoT3D skeleton from a live N64 pose with an explicit bone correspondence (NULL
 // map = identity). Defined in zelda3d_model.cpp.
 void Zelda3D_UpdateAnimN64Mapped(int modelId, const s16* jointRots, int rotCount, const signed char* boneToLimb,
-                               int mapCount);
+                                 int mapCount);
 // As Zelda3D_UpdateAnimN64Mapped but with a per-bone correction table (indexed by bone id). Defined
 // in zelda3d_model.cpp.
 void Zelda3D_UpdateAnimN64Corr(int modelId, const s16* jointRots, int rotCount, const Zelda3dBoneCorr* corr,
-                             int corrCount);
+                               int corrCount);
 
-// OoT3D Link (player) replacement, called from Player_Draw (declared also in zelda3d.h for the engine
-// call site). Draws the OoT3D link body CMB at the player's transform; returns 1 if it drew.
+// OoT3D Link (player) replacement, called from Player_Draw. Draws the OoT3D link body CMB at the
+// player's transform; returns 1 if it drew.
 int Zelda3D_TryDrawPlayer(PlayState* play, Actor* actor);
 
 // #6/#9 cucco-grab repro driver: extracted from Zelda3D_WalkInject. Holds the asel-selected actor in

@@ -22,7 +22,9 @@
 // Honors `invisible`: while the actor is invisible (mid-drop, blown up) the N64 draw early-returns, so
 // we draw nothing but still claim the draw to keep the N64 rupee suppressed.
 #include "z64.h"
+#include "rupee_draw.h"
 #include "ruppy.h"
+#include "zelda3d/diagnostics/model_tuning_query.h"
 #include "overlays/actors/ovl_En_Ex_Ruppy/z_en_ex_ruppy.h"
 
 // World scale: the N64 draws gRupeeDL at (actor.scale * mtxScale), with mtxScale 25.0 (17.5 for the
@@ -33,8 +35,6 @@
 // and retunable via REPL `gscale 17` (shared with En_Item00 — same CMB).
 static constexpr float kRuppyScaleMul = 25.0f;
 static constexpr int kRuppyGScaleSlot = 17;
-
-extern "C" float Zelda3D_GScale(int slot, float def);
 
 namespace Zelda3D {
 
@@ -47,7 +47,7 @@ bool EnExRuppyBehavior::tryDrawModel(PlayState* play, Actor* actor) {
     if (ruppy->invisible) {
         return true; // invisible: draw nothing, but keep the N64 rupee suppressed (matches N64 Draw)
     }
-    float worldScale = actor->scale.x * Zelda3D_GScale(kRuppyGScaleSlot, kRuppyScaleMul);
+    float worldScale = actor->scale.x * Zelda3D_ModelScaleOrDefault(kRuppyGScaleSlot, kRuppyScaleMul);
     // mesh_id == colorIdx; the shared helper masks to that single color (and falls through to N64 if
     // the CMB is unavailable, returning false).
     return drawRupeeColorMesh(play, actor, ruppy->colorIdx, worldScale);

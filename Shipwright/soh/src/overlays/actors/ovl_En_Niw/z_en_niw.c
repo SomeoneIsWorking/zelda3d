@@ -10,7 +10,7 @@
 #include "vt.h"
 #include "soh/frame_interpolation.h"
 #include "soh/ResourceManagerHelpers.h"
-#include "zelda3d/zelda3d.h" // #5 cucco-flap diagnostic (gZelda3dForceCuccoAgitate)
+#include "zelda3d/behaviors/actor/cucco_control.h"
 
 #define FLAGS (ACTOR_FLAG_UPDATE_CULLING_DISABLED | ACTOR_FLAG_THROW_ONLY)
 

@@ -1,4 +1,10 @@
-#include <soh/OTRGlobals.h>
+
+#include "soh/OTRGlobals.h"
+#include "functions/actors.h"
+#include "functions/effects.h"
+#include "functions/game_state.h"
+#include "functions/math.h"
+#include "functions/memory.h"
 #include <soh/GameVersions.h>
 #include "soh/ResourceManagerHelpers.h"
 #include "object/ObjectExtension.h"

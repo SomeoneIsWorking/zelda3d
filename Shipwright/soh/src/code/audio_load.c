@@ -4,7 +4,7 @@
 
 #include <libultraship/libultra.h>
 #include "global.h"
-#include "soh/OTRGlobals.h"
+
 #include "soh/Enhancements/audio/AudioCollection.h"
 #include "soh/Enhancements/audio/AudioEditor.h"
 #include "soh/ResourceManagerHelpers.h"

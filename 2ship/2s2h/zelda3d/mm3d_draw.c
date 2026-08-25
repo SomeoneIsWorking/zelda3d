@@ -7,19 +7,14 @@
 // later, exactly as OoT grew them, not bolted onto this seam.
 #include "2s2h/zelda3d/mm3d_draw.h"
 #include "2s2h/zelda3d/mm3d_model.h"
+#include "2s2h/zelda3d/mm3d_model_diagnostics.h"
+#include "2s2h/zelda3d/mm3d_pending_draw.h"
 
 #include <stdio.h>  // fprintf (bring-up diagnostic)
 #include <stdlib.h> // getenv, atoi
 #include "global.h" // Actor, PlayState, POLY_OPA_DISP, Matrix_*, Gfx_SetupDL25_Opa, gSPZelda3DDraw
 
-// Public C bridge for the C++ SkelAnime intercept in mm3d_model.cpp (which can't
-// touch the decomp macros like POLY_OPA_DISP / OPEN_DISPS from a .cpp cleanly).
-// void* over PlayState*/Actor* so mm3d_model.h needs no decomp headers.
-void Zelda3D_MM_EmitModelDraw(void* play, void* actor, int modelId, float worldScale,
-                              float groundOffset);
-
-static void Zelda3D_EmitModelDraw(PlayState* play, Actor* actor, int modelId, float worldScale,
-                               float groundOffset) {
+static void Zelda3D_EmitModelDraw(PlayState* play, Actor* actor, int modelId, float worldScale, float groundOffset) {
     OPEN_DISPS(play->state.gfxCtx);
 
     Gfx_SetupDL25_Opa(play->state.gfxCtx);
@@ -46,8 +41,7 @@ static void Zelda3D_EmitModelDraw(PlayState* play, Actor* actor, int modelId, fl
     CLOSE_DISPS(play->state.gfxCtx);
 }
 
-void Zelda3D_MM_EmitModelDraw(void* play, void* actor, int modelId, float worldScale,
-                              float groundOffset) {
+void Zelda3D_MM_EmitModelDraw(void* play, void* actor, int modelId, float worldScale, float groundOffset) {
     Zelda3D_EmitModelDraw((PlayState*)play, (Actor*)actor, modelId, worldScale, groundOffset);
 }
 
@@ -55,7 +49,8 @@ void Zelda3D_MM_EmitModelDraw(void* play, void* actor, int modelId, float worldS
 // Matches OoT's Zelda3D_CountN64Limbs (Shipwright/soh/src/zelda3d/core/zelda3d.c). Small iterative
 // walk to avoid recursion into the C++ retarget path from a C entry point.
 static int Zelda3D_MM_CountLimbs(void** skeleton) {
-    if (skeleton == NULL || skeleton[0] == NULL) return 0;
+    if (skeleton == NULL || skeleton[0] == NULL)
+        return 0;
     int stack[64];
     s32 sp = 0;
     stack[sp++] = 0;
@@ -64,12 +59,17 @@ static int Zelda3D_MM_CountLimbs(void** skeleton) {
     while (sp > 0 && steps < 256) {
         int i = stack[--sp];
         steps++;
-        if (i < 0 || i >= 64) continue;
-        if (skeleton[i] == NULL) continue;
+        if (i < 0 || i >= 64)
+            continue;
+        if (skeleton[i] == NULL)
+            continue;
         StandardLimb* lb = (StandardLimb*)Lib_SegmentedToVirtual(skeleton[i]);
-        if (i > maxIdx) maxIdx = i;
-        if (lb->sibling != LIMB_DONE && sp < 64) stack[sp++] = lb->sibling;
-        if (lb->child != LIMB_DONE && sp < 64) stack[sp++] = lb->child;
+        if (i > maxIdx)
+            maxIdx = i;
+        if (lb->sibling != LIMB_DONE && sp < 64)
+            stack[sp++] = lb->sibling;
+        if (lb->child != LIMB_DONE && sp < 64)
+            stack[sp++] = lb->child;
     }
     return maxIdx + 1;
 }
@@ -79,7 +79,8 @@ static int Zelda3D_MM_CountLimbs(void** skeleton) {
 // for the rest-pose scale derivation. Mirrors OoT's Zelda3D_N64SkelBoneLenSum.
 // Iterative walk (shared with CountLimbs) so we don't recurse from a C entry.
 static float Zelda3D_MM_SkelBoneLenSum(void** skeleton, int limbCap) {
-    if (skeleton == NULL || skeleton[0] == NULL || limbCap <= 0) return 0.0f;
+    if (skeleton == NULL || skeleton[0] == NULL || limbCap <= 0)
+        return 0.0f;
     int stack[64];
     s32 sp = 0;
     stack[sp++] = 0;
@@ -88,15 +89,19 @@ static float Zelda3D_MM_SkelBoneLenSum(void** skeleton, int limbCap) {
     while (sp > 0 && steps < 256) {
         int i = stack[--sp];
         steps++;
-        if (i < 0 || i >= limbCap || i >= 64) continue;
-        if (skeleton[i] == NULL) continue;
+        if (i < 0 || i >= limbCap || i >= 64)
+            continue;
+        if (skeleton[i] == NULL)
+            continue;
         StandardLimb* lb = (StandardLimb*)Lib_SegmentedToVirtual(skeleton[i]);
         if (i != 0) { // root jointPos is placement, not a bone length
             float x = lb->jointPos.x, y = lb->jointPos.y, z = lb->jointPos.z;
             sum += sqrtf(x * x + y * y + z * z);
         }
-        if (lb->sibling != LIMB_DONE && sp < 64) stack[sp++] = lb->sibling;
-        if (lb->child != LIMB_DONE && sp < 64) stack[sp++] = lb->child;
+        if (lb->sibling != LIMB_DONE && sp < 64)
+            stack[sp++] = lb->sibling;
+        if (lb->child != LIMB_DONE && sp < 64)
+            stack[sp++] = lb->child;
     }
     return sum;
 }
@@ -107,13 +112,16 @@ static float Zelda3D_MM_SkelBoneLenSum(void** skeleton, int limbCap) {
 int gZelda3dMmColliderPass = 0;
 
 int Zelda3D_MM_InterceptSkelAnime(PlayState* play, Actor* actor, void** skeleton, Vec3s* jointTable) {
-    if (skeleton == NULL || jointTable == NULL) return 0;
+    if (skeleton == NULL || jointTable == NULL)
+        return 0;
     // #107 collider re-walk: caller has already emitted the MM3D replacement and is
     // now re-running the N64 walk purely for its postLimbDraw side effects — do NOT
     // replace this second pass, let SkelAnime walk the tree and update the spheres.
-    if (gZelda3dMmColliderPass) return 0;
+    if (gZelda3dMmColliderPass)
+        return 0;
     int limbCount = Zelda3D_MM_CountLimbs(skeleton);
-    if (limbCount <= 0) return 0;
+    if (limbCount <= 0)
+        return 0;
     // Stage 3 auto-scale + ground-offset. See mm3d_model.h. Skip if no pending model
     // (Zelda3D_MM_OverridePending is a no-op) or actor missing (fall back to base scale).
     if (actor != NULL) {
@@ -123,7 +131,7 @@ int Zelda3D_MM_InterceptSkelAnime(PlayState* play, Actor* actor, void** skeleton
         int mid = Zelda3D_MM_PendingModelId();
         if (mid >= 0) {
             float cmbSum = Zelda3D_MM_ModelBoneLenSum(mid);
-            float minY   = Zelda3D_MM_ModelMinY(mid);
+            float minY = Zelda3D_MM_ModelMinY(mid);
             if (n64Sum > 1e-3f && cmbSum > 1e-3f) {
                 float scale = actor->scale.x * (n64Sum / cmbSum);
                 // ZELDA3D_MM_SCALE_LOG prints the RESULT; print the three INPUT terms too, so a
@@ -145,18 +153,20 @@ int Zelda3D_MM_InterceptSkelAnime(PlayState* play, Actor* actor, void** skeleton
                         if (!sOnce) {
                             sOnce = 1;
                             for (int li = 1; li < limbCount && li < 6; li++) {
-                                if (skeleton[li] == NULL) continue;
+                                if (skeleton[li] == NULL)
+                                    continue;
                                 StandardLimb* L = (StandardLimb*)Lib_SegmentedToVirtual(skeleton[li]);
                                 float x = L->jointPos.x, y = L->jointPos.y, z = L->jointPos.z;
                                 fprintf(stderr, "[MM3D-BONE-N64] model=%d limb=%d jointPos=(%.1f,%.1f,%.1f) |v|=%.2f\n",
-                                        mid, li, x, y, z, sqrtf(x*x + y*y + z*z));
+                                        mid, li, x, y, z, sqrtf(x * x + y * y + z * z));
                             }
                             Zelda3D_MM_DumpModelBones(mid, 5);
                         }
-                        fprintf(stderr, "[MM3D-SCALE-IN] model=%d actorId=0x%03X actorScale=%.5f "
-                                        "n64Sum=%.2f cmbSum=%.2f ratio=%.4f limbs=%d -> %.5f\n",
-                                mid, (unsigned)actor->id, actor->scale.x, n64Sum, cmbSum,
-                                n64Sum / cmbSum, limbCount, scale);
+                        fprintf(stderr,
+                                "[MM3D-SCALE-IN] model=%d actorId=0x%03X actorScale=%.5f "
+                                "n64Sum=%.2f cmbSum=%.2f ratio=%.4f limbs=%d -> %.5f\n",
+                                mid, (unsigned)actor->id, actor->scale.x, n64Sum, cmbSum, n64Sum / cmbSum, limbCount,
+                                scale);
                     }
                 }
                 Zelda3D_MM_OverridePending(scale, -minY);
@@ -256,8 +266,8 @@ int Zelda3D_TryDrawRoom(PlayState* play, Room* room) {
         static int logged = 0;
         if (!logged) {
             logged = 1;
-            fprintf(stderr, "[MM3D-ROOM] sceneId=%d room=%d name=%s\n", (int)play->sceneId,
-                    (int)room->num, sceneName ? sceneName : "(none)");
+            fprintf(stderr, "[MM3D-ROOM] sceneId=%d room=%d name=%s\n", (int)play->sceneId, (int)room->num,
+                    sceneName ? sceneName : "(none)");
         }
     }
     if (sceneName == NULL) {

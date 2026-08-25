@@ -8,14 +8,16 @@
  * A modified dynamicExitList is manually included since we can't read it from addressing like 3ds rando.
  */
 
+#include "soh/host/item_randomizer_bridge.h"
 #include <stdio.h>
 #include "randomizer_entrance.h"
 #include "randomizer_grotto.h"
-#include "soh/OTRGlobals.h"
+
 #include "soh/SaveManager.h"
 #include <string.h>
 
 #include "global.h"
+#include "functions/game_state.h"
 #include "entrance.h"
 #include "soh/Enhancements/game-interactor/GameInteractor_Hooks.h"
 

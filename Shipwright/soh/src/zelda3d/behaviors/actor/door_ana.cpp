@@ -18,6 +18,9 @@
 // beehive), so no draw offset is needed — it sits at world.pos exactly like the N64 gGrottoDL.
 #include "z64.h"
 #include "door_ana.h"
+#include "zelda3d/render/model_draw.h"
+#include "zelda3d/render/model_queries.h"
+#include "zelda3d/diagnostics/model_tuning_query.h"
 
 // Field-keep zar + the grotto-hole CMB. Self-contained to this module.
 #define ZELDA3D_DOOR_ANA_ZAR "/actor/zelda_field_keep.zar"
@@ -29,12 +32,6 @@
 // Live-retunable via REPL `gscale 22`.
 static constexpr float kDoorAnaWorldScale = 0.013f;
 static constexpr int kDoorAnaGScaleSlot = 22;
-
-extern "C" {
-int Zelda3D_AutoModelId(const char* zarPath);
-int Zelda3D_DrawActorModel(PlayState* play, int modelId, Actor* actor, float worldScale);
-float Zelda3D_GScale(int slot, float def);
-}
 
 namespace Zelda3D {
 
@@ -50,7 +47,8 @@ bool DoorAnaBehavior::tryDrawModel(PlayState* play, Actor* actor) {
     if (sModelId < 0) {
         return false; // no OoT3D grotto-hole CMB -> let the N64 hole draw
     }
-    Zelda3D_DrawActorModel(play, sModelId, actor, Zelda3D_GScale(kDoorAnaGScaleSlot, kDoorAnaWorldScale));
+    Zelda3D_DrawActorModel(play, sModelId, actor,
+                           Zelda3D_ModelScaleOrDefault(kDoorAnaGScaleSlot, kDoorAnaWorldScale));
     return true;
 }
 

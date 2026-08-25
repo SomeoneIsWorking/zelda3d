@@ -34,16 +34,13 @@
 // the frame) — deliberately not ported here; documented in the decomp doc for whoever meets it
 // in-game (Death Mountain Trail's fiery variant).
 #include "title_cloud_vortex.h"
+#include "title_activity.h"
+#include "../../render/model_group_diagnostics.h"
+#include "../../render/model_queries.h"
+#include "functions/math.h"
 #include "soh/frame_interpolation.h" // OPEN_DISPS/gSPMatrix record hooks (extern "C" decls)
 
 #include <cstdio>
-
-extern "C" {
-int Zelda3D_Title_IsActive(void);
-int Zelda3D_AutoModelId(const char* zarPath);
-int Zelda3D_ModelGroupCentroid(int modelId, int materialIndex, float out[3]);
-void Zelda3D_EnsureModelProvider(void);
-}
 
 namespace {
 
@@ -73,8 +70,7 @@ void Zelda3D_TitleCloudVortex_Emit(PlayState* play, int roomModelId) {
         sAnchorForModel = roomModelId;
         sAnchorOk = Zelda3D_ModelGroupCentroid(roomModelId, /*materialIndex=*/0, sAnchor) != 0;
         if (!sAnchorOk) {
-            std::fprintf(stderr, "[Zelda3D] title cloud vortex: no material-0 ring in room model %d\n",
-                         roomModelId);
+            std::fprintf(stderr, "[Zelda3D] title cloud vortex: no material-0 ring in room model %d\n", roomModelId);
         }
     }
     if (!sAnchorOk || sModelId < 0) {

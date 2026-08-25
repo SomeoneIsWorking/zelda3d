@@ -1,5 +1,7 @@
-#include "savefile.h"
 #include "soh/OTRGlobals.h"
+#include "soh/host/item_randomizer_bridge.h"
+#include "savefile.h"
+
 #include "soh/ResourceManagerHelpers.h"
 #include "soh/Enhancements/game-interactor/GameInteractor.h"
 #include "soh/Enhancements/randomizer/logic.h"
@@ -8,7 +10,8 @@
 extern "C" {
 #include <z64.h>
 #include "variables.h"
-#include "functions.h"
+#include "functions/game_state.h"
+#include "functions/ui.h"
 #include "macros.h"
 
 uint8_t Randomizer_GetSettingValue(RandomizerSettingKey randoSettingKey);

@@ -15,6 +15,29 @@ You supply your own ROMs. None are included, and none ever will be.
 
 ---
 
+## Running
+
+Install `uv` and the native C++/SDL dependencies for your platform, then supply your own OoT and MM
+inputs: decrypted OoT3D and MM3D `.3ds` files plus the corresponding N64 ROMs. Name them with
+`ZELDA3D_OOT3D_ROM`, `ZELDA3D_OOT_ROM`, `ZELDA3D_MM3D_ROM`, and `ZELDA3D_MM_ROM` in the process
+environment or a gitignored `.env`. Canonical repo-root names (`oot3d.3ds`, `oot.z64`, `mm3d.3ds`,
+and `mm.z64`) work without configuration; other repo-root drop-ins are identified by their ROM
+metadata and ambiguous matches are refused.
+
+```sh
+./run.sh
+```
+
+The no-argument path provisions the locked Python environment and the two pinned public build
+dependencies, extracts both games' runtime archives, configures with the compiler selected by the
+user or platform, builds the unified launcher and both game cores, and opens the game chooser. A
+recursive clone or manual submodule step is not required. It does not initialize the private decomp
+references or require Ghidra or either decomp repository's analysis tooling. Run
+`./run.sh --bootstrap-check` for a non-building cold-path check; missing native packages are reported
+with the platform's exact install command.
+
+---
+
 ## Screenshots
 
 Captured from the running build — 3DS models, scene geometry and lighting.

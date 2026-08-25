@@ -53,8 +53,8 @@ extern "C" void Zelda3D_HostHudFlushPoint(void) {
     }
 }
 
-extern "C" void Zelda3D_HostMeasureResult(int key, float height) {
+extern "C" void Zelda3D_HostMeasureResult(int key, float height, float footprintX, float footprintZ) {
     if (sHooks.measureResult != nullptr) {
-        sHooks.measureResult(key, height);
+        sHooks.measureResult(key, height, footprintX, footprintZ);
     }
 }

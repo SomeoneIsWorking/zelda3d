@@ -20,6 +20,9 @@
 // generic actor shadow underneath, matching the OoT3D behavior.
 #include "z64.h"
 #include "en_jsjutan.h"
+#include "zelda3d/render/model_draw.h"
+#include "zelda3d/render/model_queries.h"
+#include "zelda3d/diagnostics/model_tuning_query.h"
 
 #define ZELDA3D_JSJUTAN_ZAR "/actor/zelda_keep.zar"
 #define ZELDA3D_JSJUTAN_CMB "jyutan/model/js_jyutan_model.cmb"
@@ -29,12 +32,6 @@
 // keeps the same world footprint. Live-retunable via REPL `gscale 25`.
 static constexpr float kJsjutanWorldScale = 0.02f;
 static constexpr int kJsjutanGScaleSlot = 25;
-
-extern "C" {
-int Zelda3D_AutoModelId(const char* zarPath);
-int Zelda3D_DrawActorModel(PlayState* play, int modelId, Actor* actor, float worldScale);
-float Zelda3D_GScale(int slot, float def);
-}
 
 namespace Zelda3D {
 
@@ -51,7 +48,7 @@ bool EnJsjutanBehavior::tryDrawModel(PlayState* play, Actor* actor) {
         return false;
     }
     Zelda3D_DrawActorModel(play, sModelId, actor,
-                           Zelda3D_GScale(kJsjutanGScaleSlot, kJsjutanWorldScale));
+                           Zelda3D_ModelScaleOrDefault(kJsjutanGScaleSlot, kJsjutanWorldScale));
     return true;
 }
 

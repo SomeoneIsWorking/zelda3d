@@ -11,6 +11,9 @@
 // force-loads the field-keep grotto CMB regardless of the actor's declared OBJECT_GAMEPLAY_FIELD_KEEP.
 #include "z64.h"
 #include "en_trap.h"
+#include "zelda3d/render/model_draw.h"
+#include "zelda3d/render/model_queries.h"
+#include "zelda3d/diagnostics/model_tuning_query.h"
 
 #define ZELDA3D_EN_TRAP_ZAR "/actor/zelda_yukabyun.zar"
 #define ZELDA3D_EN_TRAP_CMB "Model/trap_yukabyun_model.cmb"
@@ -19,12 +22,6 @@
 // (measured 2026-07-02). Start at 0.01 like other prop CMBs; live-retunable via REPL `gscale 14`.
 static constexpr float kEnTrapWorldScale = 0.01f;
 static constexpr int kEnTrapGScaleSlot = 14;
-
-extern "C" {
-int Zelda3D_AutoModelId(const char* zarPath);
-int Zelda3D_DrawActorModel(PlayState* play, int modelId, Actor* actor, float worldScale);
-float Zelda3D_GScale(int slot, float def);
-}
 
 namespace Zelda3D {
 
@@ -40,7 +37,7 @@ bool EnTrapBehavior::tryDrawModel(PlayState* play, Actor* actor) {
     if (sModelId < 0) {
         return false;
     }
-    Zelda3D_DrawActorModel(play, sModelId, actor, Zelda3D_GScale(kEnTrapGScaleSlot, kEnTrapWorldScale));
+    Zelda3D_DrawActorModel(play, sModelId, actor, Zelda3D_ModelScaleOrDefault(kEnTrapGScaleSlot, kEnTrapWorldScale));
     return true;
 }
 

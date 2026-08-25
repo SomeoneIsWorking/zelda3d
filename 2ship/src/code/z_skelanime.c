@@ -7,7 +7,7 @@
 #include "z64malloc.h"
 #include "2s2h/GameInteractor/GameInteractor.h"
 #include "2s2h/zelda3d/mm3d_draw.h" // Zelda3D_MM_InterceptSkelAnime — skinned MM3D port
-#include "2s2h/zelda3d/mm3d_model.h" // Zelda3D_MM_CaptureAnimState — live N64 anim state for CSAB phase-lock
+#include "2s2h/zelda3d/mm3d_animation.h"
 
 #define ANIM_INTERP 1
 

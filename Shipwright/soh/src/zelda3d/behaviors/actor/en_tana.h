@@ -9,7 +9,7 @@
 namespace Zelda3D {
 
 class EnTanaBehavior : public ActorBehavior {
-public:
+  public:
     s16 actorId() const override;
     // Draws the OoT3D wooden shop shelf at world.pos + shape.rot for params 0, suppressing the N64
     // shelf; falls through for the stone variants.

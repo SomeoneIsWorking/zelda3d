@@ -3,7 +3,7 @@
 #include "fast/unified_vtx.h"      // UnifiedVtx — not yet referenced by any draw path (Phase 2/3)
 #include "fast/unified_material.h" // UnifiedMaterial — ditto
 #include "fast/unified_ubo.h"      // CommonUbo/UnifiedDrawUbo — static_assert-checked against kCommonUboBody here
-#include "fast/zelda3d_gl.h" // ZELDA3D_GL_MAX_BONES
+#include "fast/zelda3d_model_types.h"
 
 #include <prism/processor.h>
 
@@ -38,7 +38,7 @@ namespace {
 std::once_flag gGlslangOnce;
 
 bool CompileGlslToSpirv(EShLanguage stage, const std::string& src, std::vector<uint32_t>& outSpirv,
-                         std::string& outLog) {
+                        std::string& outLog) {
     std::call_once(gGlslangOnce, []() { glslang::InitializeProcess(); });
 
     glslang::TShader shader(stage);
@@ -75,14 +75,22 @@ struct VariantFeatures {
 
 VariantFeatures FeaturesFor(Variant v) {
     switch (v) {
-        case Variant::kUntextured:         return { false, false, false, false, false, false, false };
-        case Variant::kSingleTex:          return { true, false, false, false, false, false, false };
-        case Variant::kSingleTexAlphaTest: return { true, false, false, true, false, false, false };
-        case Variant::kDualTex:            return { true, true, false, false, false, false, false };
-        case Variant::kDualTexFog:         return { true, true, false, false, true, false, false };
-        case Variant::kGrayscale:          return { true, false, false, false, false, true, false };
-        case Variant::kGenericTev:         return { true, true, true, false, false, false, true };
-        default:                          return {};
+        case Variant::kUntextured:
+            return { false, false, false, false, false, false, false };
+        case Variant::kSingleTex:
+            return { true, false, false, false, false, false, false };
+        case Variant::kSingleTexAlphaTest:
+            return { true, false, false, true, false, false, false };
+        case Variant::kDualTex:
+            return { true, true, false, false, false, false, false };
+        case Variant::kDualTexFog:
+            return { true, true, false, false, true, false, false };
+        case Variant::kGrayscale:
+            return { true, false, false, false, false, true, false };
+        case Variant::kGenericTev:
+            return { true, true, true, false, false, false, true };
+        default:
+            return {};
     }
 }
 
@@ -96,7 +104,7 @@ std::optional<std::string> IncludeNoop(const std::string&) {
 // to vertex binding 0 AND fragment binding 0; bones are a separate block at vertex binding 1) —
 // // BYTE-IDENTICAL to unified_ubo.h's CommonUbo, sized to fit Zelda3DSg::kCommonBytes (static_assert-
 // bytes) exactly so the existing DRAW_MODEL Op/AppendZelda3DModelDraw/mSoh3dModelUbos plumbing needs
-// ZERO changes for a unified draw — see zelda3d_sdl3gpu.cpp/gfx_sdl3gpu.cpp's DrawModel/DrawTriangles
+// ZERO changes for a unified draw — see zelda3d_sdl3gpu_pass.cpp/gfx_sdl3gpu.cpp's DrawModel/DrawTriangles
 // wiring.
 const char* kUnifiedShaderTemplate = R"PRISM(@prism(type='fragment', name='Unified Shader', version='1.0.0')
 #version 450
@@ -214,13 +222,13 @@ const char* kUnifiedShaderTemplate = R"PRISM(@prism(type='fragment', name='Unifi
         // lightingMode 2 (3DS scene vertex-lit): baked here per-vertex, matching the existing
         // per-vertex NdotL approach (docs/oot3d_world_lighting_re.md), not in the fragment stage.
         if (ubo.uParams0.y > 1.5) {
-            // -uLightDir: uLightDir is 3DS-native light-TRAVEL (see Zelda3D_UpdateLight's
+            // -uLightDir: uLightDir is 3DS-native light-TRAVEL (see Zelda3D_UpdateSceneLighting's
             // direction-convention comment); negate at the dot like CmbVShader / kFrag do.
             float ndotl = max(dot(normalize(nM), -normalize(ubo.uLightDir.xyz)), 0.0);
             vec3 lit = ubo.uMatAmbient.xyz + ubo.uMatDiffuse.xyz * ndotl;
             // Clamp order = the PRODUCT (PICA clamps o1 on register write). clamp(lit) first
             // was tried 2026-07-22 and measured ~30% dark vs the oracle — see the kFrag
-            // comment in zelda3d_sdl3gpu.cpp. Do not re-flip.
+            // comment in zelda3d_sdl3gpu_shaders.cpp. Do not re-flip.
             vColor0 = vec4(clamp(vColor0.rgb * lit, 0.0, 1.0), vColor0.a);
         }
     }
@@ -390,14 +398,22 @@ std::string BuildSource(Variant v, bool vertex) {
 
 const char* VariantName(Variant v) {
     switch (v) {
-        case Variant::kUntextured: return "Untextured";
-        case Variant::kSingleTex: return "SingleTex";
-        case Variant::kSingleTexAlphaTest: return "SingleTexAlphaTest";
-        case Variant::kDualTex: return "DualTex";
-        case Variant::kDualTexFog: return "DualTexFog";
-        case Variant::kGrayscale: return "Grayscale";
-        case Variant::kGenericTev: return "GenericTev";
-        default: return "?";
+        case Variant::kUntextured:
+            return "Untextured";
+        case Variant::kSingleTex:
+            return "SingleTex";
+        case Variant::kSingleTexAlphaTest:
+            return "SingleTexAlphaTest";
+        case Variant::kDualTex:
+            return "DualTex";
+        case Variant::kDualTexFog:
+            return "DualTexFog";
+        case Variant::kGrayscale:
+            return "Grayscale";
+        case Variant::kGenericTev:
+            return "GenericTev";
+        default:
+            return "?";
     }
 }
 

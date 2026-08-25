@@ -49,7 +49,7 @@ each needing its own "find the natural installer, RE its body, add a Force* hook
 
 ## Tooling
 
-- `tools/mm_game.sh {start|restart|stop|status|shot|log}` — MM instance manager (existing).
+- `tools/mm_game.py {start|restart|stop|status|shot|log}` — exact-owned MM instance manager.
 - `tools/mm_control.py query "linkstate <idle|walk|run>"` — drives the new Force* hooks (this
   session). `tools/mm_control.py query posinfo` reads back Link's pos/yaw to confirm the state took.
 - No `mm_sweep.py` orchestrator yet (the OoT analog is `tools/link_sweep.py`) — write one once there

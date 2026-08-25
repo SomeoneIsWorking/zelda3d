@@ -2,12 +2,16 @@
 // (Zelda3D_WalkInject + the walkhold/btnhold REPL bodies + the Xbox/input-device globals
 // and accessors) and zelda3d_model.cpp (Zelda3D_InjectKey) — pure code motion, no behavior change.
 #include "zelda3d_input.h"
+#include "functions/player.h"
 
-#include "../zelda3d.h"
+#include "pause_navigation.h"
 #include "../core/zelda3d_log.h"
+#include "../core/zelda3d_runtime.h"
+#include "../hud/zelda3d_hud_assets.h"
 #include "../player/zelda3d_link.h" // Zelda3D_LinkWalkInject — called from Zelda3D_WalkInject below
-#include "ship/Context.h"                              // #20 keyboard-inject verification shim
-#include "ship/controller/controldeck/ControlDeck.h"   // #20 ProcessKeyboardEvent path
+#include "../repl/zelda3d_repl.h"
+#include "ship/Context.h"                            // #20 keyboard-inject verification shim
+#include "ship/controller/controldeck/ControlDeck.h" // #20 ProcessKeyboardEvent path
 
 #include <cstdlib>
 #include <cstdio>
@@ -28,8 +32,7 @@ int Zelda3D_InjectKey(int scancode, int down) {
     if (controlDeck == nullptr) {
         return -1;
     }
-    Ship::KbEventType ev = down ? Ship::KbEventType::LUS_KB_EVENT_KEY_DOWN
-                                : Ship::KbEventType::LUS_KB_EVENT_KEY_UP;
+    Ship::KbEventType ev = down ? Ship::KbEventType::LUS_KB_EVENT_KEY_DOWN : Ship::KbEventType::LUS_KB_EVENT_KEY_UP;
     return controlDeck->ProcessKeyboardEvent(ev, static_cast<Ship::KbScancode>(scancode)) ? 1 : 0;
 }
 
@@ -99,15 +102,9 @@ static int gZelda3dBtnHoldFirst = 0;
 static int gZelda3dFpRepro = -1; // -1 uninit, 0 off, 1 on
 static int gZelda3dFpFrames = 0; // frames elapsed since first controllable
 
-// `ztarget` REPL target (zelda3d.c owns the REPL handler that sets this — the native
-// auto-lock-on is re-asserted every frame from Zelda3D_WalkInject below, since autoLockOnActor is
-// a one-frame latch by design) and `pause` REPL nav target (zelda3d.c owns that REPL handler too).
-// Both cross the zelda3d.c <-> this module boundary now that Zelda3D_WalkInject moved, so they
-// stay DEFINED in zelda3d.c (unchanged ownership) and are just extern-declared here, matching the
-// existing codebase convention of inline `extern` forward decls at the use site (e.g.
-// Zelda3D_InjectKey was extern-declared inline in zelda3d.c's REPL `key` handler before this move).
+// The diagnostics owner selects the `ztarget` actor. The input module re-asserts that target every
+// frame because autoLockOnActor is a one-frame latch by design.
 extern Actor* gZelda3dZTargetActor;
-extern int gZelda3dPauseTarget;
 
 // `walkhold <frames> [stickX] [stickY]` — inject a held control stick for N frames so Link really
 // WALKS/RUNS via the locomotion system (default stickY=+60 forward; stick range +-60 walk /
@@ -121,8 +118,8 @@ void Zelda3D_Input_HandleWalkHoldCmd(const char* line, const char* outPath) {
         gZelda3dWalkHoldFrames = frames;
         gZelda3dWalkStickX = (s8)sx;
         gZelda3dWalkStickY = (s8)(nargs >= 3 ? sy : 60);
-        Zelda3D_ReplReply(outPath, "walkhold frames=%d stick=(%d,%d)", gZelda3dWalkHoldFrames,
-                        gZelda3dWalkStickX, gZelda3dWalkStickY);
+        Zelda3D_ReplReply(outPath, "walkhold frames=%d stick=(%d,%d)", gZelda3dWalkHoldFrames, gZelda3dWalkStickX,
+                          gZelda3dWalkStickY);
     } else {
         Zelda3D_ReplReply(outPath, "usage: walkhold <frames> [stickX] [stickY]");
     }
@@ -177,28 +174,7 @@ void Zelda3D_WalkInject(PlayState* play) {
         Player_SetAutoLockOnActor(play, gZelda3dZTargetActor);
     }
 
-    // #71 pause-menu nav: open/switch-page/close via the real kaleido input path (see gZelda3dPauseTarget).
-    if (gZelda3dPauseTarget != -1) {
-        PauseContext* pc = &play->pauseCtx;
-        if (gZelda3dPauseTarget == -2) { // close
-            if (pc->state == 0) {
-                gZelda3dPauseTarget = -1; // fully closed
-            } else if (pc->state == 6 && pc->unk_1E4 == 0) {
-                play->state.input[0].cur.button |= BTN_START;
-                play->state.input[0].press.button |= BTN_START; // edge: trigger close
-            }
-        } else if (pc->state == 0) { // closed -> open
-            play->state.input[0].cur.button |= BTN_START;
-            play->state.input[0].press.button |= BTN_START; // edge: trigger open
-        } else if (pc->state == 6 && pc->unk_1E4 == 0) { // open & settled (not mid-rotation)
-            if (pc->pageIndex == (u16)gZelda3dPauseTarget) {
-                gZelda3dPauseTarget = -1; // arrived
-            } else {
-                play->state.input[0].cur.button |= BTN_R;
-                play->state.input[0].press.button |= BTN_R; // edge: rotate one page right
-            }
-        }
-    }
+    Zelda3D_PauseNavigationInject(play);
 
     // #6/#9 linkgrab: hold the selected actor in front of Link + inject fresh A edges until grabbed.
     // The driver lives in zelda3d_link.cpp (Link policy); it's a no-op unless `linkgrab` armed it.

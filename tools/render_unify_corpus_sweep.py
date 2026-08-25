@@ -81,8 +81,9 @@ def main():
         env["ZELDA3D_FREEZE_NOISE_FRAME"] = FREEZE_NOISE_FRAME
         env["ZELDA3D_FREEZE_INTERP"] = "1"
         env["ZELDA3D_FREEZE_RAND_SEED"] = FREEZE_RAND_SEED
-        r = subprocess.run(f"tools/zelda3d_game.sh start {idx} 0x8000",
-                           shell=True, cwd=REPO, env=env, capture_output=True, text=True, timeout=150)
+        r = subprocess.run(
+            [sys.executable, "tools/zelda3d_game.py", "start", str(idx), "0x8000"],
+            cwd=REPO, env=env, capture_output=True, text=True, timeout=150)
         ready = "ready (pid" in (r.stdout + r.stderr)
         crash = ""
         try:
@@ -112,7 +113,11 @@ def main():
         json.dump(results, open(RESULTS, "w"), indent=1)
         print(f"{key} {scene:42s} {rec['status']}", flush=True)
 
-    subprocess.run("tools/zelda3d_game.sh stop", shell=True, cwd=REPO, capture_output=True)
+    subprocess.run(
+        [sys.executable, "tools/zelda3d_game.py", "stop"],
+        cwd=REPO,
+        capture_output=True,
+    )
     ok = sum(1 for r in results.values() if r.get("status") == "OK")
     print(f"\ndone: {ok}/{len(results)} scenes OK; cc corpus log -> {CC_LOG}")
     if os.path.exists(CC_LOG):

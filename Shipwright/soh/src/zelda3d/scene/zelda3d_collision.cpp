@@ -3,7 +3,9 @@
 // from zelda3d.c (Phase 2 codebase reorg — see this repo's docs/codemap.md). Zelda3D_BuildSceneCollision
 // is the single public entry point (declared in zelda3d.h, called from Scene_CommandCollisionHeader);
 // everything else here is a file-local helper.
-#include "../zelda3d.h"
+#include "../core/zelda3d_runtime.h"
+#include "scene_draw.h"
+#include "gameplay_collision.h" // extern "C" declarations for Zelda3D_BuildSceneCollision / Zelda3D_CollisionEnabled
 #include "zelda3d_collision.h" // C-ABI bridge: Zelda3D_RawCollision / LoadSceneCollisionRaw / stair treads
 #include <stdlib.h> // getenv, malloc/calloc/free
 #include <stdio.h>  // fprintf/stderr

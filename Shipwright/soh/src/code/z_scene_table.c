@@ -24,7 +24,7 @@
 #include "overlays/actors/ovl_Bg_Dodoago/z_bg_dodoago.h"
 
 #include "soh/mq_asset_hacks.h"
-#include "soh/OTRGlobals.h"
+
 #include "soh/ResourceManagerHelpers.h"
 #include "soh/Enhancements/game-interactor/GameInteractor_Hooks.h"
 

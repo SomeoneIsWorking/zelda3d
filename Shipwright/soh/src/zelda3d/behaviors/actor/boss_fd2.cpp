@@ -2,10 +2,13 @@
 // Ground truth: oot3d-decomp/docs/boss_fd2.md; draw FUN_0020A3B0 and chain helper FUN_00335904.
 #include "boss_fd2.h"
 
-#include "../../render/zelda3d_render.h"
-#include "../../zelda3d.h"
+#include "../../anim/zelda3d_anim_override.h"
+#include "../../anim/skeleton_draw_bridge.h"
+#include "../../render/model_draw.h"
+#include "../../render/model_queries.h"
 #include "../../model/zelda3d_cmab.h"
 #include "asset/mat4.h"
+#include "fast/zelda3d_material_overrides.h"
 #include "overlays/actors/ovl_Boss_Fd/z_boss_fd.h"
 #include "overlays/actors/ovl_Boss_Fd2/z_boss_fd2.h"
 
@@ -58,7 +61,8 @@ void selectCsab(BossFd2CsabController& controller, const char* csab, float frame
 }
 
 void transitionCsab(BossFd2CsabController& controller, const char* csab) {
-    if (controller.csab == csab) return;
+    if (controller.csab == csab)
+        return;
     controller.outgoingCsab = controller.csab;
     controller.outgoingFrame = controller.frame;
     controller.csab = csab;
@@ -96,8 +100,7 @@ void advanceEmergeController(BossFd2CsabController& controller, Actor* actor) {
             const BossFd* parent = reinterpret_cast<const BossFd*>(actor->parent);
             const int health = parent != nullptr ? parent->actor.colChkInfo.health : 24;
             controller.emergePhase = 1;
-            const int timer30Hz = health == 24 ? 45 : health >= 18 ? 38 : health >= 12 ? 30 :
-                                                health >= 6  ? 15 : 8;
+            const int timer30Hz = health == 24 ? 45 : health >= 18 ? 38 : health >= 12 ? 30 : health >= 6 ? 15 : 8;
             controller.emergeTimerHalfTicks = timer30Hz * 2;
         } else if (controller.fakeouts > 0) {
             --controller.fakeouts;
@@ -128,8 +131,10 @@ void tickCsabController(PlayState* play, BossFd2* boss) {
         controller.actor = actor;
     }
     const bool actionChanged = boss->actionFunc != controller.lastAction;
-    if (controller.morphFramesRemaining > 0) --controller.morphFramesRemaining;
-    if (boss->actionFunc != BossFd2_Emerge) controller.emergeActive = false;
+    if (controller.morphFramesRemaining > 0)
+        --controller.morphFramesRemaining;
+    if (boss->actionFunc != BossFd2_Emerge)
+        controller.emergeActive = false;
     if (boss->actionFunc == BossFd2_Emerge && actionChanged && !controller.emergeActive) {
         initializeEmergeController(controller, actor);
     } else if (boss->actionFunc == BossFd2_Emerge && controller.emergeActive) {
@@ -210,18 +215,10 @@ void tickCsabController(PlayState* play, BossFd2* boss) {
 constexpr const char* kVolvagiaZar = "/actor/zelda_fd.zar";
 constexpr const char* kFireHairCmb = "Model/valbasia_firehair.cmb";
 
-extern "C" void Zelda3D_GL_SetMatConstOverride(int modelId, int materialIndex, int constIdx,
-                                                float r, float g, float b, float a);
-extern "C" uint8_t* Zelda3D_AutoModelReadZarFile(int modelId, const char* suffix, size_t* outSize);
-extern "C" void Zelda3D_GL_SetMatUvOverride(int modelId, int materialIndex, float u, float v);
-extern "C" void Zelda3D_GL_SetMatTexOverride(int modelId, int materialIndex, int texIndex);
-extern "C" int Zelda3D_FacialFrameTex(int modelId, int materialIndex, int frame);
-extern "C" void Zelda3D_GL_SetMidMask(int modelId, unsigned long long mask);
-extern "C" void Zelda3D_SetBonePostRot(int modelId, int boneId, const float* mat9);
-
 void setPostRot(int modelId, int boneId, const Zelda3D::Mat4& matrix) {
-    float m9[9] = { matrix[0], matrix[1], matrix[2], matrix[4], matrix[5], matrix[6],
-                    matrix[8], matrix[9], matrix[10] };
+    float m9[9] = {
+        matrix[0], matrix[1], matrix[2], matrix[4], matrix[5], matrix[6], matrix[8], matrix[9], matrix[10]
+    };
     Zelda3D_SetBonePostRot(modelId, boneId, m9);
 }
 
@@ -363,8 +360,7 @@ void BossFd2Behavior::applyDrawOverrides(int modelId, Actor* actor, bool track, 
     // bones 14/15: post RotateZ(-jaw * 0.1)
     // FUN_00371234 is the Z concatenation and FUN_003735e8 is Y; both are now independently
     // decompiled in oot3d-decomp. These are authored 3DS draw semantics, not N64 limb animation.
-    setPostRot(modelId, 10,
-               matMul(matRz(boss->headRot.x * kBinangToRad), matRy(-boss->headRot.y * kBinangToRad)));
+    setPostRot(modelId, 10, matMul(matRz(boss->headRot.x * kBinangToRad), matRy(-boss->headRot.y * kBinangToRad)));
     setPostRot(modelId, 13, matRz(boss->jawOpening * kBinangToRad));
     const Mat4 jawSide = matRz(-boss->jawOpening * 0.1f * kBinangToRad);
     setPostRot(modelId, 14, jawSide);
@@ -421,12 +417,10 @@ bool BossFd2Behavior::prepareDeferredDraw(PlayState* play, Actor* actor) {
 
 } // namespace Zelda3D
 
-extern "C" int Zelda3D_BossFd2ResolveAnim(PlayState* play, Actor* actor, const char** outCsab,
-                                            float* outFrame, const char** outMorphCsab,
-                                            float* outMorphFrame, float* outMorphWeight) {
+extern "C" int Zelda3D_BossFd2ResolveAnim(PlayState* play, Actor* actor, const char** outCsab, float* outFrame,
+                                          const char** outMorphCsab, float* outMorphFrame, float* outMorphWeight) {
     if (play == nullptr || actor == nullptr || actor->id != ACTOR_BOSS_FD2 || outCsab == nullptr ||
-        outFrame == nullptr || outMorphCsab == nullptr || outMorphFrame == nullptr ||
-        outMorphWeight == nullptr) {
+        outFrame == nullptr || outMorphCsab == nullptr || outMorphFrame == nullptr || outMorphWeight == nullptr) {
         return 0;
     }
 
@@ -438,7 +432,8 @@ extern "C" int Zelda3D_BossFd2ResolveAnim(PlayState* play, Actor* actor, const c
 
     // The actor post-update owns the controller tick. Draw only samples its authored CSAB result,
     // so no N64 animation pointer, clip identity, cursor, joint table, or morph state enters here.
-    if (controller.csab.empty()) selectCsab(controller, "vba_wait");
+    if (controller.csab.empty())
+        selectCsab(controller, "vba_wait");
 
     *outCsab = controller.csab.c_str();
     *outFrame = controller.frame;
@@ -448,11 +443,9 @@ extern "C" int Zelda3D_BossFd2ResolveAnim(PlayState* play, Actor* actor, const c
     return 1;
 }
 
-extern "C" int Zelda3D_BossFd2DrawManeSegment(PlayState* play, Actor* actor, int chain, int segment,
-                                               const Vec3f* pos, const Vec3f* rot,
-                                               const Vec3f* scale) {
-    if (actor == nullptr || actor->id != ACTOR_BOSS_FD2 || chain < 0 || chain >= 3 ||
-        segment < 0 || segment >= 9) {
+extern "C" int Zelda3D_BossFd2DrawManeSegment(PlayState* play, Actor* actor, int chain, int segment, const Vec3f* pos,
+                                              const Vec3f* rot, const Vec3f* scale) {
+    if (actor == nullptr || actor->id != ACTOR_BOSS_FD2 || chain < 0 || chain >= 3 || segment < 0 || segment >= 9) {
         return 0;
     }
     static int debug = -1;
@@ -465,8 +458,7 @@ extern "C" int Zelda3D_BossFd2DrawManeSegment(PlayState* play, Actor* actor, int
         fprintf(stderr,
                 "[BossFd2Mane] chain=%d segment=%d pos=(%.3f,%.3f,%.3f) rot=(%.6f,%.6f,%.6f) "
                 "scale=(%.8f,%.8f,%.8f)\n",
-                chain, segment, pos->x, pos->y, pos->z, rot->x, rot->y, rot->z,
-                scale->x, scale->y, scale->z);
+                chain, segment, pos->x, pos->y, pos->z, rot->x, rot->y, rot->z, scale->x, scale->y, scale->z);
         reported[chain][segment] = true;
     }
     const int modelId = fireHairModel();
@@ -493,7 +485,8 @@ extern "C" int Zelda3D_BossFd2ForceGround(Actor* actor) {
 extern "C" int Zelda3D_BossFd2ForceIdle(PlayState* play, Actor* actor, int hold) {
     if (play == nullptr || actor == nullptr || actor->id != ACTOR_BOSS_FD2 || actor->parent == nullptr ||
         actor->parent->id != ACTOR_BOSS_FD) {
-        if (actor == nullptr) sBossFd2IdleHold = false;
+        if (actor == nullptr)
+            sBossFd2IdleHold = false;
         return 0;
     }
     BossFd2* boss = reinterpret_cast<BossFd2*>(actor);
@@ -503,7 +496,8 @@ extern "C" int Zelda3D_BossFd2ForceIdle(PlayState* play, Actor* actor, int hold)
     // reach and left the parent's long N64 body stretched across the diagnostic frame.
     parent->actionFunc = BossFd_Wait;
     parent->handoffSignal = FD2_SIGNAL_NONE;
-    if (actor->world.pos.y < 0.0f) actor->world.pos.y = 150.0f;
+    if (actor->world.pos.y < 0.0f)
+        actor->world.pos.y = 150.0f;
     BossFd2_SetupIdle(boss, play);
     sBossFd2IdleHold = hold != 0;
     return 1;
@@ -520,7 +514,8 @@ extern "C" int Zelda3D_BossFd2ForceDamageState(PlayState* play, Actor* actor, in
     // flying parent immediately hands the helper back into emergence, making this diagnostic lie.
     parent->actionFunc = BossFd_Wait;
     parent->handoffSignal = FD2_SIGNAL_NONE;
-    if (actor->world.pos.y < 0.0f) actor->world.pos.y = 150.0f;
+    if (actor->world.pos.y < 0.0f)
+        actor->world.pos.y = 150.0f;
     if (state == 0) {
         BossFd2_SetupVulnerable(boss, play);
     } else if (state == 1) {
@@ -535,16 +530,19 @@ extern "C" int Zelda3D_BossFd2ForceDamageState(PlayState* play, Actor* actor, in
 }
 
 extern "C" void Zelda3D_BossFd2IdleTick(PlayState* play, Actor* actor) {
-    if (play == nullptr || actor == nullptr || actor->id != ACTOR_BOSS_FD2) return;
+    if (play == nullptr || actor == nullptr || actor->id != ACTOR_BOSS_FD2)
+        return;
     BossFd2* boss = reinterpret_cast<BossFd2*>(actor);
     tickCsabController(play, boss);
-    if (!sBossFd2IdleHold) return;
+    if (!sBossFd2IdleHold)
+        return;
     if (actor->parent != nullptr && actor->parent->id == ACTOR_BOSS_FD) {
         BossFd* parent = reinterpret_cast<BossFd*>(actor->parent);
         parent->actionFunc = BossFd_Wait;
         parent->handoffSignal = FD2_SIGNAL_NONE;
     }
-    if (boss->actionFunc != BossFd2_Idle) BossFd2_SetupIdle(boss, play);
+    if (boss->actionFunc != BossFd2_Idle)
+        BossFd2_SetupIdle(boss, play);
     actor->world.pos.y = 150.0f;
     actor->velocity = { 0.0f, 0.0f, 0.0f };
     actor->speedXZ = 0.0f;

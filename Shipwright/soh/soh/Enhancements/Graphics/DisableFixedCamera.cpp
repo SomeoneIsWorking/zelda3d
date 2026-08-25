@@ -4,7 +4,7 @@
 #include <unordered_map>
 
 extern "C" {
-#include "functions.h"
+#include "functions/collision.h"
 #include "variables.h"
 #include "z64bgcheck.h"
 }

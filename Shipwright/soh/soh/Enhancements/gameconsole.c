@@ -3,7 +3,6 @@
 #include <macros.h>
 #include <z64.h>
 #include <libultraship/libultra.h>
-#include <functions.h>
 #include <variables.h>
 #include <stdarg.h>
 #include <string.h>

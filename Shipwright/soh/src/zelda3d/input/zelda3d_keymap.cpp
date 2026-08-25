@@ -6,7 +6,7 @@
 // fold that name into something that fits on a keycap. Nothing here duplicates the binding state —
 // it is a read-only view of it, which is the whole point.
 #include "zelda3d_keymap.h"
-#include "../zelda3d.h" // Zelda3D_KeyCapAlphabet — the glyph set the badge can actually draw
+#include "../hud/zelda3d_hud_assets.h"
 
 #include "ship/Context.h"
 #include "ship/controller/controldeck/ControlDeck.h"

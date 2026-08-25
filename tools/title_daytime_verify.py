@@ -26,7 +26,7 @@ from PIL import Image
 
 REPO = Path(__file__).resolve().parent.parent
 sys.path.insert(0, str(REPO / "tools"))
-import harness_ctl as hc  # noqa: E402
+from harness_process import spawn  # noqa: E402
 import title_ab  # noqa: E402
 
 OUTDIR = REPO / "scratch" / "title_daytime"
@@ -55,7 +55,7 @@ def main():
         import os
         os.environ.setdefault("HARNESS_STDERR", str(REPO / "scratch" / "logs" / "title_dt_verify.log"))
         (REPO / "scratch" / "logs").mkdir(parents=True, exist_ok=True)
-        h = hc.spawn(save_state=str(SAVESTATE))
+        h = spawn(save_state=str(SAVESTATE))
         r = h.send("soh_boot")
         if not r.startswith("ok"):
             print(f"soh_boot failed: {r}", file=sys.stderr); h.quit(); continue

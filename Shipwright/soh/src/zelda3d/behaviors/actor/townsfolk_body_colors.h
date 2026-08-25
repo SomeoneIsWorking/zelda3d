@@ -15,9 +15,9 @@ namespace Zelda3D {
 
 // One material-constant-color override that EnHy_Draw would perform.
 struct TownsfolkMatConstOverride {
-    int   matIdx;        // CMB material index to patch
-    int   constIdx;      // 0..5: which slot in the material's constant palette
-    float rgba[4];       // RGBA float (matches the runtime overwrite semantics)
+    int matIdx;    // CMB material index to patch
+    int constIdx;  // 0..5: which slot in the material's constant palette
+    float rgba[4]; // RGBA float (matches the runtime overwrite semantics)
 };
 
 // Populate `out[0..1]` with the two per-type body-color overrides EnHy_Draw would

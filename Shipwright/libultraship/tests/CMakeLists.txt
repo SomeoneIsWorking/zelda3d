@@ -27,6 +27,7 @@ add_executable(lus_tests
     zelda3d_render_tests.cpp
     cmb_combiner_parse_tests.cpp
     townsfolk_body_colors_tests.cpp
+    fifo_rpc_tests.cpp
     zelda3d_test_stubs.cpp
 )
 

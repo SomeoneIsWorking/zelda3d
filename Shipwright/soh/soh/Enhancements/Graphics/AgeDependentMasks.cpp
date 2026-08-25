@@ -4,7 +4,7 @@
 
 extern "C" {
 #include "macros.h"
-#include "functions.h"
+#include "functions/rendering.h"
 #include "objects/object_link_boy/object_link_boy.h"
 extern SaveContext gSaveContext;
 }

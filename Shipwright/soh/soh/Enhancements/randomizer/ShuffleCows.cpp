@@ -1,4 +1,6 @@
-#include <soh/OTRGlobals.h>
+
+#include "soh/OTRGlobals.h"
+#include "functions/game_state.h"
 #include "static_data.h"
 #include "soh/Enhancements/randomizer/randomizer.h"
 #include "soh/Enhancements/randomizer/RCToRandInf.h"

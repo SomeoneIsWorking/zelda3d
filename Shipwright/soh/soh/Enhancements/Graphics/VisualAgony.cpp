@@ -7,8 +7,7 @@
 extern "C" {
 #include "macros.h"
 #include "variables.h"
-#include "functions.h"
-
+#include "functions/audio.h"
 extern PlayState* gPlayState;
 int16_t OTRGetRectDimensionFromLeftEdge(float v);
 float OTRGetDimensionFromLeftEdge(float v);

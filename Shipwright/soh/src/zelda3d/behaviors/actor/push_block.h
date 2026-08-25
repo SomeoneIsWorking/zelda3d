@@ -9,7 +9,7 @@
 namespace Zelda3D {
 
 class ObjOshihikiBehavior : public ActorBehavior {
-public:
+  public:
     s16 actorId() const override;
     // Draws the OoT3D themed push-block brick at world.pos + shape.rot, scaled per the actor's size
     // param, suppressing the N64 block. Falls through for scenes with no OoT3D brick.

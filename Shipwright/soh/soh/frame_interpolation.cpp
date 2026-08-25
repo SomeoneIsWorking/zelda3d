@@ -1,4 +1,7 @@
+#include "soh/OTRGlobals.h"
 #include <libultraship/bridge.h>
+#include "functions/animation.h"
+#include "functions/math.h"
 
 #include <vector>
 #include <map>
@@ -6,7 +9,7 @@
 #include <math.h>
 
 #include "frame_interpolation.h"
-#include "soh/OTRGlobals.h"
+
 
 /*
 Frame interpolation.

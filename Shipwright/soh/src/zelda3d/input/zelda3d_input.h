@@ -51,6 +51,8 @@ int Zelda3D_XboxBtnEnabled(void);
 // #32 hotswap — last-used input device: 0=gamepad (Xbox glyphs), 1=keyboard (key labels). Updated
 // by the C++ LUS input layer (Controller.cpp) on every key/gamepad event. Moved from zelda3d.c.
 int Zelda3D_InputDevice(void);
+extern int gZelda3dInputDevice;
+extern int gZelda3dXboxBtn;
 
 // Consolidated input diagnostic gate (`log input 1`) — the single source of truth for "is the headed
 // keyboard-input diagnostic enabled" (debug_journal/2026-07-15-keyboard-headed-v2.md). Read once,

@@ -2,7 +2,7 @@
 #include "init/ShipInit.hpp"
 
 extern "C" {
-#include "functions.h"
+#include "functions/ui.h"
 extern GameInfo* gGameInfo;
 }
 

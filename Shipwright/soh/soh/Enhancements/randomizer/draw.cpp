@@ -1,5 +1,8 @@
-#include "draw.h"
 #include "soh/OTRGlobals.h"
+#include "soh/host/item_randomizer_bridge.h"
+#include "draw.h"
+
+#include "soh/host/math_constants.h"
 #include "soh/cvar_prefixes.h"
 #include "randomizerTypes.h"
 #include "soh_assets.h"
@@ -10,8 +13,10 @@
 extern "C" {
 #include "z64.h"
 #include "macros.h"
-#include "zelda3d/zelda3d.h"
-#include "functions.h"
+#include "zelda3d/core/zelda3d_runtime.h"
+#include "functions/animation.h"
+#include "functions/math.h"
+#include "functions/rendering.h"
 #include "variables.h"
 #include "dungeon.h"
 #include "objects/object_box/object_box.h"

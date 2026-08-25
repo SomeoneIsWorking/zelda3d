@@ -7,7 +7,7 @@
 #include <unordered_map>
 #include <libultraship/libultra/types.h>
 #include <spdlog/fmt/fmt.h>
-#include "soh/OTRGlobals.h"
+#include "soh/host/controller_buttons.h"
 
 namespace UIWidgets {
 

@@ -16,7 +16,8 @@ have functions to both enable and disable said effect.
 extern "C" {
 #include <z64.h>
 #include "variables.h"
-#include "functions.h"
+#include "functions/player.h"
+#include "functions/ui.h"
 #include "macros.h"
 extern PlayState* gPlayState;
 }

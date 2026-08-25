@@ -11,7 +11,7 @@
 namespace Zelda3D {
 
 class EnExRuppyBehavior : public ActorBehavior {
-public:
+  public:
     s16 actorId() const override;
     // Draws only the colorIdx-matching mesh of the OoT3D rupee CMB at the actor's world transform,
     // suppressing the N64 rupee. Honors the actor's `invisible` flag.

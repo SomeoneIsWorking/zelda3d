@@ -10,7 +10,7 @@
 namespace Zelda3D {
 
 class EnFishBehavior : public ActorBehavior {
-public:
+  public:
     s16 actorId() const override;
     // Draws the OoT3D fish CMB animated by fs2_swim.csab at the actor's world.pos + shape.rot,
     // suppressing the N64 fish.

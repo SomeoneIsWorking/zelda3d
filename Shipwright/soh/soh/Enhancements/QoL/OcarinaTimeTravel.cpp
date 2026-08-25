@@ -1,6 +1,6 @@
 #include <libultraship/bridge.h>
 #include "init/ShipInit.hpp"
-#include "functions.h"
+#include "functions/actors.h"
 #include "macros.h"
 #include "variables.h"
 #include "soh/Enhancements/enhancementTypes.h"

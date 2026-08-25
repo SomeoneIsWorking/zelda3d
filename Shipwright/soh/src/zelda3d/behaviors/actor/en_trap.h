@@ -9,7 +9,7 @@
 namespace Zelda3D {
 
 class EnTrapBehavior : public ActorBehavior {
-public:
+  public:
     s16 actorId() const override;
     bool tryDrawModel(PlayState* play, Actor* actor) override;
 };

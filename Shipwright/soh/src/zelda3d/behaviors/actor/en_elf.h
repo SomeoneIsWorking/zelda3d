@@ -9,7 +9,7 @@
 namespace Zelda3D {
 
 class EnElfBehavior : public ActorBehavior {
-public:
+  public:
     s16 actorId() const override;
     // Emits an outer glow + inner core billboard at actor.world.pos, coloured from the
     // live EnElf outer/inner colors and sized by the standard fairy scale curve.

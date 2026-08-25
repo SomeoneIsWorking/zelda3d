@@ -27,7 +27,7 @@ import numpy as np
 
 REPO = Path(__file__).resolve().parent.parent
 sys.path.insert(0, str(REPO / "tools"))
-import harness_ctl as hc  # noqa: E402
+from harness_process import spawn  # noqa: E402
 
 OUTDIR = REPO / "scratch" / "title_ab"
 SAVESTATE = REPO / "scratch" / "title_settled.state"
@@ -123,7 +123,7 @@ def run_diff(argv):
     posts = [(cs, cs_to_az(cs)) for cs in sorted(args.cs_post)]
     all_az = sorted({az_pre} | {az for _, az in posts})
 
-    h = hc.spawn(save_state=str(SAVESTATE))
+    h = spawn(save_state=str(SAVESTATE))
     caps = {}
     try:
         r = h.send("soh_boot")
@@ -173,7 +173,7 @@ def main(argv):
                           str(REPO / "scratch" / "logs" / "fireglow_ab_harness.log"))
 
     frames = sorted(args.frames)
-    h = hc.spawn(save_state=str(SAVESTATE))
+    h = spawn(save_state=str(SAVESTATE))
     rows = []
     try:
         r = h.send("soh_boot")

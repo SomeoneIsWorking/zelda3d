@@ -1,5 +1,5 @@
 #include "soh/Enhancements/randomizer/RocsFeatherCycle.h"
-#include "functions.h"
+#include "functions/game_state.h"
 #include "variables.h"
 #include "macros.h"
 

@@ -12,6 +12,8 @@ extern "C" {
 // Zelda3D_EmitModelDraw). Zelda3D_HorseSaddleOffset reads this to anchor the rider seat to the DRAWN
 // 3DS pose. A NULL actor clears the record. See en_horse.cpp.
 void Zelda3D_EnHorse_RecordDraw(Actor* actor, int modelId, float worldScale, float groundOffset);
+int Zelda3D_HoofDustWorldPos(PlayState* play, Actor* horseActor, float* ioPos);
+int Zelda3D_HorseSaddleOffset(Actor* horseActor, float out[3]);
 
 #ifdef __cplusplus
 }

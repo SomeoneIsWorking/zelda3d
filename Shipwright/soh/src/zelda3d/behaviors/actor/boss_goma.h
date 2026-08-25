@@ -18,7 +18,7 @@
 namespace Zelda3D {
 
 class BossGomaBehavior : public ActorBehavior {
-public:
+  public:
     s16 actorId() const override;
     // Faithful BossGoma_Draw placement: world lift = shape.yOffset*scale.y, local translate =
     // (0, -4000*scale.y, 0) applied after shape.rot, in the rotated world-unit frame.

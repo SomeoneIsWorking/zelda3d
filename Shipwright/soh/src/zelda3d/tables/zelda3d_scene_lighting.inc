@@ -9,13 +9,6 @@
 // See the generator docstring for the byte-level derivation.
 // 102/111 scenes have a palette.
 
-typedef struct {
-    unsigned char amb[3]; signed char l0dir[3]; unsigned char l0col[3];
-    signed char l1dir[3]; unsigned char l1col[3]; unsigned char fogCol[3];
-    unsigned short fogNear; float fogFar; float zFar; // eye units (3DS PICA fog window + far plane)
-} Zelda3dLightSlot;
-typedef struct { unsigned char numSlots; const Zelda3dLightSlot* slots; } Zelda3dSceneLight;
-
 static const Zelda3dLightSlot kSlots_bdan[] = { // bdan
     {{119,104,109},{  72,  72,  72},{255,160, 61},{ -72, -72, -72},{255, 51,  0},{140,140,  0},  40,3200,8000},
     {{ 19, 19, 19},{  72,  72,  72},{114,114,100},{   0,-127,   0},{ 29, 19, 19},{  0, 29, 45}, 754,2790,2790},

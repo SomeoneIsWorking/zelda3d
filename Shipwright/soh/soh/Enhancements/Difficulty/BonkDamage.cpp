@@ -3,7 +3,7 @@
 #include "soh/Enhancements/enhancementTypes.h"
 
 extern "C" {
-#include "functions.h"
+#include "functions/ui.h"
 #include "macros.h"
 extern PlayState* gPlayState;
 extern SaveContext gSaveContext;

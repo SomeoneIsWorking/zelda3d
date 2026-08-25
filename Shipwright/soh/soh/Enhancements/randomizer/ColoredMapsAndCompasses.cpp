@@ -1,10 +1,11 @@
 #include <libultraship/bridge.h>
+#include "soh/OTRGlobals.h"
 #include "soh/ResourceManagerHelpers.h"
 #include "init/ShipInit.hpp"
 #include "z64save.h"
 #include "objects/object_gi_compass/object_gi_compass.h"
 #include "objects/object_gi_map/object_gi_map.h"
-#include "soh/OTRGlobals.h"
+
 #include "soh/Enhancements/randomizer/SeedContext.h"
 
 extern "C" {
@@ -35,3 +36,4 @@ void RegisterColoredMapsAndCompasses() {
 
 static RegisterShipInitFunc initFunc(RegisterColoredMapsAndCompasses,
                                      { "IS_RANDO", CVAR_COLORED_MAPS_AND_COMPASSES_NAME });
+#include "soh/OTRGlobals.h"

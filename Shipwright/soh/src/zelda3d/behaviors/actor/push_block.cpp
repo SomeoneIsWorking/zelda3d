@@ -24,17 +24,14 @@
 #include "z64.h"
 #include "push_block.h"
 #include "overlays/actors/ovl_Obj_Oshihiki/z_obj_oshihiki.h"
+#include "zelda3d/render/model_draw.h"
+#include "zelda3d/render/model_queries.h"
+#include "zelda3d/diagnostics/model_tuning_query.h"
 
 #define ZELDA3D_PUSHBLOCK_ZAR "/actor/zelda_dangeon_keep.zar"
 
 // Live-retunable base scale slot; per-size scale = sScales[type] applied below.
 static constexpr int kPushBlockGScaleSlot = 20;
-
-extern "C" {
-int Zelda3D_AutoModelId(const char* zarPath);
-int Zelda3D_DrawActorModel(PlayState* play, int modelId, Actor* actor, float worldScale);
-float Zelda3D_GScale(int slot, float def);
-}
 
 namespace Zelda3D {
 
@@ -123,7 +120,7 @@ bool ObjOshihikiBehavior::tryDrawModel(PlayState* play, Actor* actor) {
         return false; // brick CMB missing -> N64 fallback
     }
     // world scale = sScales[type] (raw 600u cube == 600u CMB). gscale slot scales the whole family.
-    float scale = sizeScale(sz) * Zelda3D_GScale(kPushBlockGScaleSlot, 1.0f);
+    float scale = sizeScale(sz) * Zelda3D_ModelScaleOrDefault(kPushBlockGScaleSlot, 1.0f);
     Zelda3D_DrawActorModel(play, modelId, actor, scale);
     return true;
 }

@@ -112,6 +112,9 @@ list(FILTER src__ EXCLUDE REGEX "src/dmadata/")
 list(FILTER src__ EXCLUDE REGEX "src/elf_message/")
 list(FILTER src__ EXCLUDE REGEX "src/libultra/")
 
+include(cmake/MM3DLegacySourceContracts.cmake)
+mm3d_apply_legacy_source_contracts("${CMAKE_CURRENT_SOURCE_DIR}")
+
 set(ALL_FILES
     ${Header_Files__include}
     ${ship__}

@@ -9,7 +9,7 @@
 namespace Zelda3D {
 
 class ObjSwitchBehavior : public ActorBehavior {
-public:
+  public:
     s16 actorId() const override;
     // Draws the OoT3D switch CMB for the actor's type/subType (params). Returns false for
     // not-yet-ported subtypes so the N64 switch still draws.

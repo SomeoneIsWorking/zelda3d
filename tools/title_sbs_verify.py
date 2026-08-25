@@ -33,7 +33,8 @@ import sys
 from pathlib import Path
 
 sys.path.insert(0, str(Path(__file__).resolve().parent))
-import harness_ctl as hc  # noqa: E402
+from harness_process import spawn  # noqa: E402
+from harness_transport import Harness  # noqa: E402
 from title_ab import content_score, ppm_to_png, compose_sxs, OUTDIR  # noqa: E402
 
 # SoH's title-cs cursor advances 0.5 cs-frame per engine frame (RE'd rate
@@ -42,7 +43,7 @@ from title_ab import content_score, ppm_to_png, compose_sxs, OUTDIR  # noqa: E40
 ENGINE_FRAMES_PER_CS = 2
 
 
-def step(h: hc.Harness, n: int, timeout: float = 900.0) -> str:
+def step(h: Harness, n: int, timeout: float = 900.0) -> str:
     h.proc.stdin.write((f"step {n}\n").encode())
     h.proc.stdin.flush()
     line = h._readline(timeout=timeout)
@@ -51,7 +52,7 @@ def step(h: hc.Harness, n: int, timeout: float = 900.0) -> str:
     return line.rstrip()
 
 
-def titlesync_state(h: hc.Harness) -> str:
+def titlesync_state(h: Harness) -> str:
     return h.send("titlesync")
 
 
@@ -59,7 +60,7 @@ def parse_field(state_line: str, key: str) -> str:
     return state_line.split(f"{key}=")[1].split()[0]
 
 
-def snapshot_and_score(h: hc.Harness, name: str) -> float:
+def snapshot_and_score(h: Harness, name: str) -> float:
     base = OUTDIR / name
     h.send_multiline(f"snapshot {base}")
     az = ppm_to_png(str(base) + ".az.ppm")
@@ -69,7 +70,7 @@ def snapshot_and_score(h: hc.Harness, name: str) -> float:
     return score
 
 
-def drive_to_locked(h: hc.Harness, boot_step: int = 20, frame_budget: int = 3000) -> str:
+def drive_to_locked(h: Harness, boot_step: int = 20, frame_budget: int = 3000) -> str:
     """Advance until TitleSyncController reaches LOCKED (auto-arms on the
     first `step`). Raises if it never locks within frame_budget SoH frames."""
     while True:
@@ -101,7 +102,7 @@ def main() -> int:
     OUTDIR.mkdir(parents=True, exist_ok=True)
     os.environ.setdefault("HARNESS_STDERR", f"scratch/logs/title_sbs_verify_{args.name}.log")
 
-    h = hc.spawn(save_state=None)
+    h = spawn(save_state=None)
     results = []  # (target, actual_cs, score, delta, corrections, state)
     try:
         t = drive_to_locked(h)

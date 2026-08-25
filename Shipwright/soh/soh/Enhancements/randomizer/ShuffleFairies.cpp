@@ -1,4 +1,9 @@
+
 #include "soh/OTRGlobals.h"
+#include "functions/actors.h"
+#include "functions/game_state.h"
+#include "functions/math.h"
+#include "functions/rendering.h"
 #include "randomizer_grotto.h"
 #include "draw.h"
 #include "soh/cvar_prefixes.h"

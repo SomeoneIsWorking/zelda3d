@@ -7,7 +7,8 @@ extern "C" {
 #include "macros.h"
 #include "src/overlays/actors/ovl_En_Ko/z_en_ko.h"
 #include "z64save.h"
-#include "functions.h"
+#include "functions/actors.h"
+#include "functions/game_state.h"
 #include "variables.h"
 }
 

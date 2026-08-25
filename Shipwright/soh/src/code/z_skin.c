@@ -1,5 +1,4 @@
 #include "global.h"
-#include "zelda3d/zelda3d.h"
 
 MtxF gSkinLimbMatrices[60]; // holds matrices for each limb of the skeleton currently being drawn
 

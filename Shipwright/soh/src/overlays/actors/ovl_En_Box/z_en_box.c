@@ -2,7 +2,7 @@
 #include "objects/object_box/object_box.h"
 #include "soh_assets.h"
 #include <assert.h>
-#include "soh/OTRGlobals.h"
+
 #include "soh/ResourceManagerHelpers.h"
 #include "soh/Enhancements/game-interactor/GameInteractor_Hooks.h"
 #include "soh/Enhancements/randomizer/item_category_adj.h"

@@ -9,12 +9,19 @@
 namespace Zelda3D {
 
 class EnDoorBehavior : public ActorBehavior {
-public:
+  public:
     s16 actorId() const override;
     // Draws the OoT3D door CMB at the actor's world.pos + shape.rot.y, suppressing the N64 door.
     bool tryDrawModel(PlayState* play, Actor* actor) override;
 };
 
 } // namespace Zelda3D
+
+extern "C" {
+extern int gZelda3dDoorBone;
+extern int gZelda3dDoorAxis;
+extern float gZelda3dDoorGain;
+extern int gZelda3dDoorHold;
+}
 
 #endif // ZELDA3D_BEHAVIORS_ACTOR_DOOR_H

@@ -3,7 +3,7 @@
 
 extern "C" {
 #include "z64save.h"
-#include "functions.h"
+#include "functions/actors.h"
 extern SaveContext gSaveContext;
 }
 

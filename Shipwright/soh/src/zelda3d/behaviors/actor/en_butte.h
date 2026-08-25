@@ -10,7 +10,7 @@
 namespace Zelda3D {
 
 class EnButteBehavior : public ActorBehavior {
-public:
+  public:
     s16 actorId() const override;
     // Draws the OoT3D butterfly CMB animated by butterfly_fly.csab at the actor's world.pos +
     // shape.rot, suppressing the N64 butterfly. Falls through to N64 during the fairy-transform flash.

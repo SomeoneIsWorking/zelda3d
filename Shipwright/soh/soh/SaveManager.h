@@ -45,6 +45,17 @@ typedef enum {
 } FilenameLanguage;
 
 #ifdef __cplusplus
+extern "C" {
+#endif
+
+void Save_LoadFile(void);
+SaveFileMetaInfo* Save_GetSaveMetaInfo(int fileNum);
+
+#ifdef __cplusplus
+}
+#endif
+
+#ifdef __cplusplus
 
 #include <map>
 #include <string>
@@ -213,7 +224,6 @@ void Save_SaveGlobal(void);
 void Save_LoadGlobal(void);
 void Save_AddLoadFunction(char* name, int version, Save_LoadFunc func);
 void Save_AddSaveFunction(char* name, int version, Save_SaveFunc func, bool saveWithBase, int parentSection);
-SaveFileMetaInfo* Save_GetSaveMetaInfo(int fileNum);
 void Save_CopyFile(int from, int to);
 void Save_DeleteFile(int fileNum);
 bool Save_Exist(int fileNum);

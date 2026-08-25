@@ -11,12 +11,12 @@ Two independent cache namespaces share the scratch/oracle_cache/ root
       deterministic for a given (entrance, dayTime).
 
   scratch/oracle_cache/<savestate_sha16>_<rom_sha16>_<patch_marker>/
-      The FRAME/PROBE cache (harness_ctl.OracleCache, driven from this
+      The FRAME/PROBE cache (harness_cache.OracleCache, driven from this
       file's CLI): memoizes embedded-Azahar (soh3d_harness) title-cutscene
       frame captures and structured probe output by az (Azahar) frame
       number, keyed additionally by the loaded savestate, the ROM, and the
       Azahar rendering patches in tools/soh3d_harness/AZAHAR_PATCH.md — see
-      harness_ctl.cache_key(). Used by tools/title_ab.py's `ab` command and
+      harness_cache.cache_key(). Used by tools/title_ab.py's `ab` command and
       any future probe built on OracleCache. Managed via this file's CLI:
 
           tools/oracle_cache.py stats                  # entries, size, active key
@@ -37,9 +37,13 @@ import argparse
 import json
 import os
 import re
-import subprocess
 import sys
 from pathlib import Path
+
+from harness_cache import OracleCache
+from harness_gameplay import GSAVECONTEXT_DAYTIME_VA, boot_to_gameplay
+from harness_paths import CACHE_ROOT
+from harness_process import spawn
 
 REPO = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 DECOMP = os.path.join(REPO, "oot3d-decomp")
@@ -67,17 +71,15 @@ def _probe_oracle(entrance, day_time, timeout):
 
     Returns the same {scene, head, pos, rot, raw} shape the cache has always stored.
     """
-    import harness_ctl as HC
-
     ent = entrance if isinstance(entrance, int) else int(str(entrance), 0)
     dt = day_time if isinstance(day_time, int) else int(str(day_time), 0)
 
-    h = HC.spawn(save_state=os.path.join(REPO, "scratch", "title_settled.state"))
+    h = spawn(save_state=os.path.join(REPO, "scratch", "title_settled.state"))
     try:
-        if not HC.boot_to_gameplay(h, entrance=ent):
+        if not boot_to_gameplay(h, entrance=ent):
             return None
         if dt:
-            h.send(f"w16 0x{HC.GSAVECONTEXT_DAYTIME_VA:08x} 0x{dt:04x}")
+            h.send(f"w16 0x{GSAVECONTEXT_DAYTIME_VA:08x} 0x{dt:04x}")
             h.send("run 30")
         scene = (h.send("scene") or "").strip()
         pos_r = (h.send("az_playerpos") or "").strip()
@@ -143,18 +145,13 @@ invalidate = invalidate_warp_cache
 
 
 # ---------------------------------------------------------------------------
-# Frame/probe cache CLI (new) — thin wrapper over harness_ctl.OracleCache.
+# Frame/probe cache CLI — thin wrapper over harness_cache.OracleCache.
 # ---------------------------------------------------------------------------
 
 # The standard title-frame sweep points used across title_ab.py A/B and
 # calibration sessions — pre-warming these covers the common case.
 DEFAULT_SWEEP = [100, 200, 360, 500, 700, 764, 1000, 1300, 1522, 1700, 1900]
 WARN_BYTES = 2 * 1024 ** 3  # 2 GB
-
-
-def _hc():
-    import harness_ctl
-    return harness_ctl
 
 
 def _savestate():
@@ -170,8 +167,7 @@ def _step_chunked(h, n, chunk=100):
 
 
 def cmd_stats(args) -> None:
-    hc = _hc()
-    cache = hc.OracleCache(_savestate())
+    cache = OracleCache(_savestate())
     s = cache.stats()
     print(f"active key:  {s['key']}")
     print(f"dir:         {s['dir']}")
@@ -182,8 +178,8 @@ def cmd_stats(args) -> None:
         print(f"WARNING: cache exceeds {WARN_BYTES / 1e9:.1f} GB — consider "
               f"`invalidate` for stale key contexts.", file=sys.stderr)
 
-    if hc.CACHE_ROOT.exists():
-        contexts = sorted(d for d in hc.CACHE_ROOT.iterdir() if d.is_dir() and d.name != "warp")
+    if CACHE_ROOT.exists():
+        contexts = sorted(d for d in CACHE_ROOT.iterdir() if d.is_dir() and d.name != "warp")
         if contexts:
             print(f"\nall frame/probe cache-key contexts on disk ({len(contexts)}):")
             for d in contexts:
@@ -199,8 +195,7 @@ def cmd_warm(args) -> None:
     if not savestate.exists():
         sys.exit(f"missing {savestate} — a title_settled.state save-state is required")
 
-    hc = _hc()
-    cache = hc.OracleCache(savestate)
+    cache = OracleCache(savestate)
     frames = sorted(set(args.frames)) if args.frames else list(DEFAULT_SWEEP)
     missing = [f for f in frames if cache.get_frame(f) is None]
     if not missing:
@@ -214,7 +209,7 @@ def cmd_warm(args) -> None:
     log_dir.mkdir(parents=True, exist_ok=True)
     os.environ.setdefault("HARNESS_STDERR", str(log_dir / "oracle_cache_harness.log"))
 
-    h = hc.spawn(save_state=str(savestate))
+    h = spawn(save_state=str(savestate))
     tmp = Path(REPO) / "scratch" / "oracle_cache" / "_warm_tmp"
     tmp.parent.mkdir(parents=True, exist_ok=True)
     try:
@@ -236,8 +231,7 @@ def cmd_warm(args) -> None:
 
 
 def cmd_invalidate(args) -> None:
-    hc = _hc()
-    cache = hc.OracleCache(_savestate())
+    cache = OracleCache(_savestate())
     s = cache.stats()
     print(f"[oracle_cache] invalidating key={cache.key} "
           f"({s['n_frames']} frames, {s['n_probes']} probes, {s['bytes'] / 1e6:.1f} MB) "

@@ -1,9 +1,10 @@
+#include "soh/OTRGlobals.h"
 #include "debugSaveEditor.h"
 #include "soh/Enhancements/randomizer/randomizerTypes.h"
 #include "soh/Enhancements/randomizer/randomizer.h"
 #include "soh/util.h"
 #include "soh/SohGui/ImGuiUtils.h"
-#include "soh/OTRGlobals.h"
+
 #include "soh/SohGui/UIWidgets.hpp"
 #include "soh/SohGui/SohGui.hpp"
 #include "soh/SaveManager.h"
@@ -22,7 +23,7 @@
 extern "C" {
 #include <z64.h>
 #include "variables.h"
-#include "functions.h"
+#include "functions/game_state.h"
 #include "macros.h"
 #include "soh/cvar_prefixes.h"
 extern PlayState* gPlayState;

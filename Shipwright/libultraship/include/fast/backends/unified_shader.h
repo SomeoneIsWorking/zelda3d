@@ -5,7 +5,7 @@
 
 // Render-unification effort (kanban #131), Phase 1: the unified shader that will eventually
 // replace both the N64 per-combiner-permutation shader generator (gfx_sdl3gpu.cpp's
-// kSgShaderTemplate) and the fixed 3DS CMB shader (zelda3d_sdl3gpu.cpp's kVert/kFrag), per
+// kSgShaderTemplate) and the fixed 3DS CMB shader (zelda3d_sdl3gpu_shaders.cpp), per
 // UnifiedVtx (unified_vtx.h) / UnifiedMaterial (unified_material.h).
 //
 // Phase 1 status: DORMANT. This module is unreferenced by any live draw path — nothing calls

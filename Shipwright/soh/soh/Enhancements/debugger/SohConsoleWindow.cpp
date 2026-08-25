@@ -1,5 +1,6 @@
-#include "SohConsoleWindow.h"
 #include "soh/OTRGlobals.h"
+#include "SohConsoleWindow.h"
+
 #include "soh/SohGui/UIWidgets.hpp"
 #include "soh/SohGui/SohGui.hpp"
 

@@ -1,7 +1,7 @@
 #include "valueViewer.h"
 #include "soh/SohGui/UIWidgets.hpp"
 #include "soh/SohGui/SohGui.hpp"
-#include "soh/OTRGlobals.h"
+
 #include "init/ShipInit.hpp"
 #include "soh/Enhancements/game-interactor/GameInteractor.h"
 
@@ -9,10 +9,11 @@ extern "C" {
 #include <spdlog/spdlog.h>
 #include <z64.h>
 #include "variables.h"
-#include "functions.h"
+#include "functions/actors.h"
+#include "functions/rendering.h"
 #include "macros.h"
 #include "soh/cvar_prefixes.h"
-#include "zelda3d/zelda3d.h"
+#include "zelda3d/core/zelda3d_runtime.h"
 #include "overlays/actors/ovl_Door_Warp1/z_door_warp1.h"
 
 extern PlayState* gPlayState;

@@ -19,20 +19,21 @@ foreach(m kibako pot gs hintstone geldwoman childlink)
 endforeach()
 
 if(NOT ZELDA3D_MODEL_SRCS)
-    message(WARNING "zelda3d_dlist_harness: no zelda3d_*_model.c found in ${ZELDA3D_DIR} — "
-                    "regenerate with tools/cmb_to_c.py. Skipping harness target.")
-    return()
+    message(STATUS "zelda3d_dlist_harness: no generated zelda3d_*_model.c fixtures found; "
+                   "building the ROM-backed --zelda3d mode only")
 endif()
 
 add_executable(zelda3d_dlist_harness
     dlist_harness.cpp
+    generic_dlist_fixture.cpp
+    harness_options.cpp
+    headless_window_backend.cpp
+    ppm_output.cpp
+    recording_rendering_api.cpp
+    sdl3gpu_headless_environment.cpp
+    zelda3d_dlist_fixture.cpp
     ${ZELDA3D_MODEL_SRCS}
-    "${ZELDA3D_DIR}/asset/ctr_rom.cpp"
-    "${ZELDA3D_DIR}/asset/zar.cpp"
-    "${ZELDA3D_DIR}/asset/cmb.cpp"
-    "${ZELDA3D_DIR}/asset/csab.cpp"
-    "${ZELDA3D_DIR}/asset/pica_texture.cpp"
-    "${ZELDA3D_DIR}/zelda3d_model.cpp"
+    "${ZELDA3D_DIR}/model/zelda3d_model.cpp"
 )
 target_compile_definitions(zelda3d_dlist_harness PRIVATE ${ZELDA3D_MODEL_DEFS})
 
@@ -41,14 +42,6 @@ set_property(TARGET zelda3d_dlist_harness PROPERTY CXX_STANDARD 20)
 # Both defines are set PRIVATE on libultraship, so they don't propagate to us:
 #  - F3DEX_GBI_2: the gbi.h opcode macros are selected at compile time and must
 #    encode F3DEX2, or the interpreter walks the dlist with the wrong opcodes/stride.
-#  - ENABLE_OPENGL: gates the GfxRenderingAPIOGL class declaration in gfx_opengl.h
-#    (needed by the --gl real-rasteriser mode) and selects the GL_GLEXT_PROTOTYPES
-#    desktop-GL include path.
-target_compile_definitions(zelda3d_dlist_harness PRIVATE F3DEX_GBI_2 ENABLE_OPENGL)
-target_link_libraries(zelda3d_dlist_harness PRIVATE libultraship)
-
-# --gl mode renders through the real OpenGL backend in an EGL *surfaceless*
-# context (no window / no X server). Link GLVND OpenGL + EGL directly (libultraship
-# pulls these in PRIVATEly, so the symbols aren't re-exported to this executable).
-find_package(OpenGL REQUIRED COMPONENTS OpenGL EGL)
-target_link_libraries(zelda3d_dlist_harness PRIVATE OpenGL::OpenGL OpenGL::EGL)
+#  - ENABLE_SDL3GPU: exposes the sole shipping renderer used by --gpu.
+target_compile_definitions(zelda3d_dlist_harness PRIVATE F3DEX_GBI_2 ENABLE_SDL3GPU)
+target_link_libraries(zelda3d_dlist_harness PRIVATE libultraship cmb3d)

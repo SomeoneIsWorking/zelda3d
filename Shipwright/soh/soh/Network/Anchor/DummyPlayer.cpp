@@ -4,7 +4,12 @@
 extern "C" {
 #include "macros.h"
 #include "variables.h"
-#include "functions.h"
+#include "functions/actors.h"
+#include "functions/animation.h"
+#include "functions/collision.h"
+#include "functions/effects.h"
+#include "functions/math.h"
+#include "functions/player.h"
 extern PlayState* gPlayState;
 
 void Player_UseItem(PlayState* play, Player* player, s32 item);

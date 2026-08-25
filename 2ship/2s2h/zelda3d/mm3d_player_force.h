@@ -6,10 +6,11 @@
 // natural in-game trigger would install, bypassing only the entry gate (button/stick
 // input decode, an NPC handshake, ...) that headless control can't reliably hit. They
 // call the genuine MM decomp functions directly — never a synthetic/faked pose — so
-// the sweep observes the real engine behavior. Bodies live in z_player.c itself (next
-// to func_80839E74/func_8083A794, whose non-static-but-undeclared internals they call).
+// the sweep observes the real engine behavior. Legacy bodies live in z_player.c itself (next
+// to func_80839E74/func_8083A794); new controls live in mm3d_player_force.c and call the same
+// non-static decomp entry points without growing that 22,000-line overlay.
 //
-// REPL surface: 2ship/2s2h/Z3DRepl.c `linkstate <idle|walk|run>`.
+// REPL surface: repl/mm3d_link_repl.c `linkstate <idle|walk|run>`.
 #pragma once
 #include "global.h" // PlayState, Player
 
@@ -37,6 +38,24 @@ s32 Zelda3D_PlayerForceTurnInPlace(Player* player, PlayState* play);
 
 // Roll: Player_Action_26 (ground/landing roll) + landing_roll anim. Human/Deku/Zora form.
 s32 Zelda3D_PlayerForceRoll(Player* player, PlayState* play);
+
+// Goron roll/dash: runs the real func_80836B3C Goron installer -> Player_Action_96. Requires
+// PLAYER_FORM_GORON; the action owns movement, charge buildup, magic consumption, and spike mode.
+s32 Zelda3D_PlayerForceGoronRoll(Player* player, PlayState* play);
+
+typedef enum Zelda3DPlayerFormRequestResult {
+    ZELDA3D_PLAYER_FORM_REQUEST_INVALID = -2,
+    ZELDA3D_PLAYER_FORM_REQUEST_MASK_MISSING = -1,
+    ZELDA3D_PLAYER_FORM_REQUEST_SENT = 1,
+    ZELDA3D_PLAYER_FORM_REQUEST_ALREADY_ACTIVE = 2,
+} Zelda3DPlayerFormRequestResult;
+
+// Request a transformation through Player_UseItem, the same asynchronous mask path used by normal
+// input. Returning SENT means the request reached Player_UseItem, not that the action gate accepted
+// or completed it; poll the link-state diagnostics and Player::transformation to observe those states.
+// Changing back to human uses the mask for the live transformed form. No form, mask, save, or object
+// state is mutated directly. The required transformation mask must be present in the inventory.
+Zelda3DPlayerFormRequestResult Zelda3D_PlayerRequestForm(Player* player, PlayState* play, PlayerTransformation form);
 
 // Throw-release: Player_Action_42 + throw anim (func_8083D6DC's body). Only while carrying an actor.
 s32 Zelda3D_PlayerForceThrow(Player* player, PlayState* play);

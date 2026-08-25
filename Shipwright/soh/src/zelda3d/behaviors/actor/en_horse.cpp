@@ -33,16 +33,11 @@
 //      3DS does: posed bone-14 origin lifted through the transform Zelda3D_EmitModelDraw applied this
 //      frame (T(pos)·R_YXZ(shape.rot)·S(worldScale)·T(0,groundOff,0)) minus the actor position — the
 //      same actor-relative convention riderPos already uses (and the same FUN_00408828 performs).
-#include "global.h" // Matrix_* / BINANG_TO_RAD / Vec3f (functions.h + z64 math), via the same chain render.cpp uses
+#include "global.h" // Vec3f and the N64 transform types used at this port boundary
+#include "functions/math.h"
 #include "en_horse.h"
-
-extern "C" {
-// Posed-3DS draw primitives (defined in zelda3d_model.cpp / zelda3d_render.cpp; C linkage). Redeclared
-// here rather than pulling the full zelda3d.h/render.h — matching extern decls are safe to repeat.
-int   Zelda3D_PosedBoneWorldPos(int modelId, int boneId, float* outModelPos); // posed bone origin (model-local)
-void  Zelda3D_SetTrackPosedMinY(int modelId, int enable);                     // enable posed-skin cache upkeep
-float Zelda3D_RenderYOffsetAtXZ(PlayState* play, Actor* actor, float x, float z); // terrain-warp Y delta
-}
+#include "zelda3d/anim/pose_tracking.h"
+#include "zelda3d/render/terrain_alignment_render.h"
 
 // #152 rider seat: last replaced-draw transform recorded for the (single) live EnHorse. Populated by
 // Zelda3D_EmitModelDraw via Zelda3D_EnHorse_RecordDraw; read by Zelda3D_HorseSaddleOffset.

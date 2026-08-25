@@ -5,7 +5,7 @@
 #include "textures/map_i_static/map_i_static.h"
 #include "textures/map_grand_static/map_grand_static.h"
 #include <assert.h>
-#include "soh/OTRGlobals.h"
+
 #include "soh/Enhancements/cosmetics/cosmeticsTypes.h"
 #include "soh/Enhancements/game-interactor/GameInteractor_Hooks.h"
 #include "zelda3d/hud/zelda3d_hud.h" // #205 — native HUD: the minimap image draws as a quad

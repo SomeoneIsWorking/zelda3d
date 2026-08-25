@@ -41,7 +41,7 @@ Examples:
 import sys, os, time, subprocess
 
 REPO = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
-# Target a parallel game instance with ZELDA3D_INSTANCE=<N> (matches tools/zelda3d_game.sh); an
+# Target a parallel game instance with ZELDA3D_INSTANCE=<N> (matches tools/zelda3d_game.py); an
 # explicit ZELDA3D_REPL still wins. Empty/unset = the default "main" instance (unchanged).
 _inst = os.environ.get("ZELDA3D_INSTANCE", "")
 FIFO = os.environ.get("ZELDA3D_REPL") or os.path.join(

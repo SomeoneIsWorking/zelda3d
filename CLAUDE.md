@@ -66,6 +66,26 @@ issue. **No evidence = not fixed.** This is mandatory, not optional.
 
 ## RULE: structure SoH3D like a real PC game — per-behavior modules, OOP, NOT one giant soh3d.c
 
+USER 2026-08-24: "Ideally a file should be max 1200 lines"
+
+USER 2026-08-24: "And a file should be focused around a responsibility, grab-bag files are banned"
+
+The 1,200-line ceiling and responsibility boundary are independent requirements. A smaller grab-bag
+still fails the architecture rule: every file owns one cohesive concept and a narrow interface;
+entry points and registries compose those owners without absorbing their implementations. Existing
+oversized legacy files are frozen by the normal verifier and their caps ratchet downward whenever a
+responsibility is extracted. Never raise a cap to land a change.
+
+Current application of the Dusklight composition pattern: the embedded harness `main.cpp`,
+`harness_cli.py`, launcher, Clang verifier, and MM phase-tour composer delegate to
+responsibility-named modules. The SoH and MM REPLs now route to focused command, transport, framing,
+lifecycle, and domain owners. Do not move extracted libretro/process/transport/gameplay/cache/
+command/report/build-policy implementations back into entry points. The concrete ownership map and
+remaining violations are maintained in `docs/project-structure.md` and `docs/codemap.md`.
+The SDL3GPU model renderer follows the same pattern: its C ABI adapter composes focused resource,
+pipeline, pass/diagnostic, lifecycle, and shader owners; do not fold those implementations back into
+`zelda3d_sdl3gpu.cpp`.
+
 Treat the zelda3d layer as a brand-new PC game that needs proper structure. Do **NOT** keep cramming
 logic into `core/zelda3d.c` (the multi-thousand-line dumping ground). When we RE/decomp an OoT3D
 behavior and port it, it goes into a **dedicated, well-named module** under a game-like tree, e.g.:
@@ -134,15 +154,16 @@ game reliably, you shouldn't be working on the bug fix." (user directive, 2026-0
   transform/params), `acam [dist] [axis]` (auto-frame it as a side profile — no coordinate
   guessing), `ainfo` (dump pos/rot/params/velocity). These work on ANY actor. Build bug-specific
   controls only for state with no generic form (e.g. the cucco wing state machine: `cuccostate`,
-  `flapinfo`). Driven per-frame from `SoH3D_ActorPostUpdate` in `Actor_UpdateAll`.
+  `flapinfo`). Driven per-frame from `Zelda3D_ActorPostUpdate` in `Actor_UpdateAll`.
 
 ## The OoT3D oracle IS the embedded harness — there is no external Azahar
 
 `tools/soh3d_harness` links Azahar's core as a **library** into a headless C++ program that loads the
 ROM, warps deterministically, reads actor tables / memory / framebuffers, and runs SoH3D side-by-side
-in the same process. Build/run it with `tools/soh3d_harness.sh`; drive it with `tools/harness_ctl.py`
-(`boot_to_gameplay()` is the entry point — it loadstates a gameplay save and warps, with no input
-driving). `oot3d-decomp/docs/oracle.md` documents the REPL surface.
+in the same process. Build/run it with executable `tools/soh3d_harness.py`; drive it with
+`tools/harness_cli.py` (`boot_to_gameplay()` in `harness_gameplay.py` is the entry point — it
+loadstates a gameplay save and warps, with no input driving). `oot3d-decomp/docs/oracle.md`
+documents the REPL surface.
 
 **Rule:** when the next observation would come from OoT3D, drive the harness — and if it doesn't
 cover the observable yet, EXTEND it (new dump routine, new comparison field). Same workflow-first

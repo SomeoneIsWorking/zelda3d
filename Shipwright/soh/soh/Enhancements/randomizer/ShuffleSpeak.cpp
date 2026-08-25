@@ -1,6 +1,6 @@
-#include <soh/OTRGlobals.h>
+
 #include "z64.h"
-#include "functions.h"
+#include "functions/game_state.h"
 #include "soh/Enhancements/randomizer/SeedContext.h"
 #include "overlays/actors/ovl_En_Ossan/z_en_ossan.h"
 extern "C" {

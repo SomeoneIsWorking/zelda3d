@@ -7,7 +7,7 @@
 #include "z_en_takara_man.h"
 #include "vt.h"
 #include "objects/object_ts/object_ts.h"
-#include "soh/OTRGlobals.h"
+
 #include "soh/ResourceManagerHelpers.h"
 
 #define FLAGS                                                                                  \

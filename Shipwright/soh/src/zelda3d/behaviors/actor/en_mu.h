@@ -8,7 +8,7 @@
 namespace Zelda3D {
 
 class EnMuBehavior : public ActorBehavior {
-public:
+  public:
     s16 actorId() const override;
     void applyDrawOverrides(int modelId, Actor* actor, bool track, bool facial) override;
 };

@@ -15,7 +15,7 @@ Two subcommands:
 `score` is PURE: it reads PNGs off disk and never imports/touches the game. `capture` is the only
 half that talks to the REPL, and it is never invoked by `score`.
 
-    # capture (needs a running instance: tools/zelda3d_game.sh start)
+    # capture (needs a running instance: tools/zelda3d_game.py start)
     tools/model_match.py capture --actor 0x12A --params 0 --entrance 0x00CD \\
         --scale 0.06 --cmb 1-11 --out scratch/model_match/switch
 

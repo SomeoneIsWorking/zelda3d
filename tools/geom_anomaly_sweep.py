@@ -99,7 +99,7 @@ def main():
         prefix = args[args.index("--prefix") + 1]
 
     env = dict(os.environ, ZELDA3D_HEADLESS="1")
-    subprocess.run([os.path.join(REPO, "tools", "zelda3d_game.sh"), "start", str(entrance), "0x6000"],
+    subprocess.run([sys.executable, os.path.join(REPO, "tools", "zelda3d_game.py"), "start", str(entrance), "0x6000"],
                    cwd=REPO, env=env, capture_output=True, text=True)
     subprocess.run([os.path.join(REPO, "tools", "zelda3d_repl.py"), "ready"], cwd=REPO, capture_output=True)
     time.sleep(2)
@@ -121,7 +121,7 @@ def main():
                 roomext.append(float(m.group(2)))
     finally:
         if not keep:
-            subprocess.run([os.path.join(REPO, "tools", "zelda3d_game.sh"), "stop"],
+            subprocess.run([sys.executable, os.path.join(REPO, "tools", "zelda3d_game.py"), "stop"],
                            cwd=REPO, env=env, capture_output=True)
 
     room_ref = max(roomext) if roomext else 0.0

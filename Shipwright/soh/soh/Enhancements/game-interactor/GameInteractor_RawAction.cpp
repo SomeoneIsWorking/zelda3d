@@ -1,4 +1,5 @@
 #include "GameInteractor.h"
+#include "functions/boot.h"
 #include <libultraship/bridge.h>
 #include "soh/ShipUtils.h"
 #include <math.h>
@@ -10,7 +11,14 @@ extern "C" {
 #include "variables.h"
 #include "macros.h"
 #include "soh/cvar_prefixes.h"
-#include "functions.h"
+#include "functions/actors.h"
+#include "functions/audio.h"
+#include "functions/collision.h"
+#include "functions/environment.h"
+#include "functions/game_state.h"
+#include "functions/math.h"
+#include "functions/player.h"
+#include "functions/ui.h"
 extern PlayState* gPlayState;
 }
 

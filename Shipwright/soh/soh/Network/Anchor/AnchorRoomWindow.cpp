@@ -1,11 +1,10 @@
 #include "Anchor.h"
-#include "soh/OTRGlobals.h"
+
 #include "soh/util.h"
 #include "soh/Enhancements/randomizer/SeedContext.h"
 
 extern "C" {
 #include "variables.h"
-#include "functions.h"
 extern PlayState* gPlayState;
 }
 

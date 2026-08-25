@@ -1,10 +1,10 @@
 #include "global.h"
 #include "textures/parameter_static/parameter_static.h"
 #include "soh/frame_interpolation.h"
-#include "soh/OTRGlobals.h"
+
 #include "soh/Enhancements/cosmetics/cosmeticsTypes.h"
 #include "soh/Enhancements/game-interactor/GameInteractor_Hooks.h"
-#include "zelda3d/zelda3d.h" // #31 — crisp higher-res HUD heart textures (Zelda3D_HudTexEnabled / Zelda3D_HeartTex)
+#include "zelda3d/hud/zelda3d_hud_assets.h" // #31 — crisp higher-res HUD heart textures
 #include "zelda3d/hud/zelda3d_hud.h" // #205 — native HUD: record quads instead of display lists
 
 // #31 — map an N64 heart texture symbol to a ZELDA3D_HEART_* kind, or -1 if it isn't a heart we

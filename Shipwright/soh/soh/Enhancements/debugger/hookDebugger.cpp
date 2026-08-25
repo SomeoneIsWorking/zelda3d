@@ -1,8 +1,9 @@
+#include "soh/OTRGlobals.h"
 #include "hookDebugger.h"
 #include "soh/SohGui/SohGui.hpp"
 #include "soh/Enhancements/game-interactor/GameInteractor.h"
 #include "soh/SohGui/UIWidgets.hpp"
-#include "soh/OTRGlobals.h"
+
 #include <string>
 #include <version>
 

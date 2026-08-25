@@ -8,6 +8,7 @@
 #include "z64.h"
 #include "src/overlays/actors/ovl_En_Md/z_en_md.h"
 #include "mido.h"
+#include "npc_draw.h"
 
 namespace Zelda3D {
 

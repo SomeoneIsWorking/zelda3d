@@ -1,11 +1,11 @@
+#include "soh/OTRGlobals.h"
 #include "soh/Enhancements/game-interactor/GameInteractor_Hooks.h"
 #include "soh/Enhancements/randomizer/randomizer.h"
-#include "soh/OTRGlobals.h"
+
 #include "soh/SaveManager.h"
 #include "init/ShipInit.hpp"
 
 extern "C" {
-#include "functions.h"
 #include "macros.h"
 #include "variables.h"
 #include "z64save.h"

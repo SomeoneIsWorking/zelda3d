@@ -20,7 +20,6 @@
 #include "overlays/misc/ovl_kaleido_scope/z_kaleido_scope.h"
 #include "objects/gameplay_keep/gameplay_keep.h"
 #include "objects/object_link_child/object_link_child.h"
-#include "zelda3d/zelda3d.h" // Zelda3D Link (player) body replacement (Zelda3D_TryDrawPlayer)
 #include <soh/Enhancements/custom-message/CustomMessageTypes.h>
 #include "soh/Enhancements/item-tables/ItemTableTypes.h"
 #include "soh/Enhancements/game-interactor/GameInteractor.h"
@@ -30,7 +29,7 @@
 #include "soh/Enhancements/game-interactor/GameInteractor_Hooks.h"
 #include "soh/Enhancements/randomizer/randomizer_grotto.h"
 #include "soh/frame_interpolation.h"
-#include "soh/OTRGlobals.h"
+
 #include "soh/ResourceManagerHelpers.h"
 
 #include <string.h>
@@ -6978,14 +6977,16 @@ void func_8083D6EC(PlayState* play, Player* this) {
     f32 temp2;
     f32 temp3;
     f32 temp4;
+    s32 zelda3dAtDefaultOwnsUnk6C4;
 
     this->actor.minVelocityY = -20.0f;
     this->actor.gravity = REG(68) / 100.0f;
 
-    if (func_8083816C(sFloorType)) {
+    zelda3dAtDefaultOwnsUnk6C4 = Zelda3D_CameraAtDefaultUpdatePlayer(
+        play, this, sFloorType, Player_Action_80842180 == this->actionFunc, Player_Action_8084E6D4 == this->actionFunc);
+    if (func_8083816C(sFloorType) && !zelda3dAtDefaultOwnsUnk6C4) {
         temp1 = fabsf(this->linearVelocity) * 20.0f;
         temp3 = 0.0f;
-
         if (sFloorType == 4) {
             if (this->unk_6C4 > 1300.0f) {
                 temp2 = this->unk_6C4;
@@ -7005,7 +7006,6 @@ void func_8083D6EC(PlayState* play, Player* this) {
                 temp1 = 0;
             }
         }
-
         if (this->currentBoots != PLAYER_BOOTS_HOVER) {
             temp3 = (temp2 - this->unk_6C4) * 0.02f;
             temp3 = CLAMP(temp3, 0.0f, 300.0f);
@@ -7013,15 +7013,12 @@ void func_8083D6EC(PlayState* play, Player* this) {
                 temp3 += temp3;
             }
         }
-
         this->unk_6C4 += temp3 - temp1;
         this->unk_6C4 = CLAMP(this->unk_6C4, 0.0f, temp2);
-
         this->actor.gravity -= this->unk_6C4 * 0.004f;
-    } else {
+    } else if (!zelda3dAtDefaultOwnsUnk6C4) {
         this->unk_6C4 = 0.0f;
     }
-
     if (this->actor.bgCheckFlags & 0x20) {
         if (this->actor.yDistToWater < 50.0f) {
             temp4 = fabsf(this->bodyPartsPos[PLAYER_BODYPART_WAIST].x - this->unk_A88.x) +

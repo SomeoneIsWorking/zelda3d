@@ -36,25 +36,27 @@
 #include "z64.h"
 #include "src/overlays/actors/ovl_En_Mu/z_en_mu.h"
 #include "en_mu.h"
-
-extern "C" {
-void Zelda3D_GL_SetMatConstOverride(int modelId, int materialIndex, int constIdx,
-                                    float r, float g, float b, float a);
-}
+#include "fast/zelda3d_material_overrides.h"
 
 namespace Zelda3D {
 
 // N64 EnMu_Draw colour palettes (SoH z_en_mu.c:204-207). Packed as 0..255 bytes; the shader
 // wants 0..1 floats, so divide at bind time.
 static constexpr unsigned char kEnMuPalette[2][5][3] = {
-    { { 100, 130, 235 }, { 160, 250,  60 }, {  90,  60,  20 }, {  30, 240, 200 }, { 140,  70,  20 } },
-    { { 140,  70,  20 }, {  30, 240, 200 }, {  90,  60,  20 }, { 160, 250,  60 }, { 100, 130, 235 } },
+    { { 100, 130, 235 }, { 160, 250, 60 }, { 90, 60, 20 }, { 30, 240, 200 }, { 140, 70, 20 } },
+    { { 140, 70, 20 }, { 30, 240, 200 }, { 90, 60, 20 }, { 160, 250, 60 }, { 100, 130, 235 } },
 };
 
 // Palette-slot -> (materialIndex, constIdx) binding for marketpeople.cmb; see file header.
-struct MatConstSlot { int materialIndex; int constIdx; };
+struct MatConstSlot {
+    int materialIndex;
+    int constIdx;
+};
 static constexpr MatConstSlot kMarketPeopleSlots[4] = {
-    { 0, 4 }, { 1, 3 }, { 2, 2 }, { 3, 1 },
+    { 0, 4 },
+    { 1, 3 },
+    { 2, 2 },
+    { 3, 1 },
 };
 
 s16 EnMuBehavior::actorId() const {
@@ -68,8 +70,8 @@ void EnMuBehavior::applyDrawOverrides(int modelId, Actor* actor, bool /*track*/,
     int palette = actor->params & 1; // N64 uses this->actor.params[0/1] as the palette index
     for (const auto& slot : kMarketPeopleSlots) {
         const auto& c = kEnMuPalette[palette][slot.materialIndex]; // parallel index by slot order
-        Zelda3D_GL_SetMatConstOverride(modelId, slot.materialIndex, slot.constIdx,
-                                       c[0] / 255.0f, c[1] / 255.0f, c[2] / 255.0f, 1.0f);
+        Zelda3D_GL_SetMatConstOverride(modelId, slot.materialIndex, slot.constIdx, c[0] / 255.0f, c[1] / 255.0f,
+                                       c[2] / 255.0f, 1.0f);
     }
 }
 

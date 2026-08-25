@@ -1,0 +1,6 @@
+#ifndef ZELDA3D_REPL_COMMANDS_PERFORMANCE_DIAGNOSTICS_H
+#define ZELDA3D_REPL_COMMANDS_PERFORMANCE_DIAGNOSTICS_H
+
+bool Zelda3D_PerformanceDiagnosticsReplCommand(const char* command, const char* outPath);
+
+#endif // ZELDA3D_REPL_COMMANDS_PERFORMANCE_DIAGNOSTICS_H

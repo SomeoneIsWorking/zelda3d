@@ -18,6 +18,9 @@
 // uniform 0.1 scale and needs no Y correction.
 #include "z64.h"
 #include "bombwall.h"
+#include "zelda3d/render/model_draw.h"
+#include "zelda3d/render/model_queries.h"
+#include "zelda3d/diagnostics/model_tuning_query.h"
 #include "overlays/actors/ovl_Bg_Bombwall/z_bg_bombwall.h"
 #include "objects/gameplay_field_keep/gameplay_field_keep.h"
 
@@ -30,12 +33,6 @@
 // 0.1 is the calibration starting point. Live-retunable via REPL `gscale 16`.
 static constexpr float kBombwallWorldScale = 0.1f;
 static constexpr int kBombwallGScaleSlot = 16;
-
-extern "C" {
-int Zelda3D_AutoModelId(const char* zarPath);
-int Zelda3D_DrawActorModel(PlayState* play, int modelId, Actor* actor, float worldScale);
-float Zelda3D_GScale(int slot, float def);
-}
 
 namespace Zelda3D {
 
@@ -65,7 +62,8 @@ bool BgBombwallBehavior::tryDrawModel(PlayState* play, Actor* actor) {
     if (modelId < 0) {
         return false; // no OoT3D wall CMB for this state -> let the N64 wall draw
     }
-    Zelda3D_DrawActorModel(play, modelId, actor, Zelda3D_GScale(kBombwallGScaleSlot, kBombwallWorldScale));
+    Zelda3D_DrawActorModel(play, modelId, actor,
+                           Zelda3D_ModelScaleOrDefault(kBombwallGScaleSlot, kBombwallWorldScale));
     return true;
 }
 

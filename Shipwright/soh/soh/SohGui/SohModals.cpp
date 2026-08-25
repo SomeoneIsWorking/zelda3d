@@ -7,7 +7,7 @@
 #include <libultraship/libultraship.h>
 #include "UIWidgets.hpp"
 #include "SohGui.hpp"
-#include "soh/OTRGlobals.h"
+
 #include "z64.h"
 
 extern "C" PlayState* gPlayState;
@@ -81,7 +81,7 @@ void SohModalWindow::DrawElement() {
 // log it, so boot proceeds exactly as if the default were clicked (continue, or a
 // clean logged exit for a genuinely-missing asset) instead of hanging on an
 // invisible dialog. Unattended markers, any of:
-//   - ZELDA3D_REPL set   -> launched by the automated FIFO driver (tools/zelda3d_game.sh);
+//   - ZELDA3D_REPL set   -> launched by the automated FIFO driver (tools/zelda3d_game.py);
 //                         a real user's headed session never sets this.
 //   - ZELDA3D_HEADLESS=1  -> the project's Xvfb headless marker.
 //   - SOH_HEADLESS=1    -> libultraship's headless marker.

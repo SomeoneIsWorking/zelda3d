@@ -1,8 +1,7 @@
 // See zelda3d_hud.h for the design and the user directive behind it (#205).
 #include "zelda3d_hud.h"
 
-#include "../zelda3d.h"
-#include "../behaviors/title/title_presentation.h" // Zelda3D_Title_IsActive — no HUD over the title demo
+#include "../behaviors/title/title_activity.h" // Zelda3D_Title_IsActive — no HUD over the title demo
 
 #include <cstdint>
 #include <cstdlib>

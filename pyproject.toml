@@ -1,0 +1,13 @@
+[project]
+name = "zelda3d-tools"
+version = "0.1.0"
+description = "Locked Python runtime for Zelda3D setup, builds, and project tooling"
+requires-python = ">=3.11"
+dependencies = [
+    "cryptography>=45.0.0",
+    "numpy>=2.0.0",
+    "pillow>=11.0.0",
+]
+
+[tool.uv]
+package = false

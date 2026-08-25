@@ -1,6 +1,6 @@
 ﻿#include "FileSelectEnhancements.h"
 
-#include "soh/OTRGlobals.h"
+
 #include "soh/SohGui/SohModals.h"
 #include "soh/SohGui/SohGui.hpp"
 

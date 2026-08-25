@@ -1,7 +1,7 @@
 #include "global.h"
 #include "vt.h"
 #include "soh/ActorDB.h"
-#include "zelda3d/zelda3d.h"
+#include "zelda3d/scene/gameplay_collision.h"
 #include <assert.h>
 
 RomFile sNaviMsgFiles[];
@@ -538,7 +538,7 @@ u32 gObjectTableSize = ARRAY_COUNT(gObjectTable);
 #define DEFINE_OBJECT_NULL(_0, _1)
 #define DEFINE_OBJECT_UNSET(_0)
 
-//#include "tables/object_table.h"
+// #include "tables/object_table.h"
 
 #undef DEFINE_OBJECT
 #undef DEFINE_OBJECT_NULL

@@ -1,14 +1,13 @@
 #include "global.h"
 #include "vt.h"
 #include "regs.h"
-#include "zelda3d/zelda3d.h"
 
 #include <string.h>
 #include <stdio.h>
 #include <stdlib.h>
 
 #include "soh/Enhancements/gameconsole.h"
-#include "soh/OTRGlobals.h"
+
 #include "libultraship/bridge.h"
 
 #define GFXPOOL_HEAD_MAGIC 0x1234

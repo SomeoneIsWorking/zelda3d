@@ -4,13 +4,11 @@
 // Zelda3D_ReplPoll (called once per frame from z_play.c's Play_Update). Both entry points are
 // also declared in zelda3d.h (their original home, unchanged) — this header exists so a future
 // consumer of the REPL module specifically doesn't need to pull in the whole zelda3d.h umbrella
-// just to find them, and so this module's dependency on zelda3d/render/zelda3d_render.h (the
-// render-owned state ~149 of the commands poke) is documented in one place.
+// just to find them. Each command owner imports only the domain contract it uses.
 #ifndef ZELDA3D_REPL_H
 #define ZELDA3D_REPL_H
 
 #include "global.h"
-#include "../render/zelda3d_render.h"
 
 #ifdef __cplusplus
 extern "C" {

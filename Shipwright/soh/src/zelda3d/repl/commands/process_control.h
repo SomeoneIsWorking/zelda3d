@@ -1,0 +1,8 @@
+#ifndef ZELDA3D_REPL_COMMANDS_PROCESS_CONTROL_H
+#define ZELDA3D_REPL_COMMANDS_PROCESS_CONTROL_H
+
+#include "global.h"
+
+bool Zelda3D_ProcessControlReplCommand(PlayState* play, const char* command, const char* line, const char* outPath);
+
+#endif

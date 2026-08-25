@@ -1,4 +1,4 @@
-#include <soh/OTRGlobals.h>
+
 #include "soh/Enhancements/game-interactor/GameInteractor_Hooks.h"
 #include "soh/Enhancements/randomizer/SeedContext.h"
 #include "init/ShipInit.hpp"
@@ -6,7 +6,9 @@
 
 extern "C" {
 #include <z64.h>
-#include "functions.h"
+#include "functions/actors.h"
+#include "functions/effects.h"
+#include "functions/enhancements.h"
 #include "variables.h"
 #include "macros.h"
 #include "objects/gameplay_keep/gameplay_keep.h"

@@ -1,5 +1,5 @@
 #include <libultraship/libultraship.h>
-#include "soh/OTRGlobals.h"
+
 #include "soh/Enhancements/game-interactor/GameInteractor_Hooks.h"
 #include "init/ShipInit.hpp"
 #include "soh/Enhancements/custom-message/CustomMessageTypes.h"
@@ -7,7 +7,8 @@
 extern "C" {
 extern PlayState* gPlayState;
 #include "macros.h"
-#include "functions.h"
+#include "functions/actors.h"
+#include "functions/game_state.h"
 #include "variables.h"
 #include "src/overlays/actors/ovl_Bg_Spot06_Objects/z_bg_spot06_objects.h"
 

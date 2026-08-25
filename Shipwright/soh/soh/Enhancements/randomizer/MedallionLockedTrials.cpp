@@ -1,4 +1,4 @@
-#include "soh/OTRGlobals.h"
+
 #include "init/ShipInit.hpp"
 #include "soh/Enhancements/randomizer/SeedContext.h"
 

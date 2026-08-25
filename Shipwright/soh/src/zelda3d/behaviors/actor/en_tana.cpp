@@ -14,6 +14,9 @@
 // variants fall through to the N64 DL.
 #include "z64.h"
 #include "en_tana.h"
+#include "zelda3d/render/model_draw.h"
+#include "zelda3d/render/model_queries.h"
+#include "zelda3d/diagnostics/model_tuning_query.h"
 
 #define ZELDA3D_TANA_ZAR "/actor/zelda_shop_tana.zar"
 #define ZELDA3D_TANA_CMB_WOODEN "Model/shop_tana01_model.cmb"
@@ -22,12 +25,6 @@
 // Live-retunable via REPL `gscale 21`.
 static constexpr float kTanaWorldScale = 1.0f;
 static constexpr int kTanaGScaleSlot = 21;
-
-extern "C" {
-int Zelda3D_AutoModelId(const char* zarPath);
-int Zelda3D_DrawActorModel(PlayState* play, int modelId, Actor* actor, float worldScale);
-float Zelda3D_GScale(int slot, float def);
-}
 
 namespace Zelda3D {
 
@@ -47,7 +44,8 @@ bool EnTanaBehavior::tryDrawModel(PlayState* play, Actor* actor) {
     if (sWoodenId < 0) {
         return false;
     }
-    Zelda3D_DrawActorModel(play, sWoodenId, actor, Zelda3D_GScale(kTanaGScaleSlot, kTanaWorldScale));
+    Zelda3D_DrawActorModel(play, sWoodenId, actor,
+                           Zelda3D_ModelScaleOrDefault(kTanaGScaleSlot, kTanaWorldScale));
     return true;
 }
 

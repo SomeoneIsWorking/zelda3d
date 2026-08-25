@@ -40,7 +40,8 @@ import sys
 from pathlib import Path
 
 sys.path.insert(0, str(Path(__file__).resolve().parent))
-import harness_ctl as hc  # noqa: E402
+from harness_process import spawn  # noqa: E402
+from harness_transport import Harness  # noqa: E402
 from title_ab import ppm_to_png, OUTDIR  # noqa: E402
 from PIL import Image, ImageDraw  # noqa: E402
 
@@ -53,7 +54,7 @@ RIDER_POS_VA = 0x005AFFB0  # static mirror of the title rider world.pos (Vec3f)
 EXPECT_W, EXPECT_H = 400, 240
 
 
-def step_chunked(h: hc.Harness, n: int, chunk: int = 100, timeout: float = 900.0) -> str:
+def step_chunked(h: Harness, n: int, chunk: int = 100, timeout: float = 900.0) -> str:
     remaining = n
     line = None
     while remaining > 0:
@@ -71,16 +72,16 @@ def parse_field(state_line: str, key: str) -> str:
     return state_line.split(f"{key}=")[1].split()[0]
 
 
-def read_f32(h: hc.Harness, va: int) -> float:
+def read_f32(h: Harness, va: int) -> float:
     resp = h.send(f"r32 0x{va:08x}")
     return struct.unpack("<f", struct.pack("<I", int(resp.split()[1], 16)))[0]
 
 
-def az_rider_pos(h: hc.Harness):
+def az_rider_pos(h: Harness):
     return tuple(read_f32(h, RIDER_POS_VA + 4 * j) for j in range(3))
 
 
-def soh_player_pos(h: hc.Harness):
+def soh_player_pos(h: Harness):
     lines = h.send_multiline("compare player")
     for ln in lines:
         ln = ln.strip()
@@ -90,7 +91,7 @@ def soh_player_pos(h: hc.Harness):
     return None
 
 
-def soh_camera(h: hc.Harness):
+def soh_camera(h: Harness):
     """(eye, at, up, fov_deg) from SoH's active camera, or None."""
     lines = h.send_multiline("compare camera")
     for ln in lines:
@@ -188,7 +189,7 @@ def main() -> int:
     OUTDIR.mkdir(parents=True, exist_ok=True)
     os.environ.setdefault("HARNESS_STDERR", f"scratch/logs/title_rider_crop_{args.name}.log")
 
-    h = hc.spawn(save_state=None)
+    h = spawn(save_state=None)
     try:
         while True:
             step_chunked(h, 20)

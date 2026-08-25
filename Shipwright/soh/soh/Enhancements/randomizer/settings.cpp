@@ -1,10 +1,11 @@
+#include "soh/OTRGlobals.h"
 #include "settings.h"
 #include <cstdio>
 #include "trial.h"
 #include "dungeon.h"
 #include "soh/Enhancements/randomizer/randomizerTypes.h"
 #include "soh/Enhancements/randomizer/3drando/random.hpp"
-#include "soh/OTRGlobals.h"
+
 
 #include <spdlog/spdlog.h>
 #include <libultraship/bridge/consolevariablebridge.h>

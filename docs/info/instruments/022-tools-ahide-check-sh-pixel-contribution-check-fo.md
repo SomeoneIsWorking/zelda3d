@@ -1,8 +1,9 @@
 ---
 id: I022
 kind: instrument
-status: trusted
+status: DISTRUSTED
 created: 2026-08-04
+distrusted_on: 2026-08-25
 ---
 
 ## Instrument
@@ -16,3 +17,9 @@ Run against all three classes 2026-08-04 AFTER the fix: live routed prop (Obj_Ka
 ## Known failure modes
 
 (none recorded yet)
+
+## DISTRUSTED 2026-08-25
+
+The validated shell implementation was retired in the Python tooling migration. tools/ahide_check.py preserves its three outcomes in code, but has not yet been live-validated against a drawing actor, an absent actor, and an unreachable REPL on the combined tree.
+
+> Every result this instrument produced is suspect until it is re-validated.

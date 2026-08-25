@@ -8,7 +8,7 @@
 #include "objects/gameplay_field_keep/gameplay_field_keep.h"
 #include "soh/Enhancements/randomizer/randomizer_entrance.h"
 #include "soh/Enhancements/randomizer/randomizer_grotto.h"
-#include "soh/OTRGlobals.h"
+
 
 #define FLAGS ACTOR_FLAG_UPDATE_DURING_OCARINA
 

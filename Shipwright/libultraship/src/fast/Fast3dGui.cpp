@@ -297,57 +297,6 @@ void Fast3dGui::RmlMenuInjectClick(int x, int y) {
     mRml->ProcessSdlEvent(&ev);
 }
 
-// C bridge for the Zelda3D REPL (`menu <action>`): resolve the active Fast3dGui and inject the key
-// that drives the requested navigation. The action codes (kept SDL-free for the C caller in
-// zelda3d.c) match Zelda3D_RmlMenuAction in tools/zelda3d_repl.py:
-//   0 next-row (Down)  1 prev-row (Up)  2 activate (Enter)  3 close (Esc)
-//   4 next-tab (Right)  5 prev-tab (Left)
-extern "C" void Zelda3D_RmlMenuKey(int action) {
-    auto ctx = Ship::Context::GetRawInstance();
-    if (!ctx || !ctx->GetWindow()) {
-        return;
-    }
-    auto* gui = dynamic_cast<Fast::Fast3dGui*>(ctx->GetWindow()->GetGui().get());
-    if (!gui) {
-        return;
-    }
-    int keycode;
-    switch (action) {
-        case 0:
-            keycode = SDLK_DOWN;
-            break;
-        case 1:
-            keycode = SDLK_UP;
-            break;
-        case 2:
-            keycode = SDLK_RETURN;
-            break;
-        case 4:
-            keycode = SDLK_RIGHT;
-            break;
-        case 5:
-            keycode = SDLK_LEFT;
-            break;
-        default:
-            keycode = SDLK_ESCAPE; // 3 (close) rides the Esc toggle binding
-            break;
-    }
-    gui->RmlMenuInjectKey(keycode);
-}
-
-// C bridge for the Zelda3D REPL (`menuclick <x> <y>`): synthesize a left click at window pixel
-// (x, y) through the menu's real input path (used to verify mouse interactions headlessly).
-extern "C" void Zelda3D_RmlMenuClick(int x, int y) {
-    auto ctx = Ship::Context::GetRawInstance();
-    if (!ctx || !ctx->GetWindow()) {
-        return;
-    }
-    auto* gui = dynamic_cast<Fast::Fast3dGui*>(ctx->GetWindow()->GetGui().get());
-    if (gui) {
-        gui->RmlMenuInjectClick(x, y);
-    }
-}
-
 void Fast3dGui::DrawFloatingWindows() {
     // ImGui multi-viewport support. The body was gated on
     // `ImGui::GetIO().ConfigFlags & ImGuiConfigFlags_ViewportsEnable`, which is zero against the

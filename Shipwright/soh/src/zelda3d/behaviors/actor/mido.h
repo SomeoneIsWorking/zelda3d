@@ -7,7 +7,7 @@
 namespace Zelda3D {
 
 class MidoBehavior : public ActorBehavior {
-public:
+  public:
     s16 actorId() const override;
     void applyDrawOverrides(int modelId, Actor* actor, bool track, bool facial) override;
 };

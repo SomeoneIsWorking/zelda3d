@@ -1,5 +1,7 @@
+#include "soh/OTRGlobals.h"
 #include "ResourceManagerHelpers.h"
-#include "OTRGlobals.h"
+
+#include "soh/host/archive_extension_cache.h"
 #include "variables.h"
 #include "z64.h"
 #include "cvar_prefixes.h"

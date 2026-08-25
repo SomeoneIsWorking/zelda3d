@@ -2,6 +2,8 @@
 // zelda3d.c's Zelda3D_RiderStepCue; applyToActor()/releaseMount() are the new horse-attribution
 // port (title_rider.h's header comment, oot3d-decomp/docs/title_rider_port_spec.md).
 #include "global.h"
+#include "functions/actors.h"
+#include "functions/collision.h"
 #include <cmath>
 #include "title_rider.h"
 #include "../../core/zelda3d_log.h"
@@ -16,7 +18,7 @@ void Zelda3D_PathFollowUpdate(float pos[3], int16_t* yaw, float* speed_xz, const
 void Zelda3D_ActorMoveXZByYawSpeed(float pos[3], int16_t yaw, float speed_xz);
 // EnHorse state-transition helpers (z_en_horse.c) — file-scope-visible (not static) but not
 // declared in z_en_horse.h; forward-declared here the same way zelda3d.c exposes other
-// "was static, now shared" primitives (see e.g. Zelda3D_TitleCamEnabled in title_presentation.cpp).
+// "was static, now shared" primitives (see e.g. Zelda3D_TitleCamEnabled in title_activity.cpp).
 void EnHorse_MountedGallopReset(EnHorse* horse);
 void EnHorse_MountedTrotReset(EnHorse* horse);
 void EnHorse_StartMountedIdleResetAnim(EnHorse* horse);
@@ -54,12 +56,18 @@ namespace {
 // anything else returns 0 (hold). See title_rider.h's step() doc for the derivation trail.
 int RiderCsFuncIdx(uint16_t action) {
     switch (action) {
-        case 0x24: return 1; // CsMoveToPoint      (FUN_003cf3c4)
-        case 0x25: return 2; // CsJump             (FUN_001033d4; unused by the title cs)
-        case 0x26: return 3; // CsRearing          (FUN_0010360c; unused by the title cs)
-        case 0x40: return 4; // CsWarpMoveToPoint  (FUN_00230d84)
-        case 0x41: return 5; // CsWarpRearing      (FUN_002535f0)
-        default:   return 0;
+        case 0x24:
+            return 1; // CsMoveToPoint      (FUN_003cf3c4)
+        case 0x25:
+            return 2; // CsJump             (FUN_001033d4; unused by the title cs)
+        case 0x26:
+            return 3; // CsRearing          (FUN_0010360c; unused by the title cs)
+        case 0x40:
+            return 4; // CsWarpMoveToPoint  (FUN_00230d84)
+        case 0x41:
+            return 5; // CsWarpRearing      (FUN_002535f0)
+        default:
+            return 0;
     }
 }
 
@@ -85,9 +93,8 @@ void TitleRider::step(PlayState* play, int csFrame, bool* outDiscontinuity) {
     if (funcIdx != mCsFuncIdx) {
         // First-ever cue: the dispatcher body itself seeds the transform from the cue before
         // running the init func (FUN_0026a30c's csAction==0 branch).
-        const bool teleport = (mCsFuncIdx == 0) ||
-                              (funcIdx == 4) ||  // WarpMoveInit      (FUN_002a8af8) teleports
-                              (funcIdx == 5);    // CsWarpRearingInit (FUN_002b6c00) teleports
+        const bool teleport = (mCsFuncIdx == 0) || (funcIdx == 4) || // WarpMoveInit      (FUN_002a8af8) teleports
+                              (funcIdx == 5);                        // CsWarpRearingInit (FUN_002b6c00) teleports
         mCsFuncIdx = funcIdx;
         if (teleport) {
             mPos[0] = p0[0];
@@ -159,8 +166,7 @@ void TitleRider::applyToActor(PlayState* play, Actor* actor) {
             // own spawn sites use (e.g. z_horse.c:76) — EnHorse_Init's early Actor_Kill branches
             // all gate on SCENE_LON_LON_RANCH/SCENE_STABLE/SCENE_GERUDOS_FORTRESS, none of which is
             // the title's SCENE_TITLE, so the spawn always survives init here.
-            mHorseActor = Actor_Spawn(&play->actorCtx, play, ACTOR_EN_HORSE,
-                                       mPos[0], mPos[1], mPos[2], 0, mYaw, 0, 1);
+            mHorseActor = Actor_Spawn(&play->actorCtx, play, ACTOR_EN_HORSE, mPos[0], mPos[1], mPos[2], 0, mYaw, 0, 1);
             if (mHorseActor != nullptr) {
                 // Mount Link onto her via the literal native field-set + call z_player.c's own
                 // A-press mount path uses (~7169-7193), minus the button-press/put-away/climb-on
@@ -190,7 +196,7 @@ void TitleRider::applyToActor(PlayState* play, Actor* actor) {
     // 60fps sub-frame: mPos integrates once per cs tick (30fps); on the hold engine frame render
     // half a step ahead along the heading so the rider moves EVERY engine frame instead of
     // stepping at half rate (kanban #149; pairs with the camera's fractional spline eval in
-    // title_presentation.cpp). Move cues only — rearing/idle have speed 0, and teleport frames
+    // title_rider_state.cpp). Move cues only — rearing/idle have speed 0, and teleport frames
     // land on the advance tick (subframe 0), so no discontinuity is smeared.
     {
         const float sub = Zelda3D_TitleCsSubframe();
@@ -203,8 +209,7 @@ void TitleRider::applyToActor(PlayState* play, Actor* actor) {
                 // Y follows the terrain (step()'s raycast) but only at cs cadence — re-raycast at
                 // the advanced XZ so the ground-follow is also per-engine-frame (the measured
                 // ~2.7-unit 30Hz vertical stepping on the uphill gallop, kanban #149).
-                Vec3f q = { horse->actor.world.pos.x, horse->actor.world.pos.y + 200.0f,
-                            horse->actor.world.pos.z };
+                Vec3f q = { horse->actor.world.pos.x, horse->actor.world.pos.y + 200.0f, horse->actor.world.pos.z };
                 CollisionPoly poly;
                 f32 y = BgCheck_AnyRaycastFloor1(&play->colCtx, &poly, &q);
                 if (y > BGCHECK_Y_MIN + 1.0f) {
@@ -229,13 +234,12 @@ void TitleRider::applyToActor(PlayState* play, Actor* actor) {
     const int funcIdx = RiderCsFuncIdx(mCueAction);
     if (funcIdx == 3 || funcIdx == 5) {
         // `log rider 1`: transition diagnosis (see the Move branch's twin below).
-        Z3D_LOG(RIDER, "REARING funcIdx=%d cutsceneAction(before)=%d animIdx(before)=%d action=%d "
+        Z3D_LOG(RIDER,
+                "REARING funcIdx=%d cutsceneAction(before)=%d animIdx(before)=%d action=%d "
                 "animFrame=%.2f riderPos=(%.1f,%.1f,%.1f) playerPos=(%.1f,%.1f,%.1f)\n",
                 funcIdx, (int)horse->cutsceneAction, (int)horse->animationIdx, (int)horse->action,
-                horse->skin.skelAnime.curFrame,
-                horse->riderPos.x, horse->riderPos.y, horse->riderPos.z,
-                mPlayerActor ? mPlayerActor->world.pos.x : 0.0f,
-                mPlayerActor ? mPlayerActor->world.pos.y : 0.0f,
+                horse->skin.skelAnime.curFrame, horse->riderPos.x, horse->riderPos.y, horse->riderPos.z,
+                mPlayerActor ? mPlayerActor->world.pos.x : 0.0f, mPlayerActor ? mPlayerActor->world.pos.y : 0.0f,
                 mPlayerActor ? mPlayerActor->world.pos.z : 0.0f);
         CsCmdActorCue cue{};
         cue.action = mCueAction;
@@ -301,7 +305,8 @@ void TitleRider::applyToActor(PlayState* play, Actor* actor) {
     if (funcIdx == 1 || funcIdx == 4) {
         // `log rider 1`: catch who stomps animationIdx between our per-frame calls (the mounted-Link
         // stand-pose diagnosis: Player reads idx=REARING while this branch sets GALLOP).
-        Z3D_LOG(RIDER, "MOVE funcIdx=%d cutsceneAction(before)=%d animIdx(before)=%d action=%d "
+        Z3D_LOG(RIDER,
+                "MOVE funcIdx=%d cutsceneAction(before)=%d animIdx(before)=%d action=%d "
                 "pos=(%.1f,%.1f,%.1f) animFrame=%.2f\n",
                 funcIdx, (int)horse->cutsceneAction, (int)horse->animationIdx, (int)horse->action,
                 horse->actor.world.pos.x, horse->actor.world.pos.y, horse->actor.world.pos.z,

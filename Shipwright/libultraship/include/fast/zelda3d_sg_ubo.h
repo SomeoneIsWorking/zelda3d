@@ -1,8 +1,8 @@
 #ifndef ZELDA3D_SG_UBO_H
 #define ZELDA3D_SG_UBO_H
 
-// Zelda3D SDL3 GPU per-draw uniform layout — the single source of truth shared by the renderer
-// (zelda3d_sdl3gpu.cpp) and the layout unit tests (tests/zelda3d_render_tests.cpp).
+// Zelda3D SDL3 GPU per-draw uniform layout — the single source of truth shared by the renderer pass
+// and shader owners and the layout unit tests (tests/zelda3d_render_tests.cpp).
 //
 // WHY THIS IS A HEADER WITH HARD INVARIANTS: SDL3 GPU's Vulkan backend binds every *pushed* uniform
 // block with a descriptor range capped at MAX_UBO_SECTION_SIZE = 4096 bytes. Any shader field past
@@ -15,7 +15,7 @@
 
 #include <cstddef>
 #include <cstdint>
-#include "fast/zelda3d_gl.h" // ZELDA3D_GL_MAX_BONES — shared by the shader string, this struct, the tests
+#include "fast/zelda3d_model_types.h"
 
 namespace Zelda3DSg {
 
@@ -110,7 +110,7 @@ struct SgUbo {
     // decoded from the packed words instead (shader mirrors: uvec4 uTevStages[6],
     // uvec4 uTevConst[2], vec4 uTex2Xf, vec4 uTevCtl).
     //   uTevStages[s] = { w0 srcs, w1 mods+constIdx, w2 ops+scales, 0 } — packing documented
-    //     at Zelda3DGlGroup::tevStagePack (zelda3d_gl.h).
+    //     at Zelda3DGlGroup::tevStagePack (zelda3d_model_types.h).
     //   uTevConst = 6 RGBA8-packed constant-color slots (PICA's const registers are 8-bit) in
     //     words [0..5], AFTER the per-actor override channel is applied.
     //   uTex2Xf = coordinator-2 scale (xy) / translate (zw) for the third texture unit.

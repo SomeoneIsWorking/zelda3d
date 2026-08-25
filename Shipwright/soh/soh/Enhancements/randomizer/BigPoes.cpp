@@ -1,4 +1,6 @@
-#include <soh/OTRGlobals.h>
+
+#include "functions/game_state.h"
+#include "functions/ui.h"
 #include "soh/Enhancements/randomizer/randomizer.h"
 
 extern "C" {

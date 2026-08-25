@@ -42,11 +42,10 @@
 //   face, which is the correct behavior for the whole idle/locomotion set.
 #include "z64.h"
 #include "zelda3d_link_face.h"
-#include "../behaviors/actor_behavior.h"
+#include "../anim/automatic_playback.h"
+#include "../behaviors/actor/npc_draw.h"
 
 extern "C" {
-// Resolved (clip, playhead) the auto anim path last drew this model with — zelda3d_anim.cpp.
-int Zelda3D_LastAutoAnim(int modelId, const char** outCsab, float* outFrame);
 // Sample `<clip>.faceb` at `frame`; out indices are -1 when the clip holds that channel.
 int Zelda3D_FacebSample(int modelId, const char* animName, float frame, int* outEye, int* outMouth);
 // CMB material a model's facial cmab drives: slot 0 = eye, slot 1 = mouth. -1 = none.
@@ -77,10 +76,18 @@ extern "C" void Zelda3D_LinkFaceUpdate(int modelId) {
     if (Zelda3D_LastAutoAnim(modelId, &csab, &frame) && csab != nullptr) {
         int eye = -1, mouth = -1;
         Zelda3D_FacebSample(modelId, csab, frame, &eye, &mouth);
-        if (eye >= 0) sLastEye = eye;
-        if (mouth >= 0) sLastMouth = mouth;
+        if (eye >= 0) {
+            sLastEye = eye;
+        }
+        if (mouth >= 0) {
+            sLastMouth = mouth;
+        }
     }
 
-    if (eyeMat >= 0) Zelda3D::applyFacialFrame(modelId, eyeMat, sLastEye);
-    if (mouthMat >= 0) Zelda3D::applyFacialFrame(modelId, mouthMat, sLastMouth);
+    if (eyeMat >= 0) {
+        Zelda3D::applyFacialFrame(modelId, eyeMat, sLastEye);
+    }
+    if (mouthMat >= 0) {
+        Zelda3D::applyFacialFrame(modelId, mouthMat, sLastMouth);
+    }
 }

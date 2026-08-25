@@ -22,8 +22,9 @@ REPO = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 
 def soh_scene(ent_hex, day_hex):
     subprocess.run(
-        f"ZELDA3D_HEADLESS=1 tools/zelda3d_game.sh restart {ent_hex} {day_hex}",
-        shell=True, cwd=REPO, capture_output=True, text=True, timeout=90,
+        [sys.executable, "tools/zelda3d_game.py", "restart", ent_hex, day_hex],
+        env={**os.environ, "ZELDA3D_HEADLESS": "1"},
+        cwd=REPO, capture_output=True, text=True, timeout=90,
     )
     time.sleep(4)
     r = subprocess.run(

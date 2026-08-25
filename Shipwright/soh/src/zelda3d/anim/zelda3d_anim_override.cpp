@@ -7,15 +7,14 @@
 // owns the live feature gates (REPL track/facial/faceframe), clears stale per-bone/material overrides
 // each draw, and dispatches to the actor's behavior module.
 #include "zelda3d_anim_override.h"
-#include "z64.h"                      // Actor
+#include "z64.h"                         // Actor
 #include "../behaviors/actor_behavior.h" // per-actor behavior modules (registry by actor->id)
+#include "fast/zelda3d_material_overrides.h"
 
 #include <cstdlib>
 
 extern "C" {
 void Zelda3D_ClearBonePostRots(int modelId);
-void Zelda3D_GL_ClearMatTexOverrides(int modelId);
-void Zelda3D_GL_ClearMatConstOverrides(int modelId);
 }
 
 int gZelda3dTrack = -1;  // -1 = uninit (env ZELDA3D_TRACK, default on)
@@ -23,7 +22,7 @@ int gZelda3dFacial = -1; // -1 = uninit (env ZELDA3D_FACIAL, default on)
 // Debug/verification override (REPL `faceframe <n>`): when >= 0, force every facial actor's eye/mouth
 // to this frame index, bypassing the live N64 index. Lets the channel be verified deterministically
 // despite the headless actor-update throttle stalling natural blink. -1 = off (use the live index).
-// Honored by Zelda3D::applyFacialFrame (behaviors/actor_behavior.cpp).
+// Honored by Zelda3D::applyFacialFrame (behaviors/actor/npc_draw.cpp).
 int gZelda3dFaceForce = -1;
 
 extern "C" void Zelda3D_ApplyActorOverrides(int modelId, void* actorv) {

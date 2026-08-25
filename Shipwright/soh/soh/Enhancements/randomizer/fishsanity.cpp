@@ -3,7 +3,12 @@
 #include "fishsanity.h"
 #include "draw.h"
 #include "variables.h"
-#include "functions.h"
+#include "functions/actors.h"
+#include "functions/effects.h"
+#include "functions/game_state.h"
+#include "functions/math.h"
+#include "functions/memory.h"
+#include "functions/rendering.h"
 #include "macros.h"
 #include <libultraship/bridge/consolevariablebridge.h>
 #include "soh/Enhancements/randomizer/randomizer.h"

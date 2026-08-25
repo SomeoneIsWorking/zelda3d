@@ -12,20 +12,17 @@ Usage: tools/render_smoke_test.py [entrance] [time] [min_draws]
 """
 import os, re, subprocess, sys, time, signal, pathlib
 
+from rom_provision import provision_n64_extraction_rom, resolve_rom_environment
+
 REPO = pathlib.Path(__file__).resolve().parent.parent
 # ONE program binary now runs both games; this test always runs OoT (`zelda3d oot`). SOH_DIR is
 # the OoT core's own asset directory -- the launcher resolves it as its build-tree sibling, same as
-# tools/zelda3d_game.sh, so ROM provisioning (done client-side here, not by the launcher) targets
+# tools/zelda3d_game.py, so ROM provisioning (done client-side here, not by the launcher) targets
 # the right place. We still cd there before exec, matching the other launch scripts' convention.
 ZELDA3D_BIN = pathlib.Path(os.environ.get("ZELDA3D_SOH", str(REPO / "Shipwright/build-cmake/zelda3d/zelda3d")))
 SOH_DIR = REPO / "Shipwright/build-cmake/soh"
 FIFO = REPO / "scratch/zelda3d.ctl"
 REPL = REPO / "tools/zelda3d_repl.py"
-
-entrance = sys.argv[1] if len(sys.argv) > 1 else "238"
-daytime = sys.argv[2] if len(sys.argv) > 2 else "0x8000"
-min_draws = int(sys.argv[3]) if len(sys.argv) > 3 else 1
-
 
 def ensure_xvfb():
     if subprocess.run(["xdpyinfo"], env={**os.environ, "DISPLAY": ":99"},
@@ -36,24 +33,23 @@ def ensure_xvfb():
 
 
 def provision_roms():
-    """Resolve ZELDA3D_OOT3D_ROM / ZELDA3D_OOT_ROM exactly like tools/zelda3d_game.sh does (env -> .env
-    -> drop-in ROM), via the shared rom_provision.sh. Without the 3DS ROM the model provider has
-    no OoT3D assets to hand the renderer, so EVERY model fails to load and geomscan reports 0
-    draws — i.e. the harness would manufacture the very failure it is meant to detect."""
-    sohdir = str(SOH_DIR)
-    script = (f'. "{REPO}/tools/rom_provision.sh"; '
-              f'zelda3d_provision_roms "{REPO}" "{sohdir}"; '
-              f'printf "%s\\n%s\\n" "${{ZELDA3D_OOT3D_ROM:-}}" "${{ZELDA3D_OOT_ROM:-}}"')
-    out = subprocess.run(["bash", "-c", script], capture_output=True, text=True).stdout.splitlines()
-    roms = {}
-    if len(out) >= 1 and out[0].strip():
-        roms["ZELDA3D_OOT3D_ROM"] = out[0].strip()
-    if len(out) >= 2 and out[1].strip():
-        roms["ZELDA3D_OOT_ROM"] = out[1].strip()
-    return roms
+    """Resolve ROMs through the shipping Python policy used by every launcher."""
+    environment = resolve_rom_environment(REPO, os.environ)
+    provision_n64_extraction_rom(SOH_DIR, environment)
+    return {
+        name: environment[name]
+        for name in ("ZELDA3D_OOT3D_ROM", "ZELDA3D_OOT_ROM")
+        if environment.get(name)
+    }
 
 
-def main():
+def main(arguments=None):
+    args = list(sys.argv[1:] if arguments is None else arguments)
+    if len(args) > 3:
+        raise ValueError("usage: render_smoke_test.py [entrance] [time] [min_draws]")
+    entrance = args[0] if args else "238"
+    daytime = args[1] if len(args) > 1 else "0x8000"
+    min_draws = int(args[2]) if len(args) > 2 else 1
     ensure_xvfb()
     for f in (FIFO, pathlib.Path(str(FIFO) + ".out")):
         f.unlink(missing_ok=True)

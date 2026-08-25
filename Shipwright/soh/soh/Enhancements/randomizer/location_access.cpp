@@ -1,3 +1,4 @@
+#include "soh/OTRGlobals.h"
 #include "location_access.h"
 #include <cstdio>
 
@@ -7,7 +8,7 @@
 #include "soh/Enhancements/debugger/performanceTimer.h"
 
 #include <fstream>
-#include <soh/OTRGlobals.h>
+
 
 #include "3drando/shops.hpp"
 extern "C" {

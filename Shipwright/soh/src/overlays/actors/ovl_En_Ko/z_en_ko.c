@@ -12,7 +12,7 @@
 #include "vt.h"
 #include "soh/ResourceManagerHelpers.h"
 #include "soh/Enhancements/game-interactor/GameInteractor_Hooks.h"
-#include "zelda3d/zelda3d.h" // Zelda3D: keep replaced Kokiri kids opaque past the N64 distance fade (#3)
+#include "zelda3d/behaviors/actor/actor_draw.h" // replaced Kokiri kids stay opaque past the N64 distance fade (#3)
 
 #define FLAGS (ACTOR_FLAG_ATTENTION_ENABLED | ACTOR_FLAG_FRIENDLY | ACTOR_FLAG_UPDATE_CULLING_DISABLED)
 

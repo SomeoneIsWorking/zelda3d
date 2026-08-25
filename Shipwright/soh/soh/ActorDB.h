@@ -75,9 +75,15 @@ class ActorDB {
     size_t nextFreeId = 0;
 };
 
-#else
+#endif
+
+#ifdef __cplusplus
+extern "C" {
+#endif
 
 ActorDBEntry* ActorDB_Retrieve(const int id);
 int ActorDB_RetrieveId(const char* name);
 
+#ifdef __cplusplus
+}
 #endif

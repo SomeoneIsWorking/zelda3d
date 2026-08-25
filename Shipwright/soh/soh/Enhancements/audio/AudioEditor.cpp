@@ -5,9 +5,9 @@
 #include <set>
 #include <string>
 #include <libultraship/libultraship.h>
-#include <functions.h>
+#include "functions/audio.h"
 #include "soh/ShipUtils.h"
-#include "soh/OTRGlobals.h"
+
 #include "soh/cvar_prefixes.h"
 #include <ship/utils/StringHelper.h>
 #include "soh/SohGui/SohMenu.h"

@@ -11,6 +11,7 @@
 // kokiri_kid.cpp for the full rationale behind the #116 fix).
 #include "z64.h"
 #include "src/overlays/actors/ovl_En_Sa/z_en_sa.h"
+#include "npc_draw.h"
 #include "saria.h"
 
 namespace Zelda3D {

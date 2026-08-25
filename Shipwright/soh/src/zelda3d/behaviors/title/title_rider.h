@@ -5,7 +5,7 @@
 // row "Zelda3D_RiderStepCue() + Zelda3D_ActorTurnToPoint/Zelda3D_PathFollowUpdate/
 // Zelda3D_ActorMoveXZByYawSpeed"). This is a pure relocation: the integration math and cue
 // semantics are UNCHANGED, only the storage (file-scope statics -> class members) and call site
-// (TitlePresentation::update(), via zelda3d.c's Zelda3D_Title_Update bridge) moved.
+// (TitleRiderState::update(), sequenced by Zelda3D_Title_Update) moved.
 //
 // DEVIATION from the design doc's literal migration table: the three low-level math primitives
 // (Zelda3D_ActorTurnToPoint / Zelda3D_PathFollowUpdate / Zelda3D_ActorMoveXZByYawSpeed) stay in
@@ -39,14 +39,14 @@
 namespace Zelda3D {
 
 class TitleRider {
-public:
+  public:
     // Drop the actor pointers this rider captured, without touching the actors themselves.
     //
     // mHorseActor and mPlayerActor are raw Actor* into the ZeldaArena, which a run's teardown frees.
-    // The rider lives inside TitlePresentation, which is a process-lifetime Meyers singleton, so it
+    // The rider lives inside TitleRiderState, which is a process-lifetime Meyers singleton, so it
     // carries them into the NEXT run -- where releaseMount() writes through mPlayerActor and takes
     // SIGSEGV. Measured on run 2 of `oot,oot`: SIGSEGV in TitleRider::releaseMount via
-    // TitlePresentation::update. Deliberately does NOT go through releaseMount(): by the time this
+    // TitleRiderState::update. Deliberately does NOT go through releaseMount(): by the time this
     // runs, the actors are gone and there is nothing to hand back.
     void forgetActorsForNewRun() {
         mHorseActor = nullptr;
@@ -78,9 +78,15 @@ public:
     // seed) teleports the rider.
     void step(PlayState* play, int csFrame, bool* outDiscontinuity);
 
-    const float* pos() const { return mPos; }
-    int16_t yaw() const { return mYaw; }
-    const Actor* horseActor() const { return mHorseActor; } // rendered rider (null before mount)
+    const float* pos() const {
+        return mPos;
+    }
+    int16_t yaw() const {
+        return mYaw;
+    }
+    const Actor* horseActor() const {
+        return mHorseActor;
+    } // rendered rider (null before mount)
 
     // Per-actor apply, called from Zelda3D_ActorPostUpdate (zelda3d.c) for EVERY actor while the
     // title demo is active — mirrors the call shape Zelda3D_ActorPostUpdate already uses for every
@@ -98,23 +104,23 @@ public:
     //   frame rather than once.
     void applyToActor(PlayState* play, Actor* actor);
 
-    // Title-exit teardown (called once from TitlePresentation::exit()): un-mounts Link
+    // Title-exit teardown (called once when TitleActivity deactivates): un-mounts Link
     // symmetrically (clears rideActor/PLAYER_STATE1_ON_HORSE/actor.parent) and kills the spawned
     // EN_HORSE instance so nothing lingers into gameplay/attract paths after title hands off.
     void releaseMount(PlayState* play);
 
-private:
+  private:
     // Initial values verbatim from zelda3d.c's gZelda3dRiderPos/gZelda3dRiderYaw initializers
     // (see that file's history for the RE trail: Az's 0x005AFFB0 read at the shot-1 anchor).
-    float mPos[3]  = { -5898.0f, 59.8f, 5091.6f };
-    int16_t mYaw   = 0x2AAA;
-    float mSpeed   = 8.0f;
+    float mPos[3] = { -5898.0f, 59.8f, 5091.6f };
+    int16_t mYaw = 0x2AAA;
+    float mSpeed = 8.0f;
     // Current cs-function index (horse+0x100e in FUN_0026a30c) — 0 = "no cue consumed yet", which
     // makes the first consumed cue teleport-seed the transform exactly like the 3DS dispatcher.
     int mCsFuncIdx = 0;
     uint16_t mCueAction = 0x40; // last-seen RiderCue::action (default gallop; see step())
 
-    Actor* mHorseActor  = nullptr; // the title-scoped EN_HORSE instance, or null before/after mount
+    Actor* mHorseActor = nullptr;  // the title-scoped EN_HORSE instance, or null before/after mount
     Actor* mPlayerActor = nullptr; // the mounted Player actor, kept for symmetric releaseMount()
 };
 

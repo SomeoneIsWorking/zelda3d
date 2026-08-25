@@ -1,3 +1,5 @@
+#include "soh/OTRGlobals.h"
+#include "soh/host/core_lifecycle.h"
 #include "Presets.h"
 #include <string>
 #include <fstream>
@@ -6,7 +8,7 @@
 #include <nlohmann/json.hpp>
 #include <libultraship/libultraship.h>
 #include <ship/resource/type/Json.h>
-#include "soh/OTRGlobals.h"
+
 #include "soh/util.h"
 #include "soh/SohGui/MenuTypes.h"
 #include "soh/SohGui/SohMenu.h"
@@ -14,6 +16,7 @@
 #include "soh/Enhancements/randomizer/randomizer_check_tracker.h"
 #include "soh/Enhancements/randomizer/randomizer_entrance_tracker.h"
 #include "soh/Enhancements/randomizer/randomizer_item_tracker.h"
+#include "soh/Enhancements/randomizer/randomizer_item_tracker_persistence.h"
 #include "soh/Enhancements/randomizer/settings.h"
 
 namespace fs = std::filesystem;
@@ -344,21 +347,9 @@ void DrawNewPresetPopup() {
             }
         }
         if (saveSection[PRESET_SECTION_TRACKERS]) {
-            for (auto id : itemTrackerWindowIDs) {
-                auto window = ImGui::FindWindowByName(id);
-                if (window != nullptr) {
-                    auto size = window->Size;
-                    auto pos = window->Pos;
-                    presets[newPresetName].presetValues["blocks"][blockInfo[PRESET_SECTION_TRACKERS].names[1]]
-                                                       ["windows"][id]["size"]["width"] = size.x;
-                    presets[newPresetName].presetValues["blocks"][blockInfo[PRESET_SECTION_TRACKERS].names[1]]
-                                                       ["windows"][id]["size"]["height"] = size.y;
-                    presets[newPresetName].presetValues["blocks"][blockInfo[PRESET_SECTION_TRACKERS].names[1]]
-                                                       ["windows"][id]["pos"]["x"] = pos.x;
-                    presets[newPresetName].presetValues["blocks"][blockInfo[PRESET_SECTION_TRACKERS].names[1]]
-                                                       ["windows"][id]["pos"]["y"] = pos.y;
-                }
-            }
+            auto& windows = presets[newPresetName]
+                                .presetValues["blocks"][blockInfo[PRESET_SECTION_TRACKERS].names[1]]["windows"];
+            ItemTracker_SaveToPreset(windows);
 
             auto window = ImGui::FindWindowByName("Entrance Tracker");
             if (window != nullptr) {

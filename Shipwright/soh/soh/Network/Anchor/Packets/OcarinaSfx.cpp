@@ -4,7 +4,7 @@
 
 extern "C" {
 #include "macros.h"
-#include "functions.h"
+#include "functions/audio.h"
 #include "variables.h"
 extern PlayState* gPlayState;
 extern f32 D_80130F28;

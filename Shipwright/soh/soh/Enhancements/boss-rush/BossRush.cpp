@@ -10,7 +10,12 @@
 #include <vector>
 
 extern "C" {
-#include "functions.h"
+#include "functions/actors.h"
+#include "functions/audio.h"
+#include "functions/game_state.h"
+#include "functions/math.h"
+#include "functions/rendering.h"
+#include "functions/ui.h"
 #include "macros.h"
 #include "variables.h"
 #include "src/overlays/actors/ovl_Boss_Goma/z_boss_goma.h"

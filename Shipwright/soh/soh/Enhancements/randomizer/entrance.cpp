@@ -15,7 +15,7 @@
 extern "C" {
 #include "variables.h"
 #include "macros.h"
-#include "functions.h"
+#include "functions/collision.h"
 }
 
 namespace Rando {

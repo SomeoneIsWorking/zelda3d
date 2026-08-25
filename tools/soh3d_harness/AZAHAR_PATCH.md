@@ -49,7 +49,7 @@ existing `memcpy` and `#ifdef ENABLE_GDBSTUB` block, insert:
 ```cpp
         // soh3d_harness write-hook: notify external hook on every write
         // that lands in a MemoryWatchpoint page. See tools/soh3d_harness/
-        // watchhook.{h,cpp} for the harness-side receiver.
+        // oracle_watch_bridge.h + watchhook.cpp for the harness-side receiver.
         if (&::Soh3d_OnMemoryWrite) {
             u64 wd = 0;
             std::memcpy(&wd, &data, std::min(sizeof(T), sizeof(u64)));
@@ -66,14 +66,14 @@ existing `memcpy` and `#ifdef ENABLE_GDBSTUB` block, insert:
    `MemorySystem::Write<T>` (search for `MemoryWatchpoint` — there's one
    in the `Read<T>` block and one in the `Write<T>` block; edit the
    Write one).
-5. Rebuild the harness: `tools/soh3d_harness.sh` (which triggers
+5. Rebuild the harness: `tools/soh3d_harness.py` (which triggers
    `ninja -C Azahar/build-harness soh3d_harness`).
 
 ## Related files
 
 - `tools/soh3d_harness/watchhook.cpp` — the harness-side hook receiver
   and per-range ring buffer.
-- `tools/soh3d_harness/main.cpp` — REPL commands `watch`, `unwatch`,
+- `tools/soh3d_harness/watch_commands.{h,cpp}` — REPL commands `watch`, `unwatch`,
   `watches`, `hits`, `hitclear`.
 - `scratch/watch_bgflags.py` — smoke test that watches
   `Actor+0x0090` (bgCheckFlags) during walk-into-wall and prints the

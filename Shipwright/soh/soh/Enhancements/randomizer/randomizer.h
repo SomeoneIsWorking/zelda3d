@@ -37,14 +37,3 @@ class Randomizer {
     ItemObtainability GetItemObtainabilityFromRandomizerGet(RandomizerGet randomizerCheck);
     RandomizerCheck GetCheckFromActor(s16 actorId, s16 sceneNum, s16 actorParams);
 };
-
-#ifdef __cplusplus
-extern "C" {
-#endif
-
-bool GenerateRandomizer(std::string seed = "");
-void JoinRandoGenerationThread();
-
-#ifdef __cplusplus
-}
-#endif

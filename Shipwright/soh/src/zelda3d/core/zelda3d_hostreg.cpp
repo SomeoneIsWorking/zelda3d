@@ -15,7 +15,7 @@
 
 #include "zelda3d/hud/zelda3d_hud.h"
 #include "zelda3d/input/zelda3d_input.h"
-#include "zelda3d/render/zelda3d_render.h"
+#include "zelda3d/render/replacement_calibration.h"
 
 extern "C" void Zelda3D_RegisterHostHooks(void) {
     // Seed engine-owned state from this core's configuration before anything can write it. Doing it

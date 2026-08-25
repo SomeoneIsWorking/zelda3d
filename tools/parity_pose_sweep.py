@@ -8,7 +8,7 @@ PASS/FAIL verdict:
 
   Zelda3D : REPL `walkhold` (re-armed each tick so the hold survives headless's uncapped frame rate) until
           linkanimstate reports the target CSAB at steady speed, then `skindump` a short burst.
-  oracle: the EMBEDDED harness (harness_ctl.spawn + `analog` stick hold + `az_linkjoints` per
+  oracle: the EMBEDDED harness (harness_process.spawn + `analog` stick hold + `az_linkjoints` per
           logic frame). Rewired 2026-07-23 — the old standalone-Azahar capture tools are gone.
 
 States with a live pose oracle: idle, walk, run. Gated states (attack/jump/climb/swim/carry/damage)
@@ -129,16 +129,17 @@ def capture_oracle(st, cfg):
     the format parity_pose_diff.load_oracle_local expects.
     """
     sys.path.insert(0, HERE)
-    import harness_ctl as HC
+    from harness_gameplay import boot_to_gameplay
+    from harness_process import spawn
     os.makedirs(OUT, exist_ok=True)
     out = os.path.join(OUT, f"oracle_{st}.csv")
-    h = HC.spawn()
+    h = spawn()
     try:
         if os.path.exists(ORACLE_STATE):
             h.send(f"loadstate {ORACLE_STATE}")
             h.send("run 6")
         else:
-            if not HC.boot_to_gameplay(h, entrance=KOKIRI):
+            if not boot_to_gameplay(h, entrance=KOKIRI):
                 print(f"  oracle {st}: boot_to_gameplay failed"); return None
             h.send(f"savestate {ORACLE_STATE}")
         mag = cfg["ora_mag"]

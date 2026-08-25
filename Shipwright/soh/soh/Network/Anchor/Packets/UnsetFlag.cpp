@@ -2,10 +2,10 @@
 #include <nlohmann/json.hpp>
 #include <libultraship/libultraship.h>
 #include "soh/Enhancements/game-interactor/GameInteractor.h"
-#include "soh/OTRGlobals.h"
+
 
 extern "C" {
-#include "functions.h"
+#include "functions/ui.h"
 #include "soh/Enhancements/randomizer/ShuffleTradeItems.h"
 extern PlayState* gPlayState;
 }

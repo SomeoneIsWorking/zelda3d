@@ -2,11 +2,15 @@
 #include "item_category_adj.h"
 #include "particle_cmc.h"
 #include "soh/frame_interpolation.h"
+#include "soh/OTRGlobals.h"
 #include "soh/Enhancements/randomizer/randomizer.h"
 #include "soh/Enhancements/randomizer/RCToRandInf.h"
 
 extern "C" {
-#include "functions.h"
+#include "functions/actors.h"
+#include "functions/game_state.h"
+#include "functions/math.h"
+#include "functions/rendering.h"
 #include "overlays/actors/ovl_Bg_Ice_Turara/z_bg_ice_turara.h"
 #include "objects/object_tk/object_tk.h"
 extern PlayState* gPlayState;

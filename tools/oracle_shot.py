@@ -17,7 +17,7 @@ SOLVED (2026-07-22): two causes, both now fixed at the source rather than here.
      `gameplay` -> ok yes|no (gPlayState populated AND not TitleActive) — gate on that.
   2. OoT3D's warp (nextEntranceIndex + transitionTrigger, identical to SoH's) cannot work from the
      title: no save is loaded, so nothing spawns. `warp` used to write into the title PlayState and
-     print ok; it now errors. Reaching a loaded save is a ONE-TIME cost — harness_ctl.boot_to_gameplay
+     print ok; it now errors. Reaching a loaded save is a ONE-TIME cost — harness_gameplay.boot_to_gameplay
      captures scratch/gameplay_settled.state on first run and every later session is loadstate+warp
      with no input driving at all.
 
@@ -27,9 +27,7 @@ Usage:
 """
 import argparse
 import os
-import subprocess
 import sys
-import time
 
 HERE = os.path.dirname(os.path.abspath(__file__))
 REPO = os.path.dirname(HERE)
@@ -50,16 +48,17 @@ def _pos_of(h) -> str:
 
 def capture(entrance: int, out_png: str, settle_frames: int, keep_ppm: bool,
             daytime: int = None) -> int:
-    import harness_ctl as HC
+    from harness_gameplay import boot_to_gameplay, set_time_of_day
+    from harness_process import spawn
     import link_sweep as LS  # for SAVE_STATE (the cold-boot title state)
 
-    h = HC.spawn(save_state=LS.SAVE_STATE)
+    h = spawn(save_state=LS.SAVE_STATE)
     # Drive to REAL gameplay and warp — one shared, deterministic path
-    # (harness_ctl.boot_to_gameplay: loadstate the cached gameplay state, else
+    # (harness_gameplay.boot_to_gameplay: loadstate the cached gameplay state, else
     # capture it once, then warp). `warp` now fails loudly off the title instead
     # of reporting ok, so a title frame can no longer be captured as an oracle
     # screenshot.
-    if not HC.boot_to_gameplay(h, entrance=entrance, settle_frames=settle_frames):
+    if not boot_to_gameplay(h, entrance=entrance, settle_frames=settle_frames):
         print("oracle_shot: never reached gameplay — refusing to write a "
               "title-screen frame.", file=sys.stderr)
         return 3
@@ -71,7 +70,7 @@ def capture(entrance: int, out_png: str, settle_frames: int, keep_ppm: bool,
     # silently, so a bad clock fails the capture instead of poisoning a measurement.
     if daytime is not None:
         try:
-            HC.set_time_of_day(h, daytime)
+            set_time_of_day(h, daytime)
         except RuntimeError as e:
             print(f"oracle_shot: {e}", file=sys.stderr)
             return 4

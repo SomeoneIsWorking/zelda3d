@@ -1,5 +1,6 @@
 #include <libultraship/libultraship.h>
-#include "soh/OTRGlobals.h"
+#include "functions/game_state.h"
+
 #include "soh/Enhancements/game-interactor/GameInteractor_Hooks.h"
 #include "soh/Enhancements/randomizer/SeedContext.h"
 #include "init/ShipInit.hpp"

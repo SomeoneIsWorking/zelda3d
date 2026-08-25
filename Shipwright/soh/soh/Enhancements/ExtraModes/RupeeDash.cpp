@@ -2,7 +2,7 @@
 #include "init/ShipInit.hpp"
 
 extern "C" {
-#include "functions.h"
+#include "functions/ui.h"
 #include "macros.h"
 #include "variables.h"
 extern PlayState* gPlayState;

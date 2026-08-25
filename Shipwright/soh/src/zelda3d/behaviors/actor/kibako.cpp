@@ -16,6 +16,9 @@
 // their own actors and keep their N64 fragment DL).
 #include "z64.h"
 #include "kibako.h"
+#include "zelda3d/render/model_draw.h"
+#include "zelda3d/render/model_queries.h"
+#include "zelda3d/diagnostics/model_tuning_query.h"
 
 // Dungeon-keep zar + the crate CMB. Self-contained to this module.
 #define ZELDA3D_KIBAKO_ZAR "/actor/zelda_dangeon_keep.zar"
@@ -26,12 +29,6 @@
 // `gscale 18`.
 static constexpr float kKibakoWorldScale = 0.1f;
 static constexpr int kKibakoGScaleSlot = 18;
-
-extern "C" {
-int Zelda3D_AutoModelId(const char* zarPath);
-int Zelda3D_DrawActorModel(PlayState* play, int modelId, Actor* actor, float worldScale);
-float Zelda3D_GScale(int slot, float def);
-}
 
 namespace Zelda3D {
 
@@ -47,7 +44,7 @@ bool ObjKibakoBehavior::tryDrawModel(PlayState* play, Actor* actor) {
     if (sModelId < 0) {
         return false; // no OoT3D crate CMB -> let the N64 crate draw
     }
-    Zelda3D_DrawActorModel(play, sModelId, actor, Zelda3D_GScale(kKibakoGScaleSlot, kKibakoWorldScale));
+    Zelda3D_DrawActorModel(play, sModelId, actor, Zelda3D_ModelScaleOrDefault(kKibakoGScaleSlot, kKibakoWorldScale));
     return true;
 }
 

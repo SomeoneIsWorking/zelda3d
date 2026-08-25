@@ -21,6 +21,10 @@
 #include "z64.h"
 #include "src/overlays/actors/ovl_En_Butte/z_en_butte.h" // EnButte (skelAnime + drawSkelAnime, 64-bit-safe)
 #include "en_butte.h"
+#include "zelda3d/anim/automatic_playback.h"
+#include "zelda3d/render/model_draw.h"
+#include "zelda3d/render/model_queries.h"
+#include "zelda3d/diagnostics/model_tuning_query.h"
 
 // Field-keep zar + the butterfly CMB. The CSAB (butterfly_fly) resolves from the same zar by name.
 #define ZELDA3D_BUTTE_ZAR "/actor/zelda_field_keep.zar"
@@ -35,16 +39,6 @@ static constexpr int kButteGScaleSlot = 23;
 // Free-run fallback rate (frames/draw) when the N64 anim has no lockable progress; phase-lock is used
 // whenever the live N64 anim length is meaningful (it is for the butterfly's looping flight clip).
 static constexpr float kButteAnimRate = 1.0f;
-
-extern "C" {
-int Zelda3D_AutoModelId(const char* zarPath);
-int Zelda3D_DrawActorModel(PlayState* play, int modelId, Actor* actor, float worldScale);
-float Zelda3D_GScale(int slot, float def);
-// CSAB driver (phase-lock to the live N64 anim / free-run + morph), keyed per model id; sets the
-// model's GPU skinning pose for this draw. See Zelda3D_UpdateAnimAuto in zelda3d_anim.cpp.
-void Zelda3D_UpdateAnimAuto(int modelId, const char* animName, float rate, float n64CurFrame,
-                          float n64AnimLength, float morphWeight);
-}
 
 namespace Zelda3D {
 
@@ -67,9 +61,9 @@ bool EnButteBehavior::tryDrawModel(PlayState* play, Actor* actor) {
     }
     // Flap the wings via butterfly_fly.csab, phase-locked to the live N64 SkelAnime so the tempo
     // matches; the per-emit pose snapshot pairs this actor's pose with its own draw.
-    Zelda3D_UpdateAnimAuto(sModelId, ZELDA3D_BUTTE_CSAB, kButteAnimRate, b->skelAnime.curFrame,
-                         b->skelAnime.animLength, b->skelAnime.morphWeight);
-    Zelda3D_DrawActorModel(play, sModelId, actor, Zelda3D_GScale(kButteGScaleSlot, kButteWorldScale));
+    Zelda3D_UpdateAnimAuto(sModelId, ZELDA3D_BUTTE_CSAB, kButteAnimRate, b->skelAnime.curFrame, b->skelAnime.animLength,
+                           b->skelAnime.morphWeight);
+    Zelda3D_DrawActorModel(play, sModelId, actor, Zelda3D_ModelScaleOrDefault(kButteGScaleSlot, kButteWorldScale));
     return true;
 }
 

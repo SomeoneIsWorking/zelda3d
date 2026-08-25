@@ -21,7 +21,7 @@
 #include <assert.h>
 #include "z64save.h"
 #include "soh/SaveManager.h"
-#include "soh/OTRGlobals.h"
+
 #include "soh/ResourceManagerHelpers.h"
 #include "soh/ShipUtils.h"
 

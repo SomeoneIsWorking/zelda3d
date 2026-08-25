@@ -1,12 +1,10 @@
-// Zelda3D SDL3 GPU renderer — the OoT3D skinned-model + shadow/AO renderer and the HUD, folded
+// Zelda3D SDL3 GPU renderer — the OoT3D skinned-model renderer and HUD, folded
 // into the SDL3 GPU backend (Fast::GfxRenderingAPISdl3Gpu) as MEMBER SUBSYSTEMS.
 //
-// Both classes used to be a pile of file-scope `g_*` globals + free functions in
-// zelda3d_sdl3gpu.cpp / zelda3d_hud_sdl3gpu.cpp; this header pulls that state into two classes
-// (Zelda3DRenderer + Zelda3DHudRenderer) owned by the backend. The member names are kept IDENTICAL to
-// the former globals so the large function bodies move over unchanged (member access is implicit
-// `this->`). The extern "C" C-ABI entry points (Zelda3D_Sg_* / Zelda3D_Hud_*) stay in their .cpp files
-// as thin shims that forward to the live instance via Fast::g_activeSdl3GpuApi.
+// Zelda3DRenderer and Zelda3DHudRenderer are owned by the backend. The model renderer's C ABI,
+// upload/cache, pipeline/shader, pass/diagnostic, and lifecycle implementations live in focused
+// sibling modules; this header contains their shared state contract. The extern "C" entry points
+// remain stable adapters to the live instance via Fast::g_activeSdl3GpuApi.
 #pragma once
 #ifdef ENABLE_SDL3GPU
 
@@ -22,12 +20,12 @@
 
 #include <glslang/Public/ShaderLang.h> // EShLanguage (makeShader parameter)
 
-#include "fast/zelda3d_sg_ubo.h" // Zelda3DSg::SgUbo (per-draw uniform payload size)
+#include "fast/zelda3d_sg_ubo.h"          // Zelda3DSg::SgUbo (per-draw uniform payload size)
 #include "fast/backends/unified_shader.h" // Fast::Unified::Variant (render-unification, kanban #131)
 
 namespace Fast {
 
-// ---- model-renderer record types (verbatim from zelda3d_sdl3gpu.cpp) ----
+// ---- model-renderer record types ----
 
 struct SgGroup {
     uint32_t first = 0, count = 0;
@@ -66,8 +64,7 @@ struct SgGroup {
     // combConstIdx). Populated by the model provider; overwritten by the per-actor override
     // channel (Step 2c EnHy body-color port) before submit.
     float matConstant[6][4] = {
-        { 0, 0, 0, 1 }, { 0, 0, 0, 1 }, { 0, 0, 0, 1 },
-        { 0, 0, 0, 1 }, { 0, 0, 0, 1 }, { 0, 0, 0, 1 },
+        { 0, 0, 0, 1 }, { 0, 0, 0, 1 }, { 0, 0, 0, 1 }, { 0, 0, 0, 1 }, { 0, 0, 0, 1 }, { 0, 0, 0, 1 },
     };
     int combConstIdx = 0;
     int combUsesConst = 0;
@@ -132,8 +129,8 @@ struct PipeKey {
     }
 };
 
-// The OoT3D skinned-model + dynamic sun-shadow + SSAO renderer. Holds every former file-scope `g_*`
-// of zelda3d_sdl3gpu.cpp as a data member with the same name. Methods borrow the backend (device,
+// The OoT3D skinned-model renderer. Holds the model renderer's device resources and per-pass state.
+// Methods borrow the backend (device,
 // AppendZelda3DModelDraw / AppendZelda3DFullscreen / AppendZelda3DOwnPass, GpuColorFormat, ...) via the
 // global Fast::g_activeSdl3GpuApi, exactly as the former free functions did.
 class Zelda3DRenderer {
@@ -144,9 +141,8 @@ class Zelda3DRenderer {
     void BeginPass();
     void DrawModel(int modelId, const float* mp16, const float* mv16, int lit, int invertY, unsigned char r8,
                    unsigned char g8, unsigned char b8, unsigned char a8, float aspectAdj, const float* boneData,
-                   int boneCnt, unsigned long long midMask, int sky, float uvOffU, float uvOffV,
-                   const void* matTex, const void* matConst, const void* matUv, int forceUnlit,
-                   const float* lightDirOv = nullptr,
+                   int boneCnt, unsigned long long midMask, int sky, float uvOffU, float uvOffV, const void* matTex,
+                   const void* matConst, const void* matUv, int forceUnlit, const float* lightDirOv = nullptr,
                    const float* sphRotOv = nullptr);
     void EndPass();
     void ClearOverlayDepth(); // #146 item B — fullscreen depth-only reset, in-pass, no color write.
@@ -164,6 +160,12 @@ class Zelda3DRenderer {
     // texture, say) cannot be freed twice. The gate asserts that count is zero.
     void releaseGpuResources(bool (*note)(const void* handle, const char* what));
 
+    // Local AABB of one uploaded draw group (see Zelda3D_Sg_GroupBounds / REPL `camdraw`).
+    bool groupBounds(int modelId, int groupIdx, float* outMin, float* outMax) const;
+
+  private:
+    // Focused owners implement these helpers in the resource-cache and pipeline-cache modules.
+
     SDL_GPUSampler* getSampler(unsigned wrapS, unsigned wrapT, bool noMip = false);
     SDL_GPUTexture* uploadTexture(int w, int h, const unsigned char* rgba, int srcLevels = 1);
     bool ensureResources();
@@ -174,10 +176,7 @@ class Zelda3DRenderer {
     SDL_GPUGraphicsPipeline* getUnifiedPipeline(const SgGroup& g, int frontCW, int variant);
     void applyPendingEvict();
     SDL_GPUShader* makeShader(const char* glsl, EShLanguage stage, uint32_t numSamplers, uint32_t numUbo);
-    SDL_GPUGraphicsPipeline* getDepthPipeline(bool doCull, int frontCW);
     bool ensureOverlayDepthResources(); // #146 item B
-    // Local AABB of one uploaded draw group (see Zelda3D_Sg_GroupBounds / REPL `camdraw`).
-    bool groupBounds(int modelId, int groupIdx, float* outMin, float* outMax) const;
 
     // ---- state (former module globals; names unchanged) ----
     std::unordered_map<int, SgModel> g_models;

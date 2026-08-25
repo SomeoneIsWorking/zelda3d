@@ -6,7 +6,7 @@
 
 #include "z_en_js.h"
 #include "objects/object_js/object_js.h"
-#include "soh/OTRGlobals.h"
+
 #include "soh/ResourceManagerHelpers.h"
 #include "soh/Enhancements/game-interactor/GameInteractor_Hooks.h"
 

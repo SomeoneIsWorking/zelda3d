@@ -15,6 +15,7 @@
 
 #include "z64.h" // Camera, PlayState, s16
 
+#ifdef __cplusplus
 namespace Zelda3D {
 
 // Base class for a ported OoT3D camera-mode function. Registered per funcIdx (CAM_FUNC_NORM1, ...);
@@ -37,6 +38,7 @@ public:
 CameraBehavior* findCameraBehavior(s16 funcIdx);
 
 } // namespace Zelda3D
+#endif
 
 // C bridge for the z_camera.c seams — z_camera.c is compiled as C, so it cannot include the C++
 // header directly. Returns 1 if a Zelda3D behavior handled the frame (skip legacy body), 0 to

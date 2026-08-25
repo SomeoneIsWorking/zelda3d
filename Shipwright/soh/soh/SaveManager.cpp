@@ -1,5 +1,7 @@
+#include "soh/OTRGlobals.h"
+#include "soh/host/frame_timing.h"
 #include "SaveManager.h"
-#include "OTRGlobals.h"
+
 #include "Enhancements/game-interactor/GameInteractor.h"
 #include "Enhancements/randomizer/SeedContext.h"
 #include "Enhancements/randomizer/entrance.h"
@@ -13,7 +15,7 @@
 
 #include "z64.h"
 #include "cvar_prefixes.h"
-#include "functions.h"
+#include "functions/game_state.h"
 #include "macros.h"
 #include <variables.h>
 #include <libultraship/libultraship.h>

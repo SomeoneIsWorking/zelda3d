@@ -71,8 +71,9 @@ def boot_and_shoot(idx, name, env_overrides):
     env["ZELDA3D_FREEZE_INTERP"] = "1"
     env["ZELDA3D_FREEZE_RAND_SEED"] = FREEZE_RAND_SEED
     env.update(env_overrides)
-    r = subprocess.run(f"tools/zelda3d_game.sh start {idx} 0x8000",
-                       shell=True, cwd=REPO, env=env, capture_output=True, text=True, timeout=150)
+    r = subprocess.run(
+        [sys.executable, "tools/zelda3d_game.py", "start", str(idx), "0x8000"],
+        cwd=REPO, env=env, capture_output=True, text=True, timeout=150)
     ready = "ready (pid" in (r.stdout + r.stderr)
     crash = ""
     try:
@@ -188,7 +189,11 @@ def main():
         print(f"{key} {scene:42s} {tag} mean={stats['mean_delta']:.3f} "
               f"max={stats['max_delta']} frac_over={stats['frac_pixels_over_tol']:.4f}", flush=True)
 
-    subprocess.run("tools/zelda3d_game.sh stop", shell=True, cwd=REPO, capture_output=True)
+    subprocess.run(
+        [sys.executable, "tools/zelda3d_game.py", "stop"],
+        cwd=REPO,
+        capture_output=True,
+    )
     n = len(results)
     passed = sum(1 for r in results.values() if r.get("status") == "OK" and r.get("pass"))
     print(f"\ndone: {passed}/{n} scenes within tolerance ({mode} mode). Results -> {RESULTS}")

@@ -9,7 +9,6 @@
 #include "objects/object_horse/object_horse.h"
 #include "objects/object_hni/object_hni.h"
 #include "scenes/overworld/spot09/spot09_scene.h"
-#include "zelda3d/zelda3d.h" // Zelda3D_HoofDustWorldPos: posed-3DS hoof position for dust spawns
 #include "zelda3d/core/zelda3d_log.h" // Z3D_LOG(RIDER, ...) — #152 saddle/riderPos diagnostics
 #include <assert.h>
 #include <stdio.h>

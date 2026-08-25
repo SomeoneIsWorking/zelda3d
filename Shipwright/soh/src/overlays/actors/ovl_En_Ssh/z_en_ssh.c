@@ -1,6 +1,6 @@
 #include "z_en_ssh.h"
 #include "objects/object_ssh/object_ssh.h"
-#include "soh/OTRGlobals.h"
+
 #include "soh/ResourceManagerHelpers.h"
 
 #define FLAGS                                                                                 \

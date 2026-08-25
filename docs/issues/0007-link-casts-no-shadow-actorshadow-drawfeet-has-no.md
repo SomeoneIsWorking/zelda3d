@@ -23,8 +23,9 @@ VERIFY WITH: a ground strip BELOW the boots (e.g. px box 320,395-450,435) — a 
 Fixed in z_player.c Player_Draw: when Zelda3D_TryDrawPlayer replaces the body, re-run Player_DrawImpl
 (with Player_PostLimbDrawGameplay) under gZelda3dColliderPass = 1 purely for the side effect, then
 rewind play->state.gfxCtx->polyOpa.p / polyXlu.p so none of the N64 geometry renders. This is exactly
-Zelda3D_UpdateSkelColliders' remedy (z_skelanime.c, #107/#108) applied to the player's dedicated hook;
-gZelda3dColliderPass now has one declaration, in zelda3d/zelda3d.h, instead of a local extern.
+Zelda3D_UpdateSkelColliders' remedy (z_skelanime.c, #107/#108) applied to the player's dedicated hook.
+`gZelda3dColliderPass` is owned by `zelda3d/anim/skeleton_draw_bridge.{h,c}` (declaration in the
+header, definition in the C owner), rather than the compatibility umbrella `zelda3d.h`.
 
 Ordering is safe: Actor_Draw calls actor->shape.shadowDraw immediately after actor->draw
 (z_actor.c:2833), so feetPos written during the re-run walk is fresh for the same frame's shadow.
@@ -84,4 +85,3 @@ darkening doing exactly what they should.
 Frontier row `player.shadow-strength` is closed as skip-by-design. **Lesson:** an oracle-vs-ours
 pixel comparison is meaningless unless time-of-day is verified equal on BOTH sides; passing
 `--daytime` to the oracle is not proof that it landed there.
-

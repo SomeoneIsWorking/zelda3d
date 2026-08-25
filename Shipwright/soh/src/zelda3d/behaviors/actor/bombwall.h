@@ -9,7 +9,7 @@
 namespace Zelda3D {
 
 class BgBombwallBehavior : public ActorBehavior {
-public:
+  public:
     s16 actorId() const override;
     // Draws the OoT3D bombable-wall CMB (intact or broken, picked from the actor's live dList) at
     // world.pos + shape.rot, suppressing the N64 wall.

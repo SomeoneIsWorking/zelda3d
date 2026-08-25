@@ -44,7 +44,8 @@ typedef struct Zelda3DGameHooks {
     int (*dbgInputEnabled)(void);              // is the debug input path active?
     void (*hudFrame)(void);                    // per-frame native HUD entry, from Gui::EndFrame
     void (*hudFlushPoint)(void);               // HUD batch flush boundary, from the Fast3D interpreter
-    void (*measureResult)(int key, float height); // report a measured model height back to the game
+    void (*measureResult)(int key, float height, float footprintX,
+                          float footprintZ); // report measured model extents back to the game
 } Zelda3DGameHooks;
 
 // Install a core's hooks. Pass NULL to clear (a core being unloaded MUST clear, or libultraship
@@ -55,7 +56,7 @@ void Zelda3D_SetGameHooks(const Zelda3DGameHooks* hooks);
 int Zelda3D_HostDbgInputEnabled(void);
 void Zelda3D_HostHudFrame(void);
 void Zelda3D_HostHudFlushPoint(void);
-void Zelda3D_HostMeasureResult(int key, float height);
+void Zelda3D_HostMeasureResult(int key, float height, float footprintX, float footprintZ);
 
 #ifdef __cplusplus
 }

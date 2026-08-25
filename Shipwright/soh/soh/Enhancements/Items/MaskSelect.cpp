@@ -2,7 +2,7 @@
 #include "init/ShipInit.hpp"
 
 extern "C" {
-#include "functions.h"
+#include "functions/game_state.h"
 #include "src/overlays/actors/ovl_En_Ossan/z_en_ossan.h"
 }
 

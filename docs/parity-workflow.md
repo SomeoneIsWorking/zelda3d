@@ -99,11 +99,11 @@ again for a frame already captured in a prior session.
 
 - **Cache**: `scratch/oracle_cache/<key>/` (gitignored — contains ROM-derived frame data,
   never committed). `<key>` = `sha256(savestate)[:16]_sha256(rom)[:16]_<patch-marker>`
-  (`harness_ctl.cache_key()`); the patch marker is derived from `AZAHAR_PATCH.md`'s
+  (`harness_cache.cache_key()`); the patch marker is derived from `AZAHAR_PATCH.md`'s
   heading list, so editing a patch mints a fresh key instead of silently serving stale
   frames. Frames stored as PNG; each context has an `index.json` recording the full key
   metadata (savestate/ROM paths+hashes, patch marker) for auditability.
-- **API**: `harness_ctl.OracleCache` — `get_frame`/`put_frame` (by az frame number),
+- **API**: `harness_cache.OracleCache` — `get_frame`/`put_frame` (by az frame number),
   `get_probe`/`put_probe` (by probe name + az frame + args, for deterministic structured
   probes like camera eye/at, `az_daytime`, `az_fog`, `vsuni_log`). `stats()`/`invalidate()`
   for housekeeping.
@@ -185,7 +185,7 @@ Don't re-derive a Link state matrix or a fresh oracle transport — start here.
   drive/verdict logic; `link_sweep.py` only orchestrates + adds states those tools don't
   cover + writes the checklist.
 - **Oracle transport is the embedded harness** — the only one. `link_sweep.py`'s `OracleSession`
-  drives `soh3d_harness` through `harness_ctl.py`, reaching gameplay via
+  drives `soh3d_harness` through `harness_cli.py`, reaching gameplay via
   `boot_to_gameplay()` (loadstate a gameplay save, then warp — no input driving) and reading Link's
   selected animation with the `az_linkanim` REPL command at `PLAYER+0x254+0x30`, named against
   `oot3d-decomp/tools/skeldata/player_animid_names.json`. The standalone Qt-frontend Azahar and its

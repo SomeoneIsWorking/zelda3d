@@ -796,10 +796,11 @@ input is a single shared seam, per-game REPLs carry only decomp-typed state.
 
 **Durable MM game-control tooling (committed, reusable — don't re-derive the FIFO recipe).** The
 one-off scratch drivers were promoted to tracked tools mirroring OoT's `soh3d_game.sh`/`soh3d_repl.py`:
-- `tools/mm_game.sh {start [entrance]|restart|stop|status|shot <name>|log}` — single-instance MM
+- `tools/mm_game.py {start [entrance]|restart|stop|status|shot <name>|log}` — exact-owned MM
   manager: boots `mm.elf` headless (private Xvfb :94, both FIFOs wired, `ZELDA3D_MM_WARP=1`),
-  detached via setsid so it survives across tool calls; `start` blocks until gameplay is confirmed
-  via the REPL; `stop` reaps ALL `mm.elf` (incl. "(deleted)") + this Xvfb + FIFOs.
+  detached in its own session so it survives across tool calls; `start` blocks until gameplay is
+  confirmed via the REPL; `stop` signals only the manifest-owned PID generations and refuses
+  unowned MM processes.
 - `tools/mm_control.py {pos|walk <s> [x y]|press <hex> [ms]|actors [n]|warp <ent>|query <c>|input <c>}`
   — the two-FIFO client (input → shared `$SHIP_SCRIPTED_FIFO`, queries → `$ZELDA3D_MM_REPL`).
 Verified live: `walk 3` moved Link ~485u, `press 0x1000` opened the SELECT-ITEM subscreen
@@ -869,7 +870,7 @@ a custom GBI opcode and a model-provider callback.
    `SoH3D_GL_SetModelProvider`, and the MM actor/object→ZAR/CMB tables.
 3. **Hook** `mm z_actor.c:2986` (actor) and `mm z_skelanime.c` DrawOpa/DrawFlexOpa (skinned).
 4. **Provision + open** the MM3D ROM via an MM env var + reused `CtrRom`.
-5. **Verify** with `tools/mm_game.sh` + `mm_control.py`: warp to a scene, screenshot N64-vs-MM3D;
+5. **Verify** with `tools/mm_game.py` + `mm_control.py`: warp to a scene, screenshot N64-vs-MM3D;
    use the Azahar 3DS oracle (memory `soh3d-azahar-oracle`) for coordinate-matched A/B ground truth.
 Start faithful-first: get ONE static prop or the pot/actor replaced and measured correctly before
 scaling to the auto table.
@@ -915,7 +916,7 @@ EMPTY so MM renders vanilla N64 with zero regression (VERIFIED South Clock Town,
      find its MM actorId + N64 objectId + the MM3D `/actor/zelda_*.zar` name.
   3. Add ONE `kModels[]` entry + make `MM3D_LookupModel` map that (actorId|objectId)→modelId 0.
      Auto-measure scale later; hardcode a first guess or reuse the `G_SOH3D_MEASURE` opcode.
-  4. `tools/mm_game.sh start`; screenshot; compare vs N64 + the Azahar 3DS oracle (coord-matched A/B).
+  4. `tools/mm_game.py start`; screenshot; compare vs N64 + the Azahar 3DS oracle (coord-matched A/B).
      Faithful-first: get ONE prop replaced + correctly scaled before any actorId/objectId auto table.
   5. Skinned actors come AFTER static props: hook `mm z_skelanime.c:313/421` (DrawOpa/DrawFlexOpa) to
      pose from live N64 joints (OoT does `SoH3D_DoRetarget`), an `SoH3D_GL_EmitPose` equivalent.

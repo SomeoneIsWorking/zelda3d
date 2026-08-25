@@ -4,7 +4,8 @@
 
 extern "C" {
 #include "z64.h"
-#include "functions.h"
+#include "functions/audio.h"
+#include "functions/ui.h"
 #include "macros.h"
 #include "variables.h"
 #include "overlays/misc/ovl_kaleido_scope/z_kaleido_scope.h"

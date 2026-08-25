@@ -24,12 +24,16 @@ extern "C" {
 // stale per-bone overrides first, so it is safe to call for every auto actor (no-op for actors with
 // no override row). Currently: head/torso tracking. (Facial/material overrides will extend this.)
 void Zelda3D_ApplyActorOverrides(int modelId, void* actor);
+void Zelda3D_SetBonePostRot(int modelId, int boneId, const float* matrix3x3);
+void Zelda3D_SetBoneRotDelta(int modelId, int boneId, float rx, float ry, float rz);
+void Zelda3D_ClearBoneRotDeltas(int modelId);
 
 // Feature gate (REPL `track`, env ZELDA3D_TRACK, default on) — lets the override be A/B'd live.
 extern int gZelda3dTrack;
 
 // Facial eye/mouth material-anim gate (REPL `facial`, env ZELDA3D_FACIAL, default on). Keystone #3.
 extern int gZelda3dFacial;
+extern int gZelda3dFaceForce;
 
 #ifdef __cplusplus
 }
