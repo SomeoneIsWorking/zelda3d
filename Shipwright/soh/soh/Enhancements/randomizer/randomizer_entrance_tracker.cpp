@@ -1,5 +1,6 @@
-#include "randomizer_entrance_tracker.h"
 #include "soh/OTRGlobals.h"
+#include "randomizer_entrance_tracker.h"
+
 #include "soh/cvar_prefixes.h"
 #include "soh/SohGui/SohGui.hpp"
 
@@ -12,7 +13,6 @@
 extern "C" {
 #include <z64.h>
 #include "variables.h"
-#include "functions.h"
 #include "macros.h"
 extern PlayState* gPlayState;
 

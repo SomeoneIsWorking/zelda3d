@@ -1,0 +1,23 @@
+// Native Zelda3D renderer instrumentation and draw isolation controls.
+#ifndef ZELDA3D_FAST_INSTRUMENTATION_H
+#define ZELDA3D_FAST_INSTRUMENTATION_H
+
+#ifdef __cplusplus
+extern "C" {
+#endif
+
+extern int gZelda3dTraceModelId;
+extern int gZelda3dStateCheck;
+extern int gZelda3dSgDrawOnly;
+extern int gZelda3dSgModelOnly;
+extern int gZelda3dSgDrawList;
+extern int g_sgDumpModel;
+
+long Zelda3D_GL_SubmitCount(int modelId);
+int Zelda3D_GeomScanDump(int* modelIds, float* mins, float* maxs, int capacity);
+
+#ifdef __cplusplus
+}
+#endif
+
+#endif // ZELDA3D_FAST_INSTRUMENTATION_H

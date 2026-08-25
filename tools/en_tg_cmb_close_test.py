@@ -23,8 +23,9 @@ LOG = os.path.join(REPO, "scratch/logs/run.log")
 
 def main():
     subprocess.run(
-        "ZELDA3D_HEADLESS=1 tools/zelda3d_game.sh restart 0xB1 0x8001",
-        shell=True, cwd=REPO, capture_output=True, text=True, timeout=90,
+        [sys.executable, "tools/zelda3d_game.py", "restart", "0xB1", "0x8001"],
+        env={**os.environ, "ZELDA3D_HEADLESS": "1"},
+        cwd=REPO, capture_output=True, text=True, timeout=90,
     )
     time.sleep(5)
     # Warm the actor set so EN_TG's draw path is exercised; a wide actorsnear tickles

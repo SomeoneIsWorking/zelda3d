@@ -4,7 +4,9 @@
 #include "init/ShipInit.hpp"
 
 extern "C" {
-#include "functions.h"
+#include "functions/audio.h"
+#include "functions/game_state.h"
+#include "functions/ui.h"
 #include "macros.h"
 #include "variables.h"
 

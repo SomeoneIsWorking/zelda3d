@@ -1,10 +1,14 @@
+#include "soh/OTRGlobals.h"
+#include "soh/host/item_randomizer_bridge.h"
 #include "randomizer.h"
+#include "randomizer_actor_check_resolution.h"
 #include <nlohmann/json.hpp>
 #include <fstream>
 #include <variables.h>
 #include <macros.h>
 #include <objects/gameplay_keep/gameplay_keep.h>
-#include <functions.h>
+#include "functions/game_state.h"
+#include "functions/ui.h"
 #include <libultraship/libultraship.h>
 #include <textures/icon_item_static/icon_item_static.h>
 #include <textures/icon_item_24_static/icon_item_24_static.h>
@@ -15,10 +19,9 @@
 #include <imgui_internal.h>
 #include "../../../src/overlays/actors/ovl_En_GirlA/z_en_girla.h"
 #include "randomizer_check_objects.h"
-#include <sstream>
 #include <tuple>
 #include "draw.h"
-#include "soh/OTRGlobals.h"
+
 #include <ship/window/FileDropMgr.h>
 #include "static_data.h"
 #include "soh/Enhancements/game-interactor/GameInteractor.h"
@@ -29,7 +32,6 @@
 #include "gui/Notification.h"
 #include "object/ObjectExtension.h"
 #include "soh/Enhancements/randomizer/RCToRandInf.h"
-
 extern "C" {
 #include "src/overlays/actors/ovl_Obj_Bean/z_obj_bean.h"
 
@@ -47,8 +49,6 @@ std::unordered_map<std::string, RandomizerCheckArea> SpoilerfileAreaNameToEnum;
 std::unordered_map<std::string, HintType> SpoilerfileHintTypeNameToEnum;
 std::set<RandomizerCheck> excludedLocations;
 std::set<RandomizerCheck> spoilerExcludedLocations;
-
-bool generated;
 
 bool Rando_HandleSpoilerDrop(char* filePath) {
     if (SohUtils::IsStringEmpty(filePath)) {
@@ -722,150 +722,8 @@ ItemObtainability Randomizer::GetItemObtainabilityFromRandomizerGet(RandomizerGe
     }
 }
 
-Rando::Location* Randomizer::GetCheckObjectFromActor(s16 actorId, s16 sceneNum, s32 actorParams = 0x00) {
-    RandomizerCheck specialRc = RC_UNKNOWN_CHECK;
-    // TODO: Migrate these special cases into table, or at least document why they are special
-    switch (sceneNum) {
-        case SCENE_TREASURE_BOX_SHOP: {
-            if ((actorId == ACTOR_EN_BOX && actorParams == 20170) ||
-                (actorId == ACTOR_ITEM_ETCETERA && actorParams == 2572)) {
-                specialRc = RC_MARKET_TREASURE_CHEST_GAME_REWARD;
-            }
-
-            // todo: handle the itemetc part of this so drawing works when we implement shuffle
-            if (actorId == ACTOR_EN_BOX) {
-                bool isAKey = (actorParams & 0x60) == 0x20;
-                if ((actorParams & 0xF) < 2) {
-                    specialRc = isAKey ? RC_MARKET_TREASURE_CHEST_GAME_KEY_1 : RC_MARKET_TREASURE_CHEST_GAME_ITEM_1;
-                } else if ((actorParams & 0xF) < 4) {
-                    specialRc = isAKey ? RC_MARKET_TREASURE_CHEST_GAME_KEY_2 : RC_MARKET_TREASURE_CHEST_GAME_ITEM_2;
-                } else if ((actorParams & 0xF) < 6) {
-                    specialRc = isAKey ? RC_MARKET_TREASURE_CHEST_GAME_KEY_3 : RC_MARKET_TREASURE_CHEST_GAME_ITEM_3;
-                } else if ((actorParams & 0xF) < 8) {
-                    specialRc = isAKey ? RC_MARKET_TREASURE_CHEST_GAME_KEY_4 : RC_MARKET_TREASURE_CHEST_GAME_ITEM_4;
-                } else if ((actorParams & 0xF) < 10) {
-                    specialRc = isAKey ? RC_MARKET_TREASURE_CHEST_GAME_KEY_5 : RC_MARKET_TREASURE_CHEST_GAME_ITEM_5;
-                }
-            }
-            break;
-        }
-        case SCENE_SACRED_FOREST_MEADOW:
-            if (actorId == ACTOR_EN_SA) {
-                specialRc = RC_SONG_FROM_SARIA;
-            }
-            break;
-        case SCENE_TEMPLE_OF_TIME_EXTERIOR_DAY:
-        case SCENE_TEMPLE_OF_TIME_EXTERIOR_NIGHT:
-        case SCENE_TEMPLE_OF_TIME_EXTERIOR_RUINS:
-            switch (actorParams) {
-                case 14342:
-                    specialRc = RC_TOT_LEFTMOST_GOSSIP_STONE;
-                    break;
-                case 14599:
-                    specialRc = RC_TOT_LEFT_CENTER_GOSSIP_STONE;
-                    break;
-                case 14862:
-                    specialRc = RC_TOT_RIGHT_CENTER_GOSSIP_STONE;
-                    break;
-                case 15120:
-                    specialRc = RC_TOT_RIGHTMOST_GOSSIP_STONE;
-                    break;
-            }
-            break;
-        case SCENE_HOUSE_OF_SKULLTULA:
-            if (actorId == ACTOR_EN_SSH) {
-                switch (actorParams) { // actor params are used to differentiate between textboxes
-                    case 1:
-                        specialRc = RC_KAK_10_GOLD_SKULLTULA_REWARD;
-                        break;
-                    case 2:
-                        specialRc = RC_KAK_20_GOLD_SKULLTULA_REWARD;
-                        break;
-                    case 3:
-                        specialRc = RC_KAK_30_GOLD_SKULLTULA_REWARD;
-                        break;
-                    case 4:
-                        specialRc = RC_KAK_40_GOLD_SKULLTULA_REWARD;
-                        break;
-                    case 5:
-                        specialRc = RC_KAK_50_GOLD_SKULLTULA_REWARD;
-                        break;
-                }
-            }
-            break;
-        case SCENE_KAKARIKO_VILLAGE:
-            switch (actorId) {
-                case ACTOR_EN_NIW_LADY:
-                    if (LINK_IS_ADULT) {
-                        specialRc = RC_KAK_ANJU_AS_ADULT;
-                    } else {
-                        specialRc = RC_KAK_ANJU_AS_CHILD;
-                    }
-            }
-            break;
-        case SCENE_LAKE_HYLIA:
-            switch (actorId) {
-                case ACTOR_ITEM_ETCETERA:
-                    if (LINK_IS_ADULT) {
-                        specialRc = RC_LH_SUN;
-                    } else {
-                        specialRc = RC_LH_UNDERWATER_ITEM;
-                    }
-            }
-            break;
-        case SCENE_ZORAS_FOUNTAIN:
-            switch (actorParams) {
-                case 15362:
-                case 14594:
-                    specialRc = RC_ZF_JABU_GOSSIP_STONE;
-                    break;
-                case 14849:
-                case 14337:
-                    specialRc = RC_ZF_FAIRY_GOSSIP_STONE;
-                    break;
-            }
-            break;
-        case SCENE_GERUDOS_FORTRESS:
-            // GF chest as child has different params and gives odd mushroom
-            // set it to the GF chest check for both ages
-            if (actorId == ACTOR_EN_BOX) {
-                specialRc = RC_GF_CHEST;
-            }
-            break;
-        case SCENE_DODONGOS_CAVERN:
-            // special case for MQ DC Gossip Stone
-            if (actorId == ACTOR_EN_GS && actorParams == 15892 && ResourceMgr_IsGameMasterQuest()) {
-                specialRc = RC_DODONGOS_CAVERN_GOSSIP_STONE;
-            }
-            break;
-        case SCENE_SHOOTING_GALLERY:
-            // special case for shooting gallery sign
-            if (actorId == ACTOR_EN_KANBAN) {
-                if (LINK_IS_ADULT) {
-                    specialRc = RC_KAK_SHOOTING_GALLERY_RECTANGLE_SIGN;
-                } else {
-                    specialRc = RC_MK_SHOOTING_GALLERY_RECTANGLE_SIGN;
-                }
-            }
-            break;
-    }
-
-    if (specialRc != RC_UNKNOWN_CHECK) {
-        return Rando::StaticData::GetLocation(specialRc);
-    }
-
-    auto range = Rando::StaticData::CheckFromActorMultimap.equal_range(std::make_tuple(actorId, sceneNum, actorParams));
-
-    for (auto it = range.first; it != range.second; ++it) {
-        if (Rando::StaticData::GetLocation(it->second)->GetQuest() == RCQUEST_BOTH ||
-            (Rando::StaticData::GetLocation(it->second)->GetQuest() == RCQUEST_VANILLA &&
-             !ResourceMgr_IsGameMasterQuest()) ||
-            (Rando::StaticData::GetLocation(it->second)->GetQuest() == RCQUEST_MQ && ResourceMgr_IsGameMasterQuest())) {
-            return Rando::StaticData::GetLocation(it->second);
-        }
-    }
-
-    return Rando::StaticData::GetLocation(RC_UNKNOWN_CHECK);
+Rando::Location* Randomizer::GetCheckObjectFromActor(s16 actorId, s16 sceneNum, s32 actorParams) {
+    return ResolveRandomizerCheckFromActor(actorId, sceneNum, actorParams);
 }
 
 // RANDOTODO: Move all Shopsanity stuff to a ShuffleShops.cpp
@@ -937,134 +795,8 @@ RandomizerCheck Randomizer::GetCheckFromRandomizerInf(RandomizerInf randomizerIn
     return RC_UNKNOWN_CHECK;
 }
 
-std::thread randoThread;
-
-void GenerateRandomizerImgui(std::string seed = "") {
-    CVarSetInteger(CVAR_GENERAL("RandoGenerating"), 1);
-    Ship::Context::GetRawInstance()->GetWindow()->GetGui()->SaveConsoleVariablesNextFrame();
-    auto ctx = Rando::Context::GetInstance();
-    // RANDOTODO proper UI for selecting if a spoiler loaded should be used for settings
-    Rando::Settings::GetInstance()->SetAllToContext();
-
-    // todo: this efficiently when we build out cvar array support
-    std::set<RandomizerCheck> excludedLocations;
-    std::stringstream excludedLocationStringStream(CVarGetString(CVAR_RANDOMIZER_SETTING("ExcludedLocations"), ""));
-    std::string excludedLocationString;
-    while (getline(excludedLocationStringStream, excludedLocationString, ',')) {
-        excludedLocations.insert((RandomizerCheck)std::stoi(excludedLocationString));
-    }
-
-    // todo: better way to sort out linking tricks rather than name
-
-    std::set<RandomizerTrick> enabledTricks;
-    std::stringstream enabledTrickStringStream(CVarGetString(CVAR_RANDOMIZER_SETTING("EnabledTricks"), ""));
-    std::string enabledTrickString;
-    while (getline(enabledTrickStringStream, enabledTrickString, ',')) {
-        if (Rando::StaticData::trickToEnum.contains(enabledTrickString)) {
-            enabledTricks.insert(Rando::StaticData::trickToEnum[enabledTrickString]);
-        }
-    }
-
-    // Update the visibilitiy before removing conflicting excludes (in case the locations tab wasn't viewed)
-    RandomizerCheckObjects::UpdateImGuiVisibility();
-
-    // Remove excludes for locations that are no longer allowed to be excluded
-    for (auto& location : Rando::StaticData::GetLocationTable()) {
-        auto elfound = excludedLocations.find(location.GetRandomizerCheck());
-        if (!ctx->GetItemLocation(location.GetRandomizerCheck())->IsVisible() && elfound != excludedLocations.end()) {
-            excludedLocations.erase(elfound);
-        }
-    }
-
-    Rando::Context::GetInstance()->SetSeedGenerated(GenerateRandomizer(excludedLocations, enabledTricks, seed));
-    CVarSetInteger(CVAR_GENERAL("RandoGenerating"), 0);
-    Ship::Context::GetRawInstance()->GetWindow()->GetGui()->SaveConsoleVariablesNextFrame();
-
-    generated = true;
-
-    GameInteractor::Instance->ExecuteHooks<GameInteractor::OnGenerationCompletion>();
-}
-
-bool GenerateRandomizer(std::string seed /*= ""*/) {
-    JoinRandoGenerationThread();
-    if (CVarGetInteger(CVAR_GENERAL("RandoGenerating"), 0) == 0) {
-        randoThread = std::thread(&GenerateRandomizerImgui, seed);
-        return true;
-    }
-    return false;
-}
-
-// Headless entry point for seed generation: start it and WAIT, so a caller with no frame loop and no
-// mouse can exercise the path. `tools/zelda3d_deep_check.sh` states in its own verdict that the rando
-// ownership paths go unexercised because no seed is generated -- the only trigger was an ImGui button.
-//
-// The report is written whether it worked or not, and carries the two facts that distinguish the
-// outcomes: whether generation was accepted at all (it declines while one is already running), and
-// whether the context says a seed EXISTS afterwards. "randogen: ok" with no numbers would be
-// indistinguishable from a generator that returned immediately having done nothing.
-//
-// `async` as the first word starts generation and returns immediately. That is the ONLY way to reach
-// the case DeinitOTR's join exists for -- a generation still in flight when the game ends -- because
-// the blocking form finishes it first. The reply says which form ran, so a run cannot be read as
-// covering the race when it covered the completed path.
-extern "C" void Zelda3D_RandoGenerateBlocking(const char* seed, char* out, int outSize) {
-    std::string seedStr = (seed != nullptr) ? seed : "";
-    bool wait = true;
-    if (seedStr.rfind("async", 0) == 0) {
-        wait = false;
-        seedStr = seedStr.substr(5);
-        while (!seedStr.empty() && seedStr.front() == ' ') {
-            seedStr.erase(seedStr.begin());
-        }
-    }
-    if (!GenerateRandomizer(seedStr)) {
-        snprintf(out, outSize, "randogen: DECLINED -- a generation is already running (RandoGenerating=%d)",
-                 CVarGetInteger(CVAR_GENERAL("RandoGenerating"), 0));
-        return;
-    }
-    if (!wait) {
-        snprintf(out, outSize, "randogen: ASYNC started, seed='%s' -- NOT waited for; this run covers the "
-                               "in-flight case, not a completed seed",
-                 seedStr.empty() ? "(random)" : seedStr.c_str());
-        return;
-    }
-    JoinRandoGenerationThread();
-    auto ctx = Rando::Context::GetInstance();
-    snprintf(out, outSize, "randogen: seed='%s' generated=%d hash='%s' seedString='%s'",
-             seedStr.empty() ? "(random)" : seedStr.c_str(), ctx->IsSeedGenerated() ? 1 : 0, ctx->GetHash().c_str(),
-             ctx->GetSeedString().c_str());
-}
-
 static bool locationsTabOpen = false;
 static bool tricksTabOpen = false;
-
-// Gated on joinable(), NOT on `generated`. `generated` is set at the END of the generation thread's
-// body, so it means "finished", not "started" -- and a generation still IN FLIGHT is precisely the
-// case that must not be left running. Both call sites had the `generated` test; on a seed that was
-// still generating, one would have started a second thread over a joinable member (std::terminate)
-// and the other would have returned with the thread alive.
-//
-// It also has to be CALLED, which it never was: `randoThread` is a file-scope std::thread, so a
-// generated seed left it joinable for the life of the process, and ~thread on a joinable thread is
-// std::terminate. Under one game per process, ending in _exit(0), nothing ever reached that
-// destructor. DeinitOTR calls this now, alongside the other thread stops.
-void JoinRandoGenerationThread() {
-    if (!randoThread.joinable()) {
-        // Said out loud. "Nothing to join" and "I was never called" are the same silence otherwise,
-        // and this function spent its whole life being the second one.
-        SPDLOG_INFO("JoinRandoGenerationThread: no generation thread to join.");
-        generated = false;
-        return;
-    }
-    // RandoGenerating is 1 for the duration of the thread body, so this distinguishes the case the
-    // join exists for -- a generation still RUNNING as the game ends -- from joining one that already
-    // finished. Without it, a clean async run cannot show which of the two it actually covered.
-    const bool inFlight = CVarGetInteger(CVAR_GENERAL("RandoGenerating"), 0) != 0;
-    SPDLOG_INFO("JoinRandoGenerationThread: joining the generation thread ({}).",
-                inFlight ? "IN FLIGHT -- waiting for it to finish" : "already finished");
-    randoThread.join();
-    generated = false;
-}
 
 class ExtendedVanillaTableInvalidItemIdException : public std::exception {
   private:

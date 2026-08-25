@@ -4,7 +4,8 @@
 
 extern "C" {
 #include "z64save.h"
-#include "functions.h"
+#include "functions/game_state.h"
+#include "functions/ui.h"
 extern PlayState* gPlayState;
 extern SaveContext gSaveContext;
 }

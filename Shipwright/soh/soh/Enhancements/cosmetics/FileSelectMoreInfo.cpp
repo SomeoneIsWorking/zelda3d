@@ -9,7 +9,7 @@
 #include "soh/SaveManager.h"
 #include "soh/frame_interpolation.h"
 #include "ship/utils/color.h"
-#include "functions.h"
+#include "functions/rendering.h"
 #include "macros.h"
 #include "variables.h"
 #include "src/overlays/gamestates/ovl_file_choose/file_choose.h"

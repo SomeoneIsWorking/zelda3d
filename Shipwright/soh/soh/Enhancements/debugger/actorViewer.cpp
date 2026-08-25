@@ -16,7 +16,7 @@
 #include <libultraship/bridge.h>
 #include <libultraship/libultraship.h>
 #include <spdlog/fmt/fmt.h>
-#include "soh/OTRGlobals.h"
+
 #include "soh/cvar_prefixes.h"
 #include "soh/ObjectExtension/ActorListIndex.h"
 
@@ -24,7 +24,9 @@ extern "C" {
 #include <z64.h>
 #include "z64math.h"
 #include "variables.h"
-#include "functions.h"
+#include "functions/actors.h"
+#include "functions/audio.h"
+#include "functions/math.h"
 #include "macros.h"
 extern PlayState* gPlayState;
 

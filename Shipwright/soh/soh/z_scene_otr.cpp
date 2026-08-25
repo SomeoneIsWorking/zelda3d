@@ -1,9 +1,16 @@
 #include "soh/Enhancements/game-interactor/GameInteractor_Hooks.h"
+#include "functions/boot.h"
 #include "ResourceManagerHelpers.h"
 #include <libultraship/libultraship.h>
 #include "soh/resource/type/Scene.h"
 #include <ship/utils/StringHelper.h>
 #include "global.h"
+#include "functions/actors.h"
+#include "functions/audio.h"
+#include "functions/collision.h"
+#include "functions/environment.h"
+#include "functions/math.h"
+#include "functions/player.h"
 #include "vt.h"
 #include "soh/resource/type/CollisionHeader.h"
 #include <fast/resource/type/DisplayList.h>

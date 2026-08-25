@@ -17,11 +17,12 @@ zelda   (base: N64-asset PC ports)          zelda3d  (our layer: 3DS-asset rende
 ```
 
 - **zelda3d is a layer on zelda, not a sibling.** The zelda3d code lives *inside* each engine
-  (`soh/src/zelda3d/`, `mm/2s2h/zelda3d/`) and falls through to the N64 (zelda) path for anything not
-  yet ported. `zelda3d` is also the C/C++ symbol prefix and namespace for that layer in BOTH engines.
+  (`Shipwright/soh/src/zelda3d/`, `2ship/2s2h/zelda3d/`) and falls through to the N64 (zelda) path
+  for anything not yet ported. `zelda3d` is also the C/C++ symbol prefix and namespace for that layer
+  in BOTH engines.
 - **soh3d / 2ship3d** name the two branches of the zelda3d layer. They are the human-facing project
   names; there is no separate "soh3d" or "2ship3d" build target — each is the zelda3d code within its
-  engine's target (`soh` / `mm`).
+  engine's core target (`soh_core` / `mm_core`).
 
 ## Where each part lives
 
@@ -34,18 +35,24 @@ zelda   (base: N64-asset PC ports)          zelda3d  (our layer: 3DS-asset rende
 | **zelda3d** | umbrella for the 3DS render layer + its shared code | see the two branches | `zelda3d` / `Zelda3D_` |
 | **soh3d** | OoT3D render layer (in soh) | `Shipwright/soh/src/zelda3d/` | `zelda3d_*` / `Zelda3D_` |
 | **2ship3d** | MM3D render layer (in 2ship) | `2ship/2s2h/zelda3d/` | `mm3d_*` / `Zelda3D_` |
-| shared zelda3d | unified Link/player across soh3d + 2ship3d | `Shipwright/zelda3d_shared/` | `Zelda3D_` |
+| shared zelda3d | cross-game audio, extractor, GUI, init, object, player, port, and third-party support | `Shipwright/zelda3d_shared/` | `Zelda3D_` |
 | shared zelda3d | CMB (3DS model/texture format) library | `Shipwright/cmb3d/` | `cmb3d` |
 | reference | OoT3D decomp (ground truth for soh3d) | `oot3d-decomp/` (submodule) | — |
 | reference | MM3D decomp (ground truth for 2ship3d) | `mm3d-decomp/` (submodule) | — |
 
-Build targets: `soh` (→ `Shipwright/build-cmake/soh/soh.elf`) and `mm`
-(→ `Shipwright/build-cmake/mm/mm.elf`). Run via `tools/zelda3d_game.sh` (soh) / `tools/mm_game.sh` (mm).
+Shipping target: `zelda3d_app` builds the one launcher plus `soh_core` and `mm_core`; there are no
+per-game executables. Run via `./run.sh`; headless managers are `tools/zelda3d_game.sh` (soh) and
+`tools/mm_game.py` (mm).
 
 ## The build layering — one runtime, one engine, two peer games
 
-The configure root is the **repo root** (`/CMakeLists.txt`). Configure with `cmake -S . -B
+The configure root is the **repo root** (`CMakeLists.txt`). Configure with `cmake -S . -B
 Shipwright/build-cmake -G Ninja`.
+
+Build-time ROM extraction/header generation and shipping runtime archives are separate CMake
+responsibilities. `cmake/Zelda3DAssetExtraction.cmake` owns developer ROM extraction and generated
+headers; `cmake/Zelda3DRuntimeArchives.cmake` always regenerates the current `soh.o2r` and
+`2ship.o2r` consumed by the launcher target. The launcher build validates both runtime artifacts.
 
 ```
 launcher   Shipwright/zelda3d_app     one binary; dlopens a game core, holds no game code
@@ -62,6 +69,91 @@ engine     Shipwright/libultraship    window/renderer/input/resources — knows 
 This mirrors Dusklight's `aurora` (engine) / `borealis` (app services) / `dusk` (port layer) /
 decomp split — see `docs/dusklight-adoption.md`. The layer Dusklight has no need for is **shared**:
 it hosts one game, we host two.
+
+### Source ownership and size are separate gates
+
+Every first-party source file owns one cohesive responsibility and exposes a narrow interface. The
+normal ceiling is 1,200 lines, but being shorter does not excuse a grab-bag: actor-specific policy,
+I/O, diagnostics, state machines, and orchestration still need their own owners. Entry points,
+registries, and routers compose those modules and do not absorb their implementations.
+
+`tools/verify_clang.py` enforces the size half for first-party C, C++, headers, and Python. It
+rejects new legacy ceilings, rejects growth in touched legacy decomp seams, and requires every
+existing ceiling to ratchet down after an extraction. Files above 2,000 lines are critical
+extraction territory. The codemap records the separate responsibility audit because a line counter
+cannot identify mixed ownership.
+
+Current application boundaries:
+
+- `behaviors/actor_behavior.*` owns actor dispatch/lifecycle seams. Each actor owns its behavior;
+  complex actors use a same-named directory of cohesive internals. Flying Volvagia, for example,
+  keeps render orchestration in `boss_fd.cpp` while authored flight/history, forced controls,
+  effects, shared profile, and history layout live under `behaviors/actor/boss_fd/`.
+- `behaviors/camera/at_default.*` owns the recovered camera-at Y-bias producer/consumer;
+  `at_default_policy.*` owns its pure slope/get-item branch rule. The large Player and camera decomp
+  files contain only narrow typed call sites, and `Shipwright/soh/tests/` tests the production
+  policy without creating a game dependency in libultraship.
+- `behaviors/title/title_presentation.cpp` is a composition-only presenter. Activity, camera,
+  rider state/motion, atmosphere, lighting, and overlay presentation live in focused title owners.
+- MM's `zelda3d/repl/` is a composed in-game REPL: `mm3d_repl.*` wires focused transport, framing,
+  lifecycle, parser, router, world, scene, model, and Link owners. Typed Player mutations remain in
+  `mm3d_player_force.*`, outside the command surface that invokes them.
+- Animation responsibilities are explicit: `automatic_playback.*`, pose evaluation, inspection,
+  tracking and submission, and `skeleton_draw_bridge.*` remain separate from the legacy
+  retarget/override owners.
+- `core/zelda3d.c` and `player/zelda3d_link.cpp` are composition-only entry points. Runtime,
+  diagnostics, control, scene policy, Link draw, retarget, pose scan, mid-mask, and player REPL work
+  live in responsibility-named sibling modules. The former renderer monolith is deleted; shipping
+  hooks call focused render owners directly, while `render_lifecycle.*` owns run-boundary reset
+  orchestration only.
+- Top-level `zelda3d.h` is compatibility-only: it contains no declarations and includes focused
+  subsystem headers for legacy call sites. New code includes the header owned by what it consumes.
+- `Shipwright/soh/include/functions.h` follows the same rule for the vendored engine API: it is a
+  declaration-free compatibility umbrella over responsibility headers in `include/functions/`.
+- The former Fast renderer `zelda3d_gl` contract is deleted. Consumers include one of nine focused
+  owners: model types, model provider, submission, pose, material overrides, lighting, fog,
+  instrumentation, or render control. Frame capture, SDL, and UBO remain their own contracts.
+- The SDL3GPU model renderer mirrors that boundary internally: `zelda3d_sdl3gpu.cpp` is only the
+  stable C ABI adapter; model/texture upload caches, shader/pipeline caches, pass recording and
+  diagnostics, device teardown, and shader source/compilation each have a responsibility-named
+  sibling. The private internal header exposes only the provider, pipeline-policy, and submission-
+  probe seams needed between those owners.
+- RmlUi Zelda3D menu state, input automation, launcher, diagnostics, and registry bridges live in
+  separate `Zelda3D*Bridge`/`Zelda3DRmlUiRegistry` owners; randomizer actor-check resolution,
+  generation bridge, lifecycle, and policy likewise live outside `randomizer.cpp`.
+
+### Tooling ownership follows the same composition rule
+
+- `tools/soh3d_harness/main.cpp` composes focused libretro, lockstep, state/probe, comparison,
+  capture, REPL, watchdog, and process-lifetime modules; it contains no subsystem implementation.
+  SoH state is split into typed play/environment/player/actor/input/warp/lighting/camera/animation
+  owners, and oracle comparisons are split by scene, player, camera, skeleton, lighting, and title
+  actor responsibility.
+- `tools/harness_cli.py` is the public harness client; allocator, build, cache, gameplay, headless
+  display, paths, process, ROM environment, runtime inputs, transport, and shared repository
+  environment each have focused Python owners. The former `harness_ctl.py` facade is deleted.
+- `soh/src/zelda3d/repl/zelda3d_repl.cpp` is a 105-line command router over focused
+  `repl/commands/` owners; FIFO lifecycle and resettable run state live outside it in their own
+  modules.
+- MM process ownership, FIFO framing, manifest/path policy, launch, lease, lifecycle, error, and
+  test-fixture responsibilities live in direct `mm_runtime_*` owners; the former `mm_runtime.py`
+  facade is deleted. Phase sessions, artifacts, orchestration, catalog, and report parsing are
+  separate, with `mm_phase_tour.py` limited to CLI wiring. The shared FIFO wire format belongs to libultraship's
+  `bridge/fifo_rpc.h`, not to either game. The MM in-game REPL mirrors that separation under
+  `2ship/2s2h/zelda3d/repl/` rather than duplicating those external-tool responsibilities.
+- `tools/gen_mm_animmap.py` composes archive, inventory, matching, types, defaults, C-table emission,
+  coverage, report, paths, and verification owners while retaining cohesive build iteration and CLI
+  orchestration.
+- `tools/verify_clang.py` composes source-structure, compilation-database, format, and tidy owners
+  under `tools/clang_verifier/`. C/C++/header/Python structure is checked independently of which
+  files clang-tidy compiles.
+- `tools/cmake_build_policy.py` is the single shared CMake cache, Clang, Ninja, and configure-policy
+  owner used by launcher and harness builds; those entry points do not duplicate build policy.
+- `Shipwright/libultraship/tools/dlist_harness/dlist_harness.cpp` is a 101-line composition entry
+  point. CLI parsing/model selection, generic fixtures, Zelda3D fixtures, recording-renderer
+  instrumentation, the headless window backend, SDL3GPU headless setup, framebuffer-to-PPM output,
+  and shared fixture/interpreter state have focused owners beside it. The dead OpenGL/EGL harness
+  path is deleted; `--gpu` exercises SDL3GPU.
 
 **Until 2026-08-06 the configure root was `Shipwright/CMakeLists.txt` — OoT's own directory** — and
 it reached out of its tree with `add_subdirectory(${CMAKE_SOURCE_DIR}/../2ship)`. That was not just
@@ -289,7 +381,8 @@ What remains, in ascending cost:
    `gEventLog.*`, `gModes.*`, `gFixes.*` — MM-only, and unifying the namespace would corrupt both
    games' configs.
 
-**Size it against `strings mm.elf`, not against a source grep** (claim C073). Five of the ten "bare
+**Size it against the shipping binary (`strings Shipwright/build-cmake/mm/libmm_core.so`), not
+against a source grep** (claim C073). Five of the ten "bare
 globals needing migration" are dead code inside `BenPort.cpp`'s `#if 0` and never reach the binary —
 the whole `gLed*` family, plus `gA11yTTS` and `gCrowdControl` — as are the three
 `gCosmetics.Link_*Tunic.Value` literals, so the binary holds 3 `gCosmetics.*` strings where the
@@ -313,16 +406,15 @@ code name we deliberately do NOT rename:
 - **2ship = the vendored `2s2h`.** "2 Ship 2 Harkinian" is the upstream MM PC port; its own dir and
   code use `2s2h`/`mm` (660+ files). We keep `2s2h`/`mm` in code (renaming would diverge hard from the
   upstream tree for no functional gain) and use **2ship** as the canonical human-facing name in prose.
-- **2ship3d = the MM3D render layer** at `mm/2s2h/zelda3d/`, whose files carry the `mm3d_*` prefix.
+- **2ship3d = the MM3D render layer** at `2ship/2s2h/zelda3d/`, whose files carry the `mm3d_*` prefix.
   `2ship3d`/`mm3d` refer to the same thing; prefer **2ship3d** in prose, `mm3d_*` stays the file prefix.
 - **zelda3d** is BOTH the umbrella concept AND the literal code prefix/namespace (`Zelda3D_*`,
   `src/zelda3d/`) — it is shared by soh3d and 2ship3d, which is why the prefix is engine-neutral.
 - **soh3d** is the OoT3D layer; its files carry the umbrella `zelda3d_*` prefix (they live in
   `soh/src/zelda3d/`). "soh3d" is the branch name, `zelda3d_*` the file prefix — not a contradiction.
 
-The repo/working dir and the GitHub repo are named `soh3d` for historical reasons (the OoT work came
-first); it now hosts both soh3d and 2ship3d under the zelda3d umbrella. Renaming the repo to `zelda3d`
-would better reflect that but is disruptive (remote URL, `.env`, all tooling paths) — not done.
+The workspace and GitHub repository are named `zelda3d`; they host both soh3d and 2ship3d under the
+zelda3d umbrella.
 
 ## Code names — RESOLVED: keep the embedded names, no renames
 

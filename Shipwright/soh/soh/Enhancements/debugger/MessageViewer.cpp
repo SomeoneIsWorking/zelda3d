@@ -1,14 +1,15 @@
 #include "MessageViewer.h"
+#include "functions/boot.h"
 
 #include "soh/SohGui/UIWidgets.hpp"
 #include "soh/SohGui/SohGui.hpp"
 #include "soh/SohGui/SohMenu.h"
-#include "soh/OTRGlobals.h"
+
 
 #include <textures/message_static/message_static.h>
 
 #include "../custom-message/CustomMessageManager.h"
-#include "functions.h"
+#include "functions/rendering.h"
 #include "macros.h"
 #include "soh/cvar_prefixes.h"
 #include "message_data_static.h"

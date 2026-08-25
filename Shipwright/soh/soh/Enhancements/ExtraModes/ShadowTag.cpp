@@ -1,8 +1,7 @@
 #include <libultraship/bridge.h>
 #include "soh/Enhancements/game-interactor/GameInteractor_Hooks.h"
 #include "init/ShipInit.hpp"
-#include "functions.h"
-
+#include "functions/actors.h"
 extern "C" PlayState* gPlayState;
 
 static constexpr int32_t CVAR_SHADOW_TAG_DEFAULT = 0;

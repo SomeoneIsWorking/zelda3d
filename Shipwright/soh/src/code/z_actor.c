@@ -9,7 +9,6 @@
 #include "objects/object_bdoor/object_bdoor.h"
 #include "object/ObjectExtension.h"
 #include "soh/ObjectExtension/ActorListIndex.h"
-#include "zelda3d/zelda3d.h"
 #include "soh/frame_interpolation.h"
 #include "soh/Enhancements/cosmetics/cosmeticsTypes.h"
 #include "soh/Enhancements/game-interactor/GameInteractor.h"
@@ -17,7 +16,6 @@
 #include "soh/Enhancements/nametag.h"
 
 #include "soh/ActorDB.h"
-#include "soh/OTRGlobals.h"
 
 #include <string.h>
 #include <stdlib.h>
@@ -2700,6 +2698,7 @@ void Actor_UpdateAll(PlayState* play, ActorContext* actorCtx) {
                         actor->colorFilterTimer--;
                     }
                     if (GameInteractor_ShouldActorUpdate(actor)) {
+                        Zelda3D_ActorBehaviorPreUpdate(play, actor);
                         actor->update(actor, play);
                         GameInteractor_ExecuteOnActorUpdate(actor);
                         Zelda3D_ActorPostUpdate(play, actor); // generic actor-control debug override
@@ -2708,7 +2707,6 @@ void Actor_UpdateAll(PlayState* play, ActorContext* actorCtx) {
                 }
 
                 CollisionCheck_ResetDamage(&actor->colChkInfo);
-
                 actor = actor->next;
             }
         }

@@ -6,7 +6,8 @@
 
 extern "C" {
 #include "variables.h"
-#include "functions.h"
+#include "functions/audio.h"
+#include "functions/game_state.h"
 #include "macros.h"
 extern PlayState* gPlayState;
 GetItemEntry ItemTable_RetrieveEntry(s16 modIndex, s16 getItemID);

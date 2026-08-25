@@ -1,7 +1,8 @@
 #!/usr/bin/env python3
 """GPU regression test for the SDL3-GPU skinned-draw crash (TDD oracle).
 
-Root cause this guards against: the Zelda3D skinned-model vertex shader (zelda3d_sdl3gpu.cpp `kVert`)
+Root cause this guards against: the Zelda3D skinned-model vertex shader
+(`zelda3d_sdl3gpu_shaders.cpp` `kVertTemplate`)
 declares TWO vertex uniform buffers — set=1 binding=0 `UBO` (common) and set=1 binding=1 `UBOBones`
 (bone matrices) — but the shader was created with `num_uniform_buffers = 1`. The pipeline layout then
 had no descriptor slot for `bones`, so every skinned draw bound an unbacked descriptor. At
@@ -31,19 +32,18 @@ Usage: tools/gpu_validation_test.py [entrance] [time]
 """
 import os, re, subprocess, sys, time, signal, pathlib
 
+from rom_provision import provision_n64_extraction_rom, resolve_rom_environment
+
 REPO = pathlib.Path(__file__).resolve().parent.parent
 # ONE program binary now runs both games; this test always runs OoT (`zelda3d oot`). SOH_DIR is
 # the OoT core's own asset directory -- the launcher resolves it as its build-tree sibling, same as
-# tools/zelda3d_game.sh, so ROM provisioning (done client-side here, not by the launcher) targets
+# tools/zelda3d_game.py, so ROM provisioning (done client-side here, not by the launcher) targets
 # the right place. We still cd there before exec, matching the other launch scripts' convention.
 ZELDA3D_BIN = pathlib.Path(os.environ.get("ZELDA3D_SOH", str(REPO / "Shipwright/build-cmake/zelda3d/zelda3d")))
 SOH_DIR = REPO / "Shipwright/build-cmake/soh"
 FIFO = REPO / "scratch/zelda3d.ctl"
 REPL = REPO / "tools/zelda3d_repl.py"
 LOGDIR = REPO / "scratch/logs"
-
-entrance = sys.argv[1] if len(sys.argv) > 1 else "238"
-daytime = sys.argv[2] if len(sys.argv) > 2 else "0x8000"
 
 # Validation messages that ARE the bug-under-test (and its descriptor/layout kin). Substring match.
 FATAL_VALIDATION = [
@@ -67,19 +67,14 @@ def ensure_xvfb():
 
 
 def provision_roms():
-    """Resolve ZELDA3D_OOT3D_ROM / ZELDA3D_OOT_ROM via the shared rom_provision.sh (env -> .env -> drop-in),
-    exactly like tools/zelda3d_game.sh. Without the 3DS ROM no OoT3D model loads -> no skinned draw."""
-    sohdir = str(SOH_DIR)
-    script = (f'. "{REPO}/tools/rom_provision.sh"; '
-              f'zelda3d_provision_roms "{REPO}" "{sohdir}"; '
-              f'printf "%s\\n%s\\n" "${{ZELDA3D_OOT3D_ROM:-}}" "${{ZELDA3D_OOT_ROM:-}}"')
-    out = subprocess.run(["bash", "-c", script], capture_output=True, text=True).stdout.splitlines()
-    roms = {}
-    if len(out) >= 1 and out[0].strip():
-        roms["ZELDA3D_OOT3D_ROM"] = out[0].strip()
-    if len(out) >= 2 and out[1].strip():
-        roms["ZELDA3D_OOT_ROM"] = out[1].strip()
-    return roms
+    """Resolve ROMs through the shipping Python policy used by every launcher."""
+    environment = resolve_rom_environment(REPO, os.environ)
+    provision_n64_extraction_rom(SOH_DIR, environment)
+    return {
+        name: environment[name]
+        for name in ("ZELDA3D_OOT3D_ROM", "ZELDA3D_OOT_ROM")
+        if environment.get(name)
+    }
 
 
 def read_geomscan():
@@ -92,7 +87,7 @@ def read_geomscan():
     return int(m.group(1)) if m else None
 
 
-def launch(roms, extra_env, logname):
+def launch(roms, extra_env, logname, entrance, daytime):
     for f in (FIFO, pathlib.Path(str(FIFO) + ".out")):
         f.unlink(missing_ok=True)
     env = {**os.environ, "DISPLAY": ":99", "XAUTHORITY": "/dev/null", "SDL_VIDEODRIVER": "x11",
@@ -125,9 +120,11 @@ def kill(proc):
         pass
 
 
-def phase1_stability(roms):
+def phase1_stability(roms, entrance, daytime):
     """Hard gate: default renderer must survive sustained skinned-model rendering and keep drawing."""
-    proc, log = launch(roms, {}, "gpu_regression_phase1.log")
+    proc, log = launch(
+        roms, {}, "gpu_regression_phase1.log", entrance, daytime
+    )
     draws = 0
     try:
         if not wait_repl(proc):
@@ -160,12 +157,17 @@ def phase1_stability(roms):
     return 0, f"phase 1 OK: no crash, {draws} Zelda3D draws sustained"
 
 
-def phase2_validation(roms):
+def phase2_validation(roms, entrance, daytime):
     """Vulkan validation layer names the descriptor/layout bug explicitly. Forces serial software
     rasterization (LP_NUM_THREADS=0) so the async multi-thread execution race can't crash the run
     before validation (a record-time check) is read. Returns (fail: bool, message)."""
-    proc, log = launch(roms, {"ZELDA3D_SDL3GPU_DEBUG": "1", "LP_NUM_THREADS": "0"},
-                       "gpu_regression_phase2.log")
+    proc, log = launch(
+        roms,
+        {"ZELDA3D_SDL3GPU_DEBUG": "1", "LP_NUM_THREADS": "0"},
+        "gpu_regression_phase2.log",
+        entrance,
+        daytime,
+    )
     draws = 0
     try:
         if wait_repl(proc):
@@ -198,7 +200,12 @@ def phase2_validation(roms):
     return False, f"phase 2 OK: validation clean across {draws} draws"
 
 
-def main():
+def main(arguments=None):
+    args = list(sys.argv[1:] if arguments is None else arguments)
+    if len(args) > 2:
+        raise ValueError("usage: gpu_validation_test.py [entrance] [time]")
+    entrance = args[0] if args else "238"
+    daytime = args[1] if len(args) > 1 else "0x8000"
     ensure_xvfb()
     roms = provision_roms()
     if "ZELDA3D_OOT3D_ROM" not in roms:
@@ -206,12 +213,12 @@ def main():
               file=sys.stderr)
         return 2
 
-    code, msg = phase1_stability(roms)
+    code, msg = phase1_stability(roms, entrance, daytime)
     print(msg, file=sys.stderr if code else sys.stdout)
     if code:
         return code
 
-    fail, vmsg = phase2_validation(roms)
+    fail, vmsg = phase2_validation(roms, entrance, daytime)
     print(vmsg, file=sys.stderr if fail else sys.stdout)
     if fail:
         return 1

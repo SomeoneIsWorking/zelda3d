@@ -122,7 +122,7 @@ tune offline constants to match.
 6. Verify live across scenes (Kokiri, Market, Kakariko, a dungeon; day+night) vs oracle. Pixel-diff.
 
 Tools: `scratch/lightport/mat_probe.py` (material+combiner dump), `tools/cmb.py`/`zsi.py`/`ctr_romfs.py`
-(ROM decode), the embedded-Azahar harness (`tools/harness_ctl.py`), live SoH3D (skill soh3d-game-control).
+(ROM decode), the embedded-Azahar harness (`tools/harness_cli.py`), live SoH3D (skill soh3d-game-control).
 
 ---
 

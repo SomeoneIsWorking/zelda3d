@@ -1,7 +1,7 @@
 // cmb_glgroups — the game-agnostic CMB -> renderer bridge.
 //
 // Turns a parsed Zelda3D::Cmb (3DS model) into the libultraship renderer's POD
-// contract (Zelda3DGlGroup / Zelda3DGlTex, from <fast/zelda3d_gl.h>): per-material draw
+// contract (Zelda3DGlGroup / Zelda3DGlTex, from <fast/zelda3d_model_types.h>): per-material draw
 // batches + decoded RGBA textures (with hi-res-pack substitution). This is pure
 // geometry/material translation with NO decomp coupling, so BOTH games (OoT via
 // soh, MM via mm) share the one converter instead of each re-implementing it.
@@ -15,7 +15,7 @@
 #include <utility>
 #include <vector>
 
-#include <fast/zelda3d_gl.h> // Zelda3DGlGroup / Zelda3DGlVtx / Zelda3DGlTex (renderer POD contract)
+#include <fast/zelda3d_model_types.h>
 
 #include "cmb.h"
 

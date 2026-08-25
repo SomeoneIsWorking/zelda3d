@@ -1,11 +1,11 @@
 #include "2s2h/Enhancements/FrameInterpolation/FrameInterpolation.h"
 #include "init/ShipInit.hpp"
+#include "overlays/actors/ovl_player_actor/z_player_overlay.h"
 
 extern "C" {
 #include "assets/interface/parameter_static/parameter_static.h"
 #include "src/overlays/kaleido_scope/ovl_kaleido_scope/z_kaleido_scope.h"
 
-void Player_UseItem(PlayState* play, Player* player, ItemId item);
 void func_8082E1F0(Player* player, u16 sfxId);
 PlayerItemAction Player_ItemToItemAction(Player* player, ItemId item);
 }

@@ -22,8 +22,8 @@
 #include "asset/lzs.h"
 #include "asset/zcol.h"
 
-#include "mm3d_draw.h"   // Zelda3D_MM_SceneName — one owner for the sceneNum -> MM3D name table
-#include "mm3d_model.h"  // Zelda3D_MM_Rom — the shared CtrRom handle
+#include "mm3d_draw.h" // Zelda3D_MM_SceneName — one owner for the sceneNum -> MM3D name table
+#include "mm3d_model_store.h"
 
 namespace {
 
@@ -121,8 +121,9 @@ extern "C" CollisionHeader* Zelda3D_MM_BuildSceneCollision(PlayState* play, Coll
     // CollisionPoly stores 13-bit vertex indices, so a scene past 8192 verts cannot be expressed.
     // Report and fall back rather than silently truncating into wrong geometry.
     if (V.size() >= 8192 || P.size() >= 65535) {
-        fprintf(stderr, "[MM3D-COL] %s: %zu verts / %zu polys exceeds the collision index budget — "
-                        "using N64 collision for this scene\n",
+        fprintf(stderr,
+                "[MM3D-COL] %s: %zu verts / %zu polys exceeds the collision index budget — "
+                "using N64 collision for this scene\n",
                 path.c_str(), V.size(), P.size());
         return nullptr;
     }
@@ -146,8 +147,10 @@ extern "C" CollisionHeader* Zelda3D_MM_BuildSceneCollision(PlayState* play, Coll
         sVtx[i].z = V[i].z;
         const s16 c[3] = { V[i].x, V[i].y, V[i].z };
         for (int k = 0; k < 3; k++) {
-            if (i == 0 || c[k] < lo[k]) lo[k] = c[k];
-            if (i == 0 || c[k] > hi[k]) hi[k] = c[k];
+            if (i == 0 || c[k] < lo[k])
+                lo[k] = c[k];
+            if (i == 0 || c[k] > hi[k])
+                hi[k] = c[k];
         }
     }
     for (size_t k = 0; k < P.size(); k++) {
@@ -190,8 +193,7 @@ extern "C" CollisionHeader* Zelda3D_MM_BuildSceneCollision(PlayState* play, Coll
     }
 
     sDiverted = 1;
-    fprintf(stderr, "[MM3D-COL] %s: %zu verts, %zu polys, %zu surface types (N64 was %u/%u)\n",
-            path.c_str(), V.size(), P.size(), S.size(), n64 ? n64->numVertices : 0,
-            n64 ? n64->numPolygons : 0);
+    fprintf(stderr, "[MM3D-COL] %s: %zu verts, %zu polys, %zu surface types (N64 was %u/%u)\n", path.c_str(), V.size(),
+            P.size(), S.size(), n64 ? n64->numVertices : 0, n64 ? n64->numPolygons : 0);
     return sHeader;
 }

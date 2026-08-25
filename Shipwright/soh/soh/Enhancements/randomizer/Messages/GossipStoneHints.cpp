@@ -2,13 +2,14 @@
  * This file handles the custom messages for Gossip Stone
  * hints.
  */
-#include <soh/OTRGlobals.h>
+
+#include "soh/OTRGlobals.h"
 #include "soh/Enhancements/randomizer/randomizer.h"
 
 extern "C" {
 extern PlayState* gPlayState;
 #include <macros.h>
-#include <functions.h>
+#include "functions/player.h"
 #include <variables.h>
 }
 

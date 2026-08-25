@@ -12,7 +12,6 @@
 
 extern "C" {
 #include "macros.h"
-#include "functions.h"
 #include "variables.h"
 extern PlayState* gPlayState;
 uint64_t GetUnixTimestamp();

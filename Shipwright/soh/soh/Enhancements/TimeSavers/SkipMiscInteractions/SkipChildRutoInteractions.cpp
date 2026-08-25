@@ -1,4 +1,7 @@
 #include "soh/Enhancements/game-interactor/GameInteractor.h"
+#include "functions/actors.h"
+#include "functions/animation.h"
+#include "functions/game_state.h"
 #include "soh/Enhancements/randomizer/SeedContext.h"
 #include "init/ShipInit.hpp"
 

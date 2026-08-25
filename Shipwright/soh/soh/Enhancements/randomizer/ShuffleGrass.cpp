@@ -1,4 +1,8 @@
-#include <soh/OTRGlobals.h>
+
+#include "soh/OTRGlobals.h"
+#include "functions/actors.h"
+#include "functions/game_state.h"
+#include "functions/rendering.h"
 #include "soh_assets.h"
 #include "static_data.h"
 #include "item_category_adj.h"

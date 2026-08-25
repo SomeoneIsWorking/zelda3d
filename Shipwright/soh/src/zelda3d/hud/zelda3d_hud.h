@@ -96,8 +96,7 @@ enum {
 // (Y down, height 240, X extended for widescreen — exactly what OTRGetDimensionFrom*Edge returns).
 // `tex` must be a persistent RGBA32 buffer; its address doubles as the upload cache key, so pass the
 // same pointer each frame. `primRGBA` is the N64 PRIM colour, alpha included (the interfaceCtx fade).
-void Zelda3D_HudQuad(const void* tex, int texW, int texH, float x, float y, float w, float h,
-                     unsigned int primRGBA);
+void Zelda3D_HudQuad(const void* tex, int texW, int texH, float x, float y, float w, float h, unsigned int primRGBA);
 
 // The full form: a source sub-rect in texture pixels plus the combine.
 //
@@ -107,8 +106,8 @@ void Zelda3D_HudQuad(const void* tex, int texW, int texH, float x, float y, floa
 // a 24px strip across the whole bar. Pass the rect the N64 call actually samples; a source rect
 // larger than the texture TILES it (the renderer switches to a repeat sampler when UVs leave [0,1]),
 // and sw or sh may be negative to mirror, which is how the bar's right cap is drawn.
-void Zelda3D_HudQuadEx(const void* tex, int texW, int texH, int sx, int sy, int sw, int sh, float x, float y,
-                       float w, float h, unsigned int primRGBA, unsigned int envRGB, int mode);
+void Zelda3D_HudQuadEx(const void* tex, int texW, int texH, int sx, int sy, int sw, int sh, float x, float y, float w,
+                       float h, unsigned int primRGBA, unsigned int envRGB, int mode);
 
 // Decode an N64-format HUD texture to a persistent RGBA32 buffer the Quad* calls can draw, or NULL
 // if it cannot be decoded. Most HUD sources are neither RGBA32 nor one of our own runtime buffers:

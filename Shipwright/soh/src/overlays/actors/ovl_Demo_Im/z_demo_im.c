@@ -10,7 +10,7 @@
 #include "scenes/indoors/nakaniwa/nakaniwa_scene.h"
 #include "objects/object_im/object_im.h"
 #include "vt.h"
-#include "soh/OTRGlobals.h"
+
 #include "soh/ResourceManagerHelpers.h"
 #include "soh/Enhancements/game-interactor/GameInteractor_Hooks.h"
 

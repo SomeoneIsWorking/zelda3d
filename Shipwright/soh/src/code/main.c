@@ -6,7 +6,7 @@
 #include "global.h"
 #include "vt.h"
 #include "stdio.h"
-#include "soh/OTRGlobals.h"
+
 
 s32 gScreenWidth = SCREEN_WIDTH;
 s32 gScreenHeight = SCREEN_HEIGHT;

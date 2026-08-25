@@ -38,6 +38,9 @@ extern int gZelda3dMmColliderPass;
 // ONE renderer and ONE pass; no per-game copy and no separate Zelda3D render-pass drain.
 int Zelda3D_TryDrawActor(PlayState* play, Actor* actor);
 
+// Emit one resolved model using the MM decomp display-list/matrix macros.
+void Zelda3D_MM_EmitModelDraw(void* play, void* actor, int modelId, float worldScale, float groundOffset);
+
 // Per-room scene divert (MM analog of the OoT implementation). Returns 1 when the
 // current MM scene has an MM3D room CMB registered and this call drew it — caller
 // then skips the N64 room mesh. Currently returns 0 unconditionally (no MM3D scene

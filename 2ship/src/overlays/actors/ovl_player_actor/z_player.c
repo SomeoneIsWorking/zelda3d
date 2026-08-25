@@ -50,6 +50,7 @@
 #include "2s2h/GameInteractor/GameInteractor.h"
 #include "2s2h/CustomMessage/CustomMessage.h"
 #include <libultraship/bridge/consolevariablebridge.h>
+#include "z_player_overlay.h"
 
 void Player_Init(Actor* thisx, PlayState* play);
 void Player_Destroy(Actor* thisx, PlayState* play);
@@ -71,8 +72,6 @@ s32 Player_StartFishing(PlayState* play);
 void func_8085B170(PlayState* play, Player* this);
 s32 func_8083A658(PlayState* play, Player* this);
 void Player_InitItemAction(PlayState* play, Player* this, PlayerItemAction itemAction);
-
-void Player_UseItem(PlayState* play, Player* this, ItemId item);
 
 void func_80836988(Player* this, PlayState* play);
 
@@ -205,7 +204,6 @@ void Player_Action_82(Player* this, PlayState* play);
 void Player_Action_83(Player* this, PlayState* play);
 void Player_Action_84(Player* this, PlayState* play);
 void Player_Action_85(Player* this, PlayState* play);
-void Player_Action_86(Player* this, PlayState* play);
 void Player_Action_87(Player* this, PlayState* play);
 void Player_Action_88(Player* this, PlayState* play);
 void Player_Action_89(Player* this, PlayState* play);
@@ -215,7 +213,6 @@ void Player_Action_HookshotFly(Player* this, PlayState* play);
 void Player_Action_93(Player* this, PlayState* play);
 void Player_Action_94(Player* this, PlayState* play);
 void Player_Action_95(Player* this, PlayState* play);
-void Player_Action_96(Player* this, PlayState* play);
 void Player_Action_CsAction(Player* this, PlayState* play);
 
 s32 Player_UpperAction_0(Player* this, PlayState* play);

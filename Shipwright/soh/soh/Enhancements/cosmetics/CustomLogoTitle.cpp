@@ -8,7 +8,11 @@
 extern "C" {
 #include "macros.h"
 #include "z64.h"
-#include "functions.h"
+#include "functions/actors.h"
+#include "functions/environment.h"
+#include "functions/game_state.h"
+#include "functions/math.h"
+#include "functions/rendering.h"
 #include "variables.h"
 #include "soh/Enhancements/enhancementTypes.h"
 }

@@ -7,7 +7,7 @@ walks, freezes, advances the walk φ by k frames (walkhold still held), releases
 per logic frame via posescan and reports the max per-bone jump (deg).
 
 Usage: tools/walk_stop_phase_sweep.py [--offsets 0,2,4,...] [--steps 18] [--sleep 0.13]
-Run with the game up (tools/zelda3d_game.sh) and `link 1` set. Prints a per-offset table + the worst case.
+Run with the game up (tools/zelda3d_game.py) and `link 1` set. Prints a per-offset table + the worst case.
 """
 import argparse, os, sys, time
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))

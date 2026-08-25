@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
 """boss_parity_sweep.py — render-parity audit of the 10 boss arenas (Zelda3D #115 family).
 
-For each boss arena it: plain-warps in (the ONLY correct entry — see boss_survival.sh), waits for
+For each boss arena it: plain-warps in (the ONLY correct entry — see boss_survival.py), waits for
 the boss intro to spawn the boss, enables the OoT3D Link body, brightens the (dim) arena, locates
 the boss actor (ACTORCAT_BOSS cat=9, else the nearest large enemy), teleports Link next to the boss
 so it falls inside `actorsnear`'s radius, and records the boss's RENDER STATUS from the `actorsnear`
@@ -70,7 +70,7 @@ def main():
     results = []
     for ent, name, zar_hint in ARENAS:
         print(f"\n=== {name} ({ent}) ===", flush=True)
-        subprocess.run(["tools/zelda3d_game.sh", "restart", ent, "0x6000"], cwd=REPO,
+        subprocess.run([sys.executable, "tools/zelda3d_game.py", "restart", ent, "0x6000"], cwd=REPO,
                        capture_output=True, text=True, env={**os.environ, "ZELDA3D_HEADLESS": "1"})
         time.sleep(13)  # boss intro + spawn
         repl("link 1")

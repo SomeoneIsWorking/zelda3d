@@ -38,7 +38,8 @@ import sys
 from pathlib import Path
 
 sys.path.insert(0, str(Path(__file__).resolve().parent))
-import harness_ctl as hc  # noqa: E402
+from harness_process import spawn  # noqa: E402
+from harness_transport import Harness  # noqa: E402
 
 ENGINE_FRAMES_PER_CS = 2
 RIDER_POS_VA = 0x005AFFB0     # static mirror of the title rider world.pos (Vec3f)
@@ -46,7 +47,7 @@ RIDER_ACTOR_VA = 0x09906A80   # deterministic heap instance (title_rider_driver.
 OUTDIR = Path(__file__).resolve().parent.parent / "scratch" / "title_ab"
 
 
-def step(h: hc.Harness, n: int, timeout: float = 900.0) -> str:
+def step(h: Harness, n: int, timeout: float = 900.0) -> str:
     h.proc.stdin.write((f"step {n}\n").encode())
     h.proc.stdin.flush()
     line = h._readline(timeout=timeout)
@@ -59,14 +60,14 @@ def parse_field(state_line: str, key: str) -> str:
     return state_line.split(f"{key}=")[1].split()[0]
 
 
-def read_f32(h: hc.Harness, va: int) -> float | None:
+def read_f32(h: Harness, va: int) -> float | None:
     resp = h.send(f"r32 0x{va:08x}")
     if not resp.startswith("ok "):
         return None
     return struct.unpack("<f", struct.pack("<I", int(resp.split()[1], 16)))[0]
 
 
-def read_s16(h: hc.Harness, va: int) -> int | None:
+def read_s16(h: Harness, va: int) -> int | None:
     resp = h.send(f"r16 0x{va:08x}")
     if not resp.startswith("ok "):
         return None
@@ -74,11 +75,11 @@ def read_s16(h: hc.Harness, va: int) -> int | None:
     return v - 0x10000 if v >= 0x8000 else v
 
 
-def az_rider_pos(h: hc.Harness) -> tuple[float, float, float]:
+def az_rider_pos(h: Harness) -> tuple[float, float, float]:
     return tuple(read_f32(h, RIDER_POS_VA + 4 * j) for j in range(3))  # type: ignore
 
 
-def az_rider_actor(h: hc.Harness):
+def az_rider_actor(h: Harness):
     """(pos, yaw, speed_xz) from the heap actor instance, or None if it no
     longer cross-checks against the static mirror (heap layout drifted)."""
     pos = tuple(read_f32(h, RIDER_ACTOR_VA + 0x28 + 4 * j) for j in range(3))
@@ -92,7 +93,7 @@ def az_rider_actor(h: hc.Harness):
     return pos, yaw, spd
 
 
-def soh_player_pos(h: hc.Harness):
+def soh_player_pos(h: Harness):
     lines = h.send_multiline("compare player")
     for ln in lines:
         ln = ln.strip()
@@ -130,7 +131,7 @@ def main() -> int:
     OUTDIR.mkdir(parents=True, exist_ok=True)
     os.environ.setdefault("HARNESS_STDERR", f"scratch/logs/title_rider_traj_{args.name}.log")
 
-    h = hc.spawn(save_state=None)
+    h = spawn(save_state=None)
     rows = []
     try:
         # drive to LOCKED (same loop as title_sbs_verify.drive_to_locked)

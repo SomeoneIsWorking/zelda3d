@@ -6,14 +6,15 @@
  * including both shops and one-off merchants (i.e. Medigoron, Bean Guy,
  * and Carpet Salesman)
  */
-#include <soh/OTRGlobals.h>
+
+#include "soh/OTRGlobals.h"
 #include "object/ObjectExtension.h"
 #include "soh/Enhancements/randomizer/randomizer.h"
 
 extern "C" {
 extern PlayState* gPlayState;
 #include <macros.h>
-#include <functions.h>
+#include "functions/game_state.h"
 #include <variables.h>
 #include <overlays/actors/ovl_En_Dns/z_en_dns.h>
 }

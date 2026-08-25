@@ -2,7 +2,7 @@
 #include "init/ShipInit.hpp"
 
 extern "C" {
-#include "functions.h"
+#include "functions/actors.h"
 #include "src/overlays/actors/ovl_Bg_Spot18_Basket/z_bg_spot18_basket.h"
 extern PlayState* gPlayState;
 }

@@ -129,7 +129,7 @@ class GfxRenderingAPISdl3Gpu : public GfxRenderingAPI {
     // ---- Unified op model: the Zelda3D OoT3D content (CMB models, HUD, AO composite, RmlUi menu) records
     // its draws into the SAME deferred op-list as the N64 Fast3D triangles, replayed in ONE render pass
     // in FinishRender. Every in-pass draw is a first-class OP_DRAW (AppendZelda3DModelDraw / HudDraw /
-    // Fullscreen); only genuine offscreen passes use AppendZelda3DOwnPass. zelda3d_sdl3gpu.cpp owns its own
+    // Fullscreen); only genuine offscreen passes use AppendZelda3DOwnPass. The focused Zelda3D renderer owns its
     // GPU resources (created via the device handle below).
     SDL_GPUDevice* GpuDevice() {
         return mDevice;

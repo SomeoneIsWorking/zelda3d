@@ -8,7 +8,7 @@
 #include "objects/object_fd/object_fd.h"
 #include "objects/gameplay_keep/gameplay_keep.h"
 #include "overlays/actors/ovl_Boss_Fd/z_boss_fd.h"
-#include "zelda3d/zelda3d.h"
+#include "zelda3d/behaviors/actor/en_vb_ball_bridge.h"
 
 #define FLAGS (ACTOR_FLAG_UPDATE_CULLING_DISABLED | ACTOR_FLAG_DRAW_CULLING_DISABLED)
 

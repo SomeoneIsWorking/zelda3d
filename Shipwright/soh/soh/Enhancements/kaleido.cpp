@@ -1,3 +1,4 @@
+#include "soh/OTRGlobals.h"
 #include "kaleido.h"
 
 #include "objects/gameplay_keep/gameplay_keep.h"
@@ -9,14 +10,16 @@
 
 extern "C" {
 #include "z64.h"
-#include "functions.h"
+#include "functions/audio.h"
+#include "functions/math.h"
+#include "functions/rendering.h"
 #include "macros.h"
 #include "variables.h"
 #include <textures/message_static/message_static.h>
 #include <textures/parameter_static/parameter_static.h>
 extern PlayState* gPlayState;
 }
-#include "soh/OTRGlobals.h"
+
 #include "soh/Enhancements/game-interactor/GameInteractor.h"
 #include "soh_assets.h"
 #include "textures/icon_item_static/icon_item_static.h"

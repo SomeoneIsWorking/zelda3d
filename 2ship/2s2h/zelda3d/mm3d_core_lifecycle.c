@@ -36,18 +36,17 @@
 // another is the pairing that gets missed).
 
 #include "mm3d_core_lifecycle.h"
+#include "mm3d_model_lifecycle.h"
+#include "2s2h/BenPortLifecycle.h"
+#include "2s2h/zelda3d/repl/mm3d_repl.h"
+#include "src/code/cutscene_manager_lifecycle.h"
+#include "src/code/graph_lifecycle.h"
+#include "object/ObjectExtension.h"
 
 #include "global.h"
 
 #include <stdio.h>
 #include <string.h>
-
-void Zelda3D_FreePreviousOTRGlobals(void); // OTRGlobals.cpp / BenPort.cpp -- the previous run's owner object
-void Graph_ResetRunState(void);       // src/code/graph.c -- the frame loop's resume point
-void Zelda3D_ReplResetRunState(void);  // 2s2h/Z3DRepl.c        -- the REPL FIFO descriptor
-void Zelda3D_MM_ModelResetRunState(void); // 2s2h/zelda3d/mm3d_model.cpp -- anim state keyed by arena addresses
-void ObjectExtension_ResetRunState(void); // zelda3d_shared/object -- keyed by Actor*, one instance per core
-void CutsceneManager_ResetRunState(void); // src/code/z_eventmgr.c -- a scene cutscene list plus PlayState*/Actor*
 
 // ---------------------------------------------------------------------------------------------
 // Once-per-run latches
@@ -92,8 +91,8 @@ void Zelda3D_ResetAudioContext(void) {
     // report that only ever says "reset" could not tell that apart from a run that inherited a live
     // note array. The equivalent line on the soh side is what falsified a wrong theory about which
     // piece of audio state was actually being carried over.
-    fprintf(stderr, "MM3D CORE: gAudioCtx reset (%zu bytes) -- inherited numNotes=%d notes=%p.\n",
-            sizeof(gAudioCtx), (int)inheritedNotes, inheritedNotePtr);
+    fprintf(stderr, "MM3D CORE: gAudioCtx reset (%zu bytes) -- inherited numNotes=%d notes=%p.\n", sizeof(gAudioCtx),
+            (int)inheritedNotes, inheritedNotePtr);
     fflush(stderr);
 }
 
@@ -120,8 +119,8 @@ void Zelda3D_ResetSaveContext(void) {
 
     // A COUNT with its denominator, not "reset ok": run 1 must report 0, and a line that cannot
     // report anything else could not tell run 1 from a run inheriting a full save.
-    fprintf(stderr, "MM3D CORE: gSaveContext reset -- inherited %zu non-zero byte(s) of %zu.\n",
-            inheritedNonZero, sizeof(gSaveContext));
+    fprintf(stderr, "MM3D CORE: gSaveContext reset -- inherited %zu non-zero byte(s) of %zu.\n", inheritedNonZero,
+            sizeof(gSaveContext));
     fflush(stderr);
 }
 
@@ -157,7 +156,7 @@ void Zelda3D_CoreRunBegin(void) {
     // The save + session state: wrong-state, not dangling-pointer, and silent either way.
     Zelda3D_ResetSaveContext();
     // The REPL FIFO: an open descriptor onto a path this run must create for itself.
-    Zelda3D_ReplResetRunState();
+    Zelda3D_MmReplResetRunState();
     // The zelda3d layer's per-run caches: anim state keyed by ZeldaArena addresses (which the next
     // run reuses) and a parked Actor*.
     Zelda3D_MM_ModelResetRunState();

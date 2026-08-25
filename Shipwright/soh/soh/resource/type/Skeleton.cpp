@@ -1,6 +1,6 @@
 #include <ship/resource/ResourceManager.h>
 #include "Skeleton.h"
-#include "soh/OTRGlobals.h"
+
 #include "libultraship/libultraship.h"
 #include <soh_assets.h>
 #include <objects/object_link_child/object_link_child.h>

@@ -1,4 +1,5 @@
 #include "z64.h"
+#include "functions/rendering.h"
 
 // OTRTODO - this is awful
 

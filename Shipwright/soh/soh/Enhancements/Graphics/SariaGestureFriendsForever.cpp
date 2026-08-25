@@ -1,4 +1,5 @@
 #include "soh/Enhancements/game-interactor/GameInteractor.h"
+#include "functions/animation.h"
 #include "init/ShipInit.hpp"
 
 extern "C" {

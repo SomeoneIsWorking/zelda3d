@@ -7,12 +7,12 @@
 // content interleaves depth-correctly with the N64 triangles with no separate-pass handshake —
 // one renderer, one pass, one bind path, no N64-vs-3DS distinction in how draws are submitted.
 //
-// The backend-agnostic bookkeeping (draw list, per-emit pose capture, light/shadow/AO tunables, the
-// Zelda3D_GL_* C-ABI) stays in zelda3d_gl.cpp; when the live Fast3D backend is the SDL3 GPU one those
-// entry points dispatch the GPU submission here. This module owns its own SDL3 GPU resources
-// (per-model vertex buffers + textures, the model pipeline cache, per-draw uniforms).
+// The backend-agnostic pose, material, lighting, and submission owners expose the Zelda3D_GL_* C ABI;
+// when the live Fast3D backend is the SDL3 GPU one those entry points dispatch GPU work here. This
+// module owns its SDL3 GPU resources (per-model vertex buffers and textures, the model pipeline cache,
+// and per-draw uniforms).
 #pragma once
-#include "fast/zelda3d_gl.h"
+#include "fast/zelda3d_model_provider.h"
 #include <stddef.h>
 
 #ifdef __cplusplus
@@ -27,7 +27,7 @@ void Zelda3D_Sg_SetProvider(Zelda3DModelProvider fn);
 
 // Bracket the Zelda3D SDL3 GPU submission. BeginPass resolves resources + starts the per-frame model
 // pass; DrawModel appends one (already pose-resolved) model as an in-pass op; EndPass finalizes.
-// The caller (Zelda3D_GL_RenderPass) does the per-item pose interpolation, exactly as for GL/Vulkan.
+// The focused submission owner resolves and interpolates each pose before calling this backend.
 void Zelda3D_Sg_BeginPass(void);
 // matTex: a const std::unordered_map<int,int>* (material->texIndex facial override), passed as void*.
 // matConst: a const std::unordered_map<int, MatConstOv>* keyed by material*6+constant-slot,
@@ -42,17 +42,15 @@ void Zelda3D_Sg_BeginPass(void);
 // before. Non-NULL = float[9] row-major view-rotation matrix (rows = the live camera's LH view
 // basis right/up/forward) used INSTEAD of mat3(uMV) for the sphere-map normal — required for the
 // title 2D ortho-overlay pass whose uMV carries no camera (see zelda3d_sg_ubo.h uSphRot*).
-void Zelda3D_Sg_DrawModel(int modelId, const float* mp16, const float* mv16, int lit, int invertY,
-                        unsigned char r, unsigned char g, unsigned char b, unsigned char a, float aspectAdj,
-                        const float* boneData, int boneCnt, unsigned long long midMask, int sky,
-                        float uvOffU, float uvOffV, const void* matTex, const void* matConst,
-                        const void* matUv, int forceUnlit,
-                        const float* lightDirOv = nullptr, const float* sphRotOv = nullptr);
+void Zelda3D_Sg_DrawModel(int modelId, const float* mp16, const float* mv16, int lit, int invertY, unsigned char r,
+                          unsigned char g, unsigned char b, unsigned char a, float aspectAdj, const float* boneData,
+                          int boneCnt, unsigned long long midMask, int sky, float uvOffU, float uvOffV,
+                          const void* matTex, const void* matConst, const void* matUv, int forceUnlit,
+                          const float* lightDirOv = nullptr, const float* sphRotOv = nullptr);
 void Zelda3D_Sg_EndPass(void);
 
 // Mirror of Zelda3D_GL_RequestEvictRange for the SDL3 GPU model store.
 void Zelda3D_Sg_RequestEvictRange(int lo, int hi);
-
 
 // #146 item B: reset the shared depth buffer to "far" via a fullscreen depth-only draw (color
 // writes off) appended at THIS point in the op-list — no render-pass split. Called once by

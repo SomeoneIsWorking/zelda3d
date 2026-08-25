@@ -2,14 +2,15 @@
 #include "soh/Enhancements/game-interactor/GameInteractor.h"
 #include "soh/Enhancements/game-interactor/GameInteractor_Hooks.h"
 #include "init/ShipInit.hpp"
-#include "functions.h"
+#include "functions/audio.h"
+#include "functions/game_state.h"
 #include "soh/SohGui/MenuTypes.h"
 #include "soh/util.h"
 
 extern "C" {
 #include "z64.h"
 #include "global.h"
-#include "zelda3d/zelda3d.h"
+#include "zelda3d/core/zelda3d_runtime.h"
 #include "soh/Enhancements/enhancementTypes.h"
 void Sram_InitDebugSave(void);
 void Select_LoadGame(SelectContext* selectContext, s32 entranceIndex);

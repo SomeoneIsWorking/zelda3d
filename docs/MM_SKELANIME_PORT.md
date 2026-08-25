@@ -83,7 +83,7 @@ Prove skinned CMB rendering end-to-end using MM3D bind-pose bones only.
 >
 > **Entrance resolved + first drive (2026-07-17):** `ENTRANCE(scene,spawn) = ((ENTR_SCENE_##scene &
 > 0x7F) << 9) | ((spawn & 0x1F) << 4)` (z64scene.h:755); `ENTR_SCENE_TERMINA_FIELD = 0x2A`, so
-> **Termina Field spawn 0 = `0x5400`**. `ZELDA3D_MM_SKINNED_TPOSE=1 tools/mm_game.sh start 0x5400`
+> **Termina Field spawn 0 = `0x5400`**. `ZELDA3D_MM_SKINNED_TPOSE=1 tools/mm_game.py start 0x5400`
 > boots there (scene 45), MM3D provider live (rigid scene objects obj_tokeidai/keikoku_obj/fall map +
 > render). BUT the entrance-corridor spawn is **enemy-sparse — the run log shows ZERO skinned-MM3D
 > archive loads** (no `[MM3D] skinned-tpose ...`), so nothing skinned rendered to grade. The 12

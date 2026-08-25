@@ -10,7 +10,9 @@
 extern "C" {
 #include <z64.h>
 #include "variables.h"
-#include "functions.h"
+#include "functions/animation.h"
+#include "functions/collision.h"
+#include "functions/rendering.h"
 #include "macros.h"
 #include "soh/cvar_prefixes.h"
 #include "overlays/actors/ovl_En_Kakasi2/z_en_kakasi2.h"

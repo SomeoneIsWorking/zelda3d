@@ -49,12 +49,12 @@ void Zelda3D_LogList(char* out, int outCap);
 // Channel name for the message prefix (internal to the macro).
 const char* Zelda3D_LogName(int channel);
 
-#define Z3D_LOG(ch, ...)                                                    \
-    do {                                                                    \
-        if (Zelda3D_LogEnabled(Z3D_LOG_##ch)) {                             \
-            fprintf(stderr, "[%s] ", Zelda3D_LogName(Z3D_LOG_##ch));        \
-            fprintf(stderr, __VA_ARGS__);                                   \
-        }                                                                   \
+#define Z3D_LOG(ch, ...)                                             \
+    do {                                                             \
+        if (Zelda3D_LogEnabled(Z3D_LOG_##ch)) {                      \
+            fprintf(stderr, "[%s] ", Zelda3D_LogName(Z3D_LOG_##ch)); \
+            fprintf(stderr, __VA_ARGS__);                            \
+        }                                                            \
     } while (0)
 
 #ifdef __cplusplus

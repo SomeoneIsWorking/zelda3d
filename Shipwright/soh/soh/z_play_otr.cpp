@@ -1,9 +1,13 @@
 #include "ResourceManagerHelpers.h"
+#include "functions/boot.h"
 #include <libultraship/libultraship.h>
 #include "soh/resource/type/Scene.h"
 #include <ship/utils/StringHelper.h>
 #include "soh/Enhancements/game-interactor/GameInteractor_Hooks.h"
 #include "global.h"
+#include "functions/environment.h"
+#include "functions/game_state.h"
+#include "functions/rendering.h"
 #include "vt.h"
 #include <fast/resource/type/Vertex.h>
 

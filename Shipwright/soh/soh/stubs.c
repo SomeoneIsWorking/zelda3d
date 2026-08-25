@@ -1,9 +1,12 @@
 #include <libultraship/libultra.h>
+#include "functions/boot.h"
+#include "functions/libultra_core.h"
+#include "functions/libultra_io.h"
 #include <stdarg.h>
 #include <stdio.h>
 #include <string.h>
 #include "z64.h"
-#include "OTRGlobals.h"
+
 //#include <math.h>
 
 u32 osResetType;

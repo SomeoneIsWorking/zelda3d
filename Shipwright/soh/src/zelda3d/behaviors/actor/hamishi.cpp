@@ -17,6 +17,9 @@
 // unchanged.
 #include "z64.h"
 #include "hamishi.h"
+#include "zelda3d/render/model_draw.h"
+#include "zelda3d/render/model_queries.h"
+#include "zelda3d/diagnostics/model_tuning_query.h"
 
 // Field-keep zar + the silver-rock CMB. Self-contained to this module.
 #define ZELDA3D_HAMISHI_ZAR "/actor/zelda_field_keep.zar"
@@ -27,12 +30,6 @@
 // Live-retunable via REPL `gscale 15`.
 static constexpr float kHamishiWorldScale = 0.4f;
 static constexpr int kHamishiGScaleSlot = 15;
-
-extern "C" {
-int Zelda3D_AutoModelId(const char* zarPath);
-int Zelda3D_DrawActorModel(PlayState* play, int modelId, Actor* actor, float worldScale);
-float Zelda3D_GScale(int slot, float def);
-}
 
 namespace Zelda3D {
 
@@ -48,7 +45,8 @@ bool ObjHamishiBehavior::tryDrawModel(PlayState* play, Actor* actor) {
     if (sModelId < 0) {
         return false; // no OoT3D rock CMB -> let the N64 rock draw
     }
-    Zelda3D_DrawActorModel(play, sModelId, actor, Zelda3D_GScale(kHamishiGScaleSlot, kHamishiWorldScale));
+    Zelda3D_DrawActorModel(play, sModelId, actor,
+                           Zelda3D_ModelScaleOrDefault(kHamishiGScaleSlot, kHamishiWorldScale));
     return true;
 }
 

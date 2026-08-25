@@ -1,11 +1,11 @@
+#include "soh/OTRGlobals.h"
 #include "debugconsole.h"
 #include <ship/utils/Utils.h>
 #include "savestates.h"
 #include "soh/ActorDB.h"
-
 #include <vector>
 #include <string>
-#include "soh/OTRGlobals.h"
+
 #include "soh/cvar_prefixes.h"
 #include <soh/Enhancements/item-tables/ItemTableManager.h>
 #include "soh/Enhancements/game-interactor/GameInteractor.h"
@@ -13,6 +13,7 @@
 #include "soh/Enhancements/audio/AudioEditor.h"
 #include "soh/Enhancements/randomizer/logic.h"
 #include "soh/Enhancements/randomizer/randomizer.h"
+#include "soh/Enhancements/randomizer/randomizer_generation_lifecycle.h"
 
 #define Path _Path
 #define PATH_HACK
@@ -28,7 +29,8 @@
 extern "C" {
 #include <z64.h>
 #include "variables.h"
-#include "functions.h"
+#include "functions/actors.h"
+#include "functions/game_state.h"
 #include "macros.h"
 extern PlayState* gPlayState;
 }

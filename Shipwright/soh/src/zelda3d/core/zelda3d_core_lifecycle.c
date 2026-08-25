@@ -35,31 +35,34 @@
 #include "global.h"
 #include "z64.h"
 #include "variables.h"
-#include "zelda3d/zelda3d.h"
+#include "zelda3d/core/zelda3d_runtime.h"
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
 
-void Zelda3D_FreePreviousOTRGlobals(void); // OTRGlobals.cpp / BenPort.cpp -- the previous run's owner object
-void Graph_ResetRunState(void);        // graph.c
-void Zelda3D_AudioResetRunState(void);   // OTRGlobals.cpp -- the audio THREAD's control block
-void Zelda3D_MessageResetRunState(void); // z_message_OTR.cpp -- the message tables
-void Zelda3D_ReplResetRunState(void);    // zelda3d_repl.cpp -- the REPL FIFO descriptor
-void Zelda3D_AnimResetRunState(void);    // zelda3d_anim.cpp -- last frame's pose, NOT the asset caches
+void Zelda3D_FreePreviousOTRGlobals(void);          // OTRGlobals.cpp / BenPort.cpp -- the previous run's owner object
+void Graph_ResetRunState(void);                     // graph.c
+void Zelda3D_AudioResetRunState(void);              // OTRGlobals.cpp -- the audio THREAD's control block
+void Zelda3D_MessageResetRunState(void);            // z_message_OTR.cpp -- the message tables
+void Zelda3D_ReplResetRunState(void);               // zelda3d_repl.cpp -- the REPL FIFO descriptor
+void Zelda3D_AnimResetRunState(void);               // zelda3d_anim.cpp -- last frame's pose, NOT the asset caches
 void Zelda3D_DisableFixedCameraResetRunState(void); // DisableFixedCamera.cpp -- scene camera backups
-void Zelda3D_ActorRefsResetRunState(void);   // zelda3d.c        -- REPL/debug actor selections
-void Zelda3D_RenderRefsResetRunState(void); // zelda3d_render.cpp
-void Zelda3D_HorseRefsResetRunState(void);  // behaviors/actor/en_horse.cpp
-void ObjectExtension_ResetRunState(void); // zelda3d_shared/object -- keyed by Actor*, one instance per core
-void Zelda3D_RandoContextResetRunState(void); // randomizer/SeedContext.cpp -- the per-run seed context
-void Zelda3D_RandoLogicRefsResetRunState(void); // randomizer/location_access.cpp -- Context*/Logic the region table builds from
-void Zelda3D_RandoSettingsResetRunState(void);  // randomizer/settings.cpp -- the static Settings singleton that OWNED the seed context
-void Zelda3D_EntranceTableResetRunState(void); // randomizer/randomizer_entrance.c -- gEntranceTable is .data
-void Zelda3D_GameInteractorResetRunState(void); // game-interactor -- inline static hook maps, process lifetime
+void Zelda3D_ActorSelectionResetRunState(void);     // diagnostics/actor_selection.c -- REPL/debug actor selections
+void Zelda3D_SkeletonDrawResetRunState(void);       // anim/skeleton_draw_bridge.c -- deferred actor handoff
+void Zelda3D_RenderRefsResetRunState(void);         // render/render_lifecycle.cpp
+void Zelda3D_HorseRefsResetRunState(void);          // behaviors/actor/en_horse.cpp
+void ObjectExtension_ResetRunState(void);           // zelda3d_shared/object -- keyed by Actor*, one instance per core
+void Zelda3D_RandoContextResetRunState(void);       // randomizer/SeedContext.cpp -- the per-run seed context
+void Zelda3D_RandoLogicRefsResetRunState(
+    void); // randomizer/location_access.cpp -- Context*/Logic the region table builds from
+void Zelda3D_RandoSettingsResetRunState(
+    void); // randomizer/settings.cpp -- the static Settings singleton that OWNED the seed context
+void Zelda3D_EntranceTableResetRunState(void);        // randomizer/randomizer_entrance.c -- gEntranceTable is .data
+void Zelda3D_GameInteractorResetRunState(void);       // game-interactor -- inline static hook maps, process lifetime
 void Zelda3D_EntranceCameraBackupResetRunState(void); // randomizer/entrance.cpp -- a Camera full of pointers
 void Zelda3D_NameTagResetRunState(void); // Enhancements/nametag.cpp -- raw Actor* plus a mirror of the hook registry
 void Zelda3D_TitlePresentationResetRunState(void); // behaviors/title -- a process-lifetime singleton holding run Actor*
-void Zelda3D_ExtraTrapsResetRunState(void); // Enhancements/ExtraTraps.cpp -- an armed trap and its timers
+void Zelda3D_ExtraTrapsResetRunState(void);        // Enhancements/ExtraTraps.cpp -- an armed trap and its timers
 
 // The name tables AudioLoad_Init builds for this run, so they can be released before it builds the
 // next run's. Declared here rather than in a header because this file is where their lifetime is.
@@ -198,8 +201,8 @@ void Zelda3D_ResetSaveContext(void) {
     // and a line that cannot say anything else could not tell run 1 from a run that inherited a full
     // save. Naming individual fields would have been worse -- whichever field the next regression
     // uses would be the one not printed.
-    fprintf(stderr, "ZELDA3D CORE: gSaveContext reset -- inherited %zu non-zero byte(s) of %zu.\n",
-            inheritedNonZero, sizeof(gSaveContext));
+    fprintf(stderr, "ZELDA3D CORE: gSaveContext reset -- inherited %zu non-zero byte(s) of %zu.\n", inheritedNonZero,
+            sizeof(gSaveContext));
     fflush(stderr);
 }
 
@@ -245,7 +248,8 @@ void Zelda3D_CoreRunBegin(void) {
     Zelda3D_DisableFixedCameraResetRunState();
     // Actor pointers this layer parks in globals. They point into the play heap, so they are exactly
     // the shape this file's header argues against; most are only compared, one is dereferenced.
-    Zelda3D_ActorRefsResetRunState();
+    Zelda3D_ActorSelectionResetRunState();
+    Zelda3D_SkeletonDrawResetRunState();
     Zelda3D_RenderRefsResetRunState();
     Zelda3D_HorseRefsResetRunState();
     // Object extensions, keyed by actor pointer. zelda3d_shared is a static library linked into

@@ -1,7 +1,9 @@
+#include "soh/OTRGlobals.h"
+#include "soh/host/item_randomizer_bridge.h"
 #include <cstdio>
 #include "SeedContext.h"
 #include "static_data.h"
-#include "soh/OTRGlobals.h"
+
 #include "soh/Enhancements/item-tables/ItemTableManager.h"
 #include "dungeon.h"
 #include "logic.h"
@@ -22,7 +24,7 @@
 #include <fstream>
 #include <spdlog/spdlog.h>
 extern "C" {
-#include <functions.h>
+#include "functions/game_state.h"
 }
 
 namespace Rando {

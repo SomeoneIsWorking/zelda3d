@@ -8,7 +8,7 @@ exists — it composes:
   - parity_speed_sweep.py  (the walk/run locomotion CONTINUUM by speedXZ; SoH-side curve +
                              classify()/windows_overlap() reused verbatim for the oracle side)
   - REPL primitives (zelda3d_repl.py: link/linksrc/linkanimstate/linkstate/warp/...)
-  - the EMBEDDED-Azahar oracle harness (harness_ctl.py + tools/soh3d_harness), NOT the
+  - the EMBEDDED-Azahar oracle harness (focused Python owners + tools/soh3d_harness), NOT the
     embedded harness (the only oracle transport) that parity_state_sweep/parity_speed_sweep
     to — that external frontend needs Qt6, which is not installed on this machine (see
     OracleSession docstring below). `az_linkanim` (added to tools/soh3d_harness/main.cpp this
@@ -30,7 +30,7 @@ Results persist to scratch/link_sweep/<timestamp>.json (raw, diffable) and
 scratch/link_sweep/latest.json (symlink-equivalent: plain copy, always the last sweep) — the
 checklist doc (docs/link_parity_checklist.md) is REGENERATED from latest.json, never hand-edited.
 """
-import argparse, json, os, subprocess, sys, time
+import argparse, json, os, sys, time
 from datetime import datetime, timezone
 
 HERE = os.path.dirname(os.path.abspath(__file__))
@@ -41,7 +41,8 @@ import parity_state_sweep as PSS   # noqa: E402  (forcestate/idle/carry drive + 
 import parity_speed_sweep as SPD   # noqa: E402  (locomotion continuum: soh_curve/classify)
 import parity_pose_sweep as PPS    # noqa: E402  (walk/run soh_mag/csab config — reused, not re-picked)
 import parity_pose_diff as PPD     # noqa: E402  (geodesic per-bone LOCAL-rotation compare, reused verbatim)
-import harness_ctl as HC           # noqa: E402  (embedded-Azahar oracle transport)
+from harness_gameplay import boot_to_gameplay  # noqa: E402
+from harness_process import spawn  # noqa: E402
 
 SCRATCH = os.path.join(REPO, "scratch", "link_sweep")
 CHECKLIST_MD = os.path.join(REPO, "docs", "link_parity_checklist.md")
@@ -65,7 +66,7 @@ class OracleSession:
     over ONE session instead of paying it per state.
 
     Transport: the embedded-Azahar harness (`Azahar/build-harness`, target `soh3d_harness`,
-    driven by tools/harness_ctl.py). It is the only oracle transport — the standalone
+    driven by the focused harness process/gameplay owners). It is the only oracle transport — the standalone
     Qt-frontend Azahar and its UDP-RPC tools were removed. Link's selected animation comes
     from the `az_linkanim` REPL command at PLAYER+0x254+0x30, named against
     oot3d-decomp/tools/skeldata/player_animid_names.json.
@@ -80,16 +81,16 @@ class OracleSession:
     def boot(self):
         """Boot to gameplay at Kokiri Forest.
 
-        Delegates to harness_ctl.boot_to_gameplay: loadstate the cached gameplay
+        Delegates to harness_gameplay.boot_to_gameplay: loadstate the cached gameplay
         state (or capture it once), then warp. The old inline schedule tapped
         hold=30/release=60 and gated on `playstate`, which reports ok AT THE
         TITLE — so it happily "succeeded" on the title screen and warped into a
         context with no loaded save, where the warp is a no-op.
         """
         try:
-            self.h = HC.spawn(save_state=SAVE_STATE)
-            if not HC.boot_to_gameplay(self.h, entrance=KOKIRI):
-                self.fail_reason = "oracle never reached gameplay (see harness_ctl output)"
+            self.h = spawn(save_state=SAVE_STATE)
+            if not boot_to_gameplay(self.h, entrance=KOKIRI):
+                self.fail_reason = "oracle never reached gameplay (see harness output)"
                 return False
             self.ok = True
             return True

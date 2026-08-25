@@ -1,0 +1,4 @@
+#pragma once
+
+#define M_PIf 3.14159265358979323846f
+#define M_PI_2f 1.57079632679489661923f

@@ -10,7 +10,7 @@
 namespace Zelda3D {
 
 class EnItem00Behavior : public ActorBehavior {
-public:
+  public:
     s16 actorId() const override;
     // Draws the OoT3D rupee CMB for rupee-type drops (masked to the color mesh); returns false for
     // every other item type so the N64 draw handles it.

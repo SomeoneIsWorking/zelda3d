@@ -1,4 +1,10 @@
-#include <soh/OTRGlobals.h>
+
+#include "soh/OTRGlobals.h"
+#include "functions/actors.h"
+#include "functions/collision.h"
+#include "functions/game_state.h"
+#include "functions/math.h"
+#include "functions/memory.h"
 #include "static_data.h"
 #include "object/ObjectExtension.h"
 #include "soh/Enhancements/randomizer/randomizer.h"

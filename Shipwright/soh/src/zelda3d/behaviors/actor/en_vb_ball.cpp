@@ -1,19 +1,19 @@
 // OoT3D En_Vb_Ball graphics: Volvagia attack stones and detached death-body ribs.
 // Ground truth: oot3d-decomp/docs/boss_fd2.md; FUN_00212F94 and FUN_0024E4E8.
 #include "global.h"
+#include "functions/actors.h"
+#include "functions/math.h"
 #include "en_vb_ball.h"
-#include "fast/zelda3d_gl.h"
+#include "fast/zelda3d_material_overrides.h"
 #include "overlays/actors/ovl_Boss_Fd/z_boss_fd.h"
 #include "overlays/actors/ovl_En_Vb_Ball/z_en_vb_ball.h"
-#include "zelda3d/zelda3d.h"
+#include "zelda3d/core/zelda3d_runtime.h"
+#include "zelda3d/render/model_draw.h"
+#include "zelda3d/render/model_queries.h"
 
 #include <algorithm>
 
 extern "C" {
-int Zelda3D_AutoModelId(const char* zarPath);
-int Zelda3D_DrawModelTransform(PlayState* play, int modelId, const Vec3f* pos, const Vec3f* rotYXZ, const Vec3f* scale,
-                               float postRotX);
-void Zelda3D_GL_SetMatConstOverride(int modelId, int materialIndex, int constIdx, float r, float g, float b, float a);
 void EnVbBall_SpawnDebris(PlayState* play, BossFdEffect* effects, Vec3f* position, Vec3f* velocity, Vec3f* acceleration,
                           float scale);
 void EnVbBall_SpawnDust(PlayState* play, BossFdEffect* effects, Vec3f* position, Vec3f* velocity, Vec3f* acceleration,

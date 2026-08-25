@@ -9,6 +9,8 @@ extern "C" {
 // Drive Link's eye/mouth materials for THIS frame from the clip the draw path just resolved.
 // Call once per player draw, AFTER the animation update (it reads the resolved CSAB + playhead).
 void Zelda3D_LinkFaceUpdate(int modelId);
+int Zelda3D_FacebSample(int modelId, const char* animName, float frame, int* outEye, int* outMouth);
+int Zelda3D_FacialMaterialIndex(int modelId, int slot);
 
 #ifdef __cplusplus
 }

@@ -59,7 +59,7 @@ ALIAS = {
     # Deku Tree's mouth in Kokiri Forest. It had been rendering the N64 mesh in an otherwise-3DS
     # scene purely because of the one-character name difference. NOTE: this archive holds 11 CMBs
     # (Y_*/ousei_* cutscene models too), so AUTO's largest-CMB heuristic cannot be trusted to pick
-    # the mouth -- Bg_Treemouth is routed to it explicitly via sActorForcedAuto in zelda3d_render.cpp.
+    # the mouth -- Bg_Treemouth is routed explicitly by the replacement catalog.
     "spot04_objects": "spo04_objects",
     # Dungeon props whose archives use the bare dk_ prefix. Each confirmed twice: the archive name
     # matches the object, AND the actor that loads the object draws a single model of that name.

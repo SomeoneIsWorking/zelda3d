@@ -56,8 +56,7 @@ uint32_t FindMemoryType(uint32_t typeBits, VkMemoryPropertyFlags want) {
     VkPhysicalDeviceMemoryProperties mp{};
     vkGetPhysicalDeviceMemoryProperties(g.gpu, &mp);
     for (uint32_t i = 0; i < mp.memoryTypeCount; i++) {
-        if ((typeBits & (1u << i)) &&
-            (mp.memoryTypes[i].propertyFlags & want) == want) {
+        if ((typeBits & (1u << i)) && (mp.memoryTypes[i].propertyFlags & want) == want) {
             return i;
         }
     }
@@ -66,9 +65,8 @@ uint32_t FindMemoryType(uint32_t typeBits, VkMemoryPropertyFlags want) {
 
 // --- retro_hw_render_interface_vulkan callbacks -----------------------------
 
-void cb_set_image(void* /*handle*/, const struct retro_vulkan_image* image,
-                                 uint32_t /*num_semaphores*/, const VkSemaphore* /*semaphores*/,
-                                 uint32_t /*src_queue_family*/) {
+void cb_set_image(void* /*handle*/, const struct retro_vulkan_image* image, uint32_t /*num_semaphores*/,
+                  const VkSemaphore* /*semaphores*/, uint32_t /*src_queue_family*/) {
     std::lock_guard<std::mutex> lk(g.imgMtx);
     if (!image) {
         g.haveImage = false;
@@ -87,18 +85,25 @@ void cb_set_image(void* /*handle*/, const struct retro_vulkan_image* image,
 // Single-image, synchronous model: we always hand the core frame slot 0 and
 // finish our readback before returning from video_refresh, so there is never
 // more than one live frame to track.
-uint32_t cb_get_sync_index(void* /*handle*/) { return 0; }
-uint32_t cb_get_sync_index_mask(void* /*handle*/) { return 0x1; }
+uint32_t cb_get_sync_index(void* /*handle*/) {
+    return 0;
+}
+uint32_t cb_get_sync_index_mask(void* /*handle*/) {
+    return 0x1;
+}
 void cb_wait_sync_index(void* /*handle*/) {
     // Our readback already fence-waited inside Readback(), so by the time the
     // core asks to reuse slot 0 the previous read is complete. Nothing to do.
 }
-void cb_set_command_buffers(void* /*handle*/, uint32_t /*n*/,
-                                           const VkCommandBuffer* /*cmd*/) {
+void cb_set_command_buffers(void* /*handle*/, uint32_t /*n*/, const VkCommandBuffer* /*cmd*/) {
     // The core uses the set_image path, not set_command_buffers. No-op.
 }
-void cb_lock_queue(void* /*handle*/) { g.queueMtx.lock(); }
-void cb_unlock_queue(void* /*handle*/) { g.queueMtx.unlock(); }
+void cb_lock_queue(void* /*handle*/) {
+    g.queueMtx.lock();
+}
+void cb_unlock_queue(void* /*handle*/) {
+    g.queueMtx.unlock();
+}
 void cb_set_signal_semaphore(void* /*handle*/, VkSemaphore /*sem*/) {
     // We don't ping-pong images; nothing to signal.
 }
@@ -115,12 +120,14 @@ bool CreateInstance(const retro_hw_render_context_negotiation_interface_vulkan* 
     fallback.pApplicationName = "soh3d_harness";
     fallback.pEngineName = "soh3d_harness";
     fallback.apiVersion = VK_API_VERSION_1_1;
-    if (!app) app = &fallback;
+    if (!app)
+        app = &fallback;
 
     // VkPhysicalDeviceFeatures2 (used by the core's create_device) needs a 1.1
     // instance; the app info requests 1.1 already, but be defensive.
     VkApplicationInfo bumped = *app;
-    if (bumped.apiVersion < VK_API_VERSION_1_1) bumped.apiVersion = VK_API_VERSION_1_1;
+    if (bumped.apiVersion < VK_API_VERSION_1_1)
+        bumped.apiVersion = VK_API_VERSION_1_1;
 
     // Enable VK_KHR_surface if present so the swapchain DEVICE extension the
     // core adds has its instance-level dependency satisfied (we never make a
@@ -128,7 +135,8 @@ bool CreateInstance(const retro_hw_render_context_negotiation_interface_vulkan* 
     uint32_t extCount = 0;
     vkEnumerateInstanceExtensionProperties(nullptr, &extCount, nullptr);
     std::vector<VkExtensionProperties> exts(extCount);
-    if (extCount) vkEnumerateInstanceExtensionProperties(nullptr, &extCount, exts.data());
+    if (extCount)
+        vkEnumerateInstanceExtensionProperties(nullptr, &extCount, exts.data());
     std::vector<const char*> enabled;
     for (const auto& e : exts) {
         if (!std::strcmp(e.extensionName, VK_KHR_SURFACE_EXTENSION_NAME)) {
@@ -182,36 +190,46 @@ bool CreatePerFrameObjects() {
     pci.sType = VK_STRUCTURE_TYPE_COMMAND_POOL_CREATE_INFO;
     pci.flags = VK_COMMAND_POOL_CREATE_RESET_COMMAND_BUFFER_BIT;
     pci.queueFamilyIndex = g.queueFamily;
-    if (vkCreateCommandPool(g.device, &pci, nullptr, &g.cmdPool) != VK_SUCCESS) return false;
+    if (vkCreateCommandPool(g.device, &pci, nullptr, &g.cmdPool) != VK_SUCCESS)
+        return false;
 
     VkCommandBufferAllocateInfo ai{};
     ai.sType = VK_STRUCTURE_TYPE_COMMAND_BUFFER_ALLOCATE_INFO;
     ai.commandPool = g.cmdPool;
     ai.level = VK_COMMAND_BUFFER_LEVEL_PRIMARY;
     ai.commandBufferCount = 1;
-    if (vkAllocateCommandBuffers(g.device, &ai, &g.cmd) != VK_SUCCESS) return false;
+    if (vkAllocateCommandBuffers(g.device, &ai, &g.cmd) != VK_SUCCESS)
+        return false;
 
     VkFenceCreateInfo fi{};
     fi.sType = VK_STRUCTURE_TYPE_FENCE_CREATE_INFO;
-    if (vkCreateFence(g.device, &fi, nullptr, &g.fence) != VK_SUCCESS) return false;
+    if (vkCreateFence(g.device, &fi, nullptr, &g.fence) != VK_SUCCESS)
+        return false;
     return true;
 }
 
 void DestroyLinearImage() {
-    if (g.linImg) { vkDestroyImage(g.device, g.linImg, nullptr); g.linImg = VK_NULL_HANDLE; }
-    if (g.linMem) { vkFreeMemory(g.device, g.linMem, nullptr); g.linMem = VK_NULL_HANDLE; }
+    if (g.linImg) {
+        vkDestroyImage(g.device, g.linImg, nullptr);
+        g.linImg = VK_NULL_HANDLE;
+    }
+    if (g.linMem) {
+        vkFreeMemory(g.device, g.linMem, nullptr);
+        g.linMem = VK_NULL_HANDLE;
+    }
     g.linW = g.linH = 0;
 }
 
 bool EnsureLinearImage(uint32_t w, uint32_t h) {
-    if (g.linImg && g.linW == w && g.linH == h) return true;
+    if (g.linImg && g.linW == w && g.linH == h)
+        return true;
     DestroyLinearImage();
 
     VkImageCreateInfo ici{};
     ici.sType = VK_STRUCTURE_TYPE_IMAGE_CREATE_INFO;
     ici.imageType = VK_IMAGE_TYPE_2D;
     ici.format = VK_FORMAT_R8G8B8A8_UNORM; // same as core output → plain copy
-    ici.extent = {w, h, 1};
+    ici.extent = { w, h, 1 };
     ici.mipLevels = 1;
     ici.arrayLayers = 1;
     ici.samples = VK_SAMPLE_COUNT_1_BIT;
@@ -226,9 +244,8 @@ bool EnsureLinearImage(uint32_t w, uint32_t h) {
 
     VkMemoryRequirements mr{};
     vkGetImageMemoryRequirements(g.device, g.linImg, &mr);
-    uint32_t mt = FindMemoryType(mr.memoryTypeBits,
-                                 VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT |
-                                     VK_MEMORY_PROPERTY_HOST_COHERENT_BIT);
+    uint32_t mt =
+        FindMemoryType(mr.memoryTypeBits, VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT | VK_MEMORY_PROPERTY_HOST_COHERENT_BIT);
     if (mt == UINT32_MAX) {
         VKLOG("no host-visible memory type\n");
         DestroyLinearImage();
@@ -249,9 +266,8 @@ bool EnsureLinearImage(uint32_t w, uint32_t h) {
     return true;
 }
 
-void ImageBarrier(VkCommandBuffer cmd, VkImage img, VkImageLayout from, VkImageLayout to,
-                  VkAccessFlags srcAcc, VkAccessFlags dstAcc, VkPipelineStageFlags srcStage,
-                  VkPipelineStageFlags dstStage) {
+void ImageBarrier(VkCommandBuffer cmd, VkImage img, VkImageLayout from, VkImageLayout to, VkAccessFlags srcAcc,
+                  VkAccessFlags dstAcc, VkPipelineStageFlags srcStage, VkPipelineStageFlags dstStage) {
     VkImageMemoryBarrier b{};
     b.sType = VK_STRUCTURE_TYPE_IMAGE_MEMORY_BARRIER;
     b.oldLayout = from;
@@ -259,7 +275,7 @@ void ImageBarrier(VkCommandBuffer cmd, VkImage img, VkImageLayout from, VkImageL
     b.srcQueueFamilyIndex = VK_QUEUE_FAMILY_IGNORED;
     b.dstQueueFamilyIndex = VK_QUEUE_FAMILY_IGNORED;
     b.image = img;
-    b.subresourceRange = {VK_IMAGE_ASPECT_COLOR_BIT, 0, 1, 0, 1};
+    b.subresourceRange = { VK_IMAGE_ASPECT_COLOR_BIT, 0, 1, 0, 1 };
     b.srcAccessMask = srcAcc;
     b.dstAccessMask = dstAcc;
     vkCmdPipelineBarrier(cmd, srcStage, dstStage, 0, 0, nullptr, 0, nullptr, 1, &b);
@@ -272,13 +288,14 @@ bool Init(const retro_hw_render_context_negotiation_interface_vulkan* nego) {
         VKLOG("negotiation interface missing create_device\n");
         return false;
     }
-    if (!CreateInstance(nego)) return false;
-    if (!PickPhysicalDevice()) return false;
+    if (!CreateInstance(nego))
+        return false;
+    if (!PickPhysicalDevice())
+        return false;
 
     retro_vulkan_context ctx{};
     // Headless: no surface. Ask the core for exactly the GPU we picked.
-    bool created = nego->create_device(&ctx, g.instance, g.gpu, VK_NULL_HANDLE,
-                                       vkGetInstanceProcAddr,
+    bool created = nego->create_device(&ctx, g.instance, g.gpu, VK_NULL_HANDLE, vkGetInstanceProcAddr,
                                        /*required_device_extensions*/ nullptr, 0,
                                        /*required_device_layers*/ nullptr, 0,
                                        /*required_features*/ nullptr);
@@ -336,14 +353,17 @@ bool Readback(std::vector<uint8_t>& out, uint32_t w, uint32_t h, size_t& pitch) 
     VkImageLayout srcLayout;
     {
         std::lock_guard<std::mutex> lk(g.imgMtx);
-        if (!g.ok || !g.haveImage || g.srcImage == VK_NULL_HANDLE) return false;
+        if (!g.ok || !g.haveImage || g.srcImage == VK_NULL_HANDLE)
+            return false;
         src = g.srcImage;
         srcLayout = g.srcLayout;
     }
     const uint32_t sw = w, sh = h;
-    if (!sw || !sh) return false;
+    if (!sw || !sh)
+        return false;
 
-    if (!EnsureLinearImage(sw, sh)) return false;
+    if (!EnsureLinearImage(sw, sh))
+        return false;
 
     vkResetFences(g.device, 1, &g.fence);
     vkResetCommandBuffer(g.cmd, 0);
@@ -359,15 +379,14 @@ bool Readback(std::vector<uint8_t>& out, uint32_t w, uint32_t h, size_t& pitch) 
                  VK_PIPELINE_STAGE_ALL_COMMANDS_BIT, VK_PIPELINE_STAGE_TRANSFER_BIT);
     // Linear staging: UNDEFINED → TRANSFER_DST.
     ImageBarrier(g.cmd, g.linImg, VK_IMAGE_LAYOUT_UNDEFINED, VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL, 0,
-                 VK_ACCESS_TRANSFER_WRITE_BIT, VK_PIPELINE_STAGE_TOP_OF_PIPE_BIT,
-                 VK_PIPELINE_STAGE_TRANSFER_BIT);
+                 VK_ACCESS_TRANSFER_WRITE_BIT, VK_PIPELINE_STAGE_TOP_OF_PIPE_BIT, VK_PIPELINE_STAGE_TRANSFER_BIT);
 
     VkImageCopy region{};
-    region.srcSubresource = {VK_IMAGE_ASPECT_COLOR_BIT, 0, 0, 1};
-    region.dstSubresource = {VK_IMAGE_ASPECT_COLOR_BIT, 0, 0, 1};
-    region.extent = {sw, sh, 1};
-    vkCmdCopyImage(g.cmd, src, VK_IMAGE_LAYOUT_TRANSFER_SRC_OPTIMAL, g.linImg,
-                   VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL, 1, &region);
+    region.srcSubresource = { VK_IMAGE_ASPECT_COLOR_BIT, 0, 0, 1 };
+    region.dstSubresource = { VK_IMAGE_ASPECT_COLOR_BIT, 0, 0, 1 };
+    region.extent = { sw, sh, 1 };
+    vkCmdCopyImage(g.cmd, src, VK_IMAGE_LAYOUT_TRANSFER_SRC_OPTIMAL, g.linImg, VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL, 1,
+                   &region);
 
     // Linear staging: make writes visible to the host.
     ImageBarrier(g.cmd, g.linImg, VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL, VK_IMAGE_LAYOUT_GENERAL,
@@ -395,7 +414,7 @@ bool Readback(std::vector<uint8_t>& out, uint32_t w, uint32_t h, size_t& pitch) 
     // Read the linear image row by row, swizzling R8G8B8A8 → XRGB8888
     // (LE bytes B,G,R,X) so downstream consumers (compositor, PPM dumps) that
     // treat g_az_buf as XRGB8888 stay correct.
-    VkImageSubresource sub{VK_IMAGE_ASPECT_COLOR_BIT, 0, 0};
+    VkImageSubresource sub{ VK_IMAGE_ASPECT_COLOR_BIT, 0, 0 };
     VkSubresourceLayout lay{};
     vkGetImageSubresourceLayout(g.device, g.linImg, &sub, &lay);
 
@@ -405,17 +424,18 @@ bool Readback(std::vector<uint8_t>& out, uint32_t w, uint32_t h, size_t& pitch) 
         return false;
     }
     const size_t dstPitch = static_cast<size_t>(sw) * 4;
-    if (out.size() < dstPitch * sh) out.resize(dstPitch * sh);
+    if (out.size() < dstPitch * sh)
+        out.resize(dstPitch * sh);
     const uint8_t* base = static_cast<const uint8_t*>(mapped) + lay.offset;
     for (uint32_t y = 0; y < sh; y++) {
         const uint8_t* srcRow = base + static_cast<size_t>(y) * lay.rowPitch;
         uint8_t* dstRow = out.data() + static_cast<size_t>(y) * dstPitch;
         for (uint32_t x = 0; x < sw; x++) {
             const uint8_t* p = srcRow + static_cast<size_t>(x) * 4; // R,G,B,A
-            dstRow[x * 4 + 0] = p[2]; // B
-            dstRow[x * 4 + 1] = p[1]; // G
-            dstRow[x * 4 + 2] = p[0]; // R
-            dstRow[x * 4 + 3] = 0xFF; // X
+            dstRow[x * 4 + 0] = p[2];                               // B
+            dstRow[x * 4 + 1] = p[1];                               // G
+            dstRow[x * 4 + 2] = p[0];                               // R
+            dstRow[x * 4 + 3] = 0xFF;                               // X
         }
     }
     vkUnmapMemory(g.device, g.linMem);

@@ -41,7 +41,7 @@ u8 sMotionBlurStatus;
 #include "overlays/gamestates/ovl_file_choose/z_file_select.h"
 #include "debug.h"
 #include "BenPort.h"
-#include <fast/zelda3d_gl.h> // shared unified renderer: Zelda3D_GL_FrameBegin (one renderer, both games)
+#include <fast/zelda3d_submission.h> // shared unified renderer frame lifecycle
 #include "2s2h/zelda3d/mm3d_draw.h" // Zelda3D_ShouldSuppressBgImageSkybox (bg-image guard, MM analog of OoT #134)
 #include "2s2h/GameInteractor/GameInteractor.h"
 #include "2s2h/Enhancements/FrameInterpolation/FrameInterpolation.h"

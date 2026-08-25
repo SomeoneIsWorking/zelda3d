@@ -2,7 +2,8 @@
 #include "init/ShipInit.hpp"
 
 extern "C" {
-#include "functions.h"
+#include "functions/game_state.h"
+#include "functions/ui.h"
 #include "src/overlays/actors/ovl_En_Ge1/z_en_ge1.h"
 extern SaveContext gSaveContext;
 

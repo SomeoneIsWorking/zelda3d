@@ -1,8 +1,11 @@
+#include "soh/OTRGlobals.h"
+#include "soh/host/item_randomizer_bridge.h"
 #include "randomizer_check_tracker.h"
 #include "randomizer_entrance_tracker.h"
 #include "randomizer_item_tracker.h"
 #include "randomizerTypes.h"
-#include "soh/OTRGlobals.h"
+
+#include "soh/host/math_constants.h"
 #include "soh/cvar_prefixes.h"
 #include "soh/SaveManager.h"
 #include "soh/ResourceManagerHelpers.h"
@@ -31,7 +34,6 @@
 
 extern "C" {
 #include "variables.h"
-#include "functions.h"
 #include "macros.h"
 extern PlayState* gPlayState;
 }

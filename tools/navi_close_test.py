@@ -3,7 +3,8 @@
 
 Structured close-test for #140 (Navi still renders as the N64 fairy sprite).
 
-The observable is a runtime probe in `Zelda3D_Sg_DrawModel` (zelda3d_sdl3gpu.cpp):
+The observable is the pass-owned runtime probe in `Zelda3D_Sg_DrawModel`
+(`zelda3d_sdl3gpu_pass.cpp`, reached through the C ABI adapter):
 each frame it logs one line per DrawModel of the sun/Navi billboard model id (2002 in
 a typical run) with `sky=<0|1>`. Sun and moon emit with `sky=1`; the OoT3D Navi port
 emits at Navi's world.pos with `sky=0`. So the presence of a `sky=0` DrawModel line
@@ -42,8 +43,9 @@ def repl(cmd, timeout=15):
 
 def main():
     subprocess.run(
-        "ZELDA3D_HEADLESS=1 tools/zelda3d_game.sh restart 0x157 0x8001",
-        shell=True, cwd=REPO, capture_output=True, text=True, timeout=90,
+        [sys.executable, "tools/zelda3d_game.py", "restart", "0x157", "0x8001"],
+        env={**os.environ, "ZELDA3D_HEADLESS": "1"},
+        cwd=REPO, capture_output=True, text=True, timeout=90,
     )
     time.sleep(6)
     # Give the game a few actor-draw passes so Navi's Draw path runs.
@@ -56,7 +58,7 @@ def main():
     with open(LOG, "r", errors="replace") as f:
         log = f.read()
 
-    # Runtime probe format (Zelda3D_Sg_DrawModel in zelda3d_sdl3gpu.cpp):
+    # Runtime probe format (RecordSubmissionProbe in zelda3d_sdl3gpu_pass.cpp):
     #   [Zelda3D sgDraw #<n>] modelId=2002 sky=<0|1> lit=<0|1> ...
     hits_sun = re.findall(r"\[Zelda3D sgDraw #\d+\] modelId=2002 sky=1\b", log)
     hits_navi = re.findall(r"\[Zelda3D sgDraw #\d+\] modelId=2002 sky=0\b", log)

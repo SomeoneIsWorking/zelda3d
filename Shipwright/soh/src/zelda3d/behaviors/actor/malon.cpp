@@ -16,6 +16,7 @@
 // z_en_ma2.h (conflict in one TU). En_Ma3's struct is byte-identical to EnMa2, so En_Ma3 actors are
 // read through EnMa2* below (the fields used — interactInfo/eyeIndex/mouthIndex — match exactly).
 #include "malon.h"
+#include "npc_draw.h"
 
 namespace Zelda3D {
 

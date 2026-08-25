@@ -1,8 +1,6 @@
 #include <libultraship/libultra.h>
 #include "global.h"
 #include "vt.h"
-#include "zelda3d/zelda3d.h" // Zelda3D_Once -- the camera register table is run-scoped
-
 #include <string.h>
 
 #include "overlays/actors/ovl_En_Horse/z_en_horse.h"
@@ -1015,7 +1013,7 @@ s32 Camera_CalcAtDefault(Camera* camera, VecSph* eyeAtDir, f32 extraYOffset, s16
                          0.1f);
 
     atTarget.x = playerPosRot->pos.x + camera->posOffset.x;
-    atTarget.y = playerPosRot->pos.y + camera->posOffset.y;
+    atTarget.y = playerPosRot->pos.y + camera->posOffset.y + Zelda3D_CameraAtDefaultYBias(camera->player);
     atTarget.z = playerPosRot->pos.z + camera->posOffset.z;
 
     Camera_LERPCeilVec3f(&atTarget, at, camera->atLERPStepScale, camera->atLERPStepScale, 0.2f);

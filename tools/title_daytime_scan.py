@@ -35,12 +35,13 @@ from pathlib import Path
 
 REPO = Path(__file__).resolve().parent.parent
 sys.path.insert(0, str(REPO / "tools"))
-import harness_ctl as hc  # noqa: E402
+from harness_process import spawn  # noqa: E402
+from harness_transport import Harness  # noqa: E402
 
 SAVESTATE = REPO / "scratch" / "title_settled.state"
 
 
-def read_az_daytime(h: hc.Harness) -> int:
+def read_az_daytime(h: Harness) -> int:
     r = h.send("az_daytime")
     m = re.search(r"daytime=0x([0-9a-fA-F]+)", r)
     if not m:
@@ -48,7 +49,7 @@ def read_az_daytime(h: hc.Harness) -> int:
     return int(m.group(1), 16)
 
 
-def read_az_csframe(h: hc.Harness) -> int:
+def read_az_csframe(h: Harness) -> int:
     lines = h.send_multiline("force titletime_read")
     for ln in lines:
         m = re.search(r"az=0x0054CC3C:\s*(\d+)", ln)
@@ -64,7 +65,7 @@ def main():
     ap.add_argument("--savestate", default=str(SAVESTATE))
     args = ap.parse_args()
 
-    h = hc.spawn(save_state=args.savestate)
+    h = spawn(save_state=args.savestate)
     rows = []
     cs0 = read_az_csframe(h)
     dt0 = read_az_daytime(h)

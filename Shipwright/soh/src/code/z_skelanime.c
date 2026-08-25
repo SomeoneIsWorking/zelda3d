@@ -5,8 +5,8 @@
 #include <assert.h>
 #include "soh/ResourceManagerHelpers.h"
 #include "soh/Enhancements/game-interactor/GameInteractor_Hooks.h"
-#include "zelda3d/zelda3d.h"
-
+#include "zelda3d/anim/skeleton_draw_bridge.h"
+#include "zelda3d/behaviors/actor/cucco_wing_override.h"
 #define ANIM_INTERP 1
 
 s32 LinkAnimation_Loop(PlayState* play, SkelAnime* skelAnime);
@@ -308,8 +308,8 @@ void SkelAnime_DrawLimbOpa(PlayState* play, s32 limbIndex, void** skeleton, Vec3
 // N64 limb matrix walk purely for those side effects (gZelda3dColliderPass suppresses the OoT3D
 // replacement so the real walk runs), then rewind the gfx buffers so none of the N64 geometry renders.
 // gZelda3dColliderPass is declared in zelda3d/zelda3d.h.
-static void Zelda3D_UpdateSkelColliders(PlayState* play, SkelAnime* skelAnime,
-                                      OverrideLimbDrawOpa overrideLimbDraw, PostLimbDrawOpa postLimbDraw, void* arg) {
+static void Zelda3D_UpdateSkelColliders(PlayState* play, SkelAnime* skelAnime, OverrideLimbDrawOpa overrideLimbDraw,
+                                        PostLimbDrawOpa postLimbDraw, void* arg) {
     Gfx* opaP = play->state.gfxCtx->polyOpa.p;
     Gfx* xluP = play->state.gfxCtx->polyXlu.p;
     gZelda3dColliderPass = 1;

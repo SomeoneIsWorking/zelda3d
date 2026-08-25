@@ -80,7 +80,7 @@
 #include "objects/object_st/object_st.h"
 
 #include "soh_assets.h"
-#include "zelda3d/zelda3d.h" // Zelda3D get-item replacement (Zelda3D_TryDrawGetItem)
+#include "zelda3d/render/get_item_render.h"
 
 // "Get Item" Model Draw Functions
 void GetItem_DrawMaskOrBombchu(PlayState* play, s16 drawId);

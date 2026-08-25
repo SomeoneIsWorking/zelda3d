@@ -6,7 +6,7 @@
 namespace Zelda3D {
 
 class EnVbBallBehavior : public ActorBehavior {
-public:
+  public:
     s16 actorId() const override;
     bool tryDrawModel(PlayState* play, Actor* actor) override;
 };

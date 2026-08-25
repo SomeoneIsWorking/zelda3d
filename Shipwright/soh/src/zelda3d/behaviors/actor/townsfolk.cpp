@@ -9,15 +9,15 @@
 // State read through the EnHy C struct (64-bit build — never raw N64 offsets).
 #include "z64.h"
 #include "src/overlays/actors/ovl_En_Hy/z_en_hy.h"
+#include "npc_draw.h"
 #include "townsfolk.h"
 #include "townsfolk_body_colors.h"
+#include "fast/zelda3d_material_overrides.h"
 
 #include <cstring>
 
 extern "C" {
 const char* Zelda3D_AutoModelZar(int modelId);
-void Zelda3D_GL_SetMatConstOverride(int modelId, int materialIndex, int constIdx,
-                                   float r, float g, float b, float a);
 }
 
 namespace Zelda3D {
@@ -32,14 +32,11 @@ struct HyArchetype {
 };
 
 static constexpr HyArchetype kArchetypes[] = {
-    { "zelda_boj", 9, 8, 3 },  // Hylian man 1
-    { "zelda_ahg", 15, 8, 3 }, // Hylian man 2
-    { "zelda_bji", 10, 9, 3 }, // Hylian old man
-    { "zelda_cne", 14, 7, -1 },
-    { "zelda_aob", 10, 9, 1 }, // Hylian woman 1
-    { "zelda_cob", 12, 5, -1 },
-    { "zelda_bba", 7, 6, -1 },
-    { "zelda_bob", 14, 7, 1 }, // Hylian woman 3
+    { "zelda_boj", 9, 8, 3 },                                                         // Hylian man 1
+    { "zelda_ahg", 15, 8, 3 },                                                        // Hylian man 2
+    { "zelda_bji", 10, 9, 3 },                                                        // Hylian old man
+    { "zelda_cne", 14, 7, -1 }, { "zelda_aob", 10, 9, 1 },                            // Hylian woman 1
+    { "zelda_cob", 12, 5, -1 }, { "zelda_bba", 7, 6, -1 }, { "zelda_bob", 14, 7, 1 }, // Hylian woman 3
 };
 
 s16 TownsfolkBehavior::actorId() const {
@@ -78,10 +75,52 @@ void TownsfolkBehavior::applyDrawOverrides(int modelId, Actor* actor, bool track
     int type = actor->params & 0x7F;
     int nOv = TownsfolkBodyColorOverrides(type, bodyOv);
     for (int i = 0; i < nOv; i++) {
-        Zelda3D_GL_SetMatConstOverride(modelId, bodyOv[i].matIdx, bodyOv[i].constIdx,
-                                       bodyOv[i].rgba[0], bodyOv[i].rgba[1],
-                                       bodyOv[i].rgba[2], bodyOv[i].rgba[3]);
+        Zelda3D_GL_SetMatConstOverride(modelId, bodyOv[i].matIdx, bodyOv[i].constIdx, bodyOv[i].rgba[0],
+                                       bodyOv[i].rgba[1], bodyOv[i].rgba[2], bodyOv[i].rgba[3]);
     }
 }
 
 } // namespace Zelda3D
+
+// OoT3D chooses these En_Hy idle clips from the per-type animation pool. The automatic model
+// default is only correct for types omitted from this switch.
+extern "C" const char* Zelda3D_EnHyCsabOverride(int modelId, Actor* actor) {
+    (void)modelId;
+    if (actor == nullptr || actor->id != ACTOR_EN_HY) {
+        return nullptr;
+    }
+
+    switch (actor->params & 0x7F) {
+        case 4:
+        case 17:
+            return "Ahg2_8";
+        case 13:
+        case 20:
+            return "Ahg2_18";
+        case 6:
+            return "Bba_n_wait";
+        case 15:
+        case 19:
+            return "Bji2_20";
+        case 3:
+            return "Boj2_5";
+        case 5:
+            return "Boj2_9";
+        case 9:
+            return "Boj_13";
+        case 10:
+            return "Boj_14";
+        case 12:
+            return "Boj2_17";
+        case 14:
+            return "Boj2_19";
+        case 16:
+            return nullptr; // Boj_matsu is already the correct automatic default.
+        case 8:
+            return "Cne_n_wait";
+        case 11:
+            return "Cne2_15";
+        default:
+            return nullptr;
+    }
+}

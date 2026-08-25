@@ -2,7 +2,7 @@
 #define SHUFFLEROCKS_H
 
 #include <z64.h>
-#include <soh/OTRGlobals.h>
+
 
 #ifdef __cplusplus
 extern "C" {

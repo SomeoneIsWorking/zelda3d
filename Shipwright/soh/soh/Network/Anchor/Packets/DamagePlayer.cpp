@@ -5,7 +5,9 @@
 
 extern "C" {
 #include "macros.h"
-#include "functions.h"
+#include "functions/actors.h"
+#include "functions/math.h"
+#include "functions/player.h"
 extern PlayState* gPlayState;
 void func_80838280(Player* player);
 }

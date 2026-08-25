@@ -1,12 +1,12 @@
 
 #include "gui/Notification.h"
 #include <libultraship/libultraship.h>
-#include "soh/OTRGlobals.h"
+
 
 #include <fast/Fast3dGui.h>
 
 extern "C" {
-#include "functions.h"
+#include "functions/audio.h"
 #include "macros.h"
 #include "variables.h"
 }

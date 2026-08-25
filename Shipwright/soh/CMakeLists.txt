@@ -20,7 +20,11 @@ set (BUILD_SHARED_LIBS OFF CACHE STRING "install/link shared instead of static l
 ################################################################################
 if (CMAKE_SYSTEM_NAME STREQUAL "Windows")
     if(NOT CMAKE_VS_PLATFORM_NAME)
-        set(CMAKE_VS_PLATFORM_NAME "x64")
+        if(VCPKG_TARGET_TRIPLET MATCHES "^arm64-")
+            set(CMAKE_VS_PLATFORM_NAME "arm64")
+        else()
+            set(CMAKE_VS_PLATFORM_NAME "x64")
+        endif()
     endif()
     if("${CMAKE_VS_PLATFORM_NAME}" MATCHES "^[Aa][Rr][Mm]64$")
         set(SOH_WINDOWS_ARM64 TRUE)
@@ -149,7 +153,9 @@ set(Header_Files "resource.h")
 source_group("headers" FILES ${Header_Files})
 
 # include {{{
-file(GLOB Header_Files__include CONFIGURE_DEPENDS "include/*.h" "include/*.inc")
+file(GLOB_RECURSE Header_Files__include CONFIGURE_DEPENDS "include/*.h" "include/*.inc")
+set(SOH_FUNCTION_OWNER_HEADERS ${Header_Files__include})
+list(FILTER SOH_FUNCTION_OWNER_HEADERS INCLUDE REGEX "/include/functions/[^/]+\\.h$")
 list(APPEND Header_Files__include ${CMAKE_CURRENT_SOURCE_DIR}/include/libc/stdarg.h)
 list(REMOVE_ITEM Header_Files__include ${CMAKE_CURRENT_SOURCE_DIR}/include/bgm.h)
 list(REMOVE_ITEM Header_Files__include ${CMAKE_CURRENT_SOURCE_DIR}/include/math_n64.h)
@@ -228,6 +234,25 @@ endif()
 # src (decomp) {{{
 file(GLOB_RECURSE src__ RELATIVE ${CMAKE_CURRENT_SOURCE_DIR} CONFIGURE_DEPENDS "src/*.c" "src/*.cpp" "src/*.h")
 set_source_files_properties(${src__} PROPERTIES COMPILE_OPTIONS "${WARNING_OVERRIDE}")
+set(SOH_LEGACY_DECOMP_SOURCES ${src__})
+list(FILTER SOH_LEGACY_DECOMP_SOURCES EXCLUDE REGEX "^src/zelda3d/")
+
+include(${ZELDA3D_SHARED_DIR}/cmake/LegacySourceContracts.cmake)
+
+# Upstream decomp sources intentionally retain their generated include boundary. The old global
+# function header supplied every engine declaration through global.h; responsibility-owned headers
+# now replace that declaration store without adding port-only include churn to 700+ decomp files.
+# Force the focused headers themselves at this build boundary: there is no aggregate compatibility
+# header, while authored soh/ and src/zelda3d/ code must name every owner it consumes directly.
+set(SOH_LEGACY_DECOMP_COMPILE_OPTIONS ${WARNING_OVERRIDE})
+zelda3d_c_forced_include_options(SOH_FUNCTION_OWNER_COMPILE_OPTIONS
+    HEADERS ${SOH_FUNCTION_OWNER_HEADERS})
+list(APPEND SOH_LEGACY_DECOMP_COMPILE_OPTIONS ${SOH_FUNCTION_OWNER_COMPILE_OPTIONS})
+set_source_files_properties(${SOH_LEGACY_DECOMP_SOURCES}
+    PROPERTIES COMPILE_OPTIONS "${SOH_LEGACY_DECOMP_COMPILE_OPTIONS}")
+
+include(CMake/Zelda3DLegacySourceContracts.cmake)
+soh_apply_zelda3d_legacy_source_contracts("${CMAKE_CURRENT_SOURCE_DIR}")
 
 list(APPEND src__ ${CMAKE_CURRENT_SOURCE_DIR}/Resource.rc)
 list(FILTER src__ EXCLUDE REGEX "src/dmadata/")
@@ -331,9 +356,8 @@ endif()
 
 # Game engine as a static library. Everything the SoH3D runtime needs —
 # N64 subsystem, boot chain, hooks, RunFrame, Main_Init/Main_Shutdown, all the zelda3d/ port code.
-# A separate static lib rather than sources on the core directly, because the RE harness
-# (tools/soh3d_harness/) links this same code and drives its own frame loop — it supplies its own
-# main(), which is why nothing here may define one.
+# The shared soh_core below consumes these same objects. The embedded RE harness imports that
+# shipping shared core and drives its own frame loop, so nothing in this library may define main().
 add_library(soh_lib STATIC ${ALL_FILES})
 target_link_libraries(soh_lib PUBLIC soh_settings)
 
@@ -411,13 +435,7 @@ if (CMAKE_SYSTEM_NAME STREQUAL "Windows")
 endif()
 include(FetchContent)
 
-# SDL3-MIGRATION: project migrated SDL2 -> SDL3 (system SDL3 3.4.10).
 find_package(SDL3 REQUIRED)
-set(SDL2-INCLUDE ${SDL3_INCLUDE_DIRS})
-
-# SDL3-MIGRATION: SDL3_net is not available on this system and the codebase has
-# no SDL_net (SDLNet_*) call sites, so the net dependency is dropped entirely.
-set(SDL2-NET-INCLUDE "")
 
 if (ESPEAK)
     add_compile_definitions(ESPEAK=1)
@@ -433,8 +451,7 @@ target_include_directories(soh_settings INTERFACE assets
     ${CMAKE_CURRENT_SOURCE_DIR}/src/
     ${CMAKE_CURRENT_SOURCE_DIR}/../libultraship/include
     ${CMAKE_CURRENT_SOURCE_DIR}/../ZAPDTR/ZAPD/resource/type
-    ${SDL2-INCLUDE}
-    ${SDL2-NET-INCLUDE}
+    ${SDL3_INCLUDE_DIRS}
     ${CMAKE_CURRENT_SOURCE_DIR}/assets/
     ${dr_libs_SOURCE_DIR}
     .
@@ -764,9 +781,7 @@ if (CMAKE_SYSTEM_NAME STREQUAL "Windows")
             "libultraship;"
             "ZAPDLib;"
             "glu32;"
-            "SDL2::SDL2;"
-            "SDL2::SDL2main;"
-            "SDL2_net::SDL2_net-static"
+            "SDL3::SDL3;"
             "glfw;"
             "winmm;"
             "imm32;"
@@ -784,8 +799,7 @@ if (CMAKE_SYSTEM_NAME STREQUAL "Windows")
             "libultraship;"
             "ZAPDLib;"
             "glu32;"
-            "SDL2::SDL2;"
-            "SDL2::SDL2main;"
+            "SDL3::SDL3;"
             "glfw;"
             "winmm;"
             "imm32;"
@@ -835,7 +849,6 @@ else()
         "Vorbis::vorbisfile"
         "Opus::opus"
         "Opusfile::Opusfile"
-        # SDL3-MIGRATION: SDL2_net dropped (no SDL3_net, no SDLNet_* usage in source).
         ${CMAKE_DL_LIBS}
         Threads::Threads
     )
@@ -869,6 +882,10 @@ if(CMAKE_SYSTEM_NAME MATCHES "NintendoSwitch|CafeOS")
     target_link_libraries(soh_settings INTERFACE "${ADDITIONAL_LIBRARY_DEPENDENCIES}" $<TARGET_OBJECTS:pathconf> )
 else()
     target_link_libraries(soh_settings INTERFACE "${ADDITIONAL_LIBRARY_DEPENDENCIES}")
+endif()
+
+if(LUS_BUILD_TESTS)
+    add_subdirectory(tests)
 endif()
 
 # The inherited Switch (.nro) and Wii U (.rpx/.wuhb) packaging blocks were DELETED here rather than

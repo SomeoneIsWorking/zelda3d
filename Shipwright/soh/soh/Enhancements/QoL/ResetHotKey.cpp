@@ -1,8 +1,7 @@
 #include <libultraship/bridge.h>
 #include "soh/Enhancements/game-interactor/GameInteractor.h"
 #include "init/ShipInit.hpp"
-#include "functions.h"
-#include "soh/OTRGlobals.h"
+#include "soh/host/controller_buttons.h"
 
 extern "C" {
 #include "z64.h"

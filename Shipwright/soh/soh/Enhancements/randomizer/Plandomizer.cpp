@@ -10,7 +10,7 @@
 #include <fstream>
 #include <filesystem>
 
-#include "soh/OTRGlobals.h"
+
 #include "soh/SohGui/ImGuiUtils.h"
 #include "soh/Enhancements/randomizer/logic.h"
 #include "soh/Enhancements/randomizer/randomizer_check_objects.h"

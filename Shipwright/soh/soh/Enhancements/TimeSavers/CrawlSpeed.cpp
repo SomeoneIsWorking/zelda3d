@@ -5,7 +5,10 @@
 #include "global.h"
 
 extern "C" {
-#include "functions.h"
+#include "functions/animation.h"
+#include "functions/camera_cutscene.h"
+#include "functions/game_state.h"
+#include "functions/player.h"
 #include "objects/gameplay_keep/gameplay_keep.h"
 extern PlayState* gPlayState;
 }

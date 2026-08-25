@@ -9,7 +9,7 @@
 namespace Zelda3D {
 
 class ObjKibako2Behavior : public ActorBehavior {
-public:
+  public:
     s16 actorId() const override;
     // Draws the OoT3D large-crate CMB at the actor's world.pos + shape.rot, suppressing the N64 crate.
     bool tryDrawModel(PlayState* play, Actor* actor) override;

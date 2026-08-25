@@ -1,6 +1,10 @@
 #include "SohRmlUi.h"
-#include <vector>
+#include "Zelda3DRmlUiRegistry.h"
 
+#include <ship/zelda3d_diagnostics_bridge.h>
+#include <ship/zelda3d_launcher_bridge.h>
+#include <ship/zelda3d_menu_state.h>
+#include <vector>
 #include "RmlUi_Platform_SDL.h"
 #ifdef ENABLE_SDL3GPU
 #include "RmlRenderInterfaceSdl3Gpu.h"
@@ -23,59 +27,6 @@
 #include <algorithm>
 #include <cstdio>
 #include <cstdlib>
-
-// Zelda3D render toggles live as extern "C" ints in libultraship's zelda3d_gl.cpp (the live state the
-// GL pass reads each frame). The RML rows flip these directly for an immediate, visible effect and
-// persist the choice to a CVar (which the GL pass also reads to seed the global at first use).
-extern "C" {
-}
-
-// Debug-menu warp request: a row with `warp="<entrance>"` sets this to the target entrance index;
-// zelda3d.c's per-frame Zelda3D_ReplPoll consumes it (it has the PlayState) and triggers the scene
-// transition. -1 = nothing pending. Defined here (libultraship) so soh can extern-reference it.
-extern "C" int gZelda3dMenuWarp = -1;
-
-// Debug-menu restart request: a row with `restart="1"` sets this to 1; zelda3d.c's per-frame
-// Zelda3D_ReplPoll consumes it (it has the PlayState) and returns to the title screen.
-extern "C" int gZelda3dMenuRestart = 0;
-// Launcher choice, consumed by the zelda3d layer (which owns process control -- this layer must not
-// exec anything). 0 = nothing chosen yet, 1 = Ocarina of Time, 2 = Majora's Mask, 3 = quit.
-// Set from the launcher document's `action="..."` rows exactly as the warp/restart rows above work.
-extern "C" int gZelda3dLauncherAction = 0;
-// The live SohRmlUi (there is exactly one, owned by Fast3dGui), so the C shims at the bottom of this
-// file can drive the launcher from the zelda3d REPL without exposing RmlUi types.
-namespace Ship {
-class SohRmlUi;
-}
-static Ship::SohRmlUi* sLiveRmlUi = nullptr;
-
-// Link render/anim mode, cycled by the `linkmode` row: 0 = N64 model + N64 anim, 1 = 3DS model +
-// N64-retarget anim, 2 = 3DS model + 3DS-own CSAB anim. zelda3d.c's Zelda3D_ReplPoll applies it to
-// gZelda3dLinkOn/gZelda3dLinkAnimSrc (and seeds it from the current mode on the first frame). DEFINED
-// here in libultraship because charcompare also links against it.
-extern "C" int gZelda3dMenuLinkMode = 0;
-
-// Time-of-day applied on the NEXT Debug-menu warp, cycled by the `warptime` row: 0 = scene default
-// (clock runs), 1 = Day, 2 = Night. zelda3d.c reads this when it consumes gZelda3dMenuWarp and sets
-// gZelda3dForceTime before the transition (so the new scene's Play_Init picks the right day/night set).
-extern "C" int gZelda3dMenuWarpTime = 0;
-
-// Generated stair step size, cycled by the `stairsize` row: 0 = Small, 1 = Medium, 2 = Large.
-// zelda3d.c's Zelda3D_ReplPoll maps it to a step rise (Zelda3D_SetStairRiserY) and seeds it from the
-// current rise on the first frame.
-extern "C" int gZelda3dMenuStairSize = 1;
-
-// Debug-warp era applied to the NEXT Level-Select / Boss / Dungeon warp: 0 = Default (keep the
-// current age), 1 = Child (past), 2 = Adult (future). zelda3d.c sets gSaveContext.linkAge from this
-// before the warp, so Play_Init picks the child vs adult scene-setup layer (the past/future variant
-// of the destination). Composes with gZelda3dMenuWarpTime (day/night).
-extern "C" int gZelda3dMenuWarpAge = 0;
-
-// Live on-screen diagnostics text (Link coords / scene / yaw / floor). Owned here (libultraship,
-// no PlayState) and rewritten every frame by zelda3d.c's Zelda3D_ReplPoll, which DOES have the
-// PlayState. The "Diag" RML pane's #diagtext element is refreshed from this buffer each frame
-// (SohRmlUi::RefreshDiag), so a screenshot of that tab reports coords without the REPL FIFO.
-extern "C" char gZelda3dDiagText[512] = "(waiting for game state...)";
 
 // Unique id for blocking game input while the RML menu is open (sequence continues the existing
 // *_BLOCK_ID constants in gfx_dxgi.cpp / InputEditorWindow.cpp). Without this, SoH polls the
@@ -127,9 +78,9 @@ struct KnobSpec {
     int step;
 };
 static const KnobSpec kKnobs[] = {
-    { "vol-master",     "gSettings.Volume.Master",    40,   0, 100, 10 },
-    { "vol-music",      "gSettings.Volume.MainMusic", 100,  0, 100, 10 },
-    { "vol-sfx",        "gSettings.Volume.SFX",       100,  0, 100, 10 },
+    { "vol-master", "gSettings.Volume.Master", 40, 0, 100, 10 },
+    { "vol-music", "gSettings.Volume.MainMusic", 100, 0, 100, 10 },
+    { "vol-sfx", "gSettings.Volume.SFX", 100, 0, 100, 10 },
 };
 static const KnobSpec* FindKnob(const Rml::String& id) {
     for (const auto& k : kKnobs) {
@@ -170,8 +121,8 @@ static bool StepKnob(const KnobSpec& k, int direction) {
 // the on/off toggles these have N states. The displayed `<value>` is the current label.
 struct CycleSpec {
     const char* id;
-    int* live;                 // menu global (also defined as extern "C" above)
-    const char* labels[4];     // labels[0..count-1]
+    int* live;             // menu global (also defined as extern "C" above)
+    const char* labels[4]; // labels[0..count-1]
     int count;
 };
 static const CycleSpec kCycles[] = {
@@ -206,7 +157,8 @@ static bool sRmlLibraryInitialised = false;
 // Left/Right keyboard/D-pad tab nav). Owned by SohRmlUi::mTabClickListeners.
 class TabClickListener : public Rml::EventListener {
   public:
-    TabClickListener(SohRmlUi* ui, int index) : mUi(ui), mIndex(index) {}
+    TabClickListener(SohRmlUi* ui, int index) : mUi(ui), mIndex(index) {
+    }
     void ProcessEvent(Rml::Event& /*event*/) override {
         mUi->SetActiveTab(mIndex);
     }
@@ -222,7 +174,8 @@ class TabClickListener : public Rml::EventListener {
 // than duplicating it, so mouse and keyboard cannot drift apart.
 class LauncherRowClickListener : public Rml::EventListener {
   public:
-    LauncherRowClickListener(SohRmlUi* ui, Rml::Element* el) : mUi(ui), mEl(el) {}
+    LauncherRowClickListener(SohRmlUi* ui, Rml::Element* el) : mUi(ui), mEl(el) {
+    }
     void ProcessEvent(Rml::Event& /*event*/) override {
         if (mEl) {
             mEl->Focus();
@@ -240,15 +193,7 @@ SohRmlUi::SohRmlUi() = default;
 SohRmlUi::~SohRmlUi() {
     Shutdown();
 
-    // sLiveRmlUi is how the C REPL shims (launcher show/hit-test/activate-row) reach the live
-    // instance, and Init sets it to `this` with nothing ever clearing it. Destroying the instance
-    // therefore left those shims holding a freed object -- reachable from outside the process via
-    // the REPL, which is exactly how the switch gate drives the chooser. Guarded on identity rather
-    // than cleared unconditionally: if a newer instance has already claimed the slot, an older one
-    // being destroyed must not steal it back to null.
-    if (sLiveRmlUi == this) {
-        sLiveRmlUi = nullptr;
-    }
+    Zelda3DRmlUiRegistry::Detach(this);
 }
 
 bool SohRmlUi::Init(void* sdlWindow, void* glContext, int width, int height, bool vulkan, bool sdl3gpu) {
@@ -344,7 +289,7 @@ bool SohRmlUi::Init(void* sdlWindow, void* glContext, int width, int height, boo
 
     SPDLOG_INFO("[SohRmlUi] RmlUi initialised ({}x{}) — {} (SDL3 GPU)", mWidth, mHeight, docPath);
     mInitialised = true;
-    sLiveRmlUi = this; // reachable from the C REPL shims above
+    Zelda3DRmlUiRegistry::Attach(this);
     // Debug: open the menu at startup (deterministic verification via the screenshot harness, no
     // input injection needed). Normal use opens it with ESC / the Start button.
     if (const char* e = std::getenv("ZELDA3D_RMLUI_OPEN"); e && e[0] == '1') {
@@ -398,9 +343,8 @@ void SohRmlUi::LoadLauncherFonts() {
             std::ifstream in(path, std::ios::binary);
             sFontBuffers.emplace_back((std::istreambuf_iterator<char>(in)), std::istreambuf_iterator<char>());
             const std::vector<Rml::byte>& data = sFontBuffers.back();
-            ok = !data.empty() &&
-                 Rml::LoadFontFace(Rml::Span<const Rml::byte>(data.data(), data.size()), f.family,
-                                   Rml::Style::FontStyle::Normal, f.weight, false);
+            ok = !data.empty() && Rml::LoadFontFace(Rml::Span<const Rml::byte>(data.data(), data.size()), f.family,
+                                                    Rml::Style::FontStyle::Normal, f.weight, false);
         }
         // A missing face is reported, never swallowed: the symptom otherwise is text that simply
         // does not draw, with the cause buried in an RmlUi warning per element per frame.
@@ -409,17 +353,6 @@ void SohRmlUi::LoadLauncherFonts() {
                          f.family ? f.family : "<own>");
         }
     }
-}
-
-// C shims: the zelda3d REPL drives the launcher but must not include RmlUi headers. A file-static
-// pointer to the live instance is enough -- there is exactly one, owned by Fast3dGui.
-extern "C" void Zelda3D_LauncherShow(int show) {
-    if (sLiveRmlUi) {
-        sLiveRmlUi->ShowLauncher(show != 0);
-    }
-}
-extern "C" int Zelda3D_LauncherIsVisible(void) {
-    return (sLiveRmlUi && sLiveRmlUi->IsLauncherVisible()) ? 1 : 0;
 }
 
 // Brighten the half that currently has focus. In Zelda64Recomp's original the chosen game's title
@@ -601,8 +534,8 @@ void SohRmlUi::DescribeLauncherHits(char* out, int outSize) {
             }
         }
         reachable += inSubtree ? 1 : 0;
-        report += Rml::CreateString("  %-24s box=(%.0f,%.0f %.0fx%.0f) centre=(%.0f,%.0f) -> %s  %s\n",
-                                    action.c_str(), pos.x, pos.y, size.x, size.y, centre.x, centre.y,
+        report += Rml::CreateString("  %-24s box=(%.0f,%.0f %.0fx%.0f) centre=(%.0f,%.0f) -> %s  %s\n", action.c_str(),
+                                    pos.x, pos.y, size.x, size.y, centre.x, centre.y,
                                     inSubtree ? "REACHABLE" : "OCCLUDED by", DescribeElement(hit).c_str());
     }
 
@@ -623,30 +556,6 @@ void SohRmlUi::DescribeLauncherHits(char* out, int outSize) {
                           "(context %dx%d, dp ratio %.2f)\n",
                           examined, reachable, examined - reachable, dims.x, dims.y, mDpRatio);
     snprintf(out, outSize, "%s%s", header.c_str(), report.c_str());
-}
-
-// C shim for the REPL, which must not see RmlUi types.
-extern "C" void Zelda3D_LauncherHitReport(char* out, int outSize) {
-    if (out == nullptr || outSize <= 0) {
-        return;
-    }
-    if (sLiveRmlUi == nullptr) {
-        snprintf(out, outSize, "launcher hit-test UNAVAILABLE: no live RmlUi instance -- NOTHING was tested");
-        return;
-    }
-    sLiveRmlUi->DescribeLauncherHits(out, outSize);
-}
-
-// C shim for the REPL's `menurow <text>`.
-extern "C" void Zelda3D_MenuActivateRow(const char* needle, char* out, int outSize) {
-    if (out == nullptr || outSize <= 0) {
-        return;
-    }
-    if (sLiveRmlUi == nullptr) {
-        snprintf(out, outSize, "menurow UNAVAILABLE: no live RmlUi instance -- NOTHING activated");
-        return;
-    }
-    sLiveRmlUi->ActivateRowByLabel(needle, out, outSize);
 }
 
 void SohRmlUi::ShowLauncher(bool show) {
@@ -908,7 +817,7 @@ bool SohRmlUi::ToggleFocusedRow() {
         return false;
     }
     const bool next = !ToggleState(*t);
-    *t->live = next ? 1 : 0;            // immediate effect (GL pass reads this next frame)
+    *t->live = next ? 1 : 0;               // immediate effect (GL pass reads this next frame)
     CVarSetInteger(t->cvar, next ? 1 : 0); // persist the choice
     CVarSave();
     SetToggleValueText(focus, next);
@@ -1163,7 +1072,6 @@ void SohRmlUi::Resize(int width, int height) {
         mContext->SetDimensions(Rml::Vector2i(mWidth, mHeight));
     }
 }
-
 
 void SohRmlUi::UpdateAndRender() {
     if (!mInitialised || !mContext || (!mVisible && !mLauncherVisible)) {

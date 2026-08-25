@@ -191,6 +191,16 @@
     }                                      \
     (void)0
 
+// Responsibility-owned function declarations these macros expand to. The owner headers name only
+// z64.h, so this include set is cycle-free; consumers of macros.h get the declarations the macros
+// require without depending on a transitive aggregate.
+#include "functions/boot.h"
+#include "functions/game_state.h"
+#include "functions/math.h"
+#include "functions/memory.h"
+#include "functions/rendering.h"
+#include "functions/runtime.h"
+
 extern GraphicsContext* __gfxCtx;
 
 #define WORK_DISP          __gfxCtx->work.p

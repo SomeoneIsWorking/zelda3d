@@ -38,11 +38,14 @@ cmake --build build
 
 ### Windows
 
-On Windows, LUS uses [vcpkg](https://vcpkg.io) to manage C++ dependencies. Pass `-DUSE_AUTO_VCPKG=ON` to have CMake download and bootstrap vcpkg automatically. Alternatively, install the required ports manually with an existing vcpkg installation and pass `-DCMAKE_TOOLCHAIN_FILE=%VCPKG_ROOT%/scripts/buildsystems/vcpkg.cmake` instead.
+On Windows, LUS uses a user-owned [vcpkg](https://vcpkg.io) toolchain. In the Zelda3D tree,
+`./run.sh --bootstrap-check` prints the exact Visual Studio workload, static triplet, and ports to
+install, then the launcher forwards that toolchain to CMake. The build never downloads or installs
+packages itself.
 
 #### Generating a Visual Studio solution (x64)
 ```powershell
-& 'C:\Program Files\CMake\bin\cmake' -DUSE_AUTO_VCPKG=ON -S . -B "build/x64" -G "Visual Studio 17 2022" -T v143 -A x64
+& 'C:\Program Files\CMake\bin\cmake' -S . -B "build/x64" -G "Visual Studio 17 2022" -T v143 -A x64 -DCMAKE_TOOLCHAIN_FILE="$env:VCPKG_ROOT/scripts/buildsystems/vcpkg.cmake" -DVCPKG_TARGET_TRIPLET=x64-windows-static
 ```
 
 #### Building

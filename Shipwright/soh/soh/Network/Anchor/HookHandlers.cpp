@@ -1,13 +1,18 @@
+#include "soh/host/viewport_dimensions.h"
 #include "Anchor.h"
 #include <libultraship/libultraship.h>
 #include "soh/Enhancements/cosmetics/cosmeticsTypes.h"
 #include "soh/Enhancements/game-interactor/GameInteractor.h"
 #include "soh/frame_interpolation.h"
-#include "soh/OTRGlobals.h"
+
 
 extern "C" {
 #include "variables.h"
-#include "functions.h"
+#include "functions/actors.h"
+#include "functions/audio.h"
+#include "functions/game_state.h"
+#include "functions/math.h"
+#include "functions/rendering.h"
 #include "src/overlays/actors/ovl_Bg_Bombwall/z_bg_bombwall.h"
 #include "src/overlays/actors/ovl_Bg_Breakwall/z_bg_breakwall.h"
 #include "src/overlays/actors/ovl_Bg_Haka_Zou/z_bg_haka_zou.h"

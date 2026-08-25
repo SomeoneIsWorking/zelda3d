@@ -5,7 +5,9 @@ extern "C" {
 extern PlayState* gPlayState;
 extern SaveContext gSaveContext;
 #include "macros.h"
-#include "functions.h"
+#include "functions/actors.h"
+#include "functions/math.h"
+#include "functions/player.h"
 }
 
 #define CVAR_BOW_RETICLE_NAME CVAR_ENHANCEMENT("BowReticle")

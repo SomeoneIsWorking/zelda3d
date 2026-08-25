@@ -12,10 +12,10 @@
 extern float gZelda3dStairRiserY; // generated step rise (world-units/step), runtime tunable
 extern int gZelda3dStairs;        // env ZELDA3D_STAIRS / REPL `stairs` gate
 
-const std::vector<uint8_t>& stairStoneTex(int& w, int& h);          // cached custom stair texture
-bool texNameIsKaidan(const Zelda3D::Cmb& cmb, int matIndex);          // is this material a kaidan ramp?
-void generateStairsGroup(Zelda3D::CmbDrawGroup& g);                   // ramp group -> stepped geometry
-void ensureStairsEnv(void);                                         // apply env overrides once
+const std::vector<uint8_t>& stairStoneTex(int& w, int& h);   // cached custom stair texture
+bool texNameIsKaidan(const Zelda3D::Cmb& cmb, int matIndex); // is this material a kaidan ramp?
+void generateStairsGroup(Zelda3D::CmbDrawGroup& g);          // ramp group -> stepped geometry
+void ensureStairsEnv(void);                                  // apply env overrides once
 
 #include <array>
 

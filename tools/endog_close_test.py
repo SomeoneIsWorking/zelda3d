@@ -30,7 +30,7 @@ def main():
     env["ZELDA3D_HEADLESS"] = "1"
     env["ZELDA3D_DBG_MATCONST"] = "1"
     subprocess.run(
-        ["tools/zelda3d_game.sh", "restart", "0xB1", "0x8001"],
+        [sys.executable, "tools/zelda3d_game.py", "restart", "0xB1", "0x8001"],
         cwd=REPO, env=env, capture_output=True, text=True, timeout=90,
     )
     time.sleep(6)

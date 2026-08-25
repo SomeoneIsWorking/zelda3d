@@ -20,6 +20,10 @@
 #include "z64.h"
 #include "src/overlays/actors/ovl_En_Fish/z_en_fish.h" // EnFish (skelAnime, 64-bit-safe)
 #include "en_fish.h"
+#include "zelda3d/anim/automatic_playback.h"
+#include "zelda3d/render/model_draw.h"
+#include "zelda3d/render/model_queries.h"
+#include "zelda3d/diagnostics/model_tuning_query.h"
 
 // Keep zar + the fish CMB. The CSAB (fs2_swim) resolves from the same zar by basename.
 #define ZELDA3D_FISH_ZAR "/actor/zelda_keep.zar"
@@ -32,14 +36,6 @@
 static constexpr float kFishWorldScale = 0.008f;
 static constexpr int kFishGScaleSlot = 24;
 static constexpr float kFishAnimRate = 1.0f;
-
-extern "C" {
-int Zelda3D_AutoModelId(const char* zarPath);
-int Zelda3D_DrawActorModel(PlayState* play, int modelId, Actor* actor, float worldScale);
-float Zelda3D_GScale(int slot, float def);
-void Zelda3D_UpdateAnimAuto(int modelId, const char* animName, float rate, float n64CurFrame,
-                          float n64AnimLength, float morphWeight);
-}
 
 namespace Zelda3D {
 
@@ -58,9 +54,9 @@ bool EnFishBehavior::tryDrawModel(PlayState* play, Actor* actor) {
     EnFish* f = reinterpret_cast<EnFish*>(actor);
     // Wiggle the spine via fs2_swim.csab, phase-locked to the live N64 SkelAnime so the tempo matches
     // the actor's speed-driven playSpeed; the per-emit pose snapshot pairs each fish with its own pose.
-    Zelda3D_UpdateAnimAuto(sModelId, ZELDA3D_FISH_CSAB, kFishAnimRate, f->skelAnime.curFrame,
-                         f->skelAnime.animLength, f->skelAnime.morphWeight);
-    Zelda3D_DrawActorModel(play, sModelId, actor, Zelda3D_GScale(kFishGScaleSlot, kFishWorldScale));
+    Zelda3D_UpdateAnimAuto(sModelId, ZELDA3D_FISH_CSAB, kFishAnimRate, f->skelAnime.curFrame, f->skelAnime.animLength,
+                           f->skelAnime.morphWeight);
+    Zelda3D_DrawActorModel(play, sModelId, actor, Zelda3D_ModelScaleOrDefault(kFishGScaleSlot, kFishWorldScale));
     return true;
 }
 

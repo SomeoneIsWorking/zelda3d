@@ -4,7 +4,9 @@
 extern "C" {
 #include "macros.h"
 #include "variables.h"
-#include "functions.h"
+#include "functions/actors.h"
+#include "functions/audio.h"
+#include "functions/ui.h"
 #include "overlays/actors/ovl_En_Arrow/z_en_arrow.h"
 
 s32 func_808351D4(Player* thisx, PlayState* play); // Arrow nocked

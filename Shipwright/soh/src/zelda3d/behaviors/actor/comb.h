@@ -9,7 +9,7 @@
 namespace Zelda3D {
 
 class ObjCombBehavior : public ActorBehavior {
-public:
+  public:
     s16 actorId() const override;
     // Draws the OoT3D beehive CMB at the actor's world.pos + shape.rot, suppressing the N64 beehive.
     bool tryDrawModel(PlayState* play, Actor* actor) override;

@@ -1,3 +1,4 @@
+#include "soh/OTRGlobals.h"
 #include "actorViewer.h"
 #include "soh/util.h"
 #include "soh/SohGui/UIWidgets.hpp"
@@ -5,7 +6,7 @@
 #include <ship/resource/ResourceManager.h>
 #include <fast/resource/ResourceType.h>
 #include <fast/resource/type/DisplayList.h>
-#include "soh/OTRGlobals.h"
+
 
 #include <array>
 #include <bit>
@@ -18,7 +19,6 @@ extern "C" {
 #include <z64.h>
 #include "z64math.h"
 #include "variables.h"
-#include "functions.h"
 #include "macros.h"
 }
 

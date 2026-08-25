@@ -1,3 +1,4 @@
+
 #include "soh/OTRGlobals.h"
 #include "object/ObjectExtension.h"
 #include "item_category_adj.h"
@@ -6,7 +7,11 @@
 #include "soh/Enhancements/randomizer/RCToRandInf.h"
 
 extern "C" {
-#include "functions.h"
+#include "functions/actors.h"
+#include "functions/effects.h"
+#include "functions/game_state.h"
+#include "functions/math.h"
+#include "functions/memory.h"
 #include "overlays/actors/ovl_Bg_Ice_Shelter/z_bg_ice_shelter.h"
 #include "objects/object_ice_objects/object_ice_objects.h"
 extern PlayState* gPlayState;

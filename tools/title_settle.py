@@ -39,7 +39,8 @@ from pathlib import Path
 
 REPO = Path(__file__).resolve().parent.parent
 sys.path.insert(0, str(REPO / "tools"))
-import harness_ctl as hc  # noqa: E402
+from harness_process import spawn  # noqa: E402
+from harness_transport import Harness  # noqa: E402
 
 SAVESTATE = REPO / "scratch" / "title_settled.state"
 
@@ -56,7 +57,7 @@ SAVESTATE = REPO / "scratch" / "title_settled.state"
 DEFAULT_RUN = 30
 
 
-def read_az_csframe(h: hc.Harness) -> int:
+def read_az_csframe(h: Harness) -> int:
     lines = h.send_multiline("force titletime_read")
     for ln in lines:
         m = re.search(r"az=0x0054CC3C:\s*(\d+)", ln)
@@ -74,7 +75,7 @@ def main():
     args = ap.parse_args()
 
     print(f"[title_settle] cold-booting harness (no savestate)...", file=sys.stderr)
-    h = hc.spawn(save_state=None)
+    h = spawn(save_state=None)
     try:
         print(f"[title_settle] run {args.run} (cold-boot warm-up)...", file=sys.stderr)
         c0 = read_az_csframe(h)

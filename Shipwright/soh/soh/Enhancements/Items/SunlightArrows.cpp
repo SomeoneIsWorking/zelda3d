@@ -1,4 +1,6 @@
 #include "soh/Enhancements/game-interactor/GameInteractor_Hooks.h"
+#include "functions/collision.h"
+#include "functions/game_state.h"
 #include "soh/Enhancements/randomizer/SeedContext.h"
 #include "init/ShipInit.hpp"
 #include "object/ObjectExtension.h"

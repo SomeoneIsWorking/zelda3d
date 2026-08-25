@@ -1,0 +1,5 @@
+Checks: '-*,clang-analyzer-*,bugprone-branch-clone,bugprone-infinite-loop,bugprone-suspicious-memory-comparison,bugprone-suspicious-memset-usage,bugprone-swapped-arguments,bugprone-use-after-move,performance-move-const-arg,performance-unnecessary-copy-initialization'
+WarningsAsErrors: '*'
+HeaderFilterRegex: '(^|/)(2ship/2s2h|Shipwright/(OTRExporter|cmb3d|libultraship/(include|src|tests)|soh/soh|soh/src/zelda3d|zelda3d_app|zelda3d_shared)|tools)/'
+FormatStyle: file
+SystemHeaders: false

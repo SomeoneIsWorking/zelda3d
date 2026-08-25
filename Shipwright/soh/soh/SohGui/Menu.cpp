@@ -1,6 +1,7 @@
+#include "soh/OTRGlobals.h"
 #include "Menu.h"
 #include "UIWidgets.hpp"
-#include "soh/OTRGlobals.h"
+
 #include <ship/window/gui/GuiMenuBar.h>
 #include <ship/window/gui/GuiElement.h>
 #include "SohModals.h"

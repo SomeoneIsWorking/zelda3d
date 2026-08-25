@@ -80,8 +80,11 @@ def main():
         key = f"0x{idx:03X}"
         if resume and key in results:
             continue
-        r = subprocess.run(f"ZELDA3D_HEADLESS=1 tools/zelda3d_game.sh start {idx} 0x8000",
-                           shell=True, cwd=REPO, capture_output=True, text=True, timeout=150)
+        r = subprocess.run(
+            [sys.executable, "tools/zelda3d_game.py", "start", str(idx), "0x8000"],
+            cwd=REPO,
+            env={**os.environ, "ZELDA3D_HEADLESS": "1"},
+            capture_output=True, text=True, timeout=150)
         ready = "ready (pid" in (r.stdout + r.stderr)
         crash = ""
         try:

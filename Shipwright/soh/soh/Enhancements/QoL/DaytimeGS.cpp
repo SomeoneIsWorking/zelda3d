@@ -2,7 +2,7 @@
 #include "init/ShipInit.hpp"
 
 extern "C" {
-#include "functions.h"
+#include "functions/actors.h"
 #include "macros.h"
 extern PlayState* gPlayState;
 extern SaveContext gSaveContext;

@@ -23,7 +23,7 @@
 #include <variables.h>
 
 #include <ship/Context.h>
-#include <soh/OTRGlobals.h>
+
 
 #include <libultraship/bridge/consolevariablebridge.h>
 

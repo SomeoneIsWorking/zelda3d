@@ -58,7 +58,7 @@
 #include <cstdint>
 
 class TitleSyncController {
-public:
+  public:
     enum class State { UNARMED, HOLD, LOCKED, DISABLED };
 
     // Emulated-memory VA of the oracle's title-state VBLANK counter (u32,
@@ -69,8 +69,8 @@ public:
     static constexpr uint32_t kAzVblankCounterVA = 0x0054CC3C;
 
     // Emulated-memory VA of the oracle's live title camera basis
-    // (+0x00 eye Vec3f — see the TITLE_CAM_BASIS_VA writeup in main.cpp,
-    // provenance oot3d-decomp/docs/title_view_matrix_lh.md).
+    // (+0x00 eye Vec3f — provenance in
+    // oot3d-decomp/docs/title_view_matrix_lh.md).
     static constexpr uint32_t kAzTitleCamEyeVA = 0x005BE6D4;
 
     // Max |eye - spline(frame)| (world units) for an inversion candidate
@@ -87,34 +87,63 @@ public:
     // tick-parity band, which determinism says should never happen).
     static constexpr int kDeltaWarnThreshold = 2;
 
-    void Arm(bool armed) { state_ = armed ? State::HOLD : State::DISABLED; }
+    void Arm(bool armed) {
+        state_ = armed ? State::HOLD : State::DISABLED;
+    }
 
-    bool IsUnarmed() const { return state_ == State::UNARMED; }
-    bool IsActive()  const { return state_ == State::HOLD || state_ == State::LOCKED; }
-    State state() const { return state_; }
+    bool IsUnarmed() const {
+        return state_ == State::UNARMED;
+    }
+    bool IsActive() const {
+        return state_ == State::HOLD || state_ == State::LOCKED;
+    }
+    State state() const {
+        return state_;
+    }
 
-    uint64_t sohFrameCount() const { return sohFrameCount_; }
-    uint64_t azFrameCount()  const { return azFrameCount_; }
-    int azLockCs() const { return azLockCs_; }
-    int lastDelta() const { return lastDelta_; }
-    int corrections() const { return corrections_; }
-    int maxAbsDelta() const { return maxAbsDelta_; }
-    int locks() const { return locks_; }
+    uint64_t sohFrameCount() const {
+        return sohFrameCount_;
+    }
+    uint64_t azFrameCount() const {
+        return azFrameCount_;
+    }
+    int azLockCs() const {
+        return azLockCs_;
+    }
+    int lastDelta() const {
+        return lastDelta_;
+    }
+    int corrections() const {
+        return corrections_;
+    }
+    int maxAbsDelta() const {
+        return maxAbsDelta_;
+    }
+    int locks() const {
+        return locks_;
+    }
 
-    void NoteSohFrame() { ++sohFrameCount_; }   // once per SoH RunFrame()
-    void BumpAzFrame()  { ++azFrameCount_; }    // once per oracle retro_run()
+    void NoteSohFrame() {
+        ++sohFrameCount_;
+    } // once per SoH RunFrame()
+    void BumpAzFrame() {
+        ++azFrameCount_;
+    } // once per oracle retro_run()
 
     // Set once the arm-time eye-inversion has produced the oracle's held
     // cs frame (lazily, during HOLD, once SoH's cs data is loaded so the
     // ported spline is available to invert against).
-    void SetAzLockCs(int cs) { azLockCs_ = cs; }
-    bool HasAzLockCs() const { return azLockCs_ >= 0; }
+    void SetAzLockCs(int cs) {
+        azLockCs_ = cs;
+    }
+    bool HasAzLockCs() const {
+        return azLockCs_ >= 0;
+    }
 
     // HOLD -> LOCKED test: SoH's climbing cursor reached the oracle's
     // held frame.
     bool ShouldLock(int sohCs) const {
-        return state_ == State::HOLD && azLockCs_ >= 0 && sohCs >= 1 &&
-               sohCs >= azLockCs_;
+        return state_ == State::HOLD && azLockCs_ >= 0 && sohCs >= 1 && sohCs >= azLockCs_;
     }
     // `vblNow` = vblank counter at the lock instant — the rate-model
     // anchor: azCs(vbl) = azLockCs_ + (vbl - vblAtLock_) / 2.
@@ -135,38 +164,43 @@ public:
         lastSohCs_ = sohCs;
         return wrapped;
     }
-    void ReHold() { state_ = State::HOLD; }
+    void ReHold() {
+        state_ = State::HOLD;
+    }
 
     // LOCKED governor: how many retro_run() calls this frame (0/1/2) so
     // the (sohCs - modelAzCs) delta converges to 0 and stays there.
     int GovernorSteps(int sohCs, int modelAzCs) {
         int d = sohCs - modelAzCs;
         lastDelta_ = d;
-        if (d > maxAbsDelta_)  maxAbsDelta_ = d;
-        if (-d > maxAbsDelta_) maxAbsDelta_ = -d;
-        if (d == 0) return 1;
+        if (d > maxAbsDelta_)
+            maxAbsDelta_ = d;
+        if (-d > maxAbsDelta_)
+            maxAbsDelta_ = -d;
+        if (d == 0)
+            return 1;
         ++corrections_;
         // NOTE: an extra/skipped retro_run moves the vblank counter too,
         // so the model self-consistently absorbs the correction.
-        return d > 0 ? 2 : 0;  // SoH ahead -> oracle catches up; behind -> hold
+        return d > 0 ? 2 : 0; // SoH ahead -> oracle catches up; behind -> hold
     }
 
-private:
+  private:
     State state_ = State::UNARMED;
     uint64_t sohFrameCount_ = 0;
-    uint64_t azFrameCount_  = 0;
-    int azLockCs_    = -1;
+    uint64_t azFrameCount_ = 0;
+    int azLockCs_ = -1;
     uint32_t vblAtLock_ = 0;
-    int lastSohCs_   = -1;
-    int lastDelta_   = 0;
+    int lastSohCs_ = -1;
+    int lastDelta_ = 0;
     int maxAbsDelta_ = 0;
     int corrections_ = 0;
-    int locks_       = 0;
+    int locks_ = 0;
 };
 
 extern TitleSyncController g_titleSync;
 
 // Path to the settled title save-state the controller loads on arm and on
 // every loop-wrap re-hold (auto-generated via tools/title_settle.py if
-// missing -- see ArmTitleSync() in main.cpp).
+// missing -- see HarnessTitleSyncRuntime::EnsureArmed()).
 extern const char* const kTitleSettledStatePath;

@@ -24,6 +24,7 @@
 
 cmake_minimum_required(VERSION 3.26.0 FATAL_ERROR)
 
+set(CMAKE_EXPORT_COMPILE_COMMANDS ON CACHE BOOL "Export commands for Clang verification" FORCE)
 set(CMAKE_SYSTEM_VERSION 10.0 CACHE STRING "" FORCE)
 set(CMAKE_CXX_STANDARD 20 CACHE STRING "The C++ standard to use")
 set(CMAKE_C_STANDARD 23 CACHE STRING "The C standard to use")
@@ -33,6 +34,14 @@ set(CMAKE_OSX_DEPLOYMENT_TARGET "10.15" CACHE STRING "Minimum OS X deployment ve
 # Named "Ship" with VERSION 9.2.3 still: Shipwright/soh/CMakeLists.txt has no project() call of its
 # own and reads PROJECT_VERSION_* from here (soh/CMakeLists.txt:807), as does CMake/Packaging.cmake.
 project(Ship VERSION 9.2.3 LANGUAGES C CXX)
+
+find_package(Python3 REQUIRED COMPONENTS Interpreter)
+add_custom_target(zelda3d_verify_clang
+    COMMAND "${Python3_EXECUTABLE}" "${CMAKE_CURRENT_SOURCE_DIR}/tools/verify_clang.py"
+            --compile-commands "${CMAKE_BINARY_DIR}/compile_commands.json"
+    WORKING_DIRECTORY "${CMAKE_CURRENT_SOURCE_DIR}"
+    COMMENT "Checking changed first-party C/C++ with Clang and the source-size ratchet"
+    VERBATIM)
 
 ################################################################################
 # Where each layer lives.
@@ -180,7 +189,11 @@ add_compile_options($<$<CXX_COMPILER_ID:MSVC>:/Zc:preprocessor>)
 
 if (CMAKE_SYSTEM_NAME STREQUAL "Windows")
     if(NOT CMAKE_VS_PLATFORM_NAME)
-        set(CMAKE_VS_PLATFORM_NAME "x64")
+        if(VCPKG_TARGET_TRIPLET MATCHES "^arm64-")
+            set(CMAKE_VS_PLATFORM_NAME "arm64")
+        else()
+            set(CMAKE_VS_PLATFORM_NAME "x64")
+        endif()
     endif()
 
     if("${CMAKE_VS_PLATFORM_NAME}" MATCHES "^[Aa][Rr][Mm]64$")
@@ -189,17 +202,13 @@ if (CMAKE_SYSTEM_NAME STREQUAL "Windows")
         set(SOH_WINDOWS_ARM64 FALSE)
     endif()
 
-    include(${ZELDA3D_SHIPWRIGHT_DIR}/CMake/automate-vcpkg.cmake)
-
-    set(VCPKG_TRIPLET x64-windows-static)
-    set(VCPKG_TARGET_TRIPLET x64-windows-static)
-    if(SOH_WINDOWS_ARM64)
-        set(VCPKG_TRIPLET arm64-windows-static)
-        set(VCPKG_TARGET_TRIPLET arm64-windows-static)
+    if(NOT CMAKE_TOOLCHAIN_FILE OR NOT EXISTS "${CMAKE_TOOLCHAIN_FILE}")
+        message(FATAL_ERROR
+            "Windows builds require a user-owned vcpkg toolchain. "
+            "Run ./run.sh --bootstrap-check for the exact install command, set VCPKG_ROOT, "
+            "and configure through ./run.sh; Zelda3D never downloads or installs packages silently.")
     endif()
-
-    vcpkg_bootstrap()
-    vcpkg_install_packages(zlib bzip2 libzip libpng sdl2 sdl2-net glew glfw3 nlohmann-json tinyxml2 spdlog libogg libvorbis opus opusfile)
+    message(STATUS "Windows vcpkg triplet: ${VCPKG_TARGET_TRIPLET}")
     if (CMAKE_C_COMPILER_LAUNCHER MATCHES "ccache|sccache")
         set(CMAKE_MSVC_DEBUG_INFORMATION_FORMAT Embedded)
     endif()
@@ -368,51 +377,9 @@ install(DIRECTORY "${ZELDA3D_OOT_DIR}/assets/extractor/" DESTINATION ./assets/ C
 install(DIRECTORY "${ZELDA3D_OOT_DIR}/assets/xml/" DESTINATION ./assets/xml COMPONENT ship)
 endif()
 
-find_package(Python3 COMPONENTS Interpreter)
-
-# Target to generate OTRs
-add_custom_target(
-    ExtractAssets
-    COMMAND ${CMAKE_COMMAND} -E rm -f oot.o2r oot-mq.o2r soh.o2r
-
-    # copy LUS default shaders into assets/custom
-    COMMAND ${CMAKE_COMMAND} -E rm -r -f ${ZELDA3D_OOT_DIR}/assets/custom/shaders/
-    COMMAND ${CMAKE_COMMAND} -E copy_directory ${ZELDA3D_ENGINE_DIR}/src/fast/shaders/ ${ZELDA3D_OOT_DIR}/assets/custom/shaders/
-
-    COMMAND ${Python3_EXECUTABLE} ${ZELDA3D_SHIPWRIGHT_DIR}/OTRExporter/extract_assets.py -z "$<TARGET_FILE:ZAPD>" --non-interactive --xml-root assets/xml --custom-otr-file soh.o2r "--custom-assets-path" ${ZELDA3D_OOT_DIR}/assets/custom --port-ver "${CMAKE_PROJECT_VERSION}"
-    COMMAND ${CMAKE_COMMAND} -DSYSTEM_NAME=${CMAKE_SYSTEM_NAME} -DTARGET_DIR="$<TARGET_FILE_DIR:ZAPD>" -DSOURCE_DIR=${ZELDA3D_SHIPWRIGHT_DIR} -DBINARY_DIR=${CMAKE_BINARY_DIR} -P ${ZELDA3D_SHIPWRIGHT_DIR}/copy-existing-otrs.cmake
-    WORKING_DIRECTORY ${ZELDA3D_OOT_DIR}
-    COMMENT "Running asset extraction..."
-    DEPENDS ZAPD
-    BYPRODUCTS oot.o2r ${ZELDA3D_SHIPWRIGHT_DIR}/oot.o2r oot-mq.o2r ${ZELDA3D_SHIPWRIGHT_DIR}/oot-mq.o2r ${ZELDA3D_SHIPWRIGHT_DIR}/soh.o2r
-)
-
-# Target to generate headers
-add_custom_target(
-    ExtractAssetHeaders
-    COMMAND ${Python3_EXECUTABLE} ${ZELDA3D_SHIPWRIGHT_DIR}/OTRExporter/extract_assets.py -z "$<TARGET_FILE:ZAPD>" --non-interactive --xml-root assets/xml --gen-headers
-    WORKING_DIRECTORY ${ZELDA3D_OOT_DIR}
-    COMMENT "Generating asset headers..."
-    DEPENDS ZAPD
-)
-
-# Target to generate only soh.o2r
-add_custom_target(
-    GenerateSohOtr
-    COMMAND ${CMAKE_COMMAND} -E rm -f soh.o2r
-
-    # NOTE: the old renderer shipped GL shader source in assets/custom/shaders/ and
-    # copied it in here. The SDL3GPU backend GENERATES its shaders at runtime (GLSL ->
-    # SPIR-V via glslang, gfx_sdl3gpu.cpp) and loads nothing from the archive, so that
-    # dir no longer exists and the copy is gone. soh.o2r now carries only the real port
-    # assets (fonts/objects/scenes/textures/lang/presets/...).
-
-    COMMAND ${Python3_EXECUTABLE} ${ZELDA3D_SHIPWRIGHT_DIR}/OTRExporter/extract_assets.py -z "$<TARGET_FILE:ZAPD>" --norom --custom-otr-file soh.o2r "--custom-assets-path" ${ZELDA3D_OOT_DIR}/assets/custom --port-ver "${CMAKE_PROJECT_VERSION}"
-    COMMAND ${CMAKE_COMMAND} -DSYSTEM_NAME=${CMAKE_SYSTEM_NAME} -DTARGET_DIR="$<TARGET_FILE_DIR:ZAPD>" -DSOURCE_DIR=${ZELDA3D_SHIPWRIGHT_DIR} -DBINARY_DIR=${CMAKE_BINARY_DIR} -DONLYSOHOTR=On -P ${ZELDA3D_SHIPWRIGHT_DIR}/copy-existing-otrs.cmake
-    WORKING_DIRECTORY ${ZELDA3D_OOT_DIR}
-    COMMENT "Generating soh.o2r..."
-    DEPENDS ZAPD
-)
+include(${ZELDA3D_ROOT}/cmake/Zelda3DAssetExtraction.cmake)
+include(${ZELDA3D_ROOT}/cmake/Zelda3DRuntimeArchives.cmake)
+add_dependencies(zelda3d_app zelda3d_runtime_archives)
 
 if(CMAKE_SYSTEM_NAME MATCHES "Linux")
     find_package(ImageMagick COMPONENTS convert)

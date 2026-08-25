@@ -2,7 +2,7 @@
 #include "init/ShipInit.hpp"
 
 extern "C" {
-#include "functions.h"
+#include "functions/game_state.h"
 #include "macros.h"
 #include "variables.h"
 #include "z64save.h"

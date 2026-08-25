@@ -4,7 +4,7 @@
 #include "libultraship/libultra/controller.h"
 #include <ship/Context.h>
 #include <libultraship/controller/controldeck/ControlDeck.h>
-#include "soh/OTRGlobals.h"
+#include "soh/host/controller_buttons.h"
 #include "soh/cvar_prefixes.h"
 #include <imgui.h>
 #include <spdlog/spdlog.h>

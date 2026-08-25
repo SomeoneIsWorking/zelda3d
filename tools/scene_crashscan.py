@@ -2,7 +2,7 @@
 """scene_crashscan.py — load EVERY distinct scene and report which crash on load.
 
 Whole-game load-regression check: for each distinct scene it takes that scene's first
-entrance (from entrance_table.h) and cold-boots Zelda3D there via tools/zelda3d_game.sh `start`
+entrance (from entrance_table.h) and cold-boots Zelda3D there via tools/zelda3d_game.py `start`
 (no rebuild). A scene that segfaults on load dies before the REPL `.out` appears, so
 game.sh returns nonzero and run.log shows a fatal signal. Writes results incrementally to
 scratch/crashscan_results.json and prints a summary.
@@ -66,8 +66,14 @@ def main():
         key = f"0x{idx:03X}"
         if resume and key in results:
             continue
-        r = subprocess.run(f"ZELDA3D_HEADLESS=1 tools/zelda3d_game.sh start {idx} 0x6000",
-                           shell=True, cwd=REPO, capture_output=True, text=True, timeout=120)
+        r = subprocess.run(
+            [sys.executable, "tools/zelda3d_game.py", "start", str(idx), "0x6000"],
+            cwd=REPO,
+            env={**os.environ, "ZELDA3D_HEADLESS": "1"},
+            capture_output=True,
+            text=True,
+            timeout=120,
+        )
         ready = "ready (pid" in (r.stdout + r.stderr)
         crash = ""
         try:

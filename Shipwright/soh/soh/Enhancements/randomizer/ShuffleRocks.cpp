@@ -4,13 +4,17 @@
 #include "item_category_adj.h"
 #include "particle_cmc.h"
 #include "soh/frame_interpolation.h"
+#include "soh/OTRGlobals.h"
 #include "soh/Enhancements/randomizer/randomizer.h"
 #include "soh/Enhancements/randomizer/RCToRandInf.h"
 
 extern "C" {
 #include "variables.h"
 #include "macros.h"
-#include "functions.h"
+#include "functions/actors.h"
+#include "functions/game_state.h"
+#include "functions/math.h"
+#include "functions/rendering.h"
 #include "overlays/actors/ovl_En_Ishi/z_en_ishi.h"
 #include "overlays/actors/ovl_Obj_Bombiwa/z_obj_bombiwa.h"
 #include "overlays/actors/ovl_Obj_Hamishi/z_obj_hamishi.h"

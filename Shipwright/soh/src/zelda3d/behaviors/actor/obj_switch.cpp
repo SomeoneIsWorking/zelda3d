@@ -28,6 +28,9 @@
 // identification; it also bypasses the crystal tint so a forced CMB shows its own colours.
 #include "z64.h"
 #include "obj_switch.h"
+#include "zelda3d/render/model_draw.h"
+#include "zelda3d/render/model_queries.h"
+#include "zelda3d/diagnostics/model_tuning_query.h"
 #include "overlays/actors/ovl_Obj_Switch/z_obj_switch.h" // ObjSwitch: read crystalColor via the C STRUCT
 #include <stdio.h>
 
@@ -55,14 +58,6 @@ constexpr float kSwitchWorldScale = 0.06f; // calibrated live vs the N64 floor-s
 constexpr int kSwitchGScaleSlot   = 24;    // live scale tune: REPL `gscale 24`
 constexpr int kSwitchIdentSlot    = 25;    // >0 forces switch_<N> on EVERY switch (bring-up identify)
 } // namespace
-
-extern "C" {
-int Zelda3D_AutoModelId(const char* zarPath);
-int Zelda3D_DrawActorModel(PlayState* play, int modelId, Actor* actor, float worldScale);
-int Zelda3D_DrawActorModelTinted(PlayState* play, int modelId, Actor* actor, float worldScale,
-                                 unsigned char r, unsigned char g, unsigned char b);
-float Zelda3D_GScale(int slot, float def);
-}
 
 namespace Zelda3D {
 
@@ -93,7 +88,7 @@ bool ObjSwitchBehavior::tryDrawModel(PlayState* play, Actor* actor) {
     int subType = (actor->params >> 4) & 7;
 
     // Bring-up identification: gscale slot 25 forces switch_<N> on every switch.
-    int ident = (int)Zelda3D_GScale(kSwitchIdentSlot, 0.0f);
+    int ident = (int)Zelda3D_ModelScaleOrDefault(kSwitchIdentSlot, 0.0f);
     const bool crystal = (type == 3 /*CRYSTAL*/ || type == 4 /*CRYSTAL_TARGETABLE*/);
     int cmbN;
     if (ident > 0) {
@@ -112,7 +107,7 @@ bool ObjSwitchBehavior::tryDrawModel(PlayState* play, Actor* actor) {
     if (modelId < 0) {
         return false; // not identified / unresolved -> N64 switch draws
     }
-    const float scale = Zelda3D_GScale(kSwitchGScaleSlot, kSwitchWorldScale);
+    const float scale = Zelda3D_ModelScaleOrDefault(kSwitchGScaleSlot, kSwitchWorldScale);
     if (crystal && ident <= 0) {
         // Carry the actor's live crystalColor so the crystal dims/brightens with the puzzle state,
         // mirroring N64 gDPSetEnvColor(crystalColor). Read through the C struct: this is a 64-bit

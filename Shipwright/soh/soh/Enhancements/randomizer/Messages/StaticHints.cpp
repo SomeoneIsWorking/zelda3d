@@ -5,15 +5,16 @@
  * File for registering hooks for "Static" hints, i.e. hints that
  * are always given by a specific NPC and/or for a specific item.
  */
+#include "soh/OTRGlobals.h"
 #include "soh/Enhancements/randomizer/randomizerTypes.h"
 #include "z64scene.h"
-#include <soh/OTRGlobals.h>
+
 #include "soh/Enhancements/randomizer/randomizer.h"
 
 extern "C" {
 extern PlayState* gPlayState;
 #include <macros.h>
-#include <functions.h>
+#include "functions/game_state.h"
 #include <variables.h>
 }
 

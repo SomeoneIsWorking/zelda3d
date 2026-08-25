@@ -6,7 +6,7 @@
 
 extern "C" {
 extern PlayState* gPlayState;
-#include "functions.h"
+#include "functions/game_state.h"
 #include "macros.h"
 #include "variables.h"
 }

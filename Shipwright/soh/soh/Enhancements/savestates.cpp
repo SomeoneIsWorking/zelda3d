@@ -1,16 +1,16 @@
+#include "soh/OTRGlobals.h"
 #include "savestates.h"
 
 #include <soh/GameVersions.h>
 
 #include <spdlog/spdlog.h>
 
-#include <soh/OTRGlobals.h>
+
 #include <soh/OTRAudio.h>
 
 #include "z64.h"
 #include "z64save.h"
 #include <variables.h>
-#include <functions.h>
 #include "z64map_mark.h"
 #include "../../src/overlays/actors/ovl_Boss_Ganon/z_boss_ganon.h"
 #include "../../src/overlays/actors/ovl_Boss_Ganon2/z_boss_ganon2.h"

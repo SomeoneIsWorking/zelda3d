@@ -8,8 +8,6 @@ extern "C" {
 #include "macros.h"
 #include "soh/cvar_prefixes.h"
 #include "variables.h"
-#include "functions.h"
-
 extern SaveContext gSaveContext;
 extern PlayState* gPlayState;
 }

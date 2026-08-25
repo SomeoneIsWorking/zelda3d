@@ -10,7 +10,7 @@
 //
 // Design: per-address ring buffer of the last N writes. On each hook
 // fire, capture (vaddr, size, data, arm_pc, arm_lr, cycles) into the
-// buffer that keys off the vaddr. REPL commands in main.cpp query it.
+// buffer that keys off the vaddr. watch_commands.cpp owns the REPL surface.
 //
 // Watchpoints are registered via MemorySystem::RegisterWatchpoint which
 // marks the enclosing page as MemoryWatchpoint-type. That's page-
@@ -29,48 +29,22 @@
 #include "core/core.h"
 #include "core/hle/kernel/process.h"
 #include "core/memory.h"
+#include "oracle_watch_bridge.h"
 
 namespace Soh3d {
-
-struct WriteRecord {
-    u32  vaddr;
-    u32  size;
-    u64  data;
-    u32  arm_pc;
-    u32  arm_lr;
-    u64  cycles;
-    // Arg-reg snapshot at fire time. Captures caller-context values that
-    // outlive PC/LR clobbering (e.g. path_node passed as r2 to
-    // PathFollow_Update — recoverable from r2 at the fn's first write to
-    // its own local frame, before r2 is reused). Also SP for stack window
-    // inspection.
-    u32  arm_r0;
-    u32  arm_r1;
-    u32  arm_r2;
-    u32  arm_r3;
-    u32  arm_sp;
-    // 64 words of stack at SP..SP+255 — enough to catch a saved-LR chain 4-6
-    // frames deep for the common "push {r4..r7, lr}" ARM prologue and read
-    // back the calling function's return address without an interp arg tracer.
-    u32  stack_words[256];
-};
 
 // Global watchlist state.
 static std::mutex g_mtx;
 static std::unordered_map<u32, std::vector<u32>> g_watched_pages_by_range;
-static std::unordered_map<u32, std::vector<WriteRecord>> g_hits;  // key = watched range base
+static std::unordered_map<u32, std::vector<WatchRecord>> g_hits; // key = watched range base
 static constexpr std::size_t kMaxHitsPerRange = 128;
-
-struct WatchRange {
-    u32 addr;
-    u32 size;
-};
 static std::vector<WatchRange> g_ranges;
 
 // True when a write vaddr is inside any watched range.
 static bool InRange(u32 vaddr, u32 size) {
     for (auto& r : g_ranges) {
-        if (vaddr < r.addr + r.size && vaddr + size > r.addr) return true;
+        if (vaddr < r.addr + r.size && vaddr + size > r.addr)
+            return true;
     }
     return false;
 }
@@ -79,15 +53,17 @@ static bool InRange(u32 vaddr, u32 size) {
 // 0 if none. Used as the key into g_hits.
 static u32 RangeKey(u32 vaddr, u32 size) {
     for (auto& r : g_ranges) {
-        if (vaddr < r.addr + r.size && vaddr + size > r.addr) return r.addr;
+        if (vaddr < r.addr + r.size && vaddr + size > r.addr)
+            return r.addr;
     }
     return 0;
 }
 
 extern "C" void Soh3d_WatchAddRange(u32 addr, u32 size) {
-    if (size == 0) size = 4;
+    if (size == 0)
+        size = 4;
     std::lock_guard lock(g_mtx);
-    g_ranges.push_back({addr, size});
+    g_ranges.push_back({ addr, size });
     // Register the encompassing page(s) as watchpoint pages so writes
     // trip the MemoryWatchpoint case in Memory::Write<T>().
     auto& sys = Core::System::GetInstance();
@@ -98,7 +74,8 @@ extern "C" void Soh3d_WatchAddRange(u32 addr, u32 size) {
 }
 
 extern "C" void Soh3d_WatchRemoveRange(u32 addr, u32 size) {
-    if (size == 0) size = 4;
+    if (size == 0)
+        size = 4;
     std::lock_guard lock(g_mtx);
     auto& sys = Core::System::GetInstance();
     if (auto p = sys.Kernel().GetCurrentProcess()) {
@@ -106,19 +83,21 @@ extern "C" void Soh3d_WatchRemoveRange(u32 addr, u32 size) {
     }
     for (auto it = g_ranges.begin(); it != g_ranges.end(); ++it) {
         if (it->addr == addr && it->size == size) {
-            g_ranges.erase(it); break;
+            g_ranges.erase(it);
+            break;
         }
     }
     g_hits.erase(addr);
 }
 
-extern "C" std::size_t Soh3d_WatchGetHits(u32 addr, WriteRecord* out,
-                                          std::size_t max_out) {
+extern "C" std::size_t Soh3d_WatchGetHits(u32 addr, WatchRecord* out, std::size_t max_out) {
     std::lock_guard lock(g_mtx);
     auto it = g_hits.find(addr);
-    if (it == g_hits.end()) return 0;
+    if (it == g_hits.end())
+        return 0;
     const std::size_t n = std::min(max_out, it->second.size());
-    for (std::size_t i = 0; i < n; ++i) out[i] = it->second[i];
+    for (std::size_t i = 0; i < n; ++i)
+        out[i] = it->second[i];
     return n;
 }
 
@@ -128,14 +107,16 @@ extern "C" void Soh3d_WatchClear(u32 addr) {
         g_hits.clear();
     } else {
         auto it = g_hits.find(addr);
-        if (it != g_hits.end()) it->second.clear();
+        if (it != g_hits.end())
+            it->second.clear();
     }
 }
 
 extern "C" std::size_t Soh3d_WatchListRanges(WatchRange* out, std::size_t max_out) {
     std::lock_guard lock(g_mtx);
     const std::size_t n = std::min(max_out, g_ranges.size());
-    for (std::size_t i = 0; i < n; ++i) out[i] = g_ranges[i];
+    for (std::size_t i = 0; i < n; ++i)
+        out[i] = g_ranges[i];
     return n;
 }
 
@@ -143,16 +124,16 @@ extern "C" std::size_t Soh3d_WatchListRanges(WatchRange* out, std::size_t max_ou
 // (data & mask) == expected. Used by the classifier auto-attach: on
 // `d3 collision-wall`, look up the most recent write to bgCheckFlags
 // with bit 0x08 set. Returns true if found, populating out.
-extern "C" bool Soh3d_WatchGetLatestMatching(u32 range_base, u64 mask,
-                                              u64 expected,
-                                              WriteRecord* out) {
+extern "C" bool Soh3d_WatchGetLatestMatching(u32 range_base, u64 mask, u64 expected, WatchRecord* out) {
     std::lock_guard lock(g_mtx);
     auto it = g_hits.find(range_base);
-    if (it == g_hits.end()) return false;
+    if (it == g_hits.end())
+        return false;
     // Walk backwards for the most recent matching write.
     for (auto ri = it->second.rbegin(); ri != it->second.rend(); ++ri) {
         if ((ri->data & mask) == expected) {
-            if (out) *out = *ri;
+            if (out)
+                *out = *ri;
             return true;
         }
     }
@@ -165,7 +146,8 @@ extern "C" bool Soh3d_WatchGetLatestMatching(u32 range_base, u64 mask,
 extern "C" bool Soh3d_WatchIsRegistered(u32 addr) {
     std::lock_guard lock(g_mtx);
     for (auto& r : g_ranges) {
-        if (r.addr == addr) return true;
+        if (r.addr == addr)
+            return true;
     }
     return false;
 }
@@ -180,14 +162,15 @@ extern "C" void Soh3d_OnMemoryWrite(u32 vaddr, u32 size, u64 data) {
     // Fast reject on non-watched writes. Writers to arbitrary pages in
     // the same page as a watch trigger the hook but aren't interesting.
     std::lock_guard lock(g_mtx);
-    if (!InRange(vaddr, size)) return;
+    if (!InRange(vaddr, size))
+        return;
 
     auto& sys = Core::System::GetInstance();
     auto& cpu = sys.GetRunningCore();
-    WriteRecord rec;
-    rec.vaddr  = vaddr;
-    rec.size   = size;
-    rec.data   = data;
+    WatchRecord rec;
+    rec.vaddr = vaddr;
+    rec.size = size;
+    rec.data = data;
     rec.arm_pc = cpu.GetPC();
     rec.arm_lr = cpu.GetReg(14);
     rec.arm_r0 = cpu.GetReg(0);
@@ -210,7 +193,7 @@ extern "C" void Soh3d_OnMemoryWrite(u32 vaddr, u32 size, u64 data) {
     const u32 key = RangeKey(vaddr, size);
     auto& bucket = g_hits[key];
     if (bucket.size() >= kMaxHitsPerRange) {
-        bucket.erase(bucket.begin());  // FIFO drop oldest
+        bucket.erase(bucket.begin()); // FIFO drop oldest
     }
     bucket.push_back(rec);
 }

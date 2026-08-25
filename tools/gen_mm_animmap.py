@@ -1,1213 +1,193 @@
 #!/usr/bin/env python3
-"""Generate the `kMMAnimMaps` table (N64 animation OTR key -> MM3D CSAB clip name).
+"""Generate N64-animation to MM3D-CSAB mapping tables and coverage reports.
 
-Fully OFFLINE: reads the N64 (2ship) object assets from the repo and the MM3D ROM
-(`$ZELDA3D_MM3D_ROM`, see <repo>/.env). No emulator, no game, no network.
-
-Pipeline:
-  1. enumerate every N64 object's animation symbols   (2ship/assets/objects/*/, /g\\w+Anim\\b/)
-  2. resolve each object to its MM3D /actors/ GAR and enumerate that GAR's CSAB clip names
-     (GAR2 + LzS readers ported 1:1 from Shipwright/cmb3d/asset/{gar,lzs}.cpp)
-  3. match symbol <-> clip (token/synonym scoring; ambiguous or weak => UNMATCHED, because a
-     wrong animation is worse than the idle fallback)
-  4. emit C entries for kMMAnimMaps + a coverage report (markdown & json)
-
-  python3 tools/gen_mm_animmap.py [--only object_dog] [--min-confidence 0.9]
-                                  [--out scratch/mm_animmap.inc] [--report scratch/mm_animmap]
+Fully offline: reads 2ship object assets and ``$ZELDA3D_MM3D_ROM``. Archive
+decoding, source inventory, matching, output rendering, and evidence
+verification live in focused sibling modules; this file composes the pipeline.
 """
+
 from __future__ import annotations
 
 import argparse
 import json
 import os
 import re
-import struct
 import sys
-from dataclasses import dataclass
-from typing import Dict, List, Optional, Tuple
 
-REPO = os.path.abspath(os.path.join(os.path.dirname(os.path.abspath(__file__)), ".."))
-OBJ_DIR = os.path.join(REPO, "2ship", "assets", "objects")
-
-
-# =============================================================== env / romfs
-
-def _load_env() -> None:
-    p = os.path.join(REPO, ".env")
-    if not os.path.exists(p):
-        return
-    with open(p) as fh:
-        for line in fh:
-            line = line.strip()
-            if not line or line.startswith("#") or "=" not in line:
-                continue
-            k, v = line.split("=", 1)
-            k = k.strip()
-            if k.startswith("export "):
-                k = k[7:].strip()
-            os.environ.setdefault(k, v.strip().strip('"').strip("'"))
-
-
-# =============================================================== LzS (lzs.cpp)
-
-LZS_MAGIC = b"LzS\x01"
-
-
-def lzs_is_compressed(data: bytes) -> bool:
-    return len(data) >= 16 and data[:4] == LZS_MAGIC
-
-
-def lzs_decompress(data: bytes) -> bytes:
-    if not lzs_is_compressed(data):
-        raise ValueError("not an LzS\\1 buffer")
-    dec_size, comp_size = struct.unpack_from("<II", data, 8)
-    if comp_size == 0 or 16 + comp_size > len(data):
-        raise ValueError("LzS comp_size overruns buffer")
-    src = data[16:16 + comp_size]
-    in_len = comp_size
-    out = bytearray()
-    buf = bytearray(4096)
-    writeidx, fidx = 0xFEE, 0
-    while fidx < in_len:
-        flags8 = src[fidx]
-        fidx += 1
-        for _ in range(8):
-            if fidx >= in_len:
-                break
-            if flags8 & 1:
-                b = src[fidx]
-                fidx += 1
-                out.append(b)
-                buf[writeidx] = b
-                writeidx = (writeidx + 1) & 0xFFF
-            else:
-                if fidx + 1 >= in_len:
-                    break
-                b1, b2 = src[fidx], src[fidx + 1]
-                fidx += 2
-                readidx = b1 | ((b2 & 0xF0) << 4)
-                for _j in range((b2 & 0x0F) + 3):
-                    v = buf[readidx]
-                    out.append(v)
-                    buf[writeidx] = v
-                    readidx = (readidx + 1) & 0xFFF
-                    writeidx = (writeidx + 1) & 0xFFF
-            flags8 >>= 1
-    if len(out) != dec_size:
-        raise ValueError("LzS decompressed size mismatch: %d != %d" % (len(out), dec_size))
-    return bytes(out)
-
-
-# =============================================================== GAR2 (gar.cpp)
-
-GAR2_MAGIC = b"GAR\x02"
-CSAB_MAGIC = b"csab"
-
-
-def _u16(b, o): return struct.unpack_from("<H", b, o)[0]
-def _u32(b, o): return struct.unpack_from("<I", b, o)[0]
-
-
-def _cstr(b: bytes, o: int) -> str:
-    if o >= len(b):
-        return ""
-    end = b.find(b"\x00", o)
-    return b[o:(end if end >= 0 else len(b))].decode("ascii", "replace")
-
-
-@dataclass
-class GarFile:
-    name: str = ""
-    path: str = ""
-    type: str = ""
-    offset: int = 0
-    size: int = 0
-    data: bytes = b""
-
-
-class Gar:
-    """GAR version-2 archive; transparently LzS-inflates a compressed blob.
-
-    NOTE (measured): the ".gar.lzs" extension is NOT a compression indicator -- most
-    archives so named are stored raw. Always sniff the LzS magic, never the filename.
-    """
-
-    def __init__(self, data: bytes):
-        self.was_compressed = False
-        if lzs_is_compressed(data):
-            data = lzs_decompress(data)
-            self.was_compressed = True
-        self.blob = b = data
-        n = len(b)
-        if n < 0x20 or b[:4] != GAR2_MAGIC:
-            raise ValueError("not a GAR2 archive")
-        n_types, n_files = _u16(b, 0x08), _u16(b, 0x0A)
-        types_off, files_off, datahdr_off = _u32(b, 0x0C), _u32(b, 0x10), _u32(b, 0x14)
-        self.codec = _cstr(b, 0x18)
-        if types_off + 16 * n_types > n or files_off + 12 * n_files > n \
-                or datahdr_off + 4 * n_files > n:
-            raise ValueError("GAR2 table out of range")
-        self.entries: List[GarFile] = []
-        for i in range(n_files):
-            fe = files_off + 12 * i
-            fsize = _u32(b, fe)
-            off = _u32(b, datahdr_off + 4 * i)
-            f = GarFile(name=_cstr(b, _u32(b, fe + 4)), path=_cstr(b, _u32(b, fe + 8)),
-                        offset=off, size=fsize)
-            f.data = b[off:off + fsize] if off + fsize <= n else b""
-            self.entries.append(f)
-        for t in range(n_types):
-            e = types_off + 16 * t
-            cnt, idx_off = _u32(b, e), _u32(b, e + 4)
-            tname = _cstr(b, _u32(b, e + 8))
-            if idx_off == 0xFFFFFFFF or idx_off + 4 * cnt > n:
-                continue
-            for k in range(cnt):
-                fi = _u32(b, idx_off + 4 * k)
-                if fi < len(self.entries):
-                    self.entries[fi].type = tname
-
-    def clip_names(self, verify: bool = True) -> List[str]:
-        """CSAB clip names, i.e. the kMMAnimMaps csab-side strings.
-
-        The name is the GAR member SHORT name minus a .csab extension -- MM3D CSABs
-        (subversion 5) carry no internal name field. Members are selected by the GAR type
-        table ('csab'), falling back to the suffix, and (when verify) checked for the
-        'csab' magic so a mistyped member can't leak in.
-        """
-        out, seen = [], set()
-        for f in self.entries:
-            leaf = os.path.basename((f.name or f.path).replace("\\", "/"))
-            is_csab = f.type == "csab" or leaf.lower().endswith(".csab") \
-                or f.path.lower().endswith(".csab")
-            if not is_csab:
-                continue
-            if verify and f.data and f.data[:4] != CSAB_MAGIC:
-                continue
-            if leaf.lower().endswith(".csab"):
-                leaf = leaf[:-5]
-            if leaf and leaf not in seen:
-                seen.add(leaf)
-                out.append(leaf)
-        return out
-
-
-class Mm3dActors:
-    """Index of /actors/*.gar[.lzs] in the MM3D ROM, keyed by archive basename."""
-
-    def __init__(self, rom_path: Optional[str] = None):
-        sys.path.insert(0, os.path.join(REPO, "tools"))
-        from ctr_romfs import CtrRom  # noqa: E402
-        rom_path = rom_path or os.environ.get("ZELDA3D_MM3D_ROM")
-        if not rom_path:
-            raise SystemExit("ZELDA3D_MM3D_ROM not set (see <repo>/.env)")
-        self.rom_path = rom_path
-        self.rom = CtrRom(rom_path)
-        self.actors: Dict[str, object] = {}
-        for f in self.rom.iter_files():
-            if not f.path.startswith("/actors/"):
-                continue
-            base = os.path.basename(f.path)
-            for suf in (".gar.lzs", ".gar"):
-                if base.endswith(suf):
-                    self.actors.setdefault(base[:-len(suf)], f)
-                    break
-        self._cache: Dict[str, List[str]] = {}
-
-    def clips(self, basename: str) -> Optional[List[str]]:
-        if basename in self._cache:
-            return self._cache[basename]
-        fe = self.actors.get(basename)
-        if fe is None:
-            return None
-        names = Gar(self.rom.read(fe)).clip_names()
-        self._cache[basename] = names
-        return names
-
-
-# =============================================================== (a) N64 side
-
-ANIM_RE = re.compile(r"\bg[A-Za-z0-9_]+Anim\b")
-NON_SKEL_TOKENS = ("tex", "texture", "eye", "mouth", "uv")
-
-
-def n64_anims(objects_dir: str = OBJ_DIR) -> Dict[str, List[str]]:
-    """{object_name: ["objects/<object>/<gFooAnim>", ...]} -- the OTR key without __OTR__."""
-    out: Dict[str, List[str]] = {}
-    for obj in sorted(os.listdir(objects_dir)):
-        d = os.path.join(objects_dir, obj)
-        if not os.path.isdir(d):
-            continue
-        syms = set()
-        for root, _dirs, files in os.walk(d):
-            for fn in files:
-                try:
-                    with open(os.path.join(root, fn), "r", errors="replace") as fp:
-                        syms.update(ANIM_RE.findall(fp.read()))
-                except OSError:
-                    continue
-        if syms:
-            out[obj] = ["objects/%s/%s" % (obj, s) for s in sorted(syms)]
-    # Union in every animation the asset XMLs declare -- this is what picks up the address-named
-    # ones the header regex cannot see (see xml_anim_symbols).
-    for obj, syms in xml_anim_symbols().items():
-        if not os.path.isdir(os.path.join(objects_dir, obj)):
-            continue
-        keys = out.setdefault(obj, [])
-        have = set(keys)
-        for sym in syms:
-            k = "objects/%s/%s" % (obj, sym)
-            if k not in have:
-                keys.append(k)
-                have.add(k)
-        keys.sort()
-    return out
-
-
-def all_object_dirs(objects_dir: str = OBJ_DIR) -> List[str]:
-    return sorted(d for d in os.listdir(objects_dir)
-                  if os.path.isdir(os.path.join(objects_dir, d)))
-
-
-def symbol_of(otr_key: str) -> str:
-    return otr_key.rsplit("/", 1)[-1]
-
-
-# =============================================================== (b) object -> GAR
-
-def object_to_gar(object_name: str, known: Optional[set] = None) -> List[str]:
-    """Candidate MM3D /actors/ archive basenames, in preference order.
-
-    MEASURED rules against the real listing: object_X -> zelda2_X (main rule);
-    OoT-inherited actors -> zelda_X (no '2'); a few -> zelda2_X_new; gameplay_X_keep ->
-    zelda2_X_keep; names are lowercase; a handful carry no prefix (dk_trap).
-    """
-    name = object_name.lower()
-    stem = name
-    for pref in ("object_", "obj_"):
-        if stem.startswith(pref):
-            stem = stem[len(pref):]
-            break
-    if name.startswith("gameplay_"):
-        stem = name[len("gameplay_"):]
-    cands = ["zelda2_" + stem, "zelda_" + stem,
-             "zelda2_" + stem + "_new", "zelda_" + stem + "_new",
-             stem, "zelda2_" + name, name]
-    ordered, seen = [], set()
-    for c in cands:
-        if c not in seen:
-            seen.add(c)
-            ordered.append(c)
-    return ordered if known is None else [c for c in ordered if c in known]
-
-
-# =============================================================== (c) matcher
-
-SYNONYM_CLASSES: List[Tuple[str, ...]] = [
-    ("wait", "idle", "stand", "matsu", "matteru", "machi", "mati", "kihon", "tachi", "tati", "neutral"),
-    ("walk", "aruki", "aruku", "ayumi"),
-    ("run", "hashiri", "hasiri", "dash"),
-    ("jump", "tobi", "leap", "hop"),
-    ("damage", "dmg", "hit", "yarare", "flinch", "recoil", "hurt"),
-    ("attack", "atack", "kougeki"),
-    ("slash", "kiru", "swing", "cut"),
-    ("die", "dead", "death", "shinu"),
-    ("down", "taore", "daun", "fall", "collapse", "knock", "knockover", "knockedover"),
-    ("getup", "standup", "mukuri", "rise", "okiru"),
-    ("fly", "flight", "hover", "tobu"),
-    ("float", "ukabu"),
-    ("talk", "speak", "hanasi", "hanashi", "syaberi", "shaberi"),
-    ("sit", "suwari", "seated"),
-    ("sleep", "nemuri", "neru"),
-    ("eat", "eating", "taberu", "kuu"),
-    ("turn", "furimuki", "furimuku"),
-    ("nod", "unazuki"),
-    ("laugh", "warai"),
-    ("surprise", "odoroki", "shock", "startle"),
-    ("angry", "anger", "okoru", "mad"),
-    ("happy", "uresi", "ureshi", "joy", "glad"),
-    ("dance", "odori"),
-    ("cheer", "banzai", "celebrate"),
-    ("greet", "aisatsu"),
-    ("start", "begin", "hajime", "appear"),
-    ("end", "finish", "owari", "ending", "disappear"),
-    ("open", "ake", "aku"),
-    ("close", "shime", "shimeru"),
-    ("throw", "nage", "nageru"),
-    ("swim", "oyogi", "oyogu"),
-    ("ocarina", "okarina", "flute"),
-    ("wake", "okiru", "wakeup"),
-    ("push", "osu"),
-    ("pull", "hiku"),
-    ("catch", "tsukamu", "grab", "hold"),
-    ("shout", "sakebi", "sakebu", "scream", "roar", "call", "yell"),
-    ("lookup", "kaoage", "faceup"),
-    ("lookaround", "kyoro", "kyorokyoro", "lookabout"),
-    ("stab", "tukisasae", "tsukisasu", "thrust", "lunge"),
-    ("support", "sasaeru", "sasae"),
-    ("suffer", "kurusimu", "kurushimu", "struggle", "writhe"),
-    ("transform", "hensin", "henshin", "morph"),
-    ("return", "modori", "modoru"),
-    ("play", "ensou", "perform"),
-    ("salute", "keirei"),
-    ("whip", "muti", "muchi"),
-    ("stop", "tome", "tomaru", "halt"),
-    ("escape", "nige", "nigeru", "flee"),
-    ("stumble", "koke", "kokeru", "trip"),
-    ("fall", "rakka", "ochiru"),
-    ("cutscene", "demo", "cs"),
-    ("verticalslash", "tategiri"),
-    ("pillar", "hashira"),
-    ("standup", "tachiagari", "tachiagaru", "riseup"),
-    ("jmp",), ("dam",),
-]
-_ALIAS = {"jmp": "jump", "dam": "damage", "dmg": "damage"}
-_SYN: Dict[str, int] = {}
-for _i, _cls in enumerate(SYNONYM_CLASSES):
-    for _t in _cls:
-        _SYN.setdefault(_t, _i)
-for _a, _b in _ALIAS.items():
-    _SYN[_a] = _SYN[_b]
-
-
-def _canon(tok: str) -> str:
-    for cand in (tok, tok + "e"):
-        c = _SYN.get(cand)
-        if c is not None:
-            return "#%d" % c
-    return tok
-
-
-def _canon_seq(toks: List[str]) -> List[str]:
-    j = "".join(toks)
-    if len(toks) > 1 and (j in _SYN or (j + "e") in _SYN):
-        return [_canon(j)]
-    return [_canon(t) for t in toks]
-
-
-def _stem(t: str) -> str:
-    for suf in ("ing", "ed"):
-        if len(t) > len(suf) + 3 and t.endswith(suf):
-            base = t[:-len(suf)]
-            if len(base) > 3 and base[-1] == base[-2]:
-                base = base[:-1]
-            return base
-    return t
-
-
-def _atoms(tok: str) -> Tuple[List[str], bool]:
-    parts = re.findall(r"[a-z]+|\d+", tok.lower())
-    return [_stem(p) for p in parts if not p.isdigit()], any(p.isdigit() for p in parts)
-
-
-def split_symbol(symbol: str) -> Tuple[List[str], bool]:
-    s = symbol[1:] if symbol.startswith("g") else symbol
-    s = re.sub(r"Anim$", "", s)
-    toks, num = [], False
-    for p in re.findall(r"[A-Z]+(?![a-z])|[A-Z][a-z0-9]*|[a-z0-9]+", s):
-        w, n = _atoms(p)
-        toks += w
-        num = num or n
-    return toks, num
-
-
-def split_clip(clip: str) -> Tuple[List[str], bool]:
-    toks, num = [], False
-    for p in re.split(r"[_\-.]+", clip.lower()):
-        if not p:
-            continue
-        w, n = _atoms(p)
-        toks += w
-        num = num or n
-    return toks, num
-
-
-def _common_lead(seqs: List[List[str]]) -> int:
-    if len(seqs) < 2:
-        return 0
-    limit = min(len(s) for s in seqs) - 1
-    k = 0
-    while k < limit and all(s[k] == seqs[0][k] for s in seqs):
-        k += 1
-    return k
-
-
-def _strip_actor(seqs: List[List[str]], extra: Tuple[str, ...]) -> List[List[str]]:
-    k = _common_lead(seqs)
-    res = []
-    for s in (x[k:] for x in seqs):
-        while len(s) > 1 and s[0] in extra:
-            s = s[1:]
-        res.append(s)
-    return res
-
-
-def _noise_heads(seqs: List[List[str]]) -> set:
-    heads: Dict[str, int] = {}
-    for s in seqs:
-        if len(s) > 1:
-            heads[s[0]] = heads.get(s[0], 0) + 1
-    return {h for h, n in heads.items() if n >= 2 and h not in _SYN and h != "loop"}
-
-
-def actor_tokens_for(object_name: str) -> Tuple[str, ...]:
-    stem = re.sub(r"^(object_|obj_)", "", object_name)
-    toks = {stem}
-    toks.update(t for t in stem.split("_") if t)
-    return tuple(toks)
-
-
-@dataclass
-class Match:
-    symbol: str
-    clip: Optional[str]
-    confidence: float
-    why: str
-
-
-def _score(sym_toks: List[str], clip_toks: List[str]) -> Tuple[float, str]:
-    if not sym_toks or not clip_toks:
-        return 0.0, "empty"
-    if "".join(sym_toks) == "".join(clip_toks):
-        return 1.0, "exact (token join)"
-    a, b = _canon_seq(sym_toks), _canon_seq(clip_toks)
-    ja, jb = "".join(a), "".join(b)
-    sa, sb = set(a), set(b)
-    if sa == sb:
-        return 1.0, "exact token set" + ("" if sym_toks == clip_toks else " (synonym)")
-    if ja == jb:
-        return 0.97, "exact after token join (%s)" % ja
-    inter = sa & sb
-    if not inter:
-        return 0.0, "no shared token"
-    return (len(inter) / float(len(sa | sb)),
-            "partial overlap %s (%d/%d)" % ("+".join(sorted(inter)), len(inter), len(sa | sb)))
-
-
-ACCEPT = 0.90
-TIE_MARGIN = 0.05
-
-# ---------------------------------------------- externally VERIFIED mappings (evidence required)
-# Mappings established by measurement rather than by a rule that generalises. Each entry must cite
-# the evidence, and `--verify-overrides` re-derives it from the ROM so a stale entry FAILS instead
-# of quietly persisting. This is the sanctioned way to carry a proven fact -- hand-editing the
-# generated .inc is not, because the next regeneration silently drops it.
-#
-# gameplay_keep doors. Closed system: exactly 8 N64 door symbols, exactly 8 door clips in
-# zelda2_keep (door/anim/). Resolved by two INDEPENDENT chains, neither of which is frame counts
-# alone -- durations 66 and 85 each recur across forms, so bipartite matching on duration admits
-# many assignments and settles nothing by itself:
-#
-#   1. FORM, from archive directory names. zelda2_link_new.gar.lzs files the same door animations
-#      under form-named directories: child/anim/clink_demo_door*, goron/anim/pg_door*,
-#      nuts/anim/pn_door*, zora/anim/pz_door*. So clink=Human(child), pg=Goron, pn=Deku(nuts),
-#      pz=Zora -- named, not inferred. zelda2_keep has NO pz and instead has `link`, and the one
-#      N64 symbol covering two adult-height forms is FierceDeityZora: the door needs 4 height
-#      classes where the player rig needs 5. Hence link = FierceDeityZora.
-#   2. SIDE, from exact duration equality WITHIN each already-pinned form, where the two clips
-#      always differ (measured N64 frameCount u16@0x44 vs MM3D csab duration u32@0x34):
-#         Human  L 88 / R 85   clink_demo_doorA 88 / B 85
-#         FD+Zora L 66 / R 74  link_demo_doorA  66 / B 74
-#         Goron  L 66 / R 85   pg_doorA 66 / pg_doorB 85
-#         Deku   L 81 / R 85   pn_doorA 81 / pn_doorB 85
-#      Four independent confirmations of the single bit A=Left, B=Right.
-VERIFIED_OVERRIDES: Dict[str, Dict[str, str]] = {
-    "gameplay_keep": {
-        "gDoorHumanOpenLeftAnim":            "clink_demo_doorA_door",
-        "gDoorHumanOpenRightAnim":           "clink_demo_doorB_door",
-        "gDoorFierceDeityZoraOpenLeftAnim":  "link_demo_doorA_door",
-        "gDoorFierceDeityZoraOpenRightAnim": "link_demo_doorB_door",
-        "gDoorGoronOpenLeftAnim":            "pg_doorA",
-        "gDoorGoronOpenRightAnim":           "pg_doorB",
-        "gDoorDekuOpenLeftAnim":             "pn_doorA",
-        "gDoorDekuOpenRightAnim":            "pn_doorB",
-    },
-    # object_delf: the decomp XML annotates TWO symbols with the same original name, which is an
-    # upstream copy-paste error rather than a genuine alias -- and it produced a real wrong mapping,
-    # two N64 animations sharing one clip while elf_attack_2b went unclaimed.
-    #   0x4FF4 elf_attack_1a   0x53A4 elf_attack_1b   0x5B68 elf_attack_2a   0x6328 "elf_attack_1b"
-    # MEASURED, not argued from the offset ordering (which an adversarial pass rejected as a general
-    # corroborator, 8 of 141 objects being non-monotone): the N64 frameCounts are 24, 24, 56, 56 and
-    # the GAR durations are elf_attack_1a 23, 1b 23, 2a 55, 2b 55. Symbol 0x6328 is 56 frames, so it
-    # belongs to the 2-series and is 33 frames away from the elf_attack_1b it is annotated with.
-    # Within that series 2a is already claimed by its own correctly-annotated symbol and 2b is the
-    # only unclaimed clip, so the assignment is forced. The duration evidence establishes the SERIES;
-    # it cannot separate 2a from 2b on its own, since both are 55.
-    "object_delf": {
-        "object_delf_Anim_006328": "elf_attack_2b",
-    },
-}
-
-
-
-# ---------------------------------------------- authoritative XML "Original name" annotations
-# The 2ship decomp XMLs annotate most animations with the asset's ORIGINAL (romaji) name, which is
-# exactly what the MM3D GAR names its CSAB clip:
-#     <Animation Name="gDogBarkAnim" Offset="0x998" /> <!-- Original name is "dog_bark" -->
-# 1555 of 1746 Animation entries carry it. This is an AUTHORITATIVE mapping written by the decomp
-# authors, so it beats any lexical guess — and it is the only thing that bridges the romaji gap
-# (MM3D clips are Japanese: an_hokiwalk, dnt_iyaiyaTOmuun), which pure name matching cannot do.
-XML_DIRS = ("N64_US", "GC_US")
-# KNOWN GAP: 11 animation symbols live in assets/overlays/ (e.g. ovl_En_Sth) rather than
-# objects/. They are deliberately NOT scanned: an overlay has no MM3D actor GAR of its own
-# (its model comes from some object), and that overlay->object association is not recorded
-# in the XML, so scanning them would only produce unresolvable entries.
-XML_SUBDIRS = ("objects",)
-# One entry = the self-closing <Animation/> tag plus EVERY trailing comment on its line. Scanning
-# only the FIRST comment (the previous shape of this regex) silently dropped 16 symbols whose
-# annotation sits in a second comment, and there is no signal that it dropped them -- the symbol
-# just fell through to fuzzy matching. Classification of the comment blob happens in Python below,
-# because there are four annotation dialects and encoding them as four regexes made the precedence
-# between them invisible.
-_ANIM_ENTRY_RE = re.compile(
-    r'<Animation\s+Name="([A-Za-z0-9_]+)"[^>]*/>((?:[ \t]*<!--(?:(?!-->).)*?-->)*)')
-
-# The MM3D-side name, when the annotator recorded it directly. This OUTRANKS "Original name is":
-# it names the clip in the MM3D GAR, which is the thing being matched, whereas "Original name"
-# names the N64 asset and only usually coincides. e.g.
-#     <!-- MM3D name is "dance_roll", but it was probably renamed. Might have originally been ... -->
-# Under the old single-dialect regex these entries carried NO annotation at all and were matched
-# by guesswork.
-# BOTH alternatives are anchored on "MM3D". An unanchored /Named "X"/ also matches the SPECULATIVE
-# phrasing "might have been originally named \"jmp_stop13\"", which is a guess about the N64 name in
-# an entry that says the animation is NOT in MM3D at all -- widening it that far made
-# gOdolwaJumpDanceAnim fall through to the heuristics and steal dance_jump from the symbol actually
-# annotated with it.
-_MM3D_NAME_RE = re.compile(
-    r'(?:MM3D name is\s+["\']([A-Za-z0-9_]+)'
-    r'|Named\s+["\']([A-Za-z0-9_]+)["\']\s+in MM3D)', re.I)
-# "Or\w*nal" and not "Original": the corpus contains "Orignal" and "Orginal". The value is read as a
-# maximal identifier rather than as everything-between-quotes, because several annotations close the
-# quote in the wrong place ("gg_odoroki (surprise)").
-_ORIG_NAME_RE = re.compile(r'Or\w*nal name is\s+["\']([A-Za-z0-9_]+)')
-# A NEGATIVE annotation: the annotator checked and the clip is gone. This never adds a mapping; it
-# only stops the heuristics from inventing one, which is the failure it exists to prevent -- these
-# symbols were previously free to claim whatever clip scored best.
-_ABSENT_RE = re.compile(r'Not present in MM3D|removed in MM3D', re.I)
-
-_ANIM_ANY_RE = re.compile(r'<Animation\s+Name="([A-Za-z0-9_]+)"')
-# <TextureAnimation> is a UV/material track, not a skeletal clip -- it can never match a CSAB and
-# its symbol does not always carry a "tex"/"uv" token, so token-based exclusion misses some.
-_TEXANIM_RE = re.compile(r'<TextureAnimation\s+Name="([A-Za-z0-9_]+)"')
-
-def xml_anim_symbols(repo: str = REPO) -> Dict[str, List[str]]:
-    r"""{object_name: [animation symbol...]} declared in the 2ship asset XMLs.
-
-    AUTHORITATIVE and broader than grepping the headers for /g\w+Anim/: many animations are still
-    address-named (object_daiku_Anim_00B690) because they have not been given a symbolic name, and
-    566 such entries exist -- 536 of them WITH an "Original name" annotation, i.e. fully mappable.
-    A g-prefixed regex silently drops all of them."""
-    out: Dict[str, List[str]] = {}
-    for d in XML_DIRS:
-        for sub in XML_SUBDIRS:
-            base = os.path.join(repo, "2ship", "assets", "xml", d, sub)
-            if not os.path.isdir(base):
-                continue
-            for fn in sorted(os.listdir(base)):
-                if not fn.endswith(".xml"):
-                    continue
-                obj = fn[:-4]
-                try:
-                    txt = open(os.path.join(base, fn), encoding="utf-8", errors="ignore").read()
-                except OSError:
-                    continue
-                for sym in _ANIM_ANY_RE.findall(txt):
-                    lst = out.setdefault(obj, [])
-                    if sym not in lst:
-                        lst.append(sym)
-    return out
-
-
-def _classify_annotation(comments: str) -> Optional[Optional[str]]:
-    """The annotated clip name, None for 'annotated as ABSENT', or missing (return ()) for no
-    annotation at all. Precedence: MM3D-side name > N64 original name > absent."""
-    m = _MM3D_NAME_RE.search(comments)
-    if m:
-        return m.group(1) or m.group(2)
-    # ABSENT outranks "Original name is": when an entry carries both ('Original name is "ka_dance"
-    # (this animation was removed in MM3D)') the annotator is telling us the clip is gone, and the
-    # N64 name is history rather than a lookup key.
-    if _ABSENT_RE.search(comments):
-        return None
-    m = _ORIG_NAME_RE.search(comments)
-    if m:
-        return m.group(1)
-    return ()  # sentinel: no annotation of any dialect
-
-
-def xml_original_names(repo: str = REPO) -> Dict[str, Dict[str, Optional[str]]]:
-    """{object_name: {n64_symbol: annotated_clip_name_or_None}}, from the 2ship asset XMLs.
-
-    A value of None means the annotator recorded that the animation is ABSENT from MM3D. That is
-    information, not a gap: it must suppress fuzzy matching rather than leave the symbol open."""
-    out: Dict[str, Dict[str, Optional[str]]] = {}
-    for d in XML_DIRS:
-      for sub in XML_SUBDIRS:
-        base = os.path.join(repo, "2ship", "assets", "xml", d, sub)
-        if not os.path.isdir(base):
-            continue
-        for fn in sorted(os.listdir(base)):
-            if not fn.endswith(".xml"):
-                continue
-            obj = fn[:-4]
-            try:
-                txt = open(os.path.join(base, fn), encoding="utf-8", errors="ignore").read()
-            except OSError:
-                continue
-            for sym, comments in _ANIM_ENTRY_RE.findall(txt):
-                if not comments:
-                    continue
-                val = _classify_annotation(comments)
-                if val == ():
-                    continue
-                # first XML dir wins; don't let a later variant overwrite a known name
-                out.setdefault(obj, {}).setdefault(sym, val)
-    return out
-
-
-def xml_texture_anims(repo: str = REPO) -> Dict[str, set]:
-    """{object_name: {symbol,...}} declared as <TextureAnimation> -- never skeletal."""
-    out: Dict[str, set] = {}
-    for d in XML_DIRS:
-      for sub in XML_SUBDIRS:
-        base = os.path.join(repo, "2ship", "assets", "xml", d, sub)
-        if not os.path.isdir(base):
-            continue
-        for fn in sorted(os.listdir(base)):
-            if not fn.endswith(".xml"):
-                continue
-            try:
-                txt = open(os.path.join(base, fn), encoding="utf-8", errors="ignore").read()
-            except OSError:
-                continue
-            for sym in _TEXANIM_RE.findall(txt):
-                out.setdefault(fn[:-4], set()).add(sym)
-    return out
-
-
-def match_anims(symbols: List[str], clip_names: List[str], object_name: str = "",
-                accept: float = ACCEPT, orig: Optional[Dict[str, Optional[str]]] = None,
-                texanims: Optional[set] = None) -> List[Match]:
-    """Match each N64 animation symbol to at most one CSAB clip; ambiguous/weak => unmatched.
-
-    `orig` = {symbol: original_clip_name} from the decomp XML annotations. When the annotated name
-    is actually present in this actor's GAR it is taken verbatim at confidence 1.0 — authoritative,
-    and the only signal that crosses the English<->romaji vocabulary gap."""
-    if not object_name and symbols and "/" in symbols[0]:
-        object_name = symbols[0].split("/")[1]
-    extra = actor_tokens_for(object_name)
-    raw_sym = [split_symbol(symbol_of(s)) for s in symbols]
-    raw_clip = [split_clip(c) for c in clip_names]
-    sym_toks = _strip_actor([t for t, _n in raw_sym], extra)
-    clip_toks = _strip_actor([t for t, _n in raw_clip], extra)
-    noise = _noise_heads(clip_toks)
-    if noise:
-        clip_toks = [(s[1:] if len(s) > 1 and s[0] in noise else s) for s in clip_toks]
-    clip_num = [n for _t, n in raw_clip]
-
-    orig = orig or {}
-    texanims = texanims or set()
-    clipset = set(clip_names)
-    out: List[Match] = []
-    for s, toks in zip(symbols, sym_toks):
-        sym = symbol_of(s)
-        ov = VERIFIED_OVERRIDES.get(object_name, {}).get(sym)
-        if ov:
-            # Refuse rather than silently fall through: an override naming a clip this GAR does not
-            # have means the evidence behind it no longer describes the asset.
-            if ov not in clipset:
-                raise SystemExit(
-                    "VERIFIED_OVERRIDES[%r][%r] names %r, which is not a clip in this GAR (%d "
-                    "clips). The recorded evidence no longer holds -- re-derive it, do not delete "
-                    "the guard." % (object_name, sym, ov, len(clip_names)))
-            out.append(Match(s, ov, 1.0, "verified override (see VERIFIED_OVERRIDES)"))
-            continue
-        if sym in texanims:
-            out.append(Match(s, None, 0.0, "non-skeletal: declared <TextureAnimation> in the XML"))
-            continue
-        # AUTHORITATIVE: the decomp XML's annotation, when it names a clip this GAR actually has.
-        if sym in orig:
-            o = orig[sym]
-            if o is None:
-                # The annotator checked and said it is gone. Without this the heuristics were free
-                # to hand the symbol whatever clip scored best, which is a fabricated mapping.
-                out.append(Match(s, None, 0.0, "XML annotates this animation as absent from MM3D"))
-                continue
-            if o in clipset:
-                out.append(Match(s, o, 1.0, "xml annotation names an existing clip"))
-                continue
-            # The annotated name is absent but exactly one numbered clip extends it (last_dam ->
-            # last_dam01). Gated on the exact name being absent AND the variant being unique; with
-            # either guard dropped this rule starts stealing clips from their real owners.
-            vs = sorted(c for c in clip_names
-                        if re.fullmatch(re.escape(o) + r"\d{1,2}", c))
-            if len(vs) == 1:
-                out.append(Match(s, vs[0], 0.95,
-                                 "xml annotation %r + its unique numeric variant" % o))
-                continue
-            # Otherwise fall through to the heuristics: an annotation naming no clip here is a
-            # dead end, not evidence of absence (that is what the negative dialect is for).
-        if any(t in NON_SKEL_TOKENS for t in toks):
-            out.append(Match(s, None, 0.0, "non-skeletal symbol (%s)" % "+".join(toks)))
-            continue
-        scored = []
-        for c, ct, cn in zip(clip_names, clip_toks, clip_num):
-            sc, why = _score(toks, ct)
-            if sc > 0:
-                scored.append((sc, cn, c, why))
-        if not scored:
-            out.append(Match(s, None, 0.0,
-                             "no candidate shares a token with [%s]" % " ".join(toks)))
-            continue
-        scored.sort(key=lambda x: (-x[0], x[1], x[2]))
-        top_sc, top_num, top_c, top_why = scored[0]
-        if top_sc < accept:
-            out.append(Match(s, None, round(top_sc, 2), "best %s too weak: %s" % (top_c, top_why)))
-            continue
-        rivals = [c for sc, num, c, _w in scored[1:]
-                  if sc >= top_sc - TIE_MARGIN and (num == top_num or top_num)]
-        if rivals:
-            out.append(Match(s, None, round(top_sc, 2),
-                             "ambiguous: %s vs %s" % (top_c, ",".join(rivals[:3]))))
-            continue
-        why = top_why
-        if any(sc >= top_sc - TIE_MARGIN for sc, _n, _c, _w in scored[1:]):
-            why += "; preferred over numbered variant"
-        out.append(Match(s, top_c, round(top_sc, 2), why))
-    return out
-
-
-# =============================================================== driver
-
-@dataclass
-class ActorResult:
-    obj: str
-    gar: Optional[str]
-    clips: List[str]
-    matches: List[Match]
-    # Informational ONLY: when the resolved GAR holds no CSAB at all, a same-family archive
-    # that does (object_stk2 -> zelda2_stk). NOT matched against -- borrowing another actor's
-    # clips would risk a wrong-skeleton animation, which is worse than the idle fallback.
-    alt_gar_hint: Optional[str] = None
-
-
-def _alt_gar_hint(obj: str, gar: str, actors: "Mm3dActors") -> Optional[str]:
+from mm_animmap_archive import (
+    Mm3dActors,
+)
+from mm_animmap_c_tables import emit_default_inc, emit_inc
+from mm_animmap_inventory import (
+    all_object_dirs,
+    n64_anims,
+    object_to_gar,
+    xml_original_names,
+    xml_texture_anims,
+)
+from mm_animmap_matching import (
+    ACCEPT,
+    Match,
+    match_anims,
+)
+from mm_animmap_paths import REPO, load_env
+from mm_animmap_report import build_report
+from mm_animmap_types import ActorResult
+from mm_animmap_verify import verify_overrides
+
+_load_env = load_env
+
+
+def _alt_gar_hint(obj: str, gar: str, actors: Mm3dActors) -> str | None:
     stem = re.sub(r"^(object_|obj_|gameplay_)", "", obj.lower())
     bases = {re.sub(r"\d+$", "", stem), stem.split("_")[0]}
-    for b in sorted(bases):
-        for cand in ("zelda2_" + b, "zelda_" + b, b):
-            if cand != gar and actors.clips(cand):
-                return cand
+    for base in sorted(bases):
+        for candidate in ("zelda2_" + base, "zelda_" + base, base):
+            if candidate != gar and actors.clips(candidate):
+                return candidate
     return None
 
 
-def build(only: Optional[str] = None, accept: float = ACCEPT) -> Tuple[List[ActorResult], dict]:
-    anims = n64_anims()
+def build(
+    only: str | None = None, accept: float = ACCEPT
+) -> tuple[list[ActorResult], dict]:
+    animations = n64_anims()
     if only:
-        anims = {k: v for k, v in anims.items() if k == only}
-        if not anims:
-            raise SystemExit("no animation symbols for object %r" % only)
+        animations = {key: value for key, value in animations.items() if key == only}
+        if not animations:
+            raise SystemExit(f"no animation symbols for object {only!r}")
+
     actors = Mm3dActors()
     known = set(actors.actors)
-    orig_all = xml_original_names()
-    texanim_all = xml_texture_anims()
-    results: List[ActorResult] = []
-    for obj in sorted(anims):
-        cands = object_to_gar(obj, known)
-        gar = cands[0] if cands else None
-        clips = actors.clips(gar) if gar else []
-        clips = clips or []
-        matches = match_anims(anims[obj], clips, obj, accept, orig_all.get(obj),
-                              texanim_all.get(obj)) if clips else [
-            Match(s, None, 0.0, "no GAR" if not gar else "GAR has no CSAB clips")
-            for s in anims[obj]]
-        hint = _alt_gar_hint(obj, gar, actors) if (gar and not clips) else None
-        results.append(ActorResult(obj, gar, clips, matches, hint))
+    original_names = xml_original_names()
+    texture_animations = xml_texture_anims()
+    results: list[ActorResult] = []
+    for obj in sorted(animations):
+        candidates = object_to_gar(obj, known)
+        gar = candidates[0] if candidates else None
+        clips = (actors.clips(gar) if gar else []) or []
+        if clips:
+            matches = match_anims(
+                animations[obj],
+                clips,
+                obj,
+                accept,
+                original_names.get(obj),
+                texture_animations.get(obj),
+            )
+        else:
+            reason = "no GAR" if not gar else "GAR has no CSAB clips"
+            matches = [Match(symbol, None, 0.0, reason) for symbol in animations[obj]]
+        hint = _alt_gar_hint(obj, gar, actors) if gar and not clips else None
+        results.append(ActorResult(obj, gar, tuple(clips), tuple(matches), hint))
+
     meta = {
         "rom": getattr(actors.rom, "product_code", "MM3D"),
         "actor_gars_in_rom": len(known),
         "object_dirs_total": len(all_object_dirs()),
-        "objects_with_anims": len(anims),
+        "objects_with_anims": len(animations),
         "min_confidence": accept,
     }
     return results, meta
 
 
-# An N64 symbol naming the actor's idle. Used ONLY when the GAR has no *wait* clip of its own --
-# see resolve_default_anim for why that order and not the reverse.
-_N64_IDLE_RE = (re.compile(r"Wait", re.I), re.compile(r"Idle", re.I), re.compile(r"Stand", re.I))
+def _write_outputs(
+    output: str, report_stem: str, results: list[ActorResult], meta: dict
+) -> dict:
+    include = emit_inc(results, meta)
+    markdown, report = build_report(results, meta)
+    for destination in (output, report_stem + ".md", report_stem + ".json"):
+        os.makedirs(os.path.dirname(destination), exist_ok=True)
+    with open(output, "w") as include_file:
+        include_file.write(include)
+
+    default_include, unknown = emit_default_inc(results)
+    if os.path.basename(output) == "mm3d_animmap.inc":
+        default_output = os.path.join(os.path.dirname(output), "mm3d_defaultanim.inc")
+    else:
+        default_output = os.path.splitext(output)[0] + "_defaultanim.inc"
+    with open(default_output, "w") as default_file:
+        default_file.write(default_include)
+    default_count = default_include.count("\n    { ")
+    print(f"default-idle table: {default_count} actors -> {default_output}")
+    if unknown:
+        unknown_names = ", ".join(unknown)
+        print(
+            f"  NO determinable idle for {len(unknown)} actor(s) -- these keep the runtime's arbitrary "
+            f"first-CSAB fallback, which is a KNOWN GAP, not a choice: {unknown_names}"
+        )
+
+    with open(report_stem + ".md", "w") as markdown_file:
+        markdown_file.write(markdown)
+    with open(report_stem + ".json", "w") as json_file:
+        json.dump(report, json_file, indent=2)
+    return report
 
 
-def resolve_default_anim(r: "ActorResult") -> Tuple[Optional[str], str]:
-    """The clip to play when this actor's live N64 animation has no mapping. Returns (clip, why).
-
-    Priority, and the order matters:
-      1. a GAR clip named *wait*. Direct evidence from the actor's own archive.
-      2. the clip mapped from an N64 Wait/Idle/Stand symbol. Weaker -- the qualified symbols
-         (gEyegoreSlamWaitAnim, gGerudoPurpleSlashToStandingAnim) map to ATTACK clips -- but it is
-         real evidence, and it only applies where rule 1 found none. Measured: putting this rule
-         FIRST regresses six actors (object_eg -> eg_atack02, object_kamejima -> kam_mezame, ...),
-         every one of which has a perfectly good *wait* clip. Hence second, not first.
-      3. the sole clip, when the archive has exactly one. Not a guess: there is nothing to choose.
-      4. nothing -- the actor is left to the runtime's 'first CSAB in the archive'. That is GAR
-         ordering, which is not evidence about anything (it picks pr_damage for object_pr and
-         bb_atack for object_bb), so those actors are REPORTED as a known gap rather than being
-         silently blessed by appearing in a generated table.
-
-    Note rule 1 cannot see a Japanese-named idle (matsu, taiki), which is exactly what rule 2
-    recovers for object_dinofos (zf2_aruku 'walk' -> zf2_matsu 'wait')."""
-    wait = [c for c in sorted(r.clips) if "wait" in c.lower()]
-    if wait:
-        return wait[0], "GAR *wait* clip"
-    for rx in _N64_IDLE_RE:
-        for m in r.matches:
-            if m.clip and rx.search(symbol_of(m.symbol)):
-                return m.clip, "clip mapped from N64 /%s/ symbol %s" % (rx.pattern,
-                                                                       symbol_of(m.symbol))
-    if len(r.clips) == 1:
-        return r.clips[0], "the archive's only clip"
-    return None, "no idle determinable (no *wait* clip, no mapped N64 idle symbol)"
+def _print_summary(report: dict, output: str, report_stem: str) -> None:
+    meta = report["meta"]
+    print(
+        f"objects with anims: {meta['objects_with_anims']}  "
+        f"(resolved to a GAR: {meta['objects_with_gar']}, no GAR: {meta['objects_without_gar']})"
+    )
+    matched_percent = 100.0 * meta["symbols_matched"] / max(1, meta["symbols_total"])
+    print(
+        f"symbols: {meta['symbols_total']}  matched: {meta['symbols_matched']} "
+        f"({matched_percent:.1f}%)  unmatched: {meta['symbols_unmatched']}"
+    )
+    for reason, count in sorted(
+        report["unmatched_reasons"].items(), key=lambda item: -item[1]
+    ):
+        print(f"  {count:5d}  {reason}")
+    print(
+        f"wrote {os.path.relpath(output, REPO)}, {os.path.relpath(report_stem, REPO)}.md, {os.path.relpath(report_stem, REPO)}.json"
+    )
 
 
-def emit_default_inc(results: List[ActorResult]) -> Tuple[str, List[str]]:
-    """The gar-basename -> default-idle-clip table, plus the list of actors with no determinable
-    idle (which is a REPORTED gap, not a silent guess)."""
-    lines = [
-        "// Generated by tools/gen_mm_animmap.py -- DO NOT EDIT BY HAND.",
-        "// MM3D actor GAR basename -> the CSAB clip to play when the live N64 animation has no",
-        "// entry in kMMAnimMaps. See resolve_default_anim() in the generator for the priority and",
-        "// for the priority. An actor ABSENT from this table has no determinable idle; it keeps",
-        "// the runtime's first-CSAB fallback, which is GAR ordering rather than evidence (it picks",
-        "// pr_damage for object_pr). That is a known gap, listed by the generator, not a default.",
-    ]
-    unknown = []
-    for r in sorted(results, key=lambda r: r.obj):
-        if not r.gar or not r.clips:
-            continue
-        clip, why = resolve_default_anim(r)
-        if clip is None:
-            unknown.append("%s (%s, %d clips)" % (r.obj, r.gar, len(r.clips)))
-            continue
-        lines.append('    { "%s", "%s" },%s// %s' % (
-            r.gar, clip, " " * max(1, 46 - len(r.gar) - len(clip)), why))
-    return "\n".join(lines) + "\n", unknown
+def parse_args(argv: list[str] | None = None) -> argparse.Namespace:
+    parser = argparse.ArgumentParser(
+        description=__doc__, formatter_class=argparse.RawDescriptionHelpFormatter
+    )
+    parser.add_argument(
+        "--only", help="restrict to a single N64 object dir (e.g. object_dog)"
+    )
+    parser.add_argument(
+        "--min-confidence",
+        type=float,
+        default=ACCEPT,
+        help=f"acceptance threshold (default {ACCEPT:.2f})",
+    )
+    parser.add_argument(
+        "--out",
+        default=os.path.join("scratch", "mm_animmap.inc"),
+        help="C entries output (default scratch/mm_animmap.inc)",
+    )
+    parser.add_argument(
+        "--report",
+        default=os.path.join("scratch", "mm_animmap_report"),
+        help="report path stem; writes <stem>.md and <stem>.json",
+    )
+    parser.add_argument(
+        "--verify-overrides",
+        action="store_true",
+        help="re-derive VERIFIED_OVERRIDES from the assets and exit",
+    )
+    return parser.parse_args(argv)
 
 
-def emit_inc(results: List[ActorResult], meta: dict) -> str:
-    lines = [
-        "// Generated by tools/gen_mm_animmap.py -- DO NOT EDIT BY HAND.",
-        "// N64 animation OTR key (no __OTR__ prefix) -> MM3D CSAB clip name.",
-        "// Source: 2ship/assets/objects/*/ + the MM3D ROM's /actors/zelda*_*.gar[.lzs]",
-        "// Accepted at confidence >= %.2f; ambiguous/weak matches are intentionally omitted so"
-        % meta["min_confidence"],
-        "// the actor falls back to its default idle CSAB rather than playing a wrong animation.",
-    ]
-    n = 0
-    for r in results:
-        got = [m for m in r.matches if m.clip]
-        if not got:
-            continue
-        width = max(len(m.symbol) for m in got) + 3
-        lines.append("// ---- %s (%s: %d/%d anims, %d clips) ----"
-                     % (r.obj, r.gar, len(got), len(r.matches), len(r.clips)))
-        for m in got:
-            key = '"%s",' % m.symbol
-            lines.append('    { %-*s "%s" },' % (width, key, m.clip))
-            n += 1
-    lines.insert(5, "// %d entries across %d actors."
-                 % (n, sum(1 for r in results if any(m.clip for m in r.matches))))
-    return "\n".join(lines) + "\n"
-
-
-def _reason_bucket(why: str) -> str:
-    if why.startswith("no candidate shares"):
-        return "no shared token (romaji vs english vocabulary gap)"
-    if why.startswith("best "):
-        return "weak partial overlap (below min-confidence)"
-    if why.startswith("non-skeletal"):
-        return "non-skeletal symbol (Tex/UV/eye/mouth)"
-    if why.startswith("ambiguous"):
-        return "ambiguous tie between clips"
-    if why == "no GAR":
-        return "object has no MM3D actor GAR"
-    return why
-
-
-# tag -> the substring of Match.why that identifies it. Kept next to the report so adding a rule
-# without reporting its firing count is an obvious omission rather than an invisible one.
-_RULE_TAGS = {
-    "XML annotation naming an existing clip": "names an existing clip",
-    "XML annotation + unique numeric variant": "unique numeric variant",
-    "verified override (measured, cited)": "verified override",
-    "annotated ABSENT from MM3D (suppresses guessing)": "absent from MM3D",
-    "<TextureAnimation> exclusion": "<TextureAnimation>",
-}
-
-
-def build_report(results: List[ActorResult], meta: dict) -> Tuple[str, dict]:
-    tot_sym = sum(len(r.matches) for r in results)
-    tot_ok = sum(1 for r in results for m in r.matches if m.clip)
-    with_gar = [r for r in results if r.gar]
-    no_gar = [r for r in results if not r.gar]
-    reasons: Dict[str, int] = {}
-    for r in results:
-        for m in r.matches:
-            if not m.clip:
-                reasons[_reason_bucket(m.why)] = reasons.get(_reason_bucket(m.why), 0) + 1
-
-    # Per-RULE firing counts, with the denominator. A matching rule that quietly stops firing --
-    # because a regex broke, or because the upstream decomp XML changed dialect -- looks exactly
-    # like "there was nothing to match", and the totals above cannot tell those apart. Two of these
-    # rules measure ZERO today and that is worth SEEING rather than assuming: they are guards
-    # against annotations the decomp has not written yet, not coverage this table already has.
-    rules: Dict[str, int] = {k: 0 for k in _RULE_TAGS}
-    for r in results:
-        for m in r.matches:
-            for tag, key in _RULE_TAGS.items():
-                if key in m.why:
-                    rules[tag] += 1
-    # Residual, not a substring probe: everything matched that no annotation rule claimed. Derived
-    # this way so it cannot silently read 0 when the tag string drifts -- which it just did.
-    rules["token/synonym heuristic"] = tot_ok - sum(
-        rules[t] for t in _RULE_TAGS if t.startswith(("XML annotation", "verified override")))
-
-    js = {
-        "meta": dict(meta, symbols_total=tot_sym, symbols_matched=tot_ok,
-                     symbols_unmatched=tot_sym - tot_ok,
-                     objects_with_gar=len(with_gar), objects_without_gar=len(no_gar)),
-        "unmatched_reasons": reasons,
-        "rule_firings": rules,
-        "actors": [{
-            "object": r.obj, "gar": r.gar, "clips": len(r.clips),
-            # The clip NAMES, not just how many. Without these the unmatched list is unactionable:
-            # you can see that a symbol failed to match but not what it could have matched against.
-            "clip_names": sorted(r.clips),
-            "alt_gar_hint": r.alt_gar_hint,
-            "symbols": len(r.matches),
-            "matched": [{"n64otr": m.symbol, "csab": m.clip, "confidence": m.confidence,
-                         "why": m.why} for m in r.matches if m.clip],
-            "unmatched": [{"n64otr": m.symbol, "confidence": m.confidence, "why": m.why}
-                          for m in r.matches if not m.clip],
-        } for r in results],
-    }
-    _live = [r for r in results if r.gar and r.clips]
-    def _su(r):
-        # Symbols that are UNMAPPED AND MAPPABLE. Two kinds are neither: a non-skeletal symbol
-        # (Tex/UV/eye/mouth, <TextureAnimation>) can never take this path, and a symbol the decomp
-        # annotates as ABSENT from MM3D has no clip to be mapped to -- counting either against an
-        # actor makes it look partially covered when it is as covered as it can be. object_ka was
-        # PARTIAL on nothing but an annotated-absent animation.
-        return [m for m in r.matches if not m.clip
-                and not m.why.startswith("non-skeletal")
-                and "absent from MM3D" not in m.why]
-    js["ungating_coverage"] = {
-        "full": sorted(r.obj for r in _live if not _su(r) and any(m.clip for m in r.matches)),
-        "partial": sorted(r.obj for r in _live if _su(r) and any(m.clip for m in r.matches)),
-        "zero": sorted(r.obj for r in _live if not any(m.clip for m in r.matches)),
-        "excluded": len(results) - len(_live),
-    }
-
-    md = ["# kMMAnimMaps coverage report", "",
-          "Generated by `tools/gen_mm_animmap.py` (offline: repo assets + MM3D ROM `%s`)." % meta["rom"], "",
-          "| metric | value |", "| --- | --- |",
-          "| N64 object dirs | %d |" % meta["object_dirs_total"],
-          "| objects with animation symbols | %d |" % meta["objects_with_anims"],
-          "| MM3D `/actors/` GARs in ROM | %d |" % meta["actor_gars_in_rom"],
-          "| anim-bearing objects resolved to a GAR | %d |" % len(with_gar),
-          "| anim-bearing objects with NO GAR | %d |" % len(no_gar),
-          "| animation symbols total | %d |" % tot_sym,
-          "| symbols matched (conf >= %.2f) | %d (%.1f%%) |"
-          % (meta["min_confidence"], tot_ok, 100.0 * tot_ok / max(1, tot_sym)),
-          "| symbols unmatched | %d |" % (tot_sym - tot_ok), "",
-          "## Rule firings (of %d symbols)" % tot_sym, "",
-          "A rule measuring 0 is not the same as a rule that had nothing to do -- it means this",
-          "run produced no evidence about it. Both zeroes below are deliberate guards against",
-          "annotation dialects the upstream decomp XML does not use yet.", "",
-          "| rule | fired |", "| --- | --- |"]
-    for k in rules:
-        md.append("| %s | %d |" % (k, rules[k]))
-    md += ["", "## Unmatched reasons", "", "| reason | count |", "| --- | --- |"]
-    for k, v in sorted(reasons.items(), key=lambda kv: -kv[1]):
-        md.append("| %s | %d |" % (k, v))
-    md += ["", "## Per actor", "", "| object | GAR | clips | symbols | matched | unmatched |",
-           "| --- | --- | --- | --- | --- | --- |"]
-    for r in sorted(results, key=lambda r: (-sum(1 for m in r.matches if m.clip), r.obj)):
-        ok = sum(1 for m in r.matches if m.clip)
-        md.append("| %s | %s | %d | %d | %d | %d |"
-                  % (r.obj, r.gar or "(none)", len(r.clips), len(r.matches), ok,
-                     len(r.matches) - ok))
-    # ---- Un-gating coverage. This is the number that decides whether ZELDA3D_MM_SKINNED can go
-    # default-on, and it is NOT the "matched %" above. Two corrections matter:
-    #   * only actors whose GAR actually HAS clips can take the skinned path at all -- an object with
-    #     no GAR, or a GAR of models/textures only, never enters it and is not a coverage gap;
-    #   * Tex/UV/eye/mouth symbols are not skeletal animations, so counting them as "unmatched" makes
-    #     a fully-covered actor look partial. Doing that is how the parity-map came to say "~40
-    #     actors partially mapped" when the real figure is far lower.
-    # The risk being measured is an actor that animates for SOME actions and idles for others, which
-    # can read worse than uniform N64 -- so PARTIAL is the interesting bucket, not the total.
-    live = [r for r in results if r.gar and r.clips]
-    def _skel_unmatched(r):
-        return [m for m in r.matches if not m.clip and not m.why.startswith("non-skeletal")]
-    full = [r for r in live if not _skel_unmatched(r) and any(m.clip for m in r.matches)]
-    zero_matched = [r for r in live if not any(m.clip for m in r.matches)]
-    partial = [r for r in live if r not in full and r not in zero_matched]
-    md += ["", "## Un-gating coverage (skeletal symbols only, actors that can use the skinned path)", "",
-           "| bucket | actors | meaning |", "| --- | --- | --- |",
-           "| FULL | %d | every skeletal animation resolves to a clip; safe to un-gate |" % len(full),
-           "| PARTIAL | %d | animates for some actions, idles for others -- the un-gating risk |" % len(partial),
-           "| ZERO | %d | has clips but nothing matched; behaves as idle throughout |" % len(zero_matched),
-           "| (excluded) | %d | no GAR, or a GAR with no CSAB clips -- cannot take the path |"
-           % (len(results) - len(live)), ""]
-    if partial:
-        md += ["Partial actors, worst first:", "",
-               "| object | GAR | clips | mapped | UNMAPPED (skeletal) |", "| --- | --- | --- | --- | --- |"]
-        for r in sorted(partial, key=lambda r: -len(_skel_unmatched(r))):
-            md.append("| %s | %s | %d | %d | %d |"
-                      % (r.obj, r.gar, len(r.clips), sum(1 for m in r.matches if m.clip),
-                         len(_skel_unmatched(r))))
-        md.append("")
-    if zero_matched:
-        md += ["Zero-mapped actors (have clips, matched nothing): "
-               + ", ".join("`%s`" % r.obj for r in sorted(zero_matched, key=lambda r: r.obj)), ""]
-
-    if no_gar:
-        md += ["", "## Anim-bearing objects with no MM3D actor GAR", "",
-               ", ".join("`%s`" % r.obj for r in no_gar), ""]
-    zero = [r for r in results if r.gar and not r.clips]
-    if zero:
-        md += ["", "## Resolved to a GAR that contains NO CSAB clips", "",
-               "These objects' MM3D archive holds only models/textures. Where a same-family"
-               " archive does carry clips it is listed as a HINT -- it is NOT used for matching"
-               " (another actor's clips could mean a wrong-skeleton animation).", "",
-               "| object | GAR | symbols | same-family hint |", "| --- | --- | --- | --- |"]
-        for r in sorted(zero, key=lambda r: -len(r.matches)):
-            md.append("| %s | %s | %d | %s |"
-                      % (r.obj, r.gar, len(r.matches), r.alt_gar_hint or "-"))
-        md.append("")
-    return "\n".join(md) + "\n", js
-
-
-def verify_overrides(o2r_path: Optional[str] = None) -> int:
-    """Re-derive VERIFIED_OVERRIDES from the assets. Exits non-zero if it cannot check, rather
-    than reporting a pass it did not earn.
-
-    The check is duration equality: N64 animation frameCount (u16 @ 0x44 of the o2r resource)
-    against MM3D csab duration (u32 @ 0x34). Both sides are read fresh; nothing is taken from the
-    comment above the table."""
-    import zipfile
-    o2r = o2r_path or os.path.join(REPO, "2ship", "mm.o2r")
-    if not os.path.exists(o2r):
-        print("VERIFY: REFUSING -- no N64 archive at %s, so the N64 side of every override is "
-              "UNCHECKED. Build 2ship/mm.o2r first. Checked 0 of %d overrides."
-              % (o2r, sum(len(v) for v in VERIFIED_OVERRIDES.values())))
-        return 2
-    z = zipfile.ZipFile(o2r)
-    actors = Mm3dActors()
-    bad = checked = 0
-    for obj, table in sorted(VERIFIED_OVERRIDES.items()):
-        gar = (object_to_gar(obj, set(actors.actors)) or [None])[0]
-        durations = _csab_durations(actors, gar) if gar else {}
-        if not durations:
-            print("VERIFY: REFUSING -- no csab durations for %s (gar=%s); %d overrides UNCHECKED."
-                  % (obj, gar, len(table)))
-            return 2
-        for sym, clip in sorted(table.items()):
-            key = "objects/%s/%s" % (obj, sym)
-            try:
-                fc = struct.unpack_from("<H", z.read(key), 0x44)[0]
-            except (KeyError, struct.error) as e:
-                print("VERIFY: FAIL %s -- cannot read N64 frameCount (%s)" % (key, e))
-                bad += 1
-                continue
-            got = durations.get(clip)
-            checked += 1
-            # TOLERANCE 1, and it is measured rather than assumed. The gameplay_keep doors match
-            # EXACTLY (88 vs 88); object_delf runs fc = duration + 1 across every pair in the actor
-            # (24/23, 24/23, 56/55, 56/55). So the two sides do not share one frame-count convention,
-            # and an equality check would fail a correct override. What the check must catch is a
-            # mapping to the WRONG animation, and those are not off by one: the annotation this
-            # override corrects pointed at a clip 33 frames away.
-            if got is None or abs(got - fc) > 1:
-                print("VERIFY: FAIL %s -> %s: N64 frameCount %s vs csab duration %s (delta %s)"
-                      % (sym, clip, fc, got, "n/a" if got is None else abs(got - fc)))
-                bad += 1
-            else:
-                print("VERIFY: ok   %-36s -> %-24s fc=%d dur=%d (delta %d)"
-                      % (sym, clip, fc, got, abs(got - fc)))
-    print("VERIFY: checked %d override(s), %d failed." % (checked, bad))
-    return 1 if bad else 0
-
-
-def _csab_durations(actors: "Mm3dActors", gar: str) -> Dict[str, int]:
-    fe = actors.actors.get(gar)
-    if fe is None:
-        return {}
-    out: Dict[str, int] = {}
-    for e in Gar(actors.rom.read(fe)).entries:
-        p = (e.path or e.name or "").replace("\\", "/")
-        if p.endswith(".csab") and len(e.data) >= 0x38:
-            out[p.split("/")[-1][:-5]] = struct.unpack_from("<I", e.data, 0x34)[0]
-    return out
-
-
-def main(argv=None) -> int:
-    _load_env()
-    ap = argparse.ArgumentParser(description=__doc__,
-                                 formatter_class=argparse.RawDescriptionHelpFormatter)
-    ap.add_argument("--only", help="restrict to a single N64 object dir (e.g. object_dog)")
-    ap.add_argument("--min-confidence", type=float, default=ACCEPT,
-                    help="acceptance threshold (default %.2f)" % ACCEPT)
-    ap.add_argument("--out", default=os.path.join("scratch", "mm_animmap.inc"),
-                    help="C entries output (default scratch/mm_animmap.inc)")
-    ap.add_argument("--report", default=os.path.join("scratch", "mm_animmap_report"),
-                    help="report path stem; writes <stem>.md and <stem>.json")
-    ap.add_argument("--verify-overrides", action="store_true",
-                    help="re-derive VERIFIED_OVERRIDES from the assets and exit")
-    args = ap.parse_args(argv)
-
+def main(argv: list[str] | None = None) -> int:
+    load_env()
+    args = parse_args(argv)
     if args.verify_overrides:
         return verify_overrides()
 
     results, meta = build(args.only, args.min_confidence)
-    inc = emit_inc(results, meta)
-    md, js = build_report(results, meta)
-
-    out = args.out if os.path.isabs(args.out) else os.path.join(REPO, args.out)
-    stem = args.report if os.path.isabs(args.report) else os.path.join(REPO, args.report)
-    for p in (out, stem + ".md", stem + ".json"):
-        os.makedirs(os.path.dirname(p), exist_ok=True)
-    with open(out, "w") as fh:
-        fh.write(inc)
-    # Sibling table, written next to the anim map: <gar> -> default idle clip.
-    dinc, dunknown = emit_default_inc(results)
-    dout = os.path.join(os.path.dirname(out), "mm3d_defaultanim.inc") \
-        if os.path.basename(out) == "mm3d_animmap.inc" \
-        else os.path.splitext(out)[0] + "_defaultanim.inc"
-    with open(dout, "w") as fh:
-        fh.write(dinc)
-    print("default-idle table: %d actors -> %s" % (dinc.count("\n    { "), dout))
-    if dunknown:
-        # Named, not counted. A bare number here would be indistinguishable from "none", and these
-        # are the actors whose unmapped animations have nothing sensible to fall back to.
-        print("  NO determinable idle for %d actor(s) -- these keep the runtime's arbitrary "
-              "first-CSAB fallback, which is a KNOWN GAP, not a choice: %s"
-              % (len(dunknown), ", ".join(dunknown)))
-    with open(stem + ".md", "w") as fh:
-        fh.write(md)
-    with open(stem + ".json", "w") as fh:
-        json.dump(js, fh, indent=2)
-
-    m = js["meta"]
-    print("objects with anims: %d  (resolved to a GAR: %d, no GAR: %d)"
-          % (m["objects_with_anims"], m["objects_with_gar"], m["objects_without_gar"]))
-    print("symbols: %d  matched: %d (%.1f%%)  unmatched: %d"
-          % (m["symbols_total"], m["symbols_matched"],
-             100.0 * m["symbols_matched"] / max(1, m["symbols_total"]), m["symbols_unmatched"]))
-    for k, v in sorted(js["unmatched_reasons"].items(), key=lambda kv: -kv[1]):
-        print("  %5d  %s" % (v, k))
-    print("wrote %s, %s.md, %s.json"
-          % (os.path.relpath(out, REPO), os.path.relpath(stem, REPO),
-             os.path.relpath(stem, REPO)))
+    output = args.out if os.path.isabs(args.out) else os.path.join(REPO, args.out)
+    report_stem = (
+        args.report if os.path.isabs(args.report) else os.path.join(REPO, args.report)
+    )
+    report = _write_outputs(output, report_stem, results, meta)
+    _print_summary(report, output, report_stem)
     return 0
 
 

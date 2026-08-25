@@ -1,0 +1,6 @@
+#ifndef ZELDA3D_TOOLS_SOH3D_HARNESS_ORACLE_CAMERA_COMPARE_H
+#define ZELDA3D_TOOLS_SOH3D_HARNESS_ORACLE_CAMERA_COMPARE_H
+namespace HarnessOracle {
+void CompareCameraImpl();
+}
+#endif

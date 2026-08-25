@@ -1,7 +1,7 @@
 #include "global.h"
 #include <string.h>
-#include "soh/OTRGlobals.h"
-#include "zelda3d/zelda3d.h"
+
+#include "zelda3d/core/zelda3d_runtime.h"
 
 void func_800C3C80(AudioMgr* audioMgr) {
     AudioTask* task;

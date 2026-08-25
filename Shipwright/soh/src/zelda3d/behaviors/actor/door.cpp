@@ -25,6 +25,9 @@
 // Follow-up: shutter (DOOR_SHUTTER, vertical slide) + DOOR_ANA grotto holes.
 #include "z64.h"
 #include "door.h"
+#include "zelda3d/render/model_draw.h"
+#include "zelda3d/render/model_queries.h"
+#include "zelda3d/diagnostics/model_tuning_query.h"
 #include "overlays/actors/ovl_En_Door/z_en_door.h" // EnDoor (read swing state through the C struct)
 #include <math.h>
 
@@ -70,13 +73,6 @@ static constexpr float kDoorWorldScale = 0.009f;
 static constexpr int kDoorGScaleSlot = 12;
 
 extern "C" {
-// Resolve (get-or-alloc) a GL model id for a forced "<zar>|<cmb>" asset key (zelda3d_model.cpp).
-int Zelda3D_AutoModelId(const char* zarPath);
-// Draw an OoT3D replacement model at an actor's world transform (thin wrapper over the static
-// Zelda3D_DrawModelGL); returns 1 = drew. Declared in zelda3d.h, implemented in zelda3d.c.
-int Zelda3D_DrawActorModel(PlayState* play, int modelId, Actor* actor, float worldScale);
-// Effective value of REPL `gscale <slot>` (the live override), or `def` if unset. From zelda3d.c.
-float Zelda3D_GScale(int slot, float def);
 // Procedural per-bone local-euler rotation delta channel (radians), and the no-CSAB bind-pose
 // skinning that consumes it. Used to swing the door panel bone by the live N64 open angle.
 void Zelda3D_SetBoneRotDelta(int modelId, int boneId, float rx, float ry, float rz);
@@ -85,10 +81,10 @@ void Zelda3D_UpdateBindPose(int modelId);
 
 // Live swing-tuning knobs (REPL doorbone/dooraxis/doorgain), so the panel bone, rotation axis and
 // sign/gain can be calibrated against the real open without a rebuild. Defaults derived below.
-extern int gZelda3dDoorBone;   // CMB bone id to swing (panel limb)
-extern int gZelda3dDoorAxis;   // local-euler axis: 0=x 1=y 2=z
-extern float gZelda3dDoorGain; // swing multiplier (negative flips direction)
-extern int gZelda3dDoorHold;   // debug: pin swing to this binang (INT32_MIN = off, use live state)
+int gZelda3dDoorBone = 1;
+int gZelda3dDoorAxis = 1;
+float gZelda3dDoorGain = 1.0f;
+int gZelda3dDoorHold = (-2147483647 - 1);
 }
 
 namespace Zelda3D {
@@ -120,12 +116,15 @@ bool EnDoorBehavior::tryDrawModel(PlayState* play, Actor* actor) {
                           : (s16)(d->skelAnime.jointTable[3].z + d->actor.world.rot.y);
     float swingRad = (float)swingBinang * (3.14159265358979f / 32768.0f) * gZelda3dDoorGain;
     float rx = 0.0f, ry = 0.0f, rz = 0.0f;
-    if (gZelda3dDoorAxis == 0) rx = swingRad;
-    else if (gZelda3dDoorAxis == 1) ry = swingRad;
-    else rz = swingRad;
+    if (gZelda3dDoorAxis == 0)
+        rx = swingRad;
+    else if (gZelda3dDoorAxis == 1)
+        ry = swingRad;
+    else
+        rz = swingRad;
     Zelda3D_SetBoneRotDelta(modelId, gZelda3dDoorBone, rx, ry, rz);
     Zelda3D_UpdateBindPose(modelId); // pose the panel before the draw captures it
-    Zelda3D_DrawActorModel(play, modelId, actor, Zelda3D_GScale(kDoorGScaleSlot, kDoorWorldScale));
+    Zelda3D_DrawActorModel(play, modelId, actor, Zelda3D_ModelScaleOrDefault(kDoorGScaleSlot, kDoorWorldScale));
     return true;
 }
 

@@ -22,18 +22,12 @@
 // at the actor's LIVE scale (z_en_elf.c animates it: 0.008 base, shrink on pickup/despawn),
 // phase-locked to the N64 skelAnime flap like En_Butte. See oot3d-decomp/docs/en_elf_navi.md.
 #include "z64.h"
+#include "functions/math.h"
 #include "src/overlays/actors/ovl_En_Elf/z_en_elf.h" // EnElf (timer, innerColor, outerColor, disappearTimer, fairyFlags)
 #include "en_elf.h"
-
-extern "C" {
-int Zelda3D_AutoModelId(const char* zarPath);
-int Zelda3D_EmitActorBillboard(PlayState* play, int modelId, Actor* actor,
-                               float xOff, float yOff, float zOff, float scale,
-                               u8 r, u8 g, u8 b, u8 a);
-int Zelda3D_DrawActorModel(PlayState* play, int modelId, Actor* actor, float worldScale);
-void Zelda3D_UpdateAnimAuto(int modelId, const char* animName, float rate, float n64CurFrame,
-                            float n64AnimLength, float morphWeight);
-}
+#include "zelda3d/anim/automatic_playback.h"
+#include "zelda3d/render/model_draw.h"
+#include "zelda3d/render/model_queries.h"
 
 // The REAL OoT3D fairy sprites, found 2026-07-22 in /actor/zelda_keep.zar under elf/:
 // acto_navi_light1.ctxb (outer glow) + acto_navi_light2.ctxb (inner core) — matching the

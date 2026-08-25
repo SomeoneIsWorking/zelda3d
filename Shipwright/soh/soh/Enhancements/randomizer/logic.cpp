@@ -1,10 +1,11 @@
+#include "soh/OTRGlobals.h"
 #include "logic.h"
 #include "../debugger/performanceTimer.h"
 
 #include <string>
 #include <vector>
 
-#include "soh/OTRGlobals.h"
+
 #include "dungeon.h"
 #include "SeedContext.h"
 #include "macros.h"

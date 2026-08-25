@@ -11,7 +11,7 @@
 #include <ship/utils/StringHelper.h>
 #include <libultraship/bridge.h>
 #include <libultraship/classes.h>
-#include <soh/OTRGlobals.h>
+
 #include <locale>
 #include <filesystem>
 

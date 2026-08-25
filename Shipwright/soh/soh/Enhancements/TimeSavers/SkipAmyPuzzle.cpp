@@ -2,7 +2,7 @@
 #include "init/ShipInit.hpp"
 
 extern "C" {
-#include "functions.h"
+#include "functions/game_state.h"
 extern SaveContext gSaveContext;
 }
 

@@ -28,6 +28,9 @@
 // them, so we use the N64 bars as a faithful overlay.
 #include "z64.h"
 #include "door_shutter.h"
+#include "zelda3d/render/model_draw.h"
+#include "zelda3d/render/model_queries.h"
+#include "zelda3d/diagnostics/model_tuning_query.h"
 
 // Per-scene panel CMB, mirroring N64 sObjectInfo[styleType].index1 (the standard panel — the "back"
 // index2 for boss doors is a follow-up). "" = no OoT3D CMB → fall through to N64.
@@ -93,12 +96,6 @@ static const char* keyForScene(int sceneNum) {
 
 } // namespace
 
-extern "C" {
-int Zelda3D_AutoModelId(const char* zarPath);
-int Zelda3D_DrawActorModel(PlayState* play, int modelId, Actor* actor, float worldScale);
-float Zelda3D_GScale(int slot, float def);
-}
-
 namespace Zelda3D {
 
 s16 DoorShutterBehavior::actorId() const {
@@ -150,7 +147,7 @@ bool DoorShutterBehavior::tryDrawModel(PlayState* play, Actor* actor) {
 
     // Draw the main 3DS door panel
     Zelda3D_DrawActorModel(play, sIds[slot], actor,
-                           Zelda3D_GScale(kShutterGScaleSlot, kShutterWorldScale));
+                           Zelda3D_ModelScaleOrDefault(kShutterGScaleSlot, kShutterWorldScale));
 
     return true;
 }

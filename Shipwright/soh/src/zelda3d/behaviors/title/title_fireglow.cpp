@@ -66,11 +66,13 @@
 //     element's own later-starting alpha ramp, and (being loopMode=Once) settles at its
 //     frame-300 value for the rest of the display phase.
 #include "global.h"
+#include "title_activity.h"
 #include "title_fireglow.h"
 #include "title_logo.h"
 #include "../../core/zelda3d_log.h"
 #include "../../model/zelda3d_cmab.h"
 #include "../../model/zelda3d_overlay2d.h"
+#include "functions/rendering.h"
 
 #include <cmath>
 #include <cstdlib>
@@ -83,7 +85,6 @@ extern "C" {
 int Zelda3D_AutoModelId(const char* zarPath);
 float Zelda3D_AutoModelHeight(int modelId);
 void Zelda3D_EnsureModelProvider(void);
-int Zelda3D_Title_IsActive(void);
 int Zelda3D_TitleCsFrame(void);
 float Zelda3D_TitleCsSubframe(void);
 uint8_t* Zelda3D_AutoModelReadZarFile(int modelId, const char* suffix, size_t* outSize);
@@ -157,7 +158,7 @@ extern "C" int Zelda3D_TryDrawTitleFireGlow(PlayState* play) {
     // material-animation's native tick domain, which every other CMAB/CSAB player in this port
     // runs at the REAL, per-engine-tick rate (confirmed for the title screen specifically —
     // `zelda3d_cutscene.cpp`'s `Zelda3D_TitleCsAdvance()` is called once per real engine update
-    // from `TitlePresentation::update()`, and only advances its OWN returned cursor,
+    // from `Zelda3D_Title_Update()`, and only advances its OWN returned cursor,
     // `Zelda3D_TitleCsFrame()`, every OTHER call (`sTickParity`) — i.e. `csFrame` is a HALF-RATE
     // derived clock, not the tick clock itself. This exact ratio is independently confirmed twice:
     // statically (title_logo_actor.md §5.5's `csCtx.curFrame` vs the raw emulated-frame counter)
@@ -174,8 +175,7 @@ extern "C" int Zelda3D_TryDrawTitleFireGlow(PlayState* play) {
     // + Zelda3D_TitleCsSubframe(): sample the cmab at the fractional cs frame so the UV scroll /
     // color curve advances every ENGINE tick (1 native tick per engine frame), not in 2-tick
     // steps at half rate — same 60fps sub-frame interp as the camera spline (kanban #149).
-    float cmabFrame = (fadeInFrame >= 0)
-        ? 2.0f * ((float)(csFrame - fadeInFrame) + Zelda3D_TitleCsSubframe()) : 0.0f;
+    float cmabFrame = (fadeInFrame >= 0) ? 2.0f * ((float)(csFrame - fadeInFrame) + Zelda3D_TitleCsSubframe()) : 0.0f;
     if (cmabFrame < 0.0f) {
         cmabFrame = 0.0f;
     }
@@ -189,8 +189,8 @@ extern "C" int Zelda3D_TryDrawTitleFireGlow(PlayState* play) {
     // be confirmed live-varying quantitatively, independent of screen-capture timing (camera pan/
     // attract-mode cuts make screenshot diffing an unreliable isolation of the material-anim's own
     // contribution — see debug_journal/2026-07-10-title-fireglow-copyright.md).
-    Z3D_LOG(FIREGLOW, "csFrame=%d cmabFrame=%.1f rgb=(%.4f,%.4f,%.4f) uvV=%.4f alpha=%.1f\n",
-            csFrame, cmabFrame, rgb[0], rgb[1], rgb[2], uvV, alpha);
+    Z3D_LOG(FIREGLOW, "csFrame=%d cmabFrame=%.1f rgb=(%.4f,%.4f,%.4f) uvV=%.4f alpha=%.1f\n", csFrame, cmabFrame,
+            rgb[0], rgb[1], rgb[2], uvV, alpha);
 
     float refW, refH;
     Zelda3D_TitleOverlayRefWH(&refW, &refH);
@@ -204,8 +204,7 @@ extern "C" int Zelda3D_TryDrawTitleFireGlow(PlayState* play) {
     // height, shrinking the glow footprint ~31% — a measured contributor to the fire-glow
     // coverage residual (debug_journal/2026-07-10).
     const float pxPerUnit = Zelda3D_TitleOverlayPxPerUnit(play);
-    Zelda3D_Overlay2D_PlaceModel(play, 0.5f * refW, 0.5f * refH, pxPerUnit * localHeight,
-                                 localHeight);
+    Zelda3D_Overlay2D_PlaceModel(play, 0.5f * refW, 0.5f * refH, pxPerUnit * localHeight, localHeight);
 
     // Wrap the sampled V offset into [0,1) and pack as 16-bit fixed, same convention as the sky
     // cloud-band scroll (zelda3d.c #28b).
@@ -218,8 +217,8 @@ extern "C" int Zelda3D_TryDrawTitleFireGlow(PlayState* play) {
 
     // FORCE_UNLIT: g_title.cmb is a self-illuminated additive overlay, same reasoning as the
     // wordmark (title_logo.cpp) — don't let the scene's ambient darken the glow.
-    gSPZelda3DDrawUV(OVERLAY_DISP++, modelId | (int)ZELDA3D_HANDLE_FORCE_UNLIT | (int)ZELDA3D_HANDLE_SCREEN_SPACE, a8, 0, vFx, r8, g8,
-                     b8);
+    gSPZelda3DDrawUV(OVERLAY_DISP++, modelId | (int)ZELDA3D_HANDLE_FORCE_UNLIT | (int)ZELDA3D_HANDLE_SCREEN_SPACE, a8,
+                     0, vFx, r8, g8, b8);
     CLOSE_DISPS(play->state.gfxCtx);
     return 1;
 }

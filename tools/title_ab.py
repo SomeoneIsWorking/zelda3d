@@ -53,7 +53,6 @@ from __future__ import annotations
 import argparse
 import os
 import sys
-import time
 from pathlib import Path
 
 import numpy as np
@@ -62,7 +61,8 @@ from PIL import Image, ImageDraw
 REPO = Path(__file__).resolve().parent.parent
 TOOLS = REPO / "tools"
 sys.path.insert(0, str(TOOLS))
-import harness_ctl as hc  # noqa: E402
+from harness_cache import OracleCache  # noqa: E402
+from harness_process import spawn  # noqa: E402
 
 OUTDIR = REPO / "scratch" / "title_ab"
 SAVESTATE = REPO / "scratch" / "title_settled.state"
@@ -174,7 +174,10 @@ def ppm_to_png(ppm_path) -> Path:
 
 def _require_env():
     if not os.environ.get("ZELDA3D_OOT3D_ROM"):
-        sys.exit("ZELDA3D_OOT3D_ROM not set — run `source .env` first (see tools/rom_provision.sh)")
+        sys.exit(
+            "ZELDA3D_OOT3D_ROM not set — add it to .env or use "
+            "tools/rom_provision.py"
+        )
     if not SAVESTATE.exists():
         sys.exit(f"missing {SAVESTATE} — a title_settled.state save-state (Az, right before the "
                   "title cutscene starts) is required as the shared t=0 for both engines")
@@ -185,7 +188,7 @@ def _step_chunked(h, cmd: str, n: int, chunk: int = 100) -> None:
     `<cmd> <n>` call. Some title-cs frame ranges (e.g. the demo-loop's
     logo/scene-transition around az~700-900) cost noticeably more real time
     per emulated frame than the steady-state night/field frames, and a
-    single big `run`/`soh_step` call can exceed harness_ctl's 60s default
+    single big `run`/`soh_step` call can exceed the transport's 60s default
     read timeout even though the harness itself is still working fine —
     chunking keeps every single wire round-trip well under that timeout."""
     remaining = n
@@ -199,7 +202,7 @@ def _spawn():
     OUTDIR.mkdir(parents=True, exist_ok=True)
     (REPO / "scratch" / "logs").mkdir(parents=True, exist_ok=True)
     os.environ.setdefault("HARNESS_STDERR", str(REPO / "scratch" / "logs" / "title_ab_harness.log"))
-    h = hc.spawn(save_state=str(SAVESTATE))
+    h = spawn(save_state=str(SAVESTATE))
     r = h.send("soh_boot")
     if not r.startswith("ok"):
         h.quit()
@@ -288,7 +291,7 @@ def cmd_ab(args):
     (e.g. one already established by `calibrate`) and just emit the SxS +
     diff. Useful once a mapping is known, to avoid re-searching.
 
-    Oracle (Az) side is CACHE-AWARE (see harness_ctl.OracleCache /
+    Oracle (Az) side is CACHE-AWARE (see harness_cache.OracleCache /
     docs/parity-workflow.md "Oracle data cache"): the Az frame at `args.az`
     is deterministic given (savestate, ROM, Azahar patches), so a repeat
     request for the same az frame under the same cache key reuses the
@@ -301,7 +304,6 @@ def cmd_ab(args):
     cached frame for the az_png used in scoring/compositing.
     """
     _require_env()
-    from harness_ctl import OracleCache
     cache = OracleCache(SAVESTATE)
     cached_frame = cache.get_frame(args.az)
     h = _spawn()

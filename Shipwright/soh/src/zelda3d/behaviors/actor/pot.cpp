@@ -16,6 +16,9 @@
 // unchanged and just moves actor.world.pos, which this draw follows.
 #include "z64.h"
 #include "pot.h"
+#include "zelda3d/render/model_draw.h"
+#include "zelda3d/render/model_queries.h"
+#include "zelda3d/diagnostics/model_tuning_query.h"
 
 // Dungeon-keep zar + the dungeon pot CMB. Self-contained to this module.
 #define ZELDA3D_POT_ZAR "/actor/zelda_dangeon_keep.zar"
@@ -28,12 +31,6 @@
 // Live-retunable via REPL `gscale 13`.
 static constexpr float kPotWorldScale = 0.13f;
 static constexpr int kPotGScaleSlot = 13;
-
-extern "C" {
-int Zelda3D_AutoModelId(const char* zarPath);
-int Zelda3D_DrawActorModel(PlayState* play, int modelId, Actor* actor, float worldScale);
-float Zelda3D_GScale(int slot, float def);
-}
 
 namespace Zelda3D {
 
@@ -49,7 +46,7 @@ bool EnTuboTrapBehavior::tryDrawModel(PlayState* play, Actor* actor) {
     if (sModelId < 0) {
         return false; // no OoT3D pot CMB -> let the N64 pot draw
     }
-    Zelda3D_DrawActorModel(play, sModelId, actor, Zelda3D_GScale(kPotGScaleSlot, kPotWorldScale));
+    Zelda3D_DrawActorModel(play, sModelId, actor, Zelda3D_ModelScaleOrDefault(kPotGScaleSlot, kPotWorldScale));
     return true;
 }
 

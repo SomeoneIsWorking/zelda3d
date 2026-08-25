@@ -1,4 +1,9 @@
-#include <soh/OTRGlobals.h>
+
+#include "soh/OTRGlobals.h"
+#include "functions/actors.h"
+#include "functions/effects.h"
+#include "functions/game_state.h"
+#include "functions/memory.h"
 #include "object/ObjectExtension.h"
 #include "item_category_adj.h"
 #include "particle_cmc.h"

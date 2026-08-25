@@ -2,7 +2,8 @@
 #include "init/ShipInit.hpp"
 
 extern "C" {
-#include "functions.h"
+#include "functions/actors.h"
+#include "functions/game_state.h"
 #include "src/overlays/actors/ovl_Bg_Haka_Ship/z_bg_haka_ship.h"
 }
 

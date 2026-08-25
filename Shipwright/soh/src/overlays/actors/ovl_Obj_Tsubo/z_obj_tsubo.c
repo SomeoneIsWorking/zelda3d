@@ -5,7 +5,6 @@
  */
 
 #include "z_obj_tsubo.h"
-#include "zelda3d/zelda3d.h"
 #include "overlays/effects/ovl_Effect_Ss_Kakera/z_eff_ss_kakera.h"
 #include "objects/gameplay_dangeon_keep/gameplay_dangeon_keep.h"
 #include "objects/object_tsubo/object_tsubo.h"

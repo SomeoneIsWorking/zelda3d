@@ -12,7 +12,9 @@ extern "C" {
 #include "z64.h"
 #include "macros.h"
 #include "soh/cvar_prefixes.h"
-#include "functions.h"
+#include "functions/actors.h"
+#include "functions/math.h"
+#include "functions/rendering.h"
 #include "variables.h"
 #include "textures/message_static/message_static.h"
 extern PlayState* gPlayState;

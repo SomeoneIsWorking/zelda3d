@@ -21,7 +21,7 @@ pop shows a lone spike -- the report distinguishes them (spike = max > SPIKE_RAT
 The metric is validated: scrubbing one CSAB frame-by-frame (animframe 0..N) yields a smooth
 ~3deg/frame series, so spikes in live playback are real transition hard-cuts, not math artifacts.
 
-Requires the game already running (tools/zelda3d_game.sh start 238 0x6000) with link 1 / linksrc 3ds.
+Requires the game already running (tools/zelda3d_game.py start 238 0x6000) with link 1 / linksrc 3ds.
 
 Usage:  tools/zelda3d_anim_qa.py            # full sweep
         tools/zelda3d_anim_qa.py <name>...  # only the named transitions

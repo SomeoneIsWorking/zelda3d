@@ -1,4 +1,13 @@
 #include <libultraship/bridge.h>
+#include "functions/actors.h"
+#include "functions/animation.h"
+#include "functions/audio.h"
+#include "functions/collision.h"
+#include "functions/effects.h"
+#include "functions/environment.h"
+#include "functions/game_state.h"
+#include "functions/player.h"
+#include "functions/ui.h"
 #include "soh/Enhancements/game-interactor/GameInteractor.h"
 #include "soh/Enhancements/game-interactor/GameInteractor_Hooks.h"
 #include "soh/Enhancements/enhancementTypes.h"

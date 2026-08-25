@@ -1,5 +1,7 @@
 // See zelda3d_overlay2d.h for the design rationale.
 #include "global.h"
+#include "functions/math.h"
+#include "functions/rendering.h"
 #include "zelda3d_overlay2d.h"
 
 extern "C" void Zelda3D_Overlay2D_Begin(PlayState* play, float refW, float refH) {

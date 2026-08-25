@@ -6,10 +6,10 @@
 #include "soh/Enhancements/randomizer/randomizer.h"
 #include "soh/SohGui/ImGuiUtils.h"
 #include "soh/Enhancements/item-tables/ItemTableManager.h"
-#include "soh/OTRGlobals.h"
+
 
 extern "C" {
-#include "functions.h"
+#include "functions/ui.h"
 extern PlayState* gPlayState;
 }
 

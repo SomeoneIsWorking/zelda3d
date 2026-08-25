@@ -12,8 +12,9 @@
 //                                        height 19.1 (measured via Zelda3D_AutoModelHeight).
 //   Anim/title_logo_us.csab     1812B   assembly/idle animation for the wordmark (120 frames,
 //                                        per-bone Z-translation ramp -6 -> 0 = letters fly in).
-//   Model/g_title.cmb + Misc/g_title_fire.cmab                  fire-glow material anim (behaviors/title/title_fireglow.cpp).
-//   Model/copy_nintendo.cmb                                     copyright block (drawn below, Zelda3D_TryDrawTitleCopyright).
+//   Model/g_title.cmb + Misc/g_title_fire.cmab                  fire-glow material anim
+//   (behaviors/title/title_fireglow.cpp). Model/copy_nintendo.cmb                                     copyright block
+//   (drawn below, Zelda3D_TryDrawTitleCopyright).
 // En_Mag does NOT spawn under SoH3D's title (SoH hijacks spot00; the actor lives in spot99), so
 // there is no actor to hang an ActorBehavior draw-override on — this module is driven directly
 // from the title-demo draw seam (Play_DrawOverlayElements, z_play.c) instead of the actor
@@ -52,7 +53,7 @@
 // TRUE 2D ORTHOGRAPHIC PASS (oot3d-decomp/docs/title_2d_overlay_logo.md §5.1): the POSITION/SCALE
 // of the old placement — camera eye + forward*dist, offset by a screen-fraction derived from the
 // camera's own FOV — is replaced with zelda3d_overlay2d.{h,cpp}'s generic ortho pass:
-// TitlePresentation::draw() brackets the whole overlay (wordmark + fire-glow + copyright) in
+// Zelda3D_Title_Draw() brackets the whole overlay (wordmark + fire-glow + copyright) in
 // Zelda3D_Overlay2D_Begin/End, which swaps in an orthographic G_MTX_PROJECTION over a fixed
 // 400x240 virtual box — OoT3D's own top-screen resolution, matching the coordinate space every
 // placement fraction below was measured in directly (no unit conversion, no FOV/aspect math, no
@@ -70,10 +71,13 @@
 // through is fixed by construction (that's the whole point of the pass), so the decomp-correct
 // equivalent of "the camera-basis technique" here is a single fixed basis, not the live one.
 #include "global.h"
+#include "title_activity.h"
 #include "title_logo.h"
 #include "../../core/zelda3d_log.h"
 #include "../../cutscene/zelda3d_cutscene.h"
 #include "../../model/zelda3d_overlay2d.h"
+#include "fast/zelda3d_lighting.h"
+#include "functions/rendering.h"
 
 #include <algorithm>
 #include <climits>
@@ -84,22 +88,6 @@ int Zelda3D_AutoModelId(const char* zarPath);
 float Zelda3D_AutoModelHeight(int modelId);
 void Zelda3D_EnsureModelProvider(void);
 void Zelda3D_UpdateAnim(int modelId, const char* animName, float frame);
-// Zelda3D::TitlePresentation's active flag (title_presentation.h/.cpp) — this module is now
-// driven FROM that module's draw() rather than reading the old gZelda3dInTitleDemo global
-// directly, but the guard below is kept (belt-and-suspenders: TitlePresentation::draw() only
-// calls this while active, but this stays safe to call standalone too).
-int Zelda3D_Title_IsActive(void);
-// Per-model light-direction override feeding the wordmark's sheen (title_logo_actor.md §6.3;
-// see zelda3d_gl.h's declaration for the full contract). dirObj is OBJECT space; the renderer
-// transforms it by this draw's own placement matrix before use.
-void Zelda3D_GL_SetLightDirOverride(int modelId, float dx, float dy, float dz);
-// Per-model sphere-map VIEW-rotation override (see zelda3d_gl.h): the wordmark's gold-outline
-// decorations (mats 4-11) use CameraSphereEnvMap coordinators, whose UV derives from the
-// VIEW-space normal on the 3DS. This ortho overlay's placement matrix carries no camera, so the
-// live cs-camera's view rotation must be supplied separately or the sphere UV is camera-
-// independent (always dead-center = brightest texel — the measured brightness overshoot,
-// debug_journal/2026-07-14-title-cs464-wordmark-and-composition-and-fireglow.md).
-void Zelda3D_GL_SetSphereMapViewRot(int modelId, const float m9[9]);
 }
 
 namespace {
@@ -116,13 +104,13 @@ namespace {
 //                    as DOWN on screen — the same sign derivation the previous port verified)
 //   element size   = pxPerLocalUnit * its OWN geometry (local offsets inside each CMB carry
 //                    themselves; the origin is what the basis places)
-// fovY is the live cs-camera fov (play->view.fovy, set per-frame by TitlePresentation from the
+// fovY is the live cs-camera fov (play->view.fovy, set per-frame by UpdateTitleCamera from the
 // ported OP97 spline — verified 0.00 vs Az), so the overlay breathes with the camera exactly as
 // the oracle's scene-composited elements do. VERIFIED against the oracle at az=1000 (cs display
 // phase, fov-derived pxPerUnit ~8.2-8.3): predicted copyright ink-center y-frac 0.8725 vs
 // measured 0.875, predicted copyright ink extent 30.7px vs measured 29.5, predicted wordmark
 // height 159px vs measured gold-mask 161 (debug_journal/2026-07-10 measurement notes).
-constexpr float kOverlayComposeDepth   = 34.0f; // §6.4 placement literal 0x001da8a4 = -34.0f
+constexpr float kOverlayComposeDepth = 34.0f;   // §6.4 placement literal 0x001da8a4 = -34.0f
 constexpr float kCopyrightLocalOffsetY = 11.0f; // §6.4 copyright local translate (0,-11.0,-34.0)
 
 // Virtual reference box the ortho pass projects (Zelda3D_Overlay2D_Begin) — OoT3D's own
@@ -130,7 +118,7 @@ constexpr float kCopyrightLocalOffsetY = 11.0f; // §6.4 copyright local transla
 // element's screen-space triangles in this exact space, and az1000.png/fireglow_probe2.az.png
 // were captured at 400x240 too), so every *Frac constant here converts to pixels with a single
 // multiply, no aspect/unit correction. Shared with title_fireglow.cpp and
-// TitlePresentation::draw()'s Begin() call via Zelda3D_TitleOverlayRefWH below.
+// Zelda3D_Title_Draw()'s Begin() call via Zelda3D_TitleOverlayRefWH below.
 constexpr float kOverlayRefW = 400.0f;
 constexpr float kOverlayRefH = 240.0f;
 
@@ -139,13 +127,13 @@ constexpr float kOverlayRefH = 240.0f;
 // offsets from the flag-3 trigger (345): a 40-frame lead-in delay, then three STAGED ramps run
 // back-to-back (wordmark first, then backdrop+sheen, then copyright) — each element sits at 0
 // until its own stage starts.
-constexpr int   kFadeInDelayFrames = 40; // cf345+delay = 385: wordmark ramp starts
-constexpr float kWordmarkFadeStep  = 3.0f;
-constexpr int   kWordmarkFadeFrames = 81;  // cf385..465
-constexpr float kBackdropFadeStep  = 4.25f;
-constexpr int   kBackdropFadeFrames = 60;  // cf466..525 (60*4.25 = 255 exact)
+constexpr int kFadeInDelayFrames = 40; // cf345+delay = 385: wordmark ramp starts
+constexpr float kWordmarkFadeStep = 3.0f;
+constexpr int kWordmarkFadeFrames = 81; // cf385..465
+constexpr float kBackdropFadeStep = 4.25f;
+constexpr int kBackdropFadeFrames = 60; // cf466..525 (60*4.25 = 255 exact)
 constexpr float kCopyrightFadeStep = 6.0f;
-constexpr int   kCopyrightFadeFrames = 43; // cf526..568
+constexpr int kCopyrightFadeFrames = 43; // cf526..568
 // Fade-out: all three elements together, once flag 4 fires (§5.3, measured 26 frames: 255 holds
 // through the transition frame, then -10/frame for 25 frames to 5, floored to 0 on frame 26 —
 // see the fade-out block in resolveLogoPhase for the exact off-by-one derivation).
@@ -157,7 +145,7 @@ constexpr float kFadeOutStep = 10.0f;
 constexpr int kLogoCsabDuration = 120;
 
 // OoT3D title cs misc sub-ops (per title_gamestate_driver.md §3).
-constexpr uint16_t kMiscSubFadeIn  = 0x1e; // Flags_SetEnv(play, 3)
+constexpr uint16_t kMiscSubFadeIn = 0x1e;  // Flags_SetEnv(play, 3)
 constexpr uint16_t kMiscSubFadeOut = 0x1f; // Flags_SetEnv(play, 4)
 
 // Press-START skip — ported FAITHFULLY from the N64 title's own handler EnMag_Update
@@ -169,12 +157,12 @@ constexpr uint16_t kMiscSubFadeOut = 0x1f; // Flags_SetEnv(play, 4)
 //     mainAlpha=210 in one frame, no lead-in) and arm a 20-frame sDelayTimer lockout.
 //   - Press #2 (globalState >= MAG_STATE_DISPLAY, sDelayTimer == 0): fire the file-select
 //     transition INSTANTLY (same frame — En_Mag has NO grace delay) and fade the logo out.
-constexpr int   kSkipDisplayLockout = 20;   // En_Mag sDelayTimer: frames after #1 before #2 counts
-constexpr float kSkipFadeOutStep    = 25.0f; // En_Mag fadeOutAlphaStep: logo fade rate after #2
+constexpr int kSkipDisplayLockout = 20;   // En_Mag sDelayTimer: frames after #1 before #2 counts
+constexpr float kSkipFadeOutStep = 25.0f; // En_Mag fadeOutAlphaStep: logo fade rate after #2
 // Snap-in offset for press #1: setting gTitleFadeInOverride this many frames in the "past" makes
 // resolveLogoPhase report the logo already fully displayed THIS frame (the full staged fade-in is
 // delay + wordmark + backdrop + copyright frames long) — i.e. instant, matching En_Mag.
-constexpr int   kLogoFullFadeInFrames =
+constexpr int kLogoFullFadeInFrames =
     kFadeInDelayFrames + kWordmarkFadeFrames + kBackdropFadeFrames + kCopyrightFadeFrames; // 224
 
 int gTitleLogoModelId = -1;
@@ -191,12 +179,12 @@ int titleLogoModelId() {
 enum class LogoPhase { Hidden, FadeIn, Display, FadeOut };
 struct LogoPhaseState {
     LogoPhase phase = LogoPhase::Hidden;
-    int       fadeInFrame  = -1;   // cs frame the fade-in trigger fires
-    int       fadeOutFrame = -1;   // cs frame the fade-out trigger fires
-    float     wordmarkAlpha  = 0.0f; // 0..255, title_logo_us.cmb (+0x1D4)
-    float     backdropAlpha  = 0.0f; // 0..255, g_title.cmb backdrop (+0x1D0 only — +0x1DC is a
-                                      // light-direction param, not an alpha; see §6.3)
-    float     copyrightAlpha = 0.0f; // 0..255, copy_nintendo.cmb (+0x1D8)
+    int fadeInFrame = -1;        // cs frame the fade-in trigger fires
+    int fadeOutFrame = -1;       // cs frame the fade-out trigger fires
+    float wordmarkAlpha = 0.0f;  // 0..255, title_logo_us.cmb (+0x1D4)
+    float backdropAlpha = 0.0f;  // 0..255, g_title.cmb backdrop (+0x1D0 only — +0x1DC is a
+                                 // light-direction param, not an alpha; see §6.3)
+    float copyrightAlpha = 0.0f; // 0..255, copy_nintendo.cmb (+0x1D8)
     // 0..255, wordmark light-direction sweep parameter (+0x1DC, title_logo_actor.md §6.3). Ramps
     // in LOCKSTEP with backdropAlpha during the SAME fade-in stage (same start/step/frames — the
     // decomp's own trace: both driven by the identical +4.25/frame over cf466-525), but UNLIKE
@@ -204,7 +192,7 @@ struct LogoPhaseState {
     // that one fade-in stage, so once it reaches 255 it stays there through Display, FadeOut, and
     // beyond (the "freezes at its t=1 endpoint" behavior §6.3 documents). Computed unconditionally
     // below (not inside the fade-out/fade-in branches) so it naturally holds across every phase.
-    float     sheenT = 0.0f;
+    float sheenT = 0.0f;
 };
 
 // One staged ramp: 0 before `start`, linearly steps up by `step`/frame from `start`, and is
@@ -236,12 +224,11 @@ int gTitleFadeInOverride = kNoFadeInOverride;
 
 LogoPhaseState resolveLogoPhase(int csFrame) {
     LogoPhaseState s;
-    s.fadeInFrame  = Zelda3D_TitleCsMiscTriggerFrame(kMiscSubFadeIn);
+    s.fadeInFrame = Zelda3D_TitleCsMiscTriggerFrame(kMiscSubFadeIn);
     s.fadeOutFrame = Zelda3D_TitleCsMiscTriggerFrame(kMiscSubFadeOut);
     // Press-#1 override wins only when it pulls the fade-in EARLIER than the cs trigger (a press
     // after the logo already showed must not push it later). Applies even when negative.
-    if (gTitleFadeInOverride != kNoFadeInOverride &&
-        (s.fadeInFrame < 0 || gTitleFadeInOverride < s.fadeInFrame)) {
+    if (gTitleFadeInOverride != kNoFadeInOverride && (s.fadeInFrame < 0 || gTitleFadeInOverride < s.fadeInFrame)) {
         s.fadeInFrame = gTitleFadeInOverride;
     }
     if (s.fadeInFrame < 0) {
@@ -287,11 +274,11 @@ LogoPhaseState resolveLogoPhase(int csFrame) {
         return s;
     }
     // Fade-in: three staged ramps, back-to-back, starting kFadeInDelayFrames after the trigger.
-    const int wordmarkStart  = s.fadeInFrame + kFadeInDelayFrames;
-    const int backdropStart  = wordmarkStart + kWordmarkFadeFrames;
+    const int wordmarkStart = s.fadeInFrame + kFadeInDelayFrames;
+    const int backdropStart = wordmarkStart + kWordmarkFadeFrames;
     const int copyrightStart = backdropStart + kBackdropFadeFrames;
-    s.wordmarkAlpha  = stagedRamp(csFrame, wordmarkStart, kWordmarkFadeStep, kWordmarkFadeFrames);
-    s.backdropAlpha  = stagedRamp(csFrame, backdropStart, kBackdropFadeStep, kBackdropFadeFrames);
+    s.wordmarkAlpha = stagedRamp(csFrame, wordmarkStart, kWordmarkFadeStep, kWordmarkFadeFrames);
+    s.backdropAlpha = stagedRamp(csFrame, backdropStart, kBackdropFadeStep, kBackdropFadeFrames);
     s.copyrightAlpha = stagedRamp(csFrame, copyrightStart, kCopyrightFadeStep, kCopyrightFadeFrames);
     bool allFull = s.wordmarkAlpha >= 255.0f && s.backdropAlpha >= 255.0f && s.copyrightAlpha >= 255.0f;
     s.phase = allFull ? LogoPhase::Display : LogoPhase::FadeIn;
@@ -305,7 +292,7 @@ LogoPhaseState resolveLogoPhase(int csFrame) {
 // 2026-07-10) measured the fitted version at width 0.913x / off-center vs oracle.)
 
 // Press-START skip state (title_logo_actor.md §7). Advanced once per frame by
-// Zelda3D_TitleLogoStepSkip (called from TitlePresentation::update()); consulted by
+// Zelda3D_TitleLogoStepSkip (called from Zelda3D_Title_Update); consulted by
 // Zelda3D_TitleLogoPhaseAlpha3 to override the natural cs-driven alpha once a skip is in flight.
 //
 // DELIBERATELY frame-NUMBER-anchored (pressCsFrame), not a per-call decrementing counter: SoH's
@@ -324,9 +311,9 @@ LogoPhaseState resolveLogoPhase(int csFrame) {
 // with the file's absolute-csFrame idiom).
 enum { SKIP_PRE_DISPLAY = 0, SKIP_DISPLAY, SKIP_FADE_OUT }; // == En_Mag MAG_STATE_{FADE_IN,DISPLAY,FADE_OUT}
 struct TitleSkipState {
-    int globalState      = SKIP_PRE_DISPLAY; // En_Mag globalState
-    int delayTimer       = 0;                // En_Mag sDelayTimer (20-frame lockout after press #1)
-    int fadeOutStartFrame = -1;              // cs frame press #2 fired the transition; -1 = none
+    int globalState = SKIP_PRE_DISPLAY; // En_Mag globalState
+    int delayTimer = 0;                 // En_Mag sDelayTimer (20-frame lockout after press #1)
+    int fadeOutStartFrame = -1;         // cs frame press #2 fired the transition; -1 = none
 };
 TitleSkipState gSkip;
 
@@ -375,8 +362,10 @@ extern "C" float Zelda3D_TitleOverlayPxPerUnit(PlayState* play) {
 }
 
 extern "C" void Zelda3D_TitleOverlayRefWH(float* outRefW, float* outRefH) {
-    if (outRefW) *outRefW = kOverlayRefW;
-    if (outRefH) *outRefH = kOverlayRefH;
+    if (outRefW)
+        *outRefW = kOverlayRefW;
+    if (outRefH)
+        *outRefH = kOverlayRefH;
 }
 
 // Shared phase/alpha gate for every element of the 2D title overlay — resolves the THREE
@@ -384,8 +373,8 @@ extern "C" void Zelda3D_TitleOverlayRefWH(float* outRefW, float* outRefH) {
 // +0x1D0, copyright +0x1D8) for the current cs frame in one call. Returns 0 (all alphas
 // 0) when fully Hidden (before fade-in starts / after fade-out completes), else 1.
 // *outFadeInFrame is the cs frame the fade-in trigger fired, or -1 (resolveLogoPhase's fallback).
-extern "C" int Zelda3D_TitleLogoPhaseAlpha3(float* outWordmarkAlpha, float* outBackdropAlpha,
-                                            float* outCopyrightAlpha, int* outFadeInFrame) {
+extern "C" int Zelda3D_TitleLogoPhaseAlpha3(float* outWordmarkAlpha, float* outBackdropAlpha, float* outCopyrightAlpha,
+                                            int* outFadeInFrame) {
     const int csFrame = Zelda3D_TitleCsFrame();
     LogoPhaseState ps = resolveLogoPhase(csFrame);
     // Press-#2 fade-out (En_Mag: fadeOutAlphaStep=25 starting the transition frame — NO grace). The
@@ -397,15 +386,19 @@ extern "C" int Zelda3D_TitleLogoPhaseAlpha3(float* outWordmarkAlpha, float* outB
         ps.wordmarkAlpha = ps.backdropAlpha = ps.copyrightAlpha = a;
         ps.phase = (a > 0.0f) ? LogoPhase::FadeOut : LogoPhase::Hidden;
     }
-    if (outWordmarkAlpha) *outWordmarkAlpha = ps.wordmarkAlpha;
-    if (outBackdropAlpha) *outBackdropAlpha = ps.backdropAlpha;
-    if (outCopyrightAlpha) *outCopyrightAlpha = ps.copyrightAlpha;
-    if (outFadeInFrame) *outFadeInFrame = ps.fadeInFrame;
+    if (outWordmarkAlpha)
+        *outWordmarkAlpha = ps.wordmarkAlpha;
+    if (outBackdropAlpha)
+        *outBackdropAlpha = ps.backdropAlpha;
+    if (outCopyrightAlpha)
+        *outCopyrightAlpha = ps.copyrightAlpha;
+    if (outFadeInFrame)
+        *outFadeInFrame = ps.fadeInFrame;
     return ps.phase != LogoPhase::Hidden;
 }
 
 // Advances the press-START skip state machine — see title_logo.h's doc comment for the call
-// contract (once per frame, from TitlePresentation::update()). Detection + timing fully traced in
+// contract (once per frame, from Zelda3D_Title_Update()). Detection + timing fully traced in
 // oot3d-decomp/docs/title_logo_actor.md §7.1-7.4.
 extern "C" void Zelda3D_TitleLogoStepSkip(PlayState* play) {
     if (play == nullptr) {
@@ -458,15 +451,14 @@ extern "C" void Zelda3D_TitleLogoStepSkip(PlayState* play) {
     // a state change or a press so it doesn't flood a real terminal.
     {
         static int sLastState = -1, sLastTimer = -1, sLastTrig = -1;
-        const bool changed = pressed || gSkip.globalState != sLastState ||
-                             gSkip.delayTimer != sLastTimer || play->transitionTrigger != sLastTrig;
+        const bool changed = pressed || gSkip.globalState != sLastState || gSkip.delayTimer != sLastTimer ||
+                             play->transitionTrigger != sLastTrig;
         if (changed) {
             Z3D_LOG(TITLESKIP,
                     "csFrame=%d pressed=%d phase=%d globalState=%d delayTimer=%d "
                     "fadeInOverride=%d fadeOutStart=%d transitionTrigger=%d gameMode=%d\n",
                     csFrame, pressed ? 1 : 0, (int)natural.phase, gSkip.globalState, gSkip.delayTimer,
-                    gTitleFadeInOverride, gSkip.fadeOutStartFrame, play->transitionTrigger,
-                    gSaveContext.gameMode);
+                    gTitleFadeInOverride, gSkip.fadeOutStartFrame, play->transitionTrigger, gSaveContext.gameMode);
         }
         sLastState = gSkip.globalState;
         sLastTimer = gSkip.delayTimer;
@@ -518,8 +510,7 @@ extern "C" int Zelda3D_TryDrawTitleLogo(PlayState* play) {
     // Shared-basis compose (kOverlayComposeDepth comment): model origin at screen center, size =
     // pxPerUnit * its own geometry.
     const float pxPerUnit = Zelda3D_TitleOverlayPxPerUnit(play);
-    Zelda3D_Overlay2D_PlaceModel(play, 0.5f * kOverlayRefW, 0.5f * kOverlayRefH,
-                                 pxPerUnit * localHeight, localHeight);
+    Zelda3D_Overlay2D_PlaceModel(play, 0.5f * kOverlayRefW, 0.5f * kOverlayRefH, pxPerUnit * localHeight, localHeight);
     // Wordmark sheen (title_logo_actor.md §6.3/§6.6, ported 2026-07-10; slot colors corrected +
     // mechanism verified same day): actor field +0x1DC feeds a light-DIRECTION parameter into the
     // wordmark's own material (light-env slot 0: STATIC light ambient={0.18,0.18,0.18,1}, light
@@ -551,21 +542,25 @@ extern "C" int Zelda3D_TryDrawTitleLogo(PlayState* play) {
     // live view rotation separately. Basis per the decompiled 3DS LookAt (FUN_002d9e68,
     // oot3d-decomp/docs/title_view_matrix_lh.md): fwd = normalize(eye-at), right = normalize
     // (up x fwd), up' = fwd x right; rows = (right, up', fwd). play->view.* holds this frame's
-    // ported OP97 spline camera (TitlePresentation::update, verified 0.00 vs Az).
+    // ported OP97 spline camera (UpdateTitleCamera, verified 0.00 vs Az).
     {
         float fx = play->view.eye.x - play->view.lookAt.x;
         float fy = play->view.eye.y - play->view.lookAt.y;
         float fz = play->view.eye.z - play->view.lookAt.z;
         float fl = sqrtf(fx * fx + fy * fy + fz * fz);
         if (fl > 1e-6f) {
-            fx /= fl; fy /= fl; fz /= fl;
+            fx /= fl;
+            fy /= fl;
+            fz /= fl;
             const float ux = play->view.up.x, uy = play->view.up.y, uz = play->view.up.z;
             float rx = uy * fz - uz * fy;
             float ry = uz * fx - ux * fz;
             float rz = ux * fy - uy * fx;
             const float rl = sqrtf(rx * rx + ry * ry + rz * rz);
             if (rl > 1e-6f) {
-                rx /= rl; ry /= rl; rz /= rl;
+                rx /= rl;
+                ry /= rl;
+                rz /= rl;
                 const float u2x = fy * rz - fz * ry;
                 const float u2y = fz * rx - fx * rz;
                 const float u2z = fx * ry - fy * rx;
@@ -583,8 +578,7 @@ extern "C" int Zelda3D_TryDrawTitleLogo(PlayState* play) {
         // Verification aid (`log sheen 1`) — traces the sweep parameter/direction so the ramp can
         // be confirmed from a log without relying on eyeballing a subtle (diffuse-only, no
         // specular — see the block comment above) screen-space brightness change.
-        Z3D_LOG(SHEEN, "csFrame=%d sheenT=%.2f t=%.3f dir=(%.3f,%.3f,%.3f)\n", csFrame,
-                ps.sheenT, t, dx, dy, dz);
+        Z3D_LOG(SHEEN, "csFrame=%d sheenT=%.2f t=%.3f dir=(%.3f,%.3f,%.3f)\n", csFrame, ps.sheenT, t, dx, dy, dz);
     }
     //
     // The wordmark is a self-illuminated overlay (an authored fire-glow logo composited over the
@@ -609,8 +603,8 @@ extern "C" int Zelda3D_TryDrawTitleLogo(PlayState* play) {
     // (debug_journal/2026-07-11-attr-cs438-composite.md, gap 0.141) shows SoH's mid-fade letters are
     // ~0% dimmed vs the oracle's ~15% — so confirming the runtime alpha here is step 1 of ruling
     // alpha-value-correctness in or out before chasing the blend destination.
-    Z3D_LOG(WORDMARK, "csFrame=%d phase=%d wordmarkAlpha=%.2f alphaU8=%u\n",
-            csFrame, (int)ps.phase, ps.wordmarkAlpha, (unsigned)alphaU8);
+    Z3D_LOG(WORDMARK, "csFrame=%d phase=%d wordmarkAlpha=%.2f alphaU8=%u\n", csFrame, (int)ps.phase, ps.wordmarkAlpha,
+            (unsigned)alphaU8);
     gSPZelda3DDrawA(OVERLAY_DISP++, modelId | (int)ZELDA3D_HANDLE_FORCE_UNLIT | (int)ZELDA3D_HANDLE_SCREEN_SPACE,
                     alphaU8, 255, 255, 255);
     CLOSE_DISPS(play->state.gfxCtx);
@@ -647,8 +641,7 @@ extern "C" int Zelda3D_TryDrawTitleCopyright(PlayState* play) {
     // pxPerUnit scale as the wordmark, plus the copyright's OWN decomp local-translate offset
     // (0,-11,-34) — the -11 basis-Y units read as DOWN on screen.
     const float pxPerUnit = Zelda3D_TitleOverlayPxPerUnit(play);
-    Zelda3D_Overlay2D_PlaceModel(play, 0.5f * kOverlayRefW,
-                                 0.5f * kOverlayRefH + kCopyrightLocalOffsetY * pxPerUnit,
+    Zelda3D_Overlay2D_PlaceModel(play, 0.5f * kOverlayRefW, 0.5f * kOverlayRefH + kCopyrightLocalOffsetY * pxPerUnit,
                                  pxPerUnit * localHeight, localHeight);
     const uint8_t alphaU8 = (uint8_t)(alpha + 0.5f);
     gSPZelda3DDrawA(OVERLAY_DISP++, modelId | (int)ZELDA3D_HANDLE_FORCE_UNLIT | (int)ZELDA3D_HANDLE_SCREEN_SPACE,

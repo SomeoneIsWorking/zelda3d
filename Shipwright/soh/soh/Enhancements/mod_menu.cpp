@@ -5,7 +5,7 @@
 #include <ship/utils/StringHelper.h>
 
 #include "mod_menu.h"
-#include "soh/OTRGlobals.h"
+#include "soh/host/app_identity.h"
 #include "soh/resource/type/Skeleton.h"
 #include "soh/SohGui/MenuTypes.h"
 #include "soh/SohGui/SohMenu.h"
@@ -131,7 +131,7 @@ void UpdateModFiles(bool init = false, bool reset = false) {
     unsupportedFiles.clear();
     filePaths.clear();
     bool changed = false;
-    std::string modsPath = Ship::Context::LocateFileAcrossAppDirs("mods", appShortName);
+    std::string modsPath = Ship::Context::LocateFileAcrossAppDirs("mods", kSohAppShortName);
     std::map<std::string, std::string> tempMods;
     if (modsPath.length() > 0 && std::filesystem::exists(modsPath)) {
         std::vector<std::filesystem::path> enabledFiles;

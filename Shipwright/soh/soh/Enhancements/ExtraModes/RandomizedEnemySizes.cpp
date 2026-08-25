@@ -4,7 +4,7 @@
 #include "soh/ShipUtils.h"
 
 extern "C" {
-#include "functions.h"
+#include "functions/actors.h"
 #include "src/overlays/actors/ovl_En_Fz/z_en_fz.h"
 }
 

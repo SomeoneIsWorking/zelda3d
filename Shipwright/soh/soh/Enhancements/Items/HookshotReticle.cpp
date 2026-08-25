@@ -5,7 +5,8 @@ extern "C" {
 extern PlayState* gPlayState;
 extern SaveContext gSaveContext;
 #include "macros.h"
-#include "functions.h"
+#include "functions/collision.h"
+#include "functions/rendering.h"
 #include "objects/object_link_boy/object_link_boy.h"
 }
 

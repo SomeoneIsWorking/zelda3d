@@ -1,4 +1,6 @@
 #include "soh/Enhancements/game-interactor/GameInteractor_Hooks.h"
+#include "functions/camera_cutscene.h"
+#include "functions/math.h"
 #include "init/ShipInit.hpp"
 
 extern "C" {

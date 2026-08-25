@@ -1,8 +1,11 @@
-#include <soh/OTRGlobals.h>
+
+#include "soh/OTRGlobals.h"
 #include "soh_assets.h"
 #include "static_data.h"
 #include <libultraship/libultra.h>
 #include "global.h"
+#include "functions/actors.h"
+#include "functions/game_state.h"
 #include "object/ObjectExtension.h"
 #include "item_category_adj.h"
 #include "soh/Enhancements/randomizer/randomizer.h"

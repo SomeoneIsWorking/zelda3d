@@ -1,5 +1,6 @@
-#include "SohStatsWindow.h"
 #include "soh/OTRGlobals.h"
+#include "SohStatsWindow.h"
+
 
 void SohStatsWindow::DrawElement() {
     const float framerate = ImGui::GetIO().Framerate;

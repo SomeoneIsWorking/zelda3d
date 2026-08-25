@@ -31,7 +31,7 @@ light2Dir, "l1dir" was really the FOG COLOUR, and the fog colour was therefore n
 extracted at all (the renderer fell back to the N64 scene's fogColor). Because the ZSI
 always stores light2Dir = -light1Dir, the consumer's compensating negation made light1Dir
 come out right by accident — that negation is now gone with the offsets fixed. Independent
-confirmation: the TITLE path (zelda3d_render.cpp Zelda3D_TitleLightSlotsConvert, derived
+confirmation: the TITLE path (render/title_light_slots.cpp Zelda3D_TitleLightSlotsConvert, derived
 from the decompiled Environment_Update consumer, title_env_lighting.md §6) already reads
 this same record with dir-before-colour.
 
@@ -150,13 +150,6 @@ def main():
         o.write("// already in the N64 (toward-light) convention — consumers must NOT negate.\n")
         o.write("// See the generator docstring for the byte-level derivation.\n")
         o.write(f"// {mapped}/{len(rows)} scenes have a palette.\n\n")
-        o.write("typedef struct {\n")
-        o.write("    unsigned char amb[3]; signed char l0dir[3]; unsigned char l0col[3];\n")
-        o.write("    signed char l1dir[3]; unsigned char l1col[3]; unsigned char fogCol[3];\n")
-        o.write("    unsigned short fogNear; float fogFar; float zFar; // eye units (3DS PICA fog window + far plane)\n")
-        o.write("} Zelda3dLightSlot;\n")
-        o.write("typedef struct { unsigned char numSlots; const Zelda3dLightSlot* slots; } Zelda3dSceneLight;\n\n")
-
         emitted = {}
         for name in sorted(parsed):
             slots = parsed[name]

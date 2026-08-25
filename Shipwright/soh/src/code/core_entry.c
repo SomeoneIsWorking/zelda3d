@@ -12,10 +12,10 @@
 
 #include "global.h"
 #include <soh/Enhancements/bootcommands.h>
-#include "soh/OTRGlobals.h"
+
 #include "soh/CrashHandlerExt.h"
 #include <ship/zelda3d_core.h>
-#include "zelda3d/zelda3d.h"
+#include "zelda3d/core/zelda3d_runtime.h"
 
 int Zelda3D_CoreRun(int argc, char* argv[]) {
     // FIRST, before anything can read it. The launcher may have run a game in this process already,

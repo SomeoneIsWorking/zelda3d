@@ -1,7 +1,9 @@
+#include "soh/OTRGlobals.h"
+#include "soh/host/frame_timing.h"
 #include "gameplaystats.h"
 
 #include "soh/SaveManager.h"
-#include "functions.h"
+#include "global.h"
 #include "macros.h"
 #include "soh/cvar_prefixes.h"
 #include "soh/SohGui/UIWidgets.hpp"
@@ -13,7 +15,7 @@
 #include <libultraship/bridge.h>
 #include <libultraship/libultraship.h>
 #include "soh/Enhancements/enhancementTypes.h"
-#include "soh/OTRGlobals.h"
+
 
 extern "C" {
 #include <z64.h>

@@ -2,8 +2,10 @@
 // icons, digits) packed from embedded PNGs. Split out of zelda3d_model.cpp (pure move, no behavior
 // change) so the model loader stays focused. Declarations live in zelda3d.h; the renderer/HUD path
 // calls these by name. See #18/#21/#31/#32.
-#include "../zelda3d.h"
+#include "zelda3d_hud_assets.h"
+#include "../input/zelda3d_keymap.h"
 #include <vector>
+#include <unordered_map>
 #include <string>
 #include <cstdint>
 #include <cstring>
@@ -179,7 +181,6 @@ const void* Zelda3D_XboxGlyphTex(char which, int* w, int* h) {
 // keeps the rounded corners and the vertical gradient intact. The text only scales down once even a
 // 3x-wide cap can't hold it.
 #include "../assets/key_glyphs_png.h"
-#include <unordered_map>
 
 struct KeyCapArt {
     std::vector<uint8_t> cap;    // kCapW x kCapH RGBA, blank

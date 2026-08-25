@@ -1,0 +1,6 @@
+#ifndef ZELDA3D_TOOLS_SOH3D_HARNESS_SOH_WARP_STATE_H
+#define ZELDA3D_TOOLS_SOH3D_HARNESS_SOH_WARP_STATE_H
+
+extern "C" int SohState_Warp(unsigned short entrance);
+
+#endif // ZELDA3D_TOOLS_SOH3D_HARNESS_SOH_WARP_STATE_H

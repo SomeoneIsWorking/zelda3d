@@ -1,7 +1,7 @@
 /**
  * This file is for handling the Randomize Rupee Names enhancement
  */
-#include <soh/OTRGlobals.h>
+
 #include "soh/Enhancements/randomizer/randomizer.h"
 
 extern "C" {

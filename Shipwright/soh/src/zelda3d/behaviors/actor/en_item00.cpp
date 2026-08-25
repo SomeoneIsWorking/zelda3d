@@ -18,6 +18,8 @@
 // the N64 rupee.
 #include "z64.h"
 #include "en_item00.h"
+#include "rupee_draw.h"
+#include "zelda3d/diagnostics/model_tuning_query.h"
 
 // World scale: N64 draws the rupee at (this->scale * mtxScale) with mtxScale 25.0 (17.5 gold/purple),
 // the same as En_Ex_Ruppy. We drive worldScale off the actor's own live scale and share the rupee
@@ -25,8 +27,6 @@
 // bigger gold gem into its mesh, so no per-color multiplier is needed.
 static constexpr float kRupeeScaleMul = 25.0f;
 static constexpr int kRupeeGScaleSlot = 17;
-
-extern "C" float Zelda3D_GScale(int slot, float def);
 
 namespace Zelda3D {
 
@@ -52,7 +52,7 @@ bool EnItem00Behavior::tryDrawModel(PlayState* play, Actor* actor) {
         return true; // blink gate hides the item this frame: draw nothing, keep N64 rupee suppressed
     }
 
-    float worldScale = actor->scale.x * Zelda3D_GScale(kRupeeGScaleSlot, kRupeeScaleMul);
+    float worldScale = actor->scale.x * Zelda3D_ModelScaleOrDefault(kRupeeGScaleSlot, kRupeeScaleMul);
     return drawRupeeColorMesh(play, actor, colorIdx, worldScale);
 }
 

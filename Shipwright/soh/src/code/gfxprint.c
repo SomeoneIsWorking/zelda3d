@@ -1,7 +1,7 @@
 #include "global.h"
 
 #include "align_asset_macro.h"
-#include "soh/OTRGlobals.h"
+
 #include "soh/ResourceManagerHelpers.h"
 
 // #region SOH [HD Textures]

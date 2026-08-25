@@ -9,7 +9,7 @@
 namespace Zelda3D {
 
 class DoorAnaBehavior : public ActorBehavior {
-public:
+  public:
     s16 actorId() const override;
     // Draws the OoT3D grotto-hole CMB at the actor's world.pos + shape.rot, suppressing the N64 hole.
     bool tryDrawModel(PlayState* play, Actor* actor) override;

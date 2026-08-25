@@ -26,7 +26,8 @@ import sys
 import numpy as np
 
 sys.path.insert(0, os.path.join(os.path.dirname(__file__)))
-import harness_ctl as HC  # noqa: E402
+from harness_gameplay import boot_to_gameplay, set_time_of_day  # noqa: E402
+from harness_process import spawn  # noqa: E402
 
 
 def read_ppm(path):
@@ -53,9 +54,9 @@ def main():
     os.makedirs(outdir, exist_ok=True)
     ap = os.path.abspath
 
-    h = HC.spawn(save_state='scratch/title_settled.state')
-    print(HC.boot_to_gameplay(h, entrance=ent))
-    HC.set_time_of_day(h, tod)
+    h = spawn(save_state='scratch/title_settled.state')
+    print(boot_to_gameplay(h, entrance=ent))
+    set_time_of_day(h, tod)
     for _ in range(settle):
         h.send('run 60')
 

@@ -16,7 +16,7 @@ GameInteractor functions can be called directly.
 extern "C" {
 #include "variables.h"
 #include "macros.h"
-#include "functions.h"
+#include "functions/player.h"
 extern PlayState* gPlayState;
 }
 
