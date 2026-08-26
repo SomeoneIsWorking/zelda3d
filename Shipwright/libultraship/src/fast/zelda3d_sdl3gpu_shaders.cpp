@@ -443,6 +443,20 @@ bool ReplaceToken(std::string& source, const char* token, const char* value, std
     return true;
 }
 
+bool ReplaceAllTokens(std::string& source, const char* token, const char* value, std::string& error) {
+    std::size_t position = 0;
+    bool replaced = false;
+    while ((position = source.find(token, position)) != std::string::npos) {
+        source.replace(position, strlen(token), value);
+        position += strlen(value);
+        replaced = true;
+    }
+    if (!replaced) {
+        error = std::string("shader template is missing token ") + token;
+    }
+    return replaced;
+}
+
 bool HasUnresolvedToken(const std::string& source, std::string& error) {
     const std::size_t position = source.find("{{");
     if (position == std::string::npos) {
@@ -465,8 +479,8 @@ bool BuildSources(const char* genericTevFunctions, const char* tapCombiner, cons
                   std::string& vertexSource, std::string& fragmentSource, std::string& error) {
     std::string vertexVaryings = kVaryings;
     std::string fragmentVaryings = kVaryings;
-    if (!ReplaceToken(vertexVaryings, "{{ q }}", "out", error) ||
-        !ReplaceToken(fragmentVaryings, "{{ q }}", "in", error)) {
+    if (!ReplaceAllTokens(vertexVaryings, "{{ q }}", "out", error) ||
+        !ReplaceAllTokens(fragmentVaryings, "{{ q }}", "in", error)) {
         return false;
     }
 

@@ -39,6 +39,20 @@ void PrintNativeInputs(const State& oracle, const BossFdNativeInputs& native, co
                 authored.visualVelocity[2], native.displacement[0], native.displacement[1], native.displacement[2]);
 }
 
+void PrintRenderInfo() {
+    BossFdRenderInfo info{};
+    if (!SohState_BossFdRenderInfo(&info)) {
+        std::printf("    render soh=missing\n");
+        return;
+    }
+    std::printf("    render attempts=%d successes=%d skin=%d models=", info.drawAttempts, info.drawSuccesses,
+                info.skinSegments);
+    for (int index = 0; index < 8; ++index) {
+        std::printf("%s%d:%ld", index == 0 ? "" : ",", info.modelIds[index], info.submitCounts[index]);
+    }
+    std::printf("\n");
+}
+
 BossFdCompareStatus RecordStatus(BossFdCompareStatus status) {
     gLastCompareStatus = status;
     return status;
@@ -102,6 +116,7 @@ BossFdCompareStatus CompareBossFd(uint32_t azPlayState) {
                 oracle.address, oracle.scene, oracle.action, oracle.bodyLead, sohScene & 0xFFFF, native.action,
                 authored.bodyLead, authored.sampleCount);
     PrintNativeInputs(oracle, native, authored);
+    PrintRenderInfo();
     std::printf("    authored-producer dPos=%.4f dRotRad=%.6f dVel=%.6f dMove=%d dSpeed=%.4f dTurn=%.4f\n",
                 result.producerPositionDelta, result.producerRotationDelta, result.producerVelocityDelta,
                 authored.authoredMoveTimer - oracle.moveTimer, result.producerSpeedDelta, result.producerTurnDelta);

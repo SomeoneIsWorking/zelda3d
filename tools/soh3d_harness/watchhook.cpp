@@ -30,6 +30,7 @@
 #include "core/hle/kernel/process.h"
 #include "core/memory.h"
 #include "oracle_watch_bridge.h"
+#include "paired_camera_control.h"
 
 namespace Soh3d {
 
@@ -159,6 +160,7 @@ extern "C" bool Soh3d_WatchIsRegistered(u32 addr) {
 // the ARM PC pointing at (or one past) the store; LR gives the caller.
 extern "C" void Soh3d_OnMemoryWrite(u32 vaddr, u32 size, u64 data) {
     using namespace Soh3d;
+    HarnessPairedCameraControl::OverrideOracleWrite(vaddr, size);
     // Fast reject on non-watched writes. Writers to arbitrary pages in
     // the same page as a watch trigger the hook but aren't interesting.
     std::lock_guard lock(g_mtx);

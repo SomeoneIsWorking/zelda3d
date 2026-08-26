@@ -6,6 +6,7 @@
 #include "fast/backends/gfx_sdl3gpu.h"
 #include "fast/backends/zelda3d_sdl3gpu.h"
 #include "fast/unified_vtx.h"
+#include "zelda3d_instrumentation_state.h"
 
 #include <algorithm>
 #include <cmath>
@@ -49,6 +50,12 @@ SDL_GPUSamplerAddressMode wrapMode(unsigned glWrap) {
 
 void Fast::Zelda3DSdl3GpuResources::SetModelProvider(Zelda3DModelProvider provider) {
     g_provider = provider;
+}
+
+bool Fast::Zelda3DSdl3GpuResources::ModelSource(int modelId, const Zelda3DGlGroup** groups, int* groupCount) {
+    const Zelda3DGlTex* textures = nullptr;
+    int textureCount = 0;
+    return g_provider != nullptr && g_provider(modelId, groups, groupCount, &textures, &textureCount) != 0;
 }
 
 SDL_GPUSampler* Fast::Zelda3DRenderer::getSampler(unsigned wrapS, unsigned wrapT, bool noMip) {
@@ -202,6 +209,7 @@ SDL_GPUTexture* Fast::Zelda3DRenderer::uploadTexture(int w, int h, const unsigne
     }
     SDL_SubmitGPUCommandBuffer(c);
     SDL_ReleaseGPUTransferBuffer(g_device, tb);
+    Zelda3DFast::ReportProgress();
     return tex;
 }
 
@@ -439,6 +447,7 @@ SgModel* Fast::Zelda3DRenderer::ensureUploaded(int modelId) {
     m.uploaded = true;
     fprintf(stderr, "[Zelda3D_SG] uploaded model %d: %d groups, %d textures, %zu verts\n", modelId, groupCount,
             texCount, all.size());
+    Zelda3DFast::ReportProgress();
     return &m;
 }
 

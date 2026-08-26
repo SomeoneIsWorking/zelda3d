@@ -84,6 +84,19 @@ class MmPlayerContractTests(unittest.TestCase):
         self.assertIn("play->state.gfxCtx->polyOpa.p = opaP;", lod_walker.group())
         self.assertIn("play->state.gfxCtx->polyXlu.p = xluP;", lod_walker.group())
 
+    def test_player_animation_uses_exact_shared_archive_members(self) -> None:
+        adapter = (MM / "mm3d_player_model.cpp").read_text()
+        self.assertIn("RegisterPlayerAnimationModel(resolved, form);", adapter)
+
+        animation = (MM / "mm3d_animation.cpp").read_text()
+        self.assertIn("ResolvePlayerAnimationPath(modelId, animationOtr)", animation)
+        self.assertIn("playerModel ? file.path == key : file.name == key", animation)
+
+        owner = (MM / "mm3d_player_animation.cpp").read_text()
+        self.assertIn('"/actors/zelda2_link_new.gar.lzs"', owner)
+        self.assertIn("g_playerAnimationMembers.contains(candidate)", owner)
+        self.assertNotIn("firstWithSuffix", owner)
+
     def test_focused_owners_stay_below_source_ceiling(self) -> None:
         owners = (
             MM / "mm3d_player_force.c",
@@ -97,6 +110,11 @@ class MmPlayerContractTests(unittest.TestCase):
             MM / "mm3d_player_model.h",
             MM / "mm3d_player_model_policy.cpp",
             MM / "mm3d_player_model_policy.h",
+            MM / "mm3d_player_animation.cpp",
+            MM / "mm3d_player_animation.h",
+            MM / "mm3d_animation_playhead.h",
+            MM / "mm3d_player_animation_policy.cpp",
+            MM / "mm3d_player_animation_policy.h",
             MM / "repl" / "mm3d_link_repl.c",
             MM / "repl" / "mm3d_link_repl.h",
             PLAYER_OVERLAY / "z_player_overlay.h",

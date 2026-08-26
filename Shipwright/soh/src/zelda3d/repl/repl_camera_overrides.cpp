@@ -11,9 +11,13 @@ void ApplyCameraOverrides(PlayState* play) {
         return;
     }
     if (gZelda3dCamOverride) {
-        play->view.eye = { gZelda3dCamEye[0], gZelda3dCamEye[1], gZelda3dCamEye[2] };
-        play->view.lookAt = { gZelda3dCamAt[0], gZelda3dCamAt[1], gZelda3dCamAt[2] };
-        play->view.up = { 0.0f, 1.0f, 0.0f };
+        Vec3f eye = { gZelda3dCamEye[0], gZelda3dCamEye[1], gZelda3dCamEye[2] };
+        Vec3f at = { gZelda3dCamAt[0], gZelda3dCamAt[1], gZelda3dCamAt[2] };
+        Vec3f up = { 0.0f, 1.0f, 0.0f };
+        if (gZelda3dCamFovOverride) {
+            play->view.fovy = gZelda3dCamFov;
+        }
+        func_800AA358(&play->view, &eye, &at, &up);
         return;
     }
     if (!Zelda3D_Title_Update(play)) {

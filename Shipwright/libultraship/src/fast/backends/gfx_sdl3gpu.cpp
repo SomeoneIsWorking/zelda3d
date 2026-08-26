@@ -34,7 +34,7 @@
 #include "fast/backends/gfx_sdl3gpu.h"
 #include "fast/backends/zelda3d_sdl3gpu.h" // Zelda3DRenderer / Zelda3DHudRenderer member subsystems
 #include "fast/backends/gfx_sdl.h"
-#include "fast/backends/unified_shader.h" // render-unification Phase 1 dormant shader selftest
+#include "fast/backends/unified_shader.h"   // render-unification Phase 1 dormant shader selftest
 #include "fast/backends/unified_n64_pack.h" // render-unification Phase 3: CCFeatures -> UnifiedMaterial
 #include "fast/unified_vtx.h"
 #include "fast/unified_ubo.h"
@@ -52,6 +52,7 @@
 #include <cstring>
 #include <algorithm>
 #include <array>
+#include <bit>
 #include <mutex>
 #include <string>
 #include <vector>
@@ -70,21 +71,21 @@ extern int gUnifiedRenderer; // render-unification effort (kanban #131): bit 1 =
 // comment there for the protocol. FinishRender consumes gSoh3dCapturePending
 // after each frame — the download re-uses the exact same GPU copy pattern
 // as WriteFbPpm but writes RGBA8 into gSoh3dCaptureBuf instead of a file.
-extern uint8_t*     gSoh3dCaptureBuf;
-extern uint32_t     gSoh3dCaptureCap;
-extern uint32_t     gSoh3dCaptureW;
-extern uint32_t     gSoh3dCaptureH;
+extern uint8_t* gSoh3dCaptureBuf;
+extern uint32_t gSoh3dCaptureCap;
+extern uint32_t gSoh3dCaptureW;
+extern uint32_t gSoh3dCaptureH;
 extern volatile int gSoh3dCapturePending;
 
 // Harness introspection: last-seen state of fb 0 at capture time. Written by
 // WriteFbToCaptureBuf on every capture attempt (whether it succeeded or hit
 // an early-return), so the harness can `diag` the exact reason capture is
 // empty — usually fb0 not yet sized (no game-render frame at title).
-extern "C" volatile int      gSoh3dFb0LastCaptureAttempt = 0;  // count of attempts
+extern "C" volatile int gSoh3dFb0LastCaptureAttempt = 0; // count of attempts
 extern "C" volatile uint32_t gSoh3dFb0LastW = 0;
 extern "C" volatile uint32_t gSoh3dFb0LastH = 0;
-extern "C" volatile int      gSoh3dFb0LastHasColor = 0;    // fb.color != nullptr
-extern "C" volatile int      gSoh3dFb0LastInRange = 0;     // fbId in [0, size)
+extern "C" volatile int gSoh3dFb0LastHasColor = 0; // fb.color != nullptr
+extern "C" volatile int gSoh3dFb0LastInRange = 0;  // fbId in [0, size)
 }
 
 namespace {
@@ -114,7 +115,8 @@ bool CompileGlslToSpirv(EShLanguage stage, const std::string& src, std::vector<u
 
     const TBuiltInResource* resources = GetDefaultResources();
     const int defaultVersion = 450;
-    EShMessages messages = (EShMessages)(EShMsgSpvRules | EShMsgVulkanRules);
+    const EShMessages messages =
+        std::bit_cast<EShMessages>(static_cast<unsigned>(EShMsgSpvRules) | static_cast<unsigned>(EShMsgVulkanRules));
 
     if (!shader.parse(resources, defaultVersion, false, messages)) {
         outLog = std::string("parse: ") + shader.getInfoLog() + "\n" + shader.getInfoDebugLog();
@@ -202,11 +204,9 @@ const char* sg_shader_item_to_str(uint32_t item, bool with_alpha, bool only_alph
             case SHADER_INPUT_4:
                 return "vInput4.a";
             case SHADER_TEXEL0:
-                return first_cycle ? "texVal0.a" : "texVal1.a";
             case SHADER_TEXEL0A:
                 return first_cycle ? "texVal0.a" : "texVal1.a";
             case SHADER_TEXEL1A:
-                return first_cycle ? "texVal1.a" : "texVal0.a";
             case SHADER_TEXEL1:
                 return first_cycle ? "texVal1.a" : "texVal0.a";
             case SHADER_COMBINED:
@@ -225,10 +225,11 @@ bool sg_get_bool(prism::ContextTypes* value) {
     return false;
 }
 
-prism::ContextTypes* sg_append_formula(prism::ContextTypes* _, prism::ContextTypes* a_arg, prism::ContextTypes* a_single,
-                                       prism::ContextTypes* a_mult, prism::ContextTypes* a_mix,
-                                       prism::ContextTypes* a_with_alpha, prism::ContextTypes* a_only_alpha,
-                                       prism::ContextTypes* a_alpha, prism::ContextTypes* a_first_cycle) {
+prism::ContextTypes* sg_append_formula(prism::ContextTypes* _, prism::ContextTypes* a_arg,
+                                       prism::ContextTypes* a_single, prism::ContextTypes* a_mult,
+                                       prism::ContextTypes* a_mix, prism::ContextTypes* a_with_alpha,
+                                       prism::ContextTypes* a_only_alpha, prism::ContextTypes* a_alpha,
+                                       prism::ContextTypes* a_first_cycle) {
     auto c = std::get<prism::MTDArray<int>>(*a_arg);
     bool do_single = sg_get_bool(a_single);
     bool do_multiply = sg_get_bool(a_mult);
@@ -782,14 +783,14 @@ GfxRenderingAPISdl3Gpu::~GfxRenderingAPISdl3Gpu() {
     // stacks identical and both ending here), and a claim/release imbalance is the only explanation
     // that lives on our side of the boundary. A silent "released it" line could not distinguish
     // "claimed once" from "claimed twice".
-    SPDLOG_INFO("~GfxRenderingAPISdl3Gpu: releasing window {} from device {} -- claims={} releases={}",
-                (void*)mWindow, (void*)mDevice, sGpuWindowClaims, sGpuWindowReleases);
+    SPDLOG_INFO("~GfxRenderingAPISdl3Gpu: releasing window {} from device {} -- claims={} releases={}", (void*)mWindow,
+                (void*)mDevice, sGpuWindowClaims, sGpuWindowReleases);
     if (mWindow) {
         sGpuWindowReleases++;
         SDL_ReleaseWindowFromGPUDevice(mDevice, mWindow);
     }
-    SPDLOG_INFO("SDL3 GPU: released {} handle(s) tearing down, {} of them released more than once.",
-                sGpuReleaseCount, sGpuDoubleReleaseCount);
+    SPDLOG_INFO("SDL3 GPU: released {} handle(s) tearing down, {} of them released more than once.", sGpuReleaseCount,
+                sGpuDoubleReleaseCount);
     step("DestroyGPUDevice");
     SDL_DestroyGPUDevice(mDevice);
     step("done");
@@ -817,72 +818,11 @@ void GfxRenderingAPISdl3Gpu::CreateDeviceAndClaim() {
         abort();
     }
     sGpuWindowClaims++;
-    SPDLOG_INFO("SDL3 GPU backend: claimed window {} for device {} -- claims={} releases={}",
-                (void*)mWindow, (void*)mDevice, sGpuWindowClaims, sGpuWindowReleases);
+    SPDLOG_INFO("SDL3 GPU backend: claimed window {} for device {} -- claims={} releases={}", (void*)mWindow,
+                (void*)mDevice, sGpuWindowClaims, sGpuWindowReleases);
     SDL_SetGPUAllowedFramesInFlight(mDevice, 2);
     const char* drv = SDL_GetGPUDeviceDriver(mDevice);
     SPDLOG_INFO("SDL3 GPU backend: device driver = {}", drv ? drv : "(unknown)");
-}
-
-void GfxRenderingAPISdl3Gpu::Init() {
-    mWindow = mWindowBackend ? mWindowBackend->GetSdlWindow() : nullptr;
-    if (mWindow == nullptr) {
-        SPDLOG_ERROR("SDL3 GPU backend: SDL window is null at Init()");
-        abort();
-    }
-    CreateDeviceAndClaim();
-
-    // Per-frame vertex staging buffers (transfer + device vertex buffer). 48 MB matches the Vulkan
-    // backend's 32 MB ring with headroom; one frame's worth of geometry uploaded in one copy pass.
-    mVtxCapacity = 48u * 1024u * 1024u;
-    SDL_GPUTransferBufferCreateInfo tci{};
-    tci.usage = SDL_GPU_TRANSFERBUFFERUSAGE_UPLOAD;
-    tci.size = mVtxCapacity;
-    mVtxTransfer = SDL_CreateGPUTransferBuffer(mDevice, &tci);
-    SDL_GPUBufferCreateInfo bci{};
-    bci.usage = SDL_GPU_BUFFERUSAGE_VERTEX;
-    bci.size = mVtxCapacity;
-    mVbo = SDL_CreateGPUBuffer(mDevice, &bci);
-    if (mVtxTransfer == nullptr || mVbo == nullptr) {
-        SPDLOG_ERROR("SDL3 GPU: vertex buffer alloc failed: {}", SDL_GetError());
-        abort();
-    }
-
-    // Slot 0 is the main framebuffer; the interpreter sizes it via UpdateFramebufferParameters(0,..)
-    // right after Init and every frame.
-    mFramebuffers.resize(1);
-    mFramebuffers[0].renderTarget = true;
-    g_activeSdl3GpuApi = this;
-    // Create the folded-in renderer subsystems now that the device is ready and g_activeSdl3GpuApi is
-    // set (their lazy ensureResources() pulls the device through g_activeSdl3GpuApi on first use).
-    mSoh3d = std::make_unique<Zelda3DRenderer>();
-    mHud = std::make_unique<Zelda3DHudRenderer>();
-    SPDLOG_INFO("SDL3 GPU backend initialized (P2: N64 Fast3D world)");
-
-    // Render-unification effort (kanban #131), Phase 1: the unified shader (unified_shader.h) is
-    // still dormant/unreferenced by any draw path. ZELDA3D_UNIFIED_SHADER_SELFTEST=1 compiles its six
-    // variants to SPIR-V here (once, at backend init) purely to catch a GLSL authoring mistake —
-    // zero cost/behavior change when unset.
-    if (getenv("ZELDA3D_UNIFIED_SHADER_SELFTEST") != nullptr) {
-        std::string log;
-        bool ok = Fast::Unified::SelfTestUnifiedShaderVariants(log);
-        if (ok) {
-            SPDLOG_INFO("[unified_shader] selftest: all variants compiled OK");
-        } else {
-            SPDLOG_ERROR("[unified_shader] selftest FAILED:\n{}", log);
-        }
-        // Phase 3 groundwork (dormant, unwired): sanity-run the CCFeatures -> UnifiedMaterial
-        // packer on a couple of real combiner keys so a struct-layout mistake surfaces here
-        // instead of silently sitting unexercised until Phase 3 wiring.
-        for (uint64_t shaderId : { (uint64_t)0, (uint64_t)0x01010100 }) {
-            CCFeatures cc{};
-            gfx_cc_get_features(shaderId, shaderId, &cc);
-            UnifiedMaterial um = Fast_PackCCFeaturesToUnifiedMaterial(cc);
-            SPDLOG_INFO("[unified_n64_pack] shaderId={:#x} -> combMux[0][0]=({},{},{},{}) cycleCount={}",
-                        shaderId, um.combMux[0][0][0], um.combMux[0][0][1], um.combMux[0][0][2],
-                        um.combMux[0][0][3], um.cycleCount);
-        }
-    }
 }
 
 void GfxRenderingAPISdl3Gpu::OnResize() {
@@ -1019,30 +959,30 @@ void GfxRenderingAPISdl3Gpu::ReplayOps(SDL_GPUTexture* presentTex, uint32_t pres
                         shownC++;
                     }
                 }
- {
-                endPass();
-                if (op.srcFb < 0 || (size_t)op.srcFb >= nfb)
+                {
+                    endPass();
+                    if (op.srcFb < 0 || (size_t)op.srcFb >= nfb)
+                        break;
+                    FramebufferSDL3& s = mFramebuffers[op.srcFb];
+                    FramebufferSDL3& d = mFramebuffers[op.fb];
+                    if (!s.color || !d.color)
+                        break;
+                    SDL_GPUBlitInfo bi{};
+                    bi.source.texture = s.color;
+                    bi.source.x = op.srcRect.x;
+                    bi.source.y = op.srcRect.y;
+                    bi.source.w = op.srcRect.w;
+                    bi.source.h = op.srcRect.h;
+                    bi.destination.texture = d.color;
+                    bi.destination.x = op.dstRect.x;
+                    bi.destination.y = op.dstRect.y;
+                    bi.destination.w = op.dstRect.w;
+                    bi.destination.h = op.dstRect.h;
+                    bi.load_op = SDL_GPU_LOADOP_LOAD;
+                    bi.filter = op.nearest ? SDL_GPU_FILTER_NEAREST : SDL_GPU_FILTER_LINEAR;
+                    SDL_BlitGPUTexture(mCmd, &bi);
                     break;
-                FramebufferSDL3& s = mFramebuffers[op.srcFb];
-                FramebufferSDL3& d = mFramebuffers[op.fb];
-                if (!s.color || !d.color)
-                    break;
-                SDL_GPUBlitInfo bi{};
-                bi.source.texture = s.color;
-                bi.source.x = op.srcRect.x;
-                bi.source.y = op.srcRect.y;
-                bi.source.w = op.srcRect.w;
-                bi.source.h = op.srcRect.h;
-                bi.destination.texture = d.color;
-                bi.destination.x = op.dstRect.x;
-                bi.destination.y = op.dstRect.y;
-                bi.destination.w = op.dstRect.w;
-                bi.destination.h = op.dstRect.h;
-                bi.load_op = SDL_GPU_LOADOP_LOAD;
-                bi.filter = op.nearest ? SDL_GPU_FILTER_NEAREST : SDL_GPU_FILTER_LINEAR;
-                SDL_BlitGPUTexture(mCmd, &bi);
-                break;
-            }
+                }
             case OP_DRAW: {
                 FramebufferSDL3& f = mFramebuffers[op.fb];
                 if (!f.color || !f.depth)
@@ -1102,8 +1042,7 @@ void GfxRenderingAPISdl3Gpu::ReplayOps(SDL_GPUTexture* presentTex, uint32_t pres
                         static int n = 0;
                         if (n < 40) {
                             fprintf(stderr, "[Zelda3D_BLEND] set constants (%.3f,%.3f,%.3f,%.3f)\n",
-                                    op.blendConstants.r, op.blendConstants.g, op.blendConstants.b,
-                                    op.blendConstants.a);
+                                    op.blendConstants.r, op.blendConstants.g, op.blendConstants.b, op.blendConstants.a);
                             n++;
                         }
                     }
@@ -1224,8 +1163,9 @@ void GfxRenderingAPISdl3Gpu::FinishRender() {
     bool exitAfter = false;
     {
         static const char* envDump = getenv("SOH_FRAMEDUMP");
+        static const char* envTargetFrame = getenv("SOH_FRAMEDUMP_FRAME");
         static long frame = 0;
-        static long targetFrame = getenv("SOH_FRAMEDUMP_FRAME") ? atol(getenv("SOH_FRAMEDUMP_FRAME")) : 300;
+        static long targetFrame = envTargetFrame != nullptr ? atol(envTargetFrame) : 300;
         if (envDump != nullptr) {
             ++frame;
             if (frame == targetFrame) {
@@ -1399,7 +1339,10 @@ void GfxRenderingAPISdl3Gpu::WriteFbDepthPpm(int fbId, const char* path) {
         float lo = 1.0f, hi = 0.0f;
         for (uint32_t i = 0; i < w * h; i++) {
             float d = dz[i];
-            if (d < 1.0f) { lo = std::min(lo, d); hi = std::max(hi, d); }
+            if (d < 1.0f) {
+                lo = std::min(lo, d);
+                hi = std::max(hi, d);
+            }
         }
         const float range = (hi > lo) ? (hi - lo) : 1.0f;
         fprintf(f, "P6\n%u %u\n255\n", w, h);
@@ -1424,7 +1367,8 @@ void GfxRenderingAPISdl3Gpu::WriteFbToCaptureBuf(int fbId) {
     // came up empty. Written before any early-return.
     gSoh3dFb0LastCaptureAttempt = (int)((int)gSoh3dFb0LastCaptureAttempt + 1);
     gSoh3dFb0LastInRange = (fbId >= 0 && fbId < (int)mFramebuffers.size()) ? 1 : 0;
-    if (!gSoh3dFb0LastInRange) return;
+    if (!gSoh3dFb0LastInRange)
+        return;
     FramebufferSDL3& fb = mFramebuffers[fbId];
     gSoh3dFb0LastHasColor = (fb.color != nullptr) ? 1 : 0;
     gSoh3dFb0LastW = fb.width;
@@ -1434,8 +1378,8 @@ void GfxRenderingAPISdl3Gpu::WriteFbToCaptureBuf(int fbId) {
     const uint32_t w = fb.width, h = fb.height;
     const uint32_t size = w * h * 4;
     if (gSoh3dCaptureBuf == nullptr || gSoh3dCaptureCap < size) {
-        SPDLOG_WARN("SoH3D capture: buffer too small ({} < {}) or null; skipping",
-                    (unsigned)gSoh3dCaptureCap, (unsigned)size);
+        SPDLOG_WARN("SoH3D capture: buffer too small ({} < {}) or null; skipping", (unsigned)gSoh3dCaptureCap,
+                    (unsigned)size);
         return;
     }
 
@@ -1490,7 +1434,6 @@ SDL_GPUSampler* GfxRenderingAPISdl3Gpu::GetOrCreateSampler(bool linear, uint32_t
             case G_TX_NOMIRROR | G_TX_CLAMP:
                 return SDL_GPU_SAMPLERADDRESSMODE_CLAMP_TO_EDGE;
             case G_TX_MIRROR | G_TX_WRAP:
-                return SDL_GPU_SAMPLERADDRESSMODE_MIRRORED_REPEAT;
             case G_TX_MIRROR | G_TX_CLAMP:
                 // SDL3 GPU has no mirror-clamp-to-edge; mirrored repeat is the closest match.
                 return SDL_GPU_SAMPLERADDRESSMODE_MIRRORED_REPEAT;
@@ -1842,9 +1785,9 @@ SDL_GPUGraphicsPipeline* GfxRenderingAPISdl3Gpu::GetOrCreatePipeline(ShaderProgr
     if (depthTest || depthMask) {
         pci.depth_stencil_state.enable_depth_test = true;
         pci.depth_stencil_state.enable_depth_write = depthMask;
-        pci.depth_stencil_state.compare_op = depthTest
-                                                 ? (zmodeDecal ? SDL_GPU_COMPAREOP_LESS_OR_EQUAL : SDL_GPU_COMPAREOP_LESS)
-                                                 : SDL_GPU_COMPAREOP_ALWAYS;
+        pci.depth_stencil_state.compare_op =
+            depthTest ? (zmodeDecal ? SDL_GPU_COMPAREOP_LESS_OR_EQUAL : SDL_GPU_COMPAREOP_LESS)
+                      : SDL_GPU_COMPAREOP_ALWAYS;
     } else {
         pci.depth_stencil_state.enable_depth_test = false;
         pci.depth_stencil_state.enable_depth_write = false;
@@ -1908,10 +1851,10 @@ SDL_GPUGraphicsPipeline* GfxRenderingAPISdl3Gpu::GetOrCreateUnifiedN64Pipeline(i
         // both even though N64 never uses the bones one (unlike the CMB path's getUnifiedPipeline,
         // which passes the same 2 here).
         mUniN64Vert[variant] = CreateShader(vspv, true, 0, 2);
-        uint32_t numSamplers = (variant == (int)Fast::Unified::Variant::kDualTex ||
-                                 variant == (int)Fast::Unified::Variant::kDualTexFog)
-                                    ? 2
-                                    : (variant == (int)Fast::Unified::Variant::kUntextured ? 0 : 1);
+        uint32_t numSamplers =
+            (variant == (int)Fast::Unified::Variant::kDualTex || variant == (int)Fast::Unified::Variant::kDualTexFog)
+                ? 2
+                : (variant == (int)Fast::Unified::Variant::kUntextured ? 0 : 1);
         mUniN64Frag[variant] = CreateShader(fspv, false, numSamplers, 1);
     }
     if (!mUniN64Vert[variant] || !mUniN64Frag[variant])
@@ -2050,9 +1993,11 @@ void GfxRenderingAPISdl3Gpu::UploadTexture(const uint8_t* rgba32Buf, uint32_t wi
                 int refOp = -1;
                 for (size_t oi = 0; oi < mOps.size(); oi++)
                     for (uint32_t si = 0; si < mOps[oi].numSamplers; si++)
-                        if (mOps[oi].samplers[si].texture == t.tex) refOp = (int)oi;
-                fprintf(stderr, "[DBG_TEXREL] defer-release tex id=%u ptr=%p (resize %ux%u->%ux%u) refByOp=%d ops=%zu\n",
-                        id, (void*)t.tex, t.width, t.height, width, height, refOp, mOps.size());
+                        if (mOps[oi].samplers[si].texture == t.tex)
+                            refOp = (int)oi;
+                fprintf(stderr,
+                        "[DBG_TEXREL] defer-release tex id=%u ptr=%p (resize %ux%u->%ux%u) refByOp=%d ops=%zu\n", id,
+                        (void*)t.tex, t.width, t.height, width, height, refOp, mOps.size());
                 fflush(stderr);
             }
             DeferReleaseTexture(t.tex);
@@ -2202,7 +2147,7 @@ Fast::Unified::Variant N64VariantFor(const CCFeatures& cc) {
     if (!tex0 && !tex1)
         return Fast::Unified::Variant::kUntextured;
     return (cc.opt_alpha_threshold || cc.opt_texture_edge) ? Fast::Unified::Variant::kSingleTexAlphaTest
-                                                            : Fast::Unified::Variant::kSingleTex;
+                                                           : Fast::Unified::Variant::kSingleTex;
 }
 
 // Reads one vertex's floats (already resolved concrete color values, not combiner codes — see the
@@ -2211,8 +2156,13 @@ Fast::Unified::Variant N64VariantFor(const CCFeatures& cc) {
 UnifiedVtx PackN64VertexToUnified(const float* vf, const CCFeatures& cc, float outFogColor[3]) {
     UnifiedVtx u{};
     int idx = 0;
-    u.pos[0] = vf[idx++]; u.pos[1] = vf[idx++]; u.pos[2] = vf[idx++]; u.pos[3] = vf[idx++];
-    u.nrm[0] = 0.0f; u.nrm[1] = 0.0f; u.nrm[2] = 1.0f; // N64 has no real per-vertex normal
+    u.pos[0] = vf[idx++];
+    u.pos[1] = vf[idx++];
+    u.pos[2] = vf[idx++];
+    u.pos[3] = vf[idx++];
+    u.nrm[0] = 0.0f;
+    u.nrm[1] = 0.0f;
+    u.nrm[2] = 1.0f; // N64 has no real per-vertex normal
     float uv[2][2] = { { 0, 0 }, { 0, 0 } };
     float clampS[2] = { 1e6f, 1e6f }, clampT[2] = { 1e6f, 1e6f };
     for (int t = 0; t < 2; t++) {
@@ -2225,9 +2175,14 @@ UnifiedVtx PackN64VertexToUnified(const float* vf, const CCFeatures& cc, float o
                 clampT[t] = vf[idx++];
         }
     }
-    u.uv0[0] = uv[0][0]; u.uv0[1] = uv[0][1];
-    u.uv1[0] = uv[1][0]; u.uv1[1] = uv[1][1];
-    u.texClamp[0] = clampS[0]; u.texClamp[1] = clampT[0]; u.texClamp[2] = clampS[1]; u.texClamp[3] = clampT[1];
+    u.uv0[0] = uv[0][0];
+    u.uv0[1] = uv[0][1];
+    u.uv1[0] = uv[1][0];
+    u.uv1[1] = uv[1][1];
+    u.texClamp[0] = clampS[0];
+    u.texClamp[1] = clampT[0];
+    u.texClamp[2] = clampS[1];
+    u.texClamp[3] = clampT[1];
 
     // Fog: interpreter.cpp packs {r,g,b,factor} per vertex, but r/g/b come from the RDP's fog_color
     // register — constant across the whole draw, not really per-vertex. Read once (any vertex) into
@@ -2265,7 +2220,8 @@ UnifiedVtx PackN64VertexToUnified(const float* vf, const CCFeatures& cc, float o
     // Bone data: N64 has no GPU skinning — identity (100% bone 0, which the unified vertex shader
     // never reads for N64 anyway since UnifiedMaterial.alreadyTransformed skips the whole branch).
     u.boneIds[0] = u.boneIds[1] = u.boneIds[2] = u.boneIds[3] = 0;
-    u.boneW[0] = 255; u.boneW[1] = u.boneW[2] = u.boneW[3] = 0;
+    u.boneW[0] = 255;
+    u.boneW[1] = u.boneW[2] = u.boneW[3] = 0;
     return u;
 }
 
@@ -2283,15 +2239,15 @@ void GfxRenderingAPISdl3Gpu::DrawTriangles(float bufVbo[], size_t bufVboLen, siz
     ShaderProgramSDL3* prg = mCurrentShaderProgram;
     const CCFeatures& cc = prg->cc;
     const uint32_t stateBits = (mCurrentDepthTest ? 1u : 0u) | (mCurrentDepthMask ? 2u : 0u) |
-                                (mCurrentZmodeDecal ? 4u : 0u) | (mCurrentUseAlpha ? 8u : 0u);
+                               (mCurrentZmodeDecal ? 4u : 0u) | (mCurrentUseAlpha ? 8u : 0u);
     const uint32_t numVerts = 3u * (uint32_t)bufVboNumTris;
 
     // Render-unification effort (kanban #131), Phase 3: route through the unified shader/vertex
     // format when the bit is set. Bounded to the common case for this first cut — mask/blend
     // texture combiner modes (rare) still fall back to the old per-permutation path, same
     // never-silently-drop-a-draw discipline as Phase 2's CMB wiring.
-    bool unified = (gUnifiedRenderer & 2) != 0 && cc.numInputs <= 4 && !cc.used_masks[0] &&
-                   !cc.used_masks[1] && !cc.used_blend[0] && !cc.used_blend[1];
+    bool unified = (gUnifiedRenderer & 2) != 0 && cc.numInputs <= 4 && !cc.used_masks[0] && !cc.used_masks[1] &&
+                   !cc.used_blend[0] && !cc.used_blend[1];
 
     uint32_t vboBytes, aligned;
     Op op{};
@@ -2318,14 +2274,15 @@ void GfxRenderingAPISdl3Gpu::DrawTriangles(float bufVbo[], size_t bufVboLen, siz
             uu.common.uMvp[0] = uu.common.uMvp[5] = uu.common.uMvp[10] = uu.common.uMvp[15] = 1.0f;
             uu.common.uMv[0] = uu.common.uMv[5] = uu.common.uMv[10] = uu.common.uMv[15] = 1.0f;
             memcpy(uu.common.uCombA, um.combMux, sizeof(uu.common.uCombA));
-            uu.common.uFogColor[0] = fogColor[0]; uu.common.uFogColor[1] = fogColor[1];
-            uu.common.uFogColor[2] = fogColor[2]; uu.common.uFogColor[3] = 0.0f;
+            uu.common.uFogColor[0] = fogColor[0];
+            uu.common.uFogColor[1] = fogColor[1];
+            uu.common.uFogColor[2] = fogColor[2];
+            uu.common.uFogColor[3] = 0.0f;
             uu.common.uParams0[0] = um.alphaRef;
             uu.common.uParams0[1] = 0.0f; // lightingMode 0 — N64 color0 is already the final shade
             uu.common.uParams0[2] = (float)um.cycleCount;
             static const char* freezeStrN64 = getenv("ZELDA3D_FREEZE_NOISE_FRAME");
-            uu.common.uParams0[3] =
-                freezeStrN64 != nullptr ? (float)atoi(freezeStrN64) : (float)mFrameCount;
+            uu.common.uParams0[3] = freezeStrN64 != nullptr ? (float)atoi(freezeStrN64) : (float)mFrameCount;
             uu.common.uParams1[0] = mCurrentNoiseScale;
             uu.common.uParams1[1] = 0.0f; // polygonOffset — N64 decal bias is baked into the pipeline
             uu.common.uParams1[2] = 0.0f; // hasSkin — N64 never GPU-skins
@@ -2777,13 +2734,12 @@ void GfxRenderingAPISdl3Gpu::GetZelda3DViewportScissor(SDL_GPUViewport& vp, SDL_
         sc.h = 0;
 }
 
-void GfxRenderingAPISdl3Gpu::AppendZelda3DModelDraw(SDL_GPUGraphicsPipeline* pipeline, SDL_GPUBuffer* vbo, uint32_t first,
-                                                  uint32_t count, const void* ubo, SDL_GPUTexture* tex,
-                                                  SDL_GPUSampler* samp, SDL_GPUTexture* tex2,
-                                                  SDL_GPUSampler* samp2, SDL_GPUTexture* tex1,
-                                                  SDL_GPUSampler* samp1, const SDL_GPUViewport& vp,
-                                                  const SDL_Rect& sc, bool hasBlendConst,
-                                                  SDL_FColor blendConst) {
+void GfxRenderingAPISdl3Gpu::AppendZelda3DModelDraw(SDL_GPUGraphicsPipeline* pipeline, SDL_GPUBuffer* vbo,
+                                                    uint32_t first, uint32_t count, const void* ubo,
+                                                    SDL_GPUTexture* tex, SDL_GPUSampler* samp, SDL_GPUTexture* tex2,
+                                                    SDL_GPUSampler* samp2, SDL_GPUTexture* tex1, SDL_GPUSampler* samp1,
+                                                    const SDL_GPUViewport& vp, const SDL_Rect& sc, bool hasBlendConst,
+                                                    SDL_FColor blendConst) {
     int idx = (int)mSoh3dModelUbos.size();
     mSoh3dModelUbos.emplace_back();
     memcpy(mSoh3dModelUbos.back().data(), ubo, sizeof(Zelda3DSg::SgUbo));
@@ -2817,8 +2773,8 @@ void GfxRenderingAPISdl3Gpu::AppendZelda3DModelDraw(SDL_GPUGraphicsPipeline* pip
 }
 
 void GfxRenderingAPISdl3Gpu::AppendZelda3DHudDraw(SDL_GPUGraphicsPipeline* pipeline, SDL_GPUBuffer* vbo, uint32_t first,
-                                                uint32_t count, SDL_GPUTexture* tex, SDL_GPUSampler* samp, float w,
-                                                float h) {
+                                                  uint32_t count, SDL_GPUTexture* tex, SDL_GPUSampler* samp, float w,
+                                                  float h) {
     Op op{};
     op.kind = OP_DRAW;
     op.drawClass = Op::DRAW_HUD;
@@ -2838,9 +2794,9 @@ void GfxRenderingAPISdl3Gpu::AppendZelda3DHudDraw(SDL_GPUGraphicsPipeline* pipel
     mOps.push_back(std::move(op));
 }
 
-void GfxRenderingAPISdl3Gpu::AppendZelda3DFullscreen(SDL_GPUGraphicsPipeline* pipeline, const void* ubo, uint32_t uboLen,
-                                                   SDL_GPUTexture* tex, SDL_GPUSampler* samp, const SDL_GPUViewport& vp,
-                                                   const SDL_Rect& sc) {
+void GfxRenderingAPISdl3Gpu::AppendZelda3DFullscreen(SDL_GPUGraphicsPipeline* pipeline, const void* ubo,
+                                                     uint32_t uboLen, SDL_GPUTexture* tex, SDL_GPUSampler* samp,
+                                                     const SDL_GPUViewport& vp, const SDL_Rect& sc) {
     Op op{};
     op.kind = OP_DRAW;
     op.drawClass = Op::DRAW_FULLSCREEN;

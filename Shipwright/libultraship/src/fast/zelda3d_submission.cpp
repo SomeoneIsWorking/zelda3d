@@ -63,6 +63,18 @@ extern "C" void Zelda3D_GL_Submit(int modelId, const float* modelProjection, con
     const auto pose = Zelda3DFast::PoseForSubmission(modelId, drawIndex);
     auto material = Zelda3DFast::MaterialOverridesForDraw(modelId, drawIndex);
     const auto lighting = Zelda3DFast::LightingOverridesForDraw(modelId);
+    if (modelId == gZelda3dTraceModelId) {
+        const float* firstBone = pose.current.size() >= 16 ? pose.current.data() : nullptr;
+        const float* bone19 = pose.current.size() >= 20 * 16 ? pose.current.data() + 19 * 16 : nullptr;
+        std::fprintf(stderr,
+                     "[MPPOSE] model=%d bones=%d mask=0x%016llx b0=(%.4f,%.4f,%.4f) "
+                     "b19=(%.4f,%.4f,%.4f) current=%zu previous=%zu\n",
+                     modelId, pose.boneCount, static_cast<unsigned long long>(material.visibleMeshMask),
+                     firstBone != nullptr ? firstBone[3] : 0.0f, firstBone != nullptr ? firstBone[7] : 0.0f,
+                     firstBone != nullptr ? firstBone[11] : 0.0f, bone19 != nullptr ? bone19[3] : 0.0f,
+                     bone19 != nullptr ? bone19[7] : 0.0f, bone19 != nullptr ? bone19[11] : 0.0f, pose.current.size(),
+                     pose.previous.size());
+    }
 
 #ifdef ENABLE_SDL3GPU
     if (Zelda3D_Sg_Active()) {

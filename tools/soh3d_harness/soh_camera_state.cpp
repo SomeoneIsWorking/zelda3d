@@ -1,5 +1,6 @@
 #include "soh_camera_state.h"
 
+#include "../../Shipwright/soh/src/zelda3d/diagnostics/camera_override_state.h"
 #include "global.h"
 #include "z64camera.h"
 
@@ -24,5 +25,26 @@ extern "C" int SohState_Camera(float* eyeX, float* eyeY, float* eyeZ, float* atX
     *fov = camera->fov;
     *roll = camera->roll;
     *activeCamId = gPlayState->activeCamera;
+    return 1;
+}
+
+extern "C" int SohState_SetCameraOverride(int enabled, const float* eye, const float* at, float fov) {
+    if (gPlayState == nullptr) {
+        return 0;
+    }
+    if (enabled) {
+        if (eye == nullptr || at == nullptr) {
+            return 0;
+        }
+        for (int axis = 0; axis < 3; ++axis) {
+            gZelda3dCamEye[axis] = eye[axis];
+            gZelda3dCamAt[axis] = at[axis];
+        }
+        gZelda3dCamFov = fov;
+        gZelda3dCamFovOverride = 1;
+    } else {
+        gZelda3dCamFovOverride = 0;
+    }
+    gZelda3dCamOverride = enabled != 0;
     return 1;
 }

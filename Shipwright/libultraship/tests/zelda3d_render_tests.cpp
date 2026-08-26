@@ -9,9 +9,31 @@
 // the shader's UBO block.
 
 #include "gtest/gtest.h"
+#include "fast/zelda3d_sdl3gpu_shaders.h"
 #include "fast/zelda3d_sg_ubo.h"
 
 using namespace Zelda3DSg;
+
+TEST(Zelda3DShaderTemplate, ExpandsEveryRepeatedVaryingQualifier) {
+    std::string vertexSource;
+    std::string fragmentSource;
+    std::string error;
+    ASSERT_TRUE(Fast::Zelda3DSdl3GpuShaders::BuildSources("", "", "", vertexSource, fragmentSource, error)) << error;
+    EXPECT_EQ(vertexSource.find("{{"), std::string::npos);
+    EXPECT_EQ(fragmentSource.find("{{"), std::string::npos);
+
+    const auto count = [](const std::string& source, const std::string& token) {
+        std::size_t occurrences = 0;
+        std::size_t position = 0;
+        while ((position = source.find(token, position)) != std::string::npos) {
+            ++occurrences;
+            position += token.size();
+        }
+        return occurrences;
+    };
+    EXPECT_EQ(count(vertexSource, ") out "), 8u);
+    EXPECT_EQ(count(fragmentSource, ") in "), 8u);
+}
 
 // BUG 3: neither pushed uniform block may exceed SDL3 GPU's MAX_UBO_SECTION_SIZE. If this fails, the
 // renderer silently reads 0 for everything past the cap -> black world, T-posed actors.

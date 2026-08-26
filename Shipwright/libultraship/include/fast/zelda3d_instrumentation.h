@@ -16,6 +16,10 @@ extern int g_sgDumpModel;
 long Zelda3D_GL_SubmitCount(int modelId);
 int Zelda3D_GeomScanDump(int* modelIds, float* mins, float* maxs, int capacity);
 
+// Optional host-side heartbeat for long, synchronous GPU provisioning. Shipping hosts leave this
+// unset; the differential harness uses it to distinguish progressing cold uploads from a hung frame.
+void Zelda3D_GL_SetProgressCallback(void (*callback)(void));
+
 #ifdef __cplusplus
 }
 #endif

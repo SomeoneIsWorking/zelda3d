@@ -13789,10 +13789,10 @@ void Player_Draw(Actor* thisx, PlayState* play) {
                 Matrix_Pop();
             }
 
-            // MM/OoT Link unification Stage 1 seam. When MM_ZELDA3D_LINK is on and a
-            // per-form MM3D Link is available, the hook emits it and returns 1, and
-            // we skip the vanilla back-cull draw. Off by default -> hook returns 0
-            // and this branch is byte-identical to vanilla MM.
+            // MM/OoT Link unification Stage 1 seam. When MM_ZELDA3D_LINK is on, the hook
+            // arms a pending form-model replacement and returns 0 so Player_DrawGameplay
+            // supplies the LOD skeleton; its intercept consumes the pending replacement.
+            // Off by default, the same call remains byte-identical to vanilla MM.
             if (!Zelda3D_TryDrawPlayer(play, &this->actor)) {
                 Player_DrawGameplay(play, this, lod, gCullBackDList, sp84);
             }

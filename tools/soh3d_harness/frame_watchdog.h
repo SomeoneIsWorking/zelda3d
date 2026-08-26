@@ -3,6 +3,7 @@
 namespace HarnessWatchdog {
 
 void Install();
+void Pulse();
 
 class Frame {
   public:

@@ -3,6 +3,10 @@
 
 #include "fast/backends/zelda3d_sdl3gpu.h"
 
+bool Fast::Zelda3DRenderer::initializeGpuResources() {
+    return ensureResources();
+}
+
 void Fast::Zelda3DRenderer::releaseGpuResources(bool (*note)(const void* handle, const char* what)) {
     if (g_device == nullptr) {
         return;

@@ -23,6 +23,7 @@ void CrashHandlerRegisterCallback(CrashHandlerCallback callback);
 void BootCommands_Init(void);
 void Heaps_Alloc(void);
 void Zelda3D_CoreRunBegin(void);
+void Zelda3D_GL_SetProgressCallback(void (*callback)(void));
 void Main_Init(void* arg);
 void RunFrame(void);
 }
@@ -143,6 +144,7 @@ void Boot() {
 
     // Establish the run epoch before any once-per-run subsystem initialization.
     Zelda3D_CoreRunBegin();
+    Zelda3D_GL_SetProgressCallback(HarnessWatchdog::Pulse);
     GameConsole_Init();
     InitOTR(1, arguments);
     CrashHandlerRegisterCallback(&CrashHandler_PrintSohData);

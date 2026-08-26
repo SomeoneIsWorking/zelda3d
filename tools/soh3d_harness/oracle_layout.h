@@ -40,7 +40,14 @@ inline constexpr uint8_t kTransitionTriggerStart = 20;
 inline constexpr uint32_t kPlayCameraEyeOffset = 0x01B8;
 inline constexpr uint32_t kPlayCameraAtOffset = 0x01C4;
 inline constexpr uint32_t kPlayCameraUpOffset = 0x01D0;
+inline constexpr uint32_t kPlayCameraFovOffset = 0x0198;
+inline constexpr uint32_t kPlayCameraDirtyOffset = 0x0360;
 inline constexpr uint32_t kPlayCameraPointersOffset = 0x0A54;
+inline constexpr uint32_t kPlayActiveCameraOffset = 0x0A64;
+inline constexpr uint32_t kCameraAtOffset = 0x0080;
+inline constexpr uint32_t kCameraEyeOffset = 0x008C;
+inline constexpr uint32_t kCameraUpOffset = 0x0098;
+inline constexpr uint32_t kCameraFovOffset = 0x0144;
 inline constexpr uint32_t kCameraStatusOffset = 0x0188;
 inline constexpr uint32_t kCameraModeOffset = 0x018C;
 

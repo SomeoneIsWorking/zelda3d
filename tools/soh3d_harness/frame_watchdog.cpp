@@ -14,6 +14,7 @@ namespace {
 constexpr int kTimeoutSeconds = 5;
 std::atomic<const char*> g_operation{ nullptr };
 std::atomic<uint64_t> g_frame{ 0 };
+std::atomic<bool> g_active{ false };
 
 void HandleTimeout(int) {
     const char* operation = g_operation.load();
@@ -41,13 +42,21 @@ void Install() {
     sigaction(SIGALRM, &action, nullptr);
 }
 
+void Pulse() {
+    if (g_active.load()) {
+        alarm(kTimeoutSeconds);
+    }
+}
+
 Frame::Frame(const char* operation) {
     g_operation.store(operation);
     g_frame.fetch_add(1);
+    g_active.store(true);
     alarm(kTimeoutSeconds);
 }
 
 Frame::~Frame() {
+    g_active.store(false);
     alarm(0);
 }
 
