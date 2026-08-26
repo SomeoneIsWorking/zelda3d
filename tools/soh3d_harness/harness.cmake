@@ -7,7 +7,7 @@
 # for the composition entry point.
 set(_libretro_root ${CMAKE_SOURCE_DIR}/src/citra_libretro)
 set(_harness_root  ${CMAKE_CURRENT_LIST_DIR})
-set(_zelda3d_root  ${_harness_root}/../..)
+get_filename_component(_zelda3d_root "${_harness_root}/../.." ABSOLUTE)
 
 set(ZELDA3D_SHIPPING_BUILD_DIR "${_zelda3d_root}/Shipwright/build-cmake" CACHE PATH
     "Configured Zelda3D build tree whose shipping cores the harness imports")
@@ -78,6 +78,7 @@ add_executable(soh3d_harness
     ${_harness_root}/oracle_state.cpp
     ${_harness_root}/oracle_scene_compare.cpp
     ${_harness_root}/oracle_skeleton_compare.cpp
+    ${_harness_root}/paired_camera_control.cpp
     ${_harness_root}/oracle_state_storage.cpp
     ${_harness_root}/oracle_title_state.cpp
     ${_harness_root}/oracle_title_actor_compare.cpp
@@ -141,11 +142,11 @@ target_include_directories(soh3d_harness PRIVATE
     # The harness directly includes asset/texpack.h. Linking cmb3d does not propagate its include
     # directory in the Azahar superbuild because the imported Shipwright target is consumed across
     # the deferred top-level boundary, so declare the direct source dependency explicitly here.
-    ${_harness_root}/../../Shipwright/cmb3d
-    ${_harness_root}/../../Shipwright/soh
-    ${_harness_root}/../../Shipwright/soh/include
-    ${_harness_root}/../../Shipwright/soh/src
-    ${_harness_root}/../../Shipwright/libultraship/include
+    ${_zelda3d_root}/Shipwright/cmb3d
+    ${_zelda3d_root}/Shipwright/soh
+    ${_zelda3d_root}/Shipwright/soh/include
+    ${_zelda3d_root}/Shipwright/soh/src
+    ${_zelda3d_root}/Shipwright/libultraship/include
 )
 
 # -rdynamic so backtrace(3) can resolve our function names in the watchdog

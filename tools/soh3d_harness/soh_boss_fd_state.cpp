@@ -3,6 +3,7 @@
 #include "global.h"
 #include "overlays/actors/ovl_Boss_Fd/z_boss_fd.h"
 #include "zelda3d/behaviors/actor/boss_fd/authored_flight.h"
+#include "zelda3d/behaviors/actor/boss_fd.h"
 #include "zelda3d/behaviors/actor/boss_fd/forced_flight.h"
 
 namespace {
@@ -100,6 +101,25 @@ int SohState_BossFdForceFlightSeeded(const float* pos3, const short* rot3, uintp
         return 0;
     }
     *outAddress = reinterpret_cast<uintptr_t>(boss);
+    return 1;
+}
+
+int SohState_BossFdRenderInfo(BossFdRenderInfo* outInfo) {
+    if (outInfo == nullptr) {
+        return 0;
+    }
+    BossFd* boss = FindBossFd();
+    Zelda3D::BossFdRenderStatus status;
+    if (boss == nullptr || !Zelda3D::bossFdRenderStatus(&boss->actor, &status)) {
+        return 0;
+    }
+    for (int index = 0; index < Zelda3D::BossFdRenderStatus::kModelCount; ++index) {
+        outInfo->modelIds[index] = status.modelIds[index];
+        outInfo->submitCounts[index] = status.submitCounts[index];
+    }
+    outInfo->drawAttempts = status.drawAttempts;
+    outInfo->drawSuccesses = status.drawSuccesses;
+    outInfo->skinSegments = status.skinSegments;
     return 1;
 }
 

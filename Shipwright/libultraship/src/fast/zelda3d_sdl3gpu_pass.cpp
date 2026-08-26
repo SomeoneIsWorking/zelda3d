@@ -6,6 +6,7 @@
 #include "fast/backends/gfx_sdl3gpu.h"
 #include "fast/backends/zelda3d_sdl3gpu.h"
 #include "fast/zelda3d_material_overrides.h"
+#include "fast/zelda3d_instrumentation.h"
 #include "fast/zelda3d_sg_ubo.h"
 #include "fast/unified_material.h"
 #include "fast/unified_ubo.h"
@@ -38,6 +39,95 @@ constexpr uint32_t kSgBonesBytes = Zelda3DSg::kBonesBytes;
 // 0.1834 "diffuse" constant here had the two slot colors swapped). Only the direction L(t) is
 // animated per-frame by the caller (Zelda3D_GL_SetLightDirOverride).
 constexpr float kWordmarkLightAmbient = 0.18f;
+
+namespace {
+
+void TraceSkinnedClipBounds(int modelId, const float* modelProjection, const float* boneData, int boneCount,
+                            unsigned long long visibleMeshMask, float aspectAdjustment) {
+    if (modelId != gZelda3dTraceModelId || boneData == nullptr || boneCount <= 0) {
+        return;
+    }
+
+    const Zelda3DGlGroup* groups = nullptr;
+    int groupCount = 0;
+    if (!Fast::Zelda3DSdl3GpuResources::ModelSource(modelId, &groups, &groupCount)) {
+        return;
+    }
+
+    std::array<float, 3> ndcMin = { INFINITY, INFINITY, INFINITY };
+    std::array<float, 3> ndcMax = { -INFINITY, -INFINITY, -INFINITY };
+    int vertexCount = 0;
+    int frontCount = 0;
+    int insideCount = 0;
+    int invalidBoneCount = 0;
+    float minWeightSum = INFINITY;
+    float maxWeightSum = -INFINITY;
+    for (int groupIndex = 0; groupIndex < groupCount; ++groupIndex) {
+        const Zelda3DGlGroup& group = groups[groupIndex];
+        if (group.cull || (group.meshId >= 0 && group.meshId < 64 && ((visibleMeshMask >> group.meshId) & 1ull) == 0)) {
+            continue;
+        }
+        for (int vertexIndex = 0; vertexIndex < group.vertCount; ++vertexIndex) {
+            const Zelda3DGlVtx& vertex = group.verts[vertexIndex];
+            std::array<float, 4> skinned = { 0.0f, 0.0f, 0.0f, 0.0f };
+            float weightSum = 0.0f;
+            bool valid = true;
+            for (int influence = 0; influence < 4; ++influence) {
+                const int boneIndex = static_cast<int>(vertex.boneIds[influence]);
+                const float weight = vertex.weights[influence];
+                weightSum += weight;
+                if (weight == 0.0f) {
+                    continue;
+                }
+                if (boneIndex < 0 || boneIndex >= boneCount) {
+                    valid = false;
+                    continue;
+                }
+                const float* bone = boneData + boneIndex * 16;
+                for (int row = 0; row < 4; ++row) {
+                    skinned[row] += weight * (bone[row * 4] * vertex.pos[0] + bone[row * 4 + 1] * vertex.pos[1] +
+                                              bone[row * 4 + 2] * vertex.pos[2] + bone[row * 4 + 3]);
+                }
+            }
+            ++vertexCount;
+            minWeightSum = std::min(minWeightSum, weightSum);
+            maxWeightSum = std::max(maxWeightSum, weightSum);
+            if (!valid) {
+                ++invalidBoneCount;
+                continue;
+            }
+
+            std::array<float, 4> clip{};
+            for (int row = 0; row < 4; ++row) {
+                const float aspect = row == 0 ? aspectAdjustment : 1.0f;
+                clip[row] = aspect * (modelProjection[row] * skinned[0] + modelProjection[4 + row] * skinned[1] +
+                                      modelProjection[8 + row] * skinned[2] + modelProjection[12 + row] * skinned[3]);
+            }
+            if (!(clip[3] > 0.0f) || !std::isfinite(clip[3])) {
+                continue;
+            }
+            ++frontCount;
+            const std::array<float, 3> ndc = { clip[0] / clip[3], clip[1] / clip[3], clip[2] / clip[3] };
+            if (!std::isfinite(ndc[0]) || !std::isfinite(ndc[1]) || !std::isfinite(ndc[2])) {
+                continue;
+            }
+            for (int axis = 0; axis < 3; ++axis) {
+                ndcMin[axis] = std::min(ndcMin[axis], ndc[axis]);
+                ndcMax[axis] = std::max(ndcMax[axis], ndc[axis]);
+            }
+            if (std::abs(ndc[0]) <= 1.0f && std::abs(ndc[1]) <= 1.0f && std::abs(ndc[2]) <= 1.0f) {
+                ++insideCount;
+            }
+        }
+    }
+    std::fprintf(stderr,
+                 "[MPCLIP] model=%d verts=%d front=%d inside=%d badbone=%d weights=(%.4f,%.4f) "
+                 "ndc=(%.3f,%.3f,%.3f)..(%.3f,%.3f,%.3f)\n",
+                 modelId, vertexCount, frontCount, insideCount, invalidBoneCount, minWeightSum, maxWeightSum, ndcMin[0],
+                 ndcMin[1], ndcMin[2], ndcMax[0], ndcMax[1], ndcMax[2]);
+}
+
+} // namespace
 
 // ---- Shared scene/light/effect globals (owned by zelda3d_gl.cpp, set per frame by zelda3d.c) ----
 extern "C" float gZelda3dLightDirWorld[3];
@@ -234,11 +324,23 @@ void Fast::Zelda3DRenderer::DrawModel(int modelId, const float* mp16, const floa
         static_cast<const std::unordered_map<int, Zelda3DMatConstOv>*>(matConst);
     const std::unordered_map<int, Zelda3DMatUvOv>* matUvMap =
         static_cast<const std::unordered_map<int, Zelda3DMatUvOv>*>(matUv);
-    if (!g_ctxValid || mp16 == nullptr || mv16 == nullptr)
+    if (!g_ctxValid || mp16 == nullptr || mv16 == nullptr) {
+        if (modelId == gZelda3dTraceModelId) {
+            std::fprintf(stderr, "[MPDROP] model=%d context=%d mp=%d mv=%d\n", modelId, g_ctxValid ? 1 : 0,
+                         mp16 != nullptr ? 1 : 0, mv16 != nullptr ? 1 : 0);
+        }
         return;
+    }
     SgModel* m = ensureUploaded(modelId);
-    if (!m || !m->vbo)
+    if (!m || !m->vbo) {
+        if (modelId == gZelda3dTraceModelId) {
+            std::fprintf(stderr, "[MPDROP] model=%d upload=%d vbo=%d\n", modelId, m != nullptr ? 1 : 0,
+                         m != nullptr && m->vbo != nullptr ? 1 : 0);
+        }
         return;
+    }
+
+    TraceSkinnedClipBounds(modelId, mp16, boneData, boneCnt, midMask, aspectAdj);
 
     // Geometry-value capture (geomscan): world AABB = local AABB transformed by mv16 (model->world,
     // column-major to match the shader's ubo.uMV * pos). One record per visible draw; the #115/#120

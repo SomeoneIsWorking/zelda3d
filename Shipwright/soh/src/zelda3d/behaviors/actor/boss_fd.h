@@ -6,6 +6,17 @@
 
 namespace Zelda3D {
 
+struct BossFdRenderStatus {
+    static constexpr int kModelCount = 8;
+    int modelIds[kModelCount]{};
+    long submitCounts[kModelCount]{};
+    int drawAttempts = 0;
+    int drawSuccesses = 0;
+    int skinSegments = 0;
+};
+
+bool bossFdRenderStatus(Actor* actor, BossFdRenderStatus* outStatus);
+
 class BossFdBehavior : public ActorBehavior {
   public:
     s16 actorId() const override;

@@ -1,5 +1,7 @@
 #include "render_debug_commands.h"
 
+#include <fast/zelda3d_instrumentation.h>
+
 #include <cstdint>
 
 #include "oracle_render_debug_bridge.h"
@@ -88,6 +90,24 @@ bool HandleCommand(const std::string& cmd, std::istringstream& toks) {
         gSoh3dDepthDumpPending = 1;
         HarnessSohRuntime::AdvanceFrame("soh_depthdump/RunFrame");
         std::printf("ok soh_depthdump %s\n", path.c_str());
+    } else if (cmd == "soh_model_trace") {
+        handled = true;
+        std::string model;
+        if (!(toks >> model)) {
+            PrintErr("soh_model_trace: usage: soh_model_trace <modelId|off>");
+            return true;
+        }
+        if (model == "off") {
+            gZelda3dTraceModelId = -1;
+        } else {
+            const auto parsed = ParseNum(model);
+            if (!parsed) {
+                PrintErr("soh_model_trace: modelId must be an integer or off");
+                return true;
+            }
+            gZelda3dTraceModelId = static_cast<int>(*parsed);
+        }
+        std::printf("ok soh_model_trace %d\n", gZelda3dTraceModelId);
     }
     return handled;
 }

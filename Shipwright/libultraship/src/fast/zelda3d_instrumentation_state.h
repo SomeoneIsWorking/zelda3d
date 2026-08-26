@@ -5,6 +5,7 @@
 namespace Zelda3DFast {
 
 void RecordSubmission(int modelId);
+void ReportProgress();
 
 } // namespace Zelda3DFast
 

@@ -36,12 +36,21 @@ struct BossFdNativeInputs {
     float displacement[3];
 };
 
+struct BossFdRenderInfo {
+    int modelIds[8];
+    long submitCounts[8];
+    int drawAttempts;
+    int drawSuccesses;
+    int skinSegments;
+};
+
 extern "C" {
 int SohState_BossFdAuthoredState(BossFdAuthoredState* outState, float* outPos3, float* outRot3, int capacity);
 int SohState_BossFdNativeInputs(BossFdNativeInputs* outInputs);
 int SohState_BossFdIdentity(std::uintptr_t* outAddress);
 int SohState_BossFdForceFlight(std::uintptr_t* outAddress);
 int SohState_BossFdForceFlightSeeded(const float* pos3, const short* rot3, std::uintptr_t* outAddress);
+int SohState_BossFdRenderInfo(BossFdRenderInfo* outInfo);
 }
 
 #endif // ZELDA3D_TOOLS_SOH3D_HARNESS_SOH_BOSS_FD_STATE_H

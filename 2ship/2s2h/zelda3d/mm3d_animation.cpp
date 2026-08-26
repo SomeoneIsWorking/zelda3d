@@ -14,8 +14,10 @@
 #include <fast/zelda3d_pose.h>
 
 #include "asset/csab.h"
+#include "mm3d_animation_playhead.h"
 #include "mm3d_model_store.h"
 #include "mm3d_phase_diagnostics.h"
+#include "mm3d_player_animation.h"
 
 namespace Zelda3D::MM3D {
 namespace {
@@ -27,17 +29,8 @@ struct CapturedAnimation {
     float morphWeight = 0.0f;
 };
 
-struct ActorPlayhead {
-    float frame = 0.0f;
-    bool hasFrame = false;
-    std::string lastCsab;
-    float lastFrame = 0.0f;
-    std::string morphOut;
-    float morphOutFrame = 0.0f;
-};
-
 std::unordered_map<void*, CapturedAnimation> g_capturedAnimations;
-std::unordered_map<const void*, ActorPlayhead> g_playheads;
+std::unordered_map<const void*, ActorAnimationPlayhead> g_playheads;
 
 struct AnimationAssets {
     std::unordered_map<std::string, std::unique_ptr<Csab>> clips;
@@ -117,7 +110,7 @@ const char* DefaultCsab(int modelId, LoadedModel& model) {
 }
 
 Csab* LoadAnimation(int modelId, LoadedModel& model, const char* baseName) {
-    if (baseName == nullptr || baseName[0] == '\0' || model.gar == nullptr) {
+    if (baseName == nullptr || baseName[0] == '\0') {
         return nullptr;
     }
     std::string key(baseName);
@@ -125,16 +118,22 @@ Csab* LoadAnimation(int modelId, LoadedModel& model, const char* baseName) {
     if (const auto found = assets.clips.find(key); found != assets.clips.end()) {
         return found->second.get();
     }
+    const bool playerModel = IsPlayerAnimationModel(modelId);
+    const Gar* archive = playerModel ? PlayerAnimationArchive(modelId) : model.gar.get();
+    if (archive == nullptr) {
+        return nullptr;
+    }
     const GarFile* animationFile = nullptr;
-    for (const auto& file : model.gar->files()) {
-        if (file.type == "csab" && file.name == key) {
+    for (const auto& file : archive->files()) {
+        const bool matches = playerModel ? file.path == key : file.name == key;
+        if (file.type == "csab" && matches) {
             animationFile = &file;
             break;
         }
     }
     std::unique_ptr<Csab> animation;
     if (animationFile != nullptr) {
-        animation = std::make_unique<Csab>(model.gar->read(*animationFile));
+        animation = std::make_unique<Csab>(archive->read(*animationFile));
         if (!animation->ok()) {
             fprintf(stderr, "[MM3D] Csab %s: %s\n", key.c_str(), animation->error().c_str());
             animation.reset();
@@ -199,7 +198,8 @@ void DriveAnimation(int modelId, const void* actorKey, const char* name, float r
         SampleAnimation(modelId, nullptr, 0.0f);
         return;
     }
-    ActorPlayhead& playhead = g_playheads[actorKey];
+    ActorAnimationPlayhead& playhead = g_playheads[actorKey];
+    playhead.beginModel(modelId);
     LoadedModel* model = LoadModel(modelId);
     float duration = 0.0f;
     if (model != nullptr && model->ok && model->cmb != nullptr) {
@@ -259,16 +259,25 @@ const char* ApplyCapturedAnimation(int modelId, const void* jointTable) {
         morphWeight = captured->second.morphWeight;
     }
 
-    const char* csab = ResolveCsab(animationOtr);
+    const bool playerModel = IsPlayerAnimationModel(modelId);
+    const char* csab = nullptr;
+    if (playerModel) {
+        csab = ResolvePlayerAnimationPath(modelId, animationOtr);
+    } else {
+        csab = ResolveCsab(animationOtr);
+    }
     if (csab == nullptr) {
-        if (LoadedModel* model = LoadModel(modelId); model != nullptr) {
-            csab = DefaultCsab(modelId, *model);
+        if (!playerModel) {
+            LoadedModel* model = LoadModel(modelId);
+            if (model != nullptr) {
+                csab = DefaultCsab(modelId, *model);
+            }
         }
         if (animationOtr != nullptr) {
             static std::set<std::string> seen;
             if (seen.insert(animationOtr).second) {
-                fprintf(stderr, "[MM3D-ANIM] model=%d unmapped n64='%s' -> default '%s'\n", modelId, animationOtr,
-                        csab == nullptr ? "(none)" : csab);
+                fprintf(stderr, "[MM3D-ANIM] model=%d unmapped n64='%s' -> %s '%s'\n", modelId, animationOtr,
+                        playerModel ? "exact player route" : "default", csab == nullptr ? "(none)" : csab);
             }
         }
     }

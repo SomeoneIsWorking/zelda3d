@@ -9,6 +9,8 @@ extern "C" {
 extern int gZelda3dCamOverride;
 extern float gZelda3dCamEye[3];
 extern float gZelda3dCamAt[3];
+extern float gZelda3dCamFov;
+extern int gZelda3dCamFovOverride;
 
 #ifdef __cplusplus
 }

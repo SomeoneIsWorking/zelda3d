@@ -116,8 +116,10 @@ Current application boundaries:
 - The SDL3GPU model renderer mirrors that boundary internally: `zelda3d_sdl3gpu.cpp` is only the
   stable C ABI adapter; model/texture upload caches, shader/pipeline caches, pass recording and
   diagnostics, device teardown, and shader source/compilation each have a responsibility-named
-  sibling. The private internal header exposes only the provider, pipeline-policy, and submission-
-  probe seams needed between those owners.
+  sibling. Backend device/subsystem startup is extracted from the legacy backend monolith into
+  `backends/gfx_sdl3gpu_initialization.cpp`; shader creation is an explicit startup gate rather than
+  a first-frame side effect. The private internal header exposes only the provider, pipeline-policy,
+  and diagnostic/submission seams needed between those owners.
 - RmlUi Zelda3D menu state, input automation, launcher, diagnostics, and registry bridges live in
   separate `Zelda3D*Bridge`/`Zelda3DRmlUiRegistry` owners; randomizer actor-check resolution,
   generation bridge, lifecycle, and policy likewise live outside `randomizer.cpp`.
@@ -128,7 +130,8 @@ Current application boundaries:
   capture, REPL, watchdog, and process-lifetime modules; it contains no subsystem implementation.
   SoH state is split into typed play/environment/player/actor/input/warp/lighting/camera/animation
   owners, and oracle comparisons are split by scene, player, camera, skeleton, lighting, and title
-  actor responsibility.
+  actor responsibility. `paired_camera_control.*` owns the paired gameplay-camera hold, while the
+  watchdog consumes renderer upload heartbeats without owning renderer policy.
 - `tools/harness_cli.py` is the public harness client; allocator, build, cache, gameplay, headless
   display, paths, process, ROM environment, runtime inputs, transport, and shared repository
   environment each have focused Python owners. The former `harness_ctl.py` facade is deleted.

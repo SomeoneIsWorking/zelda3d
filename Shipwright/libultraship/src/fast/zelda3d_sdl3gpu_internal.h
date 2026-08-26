@@ -12,6 +12,10 @@ namespace Fast::Zelda3DSdl3GpuResources {
 // retains it so a recreated backend can upload from the same game-facing model source.
 void SetModelProvider(Zelda3DModelProvider provider);
 
+// Return the stable game-owned source view for renderer diagnostics. The resource owner remains the
+// sole authority for the configured provider; callers must not retain the returned pointers.
+bool ModelSource(int modelId, const Zelda3DGlGroup** groups, int* groupCount);
+
 } // namespace Fast::Zelda3DSdl3GpuResources
 
 namespace Fast::Zelda3DSdl3GpuPipeline {

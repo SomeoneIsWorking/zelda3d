@@ -147,6 +147,11 @@ class Zelda3DRenderer {
     void EndPass();
     void ClearOverlayDepth(); // #146 item B — fullscreen depth-only reset, in-pass, no color write.
 
+    // Compile the fixed renderer shaders while the backend is initializing. Failure is fatal to the
+    // Zelda3D target; deferring this to the first frame would turn an invalid shader into a black
+    // world and repeatedly retry it during rendering.
+    bool initializeGpuResources();
+
     // ---- internal helpers (former anonymous-namespace functions) ----
     // Hand every GPU object this renderer OWNS back to the device, before the device is destroyed.
     //

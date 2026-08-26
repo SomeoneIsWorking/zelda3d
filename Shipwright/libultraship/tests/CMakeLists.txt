@@ -57,7 +57,7 @@ target_link_libraries(lus_tests PRIVATE
     gtest_main
 )
 
-target_compile_definitions(lus_tests PRIVATE SPDLOG_ACTIVE_LEVEL=SPDLOG_LEVEL_OFF)
+target_compile_definitions(lus_tests PRIVATE ENABLE_SDL3GPU SPDLOG_ACTIVE_LEVEL=SPDLOG_LEVEL_OFF)
 
 include(GoogleTest)
 gtest_discover_tests(lus_tests)

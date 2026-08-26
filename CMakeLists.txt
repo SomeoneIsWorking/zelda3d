@@ -345,6 +345,15 @@ add_subdirectory(${ZELDA3D_SHARED_DIR} ${CMAKE_BINARY_DIR}/zelda3d_shared)
 add_subdirectory(${ZELDA3D_OOT_DIR} ${CMAKE_BINARY_DIR}/soh)
 add_subdirectory(${ZELDA3D_MM_DIR} ${CMAKE_BINARY_DIR}/mm)
 
+if(LUS_BUILD_TESTS)
+    add_executable(mm3d_player_animation_policy_test
+        tools/mm3d_player_animation_policy_test.cpp
+        2ship/2s2h/zelda3d/mm3d_player_animation_policy.cpp
+    )
+    target_include_directories(mm3d_player_animation_policy_test PRIVATE ${ZELDA3D_MM_DIR})
+    add_test(NAME mm3d_player_animation_policy_test COMMAND mm3d_player_animation_policy_test)
+endif()
+
 ################################################################################
 # LAUNCHER — the one binary. Must come after both games, since it depends on
 # their core targets. Holds no game code itself — see zelda3d_app/zelda3d_main.cpp.

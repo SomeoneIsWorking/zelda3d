@@ -12,6 +12,7 @@
 #include "asset/mat4.h"
 #include "fast/zelda3d_material_overrides.h"
 #include "overlays/actors/ovl_Boss_Fd/z_boss_fd.h"
+#include "fast/zelda3d_instrumentation.h"
 
 #include <algorithm>
 #include <array>
@@ -19,6 +20,9 @@
 #include <cstdlib>
 
 namespace {
+
+int gDrawAttempts = 0;
+int gDrawSuccesses = 0;
 
 using Zelda3D::BossFdFlight::kBinangToRad;
 using Zelda3D::BossFdFlight::kBodyHistoryOffset;
@@ -381,6 +385,25 @@ void drawManeChain(PlayState* play, BossFd* boss, const State& state, int modelI
 
 namespace Zelda3D {
 
+bool bossFdRenderStatus(Actor* actor, BossFdRenderStatus* outStatus) {
+    if (actor == nullptr || actor->id != ACTOR_BOSS_FD || outStatus == nullptr) {
+        return false;
+    }
+    const FlyingModels& currentModels = models();
+    const int modelIds[BossFdRenderStatus::kModelCount] = {
+        currentModels.body,     currentModels.head,      currentModels.leftArm,   currentModels.rightArm,
+        currentModels.fireHair, currentModels.deathBody, currentModels.deathHead, currentModels.particles,
+    };
+    for (int index = 0; index < BossFdRenderStatus::kModelCount; ++index) {
+        outStatus->modelIds[index] = modelIds[index];
+        outStatus->submitCounts[index] = Zelda3D_GL_SubmitCount(modelIds[index]);
+    }
+    outStatus->drawAttempts = gDrawAttempts;
+    outStatus->drawSuccesses = gDrawSuccesses;
+    outStatus->skinSegments = reinterpret_cast<BossFd*>(actor)->skinSegments;
+    return true;
+}
+
 s16 BossFdBehavior::actorId() const {
     return ACTOR_BOSS_FD;
 }
@@ -395,6 +418,7 @@ bool BossFdBehavior::tryDrawModel(PlayState* play, Actor* actor) {
     if (!play || !actor || actor->id != ACTOR_BOSS_FD)
         return false;
     BossFd* boss = reinterpret_cast<BossFd*>(actor);
+    ++gDrawAttempts;
     FlyingModels& m = models();
     if (m.body <= 0 || m.head <= 0 || m.leftArm <= 0 || m.rightArm <= 0 || m.fireHair <= 0 || m.deathBody <= 0 ||
         m.deathHead <= 0 || m.particles <= 0) {
@@ -426,6 +450,7 @@ bool BossFdBehavior::tryDrawModel(PlayState* play, Actor* actor) {
     BossFdEffects::applyOverride(boss);
     drawParticles(play, boss, m.particles);
 
+    ++gDrawSuccesses;
     return true;
 }
 

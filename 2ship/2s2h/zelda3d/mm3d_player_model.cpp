@@ -1,6 +1,7 @@
 #include "mm3d_player_model.h"
 
 #include "mm3d_model_catalog.h"
+#include "mm3d_player_animation.h"
 #include "mm3d_player_model_policy.h"
 #include "global.h"
 
@@ -44,6 +45,7 @@ extern "C" int Zelda3D_MM_LookupPlayerModel(int playerForm, int* modelId, float*
     if (spec == nullptr) {
         return 0;
     }
+    RegisterPlayerAnimationModel(resolved, form);
     if (modelId != nullptr) {
         *modelId = resolved;
     }

@@ -8,6 +8,7 @@
 #include "core/memory.h"
 #include "oracle_layout.h"
 #include "oracle_state.h"
+#include "paired_camera_control.h"
 #include "repl_protocol.h"
 #include "soh_play_state.h"
 #include "soh_runtime.h"
@@ -53,6 +54,9 @@ void HandleForce(std::istringstream& toks) {
                              "  bossfd_fault <apply|restore>\n"
                              "                    reversibly corrupt one non-lead oracle history\n"
                              "                    sample for a required DIVERGED falsifier.\n"
+                             "  camera <eye xyz> <at xyz> <fov>\n"
+                             "                    hold one explicit gameplay camera on both engines.\n"
+                             "  camera_off         release the paired gameplay camera hold.\n"
                              "\n"
                              "Not yet implemented (needs gamestate-machinery RE):\n"
                              "  gamestate <name>  jump both engines out of the current\n"
@@ -63,6 +67,9 @@ void HandleForce(std::istringstream& toks) {
         return;
     }
     if (HarnessBossFdControl::HandleForce(sub, toks)) {
+        return;
+    }
+    if (HarnessPairedCameraControl::HandleForce(sub, toks)) {
         return;
     }
     if (sub == "warp") {
