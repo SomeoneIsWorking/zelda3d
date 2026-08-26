@@ -65,6 +65,13 @@ int main() {
     divergence.position[141 * 3] = static_cast<float>(HarnessBossFdComparison::kPositionTolerance + 0.001);
     assert(divergence.evaluate().status == BossFdCompareStatus::Diverged);
 
+    Fixture warming;
+    warming.authored.sampleCount = 1;
+    warming.authored.visualPos[0] = 3.0F;
+    const auto warmingResult = warming.evaluate();
+    assert(warmingResult.status == BossFdCompareStatus::Missing);
+    assert(warmingResult.producerPositionDelta == 3.0);
+
     Fixture wrappedRotation;
     constexpr float kPi = 3.14159265358979323846F;
     wrappedRotation.oracle.historyRot[141 * 3] = kPi - 0.0002F;
@@ -78,8 +85,8 @@ int main() {
     Fixture profileTolerance;
     profileTolerance.native.targetPosition[0] = kTargetX + 0.0005F;
     assert(HarnessBossFdProfile::MatchesComparisonScope(profileTolerance.oracle, profileTolerance.native,
-                                                       profileTolerance.authored, 0.001F));
+                                                        profileTolerance.authored, 0.001F));
     assert(!HarnessBossFdProfile::MatchesComparisonScope(profileTolerance.oracle, profileTolerance.native,
-                                                        profileTolerance.authored, 0.0001F));
+                                                         profileTolerance.authored, 0.0001F));
     return 0;
 }

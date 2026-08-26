@@ -211,28 +211,29 @@ void SkelAnime_DrawFlexLod(PlayState* play, void** skeleton, Vec3s* jointTable, 
     Gfx* limbDList;
     Vec3f pos;
     Vec3s rot;
-    Mtx* mtx = GRAPH_ALLOC(play->state.gfxCtx, dListCount * sizeof(Mtx));
+    Mtx* mtx;
 
     if (skeleton == NULL) {
         return;
     }
 
-    // What this function was actually handed, gated on ZELDA3D_SKELLOG=1.
-    //
-    // MM's third core in `mm,oot,mm` SIGSEGVs two lines below, dereferencing rootLimb. The crash
-    // handler's register dump showed RDI = 0x0000010100000103 -- packed data, not a pointer -- so
-    // `skeleton` is not a limb table at all, and nothing at the crash site says where it came from.
-    //
-    // Logged for the FIRST few calls in every run rather than only when something looks wrong,
-    // because the useful comparison is `mm,mm` (which passes) against `mm,oot,mm` (which does not):
-    // a check that only fires on the bad run cannot show what the good one does instead. skeleton[0]
-    // is read here rather than after Lib_SegmentedToVirtual so the raw stored value is visible --
-    // that is the value that is wrong.
+    // Player_DrawImpl reaches MM3D through this LOD-specific seam.
+    if (Zelda3D_MM_InterceptSkelAnime(play, actor, skeleton, jointTable)) {
+        Gfx* opaP = play->state.gfxCtx->polyOpa.p;
+        Gfx* xluP = play->state.gfxCtx->polyXlu.p;
+        gZelda3dMmColliderPass = 1;
+        SkelAnime_DrawFlexLod(play, skeleton, jointTable, dListCount, overrideLimbDraw, postLimbDraw, actor, lod);
+        gZelda3dMmColliderPass = 0;
+        play->state.gfxCtx->polyOpa.p = opaP;
+        play->state.gfxCtx->polyXlu.p = xluP;
+        return;
+    }
+    mtx = GRAPH_ALLOC(play->state.gfxCtx, dListCount * sizeof(Mtx));
+
+    // Log novel raw tuples before converting a possibly invalid skeleton[0].
     {
-        // Capped by NOVELTY, not by count. The first version of this printed the first 8 calls and
-        // showed eight identical, perfectly healthy lines -- because Player_DrawFlexLod runs every
-        // frame and the interesting call is whichever one FIRST differs, thousands of frames in. A
-        // count cap reports the boring case and hides the only case worth seeing.
+        // Cap by novelty: Player_DrawFlexLod otherwise exhausts a count cap before the
+        // interesting skeleton appears.
         static int sSkelCalls = 0;
         static int sSkelPrints = 0;
         static void* sLastSkel = NULL;
@@ -253,8 +254,7 @@ void SkelAnime_DrawFlexLod(PlayState* play, void** skeleton, Vec3s* jointTable, 
                 sSkelPrints++;
                 // The call number is printed so the gap since the last change is visible: a value
                 // that changes once at call 3 and one that changes every frame are different bugs.
-                fprintf(stderr,
-                        "MM3D SKEL: call %d (change %d) -- skeleton=%p skeleton[0]=%p dListCount=%d lod=%d\n",
+                fprintf(stderr, "MM3D SKEL: call %d (change %d) -- skeleton=%p skeleton[0]=%p dListCount=%d lod=%d\n",
                         sSkelCalls, sSkelPrints, (void*)skeleton, (void*)skeleton[0], (int)dListCount, (int)lod);
                 fflush(stderr);
             }
@@ -649,7 +649,7 @@ void SkelAnime_DrawTransformFlexOpa(PlayState* play, void** skeleton, Vec3s* joi
         Gfx* xluP = play->state.gfxCtx->polyXlu.p;
         gZelda3dMmColliderPass = 1;
         SkelAnime_DrawTransformFlexOpa(play, skeleton, jointTable, dListCount, overrideLimbDraw, postLimbDraw,
-                                        transformLimbDraw, actor);
+                                       transformLimbDraw, actor);
         gZelda3dMmColliderPass = 0;
         play->state.gfxCtx->polyOpa.p = opaP;
         play->state.gfxCtx->polyXlu.p = xluP;
@@ -1434,8 +1434,8 @@ void PlayerAnimation_SetUpdateFunction(SkelAnime* skelAnime) {
  */
 s32 PlayerAnimation_Update(PlayState* play, SkelAnime* skelAnime) {
     s32 ret = skelAnime->update.player(play, skelAnime);
-    Zelda3D_MM_CaptureAnimState(skelAnime->jointTable, skelAnime->animation, skelAnime->curFrame,
-                               skelAnime->animLength, skelAnime->morphWeight);
+    Zelda3D_MM_CaptureAnimState(skelAnime->jointTable, skelAnime->animation, skelAnime->curFrame, skelAnime->animLength,
+                                skelAnime->morphWeight);
     return ret;
 }
 
@@ -1818,8 +1818,8 @@ s32 SkelAnime_Update(SkelAnime* skelAnime) {
     s32 ret = skelAnime->update.normal(skelAnime);
     // Capture the live N64 anim identity + playhead for the MM3D CSAB path (keyed by jointTable,
     // the only handle the draw choke shares). skelAnime->animation holds the ogAnim OTR path.
-    Zelda3D_MM_CaptureAnimState(skelAnime->jointTable, skelAnime->animation, skelAnime->curFrame,
-                               skelAnime->animLength, skelAnime->morphWeight);
+    Zelda3D_MM_CaptureAnimState(skelAnime->jointTable, skelAnime->animation, skelAnime->curFrame, skelAnime->animLength,
+                                skelAnime->morphWeight);
     return ret;
 }
 

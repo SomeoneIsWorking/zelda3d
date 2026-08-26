@@ -69,9 +69,10 @@ extern "C" {
 int Zelda3D_BossFdHistoryInfo(Actor* actor, int* bodyLead, int* maneLead, Vec3f* minPos, Vec3f* maxPos,
                               int* sampleCount);
 int Zelda3D_BossFdAuthoredStateSnapshot(Actor* actor, int* outLead, int* outSampleCount, int* outAuthoredMoveTimer,
-                                        float* outVisualPos3, short* outVisualRot3, float* outVisualSpeed,
-                                        float* outVisualTurnRate, float* outAppliedFlySpeedControl,
-                                        float* outBodyPos3, float* outBodyRot3, int capacity);
+                                        float* outVisualPos3, short* outVisualRot3, float* outVisualVelocity3,
+                                        float* outVisualSpeed, float* outVisualTurnRate,
+                                        float* outAppliedFlySpeedControl, float* outBodyPos3, float* outBodyRot3,
+                                        int capacity);
 }
 
 #endif // ZELDA3D_BEHAVIORS_ACTOR_BOSS_FD_AUTHORED_FLIGHT_H

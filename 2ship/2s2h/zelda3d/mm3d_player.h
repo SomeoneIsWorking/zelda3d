@@ -1,11 +1,7 @@
-// mm3d_player — MM's dedicated Link-render seam (Stage 1 of the MM/OoT Link unification,
-// see scratch/plans/mm_oot_link_unify.md). Mirrors OoT's Zelda3D_TryDrawPlayer surface.
-//
-// z_player.c's primary back-cull Player_DrawGameplay call guards on this: when the hook
-// returns 1, the vanilla N64 draw is skipped and the MM3D replacement was emitted
-// instead. Returns 0 today unless MM_ZELDA3D_LINK is set, in which case it delegates to
-// the generic actor path (Zelda3D_TryDrawActor) — no per-form policy yet. Stage 2 grows
-// the MmPlayerBehavior subclass on top of this seam.
+// mm3d_player — MM's dedicated Link-render seam. The hook selects the retail MM3D body
+// archive for the live transformation and defers its skinned replacement to Player_DrawImpl's
+// SkelAnime_DrawFlexLod call. Mesh/equipment policy and the shared player animation archive
+// remain separate later stages, so MM_ZELDA3D_LINK stays opt-in.
 #pragma once
 #include "global.h" // PlayState, Actor
 
@@ -13,7 +9,8 @@
 extern "C" {
 #endif
 
-// 1 = MM3D replacement drew, skip vanilla N64. 0 = fall through to Player_DrawGameplay.
+// Currently returns 0 so Player_DrawGameplay supplies its live skeleton and post-limb callbacks.
+// With a resolved form model, the SkelAnime seam replaces that draw; otherwise it stays vanilla.
 int Zelda3D_TryDrawPlayer(PlayState* play, Actor* actor);
 
 #ifdef __cplusplus

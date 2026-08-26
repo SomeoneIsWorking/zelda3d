@@ -56,6 +56,7 @@ Result Evaluate(const HarnessBossFdOracle::State& oracle, const BossFdAuthoredSt
         authored.sampleCount > BOSS_FD_HISTORY_COUNT || oracle.bodyLead < 0 ||
         oracle.bodyLead >= BOSS_FD_HISTORY_COUNT || !IsFinite(sohPosition.data(), sohPosition.size()) ||
         !IsFinite(sohRotation.data(), sohRotation.size()) || !IsFinite(authored.visualPos, 3) ||
+        !IsFinite(authored.visualVelocity, 3) || !IsFinite(oracle.velocity.data(), oracle.velocity.size()) ||
         !std::isfinite(authored.visualSpeed) || !std::isfinite(authored.visualTurnRate)) {
         return Finish(BossFdCompareStatus::Invalid, Reason::InvalidSnapshot);
     }
@@ -71,10 +72,6 @@ Result Evaluate(const HarnessBossFdOracle::State& oracle, const BossFdAuthoredSt
     if (sohScene != oracle.scene || native.action != oracle.action || authored.authoredMoveTimer != oracle.moveTimer) {
         return Finish(BossFdCompareStatus::Invalid, Reason::UnpairedState);
     }
-    if (authored.sampleCount < BOSS_FD_HISTORY_COUNT) {
-        return Finish(BossFdCompareStatus::Missing, Reason::InsufficientHistory);
-    }
-
     Result result;
     constexpr float kBinangToRad = 3.14159265358979323846F / 32768.0F;
     const float authoredRotation[] = { authored.visualRot[0] * kBinangToRad, authored.visualRot[1] * kBinangToRad,
@@ -83,8 +80,14 @@ Result Evaluate(const HarnessBossFdOracle::State& oracle, const BossFdAuthoredSt
                                      oracle.worldRot[2] * kBinangToRad };
     result.producerPositionDelta = VectorDistance(oracle.worldPos.data(), authored.visualPos);
     result.producerRotationDelta = RotationDistance(oracleRotation, authoredRotation);
+    result.producerVelocityDelta = VectorDistance(oracle.velocity.data(), authored.visualVelocity);
     result.producerSpeedDelta = std::abs(static_cast<double>(authored.visualSpeed) - oracle.speed);
     result.producerTurnDelta = std::abs(static_cast<double>(authored.visualTurnRate) - oracle.controls[1]);
+    if (authored.sampleCount < BOSS_FD_HISTORY_COUNT) {
+        result.status = BossFdCompareStatus::Missing;
+        result.reason = Reason::InsufficientHistory;
+        return result;
+    }
 
     for (int offset : Zelda3D::BossFdHistoryLayout::kBodyOffset) {
         const int oracleIndex = (oracle.bodyLead + offset) % BOSS_FD_HISTORY_COUNT;

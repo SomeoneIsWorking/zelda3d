@@ -67,6 +67,23 @@ class MmPlayerContractTests(unittest.TestCase):
             declaration = re.compile(rf"^(?:void|int) {symbol}\([^\n]*\);", re.MULTILINE)
             self.assertNotRegex(lifecycle, declaration, f"lifecycle restored a local declaration for {symbol}")
 
+    def test_player_model_selection_reaches_lod_skeleton_seam(self) -> None:
+        player = (MM / "mm3d_player.c").read_text()
+        self.assertIn("Zelda3D_MM_LookupPlayerModel(player->transformation", player)
+        self.assertIn("Zelda3D_MM_SetPending(actor, modelId, worldScale, groundOffset);", player)
+
+        skelanime = (REPO / "2ship" / "src" / "code" / "z_skelanime.c").read_text()
+        lod_walker = re.search(
+            r"void SkelAnime_DrawFlexLod\(.*?\n}\n\n",
+            skelanime,
+            re.DOTALL,
+        )
+        self.assertIsNotNone(lod_walker)
+        self.assertIn("Zelda3D_MM_InterceptSkelAnime(play, actor, skeleton, jointTable)", lod_walker.group())
+        self.assertIn("gZelda3dMmColliderPass = 1;", lod_walker.group())
+        self.assertIn("play->state.gfxCtx->polyOpa.p = opaP;", lod_walker.group())
+        self.assertIn("play->state.gfxCtx->polyXlu.p = xluP;", lod_walker.group())
+
     def test_focused_owners_stay_below_source_ceiling(self) -> None:
         owners = (
             MM / "mm3d_player_force.c",
@@ -74,6 +91,12 @@ class MmPlayerContractTests(unittest.TestCase):
             MM / "mm3d_link_state.c",
             MM / "mm3d_link_state.h",
             MM / "mm3d_core_lifecycle.c",
+            MM / "mm3d_player.c",
+            MM / "mm3d_player.h",
+            MM / "mm3d_player_model.cpp",
+            MM / "mm3d_player_model.h",
+            MM / "mm3d_player_model_policy.cpp",
+            MM / "mm3d_player_model_policy.h",
             MM / "repl" / "mm3d_link_repl.c",
             MM / "repl" / "mm3d_link_repl.h",
             PLAYER_OVERLAY / "z_player_overlay.h",

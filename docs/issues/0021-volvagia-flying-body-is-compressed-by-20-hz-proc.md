@@ -5,7 +5,7 @@ status: investigating
 symptom: Flying Volvagia renders with a shortened/compressed articulated body because the 150-entry OoT3D history is populated at the host 20 Hz cadence instead of the producer 30 Hz cadence
 tags: volvagia,boss-fd,history,cadence,render
 created: 2026-08-24
-updated: 2026-08-24
+updated: 2026-08-26
 ---
 
 ## Root cause
@@ -34,3 +34,16 @@ the body and death-head controllers remain at frame zero.
   the authoritative `Actor_Delete` seam and resets between core runs.
 
 ## Resolution
+
+The shipping owner now emits one then two authored ticks on alternating 20 Hz
+host updates, reproducing the 30 Hz producer without floating cadence drift.
+Each authored tick uses the decompiled unit integration scalar, exact
+interpolated OoT3D sine/cosine table, and `FUN_003696EC` atan2 polynomial.
+
+The embedded-oracle forced-profile gate reached exact zero-delta through 270
+authored ticks for position, rotation, velocity, speed, turn, move timer, and
+the sampled 150-entry body ring. Its positive control changed one history X
+sample by 1000 and reported `DIVERGED` (`meanPos=50`, `maxPos=1000`), then
+returned exact `MATCH` after restoration. The issue remains investigating
+until the live user-facing flying-body view is captured; the comparator scope
+does not cover general action/death sequencing.

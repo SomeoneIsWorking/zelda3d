@@ -31,6 +31,7 @@ struct Result {
     Reason reason = Reason::InvalidSnapshot;
     double producerPositionDelta = 0.0;
     double producerRotationDelta = 0.0;
+    double producerVelocityDelta = 0.0;
     double producerSpeedDelta = 0.0;
     double producerTurnDelta = 0.0;
     double positionMean = 0.0;

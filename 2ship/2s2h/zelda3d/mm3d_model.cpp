@@ -113,9 +113,9 @@ void LoadActorModel(int modelId, const ModelSpec& spec, LoadedModel& model) {
         fprintf(stderr, "[MM3D] gar parse %s: %s\n", spec.garPath.c_str(), model.gar->error().c_str());
         return;
     }
-    const GarFile* cmbFile = model.gar->firstWithSuffix(".cmb");
+    const GarFile* cmbFile = FindModelCmb(*model.gar, spec.cmbName);
     if (cmbFile == nullptr) {
-        fprintf(stderr, "[MM3D] no .cmb in %s\n", spec.garPath.c_str());
+        fprintf(stderr, "[MM3D] no requested CMB '%s' in %s\n", spec.cmbName.c_str(), spec.garPath.c_str());
         return;
     }
     model.cmb = std::make_unique<Cmb>(model.gar->read(*cmbFile));
