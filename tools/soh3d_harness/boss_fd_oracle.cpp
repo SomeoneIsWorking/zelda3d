@@ -99,6 +99,7 @@ bool Read(Memory::MemorySystem& memory, uint32_t playState, uint32_t actor, Stat
     out->worldRot[2] = static_cast<int16_t>(*rotZ & 0xFFFF);
 
     if (!ReadFloatArray(memory, actor + ActorLayout::kWorldPosOffset, out->worldPos.data(), 3) ||
+        !ReadFloatArray(memory, actor + kActorVelocityOffset, out->velocity.data(), 3) ||
         !ReadFloat(memory, actor + kActorSpeedOffset, &out->speed) ||
         !ReadFloatArray(memory, actor + kActorDisplacementOffset, out->displacement.data(), 3) ||
         !ReadFloatArray(memory, actor + kTargetOffset, out->target.data(), 3) ||

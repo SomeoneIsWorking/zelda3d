@@ -1,5 +1,6 @@
 // OoT3D Boss_Fd 30 Hz authored flight producer and procedural-history state.
 #include "authored_flight.h"
+#include "steering_math.h"
 #include "functions/math.h"
 
 #include "../../../anim/pose_evaluation.h"
@@ -91,14 +92,17 @@ void advanceFlight(BossFd* boss, State& flight, int bodyModelId) {
     const float move = static_cast<float>(flight.authoredMoveTimer);
     const float wobbleRate = boss->fwork[BFD_FLY_WOBBLE_RATE];
     const float wobbleAmp = boss->fwork[BFD_FLY_WOBBLE_AMP];
-    const float dx = boss->targetPosition.x - flight.visualPos.x +
-                     Math_SinS(static_cast<s16>((2096.0f + wobbleRate) * move)) * wobbleAmp;
+    const float dx =
+        boss->targetPosition.x - flight.visualPos.x +
+        BossFdSteeringMath::SinS(BossFdSteeringMath::WrapBinAngle(move * (wobbleRate + 2096.0F))) * wobbleAmp;
     float dy = boss->targetPosition.y - flight.visualPos.y +
-               Math_SinS(static_cast<s16>((1096.0f + wobbleRate) * move)) * wobbleAmp;
-    const float dz = boss->targetPosition.z - flight.visualPos.z +
-                     Math_SinS(static_cast<s16>((1796.0f + wobbleRate) * move)) * wobbleAmp;
-    const s16 yawTarget = static_cast<s16>(std::atan2(dx, dz) * (32768.0f / kPi));
-    s16 pitchTarget = static_cast<s16>(std::atan2(dy, std::sqrt(dx * dx + dz * dz)) * (32768.0f / kPi));
+               BossFdSteeringMath::SinS(BossFdSteeringMath::WrapBinAngle(move * (wobbleRate + 1096.0F))) * wobbleAmp;
+    const float dz =
+        boss->targetPosition.z - flight.visualPos.z +
+        BossFdSteeringMath::SinS(BossFdSteeringMath::WrapBinAngle(move * (wobbleRate + 1796.0F))) * wobbleAmp;
+    const s16 yawTarget = BossFdSteeringMath::WrapBinAngle(BossFdSteeringMath::Atan2(dx, dz) * (32768.0f / kPi));
+    s16 pitchTarget = BossFdSteeringMath::WrapBinAngle(BossFdSteeringMath::Atan2(dy, std::sqrt(dx * dx + dz * dz)) *
+                                                       (32768.0f / kPi));
 
     const int action = boss->work[BFD_ACTION_STATE];
     const s16 turnStep = static_cast<s16>(flight.visualTurnRate * (2.0f / 3.0f));
@@ -111,18 +115,21 @@ void advanceFlight(BossFd* boss, State& flight, int bodyModelId) {
     Math_ApproachF(&flight.visualTurnRate, boss->fwork[BFD_TURN_RATE_MAX], 1.0f, 20000.0f);
     Math_ApproachF(&flight.visualSpeed, boss->fwork[BFD_FLY_SPEED], 1.0f, 0.1f);
     if (action < BOSSFD_SKULL_FALL) {
-        const float cosPitch = Math_CosS(flight.visualRot.x);
-        flight.visualVelocity.x = Math_SinS(flight.visualRot.y) * cosPitch * flight.visualSpeed;
-        flight.visualVelocity.y = Math_SinS(flight.visualRot.x) * flight.visualSpeed;
-        flight.visualVelocity.z = Math_CosS(flight.visualRot.y) * cosPitch * flight.visualSpeed;
+        const float cosPitch = BossFdSteeringMath::CosS(flight.visualRot.x);
+        flight.visualVelocity.x = BossFdSteeringMath::SinS(flight.visualRot.y) * cosPitch * flight.visualSpeed;
+        flight.visualVelocity.y = BossFdSteeringMath::SinS(flight.visualRot.x) * flight.visualSpeed;
+        flight.visualVelocity.z = BossFdSteeringMath::CosS(flight.visualRot.y) * cosPitch * flight.visualSpeed;
     } else {
         // FUN_003C724C skips velocity derivation from action 0xCC onward, but still integrates the
         // action-authored velocity through FUN_0036B96C.
         flight.visualVelocity = boss->actor.velocity;
     }
-    flight.visualPos.x += flight.visualVelocity.x + boss->actor.colChkInfo.displacement.x;
-    flight.visualPos.y += flight.visualVelocity.y + boss->actor.colChkInfo.displacement.y;
-    flight.visualPos.z += flight.visualVelocity.z + boss->actor.colChkInfo.displacement.z;
+    // FUN_0036B96C's authored-tick scalar is 2 * 0.5 = 1.0. The observed 0.5 displacement per
+    // emulator frame came from the actor running at 30 Hz inside a 60 Hz oracle, not from a half-rate
+    // integration step. Collision displacement is already integrated and remains unscaled.
+    flight.visualPos.x += boss->actor.colChkInfo.displacement.x + flight.visualVelocity.x;
+    flight.visualPos.y += boss->actor.colChkInfo.displacement.y + flight.visualVelocity.y;
+    flight.visualPos.z += boss->actor.colChkInfo.displacement.z + flight.visualVelocity.z;
 
     const Vec3f rot = { flight.visualRot.x * kBinangToRad, flight.visualRot.y * kBinangToRad,
                         flight.visualRot.z * kBinangToRad };
@@ -206,13 +213,14 @@ void preUpdate(BossFd* boss, int bodyModelId) {
 
 extern "C" int Zelda3D_BossFdAuthoredStateSnapshot(Actor* actor, int* outLead, int* outSampleCount,
                                                    int* outAuthoredMoveTimer, float* outVisualPos3,
-                                                   short* outVisualRot3, float* outVisualSpeed,
-                                                   float* outVisualTurnRate, float* outAppliedFlySpeedControl,
-                                                   float* outBodyPos3, float* outBodyRot3, int capacity) {
+                                                   short* outVisualRot3, float* outVisualVelocity3,
+                                                   float* outVisualSpeed, float* outVisualTurnRate,
+                                                   float* outAppliedFlySpeedControl, float* outBodyPos3,
+                                                   float* outBodyRot3, int capacity) {
     using namespace Zelda3D::BossFdFlight;
     if (!actor || actor->id != ACTOR_BOSS_FD || capacity < kHistoryCount || !outLead || !outSampleCount ||
-        !outAuthoredMoveTimer || !outVisualPos3 || !outVisualRot3 || !outVisualSpeed || !outVisualTurnRate ||
-        !outAppliedFlySpeedControl || !outBodyPos3 || !outBodyRot3) {
+        !outAuthoredMoveTimer || !outVisualPos3 || !outVisualRot3 || !outVisualVelocity3 || !outVisualSpeed ||
+        !outVisualTurnRate || !outAppliedFlySpeedControl || !outBodyPos3 || !outBodyRot3) {
         return 0;
     }
     const State* flight = findState(actor);
@@ -228,6 +236,9 @@ extern "C" int Zelda3D_BossFdAuthoredStateSnapshot(Actor* actor, int* outLead, i
     outVisualRot3[0] = flight->visualRot.x;
     outVisualRot3[1] = flight->visualRot.y;
     outVisualRot3[2] = flight->visualRot.z;
+    outVisualVelocity3[0] = flight->visualVelocity.x;
+    outVisualVelocity3[1] = flight->visualVelocity.y;
+    outVisualVelocity3[2] = flight->visualVelocity.z;
     *outVisualSpeed = flight->visualSpeed;
     *outVisualTurnRate = flight->visualTurnRate;
     *outAppliedFlySpeedControl = flight->appliedFlySpeedControl;

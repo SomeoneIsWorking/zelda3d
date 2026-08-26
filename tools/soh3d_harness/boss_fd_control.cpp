@@ -112,9 +112,18 @@ void ForceProfile() {
         return;
     }
 
+    State seed{};
+    if (!HarnessBossFdOracle::Read(memory, *playState, lookup.address, &seed)) {
+        HarnessRepl::PrintErr("force bossfd_profile: oracle world transform unreadable");
+        return;
+    }
+
     uintptr_t forcedSohIdentity = 0;
-    if (!SohState_BossFdForceFlight(&forcedSohIdentity) || forcedSohIdentity != sohIdentity ||
-        !WriteOracleProfile(memory, lookup.address)) {
+    // Seed-lock both engines: the shipping actor adopts the ORACLE's live world transform before
+    // its profile is applied, so the two chaotic producers start from identical initial
+    // conditions and equal dynamics are observable as zero divergence.
+    if (!SohState_BossFdForceFlightSeeded(seed.worldPos.data(), seed.worldRot.data(), &forcedSohIdentity) ||
+        forcedSohIdentity != sohIdentity || !WriteOracleProfile(memory, lookup.address)) {
         HarnessRepl::PrintErr("force bossfd_profile: synchronous profile application failed");
         return;
     }

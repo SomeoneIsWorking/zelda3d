@@ -46,6 +46,7 @@ struct State {
     int introState = 0;
     std::array<float, 3> worldPos{};
     std::array<short, 3> worldRot{};
+    std::array<float, 3> velocity{};
     float speed = 0.0f;
     std::array<float, 3> displacement{};
     std::array<float, 3> target{};

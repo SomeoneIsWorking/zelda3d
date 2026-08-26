@@ -53,7 +53,7 @@ def run_command(command: Sequence[str]) -> None:
 def has_required_configuration(build: HarnessBuild) -> bool:
     return cmake_build_policy.has_ninja_configuration(
         build.build_dir, languages=("CXX",)
-    )
+    ) and (build.build_dir / "compile_commands.json").is_file()
 
 
 def configure_command(
@@ -99,7 +99,7 @@ def ensure_harness_build(
         runner(configure_command(build, python_executable or sys.executable))
     if not has_required_configuration(build):
         raise HarnessBuildError(
-            "harness configure did not produce complete Ninja C++ build metadata"
+            "harness configure did not produce complete Ninja C++ build metadata and compile commands"
         )
     runner(["ninja", "-C", str(build.build_dir), f"-j{build.jobs}", "soh3d_harness"])
     if not build.binary.is_file() or not os.access(build.binary, os.X_OK):

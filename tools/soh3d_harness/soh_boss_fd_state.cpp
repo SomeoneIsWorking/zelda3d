@@ -36,10 +36,10 @@ int SohState_BossFdAuthoredState(BossFdAuthoredState* outState, float* outPos3, 
         return 0;
     }
 
-    return Zelda3D_BossFdAuthoredStateSnapshot(&boss->actor, &outState->bodyLead, &outState->sampleCount,
-                                               &outState->authoredMoveTimer, outState->visualPos, outState->visualRot,
-                                               &outState->visualSpeed, &outState->visualTurnRate,
-                                               &outState->appliedFlySpeedControl, outPos3, outRot3, capacity);
+    return Zelda3D_BossFdAuthoredStateSnapshot(
+        &boss->actor, &outState->bodyLead, &outState->sampleCount, &outState->authoredMoveTimer, outState->visualPos,
+        outState->visualRot, outState->visualVelocity, &outState->visualSpeed, &outState->visualTurnRate,
+        &outState->appliedFlySpeedControl, outPos3, outRot3, capacity);
 }
 
 int SohState_BossFdNativeInputs(BossFdNativeInputs* outInputs) {
@@ -85,6 +85,18 @@ int SohState_BossFdIdentity(uintptr_t* outAddress) {
 int SohState_BossFdForceFlight(uintptr_t* outAddress) {
     BossFd* boss = FindBossFd();
     if (boss == nullptr || outAddress == nullptr || !Zelda3D_BossFdForceFly(&boss->actor)) {
+        return 0;
+    }
+    *outAddress = reinterpret_cast<uintptr_t>(boss);
+    return 1;
+}
+
+int SohState_BossFdForceFlightSeeded(const float* pos3, const short* rot3, uintptr_t* outAddress) {
+    if (pos3 == nullptr || rot3 == nullptr || outAddress == nullptr) {
+        return 0;
+    }
+    BossFd* boss = FindBossFd();
+    if (boss == nullptr || !Zelda3D_BossFdForceFlySeeded(&boss->actor, pos3, rot3)) {
         return 0;
     }
     *outAddress = reinterpret_cast<uintptr_t>(boss);

@@ -27,6 +27,16 @@ void PrintNativeInputs(const State& oracle, const BossFdNativeInputs& native, co
                 native.action, native.moveTimer, native.targetPosition[0], native.targetPosition[1],
                 native.targetPosition[2], native.flySpeed, native.turnRate, native.turnRateMax,
                 native.flyWobbleAmplitude, native.flyWobbleRate, authored.appliedFlySpeedControl);
+    std::printf("    producer-state oracle pos=(%.4f,%.4f,%.4f) rot=(%d,%d,%d) vel=(%.6f,%.6f,%.6f) "
+                "disp=(%.4f,%.4f,%.4f)\n",
+                oracle.worldPos[0], oracle.worldPos[1], oracle.worldPos[2], oracle.worldRot[0], oracle.worldRot[1],
+                oracle.worldRot[2], oracle.velocity[0], oracle.velocity[1], oracle.velocity[2], oracle.displacement[0],
+                oracle.displacement[1], oracle.displacement[2]);
+    std::printf("    producer-state soh pos=(%.4f,%.4f,%.4f) rot=(%d,%d,%d) vel=(%.6f,%.6f,%.6f) "
+                "disp=(%.4f,%.4f,%.4f)\n",
+                authored.visualPos[0], authored.visualPos[1], authored.visualPos[2], authored.visualRot[0],
+                authored.visualRot[1], authored.visualRot[2], authored.visualVelocity[0], authored.visualVelocity[1],
+                authored.visualVelocity[2], native.displacement[0], native.displacement[1], native.displacement[2]);
 }
 
 BossFdCompareStatus RecordStatus(BossFdCompareStatus status) {
@@ -92,8 +102,8 @@ BossFdCompareStatus CompareBossFd(uint32_t azPlayState) {
                 oracle.address, oracle.scene, oracle.action, oracle.bodyLead, sohScene & 0xFFFF, native.action,
                 authored.bodyLead, authored.sampleCount);
     PrintNativeInputs(oracle, native, authored);
-    std::printf("    authored-producer dPos=%.4f dRotRad=%.6f dMove=%d dSpeed=%.4f dTurn=%.4f\n",
-                result.producerPositionDelta, result.producerRotationDelta,
+    std::printf("    authored-producer dPos=%.4f dRotRad=%.6f dVel=%.6f dMove=%d dSpeed=%.4f dTurn=%.4f\n",
+                result.producerPositionDelta, result.producerRotationDelta, result.producerVelocityDelta,
                 authored.authoredMoveTimer - oracle.moveTimer, result.producerSpeedDelta, result.producerTurnDelta);
     std::printf("    cursor-selfcheck oracle=(%.6f,%.8f) soh=(%.6f,%.8f) tol=(%.6f,%.8f)\n",
                 result.oracleSelfPositionDelta, result.oracleSelfRotationDelta, result.sohSelfPositionDelta,

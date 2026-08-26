@@ -44,6 +44,7 @@ class Fixture:
         (self.build.build_dir / "CMakeCache.txt").write_text(
             f"CMAKE_GENERATOR:INTERNAL=Ninja\nCMAKE_CXX_COMPILER:FILEPATH={compiler}\n"
         )
+        (self.build.build_dir / "compile_commands.json").write_text("[]\n")
         metadata = self.build.build_dir / "CMakeFiles" / "fixture"
         metadata.mkdir(parents=True, exist_ok=True)
         (metadata / "CMakeCXXCompiler.cmake").write_text(
@@ -134,6 +135,21 @@ class HarnessBuildTests(unittest.TestCase):
             harness_build.HarnessBuildError, "complete Ninja"
         ):
             harness_build.ensure_harness_build(self.fixture.build, runner)
+
+    def test_missing_compile_commands_reconfigures(self) -> None:
+        self.fixture.write_toolchain()
+        (self.fixture.build.build_dir / "compile_commands.json").unlink()
+        self.fixture.write_binary()
+        commands: list[list[str]] = []
+
+        def runner(command: Sequence[str]) -> None:
+            commands.append(list(command))
+            if "-S" in command:
+                (self.fixture.build.build_dir / "compile_commands.json").write_text("[]\n")
+
+        harness_build.ensure_harness_build(self.fixture.build, runner)
+        self.assertIn("-S", commands[0])
+        self.assertEqual(commands[-1][-1], "soh3d_harness")
 
     def test_missing_binary_after_target_is_an_error(self) -> None:
         self.fixture.write_toolchain()

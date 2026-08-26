@@ -11,6 +11,7 @@ struct BossFdAuthoredState {
     int authoredMoveTimer;
     float visualPos[3];
     short visualRot[3];
+    float visualVelocity[3];
     float visualSpeed;
     float visualTurnRate;
     // Fly-speed control the authored producer last applied. The raw fwork slot is rewritten by
@@ -40,6 +41,7 @@ int SohState_BossFdAuthoredState(BossFdAuthoredState* outState, float* outPos3, 
 int SohState_BossFdNativeInputs(BossFdNativeInputs* outInputs);
 int SohState_BossFdIdentity(std::uintptr_t* outAddress);
 int SohState_BossFdForceFlight(std::uintptr_t* outAddress);
+int SohState_BossFdForceFlightSeeded(const float* pos3, const short* rot3, std::uintptr_t* outAddress);
 }
 
 #endif // ZELDA3D_TOOLS_SOH3D_HARNESS_SOH_BOSS_FD_STATE_H
