@@ -1,6 +1,7 @@
 // OoT3D Boss_Fd2 multipart draw port.
 // Ground truth: oot3d-decomp/docs/boss_fd2.md; draw FUN_0020A3B0 and chain helper FUN_00335904.
 #include "boss_fd2.h"
+#include "boss_fd2_animation_policy.h"
 
 #include "../../anim/zelda3d_anim_override.h"
 #include "../../anim/skeleton_draw_bridge.h"
@@ -31,9 +32,42 @@ namespace {
 
 bool sBossFd2IdleHold = false;
 
+using Zelda3D::BossFd2Animation::Action;
+
+Action classifyAction(BossFd2ActionFunc action) {
+    if (action == BossFd2_Wait) {
+        return Action::Wait;
+    }
+    if (action == BossFd2_Emerge) {
+        return Action::Emerge;
+    }
+    if (action == BossFd2_Idle) {
+        return Action::Idle;
+    }
+    if (action == BossFd2_BreatheFire) {
+        return Action::BreatheFire;
+    }
+    if (action == BossFd2_ClawSwipe) {
+        return Action::ClawSwipe;
+    }
+    if (action == BossFd2_Burrow) {
+        return Action::Burrow;
+    }
+    if (action == BossFd2_Vulnerable) {
+        return Action::Vulnerable;
+    }
+    if (action == BossFd2_Damaged) {
+        return Action::Damaged;
+    }
+    if (action == BossFd2_Death) {
+        return Action::Death;
+    }
+    return Action::Unknown;
+}
+
 struct BossFd2CsabController {
     Actor* actor = nullptr;
-    BossFd2ActionFunc lastAction = nullptr;
+    Action lastAction = Action::Unknown;
     int previousActionState = 0;
     int lastLogicFrame = -1;
     int previousTurnToLink = 0;
@@ -61,14 +95,23 @@ void selectCsab(BossFd2CsabController& controller, const char* csab, float frame
 }
 
 void transitionCsab(BossFd2CsabController& controller, const char* csab) {
-    if (controller.csab == csab)
+    if (controller.csab == csab) {
         return;
+    }
     controller.outgoingCsab = controller.csab;
     controller.outgoingFrame = controller.frame;
     controller.csab = csab;
     controller.frame = 0.0f;
     // OoT3D's FUN_0012827C and outgoing attack selectors pass -5.0 to the CSAB transition helper.
     controller.morphFramesRemaining = controller.outgoingCsab.empty() ? 0 : 5;
+}
+
+void invalidateCsab(BossFd2CsabController& controller) {
+    controller.csab.clear();
+    controller.frame = 0.0f;
+    controller.outgoingCsab.clear();
+    controller.outgoingFrame = 0.0f;
+    controller.morphFramesRemaining = 0;
 }
 
 void advanceLoop(BossFd2CsabController& controller, float endFrame) {
@@ -130,45 +173,31 @@ void tickCsabController(PlayState* play, BossFd2* boss) {
         controller = {};
         controller.actor = actor;
     }
-    const bool actionChanged = boss->actionFunc != controller.lastAction;
-    if (controller.morphFramesRemaining > 0)
+    const Action action = classifyAction(boss->actionFunc);
+    const bool actionChanged = action != controller.lastAction;
+    if (controller.morphFramesRemaining > 0) {
         --controller.morphFramesRemaining;
-    if (boss->actionFunc != BossFd2_Emerge)
+    }
+    if (action != Action::Emerge) {
         controller.emergeActive = false;
-    if (boss->actionFunc == BossFd2_Emerge && actionChanged && !controller.emergeActive) {
+    }
+    if (action == Action::Emerge && actionChanged && !controller.emergeActive) {
         initializeEmergeController(controller, actor);
-    } else if (boss->actionFunc == BossFd2_Emerge && controller.emergeActive) {
+    } else if (action == Action::Emerge && controller.emergeActive) {
         advanceEmergeController(controller, actor);
     } else if (actionChanged) {
-        if (boss->actionFunc == BossFd2_Wait) {
-            selectCsab(controller, "vba_wait");
-        } else if (boss->actionFunc == BossFd2_Idle) {
-            // FUN_003B9814 completes emergence by selecting slot 10 (vba_search) before entering
-            // FUN_0012827C. That action switches slots at the yaw-error threshold below.
-            selectCsab(controller, "vba_search");
-            controller.previousTurnToLink = boss->work[FD2_TURN_TO_LINK];
-        } else if (boss->actionFunc == BossFd2_BreatheFire) {
-            transitionCsab(controller, "vba_atack");
-        } else if (boss->actionFunc == BossFd2_ClawSwipe) {
-            transitionCsab(controller, "vba_tyokkai");
-        } else if (boss->actionFunc == BossFd2_Burrow) {
-            transitionCsab(controller, "vba_down");
-        } else if (boss->actionFunc == BossFd2_Vulnerable) {
-            // Collision controller FUN_0020A668 selects slot 8 before entering FUN_00120B20;
-            // that action advances to slot 9 when its first authored clip completes.
-            transitionCsab(controller, "vba_hit");
-        } else if (boss->actionFunc == BossFd2_Damaged) {
-            // Nonlethal damage enters FUN_00137D74 on slot 5, then selects slot 6 at state 1.
-            transitionCsab(controller, "vba_beforedamage");
-        } else if (boss->actionFunc == BossFd2_Death) {
-            // Lethal collision selects slot 6 before entering FUN_001386D4.
-            transitionCsab(controller, "vba_damage");
+        const auto selection = Zelda3D::BossFd2Animation::InitialSelectionForAction(action);
+        if (selection.csab == nullptr) {
+            invalidateCsab(controller);
+        } else if (selection.crossfade) {
+            transitionCsab(controller, selection.csab);
         } else {
-            // Every persistent retail action is listed above. A new action must be RE'd before it
-            // selects a 3DS clip; never infer one from N64 animation identity or phase.
-            transitionCsab(controller, "vba_wait");
+            selectCsab(controller, selection.csab);
+            if (action == Action::Idle) {
+                controller.previousTurnToLink = boss->work[FD2_TURN_TO_LINK];
+            }
         }
-    } else if (boss->actionFunc == BossFd2_Idle) {
+    } else if (action == Action::Idle) {
         const int turnToLink = boss->work[FD2_TURN_TO_LINK];
         const int previousAbs = std::abs(controller.previousTurnToLink);
         const int currentAbs = std::abs(turnToLink);
@@ -180,13 +209,13 @@ void tickCsabController(PlayState* play, BossFd2* boss) {
             advanceLoop(controller, controller.csab == "vba_wait" ? 20.0f : 16.0f);
         }
         controller.previousTurnToLink = turnToLink;
-    } else if (boss->actionFunc == BossFd2_BreatheFire) {
+    } else if (action == Action::BreatheFire) {
         advanceOnce(controller, 85.0f);
-    } else if (boss->actionFunc == BossFd2_ClawSwipe) {
+    } else if (action == Action::ClawSwipe) {
         advanceOnce(controller, 23.0f);
-    } else if (boss->actionFunc == BossFd2_Burrow) {
+    } else if (action == Action::Burrow) {
         advanceOnce(controller, 20.0f);
-    } else if (boss->actionFunc == BossFd2_Vulnerable) {
+    } else if (action == Action::Vulnerable) {
         const int actionState = boss->work[FD2_ACTION_STATE];
         if (controller.previousActionState == 0 && actionState == 1) {
             transitionCsab(controller, "vba_pikupiku");
@@ -195,7 +224,7 @@ void tickCsabController(PlayState* play, BossFd2* boss) {
         } else {
             advanceLoop(controller, 15.0f);
         }
-    } else if (boss->actionFunc == BossFd2_Damaged) {
+    } else if (action == Action::Damaged) {
         const int actionState = boss->work[FD2_ACTION_STATE];
         if (controller.previousActionState == 0 && actionState == 1) {
             transitionCsab(controller, "vba_damage");
@@ -204,11 +233,11 @@ void tickCsabController(PlayState* play, BossFd2* boss) {
         } else {
             advanceOnce(controller, 45.0f);
         }
-    } else if (boss->actionFunc == BossFd2_Death) {
+    } else if (action == Action::Death) {
         advanceOnce(controller, 45.0f);
     }
     controller.previousActionState = boss->work[FD2_ACTION_STATE];
-    controller.lastAction = boss->actionFunc;
+    controller.lastAction = action;
     controller.lastLogicFrame = static_cast<int>(play->gameplayFrames);
 }
 
@@ -389,6 +418,10 @@ bool BossFd2Behavior::prepareDeferredDraw(PlayState* play, Actor* actor) {
     if (boss->actionFunc == BossFd2_Wait) {
         return false;
     }
+    if (classifyAction(boss->actionFunc) == Action::Unknown || sCsabController.actor != actor ||
+        sCsabController.csab.empty()) {
+        return false;
+    }
     const int modelId = bodyModel();
     if (modelId < 0) {
         return false;
@@ -432,8 +465,9 @@ extern "C" int Zelda3D_BossFd2ResolveAnim(PlayState* play, Actor* actor, const c
 
     // The actor post-update owns the controller tick. Draw only samples its authored CSAB result,
     // so no N64 animation pointer, clip identity, cursor, joint table, or morph state enters here.
-    if (controller.csab.empty())
-        selectCsab(controller, "vba_wait");
+    if (controller.csab.empty()) {
+        return 0;
+    }
 
     *outCsab = controller.csab.c_str();
     *outFrame = controller.frame;
@@ -485,8 +519,9 @@ extern "C" int Zelda3D_BossFd2ForceGround(Actor* actor) {
 extern "C" int Zelda3D_BossFd2ForceIdle(PlayState* play, Actor* actor, int hold) {
     if (play == nullptr || actor == nullptr || actor->id != ACTOR_BOSS_FD2 || actor->parent == nullptr ||
         actor->parent->id != ACTOR_BOSS_FD) {
-        if (actor == nullptr)
+        if (actor == nullptr) {
             sBossFd2IdleHold = false;
+        }
         return 0;
     }
     BossFd2* boss = reinterpret_cast<BossFd2*>(actor);
@@ -496,8 +531,9 @@ extern "C" int Zelda3D_BossFd2ForceIdle(PlayState* play, Actor* actor, int hold)
     // reach and left the parent's long N64 body stretched across the diagnostic frame.
     parent->actionFunc = BossFd_Wait;
     parent->handoffSignal = FD2_SIGNAL_NONE;
-    if (actor->world.pos.y < 0.0f)
+    if (actor->world.pos.y < 0.0f) {
         actor->world.pos.y = 150.0f;
+    }
     BossFd2_SetupIdle(boss, play);
     sBossFd2IdleHold = hold != 0;
     return 1;
@@ -514,8 +550,9 @@ extern "C" int Zelda3D_BossFd2ForceDamageState(PlayState* play, Actor* actor, in
     // flying parent immediately hands the helper back into emergence, making this diagnostic lie.
     parent->actionFunc = BossFd_Wait;
     parent->handoffSignal = FD2_SIGNAL_NONE;
-    if (actor->world.pos.y < 0.0f)
+    if (actor->world.pos.y < 0.0f) {
         actor->world.pos.y = 150.0f;
+    }
     if (state == 0) {
         BossFd2_SetupVulnerable(boss, play);
     } else if (state == 1) {
@@ -530,19 +567,22 @@ extern "C" int Zelda3D_BossFd2ForceDamageState(PlayState* play, Actor* actor, in
 }
 
 extern "C" void Zelda3D_BossFd2IdleTick(PlayState* play, Actor* actor) {
-    if (play == nullptr || actor == nullptr || actor->id != ACTOR_BOSS_FD2)
+    if (play == nullptr || actor == nullptr || actor->id != ACTOR_BOSS_FD2) {
         return;
+    }
     BossFd2* boss = reinterpret_cast<BossFd2*>(actor);
     tickCsabController(play, boss);
-    if (!sBossFd2IdleHold)
+    if (!sBossFd2IdleHold) {
         return;
+    }
     if (actor->parent != nullptr && actor->parent->id == ACTOR_BOSS_FD) {
         BossFd* parent = reinterpret_cast<BossFd*>(actor->parent);
         parent->actionFunc = BossFd_Wait;
         parent->handoffSignal = FD2_SIGNAL_NONE;
     }
-    if (boss->actionFunc != BossFd2_Idle)
+    if (boss->actionFunc != BossFd2_Idle) {
         BossFd2_SetupIdle(boss, play);
+    }
     actor->world.pos.y = 150.0f;
     actor->velocity = { 0.0f, 0.0f, 0.0f };
     actor->speedXZ = 0.0f;

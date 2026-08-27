@@ -111,6 +111,24 @@ void HandleIdle(PlayState* play, Actor* selectedActor, const char* line, const c
     }
 }
 
+void HandleGroundInfo(PlayState* play, Actor* selectedActor, const char* outPath) {
+    if (selectedActor == nullptr || selectedActor->id != ACTOR_BOSS_FD2) {
+        Zelda3D_ReplReply(outPath, "fd2info: scanned selected actor; need live Boss_Fd2 (0xA2)");
+        return;
+    }
+
+    const char* csab = nullptr;
+    const char* morphCsab = nullptr;
+    float frame = 0.0f;
+    float morphFrame = 0.0f;
+    float morphWeight = 0.0f;
+    const bool resolved =
+        Zelda3D_BossFd2ResolveAnim(play, selectedActor, &csab, &frame, &morphCsab, &morphFrame, &morphWeight) != 0;
+    Zelda3D_ReplReply(outPath, "fd2info: resolved=%s csab=%s frame=%.2f morph=%s morphFrame=%.2f morphWeight=%.2f",
+                      resolved ? "yes" : "no", resolved ? csab : "(none)", frame,
+                      morphCsab != nullptr ? morphCsab : "(none)", morphFrame, morphWeight);
+}
+
 void HandleState(PlayState* play, Actor* selectedActor, const char* line, const char* outPath) {
     char stateName[24] = {};
     int state = -1;
@@ -147,6 +165,8 @@ bool Zelda3D_BossFdReplCommand(PlayState* play, Actor* selectedActor, const char
         HandleInfo(selectedActor, outPath);
     } else if (std::strcmp(command, "fd2idle") == 0) {
         HandleIdle(play, selectedActor, line, outPath);
+    } else if (std::strcmp(command, "fd2info") == 0) {
+        HandleGroundInfo(play, selectedActor, outPath);
     } else if (std::strcmp(command, "fd2state") == 0) {
         HandleState(play, selectedActor, line, outPath);
     } else {

@@ -73,6 +73,7 @@ def repository_files(repo: Path, suffixes: frozenset[str]) -> list[Path]:
             and Path(raw).suffix.lower() in suffixes
             and is_first_party(raw)
             and candidate.is_file()
+            and not candidate.is_symlink()
         ):
             paths.append(candidate)
     return sorted(set(paths))
