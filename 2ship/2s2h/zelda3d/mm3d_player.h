@@ -1,7 +1,7 @@
 // mm3d_player — MM's dedicated Link-render seam. The hook selects the retail MM3D body
 // archive for the live transformation and defers its skinned replacement to Player_DrawImpl's
-// SkelAnime_DrawFlexLod call. Mesh/equipment policy and the shared player animation archive
-// remain separate later stages, so MM_ZELDA3D_LINK stays opt-in.
+// SkelAnime_DrawFlexLod call. Base/sheath visibility and shared animation now have focused
+// owners; hand/held-equipment policy remains incomplete, so MM_ZELDA3D_LINK stays opt-in.
 #pragma once
 #include "global.h" // PlayState, Actor
 

@@ -6,7 +6,7 @@ import struct
 import unittest
 
 import cmb
-from mm_player_cmb_dump import summarize_mesh_ids
+from mm_player_cmb_dump import parse_args, summarize_mesh_ids
 
 
 def _pack_into(blob: bytearray, offset: int, fmt: str, *values: object) -> None:
@@ -64,6 +64,14 @@ def _synthetic_v10_cmb() -> bytes:
 
 
 class MmCmbV10Tests(unittest.TestCase):
+    def test_exact_member_gate_parses_required_mesh_ids(self) -> None:
+        args = parse_args(
+            ["mm_player_cmb_dump.py", "archive", "member", "--require-mids", "3", "17"]
+        )
+        self.assertEqual(args.archive_path, "archive")
+        self.assertEqual(args.cmb_member_path, "member")
+        self.assertEqual(args.require_mids, [3, 17])
+
     def test_v10_qtrs_bone_and_mesh_strides(self) -> None:
         model = cmb.Cmb(_synthetic_v10_cmb())
 

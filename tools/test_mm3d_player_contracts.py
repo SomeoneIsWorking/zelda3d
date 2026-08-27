@@ -106,6 +106,15 @@ class MmPlayerContractTests(unittest.TestCase):
     def test_player_model_selection_reaches_lod_skeleton_seam(self) -> None:
         player = (MM / "mm3d_player.c").read_text()
         self.assertIn("Zelda3D_MM_LookupPlayerModel(player->transformation", player)
+        self.assertIn("meshMask |= Zelda3D_MM_PlayerSheathMeshMask(", player)
+        for typed_input in (
+            "player->sheathType",
+            "player->currentShield",
+            "player->currentMask",
+        ):
+            self.assertIn(typed_input, player)
+        self.assertIn("GET_CUR_EQUIP_VALUE(EQUIP_TYPE_SWORD)", player)
+        self.assertIn("Zelda3D_GL_SetMidMask(modelId, meshMask);", player)
         self.assertIn(
             "Zelda3D_MM_SetPending(actor, modelId, worldScale, groundOffset);", player
         )
@@ -167,6 +176,10 @@ class MmPlayerContractTests(unittest.TestCase):
             MM / "mm3d_player_model.h",
             MM / "mm3d_player_model_policy.cpp",
             MM / "mm3d_player_model_policy.h",
+            MM / "mm3d_player_sheath.cpp",
+            MM / "mm3d_player_sheath.h",
+            MM / "mm3d_player_sheath_policy.cpp",
+            MM / "mm3d_player_sheath_policy.h",
             MM / "mm3d_player_animation.cpp",
             MM / "mm3d_player_animation.h",
             MM / "mm3d_animation_playhead.h",
