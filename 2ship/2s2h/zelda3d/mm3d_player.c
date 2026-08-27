@@ -7,6 +7,7 @@
 #include "2s2h/zelda3d/mm3d_model.h"
 #include "2s2h/zelda3d/mm3d_pending_draw.h"
 #include "2s2h/zelda3d/mm3d_player_model.h"
+#include <fast/zelda3d_material_overrides.h>
 #include <stdlib.h> // getenv
 
 static int mm_link_enabled(void) {
@@ -33,6 +34,10 @@ int Zelda3D_TryDrawPlayer(PlayState* play, Actor* actor) {
     if (!Zelda3D_MM_LookupPlayerModel(player->transformation, &modelId, &worldScale, &groundOffset)) {
         return 0;
     }
+    // Retail Player_Draw first resets the form CMB to its base body groups, then layers
+    // state-dependent equipment/hand groups on top. Apply that recovered reset stage here;
+    // the later selectors are a separate, still-unported stage.
+    Zelda3D_GL_SetMidMask(modelId, Zelda3D_MM_PlayerBaseMeshMask(player->transformation));
     // Player_DrawGameplay still runs so its real SkelAnime draw supplies the live skeleton,
     // joint table and post-limb side effects. SkelAnime_DrawFlexLod consumes this pending draw.
     Zelda3D_MM_SetPending(actor, modelId, worldScale, groundOffset);

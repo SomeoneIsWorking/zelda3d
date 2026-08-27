@@ -50,6 +50,7 @@ int SohState_BossFdNativeInputs(BossFdNativeInputs* outInputs);
 int SohState_BossFdIdentity(std::uintptr_t* outAddress);
 int SohState_BossFdForceFlight(std::uintptr_t* outAddress);
 int SohState_BossFdForceFlightSeeded(const float* pos3, const short* rot3, std::uintptr_t* outAddress);
+int SohState_BossFd2ForceGround(std::uintptr_t* outAddress);
 int SohState_BossFdRenderInfo(BossFdRenderInfo* outInfo);
 }
 

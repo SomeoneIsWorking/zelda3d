@@ -2,6 +2,7 @@
 
 #include "mm3d_model_catalog.h"
 #include "mm3d_player_animation.h"
+#include "mm3d_player_mesh_policy.h"
 #include "mm3d_player_model_policy.h"
 #include "global.h"
 
@@ -56,4 +57,13 @@ extern "C" int Zelda3D_MM_LookupPlayerModel(int playerForm, int* modelId, float*
         *groundOffset = 0.0f;
     }
     return 1;
+}
+
+extern "C" unsigned long long Zelda3D_MM_PlayerBaseMeshMask(int playerForm) {
+    using namespace Zelda3D::MM3D;
+    PlayerModelForm form = PlayerModelForm::Human;
+    if (!ToPlayerModelForm(playerForm, form)) {
+        return 0;
+    }
+    return PlayerBaseMeshMaskForForm(form);
 }

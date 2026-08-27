@@ -10,6 +10,7 @@
 
 #include "../../Shipwright/soh/src/zelda3d/behaviors/actor/boss_fd/forced_flight_profile.h"
 #include "../../Shipwright/soh/src/zelda3d/behaviors/actor/boss_fd/history_layout.h"
+#include "actor_layout.h"
 #include "boss_fd_compare.h"
 #include "boss_fd_oracle.h"
 #include "boss_fd_profile_validation.h"
@@ -150,6 +151,41 @@ void ForceProfile() {
                 oracle.controls[1], oracle.controls[2], oracle.controls[3], oracle.controls[4]);
 }
 
+void ForceGround() {
+    const auto playState = HarnessOracle::GameplayPlayState();
+    if (!playState) {
+        HarnessRepl::PrintErr("force bossfd2_ground: oracle is not in gameplay");
+        return;
+    }
+
+    auto& memory = Core::System::GetInstance().Memory();
+    const auto hole = HarnessBossFdOracle::FindById(memory, *playState, HarnessBossFdOracle::kHoleActorId);
+    if (hole.status != LookupStatus::Found) {
+        HarnessRepl::PrintErr("force bossfd2_ground: oracle Boss_Fd2 (0xA2) is not live");
+        return;
+    }
+    const auto parent = memory.Read32OrNullopt(hole.address + HarnessBossFdOracle::kParentPointerOffset);
+    const auto parentId =
+        parent && *parent != 0 ? memory.Read32OrNullopt(*parent + ActorLayout::kIdOffset) : std::optional<uint32_t>{};
+    if (!parentId || (*parentId & 0xFFFF) != HarnessBossFdOracle::kActorId) {
+        HarnessRepl::PrintErr("force bossfd2_ground: oracle Boss_Fd2 has no live Boss_Fd parent");
+        return;
+    }
+
+    uintptr_t sohAddress = 0;
+    if (!SohState_BossFd2ForceGround(&sohAddress)) {
+        HarnessRepl::PrintErr("force bossfd2_ground: SoH Boss_Fd2 with live parent is not available");
+        return;
+    }
+
+    // FUN_003E4790 reads child+0x124 for the parent and consumes byte +0x940 == 0x64 before calling
+    // the genuine emergence setup. The constants are named in boss_fd_oracle.h and documented in
+    // oot3d-decomp/docs/boss_fd2.md; this command never installs an action function or synthetic pose.
+    memory.Write8(*parent + HarnessBossFdOracle::kParentHandoffSignalOffset, HarnessBossFdOracle::kGroundHandoffSignal);
+    std::printf("ok force bossfd2_ground oracle=0x%08x parent=0x%08x soh=0x%lx signal=0x%02x\n", hole.address, *parent,
+                static_cast<unsigned long>(sohAddress), HarnessBossFdOracle::kGroundHandoffSignal);
+}
+
 void ApplyFault() {
     if (g_activeFault) {
         HarnessRepl::PrintErr("force bossfd_fault: fault already active; restore it first");
@@ -237,6 +273,10 @@ void RestoreFault() {
 } // namespace
 
 bool HandleForce(std::string_view subcommand, std::istringstream& arguments) {
+    if (subcommand == "bossfd2_ground") {
+        ForceGround();
+        return true;
+    }
     if (subcommand == "bossfd_profile") {
         ForceProfile();
         return true;

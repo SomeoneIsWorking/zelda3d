@@ -12,7 +12,8 @@ Subcommands:
   query "<cmd>"          send a REPL query, print the reply
                          (posinfo | actors [n] | warp <ent> | tp <x> <y> <z> | turn <deg>
                           | roomwarp <n> | cam <yawDeg> [dist] [h] | cam off
-                          | linkinfo | linkform <human|deku|goron|zora|fd> | mscale | mlist | ping)
+                          | linkinfo | linkform <human|deku|goron|zora|fd>
+                          | mscale | mlist | mptrace <modelId|off> | ping)
   input "<cmd>"          send a raw scripted-input command (enable 0|1 | btn <hex> | stick <x> <y> | reset)
   walk <secs> [x] [y]    enable + hold the stick (default 0 72 = forward) for <secs>, then neutral
   press <hexmask> [ms]   tap a button mask (default 100ms), e.g. press 0x1000 = START
@@ -26,6 +27,7 @@ Subcommands:
   cam off                releases the persistent cam framing
   info                   shorthand for `query linkinfo`
   form <name>            request human/deku/goron/zora/fd through the real mask item-use path
+  trace <modelId|off>    select the existing renderer submission trace for one exact model
 
 Examples:
   tools/mm_control.py pos
@@ -102,6 +104,10 @@ def main(argv):
         if len(argv) != 2:
             sys.exit("usage: tools/mm_control.py form <human|deku|goron|zora|fd>")
         query("linkform " + argv[1])
+    elif cmd == "trace":
+        if len(argv) != 2:
+            sys.exit("usage: tools/mm_control.py trace <modelId|off>")
+        query("mptrace " + argv[1])
     elif cmd == "walk":
         secs = float(argv[1]) if len(argv) > 1 else 2.0
         x = argv[2] if len(argv) > 2 else "0"
