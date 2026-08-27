@@ -28,5 +28,13 @@ int main() {
         assert(std::strcmp(actual.garPath, expected.garPath) == 0);
         assert(std::strcmp(actual.cmbName, expected.cmbName) == 0);
     }
+
+    Zelda3D::MM3D::PlayerModelForm form = Zelda3D::MM3D::PlayerModelForm::Human;
+    assert(Zelda3D::MM3D::PlayerModelFormFromRetailIndex(0, form));
+    assert(form == Zelda3D::MM3D::PlayerModelForm::FierceDeity);
+    assert(Zelda3D::MM3D::PlayerModelFormFromRetailIndex(4, form));
+    assert(form == Zelda3D::MM3D::PlayerModelForm::Human);
+    assert(!Zelda3D::MM3D::PlayerModelFormFromRetailIndex(-1, form));
+    assert(!Zelda3D::MM3D::PlayerModelFormFromRetailIndex(5, form));
     return 0;
 }

@@ -10,11 +10,12 @@ Usage:
 
 Example:
   mm_player_cmb_dump.py /actors/zelda2_link_child_new.gar.lzs \
-      child/model/link_child.cmb
+      child/model/link_child.cmb --require-mids 3 4 5 6 7 13 15 17
 """
 
 from __future__ import annotations
 
+import argparse
 import sys
 from collections import defaultdict
 from dataclasses import dataclass, field
@@ -56,12 +57,25 @@ def summarize_mesh_ids(model: cmb.Cmb) -> dict[int, MeshIdSummary]:
     return dict(summaries)
 
 
-def main(argv: list[str]) -> int:
-    if len(argv) != 3:
-        print(f"usage: {argv[0]} ARCHIVE_PATH CMB_MEMBER_PATH", file=sys.stderr)
-        return 2
+def parse_args(argv: list[str]) -> argparse.Namespace:
+    parser = argparse.ArgumentParser(description=__doc__)
+    parser.add_argument("archive_path")
+    parser.add_argument("cmb_member_path")
+    parser.add_argument(
+        "--require-mids",
+        metavar="ID",
+        type=int,
+        nargs="+",
+        default=(),
+        help="fail unless every listed mesh ID exists in the exact CMB member",
+    )
+    return parser.parse_args(argv[1:])
 
-    archive_path, member_path = argv[1:]
+
+def main(argv: list[str]) -> int:
+    args = parse_args(argv)
+    archive_path = args.archive_path
+    member_path = args.cmb_member_path
     actors = Mm3dActors()
     try:
         archive_file = actors.rom.get(archive_path)
@@ -86,6 +100,14 @@ def main(argv: list[str]) -> int:
             f"materials={','.join(map(str, sorted(summary.materials)))} "
             f"textures={','.join(sorted(summary.textures)) or '-'}"
         )
+    missing = sorted(set(args.require_mids) - summaries.keys())
+    if missing:
+        print(
+            f"missing required mesh IDs: {','.join(map(str, missing))}", file=sys.stderr
+        )
+        return 1
+    if args.require_mids:
+        print(f"required_mesh_ids=PASS count={len(set(args.require_mids))}")
     return 0
 
 

@@ -6,7 +6,6 @@ import re
 import unittest
 from pathlib import Path
 
-
 REPO = Path(__file__).resolve().parents[1]
 HARNESS = REPO / "tools" / "soh3d_harness"
 MANIFEST = HARNESS / "harness.cmake"
@@ -21,7 +20,9 @@ class HarnessStructureTests(unittest.TestCase):
         listed = re.findall(r"\$\{_harness_root\}/([A-Za-z0-9_]+\.cpp)", source)
         actual = sorted(path.name for path in HARNESS.glob("*.cpp"))
 
-        self.assertEqual(len(listed), len(set(listed)), "duplicate harness source in CMake")
+        self.assertEqual(
+            len(listed), len(set(listed)), "duplicate harness source in CMake"
+        )
         self.assertEqual(sorted(listed), actual)
 
     def test_harness_sources_stay_below_the_normal_ceiling(self) -> None:
@@ -114,7 +115,9 @@ class HarnessStructureTests(unittest.TestCase):
                     re.MULTILINE,
                 )
                 for source_path in sources:
-                    with self.subTest(header=header, symbol=symbol, source=source_path.name):
+                    with self.subTest(
+                        header=header, symbol=symbol, source=source_path.name
+                    ):
                         self.assertIsNone(
                             declaration.search(source_path.read_text(encoding="utf-8"))
                         )
@@ -143,15 +146,22 @@ class HarnessStructureTests(unittest.TestCase):
         ):
             self.assertNotIn(forwarded, header)
 
+    def test_actor_command_has_one_dispatch_owner(self) -> None:
+        repl = (HARNESS / "harness_repl.cpp").read_text(encoding="utf-8")
+        player_probe = (HARNESS / "player_probe_commands.cpp").read_text(
+            encoding="utf-8"
+        )
+
+        self.assertEqual(repl.count('cmd == "actors"'), 1)
+        self.assertEqual(repl.count("HarnessOracle::HandleActors(toks)"), 1)
+        self.assertNotIn('command == "actors"', player_probe)
+        self.assertNotIn('#include "oracle_actor_commands.h"', player_probe)
+
     def test_boss_fd_interfaces_have_one_responsibility_each(self) -> None:
         comparison = (HARNESS / "boss_fd_compare.h").read_text(encoding="utf-8")
         state = (HARNESS / "soh_boss_fd_state.h").read_text(encoding="utf-8")
-        profile = (HARNESS / "boss_fd_profile_validation.h").read_text(
-            encoding="utf-8"
-        )
-        policy = (HARNESS / "boss_fd_comparison_policy.h").read_text(
-            encoding="utf-8"
-        )
+        profile = (HARNESS / "boss_fd_profile_validation.h").read_text(encoding="utf-8")
+        policy = (HARNESS / "boss_fd_comparison_policy.h").read_text(encoding="utf-8")
 
         self.assertIn("BossFdCompareStatus", comparison)
         self.assertNotIn("BossFdAuthoredState", comparison)

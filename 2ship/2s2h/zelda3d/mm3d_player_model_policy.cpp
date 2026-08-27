@@ -16,6 +16,15 @@ constexpr std::array<PlayerModelAsset, 5> kPlayerModels = { {
 
 } // namespace
 
+bool PlayerModelFormFromRetailIndex(int formIndex, PlayerModelForm& result) {
+    if (formIndex < static_cast<int>(PlayerModelForm::FierceDeity) ||
+        formIndex > static_cast<int>(PlayerModelForm::Human)) {
+        return false;
+    }
+    result = static_cast<PlayerModelForm>(formIndex);
+    return true;
+}
+
 const PlayerModelAsset& PlayerModelAssetForForm(PlayerModelForm form) {
     return kPlayerModels.at(static_cast<std::size_t>(form));
 }

@@ -106,3 +106,26 @@ edges, including a second attempt using longer engine-native `run` intervals. Th
 recovered paired handoff are therefore proven separately, but a like-for-like visual pair remains
 blocked on generic oracle message dismissal/camera ownership. No model or camera tuning was inferred
 from the mismatched frames.
+
+## Continuation: warning dismissal, response ownership, and anchor falsifier
+
+The generic oracle message sequence is long B ×3 then A (30 held frames, 60
+released frames per edge). That authentic input dismissed the Fire Temple heat
+warning; shorter 4/8-frame edges did not. The next paired run then exposed a
+protocol producer bug rather than a graphics fault: `actors` was routed once
+through `HarnessPlayerProbe` and again by the main REPL, emitting two complete
+`ok actors ... ok end` frames for one command. The client consumed the first
+and paired the second with later input. `actors` now has one dispatch owner,
+the structure test forbids reintroducing the duplicate, and transport terminal
+matching uses the audited command-specific reply shapes instead of timing.
+
+With those fixes, capture `fd2_ground_paired_20260827_i` completed every
+command in sequence and wrote both 800×480 buffers. It is still not parity
+evidence. Reading child `+0x328` yielded `(-239.966,-321.249,-240.000)`, but a
+camera aimed there showed Link on the oracle; the shipping frame showed a small
+BossFd2 at the far left against incomplete/black scene geometry. Therefore
+`+0x328` is not a directly usable rendered-head world anchor in this phase.
+The next grounded step is to expose the oracle post-limb head transform (the
+documented render result is near Y 126.23) and the matching typed shipping
+anchor, then frame from those values. No camera offset or renderer parameter
+was tuned from this failed assumption.
