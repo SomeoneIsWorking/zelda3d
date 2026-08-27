@@ -7,6 +7,7 @@
 #include "2s2h/zelda3d/mm3d_model.h"
 #include "2s2h/zelda3d/mm3d_pending_draw.h"
 #include "2s2h/zelda3d/mm3d_player_model.h"
+#include "2s2h/zelda3d/mm3d_player_right_hand.h"
 #include "2s2h/zelda3d/mm3d_player_sheath.h"
 #include <fast/zelda3d_material_overrides.h>
 #include <stdlib.h> // getenv
@@ -35,11 +36,16 @@ int Zelda3D_TryDrawPlayer(PlayState* play, Actor* actor) {
     if (!Zelda3D_MM_LookupPlayerModel(player->transformation, &modelId, &worldScale, &groundOffset)) {
         return 0;
     }
-    // Retail Player_Draw resets the form CMB, then enables sheath-limb equipment
-    // before the still-unported hand selectors. Preserve that order in one mask snapshot.
+    unsigned long long rightHandMask = 0;
+    if (!Zelda3D_MM_PlayerRightHandMeshMask(player, &rightHandMask)) {
+        return 0;
+    }
+    // Retail Player_Draw resets the form CMB, then enables sheath and right-hand
+    // groups. Preserve that order in one deferred-draw mask snapshot.
     unsigned long long meshMask = Zelda3D_MM_PlayerBaseMeshMask(player->transformation);
     meshMask |= Zelda3D_MM_PlayerSheathMeshMask(player->transformation, player->sheathType, player->currentShield,
                                                 player->currentMask, GET_CUR_EQUIP_VALUE(EQUIP_TYPE_SWORD));
+    meshMask |= rightHandMask;
     Zelda3D_GL_SetMidMask(modelId, meshMask);
     // Player_DrawGameplay still runs so its real SkelAnime draw supplies the live skeleton,
     // joint table and post-limb side effects. SkelAnime_DrawFlexLod consumes this pending draw.

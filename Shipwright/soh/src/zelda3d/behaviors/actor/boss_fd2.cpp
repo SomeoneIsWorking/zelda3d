@@ -3,8 +3,10 @@
 #include "boss_fd2.h"
 #include "boss_fd2_animation_policy.h"
 
+#include "../../anim/pose_tracking.h"
 #include "../../anim/zelda3d_anim_override.h"
 #include "../../anim/skeleton_draw_bridge.h"
+#include "../../diagnostics/model_tuning_query.h"
 #include "../../render/model_draw.h"
 #include "../../render/model_queries.h"
 #include "../../model/zelda3d_cmab.h"
@@ -430,6 +432,11 @@ bool BossFd2Behavior::prepareDeferredDraw(PlayState* play, Actor* actor) {
         return false;
     }
 
+    // OoT3D's post-limb callback FUN_001EC5B8 records limb 14's posed origin at actor+0x328.
+    // Keep the replacement skin pose available so consumers can address the head that was actually
+    // rendered, rather than the unrelated N64 skeleton pose.
+    Zelda3D_SetTrackPosedMinY(modelId, 1);
+
     applyBodyCmabs(play, modelId, boss);
     if (const char* onlyMid = getenv("ZELDA3D_DBG_BOSSFD2_MID")) {
         char* end = nullptr;
@@ -449,6 +456,96 @@ bool BossFd2Behavior::prepareDeferredDraw(PlayState* play, Actor* actor) {
 }
 
 } // namespace Zelda3D
+
+namespace {
+
+struct BossFd2RenderedAnchors {
+    Vec3f head;
+    Vec3f mane[3];
+};
+
+bool computeRenderedAnchors(Actor* actor, BossFd2RenderedAnchors* out) {
+    if (actor == nullptr || out == nullptr || actor->id != ACTOR_BOSS_FD2 || sCsabController.actor != actor) {
+        return 0;
+    }
+
+    const int modelId = bodyModel();
+    // FUN_001EC5B8's five limb-14 callback points. Focus uses (4500,0,0); the rendered head and
+    // three mane roots use the four values below. Literal pool 0x001EC7B0..0x001EC7E0 initializes
+    // these exact vectors before FUN_003735AC transforms them.
+    constexpr float kBonePoints[4][3] = {
+        { 4000.0f, 0.0f, 0.0f },
+        { 4000.0f, -2900.0f, 2000.0f },
+        { 4000.0f, -1600.0f, 0.0f },
+        { 4000.0f, -1600.0f, -2000.0f },
+    };
+    Vec3f modelPoints[4];
+    if (modelId <= 0) {
+        return 0;
+    }
+    for (int index = 0; index < 4; ++index) {
+        float modelPoint[3];
+        if (!Zelda3D_PosedBonePoint(modelId, 14, kBonePoints[index], modelPoint)) {
+            return 0;
+        }
+        modelPoints[index] = { modelPoint[0], modelPoint[1], modelPoint[2] };
+    }
+
+    // Match Zelda3D_EmitModelDraw exactly for BossFd2:
+    // T(world.pos + shape.yOffset*scale.y) * R_YXZ(shape.rot) * S(actor.scale.x) * R(model tuning).
+    // BossFd2's faithful draw-space transform has no local offset and replaces groundOffset.
+    Matrix_Push();
+    Matrix_Translate(actor->world.pos.x, actor->world.pos.y + actor->shape.yOffset * actor->scale.y, actor->world.pos.z,
+                     MTXMODE_NEW);
+    Matrix_RotateY(BINANG_TO_RAD(actor->shape.rot.y), MTXMODE_APPLY);
+    Matrix_RotateX(BINANG_TO_RAD(actor->shape.rot.x), MTXMODE_APPLY);
+    Matrix_RotateZ(BINANG_TO_RAD(actor->shape.rot.z), MTXMODE_APPLY);
+    Matrix_Scale(actor->scale.x, actor->scale.x, actor->scale.x, MTXMODE_APPLY);
+    float rotationX = 0.0f;
+    float rotationY = 0.0f;
+    float rotationZ = 0.0f;
+    Zelda3D_ModelRotationDegrees(&rotationX, &rotationY, &rotationZ);
+    constexpr float kDegreesToRadians = 3.14159265f / 180.0f;
+    Matrix_RotateX(rotationX * kDegreesToRadians, MTXMODE_APPLY);
+    Matrix_RotateY(rotationY * kDegreesToRadians, MTXMODE_APPLY);
+    Matrix_RotateZ(rotationZ * kDegreesToRadians, MTXMODE_APPLY);
+    Vec3f worldPoints[4];
+    for (int index = 0; index < 4; ++index) {
+        Matrix_MultVec3f(&modelPoints[index], &worldPoints[index]);
+    }
+    Matrix_Pop();
+
+    out->head = worldPoints[0];
+    for (int chain = 0; chain < 3; ++chain) {
+        out->mane[chain] = worldPoints[chain + 1];
+    }
+    return 1;
+}
+
+} // namespace
+
+extern "C" int Zelda3D_BossFd2RenderedHeadWorldPos(Actor* actor, float out[3]) {
+    BossFd2RenderedAnchors anchors;
+    if (out == nullptr || !computeRenderedAnchors(actor, &anchors)) {
+        return 0;
+    }
+    out[0] = anchors.head.x;
+    out[1] = anchors.head.y;
+    out[2] = anchors.head.z;
+    return 1;
+}
+
+extern "C" int Zelda3D_BossFd2PrepareRenderedMane(Actor* actor) {
+    BossFd2RenderedAnchors anchors;
+    if (!computeRenderedAnchors(actor, &anchors)) {
+        return 0;
+    }
+    BossFd2* boss = reinterpret_cast<BossFd2*>(actor);
+    boss->centerMane.head = anchors.mane[0];
+    boss->rightMane.head = anchors.mane[1];
+    boss->leftMane.head = anchors.mane[2];
+    return 1;
+}
 
 extern "C" int Zelda3D_BossFd2ResolveAnim(PlayState* play, Actor* actor, const char** outCsab, float* outFrame,
                                           const char** outMorphCsab, float* outMorphFrame, float* outMorphWeight) {

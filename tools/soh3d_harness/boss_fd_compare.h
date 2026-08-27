@@ -11,6 +11,7 @@ enum class BossFdCompareStatus {
 };
 
 BossFdCompareStatus CompareBossFd(uint32_t azPlayState);
+void CompareBossFd2Mane(uint32_t azPlayState);
 BossFdCompareStatus LastBossFdCompareStatus();
 const char* BossFdCompareStatusName(BossFdCompareStatus status);
 

@@ -1,11 +1,15 @@
 #include "soh_boss_fd_state.h"
 
+#include <cstring>
+
 #include "global.h"
 #include "overlays/actors/ovl_Boss_Fd/z_boss_fd.h"
+#include "overlays/actors/ovl_Boss_Fd2/z_boss_fd2.h"
 #include "zelda3d/behaviors/actor/boss_fd/authored_flight.h"
 #include "zelda3d/behaviors/actor/boss_fd.h"
 #include "zelda3d/behaviors/actor/boss_fd/forced_flight.h"
 #include "zelda3d/behaviors/actor/boss_fd2.h"
+#include "zelda3d/behaviors/actor/boss_fd2_bridge.h"
 
 namespace {
 
@@ -115,6 +119,55 @@ int SohState_BossFd2ForceGround(uintptr_t* outAddress) {
         return 0;
     }
     *outAddress = reinterpret_cast<uintptr_t>(boss);
+    return 1;
+}
+
+int SohState_BossFd2RenderedAnchor(float outHead[3], short* outShapeYaw) {
+    Actor* boss = FindBossActor(ACTOR_BOSS_FD2);
+    if (boss == nullptr || outShapeYaw == nullptr || !Zelda3D_BossFd2RenderedHeadWorldPos(boss, outHead)) {
+        return 0;
+    }
+    *outShapeYaw = boss->shape.rot.y;
+    return 1;
+}
+
+int SohState_BossFd2Mane(BossFd2ManeState* outState) {
+    BossFd2* boss = reinterpret_cast<BossFd2*>(FindBossActor(ACTOR_BOSS_FD2));
+    if (boss == nullptr || outState == nullptr) {
+        return 0;
+    }
+    const BossFd2Mane* manes[3] = { &boss->centerMane, &boss->rightMane, &boss->leftMane };
+    for (int chain = 0; chain < 3; ++chain) {
+        outState->head[chain][0] = manes[chain]->head.x;
+        outState->head[chain][1] = manes[chain]->head.y;
+        outState->head[chain][2] = manes[chain]->head.z;
+        for (int segment = 0; segment < 10; ++segment) {
+            outState->pos[chain][segment][0] = manes[chain]->pos[segment].x;
+            outState->pos[chain][segment][1] = manes[chain]->pos[segment].y;
+            outState->pos[chain][segment][2] = manes[chain]->pos[segment].z;
+        }
+    }
+    return 1;
+}
+
+int SohState_BossFd2SyncMane(const float worldPos[3]) {
+    BossFd2* boss = reinterpret_cast<BossFd2*>(FindBossActor(ACTOR_BOSS_FD2));
+    if (boss == nullptr || worldPos == nullptr) {
+        return 0;
+    }
+    boss->actor.world.pos = { worldPos[0], worldPos[1], worldPos[2] };
+    boss->actor.prevPos = boss->actor.world.pos;
+    if (!Zelda3D_BossFd2PrepareRenderedMane(&boss->actor)) {
+        return 0;
+    }
+    BossFd2Mane* manes[3] = { &boss->centerMane, &boss->rightMane, &boss->leftMane };
+    for (BossFd2Mane* mane : manes) {
+        std::memset(mane->rot, 0, sizeof(mane->rot));
+        std::memset(mane->pull, 0, sizeof(mane->pull));
+        for (Vec3f& pos : mane->pos) {
+            pos = mane->head;
+        }
+    }
     return 1;
 }
 

@@ -10,6 +10,8 @@ extern "C" {
 
 int Zelda3D_BossFd2DrawManeSegment(PlayState* play, Actor* actor, int chain, int segment, const Vec3f* pos,
                                    const Vec3f* rot, const Vec3f* scale);
+// Applies the posed CMB limb-14 roots. Returns 1 when available, 0 for the native fallback.
+int Zelda3D_BossFd2PrepareRenderedMane(Actor* actor);
 int Zelda3D_BossFd2ForceGround(Actor* actor);
 int Zelda3D_BossFd2ForceDamageState(PlayState* play, Actor* actor, int state);
 void Zelda3D_BossFd2IdleTick(PlayState* play, Actor* actor);

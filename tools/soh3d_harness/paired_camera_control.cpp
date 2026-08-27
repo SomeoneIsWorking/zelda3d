@@ -177,21 +177,52 @@ void SetCamera(std::istringstream& arguments) {
         HarnessRepl::PrintErr("force camera: usage: force camera <eyeX> <eyeY> <eyeZ> <atX> <atY> <atZ> <fov>");
         return;
     }
-    if (!HarnessSohRuntime::IsBooted() || !SohState_HasPlayState() || !HarnessOracle::GameplayPlayState()) {
-        HarnessRepl::PrintErr("force camera: both engines must be in gameplay");
-        return;
-    }
-    if (!ApplyOracle(eye, at, *fov)) {
-        HarnessRepl::PrintErr("force camera: could not apply the paired gameplay camera");
-        return;
-    }
-    if (!SohState_SetCameraOverride(1, eye.data(), at.data(), *fov)) {
-        DisableOracle();
+    if (!Apply(eye, at, eye, at, *fov)) {
         HarnessRepl::PrintErr("force camera: could not apply the paired gameplay camera");
         return;
     }
     std::printf("ok force camera eye=(%.3f,%.3f,%.3f) at=(%.3f,%.3f,%.3f) fov=%.3f\n", eye[0], eye[1], eye[2], at[0],
                 at[1], at[2], *fov);
+}
+
+void SetCameraPair(std::istringstream& arguments) {
+    std::array<float, 3> oracleEye{};
+    std::array<float, 3> oracleAt{};
+    std::array<float, 3> sohEye{};
+    std::array<float, 3> sohAt{};
+    std::array<float*, 12> outputs = { &oracleEye[0], &oracleEye[1], &oracleEye[2], &oracleAt[0],
+                                       &oracleAt[1],  &oracleAt[2],  &sohEye[0],    &sohEye[1],
+                                       &sohEye[2],    &sohAt[0],     &sohAt[1],     &sohAt[2] };
+    for (float* output : outputs) {
+        std::string text;
+        if (!(arguments >> text)) {
+            HarnessRepl::PrintErr("force camera_pair: usage: force camera_pair <oracleEye xyz> <oracleAt xyz> <sohEye "
+                                  "xyz> <sohAt xyz> <fov>");
+            return;
+        }
+        const auto value = ParseFiniteFloat(text);
+        if (!value) {
+            HarnessRepl::PrintErr("force camera_pair: coordinates must be finite numbers");
+            return;
+        }
+        *output = *value;
+    }
+    std::string fovText;
+    const auto fov = (arguments >> fovText) ? ParseFiniteFloat(fovText) : std::optional<float>{};
+    std::string trailing;
+    if (!fov || *fov <= 0.0f || *fov >= 180.0f || (arguments >> trailing)) {
+        HarnessRepl::PrintErr("force camera_pair: usage: force camera_pair <oracleEye xyz> <oracleAt xyz> <sohEye xyz> "
+                              "<sohAt xyz> <fov>");
+        return;
+    }
+    if (!Apply(oracleEye, oracleAt, sohEye, sohAt, *fov)) {
+        HarnessRepl::PrintErr("force camera_pair: could not apply the paired gameplay cameras");
+        return;
+    }
+    std::printf("ok force camera_pair oracleEye=(%.3f,%.3f,%.3f) oracleAt=(%.3f,%.3f,%.3f) "
+                "sohEye=(%.3f,%.3f,%.3f) sohAt=(%.3f,%.3f,%.3f) fov=%.3f\n",
+                oracleEye[0], oracleEye[1], oracleEye[2], oracleAt[0], oracleAt[1], oracleAt[2], sohEye[0], sohEye[1],
+                sohEye[2], sohAt[0], sohAt[1], sohAt[2], *fov);
 }
 
 void DisableCamera() {
@@ -206,6 +237,19 @@ void DisableCamera() {
 }
 
 } // namespace
+
+bool Apply(const std::array<float, 3>& oracleEye, const std::array<float, 3>& oracleAt,
+           const std::array<float, 3>& sohEye, const std::array<float, 3>& sohAt, float fov) {
+    if (!std::isfinite(fov) || fov <= 0.0f || fov >= 180.0f || !HarnessSohRuntime::IsBooted() ||
+        !SohState_HasPlayState() || !HarnessOracle::GameplayPlayState() || !ApplyOracle(oracleEye, oracleAt, fov)) {
+        return false;
+    }
+    if (!SohState_SetCameraOverride(1, sohEye.data(), sohAt.data(), fov)) {
+        DisableOracle();
+        return false;
+    }
+    return true;
+}
 
 void OverrideOracleWrite(uint32_t address, uint32_t size) {
     if (g_writingOverride || !g_oracleOverride) {
@@ -224,6 +268,10 @@ void OverrideOracleWrite(uint32_t address, uint32_t size) {
 bool HandleForce(std::string_view subcommand, std::istringstream& arguments) {
     if (subcommand == "camera") {
         SetCamera(arguments);
+        return true;
+    }
+    if (subcommand == "camera_pair") {
+        SetCameraPair(arguments);
         return true;
     }
     if (subcommand == "camera_off") {

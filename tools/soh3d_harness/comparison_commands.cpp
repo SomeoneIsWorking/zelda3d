@@ -34,6 +34,7 @@ void HandleCompare(std::istringstream& toks) {
                              "pos + rot)\n"
                              "  bossfd             validated Boss_Fd authored producer + "
                              "150-entry history\n"
+                             "  bossfd2_mane       head-relative positions for all three 10-point mane chains\n"
                              "  camera             active camera eye/at/up/fov/roll — the\n"
                              "                     title-screen demo drives this on a spline;\n"
                              "                     mismatches here explain framing/parallax\n"
@@ -59,6 +60,8 @@ void HandleCompare(std::istringstream& toks) {
         CompareActors(HarnessOracle::CurrentPlayState().value_or(0));
     else if (sub == "bossfd") {
         bossFdStatus = CompareBossFd(HarnessOracle::CurrentPlayState().value_or(0));
+    } else if (sub == "bossfd2_mane") {
+        CompareBossFd2Mane(HarnessOracle::CurrentPlayState().value_or(0));
     } else if (sub == "camera")
         HarnessOracle::CompareCameraImpl();
     else if (sub == "skeleton") {

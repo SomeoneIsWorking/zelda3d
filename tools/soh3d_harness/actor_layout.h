@@ -19,6 +19,7 @@ inline constexpr uint32_t kIdOffset = 0x0000;
 // instead read Actor.world at +0x28/+0x34, matching SoH's Actor.world fields.
 inline constexpr uint32_t kWorldPosOffset = 0x0028;
 inline constexpr uint32_t kWorldRotOffset = 0x0034;
+inline constexpr uint32_t kShapeRotOffset = 0x00BC;
 inline constexpr uint32_t kNextOffset = 0x0130;
 
 constexpr uint32_t ListAddress(uint32_t playStateAddress, uint32_t category) {

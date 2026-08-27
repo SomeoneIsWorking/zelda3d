@@ -24,7 +24,11 @@ class BossFd2Behavior : public ActorBehavior {
 extern "C" {
 #endif
 
-// Called from BossFd2_UpdateMane after the native chain simulation has produced the exact world
+// Return the rendered OoT3D body model's posed limb-14 origin in engine world space. This is the
+// typed counterpart of OoT3D FUN_001EC5B8 writing the live limb matrix origin to actor+0x328.
+int Zelda3D_BossFd2RenderedHeadWorldPos(Actor* actor, float out[3]);
+
+// Called from the focused mane owner after the shared chain simulation has produced the exact world
 // transform. Returns 1 when the OoT3D fire-hair CMB was submitted, 0 to retain the N64 segment.
 int Zelda3D_BossFd2DrawManeSegment(PlayState* play, Actor* actor, int chain, int segment, const Vec3f* pos,
                                    const Vec3f* rot, const Vec3f* scale);
