@@ -2788,8 +2788,8 @@ typedef union Gfx {
 // docs/oot3d_world_lighting_re.md formula) off even when the model's authored material asks for
 // it, so a self-illuminated 2D overlay (e.g. the title-demo logo wordmark) renders at its baked/
 // texture colours full-bright instead of being darkened by whatever world ambient the scene
-// behind it is running. Distinct from bit30 (sky), which only affects depth/AO treatment, not
-// the lighting term.
+// behind it is running. Bit30 (sky) only affects depth/AO treatment, not the lighting term.
+#define ZELDA3D_HANDLE_LIT (1u << 31)
 #define ZELDA3D_HANDLE_FORCE_UNLIT (1u << 29)
 // Bit 28 (ZELDA3D_HANDLE_SCREEN_SPACE below): this draw's MP_matrix already came from a
 // self-contained, fixed-aspect orthographic projection (Zelda3D_Overlay2D_Begin's 400x240

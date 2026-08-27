@@ -377,7 +377,7 @@ void drawManeChain(PlayState* play, BossFd* boss, const State& state, int modelI
         Vec3f rot = { -(state.maneRot[index].x + pitch), state.maneRot[index].y + yaw, 0.0f };
         const float taper = 0.01f - segment * 0.0008f;
         Vec3f scale = { state.maneScale[mode][index] * taper, state.maneScale[mode][index] * taper, 0.01f };
-        Zelda3D_DrawModelTransform(play, modelId, &pos, &rot, &scale, -kPi * 0.5f);
+        Zelda3D_DrawModelTransformFlags(play, modelId, &pos, &rot, &scale, -kPi * 0.5f, ZELDA3D_MODEL_DRAW_FORCE_UNLIT);
     }
 }
 

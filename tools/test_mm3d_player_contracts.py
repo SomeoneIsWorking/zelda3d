@@ -110,11 +110,13 @@ class MmPlayerContractTests(unittest.TestCase):
         self.assertIn(
             "Zelda3D_MM_PlayerRightHandMeshMask(player, &rightHandMask)", player
         )
+        self.assertIn("Zelda3D_MM_PlayerLeftHandMeshMask(", player)
         self.assertLess(
             player.index("Zelda3D_MM_PlayerRightHandMeshMask"),
             player.index("Zelda3D_GL_SetMidMask"),
         )
         self.assertIn("meshMask |= rightHandMask;", player)
+        self.assertIn("meshMask |= leftHandMask;", player)
         for typed_input in (
             "player->sheathType",
             "player->currentShield",
@@ -192,6 +194,10 @@ class MmPlayerContractTests(unittest.TestCase):
             MM / "mm3d_player_right_hand.h",
             MM / "mm3d_player_right_hand_policy.cpp",
             MM / "mm3d_player_right_hand_policy.h",
+            MM / "mm3d_player_left_hand.cpp",
+            MM / "mm3d_player_left_hand.h",
+            MM / "mm3d_player_left_hand_policy.cpp",
+            MM / "mm3d_player_left_hand_policy.h",
             MM / "mm3d_player_animation.cpp",
             MM / "mm3d_player_animation.h",
             MM / "mm3d_animation_playhead.h",

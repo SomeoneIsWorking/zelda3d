@@ -7,6 +7,7 @@
 #include "2s2h/zelda3d/mm3d_model.h"
 #include "2s2h/zelda3d/mm3d_pending_draw.h"
 #include "2s2h/zelda3d/mm3d_player_model.h"
+#include "2s2h/zelda3d/mm3d_player_left_hand.h"
 #include "2s2h/zelda3d/mm3d_player_right_hand.h"
 #include "2s2h/zelda3d/mm3d_player_sheath.h"
 #include <fast/zelda3d_material_overrides.h>
@@ -37,6 +38,10 @@ int Zelda3D_TryDrawPlayer(PlayState* play, Actor* actor) {
         return 0;
     }
     unsigned long long rightHandMask = 0;
+    unsigned long long leftHandMask = 0;
+    if (!Zelda3D_MM_PlayerLeftHandMeshMask(player, GET_CUR_EQUIP_VALUE(EQUIP_TYPE_SWORD), &leftHandMask)) {
+        return 0;
+    }
     if (!Zelda3D_MM_PlayerRightHandMeshMask(player, &rightHandMask)) {
         return 0;
     }
@@ -46,6 +51,7 @@ int Zelda3D_TryDrawPlayer(PlayState* play, Actor* actor) {
     meshMask |= Zelda3D_MM_PlayerSheathMeshMask(player->transformation, player->sheathType, player->currentShield,
                                                 player->currentMask, GET_CUR_EQUIP_VALUE(EQUIP_TYPE_SWORD));
     meshMask |= rightHandMask;
+    meshMask |= leftHandMask;
     Zelda3D_GL_SetMidMask(modelId, meshMask);
     // Player_DrawGameplay still runs so its real SkelAnime draw supplies the live skeleton,
     // joint table and post-limb side effects. SkelAnime_DrawFlexLod consumes this pending draw.

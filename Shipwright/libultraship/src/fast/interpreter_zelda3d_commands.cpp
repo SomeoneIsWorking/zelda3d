@@ -69,12 +69,12 @@ bool gfx_zelda3d_draw_handler_custom(F3DGfx** cmd0) {
     // The emitter packs a "lit" flag into the handle's high bit (modelIds are small): 1 = apply the
     // character/prop lighting term, 0 = scene geometry (keeps its baked vertex colours). Mask it off
     // to recover the model id.
-    int lit = (handle < 0) ? 1 : 0; // bit 31 = lit (half-Lambert form term)
-    int sky = (handle >> 30) & 1;   // bit 30 = skybox dome (far-plane depth, no shadow/AO)
+    int sky = (handle >> 30) & 1; // bit 30 = skybox dome (far-plane depth, no shadow/AO)
     // bit 29 = force-unlit override (ZELDA3D_HANDLE_FORCE_UNLIT): ignore the CMB material's own
     // vertex_lighting flag for this draw so a self-illuminated overlay (title logo) isn't darkened
     // by the scene's ambient/world lighting term. See gbi.h comment above gSPZelda3DDrawUV.
     int forceUnlit = (handle >> 29) & 1;
+    int lit = (handle < 0) && !forceUnlit; // bit 31 = lit (half-Lambert form term)
     // bit 28 = screen-space override (ZELDA3D_HANDLE_SCREEN_SPACE): this draw's MP already came
     // from a self-contained fixed-aspect ortho projection (title overlay), not the 3D camera's
     // N64-4:3-authored one — skip the widescreen aspect correction below. See gbi.h.
