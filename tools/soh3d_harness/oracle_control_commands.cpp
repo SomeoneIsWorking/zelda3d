@@ -51,6 +51,8 @@ void HandleForce(std::istringstream& toks) {
                              "                    the Play gamestate.\n"
                              "  bossfd_profile    synchronously apply the scoped authored-flight\n"
                              "                    producer profile to both live Boss_Fd actors.\n"
+                             "  bossfd2_ground    signal both live Boss_Fd2 actors through their\n"
+                             "                    genuine Boss_Fd parent handoff.\n"
                              "  bossfd_fault <apply|restore>\n"
                              "                    reversibly corrupt one non-lead oracle history\n"
                              "                    sample for a required DIVERGED falsifier.\n"

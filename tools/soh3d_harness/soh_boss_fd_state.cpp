@@ -5,10 +5,11 @@
 #include "zelda3d/behaviors/actor/boss_fd/authored_flight.h"
 #include "zelda3d/behaviors/actor/boss_fd.h"
 #include "zelda3d/behaviors/actor/boss_fd/forced_flight.h"
+#include "zelda3d/behaviors/actor/boss_fd2.h"
 
 namespace {
 
-BossFd* FindBossFd() {
+Actor* FindBossActor(s16 actorId) {
     if (gPlayState == nullptr) {
         return nullptr;
     }
@@ -16,11 +17,15 @@ BossFd* FindBossFd() {
     ActorListEntry* bosses = &gPlayState->actorCtx.actorLists[ACTORCAT_BOSS];
     int remaining = bosses->length + 4;
     for (Actor* actor = bosses->head; actor != nullptr && remaining-- > 0; actor = actor->next) {
-        if (actor->id == ACTOR_BOSS_FD) {
-            return reinterpret_cast<BossFd*>(actor);
+        if (actor->id == actorId) {
+            return actor;
         }
     }
     return nullptr;
+}
+
+BossFd* FindBossFd() {
+    return reinterpret_cast<BossFd*>(FindBossActor(ACTOR_BOSS_FD));
 }
 
 } // namespace
@@ -98,6 +103,15 @@ int SohState_BossFdForceFlightSeeded(const float* pos3, const short* rot3, uintp
     }
     BossFd* boss = FindBossFd();
     if (boss == nullptr || !Zelda3D_BossFdForceFlySeeded(&boss->actor, pos3, rot3)) {
+        return 0;
+    }
+    *outAddress = reinterpret_cast<uintptr_t>(boss);
+    return 1;
+}
+
+int SohState_BossFd2ForceGround(uintptr_t* outAddress) {
+    Actor* boss = FindBossActor(ACTOR_BOSS_FD2);
+    if (boss == nullptr || outAddress == nullptr || !Zelda3D_BossFd2ForceGround(boss)) {
         return 0;
     }
     *outAddress = reinterpret_cast<uintptr_t>(boss);

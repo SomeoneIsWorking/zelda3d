@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Parser for OoT3D CMB models (geometry + skeleton + material/texture refs).
+"""Parser for OoT3D/MM3D CMB models (geometry + skeleton + material/texture refs).
 
 Indexing model (verified against noclip.website OcarinaOfTime3D/cmb.ts):
   - VATR holds one raw byte-buffer per attribute (position/normal/color/uv/...).
@@ -121,13 +121,17 @@ class Cmb:
         self.name = b[0x10:0x20].split(b"\x00")[0].decode("ascii","replace")
         self.index_count = _u32(b,0x20)
         self.skl_ptr  = _u32(b,0x24)
-        self.mats_ptr = _u32(b,0x28)
-        self.tex_ptr  = _u32(b,0x2C)
-        self.sklm_ptr = _u32(b,0x30)
-        self.luts_ptr = _u32(b,0x34)
-        self.vatr_ptr = _u32(b,0x38)
-        self.idx_ptr  = _u32(b,0x3C)
-        self.texdata_ptr = _u32(b,0x40)
+        # MM3D (v>=7) inserts a qtrs pointer after skl, shifting the remaining
+        # chunk pointers by four bytes. This is the same version gate as the
+        # shipping C++ parser (Shipwright/cmb3d/asset/cmb.cpp).
+        d = 4 if self.version >= 7 else 0
+        self.mats_ptr = _u32(b,0x28+d)
+        self.tex_ptr  = _u32(b,0x2C+d)
+        self.sklm_ptr = _u32(b,0x30+d)
+        self.luts_ptr = _u32(b,0x34+d)
+        self.vatr_ptr = _u32(b,0x38+d)
+        self.idx_ptr  = _u32(b,0x3C+d)
+        self.texdata_ptr = _u32(b,0x40+d)
         self.attrs_def = ATTRS_MM3D if self.version>=7 else ATTRS_OOT3D
         self._parse_skl()
         self._compute_bone_matrices()
@@ -143,11 +147,12 @@ class Cmb:
         n=_u32(b,p+8)
         self.bones=[]
         o=p+0x10
+        bone_stride = 0x2C if self.version >= 7 else 0x28
         for _ in range(n):
             bid=_u8(b,o); parent=_s16(b,o+2)
             scale=_vec(b,o+4,3); rot=_vec(b,o+0x10,3); trans=_vec(b,o+0x1C,3)
             self.bones.append(Bone(bid,parent,scale,rot,trans))
-            o+=0x28   # id+unk+parent(4) + scale/rot/trans(3x12=36) = 0x28
+            o += bone_stride
 
     # ---- bind-pose bone matrices ----
     def _compute_bone_matrices(self):
@@ -247,10 +252,11 @@ class Cmb:
         mesh_count=_u32(b,mshs_off+8)
         self.meshes=[]
         mo=mshs_off+0x10
+        mesh_stride = 0x0C if self.version >= 7 else 0x04
         for _ in range(mesh_count):
             sepd_i=_u16(b,mo); mat_i=_u8(b,mo+2); mid=_u8(b,mo+3)
             self.meshes.append(Mesh(sepd_i,mat_i,mid))
-            mo+=4   # OoT3D mesh stride = 4
+            mo += mesh_stride
         # SHP: shapes -> SEPDs
         assert b[shp_off:shp_off+4]==b"shp ", "bad shp"
         sepd_count=_u32(b,shp_off+8)

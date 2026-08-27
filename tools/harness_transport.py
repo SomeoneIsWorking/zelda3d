@@ -35,7 +35,7 @@ def _read_streaming_response(
     lines = [first.rstrip()]
     if lines[0].startswith("err "):
         return lines
-    first_ok = lines[0].startswith("ok ")
+    first_ok = lines[0] == "ok" or lines[0].startswith("ok ")
     if first_ok:
         peek = read_line(peek_timeout)
         if peek is None:

@@ -25,6 +25,14 @@ class ResponseReader:
 
 
 class StreamingResponseTests(unittest.TestCase):
+    def test_bare_ok_ends_after_peek_timeout(self) -> None:
+        reader = ResponseReader(["ok", None])
+
+        result = _read_streaming_response(reader, "input 0x100", 30.0, 0.2)
+
+        self.assertEqual(result, ["ok"])
+        self.assertEqual(reader.timeouts, [30.0, 0.2])
+
     def test_single_line_ok_ends_after_peek_timeout(self) -> None:
         reader = ResponseReader(["ok 123", None])
 

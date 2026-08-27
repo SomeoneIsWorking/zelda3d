@@ -10,6 +10,7 @@
 #include "2s2h/zelda3d/mm3d_model_diagnostics.h"
 #include "2s2h/zelda3d/mm3d_pending_draw.h"
 
+#include <fast/zelda3d_pose.h>
 #include <stdio.h>  // fprintf (bring-up diagnostic)
 #include <stdlib.h> // getenv, atoi
 #include "global.h" // Actor, PlayState, POLY_OPA_DISP, Matrix_*, Gfx_SetupDL25_Opa, gSPZelda3DDraw
@@ -33,6 +34,11 @@ static void Zelda3D_EmitModelDraw(PlayState* play, Actor* actor, int modelId, fl
     }
 
     MATRIX_FINALIZE_AND_LOAD(POLY_OPA_DISP++, play->state.gfxCtx);
+
+    // The display list executes after actor traversal, so snapshot this draw's current
+    // pose and material overrides in emit order. This is also what carries an MM Player
+    // form's visible-mesh mask to the matching deferred submission.
+    Zelda3D_GL_EmitPose(modelId);
 
     // High bit of the handle = "lit": apply the renderer's half-Lambert FORM term.
     // Characters/props carry no baked vertex lighting, so without it they render flat.

@@ -1,11 +1,13 @@
 #include "framebuffer_snapshot.h"
 
 #include <cstdio>
+#include <filesystem>
 #include <string>
 
 #include "frontend_presentation.h"
 #include "repl_protocol.h"
 #include "soh_capture_bridge.h"
+#include "soh_runtime.h"
 
 namespace HarnessCapture {
 
@@ -54,10 +56,22 @@ void HandleSnapshot(std::istringstream& toks) {
         PrintErr("snapshot: usage: snapshot <basepath>");
         return;
     }
-    const std::string az_path = base + ".az.ppm";
-    const std::string soh_path = base + ".soh.ppm";
+    std::filesystem::path basePath(base);
+    if (basePath.is_relative()) {
+        // Embedded SoH deliberately changes cwd to scratch/harness/soh_cwd. Keep the REPL contract
+        // repo-relative across that lifecycle transition instead of resolving output under SoH's cwd.
+        basePath = std::filesystem::path(ZELDA3D_HARNESS_REPO_ROOT) / basePath;
+    }
+    const std::string az_path = basePath.string() + ".az.ppm";
+    const std::string soh_path = basePath.string() + ".soh.ppm";
     const bool az_ok = WriteAzahar_Ppm(az_path);
     const bool soh_ok = WriteSoh_Ppm(soh_path);
+    const bool sohRequired = HarnessSohRuntime::IsBooted();
+    if (!az_ok || (sohRequired && !soh_ok)) {
+        std::printf("err snapshot az=%s soh=%s soh_required=%d az_path=%s soh_path=%s\n", az_ok ? "wrote" : "failed",
+                    soh_ok ? "wrote" : "failed", sohRequired ? 1 : 0, az_path.c_str(), soh_path.c_str());
+        return;
+    }
     std::printf("ok snapshot\n"
                 "  az:  %s %s (%ux%u)\n"
                 "  soh: %s %s (%ux%u)\n"

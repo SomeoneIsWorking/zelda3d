@@ -42,7 +42,7 @@ bool ReadFloatArray(Memory::MemorySystem& memory, uint32_t address, float* out, 
 
 } // namespace
 
-Lookup Find(Memory::MemorySystem& memory, uint32_t playState) {
+Lookup FindById(Memory::MemorySystem& memory, uint32_t playState, uint16_t actorId) {
     const uint32_t list = ActorLayout::ListAddress(playState, kCategory);
     const auto count = memory.Read32OrNullopt(list + ActorLayout::kListCountOffset);
     const auto head = memory.Read32OrNullopt(list + ActorLayout::kListHeadOffset);
@@ -64,7 +64,7 @@ Lookup Find(Memory::MemorySystem& memory, uint32_t playState) {
         if (!id) {
             return { LookupStatus::Invalid, 0 };
         }
-        if ((*id & 0xFFFF) == kActorId) {
+        if ((*id & 0xFFFF) == actorId) {
             return { LookupStatus::Found, actor };
         }
         const auto next = memory.Read32OrNullopt(actor + ActorLayout::kNextOffset);
@@ -74,6 +74,10 @@ Lookup Find(Memory::MemorySystem& memory, uint32_t playState) {
         actor = *next;
     }
     return { actor == 0 && traversed == *count ? LookupStatus::Missing : LookupStatus::Invalid, 0 };
+}
+
+Lookup Find(Memory::MemorySystem& memory, uint32_t playState) {
+    return FindById(memory, playState, kActorId);
 }
 
 bool Read(Memory::MemorySystem& memory, uint32_t playState, uint32_t actor, State* out) {

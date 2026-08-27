@@ -72,3 +72,37 @@ The shipping Clang build, focused clang-format/clang-tidy checks, CTest, codemap
 checks pass. The normal all-source verifier still stops on eleven untouched legacy SoH files whose
 current line counts exceed their frozen ceilings. No ceiling was raised and none of those failures is
 claimed as passing evidence for this milestone.
+
+## Continuation: paired BossFd2 handoff and capture-path root cause
+
+The August 27 claim that isolated model 2004 contained no visible body was falsified by a fresh
+shipping run. `fd2ground` + `fd2idle 1` + `aaim` resolved `vba_search`; model 2004 was submitted, and
+a fixed-distance same-frame model-on/off pair isolated a 57-pixel-wide vertical body silhouette.
+That observation proves the body is present, but it does not by itself prove visual parity.
+
+The embedded harness had no typed way to drive the oracle into the same ground-form handoff. The
+already-decompiled `FUN_003E4790` supplies the missing layout: BossFd2 parent pointer `+0x124`, then
+BossFd parent handoff byte `+0x940`, with `0x64` selecting ground form. New paired command
+`force bossfd2_ground` finds the live 0xA2 child, verifies its 0x96 parent, writes only that recovered
+signal on the oracle, and invokes the shipping typed control on SoH. A live paired run found both
+actor pairs and accepted the exact handoff (`oracle=0x0990c440 parent=0x09907860 signal=0x64`).
+
+The first paired snapshots misleadingly returned `ok snapshot` with both sides marked `skip` and no
+files. This was not a GPU or model failure: `soh_boot` deliberately changes process cwd to
+`scratch/harness/soh_cwd`, while the snapshot command resolved its documented repo-relative output
+against the current cwd. `framebuffer_snapshot.cpp` now anchors relative basenames to
+`ZELDA3D_HARNESS_REPO_ROOT`. It also returns `err snapshot` when the oracle buffer, or a required
+booted-SoH buffer, cannot be written; a printed `skip` can no longer masquerade as evidence.
+
+The next run exposed a separate response-framing defect before it could test the image path.
+Oracle `input` returns the protocol's valid bare `ok`, but `_read_streaming_response` recognized
+only `ok ` with a payload and waited for a nonexistent continuation line. The shared framer now
+accepts both terminal shapes, with a regression using the exact `input 0x100` reply.
+
+With both tooling fixes live, paired captures `fd2_ground_paired_20260827_d` and `_e` wrote both
+800x480 buffers. They are not parity evidence: SoH dismissed the heat warning and rendered the
+ground-form body, while the oracle remained in the heat-warning textbox/camera after three A-button
+edges, including a second attempt using longer engine-native `run` intervals. The shipping body and
+recovered paired handoff are therefore proven separately, but a like-for-like visual pair remains
+blocked on generic oracle message dismissal/camera ownership. No model or camera tuning was inferred
+from the mismatched frames.
