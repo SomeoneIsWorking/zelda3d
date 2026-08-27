@@ -346,6 +346,17 @@ add_subdirectory(${ZELDA3D_OOT_DIR} ${CMAKE_BINARY_DIR}/soh)
 add_subdirectory(${ZELDA3D_MM_DIR} ${CMAKE_BINARY_DIR}/mm)
 
 if(LUS_BUILD_TESTS)
+    enable_testing()
+
+    add_executable(boss_fd2_animation_policy_test
+        tools/boss_fd2_animation_policy_test.cpp
+        Shipwright/soh/src/zelda3d/behaviors/actor/boss_fd2_animation_policy.cpp
+    )
+    target_include_directories(boss_fd2_animation_policy_test PRIVATE
+        Shipwright/soh/src/zelda3d/behaviors/actor
+    )
+    add_test(NAME boss_fd2_animation_policy_test COMMAND boss_fd2_animation_policy_test)
+
     add_executable(mm3d_player_animation_policy_test
         tools/mm3d_player_animation_policy_test.cpp
         2ship/2s2h/zelda3d/mm3d_player_animation_policy.cpp

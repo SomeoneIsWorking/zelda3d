@@ -85,26 +85,37 @@ class MMRuntime:
             )
 
         self.paths.runtime_dir.mkdir(parents=True, exist_ok=True)
+        self.paths.log.write_bytes(b"")
+        xvfb_command = [
+            "Xvfb",
+            self.paths.display,
+            "-screen",
+            "0",
+            "1280x960x24",
+        ]
         with self.paths.xvfb_log.open("wb") as xvfb_log:
             xvfb_process = subprocess.Popen(
-                ["Xvfb", self.paths.display, "-screen", "0", "1280x960x24"],
+                xvfb_command,
                 stdout=xvfb_log,
                 stderr=subprocess.STDOUT,
                 start_new_session=True,
             )
-        xvfb = self._capture_started_process(xvfb_process, "Xvfb")
+        xvfb = self._capture_started_process(xvfb_process, "Xvfb", tuple(xvfb_command))
         try:
             self._wait_for_display(xvfb, display_socket)
+            game_command = [str(self.paths.binary), "mm"]
             with self.paths.log.open("wb") as game_log:
                 game_process = subprocess.Popen(
-                    [str(self.paths.binary), "mm"],
+                    game_command,
                     cwd=self.paths.game_dir,
                     env=env,
                     stdout=game_log,
                     stderr=subprocess.STDOUT,
                     start_new_session=True,
                 )
-            game = self._capture_started_process(game_process, "zelda3d mm")
+            game = self._capture_started_process(
+                game_process, "zelda3d mm", tuple(game_command)
+            )
         except BaseException:
             self._terminate_spawned(xvfb_process)
             raise
@@ -208,11 +219,12 @@ class MMRuntime:
         self,
         process: subprocess.Popen[bytes],
         label: str,
+        expected_argv: tuple[str, ...],
     ) -> ProcessIdentity:
         deadline = time.monotonic() + 1.0
         while time.monotonic() < deadline:
             identity = inspect_process(process.pid)
-            if identity is not None:
+            if identity is not None and identity.argv == expected_argv:
                 return identity
             if process.poll() is not None:
                 break

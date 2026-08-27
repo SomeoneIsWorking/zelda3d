@@ -49,7 +49,10 @@ class LiveMM:
         instance = self.runtime.start(
             self.lease,
             hex(entrance),
-            extra_env={"ZELDA3D_MM_PHASE_REPORT": "1"},
+            extra_env={
+                "ZELDA3D_MM_PHASE_REPORT": "1",
+                "ZELDA3D_MM_SKINNED": "1",
+            },
         )
         self.started = True
         position = self.runtime.wait_for_gameplay(

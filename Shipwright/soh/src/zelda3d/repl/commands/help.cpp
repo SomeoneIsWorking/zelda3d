@@ -20,7 +20,7 @@ constexpr const char* kCommandCatalog[] = {
     "skip skiptest",
     "actor: asel ztarget ztargetstate ahide afreeze apos arot aparams acam aaim aorbit ainfo actors "
     "actorscan actorsnear apeek bscan asample spawn spawnp floaters",
-    "actor behavior: vbball vbinfo fd2ground fdfly fddeath fdfx fdinfo fd2idle fd2state chickflap "
+    "actor behavior: vbball vbinfo fd2ground fdfly fddeath fdfx fdinfo fd2idle fd2info fd2state chickflap "
     "cuccoheld cuccopose cuccostate flapinfo wingflap wingmap wingprobe enkomask dooraxis doorbone "
     "doorforce doorgain doorhold swtilt",
     "pose/geometry: bitem boneinfo bonerot bonestats cvari faceframe facial mptrace morph posescan "

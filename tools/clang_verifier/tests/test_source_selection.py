@@ -61,3 +61,19 @@ class SourceSelectionTests(unittest.TestCase):
             files = repository_files(root, STRUCTURE_SUFFIXES)
 
         self.assertEqual(files, [])
+
+    def test_repository_files_ignores_source_symlink_entry_points(self) -> None:
+        scratch = REPO / "scratch"
+        scratch.mkdir(exist_ok=True)
+        with tempfile.TemporaryDirectory(dir=scratch) as raw:
+            fixture = Path(raw)
+            root = fixture / "repo"
+            root.mkdir()
+            authority = fixture / "authority.py"
+            authority.write_text("print('shared authority')\n")
+            (root / "entry.py").symlink_to(authority)
+            subprocess.run(["git", "init", "-q", str(root)], check=True)
+
+            files = repository_files(root, STRUCTURE_SUFFIXES)
+
+        self.assertEqual(files, [])

@@ -32,7 +32,53 @@ class StubRuntime:
         return self._status
 
 
+class StartRuntime:
+    def __init__(self) -> None:
+        self.paths = SimpleNamespace(repl_fifo=Path("unused.fifo"))
+        self.extra_env: dict[str, str] | None = None
+
+    def start(
+        self,
+        _lease: object,
+        _entrance: str,
+        *,
+        extra_env: dict[str, str],
+    ) -> object:
+        self.extra_env = extra_env
+        return SimpleNamespace(game=SimpleNamespace(pid=4312))
+
+    def wait_for_gameplay(
+        self,
+        _lease: object,
+        query: object,
+        *,
+        timeout: float,
+    ) -> str:
+        del timeout
+        return query()  # type: ignore[operator]
+
+
 class PhaseSessionTests(unittest.TestCase):
+    def test_start_opts_into_skinned_phase_reporting(self) -> None:
+        runtime = StartRuntime()
+        session = LiveMM(
+            runtime,  # type: ignore[arg-type]
+            object(),  # type: ignore[arg-type]
+            1.0,
+            client=StubClient(["posinfo scene=111 pos=(1,2,3)"]),  # type: ignore[arg-type]
+        )
+
+        reply = session.start(0xD800)
+
+        self.assertIn("mm pid=4312", reply)
+        self.assertEqual(
+            runtime.extra_env,
+            {
+                "ZELDA3D_MM_PHASE_REPORT": "1",
+                "ZELDA3D_MM_SKINNED": "1",
+            },
+        )
+
     def test_refuses_foreign_runtime_and_names_its_pid(self) -> None:
         status = SimpleNamespace(
             game_alive=False,

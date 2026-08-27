@@ -89,6 +89,9 @@ Current application boundaries:
   complex actors use a same-named directory of cohesive internals. Flying Volvagia, for example,
   keeps render orchestration in `boss_fd.cpp` while authored flight/history, forced controls,
   effects, shared profile, and history layout live under `behaviors/actor/boss_fd/`.
+- Hole-form Volvagia keeps controller/draw composition in `boss_fd2.cpp`, while
+  `boss_fd2_animation_policy.*` is the single pure owner of the recovered persistent-action→initial-
+  CSAB mapping and its unknown-action refusal contract.
 - `behaviors/camera/at_default.*` owns the recovered camera-at Y-bias producer/consumer;
   `at_default_policy.*` owns its pure slope/get-item branch rule. The large Player and camera decomp
   files contain only narrow typed call sites, and `Shipwright/soh/tests/` tests the production
@@ -149,7 +152,11 @@ Current application boundaries:
   orchestration.
 - `tools/verify_clang.py` composes source-structure, compilation-database, format, and tidy owners
   under `tools/clang_verifier/`. C/C++/header/Python structure is checked independently of which
-  files clang-tidy compiles.
+  files clang-tidy compiles. Source selection ignores tracked symlink entry points: their targets
+  remain owned and verified by their canonical repository instead of becoming duplicate local code.
+- `tools/info.py` is the repo-relative compatibility entry point to the canonical
+  `../shared/re-harness/tools/info.py`; it keeps every project registry query available without copying
+  the shared implementation into this repository.
 - `tools/cmake_build_policy.py` is the single shared CMake cache, Clang, Ninja, and configure-policy
   owner used by launcher and harness builds; those entry points do not duplicate build policy.
 - `Shipwright/libultraship/tools/dlist_harness/dlist_harness.cpp` is a 101-line composition entry
