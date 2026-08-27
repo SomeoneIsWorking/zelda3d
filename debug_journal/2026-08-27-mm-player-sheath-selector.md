@@ -1,4 +1,4 @@
-# MM Player sheath and back-shield selector
+# MM Player sheath, back-shield, and right-hand selectors
 
 ## Root cause
 
@@ -38,10 +38,47 @@ asset inventory is an independent structural check.
 `mm3d_player_sheath_policy.{cpp,h}` owns a pure typed selector, and
 `mm3d_player_sheath.{cpp,h}` is the narrow adapter from native 2S2H enums. The
 Player draw composer ORs the returned equipment additions with the existing
-base mask before its one material-state snapshot. The left/right-hand stages
-are intentionally still absent: their default mesh corpus is recovered, but
-their animation, speed, joint-table, and state overrides are not yet fully
-aligned.
+base mask before its one material-state snapshot.
+
+The following right-hand stage is now separately owned by
+`mm3d_player_right_hand_policy.{cpp,h}` and the narrow typed adapter
+`mm3d_player_right_hand.{cpp,h}`. Keeping the two selectors separate preserves
+their retail responsibilities and branch order. The independent left-hand
+stage in `FUN_00211aa4` remains absent.
+
+## Follow-on right-hand recovery
+
+`FUN_00201074` tail-shares the complete right-hand selector at
+`0x00211fd4..0x00212124`. Its literal pool at `0x00212128..0x00212140` names:
+
+- state mask `0x402` (`PLAYER_STATE1_2 | PLAYER_STATE1_400`);
+- live draw state `0x006919bc`;
+- closed-hand table `0x006913ac`;
+- held-shield table `0x00691514`;
+- animation override table `0x00691a64`;
+- carry-action callback `FUN_001ef758`;
+- animation-open table `0x00691384`.
+
+The recovered branch order selects Zora mesh 4 for its state/land-boots cases;
+Human mesh 10/11 for Hero/Mirror shields held in hand; per-form closed hands
+while a nominally open hand moves above `2.0f`; linkb closed/open overrides;
+Fierce Deity closed/carry-open hands under Giant's Mask; Deku mesh 4 for
+animation IDs `0x26b/0x26c`; otherwise the retained live default table. The
+adapter recognizes that table pointer independently of `rightHandType`, which
+preserves cutscene `RH_FF` states that intentionally keep their previous hand.
+
+`FUN_001ef758` is grounded as typed 2S2H
+`Player_UpperAction_CarryActor`: both implementations test
+`PLAYER_STATE1_CARRYING_ACTOR`, handle `heldActor`, contain Cucco ID `0x11`, and
+write gravity `-0.5f` plus terminal velocity `-2.0f`. The linkb override is
+aligned through typed `PlayerAnimationFrame.appearanceInfo`; zero means none
+and `0x0100/0x0200` decode to the same closed/open table indices.
+
+The retail shared GAR contains exactly 1,694 entries: 847 CSABs followed by
+847 paired linkb entries. IDs `0x26b/0x26c` are the exact
+`nuts/anim/pn_drink.csab` and `pn_drinkend.csab` pairs, not texture-name
+inferences. Five exact CMB inventory checks found every selected mesh: FD 4/5,
+Goron 4/5, Zora 4/5, Deku 3/4, and Human 2/9/10/11/22/23/25.
 
 ## Focused evidence
 
@@ -84,5 +121,13 @@ R released: 0x0000000370000028
 The `0x8` Hero back-shield bit disappears only while the shipping R-shield
 path changes sheath type 14 to 12; the `0x20` sheathed Kokiri sword remains.
 This proves the selector is live and state-driven. It is not full visual Player
-parity: the later right-hand selector still owns the shield-in-hand mesh and
-remains open on the RE frontier.
+parity: that capture predates the right-hand port and therefore proves only the
+sheath transition, not the shield-in-hand mesh.
+
+The completed right-hand policy/adapter/retail-asset checks passed 3/3 and the
+MM contracts passed 8/8 (11/11 combined). The serialized Clang `mm_core` build
+and `mm3d_player_animation_policy_test` CTest passed 1/1; direct clang-tidy
+passed all three touched production translation units, and format/diff checks
+were clean. No right-hand game instance was launched for this batch. The
+honest remaining gaps are an authentic live held-shield/weapon/instrument
+capture and the independent left-hand selector at `FUN_00211aa4`.

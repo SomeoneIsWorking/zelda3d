@@ -17,6 +17,7 @@
 #include "core/core.h"
 #include "core/memory.h"
 #include "oracle_state.h"
+#include "paired_camera_control.h"
 #include "repl_protocol.h"
 #include "soh_boss_fd_state.h"
 
@@ -186,6 +187,68 @@ void ForceGround() {
                 static_cast<unsigned long>(sohAddress), HarnessBossFdOracle::kGroundHandoffSignal);
 }
 
+void ForceGroundCamera(std::istringstream& arguments) {
+    std::array<float, 3> offset{};
+    float fov = 0.0f;
+    std::string trailing;
+    if (!(arguments >> offset[0] >> offset[1] >> offset[2] >> fov) || (arguments >> trailing) ||
+        !std::isfinite(offset[0]) || !std::isfinite(offset[1]) || !std::isfinite(offset[2]) || !std::isfinite(fov) ||
+        fov <= 0.0f || fov >= 180.0f) {
+        HarnessRepl::PrintErr(
+            "force bossfd2_camera: usage: force bossfd2_camera <eyeOffsetX> <eyeOffsetY> <eyeOffsetZ> <fov>");
+        return;
+    }
+    const auto playState = HarnessOracle::GameplayPlayState();
+    std::array<float, 3> oracleHead{};
+    std::array<float, 3> sohHead{};
+    int16_t oracleYaw = 0;
+    short sohYaw = 0;
+    auto& memory = Core::System::GetInstance().Memory();
+    if (!playState || !HarnessBossFdOracle::ReadHoleRenderedAnchor(memory, *playState, &oracleHead, &oracleYaw) ||
+        !SohState_BossFd2RenderedAnchor(sohHead.data(), &sohYaw)) {
+        HarnessRepl::PrintErr("force bossfd2_camera: both rendered Boss_Fd2 head anchors must be available");
+        return;
+    }
+    std::array<float, 3> oracleEye{};
+    std::array<float, 3> sohEye{};
+    constexpr float kBinangToRadians = 3.14159265f / 32768.0f;
+    const auto localEye = [&offset](const std::array<float, 3>& head, int yaw) {
+        const float angle = static_cast<float>(yaw) * kBinangToRadians;
+        const float sinYaw = std::sin(angle);
+        const float cosYaw = std::cos(angle);
+        return std::array<float, 3>{ head[0] + cosYaw * offset[0] + sinYaw * offset[2], head[1] + offset[1],
+                                     head[2] - sinYaw * offset[0] + cosYaw * offset[2] };
+    };
+    oracleEye = localEye(oracleHead, oracleYaw);
+    sohEye = localEye(sohHead, sohYaw);
+    if (!HarnessPairedCameraControl::Apply(oracleEye, oracleHead, sohEye, sohHead, fov)) {
+        HarnessRepl::PrintErr("force bossfd2_camera: could not apply the rendered-head camera pair");
+        return;
+    }
+    std::printf("ok force bossfd2_camera oracleHead=(%.3f,%.3f,%.3f) oracleYaw=%d "
+                "sohHead=(%.3f,%.3f,%.3f) sohYaw=%d localOffset=(%.3f,%.3f,%.3f) fov=%.3f\n",
+                oracleHead[0], oracleHead[1], oracleHead[2], oracleYaw, sohHead[0], sohHead[1], sohHead[2], sohYaw,
+                offset[0], offset[1], offset[2], fov);
+}
+
+void ForceGroundManeSync(std::istringstream& arguments) {
+    std::string trailing;
+    if (arguments >> trailing) {
+        HarnessRepl::PrintErr("force bossfd2_mane_sync: usage: force bossfd2_mane_sync");
+        return;
+    }
+    const auto playState = HarnessOracle::GameplayPlayState();
+    std::array<float, 3> worldPos{};
+    auto& memory = Core::System::GetInstance().Memory();
+    if (!playState || !HarnessBossFdOracle::ResetHoleMane(memory, *playState, &worldPos) ||
+        !SohState_BossFd2SyncMane(worldPos.data())) {
+        HarnessRepl::PrintErr("force bossfd2_mane_sync: both live ground-form actors are required");
+        return;
+    }
+    std::printf("ok force bossfd2_mane_sync worldPos=(%.3f,%.3f,%.3f) histories=zero\n", worldPos[0], worldPos[1],
+                worldPos[2]);
+}
+
 void ApplyFault() {
     if (g_activeFault) {
         HarnessRepl::PrintErr("force bossfd_fault: fault already active; restore it first");
@@ -275,6 +338,14 @@ void RestoreFault() {
 bool HandleForce(std::string_view subcommand, std::istringstream& arguments) {
     if (subcommand == "bossfd2_ground") {
         ForceGround();
+        return true;
+    }
+    if (subcommand == "bossfd2_camera") {
+        ForceGroundCamera(arguments);
+        return true;
+    }
+    if (subcommand == "bossfd2_mane_sync") {
+        ForceGroundManeSync(arguments);
         return true;
     }
     if (subcommand == "bossfd_profile") {

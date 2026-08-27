@@ -107,6 +107,14 @@ class MmPlayerContractTests(unittest.TestCase):
         player = (MM / "mm3d_player.c").read_text()
         self.assertIn("Zelda3D_MM_LookupPlayerModel(player->transformation", player)
         self.assertIn("meshMask |= Zelda3D_MM_PlayerSheathMeshMask(", player)
+        self.assertIn(
+            "Zelda3D_MM_PlayerRightHandMeshMask(player, &rightHandMask)", player
+        )
+        self.assertLess(
+            player.index("Zelda3D_MM_PlayerRightHandMeshMask"),
+            player.index("Zelda3D_GL_SetMidMask"),
+        )
+        self.assertIn("meshMask |= rightHandMask;", player)
         for typed_input in (
             "player->sheathType",
             "player->currentShield",
@@ -180,6 +188,10 @@ class MmPlayerContractTests(unittest.TestCase):
             MM / "mm3d_player_sheath.h",
             MM / "mm3d_player_sheath_policy.cpp",
             MM / "mm3d_player_sheath_policy.h",
+            MM / "mm3d_player_right_hand.cpp",
+            MM / "mm3d_player_right_hand.h",
+            MM / "mm3d_player_right_hand_policy.cpp",
+            MM / "mm3d_player_right_hand_policy.h",
             MM / "mm3d_player_animation.cpp",
             MM / "mm3d_player_animation.h",
             MM / "mm3d_animation_playhead.h",

@@ -12,6 +12,7 @@
 #include "soh/frame_interpolation.h"
 #include "soh/Enhancements/game-interactor/GameInteractor_Hooks.h"
 #include "zelda3d/behaviors/actor/boss_fd2_bridge.h"
+#include "zelda3d/behaviors/actor/boss_fd2_mane.h"
 
 #define FLAGS                                                                                 \
     (ACTOR_FLAG_ATTENTION_ENABLED | ACTOR_FLAG_HOSTILE | ACTOR_FLAG_UPDATE_CULLING_DISABLED | \
@@ -1068,118 +1069,7 @@ void BossFd2_PostLimbDraw(PlayState* play, s32 limbIndex, Gfx** dList, Vec3s* ro
     Collider_UpdateSpheres(limbIndex, &this->collider);
 }
 
-void BossFd2_UpdateMane(BossFd2* this, PlayState* play, s16 chain, Vec3f* head, Vec3f* pos, Vec3f* rot,
-                        Vec3f* pull, f32* scale) {
-    f32 sp138[10] = { 0.0f, 100.0f, 50.0f, 0.0f, 0.0f, 0.0f, 0.0f, 0.0f, 0.0f, 0.0f };
-    f32 sp110[10] = { 0.0f, 5.0f, -10.0f, 500.0f, 500.0f, 500.0f, 500.0f, 500.0f, 500.0f, 500.0f };
-    f32 spE8[10] = { 0.4f, 0.6f, 0.8f, 1.0f, 1.0f, 1.0f, 1.0f, 1.0f, 1.0f, 1.0f };
-    s16 i;
-    Vec3f temp_vec;
-    f32 temp_f2;
-    f32 phi_f0;
-    f32 temp_angleX;
-    f32 temp_angleY;
-    Vec3f spBC;
-    Vec3f spB0;
-    f32 xyScale;
-
-    OPEN_DISPS(play->state.gfxCtx);
-    Matrix_Push();
-    gDPPipeSync(POLY_OPA_DISP++);
-
-    for (i = 0; i < 10; i++) {
-        if (i == 0) {
-            (pos + i)->x = head->x;
-            (pos + i)->y = head->y;
-            (pos + i)->z = head->z;
-        } else {
-            Math_ApproachF(&(pull + i)->x, 0.0f, 1.0f, 1.0f);
-            Math_ApproachF(&(pull + i)->y, 0.0f, 1.0f, 1.0f);
-            Math_ApproachF(&(pull + i)->z, 0.0f, 1.0f, 1.0f);
-        }
-    }
-
-    for (i = 1; i < 10; i++) {
-        temp_vec.x = (pos + i)->x + (pull + i)->x - (pos + i - 1)->x;
-
-        phi_f0 = (pos + i)->y + (pull + i)->y - 2.0f + sp138[i];
-        temp_f2 = (pos + i - 1)->y + sp110[i];
-        if (phi_f0 > temp_f2) {
-            phi_f0 = temp_f2;
-        }
-        if ((head->y >= -910.0f) && (phi_f0 < 110.0f)) {
-            phi_f0 = 110.0f;
-        }
-        temp_vec.y = phi_f0 - (pos + i - 1)->y;
-
-        temp_vec.z = (pos + i)->z + (pull + i)->z - (pos + i - 1)->z;
-        temp_angleY = Math_Atan2F(temp_vec.z, temp_vec.x);
-        temp_angleX = -Math_Atan2F(sqrtf(SQ(temp_vec.x) + SQ(temp_vec.z)), temp_vec.y);
-        (rot + i - 1)->y = temp_angleY;
-        (rot + i - 1)->x = temp_angleX;
-        spBC.x = 0.0f;
-        spBC.y = 0.0f;
-        spBC.z = spE8[i] * 25.0f;
-        Matrix_RotateY(temp_angleY, MTXMODE_NEW);
-        Matrix_RotateX(temp_angleX, MTXMODE_APPLY);
-        Matrix_MultVec3f(&spBC, &spB0);
-        temp_vec.x = (pos + i)->x;
-        temp_vec.y = (pos + i)->y;
-        temp_vec.z = (pos + i)->z;
-        (pos + i)->x = (pos + i - 1)->x + spB0.x;
-        (pos + i)->y = (pos + i - 1)->y + spB0.y;
-        (pos + i)->z = (pos + i - 1)->z + spB0.z;
-        (pull + i)->x = (((pos + i)->x - temp_vec.x) * 88.0f) / 100.0f;
-        (pull + i)->y = (((pos + i)->y - temp_vec.y) * 88.0f) / 100.0f;
-        (pull + i)->z = (((pos + i)->z - temp_vec.z) * 88.0f) / 100.0f;
-        if ((pull + i)->x > 30.0f) {
-            (pull + i)->x = 30.0f;
-        }
-        if ((pull + i)->x < -30.0f) {
-            (pull + i)->x = -30.0f;
-        }
-        if ((pull + i)->y > 30.0f) {
-            (pull + i)->y = 30.0f;
-        }
-        if ((pull + i)->y < -30.0f) {
-            (pull + i)->y = -30.0f;
-        }
-        if ((pull + i)->z > 30.0f) {
-            (pull + i)->z = 30.0f;
-        }
-        if ((pull + i)->z < -30.0f) {
-            (pull + i)->z = -30.0f;
-        }
-    }
-
-    for (i = 0; i < 9; i++) {
-        Vec3f modelScale;
-        FrameInterpolation_RecordOpenChild(this, this->epoch + i * 25);
-
-        Matrix_Translate((pos + i)->x, (pos + i)->y, (pos + i)->z, MTXMODE_NEW);
-        Matrix_RotateY((rot + i)->y, MTXMODE_APPLY);
-        Matrix_RotateX((rot + i)->x, MTXMODE_APPLY);
-        xyScale = (0.01f - (i * 0.0009f)) * spE8[i] * scale[i];
-        modelScale.x = xyScale;
-        modelScale.y = xyScale;
-        modelScale.z = 0.01f * spE8[i];
-        if (Zelda3D_BossFd2DrawManeSegment(play, &this->actor, chain, i, &pos[i], &rot[i], &modelScale)) {
-            FrameInterpolation_RecordCloseChild();
-            continue;
-        }
-        Matrix_Scale(xyScale, xyScale, 0.01f * spE8[i], MTXMODE_APPLY);
-        Matrix_RotateX(M_PI / 2.0f, MTXMODE_APPLY);
-        gSPMatrix(POLY_XLU_DISP++, MATRIX_NEWMTX(play->state.gfxCtx), G_MTX_NOPUSH | G_MTX_LOAD | G_MTX_MODELVIEW);
-        gSPDisplayList(POLY_XLU_DISP++, gHoleVolvagiaManeModelDL);
-
-        FrameInterpolation_RecordCloseChild();
-    }
-    Matrix_Pop();
-    CLOSE_DISPS(play->state.gfxCtx);
-}
-
-void BossFd2_DrawMane(BossFd2* this, PlayState* play) {
-    s32 pad;
+void BossFd2_DrawMane(BossFd2* this, PlayState* play, s16 substeps) {
     BossFd* bossFd = (BossFd*)this->actor.parent;
     s16 i;
 
@@ -1195,23 +1085,22 @@ void BossFd2_DrawMane(BossFd2* this, PlayState* play) {
     gSPDisplayList(POLY_XLU_DISP++, gHoleVolvagiaManeMaterialDL);
 
     gDPSetPrimColor(POLY_XLU_DISP++, 0, 0, 255, bossFd->fwork[BFD_MANE_COLOR_CENTER], 0, 255);
-        BossFd2_UpdateMane(this, play, 0, &this->centerMane.head, this->centerMane.pos, this->centerMane.rot,
-                         this->centerMane.pull, this->centerMane.scale);
+    Zelda3D_BossFd2UpdateMane(&this->actor, play, 0, &this->centerMane.head, this->centerMane.pos, this->centerMane.rot,
+                              this->centerMane.pull, this->centerMane.scale, substeps);
 
     gDPSetPrimColor(POLY_XLU_DISP++, 0, 0, 255, bossFd->fwork[BFD_MANE_COLOR_RIGHT], 0, 255);
-        BossFd2_UpdateMane(this, play, 1, &this->rightMane.head, this->rightMane.pos, this->rightMane.rot,
-                         this->rightMane.pull, this->rightMane.scale);
+    Zelda3D_BossFd2UpdateMane(&this->actor, play, 1, &this->rightMane.head, this->rightMane.pos, this->rightMane.rot,
+                              this->rightMane.pull, this->rightMane.scale, substeps);
 
     gDPSetPrimColor(POLY_XLU_DISP++, 0, 0, 255, bossFd->fwork[BFD_MANE_COLOR_LEFT], 0, 255);
-        BossFd2_UpdateMane(this, play, 2, &this->leftMane.head, this->leftMane.pos, this->leftMane.rot, this->leftMane.pull,
-                         this->leftMane.scale);
+    Zelda3D_BossFd2UpdateMane(&this->actor, play, 2, &this->leftMane.head, this->leftMane.pos, this->leftMane.rot,
+                              this->leftMane.pull, this->leftMane.scale, substeps);
 
     CLOSE_DISPS(play->state.gfxCtx);
 }
 
 void BossFd2_Draw(Actor* thisx, PlayState* play) {
     static void* eyeTextures[] = { gHoleVolvagiaEyeOpenTex, gHoleVolvagiaEyeHalfTex, gHoleVolvagiaEyeClosedTex };
-    s32 pad;
     BossFd2* this = (BossFd2*)thisx;
 
     OPEN_DISPS(play->state.gfxCtx);
@@ -1232,7 +1121,8 @@ void BossFd2_Draw(Actor* thisx, PlayState* play) {
         gDPSetEnvColor(POLY_OPA_DISP++, 255, 255, 255, 128);
 
         SkelAnime_DrawSkeletonOpa(play, &this->skelAnime, BossFd2_OverrideLimbDraw, BossFd2_PostLimbDraw, &this->actor);
-        BossFd2_DrawMane(this, play);
+        s16 maneSubsteps = Zelda3D_BossFd2PrepareRenderedMane(&this->actor);
+        BossFd2_DrawMane(this, play, maneSubsteps > 0 ? maneSubsteps : 1);
         POLY_OPA_DISP = Play_SetFog(play, POLY_OPA_DISP);
     }
     CLOSE_DISPS(play->state.gfxCtx);

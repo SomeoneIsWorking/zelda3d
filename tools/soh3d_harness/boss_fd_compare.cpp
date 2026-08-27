@@ -1,5 +1,7 @@
 #include "boss_fd_compare.h"
 
+#include <algorithm>
+#include <cmath>
 #include <cstdio>
 
 #include "boss_fd_comparison_policy.h"
@@ -132,4 +134,43 @@ BossFdCompareStatus CompareBossFd(uint32_t azPlayState) {
                 HarnessBossFdComparison::kTurnRateTolerance, BossFdCompareStatusName(result.status),
                 HarnessBossFdComparison::ReasonName(result.reason));
     return RecordStatus(result.status);
+}
+
+void CompareBossFd2Mane(uint32_t azPlayState) {
+    auto& memory = Core::System::GetInstance().Memory();
+    HarnessBossFdOracle::ManeState oracle{};
+    BossFd2ManeState soh{};
+    if (!HarnessBossFdOracle::ReadHoleMane(memory, azPlayState, &oracle) || !SohState_BossFd2Mane(&soh)) {
+        std::printf("  bossfd2_mane state=MISSING\n");
+        return;
+    }
+
+    float total = 0.0f;
+    float maximum = 0.0f;
+    for (int chain = 0; chain < 3; ++chain) {
+        float chainTotal = 0.0f;
+        float chainMaximum = 0.0f;
+        for (int segment = 0; segment < 10; ++segment) {
+            float squared = 0.0f;
+            for (int axis = 0; axis < 3; ++axis) {
+                const float oracleRelative = oracle.pos[chain][segment][axis] - oracle.head[chain][axis];
+                const float sohRelative = soh.pos[chain][segment][axis] - soh.head[chain][axis];
+                const float delta = sohRelative - oracleRelative;
+                squared += delta * delta;
+            }
+            const float distance = std::sqrt(squared);
+            chainTotal += distance;
+            chainMaximum = std::max(chainMaximum, distance);
+        }
+        total += chainTotal;
+        maximum = std::max(maximum, chainMaximum);
+        std::printf("  chain=%d mean=%.4f max=%.4f oracleHead=(%.3f,%.3f,%.3f) sohHead=(%.3f,%.3f,%.3f) "
+                    "oracleTail=(%.3f,%.3f,%.3f) sohTail=(%.3f,%.3f,%.3f)\n",
+                    chain, chainTotal / 10.0f, chainMaximum, oracle.head[chain][0], oracle.head[chain][1],
+                    oracle.head[chain][2], soh.head[chain][0], soh.head[chain][1], soh.head[chain][2],
+                    oracle.pos[chain][9][0] - oracle.head[chain][0], oracle.pos[chain][9][1] - oracle.head[chain][1],
+                    oracle.pos[chain][9][2] - oracle.head[chain][2], soh.pos[chain][9][0] - soh.head[chain][0],
+                    soh.pos[chain][9][1] - soh.head[chain][1], soh.pos[chain][9][2] - soh.head[chain][2]);
+    }
+    std::printf("  bossfd2_mane summary samples=30 mean=%.4f max=%.4f\n", total / 30.0f, maximum);
 }

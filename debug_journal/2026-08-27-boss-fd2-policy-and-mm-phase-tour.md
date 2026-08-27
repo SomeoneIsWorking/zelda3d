@@ -129,3 +129,36 @@ The next grounded step is to expose the oracle post-limb head transform (the
 documented render result is near Y 126.23) and the matching typed shipping
 anchor, then frame from those values. No camera offset or renderer parameter
 was tuned from this failed assumption.
+
+## Continuation: rendered anchors and exact hole-mane solver semantics
+
+The failed `+0x328` assumption came from reading the actor field before the
+post-limb callback had refreshed it. `FUN_001EC5B8` is now recovered directly:
+limb 14 transforms head `(4000,0,0)` to `+0x328`, center-mane
+`(4000,-2900,2000)` to `+0x4CC`, right-mane `(4000,-1600,0)` to `+0x668`, and
+left-mane `(4000,-1600,-2000)` to `+0x804`. The shipping path evaluates those
+same bone-local points through the live CMB skin matrices, then through the
+actor draw transform. `force bossfd2_camera` frames each engine from its own
+typed rendered head; ten rendered frames are required before the libretro
+framebuffer reflects the changed Camera/View.
+
+The inherited N64 mane solver was structurally the same as OoT3D
+`FUN_00335904`, but not temporally exact. Two probes initially lied for
+different reasons: `run N` is a 60 Hz libretro call count while OoT3D draws at
+30 Hz, so `run 10` versus `soh_step 10` compared five oracle solves with ten
+host solves; and the host used an unscaled `Math_ApproachF(...,1,1)` for pull
+decay. ARM at `0x00373500` proves both fraction and maximum step are multiplied
+by `s16(global+0x110) * 1/3`, which is exactly `2/3` at the retail update value
+2, with a `1e-5` snap threshold. `boss_fd2_mane.c` now owns that exact rule and
+the ten-point solver, reducing the legacy overlay from 1,239 to 1,129 lines.
+
+With equal solver counts and absolute-zero histories, the corrected solver
+measured mean 0.830/max 3.732 across 30 points after ten calls (down from mean
+17.178/max 59.917 before the decay fix). A stricter reusable control initializes
+each chain at its live root; its immediate comparator is exact zero and after
+ten equal calls measures mean 6.411/max 28.281. That singular stress state is
+not a parity closure. The paired 800×480 capture
+`fd2_ground_paired_20260828_w` does show the centered CMB body and the same
+three-chain silhouette in both engines, while leaving material brightness,
+natural action timing, and the residual moving-root/trig precision explicitly
+open.

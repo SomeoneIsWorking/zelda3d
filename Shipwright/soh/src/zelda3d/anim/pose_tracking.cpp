@@ -22,11 +22,13 @@ extern "C" void Zelda3D_DumpBoneStats(int modelId) {
     for (const auto& g : lm->groups) {
         for (const auto& v : g.verts) {
             for (int k = 0; k < 4; k++) {
-                if (v.weights[k] <= 0.0f)
+                if (v.weights[k] <= 0.0f) {
                     continue;
+                }
                 int b = (int)(v.boneIds[k] + 0.5f);
-                if (b < 0 || b >= n)
+                if (b < 0 || b >= n) {
                     continue;
+                }
                 vc[b]++;
                 mx[b] += v.pos[0];
                 my[b] += v.pos[1];
@@ -37,8 +39,9 @@ extern "C" void Zelda3D_DumpBoneStats(int modelId) {
     fprintf(stderr, "[BONESTATS] model %d bones=%d\n", modelId, n);
     for (const auto& bn : bones) {
         int id = bn.id;
-        if (id < 0 || id >= n)
+        if (id < 0 || id >= n) {
             continue;
+        }
         int c = vc[id];
         fprintf(stderr, "[BONESTATS]  bone %2d parent %2d verts %5d meanPos(%.1f,%.1f,%.1f) trans(%.1f,%.1f,%.1f)\n",
                 id, bn.parent, c, c ? mx[id] / c : 0.0, c ? my[id] / c : 0.0, c ? mz[id] / c : 0.0, bn.trans[0],
@@ -70,14 +73,16 @@ static std::unordered_map<int, std::vector<std::array<float, 16>>>& lastSkin() {
 // posed feet position against the (later-known) mesh_id mask. No-op unless tracking is enabled.
 void Zelda3D_CacheTrackedPose(int modelId, const std::vector<std::array<float, 16>>& sm) {
     auto it = trackMinYFlags().find(modelId);
-    if (it == trackMinYFlags().end() || !it->second)
+    if (it == trackMinYFlags().end() || !it->second) {
         return;
+    }
     lastSkin()[modelId] = sm;
 }
 extern "C" void Zelda3D_SetTrackPosedMinY(int modelId, int enable) {
     trackMinYFlags()[modelId] = enable ? 1 : 0;
-    if (!enable)
+    if (!enable) {
         lastSkin().erase(modelId);
+    }
 }
 // Model-local Y translation to add (innermost, pre-scale) so the posed model's lowest VISIBLE
 // vertex lands on the actor's ground. midMask selects the drawn equipment/hand variant subset
@@ -85,34 +90,40 @@ extern "C" void Zelda3D_SetTrackPosedMinY(int modelId, int enable) {
 // shown). Returns 0 if tracking wasn't enabled / no pose cached.
 extern "C" float Zelda3D_PosedGroundOffset(int modelId, unsigned long long midMask) {
     LoadedModel* lm = loadModel(modelId);
-    if (!lm || !lm->ok)
+    if (!lm || !lm->ok) {
         return 0.0f;
+    }
     auto it = lastSkin().find(modelId);
-    if (it == lastSkin().end() || it->second.empty())
+    if (it == lastSkin().end() || it->second.empty()) {
         return 0.0f;
+    }
     const auto& sm = it->second;
     const int n = (int)sm.size();
     float mn = 1e30f;
     for (const auto& g : lm->groups) {
-        if (g.mesh_id >= 0 && g.mesh_id < 64 && !((midMask >> g.mesh_id) & 1ull))
+        if (g.mesh_id >= 0 && g.mesh_id < 64 && !((midMask >> g.mesh_id) & 1ull)) {
             continue;
+        }
         for (const auto& v : g.verts) {
             float y = 0.0f, wsum = 0.0f;
             for (int k = 0; k < 4; k++) {
                 float w = v.weights[k];
-                if (w <= 0.0f)
+                if (w <= 0.0f) {
                     continue;
+                }
                 int b = (int)(v.boneIds[k] + 0.5f);
-                if (b < 0 || b >= n)
+                if (b < 0 || b >= n) {
                     continue;
+                }
                 const float* M = sm[b].data();
                 y += w * (M[4] * v.pos[0] + M[5] * v.pos[1] + M[6] * v.pos[2] + M[7]);
                 wsum += w;
             }
             if (wsum > 0.0f) {
                 y /= wsum;
-                if (y < mn)
+                if (y < mn) {
                     mn = y;
+                }
             }
         }
     }
@@ -128,8 +139,9 @@ extern "C" float Zelda3D_PosedGroundOffset(int modelId, unsigned long long midMa
 // Returns 1 on success (outMin/outMax = 3 floats, model-local space), 0 if the model isn't loaded.
 extern "C" int Zelda3D_PosedModelLocalAABB(int modelId, unsigned long long midMask, float* outMin, float* outMax) {
     LoadedModel* lm = loadModel(modelId);
-    if (!lm || !lm->ok || !outMin || !outMax)
+    if (!lm || !lm->ok || !outMin || !outMax) {
         return 0;
+    }
     auto it = lastSkin().find(modelId);
     const std::vector<std::array<float, 16>>* sm =
         (it != lastSkin().end() && !it->second.empty()) ? &it->second : nullptr;
@@ -137,8 +149,9 @@ extern "C" int Zelda3D_PosedModelLocalAABB(int modelId, unsigned long long midMa
     float mn[3] = { 1e30f, 1e30f, 1e30f }, mx[3] = { -1e30f, -1e30f, -1e30f };
     bool any = false;
     for (const auto& g : lm->groups) {
-        if (g.mesh_id >= 0 && g.mesh_id < 64 && !((midMask >> g.mesh_id) & 1ull))
+        if (g.mesh_id >= 0 && g.mesh_id < 64 && !((midMask >> g.mesh_id) & 1ull)) {
             continue;
+        }
         for (const auto& v : g.verts) {
             float p[3];
             if (sm) {
@@ -146,11 +159,13 @@ extern "C" int Zelda3D_PosedModelLocalAABB(int modelId, unsigned long long midMa
                 float acc[3] = { 0, 0, 0 }, wsum = 0.0f;
                 for (int k = 0; k < 4; k++) {
                     float w = v.weights[k];
-                    if (w <= 0.0f)
+                    if (w <= 0.0f) {
                         continue;
+                    }
                     int b = (int)(v.boneIds[k] + 0.5f);
-                    if (b < 0 || b >= n)
+                    if (b < 0 || b >= n) {
                         continue;
+                    }
                     const float* M = (*sm)[b].data();
                     acc[0] += w * (M[0] * v.pos[0] + M[1] * v.pos[1] + M[2] * v.pos[2] + M[3]);
                     acc[1] += w * (M[4] * v.pos[0] + M[5] * v.pos[1] + M[6] * v.pos[2] + M[7]);
@@ -172,16 +187,19 @@ extern "C" int Zelda3D_PosedModelLocalAABB(int modelId, unsigned long long midMa
                 p[2] = v.pos[2]; // bind/static fallback
             }
             for (int a = 0; a < 3; a++) {
-                if (p[a] < mn[a])
+                if (p[a] < mn[a]) {
                     mn[a] = p[a];
-                if (p[a] > mx[a])
+                }
+                if (p[a] > mx[a]) {
                     mx[a] = p[a];
+                }
             }
             any = true;
         }
     }
-    if (!any)
+    if (!any) {
         return 0;
+    }
     for (int a = 0; a < 3; a++) {
         outMin[a] = mn[a];
         outMax[a] = mx[a];
@@ -196,24 +214,37 @@ extern "C" int Zelda3D_PosedModelLocalAABB(int modelId, unsigned long long midMa
 // The caller lifts this through the actor world matrix (Matrix_MultVec3f) to get world space. Uses
 // the SAME lastSkin cache the feet-grounding path already maintains, so any posing path (N64-retarget
 // or CSAB) that ran Zelda3D_CacheTrackedPose this frame exposes it. Requires Zelda3D_SetTrackPosedMinY(1).
-extern "C" int Zelda3D_PosedBoneWorldPos(int modelId, int boneId, float* outModelPos) {
+extern "C" int Zelda3D_PosedBonePoint(int modelId, int boneId, const float* boneLocalPoint, float* outModelPos) {
     LoadedModel* lm = loadModel(modelId);
-    if (!lm || !lm->ok || !lm->cmb || !outModelPos)
+    if (!lm || !lm->ok || !lm->cmb || !boneLocalPoint || !outModelPos) {
         return 0;
+    }
     auto it = lastSkin().find(modelId);
-    if (it == lastSkin().end() || it->second.empty())
+    if (it == lastSkin().end() || it->second.empty()) {
         return 0;
+    }
     const auto& sm = it->second;
     const auto& bind = lm->cmb->boneMatrices();
-    if (boneId < 0 || (size_t)boneId >= sm.size() || (size_t)boneId >= bind.size())
+    if (boneId < 0 || (size_t)boneId >= sm.size() || (size_t)boneId >= bind.size()) {
         return 0;
+    }
     const float* M = sm[boneId].data();
     const float* B = bind[boneId].data();
-    const float bx = B[3], by = B[7], bz = B[11]; // bind-pose bone origin (row-major translation col)
+    // Convert the bone-local point through its bind-world transform, then through the cached skin
+    // matrix (animatedWorld * inverse(bindWorld)). The product is the exact animated model-space
+    // point used by the CMB draw.
+    const float bx = B[0] * boneLocalPoint[0] + B[1] * boneLocalPoint[1] + B[2] * boneLocalPoint[2] + B[3];
+    const float by = B[4] * boneLocalPoint[0] + B[5] * boneLocalPoint[1] + B[6] * boneLocalPoint[2] + B[7];
+    const float bz = B[8] * boneLocalPoint[0] + B[9] * boneLocalPoint[1] + B[10] * boneLocalPoint[2] + B[11];
     outModelPos[0] = M[0] * bx + M[1] * by + M[2] * bz + M[3];
     outModelPos[1] = M[4] * bx + M[5] * by + M[6] * bz + M[7];
     outModelPos[2] = M[8] * bx + M[9] * by + M[10] * bz + M[11];
     return 1;
+}
+
+extern "C" int Zelda3D_PosedBoneWorldPos(int modelId, int boneId, float* outModelPos) {
+    const float origin[3] = { 0.0f, 0.0f, 0.0f };
+    return Zelda3D_PosedBonePoint(modelId, boneId, origin, outModelPos);
 }
 
 // Pose-discontinuity scanner (anim QA tooling): the 3d3 named-CSAB path picks ONE csab at a phase and
@@ -279,11 +310,13 @@ static void orthoRows(const float* M, float r[3][3]) {
     }
 }
 extern "C" float Zelda3D_PoseDiscontinuity(int modelId, int* outBone) {
-    if (outBone)
+    if (outBone) {
         *outBone = -1;
+    }
     auto it = lastSkin().find(modelId);
-    if (it == lastSkin().end() || it->second.empty())
+    if (it == lastSkin().end() || it->second.empty()) {
         return 0.0f;
+    }
     const auto& cur = it->second;
     auto& prev = posePrev()[modelId];
     float maxDeg = 0.0f;
@@ -295,14 +328,18 @@ extern "C" float Zelda3D_PoseDiscontinuity(int modelId, int* outBone) {
             orthoRows(cur[b].data(), Rb);
             // tr(Ra^T * Rb) = sum_ij Ra[i][j]*Rb[i][j]  (Ra rows are basis vectors)
             float tr = 0.0f;
-            for (int i = 0; i < 3; i++)
-                for (int j = 0; j < 3; j++)
+            for (int i = 0; i < 3; i++) {
+                for (int j = 0; j < 3; j++) {
                     tr += Ra[i][j] * Rb[i][j];
+                }
+            }
             float cosA = (tr - 1.0f) * 0.5f;
-            if (cosA > 1.0f)
+            if (cosA > 1.0f) {
                 cosA = 1.0f;
-            if (cosA < -1.0f)
+            }
+            if (cosA < -1.0f) {
                 cosA = -1.0f;
+            }
             float deg = std::acos(cosA) * (180.0f / 3.14159265358979f);
             if (deg > maxDeg) {
                 maxDeg = deg;
@@ -311,8 +348,9 @@ extern "C" float Zelda3D_PoseDiscontinuity(int modelId, int* outBone) {
         }
     }
     prev = cur; // snapshot for next call
-    if (outBone)
+    if (outBone) {
         *outBone = maxBone;
+    }
     return maxDeg;
 }
 extern "C" void Zelda3D_PoseScanReset(int modelId) {

@@ -40,6 +40,12 @@ bool ReadFloatArray(Memory::MemorySystem& memory, uint32_t address, float* out, 
     return true;
 }
 
+void WriteFloat(Memory::MemorySystem& memory, uint32_t address, float value) {
+    uint32_t word = 0;
+    std::memcpy(&word, &value, sizeof(word));
+    memory.Write32(address, word);
+}
+
 } // namespace
 
 Lookup FindById(Memory::MemorySystem& memory, uint32_t playState, uint16_t actorId) {
@@ -113,6 +119,75 @@ bool Read(Memory::MemorySystem& memory, uint32_t playState, uint32_t actor, Stat
         return false;
     }
     return out->bodyLead >= 0 && out->bodyLead < kHistoryCount;
+}
+
+bool ReadHoleRenderedAnchor(Memory::MemorySystem& memory, uint32_t playState, std::array<float, 3>* outHead,
+                            int16_t* outShapeYaw) {
+    if (outHead == nullptr || outShapeYaw == nullptr) {
+        return false;
+    }
+    const Lookup hole = FindById(memory, playState, kHoleActorId);
+    int shapeYaw = 0;
+    if (hole.status != LookupStatus::Found ||
+        !ReadFloatArray(memory, hole.address + kRenderedHeadOffset, outHead->data(), outHead->size()) ||
+        !ReadS16(memory, hole.address + ActorLayout::kShapeRotOffset + sizeof(int16_t), &shapeYaw)) {
+        return false;
+    }
+    *outShapeYaw = static_cast<int16_t>(shapeYaw);
+    return true;
+}
+
+bool ReadHoleMane(Memory::MemorySystem& memory, uint32_t playState, ManeState* out) {
+    if (out == nullptr) {
+        return false;
+    }
+    const Lookup hole = FindById(memory, playState, kHoleActorId);
+    if (hole.status != LookupStatus::Found) {
+        return false;
+    }
+    constexpr uint32_t kHeadOffsets[3] = { 0x04CC, 0x0668, 0x0804 };
+    constexpr uint32_t kPositionOffsets[3] = { 0x03B4, 0x0550, 0x06EC };
+    for (int chain = 0; chain < 3; ++chain) {
+        if (!ReadFloatArray(memory, hole.address + kHeadOffsets[chain], out->head[chain].data(), 3)) {
+            return false;
+        }
+        for (int segment = 0; segment < 10; ++segment) {
+            if (!ReadFloatArray(memory, hole.address + kPositionOffsets[chain] + segment * 3 * sizeof(float),
+                                out->pos[chain][segment].data(), 3)) {
+                return false;
+            }
+        }
+    }
+    return true;
+}
+
+bool ResetHoleMane(Memory::MemorySystem& memory, uint32_t playState, std::array<float, 3>* outWorldPos) {
+    if (outWorldPos == nullptr) {
+        return false;
+    }
+    const Lookup hole = FindById(memory, playState, kHoleActorId);
+    if (hole.status != LookupStatus::Found || !ReadFloatArray(memory, hole.address + ActorLayout::kWorldPosOffset,
+                                                              outWorldPos->data(), outWorldPos->size())) {
+        return false;
+    }
+    constexpr uint32_t kDynamicOffsets[3][3] = {
+        { 0x033C, 0x03B4, 0x042C },
+        { 0x04D8, 0x0550, 0x05C8 },
+        { 0x0674, 0x06EC, 0x0764 },
+    };
+    constexpr uint32_t kHeadOffsets[3] = { 0x04CC, 0x0668, 0x0804 };
+    std::array<float, 3> head{};
+    for (int chain = 0; chain < 3; ++chain) {
+        if (!ReadFloatArray(memory, hole.address + kHeadOffsets[chain], head.data(), head.size())) {
+            return false;
+        }
+        for (int word = 0; word < 30; ++word) {
+            memory.Write32(hole.address + kDynamicOffsets[chain][0] + word * sizeof(float), 0);
+            WriteFloat(memory, hole.address + kDynamicOffsets[chain][1] + word * sizeof(float), head[word % 3]);
+            memory.Write32(hole.address + kDynamicOffsets[chain][2] + word * sizeof(float), 0);
+        }
+    }
+    return true;
 }
 
 } // namespace HarnessBossFdOracle
