@@ -15,8 +15,8 @@ int Zelda3D_DrawActorModel(PlayState* play, int modelId, Actor* actor, float wor
     return 1;
 }
 
-int Zelda3D_DrawModelTransform(PlayState* play, int modelId, const Vec3f* pos, const Vec3f* rotYXZ, const Vec3f* scale,
-                               float postRotX) {
+int Zelda3D_DrawModelTransformFlags(PlayState* play, int modelId, const Vec3f* pos, const Vec3f* rotYXZ,
+                                    const Vec3f* scale, float postRotX, Zelda3DModelDrawFlags flags) {
     if (play == NULL || modelId < 0 || pos == NULL || rotYXZ == NULL || scale == NULL) {
         return 0;
     }
@@ -38,9 +38,17 @@ int Zelda3D_DrawModelTransform(PlayState* play, int modelId, const Vec3f* pos, c
               G_MTX_MODELVIEW | G_MTX_LOAD);
     Zelda3D_SceneTint(play, tint);
     Zelda3D_GL_EmitPose(modelId);
-    gSPZelda3DDraw(xluPass ? POLY_XLU_DISP++ : POLY_OPA_DISP++, modelId | (int)0x80000000, tint[0], tint[1], tint[2]);
+    const unsigned int lightingFlags =
+        (flags & ZELDA3D_MODEL_DRAW_FORCE_UNLIT) != 0 ? ZELDA3D_HANDLE_FORCE_UNLIT : ZELDA3D_HANDLE_LIT;
+    gSPZelda3DDraw(xluPass ? POLY_XLU_DISP++ : POLY_OPA_DISP++, modelId | (int)lightingFlags, tint[0], tint[1],
+                   tint[2]);
     CLOSE_DISPS(play->state.gfxCtx);
     return 1;
+}
+
+int Zelda3D_DrawModelTransform(PlayState* play, int modelId, const Vec3f* pos, const Vec3f* rotYXZ, const Vec3f* scale,
+                               float postRotX) {
+    return Zelda3D_DrawModelTransformFlags(play, modelId, pos, rotYXZ, scale, postRotX, ZELDA3D_MODEL_DRAW_DEFAULT);
 }
 
 int Zelda3D_DrawModelBillboard(PlayState* play, int modelId, const Vec3f* pos, const Vec3f* scale) {

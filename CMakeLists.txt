@@ -357,6 +357,14 @@ if(LUS_BUILD_TESTS)
     )
     add_test(NAME boss_fd2_animation_policy_test COMMAND boss_fd2_animation_policy_test)
 
+    add_executable(boss_fd2_material_controller_test
+        tools/boss_fd2_material_controller_test.cpp
+    )
+    target_include_directories(boss_fd2_material_controller_test PRIVATE
+        Shipwright/soh/src/zelda3d/behaviors/actor
+    )
+    add_test(NAME boss_fd2_material_controller_test COMMAND boss_fd2_material_controller_test)
+
     add_executable(mm3d_player_animation_policy_test
         tools/mm3d_player_animation_policy_test.cpp
         2ship/2s2h/zelda3d/mm3d_player_animation_policy.cpp

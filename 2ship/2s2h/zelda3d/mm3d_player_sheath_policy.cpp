@@ -38,6 +38,25 @@ constexpr std::size_t Index(PlayerSword sword) {
 
 } // namespace
 
+bool PlayerSwordFromRetailIndex(int value, PlayerSword& result) {
+    switch (value) {
+        case 0:
+            result = PlayerSword::None;
+            return true;
+        case 1:
+            result = PlayerSword::Kokiri;
+            return true;
+        case 2:
+            result = PlayerSword::Razor;
+            return true;
+        case 3:
+            result = PlayerSword::Gilded;
+            return true;
+        default:
+            return false;
+    }
+}
+
 std::uint64_t PlayerSheathMeshMaskForState(const PlayerSheathState& state) {
     // 0x0020d0ec branches around both the back-shield and sheath selection
     // when the Giant's Mask is active.

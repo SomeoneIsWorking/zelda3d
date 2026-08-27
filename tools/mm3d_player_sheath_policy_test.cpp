@@ -19,6 +19,14 @@ std::uint64_t Mask(std::initializer_list<int> meshIds) {
 int main() {
     using namespace Zelda3D::MM3D;
 
+    PlayerSword mappedSword = PlayerSword::None;
+    assert(PlayerSwordFromRetailIndex(0, mappedSword) && mappedSword == PlayerSword::None);
+    assert(PlayerSwordFromRetailIndex(1, mappedSword) && mappedSword == PlayerSword::Kokiri);
+    assert(PlayerSwordFromRetailIndex(2, mappedSword) && mappedSword == PlayerSword::Razor);
+    assert(PlayerSwordFromRetailIndex(3, mappedSword) && mappedSword == PlayerSword::Gilded);
+    assert(!PlayerSwordFromRetailIndex(-1, mappedSword));
+    assert(!PlayerSwordFromRetailIndex(4, mappedSword));
+
     const PlayerSheathState fierce{ PlayerModelForm::FierceDeity, PlayerSheathType::Type12, PlayerShield::None,
                                     PlayerSword::None, false };
     const PlayerSheathState goron{ PlayerModelForm::Goron, PlayerSheathType::Type13, PlayerShield::None,

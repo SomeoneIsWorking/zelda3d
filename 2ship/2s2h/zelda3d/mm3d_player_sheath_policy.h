@@ -26,6 +26,8 @@ enum class PlayerSword {
     Gilded,
 };
 
+bool PlayerSwordFromRetailIndex(int value, PlayerSword& result);
+
 struct PlayerSheathState {
     PlayerModelForm form;
     PlayerSheathType sheathType;

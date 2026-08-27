@@ -42,25 +42,6 @@ bool ToPlayerShield(int value, PlayerShield& result) {
     }
 }
 
-bool ToPlayerSword(int value, PlayerSword& result) {
-    switch (value) {
-        case EQUIP_VALUE_SWORD_NONE:
-            result = PlayerSword::None;
-            return true;
-        case EQUIP_VALUE_SWORD_KOKIRI:
-            result = PlayerSword::Kokiri;
-            return true;
-        case EQUIP_VALUE_SWORD_RAZOR:
-            result = PlayerSword::Razor;
-            return true;
-        case EQUIP_VALUE_SWORD_GILDED:
-            result = PlayerSword::Gilded;
-            return true;
-        default:
-            return false;
-    }
-}
-
 } // namespace
 } // namespace Zelda3D::MM3D
 
@@ -69,7 +50,7 @@ extern "C" unsigned long long Zelda3D_MM_PlayerSheathMeshMask(int playerForm, in
     using namespace Zelda3D::MM3D;
     PlayerSheathState state{};
     if (!PlayerModelFormFromRetailIndex(playerForm, state.form) || !ToPlayerSheathType(sheathType, state.sheathType) ||
-        !ToPlayerShield(currentShield, state.shield) || !ToPlayerSword(swordEquipValue, state.sword)) {
+        !ToPlayerShield(currentShield, state.shield) || !PlayerSwordFromRetailIndex(swordEquipValue, state.sword)) {
         return 0;
     }
     state.giantMask = currentMask == PLAYER_MASK_GIANT;

@@ -2,6 +2,7 @@
 // Ground truth: oot3d-decomp/docs/boss_fd2.md; draw FUN_0020A3B0 and chain helper FUN_00335904.
 #include "boss_fd2.h"
 #include "boss_fd2_animation_policy.h"
+#include "boss_fd2_materials.h"
 
 #include "../../anim/pose_tracking.h"
 #include "../../anim/zelda3d_anim_override.h"
@@ -9,7 +10,6 @@
 #include "../../diagnostics/model_tuning_query.h"
 #include "../../render/model_draw.h"
 #include "../../render/model_queries.h"
-#include "../../model/zelda3d_cmab.h"
 #include "asset/mat4.h"
 #include "fast/zelda3d_material_overrides.h"
 #include "overlays/actors/ovl_Boss_Fd/z_boss_fd.h"
@@ -84,6 +84,7 @@ struct BossFd2CsabController {
     float outgoingFrame = 0.0f;
     std::string outgoingCsab;
     int morphFramesRemaining = 0;
+    Zelda3D::BossFd2Materials::Controller materials;
 };
 
 BossFd2CsabController sCsabController;
@@ -176,6 +177,9 @@ void tickCsabController(PlayState* play, BossFd2* boss) {
         controller.actor = actor;
     }
     const Action action = classifyAction(boss->actionFunc);
+    const bool faceExposed = actor->parent != nullptr && actor->parent->id == ACTOR_BOSS_FD &&
+                             reinterpret_cast<const BossFd*>(actor->parent)->faceExposed;
+    controller.materials.tick(action != Action::Wait, faceExposed);
     const bool actionChanged = action != controller.lastAction;
     if (controller.morphFramesRemaining > 0) {
         --controller.morphFramesRemaining;
@@ -274,102 +278,6 @@ int fireHairModel() {
     return modelId;
 }
 
-void applyFireHairCmab(PlayState* play, int modelId) {
-    static void* cmab = nullptr;
-    static bool tried = false;
-    if (!tried) {
-        tried = true;
-        size_t size = 0;
-        uint8_t* bytes = Zelda3D_AutoModelReadZarFile(modelId, "valbasia_firehair.cmab", &size);
-        if (bytes != nullptr) {
-            cmab = Zelda3D_CmabParse(bytes, size);
-            free(bytes);
-        }
-    }
-    if (cmab == nullptr) {
-        return;
-    }
-    const float frame = static_cast<float>(play->state.frames % Zelda3D_CmabDuration(cmab));
-    float rgba[4];
-    if (Zelda3D_CmabSampleConstColorRGBA(cmab, 0, 1, frame, rgba)) {
-        Zelda3D_GL_SetMatConstOverride(modelId, 0, 1, rgba[0], rgba[1], rgba[2], rgba[3]);
-    }
-    if (Zelda3D_CmabSampleConstColorRGBA(cmab, 0, 2, frame, rgba)) {
-        Zelda3D_GL_SetMatConstOverride(modelId, 0, 2, rgba[0], rgba[1], rgba[2], rgba[3]);
-    }
-}
-
-void* loadCmabOnce(int modelId, const char* suffix, void*& handle, bool& tried) {
-    if (handle != nullptr || tried) {
-        return handle;
-    }
-    tried = true;
-    size_t size = 0;
-    uint8_t* bytes = Zelda3D_AutoModelReadZarFile(modelId, suffix, &size);
-    if (bytes != nullptr) {
-        handle = Zelda3D_CmabParse(bytes, size);
-        free(bytes);
-    }
-    return handle;
-}
-
-void applyBodyCmabs(PlayState* play, int modelId, const BossFd2* boss) {
-    static void* body = nullptr;
-    static void* eye = nullptr;
-    static void* pulse = nullptr;
-    static bool bodyTried = false;
-    static bool eyeTried = false;
-    static bool pulseTried = false;
-    loadCmabOnce(modelId, "valbasiagnd.cmab", body, bodyTried);
-    loadCmabOnce(modelId, "valbasia_eye.cmab", eye, eyeTried);
-    loadCmabOnce(modelId, "valbasiagnd2.cmab", pulse, pulseTried);
-
-    static int debug = -1;
-    static bool reportedLoad = false;
-    static int lastEyeState = -1;
-    if (debug < 0) {
-        const char* value = getenv("ZELDA3D_DBG_BOSSFD2_MAT");
-        debug = value != nullptr && value[0] != '\0';
-    }
-    int uvSamples = 0;
-
-    if (body != nullptr) {
-        const float frame = static_cast<float>(play->state.frames % Zelda3D_CmabDuration(body));
-        for (int material : { 0, 1, 5 }) {
-            float u = 0.0f;
-            float v = 0.0f;
-            if (Zelda3D_CmabSampleTranslationUV(body, material, 1, frame, &u, &v)) {
-                Zelda3D_GL_SetMatUvOverride(modelId, material, u, v);
-                ++uvSamples;
-            }
-        }
-    }
-    if (eye != nullptr) {
-        int palette = 0;
-        if (Zelda3D_CmabSampleTexturePalette(eye, 3, 0, static_cast<float>(boss->eyeState), &palette)) {
-            const int texture = Zelda3D_FacialFrameTex(modelId, 3, palette);
-            Zelda3D_GL_SetMatTexOverride(modelId, 3, texture);
-            if (debug && boss->eyeState != lastEyeState) {
-                fprintf(stderr, "[BossFd2Mat] eyeState=%d palette=%d texture=%d\n", boss->eyeState, palette, texture);
-                lastEyeState = boss->eyeState;
-            }
-        }
-    }
-    if (pulse != nullptr) {
-        const float frame = static_cast<float>(play->state.frames % Zelda3D_CmabDuration(pulse));
-        float rgba[4];
-        if (Zelda3D_CmabSampleConstColorRGBA(pulse, 4, 4, frame, rgba)) {
-            Zelda3D_GL_SetMatConstOverride(modelId, 4, 4, rgba[0], rgba[1], rgba[2], rgba[3]);
-        }
-    }
-    if (debug && !reportedLoad) {
-        fprintf(stderr, "[BossFd2Mat] cmab body=%s eye=%s pulse=%s; UV sampled %d/3 materials\n",
-                body != nullptr ? "loaded" : "MISSING", eye != nullptr ? "loaded" : "MISSING",
-                pulse != nullptr ? "loaded" : "MISSING", uvSamples);
-        reportedLoad = true;
-    }
-}
-
 } // namespace
 
 namespace Zelda3D {
@@ -437,7 +345,7 @@ bool BossFd2Behavior::prepareDeferredDraw(PlayState* play, Actor* actor) {
     // rendered, rather than the unrelated N64 skeleton pose.
     Zelda3D_SetTrackPosedMinY(modelId, 1);
 
-    applyBodyCmabs(play, modelId, boss);
+    Zelda3D::BossFd2Materials::ApplyBody(modelId, boss, sCsabController.materials);
     if (const char* onlyMid = getenv("ZELDA3D_DBG_BOSSFD2_MID")) {
         char* end = nullptr;
         const long mid = strtol(onlyMid, &end, 0);
@@ -596,10 +504,10 @@ extern "C" int Zelda3D_BossFd2DrawManeSegment(PlayState* play, Actor* actor, int
     if (modelId <= 0) {
         return 0;
     }
-    applyFireHairCmab(play, modelId);
+    Zelda3D::BossFd2Materials::ApplyFireHair(modelId, sCsabController.materials);
     // FUN_00335904 submits T(pos) * Ry * Rx * S(nonuniform) * Rx(pi/2). The final rotation must
     // remain after the nonuniform scale; folding it into rot.x changes the transform.
-    return Zelda3D_DrawModelTransform(play, modelId, pos, rot, scale, M_PI / 2.0f);
+    return Zelda3D_DrawModelTransformFlags(play, modelId, pos, rot, scale, M_PI / 2.0f, ZELDA3D_MODEL_DRAW_FORCE_UNLIT);
 }
 
 extern "C" int Zelda3D_BossFd2ForceGround(Actor* actor) {
