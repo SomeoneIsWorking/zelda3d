@@ -23,8 +23,10 @@ class MmReplStructureTests(unittest.TestCase):
         expected = {
             "actors",
             "cam",
+            "linkequip",
             "linkform",
             "linkinfo",
+            "linkitem",
             "linkstate",
             "mlist",
             "mptrace",

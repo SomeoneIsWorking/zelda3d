@@ -17,6 +17,8 @@ int Zelda3D_BossFd2ForceDamageState(PlayState* play, Actor* actor, int state);
 void Zelda3D_BossFd2IdleTick(PlayState* play, Actor* actor);
 int Zelda3D_BossFd2ResolveAnim(PlayState* play, Actor* actor, const char** outCsab, float* outFrame,
                                const char** outMorphCsab, float* outMorphFrame, float* outMorphWeight);
+int Zelda3D_BossFd2CaptureAnimController(Actor* actor);
+int Zelda3D_BossFd2RestoreAnimController(Actor* actor);
 
 #ifdef __cplusplus
 }

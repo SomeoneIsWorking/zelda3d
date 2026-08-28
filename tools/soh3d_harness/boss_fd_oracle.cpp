@@ -161,13 +161,48 @@ bool ReadHoleMane(Memory::MemorySystem& memory, uint32_t playState, ManeState* o
     return true;
 }
 
-bool ResetHoleMane(Memory::MemorySystem& memory, uint32_t playState, std::array<float, 3>* outWorldPos) {
-    if (outWorldPos == nullptr) {
+bool ReadHoleManeRootDriver(Memory::MemorySystem& memory, uint32_t playState, ManeRootDriverState* outDriver) {
+    if (outDriver == nullptr) {
         return false;
     }
     const Lookup hole = FindById(memory, playState, kHoleActorId);
-    if (hole.status != LookupStatus::Found || !ReadFloatArray(memory, hole.address + ActorLayout::kWorldPosOffset,
-                                                              outWorldPos->data(), outWorldPos->size())) {
+    int value = 0;
+    if (hole.status != LookupStatus::Found ||
+        !ReadFloatArray(memory, hole.address + ActorLayout::kWorldPosOffset, outDriver->worldPos.data(), 3) ||
+        !ReadFloat(memory, hole.address + kHoleJawOpeningOffset, &outDriver->jawOpening) ||
+        !ReadFloat(memory, hole.address + kHoleAnimationFrameOffset, &outDriver->animationFrame)) {
+        return false;
+    }
+    for (int axis = 0; axis < 3; ++axis) {
+        if (!ReadS16(memory, hole.address + ActorLayout::kWorldRotOffset + axis * sizeof(int16_t), &value)) {
+            return false;
+        }
+        outDriver->worldRot[axis] = static_cast<int16_t>(value);
+        if (!ReadS16(memory, hole.address + ActorLayout::kShapeRotOffset + axis * sizeof(int16_t), &value)) {
+            return false;
+        }
+        outDriver->shapeRot[axis] = static_cast<int16_t>(value);
+        if (axis < 2) {
+            if (!ReadS16(memory, hole.address + kHoleHeadRotOffset + axis * sizeof(int16_t), &value)) {
+                return false;
+            }
+            outDriver->headRot[axis] = static_cast<int16_t>(value);
+        }
+    }
+    outDriver->headRot[2] = 0;
+    if (!ReadS16(memory, hole.address + kHoleTimerOffset, &value)) {
+        return false;
+    }
+    outDriver->timer = static_cast<int16_t>(value);
+    return true;
+}
+
+bool ResetHoleMane(Memory::MemorySystem& memory, uint32_t playState, ManeRootDriverState* outDriver) {
+    if (!ReadHoleManeRootDriver(memory, playState, outDriver)) {
+        return false;
+    }
+    const Lookup hole = FindById(memory, playState, kHoleActorId);
+    if (hole.status != LookupStatus::Found) {
         return false;
     }
     constexpr uint32_t kDynamicOffsets[3][3] = {
@@ -187,6 +222,28 @@ bool ResetHoleMane(Memory::MemorySystem& memory, uint32_t playState, std::array<
             memory.Write32(hole.address + kDynamicOffsets[chain][2] + word * sizeof(float), 0);
         }
     }
+    return true;
+}
+
+bool WriteHoleManeRootDriver(Memory::MemorySystem& memory, uint32_t playState, const ManeRootDriverState& driver) {
+    const Lookup hole = FindById(memory, playState, kHoleActorId);
+    if (hole.status != LookupStatus::Found) {
+        return false;
+    }
+    for (int axis = 0; axis < 3; ++axis) {
+        WriteFloat(memory, hole.address + ActorLayout::kWorldPosOffset + axis * sizeof(float), driver.worldPos[axis]);
+        memory.Write16(hole.address + ActorLayout::kWorldRotOffset + axis * sizeof(int16_t),
+                       static_cast<uint16_t>(driver.worldRot[axis]));
+        memory.Write16(hole.address + ActorLayout::kShapeRotOffset + axis * sizeof(int16_t),
+                       static_cast<uint16_t>(driver.shapeRot[axis]));
+        if (axis < 2) {
+            memory.Write16(hole.address + kHoleHeadRotOffset + axis * sizeof(int16_t),
+                           static_cast<uint16_t>(driver.headRot[axis]));
+        }
+    }
+    memory.Write16(hole.address + kHoleTimerOffset, static_cast<uint16_t>(driver.timer));
+    WriteFloat(memory, hole.address + kHoleJawOpeningOffset, driver.jawOpening);
+    WriteFloat(memory, hole.address + kHoleAnimationFrameOffset, driver.animationFrame);
     return true;
 }
 

@@ -862,7 +862,6 @@ void Fast::Zelda3DRenderer::DrawModel(int modelId, const float* mp16, const floa
             Zelda3DUnified::UnifiedDrawUbo uu{};
             memcpy(uu.common.uMvp, base.uMP, sizeof(uu.common.uMvp));
             memcpy(uu.common.uMv, base.uMV, sizeof(uu.common.uMv));
-            memcpy(uu.common.uLightDir, base.uLightDir, sizeof(uu.common.uLightDir));
             // Cycle 0 = texel0 * vColor0 (matches the old fixed shader's `t.rgb * vColor.rgb`); no
             // real per-material TEV data exists on the CMB side yet to derive a richer mux from.
             static const int32_t kCombA[16] = {
@@ -901,24 +900,9 @@ void Fast::Zelda3DRenderer::DrawModel(int modelId, const float* mp16, const floa
             uu.common.uParams1[1] = grp.polygonOffset;
             uu.common.uParams1[2] = (boneData && boneCnt > 0) ? 1.0f : 0.0f;
             uu.common.uParams1[3] = 0.0f;
-            // OoT3D's real vertex-lit formula (docs/oot3d_world_lighting_re.md,
-            // cmb.h vertex_lighting header) is:
-            //   v_Color = saturate(sceneAmb*matAmbient + sceneDif*matDiffuse*max(0,N.L)) * bakedColor
-            // The unified vertex shader computes `lit = uMatAmbient + uMatDiffuse*NdotL`, no
-            // separate scene-uniform multiplication — so the scene modulation MUST be pre-baked
-            // here at UBO fill. Otherwise sceneAmb / sceneDif are dead data (as they were pre-
-            // task-#16 for the unified path), materials with matAmb=(1,1,1) render at full day
-            // brightness even at midnight (visible in the title SxS: bright red-brown mountains
-            // where the oracle showed near-silhouette). This is the actual port defect; the
-            // "environment-value tuning" earlier was chasing a symptom of it.
-            uu.common.uMatAmbient[0] = grp.matAmbient[0] * gZelda3dAmbient[0];
-            uu.common.uMatAmbient[1] = grp.matAmbient[1] * gZelda3dAmbient[1];
-            uu.common.uMatAmbient[2] = grp.matAmbient[2] * gZelda3dAmbient[2];
-            uu.common.uMatAmbient[3] = 0.0f;
-            uu.common.uMatDiffuse[0] = grp.matDiffuse[0] * gZelda3dLight1Col[0];
-            uu.common.uMatDiffuse[1] = grp.matDiffuse[1] * gZelda3dLight1Col[1];
-            uu.common.uMatDiffuse[2] = grp.matDiffuse[2] * gZelda3dLight1Col[2];
-            uu.common.uMatDiffuse[3] = 0.0f;
+            // Adapt the authoritative native CMB payload instead of re-deriving actor/scene light
+            // policy in the optional unified route.
+            Zelda3DUnified::CopyCmbVertexLightBank(uu.common, ubo);
             // The legacy CMB UBO above is the authoritative material packer. Carry its complete
             // PICA state into the unified layout so generic-TEV materials execute the same staged
             // combiner, per-actor constant overrides, coordinator transforms, and alpha compare.
@@ -931,9 +915,6 @@ void Fast::Zelda3DRenderer::DrawModel(int modelId, const float* mp16, const floa
             memcpy(uu.common.uSphRot0, ubo.uSphRot0, sizeof(uu.common.uSphRot0));
             memcpy(uu.common.uSphRot1, ubo.uSphRot1, sizeof(uu.common.uSphRot1));
             memcpy(uu.common.uSphRot2, ubo.uSphRot2, sizeof(uu.common.uSphRot2));
-            memcpy(uu.common.uLitDif1, ubo.uLitDif1, sizeof(uu.common.uLitDif1));
-            memcpy(uu.common.uLitDif2, ubo.uLitDif2, sizeof(uu.common.uLitDif2));
-            memcpy(uu.common.uLightDir2, ubo.uLightDir2, sizeof(uu.common.uLightDir2));
             memcpy(uu.common.uTevStages, ubo.uTevStages, sizeof(uu.common.uTevStages));
             memcpy(uu.common.uTevConst, ubo.uTevConst, sizeof(uu.common.uTevConst));
             memcpy(uu.common.uTex2Xf, ubo.uTex2Xf, sizeof(uu.common.uTex2Xf));

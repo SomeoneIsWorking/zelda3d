@@ -101,6 +101,10 @@ Current application boundaries:
 - MM's `zelda3d/repl/` is a composed in-game REPL: `mm3d_repl.*` wires focused transport, framing,
   lifecycle, parser, router, world, scene, model, and Link owners. Typed Player mutations remain in
   `mm3d_player_force.*`, outside the command surface that invokes them.
+- MM Player draw composition remains in `mm3d_player.c`; form/model, base visibility, sheath,
+  left/right hand, bottle material, and Deku-spin material behavior live in same-named typed
+  adapter/policy owners. New retail `Player_Draw` stages extend that set instead of growing the
+  composer or the legacy Player overlay.
 - Animation responsibilities are explicit: `automatic_playback.*`, pose evaluation, inspection,
   tracking and submission, and `skeleton_draw_bridge.*` remain separate from the legacy
   retarget/override owners.

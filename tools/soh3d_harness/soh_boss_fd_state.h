@@ -58,7 +58,14 @@ int SohState_BossFdForceFlightSeeded(const float* pos3, const short* rot3, std::
 int SohState_BossFd2ForceGround(std::uintptr_t* outAddress);
 int SohState_BossFd2RenderedAnchor(float outHead[3], short* outShapeYaw);
 int SohState_BossFd2Mane(BossFd2ManeState* outState);
-int SohState_BossFd2SyncMane(const float worldPos[3]);
+int SohState_BossFd2SyncMane(const float worldPos[3], const short worldRot[3], const short shapeRot[3],
+                             const short headRot[3], short timer, float jawOpening);
+int SohState_BossFd2ResetManeHistories();
+int SohState_BossFd2SetManeRootDrivers(const float worldPos[3], const short worldRot[3], const short shapeRot[3],
+                                       const short headRot[3], short timer, float jawOpening);
+int SohState_BossFd2AnimationFrame(float* outFrame);
+int SohState_BossFd2CaptureManeAnimController();
+int SohState_BossFd2RestoreManeAnimController();
 int SohState_BossFdRenderInfo(BossFdRenderInfo* outInfo);
 }
 

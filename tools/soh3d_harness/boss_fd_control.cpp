@@ -1,7 +1,7 @@
 #include "boss_fd_control.h"
 
-#include <cmath>
 #include <array>
+#include <cmath>
 #include <cstdint>
 #include <cstdio>
 #include <cstring>
@@ -16,10 +16,16 @@
 #include "boss_fd_profile_validation.h"
 #include "core/core.h"
 #include "core/memory.h"
+#include "frame_watchdog.h"
+#include "libretro.h"
+#include "libretro_frontend.h"
 #include "oracle_state.h"
 #include "paired_camera_control.h"
 #include "repl_protocol.h"
 #include "soh_boss_fd_state.h"
+#include "soh_runtime.h"
+
+extern "C" int soh3d_draw_index;
 
 namespace HarnessBossFdControl {
 namespace {
@@ -40,6 +46,42 @@ struct ActiveFault {
 };
 
 std::optional<ActiveFault> g_activeFault;
+std::optional<ActiveFault> g_activeManeFault;
+std::optional<HarnessBossFdOracle::ManeRootDriverState> gFrozenManeDriver;
+HarnessBossFd2ManeRootControl::Trajectory gManeRootTrajectory;
+
+void InvalidateManeRootControl() {
+    gManeRootTrajectory.Reset();
+    gFrozenManeDriver.reset();
+}
+
+HarnessBossFd2ManeRootControl::Roots ManeRoots(const HarnessBossFdOracle::ManeState& state) {
+    return state.head;
+}
+
+HarnessBossFd2ManeRootControl::Roots ManeRoots(const BossFd2ManeState& state) {
+    HarnessBossFd2ManeRootControl::Roots roots{};
+    for (int chain = 0; chain < 3; ++chain) {
+        for (int axis = 0; axis < 3; ++axis) {
+            roots[chain][axis] = state.head[chain][axis];
+        }
+    }
+    return roots;
+}
+
+bool ReadManePair(uint32_t playState, HarnessBossFdOracle::ManeState* oracle, BossFd2ManeState* soh) {
+    return HarnessBossFdOracle::ReadHoleMane(Core::System::GetInstance().Memory(), playState, oracle) &&
+           SohState_BossFd2Mane(soh);
+}
+
+bool ApplyOracleManeRootDriver(uint32_t playState, const HarnessBossFdOracle::ManeRootDriverState& driver) {
+    return HarnessBossFdOracle::WriteHoleManeRootDriver(Core::System::GetInstance().Memory(), playState, driver);
+}
+
+bool ApplySohManeRootDriver(const HarnessBossFdOracle::ManeRootDriverState& driver) {
+    return SohState_BossFd2SetManeRootDrivers(driver.worldPos.data(), driver.worldRot.data(), driver.shapeRot.data(),
+                                              driver.headRot.data(), driver.timer, driver.jawOpening);
+}
 
 constexpr int FaultSlot(int lead) {
     return (lead + Zelda3D::BossFdHistoryLayout::kBodyOffset[1]) % HarnessBossFdOracle::kHistoryCount;
@@ -237,16 +279,208 @@ void ForceGroundManeSync(std::istringstream& arguments) {
         HarnessRepl::PrintErr("force bossfd2_mane_sync: usage: force bossfd2_mane_sync");
         return;
     }
+    if (g_activeManeFault) {
+        HarnessRepl::PrintErr("force bossfd2_mane_sync: restore the active bossfd2_mane_fault first");
+        return;
+    }
     const auto playState = HarnessOracle::GameplayPlayState();
-    std::array<float, 3> worldPos{};
+    HarnessBossFdOracle::ManeRootDriverState driver{};
     auto& memory = Core::System::GetInstance().Memory();
-    if (!playState || !HarnessBossFdOracle::ResetHoleMane(memory, *playState, &worldPos) ||
-        !SohState_BossFd2SyncMane(worldPos.data())) {
+    float sohAnimationFrame = 0.0F;
+    if (!playState || !HarnessSohRuntime::IsBooted() ||
+        !HarnessBossFdOracle::ReadHoleManeRootDriver(memory, *playState, &driver) ||
+        !SohState_BossFd2AnimationFrame(&sohAnimationFrame)) {
+        InvalidateManeRootControl();
         HarnessRepl::PrintErr("force bossfd2_mane_sync: both live ground-form actors are required");
         return;
     }
-    std::printf("ok force bossfd2_mane_sync worldPos=(%.3f,%.3f,%.3f) histories=zero\n", worldPos[0], worldPos[1],
-                worldPos[2]);
+    if (sohAnimationFrame != driver.animationFrame) {
+        InvalidateManeRootControl();
+        HarnessRepl::PrintErr(
+            "force bossfd2_mane_sync: authored animation frames differ; use the frozen emergence hold");
+        return;
+    }
+    // The stored limb-14 roots can still describe the frame before the first body submission (the
+    // Oracle roots are zero in that state). Checkpoint each pre-call controller, run one ordinary
+    // controlled solver/draw call, then initialize both histories around the resulting posed roots.
+    // Every later controlled call restores these same pre-call inputs and must reproduce those roots.
+    if (!ApplySohManeRootDriver(driver) || !SohState_BossFd2CaptureManeAnimController()) {
+        InvalidateManeRootControl();
+        HarnessRepl::PrintErr("force bossfd2_mane_sync: host controller checkpoint failed");
+        return;
+    }
+    for (int frame = 0; frame < 2; ++frame) {
+        if (!ApplyOracleManeRootDriver(*playState, driver)) {
+            InvalidateManeRootControl();
+            HarnessRepl::PrintErr("force bossfd2_mane_sync: oracle pose priming failed");
+            return;
+        }
+        HarnessWatchdog::Frame watchdog("ForceGroundManeSync/retro_run");
+        soh3d_draw_index = 0;
+        retro_run();
+    }
+    if (!ApplySohManeRootDriver(driver) || !SohState_BossFd2RestoreManeAnimController()) {
+        InvalidateManeRootControl();
+        HarnessRepl::PrintErr("force bossfd2_mane_sync: host pose priming failed");
+        return;
+    }
+    HarnessSohRuntime::AdvanceFrame("ForceGroundManeSync/RunFrame");
+    if (!ApplyOracleManeRootDriver(*playState, driver) ||
+        !HarnessBossFdOracle::ResetHoleMane(memory, *playState, &driver) || !ApplySohManeRootDriver(driver) ||
+        !SohState_BossFd2ResetManeHistories()) {
+        InvalidateManeRootControl();
+        HarnessRepl::PrintErr("force bossfd2_mane_sync: post-pose mane reset failed");
+        return;
+    }
+    HarnessBossFdOracle::ManeState oracle{};
+    BossFd2ManeState soh{};
+    if (!ReadManePair(*playState, &oracle, &soh)) {
+        InvalidateManeRootControl();
+        HarnessRepl::PrintErr("force bossfd2_mane_sync: paired mane readback failed");
+        return;
+    }
+    gFrozenManeDriver = driver;
+    gManeRootTrajectory.Arm(ManeRoots(oracle), ManeRoots(soh));
+    std::printf("ok force bossfd2_mane_sync worldPos=(%.3f,%.3f,%.3f) timer=%d head=(%d,%d,%d) "
+                "jaw=%.3f csabFrame=%.3f pose=primed histories=zero root-control=armed\n",
+                driver.worldPos[0], driver.worldPos[1], driver.worldPos[2], driver.timer, driver.headRot[0],
+                driver.headRot[1], driver.headRot[2], driver.jawOpening, driver.animationFrame);
+}
+
+void ForceGroundManeStep(std::istringstream& arguments) {
+    std::string countText;
+    std::string trailing;
+    if (!(arguments >> countText) || (arguments >> trailing)) {
+        HarnessRepl::PrintErr("force bossfd2_mane_step: usage: force bossfd2_mane_step <solverCalls>");
+        return;
+    }
+    const auto count = HarnessRepl::ParseNum(countText);
+    if (!count || *count == 0) {
+        HarnessRepl::PrintErr("force bossfd2_mane_step: solverCalls must be positive");
+        return;
+    }
+    if (g_activeManeFault) {
+        HarnessRepl::PrintErr("force bossfd2_mane_step: restore the active bossfd2_mane_fault first");
+        return;
+    }
+    const auto playState = HarnessOracle::GameplayPlayState();
+    if (!playState || !HarnessSohRuntime::IsBooted()) {
+        HarnessRepl::PrintErr("force bossfd2_mane_step: both engines must be in gameplay");
+        return;
+    }
+    HarnessBossFdOracle::ManeState oracle{};
+    BossFd2ManeState soh{};
+    if (!ReadManePair(*playState, &oracle, &soh) ||
+        !gManeRootTrajectory.CurrentWasObserved(ManeRoots(oracle), ManeRoots(soh))) {
+        InvalidateManeRootControl();
+        HarnessRepl::PrintErr(
+            "force bossfd2_mane_step: root control is unarmed or unobserved stepping occurred; resync");
+        return;
+    }
+
+    uint64_t completed = 0;
+    for (; completed < *count && !HarnessFrontend::QuitRequested(); ++completed) {
+        // OoT3D's draw/solver cadence is one call per two 60 Hz libretro frames. Keeping the pair
+        // inside this owner lets every authored root displacement be observed before another call.
+        // Restore before both guest updates as well as the host update so neither engine can carry
+        // a root-driver mutation from an unsampled update into its solver call.
+        for (int frame = 0; frame < 2; ++frame) {
+            if (!gFrozenManeDriver || !ApplyOracleManeRootDriver(*playState, *gFrozenManeDriver)) {
+                InvalidateManeRootControl();
+                HarnessRepl::PrintErr("force bossfd2_mane_step: could not restore the frozen root drivers");
+                return;
+            }
+            HarnessWatchdog::Frame watchdog("ForceGroundManeStep/retro_run");
+            soh3d_draw_index = 0;
+            retro_run();
+        }
+        if (!gFrozenManeDriver || !ApplySohManeRootDriver(*gFrozenManeDriver) ||
+            !SohState_BossFd2RestoreManeAnimController()) {
+            InvalidateManeRootControl();
+            HarnessRepl::PrintErr("force bossfd2_mane_step: could not restore the frozen root drivers");
+            return;
+        }
+        HarnessSohRuntime::AdvanceFrame("ForceGroundManeStep/RunFrame");
+        if (!ReadManePair(*playState, &oracle, &soh)) {
+            InvalidateManeRootControl();
+            HarnessRepl::PrintErr("force bossfd2_mane_step: actor disappeared during paired step");
+            return;
+        }
+        const auto rootControl = gManeRootTrajectory.Observe(ManeRoots(oracle), ManeRoots(soh));
+        if (rootControl.status == HarnessBossFd2ManeRootControl::Status::Diverged) {
+            std::printf("bossfd2_mane root-control=DIVERGED call=%llu maxStepDelta=%.9g\n",
+                        static_cast<unsigned long long>(completed + 1), rootControl.maximumStepDelta);
+            HarnessRepl::PrintErr("force bossfd2_mane_step: posed-root trajectories diverged; solver compare refused");
+            return;
+        }
+    }
+    const auto rootControl = gManeRootTrajectory.GetSnapshot();
+    std::printf("ok force bossfd2_mane_step calls=%llu root-control=MATCH maxStepDelta=%.9g\n",
+                static_cast<unsigned long long>(completed), rootControl.maximumStepDelta);
+}
+
+void ApplyManeFault() {
+    if (g_activeManeFault) {
+        HarnessRepl::PrintErr("force bossfd2_mane_fault: fault already active; restore it first");
+        return;
+    }
+    if (LastBossFd2ManeCompareStatus() != BossFdCompareStatus::Match) {
+        HarnessRepl::PrintErr(
+            "force bossfd2_mane_fault: requires an immediately preceding MATCH from compare bossfd2_mane");
+        return;
+    }
+    const auto playState = HarnessOracle::GameplayPlayState();
+    if (!playState || CompareBossFd2Mane(*playState) != BossFdCompareStatus::Match) {
+        HarnessRepl::PrintErr("force bossfd2_mane_fault: the controlled baseline is no longer an exact MATCH");
+        return;
+    }
+    auto& memory = Core::System::GetInstance().Memory();
+    const auto hole = HarnessBossFdOracle::FindById(memory, *playState, HarnessBossFdOracle::kHoleActorId);
+    constexpr int kSegment = 9;
+    constexpr uint32_t kCenterPositionOffset = 0x03B4;
+    const uint32_t address = hole.address + kCenterPositionOffset + kSegment * 3 * sizeof(float);
+    const auto originalWord = hole.status == LookupStatus::Found ? memory.Read32OrNullopt(address) : std::nullopt;
+    if (!originalWord) {
+        HarnessRepl::PrintErr("force bossfd2_mane_fault: live oracle center-tail position is unavailable");
+        return;
+    }
+    float originalValue = 0.0F;
+    std::memcpy(&originalValue, &*originalWord, sizeof(originalValue));
+    const float injectedValue = originalValue + 1000.0F;
+    if (!std::isfinite(originalValue) || !std::isfinite(injectedValue)) {
+        HarnessRepl::PrintErr("force bossfd2_mane_fault: selected position is non-finite");
+        return;
+    }
+    const uint32_t injectedWord = FloatWord(injectedValue);
+    memory.Write32(address, injectedWord);
+    g_activeManeFault =
+        ActiveFault{ hole.address, address, *originalWord, injectedWord, 0, kSegment, originalValue, injectedValue };
+    std::printf("ok force bossfd2_mane_fault apply oracle=0x%08x chain=0 segment=%d addr=0x%08x "
+                "x=%.3f->%.3f\n",
+                hole.address, kSegment, address, originalValue, injectedValue);
+}
+
+void RestoreManeFault() {
+    if (!g_activeManeFault) {
+        HarnessRepl::PrintErr("force bossfd2_mane_fault: no active fault to restore");
+        return;
+    }
+    auto& memory = Core::System::GetInstance().Memory();
+    const auto playState = HarnessOracle::GameplayPlayState();
+    const auto hole = playState ? HarnessBossFdOracle::FindById(memory, *playState, HarnessBossFdOracle::kHoleActorId)
+                                : HarnessBossFdOracle::Lookup{ LookupStatus::Missing, 0 };
+    const auto currentWord = memory.Read32OrNullopt(g_activeManeFault->address);
+    if (hole.status != LookupStatus::Found || hole.address != g_activeManeFault->actor || !currentWord ||
+        *currentWord != g_activeManeFault->injectedWord) {
+        std::printf("ok force bossfd2_mane_fault restore state=already-cleared no-write=1\n");
+        g_activeManeFault.reset();
+        return;
+    }
+    memory.Write32(g_activeManeFault->address, g_activeManeFault->originalWord);
+    std::printf("ok force bossfd2_mane_fault restore oracle=0x%08x segment=%d addr=0x%08x x=%.3f\n",
+                g_activeManeFault->actor, g_activeManeFault->slot, g_activeManeFault->address,
+                g_activeManeFault->originalValue);
+    g_activeManeFault.reset();
 }
 
 void ApplyFault() {
@@ -348,6 +582,23 @@ bool HandleForce(std::string_view subcommand, std::istringstream& arguments) {
         ForceGroundManeSync(arguments);
         return true;
     }
+    if (subcommand == "bossfd2_mane_step") {
+        ForceGroundManeStep(arguments);
+        return true;
+    }
+    if (subcommand == "bossfd2_mane_fault") {
+        std::string action;
+        if (!(arguments >> action) || (action != "apply" && action != "restore")) {
+            HarnessRepl::PrintErr("force bossfd2_mane_fault: usage: force bossfd2_mane_fault <apply|restore>");
+            return true;
+        }
+        if (action == "apply") {
+            ApplyManeFault();
+        } else {
+            RestoreManeFault();
+        }
+        return true;
+    }
     if (subcommand == "bossfd_profile") {
         ForceProfile();
         return true;
@@ -366,6 +617,15 @@ bool HandleForce(std::string_view subcommand, std::istringstream& arguments) {
         RestoreFault();
     }
     return true;
+}
+
+HarnessBossFd2ManeRootControl::Snapshot ManeRootControlSnapshot() {
+    return gManeRootTrajectory.GetSnapshot();
+}
+
+bool ManeRootControlAcceptsCurrent(const HarnessBossFd2ManeRootControl::Roots& oracle,
+                                   const HarnessBossFd2ManeRootControl::Roots& soh) {
+    return gManeRootTrajectory.CurrentWasObserved(oracle, soh);
 }
 
 } // namespace HarnessBossFdControl

@@ -47,3 +47,23 @@ Zelda3DPlayerFormRequestResult Zelda3D_PlayerRequestForm(Player* player, PlaySta
     Player_UseItem(play, player, maskItem);
     return ZELDA3D_PLAYER_FORM_REQUEST_SENT;
 }
+
+s32 Zelda3D_PlayerRequestItem(Player* player, PlayState* play, s32 itemId) {
+    if ((player == NULL) || (play == NULL) || (itemId < 0) || (itemId > UINT8_MAX)) {
+        return 0;
+    }
+
+    Player_UseItem(play, player, (ItemId)itemId);
+    return 1;
+}
+
+s32 Zelda3D_PlayerEquipItem(PlayState* play, EquipSlot slot, s32 itemId) {
+    if ((play == NULL) || (slot < EQUIP_SLOT_C_LEFT) || (slot > EQUIP_SLOT_C_RIGHT) || (itemId < 0) ||
+        (itemId > UINT8_MAX)) {
+        return 0;
+    }
+
+    SET_CUR_FORM_BTN_ITEM(slot, (ItemId)itemId);
+    Interface_LoadItemIcon(play, slot);
+    return 1;
+}

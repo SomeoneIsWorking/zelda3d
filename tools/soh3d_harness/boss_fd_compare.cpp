@@ -5,6 +5,7 @@
 #include <cstdio>
 
 #include "boss_fd_comparison_policy.h"
+#include "boss_fd_control.h"
 #include "boss_fd_oracle.h"
 #include "core/core.h"
 #include "core/memory.h"
@@ -14,6 +15,7 @@
 namespace {
 
 BossFdCompareStatus gLastCompareStatus = BossFdCompareStatus::Invalid;
+BossFdCompareStatus gLastManeCompareStatus = BossFdCompareStatus::Invalid;
 
 using HarnessBossFdOracle::Lookup;
 using HarnessBossFdOracle::LookupStatus;
@@ -64,6 +66,10 @@ BossFdCompareStatus RecordStatus(BossFdCompareStatus status) {
 
 BossFdCompareStatus LastBossFdCompareStatus() {
     return gLastCompareStatus;
+}
+
+BossFdCompareStatus LastBossFd2ManeCompareStatus() {
+    return gLastManeCompareStatus;
 }
 
 const char* BossFdCompareStatusName(BossFdCompareStatus status) {
@@ -136,13 +142,29 @@ BossFdCompareStatus CompareBossFd(uint32_t azPlayState) {
     return RecordStatus(result.status);
 }
 
-void CompareBossFd2Mane(uint32_t azPlayState) {
+BossFdCompareStatus CompareBossFd2Mane(uint32_t azPlayState) {
     auto& memory = Core::System::GetInstance().Memory();
     HarnessBossFdOracle::ManeState oracle{};
     BossFd2ManeState soh{};
     if (!HarnessBossFdOracle::ReadHoleMane(memory, azPlayState, &oracle) || !SohState_BossFd2Mane(&soh)) {
         std::printf("  bossfd2_mane state=MISSING\n");
-        return;
+        return gLastManeCompareStatus = BossFdCompareStatus::Missing;
+    }
+
+    HarnessBossFd2ManeRootControl::Roots oracleRoots = oracle.head;
+    HarnessBossFd2ManeRootControl::Roots sohRoots{};
+    for (int chain = 0; chain < 3; ++chain) {
+        for (int axis = 0; axis < 3; ++axis) {
+            sohRoots[chain][axis] = soh.head[chain][axis];
+        }
+    }
+    const auto rootControl = HarnessBossFdControl::ManeRootControlSnapshot();
+    if (rootControl.status != HarnessBossFd2ManeRootControl::Status::Tracking ||
+        !HarnessBossFdControl::ManeRootControlAcceptsCurrent(oracleRoots, sohRoots)) {
+        std::printf("  bossfd2_mane state=INVALID reason=root-trajectory-uncontrolled observedSteps=%d "
+                    "maxStepDelta=%.9g\n",
+                    rootControl.observedSteps, rootControl.maximumStepDelta);
+        return gLastManeCompareStatus = BossFdCompareStatus::Invalid;
     }
 
     float total = 0.0f;
@@ -173,4 +195,7 @@ void CompareBossFd2Mane(uint32_t azPlayState) {
                     soh.pos[chain][9][1] - soh.head[chain][1], soh.pos[chain][9][2] - soh.head[chain][2]);
     }
     std::printf("  bossfd2_mane summary samples=30 mean=%.4f max=%.4f\n", total / 30.0f, maximum);
+    std::printf("  bossfd2_mane root-control=MATCH observedSteps=%d maxStepDelta=%.9g verdict=%s\n",
+                rootControl.observedSteps, rootControl.maximumStepDelta, maximum == 0.0F ? "MATCH" : "DIVERGED");
+    return gLastManeCompareStatus = maximum == 0.0F ? BossFdCompareStatus::Match : BossFdCompareStatus::Diverged;
 }

@@ -68,6 +68,19 @@ static s32 Zelda3D_MmLinkParseForm(const char* name, PlayerTransformation* outFo
     return 1;
 }
 
+static s32 Zelda3D_MmLinkParseEquipSlot(const char* name, EquipSlot* outSlot) {
+    if (strcmp(name, "c-left") == 0) {
+        *outSlot = EQUIP_SLOT_C_LEFT;
+    } else if (strcmp(name, "c-down") == 0) {
+        *outSlot = EQUIP_SLOT_C_DOWN;
+    } else if (strcmp(name, "c-right") == 0) {
+        *outSlot = EQUIP_SLOT_C_RIGHT;
+    } else {
+        return 0;
+    }
+    return 1;
+}
+
 static void Zelda3D_MmLinkInfo(PlayState* play, const Zelda3DMmLinkReplOutput* output) {
     char out[512];
     Player* player = (play != NULL) ? GET_PLAYER(play) : NULL;
@@ -84,15 +97,18 @@ static void Zelda3D_MmLinkInfo(PlayState* play, const Zelda3DMmLinkReplOutput* o
     snprintf(out, sizeof(out),
              "linkinfo runtimeForm=%s(%d) saveForm=%s(%d) currentMask=%s(%d) equippedMask=%s(%d) "
              "ownedMask=deku:%d,goron:%d,zora:%d,fd:%d action=%s actionVar1=%d itemAction=%d "
-             "itemRequest=%d heldItemAction=%d stateFlags=0x%08X,0x%08X,0x%08X speedXZ=%.2f "
+             "itemRequest=%d heldItemId=%d heldItemAction=%d cItems=%02X,%02X,%02X "
+             "stateFlags=0x%08X,0x%08X,0x%08X speedXZ=%.2f "
              "pos=(%.1f,%.1f,%.1f)",
              Zelda3D_MmLinkFormName(runtimeForm), runtimeForm, Zelda3D_MmLinkFormName(saveForm), saveForm,
              Zelda3D_MmLinkMaskName(currentMask), currentMask, Zelda3D_MmLinkMaskName(equippedMask), equippedMask,
              INV_CONTENT(ITEM_MASK_DEKU) == ITEM_MASK_DEKU, INV_CONTENT(ITEM_MASK_GORON) == ITEM_MASK_GORON,
              INV_CONTENT(ITEM_MASK_ZORA) == ITEM_MASK_ZORA,
              INV_CONTENT(ITEM_MASK_FIERCE_DEITY) == ITEM_MASK_FIERCE_DEITY, Zelda3D_PlayerActionName(player),
-             player->av1.actionVar1, player->itemAction, player->unk_AA5, player->heldItemAction, player->stateFlags1,
-             player->stateFlags2, player->stateFlags3, player->speedXZ, pos->x, pos->y, pos->z);
+             player->av1.actionVar1, player->itemAction, player->unk_AA5, player->heldItemId, player->heldItemAction,
+             GET_CUR_FORM_BTN_ITEM(EQUIP_SLOT_C_LEFT), GET_CUR_FORM_BTN_ITEM(EQUIP_SLOT_C_DOWN),
+             GET_CUR_FORM_BTN_ITEM(EQUIP_SLOT_C_RIGHT), player->stateFlags1, player->stateFlags2, player->stateFlags3,
+             player->speedXZ, pos->x, pos->y, pos->z);
     Zelda3D_MmLinkReply(output, out);
 }
 
@@ -130,6 +146,42 @@ static void Zelda3D_MmLinkForm(PlayState* play, Zelda3DMmReplArgs* args, const Z
              Zelda3D_MmLinkFormName((PlayerTransformation)player->transformation),
              Zelda3D_MmLinkFormName((PlayerTransformation)gSaveContext.save.playerForm),
              Zelda3D_PlayerActionName(player));
+    Zelda3D_MmLinkReply(output, out);
+}
+
+static void Zelda3D_MmLinkItem(PlayState* play, Zelda3DMmReplArgs* args, const Zelda3DMmLinkReplOutput* output) {
+    Player* player = (play != NULL) ? GET_PLAYER(play) : NULL;
+    int32_t itemId;
+    if (player == NULL) {
+        Zelda3D_MmLinkReply(output, "linkitem err (no player)");
+        return;
+    }
+    if (!Zelda3D_MmReplParseI32(args, 0, &itemId) || !Zelda3D_MmReplArgsEnd(args) ||
+        !Zelda3D_PlayerRequestItem(player, play, itemId)) {
+        Zelda3D_MmLinkReply(output, "usage: linkitem <ItemId 0x00..0xff>");
+        return;
+    }
+
+    char out[192];
+    snprintf(out, sizeof(out), "linkitem requested=0x%02X itemAction=%d itemRequest=%d heldItemId=%d heldItemAction=%d",
+             (unsigned)itemId, player->itemAction, player->unk_AA5, player->heldItemId, player->heldItemAction);
+    Zelda3D_MmLinkReply(output, out);
+}
+
+static void Zelda3D_MmLinkEquip(PlayState* play, Zelda3DMmReplArgs* args, const Zelda3DMmLinkReplOutput* output) {
+    char slotName[16] = { 0 };
+    EquipSlot slot;
+    int32_t itemId;
+    if (!Zelda3D_MmReplNextToken(args, slotName, sizeof(slotName)) || !Zelda3D_MmLinkParseEquipSlot(slotName, &slot) ||
+        !Zelda3D_MmReplParseI32(args, 0, &itemId) || !Zelda3D_MmReplArgsEnd(args) ||
+        !Zelda3D_PlayerEquipItem(play, slot, itemId)) {
+        Zelda3D_MmLinkReply(output, "usage: linkequip <c-left|c-down|c-right> <ItemId 0x00..0xff>");
+        return;
+    }
+
+    char out[128];
+    snprintf(out, sizeof(out), "linkequip slot=%s item=0x%02X equipped=0x%02X", slotName, (unsigned)itemId,
+             GET_CUR_FORM_BTN_ITEM(slot));
     Zelda3D_MmLinkReply(output, out);
 }
 
@@ -251,6 +303,14 @@ s32 Zelda3D_MmLinkReplDispatch(PlayState* play, const char* command, Zelda3DMmRe
     }
     if (Zelda3D_MmReplMatch(command, "linkform", &args)) {
         Zelda3D_MmLinkForm(play, &args, &output);
+        return 1;
+    }
+    if (Zelda3D_MmReplMatch(command, "linkequip", &args)) {
+        Zelda3D_MmLinkEquip(play, &args, &output);
+        return 1;
+    }
+    if (Zelda3D_MmReplMatch(command, "linkitem", &args)) {
+        Zelda3D_MmLinkItem(play, &args, &output);
         return 1;
     }
     if (Zelda3D_MmReplMatch(command, "linkstate", &args)) {
