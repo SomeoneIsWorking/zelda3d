@@ -37,3 +37,20 @@ Its non-black means are oracle `(142.3,65.8,14.4)` and host `(110.5,39.4,3.5)`; 
 `38.646744` over 22,400 pixels. This is evidence that the new UV override is live and that the
 remaining body darkness is not closed by it. It is not a parity claim: the next BossFd2 material
 change still needs a named renderer or decomp mechanism and a new matched capture.
+
+## Actor light-bank correction
+
+The next renderer probe found a separate binding defect. The live oracle body records bind the
+orange `light2Color` to one directional slot and the warm `light1Color` to the other; the two
+directions are the actor bank's opposed pair. The host's final `SG_DUMP` UBO before this change
+paired the warm diffuse product with the live primary direction `(-0.3274,-0.9449,0)` but left the
+orange diffuse product on the static scene `light2Dir=(0,1,0)`. That static scene direction is not
+the actor bank's second direction.
+
+The native pass now applies the actor bank's second direction as the exact negation of the live
+primary direction for lit CMB materials with non-zero material diffuse colour. Scene materials
+have zero diffuse colour, and the title wordmark light-direction override remains on its own path.
+The post-change UBO dump reports `dir1=(-0.3274,-0.9449,0)` and `dir2=(0.3274,0.9449,0)` for all
+six diffuse BossFd2 groups. This is a mechanism-level correction; the normal final-material
+capture still measures a residual (`oracle 139.2/61.0/14.5` vs host `108.2/37.3/2.8` over the
+non-black actor crop), so BossFd2 remains open for the next grounded material discriminator.
