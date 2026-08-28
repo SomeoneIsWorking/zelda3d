@@ -457,7 +457,7 @@ draw's tex0 physical address matches a target, it appends up to 200 lines
 per target per activation:
 
 ```
-PIXEL tex0=<pa> xy=(x,y) texcol=(r,g,b,a) primary=(r,g,b,a) combined=(r,g,b,a)
+PIXEL tex0=<pa> xy=(x,y) texcol=(r,g,b,a) tex1col=(r,g,b,a) primary=(r,g,b,a) combined=(r,g,b,a)
 ```
 
 `primary` is the interpolated PRIMARY_COLOR the TEV actually consumed (the
@@ -468,6 +468,10 @@ addresses (`0x20906a80/0x2090ec80/0x20910e80`, task #16 era) plus ONE generic
 runtime-selected address via env `SOH3D_PIXEL_TEX=<hex physaddr>` (added
 2026-07-10 for the cloud-vortex RE; see oot3d-decomp `title_cloud_vortex.md`).
 Search `SOH3D_PIXEL_TEX` in the in-tree copy for the exact block.
+
+The same block also logs `tex1col`, the sample returned for texture unit 1 at the fragment. This
+field is useful when a multi-stage material's TEX0 and PRIMARY probes agree but its secondary
+coordinator remains suspect; it is a diagnostic addition and does not alter TEV execution.
 
 # Azahar Patch 6 (2026-07-10, dawn-hue fog RE): `az_fog` + per-draw fog fields + pixel probes
 

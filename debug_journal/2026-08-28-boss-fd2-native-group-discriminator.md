@@ -115,3 +115,36 @@ claimed as the explanation for the remaining opaque BossFd2 body brightness. A C
 asserts all four material-1 source words, and a shader-source test asserts the 16/20/24 decode. The
 native harness also exposes `soh_sgdump <modelId>` so this boundary can be inspected on the same
 fixed checkpoint. The body residual remains open for a separate material/texture comparison.
+
+## Fragment probe extension (2026-08-28)
+
+The existing oracle `PIXEL` probe was extended in the local Azahar harness patch to include the
+texture-unit-1 sample (`tex1col`) alongside `texcol`, `primary`, and `combined`. At the fixed
+material-1 address `tex0=0x180bde00`, 1,524 samples measured linear 8-bit means:
+
+```text
+tex0     (93.260, 29.911, 11.373, 255)
+tex1     (131.835, 85.491, 66.180, 255)
+primary  (107.285, 53.755, 16.251, 255)
+combined (138.288, 28.182,  4.222, 255)
+```
+
+The host received a generic `ZELDA3D_SG_FRAGDBG=14` tap for `texture(uTex1,vUv1)` so the same
+sample boundary can be measured through SDL3GPU. The first host paired runs exposed a separate
+tooling failure: after `force bossfd2_mane_sync 0 -850 0`, later fresh processes sometimes reported
+the oracle rendered anchor at `z=240` while the host anchor stayed at `z=0`. Those camera-mismatched
+frames are rejected as parity evidence. No material, lighting, or gain change is justified until
+the checkpoint restores the same rendered anchor on both sides.
+
+The host probe was then changed to the generic `force camera` command, which writes the same explicit
+eye/at/FOV into both engines and removes anchor-derived camera placement from the measurement. With
+that control, host `soh_drawskip 37` changed the model-2018 material-1 surface and overlapped 1,588
+pixels of the oracle material-1 union mask (1,656 pixels), so the draw boundary is real. A nearest-
+texel host tap (`ZELDA3D_SG_FRAGDBG=15`) was added beside the filtered TEX1 tap (`=14`) as a sampler
+discriminator; it is diagnostic only and does not change the shipping sampler.
+
+One subsequent A/B was rejected: the oracle checkpoint had been saved with the texture pack enabled
+while the host side was run with it disabled. The host-off run also hit a 240-unit posed-root
+divergence on the next controlled mane step. Future material numbers must use a newly generated
+checkpoint and the same `ZELDA3D_HARNESS_TEXPACK` mode on both sides, with the root-control result
+matching before the framebuffer is interpreted.
