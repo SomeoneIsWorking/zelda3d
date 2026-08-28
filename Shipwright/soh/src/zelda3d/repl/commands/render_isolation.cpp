@@ -24,9 +24,18 @@ bool Zelda3D_RenderIsolationReplCommand(PlayState* play, const char* command, co
         // and FRAGDBG alone gives a whole-frame composite. Isolate the group and the frame IS that
         // draw's output, directly comparable with the oracle's per-fragment PIXEL probe.
         // Indices are per-frame, in append order; get them from `sgdrawlist`.
-        if (sscanf(line, "%*s %i", &iv) == 1)
+        if (sscanf(line, "%*s %i", &iv) == 1) {
             gZelda3dSgDrawOnly = iv;
+        }
         Zelda3D_ReplReply(outPath, "sgdrawonly=%d", gZelda3dSgDrawOnly);
+    } else if (strcmp(cmd, "sgdrawskip") == 0) {
+        // Like the oracle harness's drawskip: retain the complete frame except for one native CMB
+        // group. Full-vs-skipped pairs therefore measure the same composited contribution on both
+        // engines; sgdrawlist supplies the per-frame index and its stable model-group/material ids.
+        if (sscanf(line, "%*s %i", &iv) == 1) {
+            gZelda3dSgDrawSkip = iv;
+        }
+        Zelda3D_ReplReply(outPath, "sgdrawskip=%d", gZelda3dSgDrawSkip);
     } else if (strcmp(cmd, "sgmodelonly") == 0) {
         // Stable counterpart to sgdrawonly: model ids do not shift when unrelated transient draws
         // enter/leave the frame, so multi-frame shader probes remain attached to their target.

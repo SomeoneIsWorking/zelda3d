@@ -1,9 +1,11 @@
 #include "boss_fd_control.h"
 
 #include <array>
+#include <cerrno>
 #include <cmath>
 #include <cstdint>
 #include <cstdio>
+#include <cstdlib>
 #include <cstring>
 #include <optional>
 #include <string>
@@ -81,6 +83,16 @@ bool ApplyOracleManeRootDriver(uint32_t playState, const HarnessBossFdOracle::Ma
 bool ApplySohManeRootDriver(const HarnessBossFdOracle::ManeRootDriverState& driver) {
     return SohState_BossFd2SetManeRootDrivers(driver.worldPos.data(), driver.worldRot.data(), driver.shapeRot.data(),
                                               driver.headRot.data(), driver.timer, driver.jawOpening);
+}
+
+std::optional<float> ParseFiniteFloat(const std::string& text) {
+    char* end = nullptr;
+    errno = 0;
+    const float value = std::strtof(text.c_str(), &end);
+    if (errno != 0 || end == text.c_str() || *end != '\0' || !std::isfinite(value)) {
+        return std::nullopt;
+    }
+    return value;
 }
 
 constexpr int FaultSlot(int lead) {
@@ -274,10 +286,30 @@ void ForceGroundCamera(std::istringstream& arguments) {
 }
 
 void ForceGroundManeSync(std::istringstream& arguments) {
-    std::string trailing;
-    if (arguments >> trailing) {
-        HarnessRepl::PrintErr("force bossfd2_mane_sync: usage: force bossfd2_mane_sync");
-        return;
+    std::array<float, 3> requestedWorldPos{};
+    std::string coordinate;
+    bool hasRequestedWorldPos = false;
+    if (arguments >> coordinate) {
+        std::array<std::string, 2> remainingCoordinates{};
+        if (!(arguments >> remainingCoordinates[0] >> remainingCoordinates[1])) {
+            HarnessRepl::PrintErr("force bossfd2_mane_sync: usage: force bossfd2_mane_sync [worldX worldY worldZ]");
+            return;
+        }
+        const std::array<std::string, 3> coordinates = { coordinate, remainingCoordinates[0], remainingCoordinates[1] };
+        for (std::size_t axis = 0; axis < coordinates.size(); ++axis) {
+            const auto value = ParseFiniteFloat(coordinates[axis]);
+            if (!value) {
+                HarnessRepl::PrintErr("force bossfd2_mane_sync: world coordinates must be finite numbers");
+                return;
+            }
+            requestedWorldPos[axis] = *value;
+        }
+        std::string trailing;
+        if (arguments >> trailing) {
+            HarnessRepl::PrintErr("force bossfd2_mane_sync: usage: force bossfd2_mane_sync [worldX worldY worldZ]");
+            return;
+        }
+        hasRequestedWorldPos = true;
     }
     if (g_activeManeFault) {
         HarnessRepl::PrintErr("force bossfd2_mane_sync: restore the active bossfd2_mane_fault first");
@@ -299,6 +331,9 @@ void ForceGroundManeSync(std::istringstream& arguments) {
         HarnessRepl::PrintErr(
             "force bossfd2_mane_sync: authored animation frames differ; use the frozen emergence hold");
         return;
+    }
+    if (hasRequestedWorldPos) {
+        driver.worldPos = requestedWorldPos;
     }
     // The stored limb-14 roots can still describe the frame before the first body submission (the
     // Oracle roots are zero in that state). Checkpoint each pre-call controller, run one ordinary

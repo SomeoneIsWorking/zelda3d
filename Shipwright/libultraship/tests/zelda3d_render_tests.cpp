@@ -10,6 +10,7 @@
 
 #include "gtest/gtest.h"
 #include "fast/backends/unified_shader.h"
+#include "fast/zelda3d_instrumentation.h"
 #include "fast/zelda3d_sdl3gpu_shaders.h"
 #include "fast/zelda3d_sg_ubo.h"
 #include "fast/unified_ubo.h"
@@ -35,6 +36,28 @@ TEST(Zelda3DShaderTemplate, ExpandsEveryRepeatedVaryingQualifier) {
     };
     EXPECT_EQ(count(vertexSource, ") out "), 8u);
     EXPECT_EQ(count(fragmentSource, ") in "), 8u);
+}
+
+TEST(Zelda3DDrawIsolation, SkipComposesWithExistingDrawAndModelSelection) {
+    gZelda3dSgModelOnly = -1;
+    gZelda3dSgDrawOnly = -1;
+    gZelda3dSgDrawSkip = -1;
+    EXPECT_TRUE(Zelda3D_SgDrawIsolationIncludes(23, 17));
+
+    gZelda3dSgModelOnly = 23;
+    EXPECT_TRUE(Zelda3D_SgDrawIsolationIncludes(23, 17));
+    EXPECT_FALSE(Zelda3D_SgDrawIsolationIncludes(24, 17));
+
+    gZelda3dSgDrawOnly = 17;
+    EXPECT_TRUE(Zelda3D_SgDrawIsolationIncludes(23, 17));
+    EXPECT_FALSE(Zelda3D_SgDrawIsolationIncludes(23, 18));
+
+    gZelda3dSgDrawSkip = 17;
+    EXPECT_FALSE(Zelda3D_SgDrawIsolationIncludes(23, 17));
+
+    gZelda3dSgModelOnly = -1;
+    gZelda3dSgDrawOnly = -1;
+    gZelda3dSgDrawSkip = -1;
 }
 
 // CmbVShader's PRIMARY path dots the transformed/skinned normal against both actor light slots.
