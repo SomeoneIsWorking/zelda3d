@@ -590,6 +590,18 @@ void Fast::Zelda3DRenderer::DrawModel(int modelId, const float* mp16, const floa
             continue;
 
         SgUbo ubo = base;
+        // OoT3D's actor bank binds the two directional colours to opposed directions: the live
+        // primary direction carries light1Color, while light2Color uses its exact opposite. The
+        // N64 scene settings' light2Dir is a static scene direction and is not the actor bank's
+        // second direction; using it here made BossFd2's orange diffuse term sample the wrong
+        // hemisphere. Scene materials have zero matDiffuse and therefore remain unaffected.
+        const bool hasDirectionalMaterial =
+            grp.matDiffuse[0] != 0.0f || grp.matDiffuse[1] != 0.0f || grp.matDiffuse[2] != 0.0f;
+        if (lit && !sky && grp.vertexLighting && hasDirectionalMaterial && !lightDirOv) {
+            ubo.uLightDir2[0] = -ubo.uLightDir[0];
+            ubo.uLightDir2[1] = -ubo.uLightDir[1];
+            ubo.uLightDir2[2] = -ubo.uLightDir[2];
+        }
         float groupUvU = uvOffU;
         float groupUvV = uvOffV;
         const Zelda3DMatUvOv* uvOverride = nullptr;
@@ -697,6 +709,15 @@ void Fast::Zelda3DRenderer::DrawModel(int modelId, const float* mp16, const floa
         }
         ubo.uLitDif1[3] = 0.0f;
         ubo.uLitDif2[3] = 0.0f;
+        if (sgDumpThisDraw) {
+            fprintf(stderr,
+                    "[SG_DUMP]  g%d lighting amb=(%.4f,%.4f,%.4f)x%.1f dif1=(%.4f,%.4f,%.4f) "
+                    "dif2=(%.4f,%.4f,%.4f) dir1=(%.4f,%.4f,%.4f) dir2=(%.4f,%.4f,%.4f)\n",
+                    gIdx, ubo.uAmbient[0], ubo.uAmbient[1], ubo.uAmbient[2], ubo.uAmbient[3], ubo.uLitDif1[0],
+                    ubo.uLitDif1[1], ubo.uLitDif1[2], ubo.uLitDif2[0], ubo.uLitDif2[1], ubo.uLitDif2[2],
+                    ubo.uLightDir[0], ubo.uLightDir[1], ubo.uLightDir[2], ubo.uLightDir2[0], ubo.uLightDir2[1],
+                    ubo.uLightDir2[2]);
+        }
         // PICA200 TEV CONSTANT modulate: for materials whose combiner sources CONSTANT in any
         // stage, publish the selected slot's RGB with .a = 1 so the shader applies it. Materials
         // that never reference CONSTANT (e.g. plain MODULATE(PRIM, TEX0)) leave .a = 0 and the
