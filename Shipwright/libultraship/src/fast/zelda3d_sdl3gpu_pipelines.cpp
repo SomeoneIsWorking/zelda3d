@@ -183,7 +183,7 @@ bool Fast::Zelda3DRenderer::ensureResources() {
     if (!g_device)
         return false;
 
-    // ZELDA3D_SG_FRAGDBG=<1..5>: replace the combiner with an isolated stage so a black/missing draw is
+    // ZELDA3D_SG_FRAGDBG=<1..15>: replace the combiner with an isolated stage so a black/missing draw is
     // diagnosed by VALUE — 1=texture only, 2=raw vertex colour, 3=solid white, 4=shade(flat tint),
     // 5=PRIMARY_COLOR (the vertex-lit o1 the TEV consumes; the direct counterpart of the oracle's
     // `PIXEL ... primary=` probe). Applied to EVERY Zelda3D draw unconditionally (unlike a per-draw
@@ -233,6 +233,15 @@ bool Fast::Zelda3DRenderer::ensureResources() {
             : mode == 12 ? "uint w=ubo.uTevStages[1].x; "
                            "frag=vec4(float(w&15u)/15.0,float((w>>4)&15u)/15.0,float((w>>8)&15u)/15.0,1); return;\n"
             : mode == 13 ? "frag=vec4(ubo.uTevCtl.x/6.0,ubo.uTevCtl.y/4.0,ubo.uTevCtl.z/4.0,1); return;\n"
+            // Mode 14 exposes the secondary TEV sample. It is intentionally a direct sampler
+            // read here because t1s is scoped to the generic-TEV block below; dummy-bound draws
+            // therefore remain visible as white rather than silently producing an absent probe.
+            : mode == 14 ? "frag=vec4(texture(uTex1,vUv1).rgb,1.0); return;\n"
+            // Mode 15 exposes the same secondary sample with PICA's software-oracle addressing:
+            // integer texel coordinates, rather than the GPU's filtered normalized lookup. This
+            // is a discriminator only; the shipping sampler remains mode 14's authored filter.
+            : mode == 15 ? "ivec2 sz=textureSize(uTex1,0); ivec2 p=clamp(ivec2(vUv1*vec2(sz)),ivec2(0),sz-1); "
+                           "frag=vec4(texelFetch(uTex1,p,0).rgb,1.0); return;\n"
                          : "";
         // Mode 6 taps the combiner result before the CONSTANT/stage-scale/FOG stages — the direct
         // counterpart of the oracle's `PIXEL ... combined=` field. Mode 7 taps after the CONSTANT +
