@@ -96,3 +96,22 @@ material-parity measurement. The oracle was not advanced or skipped between thos
 two PPMs were byte-identical (0 changed channels), proving the paired capture itself was stable while
 leaving host repeat stability unproven. The matched repeated-base capture protocol above remains the
 required gate before drawing a UV1-versus-lighting conclusion.
+
+## Generic TEV source-layout correction
+
+The oracle's `vsuni_log` and Azahar's `TevStageConfig` then exposed an independent shared-renderer
+defect. PICA packs the three RGB source selectors into bits 0/4/8 and the three alpha selectors into
+bits 16/20/24; the four-bit gap is present only in the source word. The host `PackTevStage` and
+`tevRun` had incorrectly used 12/16/20, which is the alpha-modifier layout, not the alpha-source
+layout. For `valbasiagnd` material 1 the corrected host words are byte-compatible with the oracle:
+
+```text
+host after fix: 0e300430, 0e1f0e43, 0e1f0edf, 0e1f0eef
+oracle records: e300430,  e1f0e43,  e1f0edf,  e1f0eef
+```
+
+The RGB fields were already correct; therefore this fixes generic TEV alpha behavior without being
+claimed as the explanation for the remaining opaque BossFd2 body brightness. A CMB close-test now
+asserts all four material-1 source words, and a shader-source test asserts the 16/20/24 decode. The
+native harness also exposes `soh_sgdump <modelId>` so this boundary can be inspected on the same
+fixed checkpoint. The body residual remains open for a separate material/texture comparison.

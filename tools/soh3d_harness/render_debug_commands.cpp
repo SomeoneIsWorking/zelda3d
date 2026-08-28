@@ -80,6 +80,17 @@ bool HandleCommand(const std::string& cmd, std::istringstream& toks) {
         // for a base or skip capture.
         gZelda3dSgDrawList = 1;
         std::printf("ok soh_drawlist armed\n");
+    } else if (cmd == "soh_sgdump") {
+        handled = true;
+        std::string model;
+        toks >> model;
+        const auto parsed = ParseNum(model);
+        if (!parsed) {
+            PrintErr("soh_sgdump: usage: soh_sgdump <modelId>");
+        } else {
+            g_sgDumpModel = static_cast<int>(*parsed);
+            std::printf("ok soh_sgdump armed model=%d\n", g_sgDumpModel);
+        }
     } else if (cmd == "soh_drawskip") {
         handled = true;
         // Native counterpart to the oracle command above. Arm both around the same lockstep

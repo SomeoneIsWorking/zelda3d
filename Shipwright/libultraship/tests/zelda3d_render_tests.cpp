@@ -13,6 +13,7 @@
 #include "fast/zelda3d_instrumentation.h"
 #include "fast/zelda3d_sdl3gpu_shaders.h"
 #include "fast/zelda3d_sg_ubo.h"
+#include "fast/backends/zelda3d_tev_glsl.h"
 #include "fast/unified_ubo.h"
 
 using namespace Zelda3DSg;
@@ -36,6 +37,14 @@ TEST(Zelda3DShaderTemplate, ExpandsEveryRepeatedVaryingQualifier) {
     };
     EXPECT_EQ(count(vertexSource, ") out "), 8u);
     EXPECT_EQ(count(fragmentSource, ") in "), 8u);
+}
+
+TEST(Zelda3DTev, UsesPicaAlphaSourceFieldLayout) {
+    const std::string source = Fast::Zelda3DTev::kGenericFunctions;
+    EXPECT_NE(source.find("(w.x >> 16) & 15u"), std::string::npos);
+    EXPECT_NE(source.find("(w.x >> 20) & 15u"), std::string::npos);
+    EXPECT_NE(source.find("(w.x >> 24) & 15u"), std::string::npos);
+    EXPECT_EQ(source.find("(w.x >> 12) & 15u"), std::string::npos);
 }
 
 TEST(Zelda3DDrawIsolation, SkipComposesWithExistingDrawAndModelSelection) {
