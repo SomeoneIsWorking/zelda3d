@@ -212,6 +212,10 @@ struct DrawGroup {
     uint32_t first, count;
     int model_group_index = -1;
     int material_index = -1;
+    int dual_tex_mode = 0;
+    int tev_generic = 0;
+    int tex1_index = -1;
+    int coord1_mapping = 1;
     // Blend constants (SDL_SetGPUBlendConstants) for a group whose pipeline uses a CONSTANT_COLOR
     // factor. Render-pass state, not pipeline state — so it travels per-draw, next to the pipeline.
     bool hasBlendConst = false;
@@ -869,6 +873,10 @@ void Fast::Zelda3DRenderer::DrawModel(int modelId, const float* mp16, const floa
         dg.count = grp.count;
         dg.model_group_index = gIdx;
         dg.material_index = grp.materialIndex;
+        dg.dual_tex_mode = grp.dualTexMode;
+        dg.tev_generic = grp.tevGeneric;
+        dg.tex1_index = grp.tex1Index;
+        dg.coord1_mapping = grp.coord1Mapping;
         dg.hasBlendConst = Fast::Zelda3DSdl3GpuPipeline::BlendConstants(gb, dg.blendConst);
         if (unified) {
             bool hasTex = tex != Fast::g_activeSdl3GpuApi->DummyTexture();
@@ -965,10 +973,11 @@ void Fast::Zelda3DRenderer::DrawModel(int modelId, const float* mp16, const floa
         const int drawIdx = g_sgDrawIdx++;
         if (gZelda3dSgDrawList) {
             fprintf(stderr,
-                    "[Zelda3D_SG] draw %d model=%d group=%d material=%d first=%u count=%u tex=%p tex1=%p "
-                    "tex2=%p\n",
-                    drawIdx, modelId, g.model_group_index, g.material_index, g.first, g.count, (const void*)g.tex,
-                    (const void*)g.tex1, (const void*)g.tex2);
+                    "[Zelda3D_SG] draw %d model=%d group=%d material=%d first=%u count=%u dual=%d tev=%d "
+                    "tex1idx=%d coord1=%d tex=%p tex1=%p tex2=%p\n",
+                    drawIdx, modelId, g.model_group_index, g.material_index, g.first, g.count, g.dual_tex_mode,
+                    g.tev_generic, g.tex1_index, g.coord1_mapping, (const void*)g.tex, (const void*)g.tex1,
+                    (const void*)g.tex2);
         }
         if (!Zelda3D_SgDrawIsolationIncludes(modelId, drawIdx)) {
             continue; // draw-isolation probe: suppress groups excluded by the active controls

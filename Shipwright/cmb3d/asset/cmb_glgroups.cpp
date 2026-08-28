@@ -88,9 +88,12 @@ static unsigned TevScaleLog2(uint16_t s) {
     return s == 4 ? 2u : (s == 2 ? 1u : 0u);
 }
 static void PackTevStage(const CmbMaterial::CombStage& cs, unsigned out[3]) {
-    out[0] = TevSrcCode(cs.rgb_src[0]) | (TevSrcCode(cs.rgb_src[1]) << 4) |
-             (TevSrcCode(cs.rgb_src[2]) << 8) | (TevSrcCode(cs.a_src[0]) << 12) |
-             (TevSrcCode(cs.a_src[1]) << 16) | (TevSrcCode(cs.a_src[2]) << 20);
+    // PICA leaves a four-bit gap between the RGB and alpha source triplets: alpha starts at
+    // bit 16, unlike the modifier word where alpha starts at bit 12. This mirrors Azahar's
+    // TevStageConfig (alpha_source1/2/3 = bits 16/20/24); packing alpha at 12/16/20 makes
+    // the generic evaluator read a different source whenever the alpha chain is consumed.
+    out[0] = TevSrcCode(cs.rgb_src[0]) | (TevSrcCode(cs.rgb_src[1]) << 4) | (TevSrcCode(cs.rgb_src[2]) << 8) |
+             (TevSrcCode(cs.a_src[0]) << 16) | (TevSrcCode(cs.a_src[1]) << 20) | (TevSrcCode(cs.a_src[2]) << 24);
     out[1] = TevColorModCode(cs.rgb_mod[0]) | (TevColorModCode(cs.rgb_mod[1]) << 4) |
              (TevColorModCode(cs.rgb_mod[2]) << 8) | (TevAlphaModCode(cs.a_mod[0]) << 12) |
              (TevAlphaModCode(cs.a_mod[1]) << 16) | (TevAlphaModCode(cs.a_mod[2]) << 20) |

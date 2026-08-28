@@ -93,9 +93,11 @@ vec4 tevRun(vec4 prim, vec4 t0, vec4 t1, vec4 t2) {
         if (((w.z >> 4) & 15u) == 7u) {
             alpha = rgb.r;
         } else {
-            vec4 aa = tevSrc((w.x >> 12) & 15u, prim, t0, t1, t2, prev, buf, kidx);
-            vec4 ab = tevSrc((w.x >> 16) & 15u, prim, t0, t1, t2, prev, buf, kidx);
-            vec4 ac = tevSrc((w.x >> 20) & 15u, prim, t0, t1, t2, prev, buf, kidx);
+            // PICA's source word has RGB at bits 0/4/8, then alpha at 16/20/24. The
+            // four-bit gap is real; modifiers use a different layout and do start at bit 12.
+            vec4 aa = tevSrc((w.x >> 16) & 15u, prim, t0, t1, t2, prev, buf, kidx);
+            vec4 ab = tevSrc((w.x >> 20) & 15u, prim, t0, t1, t2, prev, buf, kidx);
+            vec4 ac = tevSrc((w.x >> 24) & 15u, prim, t0, t1, t2, prev, buf, kidx);
             float fa = tevAlphaMod((w.y >> 12) & 15u, aa);
             float fb = tevAlphaMod((w.y >> 16) & 15u, ab);
             float fc = tevAlphaMod((w.y >> 20) & 15u, ac);

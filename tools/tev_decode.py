@@ -9,7 +9,7 @@ is at fault — so decode them here instead.
 Packing is `Zelda3DGlGroup::tevStagePack` (documented in zelda3d_gl.h, produced by
 `PackTevStage` in cmb3d/asset/cmb_glgroups.cpp):
 
-    w0 = rgbSrc0 | rgbSrc1<<4 | rgbSrc2<<8 | aSrc0<<12 | aSrc1<<16 | aSrc2<<20
+    w0 = rgbSrc0 | rgbSrc1<<4 | rgbSrc2<<8 | aSrc0<<16 | aSrc1<<20 | aSrc2<<24
     w1 = rgbMod0 | rgbMod1<<4 | rgbMod2<<8 | aMod0<<12 | aMod1<<16 | aMod2<<20 | constIdx<<24
     w2 = rgbOp | aOp<<4 | log2(rgbScale)<<8 | log2(aScale)<<10
 
@@ -90,7 +90,7 @@ def expr(op, ops):
 
 def decode_stage(w0, w1, w2):
     rgb_src = [(w0 >> (4 * i)) & 0xF for i in range(3)]
-    a_src = [(w0 >> (12 + 4 * i)) & 0xF for i in range(3)]
+    a_src = [(w0 >> (16 + 4 * i)) & 0xF for i in range(3)]
     rgb_mod = [(w1 >> (4 * i)) & 0xF for i in range(3)]
     a_mod = [(w1 >> (12 + 4 * i)) & 0xF for i in range(3)]
     const_idx = (w1 >> 24) & 7

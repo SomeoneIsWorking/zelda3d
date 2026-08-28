@@ -22,9 +22,11 @@
 
 #include "gtest/gtest.h"
 #include "asset/cmb.h"
+#include "asset/cmb_glgroups.h"
 #include "asset/zar.h"
 #include "asset/ctr_rom.h"
 
+#include <algorithm>
 #include <cmath>
 #include <cstdlib>
 #include <string>
@@ -43,7 +45,6 @@ static std::string OoT3dRomPath() {
     const char* p = std::getenv("ZELDA3D_OOT3D_ROM");
     return p ? std::string(p) : std::string();
 }
-
 // Load AHG's hyliaman2.cmb (the shared "Hylian man 2" body used by several EnHy types
 // including AHG). AHG mat 0 is the clothing MODULATE(PRIM, TEX0)+MODULATE(PREV, CONST[4])
 // two-stage material EnHy_Draw overrides via colorA on constant slot 4.
@@ -309,4 +310,27 @@ TEST(CmbCombinerParse, BossFd2SecondaryTextureUsesIndependentTexCoordOne) {
     // The source groups reference 598 unique vertices; buildDrawGroups expands indexed
     // triangles, so the shipping vertex buffer contains 2,136 affected vertices.
     EXPECT_EQ(affectedVertices, 2136u);
+}
+
+// The PICA source register leaves one four-bit field unused between the RGB and alpha source
+// triplets. This is easy to miss because the modifier register puts alpha at bit 12 instead. The
+// oracle's valbasiagnd material-1 records are the close-test: their source words are
+// e300430/e1f0e43/e1f0edf/e1f0eef, not the old e30430/e1fe43/e1fedf/e1feef packing.
+TEST(CmbCombinerParse, BossFd2PicaSourceWordsKeepAlphaGap) {
+    if (OoT3dRomPath().empty()) {
+        GTEST_SKIP() << "ZELDA3D_OOT3D_ROM not set — cannot exercise real-asset close-test";
+    }
+    Cmb cmb(LoadBossFd2Cmb());
+    ASSERT_TRUE(cmb.ok()) << cmb.error();
+    const auto groups = cmb.buildDrawGroups();
+    const auto it =
+        std::find_if(groups.begin(), groups.end(), [](const auto& group) { return group.material_index == 1; });
+    ASSERT_NE(it, groups.end());
+    ASSERT_FALSE(it->verts.empty());
+    const Zelda3DGlGroup glGroup = MakeGlGroup(cmb, *it, it->verts.data(), 0);
+    ASSERT_EQ(glGroup.tevStageCount, 4);
+    constexpr unsigned expectedSources[] = { 0x0e300430, 0x0e1f0e43, 0x0e1f0edf, 0x0e1f0eef };
+    for (int stage = 0; stage < glGroup.tevStageCount; ++stage) {
+        EXPECT_EQ(glGroup.tevStagePack[stage][0], expectedSources[stage]) << "stage " << stage;
+    }
 }

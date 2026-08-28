@@ -46,3 +46,14 @@ state. The next step is a matched per-material output comparison at the correcte
 - Sequential base/skip frames can differ because animation, particles, camera, or lighting advanced.
   They validate skip delivery only. Material attribution requires two byte-identical unmodified
   repeats from the same restored checkpoint before comparing either engine's skipped frame.
+
+## Related renderer-boundary finding
+
+The same restored BossFd2 run compared native `sgdump` material chains with the oracle's PICA
+`vsuni_log`. It found and corrected a generic packing error: PICA alpha source selectors occupy
+bits 16/20/24 of the source word, while the host had used 12/16/20. Material 1 now emits
+`0e300430/0e1f0e43/0e1f0edf/0e1f0eef`, matching oracle `e300430/e1f0e43/e1f0edf/e1f0eef` after
+leading-zero normalization. This is an alpha-path correctness fix, not evidence that the remaining
+opaque body brightness has the same cause; the material residual stays open.
+
+The embedded harness exposes `soh_sgdump <modelId>` to repeat this material-boundary observation.

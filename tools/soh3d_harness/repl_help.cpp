@@ -39,6 +39,7 @@ void PrintHelp() {
                          "  snapshot <basepath>  write both fbs as <basepath>.{az,soh}.ppm\n"
                          "  drawskip <n>|off     suppress per-frame PICA draw #n (draw isolation)\n"
                          "  soh_drawlist         list native group/material ids on next host frame\n"
+                         "  soh_sgdump <model>   dump native material/TEV state for one model\n"
                          "  soh_drawskip <n>|off suppress native Zelda3D group #n\n"
                          "  sweep <sub>          automated multi-step parity driver;\n"
                          "                       `sweep list` shows subs (title, ...)\n"
