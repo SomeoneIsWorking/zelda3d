@@ -4,6 +4,8 @@
 #include "boss_fd2_animation_policy.h"
 #include "boss_fd2_materials.h"
 
+#include <optional>
+
 #include "../../anim/pose_tracking.h"
 #include "../../anim/zelda3d_anim_override.h"
 #include "../../anim/skeleton_draw_bridge.h"
@@ -88,6 +90,7 @@ struct BossFd2CsabController {
 };
 
 BossFd2CsabController sCsabController;
+std::optional<BossFd2CsabController> sDiagnosticCsabControllerSnapshot;
 
 void selectCsab(BossFd2CsabController& controller, const char* csab, float frame = 0.0f) {
     controller.csab = csab;
@@ -479,6 +482,25 @@ extern "C" int Zelda3D_BossFd2ResolveAnim(PlayState* play, Actor* actor, const c
     *outMorphCsab = controller.outgoingCsab.empty() ? nullptr : controller.outgoingCsab.c_str();
     *outMorphFrame = controller.outgoingFrame;
     *outMorphWeight = static_cast<float>(controller.morphFramesRemaining) / 5.0f;
+    return 1;
+}
+
+extern "C" int Zelda3D_BossFd2CaptureAnimController(Actor* actor) {
+    sDiagnosticCsabControllerSnapshot.reset();
+    if (actor == nullptr || actor->id != ACTOR_BOSS_FD2 || sCsabController.actor != actor ||
+        sCsabController.csab.empty()) {
+        return 0;
+    }
+    sDiagnosticCsabControllerSnapshot = sCsabController;
+    return 1;
+}
+
+extern "C" int Zelda3D_BossFd2RestoreAnimController(Actor* actor) {
+    if (actor == nullptr || actor->id != ACTOR_BOSS_FD2 || !sDiagnosticCsabControllerSnapshot ||
+        sDiagnosticCsabControllerSnapshot->actor != actor) {
+        return 0;
+    }
+    sCsabController = *sDiagnosticCsabControllerSnapshot;
     return 1;
 }
 

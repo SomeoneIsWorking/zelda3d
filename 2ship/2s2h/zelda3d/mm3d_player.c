@@ -6,6 +6,7 @@
 #include "2s2h/zelda3d/mm3d_player.h"
 #include "2s2h/zelda3d/mm3d_model.h"
 #include "2s2h/zelda3d/mm3d_pending_draw.h"
+#include "2s2h/zelda3d/mm3d_player_deku_spin_material.h"
 #include "2s2h/zelda3d/mm3d_player_model.h"
 #include "2s2h/zelda3d/mm3d_player_left_hand.h"
 #include "2s2h/zelda3d/mm3d_player_right_hand.h"
@@ -40,11 +41,15 @@ int Zelda3D_TryDrawPlayer(PlayState* play, Actor* actor) {
     unsigned long long rightHandMask = 0;
     unsigned long long leftHandMask = 0;
     Zelda3DMMPlayerBottleMaterialOverride bottleMaterial = { 0 };
+    Zelda3DMMPlayerDekuSpinMaterialOverride dekuSpinMaterial = { 0 };
     if (!Zelda3D_MM_PlayerLeftHandDrawState(player, GET_CUR_EQUIP_VALUE(EQUIP_TYPE_SWORD), &leftHandMask,
                                             &bottleMaterial)) {
         return 0;
     }
     if (!Zelda3D_MM_PlayerRightHandMeshMask(player, &rightHandMask)) {
+        return 0;
+    }
+    if (!Zelda3D_MM_PlayerDekuSpinMaterialOverride(player, &dekuSpinMaterial)) {
         return 0;
     }
     // Retail Player_Draw resets the form CMB, then enables sheath and right-hand
@@ -58,6 +63,11 @@ int Zelda3D_TryDrawPlayer(PlayState* play, Actor* actor) {
         Zelda3D_GL_SetMatConstOverride(modelId, bottleMaterial.materialIndex, bottleMaterial.constantIndex,
                                        bottleMaterial.rgba[0], bottleMaterial.rgba[1], bottleMaterial.rgba[2],
                                        bottleMaterial.rgba[3]);
+    }
+    if (dekuSpinMaterial.enabled) {
+        Zelda3D_GL_SetMatConstOverride(modelId, dekuSpinMaterial.materialIndex, dekuSpinMaterial.constantIndex,
+                                       dekuSpinMaterial.rgba[0], dekuSpinMaterial.rgba[1], dekuSpinMaterial.rgba[2],
+                                       dekuSpinMaterial.rgba[3]);
     }
     Zelda3D_GL_SetMidMask(modelId, meshMask);
     // Player_DrawGameplay still runs so its real SkelAnime draw supplies the live skeleton,

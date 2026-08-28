@@ -150,14 +150,37 @@ int SohState_BossFd2Mane(BossFd2ManeState* outState) {
     return 1;
 }
 
-int SohState_BossFd2SyncMane(const float worldPos[3]) {
+int SohState_BossFd2SetManeRootDrivers(const float worldPos[3], const short worldRot[3], const short shapeRot[3],
+                                       const short headRot[3], short timer, float jawOpening) {
     BossFd2* boss = reinterpret_cast<BossFd2*>(FindBossActor(ACTOR_BOSS_FD2));
-    if (boss == nullptr || worldPos == nullptr) {
+    if (boss == nullptr || worldPos == nullptr || worldRot == nullptr || shapeRot == nullptr || headRot == nullptr) {
         return 0;
     }
     boss->actor.world.pos = { worldPos[0], worldPos[1], worldPos[2] };
     boss->actor.prevPos = boss->actor.world.pos;
+    boss->actor.world.rot = { worldRot[0], worldRot[1], worldRot[2] };
+    boss->actor.shape.rot = { shapeRot[0], shapeRot[1], shapeRot[2] };
+    boss->headRot = { headRot[0], headRot[1], headRot[2] };
+    boss->work[FD2_VAR_TIMER] = timer;
+    boss->jawOpening = jawOpening;
+    return 1;
+}
+
+int SohState_BossFd2SyncMane(const float worldPos[3], const short worldRot[3], const short shapeRot[3],
+                             const short headRot[3], short timer, float jawOpening) {
+    if (!SohState_BossFd2SetManeRootDrivers(worldPos, worldRot, shapeRot, headRot, timer, jawOpening)) {
+        return 0;
+    }
+    BossFd2* boss = reinterpret_cast<BossFd2*>(FindBossActor(ACTOR_BOSS_FD2));
     if (!Zelda3D_BossFd2PrepareRenderedMane(&boss->actor)) {
+        return 0;
+    }
+    return SohState_BossFd2ResetManeHistories();
+}
+
+int SohState_BossFd2ResetManeHistories() {
+    BossFd2* boss = reinterpret_cast<BossFd2*>(FindBossActor(ACTOR_BOSS_FD2));
+    if (boss == nullptr) {
         return 0;
     }
     BossFd2Mane* manes[3] = { &boss->centerMane, &boss->rightMane, &boss->leftMane };
@@ -169,6 +192,26 @@ int SohState_BossFd2SyncMane(const float worldPos[3]) {
         }
     }
     return 1;
+}
+
+int SohState_BossFd2AnimationFrame(float* outFrame) {
+    Actor* actor = FindBossActor(ACTOR_BOSS_FD2);
+    if (actor == nullptr || outFrame == nullptr) {
+        return 0;
+    }
+    const char* csab = nullptr;
+    const char* morphCsab = nullptr;
+    float morphFrame = 0.0F;
+    float morphWeight = 0.0F;
+    return Zelda3D_BossFd2ResolveAnim(gPlayState, actor, &csab, outFrame, &morphCsab, &morphFrame, &morphWeight);
+}
+
+int SohState_BossFd2CaptureManeAnimController() {
+    return Zelda3D_BossFd2CaptureAnimController(FindBossActor(ACTOR_BOSS_FD2));
+}
+
+int SohState_BossFd2RestoreManeAnimController() {
+    return Zelda3D_BossFd2RestoreAnimController(FindBossActor(ACTOR_BOSS_FD2));
 }
 
 int SohState_BossFdRenderInfo(BossFdRenderInfo* outInfo) {

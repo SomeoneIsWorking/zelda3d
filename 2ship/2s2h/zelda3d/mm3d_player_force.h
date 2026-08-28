@@ -10,7 +10,7 @@
 // to func_80839E74/func_8083A794); new controls live in mm3d_player_force.c and call the same
 // non-static decomp entry points without growing that 22,000-line overlay.
 //
-// REPL surface: repl/mm3d_link_repl.c `linkstate <idle|walk|run>`.
+// REPL surface: repl/mm3d_link_repl.c `linkstate <idle|walk|run>` and `linkitem <ItemId>`.
 #pragma once
 #include "global.h" // PlayState, Player
 
@@ -56,6 +56,17 @@ typedef enum Zelda3DPlayerFormRequestResult {
 // Changing back to human uses the mask for the live transformed form. No form, mask, save, or object
 // state is mutated directly. The required transformation mask must be present in the inventory.
 Zelda3DPlayerFormRequestResult Zelda3D_PlayerRequestForm(Player* player, PlayState* play, PlayerTransformation form);
+
+// Request any byte-sized ItemId through Player_UseItem, the same asynchronous path used by normal
+// button input. Returns 1 when the request was sent and 0 for invalid pointers or an out-of-range ID.
+// The item/action gate remains authoritative: callers must inspect Player::itemAction,
+// Player::heldItemId, and Player::heldItemAction to observe whether the request was accepted.
+s32 Zelda3D_PlayerRequestItem(Player* player, PlayState* play, s32 itemId);
+
+// Equip a byte-sized ItemId on one of the three normal C buttons and refresh its HUD icon. This is
+// the same save-state surface owned by the pause menu; it does not install an action or mutate Player
+// fields. Returns 1 on success and 0 for an invalid play pointer, slot, or item ID.
+s32 Zelda3D_PlayerEquipItem(PlayState* play, EquipSlot slot, s32 itemId);
 
 // Throw-release: Player_Action_42 + throw anim (func_8083D6DC's body). Only while carrying an actor.
 s32 Zelda3D_PlayerForceThrow(Player* player, PlayState* play);

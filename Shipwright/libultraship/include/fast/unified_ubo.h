@@ -43,9 +43,9 @@ struct CommonUbo {
     float uSphRot1[4];
     float uSphRot2[4];
     // Mirror of SgUbo::uLitDif1/uLitDif2/uLightDir2 (per-light diffuse products + light2 dir,
-    // #153 CmbVShader vertex-lit port — zelda3d_sg_ubo.h). Size-parity padding today: the
-    // (default-off) unified path still runs its single-light uMatAmbient/uMatDiffuse form; wire
-    // these through UNIFIED_COMMON_UBO_BODY when the unified renderer takes over CMB draws.
+    // #153 CmbVShader vertex-lit port — zelda3d_sg_ubo.h). Live for unified CMB lightingMode 2:
+    // actor draws require both opposed directional slots, while scene draws reduce to their
+    // separately packed repeated ambient because both diffuse products are zero.
     float uLitDif1[4];
     float uLitDif2[4];
     float uLightDir2[4];
@@ -56,6 +56,26 @@ struct CommonUbo {
     float uTex2Xf[4];
     float uTevCtl[4];
 };
+
+// Adapt the native CMB light-bank payload into the unified layout without re-deriving its actor /
+// scene policy. The native packer is authoritative: uAmbient.w carries enabled-slot ambient
+// multiplicity, and uLitDif1/2 already carry the material-diffuse products for the bound slots.
+inline void CopyCmbVertexLightBank(CommonUbo& target, const Zelda3DSg::SgUbo& source) {
+    for (int component = 0; component < 3; ++component) {
+        target.uMatAmbient[component] = source.uAmbient[component] * source.uAmbient[3];
+        // Kept populated for CommonUbo compatibility even though CMB lightingMode 2 consumes the
+        // two explicit slot products below.
+        target.uMatDiffuse[component] = source.uLitDif1[component];
+    }
+    target.uMatAmbient[3] = 0.0f;
+    target.uMatDiffuse[3] = 0.0f;
+    for (int component = 0; component < 4; ++component) {
+        target.uLightDir[component] = source.uLightDir[component];
+        target.uLitDif1[component] = source.uLitDif1[component];
+        target.uLitDif2[component] = source.uLitDif2[component];
+        target.uLightDir2[component] = source.uLightDir2[component];
+    }
+}
 
 static_assert(sizeof(CommonUbo) == Zelda3DSg::kCommonBytes,
               "CommonUbo must byte-match unified_shader.cpp's kCommonUboBody AND Zelda3DSg::kCommonBytes "

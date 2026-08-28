@@ -11,8 +11,9 @@ enum class BossFdCompareStatus {
 };
 
 BossFdCompareStatus CompareBossFd(uint32_t azPlayState);
-void CompareBossFd2Mane(uint32_t azPlayState);
+BossFdCompareStatus CompareBossFd2Mane(uint32_t azPlayState);
 BossFdCompareStatus LastBossFdCompareStatus();
+BossFdCompareStatus LastBossFd2ManeCompareStatus();
 const char* BossFdCompareStatusName(BossFdCompareStatus status);
 
 #endif // ZELDA3D_TOOLS_SOH3D_HARNESS_BOSS_FD_COMPARE_H

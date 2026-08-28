@@ -7,8 +7,9 @@
 extern "C" {
 #endif
 
-// Dispatch the MM Link control commands (linkinfo, linkform, and linkstate). Returns nonzero when
-// the command belongs to this module. All engine mutations remain owned by mm3d_player_force.
+// Dispatch the MM Link control commands (linkinfo, linkform, linkequip, linkitem, and linkstate).
+// Returns nonzero when the command belongs to this module. All engine mutations remain owned by
+// mm3d_player_force.
 s32 Zelda3D_MmLinkReplDispatch(PlayState* play, const char* command, Zelda3DMmReplReply reply, void* user);
 
 #ifdef __cplusplus

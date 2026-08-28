@@ -17,6 +17,11 @@ inline constexpr uint16_t kHoleActorId = 0x00A2;
 inline constexpr uint32_t kCategory = 9;
 inline constexpr uint32_t kParentPointerOffset = 0x0124;
 inline constexpr uint32_t kRenderedHeadOffset = 0x0328;
+inline constexpr uint32_t kHoleAnimationControllerOffset = 0x01A4;
+inline constexpr uint32_t kHoleAnimationFrameOffset = kHoleAnimationControllerOffset + 0x003C;
+inline constexpr uint32_t kHoleTimerOffset = 0x02BC;
+inline constexpr uint32_t kHoleHeadRotOffset = 0x0334;
+inline constexpr uint32_t kHoleJawOpeningOffset = 0x0814;
 inline constexpr uint32_t kParentHandoffSignalOffset = 0x0940;
 inline constexpr uint8_t kGroundHandoffSignal = 0x64;
 inline constexpr uint32_t kActorSpeedOffset = 0x006C;
@@ -65,6 +70,16 @@ struct ManeState {
     std::array<std::array<std::array<float, 3>, 10>, 3> pos{};
 };
 
+struct ManeRootDriverState {
+    std::array<float, 3> worldPos{};
+    std::array<short, 3> worldRot{};
+    std::array<short, 3> shapeRot{};
+    std::array<short, 3> headRot{};
+    short timer = 0;
+    float jawOpening = 0.0F;
+    float animationFrame = 0.0F;
+};
+
 enum class LookupStatus {
     Found,
     Missing,
@@ -82,7 +97,9 @@ bool Read(Memory::MemorySystem& memory, uint32_t playState, uint32_t actor, Stat
 bool ReadHoleRenderedAnchor(Memory::MemorySystem& memory, uint32_t playState, std::array<float, 3>* outHead,
                             int16_t* outShapeYaw);
 bool ReadHoleMane(Memory::MemorySystem& memory, uint32_t playState, ManeState* out);
-bool ResetHoleMane(Memory::MemorySystem& memory, uint32_t playState, std::array<float, 3>* outWorldPos);
+bool ReadHoleManeRootDriver(Memory::MemorySystem& memory, uint32_t playState, ManeRootDriverState* outDriver);
+bool ResetHoleMane(Memory::MemorySystem& memory, uint32_t playState, ManeRootDriverState* outDriver);
+bool WriteHoleManeRootDriver(Memory::MemorySystem& memory, uint32_t playState, const ManeRootDriverState& driver);
 
 } // namespace HarnessBossFdOracle
 

@@ -101,3 +101,55 @@ mesh mask. `mm3d_player.c` writes it to the existing emit-ordered material
 override seam before the pending Player draw is captured. Exact addresses,
 RGBA rows, and the writer chain are recorded in
 `mm3d-decomp/docs/player_draw.md`.
+
+## Deku spin material follow-up
+
+The next cohesive `Player_Draw` stage is the Deku-only material-alpha write at
+`0x001f9c9c..0x001f9d18`. Retail initializes alpha to zero, raises it across
+the opening portion of typed `Player_Action_95`, holds it at one, then lowers
+it as `Player::unk_B10[1]` approaches zero. The writer chain is
+`0x001f9038 -> 0x0020ce94 -> 0x001ff274 -> FUN_00223fc8`; mode 2 replaces
+only alpha in material 6, constant 4.
+
+The typed alignment is not address inference: retail setup
+`0x001f02bc..0x001f0318` installs action `0x00200974` and initializes the two
+phase values to the same `20000.0f`/`196608.0f` used by 2S2H. Decompilation of
+that action matches `Player_Action_95`'s flags, attack cylinder, `-800.0f`
+step, yaw rotation, and termination behavior. The shipping Deku CMB confirms
+the write's consumers: material 6/constant 4 is used only by mesh IDs
+`11,12,13` and binds `link_nuts_f00`.
+
+`mm3d_player_deku_spin_material_policy.{cpp,h}` now owns the exact four-word
+fade formula. `mm3d_player_deku_spin_material.{cpp,h}` adapts typed form,
+action callback, and `unk_B10[1]`; the Player composer submits the result
+through the existing emit-ordered constant channel. The focused policy,
+adapter, production-seam, and exact-CMB gate passes 4/4 with the locked asset
+environment, and the combined Clang build passes `mm_core`, `soh_core`,
+`lus_tests`, and `zelda3d_app`.
+
+## Authentic bottle control and live material proof
+
+The earlier `linkstate itemuse` control only installed an animation. It did not
+equip an item or call MM's item-use owner, so it could not prove the bottle
+selector in the shipping path. The generic replacement keeps state ownership
+in the game: `linkequip <c-left|c-down|c-right> <ItemId>` writes the selected
+save button item and reloads its icon, while `linkitem <ItemId>` delegates to
+`Player_UseItem`. Both commands reject malformed slots and values outside the
+retail byte-sized ItemId range.
+
+A headless native-MM run equipped and requested empty bottle ItemId `0x12`.
+After the asynchronous transition settled, typed state reported
+`itemAction=21`, `heldItemAction=21`, and `heldItemId=18`. The renderer trace
+changed from put-away mask `0x0000000370a00028` to held mask
+`0x0000000370800029`: the only changed bits were 0 and 21, exactly replacing
+the default closed Human hand with the empty-bottle mesh while every other
+Player group stayed fixed. The live material diagnostic reported model 0,
+material 5, constant 0 as `(0,0,0,0)`, the exact empty-bottle row.
+
+The diagnostic also demonstrated the required other answer. Equipping and
+requesting fish ItemId `0x1a` selected `itemAction=22` and repeatedly emitted
+model 0, material 5, constant 0 as `(0,0.498,1,1)`, matching the exact fish
+row before the ordinary action put the item away. This rules out an inert or
+all-zero material probe. The controls establish live selector/material
+delivery; the newly ported Deku-spin stage still needs its own authentic live
+spin capture.

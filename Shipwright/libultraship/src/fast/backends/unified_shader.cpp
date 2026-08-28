@@ -220,13 +220,20 @@ const char* kUnifiedShaderTemplate = R"PRISM(@prism(type='fragment', name='Unifi
         vColor2 = aColor2;
         vColor3 = aColor3;
         vFog = aFog;
-        // lightingMode 2 (3DS scene vertex-lit): baked here per-vertex, matching the existing
-        // per-vertex NdotL approach (docs/oot3d_world_lighting_re.md), not in the fragment stage.
+        // lightingMode 2 (3DS CMB vertex lighting): bake PRIMARY here per vertex, before
+        // interpolation. CmbVShader uses the normal after skinning and the draw transform, then
+        // accumulates every enabled light slot. Actor draws bind the opposed two-light bank
+        // (+D/light2Color, -D/light1Color) with ambient in the first slot only; scene draws bind
+        // ambient in both slots with zero diffuse. The CPU packer has already reduced each bank to
+        // uMatAmbient plus the two per-light diffuse products, exactly like the native CMB path.
         if (ubo.uParams0.y > 1.5) {
-            // -uLightDir: uLightDir is 3DS-native light-TRAVEL (see Zelda3D_UpdateSceneLighting's
-            // direction-convention comment); negate at the dot like CmbVShader / kFrag do.
-            float ndotl = max(dot(normalize(nM), -normalize(ubo.uLightDir.xyz)), 0.0);
-            vec3 lit = ubo.uMatAmbient.xyz + ubo.uMatDiffuse.xyz * ndotl;
+            vec3 nV = normalize(vNrmView);
+            // Light directions are already normalized by the scene-light submission. Do not
+            // normalize them here: CmbVShader dots the uniform verbatim, and a disabled/zero
+            // direction must contribute zero rather than normalize(0) producing an undefined value.
+            vec3 lit = ubo.uMatAmbient.xyz
+                     + ubo.uLitDif1.rgb * max(dot(nV, -ubo.uLightDir.xyz), 0.0)
+                     + ubo.uLitDif2.rgb * max(dot(nV, -ubo.uLightDir2.xyz), 0.0);
             // Clamp order = the PRODUCT (PICA clamps o1 on register write). clamp(lit) first
             // was tried 2026-07-22 and measured ~30% dark vs the oracle — see the kFrag
             // comment in zelda3d_sdl3gpu_shaders.cpp. Do not re-flip.

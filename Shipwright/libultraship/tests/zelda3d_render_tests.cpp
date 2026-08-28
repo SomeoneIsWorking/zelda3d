@@ -9,8 +9,10 @@
 // the shader's UBO block.
 
 #include "gtest/gtest.h"
+#include "fast/backends/unified_shader.h"
 #include "fast/zelda3d_sdl3gpu_shaders.h"
 #include "fast/zelda3d_sg_ubo.h"
+#include "fast/unified_ubo.h"
 
 using namespace Zelda3DSg;
 
@@ -33,6 +35,45 @@ TEST(Zelda3DShaderTemplate, ExpandsEveryRepeatedVaryingQualifier) {
     };
     EXPECT_EQ(count(vertexSource, ") out "), 8u);
     EXPECT_EQ(count(fragmentSource, ") in "), 8u);
+}
+
+// CmbVShader's PRIMARY path dots the transformed/skinned normal against both actor light slots.
+// The unified CMB route once used one model-space NdotL and silently ignored the second slot even
+// though its UBO already mirrored the native fields. Lock the shipping shader source to the full
+// bank so later UBO cleanup cannot regress actor lighting to a single-light approximation.
+TEST(Zelda3DUnifiedShader, CmbPrimaryUsesTransformedNormalAndBothLightSlots) {
+    const std::string source = Fast::Unified::BuildVertexSource(Fast::Unified::Variant::kGenericTev);
+    EXPECT_NE(source.find("vec3 nV = normalize(vNrmView);"), std::string::npos);
+    EXPECT_NE(source.find("ubo.uLitDif1.rgb * max(dot(nV, -ubo.uLightDir.xyz), 0.0)"), std::string::npos);
+    EXPECT_NE(source.find("ubo.uLitDif2.rgb * max(dot(nV, -ubo.uLightDir2.xyz), 0.0)"), std::string::npos);
+    EXPECT_EQ(source.find("dot(normalize(nM), -normalize(ubo.uLightDir.xyz))"), std::string::npos);
+}
+
+TEST(Zelda3DUnifiedUbo, CmbLightBankPreservesAmbientMultiplicityAndBothSlots) {
+    SgUbo native{};
+    native.uAmbient[0] = 0.2f;
+    native.uAmbient[1] = 0.3f;
+    native.uAmbient[2] = 0.4f;
+    native.uAmbient[3] = 2.0f;
+    for (int component = 0; component < 4; ++component) {
+        native.uLightDir[component] = 10.0f + component;
+        native.uLitDif1[component] = 20.0f + component;
+        native.uLitDif2[component] = 30.0f + component;
+        native.uLightDir2[component] = 40.0f + component;
+    }
+
+    Zelda3DUnified::CommonUbo unified{};
+    Zelda3DUnified::CopyCmbVertexLightBank(unified, native);
+
+    EXPECT_FLOAT_EQ(unified.uMatAmbient[0], 0.4f);
+    EXPECT_FLOAT_EQ(unified.uMatAmbient[1], 0.6f);
+    EXPECT_FLOAT_EQ(unified.uMatAmbient[2], 0.8f);
+    for (int component = 0; component < 4; ++component) {
+        EXPECT_FLOAT_EQ(unified.uLightDir[component], native.uLightDir[component]);
+        EXPECT_FLOAT_EQ(unified.uLitDif1[component], native.uLitDif1[component]);
+        EXPECT_FLOAT_EQ(unified.uLitDif2[component], native.uLitDif2[component]);
+        EXPECT_FLOAT_EQ(unified.uLightDir2[component], native.uLightDir2[component]);
+    }
 }
 
 // BUG 3: neither pushed uniform block may exceed SDL3 GPU's MAX_UBO_SECTION_SIZE. If this fails, the

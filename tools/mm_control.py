@@ -13,6 +13,7 @@ Subcommands:
                          (posinfo | actors [n] | warp <ent> | tp <x> <y> <z> | turn <deg>
                           | roomwarp <n> | cam <yawDeg> [dist] [h] | cam off
                           | linkinfo | linkform <human|deku|goron|zora|fd>
+                          | linkequip <c-left|c-down|c-right> <ItemId> | linkitem <ItemId>
                           | mscale | mlist | mptrace <modelId|off> | ping)
   input "<cmd>"          send a raw scripted-input command (enable 0|1 | btn <hex> | stick <x> <y> | reset)
   walk <secs> [x] [y]    enable + hold the stick (default 0 72 = forward) for <secs>, then neutral
@@ -27,6 +28,8 @@ Subcommands:
   cam off                releases the persistent cam framing
   info                   shorthand for `query linkinfo`
   form <name>            request human/deku/goron/zora/fd through the real mask item-use path
+  equip <slot> <ItemId>  equip a numeric MM ItemId on c-left/c-down/c-right
+  item <ItemId>          request a numeric MM ItemId through the real item-use path
   trace <modelId|off>    select the existing renderer submission trace for one exact model
 
 Examples:
@@ -37,6 +40,8 @@ Examples:
   tools/mm_control.py tp 1200 60 -500  # teleport Link to (1200, 60, -500)
   tools/mm_control.py cam 90 200 60    # side-profile from Link's right
   tools/mm_control.py form goron       # requires the Goron Mask in the active save
+  tools/mm_control.py equip c-left 0x12 # equip an empty bottle on C-left
+  tools/mm_control.py item 0x12        # request the empty bottle ItemId
   tools/mm_control.py info             # poll form, mask, action, speed, and position state
 """
 
@@ -104,6 +109,16 @@ def main(argv):
         if len(argv) != 2:
             sys.exit("usage: tools/mm_control.py form <human|deku|goron|zora|fd>")
         query("linkform " + argv[1])
+    elif cmd == "equip":
+        if len(argv) != 3:
+            sys.exit(
+                "usage: tools/mm_control.py equip <c-left|c-down|c-right> <ItemId 0x00..0xff>"
+            )
+        query("linkequip " + " ".join(argv[1:]))
+    elif cmd == "item":
+        if len(argv) != 2:
+            sys.exit("usage: tools/mm_control.py item <ItemId 0x00..0xff>")
+        query("linkitem " + argv[1])
     elif cmd == "trace":
         if len(argv) != 2:
             sys.exit("usage: tools/mm_control.py trace <modelId|off>")

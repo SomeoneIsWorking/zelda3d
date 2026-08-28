@@ -49,6 +49,12 @@ int Zelda3D_BossFd2ForceDamageState(PlayState* play, Actor* actor, int state);
 int Zelda3D_BossFd2ResolveAnim(PlayState* play, Actor* actor, const char** outCsab, float* outFrame,
                                const char** outMorphCsab, float* outMorphFrame, float* outMorphWeight);
 
+// Opaque diagnostic checkpoint for paired solver controls. Capture copies the complete actor-local
+// controller; restore rewinds it so the next ordinary post-update reproduces the same next pose.
+// Neither function changes controller behavior unless explicitly called.
+int Zelda3D_BossFd2CaptureAnimController(Actor* actor);
+int Zelda3D_BossFd2RestoreAnimController(Actor* actor);
+
 #ifdef __cplusplus
 }
 #endif
