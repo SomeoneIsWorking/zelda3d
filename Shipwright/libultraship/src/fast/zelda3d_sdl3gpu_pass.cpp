@@ -196,6 +196,12 @@ bool isAdditiveBlendGroup(const SgGroup& group) {
     return group.blendEnable && group.bSrcRGB == 0x0302 && group.bDstRGB == 0x0001;
 }
 
+float cmabTranslationInPreScaleSpace(float translation, float scale, float bakedTranslation) {
+    // uTex1Xf stores the translation before the shader multiplies by scale. A CMAB value is
+    // already the translation in the runtime matrix, so invert that scale when installing it.
+    return scale != 0.0f ? translation / scale : bakedTranslation;
+}
+
 // One captured per-group draw, replayed inside the unified render pass.
 struct DrawGroup {
     SDL_GPUGraphicsPipeline* pipeline;
@@ -586,9 +592,11 @@ void Fast::Zelda3DRenderer::DrawModel(int modelId, const float* mp16, const floa
         SgUbo ubo = base;
         float groupUvU = uvOffU;
         float groupUvV = uvOffV;
+        const Zelda3DMatUvOv* uvOverride = nullptr;
         if (matUvMap) {
             auto uvIt = matUvMap->find(grp.materialIndex);
             if (uvIt != matUvMap->end()) {
+                uvOverride = &uvIt->second;
                 groupUvU += uvIt->second.u;
                 groupUvV += uvIt->second.v;
             }
@@ -737,8 +745,16 @@ void Fast::Zelda3DRenderer::DrawModel(int modelId, const float* mp16, const floa
             ubo.uSheen[3] = (grp.dualTexMode == 4) ? 3.0f : (float)grp.coord1Mapping;
             ubo.uTex1Xf[0] = grp.uv1Scale[0];
             ubo.uTex1Xf[1] = grp.uv1Scale[1];
-            ubo.uTex1Xf[2] = grp.uv1Trans[0] + groupUvU;
-            ubo.uTex1Xf[3] = grp.uv1Trans[1] + groupUvV;
+            // A CMAB Translation track replaces the coordinator matrix's translation. The
+            // shader stores baked translation before the scale (uv' = scale * (uv - trans)),
+            // so convert the runtime matrix translation back to that representation. uvOff is
+            // retained for the older draw-level scroll path when no material override exists.
+            ubo.uTex1Xf[2] = uvOverride
+                                 ? cmabTranslationInPreScaleSpace(uvOverride->u, grp.uv1Scale[0], grp.uv1Trans[0])
+                                 : grp.uv1Trans[0] + groupUvU;
+            ubo.uTex1Xf[3] = uvOverride
+                                 ? cmabTranslationInPreScaleSpace(uvOverride->v, grp.uv1Scale[1], grp.uv1Trans[1])
+                                 : grp.uv1Trans[1] + groupUvV;
             ubo.uExtra[1] = 0.0f;
             ubo.uExtra[2] = 0.0f;
         }
@@ -793,8 +809,12 @@ void Fast::Zelda3DRenderer::DrawModel(int modelId, const float* mp16, const floa
             ubo.uSheen[3] = (grp.coord1Mapping == 3) ? 3.0f : 1.0f;
             ubo.uTex1Xf[0] = grp.uv1Scale[0];
             ubo.uTex1Xf[1] = grp.uv1Scale[1];
-            ubo.uTex1Xf[2] = grp.uv1Trans[0];
-            ubo.uTex1Xf[3] = grp.uv1Trans[1];
+            ubo.uTex1Xf[2] = uvOverride
+                                 ? cmabTranslationInPreScaleSpace(uvOverride->u, grp.uv1Scale[0], grp.uv1Trans[0])
+                                 : grp.uv1Trans[0];
+            ubo.uTex1Xf[3] = uvOverride
+                                 ? cmabTranslationInPreScaleSpace(uvOverride->v, grp.uv1Scale[1], grp.uv1Trans[1])
+                                 : grp.uv1Trans[1];
             ubo.uTex2Xf[0] = grp.uv2Scale[0];
             ubo.uTex2Xf[1] = grp.uv2Scale[1];
             ubo.uTex2Xf[2] = grp.uv2Trans[0];
