@@ -73,6 +73,33 @@ bool HandleCommand(const std::string& cmd, std::istringstream& toks) {
                 std::printf("ok drawskip %d\n", soh3d_draw_skip);
             }
         }
+    } else if (cmd == "soh_drawlist") {
+        handled = true;
+        // One-shot group/material inventory on the next host render. This deliberately does not
+        // advance a frame: the caller can arm it immediately before the same controlled step used
+        // for a base or skip capture.
+        gZelda3dSgDrawList = 1;
+        std::printf("ok soh_drawlist armed\n");
+    } else if (cmd == "soh_drawskip") {
+        handled = true;
+        // Native counterpart to the oracle command above. Arm both around the same lockstep
+        // frame, then snapshot, so each framebuffer differs from its own unmodified base only by
+        // the selected draw. Host indices come from sgdrawlist because the two renderers have
+        // distinct global draw-number domains. `soh_drawlist` arms that inventory here.
+        std::string arg;
+        toks >> arg;
+        if (arg == "off" || arg.empty()) {
+            gZelda3dSgDrawSkip = -1;
+            std::printf("ok soh_drawskip off\n");
+        } else {
+            auto n = ParseNum(arg);
+            if (!n) {
+                PrintErr("soh_drawskip: bad n");
+            } else {
+                gZelda3dSgDrawSkip = static_cast<int>(*n);
+                std::printf("ok soh_drawskip %d\n", gZelda3dSgDrawSkip);
+            }
+        }
     } else if (cmd == "soh_depthdump") {
         handled = true;
         // Dump SoH fb0's DEPTH buffer (auto-contrast grayscale PPM) for the CURRENT scene, to

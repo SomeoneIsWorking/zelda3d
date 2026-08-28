@@ -166,19 +166,28 @@ extern "C" int gZelda3dHlGroup;
 // Rendering ONE group and nothing else closes that gap: the resulting frame IS that draw's own
 // output, so a FRAGDBG mode over it measures the same quantity the oracle's probe reports.
 //
-// `sgdrawonly <n>` (REPL) / ZELDA3D_SG_DRAWONLY=<n> renders only the n-th Zelda3D group of the frame;
-// `sgdrawlist` (REPL) / ZELDA3D_SG_DRAWLIST=1 dumps one frame's group list so you can find the n you
-// want. Indices are per-frame and sequential in append order — the same order that matters for
-// translucency — so they are stable for a frozen camera and meaningless across a moving one.
-// DEFINED HERE, not in the game layer. These two are read and written by this file, which lives in
+// `sgdrawonly <n>` (REPL) / ZELDA3D_SG_DRAWONLY=<n> renders only the n-th Zelda3D group of the frame.
+// `sgdrawskip <n>` / ZELDA3D_SG_DRAWSKIP=<n> suppresses only that group, mirroring the oracle's
+// drawskip experiment so base-minus-skip comparisons have the same compositing context on both
+// sides. `sgdrawlist` / ZELDA3D_SG_DRAWLIST=1 dumps the model-local group and CMB material identity
+// needed to map the per-frame draw index. Indices are sequential in append order — the same order
+// that matters for translucency — so they are stable for a frozen camera and meaningless across a
+// moving one.
+// DEFINED HERE, not in the game layer. These controls are read and written by this file, which lives in
 // libultraship -- shared by BOTH soh and mm. They used to be defined in soh/src/zelda3d/core/zelda3d.c,
 // so linking the mm target failed with "undefined reference to gZelda3dSgDrawList/Only": mm links the
 // same libultraship but has no soh globals to satisfy it. A diagnostic owned by the renderer belongs
 // to the renderer; the game layers now just extern-declare it for their REPLs.
 extern "C" int gZelda3dSgDrawOnly = -1;  // -1 = draw everything (default)
+extern "C" int gZelda3dSgDrawSkip = -1;  // -1 = skip nothing; otherwise suppress one group
 extern "C" int gZelda3dSgModelOnly = -1; // -1 = all models; otherwise stable model-id isolation
 extern "C" int gZelda3dSgDrawList = 0;   // 1 = dump this frame's group list, then self-clears
 static int g_sgDrawIdx = 0;              // groups appended so far this frame
+
+extern "C" int Zelda3D_SgDrawIsolationIncludes(int modelId, int drawIndex) {
+    return (gZelda3dSgModelOnly < 0 || modelId == gZelda3dSgModelOnly) &&
+           (gZelda3dSgDrawOnly < 0 || drawIndex == gZelda3dSgDrawOnly) && drawIndex != gZelda3dSgDrawSkip;
+}
 // strength/bias the same way the Vulkan path does.
 
 namespace {
@@ -201,6 +210,8 @@ struct DrawGroup {
     SDL_GPUTexture* tex2 = nullptr;
     SDL_GPUSampler* samp2 = nullptr;
     uint32_t first, count;
+    int model_group_index = -1;
+    int material_index = -1;
     // Blend constants (SDL_SetGPUBlendConstants) for a group whose pipeline uses a CONSTANT_COLOR
     // factor. Render-pass state, not pipeline state — so it travels per-draw, next to the pipeline.
     bool hasBlendConst = false;
@@ -297,6 +308,9 @@ void Fast::Zelda3DRenderer::BeginPass() {
         sgProbeSeeded = true;
         if (const char* v = getenv("ZELDA3D_SG_DRAWONLY"))
             gZelda3dSgDrawOnly = atoi(v);
+        if (const char* v = getenv("ZELDA3D_SG_DRAWSKIP")) {
+            gZelda3dSgDrawSkip = atoi(v);
+        }
         if (const char* v = getenv("ZELDA3D_SG_MODELONLY"))
             gZelda3dSgModelOnly = atoi(v);
         if (const char* v = getenv("ZELDA3D_SG_DRAWLIST"))
@@ -853,6 +867,8 @@ void Fast::Zelda3DRenderer::DrawModel(int modelId, const float* mp16, const floa
         dg.samp2 = samp2;
         dg.first = grp.first;
         dg.count = grp.count;
+        dg.model_group_index = gIdx;
+        dg.material_index = grp.materialIndex;
         dg.hasBlendConst = Fast::Zelda3DSdl3GpuPipeline::BlendConstants(gb, dg.blendConst);
         if (unified) {
             bool hasTex = tex != Fast::g_activeSdl3GpuApi->DummyTexture();
@@ -948,12 +964,15 @@ void Fast::Zelda3DRenderer::DrawModel(int modelId, const float* mp16, const floa
     for (const DrawGroup& g : dgs) {
         const int drawIdx = g_sgDrawIdx++;
         if (gZelda3dSgDrawList) {
-            fprintf(stderr, "[Zelda3D_SG] draw %d model=%d first=%u count=%u tex=%p tex1=%p tex2=%p\n", drawIdx,
-                    modelId, g.first, g.count, (const void*)g.tex, (const void*)g.tex1, (const void*)g.tex2);
+            fprintf(stderr,
+                    "[Zelda3D_SG] draw %d model=%d group=%d material=%d first=%u count=%u tex=%p tex1=%p "
+                    "tex2=%p\n",
+                    drawIdx, modelId, g.model_group_index, g.material_index, g.first, g.count, (const void*)g.tex,
+                    (const void*)g.tex1, (const void*)g.tex2);
         }
-        if ((gZelda3dSgModelOnly >= 0 && modelId != gZelda3dSgModelOnly) ||
-            (gZelda3dSgDrawOnly >= 0 && drawIdx != gZelda3dSgDrawOnly))
-            continue; // draw-isolation probe: everything except the selected group is suppressed
+        if (!Zelda3D_SgDrawIsolationIncludes(modelId, drawIdx)) {
+            continue; // draw-isolation probe: suppress groups excluded by the active controls
+        }
         api->AppendZelda3DModelDraw(g.pipeline, vbo, g.first, g.count, g.ubo.data(), g.tex, g.samp,
                                     g.tex2 ? g.tex2 : dummyTex, g.samp2 ? g.samp2 : dummySamp, g.tex1, g.samp1, vp, sc,
                                     g.hasBlendConst, g.blendConst);
@@ -969,6 +988,10 @@ void Fast::Zelda3DRenderer::EndPass() {
     if (gZelda3dSgDrawOnly >= 0 && g_sgDrawIdx > 0 && gZelda3dSgDrawOnly >= g_sgDrawIdx) {
         fprintf(stderr, "[Zelda3D_SG] DRAWONLY=%d but this frame appended only %d group(s) — probe inert\n",
                 gZelda3dSgDrawOnly, g_sgDrawIdx);
+    }
+    if (gZelda3dSgDrawSkip >= 0 && g_sgDrawIdx > 0 && gZelda3dSgDrawSkip >= g_sgDrawIdx) {
+        fprintf(stderr, "[Zelda3D_SG] DRAWSKIP=%d but this frame appended only %d group(s) — probe inert\n",
+                gZelda3dSgDrawSkip, g_sgDrawIdx);
     }
     // One-shot, but only once it has something to SHOW: the first frames after launch append zero
     // groups (the scene has not loaded), and an arm-at-launch that self-cleared on one of those

@@ -11,7 +11,7 @@ constexpr const char* kCommandCatalog[] = {
     "render: mul diff tint lightdir lightparams worldamb worldlit fog fog3d sky sceneoff scenescale "
     "scale yoff rotx roty rotz gscale autoyoff facecull stairs stairsize",
     "model: auto autostate n64anim animlist animforce animdbg animrate animframe animlive submitted "
-    "jointdump atlasdump sgdrawlist sgdrawonly sgmodelonly sgdump geomscan",
+    "jointdump atlasdump sgdrawlist sgdrawonly sgdrawskip sgmodelonly sgdump geomscan",
     "scene: tp tpf warp cswarp introcs eventflag age savecycle roominfo roomwarp hlroom terrainwarp collision "
     "floorat floorcol exitat floorgrid exitgrid wallscan meshfloor time",
     "player: move gcam walkhold btnhold pause turn posinfo cammode climbinfo forceclimb linkstate "
