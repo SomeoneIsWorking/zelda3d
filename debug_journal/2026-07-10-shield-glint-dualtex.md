@@ -67,13 +67,12 @@ project rule (extend the generic mechanism, no model-name special case):
   `kDualTexModulateThenScale`), plus `dual_tex_mode` and `dual_tex_scale2` fields.
   `comb0_dual_addmult` kept as-is (implies `dual_tex_mode == kDualTexAddMult`) so the existing
   fire-glow close-test didn't need to change.
-- **`Shipwright/cmb3d/asset/cmb.cpp`**: `parseMats()` now also captures stage 1's op/scale/sources
-  (previously only stage 0 was captured in full), then classifies `dual_tex_mode` from the actual
-  op codes: `ADD(TEX0,TEX1)` + `MODULATE(PREV,PRIMARY)` → `kDualTexAddThenModulatePrimary`;
-  `MODULATE(PRIMARY,TEX0)` + `MODULATE(PREV,TEX1)` → `kDualTexModulateThenScale` (captures the
-  stage's hardware RGB scale as `dual_tex_scale2`). Requires TEXTURE1 to be an ACTUALLY-CONSUMED
-  source within the op's slot arity, not just a declared `tex1_idx` binding — this is what keeps
-  material 8 correctly classified as `kDualTexNone`.
+- **`Shipwright/cmb3d/asset/cmb.cpp`**: `parseMats()` captures every stage. The early specialized
+  classifier recognized `ADD(TEX0,TEX1)` + `MODULATE(PREV,PRIMARY)` and
+  `MODULATE(PRIMARY,TEX0)` + `MODULATE(PREV,TEX1)`, but a later exact-stage-count correction found
+  that title materials 4/6/7/9 each have a third authored alpha/constant stage. They now route
+  through the generic TEV evaluator; only genuinely complete one/two-stage legacy shapes use
+  `dual_tex_mode`. Material 8 also stays `kDualTexNone` because its declared TEX1 is never consumed.
 - **`Shipwright/cmb3d/asset/cmb_glgroups.cpp`**: `MakeGlGroup` now copies `dual_tex_mode`/
   `dual_tex_scale2` unconditionally (was gated on `comb0_dual_addmult`).
 - **`Shipwright/libultraship/include/fast/zelda3d_gl.h`,
@@ -90,14 +89,13 @@ project rule (extend the generic mechanism, no model-name special case):
   compound already applies PRIMARY, so mode 2 only computes `clamp(t0+t1,0,1)` and mode 3 only
   computes `clamp(scale2*t0*t1,0,1)`, letting the existing compound supply the `*primary` factor
   without duplicating it in-shader.
-- **`Shipwright/libultraship/tests/cmb_combiner_parse_tests.cpp`**: added
-  `CmbCombinerParse.TitleLogoUsShieldSwordDualTexModes`, locking materials 4/6/7/8/9's
-  `dual_tex_mode`/`dual_tex_scale2` against the real ROM's `title_logo_us.cmb` (skips cleanly
-  without `ZELDA3D_OOT3D_ROM`). All 6 `CmbCombinerParse.*` tests green, including the pre-existing
-  `TitleGlowDualTexAddMultAndConstScale` (g_title.cmb unaffected — verified byte-identical
-  `dual_tex_mode=kDualTexAddMult`, `tex1_idx=1`, `uv1Xf=(3,2,0,0.9433)`, `dual_tex_scale2=1.0` via
-  both the gtest and a live `sgdump` of the fire-glow draw, model id 2014, post-fix). Full
-  `lus_tests` suite: 444/444 pass.
+- **`Shipwright/libultraship/tests/cmb_combiner_parse_tests.cpp`**:
+  `CmbCombinerParse.TitleLogoUsShieldSwordChainsUseGenericTev` locks materials 4/6/7/8/9 to their
+  complete generic chains and exact stage counts against the real ROM (skips cleanly without
+  `ZELDA3D_OOT3D_ROM`). `TitleGlowDualTexAddMultAndConstScale` keeps g_title.cmb's genuinely
+  complete one-stage legacy shape byte-identical (`dual_tex_mode=kDualTexAddMult`,
+  `tex1_idx=1`, `uv1Xf=(3,2,0,0.9433)`, `dual_tex_scale2=1.0`) via
+  both the gtest and a live `sgdump` of the fire-glow draw, model id 2014.
 
 ## Step 3 — element-verify
 

@@ -110,7 +110,7 @@ class MmPlayerContractTests(unittest.TestCase):
         self.assertIn(
             "Zelda3D_MM_PlayerRightHandMeshMask(player, &rightHandMask)", player
         )
-        self.assertIn("Zelda3D_MM_PlayerLeftHandMeshMask(", player)
+        self.assertIn("Zelda3D_MM_PlayerLeftHandDrawState(", player)
         self.assertLess(
             player.index("Zelda3D_MM_PlayerRightHandMeshMask"),
             player.index("Zelda3D_GL_SetMidMask"),
@@ -173,6 +173,15 @@ class MmPlayerContractTests(unittest.TestCase):
             body.index("gSPZelda3DDraw("),
         )
 
+    def test_player_bottle_material_uses_the_deferred_override_seam(self) -> None:
+        player = (MM / "mm3d_player.c").read_text()
+        self.assertIn("Zelda3D_MM_PlayerLeftHandDrawState(", player)
+        self.assertIn("Zelda3D_GL_SetMatConstOverride(", player)
+        self.assertLess(
+            player.index("Zelda3D_GL_SetMatConstOverride("),
+            player.index("Zelda3D_GL_SetMidMask("),
+        )
+
     def test_focused_owners_stay_below_source_ceiling(self) -> None:
         owners = (
             MM / "mm3d_player_force.c",
@@ -198,6 +207,8 @@ class MmPlayerContractTests(unittest.TestCase):
             MM / "mm3d_player_left_hand.h",
             MM / "mm3d_player_left_hand_policy.cpp",
             MM / "mm3d_player_left_hand_policy.h",
+            MM / "mm3d_player_bottle_material_policy.cpp",
+            MM / "mm3d_player_bottle_material_policy.h",
             MM / "mm3d_player_animation.cpp",
             MM / "mm3d_player_animation.h",
             MM / "mm3d_animation_playhead.h",

@@ -8,9 +8,9 @@
 // pipeline will feed once Phases 2/3 wire them through it. It is a strict superset of the two
 // pipelines' current per-vertex data:
 //   - N64 (LoadedVertex, interpreter.h) writes pos/uv0/color0 (CPU-baked Gouraud shade) and leaves
-//     texClamp/color1-3/uv1/fog/bone* at their identity defaults (boneW = {255,0,0,0} = 100% bone 0).
-//   - 3DS (CmbVertex, cmb3d/asset/cmb.h) writes pos/nrm/uv0/color0/boneIds/boneW and leaves
-//     texClamp/color1-3/uv1/fog at their identity defaults.
+//     texClamp/color1-3/uv1/uv2/fog/bone* at their identity defaults (boneW = {255,0,0,0} = 100% bone 0).
+//   - 3DS (CmbVertex, cmb3d/asset/cmb.h) writes pos/nrm/uv0/uv1/uv2/color0/boneIds/boneW and leaves
+//     texClamp/color1-3/fog at their identity defaults.
 //
 // Phase 1 (current): this struct is dormant — landed but unreferenced by any live draw path.
 // Phase 2/3 wire the CMB / N64 emitters to populate it; the two skinning MECHANISMS themselves
@@ -25,8 +25,8 @@ struct UnifiedVtx {
     // false (3DS) -> gl_Position = uMvp * vec4(pos.xyz, 1.0).
     float pos[4];
     float nrm[3];         // vertex normal; N64 content that has no real normal writes {0,0,1}
-    float uv0[2];         // primary texture coordinate (texel0 for N64; the CMB's single UV set)
-    float uv1[2];          // secondary texture coordinate (texel1 for N64 2-cycle combiners; unused by 3DS)
+    float uv0[2];         // primary coordinate (N64 texel0; CMB coordinator-0 selected source)
+    float uv1[2];         // secondary coordinate (N64 texel1; CMB coordinator-1 selected source)
     float texClamp[4];    // {clampS0, clampT0, clampS1, clampT1} — mirrors N64's per-vertex
                             // aTexClampS/T attributes (gfx_sdl3gpu.cpp's o_clamp path); 3DS content
                             // that doesn't clamp writes the tex's full extent (no-op clamp).
@@ -40,6 +40,7 @@ struct UnifiedVtx {
     float fog[2];          // {fogAmount, fogAlpha} — N64 fog blend factor; 3DS writes {0,0} (no fog).
     uint8_t boneIds[4];   // 3DS: up to 4 skin-matrix indices. N64: {0,0,0,0} (identity/no skin).
     uint8_t boneW[4];      // 3DS: per-bone blend weights (unorm8, sum to 255). N64: {255,0,0,0}.
+    float uv2[2];          // CMB coordinator-2 selected source; N64 writes {0,0}
 };
 
-static_assert(sizeof(UnifiedVtx) == 92, "UnifiedVtx layout changed — update the emitters in lockstep");
+static_assert(sizeof(UnifiedVtx) == 100, "UnifiedVtx layout changed — update the emitters in lockstep");

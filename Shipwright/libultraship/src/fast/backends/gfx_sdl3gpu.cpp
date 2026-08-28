@@ -1824,10 +1824,9 @@ SDL_GPUGraphicsPipeline* GfxRenderingAPISdl3Gpu::GetOrCreatePipeline(ShaderProgr
 
 // ---------------------------------------------------------------------------
 // Render-unification effort (kanban #131), Phase 3: N64 draws through the unified shader
-// (gUnifiedRenderer & 2). Mirrors GetOrCreatePipeline's depth/blend/cull mapping exactly (N64
+// (`gUnifiedRenderer & 2`), mirroring GetOrCreatePipeline's depth/blend/cull mapping (N64
 // always culls on the CPU, front-face fixed CCW, blend is fixed standard alpha-over when
-// useAlpha) — only the vertex layout (UnifiedVtx, 12 attribs) and shader (unified_shader.h's
-// per-variant pair) differ.
+// useAlpha); only UnifiedVtx's 13 attributes and the per-variant unified shader pair differ.
 // ---------------------------------------------------------------------------
 SDL_GPUGraphicsPipeline* GfxRenderingAPISdl3Gpu::GetOrCreateUnifiedN64Pipeline(int variant, uint32_t stateBits) {
     uint32_t key = (uint32_t)variant * 16u + stateBits;
@@ -1865,7 +1864,7 @@ SDL_GPUGraphicsPipeline* GfxRenderingAPISdl3Gpu::GetOrCreateUnifiedN64Pipeline(i
     const bool zmodeDecal = (stateBits & 4) != 0;
     const bool useAlpha = (stateBits & 8) != 0;
 
-    SDL_GPUVertexAttribute attrs[12]{};
+    SDL_GPUVertexAttribute attrs[13]{};
     attrs[0] = { 0, 0, SDL_GPU_VERTEXELEMENTFORMAT_FLOAT4, (uint32_t)offsetof(UnifiedVtx, pos) };
     attrs[1] = { 1, 0, SDL_GPU_VERTEXELEMENTFORMAT_FLOAT3, (uint32_t)offsetof(UnifiedVtx, nrm) };
     attrs[2] = { 2, 0, SDL_GPU_VERTEXELEMENTFORMAT_FLOAT2, (uint32_t)offsetof(UnifiedVtx, uv0) };
@@ -1878,6 +1877,7 @@ SDL_GPUGraphicsPipeline* GfxRenderingAPISdl3Gpu::GetOrCreateUnifiedN64Pipeline(i
     attrs[9] = { 9, 0, SDL_GPU_VERTEXELEMENTFORMAT_FLOAT2, (uint32_t)offsetof(UnifiedVtx, fog) };
     attrs[10] = { 10, 0, SDL_GPU_VERTEXELEMENTFORMAT_UBYTE4, (uint32_t)offsetof(UnifiedVtx, boneIds) };
     attrs[11] = { 11, 0, SDL_GPU_VERTEXELEMENTFORMAT_UBYTE4_NORM, (uint32_t)offsetof(UnifiedVtx, boneW) };
+    attrs[12] = { 12, 0, SDL_GPU_VERTEXELEMENTFORMAT_FLOAT2, (uint32_t)offsetof(UnifiedVtx, uv2) };
     SDL_GPUVertexBufferDescription vbDesc{};
     vbDesc.slot = 0;
     vbDesc.pitch = sizeof(UnifiedVtx);
@@ -1889,7 +1889,7 @@ SDL_GPUGraphicsPipeline* GfxRenderingAPISdl3Gpu::GetOrCreateUnifiedN64Pipeline(i
     pci.vertex_input_state.vertex_buffer_descriptions = &vbDesc;
     pci.vertex_input_state.num_vertex_buffers = 1;
     pci.vertex_input_state.vertex_attributes = attrs;
-    pci.vertex_input_state.num_vertex_attributes = 12;
+    pci.vertex_input_state.num_vertex_attributes = 13;
     pci.primitive_type = SDL_GPU_PRIMITIVETYPE_TRIANGLELIST;
 
     pci.rasterizer_state.fill_mode = SDL_GPU_FILLMODE_FILL;

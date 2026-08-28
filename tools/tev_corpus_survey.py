@@ -173,7 +173,10 @@ def parse_mats(b):
     for i in range(n):
         tex = [struct.unpack_from("<h", b, o + 0x10 + 0x18 * t)[0] for t in range(3)]
         coord_map = [b[o + 0x58 + 0x18 * t + 2] for t in range(3)]
-        coord_src = [b[o + 0x58 + 0x18 * t + 1] for t in range(3)]  # candidate: source UV index
+        # TextureCoordinator::sourceCoordinate is byte 0. Byte 1 is referenceCamera; surveying
+        # that byte previously produced the false corpus-wide conclusion that every coordinator
+        # selected texCoord0 (valbasiagnd's coordinator 1 selects texCoord1).
+        coord_src = [b[o + 0x58 + 0x18 * t + 0] for t in range(3)]
         cnt = _u32(b, o + 0x120)
         stages = []
         for s in range(min(cnt, 6)):

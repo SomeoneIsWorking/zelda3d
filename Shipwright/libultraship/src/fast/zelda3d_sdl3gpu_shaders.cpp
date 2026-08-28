@@ -112,6 +112,8 @@ layout(location=2) in vec2 aUv;
 layout(location=3) in vec4 aBoneId;
 layout(location=4) in vec4 aBoneW;
 layout(location=5) in vec4 aColor;
+layout(location=6) in vec2 aUv1;
+layout(location=7) in vec2 aUv2;
 {{ varyings }}
 layout(set=1, binding=0, std140) uniform UBO {
 {{ ubo_body }}
@@ -198,20 +200,21 @@ void main() {
                         (nv.y * 0.5 + 0.5 - ubo.uTex1Xf.w) * ubo.uTex1Xf.y);
         vUv1 = vec2(suv.x, 1.0 - suv.y);
     } else {
-        vec2 uv1 = vec2((aUv.x - ubo.uTex1Xf.z) * ubo.uTex1Xf.x, (aUv.y - ubo.uTex1Xf.w) * ubo.uTex1Xf.y);
+        vec2 uv1 = vec2((aUv1.x - ubo.uTex1Xf.z) * ubo.uTex1Xf.x,
+                        (aUv1.y - ubo.uTex1Xf.w) * ubo.uTex1Xf.y);
         vUv1 = vec2(uv1.x, 1.0 - uv1.y);
     }
-    // Coordinator-2 UV for the third texture unit (generic TEV, render.multi-stage-tev). Every
-    // OoT3D coordinator sources texcoord0 (corpus-verified, tools/tev_corpus_survey.py), so uv2
-    // is the same baked UV through coordinator 2's scale/translate — or the sphere-mapped UV
-    // when coordinator 2 uses CameraSphereEnvMap (uTevCtl.z == 3), same convention as uv1.
+    // Coordinator-2 UV for the third texture unit (generic TEV, render.multi-stage-tev), or the
+    // sphere-mapped UV when coordinator 2 uses CameraSphereEnvMap (uTevCtl.z == 3), same convention
+    // as uv1. aUv2 has already been resolved from the coordinator's selected CMB attribute stream.
     if (ubo.uTevCtl.z > 2.5 && ubo.uTevCtl.z < 3.5) {
         vec3 nv2 = normalize(ns);
         vec2 suv2 = vec2((nv2.x * 0.5 + 0.5 - ubo.uTex2Xf.z) * ubo.uTex2Xf.x,
                          (nv2.y * 0.5 + 0.5 - ubo.uTex2Xf.w) * ubo.uTex2Xf.y);
         vUv2 = vec2(suv2.x, 1.0 - suv2.y);
     } else {
-        vec2 uv2 = vec2((aUv.x - ubo.uTex2Xf.z) * ubo.uTex2Xf.x, (aUv.y - ubo.uTex2Xf.w) * ubo.uTex2Xf.y);
+        vec2 uv2 = vec2((aUv2.x - ubo.uTex2Xf.z) * ubo.uTex2Xf.x,
+                        (aUv2.y - ubo.uTex2Xf.w) * ubo.uTex2Xf.y);
         vUv2 = vec2(uv2.x, 1.0 - uv2.y);
     }
 }

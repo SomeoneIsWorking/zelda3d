@@ -82,4 +82,9 @@ struct PlayerLeftHandState {
 // contents and the separately-authored Deku-stick group.
 std::uint64_t PlayerLeftHandMeshMaskForState(const PlayerLeftHandState& state);
 
+// Retail computes the bottle material colour from the same route and item
+// fallback used by the visibility selector. No value means the non-bottle
+// branch of FUN_00211aa4 is active.
+std::optional<int> PlayerBottleContentIndexForState(const PlayerLeftHandState& state);
+
 } // namespace Zelda3D::MM3D

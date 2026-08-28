@@ -174,6 +174,7 @@ bool Cmb::parseMats() {
         m.trans_s = f32(b, co + 12);
         m.trans_t = f32(b, co + 16);
         m.rot = f32(b, co + 20);
+        m.coord0_source = u8(b, co + 0);
         // Coordinator-0 mapping method (noclip byte[2] of coordinator entry 0).
         m.coord0_mapping = u8(b, co + 2);
         uint32_t co1 = o + 0x58 + 0x18;
@@ -181,17 +182,21 @@ bool Cmb::parseMats() {
         m.scale1_t = f32(b, co1 + 8);
         m.trans1_s = f32(b, co1 + 12);
         m.trans1_t = f32(b, co1 + 16);
+        // TextureCoordinator::sourceCoordinate is byte 0; byte 1 is referenceCamera.
+        // This used to be omitted after a corpus survey accidentally inspected byte 1 and
+        // concluded every coordinator sourced texCoord0. valbasiagnd's additive TEX1 stages
+        // explicitly use sourceCoordinate=1 and carry an independent texCoord1 attribute.
+        m.coord1_source = u8(b, co1 + 0);
         // Coordinator-1 mapping method (noclip byte[2] of the coordinator entry): determines how
         // the second texture's UVs are generated. 3 = CameraSphereEnvMap (normal-derived UV).
         m.coord1_mapping = u8(b, co1 + 2);
-        // Coordinator 2 (feeds texture binding 2). Corpus-wide every coordinator sources
-        // texcoord0 (byte[1] == 0 for all 11172 materials — tools/tev_corpus_survey.py), so the
-        // renderer derives every unit's UV from the one baked UV set through these transforms.
+        // Coordinator 2 (feeds texture binding 2).
         uint32_t co2 = o + 0x58 + 0x30;
         m.scale2_s = f32(b, co2 + 4);
         m.scale2_t = f32(b, co2 + 8);
         m.trans2_s = f32(b, co2 + 12);
         m.trans2_t = f32(b, co2 + 16);
+        m.coord2_source = u8(b, co2 + 0);
         m.coord2_mapping = u8(b, co2 + 2);
         m.alpha_test = u8(b, o + 0x130) != 0;
         m.alpha_ref = u8(b, o + 0x131) / 255.0f;
@@ -260,7 +265,7 @@ bool Cmb::parseMats() {
         // Stage-1 op/scale/sources, captured alongside stage 0 below — needed to classify
         // multi-stage dual-texture shapes (title_logo_us.cmb's shield/sword glint materials;
         // see comb_dual_tex_mode below). Only meaningful when m.comb_stage_count >= 2.
-        uint16_t stage1Op = 0, stage1SrcA = 0, stage1SrcB = 0, stage1SrcC = 0, stage1Scale = 1;
+        uint16_t stage1Op = 0, stage1SrcA = 0, stage1SrcB = 0, stage1Scale = 1;
         for (int s = 0; s < m.comb_stage_count && s < 6; s++) {
             uint32_t cidx = u16(b, o + 0x124 + s * 2);   // per-stage combiner-settings index
             uint32_t co = combTableBase + cidx * 0x28;
@@ -292,7 +297,6 @@ bool Cmb::parseMats() {
                 stage1Op = op;
                 stage1SrcA = srcA;
                 stage1SrcB = srcB;
-                stage1SrcC = srcC;
                 stage1Scale = u16(b, co + 0x04);
             }
             // Which of the three source slots the OP actually consumes. MODULATE / ADD /
@@ -609,7 +613,7 @@ Cmb::Prm Cmb::parsePrm(uint32_t p) {
     return r;
 }
 
-// An optional vertex attribute (color/normal/texCoord0) is only real data if either its mode
+// An optional vertex attribute (color/normal/texCoord0/texCoord1/texCoord2) is only real data if either its mode
 // is CONSTANT (attr.constant[] always readable, no VATR backing needed) or its ARRAY mode has a
 // nonzero-size backing VATR buffer. parseSepd() unconditionally sets `.present = true` for every
 // declared attribute slot regardless of whether the exporter actually wrote data for it (many
@@ -795,12 +799,17 @@ std::vector<CmbDrawGroup> Cmb::buildDrawGroupsSkinned(const std::array<float, 16
     int count = 0;
     const AttrDef* defs = Cmb_attrsDef(mVersion, &count);
     // locate attribute slots by name
-    int slotPos = -1, slotNrm = -1, slotUv0 = -1, slotBi = -1, slotBw = -1, slotCol = -1;
+    int slotPos = -1, slotNrm = -1, slotUv0 = -1, slotUv1 = -1, slotUv2 = -1;
+    int slotBi = -1, slotBw = -1, slotCol = -1;
     for (int i = 0; i < count; i++) {
         if (!strcmp(defs[i].name, "position")) slotPos = i;
         else if (!strcmp(defs[i].name, "normal")) slotNrm = i;
         else if (!strcmp(defs[i].name, "color")) slotCol = i;
         else if (!strcmp(defs[i].name, "texCoord0")) slotUv0 = i;
+        else if (!strcmp(defs[i].name, "texCoord1"))
+            slotUv1 = i;
+        else if (!strcmp(defs[i].name, "texCoord2"))
+            slotUv2 = i;
         else if (!strcmp(defs[i].name, "boneIndices")) slotBi = i;
         else if (!strcmp(defs[i].name, "boneWeights")) slotBw = i;
     }
@@ -826,6 +835,19 @@ std::vector<CmbDrawGroup> Cmb::buildDrawGroupsSkinned(const std::array<float, 16
         const Mesh& mesh = mMeshes[mi];
         if (mesh.sepd_index >= mSepds.size()) continue;
         const Sepd& sepd = mSepds[mesh.sepd_index];
+        int coordSources[3] = { 0, 0, 0 };
+        if (mesh.material_index >= 0 && mesh.material_index < (int)mMaterials.size()) {
+            const CmbMaterial& material = mMaterials[mesh.material_index];
+            coordSources[0] = material.coord0_source;
+            coordSources[1] = material.coord1_source;
+            coordSources[2] = material.coord2_source;
+        }
+        const int uvSlots[3] = { slotUv0, slotUv1, slotUv2 };
+        bool uvHasData[3] = {};
+        for (int uvIndex = 0; uvIndex < 3; ++uvIndex) {
+            const int slot = uvSlots[uvIndex];
+            uvHasData[uvIndex] = slot >= 0 && sepd.attrs[slot].present && attrHasData(sepd.attrs[slot], slot);
+        }
         int bd = sepd.bone_dimension;
         bool hasNormal = slotNrm >= 0 && sepd.attrs[slotNrm].present && attrHasData(sepd.attrs[slotNrm], slotNrm);
         CmbDrawGroup& g = groupFor(mesh.material_index, mesh.mesh_id);
@@ -875,11 +897,14 @@ std::vector<CmbDrawGroup> Cmb::buildDrawGroupsSkinned(const std::array<float, 16
             verts.reserve(prm.count);
             for (uint16_t k = 0; k < prm.count; k++) {
                 uint32_t idx = (uint32_t)dtRead(b, ibase + (size_t)k * isz, prm.index_type);
-                float pos[3], nrm[3] = { 0, 0, 1 }, uv[2] = { 0, 0 };
+                float pos[3], nrm[3] = { 0, 0, 1 }, rawUv[3][2] = {};
                 readAttr(sepd.attrs[slotPos], slotPos, idx, 3, pos);
                 if (hasNormal) readAttr(sepd.attrs[slotNrm], slotNrm, idx, 3, nrm);
-                if (slotUv0 >= 0 && sepd.attrs[slotUv0].present && attrHasData(sepd.attrs[slotUv0], slotUv0))
-                    readAttr(sepd.attrs[slotUv0], slotUv0, idx, 2, uv);
+                for (int uvIndex = 0; uvIndex < 3; ++uvIndex) {
+                    if (uvHasData[uvIndex]) {
+                        readAttr(sepd.attrs[uvSlots[uvIndex]], uvSlots[uvIndex], idx, 2, rawUv[uvIndex]);
+                    }
+                }
                 // RIGID_SKINNING: resolve this vertex's own bone + bind matrix (see rigidPV above).
                 int vBone = boneId;
                 Mat4 Mv = M;
@@ -926,8 +951,18 @@ std::vector<CmbDrawGroup> Cmb::buildDrawGroupsSkinned(const std::array<float, 16
                     matApplyDir(S, mn, sn);
                     for (int c = 0; c < 3; c++) { v.pos[c] += wts[e] * sp[c]; v.nrm[c] += wts[e] * sn[c]; }
                 }
-                v.uv[0] = uv[0];
-                v.uv[1] = uv[1];
+                // Resolve each texture coordinator's selected source while all three CMB
+                // attribute streams are available. Missing/invalid sources retain texCoord0,
+                // matching the previous path rather than sampling an uninitialized coordinate.
+                float* resolvedUv[3] = { v.uv, v.uv1, v.uv2 };
+                for (int textureUnit = 0; textureUnit < 3; ++textureUnit) {
+                    int source = coordSources[textureUnit];
+                    if (source < 0 || source >= 3 || !uvHasData[source]) {
+                        source = 0;
+                    }
+                    resolvedUv[textureUnit][0] = rawUv[source][0];
+                    resolvedUv[textureUnit][1] = rawUv[source][1];
+                }
                 // Per-vertex color: OoT3D's baked scene lighting (walls dimmed, AO on the
                 // ground) and the additive light-shaft/god-ray alpha falloff. Defaults to
                 // white when the attribute is absent, so untinted models are unaffected.

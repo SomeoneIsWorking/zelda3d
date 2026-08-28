@@ -40,6 +40,8 @@ struct CmbMaterial {
     // (sphere) for the second texture; mat10-11 use coord0=3 (sphere) for the primary texture.
     int coord0_mapping = 1; // coordinator-0 (primary texture): default UV
     int coord1_mapping = 1; // coordinator-1 (second texture): default UV
+    int coord0_source = 0;  // sourceCoordinate: 0/1/2 select CMB texCoord0/1/2
+    int coord1_source = 0;
     // Texture binding 2 (third sampler) + coordinator-2 transform (render.multi-stage-tev).
     // Zora's Domain water (spot07_1 mat0-2) binds tex0+tex1+tex2 and combines them through a
     // 3-stage TEV chain — verified identical between the CMB file bytes and the live oracle's
@@ -48,6 +50,7 @@ struct CmbMaterial {
     uint16_t wrap2_s = 0x2901, wrap2_t = 0x2901;
     float scale2_s = 1, scale2_t = 1, trans2_s = 0, trans2_t = 0;
     int coord2_mapping = 1; // coordinator-2 (third texture): default UV
+    int coord2_source = 0;
     int cull = 0;
     bool alpha_test = false;
     float alpha_ref = 0;
@@ -232,7 +235,7 @@ struct CmbTexture {
     }
 };
 
-// Interleaved render vertex: position (model space), normal, uv0, and skinning
+// Interleaved render vertex: position (model space), normal, source-resolved UVs, and skinning
 // bindings (up to 4 bone ids + weights). MUST stay byte-compatible with
 // Zelda3DGlVtx (zelda3d_gl.h) — the bridge reinterpret_casts between them.
 struct CmbVertex {
@@ -242,6 +245,10 @@ struct CmbVertex {
     float boneIds[4] = { 0, 0, 0, 0 };
     float weights[4] = { 0, 0, 0, 0 };
     float color[4] = { 1, 1, 1, 1 }; // per-vertex RGBA (OoT3D baked lighting / falloff)
+    // Coordinators 1/2 need separate resolved coordinates because a material can combine
+    // TEX0(texCoord0) with TEX1(texCoord1), as valbasiagnd does for its fire detail.
+    float uv1[2] = { 0, 0 };
+    float uv2[2] = { 0, 0 };
 };
 
 // One draw batch: all triangles that use a given (material, mesh_id), as a triangle list.

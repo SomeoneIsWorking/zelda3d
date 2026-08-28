@@ -82,6 +82,22 @@ or game instance ran for this batch.
   homolog is proved, so the adapter does not guess it.
 - Retail-only Zora `pz_gakkiwait` and `pz_gakki_demo` have no independent
   typed N64 animation symbols. The shared N64 play/start cases are aligned.
-- The 23-record bottle-content joint-transform stage in `FUN_00211aa4` is
-  independent of group visibility and remains unported.
 - The new selector has no authentic live sword/bottle submission capture yet.
+
+## Bottle material follow-up
+
+The previously named "joint-transform" stage is a material-constant write.
+Retail `0x00211c90..0x00211cc8` calls `FUN_0020ce94`, which forwards to the
+generic `FUN_001ff274`/`FUN_00223fc8` RGBA writer. The exact call targets
+constant zero on form materials `6/3/4/3/5`; all five shipping targets bind
+`p_bin_00` and source `CONST[0]` in the same TEV chain. The 23 four-float
+records at `0x006269c4` are byte-normalized item colours, not position,
+rotation, or scale values.
+
+`mm3d_player_bottle_material_policy.{cpp,h}` now owns the recovered table and
+form-material mapping. It reuses the left-hand selector's bottle-route/content
+index and returns the override through the same typed production result as the
+mesh mask. `mm3d_player.c` writes it to the existing emit-ordered material
+override seam before the pending Player draw is captured. Exact addresses,
+RGBA rows, and the writer chain are recorded in
+`mm3d-decomp/docs/player_draw.md`.
