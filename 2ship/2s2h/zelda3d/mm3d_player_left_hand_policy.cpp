@@ -103,15 +103,21 @@ constexpr bool BottleContentVisible(const PlayerLeftHandState& state, int conten
 
 } // namespace
 
+std::optional<int> PlayerBottleContentIndexForState(const PlayerLeftHandState& state) {
+    if (state.type != PlayerLeftHandType::Bottle && !ItemChangeKeepsBottle(state)) {
+        return std::nullopt;
+    }
+    return BottleContentIndex(state);
+}
+
 std::uint64_t PlayerLeftHandMeshMaskForState(const PlayerLeftHandState& state) {
-    const bool bottleRoute = state.type == PlayerLeftHandType::Bottle || ItemChangeKeepsBottle(state);
+    const std::optional<int> bottleContentIndex = PlayerBottleContentIndexForState(state);
     int meshId = DefaultMesh(state.defaultModel, state.form);
     std::uint64_t mask = 0;
 
-    if (bottleRoute) {
+    if (bottleContentIndex.has_value()) {
         meshId = kBottleMeshes[Index(state.form)];
-        const int contentIndex = BottleContentIndex(state);
-        if (BottleContentVisible(state, contentIndex)) {
+        if (BottleContentVisible(state, *bottleContentIndex)) {
             mask |= MeshBit(kBottleContentMeshes[Index(state.form)]);
         }
     } else if ((state.type == PlayerLeftHandType::Four && state.zoraBoomerangThrown) || state.modelForcesOpenHand) {

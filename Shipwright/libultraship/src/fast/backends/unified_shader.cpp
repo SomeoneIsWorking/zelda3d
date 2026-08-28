@@ -150,6 +150,7 @@ const char* kUnifiedShaderTemplate = R"PRISM(@prism(type='fragment', name='Unifi
     layout(location=9) in vec2 aFog;
     layout(location=10) in vec4 aBoneId;
     layout(location=11) in vec4 aBoneW;
+    layout(location=12) in vec2 aUv2;
 
     layout(location=0) out vec2 vUv0;
     layout(location=1) out vec2 vUv1;
@@ -194,8 +195,8 @@ const char* kUnifiedShaderTemplate = R"PRISM(@prism(type='fragment', name='Unifi
                                 (nv.y * 0.5 + 0.5 - ubo.uTex1Xf.w) * ubo.uTex1Xf.y);
                 vUv1 = vec2(suv.x, 1.0 - suv.y);
             } else {
-                vec2 uv1 = vec2((aUv0.x - ubo.uTex1Xf.z) * ubo.uTex1Xf.x,
-                                (aUv0.y - ubo.uTex1Xf.w) * ubo.uTex1Xf.y);
+                vec2 uv1 = vec2((aUv1.x - ubo.uTex1Xf.z) * ubo.uTex1Xf.x,
+                                (aUv1.y - ubo.uTex1Xf.w) * ubo.uTex1Xf.y);
                 vUv1 = vec2(uv1.x, 1.0 - uv1.y);
             }
             if (ubo.uTevCtl.z > 2.5 && ubo.uTevCtl.z < 3.5) {
@@ -204,8 +205,8 @@ const char* kUnifiedShaderTemplate = R"PRISM(@prism(type='fragment', name='Unifi
                                  (nv2.y * 0.5 + 0.5 - ubo.uTex2Xf.w) * ubo.uTex2Xf.y);
                 vUv2 = vec2(suv2.x, 1.0 - suv2.y);
             } else {
-                vec2 uv2 = vec2((aUv0.x - ubo.uTex2Xf.z) * ubo.uTex2Xf.x,
-                                (aUv0.y - ubo.uTex2Xf.w) * ubo.uTex2Xf.y);
+                vec2 uv2 = vec2((aUv2.x - ubo.uTex2Xf.z) * ubo.uTex2Xf.x,
+                                (aUv2.y - ubo.uTex2Xf.w) * ubo.uTex2Xf.y);
                 vUv2 = vec2(uv2.x, 1.0 - uv2.y);
             }
         @else

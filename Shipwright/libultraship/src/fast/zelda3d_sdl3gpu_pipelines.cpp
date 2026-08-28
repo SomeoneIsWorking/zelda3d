@@ -343,14 +343,16 @@ SDL_GPUGraphicsPipeline* Fast::Zelda3DRenderer::getPipeline(const SgGroup& g, in
 
     GfxRenderingAPISdl3Gpu* api = g_activeSdl3GpuApi;
 
-    // Vertex input: Zelda3DGlVtx (pos3, nrm3, uv2, boneId4, boneW4, color4).
-    SDL_GPUVertexAttribute attrs[6]{};
+    // Vertex input: Zelda3DGlVtx (pos3, nrm3, uv0, boneId4, boneW4, color4, uv1, uv2).
+    SDL_GPUVertexAttribute attrs[8]{};
     attrs[0] = { 0, 0, SDL_GPU_VERTEXELEMENTFORMAT_FLOAT3, (uint32_t)offsetof(Zelda3DGlVtx, pos) };
     attrs[1] = { 1, 0, SDL_GPU_VERTEXELEMENTFORMAT_FLOAT3, (uint32_t)offsetof(Zelda3DGlVtx, nrm) };
     attrs[2] = { 2, 0, SDL_GPU_VERTEXELEMENTFORMAT_FLOAT2, (uint32_t)offsetof(Zelda3DGlVtx, uv) };
     attrs[3] = { 3, 0, SDL_GPU_VERTEXELEMENTFORMAT_FLOAT4, (uint32_t)offsetof(Zelda3DGlVtx, boneIds) };
     attrs[4] = { 4, 0, SDL_GPU_VERTEXELEMENTFORMAT_FLOAT4, (uint32_t)offsetof(Zelda3DGlVtx, weights) };
     attrs[5] = { 5, 0, SDL_GPU_VERTEXELEMENTFORMAT_FLOAT4, (uint32_t)offsetof(Zelda3DGlVtx, color) };
+    attrs[6] = { 6, 0, SDL_GPU_VERTEXELEMENTFORMAT_FLOAT2, (uint32_t)offsetof(Zelda3DGlVtx, uv1) };
+    attrs[7] = { 7, 0, SDL_GPU_VERTEXELEMENTFORMAT_FLOAT2, (uint32_t)offsetof(Zelda3DGlVtx, uv2) };
     SDL_GPUVertexBufferDescription vb{};
     vb.slot = 0;
     vb.pitch = sizeof(Zelda3DGlVtx);
@@ -362,7 +364,7 @@ SDL_GPUGraphicsPipeline* Fast::Zelda3DRenderer::getPipeline(const SgGroup& g, in
     pci.vertex_input_state.vertex_buffer_descriptions = &vb;
     pci.vertex_input_state.num_vertex_buffers = 1;
     pci.vertex_input_state.vertex_attributes = attrs;
-    pci.vertex_input_state.num_vertex_attributes = 6;
+    pci.vertex_input_state.num_vertex_attributes = 8;
     pci.primitive_type = SDL_GPU_PRIMITIVETYPE_TRIANGLELIST;
 
     pci.rasterizer_state.fill_mode = SDL_GPU_FILLMODE_FILL;
@@ -438,8 +440,8 @@ SDL_GPUGraphicsPipeline* Fast::Zelda3DRenderer::getUnifiedPipeline(const SgGroup
         return nullptr;
 
     // Vertex input: UnifiedVtx (pos4, nrm3, uv0_2, uv1_2, texClamp4, color0..3 x ubyte4norm, fog2,
-    // boneIds ubyte4, boneW ubyte4norm) — see unified_vtx.h.
-    SDL_GPUVertexAttribute attrs[12]{};
+    // boneIds ubyte4, boneW ubyte4norm, uv2_2) — see unified_vtx.h.
+    SDL_GPUVertexAttribute attrs[13]{};
     attrs[0] = { 0, 0, SDL_GPU_VERTEXELEMENTFORMAT_FLOAT4, (uint32_t)offsetof(UnifiedVtx, pos) };
     attrs[1] = { 1, 0, SDL_GPU_VERTEXELEMENTFORMAT_FLOAT3, (uint32_t)offsetof(UnifiedVtx, nrm) };
     attrs[2] = { 2, 0, SDL_GPU_VERTEXELEMENTFORMAT_FLOAT2, (uint32_t)offsetof(UnifiedVtx, uv0) };
@@ -452,6 +454,7 @@ SDL_GPUGraphicsPipeline* Fast::Zelda3DRenderer::getUnifiedPipeline(const SgGroup
     attrs[9] = { 9, 0, SDL_GPU_VERTEXELEMENTFORMAT_FLOAT2, (uint32_t)offsetof(UnifiedVtx, fog) };
     attrs[10] = { 10, 0, SDL_GPU_VERTEXELEMENTFORMAT_UBYTE4, (uint32_t)offsetof(UnifiedVtx, boneIds) };
     attrs[11] = { 11, 0, SDL_GPU_VERTEXELEMENTFORMAT_UBYTE4_NORM, (uint32_t)offsetof(UnifiedVtx, boneW) };
+    attrs[12] = { 12, 0, SDL_GPU_VERTEXELEMENTFORMAT_FLOAT2, (uint32_t)offsetof(UnifiedVtx, uv2) };
     SDL_GPUVertexBufferDescription vb{};
     vb.slot = 0;
     vb.pitch = sizeof(UnifiedVtx);
@@ -463,7 +466,7 @@ SDL_GPUGraphicsPipeline* Fast::Zelda3DRenderer::getUnifiedPipeline(const SgGroup
     pci.vertex_input_state.vertex_buffer_descriptions = &vb;
     pci.vertex_input_state.num_vertex_buffers = 1;
     pci.vertex_input_state.vertex_attributes = attrs;
-    pci.vertex_input_state.num_vertex_attributes = 12;
+    pci.vertex_input_state.num_vertex_attributes = 13;
     pci.primitive_type = SDL_GPU_PRIMITIVETYPE_TRIANGLELIST;
 
     pci.rasterizer_state.fill_mode = SDL_GPU_FILLMODE_FILL;

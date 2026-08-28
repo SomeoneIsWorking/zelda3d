@@ -25,6 +25,7 @@
 #include "asset/zar.h"
 #include "asset/ctr_rom.h"
 
+#include <cmath>
 #include <cstdlib>
 #include <string>
 #include <vector>
@@ -208,18 +209,11 @@ static std::vector<uint8_t> LoadTitleLogoUsCmb() {
 
 } // namespace
 
-// Close-test for the 2026-07-10 multi-stage dual-texture classification (cmb.cpp
-// parseMats' dual_tex_mode). Locks the byte-verified combiner shape of title_logo_us.cmb's
-// shield materials (6, 7, 8, 9 — sepd 16-19) and sword material (4):
-//   mat6/mat9 (shield glint dot):  stage0 ADD(TEX0,TEX1), stage1 MODULATE(PREV,PRIMARY)
-//                                  -> kDualTexAddThenModulatePrimary, (t0+t1)*primary.
-//   mat7      (shield sparkle):    stage0 MODULATE(PRIM,TEX0), stage1 MODULATE(PREV,TEX1) x2
-//                                  -> kDualTexModulateThenScale, scale2=2.0.
-//   mat4      (sword detail mask): same shape as mat7, scale2=2.0.
-//   mat8      (shield, unused tex1 binding): tex1_idx >= 0 but TEXTURE1 is never an ACTIVE
-//                                  combiner source in either stage -> kDualTexNone (the
-//                                  detection must not fire on a merely-declared binding).
-TEST(CmbCombinerParse, TitleLogoUsShieldSwordDualTexModes) {
+// Close-test for the exact-stage-count guard added after the original two-stage title classifier.
+// Materials 4/6/7/9 have a third alpha/constant stage, so routing them through a two-stage legacy
+// approximation would discard authored work. Material 8 has two stages but never consumes TEX1.
+// All five therefore belong on the generic TEV evaluator.
+TEST(CmbCombinerParse, TitleLogoUsShieldSwordChainsUseGenericTev) {
     if (OoT3dRomPath().empty()) {
         GTEST_SKIP() << "ZELDA3D_OOT3D_ROM not set — cannot exercise real-asset close-test";
     }
@@ -229,25 +223,90 @@ TEST(CmbCombinerParse, TitleLogoUsShieldSwordDualTexModes) {
 
     const CmbMaterial& mat4 = cmb.materials()[4];
     EXPECT_EQ(mat4.tex1_idx, 2);
-    EXPECT_EQ(mat4.dual_tex_mode, CmbMaterial::kDualTexModulateThenScale);
-    EXPECT_FLOAT_EQ(mat4.dual_tex_scale2, 2.0f);
+    EXPECT_EQ(mat4.comb_stage_count, 3);
+    EXPECT_EQ(mat4.dual_tex_mode, CmbMaterial::kDualTexNone);
+    EXPECT_TRUE(mat4.tev_generic);
 
     const CmbMaterial& mat6 = cmb.materials()[6];
     EXPECT_EQ(mat6.tex1_idx, 5);
-    EXPECT_EQ(mat6.dual_tex_mode, CmbMaterial::kDualTexAddThenModulatePrimary);
+    EXPECT_EQ(mat6.comb_stage_count, 3);
+    EXPECT_EQ(mat6.dual_tex_mode, CmbMaterial::kDualTexNone);
+    EXPECT_TRUE(mat6.tev_generic);
 
     const CmbMaterial& mat7 = cmb.materials()[7];
     EXPECT_EQ(mat7.tex1_idx, 6);
-    EXPECT_EQ(mat7.dual_tex_mode, CmbMaterial::kDualTexModulateThenScale);
-    EXPECT_FLOAT_EQ(mat7.dual_tex_scale2, 2.0f);
+    EXPECT_EQ(mat7.comb_stage_count, 3);
+    EXPECT_EQ(mat7.dual_tex_mode, CmbMaterial::kDualTexNone);
+    EXPECT_TRUE(mat7.tev_generic);
 
     const CmbMaterial& mat8 = cmb.materials()[8];
     EXPECT_EQ(mat8.tex1_idx, 7);
+    EXPECT_EQ(mat8.comb_stage_count, 2);
     EXPECT_EQ(mat8.dual_tex_mode, CmbMaterial::kDualTexNone)
         << "mat8 declares a tex1 binding but never sources TEXTURE1 from an active combiner "
            "slot (both stages ignore it) — must NOT be classified as dual-texture";
+    EXPECT_TRUE(mat8.tev_generic);
 
     const CmbMaterial& mat9 = cmb.materials()[9];
     EXPECT_EQ(mat9.tex1_idx, 7);
-    EXPECT_EQ(mat9.dual_tex_mode, CmbMaterial::kDualTexAddThenModulatePrimary);
+    EXPECT_EQ(mat9.comb_stage_count, 3);
+    EXPECT_EQ(mat9.dual_tex_mode, CmbMaterial::kDualTexNone);
+    EXPECT_TRUE(mat9.tev_generic);
+}
+
+namespace {
+
+// Load Volvagia's hole-form body. Four of its seven groups combine TEX0 with an additive
+// TEX1 fire-detail layer whose coordinator explicitly selects the independent texCoord1 stream.
+static std::vector<uint8_t> LoadBossFd2Cmb() {
+    CtrRom rom(OoT3dRomPath());
+    auto zar_bytes = rom.read("/actor/zelda_fd.zar");
+    Zar zar(std::move(zar_bytes));
+    for (const auto& f : zar.files()) {
+        if (f.name.find("valbasiagnd.cmb") != std::string::npos) {
+            return zar.read(f);
+        }
+    }
+    return {};
+}
+
+} // namespace
+
+// Regression for the independent TEXCOORD1 path. The old parser inspected coordinator byte 1
+// (referenceCamera) instead of byte 0 (sourceCoordinate), concluded every material selected
+// texCoord0, and retained only one UV pair in CmbVertex/Zelda3DGlVtx. That silently sampled the
+// additive fire-detail texture with the body texture's coordinates.
+TEST(CmbCombinerParse, BossFd2SecondaryTextureUsesIndependentTexCoordOne) {
+    if (OoT3dRomPath().empty()) {
+        GTEST_SKIP() << "ZELDA3D_OOT3D_ROM not set — cannot exercise real-asset close-test";
+    }
+    Cmb cmb(LoadBossFd2Cmb());
+    ASSERT_TRUE(cmb.ok()) << cmb.error();
+    ASSERT_EQ(cmb.materials().size(), 6u);
+
+    for (int materialIndex : { 0, 1, 5 }) {
+        EXPECT_EQ(cmb.materials()[materialIndex].coord1_source, 1)
+            << "valbasiagnd material " << materialIndex << " must source its additive TEX1 stage from texCoord1";
+    }
+
+    const auto groups = cmb.buildDrawGroups();
+    ASSERT_EQ(groups.size(), 7u);
+    int affectedGroups = 0;
+    size_t affectedVertices = 0;
+    for (const auto& group : groups) {
+        if (group.material_index != 0 && group.material_index != 1 && group.material_index != 5) {
+            continue;
+        }
+        affectedGroups++;
+        for (const auto& vertex : group.verts) {
+            affectedVertices++;
+            EXPECT_TRUE(std::fabs(vertex.uv1[0] - vertex.uv[0]) > 1e-6f ||
+                        std::fabs(vertex.uv1[1] - vertex.uv[1]) > 1e-6f)
+                << "every referenced valbasiagnd fire-detail coordinate is authored independently";
+        }
+    }
+    EXPECT_EQ(affectedGroups, 4);
+    // The source groups reference 598 unique vertices; buildDrawGroups expands indexed
+    // triangles, so the shipping vertex buffer contains 2,136 affected vertices.
+    EXPECT_EQ(affectedVertices, 2136u);
 }

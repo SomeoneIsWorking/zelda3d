@@ -39,7 +39,9 @@ int Zelda3D_TryDrawPlayer(PlayState* play, Actor* actor) {
     }
     unsigned long long rightHandMask = 0;
     unsigned long long leftHandMask = 0;
-    if (!Zelda3D_MM_PlayerLeftHandMeshMask(player, GET_CUR_EQUIP_VALUE(EQUIP_TYPE_SWORD), &leftHandMask)) {
+    Zelda3DMMPlayerBottleMaterialOverride bottleMaterial = { 0 };
+    if (!Zelda3D_MM_PlayerLeftHandDrawState(player, GET_CUR_EQUIP_VALUE(EQUIP_TYPE_SWORD), &leftHandMask,
+                                            &bottleMaterial)) {
         return 0;
     }
     if (!Zelda3D_MM_PlayerRightHandMeshMask(player, &rightHandMask)) {
@@ -52,6 +54,11 @@ int Zelda3D_TryDrawPlayer(PlayState* play, Actor* actor) {
                                                 player->currentMask, GET_CUR_EQUIP_VALUE(EQUIP_TYPE_SWORD));
     meshMask |= rightHandMask;
     meshMask |= leftHandMask;
+    if (bottleMaterial.enabled) {
+        Zelda3D_GL_SetMatConstOverride(modelId, bottleMaterial.materialIndex, bottleMaterial.constantIndex,
+                                       bottleMaterial.rgba[0], bottleMaterial.rgba[1], bottleMaterial.rgba[2],
+                                       bottleMaterial.rgba[3]);
+    }
     Zelda3D_GL_SetMidMask(modelId, meshMask);
     // Player_DrawGameplay still runs so its real SkelAnime draw supplies the live skeleton,
     // joint table and post-limb side effects. SkelAnime_DrawFlexLod consumes this pending draw.

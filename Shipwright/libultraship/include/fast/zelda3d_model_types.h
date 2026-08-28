@@ -11,6 +11,8 @@ typedef struct Zelda3DGlVtx {
     float boneIds[4];
     float weights[4];
     float color[4];
+    float uv1[2];
+    float uv2[2];
 } Zelda3DGlVtx;
 
 typedef struct Zelda3DGlGroup {

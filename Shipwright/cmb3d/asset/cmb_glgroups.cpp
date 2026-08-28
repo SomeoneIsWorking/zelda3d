@@ -19,6 +19,8 @@ static_assert(offsetof(CmbVertex, uv) == offsetof(Zelda3DGlVtx, uv), "uv offset 
 static_assert(offsetof(CmbVertex, boneIds) == offsetof(Zelda3DGlVtx, boneIds), "boneIds offset mismatch");
 static_assert(offsetof(CmbVertex, weights) == offsetof(Zelda3DGlVtx, weights), "weights offset mismatch");
 static_assert(offsetof(CmbVertex, color) == offsetof(Zelda3DGlVtx, color), "color offset mismatch");
+static_assert(offsetof(CmbVertex, uv1) == offsetof(Zelda3DGlVtx, uv1), "uv1 offset mismatch");
+static_assert(offsetof(CmbVertex, uv2) == offsetof(Zelda3DGlVtx, uv2), "uv2 offset mismatch");
 
 // --- Generic TEV packing (render.multi-stage-tev) -------------------------------------------
 // GL-DMP enum -> PICA hardware code translation, done once at group build so the shader decodes

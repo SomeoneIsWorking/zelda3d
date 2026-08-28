@@ -4,6 +4,7 @@
 #include <optional>
 
 #include "assets/objects/gameplay_keep/gameplay_keep.h"
+#include "mm3d_player_bottle_material_policy.h"
 #include "mm3d_player_left_hand_policy.h"
 #include "mm3d_player_model_policy.h"
 
@@ -149,48 +150,72 @@ PlayerBottleContentAnimation BottleContentAnimationForPlayer(const Player& playe
     return PlayerBottleContentAnimation::Other;
 }
 
+bool StateForPlayer(Player& player, int swordEquipValue, PlayerLeftHandState& state) {
+    if (!PlayerModelFormFromRetailIndex(player.transformation, state.form) ||
+        !ToLeftHandType(player.leftHandType, state.type) || !DefaultModelForPlayer(player, state.defaultModel) ||
+        !PlayerSwordFromRetailIndex(swordEquipValue, state.sword) ||
+        !AnimationOverrideForPlayer(player, state.animationOverride)) {
+        return false;
+    }
+
+    state.speed = player.actor.speed;
+    state.animationFrame = player.skelAnime.curFrame;
+    state.itemChangeFrame = player.skelAnimeUpper.curFrame;
+    state.itemChangeEndFrame = player.skelAnimeUpper.endFrame;
+    state.currentBoots = player.currentBoots;
+    state.itemAction = player.itemAction;
+    state.heldItemAction = player.heldItemAction;
+    state.state2 = (player.stateFlags1 & PLAYER_STATE1_2) != 0;
+    state.state400 = (player.stateFlags1 & PLAYER_STATE1_400) != 0;
+    state.swimming = (player.stateFlags1 & PLAYER_STATE1_8000000) != 0;
+    state.carryingActor = (player.stateFlags1 & PLAYER_STATE1_CARRYING_ACTOR) != 0;
+    state.zoraBoomerangThrown = (player.stateFlags1 & PLAYER_STATE1_ZORA_BOOMERANG_THROWN) != 0;
+    state.modelForcesOpenHand = false;
+    state.giantMask = player.currentMask == PLAYER_MASK_GIANT;
+    state.carryUpperAction = player.upperActionFunc == Player_UpperAction_CarryActor;
+    state.bremenMarchAction = player.actionFunc == Player_Action_11;
+    state.zoraGuitarStart = AnimationEqual(player.skelAnime.animation, gPlayerAnim_pz_gakkistart);
+    state.zoraGuitarSpecial = AnimationEqual(player.skelAnime.animation, gPlayerAnim_pz_gakkiplay);
+    state.bottleItemChangeAnimation =
+        AnimationEqual(player.skelAnimeUpper.animation, gPlayerAnim_link_normal_free2freeB);
+    state.itemActionIsButtonEquipped = CurrentItemActionIsButtonEquipped(player);
+    state.exchangeItemAction = player.actionFunc == Player_Action_ExchangeItem;
+    state.dekuStickVisible =
+        player.itemAction == PLAYER_IA_DEKU_STICK && (player.stateFlags3 & PLAYER_STATE3_4000000) == 0;
+    state.bottleContentAnimation = BottleContentAnimationForPlayer(player);
+    return true;
+}
+
 } // namespace
 } // namespace Zelda3D::MM3D
 
-extern "C" int Zelda3D_MM_PlayerLeftHandMeshMask(Player* player, int swordEquipValue, unsigned long long* meshMask) {
+extern "C" int Zelda3D_MM_PlayerLeftHandDrawState(Player* player, int swordEquipValue, unsigned long long* meshMask,
+                                                  Zelda3DMMPlayerBottleMaterialOverride* bottleMaterial) {
     using namespace Zelda3D::MM3D;
-    if (player == nullptr || meshMask == nullptr) {
+    if (player == nullptr || meshMask == nullptr || bottleMaterial == nullptr) {
         return 0;
     }
 
     PlayerLeftHandState state{};
-    if (!PlayerModelFormFromRetailIndex(player->transformation, state.form) ||
-        !ToLeftHandType(player->leftHandType, state.type) || !DefaultModelForPlayer(*player, state.defaultModel) ||
-        !PlayerSwordFromRetailIndex(swordEquipValue, state.sword) ||
-        !AnimationOverrideForPlayer(*player, state.animationOverride)) {
+    if (!StateForPlayer(*player, swordEquipValue, state)) {
         return 0;
     }
-
-    state.speed = player->actor.speed;
-    state.animationFrame = player->skelAnime.curFrame;
-    state.itemChangeFrame = player->skelAnimeUpper.curFrame;
-    state.itemChangeEndFrame = player->skelAnimeUpper.endFrame;
-    state.currentBoots = player->currentBoots;
-    state.itemAction = player->itemAction;
-    state.heldItemAction = player->heldItemAction;
-    state.state2 = (player->stateFlags1 & PLAYER_STATE1_2) != 0;
-    state.state400 = (player->stateFlags1 & PLAYER_STATE1_400) != 0;
-    state.swimming = (player->stateFlags1 & PLAYER_STATE1_8000000) != 0;
-    state.carryingActor = (player->stateFlags1 & PLAYER_STATE1_CARRYING_ACTOR) != 0;
-    state.zoraBoomerangThrown = (player->stateFlags1 & PLAYER_STATE1_ZORA_BOOMERANG_THROWN) != 0;
-    state.modelForcesOpenHand = false;
-    state.giantMask = player->currentMask == PLAYER_MASK_GIANT;
-    state.carryUpperAction = player->upperActionFunc == Player_UpperAction_CarryActor;
-    state.bremenMarchAction = player->actionFunc == Player_Action_11;
-    state.zoraGuitarStart = AnimationEqual(player->skelAnime.animation, gPlayerAnim_pz_gakkistart);
-    state.zoraGuitarSpecial = AnimationEqual(player->skelAnime.animation, gPlayerAnim_pz_gakkiplay);
-    state.bottleItemChangeAnimation =
-        AnimationEqual(player->skelAnimeUpper.animation, gPlayerAnim_link_normal_free2freeB);
-    state.itemActionIsButtonEquipped = CurrentItemActionIsButtonEquipped(*player);
-    state.exchangeItemAction = player->actionFunc == Player_Action_ExchangeItem;
-    state.dekuStickVisible =
-        player->itemAction == PLAYER_IA_DEKU_STICK && (player->stateFlags3 & PLAYER_STATE3_4000000) == 0;
-    state.bottleContentAnimation = BottleContentAnimationForPlayer(*player);
     *meshMask = PlayerLeftHandMeshMaskForState(state);
+
+    *bottleMaterial = {};
+    if (const std::optional<PlayerBottleMaterialOverride> override = PlayerBottleMaterialOverrideForState(state);
+        override.has_value()) {
+        bottleMaterial->enabled = 1;
+        bottleMaterial->materialIndex = override->materialIndex;
+        bottleMaterial->constantIndex = override->constantIndex;
+        for (std::size_t component = 0; component < override->rgba.size(); ++component) {
+            bottleMaterial->rgba[component] = override->rgba[component];
+        }
+    }
     return 1;
+}
+
+extern "C" int Zelda3D_MM_PlayerLeftHandMeshMask(Player* player, int swordEquipValue, unsigned long long* meshMask) {
+    Zelda3DMMPlayerBottleMaterialOverride bottleMaterial{};
+    return Zelda3D_MM_PlayerLeftHandDrawState(player, swordEquipValue, meshMask, &bottleMaterial);
 }

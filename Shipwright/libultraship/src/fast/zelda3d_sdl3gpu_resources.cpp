@@ -471,8 +471,10 @@ UnifiedVtx PackUnifiedVtx(const Zelda3DGlVtx& v, float combScaleRGB) {
     u.nrm[2] = v.nrm[2];
     u.uv0[0] = v.uv[0];
     u.uv0[1] = v.uv[1];
-    u.uv1[0] = 0.0f;
-    u.uv1[1] = 0.0f;
+    u.uv1[0] = v.uv1[0];
+    u.uv1[1] = v.uv1[1];
+    u.uv2[0] = v.uv2[0];
+    u.uv2[1] = v.uv2[1];
     // No per-vertex clamp data on the CMB side (unlike N64) — a large no-op upper bound so the
     // unified fragment shader's clamp(uv, 0.5/texSize, texClamp) never actually clamps.
     u.texClamp[0] = 1e6f;
