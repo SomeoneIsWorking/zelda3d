@@ -24,3 +24,16 @@ constant.
 
 Evidence sources: `oot3d-decomp/docs/boss_fd2.md`, the paired oracle `vsuni_log`/`PIXELXY` capture in
 `scratch/logs/`, the static `valbasiagnd.cmb`/`.cmab` parse, and the host's nearest-texel probe.
+
+## Live post-port check
+
+On 2026-08-29, the deterministic BossFd2 setup was rerun with the software oracle path after
+rebuilding the shipping renderer. The host reported `body=loaded ... UV sampled 3/3 materials` for
+the live body controller. The paired output is `scratch/screenshots/fd2_oracle_base_fixed2.{az,soh}.ppm`
+with per-group suppression captures `fd2_oracle_skip29_fixed2` through `skip38_fixed2`.
+
+The fixed actor crop `(x=360..440, y=180..460)` contains the same centered body in both engines.
+Its non-black means are oracle `(142.3,65.8,14.4)` and host `(110.5,39.4,3.5)`; crop RMSE is
+`38.646744` over 22,400 pixels. This is evidence that the new UV override is live and that the
+remaining body darkness is not closed by it. It is not a parity claim: the next BossFd2 material
+change still needs a named renderer or decomp mechanism and a new matched capture.
