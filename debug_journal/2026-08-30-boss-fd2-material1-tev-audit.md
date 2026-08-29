@@ -48,3 +48,16 @@ consistent with the oracle at the controlled sample. This audit falsifies the pr
 remains open. The next useful capture must isolate material 1 by draw mapping and compare it in
 the same compositing context after the corrected camera/texture-pack state, rather than selecting
 by texture address alone.
+
+## Follow-up capture boundary
+
+Three fresh runs used the explicit side camera `eye=(-700,-871.249,0)`, `at=(0,-971.249,0)`,
+FOV 45, with the host restricted through draw 37 and a selected material-1 fragment tap. The
+host body was stable in the crop, but fixed oracle probe points did not identify the same draw:
+at `(390,230)` the host selected draw produced `(190,50,11)`, while the oracle `PIXELXY` stream
+had no `tex0=180bfe80` material-1 sample at that coordinate. The oracle frame also contains a
+dialog overlay and its visible body is shifted enough that overlapping orange masks are not a
+same-fragment correspondence. These captures are not parity evidence and do not justify a
+TEV, lighting, or texture change. A useful next instrument must select the oracle draw by draw
+identity and expose its rasterized footprint, or otherwise establish a shared material-1 pixel
+before comparing values.
