@@ -200,6 +200,13 @@ bool Fast::Zelda3DRenderer::ensureResources() {
     const char* tapCombiner = "";
     const char* tapPreFog = "";
     int fragdbgMode = 0;
+    std::string guardedProbe;
+    int fragdbgDraw = -1;
+    if (const char* draw = getenv("ZELDA3D_SG_FRAGDBG_DRAW")) {
+        fragdbgDraw = atoi(draw);
+        if (fragdbgDraw < 0)
+            fragdbgDraw = -1;
+    }
     if (const char* dbg = getenv("ZELDA3D_SG_FRAGDBG")) {
         fragdbgMode = atoi(dbg);
         const int mode = fragdbgMode;
@@ -243,6 +250,15 @@ bool Fast::Zelda3DRenderer::ensureResources() {
             : mode == 15 ? "ivec2 sz=textureSize(uTex1,0); ivec2 p=clamp(ivec2(vUv1*vec2(sz)),ivec2(0),sz-1); "
                            "frag=vec4(texelFetch(uTex1,p,0).rgb,1.0); return;\n"
                          : "";
+        // With no selector the historical probe remains whole-frame. With a selector, only the
+        // selected draw takes the early-return tap; all other draws continue through their normal
+        // combiner while retaining depth, blending, and ordering context for that draw.
+        if (fragdbgDraw >= 0 && *inject) {
+            guardedProbe = "if (ubo.uDebug.x > 0.5) { gl_FragDepth = 0.0;\n";
+            guardedProbe += inject;
+            guardedProbe += "}\n";
+            inject = guardedProbe.c_str();
+        }
         // Mode 6 taps the combiner result before the CONSTANT/stage-scale/FOG stages — the direct
         // counterpart of the oracle's `PIXEL ... combined=` field. Mode 7 taps after the CONSTANT +
         // stage-scale stages, immediately BEFORE fog.
@@ -252,6 +268,15 @@ bool Fast::Zelda3DRenderer::ensureResources() {
             tapCombiner = "    frag = vec4(rgb, 1.0); return;\n";
         } else {
             tapCombiner = inject;
+        }
+        if (fragdbgDraw >= 0 && (mode == 6 || mode == 7)) {
+            guardedProbe = "if (ubo.uDebug.x > 0.5) { gl_FragDepth = 0.0;\n";
+            guardedProbe += mode == 7 ? tapPreFog : tapCombiner;
+            guardedProbe += "}\n";
+            if (mode == 7)
+                tapPreFog = guardedProbe.c_str();
+            else
+                tapCombiner = guardedProbe.c_str();
         }
     }
 
@@ -270,7 +295,10 @@ bool Fast::Zelda3DRenderer::ensureResources() {
         if (*want && fragSrc.find(want) == std::string::npos) {
             fprintf(stderr, "[Zelda3D_SG] FRAGDBG mode=%d: TAP DID NOT LAND — probe inert\n", fragdbgMode);
         } else {
-            fprintf(stderr, "[Zelda3D_SG] FRAGDBG mode=%d active\n", fragdbgMode);
+            if (fragdbgDraw >= 0)
+                fprintf(stderr, "[Zelda3D_SG] FRAGDBG mode=%d active draw=%d\n", fragdbgMode, fragdbgDraw);
+            else
+                fprintf(stderr, "[Zelda3D_SG] FRAGDBG mode=%d active\n", fragdbgMode);
         }
     }
 

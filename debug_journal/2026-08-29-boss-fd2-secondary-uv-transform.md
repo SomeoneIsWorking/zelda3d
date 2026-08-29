@@ -77,3 +77,23 @@ the oracle material-1 fragment at that coordinate reported `primary=(97,51,12)` 
 region averaged `(94.62,46.57,14.61)`; this is a different material/group and is directional evidence
 only. It does not justify a lighting or TEV change. The remaining body residual still requires a
 same-material, same-compositing capture before a renderer patch.
+
+## Selected fragment probe boundary (2026-08-29)
+
+The host renderer now accepts `ZELDA3D_SG_FRAGDBG_DRAW=<per-frame draw index>` alongside the existing
+`ZELDA3D_SG_FRAGDBG=<mode>`. The selected draw carries a renderer-only `uDebug` gate in the shared
+native/unified UBO; all other groups keep their normal shader path and the selected tap runs in the
+original draw order. For the diagnostic early return only, the probe writes front depth because
+Azahar's `PIXELXY` instrumentation is explicitly pre-depth-test. The shipping path remains unchanged
+when the variable is absent.
+
+The companion `ZELDA3D_SG_DRAWSKIP_AFTER=<n>` / `soh_drawskipafter <n>` control suppresses later groups
+while preserving earlier scene depth. A live Clang-built harness run mapped draw 39 to BossFd2
+model 2018 group 2/material 0 and, with `FRAGDBG=5`, `FRAGDBG_DRAW=39`, and `DRAWSKIP_AFTER=39`,
+returned the expected host body mask: crop `(360,180)-(440,460)` had 6,504 nonblack pixels with
+mean `(94.62,46.57,14.61)` and display point `(400,234)` was `(105,53,16)`. This validates the
+selected tap and the context-preserving cutoff. The corresponding draw-37 material-1 probe was
+submitted (`model=2018 group=0 material=1`) but produced zero host pixels even with front depth and
+`DRAWSKIP_AFTER=37`; the group has no rasterized coverage at this pose, so that result is not a
+material mismatch. The next comparison must use a pose/pixel where host material 1 rasterizes, or
+an equivalent oracle/host geometry boundary; no material or lighting change is justified yet.

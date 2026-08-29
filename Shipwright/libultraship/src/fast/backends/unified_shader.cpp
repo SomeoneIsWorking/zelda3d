@@ -50,7 +50,10 @@ bool CompileGlslToSpirv(EShLanguage stage, const std::string& src, std::vector<u
 
     const TBuiltInResource* resources = GetDefaultResources();
     const int defaultVersion = 450;
-    EShMessages messages = (EShMessages)(EShMsgSpvRules | EShMsgVulkanRules);
+    // glslang exposes EShMessages as a bit-mask enum; the combined flags are valid even though
+    // the combined value is not listed as a standalone enumerator.
+    // NOLINTNEXTLINE(clang-analyzer-optin.core.EnumCastOutOfRange)
+    EShMessages messages = static_cast<EShMessages>(EShMsgSpvRules | EShMsgVulkanRules);
 
     if (!shader.parse(resources, defaultVersion, false, messages)) {
         outLog = std::string("parse: ") + shader.getInfoLog() + "\n" + shader.getInfoDebugLog();
@@ -135,7 +138,8 @@ const char* kUnifiedShaderTemplate = R"PRISM(@prism(type='fragment', name='Unifi
     uvec4 uTevStages[6]; \
     uvec4 uTevConst[2]; \
     vec4 uTex2Xf; \
-    vec4 uTevCtl;
+    vec4 uTevCtl; \
+    vec4 uDebug;
 
 @if(VERTEX_SHADER)
     layout(location=0) in vec4 aPos;
