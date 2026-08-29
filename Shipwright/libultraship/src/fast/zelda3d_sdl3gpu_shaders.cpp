@@ -84,7 +84,8 @@ bool CompileGlsl(EShLanguage stage, const char* src, std::vector<uint32_t>& spv)
     "    uvec4 uTevStages[6];\n" \
     "    uvec4 uTevConst[2];\n"  \
     "    vec4 uTex2Xf;\n"        \
-    "    vec4 uTevCtl;\n"
+    "    vec4 uTevCtl;\n"        \
+    "    vec4 uDebug;\n"
 #define SG_UBO_BONES_BODY "    mat4 uBones[" SG_STR(ZELDA3D_GL_MAX_BONES) "];\n"
 
 // The varyings, declared ONCE. `{{ q }}` renders as `out` for the vertex stage and `in` for the

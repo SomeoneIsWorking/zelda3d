@@ -14,6 +14,7 @@
 #include <algorithm>
 #include <array>
 #include <cmath>
+#include <cstddef>
 #include <cstdio>
 #include <cstdlib>
 #include <cstring>
@@ -173,20 +174,24 @@ extern "C" int gZelda3dHlGroup;
 // needed to map the per-frame draw index. Indices are sequential in append order — the same order
 // that matters for translucency — so they are stable for a frozen camera and meaningless across a
 // moving one.
+// `sgdrawskipafter <n>` / ZELDA3D_SG_DRAWSKIP_AFTER=<n> keeps groups through n and suppresses later
+// groups, allowing a selected FRAGDBG draw to remain visible without removing prior scene depth.
 // DEFINED HERE, not in the game layer. These controls are read and written by this file, which lives in
 // libultraship -- shared by BOTH soh and mm. They used to be defined in soh/src/zelda3d/core/zelda3d.c,
 // so linking the mm target failed with "undefined reference to gZelda3dSgDrawList/Only": mm links the
 // same libultraship but has no soh globals to satisfy it. A diagnostic owned by the renderer belongs
 // to the renderer; the game layers now just extern-declare it for their REPLs.
-extern "C" int gZelda3dSgDrawOnly = -1;  // -1 = draw everything (default)
-extern "C" int gZelda3dSgDrawSkip = -1;  // -1 = skip nothing; otherwise suppress one group
-extern "C" int gZelda3dSgModelOnly = -1; // -1 = all models; otherwise stable model-id isolation
-extern "C" int gZelda3dSgDrawList = 0;   // 1 = dump this frame's group list, then self-clears
-static int g_sgDrawIdx = 0;              // groups appended so far this frame
+extern "C" int gZelda3dSgDrawOnly = -1;      // -1 = draw everything (default)
+extern "C" int gZelda3dSgDrawSkip = -1;      // -1 = skip nothing; otherwise suppress one group
+extern "C" int gZelda3dSgDrawSkipAfter = -1; // -1 = keep all groups; otherwise keep through this index
+extern "C" int gZelda3dSgModelOnly = -1;     // -1 = all models; otherwise stable model-id isolation
+extern "C" int gZelda3dSgDrawList = 0;       // 1 = dump this frame's group list, then self-clears
+static int g_sgDrawIdx = 0;                  // groups appended so far this frame
 
 extern "C" int Zelda3D_SgDrawIsolationIncludes(int modelId, int drawIndex) {
     return (gZelda3dSgModelOnly < 0 || modelId == gZelda3dSgModelOnly) &&
-           (gZelda3dSgDrawOnly < 0 || drawIndex == gZelda3dSgDrawOnly) && drawIndex != gZelda3dSgDrawSkip;
+           (gZelda3dSgDrawOnly < 0 || drawIndex == gZelda3dSgDrawOnly) && drawIndex != gZelda3dSgDrawSkip &&
+           (gZelda3dSgDrawSkipAfter < 0 || drawIndex <= gZelda3dSgDrawSkipAfter);
 }
 // strength/bias the same way the Vulkan path does.
 
@@ -321,6 +326,8 @@ void Fast::Zelda3DRenderer::BeginPass() {
         if (const char* v = getenv("ZELDA3D_SG_DRAWSKIP")) {
             gZelda3dSgDrawSkip = atoi(v);
         }
+        if (const char* v = getenv("ZELDA3D_SG_DRAWSKIP_AFTER"))
+            gZelda3dSgDrawSkipAfter = atoi(v);
         if (const char* v = getenv("ZELDA3D_SG_MODELONLY"))
             gZelda3dSgModelOnly = atoi(v);
         if (const char* v = getenv("ZELDA3D_SG_DRAWLIST"))
@@ -1011,7 +1018,18 @@ void Fast::Zelda3DRenderer::DrawModel(int modelId, const float* mp16, const floa
         if (!Zelda3D_SgDrawIsolationIncludes(modelId, drawIdx)) {
             continue; // draw-isolation probe: suppress groups excluded by the active controls
         }
-        api->AppendZelda3DModelDraw(g.pipeline, vbo, g.first, g.count, g.ubo.data(), g.tex, g.samp,
+        std::array<uint8_t, sizeof(SgUbo)> drawUbo = g.ubo;
+        // FRAGDBG_DRAW is a probe-only per-draw gate. The selected group still renders in its
+        // authored order with neighboring draws present, so its TEV tap sees normal depth/blend
+        // context. uDebug is zero in the normal path.
+        int fragdbgDraw = -1;
+        if (const char* selected = std::getenv("ZELDA3D_SG_FRAGDBG_DRAW"))
+            fragdbgDraw = std::atoi(selected);
+        if (fragdbgDraw >= 0) {
+            const float selected = drawIdx == fragdbgDraw ? 1.0f : 0.0f;
+            std::memcpy(drawUbo.data() + offsetof(SgUbo, uDebug), &selected, sizeof(selected));
+        }
+        api->AppendZelda3DModelDraw(g.pipeline, vbo, g.first, g.count, drawUbo.data(), g.tex, g.samp,
                                     g.tex2 ? g.tex2 : dummyTex, g.samp2 ? g.samp2 : dummySamp, g.tex1, g.samp1, vp, sc,
                                     g.hasBlendConst, g.blendConst);
     }
@@ -1030,6 +1048,10 @@ void Fast::Zelda3DRenderer::EndPass() {
     if (gZelda3dSgDrawSkip >= 0 && g_sgDrawIdx > 0 && gZelda3dSgDrawSkip >= g_sgDrawIdx) {
         fprintf(stderr, "[Zelda3D_SG] DRAWSKIP=%d but this frame appended only %d group(s) — probe inert\n",
                 gZelda3dSgDrawSkip, g_sgDrawIdx);
+    }
+    if (gZelda3dSgDrawSkipAfter >= 0 && g_sgDrawIdx > 0 && gZelda3dSgDrawSkipAfter >= g_sgDrawIdx) {
+        fprintf(stderr, "[Zelda3D_SG] DRAWSKIP_AFTER=%d but this frame appended only %d group(s) — control kept all\n",
+                gZelda3dSgDrawSkipAfter, g_sgDrawIdx);
     }
     // One-shot, but only once it has something to SHOW: the first frames after launch append zero
     // groups (the scene has not loaded), and an arm-at-launch that self-cleared on one of those

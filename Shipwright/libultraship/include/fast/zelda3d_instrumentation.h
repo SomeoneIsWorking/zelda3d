@@ -10,6 +10,7 @@ extern int gZelda3dTraceModelId;
 extern int gZelda3dStateCheck;
 extern int gZelda3dSgDrawOnly;
 extern int gZelda3dSgDrawSkip;
+extern int gZelda3dSgDrawSkipAfter;
 extern int gZelda3dSgModelOnly;
 extern int gZelda3dSgDrawList;
 extern int g_sgDumpModel;

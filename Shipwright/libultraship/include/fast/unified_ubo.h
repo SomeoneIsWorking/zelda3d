@@ -55,6 +55,7 @@ struct CommonUbo {
     uint32_t uTevConst[8];
     float uTex2Xf[4];
     float uTevCtl[4];
+    float uDebug[4]; // Mirror of SgUbo::uDebug; renderer-only selected-fragment probe gate.
 };
 
 // Adapt the native CMB light-bank payload into the unified layout without re-deriving its actor /

@@ -111,6 +111,24 @@ bool HandleCommand(const std::string& cmd, std::istringstream& toks) {
                 std::printf("ok soh_drawskip %d\n", gZelda3dSgDrawSkip);
             }
         }
+    } else if (cmd == "soh_drawskipafter") {
+        handled = true;
+        // Keep groups through n and suppress later groups. This preserves prior scene depth while
+        // making a selected renderer-probe draw survive later same-model overdraw.
+        std::string arg;
+        toks >> arg;
+        if (arg == "off" || arg.empty()) {
+            gZelda3dSgDrawSkipAfter = -1;
+            std::printf("ok soh_drawskipafter off\n");
+        } else {
+            auto n = ParseNum(arg);
+            if (!n) {
+                PrintErr("soh_drawskipafter: bad n");
+            } else {
+                gZelda3dSgDrawSkipAfter = static_cast<int>(*n);
+                std::printf("ok soh_drawskipafter %d\n", gZelda3dSgDrawSkipAfter);
+            }
+        }
     } else if (cmd == "soh_depthdump") {
         handled = true;
         // Dump SoH fb0's DEPTH buffer (auto-contrast grayscale PPM) for the CURRENT scene, to

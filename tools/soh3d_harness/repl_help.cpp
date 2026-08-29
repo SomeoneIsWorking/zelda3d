@@ -41,6 +41,7 @@ void PrintHelp() {
                          "  soh_drawlist         list native group/material ids on next host frame\n"
                          "  soh_sgdump <model>   dump native material/TEV state for one model\n"
                          "  soh_drawskip <n>|off suppress native Zelda3D group #n\n"
+                         "  soh_drawskipafter <n>|off keep native groups through n\n"
                          "  sweep <sub>          automated multi-step parity driver;\n"
                          "                       `sweep list` shows subs (title, ...)\n"
                          "  texpack              hi-res texture-pack state + hit counters for\n"

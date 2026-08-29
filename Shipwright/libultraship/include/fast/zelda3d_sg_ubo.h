@@ -119,6 +119,10 @@ struct SgUbo {
     uint32_t uTevConst[8];
     float uTex2Xf[4];
     float uTevCtl[4];
+    // Renderer-only probe state. uDebug.x is 1 for the selected draw when
+    // ZELDA3D_SG_FRAGDBG_DRAW is active, otherwise 0. It lets a fragment tap
+    // retain the normal render-pass context around the selected draw.
+    float uDebug[4];
     float uBones[ZELDA3D_GL_MAX_BONES * 16]; // MUST stay last: pushed as its own <=4096 B block
 };
 
