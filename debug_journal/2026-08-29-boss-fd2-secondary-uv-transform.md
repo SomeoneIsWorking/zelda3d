@@ -49,3 +49,14 @@ oracle `dir1=(0,-0.8891,-0.4577)` transforms to `(-0.3274,-0.9449,0)`, matching 
 original `uLightDir2` and `uLightDir` values. The temporary negation experiment was therefore
 removed. The light-bank binding remains ruled out for this residual; the remaining comparison
 must target material/TEV or another renderer mechanism after both clocks are synchronized.
+
+## Actor-local clock caveat
+
+A one-shot `SG_DUMP` audit captured host material 1 with `uvOv=(2.266667,0)` and effective
+`uTex1Xf=(0.5,1,4.533333,0)`. The same run's oracle log contained a material-1 matrix translation
+of `-0.5666667`, but that is not a valid transform mismatch: the setup script advances SoH with
+`soh_step` independently of the oracle's `run` cursor, so the two records are different authored
+material frames. The only frame-matched transform check remains the earlier authored-frame-14
+capture: CMAB U `0.4666667` produced oracle matrix translation `-0.4666667`, and the host's
+pre-scale representation (`0.4666667 / 0.5`) emits the same matrix translation. Do not use an
+unsynchronized SG/oracle pair to alter the generic UV conversion.
