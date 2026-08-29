@@ -60,3 +60,20 @@ material frames. The only frame-matched transform check remains the earlier auth
 capture: CMAB U `0.4666667` produced oracle matrix translation `-0.4666667`, and the host's
 pre-scale representation (`0.4666667 / 0.5`) emits the same matrix translation. Do not use an
 unsynchronized SG/oracle pair to alter the generic UV conversion.
+
+## Draw-isolation and primary probe audit
+
+The body-group probe was narrowed to the mapped host draw indices from the native group
+discriminator. `ZELDA3D_SG_DRAWONLY=37` (material 1) produced no model pixels when the surrounding
+depth/compositing draws were removed; this is an invalid material comparison, not evidence that the
+group is absent. The same exact-frame probe with `ZELDA3D_SG_DRAWONLY=39` (material 0) produced the
+expected body surface, so the isolation control is live but cannot replace the full compositing
+context for every group.
+
+The stable oracle selector is `SOH3D_PIXEL_XY=240,195`; `SOH3D_PIXEL_TEX` values from prior runs are
+not reusable because the logged texture addresses are process-local. At the synchronized checkpoint,
+the oracle material-1 fragment at that coordinate reported `primary=(97,51,12)` and
+`combined=(255,86,22)`. The host material-0 primary-only isolation over the same displayed body
+region averaged `(94.62,46.57,14.61)`; this is a different material/group and is directional evidence
+only. It does not justify a lighting or TEV change. The remaining body residual still requires a
+same-material, same-compositing capture before a renderer patch.
