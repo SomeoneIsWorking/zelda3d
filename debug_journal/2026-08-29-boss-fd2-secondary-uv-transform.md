@@ -27,30 +27,25 @@ Evidence sources: `oot3d-decomp/docs/boss_fd2.md`, the paired oracle `vsuni_log`
 
 ## Live post-port check
 
-On 2026-08-29, the deterministic BossFd2 setup was rerun with the software oracle path after
-rebuilding the shipping renderer. The host reported `body=loaded ... UV sampled 3/3 materials` for
-the live body controller. The paired output is `scratch/screenshots/fd2_oracle_base_fixed2.{az,soh}.ppm`
-with per-group suppression captures `fd2_oracle_skip29_fixed2` through `skip38_fixed2`.
+The first 2026-08-29 post-port capture was not valid evidence for a colour residual: the oracle and
+host clocks were different (`az_daytime=0xf483`, `soh_env daytime=0x2c45`). Its crop means and RMSE
+are therefore retired rather than used to drive a renderer change. The live host diagnostic did
+confirm `body=loaded ... UV sampled 3/3 materials`, and the paired skip captures remain useful for
+the draw-discriminator work.
 
-The fixed actor crop `(x=360..440, y=180..460)` contains the same centered body in both engines.
-Its non-black means are oracle `(142.3,65.8,14.4)` and host `(110.5,39.4,3.5)`; crop RMSE is
-`38.646744` over 22,400 pixels. This is evidence that the new UV override is live and that the
-remaining body darkness is not closed by it. It is not a parity claim: the next BossFd2 material
-change still needs a named renderer or decomp mechanism and a new matched capture.
+A synchronized rerun forced `0x6000` on both engines and reported the same camera basis. A bounded
+pre-fog TEV probe on the fixed crop `(x=360..440, y=180..460)` measured oracle `(57.7,26.2,5.7)`
+and host `(54.8,17.8,4.4)`. This is a diagnostic comparison, not a parity claim: the probe exits
+before the final fog path and the crop includes geometry that is not yet proven identical. The
+remaining material residual still needs a named renderer or decomp mechanism before any further
+change.
 
-## Actor light-bank correction
+## Actor light-bank audit
 
-The next renderer probe found a separate binding defect. The live oracle body records bind the
-orange `light2Color` to one directional slot and the warm `light1Color` to the other; the two
-directions are the actor bank's opposed pair. The host's final `SG_DUMP` UBO before this change
-paired the warm diffuse product with the live primary direction `(-0.3274,-0.9449,0)` but left the
-orange diffuse product on the static scene `light2Dir=(0,1,0)`. That static scene direction is not
-the actor bank's second direction.
-
-The native pass now applies the actor bank's second direction as the exact negation of the live
-primary direction for lit CMB materials with non-zero material diffuse colour. Scene materials
-have zero diffuse colour, and the title wordmark light-direction override remains on its own path.
-The post-change UBO dump reports `dir1=(-0.3274,-0.9449,0)` and `dir2=(0.3274,0.9449,0)` for all
-six diffuse BossFd2 groups. This is a mechanism-level correction; the normal final-material
-capture still measures a residual (`oracle 139.2/61.0/14.5` vs host `108.2/37.3/2.8` over the
-non-black actor crop), so BossFd2 remains open for the next grounded material discriminator.
+The synchronized 2026-08-29 checkpoint falsified the apparent native light-bank mismatch. The
+oracle's BossFd2 registers are view-space, while the host UBO dump reports world-space directions.
+At the matched forced camera, oracle `dir0=(0,0.98995,0.14142)` transforms to world `(0,1,0)` and
+oracle `dir1=(0,-0.8891,-0.4577)` transforms to `(-0.3274,-0.9449,0)`, matching the host's
+original `uLightDir2` and `uLightDir` values. The temporary negation experiment was therefore
+removed. The light-bank binding remains ruled out for this residual; the remaining comparison
+must target material/TEV or another renderer mechanism after both clocks are synchronized.
