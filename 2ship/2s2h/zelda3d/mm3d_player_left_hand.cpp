@@ -170,7 +170,13 @@ bool StateForPlayer(Player& player, int swordEquipValue, PlayerLeftHandState& st
     state.swimming = (player.stateFlags1 & PLAYER_STATE1_8000000) != 0;
     state.carryingActor = (player.stateFlags1 & PLAYER_STATE1_CARRYING_ACTOR) != 0;
     state.zoraBoomerangThrown = (player.stateFlags1 & PLAYER_STATE1_ZORA_BOOMERANG_THROWN) != 0;
-    state.modelForcesOpenHand = false;
+    // One exact producer of MM3D Player+0x129bc bit 16 is En_Boom: both update paths set it while
+    // a Zora boomerang actor is live, and destruction clears it while setting
+    // PLAYER_STATE3_ZORA_BOOMERANG_CAUGHT. The N64 engine owns that lifetime through
+    // zoraBoomerangActor. Check the actor identity because Deku flight reuses that pointer for a
+    // nut projectile. The separate mount-transition producer remains inactive until its typed
+    // host predicate is grounded.
+    state.modelForcesOpenHand = player.zoraBoomerangActor != nullptr && player.zoraBoomerangActor->id == ACTOR_EN_BOOM;
     state.giantMask = player.currentMask == PLAYER_MASK_GIANT;
     state.carryUpperAction = player.upperActionFunc == Player_UpperAction_CarryActor;
     state.bremenMarchAction = player.actionFunc == Player_Action_11;

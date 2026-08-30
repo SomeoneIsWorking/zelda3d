@@ -214,7 +214,7 @@ class MmPlayerContractTests(unittest.TestCase):
             MM / "mm3d_animation_playhead.h",
             MM / "mm3d_player_animation_policy.cpp",
             MM / "mm3d_player_animation_policy.h",
-            MM / "repl" / "mm3d_link_repl.c",
+            MM / "repl" / "mm3d_link_repl.cpp",
             MM / "repl" / "mm3d_link_repl.h",
             PLAYER_OVERLAY / "z_player_overlay.h",
         )

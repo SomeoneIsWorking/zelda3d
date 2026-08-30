@@ -49,7 +49,7 @@ not a parallel oracle.
 New control behavior lives in focused `2ship/2s2h/zelda3d/mm3d_player_force.c`; the 22,000-line
 Player overlay does not grow. Under `zelda3d/repl/`, `mm3d_repl.*` composes focused transport,
 framing, lifecycle, command parsing/routing, world, scene, model, and Link owners;
-`mm3d_link_repl.{c,h}` owns Link command parsing/readout, and `tools/mm_control.py` owns CLI
+`mm3d_link_repl.{cpp,h}` owns Link command parsing/readout, and `tools/mm_control.py` owns CLI
 shorthands. The CLI-only phase-tour entry point delegates session/process ownership, artifact
 layout, orchestration, scene catalog, and report parsing to focused Python modules; the old
 `mm_runtime.py` facade is deleted and its offline falsifier suite passes.

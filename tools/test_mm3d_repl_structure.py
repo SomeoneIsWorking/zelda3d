@@ -42,7 +42,7 @@ class MmReplStructureTests(unittest.TestCase):
             "warp",
         }
         matches: list[str] = []
-        for source in REPL.glob("*.c"):
+        for source in sorted(path for path in REPL.iterdir() if path.suffix in {".c", ".cpp"}):
             matches.extend(
                 re.findall(
                     r'Zelda3D_MmReplMatch\(command, "([a-z]+)"', source.read_text()
@@ -102,7 +102,7 @@ class MmReplStructureTests(unittest.TestCase):
         self.assertIn("sCameraActive = 0;", framing_reset.group("body"))
 
     def test_all_repl_sources_are_below_structure_limit(self) -> None:
-        for source in REPL.glob("*.[ch]"):
+        for source in sorted(path for path in REPL.iterdir() if path.suffix in {".c", ".cpp", ".h", ".hpp"}):
             self.assertLessEqual(len(source.read_text().splitlines()), 1200, source)
 
     def test_production_command_parser_contract(self) -> None:
