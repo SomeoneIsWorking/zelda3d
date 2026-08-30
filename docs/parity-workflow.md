@@ -125,6 +125,10 @@ again for a frame already captured in a prior session.
   construction, so a cached vanilla “3D” logo cannot be compared to a host 4K replacement. Use its
   `--unified-renderer` selector when auditing the optional unified CMB route; never infer the route
   from a screenshot.
+- **`title_oracle_probe.py` caches exact-cursor draw evidence**: `uniforms <cs>` stores the complete
+  software-renderer draw/uniform log and `fragments <cs> <draw>` stores the selected fragment stream
+  plus its summary. Artifact identity includes capture version, cursor, oracle frame, renderer, and
+  draw. Both commands return before spawning on a cache hit; analyze the stored artifact thereafter.
 - **Invalidate** only to reclaim space. Savestate, ROM, patch-contract, texture-pack mode, and
   texture-pack manifest changes rotate the key automatically, so stale contexts sit unused
   rather than serving wrong data.

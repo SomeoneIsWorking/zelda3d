@@ -19,33 +19,22 @@ from PIL import Image
 REPO = Path(__file__).resolve().parent.parent
 sys.path.insert(0, str(REPO / "tools"))
 
-from harness_cache import OracleCache  # noqa: E402
-from harness_process import spawn  # noqa: E402
-from repo_environment import apply_repo_environment  # noqa: E402
-from title_ab import compose_sxs, content_score, ppm_to_png  # noqa: E402
+from harness_cache import OracleCache
+from harness_process import spawn
+from repo_environment import apply_repo_environment
+from title_ab import compose_sxs, content_score, ppm_to_png
+from title_oracle_context import (
+    SAVESTATE,
+    configure_vanilla_title_context,
+    oracle_frame_for_title_cs,
+)
 
-SAVESTATE = REPO / "scratch" / "title_settled.state"
 OUTDIR = REPO / "scratch" / "title_host_capture"
-
-# RE'd and measured in title_ab.py / debug_journal/2026-07-09-title-cs-phase-sync.md:
-# the settled oracle state starts at title cs=88 and advances one cs unit per
-# two oracle retro_run calls. This maps a title cursor to a cached oracle frame;
-# it is deliberately independent of SoH's pre-title boot duration.
-ORACLE_INITIAL_TITLE_CS = 88
-ORACLE_STEPS_PER_TITLE_CS = 2
 
 # The host title presentation becomes live at step 232. A small deterministic
 # margin establishes the title actor before the direct cursor write.
 SOH_TITLE_BOOT_STEPS = 240
 TITLE_CS_RE = re.compile(r"^ok soh_titlecs frame=(-?\d+) end=(-?\d+)$")
-
-
-def oracle_frame_for_title_cs(title_cs: int) -> int:
-    if title_cs < ORACLE_INITIAL_TITLE_CS:
-        raise ValueError(
-            f"title cs {title_cs} predates cached state cs={ORACLE_INITIAL_TITLE_CS}"
-        )
-    return (title_cs - ORACLE_INITIAL_TITLE_CS) * ORACLE_STEPS_PER_TITLE_CS
 
 
 def read_host_title_cs(harness) -> int:
@@ -119,6 +108,21 @@ def capture_host_frame(harness, title_cs: int, base: Path) -> Path:
     return ppm_to_png(str(base) + ".soh.ppm")
 
 
+def arm_host_draw_list(harness, title_cs: int) -> None:
+    response = harness.send("soh_drawlist")
+    if response != "ok soh_drawlist armed":
+        raise RuntimeError(f"host draw-list arm failed: {response}")
+    # advance_host_title stops on the first tick carrying title_cs. The cursor
+    # is half-rate, so the next tick remains on that exact script cursor while
+    # causing the renderer to publish the requested per-group identity list.
+    step_host(harness, 1)
+    observed = read_host_title_cs(harness)
+    if observed != title_cs:
+        raise RuntimeError(
+            f"host draw-list tick changed title cursor: requested={title_cs}, observed={observed}"
+        )
+
+
 def wordmark_metrics(oracle_path: Path, host_path: Path) -> dict[str, float | int]:
     """Measure the title wordmark box with one explicit gold-pixel predicate."""
     oracle = np.asarray(Image.open(oracle_path).convert("RGB"), dtype=np.float64)
@@ -168,12 +172,12 @@ def require_cached_oracle_frames(
     return resolved
 
 
-def run(title_frames: list[int], name: str, unified_renderer: int) -> None:
+def run(title_frames: list[int], name: str, unified_renderer: int, draw_list: bool) -> None:
     apply_repo_environment(REPO, os.environ)
     # The historical title anchors being consumed here are vanilla ROM frames.
     # Set this before OracleCache construction so both cache identity and host
     # runtime describe the same texture inputs.
-    os.environ["ZELDA3D_HARNESS_TEXPACK"] = "off"
+    configure_vanilla_title_context(os.environ)
     cache = OracleCache(SAVESTATE)
     ordered_frames = sorted(set(title_frames))
     cached = require_cached_oracle_frames(cache, ordered_frames)
@@ -195,6 +199,8 @@ def run(title_frames: list[int], name: str, unified_renderer: int) -> None:
         for title_cs in ordered_frames:
             oracle_frame, oracle_path = cached[title_cs]
             current_cs = advance_host_title(harness, current_cs, title_cs)
+            if draw_list:
+                arm_host_draw_list(harness, title_cs)
             base = OUTDIR / f"{name}_cs{title_cs}"
             host_path = capture_host_frame(harness, title_cs, base)
             oracle_output = Path(str(base) + ".az.png")
@@ -230,9 +236,14 @@ def main(argv: list[str]) -> int:
         default=1,
         help="host unified-renderer bitmask (default: 1, CMB unified)",
     )
+    parser.add_argument(
+        "--draw-list",
+        action="store_true",
+        help="publish the exact-cursor host group/material identity list",
+    )
     args = parser.parse_args(argv)
     try:
-        run(args.title_cs, args.name, args.unified_renderer)
+        run(args.title_cs, args.name, args.unified_renderer, args.draw_list)
     except (RuntimeError, ValueError) as error:
         print(f"title_host_capture: {error}", file=sys.stderr)
         return 1

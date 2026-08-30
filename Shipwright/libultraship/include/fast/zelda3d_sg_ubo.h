@@ -51,7 +51,8 @@ struct SgUbo {
     // light diffuse=WHITE {1,1,1,1} — byte-exact from code.bin pool 0x004d9924 AND read back from
     // the oracle's live c81/c82 vertex uniforms at the wordmark draw, 2026-07-10). .x = the light
     // AMBIENT coefficient (0 = no override; 0.18 when a draw sets a light-dir override — doubles
-    // as the gate); .y/.z used by the dual-texture path; .w reserved. The shader does
+    // as the gate); .y/.z used by the dual-texture path; .w carries coordinator-0's mapping
+    // method. The shader does
     //   shade *= clamp(uSheen.x + max(0, dot(N, -L)), 0, 1)
     // i.e. the faithful  matAmb*lightAmb + max(0,N·(-L))*matDif*lightDif  with both material
     // colors white, matching PICA's dp3 against the NEGATED c80 light dir. (A previous port used
@@ -61,12 +62,16 @@ struct SgUbo {
     // (oot3d-decomp title_env_lighting.md §10 disassembly — uniform table has only
     // dir/diffuse/ambient per light), so there is nothing to port for this draw class.
     float uSheen[4];
+    // Coordinator-0 scale/translation for the primary sampler. This is live when mapping method
+    // 3 selects CameraSphereEnvMap (title_logo_us mats 10/11); ordinary UV materials retain the
+    // established aUv + per-draw offset path.
+    float uTex0Xf[4];
     // Dual-texture stage 0 (PICA ADD_MULT detail mask, g_title.cmb fire-glow —
     // oot3d-decomp/docs/title_logo_fireglow_cmab.md §3.1): coordinator-1 UV transform for the
     // second sampler (uTex1). .xy = coordinator scale (S,T), .zw = coordinator translate (S,T)
     // PLUS any per-draw CMAB UV-scroll routed to coordinator 1. The shader computes
     // uv1 = scale * (uv - trans) (noclip calcTexMtx, rot=0) and samples uTex1 with it.
-    // The dual-tex ENABLE flag rides uSheen.y (uSheen.z/.w still reserved); when off, uTex1Xf
+    // The dual-tex ENABLE flag rides uSheen.y (uSheen.z is its scale); when off, uTex1Xf
     // is dead data and uTex1 is bound to the dummy texture.
     float uTex1Xf[4];
     // OoT3D PICA distance fog (title port — oot3d-decomp docs/title_env_lighting.md §13, the

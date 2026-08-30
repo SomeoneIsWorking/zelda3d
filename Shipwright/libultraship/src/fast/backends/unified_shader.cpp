@@ -126,6 +126,7 @@ const char* kUnifiedShaderTemplate = R"PRISM(@prism(type='fragment', name='Unifi
     vec4 uMatDiffuse; \
     vec4 uMatConst; \
     vec4 uSheen; \
+    vec4 uTex0Xf; \
     vec4 uTex1Xf; \
     vec4 uFog3d0; \
     vec4 uFog3d1; \
@@ -191,11 +192,18 @@ const char* kUnifiedShaderTemplate = R"PRISM(@prism(type='fragment', name='Unifi
         gl_Position = (ubo.uParams1.w > 0.5) ? aPos : (ubo.uMvp * vec4(sp, 1.0));
         vNrmView = mat3(ubo.uMv) * nM;
         @if(o_cmbExtraTex)
-            vUv0 = vec2(aUv0.x, 1.0 - aUv0.y);
             vec3 ns = (ubo.uSphRot0.w > 0.5)
                 ? vec3(dot(ubo.uSphRot0.xyz, nM), dot(ubo.uSphRot1.xyz, nM), dot(ubo.uSphRot2.xyz, nM))
                 : (mat3(ubo.uMv) * nM);
-            if (ubo.uSheen.w > 2.5) {
+            if (ubo.uSheen.w > 2.5 && ubo.uSheen.w < 3.5) {
+                vec3 nv0 = normalize(ns);
+                vec2 suv0 = vec2((nv0.x * 0.5 + 0.5 - ubo.uTex0Xf.z) * ubo.uTex0Xf.x,
+                                 (nv0.y * 0.5 + 0.5 - ubo.uTex0Xf.w) * ubo.uTex0Xf.y);
+                vUv0 = vec2(suv0.x, 1.0 - suv0.y);
+            } else {
+                vUv0 = vec2(aUv0.x, 1.0 - aUv0.y);
+            }
+            if (ubo.uTevCtl.y > 2.5 && ubo.uTevCtl.y < 3.5) {
                 vec3 nv = normalize(ns);
                 vec2 suv = vec2((nv.x * 0.5 + 0.5 - ubo.uTex1Xf.z) * ubo.uTex1Xf.x,
                                 (nv.y * 0.5 + 0.5 - ubo.uTex1Xf.w) * ubo.uTex1Xf.y);
@@ -376,13 +384,7 @@ const char* kUnifiedShaderTemplate = R"PRISM(@prism(type='fragment', name='Unifi
             vec4 t0 = texel0();
             vec3 t1 = texel1().rgb;
             vec3 dualRgb;
-            if (ubo.uSheen.y > 3.5) {
-                // Runtime title-logo override: tex1 aliases tex0 and both use coordinator-0's
-                // sphere coordinate. Oracle TEV: 2*(PRIMARY*TEX0) then
-                // MULT_ADD(PRIMARY,TEX1,PREVIOUS) = PRIMARY*(2*TEX0+TEX1).
-                vec3 t0s = texture(uTex0, clamp(vUv1, 0.5 / vec2(textureSize(uTex0, 0)), vTexClamp.xy)).rgb;
-                dualRgb = clamp(t0s * ubo.uSheen.z + t1, 0.0, 1.0);
-            } else if (ubo.uSheen.y > 2.5) {
+            if (ubo.uSheen.y > 2.5) {
                 dualRgb = clamp(t0.rgb * t1 * ubo.uSheen.z, 0.0, 1.0);
             } else if (ubo.uSheen.y > 1.5) {
                 dualRgb = clamp(t0.rgb + t1, 0.0, 1.0);

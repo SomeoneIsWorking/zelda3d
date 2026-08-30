@@ -72,6 +72,7 @@ bool CompileGlsl(EShLanguage stage, const char* src, std::vector<uint32_t>& spv)
     "    vec4 uAmbient;\n"       \
     "    vec4 uMatConst;\n"      \
     "    vec4 uSheen;\n"         \
+    "    vec4 uTex0Xf;\n"        \
     "    vec4 uTex1Xf;\n"        \
     "    vec4 uFog3d0;\n"        \
     "    vec4 uFog3d1;\n"        \
@@ -174,13 +175,6 @@ void main() {
         vPrim = min(abs(aColor), vec4(1.0));
     }
     vWorld = (ubo.uMV * vec4(sp, 1.0)).xyz;
-    vUv = vec2(aUv.x + ubo.uExtra.y, 1.0 - aUv.y + ubo.uExtra.z);
-    // Coordinator-1 UV for the dual-texture detail mask. uSheen.w carries the coordinator-1
-    // mapping method (noclip TextureCoordinatorMappingMethod): 1=UvCoordinateMap (scale*(uv-trans)),
-    // 3=CameraSphereEnvMap (normal-derived UV: reflect the view vector about the normal, map to
-    // [0,1]²). The wordmark's decorations (mat4-9) use sphere mapping — for the flat (0,0,1) normals
-    // this samples the texture's center, which is bright, not a per-vertex UV location (which was
-    // dim, making the multiply combiner produce near-black output). uTex1Xf: .xy=scale, .zw=trans.
     // Sphere-map normal space: view space. For scene draws mat3(uMV) approximates it; for the
     // title 2D ortho-overlay pass uMV is a fixed screen placement carrying NO camera at all, so
     // the caller supplies the live camera's view-rotation rows in uSphRot0..2 (uSphRot0.w = gate)
@@ -189,13 +183,26 @@ void main() {
     vec3 ns = (ubo.uSphRot0.w > 0.5)
         ? vec3(dot(ubo.uSphRot0.xyz, nM), dot(ubo.uSphRot1.xyz, nM), dot(ubo.uSphRot2.xyz, nM))
         : (mat3(ubo.uMV) * nM);
-    if (ubo.uSheen.w > 2.5) {
+    // Coordinator 0 is independent of TEX1. Wordmark mats 10/11 use CameraSphereEnvMap on TEX0
+    // while leaving texture unit 1 disabled; treating that mapping as a dual-texture signal was
+    // the old synthetic mode-4 bug.
+    if (ubo.uSheen.w > 2.5 && ubo.uSheen.w < 3.5) {
+        vec3 nv0 = normalize(ns);
+        vec2 suv0 = vec2((nv0.x * 0.5 + 0.5 - ubo.uTex0Xf.z) * ubo.uTex0Xf.x,
+                         (nv0.y * 0.5 + 0.5 - ubo.uTex0Xf.w) * ubo.uTex0Xf.y);
+        vUv = vec2(suv0.x, 1.0 - suv0.y);
+    } else {
+        vUv = vec2(aUv.x + ubo.uExtra.y, 1.0 - aUv.y + ubo.uExtra.z);
+    }
+    // Coordinator-1 UV for the second texture. uTevCtl.y carries its mapping method;
+    // uTex1Xf carries scale/translation.
+    if (ubo.uTevCtl.y > 2.5 && ubo.uTevCtl.y < 3.5) {
     // Same texture-space y-flip as the UV-coordinate path below (SoH uploads textures y-flipped
     // relative to PICA texture space, which is why the UvCoordinateMap branch samples 1-uv1.y);
     // the sphere-mapped UV must flip identically or it mirrors the sampled gradient vertically.
     // The coordinator's own scale/trans applies to the sphere-mapped UV too (noclip render.ts
     // CalcTextureCoordRaw: the sphere src is still multiplied by the coordinator texture matrix
-    // before the final flip) — identity for every wordmark decoration except mat4 (scaleT=2).
+    // before the final flip).
         vec3 nv = normalize(ns);
         vec2 suv = vec2((nv.x * 0.5 + 0.5 - ubo.uTex1Xf.z) * ubo.uTex1Xf.x,
                         (nv.y * 0.5 + 0.5 - ubo.uTex1Xf.w) * ubo.uTex1Xf.y);
@@ -278,12 +285,7 @@ void main() {
     // deferred-PRIMARY trick, this stage does scale2*t0*t1.
     if (ubo.uSheen.y > 1.5) {
         vec3 t1 = texture(uTex1, vUv1).rgb;
-        if (ubo.uSheen.y > 3.5) {
-    // Mode 4 (mat10/11 self-sphere-add): coordinator-0 is also sphere-mapped, so re-sample
-    // tex0 at the sphere UV. Result: 2*TEX0 + TEX1 = 3*TEX0 (tex1=tex0, same sphere UV).
-            vec3 t0s = texture(uTex, vUv1).rgb;
-            t.rgb = clamp(t0s * ubo.uSheen.z + t1, 0.0, 1.0);
-        } else if (ubo.uSheen.y > 2.5) {
+        if (ubo.uSheen.y > 2.5) {
             t.rgb = clamp(t.rgb * t1 * ubo.uSheen.z, 0.0, 1.0);
         } else {
             t.rgb = clamp(t.rgb + t1, 0.0, 1.0);
