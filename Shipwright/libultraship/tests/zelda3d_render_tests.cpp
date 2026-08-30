@@ -49,6 +49,17 @@ TEST(Zelda3DShaderTemplate, UnlitPrimarySelectsMatDiffuseOnlyWhenColorIsAbsent) 
     EXPECT_NE(vertexSource.find("vPrim = min(abs(ubo.uMatDiffuse), vec4(1.0))"), std::string::npos);
 }
 
+TEST(Zelda3DShaderTemplate, LitPrimaryPreservesDiffuseAlphaAndOptionalColorBranch) {
+    std::string vertexSource;
+    std::string fragmentSource;
+    std::string error;
+    ASSERT_TRUE(Fast::Zelda3DSdl3GpuShaders::BuildSources("", "", "", vertexSource, fragmentSource, error)) << error;
+    EXPECT_NE(vertexSource.find("float litAlpha = ubo.uLitDif1.a + ubo.uLitDif2.a"), std::string::npos);
+    EXPECT_NE(vertexSource.find("vec4 primary = vec4(lit, litAlpha)"), std::string::npos);
+    EXPECT_NE(vertexSource.find("if (ubo.uPrimaryCtl.x > 0.5) primary *= aColor"), std::string::npos);
+    EXPECT_EQ(vertexSource.find("vec4(lit * aColor.rgb, aColor.a)"), std::string::npos);
+}
+
 TEST(Zelda3DTev, UsesPicaAlphaSourceFieldLayout) {
     const std::string source = Fast::Zelda3DTev::kGenericFunctions;
     EXPECT_NE(source.find("(w.x >> 16) & 15u"), std::string::npos);
@@ -88,6 +99,8 @@ TEST(Zelda3DUnifiedShader, CmbPrimaryUsesTransformedNormalAndBothLightSlots) {
     EXPECT_NE(source.find("vec3 nV = normalize(vNrmView);"), std::string::npos);
     EXPECT_NE(source.find("ubo.uLitDif1.rgb * max(dot(nV, -ubo.uLightDir.xyz), 0.0)"), std::string::npos);
     EXPECT_NE(source.find("ubo.uLitDif2.rgb * max(dot(nV, -ubo.uLightDir2.xyz), 0.0)"), std::string::npos);
+    EXPECT_NE(source.find("float litAlpha = ubo.uLitDif1.a + ubo.uLitDif2.a"), std::string::npos);
+    EXPECT_NE(source.find("if (ubo.uPrimaryCtl.x > 0.5) primary *= aColor0"), std::string::npos);
     EXPECT_EQ(source.find("dot(normalize(nM), -normalize(ubo.uLightDir.xyz))"), std::string::npos);
 }
 

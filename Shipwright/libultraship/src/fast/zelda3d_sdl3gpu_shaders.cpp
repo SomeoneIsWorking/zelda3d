@@ -172,7 +172,12 @@ void main() {
         vec3 lit = ubo.uAmbient.xyz * ubo.uAmbient.w
                  + ubo.uLitDif1.rgb * max(dot(nV, -ubo.uLightDir.xyz), 0.0)
                  + ubo.uLitDif2.rgb * max(dot(nV, -ubo.uLightDir2.xyz), 0.0);
-        vPrim = min(abs(vec4(lit * aColor.rgb, aColor.a)), vec4(1.0));
+        // CmbVShader words 89--110 accumulate diffuse alpha once per enabled light, without
+        // NdotL, and multiply the completed RGBA value by aColor only when HasColor is set.
+        float litAlpha = ubo.uLitDif1.a + ubo.uLitDif2.a;
+        vec4 primary = vec4(lit, litAlpha);
+        if (ubo.uPrimaryCtl.x > 0.5) primary *= aColor;
+        vPrim = min(abs(primary), vec4(1.0));
     } else if (ubo.uPrimaryCtl.x > 0.5) {
         // CmbVShader HasColor=1 overwrites the unlit c8 MatDiffuseColor seed with aColor.
         vPrim = min(abs(aColor), vec4(1.0));
