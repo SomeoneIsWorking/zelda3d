@@ -705,11 +705,11 @@ void Fast::Zelda3DRenderer::DrawModel(int modelId, const float* mp16, const floa
         if (sgDumpThisDraw) {
             fprintf(stderr,
                     "[SG_DUMP]  g%d lighting amb=(%.4f,%.4f,%.4f)x%.1f dif1=(%.4f,%.4f,%.4f) "
-                    "dif2=(%.4f,%.4f,%.4f) dir1=(%.4f,%.4f,%.4f) dir2=(%.4f,%.4f,%.4f)\n",
+                    "dif2=(%.4f,%.4f,%.4f) dir1=(%.4f,%.4f,%.4f) dir2=(%.4f,%.4f,%.4f) privateAmb=%.3f\n",
                     gIdx, ubo.uAmbient[0], ubo.uAmbient[1], ubo.uAmbient[2], ubo.uAmbient[3], ubo.uLitDif1[0],
                     ubo.uLitDif1[1], ubo.uLitDif1[2], ubo.uLitDif2[0], ubo.uLitDif2[1], ubo.uLitDif2[2],
                     ubo.uLightDir[0], ubo.uLightDir[1], ubo.uLightDir[2], ubo.uLightDir2[0], ubo.uLightDir2[1],
-                    ubo.uLightDir2[2]);
+                    ubo.uLightDir2[2], ubo.uSheen[0]);
         }
         // PICA200 TEV CONSTANT modulate: for materials whose combiner sources CONSTANT in any
         // stage, publish the selected slot's RGB with .a = 1 so the shader applies it. Materials
@@ -923,8 +923,7 @@ void Fast::Zelda3DRenderer::DrawModel(int modelId, const float* mp16, const floa
                 0,
             };
             memcpy(uu.common.uCombA, kCombA, sizeof(uu.common.uCombA));
-            uu.common.uPrimColor[0] = uu.common.uPrimColor[1] = uu.common.uPrimColor[2] = uu.common.uPrimColor[3] =
-                1.0f;
+            Zelda3DUnified::PackCmbDrawModulation(uu.common, r8, g8, b8, a8, lit != 0);
             uu.common.uEnvColor[0] = uu.common.uEnvColor[1] = uu.common.uEnvColor[2] = uu.common.uEnvColor[3] = 0.0f;
             uu.common.uFogColor[0] = base.uFog[0];
             uu.common.uFogColor[1] = base.uFog[1];
@@ -936,7 +935,8 @@ void Fast::Zelda3DRenderer::DrawModel(int modelId, const float* mp16, const floa
             uu.common.uParams0[1] = (float)lightingMode;
             uu.common.uParams0[2] = 1.0f; // cycleCount — CMB never needs the N64 2-cycle shape
             uu.common.uParams0[3] = 0.0f; // frame_count — CMB draws don't use SHADER_NOISE
-            uu.common.uParams1[0] = 0.0f; // noise_scale — unused (no SHADER_NOISE on CMB content)
+            // uParams1.x carries the CMB draw-tint gate installed above; N64 noise scale occupies
+            // the same mutually exclusive field when alreadyTransformed is true.
             uu.common.uParams1[1] = grp.polygonOffset;
             uu.common.uParams1[2] = (boneData && boneCnt > 0) ? 1.0f : 0.0f;
             uu.common.uParams1[3] = 0.0f;

@@ -74,10 +74,10 @@ This doc **organizes and links to** the existing RE corpus rather than duplicati
 ### title.wordmark-decoration — mat10/11 wordmark decoration sphere-map
 - status: re-partial
 - deps: title.rider-dispatch
-- evidence: commits `efa336cd`, `400faa57`, `d8ccc2d5`; `debug_journal/2026-07-14-title-cs464-wordmark-and-composition-and-fireglow.md`, `2026-07-14-title-cs464-composition-exonerated-fireglow-remeasure.md`, `2026-07-14-wordmark-spheremap-view-rotation.md`
-- where: TEV override in the mat10/11 material path (game-side, per `400faa57`'s title)
-- gap: latest journal (`d8ccc2d5`) reports coverage at **96% of oracle** — a real, measured, NOT-YET-closed residual gap. Do not mark re-verified until 100%/explained residual.
-- notes: earlier misdiagnosis chain is instructive and should NOT be re-walked: alpha/blend was first suspected (`45b52baf` re-diagnosed it as letter-stroke coverage, a 9.7x gap) before landing on the TEV self-add fix.
+- evidence: commits `efa336cd`, `400faa57`, `d8ccc2d5`; `debug_journal/2026-07-14-{title-cs464-wordmark-and-composition-and-fireglow,title-cs464-composition-exonerated-fireglow-remeasure,wordmark-spheremap-view-rotation}.md`; `debug_journal/2026-08-30-title-unified-cmb-state-contract.md`
+- where: native CMB TEV override in the mat10/11 material path plus unified transport in `Shipwright/libultraship/src/fast/backends/unified_shader.cpp` and `zelda3d_sdl3gpu_{pipelines,pass}.cpp`
+- gap: latest closed-era journal (`d8ccc2d5`) reports coverage at **96% of oracle** — a real, measured, NOT-YET-closed residual gap. The unified owner now preserves the native sphere basis, private RE'd light, dual-texture classification, and post-TEV draw RGBA; cached cs464/cs1093 anchors prove the dropped-state regression is fixed. Broader unified rider/scene differences and selected-draw mat10/11 PRIMARY/UV evidence remain. Do not mark re-verified until 100%/explained residual.
+- notes: earlier misdiagnosis chain is instructive and should NOT be re-walked: alpha/blend was first suspected (`45b52baf` re-diagnosed it as letter-stroke coverage, a 9.7x gap) before landing on the TEV self-add fix. The 2026-08-30 alpha finding is narrower and proven: unified transport dropped the already-authored per-draw fade alpha; it is not a new blend-mode theory.
 
 ### title.terrain-grounding — title terrain/field-grass actor grounding
 - status: re-verified

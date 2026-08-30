@@ -1,6 +1,7 @@
 #include "render_debug_commands.h"
 
 #include <fast/zelda3d_instrumentation.h>
+#include <fast/zelda3d_render_control.h>
 
 #include <cstdint>
 
@@ -80,6 +81,17 @@ bool HandleCommand(const std::string& cmd, std::istringstream& toks) {
         // for a base or skip capture.
         gZelda3dSgDrawList = 1;
         std::printf("ok soh_drawlist armed\n");
+    } else if (cmd == "soh_unified") {
+        handled = true;
+        std::string value;
+        toks >> value;
+        const auto parsed = ParseNum(value);
+        if (!parsed || *parsed > 3) {
+            PrintErr("soh_unified: usage: soh_unified <0..3>");
+        } else {
+            gUnifiedRenderer = static_cast<int>(*parsed);
+            std::printf("ok soh_unified %d\n", gUnifiedRenderer);
+        }
     } else if (cmd == "soh_sgdump") {
         handled = true;
         std::string model;

@@ -119,6 +119,12 @@ again for a frame already captured in a prior session.
   <az>` stepping loop entirely and reuses the stored PNG for the oracle side; the SoH side
   is NEVER cached (it changes every build) and always runs live via `soh_step`. Reports
   "oracle: cache hit" or "oracle: live run (cached now)" so a caller can see which path ran.
+- **`title_host_capture.py` is cache-only**: it resolves the RE'd title-cursor→oracle-frame
+  mapping, refuses a missing frame before spawning the harness, advances only SoH naturally, and
+  verifies the final live cursor before `soh_snapshot`. It pins vanilla 400×240 before cache-key
+  construction, so a cached vanilla “3D” logo cannot be compared to a host 4K replacement. Use its
+  `--unified-renderer` selector when auditing the optional unified CMB route; never infer the route
+  from a screenshot.
 - **Invalidate** only to reclaim space. Savestate, ROM, patch-contract, texture-pack mode, and
   texture-pack manifest changes rotate the key automatically, so stale contexts sit unused
   rather than serving wrong data.

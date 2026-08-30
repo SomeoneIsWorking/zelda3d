@@ -9,6 +9,7 @@ namespace HarnessCapture {
 bool WriteAzahar_Ppm(const std::string& path);
 bool WriteSoh_Ppm(const std::string& path);
 void HandleSnapshot(std::istringstream& arguments);
+void HandleSohSnapshot(std::istringstream& arguments);
 
 } // namespace HarnessCapture
 

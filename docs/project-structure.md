@@ -141,7 +141,9 @@ Current application boundaries:
   watchdog consumes renderer upload heartbeats without owning renderer policy.
 - `tools/harness_cli.py` is the public harness client; allocator, build, cache, gameplay, headless
   display, paths, process, ROM environment, runtime inputs, transport, and shared repository
-  environment each have focused Python owners. The former `harness_ctl.py` facade is deleted.
+  environment each have focused Python owners. `title_host_capture.py` owns cache-only exact-cursor
+  title captures and delegates transport/cache/image comparison to those owners. The former
+  `harness_ctl.py` facade is deleted.
 - `soh/src/zelda3d/repl/zelda3d_repl.cpp` is a 105-line command router over focused
   `repl/commands/` owners; FIFO lifecycle and resettable run state live outside it in their own
   modules.
