@@ -197,10 +197,6 @@ extern "C" int Zelda3D_SgDrawIsolationIncludes(int modelId, int drawIndex) {
 
 namespace {
 
-bool isAdditiveBlendGroup(const SgGroup& group) {
-    return group.blendEnable && group.bSrcRGB == 0x0302 && group.bDstRGB == 0x0001;
-}
-
 float cmabTranslationInPreScaleSpace(float translation, float scale, float bakedTranslation) {
     // uTex1Xf stores the translation before the shader multiplies by scale. A CMAB value is
     // already the translation in the runtime matrix, so invert that scale when installing it.
@@ -437,16 +433,18 @@ void Fast::Zelda3DRenderer::DrawModel(int modelId, const float* mp16, const floa
                     "[SG_DUMP]  g%-2d cull=%d faceCull=%d meshId=%d tex=%d%s mat=%d vtxLit=%d combScale=%.3f "
                     "blend=%d(src=%#06x dst=%#06x) aTest=%d aRef=%.3f depthW=%d polyOff=%.4f first=%u count=%u "
                     "vColor0=(%.3f,%.3f,%.3f,%.3f) matAmb=(%.2f,%.2f,%.2f) matDif=(%.2f,%.2f,%.2f) "
-                    "uv=[(%.2f,%.2f)(%.2f,%.2f)(%.2f,%.2f)] wrap=(%#06x,%#06x) "
-                    "tex1=%d dualMode=%d dualScale2=%.1f constScale=%.1f uv1Xf=(%.2f,%.2f,%.2f,%.4f)\n",
+                    "uv=[(%.2f,%.2f)(%.2f,%.2f)(%.2f,%.2f)] filter=(%#06x,%#06x) wrap=(%#06x,%#06x) "
+                    "tex1=%d filter1=(%#06x,%#06x) dualMode=%d dualScale2=%.1f constScale=%.1f "
+                    "uv1Xf=(%.2f,%.2f,%.2f,%.4f)\n",
                     gi, grp.cull, grp.faceCull, grp.meshId, grp.texIndex, hasTex ? "" : "(MISSING->dummy)",
                     grp.materialIndex, grp.vertexLighting, grp.combScaleRGB, grp.blendEnable, grp.bSrcRGB, grp.bDstRGB,
                     grp.alphaTest, grp.alphaRef, grp.depthWrite, grp.polygonOffset, grp.first, grp.count,
                     grp.dbgColor0[0], grp.dbgColor0[1], grp.dbgColor0[2], grp.dbgColor0[3], grp.matAmbient[0],
                     grp.matAmbient[1], grp.matAmbient[2], grp.matDiffuse[0], grp.matDiffuse[1], grp.matDiffuse[2],
-                    grp.dbgUv0[0], grp.dbgUv0[1], grp.dbgUv1[0], grp.dbgUv1[1], grp.dbgUv2[0], grp.dbgUv2[1], grp.wrapS,
-                    grp.wrapT, grp.tex1Index, grp.dualTexMode, grp.dualTexScale2, grp.combConstScaleRGB,
-                    grp.uv1Scale[0], grp.uv1Scale[1], grp.uv1Trans[0], grp.uv1Trans[1]);
+                    grp.dbgUv0[0], grp.dbgUv0[1], grp.dbgUv1[0], grp.dbgUv1[1], grp.dbgUv2[0], grp.dbgUv2[1],
+                    grp.minFilter, grp.magFilter, grp.wrapS, grp.wrapT, grp.tex1Index, grp.min1Filter, grp.mag1Filter,
+                    grp.dualTexMode, grp.dualTexScale2, grp.combConstScaleRGB, grp.uv1Scale[0], grp.uv1Scale[1],
+                    grp.uv1Trans[0], grp.uv1Trans[1]);
             // PICA200 TEV constant palette + stage-0 selector — dumped on its own line so the
             // main SG_DUMP row stays parseable by existing tools; format:
             //   [SG_DUMP]   g<n> constIdx=<i> const0..const5=(r,g,b,a) x 6
@@ -846,27 +844,9 @@ void Fast::Zelda3DRenderer::DrawModel(int modelId, const float* mp16, const floa
         }
         SDL_GPUTexture* tex = Fast::g_activeSdl3GpuApi->DummyTexture();
         SDL_GPUSampler* samp = Fast::g_activeSdl3GpuApi->DummySampler();
-        // noMip NARROWED 2026-07-29. The old rule denied mips to every additive-blend group, which
-        // is 790 materials -- but 529 of them are additive dungeon FLOORS and WALLS (Dodongo's
-        // Cavern dg_dod_03yuka at 2153x1965 world units on a 256x256 texture, Fire Temple
-        // dg05_yuka_06, the wtr_uvwater overlays), repeat-wrapped and viewed at grazing angles,
-        // i.e. exactly what mips exist to fix. The rule was argued entirely from small sparse
-        // sparkle sprites.
-        //
-        // The asset itself says which is which, and now that the authored chain is parsed (C018) we
-        // can ask it: a texture that ships ONE level is one the artist gave no mips, and
-        // synthesising one for it is what crushes the sparkle peak. A texture that ships 3-4 levels
-        // was authored WITH mips and should keep them. Among additive materials that splits
-        // 414 single-level (fine_star and friends -> no mips) from 361 multi-level (the floors and
-        // water overlays -> mips), which is the principled separator the size heuristic was groping
-        // for -- and it needs no threshold to tune.
-        int texLevels = 1;
-        if (texIndex >= 0 && texIndex < (int)m->texLevels.size())
-            texLevels = m->texLevels[texIndex];
-        bool additive = isAdditiveBlendGroup(grp) && texLevels <= 1;
         if (texIndex >= 0 && texIndex < (int)m->textures.size() && m->textures[texIndex]) {
             tex = m->textures[texIndex];
-            samp = getSampler(grp.wrapS, grp.wrapT, additive);
+            samp = getSampler(grp.minFilter, grp.magFilter, grp.wrapS, grp.wrapT);
         }
         // Second texture binding: non-dummy when the group's dual-tex mode is on (uSheen.y gates
         // the shader-side sample) or its generic TEV chain can source TEXTURE1. Third binding
@@ -876,14 +856,14 @@ void Fast::Zelda3DRenderer::DrawModel(int modelId, const float* mp16, const floa
         if ((grp.dualTexMode || grp.tevGeneric) && grp.tex1Index >= 0 && grp.tex1Index < (int)m->textures.size() &&
             m->textures[grp.tex1Index]) {
             tex1 = m->textures[grp.tex1Index];
-            samp1 = getSampler(grp.wrap1S, grp.wrap1T, additive);
+            samp1 = getSampler(grp.min1Filter, grp.mag1Filter, grp.wrap1S, grp.wrap1T);
         }
         SDL_GPUTexture* tex2 = nullptr;
         SDL_GPUSampler* samp2 = nullptr;
         if (grp.tevGeneric && grp.tex2Index >= 0 && grp.tex2Index < (int)m->textures.size() &&
             m->textures[grp.tex2Index]) {
             tex2 = m->textures[grp.tex2Index];
-            samp2 = getSampler(grp.wrap2S, grp.wrap2T, additive);
+            samp2 = getSampler(grp.min2Filter, grp.mag2Filter, grp.wrap2S, grp.wrap2T);
         }
 
         // Translucent draw over an opaque material: synthesize a standard alpha-over pipeline.

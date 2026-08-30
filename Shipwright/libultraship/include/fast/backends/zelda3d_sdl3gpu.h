@@ -32,6 +32,7 @@ struct SgGroup {
     int texIndex = -1;
     int alphaTest = 0;
     float alphaRef = 0.0f;
+    unsigned minFilter = 0x2601, magFilter = 0x2601;
     unsigned wrapS = 0x2901, wrapT = 0x2901;
     int blendEnable = 0;
     unsigned bSrcRGB = 0x0302, bDstRGB = 0x0303, bEqRGB = 0x8006;
@@ -77,6 +78,7 @@ struct SgGroup {
     int dualTexMode = 0;
     float dualTexScale2 = 1.0f;
     int tex1Index = -1;
+    unsigned min1Filter = 0x2601, mag1Filter = 0x2601;
     unsigned wrap1S = 0x2901, wrap1T = 0x2901;
     float uv1Scale[2] = { 1.0f, 1.0f };
     float uv1Trans[2] = { 0.0f, 0.0f };
@@ -86,6 +88,7 @@ struct SgGroup {
     int tevStageCount = 0;
     unsigned tevStagePack[6][3] = {};
     int tex2Index = -1;
+    unsigned min2Filter = 0x2601, mag2Filter = 0x2601;
     unsigned wrap2S = 0x2901, wrap2T = 0x2901;
     float uv2Scale[2] = { 1.0f, 1.0f };
     float uv2Trans[2] = { 0.0f, 0.0f };
@@ -99,9 +102,6 @@ struct SgModel {
     SDL_GPUBuffer* vbo = nullptr;
     std::vector<SgGroup> groups;
     std::vector<SDL_GPUTexture*> textures;
-    // Authored mip level count per texture (claim C018). 1 = the artist shipped no chain, which
-    // is the signal the noMip rule keys on -- see the getSampler note.
-    std::vector<int> texLevels;
     // Model-local AABB over all group vertices, computed once at upload. Used by the geomscan
     // bridge (Zelda3D_GeomScanDump) to flag misrendered geometry by VALUE for the #115/#120 audit.
     bool hasBounds = false;
@@ -171,7 +171,7 @@ class Zelda3DRenderer {
   private:
     // Focused owners implement these helpers in the resource-cache and pipeline-cache modules.
 
-    SDL_GPUSampler* getSampler(unsigned wrapS, unsigned wrapT, bool noMip = false);
+    SDL_GPUSampler* getSampler(unsigned minFilter, unsigned magFilter, unsigned wrapS, unsigned wrapT);
     SDL_GPUTexture* uploadTexture(int w, int h, const unsigned char* rgba, int srcLevels = 1);
     bool ensureResources();
     SDL_GPUGraphicsPipeline* getPipeline(const SgGroup& g, int frontCW);

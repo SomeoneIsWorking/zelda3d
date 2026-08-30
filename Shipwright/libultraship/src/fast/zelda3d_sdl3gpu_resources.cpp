@@ -6,6 +6,7 @@
 #include "fast/backends/gfx_sdl3gpu.h"
 #include "fast/backends/zelda3d_sdl3gpu.h"
 #include "fast/unified_vtx.h"
+#include "fast/zelda3d_sampler.h"
 #include "zelda3d_instrumentation_state.h"
 
 #include <algorithm>
@@ -58,39 +59,20 @@ bool Fast::Zelda3DSdl3GpuResources::ModelSource(int modelId, const Zelda3DGlGrou
     return g_provider != nullptr && g_provider(modelId, groups, groupCount, &textures, &textureCount) != 0;
 }
 
-SDL_GPUSampler* Fast::Zelda3DRenderer::getSampler(unsigned wrapS, unsigned wrapT, bool noMip) {
-    // Use the backend's single sampler cache. The model path needs LINEAR + max_lod=1000: left at the
-    // zero default, a LINEAR-minified large texture (e.g. the 2048² Kokiri ground) computes an LOD > 0
-    // that clamps against max_lod=0 and samples nothing -> the surface renders BLACK. Only large/
-    // minified textures hit it (small ones stay at LOD 0), which is why the terrain vanished but
-    // props/sky did not. max_lod=1000 lands in a distinct cache slot from the N64 samplers (max_lod=0).
-    //
-    // `noMip` (title star-brightness residual, debug_journal/2026-07-10): every CMB texture Zelda3D
-    // uploads gets a SYNTHETIC full mip chain generated at upload time (uploadTexture below).
-    //
-    // CORRECTED 2026-07-29 — this comment used to assert that "the CMB format itself never carries
-    // baked mip levels", generalised from ONE texture (fine_star.cmb, data_len=4096 for a 64x64 L8 =
-    // exactly one level). That observation is right about fine_star and WRONG about the format:
-    // the tex entry's +0x04 field is (something<<16 | levelCount), and data_len is the length of the
-    // WHOLE chain. Across all 10538 textures in the ROM, data_len == baseLevel * sum(1/4^i) for that
-    // level count with a legal bpp falling out, 0 exceptions. 7284 textures ship AUTHORED mips
-    // (3 levels x6730, 2 x544, 4 x10); fine_star is simply one of the 3254 with a single level.
-    // So for most textures we currently discard the artist's chain and box-filter our own.
-    // Porting the real chain is pending (claim C018); the reasoning below about ADDITIVE VFX still
-    // holds either way, since those are overwhelmingly the single-level textures.
-    // For opaque/modulate materials (terrain, walls) the synthetic chain is a deliberate, worthwhile
-    // antialiasing enhancement over strict fidelity (grazing-angle shimmer, #134). But for a materially
-    // different class — small ADDITIVE point-sprite-style VFX textures (stars, sparkles: blend
-    // src=SRC_ALPHA(0x302) dst=ONE(0x1), matching fine_star's own material bytes) — mip-averaging is
-    // actively wrong: it blends each sparse bright texel into its near-black neighbors, which crushes
-    // the peak (measured SoH/Az peak ratio 0.73-0.80) while leaving the LOCAL average roughly intact
-    // (measured integrated ratio ~1.03x) — exactly the "peak low, integrated matches" signature
-    // documented in debug_journal/2026-07-08-title-star-brightness-L8-decode.md §4. Forcing max_lod=0
-    // for these draws makes the sampler read only the real, single, unblurred level — matching the
-    // oracle's own hardware behavior exactly, not a fitted brightness constant.
-    float maxLod = noMip ? 0.0f : 1000.0f;
-    return Fast::g_activeSdl3GpuApi->GetOrCreateSamplerEx(SDL_GPU_FILTER_LINEAR, wrapMode(wrapS), wrapMode(wrapT),
-                                                          maxLod);
+SDL_GPUSampler* Fast::Zelda3DRenderer::getSampler(unsigned minFilter, unsigned magFilter, unsigned wrapS,
+                                                  unsigned wrapT) {
+    const Zelda3DSamplerFilter filter = ResolveZelda3DSamplerFilter(minFilter, magFilter);
+    const SDL_GPUFilter minification =
+        filter.minification == Zelda3DTextureFilter::Nearest ? SDL_GPU_FILTER_NEAREST : SDL_GPU_FILTER_LINEAR;
+    const SDL_GPUFilter magnification =
+        filter.magnification == Zelda3DTextureFilter::Nearest ? SDL_GPU_FILTER_NEAREST : SDL_GPU_FILTER_LINEAR;
+    SDL_GPUSamplerMipmapMode mipmap = SDL_GPU_SAMPLERMIPMAPMODE_NEAREST;
+    if (filter.mipmap == Zelda3DMipmapFilter::Linear) {
+        mipmap = SDL_GPU_SAMPLERMIPMAPMODE_LINEAR;
+    }
+    const float maxLod = filter.mipmap == Zelda3DMipmapFilter::None ? 0.0f : 1000.0f;
+    return Fast::g_activeSdl3GpuApi->GetOrCreateSamplerEx(minification, magnification, mipmap, wrapMode(wrapS),
+                                                          wrapMode(wrapT), maxLod);
 }
 
 SDL_GPUTexture* Fast::Zelda3DRenderer::uploadTexture(int w, int h, const unsigned char* rgba, int srcLevels) {
@@ -237,6 +219,8 @@ SgModel* Fast::Zelda3DRenderer::ensureUploaded(int modelId) {
         g.alphaTest = groups[i].alphaTest;
         g.alphaRef = groups[i].alphaRef;
         g.alphaFunc = groups[i].alphaFunc;
+        g.minFilter = groups[i].minFilter;
+        g.magFilter = groups[i].magFilter;
         g.wrapS = groups[i].wrapS;
         g.wrapT = groups[i].wrapT;
         g.blendEnable = groups[i].blendEnable;
@@ -274,6 +258,8 @@ SgModel* Fast::Zelda3DRenderer::ensureUploaded(int modelId) {
         if (g.dualTexMode || g.tevGeneric) {
             g.dualTexScale2 = groups[i].dualTexScale2;
             g.tex1Index = groups[i].tex1Index;
+            g.min1Filter = groups[i].min1Filter;
+            g.mag1Filter = groups[i].mag1Filter;
             g.wrap1S = groups[i].wrap1S;
             g.wrap1T = groups[i].wrap1T;
             g.uv1Scale[0] = groups[i].uv1Scale[0];
@@ -289,6 +275,8 @@ SgModel* Fast::Zelda3DRenderer::ensureUploaded(int modelId) {
                 for (int k = 0; k < 3; k++)
                     g.tevStagePack[s][k] = groups[i].tevStagePack[s][k];
             g.tex2Index = groups[i].tex2Index;
+            g.min2Filter = groups[i].min2Filter;
+            g.mag2Filter = groups[i].mag2Filter;
             g.wrap2S = groups[i].wrap2S;
             g.wrap2T = groups[i].wrap2T;
             g.uv2Scale[0] = groups[i].uv2Scale[0];
@@ -369,7 +357,6 @@ SgModel* Fast::Zelda3DRenderer::ensureUploaded(int modelId) {
 
     for (int i = 0; i < texCount; i++) {
         m.textures.push_back(uploadTexture(texs[i].w, texs[i].h, texs[i].rgba, texs[i].levels));
-        m.texLevels.push_back(texs[i].levels > 0 ? texs[i].levels : 1);
         if (modelId == g_sgDumpModel || g_sgDumpTexActual == modelId || g_sgDumpTexAll) {
             if ((g_sgDumpTexActual == modelId || g_sgDumpTexAll) && texs[i].rgba) {
                 // One-off raw-pixel dump (PPM, no library needed) so the SOURCE texel data can be

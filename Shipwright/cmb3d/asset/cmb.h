@@ -24,7 +24,8 @@ struct CmbBone {
 struct CmbMaterial {
     int index = 0;
     int tex0_idx = -1;
-    uint16_t wrap_s = 0x2901, wrap_t = 0x2901; // GL enums
+    uint16_t min_filter = 0x2601, mag_filter = 0x2601; // GL_LINEAR, no mip selection
+    uint16_t wrap_s = 0x2901, wrap_t = 0x2901;         // GL enums
     float scale_s = 1, scale_t = 1, trans_s = 0, trans_t = 0, rot = 0;
     // Texture binding 1 (second sampler) + its coordinator-1 UV transform. Most materials leave
     // binding 1 empty (tex1_idx = -1); dual-texture combiners (g_title.cmb's fire-glow
@@ -33,6 +34,7 @@ struct CmbMaterial {
     // noclip calcTexMtx: uv' = scale * (uv - trans), rot unsupported here — no OoT3D material
     // observed using coordinator-1 rotation).
     int tex1_idx = -1;
+    uint16_t min1_filter = 0x2601, mag1_filter = 0x2601;
     uint16_t wrap1_s = 0x2901, wrap1_t = 0x2901;
     float scale1_s = 1, scale1_t = 1, trans1_s = 0, trans1_t = 0;
     // Coordinator mapping methods (noclip TextureCoordinatorMappingMethod): 0=None, 1=UvCoordinateMap,
@@ -47,6 +49,7 @@ struct CmbMaterial {
     // 3-stage TEV chain — verified identical between the CMB file bytes and the live oracle's
     // per-draw register log (tev1..5 sources/ops), 2026-07-22.
     int tex2_idx = -1;
+    uint16_t min2_filter = 0x2601, mag2_filter = 0x2601;
     uint16_t wrap2_s = 0x2901, wrap2_t = 0x2901;
     float scale2_s = 1, scale2_t = 1, trans2_s = 0, trans2_t = 0;
     int coord2_mapping = 1; // coordinator-2 (third texture): default UV
@@ -74,9 +77,9 @@ struct CmbMaterial {
     // difference, EXCEPT where ref==0 (GREATER cuts fully transparent texels, GEQUAL keeps
     // them) -- e.g. hairal_niwa's courtyard windows, which also write depth with blending off,
     // so the kept cut-out region renders opaque AND occludes.
-    uint16_t alpha_func = 0x0206;                            // GL_GEQUAL (the old hardcoded rule)
+    uint16_t alpha_func = 0x0206; // GL_GEQUAL (the old hardcoded rule)
     bool depth_test = true;
-    uint16_t depth_func = 0x0201;                            // GL_LESS
+    uint16_t depth_func = 0x0201; // GL_LESS
     // Decal depth bias. OoT3D flags coplanar detail surfaces (sand/symbol decals on the
     // ground/walls) with a polygon offset that pulls them slightly toward the camera so
     // they win the depth test cleanly instead of z-fighting the base. Stored as a window-
@@ -170,10 +173,10 @@ struct CmbMaterial {
     // 2026-07-10 (debug_journal/2026-07-10-shield-glint-dualtex.md).
     enum DualTexMode {
         kDualTexNone = 0,
-        kDualTexAddMult = 1,                    // (t0 + t1) * t0            [g_title.cmb fire-glow]
-        kDualTexAddThenModulatePrimary = 2,      // (t0 + t1) * primary       [shield glint]
-        kDualTexModulateThenScale = 3,           // scale2 * (primary*t0*t1) [sword / shield detail]
-        kDualTexSelfSphereAdd = 4,              // primary*(2*t0+t1), t1=tex0 via sphere map [wordmark mat10/11]
+        kDualTexAddMult = 1,                // (t0 + t1) * t0            [g_title.cmb fire-glow]
+        kDualTexAddThenModulatePrimary = 2, // (t0 + t1) * primary       [shield glint]
+        kDualTexModulateThenScale = 3,      // scale2 * (primary*t0*t1) [sword / shield detail]
+        kDualTexSelfSphereAdd = 4,          // primary*(2*t0+t1), t1=tex0 via sphere map [wordmark mat10/11]
     };
     int dual_tex_mode = kDualTexNone;
     // Stage-1 hardware RGB scale for kDualTexModulateThenScale (1/2/4); 1.0 for other modes.
@@ -182,14 +185,13 @@ struct CmbMaterial {
     // PICA200 TEV constant-color palette: 6 float-RGBA slots per material. Base defaults come
     // from the CMB file (matConstColor[0..5] at material +0xB4..+0xCB, big-endian RGBA8 —
     // verified against real bytes of g_title.cmb / fine_star.cmb 2026-07-10; an earlier +0xB8
-    // read was off by one slot, shifting every baked palette down by one). Referenced by the combiner via CONSTANT (0x8576) with the
-    // stage's comb_const_idx picking which slot. The game also OVERWRITES these at runtime via
+    // read was off by one slot, shifting every baked palette down by one). Referenced by the combiner via CONSTANT
+    // (0x8576) with the stage's comb_const_idx picking which slot. The game also OVERWRITES these at runtime via
     // Model_SetMaterialConstantColor (see oot3d-decomp/build/decomp/003688a8.c and the EnHy
     // per-type body-color table at oot3d-decomp/data/enhy_body_colors.inc); the port carries
     // that override channel as a per-actor input in the render layer.
     float mat_constant[6][4] = {
-        { 0, 0, 0, 1 }, { 0, 0, 0, 1 }, { 0, 0, 0, 1 },
-        { 0, 0, 0, 1 }, { 0, 0, 0, 1 }, { 0, 0, 0, 1 },
+        { 0, 0, 0, 1 }, { 0, 0, 0, 1 }, { 0, 0, 0, 1 }, { 0, 0, 0, 1 }, { 0, 0, 0, 1 }, { 0, 0, 0, 1 },
     };
 };
 
@@ -206,7 +208,9 @@ struct CmbTexture {
     // giving a legal bpp -- 0 exceptions. 7284 textures ship authored mips (3 levels x6730,
     // 2 x544, 4 x10). See claim C018.
     int levels = 1;
-    uint32_t glFormat() const { return ((uint32_t)data_type << 16) | fmt; }
+    uint32_t glFormat() const {
+        return ((uint32_t)data_type << 16) | fmt;
+    }
     // Byte size of mip level `l` (0 = base). Each level halves both dimensions, floored at 1.
     uint32_t levelBytes(int l) const {
         if (levels <= 0 || data_len == 0)
@@ -258,24 +262,40 @@ struct CmbVertex {
 // per frame. Keeping them in separate groups lets us cull the hidden ones without rebuilding.
 struct CmbDrawGroup {
     int material_index = 0;
-    int mesh_id = -1; // CMB mesh_id of the contributing meshes (the visibility-switch key)
+    int mesh_id = -1;             // CMB mesh_id of the contributing meshes (the visibility-switch key)
     std::vector<CmbVertex> verts; // multiple of 3
 };
 
 class Cmb {
   public:
     explicit Cmb(std::vector<uint8_t> data);
-    bool ok() const { return mOk; }
-    const std::string& error() const { return mErr; }
+    bool ok() const {
+        return mOk;
+    }
+    const std::string& error() const {
+        return mErr;
+    }
 
-    const std::string& name() const { return mName; }
-    uint32_t version() const { return mVersion; }
-    const std::vector<CmbBone>& bones() const { return mBones; }
-    const std::vector<CmbMaterial>& materials() const { return mMaterials; }
-    const std::vector<CmbTexture>& textures() const { return mTextures; }
+    const std::string& name() const {
+        return mName;
+    }
+    uint32_t version() const {
+        return mVersion;
+    }
+    const std::vector<CmbBone>& bones() const {
+        return mBones;
+    }
+    const std::vector<CmbMaterial>& materials() const {
+        return mMaterials;
+    }
+    const std::vector<CmbTexture>& textures() const {
+        return mTextures;
+    }
     // Bind-pose world matrix per bone id (row-major flat 16-float). Used by CSAB
     // skinning to form skinMatrix = animWorld . inverse(bindWorld).
-    const std::vector<std::array<float, 16>>& boneMatrices() const { return mBoneMatrix; }
+    const std::vector<std::array<float, 16>>& boneMatrices() const {
+        return mBoneMatrix;
+    }
 
     // Sepds that no mesh entry references. A well-formed CMB has ZERO: every sepd's geometry is
     // reachable. A non-zero count means part of the model silently never builds, which is how the
@@ -312,9 +332,15 @@ class Cmb {
     // Per-mesh introspection, for selectively culling duplicate VARIANT meshes that share a
     // material and so collapse into one draw group (can't be culled per group). e.g. Link's
     // childlink_v2.cmb bakes several hand-pose variants per hand, all on one skin material.
-    size_t meshCount() const { return mMeshes.size(); }
-    int meshMaterial(size_t i) const { return i < mMeshes.size() ? mMeshes[i].material_index : -1; }
-    int meshId(size_t i) const { return i < mMeshes.size() ? mMeshes[i].mesh_id : -1; }
+    size_t meshCount() const {
+        return mMeshes.size();
+    }
+    int meshMaterial(size_t i) const {
+        return i < mMeshes.size() ? mMeshes[i].material_index : -1;
+    }
+    int meshId(size_t i) const {
+        return i < mMeshes.size() ? mMeshes[i].mesh_id : -1;
+    }
     std::vector<int> meshBones(size_t i) const; // sorted union of bone ids the mesh references
     // As buildDrawGroups[Skinned] but skip every mesh whose index has skipMesh[idx] != 0
     // (skipMesh may be shorter than meshCount(); missing entries = keep).
@@ -339,26 +365,40 @@ class Cmb {
     std::vector<CmbTexture> mTextures;
 
     // VATR: attribute name index -> (abs offset, size)
-    struct VatrBuf { uint32_t off = 0, size = 0; };
+    struct VatrBuf {
+        uint32_t off = 0, size = 0;
+    };
     std::vector<VatrBuf> mVatr; // one per attribute slot in attrs def
 
     struct SepdAttr {
         uint32_t start = 0;
         float scale = 1;
         uint16_t data_type = 0;
-        uint16_t mode = 0;       // 0 array, 1 constant
+        uint16_t mode = 0; // 0 array, 1 constant
         float constant[4] = { 0, 0, 0, 0 };
         bool present = false;
     };
-    struct Prm { uint16_t index_type = 0; uint16_t count = 0; uint16_t first = 0; };
-    struct Prms { uint16_t skinning_mode = 0; std::vector<uint16_t> bone_table; Prm prm; };
+    struct Prm {
+        uint16_t index_type = 0;
+        uint16_t count = 0;
+        uint16_t first = 0;
+    };
+    struct Prms {
+        uint16_t skinning_mode = 0;
+        std::vector<uint16_t> bone_table;
+        Prm prm;
+    };
     struct Sepd {
         std::vector<SepdAttr> attrs; // indexed by attribute slot
         uint16_t prim_count = 0;
         uint16_t bone_dimension = 0;
         std::vector<Prms> prms;
     };
-    struct Mesh { uint16_t sepd_index = 0; uint8_t material_index = 0; uint8_t mesh_id = 0; };
+    struct Mesh {
+        uint16_t sepd_index = 0;
+        uint8_t material_index = 0;
+        uint8_t mesh_id = 0;
+    };
 
     std::vector<Sepd> mSepds;
     std::vector<Mesh> mMeshes;

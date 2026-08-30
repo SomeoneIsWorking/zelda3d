@@ -25,6 +25,7 @@
 #include "asset/cmb_glgroups.h"
 #include "asset/zar.h"
 #include "asset/ctr_rom.h"
+#include "fast/zelda3d_sampler.h"
 
 #include <algorithm>
 #include <cmath>
@@ -34,8 +35,27 @@
 
 using Zelda3D::Cmb;
 using Zelda3D::CmbMaterial;
-using Zelda3D::Zar;
 using Zelda3D::CtrRom;
+using Zelda3D::Zar;
+
+TEST(Zelda3DSampler, ResolvesCmbMinificationEnumsWithoutInventingMipSelection) {
+    using Fast::ResolveZelda3DSamplerFilter;
+    using Fast::Zelda3DMipmapFilter;
+    using Fast::Zelda3DTextureFilter;
+
+    const auto linear = ResolveZelda3DSamplerFilter(0x2601, 0x2601);
+    EXPECT_EQ(linear.minification, Zelda3DTextureFilter::Linear);
+    EXPECT_EQ(linear.magnification, Zelda3DTextureFilter::Linear);
+    EXPECT_EQ(linear.mipmap, Zelda3DMipmapFilter::None);
+
+    EXPECT_EQ(ResolveZelda3DSamplerFilter(0x2701, 0x2601).mipmap, Zelda3DMipmapFilter::Nearest);
+    EXPECT_EQ(ResolveZelda3DSamplerFilter(0x2703, 0x2601).mipmap, Zelda3DMipmapFilter::Linear);
+
+    const auto nearestLinearMip = ResolveZelda3DSamplerFilter(0x2702, 0x2600);
+    EXPECT_EQ(nearestLinearMip.minification, Zelda3DTextureFilter::Nearest);
+    EXPECT_EQ(nearestLinearMip.magnification, Zelda3DTextureFilter::Nearest);
+    EXPECT_EQ(nearestLinearMip.mipmap, Zelda3DMipmapFilter::Linear);
+}
 
 namespace {
 
@@ -123,7 +143,8 @@ TEST(CmbCombinerParse, AhgSingleStageMaterialsDoNotFlagConstant) {
         const CmbMaterial& m = cmb.materials()[i];
         EXPECT_EQ(m.comb_stage_count, 1) << "mat " << i << " expected single-stage";
         EXPECT_FALSE(m.comb_uses_const)
-            << "mat " << i << " combiner is MODULATE(PRIM, TEX0) — srcC=CONSTANT is a leftover default "
+            << "mat " << i
+            << " combiner is MODULATE(PRIM, TEX0) — srcC=CONSTANT is a leftover default "
                "that MODULATE ignores; flagging it as live CONSTANT usage would darken the mesh to black";
     }
 }
@@ -285,6 +306,12 @@ TEST(CmbCombinerParse, BossFd2SecondaryTextureUsesIndependentTexCoordOne) {
     ASSERT_TRUE(cmb.ok()) << cmb.error();
     ASSERT_EQ(cmb.materials().size(), 6u);
 
+    const CmbMaterial& bodyMaterial = cmb.materials()[1];
+    EXPECT_EQ(bodyMaterial.min_filter, 0x2601);
+    EXPECT_EQ(bodyMaterial.mag_filter, 0x2601);
+    EXPECT_EQ(bodyMaterial.min1_filter, 0x2601);
+    EXPECT_EQ(bodyMaterial.mag1_filter, 0x2601);
+
     for (int materialIndex : { 0, 1, 5 }) {
         EXPECT_EQ(cmb.materials()[materialIndex].coord1_source, 1)
             << "valbasiagnd material " << materialIndex << " must source its additive TEX1 stage from texCoord1";
@@ -310,6 +337,15 @@ TEST(CmbCombinerParse, BossFd2SecondaryTextureUsesIndependentTexCoordOne) {
     // The source groups reference 598 unique vertices; buildDrawGroups expands indexed
     // triangles, so the shipping vertex buffer contains 2,136 affected vertices.
     EXPECT_EQ(affectedVertices, 2136u);
+
+    const auto materialOne =
+        std::find_if(groups.begin(), groups.end(), [](const auto& group) { return group.material_index == 1; });
+    ASSERT_NE(materialOne, groups.end());
+    const Zelda3DGlGroup glGroup = MakeGlGroup(cmb, *materialOne, materialOne->verts.data(), 0);
+    EXPECT_EQ(glGroup.minFilter, 0x2601u);
+    EXPECT_EQ(glGroup.magFilter, 0x2601u);
+    EXPECT_EQ(glGroup.min1Filter, 0x2601u);
+    EXPECT_EQ(glGroup.mag1Filter, 0x2601u);
 }
 
 // The PICA source register leaves one four-bit field unused between the RGB and alpha source

@@ -1443,7 +1443,7 @@ SDL_GPUSampler* GfxRenderingAPISdl3Gpu::GetOrCreateSampler(bool linear, uint32_t
         }
     };
     SDL_GPUFilter f = linear ? SDL_GPU_FILTER_LINEAR : SDL_GPU_FILTER_NEAREST;
-    return GetOrCreateSamplerEx(f, wrap(cms), wrap(cmt), 0.0f);
+    return GetOrCreateSamplerEx(f, f, SDL_GPU_SAMPLERMIPMAPMODE_NEAREST, wrap(cms), wrap(cmt), 0.0f);
 }
 
 // The one sampler factory + cache for the whole backend, keyed on the fully-resolved SDL params so
@@ -1451,21 +1451,19 @@ SDL_GPUSampler* GfxRenderingAPISdl3Gpu::GetOrCreateSampler(bool linear, uint32_t
 // (the differing max_lod lands in a distinct cache slot). max_lod is bucketed to {0, nonzero}: the
 // only two values in use are 0 (N64) and 1000 (Zelda3D), and a non-mipmapped texture is unaffected by
 // any positive max_lod, so one "uncapped" bucket suffices.
-SDL_GPUSampler* GfxRenderingAPISdl3Gpu::GetOrCreateSamplerEx(SDL_GPUFilter filter, SDL_GPUSamplerAddressMode u,
-                                                             SDL_GPUSamplerAddressMode v, float maxLod) {
-    uint32_t key = (uint32_t)filter | ((uint32_t)u << 4) | ((uint32_t)v << 8) | ((maxLod > 0.0f ? 1u : 0u) << 12);
+SDL_GPUSampler* GfxRenderingAPISdl3Gpu::GetOrCreateSamplerEx(SDL_GPUFilter minFilter, SDL_GPUFilter magFilter,
+                                                             SDL_GPUSamplerMipmapMode mipmapMode,
+                                                             SDL_GPUSamplerAddressMode u, SDL_GPUSamplerAddressMode v,
+                                                             float maxLod) {
+    uint32_t key = (uint32_t)minFilter | ((uint32_t)magFilter << 2) | ((uint32_t)mipmapMode << 4) | ((uint32_t)u << 6) |
+                   ((uint32_t)v << 10) | ((maxLod > 0.0f ? 1u : 0u) << 14);
     auto it = mSamplerCache.find(key);
     if (it != mSamplerCache.end())
         return it->second;
     SDL_GPUSamplerCreateInfo si{};
-    si.min_filter = filter;
-    si.mag_filter = filter;
-    // Trilinear across the mip chain only when the caller actually uploaded one (max_lod>0 is
-    // the CMB path — see Zelda3DRenderer::getSampler / uploadTexture). N64 textures ship with a
-    // single level (max_lod=0), and jumping between mips there would just cost us the crisp
-    // point-sampled look Fast3D expects. Nearest-mip on the CMB path produced hard mip
-    // boundaries → radial moiré on room walls at grazing angles (#134).
-    si.mipmap_mode = (maxLod > 0.0f) ? SDL_GPU_SAMPLERMIPMAPMODE_LINEAR : SDL_GPU_SAMPLERMIPMAPMODE_NEAREST;
+    si.min_filter = minFilter;
+    si.mag_filter = magFilter;
+    si.mipmap_mode = mipmapMode;
     si.address_mode_u = u;
     si.address_mode_v = v;
     si.address_mode_w = SDL_GPU_SAMPLERADDRESSMODE_REPEAT;
@@ -1474,8 +1472,8 @@ SDL_GPUSampler* GfxRenderingAPISdl3Gpu::GetOrCreateSamplerEx(SDL_GPUFilter filte
     if (sampler == nullptr) {
         // Don't cache a null — binding a null sampler faults inside the GPU driver
         // (BindFragmentSamplers dereferences it, notably on macOS/MoltenVK). Surface it instead.
-        SPDLOG_ERROR("SDL_CreateGPUSampler failed (filter={}, u={}, v={}, maxLod={}): {}", (int)filter, (int)u, (int)v,
-                     maxLod, SDL_GetError());
+        SPDLOG_ERROR("SDL_CreateGPUSampler failed (min={}, mag={}, mip={}, u={}, v={}, maxLod={}): {}", (int)minFilter,
+                     (int)magFilter, (int)mipmapMode, (int)u, (int)v, maxLod, SDL_GetError());
         return nullptr;
     }
     mSamplerCache[key] = sampler;
