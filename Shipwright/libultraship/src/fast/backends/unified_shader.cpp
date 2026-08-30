@@ -385,7 +385,9 @@ const char* kUnifiedShaderTemplate = R"PRISM(@prism(type='fragment', name='Unifi
 
     void main() {
         @if(o_genericTev)
-            vec4 texel = tevRun(vColor0, texel0(), texel1(), texel2());
+            vec4 fragPrimary = ubo.uPrimaryCtl.y > 0.5 ? vColor0 : vec4(0.0);
+            vec4 fragSecondary = vec4(0.0);
+            vec4 texel = tevRun(vColor0, fragPrimary, fragSecondary, texel0(), texel1(), texel2());
             int afn = int(ubo.uTevCtl.w + 0.5);
             if (afn > 0 && !alphaPass(texel.a, ubo.uParams0.x, afn - 1)) discard;
         @else

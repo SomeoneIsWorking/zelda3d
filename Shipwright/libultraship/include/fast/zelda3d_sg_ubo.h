@@ -39,8 +39,9 @@ struct SgUbo {
     float uFog2[4];
     float uAmbient[4];
     // Exact unlit CmbVShader PRIMARY inputs (shbin words 112--120): uMatDiffuse is c8
-    // MatDiffuseColor RGBA, and uPrimaryCtl.x is the HasColor draw uniform. When HasColor is
-    // true the vertex color replaces c8; when false c8 reaches o1 unchanged.
+    // MatDiffuseColor RGBA, uPrimaryCtl.x is HasColor, and uPrimaryCtl.y is the CMB
+    // IsFragmentLighting flag. The latter selects the exact PICA disabled result (zero fixed-
+    // function colors); the enabled fixed-function calculation remains a separate RE surface.
     float uMatDiffuse[4];
     float uPrimaryCtl[4];
     // PICA200 TEV constant-color: the selected slot (matConstant[combConstIdx]) for this

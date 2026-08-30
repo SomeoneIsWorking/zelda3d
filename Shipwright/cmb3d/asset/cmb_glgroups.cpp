@@ -186,6 +186,7 @@ Zelda3DGlGroup MakeGlGroup(const Cmb& cmb, const CmbDrawGroup& g, const CmbVerte
         cg.blendColor[k] = mat ? mat->blend_color[k] : (k == 3 ? 1.0f : 0.0f);
     // OoT3D world lighting/combiner port (docs/oot3d_world_lighting_re.md).
     cg.vertexLighting = (mat && mat->vertex_lighting) ? 1 : 0;
+    cg.fragmentLighting = (mat && mat->fragment_lighting) ? 1 : 0;
     cg.hasColor = g.has_color ? 1 : 0;
     cg.fogEnabled = (mat && mat->is_fog) ? 1 : 0; // PICA distance fog participates (fog_mode=5)
     cg.combScaleRGB = mat ? mat->comb_scale_rgb : 1.0f;

@@ -241,6 +241,7 @@ SgModel* Fast::Zelda3DRenderer::ensureUploaded(int modelId) {
         g.meshId = groups[i].meshId;
         g.materialIndex = groups[i].materialIndex;
         g.vertexLighting = groups[i].vertexLighting;
+        g.fragmentLighting = groups[i].fragmentLighting;
         g.hasColor = groups[i].hasColor;
         g.fogEnabled = groups[i].fogEnabled;
         g.combScaleRGB = groups[i].combScaleRGB;
