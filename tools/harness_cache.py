@@ -120,6 +120,28 @@ def cache_key(
     }
 
 
+def frame_inputs_compatible(first: Mapping[str, Any], second: Mapping[str, Any]) -> bool:
+    """Return whether two contexts share every pixel input except the Azahar patch contract.
+
+    This is intentionally narrower than cache-key equality. It supports an explicit, provenance-
+    preserving frame adoption after an observer-only patch change; callers must still establish
+    that the patch did not alter rendering.
+    """
+
+    def identity(metadata: Mapping[str, Any]) -> tuple[Any, ...]:
+        texture_pack = metadata.get("texture_pack", {})
+        return (
+            metadata.get("savestate_sha256_16"),
+            metadata.get("rom_sha256_16"),
+            texture_pack.get("mode"),
+            texture_pack.get("manifest_files"),
+            texture_pack.get("manifest_bytes"),
+            texture_pack.get("manifest_sha256_12"),
+        )
+
+    return identity(first) == identity(second)
+
+
 class OracleCache:
     """Store deterministic oracle frames, probes, and raw artifacts by input identity."""
 
@@ -171,6 +193,31 @@ class OracleCache:
             "captured": time.time(),
             "source": str(src_image_path),
         }
+        self._save_index()
+        return destination
+
+    def adopt_frame(self, source_context: Path, az_frame: int) -> Path:
+        """Copy one frame from a pixel-compatible context and record its provenance.
+
+        The caller is responsible for asserting that the source/current patch difference is
+        observer-only. Pixel inputs are still checked here so ROM, savestate, and texture-pack
+        mismatches cannot be adopted accidentally.
+        """
+        source_context = Path(source_context)
+        source_index_path = source_context / "index.json"
+        if not source_index_path.is_file():
+            raise FileNotFoundError(source_index_path)
+        source_index = json.loads(source_index_path.read_text())
+        if not frame_inputs_compatible(self.meta, source_index.get("meta", {})):
+            raise ValueError("source cache context has different frame inputs")
+        source_entry = source_index.get("frames", {}).get(str(az_frame))
+        if source_entry is None:
+            raise KeyError(f"source cache has no az frame {az_frame}")
+        source_path = source_context / source_entry["file"]
+        destination = self.put_frame(az_frame, source_path)
+        entry = self._load_index()["frames"][str(az_frame)]
+        entry["adopted_from_key"] = source_context.name
+        entry["adopted_source"] = str(source_path)
         self._save_index()
         return destination
 

@@ -23,6 +23,7 @@ Two independent cache namespaces share the scratch/oracle_cache/ root
           tools/oracle_cache.py stats                  # entries, size, active key
           tools/oracle_cache.py warm 100 200 360 ...    # batch-capture frames
           tools/oracle_cache.py warm                    # warm the standard sweep
+          tools/oracle_cache.py adopt-frame <key> 2010 --observer-only
           tools/oracle_cache.py invalidate              # clear the CURRENT key
 
       See docs/parity-workflow.md "Oracle data cache" for the design writeup.
@@ -242,6 +243,29 @@ def cmd_invalidate(args) -> None:
     print("[oracle_cache] done")
 
 
+def cmd_adopt_frame(args) -> None:
+    if not args.observer_only:
+        raise SystemExit(
+            "refusing frame adoption without --observer-only; use it only when the Azahar patch "
+            "difference cannot change rendered pixels"
+        )
+    if not re.fullmatch(r"[A-Za-z0-9_.-]+", args.source_key):
+        raise SystemExit("invalid source cache key")
+    source_context = CACHE_ROOT / args.source_key
+    cache = OracleCache(_savestate())
+    if source_context.resolve().parent != CACHE_ROOT.resolve():
+        raise SystemExit("source cache key escapes the cache root")
+    for frame in sorted(set(args.frames)):
+        try:
+            destination = cache.adopt_frame(source_context, frame)
+        except (FileNotFoundError, KeyError, ValueError) as error:
+            raise SystemExit(f"cannot adopt az={frame}: {error}") from error
+        print(
+            f"[oracle_cache] adopted az={frame} from key={args.source_key} "
+            f"into key={cache.key}: {destination}"
+        )
+
+
 def cmd_warp_debug(args) -> None:
     result = warp(args.entrance, args.day_time, refresh=args.refresh)
     print(json.dumps(result, indent=2, sort_keys=True))
@@ -258,6 +282,19 @@ def main(argv) -> int:
     wm.add_argument("frames", type=int, nargs="*",
                      help="az frame numbers to warm (default: the standard sweep points)")
     wm.set_defaults(func=cmd_warm)
+
+    adopt = sub.add_parser(
+        "adopt-frame",
+        help="reuse frames after an explicitly observer-only Azahar patch change",
+    )
+    adopt.add_argument("source_key", help="existing cache context key")
+    adopt.add_argument("frames", type=int, nargs="+", help="az frame numbers to adopt")
+    adopt.add_argument(
+        "--observer-only",
+        action="store_true",
+        help="assert that the patch difference cannot alter rendered pixels",
+    )
+    adopt.set_defaults(func=cmd_adopt_frame)
 
     inv = sub.add_parser("invalidate", help="delete all frame/probe cache entries for the CURRENT key context")
     inv.set_defaults(func=cmd_invalidate)

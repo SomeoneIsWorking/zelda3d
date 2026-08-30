@@ -31,8 +31,8 @@ soh: red_mask_px=863  red_sat_mean=0.7503 red_R_mean=167.7
 SoH has FEWER strict-red-masked pixels (863 vs 4652) but a much higher mean R (167.7 vs 99.8)
 among the pixels it does mask. This is the same signature already root-caused in
 `2026-07-11-cs438-composite-redisagnosis.md` Addendum 3: the wordmark's decorative gold-outline
-meshes (materials 10/11, `zelda_logo_ev01/ev02`, CameraSphereEnvMap self-add TEV,
-`400faa57`/`efa336cd`) reach 96% pixel-COVERAGE parity with the oracle but overshoot per-pixel
+meshes (materials 10/11, `zelda_logo_ev01/ev02`, CameraSphereEnvMap coordinator 0 with the
+authored single-sampler TEV chain) reach 96% pixel-COVERAGE parity with the oracle but overshoot per-pixel
 BRIGHTNESS (meanR 0.686 vs oracle 0.420 at the isolation frame cs466, per that doc's own final
 table) — i.e. "brighter than it should be" is real, it's just not a fade-ramp bug, it's this
 already-tracked, already-partially-fixed decoration-shading residual.

@@ -85,18 +85,14 @@ struct SgUbo {
     //             (the camera lives folded into uMP for scene draws).
     float uFog3d0[4];
     float uFog3d1[4];
-    // Sphere-map (CameraSphereEnvMap) VIEW-rotation override — rows of the live camera's
-    // view-rotation matrix, for draws whose model-view matrix does NOT carry the camera (the
-    // title 2D ortho-overlay pass: uMV there is a fixed screen placement, so mat3(uMV)*n is NOT
-    // a view-space normal). On the 3DS the sphere-map unit consumes the VIEW-space normal
-    // (CmbVShader; the wordmark decorations' placement rotation is identity per
-    // title_logo_actor.md §6.1, so n_view = R_view * n_model exactly). uSphRot0/1/2.xyz = the
-    // LH view basis ROWS (right / up / forward=normalize(eye-at), the FUN_002d9e68 convention —
-    // oot3d-decomp/docs/title_view_matrix_lh.md); uSphRot0.w = enable flag (>=0.5). When off
-    // (default 0) the shader keeps the mat3(uMV) path, so every non-overlay draw is unchanged.
-    float uSphRot0[4];
-    float uSphRot1[4];
-    float uSphRot2[4];
+    // Sphere-map (CameraSphereEnvMap) normal transform override. The 3DS CmbVShader computes
+    // sphere coordinates from c4-c6 (uModelView) * normal. Host-native composition can carry a
+    // different placement transform in uMV, so these rows transport the oracle's actual c4-c6
+    // normal matrix independently. uSphNrm0.w is the enable gate; when off, ordinary scene draws
+    // retain mat3(uMV). The title wordmark's cached cs1093 draws 75-87 all upload exact identity.
+    float uSphNrm0[4];
+    float uSphNrm1[4];
+    float uSphNrm2[4];
     // OoT3D CmbVShader per-light DIFFUSE terms (#153/#111 — oot3d-decomp title_env_lighting.md
     // §10 disassembly). The PICA vertex-lit program computes, per enabled light i:
     //   o1 += matAmbient*LightAmbientColor_i + max(0, dot(N, -LightDir_i))*matDiffuse*LightDiffuseColor_i

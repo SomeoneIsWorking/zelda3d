@@ -38,11 +38,10 @@ struct CommonUbo {
     // wire these through UNIFIED_COMMON_UBO_BODY when the unified renderer takes over CMB draws.
     float uFog3d0[4];
     float uFog3d1[4];
-    // Mirror of SgUbo::uSphRot0/1/2 (sphere-map view-rotation override, title wordmark
-    // decorations — zelda3d_sg_ubo.h). Live for generic and dual-texture CMB variants.
-    float uSphRot0[4];
-    float uSphRot1[4];
-    float uSphRot2[4];
+    // Mirror of SgUbo::uSphNrm0/1/2 (oracle uModelView normal transform for sphere mapping).
+    float uSphNrm0[4];
+    float uSphNrm1[4];
+    float uSphNrm2[4];
     // Mirror of SgUbo::uLitDif1/uLitDif2/uLightDir2 (per-light diffuse products + light2 dir,
     // #153 CmbVShader vertex-lit port — zelda3d_sg_ubo.h). Live for unified CMB lightingMode 2:
     // actor draws require both opposed directional slots, while scene draws reduce to their

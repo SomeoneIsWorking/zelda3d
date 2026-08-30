@@ -405,7 +405,8 @@ if (FILE* fp = Soh3dOpenBlitLog()) {
 state relevant to CmbVShader lighting at every draw trigger, so the
 harness can read back EXACTLY what the game wrote into
 `LightDir0..2 / LightDiffuseColor0..2 / LightAmbientColor0..2` (c80–c88),
-`MatDiffuseColor/MatAmbientColor` (c8/c9) and the `HasColor /
+`MatDiffuseColor/MatAmbientColor` (c8/c9), `uModelView` (c4-c7),
+`TexMtx0`/`TexMtx1` (c10-c16), `TexMappingMethod` (c92), and the `HasColor /
 IsVertexLighting / IsFragmentLighting` bools (b5/b9/b10) for a given
 frame's draws. This is how the wordmark light-env slot-color ROLES were
 pinned (oot3d-decomp `docs/title_logo_actor.md` §6.6): the slot's first
@@ -431,7 +432,8 @@ extern "C" int soh3d_vsuni_log_active = 0;
 Appends one line per draw:
 `draw idx=<indexed> hasCol=<b5> vLit=<b9> fLit=<b10> matDif=(...) matAmb=(...)
 dir0=(...) dif0=(...) amb0=(...) dir1=... dif1=... amb1=... dir2=... dif2=...
-amb2=... vtxScl0=(...)` — reading `vs_setup.uniforms.f[8,9,80..88,90]` via
+amb2=... vtxScl0=(...) modelView0=(...) ... texMappingMethod=(...)` — reading
+`vs_setup.uniforms.f[4..16,80..92]` via
 `.ToFloat32()` and `uniforms.b[5,9,10]`. See the in-tree copy for the exact
 block (search `soh3d_vsuni_log_active`).
 

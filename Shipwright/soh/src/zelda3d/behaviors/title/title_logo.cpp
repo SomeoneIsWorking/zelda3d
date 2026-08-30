@@ -535,40 +535,14 @@ extern "C" int Zelda3D_TryDrawTitleLogo(PlayState* play) {
     // zelda3d_sg_ubo.h — see that comment for the falsified earlier 1+0.1834*N·(+L) version).
     // With the letters' flat N=(0,0,1) this shades them uniformly from 0.513 (t=0) to 0.757 (t=1),
     // the oracle-measured x1.3-1.4 brightening across the ramp.
-    // Sphere-map view rotation (decoration mats 4-11, CameraSphereEnvMap coordinators): on the
-    // 3DS these decorations are a normal scene draw composited through the LIVE cs-camera's view
-    // matrix, so their sphere-map UV (view-space normal) varies with the camera. This overlay's
-    // own placement matrix deliberately carries no camera (zelda3d_overlay2d.cpp), so supply the
-    // live view rotation separately. Basis per the decompiled 3DS LookAt (FUN_002d9e68,
-    // oot3d-decomp/docs/title_view_matrix_lh.md): fwd = normalize(eye-at), right = normalize
-    // (up x fwd), up' = fwd x right; rows = (right, up', fwd). play->view.* holds this frame's
-    // ported OP97 spline camera (UpdateTitleCamera, verified 0.00 vs Az).
-    {
-        float fx = play->view.eye.x - play->view.lookAt.x;
-        float fy = play->view.eye.y - play->view.lookAt.y;
-        float fz = play->view.eye.z - play->view.lookAt.z;
-        float fl = sqrtf(fx * fx + fy * fy + fz * fz);
-        if (fl > 1e-6f) {
-            fx /= fl;
-            fy /= fl;
-            fz /= fl;
-            const float ux = play->view.up.x, uy = play->view.up.y, uz = play->view.up.z;
-            float rx = uy * fz - uz * fy;
-            float ry = uz * fx - ux * fz;
-            float rz = ux * fy - uy * fx;
-            const float rl = sqrtf(rx * rx + ry * ry + rz * rz);
-            if (rl > 1e-6f) {
-                rx /= rl;
-                ry /= rl;
-                rz /= rl;
-                const float u2x = fy * rz - fz * ry;
-                const float u2y = fz * rx - fx * rz;
-                const float u2z = fx * ry - fy * rx;
-                const float m9[9] = { rx, ry, rz, u2x, u2y, u2z, fx, fy, fz };
-                Zelda3D_GL_SetSphereMapViewRot(modelId, m9);
-            }
-        }
-    }
+    // Sphere-map normal transform (decoration mats 4-11, CameraSphereEnvMap coordinators):
+    // CmbVShader words 59-61 transform normals by uModelView c4-c6 before computing
+    // uv = 0.5*n.xy+0.5. The cache-backed cs1093 oracle capture records exact identity c4-c6
+    // for every wordmark draw 75-87. Keep that matrix independent from this host-native overlay's
+    // RotateX(180) placement matrix; feeding the live camera here was an inference contradicted by
+    // the GPU uniforms and sampled the wrong texels.
+    static constexpr float kSphereNormalMatrix[9] = { 1.0f, 0.0f, 0.0f, 0.0f, 1.0f, 0.0f, 0.0f, 0.0f, 1.0f };
+    Zelda3D_GL_SetSphereMapNormalMatrix(modelId, kSphereNormalMatrix);
     {
         const float t = std::clamp(ps.sheenT / 255.0f, 0.0f, 1.0f);
         const float dx = 2.0f * t - 1.0f;

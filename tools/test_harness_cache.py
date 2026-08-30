@@ -92,6 +92,54 @@ class OracleCacheArtifactTests(unittest.TestCase):
                         "missing", {}, root / "does-not-exist.log"
                     )
 
+    def test_frame_adoption_checks_inputs_and_records_provenance(self) -> None:
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory)
+            cache_root = root / "cache"
+            savestate = root / "state.bin"
+            source_image = root / "source.png"
+            savestate.write_bytes(b"state")
+
+            from PIL import Image
+
+            Image.new("RGB", (2, 2), (1, 2, 3)).save(source_image)
+            with mock.patch.object(harness_cache, "CACHE_ROOT", cache_root):
+                source = self.cache(root, savestate)
+                source.put_frame(17, source_image)
+                source_key = source.key
+
+                with mock.patch.object(
+                    harness_cache,
+                    "_patch_marker",
+                    return_value="observer-only-patch",
+                ):
+                    target = self.cache(root, savestate)
+                    adopted = target.adopt_frame(cache_root / source_key, 17)
+
+                self.assertEqual(Image.open(adopted).getpixel((0, 0)), (1, 2, 3))
+                entry = target._load_index()["frames"]["17"]
+                self.assertEqual(entry["adopted_from_key"], source_key)
+
+    def test_frame_adoption_rejects_different_savestate(self) -> None:
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory)
+            cache_root = root / "cache"
+            first_state = root / "first.state"
+            second_state = root / "second.state"
+            source_image = root / "source.png"
+            first_state.write_bytes(b"first")
+            second_state.write_bytes(b"second")
+
+            from PIL import Image
+
+            Image.new("RGB", (1, 1), (0, 0, 0)).save(source_image)
+            with mock.patch.object(harness_cache, "CACHE_ROOT", cache_root):
+                source = self.cache(root, first_state)
+                source.put_frame(3, source_image)
+                target = self.cache(root, second_state)
+                with self.assertRaisesRegex(ValueError, "different frame inputs"):
+                    target.adopt_frame(cache_root / source.key, 3)
+
 
 if __name__ == "__main__":
     unittest.main()

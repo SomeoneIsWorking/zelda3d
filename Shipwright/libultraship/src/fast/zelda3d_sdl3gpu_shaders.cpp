@@ -76,9 +76,9 @@ bool CompileGlsl(EShLanguage stage, const char* src, std::vector<uint32_t>& spv)
     "    vec4 uTex1Xf;\n"        \
     "    vec4 uFog3d0;\n"        \
     "    vec4 uFog3d1;\n"        \
-    "    vec4 uSphRot0;\n"       \
-    "    vec4 uSphRot1;\n"       \
-    "    vec4 uSphRot2;\n"       \
+    "    vec4 uSphNrm0;\n"       \
+    "    vec4 uSphNrm1;\n"       \
+    "    vec4 uSphNrm2;\n"       \
     "    vec4 uLitDif1;\n"       \
     "    vec4 uLitDif2;\n"       \
     "    vec4 uLightDir2;\n"     \
@@ -175,13 +175,11 @@ void main() {
         vPrim = min(abs(aColor), vec4(1.0));
     }
     vWorld = (ubo.uMV * vec4(sp, 1.0)).xyz;
-    // Sphere-map normal space: view space. For scene draws mat3(uMV) approximates it; for the
-    // title 2D ortho-overlay pass uMV is a fixed screen placement carrying NO camera at all, so
-    // the caller supplies the live camera's view-rotation rows in uSphRot0..2 (uSphRot0.w = gate)
-    // and the normal is rotated into REAL view space — matching the 3DS, where these decorations
-    // are composited through the live cs-camera's view matrix (title_logo_actor.md §6.1).
-    vec3 ns = (ubo.uSphRot0.w > 0.5)
-        ? vec3(dot(ubo.uSphRot0.xyz, nM), dot(ubo.uSphRot1.xyz, nM), dot(ubo.uSphRot2.xyz, nM))
+    // Sphere-map normal space is the CmbVShader's c4-c6 uModelView transform. For ordinary scene
+    // draws host uMV carries the same transform. Native composition may differ, so an exact
+    // oracle-derived matrix can be transported independently (title wordmark: identity).
+    vec3 ns = (ubo.uSphNrm0.w > 0.5)
+        ? vec3(dot(ubo.uSphNrm0.xyz, nM), dot(ubo.uSphNrm1.xyz, nM), dot(ubo.uSphNrm2.xyz, nM))
         : (mat3(ubo.uMV) * nM);
     // Coordinator 0 is independent of TEX1. Wordmark mats 10/11 use CameraSphereEnvMap on TEX0
     // while leaving texture unit 1 disabled; treating that mapping as a dual-texture signal was

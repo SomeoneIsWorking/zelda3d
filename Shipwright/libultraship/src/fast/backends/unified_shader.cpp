@@ -130,9 +130,9 @@ const char* kUnifiedShaderTemplate = R"PRISM(@prism(type='fragment', name='Unifi
     vec4 uTex1Xf; \
     vec4 uFog3d0; \
     vec4 uFog3d1; \
-    vec4 uSphRot0; \
-    vec4 uSphRot1; \
-    vec4 uSphRot2; \
+    vec4 uSphNrm0; \
+    vec4 uSphNrm1; \
+    vec4 uSphNrm2; \
     vec4 uLitDif1; \
     vec4 uLitDif2; \
     vec4 uLightDir2; \
@@ -192,8 +192,8 @@ const char* kUnifiedShaderTemplate = R"PRISM(@prism(type='fragment', name='Unifi
         gl_Position = (ubo.uParams1.w > 0.5) ? aPos : (ubo.uMvp * vec4(sp, 1.0));
         vNrmView = mat3(ubo.uMv) * nM;
         @if(o_cmbExtraTex)
-            vec3 ns = (ubo.uSphRot0.w > 0.5)
-                ? vec3(dot(ubo.uSphRot0.xyz, nM), dot(ubo.uSphRot1.xyz, nM), dot(ubo.uSphRot2.xyz, nM))
+            vec3 ns = (ubo.uSphNrm0.w > 0.5)
+                ? vec3(dot(ubo.uSphNrm0.xyz, nM), dot(ubo.uSphNrm1.xyz, nM), dot(ubo.uSphNrm2.xyz, nM))
                 : (mat3(ubo.uMv) * nM);
             if (ubo.uSheen.w > 2.5 && ubo.uSheen.w < 3.5) {
                 vec3 nv0 = normalize(ns);
@@ -398,6 +398,18 @@ const char* kUnifiedShaderTemplate = R"PRISM(@prism(type='fragment', name='Unifi
         @end
         @end
 
+        // Selected-draw diagnostics mirror the native CMB FRAGDBG meanings. They are compiled only
+        // when requested before renderer startup and remain gated per draw by uDebug.x.
+        @if(o_probeTex0)
+            if (ubo.uDebug.x > 0.5) { gl_FragDepth = 0.0; fragColor = vec4(texel0().rgb, 1.0); return; }
+        @end
+        @if(o_probePrimary)
+            if (ubo.uDebug.x > 0.5) { gl_FragDepth = 0.0; fragColor = vec4(vColor0.rgb, 1.0); return; }
+        @end
+        @if(o_probeCombined)
+            if (ubo.uDebug.x > 0.5) { gl_FragDepth = 0.0; fragColor = vec4(texel.rgb, 1.0); return; }
+        @end
+
         // lightingMode 1 (3DS character half-Lambert): applied HERE, not baked into vColor0 like
         // mode 2, because the combiner's SHADER_INPUT_1 must stay the raw per-vertex tint (matching
         // what the old fixed CMB shader's `t.rgb * vColor.rgb * shade` does — shade multiplies the
@@ -433,7 +445,7 @@ const char* kUnifiedShaderTemplate = R"PRISM(@prism(type='fragment', name='Unifi
 @end
 )PRISM";
 
-std::string BuildSource(Variant v, bool vertex) {
+std::string BuildSource(Variant v, bool vertex, int fragmentProbeMode = 0) {
     VariantFeatures f = FeaturesFor(v);
     prism::Processor processor;
     prism::ContextItems ctx = {
@@ -447,6 +459,9 @@ std::string BuildSource(Variant v, bool vertex) {
         { "o_genericTev", f.genericTev },
         { "o_cmbExtraTex", f.genericTev || v == Variant::kDualTex || v == Variant::kDualTexFog },
         { "o_cmbDualTex", v == Variant::kDualTex || v == Variant::kDualTexFog },
+        { "o_probeTex0", !vertex && fragmentProbeMode == 1 },
+        { "o_probePrimary", !vertex && fragmentProbeMode == 5 },
+        { "o_probeCombined", !vertex && fragmentProbeMode == 6 },
         { "generic_tev_functions", Fast::Zelda3DTev::kGenericFunctions },
         { "ZELDA3D_GL_MAX_BONES", ZELDA3D_GL_MAX_BONES },
     };
@@ -485,6 +500,10 @@ std::string BuildVertexSource(Variant v) {
 
 std::string BuildFragmentSource(Variant v) {
     return BuildSource(v, false);
+}
+
+std::string BuildFragmentSource(Variant v, int fragmentProbeMode) {
+    return BuildSource(v, false, fragmentProbeMode);
 }
 
 bool SelfTestUnifiedShaderVariants(std::string& outLog) {

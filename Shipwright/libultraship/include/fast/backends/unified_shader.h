@@ -8,10 +8,7 @@
 // kSgShaderTemplate) and the fixed 3DS CMB shader (zelda3d_sdl3gpu_shaders.cpp), per
 // UnifiedVtx (unified_vtx.h) / UnifiedMaterial (unified_material.h).
 //
-// Phase 1 status: DORMANT. This module is unreferenced by any live draw path — nothing calls
-// GetOrCreateUnifiedPipeline yet. SelfTestUnifiedShaderVariants() is the only thing exercising it,
-// gated behind ZELDA3D_UNIFIED_SHADER_SELFTEST=1, purely to catch a GLSL authoring mistake at
-// compile-shader time rather than letting bad source sit unvalidated until Phase 2 wires it in.
+// This module is live for the renderer variants selected by ZELDA3D_UNIFIED_RENDERER.
 namespace Fast::Unified {
 
 // The plan calls for "~3-6 statically compiled shader variants keyed on structural features only
@@ -19,7 +16,7 @@ namespace Fast::Unified {
 // (hundreds) or one fully generic uber-shader (correct but slower on simple draws). These buckets cover
 // the structural buckets seen in the Phase 0 corpus sweep (scratch/render_unify/cc_corpus.log):
 enum class Variant {
-    kUntextured,        // vertex-color-only draws (solid UI fills, debug wireframes)
+    kUntextured,         // vertex-color-only draws (solid UI fills, debug wireframes)
     kSingleTex,          // 1 texture, no alpha test, no fog — the common opaque case
     kSingleTexAlphaTest, // 1 texture with alpha-threshold/edge discard (cutout foliage, decals)
     kDualTex,            // 2 textures / 2-cycle combine, no fog
@@ -37,6 +34,9 @@ const char* VariantName(Variant v);
 // variants. Only structural feature (texture count / alpha test / fog / grayscale / PICA TEV) differs.
 std::string BuildVertexSource(Variant v);
 std::string BuildFragmentSource(Variant v);
+// Selected-draw diagnostic form. Modes 1/5/6 expose TEX0, PRIMARY, and post-TEV combined color;
+// zero emits the shipping source. The caller gates the probe per draw through CommonUbo::uDebug.
+std::string BuildFragmentSource(Variant v, int fragmentProbeMode);
 
 // Compiles every variant's vertex + fragment source to SPIR-V via glslang, purely to validate the
 // GLSL is well-formed (does NOT create any SDL_GPUShader/pipeline — that's Phase 2/3 wiring, which

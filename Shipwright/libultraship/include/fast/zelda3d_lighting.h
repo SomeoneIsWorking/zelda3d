@@ -12,8 +12,8 @@ void Zelda3D_GL_SetLightParams(const float ambient[3], const float light1Color[3
                                const float light2Color[3], int enabledLightCount);
 void Zelda3D_GL_SetLightDirOverride(int modelId, float dx, float dy, float dz);
 void Zelda3D_GL_ClearLightDirOverride(int modelId);
-void Zelda3D_GL_SetSphereMapViewRot(int modelId, const float matrix[9]);
-void Zelda3D_GL_ClearSphereMapViewRot(int modelId);
+void Zelda3D_GL_SetSphereMapNormalMatrix(int modelId, const float matrix[9]);
+void Zelda3D_GL_ClearSphereMapNormalMatrix(int modelId);
 extern float gZelda3dAmbient[3];
 extern float gZelda3dLight1Col[3];
 extern float gZelda3dLight2Dir[3];

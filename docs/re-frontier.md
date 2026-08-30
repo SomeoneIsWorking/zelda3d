@@ -72,12 +72,12 @@ This doc **organizes and links to** the existing RE corpus rather than duplicati
 - notes: coordinator-1 CameraSphereEnvMap port (commit `efa336cd`) was the root cause of invisible gold wordmark outlines — a real port, not a hack.
 
 ### title.wordmark-decoration — mat10/11 wordmark decoration sphere-map
-- status: re-partial
+- status: re-verified
 - deps: title.rider-dispatch
-- evidence: `oot3d-decomp/docs/title_logo_actor.md` §6; exact cs1093 cached draw/uniform artifact documented in `debug_journal/2026-08-30-title-unified-cmb-state-contract.md`; coordinator-1 sphere mapping commit `efa336cd`
+- evidence: oot3d-decomp/docs/title_logo_actor.md §6.7; /CmbVShader.shbin words 59-61 and 295-296; cached cs1093 draws 75-87 c4-c6 identity and draw86 fragment artifact documented in debug_journal/2026-08-30-title-unified-cmb-state-contract.md; host selected TEX0 matches decoded linear center sample
 - where: CMB coordinator parsing in `Shipwright/cmb3d/asset/cmb.{h,cpp}` and independent coordinator transport in `Shipwright/libultraship/src/fast/{backends/unified_shader,zelda3d_sdl3gpu_pass,zelda3d_sdl3gpu_shaders}.cpp`
-- gap: mat10/11 now use their binary-authored single-sampler MODULATE→REPLACE chain and independent coordinator-0 sphere map. Cached cs464/cs1093 content scores improve to 0.8008/0.7465, but title parity remains visibly incomplete and wider unified rider/scene differences remain. The selected-fragment cache is available for the next distinct observable; do not tune the residual.
-- notes: the former `kDualTexSelfSphereAdd`/mode-4 path was not RE-backed. It misidentified another dual-texture draw, fabricated TEX1 aliasing, and made the historical 96% aggregate non-closing evidence. The 2026-08-30 alpha finding remains narrower and proven: unified transport had independently dropped authored draw fade alpha.
+- gap: none for mat10/11 coordinator-0 mapping, normal transform, authored TEV, or filtered sample; wider title composition is separately partial
+- notes: The removed live-camera basis and kDualTexSelfSphereAdd paths were both inference-driven and contradicted by exact draw identity. Azahar software PIXEL texcol is nearest-only despite authored linear filters; instrument I043 is distrusted for filtered sample values.
 
 ### title.terrain-grounding — title terrain/field-grass actor grounding
 - status: re-verified
