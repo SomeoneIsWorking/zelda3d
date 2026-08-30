@@ -1,8 +1,9 @@
 """Persistent cache for deterministic embedded-Azahar frames and probes.
 
-The cache identity is the savestate bytes, ROM bytes, and documented Azahar
-patch set. Changing any of those inputs creates a separate context under the
-gitignored ``scratch/oracle_cache`` tree instead of serving stale evidence.
+The cache identity is the savestate bytes, ROM bytes, documented Azahar patch
+set, and resolved texture-pack manifest. Changing any input creates a separate
+context under the gitignored ``scratch/oracle_cache`` tree instead of serving
+stale graphics evidence.
 """
 
 from __future__ import annotations
@@ -14,9 +15,10 @@ import re
 import shutil
 import time
 from pathlib import Path
-from typing import Any
+from typing import Any, Mapping
 
-from harness_paths import AZAHAR_PATCH_MD, CACHE_ROOT
+from harness_paths import AZAHAR_PATCH_MD, CACHE_ROOT, REPO_ROOT
+from repo_environment import apply_repo_environment
 
 
 def _sha256_file(path: Path) -> str:
@@ -37,16 +39,75 @@ def _patch_marker() -> str:
     return f"p{len(headings)}-{digest}"
 
 
-def cache_key(savestate: Path, rom: Path | None = None) -> tuple[str, dict[str, Any]]:
+def _runtime_environment(environment: Mapping[str, str] | None = None) -> dict[str, str]:
+    resolved = dict(os.environ if environment is None else environment)
+    apply_repo_environment(REPO_ROOT, resolved)
+    return resolved
+
+
+def _resolved_path(value: str) -> Path:
+    path = Path(value)
+    return path if path.is_absolute() else REPO_ROOT / path
+
+
+def _texture_pack_marker(
+    environment: Mapping[str, str], rom_path: Path | None
+) -> tuple[str, dict[str, Any]]:
+    disabled = {"0", "off", "none"}
+    harness_mode = environment.get("ZELDA3D_HARNESS_TEXPACK", "on").lower()
+    explicit = environment.get("ZELDA3D_TEXPACK")
+    if harness_mode in disabled or (explicit and explicit.lower() in disabled):
+        return "tpoff", {"mode": "off", "root": None}
+
+    candidates: list[tuple[str, Path]] = []
+    if explicit:
+        candidates.append(("explicit", _resolved_path(explicit)))
+    else:
+        candidates.append(("repo", REPO_ROOT / "textures"))
+        if rom_path is not None:
+            candidates.append(("rom", rom_path.parent / "textures"))
+
+    for origin, root in candidates:
+        if not root.is_dir():
+            continue
+        files = sorted(path for path in root.rglob("*") if path.is_file())
+        if not any(path.name.startswith("tex1_") for path in files):
+            continue
+        digest = hashlib.sha256()
+        total_bytes = 0
+        for path in files:
+            stat = path.stat()
+            total_bytes += stat.st_size
+            digest.update(str(path.relative_to(root)).encode())
+            digest.update(f"\0{stat.st_size}\0{stat.st_mtime_ns}\0".encode())
+        short_digest = digest.hexdigest()[:12]
+        return f"tp{len(files)}-{short_digest}", {
+            "mode": "on",
+            "root": str(root.resolve()),
+            "root_origin": origin,
+            "manifest_files": len(files),
+            "manifest_bytes": total_bytes,
+            "manifest_sha256_12": short_digest,
+        }
+    return "tpnone", {"mode": "off", "root": None, "reason": "no-valid-pack"}
+
+
+def cache_key(
+    savestate: Path,
+    rom: Path | None = None,
+    environment: Mapping[str, str] | None = None,
+) -> tuple[str, dict[str, Any]]:
     """Compute a cache key and the complete metadata used to derive it."""
     savestate = Path(savestate)
+    runtime_environment = _runtime_environment(environment)
     savestate_sha = _sha256_file(savestate)[:16] if savestate.exists() else "nostate"
     rom_path = Path(rom) if rom else None
-    if rom_path is None and os.environ.get("ZELDA3D_OOT3D_ROM"):
-        rom_path = Path(os.environ["ZELDA3D_OOT3D_ROM"])
+    if rom_path is None and runtime_environment.get("ZELDA3D_OOT3D_ROM"):
+        rom_path = _resolved_path(runtime_environment["ZELDA3D_OOT3D_ROM"])
     rom_sha = _sha256_file(rom_path)[:16] if rom_path and rom_path.exists() else "norom"
     patch = _patch_marker()
-    key = f"{savestate_sha}_{rom_sha}_{patch}"
+    texture_pack, texture_pack_meta = _texture_pack_marker(runtime_environment, rom_path)
+    key = f"{savestate_sha}_{rom_sha}_{patch}_{texture_pack}"
     return key, {
         "key": key,
         "savestate_path": str(savestate),
@@ -55,14 +116,20 @@ def cache_key(savestate: Path, rom: Path | None = None) -> tuple[str, dict[str, 
         "rom_sha256_16": rom_sha,
         "azahar_patch_marker": patch,
         "azahar_patch_md": str(AZAHAR_PATCH_MD),
+        "texture_pack": texture_pack_meta,
     }
 
 
 class OracleCache:
     """Store deterministic oracle frames, probes, and raw artifacts by input identity."""
 
-    def __init__(self, savestate: Path, rom: Path | None = None):
-        self.key, self.meta = cache_key(savestate, rom)
+    def __init__(
+        self,
+        savestate: Path,
+        rom: Path | None = None,
+        environment: Mapping[str, str] | None = None,
+    ):
+        self.key, self.meta = cache_key(savestate, rom, environment)
         self.dir = CACHE_ROOT / self.key
         self.frames_dir = self.dir / "frames"
         self.probes_dir = self.dir / "probes"
@@ -204,6 +271,7 @@ class OracleCache:
             "dir": str(self.dir),
             "n_frames": len(index["frames"]),
             "n_probes": len(index["probes"]),
+            "n_artifacts": len(index.get("artifacts", {})),
             "bytes": total_bytes,
         }
 

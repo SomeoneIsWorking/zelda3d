@@ -91,18 +91,21 @@ file is the failure mode; a single owner with one per-frame resolved state is th
 ## Oracle data cache — warm once, reuse across sessions
 
 The embedded-Azahar oracle's output at a given az (Azahar) title-cs frame is fully
-deterministic given three inputs: the loaded savestate, the ROM bytes, and whatever the
-`soh3d_harness` Azahar patches (`tools/soh3d_harness/AZAHAR_PATCH.md`) do to rendering.
+deterministic given four inputs: the loaded savestate, the ROM bytes, the resolved hi-res texture
+pack, and whatever the `soh3d_harness` Azahar patches
+(`tools/soh3d_harness/AZAHAR_PATCH.md`) do to rendering.
 Held fixed, re-running Az to frame N always reproduces the same pixels — so repeated A/B
 and probe runs (`tools/title_ab.py`, future probes) shouldn't pay the Az boot+step cost
 again for a frame already captured in a prior session.
 
 - **Cache**: `scratch/oracle_cache/<key>/` (gitignored — contains ROM-derived frame data,
   never committed). `<key>` = `sha256(savestate)[:16]_sha256(rom)[:16]_<patch-marker>`
-  (`harness_cache.cache_key()`); the patch marker hashes the complete `AZAHAR_PATCH.md`,
-  so editing a patch mints a fresh key instead of silently serving stale
-  frames. Frames stored as PNG; each context has an `index.json` recording the full key
-  metadata (savestate/ROM paths+hashes, patch marker) for auditability.
+  plus a texture-pack manifest marker (`harness_cache.cache_key()`). The cache resolves `.env`
+  before hashing the ROM, matching the child launcher instead of silently producing a `norom`
+  context. The patch marker hashes the complete `AZAHAR_PATCH.md`; the pack marker records its
+  resolved on/off state and hashes every relative filename, size, and modification timestamp.
+  Editing either input mints a fresh key instead of silently serving stale frames. Frames are
+  stored as PNG; each context has an `index.json` recording the full key metadata for auditability.
 - **API**: `harness_cache.OracleCache` — `get_frame`/`put_frame` (by az frame number),
   `get_probe`/`put_probe` (by probe name + az frame + args, for deterministic structured
   probes like camera eye/at, `az_daytime`, `az_fog`, `vsuni_log`). `stats()`/`invalidate()`
@@ -116,9 +119,9 @@ again for a frame already captured in a prior session.
   <az>` stepping loop entirely and reuses the stored PNG for the oracle side; the SoH side
   is NEVER cached (it changes every build) and always runs live via `soh_step`. Reports
   "oracle: cache hit" or "oracle: live run (cached now)" so a caller can see which path ran.
-- **Invalidate** whenever the savestate, ROM, or an `AZAHAR_PATCH.md` entry changes — the
-  key naturally rotates, so a stale cache just sits unused rather than serving wrong data;
-  run `invalidate` to reclaim the disk space it would otherwise occupy.
+- **Invalidate** only to reclaim space. Savestate, ROM, patch-contract, texture-pack mode, and
+  texture-pack manifest changes rotate the key automatically, so stale contexts sit unused
+  rather than serving wrong data.
 - **soh3d_harness is single-instance** (PID-locked) — the frame cache does not change
   that; `warm`/`ab` cache-miss paths still need exclusive access to the harness process.
   The tracked `tools/oracle_draw_isolate.py` also caches a completed per-draw sweep (including

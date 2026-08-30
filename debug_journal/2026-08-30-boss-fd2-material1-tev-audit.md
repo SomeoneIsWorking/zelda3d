@@ -2,73 +2,84 @@
 
 ## Question
 
-The previous fragment probe appeared to show two incompatible live chains for texture
-`0x180bfe80`. Before changing the generic TEV evaluator, identify which material produced each
-sample in a fresh capture.
+Identify the exact oracle draw corresponding to host model 2018 group 0 / material 1, capture its
+complete fragment footprint once, and determine whether its live TEV chain differs from the native
+generic evaluator. Do not infer material identity from a shared texture address.
+
+## Instrument correction
+
+The first rasterizer probe mislabeled draw IDs by one. `pica_core.cpp` logged `vsuni_log n=<current>`,
+incremented the shared counter, and only then entered the software rasterizer. The rasterizer's old
+`draw=38` record therefore described exact `vsuni_log n=37`, which is material 5, not material 1.
+That earlier material assignment is retracted.
+
+The software-rasterizer patch now reports `soh3d_draw_index - 1`, so `PIXEL`, `PIXELXY`, and triangle
+records use the exact `vsuni_log` index. `SOH3D_PIXEL_DRAW=<n>` emits every generated fragment for
+one selected draw. The corrected draw map follows expanded vertex counts:
+
+```text
+host group/material 0/1 count 702  = oracle n29 (537) + n30 (165)
+host group/material 1/2 count 198  = oracle n31
+host group/material 2/0 count 1074 = oracle n32+n33+n34
+host group/material 3/3 count 120  = oracle n35
+host group/material 4/4 count 498  = oracle n36
+host group/material 5/5 count 258  = oracle n37
+host group/material 6/5 count 102  = oracle n38
+```
 
 ## Controlled capture
 
-The embedded oracle and host were started from `scratch/gameplay_settled.state` with
-`ZELDA3D_TIME=0x6000`, `ZELDA3D_HARNESS_TEXPACK=off`, and software-oracle rendering. Both sides
-were warped to entrance `0x305`, forced to `bossfd2_ground`, placed at the same explicit camera, and
-held at `bossfd2_mane_sync 0 -850 0`. The final `bossfd2_mane_step 2` reported
-`root-control=MATCH maxStepDelta=0`; the host draw list identified draw 37 as model 2018,
-group 0, material 1, 702 vertices. The fresh oracle log is in ignored scratch output
-`scratch/logs/fd2-material1-combiner.log`.
+The paired harness used `scratch/gameplay_settled.state`, entrance `0x305`, daytime `0x6000`, the
+explicit side camera `-700 100 0 45`, mane root `0 -850 0`, and the software oracle renderer. The
+texture pack was ON on both sides from the same 2,149-file root. The final controlled step reported
+`root-control=MATCH maxStepDelta=0`. The host selected model 2018 group 0 / material 1 at draw 37;
+the oracle selected exact draw 29 with `SOH3D_PIXEL_DRAW=29`.
 
-## Finding
-
-The static `valbasiagnd.cmb` survey gives material 1 this chain:
+The oracle state for n29 is:
 
 ```text
-stage0 MODULATE(PRIMARY,TEX0)x2
-stage1 MODULATE(TEX0,TEX1)x2
-stage2 ADD(PREVIOUS,PREVBUF)
-stage3 MULT_ADD(PREVIOUS,CONST.a,CONST)
+nv=537  tex0=180bde00/128x128/f12  texSlotMap=(0,1,0,0)
+vLit=1 fLit=0  matDif=.498 matAmb=.4
+stage0=0e300430
+stage1=0e1f0e43
+stage2=0e1f0edf
+stage3=0e1f0eef
 ```
 
-The fresh oracle sample at log line 57548 has exactly that live register chain after translating
-the enum values: stage 0 `(0,3,14)` / `MODULATE` / x2, stage 1 `(3,4,14)` / `MODULATE` / x2,
-stage 2 `(15,13,14)` / `ADD`, and stage 3 `(15,14,14)` / `MULT_ADD`. Its inputs were
-`tex0=(112,10,27)`, `tex1=(77,26,9)`, and `primary=(108,61,10)`, with
-`combined=(160,6,2)`. The host's packed words are
-`0e300430/0e1f0e43/0e1f0edf/0e1f0eef`, which decode to the same four stages; the expected
-8-bit arithmetic is approximately `(163,7,4)` before fixed-point rounding.
+Those four packed stages match the host material-1 generic TEV words. The selected draw generated
+1,052 fragments and 1,036 nearest-depth pixels in PICA framebuffer bbox `(143,189)-(258,210)`. Its
+nearest-pixel means were:
 
-The earlier apparently neutral sample at line 55523 is not material 1. Its live chain is
-`stage1=(4,14,15) MULT_ADD` followed by `stage2=(15,14,14) MULT_ADD`, which matches static
-material 4's exposed-face overlay chain and its slot-4 alpha pulse. The shared texture address
-does not identify a material.
+```text
+tex0     = (105.016, 26.938,  7.656)
+tex1     = (125.411, 79.206, 61.440)
+primary  = (102.949, 51.558, 15.391)
+combined = (162.060, 28.456,  4.149)
+```
+
+The reducer is `tools/oracle_fragment_summary.py`; it keeps the smallest-depth fragment per
+framebuffer pixel and refuses a missing draw. Its unit tests include overlapping fragments and
+cross-draw rejection.
 
 ## Decision
 
-No TEV source, latch, or stage-order change is justified. The material-1 generic TEV path is
-consistent with the oracle at the controlled sample. This audit falsifies the proposed cause
-“host adds a material-1 TEX0*TEX1 term that the oracle omits”; the BossFd2 opaque-body residual
-remains open. The next useful capture must isolate material 1 by draw mapping and compare it in
-the same compositing context after the corrected camera/texture-pack state, rather than selecting
-by texture address alone.
-
-## Follow-up capture boundary
-
-Three fresh runs used the explicit side camera `eye=(-700,-871.249,0)`, `at=(0,-971.249,0)`,
-FOV 45, with the host restricted through draw 37 and a selected material-1 fragment tap. The
-host body was stable in the crop, but fixed oracle probe points did not identify the same draw:
-at `(390,230)` the host selected draw produced `(190,50,11)`, while the oracle `PIXELXY` stream
-had no `tex0=180bfe80` material-1 sample at that coordinate. The oracle frame also contains a
-dialog overlay and its visible body is shifted enough that overlapping orange masks are not a
-same-fragment correspondence. These captures are not parity evidence and do not justify a
-TEV, lighting, or texture change. A useful next instrument must select the oracle draw by draw
-identity and expose its rasterized footprint, or otherwise establish a shared material-1 pixel
-before comparing values.
+No TEV source, latch, or stage-order change is justified. Exact draw identity confirms that host and
+oracle material 1 use the same live four-stage chain. Direct host-FRAGDBG versus oracle color values
+remain non-parity evidence because instrument I004 is distrusted for color-space comparison. The
+BossFd2 opaque-body residual stays open; the cached n29 footprint can now be joined to host coverage
+without running the oracle again.
 
 ## Oracle capture cache
 
-The exact paired oracle capture is now cached under
-`scratch/oracle_cache/26f57176963dad7a_norom_p37-ef0970ab/` with setup arguments for entrance
-`0x305`, daytime `0x6000`, camera `700 100 0 45`, mane position `0 -850 0`, framebuffer probe
-`240,195`, and the software rasterizer. It contains the draw-tagged `PIXELXY` log, the matching
-`vsuni_log`, and the oracle PPM. Re-running `scratch/probe_fd2_paired_xy.py` produced
-`oracle: cache hit` and restored those files without starting the harness. `OracleCache` now
-supports raw artifacts, and its Azahar discriminator hashes the complete `AZAHAR_PATCH.md`
-content so patch-body changes rotate the cache key. The three cache identity tests pass.
+The capture is cached under:
+
+```text
+scratch/oracle_cache/
+  26f57176963dad7a_6510135ae6c38599_p37-345049fb_tp2149-e714eb17be1b/
+```
+
+It contains the complete draw-tagged oracle log, matching `vsuni_log`, oracle PPM, and derived draw-29
+JSON summary. Cache identity now resolves `.env` before hashing the ROM and includes the effective
+texture-pack mode plus a manifest fingerprint, so graphics captures cannot collide in a `norom` or
+wrong-pack context. Re-running the paired probe reported `oracle: cache hit` in 8.9 seconds without
+starting the harness; the original software-oracle capture took approximately six minutes.
