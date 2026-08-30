@@ -24,6 +24,7 @@ struct CommonUbo {
     float uParams1[4]; // x=noise_scale, y=polygonOffset, z=hasSkin, w=alreadyTransformed (N64)
     float uMatAmbient[4];
     float uMatDiffuse[4];
+    float uPrimaryCtl[4]; // x=CmbVShader HasColor; remaining lanes reserved
     // PICA constant-color fallback plus a byte-identical mirror of SgUbo::uMatConst. Generic-TEV
     // draws use the full palette below; simple unified CMB draws retain this selected-slot value.
     float uMatConst[4];
@@ -55,6 +56,9 @@ struct CommonUbo {
     uint32_t uTevConst[8];
     float uTex2Xf[4];
     float uTevCtl[4];
+    // CommonUbo shares a fixed-size storage envelope with SgUbo, whose native layout carries
+    // both uMatDiffuse and uPrimaryCtl in addition to fields that map differently here.
+    float uNativeLayoutPad[4];
     float uDebug[4]; // Mirror of SgUbo::uDebug; renderer-only selected-fragment probe gate.
 };
 
@@ -64,13 +68,11 @@ struct CommonUbo {
 inline void CopyCmbVertexLightBank(CommonUbo& target, const Zelda3DSg::SgUbo& source) {
     for (int component = 0; component < 3; ++component) {
         target.uMatAmbient[component] = source.uAmbient[component] * source.uAmbient[3];
-        // Kept populated for CommonUbo compatibility even though CMB lightingMode 2 consumes the
-        // two explicit slot products below.
-        target.uMatDiffuse[component] = source.uLitDif1[component];
     }
     target.uMatAmbient[3] = 0.0f;
-    target.uMatDiffuse[3] = 0.0f;
     for (int component = 0; component < 4; ++component) {
+        target.uMatDiffuse[component] = source.uMatDiffuse[component];
+        target.uPrimaryCtl[component] = source.uPrimaryCtl[component];
         target.uLightDir[component] = source.uLightDir[component];
         target.uLitDif1[component] = source.uLitDif1[component];
         target.uLitDif2[component] = source.uLitDif2[component];

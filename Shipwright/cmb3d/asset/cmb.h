@@ -100,7 +100,9 @@ struct CmbMaterial {
     // draws (fog_mode=5 with the palette-blended fog color/LUT). See cmb.cpp parse comment.
     bool is_fog = false;
     float mat_ambient[3] = { 1, 1, 1 };
-    float mat_diffuse[3] = { 1, 1, 1 };
+    // CmbVShader c8 MatDiffuseColor. Alpha is live in the unlit/no-color PRIMARY branch
+    // (words 112--120), so preserve the complete authored RGBA value rather than only RGB.
+    float mat_diffuse[4] = { 1, 1, 1, 1 };
     // Stage-0 TEV combiner. Scene materials are overwhelmingly a single
     // MODULATE(PRIMARY_COLOR=v_Color, TEXTURE0) stage, but the combine op and especially the
     // RGB SCALE (x1/x2/x4) are per-material — Kokiri grass MODULATEs at scaleRGB=x2, the
@@ -254,7 +256,7 @@ struct CmbVertex {
     float uv2[2] = { 0, 0 };
 };
 
-// One draw batch: all triangles that use a given (material, mesh_id), as a triangle list.
+// One draw batch: all triangles that use a given (material, mesh_id, HasColor), as a triangle list.
 // Batches are split by mesh_id (not just material) so the renderer can toggle per-mesh_id
 // visibility at draw time — e.g. Link's childlink_v2 bakes several hand-pose / equipment
 // variants onto ONE skin material, distinguished only by mesh_id; the game shows a subset
@@ -262,6 +264,7 @@ struct CmbVertex {
 struct CmbDrawGroup {
     int material_index = 0;
     int mesh_id = -1;             // CMB mesh_id of the contributing meshes (the visibility-switch key)
+    bool has_color = false;       // CmbVShader HasColor uniform for this geometry batch
     std::vector<CmbVertex> verts; // multiple of 3
 };
 

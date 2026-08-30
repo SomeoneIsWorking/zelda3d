@@ -637,6 +637,7 @@ static void loadBillboard(LoadedModel* out, const std::string& zarPath, const st
     Zelda3D::CmbDrawGroup g;
     g.material_index = -1;
     g.mesh_id = -1;
+    g.has_color = true;
     // N64 tris: gSP2Triangles(0,1,2, 0, 2,1,3, 0) over verts {bl,br,tl,tr}.
     g.verts = { bl, br, tl, tl, br, tr };
     out->groups.push_back(std::move(g));
@@ -665,6 +666,10 @@ static void loadBillboard(LoadedModel* out, const std::string& zarPath, const st
     cg.cull = 0;
     cg.faceCull = 0; // camera-facing billboard quad: always double-sided
     cg.meshId = -1;
+    cg.hasColor = 1;
+    for (float& channel : cg.matDiffuse) {
+        channel = 1.0f;
+    }
     out->cGroups.push_back(cg);
     out->skinned = false;
     out->ok = true;

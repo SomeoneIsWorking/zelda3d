@@ -70,6 +70,8 @@ bool CompileGlsl(EShLanguage stage, const char* src, std::vector<uint32_t>& spv)
     "    vec4 uFog;\n"           \
     "    vec4 uFog2;\n"          \
     "    vec4 uAmbient;\n"       \
+    "    vec4 uMatDiffuse;\n"    \
+    "    vec4 uPrimaryCtl;\n"    \
     "    vec4 uMatConst;\n"      \
     "    vec4 uSheen;\n"         \
     "    vec4 uTex0Xf;\n"        \
@@ -171,8 +173,12 @@ void main() {
                  + ubo.uLitDif1.rgb * max(dot(nV, -ubo.uLightDir.xyz), 0.0)
                  + ubo.uLitDif2.rgb * max(dot(nV, -ubo.uLightDir2.xyz), 0.0);
         vPrim = min(abs(vec4(lit * aColor.rgb, aColor.a)), vec4(1.0));
-    } else {
+    } else if (ubo.uPrimaryCtl.x > 0.5) {
+        // CmbVShader HasColor=1 overwrites the unlit c8 MatDiffuseColor seed with aColor.
         vPrim = min(abs(aColor), vec4(1.0));
+    } else {
+        // CmbVShader HasColor=0 leaves the authored c8 MatDiffuseColor in PRIMARY.
+        vPrim = min(abs(ubo.uMatDiffuse), vec4(1.0));
     }
     vWorld = (ubo.uMV * vec4(sp, 1.0)).xyz;
     // Sphere-map normal space is the CmbVShader's c4-c6 uModelView transform. For ordinary scene
@@ -355,10 +361,14 @@ void main() {
     // tested), so evaluating clamp(lit*vColor) per FRAGMENT on interpolated inputs is brighter
     // wherever a triangle straddles saturation. `vPrim` carries the per-vertex result.
         prim = vPrim;
-    } else if (ubo.uParams.y > 0.5) {
-        prim = vec4(vColor.rgb * shade, vColor.a);
     } else {
-        prim = vec4(vColor.rgb, vColor.a);
+        // vPrim already contains the exact unlit CmbVShader choice (aColor or MatDiffuse).
+        // Actor behavior modulation is an explicit host layer after that choice, not a
+        // replacement for the shader's HasColor branch.
+        prim = vPrim;
+        if (ubo.uParams.y > 0.5) {
+            prim.rgb *= shade;
+        }
     }
     // Generic per-stage TEV path (render.multi-stage-tev): evaluate the material's real
     // combiner chain — multi-texture, multi-stage, per-stage ops/operands/scales/consts —

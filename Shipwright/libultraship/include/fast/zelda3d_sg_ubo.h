@@ -38,6 +38,11 @@ struct SgUbo {
     float uFog[4];
     float uFog2[4];
     float uAmbient[4];
+    // Exact unlit CmbVShader PRIMARY inputs (shbin words 112--120): uMatDiffuse is c8
+    // MatDiffuseColor RGBA, and uPrimaryCtl.x is the HasColor draw uniform. When HasColor is
+    // true the vertex color replaces c8; when false c8 reaches o1 unchanged.
+    float uMatDiffuse[4];
+    float uPrimaryCtl[4];
     // PICA200 TEV constant-color: the selected slot (matConstant[combConstIdx]) for this
     // group's stage-0 combiner. .rgb = the color; .a = APPLY FLAG (>=0.5 modulates the
     // fragment output; <0.5 is a no-op so materials that don't use CONSTANT are unchanged).

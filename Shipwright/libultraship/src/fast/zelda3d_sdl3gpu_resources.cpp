@@ -241,10 +241,13 @@ SgModel* Fast::Zelda3DRenderer::ensureUploaded(int modelId) {
         g.meshId = groups[i].meshId;
         g.materialIndex = groups[i].materialIndex;
         g.vertexLighting = groups[i].vertexLighting;
+        g.hasColor = groups[i].hasColor;
         g.fogEnabled = groups[i].fogEnabled;
         g.combScaleRGB = groups[i].combScaleRGB;
         for (int k = 0; k < 3; k++) {
             g.matAmbient[k] = groups[i].matAmbient[k];
+        }
+        for (int k = 0; k < 4; k++) {
             g.matDiffuse[k] = groups[i].matDiffuse[k];
         }
         for (int s = 0; s < 6; s++)

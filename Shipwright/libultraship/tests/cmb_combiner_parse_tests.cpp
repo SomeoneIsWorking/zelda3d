@@ -65,19 +65,23 @@ static std::string OoT3dRomPath() {
     const char* p = std::getenv("ZELDA3D_OOT3D_ROM");
     return p ? std::string(p) : std::string();
 }
+
+static std::vector<uint8_t> LoadCmbFromZar(const std::string& zarPath, const std::string& nameFragment) {
+    CtrRom rom(OoT3dRomPath());
+    Zar zar(rom.read(zarPath));
+    for (const auto& file : zar.files()) {
+        if (file.name.find(nameFragment) != std::string::npos) {
+            return zar.read(file);
+        }
+    }
+    return {};
+}
+
 // Load AHG's hyliaman2.cmb (the shared "Hylian man 2" body used by several EnHy types
 // including AHG). AHG mat 0 is the clothing MODULATE(PRIM, TEX0)+MODULATE(PREV, CONST[4])
 // two-stage material EnHy_Draw overrides via colorA on constant slot 4.
 static std::vector<uint8_t> LoadAhgCmb() {
-    CtrRom rom(OoT3dRomPath());
-    auto zar_bytes = rom.read("/actor/zelda_ahg.zar");
-    Zar zar(std::move(zar_bytes));
-    for (const auto& f : zar.files()) {
-        if (f.name.size() >= 4 && f.name.compare(f.name.size() - 4, 4, ".cmb") == 0) {
-            return zar.read(f);
-        }
-    }
-    return {};
+    return LoadCmbFromZar("/actor/zelda_ahg.zar", ".cmb");
 }
 
 } // namespace
@@ -156,15 +160,7 @@ namespace {
 // title_logo_fireglow_cmab.md §3.1: stage0 = ADD_MULT(TEX0, TEX1, TEX0) dual-texture,
 // stage1 = MODULATE(PREV, CONST0) at scaleRGB=x2, stage2 = passthrough.
 static std::vector<uint8_t> LoadTitleGlowCmb() {
-    CtrRom rom(OoT3dRomPath());
-    auto zar_bytes = rom.read("/actor/zelda_mag.zar");
-    Zar zar(std::move(zar_bytes));
-    for (const auto& f : zar.files()) {
-        if (f.name.find("g_title.cmb") != std::string::npos) {
-            return zar.read(f);
-        }
-    }
-    return {};
+    return LoadCmbFromZar("/actor/zelda_mag.zar", "g_title.cmb");
 }
 
 } // namespace
@@ -218,15 +214,7 @@ namespace {
 // population was ALSO gated on that single flag, so tex1 was dropped before the renderer ever
 // saw it. This test locks the byte-verified classification (dual_tex_mode per material).
 static std::vector<uint8_t> LoadTitleLogoUsCmb() {
-    CtrRom rom(OoT3dRomPath());
-    auto zar_bytes = rom.read("/actor/zelda_mag.zar");
-    Zar zar(std::move(zar_bytes));
-    for (const auto& f : zar.files()) {
-        if (f.name.find("title_logo_us.cmb") != std::string::npos) {
-            return zar.read(f);
-        }
-    }
-    return {};
+    return LoadCmbFromZar("/actor/zelda_mag.zar", "title_logo_us.cmb");
 }
 
 } // namespace
@@ -293,20 +281,45 @@ TEST(CmbCombinerParse, TitleLogoUsShieldSwordChainsUseGenericTev) {
     }
 }
 
+// CmbVShader words 112--120 seed unlit PRIMARY with MatDiffuseColor, then replace it with
+// aColor only when the draw's HasColor uniform is true. The dungeon candle is a real,
+// non-BossFd2 close-test: it is unlit, has no color attribute data, and authors c8 as
+// (255,140,0,255). The old renderer discarded both HasColor and diffuse alpha, defaulted the
+// absent vertex stream to white, and therefore could not reproduce this branch.
+TEST(CmbPrimaryParse, DungeonCandlePreservesNoColorMatDiffuseFallback) {
+    if (OoT3dRomPath().empty()) {
+        GTEST_SKIP() << "ZELDA3D_OOT3D_ROM not set — cannot exercise real-asset close-test";
+    }
+
+    Cmb cmb(LoadCmbFromZar("/actor/zelda_dangeon_keep.zar", "efc_candle_modelT.cmb"));
+    ASSERT_TRUE(cmb.ok()) << cmb.error();
+    ASSERT_EQ(cmb.materials().size(), 1u);
+    const auto groups = cmb.buildDrawGroups();
+
+    const CmbMaterial& material = cmb.materials()[0];
+    EXPECT_FALSE(material.vertex_lighting);
+    EXPECT_FLOAT_EQ(material.mat_diffuse[0], 1.0f);
+    EXPECT_FLOAT_EQ(material.mat_diffuse[1], 140.0f / 255.0f);
+    EXPECT_FLOAT_EQ(material.mat_diffuse[2], 0.0f);
+    EXPECT_FLOAT_EQ(material.mat_diffuse[3], 1.0f);
+
+    ASSERT_EQ(groups.size(), 1u);
+    const auto& group = groups.front();
+    EXPECT_FALSE(group.has_color);
+
+    const Zelda3DGlGroup glGroup = MakeGlGroup(cmb, group, group.verts.data(), 0);
+    EXPECT_EQ(glGroup.hasColor, 0);
+    for (int channel = 0; channel < 4; ++channel) {
+        EXPECT_FLOAT_EQ(glGroup.matDiffuse[channel], material.mat_diffuse[channel]);
+    }
+}
+
 namespace {
 
 // Load Volvagia's hole-form body. Four of its seven groups combine TEX0 with an additive
 // TEX1 fire-detail layer whose coordinator explicitly selects the independent texCoord1 stream.
 static std::vector<uint8_t> LoadBossFd2Cmb() {
-    CtrRom rom(OoT3dRomPath());
-    auto zar_bytes = rom.read("/actor/zelda_fd.zar");
-    Zar zar(std::move(zar_bytes));
-    for (const auto& f : zar.files()) {
-        if (f.name.find("valbasiagnd.cmb") != std::string::npos) {
-            return zar.read(f);
-        }
-    }
-    return {};
+    return LoadCmbFromZar("/actor/zelda_fd.zar", "valbasiagnd.cmb");
 }
 
 } // namespace

@@ -299,6 +299,7 @@ bool Cmb::parseMats() {
         };
         rgb_be(o + 0xA4, m.mat_ambient);
         rgb_be(o + 0xA8, m.mat_diffuse);
+        m.mat_diffuse[3] = b[o + 0xAB] / 255.0f;
         // PICA200 TEV constant-color palette: 6 slots at +0xB4..+0xCB (u8 RGBA per slot, matching
         // noclip readMatsChunk's constantColors[0]=+0xB4 and the byte-level decode in
         // oot3d-decomp/docs/title_logo_fireglow_cmab.md §3.1). BUGFIX 2026-07-10: this used to
@@ -894,16 +895,17 @@ std::vector<CmbDrawGroup> Cmb::buildDrawGroupsSkinned(const std::array<float, 16
         return matId();
     };
 
-    // accumulate per (material index, mesh_id). Splitting by mesh_id (not just material) keeps
+    // Accumulate per (material index, mesh_id, HasColor). Splitting by mesh_id (not just material) keeps
     // variant meshes that share a material in distinct groups so the renderer can toggle them
-    // by mesh_id per frame (see CmbDrawGroup). Meshes with the same material AND mesh_id still
-    // merge (the common case: one mid == one material).
+    // by mesh_id per frame (see CmbDrawGroup). HasColor is a draw-uniform CmbVShader branch, so
+    // geometry with and without a color attribute cannot share one group even when its material
+    // and mesh id match.
     std::vector<CmbDrawGroup> groups;
-    auto groupFor = [&](int mat, int mid) -> CmbDrawGroup& {
+    auto groupFor = [&](int mat, int mid, bool hasColor) -> CmbDrawGroup& {
         for (auto& g : groups)
-            if (g.material_index == mat && g.mesh_id == mid)
+            if (g.material_index == mat && g.mesh_id == mid && g.has_color == hasColor)
                 return g;
-        groups.push_back({ mat, mid, {} });
+        groups.push_back({ mat, mid, hasColor, {} });
         return groups.back();
     };
 
@@ -929,7 +931,8 @@ std::vector<CmbDrawGroup> Cmb::buildDrawGroupsSkinned(const std::array<float, 16
         }
         int bd = sepd.bone_dimension;
         bool hasNormal = slotNrm >= 0 && sepd.attrs[slotNrm].present && attrHasData(sepd.attrs[slotNrm], slotNrm);
-        CmbDrawGroup& g = groupFor(mesh.material_index, mesh.mesh_id);
+        bool hasColor = slotCol >= 0 && sepd.attrs[slotCol].present && attrHasData(sepd.attrs[slotCol], slotCol);
+        CmbDrawGroup& g = groupFor(mesh.material_index, mesh.mesh_id, hasColor);
         for (const auto& prms : sepd.prms) {
             const Prm& prm = prms.prm;
             int boneId = prms.bone_table.empty() ? 0 : prms.bone_table[0];

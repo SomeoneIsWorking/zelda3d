@@ -57,10 +57,11 @@ struct SgGroup {
     int meshId = -1;
     int materialIndex = -1;
     int vertexLighting = 0;
+    int hasColor = 0;   // CmbVShader HasColor draw uniform
     int fogEnabled = 0; // CMB isFogEnabled (+0x02): PICA distance fog applies to this draw
     float combScaleRGB = 1.0f;
     float matAmbient[3] = { 1.0f, 1.0f, 1.0f };
-    float matDiffuse[3] = { 1.0f, 1.0f, 1.0f };
+    float matDiffuse[4] = { 1.0f, 1.0f, 1.0f, 1.0f };
     // PICA200 TEV constant palette + stage-0 selector (see Zelda3DGlGroup::matConstant /
     // combConstIdx). Populated by the model provider; overwritten by the per-actor override
     // channel (Step 2c EnHy body-color port) before submit.
