@@ -709,6 +709,9 @@ void Fast::Zelda3DRenderer::DrawModel(int modelId, const float* mp16, const floa
             ubo.uMatDiffuse[k] = grp.matDiffuse[k];
         }
         ubo.uPrimaryCtl[0] = grp.hasColor ? 1.0f : 0.0f;
+        // CMB IsFragmentLighting (+0x00). The exact disabled branch supplies zero for both
+        // fixed-function fragment colors; the enabled branch remains separately RE-partial.
+        ubo.uPrimaryCtl[1] = grp.fragmentLighting ? 1.0f : 0.0f;
         // Per-light diffuse products for the vertex-lit sum (#153): matDiffuse * sceneLightColor.
         // Terrain materials bake matDiffuse=BLACK, so these are zero there and the light sum
         // reduces to the previously-verified ambient-only value. Alpha is different: CmbVShader

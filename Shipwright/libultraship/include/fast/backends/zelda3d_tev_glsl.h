@@ -16,9 +16,11 @@ bool alphaPass(float a, float ref, int f) {
     if (f == 6) return a >= ref;
     return true;
 }
-vec4 tevSrc(uint code, vec4 prim, vec4 t0, vec4 t1, vec4 t2, vec4 prev, vec4 pbuf, uint kidx) {
-    if (code == 0u || code == 1u) return prim;
-    if (code == 2u) return vec4(0.0, 0.0, 0.0, 1.0);
+vec4 tevSrc(uint code, vec4 prim, vec4 fragPrimary, vec4 fragSecondary, vec4 t0, vec4 t1, vec4 t2,
+            vec4 prev, vec4 pbuf, uint kidx) {
+    if (code == 0u) return prim;
+    if (code == 1u) return fragPrimary;
+    if (code == 2u) return fragSecondary;
     if (code == 3u || code == 6u) return t0;
     if (code == 4u) return t1;
     if (code == 5u) return t2;
@@ -73,7 +75,7 @@ float tevAlphaOp(uint op, float a, float b, float c) {
     if (op == 9u) return clamp(a + b, 0.0, 1.0) * c;
     return a;
 }
-vec4 tevRun(vec4 prim, vec4 t0, vec4 t1, vec4 t2) {
+vec4 tevRun(vec4 prim, vec4 fragPrimary, vec4 fragSecondary, vec4 t0, vec4 t1, vec4 t2) {
     vec4 prev = vec4(0.0);
     vec4 buf = vec4(0.0);
     vec4 nextbuf = vec4(0.0);
@@ -81,9 +83,9 @@ vec4 tevRun(vec4 prim, vec4 t0, vec4 t1, vec4 t2) {
     for (int s = 0; s < n; s++) {
         uvec4 w = ubo.uTevStages[s];
         uint kidx = (w.y >> 24) & 7u;
-        vec4 sa = tevSrc(w.x & 15u, prim, t0, t1, t2, prev, buf, kidx);
-        vec4 sb = tevSrc((w.x >> 4) & 15u, prim, t0, t1, t2, prev, buf, kidx);
-        vec4 sc = tevSrc((w.x >> 8) & 15u, prim, t0, t1, t2, prev, buf, kidx);
+        vec4 sa = tevSrc(w.x & 15u, prim, fragPrimary, fragSecondary, t0, t1, t2, prev, buf, kidx);
+        vec4 sb = tevSrc((w.x >> 4) & 15u, prim, fragPrimary, fragSecondary, t0, t1, t2, prev, buf, kidx);
+        vec4 sc = tevSrc((w.x >> 8) & 15u, prim, fragPrimary, fragSecondary, t0, t1, t2, prev, buf, kidx);
         vec3 ca = tevColorMod(w.y & 15u, sa);
         vec3 cb = tevColorMod((w.y >> 4) & 15u, sb);
         vec3 cc = tevColorMod((w.y >> 8) & 15u, sc);
@@ -95,9 +97,9 @@ vec4 tevRun(vec4 prim, vec4 t0, vec4 t1, vec4 t2) {
         } else {
             // PICA's source word has RGB at bits 0/4/8, then alpha at 16/20/24. The
             // four-bit gap is real; modifiers use a different layout and do start at bit 12.
-            vec4 aa = tevSrc((w.x >> 16) & 15u, prim, t0, t1, t2, prev, buf, kidx);
-            vec4 ab = tevSrc((w.x >> 20) & 15u, prim, t0, t1, t2, prev, buf, kidx);
-            vec4 ac = tevSrc((w.x >> 24) & 15u, prim, t0, t1, t2, prev, buf, kidx);
+            vec4 aa = tevSrc((w.x >> 16) & 15u, prim, fragPrimary, fragSecondary, t0, t1, t2, prev, buf, kidx);
+            vec4 ab = tevSrc((w.x >> 20) & 15u, prim, fragPrimary, fragSecondary, t0, t1, t2, prev, buf, kidx);
+            vec4 ac = tevSrc((w.x >> 24) & 15u, prim, fragPrimary, fragSecondary, t0, t1, t2, prev, buf, kidx);
             float fa = tevAlphaMod((w.y >> 12) & 15u, aa);
             float fb = tevAlphaMod((w.y >> 16) & 15u, ab);
             float fc = tevAlphaMod((w.y >> 20) & 15u, ac);

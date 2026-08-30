@@ -577,3 +577,11 @@ This doc **organizes and links to** the existing RE corpus rather than duplicati
 - where: `Shipwright/libultraship/src/fast/zelda3d_sdl3gpu_{pass,shaders}.cpp`; `Shipwright/libultraship/src/fast/backends/unified_shader.cpp`; shared CMB RGBA/HasColor transport
 - gap: The exact binary mechanism, cached per-slot alpha state, and parser-to-shader transport are ported and close-tested on retail data. No new oracle run was made and no like-for-like live item-model image has been captured, so user-visible parity remains unclaimed.
 - notes: Lit PRIMARY alpha is the sum of `MatDiffuse.a * LightDiffuseColor_i.a` over enabled slots, without NdotL. The completed RGBA result is multiplied by aColor only when HasColor is true. Twenty of the 24 retail consumers remain below full alpha under the observed two-slot configuration.
+
+### render.cmb-fragment-lighting — PICA fixed-function fragment primary / secondary
+- status: re-partial
+- deps: render.multi-stage-tev
+- evidence: `oot3d-decomp/docs/fragment_lighting.md`; `FUN_003fa5d0` at OoT3D VA `0x003fa5d0`; `debug_journal/2026-08-30-cmb-fragment-lighting-disabled.md`; offline corpus survey (1,997 CMBs / 11,172 materials, zero failures); Dark Link retail close-test
+- where: CMB flag parse and group transport in `Shipwright/cmb3d/asset/`; native/unified group, UBO, shader, and shared TEV owners under `Shipwright/libultraship/{include,src}/fast/`; offline instrument `tools/cmb_fragment_lighting_survey.py`
+- gap: The exact disabled zero/zero branch is ported and close-tested for the five retail materials that consume a fragment source with lighting disabled. The 197 enabled primary and 69 enabled secondary consumers remain RE-partial: recover one complete cache-owned PICA config/light/LUT probe, validate its material products against `FUN_003fa5d0`, then implement the enabled fixed-function calculation. No new oracle run was made for this slice.
+- notes: Vertex `PRIMARY`, `FRAGMENT_PRIMARY`, and `FRAGMENT_SECONDARY` are distinct TEV sources. Material byte `+0x00` gates the fixed-function path; `+0x01` independently gates CmbVShader vertex lighting. Do not infer either flag from source use.

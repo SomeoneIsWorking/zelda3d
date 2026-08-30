@@ -68,6 +68,23 @@ TEST(Zelda3DTev, UsesPicaAlphaSourceFieldLayout) {
     EXPECT_EQ(source.find("(w.x >> 12) & 15u"), std::string::npos);
 }
 
+TEST(Zelda3DTev, KeepsVertexAndFixedFunctionFragmentSourcesDistinct) {
+    const std::string source = Fast::Zelda3DTev::kGenericFunctions;
+    EXPECT_NE(source.find("if (code == 0u) return prim"), std::string::npos);
+    EXPECT_NE(source.find("if (code == 1u) return fragPrimary"), std::string::npos);
+    EXPECT_NE(source.find("if (code == 2u) return fragSecondary"), std::string::npos);
+    EXPECT_EQ(source.find("if (code == 0u || code == 1u) return prim"), std::string::npos);
+}
+
+TEST(Zelda3DShaderTemplate, DisabledFragmentLightingSuppliesZeroTevSources) {
+    std::string vertexSource;
+    std::string fragmentSource;
+    std::string error;
+    ASSERT_TRUE(Fast::Zelda3DSdl3GpuShaders::BuildSources("", "", "", vertexSource, fragmentSource, error)) << error;
+    EXPECT_NE(fragmentSource.find("ubo.uPrimaryCtl.y > 0.5 ? prim : vec4(0.0)"), std::string::npos);
+    EXPECT_NE(fragmentSource.find("tevRun(prim, fragPrimary, fragSecondary"), std::string::npos);
+}
+
 TEST(Zelda3DDrawIsolation, SkipComposesWithExistingDrawAndModelSelection) {
     gZelda3dSgModelOnly = -1;
     gZelda3dSgDrawOnly = -1;
@@ -102,6 +119,12 @@ TEST(Zelda3DUnifiedShader, CmbPrimaryUsesTransformedNormalAndBothLightSlots) {
     EXPECT_NE(source.find("float litAlpha = ubo.uLitDif1.a + ubo.uLitDif2.a"), std::string::npos);
     EXPECT_NE(source.find("if (ubo.uPrimaryCtl.x > 0.5) primary *= aColor0"), std::string::npos);
     EXPECT_EQ(source.find("dot(normalize(nM), -normalize(ubo.uLightDir.xyz))"), std::string::npos);
+}
+
+TEST(Zelda3DUnifiedShader, DisabledFragmentLightingSuppliesZeroTevSources) {
+    const std::string source = Fast::Unified::BuildFragmentSource(Fast::Unified::Variant::kGenericTev);
+    EXPECT_NE(source.find("ubo.uPrimaryCtl.y > 0.5 ? vColor0 : vec4(0.0)"), std::string::npos);
+    EXPECT_NE(source.find("tevRun(vColor0, fragPrimary, fragSecondary"), std::string::npos);
 }
 
 TEST(Zelda3DUnifiedShader, UnlitPrimarySelectsMatDiffuseOnlyWhenColorIsAbsent) {

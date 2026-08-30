@@ -346,6 +346,33 @@ TEST(CmbPrimaryParse, BottledPoePreservesLitNoColorDiffuseAlpha) {
     EXPECT_EQ((glGroup.tevStagePack[0][0] >> 16) & 0xFu, 0u); // PRIMARY is alpha source 0.
 }
 
+// PICA initializes both fixed-function fragment colors to zero and only calls the lighting unit
+// when IsFragmentLighting is set. Dark Link deliberately authors a FRAGMENT_PRIMARY TEV source
+// while leaving that flag clear, so substituting vertex PRIMARY changes the material instead of
+// reproducing the disabled unit.
+TEST(CmbFragmentLightingParse, DarkLinkPreservesDisabledFragmentSourceBranch) {
+    if (OoT3dRomPath().empty()) {
+        GTEST_SKIP() << "ZELDA3D_OOT3D_ROM not set — cannot exercise real-asset close-test";
+    }
+
+    Cmb cmb(LoadCmbFromZar("/actor/zelda_torch2.zar", "darklink.cmb"));
+    ASSERT_TRUE(cmb.ok()) << cmb.error();
+    ASSERT_FALSE(cmb.materials().empty());
+    const CmbMaterial& material = cmb.materials()[0];
+    EXPECT_FALSE(material.fragment_lighting);
+    ASSERT_GT(material.comb_stage_count, 0);
+    EXPECT_EQ(material.comb_stages[0].rgb_src[0], 0x6210); // FRAGMENT_PRIMARY_COLOR_DMP
+
+    const auto groups = cmb.buildDrawGroups();
+    const auto group = std::find_if(groups.begin(), groups.end(), [](const Zelda3D::CmbDrawGroup& candidate) {
+        return candidate.material_index == 0;
+    });
+    ASSERT_NE(group, groups.end());
+    const Zelda3DGlGroup glGroup = Zelda3D::MakeGlGroup(cmb, *group, group->verts.data(), 0);
+    EXPECT_EQ(glGroup.fragmentLighting, 0);
+    EXPECT_EQ(glGroup.tevStagePack[0][0] & 0xFu, 1u); // Packed source code 1 = fragment primary.
+}
+
 namespace {
 
 // Load Volvagia's hole-form body. Four of its seven groups combine TEX0 with an additive
