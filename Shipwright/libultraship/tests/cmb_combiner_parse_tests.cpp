@@ -314,6 +314,38 @@ TEST(CmbPrimaryParse, DungeonCandlePreservesNoColorMatDiffuseFallback) {
     }
 }
 
+// Words 89--110 give lit PRIMARY an independently-authored alpha: every enabled light contributes
+// MatDiffuse.a * LightDiffuseColor.a, then HasColor optionally multiplies the completed RGBA value.
+// The bottled Poe is a retail, non-BossFd2 close-test with no color stream, c8.a=76/255, and a TEV
+// stage that consumes PRIMARY.a. The previous shader silently replaced this value with aColor.a=1.
+TEST(CmbPrimaryParse, BottledPoePreservesLitNoColorDiffuseAlpha) {
+    if (OoT3dRomPath().empty()) {
+        GTEST_SKIP() << "ZELDA3D_OOT3D_ROM not set — cannot exercise real-asset close-test";
+    }
+
+    Cmb cmb(LoadCmbFromZar("/actor/zelda_gi_ghost.zar", "zelda_gi_ghost.cmb"));
+    ASSERT_TRUE(cmb.ok()) << cmb.error();
+    ASSERT_FALSE(cmb.materials().empty());
+    const auto groups = cmb.buildDrawGroups();
+
+    const CmbMaterial& material = cmb.materials()[0];
+    EXPECT_TRUE(material.vertex_lighting);
+    EXPECT_FLOAT_EQ(material.mat_diffuse[3], 76.0f / 255.0f);
+
+    const auto group = std::find_if(groups.begin(), groups.end(), [](const Zelda3D::CmbDrawGroup& candidate) {
+        return candidate.material_index == 0 && candidate.mesh_id == 0;
+    });
+    ASSERT_NE(group, groups.end());
+    EXPECT_FALSE(group->has_color);
+
+    const Zelda3DGlGroup glGroup = Zelda3D::MakeGlGroup(cmb, *group, group->verts.data(), 0);
+    EXPECT_EQ(glGroup.vertexLighting, 1);
+    EXPECT_EQ(glGroup.hasColor, 0);
+    EXPECT_FLOAT_EQ(glGroup.matDiffuse[3], 76.0f / 255.0f);
+    ASSERT_GT(glGroup.tevStageCount, 0);
+    EXPECT_EQ((glGroup.tevStagePack[0][0] >> 16) & 0xFu, 0u); // PRIMARY is alpha source 0.
+}
+
 namespace {
 
 // Load Volvagia's hole-form body. Four of its seven groups combine TEX0 with an additive

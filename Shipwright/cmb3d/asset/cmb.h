@@ -90,8 +90,10 @@ struct CmbMaterial {
     // --- OoT3D fragment pipeline (PICA200), ported for pixel-parity world lighting. ---
     // See docs/oot3d_world_lighting_re.md. Scene geometry is VERTEX-lit: the per-vertex lit
     // colour fed to the TEV combiner is
-    //   v_Color = saturate( sceneAmb*mat_ambient + sceneDif*mat_diffuse*max(0,N.L) ) * a_Color
-    // where a_Color is the baked CmbVertex.color. Flags at +0x00/+0x01; mat ambient/diffuse
+    //   v_Color.rgb = sum(sceneAmb*matAmbient + NdotL*sceneDif*matDiffuse)
+    //   v_Color.a   = sum(lightDiffuse.a*matDiffuse.a)
+    // and the completed RGBA value is multiplied by the baked CmbVertex.color only when the
+    // draw's HasColor uniform is true. Flags at +0x00/+0x01; mat ambient/diffuse
     // at +0xA4/+0xA8 (RGBA8 big-endian). The old renderer ignored all of this and did
     // texture*a_Color*uTint, dropping both the lighting and the combiner scale below.
     bool vertex_lighting = false;
@@ -100,8 +102,8 @@ struct CmbMaterial {
     // draws (fog_mode=5 with the palette-blended fog color/LUT). See cmb.cpp parse comment.
     bool is_fog = false;
     float mat_ambient[3] = { 1, 1, 1 };
-    // CmbVShader c8 MatDiffuseColor. Alpha is live in the unlit/no-color PRIMARY branch
-    // (words 112--120), so preserve the complete authored RGBA value rather than only RGB.
+    // CmbVShader c8 MatDiffuseColor. Alpha is live in both the unlit/no-color fallback
+    // (words 112--120) and the lit per-enabled-light sum (words 89--110), so preserve RGBA.
     float mat_diffuse[4] = { 1, 1, 1, 1 };
     // Stage-0 TEV combiner. Scene materials are overwhelmingly a single
     // MODULATE(PRIMARY_COLOR=v_Color, TEXTURE0) stage, but the combine op and especially the

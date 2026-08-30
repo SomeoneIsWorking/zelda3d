@@ -13,7 +13,7 @@ The retail OoT3D corpus contains 154 distinct unlit/no-color mesh-material uses 
 
 ## Evidence
 
-tools/cmb_primary_corpus_survey.py over the user ROM: files=1997 candidates=154 parse_failures=0; exact branch is CmbVShader words 112-120 in oot3d-decomp/docs/title_env_lighting.md §10.2a; dungeon candle close-test confirms parser/group transport.
+tools/cmb_primary_corpus_survey.py over the user ROM: files=1997 unlit_candidates=154 lit_alpha_candidates=24 parse_failures=0; this claim covers the unlit set. The exact branch is CmbVShader words 112-120 in oot3d-decomp/docs/title_env_lighting.md section 10.2a; dungeon candle close-test confirms parser/group transport.
 
 ## What would falsify it
 

@@ -711,13 +711,16 @@ void Fast::Zelda3DRenderer::DrawModel(int modelId, const float* mp16, const floa
         ubo.uPrimaryCtl[0] = grp.hasColor ? 1.0f : 0.0f;
         // Per-light diffuse products for the vertex-lit sum (#153): matDiffuse * sceneLightColor.
         // Terrain materials bake matDiffuse=BLACK, so these are zero there and the light sum
-        // reduces to the previously-verified ambient-only value.
+        // reduces to the previously-verified ambient-only value. Alpha is different: CmbVShader
+        // words 89/93 and 95/99 add c8.a*c81.a and c8.a*c84.a once per enabled slot, without NdotL.
+        // Cached oracle uniforms show both host-model slots enabled with diffuse alpha 1 and the
+        // third slot disabled with alpha 0, so preserve the authored c8 alpha in both live slots.
         for (int k = 0; k < 3; k++) {
             ubo.uLitDif1[k] = grp.matDiffuse[k] * gZelda3dLight1Col[k];
             ubo.uLitDif2[k] = grp.matDiffuse[k] * gZelda3dLight2Col[k];
         }
-        ubo.uLitDif1[3] = 0.0f;
-        ubo.uLitDif2[3] = 0.0f;
+        ubo.uLitDif1[3] = grp.matDiffuse[3];
+        ubo.uLitDif2[3] = grp.matDiffuse[3];
         if (sgDumpThisDraw) {
             fprintf(stderr,
                     "[SG_DUMP]  g%d lighting amb=(%.4f,%.4f,%.4f)x%.1f dif1=(%.4f,%.4f,%.4f) "

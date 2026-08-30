@@ -275,10 +275,13 @@ const char* kUnifiedShaderTemplate = R"PRISM(@prism(type='fragment', name='Unifi
             vec3 lit = ubo.uMatAmbient.xyz
                      + ubo.uLitDif1.rgb * max(dot(nV, -ubo.uLightDir.xyz), 0.0)
                      + ubo.uLitDif2.rgb * max(dot(nV, -ubo.uLightDir2.xyz), 0.0);
+            float litAlpha = ubo.uLitDif1.a + ubo.uLitDif2.a;
+            vec4 primary = vec4(lit, litAlpha);
+            if (ubo.uPrimaryCtl.x > 0.5) primary *= aColor0;
             // Clamp order = the PRODUCT (PICA clamps o1 on register write). clamp(lit) first
             // was tried 2026-07-22 and measured ~30% dark vs the oracle — see the kFrag
             // comment in zelda3d_sdl3gpu_shaders.cpp. Do not re-flip.
-            vColor0 = vec4(clamp(vColor0.rgb * lit, 0.0, 1.0), vColor0.a);
+            vColor0 = min(abs(primary), vec4(1.0));
         }
     }
 @else

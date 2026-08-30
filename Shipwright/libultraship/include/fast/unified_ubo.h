@@ -43,7 +43,7 @@ struct CommonUbo {
     float uSphNrm0[4];
     float uSphNrm1[4];
     float uSphNrm2[4];
-    // Mirror of SgUbo::uLitDif1/uLitDif2/uLightDir2 (per-light diffuse products + light2 dir,
+    // Mirror of SgUbo::uLitDif1/uLitDif2/uLightDir2 (per-light RGBA diffuse products + light2 dir,
     // #153 CmbVShader vertex-lit port — zelda3d_sg_ubo.h). Live for unified CMB lightingMode 2:
     // actor draws require both opposed directional slots, while scene draws reduce to their
     // separately packed repeated ambient because both diffuse products are zero.
@@ -64,7 +64,7 @@ struct CommonUbo {
 
 // Adapt the native CMB light-bank payload into the unified layout without re-deriving its actor /
 // scene policy. The native packer is authoritative: uAmbient.w carries enabled-slot ambient
-// multiplicity, and uLitDif1/2 already carry the material-diffuse products for the bound slots.
+// multiplicity, and uLitDif1/2 carry the material-diffuse RGBA products for the bound slots.
 inline void CopyCmbVertexLightBank(CommonUbo& target, const Zelda3DSg::SgUbo& source) {
     for (int component = 0; component < 3; ++component) {
         target.uMatAmbient[component] = source.uAmbient[component] * source.uAmbient[3];

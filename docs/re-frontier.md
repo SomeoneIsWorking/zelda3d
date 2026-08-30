@@ -569,3 +569,11 @@ This doc **organizes and links to** the existing RE corpus rather than duplicati
 - where: Shipwright/cmb3d/asset/cmb.{h,cpp}, cmb_glgroups.cpp; Shipwright/libultraship/include/fast/{zelda3d_model_types,zelda3d_sg_ubo,unified_ubo}.h; native/unified SDL3GPU shaders
 - gap: The exact binary mechanism and parser-to-shader transport are ported and close-tested on retail data. No new oracle run was made, so user-visible output parity is not claimed; generic actor caller-modulation policy remains a separate host layer after PRIMARY.
 - notes: HasColor participates in draw-group identity. MatDiffuse is RGBA, not RGB. The first survey count of 1,663 was falsified because it read IsFragmentLighting at material+0; the tested instrument reads IsVertexLighting at +1 and reports 154.
+
+### render.cmb-lit-primary-alpha — CmbVShader lit HasColor / diffuse-alpha PRIMARY
+- status: re-partial
+- deps: lighting.per-draw-material
+- evidence: `oot3d-decomp/docs/title_env_lighting.md` section 10.2b (CmbVShader words 89-110); cached `scratch/title_ab/actor_light_uniforms.log` and `scratch/zora/zora_vsuni.log`; `debug_journal/2026-08-30-cmb-lit-primary-alpha.md`; offline retail survey (1,997 CMBs, 24 lit/no-color/non-opaque PRIMARY-alpha consumers, zero failures); bottled-Poe close-test
+- where: `Shipwright/libultraship/src/fast/zelda3d_sdl3gpu_{pass,shaders}.cpp`; `Shipwright/libultraship/src/fast/backends/unified_shader.cpp`; shared CMB RGBA/HasColor transport
+- gap: The exact binary mechanism, cached per-slot alpha state, and parser-to-shader transport are ported and close-tested on retail data. No new oracle run was made and no like-for-like live item-model image has been captured, so user-visible parity remains unclaimed.
+- notes: Lit PRIMARY alpha is the sum of `MatDiffuse.a * LightDiffuseColor_i.a` over enabled slots, without NdotL. The completed RGBA result is multiplied by aColor only when HasColor is true. Twenty of the 24 retail consumers remain below full alpha under the observed two-slot configuration.
