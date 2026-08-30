@@ -149,7 +149,7 @@ global camera table, global fog path); a multi-scene sweep is the outstanding ch
 
 | Item | Status | Where tracked | Notes |
 |---|---|---|---|
-| Title wordmark mat10/11 decoration — final 4% (warm coverage at 96% oracle) | OPEN | `docs/re-frontier.md` `title.wordmark-decoration`; journal `d8ccc2d5` | Close 96%→100% with cited evidence, or explain residual. The measured gap that is NOT yet closed. |
+| Title wordmark mat10/11 decoration — final 4% (warm coverage at 96% oracle) | OPEN | `docs/re-frontier.md` `title.wordmark-decoration`; journals `d8ccc2d5`, `2026-08-30-title-unified-cmb-state-contract.md` | Unified CMB now preserves the native sphere basis, private RE'd light, dual modes, and post-TEV draw RGBA; cached cs464/cs1093 evidence closes that ownership regression. Close 96%→100% only with selected-draw PRIMARY/UV evidence or an explained residual; broader unified rider/scene differences remain. |
 | Title fire-glow flame-SHAPE residual + terrain-warmth | OPEN — but **OFF-LIMITS to tuning** | journals `bd9fc251`, `65373fa0` | The mechanism is ported (closed); the remaining shape/warmth residual is not to be micro-tuned per user instruction — reopen the mechanism only with a real RE finding, not a constant tweak. |
 | Keyboard (headed mode) | OPEN — **blocked on user** | journal `2026-07-15-keyboard-headed-v2.md` | Headed keyboard path; blocked awaiting user. Do not loop on it. |
 | Epona bone-level diff follow-up | OPEN | `d7e636c9` (boneinfo REPL + compare-titleactors tooling landed) | Tooling exists; the bone-diff itself is a follow-up investigation, not yet closed. |

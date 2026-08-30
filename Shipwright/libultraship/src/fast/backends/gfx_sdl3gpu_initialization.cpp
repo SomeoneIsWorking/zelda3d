@@ -58,8 +58,8 @@ void GfxRenderingAPISdl3Gpu::Init() {
     mHud = std::make_unique<Zelda3DHudRenderer>();
     SPDLOG_INFO("SDL3 GPU backend initialized (P2: N64 Fast3D world)");
 
-    // Render-unification effort (kanban #131), Phase 1: the unified shader is dormant unless its
-    // explicit startup self-test is requested.
+    // The live unified routes compile variants lazily; this optional startup self-test compiles the
+    // complete variant set up front so source-generation regressions fail before the first draw.
     if (getenv("ZELDA3D_UNIFIED_SHADER_SELFTEST") != nullptr) {
         std::string log;
         if (Fast::Unified::SelfTestUnifiedShaderVariants(log)) {

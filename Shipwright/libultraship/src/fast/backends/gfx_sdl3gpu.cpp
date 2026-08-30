@@ -34,7 +34,7 @@
 #include "fast/backends/gfx_sdl3gpu.h"
 #include "fast/backends/zelda3d_sdl3gpu.h" // Zelda3DRenderer / Zelda3DHudRenderer member subsystems
 #include "fast/backends/gfx_sdl.h"
-#include "fast/backends/unified_shader.h"   // render-unification Phase 1 dormant shader selftest
+#include "fast/backends/unified_shader.h"
 #include "fast/backends/unified_n64_pack.h" // render-unification Phase 3: CCFeatures -> UnifiedMaterial
 #include "fast/unified_vtx.h"
 #include "fast/unified_ubo.h"

@@ -37,8 +37,7 @@ struct CommonUbo {
     float uFog3d0[4];
     float uFog3d1[4];
     // Mirror of SgUbo::uSphRot0/1/2 (sphere-map view-rotation override, title wordmark
-    // decorations — zelda3d_sg_ubo.h). Size-parity padding for the unified path, same
-    // rationale as uMatConst/uSheen/uTex1Xf/uFog3d* above.
+    // decorations — zelda3d_sg_ubo.h). Live for generic and dual-texture CMB variants.
     float uSphRot0[4];
     float uSphRot1[4];
     float uSphRot2[4];
@@ -76,6 +75,20 @@ inline void CopyCmbVertexLightBank(CommonUbo& target, const Zelda3DSg::SgUbo& so
         target.uLitDif2[component] = source.uLitDif2[component];
         target.uLightDir2[component] = source.uLightDir2[component];
     }
+}
+
+// Preserve the native CMB path's per-draw modulation without introducing a second UBO field set.
+// uPrimColor is the N64 primitive color when alreadyTransformed is true; for model-space CMB draws
+// it carries the caller's RGBA modulation. uParams1.x is otherwise the N64 noise scale, so it can
+// carry the native `lit` tint gate on the mutually exclusive CMB route.
+inline void PackCmbDrawModulation(CommonUbo& target, uint8_t red, uint8_t green, uint8_t blue, uint8_t alpha,
+                                  bool tintEnabled) {
+    constexpr float kByteToFloat = 1.0f / 255.0f;
+    target.uPrimColor[0] = static_cast<float>(red) * kByteToFloat;
+    target.uPrimColor[1] = static_cast<float>(green) * kByteToFloat;
+    target.uPrimColor[2] = static_cast<float>(blue) * kByteToFloat;
+    target.uPrimColor[3] = static_cast<float>(alpha) * kByteToFloat;
+    target.uParams1[0] = tintEnabled ? 1.0f : 0.0f;
 }
 
 static_assert(sizeof(CommonUbo) == Zelda3DSg::kCommonBytes,

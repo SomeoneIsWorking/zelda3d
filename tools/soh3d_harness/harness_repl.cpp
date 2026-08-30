@@ -116,6 +116,8 @@ void Run() {
             HarnessOracleControl::HandleForce(toks);
         else if (cmd == "snapshot")
             HarnessCapture::HandleSnapshot(toks);
+        else if (cmd == "soh_snapshot")
+            HarnessCapture::HandleSohSnapshot(toks);
         else if (cmd == "sweep")
             HarnessSweep::HandleCommand(toks);
         else if (cmd == "help")

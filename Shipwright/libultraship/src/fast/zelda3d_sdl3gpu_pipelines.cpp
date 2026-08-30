@@ -163,13 +163,16 @@ bool Fast::Zelda3DSdl3GpuPipeline::BlendConstants(const SgGroup& g, SDL_FColor& 
     return true;
 }
 
-// CMB materials never exercise N64's 2-cycle/fog/grayscale combiner shapes — one texture, optional
-// alpha test, is the whole structural space this content needs (see unified_shader.h's Variant).
+// CMB materials never exercise N64's 2-cycle/fog/grayscale combiner shapes. Preserve the legacy
+// CMB dual-texture modes as a structural two-sampler variant; routing them through kSingleTex drops
+// the second binding and bypasses the game-side title-logo TEV override entirely.
 Fast::Unified::Variant Fast::Zelda3DSdl3GpuPipeline::VariantForGroup(const SgGroup& g, bool hasTex) {
     if (!hasTex)
         return Fast::Unified::Variant::kUntextured;
     if (g.tevGeneric)
         return Fast::Unified::Variant::kGenericTev;
+    if (g.dualTexMode)
+        return Fast::Unified::Variant::kDualTex;
     return g.alphaTest ? Fast::Unified::Variant::kSingleTexAlphaTest : Fast::Unified::Variant::kSingleTex;
 }
 

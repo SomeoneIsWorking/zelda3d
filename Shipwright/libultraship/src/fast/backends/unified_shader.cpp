@@ -1,6 +1,6 @@
 #include "fast/backends/unified_shader.h"
 #include "fast/backends/zelda3d_tev_glsl.h"
-#include "fast/unified_vtx.h"      // UnifiedVtx — not yet referenced by any draw path (Phase 2/3)
+#include "fast/unified_vtx.h"
 #include "fast/unified_material.h" // UnifiedMaterial — ditto
 #include "fast/unified_ubo.h"      // CommonUbo/UnifiedDrawUbo — static_assert-checked against kCommonUboBody here
 #include "fast/zelda3d_model_types.h"
@@ -190,9 +190,11 @@ const char* kUnifiedShaderTemplate = R"PRISM(@prism(type='fragment', name='Unifi
         // clobber w=1). Otherwise (3DS): GPU-transform model-space pos via uMvp as before.
         gl_Position = (ubo.uParams1.w > 0.5) ? aPos : (ubo.uMvp * vec4(sp, 1.0));
         vNrmView = mat3(ubo.uMv) * nM;
-        @if(o_genericTev)
+        @if(o_cmbExtraTex)
             vUv0 = vec2(aUv0.x, 1.0 - aUv0.y);
-            vec3 ns = mat3(ubo.uMv) * nM;
+            vec3 ns = (ubo.uSphRot0.w > 0.5)
+                ? vec3(dot(ubo.uSphRot0.xyz, nM), dot(ubo.uSphRot1.xyz, nM), dot(ubo.uSphRot2.xyz, nM))
+                : (mat3(ubo.uMv) * nM);
             if (ubo.uSheen.w > 2.5) {
                 vec3 nv = normalize(ns);
                 vec2 suv = vec2((nv.x * 0.5 + 0.5 - ubo.uTex1Xf.z) * ubo.uTex1Xf.x,
@@ -203,6 +205,7 @@ const char* kUnifiedShaderTemplate = R"PRISM(@prism(type='fragment', name='Unifi
                                 (aUv1.y - ubo.uTex1Xf.w) * ubo.uTex1Xf.y);
                 vUv1 = vec2(uv1.x, 1.0 - uv1.y);
             }
+            @if(o_genericTev)
             if (ubo.uTevCtl.z > 2.5 && ubo.uTevCtl.z < 3.5) {
                 vec3 nv2 = normalize(ns);
                 vec2 suv2 = vec2((nv2.x * 0.5 + 0.5 - ubo.uTex2Xf.z) * ubo.uTex2Xf.x,
@@ -213,6 +216,9 @@ const char* kUnifiedShaderTemplate = R"PRISM(@prism(type='fragment', name='Unifi
                                 (aUv2.y - ubo.uTex2Xf.w) * ubo.uTex2Xf.y);
                 vUv2 = vec2(uv2.x, 1.0 - uv2.y);
             }
+            @else
+                vUv2 = vec2(0.0);
+            @end
         @else
             vUv0 = aUv0;
             vUv1 = aUv1;
@@ -224,13 +230,29 @@ const char* kUnifiedShaderTemplate = R"PRISM(@prism(type='fragment', name='Unifi
         vColor2 = aColor2;
         vColor3 = aColor3;
         vFog = aFog;
+        // Native CMB per-draw RGB modulation applies to its flat/force-unlit and character-tint
+        // PRIMARY paths, but not to vertexLighting=1 (whose PRIMARY comes from the PICA light
+        // bank). N64 draws are already transformed and use uPrimColor as a combiner source.
+        if (ubo.uParams1.w < 0.5 && ubo.uParams1.x > 0.5 && ubo.uParams0.y < 1.5) {
+            vColor0.rgb *= ubo.uPrimColor.rgb;
+        }
+        // The title wordmark is deliberately submitted force-unlit so world lighting cannot
+        // contaminate it, but its draw function still binds one private CmbVShader light:
+        // PRIMARY = vertexColor * (0.18 + max(0, N dot -L)). uSheen.x is the private ambient
+        // and its nonzero value is the independent gate. This must run before the generic TEV
+        // evaluator reads PRIMARY; keying it on lightingMode dropped the RE'd sheen from every
+        // force-unlit title material when the unified route became the default.
+        if (ubo.uSheen.x > 0.0) {
+            vec3 nV = normalize(vNrmView);
+            float ndotl = max(dot(nV, -normalize(ubo.uLightDir.xyz)), 0.0);
+            vColor0 = vec4(clamp(vColor0.rgb * (ubo.uSheen.x + ndotl), 0.0, 1.0), vColor0.a);
         // lightingMode 2 (3DS CMB vertex lighting): bake PRIMARY here per vertex, before
         // interpolation. CmbVShader uses the normal after skinning and the draw transform, then
         // accumulates every enabled light slot. Actor draws bind the opposed two-light bank
         // (+D/light2Color, -D/light1Color) with ambient in the first slot only; scene draws bind
         // ambient in both slots with zero diffuse. The CPU packer has already reduced each bank to
         // uMatAmbient plus the two per-light diffuse products, exactly like the native CMB path.
-        if (ubo.uParams0.y > 1.5) {
+        } else if (ubo.uParams0.y > 1.5) {
             vec3 nV = normalize(vNrmView);
             // Light directions are already normalized by the scene-light submission. Do not
             // normalize them here: CmbVShader dots the uniform verbatim, and a disabled/zero
@@ -349,8 +371,29 @@ const char* kUnifiedShaderTemplate = R"PRISM(@prism(type='fragment', name='Unifi
             int afn = int(ubo.uTevCtl.w + 0.5);
             if (afn > 0 && !alphaPass(texel.a, ubo.uParams0.x, afn - 1)) discard;
         @else
+        @if(o_cmbDualTex)
+            vec4 primary = vColor0;
+            vec4 t0 = texel0();
+            vec3 t1 = texel1().rgb;
+            vec3 dualRgb;
+            if (ubo.uSheen.y > 3.5) {
+                // Runtime title-logo override: tex1 aliases tex0 and both use coordinator-0's
+                // sphere coordinate. Oracle TEV: 2*(PRIMARY*TEX0) then
+                // MULT_ADD(PRIMARY,TEX1,PREVIOUS) = PRIMARY*(2*TEX0+TEX1).
+                vec3 t0s = texture(uTex0, clamp(vUv1, 0.5 / vec2(textureSize(uTex0, 0)), vTexClamp.xy)).rgb;
+                dualRgb = clamp(t0s * ubo.uSheen.z + t1, 0.0, 1.0);
+            } else if (ubo.uSheen.y > 2.5) {
+                dualRgb = clamp(t0.rgb * t1 * ubo.uSheen.z, 0.0, 1.0);
+            } else if (ubo.uSheen.y > 1.5) {
+                dualRgb = clamp(t0.rgb + t1, 0.0, 1.0);
+            } else {
+                dualRgb = clamp(t0.rgb + t1, 0.0, 1.0) * t0.rgb;
+            }
+            vec4 texel = vec4(dualRgb * primary.rgb, t0.a * primary.a);
+        @else
             vec4 texel = evalCycle(0, vec4(0.0));
             if (ubo.uParams0.z > 1.5) texel = evalCycle(1, texel); // cycleCount==2
+        @end
         @end
 
         // lightingMode 1 (3DS character half-Lambert): applied HERE, not baked into vColor0 like
@@ -379,6 +422,9 @@ const char* kUnifiedShaderTemplate = R"PRISM(@prism(type='fragment', name='Unifi
             texel.rgb = mix(texel.rgb, ubo.uFogColor.rgb, clamp(vFog.x, 0.0, 1.0));
         @end
 
+        // Native CMB applies the caller's draw alpha after TEV and alpha-test. Applying it to
+        // PRIMARY earlier would incorrectly change the alpha-test decision during title fades.
+        if (ubo.uParams1.w < 0.5) texel.a *= ubo.uPrimColor.a;
         texel = clamp(texel, 0.0, 1.0);
         fragColor = texel;
     }
@@ -397,6 +443,8 @@ std::string BuildSource(Variant v, bool vertex) {
         { "o_fog", f.fog },
         { "o_grayscale", f.grayscale },
         { "o_genericTev", f.genericTev },
+        { "o_cmbExtraTex", f.genericTev || v == Variant::kDualTex || v == Variant::kDualTexFog },
+        { "o_cmbDualTex", v == Variant::kDualTex || v == Variant::kDualTexFog },
         { "generic_tev_functions", Fast::Zelda3DTev::kGenericFunctions },
         { "ZELDA3D_GL_MAX_BONES", ZELDA3D_GL_MAX_BONES },
     };

@@ -81,6 +81,57 @@ TEST(Zelda3DUnifiedShader, CmbPrimaryUsesTransformedNormalAndBothLightSlots) {
     EXPECT_EQ(source.find("dot(normalize(nM), -normalize(ubo.uLightDir.xyz))"), std::string::npos);
 }
 
+// The title logo is force-unlit with respect to the scene, but its actor draw binds a private
+// CmbVShader light. When CMB draws moved to the unified generic-TEV route, lightingMode stayed zero
+// and the copied uSheen payload was never consumed, making the wordmark render at raw texture
+// brightness. Lock the independently-gated RE expression into the vertex-side PRIMARY producer.
+TEST(Zelda3DUnifiedShader, ForceUnlitWordmarkStillAppliesPrivateSheenToPrimary) {
+    const std::string source = Fast::Unified::BuildVertexSource(Fast::Unified::Variant::kGenericTev);
+    const auto sheenGate = source.find("if (ubo.uSheen.x > 0.0)");
+    const auto worldLightGate = source.find("else if (ubo.uParams0.y > 1.5)");
+    ASSERT_NE(sheenGate, std::string::npos);
+    ASSERT_NE(worldLightGate, std::string::npos);
+    EXPECT_LT(sheenGate, worldLightGate);
+    EXPECT_NE(source.find("ubo.uSheen.x + ndotl"), std::string::npos);
+    EXPECT_NE(source.find("dot(nV, -normalize(ubo.uLightDir.xyz))"), std::string::npos);
+}
+
+// The unified ownership boundary must preserve all state the native CMB path already consumed:
+// the live title-camera sphere basis and the four byte-classified dual-texture formulas. These
+// source checks falsify the exact regression where the UBO fields were copied but ignored.
+TEST(Zelda3DUnifiedShader, CmbDualTextureVariantConsumesSphereBasisAndLegacyModes) {
+    const std::string vertex = Fast::Unified::BuildVertexSource(Fast::Unified::Variant::kDualTex);
+    const std::string fragment = Fast::Unified::BuildFragmentSource(Fast::Unified::Variant::kDualTex);
+    EXPECT_NE(vertex.find("ubo.uSphRot0.w > 0.5"), std::string::npos);
+    EXPECT_NE(vertex.find("dot(ubo.uSphRot0.xyz, nM)"), std::string::npos);
+    EXPECT_NE(fragment.find("if (ubo.uSheen.y > 3.5)"), std::string::npos);
+    EXPECT_NE(fragment.find("t0s * ubo.uSheen.z + t1"), std::string::npos);
+    EXPECT_NE(fragment.find("t0.rgb * t1 * ubo.uSheen.z"), std::string::npos);
+    EXPECT_NE(fragment.find("clamp(t0.rgb + t1"), std::string::npos);
+}
+
+TEST(Zelda3DUnifiedShader, CmbDrawModulationPreservesTintGateAndPostTevAlpha) {
+    const std::string vertex = Fast::Unified::BuildVertexSource(Fast::Unified::Variant::kGenericTev);
+    const std::string fragment = Fast::Unified::BuildFragmentSource(Fast::Unified::Variant::kGenericTev);
+    EXPECT_NE(vertex.find("ubo.uParams1.w < 0.5 && ubo.uParams1.x > 0.5"), std::string::npos);
+    EXPECT_NE(vertex.find("vColor0.rgb *= ubo.uPrimColor.rgb"), std::string::npos);
+    const auto alphaTest = fragment.find("if (afn > 0 && !alphaPass");
+    const auto drawAlpha = fragment.find("texel.a *= ubo.uPrimColor.a");
+    ASSERT_NE(alphaTest, std::string::npos);
+    ASSERT_NE(drawAlpha, std::string::npos);
+    EXPECT_LT(alphaTest, drawAlpha);
+}
+
+TEST(Zelda3DUnifiedUbo, CmbDrawModulationUsesCallerRgbaAndLitGate) {
+    Zelda3DUnified::CommonUbo unified{};
+    Zelda3DUnified::PackCmbDrawModulation(unified, 64, 128, 192, 32, true);
+    EXPECT_FLOAT_EQ(unified.uPrimColor[0], 64.0f / 255.0f);
+    EXPECT_FLOAT_EQ(unified.uPrimColor[1], 128.0f / 255.0f);
+    EXPECT_FLOAT_EQ(unified.uPrimColor[2], 192.0f / 255.0f);
+    EXPECT_FLOAT_EQ(unified.uPrimColor[3], 32.0f / 255.0f);
+    EXPECT_FLOAT_EQ(unified.uParams1[0], 1.0f);
+}
+
 TEST(Zelda3DUnifiedUbo, CmbLightBankPreservesAmbientMultiplicityAndBothSlots) {
     SgUbo native{};
     native.uAmbient[0] = 0.2f;
