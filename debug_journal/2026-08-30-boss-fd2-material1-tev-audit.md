@@ -61,3 +61,14 @@ same-fragment correspondence. These captures are not parity evidence and do not 
 TEV, lighting, or texture change. A useful next instrument must select the oracle draw by draw
 identity and expose its rasterized footprint, or otherwise establish a shared material-1 pixel
 before comparing values.
+
+## Oracle capture cache
+
+The exact paired oracle capture is now cached under
+`scratch/oracle_cache/26f57176963dad7a_norom_p37-ef0970ab/` with setup arguments for entrance
+`0x305`, daytime `0x6000`, camera `700 100 0 45`, mane position `0 -850 0`, framebuffer probe
+`240,195`, and the software rasterizer. It contains the draw-tagged `PIXELXY` log, the matching
+`vsuni_log`, and the oracle PPM. Re-running `scratch/probe_fd2_paired_xy.py` produced
+`oracle: cache hit` and restored those files without starting the harness. `OracleCache` now
+supports raw artifacts, and its Azahar discriminator hashes the complete `AZAHAR_PATCH.md`
+content so patch-body changes rotate the cache key. The three cache identity tests pass.
