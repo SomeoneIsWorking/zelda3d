@@ -52,11 +52,11 @@ extern "C" void Zelda3D_Sg_DrawModel(int modelId, const float* mp16, const float
                                      float aspectAdj, const float* boneData, int boneCnt, unsigned long long midMask,
                                      int sky, float uvOffU, float uvOffV, const void* matTex, const void* matConst,
                                      const void* matUv, int forceUnlit, const float* lightDirOv,
-                                     const float* sphRotOv) {
+                                     const float* sphereNormalOv) {
     Fast::Zelda3DSdl3GpuPass::RecordSubmissionProbe(modelId, mp16, lit, sky, r8, g8, b8, a8, boneCnt);
     if (auto* r = sgRenderer())
         r->DrawModel(modelId, mp16, mv16, lit, invertY, r8, g8, b8, a8, aspectAdj, boneData, boneCnt, midMask, sky,
-                     uvOffU, uvOffV, matTex, matConst, matUv, forceUnlit, lightDirOv, sphRotOv);
+                     uvOffU, uvOffV, matTex, matConst, matUv, forceUnlit, lightDirOv, sphereNormalOv);
 }
 extern "C" void Zelda3D_Sg_EndPass(void) {
     if (auto* r = sgRenderer())

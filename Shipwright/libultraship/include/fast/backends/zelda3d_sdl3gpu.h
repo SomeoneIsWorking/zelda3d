@@ -146,7 +146,7 @@ class Zelda3DRenderer {
                    unsigned char g8, unsigned char b8, unsigned char a8, float aspectAdj, const float* boneData,
                    int boneCnt, unsigned long long midMask, int sky, float uvOffU, float uvOffV, const void* matTex,
                    const void* matConst, const void* matUv, int forceUnlit, const float* lightDirOv = nullptr,
-                   const float* sphRotOv = nullptr);
+                   const float* sphereNormalOv = nullptr);
     void EndPass();
     void ClearOverlayDepth(); // #146 item B — fullscreen depth-only reset, in-pass, no color write.
 

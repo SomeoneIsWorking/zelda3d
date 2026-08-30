@@ -1,7 +1,8 @@
 # cs464 composition offset EXONERATED; cs1093 fireglow remeasured post-decoration-fix (2026-07-14)
 
 Follow-up to `2026-07-14-title-cs464-wordmark-and-composition-and-fireglow.md` (D2/D3) and
-`2026-07-14-wordmark-spheremap-view-rotation.md` (the D1 fix, commit `a20566da`).
+`2026-07-14-wordmark-spheremap-normal-transform.md` (the corrected D1 history; commit `a20566da`
+had inferred the camera basis, later falsified by captured c4-c6 identity).
 
 ## Divergence 2 (whole-frame "low-right" shift at cs464): NO BUG — measurement artifacts, camera port verified at <=1px
 

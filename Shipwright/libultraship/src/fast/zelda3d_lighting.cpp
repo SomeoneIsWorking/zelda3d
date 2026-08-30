@@ -71,15 +71,15 @@ extern "C" void Zelda3D_GL_ClearLightDirOverride(int modelId) {
     }
 }
 
-extern "C" void Zelda3D_GL_SetSphereMapViewRot(int modelId, const float matrix[9]) {
+extern "C" void Zelda3D_GL_SetSphereMapNormalMatrix(int modelId, const float matrix[9]) {
     auto& override = Zelda3DFast::modelOverrides[modelId];
-    override.hasSphereMapRotation = true;
-    std::copy_n(matrix, 9, override.sphereMapRotation);
+    override.hasSphereMapNormalMatrix = true;
+    std::copy_n(matrix, 9, override.sphereMapNormalMatrix);
 }
 
-extern "C" void Zelda3D_GL_ClearSphereMapViewRot(int modelId) {
+extern "C" void Zelda3D_GL_ClearSphereMapNormalMatrix(int modelId) {
     const auto model = Zelda3DFast::modelOverrides.find(modelId);
     if (model != Zelda3DFast::modelOverrides.end()) {
-        model->second.hasSphereMapRotation = false;
+        model->second.hasSphereMapNormalMatrix = false;
     }
 }

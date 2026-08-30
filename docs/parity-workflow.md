@@ -114,7 +114,10 @@ again for a frame already captured in a prior session.
   result is larger than structured JSON.
 - **CLI**: `tools/oracle_cache.py stats|warm [frames...]|invalidate`. `warm` with no args
   pre-captures the standard title sweep points ({100,200,360,500,700,764,1000,1300,1522,
-  1700,1900}) in one harness session.
+  1700,1900}) in one harness session. If an Azahar patch change is provably observer-only,
+  `adopt-frame <old-key> <frames...> --observer-only` reuses existing PNGs after checking the
+  savestate, ROM, and texture-pack identities and records the source key/path; never rerun the
+  oracle merely because a logger gained fields. Do not use adoption for renderer changes.
 - **title_ab.py `ab`** is cache-aware: a cache hit on the target az frame skips the `run
   <az>` stepping loop entirely and reuses the stored PNG for the oracle side; the SoH side
   is NEVER cached (it changes every build) and always runs live via `soh_step`. Reports
@@ -129,6 +132,8 @@ again for a frame already captured in a prior session.
   software-renderer draw/uniform log and `fragments <cs> <draw>` stores the selected fragment stream
   plus its summary. Artifact identity includes capture version, cursor, oracle frame, renderer, and
   draw. Both commands return before spawning on a cache hit; analyze the stored artifact thereafter.
+  Long advances are split into checked 25-frame commands and immutable 400-frame savestate
+  checkpoints, so an interrupted probe resumes near its target instead of replaying the title.
 - **Invalidate** only to reclaim space. Savestate, ROM, patch-contract, texture-pack mode, and
   texture-pack manifest changes rotate the key automatically, so stale contexts sit unused
   rather than serving wrong data.

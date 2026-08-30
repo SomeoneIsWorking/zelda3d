@@ -346,7 +346,7 @@ void Fast::Zelda3DRenderer::DrawModel(int modelId, const float* mp16, const floa
                                       float aspectAdj, const float* boneData, int boneCnt, unsigned long long midMask,
                                       int sky, float uvOffU, float uvOffV, const void* matTex, const void* matConst,
                                       const void* matUv, int forceUnlit, const float* lightDirOv,
-                                      const float* sphRotOv) {
+                                      const float* sphereNormalOv) {
     const std::unordered_map<int, int>* matTexMap = static_cast<const std::unordered_map<int, int>*>(matTex);
     const std::unordered_map<int, Zelda3DMatConstOv>* matConstMap =
         static_cast<const std::unordered_map<int, Zelda3DMatConstOv>*>(matConst);
@@ -506,14 +506,14 @@ void Fast::Zelda3DRenderer::DrawModel(int modelId, const float* mp16, const floa
     base.uTintSkin[1] = g8 / 255.0f;
     base.uTintSkin[2] = b8 / 255.0f;
     base.uTintSkin[3] = (boneData && boneCnt > 0) ? 1.0f : 0.0f;
-    if (sphRotOv) {
-        // Sphere-map view-rotation override (see zelda3d_sg_ubo.h uSphRot* comment): sphRotOv is
-        // the row-major 3x3 view-rotation the caller derived from the live camera. uSphRot0.w is
-        // the shader-side gate. base{} zero-init keeps it off for every draw that doesn't set it.
-        memcpy(base.uSphRot0, sphRotOv + 0, 3 * sizeof(float));
-        memcpy(base.uSphRot1, sphRotOv + 3, 3 * sizeof(float));
-        memcpy(base.uSphRot2, sphRotOv + 6, 3 * sizeof(float));
-        base.uSphRot0[3] = 1.0f;
+    if (sphereNormalOv) {
+        // Exact CmbVShader c4-c6 normal transform for sphere mapping. Host-native composition may
+        // use a different uMV for placement, so this state remains independent and explicitly
+        // gated. base{} keeps it disabled on draws without an oracle-derived override.
+        memcpy(base.uSphNrm0, sphereNormalOv + 0, 3 * sizeof(float));
+        memcpy(base.uSphNrm1, sphereNormalOv + 3, 3 * sizeof(float));
+        memcpy(base.uSphNrm2, sphereNormalOv + 6, 3 * sizeof(float));
+        base.uSphNrm0[3] = 1.0f;
     }
     if (lightDirOv) {
         // Wordmark sheen (title_logo_actor.md §6.3): lightDirOv is OBJECT-space (same space as
@@ -963,9 +963,9 @@ void Fast::Zelda3DRenderer::DrawModel(int modelId, const float* mp16, const floa
             memcpy(uu.common.uTex1Xf, ubo.uTex1Xf, sizeof(uu.common.uTex1Xf));
             memcpy(uu.common.uFog3d0, ubo.uFog3d0, sizeof(uu.common.uFog3d0));
             memcpy(uu.common.uFog3d1, ubo.uFog3d1, sizeof(uu.common.uFog3d1));
-            memcpy(uu.common.uSphRot0, ubo.uSphRot0, sizeof(uu.common.uSphRot0));
-            memcpy(uu.common.uSphRot1, ubo.uSphRot1, sizeof(uu.common.uSphRot1));
-            memcpy(uu.common.uSphRot2, ubo.uSphRot2, sizeof(uu.common.uSphRot2));
+            memcpy(uu.common.uSphNrm0, ubo.uSphNrm0, sizeof(uu.common.uSphNrm0));
+            memcpy(uu.common.uSphNrm1, ubo.uSphNrm1, sizeof(uu.common.uSphNrm1));
+            memcpy(uu.common.uSphNrm2, ubo.uSphNrm2, sizeof(uu.common.uSphNrm2));
             memcpy(uu.common.uTevStages, ubo.uTevStages, sizeof(uu.common.uTevStages));
             memcpy(uu.common.uTevConst, ubo.uTevConst, sizeof(uu.common.uTevConst));
             memcpy(uu.common.uTex2Xf, ubo.uTex2Xf, sizeof(uu.common.uTex2Xf));

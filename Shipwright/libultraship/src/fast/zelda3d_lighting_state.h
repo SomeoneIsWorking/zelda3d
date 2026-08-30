@@ -7,8 +7,8 @@ namespace Zelda3DFast {
 struct LightingOverrides {
     bool hasLightDirection = false;
     float lightDirection[3] = { 0.0f, 0.0f, 1.0f };
-    bool hasSphereMapRotation = false;
-    float sphereMapRotation[9] = { 1.0f, 0.0f, 0.0f, 0.0f, 1.0f, 0.0f, 0.0f, 0.0f, 1.0f };
+    bool hasSphereMapNormalMatrix = false;
+    float sphereMapNormalMatrix[9] = { 1.0f, 0.0f, 0.0f, 0.0f, 1.0f, 0.0f, 0.0f, 0.0f, 1.0f };
 };
 
 LightingOverrides LightingOverridesForDraw(int modelId);

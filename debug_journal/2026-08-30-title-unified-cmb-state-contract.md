@@ -19,7 +19,9 @@ The render-unification boundary copied only part of the native CMB contract:
 
 1. `VariantForGroup` ignored `dualTexMode`, so classified modes 1..3 went through the single-texture
    shader shape.
-2. The unified vertex shader ignored the copied `uSphRot0..2` title-camera basis.
+2. The unified vertex shader ignored the copied sphere-normal transform channel. At this stage the
+   channel still carried the inferred title-camera basis; the exact audit below later corrected
+   that payload to captured CmbVShader c4-c6 identity.
 3. It ignored `uSheen.x`, even though force-unlit title draws still own the private RE'd wordmark
    light independently of world lighting.
 4. The unified UBO initialized `uPrimColor` to white and never transported DrawModel's `r8/g8/b8/a8`.
@@ -33,7 +35,8 @@ filter stopped blurring the title textures, but sampler enums were not the title
 ## Implementation
 
 - CMB dual-texture groups select the unified dual-texture variant.
-- Unified CMB vertex generation consumes the copied live sphere basis and private-light payload.
+- Unified CMB vertex generation consumes the copied sphere-normal transform and private-light
+  payload. The final transform semantics are the exact CmbVShader c4-c6 rows derived below.
 - The dual variant preserves the existing native mode 1..3 formulas instead of inventing a title
   special case.
 - `PackCmbDrawModulation` is the one UBO adapter for caller RGBA and the native tint gate. RGB is
@@ -140,3 +143,56 @@ anti-overfit evidence for transporting the authored mapping. The early gold pred
 confounded by white shield/sword highlights, so its count is diagnostic rather than a parity gate.
 The remaining title difference is still visible; the selected-fragment command is the next
 ground-truth observable and will itself be cached after one run.
+
+## Selected-fragment result: the camera-basis sphere transform was false
+
+The first selected-fragment attempt exposed a tooling defect before producing evidence: a
+`run 100` command exceeded the harness's 60-second response timeout after roughly eight minutes,
+and no artifact was saved. `title_oracle_probe.py` now:
+
+- advances in checked 25-frame chunks;
+- stores immutable `title-checkpoint` savestates every 400 oracle frames;
+- resumes from the latest checkpoint while leaving at least three post-load warmup frames; and
+- keys checkpoints by schema version, exact oracle frame, and software-renderer mode.
+
+The protected retry completed once and cached cs1093/draw86 under the observer-schema key
+`9b68c40a7247d715_6510135ae6c38599_p37-6f57056b_tpoff` as
+`artifacts/title-fragments_1564d9e6eac1.log`. An immediate repeat reported `oracle: cache hit` in
+2.41 seconds and did not spawn Azahar.
+
+The selected draw generated 2,452 unique fragments with no occlusion discards. Its exact values
+were:
+
+- PRIMARY = `(193,193,193,255)` everywhere;
+- TEX1 = zero everywhere;
+- TEX0 = `(206,40,49..57,255)` in the software rasterizer;
+- combined = `(155,30,37..43,255)`, exactly PRIMARY × TEX0.
+
+The unified host fragment taps independently reproduced PRIMARY exactly and the TEV product
+exactly. Before the final normal-transform correction, 412 clean selected host pixels sampled
+TEX0 `(148,28,16)`; lighting and TEV were therefore exonerated and texture-coordinate state was
+the only remaining cause.
+
+The oracle logger was then extended generically to serialize CmbVShader c4-c7, c10-c16, and c92.
+The same cached run records all wordmark draws 75-87 with c4-c6 exact identity, coordinator-0
+texture matrix exact identity, and mapping method 3. `/CmbVShader.shbin` independently names c4-c7
+`uModelView`; words 59-61 transform the normal by c4-c6 and words 295-296 compute
+`0.5*n.xy+0.5`. This falsifies the historical claim that the title's live camera basis belongs in
+the sphere-map input.
+
+The host reconciliation channel was renamed from a camera-specific `SphereMapViewRot` to the
+actual responsibility, `SphereMapNormalMatrix`, and now transports the oracle c4-c6 identity for
+the title independently of the host orthographic placement matrix. The selected TEX0 tap moved
+from `(148,28,16)` to `(209,42,58)` on all 412 clean pixels.
+
+That small residual is an oracle-instrument limitation, not a port offset to tune. Azahar's
+software rasterizer explicitly leaves min/mag filtering as a TODO and truncates `(0.5,0.5)` to
+RGB565 texel `(64,63)=(206,40,49)`. The decoded center 2×2 average is `(208,42,57.25)`, which the
+shipping SDL linear sampler returns as `(209,42,58)`. Instrument I043 is distrusted for filtered
+sample values. No half-texel correction was added.
+
+The cache-only normal host frame is
+`scratch/title_host_capture/title_sphere_normal_identity_cs1093_sxs.png`. The whole-frame
+software-oracle content score changes 0.7465→0.7377 because the metric now penalizes the correct
+linear-filter result against the nearest-only software oracle; it is not a valid reason to restore
+the contradicted camera transform. Wider rider/scene/title differences remain open.

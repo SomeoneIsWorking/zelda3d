@@ -85,7 +85,7 @@ extern "C" void Zelda3D_GL_Submit(int modelId, const float* modelProjection, con
                              material.visibleMeshMask, sky, uvOffsetU, uvOffsetV, &material.textures,
                              &material.constants, &material.textureCoordinates, forceUnlit,
                              lighting.hasLightDirection ? lighting.lightDirection : nullptr,
-                             lighting.hasSphereMapRotation ? lighting.sphereMapRotation : nullptr);
+                             lighting.hasSphereMapNormalMatrix ? lighting.sphereMapNormalMatrix : nullptr);
     }
 #else
     (void)modelProjection;

@@ -180,17 +180,17 @@ Decoded the oracle's live PICA TEV stages from the draw_log for each decoration 
 |---|---|---|---|---|---|
 | mat4/5 (i_ctex04a) | MODULATE(PRIM,TEX0)×2 | MODULATE(PREV,TEX1)×2 | 2*PRIM*TEX0*TEX1*2 | same | mode 3 ✓ |
 | mat6/9 (i_ctex10a) | ADD(TEX0,TEX1) | MODULATE(PREV,PRIMARY) | (TEX0+TEX1)*PRIM | same | mode 2 ✓ |
-| mat10 (zelda_logo_ev01) | MODULATE(PRIM,TEX0)×2 | MULT_ADD(PRIM,TEX1,PREV) | PRIM*(2*TEX0+TEX1) | MODULATE→REPLACE (no dual-tex!) | NONE |
+| mat10 (zelda_logo_ev01) | MODULATE(PRIM,TEX0) | REPLACE(PREV) | PRIM*TEX0 | same; TEX1 disabled | coordinator-0 sphere map |
 
 **The combiner formulas MATCH for mat4/5/6/9.** SoH implements the same multiply/add as the
 oracle. Yet the decorations are invisible. The CMB file's combiner for mat4/5 is correctly
 parsed and the dual-tex detection works (verified via `[DBG_DUALTEX]` trace: mode=3, tex1Idx
 correct, tex1Bound=1).
 
-**mat10 (zelda_logo_ev01) is the exception**: the oracle overrides the CMB's simple
-MODULATE→REPLACE with a custom 2-stage `2*TEX0 + TEX1` (MULT_ADD). The CMB file says no
-dual-tex, but the oracle binds the same texture to both slots and adds them. This is a
-game-side draw-time override not present in the CMB — 92 triangles affected.
+The 2026-08-30 exact draw-identity audit retracted the earlier mat10 exception. The old row had
+attributed another draw's TEV state to mat10. Exact mat10 draws enable only TEX0 and preserve the
+CMB's MODULATE→REPLACE chain; their distinct behavior is coordinator-0 CameraSphereEnvMap, not a
+draw-time combiner rewrite or aliased TEX1.
 
 ### Dual-tex binding is correct
 
@@ -223,9 +223,8 @@ oracle, yet the decorations produce invisible output. The remaining suspects:
 
 The investigation reached the mechanism (invisible decorative meshes) but did NOT fully
 root-cause why the multiply combiner produces black output when the oracle's identical
-formula produces visible gold. The mat10 override (game-side TEV not in CMB) is a confirmed
-partial cause but only affects 92 of 676 decoration triangles. The remaining 584 triangles
-(mat4/5/6/9) have matching formulas but still produce no visible output — this needs UV-level
+formula produces visible gold. The earlier mat10 override claim was false and is retracted above.
+The remaining decoration triangles with genuine dual-texture formulas still needed UV-level
 instrumentation (dump the actual vUv1 values and sampled texels at a decoration fragment) to
 close out. Not attempted this session — the budget went to the combiner/TEV analysis above.
 

@@ -35,6 +35,7 @@ Commands:
   set <id> field=value ...       update fields (status/deps/evidence/where/gap/notes/title/area)
 """
 import argparse
+import io
 import os
 import re
 import sys
@@ -107,9 +108,11 @@ class Entry:
     def serialize(self):
         out = [f"### {self.id} — {self.title}"]
         out.append(f"- status: {self.status}")
-        out.append(f"- deps: {', '.join(self.deps)}")
+        deps = ", ".join(self.deps)
+        out.append(f"- deps:{f' {deps}' if deps else ''}")
         for f in ("evidence", "where", "gap", "notes"):
-            out.append(f"- {f}: {getattr(self, f)}")
+            value = getattr(self, f)
+            out.append(f"- {f}:{f' {value}' if value else ''}")
         return "\n".join(out)
 
 
@@ -146,7 +149,8 @@ def load():
     cur = None
     prelude_buf = []
     capturing_prelude = False
-    lines = open(ROADMAP, encoding="utf-8").read().split("\n")
+    with open(ROADMAP, encoding="utf-8") as roadmap_file:
+        lines = roadmap_file.read().split("\n")
     last_consumed_idx = -1
     header_buf = []
     in_header = True
@@ -197,21 +201,24 @@ def save(entries, order):
         a = entries[eid].area
         if a not in areas:
             areas.append(a)
+    output = io.StringIO()
+    output.write(FILE_HEADER if FILE_HEADER is not None else HEADER)
+    for a in areas:
+        output.write(f"\n## {a}\n\n")
+        pre = AREA_PRELUDE.get(a)
+        if pre:
+            pre_text = "\n".join(pre).strip("\n")
+            if pre_text:
+                output.write(pre_text + "\n\n")
+        for eid in order:
+            if entries[eid].area == a:
+                output.write(entries[eid].serialize() + "\n\n")
+    tail_text = "\n".join(TAIL_LINES).strip("\n")
+    if tail_text:
+        output.write(tail_text + "\n")
+    serialized = output.getvalue().rstrip("\n") + "\n"
     with open(ROADMAP, "w", encoding="utf-8") as fh:
-        fh.write(FILE_HEADER if FILE_HEADER is not None else HEADER)
-        for a in areas:
-            fh.write(f"\n## {a}\n\n")
-            pre = AREA_PRELUDE.get(a)
-            if pre:
-                pre_text = "\n".join(pre).strip("\n")
-                if pre_text:
-                    fh.write(pre_text + "\n\n")
-            for eid in order:
-                if entries[eid].area == a:
-                    fh.write(entries[eid].serialize() + "\n\n")
-        tail_text = "\n".join(TAIL_LINES).strip("\n")
-        if tail_text:
-            fh.write(tail_text + "\n")
+        fh.write(serialized)
 
 
 def effective_status(e, entries):

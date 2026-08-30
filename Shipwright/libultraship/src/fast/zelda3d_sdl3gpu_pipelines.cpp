@@ -463,8 +463,24 @@ SDL_GPUGraphicsPipeline* Fast::Zelda3DRenderer::getUnifiedPipeline(const SgGroup
     GfxRenderingAPISdl3Gpu* api = g_activeSdl3GpuApi;
 
     if (g_uniVert[variant] == nullptr) {
+        int fragmentProbeMode = 0;
+        int fragmentProbeDraw = -1;
+        if (const char* mode = std::getenv("ZELDA3D_SG_FRAGDBG")) {
+            const int requested = std::atoi(mode);
+            if (requested == 1 || requested == 5 || requested == 6) {
+                fragmentProbeMode = requested;
+            }
+        }
+        if (const char* draw = std::getenv("ZELDA3D_SG_FRAGDBG_DRAW")) {
+            fragmentProbeDraw = std::atoi(draw);
+        }
+        if (fragmentProbeMode != 0 && fragmentProbeDraw < 0) {
+            std::fprintf(stderr, "[Zelda3D_SG] unified FRAGDBG mode=%d requires FRAGDBG_DRAW; probe disabled\n",
+                         fragmentProbeMode);
+            fragmentProbeMode = 0;
+        }
         std::string vsrc = Fast::Unified::BuildVertexSource((Fast::Unified::Variant)variant);
-        std::string fsrc = Fast::Unified::BuildFragmentSource((Fast::Unified::Variant)variant);
+        std::string fsrc = Fast::Unified::BuildFragmentSource((Fast::Unified::Variant)variant, fragmentProbeMode);
         // 1 UBO (UnifiedCommon) + 1 UBO (bones) for vertex; 1 sampler (untextured variant needs 0)
         // + 1 UBO (UnifiedCommon) for fragment — mirrors makeShader's existing (numSamplers, numUbo)
         // convention for the old fixed CMB shader.
@@ -475,6 +491,9 @@ SDL_GPUGraphicsPipeline* Fast::Zelda3DRenderer::getUnifiedPipeline(const SgGroup
         g_uniFrag[variant] = makeShader(fsrc.c_str(), EShLangFragment, numSamplers, 1);
         if (!g_uniVert[variant] || !g_uniFrag[variant])
             fprintf(stderr, "[Zelda3D_SG] unified shader variant %d compile FAILED\n", variant);
+        else if (fragmentProbeMode != 0)
+            std::fprintf(stderr, "[Zelda3D_SG] unified FRAGDBG mode=%d active draw=%d\n", fragmentProbeMode,
+                         fragmentProbeDraw);
     }
     if (!g_uniVert[variant] || !g_uniFrag[variant])
         return nullptr;
