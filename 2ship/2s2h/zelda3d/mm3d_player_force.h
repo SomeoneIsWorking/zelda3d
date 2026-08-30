@@ -10,7 +10,7 @@
 // to func_80839E74/func_8083A794); new controls live in mm3d_player_force.c and call the same
 // non-static decomp entry points without growing that 22,000-line overlay.
 //
-// REPL surface: repl/mm3d_link_repl.c `linkstate <idle|walk|run>` and `linkitem <ItemId>`.
+// REPL surface: repl/mm3d_link_repl.cpp `linkstate <idle|walk|run>` and `linkitem <ItemId>`.
 #pragma once
 #include "global.h" // PlayState, Player
 

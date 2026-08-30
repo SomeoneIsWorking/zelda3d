@@ -75,14 +75,47 @@ invalid linkb index, and a disabled bottle button. They also prove the retail
 HUD-visibility exception restores that disabled button's item. No shared build
 or game instance ran for this batch.
 
+## Live Zora-boomerang producer proof
+
+The generic `linkinfo` diagnostic now reports the shipping left-hand adapter's
+mask and the typed `zoraBoomerangActor` identity. A serialized headless run in
+Great Bay Coast transformed through the normal Zora-mask path, held B to charge,
+then released the real scripted pad. It produced this exact transition:
+
+```text
+charge:    leftHandType=1 leftHandMask=0x0000000000000004 zoraBoomerangActorId=-1
+in flight: leftHandType=1 leftHandMask=0x0000000000000002 zoraBoomerangActorId=32
+caught:    leftHandType=1 leftHandMask=0x0000000000000004 zoraBoomerangActorId=-1
+```
+
+Actor ID 32 is `ACTOR_EN_BOOM`; the in-flight state also carried
+`PLAYER_STATE1_ZORA_BOOMERANG_THROWN`. Because `leftHandType` stayed 1, the
+existing retail branch requiring type 4 plus that state flag could not select
+the open hand. The actor-lifetime producer changed the mask from closed mesh 2
+to open mesh 1, then the native destructor restored the closed hand. The full
+probe transcript is cached at
+`scratch/logs/mm_n2/zora_boomerang_probe.txt`; no oracle rerun was needed.
+The diagnostic owner was migrated from C `snprintf` construction to typed
+`fmt::format` in `mm3d_link_repl.cpp`, preserving the established numeric
+`linkinfo` contract while making the touched owner clang-tidy clean.
+
+The final combined Clang build passed `mm_core` and `zelda3d_app`; the focused
+adapter, REPL-structure, and Player-contract suite passed 19/19; and the locked
+retail-asset `lus_tests` run passed 461/461. Direct clang-format and clang-tidy
+checks are clean for every touched C/C++ owner. The normal repository verifier
+still stops on the same eleven unrelated oversized SoH enhancement files
+tracked by issue 0022; none is in this change.
+
 ## Remaining gaps
 
-- MM3D `Player+0x129bc` bit 16 is a private transient open-hand input set by
-  the mount transition and two actor-contact functions. No exact typed 2S2H
-  homolog is proved, so the adapter does not guess it.
+- MM3D `Player+0x129bc` bit 16 has multiple producers. The exact `En_Boom`
+  producer is now ported and live-proven. Player helper `0x002250f0` separately
+  drives the bit around a mount transition; its exact typed timing predicate
+  remains unresolved and inactive.
 - Retail-only Zora `pz_gakkiwait` and `pz_gakki_demo` have no independent
   typed N64 animation symbols. The shared N64 play/start cases are aligned.
-- The new selector has no authentic live sword/bottle submission capture yet.
+- Authentic live sword and instrument submission captures remain open. The
+  bottle path is covered by the later live control below.
 
 ## Bottle material follow-up
 

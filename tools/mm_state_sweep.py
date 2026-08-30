@@ -2,7 +2,7 @@
 """mm_state_sweep.py — regression sweep for the MM Zelda3D_PlayerForce* layer.
 
 Drives Link through every ported force-state via the `linkstate` command owned by
-`2ship/2s2h/zelda3d/repl/mm3d_link_repl.c` and the force interface owned by
+`2ship/2s2h/zelda3d/repl/mm3d_link_repl.cpp` and the force interface owned by
 `2ship/2s2h/zelda3d/mm3d_player_force.{c,h}`. The hook must install its expected action func (or,
 for a context-gated state with no live context, decline SAFELY) and MM must survive. This is the
 mm_sweep.py orchestrator's state-coverage half (re_control_debug_ backlog #11); the

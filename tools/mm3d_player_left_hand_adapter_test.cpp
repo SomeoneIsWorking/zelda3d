@@ -94,6 +94,20 @@ int main() {
     assert(!Zelda3D_MM_PlayerLeftHandMeshMask(&player, EQUIP_VALUE_SWORD_NONE, &mask));
 
     frame.appearanceInfo = 0;
+    player.transformation = PLAYER_FORM_ZORA;
+    player.leftHandType = PLAYER_MODELTYPE_LH_CLOSED;
+    player.leftHandDLists = &gPlayerLeftHandClosedDLs[2 * PLAYER_FORM_ZORA];
+    Actor boomerang{};
+    boomerang.id = ACTOR_EN_BOOM;
+    player.zoraBoomerangActor = &boomerang;
+    assert(Zelda3D_MM_PlayerLeftHandMeshMask(&player, EQUIP_VALUE_SWORD_NONE, &mask));
+    assert(mask == Mask({ 1 }));
+    boomerang.id = ACTOR_EN_ARROW;
+    assert(Zelda3D_MM_PlayerLeftHandMeshMask(&player, EQUIP_VALUE_SWORD_NONE, &mask));
+    assert(mask == Mask({ 2 }));
+    player.zoraBoomerangActor = nullptr;
+
+    player.transformation = PLAYER_FORM_HUMAN;
     player.leftHandType = PLAYER_MODELTYPE_LH_BOTTLE;
     player.leftHandDLists = &gPlayerLeftHandBottleDLs[2 * PLAYER_FORM_HUMAN];
     player.itemAction = PLAYER_IA_BOTTLE_FISH;
