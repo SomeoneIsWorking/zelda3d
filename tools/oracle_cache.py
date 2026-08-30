@@ -10,12 +10,13 @@ Two independent cache namespaces share the scratch/oracle_cache/ root
       scene/head/pos/rot — since a warp costs ~3-5s of oracle time and is
       deterministic for a given (entrance, dayTime).
 
-  scratch/oracle_cache/<savestate_sha16>_<rom_sha16>_<patch_marker>/
+  scratch/oracle_cache/<savestate_sha16>_<rom_sha16>_<patch_marker>_<texpack_marker>/
       The FRAME/PROBE cache (harness_cache.OracleCache, driven from this
       file's CLI): memoizes embedded-Azahar (soh3d_harness) title-cutscene
       frame captures and structured probe output by az (Azahar) frame
-      number, keyed additionally by the loaded savestate, the ROM, and the
-      Azahar rendering patches in tools/soh3d_harness/AZAHAR_PATCH.md — see
+      number, keyed additionally by the loaded savestate, the ROM, the effective
+      texture-pack manifest, and the Azahar rendering patches in
+      tools/soh3d_harness/AZAHAR_PATCH.md — see
       harness_cache.cache_key(). Used by tools/title_ab.py's `ab` command and
       any future probe built on OracleCache. Managed via this file's CLI:
 
@@ -173,6 +174,7 @@ def cmd_stats(args) -> None:
     print(f"dir:         {s['dir']}")
     print(f"frames:      {s['n_frames']}")
     print(f"probes:      {s['n_probes']}")
+    print(f"artifacts:   {s['n_artifacts']}")
     print(f"size:        {s['bytes'] / 1e6:.1f} MB")
     if s["bytes"] > WARN_BYTES:
         print(f"WARNING: cache exceeds {WARN_BYTES / 1e9:.1f} GB — consider "

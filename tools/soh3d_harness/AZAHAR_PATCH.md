@@ -518,12 +518,18 @@ depth=<f>` — the full compositing stack at one coordinate. Coordinate space is
 480x400 3D FB (NOT the final 400x240 image): image_x = fb_y, image_y ≈ 240 − fb_x/2;
 the display pass at (x,y) samples the 3D FB at (2x, y).
 
-The software-rasterizer records now also carry `draw=<n>`, using the same per-frame draw
-counter as the Patch-5 `vsuni_log` records. This joins a fragment's rasterized footprint to
-the exact draw identity and material/uniform state; texture address alone is not a reliable
-identity because multiple materials can share a texture. The counter is stable during
-`DrawArrays`: `pica_core.cpp` increments it immediately before the draw, and the software
-rasterizer waits for its scanline workers before returning.
+The software-rasterizer records now also carry `draw=<n>`, using the same identity as the
+Patch-5 `vsuni_log` records. `pica_core.cpp` emits `vsuni_log` before incrementing the counter,
+then increments immediately before `DrawArrays`; the rasterizer therefore records
+`soh3d_draw_index - 1`. This joins a fragment's rasterized footprint to the exact material and
+uniform state. Texture address alone is not a reliable identity because multiple materials can
+share a texture. The counter remains stable until the software rasterizer's scanline workers
+finish.
+
+`SOH3D_PIXEL_DRAW=<n>` selects one exact `vsuni_log` draw and emits every generated fragment as
+`PIXEL draw=<n> ...`; unlike repeated `SOH3D_PIXEL_XY` guesses, one capture yields the draw's full
+raster footprint plus texture samples, PRIMARY, combiner output, and depth. The generic four-million
+line diagnostic cap applies, and the path is inert when the variable is absent.
 
 Verification signature: at title `run 1000` (dayTime 0x3197), `az_fog` prints
 `color=(0,0,0)` end-of-frame but per-draw `vsuni_log` shows 51 draws `fog=5/0(56,42,40)`,
