@@ -99,14 +99,16 @@ again for a frame already captured in a prior session.
 
 - **Cache**: `scratch/oracle_cache/<key>/` (gitignored — contains ROM-derived frame data,
   never committed). `<key>` = `sha256(savestate)[:16]_sha256(rom)[:16]_<patch-marker>`
-  (`harness_cache.cache_key()`); the patch marker is derived from `AZAHAR_PATCH.md`'s
-  heading list, so editing a patch mints a fresh key instead of silently serving stale
+  (`harness_cache.cache_key()`); the patch marker hashes the complete `AZAHAR_PATCH.md`,
+  so editing a patch mints a fresh key instead of silently serving stale
   frames. Frames stored as PNG; each context has an `index.json` recording the full key
   metadata (savestate/ROM paths+hashes, patch marker) for auditability.
 - **API**: `harness_cache.OracleCache` — `get_frame`/`put_frame` (by az frame number),
   `get_probe`/`put_probe` (by probe name + az frame + args, for deterministic structured
   probes like camera eye/at, `az_daytime`, `az_fog`, `vsuni_log`). `stats()`/`invalidate()`
-  for housekeeping.
+  for housekeeping. `get_artifact`/`put_artifact` cache raw logs, PPMs, and other binary
+  capture outputs by a named setup plus sorted arguments; use these for scene probes whose
+  result is larger than structured JSON.
 - **CLI**: `tools/oracle_cache.py stats|warm [frames...]|invalidate`. `warm` with no args
   pre-captures the standard title sweep points ({100,200,360,500,700,764,1000,1300,1522,
   1700,1900}) in one harness session.
@@ -119,6 +121,9 @@ again for a frame already captured in a prior session.
   run `invalidate` to reclaim the disk space it would otherwise occupy.
 - **soh3d_harness is single-instance** (PID-locked) — the frame cache does not change
   that; `warm`/`ab` cache-miss paths still need exclusive access to the harness process.
+  The tracked `tools/oracle_draw_isolate.py` also caches a completed per-draw sweep (including
+  its raw logs, base image, masks, and report) by entrance/time/probe settings before starting
+  a new oracle instance.
 
 ## Hi-res texture pack — ONE switch, both sides (`ZELDA3D_HARNESS_TEXPACK`)
 

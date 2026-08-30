@@ -518,6 +518,13 @@ depth=<f>` — the full compositing stack at one coordinate. Coordinate space is
 480x400 3D FB (NOT the final 400x240 image): image_x = fb_y, image_y ≈ 240 − fb_x/2;
 the display pass at (x,y) samples the 3D FB at (2x, y).
 
+The software-rasterizer records now also carry `draw=<n>`, using the same per-frame draw
+counter as the Patch-5 `vsuni_log` records. This joins a fragment's rasterized footprint to
+the exact draw identity and material/uniform state; texture address alone is not a reliable
+identity because multiple materials can share a texture. The counter is stable during
+`DrawArrays`: `pica_core.cpp` increments it immediately before the draw, and the software
+rasterizer waits for its scanline workers before returning.
+
 Verification signature: at title `run 1000` (dayTime 0x3197), `az_fog` prints
 `color=(0,0,0)` end-of-frame but per-draw `vsuni_log` shows 51 draws `fog=5/0(56,42,40)`,
 and the LUT dump has `lut[127] = 0.9819/-0.7338` (75.2% max fog). See oot3d-decomp

@@ -21,11 +21,13 @@ Outputs in <outdir>:
 """
 import json
 import os
+import shutil
 import sys
 
 import numpy as np
 
 sys.path.insert(0, os.path.join(os.path.dirname(__file__)))
+from harness_cache import OracleCache  # noqa: E402
 from harness_gameplay import boot_to_gameplay, set_time_of_day  # noqa: E402
 from harness_process import spawn  # noqa: E402
 
@@ -53,6 +55,31 @@ def main():
             settle = int(sys.argv[i + 1])
     os.makedirs(outdir, exist_ok=True)
     ap = os.path.abspath
+
+    cache = OracleCache('scratch/title_settled.state')
+    cache_args = {
+        'probe': 'oracle-draw-isolate',
+        'entrance': ent,
+        'daytime': tod,
+        'settle': settle,
+        'warm': 2,
+        'probe_frames': 4,
+    }
+    cached_outputs = (
+        'camera.txt', 'texpack.txt', 'probe.state', 'vsuni.log', 'base.az.ppm',
+        'draws.json', 'masks.npz', 'report.txt',
+    )
+    cached_paths = {
+        filename: cache.get_artifact(
+            f'oracle-draw-isolate:{filename}', cache_args
+        )
+        for filename in cached_outputs
+    }
+    if all(path is not None for path in cached_paths.values()):
+        for filename, source in cached_paths.items():
+            shutil.copyfile(source, os.path.join(outdir, filename))
+        print('oracle: cache hit (key=%s)' % cache.key)
+        return
 
     h = spawn(save_state='scratch/title_settled.state')
     print(boot_to_gameplay(h, entrance=ent))
@@ -163,6 +190,13 @@ def main():
         for r in sorted(rows, key=lambda r: -r['px']):
             f.write('n=%-3d px=%-7d bbox=%-24s rgb=%s\n  %s\n'
                     % (r['n'], r['px'], r['bbox'], r['mean_before'], r['uni']))
+    for filename in cached_outputs:
+        cache.put_artifact(
+            f'oracle-draw-isolate:{filename}',
+            cache_args,
+            os.path.join(outdir, filename),
+        )
+    print('oracle: cached capture (key=%s)' % cache.key)
     print('wrote', outdir)
     h.close()
 
