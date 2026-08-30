@@ -645,6 +645,8 @@ static void loadBillboard(LoadedModel* out, const std::string& zarPath, const st
     cg.verts = reinterpret_cast<const Zelda3DGlVtx*>(out->groups[0].verts.data());
     cg.vertCount = (int)out->groups[0].verts.size();
     cg.texIndex = 0;
+    cg.uv0Scale[0] = cg.uv0Scale[1] = 1.0f;
+    cg.coord0Mapping = 1;
     cg.alphaTest = 0;
     cg.alphaRef = 0.0f;
     cg.wrapS = cg.wrapT = 0x2900; // GL_CLAMP (disc is centred; edges fade to black/transparent)

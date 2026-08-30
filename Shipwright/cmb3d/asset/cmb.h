@@ -139,7 +139,7 @@ struct CmbMaterial {
     CombStage comb_stages[6];
     // True when the chain needs the generic per-stage TEV evaluator: anything that is not
     // (a) the trivial single-stage MODULATE(PRIMARY, TEXTURE0) shape the renderer's legacy
-    // fast path evaluates exactly, or (b) one of the four byte-classified dual-texture title
+    // fast path evaluates exactly, or (b) one of the three byte-classified dual-texture title
     // shapes below (kept on their verified legacy path — CLOSED parity rows). Computed in
     // cmb.cpp parseMats AFTER dual_tex_mode classification.
     bool tev_generic = false;
@@ -176,7 +176,6 @@ struct CmbMaterial {
         kDualTexAddMult = 1,                // (t0 + t1) * t0            [g_title.cmb fire-glow]
         kDualTexAddThenModulatePrimary = 2, // (t0 + t1) * primary       [shield glint]
         kDualTexModulateThenScale = 3,      // scale2 * (primary*t0*t1) [sword / shield detail]
-        kDualTexSelfSphereAdd = 4,          // primary*(2*t0+t1), t1=tex0 via sphere map [wordmark mat10/11]
     };
     int dual_tex_mode = kDualTexNone;
     // Stage-1 hardware RGB scale for kDualTexModulateThenScale (1/2/4); 1.0 for other modes.

@@ -255,6 +255,11 @@ SgModel* Fast::Zelda3DRenderer::ensureUploaded(int modelId) {
         g.combConstScaleRGB = (groups[i].combConstScaleRGB > 0.0f) ? groups[i].combConstScaleRGB : 1.0f;
         g.dualTexMode = groups[i].dualTexMode;
         g.tevGeneric = groups[i].tevGeneric;
+        g.uv0Scale[0] = groups[i].uv0Scale[0];
+        g.uv0Scale[1] = groups[i].uv0Scale[1];
+        g.uv0Trans[0] = groups[i].uv0Trans[0];
+        g.uv0Trans[1] = groups[i].uv0Trans[1];
+        g.coord0Mapping = groups[i].coord0Mapping;
         if (g.dualTexMode || g.tevGeneric) {
             g.dualTexScale2 = groups[i].dualTexScale2;
             g.tex1Index = groups[i].tex1Index;

@@ -208,6 +208,11 @@ Zelda3DGlGroup MakeGlGroup(const Cmb& cmb, const CmbDrawGroup& g, const CmbVerte
     // NOT gated by model name (see CmbMaterial::DualTexMode).
     cg.dualTexMode = mat ? mat->dual_tex_mode : 0;
     cg.dualTexScale2 = mat ? mat->dual_tex_scale2 : 1.0f;
+    cg.uv0Scale[0] = mat ? mat->scale_s : 1.0f;
+    cg.uv0Scale[1] = mat ? mat->scale_t : 1.0f;
+    cg.uv0Trans[0] = mat ? mat->trans_s : 0.0f;
+    cg.uv0Trans[1] = mat ? mat->trans_t : 0.0f;
+    cg.coord0Mapping = mat ? mat->coord0_mapping : 1;
     cg.tex1Index = (mat && mat->tex1_idx >= 0) ? mat->tex1_idx + texBase : -1;
     cg.min1Filter = mat ? mat->min1_filter : 0x2601;
     cg.mag1Filter = mat ? mat->mag1_filter : 0x2601;

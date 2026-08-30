@@ -460,58 +460,11 @@ bool Cmb::parseMats() {
                 m.dual_tex_scale2 = (stage1Scale == 2 || stage1Scale == 4) ? (float)stage1Scale : 1.0f;
             }
         }
-        // Wordmark decoration override (title_logo_us mat10/11): coordinator-0 uses
-        // CameraSphereEnvMap (mapping method 3) and the material has no tex1 binding
-        // (tex1_idx=-1). The game's CTR render-object binds tex1=tex0 at draw time and
-        // uses a 2-stage TEV: tev[0]=2*(PRIMARY*TEX0), tev[1]=MULT_ADD(PRIMARY,TEX1,PREV)
-        // = PRIMARY*(2*TEX0 + TEX1) = 3*PRIMARY*TEX0 (since tex1=tex0 via sphere map).
-        // Verified from oracle draw_log at az=760/900 (92 triangles, tex0=tex1=180cba80).
-        // coord1_mapping holds coordinator-0's mapping method here (coordinator-0 is the
-        // primary coordinator, stored separately from coordinator-1's own mapping field).
-        //
-        // NARROWED 2026-07-29. The gate used to be (coord0_mapping==3 && tex1<0 && tex0>=0) alone,
-        // which catches 20 materials in FIVE different chain shapes -- only 4 of them the wordmark:
-        //     4  MODULATE[PRIM,TEX0]x1 | REPLACE[PREV] + CONST   title_logo_us/jpeu   <- wanted
-        //    12  ADD[C(PRIM),C(TEX0)]x1  (single stage)          Heart Containers + recovery hearts
-        //     3  MODULATE[PRIM,TEX0]x2   (single stage)          Zora/silver scale, Nayru spike
-        //     1  MODULATE[PRIM,TEX0]x2 | REPLACE + CONST         Nayru's Love core
-        // The 16 non-title materials were being rendered as a sphere-add they do not ask for; the
-        // hearts in particular are plainly ADDITIVE single-stage and are gameplay-visible. They now
-        // fall through to the generic per-stage TEV evaluator, which handles their real chains.
-        //
-        // The shape guard is byte-level, not a filename list: stage count == 2, stage 0 is
-        // MODULATE(PRIMARY, TEXTURE0) at rgb scale 1, and stage 1 sources CONSTANT. Scale 1 is what
-        // separates the wordmark from Nayru's Love core, whose otherwise-identical 2-stage chain is
-        // at scale 2.
-        //
-        // NOTE the justification above (tev[1]=MULT_ADD(PRIMARY,TEX1,PREV), stage 0 at x2) does NOT
-        // match the bytes: the wordmark's real chain has no MULT_ADD and stage 0 is x1. The
-        // self-tex1 sphere binding is a RUNTIME behaviour of the game's render object, so it is not
-        // visible in the chain either way -- keeping the title rows on their verified legacy path is
-        // why this stays, but the stated derivation should not be trusted as read.
-        bool titleWordmarkShape = false;
-        if (m.comb_stage_count == 2) {
-            const CmbMaterial::CombStage& s0 = m.comb_stages[0];
-            const CmbMaterial::CombStage& s1 = m.comb_stages[1];
-            const bool s0Modulate =
-                (s0.rgb_op == 0x2100 && s0.rgb_src[0] == 0x8577 && s0.rgb_src[1] == 0x84C0 && s0.rgb_scale == 1);
-            bool s1UsesConst = false;
-            for (int k = 0; k < 3; k++)
-                if (s1.rgb_src[k] == 0x8576 || s1.a_src[k] == 0x8576)
-                    s1UsesConst = true;
-            titleWordmarkShape = s0Modulate && s1UsesConst;
-        }
-        if (m.dual_tex_mode == CmbMaterial::kDualTexNone && m.coord0_mapping == 3 && m.tex1_idx < 0 &&
-            m.tex0_idx >= 0 && titleWordmarkShape) {
-            m.dual_tex_mode = CmbMaterial::kDualTexSelfSphereAdd;
-            m.tex1_idx = m.tex0_idx; // self-reference: tex1 = tex0
-            m.dual_tex_scale2 = 2.0f;
-        }
         // Generic per-stage TEV routing (render.multi-stage-tev). The renderer's legacy fast
         // path evaluates EXACTLY one shape: a single MODULATE(C(PRIMARY), C(TEXTURE0)) rgb
         // stage with MODULATE(A(PRIMARY), A(TEXTURE0)) alpha at alpha-scale x1 (the rgb scale
         // rides uExtra.w). That is 8232/11172 of the ROM's materials, including all of Kokiri's
-        // CLOSED terrain rows — those keep the legacy path bit-identically. The four
+        // CLOSED terrain rows — those keep the legacy path bit-identically. The three
         // byte-classified dual-texture title shapes (dual_tex_mode != 0, CLOSED title rows)
         // also keep their verified legacy path. EVERYTHING else — multi-stage chains,
         // non-MODULATE ops, CONST/PREVBUF/fragment-light sources, tex1/tex2 combines (Zora's

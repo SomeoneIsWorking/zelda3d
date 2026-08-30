@@ -274,6 +274,23 @@ TEST(CmbCombinerParse, TitleLogoUsShieldSwordChainsUseGenericTev) {
     EXPECT_EQ(mat9.comb_stage_count, 3);
     EXPECT_EQ(mat9.dual_tex_mode, CmbMaterial::kDualTexNone);
     EXPECT_TRUE(mat9.tev_generic);
+
+    // Sphere mapping on wordmark mats 10/11 does not imply a second texture. The authored
+    // chain is MODULATE(PRIMARY,TEX0) then REPLACE(PREVIOUS), and the decompiled title draw
+    // only writes alpha, light, and transform state before generic submission. Exact cs1093
+    // oracle identities likewise report texEn=1/0/0 for all ten matching groups.
+    for (int materialIndex : { 10, 11 }) {
+        const CmbMaterial& wordmark = cmb.materials()[materialIndex];
+        EXPECT_EQ(wordmark.tex1_idx, -1);
+        EXPECT_EQ(wordmark.comb_stage_count, 2);
+        EXPECT_EQ(wordmark.coord0_mapping, 3);
+        EXPECT_FLOAT_EQ(wordmark.scale_s, 1.0f);
+        EXPECT_FLOAT_EQ(wordmark.scale_t, 1.0f);
+        EXPECT_FLOAT_EQ(wordmark.trans_s, 0.0f);
+        EXPECT_FLOAT_EQ(wordmark.trans_t, 0.0f);
+        EXPECT_EQ(wordmark.dual_tex_mode, CmbMaterial::kDualTexNone);
+        EXPECT_TRUE(wordmark.tev_generic);
+    }
 }
 
 namespace {

@@ -97,17 +97,27 @@ TEST(Zelda3DUnifiedShader, ForceUnlitWordmarkStillAppliesPrivateSheenToPrimary) 
 }
 
 // The unified ownership boundary must preserve all state the native CMB path already consumed:
-// the live title-camera sphere basis and the four byte-classified dual-texture formulas. These
+// the live title-camera sphere basis and the three byte-classified dual-texture formulas. These
 // source checks falsify the exact regression where the UBO fields were copied but ignored.
 TEST(Zelda3DUnifiedShader, CmbDualTextureVariantConsumesSphereBasisAndLegacyModes) {
     const std::string vertex = Fast::Unified::BuildVertexSource(Fast::Unified::Variant::kDualTex);
     const std::string fragment = Fast::Unified::BuildFragmentSource(Fast::Unified::Variant::kDualTex);
     EXPECT_NE(vertex.find("ubo.uSphRot0.w > 0.5"), std::string::npos);
     EXPECT_NE(vertex.find("dot(ubo.uSphRot0.xyz, nM)"), std::string::npos);
-    EXPECT_NE(fragment.find("if (ubo.uSheen.y > 3.5)"), std::string::npos);
-    EXPECT_NE(fragment.find("t0s * ubo.uSheen.z + t1"), std::string::npos);
     EXPECT_NE(fragment.find("t0.rgb * t1 * ubo.uSheen.z"), std::string::npos);
     EXPECT_NE(fragment.find("clamp(t0.rgb + t1"), std::string::npos);
+    EXPECT_EQ(fragment.find("t0s * ubo.uSheen.z + t1"), std::string::npos);
+}
+
+// CMB texture coordinators are independent. title_logo_us mats 10/11 request
+// CameraSphereEnvMap on coordinator 0 while leaving coordinator 1 disabled; routing the mapping
+// through the old dual-texture flag invented a second sampler and a non-authored 3x combine.
+TEST(Zelda3DUnifiedShader, CmbPrimarySphereMapUsesCoordinatorZeroState) {
+    const std::string vertex = Fast::Unified::BuildVertexSource(Fast::Unified::Variant::kGenericTev);
+    EXPECT_NE(vertex.find("ubo.uSheen.w > 2.5"), std::string::npos);
+    EXPECT_NE(vertex.find("ubo.uTex0Xf.z"), std::string::npos);
+    EXPECT_NE(vertex.find("ubo.uTex0Xf.x"), std::string::npos);
+    EXPECT_NE(vertex.find("ubo.uTevCtl.y > 2.5"), std::string::npos);
 }
 
 TEST(Zelda3DUnifiedShader, CmbDrawModulationPreservesTintGateAndPostTevAlpha) {
@@ -199,23 +209,24 @@ TEST(Zelda3DUboLayout, CommonFieldOffsetsMatchStd140) {
     EXPECT_EQ(offsetof(SgUbo, uAmbient), 304u);
     EXPECT_EQ(offsetof(SgUbo, uMatConst), 320u);
     EXPECT_EQ(offsetof(SgUbo, uSheen), 336u);
-    EXPECT_EQ(offsetof(SgUbo, uTex1Xf), 352u);
-    EXPECT_EQ(offsetof(SgUbo, uFog3d0), 368u);
-    EXPECT_EQ(offsetof(SgUbo, uFog3d1), 384u);
-    EXPECT_EQ(offsetof(SgUbo, uSphRot0), 400u);
-    EXPECT_EQ(offsetof(SgUbo, uSphRot1), 416u);
-    EXPECT_EQ(offsetof(SgUbo, uSphRot2), 432u);
-    EXPECT_EQ(offsetof(SgUbo, uLitDif1), 448u);
-    EXPECT_EQ(offsetof(SgUbo, uLitDif2), 464u);
-    EXPECT_EQ(offsetof(SgUbo, uLightDir2), 480u);
+    EXPECT_EQ(offsetof(SgUbo, uTex0Xf), 352u);
+    EXPECT_EQ(offsetof(SgUbo, uTex1Xf), 368u);
+    EXPECT_EQ(offsetof(SgUbo, uFog3d0), 384u);
+    EXPECT_EQ(offsetof(SgUbo, uFog3d1), 400u);
+    EXPECT_EQ(offsetof(SgUbo, uSphRot0), 416u);
+    EXPECT_EQ(offsetof(SgUbo, uSphRot1), 432u);
+    EXPECT_EQ(offsetof(SgUbo, uSphRot2), 448u);
+    EXPECT_EQ(offsetof(SgUbo, uLitDif1), 464u);
+    EXPECT_EQ(offsetof(SgUbo, uLitDif2), 480u);
+    EXPECT_EQ(offsetof(SgUbo, uLightDir2), 496u);
     // Generic per-stage TEV (render.multi-stage-tev): uvec4[6] + uvec4[2] + vec4 + vec4.
     // std140 array stride of uvec4 is 16 bytes, so the flat uint32_t arrays match exactly.
-    EXPECT_EQ(offsetof(SgUbo, uTevStages), 496u);
-    EXPECT_EQ(offsetof(SgUbo, uTevConst), 592u);
-    EXPECT_EQ(offsetof(SgUbo, uTex2Xf), 624u);
-    EXPECT_EQ(offsetof(SgUbo, uTevCtl), 640u);
-    EXPECT_EQ(offsetof(SgUbo, uDebug), 656u);
-    EXPECT_EQ(offsetof(SgUbo, uBones), 672u);
+    EXPECT_EQ(offsetof(SgUbo, uTevStages), 512u);
+    EXPECT_EQ(offsetof(SgUbo, uTevConst), 608u);
+    EXPECT_EQ(offsetof(SgUbo, uTex2Xf), 640u);
+    EXPECT_EQ(offsetof(SgUbo, uTevCtl), 656u);
+    EXPECT_EQ(offsetof(SgUbo, uDebug), 672u);
+    EXPECT_EQ(offsetof(SgUbo, uBones), 688u);
 }
 
 // The skin-enable flag and shade tint live in uTintSkin (offset 160) — comfortably inside the COMMON

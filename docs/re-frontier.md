@@ -74,10 +74,10 @@ This doc **organizes and links to** the existing RE corpus rather than duplicati
 ### title.wordmark-decoration — mat10/11 wordmark decoration sphere-map
 - status: re-partial
 - deps: title.rider-dispatch
-- evidence: commits `efa336cd`, `400faa57`, `d8ccc2d5`; `debug_journal/2026-07-14-{title-cs464-wordmark-and-composition-and-fireglow,title-cs464-composition-exonerated-fireglow-remeasure,wordmark-spheremap-view-rotation}.md`; `debug_journal/2026-08-30-title-unified-cmb-state-contract.md`
-- where: native CMB TEV override in the mat10/11 material path plus unified transport in `Shipwright/libultraship/src/fast/backends/unified_shader.cpp` and `zelda3d_sdl3gpu_{pipelines,pass}.cpp`
-- gap: latest closed-era journal (`d8ccc2d5`) reports coverage at **96% of oracle** — a real, measured, NOT-YET-closed residual gap. The unified owner now preserves the native sphere basis, private RE'd light, dual-texture classification, and post-TEV draw RGBA; cached cs464/cs1093 anchors prove the dropped-state regression is fixed. Broader unified rider/scene differences and selected-draw mat10/11 PRIMARY/UV evidence remain. Do not mark re-verified until 100%/explained residual.
-- notes: earlier misdiagnosis chain is instructive and should NOT be re-walked: alpha/blend was first suspected (`45b52baf` re-diagnosed it as letter-stroke coverage, a 9.7x gap) before landing on the TEV self-add fix. The 2026-08-30 alpha finding is narrower and proven: unified transport dropped the already-authored per-draw fade alpha; it is not a new blend-mode theory.
+- evidence: `oot3d-decomp/docs/title_logo_actor.md` §6; exact cs1093 cached draw/uniform artifact documented in `debug_journal/2026-08-30-title-unified-cmb-state-contract.md`; coordinator-1 sphere mapping commit `efa336cd`
+- where: CMB coordinator parsing in `Shipwright/cmb3d/asset/cmb.{h,cpp}` and independent coordinator transport in `Shipwright/libultraship/src/fast/{backends/unified_shader,zelda3d_sdl3gpu_pass,zelda3d_sdl3gpu_shaders}.cpp`
+- gap: mat10/11 now use their binary-authored single-sampler MODULATE→REPLACE chain and independent coordinator-0 sphere map. Cached cs464/cs1093 content scores improve to 0.8008/0.7465, but title parity remains visibly incomplete and wider unified rider/scene differences remain. The selected-fragment cache is available for the next distinct observable; do not tune the residual.
+- notes: the former `kDualTexSelfSphereAdd`/mode-4 path was not RE-backed. It misidentified another dual-texture draw, fabricated TEX1 aliasing, and made the historical 96% aggregate non-closing evidence. The 2026-08-30 alpha finding remains narrower and proven: unified transport had independently dropped authored draw fade alpha.
 
 ### title.terrain-grounding — title terrain/field-grass actor grounding
 - status: re-verified

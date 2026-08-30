@@ -27,8 +27,10 @@ struct CommonUbo {
     // PICA constant-color fallback plus a byte-identical mirror of SgUbo::uMatConst. Generic-TEV
     // draws use the full palette below; simple unified CMB draws retain this selected-slot value.
     float uMatConst[4];
-    // Mirror of SgUbo::uSheen. Generic-TEV draws use .w for coordinator-1 mapping.
+    // Mirror of SgUbo::uSheen. CMB draws use .w for coordinator-0 mapping.
     float uSheen[4];
+    // Mirror of SgUbo::uTex0Xf (coordinator-0 transform), live for sphere-mapped TEX0.
+    float uTex0Xf[4];
     // Mirror of SgUbo::uTex1Xf (coordinator-1 transform), live on generic-TEV draws.
     float uTex1Xf[4];
     // Mirror of SgUbo::uFog3d0/uFog3d1 (OoT3D PICA distance fog, title port — zelda3d_sg_ubo.h).

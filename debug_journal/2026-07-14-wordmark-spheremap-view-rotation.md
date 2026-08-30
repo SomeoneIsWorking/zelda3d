@@ -70,12 +70,10 @@ untouched — both captures show the wordmark upright at two different camera an
 
 ## Remaining residual (open, smaller)
 
-At cs1093 SoH's letter INTERIORS carry more green than the oracle's (SoH letters pass the
-gold-hue mask g∈(0.3r,0.9r); oracle letters are deeper red g<0.3r), and isolated interior
-pixels clip to white where the oracle shows gold — i.e. the mode-4 (mat10/11) `3*TEX0`
-self-add still samples somewhat brighter/yellower texels than the oracle at some
-normals/angles. Root-causing that needs per-vertex UV ground truth from the oracle (the
-harness vsuni/draw-log capture of the actual sphere-map coordinate at specific decoration
-vertices) — not attempted here; the aggregate metrics above are already at or near
-coverage parity. Also the glow outer halo at cs1093 remains slightly smaller than oracle
-(below-shield 398 vs 518) — partially D3 territory, remeasured there.
+At cs1093 SoH's letter interiors carry more green than the oracle's and isolated pixels clip to
+white where the oracle shows gold. The 2026-08-30 exact-identity audit later falsified the mode-4
+explanation recorded here: mat10/11 have only TEX0 enabled and use their authored
+MODULATE→REPLACE chain. Their coordinator-0 sphere map remains real, but it must not imply a second
+sampler or `3*TEX0` combine. Cached evidence with independent coordinator-0 transport improves both
+cs464 and cs1093 while leaving an open residual. Also the glow outer halo at cs1093 remains smaller
+than oracle (below-shield 398 vs 518) — partially D3 territory, remeasured there.

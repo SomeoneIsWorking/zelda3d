@@ -1,4 +1,4 @@
-# Mode-4 (mat10/11) sphere-decoration combiner-order hypothesis — FALSIFIED (2026-07-15)
+# Mat10/11 synthetic mode-4 premise — FALSIFIED (corrected 2026-08-30)
 
 ## Hypothesis (wrong)
 The wordmark gold-decoration residual (parity-map `title.wordmark-decoration`, cs1030
@@ -26,17 +26,17 @@ i.e. AWAY from the oracle. **Reverted** (`zelda3d_sdl3gpu.cpp` restored to `clam
 uSheen.z + t1)` + unconditional outer shade).
 
 ## What this rules out / what it means
-- The wordmark residual is NOT the combiner clamp ORDER. The oracle is actually DIMMER than
-  SoH in the logo region (oracle meanR 116 vs SoH 130; oracle white 112 vs SoH 664) — SoH
-  OVERSHOOTS (too bright / too much white-clip). The real residual direction is "SoH too
-  bright", not "SoH too dim/desaturated" as the earlier journal at cs1093 read it (angle
-  dependent — different cs frames disagree, so a single order-fix can't satisfy both).
-- Root cause therefore lives UPSTREAM of the combiner: either the sphere-map UV sampling a
-  too-bright texel, or PRIMARY(shade) too high. Resolving needs the oracle PER-PIXEL capture
-  (SOH3D_PIXEL_TEX PIXEL dump: texcol + primary + combined at the mat10/11 draw) — which this
-  session could NOT drive: `draw_log`/`vsuni_log` returned 0 bytes under both `run` and `step`
-  from `title_settled.state` (the SW-rasterizer ProcessTriangle patch is present in-source AND
-  in the built binary — `strings` confirms "tri cbuf=" / "PIXEL tex0=" — but never appended).
-  Fixing that capture path is the prerequisite for any further wordmark-decoration work.
-- Per user (2026-07-15): the static title is "good otherwise"; do NOT keep grinding the
-  wordmark. Priorities are (1) horse/Epona ANIMATION, (2) occlusion (tree-behind-terrain).
+
+The 2026-07-15 experiment correctly ruled out clamp ordering, but still assumed mode 4 existed.
+The 2026-08-30 exact-cursor identity capture and decompiled title draw falsify that larger premise:
+
+- all ten mat10/11 oracle identities have `texEn=1/0/0` and the authored
+  `MODULATE(PRIMARY,TEX0) x1 → REPLACE(PREVIOUS)` stages;
+- the CMB has `tex1_idx=-1` and coordinator 0 set to CameraSphereEnvMap;
+- the decompiled title draw writes alpha/light/transform state, with no TEV rewrite or TEX1 alias.
+
+Mode 4 was therefore the cause of the white clipping, not an imperfect approximation awaiting a
+different clamp order. The proper fix is independent coordinator-0 sphere-map transport into TEX0
+plus the existing generic TEV evaluator. `tools/title_oracle_probe.py` now caches exact-cursor
+uniform/fragment artifacts and returns before spawning on a cache hit, so this evidence is reusable
+without rerunning the oracle.

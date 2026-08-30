@@ -77,6 +77,9 @@ struct SgGroup {
     // CmbMaterial::DualTexMode in cmb.h).
     int dualTexMode = 0;
     float dualTexScale2 = 1.0f;
+    float uv0Scale[2] = { 1.0f, 1.0f };
+    float uv0Trans[2] = { 0.0f, 0.0f };
+    int coord0Mapping = 1; // coordinator-0 mapping method: 1=UV, 3=SphereEnvMap
     int tex1Index = -1;
     unsigned min1Filter = 0x2601, mag1Filter = 0x2601;
     unsigned wrap1S = 0x2901, wrap1T = 0x2901;

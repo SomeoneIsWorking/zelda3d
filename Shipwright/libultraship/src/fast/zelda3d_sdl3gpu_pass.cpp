@@ -222,6 +222,7 @@ struct DrawGroup {
     int dual_tex_mode = 0;
     int tev_generic = 0;
     int tex1_index = -1;
+    int coord0_mapping = 1;
     int coord1_mapping = 1;
     // Blend constants (SDL_SetGPUBlendConstants) for a group whose pipeline uses a CONSTANT_COLOR
     // factor. Render-pass state, not pipeline state — so it travels per-draw, next to the pipeline.
@@ -551,6 +552,8 @@ void Fast::Zelda3DRenderer::DrawModel(int modelId, const float* mp16, const floa
     // lives directly in the shader's ndotl term. uSheen.x doubles as the wordmark-path gate.
     base.uSheen[0] = lightDirOv ? kWordmarkLightAmbient : 0.0f;
     base.uSheen[1] = base.uSheen[2] = base.uSheen[3] = 0.0f;
+    base.uTex0Xf[0] = base.uTex0Xf[1] = 1.0f;
+    base.uTex0Xf[2] = base.uTex0Xf[3] = 0.0f;
     base.uExtra[0] = a8 / 255.0f;
     base.uExtra[1] = uvOffU;
     base.uExtra[2] = uvOffV;
@@ -618,6 +621,15 @@ void Fast::Zelda3DRenderer::DrawModel(int modelId, const float* mp16, const floa
         // Alpha-test compare, encoded as (GL enum - 0x200) + 1 so 0 means DISABLED. Written
         // unconditionally: uTevCtl[0..2] are only set on the generic-TEV path.
         ubo.uTevCtl[3] = grp.alphaTest ? (float)((grp.alphaFunc & 7u) + 1u) : 0.0f;
+        // Mapping methods are independent per coordinator. Keeping coordinator 0 in uSheen.w
+        // and coordinator 1 in uTevCtl.y prevents the old mode-4 shortcut from conflating a
+        // sphere-mapped primary texture with a second texture binding.
+        ubo.uSheen[3] = (float)grp.coord0Mapping;
+        ubo.uTevCtl[1] = (float)grp.coord1Mapping;
+        ubo.uTex0Xf[0] = grp.uv0Scale[0];
+        ubo.uTex0Xf[1] = grp.uv0Scale[1];
+        ubo.uTex0Xf[2] = grp.uv0Trans[0];
+        ubo.uTex0Xf[3] = grp.uv0Trans[1];
         // OoT3D PICA distance fog (title port): per-DRAW enable = the frame-level 3DS-fog state
         // AND this material's CMB isFogEnabled byte (fog_mode=5 on the 3DS; the additive/effect
         // materials opt out). uFog.w == 2.0 selects the 3DS LUT path in the shader, overriding
@@ -756,7 +768,6 @@ void Fast::Zelda3DRenderer::DrawModel(int modelId, const float* mp16, const floa
         if (grp.dualTexMode) {
             ubo.uSheen[1] = (float)grp.dualTexMode;
             ubo.uSheen[2] = grp.dualTexScale2;
-            ubo.uSheen[3] = (grp.dualTexMode == 4) ? 3.0f : (float)grp.coord1Mapping;
             ubo.uTex1Xf[0] = grp.uv1Scale[0];
             ubo.uTex1Xf[1] = grp.uv1Scale[1];
             // A CMAB Translation track replaces the coordinator matrix's translation. The
@@ -817,10 +828,8 @@ void Fast::Zelda3DRenderer::DrawModel(int modelId, const float* mp16, const floa
                         constSlots[2][0], constSlots[2][1], constSlots[2][2], constSlots[2][3],
                         matConstMap ? matConstMap->size() : 0u);
             }
-            // Coordinator-1/2 transforms for the extra units. The vertex shader's uv1 sphere
-            // path gates on uSheen.w > 2.5 (shared with the dual-tex title path); mapping 4
-            // (ProjectionMap) is not emulated and falls back to plain UV.
-            ubo.uSheen[3] = (grp.coord1Mapping == 3) ? 3.0f : 1.0f;
+            // Coordinator-1/2 transforms for the extra units. Mapping 4 (ProjectionMap) is not
+            // emulated and falls back to plain UV.
             ubo.uTex1Xf[0] = grp.uv1Scale[0];
             ubo.uTex1Xf[1] = grp.uv1Scale[1];
             ubo.uTex1Xf[2] = uvOverride
@@ -892,6 +901,7 @@ void Fast::Zelda3DRenderer::DrawModel(int modelId, const float* mp16, const floa
         dg.dual_tex_mode = grp.dualTexMode;
         dg.tev_generic = grp.tevGeneric;
         dg.tex1_index = grp.tex1Index;
+        dg.coord0_mapping = grp.coord0Mapping;
         dg.coord1_mapping = grp.coord1Mapping;
         dg.hasBlendConst = Fast::Zelda3DSdl3GpuPipeline::BlendConstants(gb, dg.blendConst);
         if (unified) {
@@ -949,6 +959,7 @@ void Fast::Zelda3DRenderer::DrawModel(int modelId, const float* mp16, const floa
             // These fields are byte-compatible vec4/uvec4 blocks by construction (unified_ubo.h).
             memcpy(uu.common.uMatConst, ubo.uMatConst, sizeof(uu.common.uMatConst));
             memcpy(uu.common.uSheen, ubo.uSheen, sizeof(uu.common.uSheen));
+            memcpy(uu.common.uTex0Xf, ubo.uTex0Xf, sizeof(uu.common.uTex0Xf));
             memcpy(uu.common.uTex1Xf, ubo.uTex1Xf, sizeof(uu.common.uTex1Xf));
             memcpy(uu.common.uFog3d0, ubo.uFog3d0, sizeof(uu.common.uFog3d0));
             memcpy(uu.common.uFog3d1, ubo.uFog3d1, sizeof(uu.common.uFog3d1));
@@ -990,10 +1001,10 @@ void Fast::Zelda3DRenderer::DrawModel(int modelId, const float* mp16, const floa
         if (gZelda3dSgDrawList) {
             fprintf(stderr,
                     "[Zelda3D_SG] draw %d model=%d group=%d material=%d first=%u count=%u dual=%d tev=%d "
-                    "tex1idx=%d coord1=%d tex=%p tex1=%p tex2=%p\n",
+                    "tex1idx=%d coord0=%d coord1=%d tex=%p tex1=%p tex2=%p\n",
                     drawIdx, modelId, g.model_group_index, g.material_index, g.first, g.count, g.dual_tex_mode,
-                    g.tev_generic, g.tex1_index, g.coord1_mapping, (const void*)g.tex, (const void*)g.tex1,
-                    (const void*)g.tex2);
+                    g.tev_generic, g.tex1_index, g.coord0_mapping, g.coord1_mapping, (const void*)g.tex,
+                    (const void*)g.tex1, (const void*)g.tex2);
         }
         if (!Zelda3D_SgDrawIsolationIncludes(modelId, drawIdx)) {
             continue; // draw-isolation probe: suppress groups excluded by the active controls

@@ -47,6 +47,9 @@ typedef struct Zelda3DGlGroup {
     float combConstScaleRGB;
     int dualTexMode;
     float dualTexScale2;
+    float uv0Scale[2];
+    float uv0Trans[2];
+    int coord0Mapping;
     int tex1Index;
     unsigned min1Filter, mag1Filter;
     unsigned wrap1S, wrap1T;

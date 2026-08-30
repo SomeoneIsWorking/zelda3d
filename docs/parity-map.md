@@ -50,7 +50,6 @@ parity — live work) · **REOPENED** (was closed, regressed — live work again
 | Epona title-cs gait (native CsMove anim funcs, not gameplay approximation) | CLOSED-parity | RE'd CsMove funcs; motion A/B | `4f0b3df6` | 2026-07-15 |
 | Epona hoof-dust Y reconciled onto OoT3D-warped terrain (no hill punch-through) | CLOSED-parity | depth/geometry A/B | `91591e26` | 2026-07-14 |
 | Wordmark decorations: coordinator-1 CameraSphereEnvMap port (gold outlines visible) | CLOSED-parity | RE'd TEV; root-caused invisible outlines | `efa336cd` | 2026-07-11 |
-| Wordmark decoration mat10/11 sphere-map self-add (game-side TEV override) | CLOSED-parity | oracle TEV decoded; warm-coverage at 96% oracle parity | `400faa57` → `d8ccc2d5` | 2026-07-11 |
 | Wordmark sphere-map uses LIVE cs-camera view rotation (+y-flip & coordinator xform) | CLOSED-parity | RE'd view-rotation feed | `a20566da` | 2026-07-14 |
 | Wordmark sheen mechanism (shade = 0.18 + max(0, N·(-L(t)))) | CLOSED-parity | RE'd real sheen shader | `2b797541` | 2026-07-10 |
 | Fire-glow: real 3-stage TEV combiner (dual-texture ADD_MULT mask, const-palette base) | CLOSED-parity | RE'd combiner; alpha ramp proven EXACT (`65373fa0`) | `9132cdeb` | 2026-07-10 |
@@ -149,7 +148,7 @@ global camera table, global fog path); a multi-scene sweep is the outstanding ch
 
 | Item | Status | Where tracked | Notes |
 |---|---|---|---|
-| Title wordmark mat10/11 decoration — final 4% (warm coverage at 96% oracle) | OPEN | `docs/re-frontier.md` `title.wordmark-decoration`; journals `d8ccc2d5`, `2026-08-30-title-unified-cmb-state-contract.md` | Unified CMB now preserves the native sphere basis, private RE'd light, dual modes, and post-TEV draw RGBA; cached cs464/cs1093 evidence closes that ownership regression. Close 96%→100% only with selected-draw PRIMARY/UV evidence or an explained residual; broader unified rider/scene differences remain. |
+| Title wordmark mat10/11 coordinator-0 sphere mapping | OPEN | `docs/re-frontier.md` `title.wordmark-decoration`; `debug_journal/2026-08-30-title-unified-cmb-state-contract.md` | Exact oracle identities and the decompiled title draw falsify the historical self-add mode: TEX1/2 are disabled and the authored MODULATE→REPLACE chain is unchanged. Independent coordinator-0 transport improves cached cs464/cs1093 scores, but the visual residual and wider unified rider/scene differences remain. |
 | Title fire-glow flame-SHAPE residual + terrain-warmth | OPEN — but **OFF-LIMITS to tuning** | journals `bd9fc251`, `65373fa0` | The mechanism is ported (closed); the remaining shape/warmth residual is not to be micro-tuned per user instruction — reopen the mechanism only with a real RE finding, not a constant tweak. |
 | Keyboard (headed mode) | OPEN — **blocked on user** | journal `2026-07-15-keyboard-headed-v2.md` | Headed keyboard path; blocked awaiting user. Do not loop on it. |
 | Epona bone-level diff follow-up | OPEN | `d7e636c9` (boneinfo REPL + compare-titleactors tooling landed) | Tooling exists; the bone-diff itself is a follow-up investigation, not yet closed. |

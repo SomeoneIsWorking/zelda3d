@@ -89,6 +89,20 @@ class TitleHostCaptureTests(unittest.TestCase):
         with self.assertRaisesRegex(RuntimeError, "cursor mismatch"):
             title_host_capture.advance_host_title(harness, 1091, 1093)
 
+    def test_draw_list_uses_second_half_rate_tick_without_changing_cursor(self) -> None:
+        harness = FakeHarness(
+            {
+                "soh_drawlist": "ok soh_drawlist armed",
+                "soh_step 1": "ok soh_step 1",
+                "soh_titlecs": "ok soh_titlecs frame=1093 end=2400",
+            }
+        )
+        title_host_capture.arm_host_draw_list(harness, 1093)
+        self.assertEqual(
+            harness.commands,
+            ["soh_drawlist", "soh_step 1", "soh_titlecs"],
+        )
+
     def test_cache_miss_refuses_to_launch_oracle_work(self) -> None:
         with tempfile.TemporaryDirectory() as directory:
             frame = Path(directory) / "az752.png"

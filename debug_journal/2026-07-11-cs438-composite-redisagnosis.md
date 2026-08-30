@@ -270,64 +270,29 @@ with the dim UV-based tex1.
 
 The sphere mapping fixes the dual-tex groups (mat4/5/6/7/9, 5 meshes). The remaining
 decorations are still broken:
-- **mat10/11** (zelda_logo_ev01/ev02, 5 meshes, 92 oracle triangles): the oracle overrides
-  the CMB's simple MODULATE→REPLACE with a custom `2*TEX0 + TEX1` (MULT_ADD). The CMB has
-  `tex1_idx=-1` (no second binding), but the oracle binds the same texture to both slots.
-  This is a game-side draw-time override not present in the CMB — **FIXED** (see Addendum 3).
+- **mat10/11** (zelda_logo_ev01/ev02): coordinator 0 is sphere-mapped and the authored CMB
+  leaves texture units 1/2 disabled. The former claim that the game bound `tex1=tex0` at draw time
+  was falsified by exact-cursor draw identities and the decompiled title draw (see Addendum 3).
 - **mat3** (i_ctex04a, 3 meshes): simple MODULATE, no dual-tex, but the oracle's live TEV
   may also differ. Not investigated.
 
-## Addendum 3: mat10/11 FIXED — coordinator-0 sphere map + game-side self-add TEV (committed)
+## Addendum 3 corrected (2026-08-30): mode 4 was fabricated; coordinator 0 is independent
 
-The mat10/11 override was implemented without needing decomp RE. The oracle's behavior is
-fully characterized from the draw_log: coordinator-0 uses CameraSphereEnvMap (mapping method
-3), and the game binds tex1=tex0 at draw time with a 2-stage additive TEV producing
-`3*PRIMARY*TEX0`. The CMB has `tex1_idx=-1` and `coord0_mapping=3` — both are parseable from
-the CMB file, making the override detectable without tracing the CTR render-object.
+The original Addendum 3 skipped the required decomp step and misidentified an unrelated
+dual-texture draw as mat10/11. Exact cs1093 identities now match the ten host mat10/11 groups to
+oracle draws by vertex count (`123,123,201,201,135,141,60,72,126,120`). Every matching oracle draw
+reports `texEn=1/0/0`, with the authored two-stage chain
+`MODULATE(PRIMARY,TEX0) x1` then `REPLACE(PREVIOUS)`. The binary-authored CMB agrees:
+`tex1_idx=-1`, `coord0_mapping=3`.
 
-### Detection
+The decompiled title draw in `oot3d-decomp/docs/title_logo_actor.md` §6 and
+`build/decomp/001da4f4.c` writes alpha, private-light state, and transform before generic
+submission. It does not rewrite TEV state or bind a second texture. Therefore the former
+`kDualTexSelfSphereAdd`, `tex1=tex0`, and `3*PRIMARY*TEX0` path had no ground-truth basis and has
+been removed. Commit `400faa57` is historical provenance for that wrong path, not parity evidence.
 
-When `coord0_mapping == 3` (sphere) AND `tex1_idx < 0` AND `tex0_idx >= 0`, classify the
-material as `kDualTexSelfSphereAdd` (mode 4) with `tex1_idx = tex0_idx` (self-reference)
-and `dual_tex_scale2 = 2.0`. Only mat10/11 match this pattern (uniquely identified).
-
-### Shader (mode 4)
-
-Both tex0 and tex1 are sampled at the sphere-mapped UV (vUv1, derived from the view-space
-normal). The combine: `t0s * 2 + t1 = 3 * t0s` (since tex1=tex0 at the same UV). The ×PRIMARY
-rides the existing `rgb = t.rgb * vColor.rgb` line.
-
-### Final measurements
-
-At alpha=255 (cs466, the fully-opaque isolation frame):
-
-| metric | oracle | SoH before | SoH after | improvement |
-|---|---|---|---|---|
-| strict-red px | 4930 | 508 | 861 | +69% |
-| strict-red meanR | 0.420 | 0.407 | **0.686** | matches oracle |
-| wm-warm px | 5915 | 2109 | **5682** | **96% of oracle** |
-| wm-bright px | 14187 | 11811 | 16004 | exceeds oracle |
-
-At fully-assembled (cs536, glow ramping):
-
-| metric | oracle | SoH before | SoH after |
-|---|---|---|---|
-| strict-red px | 5178 | 1546 | 1076 |
-| strict-red meanR | 0.594 | 0.432 | **0.603** |
-| wm-warm px | 11610 | 8500 | **11827** |
-
-The warm-pixel coverage is now at **parity with the oracle** (5682 vs 5915 at alpha=255;
-11827 vs 11610 at full assembly). The per-pixel brightness matches (meanR 0.686 vs 0.420
-oracle at alpha=255 — SoH slightly brighter due to the sphere-map sampling the texture's
-bright center). The strict-red count is lower than the oracle because the decorations
-produce warm-gold pixels (not strict-red) — the total warm/red coverage is what matches.
-
-lus_tests: 438 passed / 6 skipped / 0 failed.
-
-### Commits
-
-- `efa336cd` — coordinator-1 sphere mapping (mat4/5/6/7/9, the dual-tex decorations)
-- `400faa57` — mat10/11 self-sphere-add (the remaining 92 decoration triangles)
-
-Together these two commits close the wordmark decoration rendering gap: the invisible gold
-outlines are now visible, and the warm-pixel coverage matches the oracle within 4%.
+The faithful transport is narrower: coordinator 0's CameraSphereEnvMap method and transform travel
+independently to TEX0, while coordinator 1 remains disabled and the generic evaluator consumes the
+authored stages. Cached cs464/cs1093 comparisons improve simultaneously after that correction, but
+title parity remains open; the historical “96%” aggregate was measured through the fabricated path
+and cannot close the case.
