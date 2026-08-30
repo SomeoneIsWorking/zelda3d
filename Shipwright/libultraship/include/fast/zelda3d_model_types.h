@@ -37,9 +37,10 @@ typedef struct Zelda3DGlGroup {
     int meshId;
     int materialIndex;
     int vertexLighting;
+    int hasColor;
     int fogEnabled;
     float matAmbient[3];
-    float matDiffuse[3];
+    float matDiffuse[4];
     float combScaleRGB;
     float matConstant[6][4];
     int combConstIdx;

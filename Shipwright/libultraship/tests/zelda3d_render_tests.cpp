@@ -39,6 +39,16 @@ TEST(Zelda3DShaderTemplate, ExpandsEveryRepeatedVaryingQualifier) {
     EXPECT_EQ(count(fragmentSource, ") in "), 8u);
 }
 
+TEST(Zelda3DShaderTemplate, UnlitPrimarySelectsMatDiffuseOnlyWhenColorIsAbsent) {
+    std::string vertexSource;
+    std::string fragmentSource;
+    std::string error;
+    ASSERT_TRUE(Fast::Zelda3DSdl3GpuShaders::BuildSources("", "", "", vertexSource, fragmentSource, error)) << error;
+    EXPECT_NE(vertexSource.find("else if (ubo.uPrimaryCtl.x > 0.5)"), std::string::npos);
+    EXPECT_NE(vertexSource.find("vPrim = min(abs(aColor), vec4(1.0))"), std::string::npos);
+    EXPECT_NE(vertexSource.find("vPrim = min(abs(ubo.uMatDiffuse), vec4(1.0))"), std::string::npos);
+}
+
 TEST(Zelda3DTev, UsesPicaAlphaSourceFieldLayout) {
     const std::string source = Fast::Zelda3DTev::kGenericFunctions;
     EXPECT_NE(source.find("(w.x >> 16) & 15u"), std::string::npos);
@@ -79,6 +89,13 @@ TEST(Zelda3DUnifiedShader, CmbPrimaryUsesTransformedNormalAndBothLightSlots) {
     EXPECT_NE(source.find("ubo.uLitDif1.rgb * max(dot(nV, -ubo.uLightDir.xyz), 0.0)"), std::string::npos);
     EXPECT_NE(source.find("ubo.uLitDif2.rgb * max(dot(nV, -ubo.uLightDir2.xyz), 0.0)"), std::string::npos);
     EXPECT_EQ(source.find("dot(normalize(nM), -normalize(ubo.uLightDir.xyz))"), std::string::npos);
+}
+
+TEST(Zelda3DUnifiedShader, UnlitPrimarySelectsMatDiffuseOnlyWhenColorIsAbsent) {
+    const std::string source = Fast::Unified::BuildVertexSource(Fast::Unified::Variant::kGenericTev);
+    EXPECT_NE(source.find("ubo.uPrimaryCtl.x < 0.5"), std::string::npos);
+    EXPECT_NE(source.find("? ubo.uMatDiffuse"), std::string::npos);
+    EXPECT_NE(source.find(": aColor0"), std::string::npos);
 }
 
 // The title logo is force-unlit with respect to the scene, but its actor draw binds a private
@@ -161,6 +178,8 @@ TEST(Zelda3DUnifiedUbo, CmbLightBankPreservesAmbientMultiplicityAndBothSlots) {
     native.uAmbient[2] = 0.4f;
     native.uAmbient[3] = 2.0f;
     for (int component = 0; component < 4; ++component) {
+        native.uMatDiffuse[component] = 0.1f + component;
+        native.uPrimaryCtl[component] = 0.5f + component;
         native.uLightDir[component] = 10.0f + component;
         native.uLitDif1[component] = 20.0f + component;
         native.uLitDif2[component] = 30.0f + component;
@@ -174,6 +193,8 @@ TEST(Zelda3DUnifiedUbo, CmbLightBankPreservesAmbientMultiplicityAndBothSlots) {
     EXPECT_FLOAT_EQ(unified.uMatAmbient[1], 0.6f);
     EXPECT_FLOAT_EQ(unified.uMatAmbient[2], 0.8f);
     for (int component = 0; component < 4; ++component) {
+        EXPECT_FLOAT_EQ(unified.uMatDiffuse[component], native.uMatDiffuse[component]);
+        EXPECT_FLOAT_EQ(unified.uPrimaryCtl[component], native.uPrimaryCtl[component]);
         EXPECT_FLOAT_EQ(unified.uLightDir[component], native.uLightDir[component]);
         EXPECT_FLOAT_EQ(unified.uLitDif1[component], native.uLitDif1[component]);
         EXPECT_FLOAT_EQ(unified.uLitDif2[component], native.uLitDif2[component]);
@@ -219,26 +240,28 @@ TEST(Zelda3DUboLayout, CommonFieldOffsetsMatchStd140) {
     EXPECT_EQ(offsetof(SgUbo, uFog), 272u);
     EXPECT_EQ(offsetof(SgUbo, uFog2), 288u);
     EXPECT_EQ(offsetof(SgUbo, uAmbient), 304u);
-    EXPECT_EQ(offsetof(SgUbo, uMatConst), 320u);
-    EXPECT_EQ(offsetof(SgUbo, uSheen), 336u);
-    EXPECT_EQ(offsetof(SgUbo, uTex0Xf), 352u);
-    EXPECT_EQ(offsetof(SgUbo, uTex1Xf), 368u);
-    EXPECT_EQ(offsetof(SgUbo, uFog3d0), 384u);
-    EXPECT_EQ(offsetof(SgUbo, uFog3d1), 400u);
-    EXPECT_EQ(offsetof(SgUbo, uSphNrm0), 416u);
-    EXPECT_EQ(offsetof(SgUbo, uSphNrm1), 432u);
-    EXPECT_EQ(offsetof(SgUbo, uSphNrm2), 448u);
-    EXPECT_EQ(offsetof(SgUbo, uLitDif1), 464u);
-    EXPECT_EQ(offsetof(SgUbo, uLitDif2), 480u);
-    EXPECT_EQ(offsetof(SgUbo, uLightDir2), 496u);
+    EXPECT_EQ(offsetof(SgUbo, uMatDiffuse), 320u);
+    EXPECT_EQ(offsetof(SgUbo, uPrimaryCtl), 336u);
+    EXPECT_EQ(offsetof(SgUbo, uMatConst), 352u);
+    EXPECT_EQ(offsetof(SgUbo, uSheen), 368u);
+    EXPECT_EQ(offsetof(SgUbo, uTex0Xf), 384u);
+    EXPECT_EQ(offsetof(SgUbo, uTex1Xf), 400u);
+    EXPECT_EQ(offsetof(SgUbo, uFog3d0), 416u);
+    EXPECT_EQ(offsetof(SgUbo, uFog3d1), 432u);
+    EXPECT_EQ(offsetof(SgUbo, uSphNrm0), 448u);
+    EXPECT_EQ(offsetof(SgUbo, uSphNrm1), 464u);
+    EXPECT_EQ(offsetof(SgUbo, uSphNrm2), 480u);
+    EXPECT_EQ(offsetof(SgUbo, uLitDif1), 496u);
+    EXPECT_EQ(offsetof(SgUbo, uLitDif2), 512u);
+    EXPECT_EQ(offsetof(SgUbo, uLightDir2), 528u);
     // Generic per-stage TEV (render.multi-stage-tev): uvec4[6] + uvec4[2] + vec4 + vec4.
     // std140 array stride of uvec4 is 16 bytes, so the flat uint32_t arrays match exactly.
-    EXPECT_EQ(offsetof(SgUbo, uTevStages), 512u);
-    EXPECT_EQ(offsetof(SgUbo, uTevConst), 608u);
-    EXPECT_EQ(offsetof(SgUbo, uTex2Xf), 640u);
-    EXPECT_EQ(offsetof(SgUbo, uTevCtl), 656u);
-    EXPECT_EQ(offsetof(SgUbo, uDebug), 672u);
-    EXPECT_EQ(offsetof(SgUbo, uBones), 688u);
+    EXPECT_EQ(offsetof(SgUbo, uTevStages), 544u);
+    EXPECT_EQ(offsetof(SgUbo, uTevConst), 640u);
+    EXPECT_EQ(offsetof(SgUbo, uTex2Xf), 672u);
+    EXPECT_EQ(offsetof(SgUbo, uTevCtl), 688u);
+    EXPECT_EQ(offsetof(SgUbo, uDebug), 704u);
+    EXPECT_EQ(offsetof(SgUbo, uBones), 720u);
 }
 
 // The skin-enable flag and shade tint live in uTintSkin (offset 160) — comfortably inside the COMMON

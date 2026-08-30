@@ -124,6 +124,7 @@ const char* kUnifiedShaderTemplate = R"PRISM(@prism(type='fragment', name='Unifi
     vec4 uParams1; \
     vec4 uMatAmbient; \
     vec4 uMatDiffuse; \
+    vec4 uPrimaryCtl; \
     vec4 uMatConst; \
     vec4 uSheen; \
     vec4 uTex0Xf; \
@@ -140,6 +141,7 @@ const char* kUnifiedShaderTemplate = R"PRISM(@prism(type='fragment', name='Unifi
     uvec4 uTevConst[2]; \
     vec4 uTex2Xf; \
     vec4 uTevCtl; \
+    vec4 uNativeLayoutPad; \
     vec4 uDebug;
 
 @if(VERTEX_SHADER)
@@ -233,7 +235,12 @@ const char* kUnifiedShaderTemplate = R"PRISM(@prism(type='fragment', name='Unifi
             vUv2 = vec2(0.0);
         @end
         vTexClamp = aTexClamp;
-        vColor0 = aColor0;
+        // Exact CmbVShader unlit PRIMARY choice (shbin words 112--120). Model-space CMB
+        // lighting modes 0/1 use authored MatDiffuse when the draw has no color attribute;
+        // HasColor=1 replaces it with aColor. N64 and vertex-lit CMB routes retain aColor.
+        vColor0 = (ubo.uParams1.w < 0.5 && ubo.uParams0.y < 1.5 && ubo.uPrimaryCtl.x < 0.5)
+                    ? ubo.uMatDiffuse
+                    : aColor0;
         vColor1 = aColor1;
         vColor2 = aColor2;
         vColor3 = aColor3;

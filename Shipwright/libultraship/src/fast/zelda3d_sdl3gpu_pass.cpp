@@ -705,6 +705,10 @@ void Fast::Zelda3DRenderer::DrawModel(int modelId, const float* mp16, const floa
         //     with right*x + up*y - fwd*z they equal ours to 3 decimals at BOTH scenes, and they
         //     track the same dayTime sun rotation the engine already computes.
         ubo.uAmbient[3] = ambGroup ? (lit ? 1.0f : gZelda3dAmbientLightCount) : 0.0f;
+        for (int k = 0; k < 4; k++) {
+            ubo.uMatDiffuse[k] = grp.matDiffuse[k];
+        }
+        ubo.uPrimaryCtl[0] = grp.hasColor ? 1.0f : 0.0f;
         // Per-light diffuse products for the vertex-lit sum (#153): matDiffuse * sceneLightColor.
         // Terrain materials bake matDiffuse=BLACK, so these are zero there and the light sum
         // reduces to the previously-verified ambient-only value.

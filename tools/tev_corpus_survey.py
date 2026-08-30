@@ -35,8 +35,7 @@ import sys
 from collections import Counter, defaultdict
 
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
-from ctr_romfs import CtrRom  # noqa: E402
-from zar import Zar  # noqa: E402
+from cmb_corpus import iter_cmbs  # noqa: E402
 
 REPO = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 
@@ -133,29 +132,6 @@ class Stage:
         if 0x8576 in used:
             s += f"/k{self.const_idx}"
         return s
-
-
-def iter_cmbs():
-    """Yield (label, cmb_bytes) for every CMB in the ROM: .zar members + .zsi room blobs."""
-    rom_path = os.environ.get("ZELDA3D_OOT3D_ROM")
-    if not rom_path:
-        sys.exit("source .env first (ZELDA3D_OOT3D_ROM)")
-    rom = CtrRom(rom_path)
-    for f in rom.iter_files():
-        if f.path.endswith(".zar"):
-            try:
-                z = Zar(rom.read(f))
-            except Exception:
-                continue
-            for zf in z.files:
-                if zf.name.endswith(".cmb"):
-                    yield f"{f.path}:{zf.name}", z.read(zf)
-        elif f.path.endswith(".zsi"):
-            data = rom.read(f)
-            i = data.find(b"cmb ")
-            if i >= 0:
-                size = _u32(data, i + 4)
-                yield f"{f.path}", data[i : i + size]
 
 
 def parse_mats(b):
