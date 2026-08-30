@@ -80,6 +80,7 @@ WRAP_CLAMP, WRAP_REPEAT, WRAP_CLAMP_EDGE, WRAP_MIRROR = 0x2900, 0x2901, 0x812F, 
 class Material:
     index:int
     tex0_idx:int          # texture index of binding 0 (-1 if none)
+    min_filter:int; mag_filter:int # GL sampler enums for binding 0
     wrap_s:int; wrap_t:int # GL wrap enums for binding 0
     scale_s:float; scale_t:float
     trans_s:float; trans_t:float
@@ -190,9 +191,12 @@ class Cmb:
         o=p+0x0C
         for i in range(n):
             cull=_u8(b,o+4)
-            # binding 0 at o+0x10: textureIdx(s16) .. wrapS(u16)@+8 wrapT@+0xA
+            # binding 0 at o+0x10: textureIdx(s16), min/mag(u16)@+4/+6,
+            # wrapS(u16)@+8, wrapT@+0xA
             bo=o+0x10
-            tex0=_s16(b,bo); wrap_s=_u16(b,bo+8); wrap_t=_u16(b,bo+0x0A)
+            tex0=_s16(b,bo)
+            min_filter=_u16(b,bo+4); mag_filter=_u16(b,bo+6)
+            wrap_s=_u16(b,bo+8); wrap_t=_u16(b,bo+0x0A)
             # coordinator 0 at o+0x58: scaleS/T, transS/T, rot (f32)
             co=o+0x58
             sS,sT,tS,tT,rot=struct.unpack_from("<5f",b,co+4)
@@ -203,7 +207,7 @@ class Cmb:
             bsr=_u16(b,o+0x13C); bdr=_u16(b,o+0x13E); ber=_u16(b,o+0x140)
             bsa=_u16(b,o+0x144); bda=_u16(b,o+0x146); bea=_u16(b,o+0x148)
             bc=struct.unpack_from("<4f",b,o+0x14C)
-            self.materials.append(Material(i,tex0,wrap_s,wrap_t,sS,sT,tS,tT,rot,
+            self.materials.append(Material(i,tex0,min_filter,mag_filter,wrap_s,wrap_t,sS,sT,tS,tT,rot,
                                            cull,bool(alpha_en),alpha_ref,
                                            bool(blend_en),bsr,bdr,bsa,bda,ber,bea,bc,bool(depth_w)))
             o+=stride
@@ -396,7 +400,8 @@ if __name__=="__main__":
     for t in c.textures:
         print(f"  tex {t.name:20} {t.width}x{t.height} fmt=0x{t.fmt:x} etc1={t.etc1} len={t.data_len}")
     for m in c.materials:
-        print(f"  mat{m.index}: tex0={m.tex0_idx} wrapS=0x{m.wrap_s:x} wrapT=0x{m.wrap_t:x} "
+        print(f"  mat{m.index}: tex0={m.tex0_idx} min/mag=0x{m.min_filter:x}/0x{m.mag_filter:x} "
+              f"wrapS=0x{m.wrap_s:x} wrapT=0x{m.wrap_t:x} "
               f"scale=({m.scale_s:.3f},{m.scale_t:.3f}) trans=({m.trans_s:.3f},{m.trans_t:.3f}) "
               f"rot={m.rot:.3f} cull={m.cull} alphaTest={m.alpha_test}@{m.alpha_ref:.2f}")
         if m.blend_enable:

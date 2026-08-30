@@ -85,7 +85,7 @@ This doc **organizes and links to** the existing RE corpus rather than duplicati
 - evidence: `oot3d-decomp/docs/title_terrain_actor_grounding.md`; `debug_journal/2026-07-14-title-terrain-field-grass-mure2.md`
 - where: title terrain port (see journal for exact seam)
 - gap: none noted
-- notes: 
+- notes:
 
 ### title.fireglow-cloud-vortex — fireglow + cloud-vortex overlay effects
 - status: re-verified
@@ -93,7 +93,7 @@ This doc **organizes and links to** the existing RE corpus rather than duplicati
 - evidence: `oot3d-decomp/docs/title_cloud_vortex.md`, `title_logo_fireglow_cmab.md`, `title_dawn_layers.md`
 - where: `behaviors/title/title_cloud_vortex.cpp/.h`, `title_fireglow.cpp/.h`
 - gap: none noted this pass (fireglow re-measured and exonerated per `title-cs464-composition-exonerated-fireglow-remeasure.md`)
-- notes: 
+- notes:
 
 ### title.moon-sky-logo — moon composition, sky dome, 2D logo overlay
 - status: re-verified
@@ -148,7 +148,7 @@ This doc **organizes and links to** the existing RE corpus rather than duplicati
 - deps: title.rider-dispatch
 - evidence: `oot3d-decomp/docs/en_horse_title_gallop_rate.md`; `debug_journal/2026-07-15-epona-title-animation.md` (2026-07-16 FIXED+VERIFIED update)
 - where: `z_en_horse.c` EnHorse_CutsceneUpdate title gate; `behaviors/title/title_rider.cpp` (sole title dispatcher)
-- gap: 
+- gap:
 - notes: gallop RATE was verified matching (0.45 vs 0.3 compensate exactly); the residual "looks off"
 
 
@@ -160,7 +160,7 @@ This doc **organizes and links to** the existing RE corpus rather than duplicati
 - evidence: `oot3d-decomp/docs/en_horse_epona_render_gap.md`; `debug_journal/2026-07-15-epona-en-horse-3ds-render.md`
 - where: `Shipwright/soh/src/zelda3d/behaviors/actor/en_horse.{h,cpp}`
 - gap: The actor-specific module owns hoof-dust and rider-seat behavior. The remaining render gap is the `Skin_DrawImpl` body-render hook: Epona's body still draws as the native N64 mesh.
-- notes: 
+- notes:
 
 ### enhorse.hoof-dust — hoof-dust particle depth
 - status: re-verified
@@ -168,7 +168,7 @@ This doc **organizes and links to** the existing RE corpus rather than duplicati
 - evidence: `oot3d-decomp/docs/en_horse_hoof_dust.md`; `debug_journal/2026-07-15-epona-hoof-dust-depth.md`
 - where: see journal for exact seam
 - gap: none noted
-- notes: 
+- notes:
 
 ### enhorse.mane-tail — mane/tail secondary motion
 - status: re-verified
@@ -195,7 +195,7 @@ This doc **organizes and links to** the existing RE corpus rather than duplicati
 - evidence: `Shipwright/soh/src/zelda3d/behaviors/camera_behavior.h` header comment (cites SoH z_camera.c:7470, OoT3D FUN_002d84c4); `oot3d-decomp/docs/camera_calc_at_default.md`, `camera_math_helpers.md`
 - where: `behaviors/camera_behavior.h/.cpp` (registry), legacy `sCameraFunctions[...]` table in vendored `z_camera.c`
 - gap: none — the dispatch mechanism itself is fully understood; only individual mode functions remain to be ported (see below).
-- notes: 
+- notes:
 
 ### camera.normal1 — Camera_Normal1 (CAM_FUNC_NORM1) at parity
 - status: re-verified
@@ -230,7 +230,7 @@ This doc **organizes and links to** the existing RE corpus rather than duplicati
 - evidence: memory `soh3d-link-player-path`
 - where: `Shipwright/soh/src/zelda3d/player/zelda3d_link.cpp` (`Zelda3D_TryDrawPlayer`, composition) and `player/player_draw.cpp` (draw implementation)
 - gap: none noted
-- notes: 
+- notes:
 
 ### player.draw-anchor — world anchor: age root-translation scale + shape.yOffset (jitter/climb-warp/door-slide, #201 a/b/c)
 - status: re-partial
@@ -326,7 +326,7 @@ This doc **organizes and links to** the existing RE corpus rather than duplicati
 - evidence: `docs/re_control_debug_backlog.md` item #6 — branch conditions confirmed (yDistToLedge>=79.0f, water/iron-boots check, forced-wall bit distinct from real-ladder bit)
 - where: `Zelda3D_PlayerForceClimb` (forced-wall path, skips lateral-centering math)
 - gap: debug-observability gap only, not missing RE — forced path already reaches the real action func; a live `yDistToLedge`/`wallFlags` readout would let a sweep find a genuinely climbable wall instead of bit-forcing.
-- notes: 
+- notes:
 
 ### player.death-trigger — gSaveContext.health==0 death trigger
 - status: re-verified
@@ -369,7 +369,7 @@ This doc **organizes and links to** the existing RE corpus rather than duplicati
 - evidence: memory `soh3d-skinned-actor-collision` (#107)
 - where: replaced skinned-skip limb walk at `DrawSkeletonOpa`
 - gap: none — closed
-- notes: 
+- notes:
 
 ### mm.skinned-csab — MM3D skinned actors play their OWN 3DS CSAB animations
 - status: re-partial
@@ -396,7 +396,7 @@ This doc **organizes and links to** the existing RE corpus rather than duplicati
 - evidence: memory `soh3d-envctx-pinned` — `play+0x3135`, `unk_BF` at `+0xA5`, stride `0x1C`; `Env_Update=FUN_0045dd30`
 - where: `Shipwright/soh/src/zelda3d/tables/zelda3d_scene_lighting.inc`
 - gap: none for the TITLE. **CORRECTED 2026-07-22: `envCtx+0xA5` (current slot) is a TITLE-only layout — it reads garbage (0xf2) in gameplay.** The oracle's runtime light list in gameplay is at `play+0x3230`. Outdoor gameplay scenes do not use `unk_BD`/`unk_BE` at all (z_kankyo takes the time-based path keyed on skyboxTime); the gameplay consumer replays `Zelda3dEnvBlend` instead.
-- notes: 
+- notes:
 
 ### lighting.worldshade-port — vertex-lighting / worldshade engine port
 - status: re-verified
@@ -404,7 +404,7 @@ This doc **organizes and links to** the existing RE corpus rather than duplicati
 - evidence: memory `soh3d-lighting-port` (#111 RESOLVED), `soh3d-stop-microtuning-lighting`
 - where: worldshade toggle, opt-in default off
 - gap: none — the ENGINE is correct; do not tune coefficients (standing user instruction). **2026-07-22: the engine was never the problem — the ported DATA had never reached gameplay** (see `lighting.gameplay-palette-feed`). The no-tuning ban covers constants, not repairing a data path.
-- notes: 
+- notes:
 
 ### lighting.gameplay-palette-feed — OoT3D env palette reaches GAMEPLAY
 - status: re-verified
@@ -541,7 +541,7 @@ This doc **organizes and links to** the existing RE corpus rather than duplicati
 - evidence: CLOSED as NOT-A-DIVERGENCE 2026-07-28. The gap was a time-of-day mismatch between the two captures, not a rendering difference. Our shadow, measured as green(under-boots)/green(clean grass) in the SAME frame: 0.868 at daytime 0x6000, 0.862 at 0x4000, and 0.624 at 0xB000 (low sun). The oracle frame it was being compared against measures 0.654 — i.e. it matches our LOW-SUN frame, not our 0x6000 frame, so the two captures were not lighting-matched. Screenshots scratch/screenshots/sh_0x4000.png, sh_0x6000.png, sh_0xB000.png (ours) and oracle_kday.png. Visually the same story: at 0xB000 our shadow is large, dark and elongated exactly like the oracle's; at 0x4000 it is nearly absent.
 - where: z_player.c Player_Draw (the #206 limb-walk re-run) + z_actor.c ActorShadow_DrawFeet/DrawCircle
 - gap: None. The shadow formula is shared (0x0033e450 IS N64's ActorShadow_DrawFoot — see oot3d-decomp/docs/actor_shadow.md), and with the lighting matched the rendered contrast agrees to within the placement error of the sample boxes (0.624 vs 0.654). The only genuinely 3DS-specific pieces are the draw target (cached model object, asset 0x51, instead of gFootShadowDL) and a Matrix_Translate(0,1.5,0) z-fight guard; neither is a visible divergence. REOPEN ONLY on a fresh user report or a LIGHTING-MATCHED measurement. Lesson worth keeping: an oracle-vs-ours pixel comparison is meaningless unless time-of-day is verified equal on both sides — tools/oracle_shot.py --daytime does not guarantee the oracle landed on the same sun position our game did.
-- notes: 
+- notes:
 
 
 ## render
@@ -549,9 +549,9 @@ This doc **organizes and links to** the existing RE corpus rather than duplicati
 ### render.boss-fd2-multipart — Boss_Fd2 Volvagia hole-form multipart render
 - status: in-progress
 - deps:
-- evidence: oot3d-decomp/docs/boss_fd2.md; embedded-oracle 600-sample emergence→idle→fire trace (`scanned=600`, five controller transitions) and live actor matrix; headless natural-camera `scratch/screenshots/fd2_controller_proc_f88.png`; SKELSCALE model 2005 ratio=1.000 scale=0.007; shipping `zelda3d_app` Clang build and `boss_fd2_animation_policy_test` pass. On 2026-08-27 the new shipping `fd2info` diagnostic observed `vba_search`, `vba_hit`, `vba_beforedamage`, and `vba_damage` advancing through typed live state transitions. The paired harness command `force bossfd2_ground` drives the recovered child `+0x124` → parent `+0x940` handoff in both engines. On 2026-08-28 `FUN_001EC5B8` established the exact limb-14 head/mane callback points and actor destinations; the shipping pose seam now derives the same points from the live CMB skin matrices. The deterministic `bossfd2_mane` comparator proved an exact zero-state control and recovered the 60:30 frontend/draw cadence plus `FUN_00373500`'s exact 2/3 pull decay. Offline float32 replay now explains the later mean 6.411/max 28.281 stress residual as unmatched posed-root trajectories: the oracle and host roots moved in opposite directions, replaying those endpoints reproduces max 28.280565, while identical roots leave only a `1.5259e-5` trig/rounding residual. Asset and binary RE also identify the named body-material mechanism: materials 0/1/5 combine authored `texCoord1` through an additive TEX1 term across four groups, 598 unique source vertices, and 2,136 expanded triangle vertices, but the shipping renderer previously aliased every coordinator to `texCoord0`; every referenced UV1 differs. BossFd2 has no body-wide light-bank bind, and its constant-4 override is localized to material 4. CmbVShader proves generic PRIMARY uses the skinned/draw-transformed normal and both enabled light slots; the default native path already matches that contract. The optional unified route did not and is now corrected, but `gUnifiedRenderer=0` means that change cannot explain the remaining native-path darkness. Paired capture `_aa` keeps the oracle PPM byte-identical to `_z`; the fixed actor-crop RMSE improves from 0.185810 to 0.183825 while the host gains the authored secondary detail. The combined Clang build passes, all seven ROM-backed `CmbCombinerParse` cases execute and pass with the locked local asset environment, and the focused unified light-bank gate passes 8/8.
-- where: Shipwright/soh/src/zelda3d/behaviors/actor/boss_fd2.{h,cpp}, `boss_fd2_animation_policy.{h,cpp}`, focused `boss_fd2_mane.{c,h}`, and `boss_fd2_materials.{h,cpp}`; generic PICA coordinate-source parsing in `Shipwright/cmb3d/asset/cmb.{h,cpp}` and UV transport in `Shipwright/libultraship/include/fast/{zelda3d_model_types,unified_vtx}.h` plus the native/unified SDL3GPU pipelines; harness `tools/soh3d_harness/{boss_fd_oracle,boss_fd_control,boss_fd_compare,soh_boss_fd_state,paired_camera_control}.*`
-- gap: Ground-form emergence, idle/turn, fire/claw, burrow, hit→vulnerable, damage, and death CSAB transitions are recovered and ported with independent authored playheads plus OoT3D five-frame crossfades. Every retail persistent action now has one exact initial-CSAB policy; an unknown action invalidates the controller and retains the native draw instead of inventing `vba_wait`. Body/fire-hair CMABs use the recovered actor-local clock, the exposed-face pulse follows typed `BossFd::faceExposed`, and the shared fire-hair CMB is submitted unlit as authored. The generic PICA coordinator source/UV1/UV2 path is ported and live-verified in the expected direction, including a 2026-08-29 software-oracle rerun that reports the body CMAB live with `UV sampled 3/3 materials`; the body remains substantially darker, so UV routing is not the remaining closure. A synchronized 2026-08-29 oracle/host audit transforms the oracle's view-space actor light registers to the host's world-space convention and matches both directions, so the temporary light-bank negation experiment was removed; lighting binding is not the remaining closure. The prior host-only versus oracle-skip material probe changed compositing context and was invalid; native `sgdrawskip` now enables matched base-minus-group captures and live validation identified the exact seven-group body signature `(group/material) 0/1,1/2,2/0,3/3,4/4,5/5,6/5`. Corrected exact draw IDs map those groups to oracle `n29+n30`, `n31`, `n32+n33+n34`, `n35`, `n36`, `n37`, and `n38` by expanded vertex count. Restored base frames are now byte-identical in both engines, and every visible body group has a measured skip footprint except the fully occluded last split draw on each side. Exact oracle n29 produces 1,036 nearest-depth material-1 pixels and uses the same four live TEV words as the host, so TEV stage selection is not the remaining closure. Its complete fragment stream, state log, frame, and reduced footprint are cached by savestate, actual ROM, patch contract, and texture-pack manifest. The next ground-truth-ready step is to join that cached footprint to host coverage without another oracle run. The controlled mane comparator now primes both post-submission roots, restores the opaque host CSAB controller plus typed root drivers for every call, and proves ten calls at exact root delta 0 / solver maximum 0; the prior stress residual was entirely uncontrolled posed-root motion, not solver math. Exercise the natural live sequence with matched action timing after the remaining material discriminator. Flying Boss_Fd is tracked separately by render.boss-fd-flying.
+- evidence: oot3d-decomp/docs/boss_fd2.md; debug_journal/2026-08-30-{boss-fd2-material1-tev-audit,cmb-authored-sampler-filters}.md. The decompiled actor and generic model chain identifies no BossFd2-wide brightness factor. Exact cached oracle draw n29 has 1,036 nearest-depth material-1 pixels; after the recovered framebuffer/display transform its footprint overlaps the host material coverage at 1,927 pixels (precision 0.930, recall 0.813, IoU 0.766), ruling geometry coverage downstream. Binary asset reads establish min/mag 0x2601/0x2601 for every active valbasiagnd binding, while a 12,888-binding ROM survey proves five real minification modes. The port now preserves per-unit min/mag/mip state. Real-ROM sampler/material tests pass and a host-only shipping capture shows restored high-frequency fire detail against the existing cached oracle artifact without launching Azahar. This is mechanism evidence, not exact image-parity closure.
+- where: Shipwright/soh/src/zelda3d/behaviors/actor/boss_fd2.{h,cpp}, boss_fd2_animation_policy.{h,cpp}, boss_fd2_mane.{c,h}, and boss_fd2_materials.{h,cpp}; generic CMB parsing in Shipwright/cmb3d/asset/cmb.{h,cpp}; sampler policy in Shipwright/libultraship/include/fast/zelda3d_sampler.h; per-unit transport and SDL3GPU sampler ownership in Shipwright/libultraship/include/fast/{zelda3d_model_types,backends/zelda3d_sdl3gpu}.h and Shipwright/libultraship/src/fast/zelda3d_sdl3gpu_{resources,pass}.cpp; cached oracle ownership in tools/harness_cache.py and tools/oracle_cache.py.
+- gap: Ground-form action/CSAB transitions, actor-local CMAB clocks, face pulse, unlit fire hair, independent texture coordinates, and binary-authored sampler filters are ported. Exact oracle fragments, state, frame, and reduced footprint are cached by savestate, actual ROM, patch contract, and texture-pack manifest. Next persist the oracle control checkpoint alongside those artifacts and replay it into a host-only capture, giving the sampler result a like-for-like image metric without booting Azahar. Then exercise the natural live sequence with matched action timing. Flying Boss_Fd remains separate under render.boss-fd-flying.
 - notes: 2026-08-13 live discriminator caught and fixed forced-CMB ZAR-qualified animation resolution. Typed REPL fd2ground drives the real parent handoff and refuses invalid selections. 2026-08-14: emergence now uses the ported OoT3D `vba_up` controller, typed `shape.yOffset*scale.y` draw lift, and decompiled bone-10/13/14/15 procedural rotations; no N64 joints or clip phase reach the 3DS object. 2026-08-27 removed the last two guessed idle fallbacks and added `fd2info` so the shipping controller could be observed directly. The corrected corpus finds nonzero coordinate sources on 1 TEX0, 60 TEX1, and 16 TEX2 consumed coordinators, so the UV fix belongs to the generic format/renderer path rather than BossFd2. Emission, fragment lighting/LUTs, blending/depth, rest/CSAB scale, and actor light binding are ruled out for this asset; the synchronized view-space/world-space audit confirmed the latter. On 2026-08-29, renderer instrumentation gained a selected per-draw FRAGDBG tap and `DRAWSKIP_AFTER`; draw 39/material 0 produced a stable primary mask in preserved pass context, while draw 37/material 1 submitted with zero host rasterized coverage at the tested pose even with front probe depth. The 2026-08-30 corrected side-camera capture does rasterize that host group. Its first oracle raster labels were one ahead of `vsuni_log`; correcting the instrument identifies n29—not the old reported draw 38—as material 1. The exact n29 audit matches the live four-stage oracle chain and host packed words. See `debug_journal/2026-08-30-boss-fd2-material1-tev-audit.md`; texture-address selection is not valid material attribution.
 
 ### render.boss-fd-flying — Boss_Fd flying Volvagia multipart render

@@ -21,6 +21,7 @@ typedef struct Zelda3DGlGroup {
     int texIndex;
     int alphaTest;
     float alphaRef;
+    unsigned minFilter, magFilter;
     unsigned wrapS, wrapT;
     int blendEnable;
     unsigned blendSrcRGB, blendDstRGB, blendEqRGB;
@@ -47,6 +48,7 @@ typedef struct Zelda3DGlGroup {
     int dualTexMode;
     float dualTexScale2;
     int tex1Index;
+    unsigned min1Filter, mag1Filter;
     unsigned wrap1S, wrap1T;
     float uv1Scale[2];
     float uv1Trans[2];
@@ -55,6 +57,7 @@ typedef struct Zelda3DGlGroup {
     int tevStageCount;
     unsigned tevStagePack[6][3];
     int tex2Index;
+    unsigned min2Filter, mag2Filter;
     unsigned wrap2S, wrap2T;
     float uv2Scale[2];
     float uv2Trans[2];

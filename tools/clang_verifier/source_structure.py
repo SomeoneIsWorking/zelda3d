@@ -37,7 +37,7 @@ LEGACY_LINE_LIMITS = {
     "Shipwright/libultraship/include/fast/lus_gbi.h": 1394,
     "Shipwright/libultraship/include/libultraship/libultra/gbi.h": 4371,
     "Shipwright/libultraship/include/ship/window/gui/Fonts.h": 2304,
-    "Shipwright/libultraship/src/fast/backends/gfx_sdl3gpu.cpp": 2837,
+    "Shipwright/libultraship/src/fast/backends/gfx_sdl3gpu.cpp": 2835,
     "Shipwright/soh/soh/Enhancements/TimeSavers/timesaver_hook_handlers.cpp": 1434,
     "Shipwright/soh/soh/Enhancements/debugconsole.cpp": 1784,
     "Shipwright/soh/soh/Enhancements/debugger/actorViewer.cpp": 1231,

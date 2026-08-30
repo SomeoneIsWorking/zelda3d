@@ -26,7 +26,6 @@ size_t Sdl3GpuShaderCompileCount();
 // Release glslang's process-wide pools. Call ONCE, at engine shutdown, after the last shader compile.
 void Sdl3GpuFinalizeShaderCompiler();
 
-
 // The OoT3D model renderer + HUD, folded into this backend as member subsystems (see
 // fast/backends/zelda3d_sdl3gpu.h). Forward-declared here so only gfx_sdl3gpu.cpp + the two zelda3d
 // .cpp files need the full definitions.
@@ -156,21 +155,22 @@ class GfxRenderingAPISdl3Gpu : public GfxRenderingAPI {
     // blend_color for pipelines built with a CONSTANT_COLOR blend factor: blend constants are
     // render-pass state rather than pipeline state, so ReplayOps sets them per draw.
     void AppendZelda3DModelDraw(SDL_GPUGraphicsPipeline* pipeline, SDL_GPUBuffer* vbo, uint32_t first, uint32_t count,
-                              const void* ubo, SDL_GPUTexture* tex, SDL_GPUSampler* samp, SDL_GPUTexture* tex2,
-                              SDL_GPUSampler* samp2, SDL_GPUTexture* tex1, SDL_GPUSampler* samp1,
-                              const SDL_GPUViewport& vp, const SDL_Rect& sc, bool hasBlendConst = false,
-                              SDL_FColor blendConst = SDL_FColor{ 0.0f, 0.0f, 0.0f, 1.0f });
+                                const void* ubo, SDL_GPUTexture* tex, SDL_GPUSampler* samp, SDL_GPUTexture* tex2,
+                                SDL_GPUSampler* samp2, SDL_GPUTexture* tex1, SDL_GPUSampler* samp1,
+                                const SDL_GPUViewport& vp, const SDL_Rect& sc, bool hasBlendConst = false,
+                                SDL_FColor blendConst = SDL_FColor{ 0.0f, 0.0f, 0.0f, 1.0f });
     // Append one coalesced HUD quad-run as a first-class OP_DRAW into fb 0 (on top of the N64 + model
     // content, in the same pass), through the same single fragment-sampler bind path. `vbo` is the HUD
     // ring vertex buffer; the vertex shader's viewport UBO is built from w/h.
     void AppendZelda3DHudDraw(SDL_GPUGraphicsPipeline* pipeline, SDL_GPUBuffer* vbo, uint32_t first, uint32_t count,
-                            SDL_GPUTexture* tex, SDL_GPUSampler* samp, float w, float h);
+                              SDL_GPUTexture* tex, SDL_GPUSampler* samp, float w, float h);
     // Append a fullscreen-triangle post-process draw (the SSAO composite) as a first-class OP_DRAW into
     // the current fb pass, over the scene, through the same single bind path. No vertex buffer (the
     // vertex shader generates the triangle from gl_VertexIndex); `ubo`/`uboLen` is its fragment UBO and
     // `tex`/`samp` its single sampler. The pipeline carries the multiply blend.
-    void AppendZelda3DFullscreen(SDL_GPUGraphicsPipeline* pipeline, const void* ubo, uint32_t uboLen, SDL_GPUTexture* tex,
-                               SDL_GPUSampler* samp, const SDL_GPUViewport& vp, const SDL_Rect& sc);
+    void AppendZelda3DFullscreen(SDL_GPUGraphicsPipeline* pipeline, const void* ubo, uint32_t uboLen,
+                                 SDL_GPUTexture* tex, SDL_GPUSampler* samp, const SDL_GPUViewport& vp,
+                                 const SDL_Rect& sc);
     // Append an external op that runs its OWN render pass (offscreen shadow/AO depth targets). The
     // main framebuffer pass is ended first (SDL3 GPU passes can't nest); the callback owns
     // SDL_BeginGPURenderPass/SDL_EndGPURenderPass on the supplied command buffer.
@@ -204,9 +204,10 @@ class GfxRenderingAPISdl3Gpu : public GfxRenderingAPI {
     // and ONE set of dummy (1x1 white tex + sampler) resources across the whole backend rather than
     // the model renderer keeping its own duplicates. GetOrCreateSamplerEx is the general primitive
     // (fully-resolved SDL params + max_lod); the N64 GetOrCreateSampler(linear,cms,cmt) is a thin
-    // wrapper over it. The Zelda3D model path needs LINEAR + max_lod=1000 (a minified num_levels=1
-    // texture sampled black at max_lod=0), which the N64 wrapper can't express — hence the Ex form.
-    SDL_GPUSampler* GetOrCreateSamplerEx(SDL_GPUFilter filter, SDL_GPUSamplerAddressMode u,
+    // wrapper over it. CMB bindings carry independent minification, magnification, and mip modes,
+    // so the Zelda3D model path resolves those authored enums before entering this cache.
+    SDL_GPUSampler* GetOrCreateSamplerEx(SDL_GPUFilter minFilter, SDL_GPUFilter magFilter,
+                                         SDL_GPUSamplerMipmapMode mipmapMode, SDL_GPUSamplerAddressMode u,
                                          SDL_GPUSamplerAddressMode v, float maxLod);
     SDL_GPUTexture* DummyTexture();
     SDL_GPUSampler* DummySampler();
@@ -269,8 +270,8 @@ class GfxRenderingAPISdl3Gpu : public GfxRenderingAPI {
     enum OpKind { OP_DRAW, OP_CLEAR, OP_COPY, OP_EXT_OWN_PASS };
     struct Op {
         OpKind kind;
-        int fb;     // target fb (DRAW/CLEAR/EXT_IN_PASS) or destination fb (COPY)
-        int srcFb;  // COPY source fb
+        int fb;    // target fb (DRAW/CLEAR/EXT_IN_PASS) or destination fb (COPY)
+        int srcFb; // COPY source fb
         bool clearColor, clearDepth;
         SDL_Rect srcRect, dstRect; // COPY
         bool nearest;              // COPY filter
@@ -288,7 +289,7 @@ class GfxRenderingAPISdl3Gpu : public GfxRenderingAPI {
         // against the pass's current value so unrelated draws cost nothing).
         bool useBlendConstants;
         SDL_FColor blendConstants;
-        uint8_t ubo[64];        // std140 uniform payload: N64 = fragment SgUboData; HUD = vertex viewport UBO
+        uint8_t ubo[64]; // std140 uniform payload: N64 = fragment SgUboData; HUD = vertex viewport UBO
         // Vertex source. altVbo != null binds that buffer (Zelda3D model's per-model vbo, or the HUD ring
         // vbo) at offset 0; null falls back to the shared frame mVbo at vboOffset (N64). numVerts +
         // firstVertex are the draw range for all three.
@@ -303,7 +304,7 @@ class GfxRenderingAPISdl3Gpu : public GfxRenderingAPI {
         //   DRAW_FULLSCREEN : one fragment UBO (op.ubo, uboLen bytes), NO vertex buffer (the AO composite
         //                     generates a fullscreen triangle from gl_VertexIndex).
         enum DrawClass : uint8_t { DRAW_N64, DRAW_MODEL, DRAW_HUD, DRAW_FULLSCREEN } drawClass;
-        uint16_t uboLen; // fragment-UBO byte length for DRAW_FULLSCREEN (0 = use the class default)
+        uint16_t uboLen;    // fragment-UBO byte length for DRAW_FULLSCREEN (0 = use the class default)
         int zelda3dDrawIdx; // DRAW_MODEL: index into mSoh3dModelUbos for the oversized skinned payload
         std::function<void(SDL_GPUCommandBuffer*)> extOwn; // OP_EXT_OWN_PASS: runs with the main pass ended
     };
