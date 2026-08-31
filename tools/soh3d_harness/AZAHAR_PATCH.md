@@ -320,7 +320,8 @@ Trigger via env:
 On each qualifying write the logger prints one line:
 ```
 MW pc=0x<pc> lr=0x<lr> va=0x<vaddr> sz=<sizeof(T)> data=0x<data> \
-   r0=... r1=... r2=... r3=... sp=...
+   r0=... r1=... r2=... r3=... r4=... r4p8=... r4p10=... r4p14=... sr4=... \
+   sr4p0=... sr4p4=... sr4p5c=... sr4p6c=... sr4t14=... sr4t20=... sr4t24=... sp=...
 ```
 
 ### The patch
@@ -814,6 +815,19 @@ normal Azahar and harness launches retain fast memory. The Hut command packet st
 record in this mode, proving that its producer is outside both Dynarmic store paths.
 Its selected `config0` packet also has no matching `MemorySystem::Write` record under the direct logger,
 so the active list is populated by another write path; recover that path before assigning a guest writer.
+
+The exact Hut `config0` write is now observed in interpreter mode at guest PC `0x00466e60`,
+with `lr=0x00466e20`. Static ARM disassembly identifies its enclosing function as the packet-copy
+loop at `0x00466e0c`: it obtains an output cursor, copies pairs of words from a prepared 24-byte
+packet block, and releases the output reservation. Its sole direct caller is the virtual material-pass
+dispatcher at `0x004527e8`, after that dispatcher has called its three pass setup slots. The logger
+captures both levels at the exact store. The copy loop’s `r4` is its packet descriptor, so `r4p8`,
+`r4p10`, and `r4p14` record its source pointer, byte count, and block index. Its prologue saves the
+caller’s dispatcher `r4` at `sp+4`; `sr4` and its table/context/packet/visibility fields
+(`sr4p0`, `sr4p4`, `sr4p5c`, `sr4p6c`) plus its three virtual setup slots
+(`sr4t14`, `sr4t20`, `sr4t24`) identify the owning material pass. Reading these after the frame
+completes is invalid because the dispatcher can reset. Capturing them at the store records the
+producer ownership rather than guessing a shader from a copied PICA value.
 
 # Azahar Patch 14 (2026-08-31, GSP command-list submitter provenance)
 

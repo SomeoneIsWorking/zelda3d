@@ -6,10 +6,13 @@ from pathlib import Path
 from tempfile import TemporaryDirectory
 
 from pica_command_writer_oracle_probe import (
+    harness_environment,
     last_register_write,
     linear_virtual_address,
     parse_command_writes,
     parse_memlog,
+    selected_writer_record,
+    snapshot_owner_state,
 )
 
 
@@ -41,3 +44,46 @@ class CommandWriterTests(unittest.TestCase):
             path = Path(directory) / "memory.log"
             path.write_text("MW pc=0x00300000 lr=0x00000000 va=0x144b0cb4 sz=8 data=0x0\n")
             self.assertEqual(len(parse_memlog(path, 0x144B0CB8)), 1)
+
+    def test_selects_packet_descriptor_for_config_value(self) -> None:
+        records = [
+            (
+                "MW pc=0x00466e60 lr=0x00466e20 va=0x145913d8 sz=4 "
+                "data=0x0000000080000400 r0=0x0821e96c r4=0x08210000 r4p8=0x0821e964 "
+                "r4p10=0x00000018 r4p14=0x00000001 sr4=0x08200000 sr4p0=0x00100000 "
+                "sr4p4=0x08201000 sr4p5c=0x08210000 sr4p6c=0x08220000 sr4t14=0x00450000 "
+                "sr4t20=0x00450010 sr4t24=0x00450020"
+            )
+        ]
+        self.assertEqual(selected_writer_record(records, 0x80000400)["r4"], 0x08210000)
+
+    def test_snapshots_exact_store_dispatcher_fields(self) -> None:
+        state = snapshot_owner_state(
+            {
+                "r0": 0x0821E96C,
+                "r4": 0x08210000,
+                "r4p8": 0x0821E964,
+                "r4p10": 0x18,
+                "r4p14": 1,
+                "sr4": 0x08200000,
+                "sr4p0": 0x00100000,
+                "sr4p4": 0x08201000,
+                "sr4p5c": 0x08210000,
+                "sr4p6c": 0x08220000,
+                "sr4t14": 0x00450000,
+                "sr4t20": 0x00450010,
+                "sr4t24": 0x00450020,
+            }
+        )
+        self.assertEqual(state["packet_descriptor"]["source_pointer"], "0x0821e964")
+        self.assertEqual(state["virtual_slots"]["setup_c"], "0x00450020")
+
+    def test_interpreter_environment_enables_direct_write_logging(self) -> None:
+        environment = harness_environment("interpreter", (0x14480000, 0x145A0000), Path("memory.log"))
+        self.assertEqual(environment["SOH3D_HARNESS_DISABLE_FASTMEM"], "1")
+        self.assertEqual(environment["SOH3D_CPU_INTERPRETER"], "1")
+        self.assertEqual(environment["SOH3D_MEMLOG_RANGES"], "0x14480000:0x145a0000")
+
+    def test_rejects_unknown_cpu_mode(self) -> None:
+        with self.assertRaisesRegex(ValueError, "unsupported CPU mode"):
+            harness_environment("unknown", (0x14480000, 0x145A0000), Path("memory.log"))
