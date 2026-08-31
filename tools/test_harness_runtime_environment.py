@@ -15,6 +15,7 @@ REPO = TOOLS.parent
 sys.path.insert(0, str(TOOLS))
 
 import harness_process
+import harness_transport
 from harness_allocator import select_scalable_allocator
 from harness_build import HarnessBuild
 from harness_headless_display import prepare_headless_display
@@ -148,7 +149,7 @@ class HarnessProcessTests(unittest.TestCase):
 
         self.assertIs(harness_process.spawn("fixture.state"), session)
 
-        harness_type.assert_called_once_with([str(harness_process.HARNESS_LAUNCHER)])
+        harness_type.assert_called_once_with([str(harness_process.HARNESS_LAUNCHER)], None)
         session.send.assert_called_once_with("loadstate fixture.state")
 
     @mock.patch.object(harness_process, "Harness")
@@ -162,6 +163,20 @@ class HarnessProcessTests(unittest.TestCase):
             harness_process.spawn("missing.state")
 
         session.close.assert_called_once_with()
+
+
+class HarnessTransportTests(unittest.TestCase):
+    def test_boot_wait_covers_the_launcher_build_phase(self) -> None:
+        process = mock.Mock()
+        with (
+            mock.patch.object(harness_transport.subprocess, "Popen", return_value=process),
+            mock.patch.object(
+                harness_transport.Harness, "_readline", return_value="boot succeeded"
+            ) as readline,
+        ):
+            harness_transport.Harness(["fixture-harness"])
+
+        readline.assert_called_once_with(timeout=harness_transport.BOOT_TIMEOUT_SECONDS)
 
 
 if __name__ == "__main__":
