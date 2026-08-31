@@ -146,6 +146,20 @@ extern "C" bool Soh3d_WatchGetLatestMatching(u32 range_base, u64 mask, u64 expec
     return false;
 }
 
+extern "C" bool Soh3d_WatchGetLatestAt(u32 range_base, u32 address, WatchRecord* out) {
+    std::lock_guard lock(g_mtx);
+    const auto it = g_hits.find(range_base);
+    if (it == g_hits.end())
+        return false;
+    for (auto record = it->second.rbegin(); record != it->second.rend(); ++record) {
+        if (record->vaddr <= address && address < record->vaddr + record->size) {
+            *out = *record;
+            return true;
+        }
+    }
+    return false;
+}
+
 // True iff a range starting at exactly `addr` is already registered.
 // Cheap check used by the auto-attach path to avoid re-registering the
 // same watchpoint every firstdiv call.

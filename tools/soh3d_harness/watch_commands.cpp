@@ -102,6 +102,28 @@ bool HandleCommand(const std::string& cmd, std::istringstream& toks) {
         }
         Soh3d_WatchClear(a);
         std::printf("ok hitclear 0x%08x\n", a);
+    } else if (cmd == "hitaddr") {
+        handled = true;
+        std::string range_text, address_text;
+        if (!(toks >> range_text >> address_text)) {
+            PrintErr("hitaddr: usage: hitaddr <watch_base_addr> <address>");
+            return true;
+        }
+        const auto range = ParseNum(range_text);
+        const auto address = ParseNum(address_text);
+        if (!range || !address) {
+            PrintErr("hitaddr: bad address");
+            return true;
+        }
+        WatchRecord record{};
+        if (!Soh3d_WatchGetLatestAt(static_cast<uint32_t>(*range), static_cast<uint32_t>(*address), &record)) {
+            std::printf("ok hitaddr none\n");
+            return true;
+        }
+        std::printf("ok hitaddr vaddr=0x%08x size=%u data=0x%016lx pc=0x%08x lr=0x%08x "
+                    "r0=0x%08x r1=0x%08x r2=0x%08x r3=0x%08x sp=0x%08x\n",
+                    record.vaddr, record.size, static_cast<unsigned long>(record.data), record.arm_pc,
+                    record.arm_lr, record.arm_r0, record.arm_r1, record.arm_r2, record.arm_r3, record.arm_sp);
     } else if (cmd == "pcwatch") {
         handled = true;
         std::string addressText;

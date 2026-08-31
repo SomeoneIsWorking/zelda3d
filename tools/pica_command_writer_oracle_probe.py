@@ -27,7 +27,7 @@ from pica_command_provenance_oracle_probe import (
 )
 from repo_environment import apply_repo_environment
 
-CAPTURE_VERSION = 4
+CAPTURE_VERSION = 6
 DEFAULT_ENTRANCE = 0xEE
 DEFAULT_DAYTIME = 0x6000
 DEFAULT_SETTLE_FRAMES = 180
@@ -152,15 +152,16 @@ def capture_live(
     discovery_path = OUTDIR / "discovery.log"
     command_list_path = OUTDIR / "command-list.bin"
     memlog_path = OUTDIR / "memory-writes.log"
-    environment = {
-        **os.environ,
-        "SOH3D_MEMLOG_RANGES": f"0x{linear_range[0]:08x}:0x{linear_range[1]:08x}",
-        "SOH3D_MEMLOG_PATH": str(memlog_path),
-    }
-    harness = spawn(environment=environment)
+    harness = spawn()
+    watch_armed = False
     try:
         if not boot_to_gameplay(harness, entrance, settle_frames):
             raise RuntimeError("oracle failed to reach deterministic gameplay state")
+        watch_size = linear_range[1] - linear_range[0]
+        response = harness.send(f"watch 0x{linear_range[0]:08x} {watch_size}")
+        if response != f"ok watch 0x{linear_range[0]:08x} {watch_size}":
+            raise RuntimeError(f"oracle command-arena watch failed: {response}")
+        watch_armed = True
         set_time_of_day(harness, daytime, settle=TIME_SETTLE_FRAMES)
         response = harness.send(f"vsuni_log {discovery_path}")
         if response != f"ok vsuni_log {discovery_path}":
@@ -193,8 +194,16 @@ def capture_live(
             raise RuntimeError(
                 f"command-list writer 0x{writer_address:08x} is outside the armed memory-log range"
             )
-        memlog_artifact = cache.put_artifact("pica-command-writer-memory", args, memlog_path, suffix=".log")
-        writer_records = parse_memlog(memlog_path, writer_address)
+        response = harness.send(f"hitaddr 0x{linear_range[0]:08x} 0x{writer_address:08x}")
+        if response == "ok hitaddr none":
+            raise RuntimeError(f"page watch has no writer for 0x{writer_address:08x}")
+        if not response.startswith("ok hitaddr vaddr="):
+            raise RuntimeError(f"oracle command-arena hit query failed: {response}")
+        writer_records = [response]
+        response = harness.send(f"unwatch 0x{linear_range[0]:08x} {watch_size}")
+        if response != f"ok unwatch 0x{linear_range[0]:08x} {watch_size}":
+            raise RuntimeError(f"oracle command-arena unwatch failed: {response}")
+        watch_armed = False
         return {
             "capture_version": CAPTURE_VERSION,
             "draw": draw,
@@ -206,9 +215,10 @@ def capture_live(
             "writer_records": writer_records,
             "discovery_artifact": str(discovery_artifact),
             "command_list_artifact": str(command_list_artifact),
-            "memory_log_artifact": str(memlog_artifact),
         }
     finally:
+        if watch_armed:
+            harness.send(f"unwatch 0x{linear_range[0]:08x} {linear_range[1] - linear_range[0]}")
         harness.close()
         discovery_path.unlink(missing_ok=True)
         command_list_path.unlink(missing_ok=True)
