@@ -494,7 +494,7 @@ This doc **organizes and links to** the existing RE corpus rather than duplicati
 - deps: mm.player-form-models
 - evidence: `mm3d-decomp/docs/player_draw.md` “Mount-transition open-hand pulse”; retail ARM `FUN_002250f0` at `0x002250f0` and `FUN_0022de58` at `0x0022de58`, statically decompiled from the persistent `build/ghidra-mm3d` project. The set sequence is disassembled at `0x0022532c..0x00225380`; `0x00225310..0x0022531c` clears the bit on mount attach.
 - where: MM3D source evidence in `mm3d-decomp/docs/player_draw.md`; eventual typed adapter belongs beside `2ship/2s2h/zelda3d/mm3d_player_left_hand.{cpp,h}`.
-- gap: The retail predicate is recovered but its fields are not typed in 2S2H: `Player+0x11e4e == 0`, raw float `Player+0x129d4 > 50.0f`, and `FUN_0022de58(40.0f, 0.0f, Player+0x334)`. Do not infer it from `rideActor`; retain the inactive producer until those source fields and the `+0x334` virtual object are identified.
+- gap: The retail predicate is recovered but its fields are not typed in 2S2H: `Player+0x11e4e == 0`, the signed raw word at `Player+0x129d4` greater than `0x42480000`, and `FUN_0022de58(40.0f, 0.0f, Player+0x334)`. `0x42480000` has 50.0f's encoding, but the ARM uses integer `ldr`/signed `cmp`/`ble`, so do not infer a float field. Do not infer it from `rideActor`; retain the inactive producer until those source fields and the `+0x334` virtual object are identified.
 - notes: The source copies `skelAnime.endFrame` to `curFrame` before ORing bit 16, so this is a timed pulse rather than a persistent mounted state. The existing typed `En_Boom` producer remains a separate closed path.
 
 ### mm.action-func-naming — name MM's ~83 numbered Player_Action_NN + 327 unnamed func_80XXXXXX
