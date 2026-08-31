@@ -4,6 +4,7 @@ import unittest
 
 from pica_command_submitter_oracle_probe import (
     match_submit_record,
+    parse_pointer_records,
     parse_submit_records,
 )
 
@@ -81,3 +82,30 @@ class ParseSubmitRecordsTests(unittest.TestCase):
             "s14=0x00000013 s15=0x00000014 s16=0x00000015\\n"
         )
         self.assertEqual(parse_submit_records([line])[0]["physical_address"], 0x20480000)
+
+    def test_reads_only_exact_pointer_acquisitions(self) -> None:
+        lines = [
+            (
+                "PTR pc=0x00123456 lr=0x00654321 va=0x1458fa80 r0=0x00000001 r1=0x00000002 "
+                "r2=0x00000003 r3=0x00000004 sp=0x0ffff000"
+            ),
+            (
+                "PTR pc=0x00876543 lr=0x00123456 va=0x1458fa84 r0=0x00000000 r1=0x00000000 "
+                "r2=0x00000000 r3=0x00000000 sp=0x0ffff000"
+            ),
+        ]
+        self.assertEqual(
+            parse_pointer_records(lines, 0x1458FA80),
+            [
+                {
+                    "pc": 0x00123456,
+                    "lr": 0x00654321,
+                    "virtual_address": 0x1458FA80,
+                    "r0": 1,
+                    "r1": 2,
+                    "r2": 3,
+                    "r3": 4,
+                    "sp": 0x0FFFF000,
+                }
+            ],
+        )

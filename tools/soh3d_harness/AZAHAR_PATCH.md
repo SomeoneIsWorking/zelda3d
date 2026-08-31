@@ -839,3 +839,19 @@ The 17 `sN` values are non-faulting reads of the guest stack at the submission S
 because the captured `lr` can be a generic service-return stub. A nonzero stack word is not by itself a
 return address: validate it against the active ARM callback frame before extending the material-state
 RE. They are diagnostic state only and do not alter guest memory or command processing.
+
+# Azahar Patch 15 (2026-08-31, direct guest-pointer provenance)
+
+`src/core/memory.cpp` adds an opt-in trace for direct host-pointer access to a selected guest virtual
+range. Set both `SOH3D_PTRLOG_RANGE=<start>:<end>` and `SOH3D_PTRLOG_PATH=<path>` to receive one
+record per `MemorySystem::GetPointer` acquisition in that half-open range:
+
+```
+PTR pc=0x... lr=0x... va=0x... r0=0x... r1=0x... r2=0x... r3=0x... sp=0x...
+```
+
+This complements, rather than replaces, the write logger: the Hut command-list arena has no observed
+`MemorySystem::Write` producer even with Dynarmic fast memory disabled. The trace is range-limited,
+off unless explicitly enabled, and records no data or mutations. A positive only proves a caller
+acquired the pointer; correlate it with the exact same-run PICA list address before treating it as a
+candidate list-construction path.
