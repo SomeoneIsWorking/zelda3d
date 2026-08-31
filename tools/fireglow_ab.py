@@ -29,10 +29,15 @@ REPO = Path(__file__).resolve().parent.parent
 sys.path.insert(0, str(REPO / "tools"))
 from harness_process import spawn  # noqa: E402
 from harness_paths import TITLE_STATE  # noqa: E402
+from title_oracle_context import initial_title_cs  # noqa: E402
 
 OUTDIR = REPO / "scratch" / "title_ab"
 SAVESTATE = TITLE_STATE
-SOH_STEP_INTERCEPT = 408  # soh_step ~= az_step + 408 (title_ab.py rate-law derivation)
+SOH_TITLE_BOOT_STEPS = 232
+
+
+def soh_step_intercept() -> int:
+    return 2 * initial_title_cs() + SOH_TITLE_BOOT_STEPS
 
 
 def read_ppm(path: Path) -> np.ndarray:
@@ -74,12 +79,11 @@ def step_chunked(h, cmd: str, n: int, chunk: int = 20) -> None:
 
 # cs-frame <-> az_step conversion, reconstructed and cross-checked in
 # oot3d-decomp/docs/title_logo_actor.md §8.1 against this tool's own matched-pair table:
-# cs = (az + 176) / 2  =>  az = 2*cs - 176.
-CS_TO_AZ_K = 176
+# cs = checkpoint_cs + az / 2  =>  az = 2 * (cs - checkpoint_cs).
 
 
 def cs_to_az(cs: int) -> int:
-    return 2 * cs - CS_TO_AZ_K
+    return 2 * (cs - initial_title_cs())
 
 
 def delta_stats(pre: np.ndarray, post: np.ndarray, box=(40, 190, 110, 300),
@@ -132,7 +136,7 @@ def run_diff(argv):
             sys.exit(f"soh_boot failed: {r}")
         az_cur = soh_cur = 0
         for az in all_az:
-            soh = az + SOH_STEP_INTERCEPT
+            soh = az + soh_step_intercept()
             step_chunked(h, "run", az - az_cur)
             step_chunked(h, "soh_step", soh - soh_cur)
             az_cur, soh_cur = az, soh
@@ -182,7 +186,7 @@ def main(argv):
             sys.exit(f"soh_boot failed: {r}")
         az_cur = soh_cur = 0
         for az in frames:
-            soh = az + SOH_STEP_INTERCEPT
+            soh = az + soh_step_intercept()
             step_chunked(h, "run", az - az_cur)
             step_chunked(h, "soh_step", soh - soh_cur)
             az_cur, soh_cur = az, soh

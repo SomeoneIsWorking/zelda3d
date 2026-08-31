@@ -3,15 +3,34 @@
 from __future__ import annotations
 
 from collections.abc import MutableMapping
-from harness_paths import TITLE_STATE
+import json
+
+from harness_paths import TITLE_STATE, TITLE_STATE_METADATA, azahar_render_contract_marker
 
 SAVESTATE = TITLE_STATE
 
-# RE'd and measured in title_ab.py / debug_journal/2026-07-09-title-cs-phase-sync.md:
-# the settled oracle state starts at title cs=88 and advances one title unit per
-# two oracle retro_run calls.
-ORACLE_INITIAL_TITLE_CS = 88
 ORACLE_STEPS_PER_TITLE_CS = 2
+
+
+def initial_title_cs() -> int:
+    """Read the cursor measured when the current checkpoint was created."""
+    if not TITLE_STATE_METADATA.is_file():
+        raise RuntimeError(
+            f"missing title checkpoint metadata: {TITLE_STATE_METADATA}; "
+            "create the checkpoint with tools/title_settle.py"
+        )
+    try:
+        payload = json.loads(TITLE_STATE_METADATA.read_text())
+        initial_cs = payload["initial_title_cs"]
+        contract = payload["render_contract"]
+        savestate = payload["savestate"]
+    except (json.JSONDecodeError, KeyError, TypeError) as error:
+        raise RuntimeError(f"invalid title checkpoint metadata: {TITLE_STATE_METADATA}") from error
+    if contract != azahar_render_contract_marker() or savestate != SAVESTATE.name:
+        raise RuntimeError(f"title checkpoint metadata does not match {SAVESTATE}")
+    if not isinstance(initial_cs, int) or initial_cs < 0:
+        raise RuntimeError(f"invalid initial title cursor in {TITLE_STATE_METADATA}")
+    return initial_cs
 
 
 def configure_vanilla_title_context(environment: MutableMapping[str, str]) -> None:
@@ -20,8 +39,9 @@ def configure_vanilla_title_context(environment: MutableMapping[str, str]) -> No
 
 
 def oracle_frame_for_title_cs(title_cs: int) -> int:
-    if title_cs < ORACLE_INITIAL_TITLE_CS:
+    initial_cs = initial_title_cs()
+    if title_cs < initial_cs:
         raise ValueError(
-            f"title cs {title_cs} predates cached state cs={ORACLE_INITIAL_TITLE_CS}"
+            f"title cs {title_cs} predates cached state cs={initial_cs}"
         )
-    return (title_cs - ORACLE_INITIAL_TITLE_CS) * ORACLE_STEPS_PER_TITLE_CS
+    return (title_cs - initial_cs) * ORACLE_STEPS_PER_TITLE_CS
