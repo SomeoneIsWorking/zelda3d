@@ -59,10 +59,9 @@ def source_textures(
     ``archive_path`` is the ROM-side ZAR path, so the source set is named by
     stable game data rather than a scene-dependent actor address.
     """
-    prefix = f"{archive_path}:"
     textures: list[SourceTexture] = []
     for label, data in iter_cmbs():
-        if not label.startswith(prefix):
+        if label != archive_path and not label.startswith(f"{archive_path}:"):
             continue
         records = scan_materials(label, data)
         if require_enabled_fragment_primary and not any(
