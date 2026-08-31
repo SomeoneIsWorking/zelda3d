@@ -25,7 +25,7 @@ from harness_paths import GAMEPLAY_STATE
 from harness_process import spawn
 from repo_environment import apply_repo_environment
 
-CAPTURE_VERSION = 9
+CAPTURE_VERSION = 10
 # `FUN_003f9b5c` is the candidate CmbRenderer's material-setup vtable slot.
 # Watching it distinguishes "the candidate renderer was not used" from "its
 # optional fragment-light branch was not used" in the same cached frame.

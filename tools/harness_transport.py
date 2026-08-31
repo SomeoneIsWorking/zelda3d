@@ -30,7 +30,6 @@ _OK_END_COMMANDS = {
 _BARE_OK_COMMANDS = {
     "help",
     "input",
-    "lighting_capture",
     "loadstate",
     "quit",
     "savestate",
