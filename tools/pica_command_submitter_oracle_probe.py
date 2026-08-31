@@ -26,7 +26,7 @@ from pica_command_provenance_oracle_probe import (
 )
 from repo_environment import apply_repo_environment
 
-CAPTURE_VERSION = 6
+CAPTURE_VERSION = 7
 DEFAULT_ENTRANCE = 0xEE
 DEFAULT_DAYTIME = 0x6000
 DEFAULT_SETTLE_FRAMES = 180
@@ -134,6 +134,19 @@ def parse_bulk_records(lines: list[str], start: int, end: int) -> list[dict[str,
     return records
 
 
+def parse_bulk_selftest_records(
+    before_lines: list[str], after_lines: list[str], virtual_address: int
+) -> list[dict[str, int]]:
+    if after_lines[: len(before_lines)] != before_lines:
+        raise RuntimeError("bulk-write log changed before the self-test boundary")
+    records = parse_bulk_records(
+        after_lines[len(before_lines) :], virtual_address, virtual_address + 16
+    )
+    if not records:
+        raise RuntimeError("WriteBlock bulk logger self-test produced no matching record")
+    return records
+
+
 def match_submit_record(
     records: list[dict[str, int | str]], physical_address: int, size: int
 ) -> dict[str, int | str]:
@@ -227,9 +240,6 @@ def capture_live(
         pointer_artifact = cache.put_artifact(
             "pica-command-submitter-pointer", args, pointer_path, suffix=".log"
         )
-        bulk_artifact = cache.put_artifact(
-            "pica-command-submitter-bulk", args, bulk_path, suffix=".log"
-        )
         result = result_from_logs(
             discovery_path.read_text().splitlines(),
             submit_path.read_text().splitlines(),
@@ -238,16 +248,31 @@ def capture_live(
             str(submit_artifact),
         )
         result["pointer_artifact"] = str(pointer_artifact)
+        bulk_lines = bulk_path.read_text().splitlines()
+        bulk_artifact = cache.put_artifact(
+            "pica-command-submitter-bulk", args, bulk_path, suffix=".log"
+        )
         result["bulk_artifact"] = str(bulk_artifact)
         result["pointer_records"] = parse_pointer_records(
             pointer_path.read_text().splitlines(), int(result["submitter"]["virtual_address"], 16)
         )
         list_start = int(result["submitter"]["virtual_address"], 16)
         result["bulk_records"] = parse_bulk_records(
-            bulk_path.read_text().splitlines(),
+            bulk_lines,
             list_start,
             list_start + result["command_list_word_count"] * 4,
         )
+        response = harness.send(f"memlogselftest 0x{list_start:08x}")
+        if response != f"ok memlogselftest va=0x{list_start:08x} size=16":
+            raise RuntimeError(f"WriteBlock bulk logger self-test failed: {response}")
+        selftest_lines = bulk_path.read_text().splitlines()
+        result["bulk_selftest_records"] = parse_bulk_selftest_records(
+            bulk_lines, selftest_lines, list_start
+        )
+        bulk_selftest_artifact = cache.put_artifact(
+            "pica-command-submitter-bulk-selftest", args, bulk_path, suffix=".log"
+        )
+        result["bulk_selftest_artifact"] = str(bulk_selftest_artifact)
         return result
     finally:
         harness.close()

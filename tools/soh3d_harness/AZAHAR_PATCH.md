@@ -863,3 +863,9 @@ their `memcpy`, using `MB` records with PC/LR, virtual range start, byte count, 
 SP. This covers host bulk copies and `CopyBlock`'s destination path, which do not route through templated
 `MemorySystem::Write<T>`. The probe joins only records overlapping the exact PICA list interval. The
 trace is disabled unless the existing `SOH3D_MEMLOG_RANGES` setting is present and remains observer-only.
+
+The harness REPL exposes `memlogselftest <va>`, which reads 16 bytes and writes those unchanged bytes
+back through the production `MemorySystem::WriteBlock` path. It is a reversible positive control for
+the `MB` logger, not a renderer or game-state override. The command refuses an unmapped range and emits
+its exact VA and byte count; the submitter probe captures this self-test only after preserving the
+unmodified production log, so its proof cannot be mistaken for a command-list producer.

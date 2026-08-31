@@ -5,6 +5,7 @@ import unittest
 from pica_command_submitter_oracle_probe import (
     match_submit_record,
     parse_bulk_records,
+    parse_bulk_selftest_records,
     parse_pointer_records,
     parse_submit_records,
 )
@@ -124,3 +125,18 @@ class ParseSubmitRecordsTests(unittest.TestCase):
         ]
         records = parse_bulk_records(lines, 0x1458FA80, 0x1458FB80)
         self.assertEqual([record["pc"] for record in records], [0x00123456])
+
+    def test_accepts_new_bulk_selftest_record_only(self) -> None:
+        before = ["unrelated log line"]
+        after = before + [
+            (
+                "MB pc=0x00123456 lr=0x00654321 va=0x1458fa80 sz=16 r0=0x00000001 r1=0x00000002 "
+                "r2=0x00000003 r3=0x00000004 sp=0x0ffff000"
+            )
+        ]
+        records = parse_bulk_selftest_records(before, after, 0x1458FA80)
+        self.assertEqual([record["size"] for record in records], [16])
+
+    def test_rejects_bulk_selftest_without_new_matching_record(self) -> None:
+        with self.assertRaisesRegex(RuntimeError, "self-test produced no matching record"):
+            parse_bulk_selftest_records([], [], 0x1458FA80)
