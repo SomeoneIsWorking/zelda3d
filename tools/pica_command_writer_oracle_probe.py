@@ -41,6 +41,7 @@ DEFAULT_LINEAR_RANGE = (0x14480000, 0x145A0000)
 CPU_MODES = ("dynarmic", "interpreter")
 SOURCE_TRACE_VERSION = 2
 WATCH_TRACE_VERSION = 1
+STATE_WATCH_TRACE_VERSION = 2
 MEMLOG_RE = re.compile(
     r"^MW pc=0x[0-9a-fA-F]{8} lr=0x[0-9a-fA-F]{8} "
     r"va=0x(?P<address>[0-9a-fA-F]{8}) sz=(?P<size>\d+) "
@@ -61,6 +62,7 @@ PACKET_DESCRIPTOR_FIELDS = {
 COPY_LOOP_PC = 0x00371758
 COPY_SOURCE_REGISTERS = ("r7", "r8", "r9", "r10")
 CONFIG_TEMPLATE_STORE_PC = 0x0040CFE4
+MATERIAL_DESCRIPTOR_BIND_PC = 0x004C6374
 CONFIG_BUILDER_R10_OFFSET = 0x100
 CONFIG_BUILDER_INPUT_WORDS = {
     "0x000": "r10bp0",
@@ -76,6 +78,15 @@ CONFIG_BUILDER_INPUT_WORDS = {
     "0x188": "r10bp188",
     "0x18c": "r10bp18c",
     "0x190": "r10bp190",
+}
+MATERIAL_DESCRIPTOR_WORDS = {
+    "0x10": "r1p10",
+    "0x14": "r1p14",
+    "0x18": "r1p18",
+    "0x1c": "r1p1c",
+    "0x20": "r1p20",
+    "0x24": "r1p24",
+    "0x28": "r1p28",
 }
 
 
@@ -126,7 +137,7 @@ def probe_args(
         args["watch_trace_version"] = WATCH_TRACE_VERSION
     if state_watch_address is not None:
         args["state_watch_address"] = f"0x{state_watch_address:08x}"
-        args["state_watch_trace_version"] = WATCH_TRACE_VERSION
+        args["state_watch_trace_version"] = STATE_WATCH_TRACE_VERSION
     return args
 
 
@@ -300,6 +311,19 @@ def snapshot_config_builder_input(record: dict[str, int]) -> dict[str, Any]:
     }
 
 
+def snapshot_material_descriptor(record: dict[str, int]) -> dict[str, Any]:
+    required = {"pc", "r1", *MATERIAL_DESCRIPTOR_WORDS.values()}
+    missing = sorted(required.difference(record))
+    if missing:
+        raise RuntimeError(f"memory log lacks material-descriptor fields: {', '.join(missing)}")
+    if record["pc"] != MATERIAL_DESCRIPTOR_BIND_PC:
+        raise RuntimeError(f"selected writer is not material-descriptor bind 0x{MATERIAL_DESCRIPTOR_BIND_PC:08x}")
+    return {
+        "address": f"0x{record['r1']:08x}",
+        "words": {offset: f"0x{record[field]:08x}" for offset, field in MATERIAL_DESCRIPTOR_WORDS.items()},
+    }
+
+
 def snapshot_owner_state(writer: dict[str, int]) -> dict[str, Any]:
     required = {
         "r0",
@@ -420,6 +444,7 @@ def capture_live(
         watch_command_records: list[str] = []
         copy_watch_records: list[str] = []
         config_builder_input: dict[str, Any] | None = None
+        material_descriptor: dict[str, Any] | None = None
         state_watch_records: list[str] = []
         if watch_address is not None:
             try:
@@ -456,6 +481,19 @@ def capture_live(
                 config_builder_input = distinct_config_store_inputs[0]
         if state_watch_address is not None:
             state_watch_records = parse_memlog(memlog_path, state_watch_address)
+            descriptor_inputs = [
+                snapshot_material_descriptor(memlog_fields(record))
+                for record in state_watch_records
+                if memlog_fields(record).get("pc") == MATERIAL_DESCRIPTOR_BIND_PC
+            ]
+            distinct_descriptors: list[dict[str, Any]] = []
+            for descriptor in descriptor_inputs:
+                if descriptor not in distinct_descriptors:
+                    distinct_descriptors.append(descriptor)
+            if len(distinct_descriptors) > 1:
+                raise RuntimeError("state watch produced multiple material descriptors")
+            if distinct_descriptors:
+                material_descriptor = distinct_descriptors[0]
         persist_selected_memlog(
             selected_memlog_path,
             writer_records,
@@ -497,6 +535,7 @@ def capture_live(
             "watch_command_records": watch_command_records,
             "copy_source_match_count": len(copy_watch_records) if watch_address is not None else None,
             "config_builder_input": config_builder_input,
+            "material_descriptor": material_descriptor,
             "state_watch_address": f"0x{state_watch_address:08x}" if state_watch_address is not None else None,
             "state_watch_write_count": len(state_watch_records) if state_watch_address is not None else None,
             "state_watch_records": state_watch_records,
