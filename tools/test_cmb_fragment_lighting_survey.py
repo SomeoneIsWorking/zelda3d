@@ -18,6 +18,9 @@ def _cmb_material(enabled: bool = True) -> tuple[bytearray, int]:
     material = 0x4C
     data[material] = int(enabled)
     data[material + 0xA0 : material + 0xB4] = bytes(range(1, 21))
+    for index, value in enumerate((0x62C884C0, 0, 0x62B0, 0x62C0, 0, 0x62A0FF01, 0x3F800000)):
+        start = material + 0xCC + 0x10 + index * 4
+        data[start : start + 4] = value.to_bytes(4, "little")
     return data, material
 
 
@@ -52,6 +55,10 @@ class FragmentLightingSurveyTests(unittest.TestCase):
         self.assertEqual(records[0].diffuse, (9, 10, 11, 12))
         self.assertEqual(records[0].specular0, (13, 14, 15, 16))
         self.assertEqual(records[0].specular1, (17, 18, 19, 20))
+        self.assertEqual(
+            records[0].descriptor_words,
+            (0x62C884C0, 0, 0x62B0, 0x62C0, 0, 0x62A0FF01, 0x3F800000),
+        )
         self.assertEqual(records[0].primary_uses, 1)
 
     def test_ignores_fragment_source_in_unused_replace_slots(self) -> None:

@@ -4,8 +4,10 @@
 The CMB material byte at +0 enables the PICA fragment-lighting setup recovered as
 OoT3D ``FUN_003fa5d0``.  That function consumes the five RGBA8 material colors at
 +0xA0..+0xB3.  TEV stages observe its two outputs through FRAGMENT_PRIMARY and
-FRAGMENT_SECONDARY.  This tool joins those independently-authored facts for every
-CMB in the user ROM; it never starts the oracle.
+FRAGMENT_SECONDARY. The material's nested PICA descriptor at +0xCC is also
+reported, so a differing real descriptor can be selected before running a new
+oracle counterfactual. This tool joins those independently-authored facts for
+every CMB in the user ROM; it never starts the oracle.
 """
 
 from __future__ import annotations
@@ -33,6 +35,7 @@ class MaterialLighting:
     diffuse: tuple[int, int, int, int]
     specular0: tuple[int, int, int, int]
     specular1: tuple[int, int, int, int]
+    descriptor_words: tuple[int, int, int, int, int, int, int]
     primary_uses: int
     secondary_uses: int
     chain: str
@@ -84,6 +87,7 @@ def scan_materials(label: str, data: bytes) -> list[MaterialLighting]:
                 diffuse=_rgba(data, offset + 0xA8),
                 specular0=_rgba(data, offset + 0xAC),
                 specular1=_rgba(data, offset + 0xB0),
+                descriptor_words=tuple(_u32(data, offset + 0xCC + field) for field in range(0x10, 0x2C, 4)),
                 primary_uses=primary_uses,
                 secondary_uses=secondary_uses,
                 chain=" | ".join(stage.sig() for stage in stages),
@@ -143,7 +147,8 @@ def main(arguments: list[str] | None = None) -> int:
                 f"frag_primary={record.primary_uses} frag_secondary={record.secondary_uses} "
                 f"emission={_format_rgba(record.emission)} ambient={_format_rgba(record.ambient)} "
                 f"diffuse={_format_rgba(record.diffuse)} spec0={_format_rgba(record.specular0)} "
-                f"spec1={_format_rgba(record.specular1)} chain={record.chain}"
+                f"spec1={_format_rgba(record.specular1)} "
+                f"descriptor={','.join(f'{word:08x}' for word in record.descriptor_words)} chain={record.chain}"
             )
 
     chain_histogram = Counter(record.chain for record in enabled)
