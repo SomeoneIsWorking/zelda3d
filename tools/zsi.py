@@ -28,12 +28,29 @@ Locating the room CMB
   This is robust and not a hardcoded offset (gerudoway happens to put it at 96).
 """
 from __future__ import annotations
+
 import struct
+from dataclasses import dataclass
 
 ZSI_MAGIC_OOT = b"ZSI\x01"
 ZSI_MAGIC_MM = b"ZSI\x09"
 CMD_END = 0x14
 CMD_MESH = 0x0A
+CMD_ACTOR_LIST = 0x01
+
+
+@dataclass(frozen=True)
+class Actor:
+    """One 16-byte room actor record, decoded from the ZSI's little-endian table."""
+
+    actor_id: int
+    x: int
+    y: int
+    z: int
+    rot_x: int
+    rot_y: int
+    rot_z: int
+    params: int
 
 
 class Zsi:
@@ -46,6 +63,7 @@ class Zsi:
         self.has_mesh = False
         self.cmb_off = -1
         self.cmb_size = 0
+        self.actors: list[Actor] = []
         self._parse()
 
     def _parse(self):
@@ -63,6 +81,8 @@ class Zsi:
             self.commands.append((ctype, count, cmd2))
             if ctype == CMD_MESH:
                 self.has_mesh = True
+            elif ctype == CMD_ACTOR_LIST:
+                self._parse_actor_list(count, cmd2)
             off += 8
             if ctype == CMD_END:
                 break
@@ -77,6 +97,19 @@ class Zsi:
                 self.error = "unexpected: >1 embedded CMB"
         self.ok = True
 
+    def _parse_actor_list(self, count: int, offset: int) -> None:
+        """Decode the documented direct-offset actor table, refusing truncated data."""
+        stride = 16
+        end = offset + count * stride
+        if end > len(self.data):
+            self.error = (
+                f"actor list at 0x{offset:x} with {count} entries exceeds file size"
+            )
+            return
+        for index in range(count):
+            fields = struct.unpack_from("<8h", self.data, offset + index * stride)
+            self.actors.append(Actor(*fields))
+
     def has_geometry(self) -> bool:
         """True for a room file with a renderable embedded CMB."""
         return self.has_mesh and self.cmb_off >= 0 and self.cmb_size > 0
@@ -88,10 +121,11 @@ class Zsi:
 
 
 if __name__ == "__main__":
-    import os, sys
+    import os
+    import sys
     sys.path.insert(0, os.path.dirname(__file__))
-    from ctr_romfs import CtrRom
     import cmb as cmbmod
+    from ctr_romfs import CtrRom
 
     rom = CtrRom(os.environ["ZELDA3D_OOT3D_ROM"])
     path = sys.argv[1] if len(sys.argv) > 1 else "/scene/gerudoway_0_info.zsi"
