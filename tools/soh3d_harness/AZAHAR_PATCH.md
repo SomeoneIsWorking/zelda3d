@@ -921,3 +921,15 @@ back through the production `MemorySystem::WriteBlock` path. It is a reversible 
 the `MB` logger, not a renderer or game-state override. The command refuses an unmapped range and emits
 its exact VA and byte count; the submitter probe captures this self-test only after preserving the
 unmodified production log, so its proof cannot be mistaken for a command-list producer.
+
+# Azahar Patch 17 (2026-08-31, synchronous CMB descriptor snapshot)
+
+`src/core/memory.cpp` now appends seven `r1+offset` words to each selected memory-write record. At
+the recovered binder store `PC=0x004c6374` in `FUN_004c6364`, `r1` is the live nested CMB material
+descriptor. The offsets `+0x10..+0x28` cover every field this binder reads. The observer is bounded
+by the existing exact state-address watch and does not alter emulation or render output.
+
+`pica_command_writer_oracle_probe.py` decodes those words only for that exact PC, requires every
+field, and rejects multiple distinct descriptors. Its state-watch trace version is 2, so this single
+new observation has a distinct cache key while all prior provenance and render observations remain
+cache hits. `AZAHAR_RENDER_CONTRACT` remains unchanged because this is capture-only instrumentation.

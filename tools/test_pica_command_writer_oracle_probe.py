@@ -15,8 +15,10 @@ from pica_command_writer_oracle_probe import (
     parse_memlog,
     parse_range,
     persist_selected_memlog,
+    probe_args,
     selected_writer_record,
     snapshot_config_builder_input,
+    snapshot_material_descriptor,
     snapshot_owner_state,
 )
 
@@ -138,6 +140,23 @@ class CommandWriterTests(unittest.TestCase):
                 }
             )
 
+    def test_snapshots_material_descriptor_at_exact_bind(self) -> None:
+        descriptor = snapshot_material_descriptor(
+            {
+                "pc": 0x004C6374,
+                "r1": 0x08EEC8D8,
+                "r1p10": 0x62C984C1,
+                "r1p14": 0x00000001,
+                "r1p18": 0x62B20000,
+                "r1p1c": 0x62C10000,
+                "r1p20": 0x00010001,
+                "r1p24": 0x62A10001,
+                "r1p28": 0x40000000,
+            }
+        )
+        self.assertEqual(descriptor["address"], "0x08eec8d8")
+        self.assertEqual(descriptor["words"]["0x24"], "0x62a10001")
+
     def test_snapshots_exact_store_dispatcher_fields(self) -> None:
         state = snapshot_owner_state(
             {
@@ -192,6 +211,22 @@ class CommandWriterTests(unittest.TestCase):
             environment["SOH3D_MEMLOG_RANGES"],
             "0x14480000:0x145a0000,0x005b31bc:0x005b31c0,0x081d1538:0x081d153c",
         )
+
+    def test_state_watch_schema_is_part_of_the_cache_key(self) -> None:
+        args = probe_args(
+            draw=4,
+            register=0x1C3,
+            label="fixture",
+            entrance=0x30D,
+            daytime=0x6000,
+            settle_frames=180,
+            linear_range=(0x14480000, 0x145A0000),
+            cpu_mode="interpreter",
+            source_range=None,
+            watch_address=0x005B31B4,
+            state_watch_address=0x081D1538,
+        )
+        self.assertEqual(args["state_watch_trace_version"], 2)
 
     def test_trace_environment_can_target_one_command_word(self) -> None:
         environment = harness_environment("interpreter", (0x144B0CB8, 0x144B0CBC), Path("memory.log"))
