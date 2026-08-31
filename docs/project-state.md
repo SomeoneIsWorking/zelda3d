@@ -1,5 +1,12 @@
 # Project state
 
+## Comparison baseline
+
+The baseline is the unmodified Nintendo 3DS releases of *Ocarina of Time 3D* and *Majora's Mask 3D*
+running on original hardware or through Azahar. Zelda3D's intended difference is one lawful native-PC
+experience that consumes the player's own remake assets while reproducing each remake's presentation
+and game-specific behavior outside a 3DS emulator.
+
 ## Current focus
 
 S003 is the current focus.
