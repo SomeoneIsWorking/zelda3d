@@ -459,3 +459,27 @@ TEST(CmbCombinerParse, BossFd2PicaSourceWordsKeepAlphaGap) {
         EXPECT_EQ(glGroup.tevStagePack[stage][0], expectedSources[stage]) << "stage " << stage;
     }
 }
+
+// Morpha material 0 is the strongest currently catalogued counterfactual for the PICA
+// fixed-function fragment-light descriptor: it enables both fragment outputs and differs from
+// the Hut default at enum_10, flag_14, and enum_26.
+TEST(CmbCombinerParse, MorphaPreservesFragmentLightingDescriptor) {
+    if (OoT3dRomPath().empty()) {
+        GTEST_SKIP() << "ZELDA3D_OOT3D_ROM not set — cannot exercise real-asset close-test";
+    }
+    Cmb cmb(LoadCmbFromZar("/actor/zelda_mo.zar", "morpha.cmb"));
+    ASSERT_TRUE(cmb.ok()) << cmb.error();
+    ASSERT_FALSE(cmb.materials().empty());
+
+    const CmbMaterial& material = cmb.materials()[0];
+    const auto& descriptor = material.fragment_lighting_descriptor;
+    EXPECT_TRUE(material.fragment_lighting);
+    EXPECT_EQ(descriptor.enum_10, 0x84C2);
+    EXPECT_EQ(descriptor.enum_12, 0x62C9);
+    EXPECT_TRUE(descriptor.flag_14);
+    EXPECT_EQ(descriptor.enum_18, 0x62B0);
+    EXPECT_EQ(descriptor.enum_1c, 0x62C0);
+    EXPECT_TRUE(descriptor.enabled);
+    EXPECT_EQ(descriptor.enum_26, 0x62A2);
+    EXPECT_FLOAT_EQ(descriptor.scale, 1.0f);
+}

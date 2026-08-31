@@ -98,6 +98,23 @@ struct CmbMaterial {
     // texture*a_Color*uTint, dropping both the lighting and the combiner scale below.
     bool vertex_lighting = false;
     bool fragment_lighting = false;
+    // Nested PICA fixed-function fragment-light descriptor at material +0xCC. The CMB runtime
+    // binds this record through OoT3D FUN_004c6364; retain its serialized domains until the host
+    // ports the corresponding light/LUT calculation (oot3d-decomp/docs/fragment_lighting.md).
+    struct FragmentLightingDescriptor {
+        uint16_t enum_10 = 0;
+        uint16_t enum_12 = 0;
+        bool flag_14 = false;
+        uint16_t enum_18 = 0;
+        uint16_t enum_1c = 0;
+        bool flag_1e = false;
+        bool flag_1f = false;
+        bool flag_20 = false;
+        bool flag_23 = false;
+        bool enabled = false;
+        uint16_t enum_26 = 0;
+        float scale = 1.0f;
+    } fragment_lighting_descriptor;
     // isFogEnabled (material +0x02): the PICA distance-fog stage applies to this material's
     // draws (fog_mode=5 with the palette-blended fog color/LUT). See cmb.cpp parse comment.
     bool is_fog = false;
