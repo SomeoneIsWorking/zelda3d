@@ -38,6 +38,23 @@ class CmbMaterialStateOracleProbeTests(unittest.TestCase):
         with self.assertRaisesRegex(RuntimeError, "was not reached"):
             probe.parse_pc_hits(["ok pchits 0", "ok end"])
 
+    def test_labels_empty_indirect_dispatch_trace(self) -> None:
+        with self.assertRaisesRegex(RuntimeError, "indirect CMB material dispatch"):
+            probe.parse_pc_hits(["ok pchits 0", "ok end"], "indirect CMB material dispatch")
+
+    def test_extracts_virtual_dispatch_context_register(self) -> None:
+        record = (
+            "pc=0x003fcc70 lr=0x00123456 ticks=3 r0=0x08001234 r1=0x2 "
+            "r2=0x3 r3=0x4 sp=0x5"
+        )
+        self.assertEqual(probe.register_value(record, 0), 0x08001234)
+
+    def test_cache_identity_includes_selected_dispatch_target(self) -> None:
+        direct = probe.probe_args(0xEE, 0x6000, 180, "material-state")
+        virtual = probe.probe_args(0xEE, 0x6000, 180, "virtual-dispatch")
+        self.assertNotEqual(direct, virtual)
+        self.assertEqual(virtual["target_function"], probe.VIRTUAL_DISPATCH_FUNCTION)
+
     def test_cache_hit_never_launches_oracle(self) -> None:
         cached = {"pc_records": ["cached"]}
         with mock.patch.object(probe, "capture_live", side_effect=AssertionError):
