@@ -25,6 +25,9 @@ from pica_command_provenance_oracle_probe import (
     TIME_SETTLE_FRAMES,
     parse_provenance,
 )
+from pica_command_provenance_oracle_probe import (
+    capture_probe as capture_provenance_probe,
+)
 from repo_environment import apply_repo_environment
 
 CAPTURE_VERSION = 11
@@ -37,6 +40,7 @@ OUTDIR = REPO / "scratch" / "pica_command_writer"
 DEFAULT_LINEAR_RANGE = (0x14480000, 0x145A0000)
 CPU_MODES = ("dynarmic", "interpreter")
 SOURCE_TRACE_VERSION = 2
+WATCH_TRACE_VERSION = 1
 MEMLOG_RE = re.compile(
     r"^MW pc=0x[0-9a-fA-F]{8} lr=0x[0-9a-fA-F]{8} "
     r"va=0x(?P<address>[0-9a-fA-F]{8}) sz=(?P<size>\d+) "
@@ -78,6 +82,7 @@ def probe_args(
     linear_range: tuple[int, int],
     cpu_mode: str,
     source_range: tuple[int, int] | None,
+    watch_address: int | None,
 ) -> dict[str, Any]:
     args = {
         "capture_version": CAPTURE_VERSION,
@@ -96,6 +101,9 @@ def probe_args(
     if source_range is not None:
         args["source_range"] = [f"0x{source_range[0]:08x}", f"0x{source_range[1]:08x}"]
         args["source_trace_version"] = SOURCE_TRACE_VERSION
+    if watch_address is not None:
+        args["watch_address"] = f"0x{watch_address:08x}"
+        args["watch_trace_version"] = WATCH_TRACE_VERSION
     return args
 
 
@@ -119,12 +127,15 @@ def harness_environment(
     linear_range: tuple[int, int],
     memory_log_path: Path,
     source_range: tuple[int, int] | None = None,
+    watch_address: int | None = None,
 ) -> dict[str, str]:
     if cpu_mode not in CPU_MODES:
         raise ValueError(f"unsupported CPU mode: {cpu_mode}")
     ranges = [linear_range]
     if source_range is not None:
         ranges.append(source_range)
+    if watch_address is not None:
+        ranges.append((watch_address, watch_address + 4))
     environment = {
         **os.environ,
         "SOH3D_HARNESS_DISABLE_FASTMEM": "1",
@@ -193,13 +204,19 @@ def parse_memlog(path: Path, target_address: int) -> list[str]:
     return records
 
 
-def persist_selected_memlog(path: Path, *record_groups: list[str]) -> None:
+def persist_selected_memlog(
+    path: Path, *record_groups: list[str], watch_address: int | None = None, watch_count: int | None = None
+) -> None:
     records: list[str] = []
     for group in record_groups:
         records.extend(record for record in group if record not in records)
     if not records:
         raise RuntimeError("no memory-log records selected for cache")
-    path.write_text("# Exact writer records selected from the oracle memory log.\n" + "\n".join(records) + "\n")
+    lines = ["# Exact writer records selected from the oracle memory log."]
+    if watch_address is not None and watch_count is not None:
+        lines.append(f"# Watch 0x{watch_address:08x}: {watch_count} matching record(s).")
+    lines.extend(records)
+    path.write_text("\n".join(lines) + "\n")
 
 
 def memlog_fields(record: str) -> dict[str, int]:
@@ -257,13 +274,26 @@ def capture_live(
     linear_range: tuple[int, int],
     cpu_mode: str,
     source_range: tuple[int, int] | None,
+    watch_address: int | None,
 ) -> dict[str, Any]:
     OUTDIR.mkdir(parents=True, exist_ok=True)
-    discovery_path = OUTDIR / "discovery.log"
-    command_list_path = OUTDIR / "command-list.bin"
+    discovery, _ = capture_provenance_probe(cache, draw, str(args["label"]), entrance, daytime, settle_frames)
+    command_list_artifact = Path(discovery["command_list_artifact"])
+    payload = command_list_artifact.read_bytes()
+    word_index, command_value = last_register_write(payload, discovery["command_list_word_index"], register)
+    writer_address = linear_virtual_address(discovery["command_list_address"], word_index)
+    if not linear_range[0] <= writer_address < linear_range[1]:
+        raise RuntimeError(
+            f"command-list writer 0x{writer_address:08x} is outside the permitted memory-log range"
+        )
+    trace_range = (writer_address, writer_address + 4)
+    discovery_path = OUTDIR / "trace-discovery.log"
+    command_list_path = OUTDIR / "trace-command-list.bin"
     memlog_path = OUTDIR / "memory-writes.log"
     selected_memlog_path = OUTDIR / "selected-memory-writes.log"
-    harness = spawn(environment=harness_environment(cpu_mode, linear_range, memlog_path, source_range))
+    harness = spawn(
+        environment=harness_environment(cpu_mode, trace_range, memlog_path, source_range, watch_address)
+    )
     try:
         if not boot_to_gameplay(harness, entrance, settle_frames):
             raise RuntimeError("oracle failed to reach deterministic gameplay state")
@@ -275,37 +305,49 @@ def capture_live(
         harness.send("vsuni_log off")
         if not discovery_path.is_file():
             raise RuntimeError("oracle PICA logger produced no discovery log")
-        provenance = parse_provenance(discovery_path.read_text().splitlines(), draw)
-        list_bytes = provenance["command_list_word_count"] * 4
+        trace_provenance = parse_provenance(discovery_path.read_text().splitlines(), draw)
+        if trace_provenance != {
+            key: discovery[key]
+            for key in ("draw", "command_list_address", "command_list_word_index", "command_list_word_count")
+        }:
+            raise RuntimeError(
+                "traced oracle frame does not reproduce the cached command-list provenance; refusing writer trace"
+            )
+        list_bytes = trace_provenance["command_list_word_count"] * 4
         dump_response = harness.send_multiline(
-            f"dumpphys 0x{provenance['command_list_address']:08x} {list_bytes} {command_list_path}"
+            f"dumpphys 0x{trace_provenance['command_list_address']:08x} {list_bytes} {command_list_path}"
         )
         if len(dump_response) != 1 or not dump_response[0].startswith("ok dumpphys "):
             raise RuntimeError(f"oracle command-list dump failed: {dump_response}")
-        payload = command_list_path.read_bytes()
-        if len(payload) != list_bytes:
-            raise RuntimeError(f"oracle command-list dump has {len(payload)} bytes, expected {list_bytes}")
-        word_index, command_value = last_register_write(
-            payload, provenance["command_list_word_index"], register
+        trace_payload = command_list_path.read_bytes()
+        if len(trace_payload) != list_bytes:
+            raise RuntimeError(f"oracle command-list dump has {len(trace_payload)} bytes, expected {list_bytes}")
+        trace_word_index, trace_command_value = last_register_write(
+            trace_payload, trace_provenance["command_list_word_index"], register
         )
-        discovery_artifact = cache.put_artifact(
-            "pica-command-writer-discovery", args, discovery_path, suffix=".log"
-        )
-        command_list_artifact = cache.put_artifact(
-            "pica-command-writer-list", args, command_list_path, suffix=".bin"
-        )
-        writer_address = linear_virtual_address(provenance["command_list_address"], word_index)
-        if not linear_range[0] <= writer_address < linear_range[1]:
-            raise RuntimeError(
-                f"command-list writer 0x{writer_address:08x} is outside the armed memory-log range"
-            )
+        if (trace_word_index, trace_command_value) != (word_index, command_value):
+            raise RuntimeError("traced oracle frame changed the selected PICA register packet; refusing writer trace")
         writer_records = parse_memlog(memlog_path, writer_address)
         owner_state = snapshot_owner_state(selected_writer_record(writer_records, command_value))
         source_records: list[str] = []
         if source_range is not None:
             source_value_address = int(owner_state["source_value_address"], 16)
             source_records = parse_memlog(memlog_path, source_value_address)
-        persist_selected_memlog(selected_memlog_path, writer_records, source_records)
+        watch_records: list[str] = []
+        if watch_address is not None:
+            try:
+                watch_records = parse_memlog(memlog_path, watch_address)
+            except RuntimeError as error:
+                if str(error) != f"memory log has no exact writer for 0x{watch_address:08x}":
+                    raise
+        persist_selected_memlog(
+            selected_memlog_path,
+            writer_records,
+            source_records,
+            watch_records,
+            watch_address=watch_address,
+            watch_count=len(watch_records) if watch_address is not None else None,
+        )
         memory_log_artifact = cache.put_artifact(
             "pica-command-writer-memory", args, selected_memlog_path, suffix=".log"
         )
@@ -321,13 +363,15 @@ def capture_live(
             "draw": draw,
             "register": f"0x{register:03x}",
             "command_value": f"0x{command_value:08x}",
-            "command_list_address": f"0x{provenance['command_list_address']:08x}",
+            "command_list_address": f"0x{discovery['command_list_address']:08x}",
             "command_list_word_index": word_index,
             "writer_address": f"0x{writer_address:08x}",
             "writer_records": writer_records,
             "writer_owner": owner_state,
             "source_writer_records": source_records,
-            "discovery_artifact": str(discovery_artifact),
+            "watch_address": f"0x{watch_address:08x}" if watch_address is not None else None,
+            "watch_writer_records": watch_records,
+            "discovery_artifact": str(discovery["artifact"]),
             "command_list_artifact": str(command_list_artifact),
             "memory_log_artifact": str(memory_log_artifact),
         }
@@ -350,8 +394,11 @@ def capture_probe(
     linear_range: tuple[int, int] = DEFAULT_LINEAR_RANGE,
     cpu_mode: str = "dynarmic",
     source_range: tuple[int, int] | None = None,
+    watch_address: int | None = None,
 ) -> tuple[dict[str, Any], bool]:
-    args = probe_args(draw, register, label, entrance, daytime, settle_frames, linear_range, cpu_mode, source_range)
+    args = probe_args(
+        draw, register, label, entrance, daytime, settle_frames, linear_range, cpu_mode, source_range, watch_address
+    )
     frame = capture_frame(settle_frames)
     cached = cache.get_probe("pica-command-writer", frame, args)
     if cached is not None:
@@ -361,7 +408,17 @@ def capture_probe(
         raise RuntimeError(f"cached oracle failure: {failed['error']}")
     try:
         result = capture_live(
-            cache, args, draw, register, entrance, daytime, settle_frames, linear_range, cpu_mode, source_range
+            cache,
+            args,
+            draw,
+            register,
+            entrance,
+            daytime,
+            settle_frames,
+            linear_range,
+            cpu_mode,
+            source_range,
+            watch_address,
         )
     except (OSError, RuntimeError, ValueError) as error:
         cache.put_probe(
@@ -391,6 +448,7 @@ def main(arguments: list[str] | None = None) -> int:
     parser.add_argument("--settle-frames", type=int, default=DEFAULT_SETTLE_FRAMES)
     parser.add_argument("--linear-range", default="0x14480000:0x145a0000")
     parser.add_argument("--source-range", help="optional packet-source VA range to trace")
+    parser.add_argument("--watch-address", type=lambda value: int(value, 0), help="optional exact VA write watch")
     parser.add_argument("--cpu-mode", choices=CPU_MODES, default="dynarmic")
     args = parser.parse_args(arguments)
     if args.draw < 0:
@@ -417,6 +475,7 @@ def main(arguments: list[str] | None = None) -> int:
             linear_range,
             args.cpu_mode,
             source_range,
+            args.watch_address,
         )
         print(f"oracle: {'cache hit' if hit else 'captured and cached'} key={cache.key}")
         print(json.dumps(result, indent=2, sort_keys=True))
