@@ -27,7 +27,7 @@ from pica_command_provenance_oracle_probe import (
 )
 from repo_environment import apply_repo_environment
 
-CAPTURE_VERSION = 6
+CAPTURE_VERSION = 7
 DEFAULT_ENTRANCE = 0xEE
 DEFAULT_DAYTIME = 0x6000
 DEFAULT_SETTLE_FRAMES = 180
@@ -152,7 +152,7 @@ def capture_live(
     discovery_path = OUTDIR / "discovery.log"
     command_list_path = OUTDIR / "command-list.bin"
     memlog_path = OUTDIR / "memory-writes.log"
-    harness = spawn()
+    harness = spawn(environment={**os.environ, "SOH3D_HARNESS_DISABLE_FASTMEM": "1"})
     watch_armed = False
     try:
         if not boot_to_gameplay(harness, entrance, settle_frames):
