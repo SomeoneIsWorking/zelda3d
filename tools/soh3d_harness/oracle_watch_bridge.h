@@ -36,4 +36,10 @@ bool Soh3d_WatchGetLatestMatching(std::uint32_t rangeBase, std::uint64_t mask, s
                                   WatchRecord* out);
 bool Soh3d_WatchIsRegistered(std::uint32_t addr);
 
+extern std::uint32_t soh3d_pc_watch_target;
+void Soh3d_PcWatchSet(std::uint32_t addr);
+std::size_t Soh3d_PcWatchGetHits(WatchRecord* out, std::size_t maxOut);
+void Soh3d_PcWatchClear();
+void Soh3d_OnGuestPc();
+
 } // extern "C"

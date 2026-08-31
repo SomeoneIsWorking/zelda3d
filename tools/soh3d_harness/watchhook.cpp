@@ -40,6 +40,11 @@ static std::unordered_map<u32, std::vector<u32>> g_watched_pages_by_range;
 static std::unordered_map<u32, std::vector<WatchRecord>> g_hits; // key = watched range base
 static constexpr std::size_t kMaxHitsPerRange = 128;
 static std::vector<WatchRange> g_ranges;
+static std::vector<WatchRecord> g_pc_hits;
+
+extern "C" {
+u32 soh3d_pc_watch_target = 0;
+}
 
 // True when a write vaddr is inside any watched range.
 static bool InRange(u32 vaddr, u32 size) {
@@ -153,7 +158,68 @@ extern "C" bool Soh3d_WatchIsRegistered(u32 addr) {
     return false;
 }
 
+extern "C" void Soh3d_PcWatchSet(u32 addr) {
+    u32 previous = 0;
+    {
+        std::lock_guard lock(g_mtx);
+        previous = soh3d_pc_watch_target;
+        g_pc_hits.clear();
+        soh3d_pc_watch_target = addr;
+    }
+    auto& cpu = Core::System::GetInstance().GetRunningCore();
+    if (previous != 0)
+        cpu.InvalidateCacheRange(previous & ~1U, sizeof(u32));
+    if (addr != 0)
+        cpu.InvalidateCacheRange(addr & ~1U, sizeof(u32));
+}
+
+extern "C" std::size_t Soh3d_PcWatchGetHits(WatchRecord* out, std::size_t max_out) {
+    std::lock_guard lock(g_mtx);
+    const std::size_t count = std::min(max_out, g_pc_hits.size());
+    for (std::size_t index = 0; index < count; ++index)
+        out[index] = g_pc_hits[index];
+    return count;
+}
+
+extern "C" void Soh3d_PcWatchClear() {
+    u32 previous = 0;
+    {
+        std::lock_guard lock(g_mtx);
+        previous = soh3d_pc_watch_target;
+        g_pc_hits.clear();
+        soh3d_pc_watch_target = 0;
+    }
+    if (previous != 0)
+        Core::System::GetInstance().GetRunningCore().InvalidateCacheRange(previous & ~1U, sizeof(u32));
+}
+
 } // namespace Soh3d
+
+extern "C" void Soh3d_OnGuestPc() {
+    using namespace Soh3d;
+    std::lock_guard lock(g_mtx);
+    if (soh3d_pc_watch_target == 0 || g_pc_hits.size() >= kMaxHitsPerRange)
+        return;
+
+    auto& system = Core::System::GetInstance();
+    auto& cpu = system.GetRunningCore();
+    WatchRecord record{};
+    record.vaddr = cpu.GetPC();
+    record.arm_pc = record.vaddr;
+    record.arm_lr = cpu.GetReg(14);
+    record.arm_r0 = cpu.GetReg(0);
+    record.arm_r1 = cpu.GetReg(1);
+    record.arm_r2 = cpu.GetReg(2);
+    record.arm_r3 = cpu.GetReg(3);
+    record.arm_sp = cpu.GetReg(13);
+    record.cycles = static_cast<u64>(cpu.GetTimer().GetTicks());
+    if (auto process = system.Kernel().GetCurrentProcess()) {
+        for (std::size_t index = 0; index < std::size(record.stack_words); ++index)
+            record.stack_words[index] = system.Memory().Read32(record.arm_sp + static_cast<u32>(index * 4));
+    }
+    g_pc_hits.push_back(record);
+    soh3d_pc_watch_target = 0;
+}
 
 // Called from Azahar/src/core/memory.cpp (AZAHAR_PATCH.md, MemoryWatchpoint
 // case in Write<T>). Guest is mid-instruction here — reading GetPC() gives

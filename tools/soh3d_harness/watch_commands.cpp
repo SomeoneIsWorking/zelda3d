@@ -102,6 +102,42 @@ bool HandleCommand(const std::string& cmd, std::istringstream& toks) {
         }
         Soh3d_WatchClear(a);
         std::printf("ok hitclear 0x%08x\n", a);
+    } else if (cmd == "pcwatch") {
+        handled = true;
+        std::string addressText;
+        if (!(toks >> addressText)) {
+            PrintErr("pcwatch: usage: pcwatch <addr|off>");
+            return true;
+        }
+        if (addressText == "off") {
+            Soh3d_PcWatchClear();
+            std::printf("ok pcwatch off\n");
+            return true;
+        }
+        const auto address = ParseNum(addressText);
+        if (!address) {
+            PrintErr("pcwatch: bad addr");
+            return true;
+        }
+        Soh3d_PcWatchSet(static_cast<uint32_t>(*address));
+        std::printf("ok pcwatch 0x%08x\n", static_cast<unsigned>(*address));
+    } else if (cmd == "pchits") {
+        handled = true;
+        WatchRecord records[128];
+        const std::size_t count = Soh3d_PcWatchGetHits(records, std::size(records));
+        std::printf("ok pchits %zu\n", count);
+        for (std::size_t index = 0; index < count; ++index) {
+            const auto& record = records[index];
+            std::printf("  pc=0x%08x lr=0x%08x ticks=%lu "
+                        "r0=0x%08x r1=0x%08x r2=0x%08x r3=0x%08x sp=0x%08x\n",
+                        record.arm_pc, record.arm_lr, static_cast<unsigned long>(record.cycles), record.arm_r0,
+                        record.arm_r1, record.arm_r2, record.arm_r3, record.arm_sp);
+        }
+        std::printf("ok end\n");
+    } else if (cmd == "pcclear") {
+        handled = true;
+        Soh3d_PcWatchClear();
+        std::printf("ok pcclear\n");
     }
     return handled;
 }

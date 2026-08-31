@@ -26,9 +26,11 @@ class FakeHarness:
             for command, value in responses.items()
         }
         self.commands: list[str] = []
+        self.timeouts: list[tuple[str, float]] = []
 
-    def send(self, command: str) -> str:
+    def send(self, command: str, *, per_line_timeout: float = 60.0) -> str:
         self.commands.append(command)
+        self.timeouts.append((command, per_line_timeout))
         values = self.responses.get(command, ["ok"])
         if len(values) > 1:
             return values.pop(0)
@@ -75,6 +77,7 @@ class BootToGameplayTests(unittest.TestCase):
 
         self.assertTrue(result)
         self.assertIn("run 300", harness.commands)
+        self.assertIn(("run 300", 180.0), harness.timeouts)
         self.assertIn(f"savestate {state}", harness.commands)
 
     def test_failed_warp_is_reported_without_settling(self) -> None:
