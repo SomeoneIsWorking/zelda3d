@@ -2,11 +2,14 @@ from __future__ import annotations
 
 import struct
 import unittest
+from pathlib import Path
+from tempfile import TemporaryDirectory
 
 from pica_command_writer_oracle_probe import (
     last_register_write,
     linear_virtual_address,
     parse_command_writes,
+    parse_memlog,
 )
 
 
@@ -32,3 +35,9 @@ class CommandWriterTests(unittest.TestCase):
     def test_rejects_non_fcram_command_list(self) -> None:
         with self.assertRaisesRegex(ValueError, "outside FCRAM"):
             linear_virtual_address(0x18000000, 0)
+
+    def test_accepts_word_inside_multibyte_memory_write(self) -> None:
+        with TemporaryDirectory() as directory:
+            path = Path(directory) / "memory.log"
+            path.write_text("MW pc=0x00300000 lr=0x00000000 va=0x144b0cb4 sz=8 data=0x0\n")
+            self.assertEqual(len(parse_memlog(path, 0x144B0CB8)), 1)
