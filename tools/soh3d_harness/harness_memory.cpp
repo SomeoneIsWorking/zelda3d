@@ -1,6 +1,9 @@
 #include "harness_memory.h"
 
+#include <array>
+#include <cstdint>
 #include <cstdio>
+#include <limits>
 
 #include "core/core.h"
 #include "core/memory.h"
@@ -99,6 +102,32 @@ void HandleMem(std::istringstream& toks) {
     for (uint64_t i = 0; i < *n; ++i)
         std::printf("%02x", p[i]);
     std::printf("\n");
+}
+
+void HandleWriteBlockSelfTest(std::istringstream& toks) {
+    constexpr std::size_t kSelfTestBytes = 16;
+    std::string va_s;
+    if (!(toks >> va_s)) {
+        PrintErr("memlogselftest: usage: memlogselftest <va>");
+        return;
+    }
+    const auto va = ParseNum(va_s);
+    if (!va || *va > std::numeric_limits<uint32_t>::max() - (kSelfTestBytes - 1)) {
+        PrintErr("memlogselftest: bad va");
+        return;
+    }
+
+    const auto address = static_cast<uint32_t>(*va);
+    auto& memory = Core::System::GetInstance().Memory();
+    if (!memory.GetPointer(address) || !memory.GetPointer(address + kSelfTestBytes - 1)) {
+        PrintErr("memlogselftest: unmapped va");
+        return;
+    }
+
+    std::array<uint8_t, kSelfTestBytes> original{};
+    memory.ReadBlock(address, original.data(), original.size());
+    memory.WriteBlock(address, original.data(), original.size());
+    std::printf("ok memlogselftest va=0x%08x size=%zu\n", address, original.size());
 }
 
 } // namespace HarnessMemory

@@ -65,6 +65,8 @@ void Run() {
             HarnessMemory::HandleWrite(toks, 16);
         else if (cmd == "w32")
             HarnessMemory::HandleWrite(toks, 32);
+        else if (cmd == "memlogselftest")
+            HarnessMemory::HandleWriteBlockSelfTest(toks);
         else if (cmd == "mem")
             HarnessMemory::HandleMem(toks);
         else if (cmd == "memscan")

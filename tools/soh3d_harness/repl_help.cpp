@@ -9,6 +9,7 @@ void PrintHelp() {
                          "  run <N>              advance N frames\n"
                          "  r8|r16|r32 <va>      read u8/u16/u32 at VA (0x prefix ok)\n"
                          "  w8|w16|w32 <va> <v>  write u8/u16/u32 at VA\n"
+                         "  memlogselftest <va> write back 16 unchanged bytes through WriteBlock\n"
                          "  mem <va> <n>         hex-dump N bytes (N<=4096)\n"
                          "  dumpphys <pa> <n> <path>\n"
                          "                      dump an exact physical-memory range to a file\n"
