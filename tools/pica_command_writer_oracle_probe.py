@@ -27,7 +27,7 @@ from pica_command_provenance_oracle_probe import (
 )
 from repo_environment import apply_repo_environment
 
-CAPTURE_VERSION = 7
+CAPTURE_VERSION = 11
 DEFAULT_ENTRANCE = 0xEE
 DEFAULT_DAYTIME = 0x6000
 DEFAULT_SETTLE_FRAMES = 180
@@ -35,10 +35,24 @@ FCRAM_PHYSICAL_BASE = 0x20000000
 LINEAR_HEAP_VIRTUAL_BASE = 0x14000000
 OUTDIR = REPO / "scratch" / "pica_command_writer"
 DEFAULT_LINEAR_RANGE = (0x14480000, 0x145A0000)
+CPU_MODES = ("dynarmic", "interpreter")
 MEMLOG_RE = re.compile(
     r"^MW pc=0x[0-9a-fA-F]{8} lr=0x[0-9a-fA-F]{8} "
     r"va=0x(?P<address>[0-9a-fA-F]{8}) sz=(?P<size>\d+) "
 )
+MEMLOG_FIELD_RE = re.compile(r"(?:^|\s)(?P<name>[a-z0-9]+)=0x(?P<value>[0-9a-fA-F]+)")
+OWNER_FIELD_OFFSETS = {
+    "dispatch_table": "sr4p0",
+    "renderer_context": "sr4p4",
+    "packet_descriptors": "sr4p5c",
+    "visibility_table": "sr4p6c",
+}
+VIRTUAL_SLOT_FIELDS = {"setup_a": "sr4t14", "setup_b": "sr4t20", "setup_c": "sr4t24"}
+PACKET_DESCRIPTOR_FIELDS = {
+    "source_pointer": "r4p8",
+    "byte_count": "r4p10",
+    "block_index": "r4p14",
+}
 
 
 class CacheLike(Protocol):
@@ -61,6 +75,7 @@ def probe_args(
     daytime: int,
     settle_frames: int,
     linear_range: tuple[int, int],
+    cpu_mode: str,
 ) -> dict[str, Any]:
     return {
         "capture_version": CAPTURE_VERSION,
@@ -73,12 +88,29 @@ def probe_args(
         "time_settle_frames": TIME_SETTLE_FRAMES,
         "discovery_run_frames": DISCOVERY_RUN_FRAMES,
         "linear_range": [f"0x{linear_range[0]:08x}", f"0x{linear_range[1]:08x}"],
+        "cpu_mode": cpu_mode,
         "texture_pack": 0,
     }
 
 
 def capture_frame(settle_frames: int) -> int:
     return settle_frames + TIME_SETTLE_FRAMES + DISCOVERY_RUN_FRAMES
+
+
+def harness_environment(
+    cpu_mode: str, linear_range: tuple[int, int], memory_log_path: Path
+) -> dict[str, str]:
+    if cpu_mode not in CPU_MODES:
+        raise ValueError(f"unsupported CPU mode: {cpu_mode}")
+    environment = {
+        **os.environ,
+        "SOH3D_HARNESS_DISABLE_FASTMEM": "1",
+        "SOH3D_MEMLOG_RANGES": f"0x{linear_range[0]:08x}:0x{linear_range[1]:08x}",
+        "SOH3D_MEMLOG_PATH": str(memory_log_path),
+    }
+    if cpu_mode == "interpreter":
+        environment["SOH3D_CPU_INTERPRETER"] = "1"
+    return environment
 
 
 def parse_command_writes(payload: bytes, end_word: int) -> list[tuple[int, int, int]]:
@@ -138,6 +170,47 @@ def parse_memlog(path: Path, target_address: int) -> list[str]:
     return records
 
 
+def memlog_fields(record: str) -> dict[str, int]:
+    return {match.group("name"): int(match.group("value"), 16) for match in MEMLOG_FIELD_RE.finditer(record)}
+
+
+def selected_writer_record(records: list[str], command_value: int) -> dict[str, int]:
+    matching = [fields for record in records if (fields := memlog_fields(record)).get("data") == command_value]
+    if not matching:
+        raise RuntimeError(f"memory log has no writer record for command value 0x{command_value:08x}")
+    descriptors = {fields.get("r4") for fields in matching}
+    if None in descriptors:
+        raise RuntimeError("memory log does not include the packet descriptor register")
+    if len(descriptors) != 1:
+        raise RuntimeError(f"command value 0x{command_value:08x} has multiple packet descriptors: {descriptors}")
+    return matching[0]
+
+
+def snapshot_owner_state(writer: dict[str, int]) -> dict[str, Any]:
+    required = {
+        "r0",
+        "r4",
+        "sr4",
+        *OWNER_FIELD_OFFSETS.values(),
+        *VIRTUAL_SLOT_FIELDS.values(),
+        *PACKET_DESCRIPTOR_FIELDS.values(),
+    }
+    missing = sorted(required - writer.keys())
+    if missing:
+        raise RuntimeError(f"memory log lacks exact-store dispatcher fields: {', '.join(missing)}")
+    owner = writer["sr4"]
+    source_word = writer["r0"]
+    return {
+        "object_address": f"0x{owner:08x}",
+        "packet_descriptor_address": f"0x{writer['r4']:08x}",
+        "source_packet_word": f"0x{source_word:08x}",
+        "source_packet_base": f"0x{source_word - 8:08x}",
+        "fields": {name: f"0x{writer[field]:08x}" for name, field in OWNER_FIELD_OFFSETS.items()},
+        "packet_descriptor": {name: f"0x{writer[field]:08x}" for name, field in PACKET_DESCRIPTOR_FIELDS.items()},
+        "virtual_slots": {name: f"0x{writer[field]:08x}" for name, field in VIRTUAL_SLOT_FIELDS.items()},
+    }
+
+
 def capture_live(
     cache: CacheLike,
     args: dict[str, Any],
@@ -147,21 +220,16 @@ def capture_live(
     daytime: int,
     settle_frames: int,
     linear_range: tuple[int, int],
+    cpu_mode: str,
 ) -> dict[str, Any]:
     OUTDIR.mkdir(parents=True, exist_ok=True)
     discovery_path = OUTDIR / "discovery.log"
     command_list_path = OUTDIR / "command-list.bin"
     memlog_path = OUTDIR / "memory-writes.log"
-    harness = spawn(environment={**os.environ, "SOH3D_HARNESS_DISABLE_FASTMEM": "1"})
-    watch_armed = False
+    harness = spawn(environment=harness_environment(cpu_mode, linear_range, memlog_path))
     try:
         if not boot_to_gameplay(harness, entrance, settle_frames):
             raise RuntimeError("oracle failed to reach deterministic gameplay state")
-        watch_size = linear_range[1] - linear_range[0]
-        response = harness.send(f"watch 0x{linear_range[0]:08x} {watch_size}")
-        if response != f"ok watch 0x{linear_range[0]:08x} {watch_size}":
-            raise RuntimeError(f"oracle command-arena watch failed: {response}")
-        watch_armed = True
         set_time_of_day(harness, daytime, settle=TIME_SETTLE_FRAMES)
         response = harness.send(f"vsuni_log {discovery_path}")
         if response != f"ok vsuni_log {discovery_path}":
@@ -194,16 +262,11 @@ def capture_live(
             raise RuntimeError(
                 f"command-list writer 0x{writer_address:08x} is outside the armed memory-log range"
             )
-        response = harness.send(f"hitaddr 0x{linear_range[0]:08x} 0x{writer_address:08x}")
-        if response == "ok hitaddr none":
-            raise RuntimeError(f"page watch has no writer for 0x{writer_address:08x}")
-        if not response.startswith("ok hitaddr vaddr="):
-            raise RuntimeError(f"oracle command-arena hit query failed: {response}")
-        writer_records = [response]
-        response = harness.send(f"unwatch 0x{linear_range[0]:08x} {watch_size}")
-        if response != f"ok unwatch 0x{linear_range[0]:08x} {watch_size}":
-            raise RuntimeError(f"oracle command-arena unwatch failed: {response}")
-        watch_armed = False
+        writer_records = parse_memlog(memlog_path, writer_address)
+        owner_state = snapshot_owner_state(selected_writer_record(writer_records, command_value))
+        memory_log_artifact = cache.put_artifact(
+            "pica-command-writer-memory", args, memlog_path, suffix=".log"
+        )
         return {
             "capture_version": CAPTURE_VERSION,
             "draw": draw,
@@ -213,12 +276,12 @@ def capture_live(
             "command_list_word_index": word_index,
             "writer_address": f"0x{writer_address:08x}",
             "writer_records": writer_records,
+            "writer_owner": owner_state,
             "discovery_artifact": str(discovery_artifact),
             "command_list_artifact": str(command_list_artifact),
+            "memory_log_artifact": str(memory_log_artifact),
         }
     finally:
-        if watch_armed:
-            harness.send(f"unwatch 0x{linear_range[0]:08x} {linear_range[1] - linear_range[0]}")
         harness.close()
         discovery_path.unlink(missing_ok=True)
         command_list_path.unlink(missing_ok=True)
@@ -234,8 +297,9 @@ def capture_probe(
     daytime: int = DEFAULT_DAYTIME,
     settle_frames: int = DEFAULT_SETTLE_FRAMES,
     linear_range: tuple[int, int] = DEFAULT_LINEAR_RANGE,
+    cpu_mode: str = "dynarmic",
 ) -> tuple[dict[str, Any], bool]:
-    args = probe_args(draw, register, label, entrance, daytime, settle_frames, linear_range)
+    args = probe_args(draw, register, label, entrance, daytime, settle_frames, linear_range, cpu_mode)
     frame = capture_frame(settle_frames)
     cached = cache.get_probe("pica-command-writer", frame, args)
     if cached is not None:
@@ -244,7 +308,9 @@ def capture_probe(
     if failed is not None:
         raise RuntimeError(f"cached oracle failure: {failed['error']}")
     try:
-        result = capture_live(cache, args, draw, register, entrance, daytime, settle_frames, linear_range)
+        result = capture_live(
+            cache, args, draw, register, entrance, daytime, settle_frames, linear_range, cpu_mode
+        )
     except (OSError, RuntimeError, ValueError) as error:
         cache.put_probe(
             "pica-command-writer-failure",
@@ -272,6 +338,7 @@ def main(arguments: list[str] | None = None) -> int:
     parser.add_argument("--daytime", type=lambda value: int(value, 0), default=DEFAULT_DAYTIME)
     parser.add_argument("--settle-frames", type=int, default=DEFAULT_SETTLE_FRAMES)
     parser.add_argument("--linear-range", default="0x14480000:0x145a0000")
+    parser.add_argument("--cpu-mode", choices=CPU_MODES, default="dynarmic")
     args = parser.parse_args(arguments)
     if args.draw < 0:
         parser.error("--draw must be non-negative")
@@ -297,6 +364,7 @@ def main(arguments: list[str] | None = None) -> int:
             args.daytime,
             args.settle_frames,
             linear_range,
+            args.cpu_mode,
         )
         print(f"oracle: {'cache hit' if hit else 'captured and cached'} key={cache.key}")
         print(json.dumps(result, indent=2, sort_keys=True))
