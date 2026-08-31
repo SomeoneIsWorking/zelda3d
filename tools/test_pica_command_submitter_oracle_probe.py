@@ -13,7 +13,10 @@ class ParseSubmitRecordsTests(unittest.TestCase):
         line = (
             "CMDSUBMIT source=MMIO pc=0x00123456 lr=0x00654321 listVa=0x00000000 "
             "listPa=0x20480000 size=640 mmio=0x1ef00018 r0=0x00000001 r1=0x00000002 "
-            "r2=0x00000003 r3=0x00000004 sp=0x0ffff000"
+            "r2=0x00000003 r3=0x00000004 sp=0x0ffff000 s0=0x00000005 s1=0x00000006 "
+            "s2=0x00000007 s3=0x00000008 s4=0x00000009 s5=0x0000000a s6=0x0000000b s7=0x0000000c "
+            "s8=0x0000000d s9=0x0000000e s10=0x0000000f s11=0x00000010 s12=0x00000011 s13=0x00000012 "
+            "s14=0x00000013 s15=0x00000014 s16=0x00000015"
         )
         self.assertEqual(
             parse_submit_records([line]),
@@ -31,6 +34,23 @@ class ParseSubmitRecordsTests(unittest.TestCase):
                     "r2": 3,
                     "r3": 4,
                     "sp": 0x0FFFF000,
+                    "s0": 5,
+                    "s1": 6,
+                    "s2": 7,
+                    "s3": 8,
+                    "s4": 9,
+                    "s5": 10,
+                    "s6": 11,
+                    "s7": 12,
+                    "s8": 13,
+                    "s9": 14,
+                    "s10": 15,
+                    "s11": 16,
+                    "s12": 17,
+                    "s13": 18,
+                    "s14": 19,
+                    "s15": 20,
+                    "s16": 21,
                 }
             ],
         )
@@ -55,6 +75,9 @@ class ParseSubmitRecordsTests(unittest.TestCase):
         line = (
             "# header\\nCMDSUBMIT source=GSP pc=0x00123456 lr=0x00654321 listVa=0x14480000 "
             "listPa=0x20480000 size=640 mmio=0x00000000 r0=0x00000001 r1=0x00000002 "
-            "r2=0x00000003 r3=0x00000004 sp=0x0ffff000\\n"
+            "r2=0x00000003 r3=0x00000004 sp=0x0ffff000 s0=0x00000005 s1=0x00000006 "
+            "s2=0x00000007 s3=0x00000008 s4=0x00000009 s5=0x0000000a s6=0x0000000b s7=0x0000000c "
+            "s8=0x0000000d s9=0x0000000e s10=0x0000000f s11=0x00000010 s12=0x00000011 s13=0x00000012 "
+            "s14=0x00000013 s15=0x00000014 s16=0x00000015\\n"
         )
         self.assertEqual(parse_submit_records([line])[0]["physical_address"], 0x20480000)

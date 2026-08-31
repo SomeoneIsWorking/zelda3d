@@ -26,7 +26,7 @@ from pica_command_provenance_oracle_probe import (
 )
 from repo_environment import apply_repo_environment
 
-CAPTURE_VERSION = 2
+CAPTURE_VERSION = 4
 DEFAULT_ENTRANCE = 0xEE
 DEFAULT_DAYTIME = 0x6000
 DEFAULT_SETTLE_FRAMES = 180
@@ -36,7 +36,13 @@ SUBMIT_RE = re.compile(
     r"^CMDSUBMIT source=(?P<source>GSP|MMIO) pc=0x(?P<pc>[0-9a-fA-F]{8}) lr=0x(?P<lr>[0-9a-fA-F]{8}) "
     r"listVa=0x(?P<virtual_address>[0-9a-fA-F]{8}) listPa=0x(?P<physical_address>[0-9a-fA-F]{8}) "
     r"size=(?P<size>\d+) mmio=0x(?P<mmio_address>[0-9a-fA-F]{8}) r0=0x(?P<r0>[0-9a-fA-F]{8}) r1=0x(?P<r1>[0-9a-fA-F]{8}) "
-    r"r2=0x(?P<r2>[0-9a-fA-F]{8}) r3=0x(?P<r3>[0-9a-fA-F]{8}) sp=0x(?P<sp>[0-9a-fA-F]{8})$"
+    r"r2=0x(?P<r2>[0-9a-fA-F]{8}) r3=0x(?P<r3>[0-9a-fA-F]{8}) sp=0x(?P<sp>[0-9a-fA-F]{8}) "
+    r"s0=0x(?P<s0>[0-9a-fA-F]{8}) s1=0x(?P<s1>[0-9a-fA-F]{8}) s2=0x(?P<s2>[0-9a-fA-F]{8}) "
+    r"s3=0x(?P<s3>[0-9a-fA-F]{8}) s4=0x(?P<s4>[0-9a-fA-F]{8}) s5=0x(?P<s5>[0-9a-fA-F]{8}) "
+    r"s6=0x(?P<s6>[0-9a-fA-F]{8}) s7=0x(?P<s7>[0-9a-fA-F]{8}) s8=0x(?P<s8>[0-9a-fA-F]{8}) "
+    r"s9=0x(?P<s9>[0-9a-fA-F]{8}) s10=0x(?P<s10>[0-9a-fA-F]{8}) s11=0x(?P<s11>[0-9a-fA-F]{8}) "
+    r"s12=0x(?P<s12>[0-9a-fA-F]{8}) s13=0x(?P<s13>[0-9a-fA-F]{8}) s14=0x(?P<s14>[0-9a-fA-F]{8}) "
+    r"s15=0x(?P<s15>[0-9a-fA-F]{8}) s16=0x(?P<s16>[0-9a-fA-F]{8})$"
 )
 
 
