@@ -18,7 +18,7 @@ from collections.abc import Mapping
 from pathlib import Path
 from typing import Any
 
-from harness_paths import AZAHAR_RENDER_CONTRACT, CACHE_ROOT, REPO_ROOT
+from harness_paths import AZAHAR_RENDER_CONTRACT, CACHE_ROOT, REPO_ROOT, azahar_render_contract_marker
 from repo_environment import apply_repo_environment
 
 
@@ -32,16 +32,7 @@ def _sha256_file(path: Path) -> str:
 
 def _patch_marker() -> str:
     """Return the declared cache discriminator for render-affecting Azahar changes only."""
-    if not AZAHAR_RENDER_CONTRACT.is_file():
-        raise RuntimeError(f"missing Azahar render contract: {AZAHAR_RENDER_CONTRACT}")
-    for line in AZAHAR_RENDER_CONTRACT.read_text().splitlines():
-        marker = line.strip()
-        if not marker or marker.startswith("#"):
-            continue
-        if not all(character.isalnum() or character in "._-" for character in marker):
-            raise RuntimeError(f"invalid Azahar render contract marker: {marker!r}")
-        return marker
-    raise RuntimeError(f"Azahar render contract has no marker: {AZAHAR_RENDER_CONTRACT}")
+    return azahar_render_contract_marker(AZAHAR_RENDER_CONTRACT)
 
 
 def _runtime_environment(environment: Mapping[str, str] | None = None) -> dict[str, str]:
