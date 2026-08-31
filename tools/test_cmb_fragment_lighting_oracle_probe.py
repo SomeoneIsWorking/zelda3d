@@ -2,6 +2,7 @@
 from __future__ import annotations
 
 import unittest
+from pathlib import Path
 from unittest import mock
 
 import cmb_fragment_lighting_oracle_probe as probe
@@ -15,6 +16,7 @@ class FakeCache:
         if result is not None:
             self.results["cmb-fragment-lighting-state"] = result
         self.puts: list[tuple[str, int, dict[str, object], object]] = []
+        self.artifacts: list[tuple[str, Path, str | None]] = []
 
     def get_probe(
         self, name: str, frame: int, args: dict[str, object]
@@ -26,6 +28,13 @@ class FakeCache:
         self, name: str, frame: int, args: dict[str, object], data: object
     ) -> None:
         self.puts.append((name, frame, args, data))
+
+    def put_artifact(
+        self, name: str, args: dict[str, object], source: Path, suffix: str | None = None
+    ) -> Path:
+        del args
+        self.artifacts.append((name, source, suffix))
+        return Path(f"/cache/{name}{suffix or ''}")
 
 
 class FragmentLightingOracleProbeTests(unittest.TestCase):
@@ -80,6 +89,17 @@ class FragmentLightingOracleProbeTests(unittest.TestCase):
         self.assertEqual(probe._parse_pc_hits(["ok pchits 0", "ok end"]), (0, []))
         with self.assertRaisesRegex(RuntimeError, "count mismatch"):
             probe._parse_pc_hits(["ok pchits 1", "ok end"])
+
+    def test_caches_raw_lighting_before_rejecting_empty_luts(self) -> None:
+        cache = FakeCache(None)
+        path = Path("lighting.json")
+        with (
+            mock.patch.object(Path, "read_text", return_value='{"draw": 4, "disable": 0, "luts": []}'),
+            self.assertRaisesRegex(RuntimeError, "no activated LUT"),
+        ):
+            probe.cache_lighting_state(cache, {}, path, 4)
+
+        self.assertEqual(cache.artifacts, [("cmb-fragment-lighting-state", path, ".json")])
 
     def test_cache_hit_never_enters_live_capture(self) -> None:
         cached = {"draw": 17, "lighting": {"disable": 0}}

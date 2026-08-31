@@ -25,7 +25,7 @@ from harness_paths import GAMEPLAY_STATE
 from harness_process import spawn
 from repo_environment import apply_repo_environment
 
-CAPTURE_VERSION = 10
+CAPTURE_VERSION = 11
 # `FUN_003f9b5c` is the candidate CmbRenderer's material-setup vtable slot.
 # Watching it distinguishes "the candidate renderer was not used" from "its
 # optional fragment-light branch was not used" in the same cached frame.
@@ -142,6 +142,23 @@ def _draw_line(lines: list[str], draw: int) -> str | None:
     return None
 
 
+def cache_lighting_state(
+    cache: CacheLike, args: dict[str, Any], lighting_path: Path, draw: int
+) -> tuple[dict[str, Any], Path]:
+    """Persist raw PICA state before enforcing the expected enabled-LUT shape."""
+    lighting = json.loads(lighting_path.read_text())
+    artifact = cache.put_artifact(
+        "cmb-fragment-lighting-state", args, lighting_path, suffix=".json"
+    )
+    if lighting.get("draw") != draw or lighting.get("disable") != 0:
+        raise RuntimeError(
+            f"oracle lighting capture is not the selected enabled draw; cached state: {artifact}"
+        )
+    if not lighting.get("luts"):
+        raise RuntimeError(f"oracle enabled draw capture contains no activated LUT; cached state: {artifact}")
+    return lighting, artifact
+
+
 def _parse_pc_hits(lines: list[str]) -> tuple[int, list[str]]:
     if not lines:
         raise RuntimeError("oracle pcwatch returned no response")
@@ -254,22 +271,13 @@ def _capture_live(
         if not lighting_path.is_file():
             raise RuntimeError(f"oracle did not produce lighting capture for draw {draw}")
 
-        lighting = json.loads(lighting_path.read_text())
-        if lighting.get("draw") != draw or lighting.get("disable") != 0:
-            raise RuntimeError(
-                f"oracle lighting capture is not the selected enabled draw: {lighting}"
-            )
-        if not lighting.get("luts"):
-            raise RuntimeError("oracle enabled draw capture contains no activated LUT")
+        lighting, lighting_artifact = cache_lighting_state(cache, args, lighting_path, draw)
 
         discovery_artifact = cache.put_artifact(
             "cmb-fragment-lighting-discovery", args, discovery_path, suffix=".log"
         )
         validation_artifact = cache.put_artifact(
             "cmb-fragment-lighting-validation", args, validation_path, suffix=".log"
-        )
-        lighting_artifact = cache.put_artifact(
-            "cmb-fragment-lighting-state", args, lighting_path, suffix=".json"
         )
         return {
             "capture_version": CAPTURE_VERSION,
