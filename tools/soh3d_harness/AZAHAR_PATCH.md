@@ -807,5 +807,10 @@ storage rotates per frame.
 Command-list storage may rotate before the next frame. A writer probe must verify that its watched
 physical list is reused before associating any hit with a draw; a stale linear alias is a bounded cached
 negative, not a renderer identity. The Hut fragment-lighting fixture first demonstrated this rotation.
+
+For the remaining producer boundary, `SOH3D_HARNESS_DISABLE_FASTMEM=1` leaves Dynarmic's page-table
+fast path unset for an oracle-only process. This routes guest stores through the normal callbacks, while
+normal Azahar and harness launches retain fast memory. The Hut command packet still has no page-watch
+record in this mode, proving that its producer is outside both Dynarmic store paths.
 Its selected `config0` packet also has no matching `MemorySystem::Write` record under the direct logger,
 so the active list is populated by another write path; recover that path before assigning a guest writer.
