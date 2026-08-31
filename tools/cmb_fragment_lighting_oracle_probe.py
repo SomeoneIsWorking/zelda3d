@@ -25,8 +25,11 @@ from harness_paths import GAMEPLAY_STATE
 from harness_process import spawn
 from repo_environment import apply_repo_environment
 
-CAPTURE_VERSION = 7
-FRAGMENT_LIGHTING_FUNCTION = 0x003FA5D0
+CAPTURE_VERSION = 8
+# `FUN_003f9b5c` is the candidate CmbRenderer's material-setup vtable slot.
+# Watching it distinguishes "the candidate renderer was not used" from "its
+# optional fragment-light branch was not used" in the same cached frame.
+MATERIAL_SETUP_FUNCTION = 0x003F9B5C
 # Start reaches OoT3D's Save overlay from the cached Kokiri gameplay state. It
 # is a stable, cacheable negative control for the PICA state logger; it does
 # not claim to exercise the separately-authored pause Link model.
@@ -75,6 +78,7 @@ def probe_args(
         "discovery_run_frames": DISCOVERY_RUN_FRAMES,
         "validation_run_frames": VALIDATION_RUN_FRAMES,
         "fixture": fixture,
+        "pc_watch_function": MATERIAL_SETUP_FUNCTION,
         "texture_pack": 0,
     }
 
@@ -196,8 +200,8 @@ def _capture_live(
             "cmb-fragment-lighting-logger-selftest", args, selftest_path, suffix=".log"
         )
 
-        response = harness.send(f"pcwatch 0x{FRAGMENT_LIGHTING_FUNCTION:08x}")
-        if response != f"ok pcwatch 0x{FRAGMENT_LIGHTING_FUNCTION:08x}":
+        response = harness.send(f"pcwatch 0x{MATERIAL_SETUP_FUNCTION:08x}")
+        if response != f"ok pcwatch 0x{MATERIAL_SETUP_FUNCTION:08x}":
             raise RuntimeError(f"oracle guest-PC watch failed: {response}")
 
         response = harness.send(f"vsuni_log {discovery_path}")
@@ -220,7 +224,8 @@ def _capture_live(
                 suffix=".log",
             )
             raise RuntimeError(
-                f"{error}; FUN_{FRAGMENT_LIGHTING_FUNCTION:08x} hits={pc_hit_count} "
+                f"FUN_{MATERIAL_SETUP_FUNCTION:08x} material-setup hits={pc_hit_count} "
+                f"after {error}; "
                 f"records={pc_hit_records}; cached fixture: {fixture_artifact}; "
                 f"cached diagnostic: {failed}"
             ) from error
