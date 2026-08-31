@@ -34,6 +34,7 @@ void Soh3d_WatchClear(std::uint32_t addr);
 std::size_t Soh3d_WatchListRanges(WatchRange* out, std::size_t maxOut);
 bool Soh3d_WatchGetLatestMatching(std::uint32_t rangeBase, std::uint64_t mask, std::uint64_t expected,
                                   WatchRecord* out);
+bool Soh3d_WatchGetLatestAt(std::uint32_t rangeBase, std::uint32_t address, WatchRecord* out);
 bool Soh3d_WatchIsRegistered(std::uint32_t addr);
 
 extern std::uint32_t soh3d_pc_watch_target;
