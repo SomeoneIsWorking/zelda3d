@@ -92,8 +92,8 @@ file is the failure mode; a single owner with one per-frame resolved state is th
 
 The embedded-Azahar oracle's output at a given az (Azahar) title-cs frame is fully
 deterministic given four inputs: the loaded savestate, the ROM bytes, the resolved hi-res texture
-pack, and whatever the `soh3d_harness` Azahar patches
-(`tools/soh3d_harness/AZAHAR_PATCH.md`) do to rendering.
+pack, and the declared render-affecting Azahar contract
+(`tools/soh3d_harness/AZAHAR_RENDER_CONTRACT`).
 Held fixed, re-running Az to frame N always reproduces the same pixels — so repeated A/B
 and probe runs (`tools/title_ab.py`, future probes) shouldn't pay the Az boot+step cost
 again for a frame already captured in a prior session.
@@ -102,8 +102,9 @@ again for a frame already captured in a prior session.
   never committed). `<key>` = `sha256(savestate)[:16]_sha256(rom)[:16]_<patch-marker>`
   plus a texture-pack manifest marker (`harness_cache.cache_key()`). The cache resolves `.env`
   before hashing the ROM, matching the child launcher instead of silently producing a `norom`
-  context. The patch marker hashes the complete `AZAHAR_PATCH.md`; the pack marker records its
-  resolved on/off state and hashes every relative filename, size, and modification timestamp.
+  context. The patch marker is the explicit render contract; descriptive patch-document changes
+  do not invalidate visual evidence. The pack marker records its resolved on/off state and hashes
+  every relative filename, size, and modification timestamp.
   Editing either input mints a fresh key instead of silently serving stale frames. Frames are
   stored as PNG; each context has an `index.json` recording the full key metadata for auditability.
 - **API**: `harness_cache.OracleCache` — `get_frame`/`put_frame` (by az frame number),
@@ -112,12 +113,15 @@ again for a frame already captured in a prior session.
   for housekeeping. `get_artifact`/`put_artifact` cache raw logs, PPMs, and other binary
   capture outputs by a named setup plus sorted arguments; use these for scene probes whose
   result is larger than structured JSON.
-- **CLI**: `tools/oracle_cache.py stats|warm [frames...]|invalidate`. `warm` with no args
+- **CLI**: `tools/oracle_cache.py stats|warm [frames...]|import-artifact|invalidate`. `warm` with no args
   pre-captures the standard title sweep points ({100,200,360,500,700,764,1000,1300,1522,
   1700,1900}) in one harness session. If an Azahar patch change is provably observer-only,
   `adopt-frame <old-key> <frames...> --observer-only` reuses existing PNGs after checking the
   savestate, ROM, and texture-pack identities and records the source key/path; never rerun the
-  oracle merely because a logger gained fields. Do not use adoption for renderer changes.
+  oracle merely because a logger gained fields. `import-artifact <exact-key> <name> <source>
+  --args-json '<variant object>'` attaches an existing raw state/log/image to the exact historical
+  context that produced it; it refuses a missing context and conflicting bytes, so it cannot
+  silently relabel old evidence as current. Do not use adoption for renderer changes.
 - **title_ab.py `ab`** is cache-aware: a cache hit on the target az frame skips the `run
   <az>` stepping loop entirely and reuses the stored PNG for the oracle side; the SoH side
   is NEVER cached (it changes every build) and always runs live via `soh_step`. Reports

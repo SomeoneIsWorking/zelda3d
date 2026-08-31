@@ -111,6 +111,24 @@ class OracleCacheArtifactTests(unittest.TestCase):
             ):
                 self.cache(root, savestate).put_artifact("missing", {}, root / "does-not-exist.log")
 
+    def test_open_existing_context_preserves_historical_identity(self) -> None:
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory)
+            savestate = root / "state.bin"
+            source = root / "checkpoint.state"
+            savestate.write_bytes(b"bootstrap state")
+            source.write_bytes(b"controlled checkpoint")
+            with mock.patch.object(harness_cache, "CACHE_ROOT", root / "cache"):
+                original = self.cache(root, savestate)
+                args = {"probe": "bossfd2", "frame": 29}
+                stored = original.put_artifact("control-checkpoint", args, source)
+                opened = harness_cache.OracleCache.open_existing_context(original.key)
+
+            self.assertEqual(opened.key, original.key)
+            self.assertEqual(opened.meta["key"], original.key)
+            self.assertEqual(opened.get_artifact("control-checkpoint", args), stored)
+            self.assertEqual(stored.read_bytes(), source.read_bytes())
+
     def test_frame_adoption_checks_inputs_and_records_provenance(self) -> None:
         with tempfile.TemporaryDirectory() as directory:
             root = Path(directory)

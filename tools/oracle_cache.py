@@ -24,6 +24,7 @@ Two independent cache namespaces share the scratch/oracle_cache/ root
           tools/oracle_cache.py warm 100 200 360 ...    # batch-capture frames
           tools/oracle_cache.py warm                    # warm the standard sweep
           tools/oracle_cache.py adopt-frame <key> 2010 --observer-only
+          tools/oracle_cache.py import-artifact <key> <name> <source> --args-json '{}'
           tools/oracle_cache.py invalidate              # clear the CURRENT key
 
       See docs/parity-workflow.md "Oracle data cache" for the design writeup.
@@ -266,6 +267,35 @@ def cmd_adopt_frame(args) -> None:
         )
 
 
+def cmd_import_artifact(args) -> None:
+    """Attach an existing raw capture to the exact historical context that produced it."""
+    try:
+        artifact_args = json.loads(args.args_json)
+    except json.JSONDecodeError as error:
+        raise SystemExit(f"invalid --args-json: {error}") from error
+    if not isinstance(artifact_args, dict):
+        raise SystemExit("--args-json must decode to an object")
+    try:
+        cache = OracleCache.open_existing_context(args.context_key)
+    except (FileNotFoundError, ValueError) as error:
+        raise SystemExit(f"cannot open context {args.context_key!r}: {error}") from error
+
+    source = Path(args.source)
+    if not source.is_file():
+        raise SystemExit(f"artifact source is not a file: {source}")
+    cached = cache.get_artifact(args.artifact_name, artifact_args)
+    if cached is not None:
+        if cached.read_bytes() != source.read_bytes():
+            raise SystemExit(
+                "refusing to overwrite an existing artifact with different bytes: "
+                f"{cached}"
+            )
+        print(f"[oracle_cache] artifact already cached: {cached}")
+        return
+    destination = cache.put_artifact(args.artifact_name, artifact_args, source)
+    print(f"[oracle_cache] imported artifact into key={cache.key}: {destination}")
+
+
 def cmd_warp_debug(args) -> None:
     result = warp(args.entrance, args.day_time, refresh=args.refresh)
     print(json.dumps(result, indent=2, sort_keys=True))
@@ -295,6 +325,20 @@ def main(argv) -> int:
         help="assert that the patch difference cannot alter rendered pixels",
     )
     adopt.set_defaults(func=cmd_adopt_frame)
+
+    artifact = sub.add_parser(
+        "import-artifact",
+        help="copy an existing raw artifact into its exact historical cache context",
+    )
+    artifact.add_argument("context_key", help="existing cache key that produced the artifact")
+    artifact.add_argument("artifact_name", help="stable logical artifact name")
+    artifact.add_argument("source", help="existing source file to preserve in that context")
+    artifact.add_argument(
+        "--args-json",
+        default="{}",
+        help="JSON object identifying the capture variant (default: {})",
+    )
+    artifact.set_defaults(func=cmd_import_artifact)
 
     inv = sub.add_parser("invalidate", help="delete all frame/probe cache entries for the CURRENT key context")
     inv.set_defaults(func=cmd_invalidate)

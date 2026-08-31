@@ -155,6 +155,31 @@ class OracleCache:
         self.index_path = self.dir / "index.json"
         self._index: dict[str, Any] | None = None
 
+    @classmethod
+    def open_existing_context(cls, context_key: str) -> "OracleCache":
+        """Open an existing cache context without recomputing its input identity.
+
+        Historical oracle artifacts must remain attached to the contract that produced
+        them.  This deliberately refuses arbitrary paths and missing indexes rather
+        than silently creating a context under the current Azahar contract.
+        """
+        if not re.fullmatch(r"[A-Za-z0-9_.-]+", context_key):
+            raise ValueError("invalid oracle cache context key")
+        directory = CACHE_ROOT / context_key
+        index_path = directory / "index.json"
+        if not index_path.is_file():
+            raise FileNotFoundError(index_path)
+        instance = cls.__new__(cls)
+        instance.key = context_key
+        instance.dir = directory
+        instance.frames_dir = directory / "frames"
+        instance.probes_dir = directory / "probes"
+        instance.artifacts_dir = directory / "artifacts"
+        instance.index_path = index_path
+        instance._index = json.loads(index_path.read_text())
+        instance.meta = dict(instance._index.get("meta", {}))
+        return instance
+
     def _load_index(self) -> dict[str, Any]:
         if self._index is not None:
             return self._index
