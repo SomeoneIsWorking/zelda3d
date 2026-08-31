@@ -16,6 +16,7 @@ from pica_command_writer_oracle_probe import (
     parse_range,
     persist_selected_memlog,
     selected_writer_record,
+    snapshot_config_builder_input,
     snapshot_owner_state,
 )
 
@@ -90,6 +91,52 @@ class CommandWriterTests(unittest.TestCase):
         }
         with self.assertRaisesRegex(RuntimeError, "2 source registers"):
             copy_source_value_address(writer, 0x80000400)
+
+    def test_snapshots_config_builder_input_at_exact_template_store(self) -> None:
+        record = {
+            "pc": 0x0040CFE4,
+            "r10": 0x081D1638,
+            "r10b": 0x081D1538,
+            "r10bp0": 0x00000000,
+            "r10bp164": 0x01020304,
+            "r10bp168": 0x05060708,
+            "r10bp16c": 0x090A0B0C,
+            "r10bp170": 0x0D0E0F10,
+            "r10bp174": 0x11121314,
+            "r10bp178": 0x15161718,
+            "r10bp17c": 0x191A1B1C,
+            "r10bp180": 0x1D1E1F20,
+            "r10bp184": 0x21222324,
+            "r10bp188": 0x25262728,
+            "r10bp18c": 0x292A2B2C,
+            "r10bp190": 0x2D2E2F30,
+        }
+        snapshot = snapshot_config_builder_input(record)
+        self.assertEqual(snapshot["address"], "0x081d1538")
+        self.assertEqual(snapshot["words"]["0x184"], "0x21222324")
+
+    def test_rejects_mismatched_config_builder_base(self) -> None:
+        with self.assertRaisesRegex(RuntimeError, "does not match r10"):
+            snapshot_config_builder_input(
+                {
+                    "pc": 0x0040CFE4,
+                    "r10": 0x081D1638,
+                    "r10b": 0x081D153C,
+                    "r10bp0": 0,
+                    "r10bp164": 0,
+                    "r10bp168": 0,
+                    "r10bp16c": 0,
+                    "r10bp170": 0,
+                    "r10bp174": 0,
+                    "r10bp178": 0,
+                    "r10bp17c": 0,
+                    "r10bp180": 0,
+                    "r10bp184": 0,
+                    "r10bp188": 0,
+                    "r10bp18c": 0,
+                    "r10bp190": 0,
+                }
+            )
 
     def test_snapshots_exact_store_dispatcher_fields(self) -> None:
         state = snapshot_owner_state(
