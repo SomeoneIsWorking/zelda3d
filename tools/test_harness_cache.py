@@ -18,22 +18,41 @@ class OracleCacheArtifactTests(unittest.TestCase):
         with mock.patch.object(harness_cache, "REPO_ROOT", root):
             return harness_cache.OracleCache(savestate, environment=environment)
 
-    def test_patch_body_change_rotates_cache_key(self) -> None:
+    def test_render_contract_change_rotates_cache_key(self) -> None:
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory)
+            savestate = root / "state.bin"
+            render_contract = root / "AZAHAR_RENDER_CONTRACT"
+            savestate.write_bytes(b"state")
+            render_contract.write_text("render-one\n")
+            environment = {"ZELDA3D_HARNESS_TEXPACK": "off"}
+            with (
+                mock.patch.object(harness_cache, "AZAHAR_RENDER_CONTRACT", render_contract),
+                mock.patch.object(harness_cache, "REPO_ROOT", root),
+            ):
+                first, _ = harness_cache.cache_key(savestate, environment=environment)
+                render_contract.write_text("render-two\n")
+                second, _ = harness_cache.cache_key(savestate, environment=environment)
+            self.assertNotEqual(first, second)
+
+    def test_patch_document_change_does_not_rotate_render_contract_key(self) -> None:
         with tempfile.TemporaryDirectory() as directory:
             root = Path(directory)
             savestate = root / "state.bin"
             patch_doc = root / "AZAHAR_PATCH.md"
+            render_contract = root / "AZAHAR_RENDER_CONTRACT"
             savestate.write_bytes(b"state")
-            patch_doc.write_text("# Patch\nbody one\n")
+            patch_doc.write_text("# Patch\nfirst note\n")
+            render_contract.write_text("render-one\n")
             environment = {"ZELDA3D_HARNESS_TEXPACK": "off"}
             with (
-                mock.patch.object(harness_cache, "AZAHAR_PATCH_MD", patch_doc),
+                mock.patch.object(harness_cache, "AZAHAR_RENDER_CONTRACT", render_contract),
                 mock.patch.object(harness_cache, "REPO_ROOT", root),
             ):
                 first, _ = harness_cache.cache_key(savestate, environment=environment)
-                patch_doc.write_text("# Patch\nbody two\n")
+                patch_doc.write_text("# Patch\nsecond note\n")
                 second, _ = harness_cache.cache_key(savestate, environment=environment)
-            self.assertNotEqual(first, second)
+            self.assertEqual(first, second)
 
     def test_repo_environment_rom_and_pack_manifest_are_cache_inputs(self) -> None:
         with tempfile.TemporaryDirectory() as directory:
@@ -86,11 +105,11 @@ class OracleCacheArtifactTests(unittest.TestCase):
             root = Path(directory)
             savestate = root / "state.bin"
             savestate.write_bytes(b"state")
-            with mock.patch.object(harness_cache, "CACHE_ROOT", root / "cache"):
-                with self.assertRaises(FileNotFoundError):
-                    self.cache(root, savestate).put_artifact(
-                        "missing", {}, root / "does-not-exist.log"
-                    )
+            with (
+                mock.patch.object(harness_cache, "CACHE_ROOT", root / "cache"),
+                self.assertRaises(FileNotFoundError),
+            ):
+                self.cache(root, savestate).put_artifact("missing", {}, root / "does-not-exist.log")
 
     def test_frame_adoption_checks_inputs_and_records_provenance(self) -> None:
         with tempfile.TemporaryDirectory() as directory:

@@ -1,0 +1,3 @@
+# Update the marker only when an Azahar patch can alter emulated or rendered output.
+# Observer-only hooks and documentation updates preserve the cache context.
+p45-00401070

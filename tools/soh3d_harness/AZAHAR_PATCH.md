@@ -836,7 +836,16 @@ This is explicitly synchronous: transient renderer input objects may be cleared 
 of a frame, so a post-run memory dump is not evidence of the state which produced a template word.
 `pica_command_writer_oracle_probe.py` accepts these fields only at the exact store PC, verifies the
 derived base, rejects divergent inputs, and persists the decoded state beside the already-selected
-compact memory records. It does not infer an object type or CMB-field mapping from the snapshot.
+compact memory records. Its optional second exact state-address watch preserves the bounded writes
+that construct that input, rather than a post-frame dump. It does not infer an object type or
+CMB-field mapping from either snapshot.
+
+## Render-contract cache marker
+
+`AZAHAR_RENDER_CONTRACT` is the oracle cache discriminator. Change its sole marker only when a
+patch can change emulated or rendered output; observer-only logging, capture decoding, and this
+document do not invalidate a cache. The initial marker deliberately retains the existing `p45` cache
+context. Tests require marker changes to rotate the key and documentation-only changes not to.
 
 For the remaining producer boundary, `SOH3D_HARNESS_DISABLE_FASTMEM=1` leaves Dynarmic's page-table
 fast path unset for an oracle-only process. This routes guest stores through the normal callbacks, while

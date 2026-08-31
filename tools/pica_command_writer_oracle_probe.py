@@ -30,7 +30,7 @@ from pica_command_provenance_oracle_probe import (
 )
 from repo_environment import apply_repo_environment
 
-CAPTURE_VERSION = 16
+CAPTURE_VERSION = 17
 DEFAULT_ENTRANCE = 0xEE
 DEFAULT_DAYTIME = 0x6000
 DEFAULT_SETTLE_FRAMES = 180
@@ -102,6 +102,7 @@ def probe_args(
     cpu_mode: str,
     source_range: tuple[int, int] | None,
     watch_address: int | None,
+    state_watch_address: int | None,
 ) -> dict[str, Any]:
     args = {
         "capture_version": CAPTURE_VERSION,
@@ -123,6 +124,9 @@ def probe_args(
     if watch_address is not None:
         args["watch_address"] = f"0x{watch_address:08x}"
         args["watch_trace_version"] = WATCH_TRACE_VERSION
+    if state_watch_address is not None:
+        args["state_watch_address"] = f"0x{state_watch_address:08x}"
+        args["state_watch_trace_version"] = WATCH_TRACE_VERSION
     return args
 
 
@@ -147,6 +151,7 @@ def harness_environment(
     memory_log_path: Path,
     source_range: tuple[int, int] | None = None,
     watch_address: int | None = None,
+    state_watch_address: int | None = None,
 ) -> dict[str, str]:
     if cpu_mode not in CPU_MODES:
         raise ValueError(f"unsupported CPU mode: {cpu_mode}")
@@ -155,6 +160,8 @@ def harness_environment(
         ranges.append(source_range)
     if watch_address is not None:
         ranges.append((watch_address, watch_address + 4))
+    if state_watch_address is not None:
+        ranges.append((state_watch_address, state_watch_address + 4))
     environment = {
         **os.environ,
         "SOH3D_HARNESS_DISABLE_FASTMEM": "1",
@@ -333,6 +340,7 @@ def capture_live(
     cpu_mode: str,
     source_range: tuple[int, int] | None,
     watch_address: int | None,
+    state_watch_address: int | None,
 ) -> dict[str, Any]:
     OUTDIR.mkdir(parents=True, exist_ok=True)
     discovery, _ = capture_provenance_probe(cache, draw, str(args["label"]), entrance, daytime, settle_frames)
@@ -350,7 +358,9 @@ def capture_live(
     memlog_path = OUTDIR / "memory-writes.log"
     selected_memlog_path = OUTDIR / "selected-memory-writes.log"
     harness = spawn(
-        environment=harness_environment(cpu_mode, trace_range, memlog_path, source_range, watch_address)
+        environment=harness_environment(
+            cpu_mode, trace_range, memlog_path, source_range, watch_address, state_watch_address
+        )
     )
     try:
         if not boot_to_gameplay(harness, entrance, settle_frames):
@@ -410,6 +420,7 @@ def capture_live(
         watch_command_records: list[str] = []
         copy_watch_records: list[str] = []
         config_builder_input: dict[str, Any] | None = None
+        state_watch_records: list[str] = []
         if watch_address is not None:
             try:
                 watch_records = parse_memlog(memlog_path, watch_address)
@@ -443,11 +454,14 @@ def capture_live(
                 raise RuntimeError("exact template watch produced multiple config-builder input states")
             if distinct_config_store_inputs:
                 config_builder_input = distinct_config_store_inputs[0]
+        if state_watch_address is not None:
+            state_watch_records = parse_memlog(memlog_path, state_watch_address)
         persist_selected_memlog(
             selected_memlog_path,
             writer_records,
             source_records,
             watch_command_records,
+            state_watch_records,
             watch_address=watch_address,
             watch_count=len(watch_records) if watch_address is not None else None,
         )
@@ -483,6 +497,9 @@ def capture_live(
             "watch_command_records": watch_command_records,
             "copy_source_match_count": len(copy_watch_records) if watch_address is not None else None,
             "config_builder_input": config_builder_input,
+            "state_watch_address": f"0x{state_watch_address:08x}" if state_watch_address is not None else None,
+            "state_watch_write_count": len(state_watch_records) if state_watch_address is not None else None,
+            "state_watch_records": state_watch_records,
             "discovery_artifact": str(discovery["artifact"]),
             "command_list_artifact": str(command_list_artifact),
             "memory_log_artifact": str(memory_log_artifact),
@@ -507,9 +524,20 @@ def capture_probe(
     cpu_mode: str = "dynarmic",
     source_range: tuple[int, int] | None = None,
     watch_address: int | None = None,
+    state_watch_address: int | None = None,
 ) -> tuple[dict[str, Any], bool]:
     args = probe_args(
-        draw, register, label, entrance, daytime, settle_frames, linear_range, cpu_mode, source_range, watch_address
+        draw,
+        register,
+        label,
+        entrance,
+        daytime,
+        settle_frames,
+        linear_range,
+        cpu_mode,
+        source_range,
+        watch_address,
+        state_watch_address,
     )
     frame = capture_frame(settle_frames)
     cached = cache.get_probe("pica-command-writer", frame, args)
@@ -531,6 +559,7 @@ def capture_probe(
             cpu_mode,
             source_range,
             watch_address,
+            state_watch_address,
         )
     except (OSError, RuntimeError, ValueError) as error:
         cache.put_probe(
@@ -561,6 +590,11 @@ def main(arguments: list[str] | None = None) -> int:
     parser.add_argument("--linear-range", default="0x14480000:0x145a0000")
     parser.add_argument("--source-range", help="optional packet-source VA range to trace")
     parser.add_argument("--watch-address", type=lambda value: int(value, 0), help="optional exact VA write watch")
+    parser.add_argument(
+        "--state-watch-address",
+        type=lambda value: int(value, 0),
+        help="optional exact live renderer-state VA write watch",
+    )
     parser.add_argument("--cpu-mode", choices=CPU_MODES, default="dynarmic")
     args = parser.parse_args(arguments)
     if args.draw < 0:
@@ -588,6 +622,7 @@ def main(arguments: list[str] | None = None) -> int:
             args.cpu_mode,
             source_range,
             args.watch_address,
+            args.state_watch_address,
         )
         print(f"oracle: {'cache hit' if hit else 'captured and cached'} key={cache.key}")
         print(json.dumps(result, indent=2, sort_keys=True))
