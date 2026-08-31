@@ -24,4 +24,5 @@ def azahar_render_contract_marker(contract: Path = AZAHAR_RENDER_CONTRACT) -> st
 
 # A savestate is serialized Azahar state, not just a deterministic input checkpoint. Keep it
 # separate per declared emulator contract so a serializer change never loads incompatible bytes.
+TITLE_STATE = REPO_ROOT / "scratch" / f"title_settled.{azahar_render_contract_marker()}.state"
 GAMEPLAY_STATE = REPO_ROOT / "scratch" / f"gameplay_settled.{azahar_render_contract_marker()}.state"

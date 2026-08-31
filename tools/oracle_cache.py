@@ -45,7 +45,7 @@ from pathlib import Path
 
 from harness_cache import OracleCache
 from harness_gameplay import GSAVECONTEXT_DAYTIME_VA, boot_to_gameplay
-from harness_paths import CACHE_ROOT
+from harness_paths import CACHE_ROOT, TITLE_STATE
 from harness_process import spawn
 
 REPO = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
@@ -77,7 +77,7 @@ def _probe_oracle(entrance, day_time, timeout):
     ent = entrance if isinstance(entrance, int) else int(str(entrance), 0)
     dt = day_time if isinstance(day_time, int) else int(str(day_time), 0)
 
-    h = spawn(save_state=os.path.join(REPO, "scratch", "title_settled.state"))
+    h = spawn(save_state=str(TITLE_STATE))
     try:
         if not boot_to_gameplay(h, entrance=ent):
             return None
@@ -158,7 +158,7 @@ WARN_BYTES = 2 * 1024 ** 3  # 2 GB
 
 
 def _savestate():
-    return Path(REPO) / "scratch" / "title_settled.state"
+    return TITLE_STATE
 
 
 def _step_chunked(h, n, chunk=100):
@@ -197,7 +197,7 @@ def cmd_warm(args) -> None:
         sys.exit("ZELDA3D_OOT3D_ROM not set — run `source .env` first")
     savestate = _savestate()
     if not savestate.exists():
-        sys.exit(f"missing {savestate} — a title_settled.state save-state is required")
+        sys.exit(f"missing {savestate} — a current-contract title save-state is required")
 
     cache = OracleCache(savestate)
     frames = sorted(set(args.frames)) if args.frames else list(DEFAULT_SWEEP)
