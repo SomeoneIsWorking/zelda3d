@@ -51,8 +51,10 @@ class LoggedTexture:
     pica_format: int
 
 
-def enabled_fragment_source_textures(archive_path: str) -> list[SourceTexture]:
-    """Return textures from CMBs with an enabled fragment-primary material.
+def source_textures(
+    archive_path: str, *, require_enabled_fragment_primary: bool = True
+) -> list[SourceTexture]:
+    """Return source textures from an archive, optionally narrowed by material use.
 
     ``archive_path`` is the ROM-side ZAR path, so the source set is named by
     stable game data rather than a scene-dependent actor address.
@@ -63,7 +65,9 @@ def enabled_fragment_source_textures(archive_path: str) -> list[SourceTexture]:
         if not label.startswith(prefix):
             continue
         records = scan_materials(label, data)
-        if not any(record.enabled and record.primary_uses for record in records):
+        if require_enabled_fragment_primary and not any(
+            record.enabled and record.primary_uses for record in records
+        ):
             continue
         cmb = Cmb(data)
         for texture in cmb.textures:
@@ -89,9 +93,15 @@ def enabled_fragment_source_textures(archive_path: str) -> list[SourceTexture]:
             )
     if not textures:
         raise RuntimeError(
-            f"source archive {archive_path!r} scanned 0 enabled fragment-primary textures"
+            f"source archive {archive_path!r} scanned 0 "
+            f"{'enabled fragment-primary ' if require_enabled_fragment_primary else ''}textures"
         )
     return textures
+
+
+def enabled_fragment_source_textures(archive_path: str) -> list[SourceTexture]:
+    """Return textures from CMBs with an enabled fragment-primary material."""
+    return source_textures(archive_path, require_enabled_fragment_primary=True)
 
 
 def logged_texture_descriptors(lines: list[str]) -> list[LoggedTexture]:

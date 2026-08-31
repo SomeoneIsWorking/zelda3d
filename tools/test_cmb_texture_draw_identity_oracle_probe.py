@@ -69,6 +69,11 @@ class CmbTextureDrawIdentityOracleProbeTests(unittest.TestCase):
                 probe.capture_probe(cache)
         live.assert_called_once()
 
+    def test_source_mode_is_part_of_the_cache_identity(self) -> None:
+        enabled = probe.probe_args("/actor/test.zar", "enabled-fragment-primary", 0xEE, 0x6000, 180)
+        any_source = probe.probe_args("/actor/test.zar", "any", 0xEE, 0x6000, 180)
+        self.assertNotEqual(enabled, any_source)
+
 
 if __name__ == "__main__":
     unittest.main()

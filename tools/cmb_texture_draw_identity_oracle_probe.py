@@ -21,9 +21,9 @@ sys.path.insert(0, str(REPO / "tools"))
 
 from cmb_texture_draw_identity import (
     descriptor_candidates,
-    enabled_fragment_source_textures,
     logged_texture_descriptors,
     match_guest_payloads,
+    source_textures,
 )
 from harness_cache import OracleCache
 from harness_gameplay import boot_to_gameplay, set_time_of_day
@@ -59,10 +59,13 @@ class CacheLike(Protocol):
     ) -> Path: ...
 
 
-def probe_args(archive: str, entrance: int, daytime: int, settle_frames: int) -> dict[str, Any]:
+def probe_args(
+    archive: str, source_mode: str, entrance: int, daytime: int, settle_frames: int
+) -> dict[str, Any]:
     return {
         "capture_version": CAPTURE_VERSION,
         "archive": archive,
+        "source_mode": source_mode,
         "entrance": entrance,
         "daytime": daytime,
         "settle_frames": settle_frames,
@@ -100,11 +103,17 @@ def _capture_live(
     cache: CacheLike,
     args: dict[str, Any],
     archive: str,
+    source_mode: str,
     entrance: int,
     daytime: int,
     settle_frames: int,
 ) -> dict[str, Any]:
-    sources = enabled_fragment_source_textures(archive)
+    sources = source_textures(
+        archive, require_enabled_fragment_primary=source_mode == "enabled-fragment-primary"
+    )
+    source_description = (
+        "enabled fragment-primary" if source_mode == "enabled-fragment-primary" else "archive"
+    )
     source_sizes = {
         (source.width, source.height, source.pica_format): len(source.payload)
         for source in sources
@@ -131,7 +140,7 @@ def _capture_live(
             )
             raise RuntimeError(
                 f"oracle draw log scanned {len(logged)} texture descriptors and matched 0 "
-                f"source descriptors from {len(sources)} enabled fragment-primary textures; "
+                f"source descriptors from {len(sources)} {source_description} textures; "
                 f"cached diagnostic: {artifact}"
             )
         guest_payloads: dict[int, bytes] = {}
@@ -199,11 +208,14 @@ def _capture_live(
 def capture_probe(
     cache: CacheLike,
     archive: str = DEFAULT_ARCHIVE,
+    source_mode: str = "enabled-fragment-primary",
     entrance: int = DEFAULT_ENTRANCE,
     daytime: int = DEFAULT_DAYTIME,
     settle_frames: int = DEFAULT_SETTLE_FRAMES,
 ) -> tuple[dict[str, Any], bool]:
-    args = probe_args(archive, entrance, daytime, settle_frames)
+    if source_mode not in {"enabled-fragment-primary", "any"}:
+        raise ValueError(f"unsupported source mode: {source_mode}")
+    args = probe_args(archive, source_mode, entrance, daytime, settle_frames)
     frame = capture_frame(settle_frames)
     cached = cache.get_probe("cmb-texture-draw-identity", frame, args)
     if cached is not None:
@@ -212,7 +224,9 @@ def capture_probe(
     if failed is not None:
         raise RuntimeError(f"cached oracle failure: {failed['error']}")
     try:
-        result = _capture_live(cache, args, archive, entrance, daytime, settle_frames)
+        result = _capture_live(
+            cache, args, archive, source_mode, entrance, daytime, settle_frames
+        )
     except RuntimeError as error:
         cache.put_probe(
             "cmb-texture-draw-identity-failure",
@@ -234,6 +248,10 @@ def cache_context() -> OracleCache:
 def main(arguments: list[str] | None = None) -> int:
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("--archive", default=DEFAULT_ARCHIVE)
+    parser.add_argument(
+        "--source-mode", choices=("enabled-fragment-primary", "any"),
+        default="enabled-fragment-primary",
+    )
     parser.add_argument("--entrance", type=lambda value: int(value, 0), default=DEFAULT_ENTRANCE)
     parser.add_argument("--daytime", type=lambda value: int(value, 0), default=DEFAULT_DAYTIME)
     parser.add_argument("--settle-frames", type=int, default=DEFAULT_SETTLE_FRAMES)
@@ -242,6 +260,7 @@ def main(arguments: list[str] | None = None) -> int:
         result, hit = capture_probe(
             cache_context(),
             options.archive,
+            options.source_mode,
             options.entrance,
             options.daytime,
             options.settle_frames,
