@@ -800,15 +800,17 @@ Every Patch-5 `vsuni_log` line now includes `cmdList=<physical-address>/<word-in
 `PicaCore::cmd_list` owns these values while processing a command list, so the field identifies the
 exact PICA packet stream that produced a logged draw without exposing a guessed CPU renderer function.
 The cache-owned `tools/pica_command_provenance_oracle_probe.py` persists both that draw log and the raw
-physical command list. `tools/pica_command_writer_oracle_probe.py` decodes a selected register packet
-offline, then launches the harness with the existing direct `SOH3D_MEMLOG_RANGES` writer logger armed
-for a validated linear command-list arena. This avoids the page-watch stale-buffer problem when PICA
+physical command list. `tools/pica_command_writer_oracle_probe.py` first reuses that cached provenance
+(or captures it without memory logging), decodes the selected register packet offline, then launches a
+trace harness with the direct `SOH3D_MEMLOG_RANGES` logger armed for only that packet's four-byte guest
+writer address. It rejects a traced frame whose command-list provenance or selected packet differs from
+discovery. This avoids both the page-watch stale-buffer problem and an arena-wide write log when PICA
 storage rotates per frame.
 
 The cache persists only the exact selected writer records, not an arena-wide raw memory log. A source
-trace may arm one additional bounded range; it stores only the matching source word and the matching
-list record, then removes the broad transient log. This keeps the oracle cache reusable without
-turning repeated RE captures into multi-gigabyte scratch accumulation.
+trace or exact state-field watch may arm one additional bounded range; it stores only the matching
+records and the selected list record. This keeps the oracle cache reusable without turning repeated RE
+captures into multi-gigabyte scratch accumulation.
 
 Command-list storage may rotate before the next frame. A writer probe must verify that its watched
 physical list is reused before associating any hit with a draw; a stale linear alias is a bounded cached

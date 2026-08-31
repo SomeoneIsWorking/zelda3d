@@ -95,6 +95,16 @@ class CommandWriterTests(unittest.TestCase):
             environment["SOH3D_MEMLOG_RANGES"], "0x14480000:0x145a0000,0x0821e000:0x08220000"
         )
 
+    def test_environment_adds_exact_write_watch(self) -> None:
+        environment = harness_environment(
+            "interpreter", (0x14480000, 0x145A0000), Path("memory.log"), watch_address=0x005B31BC
+        )
+        self.assertEqual(environment["SOH3D_MEMLOG_RANGES"], "0x14480000:0x145a0000,0x005b31bc:0x005b31c0")
+
+    def test_trace_environment_can_target_one_command_word(self) -> None:
+        environment = harness_environment("interpreter", (0x144B0CB8, 0x144B0CBC), Path("memory.log"))
+        self.assertEqual(environment["SOH3D_MEMLOG_RANGES"], "0x144b0cb8:0x144b0cbc")
+
     def test_rejects_invalid_range(self) -> None:
         with self.assertRaisesRegex(ValueError, "--source-range must be non-empty"):
             parse_range("0x10:0x10", "--source-range")
@@ -104,6 +114,19 @@ class CommandWriterTests(unittest.TestCase):
             path = Path(directory) / "selected.log"
             persist_selected_memlog(path, ["MW first", "MW first"], ["MW second"])
             self.assertEqual(path.read_text().splitlines(), ["# Exact writer records selected from the oracle memory log.", "MW first", "MW second"])
+
+    def test_persists_empty_watch_result_explicitly(self) -> None:
+        with TemporaryDirectory() as directory:
+            path = Path(directory) / "selected.log"
+            persist_selected_memlog(path, ["MW writer"], watch_address=0x005B31BC, watch_count=0)
+            self.assertEqual(
+                path.read_text().splitlines(),
+                [
+                    "# Exact writer records selected from the oracle memory log.",
+                    "# Watch 0x005b31bc: 0 matching record(s).",
+                    "MW writer",
+                ],
+            )
 
     def test_rejects_unknown_cpu_mode(self) -> None:
         with self.assertRaisesRegex(ValueError, "unsupported CPU mode"):
