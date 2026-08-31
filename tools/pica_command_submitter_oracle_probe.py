@@ -26,11 +26,12 @@ from pica_command_provenance_oracle_probe import (
 )
 from repo_environment import apply_repo_environment
 
-CAPTURE_VERSION = 4
+CAPTURE_VERSION = 5
 DEFAULT_ENTRANCE = 0xEE
 DEFAULT_DAYTIME = 0x6000
 DEFAULT_SETTLE_FRAMES = 180
 OUTDIR = REPO / "scratch" / "pica_command_submitter"
+POINTER_RANGE = (0x14480000, 0x145A0000)
 
 SUBMIT_RE = re.compile(
     r"^CMDSUBMIT source=(?P<source>GSP|MMIO) pc=0x(?P<pc>[0-9a-fA-F]{8}) lr=0x(?P<lr>[0-9a-fA-F]{8}) "
@@ -43,6 +44,12 @@ SUBMIT_RE = re.compile(
     r"s9=0x(?P<s9>[0-9a-fA-F]{8}) s10=0x(?P<s10>[0-9a-fA-F]{8}) s11=0x(?P<s11>[0-9a-fA-F]{8}) "
     r"s12=0x(?P<s12>[0-9a-fA-F]{8}) s13=0x(?P<s13>[0-9a-fA-F]{8}) s14=0x(?P<s14>[0-9a-fA-F]{8}) "
     r"s15=0x(?P<s15>[0-9a-fA-F]{8}) s16=0x(?P<s16>[0-9a-fA-F]{8})$"
+)
+POINTER_RE = re.compile(
+    r"^PTR pc=0x(?P<pc>[0-9a-fA-F]{8}) lr=0x(?P<lr>[0-9a-fA-F]{8}) "
+    r"va=0x(?P<virtual_address>[0-9a-fA-F]{8}) r0=0x(?P<r0>[0-9a-fA-F]{8}) "
+    r"r1=0x(?P<r1>[0-9a-fA-F]{8}) r2=0x(?P<r2>[0-9a-fA-F]{8}) "
+    r"r3=0x(?P<r3>[0-9a-fA-F]{8}) sp=0x(?P<sp>[0-9a-fA-F]{8})$"
 )
 
 
@@ -69,6 +76,7 @@ def probe_args(draw: int, label: str, entrance: int, daytime: int, settle_frames
         "time_settle_frames": TIME_SETTLE_FRAMES,
         "discovery_run_frames": DISCOVERY_RUN_FRAMES,
         "texture_pack": 0,
+        "pointer_range": [f"0x{POINTER_RANGE[0]:08x}", f"0x{POINTER_RANGE[1]:08x}"],
     }
 
 
@@ -92,6 +100,15 @@ def parse_submit_records(lines: list[str]) -> list[dict[str, int | str]]:
                         for name, value in match.groupdict().items()
                     }
                 )
+    return records
+
+
+def parse_pointer_records(lines: list[str], virtual_address: int) -> list[dict[str, int]]:
+    records = []
+    for line in lines:
+        match = POINTER_RE.match(line)
+        if match is not None and int(match.group("virtual_address"), 16) == virtual_address:
+            records.append({name: int(value, 16) for name, value in match.groupdict().items()})
     return records
 
 
@@ -151,7 +168,13 @@ def capture_live(
     OUTDIR.mkdir(parents=True, exist_ok=True)
     discovery_path = OUTDIR / "discovery.log"
     submit_path = OUTDIR / "gsp-submit.log"
-    environment = {**os.environ, "SOH3D_HARNESS_LOG_GSP_SUBMIT": str(submit_path)}
+    pointer_path = OUTDIR / "pointer.log"
+    environment = {
+        **os.environ,
+        "SOH3D_HARNESS_LOG_GSP_SUBMIT": str(submit_path),
+        "SOH3D_PTRLOG_RANGE": f"0x{POINTER_RANGE[0]:08x}:0x{POINTER_RANGE[1]:08x}",
+        "SOH3D_PTRLOG_PATH": str(pointer_path),
+    }
     harness = spawn(environment=environment)
     try:
         if not boot_to_gameplay(harness, entrance, settle_frames):
@@ -166,23 +189,34 @@ def capture_live(
             raise RuntimeError("oracle PICA logger produced no discovery log")
         if not submit_path.is_file():
             raise RuntimeError("oracle GSP submit logger produced no log")
+        if not pointer_path.is_file():
+            raise RuntimeError("oracle pointer logger produced no log")
         discovery_artifact = cache.put_artifact(
             "pica-command-submitter-discovery", args, discovery_path, suffix=".log"
         )
         submit_artifact = cache.put_artifact(
             "pica-command-submitter-gsp", args, submit_path, suffix=".log"
         )
-        return result_from_logs(
+        pointer_artifact = cache.put_artifact(
+            "pica-command-submitter-pointer", args, pointer_path, suffix=".log"
+        )
+        result = result_from_logs(
             discovery_path.read_text().splitlines(),
             submit_path.read_text().splitlines(),
             draw,
             str(discovery_artifact),
             str(submit_artifact),
         )
+        result["pointer_artifact"] = str(pointer_artifact)
+        result["pointer_records"] = parse_pointer_records(
+            pointer_path.read_text().splitlines(), int(result["submitter"]["virtual_address"], 16)
+        )
+        return result
     finally:
         harness.close()
         discovery_path.unlink(missing_ok=True)
         submit_path.unlink(missing_ok=True)
+        pointer_path.unlink(missing_ok=True)
 
 
 def capture_probe(
