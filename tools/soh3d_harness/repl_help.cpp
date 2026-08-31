@@ -10,6 +10,8 @@ void PrintHelp() {
                          "  r8|r16|r32 <va>      read u8/u16/u32 at VA (0x prefix ok)\n"
                          "  w8|w16|w32 <va> <v>  write u8/u16/u32 at VA\n"
                          "  mem <va> <n>         hex-dump N bytes (N<=4096)\n"
+                         "  dumpphys <pa> <n> <path>\n"
+                         "                      dump an exact physical-memory range to a file\n"
                          "  input <mask>         set held button mask (RETRO_DEVICE_JOYPAD)\n"
                          "                       B=0 Y=1 SELECT=2 START=3 UP=4 DOWN=5\n"
                          "                       LEFT=6 RIGHT=7 A=8 X=9 L=10 R=11\n"
