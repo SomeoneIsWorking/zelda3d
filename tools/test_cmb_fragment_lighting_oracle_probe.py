@@ -64,6 +64,13 @@ class FragmentLightingOracleProbeTests(unittest.TestCase):
         with self.assertRaisesRegex(ValueError, "unsupported"):
             probe.prepare_fixture(harness, "unknown")
 
+    def test_gameplay_fixture_preserves_the_loaded_scene(self) -> None:
+        harness = mock.Mock()
+        with mock.patch.object(probe, "tap") as tap:
+            probe.prepare_fixture(harness, "kokiri-gameplay")
+            probe.prepare_fixture(harness, "gameplay")
+        tap.assert_not_called()
+
     def test_finds_exact_draw_line_without_reparsing_callers(self) -> None:
         lines = ["draw n=4 picaLit=1", "draw n=9 picaLit=0"]
         self.assertEqual(probe._draw_line(lines, 9), lines[1])

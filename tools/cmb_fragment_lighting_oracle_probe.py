@@ -25,7 +25,7 @@ from harness_paths import GAMEPLAY_STATE
 from harness_process import spawn
 from repo_environment import apply_repo_environment
 
-CAPTURE_VERSION = 8
+CAPTURE_VERSION = 9
 # `FUN_003f9b5c` is the candidate CmbRenderer's material-setup vtable slot.
 # Watching it distinguishes "the candidate renderer was not used" from "its
 # optional fragment-light branch was not used" in the same cached frame.
@@ -111,9 +111,12 @@ def choose_enabled_lighting_draw(lines: list[str]) -> tuple[int, str]:
 
 def prepare_fixture(harness: Any, fixture: str) -> None:
     """Drive the named, asset-grounded fixture before arming capture."""
-    if fixture != "kokiri-save-overlay":
-        raise ValueError(f"unsupported fragment-lighting fixture: {fixture}")
-    tap(harness, BTN_START, hold=4, release=60)
+    if fixture in {"gameplay", "kokiri-gameplay"}:
+        return
+    if fixture == "kokiri-save-overlay":
+        tap(harness, BTN_START, hold=4, release=60)
+        return
+    raise ValueError(f"unsupported fragment-lighting fixture: {fixture}")
 
 
 def _read_uniform_lines(path: Path) -> list[str]:
@@ -331,7 +334,11 @@ def main(arguments: list[str] | None = None) -> int:
     parser.add_argument("--entrance", type=lambda value: int(value, 0), default=DEFAULT_ENTRANCE)
     parser.add_argument("--daytime", type=lambda value: int(value, 0), default=DEFAULT_DAYTIME)
     parser.add_argument("--settle-frames", type=int, default=DEFAULT_SETTLE_FRAMES)
-    parser.add_argument("--fixture", choices=("kokiri-save-overlay",), default=DEFAULT_FIXTURE)
+    parser.add_argument(
+        "--fixture",
+        choices=("kokiri-save-overlay", "kokiri-gameplay", "gameplay"),
+        default=DEFAULT_FIXTURE,
+    )
     args = parser.parse_args(arguments)
     if args.settle_frames < 0:
         parser.error("--settle-frames must be non-negative")
