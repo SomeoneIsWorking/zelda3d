@@ -1,9 +1,9 @@
 """Persistent cache for deterministic embedded-Azahar frames and probes.
 
-The cache identity is the savestate bytes, ROM bytes, documented Azahar patch
-set, and resolved texture-pack manifest. Changing any input creates a separate
-context under the gitignored ``scratch/oracle_cache`` tree instead of serving
-stale graphics evidence.
+The cache identity is the savestate bytes, ROM bytes, declared render-affecting
+Azahar patch contract, and resolved texture-pack manifest. Changing any input
+creates a separate context under the gitignored ``scratch/oracle_cache`` tree
+instead of serving stale graphics evidence.
 """
 
 from __future__ import annotations
@@ -14,10 +14,11 @@ import os
 import re
 import shutil
 import time
+from collections.abc import Mapping
 from pathlib import Path
-from typing import Any, Mapping
+from typing import Any
 
-from harness_paths import AZAHAR_PATCH_MD, CACHE_ROOT, REPO_ROOT
+from harness_paths import AZAHAR_RENDER_CONTRACT, CACHE_ROOT, REPO_ROOT
 from repo_environment import apply_repo_environment
 
 
@@ -30,13 +31,17 @@ def _sha256_file(path: Path) -> str:
 
 
 def _patch_marker() -> str:
-    """Return a compact cache discriminator for the complete Azahar patch contract."""
-    if not AZAHAR_PATCH_MD.exists():
-        return "nopatchmd"
-    content = AZAHAR_PATCH_MD.read_bytes()
-    headings = re.findall(r"^#{1,2}\s.*$", content.decode(errors="replace"), re.MULTILINE)
-    digest = hashlib.sha256(content).hexdigest()[:8]
-    return f"p{len(headings)}-{digest}"
+    """Return the declared cache discriminator for render-affecting Azahar changes only."""
+    if not AZAHAR_RENDER_CONTRACT.is_file():
+        raise RuntimeError(f"missing Azahar render contract: {AZAHAR_RENDER_CONTRACT}")
+    for line in AZAHAR_RENDER_CONTRACT.read_text().splitlines():
+        marker = line.strip()
+        if not marker or marker.startswith("#"):
+            continue
+        if not all(character.isalnum() or character in "._-" for character in marker):
+            raise RuntimeError(f"invalid Azahar render contract marker: {marker!r}")
+        return marker
+    raise RuntimeError(f"Azahar render contract has no marker: {AZAHAR_RENDER_CONTRACT}")
 
 
 def _runtime_environment(environment: Mapping[str, str] | None = None) -> dict[str, str]:
@@ -115,7 +120,7 @@ def cache_key(
         "rom_path": str(rom_path) if rom_path else None,
         "rom_sha256_16": rom_sha,
         "azahar_patch_marker": patch,
-        "azahar_patch_md": str(AZAHAR_PATCH_MD),
+        "azahar_render_contract": str(AZAHAR_RENDER_CONTRACT),
         "texture_pack": texture_pack_meta,
     }
 

@@ -180,6 +180,19 @@ class CommandWriterTests(unittest.TestCase):
         )
         self.assertEqual(environment["SOH3D_MEMLOG_RANGES"], "0x14480000:0x145a0000,0x005b31bc:0x005b31c0")
 
+    def test_environment_adds_exact_renderer_state_watch(self) -> None:
+        environment = harness_environment(
+            "interpreter",
+            (0x14480000, 0x145A0000),
+            Path("memory.log"),
+            watch_address=0x005B31BC,
+            state_watch_address=0x081D1538,
+        )
+        self.assertEqual(
+            environment["SOH3D_MEMLOG_RANGES"],
+            "0x14480000:0x145a0000,0x005b31bc:0x005b31c0,0x081d1538:0x081d153c",
+        )
+
     def test_trace_environment_can_target_one_command_word(self) -> None:
         environment = harness_environment("interpreter", (0x144B0CB8, 0x144B0CBC), Path("memory.log"))
         self.assertEqual(environment["SOH3D_MEMLOG_RANGES"], "0x144b0cb8:0x144b0cbc")
