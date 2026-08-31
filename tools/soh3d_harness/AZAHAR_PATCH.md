@@ -805,6 +805,11 @@ offline, then launches the harness with the existing direct `SOH3D_MEMLOG_RANGES
 for a validated linear command-list arena. This avoids the page-watch stale-buffer problem when PICA
 storage rotates per frame.
 
+The cache persists only the exact selected writer records, not an arena-wide raw memory log. A source
+trace may arm one additional bounded range; it stores only the matching source word and the matching
+list record, then removes the broad transient log. This keeps the oracle cache reusable without
+turning repeated RE captures into multi-gigabyte scratch accumulation.
+
 Command-list storage may rotate before the next frame. A writer probe must verify that its watched
 physical list is reused before associating any hit with a draw; a stale linear alias is a bounded cached
 negative, not a renderer identity. The Hut fragment-lighting fixture first demonstrated this rotation.
