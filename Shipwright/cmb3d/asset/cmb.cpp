@@ -287,6 +287,20 @@ bool Cmb::parseMats() {
         // See docs/oot3d_world_lighting_re.md. Material colours are RGBA8 BIG-endian.
         m.fragment_lighting = u8(b, o + 0x00) != 0;
         m.vertex_lighting = u8(b, o + 0x01) != 0;
+        const uint32_t fragmentDescriptor = o + 0xCC;
+        auto& descriptor = m.fragment_lighting_descriptor;
+        descriptor.enum_10 = u16(b, fragmentDescriptor + 0x10);
+        descriptor.enum_12 = u16(b, fragmentDescriptor + 0x12);
+        descriptor.flag_14 = u8(b, fragmentDescriptor + 0x14) != 0;
+        descriptor.enum_18 = u16(b, fragmentDescriptor + 0x18);
+        descriptor.enum_1c = u16(b, fragmentDescriptor + 0x1C);
+        descriptor.flag_1e = u8(b, fragmentDescriptor + 0x1E) != 0;
+        descriptor.flag_1f = u8(b, fragmentDescriptor + 0x1F) != 0;
+        descriptor.flag_20 = u8(b, fragmentDescriptor + 0x20) != 0;
+        descriptor.flag_23 = u8(b, fragmentDescriptor + 0x23) != 0;
+        descriptor.enabled = u8(b, fragmentDescriptor + 0x24) != 0;
+        descriptor.enum_26 = u16(b, fragmentDescriptor + 0x26);
+        descriptor.scale = f32(b, fragmentDescriptor + 0x28);
         // isFogEnabled (noclip readMatsChunk +0x02): this material participates in the PICA
         // distance-fog stage (fog_mode=5 per draw on the 3DS). spot99 room 0: 24/29 set; the
         // additive/effect materials (0,5,11-13) are the exceptions. Consumed by the renderer's
