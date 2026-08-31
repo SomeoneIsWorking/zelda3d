@@ -792,3 +792,16 @@ line, runs the draw, and restores the original bit before the next draw. The cac
 lighting probe requires this log to contain `picaLit=1` before it accepts a retail `picaLit=0`
 observation. The synthetic draw is solely an instrument validation: it is never captured as retail
 lighting state or used for host parity.
+
+# Azahar Patch 13 (2026-08-31, PICA command-list provenance)
+
+Every Patch-5 `vsuni_log` line now includes `cmdList=<physical-address>/<word-index>/<word-count>`.
+`PicaCore::cmd_list` owns these values while processing a command list, so the field identifies the
+exact PICA packet stream that produced a logged draw without exposing a guessed CPU renderer function.
+The cache-owned `tools/pica_command_provenance_oracle_probe.py` persists both that draw log and the raw
+physical command list. `tools/pica_command_writer_oracle_probe.py` decodes a selected register packet
+offline, then uses the harness memory watch to attempt a writer-PC capture for the same list lifetime.
+
+Command-list storage may rotate before the next frame. A writer probe must verify that its watched
+physical list is reused before associating any hit with a draw; a stale linear alias is a bounded cached
+negative, not a renderer identity. The Hut fragment-lighting fixture first demonstrated this rotation.
