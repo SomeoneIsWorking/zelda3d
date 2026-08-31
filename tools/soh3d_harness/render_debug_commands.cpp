@@ -74,6 +74,46 @@ bool HandleCommand(const std::string& cmd, std::istringstream& toks) {
                 std::printf("ok drawskip %d\n", soh3d_draw_skip);
             }
         }
+    } else if (cmd == "lighting_capture") {
+        handled = true;
+        std::string draw;
+        toks >> draw;
+        if (draw == "off" || draw.empty()) {
+            soh3d_lighting_capture_draw = -1;
+            soh3d_lighting_capture_path[0] = '\0';
+            std::printf("ok lighting_capture off\n");
+        } else {
+            std::string path;
+            toks >> path;
+            const auto parsed = ParseNum(draw);
+            if (!parsed || path.empty()) {
+                PrintErr("lighting_capture: usage: lighting_capture <draw> <path>|off");
+            } else {
+                std::snprintf(soh3d_lighting_capture_path, sizeof soh3d_lighting_capture_path, "%s", path.c_str());
+                std::FILE* file = std::fopen(path.c_str(), "w");
+                if (file == nullptr) {
+                    soh3d_lighting_capture_path[0] = '\0';
+                    PrintErr("lighting_capture: cannot open path");
+                } else {
+                    std::fclose(file);
+                    soh3d_lighting_capture_draw = static_cast<int>(*parsed);
+                    std::printf("ok lighting_capture %d %s\n", soh3d_lighting_capture_draw, path.c_str());
+                }
+            }
+        }
+    } else if (cmd == "lighting_selftest") {
+        handled = true;
+        std::string draw;
+        toks >> draw;
+        if (draw == "off" || draw.empty()) {
+            soh3d_lighting_log_selftest_draw = -1;
+            std::printf("ok lighting_selftest off\n");
+        } else if (const auto parsed = ParseNum(draw)) {
+            soh3d_lighting_log_selftest_draw = static_cast<int>(*parsed);
+            std::printf("ok lighting_selftest %d\n", soh3d_lighting_log_selftest_draw);
+        } else {
+            PrintErr("lighting_selftest: usage: lighting_selftest <draw>|off");
+        }
     } else if (cmd == "soh_drawlist") {
         handled = true;
         // One-shot group/material inventory on the next host render. This deliberately does not

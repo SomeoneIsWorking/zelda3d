@@ -599,6 +599,28 @@ DrawArrays(is_indexed);
 Harness: `main.cpp` resets `soh3d_draw_index = 0` before every `retro_run()` in `HandleRun`, and
 adds the REPL command `drawskip <n>|off`.
 
+# Azahar Patch 10 (2026-08-30, cache-owned fragment-lighting state)
+
+`pica_core.cpp`, in the same `trigger_draw` case as Patches 5–7, adds the one-shot globals
+`soh3d_lighting_capture_path[256]` and `soh3d_lighting_capture_draw`. The harness command
+`lighting_capture <draw> <path>` selects one draw after a lightweight `vsuni_log` discovery frame.
+When that draw triggers, Azahar writes one JSON object containing:
+
+- raw `config0`, `config1`, global ambient, LUT input/absolute/scale, and light-slot mapping words;
+- all eight raw PICA light records, while `max_light_index` plus `slot_mapping` identify the active
+  subset and order;
+- only the 256-entry lighting LUT tables activated by that configuration, including per-light spot
+  and distance attenuation tables when enabled.
+
+The latch clears after one attempt, so later frames cannot silently overwrite the capture. The
+committed owner `tools/cmb_fragment_lighting_oracle_probe.py` checks `OracleCache` before spawning,
+uses one process for discovery plus capture on a miss, selects and validates a draw through `picaLit=1`
+from the authoritative `regs.lighting.disable` register (not the independent CmbVShader `fLit`
+boolean), and stores raw artifacts and any structured probe under the complete
+savestate/ROM/patch/texture-pack identity. Failed discovery logs are cached too; changing scenes
+without retaining that falsifier is forbidden. The current `kokiri-save-overlay` fixture is a
+bounded PICA-disabled negative control, not a claim that it reaches Navi or the pause-menu Link model.
+
 **Why**: the Patch-5 uniform log says WHAT lighting state a draw used but not WHICH surface it
 painted. Skipping one draw and diffing the frame against the unmodified one yields that draw's
 exact screen footprint — the oracle-side draw→material mapping. Driver: `tools/oracle_draw_isolate.py`.
@@ -743,3 +765,28 @@ there. CAVEAT (unsolved): the framebuffer x/y in these lines could not be mapped
 the captured image — the depth gradient fixes the orientation (`np.rot90(a, 1)`, far at the top)
 but every candidate transform correlates at only ~0.10, so treat the dump as a POPULATION of the
 draw's fragments, not as an image.
+
+# Azahar Patch 11 (2026-08-31, guest-PC watch for vtable blind spots)
+
+`src/core/arm/dynarmic/arm_dynarmic.cpp` turns the exact armed guest VA into a one-shot JIT
+translation breakpoint. Arming invalidates that target block. Dynarmic's code reader substitutes
+an ARM or Thumb `BKPT` only while the weak `soh3d_pc_watch_target` is nonzero; the breakpoint
+callback records through weak `Soh3d_OnGuestPc`, disarms, invalidates the synthetic block, and
+returns to the unchanged original instruction. Boot, settling, and every untargeted block remain on
+the normal JIT path. The harness owns both symbols and exposes `pcwatch`, `pchits`, and `pcclear`;
+ordinary Azahar builds link neither symbol and retain only the null weak-symbol check during block
+translation.
+
+This closes the static-xref blind spot for functions reached only through heap-resident vtables.
+OoT3D `FUN_003fa5d0`, the candidate fixed-function fragment-lighting material method, is the first
+watch target: the cached probe records its PC, LR, r0-r3, SP, and cycle tick before judging whether
+the same frame contains a `regs.lighting.disable == false` draw.
+
+# Azahar Patch 12 (2026-08-31, PICA-light logger positive control)
+
+The `lighting_selftest <draw>|off` harness command arms one selected PICA draw. At that draw only,
+`pica_core.cpp` temporarily clears `regs.internal.lighting.disable`, emits the normal `vsuni_log`
+line, runs the draw, and restores the original bit before the next draw. The cache-owned fragment
+lighting probe requires this log to contain `picaLit=1` before it accepts a retail `picaLit=0`
+observation. The synthetic draw is solely an instrument validation: it is never captured as retail
+lighting state or used for host parity.

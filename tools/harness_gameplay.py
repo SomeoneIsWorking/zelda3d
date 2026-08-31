@@ -95,7 +95,7 @@ def set_time_of_day(
 
 def _drive_title_to_gameplay(harness: Harness, rounds: int = 6) -> bool:
     """Cold-boot through title and file select using empirically valid short taps."""
-    harness.send("run 300")
+    harness.send("run 300", per_line_timeout=180.0)
     if in_gameplay(harness):
         return True
     for button in (BTN_START, BTN_A):

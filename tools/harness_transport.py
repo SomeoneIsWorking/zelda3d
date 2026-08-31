@@ -21,6 +21,7 @@ _OK_END_COMMANDS = {
     "az_linkjoints",
     "diag",
     "hits",
+    "pchits",
     "snapshot",
     "titleactors",
     "watches",
@@ -29,6 +30,7 @@ _OK_END_COMMANDS = {
 _BARE_OK_COMMANDS = {
     "help",
     "input",
+    "lighting_capture",
     "loadstate",
     "quit",
     "savestate",
@@ -174,7 +176,7 @@ class Harness:
         line, self._buf = self._buf.split(b"\n", 1)
         return line.decode("utf-8", errors="replace")
 
-    def send(self, command: str) -> str:
+    def send(self, command: str, *, per_line_timeout: float = 60.0) -> str:
         """Send one command and return its terminal response line.
 
         The emulated game may print diagnostics while a command is running.
@@ -188,7 +190,7 @@ class Harness:
         stdin.write((command.rstrip() + "\n").encode())
         stdin.flush()
         return _read_streaming_response(
-            self._readline, command, per_line_timeout=60.0, peek_timeout=0.0
+            self._readline, command, per_line_timeout=per_line_timeout, peek_timeout=0.0
         )[-1]
 
     def send_multiline(
