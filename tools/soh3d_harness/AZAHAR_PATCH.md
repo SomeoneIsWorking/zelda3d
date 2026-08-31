@@ -855,3 +855,11 @@ This complements, rather than replaces, the write logger: the Hut command-list a
 off unless explicitly enabled, and records no data or mutations. A positive only proves a caller
 acquired the pointer; correlate it with the exact same-run PICA list address before treating it as a
 candidate list-construction path.
+
+# Azahar Patch 16 (2026-08-31, bulk guest-write provenance)
+
+The existing `SOH3D_MEMLOG_*` range logger now records `MemorySystem::WriteBlockImpl` page chunks before
+their `memcpy`, using `MB` records with PC/LR, virtual range start, byte count, argument registers, and
+SP. This covers host bulk copies and `CopyBlock`'s destination path, which do not route through templated
+`MemorySystem::Write<T>`. The probe joins only records overlapping the exact PICA list interval. The
+trace is disabled unless the existing `SOH3D_MEMLOG_RANGES` setting is present and remains observer-only.
