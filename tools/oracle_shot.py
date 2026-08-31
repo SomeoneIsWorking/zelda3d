@@ -18,7 +18,8 @@ SOLVED (2026-07-22): two causes, both now fixed at the source rather than here.
   2. OoT3D's warp (nextEntranceIndex + transitionTrigger, identical to SoH's) cannot work from the
      title: no save is loaded, so nothing spawns. `warp` used to write into the title PlayState and
      print ok; it now errors. Reaching a loaded save is a ONE-TIME cost — harness_gameplay.boot_to_gameplay
-     captures scratch/gameplay_settled.state on first run and every later session is loadstate+warp
+     captures a contract-versioned `scratch/gameplay_settled.<contract>.state` on first run; every
+     later session is loadstate+warp
      with no input driving at all.
 
 Usage:
