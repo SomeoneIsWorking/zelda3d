@@ -6,6 +6,7 @@ from pathlib import Path
 from tempfile import TemporaryDirectory
 
 from pica_command_writer_oracle_probe import (
+    command_value_records,
     copy_source_value_address,
     harness_environment,
     last_register_write,
@@ -70,6 +71,13 @@ class CommandWriterTests(unittest.TestCase):
             "r10": 0x090A0B0C,
         }
         self.assertEqual(copy_source_value_address(writer, 0x80000400), 0x005B31B0)
+
+    def test_keeps_only_exact_command_value_records(self) -> None:
+        records = [
+            "MW pc=0x00000001 data=0x000000003f800000 r4=0x00000001",
+            "MW pc=0x00000002 data=0x0000000080000400 r4=0x00000001",
+        ]
+        self.assertEqual(command_value_records(records, 0x80000400), records[1:])
 
     def test_rejects_ambiguous_copy_source_value(self) -> None:
         writer = {

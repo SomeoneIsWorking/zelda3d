@@ -30,7 +30,7 @@ from pica_command_provenance_oracle_probe import (
 )
 from repo_environment import apply_repo_environment
 
-CAPTURE_VERSION = 14
+CAPTURE_VERSION = 15
 DEFAULT_ENTRANCE = 0xEE
 DEFAULT_DAYTIME = 0x6000
 DEFAULT_SETTLE_FRAMES = 180
@@ -226,7 +226,7 @@ def memlog_fields(record: str) -> dict[str, int]:
 
 
 def selected_writer_record(records: list[str], command_value: int) -> dict[str, int]:
-    matching = [fields for record in records if (fields := memlog_fields(record)).get("data") == command_value]
+    matching = [memlog_fields(record) for record in command_value_records(records, command_value)]
     if not matching:
         raise RuntimeError(f"memory log has no writer record for command value 0x{command_value:08x}")
     descriptors = {fields.get("r4") for fields in matching}
@@ -235,6 +235,10 @@ def selected_writer_record(records: list[str], command_value: int) -> dict[str, 
     if len(descriptors) != 1:
         raise RuntimeError(f"command value 0x{command_value:08x} has multiple packet descriptors: {descriptors}")
     return matching[0]
+
+
+def command_value_records(records: list[str], command_value: int) -> list[str]:
+    return [record for record in records if memlog_fields(record).get("data") == command_value]
 
 
 def copy_source_value_address(writer: dict[str, int], command_value: int) -> int:
@@ -368,15 +372,17 @@ def capture_live(
                 selected_writer_record(source_records, command_value), command_value
             )
         watch_records: list[str] = []
+        watch_command_records: list[str] = []
         if watch_address is not None:
             try:
                 watch_records = parse_memlog(memlog_path, watch_address)
             except RuntimeError as error:
                 if str(error) != f"memory log has no exact writer for 0x{watch_address:08x}":
                     raise
+            watch_command_records = command_value_records(watch_records, command_value)
             copy_watch_records = [
                 record
-                for record in watch_records
+                for record in watch_command_records
                 if (fields := memlog_fields(record)).get("pc") == COPY_LOOP_PC
                 and fields.get("data") == command_value
             ]
@@ -391,7 +397,7 @@ def capture_live(
             selected_memlog_path,
             writer_records,
             source_records,
-            watch_records,
+            watch_command_records,
             watch_address=watch_address,
             watch_count=len(watch_records) if watch_address is not None else None,
         )
@@ -422,7 +428,9 @@ def capture_live(
             ),
             "source_writer_records": source_records,
             "watch_address": f"0x{watch_address:08x}" if watch_address is not None else None,
-            "watch_writer_records": watch_records,
+            "watch_write_count": len(watch_records) if watch_address is not None else None,
+            "watch_command_match_count": len(watch_command_records) if watch_address is not None else None,
+            "watch_command_records": watch_command_records,
             "copy_source_match_count": len(copy_watch_records) if watch_address is not None else None,
             "discovery_artifact": str(discovery["artifact"]),
             "command_list_artifact": str(command_list_artifact),
