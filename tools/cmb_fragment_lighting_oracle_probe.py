@@ -311,7 +311,7 @@ def capture_probe(
         result = _capture_live(
             cache, args, entrance, daytime, settle_frames, fixture
         )
-    except RuntimeError as error:
+    except (OSError, RuntimeError, ValueError) as error:
         cache.put_probe(
             "cmb-fragment-lighting-failure",
             frame,
