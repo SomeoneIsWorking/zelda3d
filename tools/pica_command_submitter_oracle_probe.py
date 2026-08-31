@@ -26,7 +26,7 @@ from pica_command_provenance_oracle_probe import (
 )
 from repo_environment import apply_repo_environment
 
-CAPTURE_VERSION = 5
+CAPTURE_VERSION = 6
 DEFAULT_ENTRANCE = 0xEE
 DEFAULT_DAYTIME = 0x6000
 DEFAULT_SETTLE_FRAMES = 180
@@ -50,6 +50,13 @@ POINTER_RE = re.compile(
     r"va=0x(?P<virtual_address>[0-9a-fA-F]{8}) r0=0x(?P<r0>[0-9a-fA-F]{8}) "
     r"r1=0x(?P<r1>[0-9a-fA-F]{8}) r2=0x(?P<r2>[0-9a-fA-F]{8}) "
     r"r3=0x(?P<r3>[0-9a-fA-F]{8}) sp=0x(?P<sp>[0-9a-fA-F]{8})$"
+)
+BULK_RE = re.compile(
+    r"^MB pc=0x(?P<pc>[0-9a-fA-F]{8}) lr=0x(?P<lr>[0-9a-fA-F]{8}) "
+    r"va=0x(?P<virtual_address>[0-9a-fA-F]{8}) sz=(?P<size>\d+) "
+    r"r0=0x(?P<r0>[0-9a-fA-F]{8}) r1=0x(?P<r1>[0-9a-fA-F]{8}) "
+    r"r2=0x(?P<r2>[0-9a-fA-F]{8}) r3=0x(?P<r3>[0-9a-fA-F]{8}) "
+    r"sp=0x(?P<sp>[0-9a-fA-F]{8})$"
 )
 
 
@@ -112,6 +119,21 @@ def parse_pointer_records(lines: list[str], virtual_address: int) -> list[dict[s
     return records
 
 
+def parse_bulk_records(lines: list[str], start: int, end: int) -> list[dict[str, int]]:
+    records = []
+    for line in lines:
+        match = BULK_RE.match(line)
+        if match is None:
+            continue
+        record = {
+            name: int(value) if name == "size" else int(value, 16)
+            for name, value in match.groupdict().items()
+        }
+        if record["virtual_address"] < end and record["virtual_address"] + record["size"] > start:
+            records.append(record)
+    return records
+
+
 def match_submit_record(
     records: list[dict[str, int | str]], physical_address: int, size: int
 ) -> dict[str, int | str]:
@@ -169,11 +191,14 @@ def capture_live(
     discovery_path = OUTDIR / "discovery.log"
     submit_path = OUTDIR / "gsp-submit.log"
     pointer_path = OUTDIR / "pointer.log"
+    bulk_path = OUTDIR / "bulk-write.log"
     environment = {
         **os.environ,
         "SOH3D_HARNESS_LOG_GSP_SUBMIT": str(submit_path),
         "SOH3D_PTRLOG_RANGE": f"0x{POINTER_RANGE[0]:08x}:0x{POINTER_RANGE[1]:08x}",
         "SOH3D_PTRLOG_PATH": str(pointer_path),
+        "SOH3D_MEMLOG_RANGES": f"0x{POINTER_RANGE[0]:08x}:0x{POINTER_RANGE[1]:08x}",
+        "SOH3D_MEMLOG_PATH": str(bulk_path),
     }
     harness = spawn(environment=environment)
     try:
@@ -191,6 +216,8 @@ def capture_live(
             raise RuntimeError("oracle GSP submit logger produced no log")
         if not pointer_path.is_file():
             raise RuntimeError("oracle pointer logger produced no log")
+        if not bulk_path.is_file():
+            raise RuntimeError("oracle bulk-write logger produced no log")
         discovery_artifact = cache.put_artifact(
             "pica-command-submitter-discovery", args, discovery_path, suffix=".log"
         )
@@ -200,6 +227,9 @@ def capture_live(
         pointer_artifact = cache.put_artifact(
             "pica-command-submitter-pointer", args, pointer_path, suffix=".log"
         )
+        bulk_artifact = cache.put_artifact(
+            "pica-command-submitter-bulk", args, bulk_path, suffix=".log"
+        )
         result = result_from_logs(
             discovery_path.read_text().splitlines(),
             submit_path.read_text().splitlines(),
@@ -208,8 +238,15 @@ def capture_live(
             str(submit_artifact),
         )
         result["pointer_artifact"] = str(pointer_artifact)
+        result["bulk_artifact"] = str(bulk_artifact)
         result["pointer_records"] = parse_pointer_records(
             pointer_path.read_text().splitlines(), int(result["submitter"]["virtual_address"], 16)
+        )
+        list_start = int(result["submitter"]["virtual_address"], 16)
+        result["bulk_records"] = parse_bulk_records(
+            bulk_path.read_text().splitlines(),
+            list_start,
+            list_start + result["command_list_word_count"] * 4,
         )
         return result
     finally:
@@ -217,6 +254,7 @@ def capture_live(
         discovery_path.unlink(missing_ok=True)
         submit_path.unlink(missing_ok=True)
         pointer_path.unlink(missing_ok=True)
+        bulk_path.unlink(missing_ok=True)
 
 
 def capture_probe(

@@ -4,6 +4,7 @@ import unittest
 
 from pica_command_submitter_oracle_probe import (
     match_submit_record,
+    parse_bulk_records,
     parse_pointer_records,
     parse_submit_records,
 )
@@ -109,3 +110,17 @@ class ParseSubmitRecordsTests(unittest.TestCase):
                 }
             ],
         )
+
+    def test_reads_bulk_write_that_overlaps_command_list(self) -> None:
+        lines = [
+            (
+                "MB pc=0x00123456 lr=0x00654321 va=0x1458fa00 sz=512 r0=0x00000001 r1=0x00000002 "
+                "r2=0x00000003 r3=0x00000004 sp=0x0ffff000"
+            ),
+            (
+                "MB pc=0x00876543 lr=0x00123456 va=0x14590000 sz=32 r0=0x00000000 r1=0x00000000 "
+                "r2=0x00000000 r3=0x00000000 sp=0x0ffff000"
+            ),
+        ]
+        records = parse_bulk_records(lines, 0x1458FA80, 0x1458FB80)
+        self.assertEqual([record["pc"] for record in records], [0x00123456])
