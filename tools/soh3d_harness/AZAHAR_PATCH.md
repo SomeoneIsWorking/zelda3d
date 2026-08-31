@@ -823,7 +823,7 @@ and direct GPU-MMIO command-buffer triggers record the guest CPU state that subm
 its resolved physical command-list address and byte size:
 
 ```
-CMDSUBMIT source=GSP|MMIO pc=0x... lr=0x... listVa=0x... listPa=0x... size=... mmio=0x... r0=0x... r1=0x... r2=0x... r3=0x... sp=0x...
+CMDSUBMIT source=GSP|MMIO pc=0x... lr=0x... listVa=0x... listPa=0x... size=... mmio=0x... r0=0x... r1=0x... r2=0x... r3=0x... sp=0x... s0=0x... ... s16=0x...
 ```
 
 This is deliberately at the last submission boundary before `GPU::SubmitCmdList` consumes the supplied
@@ -834,3 +834,8 @@ the backing address is reused with several list lengths during one frame. The ca
 guest GSP request context, not yet the routine that populated the list. Never infer provenance from
 list order or from an address captured in another frame. Normal Azahar and harness launches do not set
 this environment variable and take no logging path.
+
+The 17 `sN` values are non-faulting reads of the guest stack at the submission SVC. They are needed
+because the captured `lr` can be a generic service-return stub. A nonzero stack word is not by itself a
+return address: validate it against the active ARM callback frame before extending the material-state
+RE. They are diagnostic state only and do not alter guest memory or command processing.
