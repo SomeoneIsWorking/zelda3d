@@ -817,7 +817,9 @@ can rotate between harness processes, so this source-watch path requires the sam
 packet index, and packet value but does not pretend the physical address is a stable identity. This
 keeps the oracle cache reusable without turning repeated RE captures into multi-gigabyte scratch
 accumulation. A generic exact watch always preserves its selected records and reports the number that
-are the copy loop; it does not misclassify a producer write as another copy.
+are the copy loop; the cache retains only records matching the selected PICA value and records both
+the total write count and matching count, so unrelated overwrites cannot inflate an RE artifact or be
+misclassified as another copy.
 
 Command-list storage may rotate before the next frame. A writer probe must verify that its watched
 physical list is reused before associating any hit with a draw; a stale linear alias is a bounded cached
