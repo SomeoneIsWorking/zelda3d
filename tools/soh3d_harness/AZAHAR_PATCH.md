@@ -814,3 +814,23 @@ normal Azahar and harness launches retain fast memory. The Hut command packet st
 record in this mode, proving that its producer is outside both Dynarmic store paths.
 Its selected `config0` packet also has no matching `MemorySystem::Write` record under the direct logger,
 so the active list is populated by another write path; recover that path before assigning a guest writer.
+
+# Azahar Patch 14 (2026-08-31, GSP command-list submitter provenance)
+
+`src/video_core/gpu.cpp` adds a second opt-in, observer-only trace. When
+`SOH3D_HARNESS_LOG_GSP_SUBMIT=<path>` is set, both `CommandId::SubmitCmdList`
+and direct GPU-MMIO command-buffer triggers record the guest CPU state that submits each list, plus
+its resolved physical command-list address and byte size:
+
+```
+CMDSUBMIT source=GSP|MMIO pc=0x... lr=0x... listVa=0x... listPa=0x... size=... mmio=0x... r0=0x... r1=0x... r2=0x... r3=0x... sp=0x...
+```
+
+This is deliberately at the last submission boundary before `GPU::SubmitCmdList` consumes the supplied
+list without copying it, so page watching its rotating backing allocation cannot identify its producer.
+A probe must join a record to the PICA draw by both exact physical command-list address *and byte size*;
+the backing address is reused with several list lengths during one frame. The cached Hut capture joins
+`0x2058FA80 / 69648` to the GSP submitter at PC `0x004A0814`, LR `0x002C1970`; this identifies the
+guest GSP request context, not yet the routine that populated the list. Never infer provenance from
+list order or from an address captured in another frame. Normal Azahar and harness launches do not set
+this environment variable and take no logging path.
