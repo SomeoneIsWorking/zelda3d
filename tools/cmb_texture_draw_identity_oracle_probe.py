@@ -31,7 +31,7 @@ from harness_paths import GAMEPLAY_STATE
 from harness_process import spawn
 from repo_environment import apply_repo_environment
 
-CAPTURE_VERSION = 2
+CAPTURE_VERSION = 3
 DEFAULT_ARCHIVE = "/actor/zelda_wood02.zar"
 DEFAULT_ENTRANCE = 0xEE
 DEFAULT_DAYTIME = 0x6000
@@ -57,6 +57,10 @@ class CacheLike(Protocol):
         source: Path,
         suffix: str | None = None,
     ) -> Path: ...
+
+
+class OracleObservationFailure(RuntimeError):
+    """A complete oracle observation whose negative result is cacheable."""
 
 
 def probe_args(
@@ -138,7 +142,7 @@ def _capture_live(
             artifact = cache.put_artifact(
                 "cmb-texture-draw-identity-discovery", args, discovery_path, suffix=".log"
             )
-            raise RuntimeError(
+            raise OracleObservationFailure(
                 f"oracle draw log scanned {len(logged)} texture descriptors and matched 0 "
                 f"source descriptors from {len(sources)} {source_description} textures; "
                 f"cached diagnostic: {artifact}"
@@ -171,7 +175,7 @@ def _capture_live(
         )
         matches = match_guest_payloads(candidates, sources, guest_payloads)
         if not matches:
-            raise RuntimeError(
+            raise OracleObservationFailure(
                 f"oracle draw log scanned {len(logged)} texture descriptors, matched "
                 f"{len(candidates)} source-compatible descriptors, read "
                 f"{len(guest_payloads)} unique guest textures, and matched 0 exact CMB payloads; "
@@ -227,7 +231,7 @@ def capture_probe(
         result = _capture_live(
             cache, args, archive, source_mode, entrance, daytime, settle_frames
         )
-    except RuntimeError as error:
+    except OracleObservationFailure as error:
         cache.put_probe(
             "cmb-texture-draw-identity-failure",
             frame,

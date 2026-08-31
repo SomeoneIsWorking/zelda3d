@@ -56,10 +56,12 @@ class CmbTextureDrawIdentityOracleProbeTests(unittest.TestCase):
         self.assertIs(result, cached)
         self.assertEqual(cache.puts, [])
 
-    def test_live_failure_is_cached_and_not_retried(self) -> None:
+    def test_complete_observation_failure_is_cached_and_not_retried(self) -> None:
         cache = FakeCache(None)
         with mock.patch.object(
-            probe, "_capture_live", side_effect=RuntimeError("no source match")
+            probe,
+            "_capture_live",
+            side_effect=probe.OracleObservationFailure("no source match"),
         ) as live:
             with self.assertRaisesRegex(RuntimeError, "no source match"):
                 probe.capture_probe(cache)
@@ -68,6 +70,15 @@ class CmbTextureDrawIdentityOracleProbeTests(unittest.TestCase):
             with self.assertRaisesRegex(RuntimeError, "cached oracle failure"):
                 probe.capture_probe(cache)
         live.assert_called_once()
+
+    def test_bootstrap_failure_is_not_cached(self) -> None:
+        cache = FakeCache(None)
+        with mock.patch.object(
+            probe, "_capture_live", side_effect=RuntimeError("harness closed stdout unexpectedly")
+        ):
+            with self.assertRaisesRegex(RuntimeError, "harness closed stdout unexpectedly"):
+                probe.capture_probe(cache)
+        self.assertEqual(cache.puts, [])
 
     def test_source_mode_is_part_of_the_cache_identity(self) -> None:
         enabled = probe.probe_args("/actor/test.zar", "enabled-fragment-primary", 0xEE, 0x6000, 180)
