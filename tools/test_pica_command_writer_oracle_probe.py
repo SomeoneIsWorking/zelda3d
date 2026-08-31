@@ -6,6 +6,7 @@ from pathlib import Path
 from tempfile import TemporaryDirectory
 
 from pica_command_writer_oracle_probe import (
+    copy_source_value_address,
     harness_environment,
     last_register_write,
     linear_virtual_address,
@@ -58,6 +59,29 @@ class CommandWriterTests(unittest.TestCase):
             )
         ]
         self.assertEqual(selected_writer_record(records, 0x80000400)["r4"], 0x08210000)
+
+    def test_recovers_copy_source_address_from_loaded_register(self) -> None:
+        writer = {
+            "pc": 0x00371758,
+            "r1": 0x005B31BC,
+            "r7": 0x01020304,
+            "r8": 0x80000400,
+            "r9": 0x05060708,
+            "r10": 0x090A0B0C,
+        }
+        self.assertEqual(copy_source_value_address(writer, 0x80000400), 0x005B31B0)
+
+    def test_rejects_ambiguous_copy_source_value(self) -> None:
+        writer = {
+            "pc": 0x00371758,
+            "r1": 0x005B31BC,
+            "r7": 0x80000400,
+            "r8": 0x80000400,
+            "r9": 0x05060708,
+            "r10": 0x090A0B0C,
+        }
+        with self.assertRaisesRegex(RuntimeError, "2 source registers"):
+            copy_source_value_address(writer, 0x80000400)
 
     def test_snapshots_exact_store_dispatcher_fields(self) -> None:
         state = snapshot_owner_state(
