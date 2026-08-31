@@ -1,0 +1,244 @@
+#!/usr/bin/env python3
+"""Cache-owned GSP submitter provenance for one deterministic PICA draw."""
+
+from __future__ import annotations
+
+import argparse
+import json
+import os
+import re
+import sys
+from pathlib import Path
+from typing import Any, Protocol
+
+REPO = Path(__file__).resolve().parent.parent
+if str(REPO / "tools") not in sys.path:
+    sys.path.insert(0, str(REPO / "tools"))
+
+from harness_cache import OracleCache
+from harness_gameplay import boot_to_gameplay, set_time_of_day
+from harness_paths import GAMEPLAY_STATE
+from harness_process import spawn
+from pica_command_provenance_oracle_probe import (
+    DISCOVERY_RUN_FRAMES,
+    TIME_SETTLE_FRAMES,
+    parse_provenance,
+)
+from repo_environment import apply_repo_environment
+
+CAPTURE_VERSION = 2
+DEFAULT_ENTRANCE = 0xEE
+DEFAULT_DAYTIME = 0x6000
+DEFAULT_SETTLE_FRAMES = 180
+OUTDIR = REPO / "scratch" / "pica_command_submitter"
+
+SUBMIT_RE = re.compile(
+    r"^CMDSUBMIT source=(?P<source>GSP|MMIO) pc=0x(?P<pc>[0-9a-fA-F]{8}) lr=0x(?P<lr>[0-9a-fA-F]{8}) "
+    r"listVa=0x(?P<virtual_address>[0-9a-fA-F]{8}) listPa=0x(?P<physical_address>[0-9a-fA-F]{8}) "
+    r"size=(?P<size>\d+) mmio=0x(?P<mmio_address>[0-9a-fA-F]{8}) r0=0x(?P<r0>[0-9a-fA-F]{8}) r1=0x(?P<r1>[0-9a-fA-F]{8}) "
+    r"r2=0x(?P<r2>[0-9a-fA-F]{8}) r3=0x(?P<r3>[0-9a-fA-F]{8}) sp=0x(?P<sp>[0-9a-fA-F]{8})$"
+)
+
+
+class CacheLike(Protocol):
+    key: str
+
+    def get_probe(self, name: str, frame: int, args: dict[str, Any]) -> dict[str, Any] | None: ...
+
+    def put_probe(self, name: str, frame: int, args: dict[str, Any], result: dict[str, Any]) -> Path: ...
+
+    def put_artifact(
+        self, name: str, args: dict[str, Any], source: Path, suffix: str | None = None
+    ) -> Path: ...
+
+
+def probe_args(draw: int, label: str, entrance: int, daytime: int, settle_frames: int) -> dict[str, Any]:
+    return {
+        "capture_version": CAPTURE_VERSION,
+        "draw": draw,
+        "label": label,
+        "entrance": entrance,
+        "daytime": daytime,
+        "settle_frames": settle_frames,
+        "time_settle_frames": TIME_SETTLE_FRAMES,
+        "discovery_run_frames": DISCOVERY_RUN_FRAMES,
+        "texture_pack": 0,
+    }
+
+
+def capture_frame(settle_frames: int) -> int:
+    return settle_frames + TIME_SETTLE_FRAMES + DISCOVERY_RUN_FRAMES
+
+
+def parse_submit_records(lines: list[str]) -> list[dict[str, int | str]]:
+    records = []
+    for raw_line in lines:
+        for line in raw_line.replace("\\n", "\n").splitlines():
+            match = SUBMIT_RE.match(line)
+            if match is not None:
+                records.append(
+                    {
+                        name: value
+                        if name == "source"
+                        else int(value, 16)
+                        if name != "size"
+                        else int(value)
+                        for name, value in match.groupdict().items()
+                    }
+                )
+    return records
+
+
+def match_submit_record(
+    records: list[dict[str, int | str]], physical_address: int, size: int
+) -> dict[str, int | str]:
+    matches = [
+        record
+        for record in records
+        if record["physical_address"] == physical_address and record["size"] == size
+    ]
+    if not matches:
+        raise RuntimeError(
+            f"GSP submit log has no {size}-byte record for command list 0x{physical_address:08x}"
+        )
+    distinct = {tuple(sorted(record.items())) for record in matches}
+    if len(distinct) != 1:
+        raise RuntimeError(
+            f"GSP submit log has {len(distinct)} distinct records for command list 0x{physical_address:08x}"
+        )
+    return matches[-1]
+
+
+def result_from_logs(
+    discovery_lines: list[str],
+    submit_lines: list[str],
+    draw: int,
+    discovery_artifact: str,
+    submit_artifact: str,
+) -> dict[str, Any]:
+    provenance = parse_provenance(discovery_lines, draw)
+    submitter = match_submit_record(
+        parse_submit_records(submit_lines),
+        provenance["command_list_address"],
+        provenance["command_list_word_count"] * 4,
+    )
+    return {
+        "capture_version": CAPTURE_VERSION,
+        "draw": draw,
+        "command_list_address": f"0x{provenance['command_list_address']:08x}",
+        "command_list_word_index": provenance["command_list_word_index"],
+        "command_list_word_count": provenance["command_list_word_count"],
+        "submitter": {
+            name: value if name == "source" else f"0x{value:08x}"
+            for name, value in submitter.items()
+            if name not in {"size", "source"}
+        }
+        | {"source": submitter["source"], "size": submitter["size"]},
+        "discovery_artifact": discovery_artifact,
+        "submit_artifact": submit_artifact,
+    }
+
+
+def capture_live(
+    cache: CacheLike, args: dict[str, Any], draw: int, entrance: int, daytime: int, settle_frames: int
+) -> dict[str, Any]:
+    OUTDIR.mkdir(parents=True, exist_ok=True)
+    discovery_path = OUTDIR / "discovery.log"
+    submit_path = OUTDIR / "gsp-submit.log"
+    environment = {**os.environ, "SOH3D_HARNESS_LOG_GSP_SUBMIT": str(submit_path)}
+    harness = spawn(environment=environment)
+    try:
+        if not boot_to_gameplay(harness, entrance, settle_frames):
+            raise RuntimeError("oracle failed to reach deterministic gameplay state")
+        set_time_of_day(harness, daytime, settle=TIME_SETTLE_FRAMES)
+        response = harness.send(f"vsuni_log {discovery_path}")
+        if response != f"ok vsuni_log {discovery_path}":
+            raise RuntimeError(f"oracle PICA logger failed: {response}")
+        harness.send(f"run {DISCOVERY_RUN_FRAMES}")
+        harness.send("vsuni_log off")
+        if not discovery_path.is_file():
+            raise RuntimeError("oracle PICA logger produced no discovery log")
+        if not submit_path.is_file():
+            raise RuntimeError("oracle GSP submit logger produced no log")
+        discovery_artifact = cache.put_artifact(
+            "pica-command-submitter-discovery", args, discovery_path, suffix=".log"
+        )
+        submit_artifact = cache.put_artifact(
+            "pica-command-submitter-gsp", args, submit_path, suffix=".log"
+        )
+        return result_from_logs(
+            discovery_path.read_text().splitlines(),
+            submit_path.read_text().splitlines(),
+            draw,
+            str(discovery_artifact),
+            str(submit_artifact),
+        )
+    finally:
+        harness.close()
+        discovery_path.unlink(missing_ok=True)
+        submit_path.unlink(missing_ok=True)
+
+
+def capture_probe(
+    cache: CacheLike,
+    draw: int,
+    label: str,
+    entrance: int = DEFAULT_ENTRANCE,
+    daytime: int = DEFAULT_DAYTIME,
+    settle_frames: int = DEFAULT_SETTLE_FRAMES,
+) -> tuple[dict[str, Any], bool]:
+    args = probe_args(draw, label, entrance, daytime, settle_frames)
+    frame = capture_frame(settle_frames)
+    cached = cache.get_probe("pica-command-submitter", frame, args)
+    if cached is not None:
+        return cached, True
+    failed = cache.get_probe("pica-command-submitter-failure", frame, args)
+    if failed is not None:
+        raise RuntimeError(f"cached oracle failure: {failed['error']}")
+    try:
+        result = capture_live(cache, args, draw, entrance, daytime, settle_frames)
+    except (OSError, RuntimeError, ValueError) as error:
+        cache.put_probe(
+            "pica-command-submitter-failure",
+            frame,
+            args,
+            {"capture_version": CAPTURE_VERSION, "error": str(error)},
+        )
+        raise
+    cache.put_probe("pica-command-submitter", frame, args, result)
+    return result, False
+
+
+def cache_context() -> OracleCache:
+    apply_repo_environment(REPO, os.environ)
+    os.environ["ZELDA3D_HARNESS_TEXPACK"] = "off"
+    return OracleCache(GAMEPLAY_STATE)
+
+
+def main(arguments: list[str] | None = None) -> int:
+    parser = argparse.ArgumentParser(description=__doc__.splitlines()[0])
+    parser.add_argument("--draw", required=True, type=int)
+    parser.add_argument("--label", required=True)
+    parser.add_argument("--entrance", type=lambda value: int(value, 0), default=DEFAULT_ENTRANCE)
+    parser.add_argument("--daytime", type=lambda value: int(value, 0), default=DEFAULT_DAYTIME)
+    parser.add_argument("--settle-frames", type=int, default=DEFAULT_SETTLE_FRAMES)
+    args = parser.parse_args(arguments)
+    if args.draw < 0:
+        parser.error("--draw must be non-negative")
+    if args.settle_frames < 0:
+        parser.error("--settle-frames must be non-negative")
+    try:
+        cache = cache_context()
+        result, hit = capture_probe(
+            cache, args.draw, args.label, args.entrance, args.daytime, args.settle_frames
+        )
+        print(f"oracle: {'cache hit' if hit else 'captured and cached'} key={cache.key}")
+        print(json.dumps(result, indent=2, sort_keys=True))
+        return 0
+    except (OSError, RuntimeError, ValueError, json.JSONDecodeError) as error:
+        print(f"error: {error}", file=sys.stderr)
+        return 1
+
+
+if __name__ == "__main__":
+    raise SystemExit(main())
