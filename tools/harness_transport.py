@@ -7,7 +7,7 @@ import re
 import select
 import subprocess
 import time
-from collections.abc import Callable
+from collections.abc import Callable, Mapping
 from contextlib import ExitStack
 from typing import Self
 
@@ -134,7 +134,7 @@ def _read_streaming_response(
 class Harness:
     """Own one harness subprocess and its line-oriented REPL transport."""
 
-    def __init__(self, cmd: list[str]):
+    def __init__(self, cmd: list[str], environment: Mapping[str, str] | None = None):
         # Binary, unbuffered I/O keeps select() and the Python buffer in sync.
         with ExitStack() as resources:
             stderr = subprocess.DEVNULL
@@ -149,6 +149,7 @@ class Harness:
                 stdout=subprocess.PIPE,
                 stderr=stderr,
                 bufsize=0,
+                env=environment,
             )
         self._buf = b""
         line = self._readline()

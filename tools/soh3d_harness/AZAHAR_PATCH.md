@@ -800,8 +800,12 @@ Every Patch-5 `vsuni_log` line now includes `cmdList=<physical-address>/<word-in
 exact PICA packet stream that produced a logged draw without exposing a guessed CPU renderer function.
 The cache-owned `tools/pica_command_provenance_oracle_probe.py` persists both that draw log and the raw
 physical command list. `tools/pica_command_writer_oracle_probe.py` decodes a selected register packet
-offline, then uses the harness memory watch to attempt a writer-PC capture for the same list lifetime.
+offline, then launches the harness with the existing direct `SOH3D_MEMLOG_RANGES` writer logger armed
+for a validated linear command-list arena. This avoids the page-watch stale-buffer problem when PICA
+storage rotates per frame.
 
 Command-list storage may rotate before the next frame. A writer probe must verify that its watched
 physical list is reused before associating any hit with a draw; a stale linear alias is a bounded cached
 negative, not a renderer identity. The Hut fragment-lighting fixture first demonstrated this rotation.
+Its selected `config0` packet also has no matching `MemorySystem::Write` record under the direct logger,
+so the active list is populated by another write path; recover that path before assigning a guest writer.

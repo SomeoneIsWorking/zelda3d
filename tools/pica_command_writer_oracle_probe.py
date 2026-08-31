@@ -6,6 +6,7 @@ from __future__ import annotations
 import argparse
 import json
 import os
+import re
 import struct
 import sys
 from pathlib import Path
@@ -23,17 +24,21 @@ from pica_command_provenance_oracle_probe import (
     DISCOVERY_RUN_FRAMES,
     TIME_SETTLE_FRAMES,
     parse_provenance,
-    provenance_records,
 )
 from repo_environment import apply_repo_environment
 
-CAPTURE_VERSION = 2
+CAPTURE_VERSION = 4
 DEFAULT_ENTRANCE = 0xEE
 DEFAULT_DAYTIME = 0x6000
 DEFAULT_SETTLE_FRAMES = 180
 FCRAM_PHYSICAL_BASE = 0x20000000
 LINEAR_HEAP_VIRTUAL_BASE = 0x14000000
 OUTDIR = REPO / "scratch" / "pica_command_writer"
+DEFAULT_LINEAR_RANGE = (0x14480000, 0x145A0000)
+MEMLOG_RE = re.compile(
+    r"^MW pc=0x[0-9a-fA-F]{8} lr=0x[0-9a-fA-F]{8} "
+    r"va=0x(?P<address>[0-9a-fA-F]{8}) sz=(?P<size>\d+) "
+)
 
 
 class CacheLike(Protocol):
@@ -49,7 +54,13 @@ class CacheLike(Protocol):
 
 
 def probe_args(
-    draw: int, register: int, label: str, entrance: int, daytime: int, settle_frames: int
+    draw: int,
+    register: int,
+    label: str,
+    entrance: int,
+    daytime: int,
+    settle_frames: int,
+    linear_range: tuple[int, int],
 ) -> dict[str, Any]:
     return {
         "capture_version": CAPTURE_VERSION,
@@ -61,13 +72,13 @@ def probe_args(
         "settle_frames": settle_frames,
         "time_settle_frames": TIME_SETTLE_FRAMES,
         "discovery_run_frames": DISCOVERY_RUN_FRAMES,
-        "validation_run_frames": 1,
+        "linear_range": [f"0x{linear_range[0]:08x}", f"0x{linear_range[1]:08x}"],
         "texture_pack": 0,
     }
 
 
 def capture_frame(settle_frames: int) -> int:
-    return settle_frames + TIME_SETTLE_FRAMES + DISCOVERY_RUN_FRAMES + 1
+    return settle_frames + TIME_SETTLE_FRAMES + DISCOVERY_RUN_FRAMES
 
 
 def parse_command_writes(payload: bytes, end_word: int) -> list[tuple[int, int, int]]:
@@ -111,12 +122,19 @@ def linear_virtual_address(physical_address: int, word_index: int) -> int:
     return LINEAR_HEAP_VIRTUAL_BASE + physical_address - FCRAM_PHYSICAL_BASE + word_index * 4
 
 
-def parse_hits(lines: list[str]) -> list[str]:
-    if not lines or not lines[0].startswith("ok hits ") or lines[-1] != "ok end":
-        raise RuntimeError(f"oracle memory watch returned malformed response: {lines}")
-    records = lines[1:-1]
+def parse_memlog(path: Path, target_address: int) -> list[str]:
+    if not path.is_file():
+        raise RuntimeError("oracle command-buffer memory log is missing")
+    records = []
+    for line in path.read_text().splitlines():
+        match = MEMLOG_RE.match(line)
+        if match is not None:
+            address = int(match.group("address"), 16)
+            size = int(match.group("size"))
+            if address <= target_address < address + size:
+                records.append(line)
     if not records:
-        raise RuntimeError("PICA command-buffer word was not rewritten in the validation frame")
+        raise RuntimeError(f"memory log has no exact writer for 0x{target_address:08x}")
     return records
 
 
@@ -128,14 +146,18 @@ def capture_live(
     entrance: int,
     daytime: int,
     settle_frames: int,
+    linear_range: tuple[int, int],
 ) -> dict[str, Any]:
     OUTDIR.mkdir(parents=True, exist_ok=True)
     discovery_path = OUTDIR / "discovery.log"
-    alternate_path = OUTDIR / "alternate.log"
-    validation_path = OUTDIR / "validation.log"
     command_list_path = OUTDIR / "command-list.bin"
-    harness = spawn()
-    watch_address = 0
+    memlog_path = OUTDIR / "memory-writes.log"
+    environment = {
+        **os.environ,
+        "SOH3D_MEMLOG_RANGES": f"0x{linear_range[0]:08x}:0x{linear_range[1]:08x}",
+        "SOH3D_MEMLOG_PATH": str(memlog_path),
+    }
+    harness = spawn(environment=environment)
     try:
         if not boot_to_gameplay(harness, entrance, settle_frames):
             raise RuntimeError("oracle failed to reach deterministic gameplay state")
@@ -148,22 +170,9 @@ def capture_live(
         if not discovery_path.is_file():
             raise RuntimeError("oracle PICA logger produced no discovery log")
         provenance = parse_provenance(discovery_path.read_text().splitlines(), draw)
-        response = harness.send(f"vsuni_log {alternate_path}")
-        if response != f"ok vsuni_log {alternate_path}":
-            raise RuntimeError(f"oracle alternate-buffer logger failed: {response}")
-        harness.send("run 1")
-        harness.send("vsuni_log off")
-        if not alternate_path.is_file():
-            raise RuntimeError("oracle alternate-buffer logger produced no log")
-        alternate = parse_provenance(alternate_path.read_text().splitlines(), draw)
-        if alternate["command_list_address"] == provenance["command_list_address"]:
-            raise RuntimeError(
-                "PICA command-list address did not rotate to an alternate buffer: "
-                f"0x{alternate['command_list_address']:08x}"
-            )
-        list_bytes = alternate["command_list_word_count"] * 4
+        list_bytes = provenance["command_list_word_count"] * 4
         dump_response = harness.send_multiline(
-            f"dumpphys 0x{alternate['command_list_address']:08x} {list_bytes} {command_list_path}"
+            f"dumpphys 0x{provenance['command_list_address']:08x} {list_bytes} {command_list_path}"
         )
         if len(dump_response) != 1 or not dump_response[0].startswith("ok dumpphys "):
             raise RuntimeError(f"oracle command-list dump failed: {dump_response}")
@@ -171,64 +180,39 @@ def capture_live(
         if len(payload) != list_bytes:
             raise RuntimeError(f"oracle command-list dump has {len(payload)} bytes, expected {list_bytes}")
         word_index, command_value = last_register_write(
-            payload, alternate["command_list_word_index"], register
+            payload, provenance["command_list_word_index"], register
         )
         discovery_artifact = cache.put_artifact(
             "pica-command-writer-discovery", args, discovery_path, suffix=".log"
         )
-        alternate_artifact = cache.put_artifact(
-            "pica-command-writer-alternate", args, alternate_path, suffix=".log"
-        )
         command_list_artifact = cache.put_artifact(
             "pica-command-writer-list", args, command_list_path, suffix=".bin"
         )
-        watch_address = linear_virtual_address(alternate["command_list_address"], word_index)
-        response = harness.send(f"watch 0x{watch_address:08x} 4")
-        if response != f"ok watch 0x{watch_address:08x} 4":
-            raise RuntimeError(f"oracle command-buffer watch failed: {response}")
-        response = harness.send(f"vsuni_log {validation_path}")
-        if response != f"ok vsuni_log {validation_path}":
-            raise RuntimeError(f"oracle validation logger failed: {response}")
-        harness.send("run 2")
-        harness.send("vsuni_log off")
-        hits = parse_hits(harness.send_multiline(f"hits 0x{watch_address:08x}"))
-        response = harness.send(f"unwatch 0x{watch_address:08x} 4")
-        if response != f"ok unwatch 0x{watch_address:08x} 4":
-            raise RuntimeError(f"oracle command-buffer unwatch failed: {response}")
-        watch_address = 0
-        if not validation_path.is_file():
-            raise RuntimeError("oracle validation logger produced no log")
-        validation = provenance_records(validation_path.read_text().splitlines(), draw)
-        if not any(record["command_list_address"] == alternate["command_list_address"] for record in validation):
+        writer_address = linear_virtual_address(provenance["command_list_address"], word_index)
+        if not linear_range[0] <= writer_address < linear_range[1]:
             raise RuntimeError(
-                "watched PICA command-list buffer was not reused during validation: "
-                f"0x{alternate['command_list_address']:08x}"
+                f"command-list writer 0x{writer_address:08x} is outside the armed memory-log range"
             )
-        validation_artifact = cache.put_artifact(
-            "pica-command-writer-validation", args, validation_path, suffix=".log"
-        )
+        memlog_artifact = cache.put_artifact("pica-command-writer-memory", args, memlog_path, suffix=".log")
+        writer_records = parse_memlog(memlog_path, writer_address)
         return {
             "capture_version": CAPTURE_VERSION,
             "draw": draw,
             "register": f"0x{register:03x}",
             "command_value": f"0x{command_value:08x}",
-            "command_list_address": f"0x{alternate['command_list_address']:08x}",
+            "command_list_address": f"0x{provenance['command_list_address']:08x}",
             "command_list_word_index": word_index,
-            "watch_address": f"0x{linear_virtual_address(alternate['command_list_address'], word_index):08x}",
-            "writer_records": hits,
+            "writer_address": f"0x{writer_address:08x}",
+            "writer_records": writer_records,
             "discovery_artifact": str(discovery_artifact),
-            "alternate_artifact": str(alternate_artifact),
             "command_list_artifact": str(command_list_artifact),
-            "validation_artifact": str(validation_artifact),
+            "memory_log_artifact": str(memlog_artifact),
         }
     finally:
-        if watch_address:
-            harness.send(f"unwatch 0x{watch_address:08x} 4")
         harness.close()
         discovery_path.unlink(missing_ok=True)
-        alternate_path.unlink(missing_ok=True)
-        validation_path.unlink(missing_ok=True)
         command_list_path.unlink(missing_ok=True)
+        memlog_path.unlink(missing_ok=True)
 
 
 def capture_probe(
@@ -239,8 +223,9 @@ def capture_probe(
     entrance: int = DEFAULT_ENTRANCE,
     daytime: int = DEFAULT_DAYTIME,
     settle_frames: int = DEFAULT_SETTLE_FRAMES,
+    linear_range: tuple[int, int] = DEFAULT_LINEAR_RANGE,
 ) -> tuple[dict[str, Any], bool]:
-    args = probe_args(draw, register, label, entrance, daytime, settle_frames)
+    args = probe_args(draw, register, label, entrance, daytime, settle_frames, linear_range)
     frame = capture_frame(settle_frames)
     cached = cache.get_probe("pica-command-writer", frame, args)
     if cached is not None:
@@ -249,7 +234,7 @@ def capture_probe(
     if failed is not None:
         raise RuntimeError(f"cached oracle failure: {failed['error']}")
     try:
-        result = capture_live(cache, args, draw, register, entrance, daytime, settle_frames)
+        result = capture_live(cache, args, draw, register, entrance, daytime, settle_frames, linear_range)
     except (OSError, RuntimeError, ValueError) as error:
         cache.put_probe(
             "pica-command-writer-failure",
@@ -276,6 +261,7 @@ def main(arguments: list[str] | None = None) -> int:
     parser.add_argument("--entrance", type=lambda value: int(value, 0), default=DEFAULT_ENTRANCE)
     parser.add_argument("--daytime", type=lambda value: int(value, 0), default=DEFAULT_DAYTIME)
     parser.add_argument("--settle-frames", type=int, default=DEFAULT_SETTLE_FRAMES)
+    parser.add_argument("--linear-range", default="0x14480000:0x145a0000")
     args = parser.parse_args(arguments)
     if args.draw < 0:
         parser.error("--draw must be non-negative")
@@ -283,6 +269,13 @@ def main(arguments: list[str] | None = None) -> int:
         parser.error("--register must be a PICA register index")
     if args.settle_frames < 0:
         parser.error("--settle-frames must be non-negative")
+    try:
+        start_text, end_text = args.linear_range.split(":", 1)
+        linear_range = int(start_text, 0), int(end_text, 0)
+    except ValueError:
+        parser.error("--linear-range must be START:END")
+    if linear_range[0] >= linear_range[1]:
+        parser.error("--linear-range must be non-empty")
     try:
         cache = cache_context()
         result, hit = capture_probe(
@@ -293,6 +286,7 @@ def main(arguments: list[str] | None = None) -> int:
             args.entrance,
             args.daytime,
             args.settle_frames,
+            linear_range,
         )
         print(f"oracle: {'cache hit' if hit else 'captured and cached'} key={cache.key}")
         print(json.dumps(result, indent=2, sort_keys=True))
