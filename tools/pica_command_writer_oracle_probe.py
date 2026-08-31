@@ -30,7 +30,7 @@ from pica_command_provenance_oracle_probe import (
 )
 from repo_environment import apply_repo_environment
 
-CAPTURE_VERSION = 11
+CAPTURE_VERSION = 14
 DEFAULT_ENTRANCE = 0xEE
 DEFAULT_DAYTIME = 0x6000
 DEFAULT_SETTLE_FRAMES = 180
@@ -58,6 +58,8 @@ PACKET_DESCRIPTOR_FIELDS = {
     "byte_count": "r4p10",
     "block_index": "r4p14",
 }
+COPY_LOOP_PC = 0x00371758
+COPY_SOURCE_REGISTERS = ("r7", "r8", "r9", "r10")
 
 
 class CacheLike(Protocol):
@@ -235,6 +237,23 @@ def selected_writer_record(records: list[str], command_value: int) -> dict[str, 
     return matching[0]
 
 
+def copy_source_value_address(writer: dict[str, int], command_value: int) -> int:
+    required = {"pc", "r1", *COPY_SOURCE_REGISTERS}
+    missing = sorted(required.difference(writer))
+    if missing:
+        raise RuntimeError(f"memory log lacks copy-source registers: {', '.join(missing)}")
+    if writer["pc"] != COPY_LOOP_PC:
+        raise RuntimeError(f"selected writer is not copy loop 0x{COPY_LOOP_PC:08x}")
+    matching = [index for index, register in enumerate(COPY_SOURCE_REGISTERS) if writer[register] == command_value]
+    if len(matching) != 1:
+        raise RuntimeError(
+            f"copy loop has {len(matching)} source registers for command value 0x{command_value:08x}; refusing guess"
+        )
+    # At the second `stmia` of `FUN_00371758`, two preceding `ldmia r1!` instructions
+    # have advanced r1 by 32 bytes; r7-r10 hold the final 16-byte source group.
+    return writer["r1"] - 16 + matching[0] * 4
+
+
 def snapshot_owner_state(writer: dict[str, int]) -> dict[str, Any]:
     required = {
         "r0",
@@ -306,12 +325,16 @@ def capture_live(
         if not discovery_path.is_file():
             raise RuntimeError("oracle PICA logger produced no discovery log")
         trace_provenance = parse_provenance(discovery_path.read_text().splitlines(), draw)
-        if trace_provenance != {
-            key: discovery[key]
-            for key in ("draw", "command_list_address", "command_list_word_index", "command_list_word_count")
-        }:
+        matching_command_shape = all(
+            trace_provenance[key] == discovery[key]
+            for key in ("draw", "command_list_word_index", "command_list_word_count")
+        )
+        if not matching_command_shape:
+            raise RuntimeError("traced oracle frame changed the command-list shape; refusing writer trace")
+        same_command_list_address = trace_provenance["command_list_address"] == discovery["command_list_address"]
+        if not same_command_list_address and watch_address is None:
             raise RuntimeError(
-                "traced oracle frame does not reproduce the cached command-list provenance; refusing writer trace"
+                "traced oracle frame relocated the command list; an exact source-word watch is required"
             )
         list_bytes = trace_provenance["command_list_word_count"] * 4
         dump_response = harness.send_multiline(
@@ -327,12 +350,23 @@ def capture_live(
         )
         if (trace_word_index, trace_command_value) != (word_index, command_value):
             raise RuntimeError("traced oracle frame changed the selected PICA register packet; refusing writer trace")
-        writer_records = parse_memlog(memlog_path, writer_address)
-        owner_state = snapshot_owner_state(selected_writer_record(writer_records, command_value))
+        writer_records: list[str] = []
+        owner_state: dict[str, Any] | None = None
+        packet_value_address: int | None = None
+        if same_command_list_address:
+            writer_records = parse_memlog(memlog_path, writer_address)
+            selected_writer = selected_writer_record(writer_records, command_value)
+            owner_state = snapshot_owner_state(selected_writer)
+            packet_value_address = int(owner_state["source_value_address"], 16)
+        template_value_address: int | None = None
         source_records: list[str] = []
         if source_range is not None:
-            source_value_address = int(owner_state["source_value_address"], 16)
-            source_records = parse_memlog(memlog_path, source_value_address)
+            if packet_value_address is None:
+                raise RuntimeError("command list relocated; a source range cannot identify the current packet word")
+            source_records = parse_memlog(memlog_path, packet_value_address)
+            template_value_address = copy_source_value_address(
+                selected_writer_record(source_records, command_value), command_value
+            )
         watch_records: list[str] = []
         if watch_address is not None:
             try:
@@ -340,6 +374,19 @@ def capture_live(
             except RuntimeError as error:
                 if str(error) != f"memory log has no exact writer for 0x{watch_address:08x}":
                     raise
+            copy_watch_records = [
+                record
+                for record in watch_records
+                if (fields := memlog_fields(record)).get("pc") == COPY_LOOP_PC
+                and fields.get("data") == command_value
+            ]
+            if copy_watch_records:
+                watched_template_value_address = copy_source_value_address(
+                    selected_writer_record(copy_watch_records, command_value), command_value
+                )
+                if template_value_address is not None and watched_template_value_address != template_value_address:
+                    raise RuntimeError("source-range and exact-watch template addresses disagree")
+                template_value_address = watched_template_value_address
         persist_selected_memlog(
             selected_memlog_path,
             writer_records,
@@ -368,9 +415,15 @@ def capture_live(
             "writer_address": f"0x{writer_address:08x}",
             "writer_records": writer_records,
             "writer_owner": owner_state,
+            "packet_value_address": f"0x{packet_value_address:08x}" if packet_value_address is not None else None,
+            "watched_packet_value_address": f"0x{watch_address:08x}" if watch_address is not None else None,
+            "template_value_address": (
+                f"0x{template_value_address:08x}" if template_value_address is not None else None
+            ),
             "source_writer_records": source_records,
             "watch_address": f"0x{watch_address:08x}" if watch_address is not None else None,
             "watch_writer_records": watch_records,
+            "copy_source_match_count": len(copy_watch_records) if watch_address is not None else None,
             "discovery_artifact": str(discovery["artifact"]),
             "command_list_artifact": str(command_list_artifact),
             "memory_log_artifact": str(memory_log_artifact),

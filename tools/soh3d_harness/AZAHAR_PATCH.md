@@ -809,8 +809,15 @@ storage rotates per frame.
 
 The cache persists only the exact selected writer records, not an arena-wide raw memory log. A source
 trace or exact state-field watch may arm one additional bounded range; it stores only the matching
-records and the selected list record. This keeps the oracle cache reusable without turning repeated RE
-captures into multi-gigabyte scratch accumulation.
+records and the selected list record. The write record includes `r7`--`r10` as well as `r0`--`r4`.
+The final list writer identifies its exact staging packet word; a subsequent exact watch of only
+that word can identify the `FUN_00371758` copy loop, whose second store uses the four loaded source
+values to recover the template word and refuses an ambiguous match. Command-list backing allocation
+can rotate between harness processes, so this source-watch path requires the same draw, list length,
+packet index, and packet value but does not pretend the physical address is a stable identity. This
+keeps the oracle cache reusable without turning repeated RE captures into multi-gigabyte scratch
+accumulation. A generic exact watch always preserves its selected records and reports the number that
+are the copy loop; it does not misclassify a producer write as another copy.
 
 Command-list storage may rotate before the next frame. A writer probe must verify that its watched
 physical list is reused before associating any hit with a draw; a stale linear alias is a bounded cached
