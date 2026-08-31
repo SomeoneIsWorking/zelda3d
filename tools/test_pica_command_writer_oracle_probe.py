@@ -11,6 +11,8 @@ from pica_command_writer_oracle_probe import (
     linear_virtual_address,
     parse_command_writes,
     parse_memlog,
+    parse_range,
+    persist_selected_memlog,
     selected_writer_record,
     snapshot_owner_state,
 )
@@ -76,6 +78,7 @@ class CommandWriterTests(unittest.TestCase):
             }
         )
         self.assertEqual(state["packet_descriptor"]["source_pointer"], "0x0821e964")
+        self.assertEqual(state["source_value_address"], "0x0821e968")
         self.assertEqual(state["virtual_slots"]["setup_c"], "0x00450020")
 
     def test_interpreter_environment_enables_direct_write_logging(self) -> None:
@@ -83,6 +86,24 @@ class CommandWriterTests(unittest.TestCase):
         self.assertEqual(environment["SOH3D_HARNESS_DISABLE_FASTMEM"], "1")
         self.assertEqual(environment["SOH3D_CPU_INTERPRETER"], "1")
         self.assertEqual(environment["SOH3D_MEMLOG_RANGES"], "0x14480000:0x145a0000")
+
+    def test_environment_adds_packet_source_range(self) -> None:
+        environment = harness_environment(
+            "interpreter", (0x14480000, 0x145A0000), Path("memory.log"), (0x0821E000, 0x08220000)
+        )
+        self.assertEqual(
+            environment["SOH3D_MEMLOG_RANGES"], "0x14480000:0x145a0000,0x0821e000:0x08220000"
+        )
+
+    def test_rejects_invalid_range(self) -> None:
+        with self.assertRaisesRegex(ValueError, "--source-range must be non-empty"):
+            parse_range("0x10:0x10", "--source-range")
+
+    def test_persists_only_selected_memory_records(self) -> None:
+        with TemporaryDirectory() as directory:
+            path = Path(directory) / "selected.log"
+            persist_selected_memlog(path, ["MW first", "MW first"], ["MW second"])
+            self.assertEqual(path.read_text().splitlines(), ["# Exact writer records selected from the oracle memory log.", "MW first", "MW second"])
 
     def test_rejects_unknown_cpu_mode(self) -> None:
         with self.assertRaisesRegex(ValueError, "unsupported CPU mode"):

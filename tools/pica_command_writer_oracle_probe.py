@@ -36,6 +36,7 @@ LINEAR_HEAP_VIRTUAL_BASE = 0x14000000
 OUTDIR = REPO / "scratch" / "pica_command_writer"
 DEFAULT_LINEAR_RANGE = (0x14480000, 0x145A0000)
 CPU_MODES = ("dynarmic", "interpreter")
+SOURCE_TRACE_VERSION = 2
 MEMLOG_RE = re.compile(
     r"^MW pc=0x[0-9a-fA-F]{8} lr=0x[0-9a-fA-F]{8} "
     r"va=0x(?P<address>[0-9a-fA-F]{8}) sz=(?P<size>\d+) "
@@ -76,8 +77,9 @@ def probe_args(
     settle_frames: int,
     linear_range: tuple[int, int],
     cpu_mode: str,
+    source_range: tuple[int, int] | None,
 ) -> dict[str, Any]:
-    return {
+    args = {
         "capture_version": CAPTURE_VERSION,
         "draw": draw,
         "register": register,
@@ -91,21 +93,42 @@ def probe_args(
         "cpu_mode": cpu_mode,
         "texture_pack": 0,
     }
+    if source_range is not None:
+        args["source_range"] = [f"0x{source_range[0]:08x}", f"0x{source_range[1]:08x}"]
+        args["source_trace_version"] = SOURCE_TRACE_VERSION
+    return args
 
 
 def capture_frame(settle_frames: int) -> int:
     return settle_frames + TIME_SETTLE_FRAMES + DISCOVERY_RUN_FRAMES
 
 
+def parse_range(value: str, option: str) -> tuple[int, int]:
+    try:
+        start_text, end_text = value.split(":", 1)
+        start, end = int(start_text, 0), int(end_text, 0)
+    except ValueError as error:
+        raise ValueError(f"{option} must be START:END") from error
+    if start >= end:
+        raise ValueError(f"{option} must be non-empty")
+    return start, end
+
+
 def harness_environment(
-    cpu_mode: str, linear_range: tuple[int, int], memory_log_path: Path
+    cpu_mode: str,
+    linear_range: tuple[int, int],
+    memory_log_path: Path,
+    source_range: tuple[int, int] | None = None,
 ) -> dict[str, str]:
     if cpu_mode not in CPU_MODES:
         raise ValueError(f"unsupported CPU mode: {cpu_mode}")
+    ranges = [linear_range]
+    if source_range is not None:
+        ranges.append(source_range)
     environment = {
         **os.environ,
         "SOH3D_HARNESS_DISABLE_FASTMEM": "1",
-        "SOH3D_MEMLOG_RANGES": f"0x{linear_range[0]:08x}:0x{linear_range[1]:08x}",
+        "SOH3D_MEMLOG_RANGES": ",".join(f"0x{start:08x}:0x{end:08x}" for start, end in ranges),
         "SOH3D_MEMLOG_PATH": str(memory_log_path),
     }
     if cpu_mode == "interpreter":
@@ -170,6 +193,15 @@ def parse_memlog(path: Path, target_address: int) -> list[str]:
     return records
 
 
+def persist_selected_memlog(path: Path, *record_groups: list[str]) -> None:
+    records: list[str] = []
+    for group in record_groups:
+        records.extend(record for record in group if record not in records)
+    if not records:
+        raise RuntimeError("no memory-log records selected for cache")
+    path.write_text("# Exact writer records selected from the oracle memory log.\n" + "\n".join(records) + "\n")
+
+
 def memlog_fields(record: str) -> dict[str, int]:
     return {match.group("name"): int(match.group("value"), 16) for match in MEMLOG_FIELD_RE.finditer(record)}
 
@@ -205,6 +237,9 @@ def snapshot_owner_state(writer: dict[str, int]) -> dict[str, Any]:
         "packet_descriptor_address": f"0x{writer['r4']:08x}",
         "source_packet_word": f"0x{source_word:08x}",
         "source_packet_base": f"0x{source_word - 8:08x}",
+        # `0x00466e60` stores the previous 16-byte group then post-increments r0;
+        # the copied PICA value is the final word of that group.
+        "source_value_address": f"0x{source_word - 4:08x}",
         "fields": {name: f"0x{writer[field]:08x}" for name, field in OWNER_FIELD_OFFSETS.items()},
         "packet_descriptor": {name: f"0x{writer[field]:08x}" for name, field in PACKET_DESCRIPTOR_FIELDS.items()},
         "virtual_slots": {name: f"0x{writer[field]:08x}" for name, field in VIRTUAL_SLOT_FIELDS.items()},
@@ -221,12 +256,14 @@ def capture_live(
     settle_frames: int,
     linear_range: tuple[int, int],
     cpu_mode: str,
+    source_range: tuple[int, int] | None,
 ) -> dict[str, Any]:
     OUTDIR.mkdir(parents=True, exist_ok=True)
     discovery_path = OUTDIR / "discovery.log"
     command_list_path = OUTDIR / "command-list.bin"
     memlog_path = OUTDIR / "memory-writes.log"
-    harness = spawn(environment=harness_environment(cpu_mode, linear_range, memlog_path))
+    selected_memlog_path = OUTDIR / "selected-memory-writes.log"
+    harness = spawn(environment=harness_environment(cpu_mode, linear_range, memlog_path, source_range))
     try:
         if not boot_to_gameplay(harness, entrance, settle_frames):
             raise RuntimeError("oracle failed to reach deterministic gameplay state")
@@ -264,9 +301,21 @@ def capture_live(
             )
         writer_records = parse_memlog(memlog_path, writer_address)
         owner_state = snapshot_owner_state(selected_writer_record(writer_records, command_value))
+        source_records: list[str] = []
+        if source_range is not None:
+            source_value_address = int(owner_state["source_value_address"], 16)
+            source_records = parse_memlog(memlog_path, source_value_address)
+        persist_selected_memlog(selected_memlog_path, writer_records, source_records)
         memory_log_artifact = cache.put_artifact(
-            "pica-command-writer-memory", args, memlog_path, suffix=".log"
+            "pica-command-writer-memory", args, selected_memlog_path, suffix=".log"
         )
+        if source_range is not None and not any(
+            memlog_fields(record).get("data") == command_value for record in source_records
+        ):
+            raise RuntimeError(
+                f"memory log has no source write for command value 0x{command_value:08x}; "
+                f"artifact: {memory_log_artifact}"
+            )
         return {
             "capture_version": CAPTURE_VERSION,
             "draw": draw,
@@ -277,6 +326,7 @@ def capture_live(
             "writer_address": f"0x{writer_address:08x}",
             "writer_records": writer_records,
             "writer_owner": owner_state,
+            "source_writer_records": source_records,
             "discovery_artifact": str(discovery_artifact),
             "command_list_artifact": str(command_list_artifact),
             "memory_log_artifact": str(memory_log_artifact),
@@ -286,6 +336,7 @@ def capture_live(
         discovery_path.unlink(missing_ok=True)
         command_list_path.unlink(missing_ok=True)
         memlog_path.unlink(missing_ok=True)
+        selected_memlog_path.unlink(missing_ok=True)
 
 
 def capture_probe(
@@ -298,8 +349,9 @@ def capture_probe(
     settle_frames: int = DEFAULT_SETTLE_FRAMES,
     linear_range: tuple[int, int] = DEFAULT_LINEAR_RANGE,
     cpu_mode: str = "dynarmic",
+    source_range: tuple[int, int] | None = None,
 ) -> tuple[dict[str, Any], bool]:
-    args = probe_args(draw, register, label, entrance, daytime, settle_frames, linear_range, cpu_mode)
+    args = probe_args(draw, register, label, entrance, daytime, settle_frames, linear_range, cpu_mode, source_range)
     frame = capture_frame(settle_frames)
     cached = cache.get_probe("pica-command-writer", frame, args)
     if cached is not None:
@@ -309,7 +361,7 @@ def capture_probe(
         raise RuntimeError(f"cached oracle failure: {failed['error']}")
     try:
         result = capture_live(
-            cache, args, draw, register, entrance, daytime, settle_frames, linear_range, cpu_mode
+            cache, args, draw, register, entrance, daytime, settle_frames, linear_range, cpu_mode, source_range
         )
     except (OSError, RuntimeError, ValueError) as error:
         cache.put_probe(
@@ -338,6 +390,7 @@ def main(arguments: list[str] | None = None) -> int:
     parser.add_argument("--daytime", type=lambda value: int(value, 0), default=DEFAULT_DAYTIME)
     parser.add_argument("--settle-frames", type=int, default=DEFAULT_SETTLE_FRAMES)
     parser.add_argument("--linear-range", default="0x14480000:0x145a0000")
+    parser.add_argument("--source-range", help="optional packet-source VA range to trace")
     parser.add_argument("--cpu-mode", choices=CPU_MODES, default="dynarmic")
     args = parser.parse_args(arguments)
     if args.draw < 0:
@@ -347,12 +400,10 @@ def main(arguments: list[str] | None = None) -> int:
     if args.settle_frames < 0:
         parser.error("--settle-frames must be non-negative")
     try:
-        start_text, end_text = args.linear_range.split(":", 1)
-        linear_range = int(start_text, 0), int(end_text, 0)
-    except ValueError:
-        parser.error("--linear-range must be START:END")
-    if linear_range[0] >= linear_range[1]:
-        parser.error("--linear-range must be non-empty")
+        linear_range = parse_range(args.linear_range, "--linear-range")
+        source_range = parse_range(args.source_range, "--source-range") if args.source_range else None
+    except ValueError as error:
+        parser.error(str(error))
     try:
         cache = cache_context()
         result, hit = capture_probe(
@@ -365,6 +416,7 @@ def main(arguments: list[str] | None = None) -> int:
             args.settle_frames,
             linear_range,
             args.cpu_mode,
+            source_range,
         )
         print(f"oracle: {'cache hit' if hit else 'captured and cached'} key={cache.key}")
         print(json.dumps(result, indent=2, sort_keys=True))
