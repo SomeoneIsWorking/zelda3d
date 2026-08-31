@@ -29,6 +29,7 @@ import numpy as np
 sys.path.insert(0, os.path.join(os.path.dirname(__file__)))
 from harness_cache import OracleCache  # noqa: E402
 from harness_gameplay import boot_to_gameplay, set_time_of_day  # noqa: E402
+from harness_paths import TITLE_STATE  # noqa: E402
 from harness_process import spawn  # noqa: E402
 
 
@@ -56,7 +57,7 @@ def main():
     os.makedirs(outdir, exist_ok=True)
     ap = os.path.abspath
 
-    cache = OracleCache('scratch/title_settled.state')
+    cache = OracleCache(TITLE_STATE)
     cache_args = {
         'probe': 'oracle-draw-isolate',
         'entrance': ent,
@@ -81,7 +82,7 @@ def main():
         print('oracle: cache hit (key=%s)' % cache.key)
         return
 
-    h = spawn(save_state='scratch/title_settled.state')
+    h = spawn(save_state=str(TITLE_STATE))
     print(boot_to_gameplay(h, entrance=ent))
     set_time_of_day(h, tod)
     for _ in range(settle):

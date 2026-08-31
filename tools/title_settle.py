@@ -1,12 +1,11 @@
 #!/usr/bin/env python3
-"""title_settle.py — (re)generate scratch/title_settled.state.
+"""title_settle.py — generate the current render-contract title checkpoint once.
 
 `title_ab.py`, `oracle_cache.py`, `title_daytime_scan.py` etc. all treat
-`scratch/title_settled.state` as an input they require but none of them
-produce it — it was hand-captured in an early session (2026-07-04) and
-just carried forward as a gitignored, machine-local artifact ever since.
-That's a workflow gap: a fresh checkout / fresh machine has no way to
-warm the oracle without this file. This tool closes it.
+the render-contract-keyed title checkpoint as an input they require but none
+of them produce it. This tool creates that cache input once. A matching
+checkpoint is reused without launching the oracle; a serializer-contract
+change creates a new path instead of loading incompatible bytes.
 
 Procedure: cold-boot the embedded-Azahar harness straight from the ROM
 (no savestate — `spawn(None)`), run forward far enough that the title
@@ -14,7 +13,7 @@ cutscene's free-running frame counter (Az VA 0x0054CC3C, read via the
 harness's `force titletime_read`) is confirmed ACTIVELY INCREMENTING at
 its steady-state rate (title cs already running, not still on the
 pre-title Nintendo/logo sequence where the counter stays at 0), then
-`savestate` that moment to `scratch/title_settled.state`.
+`savestate` that moment to the current contract's title-checkpoint path.
 
 The exact cs-frame the resulting savestate lands on is whatever cold-boot
 determinism produces — it does NOT need to match any previously-recorded
@@ -27,7 +26,7 @@ at a different absolute offset is fully interchangeable with the old one.
 
 Usage:
     source .env   # ZELDA3D_OOT3D_ROM
-    tools/title_settle.py                  # warm scratch/title_settled.state
+    tools/title_settle.py                  # warm current contract's checkpoint
     tools/title_settle.py --run 900        # override the cold-boot run count
 """
 from __future__ import annotations
@@ -40,9 +39,10 @@ from pathlib import Path
 REPO = Path(__file__).resolve().parent.parent
 sys.path.insert(0, str(REPO / "tools"))
 from harness_process import spawn  # noqa: E402
+from harness_paths import TITLE_STATE  # noqa: E402
 from harness_transport import Harness  # noqa: E402
 
-SAVESTATE = REPO / "scratch" / "title_settled.state"
+SAVESTATE = TITLE_STATE
 
 # Cold-boot run budget before the title cs is expected to be live. Measured
 # empirically this session (2026-07-14, current harness build): the Az cs
@@ -73,6 +73,10 @@ def main():
                           f"counter is live (default {DEFAULT_RUN})")
     ap.add_argument("--out", type=Path, default=SAVESTATE)
     args = ap.parse_args()
+
+    if args.out.exists():
+        print(f"[title_settle] cache hit: {args.out}", file=sys.stderr)
+        return
 
     print(f"[title_settle] cold-booting harness (no savestate)...", file=sys.stderr)
     h = spawn(save_state=None)

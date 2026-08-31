@@ -42,6 +42,7 @@ import parity_speed_sweep as SPD   # noqa: E402  (locomotion continuum: soh_curv
 import parity_pose_sweep as PPS    # noqa: E402  (walk/run soh_mag/csab config — reused, not re-picked)
 import parity_pose_diff as PPD     # noqa: E402  (geodesic per-bone LOCAL-rotation compare, reused verbatim)
 from harness_gameplay import boot_to_gameplay  # noqa: E402
+from harness_paths import TITLE_STATE  # noqa: E402
 from harness_process import spawn  # noqa: E402
 
 SCRATCH = os.path.join(REPO, "scratch", "link_sweep")
@@ -49,7 +50,7 @@ CHECKLIST_MD = os.path.join(REPO, "docs", "link_parity_checklist.md")
 NAMES_TABLE = os.path.join(REPO, "oot3d-decomp", "tools", "skeldata",
                            "player_animid_names.json")
 NAMES_TABLE = os.path.abspath(NAMES_TABLE)
-SAVE_STATE = os.path.join(REPO, "scratch", "title_settled.state")
+SAVE_STATE = str(TITLE_STATE)
 
 KOKIRI = 0xEE
 LINKJOINTS_NBONE = 25  # childlink_v2 rig; must match soh3d_harness/main.cpp LINKJOINTS_NBONE
@@ -62,7 +63,7 @@ POSE_OUT = os.path.join(REPO, "scratch", "link_sweep", "pose")
 class OracleSession:
     """One embedded-Azahar (soh3d_harness) process, booted to free gameplay at Kokiri Forest,
     kept alive for the DURATION of a sweep so every oracle-side probe amortizes the ~4-5min
-    cold-boot cost (title_settled.state -> START/A taps -> gPlayState populated -> warp 0xEE)
+    cold-boot cost (the current title checkpoint -> START/A taps -> gPlayState populated -> warp 0xEE)
     over ONE session instead of paying it per state.
 
     Transport: the embedded-Azahar harness (`Azahar/build-harness`, target `soh3d_harness`,

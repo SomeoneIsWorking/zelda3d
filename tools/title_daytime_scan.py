@@ -12,11 +12,11 @@ loadstate only restores Azahar's libretro core, not SoH's separate
 in-process state, so SoH numbers from a shared savestate are not
 apples-to-apples for schedule RE; see debug_journal note this session).
 
-Method: load title_settled.state (Az only), read gSaveContext.dayTime
+Method: load the current-contract settled title checkpoint (Az only), read gSaveContext.dayTime
 (new `az_daytime` harness command, fixed VA 0x00587958+0xC — a GLOBAL,
 valid even during the title/opening GameState) and the free-running cs
 frame counter (0x0054CC3C, `force titletime_read`) at increasing `run N`
-offsets, spanning the full 2400-frame loop (title_settled.state is
+offsets, spanning the full 2400-frame loop (the checkpoint is
 already partway through the demo; we scan forward from wherever it is,
 including the wrap back to 0).
 
@@ -36,9 +36,10 @@ from pathlib import Path
 REPO = Path(__file__).resolve().parent.parent
 sys.path.insert(0, str(REPO / "tools"))
 from harness_process import spawn  # noqa: E402
+from harness_paths import TITLE_STATE  # noqa: E402
 from harness_transport import Harness  # noqa: E402
 
-SAVESTATE = REPO / "scratch" / "title_settled.state"
+SAVESTATE = TITLE_STATE
 
 
 def read_az_daytime(h: Harness) -> int:

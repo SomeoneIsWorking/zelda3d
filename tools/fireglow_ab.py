@@ -28,9 +28,10 @@ import numpy as np
 REPO = Path(__file__).resolve().parent.parent
 sys.path.insert(0, str(REPO / "tools"))
 from harness_process import spawn  # noqa: E402
+from harness_paths import TITLE_STATE  # noqa: E402
 
 OUTDIR = REPO / "scratch" / "title_ab"
-SAVESTATE = REPO / "scratch" / "title_settled.state"
+SAVESTATE = TITLE_STATE
 SOH_STEP_INTERCEPT = 408  # soh_step ~= az_step + 408 (title_ab.py rate-law derivation)
 
 

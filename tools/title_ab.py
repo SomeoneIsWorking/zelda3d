@@ -62,10 +62,11 @@ REPO = Path(__file__).resolve().parent.parent
 TOOLS = REPO / "tools"
 sys.path.insert(0, str(TOOLS))
 from harness_cache import OracleCache  # noqa: E402
+from harness_paths import TITLE_STATE  # noqa: E402
 from harness_process import spawn  # noqa: E402
 
 OUTDIR = REPO / "scratch" / "title_ab"
-SAVESTATE = REPO / "scratch" / "title_settled.state"
+SAVESTATE = TITLE_STATE
 
 # ---------------------------------------------------------------------------
 # az_step -> soh_step SEED, derived from the RE'd rate law (2026-07-09 phase-
@@ -81,7 +82,7 @@ SAVESTATE = REPO / "scratch" / "title_settled.state"
 # as the oracle, so the relationship collapses to a single affine formula:
 #
 #   az_cs(az_step)  = 88 + 0.5 * az_step          (measured intercept: the
-#                      title_settled.state savestate is captured 88 cs-
+#                      the settled title checkpoint is captured 88 cs-
 #                      frames into the loop, not at cs frame 0)
 #   soh_cs(soh_step) = 0.5 * (soh_step - 232)      (232 = SoH's own N64-
 #                      splash/boot tick count before TitlePresentation first
@@ -179,7 +180,7 @@ def _require_env():
             "tools/rom_provision.py"
         )
     if not SAVESTATE.exists():
-        sys.exit(f"missing {SAVESTATE} — a title_settled.state save-state (Az, right before the "
+        sys.exit(f"missing {SAVESTATE} — a current-contract title save-state (Az, right before the "
                   "title cutscene starts) is required as the shared t=0 for both engines")
 
 
@@ -352,7 +353,7 @@ def main(argv):
     la.set_defaults(func=cmd_list_anchors)
 
     ca = sub.add_parser("calibrate", help="find the SoH frame matching a given Az frame by content")
-    ca.add_argument("az", type=int, help="target Az (oracle) title-cs frame count (from title_settled.state)")
+    ca.add_argument("az", type=int, help="target Az (oracle) title-cs frame count (from the settled title checkpoint)")
     ca.add_argument("--margin", type=int, default=30, help="search window +-N frames around the estimate "
                     "(the splash-recovery zone below az~360 needs far more, e.g. 150-250 — see ANCHORS note)")
     ca.add_argument("--name", default=None, help="output basename (default title_az<az>)")

@@ -3,10 +3,9 @@
 from __future__ import annotations
 
 from collections.abc import MutableMapping
-from pathlib import Path
+from harness_paths import TITLE_STATE
 
-REPO = Path(__file__).resolve().parent.parent
-SAVESTATE = REPO / "scratch" / "title_settled.state"
+SAVESTATE = TITLE_STATE
 
 # RE'd and measured in title_ab.py / debug_journal/2026-07-09-title-cs-phase-sync.md:
 # the settled oracle state starts at title cs=88 and advances one title unit per
