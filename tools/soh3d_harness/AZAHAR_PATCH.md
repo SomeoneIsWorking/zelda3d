@@ -825,6 +825,19 @@ Command-list storage may rotate before the next frame. A writer probe must verif
 physical list is reused before associating any hit with a draw; a stale linear alias is a bounded cached
 negative, not a renderer identity. The Hut fragment-lighting fixture first demonstrated this rotation.
 
+# Azahar Patch 14 (2026-08-31, synchronous configuration-builder input)
+
+The Patch-13 memory logger now appends `r10b` and a compact set of `r10b+offset` words to each selected
+write record. At the recovered direct template store `0x0040cfe4` in `FUN_0040cdd8`, `r10b = r10 -
+0x100` is that function's input object. The words cover its independent eight-element loop
+(`+0x164..+0x17c`) and every byte source used for output word 6 (`+0x184..+0x190`).
+
+This is explicitly synchronous: transient renderer input objects may be cleared or reused by the end
+of a frame, so a post-run memory dump is not evidence of the state which produced a template word.
+`pica_command_writer_oracle_probe.py` accepts these fields only at the exact store PC, verifies the
+derived base, rejects divergent inputs, and persists the decoded state beside the already-selected
+compact memory records. It does not infer an object type or CMB-field mapping from the snapshot.
+
 For the remaining producer boundary, `SOH3D_HARNESS_DISABLE_FASTMEM=1` leaves Dynarmic's page-table
 fast path unset for an oracle-only process. This routes guest stores through the normal callbacks, while
 normal Azahar and harness launches retain fast memory. The Hut command packet still has no page-watch

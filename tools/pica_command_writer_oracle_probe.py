@@ -30,7 +30,7 @@ from pica_command_provenance_oracle_probe import (
 )
 from repo_environment import apply_repo_environment
 
-CAPTURE_VERSION = 15
+CAPTURE_VERSION = 16
 DEFAULT_ENTRANCE = 0xEE
 DEFAULT_DAYTIME = 0x6000
 DEFAULT_SETTLE_FRAMES = 180
@@ -60,6 +60,23 @@ PACKET_DESCRIPTOR_FIELDS = {
 }
 COPY_LOOP_PC = 0x00371758
 COPY_SOURCE_REGISTERS = ("r7", "r8", "r9", "r10")
+CONFIG_TEMPLATE_STORE_PC = 0x0040CFE4
+CONFIG_BUILDER_R10_OFFSET = 0x100
+CONFIG_BUILDER_INPUT_WORDS = {
+    "0x000": "r10bp0",
+    "0x164": "r10bp164",
+    "0x168": "r10bp168",
+    "0x16c": "r10bp16c",
+    "0x170": "r10bp170",
+    "0x174": "r10bp174",
+    "0x178": "r10bp178",
+    "0x17c": "r10bp17c",
+    "0x180": "r10bp180",
+    "0x184": "r10bp184",
+    "0x188": "r10bp188",
+    "0x18c": "r10bp18c",
+    "0x190": "r10bp190",
+}
 
 
 class CacheLike(Protocol):
@@ -258,6 +275,24 @@ def copy_source_value_address(writer: dict[str, int], command_value: int) -> int
     return writer["r1"] - 16 + matching[0] * 4
 
 
+def snapshot_config_builder_input(record: dict[str, int]) -> dict[str, Any]:
+    required = {"pc", "r10", "r10b", *CONFIG_BUILDER_INPUT_WORDS.values()}
+    missing = sorted(required.difference(record))
+    if missing:
+        raise RuntimeError(f"memory log lacks config-builder fields: {', '.join(missing)}")
+    if record["pc"] != CONFIG_TEMPLATE_STORE_PC:
+        raise RuntimeError(f"selected writer is not config-template store 0x{CONFIG_TEMPLATE_STORE_PC:08x}")
+    expected_base = record["r10"] - CONFIG_BUILDER_R10_OFFSET
+    if record["r10b"] != expected_base:
+        raise RuntimeError(
+            f"config-builder input base 0x{record['r10b']:08x} does not match r10 - 0x{CONFIG_BUILDER_R10_OFFSET:x}"
+        )
+    return {
+        "address": f"0x{record['r10b']:08x}",
+        "words": {offset: f"0x{record[field]:08x}" for offset, field in CONFIG_BUILDER_INPUT_WORDS.items()},
+    }
+
+
 def snapshot_owner_state(writer: dict[str, int]) -> dict[str, Any]:
     required = {
         "r0",
@@ -373,6 +408,8 @@ def capture_live(
             )
         watch_records: list[str] = []
         watch_command_records: list[str] = []
+        copy_watch_records: list[str] = []
+        config_builder_input: dict[str, Any] | None = None
         if watch_address is not None:
             try:
                 watch_records = parse_memlog(memlog_path, watch_address)
@@ -393,6 +430,19 @@ def capture_live(
                 if template_value_address is not None and watched_template_value_address != template_value_address:
                     raise RuntimeError("source-range and exact-watch template addresses disagree")
                 template_value_address = watched_template_value_address
+            config_store_inputs = [
+                snapshot_config_builder_input(memlog_fields(record))
+                for record in watch_command_records
+                if memlog_fields(record).get("pc") == CONFIG_TEMPLATE_STORE_PC
+            ]
+            distinct_config_store_inputs: list[dict[str, Any]] = []
+            for input_state in config_store_inputs:
+                if input_state not in distinct_config_store_inputs:
+                    distinct_config_store_inputs.append(input_state)
+            if len(distinct_config_store_inputs) > 1:
+                raise RuntimeError("exact template watch produced multiple config-builder input states")
+            if distinct_config_store_inputs:
+                config_builder_input = distinct_config_store_inputs[0]
         persist_selected_memlog(
             selected_memlog_path,
             writer_records,
@@ -432,6 +482,7 @@ def capture_live(
             "watch_command_match_count": len(watch_command_records) if watch_address is not None else None,
             "watch_command_records": watch_command_records,
             "copy_source_match_count": len(copy_watch_records) if watch_address is not None else None,
+            "config_builder_input": config_builder_input,
             "discovery_artifact": str(discovery["artifact"]),
             "command_list_artifact": str(command_list_artifact),
             "memory_log_artifact": str(memory_log_artifact),
