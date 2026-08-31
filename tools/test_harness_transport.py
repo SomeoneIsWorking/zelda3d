@@ -41,6 +41,16 @@ class StreamingResponseTests(unittest.TestCase):
         self.assertEqual(result, ["ok 0x00000123"])
         self.assertEqual(reader.timeouts, [30.0])
 
+    def test_lighting_capture_ack_keeps_draw_and_path(self) -> None:
+        reader = ResponseReader(["ok lighting_capture 4 scratch/lighting.json"])
+
+        result = _read_streaming_response(
+            reader, "lighting_capture 4 scratch/lighting.json", 30.0, 0.2
+        )
+
+        self.assertEqual(result, ["ok lighting_capture 4 scratch/lighting.json"])
+        self.assertEqual(reader.timeouts, [30.0])
+
     def test_single_line_reply_does_not_peek_into_async_output(self) -> None:
         reader = ResponseReader(["ok soh_input 0x8000 stick=(0,0)", "async diagnostic"])
 
