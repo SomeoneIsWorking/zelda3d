@@ -13,6 +13,8 @@ from typing import Self
 
 from harness_paths import REPO_ROOT
 
+BOOT_TIMEOUT_SECONDS = 900.0
+
 ReadLine = Callable[[float], str | None]
 
 _OK_END_COMMANDS = {
@@ -152,7 +154,11 @@ class Harness:
                 env=environment,
             )
         self._buf = b""
-        line = self._readline()
+        # The launcher may configure and build the harness before it execs the
+        # binary.  Do not close that build at the ordinary command timeout:
+        # an interrupted Ninja run leaves its dependency log incomplete and
+        # turns the next launch into another full rebuild.
+        line = self._readline(timeout=BOOT_TIMEOUT_SECONDS)
         if line is None or line.strip() != "boot succeeded":
             self.close()
             raise RuntimeError(f"harness did not boot: got {line!r}")

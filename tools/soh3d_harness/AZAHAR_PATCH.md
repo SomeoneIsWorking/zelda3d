@@ -933,3 +933,16 @@ by the existing exact state-address watch and does not alter emulation or render
 field, and rejects multiple distinct descriptors. Its state-watch trace version is 2, so this single
 new observation has a distinct cache key while all prior provenance and render observations remain
 cache hits. `AZAHAR_RENDER_CONTRACT` remains unchanged because this is capture-only instrumentation.
+
+# Azahar Patch 18 (2026-08-31, serializable HLE request wakeup callback)
+
+`src/core/hle/kernel/thread.cpp` now serializes `wakeup_callback` exactly once.
+A cold-booted title reached a live cutscene counter (`0 -> 25 -> 85`) but
+aborted during state serialization because `Thread::serialize` first respected
+`SupportsSerialization()` and then unconditionally serialized the callback a
+second time. That second write reached an intentionally non-serializable async
+HLE request callback and made `title_settle.py` unable to regenerate the
+deterministic title fixture.
+
+This corrects save-state serialization only. It does not observe, alter, or
+render guest state, so `AZAHAR_RENDER_CONTRACT` remains unchanged.

@@ -34,6 +34,34 @@ class CheckpointCache:
         return self.artifacts.get(args["oracle_frame"])
 
 
+class RegisterCache:
+    def __init__(self, result: dict[str, object] | None):
+        self.result = result
+
+    def get_probe(
+        self, name: str, _frame: int, _args: dict[str, int]
+    ) -> dict[str, object] | None:
+        return self.result if name == "title-pica-register" else None
+
+
+class RecordingRegisterCache(RegisterCache):
+    def __init__(self) -> None:
+        super().__init__(None)
+        self.writes: list[tuple[str, dict[str, object]]] = []
+
+    def put_probe(
+        self, name: str, _frame: int, _args: dict[str, int], result: dict[str, object]
+    ) -> None:
+        self.writes.append((name, result))
+
+
+class CommandListCache(RegisterCache):
+    def get_probe(
+        self, name: str, _frame: int, _args: dict[str, int]
+    ) -> dict[str, object] | None:
+        return self.result if name == "title-pica-command-list" else None
+
+
 class TitleOracleProbeTests(unittest.TestCase):
     def test_artifact_identity_includes_exact_cursor_frame_and_draw(self) -> None:
         self.assertEqual(
@@ -70,6 +98,50 @@ class TitleOracleProbeTests(unittest.TestCase):
                 )
             self.assertEqual(path, artifact)
             self.assertTrue(hit)
+
+    def test_register_identity_includes_cursor_draw_and_register(self) -> None:
+        self.assertEqual(
+            title_oracle_probe.register_args(1093, 77, 0x1C3),
+            {
+                "capture_version": 2,
+                "title_cs": 1093,
+                "oracle_frame": 2010,
+                "software_renderer": 1,
+                "draw": 77,
+                "pica_command_list_capture_version": 1,
+                "pica_register_capture_version": 1,
+                "register": 0x1C3,
+            },
+        )
+
+    def test_register_cache_hit_never_spawns_oracle(self) -> None:
+        result = {"value": "0x80000400"}
+        with mock.patch.object(title_oracle_probe, "spawn", side_effect=AssertionError("spawned")):
+            cached, hit = title_oracle_probe.capture_register(RegisterCache(result), 1093, 77, 0x1C3)
+        self.assertEqual(cached, result)
+        self.assertTrue(hit)
+
+    def test_command_list_cache_hit_never_spawns_oracle(self) -> None:
+        result = {"command_list_artifact": "cached.bin"}
+        with mock.patch.object(title_oracle_probe, "spawn", side_effect=AssertionError("spawned")):
+            cached, hit = title_oracle_probe.capture_command_list(CommandListCache(result), 1093, 77)
+        self.assertEqual(cached, result)
+        self.assertTrue(hit)
+
+    def test_register_spawn_failure_is_cached(self) -> None:
+        cache = RecordingRegisterCache()
+        with (
+            mock.patch.object(title_oracle_probe, "spawn_for_capture", side_effect=OSError("loadstate failed")),
+            self.assertRaisesRegex(OSError, "loadstate failed"),
+        ):
+            title_oracle_probe.capture_register(cache, 1093, 77, 0x1C3)
+        self.assertEqual(
+            cache.writes,
+            [
+                ("title-pica-command-list-failure", {"capture_version": 1, "error": "loadstate failed"}),
+                ("title-pica-register-failure", {"capture_version": 1, "error": "loadstate failed"}),
+            ],
+        )
 
     def test_oracle_steps_are_chunked_and_checked(self) -> None:
         harness = FakeHarness(

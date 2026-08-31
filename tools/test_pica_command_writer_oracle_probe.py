@@ -5,13 +5,12 @@ import unittest
 from pathlib import Path
 from tempfile import TemporaryDirectory
 
+from pica_command_list import last_register_write, parse_command_writes
 from pica_command_writer_oracle_probe import (
     command_value_records,
     copy_source_value_address,
     harness_environment,
-    last_register_write,
     linear_virtual_address,
-    parse_command_writes,
     parse_memlog,
     parse_range,
     persist_selected_memlog,

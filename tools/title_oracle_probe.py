@@ -14,6 +14,7 @@ import os
 import re
 import sys
 from pathlib import Path
+from typing import Any
 
 REPO = Path(__file__).resolve().parent.parent
 sys.path.insert(0, str(REPO / "tools"))
@@ -21,6 +22,8 @@ sys.path.insert(0, str(REPO / "tools"))
 from harness_cache import OracleCache
 from harness_process import spawn
 from oracle_fragment_summary import summarize
+from pica_command_list import last_register_write
+from pica_command_provenance_oracle_probe import parse_provenance
 from repo_environment import apply_repo_environment
 from title_oracle_context import (
     SAVESTATE,
@@ -214,6 +217,130 @@ def capture_fragments(
     return captured, result, False
 
 
+def command_list_args(title_cs: int, draw: int) -> dict[str, int]:
+    """Return the immutable identity for one title draw's PICA command list."""
+    return {
+        **artifact_args(title_cs, draw=draw),
+        "pica_command_list_capture_version": 1,
+    }
+
+
+def register_args(title_cs: int, draw: int, register: int) -> dict[str, int]:
+    """Return the immutable identity for one title-frame PICA register observation."""
+    return {
+        **command_list_args(title_cs, draw),
+        "pica_register_capture_version": 1,
+        "register": register,
+    }
+
+
+def capture_command_list(cache: OracleCache, title_cs: int, draw: int) -> tuple[dict[str, Any], bool]:
+    """Cache one title draw's exact PICA provenance and raw command list.
+
+    The title cursor driver remains this module's owner.  Packet provenance and
+    raw command list are preserved before any register-specific interpretation,
+    so later analysis always reuses this one oracle execution.
+    """
+    args = command_list_args(title_cs, draw)
+    oracle_frame = oracle_frame_for_title_cs(title_cs)
+    cached = cache.get_probe("title-pica-command-list", oracle_frame, args)
+    if cached is not None:
+        return cached, True
+    failed = cache.get_probe("title-pica-command-list-failure", oracle_frame, args)
+    if failed is not None:
+        raise RuntimeError(f"cached oracle failure: {failed['error']}")
+
+    OUTDIR.mkdir(parents=True, exist_ok=True)
+    log_path = OUTDIR / "live_pica.log"
+    command_list_path = OUTDIR / "live_pica.bin"
+    harness = None
+    try:
+        harness, start_frame = spawn_for_capture(cache, title_cs)
+        capture_frame_log(cache, harness, start_frame, title_cs, log_path, draw=None)
+        if not log_path.is_file():
+            raise RuntimeError("oracle PICA logger produced no title provenance log")
+        provenance = parse_provenance(log_path.read_text().splitlines(), draw)
+        command_list_bytes = provenance["command_list_word_count"] * 4
+        response = harness.send_multiline(
+            f"dumpphys 0x{provenance['command_list_address']:08x} {command_list_bytes} {command_list_path}"
+        )
+        if len(response) != 1 or not response[0].startswith("ok dumpphys "):
+            raise RuntimeError(f"oracle title command-list dump failed: {response}")
+        if not command_list_path.is_file():
+            raise RuntimeError("oracle title command-list dump created no artifact")
+        payload = command_list_path.read_bytes()
+        if len(payload) != command_list_bytes:
+            raise RuntimeError(
+                f"oracle title command-list dump has {len(payload)} bytes, expected {command_list_bytes}"
+            )
+        provenance_artifact = cache.put_artifact(
+            "title-pica-provenance", args, log_path, suffix=".log"
+        )
+        command_list_artifact = cache.put_artifact(
+            "title-pica-command-list-data", args, command_list_path, suffix=".bin"
+        )
+        result = {
+            "capture_version": 1,
+            "draw": draw,
+            "command_list_artifact": str(command_list_artifact),
+            "provenance_artifact": str(provenance_artifact),
+            **provenance,
+        }
+        cache.put_probe("title-pica-command-list", oracle_frame, args, result)
+        return result, False
+    except (OSError, RuntimeError, ValueError) as error:
+        cache.put_probe(
+            "title-pica-command-list-failure",
+            oracle_frame,
+            args,
+            {"capture_version": 1, "error": str(error)},
+        )
+        raise
+    finally:
+        if harness is not None:
+            harness.close()
+        log_path.unlink(missing_ok=True)
+        command_list_path.unlink(missing_ok=True)
+
+
+def capture_register(
+    cache: OracleCache, title_cs: int, draw: int, register: int
+) -> tuple[dict[str, Any], bool]:
+    """Cache the final write to one PICA register in an already-cached title draw."""
+    args = register_args(title_cs, draw, register)
+    oracle_frame = oracle_frame_for_title_cs(title_cs)
+    cached = cache.get_probe("title-pica-register", oracle_frame, args)
+    if cached is not None:
+        return cached, True
+    failed = cache.get_probe("title-pica-register-failure", oracle_frame, args)
+    if failed is not None:
+        raise RuntimeError(f"cached oracle failure: {failed['error']}")
+
+    try:
+        command_list, _ = capture_command_list(cache, title_cs, draw)
+        payload = Path(command_list["command_list_artifact"]).read_bytes()
+        word_index, value = last_register_write(
+            payload, command_list["command_list_word_index"], register
+        )
+        result = {
+            "capture_version": 1,
+            "register": f"0x{register:03x}",
+            "value": f"0x{value:08x}",
+            "command_list_word_index": word_index,
+            **command_list,
+        }
+        cache.put_probe("title-pica-register", oracle_frame, args, result)
+        return result, False
+    except (OSError, RuntimeError, ValueError) as error:
+        cache.put_probe(
+            "title-pica-register-failure",
+            oracle_frame,
+            args,
+            {"capture_version": 1, "error": str(error)},
+        )
+        raise
+
+
 def main(argv: list[str]) -> int:
     parser = argparse.ArgumentParser(description=__doc__.splitlines()[0])
     subcommands = parser.add_subparsers(dest="command", required=True)
@@ -226,6 +353,17 @@ def main(argv: list[str]) -> int:
     )
     fragments.add_argument("title_cs", type=int)
     fragments.add_argument("draw", type=int)
+    pica = subcommands.add_parser(
+        "pica-register", help="cache one title draw's final PICA register write"
+    )
+    pica.add_argument("title_cs", type=int)
+    pica.add_argument("draw", type=int)
+    pica.add_argument("register", type=lambda value: int(value, 0))
+    command_list = subcommands.add_parser(
+        "pica-command-list", help="cache one title draw's raw PICA command list"
+    )
+    command_list.add_argument("title_cs", type=int)
+    command_list.add_argument("draw", type=int)
     args = parser.parse_args(argv)
 
     try:
@@ -240,12 +378,22 @@ def main(argv: list[str]) -> int:
             print(f"dual-texture draws: {len(candidates)}")
             for _draw, line in candidates:
                 print(line)
-        else:
+        elif args.command == "fragments":
             path, result, hit = capture_fragments(cache, args.title_cs, args.draw)
             print(
                 f"oracle: {'cache hit' if hit else 'captured and cached'} key={cache.key}"
             )
             print(f"artifact: {path}")
+            print(json.dumps(result, indent=2, sort_keys=True))
+        elif args.command == "pica-register":
+            if not 0 <= args.register <= 0x2FF:
+                parser.error("register must be a PICA register index")
+            result, hit = capture_register(cache, args.title_cs, args.draw, args.register)
+            print(f"oracle: {'cache hit' if hit else 'captured and cached'} key={cache.key}")
+            print(json.dumps(result, indent=2, sort_keys=True))
+        else:
+            result, hit = capture_command_list(cache, args.title_cs, args.draw)
+            print(f"oracle: {'cache hit' if hit else 'captured and cached'} key={cache.key}")
             print(json.dumps(result, indent=2, sort_keys=True))
     except (OSError, RuntimeError, ValueError) as error:
         print(f"title_oracle_probe: {error}", file=sys.stderr)
