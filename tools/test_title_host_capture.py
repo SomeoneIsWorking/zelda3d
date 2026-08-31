@@ -3,6 +3,7 @@ from __future__ import annotations
 import tempfile
 import unittest
 from pathlib import Path
+from unittest.mock import patch
 
 from tools import title_host_capture
 
@@ -32,10 +33,14 @@ class FakeCache:
 
 class TitleHostCaptureTests(unittest.TestCase):
     def test_oracle_frame_uses_recovered_title_clock(self) -> None:
-        self.assertEqual(title_host_capture.oracle_frame_for_title_cs(464), 752)
-        self.assertEqual(title_host_capture.oracle_frame_for_title_cs(1093), 2010)
-        with self.assertRaises(ValueError):
-            title_host_capture.oracle_frame_for_title_cs(87)
+        with patch.dict(
+            title_host_capture.oracle_frame_for_title_cs.__globals__,
+            {"initial_title_cs": lambda: 88},
+        ):
+            self.assertEqual(title_host_capture.oracle_frame_for_title_cs(464), 752)
+            self.assertEqual(title_host_capture.oracle_frame_for_title_cs(1093), 2010)
+            with self.assertRaises(ValueError):
+                title_host_capture.oracle_frame_for_title_cs(87)
 
     def test_boot_selects_renderer_before_title_frames(self) -> None:
         harness = FakeHarness(
@@ -108,8 +113,12 @@ class TitleHostCaptureTests(unittest.TestCase):
             frame = Path(directory) / "az752.png"
             frame.touch()
             cache = FakeCache({752: frame})
-            with self.assertRaisesRegex(RuntimeError, "cs=1093->az=2010"):
-                title_host_capture.require_cached_oracle_frames(cache, [464, 1093])
+            with patch.dict(
+                title_host_capture.oracle_frame_for_title_cs.__globals__,
+                {"initial_title_cs": lambda: 88},
+            ):
+                with self.assertRaisesRegex(RuntimeError, "cs=1093->az=2010"):
+                    title_host_capture.require_cached_oracle_frames(cache, [464, 1093])
 
 
 if __name__ == "__main__":

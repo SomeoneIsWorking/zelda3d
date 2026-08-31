@@ -64,6 +64,7 @@ sys.path.insert(0, str(TOOLS))
 from harness_cache import OracleCache  # noqa: E402
 from harness_paths import TITLE_STATE  # noqa: E402
 from harness_process import spawn  # noqa: E402
+from title_oracle_context import initial_title_cs  # noqa: E402
 
 OUTDIR = REPO / "scratch" / "title_ab"
 SAVESTATE = TITLE_STATE
@@ -81,33 +82,34 @@ SAVESTATE = TITLE_STATE
 # lag. The fix makes SoH's cursor advance at the same 0.5 cs-frame/tick rate
 # as the oracle, so the relationship collapses to a single affine formula:
 #
-#   az_cs(az_step)  = 88 + 0.5 * az_step          (measured intercept: the
-#                      the settled title checkpoint is captured 88 cs-
-#                      frames into the loop, not at cs frame 0)
+#   az_cs(az_step)  = checkpoint_cs + 0.5 * az_step
 #   soh_cs(soh_step) = 0.5 * (soh_step - 232)      (232 = SoH's own N64-
 #                      splash/boot tick count before TitlePresentation first
 #                      activates; unaffected by the rate fix)
-#   content match (az_cs == soh_cs)  =>  soh_step = az_step + 408
+#   content match (az_cs == soh_cs)  =>  soh_step = az_step + 2*checkpoint_cs + 232
 #
-# Both constants (88, 232) were measured directly off Az/SoH's own cs-cursor
-# state (not SSIM-guessed): Az's via exact camera-eye-position inversion
-# against the ported OP97 spline table (byte-exact, <0.1 world-unit
-# residual); SoH's via the live `soh_titlecs` cursor readout at soh_step
-# checkpoints (exact, slope==0.5 confirmed to the frame). This seed can be
+# The checkpoint cursor is measured and persisted beside each contract-keyed
+# state; the host's 232-step boot offset comes from the live `soh_titlecs`
+# cursor readout (exact, slope==0.5 confirmed to the frame). This seed can be
 # WRONG by the boot-splash constant if a build changes SoH's own pre-title
 # frame count — that's fine, it's still only a search SEED; calibrate()'s
 # fine content sweep is what actually establishes the match. Give the sweep
 # enough --margin (all recent verified matches needed >=150) since the
 # early-night sky content is low-motion and the SSIM curve is a broad
 # plateau, not a sharp spike, in that regime.
-SOH_STEP_INTERCEPT = 408  # soh_step ≈ az_step + SOH_STEP_INTERCEPT (post 2026-07-09 fix)
+SOH_TITLE_BOOT_STEPS = 232
+
+
+def soh_step_intercept() -> int:
+    """Return the current checkpoint's RE-grounded Az-to-host step offset."""
+    return 2 * initial_title_cs() + SOH_TITLE_BOOT_STEPS
 
 
 def estimate_soh_frame(az_frames: int) -> int:
     """Affine SEARCH SEED derived from the RE'd rate law above — NOT the
     final answer. calibrate()'s fine content-search is what actually
     verifies the match; a wrong estimate just costs a wider bulk-step."""
-    return az_frames + SOH_STEP_INTERCEPT
+    return az_frames + soh_step_intercept()
 
 
 def load_gray_small(path, size=(48, 28)) -> np.ndarray:

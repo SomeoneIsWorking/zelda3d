@@ -32,6 +32,7 @@ Usage:
 from __future__ import annotations
 
 import argparse
+import json
 import re
 import sys
 from pathlib import Path
@@ -39,10 +40,11 @@ from pathlib import Path
 REPO = Path(__file__).resolve().parent.parent
 sys.path.insert(0, str(REPO / "tools"))
 from harness_process import spawn  # noqa: E402
-from harness_paths import TITLE_STATE  # noqa: E402
+from harness_paths import TITLE_STATE, TITLE_STATE_METADATA, azahar_render_contract_marker  # noqa: E402
 from harness_transport import Harness  # noqa: E402
 
 SAVESTATE = TITLE_STATE
+METADATA = TITLE_STATE_METADATA
 
 # Cold-boot run budget before the title cs is expected to be live. Measured
 # empirically this session (2026-07-14, current harness build): the Az cs
@@ -66,17 +68,50 @@ def read_az_csframe(h: Harness) -> int:
     raise RuntimeError(f"force titletime_read: no az= line in {lines!r}")
 
 
+def write_checkpoint_metadata(output: Path, initial_cs: int, cold_boot_frames: int | None) -> Path:
+    """Persist the measured title cursor that makes this checkpoint reusable."""
+    if output != SAVESTATE:
+        raise ValueError("checkpoint metadata is only defined for the current-contract title state")
+    if initial_cs < 0:
+        raise ValueError("title cursor must be non-negative")
+    if cold_boot_frames is not None and cold_boot_frames < 0:
+        raise ValueError("cold-boot frame count must be non-negative")
+    payload = {
+        "cold_boot_frames": cold_boot_frames,
+        "initial_title_cs": initial_cs,
+        "render_contract": azahar_render_contract_marker(),
+        "savestate": output.name,
+    }
+    METADATA.parent.mkdir(parents=True, exist_ok=True)
+    METADATA.write_text(json.dumps(payload, indent=2, sort_keys=True) + "\n")
+    return METADATA
+
+
 def main():
     ap = argparse.ArgumentParser(description=__doc__.splitlines()[0])
     ap.add_argument("--run", type=int, default=DEFAULT_RUN,
                      help=f"cold-boot frames to run before checking the cs "
                           f"counter is live (default {DEFAULT_RUN})")
     ap.add_argument("--out", type=Path, default=SAVESTATE)
+    ap.add_argument(
+        "--record-initial-cs",
+        type=int,
+        help="record the already-observed title cursor for an existing current-contract checkpoint",
+    )
     args = ap.parse_args()
 
     if args.out.exists():
+        if args.record_initial_cs is not None:
+            metadata = write_checkpoint_metadata(args.out, args.record_initial_cs, None)
+            print(
+                f"[title_settle] recorded cached checkpoint metadata: {metadata}",
+                file=sys.stderr,
+            )
+            return
         print(f"[title_settle] cache hit: {args.out}", file=sys.stderr)
         return
+    if args.record_initial_cs is not None:
+        sys.exit(f"[title_settle] cannot record metadata: checkpoint does not exist: {args.out}")
 
     print(f"[title_settle] cold-booting harness (no savestate)...", file=sys.stderr)
     h = spawn(save_state=None)
@@ -106,8 +141,9 @@ def main():
         r = h.send(f"savestate {args.out}")
         if not r.startswith("ok"):
             sys.exit(f"[title_settle] savestate failed: {r}")
+        metadata = write_checkpoint_metadata(args.out, c2, args.run + 60)
         print(f"[title_settle] wrote {args.out} at cs-frame {c2} "
-              f"(cold-boot run count: {args.run + 60})", file=sys.stderr)
+              f"(cold-boot run count: {args.run + 60}; metadata: {metadata})", file=sys.stderr)
     finally:
         h.quit()
 
