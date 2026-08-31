@@ -105,6 +105,18 @@ class FragmentLightingOracleProbeTests(unittest.TestCase):
         self.assertEqual(cache.puts[0][0], "cmb-fragment-lighting-state")
         self.assertEqual(cache.puts[0][1], probe.capture_frame(12))
 
+    def test_cache_miss_persists_os_failure(self) -> None:
+        cache = FakeCache(None)
+        with (
+            mock.patch.object(probe, "_capture_live", side_effect=OSError("harness closed")),
+            self.assertRaisesRegex(OSError, "harness closed"),
+        ):
+            probe.capture_probe(cache, settle_frames=12)
+
+        self.assertEqual(len(cache.puts), 1)
+        self.assertEqual(cache.puts[0][0], "cmb-fragment-lighting-failure")
+        self.assertEqual(cache.puts[0][3], {"capture_version": probe.CAPTURE_VERSION, "error": "harness closed"})
+
     def test_live_failure_is_cached_and_not_retried(self) -> None:
         cache = FakeCache(None)
         with mock.patch.object(
