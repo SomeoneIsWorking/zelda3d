@@ -778,9 +778,11 @@ ordinary Azahar builds link neither symbol and retain only the null weak-symbol 
 translation.
 
 This closes the static-xref blind spot for functions reached only through heap-resident vtables.
-OoT3D `FUN_003fa5d0`, the candidate fixed-function fragment-lighting material method, is the first
-watch target: the cached probe records its PC, LR, r0-r3, SP, and cycle tick before judging whether
-the same frame contains a `regs.lighting.disable == false` draw.
+OoT3D `FUN_003fa5d0`, the candidate fixed-function fragment-lighting material method, was the first
+watch target. The cache-owned probe subsequently watched its preceding `FUN_003f9b5c` material-setup
+slot too; the separately keyed 99-draw Save-overlay capture reached neither address. That rules the
+candidate renderer out for this fixture before choosing a new retail observation. Each watch records
+the PC, LR, r0-r3, SP, and cycle tick without changing untargeted execution.
 
 # Azahar Patch 12 (2026-08-31, PICA-light logger positive control)
 
