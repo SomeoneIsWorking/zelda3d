@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import importlib.util
+import json
 import os
 import stat
 import struct
@@ -98,11 +99,22 @@ class LauncherBootstrapTests(unittest.TestCase):
         )
         self.assertEqual(environment["VCPKG_TARGET_TRIPLET"], "arm64-windows-static")
         self.assertEqual(environment["VCPKG_DEFAULT_TRIPLET"], "arm64-windows-static")
-        self.assertTrue(
-            environment["CMAKE_TOOLCHAIN_FILE"].endswith(
-                "scripts/buildsystems/vcpkg.cmake"
-            )
+        self.assertEqual(
+            Path(environment["CMAKE_TOOLCHAIN_FILE"]),
+            Path(environment["VCPKG_ROOT"])
+            / "scripts"
+            / "buildsystems"
+            / "vcpkg.cmake",
         )
+
+    def test_apt_guidance_includes_libzip_exported_command_targets(self) -> None:
+        with mock.patch(
+            "launcher_bootstrap.native_dependencies._linux_family", return_value="apt"
+        ):
+            guidance = installation_guidance("linux")
+        self.assertIn("sudo apt install", guidance)
+        for package in ("libzip-dev", "zipcmp", "zipmerge", "ziptool"):
+            self.assertIn(package, guidance.split())
 
     def test_windows_missing_ports_are_detected_before_cmake(self) -> None:
         root = self.fixture / "vcpkg"
@@ -157,21 +169,29 @@ class LauncherBootstrapTests(unittest.TestCase):
         self.assertNotIn("SDL2", soh_windows)
         self.assertIn("SDL3::SDL3", soh_windows)
 
-    def test_run_sh_enters_repo_before_frozen_uv_from_another_cwd(self) -> None:
+    def _assert_posix_shim_forwards_cwd_and_arguments(self) -> None:
         fake_bin = self.fixture / "bin"
         fake_bin.mkdir()
         fake_uv = fake_bin / "uv"
-        fake_uv.write_text('#!/bin/sh\nprintf \'%s\\n\' "$PWD" "$@"\n')
+        fake_uv.write_text(
+            "#!/usr/bin/env python3\n"
+            "import json, os, sys\n"
+            "print(json.dumps([os.getcwd(), *sys.argv[1:]]))\n",
+            encoding="utf-8",
+        )
         fake_uv.chmod(fake_uv.stat().st_mode | stat.S_IXUSR)
         result = subprocess.run(
             [str(REPO / "run.sh"), "oot", "--developer-option"],
             cwd=self.fixture,
-            env={**os.environ, "PATH": f"{fake_bin}:{os.environ['PATH']}"},
+            env={
+                **os.environ,
+                "PATH": os.pathsep.join((str(fake_bin), os.environ["PATH"])),
+            },
             check=True,
             capture_output=True,
             text=True,
         )
-        lines = result.stdout.splitlines()
+        lines = json.loads(result.stdout)
         self.assertEqual(lines[0], str(REPO))
         self.assertEqual(
             lines[1:],
@@ -184,6 +204,39 @@ class LauncherBootstrapTests(unittest.TestCase):
                 "--developer-option",
             ],
         )
+
+    def test_supported_launcher_entry_from_another_cwd(self) -> None:
+        if os.name != "nt":
+            self._assert_posix_shim_forwards_cwd_and_arguments()
+
+        # Windows enters the same shipping bootstrap through uv directly, not
+        # through CreateProcess on a Bash script. Exercise this entry on every host.
+        command = [
+            "uv",
+            "run",
+            "--frozen",
+            "--project",
+            str(REPO),
+            "python",
+            str(REPO / "bootstrap.py"),
+        ]
+        for arguments, exit_code, expected in (
+            (["--bootstrap-help"], 0, "Provision, build, and launch Zelda3D."),
+            (["--bootstrap-jobs", "0"], 2, "--bootstrap-jobs must be positive"),
+        ):
+            with self.subTest(arguments=arguments):
+                result = subprocess.run(
+                    [*command, *arguments],
+                    cwd=self.fixture,
+                    check=False,
+                    capture_output=True,
+                    text=True,
+                    timeout=30,
+                )
+                self.assertEqual(
+                    result.returncode, exit_code, result.stdout + result.stderr
+                )
+                self.assertIn(expected, result.stdout + result.stderr)
 
     def test_extraction_input_exists_before_build_and_locked_python_is_forwarded(
         self,

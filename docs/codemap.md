@@ -62,7 +62,8 @@ from tracker UI and event handling. `Shipwright/soh/soh/SaveManagerCBridge.cpp` 
 C save ABI over `SaveManager`. MM's controller LED/rumble policy lives in
 `2ship/2s2h/controller_feedback.cpp` behind the existing port ABI. Its graphics-text UTF-16 conversion and glyph callback
 adapter live in `2ship/2s2h/host/gfx_print`, using SDL's bounded UTF-8 decoder while retaining MM's
-delimiter and kana mapping policy. The source-preserving actor/game code stays in the game core.
+delimiter and kana mapping policy. `2ship/tests/gfx_print_test.cpp` exercises that adapter's text
+conversion and callback contract. The source-preserving actor/game code stays in the game core.
 
 `GameInteractor` owns multicast hook argument lifetime in
 `Shipwright/soh/soh/Enhancements/game-interactor/GameInteractor.h`; the production-template
@@ -71,7 +72,9 @@ regression is `tools/game_interactor_multicast_test.cpp`.
 Asset-free product CI composes the normal builder through `tools/verify_product.py`;
 `tools/prepare_ci_sdl.py` owns the pinned CI SDL dependency prefix. Source classification and
 committed-change selection remain in `tools/clang_verifier/source_selection.py`, consumed by
-`tools/verify_clang.py` for both worktree checks and clean hosted checkout lint.
+`tools/verify_clang.py` for both worktree checks and clean hosted checkout lint, and by the MM
+Python ownership test. This census uses Git link metadata: global discovery links belong to their
+shared authority, not the project's source corpus, including Windows link-placeholder checkouts.
 
 `cmake -S . -B Shipwright/build-cmake -G Ninja`. The root `CMakeLists.txt` is the project root and
 the two games are **peers** under it; see `docs/project-structure.md` for the full picture and for

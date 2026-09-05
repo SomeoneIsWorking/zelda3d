@@ -62,10 +62,10 @@ class SourceProvisionTests(unittest.TestCase):
         source_provision.ensure_build_sources(self.repo, runner)
         self.assertEqual(len(commands), 1)
         self.assertEqual(
-            commands[0][-2:],
+            [Path(argument) for argument in commands[0][-2:]],
             [
-                "Shipwright/ZAPDTR",
-                "Shipwright/libultraship/extern/StormLib",
+                Path("Shipwright/ZAPDTR"),
+                Path("Shipwright/libultraship/extern/StormLib"),
             ],
         )
         self.assertIn("--depth", commands[0])

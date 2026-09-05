@@ -62,12 +62,20 @@ def is_legacy_decomp_seam(relative: str) -> bool:
 
 
 def repository_files(repo: Path, suffixes: frozenset[str]) -> list[Path]:
-    tracked = run_git(repo, ["ls-files", "-z"]).stdout
+    tracked = run_git(repo, ["ls-files", "--stage", "-z"]).stdout
+    # Git's ownership metadata also identifies discovery links when Windows
+    # checks them out as regular files containing the link target.
+    tracked_paths = []
+    for entry in tracked.split("\0"):
+        if entry:
+            metadata, relative = entry.split("\t", 1)
+            if metadata.split()[0] != "120000":
+                tracked_paths.append(relative)
     untracked = run_git(
         repo, ["ls-files", "--others", "--exclude-standard", "-z"]
     ).stdout
     paths = []
-    for raw in (tracked + untracked).split("\0"):
+    for raw in [*tracked_paths, *untracked.split("\0")]:
         candidate = repo / raw
         if (
             raw
