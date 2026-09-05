@@ -220,7 +220,7 @@ def installation_guidance(
         return (
             "Install the missing native dependencies yourself, then rerun ./run.sh:\n"
             "  sudo apt install build-essential cmake ninja-build git pkg-config libsdl3-dev "
-            "libpng-dev libzip-dev zipcmp zipmerge ziptool "
+            "libpng-dev libzip-dev zipcmp zipmerge ziptool libgles-dev "
             "nlohmann-json3-dev libtinyxml2-dev libspdlog-dev "
             "libopusfile-dev libogg-dev libvorbis-dev libfreetype-dev libbz2-dev zlib1g-dev"
         )

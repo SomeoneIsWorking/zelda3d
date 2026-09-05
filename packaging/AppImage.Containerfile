@@ -17,6 +17,7 @@ RUN apt-get update && apt-get install --yes --no-install-recommends \
     libdecor-0-dev \
     libfreetype-dev \
     libgl1-mesa-dev \
+    libgles-dev \
     libglfw3-dev \
     libogg-dev \
     libopengl-dev \

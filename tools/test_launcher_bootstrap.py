@@ -107,14 +107,23 @@ class LauncherBootstrapTests(unittest.TestCase):
             / "vcpkg.cmake",
         )
 
-    def test_apt_guidance_includes_libzip_exported_command_targets(self) -> None:
+    def test_apt_declarations_include_required_native_packages(self) -> None:
         with mock.patch(
             "launcher_bootstrap.native_dependencies._linux_family", return_value="apt"
         ):
             guidance = installation_guidance("linux")
         self.assertIn("sudo apt install", guidance)
-        for package in ("libzip-dev", "zipcmp", "zipmerge", "ziptool"):
-            self.assertIn(package, guidance.split())
+        declarations = {
+            "player guidance": guidance,
+            "hosted CI": (REPO / ".github/workflows/portable.yml").read_text(),
+            "AppImage": (REPO / "packaging/AppImage.Containerfile").read_text(),
+        }
+        for owner, declaration in declarations.items():
+            for package in (
+                "libzip-dev", "zipcmp", "zipmerge", "ziptool", "libgles-dev"
+            ):
+                with self.subTest(owner=owner, package=package):
+                    self.assertIn(package, declaration.split())
 
     def test_windows_missing_ports_are_detected_before_cmake(self) -> None:
         root = self.fixture / "vcpkg"
