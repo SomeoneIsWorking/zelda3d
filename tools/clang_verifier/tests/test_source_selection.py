@@ -106,3 +106,26 @@ class SourceSelectionTests(unittest.TestCase):
             files = repository_files(root, STRUCTURE_SUFFIXES)
 
         self.assertEqual(files, [])
+
+    def test_git_discovery_link_is_not_source_even_as_a_windows_placeholder(self) -> None:
+        scratch = REPO / "scratch"
+        scratch.mkdir(exist_ok=True)
+        with tempfile.TemporaryDirectory(dir=scratch) as raw:
+            root = Path(raw)
+            subprocess.run(["git", "init", "-q", str(root)], check=True)
+            source = root / "owned.py"
+            source.write_text("import mm_runtime_launcher\n")
+            link = root / "info.py"
+            link.write_text("../../missing-shared/tools/info.py")
+            blob = subprocess.run(
+                ["git", "-C", str(root), "hash-object", "-w", str(link)],
+                check=True, capture_output=True, text=True,
+            ).stdout.strip()
+            subprocess.run(
+                ["git", "-C", str(root), "update-index", "--add", "--cacheinfo",
+                 f"120000,{blob},info.py"], check=True,
+            )
+            self.assertEqual(repository_files(root, STRUCTURE_SUFFIXES), [source])
+            # A missing discovery target must not hide the real local source.
+            link.unlink()
+            self.assertEqual(repository_files(root, STRUCTURE_SUFFIXES), [source])

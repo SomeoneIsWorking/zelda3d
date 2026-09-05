@@ -270,8 +270,11 @@ class LauncherBuildTests(unittest.TestCase):
             soh_archive.parent.mkdir(parents=True, exist_ok=True)
             soh_archive.write_text("fixture\n")
 
-        with self.assertRaisesRegex(launcher_build.LauncherBuildError, "mm/mm.o2r"):
+        with self.assertRaises(launcher_build.LauncherBuildError) as failure:
             launcher_build.ensure_launcher_build(self.fixture.build, runner)
+        self.assertIn(
+            str(self.fixture.build.runtime_archives[1]), str(failure.exception)
+        )
 
     def test_missing_mm_custom_runtime_archive_after_target_build_fails(self) -> None:
         self.fixture.write_toolchain()
@@ -285,8 +288,11 @@ class LauncherBuildTests(unittest.TestCase):
                 archive.parent.mkdir(parents=True, exist_ok=True)
                 archive.write_text("fixture\n")
 
-        with self.assertRaisesRegex(launcher_build.LauncherBuildError, "mm/2ship.o2r"):
+        with self.assertRaises(launcher_build.LauncherBuildError) as failure:
             launcher_build.ensure_launcher_build(self.fixture.build, runner)
+        self.assertIn(
+            str(self.fixture.build.runtime_archives[2]), str(failure.exception)
+        )
 
     def test_missing_soh_runtime_archive_after_target_build_fails(self) -> None:
         self.fixture.write_toolchain()
@@ -300,18 +306,22 @@ class LauncherBuildTests(unittest.TestCase):
                 archive.parent.mkdir(parents=True, exist_ok=True)
                 archive.write_text("fixture\n")
 
-        with self.assertRaisesRegex(launcher_build.LauncherBuildError, "soh/soh.o2r"):
+        with self.assertRaises(launcher_build.LauncherBuildError) as failure:
             launcher_build.ensure_launcher_build(self.fixture.build, runner)
+        self.assertIn(
+            str(self.fixture.build.runtime_archives[0]), str(failure.exception)
+        )
 
     def test_missing_checkout_source_is_named_before_any_command(self) -> None:
         (self.fixture.repo / "Shipwright" / "libultraship" / "CMakeLists.txt").unlink()
         commands: list[list[str]] = []
-        with self.assertRaisesRegex(
-            launcher_build.LauncherBuildError, "Shipwright/libultraship/CMakeLists.txt"
-        ):
+        with self.assertRaises(launcher_build.LauncherBuildError) as failure:
             launcher_build.ensure_launcher_build(
                 self.fixture.build, lambda command: commands.append(list(command))
             )
+        self.assertIn(
+            str(Path("Shipwright/libultraship/CMakeLists.txt")), str(failure.exception)
+        )
         self.assertEqual(commands, [])
 
     def test_missing_cmake_is_reported_without_a_traceback(self) -> None:

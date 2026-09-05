@@ -36,6 +36,11 @@ references or require Ghidra or either decomp repository's analysis tooling. Run
 `./run.sh --bootstrap-check` for a non-building cold-path check; missing native packages are reported
 with the platform's exact install command.
 
+On Windows, enter the same locked bootstrap with `uv run --frozen python bootstrap.py`
+from the checkout; `run.sh` is the POSIX shim. This verifies the bootstrap entry, not a complete
+Windows application: the remaining native loader/build gaps are listed in
+[project state S010](docs/project-state.md#s010--windows-x86_64-ci-coverage).
+
 ### AppImage release
 
 The AppImage runs without a terminal. On first launch, Zelda3D shows a Browse prompt for each of the
