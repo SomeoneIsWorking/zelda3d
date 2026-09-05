@@ -3,10 +3,13 @@
 
 from __future__ import annotations
 
+import os
 import stat
+import subprocess
 import sys
 import tempfile
 import unittest
+import venv
 from collections.abc import Sequence
 from pathlib import Path
 from unittest import mock
@@ -194,9 +197,70 @@ class LauncherBuildTests(unittest.TestCase):
     def test_configure_forwards_locked_python_without_forcing_a_compiler(self) -> None:
         command = launcher_build.configure_command(self.fixture.build, "/locked/python")
 
-        self.assertIn("-DPython3_EXECUTABLE=/locked/python", command)
+        self.assertIn(f"-DPython3_EXECUTABLE={Path('/locked/python').absolute()}", command)
         self.assertFalse(any("CMAKE_C_COMPILER" in item for item in command))
         self.assertFalse(any("CMAKE_CXX_COMPILER" in item for item in command))
+
+    def test_real_cmake_retains_virtual_environment_entry_identity(self) -> None:
+        build_root = REPO / "build"
+        build_root.mkdir(exist_ok=True)
+        with tempfile.TemporaryDirectory(dir=build_root) as raw:
+            root = Path(raw)
+            source = root / "source"
+            source.mkdir()
+            (source / "CMakeLists.txt").write_text(
+                "cmake_minimum_required(VERSION 3.26)\n"
+                "project(PythonEntryContract LANGUAGES C CXX)\n"
+                'option(LUS_BUILD_TESTS "Build tests" ON)\n'
+                "find_package(Python3 REQUIRED COMPONENTS Interpreter)\n"
+                'execute_process(COMMAND "${Python3_EXECUTABLE}" -c '
+                '"import sys; print(sys.prefix)" OUTPUT_VARIABLE python_prefix '
+                "COMMAND_ERROR_IS_FATAL ANY)\n"
+                'file(WRITE "${CMAKE_BINARY_DIR}/python-prefix.txt" "${python_prefix}")\n',
+                encoding="utf-8",
+            )
+            environment = root / "venv"
+            venv.EnvBuilder(with_pip=False, symlinks=os.name != "nt").create(environment)
+            python = environment / (
+                "Scripts/python.exe" if os.name == "nt" else "bin/python"
+            )
+            build = launcher_build.BuildLayout.for_repo(
+                source, build_dir=root / "configured"
+            )
+            command = launcher_build.configure_command(build, python)
+            result = subprocess.run(command, capture_output=True, text=True, timeout=60)
+            self.assertEqual(result.returncode, 0, result.stdout + result.stderr)
+            cache = launcher_build.cmake_build_policy.read_cmake_cache(
+                build.build_dir / "CMakeCache.txt"
+            )
+            self.assertEqual(Path(cache["Python3_EXECUTABLE"]), python)
+            self.assertEqual(
+                Path((build.build_dir / "python-prefix.txt").read_text().strip()),
+                environment,
+            )
+            self.assertTrue(
+                launcher_build.has_required_configuration(build, python),
+                f"configured={cache['Python3_EXECUTABLE']}; "
+                f"requested={python}; resolved={python.resolve()}; "
+                f"tests={cache.get('LUS_BUILD_TESTS')}",
+            )
+            self.assertFalse(
+                launcher_build.has_required_configuration(build, sys._base_executable)
+            )
+            for replacement in (
+                [f"-DPython3_EXECUTABLE={sys._base_executable}"],
+                ["-DLUS_BUILD_TESTS=OFF"],
+            ):
+                result = subprocess.run(
+                    [*launcher_build.configure_command(build, python), *replacement],
+                    capture_output=True,
+                    text=True,
+                    timeout=60,
+                )
+                self.assertEqual(result.returncode, 0, result.stdout + result.stderr)
+                self.assertFalse(
+                    launcher_build.has_required_configuration(build, python)
+                )
 
     def test_mismatched_cached_python_forces_fresh_locked_reconfigure(self) -> None:
         locked_python = str(self.fixture.repo / ".venv" / "bin" / "python")

@@ -101,7 +101,9 @@ separate from the always-current shipping archives in `cmake/Zelda3DRuntimeArchi
 `launcher_build.py` validates that all runtime artifacts exist. `tools/build_mm_custom_archive.py`
 is only the container-callable entry point to that shared MM owner.
 Shared CMake cache/Clang/Ninja/configure policy belongs only to
-`tools/cmake_build_policy.py`, which both launcher and harness build entry points call.
+`tools/cmake_build_policy.py`, which both launcher and harness build entry points call. Its Python
+entry-path owner preserves virtual-environment symlinks during configure and cache comparison;
+the launcher and MM exporter use that identity rather than equating a venv with its base interpreter.
 `launcher_bootstrap/source_provision.py` restores the public build gitlinks and the exact Lucent
 checkout under `build/deps/lucent-source`. `launcher_bootstrap/native_sources.py` owns immutable
 source revisions, checkout validation, and native dependency build options; `tools/prepare_ci_sdl.py`

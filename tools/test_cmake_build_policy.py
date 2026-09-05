@@ -113,7 +113,7 @@ class CMakeBuildPolicyTests(unittest.TestCase):
         self.assertFalse(any("CMAKE_C_COMPILER" in item for item in refresh))
         self.assertFalse(any("CMAKE_CXX_COMPILER" in item for item in refresh))
         self.assertIn("-DFEATURE=ON", refresh)
-        self.assertIn("-DPython3_EXECUTABLE=/locked/python", refresh)
+        self.assertIn(f"-DPython3_EXECUTABLE={Path('/locked/python').absolute()}", refresh)
 
     def test_missing_executable_is_named(self) -> None:
         with (
